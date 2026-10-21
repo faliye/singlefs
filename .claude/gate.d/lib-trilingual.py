@@ -4,9 +4,9 @@
 # gate-similar: .claude/singlefs-ai-sop/scripts/i18n-sync.sh 它判上游各语言仓之间的同步（兄弟目录里的仓、清单与溯源哈希）；这一份判本仓里登记的英、中、日三份文件，对象与输入都不同，不并进它
 """三语文件的判法：门禁 doc-text 的 trilingual-files、trilingual-structure、trilingual-changed-together、trilingual-glossary 四格调它，不单独成阶段。
 
-三份：一份英语文件（默认语言）<名>.md 配 <名>.zh.md（中文）与 <名>.ja.md（日语）。
-登记表 .claude/trilingual-documents 一行一条「<模式>  # 理由」，模式指英语那一份（相对仓根；* 与 ? 不跨目录，** 跨目录），理由不许省。
-模式匹配到的文件名里不能带点（<名>.md 里的名不含 .），带语言后缀的名字不是英语那一份。
+三份：一份中文文件（默认语言）<名>.md 配 <名>.en.md（英语）与 <名>.ja.md（日语）。
+登记表 .claude/trilingual-documents 一行一条「<模式>  # 理由」，模式指中文那一份（相对仓根；* 与 ? 不跨目录，** 跨目录），理由不许省。
+名里可以带点；以 .<两个小写字母>.md 结尾的（.en.md、.ja.md 是译文，.fr.md 这类是别的语言）不是中文那一份，只有 .en.md 与 .ja.md 进组。
 
 用法：
     lib-trilingual.py files <根>              登记的文件三份齐全；登记表本身写对了
@@ -18,13 +18,15 @@
 
 判法细节：
   files：登记表缺、读不出，或行没写理由、模式指不到任何文件、模式带语言后缀或不以 .md 结尾，判红；
-        每组三份缺哪份点名哪份；反过来，登记模式所在目录里出现了 <名>.zh.md 或 <名>.ja.md、而 <名>.md 符合某条登记模式，
-        这一组同样要三份齐全（英语那份不在也判红）。
+        每组三份缺哪份点名哪份；反过来，登记模式所在目录里出现了 <名>.en.md 或 <名>.ja.md、而 <名>.md 符合某条登记模式，
+        这一组同样要三份齐全（中文那份不在也判红）。
   structure：只比三份都在的组（缺份的归 files）。编号用 (?<![A-Za-z0-9_])(?:[DEC][0-9]+|I-[0-9]+(?:\\.[0-9]+)*)(?![0-9])，
-        不用 \\b（日文字符算词字符，「ファイルE152」里 \\b 不成立）；链接目标取 ](目标) 里第一个空白之前的那一段；
+        不用 \\b（日文字符算词字符，「ファイルE152」里 \\b 不成立）；链接目标取 ](目标) 里第一个空白之前的那一段，
+        以 .en.md 或 .ja.md 结尾的目标先归成 <名>.md 再比（译文里链同一种语言的那一份，与中文链中文那一份算同一个目标；
+        三语切换行 [中文](<名>.md) · [English](<名>.en.md) · [日本語](<名>.ja.md) 每份不链自己，归名之后三份都是 <名>.md）；
         标题取围栏外 ATX 写法（行首至多三个空格、一到六个 #、后接空白或行尾）的行，按级别分别数；表格行取围栏外去掉行首空白后以 | 起头的行；
         围栏取 ``` 或 ~~~ 起头的开围栏，数开围栏的个数。
-  changed-together：路径是 <名>.md、<名>.zh.md、<名>.ja.md 之一，而 <名>.md 符合某条登记模式，就算碰到了那一组（不看文件还在不在，删掉的也算碰）。
+  changed-together：路径是 <名>.md、<名>.en.md、<名>.ja.md 之一，而 <名>.md 符合某条登记模式，就算碰到了那一组（不看文件还在不在，删掉的也算碰）。
   glossary：术语表 .claude/kb/translation-glossary.md，单独一行 <!-- trilingual-glossary --> 紧挨着表，表头
         | 中文 | English | 日本語 | 说明 / Note / 注 |，分隔行，再是数据行（到第一个不以 | 起头的行为止）。
         表：每行四列，中文、English、日本語三列不空；中文列不重复；说明列可以空，不空就要恰好三段、用 <br> 分隔、每段不空。
@@ -34,10 +36,11 @@
   registry-reason-ignored     登记表的行不要求理由：files-registry-red 里「没写理由」那一行找不到
   registry-unmatched-ignored  模式指不到任何文件不报：files-registry-red 里「指不到任何文件」那一行找不到
   registry-suffix-ignored     模式带语言后缀不报：files-registry-red 里「带语言后缀」那一行找不到
-  reverse-ignored             不看目录里单有 .zh.md / .ja.md 的那一组：files-red 里点名 2026-10-10 与 2026-10-12 的两行找不到
+  reverse-ignored             不看目录里单有 .en.md / .ja.md 的那一组：files-red 里点名 2026-10-10 与 2026-10-12 的两行找不到
   ids-ignored                 不比编号集合：structure-red 里「编号集合」那一行找不到
   word-boundary               编号前后的限制换成 \\b：structure-green 里日文紧挨编号的写法对不上，判红
   links-ignored               不比链接目标集合：structure-red 里「链接目标集合」那一行找不到
+  link-language-kept          链接目标里的 .en.md / .ja.md 不归成 <名>.md：structure-green 里 README 三份的三语切换行与 2026-09-28 三份各链同一种语言的下一份简报对不上，判红
   headings-ignored            不比标题个数：structure-red 里「标题」那一行找不到
   table-rows-ignored          不比表格行个数：structure-red 里「表格行」那一行找不到
   fences-ignored              不比围栏代码块个数：structure-red 里「围栏代码块」那一行找不到
@@ -70,7 +73,7 @@ GLOSSARY = ".claude/kb/translation-glossary.md"
 GLOSSARY_MARKER = "<!-- trilingual-glossary -->"
 GLOSSARY_HEADER = ["中文", "English", "日本語", "说明 / Note / 注"]
 GLOSSARY_COLUMN_NAMES = ["中文", "English", "日本語"]
-LANGUAGES = (("en", ""), ("zh", ".zh"), ("ja", ".ja"))
+LANGUAGES = (("zh", ""), ("en", ".en"), ("ja", ".ja"))
 MINIMUM_REASON_CHARACTERS = 4
 DETAIL_LIMIT = 200
 BROKEN = os.environ.get("LIB_TRILINGUAL_BREAK", "")
@@ -82,8 +85,10 @@ LINK_TARGET = re.compile(r"\]\(([^)]*)\)")
 FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]|$)")
-LANGUAGE_FILE = re.compile(r"^(?P<name>[^.]+)\.(?P<language>zh|ja)\.md$")
-CHANGED_FILE = re.compile(r"^(?P<directory>(?:.*/)?)(?P<name>[^/.]+)(?P<suffix>\.zh|\.ja)?\.md$")
+LANGUAGE_FILE = re.compile(r"^(?P<name>.+)\.(?P<language>en|ja)\.md$")
+LINK_LANGUAGE_SUFFIX = re.compile(r"\.(?:en|ja)\.md(?=$|[#?])")
+LANGUAGE_SUFFIXED = re.compile(r"\.[a-z]{2}\.md$")
+CHANGED_FILE = re.compile(r"^(?P<directory>(?:.*/)?)(?P<name>[^/]+?)(?P<suffix>\.en|\.ja)?\.md$")
 TABLE_SEPARATOR_CELL = re.compile(r"^:?-+:?$")
 UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
 GLOB_CHARACTERS = re.compile(r"[*?]")
@@ -148,19 +153,19 @@ def load_registry():
         if not pattern or pattern.startswith("/") or pattern.split("/")[0] == "..":
             problems.append(f"{where}：模式 {pattern or '（空）'} 要写成相对仓根的路径")
             continue
-        if not base.endswith(".md") or ("." in base[:-3] and BROKEN != "registry-suffix-ignored"):
-            problems.append(f"{where}：模式 {pattern} 带语言后缀或不以 .md 结尾，登记的是英语那一份 <名>.md")
+        if not base.endswith(".md") or (LANGUAGE_SUFFIXED.search(base) and BROKEN != "registry-suffix-ignored"):
+            problems.append(f"{where}：模式 {pattern} 带语言后缀或不以 .md 结尾，登记的是中文那一份 <名>.md")
             continue
         matches = sorted(path for path in glob.glob(pattern, root_dir=".", recursive=True)
-                         if os.path.isfile(path) and "." not in posixpath.basename(path)[:-3])
+                         if os.path.isfile(path) and not LANGUAGE_SUFFIXED.search(posixpath.basename(path)))
         if not matches and BROKEN != "registry-unmatched-ignored":
             problems.append(f"{where}：模式 {pattern} 指不到任何文件")
         entries.append({"line": line_number, "pattern": pattern, "regex": pattern_regex(pattern), "matches": matches})
     return entries, problems
 
 
-def registered(entries, english_path):
-    return any(entry["regex"].match(english_path) for entry in entries)
+def registered(entries, chinese_path):
+    return any(entry["regex"].match(chinese_path) for entry in entries)
 
 
 def language_paths(directory, name):
@@ -168,7 +173,7 @@ def language_paths(directory, name):
 
 
 def build_groups(entries):
-    """登记模式指到的英语文件各成一组；模式所在目录里单有 .zh.md 或 .ja.md 的也成一组。→ 按组名排序的列表。"""
+    """登记模式指到的中文文件各成一组；模式所在目录里单有 .en.md 或 .ja.md 的也成一组。→ 按组名排序的列表。"""
     keys = set()
     directories = set()
     for entry in entries:
@@ -201,7 +206,7 @@ def require_registry():
     if entries is None:
         report_problems(f"没有三语文件登记表 {REGISTRY}",
                         [],
-                        [f"建 {REGISTRY}：一行一条「<模式>  # 理由」，模式指英语那一份（例 README.md、briefs/*.md），理由不许省；"
+                        [f"建 {REGISTRY}：一行一条「<模式>  # 理由」，模式指中文那一份（例 README.md、briefs/*.md），理由不许省；"
                          "四格都从它取对象。"])
         return None, None
     return entries, problems
@@ -222,9 +227,9 @@ def judge_files():
     if details:
         advice = []
         if incomplete:
-            advice.append("缺哪份补哪份：<名>.md 是英语（默认），<名>.zh.md 是中文，<名>.ja.md 是日语，三份同时在、同时改；")
+            advice.append("缺哪份补哪份：<名>.md 是中文（默认），<名>.en.md 是英语，<名>.ja.md 是日语，三份同时在、同时改；")
         if registry_problems:
-            advice.append(f"登记表 {REGISTRY} 一行一条「<模式>  # 理由」，模式指英语那一份（相对仓根）、要指到文件、理由不许省；"
+            advice.append(f"登记表 {REGISTRY} 一行一条「<模式>  # 理由」，模式指中文那一份（相对仓根）、要指到文件、理由不许省；"
                           "不再登记的整行删掉。")
         return report_problems(f"三语文件有 {len(details)} 处不对（登记表 {len(registry_problems)} 处，三份没配齐的 {incomplete} 组，共 {len(groups)} 组）",
                                details, advice)
@@ -232,19 +237,22 @@ def judge_files():
         print("  ! 登记表里没有一条模式指到文件，这一格无对象可判")
         return 77
     print(f"  ✓ 查了登记表 {len(entries)} 条，指到 {len(groups)} 组，每组三份（{len(groups) * 3} 份文件）都在；"
-          "登记目录里单有 .zh.md 或 .ja.md 的也归在这些组里")
+          "登记目录里单有 .en.md 或 .ja.md 的也归在这些组里")
     return 0
 
 
 def analyze(text):
-    """→ 编号集合、链接目标集合、各级标题个数、表格行个数、围栏个数。"""
+    """→ 编号集合、链接目标集合（.en.md / .ja.md 归成 .md）、各级标题个数、表格行个数、围栏个数。"""
     identifier = IDENTIFIER_WORD_BOUNDARY if BROKEN == "word-boundary" else IDENTIFIER
     identifiers = set(identifier.findall(text))
     links = set()
     for target in LINK_TARGET.findall(text):
         words = target.split()
         if words:
-            links.add(words[0].strip("<>"))
+            link = words[0].strip("<>")
+            if BROKEN != "link-language-kept":
+                link = LINK_LANGUAGE_SUFFIX.sub(".md", link)
+            links.add(link)
     headings = {level: 0 for level in range(1, 7)}
     table_rows = fences = 0
     open_fence = None
@@ -340,12 +348,12 @@ def judge_changed_together(changed_paths):
     touched = {}
     for path in changed_paths:
         found = CHANGED_FILE.match(posixpath.normpath(path)) if path else None
-        if not found:
+        if not found or (found.group("suffix") is None and LANGUAGE_SUFFIXED.search(path)):
             continue
-        english = found.group("directory") + found.group("name") + ".md"
-        if not registered(entries, english):
+        chinese = found.group("directory") + found.group("name") + ".md"
+        if not registered(entries, chinese):
             continue
-        language = {None: "en", ".zh": "zh", ".ja": "ja"}[found.group("suffix")]
+        language = {None: "zh", ".en": "en", ".ja": "ja"}[found.group("suffix")]
         touched.setdefault(found.group("directory") + found.group("name"), set()).add(language)
     if not touched:
         print("  ! 这次改动没碰到登记的三语文件，这一格无对象可判")

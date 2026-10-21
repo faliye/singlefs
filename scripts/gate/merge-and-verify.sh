@@ -3,9 +3,10 @@
 # run-condition: command git cargo
 # 一批实现员交回之后的「合入后验证」：打全部补丁、编一次、跑补丁改到的包（与依赖它们的包）的 harness 档测试二进制、fmt、clippy 与 build，红的列出来。替掉派一个实现员做这件活。
 #
-#   merge-and-verify.sh [--memory <上限>] [--threads <N>] [--skip-apply] [--copy] [--all-packages] <补丁目录> …
+#   merge-and-verify.sh [--memory <上限>] [--threads <N>] [--skip-apply] [--copy] [--all-packages] [--peer] <补丁目录> …
 #     --threads 缺省取登记的重活默认并行度（.claude/heavy-thread-default，scripts/hosts/heavy-threads.sh），不看忙闲。
 #     --all-packages 测试步照旧跑工作区成员减掉 checker 档包的全部包，不按补丁挑。
+#     --peer 编译与测试交给第二台（下面「--peer」一段）。
 #   merge-and-verify.sh --selftest                     # 用假的 apply-writer-patch 与假 cargo 走一遍；MERGE_AND_VERIFY_BREAK=ignore-red 时必须判红
 #
 # --copy：不往这份脚本所在的仓里打，自己建一份副本在副本里打、编、验，收尾删掉它自己建的副本与编译目录（成功、失败、被 INT / TERM 停都删）：
@@ -41,10 +42,14 @@
 # cargo test 那一趟内存包装退 245（显存不够，run-with-memory-cap.sh 文件头「退出码」）：这一趟的测试结果（连同 FAILED 行）不算数，记一项红、
 #   报「显存不够」、不列 FAILED 也不给只重跑它们的命令（不是代码红），出路是看谁在用卡、等它跑完重跑这一条。退 250–254 照旧报包装自己的结局。
 # 改过的包都重编了没有（.claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 1 行；判法在 scripts/gate/lib_rebuilt_packages.py，这里不另写）：
-#   改过的包从给的补丁目录里的 crates.patch 算（--skip-apply 时照样读给的补丁目录，只是不打）。编之前（刷源码戳之前）把补丁改过、落在包里的文件刷到此刻，
+#   改过的包从给的补丁目录里的 crates.patch 算（--skip-apply 时照样读给的补丁目录，只是不打；打没打先核，见「--skip-apply 先核补丁打过没有」）。编之前（刷源码戳之前）把补丁改过、落在包里的文件刷到此刻，
 #   编完核 test 与 build 两趟的编译输出：每个改过的包都要有「Compiling <包名> v…」行，缺一个记一项红，出路是刷源码修改时刻或换干净编译目录整趟重跑。
 #   只核包里改过的 .rs；包里改过的 .rs 一个都不在编译目录的 dep-info 里的包不核（这几趟编译不读它们，例如 checker 档包 gpu、verdict-store 下才编的模块）。
 #   没给补丁目录、或补丁里没有要核的包：报「重编核对本次未判」，不记红也不算核过。
+# --skip-apply 先核补丁打过没有：拿锁、进树之后，编之前，对给的每个补丁目录里的 crates.patch 在要验的树上跑 `git apply --check --reverse`
+#   （反着打得上才算这份已经打在树上）；有一份核不过、或给的补丁目录不在，就退 1、逐份点名、一个都不编，出路是没打过的那几份去掉 --skip-apply 让这里打。
+#   没有 crates.patch 的目录（只有 mutations-append.tsv 的）不核，报「本次未核」；不带 --skip-apply 时不核（这里自己打）。
+#   罩不住的：同一批里两份补丁改到同一处、后一份又改了前一份改过的行时，前一份反着核不过，会误判红；判红的说明里写明这种可能，出路是在仓副本里倒序逐份 git apply --reverse 人工核。
 # 主工作区合入锁（同一张表第 20 行；判法与锁文件在 scripts/gate/lib_workspace_lock.py 的文件头，这里不另写）：不带 --copy 时，打补丁与编之前先拿锁，
 #   持有者是这个进程（$$），被别的合入占着就排队、每过一段时间报一行谁占着，持有者已死的判失效、报出来再接管；退出时（成功、红、被 INT / TERM 停）放掉。
 #   锁按工作树分开：在 git worktree 加出来的树里跑时拿那棵树自己那一把，不排在主工作树的合入后面。
@@ -52,8 +57,26 @@
 #   带 --copy 时在自己的副本里打与编，不拿这一把。
 # MERGE_AND_VERIFY_TREE（只给自证）：刷源码戳与编译在这棵树里（默认这份脚本所在的仓根）；打补丁照旧是 apply-writer-patch.py 自己的仓根。
 # MERGE_AND_VERIFY_CHECK_SH（只给自证）：从哪一份 check.sh 读 lint 表与四条写法（默认这份脚本所在仓的 .claude/singlefs-ai-sop/scripts/check.sh）。
+# --peer（用户 2026-10-20「第二台机器不能跑吗」「去找一下可用的电脑」，records/2026-09-16-subagent拆分提案.md 第七十五节）：打补丁、刷源码戳、拿合入锁、挑包照旧在本机
+#   （不带 --copy 时就是主工作区），test、fmt、clippy、build 四条 cargo 一趟交给 scripts/hosts/multi-host-run.sh --peer：它把要验的树拷到第二台，
+#   在那边的副本里逐步经副本里的 run-with-memory-cap.sh <上限> 与 capped.sh <N> 跑（四条命令与本机跑的是同一份数组），每步的输出与退出码写进副本里的
+#   PEER_LOG_DIRECTORY，--fetch 取回 <日志目录>/peer-fetched/ 下；再拷成 <日志目录>/<步>.log，判法、出路与汇总同本机。multi-host-run.sh 的输出落 <日志目录>/peer.log。
+#   第二台共用编译目录 PEER_TARGET_DIRECTORY（相对副本的树根，即第二台 runs/ 下的 merge-and-verify-target，跨趟复用）：交 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY，
+#   multi-host-run.sh 在它上面持锁、刷源码戳再起（它文件头 ⑤；这一趟的输出不打「Running」，锁持到四步跑完）。
+#   上限 --memory 不能比第二台配置的 PEER_MEMORY_CAP 大（multi-host-run.sh 拒、退 2）。第二台那一趟没跑成（multi-host-run.sh 退非 0）判红、退 1、一步都不判。
+#   第二台的 rustfmt 与 clippy（2026-10-21 第二台 1.98.0 工具链没装这两个组件，fmt、clippy 两步退「is not installed for the toolchain」、被记成红）：
+#   第二台那一趟在 fmt、clippy 两步各自之前先在副本的树根里问一句 cargo fmt --version、cargo clippy --version（PEER_STEPS_SCRIPT），答不出就不起这一步：那一步的日志写
+#   「本次未跑」与 --version 的原话，留一个 <步>.not-run 标记，退出码文件写 77；本机这一侧看到标记就打「<步> 本次未跑：第二台的工具链没装 <组件> 组件」，出路写
+#   rustup component add rustfmt clippy（原话里点名了工具链的带 --toolchain <名>）与「或去掉 --peer 在本机跑」，不记红，汇总行末尾写「本次未跑 N 步」。测试与 build 照跑照判。
+#   选「本次未跑」而不是把 fmt、clippy 留在本机跑：clippy 要把整个工作区再编一遍，正是本机内存排不上才改去第二台的那种活，留在本机还是会排不上（退 252），
+#   而 fmt、clippy 的结论随工具链版本变，两台各跑一半，结论口径分不清（与「不自动改去第二台」同一条理由）。「本次未跑」不记成绿也不记成红，汇总行里点名，由人装好组件重跑。
+#   改过的包重编了没有不核（编译目录在第二台），报「重编核对本次未判」。不带 --peer 时不自动改去第二台：两台的结论口径分不清的时候不混用，
+#   本机排不上时只在出路里写带 --peer 重跑的整条命令（下一段）。MERGE_AND_VERIFY_MULTI_HOST_RUN 换掉 multi-host-run.sh（只给自证）。
+# 本机排不上（内存包装退 252：排满等待上限、或等多久都放不下）：那一步记一项红，打包装现查别的机器的那一行（run-with-memory-cap.sh 文件头「排队时去找别的机器」），
+#   出路是带 --peer 重跑的整条命令（补丁这一趟已打进要验的树的，重跑带 --skip-apply 只验不打；补丁目录写绝对路径）；后面几步不再排（每一步都要再等满排队上限），
+#   逐步报「本次未跑」。
 # 退出码：0 全绿；1 有红（测试、fmt、clippy、build、apply 退 1、显存不够、源码戳刷不成、check.sh 读不出、工作区成员排不掉 checker 档包、
-#   改过的包没重编、主工作区合入锁没拿成）；
+#   改过的包没重编、主工作区合入锁没拿成、本机内存排不上、--peer 时第二台那一趟没跑成）；
 #   2 补丁核不过（apply 退 2）、用法错。
 # 弄坏开关 MERGE_AND_VERIFY_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 # （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
@@ -101,6 +124,20 @@
 #       「补丁改到工作区根的 Cargo.lock：cargo test 应当照旧挑全部四个包」（实际测试本次未跑）
 #   MERGE_AND_VERIFY_BREAK=dependents-dropped  只挑补丁改到的包，不带上工作区里依赖它们的包
 #       「补丁改到 demo：cargo test 应当挑 demo 与依赖它的 delta」（实际只收到 -p demo）
+#   MERGE_AND_VERIFY_BREAK=skip-apply-unchecked  --skip-apply 时不核补丁打过没有（改前的样子）
+#       「--skip-apply 给的补丁没打在树上：应当退 1、点名那份补丁、不编」（实际退 0、照常编，在没打补丁的树上验出绿）；
+#       连带「补丁改到 alpha 与 beta 两个包：…」（那一格另核「核过 1 份补丁都已打在树上」这一行，不核就不打）
+#   MERGE_AND_VERIFY_BREAK=peer-ignored  认了 --peer 也照旧在本机跑（改前的样子：没有这个选项）
+#       「--peer 时编译与测试交给第二台」与「--peer 时取回的日志全绿」（实际假 multi-host-run.sh 一次都没被调、四步在本机跑）、
+#       「--peer 时第二台那一趟没跑成」（实际在本机跑完，没报没跑成）
+#   MERGE_AND_VERIFY_BREAK=peer-failure-unreported  第二台那一趟没跑成（multi-host-run.sh 退非 0）时不判红、照往下判各步
+#       「--peer 时第二台那一趟没跑成」（实际没报「第二台那一趟没跑成」，各步按没取回的结果判）
+#   MERGE_AND_VERIFY_BREAK=peer-components-unchecked  第二台那一趟不先核 rustfmt 与 clippy 装没装，fmt、clippy 照起（改前的样子：组件没装的被记成红）
+#       「--peer 时第二台的工具链没装 rustfmt 与 clippy，应当不起 fmt、clippy、报本次未跑与 rustup component add 的出路、不记红」（实际退 1，打 ✗ cargo fmt --check 红、✗ clippy 红）
+#   MERGE_AND_VERIFY_BREAK=no-peer-hint  本机排不上时出路不写带 --peer 重跑的命令（改前的样子）
+#       「本机内存排不上（包装退 252）时」（实际出路里没有 merge-and-verify.sh --peer）
+#   MERGE_AND_VERIFY_BREAK=refused-keeps-going  本机一步排不上之后后面几步照排
+#       「本机内存排不上（包装退 252）时」（实际假包装被调了 4 次，后面三步各排一次）
 #   本库 scripts/gate/lib_rebuilt_packages.py 的 REBUILT_PACKAGES_BREAK=any-compiling-line 也让「编译目录里的产物比源码新……」那一格红（另一个包有 Compiling 行就当 demo 也重编了）；
 #   scripts/gate/lib_workspace_lock.py 的 WORKSPACE_LOCK_BREAK=trust-dead-holder 让「锁文件里的持有者已死……」那一格红（排队等死掉的持有者，到 SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS 退 1）；
 #   它的 WORKSPACE_LOCK_BREAK=no-wait 让「两个合入同时起……」与「锁文件里的持有者已死……」两格红（活着的持有者也照拿、不排队；死的不报接管）；
@@ -119,6 +156,35 @@ REBUILT="$here/lib_rebuilt_packages.py"          # 改过的包重编了没有�
 WORKSPACE_LOCK="$here/lib_workspace_lock.py"     # 主工作区合入锁（文件头）
 CHECK_PATCH_DIRS=()                              # 算改过的包用的补丁目录（绝对路径；--skip-apply 时也留着）
 GPU_MEMORY_HIT_EXIT=245   # run-with-memory-cap.sh：显存不够（命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY），结果不算数
+MEMORY_ADMISSION_REFUSED_EXIT=252   # run-with-memory-cap.sh：内存不够排不上，命令一行没跑（文件头「本机排不上」）
+PEER_MODE=0                                       # --peer（文件头「--peer」）
+PEER_RESULTS=""                                   # --peer：第二台那一趟取回的各步日志与退出码所在目录
+PEER_LOG_DIRECTORY=merge-and-verify-peer-logs     # 第二台那棵副本里放各步日志与退出码的目录（相对树根），--fetch 取回
+PEER_TARGET_DIRECTORY=../merge-and-verify-target  # 第二台共用编译目录（相对副本的树根），交 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY
+LOCAL_REFUSED_STEP=""                             # 本机第一步排不上的那一步（文件头「本机排不上」）
+PEER_NOT_RUN_STEPS=()                             # --peer：第二台工具链缺组件、这一趟没起的步（文件头「--peer」第二台的 rustfmt 与 clippy）
+# 第二台那一趟在副本的树根里跑的：逐步经副本里的内存包装与 capped.sh 跑，每步的输出与退出码写进 <日志目录>/<步>.log、.exit；参数是 <上限> <N> <日志目录> <核组件 1 或 0> 再接 <步名> <命令…> :: …
+# 核组件（文件头「--peer」第二台的 rustfmt 与 clippy）：cargo fmt / cargo clippy 这两步之前先在副本的树根里问一句 cargo <子命令> --version，答不出（组件没装，rustup 报
+# is not installed for the toolchain）就不跑这一步：<步>.log 写本次未跑与 --version 的原话，<步>.not-run 留一个标记，<步>.exit 写 77，接着跑下一步
+PEER_STEPS_SCRIPT='memory="$1" threads="$2" logs="$3" probe="$4"
+shift 4
+mkdir -p -- "$logs" || exit 70
+while (($#)); do
+  step="$1"
+  shift
+  words=()
+  while (($#)) && [[ "$1" != "::" ]]; do words+=("$1"); shift; done
+  (($#)) && shift
+  if [[ "$probe" == 1 && "${words[0]-}" == cargo && ( "${words[1]-}" == fmt || "${words[1]-}" == clippy ) ]] \
+     && ! cargo "${words[1]}" --version > "$logs/$step.probe" 2>&1; then
+    { printf "本次未跑：第二台的工具链没装 cargo %s 要的 rustup 组件，这一步没起；cargo %s --version 的原话：\n" "${words[1]}" "${words[1]}"; cat "$logs/$step.probe"; } > "$logs/$step.log"
+    : > "$logs/$step.not-run"
+    printf "%s\n" 77 > "$logs/$step.exit"
+    continue
+  fi
+  bash scripts/hosts/run-with-memory-cap.sh "$memory" bash scripts/hosts/capped.sh "$threads" "${words[@]}" > "$logs/$step.log" 2>&1
+  printf "%s\n" "$?" > "$logs/$step.exit"
+done'
 CHECK_SH="${MERGE_AND_VERIFY_CHECK_SH:-$root/.claude/singlefs-ai-sop/scripts/check.sh}"
 CHECKER_TIER_PACKAGE=singlefs-checker-tier   # checker 档包：只归提交时的主 agent（.claude/rules/verification.md），这里的 cargo test 不挑它
 # check.sh 里四条 cargo 的写法：每条在它里面恰好出现一次，这里的 test、fmt、clippy、build 照它们对齐（test 只少一个 checker 档包）。
@@ -164,6 +230,33 @@ release_workspace_lock() {
   trap - EXIT
   python3 "$WORKSPACE_LOCK" release --root "$tree" --holder-pid "$$" || echo "  ! 放主工作区合入锁没成（上面一行是原因）：看 $WORKSPACE_LOCK status --root $tree"
   exit "$rc"
+}
+
+# check_patches_applied <日志目录>：--skip-apply 时核给的每份 crates.patch 都已打在要验的树上（文件头「--skip-apply 先核补丁打过没有」）；核不过退 1、不编。
+check_patches_applied() {
+  local logs="$1" dir patch checked_count=0 unapplied_text=""
+  local -a unapplied=()
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "skip-apply-unchecked" ]]; then
+    echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=skip-apply-unchecked：--skip-apply 时不核补丁打过没有"; return 0
+  fi
+  if ((${#CHECK_PATCH_DIRS[@]} == 0)); then echo "  - 补丁打没打本次未核：带了 --skip-apply 而没给补丁目录"; return 0; fi
+  mkdir -p "$logs" || die "建不了日志目录 $logs" "看工作根在不在、可不可写" 1
+  for dir in "${CHECK_PATCH_DIRS[@]}"; do
+    if [[ ! -d "$dir" ]]; then unapplied+=("$dir（目录不在）"); continue; fi
+    patch="$dir/crates.patch"
+    [[ -s "$patch" ]] || continue
+    checked_count=$((checked_count+1))
+    if ! git -C "$tree" apply --check --reverse "$patch" > "$logs/reverse-check-$(basename "$dir").log" 2>&1; then
+      unapplied+=("$dir（日志 $logs/reverse-check-$(basename "$dir").log）")
+    fi
+  done
+  if ((${#unapplied[@]})); then
+    unapplied_text="$(printf '%s、' "${unapplied[@]}")"
+    die "带了 --skip-apply，给的补丁有 ${#unapplied[@]} 份没打在要验的树 $tree 上（crates.patch 反着核不过：git apply --check --reverse）：${unapplied_text%、}；一个都没编" \
+      "没打过的那几份去掉 --skip-apply 让这里打（打过的与没打过的分两趟）；同一批里两份补丁改到同一处时前一份也会反着核不过，在仓副本里倒序逐份 git apply --reverse 人工核" 1
+  fi
+  if ((checked_count == 0)); then echo "  - 补丁打没打本次未核：给的 ${#CHECK_PATCH_DIRS[@]} 个补丁目录里都没有 crates.patch"; return 0; fi
+  echo "  核过 $checked_count 份补丁都已打在树上（git apply --check --reverse）"
 }
 
 # read_check_sh <check.sh>：现读编码纪律那张 lint 表进 DISCIPLINE_LINTS，核四条 cargo 写法；读不出、对不上返回 1，原因进 CHECK_SH_PROBLEM。
@@ -340,17 +433,101 @@ PY_SELECT
   return 0
 }
 
-run_capped() {   # $1 日志文件，其余是命令；经内存包装与线程上限（WRAPPER 为 none 时直接跑，自检用）
-  local log="$1"; shift
-  if [[ "$WRAPPER" == "none" ]]; then "$@" > "$log" 2>&1
-  else bash "$WRAPPER" "$MEMORY" bash "$CAPPED" "$THREADS" "$@" > "$log" 2>&1; fi
+run_capped() {   # $1 日志文件，其余是命令；经内存包装与线程上限（WRAPPER 为 none 时直接跑，自检用）。--peer 时不起，拷第二台那一趟取回的（文件头「--peer」）
+  local log="$1" step rc
+  shift
+  step="$(basename "$log" .log)"
+  if ((PEER_MODE)); then
+    rc="$(cat "$PEER_RESULTS/$step.exit" 2>/dev/null)"
+    [[ "$rc" =~ ^[0-9]+$ ]] || { echo "第二台那一趟没取回 $step 这一步的退出码（$PEER_RESULTS/$step.exit）" > "$log"; return 255; }
+    cp -- "$PEER_RESULTS/$step.log" "$log" 2>/dev/null || echo "第二台那一趟没取回 $step 这一步的日志" > "$log"
+    return "$rc"
+  fi
+  # 前面一步本机排不上（文件头「本机排不上」）：这一步不再排
+  if [[ -n "$LOCAL_REFUSED_STEP" && "${MERGE_AND_VERIFY_BREAK:-}" != "refused-keeps-going" ]]; then
+    echo "本次未跑：$LOCAL_REFUSED_STEP 那一步本机内存排不上，这一步不再排" > "$log"
+    return "$MEMORY_ADMISSION_REFUSED_EXIT"
+  fi
+  if [[ "$WRAPPER" == "none" ]]; then "$@" > "$log" 2>&1; rc=$?
+  else bash "$WRAPPER" "$MEMORY" bash "$CAPPED" "$THREADS" "$@" > "$log" 2>&1; rc=$?; fi
+  if ((rc == MEMORY_ADMISSION_REFUSED_EXIT)) && [[ -z "$LOCAL_REFUSED_STEP" ]]; then LOCAL_REFUSED_STEP="$step"; fi
+  return "$rc"
+}
+
+# peer_rerun_command：带 --peer 重跑这一趟的整条命令（文件头「本机排不上」）
+peer_rerun_command() {
+  local text
+  local -a words=(bash "$root/scripts/gate/merge-and-verify.sh" --peer --memory "$MEMORY" --threads "$THREADS")
+  ((copy_mode)) && words+=(--copy)
+  ((ALL_PACKAGES)) && words+=(--all-packages)
+  if ((copy_mode == 0 || skip_apply == 1)); then words+=(--skip-apply); fi   # 补丁这一趟已打进要验的树：重跑只验不打
+  words+=(${CHECK_PATCH_DIRS[@]+"${CHECK_PATCH_DIRS[@]}"})
+  text="$(printf '%q ' "${words[@]}")"
+  printf '%s' "${text% }"
+}
+
+# refused_step <步名> <退出码>：这一步是本机内存排不上（包装退 252）就打出来、交 0，不是交 1。第一步排不上的那一步打 ✗ 与出路（调用方记一项红），
+# 后面几步（run_capped 没再排）打「本次未跑」
+refused_step() {
+  local step="$1" hint
+  [[ "$2" == "$MEMORY_ADMISSION_REFUSED_EXIT" ]] || return 1
+  if [[ "$LOCAL_REFUSED_STEP" != "$step" ]]; then
+    echo "  - $step 本次未跑：$LOCAL_REFUSED_STEP 那一步本机内存排不上，后面几步不再排（每一步都要再等满排队上限）"
+    return 0
+  fi
+  hint="$(grep -E '^  → 第二台此刻放得下|没查到别的机器：|现查别的机器：' "$logs/$step.log" 2>/dev/null | tail -n 1)"
+  echo "  ✗ $step 那一趟本机内存排不上（内存包装退 $MEMORY_ADMISSION_REFUSED_EXIT：排满了等待上限、或等多久都放不下），一行没编（日志 $logs/$step.log）"
+  [[ -z "$hint" ]] || echo "    内存包装现查别的机器：${hint#"${hint%%[![:space:]]*}"}"
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "no-peer-hint" ]]; then
+    echo "  → 怎么办：等占着内存的那几条跑完再跑"
+  else
+    echo "  → 怎么办：编译与测试交给第二台重跑（打补丁照旧在本机，判法与汇总同本机）：$(peer_rerun_command)"
+  fi
+  return 0
+}
+
+# peer_step_not_run <步名>：--peer 时第二台那一趟在这一步之前核过 rustup 组件、没装，没起这一步（PEER_STEPS_SCRIPT 留的 <步>.not-run 标记）
+peer_step_not_run() { ((PEER_MODE)) && [[ -f "$PEER_RESULTS/$1.not-run" ]]; }
+
+# report_peer_step_not_run <步名> <组件名>：报本次未跑（不记红）与出路——在第二台装组件，或去掉 --peer 在本机跑
+report_peer_step_not_run() {
+  local step="$1" component="$2" toolchain said
+  said="$(grep -m 1 'not installed' "$logs/$step.log" 2>/dev/null)"
+  toolchain="$(sed -n "s/.*not installed for the toolchain '\([^']*\)'.*/\1/p" "$logs/$step.log" 2>/dev/null | head -n 1)"
+  PEER_NOT_RUN_STEPS+=("$step")
+  echo "  - $step 本次未跑：第二台的工具链没装 $component 组件，这一步没起，不记红（第二台上 cargo $step --version 答：${said:-见 $logs/$step.log}）"
+  echo "  → 怎么办：在第二台上装好再带 --peer 重跑：rustup component add rustfmt clippy${toolchain:+ --toolchain $toolchain}；或去掉 --peer 在本机跑 fmt 与 clippy"
+}
+
+# run_peer_steps <日志目录> <步名> <命令…> :: …：--peer 时一趟 multi-host-run.sh --peer 在第二台的副本里逐步跑，取回各步的日志与退出码（文件头「--peer」）；
+# 没跑成判红退 1
+run_peer_steps() {
+  local logs="$1" driver label rc fetched probe_components=1
+  shift
+  # 弄坏开关 peer-components-unchecked：第二台那一趟不先核 rustfmt 与 clippy 装没装，fmt、clippy 照起（改前的样子：组件没装的被记成红）
+  [[ "${MERGE_AND_VERIFY_BREAK:-}" != "peer-components-unchecked" ]] || probe_components=0
+  driver="${MERGE_AND_VERIFY_MULTI_HOST_RUN:-$tree/scripts/hosts/multi-host-run.sh}"
+  label="merge-and-verify-$(date +%s)-$$"
+  fetched="$logs/peer-fetched"
+  [[ ! -e "$fetched" ]] || die "取回目录 $fetched 已经有东西，不往里取" "换一个日志目录（不设 MERGE_AND_VERIFY_LOG_DIRECTORY 就是新的 <日期>-<进程号>）" 1
+  echo "  编译与测试交给第二台（--peer）：multi-host-run.sh --peer 把 $tree 拷过去，在那边的副本里逐步跑（内存上限 $MEMORY、线程上限 $THREADS，第二台共用编译目录 $PEER_TARGET_DIRECTORY）…"
+  MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY="$PEER_TARGET_DIRECTORY" MULTI_HOST_RUN_FETCH_DIRECTORY="$fetched" \
+    bash "$driver" --peer --memory-cap "$MEMORY" --label "$label" --fetch "$PEER_LOG_DIRECTORY" -- \
+    bash -c "$PEER_STEPS_SCRIPT" merge-and-verify-peer-steps "$MEMORY" "$THREADS" "$PEER_LOG_DIRECTORY" "$probe_components" "$@" > "$logs/peer.log" 2>&1
+  rc=$?
+  PEER_RESULTS="$fetched/$PEER_LOG_DIRECTORY"
+  if ((rc != 0)) && [[ "${MERGE_AND_VERIFY_BREAK:-}" != "peer-failure-unreported" ]]; then
+    die "第二台那一趟没跑成（multi-host-run.sh 退 $rc，日志 $logs/peer.log：$(tail -n 2 "$logs/peer.log" | tr '\n' ' ')），一步都没判" \
+      "照那份日志修（多机配置与双机开关、两台工具链、--memory 不超过第二台的 PEER_MEMORY_CAP、第二台的盘）再带 --peer 重跑；或去掉 --peer 在本机跑" 1
+  fi
+  echo "  第二台那一趟跑完，取回 $(find "$PEER_RESULTS" -name '*.exit' 2>/dev/null | wc -l) 步的日志与退出码（$PEER_RESULTS），照本机同一套判"
 }
 
 verify() {
   local logs="$1"; shift
   local -a dirs=("$@")
   local dir rc applied=0 warned=0 failed_tests reds=0 test_count untested_text
-  local -a clippy_lints=() patch_arguments=() compile_logs=()
+  local -a clippy_lints=() patch_arguments=() compile_logs=() test_command=() fmt_command=() clippy_command=() build_command=() peer_steps=()
   mkdir -p "$logs"
   rm -f -- "$logs/test.log" "$logs/build.log"   # 重编核对只认这一趟的编译输出（日志目录可能是调用方给的旧目录）
   for dir in ${CHECK_PATCH_DIRS[@]+"${CHECK_PATCH_DIRS[@]}"}; do patch_arguments+=(--patch-dir "$dir"); done
@@ -398,15 +575,29 @@ verify() {
     "看补丁目录在不在、crates.patch 与工作区成员的 Cargo.toml 读不读得了；要照旧全跑就加 --all-packages" 1
   untested_text=""
   if ((${#UNTESTED_PACKAGES[@]})); then untested_text="$(printf '%s、' "${UNTESTED_PACKAGES[@]}")"; untested_text="；本次未跑：补丁没改到 ${#UNTESTED_PACKAGES[@]} 个包：${untested_text%、}"; fi
+  # 四条 cargo 只写这一份：本机逐条经包装跑，--peer 时一趟交给第二台跑（文件头「--peer」）
+  test_command=(cargo test --offline --no-fail-fast ${TEST_PACKAGES[@]+"${TEST_PACKAGES[@]}"})
+  fmt_command=(cargo fmt --all -- --check)
+  clippy_command=(cargo clippy --offline --all-targets --all-features -- -D warnings ${clippy_lints[@]+"${clippy_lints[@]}"})
+  build_command=(cargo build --offline --all-targets)
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "peer-ignored" ]]; then PEER_MODE=0; fi
+  if ((PEER_MODE)); then
+    ((${#TEST_PACKAGES[@]} == 0)) || peer_steps+=(test "${test_command[@]}" ::)
+    peer_steps+=(fmt "${fmt_command[@]}" :: clippy "${clippy_command[@]}" ::)
+    [[ "${MERGE_AND_VERIFY_BREAK:-}" == "skip-build" ]] || peer_steps+=(build "${build_command[@]}" ::)
+    run_peer_steps "$logs" "${peer_steps[@]}"
+  fi
   rc=0; test_count=0; failed_tests=""
   if ((${#TEST_PACKAGES[@]})); then
     echo "  编译并跑 ${TEST_PACKAGES[*]} 的全部测试二进制（工作区成员减掉 $CHECKER_TIER_PACKAGE，${TEST_SELECTION_NOTE}${untested_text}；内存上限 $MEMORY、线程上限 $THREADS）…"
-    run_capped "$logs/test.log" cargo test --offline --no-fail-fast "${TEST_PACKAGES[@]}"; rc=$?
+    run_capped "$logs/test.log" "${test_command[@]}"; rc=$?
     test_count="$(awk 'match($0, /^test result: [A-Za-z]+\. [0-9]+ passed; [0-9]+ failed/) { split($0, f, " "); passed += f[4]; failed += f[6] } END { print passed + failed + 0 }' "$logs/test.log")"
     failed_tests="$(sed -n 's/^test \(.*\) \.\.\. FAILED$/\1/p' "$logs/test.log")"
   fi
   if ((${#TEST_PACKAGES[@]} == 0)); then
     echo "  - 测试本次未跑：这一批补丁一个要测的包都没改到（${TEST_SELECTION_NOTE}；checker 档包 $CHECKER_TIER_PACKAGE 归提交时）${untested_text}"
+  elif refused_step test "$rc"; then
+    [[ "$LOCAL_REFUSED_STEP" != test ]] || reds=$((reds+1))
   elif [[ $rc -eq $GPU_MEMORY_HIT_EXIT && "${MERGE_AND_VERIFY_BREAK:-}" != "gpu-memory-as-test-red" ]]; then
     reds=$((reds+1))
     echo "  ✗ cargo test 那一趟显存不够（内存包装退 $GPU_MEMORY_HIT_EXIT：起止之间内核报了 NV_ERR_NO_MEMORY），这一趟的测试结果不算数（日志 $logs/test.log）"
@@ -427,19 +618,26 @@ verify() {
   else
     echo "  ✓ 测试全绿（$(grep -c '^test result: ok' "$logs/test.log") 个测试二进制，共 $test_count 条测试；跑了 $((${#TEST_PACKAGES[@]} / 2)) 个包${untested_text}）"
   fi
-  run_capped "$logs/fmt.log" cargo fmt --all -- --check; rc=$?
-  if [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo fmt --check 红（日志 $logs/fmt.log）"; echo "  → 怎么办：cargo fmt --all，再看 diff 只动了格式"; else echo "  ✓ fmt 过"; fi
-  run_capped "$logs/clippy.log" cargo clippy --offline --all-targets --all-features -- -D warnings ${clippy_lints[@]+"${clippy_lints[@]}"}; rc=$?
-  if [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ clippy 红（日志 $logs/clippy.log）"; echo "  → 怎么办：按日志逐条改，不加 allow 绕过"; else echo "  ✓ clippy 过（带 check.sh 的编码纪律 lint $((${#clippy_lints[@]} / 2)) 条）"; fi
+  run_capped "$logs/fmt.log" "${fmt_command[@]}"; rc=$?
+  if peer_step_not_run fmt; then report_peer_step_not_run fmt rustfmt
+  elif refused_step fmt "$rc"; then [[ "$LOCAL_REFUSED_STEP" != fmt ]] || reds=$((reds+1))
+  elif [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo fmt --check 红（日志 $logs/fmt.log）"; echo "  → 怎么办：cargo fmt --all，再看 diff 只动了格式"; else echo "  ✓ fmt 过"; fi
+  run_capped "$logs/clippy.log" "${clippy_command[@]}"; rc=$?
+  if peer_step_not_run clippy; then report_peer_step_not_run clippy clippy
+  elif refused_step clippy "$rc"; then [[ "$LOCAL_REFUSED_STEP" != clippy ]] || reds=$((reds+1))
+  elif [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ clippy 红（日志 $logs/clippy.log）"; echo "  → 怎么办：按日志逐条改，不加 allow 绕过"; else echo "  ✓ clippy 过（带 check.sh 的编码纪律 lint $((${#clippy_lints[@]} / 2)) 条）"; fi
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "skip-build" ]]; then
     echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=skip-build：不跑 cargo build"
   else
-    run_capped "$logs/build.log" cargo build --offline --all-targets; rc=$?
-    if [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo build --all-targets 红（日志 $logs/build.log）"; echo "  → 怎么办：从日志里第一条 rustc 报错改起，后面的多半是它的连锁反应"; else echo "  ✓ build 过"; fi
+    run_capped "$logs/build.log" "${build_command[@]}"; rc=$?
+    if refused_step build "$rc"; then [[ "$LOCAL_REFUSED_STEP" != build ]] || reds=$((reds+1))
+    elif [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo build --all-targets 红（日志 $logs/build.log）"; echo "  → 怎么办：从日志里第一条 rustc 报错改起，后面的多半是它的连锁反应"; else echo "  ✓ build 过"; fi
   fi
   # 改过的包这一趟都重编了没有（文件头）：test 与 build 两趟的编译输出合起来核
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "skip-rebuild-check" ]]; then
     echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=skip-rebuild-check：不核改过的包重编了没有"
+  elif ((PEER_MODE)); then
+    echo "  - 重编核对本次未判：编译在第二台（--peer），编译目录不在本机"
   elif ((${#patch_arguments[@]} == 0)); then
     echo "  - 重编核对本次未判：没给补丁目录，算不出改过的包"
   elif [[ ! -f "$logs/test.log" && ! -f "$logs/build.log" ]]; then
@@ -457,7 +655,7 @@ verify() {
          echo "  → 怎么办：照上面那一行修（编译日志在不在、补丁目录读不读得了）再整趟重跑；判不了不算绿" ;;
     esac
   fi
-  echo "  汇总：打上 ${applied} 个补丁目录（其中 code-source-discipline 红 $warned 个），验证红 $reds 项，日志在 $logs"
+  echo "  汇总：打上 ${applied} 个补丁目录（其中 code-source-discipline 红 $warned 个），验证红 $reds 项${PEER_NOT_RUN_STEPS[0]+，本次未跑 ${#PEER_NOT_RUN_STEPS[@]} 步（${PEER_NOT_RUN_STEPS[*]}：第二台工具链缺组件，不算绿，装好再带 --peer 重跑）}，日志在 $logs"
   [[ $reds -eq 0 && $warned -eq 0 ]]
 }
 
@@ -548,9 +746,10 @@ FAKE
   done
   printf '\n[dev-dependencies]\ndemo = { path = "../demo" }\n' >> "$narrow_tree/crates/delta/Cargo.toml"
   printf '[package]\nname = "singlefs-checker-tier"\n' > "$narrow_tree/crates/singlefs-checker-tier/Cargo.toml"
-  narrow_patch() {   # $1 补丁目录，其余是改到的路径
+  narrow_patch() {   # $1 补丁目录，其余是改到的路径；树里那几份写成打过之后的内容（--skip-apply 先核补丁打过没有）
     mkdir -p "$1"; local narrow_path; : > "$1/crates.patch"
-    for narrow_path in "${@:2}"; do printf -- '--- a/%s\n+++ b/%s\n@@ -1 +1 @@\n-1\n+2\n' "$narrow_path" "$narrow_path" >> "$1/crates.patch"; done
+    for narrow_path in "${@:2}"; do printf -- '--- a/%s\n+++ b/%s\n@@ -1 +1 @@\n-1\n+2\n' "$narrow_path" "$narrow_path" >> "$1/crates.patch"
+      mkdir -p "$(dirname "$narrow_tree/$narrow_path")"; printf '2\n' > "$narrow_tree/$narrow_path"; done
   }
   narrow_patch "$scratch/narrow-two" crates/alpha/src/table.txt crates/beta/tests/data.txt
   narrow_patch "$scratch/narrow-demo" crates/demo/src/table.txt
@@ -560,7 +759,7 @@ FAKE
       MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-narrow-$1" MERGE_AND_VERIFY_TREE="$narrow_tree" env -u CARGO_TARGET_DIR bash "$0" "${@:2}" > "$out" 2>&1; rc=$?
   }
   out="$scratch/out-narrow-two.txt"; narrow_case two --skip-apply "$scratch/narrow-two"; checked=$((checked+1))
-  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p alpha -p beta" "$scratch/calls-narrow-two.txt" \
+  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p alpha -p beta" "$scratch/calls-narrow-two.txt" || ! grep -qF '核过 1 份补丁都已打在树上' "$out" \
      || ! grep -qF '本次未跑：补丁没改到 2 个包：demo、delta' "$out" || ! grep -q '✓ 测试全绿.*跑了 2 个包；本次未跑：补丁没改到 2 个包：demo、delta' "$out"; then
     echo "  ✗ 自检：补丁改到 alpha 与 beta 两个包：cargo test 只该挑这两个、报 demo 与 delta 本次未跑，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-two.txt" 2>/dev/null)：$(grep -E '✓ 测试|本次未跑|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   out="$scratch/out-narrow-demo.txt"; narrow_case demo --skip-apply "$scratch/narrow-demo"; checked=$((checked+1))
@@ -569,6 +768,13 @@ FAKE
   out="$scratch/out-narrow-lock.txt"; narrow_case lock --skip-apply "$scratch/narrow-lock"; checked=$((checked+1))
   if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p alpha -p beta -p delta" "$scratch/calls-narrow-lock.txt" || ! grep -qF '补丁改到工作区根的 Cargo.lock，照旧全跑' "$out"; then
     echo "  ✗ 自检：补丁改到工作区根的 Cargo.lock：cargo test 应当照旧挑全部四个包，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-lock.txt" 2>/dev/null)：$(grep -E '编译并跑|本次未跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  # --skip-apply 给的补丁没打在树上（树里那一份还是改前的 1）：退 1、点名那份补丁、不编
+  narrow_patch "$scratch/narrow-unapplied" crates/alpha/src/unapplied.txt
+  printf '1\n' > "$narrow_tree/crates/alpha/src/unapplied.txt"
+  out="$scratch/out-narrow-unapplied.txt"; narrow_case unapplied --skip-apply "$scratch/narrow-unapplied"; checked=$((checked+1))
+  rm -f "$narrow_tree/crates/alpha/src/unapplied.txt"
+  if [[ $rc -ne 1 ]] || ! grep -qF "没打在要验的树" "$out" || ! grep -qF "$scratch/narrow-unapplied" "$out" || [[ -s "$scratch/calls-narrow-unapplied.txt" ]]; then
+    echo "  ✗ 自检：--skip-apply 给的补丁没打在树上：应当退 1、点名那份补丁、不编，实际退出码 $rc，假 cargo 收到 $(cat "$scratch/calls-narrow-unapplied.txt" 2>/dev/null | wc -l) 条：$(grep -E '✗|核过|本次未核' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   out="$scratch/out-narrow-all.txt"; narrow_case all --skip-apply --all-packages "$scratch/narrow-two"; checked=$((checked+1))
   if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p alpha -p beta -p delta" "$scratch/calls-narrow-all.txt" || ! grep -qF '带了 --all-packages，照旧全跑' "$out"; then
     echo "  ✗ 自检：带 --all-packages：cargo test 应当照旧挑全部四个包，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-all.txt" 2>/dev/null)"; failures=1; fi   # gate-lint:detail
@@ -719,6 +925,96 @@ FAKE
   wait "$wt_holder" 2>/dev/null
   if [[ ! -e "$scratch/wt-held" || $rc -ne 0 ]] || grep -q '在排队' "$out"; then
     echo "  ✗ 自检：主工作树的锁被占着时在 git worktree 加出来的树里验：应当不排队、照常验完退 0，实际$([[ -e "$scratch/wt-held" ]] || echo '主工作树的假合入没拿到锁、')退出码 $rc：$(grep -E '锁|排队|✗' "$out" | head -3 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # --peer（文件头「--peer」）：假 multi-host-run.sh 把 -- 后面那条放在 <临时目录>/peer-tree（当第二台的副本：假的 run-with-memory-cap.sh 与 capped.sh 只剥掉上限与线程数）里跑，
+  # 把 --fetch 点名的目录拷进 MULTI_HOST_RUN_FETCH_DIRECTORY；PATH 前面的假 cargo 照最早那一份（FAKE_CARGO_MODE=green 时全 ok、退 0，否则一条 FAILED、退 101）
+  local peer_tree="$scratch/peer-tree" peer_bin="$scratch/peer-bin" fake_multi_host_run="$scratch/fake-multi-host-run.sh" peer_calls="$scratch/peer-calls.txt" peer_cargo_calls
+  mkdir -p "$peer_tree/scripts/hosts" "$peer_bin"
+  printf '#!/usr/bin/env bash\n# 假内存包装：剥掉上限照跑\nshift\nexec "$@"\n' > "$peer_tree/scripts/hosts/run-with-memory-cap.sh"
+  printf '#!/usr/bin/env bash\n# 假 capped.sh：剥掉线程数照跑\nshift\nexec "$@"\n' > "$peer_tree/scripts/hosts/capped.sh"
+  cat > "$peer_bin/cargo" <<'FAKE'
+#!/usr/bin/env bash
+[[ -z "${FAKE_CARGO_CALLS:-}" ]] || printf '%s\t%s\n' "$PWD" "$*" >> "$FAKE_CARGO_CALLS"
+case "$1" in
+  test) if [[ "${FAKE_CARGO_MODE:-}" == green ]]; then printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::subtracts ... ok\n\ntest result: ok. 2 passed; 0 failed\n'; exit 0; fi
+        printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::subtracts_on_peer ... FAILED\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
+  fmt|clippy) if [[ -n "${FAKE_CARGO_MISSING_COMPONENTS:-}" ]]; then   # 第二台的工具链没装 rustfmt 与 clippy：rustup 的代理这样报、退 1
+                echo "error: 'cargo-$1' is not installed for the toolchain '1.98.0-x86_64-unknown-linux-gnu'" >&2; exit 1; fi ;;
+esac
+exit 0
+FAKE
+  cat > "$fake_multi_host_run" <<'FAKE'
+#!/usr/bin/env bash
+# 假 multi-host-run.sh：参数与共用编译目录记进 FAKE_PEER_CALLS；不带 --peer 退 2；FAKE_PEER_FAIL 设了照没跑成退 255；
+# 否则在 FAKE_PEER_TREE 里跑 -- 后面那条，把 --fetch 点名的目录拷进 MULTI_HOST_RUN_FETCH_DIRECTORY，退出码照那条命令的
+printf 'args %s\nshared %s\n' "$*" "${MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY:-}" >> "$FAKE_PEER_CALLS"
+fetch="" peer=0
+while (($#)) && [[ "$1" != "--" ]]; do
+  case "$1" in
+    --peer) peer=1; shift ;;
+    --fetch) fetch="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+shift
+((peer)) || exit 2
+if [[ -n "${FAKE_PEER_FAIL:-}" ]]; then echo "  ✗ 假的第二台没跑成" >&2; exit 255; fi
+rm -rf -- "${FAKE_PEER_TREE:?}/${fetch:?}"
+(cd "$FAKE_PEER_TREE" && "$@"); rc=$?
+mkdir -p -- "$MULTI_HOST_RUN_FETCH_DIRECTORY" && cp -a -- "$FAKE_PEER_TREE/$fetch" "$MULTI_HOST_RUN_FETCH_DIRECTORY/"
+exit "$rc"
+FAKE
+  chmod +x "$peer_bin/cargo" "$fake_multi_host_run" "$peer_tree/scripts/hosts/run-with-memory-cap.sh" "$peer_tree/scripts/hosts/capped.sh"
+  peer_case() { # peer_case <名> [变量=值…] -- <参数…>：照 run_case 那样跑一趟，换上假 multi-host-run.sh 与 peer-bin 的假 cargo，两边各记一份调用
+    local name="$1"
+    local -a assignments=()
+    shift
+    while [[ "$1" != -- ]]; do assignments+=("$1"); shift; done
+    shift
+    : > "$peer_calls"
+    : > "$scratch/peer-cargo-$name.txt"
+    out="$scratch/out-$name.txt"
+    env ${assignments[@]+"${assignments[@]}"} PATH="$peer_bin:$PATH" FAKE_CARGO_CALLS="$scratch/peer-cargo-$name.txt" FAKE_PEER_CALLS="$peer_calls" FAKE_PEER_TREE="$peer_tree" \
+      MERGE_AND_VERIFY_MULTI_HOST_RUN="$fake_multi_host_run" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER=none \
+      MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-$name" MERGE_AND_VERIFY_TREE="$scratch/tree" env -u CARGO_TARGET_DIR bash "$0" "$@" > "$out" 2>&1; rc=$?
+  }
+  # 取回的日志里一条测试红：照本机同一套判（退 1、列出那条测试与只重跑它的命令）；四步都在第二台的副本里跑，共用编译目录交了，重编核对本次未判
+  checked=$((checked+1)); peer_case peer-red -- --peer "$scratch/patch-a"
+  peer_cargo_calls="$(cat "$scratch/peer-cargo-peer-red.txt" 2>/dev/null)"
+  if [[ $rc -ne 1 ]] || ! grep -q 'subtracts_on_peer' "$out" || ! grep -q 'rerun-failed-tests.py' "$out" \
+     || ! grep -q '^args --peer .*--fetch merge-and-verify-peer-logs -- bash -c' "$peer_calls" || ! grep -qx 'shared ../merge-and-verify-target' "$peer_calls" \
+     || ! grep -q '重编核对本次未判：编译在第二台' "$out" || [[ "$(grep -v -- ' --version$' <<<"$peer_cargo_calls" | grep -cE "^$peer_tree	(test|fmt|clippy|build) ")" != 4 ]]; then
+    echo "  ✗ 自检：--peer 时编译与测试交给第二台（一趟 multi-host-run.sh --peer、交共用编译目录，test、fmt、clippy、build 四步都在第二台那棵副本里跑），取回的日志里一条测试红应当照本机同一套判：退 1、列出那条测试与只重跑它的命令，实际退出码 $rc；multi-host-run.sh 收到：$(tr '\n' ' ' < "$peer_calls")；假 cargo 收到：$(tr '\n' '|' <<<"$peer_cargo_calls")；输出：$(grep -E '✗|✓|第二台|重编' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 取回的日志全绿：退 0、报测试全绿
+  checked=$((checked+1)); peer_case peer-green FAKE_CARGO_MODE=green -- --peer "$scratch/patch-a"
+  if [[ $rc -ne 0 ]] || ! grep -q '✓ 测试全绿（1 个测试二进制，共 2 条测试' "$out" || ! grep -q '^args --peer ' "$peer_calls"; then
+    echo "  ✗ 自检：--peer 时取回的日志全绿应当退 0、报测试全绿（1 个测试二进制、2 条测试），实际退出码 $rc；multi-host-run.sh 收到：$(tr '\n' ' ' < "$peer_calls")；输出：$(grep -E '✗|✓|第二台' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 第二台那一趟没跑成（multi-host-run.sh 退 255）：退 1、报没跑成，一步都不判
+  checked=$((checked+1)); peer_case peer-failed FAKE_PEER_FAIL=1 -- --peer "$scratch/patch-a"
+  if [[ $rc -ne 1 ]] || ! grep -q '第二台那一趟没跑成（multi-host-run.sh 退 255' "$out" || grep -q '✓' "$out"; then
+    echo "  ✗ 自检：--peer 时第二台那一趟没跑成（multi-host-run.sh 退 255）应当退 1、报没跑成、一步都不判，实际退出码 $rc：$(grep -E '✗|✓|第二台' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 第二台的工具链没装 rustfmt 与 clippy（文件头「--peer」）：fmt、clippy 两步之前先核组件，没装就不起这两步、报本次未跑与 rustup component add 的出路，不记红；测试与 build 照跑照判
+  checked=$((checked+1)); peer_case peer-no-components FAKE_CARGO_MODE=green FAKE_CARGO_MISSING_COMPONENTS=1 -- --peer "$scratch/patch-a"
+  peer_cargo_calls="$(cat "$scratch/peer-cargo-peer-no-components.txt" 2>/dev/null)"
+  if [[ $rc -ne 0 ]] || grep -q '✗' "$out" || ! grep -q 'fmt 本次未跑：第二台的工具链没装 rustfmt 组件' "$out" || ! grep -q 'clippy 本次未跑：第二台的工具链没装 clippy 组件' "$out" \
+     || ! grep -qF 'rustup component add rustfmt clippy --toolchain 1.98.0-x86_64-unknown-linux-gnu' "$out" || ! grep -qF '本次未跑 2 步（fmt clippy：' "$out" \
+     || ! grep -q '✓ 测试全绿' "$out" || ! grep -q '✓ build 过' "$out" || grep -qE "	(fmt --all|clippy --offline)" <<<"$peer_cargo_calls"; then
+    echo "  ✗ 自检：--peer 时第二台的工具链没装 rustfmt 与 clippy，应当不起 fmt、clippy、报本次未跑与 rustup component add 的出路、不记红（退 0，没有 ✗），测试与 build 照判，实际退出码 $rc；假 cargo 收到：$(tr '\n' '|' <<<"$peer_cargo_calls")；输出：$(grep -E '✗|✓|本次未跑|怎么办' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 本机排不上（文件头「本机排不上」）：假包装照真包装排满退 252 时那样打两行（含现查别的机器那一行），命令不跑
+  cat > "$scratch/fake-wrapper-refused.sh" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_WRAPPER_CALLS"
+echo "  ✗ 内存不够排不上：等了 3600 秒（假包装）" >&2
+echo "  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 8G --label moved-from-queue-1 -- cargo test（假包装）" >&2
+exit 252
+FAKE
+  : > "$scratch/wrapper-calls.txt"
+  out="$scratch/out-refused.txt"; checked=$((checked+1))
+  PATH="$peer_bin:$PATH" FAKE_WRAPPER_CALLS="$scratch/wrapper-calls.txt" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER="$scratch/fake-wrapper-refused.sh" \
+    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-refused" MERGE_AND_VERIFY_TREE="$scratch/tree" env -u CARGO_TARGET_DIR bash "$0" "$scratch/patch-a" > "$out" 2>&1; rc=$?
+  if [[ $rc -ne 1 ]] || ! grep -q '✗ test 那一趟本机内存排不上' "$out" || ! grep -qF "merge-and-verify.sh --peer --memory 8G" "$out" \
+     || ! grep -qF -- "--skip-apply $scratch/patch-a" "$out" || ! grep -q '内存包装现查别的机器：→ 第二台此刻放得下' "$out" \
+     || [[ "$(grep -c . "$scratch/wrapper-calls.txt")" != 1 || "$(grep -c '本次未跑：test 那一步本机内存排不上' "$out")" != 3 ]]; then
+    echo "  ✗ 自检：本机内存排不上（包装退 252）时应当退 1、报那一步排不上与包装现查别的机器那一行、出路写带 --peer 重跑的整条命令（补丁已打进树，带 --skip-apply 与补丁目录），后面三步不再排、报本次未跑，实际退出码 $rc，假包装被调 $(grep -c . "$scratch/wrapper-calls.txt") 次：$(grep -E '✗|→|本次未跑|现查' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   rm -rf "${scratch:?}"
   if [[ $failures -ne 0 ]]; then
     echo "    → 怎么办：看 verify() 抓 FAILED 行与退出码、编之前刷源码戳的那几处；MERGE_AND_VERIFY_BREAK 设着的话这里本来就该红"
@@ -731,7 +1027,10 @@ FAKE
   echo "    --copy 在自己建的副本里打补丁与编、全绿与测试红收尾都删掉副本与编译目录、MERGE_AND_VERIFY_KEEP_COPY=1 留着并打出路径、"
   echo "    补丁改过的包头一次编与再验同一批补丁都有 Compiling 行、编译目录里的产物比源码新时点名没重编的包退 1、"
   echo "    两个合入同时起后起的排队并报出前者、前者放锁后才编、锁文件里的持有者已死时报出来并接管、主工作树的锁被占着时 git worktree 加出来的树里照常验、"
-  echo "    测试只挑补丁改到的包（改两个包只跑两个、没改到的逐个报本次未跑）并带上依赖它们的包、改到 Cargo.lock 与带 --all-packages 照旧全跑、只改到 checker 档包时测试本次未跑"
+  echo "    测试只挑补丁改到的包（改两个包只跑两个、没改到的逐个报本次未跑）并带上依赖它们的包、改到 Cargo.lock 与带 --all-packages 照旧全跑、只改到 checker 档包时测试本次未跑、"
+  echo "    --skip-apply 时补丁反着核得过才往下验、没打在树上的退 1 不编、"
+  echo "    --peer 时四步一趟交给第二台、取回的日志按本机同一套判红绿、第二台没跑成退 1、第二台工具链没装 rustfmt 或 clippy 时那一步报本次未跑与 rustup component add 的出路而不记红、"
+  echo "    本机排不上时出路写带 --peer 重跑的整条命令且后面几步不再排"
   return 0
 }
 
@@ -744,7 +1043,8 @@ while [[ $# -gt 0 ]]; do
     --skip-apply) skip_apply=1; shift ;;
     --copy) copy_mode=1; shift ;;
     --all-packages) ALL_PACKAGES=1; shift ;;
-    --*) die "认不出参数 $1" "只认 --memory <上限>、--threads <N>、--skip-apply、--copy、--all-packages" ;;
+    --peer) PEER_MODE=1; shift ;;
+    --*) die "认不出参数 $1" "只认 --memory <上限>、--threads <N>、--skip-apply、--copy、--all-packages、--peer" ;;
     *) dirs+=("$1"); shift ;;
   esac
 done
@@ -786,5 +1086,5 @@ for dir in ${dirs[@]+"${dirs[@]}"}; do
   if [[ -d "$dir" ]]; then CHECK_PATCH_DIRS+=("$(cd "$dir" && pwd)"); else CHECK_PATCH_DIRS+=("$dir"); fi
 done
 cd "$tree" || die "进不去要编的树 $tree" "在仓里跑；MERGE_AND_VERIFY_TREE 只给自证用，平时不设"
-if [[ $skip_apply -eq 1 ]]; then dirs=(); fi
+if [[ $skip_apply -eq 1 ]]; then dirs=(); check_patches_applied "$logs"; fi
 verify "$logs" "${dirs[@]}"

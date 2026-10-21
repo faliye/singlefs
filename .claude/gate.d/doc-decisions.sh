@@ -45,6 +45,8 @@
 #   <格名>-red（前十四格各一份，kb-shape-red … write-frequency-red）  那一格判红、汇总有「<格名>：红（退出 1）」；各份犯了什么写在那一格函数上方
 #   decision-documents-green                前十四格的绿样本并在一棵树里（setup.sh 造 git 历史与工作区改动）：十三格绿，write-frequency 没有登记表退 77，整道退 0
 #   write-frequency-green                   write-frequency 的绿样本（不是 git 仓），那一格绿；判绿靠的几句写在那一格函数上方
+#   decision-items-sync-translation-green   decisions/ 下除中文正文外还放着英语与日语译文（<名>.en.md、<名>.ja.md，首行不是 `## D<n> 简称 —— 状态`），不是 git 仓：
+#                                           decision-items-sync 绿，生成器只读中文那一份、分项清单与索引页逐字相同；.gate-cells 只点名 decision-items-sync
 #   candidate-codes-red / -green            candidate-codes 的样本（不是 git 仓）：红的那份两个分项的候选表都用丙（一张表格、一张列表）；
 #                                           绿的那份两个分项代号不同，另一处写「已定项 1 的丙」，历史节里复用的代号不扫
 #   decision-documents-some-cells-not-run   不是 git 仓，没有分项引用、D15、「待用户复核」与写频率登记表：七格退 77 逐格报本次未跑，整道退 0
@@ -67,6 +69,17 @@
 #   evidence-ledger-red                     挂账表写坏（列数、格名、片段太短）与罩不住（对象不红、文件不在），三格都红
 #   evidence-ledger-grew-red                setup.sh 造 git 仓：挂账表相对基准提交多了一行：three-way-leg-record 红
 #   evidence-pointer-history-green          setup.sh 造 git 仓：判决与材料先提交、后整批删掉（归档出了树，git 历史里取得回来）：inference-needs-verdict、three-way-leg-record 绿
+#   按编号取文件的三份（决策有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的登记表取中文原文，判法 lib-item-ref-status.py 的 numbered_files 与 heads_for_referrer）：
+#   freeze-layer-membership-translation-green  D15、D18 各有两份译文，首行写成 `## D15 (…) — Settled` 读不出、里面也没有「#### 已定项 7 / 11」：
+#                                           freeze-layer-membership 绿（改前 compgen 把三份一并交出来、load_map() 撞上读不出的译文首行退 1，这一格报不出 COUNT）
+#   freeze-layer-membership-translation-red    同一套文件，登记表一行依据点名 D18 已定项 5、中文原文没有：freeze-layer-membership 红、点名「D18 第 5 条分项」
+#   write-frequency-translation-green       D1 有两份读不出首行的译文，登记表的权威分项在中文原文里：write-frequency 绿（改前 load_map() 当场退 1、报「2 份首行读不出」）
+#   数一遍、按语言分组的两份（判法 lib-item-ref-status.py 的 same_language_files 与 files_by_language）：
+#   kb-shape-translation-green              D1、D2 各有中文原文与英语、日语译文，译文的分项小节是各自的语言（### Settled Items 这类），首行状态词照第 5 段的判据写：
+#                                           kb-shape 绿，第 5 段报「中文原文 2 条、译文 .en.md 2 条、译文 .ja.md 2 条」，第 7 段报没对的译文份数
+#                                           （改前第 5 段把三语的号并成 [1, 1, 1, 2, 2, 2] 判不连号，第 7 段拿中文索引去对译文、每条决策多报两遍「已定 0 项 / 未定 0 项」）
+#   kb-shape-translation-red                同一套文件，中文索引表 D2 写「已定 2 项 / 未定 0 项」而中文原文是 1 / 1，日语译文 02 那一份首行写成 D3：
+#                                           kb-shape 红，点名中文原文的 D2 计数与「决策编号不连续或不从 D1 起（译文 .ja.md）：[1, 3]」
 # 弄坏开关（样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-decisions.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：红格按绿记、整道退 0
@@ -74,7 +87,7 @@
 #       freeze-layer-membership-red、history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、
 #       settled-same-file-item-heading-red、settled-same-file-red、shape-cells-marker-red、shape-red、stale-open-items-red、status-redundancy-red、user-verdict-owed-red、
 #       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、
-#       write-frequency-red（期望退出 1，实测 0）
+#       write-frequency-red、freeze-layer-membership-translation-red、kb-shape-translation-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
@@ -83,7 +96,10 @@
 #       evidence-ledger-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
-#       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
+#       freeze-layer-membership-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       freeze-layer-membership-translation-green、write-frequency-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
+#       kb-shape-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；kb-shape-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
 #   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
@@ -92,9 +108,18 @@
 #       evidence-ledger-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
-#       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
+#       freeze-layer-membership-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       freeze-layer-membership-translation-green、write-frequency-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
+#       kb-shape-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；kb-shape-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：按编号取文件不分语言、取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md），
+#                                       heads_for_referrer 不筛语言（读不出首行的译文也算这一格的对象）；same_language_files 不筛语言、files_by_language 并成一组
+#                                       （kb-shape 第 7 段拿中文索引去对译文，第 5 段把三语的号并成一个列表判连号）
+#       freeze-layer-membership-translation-green、write-frequency-translation-green、kb-shape-translation-green（期望退出 0，实测 1）；
+#       kb-shape-translation-red（输出里找不到「决策编号不连续或不从 D1 起（译文 .ja.md）：[1, 3]」）
 #   DOC_DECISIONS_BREAK=kb-shape  kb-shape 格不跑、按判过了记
-#       decision-documents-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味…」）；kb-shape-red（期望退出 1，实测 0）
+#       decision-documents-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味…」）；kb-shape-red（期望退出 1，实测 0）；
+#       kb-shape-translation-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味（6 条决策…」）；kb-shape-translation-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=item-ref-status  item-ref-status 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「分项引用与正文状态一致…」）；decision-documents-some-cells-not-run（输出里找不到「  item-ref-status：本次未跑」）；
 #       item-ref-status-red（期望退出 1，实测 0）
@@ -122,9 +147,11 @@
 #       settled-same-file-item-heading-red（期望退出 1，实测 77：本次 diff 没有新增「已定」小节）；settled-same-file-item-heading-green（期望退出 0，实测 77）
 #   DOC_DECISIONS_BREAK=freeze-layer-membership  freeze-layer-membership 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「冻结层归属登记表判过了…」）；decision-documents-some-cells-not-run（输出里找不到「  freeze-layer-membership：本次未跑」）；
-#       freeze-layer-membership-red（期望退出 1，实测 0）
+#       freeze-layer-membership-red、freeze-layer-membership-translation-red（期望退出 1，实测 0）；freeze-layer-membership-translation-green（输出里找不到「冻结层归属登记表判过了…」）
 #   DOC_DECISIONS_BREAK=decision-items-sync  decision-items-sync 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「决策索引表状态列与进度列与正文同步（21 条决策）」）；decision-items-sync-red（期望退出 1，实测 0）
+#   GEN_DECISION_ITEMS_BREAK=read-translations  归生成器 .claude/scripts/gen-decision-items.py（设进环境，被 decision-items-sync 格起的生成器继承）：译文也当正文读（改前的 glob）
+#       decision-items-sync-translation-green（期望退出 0，实测 1：「✗ 生成器跑不起来」下接「首行读不出」）
 #   DOC_DECISIONS_BREAK=blocking-verdict  blocking-verdict 格不跑、按判过了记
 #       blocking-verdict-red（期望退出 1，实测 0）；decision-documents-green（输出里找不到「13 条未定项两把尺都判过」）
 #   DOC_DECISIONS_BREAK=user-verdict-owed  user-verdict-owed 格不跑、按判过了记
@@ -134,7 +161,7 @@
 #       decision-documents-green（输出里找不到「决策索引结论列都不超 200 字（共 21 行）」）；decision-summary-width-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=write-frequency  write-frequency 格不跑、按判过了记
 #       decision-documents-green、decision-documents-some-cells-not-run（输出里找不到「  write-frequency：本次未跑」）；write-frequency-green（输出里找不到「同一结构的写频率只有一个量级…」）；
-#       write-frequency-red（期望退出 1，实测 0）
+#       write-frequency-red（期望退出 1，实测 0）；write-frequency-translation-green（输出里找不到「同一结构的写频率只有一个量级…」）
 #   DOC_DECISIONS_BREAK=entry-added  entry-added 格不跑、按判过了记
 #       decision-history-green（输出里找不到「决策正文改了 7 行，变更史新增 1 条条目」）；decision-history-red（输出里找不到「决策正文改了 2 行（碰了 2 行状态行，不按小改动放行），…」）；
 #       shape-green（输出里找不到「doc-decisions.sh：2 格里 1 格绿…」）
@@ -251,7 +278,7 @@ stage_cell settled-same-file judge_settled_same_file "这次在一份决策里�
 stage_cell freeze-layer-membership judge_freeze_layer_membership "冻结层归属登记表：每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项" \
   "照红行给缺的层与结构补一行（态别按 D21 已定项 10 的判据推，推不出写「判不动」）、写「退出」的行核态别、依据写成指得到的「D<n>（简称） 已定项 k」"
 stage_cell decision-items-sync judge_decision_items_sync "decisions.md 的分项清单生成块与索引表「状态」「进度」两列，与生成器的输出逐字相同" \
-  "权威记录是各决策正文的「### 已定项」/「### 未定项」两节；改完正文跑 bash .claude/gate.d/doc-decisions.sh --write 重写分项清单与索引表状态列、进度列"
+  "权威记录是各决策正文的「### 已定项」/「### 未定项」两节；改完正文跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync 重写分项清单与索引表状态列、进度列"
 stage_cell blocking-verdict judge_blocking_verdict "每条未定项都写了「改新池新建文件的字节」与「动不动格式」两把尺的判定" \
   "在每条缺判定的未定项的登记行或列表条目里补「改新池新建文件的字节：是 / 否 / 无对象（日期，依据：…）」与「动不动格式」那一句"
 stage_cell user-verdict-owed judge_user_verdict_owed "决策正文里标着「待用户复核」的，checks-owed.md 里要有一笔未还的账点名那条决策" \
@@ -313,8 +340,28 @@ IFS= read -r -d '' INDEX_VS_BODY_SOURCE <<'PY' || true
 ⚠️ 三态词（已定 / 半定 / 待定）**不在索引列里**，它的权威记录是正文首行
 `## D<n> 简称 —— 状态`。所以本段只对没有分项的那种行核一次三态词——
 那种行的索引格里确实写着它。
+
+⚠️ 索引页 decisions.md 是中文，只对中文原文 `<号>-<名>.md`：译文 `<号>-<名>.en.md` / `.ja.md` 的分项小节叫
+`### Settled Items` 这类别的语言，拿中文索引去对译文会数出「已定 0 项 / 未定 0 项」、每条决策多报两遍。
+取哪几份走 lib-item-ref-status.py 的 same_language_files（路径由环境变量 LIB_ITEM_REF_STATUS 给）；译文的标题与分项归第 5 段判。
+弄坏开关 KB_NUMBERED_FILE_BREAK=first-match：不分语言，译文一并拿来对中文索引。
 """
 import re, sys
+
+
+def load_item_ref_status():
+    """lib-item-ref-status.py（按语言取文件的判法只在那一份）；读不到当场判红退出，不退回不分语言。"""
+    import importlib.util, os
+    library_path = os.environ.get("LIB_ITEM_REF_STATUS", "")
+    try:
+        spec = importlib.util.spec_from_file_location("item_ref_status", library_path)
+        library = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(library)
+    except Exception as error:
+        print(f"  ✗ 读不到按语言取文件的判法 lib-item-ref-status.py（LIB_ITEM_REF_STATUS={library_path!r}：{error!r}），这一段没判")
+        print("     → 怎么办：起这一段时把 LIB_ITEM_REF_STATUS 设成门禁目录里那份 lib-item-ref-status.py；取哪几份只有那一份判法，别在这里另抄。")
+        sys.exit(1)
+    return library
 
 # 标题里声明的未定条数：阿拉伯数字或 1–99 的中文数字；第 5 段读同一份。只认一个字的中文数字会把「十一项未定」读成「一项未定」。
 TITLE_OPEN_COUNT = re.compile(r'([0-9]+|[一二两三四五六七八九十]+)\s*[项条]未定')
@@ -405,7 +452,14 @@ def count_items(body):
 
 
 def main():
-    index_path, *bodies = sys.argv[1:]
+    index_path, *all_bodies = sys.argv[1:]
+    # 中文索引只对中文原文（文档串第四条）；没对的译文按语言报数
+    item_ref_status = load_item_ref_status()
+    bodies = item_ref_status.same_language_files(all_bodies, index_path)
+    not_compared = {}
+    for p in all_bodies:
+        if p not in bodies:
+            not_compared.setdefault(item_ref_status.language_of(p), []).append(p)
     idx = open(index_path, encoding="utf-8").read()
     fail = 0
     seen = 0
@@ -425,7 +479,7 @@ def main():
         if not row:
             print(f"  ✗ {num} 在 decisions.md 索引里找不到对应行")
             print("     → 怎么办：给它补一行 `| D<n>（简称） | 状态 | 结论（简报） | 正文 | 进度 |`，")
-            print("       状态列与进度列跑 bash .claude/gate.d/doc-decisions.sh --write 生成。")
+            print("       状态列与进度列跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync 生成。")
             fail = 1
             continue
         seen += 1
@@ -438,7 +492,7 @@ def main():
         if len(cells) < 5:
             print(f"  ✗ {num} 索引行只有 {len(cells)} 列，缺「进度」列（第 5 列）")
             print("     → 怎么办：索引表写成 `| 决策 | 状态 | 结论（简报） | 正文 | 进度 |`，")
-            print("       进度列跑 bash .claude/gate.d/doc-decisions.sh --write 生成。")
+            print("       进度列跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync 生成。")
             fail = 1
         else:
             done, todo, none, missing = count_progress(body.split("\n## 历史版本")[0])
@@ -447,20 +501,20 @@ def main():
                 print(f"  ✗ {num} 进度列写「{cells[4]}」，而正文两节里数出「{want_cell}」"
                       + (f"（另有 {missing} 条分项缺进度标记或写了两个）" if missing else ""))
                 print("     → 怎么办：权威记录是各分项索引行末尾的 **进度：已实现 / 未实现 / 无对象。** 标记；")
-                print("       改完正文跑 bash .claude/gate.d/doc-decisions.sh --write")
+                print("       改完正文跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync")
                 fail = 1
 
         mc, mn = CELL.match(isx), NOITEM.match(isx)
         if not mc and not mn:
             print(f"  ✗ {num} 状态列写着「{isx}」，不是分项计数的写法")
             print("     → 怎么办：状态列一律写 `已定 N 项 / 未定 M 项`（没有分项的写 `无分项 · 整条已定`）；")
-            print("       跑 bash .claude/gate.d/doc-decisions.sh --write 从正文重新生成。")
+            print("       跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync 从正文重新生成。")
             fail = 1
             continue
         if mn:
             if n_settled or n_open:
                 print(f"  ✗ {num} 状态列写「无分项」，而正文里数出 {n_settled + n_open} 条分项")
-                print("     → 怎么办：跑 bash .claude/gate.d/doc-decisions.sh --write")
+                print("     → 怎么办：跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync")
                 fail = 1
             elif mn.group(1) != kind(bs):
                 print(f"  ✗ {num} 状态列写「整条{mn.group(1)}」，正文标题是「{kind(bs)}」")
@@ -471,7 +525,7 @@ def main():
             print(f"  ✗ {num} 状态列写「已定 {mc.group(1)} 项 / 未定 {mc.group(2)} 项」，"
                   f"而正文两节里数出「已定 {n_settled} 项 / 未定 {n_open} 项」")
             print("     → 怎么办：权威记录是正文的「### 已定项」/「### 未定项」两节。")
-            print("       改完正文跑 bash .claude/gate.d/doc-decisions.sh --write")
+            print("       改完正文跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync")
             fail = 1
             continue
         # 标题声明的未定条数也要与实数相符（标题同样会被检索到）；没声明按 0
@@ -491,7 +545,9 @@ def main():
         print("       以及 decisions/*.md 首行形如 `## D1 简称 —— 已定`。")
         sys.exit(1)
     if not fail:
-        print(f"  ✓ 决策索引表的状态列与进度列与正文相符（{seen} 条决策，分项数与进度数是本段自己数的）")
+        not_compared_note = "；".join(f"{len(paths)} 份 .{language}.md" for language, paths in sorted(not_compared.items()))
+        print(f"  ✓ 决策索引表的状态列与进度列与正文相符（{seen} 条决策，分项数与进度数是本段自己数的）"
+              + (f"；没拿中文索引去对的译文：{not_compared_note}（标题与分项归第 5 段按语言判）" if not_compared else ""))
     sys.exit(1 if fail else 0)
 
 
@@ -744,7 +800,7 @@ PY
 
   echo
   echo "── 5. 决策标题：编号连续、带状态；分项两节严格分开、未定条数与列表相符 ──"
-  INDEX_VS_BODY_SOURCE="$INDEX_VS_BODY_SOURCE" python3 - $KB/decisions/*.md <<'PY'
+  INDEX_VS_BODY_SOURCE="$INDEX_VS_BODY_SOURCE" LIB_ITEM_REF_STATUS="$LIB_ITEM_REF_STATUS" python3 - $KB/decisions/*.md <<'PY'
 import os, re, sys, types
 # 标题里未定条数的读法与第 7 段同一份（INDEX_VS_BODY_SOURCE 的 declared_open_count）
 lib_index_vs_body = types.ModuleType("lib_index_vs_body")
@@ -763,14 +819,22 @@ def bad(m, how=""):
         print(f"     → {how}")
     fail = 1
 
-# 编号连续：每个文件一个标题、按文件名次序读入，所以直接比
+# 编号连续：每个文件一个标题、按文件名次序读入，所以直接比。按语言各判各的（中文原文一组、每种译文一组）：
+# 三语三份的号并成一个列表是 [1, 1, 1, 2, …]，把译文当原文多数了两遍；分组走 lib-item-ref-status.py 的 files_by_language
+# （弄坏开关 KB_NUMBERED_FILE_BREAK=first-match 下并成一组，改前的判法）。
 nums = [int(m.group(1)) for m in re.finditer(r'^## D(\d+) ', body, flags=re.M)]
+numbering_groups = []
+for language, paths in sorted(lib_index_vs_body.load_item_ref_status().files_by_language(sys.argv[1:]).items()):
+    group_body = "".join(open(p, encoding="utf-8").read().split("\n## 历史版本", 1)[0] + "\n" for p in paths)
+    group_nums = [int(m.group(1)) for m in re.finditer(r'^## D(\d+) ', group_body, flags=re.M)]
+    group_label = "中文原文" if language == "" else f"译文 .{language}.md"
+    numbering_groups.append(f"{group_label} {len(group_nums)} 条")
+    if group_nums and group_nums != list(range(1, len(group_nums) + 1)):
+        bad(f"决策编号不连续或不从 D1 起（{group_label}）：{group_nums}",
+             "决策编号必须从 D1 起连号；废弃一条也要留占位并在变更史里写明。译文与中文原文同号，缺号先补那一份译文（.claude/skills/trilingual/SKILL.md）。")
 if not nums:
     bad("一个 `## D<n>` 标题都没读到——这一段又变成恒绿了，先修检查再谈别的",
         "确认 decisions/*.md 首行是 `## D<n> 简称 —— 状态`；读不到就是这段检查在空转。")
-elif nums != list(range(1, len(nums) + 1)):
-    bad(f"决策编号不连续或不从 D1 起：{nums}",
-         "决策编号必须从 D1 起连号；废弃一条也要留占位并在变更史里写明。")
 
 starts = [m.start() for m in re.finditer(r'^## D\d+ ', body, flags=re.M)]
 starts.append(len(body))
@@ -878,17 +942,18 @@ for a, b in zip(starts, starts[1:]):
             continue
     if got != want:
         bad(f"{title.split()[1]} 标题写「{declared_phrase}」，「### 未定项」小节里实际 {got} 项",
-                "改正文标题里的条数，并同步 decisions.md 索引行；改完跑 .claude/gate.d/doc-decisions.sh --write")
+                "改正文标题里的条数，并同步 decisions.md 索引行；改完跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync")
 if not fail:
-    print(f"  ✓ 决策标题与未定项列表相符，且两节没有互相串味（{decision_count} 条决策、核 {index_rows_checked} 行分项索引）")
+    print(f"  ✓ 决策标题与未定项列表相符，且两节没有互相串味（{decision_count} 条决策、核 {index_rows_checked} 行分项索引）"
+          f"；编号连号按语言各判各的：{'、'.join(numbering_groups)}")
 sys.exit(1 if fail else 0)
 PY
   [[ $? -ne 0 ]] && fail=1
 
   echo
   echo "── 7. 决策索引表的状态列（分项计数）vs 正文实际分项数 ──"
-  # 本段自己数正文、不经生成器（理由在 INDEX_VS_BODY_SOURCE 的文档串）
-  if python3 -c "$INDEX_VS_BODY_SOURCE" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
+  # 本段自己数正文、不经生成器（理由在 INDEX_VS_BODY_SOURCE 的文档串）；中文索引只对中文原文，取法在 lib-item-ref-status.py 的 same_language_files
+  if LIB_ITEM_REF_STATUS="$LIB_ITEM_REF_STATUS" python3 -c "$INDEX_VS_BODY_SOURCE" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
 
   echo
   if [[ $fail -eq 0 ]]; then echo "  ✓ kb 形状检查通过（kb 文件 ${#kb_md_files[@]} 份、规则 ${#rule_md_files[@]} 份）"; else echo "  ✗ kb 形状检查未通过"; fi   # gate-lint:summary
@@ -1574,6 +1639,10 @@ grid_settled_same_file() (
 # 判不了：某一行的态别对不对（改成自洽的「派生态 + 退出」三条都不红）、判不动的理由、三份清单都没单列的结构（树表单元、实例表单元、容器索引）。
 # 样本：freeze-layer-membership-red 漏一棵树的 key 编码行、漏组件 ② 与码 16 两行、一行「权威态 + 退出」、依据指到不存在的分项（一处接在「已定项 5 / 98」后面）、
 #   未定项、不存在的决策（简称里套括号），判红；decision-documents-green 里是真表原样的一份（编号与分项号改成连号），判绿。
+# D15、D18 与依据点名的决策取哪一份：lib-item-ref-status.py 的 numbered_files 与 heads_for_referrer，登记表是中文，取中文原文；
+#   译文的首行读不读得出不归这一格（归格「分项引用状态」），中文原文的首行读不出记进「清单」判红。
+# 样本：freeze-layer-membership-translation-green（两条决策各有读不出首行的译文，判绿）、-translation-red（依据点名中文原文没有的分项，判红）；
+#   弄坏开关 KB_NUMBERED_FILE_BREAK=first-match。
 grid_freeze_layer_membership() (
   LIB="$LIB_ITEM_REF_STATUS"
   REGISTRY=.claude/kb/freeze-layer-membership.md
@@ -1581,8 +1650,25 @@ grid_freeze_layer_membership() (
   SELF="$STAGE_RELATIVE_PATH --check freeze-layer-membership"
   MARKER='<!-- freeze-layer-membership:table -->'
 
-  layers_decision="$(compgen -G '.claude/kb/decisions/15-*.md' || true)"
-  units_decision="$(compgen -G '.claude/kb/decisions/18-*.md' || true)"
+  # D15、D18 取哪一份只走 lib-item-ref-status.py 的 numbered_files：登记表是中文，取中文原文。
+  # 改前 compgen 把三语三份一并交出来（多行），拼成一条不存在的路径，「#### 已定项 7」「#### 已定项 11」都去译文里找。
+  local decision_files
+  if ! decision_files="$(python3 - "$LIB" "$REGISTRY" 2>&1 <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("item_ref_status", sys.argv[1])
+lib = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib)
+for number in (15, 18):
+    found = lib.numbered_files(".claude/kb/decisions", number, sys.argv[2])
+    print(found[0] if found else "")
+PY
+  )"; then
+    printf '%s\n' "$decision_files" | sed 's/^/      /'   # gate-lint:detail
+    echo "  ✗ 按编号取 D15、D18 的那段 python 没跑成，这一格什么也没判"
+    echo "    → 怎么办：按上面的 traceback 修（判法在 $LIB 的 numbered_files）；没跑成就是没判，不许当成判过了。"
+    exit 1
+  fi
+  layers_decision="$(sed -n 1p <<<"$decision_files")"
+  units_decision="$(sed -n 2p <<<"$decision_files")"
   if [[ -z "$layers_decision" ]]; then
     echo "  ⊘ 本次未跑：.claude/kb/decisions/ 下没有 D15，没有四层图就无对象可判"
     exit 77
@@ -1767,7 +1853,14 @@ for line_number, (structure, _layer, state, exits, _basis) in rows:
 spec = importlib.util.spec_from_file_location("item_ref_status", lib_path)
 item_ref_status = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(item_ref_status)
-item_map, _names = item_ref_status.load_map()
+# 依据列点名的决策号对照中文原文（登记表是中文；heads_for_referrer 只留中文那几份）。改前 load_map() 现读全部首行，
+# 首行写成 `## D15 (Format Freeze Policy) — Settled` 的译文读不出就当场退 1，这一格报不出 COUNT（门禁日志里那一次崩）。
+# 译文的首行读没读得出归格「分项引用状态」判；中文原文的首行读不出照旧判红，记进「清单」。
+heads, unreadable = item_ref_status.decision_heads(strict=False)
+heads, unreadable = item_ref_status.heads_for_referrer(heads, unreadable, registry_path)
+for unreadable_path, first_line in unreadable:
+    bad("清单", f"{unreadable_path} 首行读不出 `## D<n> 简称 —— 状态`（首行是 {first_line[:40]!r}），这一份的分项一条都核不了")
+item_map, _names = item_ref_status.load_map(heads)
 basis_checked = 0
 for line_number, (structure, _layer, _state, _exits, basis) in rows:
     short = strip_trailing_parenthetical(structure)
@@ -1880,7 +1973,8 @@ PY
 # 进度列（最后一列）写实现计数（`已实现 3 项 / 未实现 1 项`，有无对象的再带 ` / 无对象 2 项`；没有分项写「无对象」），取自各分项索引行末尾的 **进度：…。** 标记。
 # 计数本身由格「kb 形状」第 7 段（INDEX_VS_BODY_SOURCE）不经生成器另数：只靠这一格时，生成器数错索引页会跟着错而仍逐字相同。
 # --write 时把两块写回被判的仓的 decisions.md（用法在文件头）。
-# 样本：decision-items-sync-red 状态列写错、索引漏登、索引多一行、生成块漂了各一处，判红。
+# 样本：decision-items-sync-red 状态列写错、索引漏登、索引多一行、生成块漂了各一处，判红；
+#       decision-items-sync-translation-green 的 decisions/ 下放着译文，生成器只读中文正文，判绿（译文当正文读时生成器报首行读不出，这一格红）。
 grid_decision_items_sync() (
   GEN="$GENERATOR"
   WRITE="$DECISION_ITEMS_WRITE"
@@ -1979,7 +2073,7 @@ if bad:
     for b in bad:
         print("     " + b)                                          # gate-lint:detail
     print("     → 怎么办：权威记录是各决策正文的「### 已定项」/「### 未定项」两节。")
-    print("       改完正文跑： bash .claude/gate.d/doc-decisions.sh --write")
+    print("       改完正文跑： SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync")
     sys.exit(1)
 
 print(f"  ✓ 决策索引表状态列与进度列与正文同步（{n} 条决策"
@@ -2006,7 +2100,7 @@ PY
   fi
   echo "  ✗ 决策分项清单与正文不同步"
   diff <(printf '%s\n' "$got") <(printf '%s\n' "$want") | head -20 | sed 's/^/     /'
-  echo "     → 权威记录是各决策正文。改完正文跑： bash .claude/gate.d/doc-decisions.sh --write"
+  echo "     → 权威记录是各决策正文。改完正文跑： SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync"
   exit 1
 )
 
@@ -2255,6 +2349,8 @@ PY
 # 样本：write-frequency-red 里不同级、否定同级、隔字与动词前否定三句、「只在 fsync 时写」、主语只在标题里的一句、权威是未定项、简称写错、
 #   排除表一行指不存在的文件、一行没排到判红句，判红；write-frequency-green 里同级不同词、限定与登记同量、否定别的量级、不划界的「不仅 / 不是只」、
 #   主语在别的格或只在标题、排除表登记的一句，判绿。
+# 权威分项点名的决策取哪一份：lib-item-ref-status.py 的 heads_for_referrer，登记表是中文，只对照中文原文；译文的首行归格「分项引用状态」判。
+# 样本：write-frequency-translation-green（D1 有两份读不出首行的译文，判绿）；弄坏开关 KB_NUMBERED_FILE_BREAK=first-match。
 grid_write_frequency() (
   REGISTRY=.claude/gate.d/write-frequency.tsv
   EXCLUDE=.claude/gate.d/write-frequency-exclude.tsv
@@ -2332,7 +2428,13 @@ for line_number, name, alias_list, _registered, _authority in structures:
 spec = importlib.util.spec_from_file_location("item_ref_status", lib_path)
 item_ref_status = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(item_ref_status)
-item_map, short_names = item_ref_status.load_map()
+# 权威分项点名的决策号对照中文原文（登记表是中文；heads_for_referrer 只留中文那几份）。改前 load_map() 现读全部首行，
+# 读不出的译文首行让这一格当场退 1，后面的判据一条都没走；译文的首行归格「分项引用状态」判，中文原文的首行读不出照旧判红。
+heads, unreadable = item_ref_status.decision_heads(strict=False)
+heads, unreadable = item_ref_status.heads_for_referrer(heads, unreadable, registry_path)
+for unreadable_path, first_line in unreadable:
+    bad("权威", f"{unreadable_path} 首行读不出 `## D<n> 简称 —— 状态`（首行是 {first_line[:40]!r}），这一份的分项一条都核不了")
+item_map, short_names = item_ref_status.load_map(heads)
 AUTHORITY = re.compile(r"^(D\d+)（((?:[^（）]|（[^（）]*）)*)）\s*已定项\s*(\d+)$")
 for line_number, name, _aliases, _registered, authority in structures:
     matched = AUTHORITY.match(authority)
@@ -2592,7 +2694,7 @@ cell_entry_added() {
   howto "若这次改动推翻或定下了任何结论，在 $HIST 里那条决策的 \`## D<n>（简称）\` 节里加一条变更（.claude/rules/changelog-format.md）："
   howto "  这一天的 \`### $(TZ=Asia/Tokyo date +%F)\` 块已经有就在块里最下面加一个顶格 \`- \` 项，没有就在节标题下面新开一块（新的日期在上）；"
   howto "  项里写结论、依据与改前（改前写一行 git show <提交>:<路径>，不抄原文）；一条改动点名了几条决策，只在标题里点名的第一条决策的节里写全文，别的节写一行「- 见 D<n>（简称） 节同日条目「摘要」」。"
-  howto "已定 / 未定项数或一句话现状变了，改 decisions.md 的索引表再跑 bash .claude/gate.d/doc-decisions.sh --write 同步索引表的状态列。"
+  howto "已定 / 未定项数或一句话现状变了，改 decisions.md 的索引表再跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync 同步索引表的状态列。"
   howto "纯排版改动可以拆成单独一个提交，那时这一格就无对象可判了。"
   exit 1
 }
@@ -3460,7 +3562,7 @@ if ((write_mode)); then
     for write_cell in "${STAGE_CELLS_SELECTED[@]}"; do
       if [[ "$write_cell" != decision-items-sync ]]; then
         bad "--write 只重写 decision-items-sync（decisions.md 的分项清单与索引表状态列）管的投影，不能与 --check $write_cell 一起用"
-        howto "去掉 --check，或写成 --check decision-items-sync：bash .claude/gate.d/doc-decisions.sh --write"
+        howto "去掉 --check，或写成 --check decision-items-sync：SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync"
         exit 2
       fi
     done
@@ -3473,7 +3575,7 @@ if ((write_mode)); then
   fi
   if ((write_exit != 0)); then
     bad "--write 写了 ${#write_cells[@]} 块，写完回读仍红：${write_cells[*]}（退出 ${write_exit}）"
-    howto "照上面那一块自己的红行改（节或索引行缺了 --write 补不了，先核编号），再跑 bash .claude/gate.d/doc-decisions.sh --write"
+    howto "照上面那一块自己的红行改（节或索引行缺了 --write 补不了，先核编号），再跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync"
     exit 1
   fi
   ok "--write 写完 ${#write_cells[@]} 块、回读都对：${write_cells[*]}"

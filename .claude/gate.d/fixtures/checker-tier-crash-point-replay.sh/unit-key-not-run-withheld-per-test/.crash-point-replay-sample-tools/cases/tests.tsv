@@ -1,0 +1,7 @@
+plain	src/lib.rs	-	ok	line	-
+plain	tests/setting.rs	test_a	ok	line	-
+plain	tests/setting.rs	test_b	ok	line	-
+plain	tests/setting.rs	test_c	ok	line	NOT_RUN_SAMPLE_REASON test=crash_state_enumeration::sample reason=样本：这一条这一趟没判
+plain	tests/noisy.rs	noisy_split	ok	scattered	测试自己打的字（样本）
+plain	tests/noisy.rs	noisy_glued	ok	glued	测试自己打的字（样本）
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-

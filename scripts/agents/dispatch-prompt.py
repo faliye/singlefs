@@ -54,10 +54,13 @@
       骨架的类型表与派发闸的表逐个相同（「✗ 自检：骨架的类型表与派发闸的表应当逐个相同：线程上限 骨架多 [] 少 ['three-way-defense', 'three-way-forward']…」）、
       真定义打出的骨架带线程上限与预计挂钟四行（clerk、three-way-forward、three-way-defense 三句）、这三种的骨架填完 --check 应当退 0（三句，实际 3）
   DISPATCH_PROMPT_BREAK=long-run-hosts-live-restored  skeleton() 的「多机」一行退回现算的写法（点名 host-resources.py 现算每台线程与内存）
-      骨架的多机一行引规范句、不写现算（「✗ 自检：骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现 host-resources 与 available_threads」）、
+      骨架的多机一行引规范句、不写现算（「✗ 自检：骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现现算词」；
+      现算词是 LIVE_HOSTS_WORDS 那一张：host-resources、available_threads、available_parallelism、nproc、cpu_count、sched_getaffinity、核数、忙闲、空闲、负载、除以、÷）、
       骨架的多机一行写上多机已判（「✗ 自检：骨架的多机一行应当写上放行行「多机已判：」的写法」）
   DISPATCH_PROMPT_BREAK=hosts-valve-hint-dropped  skeleton() 的「多机」一行占位里不写放行行「多机已判：」的写法（HOSTS_VALVE_HINT）
       骨架的多机一行写上多机已判（「✗ 自检：骨架的多机一行应当写上放行行「多机已判：」的写法」）
+  DISPATCH_PROMPT_BREAK=live-words-narrowed  live_hosts_words_in() 退回只认 host-resources 与 available_threads 两个现算词（改前的判法）
+      现算词表认全（「✗ 自检：现算词表应当认出每一个现算词：nproc …」，没认出的那几个逐个列出）
   DISPATCH_PROMPT_BREAK=selftest-location-dropped  skeleton() 不打「自证在哪跑」一行
       会跑自证的类型骨架带这一行（「✗ 自检：会跑自证的类型骨架应当带一行「自证在哪跑：<填 …>」」）、
       --set 填得进这一行（「✗ 自检：--set 自证在哪跑=…」）、--check 没填时点名这一行（「✗ 自检：--check 对没填自证在哪跑的提示」）
@@ -86,6 +89,9 @@ try:   # 多机一行的规范句只写在 .claude/hooks/lib_long_run.py 一处�
 except Exception:   # 文件不在、语法错都算读不到
     CANONICAL_HOSTS_SENTENCE = "<规范句见 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE，读不到时先恢复那份库>"
 BROKEN = os.environ.get("DISPATCH_PROMPT_BREAK", "")
+# 骨架的「多机」一行里不许出现的现算词（台数与线程照登记值读，不现算）：现查余量的脚本与字段、各种取核数的写法、按忙闲算的中文说法；
+# 「不现算」是规范句自己的话，不在表里
+LIVE_HOSTS_WORDS = ("host-resources", "available_threads", "available_parallelism", "nproc", "cpu_count", "sched_getaffinity", "核数", "忙闲", "空闲", "负载", "除以", "÷")
 PLACEHOLDER = re.compile(r"<填[^>]*>")
 # --check 起的派发闸（判法只在它那里）与骨架第一行写的类型
 DISPATCH_GUARD = os.path.join(REPOSITORY_ROOT, ".claude", "hooks", "runner-dispatch-guard.sh")
@@ -244,6 +250,12 @@ def skeleton(agent_type, agents_dir, settings, batch):
     return "\n".join(lines) + "\n"
 
 
+def live_hosts_words_in(text):
+    """text 里出现的现算词（LIVE_HOSTS_WORDS，按子串找），按表里的次序交回。弄坏开关 live-words-narrowed 下只认 host-resources 与 available_threads。"""
+    words = LIVE_HOSTS_WORDS[:2] if BROKEN == "live-words-narrowed" else LIVE_HOSTS_WORDS
+    return [word for word in words if word in text]
+
+
 def placeholders(text):
     if BROKEN == "ignore-placeholders":
         return []
@@ -378,9 +390,15 @@ def selftest():
             failures.append("不在类型表里的类型（kb-scribe）骨架不该带预计挂钟与分片、续跑、多机四行")
         hosts_line = next((line for line in skeleton("tooling-writer", agents, {}, None).split("\n") if line.startswith("多机：")), "")
         checked += 1
-        if ("--emit-hosts" not in hosts_line or "heavy-thread-default" not in hosts_line or "host-resources" in hosts_line or "available_threads" in hosts_line
+        if ("--emit-hosts" not in hosts_line or "heavy-thread-default" not in hosts_line or live_hosts_words_in(hosts_line)
                 or CANONICAL_HOSTS_SENTENCE not in hosts_line or CANONICAL_HOSTS_SENTENCE.startswith("<")):
-            failures.append(f"骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现 host-resources 与 available_threads：{hosts_line}")
+            failures.append(f"骨架的多机一行应当点名 --emit-hosts 与 heavy-thread-default、引 CANONICAL_HOSTS_SENTENCE、不出现现算词"
+                            f"（出现了 {live_hosts_words_in(hosts_line)}）：{hosts_line}")
+        # 现算词表自己认得全：每个词各造一句，都要认出来（开关 live-words-narrowed 下只认两个，这一项红）
+        checked += 1
+        missed = [word for word in LIVE_HOSTS_WORDS if word not in live_hosts_words_in(f"多机：每台线程按 {word} 取")]
+        if missed:
+            failures.append(f"现算词表应当认出每一个现算词：{' '.join(missed)}")
         checked += 1
         if "「多机已判：」后面写理由" not in hosts_line:
             failures.append(f"骨架的多机一行应当写上放行行「多机已判：」的写法（用户给了逐台参数时用）：{hosts_line}")

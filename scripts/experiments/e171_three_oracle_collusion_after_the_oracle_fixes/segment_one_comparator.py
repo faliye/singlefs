@@ -540,6 +540,22 @@ def inputs_outside_this_run(dumps_root: str, product_prefix: str, product_suffix
     return outside
 
 
+# 本次未跑（用户 2026-10-18 定：拿留存产物与那一趟的导出比的，缺了一律报本次未跑，不静默跳过、不当绿、不判红）：
+# 给的输入有不在的，每一样往 stderr 打一行 NOT_RUN_ARCHIVED_PRODUCT test=<比对器> reason=<哪一样不在>，退 77，一行产物都不写。
+# 写法照 scripts/experiments/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER；segment_two_comparator.py 用同一个。
+NOT_RUN_MARKER = "NOT_RUN_ARCHIVED_PRODUCT"
+NOT_RUN_EXIT_CODE = 77
+
+
+def report_missing_inputs(test_name: str, paths: list[str | None]) -> bool:
+    """给了而不在的输入（导出目录、行输出根、产物）：每一样往 stderr 打一行本次未跑、交 True；都在（或没给）交 False。"""
+    missing = [path for path in paths if path is not None and not os.path.exists(path)]
+    for path in missing:
+        print(f"{NOT_RUN_MARKER} test={test_name} reason={path} 不在，这一项本次未跑；留存产物从 git 历史取回，那一趟的导出照登记"
+              " research/prompts/e171-r1-prereg.md 重出到草稿目录、经驱动的环境变量指过去", file=sys.stderr)
+    return bool(missing)
+
+
 def parse_controls(items: list[str]) -> dict[str, list[str]]:
     """`--control 名=产物` 几次 → {名: [产物…]}（同一样对照分几份产物跑的，几份的计数相加）。"""
     controls: dict[str, list[str]] = {}
@@ -566,6 +582,10 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--product-suffix", required=True)
     arguments = parser.parse_args(argument_list)
     controls = parse_controls(arguments.control)
+    if report_missing_inputs("segment_one_comparator.py", [arguments.dumps_root, arguments.baseline, arguments.second_baseline, arguments.rows_root,
+                                                          arguments.baseline_o3, arguments.q5_main, arguments.q5_reverse]
+                             + [path for paths in controls.values() for path in paths]):
+        return NOT_RUN_EXIT_CODE
     outside = inputs_outside_this_run(arguments.dumps_root, arguments.product_prefix, arguments.product_suffix,
                                       [arguments.baseline, arguments.second_baseline, arguments.rows_root],
                                       [arguments.baseline_o3, arguments.q5_main, arguments.q5_reverse]

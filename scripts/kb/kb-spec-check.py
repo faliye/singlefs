@@ -43,6 +43,8 @@
   KB_SPEC_CHECK_BREAK=no-references  check_entries() 不调 reference_problems()（②）
       编号没带简称（「✗ 自检：编号没带简称：应当判红」）、简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）、
       判决段名撞了登记编号（「✗ 自检：判决段名撞了登记编号：应当判红」）
+  KB_SPEC_CHECK_BREAK=translations-as-registry  load_registry() 把译文（.en.md、.ja.md）也当登记位读，译名先于中文简称被认到（②，改前的读法）
+      译文登记位简称与中文不同（「✗ 自检：译文登记位简称与中文不同：应当判绿」），连带 selftest() 里别的引用了登记编号的绿例（干净的一条、简称带嵌套括号、依据段加实验号带了配对）
   KB_SPEC_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、--root 缺值与读不了的规格（改前的样子）
       命令行那几格（「✗ 自检：命令行 ['--help'] 应当退 0」起的六条）
 """
@@ -73,6 +75,9 @@ SELF_WORD_START = re.compile(r"(?:^|[。，；：！？、（(「\s>|*])(" + "|"
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 EVIDENCE_LABEL = "**依据**"
 EXPERIMENT_NUMBER = re.compile(r"(?<![A-Za-z0-9_\-])E(\d+)(?![0-9])")
+# 译文：<名>.en.md、<名>.ja.md（登记在 .claude/trilingual-documents，规矩在 .claude/skills/trilingual/SKILL.md）。登记位只认中文那一份；
+# 判法与 .claude/gate.d/lib-trilingual.py 的 LANGUAGE_SUFFIXED 同口径：带两个小写字母语言后缀的 .md 不是中文那一份。
+TRANSLATION_SUFFIX = re.compile(r"\.[a-z]{2}\.md$")
 
 
 def following_name(line, position):
@@ -98,9 +103,11 @@ def normalized_name(text):
 
 
 def load_registry(root):
-    """→ ({编号: 简称}, {不算编号的记号})。"""
+    """→ ({编号: 简称}, {不算编号的记号})。登记位只认中文那一份：译文（<名>.en.md、<名>.ja.md）里的简称是译名，不是登记位。"""
     registry, not_numbers = {}, set()
-    for path in glob.glob(os.path.join(root, ".claude", "kb", "**", "*.md"), recursive=True):
+    for path in sorted(glob.glob(os.path.join(root, ".claude", "kb", "**", "*.md"), recursive=True)):
+        if TRANSLATION_SUFFIX.search(os.path.basename(path)) and BROKEN != "translations-as-registry":   # 弄坏开关：译文也当登记位（改前的读法）
+            continue
         lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
         for index, line in enumerate(lines):
             for words in NOT_NUMBERS_MARK.findall(line):
@@ -316,6 +323,13 @@ def selftest():
         open(os.path.join(kb, "experiments", "10-样本实验.md"), "w", encoding="utf-8").write("## E10 样本实验 —— 已跑\n\n### 影响的决策\n| D3 | 支撑 | 不受影响 |\n")
         open(os.path.join(kb, "experiments", "11-另一实验.md"), "w", encoding="utf-8").write("## E11 另一实验 —— 已跑\n\n### 影响的决策\n")
         open(os.path.join(kb, "decisions-history.md"), "w", encoding="utf-8").write("# 决策变更史\n\n## D3（空间分配）\n\n锚点行\n")
+        # 译文：登记表与决策标题照中文那份抄一遍，简称是译名（与中文不同）；登记位只认中文那一份，规格里写中文简称必须判绿
+        open(os.path.join(kb, "checks-owed.en.md"), "w", encoding="utf-8").write(
+            "# Owed checks\n\n<!-- doc-lint:registry name-col=2 -->\n| No. | Name | Content |\n|---|---|---|\n| C120 | Anchor rot | old row |\n| C121 | Another entry | row |\n| C122 | Mirror test (HashMap ideal file system) | nested parentheses |\n")
+        open(os.path.join(kb, "checks-owed.ja.md"), "w", encoding="utf-8").write(
+            "# 未実施の検査\n\n<!-- doc-lint:registry name-col=2 -->\n| 番号 | 名称 | 内容 |\n|---|---|---|\n| C120 | アンカー腐敗 | 旧行 |\n| C121 | 別の一件 | 行 |\n| C122 | 照合（HashMap 理想ファイルシステム） | 括弧入れ子 |\n")
+        open(os.path.join(kb, "decisions", "03-空间分配.en.md"), "w", encoding="utf-8").write(
+            "## D3 Space allocation —— Settled\n\n**Basis**: E10 (sample experiment) shows x.\n")
         def entry(file, old, new):
             return {"file": file, "old": old, "new": new, "basis": "样本"}
         owed = ".claude/kb/checks-owed.md"
@@ -339,6 +353,7 @@ def selftest():
                                          entry(".claude/kb/experiments/11-另一实验.md", "### 影响的决策\n", "### 影响的决策\n| D3（空间分配） 已定项 1 | 支撑 | 2026-09-26 改了 |\n")], 0),
             ("变更史用旧形态", [entry(".claude/kb/decisions-history.md", "锚点行",
                                       "锚点行\n\n### 2026-09-26\n\n#### 已定项 1：样本\n\n> 快查·改前：甲。\n>\n> 快查·改后：乙。\n")], 1),
+            ("译文登记位简称与中文不同", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C121（另一笔） 与 C120（锚点腐化），决策见 D3（空间分配） |")], 0),
             ("变更史新形态", [entry(".claude/kb/decisions-history.md", "锚点行",
                                     "锚点行\n\n### 2026-09-26\n\n- 已定项 1：样本\n  - **结论**：乙。\n")], 0),
         ]
@@ -367,7 +382,7 @@ def selftest():
         if failures:
             print("  → 看 check_entries() / reference_problems() / pointer_problems() / parse_markdown_spec() 的判法；KB_SPEC_CHECK_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史形态各有红绿样本，markdown 规格认得出（{len(cases) + 1} 种）；"
+        print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史形态各有红绿样本，译文不当登记位，markdown 规格认得出（{len(cases) + 1} 种）；"
               f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的规格、--root 缺值退 2 带出路")
         return 0
     finally:

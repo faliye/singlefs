@@ -38,6 +38,7 @@
 #       第二台的树副本不带配置，那个键与 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer 随命令的环境送过去）；不是 1 只带 verdict-store。
 #       走 GPU 的计算类：开了 GPU 引擎就三类全走 GPU，它不读 GPU_COMPUTATION_CLASSES（crash-amplification-lib.sh 文件头「配置」），
 #       两台的每一趟（本机那几趟与第二台排计划、分份那两趟）都不送它，开不开 GPU 都一样；本机那几趟清掉调用方环境里漏进来的同名变量。
+#       GPU 对拍的测试各占卡的显存，不并行起：开了 GPU 时两台每一趟 cargo test 的参数（共用库拼的，本脚本在 crash_amplification_prepare 之后另加）带 --test-threads 1，没开的不加。
 #       两台怎么分：--host-weights 给了照它；给了 --local-states-per-second（本机排派活计划时试判量到的速度）就先让第二台也排一趟计划、量它的速度，
 #       按两个速度分；都没给就等分。第二台量速度的那段时间（它要拷树、从头编、编内核）本机不空等：本机先领整份判着，
 #       第二台量完就叫它停（建停下文件，它判完手里那一块、写进库就收尾），再按速度分工——判过的块在库里，不重判。
@@ -73,6 +74,7 @@
 #            第二台那两趟或本机只编那一步显式给的线程数不是正整数（文件头「线程」），
 #            或哪一趟的日志里有卡用不了的原话、给定状态表的判器借不到显存那一行（crash-amplification-lib.sh 的 crash_amplification_failure_kind 判 device），
 #            或这份二进制跑不了这一趟（结论版本与树对不上、开了 GPU 而没编进 gpu 特性；同一个函数判 build）；
+#            或录入段之后到导入那一趟之间测试二进制里的观察者版本变了而导入那一趟红了（上面「观察者版本」；出路：两趟之间判器单元变了，重跑整趟）；
 #         248 算法上判不了：哪一趟的日志里有有状态 GPU 判不了、内核展开超预算、建不出表的原话（同一个函数判 algorithm）；
 #         249 给了 --local-states-per-second 而第二台没量出速度、日志里认不出原因（打一行 CRASH_AMPLIFICATION_PEER_PLACEMENT_FAILED；本机先判着的块在库里，第二台一块都还没判）；
 #         77  本次未跑：第二台排派活计划那一趟退 0、没打计划行，日志里有行首为 NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason= 的那一行
@@ -89,6 +91,13 @@
 #   （共用库 crash-amplification-lib.sh 文件头「被停」一段）；导入那一趟开库仍按 SINGLEFS_CRASH_LIBRARY_LOCK_WAIT_SECONDS 等锁。分份之前那几段（录入段、先判着、第二台排计划）收到 TERM 照旧当场退。
 # 本机先判着、第二台量完速度就叫停的那一趟（warm-local.log）：它的 CRASH_AMPLIFICATION 行带 stopped_early=true，是有意叫停、剩下的由两台分份判完，
 #   转打时在行尾加 warm_up=true，崩溃放量入口据此不把这一项报成「本次未跑」，复用数也只取这一行的（入口文件头「复用数怎么取」）。
+# 观察者版本（录入段之后记下、导入那一趟对一遍）：挂了观察者的用例，录入段的块按观察者版本存、判段按同一把版本读（crash_amplification.rs 的 observer_versions_of_the_keys）；
+#   录入段到导入那一趟之间测试二进制重编、判器单元变了（别的会话中途往 crates 里换了文件），导入那一趟的版本和录入段的不是一把，读不到录入段录的块，
+#   用例报「录入段那一块不在库里：先跑录入段」——叫人去补录入段，其实录入段是好的。单独起（选段没设成 judge）、本机录入段成了之后，这里从 record.log 里 cargo 打的
+#   Running … (<测试二进制>) 那一行找到二进制，读出编进去的判器键表里观察者那几组（observer_code:…、observer_conclusion_composition、judgement_of_the_crash_images）与工具链行
+#   取 sha256，写进 <日志目录>/observer-version；导入那一趟之后对 import.log 指到的二进制再取一遍：对不上而且导入那一趟红了，退 78，
+#   出路写「两趟之间判器单元变了，重跑整趟」；对不上而导入那一趟判绿，只打一行说明；录入段在分项驱动那边跑过（选段交过来就是 judge）、日志里找不到二进制、二进制里读不出表，都不核，打一行说明。
+#   另读的输入（extra_inputs_digest）跑起来才算，二进制里没有，不在这一份摘要里。弄坏开关 observer-version-unchecked：导入那一趟不核。
 # 导入那一趟（import.log，含本机或第二台那一份红了之后先导入的那一趟）：它的 CRASH_AMPLIFICATION 行转打时在行尾加 import_run=true。
 #   那一趟的 states_reused= 是导入之前本机那一份已判的，崩溃放量入口据此不把它算进复用数（flow= 行不带 share= 与 imported_blocks=，只认得这个标记）。
 # 重型：跑 checker 档用例，只在用户要求时跑（SINGLEFS_HEAVY_TESTS=user-request 由这里带给三趟 cargo）；--selftest 不起 cargo，不算重型。
@@ -118,6 +127,7 @@
 # （与崩溃放量入口共用）：表里的双机开关与代码里 two_hosts_break_is 认的要相等、表里的共用库开关要是共用库里认的，每个逐个打开、要退 1、红的格与点名的逐格相等；
 # 共用库认而表里没列的开关也逐个打开，要退 0、一格不红。并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS（没给取 SINGLEFS_THREAD_CAP，再没给按 nproc）。
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=same-share-on-both-hosts  第二台那一趟也领 0/2（两台判同一半）
+#       observer-version-unrelated-group-keeps-the-exit、observer-version-changed-import-green-stays-green（两台判同一半，导入之后对账不为空，退 101；一个是退 101 的输出里没有「unjudged_blocks=1」，一个不退 0）
 #       peer-engine-variables-absent-when-unset、peer-segments-registry-sent、peer-slice-states-sent、peer-write-only-sent（导入之后对账不为空、退 101）、
 #       both-hosts-green、library-snapshot-sent、calibrated-weights（调用记录里没有第二台领 1/2 的那一趟）、
 #       reconciliation-not-empty（没人判的是 3 块、不是漏判的那 1 块）、quiesce-not-restored（导入之后对账不为空、退 101）、
@@ -127,17 +137,21 @@
 #       named-test-runs-even-if-ignored、records-library-marker、records-into-the-given-library、records-into-the-default-library-when-not-given、
 #       crash-case-shaped-records-and-imports、judge-not-run-forwarded-once（导入之后对账不为空、退 101）
 #       peer-build-guarded、peer-library-absolute（导入之后对账不为空、退 101）
-#       observers-recorded-by-share、observers-recorded-by-share-with-weights、split-record-fails、split-term-imports-the-fetched-library（第二台也领 0/2：1 3 5 没人领，导入之后对账不为空，不是退 0；被停那一格里第二台库里的观察者块是 0 2 4，不是 1 3 5）
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights、split-record-fails、split-term-imports-the-fetched-library（第二台也领 0/2：1 3 5 没人领，导入之后对账不为空，不是退 0；被停那一格里第二台库里的观察者块是 0 2 4，不是 1 3 5）、
+#       gpu-test-threads-one、gpu-off-test-threads-not-added（导入之后对账不为空、退 101，调用记录里没有第二台领 1/2 的那一趟）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=skip-import               取回之后不跑导入那一趟、当它退 0
+#       observer-version-unrelated-group-keeps-the-exit、observer-version-changed-exits-78、observer-version-unreadable-keeps-the-exit（导入那一趟没跑，漏判那一块没人发现，退 0，不退 101 / 78）
 #       peer-segments-registry-sent、peer-slice-states-sent、peer-write-only-sent（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、
 #       both-hosts-green（最后一趟不是带 IMPORT 的本机 0/2）、reconciliation-not-empty（退 0，不退 101）、
 #       gpu-on-classes-not-sent、gpu-cards-from-multi-host-configuration、gpu-off-classes-not-sent（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、
 #       records-into-the-given-library、records-into-the-default-library-when-not-given（.library 里本机只有两笔，少了导入那一趟）、
 #       crash-case-shaped-records-and-imports（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、judge-not-run-forwarded-once（导入那一趟没跑，转打 0 行）、
-#       observers-recorded-by-share、observers-recorded-by-share-with-weights（最后一趟不是带 IMPORT 的本机 0/2）
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights（最后一趟不是带 IMPORT 的本机 0/2）、
+#       gpu-test-threads-one（本机只有先判着与分份两趟，少了导入那一趟的 --test-threads 1 记录）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=term-skips-import         分份途中收到 TERM 照改前不导入第二台取回的库就退（文件头「被停」）
 #       term-imports-the-fetched-library、split-term-imports-the-fetched-library（调用记录里没有带 IMPORT 的本机 0/2 那一趟，第二台判过的块没进本机库）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-skipped-when-not-judging  单独起（选段没设成 judge）也不先在本机跑录入段
+#       observer-version-unrelated-group-keeps-the-exit、observer-version-changed-exits-78、observer-version-unreadable-keeps-the-exit（没有录入段，没有 record.log，记不下版本，退 101 但 <日志目录>/observer-version 不在、也没有「观察者版本取不到」那一行）
 #       records-when-not-judging、records-library-marker、records-into-the-given-library、records-into-the-default-library-when-not-given、
 #       crash-case-shaped-records-and-imports（.stage 或 .library 里第一笔不是本机录入段那一趟）、
 #       observers-recorded-by-share、observers-recorded-by-share-with-weights、observers-recorded-whole-when-weights-wait-for-speed、split-record-fails、split-term-imports-the-fetched-library（.record-share 里没有本机录入段那一笔）
@@ -178,6 +192,7 @@
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=accept-missing-fetched-library  第二台的库没取回也照导入
 #       peer-library-not-fetched（导入那一趟找不到库、退 101，不退 78）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=import-failure-ignored    导入那一趟退非 0（对账不为空）也报绿
+#       observer-version-unrelated-group-keeps-the-exit、observer-version-unreadable-keeps-the-exit（导入那一趟红了也报绿，退 0，不退 101）
 #       reconciliation-not-empty（退 0，不退 101）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=drop-host-weights         算出两台的分工也不带给两趟分份
 #       calibrated-weights（分份那两趟的调用记录里 weights=none）、observers-recorded-by-share-with-weights（第二台那一趟没拿到权重，调用记录里 weights=none）
@@ -191,7 +206,8 @@
 #       peer-placement-not-run、peer-placement-foreign-not-run-line、gpu-on-classes-not-sent、gpu-cards-from-multi-host-configuration、gpu-off-classes-not-sent（假的先判着那一趟看到叫停那一步走过了、停下文件却不在，退 101；各格退 101）、
 #       peer-threads-default、peer-threads-given、peer-threads-cap（同上退 101，分份那一趟没起、调用记录里只有排计划那一笔线程数）、
 #       peer-checking-threads-default、peer-checking-threads-given、peer-checking-threads-cap（同上退 101，第二台只记下排计划那一笔）
-#       peer-build-guarded（同上退 101，.shared-target 里只有排计划那一笔）、peer-library-absolute（同上退 101）
+#       peer-build-guarded（同上退 101，.shared-target 里只有排计划那一笔）、peer-library-absolute（同上退 101）、
+#       gpu-test-threads-one、gpu-off-test-threads-not-added（同上退 101，分份那一趟没起、调用记录里只有先判着与排计划两笔）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=warm-failure-ignored      本机先判着的那一趟退非 0 也往下走
 #       warm-run-card-unusable（退 0，不退 78）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-placement-failure-ignored  第二台没量出速度也往下走（分工写成「本机速度,」）
@@ -218,6 +234,8 @@
 #       quiesce-not-restored（调用记录里有 restore）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=classes-sent-to-peer  开了 GPU 照改前把三类 GPU_COMPUTATION_CLASSES 送给第二台
 #       gpu-on-classes-not-sent（第二台那几笔调用记录里 classes= 不是 [unset]）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=gpu-test-threads-unset  开了 GPU 照改前不给 cargo test 参数加 --test-threads 1（本机三趟与第二台两趟都不带）
+#       gpu-test-threads-one
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=segments-registry-not-sent-to-peer  本机环境里设了 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY 也不把那份文件送给第二台、不送变量（改前的样子）
 #       peer-segments-registry-sent（第二台那两趟的 registry= 不是第二台树里那份快照的路径、或文件内容对不上）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=slice-states-not-sent-to-peer  本机环境里设了 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES 也不送给第二台（改前的样子：第二台照 2^32 判）
@@ -241,6 +259,8 @@
 #       last-run-list（清单一直不在，红的那两趟之后对不上）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-library-relative     第二台那两趟照改前在命令的 env 里交相对路径 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library（引擎拒相对路径，第二台那一份当场红）
 #       peer-library-absolute、records-into-the-given-library、records-into-the-default-library-when-not-given（.library 里第二台那几笔是相对路径 crash-amplification-library）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=observer-version-unchecked  导入那一趟不核观察者版本（改前的样子：版本变了落成假用例「先跑录入段」那一句，退导入那一趟的 101）
+#       observer-version-changed-exits-78（退 101，不退 78）
 # 共用库 crash-amplification-lib.sh 的开关 CRASH_AMPLIFICATION_ITEM_BREAK（开关表在 crash-amplification-item.sh 文件头）打开时这里也红（共用库认而这里没列的，开关轮要它一格不红）：
 #   CRASH_AMPLIFICATION_ITEM_BREAK=device-unusable-as-run-failure
 #       local-share-card-unusable、peer-share-card-unusable、warm-run-card-unusable（退 101，不退 78）、peer-placement-card-unusable（退 249，不退 78）
@@ -321,6 +341,13 @@ run_selftest() {
 # （classes=[…] 是这一趟环境里 GPU_COMPUTATION_CLASSES 的值，cards=[…] 是 GPU_CARDS_BY_PRIORITY 的值，没设记 [unset]）
 set -uo pipefail
 share="${SINGLEFS_CRASH_AMPLIFICATION_SHARE:?}" library="${SINGLEFS_CRASH_AMPLIFICATION_LIBRARY:?}"
+# STUB_BINARY_RECORD / STUB_BINARY_JUDGE / STUB_BINARY_IMPORT（观察者版本那几格）：照 cargo test 在日志里打的那一行 Running … (<测试二进制>)，路径取这一趟
+#   （录入段 / 判段 / 带 IMPORT 的导入那一趟）对应的变量；没设不打
+running_kind=judge
+[[ "${SINGLEFS_CRASH_AMPLIFICATION_STAGE-}" == record ]] && running_kind=record
+[[ -n "${SINGLEFS_CRASH_AMPLIFICATION_IMPORT:-}" ]] && running_kind=import
+running_variable="STUB_BINARY_${running_kind^^}"
+[[ -z "${!running_variable:-}" ]] || echo "     Running tests/stub.rs (${!running_variable})"
 # STUB_CASE_SHAPE=crash-case：照崩溃点重放双机那几条用例的样子——标 #[ignore]：这一趟 cargo test 的参数（STUB_TEST_ARGUMENTS：本机那几趟是驱动交给假的本机那一趟的
 #   CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_TEST_ARGUMENTS，第二台那几趟是假的 multi-host-run.sh 收到的命令）里没有 --include-ignored，就像 libtest 那样一条都不跑、
 #   退 0（调用记录里记一笔 <台> ignored-not-run）；录入段只打 CRASH_LIBRARY_RECORDED、不打崩溃放量那一行；判段的汇总行打 CRASH_POINT_REPLAY_PARALLEL_FINISHED，不打 CRASH_AMPLIFICATION
@@ -334,6 +361,9 @@ if (( crash_case_shape )) && [[ " ${STUB_TEST_ARGUMENTS:-} " != *" --include-ign
 fi
 # 这一趟跑哪一段另记进 <调用记录>.stage（录入段那一趟只记这一笔、打 RECORDED 行就退 0；没设记 unset）
 echo "${STUB_HOST:?} stage=${SINGLEFS_CRASH_AMPLIFICATION_STAGE-unset}" >>"${STUB_CALLS:?}.stage"
+# 这一趟 cargo test 的参数里有没有 --test-threads 1 另记进 <调用记录>.test-threads（gpu-test-threads-one、gpu-off-test-threads-not-added 两格读）
+test_threads_given=no; [[ " ${STUB_TEST_ARGUMENTS:-} " == *" --test-threads 1 "* ]] && test_threads_given=yes
+echo "$STUB_HOST test_threads=$test_threads_given" >>"${STUB_CALLS:?}.test-threads"
 # 这一趟收到的库目录（SINGLEFS_CRASH_AMPLIFICATION_LIBRARY，原样）另记进 <调用记录>.library，录入段那一趟也记（records-into-the-given-library 那两格读）
 echo "$STUB_HOST stage=${SINGLEFS_CRASH_AMPLIFICATION_STAGE-unset} library=$library" >>"$STUB_CALLS.library"
 # STUB_OBSERVERS=1：模拟挂了观察者的用例——每一块有一份观察者录入块，录进库里的 observer-records（一行一块的序号）；
@@ -622,13 +652,13 @@ STUB
     done
     shift
     mkdir -p "$cell_directory"
-    : >"$cell_directory/calls"; : >"$cell_directory/calls.stage"; : >"$cell_directory/calls.library"; : >"$cell_directory/calls.record-share"
+    : >"$cell_directory/calls"; : >"$cell_directory/calls.stage"; : >"$cell_directory/calls.library"; : >"$cell_directory/calls.record-share"; : >"$cell_directory/calls.test-threads"
     cells=$((cells + 1))
     cell_command=(env -u SINGLEFS_CRASH_AMPLIFICATION_IMPORT -u SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE -u SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY -u SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS -u GPU_COMPUTATION_CLASSES -u GPU_CARDS_BY_PRIORITY
       -u SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES -u SINGLEFS_CRASH_LIBRARY_WRITE_ONLY
       -u CRASH_AMPLIFICATION_PEER_THREADS -u CRASH_AMPLIFICATION_BUILD_THREADS -u SINGLEFS_THREAD_CAP
       STUB_LOCAL_FAILURE= STUB_WARM_FAILURE= STUB_PEER_EXIT= STUB_PEER_FAILURE= STUB_PEER_DROP_BLOCK= STUB_PEER_NO_FETCH= STUB_PEER_PLACEMENT= STUB_PEER_RATE= STUB_QUIESCE= STUB_RECORD_MARKER=
-      STUB_CASE_SHAPE= STUB_PEER_WAIT_FOR_TERM= STUB_JUDGE_NOT_RUN= STUB_OBSERVERS= STUB_LOCAL_RECORD_FAILURE=
+      STUB_CASE_SHAPE= STUB_PEER_WAIT_FOR_TERM= STUB_JUDGE_NOT_RUN= STUB_OBSERVERS= STUB_LOCAL_RECORD_FAILURE= STUB_BINARY_RECORD= STUB_BINARY_JUDGE= STUB_BINARY_IMPORT=
       STUB_CALLS="$cell_directory/calls" STUB_PEER_TREE="$cell_directory/peer-tree" CRASH_AMPLIFICATION_TWO_HOSTS_STOP_DECIDED="$cell_directory/stop-decided"
       SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge "${environment[@]+"${environment[@]}"}"
       bash "$two_hosts_script" "$@" "${library_arguments[@]+"${library_arguments[@]}"}" --label "$name")
@@ -775,6 +805,48 @@ STUB
   if [[ "$cell_exit" != 101 ]] || ! output_has reconciliation-not-empty 'unjudged_blocks=1 '; then
     cell_failed reconciliation-not-empty "第二台漏判一块、导入之后对账剩 1 块，应当原样退导入那一趟的 101" \
       "看末尾导入那一趟：它退非 0 就照 import.log 分类退出，不报绿"
+  fi
+  # 观察者版本（文件头「观察者版本」）：单独起（选段空）本机先录入段，驱动从 record.log 里的 Running 行找到假二进制、取出里面观察者那几组的摘要记下；第二台漏判一块、
+  #   导入那一趟红（101）：版本没变（含只有无关的 gpu_judge 组变了）原样退 101；变了退 78、写「两趟之间判器单元变了，重跑整趟」、不是假用例那句「先跑录入段」；
+  #   录入段的二进制读不出表：说明一行、原样退 101；导入那一趟判绿而版本变了：退 0
+  fake_observer_binary() { # <文件> <观察者那几组的键> <无关的 gpu_judge 组的键>
+    { printf 'garbage-before\0'
+      printf '# singlefs entry group keys\ntoolchain\trustc fake\ngroup\tgpu_judge\tkeyed\t%s\ngroup\tjudgement_of_the_crash_images\tkeyed\t%s\ngroup\tobserver_conclusion_composition\tkeyed\t%s\n' "$3" "$2" "$2"
+      printf 'group\tobserver_code:tests/stub.rs:stub\tkeyed\t%s\nunit\tobserver_code:tests/stub.rs:stub\tfn\nwatched\ta.rs\n' "$2"
+      printf 'trailer\0'; } >"$1"
+  }
+  mkdir -p "$work/observer-version-binaries"
+  fake_observer_binary "$work/observer-version-binaries/recorded" key-one gpu-one
+  fake_observer_binary "$work/observer-version-binaries/other-gpu-group" key-one gpu-two
+  fake_observer_binary "$work/observer-version-binaries/other-observer" key-two gpu-one
+  printf 'not-a-test-binary\n' >"$work/observer-version-binaries/without-table"
+  local observer_binaries="$work/observer-version-binaries"
+  run_cell observer-version-unrelated-group-keeps-the-exit SINGLEFS_CRASH_AMPLIFICATION_STAGE= STUB_PEER_DROP_BLOCK=3 \
+    STUB_BINARY_RECORD="$observer_binaries/recorded" STUB_BINARY_IMPORT="$observer_binaries/other-gpu-group" -- some-target
+  if [[ "$cell_exit" != 101 ]] || ! output_has observer-version-unrelated-group-keeps-the-exit 'unjudged_blocks=1 ' || output_has observer-version-unrelated-group-keeps-the-exit '判器单元变了' \
+     || [[ ! -s "$work/home/runs/observer-version-unrelated-group-keeps-the-exit/observer-version" ]]; then
+    cell_failed observer-version-unrelated-group-keeps-the-exit "观察者那几组没变、只有无关的 gpu_judge 组变了：导入那一趟红了应当原样退 101（不报判器单元变了），录入段之后记下了版本" \
+      "看 two_hosts_observer_version_of_binary：只取 observer_code:… 、observer_conclusion_composition、judgement_of_the_crash_images 与工具链行；记下的版本写在 <日志目录>/observer-version"
+  fi
+  run_cell observer-version-changed-exits-78 SINGLEFS_CRASH_AMPLIFICATION_STAGE= STUB_PEER_DROP_BLOCK=3 \
+    STUB_BINARY_RECORD="$observer_binaries/recorded" STUB_BINARY_IMPORT="$observer_binaries/other-observer" -- some-target
+  if [[ "$cell_exit" != 78 ]] || ! output_has observer-version-changed-exits-78 '两趟之间判器单元变了，重跑整趟' || output_has observer-version-changed-exits-78 '先跑录入段' \
+     || ! last_call_is observer-version-changed-exits-78 '^local share=0/2 import=yes '; then
+    cell_failed observer-version-changed-exits-78 "录入段之后导入那一趟的二进制里观察者版本变了而导入那一趟红了，应当退 78、出路写「两趟之间判器单元变了，重跑整趟」、输出里不出现「先跑录入段」" \
+      "看末尾导入那一趟之后的 two_hosts_observer_version_changed：对不上而 import_exit 非 0 就退 78；录入段成了之后经 two_hosts_note_observer_version 记下版本"
+  fi
+  run_cell observer-version-unreadable-keeps-the-exit SINGLEFS_CRASH_AMPLIFICATION_STAGE= STUB_PEER_DROP_BLOCK=3 \
+    STUB_BINARY_RECORD="$observer_binaries/without-table" STUB_BINARY_IMPORT="$observer_binaries/other-observer" -- some-target
+  if [[ "$cell_exit" != 101 ]] || ! output_has observer-version-unreadable-keeps-the-exit '观察者版本取不到，导入那一趟不核版本' \
+     || [[ -e "$work/home/runs/observer-version-unreadable-keeps-the-exit/observer-version" ]]; then
+    cell_failed observer-version-unreadable-keeps-the-exit "录入段的二进制里读不出判器键表：应当打一行说明、不记版本、导入那一趟红了原样退 101" \
+      "看 two_hosts_note_observer_version：取不到时只打说明，不写 observer-version"
+  fi
+  run_cell observer-version-changed-import-green-stays-green SINGLEFS_CRASH_AMPLIFICATION_STAGE= \
+    STUB_BINARY_RECORD="$observer_binaries/recorded" STUB_BINARY_IMPORT="$observer_binaries/other-observer" -- some-target
+  if [[ "$cell_exit" != 0 ]] || output_has observer-version-changed-import-green-stays-green '重跑整趟'; then
+    cell_failed observer-version-changed-import-green-stays-green "版本变了而导入那一趟判绿：应当退 0、不退 78（对账为空、0 红，结论有效）" \
+      "看末尾导入那一趟之后：只在 import_exit 非 0 时退 78，判绿只打一行说明"
   fi
   # 分份途中被停（文件头「被停」）：本机那一份跑完、第二台那一份判完还没返回（假的 multi-host-run.sh 等 TERM）时只给驱动发 TERM ⇒
   #   驱动把 TERM 转给第二台那一趟（调用记录里有 peer term）、第二台照真的那样取回库再退，驱动带 IMPORT 跑一趟本机 0/2 把取回的块导进本机库、退 143
@@ -945,6 +1017,21 @@ STUB
      || ! calls_have gpu-off-classes-not-sent '^local share=0/2 import=yes ' || ! calls_have gpu-off-classes-not-sent '^peer share=1/2 import=no '; then
     cell_failed gpu-off-classes-not-sent "没开 GPU（调用方环境里漏进来一份 GPU_COMPUTATION_CLASSES）：两台每一趟的环境里都不该有 GPU_COMPUTATION_CLASSES，退 0" \
       "看 crash_amplification_environment_for_this_host 开头的 -u GPU_COMPUTATION_CLASSES"
+  fi
+
+  # ── gpu 那一趟的 cargo 参数带 --test-threads 1（GPU 对拍的测试各占卡的显存，不并行起；.claude/rules/verification.md「两档：轻型与重型」）：
+  #   开了 GPU，本机三趟与第二台排计划、分份两趟的 cargo test 参数都带；没开的不加。假的用例把收到的参数里有没有它记进 <调用记录>.test-threads
+  run_cell gpu-test-threads-one SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on.env" -- some-target --local-states-per-second 150
+  if [[ "$cell_exit" != 0 ]] || ! five_calls_seen gpu-test-threads-one || grep -qv '^[a-z]* test_threads=yes$' "$work/gpu-test-threads-one/calls.test-threads" \
+     || (( $(grep -c '^local ' "$work/gpu-test-threads-one/calls.test-threads") < 3 )) || (( $(grep -c '^peer ' "$work/gpu-test-threads-one/calls.test-threads") < 2 )); then
+    cell_failed gpu-test-threads-one "开了 GPU：本机三趟与第二台排计划、分份两趟的 cargo test 参数都应当带 --test-threads 1，退 0（实记「$(tr '\n' ';' <"$work/gpu-test-threads-one/calls.test-threads")」）" \
+      "看 crash_amplification_prepare 之后那一行：gpu_switch 为 1 时 cargo_test_arguments 要加 --test-threads 1"
+  fi
+  run_cell gpu-off-test-threads-not-added SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-off.env" -- some-target --local-states-per-second 150
+  if [[ "$cell_exit" != 0 ]] || grep -qv '^[a-z]* test_threads=no$' "$work/gpu-off-test-threads-not-added/calls.test-threads" \
+     || (( $(grep -c '^local ' "$work/gpu-off-test-threads-not-added/calls.test-threads") < 1 )) || (( $(grep -c '^peer ' "$work/gpu-off-test-threads-not-added/calls.test-threads") < 1 )); then
+    cell_failed gpu-off-test-threads-not-added "没开 GPU：本机与第二台的 cargo test 参数都不加 --test-threads 1，退 0（实记「$(tr '\n' ';' <"$work/gpu-off-test-threads-not-added/calls.test-threads")」）" \
+      "看 crash_amplification_prepare 之后那一行：只在 gpu_switch 为 1 时加"
   fi
 
   # ── 往引擎送的变量（文件头「步骤」之后 peer_environment 那一段）：本机设了，第二台排计划、分份那两趟也要在环境里拿到；
@@ -1246,7 +1333,7 @@ STUB
   echo "    分份途中被停先把 TERM 转给第二台那一趟、导入它取回的库再退 143、照崩溃点重放用例的样子造的用例（标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）录入段真跑并导入对账为空、"
   echo "    第二台卡用不了先导入再退 78、库没取回退 78、对账不为空原样退、先判着按速度分、先判着那一趟卡用不了退 78、判段没跑的那一行只从导入那一趟转打一次、第二台量不出速度按日志退 78 / 78 / 248 / 249、第二台排计划借不到显存记本次未跑退 77（别的用例名的那一行照退 249）、"
   echo "    参数写错与用法错退 2、清过场没写那一份显卡配置退 78、清场判不过或没过退 78、清过场退出时不复原、"
-  echo "    开不开 GPU 两台每一趟都不送 GPU_COMPUTATION_CLASSES（漏进来的也清掉）、显卡先后读多机配置（不读退役的私有显卡配置）、"
+  echo "    开不开 GPU 两台每一趟都不送 GPU_COMPUTATION_CLASSES（漏进来的也清掉）、显卡先后读多机配置（不读退役的私有显卡配置）、开了 GPU 两台每一趟 cargo test 都带 --test-threads 1（没开的不加）、"
   echo "    观察者录入按份分给两台（单独起、权重录入时就有：本机录入段只录本机那一份且带判段也带的权重、第二台先录它那一份再判、两台各写各的库、判段都读到自己库里录的；录入段红了判段不起、带停下文件导入第二台取回的；权重要等速度时仍由本机整份录）、"
   echo "    本机设了的按段登记文件（快照）与分片的段一趟判几个态（原值）都送进第二台排计划、分份那两趟、没设不送、"
   echo "    第二台那两趟与本机只编那一步的线程数取登记的重活默认并行度（显式给的优先、SINGLEFS_THREAD_CAP 设了取它、显式给的不是正整数退 78 不起；第二台那两趟判的线程数也取同一个数，不沿用本机的）"
@@ -1304,6 +1391,9 @@ two_hosts_on_exit() { # <这一趟的退出码>
 trap 'two_hosts_on_exit "$?"' EXIT
 library_is_temporary=0
 crash_amplification_prepare || two_hosts_break_is prepare-failure-ignored || exit 78
+# GPU 对拍的测试各占卡的显存，不并行起：开了 GPU 时本机与第二台每一趟 cargo test（共用库拼的 cargo_test_arguments，本机三趟与第二台排计划、分份两趟都用它）带 --test-threads 1
+# （.claude/rules/verification.md「两档：轻型与重型」）；没开的不加。弄坏开关 gpu-test-threads-unset 照改前不加
+if (( gpu_switch )) && ! two_hosts_break_is gpu-test-threads-unset; then cargo_test_arguments+=(--test-threads 1); fi
 
 # 库与日志的落点：/tmp 开机会清空（tmpfiles 的 D /tmp），2026-09-29 到 E 全域的库与树就丢在那里、续不上；正式跑一律放家目录下的固定位置，
 # 重跑同一条命令就是续跑（同一判法单元指纹下判过的块全部复用）。
@@ -1317,6 +1407,84 @@ record_library="$local_library"
 # 弄坏开关 record-into-the-default-library：照改前录入段写进默认库，--library 的覆盖落在录入段之后、只管判段
 two_hosts_break_is record-into-the-default-library && record_library="$(crash_amplification_default_library "$crash_amplification_home")"
 mkdir -p "$run_directory" || { echo "  ✗ 建不了 $run_directory" >&2; echo "  → 怎么办：看 ${crash_amplification_home} 可不可写" >&2; exit 2; }
+# 观察者版本（文件头「观察者版本」）：录入段之后记下、导入那一趟对一遍。版本取自这一趟 cargo test 在日志里打的 Running … (<测试二进制>) 那一行指到的二进制：
+# 二进制里编进去一份判器键表（crates/singlefs-checker-tier/src/crash_identity.rs 的 COMPILED_JUDGING_UNITS_KEYS_TEXT，构建脚本写的 judging_units_keys.tsv，表头
+# 「# singlefs entry group keys」），观察者版本由其中观察者代码那一组（observer_code:…）、观察者结论拼块那一组（observer_conclusion_composition）、池级 checker 那一组
+# （judgement_of_the_crash_images）的键与工具链行拼出来（crash_amplification.rs 的 observer_versions_of_the_keys）；这里把这几组的行取出来取 sha256。
+# 另读的输入（extra_inputs_digest）是跑起来才算的，二进制里没有，不在这一份摘要里。
+two_hosts_observer_version_of_binary() { # <测试二进制>：打「<摘要> groups=<组数> tables=<份数> binary=<路径>」一行；读不出打原因到 stderr、退 1
+  python3 -I - "$1" <<'OBSERVER_VERSION_PYTHON'
+import hashlib
+import mmap
+import sys
+
+path = sys.argv[1]
+start = b"# singlefs entry group keys\ntoolchain\t"
+recognized = (b"toolchain\t", b"group\t", b"refusal\t", b"not-compiled-entry\t", b"unit\t", b"watched\t")
+relevant_groups = (b"observer_conclusion_composition", b"judgement_of_the_crash_images")
+try:
+    with open(path, "rb") as handle:
+        view = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+except (OSError, ValueError) as error:
+    print(f"读不了测试二进制 {path}：{error}", file=sys.stderr)
+    sys.exit(1)
+selected, tables, at = [], 0, view.find(start)
+while at >= 0:
+    tables += 1
+    view.seek(at)
+    view.readline()
+    while True:
+        line = view.readline()
+        if not line.endswith(b"\n") or not line.startswith(recognized):
+            break
+        fields = line.rstrip(b"\n").split(b"\t")
+        if line.startswith(b"toolchain\t"):
+            selected.append(line)
+        elif line.startswith(b"group\t") and len(fields) > 1 and (fields[1].startswith(b"observer_code:") or fields[1] in relevant_groups):
+            selected.append(line)
+    at = view.find(start, at + 1)
+if tables == 0:
+    print(f"测试二进制 {path} 里找不到编进去的判器键表（# singlefs entry group keys）", file=sys.stderr)
+    sys.exit(1)
+groups = sum(1 for line in selected if line.startswith(b"group\t"))
+if groups == 0:
+    print(f"测试二进制 {path} 的判器键表里没有观察者那几组（observer_code:…、observer_conclusion_composition、judgement_of_the_crash_images）", file=sys.stderr)
+    sys.exit(1)
+print(f"{hashlib.sha256(b''.join(selected)).hexdigest()} groups={groups} tables={tables} binary={path}")
+OBSERVER_VERSION_PYTHON
+}
+two_hosts_observer_version_of_log() { # <日志>：日志里最后一行 Running … (<测试二进制>) 指到的二进制的观察者版本；相对路径按树根算
+  local binary
+  binary="$(grep -E '^[[:space:]]+Running .* \(.+\)$' "$1" 2>/dev/null | tail -n 1 | sed -E 's/^.*\((.+)\)$/\1/')"
+  if [[ -z "$binary" ]]; then echo "日志 $1 里没有 cargo 打的 Running … (<测试二进制>) 那一行（日志不在，或这一趟没经 cargo test）" >&2; return 1; fi
+  [[ "$binary" == /* ]] || binary="$repository_root/$binary"
+  two_hosts_observer_version_of_binary "$binary"
+}
+# 录入段成了之后记下（本机录入段那一趟的日志 record.log）；取不到打一行说明、导入那一趟不核
+two_hosts_note_observer_version() {
+  local version
+  rm -f -- "$run_directory/observer-version"
+  if version="$(two_hosts_observer_version_of_log "$run_directory/record.log" 2>&1)"; then
+    printf '%s\n' "$version" >"$run_directory/observer-version"
+    echo "  · 录入段之后记下观察者版本 ${version%% *}（$run_directory/observer-version）"
+  else
+    echo "  ! 观察者版本取不到，导入那一趟不核版本：$version" >&2
+  fi
+}
+# 导入那一趟的二进制里观察者版本和录入段之后记下的对不上：退 0（置 observer_version_recorded、observer_version_now）；没记下、没法核、没变都退 1。
+# 弄坏开关 observer-version-unchecked：不核（永远退 1）
+observer_version_recorded="" observer_version_now=""
+two_hosts_observer_version_changed() {
+  two_hosts_break_is observer-version-unchecked && return 1
+  [[ -s "$run_directory/observer-version" ]] || return 1
+  observer_version_recorded="$(<"$run_directory/observer-version")"
+  if ! observer_version_now="$(two_hosts_observer_version_of_log "$run_directory/import.log" 2>&1)"; then
+    echo "  ! 导入那一趟的观察者版本取不到，没法核：$observer_version_now" >&2
+    return 1
+  fi
+  [[ "${observer_version_recorded%% *}" != "${observer_version_now%% *}" ]]
+}
+
 # 两段（用户 2026-10-11 定）：分项驱动已经在本机跑过录入段、把选段设成 judge 才交过来；单独起这个驱动时它自己先在本机跑录入段。
 # 之后本机先判、两台分份、导入每一趟（连同第二台那几趟）都只跑判段，第二台从送过去的库快照里读录入段写下的那几样；
 # 单独起且权重录入时就有的，录入段不在这里先整份跑完，改成下面「分着录」：本机录自己那一份观察者、第二台自己录它那一份。
@@ -1335,6 +1503,7 @@ if (( record_wanted && ! given_states )) && [[ -z "$local_states_per_second" || 
 fi
 if (( record_wanted && ! record_split )); then
   crash_amplification_record_on_this_host "$record_library" "$run_directory/record.log" || exit $?
+  two_hosts_note_observer_version
   export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
 fi
 
@@ -1606,6 +1775,7 @@ run_local_record_then_share() {
       : > "$local_record_failed_marker"
       return "$record_exit"
     fi
+    two_hosts_note_observer_version
     export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
   fi
   run_local_share 0/2 "$local_library" "$run_directory/share-0.log"
@@ -1702,6 +1872,15 @@ else
   run_local_share 0/2 "$local_library" "$run_directory/import.log" "$fetched_library"; import_exit=$?
 fi
 print_the_import_lines
+# 观察者版本（文件头「观察者版本」）：导入那一趟用的二进制和录入段之后记下的对不上：红了不是漏录，退 78 叫人重跑整趟；判绿了只说一声
+if two_hosts_observer_version_changed; then
+  if [[ "$import_exit" != 0 ]]; then
+    echo "  ✗ 录入段之后到导入那一趟之间，测试二进制里编进去的判器单元变了：观察者版本录入段 ${observer_version_recorded%% *}，导入那一趟 ${observer_version_now%% *}（二进制见 $run_directory/observer-version 与 import.log 里 Running 那一行）；导入那一趟退 $import_exit，读不到录入段按旧版本录的块，不是录入段漏录" >&2
+    echo "  → 怎么办：两趟之间判器单元变了，重跑整趟（同一条命令，从录入段起，别只补录入段）；树在中途被改过的，在冻住的树里跑" >&2
+    exit 78
+  fi
+  echo "  ! 录入段之后到导入那一趟之间观察者版本变了（录入段 ${observer_version_recorded%% *}，导入那一趟 ${observer_version_now%% *}），导入那一趟照样对账为空、0 红：结论按导入那一趟的二进制算" >&2
+fi
 if [[ "$import_exit" != 0 ]] && ! two_hosts_break_is import-failure-ignored; then
   echo "  ✗ 导入第二台的库之后那一趟退 $import_exit（对账不为空或有红）；日志 $run_directory/import.log" >&2
   import_exit_code="$(crash_amplification_exit_code_of_a_failed_run "$import_exit" "$run_directory/import.log")"

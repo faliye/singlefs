@@ -526,10 +526,16 @@ mod tests {
     }
 
     /// 判据 7（跨装置闸）：与 E133 共有的十二条臂，每一行都要逐字段复现 E133 的留存产物；槽那两个字段按 E133 的一个字段对。
+    /// E133 的产物在 `research/results/` 下、可以被归档删掉：运行时读，读不到报本次未跑（`e7_index_bench::read_archived_product_or_report_not_run`）。
     #[test]
     fn e134_reproduces_the_e133_product_line_by_line_on_the_twelve_shared_arms() {
-        const E133_PRODUCT: &str = include_str!("../../research/results/e133-map-key-format-cost-2026-09-11.out");
-        let e133_lines: std::collections::HashSet<&str> = E133_PRODUCT.lines().collect();
+        let Some(e133_product) = e7_index_bench::read_archived_product_or_report_not_run(
+            "e134_map_key_slot_baselines::tests::e134_reproduces_the_e133_product_line_by_line_on_the_twelve_shared_arms",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e133-map-key-format-cost-2026-09-11.out"),
+        ) else {
+            return;
+        };
+        let e133_lines: std::collections::HashSet<&str> = e133_product.lines().collect();
         let mut shared_arm_count = 0u32;
         for arm in ARMS.iter().filter(|arm| !matches!(arm.name, "class_reuse_tagged" | "k1_seq_class_reuse")) {
             shared_arm_count += 1;

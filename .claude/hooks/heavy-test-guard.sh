@@ -32,7 +32,10 @@
 #                 不往后带；目录写在变量里的，同一段命令里前面赋过的与 $HOME 先展开（lib_shell_words.py 的 expand_known_variables），展开不了的照外面的当前目录判，
 #                 -p 点名 checker 档包的不看目录照算；lib_shell_words.py 的 env_directory），`env -S '串'` / `env --split-string=串` 的串拆成词再判
 #                 （lib_shell_words.py 的 env_option、env_split_string）；只编不跑、test -- --list 不算（lib_heavy_tests.py 文件头、depends_on_checker_package；
-#                 直接执行探针包编出来的二进制看不出链接了什么，罩不住）；
+#                 直接执行它的装置本体不算：target/<profile>/<名字> 与 deps/ 下同它是一份的那一个（cargo build 编出），与 cargo run --bin 同判，
+#                 lib_heavy_tests.py 的 device_main_binary；deps/ 下与本体不是一份的（cargo test 编的装置内联单测）照算）；
+#                 许可的用法：攻方原型 `cargo build` 之后经内存包装直接执行编出来的二进制（.claude/agents/three-way-attack.md 第 3b 步：原型里的流只许在原型里自己造，
+#                 不从崩溃枚举用例 crates/singlefs-checker-tier/tests/crash_enumeration_*.rs 里拷；测试目标不放进 checker 档包）；闸看不出这个二进制链接了什么、不判，守这一句靠攻方腿；
 #                 .claude/gate.d/checker-tier-crash-point-replay.sh、scripts/crash/crash-point-replay-shard-run.sh（按树根里键那一行登记的包判，登记的不是 checker 档包、
 #                 没登记分片或没有这一行的不算，判法在 lib_heavy_tests.py 的 shard_driver_runs_checker_tier）。只按包判，不按测试名、不看 --ignored
 #                 （.claude/rules/verification.md「定义与名字」；判定在 lib_heavy_tests.py）
@@ -58,8 +61,10 @@
 #                 这一道的两份判法脚本 scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py 直接起的每一种用法同算这一类
 #                 （python3 -m 加 PYTHONPATH、python3 -c、符号链接、参数放变量或 for 循环的都认），只有只读用法不算（lib_heavy_tests.py 的 verus_judge_use）：
 #                 verus-proof-check.py 字面写明的 toolchain、fingerprint、tool-versions、list-items；e165-pin-red-examples.py 照它文件头的用法，起装置的只有 --replay，
-#                 追加、--check、--backfill、--list-items 不算，参数里的变量只在可能展开成它认的选项名、或判不出落到哪种用法时才算（lib_heavy_tests.py 的 e165_pin_mode）；
-#                 .claude/scripts/lkmm.sh 只带 --herd7-version 的不算
+#                 追加、--check、--check-table、--backfill、--list-items 不算，参数里的变量只在可能展开成它认的选项名、或判不出落到哪种用法时才算（lib_heavy_tests.py 的 e165_pin_mode）；
+#                 .claude/scripts/lkmm.sh 只带 --herd7-version 的不算；直接执行装置 e165_replay_bounded_enumeration 的本体带 --pinned-cases（红例钉表重放，登记在
+#                 e165-pin-red-examples.py 的 DEVICE_BINARY、DEVICE_FLAG）同算这一类，装置本体的别的用法不算（lib_heavy_tests.py 的 device_main_replay_use）；参数里有没展开的词、可能展开成 --pinned-cases 的照重放拒，拒绝说明写出路（展开成字面的装置名与参数再起，或交主 agent）；
+#                 `cargo run --bin e165_replay_bounded_enumeration -- --pinned-cases …` 同判（lib_heavy_tests.py 的 cargo_run_device_replay）
 #   证红脚本      scripts/mutation/prove-red.sh 带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request 起、点名的变异行里有一行照 lib_heavy_tests.py 的 classify 判成重型的
 #                 （它在 python 里逐行起 cargo test，读正文看不见；判法在 lib_heavy_tests.py 的 prove_red_use），算那一行的类；不带前缀的不算（它把重型的行报本次未跑）
 #   崩溃放量      scripts/crash/crash-amplification.sh（不带参数是崩溃放量全量；--item 点名分项、--expand-up-to 缩过规模的同算）、scripts/crash/crash-amplification-item.sh
@@ -105,9 +110,13 @@
 #   ② 直接起登记成 samples-light-marker: 的那一道（checker-tier-crash-point-replay、herd7、QEMU）：cd 进放了那个标记的样本根、根参数写同一个目录，
 #      标记里的假工具（checker-tier-crash-point-replay 的 cargo）可执行、与仓里那一道某份样本的逐字节相同（标记是文件的与仓里某份样本的标记相同；空标记目录、内容不同、不可执行的照拒）；
 #      直接对真仓跑照旧按那一道拒，拒绝说明接一句样本档怎么跑。
-# 轻型（.claude/rules/verification.md「两档：轻型与重型」）：scripts/crash/crash-point-replay.sh --quick、.claude/gate.d/checker-tier-formal-verification.sh --quick [<根>]、
-#   .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick [<根>]，三条都可再带 `--item <项>`（给几次）；不算哪一类，谁都能跑：子 agent 带不带前缀都放行、
+# 轻型（.claude/rules/verification.md「两档：轻型与重型」）：scripts/crash/crash-point-replay.sh --quick（可再带 --local-only）、.claude/gate.d/checker-tier-formal-verification.sh --quick [<根>]、
+#   .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick [<根>]，三条都可再带 `--item <项>`（给几次；项经同一段命令里赋过字面元素的数组 `"${名[@]}"` 传的照认，
+#   lib_heavy_tests.py 文件头「两档里的轻型」）；不算哪一类，谁都能跑：子 agent 带不带前缀都放行、
 #   主 agent 不带前缀也放行。夹了别的词（--full、--check、写成变量的项、多出的根参数）的照那一道或崩溃点重放的重型拒；认法在 lib_heavy_tests.py 的 light_tier_command。
+#   环境里设了那一份文件头写的弄坏开关变量（GATE_MUTATION_BREAK、FORMAL_VERIFICATION_BREAK、CRASH_POINT_REPLAY_BREAK 一类，命令前、env 里、前面 export 的）的，
+#   带 --quick 也不认轻型，照那一道或崩溃点重放的重型拒（lib_heavy_tests.py 的 light_tier_break_variable）；那一份文件头 `LIGHT_SCALE_VARIABLE=<变量名>` 表登记的改轻型规模的变量
+#   （例 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES，名单只在文件头那张表里）设了同样不认。
 #   三条在 lib_heavy_tests.runs_compiled_code 里算跑编译出来的代码：子 agent 要经 scripts/hosts/run-with-memory-cap.sh 起（下面「另一道」）；
 #   要卡的经 scripts/crash/gpu-quiesce-run.sh -- <命令> 起，它与 /usr/bin/time 那一类一样剥掉（lib_heavy_tests.py 的 command_under_gpu_quiesce），里面那条照这张表判。
 # 谁、带什么才放行（都要带环境变量 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，别的值或没带一律拒）：
@@ -157,7 +166,9 @@
 # 命令词没展开（`$b`、`$(ls …)`）的，连同它点到的变量在这段命令文本里的定义（`名=值`、`for 名 in 词…`）里有 checker 档包的测试目标名，
 #   照直接执行它的测试二进制算（lib_heavy_tests.py 的 unexpanded_command_word_use；调度记录 records/2026-09-30-里程碑三开工第一轮.md 第 936 行那一次：
 #   循环里 `b=$(ls -t $D/$t-* | …)` 再经内存包装与 capped.sh 起 `$b`）；读进去的脚本正文只用它自己的定义。
-# 看不见的（照常放行、不记检出）：变量里拼出来的命令与脚本路径（命令词没展开而定义里点不到 checker 档测试目标名的）、通配与花括号写出来的脚本里的正文、eval、`<<<` 喂给 shell 的字符串；
+# 命令词写在变量里、同一段命令文本里前面赋过字面值的（`S=.claude/gate.d/<那一道>; bash "$S"`、`G=…; bash "$G/<那一道>"`、export 的同样认）：先展开再判，
+#   展开出来的脚本照读（lib_heavy_tests.py 的 command_word_expanded）。
+# 看不见的（照常放行、不记检出）：变量里拼出来的命令与脚本路径（展开不了的：上一条 Bash 设的、`$(…)` 算出来的、for / read 改写过的，命令词没展开而定义里点不到 checker 档测试目标名的）、通配与花括号写出来的脚本里的正文、eval、`<<<` 喂给 shell 的字符串；
 #   喂给 python 这类非 shell 解释器的程序（`python3 x.py` 里用 subprocess 起的命令；heredoc 正文先剥掉）；
 #   make（Makefile 里起的命令）与 xargs 起的命令；cd 到展开不了的变量路径之后（变量不在这段命令文本里赋值，或被 for / read / unset 改写过；前面赋过的与 $HOME 照展开）不带 -p 的 cargo test（认不出在不在工作区根、在哪个包里；
 #   -p 点名 checker 档包的照判）、--manifest-path 写在变量里指到工作区根或探针包的与相对路径的脚本；
@@ -293,6 +304,9 @@
 #                                   #       「stdin:被拒的检出记录写了结局「被拒」」「stdin:放行时的检出记录写了结局「只记」」（共 2 格）
 #                                   #   HEAVY_TEST_GUARD_BREAK=copy-without-run-scope  主 agent 没带前缀被拒时照抄的那条不带四段范围声明（SINGLEFS_RUN_SCOPE，写法在 run-scope-guard.sh 文件头）
 #                                   #       「stdin:主 agent 没带前缀跑整道门禁被拒时照抄的那条带四段范围声明（为什么是占位），照它再判放行」（共 1 格）
+#                                   #   HEAVY_TEST_GUARD_BREAK=device-test-case-dropped  拒绝说明与主 agent 照抄那一行里拿掉「入库装置在实验当中的单测，用户已给过授权的不另弹窗……」这一句
+#                                   #       「stdin:拒绝时 stderr 写了入库装置在实验当中的单测，用户已给过授权的不另弹窗、带 =user-request、调度记录写依据」
+#                                   #       「stdin:主 agent 没带前缀被拒时「→ 照抄」那一行也写了入库装置在实验当中的单测，用户已给过授权的不另弹窗」（共 2 格）
 #                                   #   （这几格在别的开关下也红：disable-check 下 main-full-policy、detection-outcome-dropped、copy-without-run-scope 点名的格都红；ignore-commit-checks 下 main-full-policy 头两格红）
 #                                   #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（同目录 lib_work_root.py：工作根退回旧根）  检出记录的默认位置跟着退回旧根
 #                                   #       「检出记录默认放在工作根下（lib_work_root.py）」
@@ -372,7 +386,7 @@ UNREGISTERED_SELFTEST_KIND = "commit-check-selftest-unregistered"
 GUARD_BREAK_VARIABLE = "HEAVY_TEST_GUARD_BREAK"
 KNOWN_GUARD_BREAK_ITEMS = ("disable-check", "ignore-written-scripts", "ignore-memory-cap", "ignore-commit-checks",
                            "ignore-heredoc-detached-run", "read-light-selftest-body", "drop-registry-hint", "main-full-policy",
-                           "detection-outcome-dropped", "copy-without-run-scope")
+                           "detection-outcome-dropped", "copy-without-run-scope", "device-test-case-dropped")
 def guard_break_is_set(item):
     return item in os.environ.get(GUARD_BREAK_VARIABLE, "").split(",")
 
@@ -727,7 +741,8 @@ def heavy_uses(text, directory, environment=None, frames_above=(), script=None, 
         occurrences[key] = occurrence + 1
         record_files_written(command, state)
         # 轻型写法（带 --quick）里写成变量的参数，用这段命令文本里前面赋过的值展开再判（lib_heavy_tests.py 的 light_tier_words_expanded）
-        command = command._replace(words=heavy_tests.light_tier_words_expanded(command.words, command.variables))
+        # 命令词写在变量里的也先展开（lib_heavy_tests.py 的 known_variables_expanded：command_word_expanded 再 light_tier_words_expanded）
+        command = command._replace(words=heavy_tests.known_variables_expanded(command.words, command.variables))
         # /usr/bin/time、flock、systemd-run 这一类包在外面照样起那条命令的：剥掉它，里面那条按一段命令文本接着判（包装、脚本、内存包装照认）；
         # detached-run.sh start 同样剥（同一条命令里前面写出的拷贝按写出的内容认，其余按名字、符号链接、签名行认）
         launched = written_detached_run(command, state)
@@ -806,9 +821,11 @@ def heavy_uses(text, directory, environment=None, frames_above=(), script=None, 
                                                  [run._replace(frames=run.frames[len(here):]) for run in inner.uncapped])
     return HeavyScan(uses, notices, scripts_read, hit_depth_limit, lowest_cycle_frame, uncapped)
 
+# 提交之外要跑重型先弹窗问用户；入库装置在实验当中的单测是其中用户已给过授权的一种，不再弹窗（实验执行员定义里是同一句话）。弄坏开关 device-test-case-dropped 下拿掉
+DEVICE_TEST_CASE = "" if guard_break_is_set("device-test-case-dropped") else "入库装置在实验当中的单测，用户已给过授权的不另弹窗，带 `SINGLEFS_HEAVY_TESTS=user-request` 跑，调度记录写依据"
 POLICY = ("→ 规矩：重型测试就是 checker 档那一批（.claude/rules/verification.md）：checker 档包 singlefs-checker-tier 的测试（按包判，挑哪个目标都算）与 checker-tier-crash-point-replay、QEMU、herd7、crates 变异整表、"
           "Verus 那一道门禁（checker-tier-formal-verification.sh，连同直接起它的判法脚本 scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py "
-          "的每一种用法，只有字面写明的 toolchain / fingerprint / tool-versions / list-items 与红例钉表的追加、--check、--backfill、--list-items 不算；直接起 verus 验证明、只打 --tool-versions 不算；"
+          "的每一种用法，只有字面写明的 toolchain / fingerprint / tool-versions / list-items 与红例钉表的追加、--check、--check-table、--backfill、--list-items 不算；直接起 verus 验证明、只打 --tool-versions 不算；"
           "scripts/mutation/prove-red.sh 带前缀起而点名行里有 checker 档的同算）、"
           "全量测试、整轮门禁、全部实验复跑、E152 装置、广谱变异（scripts/mutation/broad-mutation.py 起 cargo 或改库目录的每一种用法，只有 --list-items / --summary / --check-ignored / --help（-h）不算）、真编 QEMU（scripts/devices/build-patched-qemu.sh 除 --selftest 之外的用法），"
           "崩溃点重放的重型（scripts/crash/crash-point-replay.sh 不带参数、--item、--full），"
@@ -819,7 +836,7 @@ POLICY = ("→ 规矩：重型测试就是 checker 档那一批（.claude/rules/
           "都可再带 `--item <项>`，要卡的套 `bash scripts/crash/gpu-quiesce-run.sh --`）；"
           "主 agent 在提交流程里跑要带 `SINGLEFS_HEAVY_TESTS=commit`，用户要求时带 `SINGLEFS_HEAVY_TESTS=user-request`。\n"
           "→ 主 agent 怎么跑：提交时的六道重阶段照 .claude/skills/crash-test/commit-stages.md，整轮门禁照 .claude/skills/gate/staged-gate.md；都带那个前缀，都不跑全量 `cargo test`。\n"
-          "→ 提交之外任务确实要跑的：主 agent 先弹窗问用户，用户同意了才带 `SINGLEFS_HEAVY_TESTS=user-request` 跑；"
+          "→ 提交之外任务确实要跑的：主 agent 先弹窗问用户，用户同意了才带 `SINGLEFS_HEAVY_TESTS=user-request` 跑；" + (DEVICE_TEST_CASE + "；" if DEVICE_TEST_CASE else "") +
           "子 agent 在交回报告「要主 agent 跑的命令」一节写明要跑什么、为什么，交主 agent（派发提示里点名要你跑的也一样，写明被这道闸拒了）。")
 COMMIT_CHECK_POLICY = ("→ 规矩：提交时才跑的检查——扫仓的门禁阶段（重型那几道之外的）、上游的 doc-lint / gate-lint / shell-lint / preflight-lint / gate-overlap / "
                        "rules-lint / hooks-registered / stage-selftest、scripts/gate/gate-structure-check.py、"
@@ -913,7 +930,8 @@ def main_agent_copy_lines(command, directory):
             written += f"，在被拒的那条验证命令最前面加 `{declaration} `（为什么一段换成这一次的理由）"
         return [f"→ 照抄：这条命令 {len(candidate)} 字，不整条贴；在它最前面加 {written}（加上之后照同一张表再判过，放行）；用户要求时把 commit 换成 user-request。"]
     reason_hint = "；范围声明的为什么一段换成这一次的理由" if declaration is not None else ""
-    return [f"→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户{reason_hint}）：", candidate]
+    device_hint = f"；{DEVICE_TEST_CASE}" if DEVICE_TEST_CASE else ""
+    return [f"→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户{device_hint}{reason_hint}）：", candidate]
 
 def refusal_reason(kind, occasion, agent_type):
     """放行返回 None；拒绝返回一句原因。子 agent 一样都不跑，主 agent 要带前缀。"""
@@ -1189,6 +1207,56 @@ def selftest(hook_dir):
              f"D={work}; cd $D && bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick $D", 0),
             ("调查员经内存包装起形式化那一道 --quick 根写成没赋过值的变量：照拒", "investigator",
              "bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick $SINGLEFS_SELFTEST_UNSET_ROOT", 2),
+            # 命令词写在变量里（lib_heavy_tests.py 的 command_word_expanded；LIB_HEAVY_TESTS_BREAK=command-word-variables-unexpanded 下前两格红：应当是 2，实际 0）
+            ("实现员 S=… 之后 bash \"$S\" 起 crates 变异那一道整道：照拒", writer, "S=.claude/gate.d/checker-tier-crates-mutation-replay.sh; bash \"$S\" .", 2),
+            ("主 agent 不带前缀 G=… 之后 bash \"$G/…\" 起形式化那一道：照拒", None, "G=.claude/gate.d; bash \"$G/checker-tier-formal-verification.sh\" .", 2),
+            # 轻型的项经数组传（light-tier-arrays-unexpanded 下头一格红：应当是 0，实际 2；LIB_SHELL_WORDS_BREAK=array-appends-unseen 下第二格红：应当是 2，实际 0）
+            ("实现员经内存包装起 crates 变异那一道 --quick、项经字面数组传：放行", writer,
+             "items=(--item core-row-1 --item core-row-2); bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick . \"${items[@]}\"", 0),
+            ("实现员经内存包装起 crates 变异那一道 --quick、数组后来追加了 --full：照拒", writer,
+             "items=(--item core-row-1); items+=(--full); bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick . \"${items[@]}\"", 2),
+            # 崩溃点重放入口的轻型另认 --local-only（light-tier-local-only-unrecognized 下头一格红：应当是 0，实际 2）
+            ("实现员经内存包装起崩溃点重放 --quick --local-only 加点名一项：放行", writer,
+             "bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick --local-only --item fixed-script", 0),
+            ("实现员经内存包装起崩溃点重放 --local-only 不带 --quick：照拒", writer, "bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --local-only", 2),
+            # 登记了红例钉表重放用法的装置本体带 --pinned-cases 照拒（lib_heavy_tests.py 的 device_main_replay_use；device-main-replay-allowed 下前两格红：应当是 2，实际 0）
+            ("实验执行员经内存包装直接执行 e165 装置的本体带 --pinned-cases：照拒", "experiment-runner",
+             f"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/e165_replay_bounded_enumeration --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv", 2),
+            ("实验执行员经内存包装直接执行 e165 装置的本体（deps/ 下同一份）带 --pinned-cases：照拒", "experiment-runner",
+             f"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/deps/e165_replay_bounded_enumeration-fedcba9876543211 --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv", 2),
+            ("实验执行员经内存包装直接执行 e165 装置的本体不带 --pinned-cases：放行", "experiment-runner",
+             f"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/e165_replay_bounded_enumeration --bounds light", 0),
+            ("实验执行员经内存包装直接执行别的装置的本体带 --pinned-cases：放行", "experiment-runner",
+             f"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/e161_sample_device --pinned-cases table.tsv", 0),
+            # cargo run --bin 起登记装置带 --pinned-cases 同样照拒（lib_heavy_tests.py 的 cargo_run_device_replay；cargo-run-device-replay-allowed 下头一格红：应当是 2，实际 0）
+            ("实验执行员经内存包装 cargo run 起 e165 装置带 --pinned-cases：照拒", "experiment-runner",
+             "bash scripts/hosts/run-with-memory-cap.sh 4G cargo run --release --bin e165_replay_bounded_enumeration -- --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv", 2),
+            ("实验执行员经内存包装 cargo run 起 e165 装置不带 --pinned-cases：放行", "experiment-runner",
+             "bash scripts/hosts/run-with-memory-cap.sh 4G cargo run --release --bin e165_replay_bounded_enumeration -- --bounds light", 0),
+            # 带 --quick 而环境里设了那一份文件头写的弄坏开关变量：不认轻型（light-tier-break-variable-ignored 下这四格红：应当是 2，实际 0）
+            ("实现员经内存包装起 crates 变异那一道 --quick、命令前设了 GATE_MUTATION_BREAK：照拒", writer,
+             "GATE_MUTATION_BREAK=quickrunsallrows bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .", 2),
+            ("调查员经内存包装起形式化那一道 --quick、命令前设了 FORMAL_VERIFICATION_BREAK：照拒", "investigator",
+             "FORMAL_VERIFICATION_BREAK=quick-core-unselected bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick .", 2),
+            ("实现员经内存包装起崩溃点重放 --quick、命令前设了 CRASH_POINT_REPLAY_BREAK：照拒", writer,
+             "CRASH_POINT_REPLAY_BREAK=accept-unknown-item bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 2),
+            # 入口文件头 LIGHT_SCALE_VARIABLE= 表登记的改轻型规模的变量同样不认轻型（lib_heavy_tests.py 的 light_tier_break_variable；LIB_HEAVY_TESTS_BREAK=light-scale-variable-ignored 下前三格红：应当是 2，实际 0）
+            ("实现员经内存包装起崩溃点重放 --quick、命令前设了登记的改规模变量 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES：照拒", writer,
+             "SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=4294967296 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 2),
+            ("实现员带范围声明与改规模变量起崩溃点重放 --quick（攻方探针原样）：照拒", writer,
+             "SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=4294967296 SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=崩溃点重放轻型; 范围=核心部分; 为什么=核对轻型规模变量下的结果' "
+             "bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 2),
+            ("主 agent 不带前缀起崩溃点重放 --quick、命令前设了登记的改规模变量：照拒", None,
+             "SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=4294967296 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 2),
+            ("实现员经内存包装起崩溃点重放 --quick、命令前登记的改规模变量值为空：放行", writer,
+             "SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES= bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 0),
+            ("实现员经内存包装起 crates 变异那一道 --quick、命令前设的开关变量值为空：放行", writer,
+             "GATE_MUTATION_BREAK= bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .", 0),
+            # 装置的本体与 cargo run --bin 同判（lib_heavy_tests.py 的 device_main_binary；device-main-as-test 下头一格红：应当是 0，实际 2）
+            ("实验执行员经内存包装直接执行 checker 档装置的本体（deps/ 下与 target/release/<名字> 同一份）：放行", "experiment-runner",
+             f"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/deps/e161_sample_device-fedcba9876543210 stream-constants", 0),
+            ("实验执行员经内存包装直接执行 checker 档装置的内联单测（deps/ 下与本体不是一份）：照拒", "experiment-runner",
+             f"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/deps/e161_sample_device-1111111111111111", 2),
             ("主 agent带前缀经包装跑 checker 档包快档", None, commit + "nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 0),
             ("主 agent 不带前缀跑 checker 档包", None, "bash scripts/hosts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 2),
             ("主 agent 带 =user-request 跑 checker 档包", None, request + "bash scripts/hosts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 0),
@@ -1855,6 +1923,9 @@ def selftest(hook_dir):
         # 「→ 规矩」那一串列的重型测试带真编 QEMU（POLICY 里删掉这一项，这一格红）
         results.append(("stdin:拒绝时 stderr 的「→ 规矩」那一串列出真编 QEMU", 1,
                         int(any(line.startswith("→ 规矩：重型测试") and "真编 QEMU" in line for line in refused.stderr.splitlines()))))
+        # 提交之外要跑先弹窗，入库装置在实验当中的单测（用户已给过授权的）不另弹窗、带 =user-request、调度记录写依据（HEAVY_TEST_GUARD_BREAK=device-test-case-dropped 下这一格红）
+        results.append(("stdin:拒绝时 stderr 写了入库装置在实验当中的单测，用户已给过授权的不另弹窗、带 =user-request、调度记录写依据", 1,
+                        int("入库装置在实验当中的单测，用户已给过授权的不另弹窗，带 `SINGLEFS_HEAVY_TESTS=user-request` 跑，调度记录写依据" in refused.stderr)))
         allowed = subprocess.run(["bash", script], capture_output=True, text=True, env=environment,
                                  input=json.dumps({"tool_name": "Bash", "cwd": work, "tool_input": {"command": commit + "cargo test --all"}}))
         results.append(("stdin:主 agent 带前缀放行（退出码 0）", 0, allowed.returncode))
@@ -1891,6 +1962,9 @@ def selftest(hook_dir):
                         "implementation-workflow.md「checker 档只在提交时跑，harness 随时跑」" in main_refused.stderr
                         and "→ 交回前不跑它们" not in main_refused.stderr and len(main_lines) <= 4))
         results.append(("stdin:被拒的检出记录写了结局「被拒」", "被拒", main_outcome))
+        # 主 agent 被拒时看到的是「→ 照抄」那一行，不是整段规矩；入库装置在实验当中的单测不另弹窗的那句也在这一行里（device-test-case-dropped 下红）
+        results.append(("stdin:主 agent 没带前缀被拒时「→ 照抄」那一行也写了入库装置在实验当中的单测，用户已给过授权的不另弹窗", True,
+                        bool(main_lines) and main_lines[0].startswith("→ 照抄") and "入库装置在实验当中的单测，用户已给过授权的不另弹窗" in main_lines[0]))
         # 走真实入口：照抄的那条是门禁这类验证命令时带四段范围声明（.claude/hooks/run-scope-guard.sh 的写法，为什么一段是占位），照它再喂一遍放行
         # （HEAVY_TEST_GUARD_BREAK=copy-without-run-scope、main-full-policy、disable-check 下红）
         stage_command = "bash .claude/gate.d/checker-tier-lkmm.sh"

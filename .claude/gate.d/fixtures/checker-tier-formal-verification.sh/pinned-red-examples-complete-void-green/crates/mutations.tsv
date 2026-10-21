@@ -1,3 +1,0 @@
-# 样本用的 crates 变异表：只用前两段（变异名、文件），其余照格式占位
-链首锚点错一位	crates/singlefs-core/src/recovery.rs	a	b	-p singlefs-harness	t
-每条记录都当末条	crates/singlefs-core/src/recovery.rs	c	d	-p singlefs-harness	t

@@ -7,7 +7,7 @@
 #   选行按变异名与它改的判定、不按行号；改的文件取变异行第二列）；
 #   第 2 次重跑 research/prompts/e165-r2-prereg.md 5.6 第二段、第九节 9.1–9.5（这份驱动只为 r2 档写）：基线与每个变体调装置都带
 #   --profile r2；条款判据栏加 J6Qn 两行与 J7 五行；每个变体逐域报 J6 与 J6Qn 各自的首红（first_red_by_criterion，SQ2）与
-#   首个文字不同的 N 上不同的判据名（first_text_red_criteria，SQ5 要的 Z5 那一格）；自造表 Z1–Z5；红例账照落，不钉进用例表（5.6）。
+#   首个文字不同的 N 上不同的判据名（first_text_red_criteria，SQ5 要的 Z5 那一格）；自造表 Z1–Z5；红例账照落，写完当场钉进钉表、当场核钉全（「钉红例」一段）。
 #   r1 档那份第二段要复跑，用 git 里 r1 那份驱动与 r1 冻结的根（r2 登记第十一节「新旧产物怎么并存」）。
 #   第 3 次重跑 research/prompts/e165-r3-prereg.md 9.3（第三段，加 --profile r3 模式；不给 --profile 仍是 r2 那一套，一个字不改）：
 #   基线与每个变体调装置都是 --profile r3 --bounds segment1 --family root_choice；变体名单是 9.1 那六个名字（1822–1827，按名字选行，
@@ -69,6 +69,12 @@
 #       「r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2」（实际退 7：基线缺 R2 的闸字段、变体一个不编）
 #   E165_KILL_BOUNDS_BREAK=defaultone  --jobs、--threads 都不给时取 1 × 1（改前的样子），不取登记的重活默认并行度
 #       「--jobs、--threads 的缺省：…」（实际 (1, 1)）
+#   下面两项外面打开时自证的每一趟都带着它（drive() 照下面七项那一段的带法）：
+#   E165_KILL_BOUNDS_BREAK=pincheckskipped  钉红例时不跑 --check（当场追加之后不核钉全）
+#       「账写完而钉表没钉时驱动当场核钉全应当判红、退 8、一次不编」（实际退 0）、「已收尾的一对重跑同一条命令应当只重做钉红例」（实际「核了 没核」）、
+#       「整轮写完账与产物要当场钉进钉表、再核钉全」「补跑补齐之后照样当场钉、当场核」（实际成功那句不报核了几行）
+#   E165_KILL_BOUNDS_BREAK=retainedmissingred  留存产物不在时照改前不报本次未跑：V7 读不到（退非 0）、TV7 报 TV8 退 6
+#       「r2：第一段产物不在时 V7 的比对应当逐项报本次未跑」「r3：第二段产物不在时 TV7 的比对应当逐项报本次未跑」「r4：第一段产物不在时 TV7 的比对应当逐项报本次未跑」
 #
 #   e165-replay-mutation-kill-bounds.sh --list-items
 #       逐行列变体（基线 1 个、crates/mutations.tsv 里 21 种不同的替换、自造 5 条，共 27 行），不编不跑。
@@ -105,15 +111,26 @@
 #      自造表每行的文件列也要是这两份之一。今天的表行号只用来给变体起名（tsv-<行号>）。
 #   2. 每条变异的原文在它第二列点名的那份文件里恰好命中一次（\n 还原成换行）；有一条不是就报「锚点腐化」，退 3，一条都不跑。
 #   3. 基线（不改的副本）先编先跑 --profile r2 --bounds segment2；每个有 J6 行的 (域, N) 都要有 J6Qn 两行，缺了就是装置没带 --profile r2，退 7、
-#      变体一个不编（r2 9.4 第 6 条）；它每个 (域, N) 的行必须逐字出现在第一段 r2 档的两份产物里（作废条款 V7，r2 9.4 第 2 条、SV9），不然退 6。
+#      变体一个不编（r2 9.4 第 6 条）；它每个 (域, N) 的行必须逐字出现在第一段 r2 档的两份产物里（作废条款 V7，r2 9.4 第 2 条、SV9），不然退 6
+#      （产物有不在的，这一项本次未跑，见「留存产物」一段）。
 #   4. 每个变体：把 Cargo.toml、Cargo.lock、.cargo、crates/（不带 target）拷成一份副本，原件另存在副本之外、核 sha256；
 #      改坏、`cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration`（编不过记「无效」）、
 #      跑 --bounds segment2、逐行与基线比；红了的域在首红的 N 上找一个反例状态（两边的 --list-states 逐行比出第一个判定不同的状态），
 #      再拿两边的二进制各 --replay-state 单条重放一遍，判定必须与逐态行相同；收尾把原件拷回副本、核 sha256，删掉这份副本与编译目录。
 #   5. 收尾再建一份不改的副本重编重跑基线，输出必须与开头逐字相同；仓里 recovery.rs 的 sha256 与 `git status --porcelain crates/`
 #      开头与结尾相同（作废条款 V6），不然退 5、不写收尾行。
-#   6. 红例账照落，不钉进 .claude/gate.d/e165-pinned-red-examples.tsv（r2 登记 5.6、9.4 第 5 条：钉表的行要带 --profile r2 才重放得出，
-#      接不接、表格式怎么扩由主 agent 定）；r1 那份驱动收尾钉红例的那一步这里没有。
+#   6. 红例账照落，写完收尾三行之后当场钉进 .claude/gate.d/e165-pinned-red-examples.tsv、当场核钉全（「钉红例」一段）。
+# 钉红例：不给 --profile 的那一套（写红例账的只有它）写完一对账（--ledger）与 kill-bounds 产物（--output）、收尾三行落盘之后，
+#   先跑 python3 scripts/experiments/e165-pin-red-examples.py --root <脚本所在的仓> --kill-bounds <产物> <账>（追加：已钉的不重复，档取产物 config 行的
+#   device_arguments=，即 --profile r2），再跑同一份的 --check --kill-bounds <产物> <账>（显式给这一对）；钉表与变异表取脚本所在的仓，不取 --root。
+#   有一步退非 0，原样转出它的输出、整趟退 8（EXIT_PIN_INCOMPLETE）；都过，成功那句报「钉红例：钉进 N 行、核了 M 行」。
+#   产物已收尾的，重跑同一条命令不跑变体，只重做这一步（上一趟钉红例没过、改好之后走这里）。--recheck 不钉。
+#   只供自证：E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND 设了（且是自证起的那一趟）就不追加，造「账写完了、钉表没钉」。
+# 留存产物：V7、TV7 比的对象（第一段、第二段的产物，五-甲的产物）在 research/results/ 下，那个目录可以整个删掉。比对的对象有不在的，
+#   那一项本次未跑：逐个点名不在的产物打一行「! 本次未跑：作废条款 <V7|TV7> 的比对：留存产物 <路径> 不在」（环境里有 GATE_NOT_RUN_FILE 的另往那份文件追加一行），
+#   不当绿、不判红，照跑完；基线那一行的比对栏（rows_found_verbatim_in_segment1_products、rows_identical_to_segment1_product、rows_identical_to_segment2_product）
+#   与收尾判决行的 baseline_equals_segment1_product、baseline_equals_segment2_product 写 not_run，收尾那句接「本次未跑 N 项：…」。在的照旧比，不同照旧退 6；
+#   在而一行 E7RESULT 都读不到照旧按 TV8 退 6。
 # 界固定为登记 5.6 的上沿（修订第 10 条去掉了放宽规则）：每个变体整份 --bounds segment2 跑一遍，每个域的「首红的 N」取第一个与基线不同的 N，
 #   与「从小往大扫、红了就停」得出的是同一个数；到上沿没红记「界内不红」。
 # 「红」的口径：这个 (域, N) 上某条判据的违例数与基线不同。条款判据（J0–J4、J5a、J5b、J6、J6Qn、J7a 三格、J7b、J7c、A0、AS 三条、A-结构、A-限）与
@@ -136,7 +153,7 @@
 #
 # 退出码：0 点名的都落了行（或本来就都有）；1 有变体没得出结果（包装结局、装置没跑完）、--recheck 对不上、或自证判红；2 用法不对；
 #   3 锚点腐化；4 停机条款 H1（含自造表的 Z 行名字与登记不等）；5 作废条款 V6（收尾基线与开头不同，或仓里的 crates/ 在跑的时候变了）；6 作废条款 V7；
-#   7 基线里缺 J6Qn_ 行（装置没带 --profile r2，r2 9.4 第 6 条）。
+#   7 基线里缺 J6Qn_ 行（装置没带 --profile r2，r2 9.4 第 6 条）；8 钉红例没过（当场追加或 --check 退非 0，「钉红例」一段）。
 # 弄坏开关 E165_KILL_BOUNDS_BREAK=<项>（只给 --selftest 证明它会红用，逗号分隔可给几个；不认识的项当场退出）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几项红（自证的例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
 #   E165_KILL_BOUNDS_BREAK=gpumemoryasresult  wrapper_own_problem 不认 245（显存不够），照装置自己的退出码往下比
@@ -296,11 +313,15 @@ ANCHOR_CRITERIA = {"IA1", "IA2"}
 DOMAINS_WHERE_FAILED_STATES_ARE_PINNED = {"L", "L6", "L9", "U_verify_on", "X", "E1"}
 ADVERSARIAL_DOMAINS = {"A", "A6", "AC"}
 EXIT_OK, EXIT_INCOMPLETE, EXIT_USAGE, EXIT_ANCHOR, EXIT_HALT_H1, EXIT_VOID_V6, EXIT_VOID_V7, EXIT_NOT_PROFILE_R2 = 0, 1, 2, 3, 4, 5, 6, 7
+EXIT_PIN_INCOMPLETE = 8   # 钉红例（文件头「钉红例」）：当场追加或 --check 没过
+# 钉红例用的那一份：追加与 --check 的写法在它文件头
+PIN_SCRIPT = os.path.join(SCRIPT_DIRECTORY, "e165-pin-red-examples.py")
 BREAK_MODES = ("noanchorcheck", "rerunall", "progressnever", "byrownumber", "nodupcheck", "nolocationcheck", "recoveryonly",
                "j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour",
                "r3itemsmissing", "r3firstredswap", "r3kapinunchecked", "r3noprofile",
                "r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile",
-               "r5pinsignored", "r4gateignored", "gpumemoryasresult", "owntablesplit", "defaultone")
+               "r5pinsignored", "r4gateignored", "gpumemoryasresult", "owntablesplit", "defaultone",
+               "pincheckskipped", "retainedmissingred")
 # 外面打开时自证的 r2 那几趟原样传进去的四项（文件头「弄坏开关」）
 R2_BREAK_MODES = ("j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour")
 # 外面打开时自证的 r3 那几趟原样传进去的四项（登记 r3 9.3 第 6 条的表）；别的趟不带
@@ -566,6 +587,8 @@ class Setup:
         # 这几样改取脚本所在的仓（登记 r5 第十一节「根、清单、在哪编」：驱动的自造表与 scripts 取脚本所在的仓）。
         self.research_root = self.script_root if pins == "r5" else root
         self.memory_cap_runner = os.path.join(self.research_root if profile == "r2" else self.script_root, "scripts/hosts/run-with-memory-cap.sh")
+        # 这一趟本次未跑的比对（留存产物不在，retained_product_not_run 记），收尾那句逐项列出
+        self.not_run = []
 
     def bounds_arguments(self):
         """每次整份跑装置的界参数：r2 是 --bounds segment2；r3 是 --bounds segment1 --family root_choice（登记 r3 9.3 第 3 条）；
@@ -1312,8 +1335,34 @@ def build_and_run_baseline(setup, options, name):
     return {"binary": binary, "rows": rows, "exit": completed.returncode, "directory": directory}
 
 
+def retained_product_not_run(setup, clause, paths):
+    """比对的对象是 research/ 下的留存产物（可以整个删掉）：有不在的，这一项比对本次未跑——逐个点名不在的产物，记进 setup.not_run、打一行「本次未跑」，
+    环境里有 GATE_NOT_RUN_FILE 的另往那份文件追加一行；不当绿、不判红，交 True（调用方不比、比对那一栏写 not_run）。都在交 False（照旧比）。
+    弄坏开关 retainedmissingred 下一律交 False（照改前：不在就判红或读不到）。"""
+    absent = [path for path in paths if not os.path.exists(path)]
+    if not absent or "retainedmissingred" in BREAK:
+        return False
+    for path in absent:
+        line = f"作废条款 {clause} 的比对：留存产物 {path} 不在"
+        setup.not_run.append(line)
+        print(f"  ! 本次未跑：{line}（留存产物可以整个删掉；在时照比，不在不当绿、不判红）")
+        not_run_file = os.environ.get("GATE_NOT_RUN_FILE")
+        if not_run_file:
+            with open(not_run_file, "a", encoding="utf-8") as handle:
+                handle.write(f"e165-replay-mutation-kill-bounds：{line}\n")
+    return True
+
+
+def retained_comparison_text(baseline, compared_text):
+    """基线那一行、收尾判决行里比对那一栏：留存产物不在、没比的写 not_run，比过的写 compared_text。"""
+    return "not_run" if baseline.get("verbatim_rows") == "not_run" else compared_text
+
+
 def check_against_segment_one(setup, baseline):
-    """作废条款 V7：基线每个 (域, N) 的行必须逐字出现在第一段的产物里。"""
+    """作废条款 V7：基线每个 (域, N) 的行必须逐字出现在第一段的产物里。第一段产物有不在的，这一项本次未跑（retained_product_not_run）。"""
+    if retained_product_not_run(setup, "V7", [os.path.join(setup.research_root, product) for product in setup.registered["segment1_products"]]):
+        baseline["verbatim_rows"] = "not_run"
+        return
     known = set()
     for product in setup.registered["segment1_products"]:
         with open(os.path.join(setup.research_root, product), encoding="utf-8") as handle:
@@ -1683,8 +1732,11 @@ def check_the_gate_rows_r4(setup, baseline):
 
 def check_against_segment_one_product(setup, baseline):
     """作废条款 TV7（r4 9.3 第 3 条与第六节末段）：开头基线的 E7RESULT 行必须与第一段的产物逐行相同（同一份根、同一份源码编出来的）；
-    读不到、一行都没有按 TV8 不当结果。"""
+    一行都没有按 TV8 不当结果；产物不在，这一项本次未跑（retained_product_not_run）。"""
     path = os.path.join(setup.script_root, setup.registered["segment1_product"])
+    if retained_product_not_run(setup, "TV7", [path]):
+        baseline["verbatim_rows"] = "not_run"
+        return
     if not os.path.exists(path):
         raise Stop(EXIT_VOID_V7, f"  ✗ 作废条款 TV8：第一段产物读不到：{path}\n  → 怎么办：产物在脚本所在的仓的 research/results/ 下；这一次不当结果")
     with open(path, encoding="utf-8") as handle:
@@ -1725,7 +1777,7 @@ def baseline_item_line_r4(setup, item, baseline, options):
     kg_pin = r4_baseline_kg_today_pin(setup, r4_parse(rows)[0]) if rows else "no_rows"
     return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none{options.get('gate_field', '')} outcome=baseline "
             f"result_rows={len(rows)} result_rows_sha256={digest} run_exit={baseline['exit']} "
-            f"rows_identical_to_segment1_product={str(baseline.get('verbatim_rows', 0) == len(rows)).lower()} kg_today_pin={kg_pin} "
+            f"rows_identical_to_segment1_product={retained_comparison_text(baseline, str(baseline.get('verbatim_rows', 0) == len(rows)).lower())} kg_today_pin={kg_pin} "
             f"rerun=\"{rerun_command_r4(item, options)}\" title=基线（不改） complete=yes")
 
 
@@ -1856,8 +1908,11 @@ def check_the_profile_rows_r3(baseline):
 
 def check_against_segment_two_product(setup, baseline):
     """作废条款 TV7（r3 9.3 第 3 条与第六节末段）：开头基线的 E7RESULT 行必须与第二段产物逐行相同（同一份根、同一份源码编出来的，耗时字段除外）；
-    读不到、一行都没有按 TV8 不当结果。"""
+    一行都没有按 TV8 不当结果；产物不在，这一项本次未跑（retained_product_not_run）。"""
     path = os.path.join(setup.script_root, setup.registered["segment2_product"])
+    if retained_product_not_run(setup, "TV7", [path]):
+        baseline["verbatim_rows"] = "not_run"
+        return
     if not os.path.exists(path):
         raise Stop(EXIT_VOID_V7, f"  ✗ 作废条款 TV8：第二段产物读不到：{path}\n  → 怎么办：产物在脚本所在的仓的 research/results/ 下；这一次不当结果")
     with open(path, encoding="utf-8") as handle:
@@ -1895,7 +1950,7 @@ def baseline_item_line_r3(item, baseline, options):
     digest = hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
     return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none outcome=baseline "
             f"result_rows={len(rows)} result_rows_sha256={digest} run_exit={baseline['exit']} "
-            f"rows_identical_to_segment2_product={str(baseline.get('verbatim_rows', 0) == len(rows)).lower()} rerun=\"{rerun_command_r3(item, options)}\" title=基线（不改） complete=yes")
+            f"rows_identical_to_segment2_product={retained_comparison_text(baseline, str(baseline.get('verbatim_rows', 0) == len(rows)).lower())} rerun=\"{rerun_command_r3(item, options)}\" title=基线（不改） complete=yes")
 
 
 def rerun_command_r3(item, options):
@@ -1971,6 +2026,48 @@ def process_item_r3(setup, item, baseline, options):
     return {"lines": lines, "ledger": [], "problem": problem, "timing": (build_seconds, run_seconds, time.monotonic() - started)}
 
 
+def not_run_suffix(setup):
+    """收尾那句后面接的：这一趟本次未跑的比对逐项列出（留存产物不在）；没有交空串。"""
+    return f"；本次未跑 {len(setup.not_run)} 项：{'；'.join(setup.not_run)}" if setup.not_run else ""
+
+
+PIN_LINE_LIMIT = 40   # 钉红例那一步没过时，原样转出它的输出最多几行
+
+
+def pin_red_examples(setup, options):
+    """钉红例（文件头「钉红例」）：这一对账（options["ledger"]）与 kill-bounds 产物（options["output"]）写完之后当场钉进钉表，再核钉全：
+    先照 e165-pin-red-examples.py 的追加用法（--kill-bounds <产物> <账>），再 --check 显式给这一对；钉表与变异表取脚本所在的仓（setup.script_root）。
+    有一步退非 0 就 raise Stop(EXIT_PIN_INCOMPLETE)，原样转出它的输出；都过交成功那句要报的「钉进 N 行、核了 M 行」。
+    只供自证：E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND 设了（且是自证起的那一趟）就不追加，造「账写完了、钉表没钉」。
+    弄坏开关 pincheckskipped 下不跑 --check（当场不核钉全）。"""
+    ledger, product = options["ledger"], options["output"]
+    base = [sys.executable, PIN_SCRIPT, "--root", setup.script_root]
+    steps = []
+    if not (setup.selftest and os.environ.get("E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND")):
+        steps.append(("追加", base + ["--kill-bounds", product, ledger]))
+    if "pincheckskipped" not in BREAK:
+        steps.append(("核钉全（--check）", base + ["--check", "--kill-bounds", product, ledger]))
+    said = {}
+    for label, command in steps:
+        environment = dict(os.environ)
+        environment.pop("E165_PIN_RED_EXAMPLES_BREAK", None)   # 那一份的弄坏开关只给它自己的自证用，不从这里带进去
+        completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=environment)
+        lines = [line for line in completed.stdout.split("\n") if line.strip()]
+        if completed.returncode != 0:
+            shown = "\n".join("     " + line for line in lines[-PIN_LINE_LIMIT:])
+            raise Stop(EXIT_PIN_INCOMPLETE, f"  ✗ 钉红例：{label}没过（{' '.join(command[1:])} 退 {completed.returncode}），这一趟的红例没钉全：\n{shown}\n"
+                                            "  → 怎么办：照上面它打的出路办（同档冲突、按名字找不到变异、配对不上，写法在 scripts/experiments/e165-pin-red-examples.py 文件头），"
+                                            "改好之后重跑同一条命令：产物已收尾的只重做钉红例这一步，不重跑变体")
+        said[label] = next((line for line in reversed(lines) if line.lstrip().startswith("✓")), lines[-1] if lines else "")
+    appended = said.get("追加", "")
+    pinned_match = re.search(r"钉进 (\d+) 行", appended)
+    pinned = pinned_match.group(1) if pinned_match else ("0" if "没有要新钉的" in appended else "不追加（自证）" if not appended else "取不出")
+    checked_line = said.get("核钉全（--check）")
+    checked_match = re.search(r"份红例账 (\d+) 行都钉在", checked_line or "")
+    checked = checked_match.group(1) if checked_match else ("没核（弄坏开关 pincheckskipped）" if checked_line is None else "取不出")
+    return f"钉红例：钉进 {pinned} 行、核了 {checked} 行（账 {options.get('ledger_shown', ledger)} 配产物 {options.get('output_shown', product)}）"
+
+
 def main_run(setup, options, item_names, recheck):
     check_the_registered_inputs(setup)
     items, selected_rows, texts = load_items(setup)
@@ -1995,7 +2092,9 @@ def main_run(setup, options, item_names, recheck):
         return None
 
     if closed and not recheck:
-        print(f"  {options['output']} 已经收尾（name=done），{len(recorded)} 个变体都有行，这一次什么都不跑")
+        # 已收尾的一对照样当场钉、当场核（上一趟钉红例没过、改好之后重跑同一条命令走这里；已钉的不重复）
+        pin_text = pin_red_examples(setup, options)
+        print(f"  {options['output']} 已经收尾（name=done），{len(recorded)} 个变体都有行，这一次不跑变体；{pin_text}")
         return EXIT_OK
     to_run = [item for item in wanted if recheck or (item["name"] not in recorded and stored_record(item) is None)]
     status_at_start = subprocess.run(["git", "-C", setup.root, "status", "--porcelain", "crates/"], stdout=subprocess.PIPE, text=True).stdout
@@ -2138,8 +2237,8 @@ def main_run(setup, options, item_names, recheck):
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
     append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
-    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}")
-    print("  · 红例账照落，不钉进 .claude/gate.d/e165-pinned-red-examples.tsv（r2 登记 5.6：钉表要带 --profile r2 才重放得出，接不接由主 agent 定）")
+    pin_text = pin_red_examples(setup, options)
+    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}；{pin_text}{not_run_suffix(setup)}")
     return EXIT_OK
 
 
@@ -2285,11 +2384,11 @@ def main_run_r3(setup, options, item_names):
         f"red={outcomes.get('red', 0)} red_only_by_kj0_or_kj3={outcomes.get('red_only_by_kj0_or_kj3', 0)} "
         f"not_red_within_bounds={outcomes.get('not_red_within_bounds', 0)} invalid={outcomes.get('invalid', 0)} "
         f"run_did_not_finish={outcomes.get('run_did_not_finish', 0)} not_compared={outcomes.get('not_compared', 0)} "
-        f"ka_pin_mismatches={len(pin_mismatches)} baseline_equals_segment2_product=true",
+        f"ka_pin_mismatches={len(pin_mismatches)} baseline_equals_segment2_product={retained_comparison_text(baseline, 'true')}",
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
     append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
-    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}")
+    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}{not_run_suffix(setup)}")
     if pin_mismatches:
         print(f"  ✗ KA 钉值对不上（TF8）：{' '.join(pin_mismatches)}；这几个变体的 K 族结果不能读成「没有取样点」，交主 agent；别的变体照判")
         print("     → 怎么办：把这几个变体的 KA 读数与跑前登记 TF8 钉的值并排交主 agent，由主 agent 判是登记钉错还是装置算错")
@@ -2443,11 +2542,11 @@ def main_run_r4(setup, options, item_names):
         f"red={outcomes.get('red', 0)} red_only_by_kj0_or_kj3={outcomes.get('red_only_by_kj0_or_kj3', 0)} "
         f"not_red_within_bounds={outcomes.get('not_red_within_bounds', 0)} invalid={outcomes.get('invalid', 0)} "
         f"run_did_not_finish={outcomes.get('run_did_not_finish', 0)} not_compared={outcomes.get('not_compared', 0)} "
-        f"ka_pin_mismatches={len(pin_mismatches)} kg_pin_mismatches={len(kg_mismatches)} baseline_equals_segment1_product=true{options.get('gate_field', '')}",
+        f"ka_pin_mismatches={len(pin_mismatches)} kg_pin_mismatches={len(kg_mismatches)} baseline_equals_segment1_product={retained_comparison_text(baseline, 'true')}{options.get('gate_field', '')}",
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
     append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
-    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}")
+    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}{not_run_suffix(setup)}")
     if pin_mismatches:
         print(f"  ✗ KA 钉值对不上（TF7）：{' '.join(pin_mismatches)}；这几个变体的合法域结果不能读成「没有取样点」，交主 agent；别的变体照判")
         print("     → 怎么办：把这几个变体的 KA 读数与跑前登记 TF7 钉的值并排交主 agent，由主 agent 判是登记钉错还是装置算错")
@@ -3024,8 +3123,10 @@ def selftest():
         pinned_table = os.path.join(root, ".claude/gate.d/e165-pinned-red-examples.tsv")
         ledger_examples = [line for line in ledger.split("\n") if line and not line.startswith("#") and line.split("\t")[4] != "none"]
         pinned_rows = [line for line in read(pinned_table).split("\n") if line and not line.startswith("#")]
-        expect(ledger_examples and pinned_rows == [],
-               f"r2：红例账里有 {len(ledger_examples)} 行反例，钉住的用例表应当一行不加（登记 r2 5.6），实际表里 {len(pinned_rows)} 行", "看 main_run 的收尾：r2 不钉红例")
+        expect(ledger_examples and len(pinned_rows) == len(ledger_examples) and all(row.endswith("\t--profile r2") for row in pinned_rows)
+               and f"钉红例：钉进 {len(ledger_examples)} 行、核了 {len(ledger_examples)} 行" in completed.stdout,
+               f"整轮写完账与产物要当场钉进钉表、再核钉全：红例账里有 {len(ledger_examples)} 行反例，钉表应当有同样多行、档都是 --profile r2，"
+               f"成功那句报钉进与核了几行；实际表里 {len(pinned_rows)} 行：{completed.stdout[-300:]}", "看 main_run 收尾的 pin_red_examples")
 
         # 二、锚点命中 0 次：自造表里的报「锚点腐化」退 3；crates 表里的让选出的行对不上登记（停机条款 H1）退 4；两样都一次不编、不写产物。
         write(os.path.join(root, CUSTOM_TABLE_PATH), "Z1 锚点坏的\t" + LIB_PATH + "\tlet omega = 4;\tlet omega = 8;\n")
@@ -3057,11 +3158,40 @@ def selftest():
         complete_lines = lambda text: sorted(line for line in text.replace("resume.", "full.").split("\n") if line.endswith("complete=yes"))
         expect(complete_lines(resumed) == complete_lines(output), "补跑出来的变体行应当与整轮的逐字相同", "变体行里不许有随跑法变的量")
         pinned_after_resume = [line for line in read(pinned_table).split("\n") if line and not line.startswith("#")]
-        expect(pinned_after_resume == [], f"r2：补跑之后钉住的用例表也应当一行不加，实际 {len(pinned_after_resume)} 行", "看 main_run 的收尾：r2 不钉红例")
+        expect(pinned_after_resume == pinned_rows and f"钉红例：钉进 0 行、核了 {len(ledger_examples)} 行" in completed.stdout,
+               f"补跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表应当不变、报钉进 0 行，实际 {len(pinned_after_resume)} 行：{completed.stdout[-300:]}",
+               "看 main_run 收尾的 pin_red_examples：追加已钉的不重复")
         write(interrupted, kept_text)
         shutil.rmtree(os.path.join(temporary, "scratch-resume"), ignore_errors=True)
         completed, builds = drive(paths("resume"), broken="rerunall")
         expect(len(builds) == 7, f"弄坏开关 rerunall 开着时应当每个变体都重编（证明上一例的 6 次来自只补没跑的），实际 {len(builds)}", "看 BREAK 的 rerunall")
+
+        # 三之二、钉红例（文件头「钉红例」）：已收尾的一对重跑同一条命令也照钉照核，不编不跑变体。
+        # 钉表清空，再造「账写完了、钉表没钉」（只供自证的 E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND：不追加）：当场 --check 判红、整趟退 8（开关 pincheckskipped 下退 0）
+        write(pinned_table, "# 自检用的钉住的表\n")
+        completed, builds = drive(paths("full"), extra={"E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND": "1"})
+        expect(completed.returncode == EXIT_PIN_INCOMPLETE and "钉红例：核钉全（--check）没过" in completed.stdout and "行没钉进" in completed.stdout and len(builds) == 0,
+               f"账写完而钉表没钉时驱动当场核钉全应当判红、退 {EXIT_PIN_INCOMPLETE}、一次不编，实际退 {completed.returncode}、编 {len(builds)} 次：{completed.stdout[-300:]}",
+               "看 pin_red_examples 的 --check 那一步与它在 main_run 收尾（含已收尾那一支）的位置")
+        completed, builds = drive(paths("full"), broken="pincheckskipped", extra={"E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND": "1"})
+        expect(completed.returncode == 0 and "核了 没核" in completed.stdout,
+               f"弄坏开关 pincheckskipped 开着时应当照样退 0（证明上一例的红来自当场核钉全），实际退 {completed.returncode}：{completed.stdout[-300:]}", "看 BREAK 的 pincheckskipped")
+        completed, builds = drive(paths("full"))
+        repinned = [line for line in read(pinned_table).split("\n") if line and not line.startswith("#")]
+        expect(completed.returncode == 0 and repinned == pinned_rows and len(builds) == 0
+               and f"钉进 {len(ledger_examples)} 行、核了 {len(ledger_examples)} 行" in completed.stdout,
+               f"已收尾的一对重跑同一条命令应当只重做钉红例：钉回同样的 {len(pinned_rows)} 行、一次不编，实际退 {completed.returncode}、{len(repinned)} 行、编 {len(builds)} 次：{completed.stdout[-300:]}",
+               "看 main_run 已收尾那一支")
+
+        # 三之三、留存产物不在（research/ 可以整个删掉）：V7 的比对本次未跑——逐项点名、不当绿也不判红，基线那一行写 not_run（开关 retainedmissingred 下照改前读不到、退非 0）
+        os.rename(os.path.join(root, "seg1.out"), os.path.join(temporary, "seg1.out.aside"))
+        completed, builds = drive(paths("no-seg1"))
+        os.rename(os.path.join(temporary, "seg1.out.aside"), os.path.join(root, "seg1.out"))
+        no_seg1 = read(os.path.join(temporary, "no-seg1.out"))
+        expect(completed.returncode == 0 and "本次未跑：作废条款 V7 的比对：留存产物" in completed.stdout and "seg1.out 不在" in completed.stdout
+               and "本次未跑 1 项" in completed.stdout and " rows_found_verbatim_in_segment1_products=not_run " in no_seg1,
+               f"r2：第一段产物不在时 V7 的比对应当逐项报本次未跑、照跑完退 0、基线那一行写 not_run，实际退 {completed.returncode}：{completed.stdout[-400:]}{completed.stderr[-200:]}",
+               "看 retained_product_not_run 与 check_against_segment_one")
 
         # 四、--recheck 单条复跑与产物里的行相同；--list-items 列全、不编。
         completed, builds = drive(["--scratch", os.path.join(temporary, "scratch-recheck"), "--output", os.path.join(temporary, "full.out"),
@@ -3304,6 +3434,14 @@ def selftest():
         completed, builds = drive(paths3("r3-tv7"), broken=r3_broken, fake_root=root3)
         expect(completed.returncode == EXIT_VOID_V7 and "TV7" in completed.stdout and len(builds) == 1 and not os.path.exists(os.path.join(temporary, "r3-tv7.out")),
                f"r3：基线与第二段产物不逐行相同应当报作废条款 TV7 退 6、变体一个不编，实际退 {completed.returncode}、编 {len(builds)} 次", "看 check_against_segment_two_product")
+        # ⑤之二 第二段产物不在（留存产物可以整个删掉）⇒ TV7 的比对本次未跑、逐项点名，照跑完；收尾判决行写 baseline_equals_segment2_product=not_run（开关 retainedmissingred 下照改前报 TV8 退 6）
+        os.remove(os.path.join(root3, "seg2.out"))
+        completed, builds = drive(paths3("r3-no-seg2"), broken=r3_broken, fake_root=root3)
+        r3_no_seg2 = read(os.path.join(temporary, "r3-no-seg2.out"))
+        expect(completed.returncode != EXIT_VOID_V7 and "本次未跑：作废条款 TV7 的比对：留存产物" in completed.stdout and "seg2.out 不在" in completed.stdout
+               and " baseline_equals_segment2_product=not_run" in r3_no_seg2 and " rows_identical_to_segment2_product=not_run " in r3_no_seg2,
+               f"r3：第二段产物不在时 TV7 的比对应当逐项报本次未跑、照跑完、产物写 not_run，实际退 {completed.returncode}：{completed.stdout[-400:]}",
+               "看 retained_product_not_run 与 check_against_segment_two_product")
         write(os.path.join(root3, "seg2.out"), baseline_product)
         # ⑥ 选行不满足（变异名在表里改了）⇒ 那一行记 outcome=not_compared、别的行照做、整轮退 1（登记 TH5）
         write(os.path.join(root3, TABLE_PATH), table3(name_of=lambda row, name: "改了名的" + name if row == 1823 else name))
@@ -3429,6 +3567,14 @@ def selftest():
         completed, builds = drive(paths4("r4-tv7"), broken=r4_broken, fake_root=root4)
         expect(completed.returncode == EXIT_VOID_V7 and "TV7" in completed.stdout and len(builds) == 1 and not os.path.exists(os.path.join(temporary, "r4-tv7.out")),
                f"r4：基线与第一段产物不逐行相同应当报作废条款 TV7 退 6、变体一个不编，实际退 {completed.returncode}、编 {len(builds)} 次", "看 check_against_segment_one_product")
+        # ⑤之二 第一段产物不在（留存产物可以整个删掉）⇒ TV7 的比对本次未跑、逐项点名，照跑完；收尾判决行写 baseline_equals_segment1_product=not_run（开关 retainedmissingred 下照改前报 TV8 退 6）
+        os.remove(os.path.join(root4, "seg1.out"))
+        completed, builds = drive(paths4("r4-no-seg1"), broken=r4_broken, fake_root=root4)
+        r4_no_seg1 = read(os.path.join(temporary, "r4-no-seg1.out"))
+        expect(completed.returncode != EXIT_VOID_V7 and "本次未跑：作废条款 TV7 的比对：留存产物" in completed.stdout and "seg1.out 不在" in completed.stdout
+               and " baseline_equals_segment1_product=not_run" in r4_no_seg1 and " rows_identical_to_segment1_product=not_run " in r4_no_seg1,
+               f"r4：第一段产物不在时 TV7 的比对应当逐项报本次未跑、照跑完、产物写 not_run，实际退 {completed.returncode}：{completed.stdout[-400:]}",
+               "看 retained_product_not_run 与 check_against_segment_one_product")
         write(os.path.join(root4, "seg1.out"), baseline_product4)
         # ⑥ 选行不满足（变异名在表里改了）⇒ 那一行记 outcome=not_compared、别的行照做、整轮退 1（登记 TH5）
         write(os.path.join(root4, TABLE_PATH), table4(name_of=lambda row, name: "改了名的" + name if row == 1822 else name))

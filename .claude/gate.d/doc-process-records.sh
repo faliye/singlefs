@@ -161,6 +161,8 @@
 # 不判的，成功行逐个列出前缀：腿提示是旧形态的轮（<题>-local.md、<题>-forward-sonnet.md / -reverse-opus.md）与轮名不以 -r<N> 结尾的；
 #   它们都早于判决文件，判决写进 kb、形态不一，按 ② 认会把任意一句提到材料的话读成判决。
 # 归档进版本库的腿文件由 git log 取：不在 git 仓里只看树；git log 失败判红，不退回只看树（那样归档的轮次整批消失）。
+#   git log 列出的被删文件同样只认 research/prompts/ 顶层：子目录里被删的（腿在 <轮>-<模型>-model/ 里造的门禁样本、<轮>-snapshot/ 里抄的文件）
+#   名字再像轮次文件也不算发过腿（弄坏开关 ABANDONED_ROUNDS_BREAK=archived-subdirectories-read 退回改前的读法：取 basename、不限顶层）。
 # 管不到的：判决写得对不对、登记的理由真不真、出处那句话是不是用户为这一轮说的（靠主 agent 核）；② 的第二种只认同一小节里既点名又有 **判决，写着「**判决**：没判」也算判过；
 #   新轮既不写正文、腿提示又用了五种之外的名字，落进不判的那一列而不红。
 #
@@ -262,6 +264,11 @@
 #   abandoned-rounds-source-date-parentheses-green  两行的〔〕带着登记时写在括号里的日期：bracketed-date-r1 那一行的全角括号连日期被 date-once 的出路（doc-consolidate.py migrate）删了，
 #                                   halfwidth-date-r1 那一行的半角括号连日期是手删的；两行原话都找不到，去掉日期、空白与逗号、剩下的空括号之后落在行号提示那一行里，
 #                                   照提示取那一行收，判绿报对数与照提示取的两行
+#   abandoned-rounds-archived-subdirectory-green  setup.sh 建 git 仓：research/prompts/<轮>-<模型>-model/gate-samples/… 子目录里三份名字像轮次文件的样本
+#                                   （_old-topic-r1-body.md、old-topic-r1-opus.md、_r-victim-r1-body.md）先提交、再归档删掉；只认顶层，它们不算发过腿，
+#                                   顶层 live-r1 有判决，判绿报「查了 1 轮」（改前取 basename 不限顶层，old-topic-r1 与 r-victim-r1 判红）
+#   abandoned-rounds-archived-top-level-red  setup.sh 建 git 仓：顶层发过腿的 dropped-r1（_dropped-r1-body.md、dropped-r1-opus.md）与子目录里一份 _old-topic-r1-body.md
+#                                   一起归档删掉，dropped-r1 没判决没登记：判红点名 dropped-r1（归档的顶层轮次照判，不因为只认顶层就整批放过）
 #   knowledge-sync-red              没点名的触发文件、只在不带标记的文件里点名的、说改了而载体没动、处置开头不合法、不改没理由、载体没行号、
 #                                   载体不存在、缺「## 搜索」、表头写错，外加「## 原始证据」整节缺、表头错、零行、材料不在、行数不对，判红
 #   knowledge-sync-green            两份记录点名三个触发文件、三种处置各一行、中文载体、原句里的 \|、围栏里的竖线行、0 行的表、
@@ -299,17 +306,21 @@
 #   empty-parentheses-kept   比〔〕与提示那一行时剩下的空括号「（）」「()」留着不去（改前的判法）  abandoned-rounds-source-date-parentheses-green（期望退出 0，实测 1：bracketed-date-r1 与 halfwidth-date-r1
 #                                                             去掉日期之后〔〕里剩一对空括号，落不进提示那一行）
 #   source-escapes、name-substring、round-name-unchecked 这三项只在派发闸的自检里有格（这一道的样本没有对应的写法）
+# 读归档历史的弄坏开关（这一格自己的，设进环境）：
+#   ABANDONED_ROUNDS_BREAK=archived-subdirectories-read  git log 列出的被删文件不限顶层、一律取 basename（改前的读法）
+#       abandoned-rounds-archived-subdirectory-green（期望退出 0，实测 1：old-topic-r1、r-victim-r1 被当成没判决没登记的轮）
+#     abandoned-rounds-archived-top-level-red 在这个开关下照红（多报一行 old-topic-r1 也满足它的 want：expect 只列必须出现的句子），不算它的证据
 # 共用库的弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  红格按绿记、整道退 0
 #       abandoned-rounds-red、abandoned-rounds-source-red、agent-def-adversarial-review-red、agent-def-adversarial-review-section-moved-red、batch-scope-red、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-exempt-stale-red、
 #       crates-adversarial-review-pending-grown-red、crates-adversarial-review-pending-table-red、crates-adversarial-review-red、crates-adversarial-review-section-edges-red、crates-adversarial-review-section-moved-red、implementation-premise-red、
-#       knowledge-sync-red、verdict-names-local-samples-missing-clean-sample、verdict-names-local-samples-red（期望退出 1，实测 0）
+#       knowledge-sync-red、verdict-names-local-samples-missing-clean-sample、verdict-names-local-samples-red、abandoned-rounds-archived-top-level-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本八格全跑
 #       abandoned-rounds-green、abandoned-rounds-red、abandoned-rounds-source-date-parentheses-green、abandoned-rounds-source-green、abandoned-rounds-source-red、agent-def-adversarial-review-green、agent-def-adversarial-review-pending-green、agent-def-adversarial-review-red、agent-def-adversarial-review-section-green、agent-def-adversarial-review-section-moved-red、batch-scope-green、
 #       batch-scope-red、code-round-snapshot-green、code-round-snapshot-no-object、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-comment-only、crates-adversarial-review-exempt-green、crates-adversarial-review-exempt-stale-red、crates-adversarial-review-green、
 #       crates-adversarial-review-pending-green、crates-adversarial-review-pending-grown-red、crates-adversarial-review-pending-table-red、crates-adversarial-review-red、crates-adversarial-review-section-edges-red、crates-adversarial-review-section-green、crates-adversarial-review-section-moved-red、crates-adversarial-review-test-code-only、implementation-premise-green、implementation-premise-red、
 #       knowledge-sync-green、knowledge-sync-old-record-green、knowledge-sync-red、verdict-names-local-samples-green、verdict-names-local-samples-missing-clean-sample、
-#       verdict-names-local-samples-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）
+#       verdict-names-local-samples-red、abandoned-rounds-archived-subdirectory-green、abandoned-rounds-archived-top-level-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -1128,10 +1139,17 @@ if inside_repository:
     if log.returncode != 0:
         archive_log_error = f"git log 退出码 {log.returncode}：{(log.stderr.strip().splitlines() or ['（git 没说原因）'])[-1]}"
     else:
+        # 与树上一样只认 research/prompts/ 顶层：子目录里被删的（腿在自己模型目录里造的门禁样本
+        # research/prompts/<轮>-<模型>-model/gate-samples/…/_old-topic-r1-body.md、快照里抄的 kb）不是这一轮发出去的腿，
+        # 取 basename 会把它们当成轮次文件。弄坏开关 ABANDONED_ROUNDS_BREAK=archived-subdirectories-read：子目录里的也取 basename（改前的读法）。
+        read_subdirectories = os.environ.get("ABANDONED_ROUNDS_BREAK", "") == "archived-subdirectories-read"
         for entry in log.stdout.split("\n"):
             entry = entry.strip()
-            if entry.startswith(prompts_dir + "/"):
-                archived_names.add(os.path.basename(entry))
+            if not entry.startswith(prompts_dir + "/"):
+                continue
+            if "/" in entry[len(prompts_dir) + 1:] and not read_subdirectories:
+                continue
+            archived_names.add(os.path.basename(entry))
 # 不在 git 仓里（样本目录）时只看树：那里没有归档可读，判据不变宽
 prompt_files = sorted(set(name for name in os.listdir(prompts_dir)
                           if os.path.isfile(os.path.join(prompts_dir, name))) | archived_names)

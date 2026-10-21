@@ -10,11 +10,14 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
 键（与峰值表第四列相同）：给了 RUN_WITH_MEMORY_CAP_KEY 就用它；不给就把命令的各个词用空格接起来，去掉测试二进制名里 -<16 位十六进制> 的哈希；
   两种都把制表符、换行换成空格，截到 KEY_LENGTH_LIMIT 个字。
 峰值表的口径与列见 run-with-memory-cap.sh 文件头「峰值表」一段；这里只读不写（写在包装那一边，同一把锁里）。
+  记账与预测都按「近几次」（第六列，至多 RECENT_MEASUREMENTS 次）读：预测取其中最大的，其中有一次撞顶就算撞过顶（recorded_peak）；
+  包装的排队、派发器的 predict、scripts/hosts/host-resources.py 都经 recorded_peak 读，不各写一份。
+  read_peak_table 照旧交四段（峰值、时刻、上限、线程数），只认四列、五列的旧包装还在跑时 import 的是这一份，它按四段写回。
 账（${状态目录}/ledger/<unit>.json）与「还没涨到量的那一截」的算法见 run-with-memory-cap.sh 文件头「排队」一段；这里的函数就是那一段的实现。
 用时表（每条命令上一次跑了多久）：scripts/hosts/host-dispatch.py 派出去、跑完的那一条由它经 record_duration 记一行；
   派发器与 scripts/hosts/host-resources.py 经 recorded_duration 读，判「历史用时超过 LONG_RUN_SECONDS 而只派到一台」。
   默认 ${XDG_STATE_HOME:-~/.local/state}/singlefs/run-durations.tsv（跨重启、不进仓），HOST_DISPATCH_DURATIONS 可换；键同峰值表。
-  列见 DURATION_TABLE_HEADER；同一个键只留最近一次。峰值表不加这一列：在跑的旧包装只认四列与五列的峰值表。
+  列见 DURATION_TABLE_HEADER；同一个键只留最近一次。峰值表不加这一列：在跑的旧包装只认它认得的那几列，多一列它写回时就丢了。
 """
 import contextlib
 import fcntl
@@ -30,6 +33,11 @@ SIZE_UNITS = {"K": 1024, "M": MEBIBYTE, "G": 1024 * MEBIBYTE, "T": MEBIBYTE * ME
 # 峰值表里查不到这条命令时按多少算（包装的 auto、派发器的预测都用它）：取 scripts/experiments/replay.sh 的 REPLAY_MEMORY_CAP 默认值，
 # 与 scripts/hosts/multi-host-run.sh 本机默认上限同一个数；本仓日常的 cargo test 与实验装置的峰值表里绝大多数在它以下。推的，没逐条量过
 DEFAULT_MEMORY_PREDICTION_TEXT = "8G"
+# 峰值表第六列「近几次」记最近这么多次实测（run-with-memory-cap.sh 文件头「峰值表」一段）：撞顶之后要连着这么多次干净跑完才回到按峰值记账
+RECENT_MEASUREMENTS = 5
+RECENT_HIT, RECENT_CLEAN = "hit", "clean"   # 第六列里每一次的标记：撞没撞顶
+# 上限 = 预测 × CAP_FACTOR（派发器）；内存包装判「这一次峰值比记账大了这么多倍以上：工作量可能变了」也用它。依据写在 host-dispatch.py 文件头「常量的依据」
+CAP_FACTOR = 1.5
 DEFAULT_SLICE = "singlefs-heavy.slice"
 DEFAULT_RESERVE_TEXT = "20G"          # 与 run-with-memory-cap.sh 的 DEFAULT_RESERVE 同一个数，依据写在它文件头「余量」一段
 # 历史用时或预计挂钟超过它、而派法只占一台，派发器拒、资源报告提醒：用户的常设规矩「凡是超过2两小时的脚本都要考虑多机 分片 跑」
@@ -71,8 +79,24 @@ def default_peak_table():
     return os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "singlefs", "memory-peaks.tsv")
 
 
-def read_peak_table(path):
-    """键 → (峰值字节, 量的时刻, 那一次的上限写法, 线程数或 None)；表不在交空表。四列（加线程数之前记的）与五列的行都认。"""
+def parse_recent(text):
+    """第六列「近几次」→ [(峰值字节, 撞没撞顶)]（新的在前）；写坏的（空、某一次不是「<字节>:hit|clean」）交 None，调用方当没有这一列。"""
+    recent = []
+    for item in (text or "").split(","):
+        peak_text, separator, flag = item.partition(":")
+        if not separator or not peak_text.isdigit() or flag not in (RECENT_HIT, RECENT_CLEAN):
+            return None
+        recent.append((int(peak_text), flag == RECENT_HIT))
+    return recent[:RECENT_MEASUREMENTS] or None
+
+
+def format_recent(recent):
+    return ",".join(f"{peak}:{RECENT_HIT if hit else RECENT_CLEAN}" for peak, hit in recent[:RECENT_MEASUREMENTS])
+
+
+def read_peak_rows(path):
+    """键 → (峰值字节, 量的时刻, 那一次的上限写法, 线程数或 None, 近几次或 None)；表不在交空表。前三列是最近一次实测。
+    四列（加线程数之前记的）、五列（加近几次之前记的）与六列的行都认；没有第六列（或它写坏了）的近几次是 None，读近几次用 recent_of。"""
     rows = {}
     try:
         with open(path, encoding="utf-8") as handle:
@@ -81,20 +105,36 @@ def read_peak_table(path):
         return rows
     for line in lines:
         fields = line.split("\t")
-        if line.startswith("#") or len(fields) not in (4, 5) or not fields[0].isdigit():
+        if line.startswith("#") or len(fields) not in (4, 5, 6) or not fields[0].isdigit():
             continue
-        rows[fields[3]] = (int(fields[0]), fields[1], fields[2], fields[4] if len(fields) == 5 else None)
+        rows[fields[3]] = (int(fields[0]), fields[1], fields[2], fields[4] if len(fields) >= 5 else None,
+                           parse_recent(fields[5]) if len(fields) == 6 else None)
     return rows
 
 
-def recorded_peak(path, key):
-    """(峰值字节, 撞过顶没有)；表里没有这条交 (None, False)。撞过顶：记的峰值到了那一次的上限（撞了自己的上限、或按峰值表放进来又被挤掉，都记成上限），
-    真峰值不知道、只知道不小于它。"""
-    row = read_peak_table(path).get(key)
+def read_peak_table(path):
+    """键 → (峰值字节, 量的时刻, 那一次的上限写法, 线程数或 None)：read_peak_rows 去掉近几次。只认四段的旧包装还在跑时读的是这一份。"""
+    return {key: row[:4] for key, row in read_peak_rows(path).items()}
+
+
+def recent_of(row):
+    """一行的近几次 [(峰值字节, 撞没撞顶)]，新的在前。没有第六列的旧行当成只有一次：那一行的峰值，到了那一次的上限就算撞了顶
+    （撞了自己的上限、或按峰值表放进来又被挤掉，都记成上限，真峰值不知道、只知道不小于它）。"""
+    if row[4] is not None:
+        return row[4]
+    recorded_cap = size_bytes(row[2])
+    return [(row[0], recorded_cap is not None and row[0] >= recorded_cap)]
+
+
+def recorded_peak(path, key, latest_only=False):
+    """(预测的峰值字节, 撞过顶没有)；表里没有这条交 (None, False)。预测取近几次里最大的，近几次里有一次撞顶就算撞过顶（滞回：
+    撞顶之后要连着 RECENT_MEASUREMENTS 次干净跑完才回到按峰值记账；峰值一路变小时记账不跟着变小）。
+    latest_only 只看最近一次（只给包装与派发器的弄坏开关用：改前的判法）。"""
+    row = read_peak_rows(path).get(key)
     if row is None:
         return None, False
-    recorded_cap = size_bytes(row[2])
-    return row[0], recorded_cap is not None and row[0] >= recorded_cap
+    recent = recent_of(row)[:1] if latest_only else recent_of(row)
+    return max(peak for peak, _ in recent), any(hit for _, hit in recent)
 
 
 def default_duration_table(environment):

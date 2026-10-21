@@ -1,0 +1,4 @@
+exit=0
+want=决策索引表状态列与进度列与正文同步（1 条决策）
+want=决策分项清单与正文同步（2 个分项）
+want=doc-decisions.sh：1 格里 1 格绿（decision-items-sync），0 格本次未跑（无）

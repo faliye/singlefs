@@ -232,6 +232,8 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--row-name", default="P1-F")
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args(argument_list)
+    if arguments.mode == "judge" and frozen_o3.report_missing_freeze_reference(arguments.repo_root, "o3_bad_image_judge.py judge"):
+        return frozen_o3.NOT_RUN_EXIT_CODE   # 冻结行的参照产物不在：本次未跑，一行产物都不写（control 不读冻结行）
     return run_judge(arguments) if arguments.mode == "judge" else run_control(arguments)
 
 

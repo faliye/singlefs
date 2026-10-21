@@ -1,0 +1,5 @@
+exit=1
+want=这些三方轮次发过腿，却没有判决、也不在撂下登记表里
+want=dropped-r1（_dropped-r1-body.md、dropped-r1-opus.md）
+want=样本只跑 .gate-cells 点名的格：abandoned-rounds
+want=doc-process-records.sh：1 格里 1 格红（abandoned-rounds）

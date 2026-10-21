@@ -463,6 +463,9 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--product-suffix", required=True)
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args(argument_list)
+    if segment_one.report_missing_inputs("segment_two_comparator.py", [*arguments.dumps_root, arguments.baseline, *arguments.stability_baseline,
+                                                                       arguments.rows_root, arguments.driver_product, arguments.mutations_table]):
+        return segment_one.NOT_RUN_EXIT_CODE   # 给的输入有不在的：逐项报本次未跑，一行产物都不写
     outside = inputs_outside_this_run(arguments.dumps_root, arguments.product_prefix, arguments.product_suffix,
                                       [arguments.baseline, arguments.rows_root, *arguments.stability_baseline], [arguments.driver_product])
     if outside:

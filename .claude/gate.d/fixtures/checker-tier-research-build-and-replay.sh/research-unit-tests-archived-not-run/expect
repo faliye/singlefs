@@ -1,0 +1,6 @@
+exit=0
+want=· 单测按条复用：2 条编得进的测试函数，现判 2、复用 0、拒算 0
+want=! 本次未跑：lib::tests::reads_an_archived_product_that_is_not_there（research/results/sample-product.out 读不到，这一项本次未跑）
+want=· 判绿记库（tiny）：RECORD recorded=1
+want=单测按条：现判 2、复用 0、拒算 0、本次未跑 1；读不到留存产物本次未跑 1 条（上面逐条列名），它们不记为绿
+want=research-unit-tests：绿

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # 键样本现场（情形 three-questions，复用三问，scripts/gate/lib_reuse_checks.py 文件头「一」）：同 tier-key-samples-guest-function 的那棵小树与 .qemu-key-samples/ 那几份，
-# 另放 unrelated.sh（E142 产物末尾加一行这一道不读的结果行：闭包外）与 affected（raise-rollback-floor：change.sh 改的 publish_the_fourth_version 只在它的闭包里）；
+# 另放 unrelated.sh（钉反向链的用例文件末尾加一行这一道不读的：闭包外）与 affected（raise-rollback-floor：change.sh 改的 publish_the_fourth_version 只在它的闭包里）；
 # 门禁头一趟六档照绿记下，同一份输入、unrelated.sh 之后、change.sh 之后各查一趟，照三问判、打规范输出。
 set -euo pipefail
-mkdir -p scripts/devices scripts/experiments research/results .claude/kb/layout crates/singlefs-checker-tier/src/bin .qemu-key-samples
+mkdir -p scripts/devices .claude/kb/layout crates/singlefs-checker-tier/src/bin crates/singlefs-harness/tests .qemu-key-samples
 cat > scripts/devices/vm-bench.sh <<'VMBENCH'
 #!/usr/bin/env bash
 # 键样本里的小 vm-bench.sh：只为算宿主脚本单元的键，样本里不会起它
@@ -77,18 +77,23 @@ fn main() {
 }
 RUST
 printf 'fn main() {\n    println!("check");\n}\n' > crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs
-printf 'E142|@driver_e142||e142-trimmed.out|exact\nE142|@driver_e142_p8g_crates_dump||e142-r24-p8g-crates-dump-2026-10-05.out|exact\n' > scripts/experiments/replay.sh
-cat > research/results/e142-trimmed.out <<'E142'
-E7RESULT name=segments path=mkfs operations=23 segments=12+1+1+1+4 closed_form=4114 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
-E7RESULT name=segments path=transaction operations=35 segments=24+2+1+2 closed_form=16777223 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
-E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=19 rollback_floor=0 unmount_marker=false record_bytes=4096 back_chain=3937788698
-E142
+cat > crates/singlefs-harness/tests/new_pool_file_creation_publish.rs <<'RUST'
+// 键样本里的合成副本：门禁 checker-tier-qemu-device-streams 只读下面这一条常量（新池新建文件那条记录反向链的对照），值照 green 样本
+const E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION: u32 = 3_937_788_698;
+RUST
 cat > .claude/kb/layout/01-first-txn.md <<'LAYOUT'
-## 八、根槽写路径的段序列登记表（键样本里的合成副本：只留门禁 checker-tier-qemu-device-streams 读的「mkfs 种根」一行）
+## 八、根槽写路径的段序列登记表（键样本里的合成副本：照 green 样本抄的，只留门禁 checker-tier-qemu-device-streams 读的那几处登记）
+
+产物的 `name=segments` 四行（`path=instance_acquisition / warm_up / transaction / post_mkfs_stream`）；四样登记值都照 2026-10-02 录样本那一趟虚机输出（PROVENANCE.txt）。
 
 | 根槽写路径 | 录制流的段序列 | 出处 | 崩溃点重放枚举 |
 |---|---|---|---|
-| mkfs 种根 | `12+1+1+1+4`，23 次操作、4114 个崩溃状态，种类 `[zero_fill×8,unit_write×4,barrier×2]\|[root_record_fua]\|[root_record_fua]\|[root_record_fua]\|[system_configuration_slot×4,barrier×2]` | 键样本照 green 样本抄的 | 不在 |
+| mkfs 种根 | `12+1+1+1+4`，23 次操作、4114 个崩溃状态，种类 `[zero_fill×8,unit_write×4,barrier×2]\|[root_record_fua]\|[root_record_fua]\|[root_record_fua]\|[system_configuration_slot×4,barrier×2]` | 2026-10-02 录样本那一趟虚机输出的 path=mkfs 行（PROVENANCE.txt） | 不在 |
+| 第一次可写挂载取号 | `2`，2 次操作、4 个崩溃状态，种类 `[system_configuration_slot×2]` | 产物 `name=segments path=instance_acquisition`（照 2026-10-02 录样本那一趟虚机输出，PROVENANCE.txt） | 在 |
+| 空发布（暖机，第一版 2 次） | `2+1+2+2+1+2`，20 次操作、15 个崩溃状态，种类 `[journal_record×2,barrier×4]\|[root_record_fua]\|[system_configuration_slot×2,barrier×2]\|[journal_record×2,barrier×2]\|[root_record_fua]\|[system_configuration_slot×2,barrier×2]` | 产物 `name=segments path=warm_up`（照 2026-10-02 录样本那一趟虚机输出，PROVENANCE.txt） | 在 |
+| 普通发布（新池新建文件） | `24+2+1+2`，35 次操作、16777223 个崩溃状态，种类 `[unit_write×24,barrier×2]\|[journal_record×2,barrier×2]\|[root_record_fua]\|[system_configuration_slot×2,barrier×2]` | 产物 `name=segments path=transaction`（照 2026-10-02 录样本那一趟虚机输出，PROVENANCE.txt） | 在 |
+
+⚠️ 新池新建文件那条流是整条流 `2+2+1+2+2+1+2+24+2+1+2`、16777240 个状态（种类 `[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]`；57 次操作）。
 LAYOUT
 printf '样本内核镜像\n' > .qemu-key-samples/kernel.img
 printf 'kernel\t.qemu-key-samples/kernel.img\nbusybox\t%s\tBusyBox v1.36.1 (样本) multi-call binary.\nqemu-system-x86_64\t%s\tQEMU emulator version 8.2.2 (样本)\ntoolchain\tcargo 1.98.0 (样本)\ntoolchain\trustc 1.98.0 (样本)\n' \
@@ -107,8 +112,8 @@ grep -q '4 + 0' crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_d
 CHANGE
 cat > .qemu-key-samples/unrelated.sh <<'UNRELATED'
 #!/usr/bin/env bash
-# 闭包外的改动：E142 产物末尾加一行这一道不读的结果行（不是 name=segments、也不是 name=root_record）
+# 闭包外的改动：钉反向链的用例文件末尾加一行这一道不读的（不是那一条常量；布局表八一个字不动）
 set -euo pipefail
-printf 'E7RESULT name=dry_run_timing nanoseconds=12345\n' >> research/results/e142-trimmed.out
+printf '// 键样本：这一行这一道不读\nconst UNREAD_BY_THE_STAGE: u32 = 0;\n' >> crates/singlefs-harness/tests/new_pool_file_creation_publish.rs
 UNRELATED
 printf 'raise-rollback-floor\n' > .qemu-key-samples/affected

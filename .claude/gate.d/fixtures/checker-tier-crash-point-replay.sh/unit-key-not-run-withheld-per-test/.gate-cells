@@ -1,0 +1,2 @@
+# 按测试函数不记：一段三条里打了 NOT_RUN_ 的那一条、结果行打散而认不出结局的那一条不记，别的照记，样本档快档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

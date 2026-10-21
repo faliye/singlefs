@@ -3,11 +3,15 @@
 # 改一个全仓术语怎么做见 .claude/rules/path-moves.md「改一个全仓术语：正文之外还有五处会红」。
 # 指向不存在的路径、行内锚在那份文件里命中不是恰好一行，都判红：不起作用的豁免项会让人以为那批文件已经被绕开了。
 .claude/kb/prior-art.md  # 他家方案调研：btrfs、F2FS、ZFS 等自己的术语与原文引文。把别家的 superblock 改成我们的名字，引文就成了假的（用户 2026-09-21 定）
+.claude/kb/prior-art.en.md  # 他家方案调研英文翻译：与 prior-art.md 同样包含别家术语
+.claude/kb/prior-art.ja.md  # 他家方案调研日文翻译：与 prior-art.md 同样包含别家术语
 .claude/warnings/  # 警告记录按日期冻结，而且它记的就是「这个词被改掉了」这件事本身，词换掉句子就没意义了
 .claude/singlefs-ai-sop/  # 上游 SOP 的副本，只能在上游仓改（CLAUDE.md「怎么改」那一行），就地改下次同步就没
 scripts/kb/sweep-term.py  # 清扫工具自己：替换表与检测正则里必须写得出旧名，扫了它就再也换不动东西
 .claude/term-rename-exempt  # 这张表自己：豁免理由里要写得出旧名才说得清豁免的是什么
 .claude/kb/term-renames.md  # 新旧对照的唯一权威记录：写「X 改名成 Y」必须写得出 X，旧名要有一处查得到，历史产物与旧提交的字段才对得上
+.claude/kb/term-renames.en.md  # 术语改名表的英文翻译：与 term-renames.md 同样包含旧名
+.claude/kb/term-renames.ja.md  # 术语改名表的日文翻译：与 term-renames.md 同样包含旧名
 research/prompts/  # 冻结证据：发给模型的提示、腿的产出、拼好的背景材料与 diff 附录。evidence-discipline「原样保存的证据不许事后改」——改一个字，产物就不再对应它的输入；而这一轮的材料正文讨论的就是这次改名，词换掉整份材料失去意义
 .claude/kb/decisions-history.md  # F2FS 的原题引文（「F2FS 用 superblock 里的后缀表」，D14 已定项 2 的来历）：别家术语，与 prior-art.md 同一条理由。2026-09-28 按决策分节搬迁之后，这条改动点名了 D3（空间分配）、D14（双轨（大小文件 / 持久临时）） 与 D28（挂载期承诺量） 三条决策，同一句引文各在那三节里抄了一份；这份变更史别处的旧名已随本次改名一起换掉，所以只豁免这一份、不豁免整个目录
 records/2026-09-07-D14项2第一轮.md  # 同一句 F2FS 原题的引文（「原题逐字」那一行）：别家术语。records/ 别处的旧名已随本次改名一起换掉，不豁免整个目录
@@ -174,14 +178,13 @@ records/2026-10-13-复用键与全仓改名.md:「代码规范中的内容对所
 briefs/2026-09-14.zh.md:「层 0 的负载不能只是」  # 2026-09-14 简报的中文版：旧简报不回头改，与英文版同一句同一条理由
 briefs/2026-09-14.ja.md:「层 0 的负载不能只是」  # 2026-09-14 简报的日文版：旧简报不回头改，与英文版同一句同一条理由
 briefs/2026-10-10.ja.md:「lay は checker-tier-layer0-replay」  # 说的就是这个名字本身改名（改前那一侧），换成新名就成了新名改成新名
-briefs/2026-10-10.md:「named checker-tier-layer0-replay」  # 说的就是这个名字本身改名（改前那一侧），换成新名就成了新名改成新名
+briefs/2026-10-10.md:「54-layer0-replay 改名成 checker-tier-layer0-replay」  # 说的就是这个名字本身改名（改前那一侧），换成新名就成了新名改成新名
 briefs/2026-10-10.zh.md:「y 改名成 checker-tier-layer0-replay」  # 说的就是这个名字本身改名（改前那一侧），换成新名就成了新名改成新名
 .claude/kb/experiments-history.md:「的注释引 `layer0-shard-run.sh」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
 .claude/kb/experiments-history.md:「注释改引 `layer0-shard-run.sh」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
 .claude/kb/milestone/02-second-txn.md:「49 秒（`checker-tier-layer0-replay」  # 当时那一趟门禁日志的文件名，换成新名就找不到那份日志
 records/2026-09-16-subagent拆分提案.md:「别的东西（「checker-tier-layer0-replay」  # 引号里是当时的原文（用户原话、提示、报告节名或样本里的原句），换成新名就不是原文
 records/2026-09-16-subagent拆分提案.md:「ate.d/checker-tier-layer0-replay」  # 闸放行的那条命令原样（当时自检里的例句），换成新名就不是那条例句
-records/2026-09-16-subagent拆分提案.md:「「改成按 `layer0-shard-configuration-check.sh」  # 引号里是当时的原文（用户原话、提示、报告节名或样本里的原句），换成新名就不是原文
 records/2026-09-24-里程碑二收尾调度.md:「CPU）：`LAYER0_PROGRESS」  # 抄自当时那一趟的日志或输出原文（日志行、panic 位置、判定行），换成新名就对不上那次的输出
 records/2026-09-24-里程碑二收尾调度.md:「n.py`、checker-tier-layer0-replay」  # 引号里是当时的原文（用户原话、提示、报告节名或样本里的原句），换成新名就不是原文
 records/2026-09-24-里程碑二收尾调度.md:「/59「照 checker-tier-layer0-replay」  # 引号里是当时的原文（用户原话、提示、报告节名或样本里的原句），换成新名就不是原文
@@ -268,3 +271,4 @@ records/2026-10-17-全仓知识腐烂治理.md:「111 行）各抽 10 行相干 
 records/2026-10-17-全仓知识腐烂治理.md:「旧 invariants.md、layout、milestone 01」  # 记这一轮切片时旧文件 `.claude/kb/invariants.md` 的差异片段分给哪一片，说的是搬迁前那份文件
 records/2026-10-17-全仓知识腐烂治理.md:「四份文件残留旧文件名 `invariants.md`」  # 记回扫员查出旧文件名残留这件事本身
 records/2026-10-17-全仓知识腐烂治理.md:「那一句又被改名工具改坏，改回」  # 记主 agent 把 Linux 内核函数名（`block/bdev.c` 的 `sb_` 前缀）改回去这件事本身，换成新名这句就成假话
+records/2026-10-13-里程碑四预开发.md:「3c 回：table-shape 四行」  # 记 3c 那次英文标识符改名本身的一行，列的是旧名 → 新名对照，换成新名就成假话

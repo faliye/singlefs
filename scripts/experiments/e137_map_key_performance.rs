@@ -1012,9 +1012,15 @@ mod tests {
     }
 
     /// 跨装置闸：叶容量与内部扇出逐格等于 E136 留存产物里对应的行。
+    /// 留存产物在 `research/results/` 下、可以被归档删掉：运行时读，读不到报本次未跑（`e7_index_bench::read_archived_product_or_report_not_run`）。
     #[test]
     fn geometry_matches_the_e136_product() {
-        let e136_product = include_str!("../../research/results/e136-fork-cost-rows-2026-09-11.out");
+        let Some(e136_product) = e7_index_bench::read_archived_product_or_report_not_run(
+            "e137_map_key_performance::tests::geometry_matches_the_e136_product",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e136-fork-cost-rows-2026-09-11.out"),
+        ) else {
+            return;
+        };
         let field = |line: &str, name: &str| -> usize {
             let prefix = format!("{name}=");
             let value = line.split_whitespace().find(|part| part.starts_with(&prefix)).expect("E136 那一行少字段");

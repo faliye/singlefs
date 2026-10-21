@@ -1,0 +1,16 @@
+exit=1
+want=样本档（快档）：
+want=✗ StepKind 成员 TrimHint 在 quick 域里没被任何一条流罩住
+want=✗ 基准里没有的节点：registered_segment
+want=比基准 1 行多出 1 个
+want=I-3.1 评估过 0 次，基准里没有这一行
+want=crash-case:plain-stream（singlefs-checker-tier:plain_stream:plain_stream_full）：crates/mutations.tsv 里没有一行变异的 cargo test 参数带 -p singlefs-checker-tier --test plain_stream
+want=样本展开上限 的出处路径 crates/no-such-file.rs 不在仓里
+want=✗ 块行 0 行，not_full_under_the_current_key 报 1：读库程序的输出不全
+want=crash-flow-coverage：红
+want=crash-ignored-nodes：红
+want=invariant-zero-evaluations：红
+want=crash-case-must-red：红
+want=crash-knobs：红
+want=last-full-judgement：红
+want=只重跑红的格：bash .claude/gate.d/checker-tier-crash-point-replay.sh --check crash-case-replay,feature-gated-tests,crash-flow-coverage

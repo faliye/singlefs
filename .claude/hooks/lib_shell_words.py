@@ -93,6 +93,13 @@ detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期
         放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒（「应当是 1，实际 0」）
       detached-run.sh --selftest：
         Ⓟ -- 之后的 --force 照 preflight 摘：命令收到 a b，闸切出的词与登记里的命令逐字相同
+  LIB_SHELL_WORDS_BREAK=array-appends-unseen  record_array_writes() 什么都不记：`名字+=值`、`名字[下标]=值` 照旧不改记下的值（改前的判法）
+      lib_heavy_tests.py --selftest：cargo 那张表里「重型：崩溃点重放入口 --quick 的项数组后来追加了 --full」「重型：crates 变异那一道 --quick 的项数组元素改过」
+        「重型：crates 变异那一道 --quick 的项数组从文件逐行读进来」三格（「应当是 crash-point-replay / crates-mutation-stage，实际 None」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那三项）：
+        实现员经内存包装起 crates 变异那一道 --quick、数组后来追加了 --full：照拒（「应当是 2，实际 0」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh、detached-run.sh 的 --selftest 不红
   LIB_SHELL_WORDS_BREAK=env-chdir-ignored  skip_prefixes() 不交 env 的 -C / --chdir 换的目录：commands_at_command_position 里这一条命令照外面的当前目录判（改前的判法）
       lib_heavy_tests.py --selftest：cargo 那张表里「env 换目录」开头的十一格里十格红（「换的目录只管这一条」那格不红）：
         env 换目录：-C 换进探针再 cargo test -p 探针自己的包名（「应当是 checker-tier-cargo，实际 None」）
@@ -834,7 +841,9 @@ def detached_run_start_command(arguments):
 # 目录词里认的变量引用：`$名字`、`${名字}`；别的写法（`${名字:-默认}`、`$1`、`$$`、`$(…)`）不认，留着的 `$` 算展开不了
 VARIABLE_REFERENCE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
 # 改写变量、改成什么这里算不出的命令：for / select 的循环变量、read 读进来的（unset 在 commands_at_command_position 里另记）
-REBINDING_COMMANDS = {"for", "select", "read"}
+REBINDING_COMMANDS = {"for", "select", "read", "mapfile", "readarray"}
+APPEND_ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\+=(.*)$", re.S)
+ELEMENT_ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\[[^\]]*\]\+?=(.*)$", re.S)
 # 声明命令：参数里的 `名字=值` 照赋值记
 DECLARATION_COMMANDS = {"local", "declare", "typeset", "readonly"}
 
@@ -893,6 +902,40 @@ def rebind_variables(name, arguments, variables):
             variables[argument] = None
 
 
+def array_appends_unseen():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=array-appends-unseen：`名字+=值`、`名字[下标]=值` 不记（只给自检证红用）。"""
+    return "array-appends-unseen" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def record_array_writes(words, variables):
+    """一条简单命令只有关键字与赋值（没有命令词）时，把里面的 `名字+=值`（数组接数组、字符串接字符串）与 `名字[下标]=值`（记成算不出）记进 variables；
+    `名字=值` 由调用方照旧记。有命令词的（`名字+=值 命令`）不记。弄坏开关 array-appends-unseen 下什么都不记。"""
+    if array_appends_unseen():
+        return
+    writes = []
+    for word in words:
+        if word in COMMAND_KEYWORDS or ASSIGNMENT.match(word):
+            continue
+        append, element = APPEND_ASSIGNMENT.match(word), ELEMENT_ASSIGNMENT.match(word)
+        if append is None and element is None:
+            return
+        writes.append((append, element))
+    for append, element in writes:
+        if element is not None:
+            variables[element.group(1)] = None
+            continue
+        name = append.group(1)
+        before, added = variables.get(name), assigned_value(append.group(2), variables)
+        if before is None or added is None:
+            variables[name] = None
+        elif before.startswith("(") and before.endswith(")") and added.startswith("(") and added.endswith(")"):
+            variables[name] = "(" + " ".join(part for part in (before[1:-1].strip(), added[1:-1].strip()) if part) + ")"
+        elif not before.startswith("(") and not added.startswith("("):
+            variables[name] = before + added
+        else:
+            variables[name] = None
+
+
 def changed_directory(directory, arguments, variables=None):
     """cd / pushd 之后的当前目录。目标里的变量照 expand_known_variables 展开（variables 是这段命令文本里前面赋过的；不给时只认 HOME）；
     目标是 `-`、展开不了的变量或命令替换时认不出，交 None。"""
@@ -914,7 +957,9 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
     memory_capped：这段文本整个跑在 run-with-memory-cap.sh 里（它是经它起的脚本的正文）；每条命令的 memory_capped 从它起算。
     喂给 shell 的 heredoc 正文当同一段文本里的后续命令切，挂 heredoc 的那条命令上的包装不算在正文的命令上。
     variables：cd / pushd / env -C 的目录里展开变量用的值（名字 → 已展开的值，None 是算不出），递归时往里传，调用方不用给；不给时从 environment 起算。
-    单独成一条的 `名字=值`、export、local / declare 这类记进去，for / select / read / unset 改写过的记成算不出（rebind_variables）；
+    单独成一条的 `名字=值`、export、local / declare 这类记进去，for / select / read / mapfile / readarray / unset 改写过的记成算不出（rebind_variables）；
+    数组 `名字=(元素 …)` 记成 `(元素 …)` 这一串（元素切过词、引号已去掉、用空格连），单独成一条的 `名字+=(…)` / `名字+=值` 接在记下的值后面、`名字[下标]=值` 与 `unset 名字[下标]`
+    记成算不出（record_array_writes）；接不上的（之前没记过、算不出、一边是数组一边不是）记成算不出。
     命令前的 `名字=值 命令` 不记（只给那一条命令，它的参数也不按它展开）。"""
     if stripped_heredocs is None:
         stripped_heredocs = []
@@ -939,6 +984,7 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                 output_targets += inner.output_targets
         if not words:
             continue
+        record_array_writes(words, variables)
         standalone = skip_prefixes(words)
         if standalone.command_position is None and not standalone.prefix_names:
             for word in words:
@@ -979,7 +1025,7 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                     if not argument.startswith("-"):
                         exported.pop(argument, None)
                         if not variable_rebinding_unseen():
-                            variables[argument] = None
+                            variables[argument.split("[", 1)[0]] = None
                 break
             if name in ("cd", "pushd"):
                 directory = changed_directory(directory, arguments, variables)

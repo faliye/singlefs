@@ -13,15 +13,18 @@
 
 做法：
   1. 把主工作区此刻的 Cargo.toml、Cargo.lock、.cargo/、crates/（不带 target/）与每台默认重活线程数的登记文件 .claude/heavy-thread-default
-     （harness 包经 include_str! 在编译时读它，副本里没有就编不过）拷进 <草稿目录>/compile-then-swap/tree，
-     把草稿副本放到目标在副本里的位置；主工作区一个字节不碰。
+     （harness 包经 include_str! 在编译时读它，副本里没有就编不过）与装置启动时 preflight() 读的上游准入脚本
+     .claude/singlefs-ai-sop/scripts/preflight.py、proc.py（装置把 env!("CARGO_MANIFEST_DIR") 烘进二进制，运行时按
+     <树>/crates/<crate>/../../.claude/singlefs-ai-sop/scripts/preflight.py 找脚本、按 <树>/crates/<crate>/src/bin/<名>.rs 找自己的源文件）
+     拷进 <草稿目录>/compile-then-swap/tree，把草稿副本放到目标在副本里的位置；主工作区一个字节不碰。
   2. 在副本里 `nice -n 19 cargo build --offline -p <crate> --bin <名>` 与 `cargo test --offline --no-run -p <crate> --bin <名>`
      （后一条编 bin 里的 #[cfg(test)]），CARGO_TARGET_DIR 放 <草稿目录>/compile-then-swap/target。线程数照环境里的
      CARGO_BUILD_JOBS（经 scripts/hosts/capped.sh N 起时就是 N）。编译输出落 <草稿目录>/compile-then-swap/build-*.log。
   3. 两条都编过，再核主工作区那份在编的这段时间里没被改过（开跑时记的字节与此刻相同，或开跑时与此刻都不存在）。
   4. 换上：目标已有的，同目录临时文件写完、fsync、照原权限位改名盖上（scripts/kb/lib_atomic_replace.py）；目标还没有的，
      同目录临时文件写完再硬链接到目标名（目标名这时被别人占了就失败）、删临时文件。换上之后回读，与草稿副本逐字节相同。
-  5. 删掉仓副本，编译目录留着给下一次增量编；收工前 --clean。
+  5. 仓副本（树）与编译目录都留着，不删：烘进二进制的路径在树里，树不在了二进制起来就退 1；树里带着装置的源文件与上面那三份脚本。
+     下一次编同一份草稿目录时树照原路径重建；装置产物跑完之后 --clean 一并删。
 编不过、目标被改过、参数不对，都在换上之前停下：主工作区那份一个字节不动。
 
 退出码：0 换上了；1 编不过（一个字节没写）；2 参数或路径不对（没编、一个字节没写）；3 编的时候主工作区那份被改了（一个字节没写）；
@@ -45,7 +48,8 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
   non-bin-source       crate 里 bin 以外的源文件不收（退 2、不编）
   draft-inside-repo    草稿副本放在主工作区里不收
   outside-crates       crates/ 以外的 .rs 不收，那里有自己的 Cargo.toml 也不收
-  tree-removed         跑完之后仓副本不在草稿目录里
+  tree-kept-until-clean  编完不 --clean 时仓副本还在草稿目录里，树里装置的源文件、.claude/singlefs-ai-sop/scripts/preflight.py、proc.py 都在
+                       （装置的 preflight 读的路径）；--clean 之后树和这几个路径都不在
   clean-removes-work   --clean 删得掉编译目录
   thread-registry-copied  库源码里有 include_str 登记文件的标记（假 cargo 照它找 .claude/heavy-thread-default，找不到照真 cargo 退 101）：
                        仓副本里有那份登记文件，编过、换上
@@ -57,10 +61,10 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
       build-fails、test-build-fails（「退出码 0（应当 1）」）、new-bin-build-fails（「退出码 0（应当 1）」「目标 sha256」）
   skip-test-build     只跑 cargo build，不跑 cargo test --no-run（#[cfg(test)] 里编不过的放过去）
       test-build-fails（「退出码 0（应当 1）」）；changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、
-      tree-removed、clean-removes-work（「假 cargo 的调用 ['build']（应当 ['build', 'test']）」）
+      tree-kept-until-clean、clean-removes-work（「假 cargo 的调用 ['build']（应当 ['build', 'test']）」）
   build-in-root       cargo 在主工作区里编，不在仓副本里编（草稿副本没进编译）
       build-fails、test-build-fails（「退出码 0（应当 1）」）；凡调到假 cargo 的项（build-fails、test-build-fails、new-bin-build-fails、
-      changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、tree-removed、clean-removes-work）都报「假 cargo 在」
+      changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、tree-kept-until-clean、clean-removes-work）都报「假 cargo 在」
   skip-race-check     不核主工作区那份在编的时候改没改
       changed-during-build（「退出码 0（应当 3）」）
   in-place-write      不改名换上，直接在目标原来的 inode 上截断重写
@@ -69,8 +73,10 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
       swap-error（「输出里没有「时失败」」：落到回读那一支才停）
   skip-readback       换上之后不回读
       readback-mismatch（「退出码 0（应当 4）」）
-  keep-tree           编完不删仓副本
-      tree-removed（「跑完之后仓副本还在草稿目录里」）
+  remove-tree         编完就删仓副本（装置 preflight 要的路径跟着没了）
+      tree-kept-until-clean（「编完之后仓副本不在草稿目录里」）
+  preflight-not-copied  仓副本里不拷 .claude/singlefs-ai-sop/scripts/preflight.py、proc.py
+      tree-kept-until-clean（「仓副本里缺 .claude/singlefs-ai-sop/scripts/preflight.py」）
   draft-in-repo       不核草稿副本在不在主工作区里
       draft-inside-repo（「退出码 0（应当 2）」）
   any-crates-source   不核目标是不是 src/bin/ 下的装置，crate 里别的 .rs 拿文件名当 bin 名
@@ -99,10 +105,14 @@ from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  
 
 BREAK_VARIABLE = "COMPILE_THEN_SWAP_BREAK"
 KNOWN_BREAK_MODES = ("swap-on-failure", "skip-test-build", "build-in-root", "skip-race-check", "in-place-write", "swap-error-ignored",
-                     "skip-readback", "keep-tree", "draft-in-repo", "any-crates-source", "outside-crates", "registry-not-copied")
+                     "skip-readback", "remove-tree", "draft-in-repo", "any-crates-source", "outside-crates", "registry-not-copied",
+                     "preflight-not-copied")
 WORK_DIRECTORY_NAME = "compile-then-swap"
 THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"   # harness 经 include_str! 编进来的登记文件（crates/singlefs-harness/src/heavy_threads.rs）
-COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates", THREAD_REGISTRY_ENTRY)
+# 装置启动时 preflight() 读的上游脚本（crates/singlefs-checker-tier/src/bin/e*.rs 的 preflight 按 <CARGO_MANIFEST_DIR>/../../ 找它；它再同目录加载 proc.py）
+UPSTREAM_PREFLIGHT_ENTRIES = (".claude/singlefs-ai-sop/scripts/preflight.py", ".claude/singlefs-ai-sop/scripts/proc.py")
+COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates", THREAD_REGISTRY_ENTRY,
+                       *UPSTREAM_PREFLIGHT_ENTRIES)
 ERROR_LINES_SHOWN = 40
 EXIT_SWAPPED, EXIT_BUILD_FAILED, EXIT_BAD_INPUT, EXIT_CHANGED_DURING_BUILD, EXIT_SWAP_FAILED = 0, 1, 2, 3, 4
 
@@ -184,6 +194,8 @@ def copy_workspace(root, tree, mode=""):
     os.makedirs(tree)
     for entry in COPIED_ROOT_ENTRIES:
         if entry == THREAD_REGISTRY_ENTRY and mode == "registry-not-copied":
+            continue
+        if entry in UPSTREAM_PREFLIGHT_ENTRIES and mode == "preflight-not-copied":
             continue
         source = os.path.join(root, entry)
         if os.path.isdir(source):
@@ -274,9 +286,10 @@ def swap(draft, target, scratch, root, release=False, after_build=None, after_sw
             handle.write(draft_bytes)
         built, errors = build(root if mode == "build-in-root" else tree, target_directory, package, bin_name, release, log_path, mode)
     finally:
-        if mode != "keep-tree":
+        if mode == "remove-tree":
             shutil.rmtree(tree, ignore_errors=True)
-    lines.append(f"编译输出：{log_path}；编译目录 {target_directory} 留着给下一次增量编，收工前 --clean --scratch {scratch}")
+    lines.append(f"编译输出：{log_path}；编译目录 {target_directory} 与仓副本 {tree} 都留着（装置启动时的 preflight 按烘进二进制的树路径读"
+                 f"里面的 preflight.py 与自己的源文件，树不在二进制退 1），装置产物跑完之后 --clean --scratch {scratch}")
     if not built:
         lines += [f"✗ 草稿副本在仓副本里编不过，主工作区 {os.path.relpath(target, root)} 一个字节没写：", *errors,  # gate-lint:summary
                   f"→ 怎么办：照上面的错误改草稿副本 {draft}，再跑这条脚本；错误落在草稿副本以外的文件（别的会话在改的），"
@@ -324,7 +337,7 @@ def clean(scratch):
     if not os.path.isdir(work):
         return [f"  ! {work} 不存在，没有要删的"]
     shutil.rmtree(work)
-    return [f"  ✓ 删了 {work}（仓副本、编译目录与编译输出）"]
+    return [f"  ✓ 删了 {work}（仓副本、编译目录与编译输出；这之后编出来的二进制起不来，要先确认装置产物都跑完了）"]
 
 
 SELFTEST_MANIFEST = '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n'
@@ -411,6 +424,9 @@ class SelftestFixture:
         self.cargo_log = os.path.join(work, "fake-cargo.log")
         for directory in (self.bin_directory, self.scratch, self.fake_bin):
             os.makedirs(directory)
+        for entry in UPSTREAM_PREFLIGHT_ENTRIES:
+            os.makedirs(os.path.dirname(os.path.join(self.root, entry)), exist_ok=True)
+            write_text(os.path.join(self.root, entry), "# 自证样本：上游准入脚本\n")
         write_text(os.path.join(self.root, "Cargo.toml"), '[workspace]\nresolver = "2"\nmembers = ["crates/demo"]\n')
         write_text(os.path.join(self.root, "crates", "demo", "Cargo.toml"), SELFTEST_MANIFEST)
         write_text(self.library, LIBRARY_SOURCE)
@@ -534,11 +550,21 @@ def case_outside_crates(fixture):
     return check_swap(fixture, fixture.draft(GOOD_BIN), os.path.join(crate, "src", "bin", "x.rs"), EXIT_BAD_INPUT, None, [])
 
 
-def case_tree_removed(fixture):
+def case_tree_kept_until_clean(fixture):
+    """编完不 --clean：树还在，装置 preflight 读的路径（装置源文件、上游 preflight.py 与 proc.py）都在；--clean 之后一个不剩。"""
     problems = check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
                           BOTH_CARGO_COMMANDS)
-    if os.path.exists(os.path.join(fixture.scratch, WORK_DIRECTORY_NAME, "tree")):
-        problems.append("跑完之后仓副本还在草稿目录里：交回闸会拦")
+    tree = os.path.join(fixture.scratch, WORK_DIRECTORY_NAME, "tree")
+    wanted = [os.path.relpath(fixture.target, fixture.root), *UPSTREAM_PREFLIGHT_ENTRIES]
+    problems += [f"编完之后仓副本里缺 {entry}：装置起来读不到它会退 1" for entry in wanted if not os.path.isfile(os.path.join(tree, entry))]
+    if not os.path.isdir(tree):
+        problems.append("编完之后仓副本不在草稿目录里：烘进二进制的树路径没了，装置起来退 1")
+    elif read_bytes_or_none(os.path.join(tree, wanted[0])) != GOOD_BIN_CHANGED.encode():
+        problems.append("仓副本里装置的源文件不是换上的那一份")
+    clean(fixture.scratch)
+    problems += [f"--clean 之后 {entry} 还在" for entry in wanted if os.path.lexists(os.path.join(tree, entry))]
+    if os.path.lexists(tree):
+        problems.append("--clean 之后仓副本还在")
     return problems
 
 
@@ -572,7 +598,7 @@ SELFTEST_CASES = (
     ("non-bin-source", case_non_bin_source),
     ("draft-inside-repo", case_draft_inside_repo),
     ("outside-crates", case_outside_crates),
-    ("tree-removed", case_tree_removed),
+    ("tree-kept-until-clean", case_tree_kept_until_clean),
     ("clean-removes-work", case_clean_removes_work),
     ("thread-registry-copied", case_thread_registry_copied),
 )
@@ -619,7 +645,8 @@ def selftest():
     print(f"  ✓ compile-then-swap 自检通过（查了 {len(SELFTEST_CASES)} 项，假 cargo 一共被调 {cargo_calls} 次，不起真编译）："
           "编不过的（bin 本身、#[cfg(test)]、新 bin）一个字节不写，编的时候主工作区那份被改了不盖，编过的整份换上且换的是新 inode、"
           "新 bin 建得出来，换上失败与回读对不上都退 4，bin 以外的源文件、crates/ 以外的 .rs、放在主工作区里的草稿都不收，"
-          "cargo 只在仓副本里调，仓副本带着 include_str 读的登记文件 .claude/heavy-thread-default，仓副本跑完就删、--clean 删得掉编译目录")
+          "cargo 只在仓副本里调，仓副本带着 include_str 读的登记文件 .claude/heavy-thread-default，"
+          "编完不 --clean 时仓副本留着、带着装置 preflight 读的源文件与 .claude/singlefs-ai-sop/scripts/preflight.py、proc.py，--clean 之后树和编译目录都删")
     return 0
 
 

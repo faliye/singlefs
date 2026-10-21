@@ -1,0 +1,5 @@
+exit=1
+want=取不出新池新建文件那条记录的反向链登记值（crates/singlefs-harness/tests/new_pool_file_creation_publish.rs 里那一行 const E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION: u32 = <数>;）
+want=照今天的名字改本阶段的 BACK_CHAIN_PINNING_TEST / BACK_CHAIN_PINNING_CONSTANT
+want=device-streams：红（退出 1）
+want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

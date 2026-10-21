@@ -1,0 +1,11 @@
+exit=3
+want=样本档：
+want=✓ crash-case:plain-stream 判绿（
+want=块 2：复用 2、现判 0、红 0、拒算 0）
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release -p singlefs-checker-tier --features verdict-store --test fault_injection_given_states -- --include-ignored --exact fault_injection_given_states_full --nocapture
+want=crash-case:fault-injection-given-states：登记了 red-blocks=judged-by-test，按 cargo test 的退出码判（已退 0），块那一行只核在不在、数对不对得上，红块不判
+want=✓ crash-case:fault-injection-given-states 判绿（
+want=块 4：复用 1、现判 3、红 2、拒算 0）
+want=✓ 崩溃状态块：现判 3、复用 3、拒算 0、本次未跑 0
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走 --full 流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

@@ -1,0 +1,4 @@
+exit=0
+want=其中 1 个已点名、0 个没点名
+want=登记产物里判决字段是 false 的都在对应实验页里点了名（点名 1 个）
+want=doc-experiments.sh：1 格里 1 格绿（verdict-false-named），0 格本次未跑（无）

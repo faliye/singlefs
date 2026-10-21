@@ -18,6 +18,9 @@ judging-stage	crates/singlefs-checker-tier/src/crash.rs::judge_crash_state_range
 judging-body	crates/singlefs-checker-tier/src/crash.rs::check_records	# 判器本体：记录核对器的入口，把 check_records_against 包一层
 judging-body	crates/singlefs-checker-tier/src/crash.rs::judge_crash_image	# 判器本体：一张崩溃镜像的 CPU 判器（池级 checker 加记录核对器），调它的地方另判
 judging-body	crates/singlefs-checker-tier/src/crash.rs::judge_crash_image_against_the_version_table	# 判器本体：照版本表判一张崩溃镜像（池级 checker 加记录核对器），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/device_log.rs::invariants_violated_on	# 判器本体：设备日志判器算可发区间那一判（池级 checker 在施加候选 discard 前后的镜像上判违例集），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/device_log.rs::judge_discards_against_the_publishes	# 判器本体：设备日志判器判每个 Discard 落在可发区间里且在那次发布最后一道屏障之后，调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/device_log.rs::discardable_ranges_after_each_publish_found_in_the_stream	# 判器本体：设备日志判器从录制流里的发布独立算每次发布之后的可发区间（经 invariants_violated_on），调它的地方另判
 judging-body	crates/singlefs-checker-tier/src/crash.rs::evaluate_state_recording_findings	# 判器本体：手摆的一个状态的 CPU 判器加记账（照版本表判一张崩溃镜像，结论记进计数），调它的地方另判
 judging-body	crates/singlefs-checker-tier/src/crash.rs::evaluate_state	# 判器本体：单版本形态的手摆状态判法入口（把 evaluate_state_for_versions 包一层），调它的地方另判
 judging-body	crates/singlefs-checker-tier/src/crash.rs::evaluate_state_for_versions	# 判器本体：手摆状态的判法入口（把 evaluate_state_recording_findings 包一层），调它的地方另判
@@ -41,3 +44,10 @@ judge-self-test	crates/singlefs-checker-tier/tests/record_checker_reuse_exemptio
 judge-self-test	crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs::the_record_checker_bounds_the_effective_floor_by_the_floor_written_into_the_system_configuration	# 判器自测：手改写表里的系统配置槽写，断言记录核对器的复用豁免按系统配置里的回滚下界收放
 excluded	crates/singlefs-harness/tests/checker_*.rs	# 池级 checker 自己的单测：手造一张镜像、断言判器的结论，判的是判器本身，不是产出再判（harness 档随时跑）
 excluded	crates/singlefs-harness/tests/pool_checker_*.rs	# 池级 checker 自己的单测：手造一张镜像、断言判器的结论，判的是判器本身，不是产出再判（harness 档随时跑）
+judge-self-test	crates/singlefs-checker-tier/src/device_log.rs::a_stream_without_any_discard_has_no_discardable_range_after_any_publish	# 判器自测：手写一条没有 discard 的录制流交设备日志判器算可发区间，断言每次发布一项、区间都空（判器自己的契约）
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocation_stream.rs::a_discard_of_the_region_right_after_the_final_batch_is_judged_outside_the_discardable_ranges	# 判器自测：往录制流里插一段已知落错的 discard（刚搬空、仍被近几代根引用的 R），断言设备日志判器判它落在不可发的槽上
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocation_stream.rs::the_device_log_of_the_compaction_relocation_stream_holds_no_discard_and_is_judged_clean	# 判器自测：上一条必红世界的阳性对照，同一条录制流不插 discard 时设备日志判器判过 0 条、不假红；设备日志判器没有 GPU 那一份，判的是录制流不是崩溃状态
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_lifecycle_closure_stream.rs::device_log_verdicts	# 判器自测：设备日志判器的两条必红世界（discard 挪到根槽写之前、挪到流尾每一版的根都指着的实例表所在的段上）与它们的阳性对照（原样的录制流各判过一条）共用的帮手；判的是录制流不是崩溃状态，设备日志判器没有 GPU 那一份
+excluded	crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs	# 池级 checker I-1.13（扫描重建与遍历方向的索引相同）自己的单测：合法镜像上判成立、手改映射叶落点与单元头 key 的必红世界判违例，断言判器的结论（harness 档随时跑，同 checker_*.rs）
+excluded	crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs	# 池级 checker I-1.13 扫描重建读谱系与退役记录的单测：合法镜像上判成立、抹掉记录的必红世界判违例、随机历史上数三种结论，断言判器的结论（harness 档随时跑，同 checker_*.rs）
+judge-self-test	crates/singlefs-harness/tests/compaction_relocation_batches_publish_through_the_mapping.rs::a_batch_that_releases_the_source_while_the_mapping_still_names_it_is_judged_red	# 判器自测：只供测试的开关让一批先释放源落点、映射仍指着它，断言池级 checker 在这张已知坏镜像上判红（必红世界，判的是判器）

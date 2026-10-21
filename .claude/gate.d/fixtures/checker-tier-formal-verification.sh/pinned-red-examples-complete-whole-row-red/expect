@@ -1,4 +1,0 @@
-exit=1
-want=3 行里 1 行没钉进
-want=没整行钉：表第 22 行钉着同一个输入与 ⑦，⑨ 起与账这一行不同，第一处在 ⑲（账第 11 段）
-want=pinned-red-examples-complete：红（退出 1）

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 判别力样本的假 cargo（--full 样本档，登记了 red-blocks=judged-by-test 的用例与没登记的用例各一条）：-V 打版本；
+# test 先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>（阶段只转出这一类行，expect 靠它核交给 cargo 的参数），
+# 再照 cases/<测试目标>.log 打日志，退出码照同名 .exit（没有就 0）；没有那一份日志退 101。别的一律退 101。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+target=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --test ]]; then target="$word"; fi
+  previous="$word"
+done
+[[ -n "$target" && -f "$here/cases/$target.log" ]] || { echo "样本里没有测试目标 $target 的日志"; exit 101; }
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+cat "$here/cases/$target.log"
+exit "$(cat "$here/cases/$target.exit" 2>/dev/null || echo 0)"

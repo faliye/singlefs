@@ -11,12 +11,52 @@
 #   那一行（连同它所在的那一批基线）拿它自己的上限与限时，写 - 的那一样与没写的行照变异表表头、GATE_MUTATION_MEMORY_MAX / GATE_MUTATION_TIMEOUT、默认 4G / 1800 秒。
 #   # 开头：这张表的核法（crates-mutation-light-rows.py）与门禁取名字的那一段都不读它；上限与限时不进行键。依据写「推的」或量过的峰值与日期。
 # 逐行上限：步 6：恢复从系统配置 tail 起逐条验证记录的点名单元、失配即中止（E78 的自我中止形态）	-	3600	# 推的、没量过：2026-10-15 轻型（负载约 90）里这一批基线 1800 秒没跑完，那时限时含重编译（调试档单编约 18 分半）；限时改成不含重编译之后再给到 3600
-# 逐行上限：步 3 验收：取号之后没有屏障（取号的系统配置槽写与写行那次发布的单元写并成一段）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
+# 逐行上限：步 3 验收：取号之后没有屏障（取号的系统配置槽写与写行那次发布的单元写并成一段）	8G	3600	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G；限时 3600 也是推的：2026-10-21 轻型在默认 1800 秒超时，取号改写两轮之后崩溃枚举的流变长
 # 逐行上限：实二十：崩溃点重放 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
 # 逐行上限：树分裂 崩溃点重放：冷走读核映射条目数时记账树按一个节点算（多层记账树的镜像走读失败）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
-# 逐行上限：实二五 D19 已定项 5（同一处）：读得出而对不上不重读；故障注入快档判出（一次坏读隔离一对好槽，I-3.11 红）	-	3600	# 推的、没量过：2026-10-15 轻型（负载约 90）里这一批基线 1800 秒没跑完，那时限时含重编译（调试档单编约 18 分半）；限时改成不含重编译之后再给到 3600
+# 逐行上限：实二五 D19 已定项 5（同一处）：读得出而对不上不重读；故障注入快档判出（一次坏读隔离一对好槽，I-3.11 红）	24G	3600	# 量过一次：~/.local/share/singlefs/memory-peaks.tsv 2026-10-15 峰值 19198377984 字节（上限 24G）；限时 3600 是推的、没量过
 # 逐行上限：实五 崩在准入推的那一串空发布中间：抬 F 那一串不先写系统配置（带新 F 的根落盘而系统配置里还是旧 F，I-7.12 判红）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
 # 逐行上限：第57批 H1 写侧早关一片（攻方 w-close-one-early：旋钮 K ≥ 2 装 K − 1 条就开新片）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
+# 逐行上限：第 5 批 GPU 判器：带拒收值的槽判完 I-7.13 不停、接着往下判	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C780 GPU 判器：恢复判记账条目宽只拒窄于 34、宽了照收	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_given_states_of_the_images_harness_scenarios_hand_out（带 gpu 特性）的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：C780 GPU 判器：恢复读码 2 树内部节点条目宽只拒窄于字段表、宽了照收	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_given_states_of_the_images_harness_scenarios_hand_out（带 gpu 特性）的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：第 10 批 10b GPU 判器：恢复内核映射条目数不算删除那两棵树与谱系树的节点（改回只数五样的式子）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：第 21 批 N5 GPU 判器：读第一个文件不放过零条叶条目，删到最后一批那一版起 GPU 走读失败而 CPU 答没有文件（删到最后一批的整份比用例红）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：删除线第42批 F2_NEWEST 不按所选根的实例表滤（只有 R 的实例表抛弃 V 的世界上 CPU 退到 V、不落 V⁻）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：m4 验证段 GPU 分批读：恢复内核 extent 树那一遍头一块之外的指针也往 R_DATA 写（压到上段那张表）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_reads_long_files_and_lineages_block_by_block 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：m4 验证段 GPU 并进先走那一版的落点：走读内核 w_merge_below 展开过的单元改回 1024 条（满了记判不了）	12G	-	# 推的、没量过：2026-10-21 点名 crash_judge_gpu_reads_long_files_and_lineages_block_by_block，同测试目标的第 4796 行已给 12G（那一行撞过 4G），照它给
+# 逐行上限：m4 验证段 GPU 并进先走那一版的落点：走读内核记挂父单元那张表时同一个父单元的最后一行不往后挪（找孩子沿下一行走漏掉中间几行）	12G	-	# 推的、没量过：2026-10-21 点名 crash_judge_gpu_reads_long_files_and_lineages_block_by_block，同测试目标的第 4796 行已给 12G（那一行撞过 4G），照它给
+# 逐行上限：m4 验证段 GPU 并进先走那一版的落点：走读内核挂父单元那张表的索引建好之后新来的行不进桶表（建表的界少算刚记的那一行）	12G	-	# 推的、没量过：2026-10-21 点名 crash_judge_gpu_reads_long_files_and_lineages_block_by_block，同测试目标的第 4796 行已给 12G（那一行撞过 4G），照它给
+# 逐行上限：m4 验证段 GPU 并进先走那一版的落点：走读内核去重展开过的单元只比盘（同一块盘上的单元当成已经展开过）	12G	-	# 推的、没量过：2026-10-21 点名 crash_judge_gpu_reads_long_files_and_lineages_block_by_block，同测试目标的第 4796 行已给 12G（那一行撞过 4G），照它给
+# 逐行上限：m4-i315-r1 C1 乙二 GPU 判器：扫描内核 I-3.15 隔离判据的组不看这一版映射有没有位置条目指着这一槽（GPU 变成乙一，有 key 指着、一份改坏的那一形与 CPU 分歧；推的）	12G	-	# 推的、没量过：2026-10-21 点名的是 GPU 对拍用例，同族的逐态对拍量到 8.70 GiB、点名 hand_out 那份的第 5057、5062 行已给 12G，照它给
+# 逐行上限：m4-i315-r1 C1 乙二 GPU 判器：扫描内核 I-3.15 隔离判据的组退回只读打了对不上映射记号的那几条（GPU 改之前的读法：一份头用不了、没有 key 的隔离单元 GPU 红、CPU 成立）	12G	-	# 推的、没量过：2026-10-21 点名的是 GPU 对拍用例，同族的逐态对拍量到 8.70 GiB、点名 hand_out 那份的第 5057、5062 行已给 12G，照它给
+# 逐行上限：m4-i315-r1 C1 乙二 GPU 判器：扫描内核 I-3.15 没有位置条目指着这一槽时组里读的也只是打了对不上映射记号的那几条（读每条未释放记录那一支换回今天的读法：一份头用不了、没有 key 的隔离单元 GPU 红、CPU 成立）	12G	-	# 推的、没量过：2026-10-21 点名的是 GPU 对拍用例，同族的逐态对拍量到 8.70 GiB、点名 hand_out 那份的第 5057、5062 行已给 12G，照它给
+# 逐行上限：m4 验证段 GPU 分批读：恢复内核 extent 树那一遍不记单元号有洞	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：多文件 GPU M6：别的文件的单元数不并进映射条目数（恢复内核照只有第一个文件数映射条目）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：多文件 GPU M6：读每个文件的下段之前不复位单元计数（第一个文件之外的文件接着上一个文件数单元号、判成有洞）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：多文件 GPU M6：上段里没有第一个文件那一条时只认零条目根（删完第一个文件、只剩别的文件那一形判成解不开）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：多文件 GPU M6：上段叶条目只读第一批（一批之后的文件不收）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：多文件 GPU M6：记下一批的那一遍又记见过（段的根读到第二次判红）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：上段规范形 I-9.40 GPU：判形状那一句恒判成立	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：上段规范形 I-9.40 GPU：根层级不与有条目的号集合定的最低一层比	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：上段规范形 I-9.40 GPU：落在所在那片叶区间之外的号找不到它那片叶也算成立	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：上段规范形 I-9.40 GPU：删除态扫描不判 extent 树的上段	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：上段规范形 I-9.40 GPU：规范形的最低一层从 1 数起（只剩第 0 片叶有条目时也要层级 1）	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：对拍字 I-1.13 结局码：崩溃镜像那一路 CPU 一侧不从池级 checker 的判定换码	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：对拍字 I-1.13 结局码：给定状态那一路 CPU 一侧不从池级 checker 的判定换码	12G	-	# 推的、没量过：2026-10-21 轻型（外层 36G）里点名 crash_judge_gpu_judges_files_written_by_inode_number_like_the_cpu_judge 的行撞了 4G（顶到 4096 MiB），峰值没量过；同族的逐态对拍量到 8.70 GiB，给 12G
+# 逐行上限：GPU 红批 I-1.13 走读内核：一块盘都择不到系统配置那一处早退不记结局码（GPU 交没走到、CPU 报那一句不适用）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：GPU 红批 I-1.13 走读内核：环几何三格不等那一处早退记成带越界值整池拒的码	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：GPU 红批 I-1.13 走读内核：带越界值整池拒那一处早退记成环几何三格不等的码	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：GPU 红批 I-1.13 走读内核：入口不把整池交回的结局码写进结论（那一字留着初值没走到）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：GPU 红批种位用例：扫描重建那一截的入口不把违例位写回结论（它种的第 126 位与它判的 I-1.13 到不了判定）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C663 GPU 走读内核：S 越界退回「这一槽不可择」	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C663 GPU 走读内核：R 只判大于 3、退回「这一槽不可择」（R = 2 照收）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C728 GPU 走读内核：系统配置槽尾不判	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C728 GPU 走读内核：根槽尾不判	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C728 GPU 走读内核：槽尾判法逐字节那一截不判（根槽尾 457 落在这一截）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C728 GPU 走读内核：槽尾判法按字读那一截不判（系统配置槽末字节 4095 落在这一截）	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C663 GPU 判器：恢复择系统配置时不判区域数 R 是第一版的 3	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
+# 逐行上限：C663 GPU 判器：恢复择系统配置时 incompat 位不认得那一臂不先判格式版本	12G	-	# 量过一次：2026-10-20 看门狗量到 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state 常驻 8.70 GiB；2026-10-21 轻型（外层 36G）里点名它的行撞了 4G，给 12G
 逐盘核退回只核总数	-p singlefs-core --lib
 释放时清位图（立即复用）	-p singlefs-harness --test overwrite_in_one_instance
 步 3：暖机只推一次	-p singlefs-harness --test writable_mount_takes_a_second_instance
@@ -187,8 +227,75 @@ K4 重建时 I-2.5 那一判漏掉墓碑树的容器指针与根之下节点指�
 4-4 修红 W13 J1：重建不按 I-2.5 判所选那一版那条 journal 记录的新根段指针（重新编码时在写者断言上 panic）	-p singlefs-harness --test journal_record_whose_new_root_segment_pointer_does_not_ascend_is_refused_by_the_writable_mount
 4-4 修红 W13 岔路一读一次两边共用：取号之前预演没走完而读过错照旧吞成放行（真做取号、写行、续做落盘之后才交 C841）	-p singlefs-harness --test writable_mount_rehearsal_and_the_real_run_read_each_block_once
 4-4 修红 W14 C834 比 fsid：较新可读根指针槽里别的池的单元头也算被更新单元盖掉（四个槽都摆别的池的单元头、可写挂载照放过）	-p singlefs-harness --test newer_unreadable_root_counts_only_units_of_this_pool_as_overwriting_its_pointer_slots
-4-4 修红 W16 读坏当场重读：重读也取共用的那一份（预演与真做重读读到的都是记下的坏字节，释放之前读盘核把那个单元两份都隔离）	-p singlefs-harness --test writable_mount_reread_after_a_bad_read_reaches_the_disk_past_the_reads_shared_with_the_rehearsal
+4-4 修红 W16 读坏当场重读：重读也取共用的那一份（抬 F 算上限读根环时重读取到记下的坏字节，重读仍坏、挂载报 RollbackFloorCeilingRootRingSlotStillBadAfterOneReread）	-p singlefs-harness --test writable_mount_reread_after_a_bad_read_reaches_the_disk_past_the_reads_shared_with_the_rehearsal
 4-4 修红 W16 读序：真做取号写之前多读一遍根环（瞬时那条用例点名的第 10 次读成了取号写之前那一遍，抬 F 的重读是第 11 次）	-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root
 4-4 修红 W17 取号写与轮换写算世代号的那一读走共用的那一份（见证值读之后、取号写之前盘 0 两槽不再读到盘上）	-p singlefs-harness --test writable_mount_acquisition_write_reads_the_system_configuration_slots_from_the_disk
 4-4 修红 W17 读坏：读坏不进账（每一趟都读坏的那份树表照旧留给续做，真做取号、写行落盘之后抬 F 才读不出）	-p singlefs-harness --test writable_mount_rehearsal_drops_bytes_failing_self_verification_from_the_shared_reads
 4-4 修红 W17 L4：重建不按 I-2.5 判所选那一版那条 journal 记录的点名项（点名项两条位置条目逆序的记录照收、可写挂载往下写）	-p singlefs-harness --test journal_record_whose_named_unit_locations_do_not_ascend_is_refused_by_the_writable_mount
+m4 快照格式 S1：码 14、15 照旧判同一种树两条（两对快照条目的树表被拒）	-p singlefs-harness --test tree_table_entries_carry_the_previous_snapshot_txg_and_admit_snapshot_kinds
+整理意图条目少写 segs0（那 8 字节留成 0）	-p singlefs-harness --test logged_operations_intent_record_round_trips
+选段不看钉住的槽	-p singlefs-harness --test compaction_plan_chooses_regions_and_batches_by_the_clauses
+m4 discard 口子：块设备 trait 的默认 discard 交回交给了底层（不认 discard 的后端被当成认）	-p singlefs-harness --test block_devices_record_and_apply_discards
+m4 建快照：码 15 的头 ID 写成活头 inode 树号	-p singlefs-harness --test snapshot_creation_publish_and_the_entries_every_later_publish_carries
+m4 快照释放：被快照引用的单元照样释放（覆盖写）	-p singlefs-harness --test snapshot_release_and_destroy_through_the_deadlist
+m4 整理批：映射条目不换到目的地	-p singlefs-harness --test compaction_relocation_batches_publish_through_the_mapping
+m4 整理运行：签发前判不拦	-p singlefs-harness --test compaction_runs_stop_and_discard_after_the_publish
+m4 快照崩溃流：建快照不把活头前驱换成 S.txg（建快照流的判器红）	-p singlefs-checker-tier --test crash_enumeration_snapshot_creation_stream
+m4 快照崩溃流：快照下换下的用户可见单元直接释放、不进 deadlist（快照下覆盖写与删文件流的判器红）	-p singlefs-checker-tier --test crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream
+m4 快照崩溃流：删快照的最后一批漏放一条（删快照续做流的判器红）	-p singlefs-checker-tier --test crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream
+m4 意图上盘：签发那次发布不写 logged_ops	-p singlefs-harness --test compaction_intent_is_logged_and_resumed_after_a_crash
+m4 模型跟上删快照：会话在删光文件的一版上照拒删快照（模型要它做成）	-p singlefs-harness --test snapshot_operations_in_random_histories
+m4 整理对拍：搬到目的地的字节改了	-p singlefs-harness --test compaction_while_mounted_in_random_histories
+m4 整理崩溃流：源落点在映射发布之前就被释放（映射与指针留在源落点，整理搬迁流的判器红）	-p singlefs-checker-tier --test crash_enumeration_compaction_relocation_stream
+m4 整理崩溃流：留存的映射条目不跟着搬（只更新活头一侧、快照一侧仍指源落点，搬共享块流的判器红）	-p singlefs-checker-tier --test crash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream
+m4 闭环流：回收记下的段不论整段可不可再分配都发 discard（段里还有近几代根引用的单元，生命周期闭环流红）	-p singlefs-checker-tier --test crash_enumeration_lifecycle_closure_stream
+m4 修复批甲 F1：回退那一版的映射照抄现行那一版（整理搬过的单元的条目留在回退释放掉的目的落点，回退那一步红 I-3.9、I-3.15）	-p singlefs-checker-tier --test crash_given_states_of_every_step_of_the_compaction_and_rollback_histories
+m4 修复批甲 F2：腾空 R 的那一批照抄意图（留到下一次只删意图的发布，模型判一次整理发布要么搬一批要么删意图）	-p singlefs-harness --test compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish
+m4 修复批甲 F4：强制立即释放那一臂照判定走（快照下换下的单元照旧进 deadlist）	-p singlefs-harness --test snapshot_lifetime_judgement_forced_onto_either_arm_by_the_test_only_switch
+m4 修复批三甲三 H4：会话不跳过这次发布本来就重写的节点（照抄意图的一批计划的全是本来就重写的节点时一个没搬、意图照抄，攻方种子下标 297 那一形模型判不合）	-p singlefs-harness --test compaction_batches_skip_the_nodes_the_publish_rewrites_anyway
+m4 修复批三甲三 H2：最后一批删意图那一核不过时改成照删意图再发（瞬时读错那一形不照抄意图，下一遍读得出就删了）	-p singlefs-harness --test compaction_intent_check_fallbacks_reached_by_transient_read_errors
+m4 修复批三甲三 H3：签发的 segs0 少记签发那次开的新段（取成签发之后的数，意图腾出的那一段抵掉新段也算有产出）	-p singlefs-harness --test compaction_intent_issue_writes_the_empty_segments_counted_before_the_issue
+m4 修复批四甲四 J6：树表条目里各棵树的根不照映射位置刷新（搬根之后根指针字节不变、不算非空）	-p singlefs-harness --test compaction_batch_relocating_a_user_visible_root_is_non_empty
+m4 截断截甲 K3：释放判定把「计划没有文件内容」也当整份重写（截断意图只重写单元 0 时把单元 1、2 一起换下）（truncating_a_three_unit_file_into_unit_zero_in_batches_of_on…）	-p singlefs-harness --test truncation_intent_batches_and_final_batch
+m4 截断截甲 K1：共用走空先走截断、再走销毁中的快照（the_shared_walk_empties_deleted_inodes_then_the_snapshot_bei…）	-p singlefs-harness --test truncation_shared_walk_order_and_rollback
+m4 截断截甲 K3/K4：deadlist 判生死与释放判定交的文件内容口径不同（a_truncation_under_a_snapshot_keeps_the_replaced_and_release…）	-p singlefs-harness --test truncation_under_a_snapshot_keeps_the_replaced_data_units_on_the_deadlist
+m4 截断截甲 K5：变长时最后一个单元短于新 size 够得着的长度也不补零重写（extending_within_the_only_data_unit_zero_fills_it_and_keeps_…）	-p singlefs-harness --test size_extension_and_the_hole_after_the_last_data_unit
+m4 截断截甲 K1：「队列空」不算截断条目（挂载续做不走截断）（an_image_right_after_the_truncation_intent_remounted_twice_c…）	-p singlefs-harness --test truncation_crash_image_remounted_twice_continues_to_identical_disks
+m4 截断截戊 缩到 0那一条流：最后一批删截断条目而不放单元（判决 K9 的会红版本，I-4.10 红；checker 档，留整表）	-p singlefs-checker-tier --test crash_enumeration_truncate_to_zero_stream
+截庚（判决 m4-trunc-r2 R1、R2、第六节）：截断意图写的 T 取上一版的 txg	-p singlefs-harness --test inode_record_truncation_field_written_by_each_publish
+截庚（判决 m4-trunc-r2 R1、R2、第六节）：mkfs 写的系统配置不带 incompat 位 2	-p singlefs-harness --test system_configuration_incompat_bit_two_and_the_truncation_fields_of_inode_records
+截庚（判决 m4-trunc-r1 K5、截甲停下的第 ⑤ 处）：冷走读与恢复照旧拒标签 0 配 size > 0	-p singlefs-harness --test whole_file_hole_of_upper_leaf_tag_zero_with_a_positive_size_read_by_every_reader
+C703 抹头的一个写报块设备错也接着抹、照发清扫发布删行	-p singlefs-harness --test instance_table_sweep_stops_on_a_block_device_error
+C492：树表 0 条的一版上写行在取号之前的预演里报拒（改回 R1 之前那一版的「无出路」：只做过 mkfs、挂过一次没写文件的池再也挂不上可写）	-p singlefs-checker-tier --test crash_enumeration_formatted_pool_remounted_without_a_file_stream
+取号写到一半：取号只取每块盘两槽系统配置里实例代号的最小值（取号写只落了一块盘时重开取到盘上已有的号）	-p singlefs-checker-tier --test crash_enumeration_crash_in_the_middle_of_the_acquisition_write_stream
+C196（中央映射树的根住哪全仓无条款）：回退那次发布接在后面的上一版里用户可见单元的映射 key 照现行那一版带（映射不随根回退）	-p singlefs-harness --test rollback_dereferences_a_version_only_the_target_references
+C496（环里一条记录都读不出的那道拒绝的前提不承重）：重建上一版顶着的记录只认所选根自己那一条、读不出不拿环里别的顶（只剩无关记录的盘面也拒，两份盘面判得一样）	-p singlefs-harness --test replay_refuses_a_ring_where_no_record_reads
+三·5 C116 合并流：左吸收右时右片不摘（身份不退役、它的记录在两片里各一份），吸收那一次发布判器红（I-9.12）	-p singlefs-checker-tier --release --test crash_enumeration_unlink_merging_inode_leaf_containers_stream
+三·4 固定脚本之后经会话 unlink：最后一批只留下被删的那个号（删 key 不与最后一批同一次发布），会话走空再发一步被拒，流的判器红（I-9.5、可写挂载续做）	-p singlefs-checker-tier --test crash_enumeration_unlink_after_the_fixed_script_stream
+一·1 按 inode 号写：重建漏掉第一个文件之外的文件（可写挂载读回的一版没有它们的数据单元与下段，映射条目数对不上、挂不上）	-p singlefs-harness --test writes_by_inode_number_of_several_files
+一·1 K-U5：删完第一个文件之后按 inode 号写那一拒报成号不在树里（调用方与模型分不出「第一版不建带数据的文件」）	-p singlefs-harness --test writes_by_inode_number_in_random_histories_judged_by_the_model
+多文件删除 M1：删别的号时剩余单元数不取它自己的（意图之后直接最后一批，批大小 1 也一次删完）	-p singlefs-harness --test unlink_of_files_other_than_the_first
+M4 取样点：删除批留下的单元比计划少一个（批大小 1、inode 150 三个单元）	-p singlefs-harness --test unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units
+多次 COW 一·1 同一文件跨两次关闭再可写挂载覆盖写：覆盖写把文件写短时上一版多出来的数据单元不换下（释放判定漏掉文件变短的那几个）	-p singlefs-checker-tier --test crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream
+多次 COW 一·1 多个 inode 交错覆盖写：按号整份重写第一个文件之外的文件时它上一版最后一个数据单元不换下（释放判定当它在上一版没有落点）	-p singlefs-checker-tier --test crash_enumeration_several_inodes_overwritten_in_turn_stream
+多次 COW 一·1 跨下段叶的大文件覆盖写：整份重写两层的下段时上一版第 1 层的下段节点不换下（释放判定只认层级 0 的下段节点有落点）	-p singlefs-checker-tier --test crash_enumeration_large_file_overwritten_across_lower_leaves_stream
+多文件删除流：最后一批把删的号拿出有条目的号集合，却不把它当成条目变了的号（它那片上段叶与祖先照抄上一版，删掉的条目留在盘上）	-p singlefs-checker-tier --test crash_enumeration_unlink_of_two_files_holding_data_streams
+K-U5 β 父链：取墓碑树里 inode 1 最晚的死亡 txg、不排父链外的（判决之前的读法，攻方种子 200 那一段第 38 步写成）	-p singlefs-harness --test writes_by_inode_number_in_the_interleaved_histories_of_the_attack
+K-U5 β 父链：谱系记录不分在不在父链上，落在任何一段 (T_old, T_rb) 开区间里的死亡 txg 都排掉（两次死亡都排掉、β 不判）	-p singlefs-harness --test writes_and_unlinks_after_the_first_file_was_deleted_in_histories_judged_by_the_model
+K-U5 β 父链：inode 1 的记录还在（删除中）也判	-p singlefs-harness --test writes_by_inode_number_after_rollbacks_past_the_deletion_of_the_first_file
+会话走空推抬 F：推过一串之后不再接着走空、当成走空了交回（删别的号的删除批被空间拒那一形队列留着）	-p singlefs-harness --test admission_raises_the_floor_for_the_deletion_of_another_inode
+快照 × 别的文件：别的号的两种角色不问快照生死（照旧立即释放、deadlist 一条不写）	-p singlefs-harness --test snapshot_and_compaction_over_a_file_other_than_the_first
+七·6 按身份查：索引恒查不到	-p singlefs-harness --test publish_lookup_by_identity
+甲' 取号写两轮 回卷改回逐份传（盘 0 连写两槽、同段撕坏两槽）	-p singlefs-harness --test acquisition_writes_two_rounds_and_rolls_each_device_back_once
+乙' 落后支缺单元那一半不看本盘的末条记录（C593 那一形照旧永久拒可写）	-p singlefs-harness --test writable_mount_takes_a_device_holding_the_last_record_of_the_version_as_not_behind
+S3 择系统配置不按本池 fsid 筛（别的池的槽整池报对不上）	-p singlefs-harness --test writable_mount_passes_over_a_system_configuration_slot_of_another_pool
+C663 R 不读（区域数写成 4 的槽照常可择）	-p singlefs-harness --test system_configuration_region_count_and_format_version_are_refused_by_the_whole_pool
+C754 退回之后再判缺记录用读阶段扫出的记录、不重扫环	-p singlefs-harness --test writable_mount_rescans_the_journal_ring_before_rejudging_missing_records_after_falling_back
+丙' 取号那一刻的见证读不认过了补写闸的盘（照旧拒）	-p singlefs-harness --test acquisition_rewrites_a_device_that_lost_both_system_configuration_slots_only_through_the_gates
+α' 断言那一版查不到也照写	-p singlefs-harness --test system_configuration_repair_rewrites_only_slots_that_do_not_self_verify_for_an_asserted_version
+C780：记账条目的读者改回只拒窄于字段表（宽于 34 的照读）	-p singlefs-harness --test recovery_refuses_entries_wider_than_the_field_table
+批 9 甲 快照下删文件流必红：进 deadlist 的条目纪元写成活头上一个快照的 txg 加一（不是 S.txg）	-p singlefs-checker-tier --release --test crash_enumeration_unlink_under_a_snapshot_stream
+批 9 甲 快照下缩流必红：第一个文件这次不写内容时尾部截掉的数据单元少点名一个（既不释放、也不进 deadlist）	-p singlefs-checker-tier --release --test crash_enumeration_truncate_under_a_snapshot_stream
+批 9 甲 截进一个单元再变长流必红：变长那次按旧 size 算尾单元该有的声明长度（尾单元一概不补零重写）	-p singlefs-checker-tier --release --test crash_enumeration_truncate_into_a_unit_then_extend_stream
+C758 F2 的「不跳过」看整段 (见证到的那一版, 所选根)，不只看退到的那一条与所选根之间	-p singlefs-harness --test system_configuration_write_lost_silently_falls_back_without_a_read_fault
+C563 进程内记根算环里最旧有效根时挂载那一刻读坏的槽当没有根（去掉钉）	-p singlefs-harness --test root_ring_reads_that_fail_are_not_taken_as_no_root

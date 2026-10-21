@@ -1,0 +1,13 @@
+# check-segment-registry.py --selftest 测产物行解析用的样本：E142（新池新建文件的干跑） 第二十五次跑主产物
+# e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out（提交 30c245b09 入库，sha256 a64b55e9c6acb46a57c92e8ef486a065e2cb9cb4a07a40c8e3b233886d96f2bb）
+# 第 35–41、46、60 行原样摘抄。只测解析：name=segments 五行认得出、segments_geometry / segments_three_state / segments_sensitivity / root_record 不算；
+# 不拿它比登记表（登记表的权威是钉住活代码的用例），产物重跑之后这份不用跟着换。
+E7RESULT name=segments path=mkfs operations=25 segments=14+1+1+1+4 closed_form=16402 kinds=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+E7RESULT name=segments path=instance_acquisition operations=2 segments=2 closed_form=4 kinds=[system_configuration_slot×2]
+E7RESULT name=segments path=warm_up operations=20 segments=2+1+2+2+1+2 closed_form=15 kinds=[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+E7RESULT name=segments path=transaction operations=35 segments=24+2+1+2 closed_form=16777223 kinds=[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+E7RESULT name=segments path=post_mkfs_stream operations=57 segments=2+2+1+2+2+1+2+24+2+1+2 closed_form=16777240 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]
+E7RESULT name=segments_geometry point=G1B path=mkfs operations=14 segments=7+1+1+1+2 closed_form=134 kinds=[zero_fill×5,unit_write×2,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×2,barrier]
+E7RESULT name=segments_three_state path=mkfs writes=21 in_place_overwrites=0 in_place_per_segment=0+0+0+0+0 in_place_kinds=none closed_form_two_state=16402 closed_form_three_state=16402
+E7RESULT name=segments_sensitivity point=G10a swallowed_device=1 path=transaction operations=34 segments=24+5 closed_form=16777247 closed_form_three_state=16777287 in_place_per_segment=0+2 kinds=[unit_write×24,barrier×2]|[journal_record×2,root_record_fua,system_configuration_slot×2,barrier×3]
+E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=65549 rollback_floor=0 unmount_marker=false record_bytes=4096 back_chain=2660362816

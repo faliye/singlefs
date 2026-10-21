@@ -734,6 +734,26 @@ path = "e177_per_tree_resurrection_without_tombstones.rs"
 name = "e178-leaf-and-record-death-counts"
 path = "e178_leaf_and_record_death_counts.rs"
 
+# E10（老化：结构抗老化 vs 事后整理）：跑前登记 research/prompts/e10-r1-prereg.md。独立手写计数模型，不与 crates/ 共用代码；第一段只跑计数模型九格与六个反向点。
+[[bin]]
+name = "e10-aging-compaction"
+path = "e10_aging_compaction.rs"
+
+# E71（记账 key 的条目数与宽度）第 1 次重跑：重跑登记 research/prompts/e71-r1-prereg.md。独立手写算术模型，不与 crates/ 共用代码；原装置 e71-accounting-keys 不动。
+[[bin]]
+name = "e71-accounting-keys-single-generation"
+path = "e71_accounting_keys_single_generation.rs"
+
+# E97（记账与分配记录的条目编码）第 5 次重跑：重跑登记 research/prompts/e97-r5-prereg.md。独立手写算术模型，不与 crates/ 共用代码；原装置 e97-entry-encoding 不动。
+[[bin]]
+name = "e97-entry-encoding-single-generation"
+path = "e97_entry_encoding_single_generation.rs"
+
+# E186（不认识的树·记账维重推）：跑前登记 research/prompts/e186-preregistration.md。独立手写模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e186-unknown-tree-accounting-rederive"
+path = "e186_unknown_tree_accounting_rederive.rs"
+
 [workspace]
 resolver = "2"
 

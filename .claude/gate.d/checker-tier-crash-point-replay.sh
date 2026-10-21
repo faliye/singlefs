@@ -4,15 +4,45 @@
 # gate-stage: 崩溃点重放与登记的崩溃枚举用例（快档跑 checker 档包不标 ignored 的用例、按条复用，核每条用例的崩溃状态块；--full 逐条按块的单元键跑全量）
 # gate-fixture: yes
 # gate-category: checker-tier 类
-# gate-similar: code-source-discipline.sh 与 harness-model-differential-and-scenarios.sh 也调 scripts/crash/crash-case-check.py，但调的是 file-names、one-scenario 两样，分归代码类与 harness 类；这里开跑前只调 placement、modules 两样，判的是崩溃枚举用例与 checker 档测试文件，红了就不起 cargo
+# gate-similar: code-source-discipline.sh 与 harness-model-differential-and-scenarios.sh 也调 scripts/crash/crash-case-check.py，但调的是 file-names、one-scenario 两样，分归代码类与 harness 类；这里开跑前只调 placement、modules 两样，判的是崩溃枚举用例与 checker 档测试文件，红了就不起 cargo；crash-case-must-red、crash-knobs 两格另调 must-red、knobs 两样（崩溃枚举用例的必红变异、崩溃点测试的旋钮表，别的门禁都不调）
 # gate-covers: 崩溃点重放
 # gate-cell: crash-case-replay 快档跑 checker 档包不标 ignored 的用例（每条测试函数按单元键复用）、逐条核崩溃枚举用例的崩溃状态块；--full 逐条按块的单元键跑
 # gate-cell: feature-gated-tests 快档带上 checker 档 tests/ 里 cfg 点到的特性另跑一趟（每条测试函数按单元键复用）：挂特性的测试文件逐个跑到或复用的用例不为 0，GPU 对拍没卡打的 NOT_RUN_NO_GPU_ADAPTER 逐条记本次未跑
+# gate-cell: crash-flow-coverage 崩溃流覆盖表：没有登记表 crash-entries.tsv 外的入口、登记的入口都有覆盖行、StepKind 每个成员都被一条流罩住（快档判轻型域，--full 判全量域）
+# gate-cell: crash-ignored-nodes ignore 开着的节点（ignored_point、registered_segment、not_expanded）不比基准 crash-ignored-nodes.tsv 多
+# gate-cell: invariant-zero-evaluations 评估 0 次的（流，不变量）对都在带理由的基准 invariant-zero-evaluations.tsv 里（快档数轻型域，--full 数全量域）
+# gate-cell: crash-case-must-red 每条崩溃枚举用例在 crates/mutations.tsv 里至少有一行变异点名它的测试目标（只在快档跑）
+# gate-cell: crash-knobs 旋钮登记表 crash-knobs.tsv 每行取值与依据不空、出处路径在（只在快档跑）
+# gate-cell: last-full-judgement 上一次全量的标记：读崩溃判定库每块的判定日期与跑法，列出全量判定不是当前的块；这一趟没跑全量退 77，不挡提交
 #
-# 复用：快档两趟里每条测试函数各是一条判定，键是它的单元键（测试函数的单元闭包、特性组合、release 档、工具链、解析出的依赖版本，判法 scripts/gate/lib_libtest_result_lines.py
-#   的 result_line；算法在 scripts/gate/admission.py 文件头「单元键」），只跑键对不上的那几条（键相同的经 cargo test -- --exact --skip <名> 跳过），
-#   结局经 lib_libtest_result_lines.py 的 binary_runs 逐条认、判绿的照键记进判定库（<git common-dir>/singlefs-unit-verdicts/<阶段文件名>:<格名>/）；
-#   一个测试二进制的结果行条数与汇总行对不上（--nocapture 下测试自己打的字把结果行打散了）、或那一段里有 NOT_RUN_ / 判段判在 CPU 的行，那一段一条都不记、下一趟照跑。
+# 出口 4 那六格（.claude/kb/milestone/03-third-txn.md「出口」的出口 4、六·1、六·3、六·4、六·5；用户 2026-10-20 定的 K1–K7 原话在
+#   records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条）：判法不在这里，覆盖、ignore、0 次、上一次全量四格在
+#   scripts/crash/crash-flow-coverage.py（文件头「判法」），必红世界、旋钮两格在 scripts/crash/crash-case-check.py 的 must-red、knobs；这里只备行、调判法、记结局。
+#   覆盖、ignore、0 次三格读这一趟打的覆盖行（CRASH_FLOW_COVERAGE …）与计数行（I-x.y=评估/违例/不适用）：
+#     快档读 crash-case-replay 格那一趟与 feature-gated-tests 格那一趟的日志，按测试二进制交 crash-flow-coverage.py collect-quick
+#     （复用的测试这一趟不跑、不打行：整份复用的测试二进制取回判定库里同一组键整份现判时存下的行，一半复用、库里没有的记「行不全」）；
+#     crash-case-replay 没点、或判红时三格本次未跑；没点 feature-gated-tests、或它判红时挂特性的那几份记「行不全」。
+#     这一趟的记录另拷一份进快档的日志目录 <common-dir>/singlefs-crash-point-replay-logs/quick-<开跑时刻>-<pid>/flow-records.tsv（跑完不删，打一行 CRASH_FLOW_RECORDS_FILE <路径>），
+#     填两张基准的初值用它（快档跑的是 checker 档包全部不标 ignored 的测试，比入口轻型那一段的测试目标多，两份记录都要并进基准）。
+#     --full 读这一趟每条判绿的崩溃枚举用例的全量日志（域记 full），记录文件放这一趟的日志目录（flow-records.tsv），打一行 CRASH_FLOW_RECORDS_FILE <路径>
+#     （崩溃点重放入口照这一行把它并进覆盖表）；点了 --item 时带 --subset（入口没有行、成员没被罩住两样本次未跑）。
+#     「行不全」或 --subset 时覆盖格只判看得见的那几样（登记表外的入口、写法不对），别的记本次未跑；crates 侧还没打覆盖行（crates/ 下没有 CRASH_FLOW_COVERAGE）时覆盖、ignore 两格本次未跑；
+#     两张基准里还写着「# 初值：未填」时 ignore、0 次两格本次未跑并打这一趟的候选行（初值等主 agent 跑一趟轻型之后填）。
+#   必红世界、旋钮两格只读树（登记表与变异表），只在快档跑；--full 只跑 crash-case-replay 与覆盖、ignore、0 次、上一次全量四格。
+#   上一次全量那一格：起读库程序 cargo run --release --offline -p singlefs-checker-tier --bin crash_library_reader -- <子命令>（子命令名取
+#     GATE_CRASH_POINT_REPLAY_LAST_FULL_SUBCOMMAND，没设是 last-full；输出写法在 crash-flow-coverage.py 文件头「上一次全量」），交 crash-flow-coverage.py last-full；
+#     快档一律退 77 打一行信息（哪些块的全量判定不是当前的），--full 全部块都有当前的全量判定才判绿；读库程序不认那个子命令（退 2）或别的退非 0 记本次未跑，
+#     输出认不出判红。--full 点了 --item、样本档没放 .crash-point-replay-sample-tools/crash-library-reader.out 的本次未跑；样本档只读那一份、不起 cargo。
+#   每格的结局并进逐格汇总（「<格名>：绿 / 红 / 本次未跑（为什么）」），本次未跑的逐格往 $GATE_NOT_RUN_FILE 记一行；有一格红整道红。
+#
+# 复用：快档两趟里每条测试函数各是一条判定，键是它的单元键（测试函数的单元闭包连同闭包真引到的 cfg 原子与这一组特性下的真值、release 档、工具链、解析出的依赖版本，
+#   判法 scripts/gate/lib_libtest_result_lines.py 的 recordable_results；算法在 scripts/gate/admission.py 文件头「单元键」），只跑键对不上的那几条
+#   （键相同的经 cargo test -- --exact --skip <名> 跳过）。多机配置开没开 GPU 不进键，只是跑的参数（D13 已定项 17：判定不与硬件、不与 CPU 还是 GPU 绑定）。
+#   两趟共用一份判定库（<git common-dir>/singlefs-unit-verdicts/<阶段文件名>:quick-tier-test-functions/，D13「每类判定一份库」）：闭包不提 gpu 的测试两趟键相同，
+#   不带特性那一趟判绿记下的，带特性那一趟照键复用、不再现判。
+#   结局经 lib_libtest_result_lines.py 的 recordable_results 逐条认（判法写在它文件头「按条记库」）、判绿的照键记库，按测试函数不记：打了 NOT_RUN_ 的行
+#   认作谁打的，那一条不记；判段判在 CPU 的行只在多机配置开了 GPU 时让那一条不记（那一趟本来就判红），没开 GPU 时判在 CPU 的绿照键记库
+#   （D13 已定项 17：复用与剪枝不看设备）；结果行被打散的，接得上结局的照记、认不出的那几条不记；完整性闸（没有汇总行、认出的比汇总行报的多）照留，不记的下一趟照跑。
 #   一条都不用现跑就不起 cargo。拒算（单元闭包收不全）的那一条照跑、不复用、不入库，成功句报拒算条数与头几处形态。
 #   按条复用失灵（test-plan 退非 0、退 0 而没打 PLAN、它或 verdict-record 的复用哨兵报「复用失灵」「判定不稳」「强制现判没起作用」）：判法只在
 #   scripts/gate/admission.py 的 plan-failure（文件头「按条复用失灵」），快档两格把那一趟的输出交给它；它判失灵，那一格照旧全部现判跑完、结论判红。
@@ -25,11 +55,13 @@
 #   照全量起 crash-case-command 交的命令（库照键复用、不只写不读、不带块查询；features= 与 GPU 清场照原样），cargo test 退 0 算罩住、非 0 判红（出路看它的日志，
 #   日志放 <common-dir>/singlefs-crash-point-replay-logs/quick-<开跑时刻>-<pid>/log.<用例名>，跑完不删），块那一行照 admission.py crash-case-blocks --ran
 #   只核在不在、数对不对得上（缺行或对不上整条判红），红块不判；crates 侧还没接上块查询时它与别的用例一样报本次未跑、不起。
+#   --full 对登记了 red-blocks=judged-by-test 的用例用同一套判法（快档与 --full 只问 crash_case_judged_by_test 一处）：cargo test 退非 0 判红，退 0 的块那一行同样带 --ran，
+#   只核在不在、数对不对得上（blocks = reused + fresh + refused），库里有红块也不判红；没登记的用例块那一行有红照旧判红。
 #   没有用例级复用标记，不比树、不比 HEAD，不问 stage-must-run.sh 与 change-touches-crates.sh；stage-inputs.tsv 本阶段那一行只登记前提与入口，不进任何键。
 #
 # 用法（参数顺序不限）：
-#   bash .claude/gate.d/checker-tier-crash-point-replay.sh [项目根]                                     快档，两格都跑；gate.sh 只传项目根
-#   bash <worktree>/.claude/gate.d/checker-tier-crash-point-replay.sh --full [--start-over] <worktree>   全量，只有 crash-case-replay 一格
+#   bash .claude/gate.d/checker-tier-crash-point-replay.sh [项目根]                                     快档，八格都跑；gate.sh 只传项目根
+#   bash <worktree>/.claude/gate.d/checker-tier-crash-point-replay.sh --full [--start-over] <worktree>   全量：crash-case-replay 与覆盖、ignore、0 次、上一次全量四格（文件头「出口 4 那六格」）
 #   --list                     打格名表（格名、制表符、判什么），不起 cargo、不起 python
 #   --check <格名>[,<格名>…]   只跑点名的格
 #   --list-items               逐行打被判那棵树 stage-inputs.tsv 里键是 crash-case: 的行与它们的 test=，不起 cargo、不起 python；
@@ -41,7 +73,7 @@
 # 退出码：
 #   0   绿；快档有用例的块没有判定、带特性那一格有本次未跑时也退 0，逐条报「本次未跑」
 #   1   红；快档有一格红就退 1
-#   2   用法错：参数认不出，格名或用例名写错或缺，--start-over 没跟 --full，--full 只点了 feature-gated-tests，项目根进不去，
+#   2   用法错：参数认不出，格名或用例名写错或缺，--start-over 没跟 --full，--full 点了只在快档跑的格（feature-gated-tests、crash-case-must-red、crash-knobs）或没点 crash-case-replay，项目根进不去，
 #       样本档标记目录里的假 cargo 或假 rustc 不在或不可执行，PATH 上的 cargo 没解到标记目录里那一份
 #   3   样本档流程判绿：样本档没跑过真的崩溃点重放，不与真跑的绿混在一起
 #   77  本次未跑：没有 checker 档包
@@ -55,7 +87,7 @@
 #
 # --full：在 HEAD + 暂存区的 worktree 里跑（主工作区读得到别的会话没暂存的改动）；建法与 gate.sh --staged 相同，命令在快档的出路句里。
 #   逐条崩溃枚举用例，照登记表的次序，起 crash-case-command 交的命令（库目录照长期库，调用方环境里的 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY 清掉）；
-#   日志判法在 admission.py crash-case-judge（test result 恰好 1 passed、登记的计数行、线程），块那一行在 admission.py crash-case-blocks（有红判红）。
+#   日志判法在 admission.py crash-case-judge（test result 恰好 1 passed、登记的计数行、线程），块那一行在 admission.py crash-case-blocks（有红判红；登记了 red-blocks=judged-by-test 的用例带 --ran，见上面「复用」一段）。
 #   全部判绿时在这一趟的日志目录里留一份 all-green（只记这一趟绿过，scripts/gate/apply-writer-patch.py 数「上次崩溃验证全绿以来打了几个补丁」用；不是复用的标记）。
 #   线程数 SINGLEFS_CRASH_POINT_REPLAY_THREADS 没设取每台默认重活线程数（.claude/heavy-thread-default 的登记值，admission.py 的 crash_case_worker_threads 经 registered_heavy_threads 取）；
 #   只起 1 个线程怎么判红，判法在 admission.py crash-case-judge。
@@ -76,27 +108,31 @@
 #   特性里有 gpu 时这一趟的测试参数带 `-- --nocapture --test-threads 1`（GPU 对拍的测试各占卡的显存，不并行起）；特性里没有 gpu 的不加。
 #   这个参数只管同时起几个测试，不管一个测试里 CPU 判器自己开的线程：GPU 对拍的测试读 SINGLEFS_CRASH_JUDGE_CPU_THREADS，没设取本机可用并行度
 #   （available_parallelism，不照 SINGLEFS_THREAD_CAP 与登记值；改成取登记值归代码批）。样本里的假 cargo 把收到的参数打成一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: …，阶段转出来，quick-features-green 的 expect 核这一行带不带 --test-threads 1。
-#   --test-threads 1 下 libtest 先打「test <名> ... 」、测试的输出接在后面，结果行常被打散：那一段对不上就整段不记（下一趟照跑），不算红。
+#   --test-threads 1 下 libtest 先打「test <名> ... 」、测试的输出接在后面，结果行常被打散：结局单独起一行的接上照记，认不出的那几条不记（下一趟照跑），不算红；
+#   这一趟的记号（NOT_RUN_、判段判在 CPU）按 --serial 认作正在跑的那一条（lib_libtest_result_lines.py 文件头「按条记库」）。
 #
 # 多机配置开了 GPU（ENABLE_GPU=1）：快档两趟都在这份配置下跑，不靠仓根配置关 GPU。配置照 scripts/crash/crash-amplification-lib.sh 的
 #   crash_amplification_multi_host_configuration_file 找（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，样本档只认样本根
 #   .crash-point-replay-sample-tools/multi-host.env），找到的那一份在就经 SINGLEFS_MULTI_HOST_CONFIG=<它的绝对路径> 交给两趟 cargo，用例与这里判的是同一份。
-#   ENABLE_GPU 的值另经 line:enable-gpu=<0|1> 进快档两趟每条测试函数的键（同一条测试在开不开 GPU 下判的不是同一件事）。
+#   ENABLE_GPU 的值不进任何键（文件头「复用」）：同一条测试在开不开 GPU 下键相同，开没开只决定这一趟怎么跑、判段落在哪。
 #   不带特性那一趟（crash-case-replay 格）：编不进 gpu 的用例遇到 ENABLE_GPU=1 打一行 NOT_RUN_<原因> test=<用例> reason=<一句> 报本次未跑、照常返回成功
-#     （crates 那一侧的约定；GPU 对拍没卡时的 NOT_RUN_NO_GPU_ADAPTER 是同一种写法），这一格把日志里每一处这样的行逐条往 $GATE_NOT_RUN_FILE 报一行
-#     （不判红、不算通过，逐格汇总里这一格记「不带特性那一趟有 N 处本次未跑」）；它要判的那一截归带特性那一趟。日志里有判段判在 CPU 的行
+#     （crates 那一侧的约定；GPU 对拍没卡时的 NOT_RUN_NO_GPU_ADAPTER 是同一种写法）。打了这一行的测试函数（lib_libtest_result_lines.py 认作谁打的）由带特性那一趟补判：
+#     那一趟另带上它所在的测试目标（--test <名>、--bin <名>，库那一段本来就在；不论文件里写没写 cfg），它在那一趟判绿、或那一组特性下有键相同的判定复用，就算判到；
+#     补判之后仍没判到的（带特性那一格没跑、判红、没有挂特性的文件，认不出是哪一条打的，那一趟也没判绿）才逐条往 $GATE_NOT_RUN_FILE 报一行本次未跑
+#     （不判红、不算通过，逐格汇总里 crash-case-replay 格记「不带特性那一趟有 N 处本次未跑」）。日志里有判段判在 CPU 的行
 #     （崩溃枚举那一类的 CRASH_POINT_REPLAY_JUDGE route=cpu，或 CRASH_POINT_REPLAY_PARALLEL_START / _FINISHED 带 judge=cpu）判红：配了 GPU 不退回 CPU。
 #   带特性那一趟（feature-gated-tests 格）：特性里有 gpu 时照旧经 scripts/crash/gpu-quiesce-run.sh 起；配置写了 ENABLE_GPU=1 而日志里有判段判在 CPU 的行
 #     （同上两种）判红：配了 GPU、又编进了 gpu，判段必须在 GPU。
 #   判得出的只有崩溃枚举那一类打的这两种行；给定状态与放量流水线的用例有的另写一份 ENABLE_GPU=0 的配置（GPU 对拍的 CPU 那一侧），它们的 mode= 不看。
-#   配置没写 ENABLE_GPU=1（关着、没写、文件不在）两趟都不判判段在哪。
+#   配置没写 ENABLE_GPU=1（关着、没写、文件不在）两趟都不判判段在哪，判段判在 CPU 的那一条判绿照键记库（recordable 带 --cpu-judging-recordable）。
 # 样本档：样本根上有 .crash-point-replay-sample-tools/ 就进样本档，把它放到 PATH 最前面（里面的假 cargo、假 rustc 照 cases/<测试目标>.log 打日志，
 #   设了 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 时把 cases/<测试目标>.findings.tsv 追加进去），不管带没带 --full 都走 --full 那一路；判绿退 3，判红照常退 1。
 #   里面另放一个 quick-tier 文件就留在快档：假 cargo 不带 --features 打 cases/default-pass.log，
 #   带了打 cases/feature-pass.<--features 的值>.log、退出码照同名 .exit（没有那一份日志退 101）。
 #   样本根另放 .unit-verdict-sample/prior/（上一版的源码树，setup.sh 照这一版拷一份再改）时，快档开跑前先拿那一版算键、照「判绿」记进这一版的判定库
 #   （admission.py verdict-plan / verdict-record 的 --library-root：在上一版的树上算、记进样本自己的 git common-dir），再照常判：
-#   expect 读出来的「现判 … 复用 …」逐条点名就是这一版相对上一版该作废与不该作废的测试函数。
+#   expect 读出来的「现判 … 复用 …」逐条点名就是这一版相对上一版该作废与不该作废的测试函数。另放 .unit-verdict-sample/prior-multi-host.env 的，
+#   上一版那一趟照它起（它是上一版那一趟的多机配置；GPU 开没开不进键，只有弄坏开关 gpu-switch-in-key 下它的 ENABLE_GPU 进键）。
 #   样本由 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑，setup.sh 在临时目录里 git init；进库的假工具 git 模式是 100755。
 # 样本（fixtures/checker-tier-crash-point-replay.sh/）：
 #   green                        一条用例的发现日志一节、0 个签名，一条用例不走发现日志
@@ -125,16 +161,41 @@
 #   unit-key-plan-exit-red       按条复用失灵：.unit-verdict-sample/plan-failure 写 exit-1（admission.py 文件头「按条复用失灵」：test-plan 退 1），快档照旧全部现判
 #                                （假 cargo 不带 --skip、三条都过），crash-case-replay 格判红、点名 test-plan 退 1
 #   unit-key-plan-sentinel-red   同形，写 sentinel-reuse-failed（test-plan 的复用哨兵报复用失灵），判红、点名哨兵那一句
+#   unit-key-gpu-switch-not-in-key  GPU 开没开不进键：样本的多机配置写 ENABLE_GPU=1，.unit-verdict-sample/prior/ 是同一版的树、上一版那一趟的多机配置
+#                                .unit-verdict-sample/prior-multi-host.env 写 ENABLE_GPU=0（拿它算键记库）；这一版 3 条测试函数全部复用、不起 cargo，判绿（退 3）
+#   unit-key-not-run-withheld-per-test  按测试函数不记：tests/setting.rs 三条同时跑，test_c 跑完之前打了一行 NOT_RUN_；tests/noisy.rs 一条结果行打散、结局单独一行，
+#                                一条结局粘在测试自己的字后面。记库的是 test_a、test_b、noisy_split，不记的是 test_c 与 noisy_glued（各报为什么），判绿（退 3）
+#   quick-features-shared-library  两趟一份库：库单测 tests::shared_check 闭包不提特性，上一版只差这一条（.unit-verdict-sample/prior/ 记下挂特性的 store_only_quick），
+#                                不带特性那一趟现判、记库，带特性那一趟照键复用它、现判 0、不起 cargo，判绿（退 3）
+#   quick-features-supplement-not-run  补判：多机配置写 ENABLE_GPU=1，tests/enumeration.rs 没写 cfg，enumeration_quick_tier_shape 在不带特性那一趟打 NOT_RUN_；
+#                                带特性那一趟另带 --test enumeration、跑到它判绿记库（结果行被 --test-threads 1 打散、结局单独一行），不报本次未跑，判绿（退 3）
+#   quick-cpu-judged-green-recorded  没开 GPU 时判在 CPU 的绿照记：多机配置写 ENABLE_GPU=0，库单测 tests::cpu_judged_check 在不带特性那一趟先打一行
+#                                CRASH_POINT_REPLAY_JUDGE route=cpu 再判绿：照键记库；带特性那一趟（verdict-store）照键复用它、只现判 store_only_quick，判绿（退 3）
+#   quick-gpu-configured-cpu-judged-not-recorded  同一棵树，多机配置写 ENABLE_GPU=1：不带特性那一趟判段判在 CPU 照旧判红；带特性那一趟（不带 gpu）
+#                                现判 tests::cpu_judged_check 判绿也不记（「判绿不记库 1 条」点名它），退 1
 #   quick-judged-by-test-green   两条崩溃枚举用例，crates 侧接上了块查询（src/lib.rs 里有那个变量名）：plain-stream 没带标记，查询那一趟打 cases/default-pass.log 里
 #                                全部块有判定、无红的那一行，块全罩住；fault-injection-given-states 登记 features=verdict-store red-blocks=judged-by-test，
 #                                假 cargo 带 --features verdict-store 打 cases/feature-pass.verdict-store.log（test result: ok、CRASH_CASE_BLOCKS ... red=2），退 0：实跑绿，判绿（退 3）
 #   quick-judged-by-test-red     同一份登记，cases/feature-pass.verdict-store.exit 写 101（日志里块那一行照样对得上）：实跑红，红句点名它、出路指到它的日志
 #   quick-judged-by-test-missing-blocks-line  同一份登记，实跑退 0 而日志里没有 CRASH_CASE_BLOCKS 行：crash-case-blocks --ran 退 4，判红
+#   full-judged-by-test-green    --full 一路：两条崩溃枚举用例，plain-stream 没带标记、块那一行无红；fault-injection-given-states 登记 red-blocks=judged-by-test，假 cargo 退 0、
+#                                块那一行 red=2（库里有红块）：按退出码判，判绿（退 3）
+#   full-judged-by-test-unmarked-red-blocks  同一份登记，plain-stream 没带标记而块那一行 red=2：照旧判红（退 1）；带标记的那条同样 red=2、退 0，判绿
+#   full-judged-by-test-missing-blocks-line  --full 一路：只登记带标记的那一条，退 0 而日志里没有 CRASH_CASE_BLOCKS 行：crash-case-blocks --ran 退 4，判红
+#   crash-audit-cells-green        出口 4 那六格（快档）：tests/plain_stream.rs 那一段打三条覆盖行（一条 step 写 name() 的串 unit_write、一条 not_expanded）与一条计数行，
+#                                登记表两个入口、StepKind 两个成员都罩住，ignore 基准一行、0 次基准一行（I-2.1）与这一趟相同，变异表一行点名 plain_stream，旋钮表一行出处在，
+#                                读库输出全部块都是当前的全量判定：前五格判绿，上一次全量那一格快档按设计退 77、打信息行，整道退 3
+#   crash-audit-cells-red          同一棵树六处各坏一样：StepKind 多一个成员 TrimHint、日志多一条 registered_segment 的覆盖行、计数行多一对 I-3.1 评估 0 次、
+#                                变异表那一行点名的是 other_stream、旋钮的出处路径不在、读库输出报 not_full_under_the_current_key=1 却没有块行：六格各自判红、逐处点名，
+#                                整道退 1，只重跑红格的命令连 crash-case-replay、feature-gated-tests 一起点（覆盖、ignore、0 次三格要那一趟的行）
+#   crash-audit-full-domain-green  --full 一路：plain-stream 的全量日志打 domain=full 的三条覆盖行（一条 registered_segment）与一条计数行，两张基准是全量域的行，
+#                                读库输出全部块都是当前的全量判定：覆盖、ignore、0 次、上一次全量四格判绿（带 --after-full），打 CRASH_FLOW_RECORDS_FILE 那一行，整道退 3
 #   四份 quick-features-* 的 tests/ 里挂特性的写法各有一处：整份 #![cfg(feature)]、折成几行的 #![cfg(all(…))]、逐条 #[cfg(feature)]，
 #   与一个只在 // 注释里出现的特性名（读进来就找不到那组特性的日志）。
 #   每份样本根的 .gate-cells 点名它算给哪一格：green、red、static-check-red、sample-cargo-not-executable、quick-gpu-configured-*、unit-key-samples-*、unit-key-plan-*、
-#   quick-judged-by-test-* 算给 crash-case-replay，
-#   quick-features-* 算给 feature-gated-tests。这一道不用共用库、自己不读 .gate-cells，它只给 code-tooling 的 fixture-claims 格逐格数红绿。
+#   unit-key-gpu-switch-not-in-key、unit-key-not-run-withheld-per-test、quick-cpu-judged-green-recorded、quick-gpu-configured-cpu-judged-not-recorded、
+#   quick-judged-by-test-*、full-judged-by-test-* 算给 crash-case-replay，
+#   quick-features-* 算给 feature-gated-tests，crash-audit-cells-* 算给出口 4 那六格，crash-audit-full-domain-green 算给 --full 跑得了的那四格。这一道不用共用库、自己不读 .gate-cells，它只给 code-tooling 的 fixture-claims 格逐格数红绿。
 # 弄坏开关（只给证红用）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/checker-tier-crash-point-replay.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   GATE_CRASH_POINT_REPLAY_BREAK=setting-file-whole-closure  快档每条测试函数的键按它所在的整份设点文件算（文件里每个单元都进键：改同文件里别的测试也作废）
@@ -154,7 +215,11 @@
 #       static-check-red（输出里找不到「── 开跑前的静态判据」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=no-feature-pass  不起带特性那一趟
 #       quick-features-gpu-not-run（输出里找不到「本次未跑（这不是通过）：GPU 对拍没跑…」）；quick-features-green（输出里找不到「✓ feature-gated-tests：3 个挂特性的测…」）；
-#       quick-features-interrupted、quick-features-quiesce-red、quick-features-red（期望退出 1，实测 3）；quick-features-zero（输出里找不到「! feature-gated-tests 不算全绿：3 个…」）
+#       quick-features-interrupted、quick-features-quiesce-red、quick-features-red（期望退出 1，实测 3）；quick-features-zero（输出里找不到「! feature-gated-tests 不算全绿：3 个…」）；
+#       quick-features-shared-library（输出里找不到「· feature-gated-tests：这一组特性下要跑的测试函数都有键相同的判定…」）；
+#       quick-features-supplement-not-run（输出里找不到「CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-checker-tier --features gpu…」）；
+#       quick-cpu-judged-green-recorded（输出里找不到「✓ feature-gated-tests：1 个挂特性的测试文件（特性 verdict-store）…」）；
+#       quick-gpu-configured-cpu-judged-not-recorded（输出里找不到「· 判绿不记库 1 条（这一趟现判、按条记库不认的；下一趟照跑）：」）
 #   GATE_CRASH_POINT_REPLAY_BREAK=features-not-from-source  特性不从源码读、写死 verdict-store,gpu（假 cargo 没有这组特性的日志、退 101）
 #       quick-features-gpu-not-run、quick-features-green、quick-features-zero（期望退出 3，实测 1）；quick-features-interrupted（输出里找不到「GPU_QUIESCE step=command result=exit-143」）；
 #       quick-features-red（输出里找不到「找不到 GPU 适配器…」）
@@ -176,9 +241,11 @@
 #   GATE_CRASH_POINT_REPLAY_BREAK=sample-tools-unchecked  不核标记目录里的假工具
 #       sample-cargo-not-executable（期望退出 2，实测 1）
 #   GATE_CRASH_POINT_REPLAY_BREAK=cpu-judging-accepted  配置写了 ENABLE_GPU=1 也不看判段判在哪
-#       quick-gpu-configured-plain-pass-judged-on-cpu、quick-features-gpu-configured-judged-on-cpu（期望退出 1，实测 3）
+#       quick-gpu-configured-plain-pass-judged-on-cpu、quick-features-gpu-configured-judged-on-cpu、quick-gpu-configured-cpu-judged-not-recorded（期望退出 1，实测 3）
 #   GATE_CRASH_POINT_REPLAY_BREAK=plain-pass-not-run-unreported  不带特性那一趟日志里的 NOT_RUN_<原因> 行不收、不报本次未跑
-#       quick-gpu-configured-plain-pass-not-run、quick-features-gpu-configured-green（输出里找不到「本次未跑（这不是通过）：checker 档快档不带特性那一趟…」）
+#       quick-gpu-configured-plain-pass-not-run、quick-features-gpu-configured-green（输出里找不到「本次未跑（这不是通过）：checker 档快档不带特性那一趟…」）；
+#       unit-key-not-run-withheld-per-test（输出里找不到「checker 档包 现判 5、复用 0、拒算 0、本次未跑 1…」）；
+#       quick-features-supplement-not-run（输出里找不到「· feature-gated-tests：不带特性那一趟打了 NOT_RUN_ 的测试函数由这一趟补判…」：收不到就没东西可补判）
 #   GATE_CRASH_POINT_REPLAY_BREAK=list-items-refusals-counted-only  --list-items --with-keys 照改前只报拒算条数、不逐条列拒算的测试函数与理由
 #       样本档喂不进 --list-items（stage-selftest.sh 只传根），证红的输入是一份照 test-plan 标准输出的写法造的文件（几条 refused、几条 judge 与 reuse、末行 PLAN）：
 #       GATE_CRASH_POINT_REPLAY_LIST_PLAN_OUTPUT=<那份文件> bash .claude/gate.d/checker-tier-crash-point-replay.sh --list-items --with-keys <根>，
@@ -190,8 +257,43 @@
 #   GATE_CRASH_POINT_REPLAY_BREAK=judged-by-test-queried  不认 red-blocks=judged-by-test，带标记的用例照改前查库（有红判红）
 #       quick-judged-by-test-green（期望退出 3，实测 1）；quick-judged-by-test-missing-blocks-line（期望退出 1，实测 3）；
 #       quick-judged-by-test-red（输出里找不到「CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --rel…」：带标记的那条不再实跑，只起块查询）
+#       --full 一路同一个开关（带标记的用例也不认标记）：full-judged-by-test-green（期望退出 3，实测 1）；
+#       full-judged-by-test-missing-blocks-line、full-judged-by-test-unmarked-red-blocks（输出里找不到「crash-case:fault-injection-given-states：登记了 red-blocks=judged-by-test，按 cargo te…」：--full 里带标记的那条不再带 --ran）
+#   GATE_CRASH_POINT_REPLAY_BREAK=full-ran-for-every-case  --full 对每条用例都带 --ran（没登记 red-blocks=judged-by-test 的用例块那一行有红也不判红）
+#       full-judged-by-test-unmarked-red-blocks（期望退出 1，实测 3）
 #   admission.py 的 ADMISSION_BREAK=ran-blocks-line-optional  crash-case-blocks --ran 没有那一行也退 0
-#       quick-judged-by-test-missing-blocks-line（期望退出 1，实测 3）
+#       quick-judged-by-test-missing-blocks-line、full-judged-by-test-missing-blocks-line（期望退出 1，实测 3）
+#   GATE_CRASH_POINT_REPLAY_BREAK=gpu-switch-in-key  快档两趟每条测试函数的键照改前另加 line:enable-gpu=<多机配置的 ENABLE_GPU>（样本档拿上一版算键时取上一版那一趟的配置）
+#       unit-key-gpu-switch-not-in-key（输出里找不到「· 快档按条复用：checker 档包 3 条编得进的测试函数，现判 0、复用 3…」：上一版在 ENABLE_GPU=0 下记的判定这一版对不上键）
+#   GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary  照改前整段不记：一段里有 NOT_RUN_ / 判段判在 CPU 的行、或没打散的结果行条数与汇总行对不上，那一段一条都不记
+#       （转成 lib_libtest_result_lines.py 的 LIBTEST_RESULT_LINES_BREAK=marker-withholds-whole-binary,count-mismatch-withholds-whole-binary）
+#       unit-key-not-run-withheld-per-test（输出里找不到「· 判绿不记库 2 条（这一趟现判、按条记库不认的；下一趟照跑）：」：tests/setting.rs 与 tests/noisy.rs 整段不记，不记的成了 5 条）
+#   GATE_CRASH_POINT_REPLAY_BREAK=library-per-pass  照改前两趟各一份库（<阶段文件名>:crash-case-replay 与 <阶段文件名>:feature-gated-tests）
+#       quick-features-shared-library（输出里找不到「· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 2 条编得进的测试函数，现判 0、复用 2…」：库单测在带特性那一趟又现判）；
+#       quick-cpu-judged-green-recorded（输出里找不到「· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 2 条编得进的测试函数，现判 1、复用 1…」）
+#   GATE_CRASH_POINT_REPLAY_BREAK=no-supplement  不补判：带特性那一趟不另带不带特性那一趟打了 NOT_RUN_ 的测试函数所在的测试目标
+#       quick-features-supplement-not-run（输出里找不到「· feature-gated-tests：不带特性那一趟打了 NOT_RUN_ 的测试函数由这一趟补判…」：enumeration_quick_tier_shape 没跑到、报本次未跑）
+#   GATE_CRASH_POINT_REPLAY_BREAK=cpu-judging-withheld  照改前判段判在 CPU 的一律不记：多机配置没开 GPU 也不给 recordable 带 --cpu-judging-recordable
+#       （库那一侧同一种弄坏是 lib_libtest_result_lines.py 的 LIBTEST_RESULT_LINES_BREAK=cpu-judging-always-withheld）
+#       quick-cpu-judged-green-recorded（输出里找不到「· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 2 条编得进的测试函数，现判 1、复用 1…」：
+#       tests::cpu_judged_check 在不带特性那一趟没记库，带特性那一趟又现判）
+#   GATE_CRASH_POINT_REPLAY_BREAK=cpu-judging-recorded-when-gpu-configured  多机配置开了 GPU 也带 --cpu-judging-recordable（判段判在 CPU 的那一条照记）
+#       quick-gpu-configured-cpu-judged-not-recorded（输出里找不到「· 判绿不记库 1 条（这一趟现判、按条记库不认的；下一趟照跑）：」：带特性那一趟把它记了库）
+#   GATE_CRASH_POINT_REPLAY_BREAK=crash-audit-red-ignored  出口 4 那几格红了也不算进整道（快档不进红格、--full 不退 1）
+#       crash-audit-cells-red（期望退出 1，实测 3）
+#   出口 4 那几格的判法开关在判法脚本里（文件头各列全，开关轮在它们自己的 --selftest）；打开下面这几个，crash-audit-cells-red 判错：
+#   CRASH_FLOW_COVERAGE_BREAK=step-kind-coverage-unchecked  scripts/crash/crash-flow-coverage.py 不判 StepKind 成员没被罩住
+#       crash-audit-cells-red（输出里找不到「✗ StepKind 成员 TrimHint 在 quick 域里没被任何一条流罩住」）
+#   CRASH_FLOW_COVERAGE_BREAK=ignored-growth-accepted  crash-flow-coverage.py 不判比基准多出来的 ignore 节点
+#       crash-audit-cells-red（输出里找不到「✗ 基准里没有的节点：registered_segment」）
+#   CRASH_FLOW_COVERAGE_BREAK=zero-growth-accepted  crash-flow-coverage.py 不判基准外的 0 次对
+#       crash-audit-cells-red（输出里找不到「I-3.1 评估过 0 次，基准里没有这一行」）
+#   CRASH_FLOW_COVERAGE_BREAK=block-count-unchecked  crash-flow-coverage.py 不核读库输出的块行数
+#       crash-audit-cells-red（输出里找不到「✗ 块行 0 行，not_full_under_the_current_key 报 1：读库程序的输出不全」）
+#   CRASH_CASE_CHECK_BREAK=must-red-unchecked  scripts/crash/crash-case-check.py 不报一行变异都没有的崩溃枚举用例
+#       crash-audit-cells-red（输出里找不到「crash-case:plain-stream（singlefs-checker-tier:plain_stream:plain_stream_full）：crates/mutations.tsv 里没有一行变异…」）
+#   CRASH_CASE_CHECK_BREAK=knob-source-unchecked  crash-case-check.py 不核旋钮的出处路径在不在
+#       crash-audit-cells-red（输出里找不到「样本展开上限 的出处路径 crates/no-such-file.rs 不在仓里」）
 crash_point_replay_tier="quick"
 crash_point_replay_start_over=0
 root_argument=""
@@ -199,34 +301,74 @@ crash_point_replay_list_cells=0
 crash_point_replay_list_items=0
 crash_point_replay_list_with_keys=0
 crash_point_replay_named_cases=()
-# 格名表：与文件头两行 `# gate-cell:` 逐字相同
+# 格名表：与文件头八行 `# gate-cell:` 逐字相同、次序相同
 CRASH_CASE_REPLAY_CELL_NAME="crash-case-replay"
 CRASH_CASE_REPLAY_CELL_TITLE="快档跑 checker 档包不标 ignored 的用例（每条测试函数按单元键复用）、逐条核崩溃枚举用例的崩溃状态块；--full 逐条按块的单元键跑"
 FEATURE_GATED_TESTS_CELL_NAME="feature-gated-tests"
 FEATURE_GATED_TESTS_CELL_TITLE="快档带上 checker 档 tests/ 里 cfg 点到的特性另跑一趟（每条测试函数按单元键复用）：挂特性的测试文件逐个跑到或复用的用例不为 0，GPU 对拍没卡打的 NOT_RUN_NO_GPU_ADAPTER 逐条记本次未跑"
-# --check 点名的格（空着就是两格都跑）
+# 快档两趟按条复用共用的那一类判定库的后半个名字（文件头「复用」）
+QUICK_TIER_VERDICT_KIND_SUFFIX="quick-tier-test-functions"
+# --check 点名的格（空着就是八格都跑；--full 只跑它跑得了的那几格）
 crash_point_replay_selected_cells=()
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
-crash_point_replay_check_cells() { # <逗号隔开的格名>：认 crash-case-replay、feature-gated-tests，记进 crash_point_replay_selected_cells；写错、空着退 2 并列出可用的格名
+# 出口 4 那六格（文件头「出口 4 那六格」）：名字与判什么，次序同文件头
+CRASH_AUDIT_CELL_NAMES=(crash-flow-coverage crash-ignored-nodes invariant-zero-evaluations crash-case-must-red crash-knobs last-full-judgement)
+CRASH_AUDIT_CELL_TITLES=(
+  "崩溃流覆盖表：没有登记表 crash-entries.tsv 外的入口、登记的入口都有覆盖行、StepKind 每个成员都被一条流罩住（快档判轻型域，--full 判全量域）"
+  "ignore 开着的节点（ignored_point、registered_segment、not_expanded）不比基准 crash-ignored-nodes.tsv 多"
+  "评估 0 次的（流，不变量）对都在带理由的基准 invariant-zero-evaluations.tsv 里（快档数轻型域，--full 数全量域）"
+  "每条崩溃枚举用例在 crates/mutations.tsv 里至少有一行变异点名它的测试目标（只在快档跑）"
+  "旋钮登记表 crash-knobs.tsv 每行取值与依据不空、出处路径在（只在快档跑）"
+  "上一次全量的标记：读崩溃判定库每块的判定日期与跑法，列出全量判定不是当前的块；这一趟没跑全量退 77，不挡提交"
+)
+# 读这一趟的覆盖行与计数行的三格；只在快档跑的格（--full 点了它们退 2）
+CRASH_AUDIT_FLOW_CELLS=(crash-flow-coverage crash-ignored-nodes invariant-zero-evaluations)
+QUICK_ONLY_CELLS=(feature-gated-tests crash-case-must-red crash-knobs)
+# crash_point_replay_print_cells：逐行打「格名、制表符、判什么」，八格，次序同文件头
+crash_point_replay_print_cells() {
+  local index
+  printf '%s\t%s\n' "$CRASH_CASE_REPLAY_CELL_NAME" "$CRASH_CASE_REPLAY_CELL_TITLE" "$FEATURE_GATED_TESTS_CELL_NAME" "$FEATURE_GATED_TESTS_CELL_TITLE"
+  for index in "${!CRASH_AUDIT_CELL_NAMES[@]}"; do printf '%s\t%s\n' "${CRASH_AUDIT_CELL_NAMES[index]}" "${CRASH_AUDIT_CELL_TITLES[index]}"; done
+}
+# crash_point_replay_cell_in <格名> <格名…>：头一个参数在不在后面那一串里
+crash_point_replay_cell_in() {
+  local wanted="$1" candidate
+  shift
+  for candidate in "$@"; do [[ "$candidate" == "$wanted" ]] && return 0; done
+  return 1
+}
+crash_point_replay_check_cells() { # <逗号隔开的格名>：认格名表里的八格，记进 crash_point_replay_selected_cells；写错、空着退 2 并列出可用的格名
   local requested_cell requested_cells=()
   IFS=, read -r -a requested_cells <<< "$1"
   ((${#requested_cells[@]})) || requested_cells=("")
   for requested_cell in "${requested_cells[@]}"; do
-    if [[ "$requested_cell" != "$CRASH_CASE_REPLAY_CELL_NAME" && "$requested_cell" != "$FEATURE_GATED_TESTS_CELL_NAME" ]]; then
+    if [[ -z "$requested_cell" ]] || ! crash_point_replay_cell_in "$requested_cell" "$CRASH_CASE_REPLAY_CELL_NAME" "$FEATURE_GATED_TESTS_CELL_NAME" "${CRASH_AUDIT_CELL_NAMES[@]}"; then
       echo "  ✗ checker-tier-crash-point-replay.sh：--check 里有没登记的格名：「$requested_cell」"
       echo "     → 怎么办：格名照下面写（也可以 bash .claude/gate.d/checker-tier-crash-point-replay.sh --list 看）；按崩溃枚举用例点名用 --item <用例名>："
-      printf '       %s  %s\n' "$CRASH_CASE_REPLAY_CELL_NAME" "$CRASH_CASE_REPLAY_CELL_TITLE" "$FEATURE_GATED_TESTS_CELL_NAME" "$FEATURE_GATED_TESTS_CELL_TITLE"
+      crash_point_replay_print_cells | sed 's/\t/  /; s/^/       /'
       exit 2
     fi
     crash_point_replay_selected_cells+=("$requested_cell")
   done
 }
-crash_point_replay_runs_cell() { # <格名>：这一趟跑不跑这一格（没给 --check 两格都跑）
+crash_point_replay_runs_cell() { # <格名>：这一趟跑不跑这一格（没给 --check 八格都跑；--full 只跑得了 crash-case-replay 与覆盖、ignore、0 次、上一次全量四格，别的由调用处跳过）
   local selected_cell
   ((${#crash_point_replay_selected_cells[@]})) || return 0
   for selected_cell in "${crash_point_replay_selected_cells[@]}"; do [[ "$selected_cell" == "$1" ]] && return 0; done
   return 1
+}
+# crash_point_replay_plan_tokens <判法根> [<GPU 开关的值>]：快档两趟每条测试函数的判定请求另加的项（文件头「复用」）放进全局数组 crash_point_replay_plan_token_arguments：
+# release 档、判法单元 lib_libtest_result_lines.py 的 recordable_results、判法根。GPU 开没开不进键；弄坏开关 gpu-switch-in-key 下照改前另加 line:enable-gpu=<第二个参数>
+crash_point_replay_plan_tokens() {
+  crash_point_replay_plan_token_arguments=(--profile release --token "judge:scripts/gate/lib_libtest_result_lines.py::recordable_results" --token "judge-root:$1")
+  if [[ "${GATE_CRASH_POINT_REPLAY_BREAK:-}" == gpu-switch-in-key ]]; then crash_point_replay_plan_token_arguments+=(--token "line:enable-gpu=${2:-0}"); fi
+  return 0
+}
+# crash_point_replay_verdict_kind <阶段文件名> <格名>：这一格按条复用记进、读的那一类判定库（文件头「复用」：两趟同一类、同一份库）；
+# 弄坏开关 library-per-pass 下照改前一格一类（<阶段文件名>:<格名>）
+crash_point_replay_verdict_kind() {
+  if [[ "${GATE_CRASH_POINT_REPLAY_BREAK:-}" == library-per-pass ]]; then printf '%s:%s' "$1" "$2"; else printf '%s:%s' "$1" "$QUICK_TIER_VERDICT_KIND_SUFFIX"; fi
 }
 while (($#)); do
   stage_argument="$1"
@@ -255,7 +397,7 @@ while (($#)); do
   shift
 done
 if ((crash_point_replay_list_cells)); then
-  printf '%s\t%s\n' "$CRASH_CASE_REPLAY_CELL_NAME" "$CRASH_CASE_REPLAY_CELL_TITLE" "$FEATURE_GATED_TESTS_CELL_NAME" "$FEATURE_GATED_TESTS_CELL_TITLE"
+  crash_point_replay_print_cells
   exit 0
 fi
 if ((crash_point_replay_list_items)); then
@@ -277,16 +419,17 @@ if ((crash_point_replay_list_items)); then
       # 只供证红（文件头 --list-items）：照 test-plan 标准输出写法造的文件当这一趟的输出
       crash_point_replay_list_plan_command=(cat -- "$GATE_CRASH_POINT_REPLAY_LIST_PLAN_OUTPUT")
     else
-      crash_point_replay_list_plan_command=(python3 "$crash_point_replay_list_repository/scripts/gate/admission.py" test-plan "$crash_point_replay_list_root" "$(basename "$0"):$CRASH_CASE_REPLAY_CELL_NAME" singlefs-checker-tier
-        "$crash_point_replay_list_scratch/plan" --profile release --token "judge:scripts/gate/lib_libtest_result_lines.py::result_line"
-        --token "judge-root:$crash_point_replay_list_repository" --token "line:enable-gpu=0")
+      crash_point_replay_plan_tokens "$crash_point_replay_list_repository" 0
+      crash_point_replay_list_plan_command=(python3 "$crash_point_replay_list_repository/scripts/gate/admission.py" test-plan "$crash_point_replay_list_root"
+        "$(crash_point_replay_verdict_kind "$(basename "$0")" "$CRASH_CASE_REPLAY_CELL_NAME")" singlefs-checker-tier
+        "$crash_point_replay_list_scratch/plan" "${crash_point_replay_plan_token_arguments[@]}")
     fi
     if "${crash_point_replay_list_plan_command[@]}" >"$crash_point_replay_list_scratch/out" 2>&1 \
        && crash_point_replay_list_summary="$(grep '^PLAN ' "$crash_point_replay_list_scratch/out" | tail -n 1)" && [[ -n "$crash_point_replay_list_summary" ]]; then
       crash_point_replay_list_judge="$(sed -n 's/.* judge=\([0-9]*\).*/\1/p' <<<"$crash_point_replay_list_summary")"
       crash_point_replay_list_reuse="$(sed -n 's/.* reuse=\([0-9]*\).*/\1/p' <<<"$crash_point_replay_list_summary")"
       crash_point_replay_list_refused="$(sed -n 's/.* refused=\([0-9]*\).*/\1/p' <<<"$crash_point_replay_list_summary")"
-      printf '%s\t键对不上的测试函数 %s 条（现判 %s、拒算 %s），键相同的 %s 条（照多机配置没开 GPU 算）\n' "$CRASH_CASE_REPLAY_CELL_NAME" \
+      printf '%s\t键对不上的测试函数 %s 条（现判 %s、拒算 %s），键相同的 %s 条\n' "$CRASH_CASE_REPLAY_CELL_NAME" \
         "$((crash_point_replay_list_judge + crash_point_replay_list_refused))" "$crash_point_replay_list_judge" "$crash_point_replay_list_refused" "$crash_point_replay_list_reuse"
       # 拒算的逐条列：测试函数与理由（test-plan 一行的第一列与第七列，理由去掉「拒算：」起头），一条不落；弄坏开关 list-items-refusals-counted-only 下照改前不列
       if [[ ",${GATE_CRASH_POINT_REPLAY_BREAK:-}," != *,list-items-refusals-counted-only,* ]]; then
@@ -305,9 +448,15 @@ if [[ "$crash_point_replay_start_over" == 1 && "$crash_point_replay_tier" != ful
   echo "     → 怎么办：要换一份新的空库、从头跑全量，写成 bash .claude/gate.d/checker-tier-crash-point-replay.sh --full --start-over <根>。"
   exit 2
 fi
-if [[ "$crash_point_replay_tier" == full ]] && ! crash_point_replay_runs_cell "$CRASH_CASE_REPLAY_CELL_NAME"; then
-  echo "  ✗ --full 只有 $CRASH_CASE_REPLAY_CELL_NAME 一格：$FEATURE_GATED_TESTS_CELL_NAME 只在快档跑"
-  echo "     → 怎么办：带特性那一格不带 --full 跑：bash .claude/gate.d/checker-tier-crash-point-replay.sh --check $FEATURE_GATED_TESTS_CELL_NAME [项目根]；全量写成 --full（或 --full --check $CRASH_CASE_REPLAY_CELL_NAME）。"
+crash_point_replay_full_refused=()
+if [[ "$crash_point_replay_tier" == full ]]; then
+  for crash_point_replay_quick_only_cell in "${QUICK_ONLY_CELLS[@]}"; do
+    if ((${#crash_point_replay_selected_cells[@]})) && crash_point_replay_runs_cell "$crash_point_replay_quick_only_cell"; then crash_point_replay_full_refused+=("$crash_point_replay_quick_only_cell"); fi
+  done
+fi
+if [[ "$crash_point_replay_tier" == full ]] && { ! crash_point_replay_runs_cell "$CRASH_CASE_REPLAY_CELL_NAME" || ((${#crash_point_replay_full_refused[@]})); }; then
+  echo "  ✗ --full 只跑 $CRASH_CASE_REPLAY_CELL_NAME 与覆盖、ignore、0 次、上一次全量四格（要先有 $CRASH_CASE_REPLAY_CELL_NAME 跑出的全量日志）；${crash_point_replay_full_refused[*]:-$FEATURE_GATED_TESTS_CELL_NAME} 只在快档跑"
+  echo "     → 怎么办：只在快档跑的格不带 --full 跑：bash .claude/gate.d/checker-tier-crash-point-replay.sh --check $FEATURE_GATED_TESTS_CELL_NAME [项目根]；全量写成 --full（或 --full --check $CRASH_CASE_REPLAY_CELL_NAME[,crash-flow-coverage…]）。"
   exit 2
 fi
 ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -411,6 +560,11 @@ crash_point_replay_scratch_directory="$(mktemp -d)"
 # 快档实跑登记了 red-blocks=judged-by-test 的用例时的日志目录（文件头「复用」）：头一次用到才建，跑完不删
 crash_point_replay_quick_log_directory=""
 trap 'rm -rf -- "${crash_point_replay_scratch_directory:?}"' EXIT
+# 快档不带特性那一趟打了 NOT_RUN_ 的测试函数（not_run_markers_of 的写法）与带特性那一趟补判的结论（文件头「多机配置开了 GPU」）
+crash_point_replay_plain_not_run_file="$crash_point_replay_scratch_directory/plain-not-run"
+crash_point_replay_supplement_file="$crash_point_replay_scratch_directory/plain-not-run.supplement"
+crash_point_replay_plain_not_run_total=0
+: >"$crash_point_replay_plain_not_run_file"
 
 # crash-cases 一条一行：键、包、测试目标、用例函数（制表符分隔），照登记表的次序；登记有错退非 0
 if ! crash_case_listing="$(python3 "$crash_point_replay_admission_module" crash-cases "$ROOT")"; then
@@ -461,8 +615,8 @@ plan_tests() {
   local kind="$1" plan_file="$2" plan_output="$3" summary plan_exit
   shift 3
   local -a feature_options=("$@") break_setting=()
-  local -a tokens=(--profile release --token "judge:scripts/gate/lib_libtest_result_lines.py::result_line" --token "judge-root:$crash_point_replay_stage_repository"
-                   --token "line:enable-gpu=$crash_point_replay_gpu_configured")
+  crash_point_replay_plan_tokens "$crash_point_replay_stage_repository" "$crash_point_replay_gpu_configured"
+  local -a tokens=("${crash_point_replay_plan_token_arguments[@]}")
   [[ "$crash_point_replay_break" == setting-file-whole-closure ]] && break_setting=("ADMISSION_BREAK=test-key-with-whole-file")
   plan_judge=0; plan_reuse=0; plan_refused=0; plan_not_compiled=0; plan_problem=""; plan_failure=()
   if [[ "$crash_point_replay_sample_mode" == 1 && -d "$PWD/.unit-verdict-sample/prior" ]]; then
@@ -484,15 +638,24 @@ plan_tests() {
   return 0
 }
 
-# seed_prior_verdicts <种类> [--feature …]：样本档（文件头「样本档」）：拿 .unit-verdict-sample/prior/ 那一版算每条测试函数的键、全部照判绿记进这一版样本的判定库
+# seed_prior_verdicts <种类> [--feature …]：样本档（文件头「样本档」）：拿 .unit-verdict-sample/prior/ 那一版算每条测试函数的键、全部照判绿记进这一版样本的判定库。
+# 样本另放了 .unit-verdict-sample/prior-multi-host.env（上一版那一趟的多机配置）的，这一趟照它起（SINGLEFS_MULTI_HOST_CONFIG），GPU 开关取它的 ENABLE_GPU
+# （只在弄坏开关 gpu-switch-in-key 下进键）
 seed_prior_verdicts() {
   local kind="$1" prior="$PWD/.unit-verdict-sample/prior" seed="$crash_point_replay_scratch_directory/seed" seed_exit
+  local prior_configuration="$PWD/.unit-verdict-sample/prior-multi-host.env" prior_switch="$crash_point_replay_gpu_configured" prior_note=""
   shift
-  local -a break_setting=()
+  local -a break_setting=() prior_setting=()
   [[ "$crash_point_replay_break" == setting-file-whole-closure ]] && break_setting=("ADMISSION_BREAK=test-key-with-whole-file")
-  if env ${break_setting[@]+"${break_setting[@]}"} python3 "$crash_point_replay_admission_module" test-plan "$prior" "$kind" singlefs-checker-tier "$seed.plan" \
-       --profile release --token "judge:scripts/gate/lib_libtest_result_lines.py::result_line" --token "judge-root:$crash_point_replay_stage_repository" \
-       --token "line:enable-gpu=$crash_point_replay_gpu_configured" --library-root "$ROOT" "$@" >"$seed.out" 2>&1; then seed_exit=0; else seed_exit=$?; fi
+  if [[ -f "$prior_configuration" ]]; then
+    prior_setting=("SINGLEFS_MULTI_HOST_CONFIG=$prior_configuration")
+    prior_switch=0
+    if [[ "$(source "$crash_point_replay_amplification_library" >/dev/null 2>&1; crash_amplification_configuration_value "$prior_configuration" ENABLE_GPU)" == 1 ]]; then prior_switch=1; fi
+    prior_note="（上一版那一趟的多机配置 .unit-verdict-sample/prior-multi-host.env，ENABLE_GPU=${prior_switch}）"
+  fi
+  crash_point_replay_plan_tokens "$crash_point_replay_stage_repository" "$prior_switch"
+  if env ${prior_setting[@]+"${prior_setting[@]}"} ${break_setting[@]+"${break_setting[@]}"} python3 "$crash_point_replay_admission_module" test-plan "$prior" "$kind" singlefs-checker-tier "$seed.plan" \
+       "${crash_point_replay_plan_token_arguments[@]}" --library-root "$ROOT" "$@" >"$seed.out" 2>&1; then seed_exit=0; else seed_exit=$?; fi
   if ((seed_exit != 0)); then
     plan_problem="样本档：上一版的树上算不出键：$(tail -n 3 "$seed.out" | tr '\n' ' ' | cut -c1-400)"
     plan_failure=(test-plan "$seed_exit" "$seed.out")
@@ -503,7 +666,7 @@ seed_prior_verdicts() {
     seed_exit=0; else seed_exit=$?; fi
   if ((seed_exit != 0)); then
     plan_problem="样本档：上一版那一趟的判定没记进库：$(tail -n 2 "$seed.record" | tr '\n' ' ')"; plan_failure=(verdict-record "$seed_exit" "$seed.record"); return 1; fi
-  echo "  · 样本档：上一版（.unit-verdict-sample/prior）的 $(wc -l <"$seed.names") 条测试函数照判绿记进这一版的判定库（$(tail -n 1 "$seed.record")）"
+  echo "  · 样本档：上一版（.unit-verdict-sample/prior）的 $(wc -l <"$seed.names") 条测试函数照判绿记进这一版的判定库（$(tail -n 1 "$seed.record")）${prior_note}"
 }
 
 # skip_arguments_of_plan <计划输出>：键相同（reuse）、这一组特性下不编（not-compiled）的测试函数逐条 --skip（加 --exact）；要现判的同名就不跳（几个二进制里同名的测试都跑，宁多跑）。
@@ -527,33 +690,61 @@ plan_failure_verdict() {
   python3 "$crash_point_replay_admission_module" plan-failure "$crash_point_replay_stage_file_name 的 $cell 格" "$@"
 }
 
-# record_green_tests <种类> <计划文件> <计划输出> <日志> <要排除的段的清单文件> <格名>：这一趟判绿的测试函数照键记进库（文件头「复用」：结果行与汇总行对不上的段、
-# 点到 <排除清单> 里那几段（有 NOT_RUN_ / 判段判在 CPU 的行）的整段不记）。打一行「· 判绿记库：…」；记不下只报、不判红；
+# account_test_results <日志> <这一趟带没带 --test-threads 1：1|0> <清单文件>：逐条认结局与记号归谁（判法只在 scripts/gate/lib_libtest_result_lines.py 的
+# recordable_results，文件头「按条记库」；这里只调它的 recordable 子命令），一行一条落进 <清单文件>（green / withheld / marker，写法在它文件头「命令行」）。
+# 没成返回 1、打一行原因（这一趟一条都不记，本次未跑照 test_not_run_lines 报）。弄坏开关 withhold-whole-binary 下转成它的 marker-withholds-whole-binary 与
+# count-mismatch-withholds-whole-binary（改前一段有记号、或结果行条数与汇总行对不上就整段不记）。
+# 多机配置没开 GPU（crash_point_replay_gpu_configured 是 0）时带 --cpu-judging-recordable：判段判在 CPU 的那一条判绿照键记库（文件头「复用」）；
+# 开了 GPU 不带（判段判在 CPU 的那一趟判红，判归哪一条也不记）。弄坏开关 cpu-judging-withheld 下没开 GPU 也不带（改前一律不记），
+# cpu-judging-recorded-when-gpu-configured 下开了 GPU 也带
+account_test_results() {
+  local -a break_setting=() serial_option=() cpu_judging_option=()
+  [[ "$crash_point_replay_break" == withhold-whole-binary ]] && break_setting=("LIBTEST_RESULT_LINES_BREAK=marker-withholds-whole-binary,count-mismatch-withholds-whole-binary")
+  [[ "$2" == 1 ]] && serial_option=(--serial)
+  if { (( ! crash_point_replay_gpu_configured )) && [[ "$crash_point_replay_break" != cpu-judging-withheld ]]; } \
+       || [[ "$crash_point_replay_break" == cpu-judging-recorded-when-gpu-configured ]]; then
+    cpu_judging_option=(--cpu-judging-recordable)
+  fi
+  if env ${break_setting[@]+"${break_setting[@]}"} python3 "$crash_point_replay_stage_repository/scripts/gate/lib_libtest_result_lines.py" recordable "$1" \
+       ${serial_option[@]+"${serial_option[@]}"} ${cpu_judging_option[@]+"${cpu_judging_option[@]}"} >"$3" 2>"$3.err" && grep -q '^RECORDABLE ' "$3"; then
+    return 0
+  fi
+  echo "  ! 按条记库：lib_libtest_result_lines.py recordable 没成（$(tail -n 2 "$3" "$3.err" 2>/dev/null | tr '\n' ' ' | cut -c1-300)），这一趟一条都不记"
+  return 1
+}
+
+# record_green_tests <种类> <计划文件> <计划输出> <清单文件> <格名> <跑法>：这一趟现判而判绿的测试函数照键记进库（文件头「复用」：<清单文件> 是 account_test_results
+# 认出的，只记 green 那几条）。打一行「· 判绿记库：…」，现判而不记的逐条列出为什么（至多 20 条）；记不下只报、不判红；
 # 复用哨兵报红（强制现判那一条判定不稳）的经 plan_failure_verdict 判失灵、返回 1
 record_green_tests() {
-  local kind="$1" plan_file="$2" plan_output="$3" log="$4" excluded="$5" cell="$6" names="$crash_point_replay_scratch_directory/green-names.$kind" record_exit
-  python3 - "$plan_output" "$log" "$excluded" "$crash_point_replay_stage_repository/scripts/gate/lib_libtest_result_lines.py" >"$names" <<'PY' || { echo "  ! 判绿记库：取不出判绿的名单，这一趟一条都不记"; return 0; }
-import importlib.util, sys
-plan_output, log, excluded_file, library_path = sys.argv[1:5]
-specification = importlib.util.spec_from_file_location("libtest_result_lines", library_path)
-library = importlib.util.module_from_spec(specification)
-specification.loader.exec_module(library)
+  local kind="$1" plan_file="$2" plan_output="$3" accounting="$4" cell="$5" how="$6" names="$crash_point_replay_scratch_directory/green-names.$5" record_exit withheld_count
+  python3 - "$plan_output" "$accounting" "$names.withheld" >"$names" <<'PY' || { echo "  ! 判绿记库：取不出判绿的名单，这一趟一条都不记"; return 0; }
+import sys
+plan_output, accounting, withheld_file = sys.argv[1:4]
 by_binary = {}
 for line in open(plan_output, encoding="utf-8", errors="replace"):
     columns = line.rstrip("\n").split("\t")
-    if len(columns) >= 7 and columns[1] in ("judge",):
-        by_binary.setdefault(columns[4], {})[columns[5]] = columns[0]
-excluded = {line.strip() for line in open(excluded_file, encoding="utf-8", errors="replace") if line.strip()}
-for run in library.binary_runs(open(log, encoding="utf-8", errors="replace").read()):
-    if not run.consistent or run.source in excluded or ("库与别的二进制" in excluded and not run.source.startswith("tests/")):
-        continue
-    for result in run.results:
-        name = by_binary.get(run.source, {}).get(result.full_name)
-        if name and result.outcome == "ok":
-            print(name)
+    if len(columns) >= 7 and columns[1] == "judge":
+        by_binary[(columns[4], columns[5])] = columns[0]
+withheld = []
+for line in open(accounting, encoding="utf-8", errors="replace"):
+    columns = line.rstrip("\n").split("\t")
+    name = by_binary.get(tuple(columns[1:3])) if len(columns) >= 3 else None
+    if name and columns[0] == "green":
+        print(name)
+    elif name and columns[0] == "withheld" and len(columns) >= 4:
+        withheld.append(f"{name}\t{columns[3]}")
+with open(withheld_file, "w", encoding="utf-8") as handle:
+    handle.write("".join(line + "\n" for line in withheld))
 PY
-  if [[ ! -s "$names" ]]; then echo "  · 判绿记库：这一趟没有可记的（现判的都不在对得上的段里，或一条都没现判）"; return 0; fi
-  if python3 "$crash_point_replay_admission_module" verdict-record "$ROOT" "$kind" "$plan_file" "$names" --how "cargo test --release -p singlefs-checker-tier（$kind）" \
+  withheld_count="$(grep -c . "$names.withheld" 2>/dev/null)"
+  if (( ${withheld_count:-0} > 0 )); then
+    echo "  · 判绿不记库 ${withheld_count} 条（这一趟现判、按条记库不认的；下一趟照跑）："
+    head -n 20 "$names.withheld" | awk -F'\t' '{ printf "    不记 %s（%s）\n", $1, substr($2, 1, 300) }'
+    (( withheld_count > 20 )) && echo "    …另有 $((withheld_count - 20)) 条没列"
+  fi
+  if [[ ! -s "$names" ]]; then echo "  · 判绿记库：这一趟没有可记的（现判的都不认，或一条都没现判）"; return 0; fi
+  if python3 "$crash_point_replay_admission_module" verdict-record "$ROOT" "$kind" "$plan_file" "$names" --how "$how" \
        >"$names.record" 2>&1; then record_exit=0; else record_exit=$?; fi
   if ((record_exit == 0)); then
     echo "  · 判绿记库：$(tail -n 1 "$names.record")"
@@ -564,9 +755,79 @@ PY
   return 0
 }
 
-# excluded_binaries_of_log <日志> <清单文件>：有 NOT_RUN_ 行或判段判在 CPU 的那几段（tests/<名>.rs，或「库与别的二进制」）写进清单文件：那几段的判绿不记库
-excluded_binaries_of_log() {
-  { test_not_run_lines "$1" | cut -f1; cpu_judging_lines "$1" | sed 's/：.*//'; gpu_adapter_not_run_lines "$1" | cut -f1; } | LC_ALL=C sort -u >"$2"
+# not_run_markers_of <清单文件> <落进的文件>：account_test_results 认出的 NOT_RUN_ 记号，一处一行「<源文件><TAB><complete：1|0><TAB><那一截>[<TAB><认作谁打的>…]」
+not_run_markers_of() {
+  awk -F'\t' 'BEGIN { OFS = "\t" } $1 == "marker" && $3 == "not-run" { line = $2 OFS $4 OFS $5; for (i = 6; i <= NF; i++) line = line OFS $i; print line }' "$1" >"$2"
+}
+
+# supplement_plain_not_run <带特性那一趟的计划输出> <它的清单文件> <计划算没算成：1|0>：不带特性那一趟打了 NOT_RUN_ 的测试函数（crash_point_replay_plain_not_run_file）
+# 带特性那一趟补判到没有（文件头「多机配置开了 GPU」）：认作它打的每一条在这一趟判绿（清单文件里的 green）、或这一组特性下有键相同的判定复用，才算判到。
+# 一处一行「<1|0><TAB><哪几条怎么判到的，或为什么没判到>」落进 crash_point_replay_supplement_file，与 crash_point_replay_plain_not_run_file 逐行对应
+supplement_plain_not_run() {
+  python3 - "$crash_point_replay_plain_not_run_file" "$1" "$2" "$3" >"$crash_point_replay_supplement_file" <<'PY' || : >"$crash_point_replay_supplement_file"
+import sys
+markers_file, plan_output, accounting, plan_ok = sys.argv[1:5]
+decisions = {}
+if plan_ok == "1":
+    for line in open(plan_output, encoding="utf-8", errors="replace"):
+        columns = line.rstrip("\n").split("\t")
+        if len(columns) >= 7:
+            decisions[(columns[4], columns[5])] = columns[1]
+green = set()
+for line in open(accounting, encoding="utf-8", errors="replace"):
+    columns = line.rstrip("\n").split("\t")
+    if len(columns) >= 3 and columns[0] == "green":
+        green.add((columns[1], columns[2]))
+for line in open(markers_file, encoding="utf-8", errors="replace"):
+    columns = line.rstrip("\n").split("\t")
+    source, complete, candidates = columns[0], (columns[1] if len(columns) > 1 else "0"), [name for name in columns[3:] if name]
+    if complete != "1" or not candidates:
+        print("0\t认不出是这一段哪一条测试函数打的，补判不了")
+        continue
+    judged, missing = [], []
+    for name in candidates:
+        decision = decisions.get((source, name))
+        if decision == "reuse":
+            judged.append(f"{source}::{name} 键相同、复用")
+        elif (source, name) in green and decision in (None, "judge", "refused"):
+            judged.append(f"{source}::{name} 判绿")
+        elif decision == "not-compiled":
+            missing.append(f"{source}::{name} 这一组特性下不编")
+        else:
+            missing.append(f"{source}::{name} 这一趟没跑到或没判绿")
+    print(("0\t" + "、".join(missing)) if missing else ("1\t" + "、".join(judged)))
+PY
+}
+
+# report_plain_pass_not_run <带特性那一格：ran|red|空（没点它）>：不带特性那一趟打了 NOT_RUN_ 的，补判到的打一行「·」，没补判到的逐条报本次未跑
+# （文件头「多机配置开了 GPU」），条数放进 crash_point_replay_plain_not_run_after
+report_plain_pass_not_run() {
+  local where complete text _candidates verdict why reason_without="" index=0
+  local -a verdicts=()
+  crash_point_replay_plain_not_run_after=0
+  [[ -s "$crash_point_replay_plain_not_run_file" ]] || return 0
+  case "$1" in
+    "") reason_without="这一趟没跑带特性那一格（--check 没点 $FEATURE_GATED_TESTS_CELL_NAME）" ;;
+    red) reason_without="带特性那一格判红" ;;
+    *)
+      if [[ -f "$crash_point_replay_supplement_file" ]]; then mapfile -t verdicts <"$crash_point_replay_supplement_file"
+      elif [[ "$feature_cell_state" == 无对象可判 ]]; then reason_without="checker 档 tests/ 下没有挂特性的测试文件，带特性那一趟没起"
+      else reason_without="带特性那一趟没交出补判的结论"; fi ;;
+  esac
+  while IFS=$'\t' read -r where complete text _candidates; do
+    verdict="${verdicts[index]:-}"
+    index=$((index + 1))
+    if [[ -z "$reason_without" && "${verdict%%$'\t'*}" == 1 ]]; then
+      echo "  · 不带特性那一趟（${where}）报的本次未跑由带特性那一趟补判到了：${text}（${verdict#*$'\t'}）"
+      continue
+    fi
+    why="$reason_without"
+    if [[ -z "$why" && "$verdict" == *$'\t'* ]]; then why="${verdict#*$'\t'}"; fi
+    [[ -n "$why" ]] || why="补判的结论没取出来"
+    crash_point_replay_plain_not_run_after=$((crash_point_replay_plain_not_run_after + 1))
+    crash_point_replay_report_not_run "checker 档快档不带特性那一趟（${where}）报了本次未跑：${text}；带特性那一趟没补判到（${why}），这一趟不算跑过"
+  done <"$crash_point_replay_plain_not_run_file"
+  return 0
 }
 
 # plan_report <计划输出> [<本次未跑>]：成功句里那一截「现判 N、复用 M、拒算 R」（给了第二个参数另接「、本次未跑 K」），拒算另带头三处形态
@@ -752,12 +1013,15 @@ print_staged_worktree_full_commands() {
 # run_checker_quick_tier：快档跑 checker 档包不标 ignored 的用例，按条复用（文件头「复用」）。判红打出路、返回 1；判绿把现判、复用、拒算与每个测试二进制
 # 那一行 test result 的 passed / ignored 加总进 quick_tier_report。一条都不用现判就不起 cargo（quick_tier_ran=0）。
 run_checker_quick_tier() {
-  local quick_log result_lines passed_count ignored_count passed_total=0 ignored_total=0 binary_count=0 plan_ok=1
-  local kind="$crash_point_replay_stage_file_name:$CRASH_CASE_REPLAY_CELL_NAME"
+  local quick_log result_lines passed_count ignored_count passed_total=0 ignored_total=0 binary_count=0 plan_ok=1 accounting_ok=0
+  local kind
+  kind="$(crash_point_replay_verdict_kind "$crash_point_replay_stage_file_name" "$CRASH_CASE_REPLAY_CELL_NAME")"
   local plan_file="$crash_point_replay_scratch_directory/quick.plan" plan_output="$crash_point_replay_scratch_directory/quick.plan.out"
+  local accounting="$crash_point_replay_scratch_directory/quick.accounting"
   quick_log="$crash_point_replay_scratch_directory/quick-singlefs-checker-tier.log"
   quick_tier_ran=1
   : >"$quick_log"
+  : >"$crash_point_replay_plain_not_run_file"
   plan_skip_arguments=()
   if plan_tests "$kind" "$plan_file" "$plan_output"; then
     skip_arguments_of_plan "$plan_output"
@@ -768,6 +1032,7 @@ run_checker_quick_tier() {
     echo "  ! 快档按条复用算不出（$plan_problem）：这一趟全部现判、一条都不记库"
     ((${#plan_failure[@]})) && { plan_failure_verdict "$CRASH_CASE_REPLAY_CELL_NAME" "${plan_failure[@]}" || quick_tier_plan_red=1; }
   fi
+  crash_point_replay_quick_plan_ok="$plan_ok"   # 出口 4 那几格读这一趟的行时要（文件头「出口 4 那六格」）
   if (( plan_ok && plan_judge + plan_refused == 0 )); then
     quick_tier_ran=0
     quick_tier_report="checker 档包 $plan_reuse 条测试函数都有键相同的判定，全部复用，这一趟没起 cargo（现判 0、复用 $plan_reuse、拒算 0、本次未跑 0）"
@@ -794,7 +1059,7 @@ run_checker_quick_tier() {
       return 1
     fi
   fi
-  # 配置开了 GPU（文件头「多机配置开了 GPU」）：判段判在 CPU 的判红；用例报的本次未跑逐条报，不判红、不算通过
+  # 配置开了 GPU（文件头「多机配置开了 GPU」）：判段判在 CPU 的判红；用例报的本次未跑等带特性那一趟补判之后再逐条报，不判红、不算通过
   local cpu_judging=() plain_where plain_line
   if (( crash_point_replay_gpu_configured )) && [[ "$crash_point_replay_break" != cpu-judging-accepted ]]; then
     mapfile -t cpu_judging < <(cpu_judging_lines "$quick_log")
@@ -805,23 +1070,27 @@ run_checker_quick_tier() {
       return 1
     fi
   fi
-  crash_point_replay_plain_not_run_total=0
-  if [[ "$crash_point_replay_break" != plain-pass-not-run-unreported ]]; then
+  # 逐条认结局与记号（文件头「复用」）；这一趟打了 NOT_RUN_ 的测试函数落进 crash_point_replay_plain_not_run_file，等带特性那一趟补判完再报（文件头「多机配置开了 GPU」）。
+  # 认不成时退回按行收 NOT_RUN_（不知道是哪一条打的，补判不了）
+  if (( quick_tier_ran )) && account_test_results "$quick_log" 0 "$accounting"; then accounting_ok=1; fi
+  if [[ "$crash_point_replay_break" == plain-pass-not-run-unreported ]]; then
+    :
+  elif (( accounting_ok )); then
+    not_run_markers_of "$accounting" "$crash_point_replay_plain_not_run_file"
+  elif (( quick_tier_ran )); then
     while IFS=$'\t' read -r plain_where plain_line; do
-      [[ -n "$plain_line" ]] || continue
-      crash_point_replay_plain_not_run_total=$((crash_point_replay_plain_not_run_total + 1))
-      crash_point_replay_report_not_run "checker 档快档不带特性那一趟（${plain_where}）报了本次未跑：${plain_line}；这一截归带特性那一趟（$FEATURE_GATED_TESTS_CELL_NAME 格）判，这一趟不算跑过"
+      [[ -n "$plain_line" ]] && printf '%s\t0\t%s\n' "$plain_where" "$plain_line" >>"$crash_point_replay_plain_not_run_file"
     done < <(test_not_run_lines "$quick_log")
   fi
+  crash_point_replay_plain_not_run_total="$(grep -c . "$crash_point_replay_plain_not_run_file")"
   if (( quick_tier_ran && plan_ok )); then
     quick_tier_report="checker 档包 $(plan_report "$plan_output" "$crash_point_replay_plain_not_run_total")；跑了的 ${binary_count} 个测试二进制 ${passed_total} 条通过、${ignored_total} 条 ignored（全量那几条留给 --full）"
   elif (( quick_tier_ran )); then
     quick_tier_report="checker 档包 ${binary_count} 个测试二进制，${passed_total} 条通过、${ignored_total} 条 ignored、本次未跑 ${crash_point_replay_plain_not_run_total} 处（按条复用算不出，全部现判；全量那几条留给 --full）"
   fi
-  if (( plan_ok && quick_tier_ran )); then
-    excluded_binaries_of_log "$quick_log" "$crash_point_replay_scratch_directory/quick.excluded"
-    record_green_tests "$kind" "$plan_file" "$plan_output" "$quick_log" "$crash_point_replay_scratch_directory/quick.excluded" "$CRASH_CASE_REPLAY_CELL_NAME" \
-      || quick_tier_plan_red=1
+  if (( plan_ok && quick_tier_ran && accounting_ok )); then
+    record_green_tests "$kind" "$plan_file" "$plan_output" "$accounting" "$CRASH_CASE_REPLAY_CELL_NAME" \
+      "cargo test --release -p singlefs-checker-tier --lib --tests（不带特性那一趟）" || quick_tier_plan_red=1
   fi
   return 0
 }
@@ -1077,8 +1346,9 @@ gpu_adapter_not_run_lines() {
 }
 
 # run_feature_gated_tests_cell <crash-case-replay 格那一趟的日志，没跑传空串>：判红打出路、返回 1；不红返回 0，结论放进 feature_cell_state。
-# 按条复用（文件头「复用」）：这一组特性下每条测试函数各一条判定（种类 <阶段文件名>:feature-gated-tests），键相同的经 --skip 跳过，一条都不用现判就不起 cargo；
-# 挂特性的文件「跑到 0 条」按跑到的加复用的算。
+# 按条复用（文件头「复用」）：这一组特性下每条测试函数各一条判定，与不带特性那一趟同一类、同一份库（种类 <阶段文件名>:quick-tier-test-functions），
+# 键相同的经 --skip 跳过，一条都不用现判就不起 cargo；不带特性那一趟打了 NOT_RUN_ 的测试函数所在的测试目标一并带上补判（文件头「多机配置开了 GPU」）。
+# 挂特性的文件「跑到 0 条」按跑到的加复用的算，同一条不数两遍。
 run_feature_gated_tests_cell() {
   local tests_directory="crates/singlefs-checker-tier/tests" listing feature_list feature_log feature_exit=0 bindgen_arguments=""
   local amplification_library="$crash_point_replay_stage_repository/scripts/crash/crash-amplification-lib.sh"
@@ -1134,10 +1404,33 @@ run_feature_gated_tests_cell() {
   done < <(compgen -e)
   feature_log="$crash_point_replay_scratch_directory/quick-singlefs-checker-tier-features.log"
   : > "$feature_log"
-  local feature_kind="$crash_point_replay_stage_file_name:$FEATURE_GATED_TESTS_CELL_NAME" feature_plan_ok=1 feature_ran=1 feature_name feature_plan_red=0
+  local feature_kind feature_plan_ok=1 feature_ran=1 feature_name feature_plan_red=0 feature_accounting="$crash_point_replay_scratch_directory/features.accounting"
+  feature_kind="$(crash_point_replay_verdict_kind "$crash_point_replay_stage_file_name" "$FEATURE_GATED_TESTS_CELL_NAME")"
   local feature_plan_file="$crash_point_replay_scratch_directory/features.plan" feature_plan_output="$crash_point_replay_scratch_directory/features.plan.out"
-  local -a feature_plan_options=() feature_roots=(src/lib.rs) feature_names=()
+  local -a feature_plan_options=() feature_roots=(src/lib.rs) feature_names=() supplement_sources=() supplement_arguments=()
+  local supplement_source supplement_name
+  local -a supplement_target=()
   for row in "${gated_rows[@]}"; do feature_roots+=("tests/${row%%$'\t'*}"); done
+  # 补判（文件头「多机配置开了 GPU」）：不带特性那一趟打了 NOT_RUN_ 的测试函数所在的测试目标一并带上；库那一段本来就在。弄坏开关 no-supplement 下不带
+  if [[ -s "$crash_point_replay_plain_not_run_file" && "$crash_point_replay_break" != no-supplement ]]; then
+    mapfile -t supplement_sources < <(cut -f1 "$crash_point_replay_plain_not_run_file" | LC_ALL=C sort -u)
+  fi
+  for supplement_source in ${supplement_sources[@]+"${supplement_sources[@]}"}; do
+    case "$supplement_source" in
+      src/lib.rs) continue ;;
+      tests/*.rs) supplement_name="${supplement_source#tests/}"; supplement_target=(--test "${supplement_name%.rs}") ;;
+      src/bin/*/main.rs) supplement_name="${supplement_source#src/bin/}"; supplement_target=(--bin "${supplement_name%/main.rs}") ;;
+      src/bin/*.rs) supplement_name="${supplement_source#src/bin/}"; supplement_target=(--bin "${supplement_name%.rs}") ;;
+      *) continue ;;
+    esac
+    if [[ " ${target_arguments[*]} " == *" ${supplement_target[*]} "* ]]; then continue; fi
+    target_arguments+=("${supplement_target[@]}")
+    supplement_arguments+=("${supplement_target[@]}")
+    feature_roots+=("$supplement_source")
+  done
+  if (( ${#supplement_arguments[@]} > 0 )); then
+    echo "  · $FEATURE_GATED_TESTS_CELL_NAME：不带特性那一趟打了 NOT_RUN_ 的测试函数由这一趟补判，另带上它们所在的测试目标：${supplement_arguments[*]}"
+  fi
   IFS=, read -r -a feature_names <<< "$feature_list"
   for feature_name in "${feature_names[@]}"; do feature_plan_options+=(--feature "singlefs-checker-tier/$feature_name"); done
   plan_skip_arguments=()
@@ -1157,6 +1450,7 @@ run_feature_gated_tests_cell() {
     echo "  ! $FEATURE_GATED_TESTS_CELL_NAME 按条复用算不出（$plan_problem）：这一趟全部现判、一条都不记库"
     ((${#plan_failure[@]})) && { plan_failure_verdict "$FEATURE_GATED_TESTS_CELL_NAME" "${plan_failure[@]}" || feature_plan_red=1; }
   fi
+  crash_point_replay_feature_plan_ok="$feature_plan_ok"   # 出口 4 那几格读这一趟的行时要（文件头「出口 4 那六格」）
   echo "── $FEATURE_GATED_TESTS_CELL_NAME：带特性那一趟（特性从 $tests_directory 下 ${#gated_rows[@]} 个挂特性的测试文件现读）：cargo test --release -p singlefs-checker-tier --features $feature_list --lib ${target_arguments[*]} -- --nocapture${gpu_test_arguments[*]:+ ${gpu_test_arguments[*]}}"
   if [[ "$crash_point_replay_break" == no-feature-pass ]]; then
     : > "$feature_log"
@@ -1200,9 +1494,17 @@ run_feature_gated_tests_cell() {
     fi
   fi
   count_tests_run_by_file "$feature_log" ${1:+"$1"} > "$counts_file"
-  # 键相同而复用的也算跑到（这一组特性下的计划，与不带特性那一趟的计划）：一条一行「文件名<TAB>条数」
-  awk -F'\t' 'NF >= 7 && $2 == "reuse" && $5 ~ /^tests\// { sub(/^tests\//, "", $5); count[$5]++ } END { for (name in count) printf "%s\t%d\n", name, count[name] }' \
-    "$feature_plan_output.kept" "$crash_point_replay_scratch_directory/quick.plan.out" 2>/dev/null > "$counts_file.reused"
+  # 键相同而复用的也算跑到（这一组特性下的计划，与不带特性那一趟的计划）：一条一行「文件名<TAB>条数」。两趟一份库，同一条测试不数两遍：
+  # 这一趟现判（跑了、日志里数过）的，与不带特性那一趟现判、日志也数进来了的，不再按复用数
+  local -a reused_plan_files=("$feature_plan_output.kept")
+  [[ -f "$crash_point_replay_scratch_directory/quick.plan.out" ]] && reused_plan_files+=("$crash_point_replay_scratch_directory/quick.plan.out")
+  awk -F'\t' -v kept="$feature_plan_output.kept" -v plain_counted="${1:+1}" '
+    NF >= 7 && $5 ~ /^tests\// {
+      if ($2 == "reuse") reuse[$1] = $5
+      else if (($2 == "judge" || $2 == "refused") && (FILENAME == kept || plain_counted == 1)) ran[$1] = 1
+    }
+    END { for (name in reuse) if (!(name in ran)) { source = reuse[name]; sub(/^tests\//, "", source); count[source]++ } for (source in count) printf "%s\t%d\n", source, count[source] }' \
+    "${reused_plan_files[@]}" > "$counts_file.reused"
   for row in "${gated_rows[@]}"; do
     IFS=$'\t' read -r file_name file_scope file_features <<< "$row"
     count="$(awk -F'\t' -v name="$file_name" '$1 == name { print $2 }' "$counts_file")"
@@ -1222,11 +1524,18 @@ run_feature_gated_tests_cell() {
       crash_point_replay_report_not_run "GPU 对拍没跑（${gpu_where}；这台机器找不到 GPU 适配器）：${gpu_line}；在有卡的机器上跑这一格补上"
     done < <(gpu_adapter_not_run_lines "$feature_log")
   fi
-  if (( feature_plan_ok && feature_ran )) && [[ "$crash_point_replay_break" != no-feature-pass ]]; then
-    excluded_binaries_of_log "$feature_log" "$crash_point_replay_scratch_directory/features.excluded"
-    record_green_tests "$feature_kind" "$feature_plan_file" "$feature_plan_output" "$feature_log" "$crash_point_replay_scratch_directory/features.excluded" \
-      "$FEATURE_GATED_TESTS_CELL_NAME" || feature_plan_red=1
+  # 逐条认结局与记号（文件头「复用」；特性里有 gpu 时这一趟带 --test-threads 1，记号认作正在跑的那一条），判绿的照键记库
+  local feature_accounting_ok=0 feature_serial=0
+  (( ${#gpu_test_arguments[@]} > 0 )) && feature_serial=1
+  : >"$feature_accounting"
+  if (( feature_ran )) && [[ "$crash_point_replay_break" != no-feature-pass ]] && account_test_results "$feature_log" "$feature_serial" "$feature_accounting"; then
+    feature_accounting_ok=1
   fi
+  if (( feature_plan_ok && feature_ran && feature_accounting_ok )); then
+    record_green_tests "$feature_kind" "$feature_plan_file" "$feature_plan_output" "$feature_accounting" "$FEATURE_GATED_TESTS_CELL_NAME" \
+      "cargo test --release -p singlefs-checker-tier --features $feature_list（带特性那一趟）" || feature_plan_red=1
+  fi
+  supplement_plain_not_run "$feature_plan_output" "$feature_accounting" "$feature_plan_ok"
   if (( feature_plan_red )); then
     echo "  ✗ $FEATURE_GATED_TESTS_CELL_NAME 这一格判红：按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）；带特性那一趟照旧全部现判跑完了"
     echo "     → 怎么办：照那一句的出路修 scripts/gate/admission.py 点名的那一段，再只跑这一格：bash .claude/gate.d/checker-tier-crash-point-replay.sh --check $FEATURE_GATED_TESTS_CELL_NAME；不能复用就判红，不退回全部现判当绿"
@@ -1244,41 +1553,257 @@ run_feature_gated_tests_cell() {
   return 0
 }
 
+# ── 出口 4 那六格（文件头「出口 4 那六格」）─────────
+# 判法在 scripts/crash/crash-flow-coverage.py（覆盖、ignore、0 次、上一次全量）与 scripts/crash/crash-case-check.py（must-red、knobs）；这里只备行、调判法、记结局。
+crash_point_replay_flow_judge="$crash_point_replay_stage_repository/scripts/crash/crash-flow-coverage.py"
+crash_point_replay_flow_records=""            # 这一趟的记录文件（快档在临时目录，--full 在这一趟的日志目录）
+crash_point_replay_flow_records_problem=""    # 记录备不齐（快档那一趟没跑、判红）：非空时覆盖、ignore、0 次三格本次未跑
+crash_point_replay_flow_records_failed=""     # 判法脚本备记录时出错：非空时那三格判红
+crash_point_replay_flow_subset=()             # --full 点了 --item 时是 (--subset)
+crash_point_replay_quick_plan_ok=0
+crash_point_replay_feature_plan_ok=0
+crash_audit_states=()                           # 一格一项「<格名>：绿 / 红 / 本次未跑（为什么）」
+crash_audit_red=()
+
+# collect_flow_pass <种类> <计划输出|-> <日志> <哪一趟>：一趟快档的日志按测试二进制转成记录追加进 crash_point_replay_flow_records
+# （crash-flow-coverage.py collect-quick：整份复用的取回判定库里存着的行，一半复用而库里没有的记 unknown）；判法脚本出错记进 crash_point_replay_flow_records_failed、返回 1
+collect_flow_pass() {
+  local collect_exit
+  if python3 "$crash_point_replay_flow_judge" collect-quick "$ROOT" "$1" "$2" "$3" --library-root "$ROOT" --pass "$4" \
+       >>"$crash_point_replay_flow_records" 2>"$crash_point_replay_flow_records.err"; then collect_exit=0; else collect_exit=$?; fi
+  cat "$crash_point_replay_flow_records.err"
+  if (( collect_exit != 0 )); then
+    crash_point_replay_flow_records_failed="crash-flow-coverage.py collect-quick 退 ${collect_exit}（$4）：$(tail -n 2 "$crash_point_replay_flow_records.err" | tr '\n' ' ' | cut -c1-300)"
+    return 1
+  fi
+  return 0
+}
+
+# prepare_quick_flow_records：快档两趟（crash-case-replay 格与 feature-gated-tests 格）打的覆盖行与计数行转成记录（文件头「出口 4 那六格」）
+prepare_quick_flow_records() {
+  local plain_plan="-" feature_plan="-" feature_log="$crash_point_replay_scratch_directory/quick-singlefs-checker-tier-features.log"
+  crash_point_replay_flow_records="$crash_point_replay_scratch_directory/flow-records.quick"
+  : >"$crash_point_replay_flow_records"
+  [[ -f "$crash_point_replay_flow_judge" ]] || return 0
+  if ! crash_point_replay_runs_cell "$CRASH_CASE_REPLAY_CELL_NAME"; then
+    crash_point_replay_flow_records_problem="这一趟没跑 $CRASH_CASE_REPLAY_CELL_NAME（--check 没点它），快档那一趟的覆盖行与计数行没有；连它一起点：--check $CRASH_CASE_REPLAY_CELL_NAME,$FEATURE_GATED_TESTS_CELL_NAME,<这一格>"
+    return 0
+  fi
+  if (( ! crash_point_replay_cell_green )); then
+    crash_point_replay_flow_records_problem="$CRASH_CASE_REPLAY_CELL_NAME 判红，快档那一趟的行不全"
+    return 0
+  fi
+  (( crash_point_replay_quick_plan_ok )) && plain_plan="$crash_point_replay_scratch_directory/quick.plan.out"
+  collect_flow_pass "$(crash_point_replay_verdict_kind "$crash_point_replay_stage_file_name" "$CRASH_CASE_REPLAY_CELL_NAME")" "$plain_plan" \
+    "$crash_point_replay_scratch_directory/quick-singlefs-checker-tier.log" "不带特性那一趟" || return 0
+  if ! crash_point_replay_runs_cell "$FEATURE_GATED_TESTS_CELL_NAME"; then
+    # 没点带特性那一格：有挂特性的测试文件，它们打的行这一趟没有，记行不全；一份都没有就没缺什么
+    if [[ -n "$(list_feature_gated_test_files crates/singlefs-checker-tier/tests 2>/dev/null)" ]]; then
+      printf 'CRASH_FLOW_RECORD\tunknown\tfeature-gated-tests\t这一趟没跑带特性那一趟（--check 没点 %s），挂特性的测试文件打的行没有\n' "$FEATURE_GATED_TESTS_CELL_NAME" >>"$crash_point_replay_flow_records"
+    fi
+  elif [[ "$feature_cell_outcome" == red ]]; then
+    printf 'CRASH_FLOW_RECORD\tunknown\tfeature-gated-tests\t带特性那一趟判红，挂特性的测试文件打的行不全\n' >>"$crash_point_replay_flow_records"
+  elif [[ -f "$feature_log" ]]; then
+    (( crash_point_replay_feature_plan_ok )) && feature_plan="$crash_point_replay_scratch_directory/features.plan.out.kept"
+    collect_flow_pass "$(crash_point_replay_verdict_kind "$crash_point_replay_stage_file_name" "$FEATURE_GATED_TESTS_CELL_NAME")" "$feature_plan" "$feature_log" "带特性那一趟" || return 0
+  fi
+  # 记录留一份在快档的日志目录（跑完不删）：填两张基准的初值要这一份全部的行（判法只在输出里打头几行候选）
+  [[ -s "$crash_point_replay_flow_records" ]] || return 0
+  if [[ -z "$crash_point_replay_quick_log_directory" ]]; then
+    crash_point_replay_quick_log_directory="$git_common_directory/singlefs-crash-point-replay-logs/quick-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    mkdir -p -- "$crash_point_replay_quick_log_directory" || crash_point_replay_quick_log_directory=""
+  fi
+  if [[ -n "$crash_point_replay_quick_log_directory" ]] && cp -- "$crash_point_replay_flow_records" "$crash_point_replay_quick_log_directory/flow-records.tsv"; then
+    echo "  · 覆盖行与计数行的记录留在 $crash_point_replay_quick_log_directory/flow-records.tsv（填两张基准的初值：python3 scripts/crash/crash-flow-coverage.py baseline <ignored|zero-evaluations> 这一份）"
+    echo "CRASH_FLOW_RECORDS_FILE $crash_point_replay_quick_log_directory/flow-records.tsv"
+  fi
+  return 0
+}
+
+# prepare_full_flow_records：--full 每条判绿的崩溃枚举用例的全量日志转成记录（域 full），没判绿的记 unknown；记录文件放这一趟的日志目录，
+# 打一行 CRASH_FLOW_RECORDS_FILE <路径>（崩溃点重放入口照它并进覆盖表）
+prepare_full_flow_records() {
+  local row key package target function log
+  crash_point_replay_flow_records="$crash_point_replay_log_directory/flow-records.tsv"
+  : >"$crash_point_replay_flow_records"
+  (( ${#crash_point_replay_named_cases[@]} > 0 )) && crash_point_replay_flow_subset=(--subset)
+  [[ -f "$crash_point_replay_flow_judge" ]] || return 0
+  for row in "${crash_case_rows[@]}"; do
+    IFS=$'\t' read -r key package target function <<< "$row"
+    log="$crash_point_replay_log_directory/log.${key#crash-case:}"
+    if crash_point_replay_cell_in "$key" ${green_cases[@]+"${green_cases[@]}"} && [[ -f "$log" ]]; then
+      if ! python3 "$crash_point_replay_flow_judge" extract --source "$target" --domain full "$log" >>"$crash_point_replay_flow_records" 2>"$crash_point_replay_flow_records.err"; then
+        crash_point_replay_flow_records_failed="crash-flow-coverage.py extract 读 $log 出错：$(tail -n 2 "$crash_point_replay_flow_records.err" | tr '\n' ' ' | cut -c1-300)"
+        return 0
+      fi
+    else
+      printf 'CRASH_FLOW_RECORD\tunknown\t%s\t%s 这一趟没判绿（%s），它打的行不算\n' "$target" "$key" "$function" >>"$crash_point_replay_flow_records"
+    fi
+  done
+  echo "  · 覆盖行与计数行：$(grep -c . "$crash_point_replay_flow_records") 条记录，记在 $crash_point_replay_flow_records"
+  echo "CRASH_FLOW_RECORDS_FILE $crash_point_replay_flow_records"
+}
+
+# crash_audit_last_full_command <域>：上一次全量那一格要起的判法放进 crash_audit_command，起不了的原因放进 crash_audit_not_run_reason（文件头「出口 4 那六格」）
+crash_audit_last_full_command() {
+  local reader_output="$crash_point_replay_scratch_directory/crash-library-reader.out" reader_exit
+  local subcommand="${GATE_CRASH_POINT_REPLAY_LAST_FULL_SUBCOMMAND:-last-full}"
+  if [[ "$1" == full ]] && (( ${#crash_point_replay_named_cases[@]} > 0 )); then
+    crash_audit_not_run_reason="点了 --item，只跑了几条用例：上一次全量的标记不在这一趟报"
+    return 0
+  fi
+  if [[ "$crash_point_replay_sample_mode" == 1 ]]; then
+    if [[ ! -f "$PWD/.crash-point-replay-sample-tools/crash-library-reader.out" ]]; then
+      crash_audit_not_run_reason="样本档没放读库程序的输出 .crash-point-replay-sample-tools/crash-library-reader.out"
+      return 0
+    fi
+    cp -- "$PWD/.crash-point-replay-sample-tools/crash-library-reader.out" "$reader_output"
+  else
+    if ${crash_point_replay_thread_prefix[@]+"${crash_point_replay_thread_prefix[@]}"} cargo run --release --quiet --offline -p singlefs-checker-tier --bin crash_library_reader -- "$subcommand" \
+         >"$reader_output" 2>&1; then reader_exit=0; else reader_exit=$?; fi
+    if (( reader_exit == 2 )); then
+      crash_audit_not_run_reason="读库程序 crash_library_reader 不认子命令 $subcommand（退 2）：读每块判定日期与跑法的子命令还没接上"
+      return 0
+    fi
+    if (( reader_exit != 0 )); then
+      crash_audit_not_run_reason="读库程序 crash_library_reader $subcommand 退 ${reader_exit}（$(tail -n 2 "$reader_output" | tr '\n' ' ' | cut -c1-200)）"
+      return 0
+    fi
+  fi
+  crash_audit_command=(python3 "$crash_point_replay_flow_judge" last-full "$reader_output")
+  [[ "$1" == full ]] && crash_audit_command+=(--after-full)
+  return 0
+}
+
+# run_crash_audit_cell <格名> <域：quick|full>：跑出口 4 的一格，判法的输出原样转打；结局并进 crash_audit_states，红的进 crash_audit_red，
+# 本次未跑的往 $GATE_NOT_RUN_FILE 记一行。判法退 0 绿、1 红、77 本次未跑，别的退出码当判法出错、判红
+run_crash_audit_cell() {
+  local cell="$1" domain="$2" cell_exit reason output="$crash_point_replay_scratch_directory/crash-audit.$1.out"
+  crash_audit_command=()
+  crash_audit_not_run_reason=""
+  if [[ "$cell" == crash-case-must-red || "$cell" == crash-knobs ]]; then echo "── $cell（只读树）"; else echo "── $cell（${domain} 域）"; fi
+  case "$cell" in
+    crash-flow-coverage|crash-ignored-nodes|invariant-zero-evaluations)
+      if [[ ! -f "$crash_point_replay_flow_judge" ]]; then
+        crash_audit_not_run_reason="判法脚本 $crash_point_replay_flow_judge 不在（这一份阶段被拷到了不带 scripts/ 的树里）"
+      elif [[ -n "$crash_point_replay_flow_records_failed" ]]; then
+        echo "  ✗ $cell：$crash_point_replay_flow_records_failed"
+        echo "     → 怎么办：照那一句修 scripts/crash/crash-flow-coverage.py（单跑它的 --selftest 看是哪一格），再连快档那一格一起重跑：--check $CRASH_CASE_REPLAY_CELL_NAME,$cell"
+        crash_audit_states+=("$cell：红"); crash_audit_red+=("$cell")
+        return 0
+      elif [[ -n "$crash_point_replay_flow_records_problem" ]]; then
+        crash_audit_not_run_reason="$crash_point_replay_flow_records_problem"
+      else
+        local subcommand="coverage"
+        [[ "$cell" == crash-ignored-nodes ]] && subcommand="ignored"
+        [[ "$cell" == invariant-zero-evaluations ]] && subcommand="zero-evaluations"
+        crash_audit_command=(python3 "$crash_point_replay_flow_judge" check "$subcommand" "$ROOT" --domain "$domain" ${crash_point_replay_flow_subset[@]+"${crash_point_replay_flow_subset[@]}"} "$crash_point_replay_flow_records")
+      fi ;;
+    crash-case-must-red|crash-knobs)
+      if [[ ! -f "$crash_point_replay_static_judge" ]]; then
+        crash_audit_not_run_reason="判法脚本 $crash_point_replay_static_judge 不在（这一份阶段被拷到了不带 scripts/ 的树里）"
+      else
+        local item="must-red"
+        [[ "$cell" == crash-knobs ]] && item="knobs"
+        crash_audit_command=(python3 "$crash_point_replay_static_judge" --only "$item" "$ROOT")
+      fi ;;
+    last-full-judgement)
+      if [[ ! -f "$crash_point_replay_flow_judge" ]]; then
+        crash_audit_not_run_reason="判法脚本 $crash_point_replay_flow_judge 不在（这一份阶段被拷到了不带 scripts/ 的树里）"
+      else
+        crash_audit_last_full_command "$domain"
+      fi ;;
+  esac
+  if (( ${#crash_audit_command[@]} > 0 )); then
+    if "${crash_audit_command[@]}" >"$output" 2>&1; then cell_exit=0; else cell_exit=$?; fi
+    cat "$output"
+    case "$cell_exit" in
+      0) crash_audit_states+=("$cell：绿"); return 0 ;;
+      77) crash_audit_not_run_reason="$(grep -m 1 '本次未跑' "$output" | sed 's/^[[:space:]]*! 本次未跑（这不是通过）：//' | python3 -c 'import sys; print(sys.stdin.read().strip()[:120])')"
+          [[ -n "$crash_audit_not_run_reason" ]] || crash_audit_not_run_reason="判法退 77（无对象可判）" ;;
+      1) crash_audit_states+=("$cell：红"); crash_audit_red+=("$cell"); return 0 ;;
+      *)
+        echo "  ✗ $cell：判法 ${crash_audit_command[*]:0:3} 退 ${cell_exit}（不是 0、1、77：判法自己出错，输出在上面）"
+        echo "     → 怎么办：照上面的报错修那份判法脚本，单跑同一条命令到它退 0、1 或 77，再只重跑这一格"
+        crash_audit_states+=("$cell：红"); crash_audit_red+=("$cell"); return 0 ;;
+    esac
+  fi
+  reason="${crash_audit_not_run_reason:-没说为什么}"
+  [[ -s "$output" ]] || echo "  ! 本次未跑（这不是通过）：$cell：$reason"
+  crash_audit_states+=("$cell：本次未跑（${reason}）")
+  if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "checker-tier-crash-point-replay.sh 的 $cell 格本次未跑：$reason" >> "$GATE_NOT_RUN_FILE"; fi
+  return 0
+}
+
 # ── 快档：crash-case-replay 格与 feature-gated-tests 格 ─────────
 if [[ "$crash_point_replay_tier" == quick ]]; then
   quick_red_cells=()
   quick_cell_states=()
   quick_tier_log=""
+  crash_point_replay_cell_green=0
+  feature_cell_outcome=""
   if crash_point_replay_runs_cell "$CRASH_CASE_REPLAY_CELL_NAME"; then
     quick_tier_report=""
     quick_tier_plan_red=0
     if run_checker_quick_tier && check_crash_case_blocks && quick_tier_reuse_held; then
       (( quick_tier_ran )) && quick_tier_log="$crash_point_replay_scratch_directory/quick-singlefs-checker-tier.log"
-      # 不带特性那一趟用例报的本次未跑（文件头「多机配置开了 GPU」）：逐格汇总里点出来，不算全绿
-      if (( crash_point_replay_plain_not_run_total > 0 )); then
-        if [[ "$crash_point_replay_cell_state" == 绿 ]]; then crash_point_replay_cell_state="不带特性那一趟有 ${crash_point_replay_plain_not_run_total} 处本次未跑"
-        else crash_point_replay_cell_state+="；不带特性那一趟有 ${crash_point_replay_plain_not_run_total} 处本次未跑"; fi
-      fi
-      quick_cell_states+=("$CRASH_CASE_REPLAY_CELL_NAME：$crash_point_replay_cell_state")
+      crash_point_replay_cell_green=1
     else
+      # 这一格红了：不带特性那一趟的本次未跑不补判、不报（红句已经点了出路）
+      : >"$crash_point_replay_plain_not_run_file"
       quick_red_cells+=("$CRASH_CASE_REPLAY_CELL_NAME")
-      quick_cell_states+=("$CRASH_CASE_REPLAY_CELL_NAME：红")
     fi
   fi
   if crash_point_replay_runs_cell "$FEATURE_GATED_TESTS_CELL_NAME"; then
     if run_feature_gated_tests_cell "$quick_tier_log"; then
-      quick_cell_states+=("$FEATURE_GATED_TESTS_CELL_NAME：$feature_cell_state")
+      feature_cell_outcome="ran"
     else
+      feature_cell_outcome="red"
       quick_red_cells+=("$FEATURE_GATED_TESTS_CELL_NAME")
-      quick_cell_states+=("$FEATURE_GATED_TESTS_CELL_NAME：红")
     fi
   fi
+  if crash_point_replay_runs_cell "$CRASH_CASE_REPLAY_CELL_NAME"; then
+    if (( crash_point_replay_cell_green )); then
+      # 不带特性那一趟用例报的本次未跑（文件头「多机配置开了 GPU」）：带特性那一趟补判之后仍没判到的逐条报，逐格汇总里点出来，不算全绿
+      report_plain_pass_not_run "$feature_cell_outcome"
+      if (( crash_point_replay_plain_not_run_after > 0 )); then
+        if [[ "$crash_point_replay_cell_state" == 绿 ]]; then crash_point_replay_cell_state="不带特性那一趟有 ${crash_point_replay_plain_not_run_after} 处本次未跑"
+        else crash_point_replay_cell_state+="；不带特性那一趟有 ${crash_point_replay_plain_not_run_after} 处本次未跑"; fi
+      fi
+      quick_cell_states+=("$CRASH_CASE_REPLAY_CELL_NAME：$crash_point_replay_cell_state")
+    else
+      quick_cell_states+=("$CRASH_CASE_REPLAY_CELL_NAME：红")
+    fi
+  fi
+  if [[ "$feature_cell_outcome" == ran ]]; then
+    quick_cell_states+=("$FEATURE_GATED_TESTS_CELL_NAME：$feature_cell_state")
+  elif [[ "$feature_cell_outcome" == red ]]; then
+    quick_cell_states+=("$FEATURE_GATED_TESTS_CELL_NAME：红")
+  fi
+  # 出口 4 那六格（文件头「出口 4 那六格」）：覆盖、ignore、0 次三格读上面两趟的行；点了 --check 的只跑点名的
+  quick_flow_cells_wanted=0
+  for crash_audit_cell in "${CRASH_AUDIT_FLOW_CELLS[@]}"; do crash_point_replay_runs_cell "$crash_audit_cell" && quick_flow_cells_wanted=1; done
+  (( quick_flow_cells_wanted )) && prepare_quick_flow_records
+  for crash_audit_cell in "${CRASH_AUDIT_CELL_NAMES[@]}"; do
+    if crash_point_replay_runs_cell "$crash_audit_cell"; then run_crash_audit_cell "$crash_audit_cell" quick; fi
+  done
+  quick_cell_states+=(${crash_audit_states[@]+"${crash_audit_states[@]}"})
+  [[ "$crash_point_replay_break" == crash-audit-red-ignored ]] && crash_audit_red=()   # 弄坏开关：出口 4 那几格红了也不算进整道
+  quick_red_cells+=(${crash_audit_red[@]+"${crash_audit_red[@]}"})
   quick_cell_summary=""
   for quick_cell_state in "${quick_cell_states[@]}"; do quick_cell_summary+="${quick_cell_summary:+；}${quick_cell_state}"; done
   echo "  · 逐格：${quick_cell_summary}"
   if (( ${#quick_red_cells[@]} > 0 )); then
+    # 覆盖、ignore、0 次三格读快档那一趟的行：只重跑它们时连 crash-case-replay 与 feature-gated-tests 一起点
+    quick_rerun_cells=("${quick_red_cells[@]}")
+    for crash_audit_cell in "${CRASH_AUDIT_FLOW_CELLS[@]}"; do
+      if crash_point_replay_cell_in "$crash_audit_cell" "${quick_red_cells[@]}" && ! crash_point_replay_cell_in "$CRASH_CASE_REPLAY_CELL_NAME" "${quick_rerun_cells[@]}"; then
+        crash_point_replay_cell_in "$FEATURE_GATED_TESTS_CELL_NAME" "${quick_rerun_cells[@]}" || quick_rerun_cells=("$FEATURE_GATED_TESTS_CELL_NAME" "${quick_rerun_cells[@]}")
+        quick_rerun_cells=("$CRASH_CASE_REPLAY_CELL_NAME" "${quick_rerun_cells[@]}")
+      fi
+    done
     echo "  ✗ 快档有 ${#quick_red_cells[@]} 格判红：${quick_red_cells[*]}（各自的出路在上面）"
-    echo "     → 怎么办：照上面那几格各自的「→ 怎么办」改完，只重跑红的格：bash .claude/gate.d/checker-tier-crash-point-replay.sh --check $(IFS=,; printf '%s' "${quick_red_cells[*]}") [项目根]"
+    echo "     → 怎么办：照上面那几格各自的「→ 怎么办」改完，只重跑红的格：bash .claude/gate.d/checker-tier-crash-point-replay.sh --check $(IFS=,; printf '%s' "${quick_rerun_cells[*]}") [项目根]"
     exit 1
   fi
   if [[ "$crash_point_replay_sample_mode" == 1 ]]; then
@@ -1389,10 +1914,25 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   fi
   blocks_text="块判定那一行没要（crates 侧还没接上）"
   if (( blocks_supported )); then
-    if blocks_output="$(python3 "$crash_point_replay_admission_module" crash-case-blocks "$ROOT" "$case_log")"; then blocks_exit=0; else blocks_exit=$?; fi
+    # 登记了 red-blocks=judged-by-test 的用例与快档同一套判法（文件头「复用」）：用例的判定是 cargo test 的退出码（上面已判过，退非 0 早已判红），
+    # 块那一行只核在不在、数对不对得上（crash-case-blocks --ran），红块不判；没登记的照旧有红判红
+    blocks_options=()
+    if crash_case_judged_by_test "$case_key"; then blocks_judged_exit=0; else blocks_judged_exit=$?; fi
+    [[ "$crash_point_replay_break" == full-ran-for-every-case ]] && blocks_judged_exit=0   # 弄坏开关：--full 对每条用例都只核数、不判红块
+    if (( blocks_judged_exit == 2 )); then
+      echo "  ✗ $case_key：判不出它带没带 red-blocks=judged-by-test（${judged_by_test_problem}），块判定那一行没法定判法"
+      echo "     → 怎么办：单跑 python3 scripts/gate/admission.py crash-case-judged-by-test <根> $case_key，照它报的改 .claude/gate.d/stage-inputs.tsv 里那一行"
+      red_cases+=("$case_key")
+      continue
+    fi
+    if (( blocks_judged_exit == 0 )); then
+      blocks_options=(--ran)
+      echo "    $case_key：登记了 red-blocks=judged-by-test，按 cargo test 的退出码判（已退 0），块那一行只核在不在、数对不对得上，红块不判"
+    fi
+    if blocks_output="$(python3 "$crash_point_replay_admission_module" crash-case-blocks "$ROOT" "$case_log" ${blocks_options[@]+"${blocks_options[@]}"})"; then blocks_exit=0; else blocks_exit=$?; fi
     if (( blocks_exit != 0 )); then
-      echo "  ✗ $case_key 的块判定那一行不对（crash-case-blocks 退 $blocks_exit：$blocks_output）"
-      echo "     → 怎么办：退 1 是有块判红：看全量日志里那几块的发现；退 4 是用例没打恰好一行 CRASH_CASE_BLOCKS、或 blocks 不等于 reused + fresh（接口在 scripts/gate/admission.py 文件头）。"
+      echo "  ✗ $case_key 的块判定那一行不对（crash-case-blocks${blocks_options[*]:+ ${blocks_options[*]}} 退 $blocks_exit：$blocks_output）"
+      echo "     → 怎么办：退 1 是有块判红（没登记 red-blocks=judged-by-test 的用例）：看全量日志里那几块的发现；退 4 是用例没打恰好一行 CRASH_CASE_BLOCKS、或 blocks 不等于 reused + fresh + refused（接口在 scripts/gate/admission.py 文件头）。"
       red_cases+=("$case_key")
       continue
     fi
@@ -1412,9 +1952,25 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   green_cases+=("$case_key")
 done
 full_finished_date="$(TZ=Asia/Tokyo date +%F)"
+# 出口 4 那几格的全量域（文件头「出口 4 那六格」）：覆盖、ignore、0 次读这一趟判绿的用例的全量日志，上一次全量那一格读库；只在快档跑的三格这里不跑
+full_flow_cells_wanted=0
+for crash_audit_cell in "${CRASH_AUDIT_FLOW_CELLS[@]}"; do crash_point_replay_runs_cell "$crash_audit_cell" && full_flow_cells_wanted=1; done
+(( full_flow_cells_wanted )) && prepare_full_flow_records
+for crash_audit_cell in "${CRASH_AUDIT_CELL_NAMES[@]}"; do
+  crash_point_replay_cell_in "$crash_audit_cell" "${QUICK_ONLY_CELLS[@]}" && continue
+  if crash_point_replay_runs_cell "$crash_audit_cell"; then run_crash_audit_cell "$crash_audit_cell" full; fi
+done
+if (( ${#crash_audit_states[@]} > 0 )); then
+  echo "  · 逐格（全量域；旋钮、必红世界、带特性那一格只在快档跑）：$(IFS='；'; printf '%s' "${crash_audit_states[*]}")"
+fi
 if (( ${#red_cases[@]} > 0 )); then
   echo "  ✗ --full 有 ${#red_cases[@]} 条崩溃枚举用例判红：${red_cases[*]}（这一趟判绿 ${#green_cases[@]} 条，其中全部块复用 ${#reused_cases[@]} 条；开跑 ${full_started_date}，跑完 ${full_finished_date}）"
   echo "     → 怎么办：逐条照它自己那一句「→ 怎么办」改；改完暂存，再在 HEAD + 暂存区的 worktree 里跑 --full（判过的块照键复用，只判改到的块）。"
+  exit 1
+fi
+if (( ${#crash_audit_red[@]} > 0 )) && [[ "$crash_point_replay_break" != crash-audit-red-ignored ]]; then
+  echo "  ✗ --full 的 ${#crash_case_rows[@]} 条崩溃枚举用例都判绿，出口 4 有 ${#crash_audit_red[@]} 格判红：${crash_audit_red[*]}（各自的出路在上面）"
+  echo "     → 怎么办：照那几格各自的「→ 怎么办」改完，在 HEAD + 暂存区的 worktree 里只重跑：bash <worktree>/.claude/gate.d/checker-tier-crash-point-replay.sh --full --check $CRASH_CASE_REPLAY_CELL_NAME,$(IFS=,; printf '%s' "${crash_audit_red[*]}") <worktree>"
   exit 1
 fi
 # 全部判绿：日志目录里留一份 all-green（只记这一趟绿过，apply-writer-patch.py 数「上次崩溃验证全绿以来打了几个补丁」用；不是复用的标记）

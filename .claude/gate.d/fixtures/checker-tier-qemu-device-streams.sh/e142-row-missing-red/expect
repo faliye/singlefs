@@ -1,5 +1,0 @@
-exit=1
-want=scripts/experiments/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 0 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）
-want=怎么办：看 scripts/experiments/replay.sh 里 E142|@driver_e142| 开头的行：留一行
-want=device-streams：红（退出 1）
-want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

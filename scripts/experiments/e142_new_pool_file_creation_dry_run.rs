@@ -304,14 +304,19 @@ const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
 /// 与单测用，不再由任何写路径写出。位图小端、位 0 是第一个字节的最低位（D22 已定项 13）。
 const INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT: u8 = 0x01;
 /// D15（格式冻结政策） 已定项 4 登记表位 1（2026-09-26 用户定案）：第一条纯 SSD 布局线（系统配置带回退
-/// 下界 F、根记录带卸载记号、没有回退见证与回退行）。写路径写出的布局身份位，也是读者唯一认识的位。
+/// 下界 F、根记录带卸载记号、没有回退见证与回退行）。写路径恒写的布局身份位，读者要求它在。
 const INCOMPAT_LAYOUT_IDENTITY_BIT: u8 = 0x02;
+/// incompat 位 2（用户 2026-10-17 定新开一位，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节）：
+/// inode 记录带截断字段（偏移 120 起）。mkfs 起就置上；读者带不带都收，不带的池里截断字段必须全零。
+const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x04;
+/// mkfs 与之后每一次写系统配置写进 incompat 位图第一个字节的值：位 1 加位 2（0x06）。
+const WRITTEN_FIRST_INCOMPAT_BYTE: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;
 /// 三张位图各 32 字节（256 位）紧跟 magic 4 + 版本 2，incompat 在前、compat_ro 居中、compat 在后（D15 已定项 1）。
 const SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET: usize = 4 + 2;
 const FEATURE_BITMAP_BYTES: usize = 32;
-/// 读者认识的全部 incompat 位；多出任何一位就是「不认识不许挂」（fs-design 格式层判据）。
+/// 读者认识的全部 incompat 位；多出任何一位就是「不认识不许挂」（fs-design 格式层判据）。第一个字节收 0x02 与 0x06 两种。
 /// 位 0 退役之后不再列进这里：见到位 0 的读者按「不认识的位」拒（`.claude/kb/feature-bits.md` 第 15 行）。
-const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT;
+const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;
 const JOURNAL_MAGIC: [u8; 4] = *b"SFSJ";
 const FORMAT_VERSION: u16 = 1;
 
@@ -1473,7 +1478,7 @@ impl SystemConfiguration {
         let mut writer = ByteWriter::new(SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
         writer.put(&SYSTEM_CONFIGURATION_MAGIC);
         writer.put_u16(FORMAT_VERSION);
-        writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT); // feature bits：incompat 位 1 = 布局身份（D15 已定项 4，2026-09-26 用户定案；位 0 退役）
+        writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE); // feature bits：incompat 位 1 = 布局身份（D15 已定项 4，2026-09-26 用户定案；位 0 退役）、位 2 = inode 记录带截断字段（2026-10-17 用户定案）
         writer.skip(95); // 其余 incompat 位与 compat_ro / compat 两张位图全 0
         writer.assert_position(SYSTEM_CONFIGURATION_FSID_OFFSET as u64, "系统配置 fsid");
         writer.put(&self.fsid);
@@ -1573,7 +1578,7 @@ impl SystemConfiguration {
 }
 
 /// D15 已定项 4 与 fs-design「格式层的让非法状态无法表示」：incompat 位图里有读者不认识的位、
-/// 或第一条 SSD 线那一位没置（没有布局身份），都拒绝挂载；compat_ro / compat 两张位图不认识随便，读者不看。
+/// 或第一条 SSD 线那一位没置（没有布局身份），都拒绝挂载；位 2 带不带都收；compat_ro / compat 两张位图不认识随便，读者不看。
 fn incompat_bits_are_mountable(slot: &[u8]) -> bool {
     let incompat = &slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
     let unknown_in_first_byte = incompat[0] & !SUPPORTED_INCOMPAT_BITS;
@@ -6093,7 +6098,7 @@ fn stream_section(parameters: &PoolParameters, file_bytes: &[u8]) -> StreamSecti
     let mut system_configuration_fields_ok = true;
     for device in parameters.devices() {
         let slot_bytes = full.read(device, DeviceOffset(window_system_configuration_slot_offset), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-        let incompat_byte0_ok = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] == INCOMPAT_LAYOUT_IDENTITY_BIT;
+        let incompat_byte0_ok = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] == WRITTEN_FIRST_INCOMPAT_BYTE;
         let feature_bits_rest_zero = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0);
         let rollback_floor_hex = hex_bytes(&slot_bytes[SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET..SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET + 8]);
         let padding_after_489_zero = slot_bytes[SYSTEM_CONFIGURATION_BYTES as usize..].iter().all(|byte| *byte == 0);
@@ -8107,7 +8112,7 @@ fn main() {
     let mut window_system_configuration_clause_fields_ok = true;
     for device in parameters.devices() {
         let slot_bytes = recording.pool.read(device, DeviceOffset(window_system_configuration_slot_offset), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-        let incompat_byte0_ok = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] == INCOMPAT_LAYOUT_IDENTITY_BIT;
+        let incompat_byte0_ok = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] == WRITTEN_FIRST_INCOMPAT_BYTE;
         let feature_bits_rest_zero = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES]
             .iter()
             .all(|byte| *byte == 0);
@@ -8552,10 +8557,10 @@ mod tests {
         let parameters = PoolParameters::settled_two_devices();
         let (recording, _) = mkfs(&parameters);
         let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-        // 2026-09-26 用户定案：布局身份换到位 1，位 0 退役（D15 已定项 4）。
-        assert_eq!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET], INCOMPAT_LAYOUT_IDENTITY_BIT, "mkfs 起 incompat 位 1 置 1（D15 已定项 4，2026-09-26 用户定案）");
+        // 2026-09-26 用户定案：布局身份换到位 1，位 0 退役（D15 已定项 4）；2026-10-17 用户定案：新开位 2（inode 记录带截断字段），mkfs 起就置上。
+        assert_eq!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET], 0x06, "mkfs 起 incompat 位 1 与位 2 都置 1（判决 m4-trunc-r2 第六节）");
         assert!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0), "其余 95 字节全 0");
-        assert!(SystemConfiguration::parse_slot(&slot).is_some(), "原样（byte0 = 0x02）可挂（A28）");
+        assert!(SystemConfiguration::parse_slot(&slot).is_some(), "原样（byte0 = 0x06）可挂");
         let reseal = |mut bytes: Vec<u8>, offset: usize, value: u8| {
             bytes[offset] = value;
             let digest = wide_checksum_with_field_zeroed(&bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
@@ -8563,11 +8568,15 @@ mod tests {
             bytes
         };
         assert_eq!(SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 6);
-        // A28 四档拒挂：0x00（没有布局身份）、0x01（只有退役位）、0x03（退役位加位 1）、0x06（位 2 未分配）。
+        // 不带位 2 的池（0x02，截断字段之前的旧镜像）照样挂。
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x02)).is_some(), "只带位 1、不带位 2：可挂");
+        // 拒挂六档：0x00（没有布局身份）、0x01（只有退役位）、0x03（退役位加位 1）、0x04（只有位 2、没有布局身份）、0x07（退役位加位 1、位 2）、0x0e（位 1、位 2 加未分配的位 3）。
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x00)).is_none(), "没有布局身份：拒绝");
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT)).is_none(), "只有退役的位 0：位 0 退役之后一律拒（.claude/kb/feature-bits.md 第 15 行）");
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x03)).is_none(), "退役的位 0 加布局身份位 1：位 0 还在，照样拒");
-        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x06)).is_none(), "位 1 加未分配的位 2：不认识的位拒");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x04)).is_none(), "只有位 2、没有布局身份：拒绝");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x07)).is_none(), "退役的位 0 加位 1、位 2：位 0 还在，照样拒");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x0e)).is_none(), "位 1、位 2 加未分配的位 3：不认识的位拒");
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES - 1, 0x80)).is_none(), "incompat 位 255 没登记：不认识不许挂");
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat_ro 位不认识只读挂，读者照样解析");
         assert!(SystemConfiguration::parse_slot(&reseal(slot, SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 2 * FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat 位不认识随便");

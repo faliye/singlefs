@@ -1,0 +1,2 @@
+# 补判：多机配置开了 GPU，没写 cfg 的用例在不带特性那一趟打 NOT_RUN_，带特性那一趟另带它的测试目标、跑到它判绿记库，不报本次未跑，样本档快档判绿退 3（expect 里写了按设计不绿的理由），判的是带特性那一格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+feature-gated-tests

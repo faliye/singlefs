@@ -3,3 +3,5 @@
 # 登记一条，等于承认「这个格式常量今天 checker 判不了」，并把它挂在一条有人排期的账上；
 # checker 跟上之后删掉这一行——这张表只缩不涨。
 # 空表是允许的：没有滞后就一行都不该有。
+LOGGED_OPERATIONS_VALUE_BYTES	C364	checker 不按名字判 logged_operations 条目的值宽 34：走读只按条目宽 LOGGED_OPERATIONS_ENTRY_BYTES（44）与 key 宽 LOGGED_OPERATIONS_KEY_BYTES（10）切条目，值宽变了而条目宽没跟着改时它不红
+LOGGED_OPERATIONS_ENTRIES_PER_NODE	C364	checker 源码里不引这个常量（一个 logged_operations 叶节点装 369 条）：这一格变了它不会跟着红

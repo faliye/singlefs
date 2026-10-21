@@ -1,0 +1,2 @@
+# 样本的变异表（crash-case-check.py --only must-red 读它：cargo test 的参数那一列带 -p <包> --test <测试目标> 的行算点名那个测试目标）
+样本改坏一处	crates/singlefs-checker-tier/src/lib.rs	pub fn one() -> u32 { 1 }	pub fn one() -> u32 { 2 }	-p singlefs-checker-tier --test plain_stream -- plain_stream_quick --exact	plain_stream_quick

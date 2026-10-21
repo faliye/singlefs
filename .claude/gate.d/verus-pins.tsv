@@ -24,8 +24,9 @@ package	verus_syn	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b
 package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/prettyplease	0052db78e25abd4a063ac154bfb8e616aa017725154a3dba5d6e9816551f8f97
 # 核是单独的 crate singlefs-replay-prefix（只依赖 vstd），核就是它的 src/lib.rs。56 是第 10 批加择根核、扫环核与合判推论合入那一版的判定行
 # （主 agent 合入后在 /tmp/claude-1000/m3-verus-rows-10-3/rows.out 现跑：Verus 0.2026.09.20 --no-cheating --rlimit 10，56 verified, 0 errors）；加减了证明照合入那一版的判定行改这个数。
-crate	crates/singlefs-replay-prefix	56
+crate	crates/singlefs-replay-prefix	78
 kernel	crates/singlefs-replay-prefix/src/lib.rs
+kernel	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
 must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
 # rlimit 取 10，就是 Verus 0.2026.09.20 不给 --rlimit 时的默认值：今天的核与必红世界表都是在默认值上验的（实现员 4-1 的报告 /tmp/claude-1000/m3-verus-core-4-1/report.md
 # 第 62 行起的命令不带 --rlimit；同一份第 105 行：主循环 --rlimit 5 验得过、3 验不过），10 是验得过的最小值 5 的两倍，写死之后不随 Verus 改默认值漂。

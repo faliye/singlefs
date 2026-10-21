@@ -26,6 +26,15 @@ checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把
 每条分项的进度取它索引行末尾的规范标记 `**进度：已实现 / 未实现 / 无对象。**`，与 `**状态：…。**` 并排；
 缺标记、或一行写了两个不同的进度，生成器报错退出——索引页上没有「漏判」这一档。
 分项清单里每条写成 `—— 已定 · 已实现`。
+
+**只读中文那一份**：decisions/ 下的 `<名>.en.md`、`<名>.ja.md` 是译文，不进清单（见 decision_body_files()）。
+
+自证：门禁 doc-decisions 的样本 decision-items-sync-translation-green（decisions/ 下放着英语与日语译文，首行不是 `## D<n> 简称 —— 状态`）
+走本脚本，要求照常出清单、不报首行读不出。
+
+弄坏开关（只给样本自证证红用，设进环境）：
+  GEN_DECISION_ITEMS_BREAK=read-translations  decision_body_files() 把译文也当正文读（改前的 glob）
+      decision-items-sync-translation-green（期望退出 0，实测 1：生成器报「首行读不出」）
 """
 import os, re, glob, sys
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -33,6 +42,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from project_preflight import preflight  # noqa: E402
 preflight(__file__)
+TRANSLATION_SUFFIX = re.compile(r'\.[a-z]{2}\.md$')
+BROKEN = os.environ.get('GEN_DECISION_ITEMS_BREAK', '')
 
 def clip(text, n):
     """截到 n 个字符，**但不许留下没闭合的括注**。
@@ -160,11 +171,21 @@ def items_of(body, where):
     return res
 
 
+def decision_body_files():
+    """decisions/ 下的决策正文，只取中文那一份。`<名>.en.md`、`<名>.ja.md` 是译文（登记在 .claude/trilingual-documents，
+    规矩在 .claude/skills/trilingual/SKILL.md），首行与分项都是译文的写法，当正文读会报首行读不出、或把同一条决策数两遍。
+    判法与 .claude/gate.d/lib-trilingual.py 的 LANGUAGE_SUFFIXED 同口径：带两个小写字母语言后缀的 .md 不是中文那一份。"""
+    found = sorted(glob.glob('.claude/kb/decisions/*.md'))
+    if BROKEN == 'read-translations':   # 弄坏开关：译文也当正文读（改前的样子）
+        return found
+    return [f for f in found if not TRANSLATION_SUFFIX.search(os.path.basename(f))]
+
+
 # `--status-cells`：只打印决策索引表「状态」列该写的那格，一行一条决策。
 cells_only = '--status-cells' in sys.argv[1:]
 
 lines, cells = [], []
-for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
+for f in decision_body_files():
     s = open(f, encoding='utf-8').read()
     title = s.split('\n', 1)[0]
     # 破折号前有没有空格两种都有（D14 没有），不能只认一种
@@ -175,7 +196,7 @@ for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
         raise SystemExit(
             f"  ✗ {f} 首行读不出 `## D<n> 简称 —— 状态`：{title[:40]!r}\n"
             f"     → 把首行写成 `## D3 空间分配 —— 半定（…）`，首行之前不许有空行或 BOM；"
-            f"decisions/ 下只放决策正文")
+            f"decisions/ 下除译文（<名>.en.md、<名>.ja.md）外只放决策正文")
     num, name, status = mm.group(1), mm.group(2).strip(), mm.group(3).strip()
     body = s.split('\n## 历史版本')[0]
     its = items_of(body, f"{f}（{num}）")

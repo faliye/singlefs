@@ -20,6 +20,8 @@
 #   带进单元的环境：调用方的 SINGLEFS_HEAVY_TESTS、PATH、HOME、CARGO_HOME、RUSTUP_HOME（设了的才带，逐个 --setenv=名=值），工作目录是调用方的当前目录。
 #   别的变量不带：单元里是用户级 systemd 给的那一份环境（systemctl --user show-environment）加上这几样；要别的，写成 -- env 名=值 <命令>。
 #   TMPDIR 不带：会话的临时目录随会话清掉，单元里落回 /tmp。
+#   另设 SINGLEFS_SERIAL_DECLARATIONS=<登记目录>/serial-declarations：命令里的程序当场往它写串行段的声明（写法在 scripts/hosts/core_usage.py 文件头「声明」），
+#   watch 判在用核数时读它。
 #   命令经 env 起：-- 之后开头的 名=值 是给命令设的变量（与在 shell 里写在命令前一样）。名字要合 shell 变量名的写法（字母、数字、下划线，不以数字起头）：
 #   开头那一串带 = 的词里有一个名字不合写法（a-b=1、--force=1、1=1、a.b=1），start 拒、退 2、什么都不起——env 照样把它当赋值、跑后面那条，
 #   两道闸切词时却把它当命令词、看不到后面那条。判的是 preflight 摘掉整词 --force 之后、start 真收到的参数。
@@ -81,6 +83,10 @@
 #   收到 TERM / INT / HUP（会话的后台时限到点、任务被停）先打最后一次清单（「还在跑」那几条就是还在跑、没结束的脚本），再退 143 / 130 / 129。
 #   一轮轮列清单的是 watch 起的子进程，信号由 watch 进程在 wait 里接：记下信号、停子进程、等它退，再打最后一次清单（detached_run_watch 里的说明）。
 #   它只读 systemctl --user show / list-units 与登记，不停、不给任何单元或命令发信号（只停它自己起的那一个 sleep）；被 KILL 时最后那一次清单打不出来，定时那几次照打。
+#   在用核数：每一轮清单之后，给还在跑的每条登记跑一次 scripts/hosts/core_usage.py judge --pid <命令的进程号>（样本追加进登记目录的 core-usage-samples，
+#   声明读登记目录的 serial-declarations）：打一行「<名> 在用 X 核（登记 N）」；最近一个窗口（600 秒）里在用核数与同时在算的线程都低于登记数的四分之一的，
+#   打 ✗ 一行带出路、往告警记录追加一条（告警进程号是命令的进程号，看门狗 agent-watch.py 读它叫醒主 agent），声明了串行段的照报、标出秒数与理由；
+#   树里有 multi-host-run.sh --peer 那一支的判成在等第二台、不报（第二台由那个驱动自己报）。判红不停单元，处置由主 agent 定。判法与阈值在 core_usage.py 文件头。
 # stop：只按登记里的单元名停那一个（systemctl --user stop <单元名>），不按模式找进程。systemctl --user stop 等单元停下（命令在停机时限里退出，或到点被 KILL），
 #   命令收尾要多久就等多久，至多停机时限；停完回读 ActiveState，再至多等 5 秒读登记里的退出码，读不到就是到点被 KILL 了，登记里写 stop-killed（日期与停机时限）。
 #   所以一次 stop 至多要停机时限加 5 秒多一点（默认 180 秒的单元是 185 秒）。前台调用 stop 时，Bash 工具的 timeout 至少给到（停机时限 + 30）× 1000 毫秒
@@ -115,6 +121,7 @@
 # 自证（--selftest）：在临时登记目录里起名为 selftest-<进程号>-<格> 的单元，只跑 sleep、true 与几行 bash；收尾逐个按单元名停、
 #   再用 systemctl --user list-units 核这个前缀一条不剩（不剩也是一格）。替用户级 systemd 失灵、systemd-run 失败、Linger 的几格
 #   在 PATH 最前面放替身的 systemctl、systemd-run、loginctl（只在那一格的命令上），不动真的用户级 systemd。
+#   核数那三格的单元跑 core_usage.py busy-load（几条线程哈希一块内存忙等几秒），watch 每 1 秒一轮、窗口压到 2 秒（SINGLEFS_CORE_USAGE_WINDOW_SECONDS），告警记录写临时目录。
 # 弄坏开关 DETACHED_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时 --selftest 退 1）。只在 --selftest 起的进程里生效：
 #   自证在它的临时登记目录里放 .selftest-token、把同一个值放进 DETACHED_RUN_SELFTEST_TOKEN 带给它起的命令，两样对得上才认开关；
 #   别处设了它（两样对不上）就拒绝执行、退 4，什么都不做。
@@ -226,6 +233,12 @@
 #       长活④ over-2h、多机一行写死线程与内存：拒、退 5、点名写死的额度、没建登记
 #       长活⑤ over-2h、bash -c 一长串判不出被起的脚本：拒、退 5、出路写进一份脚本、没建登记
 #       长活⑧ over-2h 三样齐了照起、命令跑了；within-2h 不读声明照起
+#   DETACHED_RUN_BREAK=core-usage-unwatched  watch 不判在用核数（改前的样子：只列清单）
+#       核数① 1 条线程忙等的单元：watch 打「<名> 在用 X 核（登记 N）」与 ✗ 一行带出路、写告警记录（带会话号与来源）
+#       核数② 登记数那么多条线程忙等的单元：watch 打那一行、不打 ✗、不写告警记录
+#       核数③ 程序先声明了串行、再 1 条线程忙等的单元：照报 ✗，标出理由
+#   DETACHED_RUN_BREAK=serial-declarations-unset  start 不给单元设 SINGLEFS_SERIAL_DECLARATIONS（程序声明不了串行段）
+#       核数③ 程序先声明了串行、再 1 条线程忙等的单元：照报 ✗，标出理由
 #   长活声明判法那一半的开关在 .claude/hooks/lib_long_run.py（LIB_LONG_RUN_BREAK；只在自证起的进程里认，别处设了 start 与 long-run-check 调判法前摘掉它）：
 #   LIB_LONG_RUN_BREAK=partial-accepted  三样写了一样就当齐了
 #       长活③ over-2h、只写了分片一样（半截声明）：拒、退 5、点名缺续跑与多机、没建登记
@@ -265,6 +278,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
 detached_run_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+detached_run_core_usage="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/core_usage.py"
 DETACHED_RUN_UNIT_PREFIX="singlefs-detached-"
 DETACHED_RUN_SLICE="singlefs-detached.slice"
 DETACHED_RUN_CARRIED_VARIABLES=(SINGLEFS_HEAVY_TESTS PATH HOME CARGO_HOME RUSTUP_HOME)
@@ -660,6 +674,7 @@ detached_run_start() { # start 的参数
     echo "     → 怎么办：看登记目录的权限与剩余空间，修好再起" >&2
     exit 1
   fi
+  if ! detached_run_break_is serial-declarations-unset; then setenv+=("--setenv=SINGLEFS_SERIAL_DECLARATIONS=$record/serial-declarations"); fi
   if ! detached_run_break_is environment-dropped; then
     for name in "${DETACHED_RUN_CARRIED_VARIABLES[@]}"; do
       if detached_run_break_is path-home-dropped && [[ "$name" == PATH || "$name" == HOME ]]; then continue; fi
@@ -912,6 +927,20 @@ detached_run_watch_stopped() { # <信号名> <退出码>：先打最后一次清
   exit "$2"
 }
 
+detached_run_watch_cores() { # 还在跑的每条登记：取一次样、按窗口判在用几个核（文件头 watch 那一段「在用核数」）；判红只打、写告警记录，不停单元
+  local record pid label
+  if detached_run_break_is core-usage-unwatched; then return 0; fi
+  for record in ${DETACHED_RUN_RUNNING_RECORDS[@]+"${DETACHED_RUN_RUNNING_RECORDS[@]}"}; do
+    pid="$(detached_run_field "$record" pid)"
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    label="${record##*/}"
+    python3 "$detached_run_core_usage" judge --pid "$pid" --series "$record/core-usage-samples" --declarations "$record/serial-declarations" \
+      --subject "$label " --alert-pid "$pid" --source "detached-run.sh watch" --label "$label" \
+      --next-step "$label 在用的核太少：停下它（bash scripts/hosts/detached-run.sh stop $label），照 .claude/rules/test-script-discipline.md「编译与算法都要快」把装置里互相独立的单位分到登记的线程数上再跑；真要串行的段由程序当场往 \$SINGLEFS_SERIAL_DECLARATIONS 写「<秒>\\t此刻串行：<理由>」，核过理由成立就 --ack 进程:$pid 接着跑" \
+      || :
+  done
+}
+
 detached_run_watch_loop() { # <秒> <in-process|child>：一轮轮列清单、记观察；还在跑的与查不到的一条都不剩时报各条退出码、退 0。
   #   child：在 watch 起的子进程里跑，不接信号（watch 进程接），两轮之间用 read -t 等、不起 sleep（子进程被停时不留下没人管的 sleep）；
   #   in-process：弄坏开关 watch-stops-in-trap 下在 watch 进程里跑（改前的写法），两轮之间起一个 sleep 等
@@ -920,6 +949,7 @@ detached_run_watch_loop() { # <秒> <in-process|child>：一轮轮列清单、�
     round=$((round + 1))
     echo "  == 第 $round 次（$(detached_run_today)）"
     detached_run_list
+    detached_run_watch_cores
     # 弄坏开关 watch-skips-unknown 下只记还在跑的；记两样的那两行保持原文（第二轮攻方 v4_mutations.py 按原文改它造错实现，见文件头的开关表）
     if detached_run_break_is watch-skips-unknown; then detached_run_observe ${DETACHED_RUN_RUNNING_RECORDS[@]+"${DETACHED_RUN_RUNNING_RECORDS[@]}"}; else
     detached_run_observe ${DETACHED_RUN_RUNNING_RECORDS[@]+"${DETACHED_RUN_RUNNING_RECORDS[@]}"} \
@@ -1933,6 +1963,35 @@ SAMPLE
     "$( { ((rc == 0)) && [[ "$got" == 0 ]] && [[ -e "$long_run/lr-ok.marker" && -e "$long_run/lr-within.marker" ]] && grep -q "长活声明齐了" "$work/lr8.out"; } && echo 0 || echo 1)" \
     "$work/lr8.out"
 
+  # 核数①②③ watch 判在用核数（文件头 watch 那一段「在用核数」）：自己的登记目录里起三条单元，都跑 core_usage.py busy-load 8 秒——
+  #   1 条线程、登记数那么多条线程、先 declare-serial 再 1 条线程；watch 每 1 秒一轮、窗口 2 秒，告警记录写临时目录，等三条都结束 watch 自己退 0
+  local state_cores="$work/state-cores" core_threads core_label
+  detached_run_selftest_state_directory "$state_cores"
+  core_threads="$(python3 "${detached_run_core_usage%/*}/heavy_threads.py" --print 2>/dev/null)"
+  for core_label in cores1 cores2 cores3; do detached_run_selftest_units+=("${DETACHED_RUN_UNIT_PREFIX}${prefix}${core_label}.service"); done
+  : > "$work/cores-start.out"
+  DETACHED_RUN_STATE_DIRECTORY="$state_cores" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}cores1" -- \
+    python3 "$detached_run_core_usage" busy-load 1 8 >> "$work/cores-start.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_cores" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}cores2" -- \
+    python3 "$detached_run_core_usage" busy-load "${core_threads:-1}" 8 >> "$work/cores-start.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_cores" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}cores3" -- \
+    bash -c 'python3 "$0" declare-serial 计时窗口必须单线程跑完 && exec python3 "$0" busy-load 1 8' "$detached_run_core_usage" >> "$work/cores-start.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_cores" SINGLEFS_CORE_USAGE_WINDOW_SECONDS=2 SINGLEFS_CORE_USAGE_ALERTS="$work/cores.alerts" \
+    CLAUDE_CODE_SESSION_ID=detached-run-selftest-cores timeout 120 bash "$detached_run_script" watch --every 1 > "$work/cores-watch.out" 2>&1; rc=$?
+  cat "$work/cores-start.out" >> "$work/cores-watch.out"
+  detached_run_expect "核数① 1 条线程忙等的单元：watch 打「<名> 在用 X 核（登记 N）」与 ✗ 一行带出路、写告警记录（带会话号与来源）" \
+    "$( { ((rc == 0)) && [[ -n "$core_threads" ]] && grep -q "✗ ${prefix}cores1 在用 [0-9.]* 核（登记 $core_threads）" "$work/cores-watch.out" \
+          && grep -q "→ 怎么办：${prefix}cores1 在用的核太少" "$work/cores-watch.out" \
+          && grep "\"label\":\"${prefix}cores1\"" "$work/cores.alerts" 2>/dev/null | grep -q '"session_id":"detached-run-selftest-cores".*"source":"detached-run.sh watch"'; } && echo 0 || echo 1)" \
+    "$work/cores-watch.out"
+  detached_run_expect "核数② 登记数那么多条线程忙等的单元：watch 打那一行、不打 ✗、不写告警记录" \
+    "$( { ((rc == 0)) && grep -q "${prefix}cores2 在用 [0-9.]* 核（登记 $core_threads）：最近" "$work/cores-watch.out" \
+          && ! grep -q "✗ ${prefix}cores2 " "$work/cores-watch.out" && ! grep -q "\"label\":\"${prefix}cores2\"" "$work/cores.alerts" 2>/dev/null; } && echo 0 || echo 1)" \
+    "$work/cores-watch.out"
+  detached_run_expect "核数③ 程序先声明了串行、再 1 条线程忙等的单元：照报 ✗，标出理由" \
+    "$( { ((rc == 0)) && grep -q "✗ ${prefix}cores3 在用.*声明了串行 [0-9]* 秒：计时窗口必须单线程跑完" "$work/cores-watch.out"; } && echo 0 || echo 1)" \
+    "$work/cores-watch.out"
+
   # 收尾：a、e、i、u 用 stop 停（stop 那一格的第二遍），再逐个按单元名停剩下的，最后核这个前缀的单元一条不剩
   bash "$detached_run_script" stop "${prefix}a" > "$work/stop-a.out" 2>&1
   bash "$detached_run_script" stop "${prefix}e" > "$work/stop-e.out" 2>&1
@@ -1949,7 +2008,7 @@ SAMPLE
     echo "     → 怎么办：按不对的那一格修 detached-run.sh 再跑 --selftest；DETACHED_RUN_BREAK 设着的话本来就该红"
     exit 1
   fi
-  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、-- 之后开头的赋值名不合写法就拒、建不了登记时挪回同名旧登记且挪不回出声、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、默认停机时限设进单元、stop 只停登记的那一个、stop 等命令收尾完、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退且连续 3 次报警 start 与 stop 拒 start 同名不挪旧登记、查不到之后又查得到照报退出码、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、观察到的登记被挪走而单元在跑 watch 不算结束、systemd-run 报错而单元照起记成在跑、日志写不进不起单元、命令没跑起来认得出、单元里写登记失败单列、--force 摘法与闸一致、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、同一秒里同名重起等到下一秒、watch 开跑之后起了又跑完的短命令照报、命令留在别的 scope 里的进程随单元停、--wall-clock 必填且 over-2h 判长活声明（没声明、半截、写死额度、判不出脚本、分不了没点名都拒，多机一行按登记值读：只认规范句（可带句末句号，后面不接任何说明），别的写法都拒，豁免表里登记且 sha256 对得上的脚本按现算读、sha256 对不上的拒，包装跳过，齐了照起）、收尾不剩单元）"
+  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、-- 之后开头的赋值名不合写法就拒、建不了登记时挪回同名旧登记且挪不回出声、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、默认停机时限设进单元、stop 只停登记的那一个、stop 等命令收尾完、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退且连续 3 次报警 start 与 stop 拒 start 同名不挪旧登记、查不到之后又查得到照报退出码、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、观察到的登记被挪走而单元在跑 watch 不算结束、systemd-run 报错而单元照起记成在跑、日志写不进不起单元、命令没跑起来认得出、单元里写登记失败单列、--force 摘法与闸一致、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、同一秒里同名重起等到下一秒、watch 开跑之后起了又跑完的短命令照报、命令留在别的 scope 里的进程随单元停、watch 判在用核数（1 条线程忙等报 ✗ 并写告警记录、登记数那么多条线程不报、声明了串行照报并标出理由）、--wall-clock 必填且 over-2h 判长活声明（没声明、半截、写死额度、判不出脚本、分不了没点名都拒，多机一行按登记值读：只认规范句（可带句末句号，后面不接任何说明），别的写法都拒，豁免表里登记且 sha256 对得上的脚本按现算读、sha256 对不上的拒，包装跳过，齐了照起）、收尾不剩单元）"
 }
 
 if [[ -n "${DETACHED_RUN_BREAK:-}" && "${1:-}" != --selftest ]] && ! detached_run_break_is break-honored-anywhere && ! detached_run_inside_selftest; then

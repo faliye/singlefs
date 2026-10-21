@@ -98,8 +98,8 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 | `scripts/kb/insert-row.py` | 往公共表里插一行：按锚点定位（锚点必须恰好命中一次），写之前复核文件没被别人改过（读时记 sha256，写前再比一次，变了就拒绝）。`replace-once.py` 只解决「改一处已有的文字」，插入没有旧串可替、只能读整份写回，两个会话一前一后会互相覆盖 |
 | `scripts/experiments/perf-by-milestone.md` | singlefs 与六家文件系统按里程碑的性能对比；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `scripts/experiments/e152-tables.py` 生成 |
 | `records/` | 建设过程 |
-| `briefs/` | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么；旧的不回头改。三语：`YYYY-MM-DD.md` 是英语（默认），`YYYY-MM-DD.zh.md` 中文，`YYYY-MM-DD.ja.md` 日语；仓根 README 同样三份。改一份就三份一起改，用词照 `.claude/kb/translation-glossary.md`；哪些文件受管登记在 `.claude/trilingual-documents`，门禁 doc-text 的 trilingual 四格判 |
-| `.claude/kb/translation-glossary.md` | 翻译术语表：中、英、日三语并排，README 与简报的译文照它用词，新术语先加进表再用 |
+| `briefs/` | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么；旧的不回头改。三语：`YYYY-MM-DD.md` 是中文（默认），`YYYY-MM-DD.en.md` 英语，`YYYY-MM-DD.ja.md` 日语；仓根 README 与 `.claude/kb/` 下的文件同样三份。改一份就三份一起改，怎么改照 `.claude/skills/trilingual/SKILL.md`，用词照 `.claude/kb/translation-glossary.md`；哪些文件受管登记在 `.claude/trilingual-documents`，门禁 doc-text 的 trilingual 四格判 |
+| `.claude/kb/translation-glossary.md` | 翻译术语表：中、英、日三语并排，README、简报与 kb 的译文照它用词，新术语先加进表再用 |
 
 ## 本项目的特殊性
 
@@ -110,4 +110,4 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 
 - 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
-- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 8 项；checker 判 92 条不变量（数它的命令：`grep -ch '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | awk '{s+=$1} END{print s}'`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。
+- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 8 项；checker 判 103 条不变量（数它的命令：`grep -h '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | grep -vc '^| I-8.4 '`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；I-8.4（重放幂等） 已实现在崩溃注入的二次崩溃上、不进池级 checker 清单，所以数法排掉它；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。

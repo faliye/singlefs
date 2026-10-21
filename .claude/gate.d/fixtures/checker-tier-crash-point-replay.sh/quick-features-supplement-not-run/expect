@@ -1,0 +1,16 @@
+exit=3
+want=样本档（快档）：
+want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
+want=· feature-gated-tests：不带特性那一趟打了 NOT_RUN_ 的测试函数由这一趟补判，另带上它们所在的测试目标：--test enumeration
+want=现判 crates/singlefs-checker-tier/tests/enumeration.rs::enumeration_quick_tier_shape（库里没有这一条）
+want=复用 crates/singlefs-checker-tier/tests/enumeration.rs::enumeration_plain_check
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-checker-tier --features gpu --lib --test gpu_pair --test enumeration -- --nocapture --test-threads 1 --exact --skip enumeration_plain_check
+want=GPU_QUIESCE step=quiesce result=stopped-and-read-back holders=0
+want=· 判绿记库：RECORD recorded=2 changed=0 refused=0
+want=· 不带特性那一趟（tests/enumeration.rs）报的本次未跑由带特性那一趟补判到了：NOT_RUN_GPU_FEATURE_NOT_COMPILED_IN test=crash_state_enumeration::quick_tier reason=多机配置写了 ENABLE_GPU=1，这一趟没编进 gpu 特性（样本）（tests/enumeration.rs::enumeration_quick_tier_shape 判绿）
+want=✓ feature-gated-tests：1 个挂特性的测试文件（特性 gpu）每个都编进来、跑到了用例，共 1 条
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；feature-gated-tests：绿
+want=GPU_QUIESCE step=restore result=not-restored holders=0
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）
+not-green-by-design=crash-case-replay 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）

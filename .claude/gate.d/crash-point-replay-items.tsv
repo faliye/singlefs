@@ -1,5 +1,5 @@
 # 崩溃点重放的合表（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2：一张表、一个入口；一项一条流，
-# .claude/gate.d/stage-inputs.tsv 的 14 条 crash-case: 与 scripts/crash/crash-amplification.sh 的 8 项按流去重之后合表）。入口 scripts/crash/crash-point-replay.sh 照这张表跑。
+# .claude/gate.d/stage-inputs.tsv 的全部 crash-case: 与 scripts/crash/crash-amplification.sh 的 ITEMS 全部分项按流去重之后合表）。入口 scripts/crash/crash-point-replay.sh 照这张表跑。
 # 一行一项，制表符分隔四列，再加一列 # 说明：
 #   ① 项名：小写字母、数字、-；不用 layer0、amplification 这两个退役的词（判决第三节 J1）
 #   ② 重型里崩溃点重放那一套的部分：stage-inputs.tsv 里 crash-case: 的键，几条空格隔开（同一条流的几条用例并在一项里）；没有写 -
@@ -16,10 +16,28 @@ floor-raise-pushed-by-the-session	crash-case:floor-raise-pushed-by-the-session	f
 sigma-of-the-misaligned-reuse	crash-case:c561-sigma-full	sigma-of-the-misaligned-reuse	record_checker_judges_absence_by_the_persisted_set	# UOOUOMSU 历史上 σ 那一段（两边枚举域不同：崩溃点重放一段 2^16 子集、放量判全套）
 multi-record-publish	crash-case:multi-record-publish-stream	multi-record-publish	crash_enumeration_multi_record_publish_stream	# 取号 → 暖机两次 → A → B → C
 unlink-after-the-multi-record-publish	crash-case:unlink-after-the-multi-record-publish-stream	unlink-after-the-multi-record-publish	crash_enumeration_unlink_after_the_multi_record_publish_stream	# 多记录流之后删第一个文件，35 段
+unlink-merging-inode-leaf-containers	crash-case:unlink-merging-inode-leaf-containers-stream	unlink-merging-inode-leaf-containers	crash_enumeration_unlink_merging_inode_leaf_containers_stream	# 合并那几次发布（左从右借、左吸收右），起点镜像不枚举，16 段
+unlink-after-the-fixed-script	crash-case:unlink-after-the-fixed-script-stream	unlink-after-the-fixed-script	crash_enumeration_unlink_after_the_fixed_script_stream	# 固定脚本到 E 之后经会话 unlink 第一个文件，78 段（前 69 段同固定脚本到 E）
+snapshot-creation	crash-case:snapshot-creation-stream	snapshot-creation	crash_enumeration_snapshot_creation_stream	# 取号 → 暖机两次 → A → 建快照（里程碑四一·4 F1）
+overwrite-and-unlink-under-a-snapshot	crash-case:overwrite-and-unlink-under-a-snapshot-stream	overwrite-and-unlink-under-a-snapshot	crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream	# A → 建快照 → 覆盖写（进 deadlist）→ unlink 意图 → 最后一批，27 段（里程碑四一·4 F2）
+snapshot-destruction-resumed-after-a-crash	crash-case:snapshot-destruction-resumed-after-a-crash-stream	snapshot-destruction-resumed-after-a-crash	crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream	# A → 建快照 → 覆盖写 → 删快照意图 → 三批 → 最后一批，39 段，崩溃后可写挂载续做（里程碑四一·4 F3）
+compaction-relocation	crash-case:compaction-relocation-stream	compaction-relocation	crash_enumeration_compaction_relocation_stream	# 多记录流 → 重挂 → 整理签发 → 一批 → 最后一批，40 段（里程碑四二·3）
+compaction-relocating-a-block-shared-with-a-snapshot	crash-case:compaction-relocating-a-block-shared-with-a-snapshot-stream	compaction-relocating-a-block-shared-with-a-snapshot	crash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream	# A → 建快照 → 覆盖写 → 重挂 → 整理搬只被快照引用的单元，48 段（里程碑四二·3 第二条）
+lifecycle-closure	crash-case:lifecycle-closure-stream	lifecycle-closure	crash_enumeration_lifecycle_closure_stream	# 分配 → 覆盖写 → 建快照 → 再覆盖写 → 删文件 → 整理搬共享块 → 删快照 → 回收 → 再分配，139 段（里程碑四三·1）
+unlink-under-a-snapshot	crash-case:unlink-under-a-snapshot-stream	unlink-under-a-snapshot	crash_enumeration_unlink_under_a_snapshot_stream	# A → 建快照 → unlink 意图（进 deadlist）→ 最后一批，23 段（里程碑四一·4 第四条快照流）
+truncate-to-zero	crash-case:truncate-to-zero-stream	truncate-to-zero	crash_enumeration_truncate_to_zero_stream	# 多记录流之后缩到 0（截断意图 → 一批 → 最后一批，批大小 1），31 段（里程碑四截断，判决 m4-trunc-r1 K9）
+truncate-into-a-unit-then-extend	crash-case:truncate-into-a-unit-then-extend-stream	truncate-into-a-unit-then-extend	crash_enumeration_truncate_into_a_unit_then_extend_stream	# 多记录流之后缩到单元中间再变长（截断意图 → 最后一批 → 变长出洞，标签 3），31 段（里程碑四截断，判决 m4-trunc-r1 K9）
+truncate-under-a-snapshot	crash-case:truncate-under-a-snapshot-stream	truncate-under-a-snapshot	crash_enumeration_truncate_under_a_snapshot_stream	# 多记录流之后建快照、再缩到半个净荷（截断意图 → 一批 → 最后一批，换下的单元进 deadlist），35 段（里程碑四截断，判决 m4-trunc-r1 K9）
 tree-split-streams	crash-case:tree-split-streams	tree-split-streams	crash_enumeration_tree_split_streams	# 记账树、中央映射树分裂七条流（一个测试目标、一套 prepare）
 position-addressed-trees	crash-case:position-addressed-tree-streams	position-addressed-trees	crash_enumeration_position_addressed_trees	# 位置寻址树几条流（崩溃点重放四条、放量五条）
 writable-mount-of-an-io-min-8192-pool	crash-case:writable-mount-of-an-io-min-8192-pool	-	crash_enumeration_writable_mount_of_an_io_min_8192_pool	# io_min 8192 池 mkfs 后第一次可写挂载
+formatted-pool-remounted-without-a-file	crash-case:formatted-pool-remounted-without-a-file-stream	-	crash_enumeration_formatted_pool_remounted_without_a_file_stream	# C492 的 R1 历史：mkfs 后可写挂载、不写文件、正常卸载、重开再可写挂载，每个崩溃状态重开挂载再发第一个文件版本
+crash-in-the-middle-of-the-acquisition-write	crash-case:crash-in-the-middle-of-the-acquisition-write-stream	-	crash_enumeration_crash_in_the_middle_of_the_acquisition_write_stream	# 第一个文件之后重开那次可写挂载（取号写写到一半那一段由快档展开），每个崩溃状态重开挂载判取号不重号
 crash-injection-fast-tier	crash-case:crash-injection-fast-tier	-	crash_injection_campaign	# 随机历史（不是固定流；轻型用小种子数）
 read-faulted-states-never-hold-the-witness-criterion	crash-case:read-faulted-states-never-hold-the-witness-criterion	-	crash_injection_read_faulted_states_never_hold_the_witness_criterion	# 读回全 0 那一组比重的随机历史，判见证判据 W
 random-histories-and-fault-injection-given-states	crash-case:random-histories-and-fault-injection-given-states	-	crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library	# 随机历史每步镜像与故障注入每个注入点重开的盘经给定状态引擎两段判（不是固定流；轻型跑同文件的小批）
-instance-table-sweep	crash-case:instance-table-sweep-mount crash-case:instance-table-sweep-phases-remount	-	crash_points_of_the_instance_table_sweep	# 12 槽小环池实例表清扫那次可写挂载（全部写一条、清扫两段再挂一条，同一条流）
+instance-table-sweep	crash-case:instance-table-sweep-mount crash-case:instance-table-sweep-phases-remount crash-case:instance-table-sweep-crossing-mount	-	crash_points_of_the_instance_table_sweep	# 12 槽小环池实例表清扫那次可写挂载（全部写一条、清扫两段再挂一条，同一条流）；跨片流越过阈值的那次挂载全部写一条
+one-file-overwritten-across-two-writable-remounts	crash-case:one-file-overwritten-across-two-writable-remounts-stream	one-file-overwritten-across-two-writable-remounts	crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream	# 多记录流 → 关闭再可写挂载 → 覆盖写成一个单元 → 关闭再可写挂载 → 顺序写成两个单元，45 段（里程碑三一·1 第一条）
+several-inodes-overwritten-in-turn	crash-case:several-inodes-overwritten-in-turn-stream	several-inodes-overwritten-in-turn	crash_enumeration_several_inodes_overwritten_in_turn_stream	# 多记录流 → 建 149 个 inode → 按号交错写 150、2、第一个文件、150、2，43 段（里程碑三一·1 第二条）
+large-file-overwritten-across-lower-leaves	crash-case:large-file-overwritten-across-lower-leaves-stream	large-file-overwritten-across-lower-leaves	crash_enumeration_large_file_overwritten_across_lower_leaves_stream	# 多记录流 → 第一个文件顺序写成 145、146、144 个单元，31 段，其中六段 288–324 次写（里程碑三一·1 第三条）
+unlink-of-two-files-holding-data	crash-case:other-file-deleted-before-the-first-file-stream crash-case:first-file-deleted-before-the-other-file-stream	unlink-of-two-files-holding-data	crash_enumeration_unlink_of_two_files_holding_data_streams	# 多记录流 → 建 inode → 写 150 → 两种删序删 150 与第一个文件，两支各 55 段（判决 m3-multi-file-unlink-r1 M7 另开的多文件删除流）

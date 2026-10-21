@@ -76,7 +76,8 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
 
 行键（KeyContext.components，文件头「复用」那一句的逐样）：
   被改坏的单元   原文所在那份 .rs 里与原文重叠的最里层单元（fn 项；函数外的项按项单元：const、static、struct、impl 头、宏……）的（种类，指纹）；
-                 原文不落在任何单元上拒算；不是 .rs 的（litmus/ 这类测试读的数据文件）取整份字节的 sha256
+                 原文不落在任何单元上拒算；.wgsl 按 fn 切（原文所在的 wgsl fn，不在 fn 里的取它自己的常量、struct、绑定声明单元，取不到拒算，
+                 不退回整文件）；别的不是 .rs 的（litmus/ 这类测试读的数据文件）取整份字节的 sha256
   原文与替换文   原样（\\n \\t \\\\ 转义）
   点名测试       cargo 参数选中的目标里那条 #[test] fn 单元的闭包键（入口 = 那条测试函数，lib_function_units.py 的 rust_closure_of，
                  带上 cargo 参数里的特性）；认不出是哪一个单元、或闭包拒算，这一行拒算
@@ -116,6 +117,7 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
        LLVM_PROFILE_FILE=<这一格的 TMPDIR>/build-profiles/build-%p-%m.profraw：cargo 没带 --target 时 RUSTFLAGS 也罩构建脚本与过程宏，它们在各自依赖包的源码目录
        （~/.cargo/registry/src/ 下）里起，不设这个变量就在那里写 default_*.profraw；
     ② cargo test -- <开关> --exact <用例全名>，LLVM_PROFILE_FILE=<这一格的 TMPDIR>/cov-%p-%m.profraw；点名用例要恰好一行 ok；
+       行里 libtest 参数已带 --exact 的，开关里去掉它再补自己的，--exact 只出现一次（libtest 见两个报 Option 'exact' given more than once、退 101）；
     ③ llvm-profdata merge -sparse，llvm-cov export -format=text -skip-expansions，对象是 ① 编出来的本仓每个可执行文件（测试与 bin）；
     ④ 记：计数 > 0 的函数按它第一段代码区域的行落进的最里层单元（lib_mutation_units.py 的 executed_units），连同点名测试闭包里不是 fn 的单元，
        各自的（种类、文件、限定名、指纹）；有函数落不进任何单元的，这一份记成不全、不拿来复用。
@@ -180,6 +182,10 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   tablemissingok       static-check --table 指的文件不在时照旧当空表判、报「CHECKED 0 …」退 0（本模块自证「static-check --table 指的文件不在」那一格必须判错）
   shardrootkeptonsignal  run_pool 不接 TERM / HUP（改前的样子：收到就停，$TMPDIR 下的 singlefs-mutation-replay-* 留着）
                        （本模块自证「被 TERM 停：$TMPDIR 下的 singlefs-mutation-replay-* … 停完删掉，退 143」那一格必须判错）
+  term-sent-unwaited   自证「被 TERM 停」那一格不等「临时目录在、假 cargo 在工作进程里挂住」就发 TERM（改前碰上忙机器的样子：run_pool 还没装好信号处理，默认处理退 -15）
+                       （本模块自证「被 TERM 停：$TMPDIR 下的 singlefs-mutation-replay-* 跑的时候在、停完删掉，退 143 …」那一格必须判错）
+  shardrootnamedlate   run_pool 建 shard_root 照改前用 tempfile.mkdtemp（目录在 mkdir 里建出来、名字要等它返回才到调用方手里：TERM 落在这两步之间，名字丢了、目录漏在 $TMPDIR）
+                       （本模块自证「TERM 落在建 shard_root 的 mkdir 之后、名字交到调用方手里之前：收尾照样删掉」那一格必须判错）
   listitemspipeunhandled  --list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
                        （本模块自证「--list-items 接 | head」那一格必须判错）
   extratargetskept     开跑时不回收片号大于这一趟工作进程数的 -w<片号> 编译目录（改前的样子：分片各一份、只增不减）
@@ -205,6 +211,19 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                        （本模块自证「逐行上限：一行另给的上限与限时只给它…」那一格必须判错）
   timelimitincludescompile  基线与变异不先编、限时含重编译，插桩编译也限时（改前的样子）
                        （本模块自证「逐行上限：…先编那一趟不限时…」与日常一条那两格（包装起的次数少了先编那几次）必须判错）
+  compilejobsbyworkers  编译那一趟（基线与变异的先编、插桩编译）的并行度照改前取核数 ÷ 工作进程数，不按这一行的内存上限收
+                       （本模块自证「编译并行度按内存上限收…」那一格必须判错；一个工作进程的两趟 4G / 9G 那一格在核数大于 2 的机器上也跟着判错）
+  memorycompilemerged  包装退 250 不分编译那一趟与测试那一趟，都记内存撞顶、出路都写「无界分配」（改前的样子）
+                       （本模块自证「先编那一趟撞了内存上限：记编译撞顶…」那一格必须判错）
+  crashlibraryacrossshards  变异复跑的崩溃判定库几片共用一份、不按片号分子目录（改前的样子）
+                       （本模块自证「崩溃判定库每片各一份…」「两个工作进程同时在跑…」「变异复跑起的 cargo 写自己的崩溃判定库」「设了 GATE_MUTATION_CRASH_LIBRARY_HOME」四格必须判错）
+  exactduplicated      记覆盖那一趟把行里已有的 --exact 与自己补的叠成两个（改前的样子，libtest 报 Option 'exact' given more than once、覆盖记不成）
+                       （本模块自证「行里已带 --exact 的变异…」那一格必须判错）
+  closure-error-masked  scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：按路径载入的 lib_function_units.py
+                       不登记进 sys.modules、算闭包的工作进程把异常原样抛（改前的样子，--list-items 末尾是 PicklingError，真错被盖住）
+                       （本模块自证「闭包算不成（并行算…）」与「--list-items 遇到闭包算不成」两格必须判错）
+  wgsl-whole-file      scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：.wgsl 照改前当数据单元、
+                       取整份字节的 sha256（本模块自证「WGSL 按 fn 取键」那一格必须判错）
 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：
   自证 reuse-three-questions 一格：一份小仓（SELFTEST_UNIT_ROWS 五行）头一趟、同一份输入第二趟、同一个文件里加一个没人调的函数（闭包外）、
     改被改坏的函数 check_root 的别一行（闭包内：原文在它里面的 root-457、root-double 两行现判）各跑一趟，打规范输出
@@ -230,30 +249,84 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   「# 逐行上限：<变异名><TAB><内存上限，systemd 写法，或 -><TAB><限时秒，或 ->[<TAB># 依据]」（# 开头：那张表的核法 crates-mutation-light-rows.py 与门禁取名字的 awk 都不读它）。
   点名的变异名照 crates/mutations.tsv 第一列认，同名的几行都拿它；没写的行、写 - 的那一样照整张表的那一个数（表头「# 每条变异的内存上限：」、GATE_MUTATION_MEMORY_MAX、默认 4G；
   限时同形）。写法不对、点名的不是成形的一行，整道判红、一行都不判。一批基线（几行共用一份 cargo 参数）取这一批里最大的上限与最长的限时，一组覆盖取它那一行的；
-  工作进程数的外层内存那一项按这一趟要现跑的行里最大的上限算。取法定成逐行写（不按 host-resources.py 的峰值表现取）：峰值表里撞过顶的键记的是那一次的上限，
+  工作进程数的外层内存那一项按每条的默认上限算（下一段），个别行的大上限由派活按额度排队。取法定成逐行写（不按 host-resources.py 的峰值表现取）：峰值表里撞过顶的键记的是那一次的上限，
   照它取只是把撞顶的数原样交回；逐行写的数要写依据（「推的」或量过的峰值与日期）。上限与限时都不进行键（row-key-with-limits 那一格的口径），改了不作废记录
   （自证「逐行上限不进行键：改那一行的上限与限时之后一行都不现判」）。
-工作进程数（worker_count_for）：三项取最小、至少 1：核数的一半（至多 16，GATE_MUTATION_WORKERS 顶掉它）、这一趟要现跑的条数、外层内存上限 ÷ 每条变异的上限（向下取整）。
+工作进程数（worker_count_for）：四项取最小、至少 1：核数的一半（至多 16，GATE_MUTATION_WORKERS 顶掉它）、这一趟要现跑的条数、外层内存上限 ÷ 每条变异的默认上限（向下取整；
+  默认上限是没有逐行上限的那些行用的那个值，不是这一趟逐行上限里最大的：有一行写了 24G 不再把整趟压成 1 个）。
   外层内存上限读 RUN_WITH_MEMORY_CAP_OUTER_CAP（scripts/hosts/run-with-memory-cap.sh 套在外层时给命令设的，写法 正整数加 K / M / G / T，1024 进制）：
   套在外层包装里的里层包装不排队（那份文件头「套在包装里」），几条里层同时跑、合起来超过外层上限时只有 slice 的总上限兜着，所以按外层收；
   没设或写法不认就是没套在外层里：没有这一项（每条自己经包装排队、放不下的在它那里等），stderr 头一行写明「外层内存上限没读到」及原因，不悄悄少一项。
   外层上限不足一条的上限时按 1 个开（头一行写「那一项不足 1」）：里层的上限比外层大，包装会按用法错退 251，那是调用方该改上限的事，不在这里改每条的上限。
+  按额度排队（job_memory_bytes、pick_ready_job，run_pool 里；外层上限读不到时整段不起作用，派活与改前一样）：派的每一格（基线的批、一条变异、一组覆盖）按它自己跑起来经包装给的上限
+  （limits_for_lines 取的那个数）从外层额度里扣，在跑的各格上限之和不超过外层上限；扣不下的那一格留在队里，次序在它后面、扣得下的小格可以先派；
+  不许饿死大格：一格被越过的次数到了 worker_count 就停下，它后面的都不派，等在跑的收完释放额度，释放到扣得下它就派它；什么都没在跑时队首一定派。
+  一格的上限比整个外层还大：等在跑的全收完、单独起（选这条退路而不是开跑前就报错：整张表的别的行照跑，那一格由里层包装按用法错退 251、照旧记成「scope 起不来，没跑」，
+  与改前的单个工作进程一样报出来；不在这里改它的上限，那是登记它的人该改的）。头一行写「逐行上限最大 X、按额度排队」，最大那一格比外层大时另写这一句。
   每条变异的上限本身不动（量到峰值之后再定）；上限与限时都不进行键，改了不作废记录（只记在超时、内存撞顶那两档的记录里）。
+  第四项是磁盘余量，下一段。
+磁盘余量（disk_bound_for，第四项）：每个工作进程最多占两份编译目录（普通一份、插桩一份，prepare_shard 与 judge_coverage 起的），一份涨满按「编译目录上限」（下下段）算。
+  派活之前按目标盘（编译目录所在那块）的余量核：片号 1…n 各两份「还能涨的量」（上限减去此刻已占，目录还没建的是整个上限）加起来，再加备用 GATE_MUTATION_DISK_RESERVE（默认 30G，推的），
+  不超过余量的最大 n 就是这一项；n 从 1 数到前三项最小的那个数再多 1（放得下再多 1 个才不与前三项并列成「卡在」）。一个都放不下按 1 个开（头一行写「那一项不足 1」）。
+  头一行写：磁盘余量多少、来源、备用多少、每份涨到多少，n 个共还要多少，再多 1 个要多少、放不下，所以给 n 个；「卡在「磁盘余量」这一项」。
+  余量的来源：外层给了 GATE_MUTATION_DISK_FREE（systemd 写法，例 400G）就用它（双机分片的驱动、自证用）；没给读编译目录往上第一层存在的目录所在的盘此刻可用的字节（statvfs）；
+  两样都读不到（写法不认的整道拒；statvfs 失败的）没有这一项，头一行写「磁盘余量没读到」及原因，工作进程数不按磁盘收。已有的编译目录按此刻占盘量，
+  回收（reclaim_extra_target_directories）发生在这一步之后，所以只回收得掉的多出来的目录不算作余量（偏保守）。
+  依据：2026-10-20 第二台 9 个工作进程各一份 -w<片号> 加各一份插桩，1.8T 的盘写满（tempfile.mkdtemp 抛 OSError: [Errno 28]）；2026-10-21 压到 4 个仍涨到普通 39–71G、插桩 30–68G。
+编译目录上限（trim_target_directory、trim_worker_target，GATE_MUTATION_TARGET_DIR_CAP，默认 64G 是推的）：每个工作进程每判完一格（基线的批、一条变异、一组覆盖），
+  量一次它自己那份编译目录（判基线与变异的普通那份，判覆盖的插桩那份）此刻的占盘；超过上限就清掉 <目录>/<档>/incremental 与 <目录>/<目标三元组>/<档>/incremental
+  （rustc 每编一次改坏的副本往里加一个会话目录，只增不减；两格之间没有 cargo 在这份目录上跑），清完回读再量，stderr 报清了几处、共多大、清后多大。
+  依赖与测试二进制不动（那是下一趟复用的缓存）：清完仍超上限的只报「清后仍超上限」，由人在这一趟收尾后手删或调大上限。清不成（权限、文件被占）只报、不丢这一格的判定。
+  本机量到的一份普通编译目录 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（2026-10-21），所以清增量产物不保证清到线下；磁盘余量那一项已经按「涨到上限」算，不依赖清得掉。
 测试线程数：不压。起 cargo test 时 RUST_TEST_THREADS 与仓里各测试读的线程数变量（SINGLEFS_THREAD_CAP 等）调用方设了什么就原样透传；只有 CARGO_BUILD_JOBS（编译并行度）按核数 ÷ 工作进程数收。
+编译并行度（compile_jobs_for）：上一句算出来的是一个工作进程的上限。先编那一趟（cargo test … --no-run：基线、变异的先编与插桩编译）另按这一行的内存上限收，
+  取 上限 ÷ COMPILE_GIB_PER_JOB（1.75 GiB，向下取整、至少 1）与它的小者：每条 4G 时至多 2、8G 至多 4。1.75 是推的，只有一个读数（单编 librocksdb-sys，上限 4G，
+  并行度 2 峰值 3470786560 字节编成，并行度 10 起 15 秒就撞），量到别的再改。GATE_MUTATION_CARGO_JOBS 设了原样用；跑测试那一趟不收（编译已在先编那一趟做完）。
+  stderr 末尾「这一轮 …」那句写明收到几。编译撞顶的救法是这一行的上限与这个系数，不是给更多行加逐行上限。
+  套在外层包装里时（外层额度读得到，额度账 OuterBudget 在，compile_plan）先编那一趟不只按这一格自己的上限收，改从外层额度里此刻空着的那一部分算：
+    想要的并行度（核数 ÷ 工作进程数）× COMPILE_GIB_PER_JOB 减去这一格自己的上限，向额度账借；空着的 = 外层 − 在跑各格的上限之和 − 别的先编已借走的 −
+    给每个空着的工作进程接下一格留的默认上限，几个工作进程同时要时各分一份（空着的 ÷ 还没借着额度的工作进程数）；借到多少，这一趟先编的包装内存上限就是自己的上限加借到的，
+    并行度是（总上限 ÷ COMPILE_GIB_PER_JOB，向下取整）与想要的并行度的小者，不低于老算法的；借到了而并行度没比老算法高的当场还回去。编完（包装一返回）就还。
+    账的口径同「按额度排队」那一套：run_pool 派一格记一笔（自己的上限）、收一格销一笔，挑与记账、先编借额度都在同一把锁里做完，所以在跑各格的上限加借走的之和不超过外层上限
+    （什么都没在跑时单独起的比外层还大的那一格除外，那时没有借的）。末了 stderr 报一行「额度账：…峰值」。例：外层 36G、2 个工作进程在跑各 4G、核数 32：
+    每个先编借 14G，包装上限 18432M，并行度 10（老算法 2）；9 个工作进程各 4G 时额度已满，借不到，照老算法。
+    先编撞了内存上限（退 250）而借过额度的，判定里写的上限仍是这一格自己的，另往 stderr 报借了多少、包装实际收到多少。
+  外层额度读不到（没套在外层包装里）没有额度账：先编的并行度只按这一行自己的上限收（老算法），行为与改前一样。
+撞顶分两档（verdict_of_run、baseline_problem）：包装退 250 时看交回的是先编那一趟还是跑测试那一趟（run_under_wrapper 给先编的那一趟的结果打 compile_pass 标记）。
+  先编那一趟撞的记 compilememory：单列一栏「有变异在编译那一趟撞了内存上限」，出路写编译并行度与逐行上限，不写「无界分配」（点名的测试一次都没起）；
+  测试那一趟撞的记 memory，栏与出路照旧。「计数：」那一行不分（两档都算内存撞顶，格式不动）；基线不绿的那一句写明「那一批编译那一趟撞了内存上限」。
 变异复跑的判定库（mutation_crash_library_environment）：走判定库的 checker 档用例在变异版上判出的结论不写进真跑的长期库。起 cargo 的环境里
   SINGLEFS_CRASH_AMPLIFICATION_HOME 换成 GATE_MUTATION_CRASH_LIBRARY_HOME（设了、非空）；没设取真跑的家目录（调用方的 SINGLEFS_CRASH_AMPLIFICATION_HOME，
   没设是 ~/.local/share/singlefs/crash-amplification）底下的 mutation-replay/，跨轮留着、照用例自己的键复用；调用方点名的单份库
   SINGLEFS_CRASH_AMPLIFICATION_LIBRARY 清掉（它压过家目录）。stderr 报一行这一趟用的家目录。双机分片的驱动给第二台设成那棵树的跨趟目录底下一份。
+  每个工作进程再用这个家目录底下的 shard-<片号>（crash_library_home_for_shard，片号就是 claim_worker_slot 领到的）：几个工作进程不共用一份库，
+  开库等锁（crash_library.rs 的 DEFAULT_LOCK_WAIT_SECONDS，1800 秒）与测试限时（默认 1800 秒）不会相叠、把等锁记成超时；并发的几次调用片号不相交，各片的库也不被别的调用占着。
+  各片的库各自照用例自己的键复用（同一条用例这一趟落在哪一片不定，换片就重判一次）；从前共用的那一份 mutation-replay/crash-state-verdicts 不再被读。
 libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总行只在 scripts/gate/lib_libtest_result_lines.py 解析一份（results_by_test 调它），
   它的弄坏开关 LIBTEST_RESULT_LINES_BREAK 写在它文件头；本模块自证里认得它的那一格：
   LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  本模块自证「should panic 的用例红了判抓到、点名省掉模块路径只对上那一个」那一格必须判错
-下面三个开关一行一个，下一行起写打开后必须判错的自证项：
+下面六个开关一行一个，下一行起写打开后必须判错的自证项：
+  largestrowmemory     改前的样子：每条的上限换成这一趟逐行上限里最大的那个来算工作进程数，派活也不按额度排队
+    本模块自证「外层 36G、一行 24G 加二十行 4G：工作进程多于 1 个，任一时刻在跑的各格上限之和不超过 36G，24G 那一行跑完了」必须判错（头一行只开 1 个）
+  rowmemoryunbudgeted  工作进程数照默认上限算，但派活不按额度扣（有一行 24G 的外层 36G 里同时塞满 9 个）
+    同一格必须判错（在跑的各格上限之和超过 36G）
+  bypassunbounded      按额度排队但不设「一格最多被越过 worker_count 次」的限
+    本模块自证「按额度排队（离散模拟）：…被后面的小格越过的次数在 1 到 worker_count 之间」（越过 15 格）与「外层 36G、一行 24G 加二十行 4G：24G 那一行…越过它的（按父进程派活的次序数）不超过 worker_count（9）行」（越过 15 行）两格必须判错；
+    后一格头一批同时派出去的行由假包装按行号错开收完，所以每次都判错，不是看「同一轮收完几个」的运气
   outermemoryignored   工作进程数不看外层内存上限（当 RUN_WITH_MEMORY_CAP_OUTER_CAP 读不到，改前的样子）
     本模块自证「工作进程数不超过外层内存上限 ÷ 每条变异的上限」「外层内存上限宽裕时仍卡在别的项」「外层上限不够一条的上限」「外层内存上限交给 run_stage：开的工作进程数跟着收」四格必须判错
   noparallelreason     自己起的包装不设并行理由（改前的跑法）
     本模块自证「会话里平常跑（假包装照日常一条演）、4 个工作进程：各条照样判对，每次包装带自己那个工作进程的并行理由」
   overridecallerreason 调用方设了的并行理由也换成自己的
     本模块自证「调用方设了的并行理由原样传给每次包装、不覆盖」
+下面三个开关（磁盘余量、编译目录上限、先编借额度）一行一个，下一行起写打开后必须判错的自证项：
+  disknotchecked       工作进程数不看磁盘余量（改前的样子：2026-10-20 第二台 9 个工作进程把盘写满）
+    本模块自证「磁盘余量放不下 9 份…」「已有的编译目录只算还能涨的…」「磁盘余量交给 run_stage…」「外层没给磁盘余量时读编译目录所在的盘…」四格必须判错
+  targetcapignored     编译目录超过上限也不清增量产物（改前的样子：产物只增不减）
+    本模块自证「编译目录超过上限：清掉两处增量产物…」「清完仍超线：只清增量产物…」「编译目录上限交给 run_stage…」三格必须判错
+  compilejobsownlimit  先编那一趟只按这一格自己的上限收，不向外层额度借（改前的样子：每条 4G 时至多 2）
+    本模块自证「先编向外层额度借…」「借走的加在跑的各格上限不超过外层…」「外层 36G、2 个工作进程、每条 4G、核数 32：先编…收到的并行度全是 10…」
+    「外层 36G、2 个工作进程、每条 4G：任一时刻在跑的各次包装的上限之和不超过 36G，先编借过额度…」四格必须判错
 只供测试的开关：GATE_MUTATION_STOP_AFTER_ROWS=<k> 现跑的变异判完 k 条就不再派活、等在跑的收完，整道判红退出（造「跑到一半被杀」）。
 """
 import collections
@@ -268,6 +341,7 @@ import io
 import json
 import multiprocessing
 import os
+import random
 import re
 import shutil
 import signal
@@ -378,7 +452,22 @@ PER_MUTATION_TEMPORARY_DIRECTORY_NAME = "per-mutation-tmp"
 START_STAMP_DIRECTORY_NAME = "started-at"
 # 包在命令外面的那一层：命令在 scope 里起来的那一刻写进 $1，再 exec 原命令（用时分排队与跑两段，见文件头）
 START_STAMP_SCRIPT = 'printf "%s" "$EPOCHREALTIME" > "$1"; shift; exec "$@"'
-VERDICTS_KILLED_BY_WRAPPER = ("timeout", "memory", "squeezed")
+VERDICTS_KILLED_BY_WRAPPER = ("timeout", "memory", "compilememory", "squeezed")
+# 编译那一趟的并行度按这一行的内存上限收（文件头「编译并行度」）：每个并行的编译任务按这么多 GiB 算。推的：单编 librocksdb-sys，上限 4G、并行度 2 峰值 3470786560 字节
+# （含页缓存）= 每个任务约 1.6 GiB，取 1.75 留余地；并行度 10 同一上限 15 秒就撞（records/2026-10-18-里程碑三收尾与近期欠账.md 批 4）。只有这一个读数，量到别的再改。
+COMPILE_GIB_PER_JOB = 1.75
+# 编译目录占盘（文件头「磁盘余量」「编译目录上限」）：每个工作进程最多占两份编译目录（普通一份、插桩一份），一份涨满按 TARGET_DIRECTORY_CAP 算。
+# 默认 64G 是推的：第二台量到的 -w<片号> 普通 39–71G、插桩 30–68G（records/2026-09-16-subagent拆分提案.md 第七十八节追记，2026-10-21），取中偏上；
+# 本机一份普通的此刻 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（量的，2026-10-21），所以清增量产物不一定清到线下，清完仍超线的只报、不动别的。
+# 备用 30G 是推的：留给别的会话与系统，不让工作进程把盘写满（2026-10-20 第二台 1.8T 写满过一次、2026-10-21 又只剩 4.2G）。
+TARGET_DIRECTORY_CAP_VARIABLE = "GATE_MUTATION_TARGET_DIR_CAP"
+DEFAULT_TARGET_DIRECTORY_CAP = "64G"
+DISK_FREE_VARIABLE = "GATE_MUTATION_DISK_FREE"          # 外层给的目标盘余量（systemd 写法）；不设就读编译目录所在那块盘
+DISK_RESERVE_VARIABLE = "GATE_MUTATION_DISK_RESERVE"
+DEFAULT_DISK_RESERVE = "30G"
+TARGET_DIRECTORY_COPIES_PER_WORKER = 2                  # 普通一份、插桩一份
+INCREMENTAL_DIRECTORY_NAME = "incremental"
+CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX = "shard-"   # 每片的崩溃判定库家目录：<变异复跑的家目录>/shard-<片号>
 VERDICTS_THAT_DID_NOT_RUN = ("refused", "unavailable")
 TEST_NAME_FORM = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)*")
 # 点名的测试在本机没跑到被改坏的那一处时打的一行（见文件头「本次未跑」）；变异那一趟补 --show-output，libtest 才把成功用例的这一行交出来
@@ -388,6 +477,8 @@ BYTES_PER_STAT_BLOCK = 512   # os.stat 的 st_blocks 按 512 字节一块数（P
 EXIT_SELECTION_ONLY = 3      # 只判了选中的行、都抓到：不是整道结论，门禁汇总记失败，不会被当成通过
 # run_pool 里接住这两个信号：先停自己起的工作进程、删 shard_root，再退 128 + 信号号（双机分片的驱动停这一份、门禁被打断时都走这一条）
 STOP_SIGNALS = (signal.SIGTERM, signal.SIGHUP)
+# run_pool 在 $TMPDIR 下建的 shard_root 的名字起头（mutation-shard-run.sh 的自证、本模块的自证都按这个起头找它）
+SHARD_ROOT_PREFIX = "singlefs-mutation-replay-"
 # 源码里一处字符串字面量或注释的起头（找字面量时跳过注释用）
 LITERAL_OR_COMMENT_START = re.compile(r'//|/\*|b?r#*"|b?"|\'')
 PATH_ATTRIBUTE_BEFORE_LITERAL = re.compile(r"#\s*\[\s*path\s*=\s*$")
@@ -397,7 +488,8 @@ STAGE_VARIABLES = ("GATE_MUTATION_WORKERS", "GATE_MUTATION_CARGO_JOBS", "GATE_MU
                    "GATE_MUTATION_ROW_SELECTION", "GATE_MUTATION_START_OVER", "GATE_MUTATION_LONG_ROW_SECONDS",
                    "GATE_MUTATION_STOP_AFTER_ROWS", "GATE_MUTATION_TARGET_DIR", "GATE_MUTATION_MEMORY_CAP_RUNNER",
                    "GATE_MUTATION_RECORDS_HOME", "GATE_MUTATION_NOT_RUN_RECORD", "GATE_MUTATION_LLVM_TOOLS", "GATE_MUTATION_CRASH_LIBRARY_HOME", "SINGLEFS_GATE_FULL",
-                   "SINGLEFS_REUSE_HOURS", "GATE_MUTATION_KEY_WORKERS", OUTER_MEMORY_CAP_VARIABLE)
+                   "SINGLEFS_REUSE_HOURS", "GATE_MUTATION_KEY_WORKERS", OUTER_MEMORY_CAP_VARIABLE,
+                   TARGET_DIRECTORY_CAP_VARIABLE, DISK_FREE_VARIABLE, DISK_RESERVE_VARIABLE)
 
 Row = collections.namedtuple("Row", "line_number name path old new arguments expected fields")
 
@@ -454,6 +546,120 @@ def mutation_crash_library_environment(environment):
         return expanded_home_path(configured, environment), (CRASH_LIBRARY_DIRECTORY_VARIABLE,)
     real_home = environment.get(CRASH_LIBRARY_HOME_VARIABLE, "").strip() or DEFAULT_CRASH_LIBRARY_HOME
     return os.path.join(expanded_home_path(real_home, environment), MUTATION_CRASH_LIBRARY_SUBDIRECTORY), (CRASH_LIBRARY_DIRECTORY_VARIABLE,)
+
+
+def compile_jobs_for(memory_max, requested_jobs, environment):
+    """编译那一趟（cargo test … --no-run，基线、变异与插桩编译的先编）的并行度，字符串：requested_jobs（核数 ÷ 工作进程数）与这一行的内存上限
+    memory_max 装得下的任务数（上限 ÷ COMPILE_GIB_PER_JOB，向下取整、至少 1）取小者。GATE_MUTATION_CARGO_JOBS 设了（调用方自己定的并行度）、
+    上限写法不认、requested_jobs 不是正整数的原样交回。测试那一趟不经这里（编译已在先编那一趟做完，cargo test 不再起 rustc）。
+    弄坏开关 compilejobsbyworkers：照改前一律交 requested_jobs。"""
+    if break_is(environment, "compilejobsbyworkers") or environment.get("GATE_MUTATION_CARGO_JOBS", "").strip():
+        return str(requested_jobs)
+    limit = bytes_of_size(str(memory_max))
+    if limit is None or not re.fullmatch(r"[1-9][0-9]*", str(requested_jobs).strip()):
+        return str(requested_jobs)
+    fitting = max(1, int(limit // (COMPILE_GIB_PER_JOB * 1024 ** 3)))
+    return str(min(int(str(requested_jobs).strip()), fitting))
+
+
+def size_text_of_bytes(byte_count):
+    """字节数 → systemd 写法（向下取整到 MiB，至少 1M）；run-with-memory-cap.sh 认正整数加 K / M / G / T。"""
+    return f"{max(1, int(byte_count) // (1 << 20))}M"
+
+
+class OuterBudget:
+    """套在外层内存包装里时（RUN_WITH_MEMORY_CAP_OUTER_CAP 读得到）的额度账，父进程与各工作进程共用一份（multiprocessing.Value，同一把锁）：
+    claimed 是在跑的各格各自的上限之和（run_pool 派一格记一笔、收一格销一笔，pick_ready_job 与记账在同一把锁里做完），
+    leased 是先编那一趟（compile_plan）从外层额度里此刻空着的那一部分借走的、还没还的字节，holders 是此刻借着额度的工作进程数，
+    in_flight 是此刻在跑的格数，peak 是 claimed + leased 到过的最大值。不变量：claimed + leased 不超过外层上限，除非什么都没在跑时单独起了一格比外层还大的
+    （pick_ready_job 的退路），那时 leased 为 0。"""
+
+    def __init__(self, outer_bytes, worker_count, default_job_bytes):
+        self.outer_bytes = outer_bytes
+        self.worker_count = worker_count
+        self.default_job_bytes = default_job_bytes   # 一个空着的工作进程接下一格至少要留的额度：没有逐行上限的那些行的上限
+        self.claimed = multiprocessing.Value("q", 0)
+        lock = self.claimed.get_lock()
+        self.leased = multiprocessing.Value("q", 0, lock=lock)
+        self.holders = multiprocessing.Value("i", 0, lock=lock)
+        self.in_flight = multiprocessing.Value("i", 0, lock=lock)
+        self.peak = multiprocessing.Value("q", 0, lock=lock)
+        self.lock = lock
+
+    def _note_peak(self):
+        self.peak.value = max(self.peak.value, self.claimed.value + self.leased.value)
+
+    def used(self):
+        with self.lock:
+            return self.claimed.value + self.leased.value
+
+    def claim(self, need):
+        with self.lock:
+            self.claimed.value += need
+            self.in_flight.value += 1
+            self._note_peak()
+
+    def release(self, need):
+        with self.lock:
+            self.claimed.value -= need
+            self.in_flight.value -= 1
+
+    def lease(self, wanted_extra):
+        """先编那一趟想在自己这一格的上限之外再要 wanted_extra 字节：从外层额度里此刻空着的那一部分借，交回借到的字节（可以是 0）。
+        空着的 = 外层 − 在跑各格的上限 − 别的先编已借走的 − 给每个空着的工作进程接下一格留的默认上限；
+        几个工作进程同时要时各分一份（空着的 ÷ 还没借着额度的工作进程数），先到的不独吞。"""
+        with self.lock:
+            reserved = max(0, self.worker_count - self.in_flight.value) * self.default_job_bytes
+            free = self.outer_bytes - self.claimed.value - self.leased.value - reserved
+            divisor = max(1, self.worker_count - self.holders.value)
+            taken = max(0, min(int(wanted_extra), free // divisor))
+            if taken > 0:
+                self.leased.value += taken
+                self.holders.value += 1
+                self._note_peak()
+            return taken
+
+    def give_back(self, taken):
+        if taken > 0:
+            with self.lock:
+                self.leased.value -= taken
+                self.holders.value -= 1
+
+
+def compile_plan(memory_max, requested_jobs, environment, budget):
+    """先编那一趟（基线、变异的先编与插桩编译）的 (内存上限, 并行度, 借的字节)。
+    老算法（compile_jobs_for）只按这一格自己的上限收：每条 4G 至多 2。套在外层包装里（budget 不是 None）时改从外层额度里此刻空着的那一部分算：
+    想要的并行度（requested_jobs，核数 ÷ 工作进程数）× COMPILE_GIB_PER_JOB 减去这一格自己的上限，向额度账借（OuterBudget.lease），借到多少，
+    这一趟先编的内存上限就是自己的上限加借到的，并行度是（总上限 ÷ COMPILE_GIB_PER_JOB，向下取整）与 requested_jobs 的小者，不低于老算法的；
+    借到了而并行度没比老算法高的，当场还回去、照老算法。GATE_MUTATION_CARGO_JOBS 设了、外层额度读不到（budget 是 None）、上限或并行度写法不认的照老算法。
+    弄坏开关 compilejobsownlimit：照老算法，只按这一格自己的上限收（改前的样子）。"""
+    own_jobs = compile_jobs_for(memory_max, requested_jobs, environment)
+    if budget is None or break_is(environment, "compilejobsownlimit") or environment.get("GATE_MUTATION_CARGO_JOBS", "").strip():
+        return memory_max, own_jobs, 0
+    own_bytes = bytes_of_size(str(memory_max))
+    if own_bytes is None or not re.fullmatch(r"[1-9][0-9]*", str(requested_jobs).strip()):
+        return memory_max, own_jobs, 0
+    requested = int(str(requested_jobs).strip())
+    per_job_bytes = int(COMPILE_GIB_PER_JOB * 1024 ** 3)
+    taken = budget.lease(max(0, requested * per_job_bytes - own_bytes))
+    if taken <= 0:
+        return memory_max, own_jobs, 0
+    jobs = max(int(own_jobs), min(requested, (own_bytes + taken) // per_job_bytes))
+    if jobs <= int(own_jobs):
+        budget.give_back(taken)
+        return memory_max, own_jobs, 0
+    return size_text_of_bytes(own_bytes + taken), str(jobs), taken
+
+
+def crash_library_home_for_shard(environment, worker_sequence):
+    """片号 worker_sequence 那个工作进程起 cargo 用的崩溃判定库家目录：变异复跑的家目录（mutation_crash_library_environment 算的，已在 environment 里）底下的
+    shard-<片号>，每片各一份。几个工作进程共用一份库时，开库等锁（crash_library.rs 的 DEFAULT_LOCK_WAIT_SECONDS 1800 秒）的重试会与测试限时（默认 1800 秒）相叠，
+    等锁被记成「超时」。片号经锁领（claim_worker_slot），并发的几次调用拿到的片号不相交，所以各片的库也不会被别的调用占着。
+    环境里没有换过的家目录（弄坏开关 sharedcrashlibrary）、或弄坏开关 crashlibraryacrossshards：交 None，不分。"""
+    home = environment.get(CRASH_LIBRARY_HOME_VARIABLE, "").strip()
+    if not home or break_is(environment, "sharedcrashlibrary") or break_is(environment, "crashlibraryacrossshards"):
+        return None
+    return os.path.join(home, f"{CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX}{worker_sequence}")
 
 
 # ── 变异表 ────────────────────────────────────────────────────────────────────
@@ -876,13 +1082,14 @@ class KeyContext:
 
     def prepare(self, rows):
         """先把这一趟每一行点名测试的闭包算好（并行，进程数见 key_workers）；components 之后照缓存取。回算了几个闭包。"""
-        requests = []
+        requests, labels = [], []
         for row in rows:
             _mutated, refusal = self.keys.mutated_units(row.path, row.old)
             test, test_refusal = (None, refusal) if refusal is not None else self.keys.resolve_test(row.arguments, row.expected)
             if test_refusal is None:
                 requests.append((test.unit, test.target, mutation_units.parse_cargo_arguments(row.arguments)))
-        return self.keys.precompute_closures(requests, key_workers(self.environment))
+                labels.append(f"{TABLE}:{row.line_number} {row.name}")
+        return self.keys.precompute_closures(requests, key_workers(self.environment), labels)
 
     def dependency(self, lines):
         """(依赖版本行的键, 那几行)：行是点名测试的闭包与被改坏的单元点名的外部 crate 收到的（lib_mutation_units.py 文件头「依赖版本行」），按行缓存。"""
@@ -1136,11 +1343,12 @@ def wrapper_outcome(returncode, memory_max, timeout_seconds):
     return outcomes.get(returncode)
 
 
-def baseline_problem(row, returncode, output, memory_max, timeout_seconds):
-    """这一行的点名测试在基线输出里不是「恰好一个用例、结果都是 ok」时交那一句（接在「在没改坏的副本上」后面），是的交 None。"""
+def baseline_problem(row, returncode, output, memory_max, timeout_seconds, compile_pass=False):
+    """这一行的点名测试在基线输出里不是「恰好一个用例、结果都是 ok」时交那一句（接在「在没改坏的副本上」后面），是的交 None。
+    compile_pass：交回的是先编那一趟，句子写明是编译那一趟（撞顶说明编译没装进上限，不是测试本身要这么多）。"""
     outcome = wrapper_outcome(returncode, memory_max, timeout_seconds)
     if outcome is not None:
-        return f"没判成：那一批{outcome[1]}"
+        return f"没判成：那一批{'编译那一趟' if compile_pass else ''}{outcome[1]}"
     results = results_by_test(row.expected, output)
     if len(results) == 1 and all(result == "ok" for result in next(iter(results.values()))):
         return None
@@ -1174,14 +1382,19 @@ def not_run_reason(expected, output):
     return None
 
 
-def verdict_of_run(row, returncode, output, memory_max, timeout_seconds, environment=None):
-    """一条变异跑完之后判哪一档：(档, 那一条要打印的话)。environment 只看弄坏开关（notrunasmissed）。"""
+def verdict_of_run(row, returncode, output, memory_max, timeout_seconds, environment=None, compile_pass=False):
+    """一条变异跑完之后判哪一档：(档, 那一条要打印的话)。environment 只看弄坏开关（notrunasmissed、memorycompilemerged）。
+    compile_pass：这一趟交回的是先编那一趟（run_under_wrapper 的 compile_pass 标记）；包装退 250 时分两档：编译那一趟撞的记 compilememory（改坏之后的代码没编成，
+    点名的测试没起，说不上被测代码无界分配），测试那一趟撞的记 memory。弄坏开关 memorycompilemerged：不分，照改前都记 memory。"""
     tail = output_tail(output)
     outcome = wrapper_outcome(returncode, memory_max, timeout_seconds)
     # 包装报的几种结局先判：被停、被杀的测试二进制可能已经打出了半截输出，不许拿它判抓到或没红
     if outcome is not None:
         verdict, sentence = outcome
+        if verdict == "memory" and compile_pass and not break_is(environment or {}, "memorycompilemerged"):
+            verdict, sentence = "compilememory", f"编译那一趟撞了内存上限 {memory_max}（内存撞顶）"
         extra = {"timeout": f"，点名的测试 {row.expected} 没来得及红", "memory": f"，点名的测试 {row.expected} 没来得及红",
+                 "compilememory": f"，改坏之后的代码没编成、点名的测试 {row.expected} 一次都没起",
                  "squeezed": "，这一条的结果不算数", "gpumemory": "，这一条的结果不算数"}.get(verdict, "")
         return verdict, f"{TABLE}:{row.line_number} {row.name}：{sentence}{extra}\n{tail}"
     # 点名省掉模块路径时在输出里只许对上一个用例：对上两个就分不出红的是不是点名的那一个，按没判成记，不按「有一个红了」算抓到。
@@ -1243,9 +1456,10 @@ def own_workers_stopped_on_stop(pool, shard_root):
 
 
 
-def init_worker(sequence_counter, shard_root, context):
+def init_worker(sequence_counter, shard_root, context, budget=None):
     """工作进程启动时跑一次：领一个稳定的片号、建自己的源码副本与编译目录。片号从共用编译目录那一层的锁文件领（claim_worker_slot，跨调用不重），
-    活是动态领的（checker-tier-crates-mutation-replay 文件头）。sequence_counter 只在拿不到锁文件、或弄坏开关 local-shard-numbering 下当本地序号用。"""
+    活是动态领的（checker-tier-crates-mutation-replay 文件头）。sequence_counter 只在拿不到锁文件、或弄坏开关 local-shard-numbering 下当本地序号用。
+    budget 是外层额度账（OuterBudget，套在外层内存包装里时有，先编那一趟向它借额度）；外层读不到时是 None。"""
     # 父进程在 run_pool 里把 STOP_SIGNALS 接成「收尾再退」；工作进程照默认（收到就停），不把父进程的接法带进来
     for signal_number in STOP_SIGNALS:
         signal.signal(signal_number, signal.SIG_DFL)
@@ -1256,13 +1470,17 @@ def init_worker(sequence_counter, shard_root, context):
          + (f"片号锁 {slot_lock.name}" if slot_lock is not None else "没有片号锁，按本地序号") + "）")
     environment = dict(context["environment"])
     environment["CARGO_TARGET_DIR"] = target_directory
+    shard_crash_library_home = crash_library_home_for_shard(environment, worker_sequence)
+    if shard_crash_library_home is not None:
+        environment[CRASH_LIBRARY_HOME_VARIABLE] = shard_crash_library_home
+        note(f"  … 工作进程 {os.getpid()} 起 cargo 用的崩溃判定库家目录：{shard_crash_library_home}（每片各一份，不与别的工作进程共用）")
     # 在用的标记（WORKER_TARGET_LOCK_NAME）：进程退出内核就放，别的一趟回收时拿不到排他锁就不删这份
     WORKER_STATE["target_lock"] = hold_worker_target_lock(target_directory)
     # 这份副本的整树快照：只当基线记录的一样属性记下（弄坏开关 baseline-by-tree-snapshot 按它比），不当复用的依据
     snapshot = snapshot_identity(snapshot_of(work, context["copied"]))
     WORKER_STATE.update(work=work, environment=environment, context=context, shard_root=shard_root, worker_sequence=worker_sequence,
                         per_mutation_temporary_root=os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME),
-                        snapshot=snapshot, library=mutation_units.Library(context["library_directory"], RECORD_HEADER), unit_keys=None)
+                        snapshot=snapshot, library=mutation_units.Library(context["library_directory"], RECORD_HEADER), unit_keys=None, budget=budget)
     # 源码副本建在父进程的 shard_root 底下、由父进程收尾时整个删；编译目录留着跨轮复用。
     # 不在这里挂 atexit：进程池的工作进程走 os._exit 退出，atexit 在这里一次都不跑。
 
@@ -1507,6 +1725,150 @@ def target_reclaim_lines(shared, worker_count, outcome):
     return lines
 
 
+def size_setting_problems(environment):
+    """GATE_MUTATION_TARGET_DIR_CAP、GATE_MUTATION_DISK_FREE、GATE_MUTATION_DISK_RESERVE 里写法不认的：[(卡在哪, 下一步)]。"""
+    problems = []
+    for variable in (TARGET_DIRECTORY_CAP_VARIABLE, DISK_FREE_VARIABLE, DISK_RESERVE_VARIABLE):
+        text = environment.get(variable, "").strip()
+        if text and bytes_of_size(text) is None:
+            problems.append((f"{variable} 写成了「{text}」，不是 systemd 的写法",
+                             f"写成正整数加 K / M / G / T，单位必写，例 64G（{variable} 的意思见 scripts/mutation/crates-mutation-rows.py 文件头「磁盘余量」「编译目录上限」），或者不设它。"))
+    return problems
+
+
+def target_directory_cap_bytes(environment):
+    """每份编译目录的上限字节（GATE_MUTATION_TARGET_DIR_CAP，默认 DEFAULT_TARGET_DIRECTORY_CAP）。"""
+    return bytes_of_size(environment.get(TARGET_DIRECTORY_CAP_VARIABLE, "").strip() or DEFAULT_TARGET_DIRECTORY_CAP)
+
+
+def worker_target_directories(shared, sequence):
+    """片号 sequence 的 (普通编译目录, 插桩编译目录)：第 1 片用共用的，其余片加 -w<片号>，插桩的再加 -coverage（与 prepare_shard、judge_coverage 同一套）。"""
+    plain = shared if sequence == 1 else f"{shared}-w{sequence}"
+    return plain, plain + COVERAGE_TARGET_SUFFIX
+
+
+def disk_free_bytes(shared, environment):
+    """目标盘（编译目录所在那块）此刻的余量：(字节或 None, 说明或没读到的原因)。外层给了 GATE_MUTATION_DISK_FREE 用它，不然读编译目录往上第一层存在的目录所在的盘。"""
+    given = environment.get(DISK_FREE_VARIABLE, "").strip()
+    if given:
+        value = bytes_of_size(given)
+        if value is None:
+            return None, f"{DISK_FREE_VARIABLE} 写成「{given}」，不是正整数加 K / M / G / T"
+        return value, f"外层给的 {DISK_FREE_VARIABLE}={given}"
+    probe = os.path.abspath(shared)
+    while not os.path.exists(probe) and os.path.dirname(probe) != probe:
+        probe = os.path.dirname(probe)
+    try:
+        status = os.statvfs(probe)
+    except OSError as error:
+        return None, f"外层没给 {DISK_FREE_VARIABLE}，读编译目录所在的盘也不成（{type(error).__name__}：{error}）"
+    return status.f_bavail * status.f_frsize, "编译目录所在的盘此刻可用"
+
+
+def disk_bound_for(shared, environment, ceiling):
+    """磁盘余量放得下几个工作进程（文件头「磁盘余量」）：(个数或 None, 头一行要写的话)。
+    每个工作进程最多占两份编译目录（普通、插桩），每份涨到 TARGET_DIRECTORY_CAP 为止：片号 1…n 各份还能涨的量（上限减去此刻已占的，目录还没建的是整个上限）
+    加起来，再加备用 DISK_RESERVE，不超过目标盘余量的最大 n；n 从 1 数到 ceiling（前几项取最小的那个数，再多开也用不上）。一个都放不下交 0（调用方按 1 个开）。
+    余量没读到、写法不认交 None 与原因，头一行写明。弄坏开关 disknotchecked：不看磁盘（改前的样子）。"""
+    if break_is(environment, "disknotchecked"):
+        return None, "弄坏开关 disknotchecked：不看磁盘余量"
+    free, source = disk_free_bytes(shared, environment)
+    if free is None:
+        return None, source
+    cap = target_directory_cap_bytes(environment)
+    reserve = bytes_of_size(environment.get(DISK_RESERVE_VARIABLE, "").strip() or DEFAULT_DISK_RESERVE)
+    if cap is None or reserve is None:
+        return None, f"{TARGET_DIRECTORY_CAP_VARIABLE} 或 {DISK_RESERVE_VARIABLE} 的写法不认"
+    count, total, next_total = 0, 0, None
+    for sequence in range(1, max(1, ceiling) + 2):   # 多数一个：放得下天花板之外的一个，才不与前几项里最小的那一项并列成「卡在」
+        room = sum(max(0, cap - allocated_bytes_of_tree(directory)) if os.path.isdir(directory) else cap
+                   for directory in worker_target_directories(shared, sequence))
+        if reserve + total + room > free:
+            next_total = total + room
+            break
+        total += room
+        count = sequence
+    cap_text = environment.get(TARGET_DIRECTORY_CAP_VARIABLE, "").strip() or DEFAULT_TARGET_DIRECTORY_CAP
+    text = (f"磁盘余量 {format_size(free)}（{source}），留备用 {format_size(reserve)}，每个工作进程最多占两份编译目录（普通、插桩）、各涨到 {cap_text}（已有的目录只算还能涨的）："
+            f"{count} 个共还要 {format_size(total)}"
+            + (f"，再多 1 个要 {format_size(next_total)}、放不下，所以给 {count} 个" if next_total is not None else f"，前几项的天花板 {ceiling} 个（连同再多 1 个）都放得下，这一项不卡"))
+    return count, text
+
+
+def incremental_directories_of(target_directory):
+    """编译目录底下的增量产物目录：<目录>/<档>/incremental 与 <目录>/<目标三元组>/<档>/incremental。"""
+    found = []
+    try:
+        levels = [entry.path for entry in os.scandir(target_directory) if entry.is_dir(follow_symlinks=False)]
+    except OSError:
+        return found
+    for level in sorted(levels):
+        candidate = os.path.join(level, INCREMENTAL_DIRECTORY_NAME)
+        if os.path.isdir(candidate):
+            found.append(candidate)
+        try:
+            deeper = sorted(entry.path for entry in os.scandir(level) if entry.is_dir(follow_symlinks=False))
+        except OSError:
+            continue
+        found += [os.path.join(path, INCREMENTAL_DIRECTORY_NAME) for path in deeper if os.path.isdir(os.path.join(path, INCREMENTAL_DIRECTORY_NAME))]
+    return found
+
+
+def trim_target_directory(directory, cap_bytes, environment):
+    """一份编译目录占盘超过 cap_bytes 时清掉它底下的增量产物（incremental，rustc 每编一次改坏的副本都往里加、只增不减），回 (清前占盘, 清后占盘, [(清掉的目录, 字节)])。
+    没超线、目录不在、cap_bytes 是 None 都不动，清前清后交同一个数。清完回读再量一遍，不拿清前减清掉的估。只在两格之间调（run_pool 里每格判完），那时没有 cargo 在这份目录上跑。
+    依赖与测试二进制不动（那是下一趟复用的缓存），清完仍超线的由调用方报。弄坏开关 targetcapignored：不清（改前的样子）。"""
+    if break_is(environment, "targetcapignored") or cap_bytes is None or not os.path.isdir(directory):
+        return 0, 0, []
+    before = allocated_bytes_of_tree(directory)
+    if before <= cap_bytes:
+        return before, before, []
+    removed = []
+    for path in incremental_directories_of(directory):
+        size = allocated_bytes_of_tree(path)
+        shutil.rmtree(path)
+        removed.append((path, size))
+    return before, allocated_bytes_of_tree(directory), removed
+
+
+def trim_worker_target(coverage):
+    """这个工作进程刚判完一格：它自己的那份编译目录（coverage 为真是插桩那份）占盘超过上限就清增量产物，stderr 报清了什么、清完还剩多少。
+    清不成只报，不让这一格的判定因此丢（并行不许把失败吃掉：这里报出来，判定照交）。"""
+    context = WORKER_STATE["context"]
+    directory = WORKER_STATE["environment"]["CARGO_TARGET_DIR"] + (COVERAGE_TARGET_SUFFIX if coverage else "")
+    cap = context.get("target_directory_cap_bytes")
+    try:
+        before, after, removed = trim_target_directory(directory, cap, context["environment"])
+    except OSError as error:
+        note(f"  ! 编译目录 {directory} 超过上限时清增量产物没清成（{type(error).__name__}：{error}）；下一格判完再试")
+        return
+    if before > (cap or before):
+        note(f"  … 编译目录 {directory} 占盘 {format_size(before)} 超过上限 {format_size(cap)}：清掉增量产物 {len(removed)} 处共 {format_size(sum(size for _path, size in removed))}，清后 {format_size(after)}"
+             + (f"；清后仍超上限（剩下的是依赖与测试二进制，不在清的范围里）：等这一趟收尾后手删这份目录，或把 {TARGET_DIRECTORY_CAP_VARIABLE} 调大"
+                if after > cap else ""))
+
+
+def baseline_job(batch):
+    """进程池里的一格基线：判完清一次普通编译目录（trim_worker_target）。"""
+    result = judge_batch(batch)
+    trim_worker_target(False)
+    return result
+
+
+def mutation_job(row):
+    """进程池里的一格变异：判完清一次普通编译目录。"""
+    result = judge_row(row)
+    trim_worker_target(False)
+    return result
+
+
+def coverage_job(job):
+    """进程池里的一格覆盖：判完清一次插桩编译目录。"""
+    result = judge_coverage(job)
+    trim_worker_target(True)
+    return result
+
+
 def measure_and_remove_temporary_directory(directory, context):
     """数下一条的 TMPDIR 里有几个文件、占盘与表观各多少字节，再整个删掉。回 (文件数, 占盘字节, 表观字节, 删完之后它还在不在)。"""
     file_count = allocated_bytes = apparent_bytes = 0
@@ -1561,6 +1923,7 @@ def run_under_wrapper(command, temporary_directory, stamp_name, extra_environmen
         before = command[:command.index("--")] if "--" in command else list(command)
         build, build_seconds = run_one_under_wrapper(before + ["--no-run"], temporary_directory, stamp_name + "-build", extra_environment, memory_max, None)
         if build.returncode != 0:
+            build.compile_pass = True   # 交回的是先编那一趟：verdict_of_run、baseline_problem 靠它分编译撞顶与测试撞顶
             return build, build_seconds
         run, run_seconds = run_one_under_wrapper(command, temporary_directory, stamp_name, extra_environment, memory_max, timeout_seconds)
         return run, {name: f"{float(build_seconds[name]) + float(run_seconds[name]):.3f}" for name in run_seconds}
@@ -1579,6 +1942,11 @@ def run_one_under_wrapper(command, temporary_directory, stamp_name, extra_enviro
     else:
         environment.pop("RUN_WITH_MEMORY_CAP_TIME_LIMIT", None)
     environment.update(extra_environment or {})
+    cap, leased_bytes = memory_max, 0
+    if stamp_name.endswith("-build") and environment.get("CARGO_BUILD_JOBS"):
+        # 编译那一趟（基线与变异的先编、插桩编译）：并行度不按核数 ÷ 工作进程数；按这一行的内存上限收，套在外层包装里时再向外层额度里此刻空着的那一部分借
+        # （compile_plan，文件头「编译并行度」）：借到的算进这一趟包装的内存上限，编完就还
+        cap, environment["CARGO_BUILD_JOBS"], leased_bytes = compile_plan(memory_max, environment["CARGO_BUILD_JOBS"], context["environment"], state.get("budget"))
     # 会话里的「日常一条」：每次包装带这个工作进程自己的并行理由，调用方设了的原样传、不覆盖；只设在这一次包装的环境里（文件头「并行理由」一段）
     if not state["environment"].get("RUN_WITH_MEMORY_CAP_PARALLEL_REASON") or break_is(context["environment"], "overridecallerreason"):
         if not break_is(context["environment"], "noparallelreason"):
@@ -1590,8 +1958,15 @@ def run_one_under_wrapper(command, temporary_directory, stamp_name, extra_enviro
     kind, _dash, line_number = stamp_name[:-len("-build")].partition("-") if building else stamp_name.partition("-")
     label = {"baseline": f"基线（批首行是变异表第 {line_number} 行）", "coverage": f"覆盖（组首行是变异表第 {line_number.split('-')[0]} 行）"}.get(
         kind, f"变异表第 {line_number} 行") + ("（先编，不限时）" if building else "")
-    run = run_forwarding_queue_lines(["bash", context["memory_cap_runner"], memory_max, "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
-                                     + command, label, cwd=state["work"], env=environment)
+    try:
+        run = run_forwarding_queue_lines(["bash", context["memory_cap_runner"], cap, "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
+                                         + command, label, cwd=state["work"], env=environment)
+    finally:
+        if leased_bytes:
+            state["budget"].give_back(leased_bytes)
+    if leased_bytes and run.returncode == MEMORY_CAP_HIT_EXIT:
+        note(f"  ! {label}：先编那一趟撞了内存上限 {cap}（这一格自己的 {memory_max} 加向外层额度借的 {format_size(leased_bytes)}，并行度 {environment['CARGO_BUILD_JOBS']}）；"
+             f"判定里写的上限是这一格自己的 {memory_max}")
     returned = time.time()
     started = None
     with contextlib.suppress(OSError, ValueError):
@@ -1637,7 +2012,7 @@ def judge_batch(batch):
     output = run.stdout + run.stderr
     judged, record_problems = [], []
     for row in batch_rows:
-        problem = baseline_problem(row, run.returncode, output, *limits)
+        problem = baseline_problem(row, run.returncode, output, *limits, compile_pass=getattr(run, "compile_pass", False))
         excerpt = None
         if problem is not None:
             results = results_by_test(row.expected, output)
@@ -1676,7 +2051,7 @@ def judge_row(row):
         # 不论退出码是几都删（含限时、撞顶被杀）：被杀的测试 Drop 守卫不跑，它建的镜像只有这里删得掉
         removal = measure_and_remove_temporary_directory(temporary_directory, context)
     output = run.stdout + run.stderr
-    verdict, text = verdict_of_run(row, run.returncode, output, *limits, context["environment"])
+    verdict, text = verdict_of_run(row, run.returncode, output, *limits, context["environment"], compile_pass=getattr(run, "compile_pass", False))
     if verdict in VERDICTS_KILLED_BY_WRAPPER:
         file_count, allocated_bytes, _apparent_bytes, is_still_there = removal
         first_line, line_break, rest = text.partition("\n")
@@ -1692,8 +2067,8 @@ def judge_row(row):
             exit_code=run.returncode, judged_date=mutation_units.today_text(), how=how_text(context, "现判", limits), test_full_name=full_name,
             test_closure=components.get("test_closure", ""), mutated=components.get("mutated", ""), toolchain=components.get("toolchain", ""),
             dependency=components.get("dependency", ""))
-        if verdict in ("timeout", "memory"):
-            # 上限与限时只记在这两档的记录里（这两档本来不复用）；别的档的键与记录里都没有它们
+        if verdict in ("timeout", "memory", "compilememory"):
+            # 上限与限时只记在这几档的记录里（这两档本来不复用）；别的档的键与记录里都没有它们
             fields.update(memory_max=limits[0], timeout_seconds=limits[1])
         fields.update(seconds)
         failed_to_write = write_record_quietly("records", components["row_key"], fields)
@@ -1795,7 +2170,10 @@ def record_coverage(job, overrides, configuration, temporary_directory, profiles
     executables = executables_of_build(messages, state["work"])
     if not executables:
         return "插桩编译没交出一个本仓的可执行文件"
-    run, _seconds = run_under_wrapper(["cargo", *configuration, "test", "--offline", *job["before"], "--", *job["switches"], "--exact", job["test"]],
+    # 点名用例前自己补 --exact：行的 libtest 参数里已经带了的不再重复补（libtest 报 Option 'exact' given more than once、退 101，覆盖就记不成）；
+    # 弄坏开关 exactduplicated：照改前原样接在后面
+    switches = list(job["switches"]) if break_is(context["environment"], "exactduplicated") else [word for word in job["switches"] if word != "--exact"]
+    run, _seconds = run_under_wrapper(["cargo", *configuration, "test", "--offline", *job["before"], "--", *switches, "--exact", job["test"]],
                                       temporary_directory, stamp + "-run", dict(overrides, LLVM_PROFILE_FILE=os.path.join(profiles, "cov-%p-%m.profraw")), limits=limits)
     output = run.stdout + run.stderr
     outcome = wrapper_outcome(run.returncode, *limits)
@@ -1844,9 +2222,21 @@ def bytes_of_size(text):
     return int(matched.group(1)) * SIZE_UNIT_BYTES[matched.group(2)] if matched else None
 
 
-def worker_count_for(row_count, environment, memory_max):
-    """开几个工作进程，连同头一行要报的话。三项取最小、至少 1：核数的一半（至多 16，GATE_MUTATION_WORKERS 顶掉它）、这一趟要现跑的条数、
-    外层内存上限 ÷ 每条变异的上限（向下取整；外层上限读不到时没有这一项）。
+def outer_memory_bytes(environment):
+    """外层内存上限（RUN_WITH_MEMORY_CAP_OUTER_CAP）的字节数；没设、写法不认交 None。弄坏开关 outermemoryignored：当读不到。"""
+    if break_is(environment, "outermemoryignored"):
+        return None
+    return bytes_of_size(environment.get(OUTER_MEMORY_CAP_VARIABLE, "").strip())
+
+
+def worker_count_for(row_count, environment, memory_max, largest_memory=None, disk=None):
+    """开几个工作进程，连同头一行要报的话。四项取最小、至少 1：核数的一半（至多 16，GATE_MUTATION_WORKERS 顶掉它）、这一趟要现跑的条数、
+    外层内存上限 ÷ 每条变异的上限（向下取整；外层上限读不到时没有这一项）、磁盘余量放得下几个工作进程的编译目录（disk 给了才有这一项）。
+    disk 是一个函数：前三项取最小的那个数当天花板（ceiling）传给它，它交回 (放得下几个或 None, 头一行要写的话)，None 是磁盘余量没读到、没有这一项，
+    头一行写明原因（disk_bound_for，文件头「磁盘余量」）。
+    memory_max 是每条的默认上限（没有逐行上限的那些行用的那个值），不是这一趟逐行上限里最大的：个别行的大上限由 run_pool 按额度排队
+    （文件头「工作进程数」），不压低工作进程数。largest_memory 是这一趟逐行上限里最大的那个，只用来在头一行报「逐行上限最大 X、按额度排队」。
+    弄坏开关 largestrowmemory：改前的样子，每条的上限换成 largest_memory（run_pool 也不排队）。
     一条变异的挂钟 = 重编译那几个 crate + 跑点名的那个测试，测试那一段是单线程的，所以开得比核数 ÷ 4 多，再用 GATE_MUTATION_CARGO_JOBS
     把每个 cargo 的编译并行度收住。
     外层内存上限读环境变量 RUN_WITH_MEMORY_CAP_OUTER_CAP（run-with-memory-cap.sh 套在外层时给命令设的，例 16G）：套在外层里的里层包装不排队
@@ -1863,41 +2253,120 @@ def worker_count_for(row_count, environment, memory_max):
         bounds.append(("核数", by_processor, f"核数 {processor_count} 的一半、至多 16，给 {by_processor} 个"))
     bounds.append(("这一趟要现跑的条数", row_count, f"这一趟要现跑 {row_count} 条（没有作数的抓到记录的）"))
     outer_text = environment.get(OUTER_MEMORY_CAP_VARIABLE, "").strip()
-    outer_bytes = None if break_is(environment, "outermemoryignored") else bytes_of_size(outer_text)
+    outer_bytes = outer_memory_bytes(environment)
+    if largest_memory and break_is(environment, "largestrowmemory"):
+        memory_max = largest_memory
     per_mutation_bytes = bytes_of_size(memory_max)
     by_memory = outer_bytes // per_mutation_bytes if outer_bytes is not None and per_mutation_bytes is not None else None
     if by_memory is not None:
         bounds.append(("外层内存上限", by_memory, f"外层内存上限 {outer_text} ÷ 每条变异 {memory_max}，向下取整给 {by_memory} 个"))
+    disk_unread = None
+    if disk is not None:
+        disk_count, disk_text = disk(max(1, min(count for _name, count, _text in bounds)))
+        if disk_count is None:
+            disk_unread = disk_text
+        else:
+            bounds.append(("磁盘余量", disk_count, disk_text))
     smallest = min(count for _name, count, _text in bounds)
     binding = "、".join(f"「{name}」" for name, count, _text in bounds if count == smallest)
     floor_note = "（那一项不足 1，按 1 个开）" if smallest < 1 else ""
     worker_count = max(1, smallest)
     head_line = (f"  … 这一轮开 {worker_count} 个工作进程（各项取最小、至少 1）：{'；'.join(text for _name, _count, text in bounds)}。"
                  f"卡在{binding}这一项{floor_note}；")
+    if disk_unread is not None:
+        head_line += f"磁盘余量没读到（{disk_unread}），工作进程数不按磁盘收；"
     if by_memory is not None:
-        head_line += "套在外层包装里的里层不排队，工作进程数按外层内存上限收（slice 的总上限兜底）"
+        head_line += ("套在外层包装里的里层不排队，工作进程数按外层内存上限收（slice 的总上限兜底）；"
+                      "先编那一趟的并行度另从外层额度里此刻空着的那一部分借（文件头「编译并行度」）")
+        if largest_memory:
+            largest_bytes = bytes_of_size(largest_memory)
+            head_line += (f"；逐行上限最大 {largest_memory}、按额度排队：每一件（基线的批、变异、覆盖）按自己的上限从外层 {outer_text} 里扣，"
+                          f"在跑的各件上限之和不超过它，扣不下的等前面的跑完，后面装得下的小件可以先派（至多先派 {worker_count} 件后停下等大件）")
+            if largest_bytes is not None and outer_bytes is not None and largest_bytes > outer_bytes:
+                head_line += (f"；最大那一件比外层还大：等在跑的收完、单独起，里层包装按用法错退 {MEMORY_CAP_UNAVAILABLE_EXIT}，"
+                              "照旧报成「scope 起不来，没跑」，不在这里改它的上限")
     else:
         head_line += (f"内存不按进程数收：每条经 run-with-memory-cap.sh 排队，放不下的等（slice 的总上限兜底）；"
                       f"外层内存上限没读到（{OUTER_MEMORY_CAP_VARIABLE} {'没设' if not outer_text else f'写成「{outer_text}」，不是正整数加 K / M / G / T'}，按没套在外层包装里算）")
     return worker_count, head_line
 
 
+def new_shard_root_path():
+    """$TMPDIR 下 SHARD_ROOT_PREFIX 起头加八位随机字符的路径，只起名、不建。tempfile.mkdtemp 是在 mkdir 里把目录建出来、返回之后名字才到调用方手里：
+    TERM 落在这两步之间，收尾的 rmtree 不知道名字，空目录就漏在 $TMPDIR。这里名字先交到调用方、记进 shard_root，再由调用方 os.mkdir，
+    收尾删的就是这个名字（名字在、目录不在也无妨）。"""
+    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789_"
+    chooser = random.SystemRandom()
+    return os.path.join(tempfile.gettempdir(), SHARD_ROOT_PREFIX + "".join(chooser.choice(alphabet) for _ in range(8)))
+
+
+def job_memory_bytes(context, kind, item):
+    """派活队里一件（基线的批、一条变异、一组覆盖）自己的内存上限，字节：与它跑起来经包装给的上限同一个数（limits_for_lines：逐行上限写了的取它，
+    没写的取整张表的那一个数，一批基线取这一批里最大的）。"""
+    if kind == "baseline":
+        lines = [row.line_number for row in item[1]]
+    elif kind == "mutation":
+        lines = [item.line_number]
+    else:
+        lines = [item["line"]]
+    return bytes_of_size(limits_for_lines(context, lines)[0]) or 0
+
+
+def pick_ready_job(ready, claimed_bytes, in_flight_count, outer_bytes, need_of, bypass_counts, bypass_limit):
+    """派活堆 ready（元素 (阶段, 次序, 序号, 种类, 内容)）里此刻该派的一件，已从堆里取出；此刻不派回 None。
+    outer_bytes 是 None（外层内存上限读不到）时不排队，取堆顶，与改前一样。否则按额度派：在跑的各件上限之和 claimed_bytes 加这一件的上限不超过 outer_bytes
+    才派；扣不下的留在堆里，次序在它后面、扣得下的小件可以先派（每先派一件，被越过的每一件的 bypass_counts[序号] 加 1）；
+    一件被越过的次数到了 bypass_limit，它后面的就都不派了，等在跑的收完释放额度，不许饿死大件（bypass_limit 是 None 时不设这个限，只给弄坏开关 bypassunbounded 用）。
+    什么都没在跑时堆顶一定派：上限比整个外层还大的那一件也在这时单独起，包装按用法错退 251、照旧报出来。"""
+    if not ready:
+        return None
+    if outer_bytes is None:
+        return heapq.heappop(ready)
+    held, chosen = [], None
+    while ready:
+        entry = heapq.heappop(ready)
+        if in_flight_count == 0 or claimed_bytes + need_of(entry) <= outer_bytes:
+            chosen = entry
+            break
+        held.append(entry)
+        if bypass_limit is not None and bypass_counts.get(entry[2], 0) >= bypass_limit:
+            break
+    for entry in held:
+        heapq.heappush(ready, entry)
+    if chosen is not None:
+        for entry in held:
+            bypass_counts[entry[2]] = bypass_counts.get(entry[2], 0) + 1
+    return chosen
+
+
 def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, stop_after, coverage_planner):
     """一个进程池里先派基线、再派变异、最后派覆盖：一批基线判完，它 ok 的行进变异的队；已有基线 ok 的行一开始就在队里；
     一条变异判成抓到、它那一组还要记覆盖的（coverage_planner.job_after），那一组的覆盖进队；开跑时就要记的（coverage_planner.initial_jobs）一开始就在队里。
     同时在跑的至多 worker_count 格，空出一格补一格（谁先跑完谁再领），基线优先、变异按 ordered_rows 的次序、覆盖最后。
+    套在外层内存包装里时（context["outer_memory_bytes"] 不是 None）另按额度派：每一格按自己的上限（job_memory_bytes）从外层额度里扣，在跑的各格上限之和不超过外层
+    （pick_ready_job：扣不下的等、后面装得下的小格先派、一格最多被越过 worker_count 次）。弄坏开关 largestrowmemory 与 rowmemoryunbudgeted 下不排队，bypassunbounded 下不设越过次数的限。
     回 dict：mutation（变异的判定）、mutation_info（{行号: {snapshot, test_full_name}}）、baseline（{行号: (问题或 None, 尾巴)}）、coverage（覆盖那几格的结果）、
     submitted、received、stopped、left_behind、record_problems。"""
     sequence_counter = multiprocessing.Value("i", 0)
     # 被停的信号也要删掉 shard_root（$TMPDIR 下的 singlefs-mutation-replay-*）：先接住再建，建完之后收到的都走 finally；
-    # 只在主线程接得了。弄坏开关 shardrootkeptonsignal 下不接（改前的样子：收到就停，shard_root 留在 $TMPDIR）
+    # 接信号、起名、建目录都在 try 里：哪一步之后收到都走 finally（信号处理还原、按已记下的名字删目录），名字先记进 shard_root 再 os.mkdir（new_shard_root_path）。
+    # 只在主线程接得了。弄坏开关 shardrootkeptonsignal 下不接（改前的样子：收到就停，shard_root 留在 $TMPDIR）；
+    # 弄坏开关 shardrootnamedlate 下照改前用 tempfile.mkdtemp 建（名字要等它返回才记得下）
     previous_handlers = {}
-    if threading.current_thread() is threading.main_thread() and not break_is(context["environment"], "shardrootkeptonsignal"):
-        for signal_number in STOP_SIGNALS:
-            previous_handlers[signal_number] = signal.signal(signal_number, raise_stop_requested)
     shard_root = None
     try:
-        shard_root = tempfile.mkdtemp(prefix="singlefs-mutation-replay-")
+        if threading.current_thread() is threading.main_thread() and not break_is(context["environment"], "shardrootkeptonsignal"):
+            for signal_number in STOP_SIGNALS:
+                previous_handlers[signal_number] = signal.signal(signal_number, raise_stop_requested)
+        if break_is(context["environment"], "shardrootnamedlate"):
+            shard_root = tempfile.mkdtemp(prefix=SHARD_ROOT_PREFIX)
+        else:
+            shard_root = new_shard_root_path()
+            try:
+                os.mkdir(shard_root, 0o700)
+            except FileExistsError:
+                shard_root = None   # 别人的同名目录：收尾不许删它
+                raise
         per_mutation_temporary_root = os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME)
         os.mkdir(per_mutation_temporary_root)
         os.mkdir(os.path.join(shard_root, START_STAMP_DIRECTORY_NAME))
@@ -1915,20 +2384,43 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
             heapq.heappush(ready, (2, serial, serial, "coverage", job))
             serial += 1
         outcome = dict(mutation=[], mutation_info={}, baseline={}, coverage=[], submitted=0, received=0, stopped=False, left_behind=[], record_problems=[])
-        in_flight = {}
-        jobs = {"baseline": judge_batch, "mutation": judge_row, "coverage": judge_coverage}
+        in_flight, in_flight_bytes = {}, {}
+        jobs = {"baseline": baseline_job, "mutation": mutation_job, "coverage": coverage_job}   # 各判一格，判完清一次自己那份超线的编译目录
+        outer_bytes = (None if break_is(context["environment"], "largestrowmemory") or break_is(context["environment"], "rowmemoryunbudgeted")
+                       else context.get("outer_memory_bytes"))
+        # 额度账（OuterBudget）：外层读得到时父进程派一格记一笔、先编那一趟向它借；读不到时没有账，派活与先编的并行度与改前一样
+        budget = None if outer_bytes is None else OuterBudget(outer_bytes, worker_count, bytes_of_size(context["memory_max"]) or 0)
+        bypass_limit = None if break_is(context["environment"], "bypassunbounded") else worker_count
+        bypass_counts, needs = {}, {}
+
+        def need_of(entry):
+            if entry[2] not in needs:
+                needs[entry[2]] = job_memory_bytes(context, entry[3], entry[4])
+            return needs[entry[2]]
         with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, initializer=init_worker,
-                                                    initargs=(sequence_counter, shard_root, context)) as pool, own_workers_stopped_on_stop(pool, shard_root):
+                                                    initargs=(sequence_counter, shard_root, context, budget)) as pool, own_workers_stopped_on_stop(pool, shard_root):
             while True:
                 while ready and len(in_flight) < worker_count and not outcome["stopped"]:
-                    _phase, _index, _serial, kind, item = heapq.heappop(ready)
-                    in_flight[pool.submit(jobs[kind], item)] = kind
+                    # 挑与记账在同一把锁里做完：先编那一趟借额度也在这把锁里，在跑各格的上限加借走的不会在两步之间超过外层
+                    with (budget.lock if budget is not None else contextlib.nullcontext()):
+                        entry = pick_ready_job(ready, budget.used() if budget is not None else sum(in_flight_bytes.values()), len(in_flight),
+                                               outer_bytes, need_of, bypass_counts, bypass_limit)
+                        if entry is not None and budget is not None:
+                            budget.claim(need_of(entry))
+                    if entry is None:
+                        break   # 额度扣不下：等在跑的收完释放（什么都没在跑时 pick_ready_job 一定派，下面 `not in_flight` 才会退出）
+                    future = pool.submit(jobs[entry[3]], entry[4])
+                    in_flight[future] = entry[3]
+                    in_flight_bytes[future] = need_of(entry) if outer_bytes is not None else 0
                     outcome["submitted"] += 1
                 if not in_flight:
                     break
                 done, _pending = concurrent.futures.wait(list(in_flight), return_when=concurrent.futures.FIRST_COMPLETED)
                 for future in done:
                     kind = in_flight.pop(future)
+                    released = in_flight_bytes.pop(future, None)
+                    if budget is not None and released is not None:
+                        budget.release(released)
                     result, record_problems = future.result()   # 工作进程里抛出来的异常在这里原样炸出去：并行不许把失败吃掉
                     outcome["received"] += 1
                     outcome["record_problems"] += record_problems
@@ -1951,6 +2443,7 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
                     else:
                         outcome["coverage"].append(result)
                     note(f"  … 已判 {outcome['received']} 格、派出 {outcome['submitted']} 格、还排着 {len(ready)} 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）")
+        outcome["budget_peak"] = budget.peak.value if budget is not None else None
         outcome["left_behind"] = sorted(os.listdir(per_mutation_temporary_root))
         outcome["left_behind_contents"] = {name: (sorted(os.listdir(os.path.join(per_mutation_temporary_root, name)))
                                                   if os.path.isdir(os.path.join(per_mutation_temporary_root, name)) else ["（不是目录）"])
@@ -1986,6 +2479,11 @@ def read_selection(path, rows):
     if not selected and not problems:
         problems.append(f"{path} 里一个行号都没有")
     return selected, problems
+
+
+CLOSURE_REFUSED_HOWTO = [
+    "上面每处点名了测试和变异表的行：测试带 #[cfg(feature = \"…\")] 的，给那几行的 cargo 参数补上编它要的特性（例 --features verdict-store,gpu，写法照同一张表里别的带 gpu 的行），",
+    "或点名一条在现有特性下编得到的测试；「没有叫 … 的包」这一类就改那一行的 -p。改完单跑 python3 scripts/mutation/crates-mutation-rows.py plan <根> 看还有没有别的行（键算不出来，整张表一行都判不了）。"]
 
 
 def print_rejection(headline, details, howto_lines):
@@ -2134,7 +2632,7 @@ def run_stage(root, environment=None, judging_repository=None):
     memory_max, timeout_seconds, limit_problems = limits_of(memory_max_from_table, timeout_from_table, environment)
     # 逐行上限（文件头「逐行上限」）：照整张成形的表认名字，选行之前读
     row_limits, row_limit_problems = read_row_limits(root, rows, environment)
-    limit_problems += row_limit_problems
+    limit_problems += row_limit_problems + size_setting_problems(environment)
     for headline, howto_line in limit_problems:
         print_rejection(headline, [], [howto_line])
     if limit_problems:
@@ -2166,6 +2664,9 @@ def run_stage(root, environment=None, judging_repository=None):
     memory_cap_runner = environment.get("GATE_MUTATION_MEMORY_CAP_RUNNER", "").strip() or DEFAULT_MEMORY_CAP_RUNNER
     try:
         key_context, components, library = plan_rows(root, rows, environment, memory_max, timeout_seconds, judging_repository)
+    except mutation_units.ClosureRefused as error:
+        print_rejection(f"点名的测试在 cargo 参数选的这一组特性下认不出或不编（{len(error.failures)} 处），键算不出来：一条都没跑", error.detail_lines(), CLOSURE_REFUSED_HOWTO)
+        return 1
     except (JudgingUnitsRefused, mutation_units.MutationUnitsError, admission.InputManifestError, HeavyThreadDefaultError, OSError) as error:
         print_rejection(f"算不出判法单元指纹、工具链、依赖版本或判定库的位置（{error}），判定库没处对：一条都没跑", [],
                         ["被判的要是 git 工作树（或设 GATE_MUTATION_RECORDS_HOME）、rustc -vV 与 cargo -V 跑得通、Cargo.lock 读得懂；",
@@ -2244,10 +2745,14 @@ def run_stage(root, environment=None, judging_repository=None):
                             [tools_problem[1], "不退回不记覆盖去跑：没有覆盖记录，基线就只能按点名测试的闭包复用。"])
             return 1
         note(f"  … 记覆盖用的 llvm 工具：{tools_text}")
-        # 工作进程数的 ③（外层上限 ÷ 每条上限）按这一趟要现跑的行里最大的那一个上限算（逐行上限给了更大的，几条同时撞也装得下）
+        # 工作进程数的 ③（外层上限 ÷ 每条上限）按每条的默认上限算（没有逐行上限的那些行用的那个值），不按这一趟最大的那一行算：有一行 24G 就只开 1 个的事不再有；
+        # 个别行的大上限由 run_pool 按额度排队（每一格按自己的上限从外层额度里扣，文件头「工作进程数」）。largest_memory 只用来在头一行报
         largest_memory = limits_for_lines(dict(memory_max=memory_max, timeout_seconds=timeout_seconds, row_limits=row_limits),
                                           [row.line_number for row in candidates])[0]
-        worker_count, worker_count_head_line = worker_count_for(len(candidates), environment, largest_memory)
+        # 编译目录所在的盘放得下几个工作进程的两份编译目录（文件头「磁盘余量」）：算在核数、条数、外层内存三项之后，取最小
+        shared_target = default_shared_target_directory(environment)
+        worker_count, worker_count_head_line = worker_count_for(len(candidates), environment, memory_max, largest_memory,
+                                                                disk=lambda ceiling: disk_bound_for(shared_target, environment, ceiling))
         note(worker_count_head_line)
         # 每个 cargo 的编译并行度：进程数 × 它 ≈ 核数，免得 N 个 cargo 各自按核数开 rustc、互相抢
         cargo_jobs = environment.get("GATE_MUTATION_CARGO_JOBS", "").strip() or str(max(1, (os.cpu_count() or 4) // worker_count))
@@ -2262,8 +2767,8 @@ def run_stage(root, environment=None, judging_repository=None):
         crash_library_home_text = (f"{MUTATION_CRASH_LIBRARY_HOME_VARIABLE} 设的那一份" if environment.get(MUTATION_CRASH_LIBRARY_HOME_VARIABLE, "").strip()
                                    else str(environment.get(CRASH_LIBRARY_HOME_VARIABLE) or "没设（用例照 " + DEFAULT_CRASH_LIBRARY_HOME + "）"))
         note(f"  … 起 cargo 时的崩溃判定库家目录：{crash_library_home_text}"
-             + (f"，清掉调用方点名的 {'、'.join(crash_library_cleared)}" if crash_library_home is not None else "（弄坏开关 sharedcrashlibrary：照调用方的环境）"))
-        shared_target = default_shared_target_directory(environment)
+             + (f"，清掉调用方点名的 {'、'.join(crash_library_cleared)}" if crash_library_home is not None else "（弄坏开关 sharedcrashlibrary：照调用方的环境）")
+             + (f"；每个工作进程再用底下自己片号的 {CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX}<片号> 子目录，不共用一份库" if crash_library_home is not None else ""))
         # 编译目录数按这一趟的工作进程数复用：片号更大的旧 -w<片号>（连同 -coverage）开跑时回收，有人在用的留着（reclaim_extra_target_directories）
         for line in target_reclaim_lines(shared_target, worker_count, reclaim_extra_target_directories(shared_target, worker_count, environment)):
             note(line)
@@ -2271,7 +2776,8 @@ def run_stage(root, environment=None, judging_repository=None):
                        memory_cap_runner=memory_cap_runner, judging=key_context.judging, llvm_tools=tools,
                        library_directory=library.directory, timings_directory=timings_directory,
                        row_records={row.line_number: light_components(components[row.line_number]) for row in rows},
-                       shared_target_directory=shared_target, worker_count=worker_count, stage_process=os.getpid())
+                       shared_target_directory=shared_target, worker_count=worker_count, stage_process=os.getpid(),
+                       outer_memory_bytes=outer_memory_bytes(environment), target_directory_cap_bytes=target_directory_cap_bytes(environment))
         try:
             outcome = run_pool(context, worker_count, batches, ordered_candidates, baseline_ok_lines, numeric_settings["GATE_MUTATION_STOP_AFTER_ROWS"], planner)
         except concurrent.futures.process.BrokenProcessPool:
@@ -2280,6 +2786,8 @@ def run_stage(root, environment=None, judging_repository=None):
                             ["多半是内存不够被 OOM 杀的——GATE_MUTATION_WORKERS 调小再跑一遍（判完的那几条有判定库记录，下一趟只跑剩下的）；",
                              "单跑 GATE_MUTATION_WORKERS=1 能跑完就是并发度的问题，还死就去看那一条变异本身。"])
             return 1
+    if outcome.get("budget_peak") is not None:
+        note(f"  … 额度账：在跑各格的上限加先编借走的额度，这一趟的峰值 {format_size(outcome['budget_peak'])}（外层上限 {format_size(context['outer_memory_bytes'])}）")
     for problem in outcome["record_problems"]:
         note(f"  ! 判定库记录或用时表没写成（下一趟这一条照跑，不会复用）：{problem}")
     # 派出去多少格就要收回来多少格：对不上整道红，不许少跑一条还报绿（command-safety.md）
@@ -2335,6 +2843,11 @@ def run_stage(root, environment=None, judging_repository=None):
     sentinel_problems = sentinel.finish(printer=note)
     exit_code = report(rows, judgements, outcome, memory_max, timeout_seconds, selection_path, skip_baseline, dict(
         worker_count=worker_count, cargo_jobs=cargo_jobs, reused=len(reused), reused_baseline=reused_baseline_count,
+        compile_jobs_text=("（GATE_MUTATION_CARGO_JOBS 给的，编译那一趟不再按内存上限收）" if environment.get("GATE_MUTATION_CARGO_JOBS", "").strip()
+                           else (f"（编译那一趟再按每条的内存上限收：每条 {memory_max} 时 {compile_jobs_for(memory_max, cargo_jobs, environment)}"
+                                 + ("；套在外层包装里时另向外层额度里此刻空着的那一部分借，借到的越多并行度越高、至多 " + cargo_jobs
+                                    if outcome.get("budget_peak") is not None and not break_is(environment, "compilejobsownlimit") else "") + "）")
+                           if cargo_jobs != "-" else ""),
         fresh_columns=fresh_columns, fresh_rows=len(candidates) - len(refused_lines), refused_rows=len(refused_lines),
         coverage_recorded=coverage_recorded, coverage_existing=coverage_existing, coverage_failed=len(coverage_failures),
         fresh_mutations=len(outcome["mutation"]), fresh_batches=len(batches), records_directory=library.directory,
@@ -2433,6 +2946,7 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
         by_verdict[verdict].append(text)
     caught, failures, invalid = by_verdict["caught"], by_verdict["failure"], by_verdict["invalid"]
     memory_hits, timeouts, squeezed = by_verdict["memory"], by_verdict["timeout"], by_verdict["squeezed"]
+    compile_memory_hits = by_verdict["compilememory"]   # 编译那一趟撞了内存上限（verdict_of_run）：「计数：」里仍算在内存撞顶里，那一行的格式不动
     refused, unavailable, baseline_bad = by_verdict["refused"], by_verdict["unavailable"], by_verdict["baseline"]
     not_run = by_verdict["notrun"]
     gpu_memory = by_verdict["gpumemory"]
@@ -2440,7 +2954,7 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     for text in caught:
         say(text)
     # 各栏各数各的；「计数：」这一行的格式别的定义与规则照栏读（mutation-triage），基线另起一行报
-    say(f"  计数：抓到 {len(caught)} 条、没红 {len(failures)} 条、无效 {len(invalid)} 条、内存撞顶 {len(memory_hits)} 条、超时 {len(timeouts)} 条、"
+    say(f"  计数：抓到 {len(caught)} 条、没红 {len(failures)} 条、无效 {len(invalid)} 条、内存撞顶 {len(memory_hits) + len(compile_memory_hits)} 条、超时 {len(timeouts)} 条、"
         f"被总上限挤掉 {len(squeezed)} 条、排不上没跑 {len(refused)} 条、scope 起不来没跑 {len(unavailable)} 条、锚点失效 {len(anchor_broken)} 行"
         f"（共 {len(rows) + len(anchor_broken)} 条）")
     if gpu_memory:   # 「计数：」那一行的格式不动（别的定义照栏读），显存不够另起一行报
@@ -2477,13 +2991,19 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
           "改完单跑那几行：bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item <行号或变异名>（.claude/rules/mutation-sampling.md 第七类）。"]),
         (baseline_bad, f"有几行基线不绿（基线不绿 {len(baseline_bad)} 行；点名的测试在没改坏的副本上就不是恰好一个 ok，改坏之后红了也证明不了什么，这几行的变异没跑）：",
          ["先看点名的测试读的文件在不在拷贝范围里（.claude/gate.d/stage-inputs.tsv 本阶段那一行；bash .claude/gate.d/code-source-discipline.sh 静态判这一样），",
-          "不在就登记进那一行；再在真仓上单跑它（照那一行的 cargo test 参数），真仓上也红就是测试本来就坏，先修测试；对上多个用例的把点名写全到模块路径。"]),
+          "不在就登记进那一行；再在真仓上单跑它（照那一行的 cargo test 参数），真仓上也红就是测试本来就坏，先修测试；对上多个用例的把点名写全到模块路径；",
+          "写「编译那一趟撞了内存上限」的是编译没装进这一行的上限（不是测试本身要这么多）：看尾巴里在编什么、stderr 末尾的编译并行度，给这一行单起更大的上限（轻型变异登记表「# 逐行上限：」），或先把依赖编一遍再跑。"]),
         (invalid, f"有变异无效（无效 {len(invalid)} 条；替换文写进源码之后编不过，那条行为今天零变异覆盖）：",
          ["先看尾巴分来源，不是去补用例。有 process didn't exit successfully 与信号的，是测试进程被杀，先查是谁杀的；点名的名字里带 $ 这类字符的，改那一行的测试名；其余是替换文编不过——",
           "先看反斜杠：表里只有 \\n 会被还原成换行，\\& \\\" 这类原样写进源码就编不过；",
           "别的编译错就在副本里把替换后的那一行 cargo check 一遍，改成编得过、而且真会改行为的写法（.claude/rules/mutation-sampling.md 第八类）。"]),
         (failures, f"有变异没红（没红 {len(failures)} 条）：",
          ["没红 = 那处改法没有任何测试守着：先造一条会红的用例再改代码（show-me-test.md）；「没跑到」多半是 cargo test 参数选错了范围。"]),
+        (compile_memory_hits, f"有变异在编译那一趟撞了内存上限（编译撞顶 {len(compile_memory_hits)} 条，每条上限 {memory_max}；「计数：」里算在内存撞顶里）：",
+         ["编译撞顶 = 改坏之后的代码在这个上限里没编完，点名的测试一次都没起——不算抓到、也不是没红，更不说明这条破坏让被测代码无界分配：别去改那条变异、别加分配界。",
+          "看上面每条尾巴里在编什么（librocksdb-sys 这类 C++ 依赖最占内存）和 stderr 末尾的编译并行度；编译那一趟的并行度已按这一行的上限收",
+          f"（每个并行任务按 {COMPILE_GIB_PER_JOB} GiB 算），收了还撞就给这一行（连同它所在的一批基线）单起更大的上限（轻型变异登记表「# 逐行上限：」）或调大 GATE_MUTATION_MEMORY_MAX，",
+          "也可以先在宽一点的上限里把依赖编一遍（编译目录跨轮留着）再跑。"]),
         (memory_hits, f"有变异撞了内存上限（内存撞顶 {len(memory_hits)} 条，每条上限 {memory_max}）：",
          ["撞顶 = 这条破坏让被测代码无界分配，点名的测试没来得及红——不算抓到，也不是没红。换一处改法让它红在点名的测试上，",
           "或者给被测代码加一道先红的界（循环步数上限、分配量的断言）；正常的测试确实要这么多内存，才调大上限（表头「# 每条变异的内存上限：…」或 GATE_MUTATION_MEMORY_MAX）。"]),
@@ -2514,9 +3034,9 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     if not_run_record_problem:
         print_rejection(f"本次未跑的 {len(not_run)} 条没写进 GATE_MUTATION_NOT_RUN_RECORD 那份记录（{not_run_record_problem}），门禁汇总就看不见它们", [],
                         ["看那份文件所在的目录满没满、有没有写权限；记不下本次未跑的这一趟按红记，免得被当成全判过。"])
-    red = bool(invalid or failures or memory_hits or timeouts or squeezed or gpu_memory or refused or unavailable or baseline_bad or left_behind
+    red = bool(invalid or failures or memory_hits or compile_memory_hits or timeouts or squeezed or gpu_memory or refused or unavailable or baseline_bad or left_behind
                or not_run_record_problem or anchor_broken)
-    note(f"  … 这一轮 {counts['worker_count']} 个工作进程，每个 cargo 编译并行度 {counts['cargo_jobs']}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒；"
+    note(f"  … 这一轮 {counts['worker_count']} 个工作进程，每个 cargo 编译并行度 {counts['cargo_jobs']}{counts['compile_jobs_text']}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒；"
          f"复用抓到 {counts['reused']} 条、复用基线 ok {counts['reused_baseline']} 行，现跑变异 {counts['fresh_mutations']} 条、现跑基线 {counts['fresh_batches']} 批")
     if selection_path:
         # 只判了一部分：都抓到也退 3（门禁汇总记失败，不会被当成通过），有红退 1
@@ -2700,6 +3220,9 @@ def plan_context(root, environment):
     rows = [row for row in rows if row.line_number not in anchor_broken]
     try:
         key_context, components, library = plan_rows(root, rows, environment, memory_max, timeout_seconds)
+    except mutation_units.ClosureRefused as error:
+        print_rejection(f"点名的测试在 cargo 参数选的这一组特性下认不出或不编（{len(error.failures)} 处），键算不出来", error.detail_lines(), CLOSURE_REFUSED_HOWTO)
+        return None
     except (JudgingUnitsRefused, mutation_units.MutationUnitsError, admission.InputManifestError, HeavyThreadDefaultError, OSError) as error:
         print(f"  ✗ 算不出判法单元指纹、工具链、依赖版本或判定库的位置：{error}")
         print("     → 怎么办：被判的要是 git 工作树（或设 GATE_MUTATION_RECORDS_HOME）、rustc -vV 与 cargo -V 跑得通、Cargo.lock 读得懂")
@@ -2935,7 +3458,11 @@ FAKE_CARGO = r'''#!/usr/bin/env python3
 # 原文在、文件在就 ok，不在就 FAILED；NEEDS 那一句末尾可以跟「 RUNS <函数名>[,<函数名>…]」，说这条用例执行哪几个函数（不跟就是定义行里有那段原文的函数）；
 # 「// TEST <名字> NOTRUN <一句>」照 GPU 对拍用例在没卡的机器上：一律 ok，带 --show-output 时照 libtest 的样子
 # 在末尾交出它打的 NOT_RUN_NO_GPU_ADAPTER 那一行；每起一次往 $FAKE_CARGO_LOG 追加一行「<参数>\t<lib.rs 的 sha256 前 12 位>」；
-# $FAKE_CARGO_ENVIRONMENT_LOG 设了，每起一次 test 再往它追加一行 JSON：收到的 *_THREADS、SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS 与 CARGO_TARGET_DIR（现在没有自证格读它，留给排查）。
+# $FAKE_CARGO_ENVIRONMENT_LOG 设了，每起一次 test 再往它追加一行 JSON：收到的 *_THREADS、SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS、CARGO_TARGET_DIR、
+# 崩溃判定库的两个变量，外加键 ARGUMENTS（这一次的参数，认得出是不是先编那一趟）；编译并行度、崩溃判定库每片各一份那几格读它。
+# $FAKE_CARGO_BARRIER_DIR 设了，--no-run 且源码不是 $FAKE_CARGO_BARRIER_PRISTINE（lib.rs 的 sha256 前 12 位）的那一次（改坏了的变异先编那一趟）在里面按
+# CARGO_TARGET_DIR 记一个文件，等到里面有两个（两个工作进程都到了）或 20 秒：造「两个工作进程同时在跑」。
+# 测试那一趟的 `--` 之后 --exact 出现两次，照 libtest 报 error: Option 'exact' given more than once、退 101。
 # 开头的 --config <值> 跳过。test --no-run（插桩编译）：每个 -p 点名的包（不点名是 tiny）在 $CARGO_TARGET_DIR/debug/deps/ 下写一个假的测试可执行文件
 # （内容是 JSON：源码副本的根与这个包 src/ 下的 .rs）与它的 dep-info，打一行 compiler-artifact 消息；
 # 设了 LLVM_PROFILE_FILE 的 test 把这一趟跑到的用例执行的函数写进它指的那份 .profraw（%p 换成进程号、%m 换成 0，内容是 JSON）。
@@ -2959,14 +3486,25 @@ if os.environ.get("FAKE_CARGO_ENVIRONMENT_LOG"):
     # 设了才记：每起一次 test 往里追加一行 JSON，收到的线程数变量、编译并行度与编译目录
     names = ("RUST_TEST_THREADS", "CARGO_BUILD_JOBS", "CARGO_TARGET_DIR", "SINGLEFS_CRASH_AMPLIFICATION_HOME", "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY")
     with open(os.environ["FAKE_CARGO_ENVIRONMENT_LOG"], "a", encoding="utf-8") as environment_log:
-        environment_log.write(json.dumps({name: value for name, value in os.environ.items() if name in names or name.endswith("_THREADS") or name == "SINGLEFS_THREAD_CAP"}, sort_keys=True) + "\n")
+        recorded = {name: value for name, value in os.environ.items() if name in names or name.endswith("_THREADS") or name == "SINGLEFS_THREAD_CAP"}
+        recorded["ARGUMENTS"] = " ".join(arguments[1:])
+        environment_log.write(json.dumps(recorded, sort_keys=True) + "\n")
+if os.environ.get("FAKE_CARGO_BARRIER_DIR") and "--no-run" in arguments and hashlib.sha256(source.encode()).hexdigest()[:12] != os.environ.get("FAKE_CARGO_BARRIER_PRISTINE"):
+    import time
+    barrier = os.environ["FAKE_CARGO_BARRIER_DIR"]
+    os.makedirs(barrier, exist_ok=True)
+    open(os.path.join(barrier, hashlib.sha256(os.environ["CARGO_TARGET_DIR"].encode()).hexdigest()[:12]), "w").close()
+    barrier_deadline = time.monotonic() + 20
+    while len(os.listdir(barrier)) < 2 and time.monotonic() < barrier_deadline:
+        time.sleep(0.05)
 if os.environ.get("FAKE_CARGO_HANG_FILE"):
-    # 自证「被 TERM 停」那一格：起来记一笔，等到放行、父进程（工作进程）没了或 30 秒，记一笔「退了」再退 101
+    # 自证「被 TERM 停」那一格：起来记一笔（先写成临时文件再改名，读的一头看到文件就是写全的进程号），等到放行、父进程（工作进程）没了或 120 秒，记一笔「退了」再退 101
     import time
     parent = os.getppid()
-    with open(os.environ["FAKE_CARGO_HANG_FILE"], "w", encoding="utf-8") as handle:
+    with open(os.environ["FAKE_CARGO_HANG_FILE"] + ".part", "w", encoding="utf-8") as handle:
         handle.write(str(parent))
-    deadline = time.monotonic() + 30
+    os.rename(os.environ["FAKE_CARGO_HANG_FILE"] + ".part", os.environ["FAKE_CARGO_HANG_FILE"])
+    deadline = time.monotonic() + 120
     while time.monotonic() < deadline and os.getppid() == parent and not os.path.exists(os.environ["FAKE_CARGO_RELEASE_FILE"]):
         time.sleep(0.05)
     open(os.environ["FAKE_CARGO_DONE_FILE"], "w").close()
@@ -3005,6 +3543,12 @@ if "--no-run" in before:
     packages = [before[index + 1] for index, word in enumerate(before) if word == "-p" and index + 1 < len(before)] or ["tiny"]
     deps = os.path.join(os.environ["CARGO_TARGET_DIR"], "debug", "deps")
     os.makedirs(deps, exist_ok=True)
+    # 增量产物（rustc 每编一次改坏的副本往 incremental 里加的会话目录）：FAKE_CARGO_INCREMENTAL_BYTES 设了，每次先编往里写这么多字节（编译目录上限那一格读）
+    if os.environ.get("FAKE_CARGO_INCREMENTAL_BYTES"):
+        session = os.path.join(os.environ["CARGO_TARGET_DIR"], "debug", "incremental", "session-" + str(os.getpid()))
+        os.makedirs(session, exist_ok=True)
+        with open(os.path.join(session, "dep-graph.bin"), "wb") as handle:
+            handle.write(os.urandom(int(os.environ["FAKE_CARGO_INCREMENTAL_BYTES"])))
     for package in packages:
         crate = os.path.join(os.getcwd(), "crates", package)
         sources = sorted(os.path.relpath(os.path.join(directory, name), os.getcwd()) for directory, _names, names in os.walk(os.path.join(crate, "src"))
@@ -3029,6 +3573,9 @@ if "--no-run" in before:
                 log.write(os.getcwd() + "\t" + stray + "\n")
     sys.exit(0)
 after = arguments[arguments.index("--") + 1:] if "--" in arguments else []
+if after.count("--exact") > 1:
+    print("error: Option 'exact' given more than once", file=sys.stderr)
+    sys.exit(101)
 filters = [word for word in after if not word.startswith("-")]
 failed = False
 shown, executed = [], set()
@@ -3127,6 +3674,11 @@ FAKE_MEMORY_CAP_RUNNER = '''#!/usr/bin/env bash
 # 自证用的假内存包装：--check 退 0；其余去掉上限那一个参数、原样执行命令；FAKE_MEMORY_CAP_LOG 设了，先记一行「<上限><TAB><限时或「不限时」><TAB><命令>」（逐行上限那一格读）
 if [[ "${1:-}" == "--check" ]]; then exit 0; fi
 if [[ -n "${FAKE_MEMORY_CAP_LOG:-}" ]]; then printf '%s\t%s\t%s\n' "$1" "${RUN_WITH_MEMORY_CAP_TIME_LIMIT:-不限时}" "${*:2}" >>"$FAKE_MEMORY_CAP_LOG"; fi
+# FAKE_MEMORY_CAP_OOM_ON 设了，命令行里有它这一段（例 /line-3-build cargo：变异表第 3 行先编那一趟；/line-3 cargo：测试那一趟）就照真包装撞顶的样子退 250、命令不跑
+if [[ -n "${FAKE_MEMORY_CAP_OOM_ON:-}" && " ${*:2} " == *"$FAKE_MEMORY_CAP_OOM_ON"* ]]; then
+  echo "run-with-memory-cap: 撞了内存上限 $1（scope singlefs-memory-cap-selftest 的 Result=oom-kill，命令退出码 143）" >&2
+  exit 250
+fi
 shift
 exec "$@"
 '''
@@ -3320,6 +3872,8 @@ class Selftest:
         self.base_environment.update(PATH=self.bin_directory + os.pathsep + os.environ.get("PATH", ""), FAKE_CARGO_LOG=self.log,
                                      GATE_MUTATION_MEMORY_CAP_RUNNER=self.runner, GATE_MUTATION_TARGET_DIR=os.path.join(work, "target"),
                                      GATE_MUTATION_WORKERS="1", GATE_MUTATION_LLVM_TOOLS=self.llvm_directory)
+        # 目标盘余量：别的格不比它，给一个用不完的假值；磁盘余量那几格自己设
+        self.base_environment[DISK_FREE_VARIABLE] = "100T"
         # 复用哨兵：别的格比的是现判与复用的条数，键相同的全当哨兵、不抽强制现判；reuse-three-questions 与 reuse-sentinel 两格自己设
         self.base_environment[reuse_checks.SENTINEL_COUNT_VARIABLE] = "1000"
         self.base_environment.pop(reuse_checks.SENTINEL_SEED_VARIABLE, None)
@@ -3438,6 +3992,151 @@ def selftest_worker_count_cells(selftest, work):
                    outer[0] == 0 and "这一轮开 2 个工作进程" in outer[2] and "卡在「外层内存上限」这一项" in outer[2], f"退 {outer[0]}；{outer[2][:600]}")
 
 
+# 自证「按额度排队」那一格的假内存包装：--check 退 0；其余往 $SPAN_LOG 记「起」「止」两行（每行一次写入、O_APPEND，行序就是真实的先后），
+# 一行的格式「<起或止><TAB><起头名，line-3-build、line-3、baseline-2 这一类><TAB><收到的上限>」；命令前睡一会儿，几格才在时间上重叠，上限 24G 的睡得更久；
+# 环境变量 STAGGER_UP_TO_LINE 设了（没设不错开）：变异表行号不超过它的那几行（头一批同时派出去的）按行号错开睡的时长（每多一行多睡 0.1 秒），它们一个一个收完、不挤在同一轮：
+# 父进程每收完一个就补派一件，24G 那一行被越过的次数才由上限定、不由「同一轮收完几个」定
+SELFTEST_BUDGET_WRAPPER = r'''#!/usr/bin/env bash
+if [[ "${1:-}" == "--check" ]]; then exit 0; fi
+cap="$1"; shift
+stamp=""
+for word in "$@"; do
+  if [[ "$word" == */@STAMP_DIRECTORY@/* ]]; then stamp="${word##*/}"; fi
+done
+printf 'start\t%s\t%s\n' "$stamp" "$cap" >> "$SPAN_LOG"
+line_number=""
+if [[ "$stamp" =~ ^line-([0-9]+) ]]; then line_number="${BASH_REMATCH[1]}"; fi
+if [[ "$cap" == "24G" ]]; then
+  sleep 1.2
+elif [[ -n "$line_number" && "$line_number" -le "${STAGGER_UP_TO_LINE:-0}" ]]; then
+  milliseconds=$((400 + 100 * line_number))
+  sleep "$((milliseconds / 1000)).$(printf '%03d' $((milliseconds % 1000)))"
+else
+  sleep 0.4
+fi
+"$@"
+status=$?
+printf 'end\t%s\t%s\n' "$stamp" "$cap" >> "$SPAN_LOG"
+exit "$status"
+'''
+
+
+def simulate_budget_queue(sizes, outer, slots, bypass_limit):
+    """pick_ready_job 的离散模拟（自证用，不起进程）：sizes[i] 是第 i 件的上限，件按下标的次序排队，每次最多 slots 件在跑，最早起的先收。
+    回 (起的次序, 在跑的上限之和的峰值, {下标: 起的时候是不是什么都没在跑})。"""
+    ready = [(0, index, index, "mutation", index) for index in range(len(sizes))]
+    heapq.heapify(ready)
+    running, started, peak, alone, bypass_counts = [], [], 0, {}, {}
+    while ready or running:
+        while ready and len(running) < slots:
+            entry = pick_ready_job(ready, sum(sizes[index] for index in running), len(running), outer, lambda each: sizes[each[4]], bypass_counts, bypass_limit)
+            if entry is None:
+                break
+            alone[entry[4]] = not running
+            running.append(entry[4])
+            started.append(entry[4])
+            peak = max(peak, sum(sizes[index] for index in running))
+        if running:
+            running.pop(0)
+    return started, peak, alone
+
+
+def selftest_row_memory_budget_cells(selftest, work):
+    """按额度排队（文件头「工作进程数」）：工作进程数按每条的默认上限算，个别行的大上限不压低它；派活时每一格按自己的上限从外层额度里扣。
+    先用 pick_ready_job 的离散模拟判排队本身（不起进程）：外层 36G、一格 24G 加二十格 4G，在跑的上限之和不超过 36G，24G 那一格被越过的次数在限内、跑上了；
+    比外层还大的那一格什么都没在跑时单独起；外层读不到（outer_bytes 为 None）时照队首的次序派、不扣额度。
+    再起一趟 run_stage：外层 36G、变异表里一行写了 24G 另二十行 4G，假包装记每一次包装调用的起止与收到的上限，核开的工作进程多于 1 个、
+    任一时刻在跑的各次包装的上限之和不超过 36G（各格先编与跑测试两次包装接着来，每一格的占用不超过它那一格的上限）、24G 那一行两次包装都跑完、没被后面的小行饿死。
+    越过次数按父进程派活的次序数，不按假包装日志里 start 的先后：各工作进程写 start 的先后不是父进程派活的先后（两件紧挨着派出去的，谁的包装先起看调度，单跑也约四次里红一次）。
+    做法：selftest.run 前后把本模块里的 pick_ready_job 换成一层记录（照调原函数、按次序记下派出的变异行号），finally 里换回去；假包装日志只核上限之和、同时在跑、24G 那一行跑完。
+    头一批同时派出去的几行（假包装按行号错开睡的时长）一个一个收完，所以越过次数由上限定：没弄坏时恰为 worker_count，不是「同一轮收完几个」的运气。
+    弄坏开关 largestrowmemory（工作进程数按最大那一行算，只开 1 个，派活也不排队）、rowmemoryunbudgeted（不扣额度）、bypassunbounded（不设越过次数的限，越过 15 次）下这一格判错；
+    pick_ready_job 里越过上限的判断差一（`>=` 写成 `>`，越过 10 次）同样判错，那是改源码，不是开关。"""
+    environment = selftest.base_environment
+    slots = 9
+    limit = None if break_is(environment, "bypassunbounded") else slots
+    sizes = [4] * 5 + [24] + [4] * 15
+    started, peak, _alone = simulate_budget_queue(sizes, 36, slots, limit)
+    bypassers = [index for index in started[:started.index(5)] if index > 5] if 5 in started else []
+    selftest.check("按额度排队（离散模拟）：外层 36G、一格 24G 加二十格 4G，在跑的上限之和不超过 36G，24G 那一格跑上了，被后面的小格越过的次数在 1 到 worker_count 之间",
+                   sorted(started) == list(range(len(sizes))) and peak <= 36 and 1 <= len(bypassers) <= slots,
+                   f"起的次序 {started}；峰值 {peak}；越过它的 {len(bypassers)} 格（应在 1 到 {slots} 之间）")
+    started_small, peak_small, _alone = simulate_budget_queue([4] * 12, 36, slots, limit)
+    selftest.check("按额度排队（离散模拟）：格格都扣得下时照队里的次序派、不乱序", started_small == list(range(12)) and peak_small <= 36, f"起的次序 {started_small}；峰值 {peak_small}")
+    started_big, peak_big, alone_big = simulate_budget_queue([4, 4, 40, 4], 36, 4, limit)
+    selftest.check("按额度排队（离散模拟）：一格的上限比整个外层还大（40G 对 36G）时等在跑的收完、什么都没在跑时单独起",
+                   sorted(started_big) == [0, 1, 2, 3] and alone_big.get(2) is True and peak_big == 40, f"起的次序 {started_big}；单独起的 {alone_big}；峰值 {peak_big}")
+    started_free, peak_free, _alone = simulate_budget_queue([24] * 5, None, 3, limit)
+    selftest.check("外层上限读不到（outer_bytes 为 None）时不扣额度：照队首的次序派，在跑的 3 格各 24G 也派", started_free == [0, 1, 2, 3, 4] and peak_free == 72, f"起的次序 {started_free}；峰值 {peak_free}")
+    sixteen = dict(environment, GATE_MUTATION_WORKERS="16")
+    counted, counted_head = worker_count_for(21, dict(sixteen, **{OUTER_MEMORY_CAP_VARIABLE: "36G"}), "4G", "24G")
+    unset_count, unset_head = worker_count_for(21, dict(sixteen), "4G", "24G")
+    selftest.check("工作进程数按每条的默认上限算（36G ÷ 4G 开 9 个，不是 36G ÷ 最大那一行的 24G 开 1 个），头一行报「逐行上限最大 24G、按额度排队」；外层读不到时头一行没有这一句、照 16 个开",
+                   counted == 9 and "逐行上限最大 24G、按额度排队" in counted_head and unset_count == 16 and "按额度排队" not in unset_head,
+                   f"{counted}：{counted_head}；{unset_count}：{unset_head}")
+    huge_count, huge_head = worker_count_for(21, dict(sixteen, **{OUTER_MEMORY_CAP_VARIABLE: "36G"}), "4G", "40G")
+    selftest.check("最大那一格比外层还大（40G 对 36G）时头一行写明等在跑的收完、单独起，工作进程数照旧按默认上限算",
+                   huge_count == 9 and "最大那一件比外层还大：等在跑的收完、单独起" in huge_head, f"{huge_count}：{huge_head}")
+    # 起一趟 run_stage：变异表 21 行，budget-row-big 在第 6 个位置（前面 5 行是 4G，后面 15 行也是 4G），逐行上限给它 24G
+    repository = os.path.join(work, "row-memory-budget")
+    names = [f"budget-row-{index:02d}" for index in range(20)]
+    names.insert(5, "budget-row-big")
+    rows = [f"{name}\tcrates/tiny/src/lib.rs\t{{ left + right }}\t{{ left * (right + {index}) }}\t-p tiny --lib -- adds\tadds" for index, name in enumerate(names)]
+    build_selftest_repository(repository, rows)
+    big_line = names.index("budget-row-big") + 2   # 变异表第 1 行是表头
+    selftest_write(os.path.join(repository, LIGHT_ROWS_TABLE), "# 自证用的轻型变异登记表（只放逐行上限那一行）\n"
+                   "# 逐行上限：budget-row-big\t24G\t-\t# 自证：比整张表的 4G 大\n")
+    wrapper = os.path.join(work, "budget-wrapper.sh")
+    selftest_write(wrapper, SELFTEST_BUDGET_WRAPPER.replace("@STAMP_DIRECTORY@", START_STAMP_DIRECTORY_NAME), executable=True)
+    span_log = os.path.join(work, "budget-spans.log")
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(span_log)
+    # 派活的次序在父进程里记：run_pool 按本模块的全局名调 pick_ready_job，selftest.run 又在同一个进程里调 run_stage，所以换掉全局名就看得到每一次派出的变异行
+    dispatched = []
+    module_globals = globals()
+    real_pick_ready_job = module_globals["pick_ready_job"]
+
+    def recording_pick_ready_job(*arguments):
+        chosen = real_pick_ready_job(*arguments)
+        if chosen is not None and chosen[3] == "mutation":
+            dispatched.append(chosen[4].line_number)
+        return chosen
+    module_globals["pick_ready_job"] = recording_pick_ready_job
+    try:
+        exit_code, stdout, stderr, _invocations = selftest.run(
+            repository, GATE_MUTATION_WORKERS="16", GATE_MUTATION_MEMORY_MAX="4G", GATE_MUTATION_TIMEOUT="1800", GATE_MUTATION_START_OVER="1",
+            GATE_MUTATION_MEMORY_CAP_RUNNER=wrapper, SPAN_LOG=span_log, STAGGER_UP_TO_LINE=str(slots + 2), **{OUTER_MEMORY_CAP_VARIABLE: "36G"})
+    finally:
+        module_globals["pick_ready_job"] = real_pick_ready_job
+    events = []
+    with contextlib.suppress(OSError):
+        with open(span_log, encoding="utf-8") as handle:
+            events = [line.split("\t") for line in handle.read().splitlines()]
+    opened, peak_sum, peak_open, peak_open_with_big = {}, 0, 0, 0
+    big_stamps = {f"line-{big_line}", f"line-{big_line}-build"}
+    for kind, stamp, cap in events:
+        if kind == "start":
+            opened[stamp] = bytes_of_size(cap) or 0
+            peak_sum = max(peak_sum, sum(opened.values()))
+            peak_open = max(peak_open, len(opened))
+            if big_stamps & set(opened):
+                peak_open_with_big = max(peak_open_with_big, len(opened))
+        else:
+            opened.pop(stamp, None)
+    # 越过 = 父进程在派 24G 那一行之前派出去的、行号比它大的变异行
+    jumped = [line for line in dispatched[:dispatched.index(big_line)] if line > big_line] if big_line in dispatched else []
+    big_finished = ["end", f"line-{big_line}", "24G"] in events and ["end", f"line-{big_line}-build", "24G"] in events
+    selftest.check("外层 36G、一行 24G 加二十行 4G：开的工作进程多于 1 个（36G ÷ 4G 开 9 个），头一行报逐行上限最大 24G、按额度排队",
+                   exit_code == 0 and "这一轮开 9 个工作进程" in stderr and "逐行上限最大 24G、按额度排队" in stderr,
+                   f"退 {exit_code}；{stderr[:900]}")
+    selftest.check("外层 36G、一行 24G 加二十行 4G：任一时刻在跑的各次包装的上限之和不超过 36G，24G 那一行与 4G 的行同时在跑过",
+                   bool(events) and peak_sum <= 36 * 1024 ** 3 and peak_open_with_big >= 2,
+                   f"包装起止 {len(events)} 行；上限之和的峰值 {peak_sum / 1024 ** 3:g}G；同时在跑的峰值 {peak_open}；24G 在跑时同时在跑的峰值 {peak_open_with_big}")
+    selftest.check("外层 36G、一行 24G 加二十行 4G：24G 那一行先编与跑测试两次都跑完了，判成抓到，后面的小行越过它的（按父进程派活的次序数）不超过 worker_count（9）行（没饿死）",
+                   big_finished and "budget-row-big" in per_row_how(stdout) and len(per_row_how(stdout)) == 21 and 1 <= len(jumped) <= 9,
+                   f"24G 那一行跑完 {big_finished}；抓到 {len(per_row_how(stdout))} 行；父进程派活的次序 {dispatched}，越过它的 {len(jumped)} 行（应在 1 到 9 之间）；{stdout[-300:]}")
+
+
 def selftest_row_limit_cell(selftest, work):
     """逐行上限与限时不含重编译（文件头「逐行上限」与「基线」一段的限时）：轻型变异登记表里给 double-becomes-triple（变异表第 3 行）写 9G、2400 秒，
     假内存包装把每一次收到的上限、限时（没设记「不限时」）与命令记进 FAKE_MEMORY_CAP_LOG：那一行的先编与变异两趟都是 9G，先编不限时、变异限时 2400；
@@ -3521,32 +4220,58 @@ def selftest_signal_and_pipe_cells(selftest, work):
     with open(stderr_path, "w", encoding="utf-8") as stderr_handle:
         child = subprocess.Popen([sys.executable, "-c", SELFTEST_STAGE_CHILD, MODULE_PATH, repository], env=environment,
                                  stdout=subprocess.DEVNULL, stderr=stderr_handle)
-    deadline = time.monotonic() + 60
-    while not os.path.exists(hang) and child.poll() is None and time.monotonic() < deadline:
-        time.sleep(0.05)
-    while_running = sorted(name for name in os.listdir(temporary) if name.startswith("singlefs-mutation-replay-"))
-    if child.poll() is None:
+    # TERM 发在「$TMPDIR 下的临时目录建出来了、假 cargo 在工作进程里挂住了（标记文件里有工作进程的进程号）」之后：run_pool 装好信号处理、建了临时目录、
+    # 起了工作进程，那时收到 TERM 才走「收尾再退」；在那之前（解释器还在载入、run_stage 还在算键）收到的就是默认处理，退 -15、什么也没建。
+    # 机器忙时头一步可以慢到分钟，所以按条件等（轮询，带超时），不靠定长；等不到就不发（子进程自证自己停掉），这一格判错并写明没等到什么。
+    # 弄坏开关 term-sent-unwaited：不等条件，起了子进程立刻发 TERM（改前碰上忙机器的样子），这一格必须判错
+    ready_seconds = 300
+    ready_deadline = time.monotonic() + ready_seconds
+
+    def running_state():
+        shards = sorted(name for name in os.listdir(temporary) if name.startswith("singlefs-mutation-replay-"))
+        marker = open(hang, encoding="utf-8").read().strip() if os.path.exists(hang) else ""
+        return shards, marker
+
+    while_running, hanging_marker = running_state()
+    if not break_is(os.environ, "term-sent-unwaited"):
+        while not (len(while_running) == 1 and hanging_marker.isdigit()) and child.poll() is None and time.monotonic() < ready_deadline:
+            time.sleep(0.05)
+            while_running, hanging_marker = running_state()
+    not_ready = "" if len(while_running) == 1 and hanging_marker.isdigit() else \
+        f"没等到临时目录和挂住的假 cargo 都在（{ready_seconds} 秒内；临时目录 {while_running}，标记文件里 {hanging_marker!r}，子进程已退 {child.poll()}）；"
+    if child.poll() is None and (not not_ready or break_is(os.environ, "term-sent-unwaited")):
         child.send_signal(signal.SIGTERM)
+    elif child.poll() is None:
+        child.kill()   # 没到「该发 TERM」的时候就不发，也不留着它：只停这一个子进程
     try:
-        child.wait(timeout=60)
+        child.wait(timeout=180)
     except subprocess.TimeoutExpired:
         child.kill()
         child.wait()
     open(released, "w").close()
-    deadline = time.monotonic() + 35
+    deadline = time.monotonic() + 130
     while os.path.exists(hang) and not os.path.exists(done) and time.monotonic() < deadline:
         time.sleep(0.05)
+
+    def process_is_alive(pid):
+        """/proc/<pid> 在、而且不是僵尸（已退、等着被收的不算活着）。"""
+        try:
+            with open(f"/proc/{pid}/stat", encoding="utf-8") as handle:
+                return handle.read().rsplit(")", 1)[1].split()[0] != "Z"
+        except OSError:
+            return False
+
     # 挂住的假 cargo 记下的父进程就是那个工作进程：照理已经被停了；还活着（没接住信号的样子）就只对这一个进程号发 TERM，不留孤儿
-    worker = int(open(hang, encoding="utf-8").read() or 0) if os.path.exists(hang) else 0
-    worker_alive = bool(worker) and os.path.exists(f"/proc/{worker}")
+    worker = int(open(hang, encoding="utf-8").read().strip() or 0) if os.path.exists(hang) else 0
+    worker_alive = bool(worker) and process_is_alive(worker)
     if worker_alive:
         with contextlib.suppress(OSError):
             os.kill(worker, signal.SIGTERM)
     left = sorted(name for name in os.listdir(temporary) if name.startswith("singlefs-mutation-replay-"))
     stderr = open(stderr_path, encoding="utf-8", errors="replace").read()
     selftest.check("被 TERM 停（双机分片的驱动停这一份的样子）：$TMPDIR 下的 singlefs-mutation-replay-* 跑的时候在、停完删掉，退 143，工作进程停了，挂住的假 cargo 也退了",
-                   len(while_running) == 1 and left == [] and child.returncode == 128 + signal.SIGTERM and not worker_alive and os.path.exists(done),
-                   f"跑的时候 {while_running}，停完 {left}，退 {child.returncode}，工作进程 {worker} 还活着 {worker_alive}，假 cargo 退了 {os.path.exists(done)}；"
+                   not not_ready and len(while_running) == 1 and left == [] and child.returncode == 128 + signal.SIGTERM and not worker_alive and os.path.exists(done),
+                   f"{not_ready}跑的时候 {while_running}，停完 {left}，退 {child.returncode}，工作进程 {worker} 还活着 {worker_alive}，假 cargo 退了 {os.path.exists(done)}；"
                    f"stderr 尾：{stderr.strip()[-300:]}")
     read_end, write_end = os.pipe()
     os.close(read_end)
@@ -3555,6 +4280,37 @@ def selftest_signal_and_pipe_cells(selftest, work):
     os.close(write_end)
     selftest.check("--list-items 接 | head（读的一头先关了）：被 SIGPIPE 安静停掉，stderr 一个字都没有",
                    closed_pipe.returncode == -signal.SIGPIPE and closed_pipe.stderr == "", f"退 {closed_pipe.returncode}：{closed_pipe.stderr.strip()[-300:]!r}")
+
+
+def selftest_shard_root_window_cell(selftest, work):
+    """TERM 落在 run_pool 建 shard_root 的 mkdir 之后、名字交到调用方手里之前（改前 tempfile.mkdtemp 的窗口）：在进程内把 os.mkdir 换成「真建出
+    SHARD_ROOT_PREFIX 起头的目录之后抛 StopRequested」（等同 TERM 恰好落在那一瞬），跑 run_pool，退出码是 143、$TMPDIR 下一个目录都不剩。
+    弄坏开关 shardrootnamedlate（照改前用 tempfile.mkdtemp，名字丢了）下这一格必须判错。"""
+    temporary = os.path.join(work, "shard-root-window-tmp")
+    os.makedirs(temporary)
+    real_mkdir, saved_tempdir = os.mkdir, tempfile.tempdir
+    fired = []
+
+    def mkdir_then_stop(path, *arguments, **keywords):
+        real_mkdir(path, *arguments, **keywords)
+        if os.path.basename(os.fspath(path)).startswith(SHARD_ROOT_PREFIX) and not fired:
+            fired.append(os.fspath(path))
+            raise StopRequested(128 + signal.SIGTERM)
+
+    raised = None
+    tempfile.tempdir = temporary
+    os.mkdir = mkdir_then_stop
+    try:
+        run_pool(dict(environment=dict(os.environ)), 1, [], [], set(), None, None)
+    except StopRequested as stop:
+        raised = stop.code
+    finally:
+        os.mkdir = real_mkdir
+        tempfile.tempdir = saved_tempdir
+    left = sorted(name for name in os.listdir(temporary) if name.startswith(SHARD_ROOT_PREFIX))
+    selftest.check("TERM 落在建 shard_root 的 mkdir 之后、名字交到调用方手里之前：run_pool 照样退 143，$TMPDIR 下的 singlefs-mutation-replay-* 一个都不剩",
+                   len(fired) == 1 and raised == 128 + signal.SIGTERM and left == [],
+                   f"mkdir 之后抛停的信号 {len(fired)} 次（要 1 次），run_pool 退出码 {raised}（要 {128 + signal.SIGTERM}），停完还剩 {left}")
 
 
 def selftest_cargo_configuration_cell(selftest, work):
@@ -3699,6 +4455,10 @@ def selftest_worker_slot_cells(selftest, work):
     shared = os.path.join(work, "slot-targets", TARGET_DIRECTORY_NAME)
     released = os.path.join(work, "slot-cargo-released")
     invocations = {}
+    # 等的是条件（两个工作进程都报了片号；放掉假 cargo 之后两次调用都退出），不是定长：机器忙时头一步可以慢到分钟，照「被 TERM 停」那一格带超时地轮询；
+    # 超时不再往下赌，记进 not_ready，这一格判错并写明没等到什么
+    ready_seconds, finish_seconds = 300, 180
+    not_ready = []
     for name in ("earlier", "later"):
         repository = os.path.join(work, f"slots-{name}")
         build_selftest_repository(repository, [SELFTEST_TABLE_ROWS[0], SELFTEST_OTHER_BATCH_ROW])
@@ -3717,10 +4477,13 @@ def selftest_worker_slot_cells(selftest, work):
         with open(invocations[name]["stderr_path"], "w", encoding="utf-8") as stderr_handle:
             invocations[name]["process"] = subprocess.Popen([sys.executable, "-c", SELFTEST_STAGE_CHILD, MODULE_PATH, invocations[name]["repository"]],
                                                             env=invocations[name]["environment"], stdout=subprocess.DEVNULL, stderr=stderr_handle)
-        deadline = time.monotonic() + 90
+        deadline = time.monotonic() + ready_seconds
         while len(slots_reported(name)) < 2 and invocations[name]["process"].poll() is None and time.monotonic() < deadline:
             time.sleep(0.05)
-        return slots_reported(name)
+        reported = slots_reported(name)
+        if len(reported) < 2:
+            not_ready.append(f"{name} 那次 {ready_seconds} 秒内只报了片号 {reported}（子进程已退 {invocations[name]['process'].poll()}）")
+        return reported
 
     earlier_slots = start("earlier")
     later_slots = start("later")
@@ -3732,10 +4495,11 @@ def selftest_worker_slot_cells(selftest, work):
     open(released, "w").close()
 
     def wait_for_own_selftest_child(process):
-        """等自证自己起的那一个子进程退出；90 秒还没退就停掉它（只停这一个，按进程对象，不按模式找）。"""
+        """等自证自己起的那一个子进程退出；放掉假 cargo 之后 finish_seconds 秒还没退就停掉它（只停这一个，按进程对象，不按模式找），并记进 not_ready。"""
         try:
-            process.wait(timeout=90)
+            process.wait(timeout=finish_seconds)
         except subprocess.TimeoutExpired:
+            not_ready.append(f"放掉假 cargo 之后 {finish_seconds} 秒还没退，停掉了它（进程 {process.pid}）")
             process.kill()
             process.wait()
 
@@ -3748,9 +4512,9 @@ def selftest_worker_slot_cells(selftest, work):
         if handle is not None:
             handle.close()
     selftest.check("同一个共用编译目录上并发的两次调用各起 2 个工作进程：领到的片号集合不相交、四把片号锁都被占、两次退出之后锁都空了",
-                   len(earlier_slots) == 2 and len(later_slots) == 2 and not set(earlier_slots) & set(later_slots)
+                   not not_ready and len(earlier_slots) == 2 and len(later_slots) == 2 and not set(earlier_slots) & set(later_slots)
                    and held_while_running == sorted({*earlier_slots, *later_slots}) and len(held_while_running) == 4 and all(free_afterwards),
-                   f"先起的那次领到 {earlier_slots}、后起的那次领到 {later_slots}；跑的时候被占的锁 {held_while_running}；退出之后锁空了 {free_afterwards}")
+                   f"{'；'.join(not_ready)}{'；' if not_ready else ''}先起的那次领到 {earlier_slots}、后起的那次领到 {later_slots}；跑的时候被占的锁 {held_while_running}；退出之后锁空了 {free_afterwards}")
     # 回收：多出来的 -w<片号> 的片号锁被别的调用的工作进程拿着（它刚领到这一片、还没来得及拿在用标记）时留着，没人拿的照删
     targets = os.path.join(work, "slot-reclaim")
     reclaim_shared = os.path.join(targets, TARGET_DIRECTORY_NAME)
@@ -3794,15 +4558,318 @@ def selftest_crash_library_home_cells(selftest, work):
 
     wanted = os.path.join(real_home, MUTATION_CRASH_LIBRARY_SUBDIRECTORY)
     exit_code, records, homes, libraries, stderr = received()
-    selftest.check("变异复跑起的 cargo 写自己的崩溃判定库：家目录是真跑那一份底下的 mutation-replay/、不等于真跑的，调用方点名的单份库清掉",
-                   exit_code == 0 and len(records) >= 2 and homes == [wanted] and wanted != real_home and libraries == ["None"],
-                   f"退 {exit_code}；假 cargo 起了 {len(records)} 次，收到的家目录 {homes}（要 [{wanted}]，真跑的是 {real_home}）、单份库 {libraries}（要都没有）；{stderr[-400:]}")
+    shard_prefix = wanted + os.sep + CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX
+    selftest.check("变异复跑起的 cargo 写自己的崩溃判定库：家目录是真跑那一份底下的 mutation-replay/ 里这一片自己的子目录、不等于真跑的，调用方点名的单份库清掉",
+                   exit_code == 0 and len(records) >= 2 and len(homes) == 1 and homes[0].startswith(shard_prefix) and wanted != real_home and libraries == ["None"],
+                   f"退 {exit_code}；假 cargo 起了 {len(records)} 次，收到的家目录 {homes}（要 {shard_prefix}<片号>，真跑的是 {real_home}）、单份库 {libraries}（要都没有）；{stderr[-400:]}")
     configured = os.path.join(work, "configured-mutation-crash-library-home")
     exit_code, records, homes, libraries, stderr = received(GATE_MUTATION_CRASH_LIBRARY_HOME=configured)
-    selftest.check("设了 GATE_MUTATION_CRASH_LIBRARY_HOME：变异复跑起的 cargo 收到的家目录就是它、单份库照样清掉",
-                   exit_code == 0 and len(records) >= 2 and homes == [configured] and libraries == ["None"],
-                   f"退 {exit_code}；假 cargo 起了 {len(records)} 次，收到的家目录 {homes}（要 [{configured}]）、单份库 {libraries}；{stderr[-400:]}")
+    selftest.check("设了 GATE_MUTATION_CRASH_LIBRARY_HOME：变异复跑起的 cargo 收到的家目录是它底下这一片自己的子目录、单份库照样清掉",
+                   exit_code == 0 and len(records) >= 2 and len(homes) == 1 and homes[0].startswith(configured + os.sep + CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX)
+                   and libraries == ["None"],
+                   f"退 {exit_code}；假 cargo 起了 {len(records)} 次，收到的家目录 {homes}（要 {configured}/{CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX}<片号>）、单份库 {libraries}；{stderr[-400:]}")
 
+
+
+def environment_records(path):
+    """假 cargo 的 FAKE_CARGO_ENVIRONMENT_LOG：每起一次 test 一行 JSON（假 cargo 头上那一段）；文件不在交空表。"""
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle.read().splitlines() if line.strip()]
+
+
+def selftest_compile_jobs_cells(selftest, work):
+    """编译那一趟的并行度按这一行的内存上限收（文件头「编译并行度」）：compile_jobs_for 在 1G / 4G / 8G / 24G 上的取值；一个工作进程（并行度 = 核数）、
+    每条 4G 与 9G 各跑一趟，假 cargo 记下的先编（--no-run，含插桩编译）收到的 CARGO_BUILD_JOBS 是 min(核数, 上限装得下的任务数)，跑测试那几趟仍是核数 ÷ 工作进程数。
+    弄坏开关 compilejobsbyworkers（编译那一趟照核数 ÷ 工作进程数）下「编译并行度按内存上限收」那一格必须判错。"""
+    environment = dict(selftest.base_environment)
+    got = {limit: compile_jobs_for(limit, "10", environment) for limit in ("1G", "4G", "8G", "24G")}
+    selftest.check("编译并行度按内存上限收（每个任务按 1.75 GiB 算）：核数 ÷ 工作进程数是 10 时 1G 给 1、4G 给 2、8G 给 4、24G 装得下 13 个所以仍是 10",
+                   got == {"1G": "1", "4G": "2", "8G": "4", "24G": "10"}, f"{got}")
+    kept = (compile_jobs_for("4G", "1", environment), compile_jobs_for("4G", "10", dict(environment, GATE_MUTATION_CARGO_JOBS="10")))
+    selftest.check("核数 ÷ 工作进程数本来就比装得下的小时不抬高；调用方给了 GATE_MUTATION_CARGO_JOBS 的原样用", kept == ("1", "10"), f"{kept}")
+    processors = os.cpu_count() or 4
+    repository = os.path.join(work, "compile-jobs")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    environment_log = os.path.join(work, "compile-jobs-environment.jsonl")
+    for limit, fitting in (("4G", 2), ("9G", 5)):
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(environment_log)
+        exit_code, _stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_MEMORY_MAX=limit, FAKE_CARGO_ENVIRONMENT_LOG=environment_log)
+        records = environment_records(environment_log)
+        compile_jobs = {record.get("CARGO_BUILD_JOBS") for record in records if "--no-run" in record["ARGUMENTS"].split()}
+        test_jobs = {record.get("CARGO_BUILD_JOBS") for record in records if "--no-run" not in record["ARGUMENTS"].split()}
+        wanted = str(min(processors, fitting))
+        selftest.check(f"每条 {limit}、一个工作进程：先编（含插桩编译）收到的并行度是 min(核数 {processors}, {fitting}) = {wanted}，跑测试那几趟仍是核数 {processors}，末了一句写明收了几",
+                       exit_code == 0 and compile_jobs == {wanted} and test_jobs == {str(processors)} and f"每条 {limit} 时 {wanted}" in stderr,
+                       f"退 {exit_code}；先编收到 {sorted(map(str, compile_jobs))}（要 {wanted}），测试收到 {sorted(map(str, test_jobs))}（要 {processors}）；{stderr[-300:]}")
+
+
+def selftest_compile_memory_cells(selftest, work):
+    """撞顶分编译那一趟与测试那一趟（verdict_of_run、baseline_problem）：假内存包装在变异表第 3 行先编那一趟退 250 时，这一行记编译撞顶，单列一栏、出路不写「无界分配」；
+    在它测试那一趟退 250 时记测试撞顶、出路照旧；两种「计数：」里都算内存撞顶；基线的句子写明是编译那一趟。弄坏开关 memorycompilemerged 下编译撞顶那一格必须判错。"""
+    repository = os.path.join(work, "compile-memory")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    claim = "撞顶 = 这条破坏让被测代码无界分配"
+    exit_code, stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", FAKE_MEMORY_CAP_OOM_ON="/line-3-build cargo")
+    selftest.check("先编那一趟撞了内存上限：记编译撞顶，单列一栏，出路不写「无界分配」，「计数：」里仍算内存撞顶 1 条",
+                   exit_code == 1 and "有变异在编译那一趟撞了内存上限（编译撞顶 1 条，每条上限 4G" in stdout
+                   and "double-becomes-triple：编译那一趟撞了内存上限 4G（内存撞顶），改坏之后的代码没编成、点名的测试 doubles 一次都没起" in stdout
+                   and "内存撞顶 1 条、超时 0 条" in stdout and claim not in stdout and "有变异撞了内存上限（内存撞顶" not in stdout,
+                   f"退 {exit_code}；{stdout[-900:]}")
+    exit_code, stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", FAKE_MEMORY_CAP_OOM_ON="/line-3 cargo")
+    selftest.check("测试那一趟撞了内存上限：记测试撞顶，出路照旧写「无界分配」，不写编译那一栏",
+                   exit_code == 1 and "有变异撞了内存上限（内存撞顶 1 条，每条上限 4G）：" in stdout and claim in stdout
+                   and "double-becomes-triple：撞了内存上限 4G（内存撞顶），点名的测试 doubles 没来得及红" in stdout
+                   and "编译那一趟撞了内存上限" not in stdout and "内存撞顶 1 条、超时 0 条" in stdout,
+                   f"退 {exit_code}；{stdout[-900:]}")
+    row = Row(7, "selftest-compile-memory", "crates/selftest/src/lib.rs", "a", "b", "-p selftest", "tests::named", [])
+    on_compile = baseline_problem(row, MEMORY_CAP_HIT_EXIT, "", "4G", "1800", compile_pass=True)
+    on_test = baseline_problem(row, MEMORY_CAP_HIT_EXIT, "", "4G", "1800")
+    selftest.check("基线撞顶的句子写明是编译那一趟还是测试那一趟",
+                   on_compile == "没判成：那一批编译那一趟撞了内存上限 4G（内存撞顶）" and on_test == "没判成：那一批撞了内存上限 4G（内存撞顶）", f"{on_compile!r}；{on_test!r}")
+
+
+def selftest_write_random(path, size):
+    """size 字节的随机内容（压不下去、占盘就是 size 往上），自证里造占盘的编译目录用。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(os.urandom(size))
+
+
+def selftest_disk_cells(selftest, work):
+    """磁盘余量（文件头「磁盘余量」）：每个工作进程最多占两份编译目录（普通、插桩）、各涨到上限，派活前按目标盘余量定工作进程数。
+    先直接调 worker_count_for 与 disk_bound_for：外层内存 38G ÷ 每条 4G 本来给 9 个，假的余量 100G、上限 10G、备用 5G，每个工作进程要 20G，放得下 4 个，头一行写明卡在磁盘余量；
+    已有的编译目录只算还能涨的（片号 1 的普通编译目录已占 8M，上限 10M、余量 100M、备用 1M：放得下 5 个，没有已有目录是 4 个）。
+    再起一趟 run_stage：假的余量 50G、备用 10G，开的工作进程数按余量收成 2 个（条数 4、外层内存 9 都放得下更多），头一行写明；余量写法不认的整道拒；
+    余量设成空（外层没给）时读编译目录所在的盘，头一行写明来源。弄坏开关 disknotchecked（不看磁盘）下 run_stage 那一格与直接调的两格判错。"""
+    environment = dict(selftest.base_environment)
+    sixteen = dict(environment, GATE_MUTATION_WORKERS="16", **{OUTER_MEMORY_CAP_VARIABLE: "38G"})
+    sized = dict(sixteen, **{DISK_FREE_VARIABLE: "100G", TARGET_DIRECTORY_CAP_VARIABLE: "10G", DISK_RESERVE_VARIABLE: "5G"})
+    shared = os.path.join(work, "disk-target")
+    count, head = worker_count_for(20, sized, "4G", None, disk=lambda ceiling: disk_bound_for(shared, sized, ceiling))
+    selftest.check("磁盘余量放不下 9 份：外层内存 38G ÷ 4G 本来给 9 个，余量 100G（上限 10G、备用 5G、每个工作进程两份共 20G）按余量收成 4 个，头一行写明卡在磁盘余量与放得下几个",
+                   count == 4 and "卡在「磁盘余量」这一项" in head and "磁盘余量 100.0 GiB" in head and "4 个共还要 80.0 GiB，再多 1 个要 100.0 GiB、放不下" in head,
+                   f"{count}：{head}")
+    tiny = dict(sixteen, **{DISK_FREE_VARIABLE: "100M", TARGET_DIRECTORY_CAP_VARIABLE: "10M", DISK_RESERVE_VARIABLE: "1M"})
+    absent = os.path.join(work, "disk-target-absent")
+    present = os.path.join(work, "disk-target-present")
+    selftest_write_random(os.path.join(present, "debug", "deps", "blob.rlib"), 8 << 20)
+    absent_count, _head = disk_bound_for(absent, tiny, 9)
+    present_count, present_head = disk_bound_for(present, tiny, 9)
+    selftest.check("已有的编译目录只算还能涨的：片号 1 的普通编译目录已占 8M（上限 10M），余量 100M、备用 1M 放得下 5 个；没有已有目录是 4 个",
+                   absent_count == 4 and present_count == 5, f"没有已有目录 {absent_count}；片号 1 已占 8M {present_count}：{present_head}")
+    repository = os.path.join(work, "disk-workers")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    target = os.path.join(work, "disk-workers-target")
+    exit_code, _stdout, stderr, _ = selftest.run(
+        repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="16", GATE_MUTATION_MEMORY_MAX="4G", GATE_MUTATION_TARGET_DIR=target,
+        **{OUTER_MEMORY_CAP_VARIABLE: "38G", DISK_FREE_VARIABLE: "50G", TARGET_DIRECTORY_CAP_VARIABLE: "10G", DISK_RESERVE_VARIABLE: "10G"})
+    selftest.check("磁盘余量交给 run_stage：开的工作进程数按余量收（余量 50G、备用 10G、每个工作进程 20G 开 2 个，不是条数 4 也不是外层内存的 9），头一行写明卡在磁盘余量",
+                   exit_code == 0 and "这一轮开 2 个工作进程" in stderr and "卡在「磁盘余量」这一项" in stderr, f"退 {exit_code}；{stderr[:900]}")
+    exit_code, stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, **{DISK_FREE_VARIABLE: "lots"})
+    selftest.check("磁盘余量的写法不认：整道拒、带出路，一条变异都没跑", exit_code == 1 and f"{DISK_FREE_VARIABLE} 写成了「lots」" in stdout + stderr,
+                   f"退 {exit_code}；{(stdout + stderr)[:500]}")
+    exit_code, _stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, **{DISK_FREE_VARIABLE: ""})
+    selftest.check("外层没给磁盘余量时读编译目录所在的盘：头一行写来源，照常跑完", exit_code == 0 and "编译目录所在的盘此刻可用" in stderr, f"退 {exit_code}；{stderr[:700]}")
+
+
+def selftest_target_cap_cells(selftest, work):
+    """编译目录上限（文件头「编译目录上限」）：一份编译目录占盘超过上限，在两格之间清掉它底下的增量产物（<目录>/<档>/incremental、<目录>/<三元组>/<档>/incremental），
+    依赖与测试二进制不动；没超线不动；清完仍超线的照实报。先直接调 trim_target_directory：上限 2 MiB，增量 3+1 MiB、依赖 1 MiB，清掉两处增量、依赖还在、清后回读不到 2 MiB；
+    没超线不动；清完仍超线（依赖 3 MiB）只清增量、清后仍超。再起两趟 run_stage：假 cargo 每次先编往增量产物里写 64 KiB，上限 1T 时跑完两份编译目录（普通、插桩）的增量产物都留着（对照），
+    上限 1K 时跑完两份底下都没有增量产物。弄坏开关 targetcapignored（不清）下三格判错。"""
+    environment = dict(selftest.base_environment)
+    directory = os.path.join(work, "cap-target")
+    selftest_write_random(os.path.join(directory, "debug", "incremental", "session-a", "dep-graph.bin"), 3 << 20)
+    selftest_write_random(os.path.join(directory, "x86_64-unknown-linux-gnu", "debug", "incremental", "session-b", "query-cache.bin"), 1 << 20)
+    selftest_write_random(os.path.join(directory, "debug", "deps", "libkept.rlib"), 1 << 20)
+    before, after, removed = trim_target_directory(directory, 2 << 20, environment)
+    selftest.check("编译目录超过上限：清掉两处增量产物，依赖还在，清后回读不到上限",
+                   before >= 5 << 20 and len(removed) == 2 and after < 2 << 20 and os.path.isfile(os.path.join(directory, "debug", "deps", "libkept.rlib"))
+                   and not os.path.exists(os.path.join(directory, "debug", "incremental")) and not os.path.exists(os.path.join(directory, "x86_64-unknown-linux-gnu", "debug", "incremental")),
+                   f"清前 {before}、清后 {after}、清掉 {removed}")
+    again = trim_target_directory(directory, 10 << 20, environment)
+    selftest.check("没超线不动", again[2] == [] and again[0] == again[1] == after, f"{again}")
+    heavy = os.path.join(work, "cap-target-heavy")
+    selftest_write_random(os.path.join(heavy, "debug", "incremental", "session-c", "dep-graph.bin"), 1 << 20)
+    selftest_write_random(os.path.join(heavy, "debug", "deps", "libbig.rlib"), 3 << 20)
+    before, after, removed = trim_target_directory(heavy, 2 << 20, environment)
+    selftest.check("清完仍超线：只清增量产物、不动依赖，清后仍大于上限（由调用方报）",
+                   len(removed) == 1 and after > 2 << 20 and os.path.isfile(os.path.join(heavy, "debug", "deps", "libbig.rlib")), f"清前 {before}、清后 {after}、清掉 {removed}")
+    repository = os.path.join(work, "cap-run")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    target = os.path.join(work, "cap-run-target")
+    incremental_paths = (os.path.join(target, "debug", INCREMENTAL_DIRECTORY_NAME), os.path.join(target + COVERAGE_TARGET_SUFFIX, "debug", INCREMENTAL_DIRECTORY_NAME))
+    # 对照：上限宽裕（1T）时假 cargo 写下的增量产物两份都留着（证明假 cargo 真写了；工作进程里的 stderr 在自证里收不到，所以不靠它报的话判）
+    roomy_exit, _stdout, _stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, FAKE_CARGO_INCREMENTAL_BYTES="65536",
+                                                   **{TARGET_DIRECTORY_CAP_VARIABLE: "1T"})
+    roomy_left = [path for path in incremental_paths if os.path.exists(path)]
+    shutil.rmtree(target, ignore_errors=True)
+    shutil.rmtree(target + COVERAGE_TARGET_SUFFIX, ignore_errors=True)
+    # 清的那一趟另起一棵仓（判定库在仓的 git 目录里，沿用上一趟的覆盖记录就不会再编插桩那一份）
+    trimmed_repository = os.path.join(work, "cap-run-trimmed")
+    build_selftest_repository(trimmed_repository, SELFTEST_TABLE_ROWS)
+    exit_code, _stdout, stderr, _ = selftest.run(trimmed_repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, FAKE_CARGO_INCREMENTAL_BYTES="65536",
+                                                 **{TARGET_DIRECTORY_CAP_VARIABLE: "1K"})
+    leftovers = [path for path in incremental_paths if os.path.exists(path)]
+    selftest.check("编译目录上限交给 run_stage：上限宽裕（1T）时增量产物两份都留着；上限 1K 时每格判完清掉超线的那份编译目录的增量产物（普通、插桩两份），跑完两份底下都没有增量产物",
+                   roomy_exit == 0 and len(roomy_left) == 2 and exit_code == 0 and not leftovers and os.path.isdir(os.path.join(target + COVERAGE_TARGET_SUFFIX, "debug", "deps")),
+                   f"宽裕时退 {roomy_exit}、留着 {len(roomy_left)} 份；1K 时退 {exit_code}、还剩 {leftovers}；{stderr[-500:]}")
+
+
+def selftest_compile_budget_cells(selftest, work):
+    """先编那一趟的并行度从外层额度里此刻空着的那一部分算（文件头「编译并行度」）：套在外层内存包装里（RUN_WITH_MEMORY_CAP_OUTER_CAP 读得到）时，
+    先编向额度账借，借到的加在这一格自己的上限上，并行度随之升高，编完就还；各格的上限加借走的不超过外层。
+    先直接调 OuterBudget 与 compile_plan：外层 36G、2 个工作进程在跑各 4G、想要 16 个并行：第一个借到空着的一半 14G（总上限 18432M、并行度 10），
+    第二个借到剩下的 14G（同样 10），第三个什么也借不到（照老算法，4G 给 2），借走的之和加在跑的 8G 刚好 36G；还掉之后账回到 8G；
+    GATE_MUTATION_CARGO_JOBS 设了的、没有额度账的照老算法。再起一趟 run_stage：外层 36G、2 个工作进程、每条 4G、核数按 32 算，
+    假包装记每次包装的起止与上限：先编收到的并行度全是 10（大于老算法的 2），跑测试那几趟仍是 16，任一时刻在跑的各次包装的上限之和不超过 36G，借过额度（有包装的上限大于 4G）。
+    弄坏开关 compilejobsownlimit（先编只按这一格自己的上限收）下三格判错。"""
+    environment = dict(selftest.base_environment)
+    budget = OuterBudget(36 << 30, 2, 4 << 30)
+    budget.claim(4 << 30)
+    budget.claim(4 << 30)
+    first = compile_plan("4G", "16", environment, budget)
+    second = compile_plan("4G", "16", environment, budget)
+    third = compile_plan("4G", "16", environment, budget)
+    used, peak = budget.used(), budget.peak.value
+    for _plans in (first, second):
+        budget.give_back(14 << 30)
+    after_return = budget.used()
+    selftest.check("先编向外层额度借：36G 外层、2 个工作进程在跑各 4G、想要 16 个并行：第一个借 14G（总上限 18432M、并行度 10），第二个借剩下的 14G，第三个借不到（4G 给 2）",
+                   first == ("18432M", "10", 14 << 30) and second == ("18432M", "10", 14 << 30) and third == ("4G", "2", 0), f"{first}；{second}；{third}")
+    selftest.check("借走的加在跑的各格上限不超过外层（刚好 36G，峰值同），还掉之后账回到在跑的 8G", used == 36 << 30 and peak == 36 << 30 and after_return == 8 << 30,
+                   f"借完 {used}、峰值 {peak}、还完 {after_return}")
+    fixed = compile_plan("4G", "16", dict(environment, GATE_MUTATION_CARGO_JOBS="12"), OuterBudget(36 << 30, 2, 4 << 30))
+    unbudgeted = compile_plan("4G", "16", environment, None)
+    selftest.check("GATE_MUTATION_CARGO_JOBS 设了的原样用（不借）、没有额度账（外层读不到）的照老算法", fixed == ("4G", "16", 0) and unbudgeted == ("4G", "2", 0), f"{fixed}；{unbudgeted}")
+    repository = os.path.join(work, "compile-budget")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    wrapper = os.path.join(work, "compile-budget-wrapper.sh")
+    selftest_write(wrapper, SELFTEST_BUDGET_WRAPPER.replace("@STAMP_DIRECTORY@", START_STAMP_DIRECTORY_NAME), executable=True)
+    span_log = os.path.join(work, "compile-budget-spans.log")
+    environment_log = os.path.join(work, "compile-budget-environment.jsonl")
+    for path in (span_log, environment_log):
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(path)
+    saved_cpu_count = os.cpu_count
+    os.cpu_count = lambda: 32
+    try:
+        exit_code, _stdout, stderr, _ = selftest.run(
+            repository, GATE_MUTATION_WORKERS="2", GATE_MUTATION_MEMORY_MAX="4G", GATE_MUTATION_START_OVER="1", GATE_MUTATION_MEMORY_CAP_RUNNER=wrapper,
+            SPAN_LOG=span_log, FAKE_CARGO_ENVIRONMENT_LOG=environment_log, **{OUTER_MEMORY_CAP_VARIABLE: "36G"})
+    finally:
+        os.cpu_count = saved_cpu_count
+    records = environment_records(environment_log)
+    compile_jobs = {record.get("CARGO_BUILD_JOBS") for record in records if "--no-run" in record["ARGUMENTS"].split()}
+    test_jobs = {record.get("CARGO_BUILD_JOBS") for record in records if "--no-run" not in record["ARGUMENTS"].split()}
+    selftest.check("外层 36G、2 个工作进程、每条 4G、核数 32：先编（含插桩编译）收到的并行度全是 10（老算法给 2），跑测试那几趟仍是 16，头一行与末了一句写明借额度",
+                   exit_code == 0 and compile_jobs == {"10"} and test_jobs == {"16"} and "先编那一趟的并行度另从外层额度里此刻空着的那一部分借" in stderr and "向外层额度里此刻空着的那一部分借" in stderr,
+                   f"退 {exit_code}；先编收到 {sorted(map(str, compile_jobs))}（要 10），测试收到 {sorted(map(str, test_jobs))}（要 16）；{stderr[-600:]}")
+    events = []
+    with contextlib.suppress(OSError):
+        with open(span_log, encoding="utf-8") as handle:
+            events = [line.split("\t") for line in handle.read().splitlines()]
+    opened, peak_sum, largest = {}, 0, 0
+    for kind, stamp, cap in events:
+        if kind == "start":
+            opened[stamp] = bytes_of_size(cap) or 0
+            peak_sum = max(peak_sum, sum(opened.values()))
+            largest = max(largest, opened[stamp])
+        else:
+            opened.pop(stamp, None)
+    selftest.check("外层 36G、2 个工作进程、每条 4G：任一时刻在跑的各次包装的上限之和不超过 36G，先编借过额度（有一次包装的上限大于每条的 4G）",
+                   bool(events) and peak_sum <= 36 << 30 and largest > 4 << 30 and "额度账：" in stderr,
+                   f"包装起止 {len(events)} 行；上限之和的峰值 {peak_sum / 1024 ** 3:g}G；最大一次 {largest / 1024 ** 3:g}G；{stderr[-400:]}")
+
+
+def selftest_closure_refused_cell(selftest, work):
+    """点名的测试在这一组特性下不编（#[cfg(feature = "gpu")] 的测试、cargo 参数没开 gpu）：闭包算不成时真错照原话报出、点名它的变异表的行、带出路，
+    不被进程池换成 PicklingError。10 个闭包要算，GATE_MUTATION_KEY_WORKERS=2 走并行（子进程里抛的），=1 走就地；run_stage 与 --list-items 各核。
+    弄坏开关 closure-error-masked（模块不登记进 sys.modules、子进程原样抛）下并行那一趟必须判错。"""
+    tests = "".join(f"    #[test]\n    fn adds{index}() {{}}\n" for index in range(9))
+    source = ("pub fn add(left: u32, right: u32) -> u32 { left + right }\n\n#[cfg(test)]\nmod tests {\n" + tests
+              + '    #[cfg(feature = "gpu")]\n    #[test]\n    fn gpu_only() {}\n}\n')
+    rows = [f"plain-{index}\tcrates/tiny/src/lib.rs\t{{ left + right }}\t{{ left * right }}\t-p tiny --lib -- adds{index}\tadds{index}" for index in range(9)]
+    rows.append("gated-without-feature\tcrates/tiny/src/lib.rs\t{ left + right }\t{ left - right }\t-p tiny --features verdict-store --lib -- gpu_only\tgpu_only")
+    repository = os.path.join(work, "closure-refused")
+    build_selftest_repository(repository, rows, source=source)
+    for key_workers, how in (("2", "并行算（子进程里抛）"), ("1", "就地算")):
+        try:
+            exit_code, stdout, _stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_KEY_WORKERS=key_workers)
+        except Exception as error:   # 弄坏开关下进程池把真错换成 MaybeEncodingError（PicklingError）抛出来
+            exit_code, stdout = None, f"{type(error).__name__}：{str(error)[:300]}"
+        selftest.check(f"闭包算不成（{how}）：run_stage 打真错（入口在这一组 cfg 下不编）、点名它的变异表第 11 行、带出路，退 1，没有 PicklingError",
+                       exit_code == 1 and "UsageError：入口 crates/tiny/src/lib.rs::tests::gpu_only 在这一组 cfg 下不编" in stdout
+                       and "点名它的：crates/mutations.tsv:11 gated-without-feature" in stdout and "给那几行的 cargo 参数补上编它要的特性" in stdout
+                       and "PicklingError" not in stdout, f"退 {exit_code}；{stdout[-600:]}")
+    saved_handler = signal.getsignal(signal.SIGPIPE)
+    saved_workers = os.environ.get("GATE_MUTATION_KEY_WORKERS")
+    os.environ["GATE_MUTATION_KEY_WORKERS"] = "2"
+    listing = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(listing):
+            list_exit = command_list_items([repository])
+    except Exception as error:
+        list_exit = None
+        listing.write(f"{type(error).__name__}：{str(error)[:300]}")
+    finally:
+        signal.signal(signal.SIGPIPE, saved_handler)
+        if saved_workers is None:
+            os.environ.pop("GATE_MUTATION_KEY_WORKERS", None)
+        else:
+            os.environ["GATE_MUTATION_KEY_WORKERS"] = saved_workers
+    text = listing.getvalue()
+    selftest.check("--list-items 遇到闭包算不成：变异名照列，末尾一行写键没算出来与真错（入口在这一组 cfg 下不编、点名它的行），没有回溯",
+                   list_exit == 0 and "gated-without-feature\t第 11 行" in text and "键对不对得上没算出来" in text
+                   and "在这一组 cfg 下不编" in text and "点名它的：crates/mutations.tsv:11 gated-without-feature" in text and "PicklingError" not in text,
+                   f"退 {list_exit}；{text[-600:]}")
+
+
+def selftest_shard_crash_library_cells(selftest, work):
+    """变异复跑的崩溃判定库每片各一份（crash_library_home_for_shard、init_worker）：片号 1、2、3 的家目录互不相同、都在变异复跑那一份底下；
+    两个工作进程同时在跑（假 cargo 的屏障）时，各片起的 cargo 收到的 SINGLEFS_CRASH_AMPLIFICATION_HOME 互不相同、同一片的每一次都一样。
+    弄坏开关 crashlibraryacrossshards（几片共用一份）下两格必须判错。"""
+    base = os.path.join(work, "shard-library", MUTATION_CRASH_LIBRARY_SUBDIRECTORY)
+    homes = [crash_library_home_for_shard(dict(selftest.base_environment, **{CRASH_LIBRARY_HOME_VARIABLE: base}), sequence) for sequence in (1, 2, 3)]
+    unset = crash_library_home_for_shard(dict(selftest.base_environment), 1)
+    selftest.check("崩溃判定库每片各一份：片号 1、2、3 的家目录互不相同、都在变异复跑那一份底下；家目录没换过时不分",
+                   len(set(homes)) == 3 and all(home and home.startswith(base + os.sep + CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX) for home in homes) and unset is None,
+                   f"{homes}；没换过时 {unset}")
+    repository = os.path.join(work, "shard-library-repository")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    environment_log = os.path.join(work, "shard-library-environment.jsonl")
+    barrier = os.path.join(work, "shard-library-barrier")
+    real_home = os.path.join(work, "shard-library-real-home")
+    exit_code, _stdout, stderr, _ = selftest.run(
+        repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="2", FAKE_CARGO_ENVIRONMENT_LOG=environment_log, FAKE_CARGO_BARRIER_DIR=barrier,
+        FAKE_CARGO_BARRIER_PRISTINE=source_hash(repository), SINGLEFS_CRASH_AMPLIFICATION_HOME=real_home)
+    by_shard = collections.defaultdict(set)
+    for record in environment_records(environment_log):
+        target = record.get("CARGO_TARGET_DIR", "")
+        by_shard[target[:-len(COVERAGE_TARGET_SUFFIX)] if target.endswith(COVERAGE_TARGET_SUFFIX) else target].add(str(record.get(CRASH_LIBRARY_HOME_VARIABLE)))
+    wanted_base = os.path.join(real_home, MUTATION_CRASH_LIBRARY_SUBDIRECTORY)
+    shard_homes = [next(iter(found)) for found in by_shard.values() if len(found) == 1]
+    selftest.check("两个工作进程同时在跑：各片起的 cargo 收到的崩溃判定库家目录互不相同、同一片每一次一样、都在变异复跑那一份底下",
+                   exit_code == 0 and len(by_shard) == 2 and len(shard_homes) == 2 and len(set(shard_homes)) == 2
+                   and all(home.startswith(wanted_base + os.sep + CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX) for home in shard_homes),
+                   f"退 {exit_code}；按片分的家目录 {dict(by_shard)}；{stderr[-300:]}")
+
+
+def selftest_coverage_exact_cell(selftest, work):
+    """记覆盖时点名用例前自己补的 --exact，不与行里已有的 --exact 叠成两个（libtest 报 Option 'exact' given more than once、覆盖记不成）：
+    一行 libtest 参数已带 --exact 的变异，假 cargo 见两个 --exact 退 101；这一行抓到、覆盖记成 1 份，每一趟带 --exact 的 cargo 命令里 --exact 只出现一次。
+    弄坏开关 exactduplicated 下必须判错。"""
+    repository = os.path.join(work, "coverage-exact")
+    build_selftest_repository(repository, ["add-becomes-mul-exact\tcrates/tiny/src/lib.rs\t{ left + right }\t{ left * right }\t-p tiny --lib -- --exact adds\tadds"])
+    exit_code, stdout, stderr, invocations = selftest.run(repository, GATE_MUTATION_START_OVER="1")
+    exact_lines = [line.split("\t")[0] for line in invocations if "--exact" in line.split("\t")[0].split()]
+    selftest.check("行里已带 --exact 的变异：覆盖记成 1 份、没记成 0 份，带 --exact 的每一条 cargo 命令里 --exact 只出现一次（记覆盖那一趟也是）",
+                   exit_code == 0 and "覆盖：这一趟记了 1 份" in stdout and "没记成 0 份" in stdout and exact_lines
+                   and all(line.split().count("--exact") == 1 for line in exact_lines) and any("--message-format" not in line and "--no-run" not in line for line in exact_lines),
+                   f"退 {exit_code}；带 --exact 的命令 {exact_lines}；{stdout[-300:]}；{stderr[-300:]}")
 
 
 def run_selftest():
@@ -3822,6 +4889,7 @@ def run_selftest():
         selftest_unit_key_cells(selftest, work)
         selftest_reuse_cells(selftest, work)
         selftest_parallel_key_cell(selftest, work)
+        selftest_wgsl_unit_key_cell(selftest, work)
         selftest_judging_unit_cells(selftest, work)
         selftest_build_profile_cell(selftest, work)
         selftest_queue_line_cells(selftest, work)
@@ -3829,12 +4897,22 @@ def run_selftest():
         selftest_gpu_memory_cell(selftest, work)
         selftest_row_limit_cell(selftest, work)
         selftest_worker_count_cells(selftest, work)
+        selftest_row_memory_budget_cells(selftest, work)
+        selftest_disk_cells(selftest, work)
+        selftest_target_cap_cells(selftest, work)
+        selftest_compile_budget_cells(selftest, work)
         selftest_libtest_result_cell(selftest, work)
         selftest_cargo_configuration_cell(selftest, work)
         selftest_target_directory_cells(selftest, work)
         selftest_worker_slot_cells(selftest, work)
         selftest_signal_and_pipe_cells(selftest, work)
+        selftest_shard_root_window_cell(selftest, work)
         selftest_crash_library_home_cells(selftest, work)
+        selftest_shard_crash_library_cells(selftest, work)
+        selftest_compile_jobs_cells(selftest, work)
+        selftest_compile_memory_cells(selftest, work)
+        selftest_closure_refused_cell(selftest, work)
+        selftest_coverage_exact_cell(selftest, work)
         selftest_anchor_and_impact_cells(selftest, work)
     finally:
         JUDGING_ROOT[0] = STAGE_REPOSITORY
@@ -3854,17 +4932,22 @@ def run_selftest():
           "替换文空着的删行变异照常判、派活之前那几样 checker-tier-crates-mutation-replay 与 static-check 同一份判法、"
           "点名的测试打了 NOT_RUN 记本次未跑且变异那一趟补了 --show-output、只有本次未跑的退 77、should panic 的用例红了判抓到、"
           "单元键：被改坏函数的别一行变只现判原文在它里面的行（S34）、判法单元变了整张现判（S30）、限时变了与改名一行都不现判（N33、N34）、"
-          "同文件加没人调的函数一行都不现判（N45）、改点名测试调到的函数与被改坏函数用的常量现判点名它的行、基线按执行过的单元复用而不按整树快照、"
+          "同文件加没人调的函数一行都不现判（N45）、WGSL 按 fn 取键（改另一个 fn 键不变、改被改坏的 fn 键变、原文只在注释里的拒算）、改点名测试调到的函数与被改坏函数用的常量现判点名它的行、基线按执行过的单元复用而不按整树快照、"
           "只改判法注释判法单元指纹不变而改 libtest 解析一处就变、拒算的照跑、"
           "会话里平常跑时每次包装带自己那个工作进程的并行理由且调用方设了的不覆盖、"
           "工作进程数不超过外层内存上限 ÷ 每条变异的上限而外层上限读不到时头一行写明、"
-          "拷贝范围含 .cargo/（点名的测试要编 gpu 特性的那一行在副本里读得到 [env]）、被 TERM 停时删掉 $TMPDIR 下的 singlefs-mutation-replay-*、"
+          "有一行逐行上限很大（24G）也不压低工作进程数、派活按每一格自己的上限从外层额度里扣（在跑的各格上限之和不超过外层、大格不被饿死）、"
+          "拷贝范围含 .cargo/（点名的测试要编 gpu 特性的那一行在副本里读得到 [env]）、被 TERM 停时删掉 $TMPDIR 下的 singlefs-mutation-replay-*（TERM 落在建目录那一瞬也不漏）、"
           "片号大于这一趟工作进程数的 -w<片号> 开跑时回收而有进程在用的不删、两个变量都没设时编译目录不落 /tmp、"
           "同一个共用编译目录上并发的两次调用领到的片号集合不相交（片号锁）而片号锁被占着的 -w<片号> 回收时留着、"
-          "--list-items 接 | head 时安静退、变异复跑起的 cargo 写自己的崩溃判定库（真跑家目录底下的 mutation-replay/，或 GATE_MUTATION_CRASH_LIBRARY_HOME）而点名的单份库清掉、"
+          "--list-items 接 | head 时安静退、变异复跑起的 cargo 写自己的崩溃判定库（真跑家目录底下的 mutation-replay/，或 GATE_MUTATION_CRASH_LIBRARY_HOME；每片再分一个 shard-<片号> 子目录，两个工作进程同时在跑时互不相同）而点名的单份库清掉、"
+          "编译那一趟的并行度按这一行的内存上限收而跑测试那一趟不收、撞顶分编译那一趟与测试那一趟两栏各写各的出路、"
+          "点名的测试在这一组特性下不编时 run_stage 与 --list-items 打真错并点名变异表的行（并行算与就地算一样）、行里已带 --exact 的变异记覆盖时 --exact 只出现一次、"
           "工具链变了全现判、不按时限过期、llvm 工具不对判红、plan 只读且逐栏报数、"
           "锚点失效按行判（那一行记锚点失效、不入库、整道判红，别的行照跑照入库）而 row-plan、plan、--list-items 把锚点失效的行单列（数据文件那一行也不算键）、"
-          "牵连面在样本 crate 上报对牵连最大的单元与行数）")
+          "牵连面在样本 crate 上报对牵连最大的单元与行数、"
+          "磁盘余量放不下时工作进程数按余量收（已有的编译目录只算还能涨的、余量写法不认整道拒、没给余量读编译目录所在的盘）、"
+          "编译目录超过上限时判完一格清掉增量产物、套在外层包装里时先编向外层额度借（并行度升高、在跑各格的上限加借走的不超过外层））")
     return 0
 
 
@@ -4254,6 +5337,54 @@ def selftest_parallel_key_cell(selftest, work):
     selftest.check(f"算闭包的子进程数不同（就地算与 4 个子进程）：{count} 行的键逐字相同、没有一行拒算",
                    outputs["1"][0] == 0 and outputs["4"] == outputs["1"] and len(keys) == count and "-" not in keys,
                    f"1 个：{outputs['1'][1][:400]}；4 个：{outputs['4'][1][:400]}")
+
+
+SELFTEST_WGSL_KERNEL = '''// WGSL 按 fn 取键那一格的样本内核
+const SCALE: u32 = 3u;
+fn scaled(value: u32) -> u32 {
+    let base = value + 1u;
+    return base * SCALE;
+}
+fn untouched(value: u32) -> u32 {
+    return value + 5u;
+}
+// 只在注释里的一句：wgsl 样本的注释行
+'''
+SELFTEST_WGSL_ROWS = [
+    "wgsl-scaled-doubles\tcrates/tiny/src/kernel.wgsl\treturn base * SCALE;\treturn base * 2u;\t-p tiny --lib -- doubles\tdoubles",
+    "wgsl-scale-four\tcrates/tiny/src/kernel.wgsl\tSCALE: u32 = 3u\tSCALE: u32 = 4u\t-p tiny --lib -- doubles\tdoubles",
+    "wgsl-comment-only\tcrates/tiny/src/kernel.wgsl\twgsl 样本的注释行\twgsl 样本的另一行\t-p tiny --lib -- doubles\tdoubles",
+]
+
+
+def selftest_wgsl_unit_key_cell(selftest, work):
+    """WGSL 按 fn 取键（lib_mutation_units.py 文件头「单元」）：一份 .wgsl 两个 fn（scaled、untouched）加一个模块级常量 SCALE，
+    改坏 scaled 的一行与改坏常量的一行键算得出、原文只在注释里的一行拒算；改 untouched 之后两行的键都不变，改 scaled 的别一行之后只有改坏 scaled 的那一行键变。
+    键从 row-plan 读（只读，不起 cargo）。弄坏开关 wgsl-whole-file（.wgsl 照改前取整份字节的 sha256）下这一格必须判错。"""
+    repository = os.path.join(work, "wgsl-units")
+    build_selftest_repository(repository, SELFTEST_WGSL_ROWS)
+    kernel = os.path.join(repository, "crates", "tiny", "src", "kernel.wgsl")
+    selftest_write(kernel, SELFTEST_WGSL_KERNEL)
+
+    def keys():
+        exit_code, output = run_command_capturing(command_row_plan, [repository])
+        found = {}
+        for line in output.splitlines():
+            fields = line.split("\t")
+            if len(fields) == 5 and fields[0].isdigit():
+                found[int(fields[0])] = fields[1]
+        return exit_code, [found.get(line_number) for line_number in (2, 3, 4)], output
+
+    first_code, first, first_output = keys()
+    replace_in_file(kernel, "return value + 5u;", "return value + 6u;")
+    other_code, other, other_output = keys()
+    replace_in_file(kernel, "let base = value + 1u;", "let base = value + 2u;")
+    mutated_code, mutated, mutated_output = keys()
+    keyed = all(key is not None and re.fullmatch(r"[0-9a-f]{64}", key) for key in first[:2])
+    selftest.check("WGSL 按 fn 取键：改坏 fn 与改坏模块级常量的两行键算得出、原文只在注释里的一行拒算；改另一个 fn 之后两行键都不变，改被改坏的 fn 的别一行之后只有那一行键变",
+                   (first_code, other_code, mutated_code) == (0, 0, 0) and keyed and first[2] == "-"
+                   and other[:2] == first[:2] and mutated[0] != other[0] and mutated[1] == other[1],
+                   f"头一趟 {first}；改 untouched 之后 {other}；改 scaled 之后 {mutated}：{first_output[-300:]}{other_output[-300:]}{mutated_output[-300:]}")
 
 
 def judging_copy(work, name):

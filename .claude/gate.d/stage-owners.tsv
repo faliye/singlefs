@@ -4,6 +4,12 @@
 # 表与门禁目录、格名表、定义逐格一致由 code-tooling 的 stage-owners 格判。
 checker-tier-crash-point-replay.sh	crash-case-replay	investigator	崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条用例按崩溃状态块的单元键复用）：提交时在 HEAD 加暂存区的 worktree 里跑，红了归主 agent看
 checker-tier-crash-point-replay.sh	feature-gated-tests	investigator	快档带特性那一趟（tests/ 里 cfg 点到的 verdict-store、gpu 这类）：挂特性的测试文件跑到 0 条与没卡的 GPU 对拍报本次未跑，cargo 退非 0 判红；提交时跑，红了归主 agent看
+checker-tier-crash-point-replay.sh	crash-flow-coverage	implementation-writer,tooling-writer	崩溃流覆盖表（出口 4、六·1）：补流、改入口设点在 crates/（实现员），入口登记表 .claude/gate.d/crash-entries.tsv 与判法 scripts/crash/crash-flow-coverage.py 归工具实现员。2026-10-20 新立，没有合并之前的旧归属
+checker-tier-crash-point-replay.sh	crash-ignored-nodes	implementation-writer,tooling-writer	ignore 开着的节点只减不增（出口 4、六·2）：把多出来的段展开在 crates/（实现员），基准 .claude/gate.d/crash-ignored-nodes.tsv 归工具实现员、加行先问用户。2026-10-20 新立，没有合并之前的旧归属
+checker-tier-crash-point-replay.sh	invariant-zero-evaluations	implementation-writer,tooling-writer	评估 0 次的（流，不变量）对不许涨（六·3）：判器漏判、流没走到在 crates/（实现员），基准 .claude/gate.d/invariant-zero-evaluations.tsv 连理由归工具实现员。2026-10-20 新立，没有合并之前的旧归属
+checker-tier-crash-point-replay.sh	crash-case-must-red	implementation-writer	每条崩溃枚举用例至少一行必红变异（出口 4、六·3）：crates/mutations.tsv 只追加，归改 crates/ 的实现员，证红由主 agent 跑。2026-10-20 新立，没有合并之前的旧归属
+checker-tier-crash-point-replay.sh	crash-knobs	tooling-writer	旋钮登记表 .claude/gate.d/crash-knobs.tsv 取值、依据与出处（出口 4、六·4）归工具实现员。2026-10-20 新立，没有合并之前的旧归属
+checker-tier-crash-point-replay.sh	last-full-judgement	tooling-writer,implementation-writer	上一次全量的标记（C635）：读法 scripts/crash/crash-flow-coverage.py last-full 归工具实现员，读库子命令在 crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 归实现员；这一格不挡提交，全量本身由主 agent 在用户要求时跑。2026-10-20 新立，没有合并之前的旧归属
 checker-independence-and-sync.sh	checker-implementation-disjoint	implementation-writer,investigator	checker 与实现只许共享常量模块：两边的代码都由实现员改，记账对账那一处归主 agent
 checker-independence-and-sync.sh	layout-checker-sync	implementation-writer,kb-scribe	布局的格式常量变了 checker 判定路径要跟：格式定义一边是 crates/singlefs-format（实现员改），一边是 kb 的字节布局表（书记员改）
 checker-independence-and-sync.sh	cpu-judging-sites	implementation-writer,tooling-writer	判器调用点没落在判定段、也没带标记：标记写在 crates/ 里那一截的函数上一行，由改 crates/ 的实现员加（豁免表 .claude/gate.d/gpu-exemptions.tsv 每加一行先问用户点头）；判定段与判器本体的登记表 .claude/gate.d/cpu-judging-sites.tsv 在 gate.d 下，由工具实现员改。新立，没有合并之前的旧归属
@@ -13,7 +19,7 @@ checker-tier-formal-verification.sh	verus-toolchain-pinned	tooling-writer,implem
 checker-tier-formal-verification.sh	verus-proof	implementation-writer	证明与核在 crates/singlefs-replay-prefix 里，验不过、verified 数变了都由写证明的实现员修（加减了证明照判定行改登记数时连同登记表一起交补丁）。新立
 checker-tier-formal-verification.sh	verus-vacuity	implementation-writer	空真是核的前置条件写得不可满足，由写证明的实现员改前置条件。新立
 checker-tier-formal-verification.sh	verus-must-red-worlds	implementation-writer	必红世界表 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 与核一起由实现员维护：锚点腐化、改坏了还验得过都归它。新立
-checker-tier-formal-verification.sh	pinned-red-examples-complete	tooling-writer	没钉全只差跑一次 scripts/experiments/e165-pin-red-examples.py（写 .claude/gate.d/ 下的表），由工具实现员补；第二段驱动收尾本该当场钉，没钉上先查驱动。新立
+checker-tier-formal-verification.sh	pinned-red-examples-table	tooling-writer	钉表只由 scripts/experiments/e165-pin-red-examples.py 写（.claude/gate.d/ 下的表），旧行补段、手改坏了的找回都由工具实现员办；钉全由 E165 第二段驱动写完账当场判，这一格不判钉全。新立
 checker-tier-formal-verification.sh	pinned-red-examples-replay	implementation-writer	钉住的输入在今天的实现上与原实现不同是恢复代码的回归，装置读表（--pinned-cases）也在 crates/singlefs-checker-tier 里，都归改 crates/ 的实现员；点名的变异行不在了归同一个人找回。新立
 checker-tier-lkmm.sh	litmus-verdicts	investigator	herd7 内存序，提交时由主 agent 跑、红了派调查员查
 checker-tier-qemu-device-streams.sh	device-streams	investigator	QEMU 真设备，提交时由主 agent 跑、红了派调查员查
@@ -85,6 +91,7 @@ doc-experiments.sh	quoted-result-lines	experiment-runner	正文整行抄的产�
 doc-experiments.sh	archive-past-rounds	sweep	上一轮实验记录的归档属于回扫：与「撤回一个数之后全仓找还在引它的地方」同类
 doc-experiments.sh	multipath-registry	experiment-runner	多条路径互证的登记：路径、源码落点与共用项由跑实验的人写
 doc-experiments.sh	cited-paths-exist	kb-scribe,experiment-runner	kb 点名的产物、变异表、实验源码路径找不到：点名的行归写它的人改——kb 正文由书记员写，实验页与产物由执行员写。没有合并之前的旧归属，2026-10-13 新立（还 C43）
+doc-experiments.sh	preregistration-parallelism	experiment-designer	跑前登记的「并行与挂钟」一节由写登记的设计员写
 doc-process-records.sh	batch-scope	investigator	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，主 agent 跑整轮门禁时先看一眼
 doc-process-records.sh	verdict-names-local-samples	investigator	判决文件由主 agent 写，提交前核它按路径点名了那一轮本地腿的每一份样本
 doc-process-records.sh	crates-adversarial-review	investigator	判决文件由主 agent 写，提交前核点名
@@ -115,6 +122,8 @@ doc-registries.sh	invariant-count-elsewhere	kb-scribe	不变量条数跨文件�
 doc-registries.sh	citations	kb-scribe,prior-art	外部引用还核得动；写进 kb 的是书记员，查源码树的是调研员
 doc-registries.sh	invariant-anchors	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写
 doc-registries.sh	inline-sums	kb-scribe	kb 正文里的内联算式（整数 = 项 + 项 + …）左右相等：算式写在 kb 正文里，写回 kb 的书记员写、也由它改
+doc-registries.sh	invariant-prerequisites	kb-scribe	未实现的不变量写编号前置（C446）：不变量清单与欠账表都由书记员照规格写回，前置的编号要它补；真要实现那一条的另派实现员。2026-10-20 新立，没有合并之前的旧归属
+doc-registries.sh	field-frequency-sizes	kb-scribe	字段频率「每 X 一份」的 X 指得到已定条款给出的大小（C72）：句子与 format-const 登记都在决策与布局正文里，归写回 kb 的书记员。2026-10-20 新立，没有合并之前的旧归属
 doc-text.sh	prime-marks	investigator	全仓不许用撇号类角标给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
 doc-text.sh	clock-times	investigator	全仓描述里不许写钟点：谁写文件都可能写进时分，收尾跑整轮门禁时一并判
 doc-text.sh	session-names	investigator	全仓不许写会话号：谁写文件都可能写进会话名，收尾跑整轮门禁时一并判
@@ -125,6 +134,7 @@ doc-text.sh	trilingual-structure	kb-scribe	三份结构对不上（编号、链�
 doc-text.sh	trilingual-changed-together	kb-scribe	改了三语文件的一份而另两份没同步：同步译文归写这批文档的书记员。没有合并之前的旧归属，2026-10-13 新立
 doc-text.sh	trilingual-glossary	kb-scribe	翻译术语表 .claude/kb/translation-glossary.md 写错或译文没照它用词：术语表是 kb 页，归写 kb 的书记员，译文跟着同一位改。没有合并之前的旧归属，2026-10-13 新立
 doc-text.sh	private-values	investigator	这次改动新加的行里不许出现本机私有配置 multi-host.env 的值与本机主机名：谁写文件都可能抄进去，收尾跑整轮门禁时一并判；红行只列文件、行号与键名，换成「第二台」「本机」这类说法
+doc-text.sh	account-quota	kb-scribe	这次改动新加到记录、kb 页与三方判决正文的行里写了账号切换、会话或周限额、额度重置：这些页归写记录与 kb 的书记员，红了删掉那几句（子 agent 因此停下的只写「中途停下没交回」）；用户原话要原样留的行末写 account-quota:allow 加理由。没有合并之前的旧归属，2026-10-19 新立
 harness-model-differential-and-scenarios.sh	one-scenario	investigator	用例一条一个场景：谁改 crates/ 下测试都可能写成一条多场景，收尾跑整轮门禁时一并判
 harness-model-differential-and-scenarios.sh	model-fast-tier	implementation-writer,investigator	模型对拍快档：改 crates/ 的实现员修；主 agent跑重门禁时一起看
 harness-model-differential-and-scenarios.sh	model-reuse-sampling	implementation-writer,investigator	模型对拍的复用取样点：改 crates/ 的实现员修；主 agent跑重门禁时一起看

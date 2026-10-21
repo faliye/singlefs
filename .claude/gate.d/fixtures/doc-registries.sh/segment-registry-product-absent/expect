@@ -1,0 +1,7 @@
+exit=77
+want=本次未跑 2 处登记：甲路径（path=a）、⚠️ 整条流（发布与下一次发布之间没有屏障那句提示）（path=b）
+want=只能与 E142 产物比，而 replay.sh 指的
+want=syn-absent.out 不在
+want=覆盖写固定脚本流的登记 1 处与钉它的用例相符
+want=segment-registry：本次未跑
+not-green-by-design=segment-registry 这一份样本就是「只能与产物比、产物不在」那一支：两处登记记本次未跑，这一格与整道退 77，不记通过

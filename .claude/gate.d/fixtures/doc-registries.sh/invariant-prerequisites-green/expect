@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：invariant-prerequisites
+want=未实现的不变量都写了指得到、还没全满足的编号前置：扫 1 份不变量表文件，未实现 5 行，前置 6 个编号（C 3、D 分项 2、E 1）
+want=doc-registries.sh：1 格里 1 格绿（invariant-prerequisites），0 格本次未跑（无）

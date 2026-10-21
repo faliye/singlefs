@@ -161,6 +161,108 @@ pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
     }
 }
 
+/// 「本次未跑」那一行的记号：别的实验的产物、拿来当期望值的留存产物读不到时打它（写法照 crates 那一侧
+/// `NOT_RUN_<原因> test=<用例> reason=<一句>` 的约定，`singlefs_harness::gpu_memory_ledger::gpu_not_run_line`）。
+/// `research/` 可以整个删掉（`.claude/rules/directory-layout.md`「research/：可以整个删掉的研究目录」），
+/// 读它的装置与单测一律在运行时读、读不到报这一行，不用 `include_str!`（产物不在就编不过），也不 panic。
+/// 路径由调用处写成字面的 `concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/<文件名>")` 交进来：函数单元键
+/// （`scripts/gate/lib_function_units.py`）折得出这种写法，文件在时把它的内容算进键（与 `include_str!` 一样），不在时这一条拒算、每趟现判，
+/// 不会把一次「本次未跑」当成判过的绿复用下去；在这里按文件名拼路径就折不出，每一条都拒算。
+pub const ARCHIVED_PRODUCT_NOT_RUN_MARKER: &str = "NOT_RUN_ARCHIVED_PRODUCT";
+
+/// 装置 `main` 读不到别的实验的产物时的退出码：「本次未跑」，不是通过，也不是红（`replay.sh` 把这一行记本次未跑）。
+pub const NOT_RUN_EXIT_CODE: i32 = 77;
+
+/// 读不到那一份时那一行：记号、用例名、读不到的是 `research/results/` 下的哪一份、怎么取回。
+pub fn archived_product_not_run_line(test_name: &str, path: &str, error: &str) -> String {
+    let file_name = std::path::Path::new(path).file_name().map_or(path.into(), |name| name.to_string_lossy());
+    format!(
+        "{ARCHIVED_PRODUCT_NOT_RUN_MARKER} test={test_name} reason=research/results/{file_name} 读不到（{error}），这一项本次未跑；要跑先从 git 历史取回：git log --all --diff-filter=D --name-only -- \"*{file_name}\""
+    )
+}
+
+/// 单测里报本次未跑：把那一行写进进程的标准输出。写的是 `std::io::stdout()` 本身，不经 `println!`：
+/// libtest 只截 `print!` 一族，这样不带 `--nocapture` 的 `cargo test` 输出里也看得见这一行。
+pub fn report_not_run_line_on_stdout(line: &str) {
+    use std::io::Write as _;
+    writeln!(std::io::stdout().lock(), "{line}").expect("写不出本次未跑那一行");
+}
+
+/// 读那一份（路径照 [`ARCHIVED_PRODUCT_NOT_RUN_MARKER`] 那一段写成字面的 `concat!`）；读不到就报一行本次未跑
+/// （[`report_not_run_line_on_stdout`]）、交 `None`，调用方照常返回。
+pub fn read_archived_product_or_report_not_run(test_name: &str, path: &str) -> Option<String> {
+    read_archived_product_or_write_not_run_line(test_name, path, &mut std::io::stdout().lock())
+}
+
+/// [`read_archived_product_or_report_not_run`] 的本体：本次未跑那一行写进 `not_run_output`。自检用例交一块内存缓冲，
+/// 不往真的标准输出打：门禁 checker-tier-research-build-and-replay 的 research-unit-tests 格把输出里的每一行记号当成一条本次未跑。
+fn read_archived_product_or_write_not_run_line(test_name: &str, path: &str, not_run_output: &mut dyn std::io::Write) -> Option<String> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => Some(text),
+        Err(error) => {
+            writeln!(not_run_output, "{}", archived_product_not_run_line(test_name, path, &error.to_string())).expect("写不出本次未跑那一行");
+            None
+        }
+    }
+}
+
+/// 装置 `main` 用：按次序读这几份（路径写法同上），全读得到就按次序交出；读不到的每一份各往 stderr 打一行本次未跑，
+/// 然后退 [`NOT_RUN_EXIT_CODE`]，一行结果都不打。
+pub fn read_archived_products_or_exit_not_run(device_name: &str, paths: &[&str]) -> Vec<String> {
+    let mut texts = Vec::with_capacity(paths.len());
+    let mut missing = 0usize;
+    for path in paths {
+        match std::fs::read_to_string(path) {
+            Ok(text) => texts.push(text),
+            Err(error) => {
+                eprintln!("{}", archived_product_not_run_line(device_name, path, &error.to_string()));
+                missing += 1;
+            }
+        }
+    }
+    if missing > 0 {
+        std::process::exit(NOT_RUN_EXIT_CODE);
+    }
+    texts
+}
+
+/// E175 的装置源码：research 工作区不编它，`replay.sh` 的 `driver_e175` 把它拷进仓副本的 `crates/singlefs-harness/tests/` 编、按名字起一条用例。
+/// 这里钉住驱动依赖它的那几样（用例名、标了 `#[ignore]`、驱动设的几个环境变量），源码改了名字驱动就起不来，这一条先红。
+#[cfg(test)]
+mod e175_device_source_tests {
+    const DEVICE_SOURCE: &str = include_str!("e175_product_path_inode_watermark_regression/device-source.rs");
+
+    #[test]
+    fn the_e175_device_source_carries_the_ignored_case_and_the_variables_the_replay_driver_uses() {
+        let case = "fn run_one_family_on_one_arm_into_the_result_file()";
+        let case_at = DEVICE_SOURCE.find(case).expect("装置源码里要有 driver_e175 按 --exact 起的那条用例");
+        assert!(DEVICE_SOURCE[..case_at].trim_end().rsplit('\n').take(3).any(|line| line.trim_start().starts_with("#[ignore")), "那条用例要标 #[ignore]：driver_e175 带 --ignored 起它");
+        for variable in ["E175_ARM", "E175_FAMILY", "E175_RESULT_FILE", "E175_WORKER_THREADS", "E175_TIME_BUDGET_SECONDS"] {
+            assert!(DEVICE_SOURCE.contains(&format!("\"{variable}\"")), "装置源码要读 driver_e175 设的 {variable}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod archived_product_tests {
+    use super::*;
+
+    #[test]
+    fn a_missing_archived_product_is_reported_not_run_instead_of_read() {
+        let path = std::env::temp_dir().join(format!("no-such-product-for-the-not-run-test-{}.out", std::process::id()));
+        let path = path.to_str().expect("临时目录的路径是 UTF-8");
+        assert!(!std::path::Path::new(path).exists(), "这一条要的是一份不在的产物");
+        let mut not_run_output = Vec::new();
+        assert_eq!(read_archived_product_or_write_not_run_line("lib::archived_product_tests", path, &mut not_run_output), None);
+        let written = String::from_utf8(not_run_output).expect("本次未跑那一行是 UTF-8");
+        assert!(written.starts_with("NOT_RUN_ARCHIVED_PRODUCT test=lib::archived_product_tests reason=research/results/no-such-product-for-the-not-run-test-") && written.ends_with('\n'),
+                "读不到时写出一整行本次未跑：{written}");
+        let line = archived_product_not_run_line("lib::archived_product_tests", path, "No such file or directory (os error 2)");
+        assert!(line.starts_with("NOT_RUN_ARCHIVED_PRODUCT test=lib::archived_product_tests reason=research/results/no-such-product-for-the-not-run-test-"), "{line}");
+        assert!(line.contains("本次未跑") && !line.contains(&*std::env::temp_dir().to_string_lossy()), "那一行只写文件名：{line}");
+    }
+}
+
 #[cfg(test)]
 mod admission_tests {
     use super::*;

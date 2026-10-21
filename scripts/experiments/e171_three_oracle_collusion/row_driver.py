@@ -633,6 +633,8 @@ def main(argument_list: list[str]) -> int:
         wanted = {int(token) for token in arguments.rows.split(",") if token}
         chosen = [row for row in selected_rows if row.number in wanted]
     started = now_ns()
+    if not arguments.no_executor and frozen_o3.report_missing_freeze_reference(arguments.repo_root, "row_driver.py"):
+        return frozen_o3.NOT_RUN_EXIT_CODE   # 冻结行的参照产物不在：本次未跑，一行都不跑
     if not arguments.no_executor:
         differences = frozen_o3.freeze_differences(arguments.repo_root)
         print(f"freeze_check before=true differences={len(differences)} detail={','.join(differences) or 'none'}")

@@ -1,5 +1,5 @@
 exit=1
-want=工作区里还留着上一轮及更早的实验记录
+want=上一轮及更早的实验记录没收干净
 want=archive-past-rounds.py --apply
 want=样本只跑 .gate-cells 点名的格：archive-past-rounds
 want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）

@@ -1,0 +1,14 @@
+exit=3
+want=样本档：
+want=· 覆盖行与计数行：4 条记录，记在
+want=CRASH_FLOW_RECORDS_FILE
+want=✓ crash-flow-coverage（full 域）：登记的 2 个入口都有覆盖行，StepKind 2 个成员都被罩住（覆盖行 3 条）
+want=✓ crash-ignored-nodes：这一趟 ignore 开着的节点 1 个（ignored_point 0、registered_segment 1、not_expanded 0），都在基准 1 行里
+want=✓ invariant-zero-evaluations（full 域）：1 条流、2 个（流，不变量）对，评估 0 次的 1 个都在基准里
+want=✓ 上一次全量的标记：当前判法单元指纹下录下的 2 块都有全量判定（最晚 2026-10-19）
+want=逐格（全量域；旋钮、必红世界、带特性那一格只在快档跑）：crash-flow-coverage：绿；crash-ignored-nodes：绿；invariant-zero-evaluations：绿；last-full-judgement：绿
+want=退 3 不退 0
+not-green-by-design=crash-flow-coverage 样本档用假 cargo 走 --full 流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）
+not-green-by-design=crash-ignored-nodes 样本档用假 cargo 走 --full 流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）
+not-green-by-design=invariant-zero-evaluations 样本档用假 cargo 走 --full 流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）
+not-green-by-design=last-full-judgement 样本档用假 cargo 走 --full 流程、读库输出是样本里那一份，判绿也退 3 不退 0（不许记成通过）

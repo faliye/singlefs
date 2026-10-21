@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import queue
+import sys
 import tempfile
 import threading
 import time
@@ -118,12 +120,54 @@ class FreezeTests(unittest.TestCase):
             os.remove(os.path.join(directory, "b.py"))
             self.assertEqual(frozen_o3.freeze_differences(root, lines), ["b.py:missing", "freeze_seed:differs"])
 
+    def test_a_change_registered_as_path_only_is_not_a_difference_and_a_later_change_still_is(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            lines = make_frozen_repository(root, {"a.py": b"x", "b.py": b"y"})
+            directory = os.path.join(root, frozen_o3.FROZEN_DIRECTORY_RELATIVE)
+            frozen_digest, frozen_seed = frozen_o3.frozen_hashes_of(lines)["a.py"], frozen_o3.seed_of(lines)
+            write(os.path.join(directory, "a.py"), b"x with a moved path")
+            registered = {"a.py": (frozen_digest, frozen_o3.sha256_of_file(os.path.join(directory, "a.py"))),
+                          frozen_o3.SEED_NAME: (frozen_seed, frozen_o3.seed_from_directory(directory))}
+            self.assertEqual(frozen_o3.freeze_differences(root, lines, path_only_changes={}), ["a.py:sha256_differs", "freeze_seed:differs"],
+                             "没登记时只差路径的改动照判不同")
+            self.assertEqual(frozen_o3.freeze_differences(root, lines, path_only_changes=registered), [],
+                             "登记了、冻结时与现在的两个值都对上的不算不同")
+            write(os.path.join(directory, "a.py"), b"x changed again after the registration")
+            self.assertEqual(frozen_o3.freeze_differences(root, lines, path_only_changes=registered), ["a.py:sha256_differs", "freeze_seed:differs"],
+                             "登记之后又改了的照判不同")
+
+    def test_a_path_only_change_row_with_the_wrong_number_of_columns_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            table = os.path.join(root, "freeze-path-only-changes.tsv")
+            write(table, b"# header\nexecutor_main.py\tfrozen\tnow\tcommit\n")
+            with self.assertRaises(ValueError):
+                frozen_o3.path_only_changes_of(table)
+
+    def test_a_missing_freeze_reference_is_reported_not_run_and_never_read_as_an_empty_freeze(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            make_frozen_repository(root, {"a.py": b"x"})
+            with self.assertRaises(frozen_o3.FreezeReferenceMissing) as raised:
+                frozen_o3.freeze_differences(root)
+            line = raised.exception.not_run_line("test_o3_columns")
+            self.assertTrue(line.startswith(f"{frozen_o3.NOT_RUN_MARKER} test=test_o3_columns reason={frozen_o3.FREEZE_REFERENCE_RELATIVE} 不在"), line)
+            with unittest.mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                self.assertTrue(frozen_o3.report_missing_freeze_reference(root, "comparator.py"))
+            self.assertIn(f"{frozen_o3.NOT_RUN_MARKER} test=comparator.py reason=", stderr.getvalue())
+            self.assertEqual(frozen_o3.NOT_RUN_EXIT_CODE, 77)
+
     def test_the_real_frozen_directory_matches_the_first_rerun_freeze_lines_and_the_registered_seed(self) -> None:
-        reference = frozen_o3.frozen_lines_of(os.path.join(REPOSITORY_ROOT, frozen_o3.FREEZE_REFERENCE_RELATIVE))
+        try:
+            reference = frozen_o3.freeze_reference_lines(REPOSITORY_ROOT)
+        except frozen_o3.FreezeReferenceMissing as missing:   # 参照产物已归档：报本次未跑（直写标准输出，unittest 不截）后跳过
+            sys.__stdout__.write(missing.not_run_line("test_o3_columns." + self.id().rsplit(".", 1)[-1]) + "\n")
+            self.skipTest(missing.not_run_line(self.id()))
         self.assertEqual(frozen_o3.seed_of(reference), REGISTERED_SEED)
         self.assertEqual(len(frozen_o3.frozen_hashes_of(reference)), FROZEN_FILE_COUNT)
         self.assertEqual(frozen_o3.freeze_differences(REPOSITORY_ROOT, reference), [])
-        self.assertEqual(frozen_o3.seed_from_directory(os.path.join(REPOSITORY_ROOT, frozen_o3.FROZEN_DIRECTORY_RELATIVE)), REGISTERED_SEED)
+        # 冻结之后只改了路径的那几处登记在 freeze-path-only-changes.tsv：目录现算的种子是登记的「现在」那一个，登记的「冻结时」那一个就是登记的种子
+        frozen_seed_registered, seed_now_registered = frozen_o3.path_only_changes_of().get(frozen_o3.SEED_NAME, (REGISTERED_SEED, REGISTERED_SEED))
+        self.assertEqual(frozen_seed_registered, REGISTERED_SEED)
+        self.assertEqual(frozen_o3.seed_from_directory(os.path.join(REPOSITORY_ROOT, frozen_o3.FROZEN_DIRECTORY_RELATIVE)), seed_now_registered)
 
 
 class ImageJudgeTests(unittest.TestCase):

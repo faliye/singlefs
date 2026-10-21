@@ -1,4 +1,4 @@
 exit=1
-want=· --quick：核心部分 toolchain proof complete 三项；与重型同一份判定库，键相同就复用
-want=3 行里 1 行没钉进
-want=pinned-red-examples-complete：红（退出 1）
+want=· --quick：核心部分 toolchain proof table 三项；与重型同一份判定库，键相同就复用
+want=第 20 行的 ① 与拿 ②③⑦ 重算的指纹不同
+want=pinned-red-examples-table：红（退出 1）

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 每次调都在这一刻的树上两台各跑一份、取回、本机带导入再跑一趟，上一次的结论不替这一次作保；块的复用在判定库里
-# run-condition: command bash python3
+# run-condition: command bash python3 rsync
 # gate-similar: scripts/crash/crash-amplification-two-hosts.sh 不另起一套双机跑法：崩溃点重放的一条崩溃枚举用例也是崩溃放量的一条流（整条流一个崩溃点），这一份只把门禁 checker-tier-crash-point-replay 交的那一条用例交给它、再把导入那一趟的日志交回门禁
 # gate-overlap:copy-kept scripts/crash/crash-amplification-item.sh 排计划取本机速度这一段（decide_where_to_run 里取 crash_amplification_placement_rate 那几行，与排计划之后带 --local-states-per-second 交驱动那一句）照那边写：item.sh 是顺着主线往下跑的脚本、不是可 source 的库，抽成共用要动 item.sh 与驱动，这一份不动它们；排计划那一趟与速度合计都经共用库 crash-amplification-lib.sh 的 crash_amplification_run_on_this_host、crash_amplification_placement_rate
 # 崩溃点重放按双机跑一条崩溃枚举用例：交崩溃放量的双机驱动 scripts/crash/crash-amplification-two-hosts.sh（本机 SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、
@@ -32,6 +32,14 @@
 #   CRASH_POINT_REPLAY 计数行 states 等于 closed_form、violations=0、exhaustive=true。驱动退 78（运行条件：第二台连不上这一类）记本次未跑。判错时 runs/<标签>/ 下的日志拷到
 #   ${TMPDIR:-/tmp}/crash-point-replay-shard-run-selftest-logs-<进程号>/ 留着、打出路径。
 #   必红的样本：CRASH_AMPLIFICATION_ITEM_BREAK=include-ignored-dropped（录入段一条用例都不跑，驱动退 1）、library-marker-not-accepted（录入行不认，驱动退 1），各红在这一格。
+#   冻树（真跑那一格对着活的主工作区各编各跑的病：别的会话中途往 crates 里换文件，本机三趟编出不同的二进制，导入那一趟的观察者版本和录入段的不是一把，
+#   报「录入段那一块不在库里」，是假红）：开跑时把树拷一份到自证的临时目录（git ls-files -co --exclude-standard 列得出的文件，与 multi-host-run.sh 拷给第二台的是同一批；
+#   不是 git 仓的树按 find 列；都不带 .git、target、target-*、multi-host.env、.env、qemu.env；规范副本 .claude/singlefs-ai-sop 另拷；rsync --no-times，拷过去的 mtime 是此刻，
+#   cargo 一定重编副本里的本地包，不会被旧 mtime 骗去用别的树编的旧产物），驱动、本机三趟 cargo test 与第二台的拷树都在这一份副本上，三趟共用一份源码，退出时随临时目录删。
+#   crates 指纹：Cargo.toml、Cargo.lock、.cargo/、crates/ 下每个文件的 sha256 清单（find 排序后 sha256sum）。开跑前取一次、拷完取副本的一次、跑完取活的主工作区的一次：
+#   副本和开跑前的对不上（拷的过程中源树被换了文件）不起驱动，跑完活的主工作区和开跑前的对不上（跑的中途源树被换了文件），这一格都报「本次作废」并列出变了的文件（至多 5 个）——
+#   照「本次未跑」那一类处理（退 0，输出里写明、报进 GATE_NOT_RUN_FILE），不当红也不当绿：副本上跑出来的结论证不了现在这棵树。
+#   必红的样本：CRASH_POINT_REPLAY_SHARD_RUN_BREAK=real-run-on-live-tree（不拷树）、crates-change-not-voided（不比指纹），在假的主工作区上演（自证 real-run-* 三格，不起 cargo、不连第二台）。
 #   第二台编译之前刷源码戳、持锁（这一份没有自己的第二台编译：第二台那一份经驱动 → multi-host-run.sh 的 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY → peer-host-lib.sh 的
 #   peer_host_shared_target_guard）：这一格另判 runs/<标签>/share-1.log（第二台分份那一趟）里「· 第二台：拿到共用编译目录 … 的锁」与 SOURCE_STAMP touched= 两行都在、
 #   前者在后者之前，且都在 cargo 打的头一行 Compiling / Finished / Running 之前。必红的样本：CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-shared-target-unguarded（驱动不交那个变量，两行都没有）。
@@ -89,6 +97,10 @@
 #       local-speed-unavailable-equal-split
 #   host-weights-not-passed  配置写了 HOST_JUDGE_WEIGHTS 也不交 --host-weights（改前的样子：走排计划量速度那一支，录入段由本机整份录）
 #       host-weights-passed
+#   real-run-on-live-tree  真跑那一格不拷树，驱动与三趟 cargo test 照改前对着活的主工作区跑
+#       real-run-uses-a-frozen-copy
+#   crates-change-not-voided  真跑那一格跑完不比 crates 指纹，中途 crates 变了也照常判（红的当红）
+#       real-run-voided-when-crates-change
 # 判法脚本的弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=host-weights-unknown（定义在判法脚本文件头）也在这一份自证里证红，开关轮单独打开它：
 #   红的格逐字是 host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red（判法脚本把这个键当不认得的键，配置判不过）。
 set -uo pipefail
@@ -319,7 +331,8 @@ esac
 exit 99
 '
 selftest_cells=(library-default library-from-environment log-copied driver-exit-kept quiesce-when-gpu no-import-log-red findings-file threads-passed outer-memory-cap-to-driver local-speed-passed local-speed-unavailable-equal-split
-  host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red)
+  host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red
+  real-run-uses-a-frozen-copy real-run-voided-when-crates-change real-run-red-when-crates-unchanged)
 selftest_host_weights_cells="host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red"  # MULTI_HOST_CONFIGURATION_BREAK=host-weights-unknown 该红的五格
 selftest_zero_fingerprint="0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -546,13 +559,105 @@ cell_host_weights_bad_red() {
   [[ "$selftest_exit" == 1 && ! -e "$selftest_work/control/arguments" && "$(selftest_last_output)" == *"HOST_JUDGE_WEIGHTS 要写两台分活的权重"* ]]
 }
 
+# 真跑那一格的冻树与 crates 指纹（文件头「真跑那一格」冻树一段），在假的主工作区上演，不起 cargo、不连第二台：假的真跑包装记下收到的树根、前后读副本里 crates/lib.rs 两次，
+# 模式 change-crates-during 时在两次之间把活的主工作区里同一份改成 version two（等同别的会话中途往 crates 里换文件），退 3（等同真跑红）。
+# selftest_real_scene <场景名> [<包装模式>]：造假的主工作区与假包装，调 real_two_hosts_run；结果在 real_cell_outcome、real_cell_detail，场景目录放进 real_scene_directory
+real_scene_directory=""
+selftest_real_scene() {
+  local name="$1" mode="${2:-}" had_configuration=0 saved_configuration="${SINGLEFS_MULTI_HOST_CONFIG-}"
+  if [[ -v SINGLEFS_MULTI_HOST_CONFIG ]]; then had_configuration=1; fi
+  real_scene_directory="$selftest_work/real-scene-$name"
+  rm -rf -- "${real_scene_directory:?}"
+  mkdir -p -- "$real_scene_directory/source/crates" "$real_scene_directory/source/.claude/gate.d" "$real_scene_directory/source/.cargo"
+  printf 'version one\n' >"$real_scene_directory/source/crates/lib.rs"
+  printf '[workspace]\n' >"$real_scene_directory/source/Cargo.toml"
+  printf '# lock\n' >"$real_scene_directory/source/Cargo.lock"
+  printf 'crash-case:new-pool-file-creation-stream\t-\ttest=pkg:demo_target:demo_function shard=across-machines\n' >"$real_scene_directory/source/.claude/gate.d/stage-inputs.tsv"
+  printf 'ENABLE_ACROSS_MACHINES=1\nENABLE_GPU=1\n' >"$real_scene_directory/source/multi-host.env"
+  cat >"$real_scene_directory/fake-wrapper.sh" <<'FAKE_REAL_WRAPPER'
+#!/usr/bin/env bash
+# 假的真跑包装（自证用）：调法 <树根> <这一格的目录>
+tree="$1" real="$2"
+printf '%s\n' "$tree" >"$real/wrapper-saw-tree"
+cat "$tree/crates/lib.rs" >"$real/wrapper-saw-first"
+if [[ "${FAKE_REAL_WRAPPER_MODE:-}" == change-crates-during ]]; then printf 'version two\n' >"${FAKE_REAL_WRAPPER_LIVE_ROOT:?}/crates/lib.rs"; fi
+cat "$tree/crates/lib.rs" >"$real/wrapper-saw-last"
+exit 3
+FAKE_REAL_WRAPPER
+  real_cell_source_root="$real_scene_directory/source" real_cell_work="$real_scene_directory/work" real_cell_wrapper="$real_scene_directory/fake-wrapper.sh"
+  export SINGLEFS_MULTI_HOST_CONFIG="$real_scene_directory/source/multi-host.env" FAKE_REAL_WRAPPER_MODE="$mode" FAKE_REAL_WRAPPER_LIVE_ROOT="$real_scene_directory/source"
+  real_two_hosts_run >"$real_scene_directory/run.out" 2>&1   # 它的「· 真跑那一格」说明不进自证格的输出（run_selftest_cells 的 stdout 就是红格名单）
+  real_cell_source_root="" real_cell_work="" real_cell_wrapper=""
+  unset FAKE_REAL_WRAPPER_MODE FAKE_REAL_WRAPPER_LIVE_ROOT
+  if (( had_configuration )); then export SINGLEFS_MULTI_HOST_CONFIG="$saved_configuration"; else unset SINGLEFS_MULTI_HOST_CONFIG; fi
+}
+# 驱动与三趟 cargo test 跑在开跑时拷出来的树上：包装收到的树根是副本（不是活的主工作区），活的主工作区中途被换了文件，副本里前后读到的还是原来的；
+# 副本里有 stage-inputs.tsv 这类整棵树的文件、没有 multi-host.env（私有配置不拷）
+cell_real_run_uses_a_frozen_copy() {
+  selftest_real_scene frozen change-crates-during
+  local work="$real_scene_directory/work" saw_tree
+  [[ -f "$work/wrapper-saw-tree" && -f "$work/wrapper-saw-last" ]] || return 1
+  saw_tree="$(cat "$work/wrapper-saw-tree")"
+  [[ "$saw_tree" == "$work/tree" && "$saw_tree" != "$real_scene_directory/source" && "$(cat "$work/wrapper-saw-first")" == "version one" \
+     && "$(cat "$work/wrapper-saw-last")" == "version one" && "$(cat "$real_scene_directory/source/crates/lib.rs")" == "version two" \
+     && -f "$saw_tree/.claude/gate.d/stage-inputs.tsv" && ! -e "$saw_tree/multi-host.env" ]]
+}
+# 跑的中途活的主工作区的 crates 变了：这一格报「本次作废」（outcome 是 not-run，不是 red），列出变了的文件
+cell_real_run_voided_when_crates_change() {
+  selftest_real_scene voided change-crates-during
+  [[ "$real_cell_outcome" == not-run && "$real_cell_detail" == "本次作废"*"crates/lib.rs"* ]]
+}
+# 对照：crates 没变、包装退 3：照常判红（作废只在 crates 变了的时候）
+cell_real_run_red_when_crates_unchanged() {
+  selftest_real_scene unchanged
+  [[ "$real_cell_outcome" == red && "$real_cell_detail" == "包装退 3"* ]]
+}
+
 # 真跑那一格（文件头「真跑那一格」）：real_cell_outcome 置成 green、red 或 not-run，real_cell_detail 是一句说明
 REAL_CELL_CASE_KEY="crash-case:new-pool-file-creation-stream"
 real_cell_outcome="" real_cell_detail=""
+# 只给自证里的假场景设（real-run-* 三格）：假的主工作区、这一趟的工作目录、假的真跑包装；平常三个都空，取真的主工作区、$selftest_work/real、真的 --merged-log
+real_cell_source_root="" real_cell_work="" real_cell_wrapper=""
+# 冻树要用的两个函数（文件头「真跑那一格」冻树一段）。
+# shard_crates_manifest <树根> <输出文件>：Cargo.toml、Cargo.lock、.cargo/、crates/ 下每个文件的「sha256  路径」清单（路径相对树根、排序），任何一个文件读不了就退 1
+shard_crates_manifest() {
+  local root="$1" output="$2" entry
+  local -a entries=()
+  for entry in Cargo.toml Cargo.lock .cargo crates; do
+    if [[ -e "$root/$entry" ]]; then entries+=("$entry"); fi
+  done
+  (( ${#entries[@]} > 0 )) || return 1
+  ( cd "$root" && find "${entries[@]}" \( -type d \( -name target -o -name 'target-*' -o -name __pycache__ \) -prune \) -o -type f -print0 \
+      | LC_ALL=C sort -z | xargs -0 -r sha256sum ) >"$output" 2>"$output.err"
+}
+# shard_manifest_changes <清单甲> <清单乙>：两份清单里不一样的文件路径，至多 5 个，逗号连起来
+shard_manifest_changes() {
+  diff -- "$1" "$2" | sed -n -E 's/^[<>] [0-9a-f]{64}  //p' | LC_ALL=C sort -u | head -n 5 | paste -sd, -
+}
+# shard_freeze_tree <源树根> <副本>：把源树拷一份到副本（文件头「真跑那一格」冻树一段）；任何一步失败退 1
+shard_freeze_tree() {
+  local source="$1" destination="$2" list="$2.list"
+  mkdir -p -- "$destination" || return 1
+  if git -C "$source" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$source" ls-files -co --exclude-standard -z --deduplicate >"$list" || return 1
+  else
+    ( cd "$source" && find . -mindepth 1 \( -name .git -o -name target -o -name 'target-*' -o -name multi-host.env -o -name .env -o -name qemu.env -o -path ./.claude/singlefs-ai-sop \) -prune \
+        -o \( -type f -o -type l \) -printf '%P\0' ) >"$list" || return 1
+  fi
+  rsync -a --no-times --ignore-missing-args --from0 --files-from="$list" "$source/" "$destination/" || return 1
+  if [[ -d "$source/.claude/singlefs-ai-sop" ]]; then
+    mkdir -p -- "$destination/.claude" && rsync -a --no-times --exclude __pycache__ "$source/.claude/singlefs-ai-sop/" "$destination/.claude/singlefs-ai-sop/" || return 1
+  fi
+  rm -f -- "$list"
+}
+
 real_two_hosts_run() {
   local repository_root real configuration_source across row test_field target function label_directories runs import_copy record_log wrapper_exit
-  repository_root="$(cd "$shard_script_directory/../.." && pwd)"
-  real="$selftest_work/real"
+  local frozen_tree cargo_target voided="" crates_before crates_after
+  local -a real_wrapper
+  repository_root="${real_cell_source_root:-$(cd "$shard_script_directory/../.." && pwd)}"
+  real="${real_cell_work:-$selftest_work/real}"
+  cargo_target="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/crash-point-replay-shard-run-selftest-target"
   mkdir -p -- "$real/home"
   configuration_source="$(crash_amplification_multi_host_configuration_file "$repository_root")"
   across="$(crash_amplification_configuration_value "$configuration_source" ENABLE_ACROSS_MACHINES)"
@@ -569,21 +674,51 @@ real_two_hosts_run() {
     real_cell_outcome=red real_cell_detail=".claude/gate.d/stage-inputs.tsv 里 $REAL_CELL_CASE_KEY 那一行读不出 test=<包>:<测试目标>:<用例函数>、或没登记 shard=across-machines（读到「$row」）"
     return 0
   fi
-  echo "  · 真跑那一格：$REAL_CELL_CASE_KEY（$target::$function）经真驱动双机跑，库的家目录 $real/home，编译目录 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/crash-point-replay-shard-run-selftest-target"
+  # 冻树（文件头「真跑那一格」冻树一段）：开跑前取 crates 指纹，把树拷一份，副本的指纹要和开跑前的一样；驱动与三趟 cargo test 都在副本上跑
+  crates_before="$real/crates-before.tsv" crates_after="$real/crates-after.tsv"
+  if ! shard_crates_manifest "$repository_root" "$crates_before"; then
+    real_cell_outcome=not-run real_cell_detail="本次作废：开跑前读不出 $repository_root 的 crates 指纹（Cargo.toml、Cargo.lock、.cargo/、crates/ 下有文件读不了：$(head -c 300 "$crates_before.err" 2>/dev/null)）"
+    return 0
+  fi
+  frozen_tree="$real/tree"
+  if shard_break_is real-run-on-live-tree; then   # 弄坏开关 real-run-on-live-tree：不拷树，对着活的主工作区跑（改前的样子）
+    frozen_tree="$repository_root"
+  elif ! shard_freeze_tree "$repository_root" "$frozen_tree" >"$real/freeze.out" 2>&1; then
+    real_cell_outcome=red real_cell_detail="开跑前把 $repository_root 拷到 $frozen_tree 失败（$(tail -n 3 "$real/freeze.out" | tr '\n' '|')）：看临时目录盘满没满、rsync 在不在"
+    return 0
+  elif ! shard_crates_manifest "$frozen_tree" "$real/crates-copy.tsv" || ! cmp -s -- "$crates_before" "$real/crates-copy.tsv"; then
+    real_cell_outcome=not-run real_cell_detail="本次作废：拷树的过程中 $repository_root 的 crates 被换了文件，副本和开跑前的对不上（变了：$(shard_manifest_changes "$crates_before" "$real/crates-copy.tsv")），没起驱动"
+    return 0
+  fi
+  echo "  · 真跑那一格：$REAL_CELL_CASE_KEY（$target::$function）在开跑时拷出来的树 $frozen_tree 上经真驱动双机跑（三趟共用这一份源码），库的家目录 $real/home，编译目录 $cargo_target"
+  if [[ -n "$real_cell_wrapper" ]]; then
+    real_wrapper=(bash "$real_cell_wrapper" "$frozen_tree" "$real")
+  else
+    real_wrapper=(bash "$0" --merged-log "$REAL_CELL_CASE_KEY" "$frozen_tree" "$selftest_zero_fingerprint" "$real/merged.log" "$target" "$function")
+  fi
   if env -u SINGLEFS_CRASH_AMPLIFICATION_LIBRARY -u CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER -u CRASH_POINT_REPLAY_SHARD_RUN_BREAK \
       SINGLEFS_CRASH_AMPLIFICATION_HOME="$real/home" SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY=1 SINGLEFS_MULTI_HOST_CONFIG="$real/multi-host.env" \
-      CARGO_TARGET_DIR="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/crash-point-replay-shard-run-selftest-target" \
-      bash "$0" --merged-log "$REAL_CELL_CASE_KEY" "$repository_root" "$selftest_zero_fingerprint" "$real/merged.log" "$target" "$function" >"$real/output" 2>&1; then
+      CARGO_TARGET_DIR="$cargo_target" "${real_wrapper[@]}" >"$real/output" 2>&1; then
     wrapper_exit=0
   else
     wrapper_exit=$?
+  fi
+  # 跑完再取活的主工作区的 crates 指纹；弄坏开关 crates-change-not-voided：不比（中途变了也照常判）
+  if ! shard_break_is crates-change-not-voided; then
+    if ! shard_crates_manifest "$repository_root" "$crates_after"; then
+      voided="本次作废：跑完读不出 $repository_root 的 crates 指纹（$(head -c 300 "$crates_after.err" 2>/dev/null)），副本上的结论证不了现在这棵树"
+    elif ! cmp -s -- "$crates_before" "$crates_after"; then
+      voided="本次作废：跑的过程中 $repository_root 的 crates 被换了文件（变了：$(shard_manifest_changes "$crates_before" "$crates_after")），这一趟是在开跑时拷出来的树上跑的，证不了现在这棵树；不当红也不当绿，等换文件的会话停手再跑"
+    fi
   fi
   label_directories=("$real/home/runs/crash-point-replay-${REAL_CELL_CASE_KEY#crash-case:}-"*)
   runs="${label_directories[0]}"
   record_log="$runs/record.log" import_copy="$real/merged.log"
   # 第二台分份那一趟编译之前刷源码戳、持锁（文件头「真跑那一格」）：ok，或「lock=<行号> stamp=<行号> cargo=<行号>」（0 是没有）
   local peer_guard_order=""
-  if [[ "$wrapper_exit" == 78 ]]; then
+  if [[ -n "$voided" ]]; then
+    real_cell_outcome=not-run real_cell_detail="$voided"
+  elif [[ "$wrapper_exit" == 78 ]]; then
     real_cell_outcome=not-run real_cell_detail="驱动退 78（运行条件不满足：第二台连不上、库没取回、线程数现算不出这一类；输出尾部：$(tail -n 4 "$real/output" | tr '\n' '|')）"
   elif [[ "$wrapper_exit" != 0 ]]; then
     real_cell_outcome=red real_cell_detail="包装退 $wrapper_exit（输出尾部：$(tail -n 6 "$real/output" | tr '\n' '|')）"
@@ -640,9 +775,11 @@ if [[ "${1:-}" == --selftest ]]; then
     selftest_failed=1
   fi
   declare -A switch_cells=([library-not-passed]="library-default library-from-environment" [log-not-copied]="log-copied" [exit-swallowed]="driver-exit-kept" [quiesce-not-passed]="quiesce-when-gpu" [ignore-outer-cap]="outer-memory-cap-to-driver"
-    [speed-not-passed]="local-speed-passed" [placement-failure-ignored]="local-speed-unavailable-equal-split" [host-weights-not-passed]="host-weights-passed")
+    [speed-not-passed]="local-speed-passed" [placement-failure-ignored]="local-speed-unavailable-equal-split" [host-weights-not-passed]="host-weights-passed"
+    [real-run-on-live-tree]="real-run-uses-a-frozen-copy" [crates-change-not-voided]="real-run-voided-when-crates-change")
   switch_count=0
-  for switch in library-not-passed log-not-copied exit-swallowed quiesce-not-passed ignore-outer-cap speed-not-passed placement-failure-ignored host-weights-not-passed; do
+  for switch in library-not-passed log-not-copied exit-swallowed quiesce-not-passed ignore-outer-cap speed-not-passed placement-failure-ignored host-weights-not-passed \
+      real-run-on-live-tree crates-change-not-voided; do
     switch_count=$((switch_count + 1))
     red_cells="$(CRASH_POINT_REPLAY_SHARD_RUN_BREAK="$switch" run_selftest_cells)"
     echo "  · 开关轮：CRASH_POINT_REPLAY_SHARD_RUN_BREAK=$switch 红的格：${red_cells:-（无）}"
@@ -662,7 +799,7 @@ if [[ "${1:-}" == --selftest ]]; then
     selftest_failed=1
   fi
   if (( selftest_failed )); then exit 1; fi
-  light_summary="${#selftest_cells[@]} 格绿（假的双机驱动：参数、库目录、--quiesce、日志抄回、退出码、发现日志、线程、外层内存上限；假的排计划命令：本机速度交驱动、取不到速度等分；多机配置的 HOST_JUDGE_WEIGHTS：写对、写坏、没写、交驱动 --host-weights），开关轮 ${switch_count} 个开关各红在点名的格"
+  light_summary="${#selftest_cells[@]} 格绿（假的双机驱动：参数、库目录、--quiesce、日志抄回、退出码、发现日志、线程、外层内存上限；假的排计划命令：本机速度交驱动、取不到速度等分；多机配置的 HOST_JUDGE_WEIGHTS：写对、写坏、没写、交驱动 --host-weights；真跑那一格的冻树与 crates 指纹在假的主工作区上演：包装收到副本、中途 crates 变了报本次作废、没变照常判红），开关轮 ${switch_count} 个开关各红在点名的格"
   if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
     echo "  ✓ crash-point-replay-shard-run 自证（假的那几格）通过：$light_summary"
     echo "  ! 真跑那一格 real-two-hosts-run 本次未跑（这不是通过）：命令里没设 SINGLEFS_HEAVY_TESTS；要跑照文件头「真跑那一格」带 SINGLEFS_HEAVY_TESTS=user-request 起 --selftest"

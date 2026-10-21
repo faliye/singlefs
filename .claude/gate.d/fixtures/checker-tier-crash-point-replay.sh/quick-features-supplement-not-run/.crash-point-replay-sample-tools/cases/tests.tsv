@@ -1,0 +1,7 @@
+both	src/lib.rs	-	ok	line	-
+plain	tests/enumeration.rs	enumeration_plain_check	ok	line	-
+plain	tests/enumeration.rs	enumeration_quick_tier_shape	ok	line	NOT_RUN_GPU_FEATURE_NOT_COMPILED_IN test=crash_state_enumeration::quick_tier reason=多机配置写了 ENABLE_GPU=1，这一趟没编进 gpu 特性（样本）
+feature	tests/enumeration.rs	enumeration_quick_tier_shape	ok	scattered	CRASH_POINT_REPLAY_JUDGE route=gpu cards_used=1 blocks=2 states=8 red_states=0（样本）
+plain	tests/gpu_pair.rs	-	ok	line	-
+feature	tests/gpu_pair.rs	gpu_pair_agrees_with_the_cpu	ok	scattered	CRASH_POINT_REPLAY_JUDGE route=gpu cards_used=1 blocks=2 states=8 red_states=0（样本）
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-

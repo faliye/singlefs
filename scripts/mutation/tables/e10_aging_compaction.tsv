@@ -1,0 +1,21 @@
+M1_保持期3S减1改成3S减2	ROOT_RING_REGIONS * self.root_ring_slots_per_region - 1	ROOT_RING_REGIONS * self.root_ring_slots_per_region - 2
+M2_合取7也判删除类发布	PublishKind::Deletion => false,	PublishKind::Deletion => true,
+M3_合取7读占用口径	self.record_empty_segment_count >= self.settings.floor_segments	self.fully_free_segments.len() as u64 >= self.settings.floor_segments
+M4_记录口径把已释放未回收算占着	is_record_empty: counters.live_slots == 0,	is_record_empty: counters.live_slots + counters.released_slots == 0,
+M5_runs把已释放未回收算空闲	fn is_free_for_runs(state: SlotState) -> bool {\n    state.is_free()	fn is_free_for_runs(state: SlotState) -> bool {\n    state.is_free() || state.is_released()
+M6_c_actual不算散开只看第一个脏槽	for absolute_slot in absolute_slots.iter().copied() {	for absolute_slot in absolute_slots.iter().copied().take(1) {
+M7_层级1宽用812乘168	self.leaf_width_in_slots * ALLOCATION_RECORD_TREE_INTERNAL_FANOUT\n	self.leaf_width_in_slots * (ALLOCATION_RECORD_TREE_INTERNAL_FANOUT - 1)\n
+M8_c_actual不做不动点迭代	            completed_waves += 1;\n	            completed_waves += 1;\n            break;\n
+M9_greedy同分取起点最大	live_slots < best_live_slots	live_slots <= best_live_slots
+M12_资格不排除这次挂载开过的段	let is_eligible = !opened_this_mount && counters.pinned_live_slots == 0 && counters.live_slots > 0;	let is_eligible = (opened_this_mount || true) && counters.pinned_live_slots == 0 && counters.live_slots > 0;
+M13_签发前判把只装提交内生块的段的洞也算上	is_compaction_destination: counters.free_pairs > 0 && !opened_this_mount && counters.live_user_units > 0,	is_compaction_destination: counters.free_pairs > 0 && !opened_this_mount && counters.live_slots > 0,
+M14_停乙去掉P_G假就不签下一条	StopArm::LocalRegionPredicate => !global_difference_is_positive,	StopArm::LocalRegionPredicate => false,
+M15_P_G用大于等于0	let global_difference_is_positive = global_difference >= 1;	let global_difference_is_positive = global_difference >= 0;
+M16_B_gc不减已过去的发布数	        .saturating_sub(publishes_since_last_non_empty_root)\n	        .saturating_sub(publishes_since_last_non_empty_root * 0)\n
+M17_Y1在删意图当场判	publish_txg >= judgement.end_txg + self.geometry.retention_publishes()	publish_txg > judgement.end_txg
+M18_快照钉住的单元头一侧删除时照样释放	if record.snapshot_pins == 0 {	if record.snapshot_pins < u64::MAX {
+M19_用户数据可以落进开放段	is_user_placement_candidate: counters.free_pairs > 0 && !opened_this_mount,	is_user_placement_candidate: counters.free_pairs > 0,
+M20_活意图的R不排除在用户数据落点外	.filter(|segment| Some(*segment) != region)\n            .find_map(|segment| self.lowest_free_pair_in_segment(segment))	.filter(|segment| Some(*segment) != region || region.is_some())\n            .find_map(|segment| self.lowest_free_pair_in_segment(segment))
+M21_抬F抬到第3新的非空根	non_empty_root_txgs_in_ring[non_empty_root_txgs_in_ring.len() - RETAINED_NON_EMPTY_STATES]	non_empty_root_txgs_in_ring[non_empty_root_txgs_in_ring.len() - (RETAINED_NON_EMPTY_STATES - 1)]
+M22_抬F生效只要1次空发布	if empty_publishes_done == EMPTY_PUBLISHES_FOR_FLOOR_TO_TAKE_EFFECT {	if empty_publishes_done >= 1 {
+M23_平台判据拿后窗口比前20轮	let earlier_window_round_indices = 20..40;	let earlier_window_round_indices = 0..20;

@@ -3807,9 +3807,11 @@ mod tests {
     use super::*;
     use std::sync::OnceLock;
 
-    /// 入库的两份导出（跑前登记 e172-r2 第九节：单测读它们，找不到就判红，不跳过）。
-    const H1H2_EXPORT_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r2-deletion-write-dump-h1h2-2026-10-05.out");
-    const H3_EXPORT_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r2-deletion-write-dump-h3-2026-10-05.out");
+    /// 入库的两份导出（`research/results/` 下的文件名）。跑前登记 e172-r2 第九节原写「找不到就判红，不跳过」；
+    /// `research/` 可以整个删掉，用户 2026-10-18 定别的实验的产物缺了报本次未跑：读不到时用到它们的单测逐份报一行本次未跑、照常返回。
+    /// 路径写成字面的 `concat!`（写法与为什么见 `e7_index_bench::ARCHIVED_PRODUCT_NOT_RUN_MARKER`）。
+    const H1H2_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r2-deletion-write-dump-h1h2-2026-10-05.out");
+    const H3_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r2-deletion-write-dump-h3-2026-10-05.out");
 
     struct ExportFixture {
         export_files: Vec<ExportFile>,
@@ -3818,18 +3820,50 @@ mod tests {
         lines: Vec<String>,
     }
 
-    fn fixture() -> &'static ExportFixture {
-        static FIXTURE: OnceLock<ExportFixture> = OnceLock::new();
+    /// 两份导出读一次、解一次；读不到的交（文件名，错误）逐份列出。
+    fn loaded_exports() -> &'static Result<ExportFixture, Vec<(&'static str, String)>> {
+        static FIXTURE: OnceLock<Result<ExportFixture, Vec<(&'static str, String)>>> = OnceLock::new();
         FIXTURE.get_or_init(|| {
-            let first_text = std::fs::read_to_string(H1H2_EXPORT_PATH).expect("入库的 H1H2 导出必须在（找不到就判红）");
-            let second_text = std::fs::read_to_string(H3_EXPORT_PATH).expect("入库的 H3 导出必须在（找不到就判红）");
+            let read = |path: &'static str| std::fs::read_to_string(path).map_err(|error| (path, error.to_string()));
+            let (first_text, second_text) = match (read(H1H2_EXPORT), read(H3_EXPORT)) {
+                (Ok(first_text), Ok(second_text)) => (first_text, second_text),
+                (first, second) => return Err([first.err(), second.err()].into_iter().flatten().collect()),
+            };
             let texts = [first_text.as_str(), second_text.as_str()];
             let export_files = parse_export_files(&texts);
             let histories: Vec<HistoryExport> = export_files.iter().flat_map(|export| export.histories.iter().cloned()).collect();
             let judgements = histories.iter().map(judge_history).collect();
             let lines = report_lines(&texts);
-            ExportFixture { export_files, histories, judgements, lines }
+            Ok(ExportFixture { export_files, histories, judgements, lines })
         })
+    }
+
+    /// 用到两份导出的单测开头调：读得到交 true；读不到就替这一条单测逐份报一行本次未跑，交 false，调用方照常返回。
+    fn exports_present_or_report_not_run(test_name: &str) -> bool {
+        match loaded_exports() {
+            Ok(_) => true,
+            Err(missing) => {
+                for (file_name, error) in missing {
+                    e7_index_bench::report_not_run_line_on_stdout(&e7_index_bench::archived_product_not_run_line(test_name, file_name, error));
+                }
+                false
+            }
+        }
+    }
+
+    /// 单测开头一行：两份导出读不到就报本次未跑（用例名取所在函数的路径）、返回。
+    macro_rules! return_not_run_unless_exports_present {
+        () => {{
+            fn here() {}
+            let here_path = std::any::type_name_of_val(&here);
+            if !exports_present_or_report_not_run(here_path.strip_suffix("::here").unwrap_or(here_path)) {
+                return;
+            }
+        }};
+    }
+
+    fn fixture() -> &'static ExportFixture {
+        loaded_exports().as_ref().expect("用到导出的单测开头先写 return_not_run_unless_exports_present!()")
     }
 
     fn judgement_named(name: &str) -> &'static HistoryJudgement {
@@ -3976,6 +4010,7 @@ mod tests {
 
     #[test]
     fn export_lines_are_all_anchored_and_every_history_carries_the_registered_parameters() {
+        return_not_run_unless_exports_present!();
         let export_files = &fixture().export_files;
         assert_eq!(export_files.len(), 2);
         for (export, expected_histories) in export_files.iter().zip(HISTORIES_OF_EACH_EXPORT_FILE) {
@@ -3998,6 +4033,7 @@ mod tests {
 
     #[test]
     fn decoded_structure_passes_every_stop_check_on_the_export() {
+        return_not_run_unless_exports_present!();
         for judgement in &fixture().judgements {
             assert!(judgement.structure_failures.is_empty(), "{:?}", judgement.structure_failures);
             assert!(judgement.role_mismatches.is_empty(), "{:?}", judgement.role_mismatches);
@@ -4007,6 +4043,7 @@ mod tests {
 
     #[test]
     fn intent_record_cells_read_the_registered_offsets() {
+        return_not_run_unless_exports_present!();
         assert_eq!(cell_row("h1", 5, "L03-1", "nlink").actual, "0");
         assert_eq!(cell_row("h1", 5, "L03-2", "size").actual, "81585");
         assert_eq!(cell_row("h1", 5, "L03-3", "blocks").expected, "160");
@@ -4021,6 +4058,7 @@ mod tests {
 
     #[test]
     fn batch_sizes_are_remaining_units_times_32634_and_blocks_round_up() {
+        return_not_run_unless_exports_present!();
         assert_eq!(cell_row("h1", 6, "L03-2", "size").expected, "65268");
         assert_eq!(cell_row("h1", 6, "L03-3", "blocks").expected, "128");
         assert_eq!(cell_row("h1", 7, "L03-2", "size").expected, "32634");
@@ -4029,6 +4067,7 @@ mod tests {
 
     #[test]
     fn change_counts_equal_the_publish_txg_in_every_deletion_version() {
+        return_not_run_unless_exports_present!();
         for (history, txg) in [("h1", 5), ("h1", 6), ("h1", 7), ("h2", 5), ("h2", 11), ("h2", 12)] {
             let row = cell_row(history, txg, "L03-4", "change_count");
             assert_eq!(row.expected, txg.to_string());
@@ -4042,6 +4081,7 @@ mod tests {
 
     #[test]
     fn intent_tombstone_record_and_queue_root_match_the_registered_values() {
+        return_not_run_unless_exports_present!();
         assert_eq!(cell_row("h1", 5, "L03-9", "range_end").expected, u64::MAX.to_string());
         assert!(cell_row("h1", 5, "L03-9", "range_end").is_equal());
         assert_eq!(cell_row("h1", 5, "L03-9", "death_txg").expected, "5");
@@ -4054,6 +4094,7 @@ mod tests {
 
     #[test]
     fn final_batch_removes_the_record_and_leaves_an_empty_inode_root() {
+        return_not_run_unless_exports_present!();
         for field in ["deleted_record_in_written_containers", "inode_root_entry_count", "inode_root_key_range", "inode_leaf_containers_written"] {
             let row = cell_row("h1", 8, "L03-7", field);
             assert!(row.is_equal(), "{row:?}");
@@ -4063,6 +4104,7 @@ mod tests {
 
     #[test]
     fn committed_reservation_rows_read_98304_in_every_h1_deletion_version_and_expect_98386_in_every_h3_one() {
+        return_not_run_unless_exports_present!();
         for txg in [5u64, 6, 7, 8] {
             let row = judgement_named("h1").cell_rows.iter().find(|row| row.txg == txg && row.cell == "L03-13").expect("每一版一行");
             assert_eq!(row.expected, "98304");
@@ -4076,6 +4118,7 @@ mod tests {
 
     #[test]
     fn h1_intent_segment_string_kind_string_and_roles_are_decoded_independently() {
+        return_not_run_unless_exports_present!();
         let row = judgement_named("h1").segment_rows.iter().find(|row| row.publish_kind == "unlink_intent").expect("意图那一行");
         assert_eq!(row.actual_count_text, "26+2+1+2");
         assert_eq!(
@@ -4090,11 +4133,13 @@ mod tests {
     /// R5.a 是附带的（跑前登记 e172-r2 第六节 6.3，不进任何判定）；这一条照第 1 次留作回归。
     #[test]
     fn final_batch_drops_exactly_the_inode_leaf_container_against_the_two_to_one_batch() {
+        return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=r5a ").contains("only_in_two_to_one=t3 only_in_final=none matches_registered=true"));
     }
 
     #[test]
     fn queue_and_tombstone_roots_record_an_entry_key_range_reading() {
+        return_not_run_unless_exports_present!();
         let readings: Vec<&String> = fixture().lines.iter().filter(|line| line.starts_with("name=r7 history=h1")).collect();
         assert_eq!(readings.len(), 2);
         assert!(readings[0].contains("role=td level=0 key_range=1..1 entry_keys=1..1 reading=entry_key_range"), "{}", readings[0]);
@@ -4103,6 +4148,7 @@ mod tests {
 
     #[test]
     fn mount_writes_are_attributed_to_the_same_segments_the_export_cuts() {
+        return_not_run_unless_exports_present!();
         let h2 = judgement_named("h2");
         assert!(!h2.attribution_rows.is_empty());
         assert_eq!(h2.misattributed_writes(), 0, "{:?}", h2.attribution_rows.iter().filter(|row| !row.is_match).collect::<Vec<_>>());
@@ -4114,6 +4160,7 @@ mod tests {
     /// 不适用的只出现在表里写了不适用的那几对上。
     #[test]
     fn every_positive_control_turns_its_target_red_on_every_history_it_applies_to() {
+        return_not_run_unless_exports_present!();
         let mut held = 0usize;
         let mut not_applicable = Vec::new();
         for (history, judgement) in fixture().histories.iter().zip(&fixture().judgements) {
@@ -4136,6 +4183,7 @@ mod tests {
     /// PC-C 只重封了墓碑容器自己的载荷校验和：父指针（墓碑树根条目、映射、journal 点名项）里那 4 字节整单元校验和照样对不上，S2 那一格要红。
     #[test]
     fn a_resealed_container_still_fails_the_parent_location_checksum() {
+        return_not_run_unless_exports_present!();
         let history = history_named("h1");
         let corrupted = corrupted_copy(history, PositiveControl::BumpTombstoneDeathTxg).expect("改得到墓碑容器");
         let judgement = judge_history(&corrupted);
@@ -4146,6 +4194,7 @@ mod tests {
 
     #[test]
     fn h1_window_string_is_the_four_registered_strings_end_to_end() {
+        return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=r3d history=h1 ").ends_with("equal=true"), "{}", line_starting_with("name=r3d history=h1 "));
         // H3 那一行只钉期望一栏：13、12、11、11 四串首尾相接。
         assert!(
@@ -4175,6 +4224,7 @@ mod tests {
     /// T2：每段历史 R1.t 的行数 = 窗口里系统配置槽写次数（从导出的写区域现数），期望一栏都是 5000。
     #[test]
     fn time_threshold_rows_cover_every_system_configuration_slot_write_and_expect_5000() {
+        return_not_run_unless_exports_present!();
         for history in &fixture().histories {
             let slot_writes = history
                 .operations
@@ -4192,6 +4242,7 @@ mod tests {
     /// T3：H3 选到 L03-7 第二支、只有 H3 选到；第二支的期望一栏（写出的叶 1 片、根条目数 1）。
     #[test]
     fn only_h3_takes_the_second_l03_7_branch_and_expects_one_leaf_and_one_root_entry() {
+        return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=l03_7_branch_check ").contains("second_branch_histories=h3 exactly_h3=true"));
         assert_eq!(cell_row("h3", 9, "L03-7", "inode_root_entry_count").expected, "1");
         assert_eq!(cell_row("h3", 9, "L03-7", "inode_leaf_containers_written").expected, "1");
@@ -4203,6 +4254,7 @@ mod tests {
     /// T4：H3 意图 L03-5 的期望 = 导出的 `intent_write_time_seconds=`（与顺序写的时间不同），可分辨。
     #[test]
     fn h3_intent_times_expect_the_callers_time_and_are_discriminable() {
+        return_not_run_unless_exports_present!();
         let configuration = &history_named("h3").configuration;
         let row = cell_row("h3", 6, "L03-5", "times");
         assert_eq!(row.expected, three_equal_times_text(&configuration["intent_write_time_seconds"]));
@@ -4225,6 +4277,7 @@ mod tests {
     /// T6：R5.b 行在；判别力自证行里两套期望（H1 的、H3 的）不同时判绿。
     #[test]
     fn row_five_h3_line_is_reported_and_its_two_expectations_are_never_both_green() {
+        return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=r5b history=h3 ").contains(" final_writes_t3="));
         let discrimination = line_starting_with("name=r5b_discrimination history=h3 ");
         assert!(!discrimination.contains("h1_expectation_green=true h3_expectation_green=true"), "{discrimination}");
@@ -4234,6 +4287,7 @@ mod tests {
     /// T7：H3 的 A-tag6 期望一栏是 98386（按历史名分的字面常量）。
     #[test]
     fn h3_committed_reservation_anchor_expects_98386() {
+        return_not_run_unless_exports_present!();
         assert_eq!(registered_committed_reservation_of_history("h3"), Some(98_386));
         assert_eq!(registered_committed_reservation_of_history("h1"), Some(98_304));
         assert_eq!(registered_committed_reservation_of_history("h2"), Some(98_304));
@@ -4245,6 +4299,7 @@ mod tests {
     /// T8：PC-G 的副本恰有一次写换了段，换的是挂载写行之前那一截的最后一次写。
     #[test]
     fn pc_g_moves_exactly_the_last_write_of_the_mount_segment_into_the_next_segment() {
+        return_not_run_unless_exports_present!();
         let history = history_named("h2");
         let corrupted = corrupted_copy(history, PositiveControl::ShiftMountSegmentEndToItsLastWrite).expect("H2 有挂载写行之前那一段");
         let label_at = |segments: &[ExportSegment], step: usize| segments.iter().find(|segment| step >= segment.start_step && step < segment.end_step).map(|segment| segment.label.clone());
@@ -4265,6 +4320,7 @@ mod tests {
     /// T9：PC-H 的副本恰改了一次系统配置槽写，那次解出 5，整槽校验和过。
     #[test]
     fn pc_h_rewrites_exactly_one_system_configuration_write_to_5_and_reseals_its_slot() {
+        return_not_run_unless_exports_present!();
         for history in &fixture().histories {
             let corrupted = corrupted_copy(history, PositiveControl::RewriteIntentTimeThresholdAsSeconds).expect("每段历史的意图都有系统配置槽写");
             let changed: Vec<&RegionWrite> = history
@@ -4286,6 +4342,7 @@ mod tests {
     /// T10：PC-I 的副本里 H3 意图 1 号记录三格 = 顺序写的时间，码 3 载荷校验和过。
     #[test]
     fn pc_i_copies_the_sequential_write_time_into_the_h3_intent_record_and_reseals_the_container() {
+        return_not_run_unless_exports_present!();
         let history = history_named("h3");
         let sequential = field_number(&history.configuration, "sequential_write_time_seconds").expect("H3 带顺序写的时间");
         let corrupted = corrupted_copy(history, PositiveControl::CopySequentialWriteTimeIntoTheIntentRecord).expect("H3 意图写了 t3");
@@ -4319,6 +4376,7 @@ mod tests {
     /// T13：H3 的 A-txg、A-根槽、A-journal、A-系统配置期望一栏等于跑前登记 e172-r2 第七节 7.1 的 H3 值。
     #[test]
     fn h3_txg_root_slot_journal_and_system_configuration_anchors_expect_the_registered_h3_values() {
+        return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=anchor anchor=A-txg history=h3 deletion_publishes ").contains(" expected=6,7,8,9 "));
         for (txg, root, journal, generation, slot) in [
             (6u64, "0:1056768", 16_797_696u64, 8u64, 0u64),

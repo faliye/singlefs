@@ -636,9 +636,15 @@ mod tests {
     }
 
     /// 跨装置闸 1：`all` 配置 × 64 口径的每一行，逐字节出现在 E134 的留存产物里。
+    /// 留存产物在 `research/results/` 下、可以被归档删掉：运行时读，读不到报本次未跑（`e7_index_bench::read_archived_product_or_report_not_run`）。
     #[test]
     fn all_pointers_lines_reproduce_the_e134_product_line_by_line() {
-        let e134_product = include_str!("../../research/results/e134-map-key-slot-baselines-2026-09-11.out");
+        let Some(e134_product) = e7_index_bench::read_archived_product_or_report_not_run(
+            "e136_fork_cost_rows::tests::all_pointers_lines_reproduce_the_e134_product_line_by_line",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e134-map-key-slot-baselines-2026-09-11.out"),
+        ) else {
+            return;
+        };
         let product_lines: Vec<&str> = e134_product.lines().collect();
         let mut checked_line_count = 0;
         for arm in ARMS.iter() {
@@ -661,9 +667,17 @@ mod tests {
     }
 
     /// 跨装置闸 3：数据单元（路径 = 引用树高 4）、映射树高 4 时，搬迁字节逐格等于 E109 留存产物里 key 33 那五行。
+    /// 留存产物读法同跨装置闸 1；读不到时末尾两条不靠产物的钉值照判。
     #[test]
     fn relocation_count_reproduces_the_e109_move_table() {
-        let e109_product = include_str!("../../research/results/e109-position-authority-2026-09-06.out");
+        assert_eq!(pointer_authority_relocation_bytes(1, 4), 66_048, "E109：K = 1 时指针权威 66 048 字节");
+        assert_eq!(map_authority_relocation_bytes(4), 66_048, "E109：映射权威 66 048 字节，与 K 无关");
+        let Some(e109_product) = e7_index_bench::read_archived_product_or_report_not_run(
+            "e136_fork_cost_rows::tests::relocation_count_reproduces_the_e109_move_table",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e109-position-authority-2026-09-06.out"),
+        ) else {
+            return;
+        };
         let mut checked_row_count = 0;
         for referencing_tree_count in REFERENCING_TREE_COUNTS {
             let expected_prefix = format!("E7RESULT name=move key_bytes=33 k={referencing_tree_count} map_fanout=267 map_height=4 ");
@@ -677,8 +691,6 @@ mod tests {
             checked_row_count += 1;
         }
         assert_eq!(checked_row_count, 5);
-        assert_eq!(pointer_authority_relocation_bytes(1, 4), 66_048, "E109：K = 1 时指针权威 66 048 字节");
-        assert_eq!(map_authority_relocation_bytes(4), 66_048, "E109：映射权威 66 048 字节，与 K 无关");
     }
 
     #[test]

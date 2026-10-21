@@ -1,6 +1,6 @@
 exit=0
-want=· --quick：核心部分 toolchain proof complete 三项；与重型同一份判定库，键相同就复用
+want=· --quick：核心部分 toolchain proof table 三项；与重型同一份判定库，键相同就复用
 want=── 汇总：checker-tier-formal-verification.sh 跑了 3 格（--item 点名 3 项）
 want=verus-proof：本次未跑
-want=1 份红例账 3 行都钉在
-want=pinned-red-examples-complete：绿
+want=钉表 .claude/gate.d/e165-pinned-red-examples.tsv 3 行：每行 22 段
+want=pinned-red-examples-table：绿

@@ -5,8 +5,8 @@
 # gate-fixture: yes
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-crash-point-replay.sh 它也验 crates 写路的崩溃一致性、也是 checker-tier 类，但在宿主上枚举崩溃状态、判录制流截断重放；这里起 QEMU 虚机在两块 virtio 盘上跑真负载、判设备侧独立录制与程序录制逐项相同，要 QEMU、/dev/kvm 与内核镜像，前提、登记的输入与失败方式都不同
-# gate-similar: checker-tier-research-build-and-replay.sh 它的复跑那一格也读 E142 的产物，但比的是纯模型实验的整份输出；这里只从 E142 产物取 path=mkfs 之外那几行段序列与反向链当虚机跑的对照（mkfs 那一行与布局表八登记的值比），判的是真设备上收到的写
-# gate-similar: doc-registries.sh 它的 segment-registry 格经同一份 scripts/crash/check-segment-registry.py 读布局表八，判的是登记表与 E142 产物、钉住活代码的用例对不对得上；这里只拿登记表「mkfs 种根」那一行当虚机输出的对照，判的是真设备上 mkfs 发出的步骤
+# gate-similar: checker-tier-research-build-and-replay.sh 它的复跑那一格读 E142 的产物、比的是纯模型实验的整份输出；这里不读任何实验产物，段序列的对照取布局表八的登记、反向链的对照取钉住它的 crates 用例里的常量，判的是真设备上收到的写
+# gate-similar: doc-registries.sh 它的 segment-registry 格经同一份 scripts/crash/check-segment-registry.py 读布局表八，判的是登记表与钉住活代码的用例对不对得上；这里只拿登记表「mkfs 种根」那一行与 path= 那几行当虚机输出的对照，判的是真设备上发出的步骤
 #
 # gate-cell: device-streams QEMU 真设备上各档负载跑完，设备侧独立录制与程序录制逐项相同、两个对照红在该红的地方
 # 参数解析、每格一个子 shell、汇总与退出码经 lib/stage-cells.sh。
@@ -41,45 +41,52 @@
 #     initramfs 清单    vm-bench.sh --initramfs-manifest 这一档的根的清单（只取它标准输出里 entry<TAB> 开头的条目：路径、种类、权限、内容 sha256；
 #                       /bench 那一行的内容换成占位，被测二进制由来宾程序单元管），不取 cpio.gz 的哈希（cpio 头里有 mtime）；
 #                       跑完核 run_one 打包之前打的那一份与它相同（record_tiers_after_run），不同不记、打头几行差异
-#     E142 对照行       E142 产物里这一道真读的那几行（path=mkfs 之外的 name=segments 行、name=root_record 的 back_chain）与布局表八登记的 mkfs 那一行
+#     对照登记行        这一道真读的几样登记值：布局表八 path= 那几行与「mkfs 种根」那一行（check-segment-registry.py --print-segments-lines、
+#                       --print-mkfs-segments-line 打的）、钉住反向链的用例里那个常量的值（文件头「对照从哪来」）
 #     这一档的判据      几张按档查表的函数在这一档交的取值
 #     档位参数          /bench 收到的参数串（档名就是它）、mode_parameters_of 交的盘参数、VM_LOG_MB 与调用方环境里会改虚机行为的几个 VM_ 变量
 #   判定库在被判那棵树的 git common-dir 的 singlefs-qemu-verdicts/（种类 qemu-tier，一档一项 qemu:<模式>），跨轮留着；判绿的档当趟记，红了整趟不记。
 #   每档一行「· <模式>：绿，复用（…）」，现判的原因（变了的单元）写在成功句「按档：现判 N、复用 M（现判的原因：…）」里。
 #
-# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,e142-row-missing-red,e142-row-duplicate-red,mkfs-segments-red,segments-step-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
+# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,back-chain-pin-missing-red,mkfs-segments-red,segments-step-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
 # 样本根放 .qemu-prerecorded，按 <模式>/out.txt、vm-exit、check.txt、check-exit 摆某一轮真跑的原样输出，本阶段不起虚机、不编译，
 # 用同一段判定代码判（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条）。预录档全过这一格退 77：退 0 与真起过虚机的一档在汇总里分不出。
-# 走到段序列那一步的样本另放 .claude/kb/layout/01-first-txn.md：只有「八、」标题与登记表「mkfs 种根」一行的合成副本，登记值写那一趟录样本时的值。
+# 样本都不放 research/：对照全取登记值。走到对照那一步的样本另放两份合成副本，登记值写那一趟录样本时的值：
+#   .claude/kb/layout/01-first-txn.md（「八、」标题、开头 path= 声明、登记表「mkfs 种根」与三条出处写 path= 的行、整条流那句提示），
+#   crates/singlefs-harness/tests/new_pool_file_creation_publish.rs（只有反向链那一条常量）。back-chain-pin-missing-red 只摆这两份、那条常量改了名：红在取反向链登记值那一步。
 # 键样本 fixtures/checker-tier-qemu-device-streams.sh/tier-key-samples-*（.qemu-prerecorded 之外另放 .qemu-key-samples/：environment.tsv 写内核镜像的路径、
 #   busybox、qemu-system-x86_64 的 sha256 与版本行、工具链行，initramfs-manifest.tsv 是一份清单，mode-parameters.tsv 是每档的盘参数，change.sh 是第二趟之前施加的改动；
-#   setup.sh 现造一棵小树：vm-bench.sh、来宾与宿主检查两个 bin、E142 产物与布局表八）：只判键、不判输出。判定库放这一趟的临时目录，
+#   setup.sh 现造一棵小树：vm-bench.sh、来宾与宿主检查两个 bin、布局表八与钉反向链的用例文件）：只判键、不判输出。判定库放这一趟的临时目录，
 #   头一趟六档照绿记下，跑 change.sh，第二趟逐档 lookup，打「· <模式>：复用（…）| 现判（<原因>：<变了的单元>）」与「· 按档：现判 N、复用 M」，退 77。几份：
 #   init-heredoc（改 run_one 里 /init 的 here-doc，六档都作废）、one-tier-parameters（只改 raise-rollback-floor 一档的盘参数，只那一档作废）、
-#   kernel-byte（内核镜像换一个字节，六档都作废）、e142-unread-line（E142 产物里加一行这一道不读的，一档都不作废）、
+#   kernel-byte（内核镜像换一个字节，六档都作废）、registry-unread-line（钉反向链的用例文件末尾加一行这一道不读的，一档都不作废）、
 #   guest-function（改来宾程序里只有 raise-rollback-floor 的入口走到的那个函数，只那一档作废）、
 #   guest-dispatch（改来宾程序 main 的参数解析，六档都作废：main 自己的单元进每一档）。
 #   另两份不摆 initramfs-manifest.tsv，摆真跑那一条路读的原样（listings/<档>.txt 是 vm-bench.sh --initramfs-manifest 的标准输出，runs/<档>/initramfs.manifest
 #   是 run_one 打包之前打的清单），头一趟照真跑那一条路核过清单再记（record_tiers_after_run），change.sh 什么都不改：
 #   manifest-recorded（六档清单相同，头一趟记下 6 档，第二趟「现判 0、复用 6」）、manifest-differs（second-instance 跑的时候 /init 变了，那一档不记，第二趟「现判 1、复用 5」）。
 #
-# 段序列分两处比：path=mkfs 那一行与布局表八（.claude/kb/layout/01-first-txn.md「八、」）「mkfs 种根」那一行登记的段序列、次操作、崩溃状态数、种类串比，
+# 对照从哪来：一样都不读 research/ 下的产物（research/ 整个可删，.claude/rules/directory-layout.md「research/：可以整个删掉的研究目录」），
+#   期望值全是跟着测试放的登记，开虚机之前现取，取不出判红：
+#   段序列分两处比：path=mkfs 那一行与布局表八（.claude/kb/layout/01-first-txn.md「八、」）「mkfs 种根」那一行登记的段序列、次操作、崩溃状态数、种类串比，
 #   登记值经 scripts/crash/check-segment-registry.py --print-mkfs-segments-line 现取（同一份解析器，这里不抄第二份）；那一行的权威是活代码
-#   （crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs 的 recorded_stream_matches_the_registered_mkfs_segment_sequence 钉住），
-#   E142 的装置是独立手写模型、清零步数与活代码不同，不拿它比这一行。其余四行（instance_acquisition、warm_up、transaction、post_mkfs_stream）
-#   照旧与 E142 产物的 name=segments 行逐字比，两边都先滤掉 path=mkfs 那一行。
+#   （crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs 的 recorded_stream_matches_the_registered_mkfs_segment_sequence 钉住）。
+#   其余四行（instance_acquisition、warm_up、transaction、post_mkfs_stream）与布局表八 path= 那几处的登记逐字比（同一份脚本的 --print-segments-lines
+#   按声明次序打的），虚机输出先滤掉 path=mkfs 那一行；那几处的权威是 crates/singlefs-harness/tests/new_pool_file_creation_publish.rs 的
+#   recorded_paths_match_the_registered_segment_sequences（门禁 doc-registries 的 segment-registry 格核登记与它逐字相符）。
+#   新池新建文件那条记录的反向链与同一份用例文件里的常量 E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION 比（那条用例对活代码断言反向链等于它）。
+#   程序录制流在这一趟里现算不出独立的期望值：宿主检查照模式重跑的是同一份程序，拿它当对照等于自己比自己。
 #
 # 弄坏开关（只给样本证红用）：GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 让 direct 那一档只看退出码与宿主读回、不逐盘读 divergence=none 那一行，
 #   direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0）判绿退 77、expect 里那几条 want 找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-all-rows 让取 E142 产物的那一步退回「取复跑表里全部 E142 行的第 4 列」、不数行数：
-#   green（复跑表里两行 E142，真仓现在的形态）取到两个文件名，红在「从 replay.sh 的 @driver_e142 那一行解析不出产物文件」、不是预期的退 77，expect 里的 want 对不上；
-#   e142-row-missing-red（@driver_e142 那一行缺了）取到别的行的文件名，过了这一处，红不在「第 2 列是 @driver_e142 的 E142 行取到 0 行」。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-from-e142 让 path=mkfs 那一行退回与 E142 产物的 path=mkfs 行比、不读布局表八的登记值：
-#   mkfs-segments-red（样本登记行的段序列 12+1+1+1+4 改成 14+1+1+1+4，虚机输出与 E142 产物都是 12+1+1+1+4）判绿退 77，
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-product-read 让取对照退回改之前的取法：从 scripts/experiments/replay.sh 的 @driver_e142 那一行取产物名、
+#   读 research/results/<名> 的 name=root_record 取反向链：样本里都没有 research/（也没有 replay.sh），green 红在「解析不出产物文件」、不是预期的退 77，expect 里的 want 对不上。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-compare-skipped 让 path=mkfs 那一行与布局表八登记值的比对跳过：
+#   mkfs-segments-red（样本登记行的段序列 12+1+1+1+4 改成 14+1+1+1+4，虚机输出是 12+1+1+1+4）判绿退 77，
 #   红不在「mkfs 段序列与登记表不一致」，expect 里的 want 对不上。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped 让虚机输出与 E142 产物的 name=segments 行（path=mkfs 之外那几行）逐字比对那一步跳过：
-#   segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2，E142 产物与登记行都不动）判绿退 77，
-#   红不在「段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致」，expect 里的 want 对不上。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped 让虚机输出与布局表八 path= 那几处登记（path=mkfs 之外那几行）逐字比对那一步跳过：
+#   segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2，登记行都不动）判绿退 77，
+#   红不在「段序列（path=mkfs 之外那几行）与布局表八登记的不一致」，expect 里的 want 对不上。
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=tier-key-is-the-whole-stage 让每档的键退回整道一把（这一档的判据、档位参数、initramfs 清单换成六档合起来的一份）：
 #   tier-key-samples-one-tier-parameters（只改 raise-rollback-floor 一档的盘参数）里 file-overwrite 那一档也报现判，expect 里「· file-overwrite：复用」找不到。
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-from-main 让来宾程序单元退回六档共用 main 起的一把：tier-key-samples-guest-function（只改 raise-rollback-floor 的入口
@@ -93,7 +100,7 @@
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=reuse-lookup-skipped 让每一档一律不读库：tier-key-samples-three-questions 判红（复用三问 ① 与复用哨兵都红），expect 里的 exit=77 对不上。
 # 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：真跑每一趟六档的组成表写好之后、查库之前抽哨兵（候选按键文件查，与 lookup 分开），
 #   抽中强制现判的那一档不读库、照现跑；哨兵被现判、强制现判那一档判红，这一格红。SINGLEFS_GATE_FULL=1 不抽。
-#   键样本 tier-key-samples-three-questions（.qemu-key-samples/ 另放 unrelated.sh 与 affected）：头一趟六档照绿记下，同一份输入、unrelated.sh（E142 产物末尾加一行这一道不读的）
+#   键样本 tier-key-samples-three-questions（.qemu-key-samples/ 另放 unrelated.sh 与 affected）：头一趟六档照绿记下，同一份输入、unrelated.sh（钉反向链的用例文件末尾加一行这一道不读的）
 #   之后、change.sh（改只有 raise-rollback-floor 走到的 publish_the_fourth_version）之后各查一趟（开着哨兵，现判的照绿记），照三问判、打规范输出，退 77；
 #   登记表 .claude/gate.d/verdict-library-scripts.tsv 里这一道的自证命令经 scripts/gate/lib_reuse_checks.py sample 起这一份样本。
 #
@@ -275,17 +282,17 @@ judge_mode_outputs() { # judge_mode_outputs <档>
   checks=$((checks + 1))
   # path=mkfs 那一行：恰好一行，与登记值逐字相同（段序列、次操作、崩溃状态数、种类串四样都在这一行里）
   vm_mkfs_segments_lines="$(grep -ao 'E7RESULT name=segments path=mkfs .*' "$out" | tr -d '\r')"
-  if [[ "$vm_mkfs_segments_lines" != "$EXPECTED_MKFS_SEGMENTS_LINE" ]]; then
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != mkfs-compare-skipped && "$vm_mkfs_segments_lines" != "$EXPECTED_MKFS_SEGMENTS_LINE" ]]; then
     fail "虚机跑 $mode 的 mkfs 段序列与登记表不一致（虚机：${vm_mkfs_segments_lines:-一行 path=mkfs 都没有}；${EXPECTED_MKFS_SEGMENTS_SOURCE}：$EXPECTED_MKFS_SEGMENTS_LINE）" \
          "登记表那一行由 crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs 的 recorded_stream_matches_the_registered_mkfs_segment_sequence 钉在活代码上：虚机里的 mkfs 发出的步骤与它不同，先查虚机二进制编的是不是这份 crates/ 与真设备写路差在哪一段；登记表抄错了，照那条用例改 .claude/kb/layout/01-first-txn.md「八、」那一行。"
   fi
   checks=$((checks + 1))
-  # 其余几行与 E142 产物逐字比：两边都先滤掉 path=mkfs 那一行（它在上一条与登记表比过）
+  # 其余几行与布局表八 path= 那几处的登记逐字比：虚机输出先滤掉 path=mkfs 那一行（它在上一条与登记表比过）
   if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != segments-diff-skipped ]] \
-     && ! segments_diff="$(diff <(grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r' | grep -v '^E7RESULT name=segments path=mkfs ') \
+     && ! segments_diff="$(diff <(printf '%s\n' "$EXPECTED_SEGMENTS_LINES") \
                                 <(grep -ao 'E7RESULT name=segments .*' "$out" | tr -d '\r' | grep -v '^E7RESULT name=segments path=mkfs '))"; then
-    printf '%s\n' "$segments_diff" | sed 's/^/        /'   # 「<」是 E142 产物的行，「>」是虚机输出的行：先看是哪一档哪一行差了
-    fail "虚机跑 $mode 的段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致" "对照 $PRODUCT 与虚机输出 path=mkfs 之外的 name=segments 行（上面「<」是产物、「>」是虚机输出的差异行）；真设备上的写路发出的步骤与装置不同，先查是哪一段。"
+    printf '%s\n' "$segments_diff" | sed 's/^/        /'   # 「<」是登记值，「>」是虚机输出的行：先看是哪一档哪一行差了
+    fail "虚机跑 $mode 的段序列（path=mkfs 之外那几行）与布局表八登记的不一致" "对照 .claude/kb/layout/01-first-txn.md「八、」path= 那几处的登记（scripts/crash/check-segment-registry.py --print-segments-lines 打的，上面「<」）与虚机输出（「>」）；登记的权威是 $BACK_CHAIN_PINNING_TEST 的 recorded_paths_match_the_registered_segment_sequences（门禁 doc-registries 的 segment-registry 格核两者相符），真设备上的写路发出的步骤与它不同，先查是哪一段。"
   fi
   checks=$((checks + 1))
   cold_root="$(cold_root_of "$mode")"
@@ -294,7 +301,7 @@ judge_mode_outputs() { # judge_mode_outputs <档>
     || fail "虚机跑 $mode 冷重开之后没按 ($cold_root) 读回文件" "看 $mode 的 name=recover_cold 行与来宾的 stderr（vm-bench.sh 保留现场用 VM_KEEP=1）；根对不上先查这一档该走到哪一次发布。"
   checks=$((checks + 1))
   grep -aq "name=transaction key_order_mismatches=0 root_txg=3 back_chain=$EXPECTED_BACK_CHAIN" "$out" \
-    || fail "虚机跑 $mode 的新池新建文件计数或反向链与产物不符" "产物 name=root_record 行的 back_chain 是 $EXPECTED_BACK_CHAIN；两个运行时计数要是 0。"
+    || fail "虚机跑 $mode 的新池新建文件计数或反向链与登记不符" "$EXPECTED_BACK_CHAIN_SOURCE 是 $EXPECTED_BACK_CHAIN；两个运行时计数要是 0。"
   checks=$((checks + 1))
   while IFS= read -r pattern; do
     [[ -n "$pattern" ]] || continue
@@ -404,10 +411,45 @@ tier_parameters_text() { # tier_parameters_text <档>
     printf '%s\t%s\n' "$variable" "${!variable-未设}"
   done
 }
-# E142 产物里这一道真读的那几行：path=mkfs 之外的 name=segments 行、name=root_record 的 back_chain，与布局表八登记的 mkfs 那一行
-e142_reading_text() {
-  grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r' | grep -v '^E7RESULT name=segments path=mkfs '
+# 这一道真读的几样登记值（文件头「对照从哪来」）：布局表八 path= 那几处与「mkfs 种根」那一行、钉住反向链的那条常量
+registered_reading_text() {
+  printf '%s\n' "$EXPECTED_SEGMENTS_LINES"
   printf 'back_chain\t%s\nmkfs\t%s\n' "$EXPECTED_BACK_CHAIN" "$EXPECTED_MKFS_SEGMENTS_LINE"
+}
+# 现取对照的登记值，写进 EXPECTED_*；取不出判红。开虚机之前调一次，键样本每趟算键之前再调（样本的改动可能动到登记）。
+# 弄坏开关 e142-product-read：反向链退回从 replay.sh 指的 E142 产物里取（改之前的取法），样本里没有 research/，当场红
+SEGMENT_REGISTRY_SCRIPT="$STAGE_REPOSITORY/scripts/crash/check-segment-registry.py"
+BACK_CHAIN_PINNING_TEST="crates/singlefs-harness/tests/new_pool_file_creation_publish.rs"
+BACK_CHAIN_PINNING_CONSTANT="E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION"
+load_registered_expectations() {
+  local registered_output product_name product
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-product-read ]]; then
+    product_name="$(awk -F'|' '$1=="E142" && $2=="@driver_e142" { print $4 }' scripts/experiments/replay.sh 2>/dev/null | head -1)"
+    product="research/results/$product_name"
+    [[ -f "$product" ]] || fail "（弄坏开关 e142-product-read）从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $product）" "这是改之前的取法：research/ 整个可删，产物不在这一道就红；关掉弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK。"
+    EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$product" | head -1)"
+    EXPECTED_BACK_CHAIN_SOURCE="E142 产物 $product 的 name=root_record 行的 back_chain"
+  else
+    EXPECTED_BACK_CHAIN="$(sed -n "s/^const $BACK_CHAIN_PINNING_CONSTANT: u32 = \([0-9][0-9_]*\);.*/\1/p" "$BACK_CHAIN_PINNING_TEST" 2>/dev/null | head -1 | tr -d _)"
+    EXPECTED_BACK_CHAIN_SOURCE="$BACK_CHAIN_PINNING_TEST 里钉的 $BACK_CHAIN_PINNING_CONSTANT"
+  fi
+  [[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "取不出新池新建文件那条记录的反向链登记值（$BACK_CHAIN_PINNING_TEST 里那一行 const $BACK_CHAIN_PINNING_CONSTANT: u32 = <数>;）" \
+    "那条常量由同一份用例对活代码断言（反向链等于它），是这一道反向链的对照；文件或常量改了名，照今天的名字改本阶段的 BACK_CHAIN_PINNING_TEST / BACK_CHAIN_PINNING_CONSTANT。"
+  # path=mkfs 那一行的对照是布局表八「mkfs 种根」那一行登记的值，其余几行是 path= 那几处的登记（文件头「对照从哪来」）：解析器按本阶段自己的位置取，--root 指被判的仓，
+  # 样本把 cwd 换成样本根时，读的是样本里那份合成的布局表、跑的仍是仓里的解析器。
+  if ! registered_output="$(python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" --print-mkfs-segments-line)"; then
+    printf '%s\n' "$registered_output" | sed 's/^/        /'
+    fail "取不出 .claude/kb/layout/01-first-txn.md「八、」登记表「mkfs 种根」那一行的登记值（段序列、次操作、崩溃状态数、种类串）" \
+         "照上面 scripts/crash/check-segment-registry.py 的报错改那一行；它不在就从 git 找回来（门禁 doc-registries 的 segment-registry 格用的是同一份）。"
+  fi
+  EXPECTED_MKFS_SEGMENTS_LINE="$registered_output"
+  EXPECTED_MKFS_SEGMENTS_SOURCE="布局表八「mkfs 种根」那一行"
+  if ! registered_output="$(python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" --print-segments-lines)"; then
+    printf '%s\n' "$registered_output" | sed 's/^/        /'
+    fail "取不出 .claude/kb/layout/01-first-txn.md「八、」登记表 path= 那几处（path=mkfs 之外）的登记值" \
+         "照上面 scripts/crash/check-segment-registry.py 的报错改那几处：开头 path= 声明的每一条路径恰好一处登记，四样写全（照 $BACK_CHAIN_PINNING_TEST 的 recorded_paths_match_the_registered_segment_sequences 写）。"
+  fi
+  EXPECTED_SEGMENTS_LINES="$registered_output"
 }
 # 单元键（lib_verdict_library.py unit-key）写进文件；拒算（退 4）照写，lookup 读到拒算行就不复用
 unit_key_into() { # unit_key_into <输出文件> <unit-key 的参数…>
@@ -464,7 +506,7 @@ compute_shared_keys() {
     "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: dev profile" --dependency-of singlefs-checker-tier
   unit_key_into "$keys_directory/judging.txt" "$STAGE_REPOSITORY" "$STAGE_RELATIVE::judge_mode_outputs" "$STAGE_RELATIVE::judge_mode_device_log" \
     --exclude-file scripts/crash/lib_verdict_library.py --exclude-file scripts/gate/lib_function_units.py "${exclusions[@]}" --programs-keyed-elsewhere
-  E142_DIGEST="$(digest_text "$(e142_reading_text)")"
+  REGISTERED_DIGEST="$(digest_text "$(registered_reading_text)")"
 }
 # 一档的组成表（lib_verdict_library.py lookup / record 读的）。弄坏开关 tier-key-is-the-whole-stage 下按档的那几样换成六档合起来的一份（整道一把键）
 write_tier_table() { # write_tier_table <档>
@@ -485,7 +527,7 @@ write_tier_table() { # write_tier_table <档>
     printf '内核镜像\t%s\n' "$KERNEL_DIGEST"
     printf 'QEMU\t%s\n' "$QEMU_DIGEST"
     printf 'initramfs 清单\t%s\n' "$(digest_text "$manifest_digest")"
-    printf 'E142 对照行\t%s\n' "$E142_DIGEST"
+    printf '对照登记行\t%s\n' "$REGISTERED_DIGEST"
     printf '这一档的判据\t%s\n' "$(digest_text "$table_text")"
     printf '档位参数\t%s\n' "$(digest_text "$parameters_text")"; } > "$keys_directory/$mode.tsv"
 }
@@ -578,6 +620,7 @@ run_key_samples() {
   QEMU_MODE_PARAMETERS_TABLE="$samples/mode-parameters.tsv"
   TOOLCHAIN_OPTIONS=()
   sample_environment() {
+    load_registered_expectations   # 样本的 change.sh / unrelated.sh 可能动到登记：每趟算键之前现取
     BUSYBOX_IDENTITY=""; QEMU_SYSTEM_IDENTITY=""; QEMU_DIGEST=""; KERNEL_DIGEST=""; TOOLCHAIN_OPTIONS=()
     while IFS=$'\t' read -r name value rest; do
       case "$name" in
@@ -611,7 +654,6 @@ run_key_samples() {
   [[ -f "$samples/unrelated.sh" ]] && run_key_samples_three_questions
   echo "── 第二趟（样本 .qemu-key-samples/change.sh 改过之后）"
   (cd "$ROOT" && bash .qemu-key-samples/change.sh) || fail "样本的 .qemu-key-samples/change.sh 没跑成" "照它的报错改样本；它只许改样本根里的文件。"
-  EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
   sample_environment
   for mode in "${ALL_MODES[@]}"; do
     if lookup_tier "$mode"; then
@@ -692,34 +734,8 @@ if ((prerecorded == 0)); then
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
 fi
 
-# 复跑表里 E142 有不止一行（第 2 列 @driver_e142 与 @driver_e142_p8g_crates_dump 等）：只取第 2 列恰是 @driver_e142 的那一行的第 4 列，不取全部 E142 行。
-e142_row_filter='$1=="E142" && $2=="@driver_e142"'
-[[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-all-rows ]] && e142_row_filter='$1=="E142"'
-e142_product_names="$(awk -F'|' "$e142_row_filter"'{print $4}' scripts/experiments/replay.sh)"
-e142_product_row_count="$(grep -c . <<<"$e142_product_names")"
-if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != e142-all-rows && "$e142_product_row_count" != 1 ]]; then
-  fail "scripts/experiments/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 $e142_product_row_count 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）" \
-       "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 开头的行：留一行，第 4 列写这一道对照的 E142 产物文件名；驱动改了名，这里的 @driver_e142 跟着改。"
-fi
-PRODUCT="research/results/$e142_product_names"
-[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $PRODUCT）" "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 那一行的第 4 列，对应的文件在不在 research/results/ 下。"
-# 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
-EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
-[[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
-# path=mkfs 那一行的对照是布局表八「mkfs 种根」那一行登记的值（文件头「段序列分两处比」）：解析器按本阶段自己的位置取，--root 指被判的仓，
-# 样本把 cwd 换成样本根时，读的是样本里那份合成的布局表、跑的仍是仓里的解析器。开虚机之前取，登记表写坏了不白等虚机。
-SEGMENT_REGISTRY_SCRIPT="$STAGE_REPOSITORY/scripts/crash/check-segment-registry.py"
-if ! registered_mkfs_segments_output="$(python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" --print-mkfs-segments-line)"; then
-  printf '%s\n' "$registered_mkfs_segments_output" | sed 's/^/        /'
-  fail "取不出 .claude/kb/layout/01-first-txn.md「八、」登记表「mkfs 种根」那一行的登记值（段序列、次操作、崩溃状态数、种类串）" \
-       "照上面 scripts/crash/check-segment-registry.py 的报错改那一行；它不在就从 git 找回来（门禁 doc-registries 的 segment-registry 格用的是同一份）。"
-fi
-EXPECTED_MKFS_SEGMENTS_LINE="$registered_mkfs_segments_output"
-EXPECTED_MKFS_SEGMENTS_SOURCE="布局表八「mkfs 种根」那一行"
-if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == mkfs-from-e142 ]]; then
-  EXPECTED_MKFS_SEGMENTS_LINE="$(grep -ao 'E7RESULT name=segments path=mkfs .*' "$PRODUCT" | tr -d '\r')"
-  EXPECTED_MKFS_SEGMENTS_SOURCE="E142 产物 $PRODUCT 的 path=mkfs 行"
-fi
+# 对照的登记值开虚机之前现取（文件头「对照从哪来」）：登记表写坏了不白等虚机；不读 research/ 下的产物
+load_registered_expectations
 ((key_samples)) && run_key_samples
 
 reused_modes=(); judged_reasons=()

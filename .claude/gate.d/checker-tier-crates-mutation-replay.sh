@@ -39,11 +39,31 @@
 #
 # 并发（派活与进程数的判法在 crates-mutation-rows.py 的 worker_count_for 与 dispatch_order）：每片各一份源码副本与一个编译目录（共用一份会被 cargo 的文件锁重新串行化）；
 #   按 crate 归堆派（增量编译的命中率才稳），活动态领（等分之下拿到几十秒重测试的那一片会独自拖住整道），上一次用时 ≥ GATE_MUTATION_LONG_ROW_SECONDS（默认 300）秒或超时的先派。
-#   工作进程数取 ① 核数的一半、至多 16（设了 GATE_MUTATION_WORKERS 就顶掉 ①）、② 这一趟要现跑的条数、③ 外层内存上限 ÷ 每条变异的上限（向下取整）的小者、至少 1。
+#   工作进程数取 ① 核数的一半、至多 16（设了 GATE_MUTATION_WORKERS 就顶掉 ①）、② 这一趟要现跑的条数、③ 外层内存上限 ÷ 每条变异的默认上限（向下取整；
+#   默认上限是没有逐行上限的那些行用的那个值，有一行写了 24G 不再把整趟压成 1 个）、④ 编译目录所在的盘放得下几个工作进程的两份编译目录（下面「磁盘余量」）的小者、至少 1。
 #   ③ 的外层上限读环境变量 RUN_WITH_MEMORY_CAP_OUTER_CAP（run-with-memory-cap.sh 套在外层时给命令设的，例 `run-with-memory-cap.sh 24G bash 本阶段 --quick`）：
 #   套在外层里的里层包装不排队，合起来超过外层上限时只有 slice 的总上限兜着，所以按外层收；没设或写法不认就是没套在外层里，没有 ③、
 #   每条自己经包装排队（开跑那一刻看不见别的重活来抢，不按内存收），stderr 头一行写明「外层内存上限没读到」。外层不够一条的上限时按 1 个开。判法在 worker_count_for。
+#   按额度排队（外层读得到时；读不到时整段不起作用，派活与不排队时一样）：派的每一格（基线的批、一条变异、一组覆盖）按它自己跑起来经包装给的上限（逐行上限写了取它，
+#   没写取默认上限）从外层额度里扣，在跑的各格上限之和不超过外层上限；扣不下的那一格留在队里，后面扣得下的小格可以先派，一格被越过的次数到了工作进程数就停下、
+#   等在跑的收完（不许饿死大格）；什么都没在跑时队首一定派，上限比整个外层还大的那一格单独起，由里层包装按用法错退 251 报出来。头一行写「逐行上限最大 X、按额度排队」。
+#   判法在 crates-mutation-rows.py 的 pick_ready_job 与 run_pool，文件头「工作进程数」；自证与弄坏开关 largestrowmemory、rowmemoryunbudgeted、bypassunbounded 在它的 --selftest
+#   （「外层 36G、一行 24G 加二十行 4G」那一格）；本道样本不判这一条。
 #   线程数按工作进程数压：每个 cargo 的编译并行度 CARGO_BUILD_JOBS 取 max(1, 核数 ÷ 工作进程数)（GATE_MUTATION_CARGO_JOBS 顶掉它）。
+#   先编那一趟（cargo test … --no-run：基线、变异的先编与插桩编译）的并行度另算：外层读不到时只按这一行的内存上限收：上限 ÷ 1.75 GiB（向下取整、至少 1）与上一句算出的取小者，
+#   每条 4G 时至多 2、8G 至多 4（crates-mutation-rows.py 的 compile_jobs_for，系数 COMPILE_GIB_PER_JOB 是推的、只有一个读数；GATE_MUTATION_CARGO_JOBS 设了不收）；跑测试那一趟不收。
+#   外层读得到时先编改从外层额度里此刻空着的那一部分算（compile_plan、OuterBudget）：想要的并行度（核数 ÷ 工作进程数）× 1.75 GiB 减去这一格自己的上限，向上面按额度排队的那本账借，
+#   空着的 = 外层 − 在跑各格的上限之和 − 别的先编已借走的 − 给每个空着的工作进程接下一格留的默认上限，几个工作进程同时要时各分一份；借到多少，这一趟先编的包装内存上限就是
+#   自己的上限加借到的，并行度随之升高（不低于只按自己上限收的，至多想要的那个数），编完就还；在跑各格的上限加借走的之和不超过外层。例：外层 36G、2 个工作进程在跑各 4G、核数 32，
+#   每个先编借 14G，包装上限 18432M，并行度 10（只按自己的 4G 收是 2）；9 个工作进程各 4G 时额度已满、借不到，仍是 2。末了 stderr 报一行「额度账：…峰值」。
+#   自证与弄坏开关 compilejobsownlimit（先编只按自己的上限收）在 crates-mutation-rows.py --selftest（「先编向外层额度借」等四格）；本道样本不判这一条。
+#   磁盘余量（工作进程数的 ④，crates-mutation-rows.py 的 disk_bound_for）：每个工作进程最多占两份编译目录（普通、插桩），一份涨满按下面「编译目录上限」算；
+#   派活之前按目标盘余量（外层给了 GATE_MUTATION_DISK_FREE 用它，不然读编译目录所在的盘）核「片号 1…n 各两份还能涨的量 + 备用 GATE_MUTATION_DISK_RESERVE（默认 30G）」，
+#   放不下的 n 不开，头一行写磁盘卡在哪一项；余量没读到（两样都读不到）没有这一项，头一行写明原因。自证与弄坏开关 disknotchecked 在 crates-mutation-rows.py --selftest
+#   （「磁盘余量放不下 9 份」等四格）；本道样本不判这一条。
+#   编译目录上限（GATE_MUTATION_TARGET_DIR_CAP，默认 64G，trim_target_directory）：每个工作进程每判完一格量一次自己那份编译目录（判基线与变异的普通那份、判覆盖的插桩那份）的占盘，
+#   超过上限就在两格之间清掉底下的增量产物（<目录>/<档>/incremental），依赖与测试二进制不动，清完仍超线的只报；弄坏开关 targetcapignored，自证同在 crates-mutation-rows.py --selftest
+#   （「编译目录超过上限」等三格）；本道样本不判这一条。
 #   被测试自己起的线程不压：RUST_TEST_THREADS 与各测试读的线程数变量调用方设了什么就原样透传给 cargo test。
 #   ⚠️ stdout 里的判定与进程数无关：按变异表的行号排序再打，GATE_MUTATION_WORKERS=1 与 =8 逐字相同（并发之后重新证红的那一半）；进度、前移只进 stderr；
 #   复用了多少进 stdout 的「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：<栏>）」「（复用）」或「（拒算）」与成功句末尾「；这一趟现判 …」，比判定时去掉这几处。
@@ -65,6 +85,9 @@
 #   SINGLEFS_CRASH_AMPLIFICATION_LIBRARY 清掉；只在 crates-mutation-rows.py 的 mutation_crash_library_environment 一处算（它文件头「变异复跑的判定库」），这里照原样
 #   传调用方的环境，双机分片的驱动给第二台设 mutation-kept 下一份。自证在 crates-mutation-rows.py --selftest（弄坏开关 GATE_MUTATION_BREAK=sharedcrashlibrary）与
 #   mutation-shard-run.sh --selftest（MUTATION_SHARD_RUN_BREAK=peer-crash-library-home-unset）；本道样本不判这一条。
+# 崩溃判定库每片各一份：每个工作进程再用上面那个家目录底下的 shard-<片号>（crates-mutation-rows.py 的 crash_library_home_for_shard，片号经锁领、并发的几次调用不相交），
+#   几个工作进程不共用一份库，开库等锁（crash_library.rs 的 DEFAULT_LOCK_WAIT_SECONDS，1800 秒）不与测试限时叠在一起；弄坏开关 GATE_MUTATION_BREAK=crashlibraryacrossshards，
+#   自证在 crates-mutation-rows.py --selftest（「崩溃判定库每片各一份」「两个工作进程同时在跑」两格）；本道样本不判这一条。
 # 临时目录：每条变异与每批基线各一个 TMPDIR，结束时不论退出码（含限时、撞顶被杀）都整个删掉：被杀的测试 Drop 守卫不跑，镜像会堆在里面；
 #   全部判完总目录下还剩哪一条的目录，整道判红。
 #
@@ -78,6 +101,9 @@
 #   包装退 250 记「内存撞顶」，254 记「被总上限挤掉」，252 记「排不上没跑」，245 记「显存不够」（起止之间内核报了 NV_ERR_NO_MEMORY，
 #   输出里的 FAILED 是被它弄红的）：都不算抓到也不算没红，单列、整道判红。分栏在 scripts/mutation/crates-mutation-rows.py 的 verdict_of_run
 #   （245 那一栏的自证是它 --selftest 里「包装退 245（显存不够）记显存不够、不算抓到」那一格，弄坏开关 GATE_MUTATION_BREAK=gpumemoryasoutput）。
+#   退 250 再分两栏（verdict_of_run、baseline_problem）：先编那一趟撞的单列「编译撞顶」（出路写编译并行度与逐行上限，不写「无界分配」，点名的测试一次都没起），
+#   跑测试那一趟撞的照旧；「计数：」那一行两栏都算内存撞顶，格式不动；基线不绿的句子写明「那一批编译那一趟撞了内存上限」。弄坏开关 GATE_MUTATION_BREAK=memorycompilemerged，
+#   自证在 crates-mutation-rows.py --selftest（「先编那一趟撞了内存上限」「测试那一趟撞了内存上限」两格）；本道样本不判这一条。
 #   scope 或 slice 的总上限设不上（没有用户级 systemd、D-Bus 连不上）整道判红、一条都不跑，不退回无上限去跑。
 # 限时：交给包装（RUN_WITH_MEMORY_CAP_TIME_LIMIT → scope 的 RuntimeMaxSec，从起跑算、不算排队）；不在包装外面套 timeout：排队的时间会被算成超时。
 #   不含重编译：基线的一批与每条变异先在同一个内存上限里不限时跑一趟 cargo test <-- 之前那一段> --no-run，编成了再限时跑点名的测试；插桩编译同样不限时
@@ -134,6 +160,9 @@
 #   用假 cargo、假 llvm 工具跑（门禁 code-tooling 替它复跑），弄坏开关 row-key-with-limits（红在 N33 那一格）、baseline-by-tree-snapshot、judge-units-whole-file、
 #   mutated-unit-ignored、test-closure-ignored、rowkeywithouttoolchain、coveragenotrecorded、llvmversionunchecked、timingsignored、importunchecked、nobaseline、
 #   emptyreplacementrefused、cargoconfignotcopied、outermemoryignored 下各有一格必须判错（逐个开关红在哪几格写在它文件头「弄坏开关」）。
+#   编译并行度按内存上限收、行里已带 --exact 的变异记覆盖、点名的测试在这一组特性下不编：弄坏开关 compilejobsbyworkers、exactduplicated，以及 scripts/mutation/lib_mutation_units.py 里的
+#   closure-error-masked（同样从 GATE_MUTATION_BREAK 认；按路径载入的 lib_function_units.py 不登记进 sys.modules，--list-items 末尾的真错被 PicklingError 盖住）各有格必须判错，
+#   都在 crates-mutation-rows.py --selftest；本道样本不判这几条。
 #   拷贝范围含 .cargo/（.cargo/config.toml 的 [env] BINDGEN_EXTRA_CLANG_ARGS，点名的测试要编 gpu 或 verdict-store 特性的行靠它编 librocksdb-sys）也在那里判：
 #   假 cargo 见 --features gpu 而副本里读不到那个变量就照构建脚本报 stdbool.h 找不到、退 101，记「基线不绿」；弄坏开关 GATE_MUTATION_BREAK=cargoconfignotcopied
 #   拷副本时跳过 .cargo/，那一格（「拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到」）必须判错。本道样本不判这一条（样本用真 cargo、不编 librocksdb-sys）。

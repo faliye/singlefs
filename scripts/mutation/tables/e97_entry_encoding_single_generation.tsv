@@ -1,0 +1,16 @@
+FV1_新口径K改回25	RowCountCaliber::SingleGenerationWriteOnly => 1, // D5 已定项 2：每条根只装这一代	RowCountCaliber::SingleGenerationWriteOnly => 25, // D5 已定项 2：每条根只装这一代
+FV2_每叶组数少一	let groups_per_leaf = (leaf_fanout / kept_generations).max(1);	let groups_per_leaf = (leaf_fanout / kept_generations - 1).max(1);
+FV3_脏叶向下整除	let leaves = groups.div_ceil(groups_per_leaf);	let leaves = groups / groups_per_leaf;
+FV4_去掉每叶组数下限	let groups_per_leaf = (leaf_fanout / kept_generations).max(1);	let groups_per_leaf = leaf_fanout / kept_generations;
+FV5_宽读塌成窄读	                Reading::Wide => true,	                Reading::Wide => statistic.per_tree_narrow,
+FV6_门槛除以十	const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = DIRTY_BYTES_THRESHOLD / 100;	const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = DIRTY_BYTES_THRESHOLD / 10;
+FV7_判据10节点头换成96	const NODE_HEADER_BYTES_AT_E97: u64 = 58;	const NODE_HEADER_BYTES_AT_E97: u64 = 96;
+FV8_区间字段归零	let key_range_field_bytes = 2 * self.key_bytes;	let key_range_field_bytes = 0;
+FV9_实现条目宽34改30	const IMPLEMENTATION_ACCOUNTING_ENTRY_BYTES: u64 = 34;	const IMPLEMENTATION_ACCOUNTING_ENTRY_BYTES: u64 = 30;
+FV10_全空聚簇段数丢设备维	    Statistic { per_device: true,  per_tree_narrow: false }, // 11 全空聚簇段数	    Statistic { per_device: false, per_tree_narrow: false }, // 11 全空聚簇段数
+FV11_门槛挪到判决格一之下	const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = DIRTY_BYTES_THRESHOLD / 100;	const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = 9_076_735;
+FV12_旧口径K改24	RowCountCaliber::TwentyFiveGenerationsWriteAndDelete => 25, // 原装置调用处写死的 K	RowCountCaliber::TwentyFiveGenerationsWriteAndDelete => 24, // 原装置调用处写死的 K
+FV13_旧口径一写一删改只写	RowCountCaliber::TwentyFiveGenerationsWriteAndDelete => 2, // 一写一删	RowCountCaliber::TwentyFiveGenerationsWriteAndDelete => 1, // 一写一删
+FV14_窄读最紧取成最小	let maximum = cells.iter().map(pick).max().expect("至少一格");	let maximum = cells.iter().map(pick).min().expect("至少一格");
+FV15_过界判成大于等于	    bytes > budget_bytes\n	    bytes >= budget_bytes\n
+FV16_新口径只写不删改回一写一删	RowCountCaliber::SingleGenerationWriteOnly => 1, // 只写不删	RowCountCaliber::SingleGenerationWriteOnly => 2, // 只写不删

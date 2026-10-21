@@ -1,4 +1,0 @@
-exit=1
-want=登记的账 research/results/e165-sample-gone-red-examples.tsv 不在
-want=作废红例账登记表 .claude/gate.d/e165-void-red-example-ledgers.tsv 有 1 处不对
-want=pinned-red-examples-complete：红（退出 1）

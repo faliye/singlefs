@@ -1,0 +1,8 @@
+exit=1
+want=不变量表（1 份文件，登记在 .claude/kb-directories） 正文声称在用 6 条，实际 2 条（总行 3，退役 1；只数中文原文，译文 2 份里的 4 行表行不数）
+want=.claude/kb/survey.ja.md:3 写「5 条在用」，而 不变量表（1 份文件，登记在 .claude/kb-directories） 实际在用 2 条
+want=crates/sample/invariants/README.md:4 写「6 条在用」，而 不变量表（1 份文件，登记在 .claude/kb-directories） 实际在用 2 条
+want=不变量条数跨文件对不上 2 处
+want=  declared-counts：红（退出 1）
+want=  invariant-count-elsewhere：红（退出 1）
+want=doc-registries.sh：2 格里 2 格红（declared-counts invariant-count-elsewhere）

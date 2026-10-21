@@ -1,0 +1,10 @@
+exit=1
+want=research/prompts/e990-preregistration.md：没有「## 十四、并行与挂钟」这一节
+want=research/prompts/e991-preregistration.md:3：「并行与挂钟」一节里没有「串行：」一行
+want=research/prompts/e992-preregistration.md:9：「预计在用核数：」里没有数
+want=这次改动的跑前登记里 3 处没写全「并行与挂钟」（查了 3 份）
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（preregistration-parallelism）
+want=→ preregistration-parallelism：照 .claude/agents/experiment-designer.md「登记的固定节名」
+want=bash .claude/gate.d/doc-experiments.sh --check preregistration-parallelism

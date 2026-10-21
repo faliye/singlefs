@@ -1,0 +1,2 @@
+# 样本的崩溃点重放合表（开跑前的静态判据 crash-case-check.py --only placement 读它：每条 crash-case: 恰好被一项点名，写法同仓里那一份的表头）
+fault-injection-given-states	crash-case:fault-injection-given-states	-	fault_injection_given_states	# 样本

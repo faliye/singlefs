@@ -1,0 +1,5 @@
+exit=1
+want=决策编号不连续或不从 D1 起（译文 .ja.md）：[1, 3]
+want=D2 状态列写「已定 2 项 / 未定 0 项」，而正文两节里数出「已定 1 项 / 未定 1 项」
+want=  kb-shape：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（kb-shape）

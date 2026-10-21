@@ -1,5 +1,7 @@
 exit=0
-want=scripts/ 里声称有 --selftest 的 3 份中 1 份有门禁阶段在跑
-want=没跑的 2 份（登记在这一格的 NOT_RUN_HERE）
+want=scripts/ 里声称有 --selftest 的 5 份中 1 份有门禁阶段在跑
+want=没跑的 4 份（登记在这一格的 NOT_RUN_HERE）
 want=scripts/devices/vm-bench.sh：自证要连起三次虚机
 want=scripts/crash/lib_crash_point_replay_items.py：它自己没有自证
+want=scripts/kb/lib_notation_check.py：它自己没有自证
+want=scripts/mutation/lib_mutation_units.py：它自己没有自证

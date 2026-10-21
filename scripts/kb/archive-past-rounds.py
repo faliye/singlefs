@@ -13,8 +13,8 @@
   archive-past-rounds.py --apply --keep-registered   照删别的，被登记表点名的那几份留下、退 0（「把那份留下」这条出路）
   archive-past-rounds.py --selftest
 
-退出码：0 没有该删的、或删完了；1 --check 判红、取不到基准、删完有 include 指空；2 --apply 没给 GATE_BASE；
-        3 --apply 时有被登记表点名的上一轮产物：别的照删，点名的那几份没删，逐份列出哪张表哪一行点名。
+退出码：0 没有该删的、或删完了；1 --check 判红、取不到基准、删完有 include 指空、登记表点名的路径已经不在（指空的登记）；2 --apply 没给 GATE_BASE；
+        3 --apply 时有被 .tsv 登记表点名的上一轮产物：别的照删，点名的那几份没删，逐份列出哪张表哪一行点名。
 
 弄坏开关（只给 --selftest 证红用）：
   ARCHIVE_PAST_ROUNDS_BREAK=registry-check-skipped   named_by_registries() 不查登记表，一份都不报
@@ -23,6 +23,15 @@
       「✗ 自检失败：登记了别的门禁目录」那一格红
   ARCHIVE_PAST_ROUNDS_BREAK=gitlinks-kept   past_round_files() 不滤模式位 160000，gitlink 当文件进候选
       「✗ 自检失败：gitlink 进了候选」那一格红（--apply 对它 os.remove 抛 IsADirectoryError 的那条也跟着红）
+  ARCHIVE_PAST_ROUNDS_BREAK=glob-range-protects   named_by_registries() 把带通配的射程当点名（按 fnmatch 配候选），射程配到的不删
+      「✗ 自检失败：没点名的（只在注释行里提到的、通配射程里的）应当照删」那一格红（自证停在头一组出错的；单测 selftest_registry_namings 时
+      「✗ 自检失败：通配射程配到的那一份应当照删」那一格同样红）
+  ARCHIVE_PAST_ROUNDS_BREAK=dangling-registry-unreported   dangling_registry_namings() 一条都不报（登记表点名、文件已经不在的那几行）
+      「✗ 自检失败：登记表点名、文件已经不在的那几行」那一格红
+  ARCHIVE_PAST_ROUNDS_BREAK=flat-registries-unread   registry_namings() 不读平铺登记表（.claude/term-rename-exempt、.claude/*-exclude）
+      「✗ 自检失败：这一趟要删、被平铺登记表点名的那几份」那一格红（它们指空之后的那几行也跟着报不出来）
+  ARCHIVE_PAST_ROUNDS_BREAK=mutation-replacement-counted   registry_namings() 对变异表也按整行认（原文、替换文里的代码文本也算点名）
+      「✗ 自检失败：登记表点名、文件已经不在的那几行」那一格红（变异表替换文里写着的 e27-gone-prereg.md 也报成指空）
 
 判据（机械，不靠人记）：
   删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
@@ -31,9 +40,19 @@
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
         `abandoned-rounds.tsv`（登记表，门禁 doc-process-records 的 abandoned-rounds 格的输入）、还被代码当输入的产物（still_an_input）、
-        被检查读的登记表非注释行点名的产物（named_by_registries：门禁目录下的 .tsv，门禁目录照 .claude/gate-directory 登记、没登记取 .claude/gate.d；
+        被检查读的 .tsv 登记表非注释行点名的产物（named_by_registries：门禁目录下的 .tsv，门禁目录照 .claude/gate-directory 登记、没登记取 .claude/gate.d；
         scripts/ 与 crates/ 下的 .tsv，钉表、变异表 scripts/mutation/tables/、crates/mutations.tsv 都在里面）。
-        登记表点名的那几份 --apply 不删、退 3，逐份列出哪张表哪一行；出路是先改登记，或者把那份留下（--keep-registered）。
+        .tsv 登记表点名的那几份 --apply 不删、退 3，逐份列出哪张表哪一行；出路是先改登记，或者把那份留下（--keep-registered）。
+  报 —— 被检查读的登记表（上面那几张 .tsv，加平铺登记表 .claude/term-rename-exempt 与 .claude/*-exclude：一行「<路径>  # 理由」，# 前面那一段是点名）
+        点名的 research/ 路径，逐条报两种（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」：
+        删之前查一遍被检查读的登记表点名的路径，点到的不删，或者在同一次提交里改掉那几行登记）：
+        ① 已经不在（文件早删了）：dangling_registry_namings 逐条列「表:行  路径」，--check 与 --apply 都判红（退 1）；
+        ② 这一趟要删、被平铺登记表点名的：平铺登记表是排除表与豁免表，不保护它点到的产物——它点到的冻结证据删了，那一行就该一起删；
+           --check 逐条列出、照样判红，--apply 照删，删完它们落进 ①，判红、出路写同一次提交里删掉那几行登记。
+  不认 —— 通配（`research/results/e165-*-red-examples.tsv` 这种）是射程，不点名任何一份，也不保护任何一份；代码里拼出来的路径
+        （目录加一个从别的文件名换后缀得来的名字）这里看不见，也不保护。代码把 research/ 下的文件当输入本身就是要消掉的依赖
+        （research/ 整个可删，.claude/rules/directory-layout.md「research/：可以整个删掉的研究目录」）：读它的检查要改成读跟着测试放的登记，
+        或者文件不在时报本次未跑；still_an_input 按字面文件名留下的那几份是还没改完的旧依赖，留着是免得这一趟当场塌，不是该保护的对象。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
      不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
 """
@@ -61,8 +80,23 @@ INPUT_SUFFIX = (".sh", ".py", ".rs", ".toml")
 REGISTRY_TREES_BESIDE_GATE = ("scripts", "crates")
 REGISTRY_SUFFIX = ".tsv"
 REGISTRY_SKIPPED_DIRECTORIES = ("fixtures", "target", ".git")
-# 登记表一格里的产物路径：到空白、引号、括号、冒号（「文件:行号」）、井号、通配符为止；跟着通配符的是射程（e165-*-red-examples.tsv），不是点名
+# 登记表一格里的产物路径：到空白、引号、括号、冒号（「文件:行号」）、井号、通配符为止；跟着通配符的是射程（e165-*-red-examples.tsv），不是点名，
+# 也不保护它配得到的任何一份（文件头「不认」一段）
 REGISTRY_PATH = re.compile(r"research/(?:results|prompts)/[^\s`'\"<>|()（）\[\]\\,，。、；：:#*?]+")
+# 平铺登记表：一行一条「<路径>[:「行内锚」]  # 理由」，空白加 # 之后是理由、不算点名。门禁 doc-text 的 term-renames 格读的豁免表，
+# 与各道检查从 .claude/*-exclude 读的排除表（门禁 code-source-discipline 的 format-constants 格读 .claude/format-constants-exclude）
+FLAT_REGISTRY_FILES = (".claude/term-rename-exempt",)
+FLAT_REGISTRY_GLOB = ".claude/*-exclude"
+FLAT_REGISTRY_REASON = re.compile(r"\s+#")
+# 变异表（每行「变异名、文件、原文、替换文……」：scripts/mutation/tables/*.tsv、crates/mutations.tsv、Verus 必红世界表）只认前两列：
+# 第三列起是被改坏的代码与替换上去的代码，里面注释提到的 research/ 路径是代码文本，不是登记的输入
+MUTATION_TABLE_NAMING_COLUMNS = 2
+
+
+def is_mutation_table(table):
+    """table 是不是变异表（registry_namings 对它只认前 MUTATION_TABLE_NAMING_COLUMNS 列）。"""
+    return (table.startswith("scripts/mutation/tables/") or os.path.basename(table) == "mutations.tsv"
+            or os.path.basename(table).endswith("must-red-worlds.tsv"))
 BROKEN = os.environ.get("ARCHIVE_PAST_ROUNDS_BREAK", "")
 
 
@@ -119,7 +153,10 @@ def still_an_input(root, candidates):
     2026-09-21 实测两次，都是删完才发现：① 段序列登记表那一道门禁（段序列登记表与 E142 产物逐字比对，已搬进 doc-registries 的 segment-registry 那一格）连同它的自证一起塌；
     ② 归档删掉四份跨实验断言读的产物之后，research 整个编不过（e134 读 e133、e136 读 e134 与 e109、e137 读 e136），
     而 HEAD 上就是这个状态。第一次只把射程补到门禁脚本与 scripts，漏掉装置源码，于是第二次照样发生——
-    所以这里按「哪些后缀是代码」扫，不按「我记得哪些目录会引」扫。"""
+    所以这里按「哪些后缀是代码」扫，不按「我记得哪些目录会引」扫。
+
+    只认字面文件名（文件头「不认」一段）：代码里拼出来的路径（例：按红例账的文件名换后缀配同一目录的杀伤界产物）这里看不见、不保护，
+    那份产物照删；读它的那一道要改成不读 research/（跟着测试放的登记，或文件不在报本次未跑），不是在这里补一条认法。"""
     by_name = {}
     for relative in candidates:
         by_name.setdefault(os.path.basename(relative), []).append(relative)
@@ -166,39 +203,116 @@ def registry_trees(root):
     return trees
 
 
-def named_by_registries(root, candidates):
-    """候选里被登记表非注释行点名的：{相对路径: ["<表>:<行号>", …]}。这些 --apply 不删。
-    点名只认整条文件路径，或 research/ 下的子目录（带不带结尾的 / 都算，目录下的候选都算点到）；research/results/、research/prompts/ 本身与带通配符的是射程，不算点名。
-    注释行（# 起头）里写的「依据见 research/…」是记录引用，不算——与 still_an_input 跳注释同一个理由。"""
-    if BROKEN == "registry-check-skipped":
-        return {}
-    candidates = set(candidates)
-    found = {}
+def registry_tables(root):
+    """被检查读的登记表：[(相对路径, 种类)]，种类是 "tsv"（门禁目录、scripts/、crates/ 下的 .tsv）或 "flat"（平铺登记表）。"""
+    tables = []
     for tree in registry_trees(root):
         for directory, subdirectories, names in os.walk(os.path.join(root, tree)):
             subdirectories[:] = sorted(name for name in subdirectories if name not in REGISTRY_SKIPPED_DIRECTORIES)
-            for name in sorted(names):
-                if not name.endswith(REGISTRY_SUFFIX):
-                    continue
-                table = os.path.join(directory, name)
-                try:
-                    lines = open(table, encoding="utf-8", errors="ignore").read().splitlines()
-                except OSError:
-                    continue
-                for number, line in enumerate(lines, 1):
-                    if not line.strip() or line.lstrip().startswith("#"):
-                        continue
-                    for match in REGISTRY_PATH.finditer(line):
-                        if line[match.end():match.end() + 1] in ("*", "?"):
-                            continue                # 通配：射程，不是点名
-                        target = match.group(0)
-                        directory_prefix = target.rstrip("/") + "/"
-                        hits = [path for path in candidates if path == target or path.startswith(directory_prefix)]
-                        naming = "%s:%d" % (os.path.relpath(table, root), number)
-                        for path in hits:
-                            if naming not in found.setdefault(path, []):   # 同一行点名两次只列一次
-                                found[path].append(naming)
+            tables += [(os.path.relpath(os.path.join(directory, name), root), "tsv") for name in sorted(names) if name.endswith(REGISTRY_SUFFIX)]
+    if BROKEN != "flat-registries-unread":
+        import glob as _glob
+        flat = set(FLAT_REGISTRY_FILES) | {os.path.relpath(path, root) for path in _glob.glob(os.path.join(root, FLAT_REGISTRY_GLOB))}
+        tables += [(relative, "flat") for relative in sorted(flat) if os.path.isfile(os.path.join(root, relative))]
+    return tables
+
+
+def registry_namings(root):
+    """登记表非注释行点名的 research/ 路径：[(表, 行号, 路径, 是不是射程, 种类)]。
+    .tsv 算到头一个「制表符加 #」之前（表的理由列照 stage-inputs.tsv 那种写法以 # 起头，里面的「依据见 research/…」是记录引用），
+    之前的各格都算（一格里写什么由读它的检查定，这里不分列），变异表例外：只算变异名与文件两列（is_mutation_table）；平铺登记表只算空白加 # 之前那一段（之后是理由）。
+    注释行（# 起头）里写的「依据见 research/…」是记录引用，不算——与 still_an_input 跳注释同一个理由。
+    跟着通配符的是射程：照样列出（是不是射程那一项为真），点名、保护、指空三样都不算它。"""
+    namings = []
+    for table, kind in registry_tables(root):
+        try:
+            lines = open(os.path.join(root, table), encoding="utf-8", errors="ignore").read().splitlines()
+        except OSError:
+            continue
+        for number, line in enumerate(lines, 1):
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            named_part = FLAT_REGISTRY_REASON.split(line, 1)[0] if kind == "flat" else line.split("\t#", 1)[0]
+            if kind == "tsv" and is_mutation_table(table) and BROKEN != "mutation-replacement-counted":
+                named_part = "\t".join(named_part.split("\t")[:MUTATION_TABLE_NAMING_COLUMNS])
+            for match in REGISTRY_PATH.finditer(named_part):
+                is_range = named_part[match.end():match.end() + 1] in ("*", "?")
+                namings.append((table, number, match.group(0), is_range, kind))
+    return namings
+
+
+def named_by_registries(root, candidates, kind="tsv"):
+    """候选里被登记表点名的：{相对路径: ["<表>:<行号>", …]}。kind="tsv" 的那几份 --apply 不删（保护）；kind="flat" 的照删、只报（文件头「报」②）。
+    点名只认整条文件路径，或 research/ 下的子目录（带不带结尾的 / 都算，目录下的候选都算点到）；research/results/、research/prompts/ 本身与带通配符的是射程，不算点名。
+    弄坏开关 glob-range-protects 下射程按 fnmatch 配候选、配到的也算点名。"""
+    if BROKEN == "registry-check-skipped":
+        return {}
+    import fnmatch as _fnmatch
+    candidates = set(candidates)
+    found = {}
+    for table, number, target, is_range, table_kind in registry_namings(root):
+        if table_kind != kind:
+            continue
+        if is_range:
+            if BROKEN != "glob-range-protects":
+                continue                # 通配：射程，不是点名，也不保护
+            pattern = target + "*"
+            hits = [path for path in candidates if _fnmatch.fnmatch(path, pattern)]
+        else:
+            directory_prefix = target.rstrip("/") + "/"
+            hits = [path for path in candidates if path == target or path.startswith(directory_prefix)]
+        naming = "%s:%d" % (table, number)
+        for path in hits:
+            if naming not in found.setdefault(path, []):   # 同一行点名两次只列一次
+                found[path].append(naming)
     return found
+
+
+def path_present(root, target):
+    """点名的路径还在：是文件，或是底下至少还有一份文件的目录（删光了文件只剩空目录的不算：git 不记空目录，换一棵树就没了）。"""
+    path = os.path.join(root, target.rstrip("/"))
+    if os.path.isdir(path):
+        return any(names for _, _, names in os.walk(path))
+    return os.path.lexists(path)
+
+
+def dangling_registry_namings(root):
+    """登记表点名、而磁盘上已经不在的 research/ 路径（文件头「报」①）：["<表>:<行号>  <路径>", …]。射程不算。
+    读那张表的检查拿到的是指空的路径；出路是同一次提交里删掉或改掉那几行登记。"""
+    if BROKEN == "dangling-registry-unreported":
+        return []
+    dangling = []
+    for table, number, target, is_range, _kind in registry_namings(root):
+        if is_range or path_present(root, target):
+            continue
+        entry = "%s:%d  %s" % (table, number, target)
+        if entry not in dangling:
+            dangling.append(entry)
+    return dangling
+
+
+def report_dangling(dangling):
+    """dangling_registry_namings 的结果打出来（判红那一种）；没有就什么都不打。"""
+    if not dangling:
+        return
+    print("  ✗ 登记表点名的 %d 处路径已经不在（文件早删了，或这一趟刚删），读那张表的检查拿到的是指空的路径：" % len(dangling))
+    for entry in dangling:                                         # gate-lint:detail
+        print("      %s" % entry)
+    print("     → 怎么办：同一次提交里删掉那几行登记，或把那一格的路径改成仓里在的文件（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」）；")
+    print("               那一格只是记录引用的，改成只留文件名、不带路径（与归档改写引用同一种写法）；读它的检查还要那份文件的，")
+    print("               改成读跟着测试放的登记或文件不在报本次未跑（.claude/rules/directory-layout.md），不去把产物找回来。")
+
+
+def report_flat_named(flat_named, apply_changes):
+    """这一趟要删、被平铺登记表点名的那几份（文件头「报」②）。"""
+    if not flat_named:
+        return
+    verb = "删掉" if apply_changes else "要删"
+    print("  ✗ 这一趟%s的 %d 份上一轮产物被平铺登记表点名（排除表、豁免表不保护它点到的产物，删了那一行就指空）：" % (verb, len(flat_named)))
+    for relative in sorted(flat_named):                            # gate-lint:detail
+        print("        %s  ← %s" % (relative, "、".join(flat_named[relative])))
+    print("     → 怎么办：在归档的同一次提交里删掉那几行登记（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」：")
+    print("               删之前查一遍被检查读的登记表点名的路径，点到的不删，或者在同一次提交里改掉那几行登记）；那一行豁免的东西没了，留着只会让那道检查红。")
 
 
 def text_files(root="."):
@@ -317,6 +431,8 @@ def run(root, apply_changes, keep_registered=False):
     doomed = [p for p in doomed if p not in inputs]
     registered = named_by_registries(root, doomed)
     doomed = [p for p in doomed if p not in registered]
+    flat_named = named_by_registries(root, doomed, kind="flat")    # 照删，只报（文件头「报」②）
+    dangling = dangling_registry_namings(root)                      # 删之前就已经指空的（文件头「报」①）
     if inputs:
         print("      留下 %d 份还被代码当输入的产物（门禁按名字读它比对、装置 include_str! 编译期读它）：" % len(inputs))
         for relative in sorted(inputs):                              # gate-lint:detail
@@ -327,7 +443,11 @@ def run(root, apply_changes, keep_registered=False):
         for relative in sorted(registered):                          # gate-lint:detail
             print("        %s  ← %s" % (relative, "、".join(registered[relative])))
     if not doomed:
-        if apply_changes and refuse_registered(registered, keep_registered):
+        refused = apply_changes and refuse_registered(registered, keep_registered)
+        if dangling:
+            report_dangling(dangling)
+            return 1
+        if refused:
             return 3
         # 数磁盘上真有的，不数 git 索引：删过还没提交时索引里仍跟踪着那些文件，
         # 拿索引数报「现有多少份」会报出一个磁盘上不成立的数。
@@ -338,6 +458,8 @@ def run(root, apply_changes, keep_registered=False):
               "还被代码当输入的产物（这一次 %d 份）、被检查读的登记表点名的产物（这一次 %d 份），后两类逐个列在上面" % (len(inputs), len(registered)))
         return 0
     if not apply_changes:
+        report_flat_named(flat_named, False)
+        report_dangling(dangling)
         by_dir = {}
         for p in doomed:
             by_dir[p.split("/")[1]] = by_dir.get(p.split("/")[1], 0) + 1
@@ -355,10 +477,13 @@ def run(root, apply_changes, keep_registered=False):
         print("               它同时把别处指向这些文件的引用改成只留文件名、不留路径；")
         print("               要查删掉的内容去 git 历史里找，有疑问就重新验证、不翻旧证据。")
         return 1
+    report_flat_named(flat_named, True)
     changed, touched = rewrite_links(root, doomed)
     for relative in doomed:
         os.remove(os.path.join(root, relative))
-    stale = stale_exclusions(root)
+    dangling = dangling_registry_namings(root)                      # 删完再算一遍：这一趟删掉的平铺登记表点名的那几份落进来
+    dangling_namings = {entry.split("  ", 1)[0] for entry in dangling}
+    stale = [entry for entry in stale_exclusions(root) if entry.split("  ", 1)[0] not in dangling_namings]   # 同一行不报两遍
     losing = missing_code_inputs(root)
     print("  ✓ 删了 %d 份上一轮及更早的实验记录；%d 份文件里 %d 处引用去掉了路径、只留文件名" % (len(doomed), touched, changed))
     refused = refuse_registered(registered, keep_registered)
@@ -374,6 +499,9 @@ def run(root, apply_changes, keep_registered=False):
         for entry in stale:                                        # gate-lint:detail
             print("      %s" % entry)
         print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
+    if dangling:
+        report_dangling(dangling)
+        return 1
     print("     → 下一步：在仓库根单跑共享「链接指向」那一道 `python3 .claude/singlefs-ai-sop/scripts/link-targets.py` 确认没有指空的链接，再跑一次本脚本 --check 判绿。")
     return 3 if refused else 0
 
@@ -398,6 +526,9 @@ def selftest():
     inherited_base = os.environ.pop("GATE_BASE", None)
     try:
         code = selftest_registry_check()
+        if code != 0:
+            return code
+        code = selftest_registry_namings()
         if code != 0:
             return code
         code = selftest_in_temporary_directory()
@@ -495,6 +626,95 @@ def selftest_registry_check():
         return 1
     print(f"  ✓ 自检（登记表，查了 {checked} 格）：门禁登记表、变异表点名的不删且 --apply 退 3 列出表与行、注释行与通配不算点名照删、"
           "--keep-registered 留下退 0、--check 不算它们、登记了别的门禁目录时照那个目录找")
+    return 0
+
+
+def selftest_registry_namings():
+    """文件头「报」「不认」两段：平铺登记表（.claude/term-rename-exempt、.claude/*-exclude）点名的照删、--check 逐条报；
+    登记表点名而文件已经不在的逐条报、判红；通配射程与代码里拼出来的路径不保护任何一份。"""
+    import contextlib
+    import io
+    import tempfile
+    failures, checked = [], 0
+    with tempfile.TemporaryDirectory() as work:
+        def write(relative, text):
+            path = os.path.join(work, relative)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "w", encoding="utf-8").write(text)
+
+        def exists(relative):
+            return os.path.exists(os.path.join(work, relative))
+
+        def run_captured(apply_changes):
+            buffer = io.StringIO()
+            if apply_changes:
+                os.environ["GATE_BASE"] = "HEAD"
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    code = run(work, apply_changes)
+            finally:
+                os.environ.pop("GATE_BASE", None)
+            return code, buffer.getvalue()
+
+        git("init", "-q", root=work)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=work, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
+        for relative in ("research/results/e20-term.out", "research/prompts/e21-model/a.rs", "research/results/e22-glob-a.out",
+                         "research/results/e23-red-examples.tsv", "research/results/e23-kill-bounds.out"):
+            write(relative, "上一轮\n")
+        write(".claude/term-rename-exempt", "research/results/e20-term.out:「旧名」  # 样本：按行豁免\n"
+                                            "research/results/e24-gone.out  # 样本：文件早删了，这一行指空\n")
+        write(".claude/format-constants-exclude", "research/prompts/e21-model/  # 样本：冻结证据目录\n")
+        write(".claude/gate.d/ledgers.tsv", "research/results/e22-*.out\t通配射程，不点名也不保护\n")
+        # 变异表只认变异名与文件两列：替换文里注释提到的路径是代码文本（不报），文件那一列指空照报
+        write("scripts/mutation/tables/arms.tsv", "臂一\tcrates/x.rs\t原文\t// 依据 research/prompts/e27-gone-prereg.md 5.2\t-p x\tt\n"
+                                                  "臂二\tresearch/results/e28-gone.out\t原文\t替换文\t-p x\tt\n")
+        write(".claude/gate.d/stage.tsv", "E1\tquestion-row=research/prompts/e25-gone-questions.md#6:够判\n"
+                                          "E2\t-\t-\t# 理由列里的记录引用不算点名：依据见 research/prompts/e26-cited-only.md\n")
+        # 账的文件名在代码里写成字面（still_an_input 认得、留下），杀伤界产物的路径是换后缀拼出来的（看不见、照删）
+        write("scripts/experiments/pin.py", 'ledger = "research/results/e23-red-examples.tsv"\n'
+                                            'bounds = ledger.replace("-red-examples.tsv", "-kill-bounds.out")\n')
+        git("add", "-A", root=work)
+        subprocess.run(["git", "commit", "-qm", "上一轮"], cwd=work, check=True)
+
+        code_check, output_check = run_captured(False)
+        checked += 1
+        if (code_check != 1 or "登记表点名的 3 处路径已经不在" not in output_check
+                or "scripts/mutation/tables/arms.tsv:2  research/results/e28-gone.out" not in output_check
+                or "e27-gone-prereg" in output_check
+                or ".claude/gate.d/stage.tsv:1  research/prompts/e25-gone-questions.md" not in output_check
+                or ".claude/term-rename-exempt:2  research/results/e24-gone.out" not in output_check
+                or "e26-cited-only" in output_check):
+            failures.append((f"登记表点名、文件已经不在的那几行（.claude/gate.d/stage.tsv:1、.claude/term-rename-exempt:2、scripts/mutation/tables/arms.tsv:2）--check 应当逐条报、退 1，"
+                             f"理由列里的记录引用（stage.tsv:2）与变异表替换文里的路径（arms.tsv:1）不报，实际退 {code_check}：{output_check[-700:]}",
+                             "看 dangling_registry_namings() 与 run() 里 report_dangling() 那几处"))
+        checked += 1
+        if ("research/results/e20-term.out  ← .claude/term-rename-exempt:1" not in output_check
+                or "research/prompts/e21-model/a.rs  ← .claude/format-constants-exclude:1" not in output_check
+                or "这一趟要删的 2 份上一轮产物被平铺登记表点名" not in output_check):
+            failures.append((f"这一趟要删、被平铺登记表点名的那几份 --check 应当逐份列出表与行：{output_check[-700:]}",
+                             "看 registry_tables() 读平铺登记表、named_by_registries(kind=\"flat\") 与 report_flat_named()"))
+        code_apply, output_apply = run_captured(True)
+        checked += 1
+        if exists("research/results/e22-glob-a.out"):
+            failures.append(("通配射程配到的那一份应当照删（射程不点名、不保护）", "看 named_by_registries() 跳射程那一处"))
+        checked += 1
+        if exists("research/results/e23-kill-bounds.out") or not exists("research/results/e23-red-examples.tsv"):
+            failures.append(("代码里拼出来的路径应当看不见、照删（e23-kill-bounds.out），字面写着的那一份应当留下（e23-red-examples.tsv）",
+                             "看 still_an_input() 只按字面文件名认那一段"))
+        checked += 1
+        if (code_apply != 1 or exists("research/results/e20-term.out") or exists("research/prompts/e21-model/a.rs")
+                or ".claude/term-rename-exempt:1  research/results/e20-term.out" not in output_apply
+                or ".claude/format-constants-exclude:1  research/prompts/e21-model/" not in output_apply):
+            failures.append((f"平铺登记表点名的那几份 --apply 应当照删，删完那几行落进「已经不在」逐条报、退 1，实际退 {code_apply}：{output_apply[-700:]}",
+                             "看 run() 里删完再算一遍 dangling_registry_namings() 那一句"))
+    for failure, howto in failures:
+        print(f"  ✗ 自检失败：{failure}")                 # gate-lint:detail
+        print(f"     → 怎么办：{howto}；ARCHIVE_PAST_ROUNDS_BREAK 设着的话这里本来就该红")
+    if failures:
+        return 1
+    print(f"  ✓ 自检（登记表点名的路径，查了 {checked} 格）：登记表点名而文件已经不在的逐条报、判红；平铺登记表（.claude/term-rename-exempt、.claude/*-exclude）"
+          "点名的这一趟要删的逐条报、--apply 照删之后落进「已经不在」判红；通配射程与代码里拼出来的路径不保护任何一份")
     return 0
 
 
@@ -649,7 +869,8 @@ def selftest_gitlink():
             subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
             write("research/results/e1-old.out", "上一轮\n")
             if scene == "排除项指不到":
-                write(".claude/sample-exclude", "research/results/e7-gone-directory/  # 样本：删完指不到\n")
+                # 排除项指 research/ 之外：research/ 下指空的由 dangling_registry_namings 报（判红），这一格只证 stale_exclusions 跑到
+                write(".claude/sample-exclude", "docs/e7-gone-directory/  # 样本：删完指不到\n")
             else:
                 write("scripts/experiments/gone.rs", 'const G: &str = include_str!("../../research/results/e9-gone.out");\n')
             git("add", "-A", root=work)

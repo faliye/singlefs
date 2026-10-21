@@ -23,5 +23,5 @@
 #   同一（流名，段号）只一行。
 # 核法在 scripts/crash/lib_crash_point_replay_items.py 的 segment_problems（门禁 code-source-discipline 的 crash-point-replay-segments 格、入口开跑前都调它）。
 # 2026-10-13 登记两段（用户点头「两段都登」）：位置寻址树第三条流 position_addressed_ExtentLowerSegmentGrowsToTwoLevels 第 0 段（322 次单元写，甲二 1 个态，full）与第 1 段（290 次 journal 记录原地写，甲二装不进 u64，slice：每趟 2^32 个态、进库续跑）。
-position-addressed-trees	position_addressed_ExtentLowerSegmentGrowsToTwoLevels	0	322	878ab0793a9f3dfad700d07e9f824fe8c22b4a8c655c9394fa0065b02f07403f	# 2026-10-13 用户定两段都登；摘要取自 ~/.local/share/singlefs/work/tooling-c790-entry/segment-digests/run-1.log 的拒跑句
-position-addressed-trees	position_addressed_ExtentLowerSegmentGrowsToTwoLevels	1	290	dc92b99949659ef0b9aa80f6eaefca615364560ae1600f36f01192fdfa4ab2cf	# 同上，run-2.log
+position-addressed-trees	position_addressed_ExtentLowerSegmentGrowsToTwoLevels	0	322	8fa3df60935e6042be454d7275067c928a274885a1f4da40854e7fa25c42e018	# 2026-10-16 重登：写段收尾件 C372 把记账第 11 项改成记录口径，这一段记账叶每盘 3301 → 3304；摘要取自 <运行目录> 那一趟 position-addressed-trees 快档日志的拒跑句
+position-addressed-trees	position_addressed_ExtentLowerSegmentGrowsToTwoLevels	1	290	8a250ae92e3b49639601b3152efc18b6b762d4c406b23494c1a33a75246f5868	# 同上一个原因（journal 记录里带的单元校验和跟着变）；摘要是修复批二丁的草稿探针按 step_write_table_with_barriers 算的（同一探针在提交头上算回登记的 dc92b999…），引擎拒跑句没核过

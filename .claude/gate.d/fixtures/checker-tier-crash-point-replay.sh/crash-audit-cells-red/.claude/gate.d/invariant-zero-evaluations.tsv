@@ -1,0 +1,2 @@
+# 样本的评估 0 次基准（写法同仓里那一份的表头）：只有 I-2.1，这一趟 I-3.1 也评估了 0 次
+quick	plain_stream:CRASH_POINT_REPLAY_PLAIN_STREAM_FAST	I-2.1	样本流不走二类结构，这一条在它上面不适用

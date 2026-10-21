@@ -1,0 +1,2 @@
+# GPU 开没开不进键：上一版在 ENABLE_GPU=0 下记库、这一版在 ENABLE_GPU=1 下全部复用，样本档快档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

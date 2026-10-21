@@ -1,0 +1,3 @@
+exit=1
+want=第 22 行的 ㉒「--profile r1 --table direct」不是规范写法的档
+want=pinned-red-examples-table：红（退出 1）

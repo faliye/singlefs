@@ -1,0 +1,4 @@
+exit=1
+want=不在了：第 20 行：crates/mutations.tsv#链首锚点错一位
+want=处点名的「改回去就红」的变异不在它的表里了
+want=pinned-red-examples-table：红（退出 1）

@@ -1,0 +1,13 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：invariant-prerequisites
+want=不变量表里 8 处未实现的不变量前置不成立（未实现 9 行，扫 1 份）
+want=crates/sample/invariants/01-前置样本类.md:6 I-1.2：状态写「未实现」，没写「前置：」
+want=crates/sample/invariants/01-前置样本类.md:7 I-1.3：前置「树的种类」里一个编号都没有
+want=crates/sample/invariants/01-前置样本类.md:8 I-1.4：前置 C901 都已经满足，状态仍写「未实现」
+want=crates/sample/invariants/01-前置样本类.md:9 I-1.5：前置 C999 指不到：checks-owed.md 两张表里都没有这一行
+want=crates/sample/invariants/01-前置样本类.md:10 I-1.6：前置 D350 已定项 1 都已经满足，状态仍写「未实现」
+want=crates/sample/invariants/01-前置样本类.md:11 I-1.7：前置 D350 只写了决策号，要写到分项
+want=crates/sample/invariants/01-前置样本类.md:12 I-1.8：前置 E351 都已经满足，状态仍写「未实现」
+want=crates/sample/invariants/01-前置样本类.md:13 I-1.9：前置 D350 未定项 9 指不到：.claude/kb/decisions/350-样本决策.md 的「### 未定项」索引里没有第 9 行
+want=  invariant-prerequisites：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（invariant-prerequisites）

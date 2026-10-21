@@ -7,6 +7,10 @@
   rerun-failed-tests.py <cargo test 的日志> -p <包名>      # 每个有失败的测试目标一行命令，打到 stdout
   rerun-failed-tests.py --selftest
 打印出来的命令交给调用方经 Bash 起（加内存包装、线程上限照派发提示），重型测试闸看得见它；脚本里起就绕过了闸。
+每条命令开头带范围声明（.claude/hooks/run-scope-guard.sh 文件头的写法）：
+  SINGLEFS_RUN_SCOPE='种类=target; 跑什么=<包> <挑目标的参数> 里上一趟红的用例; 范围=<N> 个测试; 为什么=只重跑 <日志文件名> 里红的这 <N> 条用例，修完看它们转绿，不整份重跑'
+  N 是那一条 `--exact` 后面点名的用例数；日志文件名里的 ; 与 = 换成 _（声明按 ; 与 = 切段）。包内存包装时声明照样写在整条命令开头
+  （`SINGLEFS_RUN_SCOPE='…' bash scripts/hosts/run-with-memory-cap.sh <上限> cargo test …`），范围声明闸把外面的声明带进包装里面那一条。
 认的段头：`Running tests/<目标>.rs (…)` → `--test <目标>`；`Running unittests src/lib.rs (…)` → `--lib`；
 `Running unittests src/bin/<名>.rs (…)` → `--bin <名>`；`Doc-tests` 段不认（文档测试按名字重跑不了），有失败就判红要人看。
 完整性闸：每一段收到的 `test <名> ... FAILED` 条数要等于那一段 `test result:` 行报的 failed 数，对不上判红、stdout 不出命令。
@@ -18,6 +22,8 @@
   own-failed-line  回到自己的正则 `^test (\\S+) \\.\\.\\. FAILED`，不经 lib_libtest_result_lines.py（认不了「 - should panic」）
     「should panic 的失败用例按全名重跑」
   lib_libtest_result_lines.py 的 LIBTEST_RESULT_LINES_BREAK=should-panic-in-name 同样让「should panic 的失败用例按全名重跑」判错。
+  scope-dropped    打出的命令不带范围声明（改前的写法）
+    「打出的每条命令开头带范围声明、范围声明闸照子 agent 判放行」
 """
 import os
 import re
@@ -35,6 +41,8 @@ SECTION_HEADER = re.compile(r"^\s*Running (?:unittests )?(\S+?\.rs) \(")
 DOCTEST_HEADER = re.compile(r"^\s*Doc-tests (\S+)")
 OWN_FAILED_LINE = re.compile(r"^test (\S+) \.\.\. FAILED\s*$")   # 只给弄坏开关 own-failed-line 用：改前自己的那一份
 BREAK_VARIABLE = "RERUN_FAILED_TESTS_BREAK"
+SCOPE_VARIABLE = "SINGLEFS_RUN_SCOPE"
+RUN_SCOPE_GUARD = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", ".claude", "hooks", "run-scope-guard.sh")
 _LIBTEST_SPECIFICATION = importlib.util.spec_from_file_location(
     "lib_libtest_result_lines_for_rerun_failed_tests", os.path.join(os.path.dirname(os.path.realpath(__file__)), "lib_libtest_result_lines.py"))
 libtest_result_lines = importlib.util.module_from_spec(_LIBTEST_SPECIFICATION)
@@ -102,9 +110,43 @@ def failed_tests_by_target(log_text):
     return commands, problems
 
 
-def command_lines(commands, package):
+def scope_declaration(selector, names, package, log_path):
+    """一条重跑命令开头的范围声明（种类 target，范围是 --exact 点名的用例数）。"""
+    log_name = re.sub(r"[;=]", "_", os.path.basename(log_path)) if log_path else "上一趟日志"
+    value = (f"种类=target; 跑什么={package} {' '.join(selector)} 里上一趟红的用例; 范围={len(names)} 个测试; "
+             f"为什么=只重跑 {log_name} 里红的这 {len(names)} 条用例，修完看它们转绿，不整份重跑")
+    return f"{SCOPE_VARIABLE}={shlex.quote(value)}"
+
+
+def cargo_command_line(selector, names, package):
     # 一律带 --include-ignored：红的若是标了 #[ignore] 的慢档用例，不带它 libtest 会把点名的那几条直接跳过，看着跑了、其实一条没跑
-    return [shlex.join(["cargo", "test", "-p", package, *selector, "--", "--include-ignored", "--exact", *names]) for selector, names in commands]
+    return shlex.join(["cargo", "test", "-p", package, *selector, "--", "--include-ignored", "--exact", *names])
+
+
+def command_lines(commands, package, log_path=None):
+    if os.environ.get(BREAK_VARIABLE) == "scope-dropped":
+        return [cargo_command_line(selector, names, package) for selector, names in commands]
+    return [f"{scope_declaration(selector, names, package, log_path)} {cargo_command_line(selector, names, package)}" for selector, names in commands]
+
+
+def without_declaration(line):
+    """去掉开头的范围声明，交 cargo 那一截（自证比命令用）。"""
+    words = shlex.split(line)
+    if words and words[0].startswith(SCOPE_VARIABLE + "="):
+        words = words[1:]
+    return shlex.join(words)
+
+
+def run_scope_guard_exit(command, detections):
+    """把一条命令当子 agent（implementation-writer）的 Bash 喂给范围声明闸，交退出码。"""
+    import json
+    import subprocess
+    hook_input = {"tool_name": "Bash", "cwd": os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+                  "agent_type": "implementation-writer", "tool_input": {"command": command}}
+    environment = {key: value for key, value in os.environ.items() if key not in (SCOPE_VARIABLE, "RUN_SCOPE_GUARD_BREAK")}
+    environment["AGENT_HOOK_DETECTIONS"] = detections
+    finished = subprocess.run(["bash", RUN_SCOPE_GUARD], input=json.dumps(hook_input), capture_output=True, text=True, env=environment, timeout=60)
+    return finished.returncode
 
 
 def run(log_path, package):
@@ -119,7 +161,7 @@ def run(log_path, package):
     if not commands:
         print("  没有失败的用例：不用重跑", file=sys.stderr)
         return 0
-    for line in command_lines(commands, package):
+    for line in command_lines(commands, package, log_path):
         print(line)
     print(f"  ✓ {sum(len(names) for _, names in commands)} 条失败的用例，分在 {len(commands)} 个测试目标里", file=sys.stderr)
     return 0
@@ -141,11 +183,20 @@ def selftest():
     ])
     failures = []
     commands, problems = failed_tests_by_target(sample)
-    lines = command_lines(commands, "sample")
+    lines = command_lines(commands, "sample", "/tmp/harness;run=1.log")
     expected = ["cargo test -p sample --test alpha -- --include-ignored --exact alpha_two",
                 "cargo test -p sample --lib -- --include-ignored --exact module::inner_case module::other_case"]
-    if problems or lines != expected:
+    if problems or [without_declaration(line) for line in lines] != expected:
         failures.append(f"按段取失败用例：期望 {expected}，实际 {lines}，问题 {problems}")
+    with tempfile.TemporaryDirectory() as directory:
+        detections = os.path.join(directory, "detections.jsonl")
+        declared = [line.startswith(SCOPE_VARIABLE + "=") for line in lines]
+        verdicts = [run_scope_guard_exit(line, detections) for line in lines]
+        if not lines or not all(declared) or verdicts != [0] * len(lines):
+            failures.append(f"打出的每条命令开头带范围声明、范围声明闸照子 agent 判放行：开头带声明 {declared}，闸的退出码 {verdicts}，命令 {lines}")
+        bare = [run_scope_guard_exit(command, detections) for command in expected]
+        if bare != [2] * len(expected):
+            failures.append(f"不带声明的同一条命令范围声明闸拒（退 2）：实际退出码 {bare}；闸不判这种命令时上一格证不出什么")
     truncated = sample.rsplit("\n", 1)[0]
     _commands, problems = failed_tests_by_target(truncated)
     if not any("没有 test result" in problem for problem in problems):
@@ -161,7 +212,7 @@ def selftest():
         "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out",
     ])
     commands, problems = failed_tests_by_target(should_panic)
-    lines = command_lines(commands, "sample")
+    lines = [without_declaration(line) for line in command_lines(commands, "sample")]
     expected = ["cargo test -p sample --lib -- --include-ignored --exact tests::answer_panics"]
     if problems or lines != expected:
         failures.append(f"should panic 的失败用例按全名重跑：期望 {expected}，实际 {lines}，问题 {problems}")
@@ -176,7 +227,7 @@ def selftest():
             print(f"  ✗ rerun-failed-tests 自检：{failure}")  # gate-lint:detail
         print(f"     → 看 failed_tests_by_target() 的分段与条数核对；{BREAK_VARIABLE} 设着的话这里本来就该红")
         return 1
-    print("  ✓ rerun-failed-tests 自检通过（5 格：按段分目标、缺 test result、条数对不上、should panic 的按全名重跑、没有失败）")
+    print("  ✓ rerun-failed-tests 自检通过（7 格：按段分目标、打出的命令带范围声明且闸放行、不带声明闸拒、缺 test result、条数对不上、should panic 的按全名重跑、没有失败）")
     return 0
 
 

@@ -4,8 +4,8 @@
 #   （②③④ 与 ① 都变），而全量对每个域从最小的 N 起逐个 N 穷举到界（装置 crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs 里
 #   for size in domain.smallest_size()..=largest_size 那一层），更小的输入要是也红，它已经是红例账里自己的一行、照样钉在这张表里。
 # 行只由 scripts/experiments/e165-pin-red-examples.py <红例账…> 追加（写前复核这份文件没被别人改过，已钉的不重复），不手改；整行抄之前钉的八段旧行与钉档之前钉的二十一段行用它的 --backfill 补（按 ⑤ 回账里取原行、回同一趟的 kill-bounds 产物取档）；
-# E165 第二段驱动 scripts/experiments/e165-replay-mutation-kill-bounds.sh 写完红例账之后当场调它。
-# 门禁 checker-tier-formal-verification 的两格判这张表：pinned-red-examples-complete（research/results/e165-*-red-examples.tsv 每一行都钉着）、
+# E165 第二段驱动 scripts/experiments/e165-replay-mutation-kill-bounds.sh 写完一对红例账与 kill-bounds 产物之后当场照追加用法调它，再 --check 同一对判钉全（驱动文件头「钉红例」一段）。
+# 门禁 checker-tier-formal-verification 的两格判这张表：pinned-red-examples-table（只判这张表自己：22 段、①、抄来的段、㉒ 的写法、⑥ 的变异还在；不读红例账与产物）、
 # pinned-red-examples-replay（⑥ 的变异还在；装置 e165_replay_bounded_enumeration --pinned-cases <块表> <㉒> 按档分组逐行打的结果与 ⑦ 逐字节相同）。
 # 二十二段，制表符分隔：前八段是这张表自己的，⑨–㉑ 是红例账出红的那一行原样（红例账一行十三段），⑨–㉑ 用制表符接起来与账那一行逐字节相同，㉒ 是档：
 #   ① 输入指纹：sha256(<域>|<N>|<原实现逐态行里 state= 的值，截到 ;first= 之前>) 的十六进制

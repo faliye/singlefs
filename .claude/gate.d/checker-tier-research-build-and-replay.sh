@@ -78,7 +78,7 @@
 #     --item 给几次取并集，timing 与 SLOW 也照跑；成功行写明只跑了点名的几个，不是整格结论；实验号不在表里退 2
 #   bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check mutation-tables-compile [项目根]  只跑变异表只编译那一格
 #
-# 样本：fixtures/checker-tier-research-build-and-replay.sh/ 下十五份，各放 .gate-cells 只点名它判的那一格：
+# 样本：fixtures/checker-tier-research-build-and-replay.sh/ 下十八份，各放 .gate-cells 只点名它判的那一格：
 #   research-unit-tests-red    research 工作区里有一条单测红着的小仓，判红
 #   research-unit-tests-green  一条单测全绿、scripts/ 下一份脚本都没有，判绿，成功行报一个测试批次
 #   green                      带假 replay.sh 的小仓，表里一行快的 exact、一行 SLOW 里的 exact、一行 SLOW 里只有 timing 的；
@@ -100,6 +100,11 @@
 #   research-unit-tests-plan-exit-red  按条复用失灵：同 research-unit-tests-green 的小仓，样本根放 .unit-verdict-sample/plan-failure 写 exit-1（test-plan 退 1），
 #                              照旧全部现判、单测都过，判红、点名 test-plan 退 1
 #   research-unit-tests-plan-sentinel-red  同形，写 sentinel-reuse-failed（test-plan 的复用哨兵报复用失灵），判红、点名哨兵那一句
+#   research-unit-tests-archived-not-run  research 小工作区（一个 lib、两条单测，setup.sh git init、没有上一版），一条单测往标准输出写一行
+#                              NOT_RUN_ARCHIVED_PRODUCT test=lib::tests::<它自己> reason=…（读不到留存产物）：这一格判绿、那一条报本次未跑、不记库（RECORD recorded=1）
+#   research-unit-tests-archived-not-run-unmatched-red  同形，那一行的 test= 写成计划里没有的名字：判红、点名对不上的那一条
+#   experiment-replay-inputs-not-run  带假 replay.sh 的小仓：打两行本次未跑与 REPLAY_TOTAL（not_run=2、load_skipped=0）后退 77，
+#                              这一格报「输入不在 2 行」「复跑整趟本次不判（要读的产物全不在）」、整道退 77
 #   mutation-tables-compile 的样本里按条判定库与编译目录都是这一格自己的临时目录，跑完删；run-twice 那两份第二趟读第一趟记的。mutation-tables-compile 四份要真 cargo（经 mutate.sh cargo check 一个小 bin）；
 #   research-unit-tests-unit-key 的判定库在样本自己的 git common-dir 里（setup.sh git init），跑完随临时目录删；
 #   wallclock-asserts-registered 两份只读样本里的 .rs，不起 cargo。
@@ -116,6 +121,11 @@
 #       「登记了却跑了：--skip 没生效」。样本档里 research-unit-tests 两份样本的小仓没有登记位，登记数是 0、没有 --skip 可丢，看不出这一项，样本上证不了红；只靠真仓真跑：
 #       SINGLEFS_HEAVY_TESTS=commit RESEARCH_BUILD_AND_REPLAY_BREAK=skip-filter-dropped bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests
 #       必须退 1、输出里有「登记了却跑了」。wallclock-asserts-registered 格不起 cargo，不受影响。
+#   archived-not-run-ignored  research-unit-tests 不认单测写的 NOT_RUN_ARCHIVED_PRODUCT 行（改前的样子）：读不到留存产物的那一条照判绿记库
+#       research-unit-tests-archived-not-run（输出里找不到「! 本次未跑：lib::tests::reads_an_archived_product_that_is_not_there」，实得 RECORD recorded=2）、
+#       research-unit-tests-archived-not-run-unmatched-red（期望退 1，实得退 0）
+#   replay-not-run-uncounted  experiment-replay 不读 REPLAY_TOTAL 的 not_run=（改前的样子）：输入不在的行不进本次未跑的数，整趟退 77 照说负载高
+#       experiment-replay-inputs-not-run（输出里找不到「复跑整趟本次不判（要读的产物全不在）」）
 #   replay-reuse-unreported  experiment-replay 不读 replay.sh 的 REPLAY_TOTAL 行，复用数不报（改前的样子）
 #       experiment-replay-reused（输出里找不到「复跑：现判 1 行、复用 2 行、拒算 0 行、本次未跑 1 行」）
 #   row-key-with-product-name  experiment-replay 给 replay.sh 设 ADMISSION_BREAK=row-key-with-product-name：复跑表每一行的行键另加产物文件名（改名就作废）。
@@ -464,6 +474,28 @@ cell_research_unit_tests() {
     echo "               登记名是不是被别的写法拼错；--skip 是子串匹配，函数名要和登记的一字不差。"
     exit 1
   fi
+  # 研究单测读不到别的实验的产物、拿来当期望值的留存产物时打的本次未跑行（scripts/experiments/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER：
+  # 「NOT_RUN_ARCHIVED_PRODUCT test=<目标根文件名去掉 .rs>::<libtest 全名> reason=<一句>」）：那几条 libtest 照判 ok，这里逐条报本次未跑、不记库；
+  # 按条复用算得出时，test= 对不上计划里任何一条判红（名字写错的那一条会被当成判过的绿记进库）。弄坏开关 archived-not-run-ignored：不认这一种行（改前的样子）
+  local archived_not_run=() archived_unmatched=() marker_test marker_reason plan_name
+  if ! research_build_broken archived-not-run-ignored; then
+    while IFS=$'\t' read -r marker_test marker_reason; do
+      [[ -n "$marker_test" ]] || continue
+      archived_not_run+=("$marker_test")
+      if ((plan_ok)); then
+        plan_name="$(awk -F'\t' -v name="$marker_test" 'NF >= 8 { root = $6; sub(/^.*\//, "", root); sub(/\.rs$/, "", root); if (root "::" $7 == name) print $2 }' "$scratch/plan.out")"
+        if [[ -n "$plan_name" ]]; then printf '%s\n' "$plan_name" >>"$scratch/wallclock.names"; else archived_unmatched+=("$marker_test"); fi
+      fi
+      echo "  ! 本次未跑：$marker_test（$marker_reason）"
+      if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "$STAGE_NAME 的 research-unit-tests 格：$marker_test 读不到留存产物，本次未跑" >> "$GATE_NOT_RUN_FILE"; fi
+    done < <(archived_product_not_run_lines "$output_file")
+  fi
+  if ((${#archived_unmatched[@]})); then
+    echo "  ✗ 本次未跑行点名的 ${#archived_unmatched[@]} 条用例（${archived_unmatched[*]}）在按条复用的计划里找不到：名字写错的那一条会被当成判过的绿记进库"
+    echo "     → 怎么办：调用处给的用例名写成 <目标根文件名去掉 .rs>::<libtest 全名>（例 e134_map_key_slot_baselines::tests::<函数名>，写法见 scripts/experiments/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER），"
+    echo "               改完只跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests"
+    exit 1
+  fi
   ((plan_ok)) && research_unit_tests_record "$scratch" "$output_file" "$scratch/wallclock.names"
   if ((unit_plan_red)); then
     echo "  ✗ research-unit-tests 这一格判红：单测按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）；这一趟照旧全部现判跑完、$b 个测试批次共 $n 个单测都过了"
@@ -476,8 +508,10 @@ cell_research_unit_tests() {
     if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "$STAGE_NAME 的 research-unit-tests 格：挂钟断言 $name 本次未跑" >> "$GATE_NOT_RUN_FILE"; fi
     joined+="${joined:+、}$name"
   done
-  local unit_counts="单测按条：现判 ${unit_plan_judge}、复用 ${unit_plan_reuse}、拒算 ${unit_plan_refused}、本次未跑 ${#skipped_wallclock[@]}"
-  ((plan_ok)) || unit_counts="单测按条复用算不出，全部现判、本次未跑 ${#skipped_wallclock[@]}"
+  local not_run_total=$(( ${#skipped_wallclock[@]} + ${#archived_not_run[@]} ))
+  local unit_counts="单测按条：现判 ${unit_plan_judge}、复用 ${unit_plan_reuse}、拒算 ${unit_plan_refused}、本次未跑 ${not_run_total}"
+  ((plan_ok)) || unit_counts="单测按条复用算不出，全部现判、本次未跑 ${not_run_total}"
+  ((${#archived_not_run[@]})) && unit_counts+="；读不到留存产物本次未跑 ${#archived_not_run[@]} 条（上面逐条列名），它们不记为绿"
   if ((${#skipped_wallclock[@]})); then
     echo "  ✓ research 构建与单测全绿：$b 个测试批次、共 $n 个单测（${unit_counts}）；跳过挂钟断言 ${#skipped_wallclock[@]} 条（$joined），它们本次未跑，不记为绿"
   else
@@ -508,7 +542,7 @@ cell_wallclock_asserts_registered() {
 # ── experiment-replay ──
 # replay.sh 退 0 往下走；退 77（整趟全是本次不判的计时行：负载过高，它自己的汇总里有逐行说明）认成本次未跑，这一格退 77；别的退出码判红
 run_replay() {
-  local replay_rc replay_log replay_total judged reused refused archived_run_only load_skipped
+  local replay_rc replay_log replay_total judged reused refused archived_run_only load_skipped inputs_not_run
   local -a break_setting=()
   # 弄坏开关 row-key-with-product-name（文件头）：交给 replay.sh 起的 admission.py（ADMISSION_BREAK），行键另加产物文件名
   research_build_broken row-key-with-product-name && break_setting=(ADMISSION_BREAK=row-key-with-product-name)
@@ -524,15 +558,23 @@ run_replay() {
     refused="$(sed -n 's/.* refused=\([0-9]*\).*/\1/p' <<<"$replay_total")"
     archived_run_only="$(sed -n 's/.* archived_run_only=\([0-9]*\).*/\1/p' <<<"$replay_total")"
     load_skipped="$(sed -n 's/.* load_skipped=\([0-9]*\).*/\1/p' <<<"$replay_total")"
-    echo "  · 复跑：现判 ${judged:-取不出} 行、复用 ${reused:-取不出} 行、拒算 ${refused:-取不出} 行、本次未跑 $(( ${archived_run_only:-0} + ${load_skipped:-0} )) 行（已归档只跑不比 ${archived_run_only:-取不出} 行、负载高没判 ${load_skipped:-取不出} 行；replay.sh 按行复用：键相同、判过的那一行不跑，见它文件头「按行复用」）"
+    # not_run=：装置或驱动读不到别的实验的产物、当期望值的留存产物，那一行记本次未跑（replay.sh 文件头「本次未跑」）；弄坏开关 replay-not-run-uncounted 不读它（改前的样子）
+    inputs_not_run=""
+    research_build_broken replay-not-run-uncounted || inputs_not_run="$(sed -n 's/.* not_run=\([0-9]*\).*/\1/p' <<<"$replay_total")"
+    echo "  · 复跑：现判 ${judged:-取不出} 行、复用 ${reused:-取不出} 行、拒算 ${refused:-取不出} 行、本次未跑 $(( ${archived_run_only:-0} + ${load_skipped:-0} + ${inputs_not_run:-0} )) 行（已归档只跑不比 ${archived_run_only:-取不出} 行、负载高没判 ${load_skipped:-取不出} 行、输入不在 ${inputs_not_run:-取不出} 行；replay.sh 按行复用：键相同、判过的那一行不跑，见它文件头「按行复用」）"
   elif ! research_build_broken replay-reuse-unreported; then
     echo "  ! 复跑：复用数取不出（replay.sh 没打 REPLAY_TOTAL 行），这一趟现判几行、复用几行这一格报不出"
   fi
   case "$replay_rc" in
     0) return 0 ;;
     77)
-      echo "  ! 复跑整趟本次不判（负载高）：replay.sh 退 77，判的全是本次不判的行，一行都没比；不算通过也不算红"
-      if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "$STAGE_NAME 的 experiment-replay 格：复跑整趟本次不判（负载高）" >> "$GATE_NOT_RUN_FILE"; fi
+      # replay.sh 退 77：整趟没有一行判得了，判的全是负载高本次不判的行与输入不在本次未跑的行（它文件头「本次未跑」末句）；照 REPLAY_TOTAL 说是哪一种
+      local why_not_judged="负载高"
+      if [[ "${inputs_not_run:-0}" != 0 && "${load_skipped:-0}" == 0 ]]; then why_not_judged="要读的产物全不在"
+      elif [[ "${inputs_not_run:-0}" != 0 ]]; then why_not_judged="负载高 ${load_skipped} 行、要读的产物不在 ${inputs_not_run} 行"
+      fi
+      echo "  ! 复跑整趟本次不判（${why_not_judged}）：replay.sh 退 77，一行都没比；不算通过也不算红"
+      if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "$STAGE_NAME 的 experiment-replay 格：复跑整趟本次不判（${why_not_judged}）" >> "$GATE_NOT_RUN_FILE"; fi
       exit 77 ;;
     *) exit 1 ;;
   esac
@@ -585,6 +627,25 @@ cell_experiment_replay() {
 
 # ── mutation-tables-compile ──
 research_build_broken() { [[ ",${RESEARCH_BUILD_AND_REPLAY_BREAK:-}," == *",$1,"* ]]; }
+
+# archived_product_not_run_lines <cargo test 的输出>：每一处 NOT_RUN_ARCHIVED_PRODUCT（单测直接写标准输出，不带 --nocapture 也在；
+# 可能跟在「test <名> ... 」后面，按子串找），一处一行「<test= 的值><TAB><reason= 之后的整句>」
+archived_product_not_run_lines() {
+  awk '{
+    rest = $0
+    while ((at = index(rest, "NOT_RUN_ARCHIVED_PRODUCT test=")) > 0) {
+      rest = substr(rest, at + length("NOT_RUN_ARCHIVED_PRODUCT test="))
+      space = index(rest, " ")
+      name = (space > 0) ? substr(rest, 1, space - 1) : rest
+      reason = ""
+      if (match(rest, / reason=/)) reason = substr(rest, RSTART + 8)
+      following = index(reason, "NOT_RUN_ARCHIVED_PRODUCT ")
+      if (following > 0) reason = substr(reason, 1, following - 1)
+      sub(/[[:space:]]+$/, "", reason)
+      print name "\t" reason
+    }
+  }' "$1"
+}
 
 # mutation_counts_of_log <mutate.sh 的输出>：它末尾「计数：」那一行里的现判、复用、拒算条数，打成「<现判> <复用> <拒算>」；取不出打空串
 mutation_counts_of_log() {

@@ -30,7 +30,7 @@
 | **编号的简称** | kb 里由 doc-lint、kb 之外的 D / E 编号由共享 `gate.sh` 的「编号与简称」阶段判（引用与登记位要逐字一致）；C / I 编号在 kb 之外没有检查 | 简称里含旧名的编号全仓一起改，kb 之外的 C / I 引用要手工全仓搜；**历史类文件里的引用也要改** |
 | **简称的宽度上限 48** | doc-lint | 新名比旧名长时可能撞上限，要当场缩简称并全仓同步 |
 | **文件名与指向它的链接** | 共享 `gate.sh` 的「链接指向」阶段 | 文件名含旧名的，按本规则「怎么做」那一节搬 |
-| **决策分项清单** | 门禁 doc-decisions 的 kb-shape、decision-items-sync 两格 | 跑 `bash .claude/gate.d/doc-decisions.sh --write` 重新生成 |
+| **决策分项清单** | 门禁 doc-decisions 的 kb-shape、decision-items-sync 两格 | 跑 `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync` 重新生成 |
 | **实验页的「影响的决策」回看** | 门禁 doc-experiments 的 decision-links 格 | 纯改名也触发：逐行回看、写当天日期与「不受影响：改名只动措辞，结论、数与产物不变」 |
 
 **留存产物分两类，别一把梭**：装置源码在树里、`replay.sh` 判 `exact` 的产物，跟着源码一起换名，换完复跑必须仍然逐字节相同；已归档、要虚机或真设备、别人的产物，一个字节都不许动，连同引它的正文整段留旧名，并登记进 `.claude/term-rename-exempt`。引它的文件名本身不用登记：`scripts/kb/sweep-term.py` 把文件名形态、历史里 `research/results/` 下出现过而树里没有的串当已归档产物的名字，不换也不报；改名时把这类串一起换掉了的，换回旧名，门禁 doc-experiments 的 results-cited 格才在历史里找得到。分不清两类时看一句话：**这份产物跑得出来吗**。跑不出来就不许改它，也不许改引它的那一行。

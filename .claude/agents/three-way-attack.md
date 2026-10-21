@@ -33,7 +33,7 @@ required-inputs: 禁读清单, 草稿目录, 背景材料, 攻击面
    - 盘用内存稀疏盘（`crates/singlefs-harness/src/memory_pool.rs` 的 `SparseBlockDevice`），不在磁盘上建镜像文件；每个起点状态只建一次池（mkfs 与起点历史只跑一次），之后每段历史从内存里那一份拷（`SparseDevice`、`MemoryPool` 都能 `clone`）。
    - 正式跑之前先跑一小段，按它估全量的挂钟；估出来超过 40 分钟，先缩历史、候选与几何的取样，报告里写明缩了什么、缩前缩后各多少、估时怎么算的。
    - 崩溃状态不在缩的范围里（共用约束「不做」一节「崩溃点测试准确率和正确率优先，其次再衡量时间成本」那一条），照崩溃点重放的枚举域取：调 `crates/singlefs-checker-tier/src/crash_state_enumeration.rs` 里每一段都展开的 `enumerate_crash_states` / `enumerate_crash_states_versions`（录制写流，屏障与 FUA 切段，段内写的整写子集逐个枚举，不是只截前缀），每个崩溃状态恢复之后都跑 checker。缩只缩历史条数与长度、候选与几何的取样；留下的每段历史，它的崩溃状态一个不落。
-   - 在自己的原型里这样调枚举函数跑小流不算重型：原型里的流只许在原型里自己造，不从崩溃枚举用例（`crates/singlefs-checker-tier/tests/crash_enumeration_*.rs` 这一类）里拷（拷文件、拷代码段、`include!`、`mod` 引进来都算拷）；测试目标不放进 checker 档包 `singlefs-checker-tier`（`heavy-test-guard.sh` 按包判，跑到这个包的测试就拒）；每次跑之前用 `crates/singlefs-checker-tier/src/crash.rs` 的 `crash_state_count_with_torn_in_place_overwrites`（写表里没有原地覆写时它等于 `closed_form_state_count`） 算出这一次全量的状态数，不超过约 10⁶ 个（几段历史合起来超过的，分几次跑）；这一条腿与接手它的腿全部原型跑的全量合起来不超过约 10⁷ 个状态（接手的腿从交接摘要里取前面的腿已跑的量）。一段历史自己就超过约 10⁶ 的，那段不跑；再跑就要越过约 10⁷ 的，剩下的不跑；两样都写进报告交主 agent。
+   - 在自己的原型里这样调枚举函数跑小流不算重型：调枚举函数的原型只 `cargo build`，经内存包装直接执行编出来的二进制（不 `cargo run`、不 `cargo test`）；原型里的流只许在原型里自己造，不从崩溃枚举用例（`crates/singlefs-checker-tier/tests/crash_enumeration_*.rs` 这一类）里拷（拷文件、拷代码段、`include!`、`mod` 引进来都算拷）；测试目标不放进 checker 档包 `singlefs-checker-tier`（`heavy-test-guard.sh` 按包判，跑到这个包的测试就拒）；每次跑之前用 `crates/singlefs-checker-tier/src/crash.rs` 的 `crash_state_count_with_torn_in_place_overwrites`（写表里没有原地覆写时它等于 `closed_form_state_count`） 算出这一次全量的状态数，不超过约 10⁶ 个（几段历史合起来超过的，分几次跑）；这一条腿与接手它的腿全部原型跑的全量合起来不超过约 10⁷ 个状态（接手的腿从交接摘要里取前面的腿已跑的量）。一段历史自己就超过约 10⁶ 的，那段不跑；再跑就要越过约 10⁷ 的，剩下的不跑；两样都写进报告交主 agent。
    - 随机跑批分小批：每批的段数按先跑一小段估出的时长定，不给批设限时（包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`、外面套 `timeout` 都不用）；每批的段数与估时写进报告。
 3c. 内存与进程：
    - 编译与跑都经内存包装：跑的照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条，`cargo build` 也经它（`bash scripts/hosts/run-with-memory-cap.sh <上限> cargo build …`）。
@@ -50,7 +50,7 @@ required-inputs: 禁读清单, 草稿目录, 背景材料, 攻击面
 
 ## 写范围
 
-- 报告文件、模型目录、草稿目录。除此之外不写。冻结副本（主 agent 建的开工快照、`~/.local/share/singlefs/work/<轮>-frozen/` 这类）只读：要改、要编译先拷进自己的草稿目录。要改代码试的，把仓拷到草稿目录（`rsync -a --exclude target --exclude .git`），只在副本上改；副本与自己的模型可以编译、跑（`cargo test -p <crate> --test <目标>`、`cargo run`，经内存包装、照共用约束看负载与线程上限；重型测试照样不跑），副本上的数注明是副本。
+- 报告文件、模型目录、草稿目录。除此之外不写。冻结副本（主 agent 建的开工快照、`~/.local/share/singlefs/work/<轮>-frozen/` 这类）只读：要改、要编译先拷进自己的草稿目录。要改代码试的，把仓拷到草稿目录（`rsync -a --exclude target --exclude .git`），只在副本上改；副本与自己的模型可以编译、跑（`SINGLEFS_RUN_SCOPE='种类=target; 跑什么=<crate> 的测试目标 <目标>; 范围=1 个测试目标; 为什么=…' cargo test -p <crate> --test <目标>`、`cargo run`，例子只写了声明片段，完整拼法（声明在前、包装在后）照 `.claude/agent-common.md`「跑编译出来的代码经内存包装」那一条；调枚举函数的原型照第 3b 步只 `cargo build` 再直接执行编出来的二进制；经内存包装、照共用约束看负载与线程上限；重型测试照样不跑），副本上的数注明是副本。
 
 ## 产出
 

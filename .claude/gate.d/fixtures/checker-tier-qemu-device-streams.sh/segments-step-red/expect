@@ -1,7 +1,7 @@
 exit=1
-want=虚机跑 direct 的段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致
+want=虚机跑 direct 的段序列（path=mkfs 之外那几行）与布局表八登记的不一致
 want=> E7RESULT name=segments path=transaction operations=35 segments=23+2+1+2 closed_form=16777223
 want=< E7RESULT name=segments path=transaction operations=35 segments=24+2+1+2 closed_form=16777223
-want=对照 research/results/e142-trimmed.out 与虚机输出 path=mkfs 之外的 name=segments 行
+want=对照 .claude/kb/layout/01-first-txn.md「八、」path= 那几处的登记（scripts/crash/check-segment-registry.py --print-segments-lines 打的，上面「<」）与虚机输出（「>」）
 want=device-streams：红（退出 1）
 want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

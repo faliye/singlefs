@@ -12,6 +12,8 @@
 #   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_quiesce_left 报过之后置 0）；peer_host_toolchain_text（peer_host_compare_toolchains 设）；
 #   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）；
 #   peer_host_shared_target_prefix（peer_host_shared_target_prefix_for 设：第二台共用编译目录的守卫，接在第二台那条命令最前面）。
+# 调用方设的全局变量：PEER_HOST_WAIT_HOOK（函数名；peer_host_wait_detached 每轮询到一次 running 调它一次，不带参数，它的退出码不看；
+#   multi-host-run.sh 用它每隔一段取第二台那条命令在用几个核，scripts/hosts/core_usage.py；没设什么都不调）。
 # 只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）：「第二台」是本机上的另一个目录，命令在本机跑，
 #   环境照 ssh 那样只给最少几样（HOME、USER、LOGNAME、LANG、XDG_RUNTIME_DIR、DBUS_SESSION_BUS_ADDRESS、CARGO_HOME、RUSTUP_HOME 与 PATH），本机别的环境变量不漏过去。
 # 弄坏开关 PEER_HOST_LIB_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时调用方的自证退 1）。这一份没有自证，红在两份 source 它的脚本的 --selftest 里：
@@ -306,6 +308,7 @@ peer_host_wait_detached() { # <进程号文件> <退出码文件> <轮询秒数>
       echo "  … 第二台那一份：$poll"
       previous="$poll"
     fi
+    if [[ "$poll" == running && -n "${PEER_HOST_WAIT_HOOK:-}" ]]; then "$PEER_HOST_WAIT_HOOK" || :; fi
     [[ -n "$peer_host_detached_outcome" ]] || sleep "$poll_seconds"
   done
 }

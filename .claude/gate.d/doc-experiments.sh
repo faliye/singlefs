@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 实验页与产物（十一格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记、点名的路径找得到）
+# gate-stage: 实验页与产物（十二格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记、点名的路径找得到、跑前登记的并行与挂钟）
 # gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：未实现清单（.claude/gate-not-implemented.tsv）里的两项判被测代码的行为，这一道只判文本。
@@ -23,24 +23,35 @@
 # gate-cell: archive-past-rounds 上一轮及更早的实验记录已经归档进版本库，工作区里不留
 # gate-cell: multipath-registry 多条路径互证的实验，路径与共用项要登记且指得到
 # gate-cell: cited-paths-exist kb 全部正文点名的实验产物、变异表、实验源码路径，在树里或版本库历史里找得到
+# gate-cell: preregistration-parallelism 这次改动新建或改动的 E186 起的跑前登记有「并行与挂钟」一节，独立单位、线程、串行与为什么、预计挂钟、预计在用核数五样写全
 #
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经 lib/stage-cells.sh；每格自己打判定行（成功行报查了多少项，红行带出路）。
 #
 # 样本 fixtures/doc-experiments.sh/：每格一对 <格名>-red / <格名>-green（cited-paths-exist-green 的 setup.sh 先提交再删掉一个产物，造「只在历史里」），另有 verdict-false-named-zero（登记表一行都读不到）、
-# decision-links-formatting-green、decision-links-no-experiment-green、quoted-result-lines-history-added-red、quoted-result-lines-history-old-green、evidence-in-repo-worktree-red / -green（链接 worktree）；每份样本根的 .gate-cells 只点名它判的那一格。
+# decision-links-formatting-green、decision-links-no-experiment-green、decision-links-deleted-product-green、quoted-result-lines-history-added-red、quoted-result-lines-history-old-green、evidence-in-repo-worktree-red / -green（链接 worktree）；每份样本根的 .gate-cells 只点名它判的那一格。
 # 各样本放了什么写在那一格的注释里。
+# 按编号取实验页的四份（实验页有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的索引与产物取中文原文，判法 lib-item-ref-status.py 的 numbered_files）：
+# index-sync-translation-green / -red（索引结论列的数在中文原文里、译文里没有 / 只在英语译文里有），
+# verdict-false-named-translation-green（E174 的中文原文没有「## 历史版本」、正文点了 false 字段的名，两份译文排在前面：绿；改前取到 .en.md、崩在 split_page 的拆包上）、
+# verdict-false-named-no-history-red（中文原文没有历史节也没点名、英语译文点了名：红，不崩）。
 # 弄坏开关：
 #   STAGE_CELLS_BREAK=red-swallowed（共用库）                       每份红样本整道退 0，样本判错
 #   STAGE_CELLS_BREAK=marker-ignored（共用库）                      每份样本十一格全跑，汇总那条「跑了 1 格」的 want 找不到
-#   GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1                           verdict-false-named 把每个 false 字段都当成已点名：verdict-false-named-red 判错
+#   GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1                           verdict-false-named 把每个 false 字段都当成已点名：verdict-false-named-red、verdict-false-named-no-history-red 判错
+#   KB_NUMBERED_FILE_BREAK=first-match（归 lib-item-ref-status.py）  按编号取实验页不分语言、取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md）：
+#                                                                   index-sync-translation-green、verdict-false-named-translation-green（期望退出 0，实测 1）、
+#                                                                   index-sync-translation-red、verdict-false-named-no-history-red（期望退出 1，实测 0）判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-skips-whole-cell   evidence-in-repo 在链接 worktree 里整格退 77、判据二也不判：evidence-in-repo-worktree-red 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-trusts-timestamps  链接 worktree 里照信检出时写的修改时刻：evidence-in-repo-worktree-green 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=no-experiment-counted       decision-links 把依据段「无实验：」之后的 E<号>（ 也记成引用：decision-links-no-experiment-green 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=progress-mark-counted       decision-links 量索引表定案格的字数时把行末「**进度：…**」也算进去：decision-links-progress-mark-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=deleted-products-counted    decision-links 把这次改动里删掉的 research/results/e<号>… 也算「产物变了」：decision-links-deleted-product-green 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-added-lines-skipped quoted-result-lines 退回历史节整节不判：quoted-result-lines-history-added-red 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-lookup-skipped      cited-paths-exist 不查历史，树里没有的一律算缺：cited-paths-exist-green 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=existence-unchecked         cited-paths-exist 把每个点名的路径都当成在：cited-paths-exist-red 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-lines-judged        evidence-in-repo 把两份变更史里与基准版逐字相同的历史行也判：evidence-in-repo-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=parallelism-section-presence-only  preregistration-parallelism 只看有没有这一节、不看五样：preregistration-parallelism-red 里 e991、e992 那两条 want 找不到
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=parallelism-old-registrations-judged  preregistration-parallelism 号小于 186 的也判：preregistration-parallelism-green 判错（e100 被点名、退 1）
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unretained-note-ignored     cited-paths-exist 不认 kb 里某一行写明的「原件未留存 / 原始输出未留存」（那一行点名的路径别处再点名也不判）：cited-paths-exist-green 判错；
 #                                                                   results-cited 第三道同样不认它（实验页里同一行写着产物名与未留存的那个名字也算指空）
 #
@@ -56,9 +67,11 @@ STAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_REPOSITORY_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 LIB_CHANGED_PATHS="$SCRIPT_REPOSITORY_ROOT/scripts/gate/changed-paths.sh"
 ARCHIVE_SCRIPT="$SCRIPT_REPOSITORY_ROOT/scripts/kb/archive-past-rounds.py"
+# 按编号取哪一份实验页（中文引用方取中文原文，不取排在前面的译文）：index-sync、verdict-false-named 调它的 numbered_files
+LIB_ITEM_REF_STATUS="$STAGE_DIR/lib-item-ref-status.py"
 source "$STAGE_DIR/lib/stage-cells.sh"
 # 要「这次改动」的六格：选中的格里有它们之一，才去取改动范围
-CHANGE_RANGE_CELLS=" results-cited evidence-in-repo decision-links quoted-result-lines archive-past-rounds multipath-registry "
+CHANGE_RANGE_CELLS=" results-cited evidence-in-repo decision-links quoted-result-lines archive-past-rounds multipath-registry preregistration-parallelism "
 
 stage_cell index-sync cell_index_sync "实验索引行与正文标题说的是不是同一件事" \
   "以正文标题为准改 .claude/kb/experiments.md 的索引行（作废、状态词、结论列的数跟着正文），两边一一对应"
@@ -82,6 +95,8 @@ stage_cell multipath-registry cell_multipath_registry "多条路径互证的实�
   "在实验页写「### 路径与结论登记」一节（形态见 .claude/rules/format-evolution.md），源码落点写现存路径、共用项写实；multipath-registry-lag.tsv 只缩不涨，补齐的删行"
 stage_cell cited-paths-exist cell_cited_paths_exist "kb 全部正文点名的实验产物、变异表、实验源码路径，在树里或版本库历史里找得到" \
   "补回那份文件；或把那一行改成写明「原件未留存、从哪次提交取」；或改成现存的路径（移过位置的用 git log --all --diff-filter=A --name-only -- '*<文件名>' 找新路径）"
+stage_cell preregistration-parallelism cell_preregistration_parallelism "这次改动新建或改动的 E186 起的跑前登记有「并行与挂钟」一节，独立单位、线程、串行与为什么、预计挂钟、预计在用核数五样写全" \
+  "照 .claude/agents/experiment-designer.md「登记的固定节名」的「## 十四、并行与挂钟」一行在登记里补这一节，五个标签行各一行（「独立单位：」「线程：」「串行：」「预计挂钟：」「预计在用核数：」，冒号后至少 8 个字，两行预计要带数、推的写依据）"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -154,15 +169,19 @@ fi
 # 管不到：旧值以历史叙述的形态留在正文里时（「从 31.6M 抬到 31.8M」），第 3 项照样判它找得到。
 # 样本：index-sync-red 里一行正文宣告作废而索引没提、一行索引结论列的数正文里找不到、一行正文「已跑（够判）」而索引没跟、
 # 一行按子串会被「100」冒充找到的「10」；index-sync-green 里补零链接、结论整体作废两边都写了、够判两边都写了。
+# 每个实验号的正文取哪一份：lib-item-ref-status.py 的 numbered_files，索引是中文，取中文原文（只有译文的号取那份译文，缺中文原文归 doc-text 的 trilingual-files）。
+# 样本：index-sync-translation-green / -red（那个数在中文原文里 / 只在英语译文里）；弄坏开关 KB_NUMBERED_FILE_BREAK=first-match。
 cell_index_sync() {
   local IDX=.claude/kb/experiments.md
   local EXP=.claude/kb/experiments
   [[ -f "$IDX" && -d "$EXP" ]] || { echo "  ! 找不到 $IDX 或 $EXP，这一格跳过"; exit 77; }
 
-  python3 - "$IDX" "$EXP" <<'PY'
-import re, sys, glob, os
+  python3 - "$IDX" "$EXP" "$LIB_ITEM_REF_STATUS" <<'PY'
+import importlib.util, re, sys, glob, os
 
 idx_path, exp_dir = sys.argv[1], sys.argv[2]
+spec = importlib.util.spec_from_file_location("item_ref_status", sys.argv[3])
+item_ref_status = importlib.util.module_from_spec(spec); spec.loader.exec_module(item_ref_status)
 
 def unspace(s):
     for ch in (" ", " ", " "):   # 窄不换行空格、窄空格、不换行空格
@@ -170,8 +189,13 @@ def unspace(s):
     return re.sub(r"(?<=\d)[ 　](?=\d\d\d)", "", s)
 
 bodies = {}
-for p in glob.glob(os.path.join(exp_dir, "*.md")):
-    n = int(os.path.basename(p).split("-")[0])
+# 每个实验号只取一份正文：索引是中文，取中文原文（numbered_files）。改前按 glob 不排序的次序逐份覆盖，
+# 留下哪一份（中文还是哪份译文）看目录项的次序。只有译文、没有中文原文的号照旧算「有正文」（取那份译文），缺中文原文归 doc-text 的 trilingual-files
+all_pages = sorted(glob.glob(os.path.join(exp_dir, "*.md")))
+for n in sorted({int(os.path.basename(p).split("-")[0]) for p in all_pages}):
+    found = (item_ref_status.numbered_files(exp_dir, n, idx_path)
+             or [p for p in all_pages if re.match(r"0*%d-" % n, os.path.basename(p))])
+    p = found[0]
     text = open(p, encoding="utf-8").read()
     bodies[n] = (os.path.basename(p), text.splitlines()[0], unspace(text))
 
@@ -761,7 +785,7 @@ PY
 #   ④ 时效（全量）：实验最近一次变动的日期——页内历史节带日期的 ### 标题、experiments-history.md 里标题
 #      （标题没点名实验时看条目正文）点名它的条目——晚于表里某一行的回看日期，判红。
 #   ⑤ 按这次改动（这一道开头取的那一份）：
-#      实验页正文（历史版本与影响的决策两节之外）改了、或 research/results/e<号>… 的产物变了，
+#      实验页正文（历史版本与影响的决策两节之外）改了、或 research/results/e<号>… 的产物新增或改写了（删掉的不算：归档删上一轮的产物不是结论变了），
 #      这次改动要在那张表里改过至少一行；新加的三方判决 research/prompts/*-main-verification.md
 #      要有「## 回看决策」一节（同样的表，或一行「不涉及决策：理由」）；这次改动里新写成「改了」的行，
 #      它指的决策文件要在这次改动里。这次改动把实验的标题状态改成「已跑」（状态段恰好是这两个字）时，
@@ -792,6 +816,8 @@ PY
 # decision-links-progress-mark-green 的索引行去掉「**状态：已定。**」「**进度：已实现。**」之后 95 字、带上是 104 字，必须判绿；
 # 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=progress-mark-counted 下把进度标记算进字数，这份样本判红。
 # decision-links-progress-mark-red 的索引行去掉两个标记之后 101 字，照样判红在那一行（现在 101 字）。
+# decision-links-deleted-product-green 的这次改动只删了一份已提交的产物（research/results/e1-sample.out），实验页与决策表一行没动，必须判绿、
+# 报「这次改动触发回看 0 处」；弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=deleted-products-counted 下删除照旧算产物变了，判红在「没回看」。
 cell_decision_links() {
   if [[ ! -d .claude/kb/experiments || ! -d .claude/kb/decisions ]]; then
     echo "  ✗ 找不到 .claude/kb/experiments 或 .claude/kb/decisions"
@@ -1246,10 +1272,14 @@ def check_changed_rows(rel, row_lines):
 
 
 if in_git:
+    # 「产物变了」只认这次改动里新增或改写的产物：删掉的（树上已经不在）不算——归档按规则删上一轮的产物，
+    # 不是实验的结论变了，不要求回看决策表（research/ 整个可删，.claude/rules/directory-layout.md）。
+    # 判法：改动范围里的路径在被判的树上还在才算；改名的旧路径不在、新路径在，照新增算。
+    count_deleted_products = os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') == 'deleted-products-counted'
     result_hits = {}
-    for rel in changed:
+    for rel in sorted(changed):
         match = re.match(r'^research/results/e(\d+)[^0-9]', rel)
-        if match:
+        if match and (count_deleted_products or os.path.lexists(os.path.join(root, rel))):
             result_hits.setdefault(int(match.group(1)), rel)
     for number, page in sorted(experiments.items()):
         rel = page['rel']
@@ -1348,17 +1378,24 @@ PY
 #
 # 样本：verdict-false-named-red 里三个没点名的 false（一个在正文里只写字段名、一个点名的那一行标着上一次跑、一个根本没提）；
 # verdict-false-named-green 里一个在最新历史条目点名、一个实验页文件名补了零；verdict-false-named-zero 的登记表一行都读不到。
+# 实验页取哪一份：lib-item-ref-status.py 的 numbered_files，产物不带语言，取中文原文。没有「## 历史版本」的页照判正文（最新历史条目当空的）。
+# 样本：verdict-false-named-translation-green（译文排在前面、中文原文没有历史节而正文点了名，判绿）、verdict-false-named-no-history-red
+# （中文原文没有历史节也没点名、英语译文点了名，判红）；弄坏开关 KB_NUMBERED_FILE_BREAK=first-match。
 cell_verdict_false_named() {
   REPLAY=scripts/experiments/replay.sh
   [[ -f "$REPLAY" ]] || { echo "  ! 找不到 $REPLAY，这一格无对象可判"; exit 77; }
 
-  python3 - "$REPLAY" <<'PY'
+  python3 - "$REPLAY" "$LIB_ITEM_REF_STATUS" <<'PY'
 import glob
+import importlib.util
 import os
 import re
 import sys
 
 replay_path = sys.argv[1]
+item_ref_status_spec = importlib.util.spec_from_file_location('item_ref_status', sys.argv[2])
+item_ref_status = importlib.util.module_from_spec(item_ref_status_spec)
+item_ref_status_spec.loader.exec_module(item_ref_status)
 
 ROW_RE = re.compile(r'^(E[0-9]+)\|([^|]*)\|([^|]*)\|([^|]*)\|(exact|timing)$')
 rows = []
@@ -1391,7 +1428,9 @@ for exp, product in rows:
         missing_files.append((exp, product))
         continue
     checked_files += 1
-    with open(path, encoding='utf-8', errors='replace') as handle:
+    # 压成 .gz 入库的产物（超过单文件推送上限的）解压后读，判据不变
+    with (__import__('gzip').open(path, 'rt', encoding='utf-8', errors='replace') if path.endswith('.gz')
+          else open(path, encoding='utf-8', errors='replace')) as handle:
         for lineno, raw in enumerate(handle, 1):
             stripped = raw.strip()
             if not stripped.startswith(VERDICT_PREFIX):
@@ -1406,20 +1445,21 @@ for exp, product in rows:
                     false_fields.append((exp, product, lineno, field))
 
 
-def experiment_page(exp):
-    number = int(exp[1:])
-    # 实验页文件名有的补零（08-、09-），有的不补：两种都认
-    matches = sorted(set(glob.glob(os.path.join(EXP_DIR, f'{number}-*.md'))
-                         + glob.glob(os.path.join(EXP_DIR, f'{number:02d}-*.md'))))
+def experiment_page(exp, product):
+    # 实验页文件名有的补零（08-、09-），有的不补：两种都认（numbered_files）。产物不带语言，取中文原文；
+    # 改前取排序后的第一个，取到的是 <号>-<名>.en.md，那份没有「## 历史版本」，split_page 当场崩
+    matches = item_ref_status.numbered_files(EXP_DIR, int(exp[1:]), os.path.join(RESULTS_DIR, product))
     return matches[0] if matches else None
 
 
 def split_page(text):
+    """(正文, 最新那条历史条目, 它的标题行)：没有「## 历史版本」、或历史节里一个 ### 都没有的，后两样是空串。"""
     marker = '\n## 历史版本'
     idx = text.find(marker)
     body = text if idx < 0 else text[:idx]
     if idx < 0:
-        return body, ''
+        # 改前这一支只交回两样，调用方按三样拆包：没有历史节的实验页（中文原文少了这一节、或取到了译文）让整格崩在 ValueError 上
+        return body, '', ''
     tail = text[idx + len(marker):]
     head_match = re.search(r'^### .*$', tail, re.M)
     if not head_match:
@@ -1458,7 +1498,7 @@ named_count = 0
 page_cache = {}
 for exp, product, lineno, field in false_fields:
     if exp not in page_cache:
-        page_cache[exp] = experiment_page(exp)
+        page_cache[exp] = experiment_page(exp, product)
     page = page_cache[exp]
     if page is None:
         unnamed.append((exp, product, lineno, field,
@@ -1514,7 +1554,7 @@ PY
 cell_repro_command() {
   EXP_DIR=.claude/kb/experiments
   [[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，这一格跳过"; exit 77; }
-  PRODUCT_RE='research/results/[A-Za-z0-9._-]+\.out'
+  PRODUCT_RE='research/results/[A-Za-z0-9._-]+\.out(\.gz)?'
   REPRO_RE='cargo run --release --bin |scripts/(experiments/replay|devices/vm-bench)\.sh'
 
   bad=(); unreadable=(); exempt=(); pointing=0
@@ -1729,13 +1769,15 @@ if scope != '全量' and not registered:
     print('     → 怎么办：登记表是新抄的产物行唯一的对照；它挪了地方或改了格式，就同步改这一格（与 verdict-false-named 格、门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一份形状）。')
     sys.exit(1)
 
-products = sorted(glob.glob('research/results/*.out'))
+products = sorted(glob.glob('research/results/*.out') + glob.glob('research/results/*.out.gz'))
 product_lines = set()
 registered_lines = set()
 line_sources = {}
 for product in products:
     is_registered = registered is not None and os.path.basename(product) in registered
-    with open(product, encoding='utf-8', errors='ignore') as handle:
+    # 压成 .gz 入库的产物（超过单文件推送上限的）解压后读，判据不变
+    with (__import__('gzip').open(product, 'rt', encoding='utf-8', errors='ignore') if product.endswith('.gz')
+          else open(product, encoding='utf-8', errors='ignore')) as handle:
         for line in handle:
             text = line.strip().replace('\r', '')
             product_lines.add(text)
@@ -1836,9 +1878,10 @@ cell_archive_past_rounds() {
   elif python3 "$ARCHIVE_SCRIPT" --check "$ROOT"; then
     exit 0
   fi
-  echo "  ✗ 工作区里还留着上一轮及更早的实验记录（上面按目录列出份数）"
-  echo "     → 怎么办：照上面那一行打出来的基准跑 --apply 删掉（不带基准它会按 HEAD 算、把这一次提交要带的记录也删掉），"
+  echo "  ✗ 上一轮及更早的实验记录没收干净（上面 scripts/kb/archive-past-rounds.py 逐类列了红的是哪几类：工作区里还留着的上一轮记录、登记表点名而已经不在的路径、这一趟要删而被平铺登记表点名的产物）"
+  echo "     → 怎么办：还留着的上一轮记录，照上面那一行打出来的基准跑 --apply 删掉（不带基准它会按 HEAD 算、把这一次提交要带的记录也删掉），"
   echo "               它同时把别处指向这些文件的引用改成只留文件名、不留路径；删完跑共享门禁的「链接指向」阶段确认链接都还到得了。"
+  echo "               登记表指空、平铺登记表点名的那几行，同一次提交里删掉或改掉那几行登记（上面每一类自己的出路写了怎么改）。"
   exit 1
 }
 
@@ -2147,6 +2190,90 @@ if only_history:
         print(f"       {path}")
 if unretained_noted:
     print(f"     写明了原件未留存的 {len(unretained_declared)} 个路径，点名 {unretained_noted} 处不判")
+PY
+}
+
+# ── 格 preregistration-parallelism：E186 起的跑前登记有「并行与挂钟」一节，五样写全
+# 判据（.claude/agents/experiment-designer.md「登记的固定节名」的「## 十四、并行与挂钟」一行）：这次改动新建或改动的
+#   research/prompts/e<号>-preregistration.md，号不小于 PREREGISTRATION_PARALLELISM_FIRST_NUMBER（186）的，要有一节标题是「## <汉字序号>、并行与挂钟」，
+#   节里（到下一个「## 」标题为止，围栏代码块里的行不算）五个标签行各至少一行、冒号后至少 8 个字：
+#     独立单位：哪些单位互相独立            线程：分几条线程、取哪个登记值
+#     串行：哪几步因计时或共享状态必须串行与为什么（没有就写「无」并写为什么都能并行）
+#     预计挂钟：各段预计挂钟（推的写依据）  预计在用核数：各段预计在用几个核（推的写依据）
+#   标签行可带列表记号（- 或 *）与加粗（**…**），冒号全角半角都认；「预计挂钟」「预计在用核数」两行还要带一个数字。
+# 起判：号不小于 186 的才判，E185 及以前的登记不回补这一节（不设排除表：号以下的一律不判，号以上的没有例外）。
+#   重跑登记（e<号>-r<n>-prereg.md）不判：差分重跑照设计员定义只写三样、其余「同上一次登记」，这一节跟着原登记走。
+#   这次改动里一份要判的都没有：退 77（无对象可判），成功句与无对象句逐个列出号小于 186 不判的那几份。
+# 管不到：写的数对不对、装置是不是照它实现、串行的理由成不成立——靠三方与运行时的核数告警（scripts/hosts/core_usage.py）。
+# 样本：preregistration-parallelism-red（setup.sh 提交基准之后新建 e990 缺整节、e991 有节缺「串行：」一行、e992「预计在用核数：」没有数字，
+#   改 e100（号小于 186、没有这一节）不判）；preregistration-parallelism-green（新建 e993 五样写全，改 e100 不判，报「查了 1 份」）。
+# 弄坏开关见文件头 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK 的 parallelism-section-presence-only 与 parallelism-old-registrations-judged 两项。
+# 退役判据：设计员定义不再要求这一节时删掉这一格（连续几周零红不算：它只判新写的登记，零红说明新登记都写全了，不说明对象没了）。
+PREREGISTRATION_PARALLELISM_FIRST_NUMBER=186
+cell_preregistration_parallelism() {
+  ((in_git_work_tree)) || { echo "  ! $ROOT 不是 git 仓，分不出哪些登记是这次改动新建或改动的，这一格无对象可判"; exit 77; }
+  if ((! changed_paths_library_loaded || ! changed_paths_ok)); then
+    echo "  ✗ 取不到这次改动的路径（scripts/gate/changed-paths.sh 读不到，或它的 gate_changed_paths 失败）"
+    echo "     → 怎么办：看上面 changed-paths.sh 打的错误，修好再单跑这一格（bash .claude/gate.d/doc-experiments.sh --check preregistration-parallelism）"
+    exit 1
+  fi
+  python3 - "$SHARED_CHANGED_PATHS" "$PREREGISTRATION_PARALLELISM_FIRST_NUMBER" "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" <<'PY'
+import os, re, sys
+
+changed_file, first_number, broken = sys.argv[1], int(sys.argv[2]), sys.argv[3].split(",")
+NAME = re.compile(r"research/prompts/e([0-9]+)-preregistration\.md")
+HEADING = re.compile(r"^##\s+[一二三四五六七八九十百]+、并行与挂钟\s*$")
+LABELS = ("独立单位", "线程", "串行", "预计挂钟", "预计在用核数")
+LABEL_LINE = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?(独立单位|线程|串行|预计挂钟|预计在用核数)(?:\*\*)?\s*[：:]\s*(?:\*\*)?\s*(.*)$")
+NEEDS_NUMBER = ("预计挂钟", "预计在用核数")
+with open(changed_file, encoding="utf-8") as handle:
+    changed = sorted({line.strip() for line in handle if line.strip()})
+judged, old, problems = [], [], []
+for path in changed:
+    found_name = NAME.fullmatch(path)
+    if not found_name or not os.path.isfile(path):
+        continue
+    if int(found_name.group(1)) < first_number and "parallelism-old-registrations-judged" not in broken:
+        old.append(path)
+        continue
+    judged.append(path)
+    lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+    start = next((index for index, line in enumerate(lines) if HEADING.match(line)), None)
+    if start is None:
+        problems.append(f"{path}：没有「## 十四、并行与挂钟」这一节")
+        continue
+    if "parallelism-section-presence-only" in broken:
+        continue
+    end = next((index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")), len(lines))
+    labelled, in_fence = {}, False
+    for index in range(start + 1, end):
+        if lines[index].lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        found_label = None if in_fence else LABEL_LINE.match(lines[index])
+        if found_label and found_label.group(1) not in labelled:
+            labelled[found_label.group(1)] = (index + 1, found_label.group(2).strip().strip("*").strip())
+    for label in LABELS:
+        if label not in labelled:
+            problems.append(f"{path}:{start + 1}：「并行与挂钟」一节里没有「{label}：」一行")
+            continue
+        number, text = labelled[label]
+        if len(text) < 8:
+            problems.append(f"{path}:{number}：「{label}：」后面不到 8 个字（「{text}」）")
+        elif label in NEEDS_NUMBER and not re.search(r"[0-9]", text):
+            problems.append(f"{path}:{number}：「{label}：」里没有数（各段写估值，推的写依据）")
+old_text = f"；号小于 {first_number} 不判的 {len(old)} 份：{'、'.join(old)}" if old else ""
+if not judged:
+    print(f"  ! 这次改动里没有新建或改动 E{first_number} 起的跑前登记（research/prompts/e<号>-preregistration.md），这一格无对象可判{old_text}")
+    sys.exit(77)
+if problems:
+    for problem in problems:
+        print(f"  ✗ {problem}")   # gate-lint:detail
+    print(f"  ✗ 这次改动的跑前登记里 {len(problems)} 处没写全「并行与挂钟」（查了 {len(judged)} 份）")
+    print("     → 怎么办：照 .claude/agents/experiment-designer.md「登记的固定节名」的「## 十四、并行与挂钟」一行补这一节：哪些单位互相独立（独立单位：）、"
+          "分几条线程（线程：）、哪几步因计时或共享状态必须串行与为什么（串行：）、各段预计挂钟（预计挂钟：）与预计在用核数（预计在用核数：），推的写依据")
+    sys.exit(1)
+print(f"  ✓ 跑前登记的「并行与挂钟」：查了 {len(judged)} 份（{'、'.join(judged)}），五样都写全了{old_text}")
 PY
 }
 

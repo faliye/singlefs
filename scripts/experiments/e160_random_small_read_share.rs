@@ -458,6 +458,12 @@ fn declared_reads_per_second_for_byte_share(target_byte_share: RationalNumber) -
         / ((RationalNumber::one() - target_byte_share) * RationalNumber::from_integer(RANDOM_JOB_RUNTIME_SECONDS * PAGE_BYTES as i128))
 }
 
+/// 本次未跑那一行里装置的名字。
+const E160_DEVICE_NAME: &str = "e160-random-small-read-share";
+/// 丙-实测读的两份 E152 原始输出（`research/results/` 下；路径写成字面的 `concat!`，写法与为什么见 `e7_index_bench::ARCHIVED_PRODUCT_NOT_RUN_MARKER`）。
+const E152_SINGLE_DISK_INPUT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e160-e152-input-single-2026-09-15.out");
+const E152_MIRROR_INPUT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e160-e152-input-mirror-2026-09-15.out");
+
 /// 丙-实测：解析 `research/results/` 下归档的 E152 原始输出一行，只取需要的字段。
 fn field_value<'line>(line: &'line str, key: &str) -> Option<&'line str> {
     let prefix = format!("{key}=");
@@ -641,6 +647,12 @@ fn print_and_emit(emitter: &mut Emitter, body: &str) {
 }
 
 fn main() {
+    // 丙-实测的输入是 E152 的产物，放在 `research/results/` 下、可以被归档删掉：开头先读，读不到就报本次未跑、退 77，一行结果都不打
+    // （`e7_index_bench::read_archived_products_or_exit_not_run`，缺几份报几行；不用 `include_str!`，产物不在时整个 research 工作区就编不过）。
+    let [single_disk_raw, mirror_raw]: [String; 2] =
+        e7_index_bench::read_archived_products_or_exit_not_run(E160_DEVICE_NAME, &[E152_SINGLE_DISK_INPUT, E152_MIRROR_INPUT])
+            .try_into()
+            .expect("两份都读到了才交回");
     let mut emitter = Emitter::new();
 
     print_and_emit(
@@ -731,11 +743,9 @@ fn main() {
         emit_declared_instance(&mut emitter, point_label, reads_per_second);
     }
 
-    // ---------- 丙-实测：E152 归档的原始输出 ----------
-    let single_disk_raw = include_str!("../../research/results/e160-e152-input-single-2026-09-15.out");
-    let mirror_raw = include_str!("../../research/results/e160-e152-input-mirror-2026-09-15.out");
-    let single_disk_rows = parse_e152_rows(single_disk_raw);
-    let mirror_rows = parse_e152_rows(mirror_raw);
+    // ---------- 丙-实测：E152 归档的原始输出（main 开头读的那两份） ----------
+    let single_disk_rows = parse_e152_rows(&single_disk_raw);
+    let mirror_rows = parse_e152_rows(&mirror_raw);
     print_and_emit(
         &mut emitter,
         &format!(
@@ -1272,17 +1282,25 @@ mod tests {
         );
     }
 
+    /// 丙-实测那两份 E152 原始输出（`research/results/` 下、可以被归档删掉）：两份都读得到交出来；读不到的每一份各报一行本次未跑，交 `None`。
+    fn e152_inputs_or_report_not_run(test_name: &str) -> Option<(String, String)> {
+        let single_disk_raw = e7_index_bench::read_archived_product_or_report_not_run(test_name, E152_SINGLE_DISK_INPUT);
+        let mirror_raw = e7_index_bench::read_archived_product_or_report_not_run(test_name, E152_MIRROR_INPUT);
+        Some((single_disk_raw?, mirror_raw?))
+    }
+
     /// V5：E152 归档产物的行数与末行完成标记。
     #[test]
     fn e152_input_files_match_the_archived_shape() {
-        let single_disk_raw = include_str!("../../research/results/e160-e152-input-single-2026-09-15.out");
-        let mirror_raw = include_str!("../../research/results/e160-e152-input-mirror-2026-09-15.out");
+        let Some((single_disk_raw, mirror_raw)) = e152_inputs_or_report_not_run("e160_random_small_read_share::tests::e152_input_files_match_the_archived_shape") else {
+            return;
+        };
         assert_eq!(single_disk_raw.lines().count(), 890);
         assert_eq!(mirror_raw.lines().count(), 941);
         assert_eq!(single_disk_raw.lines().last(), Some("E7RESULT name=summary_done emitted=174"));
         assert_eq!(mirror_raw.lines().last(), Some("E7RESULT name=summary_done emitted=174"));
-        let single_rows = parse_e152_rows(single_disk_raw);
-        let mirror_rows = parse_e152_rows(mirror_raw);
+        let single_rows = parse_e152_rows(&single_disk_raw);
+        let mirror_rows = parse_e152_rows(&mirror_raw);
         assert_eq!(distinct_configurations(&single_rows, "read_random_4k").len(), 7);
         assert_eq!(distinct_configurations(&mirror_rows, "read_random_4k").len(), 7);
     }
@@ -1290,10 +1308,13 @@ mod tests {
     /// 丙-实测：14 个配置全部落在「越过」这一侧（钉两个极值）。
     #[test]
     fn measured_declared_workload_arm_all_configurations_cross_the_upper_band() {
-        let single_disk_raw = include_str!("../../research/results/e160-e152-input-single-2026-09-15.out");
-        let mirror_raw = include_str!("../../research/results/e160-e152-input-mirror-2026-09-15.out");
-        let single_rows = parse_e152_rows(single_disk_raw);
-        let mirror_rows = parse_e152_rows(mirror_raw);
+        let Some((single_disk_raw, mirror_raw)) =
+            e152_inputs_or_report_not_run("e160_random_small_read_share::tests::measured_declared_workload_arm_all_configurations_cross_the_upper_band")
+        else {
+            return;
+        };
+        let single_rows = parse_e152_rows(&single_disk_raw);
+        let mirror_rows = parse_e152_rows(&mirror_raw);
         let mut count = 0;
         let mut byte_shares = Vec::new();
         for rows in [&single_rows, &mirror_rows] {

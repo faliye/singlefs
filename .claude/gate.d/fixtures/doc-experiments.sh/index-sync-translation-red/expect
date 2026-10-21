@@ -1,0 +1,4 @@
+exit=1
+want=E360 索引结论列的「23.5」在 360-索引样本.md 正文里找不到
+want=实验索引与正文对不上 1 处
+want=doc-experiments.sh：1 格里 1 格红（index-sync）

@@ -1,0 +1,4 @@
+exit=1
+want=records/2026-10-21-总审核.md:7：第 1 行处置列写「已改」，引的「这一句中文原文里已经删掉了」在 decisions/09-样本决策.md 的今天正文里找不到；只在 decisions/09-样本决策.ja.md 里有，那一行没点名它
+want=  audit-contradictions：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（audit-contradictions）

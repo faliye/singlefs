@@ -12,12 +12,22 @@
 单元：
   被改坏的单元 = 原文在那份 .rs 里占的行与之重叠的单元里最里层的那几个：fn 项（连同函数体里的嵌套条目），函数外的项按项单元
     （const、static、struct、enum、union、type、trait 与 impl 头、宏定义、use……）。原文不落在任何单元上（只在注释、空白或文件头的内属性里）
-    拒算。文件不是 .rs 的（litmus 这类测试读的数据文件）按数据单元取整份字节的 sha256。
+    拒算。文件是 .wgsl 的按 fn 切（UnitKeys.wgsl_mutated_units，切法只在 lib_function_units.py 的 wgsl_file 一处）：与原文所占的行重叠的顶层单元，
+    原文在 fn 里取那个 wgsl_fn（带 @compute 的是 wgsl_compute），不在 fn 里的取它自己的单元（wgsl_const、wgsl_struct、wgsl_var 这类）；
+    文件切不开、原文不落在任何单元上（只在注释或空白里）拒算，不退回整份文件。别的不是 .rs 的文件（litmus 这类测试读的数据文件）按数据单元取整份字节的 sha256。
+  弄坏开关 wgsl-whole-file（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：.wgsl 照改前当数据单元、取整份字节的 sha256；
+  crates-mutation-rows.py --selftest 的「WGSL 按 fn 取键」那一格必须判错。
   点名的测试 = cargo test 参数选中的编译目标（--lib、--bin <名>、--test <名>；都没写是这个包的 lib、bin 与 tests/ 目标）里，
     带 #[test]（或 #[<路径>::test]）的 fn 单元里 libtest 全名（文件在目标里的模块路径加单元的限定名）等于点名、或以「::<点名>」收尾的恰好一个；
     一个都没有、对上几个都拒算（测试由宏展开出来的就是一个都没有）。
   闭包 = lib_function_units.py 的 rust_closure_of 从那个单元收的（测试单元按 cfg(test) 编；cargo 参数里有 --release 时 debug_assertions 不进 cfg），
     带上 cargo 参数里的特性；闭包里有拒算，这一个闭包就没有键。
+闭包算不成（precompute_closures 抛 ClosureRefused）：入口在这一组 cfg 下不编（点名的测试带 #[cfg(feature = "gpu")]、cargo 参数没开那个特性）、没有叫这个名字的包这一类
+  lib_function_units.py 的 UsageError，不是拒算（拒算是一个闭包没有键、这一行照跑），是这一行的参数与源码对不上。并行算（fork 出来的子进程）与就地算都把别的闭包算完，
+  最后抛一个 ClosureRefused，逐处带类名、原消息与点名它的调用方标签；工作进程只交类名与消息，不交异常对象（按路径载入的模块没登记进 sys.modules 时它 pickle 不回父进程，
+  进程池就把真错换成 PicklingError，改前 --list-items 末尾就是这一句）。
+  弄坏开关 closure-error-masked（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：模块不登记进 sys.modules、工作进程把异常原样抛（改前的样子）；
+  crates-mutation-rows.py --selftest 的「点名的测试在这一组特性下不编」一格必须判错。
 
 工具链行（toolchain_lines）：rustc -vV 与 cargo -V 原样各行；环境里影响编出什么的变量（RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、RUSTDOCFLAGS、
   CARGO_BUILD_RUSTFLAGS、CARGO_BUILD_TARGET、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、CARGO_PROFILE_*、CARGO_TARGET_<三元组>_{RUSTFLAGS,RUNNER,LINKER}）；
@@ -55,6 +65,7 @@ import sys
 import tempfile
 import time
 import tomllib
+import traceback
 
 sys.dont_write_bytecode = True
 LIBRARY_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -79,11 +90,40 @@ class MutationUnitsError(Exception):
     """算不出键（工具链起不来、Cargo.lock 读不懂这一类）：调用方报错、这一趟不写库。"""
 
 
+class ClosureRefused(MutationUnitsError):
+    """点名测试的闭包没算成（lib_function_units.py 的 UsageError：入口在这一组 cfg 下不编、没有叫这个名字的包这一类）。
+    failures：[(类名, 消息, [点名它的那几行的标签])]，同一类名同一消息的并成一条；精确到哪一行由调用方在 precompute_closures 的 labels 里给。
+    进程池的工作进程里抛的异常对象不一定能 pickle 回父进程（按路径载入的模块没登记进 sys.modules 时就不能），所以工作进程只交类名与消息，
+    父进程在这里照原话报出（文件头「闭包算不成」）。"""
+
+    def __init__(self, failures):
+        self.failures = failures
+        super().__init__(f"{len(failures)} 处点名测试的闭包算不成：" + "；".join(
+            f"{class_name}：{message}" + (f"（点名它的：{'、'.join(labels)}）" if labels else "") for class_name, message, labels in failures))
+
+    def detail_lines(self):
+        """给人看的逐处明细：一处两行（原话、点名它的行）。"""
+        lines = []
+        for class_name, message, labels in self.failures:
+            lines.append(f"{class_name}：{message}")
+            if labels:
+                lines.append(f"  点名它的：{'、'.join(labels)}")
+        return lines
+
+
+def break_is(name):
+    """弄坏开关（只给证红用）：GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK（逗号分隔）里有 name。本库没有环境参数，读本进程的环境。"""
+    return any(name in os.environ.get(variable, "").split(",") for variable in ("GATE_MUTATION_BREAK", "CRATES_MUTATION_ROWS_BREAK"))
+
+
 def function_units():
     """scripts/gate/lib_function_units.py，第一次用到时按路径载入（调用方的 sys.path 不一定有它的目录）。"""
     if not _FUNCTION_UNITS:
         specification = importlib.util.spec_from_file_location("lib_function_units_for_mutation_units", FUNCTION_UNITS_PATH)
         module = importlib.util.module_from_spec(specification)
+        if not break_is("closure-error-masked"):
+            # 登记进 sys.modules：模块里的异常类（UsageError）pickle 时按「模块名 + 类名」找类，找不到进程池就把真错换成 PicklingError（文件头「闭包算不成」）
+            sys.modules[specification.name] = module
         specification.loader.exec_module(module)
         _FUNCTION_UNITS.append(module)
     return _FUNCTION_UNITS[0]
@@ -153,12 +193,18 @@ def _parallel_closure(task):
     index, unit_index, target_id, arguments = task
     keys = _PARALLEL["keys"]
     sent = _PARALLEL.setdefault("sent", set())
-    info = keys.closure(_PARALLEL["units"][unit_index], target_id, arguments)
+    try:
+        info = keys.closure(_PARALLEL["units"][unit_index], target_id, arguments)
+    except Exception as error:   # 异常对象不交回父进程（不一定 pickle 得动）：只交类名与消息，不认得的类另带回溯，父进程照原话报（ClosureRefused）
+        if break_is("closure-error-masked"):
+            raise
+        known = isinstance(error, function_units().UsageError)
+        return index, None, None, None, None, None, (type(error).__qualname__, str(error), "" if known else traceback.format_exc())
     keys._closures.clear()   # 子进程里不留：每格只算一次，留着只占内存
     identifiers = [unit_id(reference) for reference in info.members]
     fresh = {identifier: tuple(reference) for identifier, reference in zip(identifiers, info.members) if identifier not in sent}
     sent.update(fresh)
-    return index, info.key, info.dependencies, info.refusals, "".join(identifiers), fresh
+    return index, info.key, info.dependencies, info.refusals, "".join(identifiers), fresh, None
 TestUnit = collections.namedtuple("TestUnit", "unit target full_name")
 CargoArguments = collections.namedtuple("CargoArguments", "package targets features no_default_features all_features switches release filters")
 
@@ -262,6 +308,8 @@ class UnitKeys:
                 data = handle.read()
         except OSError as error:
             return None, f"被改坏的文件 {path} 读不了（{error}）"
+        if path.endswith(".wgsl") and not break_is("wgsl-whole-file"):
+            return self.wgsl_mutated_units(path, data, original)
         if not path.endswith(".rs"):
             return [UnitReference("data-file", path, path, "1-" + str(data.count(b"\n") + 1), hashlib.sha256(data).hexdigest())], None
         text = data.decode("utf-8", "surrogateescape")
@@ -281,6 +329,24 @@ class UnitKeys:
         if not innermost:
             return None, f"原文（{path} 第 {first}–{last} 行）不落在任何单元上（只在注释、空白或内属性里）"
         return sorted((reference_of(unit) for unit in innermost), key=lambda reference: (reference.lines, reference.kind, reference.name)), None
+
+    def wgsl_mutated_units(self, path, data, original):
+        """.wgsl 的被改坏的单元（文件头「单元」）：按 lib_function_units.py 的 wgsl_file 切出的顶层单元（wgsl_fn、wgsl_compute、wgsl_const、wgsl_struct、
+        wgsl_var……），取与原文所占的行重叠的那几个；WGSL 的单元不嵌套，重叠的都是最里层。切不开、原文不落在任何单元上拒算，不退回整份文件。"""
+        text = data.decode("utf-8", "surrogateescape")
+        if text.count(original) != 1:
+            return None, f"原文在 {path} 里命中 {text.count(original)} 次，要恰好 1 次"
+        start = text.find(original)
+        first = text.count("\n", 0, start) + 1
+        last = max(first, first + original.count("\n") - (1 if original.endswith("\n") else 0))
+        wgsl_file = function_units().wgsl_file(self.root, path)
+        if wgsl_file.refusals:
+            refusal = wgsl_file.refusals[0]
+            return None, f"{path} 切不开（{refusal.form}，第 {refusal.line} 行）"
+        overlapping = [unit for unit in wgsl_file.units if unit.first_line <= last and unit.last_line >= first]
+        if not overlapping:
+            return None, f"原文（{path} 第 {first}–{last} 行）不落在任何 WGSL 单元上（只在注释或空白里）"
+        return sorted((reference_of(unit) for unit in overlapping), key=lambda reference: (reference.lines, reference.kind, reference.name)), None
 
     def is_test_function(self, rust_file, unit):
         """单元开头的外属性里有 #[test] 或 #[<路径>::test]。"""
@@ -362,34 +428,70 @@ class UnitKeys:
     def cache_key(self, unit, target_id, parsed):
         return id(unit), target_id, self.features_of(parsed, target_id), parsed.no_default_features, parsed.release
 
-    def precompute_closures(self, requests, workers):
+    def precompute_closures(self, requests, workers, labels=None):
         """requests：[(单元, 目标, cargo 参数)]。按（单元、目标、特性、--no-default-features、--release）去重，workers 个 fork 出来的子进程并行算
         （子进程拿的是父进程那一份已经切好的工作区），结果进闭包缓存，成员存成 CompactMembers。workers ≤ 1 或不到 PARALLEL_MINIMUM 格时就地算。
-        回算了几个闭包。次序与进程数无关：每个闭包各算各的，键只由它自己的成员定。"""
-        pending, seen = [], set()
-        for unit, target_id, arguments in requests:
+        回算了几个闭包。次序与进程数无关：每个闭包各算各的，键只由它自己的成员定。
+        闭包算不成（lib_function_units.py 的 UsageError）的不停在头一处：就地算与并行算都把别的闭包算完，最后抛一个 ClosureRefused，
+        逐处带类名、原消息与点名它的 labels（与 requests 一一对应的标签，例变异表的行号与名字；不给就没有）。其余类的异常（算法自己的错）
+        在并行算时连回溯一起抛 RuntimeError，不当作「算不成」。"""
+        pending, seen = [], {}
+        for position, (unit, target_id, arguments) in enumerate(requests):
             parsed = arguments if isinstance(arguments, CargoArguments) else parse_cargo_arguments(arguments or "")
             cache_key = self.cache_key(unit, target_id, parsed)
-            if cache_key in self._closures or cache_key in seen:
+            if cache_key in self._closures:
                 continue
-            seen.add(cache_key)
+            if cache_key in seen:
+                seen[cache_key].append(labels[position] if labels else "")
+                continue
+            seen[cache_key] = [labels[position] if labels else ""]
             pending.append((unit, target_id, parsed, cache_key))
+        failures = []   # [(类名, 消息, 点名它的标签)]，按 pending 的次序
+
+        def refused(position, class_name, message):
+            failures.append((class_name, message, [label for label in seen[pending[position][3]] if label]))
+
         if workers <= 1 or len(pending) < PARALLEL_MINIMUM:
-            for unit, target_id, parsed, _cache_key in pending:
-                self.closure(unit, target_id, parsed)
+            for position, (unit, target_id, parsed, _cache_key) in enumerate(pending):
+                try:
+                    self.closure(unit, target_id, parsed)
+                except function_units().UsageError as error:
+                    refused(position, type(error).__qualname__, str(error))
+            self.raise_closure_refused(failures)
             return len(pending)
         self.lock_packages()   # fork 之前读一次，子进程共用
         _PARALLEL.clear()
         _PARALLEL.update(keys=self, units=[item[0] for item in pending])
         tasks = [(index, index, item[1], item[2]) for index, item in enumerate(pending)]
+        unexpected = []
         try:
             with multiprocessing.get_context("fork").Pool(processes=min(workers, len(pending))) as pool:
-                for index, key, dependencies, refusals, identifiers, fresh in pool.imap_unordered(_parallel_closure, tasks, chunksize=4):
+                for index, key, dependencies, refusals, identifiers, fresh, failed in pool.imap_unordered(_parallel_closure, tasks, chunksize=4):
+                    if failed is not None:
+                        class_name, message, detail = failed
+                        if detail:
+                            unexpected.append(f"{class_name}：{message}\n{detail}")
+                        else:
+                            refused(index, class_name, message)
+                        continue
                     self.unit_table.update(fresh)
                     self._closures[pending[index][3]] = ClosureInfo(key, CompactMembers(identifiers, self.unit_table), dependencies, refusals)
         finally:
             _PARALLEL.clear()
+        if unexpected:
+            raise RuntimeError(f"并行算闭包时工作进程里出了算法自己的错（{len(unexpected)} 处）：\n" + "\n".join(unexpected))
+        self.raise_closure_refused(failures)
         return len(pending)
+
+    @staticmethod
+    def raise_closure_refused(failures):
+        """failures 非空就抛 ClosureRefused：同一类名同一消息的并成一条（标签并起来），次序按头一次出现。"""
+        if not failures:
+            return
+        merged = collections.OrderedDict()
+        for class_name, message, labels in failures:
+            merged.setdefault((class_name, message), []).extend(label for label in labels if label not in merged.get((class_name, message), []))
+        raise ClosureRefused([(class_name, message, labels) for (class_name, message), labels in merged.items()])
 
     def closure(self, unit, target_id, arguments=None):
         """ClosureInfo：从 unit 收的闭包的键（lib_function_units.py 的 closure_key，不带工具链与依赖）、成员、依赖版本行（文件头「依赖版本行」）、拒算。

@@ -1,0 +1,17 @@
+exit=3
+want=样本档（快档）：
+want=· 覆盖行与计数行：不带特性那一趟：2 个测试二进制，整份现判 2 个（存进判定库 2 个）、取回存着的行 0 个、行不全 0 个
+want=✓ crash-flow-coverage（quick 域）：登记的 2 个入口都有覆盖行，StepKind 2 个成员都被罩住（覆盖行 3 条）
+want=✓ crash-ignored-nodes：这一趟 ignore 开着的节点 1 个（ignored_point 0、registered_segment 0、not_expanded 1），都在基准 1 行里
+want=✓ invariant-zero-evaluations（quick 域）：1 条流、2 个（流，不变量）对，评估 0 次的 1 个都在基准里
+want=✓ 1 条崩溃枚举用例在 crates/mutations.tsv 里都有点名它的测试目标的变异行
+want=✓ 旋钮登记表 .claude/gate.d/crash-knobs.tsv 的 1 个旋钮都写了取值与依据、出处路径都在
+want=这一趟没跑全量；上一次全量 2026-10-19，当前判法单元指纹下录下的 2 块都有全量判定（只报信息，不挡提交）
+want=crash-flow-coverage：绿；crash-ignored-nodes：绿；invariant-zero-evaluations：绿；crash-case-must-red：绿；crash-knobs：绿；last-full-judgement：本次未跑
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=crash-flow-coverage 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）
+not-green-by-design=crash-ignored-nodes 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）
+not-green-by-design=invariant-zero-evaluations 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）
+not-green-by-design=crash-case-must-red 样本档整道退 3 不退 0（这一格只读树、判绿了，可整道没跑过真的 checker 档，不许记成通过）
+not-green-by-design=crash-knobs 样本档整道退 3 不退 0（这一格只读树、判绿了，可整道没跑过真的 checker 档，不许记成通过）
+not-green-by-design=last-full-judgement 快档没跑全量，这一格按设计退 77、只打上一次全量的信息行（K6 甲：不挡提交）；判绿只在 --full 全部块都有当前的全量判定时，见 crash-audit-full-domain-green

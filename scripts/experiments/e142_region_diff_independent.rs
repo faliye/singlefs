@@ -743,8 +743,51 @@ mod tests {
     fn system_configuration_incompat_byte0_reads_offset_six_not_the_magic() {
         let mut slot = vec![0u8; 4096];
         slot[0..4].copy_from_slice(b"SFSB");
-        slot[6] = 0x02;
-        assert_eq!(system_configuration_incompat_byte0(&slot), 0x02);
+        slot[6] = FIRST_INCOMPAT_BYTE_WITH_TRUNCATION_FIELDS;
+        assert_eq!(system_configuration_incompat_byte0(&slot), 0x06);
+    }
+
+    /// incompat 位 1（布局身份）：截断字段之前的系统配置第一个 incompat 字节只带它（0x02）。
+    const FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS: u8 = 0x02;
+    /// incompat 位 2（inode 记录带截断字段，用户 2026-10-17 定新开）：mkfs 从此写位 1 加位 2（0x06）。
+    const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x04;
+    const FIRST_INCOMPAT_BYTE_WITH_TRUNCATION_FIELDS: u8 = FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;
+
+    /// 一个自证得过的系统配置槽：magic、incompat 第一个字节，整槽校验和照 D18 已定项 17 封上。
+    fn sealed_system_configuration_slot(first_incompat_byte: u8) -> Vec<u8> {
+        let mut slot = vec![0u8; 4096];
+        slot[0..4].copy_from_slice(b"SFSB");
+        slot[6] = first_incompat_byte;
+        let checksum = wide_checksum_field(&slot, 4096, 155);
+        slot[155..187].copy_from_slice(&checksum);
+        slot
+    }
+
+    /// 新开 incompat 位 2 那一次改动的形状（偏移 6 由 0x02 变 0x06、整槽校验和跟着重封）：
+    /// 两段不同字节，偏移 6 归 clause_d15_4，[155, 159) 归 derived，重算校验和对得到。
+    #[test]
+    fn incompat_bit_two_set_at_offset_six_with_a_resealed_checksum_is_explained_by_the_layout_identity_clause() {
+        let old_bytes = sealed_system_configuration_slot(FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS);
+        let new_bytes = sealed_system_configuration_slot(FIRST_INCOMPAT_BYTE_WITH_TRUNCATION_FIELDS);
+        assert!(checksum_recomputes(RegionKind::SystemConfiguration, &old_bytes) && checksum_recomputes(RegionKind::SystemConfiguration, &new_bytes));
+        let segments = diff_segments(&old_bytes, &new_bytes);
+        assert_eq!(segments.first(), Some(&(6, 1)), "偏移 6 那一字节");
+        assert!(segments[1..].iter().all(|(start, length)| *start >= 155 && start + length <= 159), "其余不同字节都在整槽校验和的 CRC-32C 那 4 字节里：{segments:?}");
+        let outcome = compute_explained(RegionKind::SystemConfiguration, &old_bytes, &new_bytes);
+        assert_eq!(outcome.layout_identity_clause_bytes, 1);
+        assert!(outcome.derived_bytes >= 1);
+        assert_eq!(outcome.unmapped_bytes, 0);
+        assert!(outcome.explained, "偏移 6 换成新值、整槽校验和重算之后对得到");
+        assert_eq!(system_configuration_incompat_byte0(&new_bytes), 0x06);
+    }
+
+    /// 模型那一侧照旧写 0x02、crates 导出写 0x06 时，第一种调用报的字段标签恰是 feature_bits 与 slot_checksum 两个。
+    #[test]
+    fn a_model_slot_without_bit_two_against_a_crates_slot_with_it_differs_in_feature_bits_and_slot_checksum_only() {
+        let model_slot = sealed_system_configuration_slot(FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS);
+        let crates_slot = sealed_system_configuration_slot(FIRST_INCOMPAT_BYTE_WITH_TRUNCATION_FIELDS);
+        let segments = diff_segments(&model_slot, &crates_slot);
+        assert_eq!(field_labels_for_segments(region_kind(0, 4096), &segments), "feature_bits,slot_checksum");
     }
 
     /// 回归：一个区域里有两段不同字节时，`any_clause_changed` 要看整个区域，不能只看当前这一段——

@@ -1,0 +1,6 @@
+# --full 一路里出口 4 的四格读全量域的行判绿（覆盖、ignore、0 次照全量域的基准行，上一次全量那一格全部块都是当前的全量判定），样本档退 3（expect 里逐格写了按设计不绿的理由）；
+# 阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-flow-coverage
+crash-ignored-nodes
+invariant-zero-evaluations
+last-full-judgement

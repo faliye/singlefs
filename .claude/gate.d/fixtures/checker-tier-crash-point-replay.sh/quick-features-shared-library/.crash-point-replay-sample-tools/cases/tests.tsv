@@ -1,0 +1,4 @@
+both	src/lib.rs	tests::shared_check	ok	line	-
+plain	tests/store_only.rs	-	ok	line	-
+feature	tests/store_only.rs	store_only_quick	ok	line	-
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-

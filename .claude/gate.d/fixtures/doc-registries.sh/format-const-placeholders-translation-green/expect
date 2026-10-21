@@ -1,0 +1,3 @@
+exit=0
+want=格式常量文件里的占位都指得到分项或欠账（1 个占位：D23（样本 journal） 已定项 19）
+want=doc-registries.sh：1 格里 1 格绿（format-const-placeholders），0 格本次未跑（无）

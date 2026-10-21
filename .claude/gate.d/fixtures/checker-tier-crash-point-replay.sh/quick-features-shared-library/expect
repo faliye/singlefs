@@ -1,0 +1,14 @@
+exit=3
+want=样本档（快档）：
+want=现判 crates/singlefs-checker-tier/src/lib.rs::tests::shared_check（键对不上（上一次
+want=变了 1 处：变了 fn crates/singlefs-checker-tier/src/lib.rs::tests::shared_check）
+want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
+want=· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 2 条编得进的测试函数，现判 0、复用 2、拒算 0
+want=复用 crates/singlefs-checker-tier/src/lib.rs::tests::shared_check
+want=复用 crates/singlefs-checker-tier/tests/store_only.rs::store_only_quick
+want=· feature-gated-tests：这一组特性下要跑的测试函数都有键相同的判定，全部复用，这一趟没起 cargo
+want=✓ feature-gated-tests：1 个挂特性的测试文件（特性 verdict-store）每个都编进来、跑到了用例，共 1 条
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；feature-gated-tests：绿
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）
+not-green-by-design=crash-case-replay 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）

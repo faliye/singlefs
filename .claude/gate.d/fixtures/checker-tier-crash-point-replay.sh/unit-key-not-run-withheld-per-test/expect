@@ -1,0 +1,13 @@
+exit=3
+want=样本档（快档）：
+want=· 快档按条复用：checker 档包 5 条编得进的测试函数，现判 5、复用 0、拒算 0；这一组特性下不编 0 条
+want=· 判绿不记库 2 条（这一趟现判、按条记库不认的；下一趟照跑）：
+want=不记 crates/singlefs-checker-tier/tests/setting.rs::test_c（这一段打了 NOT_RUN_SAMPLE_REASON test=crash_state_enumeration::sample reason=样本：这一条这一趟没判，认作它打的
+want=不记 crates/singlefs-checker-tier/tests/noisy.rs::noisy_glued（结果行被打散、认不出结局）
+want=· 判绿记库：RECORD recorded=3 changed=0 refused=0
+want=checker 档包 现判 5、复用 0、拒算 0、本次未跑 1；跑了的 4 个测试二进制 5 条通过、1 条 ignored
+want=本次未跑（这不是通过）：checker 档快档不带特性那一趟（tests/setting.rs）报了本次未跑：NOT_RUN_SAMPLE_REASON test=crash_state_enumeration::sample reason=样本：这一条这一趟没判；带特性那一趟没补判到（checker 档 tests/ 下没有挂特性的测试文件，带特性那一趟没起）
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；不带特性那一趟有 1 处本次未跑；feature-gated-tests：无对象可判
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）
+not-green-by-design=feature-gated-tests 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）

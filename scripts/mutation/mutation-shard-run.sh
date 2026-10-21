@@ -9,7 +9,8 @@
 #                                      退 0：两份都跑完、拷回的记录全收，或判法退 3（双机：关，报一行「双机：关」、不连第二台）；
 #                                      退 1：有一步没成（没判的行留给 checker-tier-crates-mutation-replay 最后那一趟）；退 2：用法错，或在选行模式下被调，或弄坏开关 MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外
 #   mutation-shard-run.sh --selftest   自证：「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1），
-#                                      假 cargo、真的内存包装，逐格见文件末尾 mutation_shard_selftest 的说明；格数由成功行现算
+#                                      假 cargo、真的内存包装，逐格见文件末尾 mutation_shard_selftest 的说明；格数由成功行现算。
+#                                      退 0 都对；退 1 有格判错；退 77 没有判错而有格本次未跑（⑥ 等不到两份假 cargo 起来，见那一格的说明），不算通过
 #
 # 步骤：
 # ① 配置照 scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-assignments（只调，与崩溃点重放分片同一份）；判不过退 1，原因不在这里打；
@@ -79,6 +80,9 @@
 #   MUTATION_SHARD_RUN_BREAK=no-peer-cleanup-on-failure  ④ 之后失败退出（含收到信号）时不删第二台这一趟的树
 #       ④ 两台的构建环境不同：驱动拒、两份都没起、第二台这一趟的树删了（「stderr：  ✗ 双机分片：两台的工具链行（含构建环境）不同」）
 #       ⑥ 两份都在跑时收到 TERM：退 143，两份卡住的假 cargo 都不在了，没复原，第二台这一趟的树删了（「退 143；卡住的假 cargo 2 个（…），还活着的「」；第二台留着 1 个目录」）
+#   MUTATION_SHARD_RUN_BREAK=start-timeout-judged  ⑥ 等不到两份假 cargo 起来也照样发 TERM、照样判（改前的样子：把「没等到」与「TERM 没停住」混在一格）
+#       要连同 MUTATION_SHARD_RUN_SELFTEST_SIGNALLED_NEVER_STARTS=1 一起开（两份假 cargo 都起不来）：
+#       ⑥ 两份都在跑时收到 TERM：退 143，两份卡住的假 cargo 都不在了，没复原，第二台这一趟的树删了（「退 143；卡住的假 cargo 0 个（没有），还活着的「」；…」）
 #   MUTATION_SHARD_RUN_BREAK=peer-library-kept  第二台那一份的判定库放进跨趟保留的 mutation-kept/records（改前的样子：第二台留一份长期库），拷回的是这一趟的树里那一份（空的）
 #       ① 两台各判一份（「本机「」里是全部 6 行」：第二台判的一条都没导进来，最后那一趟在本机补跑）
 #       ① 最后那一趟全部复用（复用抓到 6 条、现跑变异至多 0 条）（「stderr 里的判定库记录行：  … 判定库记录：复用抓到 3 条」）
@@ -106,6 +110,9 @@
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）；MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=<k>
 #   给第二台那一份设 GATE_MUTATION_STOP_AFTER_ROWS=k 与 GATE_MUTATION_WORKERS=1（造「第二台那一份中途停了」：一个工作进程，判完 k 条就不再领活）；
 #   MUTATION_SHARD_RUN_SELFTEST_PLANT=<文件>（只在 --selftest 起的进程里认，同弄坏开关的标记）⑦ 拷回之后把这份文件照原名放进拷回来的 records/（造「另一台交来一条键对不上的记录」）。
+#   自证 ⑥ 那一格的三个（只在 --selftest 里读）：MUTATION_SHARD_RUN_SELFTEST_START_WAIT_SECONDS=<正整数> 等两份假 cargo 起来至多几秒（默认 120）；
+#   MUTATION_SHARD_RUN_SELFTEST_SIGNALLED_NEVER_STARTS=1 两份假 cargo 都起不来（造「等不到」，证那一格报本次未跑）；
+#   MUTATION_SHARD_RUN_SELFTEST_ONLY=signalled 只跑 ⑥ 那一格（单补这一格、看它红在哪用；只跑这一格的那一趟不算整份自证通过）。
 # 配置的开关：MUTATION_SHARD_PEER_LLVM_TOOLS=<第二台上的目录> 第二台的 llvm 工具不在 GATE_MUTATION_LLVM_TOOLS 那个路径上时设它（② 查它、⑥ 给第二台那一份换成它）。
 #
 # admission: always 每次调都分这一刻这棵树上没有作数记录的行；复用判定在判定库记录里，不在这里
@@ -505,7 +512,11 @@ mutation_shard_main() {
 #   ③ 第二台那一份判完 1 条就停（MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=1）：驱动退 1；拷回的记录照导；checker-tier-crates-mutation-replay 最后那一趟补跑缺的行，判定仍与单机逐字相同
 #   ④ 两台的构建环境不同（第二台目录的上一层放 .cargo/config.toml，两台的工具链行就不同）：驱动拒、两份都没起、第二台这一趟的树删了；checker-tier-crates-mutation-replay 在本机整张判，判定与单机逐字相同
 #   ⑤ 第二台的 rustc -Vv 不同：驱动拒，第二台这一趟的目录没建
-#   ⑥ 两份都在跑的时候给驱动（只给它自己，kill "$!"）发 TERM：退 143，两份卡住的假 cargo 进程都不在了，没复原，第二台这一趟的树删了
+#   ⑥ 两份都在跑的时候给驱动（只给它自己，kill "$!"）发 TERM：退 143，两份卡住的假 cargo 进程都不在了，没复原，第二台这一趟的树删了。
+#      等两份假 cargo 起来至多 MUTATION_SHARD_RUN_SELFTEST_START_WAIT_SECONDS 秒（默认 120）；等不到这一格报「本次未跑：<秒> 秒内假 cargo 没起来」，
+#      不算对、不算错（.claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」），照样给驱动发 TERM、等它退，自证退 77。
+#      选报本次未跑、不选随负载放宽等待上限：放宽到多少才够推不出来（2026-10-20 本机负载 120–180 时两趟都等不满，负载 64–72 时都等得到，
+#      records/2026-09-16-subagent拆分提案.md 第七十三节），放宽了等不到时照样判，「没等到」与「TERM 没停住」仍混在一格
 #   ⑦ 选行模式下调驱动：退 2 拒
 #   ⑭ ③ 分行（mutation_shard_split_plan）喂一份写好的 row-plan 输出：锚点失效的两行（一行没键、一行有键）与拒算、复用的不进两堆，汇总单报锚点失效 2 行
 #   ⑧ 驱动直接起、配置没写 ENABLE_ACROSS_MACHINES=1（判法退 3）：报一行「双机：关」、退 0，第二台这一趟的目录没建
@@ -515,6 +526,7 @@ mutation_shard_main() {
 
 mutation_shard_selftest() {
   local repository_root work template checked=0 failures=0
+  local -a not_run=()   # 本次未跑的格（⑥ 等不到两份假 cargo 起来）：不算对、不算错
   repository_root="$(cd "$mutation_shard_script_directory/../.." && pwd)"
   work="$(mktemp -d)"
   mutation_shard_selftest_work="$work"
@@ -614,6 +626,9 @@ if arguments[:1] in (["-V"], ["--version"]):
     sys.exit(0)
 if arguments[:1] != ["test"]:
     sys.exit(2)
+if os.path.exists(os.path.join(here, "hang-unseen")):   # 起不来：睡着、不写 hanging.<进程号>（自证 ⑥ 证「本次未跑」那一支）
+    time.sleep(300)
+    sys.exit(101)
 if os.path.exists(os.path.join(here, "hang")):
     with open(os.path.join(here, f"hanging.{os.getpid()}"), "w") as handle:
         handle.write(str(os.getpid()))
@@ -726,6 +741,61 @@ FAKE_LLVM
   peer_run_trees_left() { # <场景名>：第二台 mutation-runs/ 底下这一趟留下的目录数
     find "$work/$1/peer-home/mutation-runs" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l
   }
+  # ⑥ 两份都在跑的时候收到 TERM（文件头自证说明 ⑥）：等两份假 cargo 起来至多 MUTATION_SHARD_RUN_SELFTEST_START_WAIT_SECONDS 秒（默认 120），
+  # 等不到这一格报本次未跑（不算对、不算错），照样给驱动发 TERM、等它退；MUTATION_SHARD_RUN_SELFTEST_SIGNALLED_NEVER_STARTS=1 时两份假 cargo 都起不来
+  signalled_cell() {
+    local driver_pid signalled_exit waited hanging_pids=() hanging_file survivors="" hanging_pid start_wait_seconds local_up=0 peer_up=0
+    start_wait_seconds="${MUTATION_SHARD_RUN_SELFTEST_START_WAIT_SECONDS:-120}"
+    [[ "$start_wait_seconds" =~ ^[1-9][0-9]*$ ]] || start_wait_seconds=120
+    prepare_scene signalled
+    if [[ -n "${MUTATION_SHARD_RUN_SELFTEST_SIGNALLED_NEVER_STARTS:-}" ]]; then
+      touch "$work/signalled/local-bin/hang-unseen" "$work/signalled/peer-bin/hang-unseen"
+    else
+      touch "$work/signalled/local-bin/hang" "$work/signalled/peer-bin/hang"
+    fi
+    # env 起的就是驱动本身（env exec 过去）：$! 是驱动的进程号，TERM 只发给它
+    scene_command_for signalled
+    "${scene_command[@]}" bash "$work/signalled/repo/scripts/mutation/mutation-shard-run.sh" "$work/signalled/repo" > "$work/signalled/driver.out" 2>&1 &
+    driver_pid=$!
+    for (( waited = 0; waited < start_wait_seconds * 10; waited++ )); do
+      compgen -G "$work/signalled/local-bin/hanging.*" >/dev/null && local_up=1
+      compgen -G "$work/signalled/peer-bin/hanging.*" >/dev/null && peer_up=1
+      (( local_up && peer_up )) && break
+      sleep 0.1
+    done
+    for hanging_file in "$work/signalled/local-bin"/hanging.* "$work/signalled/peer-bin"/hanging.*; do
+      [[ -f "$hanging_file" ]] && hanging_pids+=("$(cat "$hanging_file")")
+    done
+    kill -TERM "$driver_pid"
+    if wait "$driver_pid"; then signalled_exit=0; else signalled_exit=$?; fi
+    if (( ! (local_up && peer_up) )) && ! mutation_shard_break_is start-timeout-judged; then
+      not_run+=("⑥ 两份都在跑时收到 TERM：$start_wait_seconds 秒内假 cargo 没起来（本机$( ((local_up)) && echo '起来了' || echo '没起来')、第二台$( ((peer_up)) && echo '起来了' || echo '没起来')；驱动收到 TERM 退 $signalled_exit）")
+      echo "  - 本次未跑：${not_run[-1]}"
+      return 0
+    fi
+    for hanging_pid in ${hanging_pids[@]+"${hanging_pids[@]}"}; do
+      peer_host_process_is_alive "$hanging_pid" && survivors+=" $hanging_pid"
+    done
+    expect "⑥ 两份都在跑时收到 TERM：退 143，两份卡住的假 cargo 都不在了，没复原，第二台这一趟的树删了" \
+      "$([[ "$signalled_exit" == 143 && "${#hanging_pids[@]}" -ge 2 && -z "$survivors" && -e "$work/signalled/quiesce-marker-selftest" && "$(peer_run_trees_left signalled)" == 0 ]]; echo $?)" \
+      "退 $signalled_exit；卡住的假 cargo ${#hanging_pids[@]} 个（${hanging_pids[*]:-没有}），还活着的「${survivors}」；第二台留着 $(peer_run_trees_left signalled) 个目录；输出尾部：$(tail -4 "$work/signalled/driver.out" | tr '\n' ' ')"
+  }
+  # 只跑 ⑥（MUTATION_SHARD_RUN_SELFTEST_ONLY=signalled）：单补这一格、看它红在哪用，不算整份自证通过
+  if [[ "${MUTATION_SHARD_RUN_SELFTEST_ONLY:-}" == signalled ]]; then
+    signalled_cell
+    if (( failures > 0 )); then
+      echo "  ✗ mutation-shard-run.sh 自证（只跑 ⑥）判错 $failures 格"
+      echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果；没设的，看驱动收到 TERM 时停两份、删第二台这一趟的树那几处"
+      return 1
+    fi
+    if ((${#not_run[@]})); then
+      echo "  - mutation-shard-run.sh 自证（只跑 ⑥）本次未跑：${not_run[*]}"
+      echo "     → 怎么办：负载降下来再跑；设了 MUTATION_SHARD_RUN_SELFTEST_SIGNALLED_NEVER_STARTS 的，这就是要的结果"
+      return 77
+    fi
+    echo "  ✓ mutation-shard-run.sh 自证（只跑 ⑥，不算整份自证通过）$checked 格都对"
+    return 0
+  fi
 
   # 单机那一趟：配置没开双机（ENABLE_ACROSS_MACHINES=0），环境里照原来的开法写 GATE_MUTATION_ACROSS_MACHINES=1，作为逐字比对的基准
   prepare_scene single off
@@ -827,30 +897,8 @@ FAKE_LLVM
     "$([[ "$toolchain_exit" == 1 ]] && grep -q '两台的工具链不同' "$work/toolchain/driver.out" && [[ ! -d "$work/toolchain/peer-home/mutation-runs" ]]; echo $?)" \
     "退 $toolchain_exit；输出：$(tail -3 "$work/toolchain/driver.out" | tr '\n' ' ')"
 
-  # ⑥ 两份都在跑的时候收到 TERM
-  prepare_scene signalled
-  touch "$work/signalled/local-bin/hang" "$work/signalled/peer-bin/hang"
-  local driver_pid signalled_exit waited hanging_pids=() hanging_file survivors=""
-  # env 起的就是驱动本身（env exec 过去）：$! 是驱动的进程号，TERM 只发给它
-  scene_command_for signalled
-  "${scene_command[@]}" bash "$work/signalled/repo/scripts/mutation/mutation-shard-run.sh" "$work/signalled/repo" > "$work/signalled/driver.out" 2>&1 &
-  driver_pid=$!
-  for (( waited = 0; waited < 1200; waited++ )); do
-    compgen -G "$work/signalled/local-bin/hanging.*" >/dev/null && compgen -G "$work/signalled/peer-bin/hanging.*" >/dev/null && break
-    sleep 0.1
-  done
-  for hanging_file in "$work/signalled/local-bin"/hanging.* "$work/signalled/peer-bin"/hanging.*; do
-    [[ -f "$hanging_file" ]] && hanging_pids+=("$(cat "$hanging_file")")
-  done
-  kill -TERM "$driver_pid"
-  if wait "$driver_pid"; then signalled_exit=0; else signalled_exit=$?; fi
-  local hanging_pid
-  for hanging_pid in ${hanging_pids[@]+"${hanging_pids[@]}"}; do
-    peer_host_process_is_alive "$hanging_pid" && survivors+=" $hanging_pid"
-  done
-  expect "⑥ 两份都在跑时收到 TERM：退 143，两份卡住的假 cargo 都不在了，没复原，第二台这一趟的树删了" \
-    "$([[ "$signalled_exit" == 143 && "${#hanging_pids[@]}" -ge 2 && -z "$survivors" && -e "$work/signalled/quiesce-marker-selftest" && "$(peer_run_trees_left signalled)" == 0 ]]; echo $?)" \
-    "退 $signalled_exit；卡住的假 cargo ${#hanging_pids[@]} 个（${hanging_pids[*]:-没有}），还活着的「${survivors}」；第二台留着 $(peer_run_trees_left signalled) 个目录；输出尾部：$(tail -4 "$work/signalled/driver.out" | tr '\n' ' ')"
+  # ⑥ 两份都在跑的时候收到 TERM（signalled_cell，在上面）
+  signalled_cell
 
   # ⑦ 选行模式下调驱动
   local selection_exit
@@ -946,9 +994,14 @@ FAKE_LLVM
   done <<< "$outside_new"
 
   if (( failures > 0 )); then
-    echo "  ✗ mutation-shard-run.sh 自证有 $failures 格判错（共 $checked 格）"
+    echo "  ✗ mutation-shard-run.sh 自证有 $failures 格判错（共 $checked 格${not_run[*]:+；另本次未跑 ${#not_run[@]} 格：${not_run[*]}}）"
     echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看驱动与 scripts/hosts/peer-host-lib.sh"
     return 1
+  fi
+  if ((${#not_run[@]})); then
+    echo "  - mutation-shard-run.sh 自证 $checked 格都对，本次未跑 ${#not_run[@]} 格（不算对、不算错，这一趟不算通过）：${not_run[*]}"
+    echo "     → 怎么办：负载降下来（uptime 看 load）再整份重跑；先单看那一格：MUTATION_SHARD_RUN_SELFTEST_ONLY=signalled bash scripts/mutation/mutation-shard-run.sh --selftest"
+    return 77
   fi
   echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对（两台各判一份、第二台判出的记录连同覆盖记录当场拷回核过再并进本机那一份库、第二台不留长期库、最后一趟全部复用且判定与单机逐字相同、第二台中途停了补跑、行键对不上被拒、判法单元指纹与工具链（含构建环境）不同就拒、第二台缺 llvm-tools 不分片、收到 TERM 先停两份、场景跑完不留 singlefs-mutation-replay-*、配置没开双机就报双机：关不分、环境变量开不了双机、弄坏开关设在自证之外驱动与门禁都拒、第二台那一份退 245 报显存不够、锚点失效的行不分给第二台）"
 }

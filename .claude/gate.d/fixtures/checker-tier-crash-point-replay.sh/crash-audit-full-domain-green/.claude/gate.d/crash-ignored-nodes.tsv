@@ -1,0 +1,2 @@
+# 样本的 ignore 开着的节点基准（写法同仓里那一份的表头）：全量域里按段登记的那一段
+registered_segment	plain_stream	publish_first_file	UnitWrite	1	full	# 样本

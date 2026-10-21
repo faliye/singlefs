@@ -14,8 +14,87 @@
 格「引用写已定紧跟说没定」（引用写着已定项、紧跟着却说它没定）、格「冻结层归属登记表」（查依据点名的分项是不是已定）与
 `scripts/kb/relabel-item.py`（分项翻状态之后改写全仓引用）都 import 这里的函数，
 不各抄一份——两份归属规则一旦分叉，工具改写的与门禁判的就不是同一批引用。
+
+**按编号取哪一份文件也只有这一份**（numbered_files、heads_for_referrer）：decisions/ 与 experiments/ 下一个编号有三份——
+中文原文 `<号>-<名>.md`、译文 `<号>-<名>.en.md` / `<号>-<名>.ja.md`（登记在 .claude/trilingual-documents）。
+引用方是中文（不带 `.<两个小写字母>.md` 后缀的文件，含代码、产物与登记表；不给引用方也按中文）取中文原文；
+引用方是译文取同一种语言的那一份，没有就取中文原文（.claude/skills/trilingual/SKILL.md「改一组的做法」第 5 条：链接可指中文那份或同语言那份）。
+译文后缀的认法与 lib-trilingual.py 的 LANGUAGE_SUFFIXED 同口径。门禁 doc-registries（field-refs、format-const-placeholders、audit-contradictions）、
+doc-decisions（freeze-layer-membership、write-frequency）、doc-experiments（index-sync、verdict-false-named）按编号取文件都调这里。
+**数一遍、按语言分组也只有这一份**（same_language_files、files_by_language）：条数与分项数只数引用方那一种语言的文件——
+门禁 doc-registries（declared-counts、invariant-count-elsewhere）的不变量在用条数只数中文原文，
+doc-decisions（kb-shape 第 7 段）中文索引表的分项计数只对中文原文；「编号从 D1 连号」这类判据按语言各判各的（kb-shape 第 5 段：中文一组、每种译文一组），
+不把三语三份的号并成一个列表。
+弄坏开关 KB_NUMBERED_FILE_BREAK=first-match：不分语言，按路径排序交回全部候选（调用方取第一个的取到排在最前的译文 `.en.md`，
+求并集的连译文一起并进来；heads_for_referrer 不筛语言；same_language_files 原样交回全部、files_by_language 并成一组）。
+打开后判错的样本逐道写在三道门禁文件头的弄坏开关一节。
 """
 import re, glob, sys, os
+
+LANGUAGE_SUFFIXED = re.compile(r'\.([a-z]{2})\.md$')
+NUMBERED_FILE_BREAK = os.environ.get('KB_NUMBERED_FILE_BREAK', '')
+
+
+def language_of(path):
+    """'' 是中文原文（也是代码、产物、登记表这类不带语言后缀的文件），否则是两个字母的语言代码。"""
+    hit = LANGUAGE_SUFFIXED.search(os.path.basename(path or ''))
+    return hit.group(1) if hit else ''
+
+
+def numbered_files(directory, number, referrer=None):
+    """directory 下编号是 number 的那一份（文件名 `<号>-*.md`，号前可补 0）→ 排序后的路径列表（通常一份，空表示没有）。
+
+    引用方 referrer 是中文取中文原文；是译文取同一种语言的那一份，没有就取中文原文。弄坏开关下交回全部候选。"""
+    pattern = re.compile(r'^0*%d-.*\.md$' % int(number))
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return []
+    candidates = sorted(os.path.join(directory, name) for name in names
+                        if pattern.match(name) and os.path.isfile(os.path.join(directory, name)))
+    if NUMBERED_FILE_BREAK == 'first-match':
+        return candidates
+    language = language_of(referrer)
+    same_language = [path for path in candidates if language_of(path) == language]
+    if same_language or not language:
+        return same_language
+    return [path for path in candidates if language_of(path) == '']
+
+
+def heads_for_referrer(heads, unreadable, referrer=None):
+    """decision_heads 的结果里，只留引用方 referrer 按编号取得到的那几份（中文引用方只留中文原文，译文引用方留同语言的、缺的那几个号补中文原文）。
+
+    首行读不出的那几份同样筛：中文引用方只关心中文原文读不读得出，译文的首行由扫全部文件的格（分项引用状态）判。弄坏开关下原样交回。"""
+    if NUMBERED_FILE_BREAK == 'first-match':
+        return heads, unreadable
+    language = language_of(referrer)
+    if not language:
+        return ({path: head for path, head in heads.items() if language_of(path) == ''},
+                [(path, first) for path, first in unreadable if language_of(path) == ''])
+    kept = {path: head for path, head in heads.items() if language_of(path) == language}
+    numbers = {decision for decision, _ in kept.values()}
+    kept.update({path: head for path, head in heads.items() if language_of(path) == '' and head[0] not in numbers})
+    return kept, [(path, first) for path, first in unreadable if language_of(path) in ('', language)]
+
+
+def same_language_files(paths, referrer=None):
+    """paths 里与引用方 referrer 同一种语言的那几份，次序不变（中文引用方只留中文原文 `<名>.md`，译文引用方只留同语言的 `<名>.<语言>.md`）。
+
+    数条数、数分项这类「数一遍」的量用它：译文是同一份内容的另一种语言，数进去就把一条算成三条。弄坏开关下原样交回全部。"""
+    if NUMBERED_FILE_BREAK == 'first-match':
+        return list(paths)
+    language = language_of(referrer)
+    return [path for path in paths if language_of(path) == language]
+
+
+def files_by_language(paths):
+    """按语言分组：{'': 中文原文, 'en': 英语译文, …}，组内次序不变；「编号连续」这类判据一组里各判各的。弄坏开关下全部并成一组（键 ''）。"""
+    if NUMBERED_FILE_BREAK == 'first-match':
+        return {'': list(paths)} if paths else {}
+    groups = {}
+    for path in paths:
+        groups.setdefault(language_of(path), []).append(path)
+    return groups
 
 
 def decision_heads(strict=True):

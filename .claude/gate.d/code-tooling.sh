@@ -305,6 +305,7 @@ SELFTEST_RUNNERS=(
   "bash scripts/hosts/detached-run.sh --selftest" "bash scripts/experiments/replay.sh --selftest"
   "bash scripts/mutation/mutate.sh --selftest" "python3 scripts/agents/cite-check.py --selftest"
   "python3 scripts/kb/kb-spec-check.py --selftest" "python3 scripts/crash/crash-case-check.py --selftest"
+  "python3 scripts/crash/crash-flow-coverage.py --selftest"
   "bash scripts/mutation/prove-red.sh --selftest" "python3 scripts/gate/apply-writer-patch.py --selftest"
   "python3 scripts/gate/lib_libtest_result_lines.py --selftest" "python3 scripts/gate/rerun-failed-tests.py --selftest"
   "python3 scripts/gate/closeout-status.py --selftest" "python3 scripts/hosts/compile-then-swap.py --selftest"
@@ -334,10 +335,15 @@ SELFTEST_RUNNERS=(
   "python3 scripts/gate/data-name-lint.py --selftest" "python3 scripts/gate/wallclock-assert-lint.py --selftest"
   "bash scripts/agents/remind.sh --selftest"
   "python3 .claude/hooks/lib_workspace_cargo_lock.py --selftest"
-  "bash scripts/hosts/heavy-threads.sh --selftest" "python3 scripts/hosts/heavy_threads.py --selftest"
+  "bash scripts/hosts/heavy-threads.sh --selftest" "python3 scripts/hosts/heavy_threads.py --selftest" "python3 scripts/hosts/core_usage.py --selftest"
   "bash scripts/crash/crash-amplification-lib.sh --selftest" "python3 scripts/kb/doc-consolidate.py --selftest" "python3 scripts/kb/history-consolidate.py --selftest"
   "python3 scripts/gate/lib_reuse_checks.py --selftest" "bash scripts/gate/lkmm-selftest.sh --selftest"
   "python3 scripts/experiments/device-code-key.py --selftest" "python3 scripts/gate/shared-index-stale-check.py --selftest"
+  "bash scripts/experiments/e180-reading-shards.sh --selftest" "bash scripts/experiments/e182-single-device-long-run.sh --selftest"
+  "bash scripts/experiments/e181-landing-check-long-run.sh --selftest" "bash scripts/experiments/e10-aging-compaction-run.sh --selftest"
+  "bash scripts/experiments/e182-single-device-units-kept-long-run.sh --selftest"
+  "bash scripts/experiments/e183-capacity-cells.sh --selftest" "bash scripts/experiments/e183-sweep-history-shards.sh --selftest"
+  "bash scripts/experiments/e184-segment-one-long-run.sh --selftest"
 )
 SELFTEST_RUNNERS_STARTED_ALONE=("bash scripts/crash/crash-point-replay-shard-run.sh --selftest" "python3 scripts/agents/agent-watch.py --selftest")
 
@@ -602,7 +608,7 @@ echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} �
 # 样本：red 放一份只在某个阶段的 echo 出路里被提到的 --selftest 脚本，必须报它没人跑；green 放一份真被阶段调用的与 NOT_RUN_HERE 每一行的那份脚本，判绿并报对数。
 #   NOT_RUN_HERE 是这一道自己的表，绿样本里缺了哪一行的脚本，那一行就判过期：往表里加一行，同时往 green、coverage-claims-green 里各放一份那个路径的脚本、改两份 expect 的份数。
 #   coverage-claims-green 放一份只在注释与出路里提 --selftest 的 .py、一份提到它的 .tsv（都不算实现了）与一份由不带编号的阶段 tooling-runs.sh 在跑的 .sh，
-#   判绿并报 3 份中 1 份（另两份是 NOT_RUN_HERE 那两行）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
+#   判绿并报 5 份中 1 份（另四份是 NOT_RUN_HERE 那四行）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
 NOT_RUN_HERE=(
   "scripts/devices/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁"
   "scripts/crash/lib_crash_point_replay_items.py	它自己没有自证：用法里提到的 --selftest 指 scripts/crash/crash-case-check.py 的自证（那一条已在这张表里）"
@@ -2436,6 +2442,8 @@ PY
 #   E161 装置只读 E161_THREADS，capped.sh 清单里有它，这一格不点名它，它没设时取 available_parallelism 的那一行照旧由排除表「代码批」行放行。
 # 判不了的：变量里拼出来的命令、读别的文件定的数、跨 5 行以上的回退值、shell 里嵌的 python 字符串（按 shell 判：引号里整句的样本不算，其余照判）、
 #   多行的 rust 字符串字面量、跨语句的回退（见上）、shell 的 if / case 多行复合语句（按行判，回退写在另一行里认不出）。排除表的理由成不成立靠 review。
+#   线程数取对了之后用在几处、装置的主循环对取样点串不串行，这一格也判不了（只用在一处的装置也可能就是对的：它唯一的重活就在那一处；
+#   串行的循环里调的函数自己可能在并行）：由运行时的在用核数告警兜（scripts/hosts/core_usage.py，multi-host-run.sh --peer、detached-run.sh watch、agent-watch.py 三处判）。
 # 样本：heavy-thread-defaults-red 的登记写对，scripts/hosts/half.sh 用 $(nproc) / 2、scripts/gate/half.py 用 cpu_count 与 min(16 与 processor_count // 2、
 #   .claude/hooks/start.py 用列表写法起 capped.sh 16、.claude/gate.d/stage.sh 用 capped.sh 16、crates/demo/src/lib.rs 用 available_parallelism 与
 #   隔了几行的 unwrap_or(8)，逐处点名判红（只在注释、echo 与 print 里提到的不点名）；排除表一行指向不存在的文件、一行锚串不命中、

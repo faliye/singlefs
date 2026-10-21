@@ -1,0 +1,2 @@
+# 多机配置没开 GPU：库单测在不带特性那一趟判段判在 CPU 而判绿，照键记库，带特性那一趟照键复用它，样本档快档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格（记不记库）；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

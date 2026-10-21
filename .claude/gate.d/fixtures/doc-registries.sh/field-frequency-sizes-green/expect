@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：field-frequency-sizes
+want=字段频率「每 X 一份」的 X 都指得到已定条款给出的大小：扫 3 份，8 处（逻辑 extent 1、单元 2、extent 1、节点 1、字面大小 1、索引节点 1；豁免 1 处）；读得出大小的粒度：DATA_UNIT_BYTES = 32768（D4 已定项 7、D4 已定项 5），NODE_BYTES = 16384（D8 已定项 2）
+want=doc-registries.sh：1 格里 1 格绿（field-frequency-sizes），0 格本次未跑（无）

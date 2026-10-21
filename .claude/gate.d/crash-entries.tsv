@@ -1,0 +1,19 @@
+# 崩溃流入口登记表（K1 乙：入口一律经 CrashPointRecorder 设点，入口名登记在这张表；里程碑三出口 4、六·1；用户 2026-10-20 定，
+# 原话在 records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条）。
+# 一行一个入口，两列用制表符分隔：入口名（覆盖行 CRASH_FLOW_COVERAGE 的 entry= 那个值，只用字母、数字、_.:-）、说明（这个入口做哪件写路径上的事）。
+# 覆盖表的行就是这张表，列是 crates/singlefs-harness/src/segments.rs 的 StepKind 成员；门禁 checker-tier-crash-point-replay 的 crash-flow-coverage 格判：
+# 日志里出现这张表外的入口红、这张表里的入口在判的那个域里一条覆盖行都没有红、StepKind 有成员没被任何一条流罩住红（判法 scripts/crash/crash-flow-coverage.py 文件头）。
+# 初值取自 2026-10-20 源码里 CrashPointRecorder 的 step / record_span 字面给出的入口名（crates/singlefs-checker-tier/tests/common_crash_points/mod.rs 与两份测试文件）；
+# crates 那一批把入口改经 CrashPointRecorder 设点、打出真行之后照真行核一遍，新入口在这里加一行。
+acquire_instance_and_warm_up	取号写行暖机：取实例号、写实例表那一行与暖机的写
+publish_first_file	首个文件版本的发布
+publish_overwrite	覆盖写一个已有文件的发布
+mount_writable	可写挂载（清扫与挂载期的写）
+mount_writable_after_the_crash	崩溃之后重挂成可写（两条流共用前缀的放量流）
+unmount	卸载
+roll_back_by_a_forward_publish	以一次向前发布回退
+raise_rollback_floor	会话推的抬回退下限（抬 F）
+sequential_write	顺序写一个文件（多记录发布这一类）
+publish_unlink_through_the_session	经会话删第一个文件的发布
+publish_unlink_intent	删除：写意图的那一次发布
+publish_unlink_step	删除：分批回收的那几次发布

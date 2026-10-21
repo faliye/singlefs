@@ -1,0 +1,8 @@
+# 出口 4 那六格在快档里都判绿（上一次全量那一格快档按设计退 77、打信息行），样本档快档退 3（expect 里逐格写了按设计不绿的理由）；
+# 阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-flow-coverage
+crash-ignored-nodes
+invariant-zero-evaluations
+crash-case-must-red
+crash-knobs
+last-full-judgement

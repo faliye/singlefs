@@ -66,8 +66,11 @@
   lists.tsv        清单按单元存：一行「清单的单元键 <TAB> 这个单元里的变异（JSON）」（mutation-prune.py 的 list_unit_key、list_entry）；
                    被变异包里每一个单元都记（没有变异的记空表），--list-items 与 --summary 照它在此刻的源码上复原清单，不起 cargo
   baselines.tsv    基线（只追加）：一行七段：基线键、步名、结局（ok / exit-<码>）、秒数、时刻、线程数、这一步的内存峰值字节；
-                   基线键按「执行过的单元」算：这一步编、跑的那几个包（连同它们的路径依赖）里全部单元的指纹多重集、这一步的命令（去掉线程数）与全局那几行
-  baselines/<基线键前 16 位>/   test-times.<线程数>.<步名>.tsv（runner 量的逐条 CPU 秒）、peaks.<线程数>.tsv（包装记的峰值）
+                   基线键按这一步真跑到的判定的单元闭包算（见下「基线」）；步名只当索引，不进键
+  baselines/<基线键前 16 位>/   test-times.<线程数>.<步名>.tsv（runner 量的逐条 CPU 秒）、peaks.<线程数>.tsv（包装记的峰值）；
+                   基线键拒算的步放 baselines/refused/（一份，每趟头一回用到时清空）
+  baseline-entries.tsv   按条记基线（只追加，见下「基线」）：一行八段：记录键、步名、线程数、kind（test / rest / binary）、二进制（只当索引）、
+                   runner 记的那几行（JSON）、量它那一趟的内存峰值字节、时刻
   coverage.tsv     覆盖记录（只追加）：一行「记录键 <TAB> 哪一段 <TAB> 二进制 <TAB> 用例 <TAB> 执行到的单元（种类:指纹，JSON）<TAB> profraw 份数 <TAB> 日期」；
                    记录键是那条测试的测试键（checker 档逐个二进制的取那个二进制里各条测试的测试键），测试的闭包不变就照用，变了那几条重跑插桩
   escalated-verdicts.tsv、escalation/   升档判的抓到的登记表与两趟日志（见下「升档」）
@@ -122,6 +125,26 @@
   被 KILL：留下的那一步还活着时占着库目录的锁（锁的描述符在驱动与内存包装最外层那个 bash 手里）：等 --lock-wait 秒，还占着就退 4、不跑。
 基线：每一步、每个线程数（--threads）按基线键先在没改过的树上跑一遍，全绿才开始跑变异（基线红了一律退 6）；基线的秒数定这个线程数下的超时。
   取基线按（基线键, 步名, 线程数）取最后一行：是绿的、逐条时间表与峰值都在就沿用，不然在这个线程数下重跑那一步、追加一行；别的线程数的行不动、不盖。
+  基线键（Judgement.baseline_key，D13 已定项 17）= 这一步真跑到的每一条判定各自单元闭包键的多重集、这一步的命令（去掉线程数）、全局那几行（判法单元指纹除外）：
+    判定是测试函数（mutation-prune.py 的 test_entries 静态列：第一段 harness 档四个包不标 #[ignore] 的，慢档用例那一步标了的、去掉排除表里的，
+    checker 档快档 singlefs-checker-tier 不标的）、这几个目标里的条目级宏调用（宏展开出来的测试静态列不出，把宏调用连同它的闭包算进去）、
+    被变异两个包的文档测试；checker 档快档带 --release，闭包照 cfg 去掉 debug_assertions 收。闭包键里有闭包单元的种类与去注释指纹、闭包真引到的
+    cfg 原子、依赖版本行、工具链那几行；在这一步的 cfg 与特性下不编的判定不算这一步跑到的。不带步名、手写的版本号、包级与文件级指纹：
+    改一个不在这一步任何判定闭包里的单元，基线照样沿用。
+  拒算（照跑、不沿用、不退回包级）：编译步（编得过与否、用时随它编的那几个包里每一个单元变，按单元闭包切不开）、有一条判定的闭包拒算
+    （读运行期拼出的路径、起自己这个可执行文件这一类，lib_function_units.py 认不全）、认不出跑哪些判定的步。拒算的步这一趟用 run_token 算一把
+    这一趟独有的键：基线行与升档登记照常记、照常对得上，以后哪一趟都对不上。stdout 那一句写「基线键拒算（为什么）」。
+  按条记基线（经 runner 的三个测试步里，基线键只因为有判定的闭包拒算而算不出的；Judgement.baseline_entry_plan、Runner.ensure_entry_baseline）：
+    不整步照跑。nextest 那两步一条测试一份记录（键 = 去掉线程数的命令、全局那几行、它自己的单元闭包键），有条目级宏调用的二进制另一份
+    「宏调用展开的那几条」（键 = 那个二进制里宏调用的闭包键多重集）；checker 档快档 runner 按二进制量 CPU 秒，一个二进制一份记录（键 = 它里面闭包
+    算得出的判定与宏调用的闭包键多重集；里面有拒算的，量的是 --exact --skip 掉它们的那一趟）。每份记录照（记录键、kind、线程数）在
+    baseline-entries.tsv 找最后一行，找得到的沿用它记的 CPU 秒；找不到的与拒算的那几条在没改过的树上照跑（nextest 用 -E 只点它们，
+    第二段慢档用例那一步与排除表的 -E 取交；checker 档拒算的那几条另起一趟 --exact 只跑它们，那个二进制的 CPU 秒 = 沿用或现量的那一份加这一趟），
+    跑绿的照键追加一行；宏调用的闭包拒算的二进制整个照跑。名字与二进制只当索引、不进键（rest 另按二进制找：改名只会重跑）。
+    这一步的逐条时间表由沿用的与现跑的拼成；baselines.tsv 照常追加这一趟那一行（这一趟独有的键，峰值取现跑那几趟与沿用的记录里最大的）。
+    stdout 写「按条记基线：N 份记录沿用 M、照跑 K；拒算的 R 条每趟照跑（头几条）」。文档测试那一步不经 runner、量不了逐条，照旧整步。
+    今天的树上第一段测试步 3 条、checker 档快档 15 条拒算（读 env!("CARGO_MANIFEST_DIR") 拼出的目录或运行期给的文件名、起自己这个可执行文件），
+    lib_function_units.py 与 crates/singlefs-unit-graph 逐条同义，那几种形态两边都拒算，不在这里另认。
   换树只重写内容不同的文件、写的文件 mtime 取此刻：cargo 按 mtime 判本地包新不新鲜，内容变了的必重编，没变的照旧复用编译目录。
   每次重起（这一趟没现跑基线的那一段）先在没改过的树上把编译那几步各跑一遍，红了退 6：基线绿过之后环境坏了要在落行之前发现。
   编译那一步退 101 而日志里没有带源码位置的编译错误（磁盘满、锁文件不符这一类），不记无效，记 driver-error 并当场在没改过的树上验一次编译。
@@ -136,6 +159,8 @@
   超时用包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT（退 253）。
   基线那几步另把 RUN_WITH_MEMORY_CAP_PEAKS 指到 baselines/<基线键>/peaks.<线程数>.tsv、键 broad-mutation baseline <步名>（BASELINE_PEAK_KEY_PREFIX）：
   每一步开跑前删掉它，跑完读出包装记的峰值、写进 baselines.tsv 那一行的峰值一段，升档的基线峰值取那一行。基线那一步记过绿而这个线程数下那一行没有峰值的，真跑重跑那一步的基线。
+  基线那几步的告警照旧叫醒主 agent：峰值表指到默认之外时包装把告警写到峰值表旁边（scripts/hosts/run-with-memory-cap.sh 文件头「告警跟着峰值表走」），所以环境里还没有
+  SINGLEFS_CORE_USAGE_ALERTS 的，驱动把它设成 scripts/hosts/core_usage.py 的 alerts_path() 给的真记录（按文件路径导入那一份取，real_alerts_record）；调用方已经设了的照调用方的。非基线的步不设。
 升档（用户 2026-10-03 定：超时与内存撞顶不交用户判，由驱动凭证据自动判）：
   一条变异某一步退 253（超时）或 250（撞了内存上限），驱动不换参数、当场在同一棵改过的树上把那一步升档重跑一次（escalate_step）：
     超时：限时 = max(ESCALATION_TIME_FACTOR 倍原限时, ESCALATION_TIME_BASELINE_MULTIPLE 倍基线秒数) 向上取整，内存上限不变；
@@ -329,6 +354,12 @@
       红：「✗ 自证：手改过的树没照源码换回去」、「✗ 自证：换树没删树里多出来的文件」、「✗ 自证：恢复原件半途被杀之后树里多出了文件、或重跑没恢复」
   BROAD_MUTATION_BREAK=sync-preserves-source-mtime  换树照源文件的 mtime 拷（shutil.copy2），cargo 会把旧产物当新鲜
       红：「✗ 自证：换树之后编译目录照旧产物跑了」
+  BROAD_MUTATION_BREAK=baseline-by-packages  基线键照改前取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名
+      红：「✗ 自证：基线键没按这一步跑到的判定的单元闭包取」、「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
+  BROAD_MUTATION_BREAK=baseline-refused-step-whole  不按条记基线：基线键拒算的测试步照改前整步照跑（一条拒算整步照跑）
+      红：「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
+  BROAD_MUTATION_BREAK=baseline-alerts-beside-peaks  基线那几步不设 SINGLEFS_CORE_USAGE_ALERTS（改前的写法：告警跟着基线峰值表写到它旁边，叫不醒主 agent）
+      红：「✗ 自证：基线那几步交给一步的 SINGLEFS_CORE_USAGE_ALERTS 不是 core_usage.py 的 alerts_path() 给的真记录」
 mutation-prune.py 文件头列的那几项（驱动在自证里把它们转给规则库）打开时这份 --selftest 不一定红，由 mutation-prune.py --selftest 判。
 只供测试（--selftest 自己设；这个进程的父进程不是带 --selftest 的这份脚本、或库目录不在那一趟自证的工作目录里，设了任何一个都拒，退 2）：
   BROAD_MUTATION_STEP_DRIVER=1 每一步的真命令换成自证工作目录（BROAD_MUTATION_SELFTEST_WORK）里的 fake-step-driver
@@ -391,6 +422,7 @@ SCRIPT_KEY = "scripts/mutation/broad-mutation.py"   # 规范输出与复用哨�
 REAL_SELF_PATH = os.path.realpath(__file__)
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 THREAD_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "capped.sh")
+CORE_USAGE_LIBRARY = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "core_usage.py")   # 基线那几步的告警记录取它的 alerts_path()（文件头「内存」）
 DEFAULT_HOME = "~/.local/share/singlefs/broad-mutation-units"
 OLD_LAYOUT_MARKERS = ("tree.source", "versions")      # 「一版一个目录」那时的库目录里才有的：见到就拒（旧库整个弃用，不迁移、不补签）
 DEFAULT_MEMORY_CAP = "24G"        # 2026-09-30 派发给的上限；各步的实测峰值由内存包装记在 ~/.local/share/singlefs/memory-peaks.tsv（键 broad-mutation <步名>）
@@ -422,6 +454,9 @@ RESULT_SIGNED_COLUMNS = len(VERDICT_COLUMNS) - 1    # mac 一段签的是它前�
 DEFAULT_RESULT_KEY = "singlefs/broad-mutation-result.key"     # 相对 ${XDG_CONFIG_HOME:-~/.config}
 RESULT_KEY_HEX_LENGTH = 64
 BASELINE_COLUMNS = ("baseline_key", "step", "outcome", "seconds", "finished_at", "threads", "peak_bytes")
+# 按条记基线（文件头「基线」）：一行一份在没改过的树上跑绿的记录；kind 是 test（一条测试）、rest（一个二进制里宏调用展开的那几条）、binary（checker 档一个二进制，
+# 有拒算的是去掉那几条的那一份），lines 是 runner 记的那几行（JSON：[[文件名, 用例, CPU 秒, 墙钟秒]…]），binary 只当索引（rest 另按它找）
+BASELINE_ENTRY_COLUMNS = ("record_key", "step", "threads", "kind", "binary", "lines", "peak_bytes", "finished_at")
 COVERAGE_COLUMNS = ("record_key", "stage", "binary", "test", "covered", "profiles", "judged_on")
 LIST_COLUMNS = ("unit_key", "mutations")
 # 判法单元指纹（文件头「键」）从这几个函数收 python 单元闭包：选条、沿用、结论分类、升档（连同它们点到的常量与被调的函数）
@@ -437,6 +472,7 @@ JUDGING_ENTRIES = (("scripts/mutation/broad-mutation.py", "select_items"), ("scr
 # 收判法单元闭包时扫哪几份（驱动、规则库、libtest 结果行的解析）；它们按字面路径载入的 lib_function_units.py 照样收进来
 JUDGING_SCAN_FILES = ("scripts/mutation/broad-mutation.py", "scripts/mutation/mutation-prune.py", "scripts/gate/lib_libtest_result_lines.py")
 RUNNER_TEST_STEPS = ("one-test", "two-test-slow-harness", "two-test-checker-tier")   # 经 runner 按单条（checker 档按二进制）限 CPU 时间的测试步
+REFUSED_BASELINE_DIRECTORY = "refused"   # baselines/ 下拒算的基线放逐条时间表与峰值的那一份（文件头「基线」）
 EXIT_GATE_RED = 8
 # 升档（文件头「升档」）：四个常量是判法的一部分（escalate_step 点到它们），改了判法单元指纹就变，库里的判定一条都不沿用；提交门禁复核登记行时按此刻的常量判倍数
 ESCALATION_TIME_FACTOR = 4                    # 超时那一步升档：限时乘几倍
@@ -1019,6 +1055,7 @@ class Library:
         self.verdicts_path = os.path.join(home, "verdicts.tsv")
         self.lists_path = os.path.join(home, "lists.tsv")
         self.baselines_path = os.path.join(home, "baselines.tsv")
+        self.baseline_entries_path = os.path.join(home, "baseline-entries.tsv")
         self.coverage_path = os.path.join(home, "coverage.tsv")
         self.registry_path = os.path.join(home, ESCALATION_REGISTRY)
         self.imports_path = os.path.join(home, "imports.tsv")
@@ -1403,6 +1440,7 @@ class Judgement:
         self.mutants_version = next((line for line in self.tools if "mutants" in line), " | ".join(self.tools))
         self.mutants_configuration = self.rules.mutants_configuration_digest(root)
         self.keys, self._tests = {}, None
+        self.release_closures = {}   # 带 --release 那一步的判定的闭包（release_entry_key），按（单元, 目标）缓存
         self.table = library.read_verdicts()
         self.by_key, self.by_locator = {}, {}
         for row in self.table.rows:
@@ -1536,7 +1574,154 @@ class Judgement:
         return chosen
 
     def baseline_key(self, step, threads):
-        """基线键（文件头「库目录」baselines.tsv）：这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹多重集、去掉线程数的命令、全局那几行（判法单元指纹除外）。"""
+        """基线键（文件头「基线」）：→ (键, "") 或 (None, 拒算的那一句)。键 = 这一步真跑到的每一条判定（baseline_entries）各自单元闭包键的多重集
+        （闭包键里有闭包单元的种类与去注释指纹、闭包真引到的 cfg 原子、依赖版本行、工具链那几行）、去掉线程数的命令、全局那几行（判法单元指纹除外）；
+        不带步名、手写的版本号、包级与文件级指纹。在这一步的 cfg 与特性下不编的判定（entry-cfg-inactive）不算这一步跑到的、不进键。
+        拒算（照跑、不沿用、不退回包级）：编译步（编得过与否、用时随包里每一个单元变，按单元闭包切不开）、认不出跑哪些判定的步、有一条判定的闭包拒算。
+        弄坏开关 baseline-by-packages：照改前取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名。"""
+        name, _stage, kind, command, _failed = step
+        if break_is("baseline-by-packages"):
+            return self.package_baseline_key(step, threads), ""
+        if kind == "build":
+            return None, "编译步：编得过与否、用时随这一步编的那几个包里每一个单元变，按单元闭包切不开"
+        entries, release = self.baseline_entries(name)
+        if entries is None:
+            return None, f"认不出步 {name} 跑哪些判定"
+        words = list(command)
+        if "-j" in words and words.index("-j") + 1 < len(words) and words[words.index("-j") + 1] == str(threads):
+            del words[words.index("-j"):words.index("-j") + 2]
+        global_lines = [line for line in self.globals if not line.startswith("judging-units ")]
+        keys = []
+        for entry in entries:
+            key, refused = self.release_entry_key(entry, global_lines) if release else self.rules.test_key(self.tree, entry["unit"], entry["target"], global_lines)
+            if key is None and refused == ["entry-cfg-inactive"]:
+                continue
+            if key is None:
+                return None, f"{entry['binary']} {entry['test']} 的单元闭包拒算（{','.join(refused) or '闭包算不出'}）"
+            keys.append(key)
+        lines = [f"command\t{shlex.join(words)}"] + global_lines + [f"entry\t{key}" for key in sorted(keys)]
+        return hashlib.sha256("".join(line + "\n" for line in lines).encode("utf-8", "surrogateescape")).hexdigest(), ""
+
+    def baseline_entry_plan(self, step, threads):
+        """按条记基线（文件头「基线」）：基线键因为有判定的闭包拒算而整步算不出的测试步，拆成各自按键沿用的几份记录与每趟照跑的那几条。
+        → None（不按条：编译步、认不出的步、不经 runner 的步，弄坏开关 baseline-refused-step-whole）或
+        {"style": nextest / libtest, "records": [记录], "refused": [(二进制, 用例)], "whole": [整个照跑的二进制], "refused_names": {二进制: [用例]}}。
+        nextest 那两步：一条测试一份记录（kind test，键 = 去掉线程数的命令、全局那几行、它自己的单元闭包键）；有条目级宏调用的二进制另一份
+        「宏调用展开的那几条」（kind rest，键 = 那个二进制里宏调用的闭包键多重集），宏调用的闭包拒算的二进制整个照跑；拒算的测试每趟照跑。
+        checker 档快档（cargo test，runner 按二进制量 CPU 秒）：一个二进制一份记录（kind binary，键 = 它里面闭包算得出的判定与宏调用的闭包键多重集；
+        有拒算的，这一份量的是 --exact --skip 掉它们的那一趟），拒算的那几条另起 --exact 照跑；宏调用拒算的二进制整个照跑。
+        记录里的二进制、名字只当索引，不进键（rest 另按二进制找，改名只会重跑、不会错沿用）。"""
+        name, _stage, kind, command, _failed = step
+        if kind != "test" or name not in RUNNER_TEST_STEPS or break_is("baseline-refused-step-whole"):
+            return None
+        entries, release = self.baseline_entries(name)
+        if entries is None:
+            return None
+        words = list(command)
+        if "-j" in words and words.index("-j") + 1 < len(words) and words[words.index("-j") + 1] == str(threads):
+            del words[words.index("-j"):words.index("-j") + 2]
+        global_lines = [line for line in self.globals if not line.startswith("judging-units ")]
+        head = [f"command\t{shlex.join(words)}"] + global_lines
+        style = "nextest" if "nextest" in command else "libtest"
+
+        def digest(lines):
+            return hashlib.sha256("".join(line + "\n" for line in lines).encode("utf-8", "surrogateescape")).hexdigest()
+
+        groups = {}
+        for entry in entries:
+            target = self.tree.workspace.targets.get(entry["target"]) if entry["target"] else None
+            group = groups.setdefault(entry["binary"], {"target": target, "tests": [], "refused": [], "macros": [], "macro_refused": False, "names": set()})
+            key, refused = self.release_entry_key(entry, global_lines) if release else self.rules.test_key(self.tree, entry["unit"], entry["target"], global_lines)
+            is_macro = entry["unit"].kind == "item_macro"
+            if not is_macro:
+                group["names"].add(entry["test"])
+            if key is None and refused == ["entry-cfg-inactive"]:
+                continue
+            if is_macro:
+                group["macros"].append(key)
+                group["macro_refused"] = group["macro_refused"] or key is None
+            elif key is None:
+                group["refused"].append(entry["test"])
+            else:
+                group["tests"].append((entry["test"], key))
+        plan = {"style": style, "records": [], "refused": [], "whole": [], "refused_names": {}}
+        for binary, group in sorted(groups.items()):
+            target = group["target"]
+            stem = (target.name if target is not None else binary.rsplit("/", 1)[-1].rsplit("::", 1)[-1]).replace("-", "_")
+            selector = (["--lib"] if target is None or target.kind == "lib" else [f"--{target.kind}", target.name])
+            plan["refused"] += [(binary, test) for test in group["refused"]]
+            if group["refused"]:
+                plan["refused_names"][binary] = sorted(group["refused"])
+            if style == "nextest":
+                plan["records"] += [{"kind": "test", "binary": binary, "test": test, "stem": stem, "key": digest(head + [f"entry\t{key}"])}
+                                    for test, key in group["tests"]]
+                if group["macro_refused"]:
+                    plan["whole"].append({"binary": binary, "stem": stem, "selector": selector})
+                elif group["macros"]:
+                    plan["records"].append({"kind": "rest", "binary": binary, "test": "", "stem": stem, "names": sorted(group["names"]),
+                                            "key": digest(head + ["rest"] + [f"macro\t{key}" for key in sorted(group["macros"])])})
+                continue
+            if group["macro_refused"]:
+                plan["whole"].append({"binary": binary, "stem": stem, "selector": selector})
+                continue
+            plan["records"].append({"kind": "binary", "binary": binary, "test": "*", "stem": stem, "selector": selector, "refused": sorted(group["refused"]),
+                                    "key": digest(head + [f"entry\t{key}" for key in sorted(key for _test, key in group["tests"])]
+                                                  + [f"macro\t{key}" for key in sorted(group["macros"])])})
+        return plan
+
+    def baseline_entries(self, name):
+        """一步真跑到的判定：→ (判定列表, 按不按 --release 的 cfg 收闭包)；认不出的步交 (None, False)。测试函数照 mutation-prune.py 的 test_entries 静态列，
+        另加这几个目标里的条目级宏调用（宏展开出来的测试静态列不出：把宏调用连同它的闭包算进去）；文档测试照 doctest_entries。"""
+        if name == "one-test":
+            return [entry for entry in self.rules.test_entries(self.tree, HARNESS_TIER_PACKAGES) if not entry["ignored"]] + self.macro_entries(HARNESS_TIER_PACKAGES), False
+        if name in (SLOW_STEP_NAME, OLD_SLOW_STEP_NAME):
+            return ([entry for entry in self.rules.test_entries(self.tree, HARNESS_TIER_PACKAGES, self.exclusions) if entry["ignored"]]
+                    + self.macro_entries(HARNESS_TIER_PACKAGES)), False
+        if name == "two-test-doc":
+            return self.rules.doctest_entries(self.tree, MUTATED_PACKAGES), False
+        if name == "two-test-checker-tier":
+            return ([entry for entry in self.rules.test_entries(self.tree, (CHECKER_TIER_PACKAGE,)) if not entry["ignored"]]
+                    + self.macro_entries((CHECKER_TIER_PACKAGE,))), True
+        return None, False
+
+    def macro_entries(self, packages):
+        """这几个包的 lib、bin、tests 目标里的条目级宏调用（item_macro 单元），照判定的写法交（二进制、名字只当报错的索引）。"""
+        found = []
+        for target in self.tree.workspace.targets.values():
+            if target.crate.package not in packages or target.kind not in ("lib", "test", "bin"):
+                continue
+            for path in sorted(target.files):
+                found += [{"binary": self.rules.target_binary(target), "test": unit.name, "unit": unit, "target": target.id, "ignored": False}
+                          for unit in self.tree.code_units(path) if unit.kind == "item_macro"]
+        return found
+
+    def release_entry_key(self, entry, global_lines):
+        """带 --release 的那一步（checker 档快档）的一条判定：cfg 去掉 debug_assertions 收闭包（试法照 mutation-prune.py 的 UnitTree.closure：
+        先照默认、不编再加 test），键照 UnitTree.closure_key 的组法（闭包键、依赖版本行、工具链那几行与 edition）。→ (键或 None, 拒算形态)。"""
+        library, unit, target_id = self.tree.library, entry["unit"], entry["target"]
+        cache_key = (id(unit), target_id)
+        if cache_key not in self.release_closures:
+            release_cfg = [item for item in library.DEFAULT_RUST_CFG if item != "debug_assertions"]
+            found = (None, ["entry-cfg-inactive"])
+            for extra in ((), ("test",)):
+                try:
+                    found = (library.rust_closure_of(self.tree.workspace, unit, target_id, release_cfg + list(extra), no_default_cfg=True), [])
+                    break
+                except library.UsageError:
+                    found = (None, ["entry-cfg-inactive"])
+            self.release_closures[cache_key] = found
+        closure, refusals = self.release_closures[cache_key]
+        if closure is None:
+            return None, refusals
+        dependencies, dependency_refusals = self.tree.dependency_lines(closure)
+        key, closure_refusals = library.closure_key(closure, toolchain=list(global_lines) + self.tree.edition_lines(closure), dependencies=dependencies,
+                                                    allow_refused=True)
+        forms = sorted({refusal.form for refusal in closure_refusals}) + dependency_refusals
+        return (None, forms) if forms else (key, [])
+
+    def package_baseline_key(self, step, threads):
+        """改前的基线键（只给弄坏开关 baseline-by-packages）：这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹多重集、去掉线程数的命令、
+        全局那几行（判法单元指纹除外），带手写的 form 与步名。"""
         name, _stage, _kind, command, _failed = step
         packages = set(MUTATED_PACKAGES if name == "two-test-doc" else (CHECKER_TIER_PACKAGE,) if "checker-tier" in name else HARNESS_TIER_PACKAGES)
         crates = {crate.directory: crate for crate in self.tree.workspace.crates if crate.package in packages}
@@ -1973,6 +2158,15 @@ def escalation_evidence_problems(first_exit, escalated_exit, baseline, first_amo
     return problems
 
 
+def real_alerts_record():
+    """基线那几步交给内存包装的告警记录（文件头「内存」）：(变量名 SINGLEFS_CORE_USAGE_ALERTS, scripts/hosts/core_usage.py 的 alerts_path() 给的路径)。
+    按文件路径导入那一份取，不另写一份路径；工作根那份库导入失败时路径是 None。"""
+    specification = importlib.util.spec_from_file_location("core_usage_for_broad_mutation", CORE_USAGE_LIBRARY)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module.ALERTS_VARIABLE, module.alerts_path()
+
+
 class Runner:
     def __init__(self, library, arguments):
         self.library, self.arguments = library, arguments
@@ -1995,26 +2189,49 @@ class Runner:
         self.coverage_available = set()
         self.profile_counts = {}
         self.baseline_keys = {}
+        self.baseline_refusals = {}    # 步名 → 基线键拒算的那一句（Judgement.baseline_key）
+        self.run_token = secrets.token_hex(16)   # 拒算的基线这一趟独有的那一把键从它算：记下的基线行以后哪一趟都对不上、不沿用
+        self.refused_directory_cleared = False
         self.current_key = ""
 
     def times_path(self, step_name):
-        return os.path.join(self.library.baseline_directory(self.baseline_key_of(step_name)), f"test-times.{self.arguments.threads}.{step_name}.tsv")
+        return os.path.join(self.baseline_directory_of(step_name), f"test-times.{self.arguments.threads}.{step_name}.tsv")
 
     def baseline_key_of(self, step_name):
-        """这一步此刻的基线键（Judgement.baseline_key：按执行过的单元算）。"""
+        """这一步此刻的基线键（Judgement.baseline_key：这一步真跑到的判定的单元闭包）。拒算的（文件头「基线」）交这一趟独有的一把（run_token 算的）：
+        这一趟照跑、记的基线行与升档登记照常对得上，以后哪一趟都对不上、不沿用。"""
         if step_name not in self.baseline_keys:
             step = next((step for step in self.steps if step[0] == step_name), (step_name, "", "test", [], None))   # 覆盖那一步不在步表里
-            self.baseline_keys[step_name] = self.judgement.baseline_key(step, self.arguments.threads)
+            key, refused = self.judgement.baseline_key(step, self.arguments.threads)
+            if key is None:
+                self.baseline_refusals[step_name] = refused
+                key = hashlib.sha256(f"refused-baseline\0{step_name}\0{self.run_token}".encode()).hexdigest()
+            self.baseline_keys[step_name] = key
         return self.baseline_keys[step_name]
+
+    def baseline_directory_of(self, step_name):
+        """这一步的逐条时间表与峰值放哪：键算得出的放 baselines/<键前 16 位>/；拒算的放 baselines/refused/（一份，这一趟头一回用到时清空，不按趟攒）。"""
+        key = self.baseline_key_of(step_name)
+        if step_name not in self.baseline_refusals:
+            return self.library.baseline_directory(key)
+        directory = os.path.join(self.library.home, "baselines", REFUSED_BASELINE_DIRECTORY)
+        if not self.refused_directory_cleared:
+            remove_tree(directory)
+            self.refused_directory_cleared = True
+        return directory
 
     def limits_path(self):
         return os.path.join(self.library.home, f"limits.{self.arguments.threads}.tsv")
 
-    def prepare_limits(self):
-        """C4：基线逐条（checker 档逐个二进制）的 CPU 秒 → 上限表（倍数 × CPU + 下限，墙钟兜底另算），runner 在 limit 模式读它。"""
+    def prepare_limits(self, stages=None):
+        """C4：基线逐条（checker 档逐个二进制）的 CPU 秒 → 上限表（倍数 × CPU + 下限，墙钟兜底另算），runner 在 limit 模式读它。
+        stages 给了只读这几段的测试步（不跑的那一段不为它现算基线键）。"""
         rules = prune_rules()
         times = {}
+        stage_of = {step[0]: step[1] for step in self.steps}
         for step_name in RUNNER_TEST_STEPS:
+            if stages is not None and stage_of.get(step_name) not in stages:
+                continue
             times.update(rules.read_times(self.times_path(step_name)))
         rules.write_limits(self.limits_path(), rules.limits_table(times, self.arguments.cpu_multiplier, self.arguments.cpu_floor,
                                                                   self.arguments.wall_multiplier, self.arguments.wall_floor))
@@ -2174,7 +2391,7 @@ class Runner:
     def baseline_peaks_path(self, step_name):
         """基线那一步跑的时候包装记峰值的那一份（RUN_WITH_MEMORY_CAP_PEAKS，包装的峰值表写法，键 BASELINE_PEAK_KEY_PREFIX + 步名）：
         每一步开跑之前删掉，跑完读出来写进 baseline.tsv 那一行的 peak_bytes（文件头「基线」），之后不再读它。"""
-        return os.path.join(self.library.baseline_directory(self.baseline_key_of(step_name)), f"peaks.{self.arguments.threads}.tsv")
+        return os.path.join(self.baseline_directory_of(step_name), f"peaks.{self.arguments.threads}.tsv")
 
     def wrapper_peak(self, step_name):
         """包装刚给这一步记下的峰值（字节）；没记交 None。"""
@@ -2237,6 +2454,15 @@ class Runner:
             os.makedirs(os.path.dirname(self.baseline_peaks_path(step_name)), exist_ok=True)
             environment["RUN_WITH_MEMORY_CAP_PEAKS"] = self.baseline_peaks_path(step_name)
             environment["RUN_WITH_MEMORY_CAP_KEY"] = BASELINE_PEAK_KEY_PREFIX + step_name
+            # 文件头「内存」：峰值表指到基线那一份，包装的告警会跟着写到它旁边；基线的告警照旧叫醒主 agent，调用方没设 SINGLEFS_CORE_USAGE_ALERTS 的设成真记录
+            if not break_is("baseline-alerts-beside-peaks"):
+                alerts_variable, alerts_record = real_alerts_record()
+                if not environment.get(alerts_variable):
+                    if alerts_record:
+                        environment[alerts_variable] = alerts_record
+                    else:
+                        note(f"  ! 基线那一步的告警记录找不到工作根（{CORE_USAGE_LIBRARY} 的 alerts_path() 交了 None）：包装会把告警写到基线峰值表旁边，看门狗读不到；"
+                             f"设 {alerts_variable} 指到工作根下的 core-usage-alerts.jsonl 再跑")
         # 文件头「内存」：升档那趟按它自己的上限排队；改坏了源码的那几步撞 slice 总上限时先挨杀（包装的 oom_score_adj）；基线与验环境那几步两样都不设
         environment.pop("RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP", None)
         environment.pop("RUN_WITH_MEMORY_CAP_OOM_FIRST", None)
@@ -2371,7 +2597,14 @@ class Runner:
                 self.baseline_seconds[step_name] = float(row["seconds"])
                 ran_every_step = False
                 continue
-            say(f"  · 基线 {step_name}：在没改过的树上跑（这把基线键下还没有它的绿记录，或这个线程数下还没量过逐条的 CPU 时间、还没记过内存峰值）")
+            plan = self.judgement.baseline_entry_plan(step, self.arguments.threads) if step_name in self.baseline_refusals else None
+            if plan is not None:
+                self.ensure_entry_baseline(step, stage, plan)
+                continue
+            if step_name in self.baseline_refusals:
+                say(f"  · 基线 {step_name}：基线键拒算（{self.baseline_refusals[step_name]}），在没改过的树上照跑、不沿用")
+            else:
+                say(f"  · 基线 {step_name}：在没改过的树上跑（这把基线键下还没有它的绿记录，或这个线程数下还没量过逐条的 CPU 时间、还没记过内存峰值）")
             runner_mode = "measure" if step_name in RUNNER_TEST_STEPS else None
             if runner_mode and os.path.exists(self.times_path(step_name)):
                 os.remove(self.times_path(step_name))
@@ -2383,32 +2616,202 @@ class Runner:
             peak = self.wrapper_peak(step_name)
             append_row(self.library.baselines_path, BASELINE_COLUMNS,
                        [self.baseline_key_of(step_name), step_name, outcome, f"{seconds:.1f}", now_text(), self.arguments.threads, "" if peak is None else peak])
-            if exit_code != 0 and stage == "two" and not break_is("stage-two-baseline-red-generic"):
-                log_path = self.log_path(BASELINE_SEQUENCE, step_name)
-                failing = []
-                try:
-                    with open(log_path, encoding="utf-8", errors="replace") as handle:
-                        for line in handle:
-                            name = libtest_failed_name(line.rstrip("\n")) or nextest_failed_name(line.rstrip("\n"))
-                            if name and name not in failing:
-                                failing.append(name)
-                except OSError:
-                    pass
-                refuse(f"第二段基线 {step_name} 在没改过的树上退 {exit_code}，红的测试：{'、'.join(failing[:8]) or UNRECOGNISED_TEST}；第二段一条结论都给不出",
-                       "已知的一条：crates/singlefs-checker-tier/src/crash_identity.rs 里读 .claude/gate.d/stage-inputs.tsv（导出树之外）的那条 lib 测试，"
-                       "要实现员改成不读导出树之外的文件（或改门禁 checker-tier-crates-mutation-replay 登记的拷贝范围把登记表并进导出树），修好之后重跑同一条命令；"
-                       f"在那之前只要第一段的结论就加 --skip-stage-two（第一段没红的记「只过了第一段」，不算定论）；全文看日志 {log_path}",
-                       EXIT_BASELINE_RED)
             if exit_code != 0:
-                refuse(f"基线 {step_name} 在没改过的树上退 {exit_code}：基线不绿，后面每一条「抓到」都不作数，一条变异都不跑",
-                       f"看日志 {self.log_path(BASELINE_SEQUENCE, step_name)}；代码本来就红就先修代码再重跑，是环境（缺工具、内存包装退 250–254）就修环境，重跑同一条命令",
-                       EXIT_BASELINE_RED)
+                self.refuse_red_baseline(step_name, stage, exit_code)
             self.baseline_seconds[step_name] = seconds
             limit = self.time_limit_of(step_name)
             say(f"  · 基线 {step_name} 绿，{seconds:.1f} 秒；" + (f"这一步的超时定为 {limit} 秒" if limit is not None else
                                                               f"逐条按 CPU 时间限（{self.arguments.cpu_multiplier} 倍加 {self.arguments.cpu_floor} 秒，墙钟兜底 {self.arguments.wall_multiplier} 倍加 {self.arguments.wall_floor} 秒）"))
         if ran_every_step:
             self.stages_with_fresh_baseline.add(stage)
+
+    def refuse_red_baseline(self, step_name, stage, exit_code, part_text=""):
+        """基线那一步在没改过的树上退了非 0（文件头「基线」：基线红了一律退 6）：第二段的另点名红的测试与已知的那一条。part_text 是按条记基线时照跑的是哪一部分。"""
+        log_path = self.log_path(BASELINE_SEQUENCE, step_name)
+        if stage == "two" and not break_is("stage-two-baseline-red-generic"):
+            failing = []
+            try:
+                with open(log_path, encoding="utf-8", errors="replace") as handle:
+                    for line in handle:
+                        name = libtest_failed_name(line.rstrip("\n")) or nextest_failed_name(line.rstrip("\n"))
+                        if name and name not in failing:
+                            failing.append(name)
+            except OSError:
+                pass
+            refuse(f"第二段基线 {step_name}{part_text} 在没改过的树上退 {exit_code}，红的测试：{'、'.join(failing[:8]) or UNRECOGNISED_TEST}；第二段一条结论都给不出",
+                   "已知的一条：crates/singlefs-checker-tier/src/crash_identity.rs 里读 .claude/gate.d/stage-inputs.tsv（导出树之外）的那条 lib 测试，"
+                   "要实现员改成不读导出树之外的文件（或改门禁 checker-tier-crates-mutation-replay 登记的拷贝范围把登记表并进导出树），修好之后重跑同一条命令；"
+                   f"在那之前只要第一段的结论就加 --skip-stage-two（第一段没红的记「只过了第一段」，不算定论）；全文看日志 {log_path}",
+                   EXIT_BASELINE_RED)
+        refuse(f"基线 {step_name}{part_text} 在没改过的树上退 {exit_code}：基线不绿，后面每一条「抓到」都不作数，一条变异都不跑",
+               f"看日志 {log_path}；代码本来就红就先修代码再重跑，是环境（缺工具、内存包装退 250–254）就修环境，重跑同一条命令",
+               EXIT_BASELINE_RED)
+
+    def entry_baseline_rows(self, step_name):
+        """baseline-entries.tsv 里这一步、这个线程数下的记录：{(记录键, kind, rest 的二进制或空): (runner 记的那几行, 那一行)}，同一把取最后一行；
+        lines 那一段读不出的行不算（那一份照跑）。"""
+        threads = str(self.arguments.threads)
+        found = {}
+        for fields in read_table(self.library.baseline_entries_path, len(BASELINE_ENTRY_COLUMNS)).rows:
+            row = dict(zip(BASELINE_ENTRY_COLUMNS, fields))
+            if row["step"] != step_name or (row["threads"] != threads and not break_is("baseline-any-threads")):
+                continue
+            try:
+                lines = [[str(stem), str(test), float(cpu), float(wall)] for stem, test, cpu, wall in json.loads(row["lines"])]
+            except (ValueError, TypeError):
+                continue
+            found[(row["record_key"], row["kind"], row["binary"] if row["kind"] == "rest" else "")] = (lines, row)
+        return found
+
+    def ensure_entry_baseline(self, step, stage, plan):
+        """按条记基线（文件头「基线」）：基线键拒算的测试步，Judgement.baseline_entry_plan 拆出来的每份记录照（记录键、kind、线程数）在 baseline-entries.tsv
+        里找最后一行，找得到的沿用它记的 CPU 秒，找不到的与拒算的那几条在没改过的树上照跑（nextest 按 -E 只点它们；checker 档按二进制起，
+        有拒算的二进制另起 --exact --skip 掉它们的一趟与只跑它们的一趟），跑绿的照键追加一行。这一步的逐条时间表由沿用的与现跑的拼成；
+        baselines.tsv 照常追加这一趟那一行（键是这一趟独有的那一把，峰值取现跑那几趟与沿用的记录里最大的），升档照它取。"""
+        step_name = step[0]
+        recorded = self.entry_baseline_rows(step_name)
+        rules = prune_rules()
+
+        def normalized(stem):
+            return stem.replace("-", "_")
+
+        def hit_of(record):
+            return recorded.get((record["key"], record["kind"], record["binary"] if record["kind"] == "rest" else ""))
+
+        reused, reused_peaks, runs, fresh_records = {}, [], [], []
+        if plan["style"] == "nextest":
+            tests, binaries = list(plan["refused"]), [item["binary"] for item in plan["whole"]]
+            for record in plan["records"]:
+                hit = hit_of(record)
+                if hit is None:
+                    fresh_records.append(record)
+                    if record["kind"] == "test":
+                        tests.append((record["binary"], record["test"]))
+                    else:
+                        binaries.append(record["binary"])
+                    continue
+                lines, row = hit
+                reused_peaks.append(row["peak_bytes"])
+                if record["kind"] == "test":
+                    stem = lines[0][0] if lines and row["binary"] == record["binary"] else record["stem"]
+                    reused[(normalized(stem), record["test"])] = [stem, record["test"], *(lines[0][2:4] if lines else [0.0, 0.0])]
+                else:
+                    reused.update({(normalized(line[0]), line[1]): line for line in lines})
+            if len(fresh_records) == len(plan["records"]):
+                runs.append({"text": "这一步全部", "command": list(step[3]), "selection": {"all": True}, "records": list(plan["records"])})
+            else:
+                binaries = sorted(set(binaries))
+                tests = [test for test in tests if test[0] not in binaries]
+                command, existing = list(step[3]), None
+                if "-E" in command:
+                    index = command.index("-E")
+                    existing = command[index + 1]
+                    del command[index:index + 2]
+                filters = rules.nextest_filters(tests) + [f"binary_id(={binary})" for binary in binaries]
+                if existing:
+                    filters = [f"({text}) & ({existing})" for text in filters]
+                command += [word for text in filters for word in ("-E", text)]
+                measured = fresh_records + [record for record in plan["records"] if record["binary"] in binaries and record not in fresh_records]
+                runs.append({"text": f"{len(tests)} 条测试、{len(binaries)} 个整个照跑的二进制", "command": command,
+                             "selection": {"tests": [list(test) for test in tests], "binaries": binaries}, "records": measured})
+        else:
+            base = [word for word in step[3] if word not in ("--lib", "--tests")] + ["--no-fail-fast"]
+            whole = list(plan["whole"])
+            for record in plan["records"]:
+                hit = hit_of(record)
+                exact = {"text": f"{record['binary']} 里拒算的 {len(record['refused'])} 条（--exact）", "binary": record["binary"], "stem": record["stem"],
+                         "command": base + record["selector"] + ["--", "--exact", *record["refused"]],
+                         "selection": {"binaries": [record["binary"]], "part": "exact"}, "records": []}
+                if hit is not None:
+                    lines, row = hit
+                    reused_peaks.append(row["peak_bytes"])
+                    stem = lines[0][0] if lines and row["binary"] == record["binary"] else record["stem"]
+                    reused[(normalized(stem), "*")] = [stem, "*", *(lines[0][2:4] if lines else [0.0, 0.0])]
+                    if record["refused"]:
+                        runs.append(exact)
+                    continue
+                fresh_records.append(record)
+                if record["refused"]:
+                    runs.append({"text": f"{record['binary']} 去掉拒算的 {len(record['refused'])} 条（--exact --skip）", "binary": record["binary"], "stem": record["stem"],
+                                 "command": base + record["selector"] + ["--", "--exact", *[word for test in record["refused"] for word in ("--skip", test)]],
+                                 "selection": {"binaries": [record["binary"]], "part": "skip"}, "records": [record]})
+                    runs.append(exact)
+                else:
+                    whole.append(record)
+            if whole:
+                runs.insert(0, {"text": f"{len(whole)} 个整个照跑的二进制", "command": base + [word for item in whole for word in item["selector"]],
+                                "selection": {"binaries": [item["binary"] for item in whole], "part": "whole"},
+                                "records": [item for item in whole if "key" in item]})
+        refused_names = [f"{binary} {test}" for binary, test in plan["refused"]]
+        say(f"  · 基线 {step_name}：基线键拒算（{self.baseline_refusals[step_name]}），按条记基线：{len(plan['records'])} 份记录沿用 "
+            f"{len(plan['records']) - len(fresh_records)}、照跑 {len(fresh_records)}；拒算的 {len(refused_names)} 条每趟照跑"
+            + (f"（{'、'.join(refused_names[:5])}{'…' if len(refused_names) > 5 else ''}）" if refused_names else ""))
+        total_seconds, peaks, fresh = 0.0, [], {}
+        sums = {}     # checker 档：按文件名把这一趟现跑的 CPU 秒、墙钟秒加起来（去掉拒算那一趟与只跑拒算那一趟各算一份，加起来是整个二进制的）
+        entry_rows = []
+        for run in runs:
+            for path in (self.times_path(step_name), self.baseline_peaks_path(step_name)):
+                if os.path.exists(path):
+                    os.remove(path)
+            os.makedirs(os.path.dirname(self.times_path(step_name)), exist_ok=True)
+            selection_text = "all" if run["selection"].get("all") else "per-entry " + json.dumps(run["selection"], ensure_ascii=False, sort_keys=True)
+            extra = {"BROAD_MUTATION_STEP_TESTS": json.dumps(run["selection"], ensure_ascii=False)} if self.fake_driver else None
+            exit_code, seconds = self.run_step(step, BASELINE_SEQUENCE, None, command=run["command"], selection_text=selection_text, runner_mode="measure", extra=extra)
+            total_seconds += seconds
+            peak = self.wrapper_peak(step_name)
+            if peak is not None:
+                peaks.append(peak)
+            if exit_code != 0:
+                append_row(self.library.baselines_path, BASELINE_COLUMNS,
+                           [self.baseline_key_of(step_name), step_name, f"exit-{exit_code}", f"{total_seconds:.1f}", now_text(), self.arguments.threads,
+                            "" if not peaks else max(peaks)])
+                self.refuse_red_baseline(step_name, stage, exit_code, f"（按条记基线照跑的那一部分：{run['text']}）")
+            lines = runner_time_lines(self.times_path(step_name))
+            if plan["style"] == "nextest":
+                fresh.update({(normalized(line[0]), line[1]): line[:4] for line in lines})
+                for record in run["records"]:
+                    if record["kind"] == "test":
+                        line = fresh.get((normalized(record["stem"]), record["test"]))
+                        if line is not None:
+                            entry_rows.append((record, [line], peak))
+                    else:
+                        names = set(record["names"])
+                        entry_rows.append((record, [line[:4] for line in lines if normalized(line[0]) == normalized(record["stem"]) and line[1] not in names], peak))
+                continue
+            by_stem = {}
+            for line in lines:
+                total = by_stem.setdefault(normalized(line[0]), [line[0], "*", 0.0, 0.0])
+                total[2] += line[2]
+                total[3] += line[3]
+            for key, total in by_stem.items():
+                running = sums.setdefault((key, "*"), [total[0], "*", 0.0, 0.0])
+                running[2] += total[2]
+                running[3] += total[3]
+            for record in run["records"]:
+                total = by_stem.get(normalized(record["stem"]))
+                if total is not None:
+                    entry_rows.append((record, [total], peak))
+        if plan["style"] != "nextest":
+            for key, total in sums.items():
+                if key in reused:
+                    total = [total[0], "*", total[2] + reused[key][2], total[3] + reused[key][3]]
+                fresh[key] = total
+        assembled = dict(reused)
+        assembled.update(fresh)
+        with open(self.times_path(step_name), "w", encoding="utf-8") as handle:
+            handle.write("".join(f"{stem}\t{test}\t{cpu:.3f}\t{wall:.3f}\t0\n" for stem, test, cpu, wall in assembled.values()))
+        if entry_rows:
+            append_rows(self.library.baseline_entries_path, BASELINE_ENTRY_COLUMNS,
+                        [[record["key"], step_name, self.arguments.threads, record["kind"], record["binary"], json.dumps(lines, ensure_ascii=False),
+                          "" if peak is None else peak, now_text()] for record, lines, peak in entry_rows])
+        unmeasured = len(fresh_records) - len({id(record) for record, _lines, _peak in entry_rows} & {id(record) for record in fresh_records})
+        peak_values = peaks + [int(value) for value in reused_peaks if str(value).isdigit()]
+        append_row(self.library.baselines_path, BASELINE_COLUMNS,
+                   [self.baseline_key_of(step_name), step_name, "ok", f"{total_seconds:.1f}", now_text(), self.arguments.threads, max(peak_values) if peak_values else ""])
+        self.baseline_seconds[step_name] = total_seconds
+        say(f"  · 基线 {step_name} 绿（按条记基线：照跑 {len(runs)} 趟共 {total_seconds:.1f} 秒，记下 {len(entry_rows)} 份"
+            + (f"，照跑而 runner 没量到的 {unmeasured} 份下一趟照跑" if unmeasured else "") + f"）；逐条按 CPU 时间限（{self.arguments.cpu_multiplier} 倍加 "
+            f"{self.arguments.cpu_floor} 秒，墙钟兜底 {self.arguments.wall_multiplier} 倍加 {self.arguments.wall_floor} 秒）")
 
     def verify_on_pristine_tree(self, step_names, why, suspects=()):
         """在没改过的树上把这几步各跑一遍（调用时树必须是原样）：退非 0 就是环境坏了，退 6。suspects 是因此不可信的那几条的序号。"""
@@ -2434,6 +2837,23 @@ class Runner:
         if step_names:
             self.verify_on_pristine_tree(step_names, "重起先验编译")
             say(f"  · 重起先验编译：{'、'.join(step_names)} 在没改过的树上照过")
+
+
+def runner_time_lines(path):
+    """runner 在 measure 模式写的表（mutation-prune.py 的 RUNNER_SCRIPT：文件名、用例、CPU 秒、墙钟秒、退出状态）逐行交 [文件名, 用例, CPU 秒, 墙钟秒, 退出状态]，
+    按写的次序、不合并（按条记基线照条记，Runner.ensure_entry_baseline）；表不在交空表，读不出的行不算。"""
+    found = []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                fields = line.rstrip("\n").split("\t")
+                try:
+                    found.append([fields[0], fields[1], float(fields[2]), float(fields[3]), fields[4] if len(fields) > 4 else ""])
+                except (IndexError, ValueError):
+                    continue
+    except OSError:
+        return found
+    return found
 
 
 def libtest_outcome(line):
@@ -3306,7 +3726,7 @@ def run_items(library, arguments, source):
     runner.runner_path = write_runner(library)
     for stage in stages:
         runner.ensure_baseline(stage)
-    runner.prepare_limits()
+    runner.prepare_limits(stages)
     runner.ensure_coverage(stages)
     runner.verify_environment_at_start(stages)
     ran = dict.fromkeys(ROW_OUTCOMES, 0)
@@ -3492,6 +3912,18 @@ if step.startswith("coverage-"):
 with open(os.path.join(work, "selections.log"), "a") as log:
     log.write(f"{sequence}\t{step}\t{os.environ.get('BROAD_MUTATION_STEP_SELECTION', '')}\t{os.environ.get('BROAD_MUTATION_RUNNER_MODE', '')}\t"
               f"{os.environ.get('BROAD_MUTATION_STEP_TIME_LIMIT', '')}\n")
+prepared_times = os.path.join(work, "runner-lines.tsv")
+if os.environ.get("BROAD_MUTATION_RUNNER_MODE") == "measure" and os.environ.get("BROAD_MUTATION_RUNNER_TIMES") and os.path.exists(prepared_times):
+    # 基线那几步替 runner 记逐条的秒数：照 <工作目录>/runner-lines.tsv（步名、二进制、文件名、用例、CPU 秒、墙钟秒、哪一部分，- 是哪一部分都算），
+    # 只记驱动经 BROAD_MUTATION_STEP_TESTS 点了的那几条、那几个二进制、那一部分（没点是全部）
+    import json
+    chosen = json.loads(os.environ.get("BROAD_MUTATION_STEP_TESTS") or '{"all": true}')
+    with open(os.environ["BROAD_MUTATION_RUNNER_TIMES"], "a") as out:
+        for prepared_line in open(prepared_times):
+            row_step, binary, stem, test, cpu, wall, part = prepared_line.rstrip("\n").split("\t")
+            picked = chosen.get("all") or [binary, test] in chosen.get("tests", []) or binary in chosen.get("binaries", [])
+            if row_step == step and picked and part in ("-", chosen.get("part", "-")):
+                out.write(f"{stem}\t{test}\t{cpu}\t{wall}\t0\n")
 with open(os.path.join(work, "limits.log"), "a") as log:
     # 升档那几格读：哪一趟（first / escalated）、整步时限、内存上限
     log.write(f"{sequence}\t{step}\t{os.environ.get('BROAD_MUTATION_STEP_ATTEMPT', '')}\t{os.environ.get('BROAD_MUTATION_STEP_TIME_LIMIT', '')}\t"
@@ -3500,6 +3932,9 @@ with open(os.path.join(work, "wrapper-env.log"), "a") as log:
     # 驱动交给内存包装的两样：按自己的上限排队（升档那趟）、撞总上限时先挨杀（改坏了源码的那几步）
     log.write(f"{sequence}\t{step}\t{os.environ.get('BROAD_MUTATION_STEP_ATTEMPT', '')}\t"
               f"{'queue-by-cap' if os.environ.get('RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP') else '-'}\t{'oom-first' if os.environ.get('RUN_WITH_MEMORY_CAP_OOM_FIRST') else '-'}\n")
+with open(os.path.join(work, "alerts-env.log"), "a") as log:
+    # 驱动交给一步的告警记录（SINGLEFS_CORE_USAGE_ALERTS，没设写 -）：基线那几步照旧写真记录（文件头「内存」）
+    log.write(f"{sequence}\t{step}\t{os.environ.get('SINGLEFS_CORE_USAGE_ALERTS') or '-'}\n")
 mutated = any("MUTATED_" in open(os.path.join(tree, path)).read()
               for path in ("crates/singlefs-core/src/lib.rs", "crates/singlefs-checker/src/lib.rs"))
 with open(os.path.join(work, "calls.log"), "a") as log:
@@ -3634,9 +4069,31 @@ SELFTEST_EXPECTED = {"1": ("caught", "one"), "2": ("unviable", "one"), "3": ("ti
                      "5": ("caught", "two"), "6": ("memory-cap", "one"), "7": ("caught", "two"), "8": ("timeout", "two")}
 SELFTEST_EXPECTED_SUMMARY = "total=8 caught=3 missed=1 unviable=1 timeout=2 memory_cap=1 stage_one_only=0 driver_error=0 not_run=0 refused=1 unlisted_units=0"
 SELFTEST_STAGE_TWO_STEPS = ["two-build-harness", "two-test-doc", SLOW_STEP_NAME, "two-build-checker-tier", "two-test-checker-tier"]
+SELFTEST_BUILD_STEPS = ("one-build", "two-build-harness", "two-build-checker-tier", "two-build-debug")   # 编译步：基线键拒算、每趟照跑
 SELFTEST_NEXTEST_CASE = "singlefs-harness::catching the_case_that_catches_it"
 SELFTEST_SLOW_CASE = "singlefs-format::ignored_cases slow_one"
 SELFTEST_JUDGING_KEY = "selftest-judging-units"
+# 按条记基线那一格（selftest_baseline_entry_cells）另加的源码：第一段测试步一个测试二进制三条、一条起自己这个可执行文件（current_exe，单元闭包拒算）；
+# checker 档包的库里两条（一条拒算）、另一个测试目标一条
+SELFTEST_ENTRY_BASELINE_FILE = "crates/singlefs-harness/tests/per_entry.rs"
+SELFTEST_ENTRY_BASELINE_SOURCES = {
+    "Cargo.toml": SELFTEST_SOURCES["Cargo.toml"].replace('"crates/singlefs-harness"]', '"crates/singlefs-harness", "crates/singlefs-checker-tier"]'),
+    SELFTEST_ENTRY_BASELINE_FILE: "#[test]\nfn kept_first() {\n    assert_eq!(2 + 2, 4);\n}\n\n#[test]\nfn kept_second() {\n    assert_eq!(3 + 3, 6);\n}\n\n"
+                                  "#[test]\nfn refused_third() {\n    let _path = std::env::current_exe();\n}\n",
+    "crates/singlefs-checker-tier/Cargo.toml": selftest_package("singlefs-checker-tier"),
+    "crates/singlefs-checker-tier/src/lib.rs": "pub fn nine() -> u32 {\n    9\n}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn kept_in_the_library() {\n"
+                                               "        assert_eq!(super::nine(), 9);\n    }\n\n    #[test]\n    fn refused_in_the_library() {\n"
+                                               "        let _path = std::env::current_exe();\n    }\n}\n",
+    "crates/singlefs-checker-tier/tests/quick.rs": "#[test]\nfn kept_in_a_test_target() {\n    assert_eq!(1 + 1, 2);\n}\n",
+}
+# 假的一步替 runner 记的逐条秒数（步名、二进制、文件名、用例、CPU 秒、墙钟秒、哪一部分）：checker 档的库那一份去掉拒算那一条量 2.0 秒、只跑它量 0.5 秒
+SELFTEST_ENTRY_RUNNER_LINES = ("one-test\tsinglefs-harness::catching\tcatching\tthe_case_that_catches_it\t0.5\t0.6\t-\n"
+                               "one-test\tsinglefs-harness::per_entry\tper_entry\tkept_first\t1.25\t1.5\t-\n"
+                               "one-test\tsinglefs-harness::per_entry\tper_entry\tkept_second\t1.5\t1.75\t-\n"
+                               "one-test\tsinglefs-harness::per_entry\tper_entry\trefused_third\t0.75\t1.0\t-\n"
+                               "two-test-checker-tier\tsinglefs-checker-tier\tsinglefs_checker_tier\t*\t2.0\t2.5\tskip\n"
+                               "two-test-checker-tier\tsinglefs-checker-tier\tsinglefs_checker_tier\t*\t0.5\t0.75\texact\n"
+                               "two-test-checker-tier\tsinglefs-checker-tier::quick\tquick\t*\t1.0\t1.25\twhole\n")
 
 
 def selftest_mutants(sources=None):
@@ -3698,6 +4155,9 @@ class Selftest:
         # 复用哨兵：别的格比的是现判与沿用的条数，沿用得了的全当哨兵、不抽强制现判；reuse-three-questions 与 reuse-sentinel 两格自己设
         self.environment[reuse_checks.SENTINEL_COUNT_VARIABLE] = "1000"
         self.environment.pop(reuse_checks.SENTINEL_SEED_VARIABLE, None)
+        # 告警记录：调用方没设时基线那几步会被设成工作根那份真记录（文件头「内存」）；自证起的每一趟都显式指到工作目录里这一份，经真内存包装的那一格也不写真记录
+        self.alerts_variable, _real_record = real_alerts_record()
+        self.environment[self.alerts_variable] = os.path.join(work, "core-usage-alerts.jsonl")
         for name in ("SINGLEFS_BROAD_MUTATION_HOME", HEAVY_PREFIX_VARIABLE, FULL_VARIABLE, "BROAD_MUTATION_KILL_AT", "BROAD_MUTATION_STEP_VIA_WRAPPER",
                      "BROAD_MUTATION_TOOLCHAIN", "BROAD_MUTATION_PROGRESS_INTERVAL", "BROAD_MUTATION_RUSTC", "BROAD_MUTATION_TOOL_VERSIONS", "RUSTUP_TOOLCHAIN"):
             self.environment.pop(name, None)
@@ -3738,8 +4198,8 @@ class Selftest:
             return [tuple(line.rstrip("\n").split("\t")) for line in handle if line.strip()]
 
     def called_sequences(self):
-        """被调过的序号（基线是 0）；在没改过的树上验环境的那几步不算在里面。"""
-        return {call[0] for call in self.calls() if call[0] != ENVIRONMENT_SEQUENCE}
+        """被调过的序号（基线是 0）；在没改过的树上验环境的那几步不算在里面，编译步的基线（基线键拒算、每趟照跑，文件头「基线」）也不算。"""
+        return {call[0] for call in self.calls() if call[0] != ENVIRONMENT_SEQUENCE and not (call[0] == str(BASELINE_SEQUENCE) and call[1] in SELFTEST_BUILD_STEPS)}
 
     def judged_sequences(self):
         """被调过的变异序号（不算基线 0 与验环境）。"""
@@ -4626,6 +5086,170 @@ def selftest_baseline_threads_cells(selftest):
                    "登记行记它的行号（baseline_row）与基线键")
 
 
+def selftest_baseline_key_cells(selftest):
+    """基线键（文件头「基线」）：编译步拒算、每趟照跑；测试步的键按它跑到的测试的单元闭包取——改一个不在任何测试闭包里的函数（core 的 six），
+    第一段测试那一步的基线照样沿用、不重跑；改抓到它的那条 harness 测试的函数体，那一步的基线重跑。弄坏开关 baseline-by-packages（包级）下这一格必须判错。"""
+    core, catching = "crates/singlefs-core/src/lib.rs", "crates/singlefs-harness/tests/catching.rs"
+    changed_core = SELFTEST_CORE.replace("pub fn six() -> u32 {\n", "pub fn six() -> u32 {\n    let _unused = 0;\n")
+    source = selftest_source_copy(selftest, "baseline-key-source")
+    selftest.write_plan([])
+    try:
+        selftest.clear_calls()
+        first = selftest.run("baseline-key", "--item", "1", "--skip-stage-two", source=source)
+        first_baselines = sorted(call[1] for call in selftest.calls() if call[0] == str(BASELINE_SEQUENCE))
+        write_sources(source, {core: changed_core})
+        selftest.write_mutants(selftest_mutants(dict(SELFTEST_SOURCES, **{core: changed_core})))
+        selftest.clear_calls()
+        outside = selftest.run("baseline-key", "--item", "1", "--skip-stage-two", "--rerun", source=source)
+        outside_baselines = sorted(call[1] for call in selftest.calls() if call[0] == str(BASELINE_SEQUENCE))
+        write_sources(source, {catching: SELFTEST_SOURCES[catching].replace("assert_eq!(1 + 1, 2);", "assert_eq!(2 + 2, 4);")})
+        selftest.clear_calls()
+        inside = selftest.run("baseline-key", "--item", "1", "--skip-stage-two", "--rerun", source=source)
+        inside_baselines = sorted(call[1] for call in selftest.calls() if call[0] == str(BASELINE_SEQUENCE))
+    finally:
+        selftest.write_mutants(selftest.mutants)
+        selftest.write_plan(SELFTEST_PLAN)
+    selftest.check((first.returncode, outside.returncode, inside.returncode) == (0, 0, 0) and first_baselines == ["one-build", "one-test"]
+                   and outside_baselines == ["one-build"] and "基线 one-build：基线键拒算" in outside.stdout and inside_baselines == ["one-build", "one-test"],
+                   f"基线键没按这一步跑到的判定的单元闭包取（头一趟退 {first.returncode}、基线 {first_baselines}；改了不在测试闭包里的 six 之后退 {outside.returncode}、"
+                   f"基线 {outside_baselines}；改了那条 harness 测试之后退 {inside.returncode}、基线 {inside_baselines}）：{outside.stdout[-400:]}{inside.stderr[-300:]}",
+                   "看 Judgement.baseline_key 与 Runner.baseline_key_of：测试步的键只取它跑到的测试（连同条目级宏调用）各自的单元闭包键、命令与全局那几行，"
+                   "不取包里全部单元的指纹、不带步名与 form；编译步拒算，这一趟用 run_token 算一把独有的键照跑")
+
+
+def selftest_baseline_entry_cells(selftest):
+    """按条记基线（文件头「基线」）：第一段测试步里 per_entry 一个测试二进制三条、refused_third 起自己这个可执行文件（闭包拒算）；checker 档快档库里两条
+    （一条拒算）、tests/quick.rs 一条。头一趟都照跑、照条记下；改一个不在任何测试闭包里的函数（core 的 six）之后，第一段测试那一步只照跑 refused_third、
+    别的三条沿用，checker 档快档只另起只跑拒算那一条的一趟（--exact），拼出来的逐条时间表里沿用的与现跑的都在；再改 kept_first 的断言，
+    第一段测试那一步照跑它与 refused_third。弄坏开关 baseline-refused-step-whole（一条拒算整步照跑）下这一格必须判错。"""
+    core = "crates/singlefs-core/src/lib.rs"
+    changed_core = SELFTEST_CORE.replace("pub fn six() -> u32 {\n", "pub fn six() -> u32 {\n    let _unused = 0;\n")
+    source = selftest_source_copy(selftest, "baseline-entry-source", SELFTEST_ENTRY_BASELINE_SOURCES)
+    prepared = os.path.join(selftest.work, "runner-lines.tsv")
+    refused_directory = os.path.join(selftest.work, "baseline-entry", "baselines", REFUSED_BASELINE_DIRECTORY)
+    with open(prepared, "w") as handle:
+        handle.write(SELFTEST_ENTRY_RUNNER_LINES)
+
+    def baseline_selections():
+        """基线那几次假的一步收到的 BROAD_MUTATION_STEP_SELECTION：{步名: [all 或 per-entry 点的那几样（dict）]}。"""
+        found = {}
+        path = os.path.join(selftest.work, "selections.log")
+        if os.path.exists(path):
+            with open(path) as handle:
+                for line in handle:
+                    fields = line.rstrip("\n").split("\t")
+                    if len(fields) >= 3 and fields[0] == str(BASELINE_SEQUENCE) and fields[1] in ("one-test", "two-test-checker-tier"):
+                        text = fields[2]
+                        found.setdefault(fields[1], []).append(json.loads(text[len("per-entry "):]) if text.startswith("per-entry ") else text)
+        return found
+
+    def assembled_times():
+        """拒算的基线放逐条时间表的那一份里此刻的行：{步名: {(文件名, 用例): CPU 秒}}（下一趟开跑会清空它，取在两趟之间）。"""
+        found = {}
+        for name in sorted(os.listdir(refused_directory)) if os.path.isdir(refused_directory) else []:
+            step_name = next((step for step in ("one-test", "two-test-checker-tier") if name.startswith("test-times.") and name.endswith(f".{step}.tsv")), None)
+            if step_name:
+                with open(os.path.join(refused_directory, name)) as handle:
+                    found[step_name] = {tuple(line.split("\t")[:2]): line.split("\t")[2] for line in handle if line.strip()}
+        return found
+
+    selftest.write_plan([])
+    try:
+        selftest.clear_calls()
+        first = selftest.run("baseline-entry", "--item", "4", source=source)
+        first_selections = baseline_selections()
+        write_sources(source, {core: changed_core})
+        selftest.write_mutants(selftest_mutants(dict(SELFTEST_SOURCES, **{core: changed_core})))
+        selftest.clear_calls()
+        outside = selftest.run("baseline-entry", "--item", "4", "--rerun", source=source)
+        outside_selections = baseline_selections()
+        outside_times = assembled_times()
+        write_sources(source, {SELFTEST_ENTRY_BASELINE_FILE: SELFTEST_ENTRY_BASELINE_SOURCES[SELFTEST_ENTRY_BASELINE_FILE].replace("assert_eq!(2 + 2, 4);", "assert_eq!(4 + 4, 8);")})
+        selftest.clear_calls()
+        inside = selftest.run("baseline-entry", "--item", "4", "--rerun", source=source)
+        inside_selections = baseline_selections()
+    finally:
+        if os.path.exists(prepared):
+            os.remove(prepared)
+        selftest.write_mutants(selftest.mutants)
+        selftest.write_plan(SELFTEST_PLAN)
+    harness_binary = "singlefs-harness::per_entry"
+    checker_parts = [selection.get("part") if isinstance(selection, dict) else selection for selection in first_selections.get("two-test-checker-tier", [])]
+    inside_tests = inside_selections.get("one-test", [{}])
+    selftest.check((first.returncode, outside.returncode, inside.returncode) == (0, 0, 0)
+                   and first_selections.get("one-test") == ["all"] and checker_parts == ["whole", "skip", "exact"]
+                   and outside_selections.get("one-test") == [{"tests": [[harness_binary, "refused_third"]], "binaries": []}]
+                   and outside_selections.get("two-test-checker-tier") == [{"binaries": ["singlefs-checker-tier"], "part": "exact"}]
+                   and "按条记基线" in outside.stdout
+                   and outside_times.get("one-test", {}).get(("per_entry", "kept_first")) == "1.250"
+                   and outside_times.get("one-test", {}).get(("per_entry", "refused_third")) == "0.750"
+                   and outside_times.get("two-test-checker-tier", {}).get(("singlefs_checker_tier", "*")) == "2.500"
+                   and outside_times.get("two-test-checker-tier", {}).get(("quick", "*")) == "1.000"
+                   and len(inside_tests) == 1 and isinstance(inside_tests[0], dict)
+                   and sorted(test for _binary, test in inside_tests[0].get("tests", [])) == ["kept_first", "refused_third"],
+                   f"基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑（头一趟退 {first.returncode}、第一段测试步 {first_selections.get('one-test')}、"
+                   f"checker 档快档 {checker_parts}；改了不在测试闭包里的 six 之后退 {outside.returncode}、第一段测试步 {outside_selections.get('one-test')}、"
+                   f"checker 档快档 {outside_selections.get('two-test-checker-tier')}、拼出的时间表 {outside_times}；改了 kept_first 之后退 {inside.returncode}、"
+                   f"第一段测试步 {inside_selections.get('one-test')}）：{outside.stdout[-400:]}{outside.stderr[-300:]}{inside.stderr[-300:]}",
+                   "看 Judgement.baseline_entry_plan 与 Runner.ensure_entry_baseline：基线键拒算的测试步按条记（一条测试、checker 档一个二进制一份记录，键是各自的单元闭包键），"
+                   "找得到记录的沿用它的 CPU 秒，只照跑找不到的与拒算的那几条，不整步照跑")
+
+
+def selftest_alerts_path_in(environment):
+    """在给定的环境里 scripts/hosts/core_usage.py 的 alerts_path() 交什么（另起一个 python 按文件路径导入它，不动自证进程自己的环境）。"""
+    probe = ("import importlib.util, sys\n"
+             "specification = importlib.util.spec_from_file_location('core_usage_probe', sys.argv[1])\n"
+             "module = importlib.util.module_from_spec(specification)\n"
+             "specification.loader.exec_module(module)\n"
+             "print(module.alerts_path())\n")
+    found = subprocess.run([sys.executable, "-c", probe, CORE_USAGE_LIBRARY], capture_output=True, text=True, stdin=subprocess.DEVNULL, env=environment)
+    return found.stdout.strip() if found.returncode == 0 else f"<探针退 {found.returncode}：{found.stderr.strip()[-200:]}>"
+
+
+def selftest_baseline_alerts_cells(selftest):
+    """文件头「内存」：基线那几步交给一步的 SINGLEFS_CORE_USAGE_ALERTS 是 core_usage.py 的 alerts_path() 给的真记录（这一格把工作根换到工作目录里认），
+    调用方先设了别的值的照调用方的，非基线的步不带它；自证每一趟都显式指到工作目录里的那一份，交给一步的没有一个是真工作根那份告警记录。"""
+    work = selftest.work
+    variable = selftest.alerts_variable
+    real_record = selftest_alerts_path_in(os.environ)
+    log_path = os.path.join(work, "alerts-env.log")
+
+    def handed(home, environment):
+        if os.path.exists(log_path):
+            os.remove(log_path)
+        ran = selftest.run(home, "--item", "1", "--skip-stage-two", environment=environment)
+        entries = []
+        if os.path.exists(log_path):
+            with open(log_path) as handle:
+                entries = [tuple(line.rstrip("\n").split("\t")) for line in handle if line.strip()]
+        return ran, [entry for entry in entries if entry[0] == str(BASELINE_SEQUENCE)], [entry for entry in entries if entry[0] != str(BASELINE_SEQUENCE)]
+    selftest.write_plan(SELFTEST_PLAN)
+    work_root = os.path.join(work, "alerts-work-root")
+    os.makedirs(work_root, exist_ok=True)
+    unset_environment = dict(selftest.environment, SINGLEFS_WORK_ROOT=work_root)
+    unset_environment.pop(variable, None)
+    expected = selftest_alerts_path_in(unset_environment)
+    unset_run, unset_baseline, unset_others = handed("baseline-alerts", unset_environment)
+    selftest.check(unset_run.returncode == 0 and path_is_under(expected, work_root) and unset_baseline and all(entry[2] == expected for entry in unset_baseline),
+                   f"基线那几步交给一步的 {variable} 不是 core_usage.py 的 alerts_path() 给的真记录（调用方没设、工作根换成 {work_root}；alerts_path() 交 {expected}；"
+                   f"驱动退 {unset_run.returncode}；基线那几步拿到的 {unset_baseline}）：{unset_run.stderr[-400:]}",
+                   f"看 Runner.run_step 基线那一支：环境里还没有 {variable} 的设成 real_alerts_record() 给的路径（core_usage.alerts_path()），"
+                   "不然包装照峰值表把基线的告警写到基线峰值表旁边、叫不醒主 agent；BROAD_MUTATION_BREAK 设着 baseline-alerts-beside-peaks 的话本来就该红")
+    selftest.check(unset_others and all(entry[2] == "-" for entry in unset_others),
+                   f"非基线的步带了 {variable}（调用方没设；那几步拿到的 {unset_others}）",
+                   f"看 Runner.run_step：只在基线那一支设 {variable}，变异步与验环境那几步照调用方的环境")
+    caller_record = os.path.join(work, "caller-alerts.jsonl")
+    caller_run, caller_baseline, caller_others = handed("baseline-alerts-caller", dict(selftest.environment, **{variable: caller_record}))
+    selftest.check(caller_run.returncode == 0 and caller_baseline and all(entry[2] == caller_record for entry in caller_baseline),
+                   f"调用方先设了 {variable}={caller_record}，基线那几步没照调用方的（驱动退 {caller_run.returncode}；基线那几步拿到的 {caller_baseline}）：{caller_run.stderr[-400:]}",
+                   f"看 Runner.run_step 基线那一支：环境里已经有 {variable} 的不动它，自证与调用方靠它自己隔离")
+    seen = {entry[2] for entry in unset_baseline + unset_others + caller_baseline + caller_others}
+    isolated = selftest.environment.get(variable, "")
+    selftest.check(path_is_under(isolated, work) and real_record not in seen and real_record != isolated,
+                   f"自证交给一步的告警记录指到了真工作根那一份 {real_record}（自证的环境里 {variable}={isolated}；这一格交给各步的 {sorted(seen)}）",
+                   f"看 Selftest.__init__：自证起的每一趟都显式把 {variable} 指到自证工作目录里的那一份，经真内存包装的那一格撞顶、挨挤也不写真记录")
+
+
 def selftest_result_mac_cells(selftest):
     """判定行的校验列：驱动写的每一行都带对得上的校验列、密钥在库目录之外且权限 600；手追加的没有校验列的 caught 行、
     校验列对不上的 caught 行都不算，--summary 判红（退 1）、点到那几行；密钥不在时 --summary 判红、不替它建。"""
@@ -4964,6 +5588,9 @@ def run_selftest_cells(selftest):
     selftest_escalation_cells(selftest)
     selftest_escalation_evidence_cells(selftest)
     selftest_baseline_threads_cells(selftest)
+    selftest_baseline_key_cells(selftest)
+    selftest_baseline_entry_cells(selftest)
+    selftest_baseline_alerts_cells(selftest)
     selftest_result_mac_cells(selftest)
     selftest_unit_environment_cells(selftest)
     selftest_import_cells(selftest)
@@ -4996,6 +5623,9 @@ def run_selftest():
         "加一条排除 / 只改 Cargo.toml 注释 / 加大限时照样沿用、改 RUSTFLAGS 全部现判、只改驱动注释判法单元指纹不变、拒算的条每趟现判、已删的参数与旧库拒、"
         "剪枝跑重跑超时与内存撞顶的条、加大限时与上限再点名重跑判出结论、超时与撞顶自动升档（证据齐的判抓到并登记、升档那趟跑完照它往后判、证据不齐的没结论、"
         "--summary 逐条列、升档判的抓到按键沿用、升档那趟按自己的上限排队、变异步撞总上限时先挨杀）、升档证据五支各一格、基线按线程数分开记且登记行指的那一行对得上、"
+        "基线键按测试的单元闭包取（改不在测试闭包里的函数测试步基线照沿用、改测试就重跑、编译步拒算照跑）、"
+        "基线键拒算的测试步按条记基线（收得全的测试各自沿用、只照跑拒算与改过的那几条，checker 档拒算的那几条另起 --exact）、"
+        "基线那几步的告警照旧写真记录（调用方设了的照调用方的、别的步不带）、"
         "判定行带密钥校验列（手追加的不算）、--unit-environment 打构建环境与工具链认的会话变量、换树后照内容重编、合并导入、"
         "忽略用例登记与排除表（没登记、指着不存在、两边都在、写坏、命令带 -E、旧基线行不认）、只供自证的变量不出自证、一步跑过进度间隔要报进度、被 TERM 连 scope 一起停，"
         f"{selftest.cells} 格都对")

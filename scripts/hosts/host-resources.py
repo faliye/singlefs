@@ -34,7 +34,8 @@
   合计：读到的那几台相加；哪一台哪一项没读到，合计里写明不含它。
 给了命令：
   历史：内存峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv）与派发器的显存峰值表（HOST_DISPATCH_GPU_PEAKS），
-    键同内存包装（memory_peaks_lib.command_key；RUN_WITH_MEMORY_CAP_KEY 给了就用它）；
+    键同内存包装（memory_peaks_lib.command_key；RUN_WITH_MEMORY_CAP_KEY 给了就用它）；内存峰值报的是 memory_peaks_lib.recorded_peak 读的那个数
+    （近几次实测里最大的，包装记账、派发器预测用的同一个），另报最近一次是哪天量的、那一次的上限与近几次有几次；
     用时取用时表（memory_peaks_lib.py 文件头「用时表」：只有经 host-dispatch.py 派出去、跑完的才记），没有这条报「没有历史」。
   长活提醒：host-dispatch.py 的 long_run_check（文件头 ⓪，同一份判法）：用时表里的历史用时，没有就按 --estimated-hours；
     派法占几台照它的 hosts_of_dispatch，「此刻能派的机器」按这一次读到的台数算。用时超过 2 小时而只占一台，结论之前报一行
@@ -402,11 +403,13 @@ def judge_command(options, summaries, command, gpu, shard=None, estimated_hours=
     hd = dispatcher()
     settings = options.settings
     prediction = hd.predict(settings, command, gpu)
-    row = peaks.read_peak_table(settings.peak_table).get(prediction.key)
+    row = peaks.read_peak_rows(settings.peak_table).get(prediction.key)
+    recorded_bytes, _ = peaks.recorded_peak(settings.peak_table, prediction.key)
     gpu_row = hd.read_gpu_peak_table(settings.gpu_peak_table).get(prediction.key) if gpu else None
     duration_seconds, duration_day = peaks.recorded_duration(settings.duration_table, prediction.key)
     history = {"key": prediction.key,
-               "memory_peak": None if row is None else {"bytes": row[0], "measured_on": row[1][:10], "cap": row[2], "hit": prediction.memory_history == "hit"},
+               "memory_peak": None if row is None else {"bytes": recorded_bytes, "latest_bytes": row[0], "recent_count": len(peaks.recent_of(row)),
+                                                        "measured_on": row[1][:10], "cap": row[2], "hit": prediction.memory_history == "hit"},
                "gpu_peak": None if gpu_row is None else {"mebibytes": gpu_row[0], "measured_on": gpu_row[1][:10], "hit": gpu_row[2]},
                "duration": None if duration_seconds is None else {"seconds": duration_seconds, "measured_on": duration_day},
                "duration_note": ("没有历史（用时表里没有这条：只有经 host-dispatch.py 派出去、跑完的才记）" if duration_seconds is None
@@ -528,7 +531,8 @@ def render(result):
         history = judged["history"]
         memory_peak = history["memory_peak"]
         memory_text = ("没有历史" if memory_peak is None else
-                       f"{gibibytes(memory_peak['bytes'])}（{memory_peak['measured_on']} 量的，那一次上限 {memory_peak['cap']}{'，撞过顶' if memory_peak['hit'] else ''}）")
+                       f"{gibibytes(memory_peak['bytes'])}（近 {memory_peak['recent_count']} 次实测里最大的；最近一次 {memory_peak['measured_on']} 量的，"
+                       f"那一次上限 {memory_peak['cap']}{'，撞过顶' if memory_peak['hit'] else ''}）")
         gpu_peak = history["gpu_peak"]
         gpu_text = ("" if not judged["gpu"] else "；显存峰值 " + ("没有历史" if gpu_peak is None else
                                                                  f"{gpu_peak['mebibytes']} MiB（{gpu_peak['measured_on']} 量的{'，撞过顶' if gpu_peak['hit'] else ''}）"))

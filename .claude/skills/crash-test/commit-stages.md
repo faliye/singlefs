@@ -10,7 +10,7 @@
 - `checker-tier-crash-point-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm 各自的内存上限（第 1b 步用），每道一个带单位的上限（例 16G）：`checker-tier-crash-point-replay` 与 checker-tier-lkmm 的写明是量过的（峰值表 `~/.local/share/singlefs/memory-peaks.tsv` 里那一道整条经包装跑出的峰值，且那一行「线程数」一列与这一次跑的线程数相同）还是推的；checker-tier-qemu-device-streams 的不小于同时起的虚机数乘每台的内存（`.claude/gate.d/checker-tier-qemu-device-streams.sh` 的 `MODES` 档数 × `scripts/devices/vm-bench.sh` 的 `VM_MEM`）。
 - checker-tier-formal-verification 的两个内存上限（第 1b 步用），各一个带单位的上限：每个 Verus 进程一个（空真与必红世界几处同时验，每处各占一份），E165 装置一个；各写明是量过的（峰值表 `~/.local/share/singlefs/memory-peaks.tsv` 里 Verus 那条命令、装置那条命令经包装跑出的峰值）还是推的。
 - 广谱变异驱动（第 2b 步）的两个上限：每条命令的内存上限（驱动的 `--memory-cap`，带单位，写明是量过的还是推的）与线程数（驱动的 `--threads`，取登记的每台默认重活线程数 `.claude/heavy-thread-default`，不给时驱动自己取它）。
-- `checker-tier-crash-point-replay` 跑哪一档：默认快档（两趟：`cargo test --release -p singlefs-checker-tier --lib --tests`，再带 `tests/` 里 `cfg` 点到的特性一趟（feature-gated-tests 格），加逐条核崩溃枚举用例的崩溃状态块（`SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1` 只查库不判：每块在崩溃判定库里有单元键相同、不红的判定才算罩住；登记行第三列写了 `red-blocks=judged-by-test` 的用例照全量起、按 cargo test 退出码判），`.claude/rules/verification.md`），用户不另说就是它；用户要求全量时带 --full，在 HEAD + 暂存区的 worktree 里跑（照 `checker-tier-crash-point-replay` 快档出路里那三行建）、命令前缀 `SINGLEFS_HEAVY_TESTS=user-request`；要不读判定库、全部块现判从头跑的，加「--start-over」（现判的照键写回同一份库）。
+- `checker-tier-crash-point-replay` 跑哪一档：默认快档（两趟：`cargo test --release -p singlefs-checker-tier --lib --tests`，再带 `tests/` 里 `cfg` 点到的特性一趟（feature-gated-tests 格），加逐条核崩溃枚举用例的崩溃状态块（`SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1` 只查库不判：每块在崩溃判定库里有单元键相同、不红的判定才算罩住；登记行第三列写了 `red-blocks=judged-by-test` 的用例照全量起、按 cargo test 退出码判、块那一行只核在不在、数对不对得上；`--full` 对这样的用例同一套判法，库里的红块不判），`.claude/rules/verification.md`），用户不另说就是它；用户要求全量时带 --full，在 HEAD + 暂存区的 worktree 里跑（照 `checker-tier-crash-point-replay` 快档出路里那三行建）、命令前缀 `SINGLEFS_HEAVY_TESTS=user-request`；要不读判定库、全部块现判从头跑的，加「--start-over」（现判的照键写回同一份库）。
 - 要不要跑崩溃放量全量：只在用户要求「崩溃放量全量」时跑（里程碑收尾、动了崩溃点重放或判器的那一批，D13（验证路线） 已定项 9），在同 `checker-tier-crash-point-replay` `--full` 那一棵 worktree 里跑；只跑几个分项的加 `--item <分项>`。
 - 草稿目录。
 
@@ -29,7 +29,18 @@
 3. 每个阶段原样抄它的「✓」行，或「✗」行与紧跟的「→」；退出码 77 记「本次未跑」，不记通过。checker-tier-formal-verification 一格里的「✗」只数那一格自己打的：从「── <格名>：」那一行到下一个「──」之间的「✗」行；不数「── 汇总：」一段里格共用库 `.claude/gate.d/lib/stage-cells.sh` 打的「✗ checker-tier-formal-verification.sh：N 格里 M 格红（…）」与它下面的「→」，也不数内存包装自己打的「✗」「→」（那一条行尾「包装自己打的：」里带出的）。这样数的每一条「✗」都写着「没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 <码>」的，那一格这一趟没判出结果：表里那一格记「没跑成」，不记成红在证明、表或实现上，原样抄它的「→」；这样数的里面另有一条不是这样写的「✗」（真红）的，那一格记红，两类「✗」连同各自的「→」都原样抄；照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条办：记下命令与退出码，不绕开包装重跑。
 4. 计数行原样抄：崩溃状态数、恢复结果、与 E142（新池新建文件的干跑） 产物或闭式比对的那几行；`checker-tier-crash-point-replay` `--full` 逐条用例各抄一行（「复用」「判绿」连同它记下的行、「✗」连同紧跟的「→」），末句的判绿、复用、判红各几条原样抄。双机分片跑的那几条另抄 `scripts/crash/crash-point-replay-shard-run.sh` 打的「· 崩溃点重放双机：…」那一行与崩溃放量双机驱动末尾的「✓ 双机各录各核、第二台的库拷回导入、对账为空、0 红」那一行，再抄 `<库的家目录>/runs/<标签>/import.log` 里的三样原话（`CRASH_POINT_REPLAY_PARALLEL_START` 带 `imported_blocks=<正数> shard=0/2`、一行不带 `blocks_left_to_other_hosts=` 的 `CRASH_POINT_REPLAY_PARALLEL_FINISHED`、计数行 `states` 等于 `closed_form` 且 `violations=0`、`exhaustive=true`）；判绿要这几样都在、`checker-tier-crash-point-replay` 判导入那一趟的日志绿；第二台那一片退 245 或 250–254 是内存包装自己的结局，照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条办，那一条用例这一趟的判定不算。输出里读不到判定行的阶段记「作废」，不记通过。
 5. 缺 herd7、缺 KVM、虚机起不来这一类判「环境」，以阶段自己的报错为准，另贴 `command -v herd7`、`ls -l /dev/kvm`、`command -v qemu-system-x86_64` 的原样输出作旁证。这三条命令不单独下判断。
-6. 每个阶段开跑与结束时各记一次指纹，开跑那次与起阶段写在同一条 Bash 命令里：`git rev-parse HEAD`、`git diff HEAD -- crates litmus Cargo.toml Cargo.lock scripts | sha256sum`（暂存与没暂存的都算）、`git ls-files --others --exclude-standard -z -- crates litmus | xargs -0 -r sha256sum | sha256sum`（未跟踪文件按内容，不只按名单）；跑 checker-tier-formal-verification 的那一趟，两条命令的路径都再加 `checker-tier-formal-verification.sh` 文件头列的输入里这里还没有的几条（`.claude/gate.d/verus-pins.tsv .claude/gate.d/e165-pinned-red-examples.tsv .claude/gate.d/e165-void-red-example-ledgers.tsv .claude/gate.d/e165-superseded-red-example-ledgers.tsv .claude/gate.d/lib/stage-cells.sh research/results scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`）；跑 checker-tier-broad-mutation 的那一趟两条命令的路径再加 `.cargo`；前后或阶段之间不同，就写明「这几个绿对应的不是同一份源码」、列出哪几个阶段之间变了。
+6. 每个阶段开跑与结束时各记一次指纹，开跑那次与起阶段写在同一条 Bash 命令里：`git rev-parse HEAD`、`git diff HEAD -- crates litmus Cargo.toml Cargo.lock scripts | sha256sum`（暂存与没暂存的都算）、`git ls-files --others --exclude-standard -z -- crates litmus | xargs -0 -r sha256sum | sha256sum`（未跟踪文件按内容，不只按名单）；跑 checker-tier-formal-verification 的那一趟，两条命令的路径都再加 `checker-tier-formal-verification.sh` 文件头列的输入里这里还没有的几条（`.claude/gate.d/verus-pins.tsv .claude/gate.d/e165-pinned-red-examples.tsv .claude/gate.d/lib/stage-cells.sh scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`）；跑 checker-tier-broad-mutation 的那一趟两条命令的路径再加 `.cargo`；前后或阶段之间不同，就写明「这几个绿对应的不是同一份源码」、列出哪几个阶段之间变了。
+
+## 监控行的三栏怎么数
+
+监控行「这一趟 ✓ N ✗ M 本次未跑 K」的 N、M、K 数第 3、4 步抄下来的判定行，不另写 grep：
+
+- 单位是一条判定：阶段汇总里的一格（「<格名>：绿 / 红（退出 N）/ 本次未跑」那一行）、`checker-tier-crash-point-replay` `--full` 逐条用例行里的一条用例、阶段自己逐项打的一项（一档、一份 litmus、一条变异行）；阶段没有逐项行的，整道阶段数一条，按它的退出码进栏。
+- ✓：判定是绿的。`--full` 逐条用例行里「判绿」与「复用」（复用的是库里不红的判定）各数一条。
+- ✗：判定是红的。一条判定的「✗」行连同紧跟的「→」数一条；格共用库打的汇总「✗ <阶段>：N 格里 M 格红」与内存包装自己打的「✗」不数。
+- 本次未跑：退出码 77 的格、项与阶段，报「本次未跑」的用例，加上「作废」（第 4 步：输出里读不到判定行）与「没跑成」（第 3 步：内存包装退非 0、这一格没有别的「✗」）。这几种都没判出结果，只进这一栏，不进 ✓，也不进 ✗。
+- 监控行里 ✗ 的逐条点名，本次未跑的 K 后面逐条点名是哪一条、属于 77、作废、没跑成里的哪一种。
+- 三栏相加要等于这一趟数到的判定条数；对不上就回头重数，对上之前不抄这一行。
 
 ## 写范围
 

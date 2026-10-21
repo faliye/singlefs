@@ -27,6 +27,21 @@
 .claude/kb/checks-owed.md:a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unblocked_slot_is_refused_by_the_space_admission_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_write_whose_slot_pairs_outside_this_mounts_cluster_segments_are_all_taken_is_refused_for_its_data_unit_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/checks-owed.md:a_file_reaching_the_second_slot_of_its_unit_without_a_forged_header_holds_the_watermark_invariant  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_live_file_with_one_data_unit_beyond_its_size_and_no_entry_reddens_the_count_and_the_account  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_node_header_carrying_another_pools_identifier_forged_on_the_second_slot_of_a_file_unit_is_claimed_and_the_watermark_invariant_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_node_header_forged_on_the_second_slot_of_a_file_unit_is_claimed_by_that_unit_and_the_watermark_invariant_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_publish_of_two_records_is_whole  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_record_without_the_last_flag_alone_is_not_a_concatenation  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_use_with_an_alias_brings_only_the_alias_into_the_module_names  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md:a_mount_that_stays_short_after_raising_the_floor_is_not_counted_as_admitted  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
+.claude/kb/checks-owed.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.en.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.en.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.ja.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
+.claude/kb/checks-owed.ja.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-harness/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
 .claude/kb/checks-owed.md:c_seen_node_insert  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:cfg_attr  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:clone_p  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -63,22 +78,50 @@
 .claude/kb/decisions-history.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions.md:spec_hash  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions/02-RAID条带策略.md:io_min  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/02-RAID条带策略.en.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/02-RAID条带策略.ja.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/02-RAID条带策略.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/02-RAID条带策略.en.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/02-RAID条带策略.ja.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/02-RAID条带策略.md:w_max  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/02-RAID条带策略.en.md:w_max  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/02-RAID条带策略.ja.md:w_max  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/05-快照-空间记账机制.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/05-快照-空间记账机制.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/05-快照-空间记账机制.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/08-核心索引结构.md:locality_id  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/08-核心索引结构.en.md:locality_id  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/08-核心索引结构.ja.md:locality_id  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/08-核心索引结构.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/08-核心索引结构.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/08-核心索引结构.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/09-加密.md:locality_id  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/09-加密.en.md:locality_id  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/09-加密.ja.md:locality_id  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/12-目标介质.md:max  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/12-目标介质.en.md:max  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/12-目标介质.ja.md:max  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/15-格式冻结政策.md:spec_hash  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions/18-块里携带什么信息.md:cp_ver  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions/18-块里携带什么信息.md:header_csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/18-块里携带什么信息.en.md:header_csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/18-块里携带什么信息.ja.md:header_csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/18-块里携带什么信息.md:image_seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions/18-块里携带什么信息.md:locality_id  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/18-块里携带什么信息.en.md:locality_id  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/18-块里携带什么信息.ja.md:locality_id  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/18-块里携带什么信息.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/18-块里携带什么信息.en.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/18-块里携带什么信息.ja.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/20-承重面单元的原子性与自包含.md:csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/20-承重面单元的原子性与自包含.en.md:csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/20-承重面单元的原子性与自包含.ja.md:csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/20-承重面单元的原子性与自包含.md:m  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/20-承重面单元的原子性与自包含.en.md:m  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/20-承重面单元的原子性与自包含.ja.md:m  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/22-单元原子性怎么合成.md:header_csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/decisions/22-单元原子性怎么合成.en.md:header_csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/decisions/22-单元原子性怎么合成.ja.md:header_csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/decisions/23-journal的角色与格式.md:header_csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions/23-journal的角色与格式.md:payload_csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/decisions/23-journal的角色与格式.md:wal_full  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -111,8 +154,14 @@
 .claude/kb/experiments.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments.md:w_max  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/08-大文件与小文件是否该走不同写路径.md:pos_ok  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/08-大文件与小文件是否该走不同写路径.en.md:pos_ok  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/08-大文件与小文件是否该走不同写路径.ja.md:pos_ok  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/08-大文件与小文件是否该走不同写路径.md:ptr256  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/08-大文件与小文件是否该走不同写路径.en.md:ptr256  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/08-大文件与小文件是否该走不同写路径.ja.md:ptr256  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/08-大文件与小文件是否该走不同写路径.md:ptr320  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/08-大文件与小文件是否该走不同写路径.en.md:ptr320  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/08-大文件与小文件是否该走不同写路径.ja.md:ptr320  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/104-扫描重建的现行版本判定.md:global_w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/107-条带表对主负载的写放大.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/108-明文层的代价交叉点.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -124,6 +173,8 @@
 .claude/kb/experiments/115-系统配置字段表的完备性与字节预算.md:g  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/115-系统配置字段表的完备性与字节预算.md:w_max  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/116-打包容器的账·补元数据写与整理策略.md:b  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/116-打包容器的账·补元数据写与整理策略.en.md:b  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/116-打包容器的账·补元数据写与整理策略.ja.md:b  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/120-档表取等比时公比怎么定.md:r  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/121-按cap切档与档数的最优点.md:r  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/125-顺序区写指针之上读到什么.md:cond  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -149,6 +200,8 @@
 .claude/kb/experiments/134-映射key格式代价槽基线与两条新臂.md:k2_instance  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/134-映射key格式代价槽基线与两条新臂.md:k3_instance  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/137-映射key形态的性能差距.md:seq_append  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/137-映射key形态的性能差距.en.md:seq_append  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/137-映射key形态的性能差距.ja.md:seq_append  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:k_runtime  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/139-按盘回退下界的收严形态.md:disk_stuck_h3  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/139-按盘回退下界的收严形态.md:f_  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -209,8 +262,14 @@
 .claude/kb/experiments/158-择根与修复四岔路.md:r4_q4  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/158-择根与修复四岔路.md:r4_q6  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/16-journal的角色WALvs意图日志.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/16-journal的角色WALvs意图日志.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/16-journal的角色WALvs意图日志.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/16-journal的角色WALvs意图日志.md:wal_full  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/16-journal的角色WALvs意图日志.en.md:wal_full  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/16-journal的角色WALvs意图日志.ja.md:wal_full  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/16-journal的角色WALvs意图日志.md:wal_leaf  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/16-journal的角色WALvs意图日志.en.md:wal_leaf  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/16-journal的角色WALvs意图日志.ja.md:wal_leaf  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md:f2_with_recording_code  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md:q11_summary  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md:q3_digest  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -255,47 +314,109 @@
 .claude/kb/experiments/171-三oracle合谋测试.md:driver_e171_s4_f4_comparator  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/171-三oracle合谋测试.md:driver_e171_s4_f4_substitutes_comparator  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/174-借据丢掉时等待与显存回还.md:q1_wait  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/174-借据丢掉时等待与显存回还.en.md:q1_wait  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/174-借据丢掉时等待与显存回还.ja.md:q1_wait  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/174-借据丢掉时等待与显存回还.md:simulated_light_trips_k9_at_the_registered_numbers  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/174-借据丢掉时等待与显存回还.en.md:simulated_light_trips_k9_at_the_registered_numbers  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/174-借据丢掉时等待与显存回还.ja.md:simulated_light_trips_k9_at_the_registered_numbers  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md:elapsed_ns  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md:segments_q2_one_birth_violated  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/178-叶容器与记录死亡的计数.md:identities_born_and_retired_inside_the_abandoned_gap_are_what_pc_b1_overcounts  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/178-叶容器与记录死亡的计数.md:v6_segments_without_coverage  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/23-journal几何.md:tail_lsn  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/23-journal几何.en.md:tail_lsn  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/23-journal几何.ja.md:tail_lsn  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/33-两条钉块规则扣的不是同一批.md:d22_prose  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/33-两条钉块规则扣的不是同一批.en.md:d22_prose  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/33-两条钉块规则扣的不是同一批.ja.md:d22_prose  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/33-两条钉块规则扣的不是同一批.md:invariant_i74  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/33-两条钉块规则扣的不是同一批.en.md:invariant_i74  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/33-两条钉块规则扣的不是同一批.ja.md:invariant_i74  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/34-根环槽几何.md:io_min  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/34-根环槽几何.en.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/34-根环槽几何.ja.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/34-根环槽几何.md:minimum_io_size  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/34-根环槽几何.en.md:minimum_io_size  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/34-根环槽几何.ja.md:minimum_io_size  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/34-根环槽几何.md:optimal_io_size  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/34-根环槽几何.en.md:optimal_io_size  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/34-根环槽几何.ja.md:optimal_io_size  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/41-根环槽几何2x4x256.md:io_min  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/41-根环槽几何2x4x256.en.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/41-根环槽几何2x4x256.ja.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/48-根环几何的可行点.md:io_min  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/48-根环几何的可行点.en.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/48-根环几何的可行点.ja.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/49-反向链宽度32还是64.md:tail_lsn  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/49-反向链宽度32还是64.en.md:tail_lsn  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/49-反向链宽度32还是64.ja.md:tail_lsn  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/58-校验和粒度的端到端代价.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/58-校验和粒度的端到端代价.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/58-校验和粒度的端到端代价.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/58-校验和粒度的端到端代价.md:verify_ns  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/58-校验和粒度的端到端代价.en.md:verify_ns  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/58-校验和粒度的端到端代价.ja.md:verify_ns  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/60-加盘之后不搬数据的代价.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/60-加盘之后不搬数据的代价.en.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/60-加盘之后不搬数据的代价.ja.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/63-分配器每次写用几列.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/63-分配器每次写用几列.en.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/63-分配器每次写用几列.ja.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/76-载荷校验和的判别力.md:header_csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/88-冒名单元与孤儿单元的判别.md:hdr47_claim  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.en.md:hdr47_claim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.ja.md:hdr47_claim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/88-冒名单元与孤儿单元的判别.md:hdr47_noclaim  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.en.md:hdr47_noclaim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.ja.md:hdr47_noclaim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/88-冒名单元与孤儿单元的判别.md:hdr91_claim  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.en.md:hdr91_claim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.ja.md:hdr91_claim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/88-冒名单元与孤儿单元的判别.md:hdr91_noclaim  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.en.md:hdr91_noclaim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/88-冒名单元与孤儿单元的判别.ja.md:hdr91_noclaim  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/96-混合架构的一致性.md:alloc_lifo  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/96-混合架构的一致性.md:alloc_lowest  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/96-混合架构的一致性.md:hdr_birth  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/96-混合架构的一致性.md:hdr_key  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/97-记账与分配记录的条目编码.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/experiments/97-记账与分配记录的条目编码.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/experiments/97-记账与分配记录的条目编码.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/experiments/98-inode记录与inode树的几何.md:locality_id  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/experiments/98-inode记录与inode树的几何.md:obj_birth  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/layout/01-first-txn.md:header_csum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/01-first-txn.en.md:header_csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/01-first-txn.ja.md:header_csum  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/01-first-txn.md:max_key  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/01-first-txn.en.md:max_key  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/01-first-txn.ja.md:max_key  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/01-first-txn.md:min_key  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/01-first-txn.en.md:min_key  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/01-first-txn.ja.md:min_key  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/01-first-txn.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/01-first-txn.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/01-first-txn.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/01-first-txn.md:w  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/01-first-txn.en.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/01-first-txn.ja.md:w  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/03-third-txn.md:a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/03-third-txn.en.md:a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/03-third-txn.ja.md:a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/03-third-txn.md:a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/layout/03-third-txn.en.md:a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/layout/03-third-txn.ja.md:a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/02-second-txn.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/milestone/02-second-txn.en.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/milestone/02-second-txn.ja.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/02-second-txn.md:a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/milestone/02-second-txn.en.md:a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/milestone/02-second-txn.ja.md:a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/03-third-txn.md:io_min  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/milestone/03-third-txn.en.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/milestone/03-third-txn.ja.md:io_min  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/08-eighth-txn.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
+.claude/kb/milestone/08-eighth-txn.en.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
+.claude/kb/milestone/08-eighth-txn.ja.md:seq  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/17-seventeenth-txn.md:spec_hash  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/prior-art.md:apfs_reap_state_t  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/prior-art.md:blk_cksum  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑

@@ -41,6 +41,8 @@
   种类由调用方定（门禁写登记键：阶段文件名或 <阶段>:<格>）。keys/<键>.json 是一条判定（只记绿：verdict、key、item、request、how（跑法）、summary、
   judged（判定日期）、composition（组成清单）），items/<名字的 sha256>.json 是这个名字最近一次判绿的那一份，只用来在键对不上时比组成清单、报出变了的单元。
   键相同就复用，不看记下来的是哪个名字（两条判定内容相同，判定就相同）。全量（--full、SINGLEFS_GATE_FULL=1）只写不读：现判的照键写回同一份库。
+  同一种类目录下另有 flow-lines/<组成键>.lines：一个测试二进制整份现判时打的覆盖行与计数行，由 scripts/crash/crash-flow-coverage.py collect-quick 照它
+  文件头「子命令」写、读（组成键是那个测试二进制里编得进的测试函数的（名字，键）排好序取 sha256），这一份不读不写它，删了只是下一趟整份复用的那几份报行不全。
   取不到 git common-dir（不在 git 工作树里）就不读不写，全部现判。旧的整道全绿标记（singlefs-stage-green.*）、崩溃枚举用例全绿标记（singlefs-crash-case-green.*）、
   环境记录（singlefs-gate-environment.*）整个弃用，这一份一样都不读，留在 common-dir 里的可以删。
 
@@ -71,10 +73,15 @@
   入口（第二列）：<文件>::<限定名>（测试函数全路径、bin 的 main、判法函数）、<文件>（Python / shell 脚本的程序入口、litmus 文件）、
       tests-of:<包>（这个包 lib 与各测试目标里全部不标 ignore 的测试函数，test-functions 现列）、vm:<档名>（虚机档，门禁 checker-tier-qemu-device-streams 认）、
       @<别的键>（那个键登记的全部入口）；路径从仓根起。实验的入口在复跑表那一行之外另加进行键（准入键登记的装置入口）。崩溃枚举用例写 -，入口就是第三列的 test=。
-  准入条件（第三列）：实验行认两种：
+  准入条件（第三列）：实验行认三种：
       question-row=<文件>#<行号>:<正则>          那份文件里第一列是 <行号> 的表格行，最后一格（状态）要匹配正则
       product-field=<实验键>:<行名>:<字段>=<值>   scripts/experiments/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
                                                   最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>
+      same-run-field=<行名>:<字段>=<值>           同一趟里先跑的那一段这一趟的输出（路径由调用方经环境变量 SINGLEFS_ADMISSION_SAME_RUN_PRODUCT 交来）里，
+                                                  最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>；不读 research/results/ 下的留存产物（用户 2026-10-18 定
+                                                  「改成同一趟现判」：research/ 可以整个删掉）。变量没设、指的文件不在、没有那一行或字段、值不等，都算前提没齐（退 3）
+    question-row 与 product-field 点名的文件（那份问题单、replay.sh 给那个实验键登记的留存产物）不在仓里，登记表自查（lint_registration_rows）判红：
+      前提指的是可以被归档删掉的东西，登记就靠不住；上一段的结论改用 same-run-field 在同一趟里现判。
     门禁行认五种：
       command=<可执行名>                  PATH 里找得到它
       readwrite=<路径>                    那个路径在、可读也可写（相对路径从仓库根起）
@@ -102,7 +109,7 @@
                                          带 features= 的另设 BINDGEN_EXTRA_CLANG_ARGS（取 scripts/crash/crash-amplification-lib.sh 的 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS）。
                                          不与 shard=across-machines 并存：分片的驱动脚本自己拼 cargo、不带特性
       shard=across-machines              至多一条：这条用例的全量在双机配置开着时两台分片（门禁 checker-tier-crash-point-replay --full 交给 scripts/crash/crash-point-replay-shard-run.sh）
-      red-blocks=judged-by-test          至多一条：这条用例故障注入之后的红块是用例自己认下的（用例自己分清单、断言清单外的失败为空），门禁快档不按库里的红块判，
+      red-blocks=judged-by-test          至多一条：这条用例故障注入之后的红块是用例自己认下的（用例自己分清单、断言清单外的失败为空），门禁快档与 --full 都不按库里的红块判，
                                          照全量起用例按 cargo test 的退出码判（块那一行照 crash-case-blocks --ran 核）；值只认 judged-by-test。
                                          crash-case-judged-by-test 子命令答登记了没有
 
@@ -112,7 +119,7 @@
   接口照 crash-case-blocks 子命令判；crates 侧在用例源码里认得 SINGLEFS_CRASH_CASE_BLOCKS_QUERY 才算接上）：
     查询（SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1）：用例只算块键、查库，一块都不判，fresh= 是库里没有键相同判定的块数，照常退 0；
       门禁快档按这一行判「这条用例的全部块都有键相同的判定且无红」：fresh、red、refused 都是 0 才算罩住，red 不是 0 判红，别的报本次未跑。
-      登记了 red-blocks=judged-by-test 的用例快档不查询：照平常跑起用例、按 cargo test 的退出码判，块那一行只核在不在、数对不对得上（crash-case-blocks --ran）。
+      登记了 red-blocks=judged-by-test 的用例快档不查询、--full 也不按红块判：照平常跑起用例、按 cargo test 的退出码判，块那一行只核在不在、数对不对得上（crash-case-blocks --ran）。
     只写不读（SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1，门禁 --start-over）：库不读，全部块现判，照键写回同一份库。
     平常跑（门禁 --full）：键相同的块复用、对不上的现判；red 不是 0 判红。
 
@@ -188,7 +195,7 @@
   crash-case-blocks <根> <日志> [--query | --ran]
                                  判日志里的 CRASH_CASE_BLOCKS 行（每条流一行，逐行收、按用例合计）：退 0 全部块都有键相同的判定且无红（--query）或无红（平常跑）；
                                  退 1 有红的块；退 3 --query 下有块没有判定或拒算（本次未跑）；退 4 一行都没有、有一行缺字段或数对不上（每一行 blocks = reused + fresh + refused）。
-                                 --ran（门禁快档实跑登记了 red-blocks=judged-by-test 的用例那一趟）：只核那一行在、每一行数对得上，红块与现判块不判：
+                                 --ran（门禁快档实跑与 --full 跑登记了 red-blocks=judged-by-test 的用例那一趟）：只核那一行在、每一行数对得上，红块与现判块不判：
                                  退 0 对得上，退 4 一行都没有、缺字段或数对不上；--query 与 --ran 同给退 2。
                                  crates 侧还没接上（crash_case_blocks_supported：用例源码里没有 SINGLEFS_CRASH_CASE_BLOCKS_QUERY）退 5，门禁按本次未跑报
   crash-case-shardable <根> <键>  这条用例登记了 shard=across-machines 没有：退 0 登记了、退 1 没登记（stdout 各一句）、退 2 登记有错
@@ -202,6 +209,8 @@
   tree-compare-reuse     gate-reuse 退回按树比：refs/sop/staged-green 那棵树（没有它取 HEAD 的树）与工作区在登记入口的文件上逐字相同就答可跳过，不查判定库：
                          自证 H2 那一格（改动带着 HEAD 一起前移、staged-green 跟着挪，键对不上的那一条必须现判）红
   skip-preconditions     实验不判前提          skip-gate-preconditions  门禁不判前提
+  same-run-field-unchecked  same-run-field= 不读同一趟的输出、一律当齐了：自证「same-run-field：同一趟的输出里值不等」那一格红
+  condition-files-unchecked 登记表自查不核 question-row=、product-field= 点名的文件在不在：自证「登记表自查点得出前提点名的文件不在」那一格红
   skip-build-environment 构建环境的生效值不进工具链行：自证 E02（RUSTFLAGS 加一个 -C target-cpu=native，键要变）红
   ignore-row-keys        复跑表按行的准入键那一段不认：自证「复跑表按行的准入键」那几格红
   row-key-with-product-name  行键另加留存产物的文件名：门禁 checker-tier-research-build-and-replay 的样本 replay-row-key-samples 里 R03（只改产物文件名，行键不变）红
@@ -224,7 +233,7 @@
                          四处调用方的样本里造失灵的那几份（*-plan-exit-red、*-plan-sentinel-red）照样跑完、不判红
   以及崩溃枚举用例日志与命令那几格的老开关（threads-by-worker-count、first-definition-only、ignore-attribute-without-space、single-worker-threads-field、
   threads-ignore-shards、keep-caller-library、target-own-files-only、judge-takes-forwarded-threads、cores-from-nproc、thread-variable-ignored、features-not-passed、
-  features-passed-to-every-case、gpu-case-not-quiesced、threads-skip-self-contained-finish-line、threads-default-unchecked、threads-default-from-cores、
+  features-passed-to-every-case、gpu-case-not-quiesced、gpu-test-threads-unset、threads-skip-self-contained-finish-line、threads-default-unchecked、threads-default-from-cores、
   runner-program-only、runner-arguments-from-configuration-directory-only），各弄坏哪一处写在用到它的那个函数里，自证里各有一格。
 
 管不到的：跑的是不是按今天的源码编出来的二进制（键按源码算，跑的是 target/ 里的旧二进制时两边对不上，cargo test 与 replay.sh 开跑前都会重编）；
@@ -304,7 +313,7 @@ BINDGEN_VARIABLE = "BINDGEN_EXTRA_CLANG_ARGS"
 BINDGEN_ASSIGNMENT_FORM = re.compile(r'^CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="([^"]*)"', re.MULTILINE)
 THREADS_VARIABLE_FORM = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 CRASH_CASE_SHARD_ACROSS_MACHINES = "across-machines"
-# 登记行的 red-blocks=：故障注入之后的红块由用例自己认下，门禁快档起用例按退出码判（文件头「崩溃枚举用例行」）
+# 登记行的 red-blocks=：故障注入之后的红块由用例自己认下，门禁快档与 --full 起用例按退出码判（文件头「崩溃枚举用例行」）
 CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST = "judged-by-test"
 CRASH_LIBRARY_DIRECTORY_VARIABLE = "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY"
 CRASH_SHARE_VARIABLE = "SINGLEFS_CRASH_AMPLIFICATION_SHARE"
@@ -440,9 +449,26 @@ def entry_file(entry):
     return entry.split("::", 1)[0]
 
 
+def experiment_condition_file_problems(root, kind, parts):
+    """实验行一条前提点名的文件不在仓里的说明（文件头「准入条件」）：question-row 那份问题单，product-field 是 replay.sh 给那个实验键登记的留存产物；
+    same-run-field 读同一趟的输出、不点名仓里的文件。复跑表按行的准入键那一段写错抛 RegistrationError。"""
+    if kind == "question-row":
+        if not os.path.isfile(os.path.join(root, parts["path"])):
+            return [f"点名的问题单 {parts['path']} 不在仓里（前提指的东西可以被归档删掉，登记就靠不住；上一段的结论改用 same-run-field= 在同一趟里现判）"]
+        return []
+    if kind == "product-field":
+        products = replay_products_of(root, parts["key"])
+        if not products:
+            return [f"点名的实验键 {parts['key']} 在 {REPLAY_SCRIPT} 的复跑表里一行留存产物都没有"]
+        return [f"点名的留存产物 {product} 不在仓里（research/ 可以整个删掉；上一段的结论改用 same-run-field= 在同一趟里现判）"
+                for product in products if not os.path.isfile(os.path.join(root, product))]
+    return []
+
+
 def lint_registration_rows(rows, root=None, all_rows=None):
     """登记表自己写对没有：键的形状、入口的写法（给了 root 还核入口的文件在不在）、准入条件认不认得（实验行只认实验的种类、门禁行只认门禁的种类）、
-    @ 引用解不解得开、崩溃枚举用例第二列写 -；给了 root 还核门禁行 probe= / environment= 指的脚本在不在。返回问题清单。"""
+    @ 引用解不解得开、崩溃枚举用例第二列写 -；给了 root 还核门禁行 probe= / environment= 指的脚本在不在、实验行 question-row= / product-field= 点名的文件在不在
+    （弄坏开关 condition-files-unchecked 下不核这一样）。返回问题清单。"""
     problems = []
     for row in rows:
         is_experiment = bool(EXPERIMENT_KEY_FORM.match(row.key))
@@ -470,7 +496,10 @@ def lint_registration_rows(rows, root=None, all_rows=None):
         for token in row.conditions:
             try:
                 if is_experiment:
-                    parse_condition(token)
+                    kind, parts = parse_condition(token)
+                    if root is not None and not break_is_set("condition-files-unchecked"):
+                        problems.extend(f"第 {row.line_number} 行：{row.key} 的 {token} {problem}"
+                                        for problem in experiment_condition_file_problems(root, kind, parts))
                     continue
                 kind, parts = parse_gate_condition(token)
                 if root is not None and kind in ("probe", "environment") and not os.path.isfile(os.path.join(root, parts["script"])):
@@ -1370,7 +1399,10 @@ def parse_condition(token):
     product_field = PRODUCT_FIELD_FORM.match(token)
     if product_field:
         return ("product-field", product_field.groupdict())
-    raise RegistrationError(f"认不出的准入条件：{token}（只认 question-row=<文件>#<行号>:<正则> 与 product-field=<实验键>:<行名>:<字段>=<值>）")
+    same_run_field = SAME_RUN_FIELD_FORM.match(token)
+    if same_run_field:
+        return ("same-run-field", same_run_field.groupdict())
+    raise RegistrationError(f"认不出的准入条件：{token}（只认 question-row=<文件>#<行号>:<正则>、product-field=<实验键>:<行名>:<字段>=<值> 与 same-run-field=<行名>:<字段>=<值>）")
 
 def sha256_of_file(path):
     digest = hashlib.sha256()
@@ -1648,12 +1680,57 @@ def product_field_value(root, experiment_key, line_name, field):
     return fields[field], product, None
 
 
+# same-run-field=<行名>:<字段>=<值>（文件头「准入条件」）：同一趟里先跑的那一段这一趟的输出，路径由调用方经这个环境变量交来；不读留存产物
+SAME_RUN_FIELD_FORM = re.compile(r"^same-run-field=(?P<line_name>[^:]+):(?P<field>[^=]+)=(?P<value>\S+)$")
+SAME_RUN_PRODUCT_VARIABLE = "SINGLEFS_ADMISSION_SAME_RUN_PRODUCT"
+
+
+def last_result_line_field(path, line_name, field):
+    """那份输出里最后一行 `E7RESULT name=<行名>` 的字段值；取不到交 (None, 原因)。"""
+    last_line = None
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if line.startswith(f"E7RESULT name={line_name} ") or line.rstrip("\n") == f"E7RESULT name={line_name}":
+                last_line = line.rstrip("\n")
+    if last_line is None:
+        return None, f"{path} 里没有 name={line_name} 这一行"
+    fields = dict(token.split("=", 1) for token in last_line.split()[1:] if "=" in token)
+    if field not in fields:
+        return None, f"{path} 的 name={line_name} 行没有 {field} 字段"
+    return fields[field], None
+
+
+def same_run_field_value(line_name, field):
+    """same-run-field 的取值：SAME_RUN_PRODUCT_VARIABLE 指的那份同一趟的输出里最后一行 name=<行名> 的字段；取不到交 (None, 那份输出, 原因)。"""
+    product = os.environ.get(SAME_RUN_PRODUCT_VARIABLE, "")
+    if not product:
+        return None, "", (f"{SAME_RUN_PRODUCT_VARIABLE} 没设：这一段要在同一趟里接在前一段之后跑，"
+                          f"先跑前一段、把它这一趟的输出路径经 {SAME_RUN_PRODUCT_VARIABLE} 交给这一段（不读 research/results/ 下的留存产物）")
+    if not os.path.isfile(product):
+        return None, product, f"{SAME_RUN_PRODUCT_VARIABLE} 指的同一趟输出 {product} 不在"
+    value, problem = last_result_line_field(product, line_name, field)
+    return value, product, problem
+
+
 def judge_preconditions(root, key, conditions):
-    """② 前提：返回 (没齐的清单, 齐了的清单)，每项是一句说明。登记写错抛 RegistrationError。"""
+    """② 前提：返回 (没齐的清单, 齐了的清单)，每项是一句说明。登记写错抛 RegistrationError。
+    same-run-field 读调用方交来的同一趟输出（弄坏开关 same-run-field-unchecked 下不读、一律当齐了）。"""
     missing = []
     satisfied = []
     for token in conditions:
         kind, parts = parse_condition(token)
+        if kind == "same-run-field":
+            if break_is_set("same-run-field-unchecked"):
+                satisfied.append(f"（弄坏开关 same-run-field-unchecked：没读同一趟的输出）{token}")
+                continue
+            value, product, problem = same_run_field_value(parts["line_name"], parts["field"])
+            if problem is not None:
+                missing.append(f"{problem}（要 name={parts['line_name']} 的 {parts['field']}={parts['value']}）")
+            elif value == parts["value"]:
+                satisfied.append(f"同一趟的输出 {product} 的 name={parts['line_name']} {parts['field']}={value}")
+            else:
+                missing.append(f"同一趟的输出 {product} 的 name={parts['line_name']} {parts['field']}={value}，要 {parts['value']}")
+            continue
         if kind == "question-row":
             status, problem = markdown_row_status(root, parts["path"], parts["row"])
             if problem is not None:
@@ -1748,7 +1825,7 @@ class CrashCase:
     def __init__(self, row, package, target, function, count_lines, exhaustive_lines, thread_lines, is_shardable_across_machines,
                  thread_variable=None, features=(), red_blocks_judged_by_test=False):
         self.row = row
-        # 登记行的 red-blocks=judged-by-test：故障注入之后的红块由用例自己认下，门禁快档起用例按退出码判、不按库里的红块判
+        # 登记行的 red-blocks=judged-by-test：故障注入之后的红块由用例自己认下，门禁快档与 --full 起用例按退出码判、不按库里的红块判
         self.red_blocks_judged_by_test = red_blocks_judged_by_test
         # 登记行的 features=：用例要编进的 cargo 特性（没登记是空）；crash-case-command 在 -p <包> 之后带 --features
         self.features = tuple(features)
@@ -1784,7 +1861,7 @@ def parse_crash_case(row):
         if kind == "red-blocks":
             if value != CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST:
                 raise RegistrationError(f"崩溃枚举用例 {row.key} 的 {token}：red-blocks= 只认 {CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST}"
-                                        "（故障注入之后的红块由用例自己认下，门禁快档起用例按退出码判）")
+                                        "（故障注入之后的红块由用例自己认下，门禁快档与 --full 起用例按退出码判）")
             red_blocks_values.append(value)
             continue
         if kind == "test":
@@ -2381,7 +2458,8 @@ def crash_case_launch(root, case, start_over, environment, blocks_query=False):
     （这一趟单机跑整条流；两台分片只由 scripts/crash/crash-point-replay-shard-run.sh 自己设）。线程数设进 SINGLEFS_CRASH_POINT_REPLAY_THREADS，这条用例读的线程变量
     （登记行的 threads-variable=）不是它时另设成同一个数，盖掉调用方环境里的（弄坏开关 thread-variable-ignored 下只设 SINGLEFS_CRASH_POINT_REPLAY_THREADS）。
     cargo test 带的特性：登记行的 features=，多机配置写了 ENABLE_GPU=1 的一律加 gpu（崩溃枚举用例的判段也上卡）；特性非空时 env 里另设 BINDGEN_EXTRA_CLANG_ARGS；
-    特性里有 gpu 的整条前面接 bash scripts/crash/gpu-quiesce-run.sh --（清场、不复原），环境里交清场之后的显卡先后与多机配置的路径（crash_case_cargo_features）。
+    特性里有 gpu 的整条前面接 bash scripts/crash/gpu-quiesce-run.sh --（清场、不复原），环境里交清场之后的显卡先后与多机配置的路径（crash_case_cargo_features），
+    特性里有 gpu 的，测试参数收尾另带 --test-threads 1（弄坏开关 gpu-test-threads-unset 下不带）；GPU 关的命令不带。
     线程数取不到、多机配置在而读不了抛 InputManifestError。"""
     machine_cores, threads, threads_origin = crash_case_worker_threads(case, environment)
     thread_settings = [f"{CRASH_POINT_REPLAY_THREADS_VARIABLE}={threads}"]
@@ -2403,9 +2481,11 @@ def crash_case_launch(root, case, start_over, environment, blocks_query=False):
         quiesce_settings = ([f"GPU_CARDS_BY_PRIORITY={cards}"] if cards else [])
         if os.path.isfile(configuration_file):
             quiesce_settings.append(f"{MULTI_HOST_CONFIGURATION_VARIABLE}={os.path.abspath(configuration_file)}")
+    # GPU 对拍的测试各占卡的显存，不并行起：特性里有 gpu 的（开了 GPU 的）带 --test-threads 1（.claude/rules/verification.md「两档：轻型与重型」）；GPU 关的不加。弄坏开关 gpu-test-threads-unset 下不加
+    test_threads_words = ["--test-threads", "1"] if GPU_FEATURE in features and not break_is_set("gpu-test-threads-unset") else []
     command = ["env", *quiesce_unsets, *share_unsets, *library_unsets, *library_setting, *thread_settings, *bindgen_setting, *quiesce_settings,
                "cargo", "test", "--release", "-p", case.package, *feature_words, "--test", case.target,
-               "--", "--include-ignored", "--exact", case.function, "--nocapture"]
+               "--", "--include-ignored", "--exact", case.function, "--nocapture", *test_threads_words]
     if quiesced:
         command = ["bash", os.path.join(root, GPU_QUIESCE_SCRIPT), "--", *command]
     return machine_cores, threads, threads_origin, command
@@ -3009,7 +3089,7 @@ def crash_case_blocks_supported(root):
 def judge_crash_case_blocks(log_text, query, ran=False):
     """日志里的 CRASH_CASE_BLOCKS 行：交 (退出码, 一句)。退出码见文件头 crash-case-blocks。
     多流的用例每条流各打一行：逐行认（每一行 blocks = reused + fresh + refused），按用例合计再判。
-    ran（--ran，快档实跑登记了 red-blocks=judged-by-test 的用例）：只核行在、数对得上，红块与现判块不判（用例的退出码由门禁判）。
+    ran（--ran，快档实跑与 --full 跑登记了 red-blocks=judged-by-test 的用例）：只核行在、数对得上，红块与现判块不判（用例的退出码由门禁判）。
     弄坏开关 blocks-single-line-only 下照改前要恰好一行，blocks-count-without-refused 下照改前核 blocks = reused + fresh；
     ran-blocks-line-optional 下 --ran 一行都没有也退 0。"""
     lines = [line.strip() for line in log_text.split("\n") if line.strip().startswith(CRASH_CASE_BLOCKS_PREFIX)]
@@ -3493,7 +3573,7 @@ def command_crash_case_blocks(arguments):
     arguments = [argument for argument in arguments if argument not in ("--query", "--ran")]
     if len(arguments) != 2 or (query and ran):
         print("  ✗ 用法：admission.py crash-case-blocks <项目根> <日志> [--query | --ran]")
-        print("     → 怎么办：日志取那一趟用例的全量输出；块查询那一趟带 --query，快档实跑登记了 red-blocks=judged-by-test 的那一趟带 --ran，两样不同给")
+        print("     → 怎么办：日志取那一趟用例的全量输出；块查询那一趟带 --query，快档实跑与 --full 跑登记了 red-blocks=judged-by-test 的那一趟带 --ran，两样不同给")
         return EXIT_REGISTRATION_ERROR
     root, log_file = arguments
     if not crash_case_blocks_supported(root):
@@ -3716,9 +3796,9 @@ def command_crash_case_judged_by_test(arguments):
         print(f"找不到 {key}：{error}")
         return EXIT_REGISTRATION_ERROR
     if case.red_blocks_judged_by_test:
-        print(f"{key} 登记了 red-blocks={CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST}：快档起用例按退出码判")
+        print(f"{key} 登记了 red-blocks={CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST}：快档与 --full 起用例按退出码判")
         return 0
-    print(f"{key} 没登记 red-blocks={CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST}：快档查库")
+    print(f"{key} 没登记 red-blocks={CRASH_CASE_RED_BLOCKS_JUDGED_BY_TEST}：快档查库、--full 有红块判红")
     return 1
 
 
@@ -4139,7 +4219,8 @@ RESEARCH_SAMPLE_FILES = {
     RESULTS_DIRECTORY + "/e901-2026-09-01.out": "E7RESULT name=e901 rows=1\nE7RESULT name=done emitted=2\n",
     ".claude/kb/decisions/08-sample.md": "# 样本决策\n\n一句。\n",
     REGISTRATION_TABLE: ("# 样本登记表\nE900\tscripts/experiments/e900.rs::main\t# 样本实验\n"
-                         "E900/second\t@E900\tquestion-row=research/questions.md#6:够判[：:][^（(|]*对照(本身)?是好的 product-field=E900:verdict:control_ok=true\t# 样本第二段\n"),
+                         "E900/second\t@E900\tquestion-row=research/questions.md#6:够判[：:][^（(|]*对照(本身)?是好的 product-field=E900:verdict:control_ok=true\t# 样本第二段\n"
+                         "E900/third\t@E900\tsame-run-field=verdict:control_ok=true\t# 样本第二段的同一趟现判写法：前一段这一趟的输出经环境变量交来\n"),
 }
 RESEARCH_SAMPLE_REPLAY = """#!/usr/bin/env bash
 # 自证的复跑表（admission.py --selftest 的样本：只有判一行的几个函数与两个驱动，不跑东西）
@@ -4249,6 +4330,22 @@ def run_experiment_cells(selftest, module):
         write_questions(work, "**够判：装置的期望值过时、对照本身是好的**（样本）")
         exit_code, _output, messages = experiment("E900/second")
         selftest.expect("实验准入：前提齐了放行（E900/second 不在复跑表里，按登记的入口算键）", exit_code == 0, f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
+        # same-run-field（文件头「准入条件」）：前一段这一趟的输出经 SAME_RUN_PRODUCT_VARIABLE 交来；复跑表登记给 E900 的留存产物里写着 control_ok=true，不算数
+        same_run_product = os.path.join(work, ".same-run", "first-segment.out")
+        environment.pop(SAME_RUN_PRODUCT_VARIABLE, None)   # 调用这一份自证的环境里设着它也不算
+        exit_code, _output, messages = experiment("E900/third")
+        selftest.expect("same-run-field：没交同一趟的输出时前提没齐（退 3）并点名那个环境变量", exit_code == EXIT_PRECONDITION_MISSING and SAME_RUN_PRODUCT_VARIABLE in messages,
+                        f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
+        write_text(same_run_product, "E7RESULT name=verdict control_ok=false\nE7RESULT name=done emitted=2\n")
+        exit_code, _output, messages = experiment("E900/third", {SAME_RUN_PRODUCT_VARIABLE: same_run_product})
+        selftest.expect("same-run-field：同一趟的输出里值不等时前提没齐（退 3），留存产物里的 control_ok=true 不算数",
+                        exit_code == EXIT_PRECONDITION_MISSING and "control_ok=false" in messages, f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
+        exit_code, _output, _messages = experiment("E900/third", {SAME_RUN_PRODUCT_VARIABLE: same_run_product, BREAK_VARIABLE: "same-run-field-unchecked"})
+        selftest.expect("弄坏开关 same-run-field-unchecked 下「same-run-field：同一趟的输出里值不等」那一格红（放行了）", exit_code == 0, f"弄坏之后仍退 {exit_code}")
+        write_text(same_run_product, "E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n")
+        exit_code, _output, messages = experiment("E900/third", {SAME_RUN_PRODUCT_VARIABLE: same_run_product})
+        selftest.expect("same-run-field：同一趟的输出里值相等时放行，说明点名那份输出",
+                        exit_code == 0 and f"同一趟的输出 {same_run_product} 的 name=verdict control_ok=true" in messages, f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
         exit_code, _output, _messages = experiment("E901")
         selftest.expect("实验准入：没登记的实验键退 2", exit_code == EXIT_REGISTRATION_ERROR, f"退 {exit_code}")
         write_text(table_path, good_table + "E902\tscripts/experiments/e902_nowhere.rs::main\t# 入口文件不在\nE903\tscripts/experiments/e900.rs::main\tbogus=1\t# 认不出的条件\n")
@@ -4259,6 +4356,20 @@ def run_experiment_cells(selftest, module):
         problems = lint_registration_rows(read_registration_rows(work), work)
         selftest.expect("登记表自查点得出入口文件不在、认不出的条件", any("e902_nowhere.rs" in problem for problem in problems) and any("bogus=1" in problem for problem in problems),
                         f"自查结果：{problems}")
+        # 前提点名的文件不在仓里（文件头「准入条件」）：question-row 的问题单、product-field 指的留存产物（E901 那一行的产物挪走）
+        write_text(table_path, good_table + "E904\t@E900\tquestion-row=research/no-such-questions.md#6:够判\t# 问题单不在\n"
+                   "E905\t@E900\tproduct-field=E901:e901:rows=1\t# 指的留存产物挪走了\n")
+        stored_e901 = os.path.join(work, RESULTS_DIRECTORY, "e901-2026-09-01.out")
+        os.rename(stored_e901, stored_e901 + ".moved")
+        problems = lint_registration_rows(read_registration_rows(work), work)
+        selftest.expect("登记表自查点得出前提点名的文件不在：question-row 的问题单、product-field 指的留存产物",
+                        any("research/no-such-questions.md 不在仓里" in problem for problem in problems)
+                        and any("e901-2026-09-01.out 不在仓里" in problem for problem in problems), f"自查结果：{problems}")
+        with EnvironmentPatch({BREAK_VARIABLE: "condition-files-unchecked"}):
+            problems = lint_registration_rows(read_registration_rows(work), work)
+        selftest.expect("弄坏开关 condition-files-unchecked 下「登记表自查点得出前提点名的文件不在」那一格红（一处都不报）",
+                        not any("不在仓里" in problem for problem in problems), f"弄坏之后自查结果：{problems}")
+        os.rename(stored_e901 + ".moved", stored_e901)
         write_text(table_path, good_table)
         with EnvironmentPatch({"PATH": environment["PATH"], "CARGO_HOME": environment["CARGO_HOME"]}):
             status, _detail = stored_product_row_key_status(work, "E900")
@@ -4401,7 +4512,7 @@ def run_crash_case_blocks_cells(selftest, module):
         selftest.expect("弄坏开关 blocks-single-line-only 下「多流用例每条流一行」那一格转红（退 4）", exit_code == EXIT_BLOCKS_LINE_BAD,
                         f"退 {exit_code}：{output.strip()}")
 
-        # --ran（快档实跑登记了 red-blocks=judged-by-test 的用例）：只核行在、数对得上，红块与现判块不判
+        # --ran（快档实跑与 --full 跑登记了 red-blocks=judged-by-test 的用例）：只核行在、数对得上，红块与现判块不判
         def ran_blocks(log_text, extra=(), changes=None):
             write_text(log_path, log_text)
             return run_quietly([sys.executable, module, "crash-case-blocks", work, log_path, "--ran", *extra], changes)[:2]
@@ -4907,7 +5018,7 @@ def run_shard_merge_log_cells(selftest, case):
 def run_crash_case_features_cells(selftest):
     """登记行 features= 带进 crash-case-command：带特性的行拼出 -p <包> 之后带 --features、env 里设 bindgen 头文件目录的命令（多机配置 ENABLE_GPU=1 的另加 gpu、整条经 gpu-quiesce-run.sh 起），
     不带的行在 GPU 关着时命令照旧（不带 --features、不设 bindgen、不经包装），GPU 开着时一律加 gpu、经包装；登记行写错（小写以外、写两条、与 shard=across-machines 并存）拒。
-    弄坏开关：features-not-passed（带特性那一格红）、features-passed-to-every-case（不带特性那一格红）、gpu-case-not-quiesced（开 GPU 那一格红）。"""
+    弄坏开关：features-not-passed（带特性那一格红）、features-passed-to-every-case（不带特性那一格红）、gpu-case-not-quiesced（开 GPU 那一格红）、gpu-test-threads-unset（开 GPU 的命令带 --test-threads 1 那一格红）。"""
     work = tempfile.mkdtemp(prefix="admission-selftest-features-")
     try:
         plain_row = "crash-case:plain\t-\ttest=pkg:own_case:the_case count-line=CRASH_POINT_REPLAY\t# 样本"
@@ -4922,6 +5033,7 @@ def run_crash_case_features_cells(selftest):
         quiesce_script = os.path.join(work, GPU_QUIESCE_SCRIPT)
         cargo_head = ["cargo", "test", "--release", "-p", "pkg"]
         cargo_tail = ["--test", "own_case", "--", "--include-ignored", "--exact", "the_case", "--nocapture"]
+        gpu_tail = cargo_tail + ["--test-threads", "1"]   # 开了 GPU 的命令收尾多一个 --test-threads 1（GPU 对拍的测试各占卡的显存，不并行起）
 
         def launched(key, configuration):
             caller = dict(os.environ, **{MULTI_HOST_CONFIGURATION_VARIABLE: configuration})
@@ -4937,7 +5049,7 @@ def run_crash_case_features_cells(selftest):
         selftest.expect("crash-case-command：没登记 features= 的行、多机配置没开 GPU：命令照旧，不带 --features、不设 bindgen、不经 gpu-quiesce-run.sh",
                         plain_is_old, f"命令是 {plain}")
         plain_on_gpu = launched("crash-case:plain", gpu_on)
-        plain_on_gpu_ok = (plain_on_gpu[:3] == ["bash", quiesce_script, "--"] and plain_on_gpu[plain_on_gpu.index("cargo"):] == cargo_head + ["--features", "gpu"] + cargo_tail
+        plain_on_gpu_ok = (plain_on_gpu[:3] == ["bash", quiesce_script, "--"] and plain_on_gpu[plain_on_gpu.index("cargo"):] == cargo_head + ["--features", "gpu"] + gpu_tail
                            and has_bindgen(plain_on_gpu) and "GPU_CARDS_BY_PRIORITY=local:0:24G" in plain_on_gpu)
         selftest.expect("crash-case-command：没登记 features= 的行、多机配置开着 GPU：一律带 --features gpu（崩溃枚举用例的判段上卡）、设 bindgen、经 gpu-quiesce-run.sh 起、交清场之后那一份显卡先后",
                         plain_on_gpu_ok, f"命令是 {plain_on_gpu}")
@@ -4964,6 +5076,14 @@ def run_crash_case_features_cells(selftest):
             broken_gpu = launched("crash-case:engine", gpu_on)
         selftest.expect("弄坏开关 gpu-case-not-quiesced 下「开 GPU 的带特性行经清场包装」那一格红（直接起 env）", broken_gpu[0] == "env" and "gpu" in broken_gpu[broken_gpu.index("--features") + 1],
                         f"弄坏之后命令是 {broken_gpu}")
+        engine_on_gpu_tail = gpu[gpu.index("cargo"):][-len(gpu_tail):]
+        selftest.expect("crash-case-command：开着 GPU（带特性行与不带特性行）的 cargo 参数收尾带 --test-threads 1，GPU 关的两种行都不带",
+                        engine_on_gpu_tail == gpu_tail and plain_on_gpu[-2:] == ["--test-threads", "1"]
+                        and "--test-threads" not in plain and "--test-threads" not in engine, f"开 GPU 带特性行的收尾是 {engine_on_gpu_tail}，不带特性行是 {plain_on_gpu[-2:]}，GPU 关的是 {plain[-2:]}、{engine[-2:]}")
+        with BreakSwitch("gpu-test-threads-unset"):
+            broken_threads_gpu = launched("crash-case:engine", gpu_on)
+        selftest.expect("弄坏开关 gpu-test-threads-unset 下「开 GPU 的 cargo 参数带 --test-threads 1」那一格红（没带）", "--test-threads" not in broken_threads_gpu,
+                        f"弄坏之后命令是 {broken_threads_gpu}")
         # 多机配置在而读不了：判不出开没开 GPU，抛错，不当成关
         unreadable = os.path.join(work, "multi-host-unreadable.env")
         with open(unreadable, "wb") as handle:

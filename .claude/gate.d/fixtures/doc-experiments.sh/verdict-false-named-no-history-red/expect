@@ -1,0 +1,4 @@
+exit=1
+want=E174  research/results/e174-sample-2026-10-21.out:2  wait_ok=false  (.claude/kb/experiments/174-样本借据.md 里既不在最新历史条目、也不在正文里被点名)
+want=其中 0 个已点名、1 个没点名
+want=doc-experiments.sh：1 格里 1 格红（verdict-false-named）

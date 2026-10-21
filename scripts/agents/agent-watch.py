@@ -113,6 +113,21 @@ AGENT_WATCH_BREAK=heavycommitcheck 把这一类照重型报，自检里「不重
 2026-09-25 两次整机 OOM：E142 的变异跑道里一条变异让测试无界分配，涨到 53.6 GiB 与 56.6 GiB 才被内核杀掉，连带杀了本地模型服务与 Claude Code 会话
 （records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
 
+「长跑在用核数过少」：两半，取样与判法都在 scripts/hosts/core_usage.py（窗口、阈值、「同时在算的线程」、声明的写法在它的文件头）。
+一、本机：这个 Claude 实例底下整棵子树（看门狗自己那一支、别的看门狗与它的自检整棵不看）里的重活进程——lib_heavy_tests.py 的 classify_process 认出的重型用法
+（提交时才跑的检查那几类不算）或 runs_compiled_code 认出的跑编译出来的代码，与 .claude/hooks/host-resources-reminder.sh 认「重活」同一个口径——一条链上只取最上面那个，
+整棵树算它的。每次整查给每个都取一次样（core_usage.py 的 tree_sample），样本存状态目录的 core-usage-samples/<进程号>-<起始时刻>.jsonl（两天没写的删掉），
+跑过一个窗口（600 秒）的判：在用核数与同时在算的线程都低于登记数的四分之一的报，写「进程 <pid> 重活只用了 X 核（登记 N）」、声明的串行段与理由（声明文件从那棵树
+进程环境里的 SINGLEFS_SERIAL_DECLARATIONS 找）、命令与出路，叫醒主 agent；不报的逐个列一行在用几核。树里有 multi-host-run.sh --peer 那一支的判成在等第二台、不报。
+二、别处写的告警记录：core_usage.py 的告警记录里最近 660 秒的（multi-host-run.sh --peer 判第二台、detached-run.sh watch 判脱离会话的单元），会话号是被看的会话
+（--processes-only 是 --session-dir 那一个）、告警进程还活着的报，说明以「进程 <告警进程号> 」起头；没有会话号的只记一行、不叫醒。
+  同一份告警记录里 scripts/hosts/run-with-memory-cap.sh 排队时写的（kind=memory-queue-peer-fits，它文件头「排队时去找别的机器」）另报「本机内存排队、别的机器放得下」：
+  phase=queued 的要包装还活着，phase=refused 的（退了 252）包装不在了也报，phase=admitted 的（排了队之后在本机起跑了）不报；出路是记录里改去第二台的那条命令。
+  同一份告警记录里 run-with-memory-cap.sh 收尾时写的三种（它文件头「峰值表」一段）各报各的，包装退了也报：kind=memory-peak-grew 报「内存峰值比记账大了 Z 倍」
+  （工作量可能变了），kind=memory-own-cap 报「撞了自己的上限：上限给小了，或工作量变了」，kind=memory-squeezed 报「被总上限挤掉：结果不算数，重跑」；出路是记录里那一句。
+两半都在 --agents 与 --processes-only 两条路的整查里；--ack 进程:<pid> 确认；只报不停（不在「进程卡住」那一类里，连报多少次都不终止）。
+2026-10-20 E185 第二段在第二台只用一个核跑了几个小时，没有一处报（records/2026-09-16-subagent拆分提案.md 第七十二节）。
+
 「交回之后副本还在」：扫被看的子 agent 所在会话里全部子 agent（--processes-only 带 --session-dir 时扫那个会话），交回过（交回工具成功返回）
 超过 --kept-copy-hours（默认 6，watch.conf 里写着）、交回正文里——或交回正文点名的报告文件（.md）里——写了一行「没删 <全路径>」
 （上游交回闸 handback-scratch-check.sh 要子 agent 写的就是这一行），而那个路径还在的，每处报一条，交主 agent 核过没人在用之后删。
@@ -147,7 +162,7 @@ proc.py 拒了或没停成的写「想终止 <pid> …没成」留着。子 agen
 
 弄坏开关 AGENT_WATCH_BREAK=<项>（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 （项名是那条失败落在哪个自证函数里：selftest_in、selftest_session_watch_in、selftest_scratch_hogs、selftest_stale_sessions、selftest_leftover_background、selftest_pipe_upstream、
-selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree、selftest_memory、selftest_unacknowledged_terminations，临时目录那三格写格名；括号里是那几条「✗ 自检：」的开头；红了自证退 1）：
+selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree、selftest_memory、selftest_core_usage、selftest_unacknowledged_terminations，临时目录那三格写格名；括号里是那几条「✗ 自检：」的开头；红了自证退 1）：
   AGENT_WATCH_BREAK=ack  split_acknowledged() 不认 --ack，确认过的告警照样叫醒
       selftest_in（「✗ 自检：「工具调用过长」被 --ack 确认之后看门狗应当到点退出码 4 并写「已确认接着盯」」、「✗ 自检：派发 125 分钟、--ack 了「跑满 2 小时」那一格时看门狗不该叫醒」）、
       selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」）、
@@ -172,6 +187,11 @@ selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree�
       selftest_in（「✗ 自检：子 agent hugecontext」）
   AGENT_WATCH_BREAK=contextzero  agent_alerts() 不看 --context-tokens 是不是 0，线写 0 也照报「该交接」
       selftest_in（「✗ 自检：子 agent hugecontext 在 --context-tokens 0 时」）
+  AGENT_WATCH_BREAK=corerecords  core_usage_report() 不读告警记录（multi-host-run.sh --peer、detached-run.sh watch 写的那些叫不醒主 agent）
+      selftest_core_usage（「✗ 自检：告警记录应当只把本会话、没过期、告警进程还活着的那一条（fresh）报出来」）
+  AGENT_WATCH_BREAK=coreusage  core_usage_report() 什么都不查（本机重活不取样、告警记录也不读）
+      selftest_core_usage（「✗ 自检：1 条线程忙等的重活进程」、「✗ 自检：声明了串行的重活进程」、「✗ 自检：报告里应当有一行「长跑在用核数过少：查了」、
+      「✗ 自检：告警记录应当只把本会话」、「✗ 自检：看门狗 --processes-only 盯着 1 条线程忙等的重活进程时」、「✗ 自检：「长跑在用核数过少」的进程都 --ack」）
   AGENT_WATCH_BREAK=cost  自检里把用量样本的 full_cache_rewrite_tokens 读成 0
       selftest_in（「✗ 自检：用量样本的 full_cache_rewrite_tokens 应当是」）
   AGENT_WATCH_BREAK=cpu  process_alerts() 不看 CPU 涨没涨，在算的进程也报「进程无输出」
@@ -306,6 +326,12 @@ selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree�
       selftest_in（「✗ 自检：检出记录属于「session」「experiment-runner healthy」」）
   AGENT_WATCH_BREAK=memorypoll  memory_alarm_between_checks() 两次整查之间不单查常驻内存
       selftest_memory（「✗ 自检：看门狗 --processes-only 起了之后才冒出来的过线进程」、「✗ 自检：看门狗 --agents 起了之后才冒出来的过线进程」）
+  AGENT_WATCH_BREAK=memoryqueue  core_usage_report() 把内存包装排队时写的告警记录当成核数过少的那一种（改前的读法：报成「长跑在用核数过少」、退了 252 的不报、起跑了的照报）
+      selftest_core_usage（「✗ 自检：内存包装排队时写的告警记录」）
+  AGENT_WATCH_BREAK=memorygrew  core_usage_report() 把内存包装收尾时写的「峰值比记账大」记录当成核数过少的那一种（改前的读法：报成「长跑在用核数过少」、包装退了就不报）
+      selftest_core_usage（「✗ 自检：内存包装收尾时写的峰值涨了的告警记录」）
+  AGENT_WATCH_BREAK=memoryoutcome  core_usage_report() 把内存包装退 250、254 时写的记录当成核数过少的那一种（改前的读法，同上）
+      selftest_core_usage（「✗ 自检：内存包装收尾时写的撞顶与被挤掉的告警记录」）
   AGENT_WATCH_BREAK=memoryscan  memory_report() 一个进程都不查常驻内存
       selftest_memory（「✗ 自检：「进程常驻内存过线」应当只报写满 256 MiB 的进程」、「✗ 自检：过线进程的告警应当写常驻内存、阈值、已跑多久与归属「子 agent memowner」」、
       「✗ 自检：过线进程的「怎么办」应当写怎么看还涨不涨、按进程号停它的命令、查清之前别照原样重派、带上限重派与 --ack 进程:」、「✗ 自检：报告里应当有一行」、「✗ 自检：看门狗 --processes-only 盯着常驻内存过线的进程时应当报」、
@@ -512,6 +538,22 @@ HEAVY_TEST_STOP_ORDER_SHOWN = 24   # 下一步里列出的停止次序最多这�
 MEMORY_ALERT = "进程常驻内存过线"
 PAGE_SIZE_BYTES = os.sysconf("SC_PAGE_SIZE")
 BYTES_PER_GIBIBYTE = 1024 ** 3
+# 「长跑在用核数过少」：取样与判法在 scripts/hosts/core_usage.py（multi-host-run.sh --peer、detached-run.sh watch 同一份），按文件路径导入
+CORE_USAGE_ALERT = "长跑在用核数过少"
+# 「本机内存排队、别的机器放得下」：scripts/hosts/run-with-memory-cap.sh 排队时写进同一份告警记录的那一种（它文件头「排队时去找别的机器」）
+MEMORY_QUEUE_ALERT = "本机内存排队、别的机器放得下"
+MEMORY_QUEUE_RECORD_KIND = "memory-queue-peer-fits"
+# run-with-memory-cap.sh 收尾时写进同一份告警记录的三种（它文件头「峰值表」一段）：种类 → 告警名
+MEMORY_PEAK_GREW_ALERT = "内存峰值比记账大"
+MEMORY_OWN_CAP_ALERT = "撞了自己的上限"
+MEMORY_SQUEEZED_ALERT = "被总上限挤掉"
+MEMORY_OUTCOME_ALERTS = {"memory-peak-grew": MEMORY_PEAK_GREW_ALERT, "memory-own-cap": MEMORY_OWN_CAP_ALERT, "memory-squeezed": MEMORY_SQUEEZED_ALERT}
+CORE_USAGE_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                                       "scripts", "hosts", "core_usage.py")
+CORE_USAGE_SAMPLES_DIRECTORY = "core-usage-samples"   # 状态目录下：每个重活进程一份样本序列，<进程号>-<起始时刻>.jsonl
+CORE_USAGE_SAMPLES_KEPT_SECONDS = 2 * 86400           # 两天没再写的样本序列删掉（进程早没了）
+CORE_USAGE_SAMPLES_ROOT_VARIABLE = "AGENT_WATCH_CORE_SAMPLES_ROOT"   # 环境变量只给 --selftest 用：它起的看门狗子进程把样本写进自证的临时目录，不写真的状态目录
+CORE_USAGE_SHOWN = 12                                 # 报告里逐个列在用核数的重活进程至多这么多个，再多写「另 N 个」
 # 「该交接」：只对这两类报、到 --context-tokens（默认 70 万，推的）报一次；别的类型上下文多大都不叫醒（主 agent 的规矩是上下文大小不是停它的理由）
 HANDOVER_AGENT_TYPES = {"implementation-writer", "experiment-runner"}
 HANDOVER_ALERT = "该交接"
@@ -2280,6 +2322,184 @@ def memory_alarm_between_checks(process_root_pid, excluded_pids, arguments):
     return bool(remaining)
 
 
+CORE_USAGE_LIBRARY = None   # (模块或 None, 导入失败的原因或 None)：第一次用时按文件路径导入，之后复用
+
+
+def core_usage_library():
+    """scripts/hosts/core_usage.py：返回 (模块, None)，导入失败返回 (None, 原因)。"""
+    global CORE_USAGE_LIBRARY
+    if CORE_USAGE_LIBRARY is None:
+        try:
+            spec = importlib.util.spec_from_file_location("core_usage", CORE_USAGE_LIBRARY_PATH)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            CORE_USAGE_LIBRARY = (module, None)
+        except Exception as error:   # 文件不在、语法错都算：报告里写明这一类没查，不让看门狗整个退出
+            CORE_USAGE_LIBRARY = (None, f"导入 {CORE_USAGE_LIBRARY_PATH} 失败（{type(error).__name__}：{error}）")
+    return CORE_USAGE_LIBRARY
+
+
+def is_heavy_work(library, arguments, directory):
+    """重活：lib_heavy_tests.py 的 classify_process 认出的重型用法（提交时才跑的检查那几类不算），或 runs_compiled_code 认出的跑编译出来的代码
+    （cargo test / run / bench、测试二进制与编出来的装置）——与 .claude/hooks/host-resources-reminder.sh 认「重活」同一个口径。"""
+    tests = [test for test in library.classify_process(arguments, directory)
+             if test.kind not in getattr(library, "COMMIT_CHECK_KINDS", frozenset())]
+    return bool(tests) or library.runs_compiled_code(arguments, directory) is not None
+
+
+def serial_declarations_of_tree(pid, children):
+    """这棵树里第一个设了 SINGLEFS_SERIAL_DECLARATIONS 的进程给的路径（起它的脚本 export 的），没有交 None。"""
+    stack = [pid]
+    while stack:
+        current = stack.pop()
+        try:
+            path = process_environment(current).get("SINGLEFS_SERIAL_DECLARATIONS")
+        except OSError:
+            path = None
+        if path:
+            return path
+        stack.extend(children.get(current, []))
+    return None
+
+
+def memory_outcome_alert(record):
+    """内存包装收尾时写的那三种（run-with-memory-cap.sh 文件头「峰值表」一段）：交 (告警名, 说明)；别的记录交 None。
+    弄坏开关 memorygrew、memoryoutcome 下对应的那几种交 None（照核数过少那一种读：包装退了就不报）。"""
+    kind = record.get("kind")
+    name = MEMORY_OUTCOME_ALERTS.get(kind)
+    if name is None or (kind == "memory-peak-grew" and BROKEN_DETECTION == "memorygrew") \
+            or (kind != "memory-peak-grew" and BROKEN_DETECTION == "memoryoutcome"):
+        return None
+
+    def size(value):
+        return f"{value / 1024 ** 2:.0f} MiB" if isinstance(value, int) else "没记"
+    numbers = (f"键「{str(record.get('key'))[:120]}」，上限 {record.get('cap')}、记账 {size(record.get('booked'))}（{record.get('booked_source') or '没记账'}）、"
+               f"实测 {size(record.get('measured'))}")
+    head = f"进程 {record.get('alert_pid')} {record.get('source')}（{record.get('label')}）："
+    if kind == "memory-peak-grew":
+        ratio = record.get("ratio")
+        ratio_text = f"{ratio:.1f}" if isinstance(ratio, (int, float)) else "?"
+        return name, f"{head}内存峰值比记账大了 {ratio_text} 倍：工作量可能变了（{numbers}）"
+    admitted = "按峰值表放进来的" if record.get("by_peak_table") else "不是按峰值表放进来的"
+    if kind == "memory-own-cap":
+        return name, f"{head}撞了自己的上限：上限给小了，或工作量变了（{numbers}，{admitted}）"
+    return name, f"{head}被总上限挤掉：结果不算数，重跑（{numbers}，{admitted}）"
+
+
+def core_usage_next_step(pid):
+    return (f"装置里互相独立的单位（取样点、轮次、不计时的准备）该分到登记的线程数上却在串行：停下它（`{PROCESS_STOP_COMMAND} {pid}`，"
+            f"或给归属的子 agent 发消息让它停），照 .claude/rules/test-script-discipline.md「编译与算法都要快」改装置再跑；"
+            f"真要串行的段由程序当场往 $SINGLEFS_SERIAL_DECLARATIONS 写「<秒>\\t此刻串行：<理由>」（写法在 scripts/hosts/core_usage.py 文件头「声明」），"
+            f"核过理由成立就 --ack 进程:{pid} 接着跑")
+
+
+def core_usage_report(root_pid, excluded_pids, session_ids, samples_root=None):
+    """「长跑在用核数过少」（判法见文件头）：这个 Claude 实例底下的重活进程每次整查都取一次样（存状态目录），跑过一个窗口的判；再读这些会话的告警记录
+    （multi-host-run.sh --peer、detached-run.sh watch 写的）。samples_root 只给自证换掉状态目录。返回 (报告行, [(告警名, 说明, 下一步)])。"""
+    if BROKEN_DETECTION == "coreusage":
+        return [], []
+    core, problem = core_usage_library()
+    if core is None:
+        return [f"{CORE_USAGE_ALERT}：这一类没查——{problem}"], []
+    try:
+        registered = core.registered_threads()
+    except Exception as error:   # 登记写坏、SINGLEFS_THREAD_CAP 不是正整数、读不到那份库
+        return [f"{CORE_USAGE_ALERT}：取不了每台默认重活线程数（{error}），这一类没查"], []
+    window, note = core.window_seconds()
+    lines, alerts, shown = ([f"{CORE_USAGE_ALERT}：{note}"] if note else []), [], []
+    examined = 0
+    library, heavy_problem = heavy_tests_library()
+    if library is None:
+        lines.append(f"{CORE_USAGE_ALERT}：本机重活这一半没查——{heavy_problem}")
+    else:
+        table = process_table()
+        children = {}
+        for pid, info in table.items():
+            children.setdefault(info["parent"], []).append(pid)
+        samples_directory = os.path.join(samples_root or os.environ.get(CORE_USAGE_SAMPLES_ROOT_VARIABLE) or STATE_ROOT, CORE_USAGE_SAMPLES_DIRECTORY)
+        try:
+            for name in os.listdir(samples_directory):
+                path = os.path.join(samples_directory, name)
+                if time.time() - os.path.getmtime(path) > CORE_USAGE_SAMPLES_KEPT_SECONDS:
+                    os.remove(path)
+        except OSError:
+            pass   # 目录还没建、刚被别的看门狗删掉：不碍这一次
+        ticks_per_second = os.sysconf("SC_CLK_TCK")
+        uptime_seconds = float(open("/proc/uptime").read().split()[0])
+        frontier = [root_pid]
+        while frontier:
+            for child in sorted(children.get(frontier.pop(), [])):
+                arguments = process_arguments(child)
+                if arguments and is_watchdog_process(arguments):
+                    continue   # 别的看门狗与它的自检：整棵不看
+                info = table[child]
+                heavy = False
+                if arguments and child not in excluded_pids and info["state"] not in EXITED_PROCESS_STATES:
+                    try:
+                        heavy = is_heavy_work(library, arguments, os.readlink(f"/proc/{child}/cwd"))
+                    except Exception:   # 刚退出、权限不够、共用判定自己的 bug：这一个不当重活
+                        heavy = False
+                if not heavy:
+                    frontier.append(child)
+                    continue
+                # 一条链上最上面那个重活进程：整棵树算它的，不往下再找；每次整查都取样存下，跑过一个窗口才判
+                sample = core.tree_sample(child)
+                if sample is None:
+                    continue
+                series = os.path.join(samples_directory, f"{child}-{info['start_ticks']}.jsonl")
+                samples = core.read_series(series) + [sample]
+                try:
+                    core.append_line(series, json.dumps(sample, ensure_ascii=False, separators=(",", ":")))
+                except OSError:
+                    pass   # 状态目录写不进：这一次照判，下一次没有这一份样本
+                if uptime_seconds - info["start_ticks"] / ticks_per_second < window:
+                    continue
+                examined += 1
+                entries, problems = core.read_declarations(serial_declarations_of_tree(child, children))
+                verdict = core.judge_series(samples, entries, problems, registered, window)
+                command = command_for_display(info["command"])[:140]
+                if verdict["status"] == "low":
+                    alerts.append((CORE_USAGE_ALERT,
+                                   f"进程 {child} 重活只用了 {verdict['cores']:.1f} 核（登记 {registered}）：最近 {verdict['span']:.0f} 秒平均、"
+                                   f"同时在算的线程约 {verdict['parallel']:.1f} 条，都低于阈值 {verdict['threshold']:g}（登记的四分之一）"
+                                   f"{core.declaration_note(verdict)}：{command}",
+                                   core_usage_next_step(child)))
+                else:
+                    shown.append(core.verdict_lines(verdict, f"进程 {child} 重活")[0].strip() + f"：{command}")
+    matched = 0
+    if BROKEN_DETECTION != "corerecords":
+        for record in core.read_alert_records(core.alerts_path()):
+            alert_pid = record.get("alert_pid")
+            memory_queue = record.get("kind") == MEMORY_QUEUE_RECORD_KIND and BROKEN_DETECTION != "memoryqueue"
+            if memory_queue and record.get("phase") == "admitted":
+                continue   # 排了队之后在本机起跑了：不再报
+            alert_name = MEMORY_QUEUE_ALERT if memory_queue else CORE_USAGE_ALERT
+            outcome_alert = memory_outcome_alert(record)
+            if outcome_alert is not None:   # 内存包装收尾时写的三种：包装退了也报（新鲜窗口照 core_usage.py）
+                if not record.get("session_id"):
+                    lines.append(f"{outcome_alert[0]}（{record.get('source')} 写的告警记录没有会话号，只记不叫醒）：{record.get('line')}")
+                elif record.get("session_id") in session_ids and isinstance(alert_pid, int):
+                    matched += 1
+                    alerts.append((*outcome_alert, record.get("next_step") or core_usage_next_step(alert_pid)))
+                continue
+            if not record.get("session_id"):
+                lines.append(f"{alert_name}（{record.get('source')} 写的告警记录没有会话号，只记不叫醒）：{record.get('line')}")
+                continue
+            # 内存包装退了 252（phase=refused）之后包装就不在了，照报；别的要告警进程还活着
+            needs_live_process = not (memory_queue and record.get("phase") == "refused")
+            if record.get("session_id") not in session_ids or not isinstance(alert_pid, int) or (needs_live_process and not os.path.exists(f"/proc/{alert_pid}")):
+                continue
+            matched += 1
+            alerts.append((alert_name, f"进程 {alert_pid} {record.get('source')}（{record.get('label')}）：{record.get('line')}",
+                           record.get("next_step") or core_usage_next_step(alert_pid)))
+    lines.append(f"{CORE_USAGE_ALERT}：查了这个 Claude 实例底下跑过 {window} 秒的重活 {examined} 个，读到这个会话的告警记录 {matched} 条"
+                 f"（multi-host-run.sh --peer、detached-run.sh watch、run-with-memory-cap.sh 排队时写的），报 {len(alerts)} 条（阈值：登记 {registered} 的四分之一）")
+    lines.extend(f"  {line}" for line in shown[:CORE_USAGE_SHOWN])
+    if len(shown) > CORE_USAGE_SHOWN:
+        lines.append(f"  另 {len(shown) - CORE_USAGE_SHOWN} 个不报的没列")
+    return lines, alerts
+
+
 BASH_TOOL_WRAPPER_COMMAND = re.compile(r"&& eval '(.*)'(?: < /dev/null)? && pwd -P >\| \S+\s*$", re.S)
 
 
@@ -2356,7 +2576,10 @@ def run_processes_only(arguments, process_root_pid, excluded_pids):
         memory_lines, memory_found = memory_report(process_root_pid, excluded_pids,
                                                    {os.path.normpath(arguments.session_dir)} if arguments.session_dir else set(), arguments)
         lines.extend(memory_lines)
-        found = found + heavy_found + memory_found
+        core_lines, core_found = core_usage_report(process_root_pid, excluded_pids,
+                                                   {os.path.basename(os.path.normpath(arguments.session_dir))} if arguments.session_dir else set())
+        lines.extend(core_lines)
+        found = found + heavy_found + memory_found + core_found
         if arguments.session_dir:
             leftover_lines, leftover_alerts, leftover_pending_until = leftover_background_report(
                 {os.path.normpath(arguments.session_dir)}, datetime.now(timezone.utc), arguments)
@@ -2469,7 +2692,9 @@ def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pid
         lines.extend(heavy_lines)
         memory_lines, memory_found = memory_report(process_root_pid, excluded_pids, session_dirs, thresholds)
         lines.extend(memory_lines)
-        for name, explanation, next_step in found + heavy_found + memory_found:
+        core_lines, core_found = core_usage_report(process_root_pid, excluded_pids, {os.path.basename(directory) for directory in session_dirs})
+        lines.extend(core_lines)
+        for name, explanation, next_step in found + heavy_found + memory_found + core_found:
             alerts.append(("进程", name, explanation, next_step))
     leftover_pending_until = None
     if session_dirs:
@@ -3941,6 +4166,169 @@ def selftest_memory(work, failures, probed_processes, watch_runs):
     return len(started)
 
 
+def selftest_core_usage(work, failures, probed_processes, watch_runs):
+    """「长跑在用核数过少」的自检：拿自检进程当 Claude 实例，窗口压到 2 秒（SINGLEFS_CORE_USAGE_WINDOW_SECONDS），告警记录写临时目录。
+    起三个假的重活进程（argv[0] 照 checker 档包的测试二进制起名，里面是 scripts/hosts/core_usage.py busy-load；带 SINGLEFS_HEAVY_TESTS=commit，「重型测试没带前缀」不报）：
+    1 条线程忙等的报「重活只用了 X 核（登记 N）」；登记数那么多条线程忙等的不报；环境里带 SINGLEFS_SERIAL_DECLARATIONS、声明了串行的照报并标出理由。
+    先取一次样、隔 2.3 秒再整查（起动那一段的 CPU 不进窗口）。告警记录：本会话的、告警进程还活着的报；别的会话的、过期的、告警进程已不在的不报；没有会话号的只记一行。
+    --processes-only 看门狗真跑：1 条线程那个进程报、退 3；都 --ack 进程:<pid> 之后到点退 4。返回起了几个进程。"""
+    core, problem = core_usage_library()
+    if core is None:
+        failures.append(f"「{CORE_USAGE_ALERT}」这一段自检没法判：{problem}")
+        return 0
+    registered = core.registered_threads()
+    deps = os.path.join(work, "core-usage", "target", "release", "deps")
+    os.makedirs(deps, exist_ok=True)
+    fake_binary = os.path.join(deps, "crash_enumeration_new_pool_file_creation_stream-0123456789abcdef")   # python 顶着这个 argv[0] 跑 busy-load
+    declarations = os.path.join(work, "core-usage", "serial-declarations")
+    with open(declarations, "w") as handle:
+        handle.write(f"{time.time() - 1:.3f}\t此刻串行：计时窗口必须单线程跑完\n")
+    alerts_file = os.path.join(work, "core-usage", "alerts.jsonl")
+    samples_root = os.path.join(work, "core-usage", "state")
+    core_session = os.path.join(work, "core-session")
+    os.makedirs(core_session, exist_ok=True)
+    session_id = os.path.basename(core_session)
+    overrides = {"SINGLEFS_CORE_USAGE_WINDOW_SECONDS": "2", "SINGLEFS_CORE_USAGE_ALERTS": alerts_file}
+    saved = {name: os.environ.get(name) for name in overrides}
+    started = []
+
+    def start(threads, extra=None, argv=None):
+        environment = dict(os.environ, **{HEAVY_TEST_VARIABLE: "commit"}, **(extra or {}))
+        environment.pop("CORE_USAGE_BREAK", None)
+        process = subprocess.Popen(argv or [fake_binary, CORE_USAGE_LIBRARY_PATH, "busy-load", str(threads), "60"], executable=None if argv else sys.executable,
+                                   env=environment, cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        started.append(process)
+        probed_processes.append(process)
+        return process
+
+    def alert_for(found, pid):
+        return next((explanation for name, explanation, _ in found if name == CORE_USAGE_ALERT and explanation.startswith(f"进程 {pid} ")), None)
+
+    try:
+        os.environ.update(overrides)
+        one = start(1)
+        many = start(registered)
+        declared = start(1, {"SINGLEFS_SERIAL_DECLARATIONS": declarations})
+        sleeper = start(0, argv=["sleep", "120"])
+        # 等三个都起来、真在算（机器忙时 python 起得慢，不按固定秒数等），先取一次样，隔 2.3 秒（窗口 2 秒）再整查
+        deadline = time.time() + SELFTEST_READY_TIMEOUT_SECONDS
+        while time.time() < deadline:
+            samples = [core.tree_sample(process.pid) for process in (one, many, declared)]
+            if all(sample and sample["cpu"] >= 0.05 for sample in samples):
+                break
+            time.sleep(0.1)
+        core_usage_report(os.getpid(), set(), {session_id}, samples_root)
+        time.sleep(2.3)
+        lines, found = core_usage_report(os.getpid(), set(), {session_id}, samples_root)
+        one_alert, many_alert, declared_alert = (alert_for(found, process.pid) for process in (one, many, declared))
+        if not one_alert or "重活只用了" not in one_alert or f"核（登记 {registered}）" not in one_alert:
+            failures.append(f"1 条线程忙等的重活进程 {one.pid} 应当报「{CORE_USAGE_ALERT}」、写「重活只用了 X 核（登记 {registered}）」，实际：{one_alert or '没报'}；报告：{lines}")
+        if many_alert:
+            failures.append(f"{registered} 条线程忙等的重活进程 {many.pid} 不该报「{CORE_USAGE_ALERT}」，实际：{many_alert}")
+        if not declared_alert or "声明了串行" not in declared_alert or "计时窗口必须单线程跑完" not in declared_alert:
+            failures.append(f"声明了串行的重活进程 {declared.pid} 应当照报并标出理由「计时窗口必须单线程跑完」，实际：{declared_alert or '没报'}")
+        if not any(line.startswith(f"{CORE_USAGE_ALERT}：查了这个 Claude 实例底下跑过 2 秒的重活 3 个") for line in lines):
+            failures.append(f"报告里应当有一行「{CORE_USAGE_ALERT}：查了这个 Claude 实例底下跑过 2 秒的重活 3 个…」，实际 {lines}")
+        # 告警记录：本会话的、告警进程还活着的报；别的会话的、过期的、告警进程已不在的不报；没有会话号的只记一行
+        now = time.time()
+        gone = subprocess.Popen(["true"])
+        gone.wait()
+        for record in ({"time": now, "session_id": session_id, "source": "multi-host-run.sh --peer", "label": "fresh", "alert_pid": sleeper.pid,
+                        "line": "✗ 第二台在用 1.0 核（登记 31）", "next_step": "停下它"},
+                       {"time": now, "session_id": "another-session", "source": "multi-host-run.sh --peer", "label": "other", "alert_pid": sleeper.pid,
+                        "line": "✗ 别的会话", "next_step": "停下它"},
+                       {"time": now - 3600, "session_id": session_id, "source": "detached-run.sh watch", "label": "stale", "alert_pid": sleeper.pid,
+                        "line": "✗ 过期的", "next_step": "停下它"},
+                       {"time": now, "session_id": session_id, "source": "detached-run.sh watch", "label": "gone", "alert_pid": gone.pid,
+                        "line": "✗ 告警进程已不在", "next_step": "停下它"},
+                       {"time": now, "session_id": "", "source": "detached-run.sh watch", "label": "nosession", "alert_pid": sleeper.pid,
+                        "line": "✗ 没有会话号", "next_step": "停下它"}):
+            core.append_line(alerts_file, json.dumps(record, ensure_ascii=False))
+        lines, found = core_usage_report(os.getpid(), set(), {session_id}, samples_root)
+        record_alerts = [explanation for name, explanation, _ in found if name == CORE_USAGE_ALERT and explanation.startswith(f"进程 {sleeper.pid} ")]
+        if record_alerts != [f"进程 {sleeper.pid} multi-host-run.sh --peer（fresh）：✗ 第二台在用 1.0 核（登记 31）"] \
+                or alert_for(found, gone.pid) or not any("没有会话号，只记不叫醒" in line and "✗ 没有会话号" in line for line in lines):
+            failures.append(f"告警记录应当只把本会话、没过期、告警进程还活着的那一条（fresh）报出来，没有会话号的只记一行；"
+                            f"实际告警 {record_alerts}、已不在的 {alert_for(found, gone.pid)}，报告：{lines}")
+        # 内存包装排队时写的（run-with-memory-cap.sh 文件头「排队时去找别的机器」）：queued 而包装活着的报、refused 而包装不在了的也报，
+        # queued 之后补了 admitted 的不报、queued 而包装不在了的不报；告警名是「本机内存排队、别的机器放得下」，出路是记录里那一句
+        def queue_record(label, phase, pid, offset=0.0):
+            return {"time": now + offset, "session_id": session_id, "source": "run-with-memory-cap.sh", "kind": MEMORY_QUEUE_RECORD_KIND, "phase": phase,
+                    "label": label, "alert_pid": pid, "line": f"→ 第二台此刻放得下（{label}）", "next_step": f"改用 multi-host-run.sh --peer（{label}）"}
+        with open(alerts_file, encoding="utf-8") as handle:
+            records_before_queue = handle.read()
+        for record in (queue_record("queued-live", "queued", sleeper.pid), queue_record("refused-gone", "refused", gone.pid),
+                       queue_record("admitted-later", "queued", sleeper.pid), queue_record("admitted-later", "admitted", sleeper.pid, 0.5),
+                       queue_record("queued-gone", "queued", gone.pid)):
+            core.append_line(alerts_file, json.dumps(record, ensure_ascii=False))
+        lines, found = core_usage_report(os.getpid(), set(), {session_id}, samples_root)
+        queue_alerts = sorted((name, explanation, next_step) for name, explanation, next_step in found if "run-with-memory-cap.sh" in explanation)
+        wanted_queue_alerts = sorted([(MEMORY_QUEUE_ALERT, f"进程 {sleeper.pid} run-with-memory-cap.sh（queued-live）：→ 第二台此刻放得下（queued-live）",
+                                       "改用 multi-host-run.sh --peer（queued-live）"),
+                                      (MEMORY_QUEUE_ALERT, f"进程 {gone.pid} run-with-memory-cap.sh（refused-gone）：→ 第二台此刻放得下（refused-gone）",
+                                       "改用 multi-host-run.sh --peer（refused-gone）")])
+        if queue_alerts != wanted_queue_alerts:
+            failures.append(f"内存包装排队时写的告警记录应当报成「{MEMORY_QUEUE_ALERT}」：queued 而包装活着的（queued-live）、refused 而包装不在了的（refused-gone）报，"
+                            f"补了 admitted 的（admitted-later）与 queued 而包装不在了的（queued-gone）不报；实际 {queue_alerts}，报告：{lines}")
+        # 下面真跑的看门狗读同一份告警记录，--ack 那一格只确认四个进程：这几条写回去之前的样子
+        with open(alerts_file, "w", encoding="utf-8") as handle:
+            handle.write(records_before_queue)
+        # 内存包装收尾时写的三种（run-with-memory-cap.sh 文件头「峰值表」一段）：包装退了也报，三种告警名各不相同；别的会话的不报，没有会话号的只记一行
+        def outcome_record(kind, label, session=session_id, **fields):
+            return {"time": now, "session_id": session, "source": "run-with-memory-cap.sh", "kind": kind, "label": label, "alert_pid": gone.pid,
+                    "key": f"selftest-{label}", "cap": "200M", "booked": 20 * 1024 ** 2, "booked_source": "peak-table", "measured": 60 * 1024 ** 2,
+                    "by_peak_table": True, "line": f"run-with-memory-cap 写的那一行（{label}）", "next_step": f"记录里的出路（{label}）", **fields}
+        for record in (outcome_record("memory-peak-grew", "grew-gone", ratio=3.0), outcome_record("memory-own-cap", "own-cap-gone"),
+                       outcome_record("memory-squeezed", "squeezed-gone", by_peak_table=False), outcome_record("memory-own-cap", "own-cap-other", session="another-session"),
+                       outcome_record("memory-peak-grew", "grew-nosession", session="", ratio=3.0)):
+            core.append_line(alerts_file, json.dumps(record, ensure_ascii=False))
+        lines, found = core_usage_report(os.getpid(), set(), {session_id}, samples_root)
+        outcome_alerts = {explanation.split("（", 2)[1].split("）", 1)[0]: (name, explanation, next_step)
+                          for name, explanation, next_step in found if "run-with-memory-cap.sh" in explanation and "selftest-" in explanation}
+        grew = outcome_alerts.get("grew-gone")
+        if not grew or grew[0] != MEMORY_PEAK_GREW_ALERT or "内存峰值比记账大了 3.0 倍" not in grew[1] or "记账 20 MiB" not in grew[1] or "实测 60 MiB" not in grew[1] \
+                or grew[2] != "记录里的出路（grew-gone）" or "grew-nosession" in outcome_alerts \
+                or not any("没有会话号，只记不叫醒" in line and "grew-nosession" in line for line in lines):
+            failures.append(f"内存包装收尾时写的峰值涨了的告警记录（memory-peak-grew）应当在包装退了之后报成「{MEMORY_PEAK_GREW_ALERT}」、写「内存峰值比记账大了 3.0 倍」与记账、实测，"
+                            f"出路是记录里那一句，没有会话号的只记一行；实际 {grew}，报告：{lines}")
+        own_cap, squeezed = outcome_alerts.get("own-cap-gone"), outcome_alerts.get("squeezed-gone")
+        if not own_cap or own_cap[0] != MEMORY_OWN_CAP_ALERT or "撞了自己的上限：上限给小了，或工作量变了" not in own_cap[1] or "按峰值表放进来的" not in own_cap[1] \
+                or not squeezed or squeezed[0] != MEMORY_SQUEEZED_ALERT or "被总上限挤掉：结果不算数，重跑" not in squeezed[1] or "不是按峰值表放进来的" not in squeezed[1] \
+                or own_cap[0] == squeezed[0] or "own-cap-other" in outcome_alerts:
+            failures.append(f"内存包装收尾时写的撞顶与被挤掉的告警记录应当在包装退了之后分开报：memory-own-cap 报成「{MEMORY_OWN_CAP_ALERT}」（上限给小了，或工作量变了），"
+                            f"memory-squeezed 报成「{MEMORY_SQUEEZED_ALERT}」（结果不算数，重跑），别的会话的不报；实际 {own_cap}、{squeezed}，报告：{lines}")
+        with open(alerts_file, "w", encoding="utf-8") as handle:
+            handle.write(records_before_queue)
+        # 看门狗真跑：--processes-only 报 1 条线程那个、退 3；三个都 --ack 之后到点退 4
+        environment = dict(os.environ, AGENT_WATCH_STATE_ROOT=os.path.join(work, "core-watch-state"))
+        base = [sys.executable, os.path.abspath(__file__), "watch", "--processes-only", "--process-root-pid", str(os.getpid()),
+                "--session-dir", core_session, "--interval-seconds", "1", "--max-minutes", "0.1"]
+        watch_runs.append(["core-usage", "--processes-only"])
+        reported = subprocess.run(base, capture_output=True, text=True, timeout=120, env=environment)
+        wanted = f"⚠️ {CORE_USAGE_ALERT}（进程）：进程 {one.pid} 重活只用了"
+        if reported.returncode != 3 or wanted not in reported.stdout or "   → 怎么办：装置里互相独立的单位" not in reported.stdout:
+            failures.append(f"看门狗 --processes-only 盯着 1 条线程忙等的重活进程时应当报「{wanted}…」连同出路、退出码 3，"
+                            f"实际退出码 {reported.returncode}，输出：{reported.stdout[-600:]}")
+        watch_runs.append(["core-usage", "--processes-only", "--ack"])
+        # 登记数那么多条线程那个也确认上：看门狗子进程没有自检进程存的样本，按起跑以来平均判，机器极忙时起动那一段可能把它判低（那一半在上面的整查里判过了）
+        acknowledged = subprocess.run(base + [f"--ack=进程:{process.pid}" for process in (one, many, declared, sleeper)],
+                                      capture_output=True, text=True, timeout=120, env=environment)
+        if acknowledged.returncode != 4 or f"已确认接着盯（--ack 进程:{CORE_USAGE_ALERT}）：进程 {one.pid} " not in acknowledged.stdout:
+            failures.append(f"「{CORE_USAGE_ALERT}」的进程都 --ack 进程:<pid> 之后看门狗不该叫醒：应当到点退出码 4 并写「已确认接着盯」，"
+                            f"实际退出码 {acknowledged.returncode}，输出：{acknowledged.stdout[-600:]}")
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        for process in started:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+    return len(started)
+
+
 def selftest_unacknowledged_terminations(work, failures, probed_processes, watch_runs):
     """调度方不响应就终止：合成的状态目录里同一件告警连报到阈值、没 --ack，调了假的 proc.py stop（记录调用的桩）并写了那一句；
     有 --ack 的、阈值 0 的、中间断过一次的不终止；子 agent 的工具调用过长到线只报；两件同时到线一次只终止一个；
@@ -4258,6 +4646,7 @@ def selftest_in(work):
                                     ask_every_minutes=60, process_rss_gibibytes=8, progress_stale_minutes=30)
     session = os.path.join(work, "session")
     failures = []
+    os.environ[CORE_USAGE_SAMPLES_ROOT_VARIABLE] = os.path.join(work, "core-usage-samples-root")   # 这份自证起的看门狗子进程都写这里，随临时目录删
     # 本机真实的会话登记与草稿根不进自证：登记目录指到不存在的地方（判不了会话在不在，一律不当失效），草稿根指到一个空目录；
     # 要用它们的两格（selftest_stale_sessions、selftest_scratch_hogs）自己给子进程另设
     os.environ[SESSION_REGISTRY_ENV] = os.path.join(work, "no-session-registry")
@@ -4692,6 +5081,7 @@ def selftest_in(work):
     heavy_processes_started += selftest_heavy_selftest_tree(work, failures, probed_processes)
     heavy_processes_started += selftest_light_tier_tree(work, failures, probed_processes)
     memory_processes_started = selftest_memory(work, failures, probed_processes, watch_runs)
+    core_processes_started = selftest_core_usage(work, failures, probed_processes, watch_runs)
     termination_checks = selftest_unacknowledged_terminations(work, failures, probed_processes, watch_runs)
     session_watch_checks = selftest_session_watch(work, thresholds, failures, watch_runs) + session_watch_extra_checks
     session_watch_checks += selftest_scratch_mentions(failures)
@@ -4729,6 +5119,8 @@ def selftest_in(work):
           f"登记成轻的自证（--selftest exec 进本体的也认）底下与它临时目录里起的驱动不报，没有自证祖先的、设了 heavy-if-set 那个变量的、仓副本里的自证底下的照报；经内存包装起的轻型三条（crash-point-replay.sh --quick）底下的 checker 档 cargo 不报、同一棵树不带 --quick 的照报），"
           f"--processes-only 与 --agents 两条路都报、--ack 进程:<pid> 不叫醒；常驻内存过阈值的进程报「{MEMORY_ALERT}」（写常驻内存、阈值、归属与出路，"
           f"只睡的小进程不报，阈值 0 不查），两条路整查都报、--ack 进程:<pid> 不叫醒，看门狗起了之后才过线的由两次整查之间的单查几秒内叫醒（{memory_processes_started} 个进程）"
+          f"；跑过一个窗口的重活进程 1 条线程忙等的报「{CORE_USAGE_ALERT}」、登记数那么多条线程忙等的不报、声明了串行的照报并标出理由，"
+          f"告警记录只报本会话、没过期、告警进程还活着的，--processes-only 真跑报、--ack 之后不叫醒（{core_processes_started} 个进程）"
           f"；上下文过线只对实现员与执行员报「该交接」并列出吃上下文最多的工具输出、线写 0 不报，等后台任务时 progress.md 久没改报「进度文件不涨」、整点询问附 progress.md 末几行，"
           f"hook 检出的主体是 agent 号，执行前已被 hook 拒了的检出只记进报告不叫醒；重启前旧进程留下的子 agent 记录（会话已不在、或最后一条记录早于现在这个进程的启动）判已失效不报；有子 agent 交回时草稿根里超阈值的编译目录与仓副本按最后修改时刻列在报告里；--discover 一个会话一个看门狗（自己找没结束的子 agent、已有一个在盯就退 5）、--ack 落文件下一次读回、条件消失的确认作废（{session_watch_checks} 格）"
           f"；「进程卡住」类告警同一件连报到阈值、没 --ack 经 proc.py stop 终止那个进程并写「终止了 <pid>（<告警种类>，连报 N 次没处置）」，"

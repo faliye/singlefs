@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：field-frequency-sizes
+want=7 处字段频率的大小指不到已定条款（扫 3 份、8 处「每 X 一份」）
+want=.claude/kb/decisions/04-样本校验和.md:19 「每个逻辑 extent 一份」：「逻辑 extent」的大小读不出来：DATA_UNIT_BYTES 登记在 .claude/kb/decisions/04-样本校验和.md:23，不在任何写着「状态：已定」的已定项小节里；给出它大小的 D4 已定项 7 没写「状态：已定」
+want=.claude/kb/decisions/04-样本校验和.md:29 「每个单元恒一份」：「单元」的大小读不出来：DATA_UNIT_BYTES 登记在 .claude/kb/decisions/04-样本校验和.md:23，不在任何写着「状态：已定」的已定项小节里
+want=.claude/kb/decisions/08-样本索引.md:14 「每个节点一份」：「节点」的大小读不出来：NODE_BYTES 登记了不止一个值：.claude/kb/decisions/08-样本索引.md:12（16384）、.claude/kb/layout/01-样本布局.md:3（4096）
+want=  field-frequency-sizes：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-frequency-sizes）

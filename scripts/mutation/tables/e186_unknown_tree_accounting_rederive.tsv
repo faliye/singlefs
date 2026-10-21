@@ -1,0 +1,26 @@
+no_carry_waits_k_generations	        AccountingPolicy::NoCarry => (watermark_steps_of_unknown_heads.clone(), Vec::new()),	        AccountingPolicy::NoCarry if point.published_generations > point.retired_k_keep => (watermark_steps_of_unknown_heads.clone(), Vec::new()),\n        AccountingPolicy::NoCarry => carried_unknown_rows(previous, txg, &watermark_steps_of_unknown_heads),
+carry_recodes_steps	    rows.extend(watermark_steps_of_unknown_heads.iter().copied());	    rows.extend(watermark_steps_of_unknown_heads.iter().map(|step| step.recoded_to(txg)));
+no_carry_drops_steps	        AccountingPolicy::NoCarry => (watermark_steps_of_unknown_heads.clone(), Vec::new()),	        AccountingPolicy::NoCarry => (Vec::new(), Vec::new()),
+keep_with_root_recodes	        AccountingPolicy::KeepWithRoot => (rows_of_unknown_trees_left_as_they_were(previous), Vec::new()),	        AccountingPolicy::KeepWithRoot => carried_unknown_rows(previous, txg, &watermark_steps_of_unknown_heads),
+i313_semantic_to_syntactic	const STEP_RECOGNITION_OF_INVARIANT_I313: StepRecognition = StepRecognition::ByWatermarkChangeHistory;	const STEP_RECOGNITION_OF_INVARIANT_I313: StepRecognition = StepRecognition::ByCheckerSyntax;
+last_publish_always_a_step	    let the_initial_publish_is_a_step = point.initial_publish_changed_the_watermark;	    let the_initial_publish_is_a_step = true;
+q2_count_dropped	const REJECT_ENTRY_NEW_SEMANTICS_CLAUSE_UNITS: u64 = 1;	const REJECT_ENTRY_NEW_SEMANTICS_CLAUSE_UNITS: u64 = 0;
+skip_freed_ignores_window	    BLOCKS_BORN_PER_GENERATION * invisible_window_generations	    BLOCKS_BORN_PER_GENERATION * 1
+per_bit_threshold_off_by_one	    if point.trees_with_registered_bit >= UNKNOWN_TREE_COUNT {	    if point.trees_with_registered_bit > UNKNOWN_TREE_COUNT {
+positions_six_and_seven_swapped	        clause_units_to_change, rows_written_per_generation,	        rows_written_per_generation, clause_units_to_change,
+rows_lost_counts_rows	    let rows_lost = tuples_lost_by_the_final_version;	    let rows_lost = rows_dropped_over_all_generations;
+second_statistic_not_silent	const SECOND_TREE_STATISTIC_LOSS_HAS_AN_INVARIANT: bool = false;	const SECOND_TREE_STATISTIC_LOSS_HAS_AN_INVARIANT: bool = true;
+ignore_never_violates	        (UNKNOWN_READ_ONLY_TREE_COUNT * writable_generations, UNKNOWN_HALF_DELETED_TREE_COUNT)	        (UNKNOWN_READ_ONLY_TREE_COUNT * writable_generations * 0, UNKNOWN_HALF_DELETED_TREE_COUNT)
+i911_misses_unknown_heads	            let heads_that_must_have_a_watermark_row: Vec<TreeOwner> = known_writable_heads(point).into_iter().chain(unknown_writable_heads(point)).collect();	            let heads_that_must_have_a_watermark_row: Vec<TreeOwner> = known_writable_heads(point);
+read_only_publishes	    let writable_generations = if effective_flags_policy == UnknownFlagsPolicy::ReadOnly { 0 } else { point.published_generations };	    let writable_generations = point.published_generations;
+w2_forgets_steps	        rows_written_all_rows_by_version.push(version.rows.len().try_into().expect("计数装得进 u64"));	        rows_written_all_rows_by_version.push(version.rows.iter().filter(|row| !history.is_a_step(row)).count().try_into().expect("计数装得进 u64"));
+mount_filter_restored	            cells.push(outcome);	            if outcome.writable_generations == 0 {\n                continue;\n            }\n            cells.push(outcome);
+u5_dangling_counts_as_holding	    if written.is_empty() { return false; }	    if written.is_empty() { return true; }
+u5_guard_dropped	    if unknown_tree_row_count == 0 { return true; }	    let _ = unknown_tree_row_count;
+u5_counts_copied_steps	    version.rows_written_for_unknown_trees.clone()	    version.rows.iter().filter(|row| row.belongs_to_an_unknown_tree() && row.generation_txg < version.txg).chain(version.rows_written_for_unknown_trees.iter()).copied().collect()
+u5_by_arm_label	            let holds = clause_holds_on_version(clause, &published.initial, previous, version, point, history, flags_policy, judgement);	            let holds = clause_holds_on_version(clause, &published.initial, previous, version, point, history, flags_policy, judgement)\n                && !(clause == ClauseUnit::DecisionEightItemTwelveCarriedRows\n                    && judgement == Judgement::DanglingU5\n                    && accounting_policy != AccountingPolicy::Carry\n                    && point.unknown_writable_head_count > 0);
+default_judgement_is_dangling	const DEFAULT_JUDGEMENT: Judgement = Judgement::VacuousU5;	const DEFAULT_JUDGEMENT: Judgement = Judgement::DanglingU5;
+verdict_judges_h_new_zero_points	.filter(|(h_new_positive, _winners)| *h_new_positive)	.filter(|(_h_new_positive, _winners)| true)
+verdict_tie_with_carry_flips	            (AcceptanceForm::TieWithCarry, Consequence::CarryStandsTieKnownToUser)	            (AcceptanceForm::TieWithCarry, Consequence::FlipChoiceToUser)
+verdict_tie_without_carry_keeps_carry	            (AcceptanceForm::TieWithoutCarry, Consequence::FlipChoiceToUser)	            (AcceptanceForm::TieWithoutCarry, Consequence::CarryStands)
+verdict_mixed_counts_as_carry_everywhere	            (AcceptanceForm::DependsOnPointMixed, Consequence::LeftToUser)	            (AcceptanceForm::DependsOnPointCarryEverywhere, Consequence::CarryStands)

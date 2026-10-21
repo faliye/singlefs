@@ -24,6 +24,13 @@
 #      进程号、退出码、输出（标准输出与标准错误合成一份）各写第二台 runs/<标签>.pid / .exit / .log，每 MULTI_HOST_RUN_POLL_SECONDS（默认 5）秒
 #      经 ssh 看一次（peer_host_wait_detached）；跑完输出拷回、经 peer_host_redact 打到标准输出。
 #      带到第二台的环境：RUN_WITH_MEMORY_CAP_RESERVE 设了就带；本机别的环境变量不带（真的第二台经 ssh 也拿不到），要设写成 -- env 变量=值 <命令>。
+#      带到第二台的还有 SINGLEFS_SERIAL_DECLARATIONS=<第二台 runs/<标签>.serial>：那条命令里的程序当场往它写串行段的声明（写法在 scripts/hosts/core_usage.py 文件头「声明」）。
+#      在用核数：第二台那条命令在跑时每 MULTI_HOST_RUN_CORE_SECONDS（默认 300，只许写不超过 300 的正整数）秒经 ssh 在那棵树里跑一次
+#      scripts/hosts/core_usage.py sample（那条命令整棵进程树的 utime + stime 与每条线程的，连同 .serial 的原文），样本存本机，再在本机跑 core_usage.py judge：
+#      打一行「第二台在用 X 核（登记 N）」；最近一个窗口（600 秒）里在用核数与同时在算的线程都低于登记数的四分之一的，打 ✗ 一行带出路、
+#      往告警记录（core_usage.py 文件头「告警记录」，看门狗 agent-watch.py 读它叫醒主 agent）追加一条，告警进程号是这个驱动的进程号；
+#      声明了串行段的照报、标出秒数与理由，累计超过整趟一半的另注一句。窗口、阈值、同时在算的线程怎么算都在 core_usage.py 文件头。
+#      判红不停那条命令：处置由主 agent 定。第二台那条命令的轮询经 peer-host-lib.sh 的 PEER_HOST_WAIT_HOOK 调这一步。
 #      第二台共用编译目录：MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=<相对树根的编译目录>（例 ../crash-amplification-target：几棵树、几趟共用树外同一个编译目录）设了时，
 #      那条命令最前面接 peer-host-lib.sh 的 peer_host_shared_target_guard：在 <编译目录>.lock 上持锁 → scripts/hosts/source-stamp.py refresh（④ 拷树是 rsync -a，
 #      源文件带着本机的旧 mtime，cargo 按 mtime 判新鲜；内容或 mtime 与戳里不一样的 touch 到此刻，cargo 才重编它们）→ 设 CARGO_TARGET_DIR 跑命令，cargo 打出 Running 就放锁；
@@ -32,7 +39,7 @@
 #      取回目录：${MULTI_HOST_RUN_FETCH_DIRECTORY:-<工作根>/multi-host-run/<标签>}，路径在里面照原样；已有东西就拒（退 2）。
 #      工作根只在 .claude/hooks/lib_work_root.py 里定义（SINGLEFS_WORK_ROOT，默认 ~/.local/share/singlefs/work，开机不清）；
 #      没设 MULTI_HOST_RUN_FETCH_DIRECTORY、又给了 --fetch 而那份库跑不起来，命令不跑、退 255。
-#   ⑦ 删第二台这一趟的树与 .pid / .exit / .log；④ 之后在哪一步失败退出，这一步都挂在 EXIT 上照做。
+#   ⑦ 删第二台这一趟的树与 .pid / .exit / .log / .serial；④ 之后在哪一步失败退出，这一步都挂在 EXIT 上照做。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停那条命令——本机的从它的进程号起、第二台的从它在第二台上记下的进程号起（peer_host_stop_detached），
 #   第二台的停下之后先取回 --fetch 点名的路径（写到一半的产物不随树一起丢），
 #   连同全部后代冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL——再删第二台这一趟的树，做完才退。
@@ -40,7 +47,7 @@
 #   2 用法错，或弄坏开关 MULTI_HOST_RUN_BREAK 设在 --selftest 之外（命令一行都没跑）；255 这个脚本自己没跑成（配置、工具链、拷树、起不来、等不到结局，或命令退 0 而点名取回的路径不在）。
 #   命令退非 0 时点名的路径不在，只提一句，退出码照旧是命令的。
 # 驱动打的每一行都不写配置里第二台的主机、别名与目录：第二台的输出与错误输出经 peer_host_redact 换成「第二台」「第二台的目录」再打。
-# 共用库 scripts/hosts/peer-host-lib.sh 只调它的对外函数，不改它。
+# 共用库 scripts/hosts/peer-host-lib.sh 只调它的对外函数，另设它认的 PEER_HOST_WAIT_HOOK（⑤ 的在用核数）。
 #
 # gate-similar: crash-point-replay-shard-run.sh 它把一条登记了分片的崩溃枚举用例切成两片、两台各跑一片再 merge 并写 checker-tier-crash-point-replay 的全绿标记，步骤与输入指纹都绑在那一类用例上；它按内容进三条用例的输入指纹（admission.py 的 SHARD_DRIVER_FILES），并进来改一行就废三格标记
 # gate-similar: mutation-shard-run.sh 它是 checker-tier-crates-mutation-replay 专用的变异表分行驱动：按用时分两堆、两台各跑一份 checker-tier-crates-mutation-replay、拷回判定库记录核过再导入，判定归 checker-tier-crates-mutation-replay；这里只挪一条任意命令，不分行、不导记录，两份共用的第二台那几段已经抽在 peer-host-lib.sh
@@ -92,6 +99,12 @@
 #         （「默认那一趟退 0，工作根下没有取回的文件；$TMPDIR 下有」）
 #   MULTI_HOST_RUN_BREAK=gpu-memory-unexplained  那条命令退 245（内存包装认出的显存不够）时不报「显存不够」
 #       Ⓚ 本机跑、内存包装认出显存不够（假 journalctl 打 NVRM … NV_ERR_NO_MEMORY）⇒ 原样退 245、报「显存不够」、说那一次的输出不算结果（「退 245，stderr 尾部：…」）
+#   MULTI_HOST_RUN_BREAK=core-usage-unwatched  第二台那条命令在跑时不取样、不判在用核数（改前的样子：只报 running）
+#       Ⓝ 第二台只起 1 条线程忙等 ⇒ 打「第二台在用 X 核（登记 N）」与 ✗ 一行带出路、写告警记录（带会话号与来源）（「退 0；在用核数那几行：；告警记录 0 条」）
+#       Ⓝ 第二台起登记数那么多条线程忙等 ⇒ 打「第二台在用 X 核（登记 N）」、不打 ✗、不写告警记录（「退 0；在用核数那几行：；…」）
+#       Ⓝ 第二台 1 条线程忙等、程序先声明了串行 ⇒ 照报 ✗，标出理由（「退 0；✗ 那几行：」）
+#   MULTI_HOST_RUN_BREAK=serial-declarations-unset  第二台那条命令不带 SINGLEFS_SERIAL_DECLARATIONS（程序声明不了串行段）
+#       Ⓝ 第二台 1 条线程忙等、程序先声明了串行 ⇒ 照报 ✗，标出理由（「退 2；✗ 那几行：」：没设变量，declare-serial 拒了）
 # 判法的开关 MULTI_HOST_CONFIGURATION_BREAK 也带进这份自证，打开后红哪几格写在 scripts/crash/crash-point-replay-shard-configuration-check.sh 文件头；
 # 共用库的开关 PEER_HOST_LIB_BREAK 同样带进来，打开后红哪几格写在 scripts/hosts/peer-host-lib.sh 文件头。
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）：「第二台」是本机上的另一个目录，命令在本机跑、环境照 ssh 那样只给最少几样。
@@ -144,12 +157,12 @@ multi_host_remove_peer_run() { # ⑦ 删第二台这一趟的树与 .pid / .exit
     return 0
   fi
   local removal_text
-  removal_text="rm -rf -- $(printf '%q' "${peer_run_directory:?}") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}")"
+  removal_text="rm -rf -- $(printf '%q' "${peer_run_directory:?}") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}") $(printf '%q' "${peer_serial_file:?}")"
   if peer_host_run / "$removal_text && test ! -e $(printf '%q' "$peer_run_directory")" >/dev/null; then
-    echo "  · ⑦ 删了第二台 runs/$run_label 这一趟的树与进程号、退出码、输出三个文件（回读不在了）" >&2
+    echo "  · ⑦ 删了第二台 runs/$run_label 这一趟的树与进程号、退出码、输出、串行声明四个文件（回读不在了）" >&2
   else
     echo "  ✗ 第二台 runs/$run_label 这一趟的树没删掉" >&2
-    echo "     → 怎么办：到第二台 PEER_REPOSITORY_DIRECTORY 下的 runs/ 里手动删 $run_label 与 $run_label.pid / .exit / .log" >&2
+    echo "     → 怎么办：到第二台 PEER_REPOSITORY_DIRECTORY 下的 runs/ 里手动删 $run_label 与 $run_label.pid / .exit / .log / .serial" >&2
   fi
 }
 
@@ -235,6 +248,23 @@ multi_host_finish() { # <命令的退出码>：缺了取回的路径、包装自
   exit "$command_exit"
 }
 
+multi_host_core_check() { # 第二台那条命令在跑时每轮询到一次 running 调一次（peer-host-lib.sh 的 PEER_HOST_WAIT_HOOK）：
+  # 到了 MULTI_HOST_RUN_CORE_SECONDS 就在第二台取一次样、在本机判一次（文件头 ⑤「在用核数」）；取不到只提一句，不影响等它跑完
+  (( SECONDS >= core_next_check )) || return 0
+  core_next_check=$(( SECONDS + core_seconds ))
+  if multi_host_break_is core-usage-unwatched; then return 0; fi
+  if ! peer_host_run "$peer_run_directory" "python3 scripts/hosts/core_usage.py sample --pid-file $(printf '%q' "$peer_pid_file") --declarations $(printf '%q' "$peer_serial_file")" \
+       > "$multi_host_scratch/core-sample" 2>/dev/null; then
+    echo "  ! 第二台那条命令在用几个核这一次没取到（ssh 或取样没成），下一次再取" >&2
+    return 0
+  fi
+  python3 "$multi_host_script_directory/core_usage.py" judge --incoming "$multi_host_scratch/core-sample" --series "$multi_host_scratch/core-series" \
+    --declarations "$multi_host_scratch/core-declarations" --subject 第二台 --alert-pid "$$" --source "multi-host-run.sh --peer" --label "$run_label" \
+    --next-step "第二台那一趟在用的核太少：停下它（python3 .claude/singlefs-ai-sop/scripts/proc.py stop $$，驱动收到 TERM 先停第二台那条命令、取回点名的产物、再删第二台的树；驱动在 detached-run.sh 起的单元里就用 detached-run.sh stop <名>），照 .claude/rules/test-script-discipline.md「编译与算法都要快」把装置里互相独立的单位分到登记的线程数上再跑；真要串行的段由程序当场往 \$SINGLEFS_SERIAL_DECLARATIONS 写「<秒>\\t此刻串行：<理由>」，核过理由成立就 --ack 进程:$$ 接着跑" \
+    2>&1 | multi_host_redact >&2
+  return 0
+}
+
 multi_host_local_main() { # 不带 --peer：在本机仓根经 run-with-memory-cap.sh 跑，不读配置
   local command_exit wrapper=(bash "$tree_root/scripts/hosts/run-with-memory-cap.sh" "$memory_cap")
   if multi_host_break_is local-reads-configuration; then
@@ -299,8 +329,9 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑦ 见文件头
   peer_pid_file="$peer_runs/$run_label.pid"
   peer_exit_file="$peer_runs/$run_label.exit"
   peer_output_file="$peer_runs/$run_label.log"
-  if ! peer_host_run / "test ! -e $(printf '%q' "$peer_run_directory") && test ! -e $(printf '%q' "$peer_pid_file") && test ! -e $(printf '%q' "$peer_exit_file") && test ! -e $(printf '%q' "$peer_output_file")" >/dev/null; then
-    multi_host_usage_error "第二台 runs/ 下已经有 $run_label（或它的 .pid / .exit / .log），或第二台连不上"
+  peer_serial_file="$peer_runs/$run_label.serial"
+  if ! peer_host_run / "test ! -e $(printf '%q' "$peer_run_directory") && test ! -e $(printf '%q' "$peer_pid_file") && test ! -e $(printf '%q' "$peer_exit_file") && test ! -e $(printf '%q' "$peer_output_file") && test ! -e $(printf '%q' "$peer_serial_file")" >/dev/null; then
+    multi_host_usage_error "第二台 runs/ 下已经有 $run_label（或它的 .pid / .exit / .log / .serial），或第二台连不上"
   fi
   peer_host_run / "mkdir -p $(printf '%q' "$peer_run_directory")" >/dev/null \
     || multi_host_fail "第二台建不了 runs/$run_label" "看配置的 PEER_REPOSITORY_DIRECTORY 可不可写、盘满没满"
@@ -349,11 +380,20 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑦ 见文件头
     command_text="${reserve_text}$(printf '%q ' "${peer_host_shared_target_prefix[@]}")${command_text#"$reserve_text"}"
     echo "  · ⑤ 第二台共用编译目录 $shared_target_directory：起命令之前在 $shared_target_directory.lock 上持锁、刷源码戳（scripts/hosts/source-stamp.py refresh），cargo 打出 Running 再放锁" >&2
   fi
+  # 程序当场声明串行段的文件（文件头 ⑤「在用核数」）
+  if multi_host_break_is serial-declarations-unset; then
+    echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=serial-declarations-unset：第二台那条命令不带 SINGLEFS_SERIAL_DECLARATIONS" >&2
+  else
+    command_text="SINGLEFS_SERIAL_DECLARATIONS=$(printf '%q' "$peer_serial_file") $command_text"
+  fi
   peer_command_started=1   # 先置上：起的那一刻收到信号，也按第二台上记下的进程号去停
   peer_host_start_detached "$peer_run_directory" "$peer_pid_file" "$peer_exit_file" "$peer_output_file" "$command_text" >/dev/null \
     || multi_host_fail "第二台那条命令起不来" "看 ssh 连不连得上、第二台那棵树在不在"
   echo "  · ⑤ 第二台开跑（脱离 ssh 会话起，经副本里的 run-with-memory-cap.sh $memory_cap），每 $poll_seconds 秒看一次" >&2
+  core_next_check=$(( SECONDS + core_seconds ))
+  PEER_HOST_WAIT_HOOK=multi_host_core_check
   peer_host_wait_detached "$peer_pid_file" "$peer_exit_file" "$poll_seconds" >&2
+  PEER_HOST_WAIT_HOOK=""
   peer_command_started=0
   if peer_host_copy "$(peer_host_path "$peer_output_file")" "$multi_host_scratch/peer.log" 2>/dev/null; then
     multi_host_redact < "$multi_host_scratch/peer.log"
@@ -437,6 +477,11 @@ multi_host_main() {
   fi
   poll_seconds="${MULTI_HOST_RUN_POLL_SECONDS:-5}"
   [[ "$poll_seconds" =~ ^[1-9][0-9]*$ ]] || multi_host_usage_error "MULTI_HOST_RUN_POLL_SECONDS 读到「$poll_seconds」，要写正整数秒"
+  core_seconds="${MULTI_HOST_RUN_CORE_SECONDS:-300}"
+  if [[ ! "$core_seconds" =~ ^[1-9][0-9]*$ ]] || (( core_seconds > 300 )); then
+    multi_host_usage_error "MULTI_HOST_RUN_CORE_SECONDS 读到「$core_seconds」，要写不超过 300 的正整数秒（只许往短里改，第二台在用几个核不许调成不看）"
+  fi
+  core_next_check=0
   tree_root="$(cd "$multi_host_script_directory/../.." && pwd)"
   local_command_process=""
   peer_command_started=0
@@ -484,6 +529,9 @@ multi_host_main() {
 #      持锁——前一趟的命令占着锁等放行文件，后一趟走到等锁那一行之后再等 1 秒，它的命令还没跑；放行之后两趟都退 0
 #      Running 放锁——前一趟的命令往标准错误打 cargo 的「     Running …」再等放行文件，后一趟 30 秒里跑完自己的命令；之后放行前一趟，两趟都退 0
 #      绝对路径——变量写成绝对路径 ⇒ 用法错（退 2），命令没跑
+#   Ⓝ 在用核数（文件头 ⑤）：MULTI_HOST_RUN_CORE_SECONDS=1、SINGLEFS_CORE_USAGE_WINDOW_SECONDS=2、告警记录写场景目录，第二台那条命令是 core_usage.py busy-load：
+#      1 条线程忙 6 秒 ⇒ 打「第二台在用 X 核（登记 N）」与 ✗ 一行带出路、告警记录带会话号与来源；登记数那么多条线程忙 6 秒 ⇒ 打那一行、不打 ✗、不写告警记录；
+#      先 declare-serial 再 1 条线程忙 6 秒 ⇒ ✗ 那一行标出声明的理由
 # 自证在临时目录里放标记文件、export MULTI_HOST_RUN_SELFTEST_MARK 指向它：场景里起的驱动认得出是自证起的，调用方设的弄坏开关才生效
 
 multi_host_selftest() {
@@ -514,6 +562,7 @@ multi_host_selftest() {
   mkdir -p "$template/.claude/hooks" "$template/research" "$template/payload"
   rsync -a --exclude __pycache__ "$repository_root/.claude/scripts/" "$template/.claude/scripts/"
   cp -- "$repository_root/.claude/hooks/lib_work_root.py" "$template/.claude/hooks/lib_work_root.py"   # 取回目录的默认值要它（Ⓙ）
+  cp -- "$repository_root/.claude/heavy-thread-default" "$template/.claude/heavy-thread-default"   # core_usage.py judge 取登记数要它（Ⓝ）
   rsync -a --exclude __pycache__ --exclude /experiments/target/ "$repository_root/scripts/" "$template/scripts/"   # 装置的编译目录几十 G，自证用不到
   ln -s "$sop_source" "$template/.claude/singlefs-ai-sop"
   printf '/.claude/singlefs-ai-sop\n__pycache__/\n/multi-host.env\n/.env\ntarget/\n' > "$template/.gitignore"
@@ -862,12 +911,38 @@ if test -e target; then echo yes > $(printf '%q' "$scene/target-copied"); fi; if
     "$([[ "$(exit_of shared-absolute run)" == 2 && ! -e "$scene/ran" ]] && grep -q 'MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 读到' "$scene/run.err"; echo $?)" \
     "退 $(exit_of shared-absolute run)，命令$([[ -e "$scene/ran" ]] && echo 跑了 || echo 没跑)；stderr 尾部：$(tail_of shared-absolute run)"
 
+  # Ⓝ 第二台在用几个核（文件头 ⑤「在用核数」）：每 1 秒取一次、窗口 2 秒，告警记录写场景目录；假负载是 core_usage.py busy-load（不起编译与重活）
+  local core_threads core_scene
+  core_threads="$(python3 "$repository_root/scripts/hosts/heavy_threads.py" --print 2>/dev/null)"
+  prepare_scene cores
+  core_scene="$work/cores"
+  core_run() { # <这一趟的名字> <命令…>：在 cores 场景里起一趟 --peer
+    MULTI_HOST_RUN_CORE_SECONDS=1 SINGLEFS_CORE_USAGE_WINDOW_SECONDS=2 SINGLEFS_CORE_USAGE_ALERTS="$core_scene/$1.alerts" CLAUDE_CODE_SESSION_ID=multi-host-run-selftest-cores \
+      run_in cores "$1" --peer --memory-cap 256M --label "cores-$1" -- "${@:2}"
+  }
+  core_alert_count() { if [[ -f "$core_scene/$1.alerts" ]]; then wc -l < "$core_scene/$1.alerts"; else echo 0; fi; }
+  core_run one python3 scripts/hosts/core_usage.py busy-load 1 6
+  core_run many python3 scripts/hosts/core_usage.py busy-load "$core_threads" 6
+  core_run declared bash -c 'python3 scripts/hosts/core_usage.py declare-serial 计时窗口必须单线程跑完 && exec python3 scripts/hosts/core_usage.py busy-load 1 6'
+  expect "Ⓝ 第二台只起 1 条线程忙等 ⇒ 打「第二台在用 X 核（登记 N）」与 ✗ 一行带出路、写告警记录（带会话号与来源）" \
+    "$([[ "$(exit_of cores one)" == 0 && -n "$core_threads" ]] && grep -q "✗ 第二台在用 [0-9.]* 核（登记 $core_threads）" "$core_scene/one.err" \
+       && grep -q '→ 怎么办：第二台那一趟在用的核太少' "$core_scene/one.err" \
+       && grep -q '"session_id":"multi-host-run-selftest-cores"' "$core_scene/one.alerts" && grep -q '"source":"multi-host-run.sh --peer"' "$core_scene/one.alerts"; echo $?)" \
+    "退 $(exit_of cores one)；在用核数那几行：$(grep '第二台在用' "$core_scene/one.err" 2>/dev/null | cut -c1-160 | tr '\n' '|')；告警记录 $(core_alert_count one) 条"
+  expect "Ⓝ 第二台起登记数那么多条线程忙等 ⇒ 打「第二台在用 X 核（登记 N）」、不打 ✗、不写告警记录" \
+    "$([[ "$(exit_of cores many)" == 0 && ! -e "$core_scene/many.alerts" ]] && grep -q "第二台在用 [0-9.]* 核（登记 $core_threads）：最近" "$core_scene/many.err" \
+       && ! grep -q '✗ 第二台在用' "$core_scene/many.err"; echo $?)" \
+    "退 $(exit_of cores many)；在用核数那几行：$(grep '第二台在用' "$core_scene/many.err" 2>/dev/null | cut -c1-160 | tr '\n' '|')；告警记录 $(core_alert_count many) 条"
+  expect "Ⓝ 第二台 1 条线程忙等、程序先声明了串行 ⇒ 照报 ✗，标出理由" \
+    "$([[ "$(exit_of cores declared)" == 0 ]] && grep -q '✗ 第二台在用.*声明了串行 [0-9]* 秒：计时窗口必须单线程跑完' "$core_scene/declared.err"; echo $?)" \
+    "退 $(exit_of cores declared)；✗ 那几行：$(grep '✗ 第二台在用' "$core_scene/declared.err" 2>/dev/null | cut -c1-200 | tr '\n' '|')；stderr 尾部：$(tail_of cores declared)"
+
   if (( failures > 0 )); then
     echo "  ✗ multi-host-run.sh 自证有 $failures 格判错（共 $checked 格）"
     echo "     → 怎么办：设了 MULTI_HOST_RUN_BREAK 或 MULTI_HOST_CONFIGURATION_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看 scripts/hosts/multi-host-run.sh 与 peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、取回目录默认在工作根下而设了变量照变量、包装认出显存不够时原样退 245 并报显存不够、第二台共用编译目录先持锁刷源码戳再编（旧 mtime 新内容的照样重编）、cargo 打出 Running 就放锁、那个变量写绝对路径就拒）"
+  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、取回目录默认在工作根下而设了变量照变量、包装认出显存不够时原样退 245 并报显存不够、第二台共用编译目录先持锁刷源码戳再编（旧 mtime 新内容的照样重编）、cargo 打出 Running 就放锁、那个变量写绝对路径就拒、第二台只用 1 条线程报在用核数过少并写告警记录而登记数那么多条线程不报、声明了串行段照报并标出理由）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then

@@ -14,7 +14,7 @@ M13_fua_never_a_boundary	                if self.fua_is_boundary && write.is_fua
 M14_root_always_region_zero	    (checkpoint_txg.0 % RING_REGIONS, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)	    (0, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)
 M15_watermark_not_above_max_tree	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_RETIREMENT + 1;	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_RETIREMENT;
 M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {
-M17_feature_bit_not_written	writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT);	writer.put_u8(0);
+M17_feature_bit_not_written	writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE);	writer.put_u8(0);
 M18_parser_ignores_unknown_incompat	unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity	{ let _ = (unknown_in_first_byte, unknown_in_rest); has_layout_identity }
 M19_one_warm_up_publish	const WARM_UP_EMPTY_PUBLISHES: u64 = 2;	const WARM_UP_EMPTY_PUBLISHES: u64 = 1;
 M20_mkfs_drops_trailing_barrier	            pool.write(device, DeviceOffset(slot_offset), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);\n        }\n    }\n    pool.barrier();	            pool.write(device, DeviceOffset(slot_offset), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);\n        }\n    }
@@ -143,9 +143,9 @@ M164_main_transaction_dependency_groups_wrong_step_kind	    let unit_indices: Ve
 M165_main_transaction_dependency_groups_wrong_chunk_size	    unit_indices.chunks(device_count.max(1)).map(<[usize]>::to_vec).collect()	    unit_indices.chunks(device_count.max(1) + 1).map(<[usize]>::to_vec).collect()
 M166_grouped_accumulator_merge_overwrites_first_violation	        if t.first_violation.is_none() {	        if true {
 M167_layer0_main_arm_verdict_root_persisted_threshold	        root_persisted_ok: tally.root_persisted_states == 4,	        root_persisted_ok: tally.root_persisted_states == 5,
-M168_feature_bit_writes_retired_bit0	writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT);	writer.put_u8(INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT);
-M169_feature_bit_writes_both_bit0_and_bit1	writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT);	writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT);
-M170_reader_recognizes_retired_bit0_too	const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT;	const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT;
+M168_feature_bit_writes_retired_bit0	writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE);	writer.put_u8(INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT);
+M169_feature_bit_writes_both_bit0_and_bit1	writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE);	writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE | INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT);
+M170_reader_recognizes_retired_bit0_too	const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;	const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT | INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT;
 M171_layout_identity_check_looks_at_bit0	let has_layout_identity = incompat[0] & INCOMPAT_LAYOUT_IDENTITY_BIT != 0;	let has_layout_identity = incompat[0] & INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT != 0;
 M172_rollback_floor_not_written	writer.assert_position(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64, "系统配置回退下界 F");\n        writer.put_u64(self.rollback_floor.0);	writer.assert_position(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64, "系统配置回退下界 F");\n        writer.skip(8);
 M173_rollback_floor_written_before_journal_tail	writer.skip(24); // 整理三条水位：第一版恒 0 = 内置默认（D22 已定项 15）\n        writer.assert_position(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64, "journal tail");\n        writer.put_u64(self.journal_tail);\n        writer.put_u32(self.journal_instance.0);\n        // D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：回退下界 F 8 字节，\n        // 住 [481, 489)，journal 实例代号之后。\n        writer.assert_position(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64, "系统配置回退下界 F");\n        writer.put_u64(self.rollback_floor.0);	writer.skip(24); // 整理三条水位：第一版恒 0 = 内置默认（D22 已定项 15）\n        writer.put_u64(self.rollback_floor.0);\n        writer.put_u64(self.journal_tail);\n        writer.put_u32(self.journal_instance.0);
@@ -217,3 +217,7 @@ M238_label6_omits_the_retirement_resident_slots	    let resident_slots = tombsto
 M239_label6_omits_the_retirement_tree_internal_levels	    let retirement_resident_slots = 2 + retirement_tree_internal_levels + 1;	    let retirement_resident_slots = 2 + 0 * retirement_tree_internal_levels + 1;
 M240_retirement_prepay_counts_live_objects	            + retirement_prepayment_bytes_per_inode_record() * inode_record_count)	            + retirement_prepayment_bytes_per_inode_record() * live_object_count + 0 * inode_record_count)
 M241_retirement_prepay_rounds_down	    (2 * SLOT_BYTES).div_ceil(RETIREMENT_RECORDS_PER_CONTAINER)	    (2 * SLOT_BYTES) / RETIREMENT_RECORDS_PER_CONTAINER
+M242_feature_bit_two_not_written	writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE);	writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT);
+M243_reader_does_not_recognize_bit_two	const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;	const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT;
+M244_reader_requires_bit_two	let has_layout_identity = incompat[0] & INCOMPAT_LAYOUT_IDENTITY_BIT != 0;	let has_layout_identity = incompat[0] & WRITTEN_FIRST_INCOMPAT_BYTE == WRITTEN_FIRST_INCOMPAT_BYTE;
+M245_bit_two_constant_names_bit_three	const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x04;	const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x08;

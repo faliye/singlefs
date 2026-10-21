@@ -390,7 +390,7 @@ def driver_timing_lines(path: str, lines: ResultLines) -> None:
 
 def freeze_line(phase: str, repo_root: str, lines: ResultLines, tally: dict[str, int]) -> list[str]:
     """Z2：冻结行逐个核（开头一次、收尾一次）。交回冻结行供各份 O3 产物里的冻结行对照。"""
-    reference = frozen_o3.frozen_lines_of(os.path.join(repo_root, frozen_o3.FREEZE_REFERENCE_RELATIVE))
+    reference = frozen_o3.freeze_reference_lines(repo_root)
     differences = frozen_o3.freeze_differences(repo_root, reference)
     lines.result(f"name=freeze_check phase={phase} reference={field(os.path.basename(frozen_o3.FREEZE_REFERENCE_RELATIVE))} "
                  f"files={len(frozen_o3.frozen_hashes_of(reference))} seed={frozen_o3.seed_of(reference)} differences={len(differences)} "
@@ -458,6 +458,8 @@ def main(argument_list: list[str]) -> int:
     for required, value in given.items():
         if value is None:
             parser.error(f"--{required.replace('_', '-')} 必给")
+    if frozen_o3.report_missing_freeze_reference(repo_root, "comparator.py"):   # 冻结行的参照产物不在：本次未跑，一行产物都不写
+        return frozen_o3.NOT_RUN_EXIT_CODE
     lines = ResultLines(arguments.output)
     started = time.monotonic_ns()
     o3_columns = "frozen_executor" if (arguments.o3_baseline or arguments.rows_root or arguments.image_judgements) else "not_run"

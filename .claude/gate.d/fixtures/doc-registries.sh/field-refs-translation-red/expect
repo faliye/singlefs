@@ -1,0 +1,5 @@
+exit=1
+want=01-first-txn.md:8 指向 D9（09-样本加密.md）的「已定项 11」，而那张表里没有这一条
+want=新池新建文件的字段表里有 1 处指向有误
+want=  field-refs：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-refs）

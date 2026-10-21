@@ -9,6 +9,7 @@
 | `heavy-threads.sh`、`heavy_threads.py` | 每台默认重活线程数的两份取法（shell 的 `heavy_thread_default`、python 的 `default_heavy_threads`）：`SINGLEFS_THREAD_CAP` 设了照它，否则读 `.claude/heavy-thread-default` 的登记值，写坏或不在就拒 |
 | `multi-host-run.sh`、`peer-host-lib.sh`、`host-dispatch.py`、`host-resources.py` | 把活挪到第二台跑、两台共用的那几段、按资源派发、量各台此刻能用多少 |
 | `detached-run.sh` | 超过后台时限的长活挂到用户级 systemd 下跑 |
+| `core_usage.py` | 长跑在用几个核：给一棵进程树取样、按 10 分钟窗口判在用核数与同时在算的线程（低于每台默认重活线程数的四分之一报）、读程序当场声明的串行段、写告警记录；`multi-host-run.sh --peer`、`detached-run.sh watch` 与 `scripts/agents/agent-watch.py` 共用 |
 | `compile-then-swap.py`、`source-stamp.py`、`target-prune.py`、`target-prune.conf` | 先编后换、换了源码没重编的拦法、清编译目录的旧产物 |
 | `minimal-copy.py` | 建最小仓副本：只拷 `crates/`、`Cargo.toml`、`Cargo.lock`、`.cargo` 与 `.claude/heavy-thread-default`（`--with-gate-tables` 再加 `.claude/gate.d`），拷前报大小、超阈值拒绝，拷过去的修改时刻是此刻 |
 | `work-directory-ownership.sh` | 工作根下每个目录的归属文件（会话号、建于、用途）：`claim` 写、`show` 读、`sweep [--dry-run]` 只删归属是本会话又没有进程开着的，别的会话的与没有归属文件的逐项列出交用户，删前逐项连大小写进 `<工作根>/sweep-<日期>.log` |

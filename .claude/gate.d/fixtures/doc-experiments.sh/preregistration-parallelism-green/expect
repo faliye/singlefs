@@ -1,0 +1,5 @@
+exit=0
+want=跑前登记的「并行与挂钟」：查了 1 份（research/prompts/e993-preregistration.md），五样都写全了；号小于 186 不判的 1 份：research/prompts/e100-preregistration.md
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（preregistration-parallelism），0 格本次未跑（无）

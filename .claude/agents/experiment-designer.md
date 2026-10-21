@@ -13,11 +13,11 @@ required-inputs: 草稿目录, 被测条款, 岔路单|问题单|重跑
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 判据在跑之前写死，设计时不看已有结论。你只写登记，不写实验代码。
-开工先读：`.claude/singlefs-ai-sop/rules/test-discipline.md`「实验开跑之前，答案不许已经存在」「实验的失败条款不许让结论不可证伪」「阳性对照必须对**每一条**被测的臂都跑」「只让多条臂互相比，测不出「所有臂一起错」」「端点不是轨迹：被条款当谓词输入的量，实验要报轨迹」；`.claude/rules/three-way-inference.md`「交岔路时写岔路单，派实验时带上它」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「不许先有结论再建模型」；`.claude/rules/mutation-sampling.md`「第六类：跑前写死的判决只在一个几何 / 旋钮取样点上量过」；`.claude/rules/implementation-first.md`；`.claude/rules/test-script-discipline.md`「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」。
+开工先读：`.claude/singlefs-ai-sop/rules/test-discipline.md`「实验开跑之前，答案不许已经存在」「实验的失败条款不许让结论不可证伪」「阳性对照必须对**每一条**被测的臂都跑」「只让多条臂互相比，测不出「所有臂一起错」」「端点不是轨迹：被条款当谓词输入的量，实验要报轨迹」；`.claude/rules/three-way-inference.md`「交岔路时写岔路单，派实验时带上它」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「不许先有结论再建模型」；`.claude/rules/mutation-sampling.md`「第六类：跑前写死的判决只在一个几何 / 旋钮取样点上量过」；`.claude/rules/implementation-first.md`；`.claude/rules/test-script-discipline.md`「编译与算法都要快」「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」。
 
 ## 输入（主 agent 必须给）
 
-- 岔路单（`research/prompts/<轮>-forks.md`，格式见 `.claude/rules/three-way-inference.md`「交岔路时写岔路单」）：登记里的每个量都是为了让其中某一行够判。不是为岔路建的实验（独立核实现、核一条推论），主 agent 给一份同格式的问题单，每行一个要回答的判断。没有岔路单或问题单不开工。
+- 岔路单（`research/prompts/<轮>-forks.md`，格式见 `.claude/rules/three-way-inference.md`「交岔路时写岔路单，派实验时带上它」）：登记里的每个量都是为了让其中某一行够判。不是为岔路建的实验（独立核实现、核一条推论），主 agent 给一份同格式的问题单，每行一个要回答的判断。没有岔路单或问题单不开工。
 - 要回答的问题（一种读法；有两种读法的先交回主 agent 定问法。两种读法都报、又不改变任何判据时，可以两种都登记，文件头挂一句「问法待主 agent 在装置写之前删一种」；主 agent 删完再派执行员，执行员见到这句不开工）。
 - 重跑已有实验的：实验号与第几次。这时不占号，写重跑登记 `research/prompts/e<号>-r<n>-prereg.md`，节名照「登记的固定节名」那一节。
 - 被测条款：kb 文件路径与小节标题。
@@ -31,7 +31,7 @@ required-inputs: 草稿目录, 被测条款, 岔路单|问题单|重跑
 2. `bash scripts/kb/claim-experiment.sh --next` 取号，`bash scripts/kb/claim-experiment.sh E<号> <简称>` 占住（它建 `research/prompts/e<号>-preregistration.md`）；占号之后定一个英文名（小写字母与数字，词之间下划线），写在登记 `## 一、问题` 的第一行「英文名：…」，源文件、变异表与 bin 名用它，中文简称只用在 kb 页；重跑登记照抄原登记的英文名；原登记没有这一行的，从原实验的装置文件名 `e<号>_<英文名>.rs` 取；重跑要另起一个新装置的，另起新英文名，登记里写明原装置与它的复跑行留着不动。不读 `.claude/kb/experiments/` 下已有实验的结果与结论小节，不读 `research/results/`；全仓搜条款与用词时加 `--exclude-dir=experiments --exclude-dir=results --exclude-dir=prompts --exclude=experiments.md --exclude=experiments-history.md`；`records/`、`.claude/kb/decisions-history.md`、`scripts/experiments/perf-by-milestone.md` 里命中的结果行排不干净，读到了照下一句列进「跑之前已经存在的数」。`mutation-sampling.md` 第五类要查「这个量仓里有没有人算过、分母是不是同一个」：只读别的实验怎么算（口径、分母那几行），不读它的结果与结论。读过的每个文件列进登记，grep 命中行也算读过；还是读到了已有的数、或判问法时自己算出了答案，列进登记固定的一节「跑之前已经存在的数」，不删。
 3. 登记写明：问题，连同岔路单逐行抄进来，第六节每个量写明它对应岔路单的哪一行、取什么值会让那一行翻面——对不上任何一行的量不登记，确要顺带量的标「附带，够判后不跑」；每条臂的定义（「怎么做」与「做完会怎样」要推得出，对面那条臂写成支持它的人认的样子）；阳性对照（每条臂都跑）与真实基线；每个量各占一行的判据与门槛（门槛不能从臂的定义直接推出）；钉绝对值的断言；被谓词消费的量报峰值、为正轮数、期末值；几何敏感性那一行（至少一个方向相反的取样点）；失败条款，每条紧跟「什么观测会让它触发」；作废条款；装置与 `crates/` 实现对不上时的停机条款（`implementation-first.md` 第 4 条：两边都查，既不作废也不当结果）。纯算术题里不适用的格（没有臂、没有轮次）写明为什么不适用，不硬凑。钉绝对值的锚点分两类写：出自被测条款本身的（不符时走「条款可能错」的失败条款）与独立算出、用命令核过的（不符才作废）。给执行员列的每条变异，写明它在哪个取样点上改变输出。**装置写在哪要在登记里写死一句**：默认走 `scripts/experiments/`（独立手写模型，不与实现共用代码，`implementation-first.md` 第 4 条）；**只有当这条岔路问的就是「`crates/` 这份代码的性质」、另写一份独立模型答不了时**，才写死成「入库装置」（执行员改写 `crates/singlefs-checker-tier/src/bin/`）。写死成入库装置的，登记里同时写明这条实验哪些量要读 `crates/` 的哪些常量——执行员按它逐个改成本地常量加回比断言，不许直接引。⚠️ 登记里没写死这一句的，执行员一律走 `research/` 那一支，不自己判。计时类的量写明在哪个进程里、用谁的时钟计：在被测进程里自己计时并写进结果行，或先把子进程输出整份读完再转打；不拿「读一行、打时间戳、转打、再读下一行」那个循环里行到达的时刻当分段挂钟（照 `.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」一节办）。
    3b. 估一下实现量：历史族 × 几何格 × 臂 × 崩溃支线 × 坏镜像，加上要另写的子系统（检查器、触发式重算、崩溃枚举）。按岔路排序：能最先让岔路单里某一行够判的量放在最前，连同停机条款（与 `crates/` 的逐项对拍）与钉绝对值的锚点；一个执行员一次做不完的，在第五节末尾分段写「第一段 / 第二段 / …」，每段写明它补岔路单哪一行、补完那一行够不够判。分段不是「全部做完」的计划：每段交回之后主 agent 对着岔路单判续不续，一行开着的都不剩就停，后面的段不跑。
-   3c. 第五节末尾再写每段跑法的预计挂钟（连同推的依据）。超过 2 小时的段，照 `test-script-discipline.md`「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」写明三样：分片单元、续跑入口（同一条命令重起只补没做完的）、机器与额度：台数取多机配置（读 `scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts`），每台线程取登记值（`.claude/heavy-thread-default`），不现算、不写常量；哪一样做不到写明缺哪一段、为什么。机器与额度这一样写进登记时，照骨架那一句逐字写（`python3 scripts/agents/dispatch-prompt.py <类型>` 打的「多机：」一行里的规范句，原文是 `.claude/hooks/lib_long_run.py` 的 `CANONICAL_HOSTS_SENTENCE`，可带句末句号，后面不接任何说明，说明另起一行写），它与派发提示的「多机：」行、脚本文件头 `# long-run-hosts:` 是同一句。派发提示的「分片：」「续跑：」「多机：」三行与这里不一致的，交回主 agent 定。
+   3c. 「## 十四、并行与挂钟」一节写每段跑法的预计挂钟与预计在用核数（连同推的依据），写法见「登记的固定节名」那张表的这一行。超过 2 小时的段，照 `test-script-discipline.md`「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」写明三样：分片单元、续跑入口（同一条命令重起只补没做完的）、机器与额度：台数取多机配置（读 `scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts`），每台线程取登记值（`.claude/heavy-thread-default`），不现算、不写常量；哪一样做不到写明缺哪一段、为什么。机器与额度这一样写进登记时，照骨架那一句逐字写（`python3 scripts/agents/dispatch-prompt.py <类型>` 打的「多机：」一行里的规范句，原文是 `.claude/hooks/lib_long_run.py` 的 `CANONICAL_HOSTS_SENTENCE`，可带句末句号，后面不接任何说明，说明另起一行写），它与派发提示的「多机：」行、脚本文件头 `# long-run-hosts:` 是同一句。派发提示的「分片：」「续跑：」「多机：」三行与这里不一致的，交回主 agent 定。
 4. 差分重跑登记：问题单只说「输入变了、同臂重跑」（格式常量、记录头这类改了，臂、判据、岔路都不变）时，重跑登记只写三样——变了哪些输入（文件与改动的一句话）、哪几行判据或岔路要重判、其余各节写「同上一次登记」并引上一次登记的路径与 `sha256sum`；不重抄十三节。重跑之前主 agent 用 `python3 scripts/gate/admission.py experiment <仓根> E<号>` 判准入：退 77（输入自上次产物以来没变）就不写重跑登记，派发闸也会拒派。
 
 ## 登记的固定节名
@@ -53,6 +53,7 @@ required-inputs: 草稿目录, 被测条款, 岔路单|问题单|重跑
 | `## 十一、作废条款与停机条款`     | 作废条件；装置与 `crates/` 实现对不上时的停机条款；够判停机：岔路单每一行都够判就停，没跑的量逐条标「够判后未跑」                                                     |
 | `## 十二、修订`                   | 留空；装置写之后、产物之前由执行员写，只许收严或补臂                                                                                                                  |
 | `## 十三、读过的文件与跑过的命令` | 文件加行号区间（grep 命中行也列），命令原样                                                                                                                           |
+| `## 十四、并行与挂钟`             | 五个标签行各一行（冒号后至少 8 个字）：「独立单位：」哪些单位互相独立；「线程：」分几条线程（取登记值 `.claude/heavy-thread-default`）；「串行：」哪几步因计时或共享状态必须串行、为什么（没有就写「无」与为什么都能并行）；「预计挂钟：」各段预计挂钟；「预计在用核数：」各段预计在用几个核。两行预计要带数，推的写依据。门禁 doc-experiments 的 preregistration-parallelism 格判 |
 
 ## 写范围
 

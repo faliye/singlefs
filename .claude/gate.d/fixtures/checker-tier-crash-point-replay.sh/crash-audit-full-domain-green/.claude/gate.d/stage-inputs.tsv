@@ -1,0 +1,2 @@
+checker-tier-crash-point-replay.sh	tests-of:singlefs-checker-tier	command=cargo command=rustc	# 样本：本阶段那一行（入口是 checker 档包的测试函数）
+crash-case:plain-stream	-	test=singlefs-checker-tier:plain_stream:plain_stream_full	# 样本：没带标记，--full 里块那一行有红就判红

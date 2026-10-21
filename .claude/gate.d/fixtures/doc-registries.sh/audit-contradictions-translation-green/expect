@@ -1,0 +1,4 @@
+exit=0
+want=最近一次总审核第五节每一行都有去向（records/2026-10-21-总审核.md：第五节 1 行，判了 1 行；写「已改」的 1 行引了 1 句原文，都在那一行点名的文件的今天正文里找得到；其中 0 行没点名 kb 文件，按 kb 全部正文找）
+want=欠账表按共用读法 lib-owed.py 切：开着 1 笔、已还清 1 笔
+want=doc-registries.sh：1 格里 1 格绿（audit-contradictions），0 格本次未跑（无）

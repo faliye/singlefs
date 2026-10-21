@@ -1,0 +1,10 @@
+EV1_新口径写次数系数取成一写一删的2	            WriteAccounting::SingleGenerationWriteOnly => 1,	            WriteAccounting::SingleGenerationWriteOnly => 2,
+EV2_旧口径写次数系数取成1	            WriteAccounting::OneWriteOneDeleteAcrossKeptGenerations => 2,	            WriteAccounting::OneWriteOneDeleteAcrossKeptGenerations => 1,
+EV3_门槛取成T_dirty的百分之二	const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = DIRTY_BYTES_THRESHOLD / 100;	const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = DIRTY_BYTES_THRESHOLD / 50;
+EV4_过界比较取成大于等于	    publish_write_bytes > budget_bytes	    publish_write_bytes >= budget_bytes
+EV5_窄读九项全按树分即塌成宽读	let tree_factor = if statistic.uses_tree_dimension_in_narrow_reading { tree_count } else { 1 };	let tree_factor = tree_count;
+EV6_设备维因子恒取1	        (DeviceDimension::Kept, true) => device_count,	        (DeviceDimension::Kept, true) => device_count.min(1),
+EV7_middle档key宽22写成21	tag: "middle", original_product_tag: Some("mid"), key_bytes: 22,	tag: "middle", original_product_tag: Some("mid"), key_bytes: 21,
+EV8_S2点漏掉seq的4字节	const CURRENT_IMPLEMENTATION_SEQUENCE_BYTES: u64 = 4;	const CURRENT_IMPLEMENTATION_SEQUENCE_BYTES: u64 = 0;
+EV9_上界臂统计量数9写成8	Arm::UpperBound => statistic_count() * tree_count	Arm::UpperBound => (statistic_count() - 1) * tree_count
+EV10_宽读臂丢掉设备维	.map(|statistic| tree_count * device_factor(statistic.uses_device_dimension, device_dimension, device_count))	.map(|statistic| tree_count * device_factor(statistic.uses_device_dimension && statistic.uses_tree_dimension_in_narrow_reading, device_dimension, device_count))

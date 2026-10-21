@@ -1,0 +1,5 @@
+exit=1
+want=crates/singlefs-format/src/lib.rs:1  D23 里找不到 已定项 20
+want=格式常量文件里有 1 个占位指不到分项或欠账
+want=  format-const-placeholders：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（format-const-placeholders）

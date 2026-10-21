@@ -29,7 +29,8 @@
 #   崩溃放量    scripts/crash/crash-amplification.sh：带 --item 是 items（N = 分项数）；不带 --item 的（--expand-up-to 缩过规模的也算）是 whole。
 #               scripts/crash/crash-amplification-item.sh、crash-amplification-two-hosts.sh 起一个测试目标：target，N = 1（范围写「1 个测试目标」，带 --test-filter 的写「1 个测试」）。
 #   实验复跑    scripts/experiments/replay.sh：不带实验号是 whole，带实验号是 items（N = 实验号个数，范围写「N 个实验」）。
-#   合入后验证  scripts/gate/merge-and-verify.sh：whole（还不认只跑改到的包，等 4-3i 第 8 条）。
+#   合入后验证  scripts/gate/merge-and-verify.sh：whole（挑包在脚本里做：只跑补丁改到的包与依赖它们的包，--all-packages 与它文件头写的另几种照旧全跑；
+#               声明照旧写 whole，为什么写明这一批补丁碰了哪些包）。
 #   整轮门禁    scripts/gate/gate-staged.sh、.claude/singlefs-ai-sop/scripts/gate.sh 与它的包装 .claude/scripts/gate.sh：whole。
 #   cargo test  cargo test 与 cargo t（cargo 的全局选项与 +工具链照 lib_heavy_tests.py 的 cargo_subcommand 跳过）：带 --test / --bin / --example / --bench <名>、--lib、--doc，
 #               又不带 --workspace / --all / --tests / --bins / --examples / --benches / --all-targets 的是 target，N = 目标数；`--` 之后带 --exact 又给了筛选词的，
@@ -52,7 +53,7 @@
 # 拒绝说明（stderr，写给 agent）：逐条写命令（驱动脚本里的写 脚本:行）、跑的是什么、范围多大、哪里不合、上次这一道红的清单；
 #   再给照抄的声明模板（种类、跑什么、范围按命令现算好，为什么留尖括号让 agent 填；驱动脚本里的写「在 <脚本> 那一行的命令前面加」，命令超过 2000 字的不整条贴），
 #   只跑红的与改到的写法（门禁 --check <格> / --item <项>，崩溃入口 --item <项>，cargo test -p <包> --test <目标> -- <测试名> --exact 或
-#   python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包>，merge-and-verify 写「还不认只跑改到的包，等 4-3i 第 8 条」），与声明的写法。
+#   python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包>（它打出的每条命令开头已带 target 声明），merge-and-verify 写挑包在脚本里做、种类照旧写 whole），与声明的写法。
 #   上次红的清单：读 <目录>/<脚本相对仓根的路径，/ 换成 __>.tsv（目录是 SINGLEFS_LAST_RUNS_DIRECTORY，没设是 ~/.local/share/singlefs/last-runs；
 #   一行一个项名，空行与 # 开头的行不算）；没有这份文件或是空的写「没有上次红的记录」。各道跑完写这份文件归下一批。cargo test 没有这份文件，说明里指到 rerun-failed-tests.py。
 # 检出记录（AGENT_HOOK_DETECTIONS，没设是 lib_work_root.py 的 default_detections_path）：

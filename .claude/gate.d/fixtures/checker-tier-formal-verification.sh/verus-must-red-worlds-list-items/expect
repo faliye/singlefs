@@ -6,6 +6,6 @@ want=proof:smaller_of_two	verus-proof	exec fn
 want=vacuity:clamp_to_limit#1	verus-vacuity
 want=vacuity:smaller_of_two#1	verus-vacuity
 want=must-red:夹到上限时返回原值	verus-must-red-worlds
-want=complete	pinned-red-examples-complete
+want=table	pinned-red-examples-table
 want=pinned:22	pinned-red-examples-replay
 want=判定库没定（样本根，或取不到 git common-dir）：列项没比键

@@ -1,0 +1,4 @@
+exit=0
+want=钉表 .claude/gate.d/e165-pinned-red-examples.tsv 3 行：每行 22 段
+want=没读红例账与 kill-bounds 产物
+want=pinned-red-examples-table：绿

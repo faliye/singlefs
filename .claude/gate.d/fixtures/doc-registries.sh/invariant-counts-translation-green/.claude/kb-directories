@@ -1,0 +1,2 @@
+.claude/kb  # 样本：实验、欠账仍在这里；登记是替换不是追加，要它仍被扫到就得列出来
+crates/sample/invariants  # 样本：不变量清单按类拆在这里（README.md 加一份类文件）

@@ -1,0 +1,5 @@
+exit=1
+want=③ 有 1 处依据指不到一条已定分项
+want=「码 1 数据单元的块头」的依据点名 D18 第 5 条分项，而那条决策的索引表里没有第 5 条
+want=  freeze-layer-membership：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（freeze-layer-membership）

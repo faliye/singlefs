@@ -10,11 +10,16 @@
 # gate-similar: bash-command-detector.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py 切词；它判命令的形状（没超时的等待循环、放出追踪、起看门狗的写法）记检出或拒，不起子进程查外部状态；这里要起报告脚本、等它至多一个时限，放进它会拖慢它判的每一条命令
 # gate-similar: pattern-process-guard.sh 同挂 PreToolUse[Bash]；它是上游 SOP 的钩子，只判按模式找进程的写法，与资源无关，上游副本也不归本仓改
 # gate-similar: session-start.sh 挂 SessionStart，开会话时打一次本机状态；这里在每一条重活或 GPU 命令之前现查各台，触发点不同
+# gate-similar: run-scope-guard.sh 同挂 PreToolUse[Bash]、也认 scripts/gate/merge-and-verify.sh（lib_run_scope.py 用 lib_heavy_tests.located_in 认位置，这里调同一个函数，不另写）；它要合入后验证带范围声明、不带就拒，这里只报各台资源、从不拒，并进它会让拒与提醒挤在同一个退出码与同一份 stderr 里
+# gate-similar: timer-only-remind-guard.sh 同挂 PreToolUse、matcher 里有 Bash；它只拒 scripts/agents/remind.sh 之外的定时办法，与资源无关、不起子进程查外部状态，判的对象与触发的命令都不同
 #
 # 认法（只看命令文本里命令位置上的命令，剥前缀与包装照 lib_shell_words.py，/usr/bin/time、flock、systemd-run、detached-run.sh start 这一类照
 #   lib_heavy_tests.command_under_launcher 剥开再判；执行的脚本文件不读进去）：
 #   重活：lib_heavy_tests.classify 认出的重型测试（提交时才跑的检查那几类 COMMIT_CHECK_KINDS 不算：它们是 lint 与轻阶段），
 #         或 lib_heavy_tests.runs_compiled_code 认出的跑编译出来的代码（cargo test / run / bench、直接执行测试二进制与编出来的装置）。
+#   合入后验证：scripts/gate/merge-and-verify.sh（按文件名与位置认：lib_heavy_tests.located_in(<命令词>, <目录>, "scripts/gate")，同 lib_run_scope.py 认它的写法；
+#         source 进来的、参数只有 --selftest 的不算）。它自己经 run-with-memory-cap.sh 起 cargo test、fmt、clippy、build，命令位置上看不到 cargo，上面两条认不出；
+#         本机排不上时它的出路是带 --peer 交给第二台（它文件头「--peer」），起它之前先看各台放不放得下。
 #   GPU：带 gpu 特性的 cargo（--features / -F 的值里有 gpu 或 <包>/gpu，或 --all-features；`--` 之后的不看）、
 #         scripts/crash/gpu-quiesce-run.sh、scripts/crash-amplification*.sh、scripts/hosts/host-dispatch.py（按文件名认；source 进来的、
 #         参数只有 --selftest 的不算）。认出 GPU 时报告脚本带 --gpu。
@@ -28,10 +33,11 @@
 #   host-resources-reminder.sh --selftest   在临时目录里喂造出来的 hook JSON，报告脚本换成假的；末尾逐个打开弄坏开关核它红在点名的格
 # 弄坏开关 HOST_RESOURCES_REMINDER_BREAK=<项>（只给证红用，逗号连几个）。项名、弄坏哪一处、打开后红在哪几格（格名是「✗ 自证 <格名>：」里的那一段）：
 #   ignore-heavy        重活不认                         heavy-test、compiled-code、report-timeout
+#   ignore-merge-and-verify  合入后验证不认              merge-and-verify
 #   ignore-gpu          GPU 的跑法不认                   gpu-script、gpu-feature
-#   remind-everything   哪条命令都出提醒                 plain-command
+#   remind-everything   哪条命令都出提醒                 plain-command、merge-and-verify
 #   no-time-limit       等报告脚本不设时限               report-timeout
-#   refuse-command      出了提醒就拒（退 2）             heavy-test、compiled-code、gpu-script、gpu-feature、report-timeout
+#   refuse-command      出了提醒就拒（退 2）             heavy-test、compiled-code、gpu-script、gpu-feature、report-timeout、merge-and-verify
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -44,6 +50,7 @@ REPORT_TIME_LIMIT_SECONDS = 25.0   # 报告脚本读别的台每台至多 12 秒
 MAXIMUM_LAUNCHER_DEPTH = 4
 GPU_SCRIPT_NAMES = {"gpu-quiesce-run.sh", "host-dispatch.py"}
 GPU_SCRIPT_PATTERNS = ("crash-amplification*.sh",)
+MERGE_AND_VERIFY = ("merge-and-verify.sh", "scripts/gate")   # 合入后验证：文件名与所在目录（文件头「认法」）
 BREAK_VARIABLE = "HOST_RESOURCES_REMINDER_BREAK"
 
 def broken(item):
@@ -77,6 +84,13 @@ def script_uses_gpu(command):
         return False
     return name in GPU_SCRIPT_NAMES or any(fnmatch.fnmatchcase(name, pattern) for pattern in GPU_SCRIPT_PATTERNS)
 
+def runs_merge_and_verify(heavy_tests, command):
+    """合入后验证（文件头「认法」）：命令位置上的 scripts/gate/merge-and-verify.sh；source 进来的、参数只有 --selftest 的不算。"""
+    if broken("ignore-merge-and-verify") or command.launcher == "source" or command.words[1:] == ["--selftest"]:
+        return False
+    name, relative_directory = MERGE_AND_VERIFY
+    return os.path.basename(command.words[0]) == name and heavy_tests.located_in(command.words[0], command.directory, relative_directory)
+
 def recognize(heavy_tests, text, directory, environment=None, depth=0):
     """命令文本里第一条要提醒的：(那一条的 CommandAtPosition, 重活的说明或 None, 是不是 GPU)；没有交 None。"""
     shell_words = heavy_tests.shell_words
@@ -98,6 +112,8 @@ def recognize(heavy_tests, text, directory, environment=None, depth=0):
             else:
                 compiled = heavy_tests.runs_compiled_code(command.words, command.directory)
                 heavy = f"跑编译出来的代码：{compiled}" if compiled else None
+        if not heavy and runs_merge_and_verify(heavy_tests, command):
+            heavy = "合入后验证：scripts/gate/merge-and-verify.sh 自己经内存包装起 cargo test、fmt、clippy、build"
         gpu = not broken("ignore-gpu") and (cargo_uses_gpu(command.words) or script_uses_gpu(command))
         if heavy or gpu or broken("remind-everything"):
             return command, heavy, gpu
@@ -222,6 +238,13 @@ def selftest_cells(hook_dir, root):
     code, context, calls, _ = feed("plain-command", "ls -l scripts && git status --short && bash scripts/crash/gpu-quiesce-run.sh --selftest")
     check("plain-command", code == 0 and context == "" and not calls,
           f"普通命令（与清场包装的 --selftest）应当不出提醒、不跑报告脚本；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
+    code, context, calls, _ = feed("merge-and-verify", "bash scripts/gate/merge-and-verify.sh /tmp/selftest-patch-directory")
+    selftest_code, selftest_context, selftest_calls, _ = feed("merge-and-verify-selftest", "bash scripts/gate/merge-and-verify.sh --selftest")
+    check("merge-and-verify", code == 0 and "资源提醒" in context and "合入后验证" in context and calls
+          and calls[0].endswith("-- scripts/gate/merge-and-verify.sh /tmp/selftest-patch-directory")
+          and selftest_code == 0 and selftest_context == "" and not selftest_calls,
+          f"合入后验证 merge-and-verify.sh <目录> 应当出提醒、报告脚本带着这一条跑、退 0，它的 --selftest 不出；"
+          f"实际 <目录> 那一条退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」；--selftest 那一条退 {selftest_code}，提醒「{selftest_context[:120]}」，报告脚本收到「{selftest_calls}」")
     code, context, calls, elapsed = feed("report-timeout", "cargo test -p singlefs-harness --test selftest_target", FAKE_REPORT_SLEEP="8",
                                          HOST_RESOURCES_REMINDER_TIME_LIMIT="1")
     check("report-timeout", code == 0 and elapsed < 6 and "没读到" in context and "1 秒没跑完" in context,
@@ -230,10 +253,11 @@ def selftest_cells(hook_dir, root):
 
 SWITCH_EXPECTED_CELLS = {
     "ignore-heavy": ["heavy-test", "compiled-code", "report-timeout"],
+    "ignore-merge-and-verify": ["merge-and-verify"],
     "ignore-gpu": ["gpu-script", "gpu-feature"],
-    "remind-everything": ["plain-command"],
+    "remind-everything": ["plain-command", "merge-and-verify"],
     "no-time-limit": ["report-timeout"],
-    "refuse-command": ["heavy-test", "compiled-code", "gpu-script", "gpu-feature", "report-timeout"],
+    "refuse-command": ["heavy-test", "compiled-code", "gpu-script", "gpu-feature", "report-timeout", "merge-and-verify"],
 }
 
 def cells_in_scratch(hook_dir):
@@ -271,7 +295,7 @@ def selftest(hook_dir):
         print("  → 怎么办：照上面那几个开关看它在代码里弄坏的那一处还在不在判法上；改了判法就改 SWITCH_EXPECTED_CELLS 与文件头的表")
         return 1
     print(f"  ✓ host-resources-reminder.sh 自证通过（查了 {checked} 格：checker 档的 cargo test、经内存包装的 harness 档 cargo test、清场包装、"
-          f"带 gpu 特性的 cargo 都出提醒且照常放行，普通命令不出，报告脚本超时照样放行并写没读到；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
+          f"带 gpu 特性的 cargo、合入后验证 merge-and-verify.sh 都出提醒且照常放行，它的 --selftest 与普通命令不出，报告脚本超时照样放行并写没读到；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
 def main():

@@ -1,0 +1,10 @@
+# ignore 开着的节点基准（K3 丙：ignored_point、registered_segment、not_expanded 三样都算；里程碑三出口 4「ignore 开着的节点清单只减不增」、六·2；
+# 用户 2026-10-20 定，原话在 records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条）。
+# 一行一个节点，六列用制表符分隔：去向（ignored_point、registered_segment、not_expanded 之一）、来源（打这条覆盖行的测试目标名，放量那一段写 crash-amplification）、
+# 入口、步骤（StepKind 成员名）、段（段序号）、域（quick 或 full）；行尾可带「<TAB># 说明」。
+# 门禁 checker-tier-crash-point-replay 的 crash-ignored-nodes 格判：这一趟的覆盖行里出现了这张表里没有的节点就红；比这张表少的报出来、不红（那几行可以删）。
+# 初值要真行才填得出：crates 那一批打出覆盖行之后，主 agent 跑一趟轻型崩溃点重放，再用
+#   python3 scripts/crash/crash-flow-coverage.py run-directory <那一趟的日志目录> --tier quick > <记录文件>
+#   python3 scripts/crash/crash-flow-coverage.py baseline ignored <记录文件>
+# 打出的行填进来，删掉下面「初值：未填」那一行；那一行在的时候门禁这一格退 77（本次未跑）并打这一趟的候选行。
+# 初值：未填

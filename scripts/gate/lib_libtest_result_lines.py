@@ -6,8 +6,9 @@
 调它的：scripts/mutation/crates-mutation-rows.py（门禁 checker-tier-crates-mutation-replay 的判法 results_by_test）、
 scripts/mutation/prove-red.sh（经 crates-mutation-rows.py 的 verdict_of_run）、scripts/gate/rerun-failed-tests.py、
 scripts/mutation/mutate.sh（经下面的命令行 failed-names）、scripts/mutation/broad-mutation.py（取第一条红的测试名与进度行里的条数，libtest_outcome / libtest_failed_name）、
-门禁 checker-tier-crash-point-replay 的快档两格与 checker-tier-research-build-and-replay 的 research-unit-tests 格（binary_runs：逐条认判绿的测试函数、照键记库；
-它们的判定请求点名 judge:scripts/gate/lib_libtest_result_lines.py::result_line，这份文件里 result_line 的闭包改了，按条记的判定一起作废）。
+门禁 checker-tier-crash-point-replay 的快档两格（recordable_results：逐条认判绿的测试函数、打了记号的那一条不记，照键记库；判定请求点名
+judge:scripts/gate/lib_libtest_result_lines.py::recordable_results）与 checker-tier-research-build-and-replay 的 research-unit-tests 格（binary_runs；判定请求点名
+judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个函数的闭包改了，按条记的判定一起作废。
 各自按文件路径用 importlib 导入（调用方的 sys.path 不一定有本目录）。
 
 认的行（行尾多出的空白不算）：
@@ -28,11 +29,27 @@ scripts/mutation/mutate.sh（经下面的命令行 failed-names）、scripts/mut
       source 是 cargo 那一行「Running <源文件> (<二进制>)」里的源文件（unittests 的写 src/lib.rs、src/bin/<名>.rs 这一类，集成测试写 tests/<名>.rs；
       Doc-tests 写 doctest:<包>），results 是那一段里的结果行，summary 是那一段的汇总行（没有是 None）；
       consistent：有汇总行、且结果行条数等于汇总行的 passed + failed + ignored（--nocapture 下测试自己打的字把结果行打散了的，这一段对不上，
-      门禁按条入库时整段不记：逐条认出测试名与结局要靠它兜）
+      research-unit-tests 格按条入库时整段不记：逐条认出测试名与结局要靠它兜）
+  recordable_results(text, serial=False, cpu_judging_recordable=False) -> [BinaryAccount]   按条记库（下面「按条记库」）：BinaryAccount = (source, recorded, withheld, markers, unseen)；
+      recorded 是判绿可记库的结果行，withheld 是 [(全名, 不记的原因)]，markers 是 [Marker]，Marker = (source, kind, text, candidates, complete)，
+      unseen 是汇总行报了、这一段里连「test <名> ... 」都没认出的条数
+按条记库（门禁 checker-tier-crash-point-replay 快档两格）：只认结局是 ok 的那几条，下面几种不记，别的照记：
+  打散的结果行：--nocapture 下「test <名> ... 」后面接了测试自己打的字，结局另起一行单独打（`ok`、`FAILED`、`ignored`，可带「, 理由」或用时）的，
+      接成一条照认；结局粘在别的字后面、或下一条「test <名> ... 」先来了的，那一条认不出结局、不记。这一段另有对不上号的单独一行结局时，接出来的都不认。
+  完整性闸：没有汇总行的一段一条不记；认出的结果行（总数，或 ok、FAILED、ignored 任一种）比汇总行报的多，整段不记；同一段里同名的结果行不止一行，那个名字不记。
+      汇总行报的比认出的多（有几条连起头都没认出），认出的照记，认不出的本来就不在名单里。
+  记号：一行里的 NOT_RUN_<原因>（后面接空白或行尾；kind 是 not-run，text 从它起到同一行下一处 NOT_RUN_ 之前），与判段判在 CPU 的行
+      （CRASH_POINT_REPLAY_JUDGE route=cpu、CRASH_POINT_REPLAY_PARALLEL_START / _FINISHED 带 judge=cpu；kind 是 cpu-judging）。记号认作谁打的，那几条不记；
+      cpu_judging_recordable（门禁在多机配置没开 GPU 时给，D13 已定项 17「复用与剪枝不看设备」）下 cpu-judging 照样交出记号、不让谁不记，not-run 照旧不记：
+      serial（这一趟带了 --test-threads 1，libtest 在测试开跑时就打「test <名> ... 」）：记号之前最近的那一条「test <名> ... 」；之前一条都没有的认作这一段全部。
+      不是 serial（几条同时跑，libtest 在测试跑完才打它的结果行）：这一段里结果行（打散的按结局那一行）在记号之后的全部、连同认不出结局而起头在记号之后的，
+      即打这一行时还没跑完的都算。complete 是 candidates 一定罩住了打这一行的那一条（serial 下找到了最近那一条；别的情形要有汇总行、这一段 unseen 是 0）。
 命令行：
   lib_libtest_result_lines.py failed-names <日志|->   一行一个 FAILED 的全名（不带 should panic 那一段），- 读标准输入；
       退 0；汇总行报了失败而一条 FAILED 结果行都没取到退 3（名字取不到：日志不全、或解析又有盲区）；读不了或用法错退 2
   lib_libtest_result_lines.py binary-results <日志|->  逐条打「<源文件><制表符><全名><制表符><结局><制表符><这一段对得上：1|0>」，末行 BINARY_RESULTS binaries=<段数> results=<条数>
+  lib_libtest_result_lines.py recordable <日志|-> [--serial] [--cpu-judging-recordable]  逐条打「green<TAB><源文件><TAB><全名>」「withheld<TAB><源文件><TAB><全名><TAB><原因>」
+      「marker<TAB><源文件><TAB><not-run|cpu-judging><TAB><complete：1|0><TAB><那一截><TAB><认作谁打的，一个一列>」，末行 RECORDABLE binaries=… green=… withheld=… markers=…
   lib_libtest_result_lines.py --selftest
 弄坏开关 LIBTEST_RESULT_LINES_BREAK（只给证红用，逗号分隔可给几个），下一行起写打开后自证红在哪几格：
   should-panic-in-name   ` - should panic` 当成全名的一部分（mutate.sh 改前的取法）
@@ -46,6 +63,12 @@ scripts/mutation/mutate.sh（经下面的命令行 failed-names）、scripts/mut
     本库「汇总行报了失败：failed-names 名字取不到退 3」「汇总行取出 passed、failed、ignored」
   per-binary-count-unchecked  binary_runs 不核「结果行条数 = 汇总行三个数之和」，一律当对得上
     本库「逐条认出测试名与结局：--nocapture 打散了结果行的那一段对不上」
+  marker-withholds-whole-binary  一段里有记号就整段不记（改前门禁 excluded_binaries_of_log 的样子）
+    本库「按条记库：一段三条、一条打了 NOT_RUN_…」「按条记库：带 --test-threads 1 的一段…」；连带门禁 checker-tier-crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary
+  count-mismatch-withholds-whole-binary  没打散的结果行条数与汇总行对不上就整段不记（改前 binary_runs 的 consistent 当门槛的样子）
+    本库「按条记库：结果行被打散，接得上结局的照记…」「按条记库：带 --test-threads 1 的一段…」；连带同上那个门禁开关
+  cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也照改前把判段判在 CPU 的那一条不记
+    本库「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable --cpu-judging-recordable…」
 """
 import collections
 import os
@@ -73,6 +96,15 @@ SummaryLine = collections.namedtuple("SummaryLine", "outcome passed failed ignor
 RESULT_LINE_FORM = re.compile(r"^test (?P<name>.+?)(?P<should_panic> - should panic)? \.\.\. (?P<outcome>ok|FAILED|ignored)(?P<rest>, .*| <[^>]*>)?\s*$")
 RESULT_LINE_FORM_WITH_SUFFIX_IN_NAME = re.compile(r"^test (?P<name>.+?) \.\.\. (?P<outcome>ok|FAILED|ignored)(?P<rest>, .*| <[^>]*>)?\s*$")
 SUMMARY_LINE_FORM = re.compile(r"^test result: (?P<outcome>\w+)\. (?P<passed>\d+) passed; (?P<failed>\d+) failed(?:; (?P<ignored>\d+) ignored)?")
+# 按条记库（文件头「按条记库」）：被打散的结果行的起头与单独一行的结局、两种记号
+SCATTERED_START_FORM = re.compile(r"^test (?P<name>.+?)(?: - should panic)? \.\.\. (?P<rest>.*)$")
+STANDALONE_OUTCOME_FORM = re.compile(r"^(?P<outcome>ok|FAILED|ignored)(?:, .*| <[^>]*>)?\s*$")
+NOT_RUN_MARKER_FORM = re.compile(r"NOT_RUN_[A-Z][A-Z0-9_]*(?=\s|$)")
+CPU_JUDGING_FORMS = (re.compile(r"CRASH_POINT_REPLAY_JUDGE route=cpu(?=\s|$)"),
+                     re.compile(r"CRASH_POINT_REPLAY_PARALLEL_(?:START|FINISHED) (?:.*\s)?judge=cpu(?=\s|$)"))
+AccountEntry = collections.namedtuple("AccountEntry", "name outcome start end scattered")
+Marker = collections.namedtuple("Marker", "source kind text candidates complete")
+BinaryAccount = collections.namedtuple("BinaryAccount", "source recorded withheld markers unseen")
 
 
 def break_is(switch_name):
@@ -160,6 +192,169 @@ def binary_runs(text):
             summary = parsed_summary
     close()
     return runs
+
+
+def marker_pieces(line):
+    """一行里的记号（文件头「按条记库」）：[(种类, 那一截)]。not-run 一处一截：从 NOT_RUN_ 起到同一行下一处 NOT_RUN_ 之前（去掉行尾空白）；
+    cpu-judging 一行至多一截：去掉行首空白的整行。"""
+    pieces = []
+    starts = [found.start() for found in NOT_RUN_MARKER_FORM.finditer(line)]
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(line)
+        pieces.append(("not-run", line[start:end].rstrip()))
+    if any(form.search(line) for form in CPU_JUDGING_FORMS):
+        pieces.append(("cpu-judging", line.strip()))
+    return pieces
+
+
+def account_binary(source, lines, serial, cpu_judging_recordable=False):
+    """一个测试二进制那一段（Running 那一行之后、下一段之前的行）逐条认结局、认记号归谁：交 BinaryAccount（文件头「按条记库」）。
+    cpu_judging_recordable：判段判在 CPU 的记号照交、不让谁不记（弄坏开关 cpu-judging-always-withheld 下照改前不记）。"""
+    cpu_judging_withholds = not cpu_judging_recordable or break_is("cpu-judging-always-withheld")
+    entries, lost, starts, raw_markers = [], [], [], []
+    pending, summary, orphans = None, None, 0
+    for index, raw in enumerate(lines):
+        line = raw.rstrip("\r\n")
+        parsed = result_line(line)
+        if parsed is not None:
+            if pending is not None:
+                lost.append(pending)
+                pending = None
+            entries.append(AccountEntry(parsed.full_name, parsed.outcome, index, index, False))
+            starts.append((index, parsed.full_name))
+            continue
+        if summary is None:
+            parsed_summary = summary_line(line)
+            if parsed_summary is not None:
+                summary = parsed_summary
+                continue
+        started = SCATTERED_START_FORM.match(line)
+        if started is not None and not line.startswith("test result: "):
+            if pending is not None:
+                lost.append(pending)
+            pending = (started.group("name"), index)
+            starts.append((index, started.group("name")))
+            for kind, piece in marker_pieces(started.group("rest")):
+                raw_markers.append((index, kind, piece))
+            continue
+        outcome = STANDALONE_OUTCOME_FORM.match(line)
+        if outcome is not None:
+            if pending is not None:
+                entries.append(AccountEntry(pending[0], outcome.group("outcome"), pending[1], index, True))
+                pending = None
+            else:
+                orphans += 1
+            continue
+        for kind, piece in marker_pieces(line):
+            raw_markers.append((index, kind, piece))
+    if pending is not None:
+        lost.append(pending)
+    names = list(dict.fromkeys([entry.name for entry in entries] + [name for name, _index in lost]))
+    withheld = collections.OrderedDict()
+
+    def withhold(name, reason):
+        withheld.setdefault(name, reason)
+
+    total = summary.passed + summary.failed + (summary.ignored or 0) if summary is not None else 0
+    unseen = max(total - len(entries) - len(lost), 0)
+    markers = []
+    for index, kind, piece in raw_markers:
+        if serial:
+            owners = [name for start, name in starts if start <= index]
+            candidates, complete = (owners[-1:], True) if owners else (names, summary is not None and unseen == 0)
+        else:
+            later = [entry.name for entry in entries if entry.end > index] + [name for name, start in lost if start > index]
+            candidates, complete = list(dict.fromkeys(later)), summary is not None and unseen == 0
+        if break_is("marker-withholds-whole-binary"):
+            candidates = names
+        markers.append(Marker(source, kind, piece, tuple(candidates), complete))
+        if kind == "cpu-judging" and not cpu_judging_withholds:
+            continue
+        label = "判段判在 CPU 的一行" if kind == "cpu-judging" else piece[:120]
+        for name in candidates:
+            withhold(name, f"这一段打了 {label}，认作它打的" + ("" if serial else "（几条测试同时跑，打这一行时还没出结果的都算）"))
+    if summary is None:
+        for name in names:
+            withhold(name, "这一段没有汇总行（测试二进制没跑完）")
+        return BinaryAccount(source, [], list(withheld.items()), markers, unseen)
+    intact = [entry for entry in entries if not entry.scattered]
+    if break_is("count-mismatch-withholds-whole-binary") and len(intact) != total:
+        for name in names:
+            withhold(name, f"弄坏开关 count-mismatch-withholds-whole-binary：结果行 {len(intact)} 条、汇总行 {total} 条，整段不记")
+    recognized = entries
+    if orphans:
+        for entry in entries:
+            if entry.scattered:
+                withhold(entry.name, f"结果行被打散，这一段另有 {orphans} 行对不上号的结局，接出来的结局不认")
+        recognized = intact
+    counts = collections.Counter(entry.outcome for entry in recognized)
+    if (len(recognized) > total or counts["ok"] > summary.passed or counts["FAILED"] > summary.failed
+            or (summary.ignored is not None and counts["ignored"] > summary.ignored)):
+        for name in names:
+            withhold(name, f"认出的结果行（{len(recognized)} 条）比汇总行报的（{total} 条）多，这一段整段不记")
+    for name, count in collections.Counter(entry.name for entry in recognized).items():
+        if count > 1:
+            withhold(name, f"同一段里这个名字的结果行有 {count} 行")
+    for name, _index in lost:
+        withhold(name, "结果行被打散、认不出结局")
+    recorded = [ResultLine(entry.name, entry.outcome, False) for entry in recognized if entry.outcome == "ok" and entry.name not in withheld]
+    return BinaryAccount(source, recorded, list(withheld.items()), markers, unseen)
+
+
+def recordable_results(text, serial=False, cpu_judging_recordable=False):
+    """cargo test 的整段输出按测试二进制切，逐段交 BinaryAccount（文件头「按条记库」）：判绿可记库的、不记的与为什么、记号归谁。
+    serial：这一趟带了 --test-threads 1（libtest 在测试开跑时就打「test <名> ... 」）。
+    cpu_judging_recordable：多机配置没开 GPU，判段判在 CPU 的那一条照记（D13 已定项 17：判定不与 CPU 还是 GPU 绑定）。"""
+    accounts, source, lines = [], None, []
+    for line in text.split("\n"):
+        running = RUNNING_LINE_FORM.match(line)
+        doctests = DOCTESTS_LINE_FORM.match(line)
+        if running or doctests:
+            if source is not None:
+                accounts.append(account_binary(source, lines, serial, cpu_judging_recordable))
+            source = running.group("source") if running else f"doctest:{doctests.group('package')}"
+            lines = []
+            continue
+        if source is not None:
+            lines.append(line)
+    if source is not None:
+        accounts.append(account_binary(source, lines, serial, cpu_judging_recordable))
+    return accounts
+
+
+def command_recordable(arguments, standard_input=None, standard_output=None, standard_error=None):
+    standard_input = standard_input or sys.stdin
+    standard_output = standard_output or sys.stdout
+    standard_error = standard_error or sys.stderr
+    serial = "--serial" in arguments
+    cpu_judging_recordable = "--cpu-judging-recordable" in arguments
+    arguments = [argument for argument in arguments if argument not in ("--serial", "--cpu-judging-recordable")]
+    if len(arguments) != 1:
+        print("  ✗ 用法：lib_libtest_result_lines.py recordable <日志|-> [--serial] [--cpu-judging-recordable]", file=standard_error)
+        print("     → 怎么办：给一份 cargo test 的整段输出文件，或写 - 从标准输入读；这一趟带了 --test-threads 1 的加 --serial；"
+              "多机配置没开 GPU、判段判在 CPU 的照记的加 --cpu-judging-recordable", file=standard_error)
+        return EXIT_USAGE
+    try:
+        if arguments[0] == "-":
+            text = standard_input.read()
+        else:
+            with open(arguments[0], encoding="utf-8", errors="replace") as handle:
+                text = handle.read()
+    except OSError as error:
+        print(f"  ✗ 读不了 {arguments[0]}：{error}", file=standard_error)
+        print("     → 怎么办：看路径对不对、文件在不在；什么都没取", file=standard_error)
+        return EXIT_USAGE
+    accounts = recordable_results(text, serial, cpu_judging_recordable)
+    for account in accounts:
+        for parsed in account.recorded:
+            print(f"green\t{account.source}\t{parsed.full_name}", file=standard_output)
+        for name, reason in account.withheld:
+            print(f"withheld\t{account.source}\t{name}\t{reason}", file=standard_output)
+        for marker in account.markers:
+            print("\t".join(["marker", marker.source, marker.kind, "1" if marker.complete else "0", marker.text, *marker.candidates]), file=standard_output)
+    print(f"RECORDABLE binaries={len(accounts)} green={sum(len(account.recorded) for account in accounts)} "
+          f"withheld={sum(len(account.withheld) for account in accounts)} markers={sum(len(account.markers) for account in accounts)}", file=standard_output)
+    return 0
 
 
 def command_binary_results(arguments, standard_input=None, standard_output=None, standard_error=None):
@@ -288,6 +483,73 @@ def selftest():
     check("binary-results 逐条打源文件、全名、结局、这一段对不对得上，末行报段数与条数",
           code == 0 and output.getvalue().split("\n")[0] == "src/lib.rs\ttests::adds\tok\t1" and "BINARY_RESULTS binaries=3 results=4" in output.getvalue(),
           f"退 {code}，输出 {output.getvalue()!r}")
+    # 按条记库（文件头「按条记库」）：几条同时跑的一段里一条打了 NOT_RUN_，只有打这一行时还没出结果的那一条不记
+    threaded = "\n".join([
+        "     Running tests/setting.rs (target/release/deps/setting-0000000000000001)", "running 3 tests",
+        "test test_a ... ok", "test test_b ... ok", "NOT_RUN_SAMPLE_REASON test=crash_state_enumeration::sample reason=样本", "test test_c ... ok", "",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out",
+        "     Running tests/noisy.rs (target/release/deps/noisy-0000000000000002)", "running 3 tests",
+        "test noisy_split ... 测试自己打的字", "ok", "test noisy_glued ... 测试自己打的字ok", "test noisy_plain ... ok", "",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"])
+    accounts = recordable_results(threaded)
+    recorded = [[parsed.full_name for parsed in account.recorded] for account in accounts]
+    withheld = [dict(account.withheld) for account in accounts]
+    check("按条记库：一段三条、一条打了 NOT_RUN_，另两条照记、那一条不记（几条同时跑：打这一行时还没出结果的才算它打的）",
+          len(accounts) == 2 and recorded[0] == ["test_a", "test_b"] and list(withheld[0]) == ["test_c"]
+          and accounts[0].markers == [Marker("tests/setting.rs", "not-run", "NOT_RUN_SAMPLE_REASON test=crash_state_enumeration::sample reason=样本", ("test_c",), True)],
+          repr(accounts[:1]))
+    check("按条记库：结果行被打散，接得上结局的照记、粘在别的字后面认不出结局的那一条不记",
+          len(accounts) == 2 and recorded[1] == ["noisy_split", "noisy_plain"] and list(withheld[1]) == ["noisy_glued"], repr(accounts[1:]))
+    serial = "\n".join([
+        "     Running tests/gpu_pair.rs (target/release/deps/gpu_pair-0000000000000003)", "running 3 tests",
+        "test gpu_first ... CRASH_POINT_REPLAY_JUDGE route=gpu cards_used=1", "ok",
+        "test gpu_second ... NOT_RUN_NO_GPU_ADAPTER test=gpu_second reason=样本", "ok",
+        "test gpu_third ... CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本", "ok", "",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"])
+    serial_accounts = recordable_results(serial, serial=True)
+    check("按条记库：带 --test-threads 1 的一段，记号归打它时正在跑的那一条（NOT_RUN_ 与判段判在 CPU 各一条不记，另一条照记）",
+          [parsed.full_name for parsed in serial_accounts[0].recorded] == ["gpu_first"]
+          and [name for name, _reason in serial_accounts[0].withheld] == ["gpu_second", "gpu_third"]
+          and [(marker.kind, marker.candidates) for marker in serial_accounts[0].markers] == [("not-run", ("gpu_second",)), ("cpu-judging", ("gpu_third",))],
+          repr(serial_accounts))
+    recordable_accounts = recordable_results(serial, serial=True, cpu_judging_recordable=True)
+    check("按条记库：没开 GPU 时判段判在 CPU 的照记（同一段带 --test-threads 1，cpu_judging_recordable：判在 CPU 那一条照记、NOT_RUN_ 那一条照旧不记，两处记号照交）",
+          [parsed.full_name for parsed in recordable_accounts[0].recorded] == ["gpu_first", "gpu_third"]
+          and [name for name, _reason in recordable_accounts[0].withheld] == ["gpu_second"]
+          and [(marker.kind, marker.candidates) for marker in recordable_accounts[0].markers] == [("not-run", ("gpu_second",)), ("cpu-judging", ("gpu_third",))],
+          repr(recordable_accounts))
+    cpu_judged = "\n".join([
+        "     Running tests/plain_stream.rs (target/release/deps/plain_stream-0000000000000007)", "running 2 tests",
+        "test plain_stream_full ... ignored", "CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=gpu_not_enabled_in_the_configuration threads=4",
+        "test plain_stream_quick ... ok", "", "test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"])
+    output = io.StringIO()
+    code = command_recordable(["-", "--cpu-judging-recordable"], standard_input=io.StringIO(cpu_judged), standard_output=output, standard_error=errors)
+    check("recordable --cpu-judging-recordable：几条同时跑的一段里判段判在 CPU 的一行照打 marker、不让打它时还没出结果的那一条不记",
+          code == 0 and "green\ttests/plain_stream.rs\tplain_stream_quick" in output.getvalue() and "\nwithheld\t" not in "\n" + output.getvalue()
+          and "marker\ttests/plain_stream.rs\tcpu-judging\t1\t" in output.getvalue() and "RECORDABLE binaries=1 green=1 withheld=0 markers=1" in output.getvalue(),
+          f"退 {code}，输出 {output.getvalue()!r}")
+    orphaned = "\n".join(["     Running tests/noisy.rs (target/release/deps/noisy-0000000000000004)", "running 2 tests",
+                          "test noisy_split ... 测试自己打的字", "ok", "ok", "test noisy_plain ... ok", "",
+                          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"])
+    orphaned_account = recordable_results(orphaned)[0]
+    check("按条记库：这一段另有对不上号的单独一行结局，接出来的结局不认（只记没打散的那一条）",
+          [parsed.full_name for parsed in orphaned_account.recorded] == ["noisy_plain"] and [name for name, _reason in orphaned_account.withheld] == ["noisy_split"],
+          repr(orphaned_account))
+    overclaimed = "\n".join(["     Running tests/fake.rs (target/release/deps/fake-0000000000000005)", "running 1 test",
+                             "test fake_echo ... ok", "test fake_real ... ok", "", "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out",
+                             "     Running tests/crashed.rs (target/release/deps/crashed-0000000000000006)", "running 2 tests",
+                             "test crashed_first ... ok", "NOT_RUN_SAMPLE_REASON test=crashed_second reason=样本"])
+    overclaimed_accounts = recordable_results(overclaimed)
+    check("按条记库：认出的结果行比汇总行报的多，整段不记；没有汇总行的一段一条不记，记号照样交出来",
+          [account.recorded for account in overclaimed_accounts] == [[], []]
+          and [name for name, _reason in overclaimed_accounts[0].withheld] == ["fake_echo", "fake_real"]
+          and len(overclaimed_accounts[1].markers) == 1 and not overclaimed_accounts[1].markers[0].complete, repr(overclaimed_accounts))
+    output = io.StringIO()
+    code = command_recordable(["-"], standard_input=io.StringIO(threaded), standard_output=output, standard_error=errors)
+    check("recordable 逐条打 green、withheld、marker，末行报段数与条数",
+          code == 0 and "green\ttests/setting.rs\ttest_a" in output.getvalue() and "withheld\ttests/noisy.rs\tnoisy_glued\t结果行被打散、认不出结局" in output.getvalue()
+          and "marker\ttests/setting.rs\tnot-run\t1\tNOT_RUN_SAMPLE_REASON" in output.getvalue()
+          and "RECORDABLE binaries=2 green=4 withheld=2 markers=1" in output.getvalue(), f"退 {code}，输出 {output.getvalue()!r}")
     if failures:
         for failure in failures:
             print(f"  ✗ lib_libtest_result_lines 自检：{failure}")  # gate-lint:detail
@@ -295,7 +557,9 @@ def selftest():
         return 1
     print(f"  ✓ lib_libtest_result_lines 自检通过（查了 {cells} 格：ok、FAILED、should panic、带理由的 ignored、用时后缀、rustdoc 全名、"
           "不是结果行的四种、汇总行、点名省掉模块路径、FAILED 全名按次序、failed-names 的标准输入、名字取不到退 3、读文件、读不了退 2、"
-          "逐条认出测试名与结局（按测试二进制切段、条数与汇总行对不上的段整段不认、binary-results））")
+          "逐条认出测试名与结局（按测试二进制切段、条数与汇总行对不上的段整段不认、binary-results）、"
+          "按条记库（打了记号的那一条不记、打散的结果行接得上结局的照记、带 --test-threads 1 的段记号归正在跑的那一条、"
+          "没开 GPU 时判段判在 CPU 的照记、对不上号的单独结局、认多了与没有汇总行、recordable 与 --cpu-judging-recordable））")
     return 0
 
 
@@ -306,7 +570,9 @@ def main(arguments):
         return command_failed_names(arguments[1:])
     if arguments[:1] == ["binary-results"]:
         return command_binary_results(arguments[1:])
-    print("  ✗ 用法：lib_libtest_result_lines.py failed-names <日志|->、binary-results <日志|-> 或 --selftest", file=sys.stderr)
+    if arguments[:1] == ["recordable"]:
+        return command_recordable(arguments[1:])
+    print("  ✗ 用法：lib_libtest_result_lines.py failed-names <日志|->、binary-results <日志|->、recordable <日志|-> [--serial] 或 --selftest", file=sys.stderr)
     print("     → 怎么办：入口与认的行写在文件头；别的脚本按文件路径 importlib 导入它，调 result_lines / results_of_named_test / failed_test_names", file=sys.stderr)
     return EXIT_USAGE
 

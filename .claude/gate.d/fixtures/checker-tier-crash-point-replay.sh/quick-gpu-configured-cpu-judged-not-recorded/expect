@@ -1,0 +1,10 @@
+exit=1
+want=库与别的二进制：CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+want=✗ checker 档快档不带 gpu 特性那一趟：多机配置
+want=日志里有 1 处判段判在 CPU（上面列了前 20 处），配了 GPU 不退回 CPU
+want=· feature-gated-tests 按条复用：--lib 与挂特性的 1 个测试目标里 2 条编得进的测试函数，现判 2、复用 0、拒算 0
+want=· 判绿不记库 1 条（这一趟现判、按条记库不认的；下一趟照跑）：
+want=不记 crates/singlefs-checker-tier/src/lib.rs::tests::cpu_judged_check（这一段打了 判段判在 CPU 的一行，认作它打的
+want=· 判绿记库：RECORD recorded=1
+want=逐格：crash-case-replay：红；feature-gated-tests：绿
+want=✗ 快档有 1 格判红：crash-case-replay（各自的出路在上面）

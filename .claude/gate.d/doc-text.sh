@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改一份就三份同进同出、译文照翻译术语表用词
+# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改一份就三份同进同出、译文照翻译术语表用词；这次改动新加到记录、kb 页与三方判决正文的行里不写账号切换与用量限额
 # gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：.claude/gate-not-implemented.tsv 的两项判被测代码的行为，这一道只判文本写法。
@@ -14,11 +14,12 @@
 # gate-cell: session-names 会话号（ListAgents 列的会话名）
 # gate-cell: term-renames 登记过改名的术语不再出现旧名
 # gate-cell: date-once 这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节
-# gate-cell: trilingual-files 登记的三语文件三份齐全：英语 <名>.md 的 <名>.zh.md、<名>.ja.md 都在，登记目录里单有 .zh.md 或 .ja.md 的也要三份齐全；登记表写对了
+# gate-cell: trilingual-files 登记的三语文件三份齐全：中文 <名>.md 的 <名>.en.md、<名>.ja.md 都在，登记目录里单有 .en.md 或 .ja.md 的也要三份齐全；登记表写对了
 # gate-cell: trilingual-structure 三语文件每组三份的结构对得上（编号集合、链接目标集合、各级标题个数、表格行个数、围栏代码块个数），抓只改了一份
 # gate-cell: trilingual-changed-together 这次改动碰了一组三语文件里的一份，就要三份都碰
 # gate-cell: trilingual-glossary 翻译术语表写对了，三语文件的译文照术语表用词
 # gate-cell: private-values 这次改动新加的行与改动的文件名里不出现本机私有配置 multi-host.env 里的值（8 个字以上的词）与本机主机名
+# gate-cell: account-quota 这次改动新加到 records/、.claude/kb/ 与三方判决正文的行里不写账号切换、会话或周限额、额度重置这类用量限额（显卡额度、内存上限、空间配额不在内）
 # 格结构经 lib/stage-cells.sh。
 #
 # ── prime-marks、clock-times、session-names ──
@@ -47,9 +48,9 @@
 # 规则：.claude/rules/changelog-format.md、kb-discipline 第 1 条。管不到的：别的日期该不该写、日期挪进标题之后小节切得对不对。
 #
 # ── trilingual-files、trilingual-structure、trilingual-changed-together、trilingual-glossary ──
-# 对象是 .claude/trilingual-documents 登记的英语文件（今天是仓根 README.md 与 briefs/*.md）：一份英语文件 <名>.md 配 <名>.zh.md 与 <名>.ja.md，
+# 对象是 .claude/trilingual-documents 登记的中文文件（今天是仓根 README.md、briefs/*.md 与 .claude/kb/**/*.md）：一份中文文件 <名>.md 配 <名>.en.md 与 <名>.ja.md，
 # 四格都从这张登记表取对象，判法都在同目录 lib-trilingual.py（四个子命令，文件头有每一条判据与每个弄坏开关），阶段里不抄第二份。
-# files：登记表自己写对了（行有理由、模式指到文件、模式不带语言后缀）；每组三份都在；登记目录里单有 .zh.md 或 .ja.md 的也要三份齐全，逐份点名缺哪份。
+# files：登记表自己写对了（行有理由、模式指到文件、模式不带语言后缀）；每组三份都在；登记目录里单有 .en.md 或 .ja.md 的也要三份齐全，逐份点名缺哪份。
 # structure：三份齐全的组逐项比，一项不同就点名组、项与各份的值：编号集合（D、E、C 加数字，I- 加数字与点；不用 \b，日文字符算词字符）、
 #   Markdown 链接目标 ](目标) 的集合、围栏外各级标题的个数、围栏外 | 起头的表格行个数、围栏代码块个数。缺份的组不比，归 files。
 # changed-together：基准取 scripts/gate/changed-paths.sh 的 gate 取法（gate_diff_base gate 与 gate_changed_paths … untracked，阶段里不再抄一遍）；
@@ -83,6 +84,28 @@
 # 没有 multi-host.env（别人的克隆、第二台）、取不到够长的词、不在 git 仓里、这次改动没有新加的行：退 77，不判绿。
 # 管不到的：换了写法的值（大小写、拆开写、换成别称）、用户原话里的别称（不在配置里）、commit message（提交之后才有，要另挂 commit-msg 钩子）、不足 8 个字的值。
 #   词源只有 multi-host.env 与 hostname：~/.config/singlefs/ 下的清场脚本里的词没并进来（并入前要在真树上整仓逐行量新增命中，新增为 0 才并；上一次量出来不是 0，没并）。
+# ── account-quota ──
+# 记录、kb 页与三方判决正文里不写账号切换与用量限额（用户 2026-10-18：「改一下 doc-lint 账号切换  限额 这种就不要记了」）：撞了哪种额度、换没换账号、额度什么时候重置，
+# 这些是子 agent 停下的原因，不是要留下的事实；子 agent 因此停下的，只写「中途停下没交回」。
+# 落点在这一道而不是上游 scripts/doc-lint.sh：那一份只扫 kb 目录，不扫 records/ 与 research/prompts/；这一道本来就有判「这次改动新加的行」的格（private-values）。
+# 射程：这次改动新加的行（scripts/gate/changed-paths.sh 的 gate 取法的基准到工作区；未跟踪的新文件整份都算新加；旧行不报），只看三类文件：
+#   records/ 与 .claude/kb/ 下的 .md、research/prompts/ 顶层的 *-main-verification.md（三方判决正文）。
+#   research/prompts/ 里别的文件（_*-appendix.md、_*-background.md、_*-body.md、*-snapshot/ 下的副本）是从仓里抄给云端腿读的，抄进来的旧话不算这一次写的，不判。
+#   .claude/rules/、.claude/agents/、钩子与脚本不在射程里（派发闸「限额窗口已判」这类放行行是闸的功能，写在定义与钩子里）。
+# 词表在 cell_account_quota 的 python 里，STRICT 与 BARE 两张表，唯一一处，每条写明键（红行点名它）和拦什么：
+#   明说层（STRICT）：句子里写明哪个账号、哪一种限额（会话、周、每周、五小时、Opus、Sonnet、Haiku、Claude、API、账号、订阅后面接限额或额度），或是限额通知原文，
+#     或「切换账号」「换了账号」「账号切换」「另一个账号」，或「限额窗口」「额度窗口」「会话上限」「周上限」，命中就红，不看同一行别的词。
+#   裸词层（BARE）：没写是哪一种的「撞限额」「撞了额度」「限额撞顶」「额度恢复」「额度重置」「被额度打断」「额度用完」「用量限额」「用量上限」；命中处前后 24 个字内有显卡、GPU、显存、内存、线程、
+#     账上、磁盘、空间、inode、文件系统、存储、quota 或「数字加 G / GiB / GB / MiB / MB」的放过（只看命中处附近，不看整行）：那是显卡额度、内存额度、空间配额、账上多少 G 这类算力与空间资源的正常用法。
+#   不在词表里的：「额度」「限额」「上限」「配额」单独出现（显卡额度、GPU_CARDS_BY_PRIORITY 的额度、内存上限、空间配额）；「欠账号」（欠账编号）；「换号」「重写换号」（版本号）；
+#     「账户」；「限流」单独出现（只有跟在「撞」后面才算）。
+# 放行：行里写「account-quota:allow <理由>」（理由至少 4 个字）整行放过，md 里也认；没写理由的标记不放过，另报一类红行。用在用户原话里带这些词、要原样留的地方，和引用 three-way-inference.md 那条规则标题的地方。
+# 误伤面（2026-10-19 对着当时工作区里射程内 719 份文件、12 万行量的）：词表命中 72 行，逐行读过，没有一行是显卡、内存或空间配额的用法；资源词放过 1 行（撞额度：账上 8G，内存额度）。
+#   裸词层最初是整行有资源词就放，量出来放过 3 行里有 2 行其实是模型限额（行里别处提到线程上限、草稿目录多少 G），所以改成只看命中处前后 24 个字。
+#   会误伤的：整份搬家后算新加的旧页里带这些词的行、测试代码里为了造限额通知而写的字面；出路都是删掉这句，或写 account-quota:allow。
+#   漏过的：换了写法的说法（「登录失效」「额度吃紧」「服务端过载」）、命中处附近恰好有资源词的裸词命中（「内存」「线程」离得近的模型限额）、射程之外的文件。
+# 没有 git 仓、这次改动没有新加到射程内的行：退 77，不判绿。
+# 管不到的：用户原话之外把这些话改写成别的词的；射程之外的文件；已经在仓里的旧行（那 72 行去留交用户）。
 #
 # 弄坏开关（打开后样本判错）：
 #   GATE_TEXT_NOTATIONS_BREAK=date-once-unjudged      date-once 不干跑、记无对象可判：date-once-red 退 77
@@ -112,6 +135,14 @@
 #     private-values-symlink-mount-red 退 0，退出码不对（链接文字里的假仓路径、假第二台主机名没人比）
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-unreadable-raises  读文件不包异常（改前的样子：读不了就让格崩，python 回溯把带假仓路径的原路径打出来）：private-values-unreadable-red 里
 #     「1 个文件读不了」「research/results/〔文件名含私有值〕/research/results/e999.out  EACCES」两条 want 找不到；兄弟三格同样崩，「prime-marks：绿」「clock-times：绿」「session-names：绿」与「读不了（EACCES」四条 want 找不到
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-unjudged   account-quota 不判、记无对象可判：account-quota-red 退 77
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-words-skipped  词表与放行标记整个不判（没有这一格的样子）：account-quota-red 判绿，退 0，退出码不对
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-strict-only  裸词层不判：account-quota-red 里「限额·撞」「限额·重置恢复」「限额·打断」「限额·用完」「用量限额·额度」五条 want 找不到，「14 行」那条 want 也对不上
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-resource-unexempt  裸词层不看资源词：account-quota-green 判红（撞额度：账上 8G、显卡额度重置、显存用量上限三行被点名）
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-records-only  射程缩到只有 records/：account-quota-red 里 kb 页两行与判决正文那一行的 want 找不到，「14 行」「4 份文件」对不上；account-quota-green 里「3 份」「10 行」对不上
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-whole-tree  不限新加的行、整份比：account-quota-green 判红（基准里的旧行「撞了限额」被点名）；account-quota-red 里「14 行」对不上
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-marker-ignored  不认放行标记：account-quota-green 判红（带理由标记的那一行被点名）；account-quota-red 里「却没写理由」那条 want 找不到
+#   GATE_TEXT_NOTATIONS_BREAK=account-quota-reasonless-allowed  没写理由的标记也放行：account-quota-red 里「却没写理由」与「:14」两条 want 找不到
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>   关掉判据行：红样本里点名那一行的报不出来
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=iso-compact-timestamp  关掉紧凑时间戳那一条判据行：clock-times-red 里六条「records/iso-compact.md:N  ISO 紧凑时间戳」want 找不到、「54 行」那条 want 也对不上
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose  紧凑时间戳那一条判据行退回「8 位数字加 T 加 4 到 6 位数字」、不核日期钟点的范围与前后字符：
@@ -123,7 +154,7 @@
 #   （键写在 lib-forbidden-notations.py）
 #   STAGE_CELLS_BREAK=red-swallowed 让每份红样本整道退 0；=marker-ignored 让每份样本几格都跑，「跑了 1 格」的 want 找不到
 #
-# 样本：fixtures/doc-text.sh/ 下四十二份，每份样本根放 .gate-cells 只点名它判的那一格（trilingual-* 十五份的现场都由 setup.sh 现造，日期取真实发生过的日子；private-values-siblings-red 与 private-values-unreadable-red 点名四格）：
+# 样本：fixtures/doc-text.sh/ 下四十四份，每份样本根放 .gate-cells 只点名它判的那一格（trilingual-* 十五份的现场都由 setup.sh 现造，日期取真实发生过的日子；private-values-siblings-red 与 private-values-unreadable-red 点名四格）：
 #   date-once-red       setup.sh 建 git 仓；这一轮往记录正文加一行带文件名日期的话、往实验页加第二个同日 `### ` 小节，逐份点名判红
 #   date-once-green     同一基准；加的行只带别的日期、加的小节是另一天，判绿
 #   prime-marks-red     一份带「K9」加一撇的 md、一份带「G5」加两撇的 rs，逐处点名「文件:行」判红
@@ -141,11 +172,11 @@
 #                       git 忽略的 multi-host.env 里有旧名，判绿（正则去掉断言、扫了 git 忽略的文件都红；旧名同样由几段拼出来）
 #   term-renames-line-exempt-red  同一现场，按行豁免的那份记录里另有一行没豁免的旧名：只报那一行（1 份文件、1 处），判红
 #                       （按行豁免当成整份豁免就判绿，正则去掉断言、扫了 git 忽略的文件报的处数就不是 1）
-#   trilingual-files-red          登记 README.md 与 briefs/*.md：README 缺日语、一组缺中文、一组只有中文、一组有中文和日语而英语不在，逐份点名缺哪份判红
+#   trilingual-files-red          登记 README.md 与 briefs/*.md：README 缺日语、一组缺英语、一组只有英语、一组有英语和日语而中文不在，逐份点名缺哪份判红
 #                       （reverse-ignored 抓不到后两组）
-#   trilingual-files-registry-red 登记表三处不对（模式指不到文件、行没写理由、模式写成了 .zh.md），逐行点名判红
+#   trilingual-files-registry-red 登记表三处不对（模式指不到文件、行没写理由、模式写成了 .en.md），逐行点名判红
 #   trilingual-files-no-registry-red  没有登记表，判红（不是 77）
-#   trilingual-files-green        三组每组三份齐全；登记目录之外的单份 .zh.md 与目录里另一种语言后缀的文件不归这一格管，判绿
+#   trilingual-files-green        四组每组三份齐全（一组在 ** 登记的子目录里、名里带点）；登记目录之外的单份 .en.md 与目录里另一种语言后缀的文件不归这一格管，判绿
 #   trilingual-structure-red      五组各错一项（编号集合、链接目标集合、二级标题个数、表格行个数、围栏代码块个数），逐项点名各份的值判红
 #   trilingual-structure-green    日文与中文里编号紧挨文字、链接带三种语言的标题、围栏里有 # 与 | 开头的行且三份个数不同、四个反引号的围栏里夹三个反引号的行，判绿
 #   trilingual-changed-together-red    setup.sh 建 git 仓：工作区改、暂存、未跟踪三种来源各有一组只碰了一部分，逐组点名没碰哪几份判红
@@ -182,8 +213,13 @@
 #                       红行里的路径只剩「records/〔文件名含私有值〕」，输出里不出现假主机名
 #   private-values-clock-snippet-red  同一份假配置；setup.sh 建 git 仓（expect、setup.sh 与假配置被 .gitignore 挡在扫描之外），记录里两行时间戳的前 20 个字
 #                       落在假仓路径、假第二台主机名中间：clock-times 判红，两行片段都从值的开头起、整值打成「〔私有值〕」，输出里不出现半截的假值
+#   account-quota-red   setup.sh 建 git 仓，基准里一份记录（另带一行旧话「撞了限额」，不报）、一份 kb 页、一份判决正文都干净；这一轮往三份里加写了账号切换与用量限额的行，
+#                       另放一份未跟踪的新记录，词表里每一条各一行（切换账号、换了账号、另一个账号、switched the account、撞了周额度、撞会话限流、撞限额、额度恢复、通知原文、限额窗口、用量限额、额度用完、被额度打断），
+#                       外加一行写了放行标记却没写理由的；射程之外的两份未跟踪文件（_ 开头的附录、.claude/rules 下的页）带同样的话，不报；逐处点名「文件:行」与判据名判红，共 14 行
+#   account-quota-green 同一基准；这一轮加的行只有显卡额度、GPU_CARDS_BY_PRIORITY 的额度、内存上限与内存额度、空间配额、欠账号、「换号」、「中途停下没交回」，命中处附近有资源词的裸词命中三行
+#                       （撞额度：账上 8G、显卡额度重置、显存用量上限），带理由的放行标记一行；射程之外的未跟踪文件（附录、snapshot 副本、规则页）带「切换账号」「撞了周额度」，不报，判绿
 #
-#   bash .claude/gate.d/doc-text.sh [项目根]                                     十格都跑
+#   bash .claude/gate.d/doc-text.sh [项目根]                                     十一格都跑
 #   bash .claude/gate.d/doc-text.sh --list                                       逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-text.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
 set -uo pipefail
@@ -367,8 +403,8 @@ stage_cell term-renames cell_term_renames "登记过改名的术语不再出现�
   "python3 scripts/kb/sweep-term.py --apply 一次换完（跑不出来的产物一个字节都不许动，连同引它的正文留旧名）；确实该留旧名的登记进 .claude/term-rename-exempt 并写明为什么"
 stage_cell date-once cell_date_once "这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节" \
   "python3 scripts/kb/doc-consolidate.py migrate <那一份> --out <临时文件> 看它删了哪些、并了哪些，照着改；红行列的是每份删了几个日期、并了几个小节"
-stage_cell trilingual-files cell_trilingual_files "登记的三语文件三份齐全：英语 <名>.md 的 <名>.zh.md、<名>.ja.md 都在，登记目录里单有 .zh.md 或 .ja.md 的也要三份齐全；登记表写对了" \
-  "缺哪份补哪份：<名>.md 是英语（默认），<名>.zh.md 是中文，<名>.ja.md 是日语，三份同时在；登记表 .claude/trilingual-documents 一行一条「<模式>  # 理由」，模式指英语那一份、要指到文件、理由不许省"
+stage_cell trilingual-files cell_trilingual_files "登记的三语文件三份齐全：中文 <名>.md 的 <名>.en.md、<名>.ja.md 都在，登记目录里单有 .en.md 或 .ja.md 的也要三份齐全；登记表写对了" \
+  "缺哪份补哪份：<名>.md 是中文（默认），<名>.en.md 是英语，<名>.ja.md 是日语，三份同时在（怎么改照 .claude/skills/trilingual/SKILL.md）；登记表 .claude/trilingual-documents 一行一条「<模式>  # 理由」，模式指中文那一份、要指到文件、理由不许省"
 stage_cell trilingual-structure cell_trilingual_structure "三语文件每组三份的结构对得上（编号集合、链接目标集合、各级标题个数、表格行个数、围栏代码块个数），抓只改了一份" \
   "照点名的组和项，把落后的那几份改到与改了的那份一致（另一份多出来的内容就补译，误删就恢复）；围栏代码块里的 # 开头行与 | 开头行不算标题与表格行"
 stage_cell trilingual-changed-together cell_trilingual_changed_together "这次改动碰了一组三语文件里的一份，就要三份都碰" \
@@ -377,6 +413,8 @@ stage_cell trilingual-glossary cell_trilingual_glossary "翻译术语表写对�
   "表的毛病照点名的行改 .claude/kb/translation-glossary.md（每行四列、前三列不空、中文列不重复、说明列空着或恰好三段用 <br> 分隔）；译文的毛病改译文，zh 里用了某术语，en 和 ja 里就用术语表给的译名；术语表文件不在就建它"
 stage_cell private-values cell_private_values "这次改动新加的行与改动的文件名里不出现本机私有配置 multi-host.env 里的值（8 个字以上的词）与本机主机名" \
   "把命中的词换成「第二台」「本机」这类说法（红行列的是文件、行号与键名，值不打印，路径里含值的那一段打成「〔文件名含私有值〕」；文件名含值的改名；要引整句的，整句里的值也换掉；超大的未跟踪文件拆小）；值不要进仓、不要进日志原样输出，用到它的命令照 multi-host.env 的键名写"
+stage_cell account-quota cell_account_quota "这次改动新加到 records/、.claude/kb/ 与三方判决正文的行里不写账号切换、会话或周限额、额度重置这类用量限额（显卡额度、内存上限、空间配额不在内）" \
+  "删掉这句；子 agent 因此停下的，只写「中途停下没交回」，不写撞了哪种额度、换没换账号、什么时候重置；用户原话里带这些词、要原样留的，那一行末尾写「account-quota:allow <理由>」（理由至少 4 个字）"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -824,6 +862,229 @@ print(f"  ✓ 查了这次改动里 {files_judged} 份文本文件新加的 {lin
 if links_judged:
     print(f"     符号链接 {links_judged} 个：比了路径与链接文字（不跟进去），没有一处命中")
 print(f"     没判的：不足 {MINIMUM_LENGTH} 个字的词 {short_total} 个（键 {short_keys}）、二进制 {len(binary_files)} 份")
+PY
+  rm -f "$changed_file"
+  exit "$python_rc"
+}
+
+cell_account_quota() {
+  local base changed changed_file python_rc=0
+  if [[ "$text_notations_break" == account-quota-unjudged ]]; then
+    echo "  ! 弄坏开关 account-quota-unjudged：这一格不判，记本次无对象可判"
+    exit 77
+  fi
+  cd "$ROOT" || exit 1
+  private_value_sources
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "  ! 被判的根不在 git 仓里，划不出「这一次改动新加的行」，这一格本次无对象可判（这不是通过）"
+    exit 77
+  fi
+  base="$(gate_diff_base gate)"
+  changed="$(gate_changed_paths "$base" untracked)" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 ${base:-空}）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
+  changed_file="$(mktemp "${TMPDIR:-/tmp}/account-quota.XXXXXX")" || { echo "  ✗ 建不了放改动文件清单的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
+  printf '%s\n' "$changed" > "$changed_file"
+  python3 - "$base" "$changed_file" "$text_notations_break" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" <<'PY' || python_rc=$?
+import errno, os, re, subprocess, sys, types
+
+base, changed_path, broken, private_values_source, configuration_path, hostname_path = sys.argv[1:7]
+private_values = types.ModuleType("lib_private_values")      # 路径与片段打码的共用函数（doc-text.sh 的 PRIVATE_VALUES_LIBRARY，与别的格同一份）
+exec(compile(private_values_source, "private-values-library", "exec"), private_values.__dict__)
+masking_targets = []
+if configuration_path:
+    try:
+        masking_targets = private_values.load_private_targets(configuration_path, hostname_path, broken)[0]
+    except OSError:
+        masking_targets = []
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+HEAD_BYTES = 8192
+
+# ── 词表（唯一一处）：逐条写明拦什么 ──
+# 两层。
+#   明说层（STRICT）：句子里写明了是哪个账号、哪一种限额（会话、周、Opus、用量、账号……），或是限额通知的原文，命中就红，不看同一行里还有什么词。
+#   裸词层（BARE）：「撞限额」「额度恢复」这类没写是哪一种额度的说法；命中处前后 24 个字内有算力资源的词（RESOURCE_WORDS：显卡、显存、内存、线程、账上、磁盘、空间、quota……）的放过，
+#     那是显卡额度、内存额度、空间配额这类正常用法。只有「额度」「限额」两个词单独出现、没有上面这些动词与限定词的，不在词表里，不判。
+# 键是红行里点名的判据名；改词表只改这一处。
+SCOPE = r"(?:会话|周|每周|五小时|5\s?小时|Opus|Sonnet|Haiku|Claude|API|账号|帐号|订阅)"
+ACCOUNT = r"(?<!欠)[账帐]号"       # 「欠账号」「欠账号 C820」是欠账编号，不是账号
+STRICT = [
+    ("账号切换·动词", "拦「切换账号」「换了账号」「换成别的账号」这类动作：切换、切到、换到、换成、轮换、更换、换（了）后六个字以内跟着账号。不拦「欠账号」",
+     r"(?:切换|切到|换到|换成|轮换|更换|换)(?:了)?[^，。；！？\n「」]{0,6}?" + ACCOUNT),
+    ("账号切换·名词", "拦「账号切换」「账号额度」「另一个账号」「备用账号」「别的账号」这类名词写法",
+     ACCOUNT + r"(?:切换|轮换|额度|限额|用量|被限)|(?:另一个|别的|备用|第二个|不同的?)" + ACCOUNT),
+    ("账号切换·英文", "拦 switched the account、account switch",
+     r"(?i:switch(?:ed|ing)?\s+(?:the\s+)?account|account\s+switch)"),
+    ("限额·写明哪种", "拦「会话限额」「周限额」「每周额度」「Opus 周额度」「账号额度」「订阅限额」：会话、周、每周、五小时、Opus、Sonnet、Haiku、Claude、API、账号、订阅后面直接接限额或额度（中间可隔空白与「用量」）",
+     SCOPE + r"\s*(?:用量)?\s*(?:限额|额度)"),
+    ("限额·窗口", "拦「限额窗口」「额度窗口」（含派发闸的放行行「限额窗口已判」被抄进记录）",
+     r"(?:限额|额度)窗口"),
+    ("限额·会话周上限", "拦「会话上限」「周上限」",
+     r"(?:会话|周)上限"),
+    ("限额·撞会话周限流", "拦「撞会话限流」「撞了周限流」：撞或碰、会话或周、限流",
+     r"(?:撞|碰)(?:到|上|了|过)*\s*" + SCOPE + r"\s*限流"),
+    ("限额·通知原文", "拦限额通知的原文：You've hit your … limit、usage limit、session limit、weekly limit",
+     r"(?i:you(?:'|’)ve hit your|usage limit|session limit|weekly limit)"),
+]
+BARE = [
+    ("限额·撞", "拦「撞限额」「撞了额度」「碰到限流」「限额撞顶」「额度见底」：撞或碰（后面可接到、上、了、过）加用量、使用（可无）加限额、额度、限流；限额或额度后面接撞顶、到顶、见底、耗尽、用尽、耗光",
+     r"(?:撞|碰)(?:到|上|了|过)*(?:用量|使用)?(?:限额|额度|限流)|(?:限额|额度)(?:撞顶|到顶|见底|耗尽|用尽|耗光)"),
+    ("限额·重置恢复", "拦「额度重置」「限额恢复」「额度刷新」「恢复了额度」「重置限额」：限额或额度后面接重置、刷新、恢复、解除、复位，或前面接重置、刷新、恢复（可带了）",
+     r"(?:限额|额度)(?:重置|刷新|恢复|解除|复位)|(?:重置|刷新|恢复)(?:了)?(?:限额|额度)"),
+    ("限额·打断", "拦「被额度打断」「限额中断」「限额续做」「限额暂停」：被（用量）额度或限额后面接打断、卡住、停，或额度、限额后面接打断、暂停、中断、续做",
+     r"被(?:用量)?(?:额度|限额)(?:打断|卡住|停)|(?:额度|限额)(?:打断|暂停|中断|续做)"),
+    ("限额·用完", "拦「额度用完」「限额用光」「用完了额度」「耗尽限额」",
+     r"(?:额度|限额)(?:用完|用光)|(?:用完|用光|耗尽)了?(?:限额|额度)"),
+    ("用量限额·额度", "拦「用量限额」「用量额度」「使用限额」「使用额度」「用量上限」",
+     r"(?:用量|使用)(?:限额|额度)|用量上限"),
+]
+# 命中处前后 RESOURCE_WINDOW 个字内有这些词，裸词层的命中放过（显卡额度、内存额度、空间配额、账上多少 G 这类算力与空间资源的正常用法）；
+# 只看命中处附近、不看整行：一行里别处提到线程上限、草稿目录多少 G，不能把同一行里的模型限额放过去（对着仓里量过，整行放过的三行里有两行其实是模型限额）
+RESOURCE_WINDOW = 24
+RESOURCE_WORDS = re.compile(r"显卡|GPU|显存|VRAM|内存|memory|CPU|线程|账上|磁盘|空间|inode|文件系统|存储|quota|\d\s?(?:G|GiB|GB|MiB|MB)\b")
+# 放行标记：行里写 account-quota:allow <理由>（理由至少 4 个字），整行放过；没写理由的不放过，另报。文件头「account-quota」一段写了什么时候用。
+ALLOW_MARKER = re.compile(r"account-quota:allow(?P<reason>.*)")
+COMPILED_STRICT = [(key, what, re.compile(pattern)) for key, what, pattern in STRICT]
+COMPILED_BARE = [(key, what, re.compile(pattern)) for key, what, pattern in BARE]
+if broken == "account-quota-strict-only":                    # 弄坏：裸词层不判
+    COMPILED_BARE = []
+if broken == "account-quota-resource-unexempt":              # 弄坏：裸词层不看资源词，显卡额度、内存额度这类也红
+    RESOURCE_WORDS = re.compile(r"(?!)")
+
+
+def in_scope(path):
+    """射程：records/ 与 .claude/kb/ 下的 .md，research/prompts/ 顶层的 *-main-verification.md（三方判决正文）。
+    prompts 里别的文件（_*-appendix.md、_*-background.md、_*-body.md、*-snapshot/ 下的副本）是从仓里抄来给云端腿读的，抄进来的旧话不算这一次写的，不判。"""
+    if broken == "account-quota-records-only":                # 弄坏：只判 records/
+        return path.startswith("records/") and path.endswith(".md")
+    if not path.endswith(".md"):
+        return False
+    if path.startswith("records/") or path.startswith(".claude/kb/"):
+        return True
+    return path.startswith("research/prompts/") and "/" not in path[len("research/prompts/"):] and path.endswith("-main-verification.md")
+
+
+def shown_path(path):
+    return private_values.shown_path(path, masking_targets, broken)
+
+
+def git(*arguments):
+    return subprocess.run(["git", "-c", "core.quotepath=false", *arguments], capture_output=True)
+
+
+def fail(what, howto):
+    print(f"  ✗ {what}")
+    print(f"     → 怎么办：{howto}")
+    sys.exit(1)
+
+
+untracked_listing = git("ls-files", "-z", "--others", "--exclude-standard")
+if untracked_listing.returncode != 0:
+    fail("列不出未跟踪的文件", "看 git 是不是可用；改动范围只经 scripts/gate/changed-paths.sh 取。")
+untracked = {name for name in untracked_listing.stdout.decode("utf-8", "replace").split("\0") if name}
+changed_paths = [name for name in open(changed_path, encoding="utf-8").read().split("\n") if name]
+
+
+def added_lines(path, whole_file):
+    """这份文件新加的 (行号, 行文)：已跟踪的取 git diff -U0 的新加行；未跟踪的整份逐行读（新文件整份都算新加）。"""
+    if not whole_file:
+        difference = git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", base, "--", path)
+        if difference.returncode != 0:
+            fail(f"取不到 {shown_path(path)} 相对基准 {base[:12]} 的改动（git diff 退 {difference.returncode}）", "看基准提交在不在、git 是不是可用；改动范围的基准只经 scripts/gate/changed-paths.sh 的 gate_diff_base 取。")
+        number, in_hunk = 0, False
+        for line in difference.stdout.decode("utf-8", "replace").split("\n"):
+            found = HUNK.match(line)
+            if found:
+                number, in_hunk = int(found.group(1)), True
+            elif in_hunk and line.startswith("+"):
+                yield number, line[1:]
+                number += 1
+        return
+    with open(path, "rb") as handle:
+        for number, raw in enumerate(handle, 1):
+            yield number, raw.decode("utf-8", "replace").rstrip("\n")
+
+
+def judge(line):
+    """一行的判法：返回 (放行状况, 命中)。放行状况 allowed（带理由的标记）/ reasonless（标记没写理由）/ None；命中 (判据名, 命中位置, 命中文字) 或 None；
+    资源词放过的裸词命中记成 exempt。"""
+    if broken == "account-quota-words-skipped":                # 弄坏：整格不判（词表与放行标记都不看）
+        return None, None
+    marker = ALLOW_MARKER.search(line) if broken != "account-quota-marker-ignored" else None
+    marker_state = None
+    if marker:
+        reason = re.sub(r"-->|^[\s:：，,]+|\s+$", "", marker.group("reason"))
+        marker_state = "allowed" if (len(reason) >= 4 or broken == "account-quota-reasonless-allowed") else "reasonless"
+    for key, _what, pattern in COMPILED_STRICT:
+        found = pattern.search(line)
+        if found:
+            return marker_state, ("hit", key, found.start(), found.group(0))
+    for key, _what, pattern in COMPILED_BARE:
+        found = pattern.search(line)
+        if found:
+            if RESOURCE_WORDS.search(line[max(0, found.start() - RESOURCE_WINDOW): found.end() + RESOURCE_WINDOW]):
+                return marker_state, ("exempt", key, found.start(), found.group(0))
+            return marker_state, ("hit", key, found.start(), found.group(0))
+    return marker_state, None
+
+
+findings, reasonless, unreadable = [], [], []      # (路径, 行号, 判据名, 片段) / (路径, 行号, 片段) / (路径, 错误)
+files_judged, lines_judged, allowed_lines, exempt_lines, binary_files = 0, 0, 0, 0, []
+for path in changed_paths:
+    if not in_scope(path) or os.path.islink(path) or not os.path.isfile(path):
+        continue
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(HEAD_BYTES)
+        if b"\0" in head:
+            binary_files.append(path)
+            continue
+        files_judged += 1
+        whole_file = path in untracked or broken == "account-quota-whole-tree"
+        for number, text in added_lines(path, whole_file):
+            lines_judged += 1
+            marker_state, hit = judge(text)
+            if marker_state == "reasonless":
+                reasonless.append((path, number, text.strip()[:60]))
+                continue
+            if hit is None:
+                continue
+            kind, key, position, matched = hit
+            if kind == "exempt":
+                exempt_lines += 1
+                continue
+            if marker_state == "allowed":
+                allowed_lines += 1
+                continue
+            start, end = max(0, position - 15), position + len(matched) + 15
+            start, end = private_values.snippet_bounds(text, start, end, masking_targets)
+            findings.append((path, number, key, text[start:end].strip()))
+    except OSError as error:
+        unreadable.append((path, error))
+
+if findings:
+    print(f"  ✗ 这次改动新加的 {len(findings)} 行写了账号切换或用量限额，在 {len({path for path, _, _, _ in findings})} 份文件里（只判这次新加的行；旧行不报）：")   # gate-lint:summary
+    for path, number, key, snippet in findings[:200]:
+        print(f"      {shown_path(path)}:{number}  {key}  …{private_values.shown_text(snippet, masking_targets)}…")   # gate-lint:detail
+    if len(findings) > 200:
+        print(f"      （另有 {len(findings) - 200} 行没列出）")   # gate-lint:detail
+    print("     → 怎么办：删掉这句。子 agent 因此停下的，只写「中途停下没交回」，不写是撞了哪种额度、换没换账号、什么时候重置；")
+    print("               用户原话里带这些词、要原样留的，那一行末尾写「account-quota:allow <理由>」（理由至少 4 个字）；显卡额度、内存上限、空间配额这类不是这一条，命中处前后 24 个字内有显卡、内存、线程这类资源词的裸词命中本来就放过。")
+if reasonless:
+    print(f"  ✗ 这次改动新加的 {len(reasonless)} 行写了 account-quota:allow 却没写理由（理由至少 4 个字，写不出理由的就是该删的）：")   # gate-lint:summary
+    for path, number, snippet in reasonless:
+        print(f"      {shown_path(path)}:{number}  …{private_values.shown_text(snippet, masking_targets)}…")   # gate-lint:detail
+    print("     → 怎么办：在 account-quota:allow 后面写为什么这一行要留（例如「用户原话」）；写不出来就删掉这一行里的限额写法。")
+if unreadable:
+    print(f"  ✗ 这次改动里 {len(unreadable)} 个文件读不了（权限这一类），这一格没法判：")   # gate-lint:summary
+    for path, error in unreadable:
+        print(f"      {shown_path(path)}  {errno.errorcode.get(error.errno, error.errno)}（{error.strerror}）")   # gate-lint:detail
+    print("     → 怎么办：给自己补上读权限（chmod u+r）再跑；确实不该留的删掉。")
+if findings or reasonless or unreadable:
+    sys.exit(1)
+if lines_judged == 0:
+    print(f"  ! 这次改动没有新加到 records/、.claude/kb/ 与 research/prompts/*-main-verification.md 的行（改动范围 {len(changed_paths)} 个路径，二进制 {len(binary_files)} 份），这一格本次无对象可判（这不是通过）")
+    sys.exit(77)
+print(f"  ✓ 查了这次改动里 {files_judged} 份记录、kb 页与判决正文新加的 {lines_judged} 行：没有账号切换、用量限额的写法")
+print(f"     放过的：带理由的放行标记 {allowed_lines} 行、命中处附近有显卡内存这类资源词的裸词命中 {exempt_lines} 行；没判的：二进制 {len(binary_files)} 份")
 PY
   rm -f "$changed_file"
   exit "$python_rc"

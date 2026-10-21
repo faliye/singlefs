@@ -42,8 +42,9 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
      第二台经 ssh 读：把 memory_peaks_lib.py 的源码与本文件里取显存的两个函数送过去（python3 -c，base64 编码），用 peer-host-lib.sh 的 peer_host_run 跑。
   ③ 按历史预测这一条要多少：
      内存：峰值表 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv（RUN_WITH_MEMORY_CAP_PEAKS 可换），键与内存包装同一份取法（memory_peaks_lib.command_key，
-       RUN_WITH_MEMORY_CAP_KEY 给了就用它）。有真峰值用峰值；撞过顶的（记的峰值到了那一次的上限）按记的上限 × CAP_FACTOR；查不到用默认值
-       （memory_peaks_lib.DEFAULT_MEMORY_PREDICTION_TEXT，8G）。
+       RUN_WITH_MEMORY_CAP_KEY 给了就用它）。读法是 memory_peaks_lib.recorded_peak（包装排队记账读的同一份）：峰值取这个键近几次实测（峰值表第六列，
+       至多 memory_peaks_lib.RECENT_MEASUREMENTS 次）里最大的，近几次里有一次撞顶就算撞过顶。有真峰值用峰值；撞过顶的按那个峰值（撞顶那一次记的是上限）× CAP_FACTOR；
+       查不到用默认值（memory_peaks_lib.DEFAULT_MEMORY_PREDICTION_TEXT，8G）。
      显存：派发器自己记的显存峰值表（默认 ${XDG_STATE_HOME:-~/.local/state}/singlefs/gpu-memory-peaks.tsv，跨重启、不进仓；
        HOST_DISPATCH_GPU_PEAKS 可换），键同内存。查不到用 DEFAULT_GPU_PREDICTION_MEBIBYTES。带 --gpu 跑完把量到的显存峰值写进去（见 ⑤）。
   ④ 挑一台：本机在前、第二台在后，挑第一台「预测量 + 余量放得下」的：内存 预测 + MEMORY_MARGIN_BYTES ≤ 那台此刻的空闲，且包装要记的量 ≤ slice 此刻放得下的
@@ -71,7 +72,7 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
   244 长活只派一台（⓪：历史用时或预计挂钟超过 2 小时而派法只占一台，命令一行都没跑；出路见 ⓪）。
 
 常量的依据：
-  CAP_FACTOR 1.5：与内存包装 auto 取实测峰值 1.5 倍同一个数。
+  CAP_FACTOR 1.5：与内存包装 auto 取实测峰值 1.5 倍同一个数；定义在 memory_peaks_lib.py（内存包装判「这一次峰值比记账大了这么多倍：工作量可能变了」读同一个）。
   MEMORY_MARGIN_BYTES 2 GiB：派出去到包装记账之间别的进程可能涨的那一截、页缓存抖动与包装外壳；推的，没量过。
   GPU_MARGIN_MEBIBYTES 2560：判器留给驱动的那一份（crates/singlefs-checker-tier/src/crash_judge_dispatch.rs 的 MEBIBYTES_LEFT_FOR_THE_DRIVER）。
   DEFAULT_GPU_PREDICTION_MEBIBYTES 8192：最小那张卡（16G）的一半；推的，没量过。
@@ -84,7 +85,8 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
   no-wait               两台都放不下时照样派到本机                  waits-then-dispatches、switch-off-local-only
   no-reprobe            等的时候不重查，一直用第一次查到的          waits-then-dispatches
   ignore-history        不看峰值表，一律用默认值                    prediction-from-history、hit-history
-  hit-as-peak           撞过顶的键当真峰值                          hit-history
+  hit-as-peak           撞过顶的键当真峰值                          hit-history、recent-peaks
+  latest-peak-only      峰值表只看最近一次实测，不看近几次（改前的判法）  recent-peaks
   no-default            查不到历史按 0 算                           default-prediction
   ignore-pending        不减包装账上还没涨到量的那一截              pending-subtracted
   book-by-cap           派发器自己的账按上限记（不按预测）          booking-sum-fits
@@ -140,7 +142,7 @@ import lib_long_run as long_run_lib  # noqa: E402   长活声明的判法（文�
 
 MEBIBYTE = peaks.MEBIBYTE
 GIBIBYTE = 1024 * MEBIBYTE
-CAP_FACTOR = 1.5
+CAP_FACTOR = peaks.CAP_FACTOR       # 文件头「常量的依据」
 MEMORY_MARGIN_BYTES = 2 * GIBIBYTE
 GPU_MARGIN_MEBIBYTES = 2560
 DEFAULT_GPU_PREDICTION_MEBIBYTES = 8192
@@ -442,7 +444,7 @@ def read_gpu_peak_table(path):
 def predict(settings, command, gpu):
     key = peaks.command_key(command, settings.environment.get("RUN_WITH_MEMORY_CAP_KEY"))
     default_bytes = 0 if broken("no-default") else peaks.size_bytes(peaks.DEFAULT_MEMORY_PREDICTION_TEXT)
-    peak, hit = (None, False) if broken("ignore-history") else peaks.recorded_peak(settings.peak_table, key)
+    peak, hit = (None, False) if broken("ignore-history") else peaks.recorded_peak(settings.peak_table, key, latest_only=broken("latest-peak-only"))
     if peak is None:
         predicted, history = default_bytes, "default"
     elif hit and not broken("hit-as-peak"):
@@ -1155,6 +1157,25 @@ def selftest_cells(root):
     check("hit-history", code == 0 and len(launches) == 1 and "--memory-cap 9216M" in launches[0],
           f"撞过 4G 的顶应当预测 6G（上限 9216M），实际退 {code}、派了「{launches}」")
 
+    # recent-peaks：峰值表六列，近几次是 100M、80M、60M、40M（最近一次 40M）⇒ 预测取最大的 100M、上限 150M，与内存包装记账读的
+    # memory_peaks_lib.recorded_peak 同一个数；另一行近几次里撞过 64M 的顶（最近两次干净的 20M）⇒ 按撞过顶预测 96M
+    world = SelftestWorld(root, "recent-peaks")
+    descending = [100, 80, 60, 40]
+    with open(world.peak_table, "a", encoding="utf-8") as handle:
+        handle.write(f"{40 * MEBIBYTE}\t{SELFTEST_MEASURED_AT}\t200M\t{key}\t4\t"
+                     + peaks.format_recent([(mebibytes * MEBIBYTE, False) for mebibytes in reversed(descending)]) + "\n")
+        handle.write(f"{20 * MEBIBYTE}\t{SELFTEST_MEASURED_AT}\t200M\tselftest-recent-hit\t4\t"
+                     + peaks.format_recent([(20 * MEBIBYTE, False), (20 * MEBIBYTE, False), (64 * MEBIBYTE, True)]) + "\n")
+    predicted = predict(world.settings(), command, False)
+    wrapper_peak, wrapper_hit = peaks.recorded_peak(world.peak_table, key)
+    settings = world.settings()
+    settings.environment["RUN_WITH_MEMORY_CAP_KEY"] = "selftest-recent-hit"
+    hit_prediction = predict(settings, ["ignored"], False)
+    check("recent-peaks", predicted.memory_predicted == 100 * MEBIBYTE == wrapper_peak and not wrapper_hit and predicted.memory_history == "peak"
+          and predicted.memory_cap == 150 * MEBIBYTE and hit_prediction.memory_history == "hit" and hit_prediction.memory_predicted == 96 * MEBIBYTE,
+          f"近几次 100M、80M、60M、40M 应当预测 100M（上限 150M、与包装读的 {wrapper_peak} 相同），近几次里撞过 64M 的顶应当按撞过顶预测 96M；"
+          f"实际 {predicted}，撞过顶那一行 {hit_prediction}")
+
     # pending-subtracted：本机 MemAvailable 12G，但包装账上一条要 10G 还没涨到量 ⇒ 本机只剩 2G、派第二台
     world = SelftestWorld(root, "pending-subtracted")
     world.seed_peak(key, GIBIBYTE, "4G")
@@ -1377,7 +1398,8 @@ SWITCH_EXPECTED_CELLS = {
     "no-wait": ["waits-then-dispatches", "switch-off-local-only"],
     "no-reprobe": ["waits-then-dispatches"],
     "ignore-history": ["prediction-from-history", "hit-history"],
-    "hit-as-peak": ["hit-history"],
+    "hit-as-peak": ["hit-history", "recent-peaks"],
+    "latest-peak-only": ["recent-peaks"],
     "no-default": ["default-prediction"],
     "ignore-pending": ["pending-subtracted"],
     "book-by-cap": ["booking-sum-fits"],

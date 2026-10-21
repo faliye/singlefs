@@ -23,7 +23,7 @@
 #   其余参数原样交给每一项的分项驱动：[--threads <N>] [--memory-cap <上限>] [--peer-memory-cap <上限>] [--library <库目录>] [--label <标签>]
 #
 # 崩溃点重放的合表（.claude/gate.d/crash-point-replay-items.tsv，入口 scripts/crash/crash-point-replay.sh）一项一条流，每项点名它在这里的分项（第三列）：
-#   这 8 项都要在合表里恰好被一项点名（合表那一份的判法 scripts/crash/lib_crash_point_replay_items.py 核），入口照合表逐项调这里的 --item。
+#   ITEMS 里每一项都要在合表里恰好被一项点名（合表那一份的判法 scripts/crash/lib_crash_point_replay_items.py 核），入口照合表逐项调这里的 --item。
 # 分项登记在 ITEMS：一行「分项名 <TAB> 测试目标 <TAB> 用例函数 <TAB> 档位」，一个分项就是 crates/singlefs-checker-tier/tests/ 下一条走
 # crash_amplification::run_from_environment 的用例（用例函数经分项驱动的 --test-filter 点名，cargo test 的 --exact）。档位今天只有「全量」：
 # 每一项都是穷举、要 checker 档的重活，只在全量里跑，不在快档（--list-items 写成「全量（不在快档）」）。
@@ -50,7 +50,7 @@
 #   取值：登记分项里最长一段的写数。今天是 30 写：多记录流与删除流（multi-record-publish、unlink-after-the-multi-record-publish）共有的第 16 段，
 #   出处是第 32 批 Q 探针真跑出来的段形状 PROBE_SEGMENT_SIZES [2,2,1,2,2,1,2,24,2,1,2,28,4,1,2,30,6,1,2,26,2,1,2,24,2,1,2,22,2,1,2,20,2,1,2]
 #   （删除流 35 段，前 19 段与多记录流逐段相同；records/2026-10-01-删除与并发事务.md 2026-10-08「三·5 量数」那一条）。展开 28 时这两项驱动行报 exhaustive=false，
-#   2026-10-08 展开 30 跑这两项，驱动行都报 exhaustive=true expand_up_to=30。别的六项没有段形状的记录；一段不超过展开上限就展开全部真子集，
+#   2026-10-08 展开 30 跑这两项，驱动行都报 exhaustive=true expand_up_to=30。别的分项没有段形状的记录；一段不超过展开上限就展开全部真子集，
 #   所以从 28 抬到 30 只改写数是 29、30 的段，不超过 28 写的段展开不变。
 #   这里不现算：驱动行只报 exhaustive= 与 expand_up_to=、不报段的写数（crates/singlefs-checker-tier/src/crash_amplification.rs 的
 #   reuse_and_scale_fields_of_the_line），段形状要编、跑 checker 档的用例才拿得到。新加的流或改了写表而出现更长的段，这里不会自己跟上：
@@ -344,12 +344,28 @@ source "$crash_amplification_script_directory/crash-amplification-lib.sh"
 ITEMS=(
   $'fixed-script-through-rollback\tcrash_amplification_fixed_script_through_rollback\tthe_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reused\t全量'
   $'fixed-script-through-unmount\tcrash_amplification_fixed_script_through_unmount\tthe_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_and_reused\t全量'
+  $'unlink-after-the-fixed-script\tcrash_enumeration_unlink_after_the_fixed_script_stream\tcrash_amplification_of_the_unlink_after_the_fixed_script_stream_is_clean\t全量'
+  $'unlink-merging-inode-leaf-containers\tcrash_enumeration_unlink_merging_inode_leaf_containers_stream\tcrash_amplification_of_the_unlink_merging_inode_leaf_containers_stream_is_clean\t全量'
   $'multi-record-publish\tcrash_enumeration_multi_record_publish_stream\tcrash_amplification_of_the_multi_record_publish_stream_is_clean\t全量'
   $'unlink-after-the-multi-record-publish\tcrash_enumeration_unlink_after_the_multi_record_publish_stream\tcrash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_clean\t全量'
   $'tree-split-streams\tcrash_enumeration_tree_split_streams\tcrash_amplification_of_every_tree_split_stream_is_clean\t全量'
   $'position-addressed-trees\tcrash_enumeration_position_addressed_trees\tcrash_amplification_of_every_position_addressed_tree_stream_is_clean\t全量'
   $'floor-raise-pushed-by-the-session\tcrash_enumeration_floor_raise_pushed_by_admission\tcrash_amplification_of_the_floor_raise_pushed_by_the_session_is_clean\t全量'
   $'sigma-of-the-misaligned-reuse\trecord_checker_judges_absence_by_the_persisted_set\tcrash_amplification_of_sigma_on_the_misaligned_reuse_history_is_clean\t全量'
+  $'compaction-relocation\tcrash_enumeration_compaction_relocation_stream\tcrash_amplification_of_the_compaction_relocation_stream_is_clean\t全量'
+  $'compaction-relocating-a-block-shared-with-a-snapshot\tcrash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream\tcrash_amplification_of_the_compaction_relocating_a_block_shared_with_a_snapshot_stream_is_clean\t全量'
+  $'lifecycle-closure\tcrash_enumeration_lifecycle_closure_stream\tcrash_amplification_of_the_lifecycle_closure_stream_is_clean\t全量'
+  $'unlink-under-a-snapshot\tcrash_enumeration_unlink_under_a_snapshot_stream\tcrash_amplification_of_the_unlink_under_a_snapshot_stream_is_clean\t全量'
+  $'truncate-to-zero\tcrash_enumeration_truncate_to_zero_stream\tcrash_amplification_of_the_truncate_to_zero_stream_is_clean\t全量'
+  $'truncate-into-a-unit-then-extend\tcrash_enumeration_truncate_into_a_unit_then_extend_stream\tcrash_amplification_of_the_truncate_into_a_unit_then_extend_stream_is_clean\t全量'
+  $'truncate-under-a-snapshot\tcrash_enumeration_truncate_under_a_snapshot_stream\tcrash_amplification_of_the_truncate_under_a_snapshot_stream_is_clean\t全量'
+  $'snapshot-creation\tcrash_enumeration_snapshot_creation_stream\tcrash_amplification_of_the_snapshot_creation_stream_is_clean\t全量'
+  $'overwrite-and-unlink-under-a-snapshot\tcrash_enumeration_overwrite_and_unlink_under_a_snapshot_stream\tcrash_amplification_of_the_overwrite_and_unlink_under_a_snapshot_stream_is_clean\t全量'
+  $'snapshot-destruction-resumed-after-a-crash\tcrash_enumeration_snapshot_destruction_resumed_after_a_crash_stream\tcrash_amplification_of_the_snapshot_destruction_resumed_after_a_crash_stream_is_clean\t全量'
+  $'one-file-overwritten-across-two-writable-remounts\tcrash_enumeration_one_file_overwritten_across_two_writable_remounts_stream\tcrash_amplification_of_one_file_overwritten_across_two_writable_remounts_is_clean\t全量'
+  $'several-inodes-overwritten-in-turn\tcrash_enumeration_several_inodes_overwritten_in_turn_stream\tcrash_amplification_of_several_inodes_overwritten_in_turn_is_clean\t全量'
+  $'large-file-overwritten-across-lower-leaves\tcrash_enumeration_large_file_overwritten_across_lower_leaves_stream\tcrash_amplification_of_a_large_file_overwritten_across_lower_leaves_is_clean\t全量'
+  $'unlink-of-two-files-holding-data\tcrash_enumeration_unlink_of_two_files_holding_data_streams\tcrash_amplification_of_both_unlink_streams_is_clean\t全量'
 )
 
 # 只供自证的变量（文件头「只供自证」）：先存下来、判是不是自证起的子进程，标记读完就清；四个变量在平常跑的那一支拒或清

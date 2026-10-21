@@ -3,6 +3,13 @@
 冻结的那一版是 E170 第 1 次重跑（`research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out`）冻结的执行器目录
 `scripts/experiments/e170_second_run_o3_spec_executor/`：产物里 `name=freeze file=… sha256=…` 每个文件一行（不含 `comparator*`
 与 `mutation_driver*`），最后一行 `name=freeze_seed sha256_prefix16=…` 是盲测族的种子。本实验不改那一份，只读、只起它。
+
+那份参照产物在 research/results/ 下、可以被归档删掉（用户 2026-10-18 定：别的实验的产物缺了报本次未跑）：读不到时
+`freeze_reference_lines` 抛 `FreezeReferenceMissing`；comparator.py、o3_bad_image_judge.py（judge）、row_driver.py 开跑前经
+`report_missing_freeze_reference` 打一行 `NOT_RUN_ARCHIVED_PRODUCT test=<哪一个> reason=…`、退 77，一行产物都不写；单测 test_o3_columns 报同一行后跳过。
+那一份搬了家、只改了路径的文件（`.claude/rules/path-moves.md`「怎么做」第 6 步：路径不在冻结范围内），逐个登记在同目录
+`freeze-path-only-changes.tsv`（写法同 `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/` 那一张）：登记了、冻结时与现在的两个值
+都对上的不算不同；登记之后又改了的照判不同（test_o3_columns 钉住）。
 """
 
 from __future__ import annotations
@@ -10,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 
@@ -22,6 +30,19 @@ FREEZE_SEED_PREFIX = "name=freeze_seed "
 EXECUTOR_SCRIPT = "executor_main.py"
 VERDICT_ERROR = "error"
 PARALLEL_REASON = "同一会话派出去的几个执行员各跑各的装置"
+# 本次未跑那一行的记号与退出码（写法照 scripts/experiments/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER、NOT_RUN_EXIT_CODE）
+NOT_RUN_MARKER = "NOT_RUN_ARCHIVED_PRODUCT"
+NOT_RUN_EXIT_CODE = 77
+PATH_ONLY_CHANGES_TABLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "freeze-path-only-changes.tsv")
+PATH_ONLY_CHANGES_COLUMNS = 5
+SEED_NAME = "freeze_seed"
+
+
+class FreezeReferenceMissing(Exception):
+    """冻结行的参照产物（FREEZE_REFERENCE_RELATIVE）读不到：冻结判不了，这一项本次未跑。"""
+
+    def not_run_line(self, test_name: str) -> str:
+        return f"{NOT_RUN_MARKER} test={test_name} reason={self}"
 
 
 def strip_result_prefix(line: str) -> str:
@@ -72,21 +93,63 @@ def seed_from_directory(directory: str) -> str:
     return hasher.hexdigest()[:16]
 
 
-def freeze_differences(repo_root: str, reference_lines: list[str] | None = None) -> list[str]:
-    """Z2：冻结行逐个核（`sha256sum -c` 同义）：文件缺失、摘要不同、目录里有冻结范围之内而冻结行里没有的文件、种子不等，各记一条。空表示都对。"""
+def freeze_reference_lines(repo_root: str) -> list[str]:
+    """参照产物里的冻结行；那份产物不在抛 FreezeReferenceMissing（说明里写怎么取回）。"""
+    path = os.path.join(repo_root, FREEZE_REFERENCE_RELATIVE)
+    if not os.path.isfile(path):
+        name = os.path.basename(FREEZE_REFERENCE_RELATIVE)
+        raise FreezeReferenceMissing(f"{FREEZE_REFERENCE_RELATIVE} 不在，冻结行判不了，这一项本次未跑；要跑先从 git 历史取回："
+                                     f"git log --all --diff-filter=D --name-only -- \"*{name}\"")
+    return frozen_lines_of(path)
+
+
+def report_missing_freeze_reference(repo_root: str, test_name: str) -> bool:
+    """开跑前调：参照产物不在就往 stderr 打一行本次未跑、交 True（调用方退 NOT_RUN_EXIT_CODE，一行产物都不写）；在交 False。"""
+    try:
+        freeze_reference_lines(repo_root)
+    except FreezeReferenceMissing as missing:
+        print(missing.not_run_line(test_name), file=sys.stderr)
+        return True
+    return False
+
+
+def path_only_changes_of(path: str = PATH_ONLY_CHANGES_TABLE) -> dict[str, tuple[str, str]]:
+    """只差路径的重冻结登记 → {名字: (冻结行里的值, 现在的值)}。一行五列，制表符隔开：名字（冻结范围里的文件名，或 freeze_seed）、
+    冻结行里的值、现在的值、改它的提交、改了什么；空行与 `#` 起头的行跳过。表不在就是空登记；列数不对抛错，不猜。"""
+    changes: dict[str, tuple[str, str]] = {}
+    if not os.path.exists(path):
+        return changes
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip() or line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) != PATH_ONLY_CHANGES_COLUMNS:
+                raise ValueError(f"{path}：一行要 {PATH_ONLY_CHANGES_COLUMNS} 列（名字、冻结时、现在、提交、改了什么），这一行 {len(fields)} 列：{line!r}")
+            changes[fields[0]] = (fields[1], fields[2])
+    return changes
+
+
+def freeze_differences(repo_root: str, reference_lines: list[str] | None = None,
+                       path_only_changes: dict[str, tuple[str, str]] | None = None) -> list[str]:
+    """Z2：冻结行逐个核（`sha256sum -c` 同义）：文件缺失、摘要不同、目录里有冻结范围之内而冻结行里没有的文件、种子不等，各记一条。空表示都对。
+    不给参照时读参照产物，它不在抛 FreezeReferenceMissing。摘要与种子不同、而 `path_only_changes`（不给就读登记表）里那一名的
+    （冻结时, 现在）正是这一对的，不记。"""
     directory = os.path.join(repo_root, FROZEN_DIRECTORY_RELATIVE)
-    lines = reference_lines if reference_lines is not None else frozen_lines_of(os.path.join(repo_root, FREEZE_REFERENCE_RELATIVE))
+    lines = reference_lines if reference_lines is not None else freeze_reference_lines(repo_root)
+    changes = path_only_changes_of() if path_only_changes is None else path_only_changes
     hashes = frozen_hashes_of(lines)
     differences = []
     for name, expected in hashes.items():
         path = os.path.join(directory, name)
         if not os.path.exists(path):
             differences.append(f"{name}:missing")
-        elif sha256_of_file(path) != expected:
+        elif sha256_of_file(path) != expected and changes.get(name) != (expected, sha256_of_file(path)):
             differences.append(f"{name}:sha256_differs")
     differences.extend(f"{name}:not_in_the_freeze" for name in frozen_files_in(directory) if name not in hashes)
     if seed_from_directory(directory) != seed_of(lines):
-        differences.append("freeze_seed:differs")
+        if changes.get(SEED_NAME) != (seed_of(lines), seed_from_directory(directory)):
+            differences.append(f"{SEED_NAME}:differs")
     return differences
 
 

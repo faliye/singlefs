@@ -1,0 +1,4 @@
+both	src/lib.rs	tests::cpu_judged_check	ok	line	CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=样本 threads=4
+plain	tests/store_only.rs	-	ok	line	-
+feature	tests/store_only.rs	store_only_quick	ok	line	-
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-

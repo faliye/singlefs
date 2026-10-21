@@ -3,11 +3,18 @@
 # run-condition: none 要的 Verus、cargo 与内存包装由各子命令自己判，缺了判红并给出路（缺工具直接红，不交给预判退 78）
 """门禁 checker-tier-formal-verification 的 Verus 那四格的判法（里程碑三七·5；阶段只负责把它接进门禁、给样本开关）。
 
-被验的：登记表 .claude/gate.d/verus-pins.tsv 点名的 crate（今天是只依赖 vstd 的 crates/singlefs-replay-prefix）与它里面的核（kernel 行，今天就是它的 src/lib.rs）。
+被验的：登记表 .claude/gate.d/verus-pins.tsv 点名的 crate（今天是只依赖 vstd 的 crates/singlefs-replay-prefix）与它里面的核（kernel 行，今天是它的 src/lib.rs 与子模块 src/compaction_plan_proofs.rs）。
 Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不变时不出判定行），对 crate 的入口文件 --crate-type=lib，带 --no-cheating、--output-json 与 --rlimit <登记的数>
 （登记表 rlimit 行；没有这一行时取 DEFAULT_RLIMIT，就是 Verus 0.2026.09.20 自己的默认 10。proof、vacuity、must-red-worlds 三格同一个数），
 判定取 stdout 的 JSON（verification-results 的 verified / errors / encountered-vir-error，verus 的 commit），报错位置取 stderr。
 直接起的 Verus 只带它自带的 vstd：crate 的 Cargo.toml 除 vstd 之外还有依赖，proof、vacuity、must-red-worlds 三格开跑之前判红。
+只验一个函数（证明逐项、空真每处）时按那个函数所在的核点模块（kernel_module）：--verify-function 只在 --verify-root 或 --verify-only-module 点的那一个模块里找。
+  核是 crate 的入口文件（Cargo.toml 的 lib.path，默认 src/lib.rs）的点 --verify-root；入口所在目录下的 <名>.rs 与 <名>/mod.rs 点 --verify-only-module <名>，
+  更深的用 :: 接起来（<甲>/<乙>.rs 与 <甲>/<乙>/mod.rs 是 <甲>::<乙>）。Verus 0.2026.09.20 的认法（2026-10-18 在草稿的三层小 crate 上量的）：
+  模块路径认 outer::inner，不认 crate::outer、outer/inner、outer.inner（报 could not find module … specified by --verify-module or --verify-only-module）；
+  --verify-module 与 --verify-function 一起给退 255（Error: When using --verify-function, use --verify-only-module instead of --verify-module）；
+  --verify-root 与 --verify-only-module 一起给、两样都不给，也退 255；--verify-only-module 不含子模块，点 outer 找不到 outer::inner 里的函数。
+  核不在入口所在目录下、或路径里有一段不是 Rust 标识符的，认不出模块，判红。必红世界整个 crate 验，不点函数，不点模块。
 
 用法（<根> 是被判的仓根；四个判的子命令都退 0 绿、1 红、2 用法错、77 本次未跑）：
   verus-proof-check.py toolchain <根> [--verus-root 目录] [--cargo-home 目录]
@@ -19,15 +26,16 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
       verifier::rlimit / verifier(rlimit …)（函数上的 rlimit 属性盖过命令行的 --rlimit，那个函数就不在登记的额度上验）；
       Verus 逐项验：核里 verus! { … } 里有证明义务的单元各一项（proof_items）：proof fn、exec fn、带 decreases 的 spec fn（终止义务）、
       derive(Clone) 的类型（Verus 验它生成的 <类型>::clone）；不带 decreases 的 spec fn 没有证明义务、不成项，随用到它的项进键。
-      每项起一次 --verify-root --verify-function <名>（自由 fn 写它的名字，clone 写 <类型>::clone）：限时内出结局、没有 vir 错（作弊标记在这一层也被
+      每项起一次 --verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function <名>（自由 fn 写它的名字，clone 写 <类型>::clone）：限时内出结局、没有 vir 错（作弊标记在这一层也被
       --no-cheating 拒：只验一个函数时别处的 assume 照样拒，主 agent 2026-10-15 在副本上量的）、encountered-error 不是 true、errors 0、verified 至少 1、
       跑的 Verus 的 commit 等于登记。--verify-function 下真 Verus 不给 success 键、is-verifying-entire-crate 报 false，这两样不看（verification_clean）。
       整格跑时各项 verified 之和（复用的取记下的数；按点的名字计，同名的只算一次）等于登记的数（整 crate 验的数），不等判红并点名
       verified 与静态估的义务条数不同的项（proof fn 1、exec fn 1 加每个 while / loop / for 1、带 decreases 的 spec fn 1、clone 1）与没成项的 fn。超时判红（C5：超时不当通过）。
       verus! 里两个 fn 同名、或 fn 在 impl / trait 里判红：--verify-function 按名点（有恰好同名的就取它，名字是别人子串的照常点得中），这两种点不准。
+      同名只在同一份核里判：Verus 只在点的那一个模块里找，两份核里同名的 Verus 点得准；但项名、各项之和与判定库都按名字计，两份核同名的今天不判红（见「管不到的」）。
   verus-proof-check.py vacuity <根> [通用选项]
       空真：核里每一处 requires（整行以 requires 起头，fn 与闭包都算）找到它的函数体的 {（其后第一行以 { 起头、缩进不深于 requires 那一行的），
-      在临时副本里 { 后面插 assert(false);，一处一份副本、一次 Verus（只验这一处所属的那个 fn：--verify-root --verify-function）；
+      在临时副本里 { 后面插 assert(false);，一处一份副本、一次 Verus（只验这一处所属的那个 fn：--verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function）；
       每一处都要报 assertion failed 且位置就是插的那一行。
       验得过 ⇒ 这一处的前置条件不可满足，判红。一次只插一处：插在外层函数入口的 assert(false) 失败之后，Verus 把其后全部当 false 已知，
       里面闭包的那一处就验得过了（2026-10-01 在草稿里实测：七处一起插只报六处）。
@@ -241,6 +249,9 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
       proof-zero-verified-red（「proof-zero-verified-red 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=nonzero-errors-accepted  errors 不是 0 也当验过（不是 vir 错的）
       proof-errors-one-red（「proof-errors-one-red 这一格判错」）、proof-broken
+  VERUS_PROOF_CHECK_BREAK=submodule-verify-root  只验一个函数时不按核所在的模块点，一律 --verify-root（改前的样子：真仓子模块 compaction_plan_proofs 的 20 项证明、9 处空真全红）
+      module-per-kernel（根、kernel、nested、nested::deep 四份核，逐项核命令行点的模块；「module-per-kernel 这一格判错」）；
+      另有几格跟着判错（自证的核在子模块 src/kernel.rs 里，点根找不到函数）：proof-green、vacuity-green、proof-count 等起 Verus 逐函数验的格
   VERUS_PROOF_CHECK_BREAK=key-mismatch-by-item-only  list-items 数键时这一项判绿过就算键相同，不比键
       list-items-key-mismatch-count（「list-items-key-mismatch-count 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=reuse-lookup-skipped  一律不读库（键相同照样现判）
@@ -256,6 +267,8 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
   SINGLEFS_REUSE_SENTINEL_COUNT；--no-reuse、SINGLEFS_GATE_FULL=1、没给库、list-items 数键的那一趟不抽。
 管不到的：spec 本身写得对不对；核与调它的 singlefs-core 之间（recovery.rs 调核那一段）没被证明的部分；插入点只认「requires 整行起头、函数体的 { 单独起行或是闭包那一行的头一个 {」
   这种写法（verusfmt 与本仓的写法），别的写法认不出就判红要求改写法。
+  模块按核的文件路径认，不读 mod 声明：#[path = …] 挪了文件、或核写在 mod <名> { … } 内联块里的，点的模块与真的不同，Verus 报 could not find module / function、判红。
+  两份核里有同名的 fn：项名（proof:<名>、vacuity:<名>#<第几处>）、各项之和的计数与判定库的键都按名字，会并成一项；今天两份核里没有同名的，没判。
 """
 import collections
 import concurrent.futures
@@ -525,8 +538,35 @@ def copy_crate(root, registry, work):
     return destination
 
 
-def verus_arguments(registry, manifest, threads, function=None):
-    """Verus 的命令行；function 给了就只验这一个函数（--verify-root --verify-function <名>：证明逐函数一项、空真只验它所属的那一个函数）。
+RUST_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def kernel_module(registry, manifest, relative):
+    """核 relative（相对仓根）所在的模块：是 crate 的入口文件（Cargo.toml 的 lib.path，默认 src/lib.rs）交 None（点 --verify-root）；
+    入口所在目录下的 <名>.rs 与 <名>/mod.rs 交 <名>，更深的用 :: 接起来（Verus 0.2026.09.20 的 --verify-only-module 认 outer::inner，文件头「只验一个函数」一段）。
+    不在入口所在目录下、或有一段不是 Rust 标识符的判红。弄坏开关 submodule-verify-root 下一律交 None（改前的样子）。"""
+    if "submodule-verify-root" in BREAK:
+        return None
+    entry = os.path.normpath(manifest.get("lib", {}).get("path", "src/lib.rs"))
+    crate_relative = os.path.normpath(os.path.relpath(relative, registry.crate_directory))
+    if crate_relative == entry:
+        return None
+    rest = os.path.relpath(crate_relative, os.path.dirname(entry) or ".")
+    parts = rest[:-len(".rs")].split(os.sep) if rest.endswith(".rs") and not rest.startswith(os.pardir + os.sep) else []
+    if parts and parts[-1] == "mod":
+        parts = parts[:-1]
+    if not parts or not all(RUST_IDENTIFIER.fullmatch(part) for part in parts):
+        raise Red(f"核 {relative} 认不出是 {registry.crate_directory} 的哪个模块：要是入口 {entry}，"
+                  f"或入口所在目录 {os.path.dirname(entry) or '.'} 下的 <名>.rs、<名>/mod.rs（更深的照样一层一层往下）",
+                  f"把核挪到入口所在目录下、照文件路径用 mod 声明接上，并照新路径改 {REGISTRY} 的 kernel 行；确要别的写法（#[path]、内联 mod），"
+                  "先给 scripts/gate/verus-proof-check.py 的 kernel_module 补上认法")
+    return "::".join(parts)
+
+
+def verus_arguments(registry, manifest, threads, function=None, module=None):
+    """Verus 的命令行；function 给了就只验这一个函数（证明逐函数一项、空真只验它所属的那一个函数）：module 是 None（核是 crate 的入口）点 --verify-root，
+    不是 None 点 --verify-only-module <module>（kernel_module），再 --verify-function <名>。--verify-function 只在点的那一个模块里找；
+    Verus 0.2026.09.20 拒 --verify-module 与 --verify-function 一起给、拒 --verify-root 与 --verify-only-module 一起给（文件头「只验一个函数」一段）。
     Verus 0.2026.09.20 按子串点名、有恰好同名的就取它（主 agent 2026-10-15 在副本上量的：名字是别人子串的四个都退 0、没报 more than one match），
     所以 verus! 里的 fn 同名判红（verus_functions），名字是别人子串的照常用。"""
     package = manifest.get("package", {})
@@ -538,8 +578,18 @@ def verus_arguments(registry, manifest, threads, function=None):
     if "cheating-unchecked" not in BREAK:
         arguments.insert(0, "--no-cheating")
     if function:
-        arguments += ["--verify-root", "--verify-function", function]
+        arguments += ["--verify-root"] if module is None else ["--verify-only-module", module]
+        arguments += ["--verify-function", function]
     return arguments + [entry]
+
+
+def kernel_modules(root, registry, manifest, kernels):
+    """每份核（相对仓根的路径）点哪个模块：{相对路径: kernel_module}。认不出的判红（开跑之前）。"""
+    modules = {}
+    for kernel in kernels:
+        relative = os.path.relpath(kernel, root).replace(os.sep, "/")
+        modules[relative] = kernel_module(registry, manifest, relative)
+    return modules
 
 
 # 内存包装排队时报的那几行（run-with-memory-cap.sh：「排队（已等 …」每 60 秒一行，「排了 … 秒，起跑」放行时一行）
@@ -1192,11 +1242,12 @@ def listed_names(names, limit=20):
 
 def check_proof(root, options):
     """证明逐项：有证明义务的单元各一项（proof_items：proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone；spec fn 不带 decreases 的不成项），
-    各验一次（--verify-root --verify-function <名>）。每项判据：限时内出结局、没有 vir 错、errors 0（verification_clean：--verify-function 下不看 success 与
+    各验一次（--verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function <名>；kernel_module）。每项判据：限时内出结局、没有 vir 错、errors 0（verification_clean：--verify-function 下不看 success 与
     is-verifying-entire-crate）、verified 至少 1（0 是 Verus 在点的函数上一条义务都没验：点错了函数，或它不该成项）、跑的 Verus 的 commit 等于登记。
     整格跑时各项 verified 之和（复用的取记下的数；按 --verify-function 点的名字计，同名的只算一次）要等于登记的数（verus-pins.tsv 的 crate 行，整 crate 验的数），
     不等判红并点名：verified 与静态估的义务条数不同的项、没成项的 verus! fn。--item proof 或不给 --item 是整格；--item proof:<名> 只验点名的，不比之和。"""
     registry, kernels, manifest, executable = prepared(root, options)
+    modules = kernel_modules(root, registry, manifest, kernels)
     functions = verus_functions(root, registry, kernels, options)
     items, left_out = proof_items(root, registry, kernels, functions, options)
     if not items:
@@ -1266,10 +1317,12 @@ def check_proof(root, options):
         counts[entry.verus_name] = results["verified"]
         return [], f"{results['verified']} verified、0 errors", {"verified": str(results["verified"])}
 
-    judging = ItemJudging(store, judge_one, "verus-proof", f"verus --verify-root --verify-function <名> --no-cheating --rlimit {registry.rlimit}（{registry.tag}）",
+    judging = ItemJudging(store, judge_one, "verus-proof",
+                          f"verus --verify-root|--verify-only-module <核所在的模块> --verify-function <名> --no-cheating --rlimit {registry.rlimit}（{registry.tag}）",
                           sentinel=sentinel)
     started = time.monotonic()
-    verify_in_parallel(root, registry, manifest, executable, options, [(entry.item, {}, entry.verus_name) for entry, _components, _reason in pending], "proof",
+    verify_in_parallel(root, registry, manifest, executable, options,
+                       [(entry.item, {}, entry.verus_name, modules[entry.relative]) for entry, _components, _reason in pending], "proof",
                        judged=lambda index, outcome, seconds: judging(index, outcome, seconds, pending[index][0].item, pending[index][1],
                                                                       judged_how(store, pending[index][0].item, pending[index][2], sentinel)))
     problems += judging.finish(len(pending))
@@ -1327,7 +1380,8 @@ def requires_insertion_points(text):
 
 
 def verify_in_parallel(root, registry, manifest, executable, options, edits, key, judged=None):
-    """edits：[(说明, {相对仓根的文件: 新内容}[, 只验的函数名])]；每一处一份副本、一次 Verus（给了函数名就 --verify-root --verify-function 只验它）。交回与 edits 同序的 outcome。
+    """edits：[(说明, {相对仓根的文件: 新内容}[, 只验的函数名, 它所在的模块])]；每一处一份副本、一次 Verus（给了函数名就只验它：模块是 None 点 --verify-root，
+    不是 None 点 --verify-only-module <模块>，再 --verify-function，verus_arguments）。交回与 edits 同序的 outcome。
     judged(下标, outcome, 秒数) 给了就在那一处出结局时当场调（按条判定在这里判完就落盘，打断之后判过的不丢）。
     一处拿到内存包装的 252 之后，还没起的那几处不建副本、不起包装（QueueRefusal），交 skipped_outcome；已经起了的照常收。"""
     if not edits:
@@ -1347,7 +1401,8 @@ def verify_in_parallel(root, registry, manifest, executable, options, edits, key
                 for relative, content in edit[1].items():
                     with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
                         handle.write(content)
-                outcome = run_verus(executable, crate_copy, verus_arguments(registry, manifest, threads, edit[2] if len(edit) > 2 else None), options, key, label=edit[0])
+                outcome = run_verus(executable, crate_copy, verus_arguments(registry, manifest, threads, edit[2] if len(edit) > 2 else None,
+                                                                            edit[3] if len(edit) > 3 else None), options, key, label=edit[0])
         if judged is not None:
             judged(index, outcome, time.monotonic() - started)
         return outcome
@@ -1459,8 +1514,10 @@ def vacuity_item_problems(label, expected, outcome, options):
 
 
 def check_vacuity(root, options):
-    """空真每处 requires 一项：插了 assert(false) 的副本上只验它所属的那一个函数（--verify-root --verify-function），键是所属函数的单元闭包与函数内第几处。"""
+    """空真每处 requires 一项：插了 assert(false) 的副本上只验它所属的那一个函数（--verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function；
+    kernel_module），键是所属函数的单元闭包与函数内第几处。"""
     registry, kernels, manifest, executable = prepared(root, options)
+    modules = kernel_modules(root, registry, manifest, kernels)
     functions = verus_functions(root, registry, kernels, options)
     points, all_at_once = vacuity_points(root, registry, kernels, functions)
     if not points:
@@ -1502,9 +1559,11 @@ def check_vacuity(root, options):
             problems += item_problems
     else:
         judging = ItemJudging(store, lambda index, outcome: vacuity_item_problems(pending[index][1], pending[index][3], outcome, options), "verus-vacuity",
-                              f"verus --verify-root --verify-function <所属函数> --no-cheating --rlimit {registry.rlimit}（{registry.tag}），函数体头插 assert(false)",
+                              f"verus --verify-root|--verify-only-module <核所在的模块> --verify-function <所属函数> --no-cheating --rlimit {registry.rlimit}"
+                              f"（{registry.tag}），函数体头插 assert(false)",
                               sentinel=sentinel)
-        verify_in_parallel(root, registry, manifest, executable, options, [(label, change, owner) for _item, label, change, _expected, _components, _reason, owner in pending],
+        verify_in_parallel(root, registry, manifest, executable, options,
+                           [(label, change, owner, modules[label.split(" ", 1)[0]]) for _item, label, change, _expected, _components, _reason, owner in pending],
                            "vacuity", judged=lambda index, outcome, seconds: judging(index, outcome, seconds, pending[index][0], pending[index][4],
                                                                                      judged_how(store, pending[index][0], pending[index][5], sentinel)))
         problems = judging.finish(len(pending))
@@ -2008,12 +2067,33 @@ FAKE_VERUS = r'''#!/usr/bin/env python3
 # 义务条数照真 Verus 量到的：proof fn 1 条，exec fn 1 条另加每个 while 1 条，spec fn 带 decreases 的 1 条、不带的 0 条，
 # derive(Clone) 的类型另有一个 <类型>::clone（1 条）；函数里有 SELFTEST_ZERO_VERIFIED 的那个函数验出 0 条。
 # --verify-function 照真 Verus 点：有恰好同名的取它，否则唯一包含它的那一个，几个都包含它报 more than one match，一个都没有报 could not find。
+# 模块也照真 Verus 0.2026.09.20（2026-10-18 的三层小 crate 探针）：--verify-function 只在 --verify-root（src/lib.rs）或 --verify-only-module <模块>
+# （src/<甲>.rs、src/<甲>/mod.rs 是 <甲>，src/<甲>/<乙>.rs 是 <甲>::<乙>，不含子模块）点的那一个模块里找；两样都没给、两样都给、给的是 --verify-module，
+# 退 255、stdout 空；点的模块没有报 could not find module。环境里有 SELFTEST_VERUS_ARGUMENTS 的，每起一次往那份文件追加一行命令行参数（JSON）。
 import json, os, re, sys, time
 here = os.path.dirname(os.path.realpath(__file__))
 commit = json.load(open(os.path.join(here, "version.json")))["verus"]["commit"]
+if os.environ.get("SELFTEST_VERUS_ARGUMENTS"):
+    open(os.environ["SELFTEST_VERUS_ARGUMENTS"], "a").write(json.dumps(sys.argv[1:]) + "\n")
 no_cheating = "--no-cheating" in sys.argv
 rlimit = float(sys.argv[sys.argv.index("--rlimit") + 1]) if "--rlimit" in sys.argv[:-1] else None
 only = sys.argv[sys.argv.index("--verify-function") + 1] if "--verify-function" in sys.argv[:-1] else None
+only_module = sys.argv[sys.argv.index("--verify-only-module") + 1] if "--verify-only-module" in sys.argv[:-1] else None
+if only is not None:
+    refusal = ("When using --verify-function, use --verify-only-module instead of --verify-module" if "--verify-module" in sys.argv
+               else "--verify-function option requires --verify-only-module or --verify-root" if "--verify-root" not in sys.argv and only_module is None
+               else "Must pass at most one --verify-only-module or --verify-root when using --verify-function" if "--verify-root" in sys.argv and only_module is not None
+               else None)
+    if refusal:
+        sys.stderr.write(f"Error: {refusal}\n")
+        sys.exit(255)
+target_module = None if only is None else only_module or ""
+
+
+def module_of(path):
+    parts = os.path.relpath(path, "src")[:-len(".rs")].split(os.sep)
+    parts = parts[:-1] if parts[-1] == "mod" else parts
+    return "" if parts == ["lib"] else "::".join(parts)
 function_line = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(open\s+|closed\s+)?(broadcast\s+)?(proof\s+|spec\s+|exec\s+)?fn\s+(\w+)")
 type_line = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(struct|enum)\s+(\w+)")
 if os.environ.get("SELFTEST_VERUS_TRACE"):
@@ -2023,7 +2103,7 @@ for directory, _s, names in os.walk("src"):
     for name in sorted(names):
         if name.endswith(".rs"):
             files.append(os.path.join(directory, name))
-obligations, order = {}, []
+obligations, order, home = {}, [], {}
 for path in sorted(files):
     current, mode, derive_clone = None, None, False
     for line in open(path).read().split("\n"):
@@ -2032,9 +2112,11 @@ for path in sorted(files):
             current, mode = heading.group(6), (heading.group(5) or "exec ").strip()
             obligations[current] = 0 if mode == "spec" else 1
             order.append(current)
+            home[current] = module_of(path)
         elif declared and derive_clone:
             obligations[declared.group(4) + "::clone"] = 1
             order.append(declared.group(4) + "::clone")
+            home[declared.group(4) + "::clone"] = module_of(path)
         derive_clone = line.lstrip().startswith("#[derive(") and "Clone" in line
         if current is not None and not heading:
             if mode == "spec" and re.search(r"\bdecreases\b", line) and obligations[current] == 0:
@@ -2044,8 +2126,14 @@ for path in sorted(files):
         if current is not None and "SELFTEST_ZERO_VERIFIED" in line:
             obligations[current] = -10 ** 6
 selected = None
+if target_module and target_module not in {module_of(path) for path in files}:
+    sys.stderr.write(f"error: could not find module {target_module} specified by --verify-module or --verify-only-module\n"
+                     "error: aborting due to 1 previous error\n\n")
+    print(json.dumps({"verification-results": {"encountered-error": True, "encountered-vir-error": True}, "verus": {"commit": commit}}))
+    sys.exit(1)
 if only is not None:
-    if only in obligations:
+    order = [name for name in order if home[name] == target_module]
+    if only in order:
         selected = only
     else:
         matched = [name for name in order if only in name]
@@ -2064,6 +2152,7 @@ for path in sorted(files):
     lines = open(path).read().split("\n")
     owner_vacuous = owner_failed = closure_vacuous = False
     current = None
+    in_scope = only is None or module_of(path) == target_module
     for number, line in enumerate(lines, 1):
         if "SELFTEST_SLEEP" in line:
             time.sleep(30)
@@ -2074,7 +2163,7 @@ for path in sorted(files):
         heading = function_line.match(line)
         if heading:
             current = heading.group(6)
-        if only is not None and current != selected:
+        if only is not None and (current != selected or not in_scope):
             continue
         if heading:
             owner_vacuous = "SELFTEST_VACUOUS" in line
@@ -2527,7 +2616,7 @@ def selftest():
         items_root = make_root("proofitems", kernel=SELFTEST_ITEMS_KERNEL, count=5)
         crate_of_items = os.path.join(items_root, "crates", "core")
         shapes = {}
-        for label, extra in (("按函数", ["--verify-root", "--verify-function", "count_up"]), ("整 crate", [])):
+        for label, extra in (("按函数", ["--verify-only-module", "kernel", "--verify-function", "count_up"]), ("整 crate", [])):
             ran = subprocess.run([os.path.join(install, "verus"), "--no-cheating", "--rlimit", "7", "--output-json", *extra, "src/lib.rs"],
                                  cwd=crate_of_items, capture_output=True, text=True)
             shapes[label] = json.loads(ran.stdout)["verification-results"] if ran.stdout.strip().startswith("{") else {"读不出": ran.stdout[-200:]}
@@ -2535,6 +2624,68 @@ def selftest():
                    shapes["按函数"] == {"encountered-error": False, "encountered-vir-error": False, "verified": 2, "errors": 0, "is-verifying-entire-crate": False}
                    and shapes["整 crate"].get("success") is True and shapes["整 crate"].get("is-verifying-entire-crate") is True and shapes["整 crate"].get("verified") == 5,
                    f"假 Verus 的输出不像真 Verus：{shapes}")
+        # 假 Verus 点模块的形态照真 Verus（文件头「只验一个函数」一段）：点根找不到子模块 kernel 里的函数，--verify-module 配 --verify-function 退 255、stdout 空
+        module_shapes = {}
+        for label, extra in (("点根", ["--verify-root"]), ("点 --verify-module", ["--verify-module", "kernel"]), ("点没有的模块", ["--verify-only-module", "nosuch"])):
+            ran = subprocess.run([os.path.join(install, "verus"), "--no-cheating", "--rlimit", "7", "--output-json", *extra, "--verify-function", "count_up", "src/lib.rs"],
+                                 cwd=crate_of_items, capture_output=True, text=True)
+            module_shapes[label] = (ran.returncode, ran.stdout.strip()[:80], ran.stderr.strip().split("\n")[0] if ran.stderr.strip() else "")
+        judge_cell("fake-verus-module-shape",
+                   module_shapes["点根"][0] == 1 and module_shapes["点根"][2] == "error: could not find function count_up specified by --verify-function"
+                   and module_shapes["点 --verify-module"] == (255, "", "Error: When using --verify-function, use --verify-only-module instead of --verify-module")
+                   and module_shapes["点没有的模块"][2] == "error: could not find module nosuch specified by --verify-module or --verify-only-module",
+                   f"假 Verus 点模块不像真 Verus：{module_shapes}")
+        # 核按所在模块点（kernel_module）：根 src/lib.rs 点 --verify-root，src/kernel.rs、src/nested/mod.rs、src/nested/deep.rs 点 --verify-only-module
+        # kernel、nested、nested::deep。四份核都进登记表，证明与空真两格跑完，逐次核假 Verus 收到的命令行（开关 submodule-verify-root 下子模块的项一律
+        # --verify-root、点不中，这一格判错）
+        def lemma_kernel(name, head=""):
+            return (head + "use vstd::prelude::*;\nverus! {\n"
+                    f"pub proof fn {name}(value: u64)\n    requires\n        value > 0,\n    ensures\n        value >= 1,\n{{\n}}\n}} // verus!\n")
+
+        modules_root = make_root("modules", count=5)
+        modules_source = os.path.join(modules_root, "crates", "core", "src")
+        os.makedirs(os.path.join(modules_source, "nested"))
+        for relative, text in (("lib.rs", lemma_kernel("root_lemma", "pub mod kernel;\npub mod nested;\n")), ("nested/mod.rs", lemma_kernel("nested_lemma", "pub mod deep;\n")),
+                               ("nested/deep.rs", lemma_kernel("deep_lemma"))):
+            with open(os.path.join(modules_source, relative), "w", encoding="utf-8") as handle:
+                handle.write(text)
+        edit_kernel(os.path.join(modules_root, REGISTRY), "kernel\tcrates/core/src/kernel.rs\n",
+                    "".join(f"kernel\tcrates/core/src/{relative}\n" for relative in ("lib.rs", "kernel.rs", "nested/mod.rs", "nested/deep.rs")))
+        arguments_path = os.path.join(work, "verus-arguments.txt")
+        open(arguments_path, "w").close()
+        os.environ["SELFTEST_VERUS_ARGUMENTS"] = arguments_path
+        try:
+            proof_exit, proof_output, _verdicts = run_items("proof", modules_root)
+            vacuity_exit, vacuity_output, _verdicts = run_items("vacuity", modules_root)
+        finally:
+            os.environ.pop("SELFTEST_VERUS_ARGUMENTS", None)
+        want_scopes = {"root_lemma": ["--verify-root"], "clamp_to_limit": ["--verify-only-module", "kernel"], "keep_small": ["--verify-only-module", "kernel"],
+                       "nested_lemma": ["--verify-only-module", "nested"], "deep_lemma": ["--verify-only-module", "nested::deep"]}
+        seen_scopes = collections.defaultdict(list)
+        for line in open(arguments_path, encoding="utf-8").read().split("\n"):
+            if not line:
+                continue
+            given = json.loads(line)
+            function = given[given.index("--verify-function") + 1] if "--verify-function" in given else "（整个 crate）"
+            seen_scopes[function].append([word for index, word in enumerate(given)
+                                          if word in ("--verify-root", "--verify-only-module", "--verify-module")
+                                          or (index and given[index - 1] in ("--verify-only-module", "--verify-module"))])
+        # 每个函数两次：证明一项、空真一处（keep_small 那一处在闭包上，所属的还是 keep_small）
+        judge_cell("module-per-kernel",
+                   proof_exit == 0 and "各项 verified 之和 5、0 errors（登记 5）" in proof_output and vacuity_exit == 0 and "5 处 requires" in vacuity_output
+                   and dict(seen_scopes) == {name: [scope, scope] for name, scope in want_scopes.items()},
+                   f"期望证明与空真都退 0、每个函数两次各点 {want_scopes}，实测证明退 {proof_exit}、空真退 {vacuity_exit}、点的是 {dict(seen_scopes)}："
+                   f"{proof_output.strip()[-200:]} | {vacuity_output.strip()[-200:]}")
+        # 核不在入口所在目录下：认不出模块，开跑之前判红、出路点 kernel_module
+        outside_root = make_root("moduleoutside")
+        os.makedirs(os.path.join(outside_root, "crates", "core", "proofs"))
+        os.replace(os.path.join(outside_root, "crates", "core", "src", "kernel.rs"), os.path.join(outside_root, "crates", "core", "proofs", "kernel.rs"))
+        with open(os.path.join(outside_root, "crates", "core", "src", "lib.rs"), "w", encoding="utf-8") as handle:
+            handle.write('#[path = "../proofs/kernel.rs"]\npub mod kernel;\n')
+        edit_kernel(os.path.join(outside_root, REGISTRY), "kernel\tcrates/core/src/kernel.rs\n", "kernel\tcrates/core/proofs/kernel.rs\n")
+        got, output, _verdicts = run_items("proof", outside_root)
+        judge_cell("module-unrecognized-red", got == 1 and "核 crates/core/proofs/kernel.rs 认不出是 crates/core 的哪个模块" in output and "kernel_module" in output,
+                   f"期望认不出模块判红、出路点 kernel_module，实测退 {got}：{output.strip()[-300:]}")
         got, output, verdicts = run_items("proof", items_root)
         want_items = ["proof:Pair::clone", "proof:sum_to", "proof:lemma_within_itself", "proof:count_up"]
         # spec fn 不带 decreases 的不成项（开关 spec-fn-as-item 下 within 成项、验出 0 条判红，这一格判错）
@@ -3026,7 +3177,7 @@ def selftest():
                      "reuse-ignores-key",
                      "reuse-records-red", "reuse-records-whole-cell-only", "threads-default-cpu-count", "list-items-pipe-unhandled",
                      "spec-fn-as-item", "spec-decreases-not-item", "derived-clone-not-item", "require-success-key-per-function",
-                     "require-entire-crate-per-function", "zero-verified-accepted", "nonzero-errors-accepted", "key-mismatch-by-item-only",
+                     "require-entire-crate-per-function", "zero-verified-accepted", "nonzero-errors-accepted", "submodule-verify-root", "key-mismatch-by-item-only",
                      "reuse-lookup-skipped", "REUSE_CHECKS_BREAK=rejudged-sentinel-passes")
         # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（至多 SELFTEST_BREAK_WORKERS 趟），按开关的次序收退出码、数份数；
         # 写成「变量=项」的是共用库 lib_reuse_checks.py 的开关（复用哨兵被现判不红：reuse-sentinel 那一格判错）

@@ -1,0 +1,11 @@
+# 评估 0 次的（流，不变量）对的基准（K4 甲：（流，不变量）对逐个比，0 次的登记带理由，轻型域与全量域都数；里程碑三六·3「0 次的不变量数不许涨」；
+# 用户 2026-10-20 定，原话在 records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条，比法取推荐的甲）。
+# 一行一对，四列用制表符分隔：域（quick 或 full）、流（<来源>:<计数行的标签>，写法在 scripts/crash/crash-flow-coverage.py 文件头「计数行」）、
+# 不变量（I-x.y）、理由（这条流为什么评估不到它；不许空，不许留 <填理由>）。
+# 门禁 checker-tier-crash-point-replay 的 invariant-zero-evaluations 格判：这一趟那个域里评估过 0 次的对不在这张表里就红；理由空着的行红；
+# 表里的对这一趟不是 0 了的报出来、不红。新不变量进清单时，同一次改动把它在各条流上的 0 次对连理由补进来。
+# 初值要真行才填得出：主 agent 跑一趟轻型崩溃点重放（另跑全量时再补 full 域的行）之后，用
+#   python3 scripts/crash/crash-flow-coverage.py run-directory <那一趟的日志目录> --tier quick > <记录文件>
+#   python3 scripts/crash/crash-flow-coverage.py baseline zero-evaluations <记录文件>
+# 打出的行填进来、逐行写理由，删掉下面「初值：未填」那一行；那一行在的时候门禁这一格退 77（本次未跑）并打这一趟的候选行。
+# 初值：未填

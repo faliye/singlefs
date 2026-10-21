@@ -1,0 +1,2 @@
+# 多机配置开了 GPU：同一条库单测在不带特性那一趟判段判在 CPU，照旧判红；带特性那一趟（不带 gpu）现判它判绿也不记，判的是 crash-case-replay 格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

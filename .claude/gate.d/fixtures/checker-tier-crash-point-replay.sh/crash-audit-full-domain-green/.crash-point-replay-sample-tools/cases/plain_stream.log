@@ -1,0 +1,9 @@
+running 1 test
+CRASH_CASE_BLOCKS blocks=2 reused=2 fresh=0 red=0 refused=0
+CRASH_FLOW_COVERAGE entry=mount_writable step=UnitWrite segment=0 expansion=expanded domain=full
+CRASH_FLOW_COVERAGE entry=publish_first_file step=Barrier segment=2 expansion=expanded domain=full
+CRASH_FLOW_COVERAGE entry=publish_first_file step=UnitWrite segment=1 expansion=registered_segment domain=full
+CRASH_POINT_REPLAY_PLAIN_STREAM states=40 checker_by_invariant(evaluated/violated/not_applicable) I-1.1=40/0/0 I-2.1=0/0/40
+test plain_stream_full ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s

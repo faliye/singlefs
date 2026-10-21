@@ -1,0 +1,15 @@
+# 崩溃点测试的旋钮登记表（K7：里程碑三出口 4「旋钮登记表带取值依据」、六·4；用户 2026-10-20 定「表进 gate.d 加一格，扫值不算出口」，
+# 原话在 records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条）。
+# 一行一个旋钮，四列用制表符分隔：旋钮、取值（今天的值）、依据（谁哪天定的、哪份产物量的；凭感觉取的写「推的」）、出处路径（这个旋钮住的那份文件，相对仓根）。
+# 门禁 checker-tier-crash-point-replay 的 crash-knobs 格判每行四列不空、出处路径在、旋钮名不重（判法 scripts/crash/crash-case-check.py --only knobs）；
+# 取值与出处里写的是不是同一个数、扫值（六·4 每个旋钮一份扫值产物、「推的」条数只减）都不在这一格。旋钮的来处见调查报告批 7 第四节那张表。
+展开上限（轻型，展开 6 那个域）	6（LIGHT_EXPAND_UP_TO）	推的：没有扫值产物；轻型取「甲二」与展开 6 两个域的并集是用户 2026-10-10 定的两档（.claude/rules/verification.md「两档：轻型与重型」），6 这个数本身没人量过	scripts/crash/crash-point-replay.sh
+展开上限（全量）	30（FULL_EXPAND_UP_TO）	登记分项里最长一段的写数（第 32 批 Q 探针 PROBE_SEGMENT_SIZES，出处在 crash-amplification.sh 文件头「全量的展开深度」）	scripts/crash/crash-amplification.sh
+线程数（每台默认重活线程数）	31	用户 2026-10-12 定：所有重活默认每台 31 线程，双机两台各 31（records/2026-10-12-里程碑三工具与治理批.md）	.claude/heavy-thread-default
+内存上限（复跑与没另给上限的装置）	8G（REPLAY_MEMORY_CAP）	推的：没有按驱动分别量过（replay.sh 文件头那一段）；门禁各道另有 GATE_*_MEMORY_MAX，提交时照峰值表 ~/.local/share/singlefs/memory-peaks.tsv 定	scripts/experiments/replay.sh
+批大小（轻型里分片的段一趟判几个态）	65536（LIGHT_REGISTERED_SEGMENT_SLICE_STATES）	推的：取引擎的一块；重型不设、引擎没设取 2^32	scripts/crash/crash-point-replay.sh
+批大小（重型里分片的段一趟判几个态）	2^32（引擎读 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES，没设时的值）	推的：没有扫值产物	crates/singlefs-checker-tier/src/crash_amplification.rs
+双机分工	本机多机配置的 ENABLE_ACROSS_MACHINES、HOST_JUDGE_WEIGHTS、ENABLE_GPU、GPU_CARDS_BY_PRIORITY（值在不进仓的 multi-host.env）	推的：各台权重按量到的速度分，配置的写法在模板里；没有扫值产物	multi-host.env.example
+ignore（一时跑不了、标 ignore 不展开的节点）	开着的节点照基准表逐条登记（今天生产流上 ignore 开着的点是 σ 那条放量流的 history_before_sigma）	D13（验证路线）已定项 9「一时跑不了的节点标 ignore 慢慢开」；只减不增由门禁 crash-ignored-nodes 格判	.claude/gate.d/crash-ignored-nodes.tsv
+快档取样点（崩溃点重放）	甲二展开（CrashPointReplaySegmentExpansion）	用户 2026-10-10 定的两档里轻型那一档的域（.claude/rules/verification.md「两档：轻型与重型」）；取样点够不够没量过（推的）	crates/singlefs-checker-tier/src/crash.rs
+快档取样点（崩溃注入）	SINGLEFS_CRASH_INJECTION_POINTS、_SEEDS、_OPERATIONS、_DEVICES、_WEIGHTS 没设时的默认	推的：没有扫值产物	crates/singlefs-checker-tier/src/crash_injection.rs

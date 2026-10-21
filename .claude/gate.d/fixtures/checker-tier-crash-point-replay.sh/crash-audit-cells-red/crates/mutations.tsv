@@ -1,0 +1,2 @@
+# 样本的变异表：唯一一行点名的是别的测试目标（other_stream），crash-case:plain-stream 一行都没有
+样本改坏一处	crates/singlefs-checker-tier/src/lib.rs	pub fn one() -> u32 { 1 }	pub fn one() -> u32 { 2 }	-p singlefs-checker-tier --test other_stream -- other_quick --exact	other_quick

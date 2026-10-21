@@ -1,9 +1,9 @@
 exit=1
 want=样本只跑 .gate-cells 点名的格：trilingual-structure
 want=三份的结构对不上：5 组里 5 项不同（查了 5 组）
-want=README：编号集合不同：en 4 个、zh 3 个、ja 4 个；zh 缺 C7
-want=briefs/2026-09-14：链接目标集合不同：en 2 个、zh 2 个、ja 2 个；en 缺 docs/c.md；zh 缺 docs/b.md；ja 缺 docs/c.md
-want=briefs/2026-09-28：## 标题个数不同：en 2，zh 2，ja 1
-want=briefs/2026-10-10：表格行个数不同：en 3，zh 3，ja 2
-want=briefs/2026-10-12：围栏代码块个数不同：en 2，zh 2，ja 1
+want=README：编号集合不同：zh 3 个、en 4 个、ja 4 个；zh 缺 C7
+want=briefs/2026-09-14：链接目标集合不同：zh 2 个、en 2 个、ja 2 个；zh 缺 docs/b.md；en 缺 docs/c.md；ja 缺 docs/c.md
+want=briefs/2026-09-28：## 标题个数不同：zh 2，en 2，ja 1
+want=briefs/2026-10-10：表格行个数不同：zh 3，en 3，ja 2
+want=briefs/2026-10-12：围栏代码块个数不同：zh 2，en 2，ja 1
 want=doc-text.sh：1 格里 1 格红（trilingual-structure）

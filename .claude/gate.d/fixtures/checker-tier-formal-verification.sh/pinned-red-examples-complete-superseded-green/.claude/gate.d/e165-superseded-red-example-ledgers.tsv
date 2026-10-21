@@ -1,2 +1,0 @@
-# 样本用的被取代红例账登记表：e165-sample-old 那一趟完整，被同档（都没写 device_arguments=，--profile r1）的后一趟 e165-sample 取代
-research/results/e165-sample-old-red-examples.tsv	research/results/e165-sample-red-examples.tsv	样本：同档后一趟重跑出同一批反例状态，钉的是后一趟	.claude/kb/experiments/165-样本.md:1

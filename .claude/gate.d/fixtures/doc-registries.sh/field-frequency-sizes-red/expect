@@ -1,0 +1,15 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：field-frequency-sizes
+want=10 处字段频率的大小指不到已定条款（扫 3 份、9 处「每 X 一份」）
+want=.claude/kb/decisions/04-样本校验和.md:13 「每个逻辑 extent 一份」：「逻辑 extent」的大小读不出来：decisions/ 下没有 DATA_UNIT_BYTES 的 format-const 登记
+want=.claude/kb/decisions/04-样本校验和.md:17 「每个单元恒一份」：「单元」的大小读不出来：decisions/ 下没有 DATA_UNIT_BYTES 的 format-const 登记
+want=.claude/kb/decisions/04-样本校验和.md:21 「每 extent 存一份」：「extent」的大小读不出来：decisions/ 下没有 DATA_UNIT_BYTES 的 format-const 登记
+want=.claude/kb/decisions/08-样本索引.md:14 「每个节点一份」：「节点」的大小读不出来：给出它大小的 D8 已定项 2 里没写出 NODE_BYTES 登记的 16384
+want=.claude/kb/layout/01-样本布局.md:5 「每 32 KiB 一份」：32768 字节不是哪条已定条款给出大小的粒度
+want=.claude/kb/layout/01-样本布局.md:6 「每索引节点一份」：「索引节点」的大小读不出来
+want=.claude/kb/layout/01-样本布局.md:7 「每 128 KiB 一份」：131072 字节不是哪条已定条款给出大小的粒度
+want=.claude/kb/layout/01-样本布局.md:9 「每个单元一份」：「单元」的大小读不出来
+want=.claude/kb/layout/01-样本布局.md:11 「<!-- doc-registries:not-field-frequency -->」：not-field-frequency 标记没写理由
+want=.claude/kb/layout/01-样本布局.md:14 「<!-- doc-registries:not-field-frequency 样本里不起作用的豁免 -->」：not-field-frequency 标记管的下一个非空行里一处「每 X 一份」都没有
+want=  field-frequency-sizes：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-frequency-sizes）

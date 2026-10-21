@@ -1,0 +1,4 @@
+exit=0
+want=查了 1 轮：判决文件 1 轮、kb 小节里的判决 0 轮、登记撂下 0 轮
+want=样本只跑 .gate-cells 点名的格：abandoned-rounds
+want=doc-process-records.sh：1 格里 1 格绿（abandoned-rounds），0 格本次未跑（无）
