@@ -1,0 +1,30 @@
+batch=3 target=default rc=0
+MARGIN compaction txg=8 relocated=0 fixed_point_slots_written=11 ckpt_cost=545
+MARGIN compaction txg=9 relocated=3 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=10 relocated=2 fixed_point_slots_written=14 ckpt_cost=545
+ROLLBACK Ok((5, 10))
+MARGIN rollback txg=11 target_txg=7 fixed_point_slots_written=17 ckpt_cost=545
+batch=3 target=8 rc=0
+MARGIN compaction txg=8 relocated=0 fixed_point_slots_written=11 ckpt_cost=545
+MARGIN compaction txg=9 relocated=3 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=10 relocated=2 fixed_point_slots_written=14 ckpt_cost=545
+ROLLBACK Ok((5, 10))
+MARGIN rollback txg=11 target_txg=8 fixed_point_slots_written=17 ckpt_cost=545
+batch=1 target=default rc=0
+MARGIN compaction txg=8 relocated=0 fixed_point_slots_written=11 ckpt_cost=545
+MARGIN compaction txg=9 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=10 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=11 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=12 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=13 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+ROLLBACK Ok((5, 10))
+MARGIN rollback txg=14 target_txg=7 fixed_point_slots_written=17 ckpt_cost=545
+batch=1 target=8 rc=0
+MARGIN compaction txg=8 relocated=0 fixed_point_slots_written=11 ckpt_cost=545
+MARGIN compaction txg=9 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=10 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=11 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=12 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+MARGIN compaction txg=13 relocated=1 fixed_point_slots_written=14 ckpt_cost=545
+ROLLBACK Ok((5, 10))
+MARGIN rollback txg=14 target_txg=8 fixed_point_slots_written=17 ckpt_cost=545

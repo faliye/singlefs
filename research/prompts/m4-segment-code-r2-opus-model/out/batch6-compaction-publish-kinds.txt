@@ -1,0 +1,4 @@
+    330 BatchCompletingTheIntent relocated_zero=no region_empty_after=true intent_live_after=false
+   2032 Batch relocated_zero=no region_empty_after=false intent_live_after=true
+     53 IntentCompletedWithoutABatch relocated_zero=yes region_empty_after=true intent_live_after=false
+fallback_and_carry_unless_lines=0

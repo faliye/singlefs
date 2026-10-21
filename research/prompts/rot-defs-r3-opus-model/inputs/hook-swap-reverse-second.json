@@ -1,0 +1,8 @@
+[
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "「…选项写成没展开的变量」四格与之后的「装置重放的登记读不出：直接执行装置本体按重放算」一格红（应当是 verus-stage，实际 None）；\n",
+  "new": "「…选项写成没展开的变量」四格红（应当是 verus-stage，实际 None）；\n",
+  "count": 1
+ }
+]

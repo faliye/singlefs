@@ -1,0 +1,22 @@
+# 攻方副本（m3-close-sysconf-r3）：主机负载高、单次前台命令限 240 秒，工作区几个大包在 release 下降到 opt-level 1、不带调试信息、多切代码单元，
+# 第三方产物（RocksDB 这类）不受影响、照用拷来的。
+[profile.release.package.singlefs-core]
+opt-level = 1
+debug = false
+codegen-units = 256
+[profile.release.package.singlefs-checker]
+opt-level = 1
+debug = false
+codegen-units = 256
+[profile.release.package.singlefs-checker-tier]
+opt-level = 1
+debug = false
+codegen-units = 256
+[profile.release.package.singlefs-harness]
+opt-level = 1
+debug = false
+codegen-units = 256
+[profile.release.package.opus-r3-probe]
+opt-level = 1
+debug = false
+codegen-units = 256

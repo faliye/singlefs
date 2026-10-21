@@ -1,0 +1,116 @@
+--- a/crates/singlefs-checker/src/rebuild.rs	2026-10-19 23:20:46.897695877 +0000
++++ b/crates/singlefs-checker/src/rebuild.rs	2026-10-19 23:20:46.898428923 +0000
+@@ -759,8 +759,11 @@
+         .map(|(inode, record)| (*inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
+         .filter(|object| tombstoned_objects.contains(object))
+         .collect();
+-    for (inode, _) in &objects_being_deleted {
+-        inode_records.remove(inode);
++    // 草稿目录里的实验开关（不进仓）：甲 = 今天；乙、丙、丁 = 扫描一侧不在这里摘记录，由 walk.rs 按各读法处理
++    if std::env::var("SONNET_RECOGNITION").unwrap_or_default().is_empty() {
++        for (inode, _) in &objects_being_deleted {
++            inode_records.remove(inode);
++        }
+     }
+     let payload_capacity_in_bytes = DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET;
+     let newest_birth_txg_below = newest_birth_txg_below_each_data_unit(&current_data_units);
+--- a/crates/singlefs-checker/src/walk.rs	2026-10-19 23:20:46.897727515 +0000
++++ b/crates/singlefs-checker/src/walk.rs	2026-10-19 23:20:46.898467811 +0000
+@@ -14920,18 +14920,69 @@
+     // 删除中的对象只对它自己两侧都不比（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M5）：扫描重建那一侧
+     // 认出的 (号, 对象出生代)，遍历方向那条记录的对象出生代相同时，去掉它的记录、它在每个 inode 的数据单元集合里的每一项与那几项的映射条目。
+     // 别的对象照比；出生代对不上的号不去掉（两侧照比、对不上就红）。
+-    let inodes_being_deleted: BTreeSet<u64> = walked
+-        .inode_records
+-        .iter()
+-        .filter(|(inode, record)| {
+-            rebuilt
+-                .objects_being_deleted
+-                .contains(&(**inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
+-        })
+-        .map(|(inode, _)| *inode)
+-        .collect();
++    let recognition = std::env::var("SONNET_RECOGNITION").unwrap_or_default();
++    let mut rebuilt = rebuilt;
++    let mut sets_of_the_two_sides_differ: Option<String> = None;
++    let inodes_being_deleted: BTreeSet<u64> = if recognition == "ding" || recognition == "ding2" {
++        // 丁：遍历方向自己认（记录 nlink = 0），两侧认出的集合必须相同
++        let walked_set: BTreeSet<(u64, u64)> = walked
++            .inode_records
++            .iter()
++            .filter(|(_, record)| read_u32(record, INODE_RECORD_NLINK_OFFSET) == 0)
++            .map(|(inode, record)| (*inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
++            .collect();
++        if walked_set != rebuilt.objects_being_deleted {
++            sets_of_the_two_sides_differ = Some(format!(
++                "删除中的对象两侧认出的不同：扫描一侧 {:?}、遍历方向 {:?}",
++                rebuilt.objects_being_deleted, walked_set
++            ));
++        }
++        if recognition == "ding2" && sets_of_the_two_sides_differ.is_some() {
++            let queue_or_tombstone_invariant_is_red = [
++                DELETION_QUEUE_AND_THE_NLINK_ZERO_RECORDS_NAME_THE_SAME_INODES,
++                QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
++                TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT,
++            ]
++            .iter()
++            .any(|invariant| judgements.violation_count(invariant) > 0);
++            if queue_or_tombstone_invariant_is_red {
++                judgements.not_applicable(
++                    SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
++                    "删除队列、墓碑与 inode 记录已判对不上（I-9.5 / I-9.18 / I-9.19 之一违例），两侧认出的删除中集合不同是那一处带出来的，扫描重建不另比",
++                );
++                return;
++            }
++        }
++        walked_set.iter().map(|(inode, _)| *inode).collect()
++    } else {
++        walked
++            .inode_records
++            .iter()
++            .filter(|(inode, record)| {
++                rebuilt
++                    .objects_being_deleted
++                    .contains(&(**inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
++            })
++            .map(|(inode, _)| *inode)
++            .collect()
++    };
++    if std::env::var("SONNET_TRACE").is_ok() {
++        println!(
++            "TRACE scan_recognized={:?} walked_inodes_dropped={:?}",
++            rebuilt.objects_being_deleted, inodes_being_deleted
++        );
++    }
+     for inode in &inodes_being_deleted {
+-        walked.inode_records.remove(inode);
++        match recognition.as_str() {
++            "" | "jia" => {
++                walked.inode_records.remove(inode);
++            }
++            "yi" => {
++                walked.inode_records.remove(inode);
++                rebuilt.inode_records.remove(inode);
++            }
++            _bing_or_ding => {}
++        }
+     }
+     let mapping_keys_of_the_data_units_being_deleted: Vec<CentralMappingKey> = walked
+         .data_units_of_each_inode
+@@ -14978,11 +15029,15 @@
+             ),
+         },
+     ];
+-    let every_table_agrees = tables.iter().all(|table| table.differences.is_empty());
++    let every_table_agrees = tables.iter().all(|table| table.differences.is_empty())
++        && sets_of_the_two_sides_differ.is_none();
+     judgements.judge(
+         SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+         every_table_agrees,
+         || {
++            if let Some(detail) = &sets_of_the_two_sides_differ {
++                return detail.clone();
++            }
+             let tables_that_differ: Vec<String> = tables
+                 .iter()
+                 .filter(|table| !table.differences.is_empty())

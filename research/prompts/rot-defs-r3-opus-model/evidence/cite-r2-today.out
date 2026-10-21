@@ -1,0 +1,49 @@
+  ✗ rot-defs-r2-sonnet-output.md:26 引 .claude/agents/experiment-runner.md:31「cargo test --release --bin e<号>-<简称>」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-sonnet-output.md:32 引 .claude/main-agent.md:51「写段打过的补丁目录带 `--skip-apply`（只编、只验，脚本先逐份核补丁已打在树上，核不过退 1），没打过的不带」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-sonnet-output.md:55 引 .claude/hooks/heavy-test-guard.sh:69「scripts/crash/crash-amplification-two-hosts.sh（双机驱动）：每一种跑法都起」：行号指到标题行，原文不在那一行
+  ✗ rot-defs-r2-sonnet-output.md:61 引 .claude/main-agent.md:51「写段打过的补丁目录带 `--skip-apply`（只编、只验，脚本先逐份核补丁已打在树上，核不过退 1），没打过的不带」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-sonnet-output.md:76 引 scripts/crash/crash-point-replay.sh:1545「cargo run --release --quiet --offline -p singlefs-checker-ti」：行号指到标题行，原文不在那一行
+  ✗ rot-defs-r2-sonnet-output.md:88 引 .claude/agents/experiment-runner.md:34「**另有四条只对入库装置生效**」：那一行不含这句；原文在这份文件第 35 行
+  ✗ rot-defs-r2-sonnet-output.md:89 引 .claude/hooks/lib_heavy_tests.py:870「src/bin/ 下的装置（它们的内联单测编成同名测试二进制）」：那一行不含这句；原文在这份文件第 897 行
+  ✗ rot-defs-r2-sonnet-output.md:99 引 .claude/rules/path-moves.md:33「跑 `bash .claude/gate.d/doc-decisions.sh --write` 重新生成」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:67 引 .claude/agents/experiment-runner.md:34「时改写 `crates/singlefs-checker-tier/src/bin/e<号>_<英文名>.rs`」：那一行不含这句；原文在这份文件第 35 行
+  ✗ rot-defs-r2-opus-output.md:67 引 .claude/agents/experiment-runner.md:34「入库装置不写 `[[bin]]`、bin 名就是文件名 `e<号>_<英文名>`」：那一行不含这句；原文在这份文件第 35 行
+  ✗ rot-defs-r2-opus-output.md:68 引 .claude/agents/experiment-runner.md:31「跑单测（`SINGLEFS_RUN_SCOPE='种类=target; 跑什么=装置 e<号>-<简称> 的单测; 范围」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:88 引 .claude/agents/experiment-runner.md:53「单测数（一条命令数出来）」：那一行不含这句；原文在这份文件第 54 行
+  ✗ rot-defs-r2-opus-output.md:90 引 .claude/agents/experiment-runner.md:34「中文简称只用在 kb 页」：那一行不含这句；原文在这份文件第 35 行
+  ✗ rot-defs-r2-opus-output.md:109 引 .claude/hooks/lib_heavy_tests.py:2899「return None   # 装置的本体（cargo build 编出）」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:109 引 .claude/hooks/lib_heavy_tests.py:71「攻方原型 `cargo build` 之后经内存包装直接执行编出来的二进制是许可的用法」：那一行不含这句；原文在这份文件第 77 行
+  ✗ rot-defs-r2-opus-output.md:131 引 .claude/agents/experiment-runner.md:31「`cargo run` 与装置二进制（例 `scripts/experiments/target/release/e<号」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:223 引 .claude/main-agent.md:51「写段打过的补丁目录带 `--skip-apply`（只编、只验，脚本先逐份核补丁已打在树上，核不过退 1），没打过的不带」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:270 引 .claude/main-agent.md:91「有实验登记钉死了常量、还没拍树的（今天是 E171（三oracle合谋测试） 修订 8）」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:276 引 .claude/agents/experiment-runner.md:34「中文简称只用在 kb 页」：那一行不含这句；原文在这份文件第 35 行
+  ✗ rot-defs-r2-opus-output.md:276 引 .claude/agents/experiment-runner.md:38「新实验没有旧名，按 `e<号>-<简称>.out` 算」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:280 引 .claude/agents/three-way-forward.md:37「- 报告文件、模型目录、草稿目录。除此之外不写。模型目录里的」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:280 引 .claude/agents/three-way-defense.md:36「冻结副本（主 agent 建的开工快照、`~/.local/share/singlefs/work/<轮>-frozen」：那一行不含这句；原文在这份文件第 37 行
+  ✗ rot-defs-r2-opus-output.md:288 引 .claude/gate.d/doc-decisions.sh:450「改完正文跑 bash .claude/gate.d/doc-decisions.sh --write」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:289 引 .claude/hooks/heavy-test-guard.sh:818「与红例钉表的追加、--check、--backfill、--list-items 不算」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:289 引 .claude/hooks/lib_heavy_tests.py:694「E165_PIN_LIGHT_MODES = frozenset({"append", "check", "check-」：那一行不含这句；原文在这份文件第 714 行
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:30 引 .claude/skills/crash-test/commit-stages.md:23：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:32 引 research/prompts/rot-defs-r1-main-verification.md:82：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:34 引 .claude/main-agent.md:95：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:34 引 .claude/main-agent.md:29：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:34 引 .claude/main-agent.md:97：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:34 引 .claude/agents/three-way-attack.md:53：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:34 引 .claude/agents/experiment-runner.md:31：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:39 引 .claude/main-agent.md:7：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:39 引 .claude/main-agent.md:29：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:39 引 .claude/main-agent.md:91：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:68 引 .claude/rules/implementation-workflow.md:10：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:75 引 research/prompts/rot-defs-r1-main-verification.md:76：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:78 引 .claude/main-agent.md:10：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:95 引 .claude/main-agent.md:51：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:103 引 .claude/agent-common.md:56：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:103 引 .claude/agents/three-way-attack.md:53：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-sonnet-output.md:103 引 .claude/agents/experiment-runner.md:31：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-opus-output.md:53 引 main-agent.md:91：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-opus-output.md:54 引 experiment-runner.md:38：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-opus-output.md:55 引 three-way-forward.md:37：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-opus-output.md:56 引 main-agent.md:89：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：rot-defs-r2-opus-output.md:280 引 .claude/agents/three-way-attack.md:53：行号在文件范围内，没有引文可比
+  ✗ 核了 119 处引文、22 处裸行号，25 处对不上，22 处没判（其中裸行号没有引文可比 22 处；逐处列在上面）
+  → 怎么办：按每处的提示改行号或引文——行号去被引文件里现查（grep -nF），不从背景材料里数；引文整行抄，不许摘句改字

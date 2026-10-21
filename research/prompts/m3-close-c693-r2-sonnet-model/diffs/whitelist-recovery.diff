@@ -1,0 +1,26 @@
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -7115,6 +7115,7 @@
+         // 走读失败才再扫一遍环拿记录给退回的判法（只读、不写盘；走读做成的恢复不多扫）。
+         Err(failure) => {
+             let version_fallen_back_to_walked = match policy {
++                _ if !failure_may_retreat(&failure) => None,
+                 JournalPolicy::Consult | JournalPolicy::ConsultWithoutNamedVerification => {
+                     newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to(
+                         reader,
+@@ -7680,3 +7681,15 @@
+         );
+     }
+ }
++
++
++/// 量过用（草稿副本，白名单）：F2 只为「字节丢了」退：单元两条位置都读不到校验和相符的那份、映射里没有这个 key、位置提示与映射都读不回字节。
++#[must_use]
++pub fn failure_may_retreat(failure: &RecoveryFailure) -> bool {
++    matches!(
++        failure,
++        RecoveryFailure::UnitUnreadable { .. }
++            | RecoveryFailure::MappingMiss { .. }
++            | RecoveryFailure::MappingStillUnreadable { .. }
++    )
++}

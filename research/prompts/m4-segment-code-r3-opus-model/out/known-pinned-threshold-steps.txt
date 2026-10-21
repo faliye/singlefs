@@ -1,0 +1,120 @@
+### step-540696.log
+SEGMENTS sizes=[14, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2, 18, 2, 1, 2] kinds=["Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit", "Jour,Jour", "Root", "Syst,Syst", "Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit", "Jour,Jour", "Roo
+STATE ordinal=540696 seg=10 effective=Some((InstanceGeneration(1), CheckpointTxg(7))) journal=JournalScanReport { valid_records: 106, above_water: 1, prefix_applied: 1, verification_passed: 1, verification_failed: 0, maximum_applied_transaction: 104 }
+MOUNT chosen=(InstanceGeneration(1), CheckpointTxg(6)) effective=(InstanceGeneration(1), CheckpointTxg(7)) isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable=0
+CHECK after-mount reds=0
+STEP 0 batches=1 versions=1 txg=Some(CheckpointTxg(11)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-0 reds=0
+STEP 1 batches=1 versions=1 txg=Some(CheckpointTxg(12)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-1 reds=0
+STEP 2 batches=1 versions=1 txg=Some(CheckpointTxg(13)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-2 reds=0
+STEP 3 batches=1 versions=1 txg=Some(CheckpointTxg(14)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-3 reds=0
+STEP 4 batches=1 versions=1 txg=Some(CheckpointTxg(15)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-4 reds=0
+STEP 5 batches=1 versions=1 txg=Some(CheckpointTxg(16)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-5 reds=0
+STEP 6 batches=1 versions=1 txg=Some(CheckpointTxg(17)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-6 reds=0
+STEP 7 batches=1 versions=1 txg=Some(CheckpointTxg(18)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-7 reds=0
+STEP 8 batches=1 versions=1 txg=Some(CheckpointTxg(19)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-8 reds=0
+STEP 9 batches=1 versions=1 txg=Some(CheckpointTxg(20)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-9 reds=0
+STEP 10 batches=1 versions=1 txg=Some(CheckpointTxg(21)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-10 reds=0
+STEP 11 batches=1 versions=1 txg=Some(CheckpointTxg(22)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-11 reds=0
+STEP 12 batches=1 versions=1 txg=Some(CheckpointTxg(23)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-12 reds=0
+STEP 13 batches=1 versions=1 txg=Some(CheckpointTxg(24)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-13 reds=0
+STEP 14 batches=1 versions=1 txg=Some(CheckpointTxg(25)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-14 reds=0
+STEP 15 batches=1 versions=1 txg=Some(CheckpointTxg(26)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-15 reds=0
+STEP 16 batches=1 versions=1 txg=Some(CheckpointTxg(27)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-16 reds=0
+STEP 17 batches=1 versions=1 txg=Some(CheckpointTxg(28)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-17 reds=0
+STEP 18 batches=1 versions=1 txg=Some(CheckpointTxg(29)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-18 reds=0
+STEP 19 batches=1 versions=1 txg=Some(CheckpointTxg(30)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-19 reds=1
+  RED 已知形（钉最旧 txg，记账多）I-3.1: 盘 0：记账的已分配 Some(7176192)，遍历全部有效根得到 7012352（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 30、环里自证过的根槽 23 个、最老的自证过的根 txg 8、遍历的候选根槽 23 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
+STEP 20 batches=1 versions=1 txg=Some(CheckpointTxg(31)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-20 reds=0
+STEP 21 batches=1 versions=1 txg=Some(CheckpointTxg(32)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-21 reds=0
+STEP 22 batches=1 versions=1 txg=Some(CheckpointTxg(33)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-22 reds=0
+STEP 23 batches=1 versions=1 txg=Some(CheckpointTxg(34)) stop=PublishBudgetSpent { budget: 1 }
+CHECK after-step-23 reds=0
+### step-overwrite-crash.log
+SEGMENTS sizes=[24, 2, 1, 2] kinds=["Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit,Unit", "Jour,Jour", "Root", "Syst,Syst"]
+STATE ordinal=16777227 seg=2 effective=Some((InstanceGeneration(1), CheckpointTxg(5))) journal=JournalScanReport { valid_records: 5, above_water: 1, prefix_applied: 1, verification_passed: 1, verification_failed: 0, maximum_applied_transaction: 3 }
+MOUNT chosen=(InstanceGeneration(1), CheckpointTxg(4)) effective=(InstanceGeneration(1), CheckpointTxg(5)) isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_unreadable=0
+CHECK after-mount reds=0
+STEP 0 overwrite ok=true txg=Some(CheckpointTxg(8))
+CHECK after-step-0 reds=0
+STEP 1 overwrite ok=true txg=Some(CheckpointTxg(9))
+CHECK after-step-1 reds=0
+STEP 2 overwrite ok=true txg=Some(CheckpointTxg(10))
+CHECK after-step-2 reds=0
+STEP 3 overwrite ok=true txg=Some(CheckpointTxg(11))
+CHECK after-step-3 reds=0
+STEP 4 overwrite ok=true txg=Some(CheckpointTxg(12))
+CHECK after-step-4 reds=0
+STEP 5 overwrite ok=true txg=Some(CheckpointTxg(13))
+CHECK after-step-5 reds=0
+STEP 6 overwrite ok=true txg=Some(CheckpointTxg(14))
+CHECK after-step-6 reds=0
+STEP 7 overwrite ok=true txg=Some(CheckpointTxg(15))
+CHECK after-step-7 reds=0
+STEP 8 overwrite ok=true txg=Some(CheckpointTxg(16))
+CHECK after-step-8 reds=0
+STEP 9 overwrite ok=true txg=Some(CheckpointTxg(17))
+CHECK after-step-9 reds=0
+STEP 10 overwrite ok=true txg=Some(CheckpointTxg(18))
+CHECK after-step-10 reds=0
+STEP 11 overwrite ok=true txg=Some(CheckpointTxg(19))
+CHECK after-step-11 reds=0
+STEP 12 overwrite ok=true txg=Some(CheckpointTxg(20))
+CHECK after-step-12 reds=0
+STEP 13 overwrite ok=true txg=Some(CheckpointTxg(21))
+CHECK after-step-13 reds=0
+STEP 14 overwrite ok=true txg=Some(CheckpointTxg(22))
+CHECK after-step-14 reds=0
+STEP 15 overwrite ok=true txg=Some(CheckpointTxg(23))
+CHECK after-step-15 reds=0
+STEP 16 overwrite ok=true txg=Some(CheckpointTxg(24))
+CHECK after-step-16 reds=0
+STEP 17 overwrite ok=true txg=Some(CheckpointTxg(25))
+CHECK after-step-17 reds=0
+STEP 18 overwrite ok=true txg=Some(CheckpointTxg(26))
+CHECK after-step-18 reds=0
+STEP 19 overwrite ok=true txg=Some(CheckpointTxg(27))
+CHECK after-step-19 reds=0
+STEP 20 overwrite ok=true txg=Some(CheckpointTxg(28))
+CHECK after-step-20 reds=1
+  RED 已知形（钉最旧 txg，记账多）I-3.1: 盘 0：记账的已分配 Some(6029312)，遍历全部有效根得到 5865472（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 28、环里自证过的根槽 23 个、最老的自证过的根 txg 6、遍历的候选根槽 23 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
+STEP 21 overwrite ok=true txg=Some(CheckpointTxg(29))
+CHECK after-step-21 reds=0
+STEP 22 overwrite ok=true txg=Some(CheckpointTxg(30))
+CHECK after-step-22 reds=0
+STEP 23 overwrite ok=true txg=Some(CheckpointTxg(31))
+CHECK after-step-23 reds=0
+STEP 24 overwrite ok=true txg=Some(CheckpointTxg(32))
+CHECK after-step-24 reds=0
+STEP 25 overwrite ok=true txg=Some(CheckpointTxg(33))
+CHECK after-step-25 reds=0
+STEP 26 overwrite ok=true txg=Some(CheckpointTxg(34))
+CHECK after-step-26 reds=0
+STEP 27 overwrite ok=true txg=Some(CheckpointTxg(35))
+CHECK after-step-27 reds=0
+STEP 28 overwrite ok=true txg=Some(CheckpointTxg(36))
+CHECK after-step-28 reds=0
+STEP 29 overwrite ok=true txg=Some(CheckpointTxg(37))
+CHECK after-step-29 reds=0

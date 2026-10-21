@@ -1,0 +1,20 @@
+PROBE group=f6 name=create-overwrite-read-destroy ending=Completed
+PROBE group=f6 name=create-overwrite-read-destroy moment=after-every-step readback=first-file green=false vote=Red { reason: "崩溃落在第 7 个操作里，读出 文件 3000 字节（末字节 Some(238)），允许集合 {S_6 = 文件 201 字节（末字节 Some(233)）}" } sets_after=-
+PROBE group=f6 name=create-overwrite-read-destroy moment=after-every-step readback=overwrite green=true vote=Green sets_after=[{}]
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-0 readback=first-file green=true vote=Green sets_after=[{} ; {65549:file3000B}]
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-0 readback=overwrite green=false vote=Red { reason: "崩溃落在第 3 个操作里，读出 文件 201 字节（末字节 Some(233)），允许集合 {S_2 = 文件 3000 字节（末字节 Some(238)），S_3 = 文件 3000 字节（末字节 Some(238)）}" } sets_after=-
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-1 readback=first-file green=true vote=Green sets_after=[{65549:file3000B}]
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-1 readback=overwrite green=true vote=Green sets_after=[{65549:file3000B}]
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-2 readback=first-file green=false vote=Red { reason: "崩溃落在第 6 个操作里，读出 文件 3000 字节（末字节 Some(238)），允许集合 {S_5 = 文件 201 字节（末字节 Some(233)）}" } sets_after=-
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-2 readback=overwrite green=true vote=Green sets_after=[{65549:file3000B}]
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-3 readback=first-file green=false vote=Red { reason: "崩溃落在第 6 个操作里，读出 文件 3000 字节（末字节 Some(238)），允许集合 {S_5 = 文件 201 字节（末字节 Some(233)），S_6 = 文件 201 字节（末字节 Some(233)）}" } sets_after=-
+PROBE group=f6 name=create-overwrite-read-destroy moment=inside-step-3 readback=overwrite green=true vote=Green sets_after=[{65549:file3000B} ; {}]
+PROBE group=f6 name=two-snapshots-then-destroy-the-first ending=Completed
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=after-every-step readback=first-file green=true vote=Green sets_after=[{65551:file3000B}]
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=after-every-step readback=overwrite green=false vote=Red { reason: "崩溃落在第 6 个操作里，读出 文件 201 字节（末字节 Some(233)），允许集合 {S_5 = 文件 3000 字节（末字节 Some(238)）}" } sets_after=-
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=inside-step-0 readback=first-file green=true vote=Green sets_after=[{} ; {65549:file3000B}]
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=inside-step-0 readback=overwrite green=false vote=Red { reason: "崩溃落在第 3 个操作里，读出 文件 201 字节（末字节 Some(233)），允许集合 {S_2 = 文件 3000 字节（末字节 Some(238)），S_3 = 文件 3000 字节（末字节 Some(238)）}" } sets_after=-
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=inside-step-1 readback=first-file green=true vote=Green sets_after=[{65549:file3000B} ; {65549:file3000B,65551:file3000B}]
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=inside-step-1 readback=overwrite green=false vote=Red { reason: "崩溃落在第 4 个操作里，读出 文件 201 字节（末字节 Some(233)），允许集合 {S_3 = 文件 3000 字节（末字节 Some(238)），S_4 = 文件 3000 字节（末字节 Some(238)）}" } sets_after=-
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=inside-step-2 readback=first-file green=true vote=Green sets_after=[{65549:file3000B,65551:file3000B} ; {65551:file3000B}]
+PROBE group=f6 name=two-snapshots-then-destroy-the-first moment=inside-step-2 readback=overwrite green=false vote=Red { reason: "崩溃落在第 5 个操作里，读出 文件 201 字节（末字节 Some(233)），允许集合 {S_4 = 文件 3000 字节（末字节 Some(238)），S_5 = 文件 3000 字节（末字节 Some(238)）}" } sets_after=-

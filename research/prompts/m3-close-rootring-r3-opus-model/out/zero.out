@@ -1,0 +1,14 @@
+R3ZERO group=clean root=(3,20) units_written=14 F=0 oldest_root_in_the_ring=9 checker_threshold=9 threshold_at_the_last_publish_with_units=9 I-3.1=Holds
+R3ZERO group=clean root=(3,21) units_written=12 F=0 oldest_root_in_the_ring=10 checker_threshold=10 threshold_at_the_last_publish_with_units=10 I-3.1=Holds
+R3ZERO group=clean root=(3,22) units_written=12 F=0 oldest_root_in_the_ring=11 checker_threshold=11 threshold_at_the_last_publish_with_units=11 I-3.1=Holds
+R3ZERO group=clean root=(3,23) units_written=12 F=22 oldest_root_in_the_ring=12 checker_threshold=22 threshold_at_the_last_publish_with_units=22 I-3.1=Holds
+R3ZERO group=clean root=(3,24) units_written=12 F=22 oldest_root_in_the_ring=13 checker_threshold=22 threshold_at_the_last_publish_with_units=22 I-3.1=Holds
+R3ZERO group=clean root=(3,25) units_written=12 F=22 oldest_root_in_the_ring=14 checker_threshold=22 threshold_at_the_last_publish_with_units=22 I-3.1=Holds
+R3ZERO_SUMMARY group=clean roots=6 i31_red=0
+R3ZERO group=pinned root=(3,20) units_written=14 F=0 oldest_root_in_the_ring=9 checker_threshold=9 threshold_at_the_last_publish_with_units=9 I-3.1=Violated(盘 0：记账的已分配 Some(2818048)，遍历全部有效根得到 2326528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 12 个、最老的自证过的根 txg 9、遍历的候选根槽 12 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个)
+R3ZERO group=pinned root=(3,21) units_written=12 F=0 oldest_root_in_the_ring=10 checker_threshold=10 threshold_at_the_last_publish_with_units=10 I-3.1=Violated(盘 0：记账的已分配 Some(2916352)，遍历全部有效根得到 2228224（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个)
+R3ZERO group=pinned root=(3,22) units_written=12 F=0 oldest_root_in_the_ring=11 checker_threshold=11 threshold_at_the_last_publish_with_units=11 I-3.1=Violated(盘 0：记账的已分配 Some(3014656)，遍历全部有效根得到 2129920（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个)
+R3ZERO group=pinned root=(3,23) units_written=12 F=22 oldest_root_in_the_ring=12 checker_threshold=22 threshold_at_the_last_publish_with_units=22 I-3.1=Holds
+R3ZERO group=pinned root=(3,24) units_written=12 F=22 oldest_root_in_the_ring=13 checker_threshold=22 threshold_at_the_last_publish_with_units=22 I-3.1=Holds
+R3ZERO group=pinned root=(3,25) units_written=12 F=22 oldest_root_in_the_ring=14 checker_threshold=22 threshold_at_the_last_publish_with_units=22 I-3.1=Holds
+R3ZERO_SUMMARY group=pinned roots=6 i31_red=3

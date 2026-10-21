@@ -1,0 +1,16 @@
+
+running 1 test
+3 的出生 CheckpointTxg(8)，墓碑里 1 的死亡 txg 在
+
+thread 'a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta' (1118432) panicked at crates/singlefs-harness/tests/attack_histories_of_multi_file_writes_and_unlinks.rs:541:40:
+1 活着时写 3 照写: DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 3, object_birth: CheckpointTxg(8), death_txg_of_the_first_file: CheckpointTxg(5) }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta ... FAILED
+
+failures:
+
+failures:
+    a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.30s
+

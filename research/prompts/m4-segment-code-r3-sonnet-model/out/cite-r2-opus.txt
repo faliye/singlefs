@@ -1,0 +1,7 @@
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r2-opus-output.md:173 引 crates/singlefs-core/src/mounted_session.rs:2583：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r2-opus-output.md:248 引 crates/singlefs-reference-filesystem/src/lib.rs:600：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r2-opus-output.md:303 引 crates/singlefs-core/src/transaction.rs:9172：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r2-opus-output.md:406 引 crates/singlefs-core/src/mounted_session.rs:2583：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r2-opus-output.md:406 引 crates/singlefs-reference-filesystem/src/lib.rs:600：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r2-opus-output.md:406 引 crates/singlefs-core/src/transaction.rs:9172：行号在文件范围内，没有引文可比
+  ✓ 核了 37 处引文、6 处裸行号，对上 37 处，没判 6 处（其中裸行号没有引文可比 6 处；逐处列在上面）

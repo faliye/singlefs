@@ -1,0 +1,13 @@
+[package]
+name = "c656-s2-attack-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "m3-close-c656-r1 攻方第二次抽样原型（只在草稿目录的仓副本里编）：乙与甲候选写序下 mkfs 崩溃态的结局"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

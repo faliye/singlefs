@@ -1,0 +1,6 @@
+E name=fault_safe nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=178576 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=9294 livelock=73484 frozen=0 unmet_del=0 false_enospc=112 release_bad=0 rb_refused=0 del_pred_true=1485 del_pred_false=6082 n0_refused=0 gc_done=34447 gc_declined=58719 gc_stuck=11442 gc_paused=484 gc_cycle=73390 gc_cap=94 gc_wasted=0
+W name=fault_safe flag=gc_stuck path=W0.GI.Q0
+W name=fault_safe flag=livelock path=W0
+W name=fault_safe flag=false_enospc path=W0.GI.O0.Q0.O0.O0.O0
+W name=fault_safe flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_safe flag=del_pred_false path=W0.GI.GB

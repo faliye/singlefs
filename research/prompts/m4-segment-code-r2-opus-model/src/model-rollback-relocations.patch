@@ -1,0 +1,18 @@
+diff -ru a/crates/singlefs-harness/src/model.rs b/crates/singlefs-harness/src/model.rs
+--- a/crates/singlefs-harness/src/model.rs
++++ b/crates/singlefs-harness/src/model.rs
+@@ -2751,12 +2751,8 @@
+         match user_visible_trees {
+             UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem => {}
+             UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(target_root) => {
+-                relocations_carried.extend(
+-                    target_root
+-                        .user_visible_root_relocations
+-                        .iter()
+-                        .map(|(unit, relocated_at)| (*unit, *relocated_at)),
+-                );
++                // 攻方腿副本上的改法（被攻过零轮）：回退那一版的根指针字节取目标那一版的，搬过的根只取目标那一版的记录。
++                relocations_carried = target_root.user_visible_root_relocations.as_ref().clone();
+             }
+         }
+         let mut root = ModelRoot {

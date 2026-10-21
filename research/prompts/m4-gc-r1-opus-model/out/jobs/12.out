@@ -1,0 +1,6 @@
+E name=inst_naive nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=112741 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=116 livelock=10224 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1333 del_pred_false=5380 n0_refused=0 gc_done=65861 gc_declined=9922 gc_stuck=8886 gc_paused=17848 gc_cycle=0 gc_cap=10224 gc_wasted=0
+W name=inst_naive flag=gc_stuck path=W0.M.M.M.GI.O0
+W name=inst_naive flag=livelock path=W0.O0.W1.M
+W name=inst_naive flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=inst_naive flag=del_pred_true path=W0.GI.D0.M.GB
+W name=inst_naive flag=del_pred_false path=W0.GI.GB

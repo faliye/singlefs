@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 每次调都现判（拷冻结树、施补丁、编、跑、比），上一次的结论不替这一次作保
 # run-condition: none 只要 cargo 和冻结树在
-# W3 正推腿的模型：在 E175 装置（research/results/e175-.../device-source.rs）上加一段「候选历史」的另算，
+# W3 正推腿的模型：在 E175 装置（scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs）上加一段「候选历史」的另算，
 # 在冻结树的两份拷贝上跑（V1 臂 = 施加 patch-V1.diff，P 臂 = 原样），比每个候选对 E175 每个发号事件的判红。
 #
 # 用法（每一步可单独调，前一步没做就拒；跑的步骤可重复调到打出 DONE）：
@@ -41,7 +41,7 @@ prepare)
         [ "$want" = "$have" ] || { echo "$f 与 E175 冻结副本不同" >&2; exit 3; }
     done
     patch "$WORK/repo-V1/crates/singlefs-core/src/mount.rs" < "$E175/patch-V1.diff" > /dev/null
-    cp "$E175/device-source.rs" "$WORK/device-source-w3.rs"
+    cp "$REPO_OF_THIS_SCRIPT/scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs" "$WORK/device-source-w3.rs"
     patch "$WORK/device-source-w3.rs" < "$HERE/w3-device.diff" > /dev/null
     for arm in V1 P; do cp "$WORK/device-source-w3.rs" "$WORK/repo-$arm/crates/singlefs-harness/tests/$TEST.rs"; done
     echo "prepare 做完：$WORK"

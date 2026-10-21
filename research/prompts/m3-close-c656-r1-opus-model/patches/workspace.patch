@@ -1,0 +1,24 @@
+--- /home/fy5090/code/singlefs/Cargo.toml	2026-10-18 12:59:21.818157897 +0000
++++ tree/Cargo.toml	2026-10-20 02:21:54.027500572 +0000
+@@ -11,13 +11,19 @@
+     "crates/singlefs-checker-tier",
+     "crates/singlefs-reference-filesystem",
+     "crates/singlefs-unit-graph",
++    "crates/c656-attack-probe",
+ ]
+ exclude = ["scripts/experiments"]
+ 
+ # 与 scripts/experiments/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
+ [profile.release]
+-opt-level = 3
+-debug = true
++opt-level = 2
++debug = false
+ overflow-checks = true
+ # debug_assert! 在 release 下也开（.claude/singlefs-ai-sop/rules/test-script-discipline.md「编译与算法都要快」）
+ debug-assertions = true
++
++[profile.release.package.singlefs-checker-tier]
++opt-level = 1
++[profile.release.package.librocksdb-sys]
++opt-level = 1

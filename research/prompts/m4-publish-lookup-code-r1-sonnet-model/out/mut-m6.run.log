@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys' (973087) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:655:9:
+assertion `left == right` failed: key [02, 02, 00, 01, 00, 00, 00, 00, 00, 07, 00, 00, 00, 00, 00, 00, 00, 02, 00, 00, 00, 01, 00, 00, 00, 00, 00]：批量读与逐 key 查不同
+  left: Found([LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50340), unit_checksum: 3227718697 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50340), unit_checksum: 1063457833 }])
+ right: Found([LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50340), unit_checksum: 3227718697 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50340), unit_checksum: 3227718697 }])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... FAILED
+
+failures:
+
+failures:
+    leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.09s
+

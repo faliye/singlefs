@@ -1,0 +1,5 @@
+E name=inst_safe nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=111921 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=10222 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1333 del_pred_false=5380 n0_refused=0 gc_done=66353 gc_declined=17498 gc_stuck=0 gc_paused=17848 gc_cycle=0 gc_cap=10222 gc_wasted=0
+W name=inst_safe flag=livelock path=W0.O0.W1.M
+W name=inst_safe flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=inst_safe flag=del_pred_true path=W0.GI.D0.M.GB
+W name=inst_safe flag=del_pred_false path=W0.GI.GB

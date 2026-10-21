@@ -1,0 +1,30 @@
+probe=counts stream=new_pool_file_creation devices=2 acquisition=one_round rollback=per_written writes=41 segments=11 closed_form_states=16777240 states_with_torn=16777260 segment_sizes=[2,2,1,2,2,1,2,24,2,1,2]
+probe=acq_counts prefix=k0 acquisition=one_round rollback=per_written acquired=2 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq_skipped prefix=k0 states_with_torn=20511
+probe=acq_counts prefix=k2 acquisition=one_round rollback=per_written acquired=2 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq_skipped prefix=k2 states_with_torn=20511
+probe=acq_counts prefix=r1 acquisition=one_round rollback=per_written acquired=3 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq_skipped prefix=r1 states_with_torn=20511
+probe=acq_counts prefix=k0_pub acquisition=one_round rollback=per_written acquired=2 writes=63 sysconf_writes=8 segments=13 closed_form_states=1069078 states_with_torn=1069098 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2,20s0,2s0,1s0,2s2
+probe=acq_skipped prefix=k0_pub states_with_torn=1069098
+probe=counts stream=new_pool_file_creation devices=2 acquisition=two_rounds rollback=per_device writes=43 segments=12 closed_form_states=16777243 states_with_torn=16777268 segment_sizes=[2,2,2,1,2,2,1,2,24,2,1,2]
+probe=acq_counts prefix=k0 acquisition=two_rounds rollback=per_device acquired=2 writes=40 sysconf_writes=8 segments=10 closed_form_states=20499 states_with_torn=20519 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq_skipped prefix=k0 states_with_torn=20519
+probe=acq_counts prefix=k2 acquisition=two_rounds rollback=per_device acquired=2 writes=40 sysconf_writes=8 segments=10 closed_form_states=20499 states_with_torn=20519 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq_skipped prefix=k2 states_with_torn=20519
+probe=acq_counts prefix=r1 acquisition=two_rounds rollback=per_device acquired=3 writes=40 sysconf_writes=8 segments=10 closed_form_states=20499 states_with_torn=20519 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq_skipped prefix=r1 states_with_torn=20519
+probe=acq_counts prefix=k0_pub acquisition=two_rounds rollback=per_device acquired=2 writes=65 sysconf_writes=10 segments=14 closed_form_states=1069081 states_with_torn=1069106 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2,20s0,2s0,1s0,2s2
+probe=acq_skipped prefix=k0_pub states_with_torn=1069106
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=0 landed_unit_writes=9_of_10 sysconf=d0[g6i1t3,g7i1t4] d1[g6i1t3,g5i1t2] outcome=refused NewerStateStillUnreadableAfterOneReread
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=0 landed_unit_writes=10_of_10 sysconf=d0[g6i1t3,g7i1t4] d1[g6i1t3,g5i1t2] outcome=mounted instance=2 effective_txg=4
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=1 landed_unit_writes=9_of_10 sysconf=d0[g8i1t5,g7i1t4] d1[g6i1t3,g7i1t4] outcome=refused WritableMountRefusedByDevicesWithoutTheSelectedVersion
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=1 landed_unit_writes=10_of_10 sysconf=d0[g8i1t5,g7i1t4] d1[g6i1t3,g7i1t4] outcome=mounted instance=2 effective_txg=5
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=0 landed_unit_writes=9_of_10 sysconf=d0[g6i1t3,g7i1t4] d1[g6i1t3,g5i1t2] outcome=refused NewerStateStillUnreadableAfterOneReread
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=0 landed_unit_writes=10_of_10 sysconf=d0[g6i1t3,g7i1t4] d1[g6i1t3,g5i1t2] outcome=mounted instance=2 effective_txg=4
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=1 landed_unit_writes=9_of_10 sysconf=d0[g8i1t5,g7i1t4] d1[g6i1t3,g7i1t4] outcome=refused WritableMountRefusedByDevicesWithoutTheSelectedVersion
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=1 landed_unit_writes=10_of_10 sysconf=d0[g8i1t5,g7i1t4] d1[g6i1t3,g7i1t4] outcome=mounted instance=2 effective_txg=5
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=0 landed_unit_writes=9_of_10 sysconf=d0[g6i1t3,g7i1t4] d1[g6i1t3,g5i1t2] outcome=refused NewerStateStillUnreadableAfterOneReread
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=0 landed_unit_writes=10_of_10 sysconf=d0[g6i1t3,g7i1t4] d1[g6i1t3,g5i1t2] outcome=mounted instance=2 effective_txg=4
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=1 landed_unit_writes=9_of_10 sysconf=d0[g8i1t5,g7i1t4] d1[g6i1t3,g7i1t4] outcome=refused WritableMountRefusedByDevicesWithoutTheSelectedVersion
+probe=snapshot acquisition=two_rounds rollback=per_device overwrites_before=1 landed_unit_writes=10_of_10 sysconf=d0[g8i1t5,g7i1t4] d1[g6i1t3,g7i1t4] outcome=mounted instance=2 effective_txg=5

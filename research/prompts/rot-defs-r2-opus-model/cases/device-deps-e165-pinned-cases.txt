@@ -1,0 +1,1 @@
+bash scripts/hosts/run-with-memory-cap.sh 8G target/release/deps/e165_replay_bounded_enumeration-e61b28ac88ceab5a --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv

@@ -1,0 +1,27 @@
+probe=acq_counts prefix=k2 acquisition=one_round rollback=per_written acquired=2 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=k2 acquisition=one_round rollback=per_written states_judged=20511 footprint_states=20502
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s0 outcomes={"COLLIDE": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d0s0/confirmed_txg_5 outcomes={"mounted_not_below_confirmed": 4113, "refused_Recovery": 16398}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d0s1/confirmed_txg_5 outcomes={"mounted_not_below_confirmed": 16398, "refused_Recovery": 4113}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d1s0/confirmed_txg_5 outcomes={"mounted_not_below_confirmed": 4113, "refused_Recovery": 16398}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d1s1/confirmed_txg_5 outcomes={"mounted_not_below_confirmed": 16398, "refused_Recovery": 4113}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=none outcomes={"mounted": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"NewerStateStillUnreadableAfterOneReread": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written post_mount_checker_red_states_by_invariant={}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written example=flip/d0s0/d1s0/COLLIDE ordinal=9 sysconf=d0[g8i2t5,g7i1t5] d1[g8i2t5,g7i1t5]
+probe=acq prefix=k2 acquisition=one_round rollback=per_written example=fsid/d0s0/refused ordinal=2 sysconf=d0[g8i2t5,g7i1t5] d1[g6i1t4,g7i1t5] error=Recovery(SystemConfigurationsDisagree)
+probe=acq prefix=k2 acquisition=one_round rollback=per_written example=fsid/d0s1/refused ordinal=0 sysconf=d0[g6i1t4,g7i1t5] d1[g6i1t4,g7i1t5] error=Recovery(SystemConfigurationsDisagree)
+probe=acq prefix=k2 acquisition=one_round rollback=per_written example=fsid/d1s0/refused ordinal=6 sysconf=d0[g6i1t4,g7i1t5] d1[g8i2t5,g7i1t5] error=Recovery(SystemConfigurationsDisagree)
+probe=acq prefix=k2 acquisition=one_round rollback=per_written example=fsid/d1s1/refused ordinal=0 sysconf=d0[g6i1t4,g7i1t5] d1[g6i1t4,g7i1t5] error=Recovery(SystemConfigurationsDisagree)
+probe=alpha_prime_c555_scan acquisition=one_round rollback=per_written acquired=2 states_judged=20511 tally={"footprint_states": 20502, "no_scan/COLLIDE": 16383, "no_scan/COLLIDE/checker_red=[]": 16383, "no_scan/mounted_above": 4109, "no_scan/refused_after_alpha_prime_wrote=true": 10, "scan/mounted_above": 20492, "scan/refused_after_alpha_prime_wrote=true": 10, "scan_after_flipping_every_unit_of_the_instance/COLLIDE": 16383, "scan_after_flipping_every_unit_of_the_instance/COLLIDE/checker_red=[]": 16383, "scan_after_flipping_every_unit_of_the_instance/mounted_above": 3, "scan_after_flipping_every_unit_of_the_instance/refused_after_alpha_prime_wrote=true": 4116}

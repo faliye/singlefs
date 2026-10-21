@@ -1,0 +1,26 @@
+OPUS|A1-after-new-inode|member=WithFile|records(inode,nlink,size)=[(2, 1, 0)] first_file_units=0 others(inode,units)=[] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=6
+OPUS|A1-after-remount|mount_writable=Err(Recovery(UnitMalformed { what: "inode 树里没有第一个文件之外那个文件的记录，extent 树里却有它的数据单元" }))
+OPUS|A1-after-unlink-1|member=WithTreesAndNoFile|records(inode,nlink,size)=[] first_file_units=0 others(inode,units)=[] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=5
+OPUS|A1-after-write|member=WithFile|records(inode,nlink,size)=[(2, 1, 97895)] first_file_units=0 others(inode,units)=[(2, 3)] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=7
+OPUS|A1-checker-violations|[]
+OPUS|A1-new-inode|Ok
+OPUS|A1-read-back-equal|Ok(true)
+OPUS|A1-unlink-1|Ok
+OPUS|A1-unlink-2|Ok
+OPUS|A1-write-inode-2|Ok
+OPUS|A2-after-unlink-1|member=WithFile|records(inode,nlink,size)=[(2, 1, 0)] first_file_units=0 others(inode,units)=[] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=6
+OPUS|A2-after-write|member=WithFile|records(inode,nlink,size)=[(2, 1, 97895)] first_file_units=0 others(inode,units)=[(2, 3)] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=7
+OPUS|A2-checker-violations|[]
+OPUS|A2-new-inode|Ok
+OPUS|A2-read-back-equal|Ok(true)
+OPUS|A2-unlink-1|Ok
+OPUS|A2-unlink-2|Ok
+OPUS|A2-write-inode-2|Ok
+OPUS|C-after-first-batch|records(inode,nlink,size)=[(1, 1, 97895), (2, 0, 65268)] first_file_units=2 others(inode,units)=[(2, 3)] upper(level,index)=[(0, 0)] deleted_inodes=[2] txg=8
+OPUS|C-after-intent|records(inode,nlink,size)=[(1, 1, 97895), (2, 0, 97895)] first_file_units=3 others(inode,units)=[(2, 3)] upper(level,index)=[(0, 0)] deleted_inodes=[2] txg=7
+OPUS|C-after-remount|member=WithFile|records(inode,nlink,size)=[(1, 1, 97895)] first_file_units=2 others(inode,units)=[(2, 3)] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=11
+OPUS|C-after-remount-violations|["I-4.7: 根（实例 2、txg 11）：inode 2 处于删除中（inode 树里没有它的记录），extent 树里还有 3 个数据单元，号也不在 deleted_inodes 里", "I-4.6: 根（实例 2、txg 9）：inode 2 的记录 nlink = 0、size 65268，按净荷容量 32634 要 2 个数据单元，extent 树里有 3 个；标签 1 或 2（之后没有洞）、没有对得上的截断条目：恰好 2 个", "I-1.13: 扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 4 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 4）：扫描重建 落点 {盘 0 槽 50186、盘 1 槽 50186}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 4 处，第一处 key （inode 1、偏移 65268）：扫描重建 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 4）、遍历方向 没有这一条", "I-4.10: 根（实例 2、txg 9）：inode 2 的记录 size 65268 要 2 个数据单元，extent 树里挂着 3 个（size 之外 1 个），同一版 logged_ops 里没有一条截断条目对得上它（inode 号、对象出生代 5、目标 = size）"]
+OPUS|C-before-intent|member=WithFile|records(inode,nlink,size)=[(1, 1, 97895), (2, 1, 97895)] first_file_units=3 others(inode,units)=[(2, 3)] upper(level,index)=[(0, 0)] deleted_inodes=[] txg=6
+OPUS|C-checker-violations|["I-4.6: 根（实例 1、txg 8）：inode 2 的记录 nlink = 0、size 65268，按净荷容量 32634 要 2 个数据单元，extent 树里有 3 个；标签 1 或 2（之后没有洞）、没有对得上的截断条目：恰好 2 个", "I-4.10: 根（实例 1、txg 8）：inode 2 的记录 size 65268 要 2 个数据单元，extent 树里挂着 3 个（size 之外 1 个），同一版 logged_ops 里没有一条截断条目对得上它（inode 号、对象出生代 5、目标 = size）"]
+OPUS|C-read-back-first-file|len=97895 equal=false first-two-units-equal=true third-unit-all-zero=true third-unit-was-all-zero=false
+OPUS|C-write-inode-2|Ok

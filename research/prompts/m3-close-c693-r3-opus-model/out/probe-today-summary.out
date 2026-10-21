@@ -1,0 +1,40 @@
+name=probe_lines parsed=266 unparsed=0
+name=probe_cell site=judge_read_recovery_fields failure_kind=UnitMalformed{树表单元} draft_whitelist_retreats=false today=see_recovery events=3
+name=probe_cell site=judge_read_recovery_fields failure_kind=UnitMalformed{树表条目} draft_whitelist_retreats=false today=see_recovery events=3
+name=probe_cell site=judge_read_recovery_fields failure_kind=UnitUnreadable draft_whitelist_retreats=true today=see_recovery events=4
+name=probe_cell site=read_only failure_kind=PointerInTheRecordCannotBeDereferenced{inode 树内部条目的子指针} draft_whitelist_retreats=false today=none events=2
+name=probe_cell site=read_only failure_kind=RecordMalformed{inode 树内部条目} draft_whitelist_retreats=false today=none events=2
+name=probe_cell site=read_only failure_kind=TreeTableEntryMalformed draft_whitelist_retreats=false today=none events=1
+name=probe_cell site=read_only failure_kind=TreeTableEntryMalformed draft_whitelist_retreats=false today=retreated events=2
+name=probe_cell site=read_only failure_kind=UnitMalformed{树表单元} draft_whitelist_retreats=true today=none events=1
+name=probe_cell site=read_only failure_kind=UnitMalformed{树表单元} draft_whitelist_retreats=true today=retreated events=2
+name=probe_cell site=read_only failure_kind=Walk(UnitUnreadable) draft_whitelist_retreats=true today=none events=6
+name=probe_cell site=read_only failure_kind=Walk(UnitUnreadable) draft_whitelist_retreats=true today=retreated events=10
+name=probe_cell site=recovery failure_kind=InvariantViolated draft_whitelist_retreats=false today=none events=4
+name=probe_cell site=recovery failure_kind=MappingStillUnreadable draft_whitelist_retreats=true today=none events=3
+name=probe_cell site=recovery failure_kind=UnitMalformed{树表单元} draft_whitelist_retreats=false today=none events=2
+name=probe_cell site=recovery failure_kind=UnitMalformed{树表单元} draft_whitelist_retreats=false today=retreated events=4
+name=probe_cell site=recovery failure_kind=UnitMalformed{树表条目} draft_whitelist_retreats=false today=none events=2
+name=probe_cell site=recovery failure_kind=UnitMalformed{树表条目} draft_whitelist_retreats=false today=retreated events=4
+name=probe_cell site=recovery failure_kind=UnitUnreadable draft_whitelist_retreats=true today=none events=7
+name=probe_cell site=recovery failure_kind=UnitUnreadable draft_whitelist_retreats=true today=retreated events=14
+name=probe_cell site=writable failure_kind=FileVersionWithoutAnyJournalRecord draft_whitelist_retreats=false today=none events=1
+name=probe_cell site=writable failure_kind=Recovery(InvariantViolated) draft_whitelist_retreats=false today=none events=9
+name=probe_cell site=writable failure_kind=Recovery(MappingStillUnreadable) draft_whitelist_retreats=true today=retreated events=41
+name=probe_cell site=writable failure_kind=Recovery(UnitMalformed){deleted_inodes 根不是层级 0、条目宽 8 的非空节点} draft_whitelist_retreats=false today=none events=1
+name=probe_cell site=writable failure_kind=Recovery(UnitMalformed){树表单元} draft_whitelist_retreats=false today=none events=1
+name=probe_cell site=writable failure_kind=Recovery(UnitMalformed){树表单元} draft_whitelist_retreats=false today=retreated events=2
+name=probe_cell site=writable failure_kind=Recovery(UnitMalformed){树表条目} draft_whitelist_retreats=false today=none events=1
+name=probe_cell site=writable failure_kind=Recovery(UnitMalformed){树表条目} draft_whitelist_retreats=false today=retreated events=2
+name=probe_cell site=writable failure_kind=Recovery(UnitUnreadable) draft_whitelist_retreats=true today=none events=5
+name=probe_cell site=writable failure_kind=Recovery(UnitUnreadable) draft_whitelist_retreats=true today=retreated events=127
+name=today_retreats_but_draft_whitelist_does_not site=read_only failure_kind=TreeTableEntryMalformed test=unknown_flags_confirmed_zero
+name=today_retreats_but_draft_whitelist_does_not site=read_only failure_kind=TreeTableEntryMalformed test=unknown_flags_crash
+name=today_retreats_but_draft_whitelist_does_not site=recovery failure_kind=UnitMalformed{树表单元} test=payload_checksum_confirmed_zero
+name=today_retreats_but_draft_whitelist_does_not site=recovery failure_kind=UnitMalformed{树表单元} test=payload_checksum_crash
+name=today_retreats_but_draft_whitelist_does_not site=recovery failure_kind=UnitMalformed{树表条目} test=unknown_flags_confirmed_zero
+name=today_retreats_but_draft_whitelist_does_not site=recovery failure_kind=UnitMalformed{树表条目} test=unknown_flags_crash
+name=today_retreats_but_draft_whitelist_does_not site=writable failure_kind=Recovery(UnitMalformed){树表单元} test=payload_checksum_confirmed_zero
+name=today_retreats_but_draft_whitelist_does_not site=writable failure_kind=Recovery(UnitMalformed){树表单元} test=payload_checksum_crash
+name=today_retreats_but_draft_whitelist_does_not site=writable failure_kind=Recovery(UnitMalformed){树表条目} test=unknown_flags_confirmed_zero
+name=today_retreats_but_draft_whitelist_does_not site=writable failure_kind=Recovery(UnitMalformed){树表条目} test=unknown_flags_crash

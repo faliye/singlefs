@@ -1,0 +1,3 @@
+S=4 family=Hh-none-k0 holes=[] recovery_ends=[] end=66 fits=True observations=64 q1a_tt_peak=0 q1a_tt_positive_points=0 q1a_tt_final=0 lag_peak=11 missing_txgs_peak=0 live_holes_peak=0 pinned_slots_peak=0
+S=8 family=Hh-none-k0 holes=[] recovery_ends=[] end=114 fits=True observations=112 q1a_tt_peak=0 q1a_tt_positive_points=0 q1a_tt_final=0 lag_peak=23 missing_txgs_peak=0 live_holes_peak=0 pinned_slots_peak=0
+S=16 family=Hh-none-k0 holes=[] recovery_ends=[] end=210 fits=True observations=208 q1a_tt_peak=0 q1a_tt_positive_points=0 q1a_tt_final=0 lag_peak=47 missing_txgs_peak=0 live_holes_peak=0 pinned_slots_peak=0

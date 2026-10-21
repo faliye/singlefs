@@ -1,0 +1,6 @@
+cargo_rc=0
+test region_scan::tests::a_record_straddling_the_region_boundary_is_refused_before_any_classification ... ok
+test region_scan::tests::a_unit_whose_header_key_differs_from_the_mapping_entry_pointing_at_it_is_inconsistent ... ok
+test region_scan::tests::a_unit_whose_mapping_entry_points_at_another_slot_is_inconsistent_not_dead ... ok
+test region_scan::tests::an_unreadable_header_or_a_class_tag_unlike_the_mapping_key_is_inconsistent ... ok
+test region_scan::tests::every_class_of_the_region_scan_is_pinned_down_slot_by_slot ... ok

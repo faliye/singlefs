@@ -1,0 +1,54 @@
+probe=acq_counts prefix=k0 acquisition=one_round rollback=per_written acquired=2 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=k0 acquisition=one_round rollback=per_written states_judged=20511 footprint_states=20502
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s0 outcomes={"COLLIDE": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=none outcomes={"mounted": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"NewerStateStillUnreadableAfterOneReread": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written post_mount_checker_red_states_by_invariant={}
+probe=acq prefix=k0 acquisition=one_round rollback=per_written example=flip/d0s0/d1s0/COLLIDE ordinal=9 sysconf=d0[g6i2t3,g5i1t3] d1[g6i2t3,g5i1t3]
+probe=acq_counts prefix=k2 acquisition=one_round rollback=per_written acquired=2 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=k2 acquisition=one_round rollback=per_written states_judged=20511 footprint_states=20502
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s0 outcomes={"COLLIDE": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=none outcomes={"mounted": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"NewerStateStillUnreadableAfterOneReread": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written post_mount_checker_red_states_by_invariant={}
+probe=acq prefix=k2 acquisition=one_round rollback=per_written example=flip/d0s0/d1s0/COLLIDE ordinal=9 sysconf=d0[g8i2t5,g7i1t5] d1[g8i2t5,g7i1t5]
+probe=acq_counts prefix=r1 acquisition=one_round rollback=per_written acquired=3 writes=38 sysconf_writes=6 segments=9 closed_form_states=20496 states_with_torn=20511 segment_shape=2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=r1 acquisition=one_round rollback=per_written states_judged=20511 footprint_states=20502
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s0 outcomes={"COLLIDE": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=none outcomes={"mounted": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"NewerStateStillUnreadableAfterOneReread": 16386, "formula_above_acquired": 4125}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20511}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written post_mount_checker_red_states_by_invariant={}
+probe=acq prefix=r1 acquisition=one_round rollback=per_written example=flip/d0s0/d1s0/COLLIDE ordinal=9 sysconf=d0[g12i3t8,g11i2t8] d1[g12i3t8,g11i2t8]

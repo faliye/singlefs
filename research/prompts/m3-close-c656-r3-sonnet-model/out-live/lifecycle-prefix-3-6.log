@@ -1,0 +1,17 @@
+name=lifecycle step=old_extra_mount ok=true
+name=lifecycle step=old_extra_mount ok=true
+name=lifecycle step=old_extra_mount ok=true
+name=lifecycle h=prefix old_extra_mounts=3 old_pool_last_root=(1, 6) old_sysconf_instance=4
+name=lifecycle step=after_remake sysconf_instance=0 recover=NoFile(i0t0) raw_red=["I-7.7"]
+name=lifecycle step=new_mount1 writable_mount=Ok(i0t0)
+name=lifecycle step=after_new_mount1 sysconf_instance=1 recover=NoFile(i1t2) raw_red=["I-7.7"]
+name=lifecycle step=new_mount2 writable_mount=Ok(i1t2)
+name=lifecycle step=after_new_mount2 sysconf_instance=2 recover=NoFile(i2t4) raw_red=["I-7.7"]
+name=lifecycle step=new_mount3 writable_mount=Ok(i2t4)
+name=lifecycle step=after_new_mount3 sysconf_instance=3 recover=NoFile(i3t7) raw_red=["I-7.7"]
+name=lifecycle step=new_mount4 writable_mount=Ok(i3t7)
+name=lifecycle step=after_new_mount4 sysconf_instance=4 recover=NoFile(i4t10) raw_red=[]
+name=lifecycle step=new_mount5 writable_mount=Ok(i4t10)
+name=lifecycle step=after_new_mount5 sysconf_instance=5 recover=NoFile(i5t13) raw_red=[]
+name=lifecycle step=new_mount6 writable_mount=Ok(i5t13)
+name=lifecycle step=after_new_mount6 sysconf_instance=6 recover=NoFile(i6t16) raw_red=[]

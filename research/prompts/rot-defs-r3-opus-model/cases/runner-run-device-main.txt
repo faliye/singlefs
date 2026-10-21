@@ -1,0 +1,1 @@
+bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e183_capacity_read_cache_reserve_and_sweep_costs > research/results/e183-capacity-read-cache-reserve-and-sweep-costs.out

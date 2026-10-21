@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/scan_rebuild_reads_lineage_and_retirement_records.rs (/home/fy5090/.local/share/singlefs/work/m4-c860-r1-forward/target/debug/deps/scan_rebuild_reads_lineage_and_retirement_records-5e17ff6012f2ce42)
+
+running 1 test
+SCAN_REBUILD_TALLY every_state 1736 成立
+SCAN_REBUILD_TALLY after_a_deletion 241 成立
+SCAN_REBUILD_TALLY_SUMMARY histories=56 states=1736 states_after_a_deletion=241 violated=0
+test the_scan_rebuild_is_never_violated_and_holds_after_deletions_over_random_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 30.57s
+

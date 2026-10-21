@@ -1,0 +1,26 @@
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:53 引 crates/singlefs-core/src/mounted_session.rs:1359：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:54 引 research/prompts/m4-snapshot-r1-main-verification.md:30：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:56 引 crates/mutations.tsv:4179：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:57 引 .claude/kb/decisions/16-发布语义.md:46：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:58 引 crates/singlefs-core/src/mount.rs:8237：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:83 引 research/prompts/m4-snapshot-r1-main-verification.md:32：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:91 引 .claude/kb/decisions/05-快照-空间记账机制.md:278：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:103 引 crates/singlefs-core/src/mounted_session.rs:1359：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:103 引 crates/singlefs-core/src/mounted_session.rs:1937：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:174 引 research/prompts/m4-gc-r1-main-verification.md:32：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:185 引 research/prompts/m4-gc-r1-main-verification.md:39：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:187 引 crates/singlefs-core/src/logged_operations.rs:128：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:212 引 crates/singlefs-core/src/compaction_plan.rs:161：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:212 引 crates/singlefs-core/src/mounted_session.rs:2270：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:220 引 .claude/kb/decisions/03-空间分配.md:146：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:275 引 crates/singlefs-core/src/recovery.rs:2968：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:275 引 crates/singlefs-core/src/mount.rs:6427：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:283 引 research/prompts/m4-snapshot-r1-main-verification.md:36：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:284 引 crates/singlefs-core/src/mount.rs:3414：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:298 引 crates/mutations.tsv:4346：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:314 引 research/prompts/m4-snapshot-r1-main-verification.md:30：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:338 引 crates/singlefs-core/src/transaction.rs:7585：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:342 引 crates/singlefs-core/src/mount.rs:6443：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:343 引 crates/singlefs-core/src/mount.rs:7512：行号在文件范围内，没有引文可比
+  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-sonnet-output.md:344 引 crates/singlefs-core/src/mount.rs:8201：行号在文件范围内，没有引文可比
+  ✓ 核了 110 处引文、25 处裸行号，对上 110 处，没判 25 处（其中裸行号没有引文可比 25 处；逐处列在上面）

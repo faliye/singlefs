@@ -1,0 +1,41 @@
+### small-rollback.log
+== width=384 units=100 region=0 rb=1 shape=rollback-after-compaction k=1
+STREAM writes=25 segments=4 sizes=[20, 2, 1, 2] tearable=2 kinds={"JournalRecord": 2, "RootRecordFua": 1, "SystemConfigurationSlot": 2, "UnitWrite": 20} states=1048588
+ORDINALS from=0 to=1048588 judged_here=13
+SUMMARY seg1 root=1:24 live=true resumed batches=10 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 15, empty_cluster_segment count=1
+SUMMARY seg1 root=1:25 live=true resumed batches=11 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=2
+SUMMARY seg2 root=1:25 live=true resumed batches=11 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=1
+SUMMARY seg3 root=1:25 live=true resumed batches=11 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=8
+SUMMARY seg4 root=1:25 live=true resumed batches=11 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=1
+ATTACK_TOTAL shape=rollback-after-compaction states=1048588 judged=13 findings=0 first=[] every=1
+rc=0
+== width=384 units=100 region=0 rb=2 shape=rollback-after-compaction k=1
+STREAM writes=25 segments=4 sizes=[20, 2, 1, 2] tearable=2 kinds={"JournalRecord": 2, "RootRecordFua": 1, "SystemConfigurationSlot": 2, "UnitWrite": 20} states=1048588
+ORDINALS from=0 to=1048588 judged_here=13
+SUMMARY seg1 root=1:24 live=true resumed batches=10 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 15, empty_cluster_segment count=1
+SUMMARY seg1 root=1:25 live=true resumed batches=12 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=2
+SUMMARY seg2 root=1:25 live=true resumed batches=12 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=1
+SUMMARY seg3 root=1:25 live=true resumed batches=12 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=8
+SUMMARY seg4 root=1:25 live=true resumed batches=12 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=1
+ATTACK_TOTAL shape=rollback-after-compaction states=1048588 judged=13 findings=0 first=[] every=1
+rc=0
+== width=384 units=100 region=0 rb=4 shape=rollback-after-compaction k=1
+STREAM writes=25 segments=4 sizes=[20, 2, 1, 2] tearable=2 kinds={"JournalRecord": 2, "RootRecordFua": 1, "SystemConfigurationSlot": 2, "UnitWrite": 20} states=1048588
+ORDINALS from=0 to=1048588 judged_here=13
+SUMMARY seg1 root=1:24 live=true resumed batches=10 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 15, empty_cluster_segment count=1
+SUMMARY seg1 root=1:25 live=true resumed batches=14 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=2
+SUMMARY seg2 root=1:25 live=true resumed batches=14 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=1
+SUMMARY seg3 root=1:25 live=true resumed batches=14 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=8
+SUMMARY seg4 root=1:25 live=true resumed batches=14 stop=NoYieldFromTheLastIntent { empty_cluster_segments_now: 13, empty_cluster_segment count=1
+ATTACK_TOTAL shape=rollback-after-compaction states=1048588 judged=13 findings=0 first=[] every=1
+rc=0
+== width=4g units=150 region=1 rb=2 shape=rollback-after-compaction k=1
+STREAM writes=25 segments=4 sizes=[20, 2, 1, 2] tearable=2 kinds={"JournalRecord": 2, "RootRecordFua": 1, "SystemConfigurationSlot": 2, "UnitWrite": 20} states=1048588
+ORDINALS from=0 to=1048588 judged_here=13
+SUMMARY seg1 root=1:13 live=false count=1
+SUMMARY seg1 root=1:14 live=false count=2
+SUMMARY seg2 root=1:14 live=false count=1
+SUMMARY seg3 root=1:14 live=false count=8
+SUMMARY seg4 root=1:14 live=false count=1
+ATTACK_TOTAL shape=rollback-after-compaction states=1048588 judged=13 findings=0 first=[] every=1
+rc=0

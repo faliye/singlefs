@@ -1,0 +1,82 @@
+== 原样模型（batch 9，小盘 384 槽，r2-mix，种子下标 3000–3495）
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3000 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3016 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3032 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3048 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3064 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3080 ops=40 steps_checked=633 problems=2
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3096 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3112 ops=40 steps_checked=623 problems=1
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3128 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3144 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3160 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3176 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3192 ops=40 steps_checked=628 problems=1
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3208 ops=40 steps_checked=640 problems=1
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3224 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3240 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3256 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3272 ops=40 steps_checked=606 problems=2
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3288 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3304 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3320 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3336 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3352 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3368 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3384 ops=40 steps_checked=593 problems=3
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3400 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3416 ops=40 steps_checked=641 problems=1
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3432 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3448 ops=40 steps_checked=642 problems=1
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3464 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3480 ops=40 steps_checked=656 problems=0
+ATTACK_PROBLEM 种子偏移 3080：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(18), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(16), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3095：结局 NewFinding { signature: ModelDisagreement { aspect: "抬 F 的上限" }, observation: FailureObservation { position: Operation(39), operation_kind: Some(RaiseRollbackFloor), violations: [], panic: None, newest_ring_root_txg: Some(37), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: RollbackFloorCeiling, model_answer: "上限 Some(24)（D16（发布语义） 已定项 1）", implementation_answer: "实现报上限 27", implementation_reported_ceiling: Some(ModelCheckpointTxg(27)), implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3118：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(7), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(13), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), r
+ATTACK_PROBLEM 种子偏移 3199：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(12), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(20), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3209：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(24), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(28), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3273：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(18), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(31), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3274：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(12), operation_kind: Some(RaiseRollbackFloor), violations: [], panic: None, newest_ring_root_txg: Some(17), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None })
+ATTACK_PROBLEM 种子偏移 3390：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(32), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(37), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3395：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(5), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(16), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), r
+ATTACK_PROBLEM 种子偏移 3399：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(20), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(25), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3430：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(25), operation_kind: Some(PublishOverwrite), violations: [], panic: None, newest_ring_root_txg: Some(28), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None }), 
+ATTACK_PROBLEM 种子偏移 3454：结局 NewFinding { signature: ModelDisagreement { aspect: "模型说该拒、实现做成了" }, observation: FailureObservation { position: Operation(26), operation_kind: Some(RaiseRollbackFloor), violations: [], panic: None, newest_ring_root_txg: Some(40), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: SucceededWhenModelRequiresRefusal, model_answer: "RaiseRollbackFloor 该拒：[\"要抬的 F 超过上限\"]", implementation_answer: "做成了", implementation_reported_ceiling: None, implementation_reported_root_ring_slot_still_bad_after_one_reread: None, implementation_rows_written: None })
+== 副本上改了模型回退那一步（batch 11，同一批种子）
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3000 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3016 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3032 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3048 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3064 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3080 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3096 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3112 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3128 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3144 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3160 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3176 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3192 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3208 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3224 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3240 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3256 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3272 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3288 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3304 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3320 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3336 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3352 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3368 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3384 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3400 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3416 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3432 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3448 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3464 ops=40 steps_checked=656 problems=0
+ATTACK_SUMMARY weights=第二轮攻方：整理 + 回退 + 删完之后的快照 seeds=16 seed_start=3480 ops=40 steps_checked=656 problems=0
+== 副本上改了模型，4 GiB 上打中过的四个种子（with-rollback）
+ATTACK_SUMMARY weights=挂着时整理夹着回退的历史（判决 m4-segment-code-r1 第三节 F1 那一格的取样点） seeds=1 seed_start=297 ops=40 steps_checked=28 problems=1
+ATTACK_PROBLEM 种子偏移 297：结局 NewFinding { signature: ModelDisagreement { aspect: "这一次整理发布对意图做的事" }, observation: FailureObservation { position: Operation(27), operation_kind: Some(CompactWhileMounted), violations: [], panic: None, newest_ring_root_txg: Some(74), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement
+ATTACK_SUMMARY weights=挂着时整理夹着回退的历史（判决 m4-segment-code-r1 第三节 F1 那一格的取样点） seeds=1 seed_start=476 ops=40 steps_checked=41 problems=0
+ATTACK_SUMMARY weights=挂着时整理夹着回退的历史（判决 m4-segment-code-r1 第三节 F1 那一格的取样点） seeds=1 seed_start=535 ops=40 steps_checked=41 problems=0
+ATTACK_SUMMARY weights=挂着时整理夹着回退的历史（判决 m4-segment-code-r1 第三节 F1 那一格的取样点） seeds=1 seed_start=640 ops=40 steps_checked=41 problems=0

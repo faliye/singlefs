@@ -1,0 +1,5 @@
+M4TRUNC extent before=200 kept=144 leaf_holding_unit=143 position=(0, 0) origin=CarriedFromThePreviousVersion
+M4TRUNC extent before=200 kept=143 leaf_holding_unit=142 position=(0, 0) origin=RewrittenThisPublish
+M4TRUNC extent before=200 kept=145 leaf_holding_unit=144 position=(0, 1) origin=RewrittenThisPublish
+M4TRUNC extent before=300 kept=288 leaf_holding_unit=287 position=(0, 1) origin=CarriedFromThePreviousVersion
+M4TRUNC extent before=3 kept=2 leaf_holding_unit=1 position=(0, 0) origin=RewrittenThisPublish

@@ -1,0 +1,13 @@
+f4c2a7e740b13a0ea241a20a9358e0e9266f752763ee4d02231254f96d198f7b  .claude/kb/experiments/186-不认识的树-记账维重推.md
+1cdbf25c59532bdebd79319376008388f2ed5ae07b2ad588fa48066e9d063432  .claude/kb/checks-owed.md
+195e103d6d8a56470b0dc8f13dadc1d1393a0807c3bcbf35d3ccfac22773b804  .claude/kb/decisions/08-核心索引结构.en.md
+731625af01b0dce2b108a31db97ca99d7936dc386c9a35666bfe737f954852eb  .claude/kb/decisions/08-核心索引结构.ja.md
+161104d3c9ba6ba5b4b49b83694619752444ea11cd7804e91a293c28e8f5fc6b  .claude/kb/decisions/08-核心索引结构.md
+b4a11be6f83b37141c277a6481a7f28e310196d536e17f866d3a4dc6708c4859  .claude/kb/decisions/05-快照-空间记账机制.en.md
+b3f45112d6a002caf8f8680337d03cc57406fa9f6f5c18ed3f2b4f27c197a089  .claude/kb/decisions/05-快照-空间记账机制.ja.md
+c3dc29d43d884ddea29a177116071a444fddc5ca0b661753c8c270580393f7d1  .claude/kb/decisions/05-快照-空间记账机制.md
+2ef305fc35ba708d5a74fbf9ad72aa3e1de97c96b4b5bb48fd702b522f75d543  crates/singlefs-checker/invariants/05-空间记账.md
+207cffed1f37652adeb9e4cba12066612b17ceb68c5e74dd6c96ce5f96f3281a  crates/singlefs-checker/invariants/09-inode树结构.md
+cfa2be758f566cbef9d6ac5f0f34afecdc86f4b633375cab358d1e50239a42e5  .claude/kb/experiments/71-记账key的条目数与宽度.en.md
+ee5ff13194c62badd91214b776605b150bfd47b68aedbdaa6ff931fe51b05a47  .claude/kb/experiments/71-记账key的条目数与宽度.ja.md
+2d787dd25f6944c7a512690dff8d8c4494abe6bc3cfbc08b9241e4c73dba5db5  .claude/kb/experiments/71-记账key的条目数与宽度.md

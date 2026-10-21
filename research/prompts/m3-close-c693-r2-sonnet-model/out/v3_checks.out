@@ -1,0 +1,38 @@
+E7RESULT name=selftest_leaf_fanout geometry=e97_header58 key_bytes=7 product=1087 mine=1087 equal=1
+E7RESULT name=selftest_leaf_fanout geometry=e97_header58 key_bytes=14 product=740 mine=740 equal=1
+E7RESULT name=selftest_leaf_fanout geometry=e97_header58 key_bytes=19 product=603 mine=603 equal=1
+E7RESULT name=selftest_leaf_fanout geometry=e97_header58 key_bytes=22 product=542 mine=542 equal=1
+E7RESULT name=selftest_leaf_fanout geometry=crates key_bytes=22 mine=(477, 150) expected=(477, 150) equal=1
+E7RESULT name=selftest_new_leaves rows=32 mismatches=0
+E7RESULT name=e97_grid_point trees=64 devs=8 reading=narrow groups=172 heights_k7_k14_k19_k22=1,1,1,1 same_height=1 new_node_bytes_k7_k14_k19_k22=16384,16384,16384,16384 ratio_22_over_7=1.000 k22_permille_of_budget=0
+E7RESULT name=e97_grid_point trees=64 devs=8 reading=wide groups=2944 heights_k7_k14_k19_k22=2,2,2,2 same_height=1 new_node_bytes_k7_k14_k19_k22=49152,65536,81920,98304 ratio_22_over_7=2.000 k22_permille_of_budget=4
+E7RESULT name=e97_grid_point trees=1024 devs=64 reading=narrow groups=2372 heights_k7_k14_k19_k22=2,2,2,2 same_height=1 new_node_bytes_k7_k14_k19_k22=49152,65536,65536,81920 ratio_22_over_7=1.667 k22_permille_of_budget=3
+E7RESULT name=e97_grid_point trees=1024 devs=64 reading=wide groups=333824 heights_k7_k14_k19_k22=3,3,3,3 same_height=1 new_node_bytes_k7_k14_k19_k22=5046272,7405568,9076736,10092544 ratio_22_over_7=2.000 k22_permille_of_budget=469
+E7RESULT name=e97_grid_point trees=8192 devs=8 reading=narrow groups=16428 heights_k7_k14_k19_k22=2,2,2,2 same_height=1 new_node_bytes_k7_k14_k19_k22=262144,376832,458752,507904 ratio_22_over_7=1.938 k22_permille_of_budget=23
+E7RESULT name=e97_grid_point trees=8192 devs=8 reading=wide groups=376832 heights_k7_k14_k19_k22=3,3,3,3 same_height=1 new_node_bytes_k7_k14_k19_k22=5685248,8355840,10240000,11403264 ratio_22_over_7=2.006 k22_permille_of_budget=531
+E7RESULT name=e97_grid_point trees=8192 devs=64 reading=narrow groups=16708 heights_k7_k14_k19_k22=2,2,2,2 same_height=1 new_node_bytes_k7_k14_k19_k22=262144,376832,458752,507904 ratio_22_over_7=1.938 k22_permille_of_budget=23
+E7RESULT name=e97_grid_point trees=8192 devs=64 reading=wide groups=2670592 heights_k7_k14_k19_k22=3,3,3,3 same_height=1 new_node_bytes_k7_k14_k19_k22=40255488,59129856,72564736,80740352 ratio_22_over_7=2.006 k22_permille_of_budget=3759
+E7RESULT name=selftest_group_formula trees=64 devs=8 equal=1
+E7RESULT name=selftest_group_formula trees=1024 devs=64 equal=1
+E7RESULT name=selftest_group_formula trees=8192 devs=8 equal=1
+E7RESULT name=selftest_group_formula trees=8192 devs=64 equal=1
+E7RESULT name=e97_height_differs_between_grid_points points=524288 narrow_differing=17440 wide_differing=92663
+E7RESULT name=crates_rows_height_differs_between_key_widths devices_1_to_4096_differing=63 first=79 last=141
+E7RESULT name=crates_split_point devices=2 rows_without_step=15 height_without_step=1 rows_with_one_step=16 height_with_one_step=1
+E7RESULT name=crates_split_point devices=78 rows_without_step=471 height_without_step=1 rows_with_one_step=472 height_with_one_step=1
+E7RESULT name=crates_split_point devices=79 rows_without_step=477 height_without_step=1 rows_with_one_step=478 height_with_one_step=2
+E7RESULT name=crates_split_point devices=80 rows_without_step=483 height_without_step=2 rows_with_one_step=484 height_with_one_step=2
+E7RESULT name=crates_leaf_fanout_one_more_key_byte key21=491 key22=477 fewer_entries_per_leaf=14 permille_fewer=28
+E7RESULT name=e71_ratio_range width=middle cells=15 wide_over_narrow_min=1.00 max=128.47 upper_over_narrow_min=1.00 max=283.52
+E7RESULT name=e71_cell trees=64 devices=8 wide_over_narrow=14.53 upper_over_narrow=28.27
+E7RESULT name=e71_1024x64 width=narrow entry_bytes=22 upper_bound:old=25952256/1,new=12976128/0 per_statistic_wide:old=11759616/0,new=5879808/0 per_statistic_narrow:old=101508/0,new=50754/0
+E7RESULT name=e71_1024x64 width=middle entry_bytes=30 upper_bound:old=35389440/1,new=17694720/0 per_statistic_wide:old=16035840/0,new=8017920/0 per_statistic_narrow:old=138420/0,new=69210/0
+E7RESULT name=e71_1024x64 width=wide entry_bytes=50 upper_bound:old=58982400/1,new=29491200/1 per_statistic_wide:old=26726400/1,new=13363200/0 per_statistic_narrow:old=230700/0,new=115350/0
+E7RESULT name=e71_1024x64 width=current_implementation entry_bytes=34 upper_bound:old=40108032/1,new=20054016/0 per_statistic_wide:old=18173952/0,new=9086976/0 per_statistic_narrow:old=156876/0,new=78438/0
+E7RESULT name=e71_over_budget arm=upper_bound widths=registered_widths cells=45 old_over=9 new_over=5 new_over_cells=middle:8192:64,narrow:8192:64,wide:1024:64,wide:8192:64,wide:8192:8
+E7RESULT name=e71_over_budget arm=upper_bound widths=current_implementation_width cells=15 old_over=3 new_over=1 new_over_cells=current_implementation:8192:64
+E7RESULT name=e71_over_budget arm=per_statistic_wide widths=registered_widths cells=45 old_over=5 new_over=3 new_over_cells=middle:8192:64,narrow:8192:64,wide:8192:64
+E7RESULT name=e71_over_budget arm=per_statistic_wide widths=current_implementation_width cells=15 old_over=1 new_over=1 new_over_cells=current_implementation:8192:64
+E7RESULT name=e71_over_budget arm=per_statistic_narrow widths=registered_widths cells=45 old_over=0 new_over=0 new_over_cells=none
+E7RESULT name=e71_over_budget arm=per_statistic_narrow widths=current_implementation_width cells=15 old_over=0 new_over=0 new_over_cells=none
+E7RESULT name=done selftest_ok=1

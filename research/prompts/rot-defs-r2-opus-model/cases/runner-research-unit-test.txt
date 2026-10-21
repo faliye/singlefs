@@ -1,0 +1,1 @@
+cd scripts/experiments && SINGLEFS_RUN_SCOPE='种类=target; 跑什么=装置 e12-lifecycle 的单测; 范围=1 个测试目标; 为什么=跑前登记第六节要的单测在跑产物之前先全绿' bash ../hosts/run-with-memory-cap.sh 8G cargo test --release --bin e12-lifecycle

@@ -1,0 +1,46 @@
+## r1-sonnet-full
+name=sonnet_forward_rerun_matches_expected result=same
+## r1-opus-full
+name=rerun_compare file=remount-sweep.txt identical=true lines=16
+name=rerun_compare file=seed126-prefix-suffixes.txt identical=true lines=10
+name=rerun_compare file=rollback-minimal-trace.txt identical=true lines=12
+name=rerun_compare file=i35-seed2022.txt identical=true lines=9
+name=rerun_compare file=compaction-seed1055-trace.txt identical=true lines=15
+name=rerun_compare file=t11-original.txt identical=true lines=4
+name=rerun_compare file=t11-mutated.txt identical=true lines=6
+name=rerun_total same=7 differ=0
+## r2-sonnet-full
+name=rerun_compare file=t4-r2-checker.txt identical=true
+name=rerun_compare file=f1-r2-core.txt identical=true
+name=rerun_compare file=f1-r2-core-with-f1-neutered.txt identical=true
+name=rerun_compare file=f1small-r2-core.txt identical=true
+name=rerun_compare file=f5-r2-core.txt identical=true
+name=rerun_compare file=f6-reference-filesystem-snapshot-sets.txt identical=true
+name=rerun_compare file=arithmetic.txt identical=true
+name=rerun_compare file=t10.txt identical=true
+name=rerun_compare file=seeds.txt identical=true
+name=rerun_compare file=t11.txt identical=true
+name=rerun_total same=10 differ=0
+## r2-opus-1
+name=rerun_compare file=reference-filesystem-probe.txt identical=true（两边去掉计时那一行）
+name=rerun_compare file=trace476.txt identical=true
+name=rerun_compare file=dump535.txt identical=true
+name=rerun_compare file=dump640.txt identical=true
+name=rerun_compare file=dump3395.txt identical=true
+name=rerun_compare file=trace297.txt identical=true
+name=rerun_compare file=transient-completing.txt identical=true
+name=rerun_compare file=transient-1055.txt identical=true
+name=rerun_compare file=transient-issue-pairs.txt identical=true
+name=rerun_compare file=checkpoint-cost-margins.txt identical=true
+name=rerun_compare file=empty-file-set-snapshots.txt identical=true
+name=rerun_total same=11 differ=0
+## r2-opus-3
+name=rerun_compare file=mount-transient-reads.txt identical=true
+name=rerun_total same=1 differ=0
+## r2-opus-4
+name=rerun_compare file=rollback-shapes-sweep.txt identical=true
+name=rerun_compare file=rollback-shapes-samples.txt identical=true
+name=rerun_total same=2 differ=0
+## r2-opus-5
+name=rerun_compare file=model-rollback-relocations-before-and-after.txt identical=true
+name=rerun_total same=1 differ=0

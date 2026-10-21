@@ -1,0 +1,26 @@
+## v2_extra_entries
+kind=4         edit=UnknownFlagsBit  face=R已确认槽读回零   恢复=拒      只读=拒      可写=拒
+kind=4         edit=UnknownFlagsBit  face=崩在轮换前      恢复=拒      只读=拒      可写=拒
+kind=4         edit=UnknownFlagsBit  face=见证了R       恢复=拒      只读=拒      可写=拒
+kind=6         edit=UnknownFlagsBit  face=R已确认槽读回零   恢复=R      只读=R      可写=拒
+kind=6         edit=UnknownFlagsBit  face=崩在轮换前      恢复=R      只读=R      可写=拒
+kind=6         edit=UnknownFlagsBit  face=见证了R       恢复=R      只读=R      可写=拒
+kind=13        edit=UnknownFlagsBit  face=R已确认槽读回零   恢复=R      只读=R      可写=拒
+kind=13        edit=UnknownFlagsBit  face=崩在轮换前      恢复=R      只读=R      可写=拒
+kind=13        edit=UnknownFlagsBit  face=见证了R       恢复=R      只读=R      可写=拒
+kind=4         edit=UnregisteredKind face=R已确认槽读回零   恢复=拒      只读=R      可写=拒
+kind=4         edit=UnregisteredKind face=崩在轮换前      恢复=拒      只读=R      可写=拒
+kind=4         edit=UnregisteredKind face=见证了R       恢复=拒      只读=R      可写=拒
+kind=6         edit=UnregisteredKind face=R已确认槽读回零   恢复=R      只读=R      可写=拒
+kind=6         edit=UnregisteredKind face=崩在轮换前      恢复=R      只读=R      可写=拒
+kind=6         edit=UnregisteredKind face=见证了R       恢复=R      只读=R      可写=拒
+kind=13        edit=UnregisteredKind face=R已确认槽读回零   恢复=R      只读=R      可写=拒
+kind=13        edit=UnregisteredKind face=崩在轮换前      恢复=R      只读=R      可写=拒
+kind=13        edit=UnregisteredKind face=见证了R       恢复=R      只读=R      可写=拒
+## tree_table_entry_with_an_unknown_flags_bit_in_the_newest_version
+kind=2(inode)  edit=SameByteChangedWithoutRecomputingChecksums face=R已确认槽读回零   恢复=R之前一版  只读=R之前一版  可写=R之前一版
+kind=2(inode)  edit=SameByteChangedWithoutRecomputingChecksums face=崩在轮换前      恢复=R之前一版  只读=R之前一版  可写=R之前一版
+kind=2(inode)  edit=SameByteChangedWithoutRecomputingChecksums face=见证了R       恢复=拒      只读=拒      可写=拒
+kind=2(inode)  edit=UnknownFlagsBit  face=R已确认槽读回零   恢复=拒      只读=拒      可写=拒
+kind=2(inode)  edit=UnknownFlagsBit  face=崩在轮换前      恢复=拒      只读=拒      可写=拒
+kind=2(inode)  edit=UnknownFlagsBit  face=见证了R       恢复=拒      只读=拒      可写=拒

@@ -1,0 +1,12 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -8014,6 +8014,9 @@
+                 previous,
+             ),
+             Err(failure_of_the_selected_version) => {
++                if !matches!(&failure_of_the_selected_version, MountError::Recovery(inner) if crate::recovery::failure_may_retreat(inner)) {
++                    return Err(failure_of_the_selected_version);
++                }
+                 let Some(version_fallen_back_to) =
+                     newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to(
+                         &*devices,

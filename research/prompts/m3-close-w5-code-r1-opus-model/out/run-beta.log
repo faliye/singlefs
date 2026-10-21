@@ -1,0 +1,23 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.3 GiB，这一条要 850 MiB（峰值表里没有这条，按它的上限 850M 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 38 秒，起跑（singlefs-memory-cap-999847-1685432228）
+
+running 1 test
+test beta_after_two_rollbacks_lets_a_write_to_an_inode_born_after_the_deletion_through ... d1 = CheckpointTxg(6)，b3 = CheckpointTxg(8)
+回退之前写 3：Err(DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 3, object_birth: CheckpointTxg(8), death_txg_of_the_first_file: CheckpointTxg(6) })
+d2 = CheckpointTxg(10)
+回退之后：3 的出生 CheckpointTxg(8)，β 读到的死亡 txg Some(CheckpointTxg(10))
+回退到建 3 那一版之后写 3：Ok(())
+写成之后读回 3：Ok(32629) 字节；checker 红 []
+
+thread 'beta_after_two_rollbacks_lets_a_write_to_an_inode_born_after_the_deletion_through' (1002425) panicked at crates/singlefs-harness/tests/attack_histories_of_multi_file_writes_and_unlinks.rs:301:5:
+这条时间线上 3 生于 1 删完（d1 = CheckpointTxg(6)）之后（b3 = CheckpointTxg(8)），β 该拒；实际放过（取了别的时间线上的 d2 = CheckpointTxg(10)）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    beta_after_two_rollbacks_lets_a_write_to_an_inode_born_after_the_deletion_through
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 1.39s
+

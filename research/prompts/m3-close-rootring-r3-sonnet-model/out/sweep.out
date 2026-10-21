@@ -1,0 +1,5 @@
+R3SWEEP mount_root_writes=5
+R3SWEEP roots before_sweep=(3, 22) sweep=(3, 23) r=(3, 24) table_same(before,sweep)=false table_same(sweep,r)=true
+R3SWEEP fault=table chosen=(3,24) table_readable=false today rec=Fail ro=Ok(3,24) rw=Fail | f2_core=(3,23) f2_exact=(3,23) f2_same_all=(3,23) f2_same_if_witness_same_instance=(3,23) replica_matches_core=true target_shares_the_chosen_table(exact,all,narrow)=(true,true,true) | union/exact: rec=Fail@(3,23) ro=Ok(3,23) rw=Fail@(3,23) | union/same_all: rec=Fail@(3,23) ro=Ok(3,23) rw=Fail@(3,23) | union/narrow: rec=Fail@(3,23) ro=Ok(3,23) rw=Fail@(3,23)
+R3SWEEP fault=table+cfg chosen=(3,24) table_readable=false today rec=Ok(3,22) ro=Ok(3,24) rw=Fail | f2_core=(3,22) f2_exact=(3,22) f2_same_all=(3,23) f2_same_if_witness_same_instance=(3,23) replica_matches_core=true target_shares_the_chosen_table(exact,all,narrow)=(false,true,true) | union/exact: rec=Ok(3,22) ro=Ok(3,22) rw=Ok(3,22) | union/same_all: rec=Fail@(3,23) ro=Ok(3,23) rw=Fail@(3,23) | union/narrow: rec=Fail@(3,23) ro=Ok(3,23) rw=Fail@(3,23)
+R3SWEEP_SUMMARY cells=2

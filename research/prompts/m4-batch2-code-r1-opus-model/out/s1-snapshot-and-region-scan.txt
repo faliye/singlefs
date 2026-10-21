@@ -1,0 +1,118 @@
+ATTACK_CHECKER 两对快照（S1 字段取值） I-9.16 违例：根（实例 1、txg 3）的树表：种类 14 有 2 条（③ 每种至多一条）
+ATTACK_CHECKER 两对快照（S1 字段取值） I-9.25 违例：树 65551（种类 14）的树表条目 previous_snapshot_txg 2：不是 inode 树的条目恒 0，inode 树的不大于这一版的 txg 3
+ATTACK_CHECKER 两对快照（S1 字段取值） 违例条数 2
+ATTACK_CHECKER 两对快照（前驱全 0） I-9.16 违例：根（实例 1、txg 3）的树表：种类 14 有 2 条（③ 每种至多一条）
+ATTACK_CHECKER 两对快照（前驱全 0） 违例条数 1
+ATTACK_CHECKER 对照（原样） 违例条数 0
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-3.12：根环里没有哪条根指着一张读得出、有行的实例表
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-3.9：有带已释放标志的记录落在比还引用它的最后一条根晚、又走不完的候选根后面（单元读不出，或走到条目格式没有条款的形状）：那几条的 L 与 T 定不下
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-4.1：所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-4.4：第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-4.6：走读到的每一版 inode 树里都没有 nlink = 0 的记录
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-4.7：走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-5.5：回退候选集里每条根与由记录施加出来的那几版，没有一版是从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条条目的诞生 txg 等于这一版的 txg）：一版都不判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-7.9：根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-8.7：环里没有哪个实例写出过两条非 0 事务号的记录：一对可比的号都凑不出来
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-8.8：环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.14：没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.17：走读到的每一版谱系树都是零根：没有谱系树内部条目可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.18：走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.19：走读到的每一版里都没有在谱系上、而 inode 树里还有同号同对象出生代记录的墓碑
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.20：走读到的每一版墓碑树都是零根：没有墓碑记录可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.21：走读到的每一版墓碑树都是零根或只一片容器：没有非最右的容器
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.22：池级 checker 的旧入口，当没装只供测试的墓碑容量旋钮：旋钮那一条不判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.23：走读到的每一版墓碑树都是零根：没有墓碑树内部条目可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.28：根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.31：走读到的每一版退役树都是零根：没有退役树内部条目可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.32：走读到的每一版退役树都是零根：没有退役记录可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.33：走读到的每一版里没有一条退役记录在谱系上：没有对象可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.34：走读到的每一版里没有一条退役记录在谱系上：没有对象可判
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.36：走读到的每一版里没装旋钮的谱系树与退役树都是零根或只一片容器：没有非最右的容器
+ATTACK_CHECKER_NA 两对快照（S1 字段取值） I-9.37：池级 checker 没拿到只供测试的谱系与退役容量旋钮（旧入口，或新入口没给这两个旋钮值）：旋钮那一条不判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-3.12：根环里没有哪条根指着一张读得出、有行的实例表
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-3.9：有带已释放标志的记录落在比还引用它的最后一条根晚、又走不完的候选根后面（单元读不出，或走到条目格式没有条款的形状）：那几条的 L 与 T 定不下
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-4.1：所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-4.4：第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-4.6：走读到的每一版 inode 树里都没有 nlink = 0 的记录
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-4.7：走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-5.5：回退候选集里每条根与由记录施加出来的那几版，没有一版是从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条条目的诞生 txg 等于这一版的 txg）：一版都不判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-7.9：根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-8.7：环里没有哪个实例写出过两条非 0 事务号的记录：一对可比的号都凑不出来
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-8.8：环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.14：没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.17：走读到的每一版谱系树都是零根：没有谱系树内部条目可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.18：走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.19：走读到的每一版里都没有在谱系上、而 inode 树里还有同号同对象出生代记录的墓碑
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.20：走读到的每一版墓碑树都是零根：没有墓碑记录可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.21：走读到的每一版墓碑树都是零根或只一片容器：没有非最右的容器
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.22：池级 checker 的旧入口，当没装只供测试的墓碑容量旋钮：旋钮那一条不判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.23：走读到的每一版墓碑树都是零根：没有墓碑树内部条目可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.28：根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.31：走读到的每一版退役树都是零根：没有退役树内部条目可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.32：走读到的每一版退役树都是零根：没有退役记录可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.33：走读到的每一版里没有一条退役记录在谱系上：没有对象可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.34：走读到的每一版里没有一条退役记录在谱系上：没有对象可判
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.36：走读到的每一版里没装旋钮的谱系树与退役树都是零根或只一片容器：没有非最右的容器
+ATTACK_CHECKER_NA 两对快照（前驱全 0） I-9.37：池级 checker 没拿到只供测试的谱系与退役容量旋钮（旧入口，或新入口没给这两个旋钮值）：旋钮那一条不判
+ATTACK_CHECKER_NA 对照（原样） I-3.12：根环里没有哪条根指着一张读得出、有行的实例表
+ATTACK_CHECKER_NA 对照（原样） I-4.1：所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2
+ATTACK_CHECKER_NA 对照（原样） I-4.4：第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现
+ATTACK_CHECKER_NA 对照（原样） I-4.6：走读到的每一版 inode 树里都没有 nlink = 0 的记录
+ATTACK_CHECKER_NA 对照（原样） I-4.7：走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）
+ATTACK_CHECKER_NA 对照（原样） I-7.9：根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）
+ATTACK_CHECKER_NA 对照（原样） I-8.7：环里没有哪个实例写出过两条非 0 事务号的记录：一对可比的号都凑不出来
+ATTACK_CHECKER_NA 对照（原样） I-8.8：环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立
+ATTACK_CHECKER_NA 对照（原样） I-9.14：没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来
+ATTACK_CHECKER_NA 对照（原样） I-9.17：走读到的每一版谱系树都是零根：没有谱系树内部条目可判
+ATTACK_CHECKER_NA 对照（原样） I-9.18：走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判
+ATTACK_CHECKER_NA 对照（原样） I-9.19：走读到的每一版里都没有在谱系上、而 inode 树里还有同号同对象出生代记录的墓碑
+ATTACK_CHECKER_NA 对照（原样） I-9.20：走读到的每一版墓碑树都是零根：没有墓碑记录可判
+ATTACK_CHECKER_NA 对照（原样） I-9.21：走读到的每一版墓碑树都是零根或只一片容器：没有非最右的容器
+ATTACK_CHECKER_NA 对照（原样） I-9.22：池级 checker 的旧入口，当没装只供测试的墓碑容量旋钮：旋钮那一条不判
+ATTACK_CHECKER_NA 对照（原样） I-9.23：走读到的每一版墓碑树都是零根：没有墓碑树内部条目可判
+ATTACK_CHECKER_NA 对照（原样） I-9.28：根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来
+ATTACK_CHECKER_NA 对照（原样） I-9.31：走读到的每一版退役树都是零根：没有退役树内部条目可判
+ATTACK_CHECKER_NA 对照（原样） I-9.32：走读到的每一版退役树都是零根：没有退役记录可判
+ATTACK_CHECKER_NA 对照（原样） I-9.33：走读到的每一版里没有一条退役记录在谱系上：没有对象可判
+ATTACK_CHECKER_NA 对照（原样） I-9.34：走读到的每一版里没有一条退役记录在谱系上：没有对象可判
+ATTACK_CHECKER_NA 对照（原样） I-9.36：走读到的每一版里没装旋钮的谱系树与退役树都是零根或只一片容器：没有非最右的容器
+ATTACK_CHECKER_NA 对照（原样） I-9.37：池级 checker 没拿到只供测试的谱系与退役容量旋钮（旧入口，或新入口没给这两个旋钮值）：旋钮那一条不判
+ATTACK_CHOOSE 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB + 覆盖写 5000 字节」 钉住 2 槽：选中 R 起点 50176，R 里各项 ["已死", "可搬"]，一批 3 交 1 项
+ATTACK_CHOOSE 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB」 钉住 2 槽：选中 R 起点 50176，R 里各项 ["已死", "可搬", "可搬", "可搬", "可搬", "可搬", "可搬", "可搬"]，一批 3 交 3 项
+ATTACK_CHOOSE 版本「第一个文件 + 建 300 个 inode」 钉住 2 槽：选中 R 起点 50176，R 里各项 ["已死", "可搬"]，一批 3 交 1 项
+ATTACK_CHOOSE 版本「第一个文件」 钉住 2 槽：选中 R 起点 50176，R 里各项 ["已死", "可搬"]，一批 3 交 1 项
+ATTACK_MOUNT 挂载之后盘上最新根（txg 5）树表里码 14 / 15 共 0 条
+ATTACK_MOUNT 现行那一版（内存里）树表 12 条，码 14 / 15 0 条
+ATTACK_PARSE flags 位 0 的码 14：TreeTableEntry::parse = None
+ATTACK_READER 两对快照（S1 字段取值） allocation_records_under_root: Ok(())
+ATTACK_READER 两对快照（S1 字段取值） open_pool_for_read: Ok(())
+ATTACK_READER 两对快照（S1 字段取值） rebuild_version: Ok(())
+ATTACK_READER 两对快照（S1 字段取值） user_visible_tree_root_pointers: Err(UnitMalformed { what: "树的种类没登记" })
+ATTACK_READER 两对快照（S1 字段取值） walk_to_file: Err(UnitMalformed { what: "树的种类没登记" })
+ATTACK_READER 两对快照（前驱全 0） allocation_records_under_root: Ok(())
+ATTACK_READER 两对快照（前驱全 0） open_pool_for_read: Ok(())
+ATTACK_READER 两对快照（前驱全 0） rebuild_version: Ok(())
+ATTACK_READER 两对快照（前驱全 0） user_visible_tree_root_pointers: Err(UnitMalformed { what: "树的种类没登记" })
+ATTACK_READER 两对快照（前驱全 0） walk_to_file: Err(UnitMalformed { what: "树的种类没登记" })
+ATTACK_READER 对照（原样） allocation_records_under_root: Ok(())
+ATTACK_READER 对照（原样） open_pool_for_read: Ok(())
+ATTACK_READER 对照（原样） user_visible_tree_root_pointers: Ok(())
+ATTACK_READER 对照（原样） walk_to_file: Ok(())
+ATTACK_ROOT 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB + 覆盖写 5000 字节」 实例表指针 NodePointer { head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(0) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50176), unit_checksum: 3559893537 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50176), unit_checksum: 3559893537 }], instance: InstanceGeneration(0), birth_sequence: BirthSequence(0) }
+ATTACK_ROOT 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB」 实例表指针 NodePointer { head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(0) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50176), unit_checksum: 3559893537 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50176), unit_checksum: 3559893537 }], instance: InstanceGeneration(0), birth_sequence: BirthSequence(0) }
+ATTACK_ROOT 版本「第一个文件 + 建 300 个 inode」 实例表指针 NodePointer { head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(0) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50176), unit_checksum: 3559893537 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50176), unit_checksum: 3559893537 }], instance: InstanceGeneration(0), birth_sequence: BirthSequence(0) }
+ATTACK_SCAN 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB + 覆盖写 5000 字节」 盘 0 段数 2 映射条目 11：{"可搬": 11, "已死｜MappingTree｜槽 50291": 1, "已死｜TreeTable｜槽 50292": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB + 覆盖写 5000 字节」 盘 1 段数 2 映射条目 11：{"可搬": 11, "已死｜MappingTree｜槽 50291": 1, "已死｜TreeTable｜槽 50292": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB」 盘 0 段数 2 映射条目 18：{"可搬": 18, "已死｜MappingTree｜槽 50279": 1, "已死｜TreeTable｜槽 50280": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件 + 建 300 个 inode + 顺序写 200 KiB」 盘 1 段数 2 映射条目 18：{"可搬": 18, "已死｜MappingTree｜槽 50279": 1, "已死｜TreeTable｜槽 50280": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件 + 建 300 个 inode」 盘 0 段数 2 映射条目 11：{"可搬": 11, "已死｜MappingTree｜槽 50265": 1, "已死｜TreeTable｜槽 50266": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件 + 建 300 个 inode」 盘 1 段数 2 映射条目 11：{"可搬": 11, "已死｜MappingTree｜槽 50265": 1, "已死｜TreeTable｜槽 50266": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件」 盘 0 段数 2 映射条目 10：{"可搬": 10, "已死｜MappingTree｜槽 50251": 1, "已死｜TreeTable｜槽 50252": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_SCAN 版本「第一个文件」 盘 1 段数 2 映射条目 10：{"可搬": 10, "已死｜MappingTree｜槽 50251": 1, "已死｜TreeTable｜槽 50252": 1, "已死｜（这一版没有这个槽上的角色）｜槽 50176": 1}
+ATTACK_STRADDLE 第 1 次：选中 Some(0)，扫描 Some(Err(RecordStraddlesTheRegionBoundaryUnsupported { device: DeviceIdentity(0), slot: SlotNumber(50239), span_slots: 2 }))
+cargo_rc=0
+test a_straddling_record_makes_greedy_choose_the_refused_region_every_time ... ATTACK_STRADDLE 第 0 次：选中 Some(0)，扫描 Some(Err(RecordStraddlesTheRegionBoundaryUnsupported { device: DeviceIdentity(0), slot: SlotNumber(50239), span_slots: 2 }))
+test a_writable_mount_of_a_pool_carrying_snapshot_entries ... ATTACK_MOUNT 挂载之前最新根（txg 3）树表里码 14 / 15 共 4 条
+test region_scan_classes_on_versions_written_by_the_writer ... ATTACK_ROOT 版本「第一个文件」 实例表指针 NodePointer { head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(0) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50176), unit_checksum: 3559893537 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50176), unit_checksum: 3559893537 }], instance: InstanceGeneration(0), birth_sequence: BirthSequence(0) }
+test snapshot_tree_tables_on_every_reader_and_the_pool_checker ... ATTACK_READER 对照（原样） rebuild_version: Ok(())
+test two_extent_roots_both_naming_the_second_inode_root ... ATTACK_PAIR 拒：Walk(UnitMalformed { what: "树表里有一条快照 extent 根配不上一条只属于它的快照 inode 根" })

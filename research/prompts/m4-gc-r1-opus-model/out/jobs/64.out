@@ -1,0 +1,11 @@
+E name=maponly_regen nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=55990 live_released=1932 unreadable=87 dup_map=87 leak=2709 hint_bad=1638 gc_stuck=261 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=546 rb_refused=90 del_pred_true=258 del_pred_false=1920 n0_refused=0 gc_done=8648 gc_declined=3263 gc_stuck=44079 gc_paused=0 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=maponly_regen flag=live_released path=W0.GI.GB.W1
+W name=maponly_regen flag=unreadable path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=dup_map path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=leak path=W0.GI.GB.W1
+W name=maponly_regen flag=hint_bad path=W0.GI.GB
+W name=maponly_regen flag=gc_stuck path=W0.GI.GB.GI
+W name=maponly_regen flag=release_bad path=W0.GI.GB.W1.O0
+W name=maponly_regen flag=rb_refused path=W0.GI.GB.W1.O0.R1
+W name=maponly_regen flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_regen flag=del_pred_false path=W0.GI.GB

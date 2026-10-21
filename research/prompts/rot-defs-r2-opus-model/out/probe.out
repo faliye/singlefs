@@ -1,0 +1,52 @@
+== runner-checker-device-unit-test（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：experiment-runner 不跑「checker 档」
+[run-scope-guard.sh] exit=0
+== runner-checker-device-unit-test-package（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：experiment-runner 不跑「checker 档」
+[run-scope-guard.sh] exit=0
+== runner-research-unit-test（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== device-main-e165-pinned-cases（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== pin-script-replay（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：scripts/experiments/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration（门禁 checker-tier-formal-verification 的判法：起 Verus 或编 checker 档装置重放；只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--backfill、--list-items 不算；红例钉表参数里的变量只在可能展开成
+[run-scope-guard.sh] exit=0
+== kb-scribe-write（kb-scribe）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== rerun-wrapped-declaration-outside（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== rerun-wrapped-declaration-inside（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== implementer-combined（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== crates-mutation-quick-with-break-switch（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== formal-quick-with-break-switch（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== crash-quick-array-appended-in-function（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：scripts/crash/crash-point-replay.sh --quick --item core --full（崩溃点重放的重型：不带参数是剪枝、--item 是逐条、--full 是全量，只有仓内那一份带 --quick（可加 --item <项>）的轻型、单独的 --list-items 与登记表里的单独 --selftest 不算）（崩溃点重放）：implementation-writer 不跑「崩溃点重放」
+[run-scope-guard.sh] exit=0

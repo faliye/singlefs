@@ -1,0 +1,49 @@
+PROBE group=f1 name=f1-remount-between-compactions-rollback-0-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-1-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-2-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-3-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-4-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-5-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-6-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-remount-between-compactions-rollback-7-cold-start ending=Completed steps=8 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-0 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-1 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-2 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-3 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-4 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-5 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-6 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-rollback-with-a-live-intent-then-compact-again-rollback-7 ending=Completed steps=6 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-0 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-1 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-2 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-3 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-4 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-5 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-6 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-compactions-with-an-overwrite-between-rollback-7 ending=Completed steps=7 rollbacks=["applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-0-then-0 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-0-then-1 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-0-then-2 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-0-then-3 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-0-then-4 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-1-then-0 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-1-then-1 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-1-then-2 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-1-then-3 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-1-then-4 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-2-then-0 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-2-then-1 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-2-then-2 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-2-then-3 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-2-then-4 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-3-then-0 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-3-then-1 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-3-then-2 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-3-then-3 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-3-then-4 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-4-then-0 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-4-then-1 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-4-then-2 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-4-then-3 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0
+PROBE group=f1 name=f1-two-rollbacks-4-then-4 ending=Completed steps=6 rollbacks=["applied", "applied"] reds=0

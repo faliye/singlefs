@@ -1,0 +1,4 @@
+R1-quarantine-wins-over-mapping	    if entries_pointing_here.is_empty() && quarantined_slots.range(covered_slots).next().is_some() {	    if quarantined_slots.range(covered_slots).next().is_some() {
+R2-any-instead-of-all	        .all(|entry| entry.key == header.mapping_key);	        .any(|entry| entry.key == header.mapping_key);
+R3-points-at-ignores-the-device	            .any(|location| location.device == device && location.slot == slot)	            .any(|location| location.slot == slot)
+R4-pinned-only-at-the-start-slot	    if pinned_slots.range(covered_slots.clone()).next().is_some() {	    if pinned_slots.contains(&record.slot) {

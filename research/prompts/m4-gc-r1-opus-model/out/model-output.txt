@@ -1,0 +1,496 @@
+E name=base nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92031 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=73280 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1015 del_pred_false=4896 n0_refused=0 gc_done=12208 gc_declined=6161 gc_stuck=0 gc_paused=382 gc_cycle=73266 gc_cap=14 gc_wasted=0
+W name=base flag=livelock path=W0
+W name=base flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=base flag=del_pred_true path=W0.GI.D0.GB
+W name=base flag=del_pred_false path=W0.GI.GB
+E name=maponly_regen nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=91228 live_released=4280 unreadable=406 dup_map=348 leak=7528 hint_bad=3262 gc_stuck=906 livelock=0 frozen=0 unmet_del=0 false_enospc=16 release_bad=1870 rb_refused=608 del_pred_true=977 del_pred_false=4752 n0_refused=0 gc_done=11769 gc_declined=7949 gc_stuck=71130 gc_paused=380 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=maponly_regen flag=live_released path=W0.GI.GB.W1
+W name=maponly_regen flag=unreadable path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=dup_map path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=leak path=W0.GI.GB.W1
+W name=maponly_regen flag=hint_bad path=W0.GI.GB
+W name=maponly_regen flag=gc_stuck path=W0.GI.GB.GI
+W name=maponly_regen flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=maponly_regen flag=release_bad path=W0.GI.GB.W1.O0
+W name=maponly_regen flag=rb_refused path=W0.GI.GB.W1.O0.R1
+W name=maponly_regen flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_regen flag=del_pred_false path=W0.GI.GB
+E name=maponly_carry nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92409 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=8808 gc_stuck=0 livelock=73594 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1015 del_pred_false=4900 n0_refused=0 gc_done=12242 gc_declined=6191 gc_stuck=0 gc_paused=382 gc_cycle=73580 gc_cap=14 gc_wasted=0
+W name=maponly_carry flag=hint_bad path=W0.GI.GB
+W name=maponly_carry flag=livelock path=W0
+W name=maponly_carry flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=maponly_carry flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_carry flag=del_pred_false path=W0.GI.GB
+E name=occ nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92453 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=14 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=486 del_pred_false=5435 n0_refused=0 gc_done=83508 gc_declined=8549 gc_stuck=0 gc_paused=382 gc_cycle=0 gc_cap=14 gc_wasted=0
+W name=occ flag=livelock path=W0.O0.O0.GI.GB.W1.M
+W name=occ flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=occ flag=del_pred_true path=W0.M.GI.D0.GB
+W name=occ flag=del_pred_false path=W0.GI.GB
+E name=holes nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=78817 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=891 del_pred_false=2438 n0_refused=0 gc_done=9915 gc_declined=5314 gc_stuck=0 gc_paused=63588 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=holes flag=del_pred_true path=W0.GI.D0.GB
+W name=holes flag=del_pred_false path=W0.GI.O0.GB
+E name=holes_pre nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=37450 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=226 del_pred_false=14 n0_refused=0 gc_done=5358 gc_declined=31716 gc_stuck=0 gc_paused=376 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes_pre flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre flag=del_pred_false path=W0.M.M.M.GI.GB
+E name=occ_holes_pre nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=37450 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=54 del_pred_false=186 n0_refused=0 gc_done=2776 gc_declined=34294 gc_stuck=0 gc_paused=380 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=occ_holes_pre flag=del_pred_true path=W0.M.W1.M.GI.GB
+W name=occ_holes_pre flag=del_pred_false path=W0.M.W1.GI.GB
+E name=cached nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=97273 live_released=912 unreadable=910 dup_map=552 leak=0 hint_bad=0 gc_stuck=0 livelock=70544 frozen=0 unmet_del=0 false_enospc=32 release_bad=572 rb_refused=132 del_pred_true=1469 del_pred_false=4562 n0_refused=0 gc_done=17725 gc_declined=9004 gc_stuck=0 gc_paused=0 gc_cycle=69872 gc_cap=672 gc_wasted=0
+W name=cached flag=live_released path=W0.O0.O0.GI.GB
+W name=cached flag=unreadable path=W0.GI.W1.GB
+W name=cached flag=dup_map path=W0.GI.W1.GB
+W name=cached flag=livelock path=W0
+W name=cached flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=cached flag=release_bad path=W0.GI.W1.GB.R2
+W name=cached flag=rb_refused path=W0.GI.W1.GB.R1
+W name=cached flag=del_pred_true path=W0.GI.D0.GB
+W name=cached flag=del_pred_false path=W0.GI.GB
+E name=cur_skip nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=86983 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=68356 frozen=0 unmet_del=32 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1019 del_pred_false=4898 n0_refused=0 gc_done=12642 gc_declined=5633 gc_stuck=0 gc_paused=352 gc_cycle=68342 gc_cap=14 gc_wasted=0
+W name=cur_skip flag=livelock path=W0
+W name=cur_skip flag=unmet_del path=W0.W1.GI.GB.R1.GB
+W name=cur_skip flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=cur_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_skip flag=del_pred_false path=W0.GI.GB
+E name=cur_recheck nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=86983 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=68616 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1019 del_pred_false=4872 n0_refused=0 gc_done=12382 gc_declined=5633 gc_stuck=0 gc_paused=352 gc_cycle=68602 gc_cap=14 gc_wasted=0
+W name=cur_recheck flag=livelock path=W0
+W name=cur_recheck flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=cur_recheck flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_recheck flag=del_pred_false path=W0.GI.GB
+E name=old_skip nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92031 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=73280 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1015 del_pred_false=4896 n0_refused=0 gc_done=12208 gc_declined=6161 gc_stuck=0 gc_paused=382 gc_cycle=73266 gc_cap=14 gc_wasted=0
+W name=old_skip flag=livelock path=W0
+W name=old_skip flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=old_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=old_skip flag=del_pred_false path=W0.GI.GB
+E name=naive nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=122940 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=36652 frozen=0 unmet_del=0 false_enospc=108 release_bad=0 rb_refused=0 del_pred_true=1058 del_pred_false=9349 n0_refused=0 gc_done=15470 gc_declined=0 gc_stuck=0 gc_paused=70818 gc_cycle=36652 gc_cap=0 gc_wasted=0
+W name=naive flag=livelock path=(mkfs)
+W name=naive flag=false_enospc path=W0.O0.GI.R2.GI.R2.O0
+W name=naive flag=del_pred_true path=W0.GI.D0.GB
+W name=naive flag=del_pred_false path=GI.GB
+E name=inst_naive nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=112741 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=116 livelock=10224 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1333 del_pred_false=5380 n0_refused=0 gc_done=65861 gc_declined=9922 gc_stuck=8886 gc_paused=17848 gc_cycle=0 gc_cap=10224 gc_wasted=0
+W name=inst_naive flag=gc_stuck path=W0.M.M.M.GI.O0
+W name=inst_naive flag=livelock path=W0.O0.W1.M
+W name=inst_naive flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=inst_naive flag=del_pred_true path=W0.GI.D0.M.GB
+W name=inst_naive flag=del_pred_false path=W0.GI.GB
+E name=inst_safe nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=111921 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=10222 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1333 del_pred_false=5380 n0_refused=0 gc_done=66353 gc_declined=17498 gc_stuck=0 gc_paused=17848 gc_cycle=0 gc_cap=10222 gc_wasted=0
+W name=inst_safe flag=livelock path=W0.O0.W1.M
+W name=inst_safe flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=inst_safe flag=del_pred_true path=W0.GI.D0.M.GB
+W name=inst_safe flag=del_pred_false path=W0.GI.GB
+E name=fault_naive nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=197884 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=13433 livelock=98822 frozen=0 unmet_del=0 false_enospc=112 release_bad=0 rb_refused=0 del_pred_true=1515 del_pred_false=6432 n0_refused=0 gc_done=34250 gc_declined=11131 gc_stuck=52975 gc_paused=706 gc_cycle=98724 gc_cap=98 gc_wasted=0
+W name=fault_naive flag=gc_stuck path=W0.GI.Q0
+W name=fault_naive flag=livelock path=W0
+W name=fault_naive flag=false_enospc path=W0.GI.O0.Q0.O0.O0.O0
+W name=fault_naive flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_naive flag=del_pred_false path=W0.GI.GB
+E name=fault_safe nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=178576 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=9294 livelock=73484 frozen=0 unmet_del=0 false_enospc=112 release_bad=0 rb_refused=0 del_pred_true=1485 del_pred_false=6082 n0_refused=0 gc_done=34447 gc_declined=58719 gc_stuck=11442 gc_paused=484 gc_cycle=73390 gc_cap=94 gc_wasted=0
+W name=fault_safe flag=gc_stuck path=W0.GI.Q0
+W name=fault_safe flag=livelock path=W0
+W name=fault_safe flag=false_enospc path=W0.GI.O0.Q0.O0.O0.O0
+W name=fault_safe flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_safe flag=del_pred_false path=W0.GI.GB
+E name=fix_all nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=107981 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=12 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=44 del_pred_false=0 n0_refused=0 gc_done=5476 gc_declined=101069 gc_stuck=12 gc_paused=1424 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=fix_all flag=gc_stuck path=W0.W1.O0.O0.O0.GI.Q0
+W name=fix_all flag=del_pred_true path=W0.Q0.O0.O0.O0.GI.GB
+E name=bounded nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92031 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1015 del_pred_false=4896 n0_refused=0 gc_done=11260 gc_declined=6153 gc_stuck=0 gc_paused=6 gc_cycle=0 gc_cap=0 gc_wasted=74612
+W name=bounded flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=bounded flag=del_pred_true path=W0.GI.D0.GB
+W name=bounded flag=del_pred_false path=W0.GI.GB
+E name=holes_pre_bounded nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=37450 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=226 del_pred_false=14 n0_refused=0 gc_done=5350 gc_declined=31078 gc_stuck=0 gc_paused=376 gc_cycle=0 gc_cap=0 gc_wasted=646
+W name=holes_pre_bounded flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre_bounded flag=del_pred_false path=W0.M.M.M.GI.GB
+E name=n0_all nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92031 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=73280 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1015 del_pred_false=4896 n0_refused=0 gc_done=12208 gc_declined=6161 gc_stuck=0 gc_paused=382 gc_cycle=73266 gc_cap=14 gc_wasted=0
+W name=n0_all flag=livelock path=W0
+W name=n0_all flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=n0_all flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_all flag=del_pred_false path=W0.GI.GB
+E name=n0_fg nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=7 states=92031 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=73280 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1015 del_pred_false=4896 n0_refused=0 gc_done=12208 gc_declined=6161 gc_stuck=0 gc_paused=382 gc_cycle=73266 gc_cap=14 gc_wasted=0
+W name=n0_fg flag=livelock path=W0
+W name=n0_fg flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=n0_fg flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_fg flag=del_pred_false path=W0.GI.GB
+E name=base nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=63089 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=14742 frozen=0 unmet_del=0 false_enospc=2944 release_bad=0 rb_refused=0 del_pred_true=1566 del_pred_false=1514 n0_refused=0 gc_done=18949 gc_declined=5326 gc_stuck=0 gc_paused=24072 gc_cycle=13938 gc_cap=804 gc_wasted=0
+W name=base flag=livelock path=W0.M
+W name=base flag=false_enospc path=W0.O0.GI.O0
+W name=base flag=del_pred_true path=W0.GI.GB
+W name=base flag=del_pred_false path=W0.GI.O0.GB
+E name=maponly_regen nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=62390 live_released=2162 unreadable=690 dup_map=614 leak=4882 hint_bad=1498 gc_stuck=666 livelock=0 frozen=0 unmet_del=0 false_enospc=2920 release_bad=1204 rb_refused=500 del_pred_true=1520 del_pred_false=1424 n0_refused=0 gc_done=11161 gc_declined=6353 gc_stuck=22828 gc_paused=22048 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=maponly_regen flag=live_released path=W0.GI.GB.W1
+W name=maponly_regen flag=unreadable path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=dup_map path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=leak path=W0.GI.GB.W1
+W name=maponly_regen flag=hint_bad path=W0.GI.GB
+W name=maponly_regen flag=gc_stuck path=W0.GI.GB.GI
+W name=maponly_regen flag=false_enospc path=W0.O0.GI.O0
+W name=maponly_regen flag=release_bad path=W0.GI.GB.W1.O0
+W name=maponly_regen flag=rb_refused path=W0.GI.GB.W1.O0.R1
+W name=maponly_regen flag=del_pred_true path=W0.GI.GB
+W name=maponly_regen flag=del_pred_false path=W0.GI.O0.GB
+E name=maponly_carry nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=63447 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=5068 gc_stuck=0 livelock=14844 frozen=0 unmet_del=0 false_enospc=2944 release_bad=0 rb_refused=0 del_pred_true=1566 del_pred_false=1518 n0_refused=0 gc_done=19093 gc_declined=5356 gc_stuck=0 gc_paused=24154 gc_cycle=14032 gc_cap=812 gc_wasted=0
+W name=maponly_carry flag=hint_bad path=W0.GI.GB
+W name=maponly_carry flag=livelock path=W0.M
+W name=maponly_carry flag=false_enospc path=W0.O0.GI.O0
+W name=maponly_carry flag=del_pred_true path=W0.GI.GB
+W name=maponly_carry flag=del_pred_false path=W0.GI.O0.GB
+E name=occ nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=63091 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=29330 frozen=0 unmet_del=0 false_enospc=2944 release_bad=0 rb_refused=0 del_pred_true=284 del_pred_false=2796 n0_refused=0 gc_done=2758 gc_declined=6935 gc_stuck=0 gc_paused=24068 gc_cycle=28362 gc_cap=968 gc_wasted=0
+W name=occ flag=livelock path=W0
+W name=occ flag=false_enospc path=W0.O0.GI.O0
+W name=occ flag=del_pred_true path=W0.GI.O0.D0.M.GB
+W name=occ flag=del_pred_false path=W0.GI.GB
+E name=holes nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=56511 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=4150 frozen=0 unmet_del=0 false_enospc=2824 release_bad=0 rb_refused=0 del_pred_true=1084 del_pred_false=1040 n0_refused=0 gc_done=6291 gc_declined=4748 gc_stuck=0 gc_paused=41322 gc_cycle=3890 gc_cap=260 gc_wasted=0
+W name=holes flag=livelock path=W0.M.M
+W name=holes flag=false_enospc path=W0.O0.GI.O0
+W name=holes flag=del_pred_true path=W0.GI.D0.GB
+W name=holes flag=del_pred_false path=W0.GI.O0.GB
+E name=holes_pre nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=30272 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=502 frozen=0 unmet_del=0 false_enospc=168 release_bad=0 rb_refused=0 del_pred_true=108 del_pred_false=142 n0_refused=0 gc_done=1973 gc_declined=22921 gc_stuck=0 gc_paused=4876 gc_cycle=502 gc_cap=0 gc_wasted=0
+W name=holes_pre flag=livelock path=W0.M.M
+W name=holes_pre flag=false_enospc path=W0.M.W1.O1.GI.O0
+W name=holes_pre flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre flag=del_pred_false path=W0.M.M.GI.GB
+E name=occ_holes_pre nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=30272 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=508 frozen=0 unmet_del=0 false_enospc=168 release_bad=0 rb_refused=0 del_pred_true=28 del_pred_false=222 n0_refused=0 gc_done=369 gc_declined=24533 gc_stuck=0 gc_paused=4862 gc_cycle=508 gc_cap=0 gc_wasted=0
+W name=occ_holes_pre flag=livelock path=W0.M.M
+W name=occ_holes_pre flag=false_enospc path=W0.M.W1.O1.GI.O0
+W name=occ_holes_pre flag=del_pred_true path=W0.M.W1.GI.O0.D0.GB
+W name=occ_holes_pre flag=del_pred_false path=W0.M.W1.GI.GB
+E name=cached nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=68691 live_released=1366 unreadable=602 dup_map=338 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=3214 release_bad=660 rb_refused=308 del_pred_true=2060 del_pred_false=1696 n0_refused=0 gc_done=40325 gc_declined=11516 gc_stuck=0 gc_paused=16850 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=cached flag=live_released path=W0.O0.GI.GB
+W name=cached flag=unreadable path=W0.GI.W1.GB
+W name=cached flag=dup_map path=W0.GI.W1.GB
+W name=cached flag=false_enospc path=W0.O0.GI.O0
+W name=cached flag=release_bad path=W0.O0.GI.GB.O0
+W name=cached flag=rb_refused path=W0.GI.W1.GB.R1
+W name=cached flag=del_pred_true path=W0.GI.GB
+W name=cached flag=del_pred_false path=W0.GI.O0.GB
+E name=cur_skip nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=56943 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=13644 frozen=0 unmet_del=4 false_enospc=2884 release_bad=0 rb_refused=0 del_pred_true=1386 del_pred_false=1486 n0_refused=0 gc_done=17497 gc_declined=4782 gc_stuck=0 gc_paused=21020 gc_cycle=12814 gc_cap=830 gc_wasted=0
+W name=cur_skip flag=livelock path=W0.M
+W name=cur_skip flag=unmet_del path=W0.W1.GI.M.GB.R1.GB
+W name=cur_skip flag=false_enospc path=W0.O0.GI.O0
+W name=cur_skip flag=del_pred_true path=W0.GI.GB
+W name=cur_skip flag=del_pred_false path=W0.GI.O0.GB
+E name=cur_recheck nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=56943 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=13636 frozen=0 unmet_del=0 false_enospc=2884 release_bad=0 rb_refused=0 del_pred_true=1386 del_pred_false=1482 n0_refused=0 gc_done=17481 gc_declined=4782 gc_stuck=0 gc_paused=21044 gc_cycle=12816 gc_cap=820 gc_wasted=0
+W name=cur_recheck flag=livelock path=W0.M
+W name=cur_recheck flag=false_enospc path=W0.O0.GI.O0
+W name=cur_recheck flag=del_pred_true path=W0.GI.GB
+W name=cur_recheck flag=del_pred_false path=W0.GI.O0.GB
+E name=old_skip nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=63089 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=14742 frozen=0 unmet_del=0 false_enospc=2944 release_bad=0 rb_refused=0 del_pred_true=1566 del_pred_false=1514 n0_refused=0 gc_done=18949 gc_declined=5326 gc_stuck=0 gc_paused=24072 gc_cycle=13938 gc_cap=804 gc_wasted=0
+W name=old_skip flag=livelock path=W0.M
+W name=old_skip flag=false_enospc path=W0.O0.GI.O0
+W name=old_skip flag=del_pred_true path=W0.GI.GB
+W name=old_skip flag=del_pred_false path=W0.GI.O0.GB
+E name=naive nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=81231 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=10781 frozen=0 unmet_del=0 false_enospc=3452 release_bad=0 rb_refused=0 del_pred_true=2057 del_pred_false=4141 n0_refused=0 gc_done=48078 gc_declined=848 gc_stuck=0 gc_paused=21524 gc_cycle=10781 gc_cap=0 gc_wasted=0
+W name=naive flag=livelock path=(mkfs)
+W name=naive flag=false_enospc path=W0.O0.GI.O0
+W name=naive flag=del_pred_true path=W0.GI.GB
+W name=naive flag=del_pred_false path=GI.GB
+E name=inst_naive nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=65738 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=1588 livelock=4474 frozen=0 unmet_del=0 false_enospc=2390 release_bad=0 rb_refused=0 del_pred_true=396 del_pred_false=696 n0_refused=0 gc_done=7058 gc_declined=9640 gc_stuck=16558 gc_paused=28008 gc_cycle=0 gc_cap=4474 gc_wasted=0
+W name=inst_naive flag=gc_stuck path=W0.O0.M.GI.O0
+W name=inst_naive flag=livelock path=M.W0
+W name=inst_naive flag=false_enospc path=W0.GI.O0
+W name=inst_naive flag=del_pred_true path=W0.O0.GI.D0.GB
+W name=inst_naive flag=del_pred_false path=W0.GI.D0.GB
+E name=inst_safe nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=59261 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=4226 frozen=0 unmet_del=0 false_enospc=2258 release_bad=0 rb_refused=0 del_pred_true=404 del_pred_false=618 n0_refused=0 gc_done=7283 gc_declined=20030 gc_stuck=0 gc_paused=27722 gc_cycle=0 gc_cap=4226 gc_wasted=0
+W name=inst_safe flag=livelock path=M.W0
+W name=inst_safe flag=false_enospc path=W0.GI.O0
+W name=inst_safe flag=del_pred_true path=W0.O0.GI.D0.GB
+W name=inst_safe flag=del_pred_false path=W0.GI.D0.GB
+E name=fault_naive nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=120812 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=5139 livelock=19404 frozen=0 unmet_del=0 false_enospc=6372 release_bad=0 rb_refused=0 del_pred_true=1968 del_pred_false=1846 n0_refused=0 gc_done=26570 gc_declined=9269 gc_stuck=16943 gc_paused=48626 gc_cycle=17690 gc_cap=1714 gc_wasted=0
+W name=fault_naive flag=gc_stuck path=W0.GI.Q0
+W name=fault_naive flag=livelock path=W0.M
+W name=fault_naive flag=false_enospc path=W0.O0.GI.O0
+W name=fault_naive flag=del_pred_true path=W0.GI.GB
+W name=fault_naive flag=del_pred_false path=W0.GI.O0.GB
+E name=fault_safe nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=111443 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=3693 livelock=15804 frozen=0 unmet_del=0 false_enospc=5636 release_bad=0 rb_refused=0 del_pred_true=1906 del_pred_false=1786 n0_refused=0 gc_done=23655 gc_declined=31547 gc_stuck=4179 gc_paused=36258 gc_cycle=14012 gc_cap=1792 gc_wasted=0
+W name=fault_safe flag=gc_stuck path=W0.GI.Q0
+W name=fault_safe flag=livelock path=W0.M
+W name=fault_safe flag=false_enospc path=W0.O0.GI.O0
+W name=fault_safe flag=del_pred_true path=W0.GI.GB
+W name=fault_safe flag=del_pred_false path=W0.GI.O0.GB
+E name=fix_all nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=72718 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=130 livelock=0 frozen=0 unmet_del=0 false_enospc=246 release_bad=0 rb_refused=0 del_pred_true=126 del_pred_false=14 n0_refused=0 gc_done=5720 gc_declined=53982 gc_stuck=130 gc_paused=12886 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=fix_all flag=gc_stuck path=W0.O0.M.M.GI.Q0
+W name=fix_all flag=false_enospc path=M.W0.O0.W1.GI.O0
+W name=fix_all flag=del_pred_true path=W0.O0.M.M.GI.GB
+W name=fix_all flag=del_pred_false path=W0.O0.O0.M.R1.GI.GB
+E name=bounded nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=63089 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=2944 release_bad=0 rb_refused=0 del_pred_true=1566 del_pred_false=1514 n0_refused=0 gc_done=10681 gc_declined=5155 gc_stuck=0 gc_paused=20352 gc_cycle=0 gc_cap=0 gc_wasted=26901
+W name=bounded flag=false_enospc path=W0.O0.GI.O0
+W name=bounded flag=del_pred_true path=W0.GI.GB
+W name=bounded flag=del_pred_false path=W0.GI.O0.GB
+E name=holes_pre_bounded nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=30272 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=168 release_bad=0 rb_refused=0 del_pred_true=108 del_pred_false=142 n0_refused=0 gc_done=1917 gc_declined=21245 gc_stuck=0 gc_paused=4254 gc_cycle=0 gc_cap=0 gc_wasted=2856
+W name=holes_pre_bounded flag=false_enospc path=W0.M.W1.O1.GI.O0
+W name=holes_pre_bounded flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre_bounded flag=del_pred_false path=W0.M.M.GI.GB
+E name=n0_all nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=49506 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=7424 frozen=2480 unmet_del=0 false_enospc=2564 release_bad=0 rb_refused=0 del_pred_true=1208 del_pred_false=1124 n0_refused=3602 gc_done=12129 gc_declined=6061 gc_stuck=0 gc_paused=23892 gc_cycle=7424 gc_cap=0 gc_wasted=0
+W name=n0_all flag=livelock path=W0.M
+W name=n0_all flag=frozen path=W0.M.W1
+W name=n0_all flag=false_enospc path=W0.O0.GI.O0
+W name=n0_all flag=del_pred_true path=W0.GI.GB
+W name=n0_all flag=del_pred_false path=W0.GI.O0.GB
+W name=n0_all flag=n0_refused path=W0.M.W1.O0
+E name=n0_fg nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=58335 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=13344 frozen=0 unmet_del=0 false_enospc=2764 release_bad=0 rb_refused=0 del_pred_true=1528 del_pred_false=1436 n0_refused=1128 gc_done=17783 gc_declined=5222 gc_stuck=0 gc_paused=21986 gc_cycle=12632 gc_cap=712 gc_wasted=0
+W name=n0_fg flag=livelock path=W0.M
+W name=n0_fg flag=false_enospc path=W0.O0.GI.O0
+W name=n0_fg flag=del_pred_true path=W0.GI.GB
+W name=n0_fg flag=del_pred_false path=W0.GI.O0.GB
+W name=n0_fg flag=n0_refused path=W0.M.W1.O0
+E name=base nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=89053 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=9264 frozen=0 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=1345 del_pred_false=4508 n0_refused=0 gc_done=53500 gc_declined=6153 gc_stuck=0 gc_paused=20136 gc_cycle=9264 gc_cap=0 gc_wasted=0
+W name=base flag=livelock path=W0
+W name=base flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=base flag=del_pred_true path=W0.GI.D0.GB
+W name=base flag=del_pred_false path=W0.GI.GB
+E name=maponly_regen nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=87884 live_released=4360 unreadable=580 dup_map=488 leak=7794 hint_bad=2820 gc_stuck=1052 livelock=0 frozen=0 unmet_del=0 false_enospc=1112 release_bad=1998 rb_refused=618 del_pred_true=1287 del_pred_false=4340 n0_refused=0 gc_done=21171 gc_declined=8169 gc_stuck=38824 gc_paused=19720 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=maponly_regen flag=live_released path=W0.GI.GB.W1
+W name=maponly_regen flag=unreadable path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=dup_map path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=leak path=W0.GI.GB.W1
+W name=maponly_regen flag=hint_bad path=W0.GI.GB
+W name=maponly_regen flag=gc_stuck path=W0.GI.GB.GI
+W name=maponly_regen flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=maponly_regen flag=release_bad path=W0.GI.GB.W1.O0
+W name=maponly_regen flag=rb_refused path=W0.GI.GB.W1.O0.R1
+W name=maponly_regen flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_regen flag=del_pred_false path=W0.GI.GB
+E name=maponly_carry nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=89265 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=8698 gc_stuck=0 livelock=9266 frozen=0 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=1345 del_pred_false=4508 n0_refused=0 gc_done=53692 gc_declined=6167 gc_stuck=0 gc_paused=20140 gc_cycle=9266 gc_cap=0 gc_wasted=0
+W name=maponly_carry flag=hint_bad path=W0.GI.GB
+W name=maponly_carry flag=livelock path=W0
+W name=maponly_carry flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=maponly_carry flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_carry flag=del_pred_false path=W0.GI.GB
+E name=occ nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=89485 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=20656 frozen=0 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=476 del_pred_false=5399 n0_refused=0 gc_done=40511 gc_declined=8418 gc_stuck=0 gc_paused=19900 gc_cycle=20656 gc_cap=0 gc_wasted=0
+W name=occ flag=livelock path=W0
+W name=occ flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=occ flag=del_pred_true path=W0.M.GI.D0.GB
+W name=occ flag=del_pred_false path=W0.GI.GB
+E name=holes nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=76913 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=1112 release_bad=0 rb_refused=0 del_pred_true=1197 del_pred_false=2346 n0_refused=0 gc_done=16359 gc_declined=5314 gc_stuck=0 gc_paused=55240 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=holes flag=del_pred_true path=W0.GI.D0.GB
+W name=holes flag=del_pred_false path=W0.GI.O0.GB
+E name=holes_pre nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=37078 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=228 del_pred_false=110 n0_refused=0 gc_done=5561 gc_declined=30859 gc_stuck=0 gc_paused=658 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes_pre flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre flag=del_pred_false path=W0.M.M.W1.GI.GB
+E name=occ_holes_pre nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=37078 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=88 del_pred_false=250 n0_refused=0 gc_done=2389 gc_declined=34031 gc_stuck=0 gc_paused=658 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=occ_holes_pre flag=del_pred_true path=W0.M.M.GI.GB
+W name=occ_holes_pre flag=del_pred_false path=W0.M.W1.GI.GB
+E name=cached nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=94464 live_released=1042 unreadable=994 dup_map=608 leak=0 hint_bad=0 gc_stuck=0 livelock=9040 frozen=0 unmet_del=0 false_enospc=1136 release_bad=318 rb_refused=146 del_pred_true=1907 del_pred_false=4576 n0_refused=0 gc_done=61882 gc_declined=9330 gc_stuck=0 gc_paused=14212 gc_cycle=9040 gc_cap=0 gc_wasted=0
+W name=cached flag=live_released path=W0.GI.W1.GB.O0
+W name=cached flag=unreadable path=W0.GI.W1.GB
+W name=cached flag=dup_map path=W0.GI.W1.GB
+W name=cached flag=livelock path=W0
+W name=cached flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=cached flag=release_bad path=W0.GI.W1.GB.R2
+W name=cached flag=rb_refused path=W0.GI.W1.GB.R1
+W name=cached flag=del_pred_true path=W0.GI.D0.GB
+W name=cached flag=del_pred_false path=W0.GI.GB
+E name=cur_skip nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=84129 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=8666 frozen=0 unmet_del=0 false_enospc=1132 release_bad=0 rb_refused=0 del_pred_true=1359 del_pred_false=4464 n0_refused=0 gc_done=51892 gc_declined=5675 gc_stuck=0 gc_paused=17896 gc_cycle=8666 gc_cap=0 gc_wasted=0
+W name=cur_skip flag=livelock path=W0
+W name=cur_skip flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=cur_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_skip flag=del_pred_false path=W0.GI.GB
+E name=cur_recheck nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=84129 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=8666 frozen=0 unmet_del=0 false_enospc=1132 release_bad=0 rb_refused=0 del_pred_true=1359 del_pred_false=4464 n0_refused=0 gc_done=51892 gc_declined=5675 gc_stuck=0 gc_paused=17896 gc_cycle=8666 gc_cap=0 gc_wasted=0
+W name=cur_recheck flag=livelock path=W0
+W name=cur_recheck flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=cur_recheck flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_recheck flag=del_pred_false path=W0.GI.GB
+E name=old_skip nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=89053 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=9264 frozen=0 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=1345 del_pred_false=4508 n0_refused=0 gc_done=53500 gc_declined=6153 gc_stuck=0 gc_paused=20136 gc_cycle=9264 gc_cap=0 gc_wasted=0
+W name=old_skip flag=livelock path=W0
+W name=old_skip flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=old_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=old_skip flag=del_pred_false path=W0.GI.GB
+E name=naive nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=118256 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=12399 frozen=0 unmet_del=0 false_enospc=1120 release_bad=0 rb_refused=0 del_pred_true=1532 del_pred_false=8305 n0_refused=0 gc_done=44879 gc_declined=0 gc_stuck=0 gc_paused=60978 gc_cycle=12399 gc_cap=0 gc_wasted=0
+W name=naive flag=livelock path=(mkfs)
+W name=naive flag=false_enospc path=GI.W0.GB.GI.O0
+W name=naive flag=del_pred_true path=W0.GI.D0.GB
+W name=naive flag=del_pred_false path=GI.GB
+E name=inst_naive nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=111403 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=1414 livelock=35082 frozen=0 unmet_del=0 false_enospc=2158 release_bad=0 rb_refused=0 del_pred_true=995 del_pred_false=4842 n0_refused=0 gc_done=11674 gc_declined=9727 gc_stuck=25630 gc_paused=29290 gc_cycle=0 gc_cap=35082 gc_wasted=0
+W name=inst_naive flag=gc_stuck path=W0.M.M.GI.O0
+W name=inst_naive flag=livelock path=W0
+W name=inst_naive flag=false_enospc path=W0.O0.O0.O0.GI.O0
+W name=inst_naive flag=del_pred_true path=W0.GI.D0.GB
+W name=inst_naive flag=del_pred_false path=W0.GI.GB
+E name=inst_safe nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=104937 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=34540 frozen=0 unmet_del=0 false_enospc=2158 release_bad=0 rb_refused=0 del_pred_true=995 del_pred_false=4746 n0_refused=0 gc_done=12324 gc_declined=28783 gc_stuck=0 gc_paused=29290 gc_cycle=0 gc_cap=34540 gc_wasted=0
+W name=inst_safe flag=livelock path=W0
+W name=inst_safe flag=false_enospc path=W0.O0.O0.O0.GI.O0
+W name=inst_safe flag=del_pred_true path=W0.GI.D0.GB
+W name=inst_safe flag=del_pred_false path=W0.GI.GB
+E name=fault_naive nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=192283 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=12780 livelock=13296 frozen=0 unmet_del=0 false_enospc=2948 release_bad=0 rb_refused=0 del_pred_true=1843 del_pred_false=5998 n0_refused=0 gc_done=80833 gc_declined=11108 gc_stuck=37894 gc_paused=49152 gc_cycle=12874 gc_cap=422 gc_wasted=0
+W name=fault_naive flag=gc_stuck path=W0.GI.Q0
+W name=fault_naive flag=livelock path=W0
+W name=fault_naive flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=fault_naive flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_naive flag=del_pred_false path=W0.GI.GB
+E name=fault_safe nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=173464 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=8684 livelock=9966 frozen=0 unmet_del=0 false_enospc=1856 release_bad=0 rb_refused=0 del_pred_true=1807 del_pred_false=5736 n0_refused=0 gc_done=72050 gc_declined=60156 gc_stuck=10654 gc_paused=20638 gc_cycle=9270 gc_cap=696 gc_wasted=0
+W name=fault_safe flag=gc_stuck path=W0.GI.Q0
+W name=fault_safe flag=livelock path=W0
+W name=fault_safe flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=fault_safe flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_safe flag=del_pred_false path=W0.GI.GB
+E name=fix_all nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=109298 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=4 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=0 del_pred_false=4 n0_refused=0 gc_done=1258 gc_declined=107932 gc_stuck=4 gc_paused=104 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=fix_all flag=gc_stuck path=M.R1.M.W0.M.GI.Q0
+W name=fix_all flag=del_pred_false path=M.R1.M.W0.M.GI.GB
+E name=bounded nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=89053 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=1345 del_pred_false=4508 n0_refused=0 gc_done=21244 gc_declined=6061 gc_stuck=0 gc_paused=17374 gc_cycle=0 gc_cap=0 gc_wasted=44374
+W name=bounded flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=bounded flag=del_pred_true path=W0.GI.D0.GB
+W name=bounded flag=del_pred_false path=W0.GI.GB
+E name=holes_pre_bounded nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=37078 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=228 del_pred_false=110 n0_refused=0 gc_done=5561 gc_declined=29173 gc_stuck=0 gc_paused=658 gc_cycle=0 gc_cap=0 gc_wasted=1686
+W name=holes_pre_bounded flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre_bounded flag=del_pred_false path=W0.M.M.W1.GI.GB
+E name=n0_all nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=66806 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=4066 frozen=3434 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=923 del_pred_false=2902 n0_refused=6320 gc_done=34126 gc_declined=7268 gc_stuck=0 gc_paused=21346 gc_cycle=4066 gc_cap=0 gc_wasted=0
+W name=n0_all flag=livelock path=W0
+W name=n0_all flag=frozen path=W0.GI.W1
+W name=n0_all flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=n0_all flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_all flag=del_pred_false path=W0.GI.GB
+W name=n0_all flag=n0_refused path=W0.GI.W1.O0
+E name=n0_fg nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=80695 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=7384 frozen=0 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=1221 del_pred_false=4030 n0_refused=2444 gc_done=47520 gc_declined=6091 gc_stuck=0 gc_paused=19700 gc_cycle=7384 gc_cap=0 gc_wasted=0
+W name=n0_fg flag=livelock path=W0
+W name=n0_fg flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
+W name=n0_fg flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_fg flag=del_pred_false path=W0.GI.GB
+W name=n0_fg flag=n0_refused path=W0.GI.W1.O0
+E name=base nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56161 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=44697 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8789 gc_declined=2675 gc_stuck=0 gc_paused=0 gc_cycle=43941 gc_cap=756 gc_wasted=0
+W name=base flag=livelock path=W0
+W name=base flag=del_pred_true path=W0.GI.D0.GB
+W name=base flag=del_pred_false path=W0.GI.GB
+E name=maponly_regen nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=55990 live_released=1932 unreadable=87 dup_map=87 leak=2709 hint_bad=1638 gc_stuck=261 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=546 rb_refused=90 del_pred_true=258 del_pred_false=1920 n0_refused=0 gc_done=8648 gc_declined=3263 gc_stuck=44079 gc_paused=0 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=maponly_regen flag=live_released path=W0.GI.GB.W1
+W name=maponly_regen flag=unreadable path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=dup_map path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=leak path=W0.GI.GB.W1
+W name=maponly_regen flag=hint_bad path=W0.GI.GB
+W name=maponly_regen flag=gc_stuck path=W0.GI.GB.GI
+W name=maponly_regen flag=release_bad path=W0.GI.GB.W1.O0
+W name=maponly_regen flag=rb_refused path=W0.GI.GB.W1.O0.R1
+W name=maponly_regen flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_regen flag=del_pred_false path=W0.GI.GB
+E name=maponly_carry nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56170 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=3783 gc_stuck=0 livelock=44703 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8789 gc_declined=2678 gc_stuck=0 gc_paused=0 gc_cycle=43947 gc_cap=756 gc_wasted=0
+W name=maponly_carry flag=hint_bad path=W0.GI.GB
+W name=maponly_carry flag=livelock path=W0
+W name=maponly_carry flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_carry flag=del_pred_false path=W0.GI.GB
+E name=occ nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56197 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=6840 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=92 del_pred_false=2119 n0_refused=0 gc_done=45800 gc_declined=3557 gc_stuck=0 gc_paused=0 gc_cycle=6840 gc_cap=0 gc_wasted=0
+W name=occ flag=livelock path=W0.W1.W2
+W name=occ flag=del_pred_true path=W0.M.GI.D0.GB
+W name=occ flag=del_pred_false path=W0.GI.GB
+E name=holes nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=51491 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=243 del_pred_false=1020 n0_refused=0 gc_done=8237 gc_declined=2463 gc_stuck=0 gc_paused=40791 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes flag=del_pred_true path=W0.GI.D0.GB
+W name=holes flag=del_pred_false path=W0.GI.O0.GB
+E name=holes_pre nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=29625 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=90 del_pred_false=0 n0_refused=0 gc_done=6510 gc_declined=23049 gc_stuck=0 gc_paused=66 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes_pre flag=del_pred_true path=W0.M.W1.GI.GB
+E name=occ_holes_pre nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=29625 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=12 del_pred_false=78 n0_refused=0 gc_done=2364 gc_declined=27195 gc_stuck=0 gc_paused=66 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=occ_holes_pre flag=del_pred_true path=W0.M.W1.M.GI.GB
+W name=occ_holes_pre flag=del_pred_false path=W0.M.W1.GI.GB
+E name=cached nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=58560 live_released=636 unreadable=621 dup_map=432 leak=0 hint_bad=0 gc_stuck=0 livelock=39846 frozen=0 unmet_del=0 false_enospc=0 release_bad=270 rb_refused=78 del_pred_true=461 del_pred_false=1776 n0_refused=0 gc_done=15260 gc_declined=3454 gc_stuck=0 gc_paused=0 gc_cycle=38022 gc_cap=1824 gc_wasted=0
+W name=cached flag=live_released path=W0.O0.O0.GI.GB
+W name=cached flag=unreadable path=W0.GI.W1.GB
+W name=cached flag=dup_map path=W0.GI.W1.GB
+W name=cached flag=livelock path=W0
+W name=cached flag=release_bad path=W0.GI.W1.GB.R2
+W name=cached flag=rb_refused path=W0.GI.W1.GB.R1
+W name=cached flag=del_pred_true path=W0.GI.D0.GB
+W name=cached flag=del_pred_false path=W0.GI.GB
+E name=cur_skip nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=53938 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=42579 frozen=0 unmet_del=6 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=281 del_pred_false=2004 n0_refused=0 gc_done=8926 gc_declined=2433 gc_stuck=0 gc_paused=0 gc_cycle=41763 gc_cap=816 gc_wasted=0
+W name=cur_skip flag=livelock path=W0
+W name=cur_skip flag=unmet_del path=W0.W1.GI.GB.R1.GB
+W name=cur_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_skip flag=del_pred_false path=W0.GI.GB
+E name=cur_recheck nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=53938 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=42705 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=281 del_pred_false=1998 n0_refused=0 gc_done=8800 gc_declined=2433 gc_stuck=0 gc_paused=0 gc_cycle=41889 gc_cap=816 gc_wasted=0
+W name=cur_recheck flag=livelock path=W0
+W name=cur_recheck flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_recheck flag=del_pred_false path=W0.GI.GB
+E name=old_skip nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56161 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=44697 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8789 gc_declined=2675 gc_stuck=0 gc_paused=0 gc_cycle=43941 gc_cap=756 gc_wasted=0
+W name=old_skip flag=livelock path=W0
+W name=old_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=old_skip flag=del_pred_false path=W0.GI.GB
+E name=naive nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=70376 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=42545 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=267 del_pred_false=3841 n0_refused=0 gc_done=10521 gc_declined=0 gc_stuck=0 gc_paused=17310 gc_cycle=36893 gc_cap=5652 gc_wasted=0
+W name=naive flag=livelock path=(mkfs)
+W name=naive flag=del_pred_true path=W0.GI.D0.GB
+W name=naive flag=del_pred_false path=GI.GB
+E name=inst_naive nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=65903 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=56499 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=92 del_pred_false=2311 n0_refused=0 gc_done=5102 gc_declined=4128 gc_stuck=174 gc_paused=0 gc_cycle=0 gc_cap=56499 gc_wasted=0
+W name=inst_naive flag=livelock path=W0
+W name=inst_naive flag=del_pred_true path=W0.GI.D0.M.GB
+W name=inst_naive flag=del_pred_false path=W0.GI.GB
+E name=inst_safe nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=65903 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=56499 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=92 del_pred_false=2311 n0_refused=0 gc_done=5108 gc_declined=4296 gc_stuck=0 gc_paused=0 gc_cycle=0 gc_cap=56499 gc_wasted=0
+W name=inst_safe flag=livelock path=W0
+W name=inst_safe flag=del_pred_true path=W0.GI.D0.M.GB
+W name=inst_safe flag=del_pred_false path=W0.GI.GB
+E name=fault_naive nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=105686 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=4792 livelock=54681 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=336 del_pred_false=2277 n0_refused=0 gc_done=21989 gc_declined=4127 gc_stuck=24889 gc_paused=0 gc_cycle=53505 gc_cap=1176 gc_wasted=0
+W name=fault_naive flag=gc_stuck path=W0.GI.Q0
+W name=fault_naive flag=livelock path=W0
+W name=fault_naive flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_naive flag=del_pred_false path=W0.GI.GB
+E name=fault_safe nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=98850 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=3692 livelock=45120 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=333 del_pred_false=2211 n0_refused=0 gc_done=22244 gc_declined=26201 gc_stuck=5285 gc_paused=0 gc_cycle=43956 gc_cap=1164 gc_wasted=0
+W name=fault_safe flag=gc_stuck path=W0.GI.Q0
+W name=fault_safe flag=livelock path=W0
+W name=fault_safe flag=del_pred_true path=W0.GI.D0.GB
+W name=fault_safe flag=del_pred_false path=W0.GI.GB
+E name=fix_all nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=68886 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=0 del_pred_false=0 n0_refused=0 gc_done=5361 gc_declined=63525 gc_stuck=0 gc_paused=0 gc_cycle=0 gc_cap=0 gc_wasted=0
+E name=bounded nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56161 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8381 gc_declined=2675 gc_stuck=0 gc_paused=0 gc_cycle=0 gc_cap=0 gc_wasted=45105
+W name=bounded flag=del_pred_true path=W0.GI.D0.GB
+W name=bounded flag=del_pred_false path=W0.GI.GB
+E name=holes_pre_bounded nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=29625 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=90 del_pred_false=0 n0_refused=0 gc_done=6510 gc_declined=23043 gc_stuck=0 gc_paused=66 gc_cycle=0 gc_cap=0 gc_wasted=6
+W name=holes_pre_bounded flag=del_pred_true path=W0.M.W1.GI.GB
+E name=n0_all nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56161 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=44697 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8789 gc_declined=2675 gc_stuck=0 gc_paused=0 gc_cycle=43941 gc_cap=756 gc_wasted=0
+W name=n0_all flag=livelock path=W0
+W name=n0_all flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_all flag=del_pred_false path=W0.GI.GB
+E name=n0_fg nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56161 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=44697 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8789 gc_declined=2675 gc_stuck=0 gc_paused=0 gc_cycle=43941 gc_cap=756 gc_wasted=0
+W name=n0_fg flag=livelock path=W0
+W name=n0_fg flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_fg flag=del_pred_false path=W0.GI.GB
+E name=base nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=449573 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=354788 frozen=0 unmet_del=0 false_enospc=232 release_bad=0 rb_refused=0 del_pred_true=6270 del_pred_false=27800 n0_refused=0 gc_done=67238 gc_declined=24485 gc_stuck=0 gc_paused=3062 gc_cycle=354152 gc_cap=636 gc_wasted=0
+W name=base flag=livelock path=W0
+W name=base flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=base flag=del_pred_true path=W0.GI.D0.GB
+W name=base flag=del_pred_false path=W0.GI.GB
+E name=holes_pre nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=160923 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=16 release_bad=0 rb_refused=0 del_pred_true=1798 del_pred_false=124 n0_refused=0 gc_done=28685 gc_declined=129848 gc_stuck=0 gc_paused=2390 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=holes_pre flag=false_enospc path=W0.M.W1.GI.O0.O0.O0.O0
+W name=holes_pre flag=del_pred_true path=W0.M.W1.GI.GB
+W name=holes_pre flag=del_pred_false path=W0.M.M.M.GI.GB
+E name=cur_skip nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=425423 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=329682 frozen=0 unmet_del=284 false_enospc=224 release_bad=0 rb_refused=0 del_pred_true=6326 del_pred_false=26968 n0_refused=0 gc_done=70293 gc_declined=22514 gc_stuck=0 gc_paused=2934 gc_cycle=329004 gc_cap=678 gc_wasted=0
+W name=cur_skip flag=livelock path=W0
+W name=cur_skip flag=unmet_del path=W0.W1.GI.GB.R1.GB
+W name=cur_skip flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=cur_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=cur_skip flag=del_pred_false path=W0.GI.GB
+E name=old_skip nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=449573 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=354788 frozen=0 unmet_del=0 false_enospc=232 release_bad=0 rb_refused=0 del_pred_true=6270 del_pred_false=27800 n0_refused=0 gc_done=67238 gc_declined=24485 gc_stuck=0 gc_paused=3062 gc_cycle=354152 gc_cap=636 gc_wasted=0
+W name=old_skip flag=livelock path=W0
+W name=old_skip flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=old_skip flag=del_pred_true path=W0.GI.D0.GB
+W name=old_skip flag=del_pred_false path=W0.GI.GB
+E name=maponly_regen nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=444544 live_released=25906 unreadable=3503 dup_map=2342 leak=52308 hint_bad=16762 gc_stuck=5745 livelock=0 frozen=0 unmet_del=0 false_enospc=232 release_bad=12434 rb_refused=5424 del_pred_true=6023 del_pred_false=26622 n0_refused=0 gc_done=64961 gc_declined=34848 gc_stuck=341767 gc_paused=2968 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=maponly_regen flag=live_released path=W0.GI.GB.W1
+W name=maponly_regen flag=unreadable path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=dup_map path=W0.GI.GB.O0.R1.W1
+W name=maponly_regen flag=leak path=W0.GI.GB.W1
+W name=maponly_regen flag=hint_bad path=W0.GI.GB
+W name=maponly_regen flag=gc_stuck path=W0.GI.GB.GI
+W name=maponly_regen flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=maponly_regen flag=release_bad path=W0.GI.GB.W1.O0
+W name=maponly_regen flag=rb_refused path=W0.GI.GB.W1.O0.R1
+W name=maponly_regen flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_regen flag=del_pred_false path=W0.GI.GB
+E name=maponly_carry nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=454343 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=53624 gc_stuck=0 livelock=358522 frozen=0 unmet_del=0 false_enospc=232 release_bad=0 rb_refused=0 del_pred_true=6284 del_pred_false=27900 n0_refused=0 gc_done=67998 gc_declined=24741 gc_stuck=0 gc_paused=3082 gc_cycle=357882 gc_cap=640 gc_wasted=0
+W name=maponly_carry flag=hint_bad path=W0.GI.GB
+W name=maponly_carry flag=livelock path=W0
+W name=maponly_carry flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=maponly_carry flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_carry flag=del_pred_false path=W0.GI.GB
+E name=cached nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=488940 live_released=5027 unreadable=5538 dup_map=3154 leak=0 hint_bad=0 gc_stuck=0 livelock=355605 frozen=0 unmet_del=0 false_enospc=384 release_bad=2564 rb_refused=2016 del_pred_true=7713 del_pred_false=27818 n0_refused=0 gc_done=95397 gc_declined=37904 gc_stuck=0 gc_paused=34 gc_cycle=351123 gc_cap=4482 gc_wasted=0
+W name=cached flag=live_released path=W0.O0.O0.GI.GB
+W name=cached flag=unreadable path=W0.GI.W1.GB
+W name=cached flag=dup_map path=W0.GI.W1.GB
+W name=cached flag=livelock path=W0
+W name=cached flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=cached flag=release_bad path=W0.GI.W1.GB.R2
+W name=cached flag=rb_refused path=W0.GI.W1.GB.R1
+W name=cached flag=del_pred_true path=W0.GI.D0.GB
+W name=cached flag=del_pred_false path=W0.GI.GB
+E name=n0_all nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=449573 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=354788 frozen=0 unmet_del=0 false_enospc=232 release_bad=0 rb_refused=0 del_pred_true=6270 del_pred_false=27800 n0_refused=0 gc_done=67238 gc_declined=24485 gc_stuck=0 gc_paused=3062 gc_cycle=354152 gc_cap=636 gc_wasted=0
+W name=n0_all flag=livelock path=W0
+W name=n0_all flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=n0_all flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_all flag=del_pred_false path=W0.GI.GB
+E name=n0_fg nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=449573 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=354788 frozen=0 unmet_del=0 false_enospc=232 release_bad=0 rb_refused=0 del_pred_true=6270 del_pred_false=27800 n0_refused=0 gc_done=67238 gc_declined=24485 gc_stuck=0 gc_paused=3062 gc_cycle=354152 gc_cap=636 gc_wasted=0
+W name=n0_fg flag=livelock path=W0
+W name=n0_fg flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
+W name=n0_fg flag=del_pred_true path=W0.GI.D0.GB
+W name=n0_fg flag=del_pred_false path=W0.GI.GB

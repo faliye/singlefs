@@ -1,0 +1,61 @@
+== runner-run-device-main（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== runner-run-device-deps-test-binary（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：直接执行 singlefs-checker-tier 包的测试二进制（e181_landing_check_fixed_point_and_mount_lower_bound）：checker 档，默认只在提交时跑；它是装置 e181_landing_check_fixed_point_and_mount_lower_bound 的话，装置的 main 用 target/<profile>/e181_landing_check_fixed_point_and_mount_lower_bound 或 cargo run --bin e181_landing_check_fixed_point_and_mount_lower_bound 起（与 deps/ 下同它是一份的那一个同判，不算重型）（checker 档）：experiment-runner 不跑「checker 档
+[run-scope-guard.sh] exit=0
+== runner-cargo-run-device（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== runner-cargo-build-device（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== main-unit-test-without-prefix（-）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    → 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户）：
+[run-scope-guard.sh] exit=0
+== main-unit-test-commit-prefix（-）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== runner-e165-loop-variable（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：直接执行 checker 档装置 e165_replay_bounded_enumeration 的本体带 --pinned-cases：门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格的活（e165-pin-red-examples.py --replay 起的就是这一条，逐行重放钉住的红例），归提交时才跑；装置本体的别的用法不算；要跑写进报告「要主 agent 跑的命令」一节交主 agent（Verus）：experiment-runner 不跑「Verus」
+[run-scope-guard.sh] exit=0
+== runner-e165-literal（experiment-runner）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== investigator-e165-replay-state（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== investigator-formal-quick-two-pinned-items（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== investigator-formal-quick-every-pinned-item（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+== writer-crates-quick-break-in-driver-script（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：脚本 @WORK@/light-mutation.sh:3 里的 门禁 checker-tier-crates-mutation-replay.sh（带 --quick，但环境里设了它文件头写的弄坏开关 GATE_MUTATION_BREAK：弄坏开关下 --quick 不只跑轻型登记的那几项，不认轻型，照整道算；要核弄坏开关下的判红，命令写进报告「要主 agent 跑的命令」一节交主 agent）；它的样本档也起重活（登记表第 159 行：样本用真 cargo：每个工作进程冷编一份样本 crate、经真的内存包装起 systemd scope 跑点名的测试，red 里一条把缓冲撑到 1536 MiB 撞 512M 上限、一条跑满 20 秒限时），样本照拒（
+[run-scope-guard.sh] exit=0
+== writer-crates-quick-shard-break（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：门禁 checker-tier-crates-mutation-replay.sh（带 --quick，但环境里设了它文件头写的弄坏开关 MUTATION_SHARD_RUN_BREAK：弄坏开关下 --quick 不只跑轻型登记的那几项，不认轻型，照整道算；要核弄坏开关下的判红，命令写进报告「要主 agent 跑的命令」一节交主 agent）；它的样本档也起重活（登记表第 159 行：样本用真 cargo：每个工作进程冷编一份样本 crate、经真的内存包装起 systemd scope 跑点名的测试，red 里一条把缓冲撑到 1536 MiB 撞 512M 上限、一条跑满 20 秒限时），样本照拒（crates 变异整表）：implementation-writer 不跑「crates 变异整表」
+[run-scope-guard.sh] exit=0
+== writer-crash-quick-slice-states（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0

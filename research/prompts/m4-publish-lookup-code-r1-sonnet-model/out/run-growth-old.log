@@ -1,0 +1,10 @@
+
+running 1 test
+test a_compaction_batch_cpu_grows_less_than_the_threshold_from_512_to_2048_data_units has been running for over 60 seconds
+publish_lookup_by_identity growth smaller_cpu_nanoseconds=[114971994, 115961896, 114986775, 128990030, 115991217, 113993672, 114000321, 113983851] larger_cpu_nanoseconds=[432992768, 436940798, 443001462, 490850475, 434010169, 435571084, 433011078, 444010716]
+publish_lookup_by_identity growth smaller_median=114986775 larger_median=436940798 growth_in_percent=379
+test a_compaction_batch_cpu_grows_less_than_the_threshold_from_512_to_2048_data_units ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 118.17s
+
+wall=118.64 s

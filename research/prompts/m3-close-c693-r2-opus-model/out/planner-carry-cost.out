@@ -1,0 +1,34 @@
+R2PLANNER capacity leaf=477 internal=150
+R2PLANNER devices=2 known_steps=1 unknown_heads=2 unknown_steps=1 rows_in_r=20 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=2 known_steps=1 unknown_heads=2 unknown_steps=3 rows_in_r=24 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=2 known_steps=1 unknown_heads=2 unknown_steps=500 rows_in_r=1018 height_in_r=2 Carry:first=4,steady_max=4 NoCarry:first=4,steady_max=2 KeepWithRoot:first=2,steady_max=2
+R2PLANNER devices=2 known_steps=1 unknown_heads=2 unknown_steps=2000 rows_in_r=4018 height_in_r=2 Carry:first=4,steady_max=4 NoCarry:first=4,steady_max=2 KeepWithRoot:first=2,steady_max=2
+R2PLANNER devices=2 known_steps=1 unknown_heads=4 unknown_steps=1 rows_in_r=24 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=2 known_steps=1 unknown_heads=4 unknown_steps=3 rows_in_r=32 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=2 known_steps=1 unknown_heads=4 unknown_steps=500 rows_in_r=2020 height_in_r=2 Carry:first=6,steady_max=6 NoCarry:first=6,steady_max=2 KeepWithRoot:first=2,steady_max=2
+R2PLANNER devices=2 known_steps=1 unknown_heads=4 unknown_steps=2000 rows_in_r=8020 height_in_r=2 Carry:first=6,steady_max=6 NoCarry:first=6,steady_max=2 KeepWithRoot:first=2,steady_max=2
+R2PLANNER devices=2 known_steps=1000 unknown_heads=2 unknown_steps=1 rows_in_r=1019 height_in_r=2 Carry:first=3,steady_max=3 NoCarry:first=3,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=2 unknown_steps=3 rows_in_r=1023 height_in_r=2 Carry:first=3,steady_max=3 NoCarry:first=3,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=2 unknown_steps=500 rows_in_r=2017 height_in_r=2 Carry:first=5,steady_max=5 NoCarry:first=5,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=2 unknown_steps=2000 rows_in_r=5017 height_in_r=2 Carry:first=5,steady_max=5 NoCarry:first=5,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=4 unknown_steps=1 rows_in_r=1023 height_in_r=2 Carry:first=3,steady_max=3 NoCarry:first=3,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=4 unknown_steps=3 rows_in_r=1031 height_in_r=2 Carry:first=3,steady_max=3 NoCarry:first=3,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=4 unknown_steps=500 rows_in_r=3019 height_in_r=2 Carry:first=7,steady_max=7 NoCarry:first=7,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=2 known_steps=1000 unknown_heads=4 unknown_steps=2000 rows_in_r=9019 height_in_r=2 Carry:first=7,steady_max=7 NoCarry:first=7,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=64 known_steps=1 unknown_heads=2 unknown_steps=1 rows_in_r=392 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=64 known_steps=1 unknown_heads=2 unknown_steps=3 rows_in_r=396 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=64 known_steps=1 unknown_heads=2 unknown_steps=500 rows_in_r=1390 height_in_r=2 Carry:first=5,steady_max=5 NoCarry:first=5,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=64 known_steps=1 unknown_heads=2 unknown_steps=2000 rows_in_r=4390 height_in_r=2 Carry:first=5,steady_max=5 NoCarry:first=5,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=64 known_steps=1 unknown_heads=4 unknown_steps=1 rows_in_r=396 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=64 known_steps=1 unknown_heads=4 unknown_steps=3 rows_in_r=404 height_in_r=1 Carry:first=1,steady_max=1 NoCarry:first=1,steady_max=1 KeepWithRoot:first=1,steady_max=1
+R2PLANNER devices=64 known_steps=1 unknown_heads=4 unknown_steps=500 rows_in_r=2392 height_in_r=2 Carry:first=7,steady_max=7 NoCarry:first=7,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=64 known_steps=1 unknown_heads=4 unknown_steps=2000 rows_in_r=8392 height_in_r=2 Carry:first=7,steady_max=7 NoCarry:first=7,steady_max=3 KeepWithRoot:first=3,steady_max=3
+R2PLANNER devices=64 known_steps=1000 unknown_heads=2 unknown_steps=1 rows_in_r=1391 height_in_r=2 Carry:first=4,steady_max=4 NoCarry:first=4,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=2 unknown_steps=3 rows_in_r=1395 height_in_r=2 Carry:first=4,steady_max=4 NoCarry:first=4,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=2 unknown_steps=500 rows_in_r=2389 height_in_r=2 Carry:first=6,steady_max=6 NoCarry:first=6,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=2 unknown_steps=2000 rows_in_r=5389 height_in_r=2 Carry:first=6,steady_max=6 NoCarry:first=6,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=4 unknown_steps=1 rows_in_r=1395 height_in_r=2 Carry:first=4,steady_max=4 NoCarry:first=4,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=4 unknown_steps=3 rows_in_r=1403 height_in_r=2 Carry:first=4,steady_max=4 NoCarry:first=4,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=4 unknown_steps=500 rows_in_r=3391 height_in_r=2 Carry:first=8,steady_max=8 NoCarry:first=8,steady_max=4 KeepWithRoot:first=4,steady_max=4
+R2PLANNER devices=64 known_steps=1000 unknown_heads=4 unknown_steps=2000 rows_in_r=9391 height_in_r=2 Carry:first=8,steady_max=8 NoCarry:first=8,steady_max=4 KeepWithRoot:first=4,steady_max=4
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished

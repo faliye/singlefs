@@ -1,0 +1,14 @@
+M4TRUNC case=shorter-overwrite-before-extend I-1.13 = Holds
+M4TRUNC case=shorter-overwrite-before-extend violated_count = 0
+M4TRUNC case=extend-after-shorter-overwrite violated I-1.13: Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建 落点 {盘 0 槽 50184、盘 1 槽 50184}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）、遍历方向 没有这一条")
+M4TRUNC case=extend-after-shorter-overwrite I-1.13 = Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建 落点 {盘 0 槽 50184、盘 1 槽 50184}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）、遍历方向 没有这一条")
+M4TRUNC case=extend-after-shorter-overwrite violated_count = 1
+M4TRUNC case=first-file-before-extend I-1.13 = Holds
+M4TRUNC case=first-file-before-extend violated_count = 0
+M4TRUNC case=extend-without-left-units I-1.13 = Holds
+M4TRUNC case=extend-without-left-units violated_count = 0
+M4TRUNC case=three-units-before-truncation I-1.13 = Holds
+M4TRUNC case=three-units-before-truncation violated_count = 0
+M4TRUNC case=truncation-intermediate-size-written-at-intent violated I-1.13: Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50184、盘 1 槽 50184}；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）")
+M4TRUNC case=truncation-intermediate-size-written-at-intent I-1.13 = Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50184、盘 1 槽 50184}；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）")
+M4TRUNC case=truncation-intermediate-size-written-at-intent violated_count = 1

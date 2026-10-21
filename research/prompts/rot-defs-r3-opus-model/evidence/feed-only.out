@@ -1,0 +1,42 @@
+  ✓ 退 0（应当 0） 主 agent 跑 ls -la 放行 ← ls -la
+  ✓ 退 0（应当 0） 实现员跑 git status 放行 ← git status --short
+  ✓ 退 2（应当 2） 实现员跑 cargo test --all 照拒 ← cargo test --all
+  ✓ 退 2（应当 2） 实现员跑 checker 档包照拒 ← bash scripts/hosts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier
+  ✓ 退 0（应当 0） 实现员单独跑登记成轻的自证放行 ← python3 scripts/gate/admission.py --selftest
+  ✓ 退 0（应当 0） 实现员 ls 合法的通配放行 ← ls scripts/*/*.sh
+  ✓ 退 2（应当 2） 实现员通配起 checker-tier-crash-point-replay 照拒 ← bash .claude/gate.d/checker-tier-crash-point-replay.s? /home/fy5090/code/singlefs
+  ✓ 退 2（应当 2） 实现员通配起 QEMU 那一道照拒 ← bash .claude/gate.d/checker-tier-qemu-device-streams.s? /home/fy5090/code/singlefs
+  ✓ 退 2（应当 2） 实现员通配起 mutate.sh 跑 crates 整表照拒 ← bash scripts/mutation/mutate.s? crates/mutations.tsv
+  ✓ 退 2（应当 2） 实现员通配起 vm-bench.sh --selftest 照拒 ← bash scripts/devices/vm-bench*.sh --selftest
+  ✓ 退 2（应当 2） 实现员通配起登记成重的自证照拒 ← bash scripts/devices/vm-bench.s? --selftest
+  ✓ 退 0（应当 0） 实现员通配起登记成轻的 compile-then-swap 自证放行 ← python3 scripts/hosts/compile-then-swap.p? --selftest
+  ✓ 退 0（应当 0） 实现员通配起登记成轻的双机驱动自证放行 ← bash scripts/crash/crash-amplification-two-host?.sh --selftest
+  ✓ 退 2（应当 2） 实现员 POSIX 字符类起 mutate.sh 跑 crates 整表照拒 ← bash scripts/mutation/mutat[[:alpha:]].sh crates/mutations.tsv
+  ✓ 退 2（应当 2） 实现员等价类起 checker-tier-crash-point-replay 照拒 ← bash .claude/gate.d/checker-tier-crash-point-replay.s[[=h=]] /home/fy5090/code/singlefs
+  ✓ 退 2（应当 2） 实现员整理符号起 QEMU 那一道照拒 ← bash .claude/gate.d/checker-tier-qemu-device-streams.s[[.h.]] /home/fy5090/code/singlefs
+  ✓ 退 0（应当 0） 实现员合法的 POSIX 字符类 ls 放行 ← ls scripts/*/[[:alpha:]]*.sh
+  ✓ 退 2（应当 2） 实现员起崩溃放量全量照拒 ← bash scripts/crash/crash-amplification.sh
+  ✓ 退 2（应当 2） 实现员起崩溃放量分项驱动照拒 ← bash scripts/crash/crash-amplification-item.sh crash_amplification_fixed_script_through_rollback
+  ✓ 退 2（应当 2） 实现员起崩溃放量双机驱动照拒 ← bash scripts/crash/crash-amplification-two-hosts.sh
+  ✓ 退 0（应当 0） 实现员单独跑 crash-amplification.sh --selftest 放行 ← bash scripts/crash/crash-amplification.sh --selftest
+  ✓ 退 0（应当 0） 实现员列崩溃放量的分项放行 ← bash scripts/crash/crash-amplification.sh --list-items
+  ✓ 退 2（应当 2） 实现员花括号起 mutate.sh 跑 crates 整表照拒 ← bash scripts/mutation/mutate.{sh,x} crates/mutations.tsv
+  ✓ 退 2（应当 2） 实现员花括号起 checker-tier-crash-point-replay 照拒 ← bash .claude/gate.d/checker-tier-crash-point-replay.{sh,} /home/fy5090/code/singlefs
+  ✓ 退 2（应当 2） 实现员参数里的通配点到 crates 整表照拒 ← bash scripts/mutation/mutate.sh crates/mutation?.tsv
+  ✓ 退 2（应当 2） 实现员花括号写在包装上（{bash,-x}）照拒 ← {bash,-x} scripts/mutation/mutate.sh crates/mutations.tsv
+  ✓ 退 0（应当 0） 实现员合法的花括号 ls 放行 ← ls scripts/{kb,gate}/*.py
+  ✓ 退 0（应当 0） 实现员合法的参数通配 cat 放行 ← cat crates/*.toml
+  ✓ 退 2（应当 2） R2 红：执行员经包装直接执行 e165 装置本体 --pinned-cases ← bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e165_replay_bounded_enumeration --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv
+  ✓ 退 2（应当 2） R2 红：调查员同上 ← bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e165_replay_bounded_enumeration --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv
+  ✓ 退 2（应当 2） R2 红：主 agent 不带前缀同上 ← bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e165_replay_bounded_enumeration --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv
+  ✓ 退 0（应当 0） R2 绿：执行员经包装直接执行 e165 装置本体 --bounds light ← bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e165_replay_bounded_enumeration --bounds light
+  ✓ 退 0（应当 0） R2 绿：执行员经包装直接执行别的装置本体带 --pinned-cases ← bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e142_new_pool_file_creation_write_dump --pinned-cases t.tsv
+  ✓ 退 2（应当 2） R3 红：实现员 crates 变异 --quick 而命令前设 GATE_MUTATION_BREAK ← GATE_MUTATION_BREAK=quickrunsallrows SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=门禁 checker-tier-crates-mutation-replay.sh 的轻型（--quick）; 范围=轻型核心部分; 为什么=改了恢复路径要核轻型登记的变异行' bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick $PWD
+  ✓ 退 2（应当 2） R3 红：调查员形式化 --quick 而命令前设 FORMAL_VERIFICATION_BREAK ← FORMAL_VERIFICATION_BREAK=quick-core-unselected SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=门禁 checker-tier-formal-verification.sh 的轻型（--quick）; 范围=轻型核心部分; 为什么=改了恢复路径要核轻型登记的变异行' bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick $PWD
+  ✓ 退 2（应当 2） R3 红：实现员崩溃点重放 --quick 而命令前设 CRASH_POINT_REPLAY_BREAK ← CRASH_POINT_REPLAY_BREAK=accept-unknown-item SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=崩溃点重放入口的轻型（--quick）; 范围=轻型核心部分; 为什么=改了恢复路径要核轻型登记的变异行' bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick
+  ✓ 退 2（应当 2） R3 红：主 agent 不带前缀 crates 变异 --quick 而 export 了 GATE_MUTATION_BREAK ← export GATE_MUTATION_BREAK=quickrunsallrows; bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .
+  ✓ 退 0（应当 0） R3 绿：实现员 crates 变异 --quick 不设开关 ← bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .
+  ✓ 退 0（应当 0） R3 绿：调查员形式化 --quick 不设开关 ← bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick .
+  ✓ 退 0（应当 0） R3 绿：实现员崩溃点重放 --quick 不设开关 ← bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick
+  ✓ 退 0（应当 0） R12 绿：调查员红例钉表 --check-table ← python3 scripts/experiments/e165-pin-red-examples.py --check-table
+✓ 只喂不换：.claude/hooks/heavy-test-guard.sh 喂了 41 条，0 条不对

@@ -1,0 +1,76 @@
+name=checkpoint_exhaustive length=4 batch=144 arm=today histories=15625 states=65485 holds=11976 resurrects=3649
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=today histories=15625 states=74459 holds=11973 resurrects=3652
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=bing histories=15625 states=65485 holds=13506 resurrects=2119
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=bing histories=15625 states=74459 holds=13506 resurrects=2119
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_latest histories=15625 states=65485 holds=13356 resurrects=2269
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_latest histories=15625 states=74459 holds=13356 resurrects=2269
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_latest_no_write_order histories=15625 states=65485 holds=11347 resurrects=4278
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg7 resurrected=unit1(birth4)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_latest_no_write_order histories=15625 states=74459 holds=11347 resurrects=4278
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg7 resurrected=unit1(birth4)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_watermark histories=15625 states=65485 holds=13506 resurrects=2119
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_watermark histories=15625 states=74459 holds=13506 resurrects=2119
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_watermark_boundary_without_max_one histories=15625 states=65485 holds=13456 kills_live=50 resurrects=2119
+  first_kills_live: ops=seq(4P),size(0P),size(1P+1),size(1P) state=truncation_intent_to_1P@txg8 killed=unit0(birth7)
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_watermark_boundary_without_max_one histories=15625 states=74459 holds=13456 kills_live=50 resurrects=2119
+  first_kills_live: ops=seq(4P),size(0P),size(1P+1),size(1P) state=truncation_intent_to_1P@txg10 killed=unit0(birth9)
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_watermark_no_clear histories=15625 states=65485 holds=13425 kills_live=81 kills_live+resurrects=18 resurrects=2101
+  first_kills_live: ops=seq(4P),seq(2P),checkpoint[size(1P)+seq(3P)],size(2P) state=truncation_intent_to_2P@txg7 killed=unit1(birth6)
+  first_kills_live+resurrects: ops=seq(4P),size(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)],size(2P) state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_watermark_no_clear histories=15625 states=74459 holds=13425 kills_live=81 kills_live+resurrects=18 resurrects=2101
+  first_kills_live: ops=seq(4P),seq(2P),checkpoint[size(1P)+seq(3P)],size(2P) state=truncation_intent_to_2P@txg7 killed=unit1(birth6)
+  first_kills_live+resurrects: ops=seq(4P),size(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)],size(2P) state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg9 resurrected=unit2(birth9);unit3(birth9)
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_full_no_write_order histories=15625 states=65485 holds=13170 resurrects=2455
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_full_no_write_order histories=15625 states=74459 holds=13170 resurrects=2455
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_watermark_extension_drops_field histories=15625 states=65485 holds=11976 resurrects=3649
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_watermark_extension_drops_field histories=15625 states=74459 holds=11973 resurrects=3652
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=yi histories=15625 states=65485 holds=13506 resurrects=2119
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=yi histories=15625 states=74459 holds=13506 resurrects=2119
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=yi_no_write_order histories=15625 states=65485 holds=11533 resurrects=4092
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg7 resurrected=unit1(birth4)
+name=checkpoint_exhaustive length=4 batch=1 arm=yi_no_write_order histories=15625 states=74459 holds=11533 resurrects=4092
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg7 resurrected=unit1(birth4)
+name=checkpoint_exhaustive length=4 batch=144 arm=yi_full_no_write_order histories=15625 states=65485 holds=13107 resurrects=2518
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=yi_full_no_write_order histories=15625 states=74459 holds=13107 resurrects=2518
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=today_by_write_order histories=15625 states=65485 holds=11976 resurrects=3649
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=today_by_write_order histories=15625 states=74459 holds=11973 resurrects=3652
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=bing_by_write_order histories=15625 states=65485 holds=15625
+name=checkpoint_exhaustive length=4 batch=1 arm=bing_by_write_order histories=15625 states=74459 holds=15625
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_watermark_by_write_order histories=15625 states=65485 holds=15625
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_watermark_by_write_order histories=15625 states=74459 holds=15625
+name=checkpoint_exhaustive length=4 batch=144 arm=jia_watermark_not_later histories=15625 states=65485 holds=15625
+name=checkpoint_exhaustive length=4 batch=1 arm=jia_watermark_not_later histories=15625 states=74459 holds=15625
+name=checkpoint_exhaustive length=4 batch=144 arm=yi_by_write_order histories=15625 states=65485 holds=15625
+name=checkpoint_exhaustive length=4 batch=1 arm=yi_by_write_order histories=15625 states=74459 holds=15625
+name=checkpoint_exhaustive length=4 batch=144 arm=yi_not_later histories=15625 states=65485 holds=11082 kills_live=4543
+  first_kills_live: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(2P)+size(0P)] state=checkpoint_of_seq(2P)+size(0P)@txg7 killed=unit0(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=yi_not_later histories=15625 states=74459 holds=11084 kills_live=4541
+  first_kills_live: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(2P)+size(0P)] state=checkpoint_of_seq(2P)+size(0P)@txg7 killed=unit0(birth7)
+name=checkpoint_exhaustive length=4 batch=144 arm=yi_full_by_write_order histories=15625 states=65485 holds=15625
+name=checkpoint_exhaustive length=4 batch=1 arm=yi_full_by_write_order histories=15625 states=74459 holds=15625
+name=checkpoint_exhaustive length=4 batch=144 arm=yi_with_tombstones_recycled histories=15625 states=65485 holds=13472 resurrects=2153
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)
+name=checkpoint_exhaustive length=4 batch=1 arm=yi_with_tombstones_recycled histories=15625 states=74459 holds=13260 resurrects=2365
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),checkpoint[seq(4P+1)+size(2P)+size(4P)] state=checkpoint_of_seq(4P+1)+size(2P)+size(4P)@txg7 resurrected=unit2(birth7);unit3(birth7)

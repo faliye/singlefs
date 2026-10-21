@@ -1,0 +1,4 @@
+  left: "[unit_write×2,barrier]"
+ right: "[zero_fill,unit_write,barrier]"
+cargo_rc=101
+test segments_count_a_discard_as_one_plain_write_with_two_crash_states ... FAILED

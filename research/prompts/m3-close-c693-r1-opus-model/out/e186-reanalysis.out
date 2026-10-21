@@ -1,0 +1,71 @@
+E7RESULT name=selftest verdict_lines_checked=112 mismatches=0
+E7RESULT name=max_rows_written_w2 value=47 leaf_capacity=477 fits_one_leaf=1
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry+NoCarry+KeepWithRoot:1600|NoCarry:1280|NoCarry+KeepWithRoot:1920
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry+NoCarry+KeepWithRoot:1600|NoCarry:1280|NoCarry+KeepWithRoot:1920
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=registered reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=registered reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry+NoCarry:1280|Carry+NoCarry+KeepWithRoot:3520
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry+NoCarry:1280|Carry+NoCarry+KeepWithRoot:3520
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=nodes reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=nodes reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=u5_dangling reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=u5_dangling reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b1_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b1_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip:600|Skip+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b1_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b1_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b2_w2_q2_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b2_w2_q2_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:3600|Skip+RejectEntry:600|Skip+RejectEntry+PerBit:600
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b2_w2_q2_not_counted group=legal_r_tree_dim_1 winner_sets=RejectEntry:4800
+E7RESULT name=q1_overall_accounting_winners variant=both reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=Carry:3200|Carry+NoCarry+KeepWithRoot:1600
+E7RESULT name=q2_overall_flags_winners variant=both reading=b2_w2_q2_not_counted group=legal_r_tree_dim_2 winner_sets=RejectEntry:4800
+E7RESULT name=q2_flags_winners_w_gens_unobserved reading=b1_w2_q2_counted groups=2400 winner_sets=RejectEntry:2400
+E7RESULT name=q2_flags_winners_w_gens_unobserved reading=b1_w2_q2_not_counted groups=2400 winner_sets=RejectEntry:2400
+E7RESULT name=q2_flags_winners_w_gens_unobserved reading=b2_w2_q2_counted groups=2400 winner_sets=RejectEntry:2400
+E7RESULT name=q2_flags_winners_w_gens_unobserved reading=b2_w2_q2_not_counted groups=2400 winner_sets=RejectEntry:2400
+E7RESULT name=done

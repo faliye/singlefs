@@ -1,0 +1,4 @@
+== device-deps-e165-pinned-cases（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0

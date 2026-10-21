@@ -1,0 +1,7 @@
+
+running 2 tests
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.11s
+

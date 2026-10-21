@@ -1,0 +1,9 @@
+name=t3_e97_leaf_fanout widths=[7, 14, 19, 22] fanouts=[1087, 740, 603, 542]
+name=t3_e97_narrow_heights_differ_with_step_rows trees=64 devs=8 rows_without_steps=172 step_rows_where_four_widths_differ=371..915 count=545
+name=t3_e97_narrow_heights_differ_with_step_rows trees=1024 devs=64 rows_without_steps=2372 step_rows_where_four_widths_differ=none count=0
+name=t3_e97_narrow_heights_differ_with_step_rows trees=8192 devs=8 rows_without_steps=16428 step_rows_where_four_widths_differ=none count=0
+name=t3_e97_narrow_heights_differ_with_step_rows trees=8192 devs=64 rows_without_steps=16708 step_rows_where_four_widths_differ=none count=0
+name=t3_crates_one_more_key_byte devices=2 step_rows=463 rows=478 nodes_key21=1 nodes_key22=3 extra_nodes=2
+name=t3_crates_one_more_key_byte devices=2 step_rows=476 rows=491 nodes_key21=1 nodes_key22=3 extra_nodes=2
+name=t3_crates_one_more_key_byte_worst ratio=3.000 step_rows=463 rows=478 nodes_key21=1 nodes_key22=3 stated_ratio_bound=1.028
+name=t3_done

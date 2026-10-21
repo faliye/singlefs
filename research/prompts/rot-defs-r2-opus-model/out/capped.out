@@ -1,0 +1,2 @@
+/home/fy5090/code/singlefs/scripts/hosts/capped.sh: line 214: exec: SINGLEFS_RUN_SCOPE=种类=target; 跑什么=x: not found
+name=capped_declaration_as_command exit=127

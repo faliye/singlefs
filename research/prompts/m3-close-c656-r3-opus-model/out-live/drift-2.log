@@ -1,0 +1,4 @@
+name=drift_start last_root=(1, 6) generations=["d0[8,9]", "d1[8,9]"] recover=FileRead(i1t6):old_last_same_root raw_red=[]
+name=drift_round round=1 mount_while_recording=Ok(i1t6) writes=40 segment_sizes=[2, 2, 14, 2, 1, 2, 12, 2, 1, 2] cut_before_write=1 kinds_up_to_cut=["system_configuration_slot@d0", "system_configuration_slot@d1"] generations=["d0[10,9]", "d1[8,9]"]
+name=drift_round round=2 mount_while_recording=Ok(i1t6) writes=40 segment_sizes=[2, 2, 14, 2, 1, 2, 12, 2, 1, 2] cut_before_write=1 kinds_up_to_cut=["system_configuration_slot@d0", "system_configuration_slot@d1"] generations=["d0[10,11]", "d1[8,9]"]
+name=drift_end rounds=2 generations=["d0[10,11]", "d1[8,9]"] choice=d0g11 recover=FileRead(i1t6):old_last_same_root raw_red=[] read_only=Ok(i1t6) writable=Ok(i1t6) generations_after_one_more_writable_mount=["d0[14,15]", "d1[12,13]"]

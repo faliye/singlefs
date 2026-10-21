@@ -1,0 +1,40 @@
+--- ../m4-segment-code-r2/repo/crates/singlefs-core/src/mounted_session.rs
++++ repo/crates/singlefs-core/src/mounted_session.rs
+@@ -2625,6 +2625,37 @@
+         }
+         Err(refused) => return pause_or_hand_up(allocator, refused),
+     };
++    if std::env::var_os("DEFENSE_TRACE").is_some()
++        && matches!(
++            kind,
++            CompactionPublishKind::Batch | CompactionPublishKind::BatchCompletingTheIntent
++        )
++    {
++        eprintln!(
++            "DEFENSE_TRACE kind={:?} planned={} relocated={} region_empty_after={} scan_allocations={}",
++            kind,
++            planned.len(),
++            published.units_relocated_by_this_publish.len(),
++            region_is_empty_by_the_records(&published.allocation_records, region),
++            scan.as_ref().map_or(0, |scan| scan.allocations.len())
++        );
++        eprintln!(
++            "DEFENSE_TRACE_ROLES planned_roles={:?} scan_classes={:?}",
++            planned
++                .iter()
++                .map(|p| version
++                    .mapped_units
++                    .iter()
++                    .find(|(_, key)| *key == p.mapping_key)
++                    .map(|(identity, _)| *identity))
++                .collect::<Vec<_>>(),
++            scan.as_ref().map(|scan| scan
++                .allocations
++                .iter()
++                .map(|a| format!("{:?}", a.class))
++                .collect::<Vec<_>>())
++        );
++    }
+     match kind {
+         CompactionPublishKind::BatchCompletingTheIntent
+         | CompactionPublishKind::IntentCompletedWithoutABatch => {

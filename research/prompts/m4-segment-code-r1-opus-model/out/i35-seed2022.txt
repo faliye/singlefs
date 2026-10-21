@@ -1,0 +1,9 @@
+START starting_point=AfterFirstFile
+STEP StartingPoint op=None outcome=
+STEP Operation(0) op=Some(CloseAndMountWritable) outcome=Applied(Mounted { instance: InstanceGeneration(2), publishes: 2, allocation_records_compared: Compared { publishes: 2 }, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, space_admission: AdmittedBeforeAcquisition })
+STEP Operation(1) op=Some(PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 7879751949923199194 }, fill_seed: 17840163520990143491 })) outcome=Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+STEP Operation(2) op=Some(RollBackWhileMounted(RingRoot { index_from_newest: 2 })) outcome=Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(4) }, released_user_visible_units: 4, resurrected_user_visible_copies: 8 })
+STEP Operation(3) op=Some(CreateSnapshot) outcome=Applied(SnapshotPublished { change: Created, snapshot: 65549, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+STEP Operation(4) op=Some(PublishOverwrite(ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 291, selector: 7664500909322504686 }, fill_seed: 4676315349287084229 })) outcome=Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 }, floor_raises_pushed_by_the_session: 0 })
+RED Operation(4) I-3.5: 相邻两版 (实例 {2}、txg 6) → (实例 2、txg 7)（NoHole）：后一版引用、前一版不引用的单元盘 0 槽 50180（用户可见树 None）诞生代号 3 不大于前一版的 txg，也不在一棵整棵继承下来的用户可见树里（根指针出生 txg 小于前一版的 txg、子树里读得出的诞生代号都不大于它）
+HIT true

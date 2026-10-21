@@ -1,0 +1,140 @@
+[
+ {
+  "file": ".claude/hooks/heavy-test-guard.sh",
+  "old": "            # 登记了红例钉表重放用法的装置本体带 --pinned-cases 照拒（lib_heavy_tests.py 的 device_main_replay_use；device-main-replay-allowed 下前两格红：应当是 2，实际 0）\n            (\"实验执行员经内存包装直接执行 e165 装置的本体带 --pinned-cases：照拒\", \"experiment-runner\",\n             f\"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/e165_replay_bounded_enumeration --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv\", 2),\n            (\"实验执行员经内存包装直接执行 e165 装置的本体（deps/ 下同一份）带 --pinned-cases：照拒\", \"experiment-runner\",\n             f\"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/deps/e165_replay_bounded_enumeration-fedcba9876543211 --pinned-cases .claude/gate.d/e165-pinned-red-examples.tsv\", 2),\n            (\"实验执行员经内存包装直接执行 e165 装置的本体不带 --pinned-cases：放行\", \"experiment-runner\",\n             f\"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/e165_replay_bounded_enumeration --bounds light\", 0),\n            (\"实验执行员经内存包装直接执行别的装置的本体带 --pinned-cases：放行\", \"experiment-runner\",\n             f\"bash scripts/hosts/run-with-memory-cap.sh 4G {work}/target/release/e161_sample_device --pinned-cases table.tsv\", 0),\n            # 带 --quick 而环境里设了那一份文件头写的弄坏开关变量：不认轻型（light-tier-break-variable-ignored 下这四格红：应当是 2，实际 0）\n            (\"实现员经内存包装起 crates 变异那一道 --quick、命令前设了 GATE_MUTATION_BREAK：照拒\", writer,\n             \"GATE_MUTATION_BREAK=quickrunsallrows bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .\", 2),\n            (\"调查员经内存包装起形式化那一道 --quick、命令前设了 FORMAL_VERIFICATION_BREAK：照拒\", \"investigator\",\n             \"FORMAL_VERIFICATION_BREAK=quick-core-unselected bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick .\", 2),\n            (\"实现员经内存包装起崩溃点重放 --quick、命令前设了 CRASH_POINT_REPLAY_BREAK：照拒\", writer,\n             \"CRASH_POINT_REPLAY_BREAK=accept-unknown-item bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick\", 2),\n            (\"实现员经内存包装起 crates 变异那一道 --quick、命令前设的开关变量值为空：放行\", writer,\n             \"GATE_MUTATION_BREAK= bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .\", 0),\n            # 装置的本体与 cargo run --bin 同判（lib_heavy_tests.py 的 device_main_binary；device-main-as-test 下头一格红：应当是 0，实际 2）\n",
+  "new": "            # 装置的本体与 cargo run --bin 同判（lib_heavy_tests.py 的 device_main_binary；device-main-as-test 下头一格红：应当是 0，实际 2）\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/heavy-test-guard.sh",
+  "old": "与红例钉表的追加、--check、--check-table、--backfill、--list-items 不算；直接起 verus 验证明",
+  "new": "与红例钉表的追加、--check、--backfill、--list-items 不算；直接起 verus 验证明",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/heavy-test-guard.sh",
+  "old": "#   主 agent 不带前缀也放行。夹了别的词（--full、--check、写成变量的项、多出的根参数）的照那一道或崩溃点重放的重型拒；认法在 lib_heavy_tests.py 的 light_tier_command。\n#   环境里设了那一份文件头写的弄坏开关变量（GATE_MUTATION_BREAK、FORMAL_VERIFICATION_BREAK、CRASH_POINT_REPLAY_BREAK 一类，命令前、env 里、前面 export 的）的，\n#   带 --quick 也不认轻型，照那一道或崩溃点重放的重型拒（lib_heavy_tests.py 的 light_tier_break_variable）。\n",
+  "new": "#   主 agent 不带前缀也放行。夹了别的词（--full、--check、写成变量的项、多出的根参数）的照那一道或崩溃点重放的重型拒；认法在 lib_heavy_tests.py 的 light_tier_command。\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/heavy-test-guard.sh",
+  "old": "#                 .claude/scripts/lkmm.sh 只带 --herd7-version 的不算；直接执行装置 e165_replay_bounded_enumeration 的本体带 --pinned-cases（红例钉表重放，登记在\n#                 e165-pin-red-examples.py 的 DEVICE_BINARY、DEVICE_FLAG）同算这一类，装置本体的别的用法不算（lib_heavy_tests.py 的 device_main_replay_use）\n",
+  "new": "#                 .claude/scripts/lkmm.sh 只带 --herd7-version 的不算\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/heavy-test-guard.sh",
+  "old": "#                 追加、--check、--check-table、--backfill、--list-items 不算，参数里的变量",
+  "new": "#                 追加、--check、--backfill、--list-items 不算，参数里的变量",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "        for label, argv, cwd, want in cargo_cases + launcher_cases + binary_cases:\n            found = classify_process(argv, cwd)\n            results.append((label, want, found[0].kind if found else None))\n        # 登记装置用法的脚本读不出：判不出是不是红例钉表重放，直接执行 checker 档装置的本体一律按重放算（开关 device-replay-registry-unreadable-allowed 下这一格红）\n        real_registry_path, DEVICE_REPLAY_REGISTRY_PATH = DEVICE_REPLAY_REGISTRY_PATH, os.path.join(work, \"no-such-registry.py\")\n        try:\n            found = classify_process([os.path.join(work, \"target\", \"release\", \"e161_sample_device\"), \"stream-constants\"], work)\n            results.append((\"装置重放的登记读不出：直接执行装置本体按重放算\", \"verus-stage\", found[0].kind if found else None))\n        finally:\n            DEVICE_REPLAY_REGISTRY_PATH = real_registry_path\n        # 登记读得出，登记的装置在 checker 档包 src/bin/ 里有源码（登记的装置改名、挪走时这一格先红）\n        registration = device_replay_registration()\n        results.append((\"装置重放的登记读得出、登记的装置在 checker 档包里\", True,\n                        registration is not None and registration[0] in checker_device_targets(HOOK_REPOSITORY)))\n",
+  "new": "        for label, argv, cwd, want in cargo_cases + launcher_cases + binary_cases:\n            found = classify_process(argv, cwd)\n            results.append((label, want, found[0].kind if found else None))\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "            (\"checker 档装置的本体直接执行（target/<profile>/<名字>）：不算\", [os.path.join(work, \"target\", \"release\", \"e161_sample_device\"), \"stream-constants\"], work, None),\n            # 登记了红例钉表重放用法的装置（device_main_replay_use；开关 device-main-replay-allowed 下前四格红）：本体带登记的选项照重型，别的用法与别的装置的本体照旧不算\n            (\"红例钉表重放：装置本体 target/<profile>/<名字> 带 --pinned-cases\", [os.path.join(work, \"target\", \"release\", \"e165_replay_bounded_enumeration\"),\n                                                                          \"--pinned-cases\", \".claude/gate.d/e165-pinned-red-examples.tsv\"], work, \"verus-stage\"),\n            (\"红例钉表重放：装置本体带 --profile 在前再带 --pinned-cases\", [os.path.join(work, \"target\", \"release\", \"e165_replay_bounded_enumeration\"),\n                                                                     \"--profile\", \"r2\", \"--pinned-cases\", \"table.tsv\"], work, \"verus-stage\"),\n            (\"红例钉表重放：装置本体在 deps/ 下、与 target/<profile>/<名字> 同一份\", [os.path.join(work, \"target\", \"release\", \"deps\", \"e165_replay_bounded_enumeration-fedcba9876543211\"),\n                                                                           \"--pinned-cases\", \"table.tsv\"], work, \"verus-stage\"),\n            (\"红例钉表重放：装置本体的选项写成没展开的变量\", [\"bash\", \"-c\", f\"{work}/target/release/e165_replay_bounded_enumeration $PIN_OPTION table.tsv\"], work, \"verus-stage\"),\n            (\"装置本体的别的用法（登记装置，没带 --pinned-cases）：不算\", [os.path.join(work, \"target\", \"release\", \"e165_replay_bounded_enumeration\"),\n                                                           \"--bounds\", \"light\"], work, None),\n            (\"别的装置的本体带 --pinned-cases：不算\", [os.path.join(work, \"target\", \"release\", \"e161_sample_device\"), \"--pinned-cases\", \"table.tsv\"], work, None),\n            (\"登记装置在 deps/ 下与本体不是一份（内联单测）：照算 checker 档\", [os.path.join(work, \"target\", \"release\", \"deps\", \"e165_replay_bounded_enumeration-1111111111111111\"),\n                                                                       \"--pinned-cases\", \"table.tsv\"], work, \"checker-tier-binary\"),\n",
+  "new": "            (\"checker 档装置的本体直接执行（target/<profile>/<名字>）：不算\", [os.path.join(work, \"target\", \"release\", \"e161_sample_device\"), \"stream-constants\"], work, None),\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "            (\"轻型：根参数写成 $PWD\", [\"bash\", \".claude/gate.d/checker-tier-crates-mutation-replay.sh\", \"--quick\", \"$PWD\"], work, None),\n            # 环境里设了那一份文件头写的弄坏开关变量，带 --quick 也不认轻型（light_tier_break_variable；开关 light-tier-break-variable-ignored 下前五格红）；\n            # 别的门禁的开关、值为空的、文件头里没有的变量不算\n            (\"重型：crates 变异那一道 --quick 而命令前设了 GATE_MUTATION_BREAK\", [\"env\", \"GATE_MUTATION_BREAK=quickrunsallrows\", \"bash\",\n                                                                          \".claude/gate.d/checker-tier-crates-mutation-replay.sh\", \"--quick\", \".\"], work, \"crates-mutation-stage\"),\n            (\"重型：形式化那一道 --quick 而 env 设了 FORMAL_VERIFICATION_BREAK\", [\"env\", \"FORMAL_VERIFICATION_BREAK=quick-core-unselected\", \"bash\",\n                                                                        \".claude/gate.d/checker-tier-formal-verification.sh\", \"--quick\", \".\"], work, \"verus-stage\"),\n            (\"重型：形式化那一道 --quick 而设了它文件头里别份脚本的开关 E165_PIN_RED_EXAMPLES_BREAK\", [\"env\", \"E165_PIN_RED_EXAMPLES_BREAK=variant-unchecked\", \"bash\",\n                                                                                    \".claude/gate.d/checker-tier-formal-verification.sh\", \"--quick\", \".\"], work, \"verus-stage\"),\n            (\"重型：崩溃点重放入口 --quick 而设了 CRASH_POINT_REPLAY_BREAK\", [\"env\", \"CRASH_POINT_REPLAY_BREAK=accept-unknown-item\", \"bash\",\n                                                                    \"scripts/crash/crash-point-replay.sh\", \"--quick\"], work, \"crash-point-replay\"),\n            (\"重型：crates 变异那一道 --quick 而前面 export 了 GATE_MUTATION_BREAK\", [\"bash\", \"-c\", \"export GATE_MUTATION_BREAK=quickrunsallrows; \"\n                                                                          \"bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .\"], work, \"crates-mutation-stage\"),\n            (\"轻型：crates 变异那一道 --quick 而设的是形式化那一道的开关\", [\"env\", \"FORMAL_VERIFICATION_BREAK=quick-core-unselected\", \"bash\",\n                                                                      \".claude/gate.d/checker-tier-crates-mutation-replay.sh\", \"--quick\", \".\"], work, None),\n            (\"轻型：crates 变异那一道 --quick 而开关变量的值为空\", [\"env\", \"GATE_MUTATION_BREAK=\", \"bash\", \".claude/gate.d/checker-tier-crates-mutation-replay.sh\",\n                                                         \"--quick\", \".\"], work, None),\n            (\"轻型：崩溃点重放入口 --quick 而设的变量不是它文件头里的开关\", [\"env\", \"SOMETHING_ELSE=1\", \"bash\", \"scripts/crash/crash-point-replay.sh\", \"--quick\"], work, None),\n",
+  "new": "            (\"轻型：根参数写成 $PWD\", [\"bash\", \".claude/gate.d/checker-tier-crates-mutation-replay.sh\", \"--quick\", \"$PWD\"], work, None),\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "    global SAMPLE_INDEX_REPOSITORY, BASH_FOR_PATTERNS, DEVICE_REPLAY_REGISTRY_PATH\n    work = tempfile.mkdtemp(prefix=\"lib-heavy-tests-\")\n",
+  "new": "    global SAMPLE_INDEX_REPOSITORY, BASH_FOR_PATTERNS\n    work = tempfile.mkdtemp(prefix=\"lib-heavy-tests-\")\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "    write(\"target/release/deps/e161_sample_device-1111111111111111\", \"装置的内联单测\\n\")\n    # 登记了红例钉表重放用法的装置 e165_replay_bounded_enumeration（device_main_replay_use）：本体同样 deps/ 下一份、target/release/<名字> 一份是同一个文件\n    write(\"crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs\", \"fn main() {}\\n\")\n    write(\"target/release/deps/e165_replay_bounded_enumeration-fedcba9876543211\", \"装置的本体\\n\")\n    replay_uplifted = os.path.join(work, \"target\", \"release\", \"e165_replay_bounded_enumeration\")\n    try:\n        os.link(os.path.join(work, \"target\", \"release\", \"deps\", \"e165_replay_bounded_enumeration-fedcba9876543211\"), replay_uplifted)\n    except OSError:\n        shutil.copyfile(os.path.join(work, \"target\", \"release\", \"deps\", \"e165_replay_bounded_enumeration-fedcba9876543211\"), replay_uplifted)\n",
+  "new": "    write(\"target/release/deps/e161_sample_device-1111111111111111\", \"装置的内联单测\\n\")\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "def device_replay_registration():\n    \"\"\"门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格起的装置用法：交 (装置名, 选项)，读自 e165-pin-red-examples.py 的\n    DEVICE_BINARY、DEVICE_FLAG 两个常量（DEVICE_REPLAY_REGISTRY_PATH）；读不出或认不出交 None。\"\"\"\n    try:\n        with open(DEVICE_REPLAY_REGISTRY_PATH, encoding=\"utf-8\") as handle:\n            text = handle.read()\n    except (OSError, UnicodeDecodeError):\n        return None\n    device, flag = DEVICE_REPLAY_BINARY_LINE.search(text), DEVICE_REPLAY_FLAG_LINE.search(text)\n    return (device.group(1), flag.group(1)) if device and flag else None\n\n\ndef device_main_replay_use(device, arguments):\n    \"\"\"checker 档装置 device 的本体直接带 arguments 执行：是登记的红例钉表重放用法（device_replay_registration：参数里有那个选项，或有没展开的词可能整词\n    展开成它）就交 verus-stage，别的用法与别的装置交 None。登记读不出时判不出，按重放算。弄坏开关 device-main-replay-allowed 下一律交 None，\n    device-replay-registry-unreadable-allowed 下登记读不出时交 None。\"\"\"\n    if break_is_set(\"device-main-replay-allowed\"):\n        return None\n    registration = device_replay_registration()\n    if registration is None:\n        if break_is_set(\"device-replay-registry-unreadable-allowed\"):\n            return None\n        return heavy_test(\"verus-stage\", f\"直接执行 checker 档装置 {device} 的本体：登记装置用法的 {DEVICE_REPLAY_REGISTRY_PATH} 读不出 DEVICE_BINARY、DEVICE_FLAG，\"\n                                        \"判不出是不是红例钉表重放，照重放算（门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格；\"\n                                        \"要跑写进报告「要主 agent 跑的命令」一节交主 agent）\")\n    registered_device, flag = registration\n    if device != registered_device:\n        return None\n    for argument in arguments:\n        pattern = unexpanded_word_pattern(argument)\n        if argument == flag or (pattern is not None and pattern.fullmatch(flag)):\n            return heavy_test(\"verus-stage\", f\"直接执行 checker 档装置 {device} 的本体带 {flag}：门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格的活\"\n                                            \"（e165-pin-red-examples.py --replay 起的就是这一条，逐行重放钉住的红例），归提交时才跑；装置本体的别的用法不算；\"\n                                            \"要跑写进报告「要主 agent 跑的命令」一节交主 agent\")\n    return None\n\n\ndef built_device_main_name(word, directory):\n    \"\"\"命令词是 cargo 编出来的装置本体 `<target 目录>/[<目标三元组>/]<profile>/<名字>`（不在 deps/ 下）、名字是 checker 档包 src/bin/ 下的装置时交它的名字，不是交 None。\"\"\"\n    if \"/deps/\" in word or not BUILT_BINARY_PATH.search(word):\n        return None\n    name = os.path.basename(word)\n    return name if name in checker_device_targets(directory or HOOK_REPOSITORY) else None\n\n\ndef test_binary_name(word):\n",
+  "new": "def test_binary_name(word):\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "        if light_tier_command(words, directory, environment) is not None:\n            return None   # 轻型（文件头「两档里的轻型」）\n        return heavy_test(\"crash-point-replay\", f\"{CRASH_POINT_REPLAY_DIRECTORY}/{name} {' '.join(arguments[:4])}（崩溃点重放的重型：不带参数是剪枝、--item 是逐条、--full 是全量，\"\n                                                \"只有仓内那一份带 --quick（可加 --item <项>）的轻型、单独的 --list-items 与登记表里的单独 --selftest 不算；\"\n                                                \"环境里设了入口文件头写的弄坏开关变量的 --quick 不算轻型）\")\n",
+  "new": "        if light_tier_command(words, directory) is not None:\n            return None   # 轻型（文件头「两档里的轻型」）\n        return heavy_test(\"crash-point-replay\", f\"{CRASH_POINT_REPLAY_DIRECTORY}/{name} {' '.join(arguments[:4])}（崩溃点重放的重型：不带参数是剪枝、--item 是逐条、--full 是全量，\"\n                                                \"只有仓内那一份带 --quick（可加 --item <项>）的轻型、单独的 --list-items 与登记表里的单独 --selftest 不算）\")\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "            if device_main_binary(words[0], binary, directory):\n                return device_main_replay_use(binary, arguments)   # 装置的本体（cargo build 编出），与 cargo run --bin、target/<profile>/<名字> 同判，只有登记的重放用法算（文件头「checker 档按包判」）\n",
+  "new": "            if device_main_binary(words[0], binary, directory):\n                return None   # 装置的本体（cargo build 编出），与 cargo run --bin、target/<profile>/<名字> 同判（文件头「checker 档按包判」）\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "        return stage_samples_hint(stage, classify_gate_stage(stage, arguments, environment))\n    built_device = built_device_main_name(words[0], directory)\n    if built_device is not None:\n        replay = device_main_replay_use(built_device, arguments)\n        if replay is not None:\n            return replay   # 装置本体 target/<profile>/<名字> 的红例钉表重放用法（文件头「checker 档按包判」）\n    binary = test_binary_name(words[0])\n    if binary is not None:\n",
+  "new": "        return stage_samples_hint(stage, classify_gate_stage(stage, arguments))\n    binary = test_binary_name(words[0])\n    if binary is not None:\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "    if kind:\n        if break_variable is not None:\n            return heavy_test(kind, f\"门禁 {stage}（带 --quick，但环境里设了它文件头写的弄坏开关 {break_variable}：弄坏开关下 --quick 不只跑轻型登记的那几项，\"\n                                    \"不认轻型，照整道算；要核弄坏开关下的判红，命令写进报告「要主 agent 跑的命令」一节交主 agent）\")\n        return heavy_test(kind, f\"门禁 {stage}\")\n    if \"--write\" in arguments or break_is_set(\"commit-checks-ignored\"):\n",
+  "new": "    if kind:\n        return heavy_test(kind, f\"门禁 {stage}\")\n    if \"--write\" in arguments or break_is_set(\"commit-checks-ignored\"):\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "    break_variable = None\n    if stage in LIGHT_TIER_STAGES and not break_is_set(\"light-tier-unrecognized\") and light_tier_arguments(arguments, 1):\n        break_variable = light_tier_break_variable(os.path.join(HOOK_REPOSITORY, GATE_STAGE_DIRECTORY, stage), environment)\n        if break_variable is None:\n            return None   # 轻型（文件头「两档里的轻型」）：谁都能跑，子 agent 要经内存包装（runs_compiled_code 认它）\n    kind = STAGE_KIND.get(stage)\n",
+  "new": "    if stage in LIGHT_TIER_STAGES and not break_is_set(\"light-tier-unrecognized\") and light_tier_arguments(arguments, 1):\n        return None   # 轻型（文件头「两档里的轻型」）：谁都能跑，子 agent 要经内存包装（runs_compiled_code 认它）\n    kind = STAGE_KIND.get(stage)\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "def classify_gate_stage(stage, arguments, environment=None):\n",
+  "new": "def classify_gate_stage(stage, arguments):\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "def script_header_names(path):\n    \"\"\"脚本文件头（第一行代码之前的注释块，含 `#!` 行）里写的弄坏开关变量名（形如 FOO_BREAK）；读不出交 None。\"\"\"\n    header = []\n    try:\n        with open(path, encoding=\"utf-8\") as handle:\n            for line in handle:\n                if line.strip() and not line.lstrip().startswith(\"#\"):\n                    break\n                header.append(line)\n    except (OSError, UnicodeDecodeError):\n        return None\n    return set(LIGHT_TIER_BREAK_NAME.findall(\"\".join(header)))\n\n\ndef light_tier_break_variable(script_path, environment):\n    \"\"\"这条命令看得到的环境（命令前、env 里、前面 export 的）里设了（值非空）script_path 文件头写的弄坏开关变量，交第一个变量名；没设交 None。\n    文件头读不出或一个名字都没有的，任何值非空的 `*_BREAK` 变量都算。带 --quick 的轻型在这种环境下不认（文件头「两档里的轻型」）。\n    弄坏开关 light-tier-break-variable-ignored 下一律交 None。\"\"\"\n    if break_is_set(\"light-tier-break-variable-ignored\") or not environment:\n        return None\n    names = script_header_names(script_path)\n    for name in sorted(environment):\n        if environment[name] and (name in names if names else LIGHT_TIER_BREAK_NAME.fullmatch(name)):\n            return name\n    return None\n\n\ndef light_tier_command(words, directory, environment=None):\n    \"\"\"一条剥掉前缀与包装的命令是不是轻型三条之一（文件头「两档里的轻型」）：是就交一句说明，不是交 None。\n    两道门禁按文件名认（gate_stage_name，同重型那一格），参数照 light_tier_arguments、至多一个根参数；崩溃点重放入口要名字是它、又落在 scripts 这一层\n    （located_in；别处的同名拷贝不算轻型），参数照 light_tier_arguments、不带根参数。环境里设了那一份文件头写的弄坏开关变量的（light_tier_break_variable）\n    不算轻型。弄坏开关 light-tier-unrecognized 下一律交 None。\"\"\"\n    if break_is_set(\"light-tier-unrecognized\") or not words:\n        return None\n    stage = gate_stage_name(words[0], directory)\n    if stage is not None:\n        if (stage in LIGHT_TIER_STAGES and light_tier_arguments(words[1:], 1)\n                and light_tier_break_variable(os.path.join(HOOK_REPOSITORY, GATE_STAGE_DIRECTORY, stage), environment) is None):\n            return f\"门禁 {stage} {LIGHT_TIER_OPTION}（轻型）\"\n        return None\n    if (os.path.basename(words[0]) == CRASH_POINT_REPLAY_SCRIPT and located_in(words[0], directory, CRASH_POINT_REPLAY_DIRECTORY)\n            and light_tier_arguments(words[1:], 0, () if break_is_set(\"light-tier-local-only-unrecognized\") else CRASH_POINT_REPLAY_LIGHT_FLAGS)\n            and light_tier_break_variable(os.path.join(HOOK_REPOSITORY, CRASH_POINT_REPLAY_DIRECTORY, CRASH_POINT_REPLAY_SCRIPT), environment) is None):\n        return f\"{CRASH_POINT_REPLAY_DIRECTORY}/{CRASH_POINT_REPLAY_SCRIPT} {LIGHT_TIER_OPTION}（轻型）\"\n    return None\n",
+  "new": "def light_tier_command(words, directory):\n    \"\"\"一条剥掉前缀与包装的命令是不是轻型三条之一（文件头「两档里的轻型」）：是就交一句说明，不是交 None。\n    两道门禁按文件名认（gate_stage_name，同重型那一格），参数照 light_tier_arguments、至多一个根参数；崩溃点重放入口要名字是它、又落在 scripts 这一层\n    （located_in；别处的同名拷贝不算轻型），参数照 light_tier_arguments、不带根参数。弄坏开关 light-tier-unrecognized 下一律交 None。\"\"\"\n    if break_is_set(\"light-tier-unrecognized\") or not words:\n        return None\n    stage = gate_stage_name(words[0], directory)\n    if stage is not None:\n        if stage in LIGHT_TIER_STAGES and light_tier_arguments(words[1:], 1):\n            return f\"门禁 {stage} {LIGHT_TIER_OPTION}（轻型）\"\n        return None\n    if (os.path.basename(words[0]) == CRASH_POINT_REPLAY_SCRIPT and located_in(words[0], directory, CRASH_POINT_REPLAY_DIRECTORY)\n            and light_tier_arguments(words[1:], 0, () if break_is_set(\"light-tier-local-only-unrecognized\") else CRASH_POINT_REPLAY_LIGHT_FLAGS)):\n        return f\"{CRASH_POINT_REPLAY_DIRECTORY}/{CRASH_POINT_REPLAY_SCRIPT} {LIGHT_TIER_OPTION}（轻型）\"\n    return None\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "HOOK_REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n# 装置本体的重放用法（文件头「checker 档按包判」）：门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格经 e165-pin-red-examples.py --replay 起装置，\n# 装置名与选项登记在那份脚本的 DEVICE_BINARY、DEVICE_FLAG 两个常量里，按它读，不另抄名单。路径相对钩子所在的仓根；自检换成读不出的路径验「判不出就按重放算」\nDEVICE_REPLAY_REGISTRY_PATH = os.path.join(HOOK_REPOSITORY, VERUS_JUDGE_DIRECTORY_OF[E165_PIN_SCRIPT], E165_PIN_SCRIPT)\nDEVICE_REPLAY_BINARY_LINE = re.compile(r'^DEVICE_BINARY = \"([A-Za-z0-9_]+)\"$', re.MULTILINE)\nDEVICE_REPLAY_FLAG_LINE = re.compile(r'^DEVICE_FLAG = \"(--[A-Za-z0-9-]+)\"$', re.MULTILINE)\n# 轻型三条各自文件头写的弄坏开关变量名的形状（light_tier_break_variable）\nLIGHT_TIER_BREAK_NAME = re.compile(r\"\\b[A-Z][A-Z0-9_]*_BREAK\\b\")\n",
+  "new": "HOOK_REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "\"只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--check-table、--backfill、--list-items 不算；\"",
+  "new": "\"只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--backfill、--list-items 不算；\"",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "  LIB_HEAVY_TESTS_BREAK=device-main-replay-allowed  装置本体的直接执行一律放行（改前的判法：`target/release/e165_replay_bounded_enumeration --pinned-cases <表>` 不判）\n      直接执行那张表里「红例钉表重放：装置本体 target/<profile>/<名字> 带 --pinned-cases」「…带 --profile 在前」「…deps/ 下同一份」「…选项写成没展开的变量」四格红（应当是 verus-stage，实际 None）；\n      heavy-test-guard.sh --selftest 里「实验执行员经内存包装直接执行 e165 装置的本体带 --pinned-cases：照拒」「…deps/ 下同一份带 --pinned-cases：照拒」两格红（应当是 2，实际 0）\n  LIB_HEAVY_TESTS_BREAK=device-replay-registry-unreadable-allowed  登记读不出时装置本体照旧放行（改前的判法：判不出就放）\n      直接执行那张表之后的「装置重放的登记读不出：直接执行装置本体按重放算」一格红（应当是 verus-stage，实际 None）\n  LIB_HEAVY_TESTS_BREAK=light-tier-break-variable-ignored  light_tier_break_variable 一律交 None（改前的判法：带 --quick 时设了弄坏开关变量也照轻型放行）\n      cargo 那张表里「重型：crates 变异那一道 --quick 而命令前设了 GATE_MUTATION_BREAK」「重型：形式化那一道 --quick 而 env 设了 FORMAL_VERIFICATION_BREAK」\n      「重型：形式化那一道 --quick 而设了它文件头里别份脚本的开关 E165_PIN_RED_EXAMPLES_BREAK」「重型：崩溃点重放入口 --quick 而设了 CRASH_POINT_REPLAY_BREAK」\n      「重型：crates 变异那一道 --quick 而前面 export 了 GATE_MUTATION_BREAK」五格红（应当是重型的 kind，实际 None）；\n      heavy-test-guard.sh --selftest 里「实现员经内存包装起 crates 变异那一道 --quick、命令前设了 GATE_MUTATION_BREAK：照拒」「调查员…形式化那一道 --quick、命令前设了 FORMAL_VERIFICATION_BREAK：照拒」\n      「实现员…崩溃点重放 --quick、命令前设了 CRASH_POINT_REPLAY_BREAK：照拒」三格红（应当是 2，实际 0）\n  LIB_HEAVY_TESTS_BREAK=command-word-variables-unexpanded  command_word_expanded 原样交回（改前的判法：命令词写在变量里的看不见）\n",
+  "new": "  LIB_HEAVY_TESTS_BREAK=command-word-variables-unexpanded  command_word_expanded 原样交回（改前的判法：命令词写在变量里的看不见）\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "弄坏开关 light-tier-local-only-unrecognized 下不认。\n  环境里设了入口或门禁自己文件头写的弄坏开关变量的（命令前、env 里与前面 export 的都算，值非空才算设了；变量名读那三份文件头第一行代码之前的注释块里形如 `FOO_BREAK` 的名字，\n  不另抄名单，light_tier_break_variable），带 --quick 也不认轻型，照那一道或崩溃点重放的重型算（弄坏开关下 --quick 不再只跑轻型登记的那几项，门禁一侧照整道跑）；\n  别的门禁的开关、值为空的不算。文件头读不出或一个名字都没有的，任何值非空的 `*_BREAK` 变量都算。弄坏开关 light-tier-break-variable-ignored 下不看。\n",
+  "new": "弄坏开关 light-tier-local-only-unrecognized 下不认。\n",
+  "count": 1
+ },
+ {
+  "file": ".claude/hooks/lib_heavy_tests.py",
+  "old": "（cargo test 编的装置内联单测、本体还没编出来的）照算 checker 档，拒绝说明写装置的 main 怎么起（弄坏开关 device-main-as-test）。\n例外是门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格起的那一种用法（e165-pin-red-examples.py --replay 逐行重放钉住的红例：\n`<装置> --pinned-cases <钉表> [档参数]`）：装置名与选项登记在那份脚本的 DEVICE_BINARY、DEVICE_FLAG 两个常量里，这里读那两行，不另抄名单（device_replay_registration）。\n直接执行那个装置的本体而参数里有这个选项的（`target/<profile>/<名字>` 与 `deps/` 下同它是一份的那一个都算；没展开的词可能整词展开成它的也算），\n按 verus-stage 算，经内存包装、capped.sh、nice 包几层都一样（device_main_replay_use）；装置本体的别的用法、别的装置的本体照旧不算；\n读不出那两个常量的，直接执行 checker 档装置的本体一律按重放算（判不出就算）。cargo run 起装置照旧不判。\n弄坏开关 device-main-replay-allowed、device-replay-registry-unreadable-allowed。\n",
+  "new": "（cargo test 编的装置内联单测、本体还没编出来的）照算 checker 档，拒绝说明写装置的 main 怎么起（弄坏开关 device-main-as-test）。\n",
+  "count": 1
+ }
+]

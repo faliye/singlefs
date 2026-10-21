@@ -1,0 +1,4 @@
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002022 ending=Completed reds=13 Operation(27) I-3.5：相邻两版 (实例 {2}、txg 7) → (实例 2、txg 8)（NoHole）：后一版引用、前一版不引用的单元盘 0 槽 50182（用户可见树 None）诞生代号 4 不大于前一版的 txg，也不在一棵整棵�
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002035 ending=Completed reds=0 
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002041 ending=Completed reds=8 Operation(32) I-3.5：相邻两版 (实例 {2}、txg 13) → (实例 2、txg 14)（NoHole）：后一版引用、前一版不引用的单元盘 0 槽 50550（用户可见树 None）诞生代号 9 不大于前一版的 txg，也不在一棵整棵�
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002052 ending=Completed reds=2 Operation(27) I-3.5：相邻两版 (实例 {1}、txg 11) → (实例 1、txg 12)（NoHole）：后一版引用、前一版不引用的单元盘 0 槽 51166（用户可见树 Some(UserVisibleTreeOfTheWalk { kind: 1, tree: 65536 })）诞生代号 9

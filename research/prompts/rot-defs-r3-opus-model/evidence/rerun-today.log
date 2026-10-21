@@ -1,0 +1,5 @@
+name=rerun_roots repo=/home/fy5090/code/singlefs frozen=/home/fy5090/code/singlefs/research/prompts/rot-defs-r2-snapshot model=/home/fy5090/.local/share/singlefs/work/rot-defs-r3-opus/k3/r2-model work=/home/fy5090/.local/share/singlefs/work/rot-defs-r3-opus/k3/rerun-today
+name=compare file=probe.out same=no
+name=compare file=probe-deps.out same=no
+name=compare file=quick-sim.out same=yes
+name=compare file=capped.out same=yes

@@ -1,0 +1,588 @@
+=== a8i-indep-tie-reverse SS X0 D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=3 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=4 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b0@1:4 b1@1:4 b2@1:4 b3@1:2 b4@1:4 b5@2:3 b6@3:4]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 3, 'i354': 0, 'conv': 0, 'loss_now': 3, 'i39_in': 3, 'i39_ex': 3}
+judge_state=['loss']
+=== a11r-rb-today-refuse-diff SS D R-1 R-1
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=4 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b4@1:3 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=5 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b0@1:5 b1@1:5 b2@1:5 b3@1:2 b4@1:3 b5@2:3 b6@3:4 b8@4:5]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 3, 'i39_in': 3, 'i39_ex': 3}
+judge_state=['blind_loss', 'loss', 'loss_in_cleanup']
+=== a10-rb-resurrect-live SS D R-2 D R-2
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-2    t=4 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b3@1:2 b4@1:3 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=5 head=- prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b0@1:5 b1@1:5 b2@1:5 b3@1:2 b4@1:3 b5@2:3 b6@3:4 b7@3:5 b8@4:5]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-2    t=6 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b0@1:5 b1@1:5 b2@1:5 b3@1:2 b4@1:3 b5@2:3 b6@3:4 b7@3:5 b8@4:5 b9@5:6]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 3, 'i39_in': 3, 'i39_ex': 3}
+judge_state=['blind_loss', 'loss', 'loss_in_cleanup']
+=== a3-same-killprev-new D+S
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D+S    t=2 head=- prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{})]
+       deadlist=[(2,b0@1) (2,b1@1) (2,b2@1)]
+       released=[b3@1:2 b4@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 3, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['blind_misdl', 'misdl']
+=== a4-meta-judged SS D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1) (1,b4@1)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 1, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['blind_misdl', 'misdl']
+=== a7c-flag-jia-chain SS D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['leak_final']
+=== a7-flag-jia-birth S X0 SS D C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=3 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('flag', 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=4 head=b0@1,b1@1 node=b2@1 prev(head)=3
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('flag', 0, 'H'),{b0@1,b1@1,b2@1}) S1(txg=4,birth=4,prev=0,live,{b0@1,b1@1,b2@1}) S2(txg=4,birth=4,prev=3,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=5 head=- prev(head)=3
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('flag', 0, 'H'),{b0@1,b1@1,b2@1}) S1(txg=4,birth=4,prev=0,live,{b0@1,b1@1,b2@1}) S2(txg=4,birth=4,prev=3,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(3,b0@1) (3,b1@1) (3,b2@1)]
+       released=[b3@1:2 b4@1:5 b5@2:3 b6@3:4 b7@4:5]
+       viol=[] metrics={'i36': 3, 'unowned': 0, 'i353': 3, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=8 head=- prev(head)=3
+       snaps=[S1(txg=4,birth=4,prev=0,live,{b0@1,b1@1,b2@1}) S2(txg=4,birth=4,prev=3,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b0@1:6 b1@1:7 b2@1:8 b3@1:2 b4@1:5 b5@2:3 b6@3:4 b7@4:5 b8@5:6 b10@6:7 b11@7:8]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 3, 'i354': 0, 'conv': 0, 'loss_now': 3, 'i39_in': 3, 'i39_ex': 3}
+judge_state=['loss']
+=== a11d-rb-destroying-included S X0 D R-3 R-1
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=3 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=4 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b0@1:4 b1@1:4 b2@1:4 b3@1:2 b4@1:4 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 3, 'i39_ex': 0}
+R-3    t=5 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b3@1:2 b4@1:4 b5@2:3 b6@3:4 b7@4:5]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=6 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b4@1:4 b5@2:3 b6@3:4 b7@4:5 b9@5:6]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['leak_final']
+=== base-indep S D X0
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 4, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 3, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['i36_red_legal']
+=== base-indep S D X0 C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 4, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 3, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=7 head=- prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b0@1:5 b1@1:6 b2@1:7 b3@1:2 b4@1:3 b5@2:3 b6@3:4 b8@4:5 b9@5:6 b10@6:7]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 2, 'i39_ex': 3}
+judge_state=['i39ex_red_legal', 'i39in_red_legal']
+=== base-indep S X0 D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=3 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=4 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 3, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b0@1:4 b1@1:4 b2@1:4 b3@1:2 b4@1:4 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 3, 'i39_ex': 0}
+judge_state=['i39in_red_legal']
+=== a12-pass-final-control SS X1 X0 C D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X1     t=3 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,destroying('full', 1, 3, 1, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 4, 0, 'H'),{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,destroying('full', 1, 3, 1, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=6 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4 b7@4:5 b8@5:6]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=7 head=- prev(head)=1
+       snaps=[]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:7 b5@2:3 b6@3:4 b7@4:5 b8@5:6 b9@6:7]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 3, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['blind_misdl', 'leak_final', 'misdl']
+=== a14-rb-today-split-yi S R-1 D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=3 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=4 head=- prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b0@1:4 b1@1:4 b2@1:4 b3@1:2 b4@1:4 b5@2:3 b6@3:4]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 3, 'i354': 0, 'conv': 0, 'loss_now': 3, 'i39_in': 3, 'i39_ex': 3}
+judge_state=['loss']
+=== a14r-rb-today-split-jia SS D R-1 R-1
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=3 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=4 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:3 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 3, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=5 head=- prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b0@1:5 b1@1:5 b2@1:5 b3@1:2 b4@1:3 b5@2:3 b6@3:4 b8@4:5]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 3, 'i39_in': 3, 'i39_ex': 3}
+judge_state=['blind_loss', 'loss', 'loss_in_cleanup']
+=== a9-rb-release-live S W0 R-1 R-1
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=4 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4 b7@3:4 b8@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=5 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b0@1:5 b2@1:5 b3@1:2 b5@2:3 b6@3:4 b9@4:5]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 2, 'i39_in': 2, 'i39_ex': 2}
+judge_state=['blind_loss', 'loss', 'loss_in_cleanup']
+=== a11r-rb-today-refuse-diff S W0 R-1 R-1
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=4 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4 b7@3:4 b8@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+R-1    t=5 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b0@1:5 b2@1:5 b3@1:2 b5@2:3 b6@3:4 b9@4:5]
+       viol=['loss'] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 2, 'i39_in': 2, 'i39_ex': 2}
+judge_state=['blind_loss', 'loss', 'loss_in_cleanup']
+=== base-indep S W0 X0 C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b7@3,b1@1 node=b8@3 prev(head)=0
+       snaps=[S0(txg=1,birth=2,prev=0,destroying('full', 1, 4, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 2, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=6 head=b7@3,b1@1 node=b8@3 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b0@1:5 b2@1:6 b3@1:2 b5@2:3 b6@3:4 b9@4:5 b10@5:6]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 1, 'i39_ex': 2}
+judge_state=['i39ex_red_legal', 'i39in_red_legal']
+=== a1-jia-stxg-from-birth S W0 X0 C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 2, 'unowned': 0, 'i353': 2, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b7@3,b1@1 node=b8@3 prev(head)=0
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('full', 2, 4, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 2, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=5 head=b7@3,b1@1 node=b8@3 prev(head)=0
+       snaps=[]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3 b6@3:4 b9@4:5]
+       viol=[] metrics={'i36': 2, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 2, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['leak_final', 'misdl']
+=== a2-jia-stxg-from-chain S W0 X0 C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+S      t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b7@3,b1@1 node=b8@3 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b7@3,b1@1 node=b8@3 prev(head)=0
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('full', 1, 4, 0, 'H'),{b0@1,b1@1,b2@1})]
+       deadlist=[(1,b0@1) (1,b2@1)]
+       released=[b3@1:2 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 2, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=6 head=b7@3,b1@1 node=b8@3 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b0@1:5 b2@1:6 b3@1:2 b5@2:3 b6@3:4 b9@4:5 b10@5:6]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 1, 'i39_ex': 2}
+judge_state=['i39ex_red_legal', 'i39in_red_legal']
+=== base-same W0+S W0 X0 C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0+S   t=2 head=b6@2,b1@1 node=b7@2 prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b1@1,b6@2,b7@2})]
+       deadlist=[]
+       released=[b0@1:2 b2@1:2 b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b9@3,b1@1 node=b10@3 prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b1@1,b6@2,b7@2})]
+       deadlist=[(2,b6@2) (2,b7@2)]
+       released=[b0@1:2 b2@1:2 b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b9@3,b1@1 node=b10@3 prev(head)=0
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('full', 2, 4, 0, 'H'),{b1@1,b6@2,b7@2})]
+       deadlist=[(2,b6@2) (2,b7@2)]
+       released=[b0@1:2 b2@1:2 b3@1:2 b5@2:3 b8@3:4]
+       viol=[] metrics={'i36': 2, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=6 head=b9@3,b1@1 node=b10@3 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b0@1:2 b2@1:2 b3@1:2 b5@2:3 b6@2:5 b7@2:6 b8@3:4 b11@4:5 b12@5:6]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 1, 'i39_ex': 2}
+judge_state=['i39ex_red_legal', 'i39in_red_legal']
+=== a3-same-killprev-new W0+S W0 X0 C
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0+S   t=2 head=b6@2,b1@1 node=b7@2 prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b1@1,b6@2,b7@2})]
+       deadlist=[(2,b0@1) (2,b2@1)]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 2, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0     t=3 head=b9@3,b1@1 node=b10@3 prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b1@1,b6@2,b7@2})]
+       deadlist=[(2,b0@1) (2,b2@1) (2,b6@2) (2,b7@2)]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 2, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b9@3,b1@1 node=b10@3 prev(head)=0
+       snaps=[S0(txg=2,birth=2,prev=0,destroying('full', 2, 4, 0, 'H'),{b1@1,b6@2,b7@2})]
+       deadlist=[(2,b0@1) (2,b2@1) (2,b6@2) (2,b7@2)]
+       released=[b3@1:2 b5@2:3 b8@3:4]
+       viol=[] metrics={'i36': 4, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 2, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=8 head=b9@3,b1@1 node=b10@3 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[b0@1:5 b2@1:6 b3@1:2 b5@2:3 b6@2:7 b7@2:8 b8@3:4 b11@4:5 b12@5:6 b13@6:7 b14@7:8]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 3, 'i39_ex': 4}
+judge_state=['i39ex_red_legal', 'i39in_red_legal']
+=== base-same W0+S
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0+S   t=2 head=b6@2,b1@1 node=b7@2 prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b1@1,b6@2,b7@2})]
+       deadlist=[]
+       released=[b0@1:2 b2@1:2 b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=[]
+=== a3-same-killprev-new W0+S
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+W0+S   t=2 head=b6@2,b1@1 node=b7@2 prev(head)=2
+       snaps=[S0(txg=2,birth=2,prev=0,live,{b1@1,b6@2,b7@2})]
+       deadlist=[(2,b0@1) (2,b2@1)]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 2, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['blind_misdl', 'misdl']
+=== a8i-indep-tie-reverse SS X1 X0 C D
+init   t=1 head=b0@1,b1@1 node=b2@1 prev(head)=0
+       snaps=[]
+       deadlist=[]
+       released=[]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+SS     t=2 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=0,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X1     t=3 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=1,live,{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,destroying('full', 1, 1, 1, 0),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+X0     t=4 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[S0(txg=1,birth=2,prev=1,destroying('full', 1, 4, 1, 'H'),{b0@1,b1@1,b2@1}) S1(txg=1,birth=2,prev=1,destroying('full', 1, 1, 1, 0),{b0@1,b1@1,b2@1})]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+C      t=6 head=b0@1,b1@1 node=b2@1 prev(head)=1
+       snaps=[]
+       deadlist=[]
+       released=[b3@1:2 b5@2:3 b6@3:4 b7@4:5 b8@5:6]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 0, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+D      t=7 head=- prev(head)=1
+       snaps=[]
+       deadlist=[(1,b0@1) (1,b1@1) (1,b2@1)]
+       released=[b3@1:2 b4@1:7 b5@2:3 b6@3:4 b7@4:5 b8@5:6 b9@6:7]
+       viol=[] metrics={'i36': 0, 'unowned': 0, 'i353': 0, 'i354': 0, 'conv': 3, 'loss_now': 0, 'i39_in': 0, 'i39_ex': 0}
+judge_state=['blind_misdl', 'leak_final', 'misdl']

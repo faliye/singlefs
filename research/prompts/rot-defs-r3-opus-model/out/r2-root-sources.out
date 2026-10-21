@@ -1,0 +1,10 @@
+name=r2_root_source file=.claude/agent-common.md from=blob
+name=r2_root_source file=.claude/agents/experiment-runner.md from=blob
+name=r2_root_source file=.claude/agents/implementation-writer.md from=blob
+name=r2_root_source file=.claude/agents/three-way-attack.md from=blob
+name=r2_root_source file=.claude/main-agent.md from=blob
+name=r2_root_source file=scripts/crash/crash-point-replay.sh from=blob
+name=r2_root_source file=.claude/agents/three-way-defense.md from=HEAD
+name=r2_root_source file=.claude/agents/three-way-forward.md from=HEAD
+name=r2_root_source file=.claude/rules/path-moves.md from=HEAD
+name=r2_root_source file=.claude/gate.d/doc-decisions.sh from=HEAD

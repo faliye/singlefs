@@ -1,0 +1,60 @@
+name=exhaustive length=5 batch=144 arm=today histories=130321 states=702382 holds=121542 resurrects=8779
+  first_resurrects: ops=seq(4P),seq(0P),seq(2P),size(1P),size(1P+1) state=extension_to_1P+1@txg9 resurrected=unit1(birth6)
+name=exhaustive length=5 batch=1 arm=today histories=130321 states=829845 holds=121322 resurrects=8999
+  first_resurrects: ops=seq(4P),seq(0P),seq(2P),size(1P),size(1P+1) state=extension_to_1P+1@txg9 resurrected=unit1(birth6)
+name=exhaustive length=5 batch=144 arm=bing histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=bing histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=jia_latest histories=130321 states=702382 holds=129752 resurrects=569
+  first_resurrects: ops=seq(4P),seq(2P),size(1P),size(2P),size(1P+1) state=truncation_intent_to_1P+1@txg9 resurrected=unit1(birth5)
+name=exhaustive length=5 batch=1 arm=jia_latest histories=130321 states=829845 holds=129742 resurrects=579
+  first_resurrects: ops=seq(4P),seq(2P),size(1P),size(2P),size(1P+1) state=truncation_intent_to_1P+1@txg9 resurrected=unit1(birth5)
+name=exhaustive length=5 batch=144 arm=jia_latest_no_write_order histories=130321 states=702382 holds=102370 resurrects=27951
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg8 resurrected=unit1(birth4)
+name=exhaustive length=5 batch=1 arm=jia_latest_no_write_order histories=130321 states=829845 holds=102409 resurrects=27912
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg8 resurrected=unit1(birth4)
+name=exhaustive length=5 batch=144 arm=jia_watermark histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=jia_watermark histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=jia_watermark_boundary_without_max_one histories=130321 states=702382 holds=129591 kills_live=730
+  first_kills_live: ops=seq(4P),seq(0P+16317),size(0P),size(1P+1),size(1P) state=truncation_intent_to_1P@txg9 killed=unit0(birth8)
+name=exhaustive length=5 batch=1 arm=jia_watermark_boundary_without_max_one histories=130321 states=829845 holds=129576 kills_live=745
+  first_kills_live: ops=seq(4P),seq(0P+16317),size(0P),size(1P+1),size(1P) state=truncation_intent_to_1P@txg9 killed=unit0(birth8)
+name=exhaustive length=5 batch=144 arm=jia_watermark_no_clear histories=130321 states=702382 holds=129594 kills_live=727
+  first_kills_live: ops=seq(4P),seq(0P+16317),size(0P),seq(4P+1),size(2P) state=truncation_intent_to_2P@txg9 killed=unit1(birth8)
+name=exhaustive length=5 batch=1 arm=jia_watermark_no_clear histories=130321 states=829845 holds=129585 kills_live=736
+  first_kills_live: ops=seq(4P),seq(0P+16317),size(0P),seq(4P+1),size(2P) state=truncation_intent_to_2P@txg9 killed=unit1(birth8)
+name=exhaustive length=5 batch=144 arm=jia_full_no_write_order histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=jia_full_no_write_order histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=jia_watermark_extension_drops_field histories=130321 states=702382 holds=121542 resurrects=8779
+  first_resurrects: ops=seq(4P),seq(0P),seq(2P),size(1P),size(1P+1) state=extension_to_1P+1@txg9 resurrected=unit1(birth6)
+name=exhaustive length=5 batch=1 arm=jia_watermark_extension_drops_field histories=130321 states=829845 holds=121322 resurrects=8999
+  first_resurrects: ops=seq(4P),seq(0P),seq(2P),size(1P),size(1P+1) state=extension_to_1P+1@txg9 resurrected=unit1(birth6)
+name=exhaustive length=5 batch=144 arm=yi histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=yi histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=yi_no_write_order histories=130321 states=702382 holds=104136 resurrects=26185
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg8 resurrected=unit1(birth4)
+name=exhaustive length=5 batch=1 arm=yi_no_write_order histories=130321 states=829845 holds=104205 resurrects=26116
+  first_resurrects: ops=seq(4P),seq(0P),seq(0P),seq(0P),size(1P+1) state=extension_to_1P+1@txg8 resurrected=unit1(birth4)
+name=exhaustive length=5 batch=144 arm=yi_full_no_write_order histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=yi_full_no_write_order histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=today_by_write_order histories=130321 states=702382 holds=121542 resurrects=8779
+  first_resurrects: ops=seq(4P),seq(0P),seq(2P),size(1P),size(1P+1) state=extension_to_1P+1@txg9 resurrected=unit1(birth6)
+name=exhaustive length=5 batch=1 arm=today_by_write_order histories=130321 states=829845 holds=121322 resurrects=8999
+  first_resurrects: ops=seq(4P),seq(0P),seq(2P),size(1P),size(1P+1) state=extension_to_1P+1@txg9 resurrected=unit1(birth6)
+name=exhaustive length=5 batch=144 arm=bing_by_write_order histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=bing_by_write_order histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=jia_watermark_by_write_order histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=jia_watermark_by_write_order histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=jia_watermark_not_later histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=jia_watermark_not_later histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=yi_by_write_order histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=yi_by_write_order histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=yi_not_later histories=130321 states=702382 holds=106152 kills_live=24169
+  first_kills_live: ops=seq(4P),seq(0P),seq(0P),seq(0P+16317),size(0P) state=truncation_intent_to_0P@txg8 killed=unit0(birth8)
+name=exhaustive length=5 batch=1 arm=yi_not_later histories=130321 states=829845 holds=106152 kills_live=24169
+  first_kills_live: ops=seq(4P),seq(0P),seq(0P),seq(0P+16317),size(0P) state=truncation_intent_to_0P@txg8 killed=unit0(birth8)
+name=exhaustive length=5 batch=144 arm=yi_full_by_write_order histories=130321 states=702382 holds=130321
+name=exhaustive length=5 batch=1 arm=yi_full_by_write_order histories=130321 states=829845 holds=130321
+name=exhaustive length=5 batch=144 arm=yi_with_tombstones_recycled histories=130321 states=702382 holds=128885 resurrects=1436
+  first_resurrects: ops=seq(4P),seq(2P),size(1P),size(2P),size(1P+1) state=truncation_final_batch@txg10 resurrected=unit1(birth5)
+name=exhaustive length=5 batch=1 arm=yi_with_tombstones_recycled histories=130321 states=829845 holds=125471 resurrects=4850
+  first_resurrects: ops=seq(4P),seq(0P),seq(4P+1),size(1P),size(1P+1) state=extension_to_1P+1@txg12 resurrected=unit1(birth6)

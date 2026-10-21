@@ -30,7 +30,7 @@ case "$PART" in
     [ -z "$(ls -A "$W" | grep -v '^out$\|^bin$')" ] || { echo "工作目录不空：$W" >&2; exit 2; }
     rsync -a --exclude target --exclude .git "$FROZEN/" "$W/repo/"
     (cd "$W/repo" && sha256sum -c --quiet "$R/research/prompts/m3-w3-r1-snapshot/tree-sha256.txt")
-    python3 "$M/make_device.py" "$E/device-source.rs" "$W/repo/crates/singlefs-harness/tests/w3_attack_candidates.rs"
+    python3 "$M/make_device.py" "$R/scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs" "$W/repo/crates/singlefs-harness/tests/w3_attack_candidates.rs"
     build() {
       (cd "$W/repo" && CARGO_TARGET_DIR=$W/target nice -n 19 $THREADS $CAP 6G cargo test --release --offline -p singlefs-harness \
         --test w3_attack_candidates --no-run --message-format=json 2>>"$W/build.log") | python3 -c 'import sys,json

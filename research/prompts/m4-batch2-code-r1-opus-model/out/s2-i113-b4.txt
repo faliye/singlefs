@@ -1,0 +1,7 @@
+ATTACK_I113 16 成立｜上一步 起点
+ATTACK_I113 24 成立｜上一步 CloseAndMountWritable
+ATTACK_I113 41 成立｜上一步 OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
+ATTACK_I113 415 成立｜上一步 PublishOverwrite
+ATTACK_SUMMARY weights=orphans seeds=16 first_seed=4000 ops=30
+ATTACK_VIOLATIONS 0
+test tally_i113_verdicts_over_random_histories ... ok

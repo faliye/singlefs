@@ -1,0 +1,3 @@
+E name=fix_all nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=109298 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=4 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=0 del_pred_false=4 n0_refused=0 gc_done=1258 gc_declined=107932 gc_stuck=4 gc_paused=104 gc_cycle=0 gc_cap=0 gc_wasted=0
+W name=fix_all flag=gc_stuck path=M.R1.M.W0.M.GI.Q0
+W name=fix_all flag=del_pred_false path=M.R1.M.W0.M.GI.GB

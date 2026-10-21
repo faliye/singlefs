@@ -1,0 +1,43 @@
+### device-main-e165-pinned-cases（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：直接执行 checker 档装置 e165_replay_bounded_enumeration 的本体带 --pinned-cases：门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格的活（e165-pin-red-examples.py --replay 起的就是这一条，逐行重放钉住的红例），归提交时才跑；装置本体的别的用法不算；要跑写进报告「要主 agent 跑的命令」一节交主 agent（Verus）：investigator 不跑「Verus」
+[run-scope-guard.sh] exit=0
+### device-deps-e165-pinned-cases（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：直接执行 checker 档装置 e165_replay_bounded_enumeration 的本体带 --pinned-cases：门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格的活（e165-pin-red-examples.py --replay 起的就是这一条，逐行重放钉住的红例），归提交时才跑；装置本体的别的用法不算；要跑写进报告「要主 agent 跑的命令」一节交主 agent（Verus）：investigator 不跑「Verus」
+[run-scope-guard.sh] exit=0
+### crates-mutation-quick-with-break-switch（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：门禁 checker-tier-crates-mutation-replay.sh（带 --quick，但环境里设了它文件头写的弄坏开关 GATE_MUTATION_BREAK：弄坏开关下 --quick 不只跑轻型登记的那几项，不认轻型，照整道算；要核弄坏开关下的判红，命令写进报告「要主 agent 跑的命令」一节交主 agent）；它的样本档也起重活（登记表第 159 行：样本用真 cargo：每个工作进程冷编一份样本 crate、经真的内存包装起 systemd scope 跑点名的测试，red 里一条把缓冲撑到 1536 MiB 撞 512M 上限、一条跑满 20 秒
+[run-scope-guard.sh] exit=0
+### formal-quick-with-break-switch（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（带 --quick，但环境里设了它文件头写的弄坏开关 FORMAL_VERIFICATION_BREAK：弄坏开关下 --quick 不只跑轻型登记的那几项，不认轻型，照整道算；要核弄坏开关下的判红，命令写进报告「要主 agent 跑的命令」一节交主 agent）；它的样本档也起重活（登记表第 160 行：verus-proof、verus-vacuity、verus-must-red-worlds 那几份样本起真的 Verus（阶段文件头：Verus 那几份样本起的是真的 Verus）），样本照拒
+[run-scope-guard.sh] exit=0
+### pin-script-replay（investigator）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 重型测试被拒：scripts/experiments/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration（门禁 checker-tier-formal-verification 的判法：起 Verus 或编 checker 档装置重放；只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--check-table、--backfill、--list-items 不算；红例钉
+[run-scope-guard.sh] exit=0
+### rerun-wrapped-declaration-outside（implementation-writer）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    ✗ 主工作区合入锁被别的进程占着，这条命令要在主工作区 /home/fy5090/code/singlefs 里起 cargo：cargo test
+[run-scope-guard.sh] exit=0
+### c1（主 agent）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=2
+    → 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户）：
+[run-scope-guard.sh] exit=0
+### c2（主 agent）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0
+### c3（主 agent）
+[bash-command-detector.sh] exit=0
+[heavy-test-guard.sh] exit=0
+[run-scope-guard.sh] exit=0

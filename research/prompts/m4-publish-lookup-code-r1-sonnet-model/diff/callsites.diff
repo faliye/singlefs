@@ -1,0 +1,176 @@
+--- a/transaction.rs
++++ b/transaction.rs
+@@ -6817,7 +6993,8 @@
+     )
+ }
+ 
+-/// 从上一版取一个照抄进来的角色的映射 key。
++/// 从上一版取一个照抄进来的角色的映射 key。在 `mapped_units` 上线性找：只查几个角色的用它（快照判定那一圈只问这次换下的几个）；
++/// 照抄全部角色的那一圈用 [`TransactionOutput::mapped_units_by_role`]（七·6）。
+ ///
+ /// # Panics
+ /// 上一版里没有这个角色的映射 key：照抄进来的角色恒是上一版里进映射的那一个（上一版装映射节点时逐个记下了）。
+@@ -7707,11 +7884,15 @@
+                 ),
+             )
+         };
++        // 照抄的角色约有上一版那么多个，每个按角色取上一版的 key：先建上一版 `mapped_units` 的索引（七·6），不逐个在表上找。
++        let mapped_units_of_the_previous_version =
++            previous.map(TransactionOutput::mapped_units_by_role);
+         let carried = |identity: TransactionUnit| {
+-            mapping_key_carried_from(
+-                previous.expect("照抄的角色只出现在接着上一版的发布里"),
+-                identity,
+-            )
++            mapped_units_of_the_previous_version
++                .as_ref()
++                .expect("照抄的角色只出现在接着上一版的发布里")
++                .mapping_key_of(identity)
++                .to_vec()
+         };
+         let mut mapped_units: Vec<(TransactionUnit, Vec<u8>)> = Vec::new();
+         match self.first_file_version() {
+@@ -11066,9 +11247,13 @@
+         .collect()
+ }
+ 
+-/// 上一版里某个角色的单元字节（照抄进这一版的 `units`）。
+-fn carried_unit(previous: &TransactionOutput, identity: TransactionUnit) -> PublishedUnit {
+-    previous.unit(identity).clone()
++/// 上一版里某个角色的单元字节（照抄进这一版的 `units`）。按角色查走上一版 `units` 的索引：一次发布照抄约有上一版那么多个单元，
++/// 索引在装这一版的 `units` 之前建一次（七·6）。
++fn carried_unit(
++    units_of_the_previous_version: &FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit>,
++    identity: TransactionUnit,
++) -> PublishedUnit {
++    units_of_the_previous_version.unit(identity).clone()
+ }
+ 
+ /// 一个文件对象这次发布的数据单元：单元字节与指针。重写时由 `build_file_version_units` 装，照抄时从上一版取
+@@ -12248,10 +12433,12 @@
+     carried: &TransactionOutput,
+     carried_data_units: usize,
+ ) -> FileVersionUnits {
++    // 第一个文件的每个数据单元按角色取一次：先建上一版 `units` 的索引（七·6）。
++    let units_of_the_carried_version = carried.units_by_role();
+     FileVersionUnits {
+         data_units: (0..carried_data_units)
+             .map(|position| {
+-                carried
++                units_of_the_carried_version
+                     .unit(TransactionUnit::Data(DataUnitIndexInFile(
+                         u64::try_from(position).expect("单元序号"),
+                     )))
+@@ -12558,7 +12745,9 @@
+             .as_ref()
+             .map_or(0, |(_, written_units)| written_units.key_order_mismatches);
+     // 第一个文件之外各文件这一版的数据指针（与 `resolved.files_other_than_the_first.files` 同序）：这次写的那一个是这次装的，别的照抄上一版
+-    // （整理的一批之后上一版的拷贝里它们已换成映射位置）。
++    // （整理的一批之后上一版的拷贝里它们已换成映射位置）。照抄的文件约有上一版那么多个，按 inode 号查走上一版的索引（七·6）。
++    let files_of_the_previous_version =
++        previous.map(TransactionOutput::files_other_than_the_first_by_inode);
+     let data_pointers_of_the_files_other_than_the_first: Vec<(InodeNumber, Vec<DataPointer>)> =
+         resolved
+             .files_other_than_the_first
+@@ -12575,10 +12764,9 @@
+                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+                 | FileOtherThanTheFirstOrigin::CutByADeletionBatch => (
+                     file_plan.inode,
+-                    previous
+-                        .and_then(|previous_version| {
+-                            previous_version.file_other_than_the_first(file_plan.inode)
+-                        })
++                    files_of_the_previous_version
++                        .as_ref()
++                        .and_then(|files| files.first_entry_of(&file_plan.inode))
+                         .expect("照抄的文件在上一版里")
+                         .data_pointers
+                         .iter()
+@@ -13439,13 +13627,19 @@
+         identity,
+         bytes,
+     };
++    let units_of_the_previous_version = previous.map(TransactionOutput::units_by_role);
+     let mut units: Vec<PublishedUnit> = Vec::new();
+     for (position, data_unit) in data_units.iter().enumerate() {
+         let identity = TransactionUnit::Data(DataUnitIndexInFile(
+             u64::try_from(position).expect("单元序号"),
+         ));
+         units.push(match carried_file {
+-            Some(carried) if !rewritten.contains(&identity) => carried_unit(carried, identity),
++            Some(_) if !rewritten.contains(&identity) => carried_unit(
++                units_of_the_previous_version
++                    .as_ref()
++                    .expect("照抄第一个文件的发布接在上一版之后：carried_file 就是上一版"),
++                identity,
++            ),
+             None | Some(_) => rewritten_unit(identity, data_unit.clone()),
+         });
+     }
+@@ -13469,7 +13663,9 @@
+                 }
+                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+                 | FileOtherThanTheFirstOrigin::CutByADeletionBatch => carried_unit(
+-                    previous.expect("照抄的文件只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的文件只出现在接着上一版的发布里"),
+                     identity,
+                 ),
+             });
+@@ -13485,7 +13681,9 @@
+             // 照抄上一版那个叶序上的那一份（字节、落点不动），装进这一版时换成这一版的角色。
+             InodeLeafContainerOrigin::CarriedFrom(previous_index) => {
+                 let carried = carried_unit(
+-                    previous.expect("没重写的叶容器只会出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("没重写的叶容器只会出现在接着上一版的发布里"),
+                     TransactionUnit::InodeLeafContainer(previous_index),
+                 );
+                 PublishedUnit {
+@@ -13499,7 +13697,9 @@
+     units.push(match &inode_tree_units.rewritten_root {
+         Some(root) => rewritten_unit(TransactionUnit::InodeRoot, root.bytes.clone()),
+         None => carried_unit(
+-            previous.expect("没重写 inode 根的发布恒接在上一版之后"),
++            units_of_the_previous_version
++                .as_ref()
++                .expect("没重写 inode 根的发布恒接在上一版之后"),
+             TransactionUnit::InodeRoot,
+         ),
+     });
+@@ -13514,7 +13714,9 @@
+             {
+                 Some(allocation_record_tree_node_unit) => allocation_record_tree_node_unit.clone(),
+                 None => carried_unit(
+-                    previous.expect("照抄的分配记录树节点只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的分配记录树节点只出现在接着上一版的发布里"),
+                     identity,
+                 ),
+             },
+@@ -13526,7 +13728,9 @@
+         |identity: TransactionUnit, node: &DeletionTreeNodeUnit| match &node.rewritten {
+             Some(rewritten_node) => rewritten_unit(identity, rewritten_node.bytes.clone()),
+             None => carried_unit(
+-                previous.expect("照抄的删除树节点只出现在接着上一版的发布里"),
++                units_of_the_previous_version
++                    .as_ref()
++                    .expect("照抄的删除树节点只出现在接着上一版的发布里"),
+                 identity,
+             ),
+         };
+@@ -13539,7 +13743,9 @@
+             Some(rewritten_node) => rewritten_unit(node.identity, rewritten_node.bytes.clone()),
+             None => {
+                 let carried = carried_unit(
+-                    previous.expect("照抄的容器树节点只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的容器树节点只出现在接着上一版的发布里"),
+                     node.identity_in_the_previous_version,
+                 );
+                 PublishedUnit {
+

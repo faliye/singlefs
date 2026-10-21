@@ -1,0 +1,2 @@
+PROBE group=f1 name=central-mapping-capacity leaf_entries=294 internal_entries=143
+PROBE group=f3 name=k-h-boundary net_zero_cycle: yielded_with_the_count_before_the_issue(3310 vs 3310)=false yielded_with_the_accounting_value(3310 vs 3309)=true

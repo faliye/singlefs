@@ -1,0 +1,251 @@
+diff -ru c/crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs d/crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs
+--- c/crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs	2026-10-19 23:50:17.504818003 +0000
++++ d/crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs	2026-10-19 23:50:17.557255933 +0000
+@@ -586,3 +586,247 @@
+         tally.states_after_a_deletion
+     );
+ }
++
++// ───────── C860 攻方第二次抽样的探针（只在攻方副本里）─────────
++
++/// 一张镜像上四种认法各判什么，连同池级 checker 别的违例（不变量名）。
++fn c860_arms_of(image: &MemoryPool, what: &str) {
++    singlefs_checker::walk::c860_probe_begin();
++    let verdicts = check_pool_image(image);
++    let probe = singlefs_checker::walk::c860_probe_take();
++    let official = verdicts
++        .iter()
++        .find(|(invariant, _)| *invariant == SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX)
++        .map(|(_, verdict)| format!("{verdict:?}"))
++        .expect("I-1.13");
++    let others: Vec<&str> = verdicts
++        .iter()
++        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++        .map(|(invariant, _)| *invariant)
++        .collect();
++    println!("C860_PROBE what={what} official={official}");
++    if probe.is_empty() {
++        println!("C860_PROBE what={what} arms=no_probe（I-1.13 在比表之前已交判定）");
++    }
++    for (arm, holds, detail) in probe {
++        if arm == "meta" {
++            println!("C860_PROBE what={what} meta={detail}");
++        } else {
++            println!(
++                "C860_PROBE what={what} arm={arm} {}",
++                if holds { "holds".to_string() } else { format!("violated {detail}") }
++            );
++        }
++    }
++    println!("C860_PROBE what={what} violated_invariants={others:?}");
++}
++
++/// 往一片码 3 容器里追加一条记录：记录数、声明长度加一条，载荷 CRC 与头校验和重封，新的整单元校验和沿引用链补到根槽。
++fn c860_append_a_record_to_the_container(image: &mut MemoryPool, pointer: &NodePointer, record: &[u8]) {
++    let slot = the_slot_of(pointer);
++    let mut unit = unit_bytes_at(image, slot, data_unit_bytes());
++    let record_count = usize::from(u16::from_le_bytes(
++        unit[PACKED_RECORD_COUNT_OFFSET..PACKED_RECORD_COUNT_OFFSET + 2].try_into().expect("2"),
++    ));
++    let record_width = usize::from(u16::from_le_bytes(
++        unit[PACKED_RECORD_WIDTH_OFFSET..PACKED_RECORD_WIDTH_OFFSET + 2].try_into().expect("2"),
++    ));
++    assert_eq!(record.len(), record_width, "记录宽对得上");
++    let start = PACKED_RECORDS_OFFSET + record_count * record_width;
++    unit[start..start + record_width].copy_from_slice(record);
++    let new_count = record_count + 1;
++    unit[PACKED_RECORD_COUNT_OFFSET..PACKED_RECORD_COUNT_OFFSET + 2]
++        .copy_from_slice(&u16::try_from(new_count).expect("2").to_le_bytes());
++    unit[PACKED_DECLARED_LENGTH_OFFSET..PACKED_DECLARED_LENGTH_OFFSET + 2]
++        .copy_from_slice(&u16::try_from(new_count * record_width).expect("2").to_le_bytes());
++    let payload_checksum = crc32_castagnoli(&unit[PACKED_PLAIN_HEADER_END..]);
++    unit[PACKED_PAYLOAD_CHECKSUM_OFFSET..PACKED_PAYLOAD_CHECKSUM_OFFSET + 4]
++        .copy_from_slice(&payload_checksum.to_le_bytes());
++    seal_header_checksum(&mut unit, PACKED_PLAIN_HEADER_END);
++    replace_the_unit_and_propagate_its_checksum(image, slot, &unit);
++}
++
++/// 改一片码 3 容器里第 `index` 条记录 `offset` 起 8 字节的值，重封、补校验和。
++fn c860_rewrite_a_field_of_a_record(image: &mut MemoryPool, pointer: &NodePointer, index: usize, offset: usize, value: u64) {
++    let slot = the_slot_of(pointer);
++    let mut unit = unit_bytes_at(image, slot, data_unit_bytes());
++    let record_width = usize::from(u16::from_le_bytes(
++        unit[PACKED_RECORD_WIDTH_OFFSET..PACKED_RECORD_WIDTH_OFFSET + 2].try_into().expect("2"),
++    ));
++    let start = PACKED_RECORDS_OFFSET + index * record_width + offset;
++    unit[start..start + 8].copy_from_slice(&value.to_le_bytes());
++    let payload_checksum = crc32_castagnoli(&unit[PACKED_PLAIN_HEADER_END..]);
++    unit[PACKED_PAYLOAD_CHECKSUM_OFFSET..PACKED_PAYLOAD_CHECKSUM_OFFSET + 4]
++        .copy_from_slice(&payload_checksum.to_le_bytes());
++    seal_header_checksum(&mut unit, PACKED_PLAIN_HEADER_END);
++    replace_the_unit_and_propagate_its_checksum(image, slot, &unit);
++}
++
++fn c860_whole_object_tombstone(inode: u64, object_birth: u64, death_txg: u64) -> Vec<u8> {
++    let mut record = Vec::with_capacity(40);
++    for value in [inode, object_birth, TombstoneRecord::WHOLE_OBJECT_RANGE_START_IN_BYTES, TombstoneRecord::WHOLE_OBJECT_RANGE_END_IN_BYTES, death_txg] {
++        record.extend_from_slice(&value.to_le_bytes());
++    }
++    record
++}
++
++fn c860_object_birth_of(output: &singlefs_core::transaction::TransactionOutput, inode: u64) -> u64 {
++    output
++        .inode_leaf_containers
++        .iter()
++        .flat_map(|container| container.contents.records.iter())
++        .find(|record| record.inode == inode)
++        .map(|record| record.object_birth.0)
++        .expect("这一版有这条记录")
++}
++
++fn c860_reseal_the_index_node(bytes: &mut [u8]) {
++    let key_width = usize::from(bytes[51]);
++    let header_end = 86 + 2 * key_width;
++    let payload_checksum_offset = 76 + 2 * key_width;
++    let payload_checksum = crc32_castagnoli(&bytes[header_end..]);
++    bytes[payload_checksum_offset..payload_checksum_offset + 4].copy_from_slice(&payload_checksum.to_le_bytes());
++    seal_header_checksum(bytes, header_end);
++}
++
++/// M5 必红世界那一招：最新根的中央映射树（根兼叶）里 key 是 `mapping_key` 的那条条目，第一条位置条目的槽号挪 4096 槽。
++fn c860_move_the_first_location_of_the_mapping_entry_keyed(image: &mut MemoryPool, mapping_key: &[u8]) {
++    let key_width = 27usize;
++    let mapping_root = newest_root(image).mapping_root;
++    let leaf_slot = the_slot_of(&mapping_root);
++    let mut leaf = unit_bytes_at(image, leaf_slot, node_bytes());
++    assert_eq!(leaf[50], 0, "根就是叶");
++    let entries_start = 115 + 2 * key_width;
++    let entry_count = usize::from(u16::from_le_bytes(
++        leaf[82 + 2 * key_width..84 + 2 * key_width].try_into().expect("2"),
++    ));
++    let entry_start = (0..entry_count)
++        .map(|index| entries_start + index * 55)
++        .find(|start| leaf[*start..*start + key_width] == *mapping_key)
++        .expect("有这把 key");
++    let slot_field_start = entry_start + key_width + 4;
++    let mut slot_bytes = [0u8; 8];
++    slot_bytes[..6].copy_from_slice(&leaf[slot_field_start..slot_field_start + 6]);
++    let moved = u64::from_le_bytes(slot_bytes) + 4096;
++    leaf[slot_field_start..slot_field_start + 6].copy_from_slice(&moved.to_le_bytes()[..6]);
++    c860_reseal_the_index_node(&mut leaf);
++    replace_the_unit_and_propagate_its_checksum(image, leaf_slot, &leaf);
++}
++
++/// 第一个文件三个单元、建 inode 2 写两个单元、删第一个文件发完意图与第一批（同 scan_rebuild_agrees_with_the_walked_index.rs 那一形）。
++fn c860_pool_with_the_first_file_half_deleted_beside_inode_two(tag: &str) -> BuiltPool {
++    use common_deletion_in_progress::{
++        pool_with_a_three_unit_file, publish_new_inodes_and_advance_the_pool, publish_the_intent,
++        publish_the_next_step_in_batches_of_one, INSTANCE_OF_THE_PUBLISHES, WRITE_TIME_SECONDS_OF_THE_NEW_INODES,
++    };
++    let mut pool = pool_with_a_three_unit_file(tag);
++    publish_new_inodes_and_advance_the_pool(&mut pool, 1);
++    let capacity = u64::try_from(singlefs_core::unit::data_unit_payload_capacity()).expect("净荷");
++    let content_of_inode_two: Vec<u8> = (0..2 * capacity - 5)
++        .map(|index| u8::try_from((index * 7 + 3) % 251).expect("小于 256"))
++        .collect();
++    let publish_parameters = common::parameters();
++    let previous = pool.output.clone();
++    let written = {
++        let devices = pool.devices.as_mut().expect("镜像还开着");
++        let mut writer = singlefs_core::transaction::PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++        singlefs_core::transaction::publish_sequential_write_of_an_inode(
++            &mut writer, &mut pool.allocator, &previous, InodeNumber(2), &content_of_inode_two,
++            WRITE_TIME_SECONDS_OF_THE_NEW_INODES, INSTANCE_OF_THE_PUBLISHES,
++        )
++        .expect("写 inode 2")
++    };
++    pool.output = written;
++    publish_the_intent(&mut pool);
++    publish_the_next_step_in_batches_of_one(&mut pool);
++    pool
++}
++
++#[test]
++fn c860_probe_legal_images() {
++    use common_deletion_in_progress::{publish_the_intent, publish_the_next_step_in_batches_of_one, pool_with_a_three_unit_file};
++    // 合法：回退、右片删空退役、左片吸收右片（已有三条用例的镜像）。
++    c860_arms_of(&pool_rolled_back_past_an_overwrite_of_the_same_length("c860-legal-rollback").memory_pool(), "legal_rollback_past_overwrite");
++    c860_arms_of(&pool_whose_right_leaf_retired_after_the_unlink_of("c860-legal-retire", THE_ONLY_INODE_OF_THE_RIGHT_LEAF).memory_pool(), "legal_right_leaf_retired");
++    c860_arms_of(&pool_whose_right_leaf_retired_after_the_unlink_of("c860-legal-absorb", AN_INODE_WHOSE_UNLINK_ABSORBS_THE_RIGHT_LEAF).memory_pool(), "legal_left_absorbs_right");
++    // 合法：第一个文件删一半、inode 2 活着；三单元文件逐批删的每一版；删到一半回退到意图那一版、再续删到底；删完回退到删之前。
++    c860_arms_of(&c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-legal-half").memory_pool(), "legal_half_deleted_beside_inode_two");
++    let mut pool = pool_with_a_three_unit_file("c860-legal-batches");
++    let before_the_intent = pool.output.clone();
++    let intent = publish_the_intent(&mut pool);
++    c860_arms_of(&pool.memory_pool(), "legal_three_unit_file_after_intent");
++    let mut batch = 0;
++    while !pool.output.deleted_inodes.is_empty() {
++        publish_the_next_step_in_batches_of_one(&mut pool);
++        batch += 1;
++        c860_arms_of(&pool.memory_pool(), &format!("legal_three_unit_file_after_batch_{batch}"));
++    }
++    let after_the_deletion = pool.output.clone();
++    roll_back_to(&mut pool, &intent);
++    c860_arms_of(&pool.memory_pool(), "legal_rolled_back_to_the_intent_after_the_deletion");
++    let mut batch = 0;
++    while !pool.output.deleted_inodes.is_empty() {
++        publish_the_next_step_in_batches_of_one(&mut pool);
++        batch += 1;
++        c860_arms_of(&pool.memory_pool(), &format!("legal_rolled_back_to_the_intent_then_batch_{batch}"));
++    }
++    roll_back_to(&mut pool, &before_the_intent);
++    c860_arms_of(&pool.memory_pool(), "legal_rolled_back_to_before_the_intent");
++    let _ = after_the_deletion;
++    // 合法：234 条记录、unlink 234 意图那一版（右片叶只装 234 一条 nlink 0）。
++    let mut pool = pool_with_new_inodes("c860-legal-234-intent", NEW_INODES_FILLING_ONE_LEAF_AND_STARTING_ANOTHER);
++    let _ = common_deletion_in_progress::publish_the_intent_of(&mut pool, THE_ONLY_INODE_OF_THE_RIGHT_LEAF);
++    c860_arms_of(&pool.memory_pool(), "legal_intent_of_the_only_inode_of_the_right_leaf");
++}
++
++#[test]
++fn c860_probe_bad_images() {
++    // C860 那张：抹掉退役记录、补回退役叶的映射条目。
++    let mut pool = pool_with_new_inodes("c860-bad-c860", NEW_INODES_FILLING_ONE_LEAF_AND_STARTING_ANOTHER);
++    let intent = unlink_to_the_end(&mut pool, THE_ONLY_INODE_OF_THE_RIGHT_LEAF);
++    let right_leaf_at_the_intent = intent.inode_leaf_containers[1].clone();
++    let mut image = pool.memory_pool();
++    erase_every_record_of_the_container(&mut image, &pool.output.retirement_containers[0].pointer);
++    c860_arms_of(&image, "bad_retirement_record_erased_only");
++    insert_the_entry_into_the_newest_mapping_leaf(
++        &mut image,
++        &build_mapping_entry(&mapping_key_for_node(UNIT_CLASS_PACKED, right_leaf_at_the_intent.pointer), right_leaf_at_the_intent.pointer.locations),
++    );
++    c860_arms_of(&image, "bad_c860_retirement_erased_and_mapping_put_back");
++    // 谱系记录抹掉（已有必红世界）。
++    let pool = pool_rolled_back_past_an_overwrite_of_the_same_length("c860-bad-lineage");
++    let mut image = pool.memory_pool();
++    erase_every_record_of_the_container(&mut image, &pool.output.lineage_containers[0].pointer);
++    c860_arms_of(&image, "bad_lineage_record_erased");
++    // 第一个文件删一半、inode 2 活着：M5 必红世界（挪 inode 2 一条映射）；多一条压着活的 inode 2 的墓碑；两样一起；墓碑的出生代改坏。
++    let pool = c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-bad-half");
++    let inode_two_pointer = pool.output.file_other_than_the_first(InodeNumber(2)).expect("inode 2").data_pointers[0];
++    let key_of_inode_two = singlefs_core::records::mapping_key_for_data(inode_two_pointer.head, inode_two_pointer.write_order);
++    let birth_of_inode_two = c860_object_birth_of(&pool.output, 2);
++    let txg = pool.output.root.checkpoint_txg.0;
++    let tombstone_pointer = pool.output.tombstone_containers.last().expect("有墓碑容器").pointer;
++    let base = pool.memory_pool();
++    let mut image = base.clone();
++    c860_move_the_first_location_of_the_mapping_entry_keyed(&mut image, &key_of_inode_two);
++    c860_arms_of(&image, "bad_m5_must_red_world_inode_two_mapping_moved");
++    let mut image = base.clone();
++    c860_append_a_record_to_the_container(&mut image, &tombstone_pointer, &c860_whole_object_tombstone(2, birth_of_inode_two, txg));
++    c860_arms_of(&image, "bad_spurious_tombstone_over_live_inode_two");
++    c860_move_the_first_location_of_the_mapping_entry_keyed(&mut image, &key_of_inode_two);
++    c860_arms_of(&image, "bad_spurious_tombstone_over_live_inode_two_and_its_mapping_moved");
++    let mut image = base.clone();
++    c860_rewrite_a_field_of_a_record(&mut image, &tombstone_pointer, 0, 8, 999_999);
++    c860_arms_of(&image, "bad_tombstone_birth_of_the_deleting_inode_rewritten");
++    let mut image = base.clone();
++    erase_every_record_of_the_container(&mut image, &tombstone_pointer);
++    c860_arms_of(&image, "bad_tombstone_container_erased_while_deleting");
++    // 删完第一个文件（inode 2、3 还在同一片叶）之后，多一条压着活的 inode 2 的墓碑。
++    let mut pool = pool_with_new_inodes("c860-bad-after-unlink", 2);
++    unlink_to_the_end(&mut pool, 1);
++    let birth = c860_object_birth_of(&pool.output, 2);
++    let txg = pool.output.root.checkpoint_txg.0;
++    let tombstone_pointer = pool.output.tombstone_containers.last().expect("有墓碑容器").pointer;
++    let mut image = pool.memory_pool();
++    c860_append_a_record_to_the_container(&mut image, &tombstone_pointer, &c860_whole_object_tombstone(2, birth, txg));
++    c860_arms_of(&image, "bad_spurious_tombstone_over_live_empty_inode_two_after_unlink");
++}

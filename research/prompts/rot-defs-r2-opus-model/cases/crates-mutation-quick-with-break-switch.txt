@@ -1,0 +1,1 @@
+GATE_MUTATION_BREAK=quickrunsallrows SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=门禁 checker-tier-crates-mutation-replay.sh 的轻型（--quick）; 范围=轻型核心部分; 为什么=改了 singlefs-core 的分配器要核轻型登记的变异行' bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick $PWD

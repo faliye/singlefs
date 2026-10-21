@@ -1,0 +1,3 @@
+b58e79886741a8660b1386096e5754da07adb9d11fbc38dbc965cab1a8dadeab  .claude/kb/milestone/03-third-txn.md
+3eaa99d34e9e1e82df3f4843fa0626bcce56f72ae3fb29bbf2183a70cf8e54e1  .claude/kb/decisions/13-验证路线.md
+934d470de94f2a0b5564380a1f9216e53b15fc46b2be101080d6e7ec97d3c41a  .claude/kb/checks-owed.md

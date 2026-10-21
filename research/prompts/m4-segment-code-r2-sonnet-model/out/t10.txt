@@ -1,0 +1,3 @@
+PROBE group=t10 name=writable-mount refused=Recovery(UnitMalformed { what: "logged_ops 根里有条目过不了字段表" })
+PROBE group=t10 name=cold-recover outcome="FileRead root=(InstanceGeneration(2), CheckpointTxg(6)) bytes=3000" effective_root=Some((InstanceGeneration(2), CheckpointTxg(6)))
+PROBE group=t10 name=cold-recover-of-the-unmodified-pool outcome="FileRead root=(InstanceGeneration(2), CheckpointTxg(6)) bytes=3000"

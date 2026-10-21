@@ -1,0 +1,6 @@
+4f27be528003e1bf9abb36b7bf416efd2b0af780495d0a2f02edf0b62bab25dd  crates/singlefs-core/src/transaction.rs
+f027e88a3299dd9968dcc3e14cecad03fb4be8110be17f69b1b69349af10bbbd  crates/singlefs-core/src/mounted_session.rs
+948e1f96597838b8692dba7e6b97fa9e82cd7a48bebf556ff441b6fe6550bb0d  crates/singlefs-harness/tests/publish_lookup_by_identity.rs
+99dc56e6387ada5b7c96ba36f0cd5d0f734eb0fc7e2b528f719e1241c5b0c63a  crates/mutations.tsv
+4d2944b8ae3c898f006259941a4b13a010c1927b76267accb66319580e1f2931  .claude/kb/milestone/04-fourth-txn.md
+8bc5a232cbc5d7afbe1bd46c89659f9c04040bf4e158456d31d18c2692569c22  .claude/rules/fs-design.md

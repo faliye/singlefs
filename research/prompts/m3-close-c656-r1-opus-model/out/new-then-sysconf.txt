@@ -1,0 +1,76 @@
+name=run h=o512-u5-fdiff order=new-then-sysconf writes=21 segment_sizes=[4, 1, 1, 1, 4, 10] states_full=7874 writable=true
+name=done h=o512-u5-fdiff order=new-then-sysconf states=7874 observed=7874 violations=31 seconds=40.6
+name=count h=o512-u5-fdiff order=new-then-sysconf count=15 s0__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=1 s1__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=1 s2__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=1 s3__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=1 s4__torn__err_no_valid_system_configuration__fail_no_valid_system_configuration__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=24 s4__torn__err_system_configurations_disagree__fail_system_configurations_disagree__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=6 s4__torn__new__newempty__green__ro_err_open__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=8 s4__torn__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=4 s4__torn__old_g7__oldlast__red__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=7 s4__torn__old_g7__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=6 s4__torn__old_g8__oldlast__red__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=9 s4__torn__old_g8__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=6 s4__whole__err_system_configurations_disagree__fail_system_configurations_disagree__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=3 s4__whole__old_g7__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=6 s4__whole__old_g8__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fdiff order=new-then-sysconf count=6752 s5__torn__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=1023 s5__whole__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u5-fdiff order=new-then-sysconf count=1 s6__whole__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=run h=o512-u5-fsame order=new-then-sysconf writes=21 segment_sizes=[4, 1, 1, 1, 4, 10] states_full=7874 writable=true
+name=done h=o512-u5-fsame order=new-then-sysconf states=7874 observed=7874 violations=1 seconds=42.5
+name=count h=o512-u5-fsame order=new-then-sysconf count=15 s0__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=1 s1__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=1 s2__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=1 s3__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=1 s4__torn__err_no_valid_system_configuration__fail_no_valid_system_configuration__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=6 s4__torn__new__oldlast__green__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=20 s4__torn__new__oldlast__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=2 s4__torn__old_g7__oldlast__green__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=3 s4__torn__old_g7__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=2 s4__torn__old_g7__oldlast__red__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=9 s4__torn__old_g7__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=4 s4__torn__old_g8__oldlast__green__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=5 s4__torn__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=2 s4__torn__old_g8__oldlast__red__ro_i1t6__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=11 s4__torn__old_g8__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=3 s4__whole__new__oldlast__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=4 s4__whole__old_g7__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=1 s4__whole__old_g8__oldlast__green__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=7 s4__whole__old_g8__oldlast__red__ro_i1t6__rw_ok_i1t6__notmixed__oldintact
+name=count h=o512-u5-fsame order=new-then-sysconf count=1024 s5__torn__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=448 s5__torn__new__oldlast__red__ro_i1t6__rw_err_file_version_without_any_journal_record__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=4224 s5__torn__new__oldlast__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=416 s5__torn__new__oldlast_at_i1t4__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=576 s5__torn__new__oldlast_at_i1t5__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=32 s5__torn__new__oldolder_t4_at_i1t4__red__ro_i1t4__rw_err_file_version_without_any_journal_record__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=32 s5__torn__new__oldolder_t5_at_i1t5__red__ro_i1t5__rw_err_file_version_without_any_journal_record__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=127 s5__whole__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=128 s5__whole__new__oldlast__red__ro_i1t6__rw_err_file_version_without_any_journal_record__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=384 s5__whole__new__oldlast__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=96 s5__whole__new__oldlast_at_i1t4__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=192 s5__whole__new__oldlast_at_i1t5__red__ro_i1t6__rw_ok_i1t6__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=32 s5__whole__new__oldolder_t4_at_i1t4__red__ro_i1t4__rw_err_file_version_without_any_journal_record__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=64 s5__whole__new__oldolder_t5_at_i1t5__red__ro_i1t5__rw_err_file_version_without_any_journal_record__mixed
+name=count h=o512-u5-fsame order=new-then-sysconf count=1 s6__whole__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=run h=o512-u23-fdiff order=new-then-sysconf writes=21 segment_sizes=[4, 1, 1, 1, 4, 10] states_full=7874 writable=true
+name=done h=o512-u23-fdiff order=new-then-sysconf states=7874 observed=7874 violations=31 seconds=59.5
+name=count h=o512-u23-fdiff order=new-then-sysconf count=15 s0__whole__old_g26__oldlast__green__ro_i1t24__rw_ok_i1t24__notmixed__oldintact
+name=count h=o512-u23-fdiff order=new-then-sysconf count=1 s1__whole__old_g26__oldlast__green__ro_i1t24__rw_ok_i1t24__notmixed__oldintact
+name=count h=o512-u23-fdiff order=new-then-sysconf count=1 s2__whole__old_g26__oldlast_at_i1t23__green__ro_i1t24__rw_ok_i1t24__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=1 s3__whole__old_g26__oldlast_at_i1t23__green__ro_i1t24__rw_ok_i1t24__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=1 s4__torn__err_no_valid_system_configuration__fail_no_valid_system_configuration__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=24 s4__torn__err_system_configurations_disagree__fail_system_configurations_disagree__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=6 s4__torn__new__newempty__green__ro_err_open__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=8 s4__torn__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=4 s4__torn__old_g25__oldlast_at_i1t23__red__ro_i1t24__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=7 s4__torn__old_g25__oldlast_at_i1t23__red__ro_i1t24__rw_ok_i1t24__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=6 s4__torn__old_g26__oldlast_at_i1t23__red__ro_i1t24__rw_err_system_configuration_unreadable_after_the_read_stage__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=9 s4__torn__old_g26__oldlast_at_i1t23__red__ro_i1t24__rw_ok_i1t24__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=6 s4__whole__err_system_configurations_disagree__fail_system_configurations_disagree__red__ro_err_recovery__rw_not_tried__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=3 s4__whole__old_g25__oldlast_at_i1t23__red__ro_i1t24__rw_ok_i1t24__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=6 s4__whole__old_g26__oldlast_at_i1t23__red__ro_i1t24__rw_ok_i1t24__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=6752 s5__torn__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=1023 s5__whole__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed
+name=count h=o512-u23-fdiff order=new-then-sysconf count=1 s6__whole__new__newempty__red__ro_err_open__rw_ok_i0t0__notmixed

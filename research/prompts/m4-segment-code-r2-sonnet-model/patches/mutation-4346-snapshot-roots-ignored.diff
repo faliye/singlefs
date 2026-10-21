@@ -1,0 +1,10 @@
+--- ../../m4-segment-code-r2/repo/crates/singlefs-harness/src/model.rs
++++ crates/singlefs-harness/src/model.rs
+@@ -820,6 +820,7 @@
+             snapshot_roots: self
+                 .snapshots
+                 .iter()
++                .filter(|_| false)
+                 .map(|snapshot| {
+                     (
+                         snapshot.inode_tree_written_by,

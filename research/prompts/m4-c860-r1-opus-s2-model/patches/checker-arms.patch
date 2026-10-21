@@ -1,0 +1,342 @@
+diff -ru a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml	2026-10-19 23:50:17.486190620 +0000
++++ b/Cargo.toml	2026-10-19 23:50:17.486768057 +0000
+@@ -9,6 +9,7 @@
+     "crates/singlefs-harness",
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
++    "crates/c860-probe",
+     "crates/singlefs-reference-filesystem",
+     "crates/singlefs-unit-graph",
+ ]
+diff -ru a/crates/singlefs-checker/src/rebuild.rs b/crates/singlefs-checker/src/rebuild.rs
+--- a/crates/singlefs-checker/src/rebuild.rs	2026-10-19 23:50:17.292313521 +0000
++++ b/crates/singlefs-checker/src/rebuild.rs	2026-10-19 23:50:17.448818468 +0000
+@@ -118,6 +118,9 @@
+     /// 它的记录与数据单元不进上面三张表，遍历方向那三张也去掉它（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M5：
+     /// 只对删除中的那一个对象两侧都不比，别的对象照比）。
+     pub(crate) objects_being_deleted: BTreeSet<(u64, u64)>,
++    /// C860 探针（攻方副本）：扫描一侧被去掉的那几条记录原样，与谱系上的全部墓碑。
++    pub(crate) probe_removed_scan_records: BTreeMap<u64, Vec<u8>>,
++    pub(crate) probe_tombstoned_objects: BTreeSet<(u64, u64)>,
+ }
+ 
+ /// 扫描重建停在条款没写的地方：每个成员说清是哪条条款没定、第一版不认。调用方把 [`ScanRebuildNotDecided::reason`] 报成不适用，
+@@ -759,8 +762,11 @@
+         .map(|(inode, record)| (*inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
+         .filter(|object| tombstoned_objects.contains(object))
+         .collect();
++    let mut probe_removed_scan_records: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
+     for (inode, _) in &objects_being_deleted {
+-        inode_records.remove(inode);
++        if let Some(record) = inode_records.remove(inode) {
++            probe_removed_scan_records.insert(*inode, record);
++        }
+     }
+     let payload_capacity_in_bytes = DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET;
+     let newest_birth_txg_below = newest_birth_txg_below_each_data_unit(&current_data_units);
+@@ -826,6 +832,8 @@
+         data_units_of_each_inode,
+         inode_records,
+         objects_being_deleted,
++        probe_removed_scan_records,
++        probe_tombstoned_objects: tombstoned_objects,
+     })
+ }
+ 
+diff -ru a/crates/singlefs-checker/src/walk.rs b/crates/singlefs-checker/src/walk.rs
+--- a/crates/singlefs-checker/src/walk.rs	2026-10-19 23:50:17.451998846 +0000
++++ b/crates/singlefs-checker/src/walk.rs	2026-10-19 23:50:17.483818178 +0000
+@@ -14866,7 +14866,7 @@
+         judgements.not_applicable(SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX, reason);
+         return;
+     }
+-    let mut walked =
++    let walked =
+         match index_tables_walked_from_the_newest_root(reader, newest_root_record, index_cache) {
+             Ok(walked) => walked,
+             Err(table_not_read_in_full) => {
+@@ -14917,90 +14917,206 @@
+             return;
+         }
+     };
+-    // 删除中的对象只对它自己两侧都不比（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M5）：扫描重建那一侧
+-    // 认出的 (号, 对象出生代)，遍历方向那条记录的对象出生代相同时，去掉它的记录、它在每个 inode 的数据单元集合里的每一项与那几项的映射条目。
+-    // 别的对象照比；出生代对不上的号不去掉（两侧照比、对不上就红）。
+-    let inodes_being_deleted: BTreeSet<u64> = walked
++    // C860 探针（攻方副本）：四种认法各比一遍，记进本线程的探针表；正式判定照 C860_OFFICIAL_ARM（默认甲，今天的读法）。
++    let mut verdicts_of_the_arms: Vec<(&'static str, bool, String)> = Vec::new();
++    for arm in C860_ARMS {
++        let mut walked_of_this_arm = IndexTablesWalkedFromTheNewestRoot {
++            central_mapping: walked.central_mapping.clone(),
++            data_units_of_each_inode: walked.data_units_of_each_inode.clone(),
++            inode_records: walked.inode_records.clone(),
++        };
++        let mut scan_records: BTreeMap<u64, Vec<u8>> = rebuilt.inode_records.clone();
++        for (inode, record) in &rebuilt.probe_removed_scan_records {
++            scan_records.insert(*inode, record.clone());
++        }
++        let walk_has = |object: &(u64, u64)| {
++            walked
++                .inode_records
++                .get(&object.0)
++                .is_some_and(|record| read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET) == object.1)
++        };
++        let nlink_zero = |record: Option<&Vec<u8>>| {
++            record.is_some_and(|record| read_u32(record, INODE_RECORD_NLINK_OFFSET) == 0)
++        };
++        let (scan_drop, walk_drop): (BTreeSet<(u64, u64)>, BTreeSet<(u64, u64)>) = match arm {
++            "jia" => (
++                rebuilt.objects_being_deleted.clone(),
++                rebuilt.objects_being_deleted.iter().filter(|object| walk_has(object)).copied().collect(),
++            ),
++            "yi" => {
++                let both: BTreeSet<(u64, u64)> =
++                    rebuilt.objects_being_deleted.iter().filter(|object| walk_has(object)).copied().collect();
++                (both.clone(), both)
++            }
++            "bing" => {
++                let both: BTreeSet<(u64, u64)> = rebuilt
++                    .objects_being_deleted
++                    .iter()
++                    .filter(|object| walk_has(object))
++                    .filter(|object| {
++                        nlink_zero(scan_records.get(&object.0))
++                            && nlink_zero(walked.inode_records.get(&object.0))
++                    })
++                    .copied()
++                    .collect();
++                (both.clone(), both)
++            }
++            _union => {
++                let mut either: BTreeSet<(u64, u64)> = rebuilt.objects_being_deleted.clone();
++                for (inode, record) in &walked.inode_records {
++                    let object = (*inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET));
++                    if rebuilt.probe_tombstoned_objects.contains(&object) {
++                        either.insert(object);
++                    }
++                }
++                (either.clone(), either.iter().filter(|object| walk_has(object)).copied().collect())
++            }
++        };
++        for (inode, _) in &scan_drop {
++            scan_records.remove(inode);
++        }
++        let inodes_being_deleted: BTreeSet<u64> = walk_drop.iter().map(|(inode, _)| *inode).collect();
++        for inode in &inodes_being_deleted {
++            walked_of_this_arm.inode_records.remove(inode);
++        }
++        let mapping_keys_of_the_data_units_being_deleted: Vec<CentralMappingKey> = walked_of_this_arm
++            .data_units_of_each_inode
++            .iter()
++            .filter(|(position, _)| inodes_being_deleted.contains(&position.inode))
++            .map(|(_, key)| key.clone())
++            .collect();
++        walked_of_this_arm
++            .data_units_of_each_inode
++            .retain(|position, _| !inodes_being_deleted.contains(&position.inode));
++        for key in &mapping_keys_of_the_data_units_being_deleted {
++            walked_of_this_arm.central_mapping.remove(key);
++        }
++        let tables = [
++            DifferencesInOneTable {
++                table: IndexTableOfTheScanRebuild::CentralMapping,
++                differences: differences_in_the_central_mapping(
++                    reader,
++                    &rebuilt.central_mapping,
++                    &walked_of_this_arm.central_mapping,
++                ),
++            },
++            DifferencesInOneTable {
++                table: IndexTableOfTheScanRebuild::DataUnitsOfEachInode,
++                differences: differences_in_a_table_of_values(
++                    &rebuilt.data_units_of_each_inode,
++                    &walked_of_this_arm.data_units_of_each_inode,
++                    |position| {
++                        format!(
++                            "（inode {}、偏移 {}）",
++                            position.inode, position.offset_in_bytes
++                        )
++                    },
++                    CentralMappingKey::describe,
++                ),
++            },
++            DifferencesInOneTable {
++                table: IndexTableOfTheScanRebuild::InodeRecords,
++                differences: differences_in_a_table_of_values(
++                    &scan_records,
++                    &walked_of_this_arm.inode_records,
++                    |inode| format!("inode {inode}"),
++                    |record| describe_inode_record(record),
++                ),
++            },
++        ];
++        let every_table_agrees = tables.iter().all(|table| table.differences.is_empty());
++        let tables_that_differ: Vec<String> = tables
++            .iter()
++            .filter(|table| !table.differences.is_empty())
++            .map(|table| {
++                format!(
++                    "「{}」差 {} 处，第一处 {}",
++                    table.table.name(),
++                    table.differences.len(),
++                    table.differences[0]
++                )
++            })
++            .collect();
++        verdicts_of_the_arms.push((
++            arm,
++            every_table_agrees,
++            format!(
++                "扫描重建的三张表与遍历方向从最新根读出的不同：{}",
++                tables_that_differ.join("；")
++            ),
++        ));
++    }
++    let scan_only = rebuilt
++        .objects_being_deleted
++        .iter()
++        .filter(|object| {
++            !walked
++                .inode_records
++                .get(&object.0)
++                .is_some_and(|record| read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET) == object.1)
++        })
++        .count();
++    let walk_tombstoned_nonzero_nlink = walked
+         .inode_records
+         .iter()
+         .filter(|(inode, record)| {
+             rebuilt
+-                .objects_being_deleted
++                .probe_tombstoned_objects
+                 .contains(&(**inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
++                && read_u32(record, INODE_RECORD_NLINK_OFFSET) != 0
+         })
+-        .map(|(inode, _)| *inode)
+-        .collect();
+-    for inode in &inodes_being_deleted {
+-        walked.inode_records.remove(inode);
+-    }
+-    let mapping_keys_of_the_data_units_being_deleted: Vec<CentralMappingKey> = walked
+-        .data_units_of_each_inode
+-        .iter()
+-        .filter(|(position, _)| inodes_being_deleted.contains(&position.inode))
+-        .map(|(_, key)| key.clone())
+-        .collect();
+-    walked
+-        .data_units_of_each_inode
+-        .retain(|position, _| !inodes_being_deleted.contains(&position.inode));
+-    for key in &mapping_keys_of_the_data_units_being_deleted {
+-        walked.central_mapping.remove(key);
+-    }
+-    let tables = [
+-        DifferencesInOneTable {
+-            table: IndexTableOfTheScanRebuild::CentralMapping,
+-            differences: differences_in_the_central_mapping(
+-                reader,
+-                &rebuilt.central_mapping,
+-                &walked.central_mapping,
+-            ),
+-        },
+-        DifferencesInOneTable {
+-            table: IndexTableOfTheScanRebuild::DataUnitsOfEachInode,
+-            differences: differences_in_a_table_of_values(
+-                &rebuilt.data_units_of_each_inode,
+-                &walked.data_units_of_each_inode,
+-                |position| {
+-                    format!(
+-                        "（inode {}、偏移 {}）",
+-                        position.inode, position.offset_in_bytes
+-                    )
+-                },
+-                CentralMappingKey::describe,
+-            ),
+-        },
+-        DifferencesInOneTable {
+-            table: IndexTableOfTheScanRebuild::InodeRecords,
+-            differences: differences_in_a_table_of_values(
+-                &rebuilt.inode_records,
+-                &walked.inode_records,
+-                |inode| format!("inode {inode}"),
+-                |record| describe_inode_record(record),
+-            ),
+-        },
+-    ];
+-    let every_table_agrees = tables.iter().all(|table| table.differences.is_empty());
+-    judgements.judge(
+-        SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+-        every_table_agrees,
+-        || {
+-            let tables_that_differ: Vec<String> = tables
+-                .iter()
+-                .filter(|table| !table.differences.is_empty())
+-                .map(|table| {
+-                    format!(
+-                        "「{}」差 {} 处，第一处 {}",
+-                        table.table.name(),
+-                        table.differences.len(),
+-                        table.differences[0]
+-                    )
+-                })
+-                .collect();
+-            format!(
+-                "扫描重建的三张表与遍历方向从最新根读出的不同：{}",
+-                tables_that_differ.join("；")
+-            )
+-        },
++        .count();
++    let meta = format!(
++        "being_deleted={} tombstoned={} scan_only={} walk_tombstoned_nonzero_nlink={}",
++        rebuilt.objects_being_deleted.len(),
++        rebuilt.probe_tombstoned_objects.len(),
++        scan_only,
++        walk_tombstoned_nonzero_nlink
+     );
++    if let Ok(mut global) = C860_GLOBAL.lock() {
++        if let Some(store) = global.as_mut() {
++            let deleting = if rebuilt.objects_being_deleted.is_empty() { "none_deleting" } else { "some_deleting" };
++            for (arm, holds, detail) in &verdicts_of_the_arms {
++                let key = format!("{arm} {deleting} {}", if *holds { "holds" } else { "violated" });
++                *store.0.entry(key.clone()).or_insert(0) += 1;
++                if !*holds {
++                    store.1.entry(key).or_insert_with(|| format!("{detail} | {meta}"));
++                }
++            }
++        }
++    }
++    verdicts_of_the_arms.push(("meta", true, meta));
++    C860_PROBE.with(|probe| {
++        if let Some(store) = probe.borrow_mut().as_mut() {
++            store.extend(verdicts_of_the_arms.iter().map(|(arm, holds, detail)| (*arm, *holds, detail.clone())));
++        }
++    });
++    let official_arm = C860_ARMS[usize::from(C860_OFFICIAL_ARM.load(std::sync::atomic::Ordering::Relaxed))];
++    let (_, every_table_agrees, detail) = verdicts_of_the_arms
++        .into_iter()
++        .find(|(arm, _, _)| *arm == official_arm && *arm != "meta")
++        .expect("四种认法都比过");
++    judgements.judge(SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX, every_table_agrees, || detail);
++}
++
++/// C860 探针的四种认法：甲（今天）、乙（遍历方向也有同号同出生代的记录）、丙（乙且两侧记录 nlink 都为 0）、丁（任一侧见记录与墓碑，并集）。
++pub const C860_ARMS: [&str; 4] = ["jia", "yi", "bing", "ding"];
++/// 正式判定取哪一种（下标进 [`C860_ARMS`]）。
++pub static C860_OFFICIAL_ARM: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
++thread_local! {
++    static C860_PROBE: std::cell::RefCell<Option<Vec<(&'static str, bool, String)>>> = const { std::cell::RefCell::new(None) };
++}
++/// C860 探针的全进程计数（崩溃枚举判段在工作线程里调池级 checker，线程局部看不见）：键「认法 有无删除中 成立/违例」→ 调用次数，与每个违例键的第一处。
++#[allow(clippy::type_complexity, reason = "攻方副本里的探针")]
++pub static C860_GLOBAL: std::sync::Mutex<Option<(BTreeMap<String, u64>, BTreeMap<String, String>)>> =
++    std::sync::Mutex::new(None);
++/// 开始在本线程记四种认法的判定。
++pub fn c860_probe_begin() {
++    C860_PROBE.with(|probe| *probe.borrow_mut() = Some(Vec::new()));
++}
++/// 取走本线程记下的判定（I-1.13 在比表之前就报不适用的，这里是空的）。
++pub fn c860_probe_take() -> Vec<(&'static str, bool, String)> {
++    C860_PROBE.with(|probe| probe.borrow_mut().take().unwrap_or_default())
+ }
+ 
+ // ───────── 只读快照与 deadlist：I-3.5 ③ ④ 与逆向、I-3.6、I-3.7（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1、S4、S5）─────────

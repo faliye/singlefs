@@ -1,0 +1,4 @@
+ba2c136f35545c08269de167ef535d47550b8a446735574f7d83fe13628dc468  .claude/kb/decisions/26-后台整理与放置回收.md
+0689f876afbb9fef657c2b1bf0f516a1b50ab7b9e328bfa5b4bb454d47cad30d  .claude/kb/decisions/05-快照-空间记账机制.md
+459aeb78649aeac5356770afdafe28a732e302ae81e8f953226e9832908e9047  .claude/kb/decisions/08-核心索引结构.md
+d91e4a01952f0668ff26ad4ea823c62ee333bd93d4bccbedb226173cdacc12a9  .claude/kb/decisions/16-发布语义.md

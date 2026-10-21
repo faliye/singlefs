@@ -1,0 +1,9 @@
+name=lagacq step=start slots: d0=[g8/inst1,g9/inst1] d1=[g8/inst1,g9/inst1] pick=g9/inst1 recover=FileRead(i1t6) read_only=Ok(i1t6) writable_mount=Ok(i1t6) raw_red=[] old_last_root=(1, 6)
+name=lagacq step=acquire1 result=Ok(2) writes_in_the_acquisition=4 withheld_write=3
+name=lagacq step=after_crash1 slots: d0=[g10/inst2,g11/inst2] d1=[g10/inst2,g9/inst1] pick=g11/inst2 recover=FileRead(i1t6) read_only=Ok(i1t6) writable_mount=Ok(i1t6) raw_red=[] old_last_root=(1, 6)
+name=lagacq step=acquire2 result=Ok(3) writes_in_the_acquisition=4 withheld_write=3
+name=lagacq step=after_crash2 slots: d0=[g12/inst3,g13/inst3] d1=[g10/inst2,g11/inst3] pick=g13/inst3 recover=FileRead(i1t6) read_only=Ok(i1t6) writable_mount=Ok(i1t6) raw_red=[] old_last_root=(1, 6)
+name=lagacq step=acquire3 result=Ok(4) writes_in_the_acquisition=4 withheld_write=3
+name=lagacq step=after_crash3 slots: d0=[g14/inst4,g15/inst4] d1=[g12/inst4,g11/inst3] pick=g15/inst4 recover=FileRead(i1t6) read_only=Ok(i1t6) writable_mount=Ok(i1t6) raw_red=[] old_last_root=(1, 6)
+name=lagacq step=acquire4 result=Ok(5) writes_in_the_acquisition=4 withheld_write=3
+name=lagacq step=after_crash4 slots: d0=[g16/inst5,g17/inst5] d1=[g12/inst4,g13/inst5] pick=g17/inst5 recover=FileRead(i1t6) read_only=Ok(i1t6) writable_mount=Ok(i1t6) raw_red=[] old_last_root=(1, 6)

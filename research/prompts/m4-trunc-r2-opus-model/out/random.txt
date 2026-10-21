@@ -1,0 +1,30 @@
+name=random seed=20261017 length=12 arm=today histories=30000 states=413282 holds=25955 resurrects=4045
+  first_resurrects: batch=144 ops=seq(4P),unsnap,size(3P),size(6P),size(0P+16317),rb(3),rb(2),seq(0P+16317),size(0P),seq(2P),size(3P),size(4P) state=extension_to_6P@txg7 resurrected=unit3(birth4)
+name=random seed=20261017 length=12 arm=bing histories=30000 states=412189 holds=30000
+name=random seed=20261017 length=12 arm=jia_latest histories=30000 states=413282 holds=29453 resurrects=547
+  first_resurrects: batch=2 ops=seq(4P),size(1P),rb(2),size(6P),rb(3),size(6P),size(1P+1),size(2P),rb(2),seq(2P),size(4P),size(0P+16317) state=truncation_intent_to_1P+1@txg16 resurrected=unit1(birth4)
+name=random seed=20261017 length=12 arm=jia_latest_no_write_order histories=30000 states=413282 holds=14000 resurrects=16000
+  first_resurrects: batch=144 ops=seq(4P),size(4P),ow(0P+16317),size(0P+16317),size(1P+1),size(2P),size(3P),size(4P),size(2P),size(6P),size(1P+1),size(3P) state=extension_to_1P+1@txg8 resurrected=unit1(birth4)
+name=random seed=20261017 length=12 arm=jia_watermark histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=jia_watermark_boundary_without_max_one histories=30000 states=413282 holds=28688 kills_live=1312
+  first_kills_live: batch=2 ops=seq(4P),rb(2),size(0P),size(2P),size(6P),size(2P),seq(2P),snap,size(2P),size(4P),snap,size(1P+1) state=truncation_intent_to_2P@txg10 killed=unit0(birth8)
+name=random seed=20261017 length=12 arm=jia_watermark_no_clear histories=30000 states=413282 holds=28240 kills_live=1760
+  first_kills_live: batch=144 ops=seq(4P),snap,size(2P),size(2P),rb(1),seq(4P+1),unsnap,size(3P),seq(4P+1),rb(3),ow(0P+16317),size(0P+16317) state=truncation_intent_to_3P@txg11 killed=unit2(birth9)
+name=random seed=20261017 length=12 arm=jia_full_no_write_order histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=jia_watermark_extension_drops_field histories=30000 states=413282 holds=25955 resurrects=4045
+  first_resurrects: batch=144 ops=seq(4P),unsnap,size(3P),size(6P),size(0P+16317),rb(3),rb(2),seq(0P+16317),size(0P),seq(2P),size(3P),size(4P) state=extension_to_6P@txg7 resurrected=unit3(birth4)
+name=random seed=20261017 length=12 arm=yi histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=yi_no_write_order histories=30000 states=413282 holds=16734 resurrects=13266
+  first_resurrects: batch=144 ops=seq(4P),size(4P),ow(0P+16317),size(0P+16317),size(1P+1),size(2P),size(3P),size(4P),size(2P),size(6P),size(1P+1),size(3P) state=extension_to_1P+1@txg8 resurrected=unit1(birth4)
+name=random seed=20261017 length=12 arm=yi_full_no_write_order histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=today_by_write_order histories=30000 states=413282 holds=25955 resurrects=4045
+  first_resurrects: batch=144 ops=seq(4P),unsnap,size(3P),size(6P),size(0P+16317),rb(3),rb(2),seq(0P+16317),size(0P),seq(2P),size(3P),size(4P) state=extension_to_6P@txg7 resurrected=unit3(birth4)
+name=random seed=20261017 length=12 arm=bing_by_write_order histories=30000 states=412189 holds=30000
+name=random seed=20261017 length=12 arm=jia_watermark_by_write_order histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=jia_watermark_not_later histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=yi_by_write_order histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=yi_not_later histories=30000 states=413282 holds=17304 kills_live=12696
+  first_kills_live: batch=2 ops=seq(4P),seq(0P),seq(4P+1),seq(0P+16317),size(4P),rb(2),size(3P),unsnap,size(0P+16317),rb(3),size(0P),unsnap state=truncation_intent_to_0P@txg16 killed=unit0(birth16)
+name=random seed=20261017 length=12 arm=yi_full_by_write_order histories=30000 states=413282 holds=30000
+name=random seed=20261017 length=12 arm=yi_with_tombstones_recycled histories=30000 states=413282 holds=28157 resurrects=1843
+  first_resurrects: batch=2 ops=seq(4P),size(1P),rb(2),size(6P),rb(3),size(6P),size(1P+1),size(2P),rb(2),seq(2P),size(4P),size(0P+16317) state=extension_to_6P@txg11 resurrected=unit1(birth4);unit2(birth4);unit3(birth4)

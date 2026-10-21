@@ -1,0 +1,56 @@
+# 改前的 mounted_session.rs（git blob 75fd509）到冻结副本，diff -u
+--- base/mounted_session.rs
++++ frozen/mounted_session.rs
+@@ -62,16 +62,16 @@
+ use crate::root_record::{RootRecord, UnmountMarker};
+ use crate::root_ring::{target_for_publish, RootRingSlot};
+ use crate::transaction::{
+-    central_mapping_locations_in_the_version, prepare_the_version_publish,
+-    publish_compaction_step_in_the_session,
++    prepare_the_version_publish, publish_compaction_step_in_the_session,
+     publish_compaction_step_with_the_region_check_of_the_intent_deletion, publish_create_snapshot,
+     publish_new_inodes, publish_overwrite, publish_overwrite_of_an_inode, publish_sequential_write,
+     publish_sequential_write_of_an_inode, publish_size_change, publish_snapshot_destruction_intent,
+     publish_unlink_intent, publish_version, walk_the_deletion_queue_until_it_is_empty,
+-    CompactionIntentStep, CompactionStepRefused, DeletionAndLineageOfThePublish, DeletionQueueWalk,
+-    FirstFile, MappingLookup, PlannedUnitsRewrittenAnyway, PoolVersion, PoolWriter, PublishError,
+-    ReadFailedOnTheDisk, ReadFailingSelfVerification, RegionCheckOfTheIntentDeletion,
+-    ReleaseChecksumCheck, RelocationBatchRefused, TransactionOutput, TransactionUnit,
++    CentralMappingOfAVersionReadLeafByLeaf, CompactionIntentStep, CompactionStepRefused,
++    DeletionAndLineageOfThePublish, DeletionQueueWalk, FirstFile, MappingLookup,
++    PlannedUnitsRewrittenAnyway, PoolVersion, PoolWriter, PublishError, ReadFailedOnTheDisk,
++    ReadFailingSelfVerification, RegionCheckOfTheIntentDeletion, ReleaseChecksumCheck,
++    RelocationBatchRefused, TransactionOutput, TransactionUnit,
+ };
+ use crate::unit::{unit_filesystem_identifier, UNIT_CLASS_DATA};
+ use crate::unlink::DeletionSwitches;
+@@ -2782,19 +2782,19 @@
+ fn version_as_the_compaction_reads_it(
+     version: &TransactionOutput,
+ ) -> VersionAsTheCompactionReadsIt {
++    // 每把 key 查一次，叶按片解一次（七·6）：答案与逐 key 查 `central_mapping_locations_in_the_version` 逐个相同。
++    let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
+     let mut mapping_entries: Vec<CentralMappingEntry> = version
+         .mapped_units
+         .iter()
+-        .filter_map(
+-            |(_, key)| match central_mapping_locations_in_the_version(version, key) {
+-                MappingLookup::Found(locations) => Some(CentralMappingEntry {
+-                    key: key.clone(),
+-                    locations,
+-                }),
+-                MappingLookup::NodeMalformedOrNoEntryWithThisKey
+-                | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => None,
+-            },
+-        )
++        .filter_map(|(_, key)| match central_mapping.locations_of_key(key) {
++            MappingLookup::Found(locations) => Some(CentralMappingEntry {
++                key: key.clone(),
++                locations,
++            }),
++            MappingLookup::NodeMalformedOrNoEntryWithThisKey
++            | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => None,
++        })
+         .collect();
+     mapping_entries.extend(version.mapping_entries_kept_for_the_snapshots.iter().map(
+         |(key, locations)| CentralMappingEntry {

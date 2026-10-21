@@ -1,6 +1,6 @@
 # W3 正推腿的模型（m3-w3-r1-sonnet-model）
 
-在 E175 装置（`research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs`）上加了一段另算（`w3-device.diff`），
+在 E175 装置（`scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs`）上加了一段另算（`w3-device.diff`），
 对每个候选的「盘上发号历史」会不会让某一步判红，逐步算出来，并拿 E175 自己的发号事件（`name=event` 行，Q1）当对照。不改装置原有的任何一行判定。
 
 ## 它算什么

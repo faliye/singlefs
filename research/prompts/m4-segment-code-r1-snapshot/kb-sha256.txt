@@ -1,0 +1,9 @@
+6aca8d61a7788b560801c84006e6bb0b2522cf9ccf8c28692bafd402de854a1a  crates/singlefs-checker/invariants/04-校验和.md
+0689f876afbb9fef657c2b1bf0f516a1b50ab7b9e328bfa5b4bb454d47cad30d  .claude/kb/decisions/05-快照-空间记账机制.md
+459aeb78649aeac5356770afdafe28a732e302ae81e8f953226e9832908e9047  .claude/kb/decisions/08-核心索引结构.md
+d91e4a01952f0668ff26ad4ea823c62ee333bd93d4bccbedb226173cdacc12a9  .claude/kb/decisions/16-发布语义.md
+ba2c136f35545c08269de167ef535d47550b8a446735574f7d83fe13628dc468  .claude/kb/decisions/26-后台整理与放置回收.md
+65e8925d12793486f943d6de05794c7d9b10d27aac333f51f48116bc53d2fbea  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+24eebabc1535e9752ce6a78876be959c39d488b41c759f47c0da67ecf020a261  .claude/kb/decisions/13-验证路线.md
+fce18f92586499afc328bf614a6a7f1604b648ad833f09b0739497f5dacae83b  crates/singlefs-checker/invariants/09-inode树结构.md
+f3a120d627db743bd7296bff9c36028fdbdce88986d87695dc60d00f3db993c9  .claude/kb/checks-owed.md

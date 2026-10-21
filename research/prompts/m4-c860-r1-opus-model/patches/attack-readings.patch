@@ -1,0 +1,575 @@
+--- a/crates/singlefs-checker/src/rebuild.rs
++++ b/crates/singlefs-checker/src/rebuild.rs
+@@ -118,6 +118,8 @@
+     /// 它的记录与数据单元不进上面三张表，遍历方向那三张也去掉它（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M5：
+     /// 只对删除中的那一个对象两侧都不比，别的对象照比）。
+     pub(crate) objects_being_deleted: BTreeSet<(u64, u64)>,
++    /// 攻方副本（m4-c860-r1）：扫描一侧按甲摘掉的那几条记录原样，walk.rs 按读法放回。
++    pub(crate) records_of_the_objects_being_deleted: BTreeMap<u64, Vec<u8>>,
+ }
+ 
+ /// 扫描重建停在条款没写的地方：每个成员说清是哪条条款没定、第一版不认。调用方把 [`ScanRebuildNotDecided::reason`] 报成不适用，
+@@ -759,8 +761,11 @@
+         .map(|(inode, record)| (*inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
+         .filter(|object| tombstoned_objects.contains(object))
+         .collect();
++    let mut records_of_the_objects_being_deleted: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
+     for (inode, _) in &objects_being_deleted {
+-        inode_records.remove(inode);
++        if let Some(record) = inode_records.remove(inode) {
++            records_of_the_objects_being_deleted.insert(*inode, record);
++        }
+     }
+     let payload_capacity_in_bytes = DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET;
+     let newest_birth_txg_below = newest_birth_txg_below_each_data_unit(&current_data_units);
+@@ -826,6 +831,7 @@
+         data_units_of_each_inode,
+         inode_records,
+         objects_being_deleted,
++        records_of_the_objects_being_deleted,
+     })
+ }
+ 
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -14841,6 +14841,42 @@
+ /// 说明里每张对不上的表写差几处与第一处（表名、key、两边的值）。实例表读不全、遍历方向的索引已被别的不变量判损坏
+ /// （[`INVARIANTS_WHOSE_VIOLATION_MEANS_THE_WALKED_INDEX_IS_DAMAGED`]）、遍历方向那三张表读不全、扫描重建停在条款没写之处
+ /// （`rebuild::ScanRebuildNotDecided`）报不适用并带理由。只读：这一遍不写盘。
++/// 攻方副本（m4-c860-r1）的读法开关：0 甲（今天）、1 乙（遍历方向也有同号同出生代的记录）、2 丙（乙且两侧记录 nlink 都是 0）、
++/// 3 丁（甲且扫描一侧记录 nlink 是 0）。没设过取环境变量 C860_READING，再没有取 0。
++pub static C860_READING: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(u8::MAX);
++thread_local! {
++    static C860_READING_OF_THIS_THREAD: std::cell::Cell<u8> = const { std::cell::Cell::new(u8::MAX) };
++    static C860_OBJECTS_BEING_DELETED_AT_THE_LAST_JUDGEMENT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
++}
++/// 攻方副本：这个线程上一次走到比对那一步时扫描一侧认出的删除中对象个数（没走到比对的不改它）。
++pub fn c860_objects_being_deleted_at_the_last_judgement_of_this_thread() -> usize {
++    C860_OBJECTS_BEING_DELETED_AT_THE_LAST_JUDGEMENT.with(std::cell::Cell::get)
++}
++/// 攻方副本：只给这个线程设读法（随机历史各工作线程各设各的）。
++pub fn set_the_c860_reading_of_this_thread(reading: u8) {
++    C860_READING_OF_THIS_THREAD.with(|cell| cell.set(reading));
++}
++pub const C860_READING_TODAY: u8 = 0;
++pub const C860_READING_WALKED_ALSO_HAS_THE_RECORD: u8 = 1;
++pub const C860_READING_BOTH_SIDES_HAVE_THE_RECORD_WITH_NLINK_ZERO: u8 = 2;
++pub const C860_READING_SCAN_SIDE_WITH_NLINK_ZERO: u8 = 3;
++fn c860_reading() -> u8 {
++    let of_this_thread = C860_READING_OF_THIS_THREAD.with(std::cell::Cell::get);
++    if of_this_thread != u8::MAX {
++        return of_this_thread;
++    }
++    let value = C860_READING.load(std::sync::atomic::Ordering::SeqCst);
++    if value != u8::MAX {
++        return value;
++    }
++    let from_the_environment = std::env::var("C860_READING")
++        .ok()
++        .and_then(|text| text.parse::<u8>().ok())
++        .unwrap_or(C860_READING_TODAY);
++    C860_READING.store(from_the_environment, std::sync::atomic::Ordering::SeqCst);
++    from_the_environment
++}
++
+ fn judge_scan_rebuild_agrees_with_the_walked_index(
+     reader: &dyn ImageReader,
+     newest_root_record: &[u8],
+@@ -14849,6 +14885,7 @@
+     index_cache: &mut IndexNodeCache,
+     judgements: &mut Judgements,
+ ) {
++    C860_OBJECTS_BEING_DELETED_AT_THE_LAST_JUDGEMENT.with(|cell| cell.set(0));
+     match abandoned_roots_filtering {
+         AbandonedRootsFilteringOfTheCandidateSet::FilteredByTheNewestRootsInstanceTable => {}
+         AbandonedRootsFilteringOfTheCandidateSet::UnfilteredAsTheMainWalkStoppedBeforeTheLastPageOfTheNewestRootsInstanceTable => {
+@@ -14907,7 +14944,7 @@
+             .collect();
+         rebuild_index_tables(&current, &container_copies)
+     });
+-    let rebuilt = match rebuilt {
++    let mut rebuilt = match rebuilt {
+         Ok(rebuilt) => rebuilt,
+         Err(not_decided) => {
+             judgements.not_applicable(
+@@ -14920,16 +14957,44 @@
+     // 删除中的对象只对它自己两侧都不比（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M5）：扫描重建那一侧
+     // 认出的 (号, 对象出生代)，遍历方向那条记录的对象出生代相同时，去掉它的记录、它在每个 inode 的数据单元集合里的每一项与那几项的映射条目。
+     // 别的对象照比；出生代对不上的号不去掉（两侧照比、对不上就红）。
+-    let inodes_being_deleted: BTreeSet<u64> = walked
+-        .inode_records
+-        .iter()
+-        .filter(|(inode, record)| {
+-            rebuilt
+-                .objects_being_deleted
+-                .contains(&(**inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
+-        })
+-        .map(|(inode, _)| *inode)
+-        .collect();
++    let reading = c860_reading();
++    C860_OBJECTS_BEING_DELETED_AT_THE_LAST_JUDGEMENT.with(|cell| cell.set(rebuilt.objects_being_deleted.len()));
++    let inodes_being_deleted: BTreeSet<u64> = if reading == C860_READING_TODAY {
++        walked
++            .inode_records
++            .iter()
++            .filter(|(inode, record)| {
++                rebuilt
++                    .objects_being_deleted
++                    .contains(&(**inode, read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET)))
++            })
++            .map(|(inode, _)| *inode)
++            .collect()
++    } else {
++        let mut chosen: BTreeSet<u64> = BTreeSet::new();
++        for (inode, object_birth) in &rebuilt.objects_being_deleted {
++            let scan_record = rebuilt.records_of_the_objects_being_deleted.get(inode);
++            let walked_record = walked.inode_records.get(inode);
++            let walked_same_birth = walked_record
++                .is_some_and(|record| read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET) == *object_birth);
++            let scan_nlink_zero = scan_record.is_some_and(|record| read_u32(record, INODE_RECORD_NLINK_OFFSET) == 0);
++            let walked_nlink_zero = walked_record.is_some_and(|record| read_u32(record, INODE_RECORD_NLINK_OFFSET) == 0);
++            let is_being_deleted = match reading {
++                C860_READING_WALKED_ALSO_HAS_THE_RECORD => walked_same_birth,
++                C860_READING_BOTH_SIDES_HAVE_THE_RECORD_WITH_NLINK_ZERO => walked_same_birth && scan_nlink_zero && walked_nlink_zero,
++                C860_READING_SCAN_SIDE_WITH_NLINK_ZERO => scan_nlink_zero,
++                other => panic!("C860_READING {other} 没定义"),
++            };
++            if is_being_deleted {
++                if walked_same_birth {
++                    chosen.insert(*inode);
++                }
++            } else if let Some(record) = scan_record {
++                rebuilt.inode_records.insert(*inode, record.clone());
++            }
++        }
++        chosen
++    };
+     for inode in &inodes_being_deleted {
+         walked.inode_records.remove(inode);
+     }
+--- a/crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs
++++ b/crates/singlefs-harness/tests/scan_rebuild_reads_lineage_and_retirement_records.rs
+@@ -586,3 +586,423 @@
+         tally.states_after_a_deletion
+     );
+ }
++
++// ───────── 攻方副本 m4-c860-r1：几种认删除中的读法在合法盘与坏盘上各判什么（只在副本里，不进补丁） ─────────
++
++mod common_snapshot_prefix;
++
++use singlefs_checker::walk::set_the_c860_reading_of_this_thread;
++
++/// 读法：甲（今天）、乙（遍历方向也有同号同出生代的记录）、丙（乙且两侧记录 nlink 都是 0）、丁（甲且扫描一侧记录 nlink 是 0）。
++const C860_READINGS: [(&str, u8); 4] = [("甲", 0), ("乙", 1), ("丙", 2), ("丁", 3)];
++
++fn c860_class(verdict: &InvariantVerdict) -> String {
++    match verdict {
++        InvariantVerdict::Holds => "成立".to_string(),
++        InvariantVerdict::Violated(detail) => {
++            let shortened: String = detail.chars().take(260).collect();
++            format!("违例：{shortened}")
++        }
++        InvariantVerdict::NotApplicable(reason) => format!("不适用：{reason}"),
++        InvariantVerdict::PartiallyJudged(_) => "部分没判".to_string(),
++    }
++}
++
++fn c860_judge(name: &str, image: &MemoryPool) {
++    set_the_c860_reading_of_this_thread(0);
++    let every_verdict = check_pool_image(image);
++    let violated: Vec<&str> = every_verdict
++        .iter()
++        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++        .map(|(invariant, _)| *invariant)
++        .collect();
++    println!("C860_OTHER {name} violated={violated:?}");
++    for (label, reading) in C860_READINGS {
++        set_the_c860_reading_of_this_thread(reading);
++        let verdict = verdict_of_the_scan_rebuild(image);
++        println!("C860_ROW {name} {label} {}", c860_class(&verdict));
++    }
++    set_the_c860_reading_of_this_thread(0);
++}
++
++fn c860_birth_of(pool: &BuiltPool, inode: u64) -> u64 {
++    common_deletion_in_progress::object_birth_of(&pool.output, inode)
++        .unwrap_or_else(|| panic!("inode {inode} 有记录"))
++        .0
++}
++
++/// 照 `scan_rebuild_agrees_with_the_walked_index.rs` 的同名搭法：第一个文件三个单元，建 inode 2、写它两个单元，删第一个文件到第一批之后。
++fn c860_pool_with_the_first_file_half_deleted_beside_inode_two(tag: &str) -> BuiltPool {
++    let mut pool = common_deletion_in_progress::pool_with_a_three_unit_file(tag);
++    common_deletion_in_progress::publish_new_inodes_and_advance_the_pool(&mut pool, 1);
++    let payload = usize::try_from(singlefs_core::unit::data_unit_payload_capacity()).expect("净荷");
++    let content_of_inode_two: Vec<u8> = (0..2 * payload - 5)
++        .map(|index| u8::try_from((index * 7 + 3) % 251).expect("小于 256"))
++        .collect();
++    let publish_parameters = common::parameters();
++    let previous = pool.output.clone();
++    let written = {
++        let devices = pool.devices.as_mut().expect("镜像还开着");
++        let mut writer =
++            singlefs_core::transaction::PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++        singlefs_core::transaction::publish_sequential_write_of_an_inode(
++            &mut writer,
++            &mut pool.allocator,
++            &previous,
++            InodeNumber(2),
++            &content_of_inode_two,
++            common_deletion_in_progress::WRITE_TIME_SECONDS_OF_THE_NEW_INODES,
++            common_deletion_in_progress::INSTANCE_OF_THE_PUBLISHES,
++        )
++        .expect("按 inode 号顺序写 inode 2 两个单元")
++    };
++    pool.output = written;
++    common_deletion_in_progress::publish_the_intent(&mut pool);
++    common_deletion_in_progress::publish_the_next_step_in_batches_of_one(&mut pool);
++    pool
++}
++
++/// 最新根中央映射叶里 key 为 `mapping_key` 的条目，第一条位置条目的槽号挪两槽，重封、补校验和（M5 必红世界那一造法）。
++fn c860_move_the_first_location_of_the_mapping_entry_keyed(image: &mut MemoryPool, mapping_key: &[u8]) {
++    let key_width = 27usize;
++    let entry_width = 55usize;
++    let leaf_slot = the_slot_of(&newest_root(image).mapping_root);
++    let mut leaf = unit_bytes_at(image, leaf_slot, node_bytes());
++    assert_eq!(leaf[50], 0, "中央映射树只有一层");
++    let entries_start = 115 + 2 * key_width;
++    let entry_count = usize::from(u16::from_le_bytes(
++        leaf[82 + 2 * key_width..84 + 2 * key_width].try_into().expect("2 字节"),
++    ));
++    let entry_start = (0..entry_count)
++        .map(|index| entries_start + index * entry_width)
++        .find(|start| leaf[*start..*start + key_width] == *mapping_key)
++        .expect("中央映射里有这把 key");
++    let slot_field_start = entry_start + key_width + 4;
++    let mut slot_bytes = [0u8; 8];
++    slot_bytes[..6].copy_from_slice(&leaf[slot_field_start..slot_field_start + 6]);
++    let moved_slot = u64::from_le_bytes(slot_bytes) + 4096;
++    leaf[slot_field_start..slot_field_start + 6].copy_from_slice(&moved_slot.to_le_bytes()[..6]);
++    let header_end = 86 + 2 * key_width;
++    let payload_checksum = crc32_castagnoli(&leaf[header_end..]);
++    leaf[76 + 2 * key_width..80 + 2 * key_width].copy_from_slice(&payload_checksum.to_le_bytes());
++    seal_header_checksum(&mut leaf, header_end);
++    replace_the_unit_and_propagate_its_checksum(image, leaf_slot, &leaf);
++}
++
++/// 把队列里剩下的删完（产品批大小）。
++fn c860_continue_the_queue_to_the_end(pool: &mut BuiltPool) {
++    let publish_parameters = common::parameters();
++    let devices = pool.devices.as_mut().expect("镜像还开着");
++    let mut writer =
++        singlefs_core::transaction::PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++    let mut current = pool.output.clone();
++    singlefs_core::transaction::publish_unlink_steps_until_the_queue_is_empty(
++        &mut writer,
++        &mut pool.allocator,
++        &mut current,
++        singlefs_core::unlink::UnlinkBatchSize::OneExtentLowerLeaf,
++        common_deletion_in_progress::INSTANCE_OF_THE_PUBLISHES,
++    )
++    .expect("续做到队列空");
++    pool.output = current;
++}
++
++#[test]
++#[ignore = "攻方副本 m4-c860-r1：逐张镜像打印四种读法的 I-1.13 判定"]
++fn c860_attack_table_of_the_readings_over_legal_and_bad_images() {
++    // ── 合法盘 ──
++    if std::env::var("C860_SKIP_LEGAL").is_err() {
++    {
++        let mut pool = common_deletion_in_progress::pool_with_a_three_unit_file("c860-legal-batches");
++        common_deletion_in_progress::publish_the_intent(&mut pool);
++        c860_judge("合法·三单元文件意图之后", &pool.memory_pool());
++        for batch in 1..=10 {
++            if pool.output.deleted_inodes.is_empty() {
++                break;
++            }
++            common_deletion_in_progress::publish_the_next_step_in_batches_of_one(&mut pool);
++            c860_judge(&format!("合法·三单元文件第{batch}批之后"), &pool.memory_pool());
++        }
++    }
++    c860_judge(
++        "合法·空inode意图之后",
++        &common_deletion_in_progress::image_after_the_intent_of_an_empty_inode("c860-legal-empty-intent"),
++    );
++    c860_judge(
++        "合法·右片删空退役",
++        &pool_whose_right_leaf_retired_after_the_unlink_of("c860-legal-retired", THE_ONLY_INODE_OF_THE_RIGHT_LEAF)
++            .memory_pool(),
++    );
++    c860_judge(
++        "合法·左片吸收右片",
++        &pool_whose_right_leaf_retired_after_the_unlink_of("c860-legal-absorbed", AN_INODE_WHOSE_UNLINK_ABSORBS_THE_RIGHT_LEAF)
++            .memory_pool(),
++    );
++    c860_judge(
++        "合法·挂着回退过同长覆盖写",
++        &pool_rolled_back_past_an_overwrite_of_the_same_length("c860-legal-rolled-back").memory_pool(),
++    );
++    c860_judge(
++        "合法·删2到底回退到意图之前再转环",
++        &common_deletion_in_progress::pool_with_inode_two_unlinked_then_rolled_back_before_the_intent_and_the_root_ring_turned_over("c860-legal-two-rolled-back").memory_pool(),
++    );
++    c860_judge(
++        "合法·删3到底再转环",
++        &common_deletion_in_progress::pool_with_inode_three_unlinked_and_the_root_ring_turned_over("c860-legal-three-turned").memory_pool(),
++    );
++    {
++        let mut pool = pool_with_new_inodes("c860-legal-rollback-to-intent", NEW_INODES_FILLING_ONE_LEAF_AND_STARTING_ANOTHER);
++        let intent = unlink_to_the_end(&mut pool, THE_ONLY_INODE_OF_THE_RIGHT_LEAF);
++        roll_back_to(&mut pool, &intent);
++        c860_judge("合法·删234到底后回退到意图那一版", &pool.memory_pool());
++        c860_continue_the_queue_to_the_end(&mut pool);
++        c860_judge("合法·回退到意图那一版后续做到底", &pool.memory_pool());
++    }
++    {
++        let mut pool = pool_with_new_inodes("c860-legal-rollback-before-intent", NEW_INODES_FILLING_ONE_LEAF_AND_STARTING_ANOTHER);
++        let before_the_intent = pool.output.clone();
++        unlink_to_the_end(&mut pool, THE_ONLY_INODE_OF_THE_RIGHT_LEAF);
++        roll_back_to(&mut pool, &before_the_intent);
++        c860_judge("合法·删234到底后回退到意图之前", &pool.memory_pool());
++        unlink_to_the_end(&mut pool, THE_ONLY_INODE_OF_THE_RIGHT_LEAF);
++        c860_judge("合法·回退到意图之前后再删234到底", &pool.memory_pool());
++    }
++    c860_judge(
++        "合法·第一个文件删一半旁边inode2带两个单元",
++        &c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-legal-half-deleted").memory_pool(),
++    );
++    {
++        let mut pool = build_pool("c860-legal-snapshot");
++        pool.output = common_snapshot_prefix::create_snapshot(&mut pool);
++        pool.output = common_snapshot_prefix::unlink_intent(&mut pool);
++        c860_judge("合法·快照下删意图之后", &pool.memory_pool());
++        for batch in 1..=10 {
++            if pool.output.deleted_inodes.is_empty() {
++                break;
++            }
++            pool.output = common_snapshot_prefix::unlink_step(&mut pool);
++            c860_judge(&format!("合法·快照下删第{batch}批之后"), &pool.memory_pool());
++        }
++    }
++    }
++    // ── 坏盘 ──
++    if std::env::var("C860_SKIP_FIRST_BAD").is_err() {
++    {
++        let mut pool = pool_with_new_inodes("c860-bad-c860", NEW_INODES_FILLING_ONE_LEAF_AND_STARTING_ANOTHER);
++        let intent = unlink_to_the_end(&mut pool, THE_ONLY_INODE_OF_THE_RIGHT_LEAF);
++        let right_leaf_at_the_intent = intent.inode_leaf_containers[1].clone();
++        let mut image = pool.memory_pool();
++        erase_every_record_of_the_container(&mut image, &pool.output.retirement_containers[0].pointer);
++        c860_judge("坏·只抹退役记录", &image);
++        insert_the_entry_into_the_newest_mapping_leaf(
++            &mut image,
++            &build_mapping_entry(
++                &mapping_key_for_node(UNIT_CLASS_PACKED, right_leaf_at_the_intent.pointer),
++                right_leaf_at_the_intent.pointer.locations,
++            ),
++        );
++        c860_judge("坏·C860镜像（抹退役记录且补回映射条目）", &image);
++    }
++    {
++        let pool = pool_rolled_back_past_an_overwrite_of_the_same_length("c860-bad-lineage");
++        let mut image = pool.memory_pool();
++        erase_every_record_of_the_container(&mut image, &pool.output.lineage_containers[0].pointer);
++        c860_judge("坏·抹谱系记录", &image);
++    }
++    {
++        let pool = c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-bad-tombstone-moved");
++        let birth_of_inode_two = c860_birth_of(&pool, 2);
++        let mut image = pool.memory_pool();
++        common_deletion_in_progress::change_the_first_tombstone_of_the_newest_root(&mut image, |tombstone| {
++            common_deletion_in_progress::set_tombstone_field(tombstone, 0, 2);
++            common_deletion_in_progress::set_tombstone_field(
++                tombstone,
++                common_deletion_in_progress::TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET,
++                birth_of_inode_two,
++            );
++        });
++        c860_judge("坏·删一半时墓碑改指活文件inode2", &image);
++    }
++    {
++        let pool = c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-bad-tombstone-extra");
++        let birth_of_inode_two = c860_birth_of(&pool, 2);
++        let mut image = pool.memory_pool();
++        common_deletion_in_progress::append_a_copy_of_the_first_tombstone_of_the_newest_root(&mut image);
++        common_deletion_in_progress::change_the_first_tombstone_of_the_newest_root(&mut image, |tombstone| {
++            common_deletion_in_progress::set_tombstone_field(tombstone, 0, 2);
++            common_deletion_in_progress::set_tombstone_field(
++                tombstone,
++                common_deletion_in_progress::TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET,
++                birth_of_inode_two,
++            );
++        });
++        c860_judge("坏·删一半时多一条墓碑指活文件inode2", &image);
++    }
++    {
++        let pool = common_deletion_in_progress::pool_with_inode_three_unlinked_and_the_root_ring_turned_over("c860-bad-tombstone-live-first-file");
++        let birth_of_the_first_file = c860_birth_of(&pool, 1);
++        let mut image = pool.memory_pool();
++        common_deletion_in_progress::append_a_copy_of_the_first_tombstone_of_the_newest_root(&mut image);
++        common_deletion_in_progress::change_the_first_tombstone_of_the_newest_root(&mut image, |tombstone| {
++            common_deletion_in_progress::set_tombstone_field(tombstone, 0, 1);
++            common_deletion_in_progress::set_tombstone_field(
++                tombstone,
++                common_deletion_in_progress::TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET,
++                birth_of_the_first_file,
++            );
++        });
++        c860_judge("坏·删完3之后多一条墓碑指带数据的活文件inode1", &image);
++    }
++    {
++        let mut image = common_deletion_in_progress::image_after_the_intent_of_a_three_unit_file("c860-bad-tombstone-birth");
++        common_deletion_in_progress::change_the_first_tombstone_of_the_newest_root(&mut image, |tombstone| {
++            let birth = common_deletion_in_progress::tombstone_field(tombstone, common_deletion_in_progress::TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET);
++            common_deletion_in_progress::set_tombstone_field(tombstone, common_deletion_in_progress::TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET, birth + 1);
++        });
++        c860_judge("坏·意图之后墓碑出生代加一", &image);
++    }
++    {
++        let mut image = common_deletion_in_progress::image_after_the_intent_of_a_three_unit_file("c860-bad-tombstone-death");
++        common_deletion_in_progress::change_the_first_tombstone_of_the_newest_root(&mut image, |tombstone| {
++            common_deletion_in_progress::set_tombstone_field(tombstone, common_deletion_in_progress::TOMBSTONE_RECORD_DEATH_TXG_OFFSET, 1 << 40);
++        });
++        c860_judge("坏·意图之后墓碑死亡txg改到谱系外", &image);
++    }
++    }
++    {
++        let pool = c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-bad-record-dropped");
++        let mut image = pool.memory_pool();
++        common_deletion_in_progress::drop_the_record_of_the_first_file_and_keep_its_data_units(&mut image);
++        c860_judge("坏·删一半时删除中记录丢了单元还在", &image);
++    }
++    {
++        let mut image = common_deletion_in_progress::image_after_the_intent_of_a_three_unit_file("c860-bad-nlink-back");
++        common_deletion_in_progress::set_the_nlink_of_the_queued_first_file_back_to_one(&mut image);
++        c860_judge("坏·意图之后删除中记录nlink改回1", &image);
++    }
++    {
++        let pool = c860_pool_with_the_first_file_half_deleted_beside_inode_two("c860-bad-m5-must-red");
++        let first_data_pointer_of_inode_two = pool
++            .output
++            .file_other_than_the_first(InodeNumber(2))
++            .expect("inode 2 带数据单元")
++            .data_pointers[0];
++        let mut image = pool.memory_pool();
++        c860_move_the_first_location_of_the_mapping_entry_keyed(
++            &mut image,
++            &singlefs_core::records::mapping_key_for_data(
++                first_data_pointer_of_inode_two.head,
++                first_data_pointer_of_inode_two.write_order,
++            ),
++        );
++        c860_judge("坏·M5必红世界（删一半时inode2映射落点挪槽）", &image);
++    }
++}
++
++fn c860_weights_named(name: &str) -> &'static GenerationWeights {
++    match name {
++        "BROAD" => &GenerationWeights::BROAD,
++        "DELETING_FILES_OF_SEVERAL_LOWER_LEAVES" => &GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES,
++        "REUSE_AFTER_RAISING_THE_FLOOR" => &GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
++        "ROLLBACK_AFTER_RAISING_THE_FLOOR" => &GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
++        "LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP" => &GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP,
++        "SNAPSHOT_OPERATIONS" => &GenerationWeights::SNAPSHOT_OPERATIONS,
++        "COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK" => &GenerationWeights::COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK,
++        "WRITES_BY_INODE_NUMBER" => &GenerationWeights::WRITES_BY_INODE_NUMBER,
++        "TRUNCATION" => &GenerationWeights::TRUNCATION,
++        other => panic!("没有比重 {other}"),
++    }
++}
++
++/// 环境变量 C860_BATCHES = 「比重:首个种子:种子数,…」，C860_STEPS = 每段步数，C860_THREADS = 工作线程数。
++/// 每个状态四种读法各判一次 I-1.13，按读法数成立 / 违例 / 不适用，四种读法判得不一样的状态逐条打印。
++#[test]
++#[ignore = "攻方副本 m4-c860-r1：随机历史上四种读法各判 I-1.13"]
++fn c860_attack_readings_over_random_histories() {
++    let batches_text = std::env::var("C860_BATCHES").expect("C860_BATCHES");
++    let steps: usize = std::env::var("C860_STEPS").expect("C860_STEPS").parse().expect("步数");
++    let worker_threads: usize = std::env::var("C860_THREADS").expect("C860_THREADS").parse().expect("线程");
++    let mut histories: Vec<(String, HistorySeed, &'static GenerationWeights)> = Vec::new();
++    for batch in batches_text.split(',') {
++        let fields: Vec<&str> = batch.split(':').collect();
++        let first_seed: u64 = fields[1].parse().expect("种子");
++        let seed_count: u64 = fields[2].parse().expect("种子数");
++        for seed in first_seed..first_seed + seed_count {
++            histories.push((fields[0].to_string(), HistorySeed(seed), c860_weights_named(fields[0])));
++        }
++    }
++    let execution = HistoryExecution {
++        per_step_checker: PerStepChecker::Skipped,
++        device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
++        space_admission: SpaceAdmission::JudgedByTheFormula,
++    };
++    let next_history = Mutex::new(0usize);
++    let tally: Mutex<BTreeMap<(String, String), u64>> = Mutex::new(BTreeMap::new());
++    let disagreements: Mutex<Vec<String>> = Mutex::new(Vec::new());
++    let states_with_an_object_being_deleted: Mutex<u64> = Mutex::new(0);
++    std::thread::scope(|scope| {
++        for _ in 0..worker_threads {
++            scope.spawn(|| loop {
++                let history_index = {
++                    let mut next = next_history.lock().expect("锁");
++                    if *next >= histories.len() {
++                        break;
++                    }
++                    *next += 1;
++                    *next - 1
++                };
++                let (weights_name, seed, weights) = &histories[history_index];
++                let history = generate_history_with_weights(*seed, steps, weights);
++                let _history_run = execute_history_with(
++                    &history,
++                    execution,
++                    &SharedStream::new(),
++                    &mut |observation| {
++                        let mut classes: Vec<String> = Vec::new();
++                        singlefs_checker::walk::set_the_c860_reading_of_this_thread(0);
++                        let _ = verdict_of_the_scan_rebuild(observation.image);
++                        let being_deleted_here = singlefs_checker::walk::c860_objects_being_deleted_at_the_last_judgement_of_this_thread();
++                        singlefs_checker::walk::set_the_c860_reading_of_this_thread(99);
++                        for (_, reading) in C860_READINGS {
++                            set_the_c860_reading_of_this_thread(reading);
++                            classes.push(verdict_class_of(&verdict_of_the_scan_rebuild(observation.image)));
++                        }
++                        set_the_c860_reading_of_this_thread(0);
++                        let mut tally = tally.lock().expect("锁");
++                        for ((label, _), class) in C860_READINGS.iter().zip(classes.iter()) {
++                            *tally.entry(((*label).to_string(), class.clone())).or_insert(0) += 1;
++                        }
++                        drop(tally);
++                        if classes.iter().any(|class| *class != classes[0]) {
++                            disagreements.lock().expect("锁").push(format!(
++                                "{weights_name} 种子 {} {:?} {:?}：{:?}",
++                                seed.0,
++                                observation.position,
++                                observation.operation.map(|operation| operation.kind()),
++                                classes
++                            ));
++                        }
++                        if being_deleted_here > 0 {
++                            *states_with_an_object_being_deleted.lock().expect("锁") += 1;
++                        }
++                    },
++                );
++            });
++        }
++    });
++    let tally = tally.into_inner().expect("锁");
++    for ((label, class), count) in &tally {
++        println!("C860_RANDOM_TALLY {label} {count} {class}");
++    }
++    let disagreements = disagreements.into_inner().expect("锁");
++    for line in &disagreements {
++        println!("C860_RANDOM_DISAGREEMENT {line}");
++    }
++    let states: u64 = tally.iter().filter(|((label, _), _)| label == "甲").map(|(_, count)| *count).sum();
++    println!(
++        "C860_RANDOM_SUMMARY histories={} steps={steps} states={states} states_with_an_object_being_deleted={} disagreements={}",
++        histories.len(),
++        states_with_an_object_being_deleted.into_inner().expect("锁"),
++        disagreements.len()
++    );
++}

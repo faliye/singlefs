@@ -1,0 +1,5 @@
+E name=maponly_carry nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=56170 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=3783 gc_stuck=0 livelock=44703 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=261 del_pred_false=1950 n0_refused=0 gc_done=8789 gc_declined=2678 gc_stuck=0 gc_paused=0 gc_cycle=43947 gc_cap=756 gc_wasted=0
+W name=maponly_carry flag=hint_bad path=W0.GI.GB
+W name=maponly_carry flag=livelock path=W0
+W name=maponly_carry flag=del_pred_true path=W0.GI.D0.GB
+W name=maponly_carry flag=del_pred_false path=W0.GI.GB

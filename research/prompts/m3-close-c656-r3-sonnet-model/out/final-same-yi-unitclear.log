@@ -1,0 +1,2 @@
+name=history h=same order=yi-unitclear writes=23 segment_writes=[2, 14, 1, 1, 1, 4] states_with_torn=280027 old_last_root=(1, 6)
+name=final h=same order=yi-unitclear phase=all torn=false choice=new@4096g1 root=i0t0 recover=NoFile(i0t0) raw_red=[] read_only=Err:Open writable=Ok(i0t0) verdict=new_complete

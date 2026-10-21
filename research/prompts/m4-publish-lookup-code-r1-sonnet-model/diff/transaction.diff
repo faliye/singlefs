@@ -1,0 +1,380 @@
+# 改前的 transaction.rs（git blob ad9371e）到冻结副本，diff -u
+--- base/transaction.rs
++++ frozen/transaction.rs
+@@ -3179,6 +3179,68 @@
+     pub highest_transaction_number_in_this_instance: u64,
+ }
+ 
++/// [`TransactionOutput::unit`] 与 [`FirstEntryOfEachIdentity::unit`] 查不到时的 panic 消息：两条查法查的是同一张 `units`。
++const EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION: &str =
++    "八个文件 / 固定点角色每种一个；实例表单元要先重写过一次才在";
++
++/// 一版里一张按身份查的表（`units`、`mapped_units`、`files_other_than_the_first`）的索引：建的时候走一遍整张表，之后每次查是一次
++/// 有序表查找，不再走整张表。发布与整理在一次调用里要对约 P 个身份各查一次，在表上 `iter().find` 是 P 的平方
++/// （里程碑四七·6；量的出处 `records/2026-10-19-里程碑四GPU垃圾回收开工.md` 2026-10-20 调查员交回那一条）。
++///
++/// 同一身份在表里出现几次时取最先那一项，与在表上 `iter().find` 逐项相同：换成索引行为一个字节不变（七·6 的验收）。
++/// 索引借着那张表（`'table`）：索引活着时那一版改不了，「索引与表一致」由借用检查守住；表换了就要重建，不跨版本留着。
++pub struct FirstEntryOfEachIdentity<'table, Identity, Entry> {
++    first_entry_of_each_identity: BTreeMap<Identity, &'table Entry>,
++}
++
++impl<'table, Identity: Ord, Entry> FirstEntryOfEachIdentity<'table, Identity, Entry> {
++    /// 走一遍 `table`，每个身份记下最先那一项。
++    #[must_use]
++    pub fn of_the_table(table: &'table [Entry], identity_of: impl Fn(&Entry) -> Identity) -> Self {
++        let mut first_entry_of_each_identity = BTreeMap::new();
++        // 迭代上界是表长；跨轮携带的是已经见过的身份，见过的不覆盖（取最先那一项，与 `iter().find` 同义）。
++        for entry in table {
++            first_entry_of_each_identity
++                .entry(identity_of(entry))
++                .or_insert(entry);
++        }
++        Self {
++            first_entry_of_each_identity,
++        }
++    }
++
++    /// 表里身份是 `identity` 的最先那一项；没有就是 `None`（同 `iter().find`）。
++    #[must_use]
++    pub fn first_entry_of(&self, identity: &Identity) -> Option<&'table Entry> {
++        self.first_entry_of_each_identity.get(identity).copied()
++    }
++}
++
++impl<'table> FirstEntryOfEachIdentity<'table, TransactionUnit, PublishedUnit> {
++    /// 同 [`TransactionOutput::unit`]：这一版里角色是 `identity` 的那个单元。
++    ///
++    /// # Panics
++    /// 这一版里没有这个角色的单元（同 [`TransactionOutput::unit`]）。
++    #[must_use]
++    pub fn unit(&self, identity: TransactionUnit) -> &'table PublishedUnit {
++        self.first_entry_of(&identity)
++            .expect(EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION)
++    }
++}
++
++impl<'table> FirstEntryOfEachIdentity<'table, TransactionUnit, (TransactionUnit, Vec<u8>)> {
++    /// 这一版里进映射的角色 `identity` 的映射 key（同在 `mapped_units` 上按角色 `iter().find`）。
++    ///
++    /// # Panics
++    /// 这一版里这个角色不进映射：调用方只拿照抄进下一版的、上一版里进映射的角色来查（上一版装映射节点时逐个记下了）。
++    #[must_use]
++    pub fn mapping_key_of(&self, identity: TransactionUnit) -> &'table [u8] {
++        self.first_entry_of(&identity)
++            .map(|(_, key)| key.as_slice())
++            .expect("照抄进来的角色在上一版里进映射、有一把 key")
++    }
++}
++
+ /// 第一个文件之外一个有数据单元的文件在一版里的样子（[`TransactionOutput::files_other_than_the_first`]）。
+ /// 数据单元从 0 起连号、没有洞，尾部也没有洞：这个文件只由按 inode 号写数据的两个入口从偏移 0 整份写（长度 0 的内容也写一个声明长度 0 的
+ /// 单元），截断与变长对它拒（[`TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses`]）。
+@@ -3645,12 +3707,36 @@
+         steps
+     }
+ 
++    /// 这一版里角色是 `identity` 的那个单元（`units` 里最先那一项）。在 `units` 上线性找：一次调用里只查几次的用它；
++    /// 要对约 P 个角色各查一次的（照抄全部单元、整理读全部映射条目）先建 [`TransactionOutput::units_by_role`]（七·6）。
+     #[must_use]
+     pub fn unit(&self, identity: TransactionUnit) -> &PublishedUnit {
+         self.units
+             .iter()
+             .find(|unit| unit.identity == identity)
+-            .expect("八个文件 / 固定点角色每种一个；实例表单元要先重写过一次才在")
++            .expect(EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION)
++    }
++
++    /// `units` 按角色的索引：建一次走完 `units`，之后每次按角色查不再走整张表（[`TransactionOutput::unit`] 的批量形态，七·6）。
++    #[must_use]
++    pub fn units_by_role(&self) -> FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit> {
++        FirstEntryOfEachIdentity::of_the_table(&self.units, |unit| unit.identity)
++    }
++
++    /// `mapped_units` 按角色的索引（照抄进下一版的角色取上一版的映射 key，七·6）。
++    #[must_use]
++    pub fn mapped_units_by_role(
++        &self,
++    ) -> FirstEntryOfEachIdentity<'_, TransactionUnit, (TransactionUnit, Vec<u8>)> {
++        FirstEntryOfEachIdentity::of_the_table(&self.mapped_units, |(identity, _)| *identity)
++    }
++
++    /// `files_other_than_the_first` 按 inode 号的索引（[`TransactionOutput::file_other_than_the_first`] 的批量形态，七·6）。
++    #[must_use]
++    pub fn files_other_than_the_first_by_inode(
++        &self,
++    ) -> FirstEntryOfEachIdentity<'_, InodeNumber, FileOfAnInodeOtherThanTheFirst> {
++        FirstEntryOfEachIdentity::of_the_table(&self.files_other_than_the_first, |file| file.inode)
+     }
+ 
+     /// 一棵多层码 2 树的高：从它这一版根节点的码 2 头里现读层级 + 1（D8（核心索引结构） 已定项 11 ⑤；
+@@ -4162,6 +4248,96 @@
+     mapping_locations_for_key(&version.unit(leaf_role).bytes, key)
+ }
+ 
++/// 一版的中央映射树按 key 查落点的批量形态：每把 key 的答案与 [`central_mapping_locations_in_the_version`] 逐个相同
++/// （走到哪片叶、叶解不开、叶里有切不动的条目、同一把 key 有几条取最后一条，几种情形都同），但每片叶只解一次、叶的单元按角色从索引取。
++/// 整理读一版时对全部进映射单元的 key 各查一次，逐 key 查是每把 key 线性找叶再整片重解（里程碑四七·6）。
++/// 一片叶在第一次有 key 走到它时才解：没有 key 走到的叶不碰，与逐 key 查一样（那片叶的角色不在 `units` 里时同样 panic）。
++pub struct CentralMappingOfAVersionReadLeafByLeaf<'version> {
++    shape: &'version CodeTwoTreeShape,
++    units_by_role: FirstEntryOfEachIdentity<'version, TransactionUnit, PublishedUnit>,
++    leaves_read: BTreeMap<TransactionUnit, CentralMappingLeafRead>,
++}
++
++/// 一片中央映射叶解一次的样子，对走到这片叶的任一把 key 给出的答案与 [`mapping_locations_for_key`] 相同。
++enum CentralMappingLeafRead {
++    /// 叶解不开：走到它的每把 key 都是 [`MappingLookup::NodeMalformedOrNoEntryWithThisKey`]。
++    NodeMalformed,
++    /// 叶里有一条条目切不动（带的是最先那条切不动的条目的字节数）：走到它的每把 key 都是
++    /// [`MappingLookup::EntryNarrowerThanItsFieldTable`]，不论那把 key 的条目排在它前面还是后面（`mapping_locations_for_key` 遇到它就返回）。
++    EntryNarrowerThanItsFieldTable { entry_bytes: usize },
++    /// 叶里每把 key 的两条位置条目；同一把 key 有几条时取最后一条（`mapping_locations_for_key` 逐条往后覆盖 `found`）。
++    LocationsOfEachKey(BTreeMap<Vec<u8>, [LocationEntry; 2]>),
++}
++
++impl CentralMappingLeafRead {
++    fn of_the_leaf_bytes(mapping_node_bytes: &[u8]) -> Self {
++        let Ok(node) = parse_index_node(mapping_node_bytes) else {
++            return Self::NodeMalformed;
++        };
++        let mut locations_of_each_key = BTreeMap::new();
++        // 迭代上界是叶里的条目数；跨轮携带的是已解出的 key → 落点，后面同一把 key 的条目覆盖前面的。
++        for entry in &node.entries {
++            let Some((key, locations)) = parse_mapping_entry(entry) else {
++                return Self::EntryNarrowerThanItsFieldTable {
++                    entry_bytes: entry.len(),
++                };
++            };
++            locations_of_each_key.insert(key, locations);
++        }
++        Self::LocationsOfEachKey(locations_of_each_key)
++    }
++
++    fn locations_of_key(&self, key: &[u8]) -> MappingLookup {
++        match self {
++            Self::NodeMalformed => MappingLookup::NodeMalformedOrNoEntryWithThisKey,
++            Self::EntryNarrowerThanItsFieldTable { entry_bytes } => {
++                MappingLookup::EntryNarrowerThanItsFieldTable {
++                    entry_bytes: *entry_bytes,
++                }
++            }
++            Self::LocationsOfEachKey(locations_of_each_key) => {
++                locations_of_each_key.get(key).map_or(
++                    MappingLookup::NodeMalformedOrNoEntryWithThisKey,
++                    |locations| MappingLookup::Found(*locations),
++                )
++            }
++        }
++    }
++}
++
++impl<'version> CentralMappingOfAVersionReadLeafByLeaf<'version> {
++    /// 建 `version` 的单元索引；叶一片都还没解。
++    #[must_use]
++    pub fn of_the_version(version: &'version TransactionOutput) -> Self {
++        Self {
++            shape: &version.central_mapping_tree.shape,
++            units_by_role: version.units_by_role(),
++            leaves_read: BTreeMap::new(),
++        }
++    }
++
++    /// 同 [`central_mapping_locations_in_the_version`]`(version, key)`。
++    ///
++    /// # Panics
++    /// `key` 走到的那片叶的角色不在这一版的 `units` 里（同 [`central_mapping_locations_in_the_version`]）。
++    pub fn locations_of_key(&mut self, key: &[u8]) -> MappingLookup {
++        let Some(leaf) = leaf_position_routed_to(
++            self.shape,
++            &CodeTwoTreeKey::new(key, CodeTwoKeyFieldWidths::CENTRAL_MAPPING),
++        ) else {
++            return MappingLookup::NodeMalformedOrNoEntryWithThisKey;
++        };
++        let leaf_role = MultiLevelCodeTwoTree::CentralMapping.role_of_node(leaf, self.shape);
++        let units_by_role = &self.units_by_role;
++        self.leaves_read
++            .entry(leaf_role)
++            .or_insert_with(|| {
++                CentralMappingLeafRead::of_the_leaf_bytes(&units_by_role.unit(leaf_role).bytes)
++            })
++            .locations_of_key(key)
++    }
++}
++
+ /// 经映射释放的角色（数据、extent 根、inode 叶容器与根、分配记录树、记账树）：这次重写的角色里走得到映射条目的那几个，按角色次序。
+ /// 映射树、树表、实例表豁免映射（D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12），硬规则 1 的读盘核挂在「经映射核到那条映射条目之后」，
+ /// 它们不在其内；这次新多出来、上一版没有落点的角色也不在其内。
+@@ -6817,7 +6993,8 @@
+     )
+ }
+ 
+-/// 从上一版取一个照抄进来的角色的映射 key。
++/// 从上一版取一个照抄进来的角色的映射 key。在 `mapped_units` 上线性找：只查几个角色的用它（快照判定那一圈只问这次换下的几个）；
++/// 照抄全部角色的那一圈用 [`TransactionOutput::mapped_units_by_role`]（七·6）。
+ ///
+ /// # Panics
+ /// 上一版里没有这个角色的映射 key：照抄进来的角色恒是上一版里进映射的那一个（上一版装映射节点时逐个记下了）。
+@@ -7707,11 +7884,15 @@
+                 ),
+             )
+         };
++        // 照抄的角色约有上一版那么多个，每个按角色取上一版的 key：先建上一版 `mapped_units` 的索引（七·6），不逐个在表上找。
++        let mapped_units_of_the_previous_version =
++            previous.map(TransactionOutput::mapped_units_by_role);
+         let carried = |identity: TransactionUnit| {
+-            mapping_key_carried_from(
+-                previous.expect("照抄的角色只出现在接着上一版的发布里"),
+-                identity,
+-            )
++            mapped_units_of_the_previous_version
++                .as_ref()
++                .expect("照抄的角色只出现在接着上一版的发布里")
++                .mapping_key_of(identity)
++                .to_vec()
+         };
+         let mut mapped_units: Vec<(TransactionUnit, Vec<u8>)> = Vec::new();
+         match self.first_file_version() {
+@@ -11066,9 +11247,13 @@
+         .collect()
+ }
+ 
+-/// 上一版里某个角色的单元字节（照抄进这一版的 `units`）。
+-fn carried_unit(previous: &TransactionOutput, identity: TransactionUnit) -> PublishedUnit {
+-    previous.unit(identity).clone()
++/// 上一版里某个角色的单元字节（照抄进这一版的 `units`）。按角色查走上一版 `units` 的索引：一次发布照抄约有上一版那么多个单元，
++/// 索引在装这一版的 `units` 之前建一次（七·6）。
++fn carried_unit(
++    units_of_the_previous_version: &FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit>,
++    identity: TransactionUnit,
++) -> PublishedUnit {
++    units_of_the_previous_version.unit(identity).clone()
+ }
+ 
+ /// 一个文件对象这次发布的数据单元：单元字节与指针。重写时由 `build_file_version_units` 装，照抄时从上一版取
+@@ -12248,10 +12433,12 @@
+     carried: &TransactionOutput,
+     carried_data_units: usize,
+ ) -> FileVersionUnits {
++    // 第一个文件的每个数据单元按角色取一次：先建上一版 `units` 的索引（七·6）。
++    let units_of_the_carried_version = carried.units_by_role();
+     FileVersionUnits {
+         data_units: (0..carried_data_units)
+             .map(|position| {
+-                carried
++                units_of_the_carried_version
+                     .unit(TransactionUnit::Data(DataUnitIndexInFile(
+                         u64::try_from(position).expect("单元序号"),
+                     )))
+@@ -12558,7 +12745,9 @@
+             .as_ref()
+             .map_or(0, |(_, written_units)| written_units.key_order_mismatches);
+     // 第一个文件之外各文件这一版的数据指针（与 `resolved.files_other_than_the_first.files` 同序）：这次写的那一个是这次装的，别的照抄上一版
+-    // （整理的一批之后上一版的拷贝里它们已换成映射位置）。
++    // （整理的一批之后上一版的拷贝里它们已换成映射位置）。照抄的文件约有上一版那么多个，按 inode 号查走上一版的索引（七·6）。
++    let files_of_the_previous_version =
++        previous.map(TransactionOutput::files_other_than_the_first_by_inode);
+     let data_pointers_of_the_files_other_than_the_first: Vec<(InodeNumber, Vec<DataPointer>)> =
+         resolved
+             .files_other_than_the_first
+@@ -12575,10 +12764,9 @@
+                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+                 | FileOtherThanTheFirstOrigin::CutByADeletionBatch => (
+                     file_plan.inode,
+-                    previous
+-                        .and_then(|previous_version| {
+-                            previous_version.file_other_than_the_first(file_plan.inode)
+-                        })
++                    files_of_the_previous_version
++                        .as_ref()
++                        .and_then(|files| files.first_entry_of(&file_plan.inode))
+                         .expect("照抄的文件在上一版里")
+                         .data_pointers
+                         .iter()
+@@ -13439,13 +13627,19 @@
+         identity,
+         bytes,
+     };
++    let units_of_the_previous_version = previous.map(TransactionOutput::units_by_role);
+     let mut units: Vec<PublishedUnit> = Vec::new();
+     for (position, data_unit) in data_units.iter().enumerate() {
+         let identity = TransactionUnit::Data(DataUnitIndexInFile(
+             u64::try_from(position).expect("单元序号"),
+         ));
+         units.push(match carried_file {
+-            Some(carried) if !rewritten.contains(&identity) => carried_unit(carried, identity),
++            Some(_) if !rewritten.contains(&identity) => carried_unit(
++                units_of_the_previous_version
++                    .as_ref()
++                    .expect("照抄第一个文件的发布接在上一版之后：carried_file 就是上一版"),
++                identity,
++            ),
+             None | Some(_) => rewritten_unit(identity, data_unit.clone()),
+         });
+     }
+@@ -13469,7 +13663,9 @@
+                 }
+                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+                 | FileOtherThanTheFirstOrigin::CutByADeletionBatch => carried_unit(
+-                    previous.expect("照抄的文件只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的文件只出现在接着上一版的发布里"),
+                     identity,
+                 ),
+             });
+@@ -13485,7 +13681,9 @@
+             // 照抄上一版那个叶序上的那一份（字节、落点不动），装进这一版时换成这一版的角色。
+             InodeLeafContainerOrigin::CarriedFrom(previous_index) => {
+                 let carried = carried_unit(
+-                    previous.expect("没重写的叶容器只会出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("没重写的叶容器只会出现在接着上一版的发布里"),
+                     TransactionUnit::InodeLeafContainer(previous_index),
+                 );
+                 PublishedUnit {
+@@ -13499,7 +13697,9 @@
+     units.push(match &inode_tree_units.rewritten_root {
+         Some(root) => rewritten_unit(TransactionUnit::InodeRoot, root.bytes.clone()),
+         None => carried_unit(
+-            previous.expect("没重写 inode 根的发布恒接在上一版之后"),
++            units_of_the_previous_version
++                .as_ref()
++                .expect("没重写 inode 根的发布恒接在上一版之后"),
+             TransactionUnit::InodeRoot,
+         ),
+     });
+@@ -13514,7 +13714,9 @@
+             {
+                 Some(allocation_record_tree_node_unit) => allocation_record_tree_node_unit.clone(),
+                 None => carried_unit(
+-                    previous.expect("照抄的分配记录树节点只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的分配记录树节点只出现在接着上一版的发布里"),
+                     identity,
+                 ),
+             },
+@@ -13526,7 +13728,9 @@
+         |identity: TransactionUnit, node: &DeletionTreeNodeUnit| match &node.rewritten {
+             Some(rewritten_node) => rewritten_unit(identity, rewritten_node.bytes.clone()),
+             None => carried_unit(
+-                previous.expect("照抄的删除树节点只出现在接着上一版的发布里"),
++                units_of_the_previous_version
++                    .as_ref()
++                    .expect("照抄的删除树节点只出现在接着上一版的发布里"),
+                 identity,
+             ),
+         };
+@@ -13539,7 +13743,9 @@
+             Some(rewritten_node) => rewritten_unit(node.identity, rewritten_node.bytes.clone()),
+             None => {
+                 let carried = carried_unit(
+-                    previous.expect("照抄的容器树节点只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的容器树节点只出现在接着上一版的发布里"),
+                     node.identity_in_the_previous_version,
+                 );
+                 PublishedUnit {

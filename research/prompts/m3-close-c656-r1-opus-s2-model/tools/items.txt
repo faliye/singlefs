@@ -1,0 +1,5 @@
+# <产物名> <历史> <写序> [起] [止]：rerun.sh 逐行跑、与 out/<产物名>.log 比（name=done 那一行不比）
+x512-same-jia-0-7874 x512-same jia 0 7874
+x512-diff-yi-0-8 x512-diff yi 0 8
+# out/v1-torn-label-bug/ 下那几份是修撕裂标签之前的二进制跑的：判定列（verdict）与态数照用，torn= 一列全写成 false 是标签错。
+# 用现在的二进制重跑它们，判定列应逐态数相同、torn= 一列不同；比法：python3 tools/summarize.py <新日志> 与对旧日志的输出只在 torn/whole 一列上不同。

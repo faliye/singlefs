@@ -1,0 +1,113 @@
+--- a/crates/singlefs-core/src/lib.rs
++++ b/crates/singlefs-core/src/lib.rs
+@@ -28,6 +28,7 @@
+ pub mod lineage_tree;
+ pub mod logged_operations;
+ pub mod make_filesystem;
++pub mod r2_switch;
+ pub mod mount;
+ pub mod mounted_read;
+ pub mod mounted_session;
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -1566,6 +1566,16 @@
+         return RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable);
+     };
+     match RootRecord::parse_slot(&bytes, filesystem_identifier) {
++        Some(root)
++            if crate::r2_switch::is_misplaced(
++                root.checkpoint_txg.0,
++                ring_slot.region,
++                ring_slot.slot,
++                immutable_sizes.root_ring_slots_per_region.count(),
++            ) =>
++        {
++            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified)
++        }
+         Some(root) => {
+             reader.note_that_the_bytes_read_self_verify(device, offset, &bytes);
+             RootRingSlotReading::SelfVerified(root)
+@@ -6993,7 +7003,11 @@
+             let kept_by_the_instance_table_of_the_chosen_root =
+                 match &instance_table_of_the_chosen_root {
+                     Some(table) => !root_is_abandoned_by_the_instance_table(root, table),
+-                    None => order == witnessed_publish,
++                    None => {
++                        order == witnessed_publish
++                            || (crate::r2_switch::same_instance()
++                                && root.instance == chosen_root.instance)
++                    }
+                 };
+             witnessed_publish <= order
+                 && order < chosen
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -2735,6 +2735,16 @@
+         return RootRingSlotReadingTellingNeverWrittenApart::AllZeroNeverWritten;
+     }
+     match RootRecord::parse_slot(&bytes, filesystem_identifier) {
++        Some(root)
++            if crate::r2_switch::is_misplaced(
++                root.checkpoint_txg.0,
++                ring_slot.region,
++                ring_slot.slot,
++                immutable_sizes.root_ring_slots_per_region.count(),
++            ) =>
++        {
++            RootRingSlotReadingTellingNeverWrittenApart::BadAndNotAllZero
++        }
+         Some(root) => RootRingSlotReadingTellingNeverWrittenApart::SelfVerified(root),
+         None => RootRingSlotReadingTellingNeverWrittenApart::BadAndNotAllZero,
+     }
+--- /dev/null
++++ b/crates/singlefs-core/src/r2_switch.rs
+@@ -0,0 +1,49 @@
++//! 正推腿模型用的开关（只在草稿目录的仓副本里，不是仓里的代码）：m3-close-rootring-r2 的两处改动点可开可关，同一份编译跑「今天」与「改后」。
++//! 公式核：0 关（今天），1 裸公式（第一轮用户那一支字面），2 带第 0 代例外（这一轮 C743 的形）。
++//! 同实例：真时 F2 判法在所选根的实例表读不出时，除了恰好等于见证到的那一版，也收与所选根同一个实例代号的根（这一轮 C751 的形）。
++//! 初值读环境变量 `R2_FORMULA` 与 `R2_SAME_INSTANCE`，测试里也能直接设。
++use std::sync::atomic::{AtomicU8, Ordering};
++
++static FORMULA: AtomicU8 = AtomicU8::new(255);
++static SAME_INSTANCE: AtomicU8 = AtomicU8::new(255);
++
++fn load_or_env(cell: &AtomicU8, name: &str) -> u8 {
++    let value = cell.load(Ordering::SeqCst);
++    if value != 255 {
++        return value;
++    }
++    let from_env = std::env::var(name)
++        .ok()
++        .and_then(|text| text.parse::<u8>().ok())
++        .unwrap_or(0);
++    cell.store(from_env, Ordering::SeqCst);
++    from_env
++}
++
++pub fn set_formula(mode: u8) {
++    FORMULA.store(mode, Ordering::SeqCst);
++}
++pub fn formula() -> u8 {
++    load_or_env(&FORMULA, "R2_FORMULA")
++}
++pub fn set_same_instance(on: bool) {
++    SAME_INSTANCE.store(u8::from(on), Ordering::SeqCst);
++}
++pub fn same_instance() -> bool {
++    load_or_env(&SAME_INSTANCE, "R2_SAME_INSTANCE") == 1
++}
++
++/// 读出的根（txg）住在 (region, slot) 这一槽里，公式核判不判它错位。
++pub fn is_misplaced(checkpoint_txg: u64, region: u64, slot: u64, slots_per_region: u64) -> bool {
++    match formula() {
++        0 => false,
++        1 => (checkpoint_txg % 3, (checkpoint_txg / 3) % slots_per_region) != (region, slot),
++        _ => {
++            if checkpoint_txg == 0 {
++                slot != 0
++            } else {
++                (checkpoint_txg % 3, (checkpoint_txg / 3) % slots_per_region) != (region, slot)
++            }
++        }
++    }
++}

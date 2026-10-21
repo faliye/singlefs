@@ -1,0 +1,11 @@
+
+running 2 tests
+test every_crash_state_of_deleting_another_file_that_lowers_the_upper_segment_is_continued ... 删 150（降层）：写 116 次，段长 [26, 2, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2]，闭式状态数 152043545
+删 150（降层）：判了 33 个状态（段边界加短段全展开）
+ok
+test every_crash_state_of_deleting_the_first_file_beside_another_file_is_continued ... 删 1（150 留着）：写 122 次，段长 [26, 2, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 26, 2, 1, 2]，闭式状态数 218103833
+删 1（150 留着）：判了 33 个状态（段边界加短段全展开）
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 28.90s
+

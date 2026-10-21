@@ -1,0 +1,6 @@
+E name=fault_naive nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=120812 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=5139 livelock=19404 frozen=0 unmet_del=0 false_enospc=6372 release_bad=0 rb_refused=0 del_pred_true=1968 del_pred_false=1846 n0_refused=0 gc_done=26570 gc_declined=9269 gc_stuck=16943 gc_paused=48626 gc_cycle=17690 gc_cap=1714 gc_wasted=0
+W name=fault_naive flag=gc_stuck path=W0.GI.Q0
+W name=fault_naive flag=livelock path=W0.M
+W name=fault_naive flag=false_enospc path=W0.O0.GI.O0
+W name=fault_naive flag=del_pred_true path=W0.GI.GB
+W name=fault_naive flag=del_pred_false path=W0.GI.O0.GB

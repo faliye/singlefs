@@ -1,0 +1,6 @@
+C860_RANDOM_TALLY 丁 62 成立
+C860_RANDOM_TALLY 丙 62 成立
+C860_RANDOM_TALLY 乙 62 成立
+C860_RANDOM_TALLY 甲 62 成立
+C860_RANDOM_SUMMARY histories=2 steps=30 states=62 states_with_an_object_being_deleted=0 disagreements=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 8.79s

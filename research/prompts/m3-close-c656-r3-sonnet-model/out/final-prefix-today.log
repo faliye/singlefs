@@ -1,0 +1,2 @@
+name=history h=prefix order=today writes=21 segment_writes=[14, 1, 1, 1, 4] states_with_torn=280019 old_last_root=(1, 6)
+name=final h=prefix order=today phase=all torn=false choice=new@4096g1 root=i0t0 recover=NoFile(i0t0) raw_red=["I-7.7"] read_only=Err:Open writable=Ok(i0t0) verdict=new_complete

@@ -1,0 +1,9 @@
+95e8dbb2ccc55ee8d3f3e0ae49b695eda8fd78a3e5df9fcf84afd4851a96fd45  .claude/kb/term-renames.md
+5023c8b6d89923eeb28af53dbaecfeab5da9b0fbc3f35d9649fac3454a2389c3  .claude/kb/decisions.md
+f9b9fbe481920766807b374669eb533330ed002e39a5a32d91f86f6e09987c06  .claude/kb/decisions-history.md
+f246ef5145306711cf9eff183aabe30b6f5c86286a662ff168b52a1fbb57951b  .claude/kb/checks-owed.md
+6bfb916c872115055ccfe49702bcb66e153061227f4b9f12d7216eb099a2f2e4  .claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md
+011f543446a107a2a291d7eae00bbf06be96c01077a1b16c813309aaf8ce48cd  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
+3eaa99d34e9e1e82df3f4843fa0626bcce56f72ae3fb29bbf2183a70cf8e54e1  .claude/kb/decisions/13-验证路线.md
+fb59ef0fcfbbcbbd816fd89aff6be3782ae031daa1de89f03d893f608822e29d  .claude/kb/experiments/171-三oracle合谋测试.md
+65b3b3f540045ed18781ba7addec456d8eca230c83202e526a29caca45c0899d  .claude/kb/experiments/179-预演内存随删除规模.md

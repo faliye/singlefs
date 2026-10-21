@@ -1,0 +1,15 @@
+bdb5179e8215e28a4031d99c8a94b97b550deca3448463d7e5e767ffb821ef51  ./out/check-numbers.txt
+ec1151a7c05e7c3f54ca1c8e539b09ab2bcc7e21036471127a85cbe51bbe9ac7  ./out/cite-r1-opus.txt
+931eb472cfc97263aefdf06a30dbee185aa80f3e8ed2ff630236b69a6210bef1  ./out/cite-r1-sonnet.txt
+55421d3faeca73caf0bd7aef624f3b8ef1e275a6bc71493162e618a1511af990  ./out/cite-r2-opus.txt
+d820274e041d1df03ccd2b8b8afa9d6cd8885971672f39289b4718816f5f1020  ./out/cite-r2-sonnet.txt
+2f242685c9d306a429f6172ee87d5b963681f6ab91441ce5b6eccab8f88160ce  ./out/existing-fix-tests.txt
+a1810bc29774da38a34ba92817855d43a6b333b234bdf0e473d7313ebc6dc821  ./out/f9-checker-tests.txt
+81e6d083555f6960a19b94d7ae82e7bd4e047af8cef9810b85c05059231e596d  ./out/legs-rerun-lines.txt
+d32bddb1915daa4e9065b7924a19d4c9c245b3fe705d7fd33e6af6c69b307823  ./out/ps-before.txt
+cd00ac0e09e381c23edc38e83f01d169dd5426a69e04f10ebbac461d80352b52  ./out/seed-rollback-950093.log
+9cb6a741a06ed2f8a36a43ef6ec6c85ff17bee3a8b1564e423649935fd637692  ./out/seed950093-ceiling.txt
+eca532bafc7fbe91458f98aef7a6e4439f028b18ff1d4b4b4c946c7560062bfb  ./out/with-rollback-310.txt
+d57eaac14e66cf6ddbdd90b18a6d09b7f224a615d2e9b2414d4655b23890b86e  ./tools/check-numbers.py
+72d8604e0237b9365f760e946dc1a7b02086198396cc00c5870e4fa2e1eecb94  ./tools/random-batch.sh
+827c08bfe5d75876a4d57cdb3a876e585fd64fe8ccc42fc1c1744abf5c2c4073  ./tools/rerun.sh

@@ -1,0 +1,51 @@
+probe=acq_counts prefix=k0 acquisition=two_rounds rollback=per_written acquired=2 writes=40 sysconf_writes=8 segments=10 closed_form_states=20499 states_with_torn=20519 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written states_judged=20519 footprint_states=20502
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=flip/d0s0/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=none outcomes={"mounted": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=k0 acquisition=two_rounds rollback=per_written post_mount_checker_red_states_by_invariant={}
+probe=acq_counts prefix=k2 acquisition=two_rounds rollback=per_written acquired=2 writes=40 sysconf_writes=8 segments=10 closed_form_states=20499 states_with_torn=20519 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written states_judged=20519 footprint_states=20502
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=flip/d0s0/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=none outcomes={"mounted": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=k2 acquisition=two_rounds rollback=per_written post_mount_checker_red_states_by_invariant={}
+probe=acq_counts prefix=r1 acquisition=two_rounds rollback=per_written acquired=3 writes=40 sysconf_writes=8 segments=10 closed_form_states=20499 states_with_torn=20519 segment_shape=2s2,2s2,14s0,2s0,1s0,2s2,12s0,2s0,1s0,2s2
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written states_judged=20519 footprint_states=20502
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=flip/d0s0/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=flip/d0s0/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=flip/d0s1/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=flip/d0s1/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=fsid/d0s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=fsid/d0s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=fsid/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=fsid/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=none outcomes={"mounted": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=read_error/d0s0/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=read_error/d0s0/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=read_error/d0s1/d1s0 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written fault=read_error/d0s1/d1s1 outcomes={"formula_above_acquired": 20519}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written raw_checker_red_states_by_invariant={}
+probe=acq prefix=r1 acquisition=two_rounds rollback=per_written post_mount_checker_red_states_by_invariant={}

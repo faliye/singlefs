@@ -1,0 +1,4 @@
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002022 ending=Completed reds=0 
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002035 ending=Completed reds=0 
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002041 ending=Completed reds=0 
+DEFENSE_SEED weights=snapshots width=4g seed_offset=7002052 ending=Completed reds=0 

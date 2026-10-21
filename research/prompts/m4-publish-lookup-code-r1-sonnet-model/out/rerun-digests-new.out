@@ -1,0 +1,5 @@
+name=rerun_roots repo=~/code/singlefs frozen=~/.local/share/singlefs/work/m4-publish-lookup-code-r1/repo model=~/code/singlefs/research/prompts/m4-publish-lookup-code-r1-sonnet-model work=~/.local/share/singlefs/work/m4-publish-lookup-code-r1-sonnet/rerun-check
+name=digest variant=new files=16 sha256=87addacdc948bbbc00b1e0f2894f5ffe45f1e93a24f7645bd4092edcb3f2bf75
+name=digest variant=new files=48 sha256=3344bce43504554dd5e0ca94c286b1a3b70f9ac362a374898760405876761b19
+name=rerun_expected digests_16=87addacdc948bbbc00b1e0f2894f5ffe45f1e93a24f7645bd4092edcb3f2bf75 digests_48=3344bce43504554dd5e0ca94c286b1a3b70f9ac362a374898760405876761b19 growth_percent_seen_in_the_report=new:310,287 old:379,377 m9:359,357 m8:609 (这几个数带负载噪声，逐个比不逐字)
+wall=49.70 s

@@ -1,0 +1,8 @@
+E7RESULT name=selftest_geometry leaf=477 inner=150 expected=477/150 equal=1
+E7RESULT name=carry_writes_more_nodes r_tree_dim=1 h_new=1 extra_rows=1 points=12288 differing=25 permille=2 first_devices=[158, 317, 476, 635, 794, 953]
+E7RESULT name=carry_writes_more_nodes r_tree_dim=1 h_new=2 extra_rows=2 points=12288 differing=50 permille=4 first_devices=[158, 317, 476, 635, 794, 953]
+E7RESULT name=carry_writes_more_nodes r_tree_dim=1 h_new=4 extra_rows=4 points=12288 differing=101 permille=8 first_devices=[78, 158, 237, 317, 396, 476]
+E7RESULT name=carry_writes_more_nodes r_tree_dim=2 h_new=1 extra_rows=2 points=12288 differing=50 permille=4 first_devices=[158, 317, 476, 635, 794, 953]
+E7RESULT name=carry_writes_more_nodes r_tree_dim=2 h_new=2 extra_rows=4 points=12288 differing=101 permille=8 first_devices=[78, 158, 237, 317, 396, 476]
+E7RESULT name=carry_writes_more_nodes r_tree_dim=2 h_new=4 extra_rows=8 points=12288 differing=203 permille=16 first_devices=[78, 157, 158, 237, 316, 317]
+E7RESULT name=done selftest_ok=1

@@ -1,0 +1,1353 @@
+diff --git a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
+index ad9371e..17abb96 100644
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3179,6 +3179,68 @@ pub struct TransactionOutput {
+     pub highest_transaction_number_in_this_instance: u64,
+ }
+ 
++/// [`TransactionOutput::unit`] 与 [`FirstEntryOfEachIdentity::unit`] 查不到时的 panic 消息：两条查法查的是同一张 `units`。
++const EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION: &str =
++    "八个文件 / 固定点角色每种一个；实例表单元要先重写过一次才在";
++
++/// 一版里一张按身份查的表（`units`、`mapped_units`、`files_other_than_the_first`）的索引：建的时候走一遍整张表，之后每次查是一次
++/// 有序表查找，不再走整张表。发布与整理在一次调用里要对约 P 个身份各查一次，在表上 `iter().find` 是 P 的平方
++/// （里程碑四七·6；量的出处 `records/2026-10-19-里程碑四GPU垃圾回收开工.md` 2026-10-20 调查员交回那一条）。
++///
++/// 同一身份在表里出现几次时取最先那一项，与在表上 `iter().find` 逐项相同：换成索引行为一个字节不变（七·6 的验收）。
++/// 索引借着那张表（`'table`）：索引活着时那一版改不了，「索引与表一致」由借用检查守住；表换了就要重建，不跨版本留着。
++pub struct FirstEntryOfEachIdentity<'table, Identity, Entry> {
++    first_entry_of_each_identity: BTreeMap<Identity, &'table Entry>,
++}
++
++impl<'table, Identity: Ord, Entry> FirstEntryOfEachIdentity<'table, Identity, Entry> {
++    /// 走一遍 `table`，每个身份记下最先那一项。
++    #[must_use]
++    pub fn of_the_table(table: &'table [Entry], identity_of: impl Fn(&Entry) -> Identity) -> Self {
++        let mut first_entry_of_each_identity = BTreeMap::new();
++        // 迭代上界是表长；跨轮携带的是已经见过的身份，见过的不覆盖（取最先那一项，与 `iter().find` 同义）。
++        for entry in table {
++            first_entry_of_each_identity
++                .entry(identity_of(entry))
++                .or_insert(entry);
++        }
++        Self {
++            first_entry_of_each_identity,
++        }
++    }
++
++    /// 表里身份是 `identity` 的最先那一项；没有就是 `None`（同 `iter().find`）。
++    #[must_use]
++    pub fn first_entry_of(&self, identity: &Identity) -> Option<&'table Entry> {
++        self.first_entry_of_each_identity.get(identity).copied()
++    }
++}
++
++impl<'table> FirstEntryOfEachIdentity<'table, TransactionUnit, PublishedUnit> {
++    /// 同 [`TransactionOutput::unit`]：这一版里角色是 `identity` 的那个单元。
++    ///
++    /// # Panics
++    /// 这一版里没有这个角色的单元（同 [`TransactionOutput::unit`]）。
++    #[must_use]
++    pub fn unit(&self, identity: TransactionUnit) -> &'table PublishedUnit {
++        self.first_entry_of(&identity)
++            .expect(EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION)
++    }
++}
++
++impl<'table> FirstEntryOfEachIdentity<'table, TransactionUnit, (TransactionUnit, Vec<u8>)> {
++    /// 这一版里进映射的角色 `identity` 的映射 key（同在 `mapped_units` 上按角色 `iter().find`）。
++    ///
++    /// # Panics
++    /// 这一版里这个角色不进映射：调用方只拿照抄进下一版的、上一版里进映射的角色来查（上一版装映射节点时逐个记下了）。
++    #[must_use]
++    pub fn mapping_key_of(&self, identity: TransactionUnit) -> &'table [u8] {
++        self.first_entry_of(&identity)
++            .map(|(_, key)| key.as_slice())
++            .expect("照抄进来的角色在上一版里进映射、有一把 key")
++    }
++}
++
+ /// 第一个文件之外一个有数据单元的文件在一版里的样子（[`TransactionOutput::files_other_than_the_first`]）。
+ /// 数据单元从 0 起连号、没有洞，尾部也没有洞：这个文件只由按 inode 号写数据的两个入口从偏移 0 整份写（长度 0 的内容也写一个声明长度 0 的
+ /// 单元），截断与变长对它拒（[`TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses`]）。
+@@ -3645,12 +3707,36 @@ impl TransactionOutput {
+         steps
+     }
+ 
++    /// 这一版里角色是 `identity` 的那个单元（`units` 里最先那一项）。在 `units` 上线性找：一次调用里只查几次的用它；
++    /// 要对约 P 个角色各查一次的（照抄全部单元、整理读全部映射条目）先建 [`TransactionOutput::units_by_role`]（七·6）。
+     #[must_use]
+     pub fn unit(&self, identity: TransactionUnit) -> &PublishedUnit {
+         self.units
+             .iter()
+             .find(|unit| unit.identity == identity)
+-            .expect("八个文件 / 固定点角色每种一个；实例表单元要先重写过一次才在")
++            .expect(EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION)
++    }
++
++    /// `units` 按角色的索引：建一次走完 `units`，之后每次按角色查不再走整张表（[`TransactionOutput::unit`] 的批量形态，七·6）。
++    #[must_use]
++    pub fn units_by_role(&self) -> FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit> {
++        FirstEntryOfEachIdentity::of_the_table(&self.units, |unit| unit.identity)
++    }
++
++    /// `mapped_units` 按角色的索引（照抄进下一版的角色取上一版的映射 key，七·6）。
++    #[must_use]
++    pub fn mapped_units_by_role(
++        &self,
++    ) -> FirstEntryOfEachIdentity<'_, TransactionUnit, (TransactionUnit, Vec<u8>)> {
++        FirstEntryOfEachIdentity::of_the_table(&self.mapped_units, |(identity, _)| *identity)
++    }
++
++    /// `files_other_than_the_first` 按 inode 号的索引（[`TransactionOutput::file_other_than_the_first`] 的批量形态，七·6）。
++    #[must_use]
++    pub fn files_other_than_the_first_by_inode(
++        &self,
++    ) -> FirstEntryOfEachIdentity<'_, InodeNumber, FileOfAnInodeOtherThanTheFirst> {
++        FirstEntryOfEachIdentity::of_the_table(&self.files_other_than_the_first, |file| file.inode)
+     }
+ 
+     /// 一棵多层码 2 树的高：从它这一版根节点的码 2 头里现读层级 + 1（D8（核心索引结构） 已定项 11 ⑤；
+@@ -4162,6 +4248,96 @@ pub fn central_mapping_locations_in_the_version(
+     mapping_locations_for_key(&version.unit(leaf_role).bytes, key)
+ }
+ 
++/// 一版的中央映射树按 key 查落点的批量形态：每把 key 的答案与 [`central_mapping_locations_in_the_version`] 逐个相同
++/// （走到哪片叶、叶解不开、叶里有切不动的条目、同一把 key 有几条取最后一条，几种情形都同），但每片叶只解一次、叶的单元按角色从索引取。
++/// 整理读一版时对全部进映射单元的 key 各查一次，逐 key 查是每把 key 线性找叶再整片重解（里程碑四七·6）。
++/// 一片叶在第一次有 key 走到它时才解：没有 key 走到的叶不碰，与逐 key 查一样（那片叶的角色不在 `units` 里时同样 panic）。
++pub struct CentralMappingOfAVersionReadLeafByLeaf<'version> {
++    shape: &'version CodeTwoTreeShape,
++    units_by_role: FirstEntryOfEachIdentity<'version, TransactionUnit, PublishedUnit>,
++    leaves_read: BTreeMap<TransactionUnit, CentralMappingLeafRead>,
++}
++
++/// 一片中央映射叶解一次的样子，对走到这片叶的任一把 key 给出的答案与 [`mapping_locations_for_key`] 相同。
++enum CentralMappingLeafRead {
++    /// 叶解不开：走到它的每把 key 都是 [`MappingLookup::NodeMalformedOrNoEntryWithThisKey`]。
++    NodeMalformed,
++    /// 叶里有一条条目切不动（带的是最先那条切不动的条目的字节数）：走到它的每把 key 都是
++    /// [`MappingLookup::EntryNarrowerThanItsFieldTable`]，不论那把 key 的条目排在它前面还是后面（`mapping_locations_for_key` 遇到它就返回）。
++    EntryNarrowerThanItsFieldTable { entry_bytes: usize },
++    /// 叶里每把 key 的两条位置条目；同一把 key 有几条时取最后一条（`mapping_locations_for_key` 逐条往后覆盖 `found`）。
++    LocationsOfEachKey(BTreeMap<Vec<u8>, [LocationEntry; 2]>),
++}
++
++impl CentralMappingLeafRead {
++    fn of_the_leaf_bytes(mapping_node_bytes: &[u8]) -> Self {
++        let Ok(node) = parse_index_node(mapping_node_bytes) else {
++            return Self::NodeMalformed;
++        };
++        let mut locations_of_each_key = BTreeMap::new();
++        // 迭代上界是叶里的条目数；跨轮携带的是已解出的 key → 落点，后面同一把 key 的条目覆盖前面的。
++        for entry in &node.entries {
++            let Some((key, locations)) = parse_mapping_entry(entry) else {
++                return Self::EntryNarrowerThanItsFieldTable {
++                    entry_bytes: entry.len(),
++                };
++            };
++            locations_of_each_key.insert(key, locations);
++        }
++        Self::LocationsOfEachKey(locations_of_each_key)
++    }
++
++    fn locations_of_key(&self, key: &[u8]) -> MappingLookup {
++        match self {
++            Self::NodeMalformed => MappingLookup::NodeMalformedOrNoEntryWithThisKey,
++            Self::EntryNarrowerThanItsFieldTable { entry_bytes } => {
++                MappingLookup::EntryNarrowerThanItsFieldTable {
++                    entry_bytes: *entry_bytes,
++                }
++            }
++            Self::LocationsOfEachKey(locations_of_each_key) => {
++                locations_of_each_key.get(key).map_or(
++                    MappingLookup::NodeMalformedOrNoEntryWithThisKey,
++                    |locations| MappingLookup::Found(*locations),
++                )
++            }
++        }
++    }
++}
++
++impl<'version> CentralMappingOfAVersionReadLeafByLeaf<'version> {
++    /// 建 `version` 的单元索引；叶一片都还没解。
++    #[must_use]
++    pub fn of_the_version(version: &'version TransactionOutput) -> Self {
++        Self {
++            shape: &version.central_mapping_tree.shape,
++            units_by_role: version.units_by_role(),
++            leaves_read: BTreeMap::new(),
++        }
++    }
++
++    /// 同 [`central_mapping_locations_in_the_version`]`(version, key)`。
++    ///
++    /// # Panics
++    /// `key` 走到的那片叶的角色不在这一版的 `units` 里（同 [`central_mapping_locations_in_the_version`]）。
++    pub fn locations_of_key(&mut self, key: &[u8]) -> MappingLookup {
++        let Some(leaf) = leaf_position_routed_to(
++            self.shape,
++            &CodeTwoTreeKey::new(key, CodeTwoKeyFieldWidths::CENTRAL_MAPPING),
++        ) else {
++            return MappingLookup::NodeMalformedOrNoEntryWithThisKey;
++        };
++        let leaf_role = MultiLevelCodeTwoTree::CentralMapping.role_of_node(leaf, self.shape);
++        let units_by_role = &self.units_by_role;
++        self.leaves_read
++            .entry(leaf_role)
++            .or_insert_with(|| {
++                CentralMappingLeafRead::of_the_leaf_bytes(&units_by_role.unit(leaf_role).bytes)
++            })
++            .locations_of_key(key)
++    }
++}
++
+ /// 经映射释放的角色（数据、extent 根、inode 叶容器与根、分配记录树、记账树）：这次重写的角色里走得到映射条目的那几个，按角色次序。
+ /// 映射树、树表、实例表豁免映射（D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12），硬规则 1 的读盘核挂在「经映射核到那条映射条目之后」，
+ /// 它们不在其内；这次新多出来、上一版没有落点的角色也不在其内。
+@@ -6817,7 +6993,8 @@ fn mapping_key_of_a_node_born_in_this_publish(
+     )
+ }
+ 
+-/// 从上一版取一个照抄进来的角色的映射 key。
++/// 从上一版取一个照抄进来的角色的映射 key。在 `mapped_units` 上线性找：只查几个角色的用它（快照判定那一圈只问这次换下的几个）；
++/// 照抄全部角色的那一圈用 [`TransactionOutput::mapped_units_by_role`]（七·6）。
+ ///
+ /// # Panics
+ /// 上一版里没有这个角色的映射 key：照抄进来的角色恒是上一版里进映射的那一个（上一版装映射节点时逐个记下了）。
+@@ -7707,11 +7884,15 @@ impl PublishPlan<'_> {
+                 ),
+             )
+         };
++        // 照抄的角色约有上一版那么多个，每个按角色取上一版的 key：先建上一版 `mapped_units` 的索引（七·6），不逐个在表上找。
++        let mapped_units_of_the_previous_version =
++            previous.map(TransactionOutput::mapped_units_by_role);
+         let carried = |identity: TransactionUnit| {
+-            mapping_key_carried_from(
+-                previous.expect("照抄的角色只出现在接着上一版的发布里"),
+-                identity,
+-            )
++            mapped_units_of_the_previous_version
++                .as_ref()
++                .expect("照抄的角色只出现在接着上一版的发布里")
++                .mapping_key_of(identity)
++                .to_vec()
+         };
+         let mut mapped_units: Vec<(TransactionUnit, Vec<u8>)> = Vec::new();
+         match self.first_file_version() {
+@@ -11066,9 +11247,13 @@ pub fn transaction_offset_of_each_record_of_the_publish(
+         .collect()
+ }
+ 
+-/// 上一版里某个角色的单元字节（照抄进这一版的 `units`）。
+-fn carried_unit(previous: &TransactionOutput, identity: TransactionUnit) -> PublishedUnit {
+-    previous.unit(identity).clone()
++/// 上一版里某个角色的单元字节（照抄进这一版的 `units`）。按角色查走上一版 `units` 的索引：一次发布照抄约有上一版那么多个单元，
++/// 索引在装这一版的 `units` 之前建一次（七·6）。
++fn carried_unit(
++    units_of_the_previous_version: &FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit>,
++    identity: TransactionUnit,
++) -> PublishedUnit {
++    units_of_the_previous_version.unit(identity).clone()
+ }
+ 
+ /// 一个文件对象这次发布的数据单元：单元字节与指针。重写时由 `build_file_version_units` 装，照抄时从上一版取
+@@ -12248,10 +12433,12 @@ fn carried_file_version_units(
+     carried: &TransactionOutput,
+     carried_data_units: usize,
+ ) -> FileVersionUnits {
++    // 第一个文件的每个数据单元按角色取一次：先建上一版 `units` 的索引（七·6）。
++    let units_of_the_carried_version = carried.units_by_role();
+     FileVersionUnits {
+         data_units: (0..carried_data_units)
+             .map(|position| {
+-                carried
++                units_of_the_carried_version
+                     .unit(TransactionUnit::Data(DataUnitIndexInFile(
+                         u64::try_from(position).expect("单元序号"),
+                     )))
+@@ -12558,7 +12745,9 @@ fn publish_admitted<Device: BlockDevice>(
+             .as_ref()
+             .map_or(0, |(_, written_units)| written_units.key_order_mismatches);
+     // 第一个文件之外各文件这一版的数据指针（与 `resolved.files_other_than_the_first.files` 同序）：这次写的那一个是这次装的，别的照抄上一版
+-    // （整理的一批之后上一版的拷贝里它们已换成映射位置）。
++    // （整理的一批之后上一版的拷贝里它们已换成映射位置）。照抄的文件约有上一版那么多个，按 inode 号查走上一版的索引（七·6）。
++    let files_of_the_previous_version =
++        previous.map(TransactionOutput::files_other_than_the_first_by_inode);
+     let data_pointers_of_the_files_other_than_the_first: Vec<(InodeNumber, Vec<DataPointer>)> =
+         resolved
+             .files_other_than_the_first
+@@ -12575,10 +12764,9 @@ fn publish_admitted<Device: BlockDevice>(
+                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+                 | FileOtherThanTheFirstOrigin::CutByADeletionBatch => (
+                     file_plan.inode,
+-                    previous
+-                        .and_then(|previous_version| {
+-                            previous_version.file_other_than_the_first(file_plan.inode)
+-                        })
++                    files_of_the_previous_version
++                        .as_ref()
++                        .and_then(|files| files.first_entry_of(&file_plan.inode))
+                         .expect("照抄的文件在上一版里")
+                         .data_pointers
+                         .iter()
+@@ -13439,13 +13627,19 @@ fn publish_admitted<Device: BlockDevice>(
+         identity,
+         bytes,
+     };
++    let units_of_the_previous_version = previous.map(TransactionOutput::units_by_role);
+     let mut units: Vec<PublishedUnit> = Vec::new();
+     for (position, data_unit) in data_units.iter().enumerate() {
+         let identity = TransactionUnit::Data(DataUnitIndexInFile(
+             u64::try_from(position).expect("单元序号"),
+         ));
+         units.push(match carried_file {
+-            Some(carried) if !rewritten.contains(&identity) => carried_unit(carried, identity),
++            Some(_) if !rewritten.contains(&identity) => carried_unit(
++                units_of_the_previous_version
++                    .as_ref()
++                    .expect("照抄第一个文件的发布接在上一版之后：carried_file 就是上一版"),
++                identity,
++            ),
+             None | Some(_) => rewritten_unit(identity, data_unit.clone()),
+         });
+     }
+@@ -13469,7 +13663,9 @@ fn publish_admitted<Device: BlockDevice>(
+                 }
+                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+                 | FileOtherThanTheFirstOrigin::CutByADeletionBatch => carried_unit(
+-                    previous.expect("照抄的文件只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的文件只出现在接着上一版的发布里"),
+                     identity,
+                 ),
+             });
+@@ -13485,7 +13681,9 @@ fn publish_admitted<Device: BlockDevice>(
+             // 照抄上一版那个叶序上的那一份（字节、落点不动），装进这一版时换成这一版的角色。
+             InodeLeafContainerOrigin::CarriedFrom(previous_index) => {
+                 let carried = carried_unit(
+-                    previous.expect("没重写的叶容器只会出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("没重写的叶容器只会出现在接着上一版的发布里"),
+                     TransactionUnit::InodeLeafContainer(previous_index),
+                 );
+                 PublishedUnit {
+@@ -13499,7 +13697,9 @@ fn publish_admitted<Device: BlockDevice>(
+     units.push(match &inode_tree_units.rewritten_root {
+         Some(root) => rewritten_unit(TransactionUnit::InodeRoot, root.bytes.clone()),
+         None => carried_unit(
+-            previous.expect("没重写 inode 根的发布恒接在上一版之后"),
++            units_of_the_previous_version
++                .as_ref()
++                .expect("没重写 inode 根的发布恒接在上一版之后"),
+             TransactionUnit::InodeRoot,
+         ),
+     });
+@@ -13514,7 +13714,9 @@ fn publish_admitted<Device: BlockDevice>(
+             {
+                 Some(allocation_record_tree_node_unit) => allocation_record_tree_node_unit.clone(),
+                 None => carried_unit(
+-                    previous.expect("照抄的分配记录树节点只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的分配记录树节点只出现在接着上一版的发布里"),
+                     identity,
+                 ),
+             },
+@@ -13526,7 +13728,9 @@ fn publish_admitted<Device: BlockDevice>(
+         |identity: TransactionUnit, node: &DeletionTreeNodeUnit| match &node.rewritten {
+             Some(rewritten_node) => rewritten_unit(identity, rewritten_node.bytes.clone()),
+             None => carried_unit(
+-                previous.expect("照抄的删除树节点只出现在接着上一版的发布里"),
++                units_of_the_previous_version
++                    .as_ref()
++                    .expect("照抄的删除树节点只出现在接着上一版的发布里"),
+                 identity,
+             ),
+         };
+@@ -13539,7 +13743,9 @@ fn publish_admitted<Device: BlockDevice>(
+             Some(rewritten_node) => rewritten_unit(node.identity, rewritten_node.bytes.clone()),
+             None => {
+                 let carried = carried_unit(
+-                    previous.expect("照抄的容器树节点只出现在接着上一版的发布里"),
++                    units_of_the_previous_version
++                        .as_ref()
++                        .expect("照抄的容器树节点只出现在接着上一版的发布里"),
+                     node.identity_in_the_previous_version,
+                 );
+                 PublishedUnit {
+diff --git a/crates/singlefs-core/src/mounted_session.rs b/crates/singlefs-core/src/mounted_session.rs
+index 75fd509..21c9a57 100644
+--- a/crates/singlefs-core/src/mounted_session.rs
++++ b/crates/singlefs-core/src/mounted_session.rs
+@@ -62,16 +62,16 @@ use crate::region_scan::{scan_region, AllocationInRegion, CentralMappingEntry, R
+ use crate::root_record::{RootRecord, UnmountMarker};
+ use crate::root_ring::{target_for_publish, RootRingSlot};
+ use crate::transaction::{
+-    central_mapping_locations_in_the_version, prepare_the_version_publish,
+-    publish_compaction_step_in_the_session,
++    prepare_the_version_publish, publish_compaction_step_in_the_session,
+     publish_compaction_step_with_the_region_check_of_the_intent_deletion, publish_create_snapshot,
+     publish_new_inodes, publish_overwrite, publish_overwrite_of_an_inode, publish_sequential_write,
+     publish_sequential_write_of_an_inode, publish_size_change, publish_snapshot_destruction_intent,
+     publish_unlink_intent, publish_version, walk_the_deletion_queue_until_it_is_empty,
+-    CompactionIntentStep, CompactionStepRefused, DeletionAndLineageOfThePublish, DeletionQueueWalk,
+-    FirstFile, MappingLookup, PlannedUnitsRewrittenAnyway, PoolVersion, PoolWriter, PublishError,
+-    ReadFailedOnTheDisk, ReadFailingSelfVerification, RegionCheckOfTheIntentDeletion,
+-    ReleaseChecksumCheck, RelocationBatchRefused, TransactionOutput, TransactionUnit,
++    CentralMappingOfAVersionReadLeafByLeaf, CompactionIntentStep, CompactionStepRefused,
++    DeletionAndLineageOfThePublish, DeletionQueueWalk, FirstFile, MappingLookup,
++    PlannedUnitsRewrittenAnyway, PoolVersion, PoolWriter, PublishError, ReadFailedOnTheDisk,
++    ReadFailingSelfVerification, RegionCheckOfTheIntentDeletion, ReleaseChecksumCheck,
++    RelocationBatchRefused, TransactionOutput, TransactionUnit,
+ };
+ use crate::unit::{unit_filesystem_identifier, UNIT_CLASS_DATA};
+ use crate::unlink::DeletionSwitches;
+@@ -2782,19 +2782,19 @@ struct VersionAsTheCompactionReadsIt {
+ fn version_as_the_compaction_reads_it(
+     version: &TransactionOutput,
+ ) -> VersionAsTheCompactionReadsIt {
++    // 每把 key 查一次，叶按片解一次（七·6）：答案与逐 key 查 `central_mapping_locations_in_the_version` 逐个相同。
++    let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
+     let mut mapping_entries: Vec<CentralMappingEntry> = version
+         .mapped_units
+         .iter()
+-        .filter_map(
+-            |(_, key)| match central_mapping_locations_in_the_version(version, key) {
+-                MappingLookup::Found(locations) => Some(CentralMappingEntry {
+-                    key: key.clone(),
+-                    locations,
+-                }),
+-                MappingLookup::NodeMalformedOrNoEntryWithThisKey
+-                | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => None,
+-            },
+-        )
++        .filter_map(|(_, key)| match central_mapping.locations_of_key(key) {
++            MappingLookup::Found(locations) => Some(CentralMappingEntry {
++                key: key.clone(),
++                locations,
++            }),
++            MappingLookup::NodeMalformedOrNoEntryWithThisKey
++            | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => None,
++        })
+         .collect();
+     mapping_entries.extend(version.mapping_entries_kept_for_the_snapshots.iter().map(
+         |(key, locations)| CentralMappingEntry {
+diff --git a/crates/singlefs-harness/tests/publish_lookup_by_identity.rs b/crates/singlefs-harness/tests/publish_lookup_by_identity.rs
+new file mode 100644
+index 0000000..bb3c1e2
+--- /dev/null
++++ b/crates/singlefs-harness/tests/publish_lookup_by_identity.rs
+@@ -0,0 +1,909 @@
++//! 发布路径与整理读版本按身份查（里程碑四七·6，`.claude/kb/milestone/04-fourth-txn.md`「七　GPU 垃圾回收」作业点表七·6 那一行）：
++//! 照抄上一版的单元（`TransactionOutput::units_by_role`）、照抄角色的映射 key（`TransactionOutput::mapped_units_by_role`）、
++//! 照抄的第一个文件之外的文件（`TransactionOutput::files_other_than_the_first_by_inode`）、整理读一版时逐 key 查中央映射
++//! （`transaction::CentralMappingOfAVersionReadLeafByLeaf`）由在 `Vec` 上 `iter().find` 换成按身份建一次的索引。这里钉三样：
++//! - 等价：两档池（十六个四单元的文件、四十八个八单元的文件，后一档的中央映射树不止一片叶）上跑同一串操作（按 inode 号写、整份重写四分之三的文件、
++//!   抬 F、整理到停、整理之后再写、unlink 一个文件），每一版的每一次按身份查都与测试里的线性查找参照逐项相同，池级 checker 一条违例都没有；
++//!   映射叶解不开、条目窄于字段表、同一把 key 有两条，三种叶上批量读与逐 key 查逐项相同。
++//! - 增长：同一进程里一批整理的线程 CPU 从 512 个数据单元的池到 2048 个（四倍）涨不到门槛的倍数（harness 慢档用例）。
++//!
++//! 池都在内存里的两块 4 GiB 稀疏盘上造（`SparseBlockDevice`），配方照 E185 装置的 `construct_the_pool`：每个文件整份写进去，
++//! 再整份重写下标不是 4 的倍数的那几个，抬 F 到换下的落点都回收，留下每段约四分之一还活着的聚簇段。
++mod common;
++
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_core::address::{DataUnitIndexInFile, DeviceIdentity, InodeNumber, SlotNumber};
++use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::compaction_plan::{
++    CompactionBatchSize, CompactionBatchUnits, CompactionSwitches,
++};
++use singlefs_core::make_filesystem::{
++    make_filesystem, root_ring_occupancy_after_make_filesystem, INSTANCE_TABLE_SLOT,
++    TREE_TABLE_GENESIS_SLOT,
++};
++use singlefs_core::mount::{
++    mount_writable_with_compaction_switches, raise_rollback_floor_to_the_admission_ceiling,
++};
++use singlefs_core::mounted_session::{CompactionRunOutcome, MountedSession, UserChange};
++use singlefs_core::records::parse_mapping_entry;
++use singlefs_core::transaction::{
++    acquire_instance, central_mapping_locations_in_the_version, publish_first_file, warm_up,
++    CentralMappingOfAVersionReadLeafByLeaf, FirstEntryOfEachIdentity, FirstFile, MappingLookup,
++    PoolVersion, PoolWriter, TransactionOutput, TransactionUnit,
++};
++use singlefs_core::unit::{build_index_node, data_unit_payload_capacity, parse_index_node};
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
++
++type Devices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++/// 512 字节的物理块：与 `common::parameters` 的几何同。
++const PHYSICAL_BLOCK_BYTES: u32 = 512;
++/// 映射 key 的宽（D19（块指针的结构与宽度预算） 已定项 10）：测试里造一把哪一版都没有的 key 用。
++const MAPPING_KEY_BYTES: usize = 27;
++/// 抬 F 那一圈至多推几次：每一次不够就多发一次建 inode 的发布，再抬（照 E185 装置 `construct_the_pool` 的上限）。
++const FLOOR_RAISES_AT_MOST: u64 = 16;
++/// 整理推到停时至多调几次显式入口：一次调用至少发一版才接着调，停了就出圈。
++const COMPACTION_RUNS_AT_MOST: u64 = 64;
++/// 等价那两档池里整理的批大小（只供测试的强制批大小）。
++const COMPACTION_BATCH_UNITS_OF_THE_EQUIVALENCE_POOLS: usize = 2;
++
++/// 一块 4 GiB 的稀疏盘。
++fn sparse_device() -> SparseBlockDevice {
++    SparseBlockDevice::new(
++        common::IMAGE_BYTES,
++        PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_BYTES),
++    )
++}
++
++/// 两块稀疏盘上 mkfs → 取号 → 暖机 → 新池新建文件，再按 `switches` 可写挂载（同 E185 装置的 `formatted_pool`）。
++fn formatted_and_mounted(switches: CompactionSwitches) -> (Devices, MountedSession) {
++    let parameters = common::parameters();
++    let mut devices: Devices = [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| (identity, sparse_device()))
++        .collect();
++    let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
++    let mut allocator = PoolAllocator::new(vec![
++        DeviceFreeMap::new(DeviceIdentity(0), common::IMAGE_BYTES),
++        DeviceFreeMap::new(DeviceIdentity(1), common::IMAGE_BYTES),
++    ]);
++    allocator.mark_format_time_units(
++        Placement {
++            slot: INSTANCE_TABLE_SLOT,
++            span: 2,
++        },
++        Placement {
++            slot: TREE_TABLE_GENESIS_SLOT,
++            span: 1,
++        },
++    );
++    allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
++        &parameters,
++        &genesis,
++    ));
++    {
++        let mut writer = PoolWriter::new(&parameters, &mut devices);
++        let instance = acquire_instance(&mut writer).expect("取号");
++        let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++        let first_file = common::file_content();
++        publish_first_file(
++            &mut writer,
++            &mut allocator,
++            warmed.roots.last().expect("暖机两代根"),
++            FirstFile {
++                content: &first_file,
++                write_time_seconds: common::FIXED_WRITE_TIME_SECONDS,
++            },
++            instance,
++            &warmed.last_record_bytes,
++        )
++        .expect("新池新建文件");
++    }
++    let mounted = mount_writable_with_compaction_switches(&parameters, &mut devices, switches)
++        .expect("可写挂载");
++    let (_, session) = MountedSession::of_the_mount(mounted);
++    (devices, session)
++}
++
++/// 产品开关，批大小换成只供测试的强制 `batch_units`。
++fn product_switches_with_the_batch_size(batch_units: usize) -> CompactionSwitches {
++    let CompactionSwitches {
++        batch_size: _,
++        forced_region,
++        run_forcing,
++        region_exclusion,
++        destination_policy,
++        release_checksum_mismatch_after_issue,
++        empty_cluster_segments_floor,
++        relocation_publish_order,
++    } = CompactionSwitches::PRODUCT;
++    CompactionSwitches {
++        batch_size: CompactionBatchSize::ForcedForTests(
++            CompactionBatchUnits::new(batch_units).expect("批大小至少 1"),
++        ),
++        forced_region,
++        run_forcing,
++        region_exclusion,
++        destination_policy,
++        release_checksum_mismatch_after_issue,
++        empty_cluster_segments_floor,
++        relocation_publish_order,
++    }
++}
++
++fn version_of(session: &MountedSession) -> &TransactionOutput {
++    session
++        .current
++        .version_of_trees()
++        .expect("新池新建文件之后每一版都有树")
++}
++
++/// 定长的伪随机字节流（xorshift64，种子取奇数）：`data_units` 个数据单元差 5 个字节写满。
++fn content_of_data_units(data_units: usize, seed: u64) -> Vec<u8> {
++    let mut state = seed | 1;
++    (0..data_units * data_unit_payload_capacity() - 5)
++        .map(|_| {
++            state ^= state << 13;
++            state ^= state >> 7;
++            state ^= state << 17;
++            u8::try_from(state & 0xff).expect("低 8 位")
++        })
++        .collect()
++}
++
++/// 这一版里 `inode` 那个文件每个数据单元落的槽（头一槽；一个数据单元占两槽，第二槽是它加一）。
++fn data_slots_of_the_file(version: &TransactionOutput, inode: InodeNumber) -> Vec<SlotNumber> {
++    let file = version
++        .files_other_than_the_first
++        .iter()
++        .find(|file| file.inode == inode)
++        .expect("写过的文件在这一版里有数据单元");
++    (0..file.data_pointers.len())
++        .map(|position| version.unit(file.data_role_at(position)).slot)
++        .collect()
++}
++
++/// 0 号盘上这一版还没释放的分配记录罩着的槽。
++fn slots_under_unreleased_records_on_device_zero(
++    version: &TransactionOutput,
++) -> std::collections::BTreeSet<u64> {
++    version
++        .allocation_records
++        .iter()
++        .filter(|record| record.device == DeviceIdentity(0) && !record.is_released)
++        .flat_map(|record| record.slot.0..record.slot.0 + u64::from(record.span_slots))
++        .collect()
++}
++
++/// 造池那一串操作里每一版都交给它看一眼（等价那两条交比对，增长那一条什么都不做）。
++type OnEveryVersion<'callback> = dyn FnMut(&TransactionOutput) + 'callback;
++
++/// 一次用户改动发成，把这次发成的每一版（连同改动之后的那一趟整理）交给 `on_every_version`。
++fn publish_and_look_at_every_version(
++    session: &mut MountedSession,
++    devices: &mut Devices,
++    change: UserChange<'_>,
++    on_every_version: &mut OnEveryVersion<'_>,
++) {
++    let published = session
++        .publish_user_change(devices, change)
++        .unwrap_or_else(|refusal| panic!("用户改动 {change:?} 发成：{refusal:?}"));
++    for version in &published.versions_published {
++        on_every_version(version);
++    }
++    if let Some(compaction) = &published.compaction_after_the_change {
++        for version in &compaction.versions_published {
++            on_every_version(version);
++        }
++    }
++}
++
++/// 一个池的样子：哪几个文件、每个几个数据单元。
++#[derive(Clone, Copy, Debug)]
++struct PoolOfFiles {
++    files: u64,
++    data_units_per_file: usize,
++}
++
++/// 造好的池：盘、还挂着的会话、文件的号（按写的次序）。
++struct PoolBuilt {
++    devices: Devices,
++    session: MountedSession,
++    inodes: Vec<InodeNumber>,
++}
++
++/// 照 E185 装置 `construct_the_pool` 的配方造池：建 `files` 个 inode、每个整份写 `data_units_per_file` 个数据单元；整份重写下标不是 4 的倍数的
++/// 那几个（换下的落点在原来那几段里留下空洞）；抬 F 到换下的落点都回收（每段约四分之一还活着）。
++fn build_a_pool_of_files(
++    shape: PoolOfFiles,
++    on_every_version: &mut OnEveryVersion<'_>,
++) -> PoolBuilt {
++    let parameters = common::parameters();
++    let (mut devices, mut session) = formatted_and_mounted(CompactionSwitches::PRODUCT);
++    let mut write_time_seconds = common::FIXED_WRITE_TIME_SECONDS + 600;
++    let first_inode = version_of(&session).inode_number_watermark();
++    write_time_seconds += 1;
++    publish_and_look_at_every_version(
++        &mut session,
++        &mut devices,
++        UserChange::NewInodes {
++            count: shape.files,
++            write_time_seconds,
++        },
++        on_every_version,
++    );
++    let inodes: Vec<InodeNumber> = (first_inode..first_inode + shape.files)
++        .map(InodeNumber)
++        .collect();
++    for inode in &inodes {
++        let content = content_of_data_units(shape.data_units_per_file, inode.0);
++        write_time_seconds += 1;
++        publish_and_look_at_every_version(
++            &mut session,
++            &mut devices,
++            UserChange::SequentialWriteOfAnInode {
++                inode: *inode,
++                content: &content,
++                write_time_seconds,
++            },
++            on_every_version,
++        );
++    }
++    let mut replaced_slots: Vec<SlotNumber> = Vec::new();
++    for (position, inode) in inodes.iter().enumerate() {
++        if position % 4 == 0 {
++            continue;
++        }
++        replaced_slots.extend(data_slots_of_the_file(version_of(&session), *inode));
++        let content = content_of_data_units(shape.data_units_per_file, inode.0 + 1_000_003);
++        write_time_seconds += 1;
++        publish_and_look_at_every_version(
++            &mut session,
++            &mut devices,
++            UserChange::SequentialWriteOfAnInode {
++                inode: *inode,
++                content: &content,
++                write_time_seconds,
++            },
++            on_every_version,
++        );
++    }
++    // 迭代上界是 FLOOR_RAISES_AT_MOST；跨轮携带的是会话（每一轮抬一次 F，不够就多发一次建 inode 的发布再抬）。
++    let mut is_every_replaced_slot_reclaimed = false;
++    for _ in 0..FLOOR_RAISES_AT_MOST {
++        let mut current = version_of(&session).clone();
++        raise_rollback_floor_to_the_admission_ceiling(
++            &parameters,
++            &mut devices,
++            &mut session.allocator,
++            &mut current,
++            session.shadow_ledger,
++        )
++        .expect("抬 F");
++        on_every_version(&current);
++        session.current = PoolVersion::of_a_version_of_trees(current);
++        let under_unreleased_records =
++            slots_under_unreleased_records_on_device_zero(version_of(&session));
++        // 换下的落点回收之后可能又被后面的整份重写取去装新的数据单元：那样的槽算回收过（同 E185 装置 `construct_the_pool` 的判法）。
++        let slots_of_live_data_units: std::collections::BTreeSet<SlotNumber> = inodes
++            .iter()
++            .flat_map(|inode| data_slots_of_the_file(version_of(&session), *inode))
++            .collect();
++        is_every_replaced_slot_reclaimed = replaced_slots.iter().all(|slot| {
++            slots_of_live_data_units.contains(slot)
++                || (!under_unreleased_records.contains(&slot.0)
++                    && session.allocator.devices[0].is_free(*slot))
++        });
++        if is_every_replaced_slot_reclaimed {
++            break;
++        }
++        write_time_seconds += 1;
++        publish_and_look_at_every_version(
++            &mut session,
++            &mut devices,
++            UserChange::NewInodes {
++                count: 1,
++                write_time_seconds,
++            },
++            on_every_version,
++        );
++    }
++    assert!(
++        is_every_replaced_slot_reclaimed,
++        "抬 F {FLOOR_RAISES_AT_MOST} 次之内整份重写换下的落点都回收了（{shape:?}）"
++    );
++    PoolBuilt {
++        devices,
++        session,
++        inodes,
++    }
++}
++
++/// 按身份查的几样与测试里的线性查找参照比过多少次。
++#[derive(Debug, Default)]
++struct LookupsCompared {
++    versions: u64,
++    unit_lookups: u64,
++    mapping_key_lookups: u64,
++    file_lookups: u64,
++    central_mapping_lookups: u64,
++    versions_whose_central_mapping_tree_has_several_nodes: u64,
++}
++
++/// 在两个 `Option<&Entry>` 上判「是表里同一项（或都没有）」：比地址，不比值（取的必须是最先那一项，不只是值相等的一项）。
++fn is_the_same_entry<Entry>(indexed: Option<&Entry>, found_linearly: Option<&Entry>) -> bool {
++    match (indexed, found_linearly) {
++        (Some(indexed_entry), Some(found_entry)) => std::ptr::eq(indexed_entry, found_entry),
++        (None, None) => true,
++        (Some(_), None) | (None, Some(_)) => false,
++    }
++}
++
++/// 一版里每一种按身份查都与线性查找参照（`iter().find`、逐 key 的 `central_mapping_locations_in_the_version`）比一遍：表里的每个身份，
++/// 再加一个哪一版都没有的身份。
++fn compare_every_lookup_with_a_linear_find(
++    version: &TransactionOutput,
++    compared: &mut LookupsCompared,
++) {
++    compared.versions += 1;
++    let absent_role = TransactionUnit::Data(DataUnitIndexInFile(u64::MAX));
++    let units_by_role = version.units_by_role();
++    for role in version
++        .units
++        .iter()
++        .map(|unit| unit.identity)
++        .chain([absent_role])
++    {
++        let found_linearly = version.units.iter().find(|unit| unit.identity == role);
++        assert!(
++            is_the_same_entry(units_by_role.first_entry_of(&role), found_linearly),
++            "txg {}：units 按角色 {role:?} 查到的与线性找的不是同一项",
++            version.root.checkpoint_txg.0
++        );
++        compared.unit_lookups += 1;
++    }
++    let mapped_units_by_role = version.mapped_units_by_role();
++    for role in version
++        .mapped_units
++        .iter()
++        .map(|(role, _)| *role)
++        .chain([absent_role])
++    {
++        let found_linearly = version
++            .mapped_units
++            .iter()
++            .find(|(mapped, _)| *mapped == role);
++        assert!(
++            is_the_same_entry(mapped_units_by_role.first_entry_of(&role), found_linearly),
++            "txg {}：mapped_units 按角色 {role:?} 查到的与线性找的不是同一项",
++            version.root.checkpoint_txg.0
++        );
++        if let Some((_, key)) = found_linearly {
++            assert_eq!(
++                mapped_units_by_role.mapping_key_of(role),
++                key.as_slice(),
++                "txg {}：角色 {role:?} 的映射 key 与线性找的那一把相同",
++                version.root.checkpoint_txg.0
++            );
++        }
++        compared.mapping_key_lookups += 1;
++    }
++    let files_by_inode = version.files_other_than_the_first_by_inode();
++    for inode in version
++        .files_other_than_the_first
++        .iter()
++        .map(|file| file.inode)
++        .chain([InodeNumber(u64::MAX)])
++    {
++        assert!(
++            is_the_same_entry(
++                files_by_inode.first_entry_of(&inode),
++                version.file_other_than_the_first(inode)
++            ),
++            "txg {}：按 inode 号 {} 查到的文件与线性找的不是同一项",
++            version.root.checkpoint_txg.0,
++            inode.0
++        );
++        compared.file_lookups += 1;
++    }
++    let mut read_leaf_by_leaf = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
++    let absent_key = vec![0xff_u8; MAPPING_KEY_BYTES];
++    for key in version
++        .mapped_units
++        .iter()
++        .map(|(_, key)| key)
++        .chain(
++            version
++                .mapping_entries_kept_for_the_snapshots
++                .iter()
++                .map(|(key, _)| key),
++        )
++        .chain([&absent_key])
++    {
++        assert_eq!(
++            read_leaf_by_leaf.locations_of_key(key),
++            central_mapping_locations_in_the_version(version, key),
++            "txg {}：key {key:02x?} 批量读与逐 key 查不同",
++            version.root.checkpoint_txg.0
++        );
++        compared.central_mapping_lookups += 1;
++    }
++    if version.central_mapping_tree.shape.nodes().len() > 1 {
++        compared.versions_whose_central_mapping_tree_has_several_nodes += 1;
++    }
++}
++
++/// 这几块盘此刻的整份镜像（交池级 checker）。
++fn memory_pool_of(devices: &Devices) -> MemoryPool {
++    MemoryPool {
++        devices: devices
++            .iter()
++            .map(|(identity, device)| (*identity, device.image.clone()))
++            .collect(),
++        device_size_in_bytes: common::IMAGE_BYTES,
++    }
++}
++
++fn violations_of_the_pool_checker(image: &MemoryPool) -> Vec<(&'static str, String)> {
++    check_pool_image(image)
++        .into_iter()
++        .filter_map(|(invariant, verdict)| match verdict {
++            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
++            InvariantVerdict::Holds
++            | InvariantVerdict::NotApplicable(_)
++            | InvariantVerdict::PartiallyJudged(_) => None,
++        })
++        .collect()
++}
++
++/// 两块盘镜像（写过的扇区）的 sha256，十六进制：改前与改后同一串操作写出的镜像逐字节相同，在仓副本里比这一行（七·6 的验收）。
++fn digest_of_the_images(devices: &Devices) -> String {
++    let mut written = Vec::new();
++    for (identity, device) in devices {
++        written.extend_from_slice(&identity.0.to_le_bytes());
++        for (sector, bytes) in device.image.written_sectors() {
++            written.extend_from_slice(&sector.to_le_bytes());
++            written.extend_from_slice(bytes);
++        }
++    }
++    singlefs_harness::sha256::sha256_digest(&written)
++        .iter()
++        .map(|byte| format!("{byte:02x}"))
++        .collect()
++}
++
++/// 等价那一串操作：造池（每一版都比）、整理推到停（每一版都比）、整理之后整份重写一个留着的文件、unlink 一个整份重写过的文件，
++/// 最后池级 checker 判镜像。交回比过的次数与整理发了几批。
++fn compare_every_lookup_along_a_history_on(shape: PoolOfFiles) -> (LookupsCompared, u64) {
++    let mut compared = LookupsCompared::default();
++    let PoolBuilt {
++        mut devices,
++        mut session,
++        inodes,
++    } = build_a_pool_of_files(shape, &mut |version| {
++        compare_every_lookup_with_a_linear_find(version, &mut compared);
++    });
++    let mut on_every_version = |version: &TransactionOutput| {
++        compare_every_lookup_with_a_linear_find(version, &mut compared);
++    };
++    session
++        .allocator
++        .set_compaction_switches(product_switches_with_the_batch_size(
++            COMPACTION_BATCH_UNITS_OF_THE_EQUIVALENCE_POOLS,
++        ));
++    let mut batches_published = 0;
++    // 迭代上界是 COMPACTION_RUNS_AT_MOST；跨轮携带的是会话与发了几批；一次调用一版都没发就出圈。
++    for _ in 0..COMPACTION_RUNS_AT_MOST {
++        let run = session.run_compaction(&mut devices).expect("整理一趟");
++        for version in &run.versions_published {
++            on_every_version(version);
++        }
++        batches_published += run.batches_published;
++        match run.outcome {
++            CompactionRunOutcome::Stopped(_) => {}
++            CompactionRunOutcome::Failed(failure) => {
++                panic!("整理的一次发布没发成（{shape:?}）：{failure:?}")
++            }
++        }
++        if run.versions_published.is_empty() {
++            break;
++        }
++    }
++    let mut write_time_seconds = common::FIXED_WRITE_TIME_SECONDS + 1_000_000;
++    let kept_file = inodes[0];
++    let content = content_of_data_units(shape.data_units_per_file, kept_file.0 + 2_000_003);
++    write_time_seconds += 1;
++    publish_and_look_at_every_version(
++        &mut session,
++        &mut devices,
++        UserChange::SequentialWriteOfAnInode {
++            inode: kept_file,
++            content: &content,
++            write_time_seconds,
++        },
++        &mut on_every_version,
++    );
++    write_time_seconds += 1;
++    publish_and_look_at_every_version(
++        &mut session,
++        &mut devices,
++        UserChange::Unlink {
++            inode: inodes[1],
++            write_time_seconds,
++        },
++        &mut on_every_version,
++    );
++    drop(session);
++    let violations = violations_of_the_pool_checker(&memory_pool_of(&devices));
++    assert!(
++        violations.is_empty(),
++        "这一串操作之后池级 checker 一条违例都没有（{shape:?}）：{violations:?}"
++    );
++    println!(
++        "publish_lookup_by_identity shape={shape:?} batches_published={batches_published} images_sha256={}",
++        digest_of_the_images(&devices)
++    );
++    (compared, batches_published)
++}
++
++/// 十六个四单元的文件（64 个数据单元，中央映射树一片叶）：每一版的每一次按身份查都与线性查找相同，整理真发了批，镜像池级 checker 判绿。
++/// 判别力：`crates/mutations.tsv` 里以「七·6 按身份查：」起头的几行（索引漏了一类单元、照抄取错角色、文件按错的号查、批量读取最先那条）。
++#[test]
++fn every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units(
++) {
++    let (compared, batches_published) = compare_every_lookup_along_a_history_on(PoolOfFiles {
++        files: 16,
++        data_units_per_file: 4,
++    });
++    assert!(
++        batches_published >= 1,
++        "整理真搬了单元：读版本走到了批量读映射（{compared:?}）"
++    );
++    assert!(
++        compared.versions >= 40 && compared.file_lookups >= 16 && compared.unit_lookups >= 64,
++        "每一版都比过：{compared:?}"
++    );
++}
++
++/// 四十八个八单元的文件（384 个数据单元，中央映射树不止一片叶）：同上，叶不止一片时批量读每片叶各解一次、各查各的。
++#[test]
++fn every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units(
++) {
++    let (compared, batches_published) = compare_every_lookup_along_a_history_on(PoolOfFiles {
++        files: 48,
++        data_units_per_file: 8,
++    });
++    assert!(
++        batches_published >= 1,
++        "整理真搬了单元：读版本走到了批量读映射（{compared:?}）"
++    );
++    assert!(
++        compared.versions_whose_central_mapping_tree_has_several_nodes >= 1,
++        "这一档的中央映射树长到了不止一个节点：{compared:?}"
++    );
++}
++
++/// 同一身份出现几次时索引取最先那一项（与 `iter().find` 同一项），表里没有的身份查不到。
++#[test]
++fn first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones() {
++    let table: Vec<(u64, &str)> = vec![
++        (7, "seven first"),
++        (3, "three first"),
++        (7, "seven second"),
++        (3, "three second"),
++        (9, "nine"),
++    ];
++    let index = FirstEntryOfEachIdentity::of_the_table(&table, |(identity, _)| *identity);
++    for identity in [7_u64, 3, 9, 4] {
++        let found_linearly = table.iter().find(|(candidate, _)| *candidate == identity);
++        assert!(
++            is_the_same_entry(index.first_entry_of(&identity), found_linearly),
++            "身份 {identity}：索引查到的 {:?} 与线性找的 {found_linearly:?} 不是同一项",
++            index.first_entry_of(&identity)
++        );
++    }
++    assert_eq!(
++        index.first_entry_of(&7).map(|(_, name)| *name),
++        Some("seven first"),
++        "重复的身份取最先那一项"
++    );
++    assert_eq!(index.first_entry_of(&4), None, "表里没有的身份查不到");
++}
++
++/// 换掉一版中央映射树唯一那片叶（根兼叶）的字节：照这一版那片叶的头重装，条目换成 `entries`、条目宽换成 `entry_width`。
++fn version_with_the_mapping_leaf_rebuilt(
++    version: &TransactionOutput,
++    entry_width: u16,
++    entries: &[Vec<u8>],
++) -> TransactionOutput {
++    let mut rebuilt = version.clone();
++    let leaf = rebuilt
++        .units
++        .iter_mut()
++        .find(|unit| unit.identity == TransactionUnit::MappingTree)
++        .expect("这一版有中央映射树的根");
++    let header = parse_index_node(&leaf.bytes).expect("这一版的映射叶解得开");
++    leaf.bytes = build_index_node(
++        header.tree,
++        header.level,
++        header.key_width,
++        &header.smallest_key,
++        &header.largest_key,
++        header.birth_txg,
++        &common::E142_FILESYSTEM_IDENTIFIER,
++        header.instance,
++        header.birth_sequence,
++        entry_width,
++        entries,
++    );
++    rebuilt
++}
++
++/// 一版里每一把进映射的 key（连同一把哪一版都没有的）批量读与逐 key 查逐项相同；交回比了几把。
++fn compare_the_leaf_by_leaf_read_with_the_per_key_lookup(version: &TransactionOutput) -> usize {
++    let mut read_leaf_by_leaf = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
++    let absent_key = vec![0xff_u8; MAPPING_KEY_BYTES];
++    let keys: Vec<&Vec<u8>> = version
++        .mapped_units
++        .iter()
++        .map(|(_, key)| key)
++        .chain([&absent_key])
++        .collect();
++    for key in &keys {
++        assert_eq!(
++            read_leaf_by_leaf.locations_of_key(key),
++            central_mapping_locations_in_the_version(version, key),
++            "key {key:02x?}：批量读与逐 key 查不同"
++        );
++    }
++    keys.len()
++}
++
++/// 中央映射树只有一片叶（根兼叶）的一版上，把那片叶换成三种：解不开（全零）、条目窄于字段表（每条截掉最后一个字节）、
++/// 同一把 key 有两条（一条改过位置条目的放在原条目前面，一条放在后面）；三种叶上批量读与逐 key 查逐项相同，
++/// 同一把 key 两条时取最后一条（放在后面的那一条改过的位置条目查得到）。
++#[test]
++fn leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys(
++) {
++    let (mut devices, mut session) = formatted_and_mounted(CompactionSwitches::PRODUCT);
++    let first_inode = version_of(&session).inode_number_watermark();
++    let content = content_of_data_units(3, 0x7006);
++    session
++        .publish_user_change(
++            &mut devices,
++            UserChange::NewInodes {
++                count: 1,
++                write_time_seconds: common::FIXED_WRITE_TIME_SECONDS + 1,
++            },
++        )
++        .unwrap_or_else(|refusal| panic!("建一个 inode：{refusal:?}"));
++    session
++        .publish_user_change(
++            &mut devices,
++            UserChange::SequentialWriteOfAnInode {
++                inode: InodeNumber(first_inode),
++                content: &content,
++                write_time_seconds: common::FIXED_WRITE_TIME_SECONDS + 2,
++            },
++        )
++        .unwrap_or_else(|refusal| panic!("给它写三个数据单元：{refusal:?}"));
++    let version = version_of(&session).clone();
++    assert_eq!(
++        version.central_mapping_tree.shape.nodes().len(),
++        1,
++        "这一版的中央映射树只有根兼叶"
++    );
++    let leaf_header = parse_index_node(&version.unit(TransactionUnit::MappingTree).bytes)
++        .expect("这一版的映射叶解得开");
++    let entry_width = u16::try_from(leaf_header.entry_width).expect("条目宽装得进 u16");
++    let original_entries = leaf_header.entries.clone();
++    assert!(
++        original_entries.len() >= 4,
++        "映射叶里有好几条：三个数据单元、下段、inode 树、分配记录树……"
++    );
++    let compared_on_the_original = compare_the_leaf_by_leaf_read_with_the_per_key_lookup(&version);
++
++    let mut malformed = version.clone();
++    malformed
++        .units
++        .iter_mut()
++        .find(|unit| unit.identity == TransactionUnit::MappingTree)
++        .expect("这一版有中央映射树的根")
++        .bytes
++        .fill(0);
++    compare_the_leaf_by_leaf_read_with_the_per_key_lookup(&malformed);
++    assert_eq!(
++        CentralMappingOfAVersionReadLeafByLeaf::of_the_version(&malformed)
++            .locations_of_key(&version.mapped_units[0].1),
++        MappingLookup::NodeMalformedOrNoEntryWithThisKey,
++        "叶解不开：进映射的 key 也查不到"
++    );
++
++    let narrow_entries: Vec<Vec<u8>> = original_entries
++        .iter()
++        .map(|entry| entry[..entry.len() - 1].to_vec())
++        .collect();
++    let narrow = version_with_the_mapping_leaf_rebuilt(&version, entry_width - 1, &narrow_entries);
++    compare_the_leaf_by_leaf_read_with_the_per_key_lookup(&narrow);
++    assert_eq!(
++        CentralMappingOfAVersionReadLeafByLeaf::of_the_version(&narrow)
++            .locations_of_key(&version.mapped_units[0].1),
++        MappingLookup::EntryNarrowerThanItsFieldTable {
++            entry_bytes: usize::from(entry_width - 1)
++        },
++        "条目窄于字段表：报那条条目的字节数"
++    );
++
++    let repeated_position = original_entries.len() / 2;
++    let mut altered_entry = original_entries[repeated_position].clone();
++    let last_byte = altered_entry.len() - 1;
++    altered_entry[last_byte] ^= 0xff;
++    for altered_entry_goes_after_the_original in [false, true] {
++        let mut entries = original_entries.clone();
++        let insert_at = if altered_entry_goes_after_the_original {
++            repeated_position + 1
++        } else {
++            repeated_position
++        };
++        entries.insert(insert_at, altered_entry.clone());
++        let repeated = version_with_the_mapping_leaf_rebuilt(&version, entry_width, &entries);
++        compare_the_leaf_by_leaf_read_with_the_per_key_lookup(&repeated);
++        let key = original_entries[repeated_position][..MAPPING_KEY_BYTES].to_vec();
++        let expected_last_entry = if altered_entry_goes_after_the_original {
++            &altered_entry
++        } else {
++            &original_entries[repeated_position]
++        };
++        let (_, expected_locations) =
++            parse_mapping_entry(expected_last_entry).expect("55 字节的映射条目切得动");
++        match CentralMappingOfAVersionReadLeafByLeaf::of_the_version(&repeated)
++            .locations_of_key(&key)
++        {
++            MappingLookup::Found(locations) => assert_eq!(
++                locations,
++                expected_locations,
++                "同一把 key 两条：取后面那一条（改过的放在{}）",
++                if altered_entry_goes_after_the_original {
++                    "后面"
++                } else {
++                    "前面"
++                }
++            ),
++            other @ (MappingLookup::NodeMalformedOrNoEntryWithThisKey
++            | MappingLookup::EntryNarrowerThanItsFieldTable { .. }) => {
++                panic!("重复的那把 key 查得到：{other:?}")
++            }
++        }
++    }
++    assert!(compared_on_the_original >= 4, "原样那一版每把 key 都比过");
++}
++
++/// 本线程到此刻在 CPU 上跑过的纳秒（Linux 的 `/proc/thread-self/schedstat` 第一栏）。
++fn nanoseconds_this_thread_ran_on_a_cpu() -> u64 {
++    let schedstat = std::fs::read_to_string("/proc/thread-self/schedstat")
++        .expect("Linux 上 /proc/thread-self/schedstat 读得出");
++    schedstat
++        .split_whitespace()
++        .next()
++        .expect("第一栏是本线程在 CPU 上跑过的纳秒")
++        .parse()
++        .expect("十进制整数")
++}
++
++/// 增长那一条量的两档：每个文件八个数据单元，512 个与 2048 个数据单元。
++const DATA_UNITS_PER_FILE_OF_THE_GROWTH_POOLS: usize = 8;
++const FILES_OF_THE_SMALLER_GROWTH_POOL: u64 = 64;
++const FILES_OF_THE_LARGER_GROWTH_POOL: u64 = 256;
++/// 一批整理的批大小（E185 的 K = 8）。
++const COMPACTION_BATCH_UNITS_OF_THE_GROWTH_POOLS: usize = 8;
++/// 每档量几次（两档轮流，一次调用至多发一版）。
++const MEASURED_CALLS_PER_POOL: usize = 8;
++/// 每档至少要有几次真发了一版才取中位。
++const PUBLISHING_CALLS_REQUIRED_PER_POOL: usize = 5;
++/// 数据单元四倍时一批整理的线程 CPU 中位至多涨到几倍（百分数）：线性就是四倍，涨过四倍就是比线性快（七·6 要的是「从平方降到接近线性」）。
++/// 依据（2026-10-20 实现员在仓副本里量，debug、本机忙）：改后 50.0 → 154.2 ms，308%；改前的平方查找那几处在 release 下
++/// 512 → 2048 是 430–470%（调查员同一会话轮流量的两次）。
++const HIGHEST_GROWTH_OF_THE_BATCH_CPU_IN_PERCENT_FOR_FOUR_TIMES_THE_DATA_UNITS: u64 = 400;
++
++/// 重挂一份造好的池（批大小强制 K），一次调用一次地推整理：每次调用之前把这次挂载数过的发布数压到上限，一次调用至多发一版
++/// （照 E185 装置 `measure_one_intent`）。交回这一次调用的线程 CPU 纳秒；一版都没发的交回 `None`。
++fn batch_cpu_of_one_compaction_call(
++    session: &mut MountedSession,
++    devices: &mut Devices,
++) -> Option<u64> {
++    session.compaction.publishes_since_the_last_user_change = 1000;
++    let before = nanoseconds_this_thread_ran_on_a_cpu();
++    let run = session.run_compaction(devices).expect("整理一趟");
++    let cpu_nanoseconds = nanoseconds_this_thread_ran_on_a_cpu() - before;
++    match run.outcome {
++        CompactionRunOutcome::Stopped(_) => {}
++        CompactionRunOutcome::Failed(failure) => panic!("整理的一次发布没发成：{failure:?}"),
++    }
++    (!run.versions_published.is_empty()).then_some(cpu_nanoseconds)
++}
++
++fn median_of(mut readings: Vec<u64>) -> u64 {
++    readings.sort_unstable();
++    readings[readings.len() / 2]
++}
++
++/// 512 个数据单元的池与 2048 个的池（每个文件八个单元），同一进程里重挂、两档轮流各推 8 次整理（K = 8、一次至多一版），
++/// 一批的线程 CPU 中位从小池到大池涨不到门槛的倍数。按身份查换回在 `Vec` 上逐个找（平方）时涨得过门槛：
++/// `crates/mutations.tsv` 里以「七·6 增长：」起头的几行。
++// harness-test-granularity:one-scenario 两档池同一个场景：比的是同一串操作在两档上的比，单造一档量不出比。
++#[test]
++#[ignore = "harness 慢档用例：造 2048 个数据单元的池要发约 460 次发布，debug 下单条超过 60 秒"]
++fn a_compaction_batch_cpu_grows_less_than_the_threshold_from_512_to_2048_data_units() {
++    let (mut smaller_devices, mut larger_devices) = std::thread::scope(|scope| {
++        let smaller = scope.spawn(|| {
++            build_a_pool_of_files(
++                PoolOfFiles {
++                    files: FILES_OF_THE_SMALLER_GROWTH_POOL,
++                    data_units_per_file: DATA_UNITS_PER_FILE_OF_THE_GROWTH_POOLS,
++                },
++                &mut |_| {},
++            )
++            .devices
++        });
++        let larger = scope.spawn(|| {
++            build_a_pool_of_files(
++                PoolOfFiles {
++                    files: FILES_OF_THE_LARGER_GROWTH_POOL,
++                    data_units_per_file: DATA_UNITS_PER_FILE_OF_THE_GROWTH_POOLS,
++                },
++                &mut |_| {},
++            )
++            .devices
++        });
++        (
++            smaller.join().expect("造小池的线程没 panic"),
++            larger.join().expect("造大池的线程没 panic"),
++        )
++    });
++    let parameters = common::parameters();
++    let switches = product_switches_with_the_batch_size(COMPACTION_BATCH_UNITS_OF_THE_GROWTH_POOLS);
++    let (_, mut smaller_session) = MountedSession::of_the_mount(
++        mount_writable_with_compaction_switches(&parameters, &mut smaller_devices, switches)
++            .expect("重挂小池"),
++    );
++    let (_, mut larger_session) = MountedSession::of_the_mount(
++        mount_writable_with_compaction_switches(&parameters, &mut larger_devices, switches)
++            .expect("重挂大池"),
++    );
++    let mut smaller_readings = Vec::new();
++    let mut larger_readings = Vec::new();
++    // 迭代上界是 MEASURED_CALLS_PER_POOL；两档轮流，同一时段的负载两档都吃到。
++    for _ in 0..MEASURED_CALLS_PER_POOL {
++        smaller_readings.extend(batch_cpu_of_one_compaction_call(
++            &mut smaller_session,
++            &mut smaller_devices,
++        ));
++        larger_readings.extend(batch_cpu_of_one_compaction_call(
++            &mut larger_session,
++            &mut larger_devices,
++        ));
++    }
++    println!(
++        "publish_lookup_by_identity growth smaller_cpu_nanoseconds={smaller_readings:?} larger_cpu_nanoseconds={larger_readings:?}"
++    );
++    assert!(
++        smaller_readings.len() >= PUBLISHING_CALLS_REQUIRED_PER_POOL
++            && larger_readings.len() >= PUBLISHING_CALLS_REQUIRED_PER_POOL,
++        "两档各至少 {PUBLISHING_CALLS_REQUIRED_PER_POOL} 次真发了一版：小池 {smaller_readings:?}，大池 {larger_readings:?}"
++    );
++    let smaller_median = median_of(smaller_readings);
++    let larger_median = median_of(larger_readings);
++    println!(
++        "publish_lookup_by_identity growth smaller_median={smaller_median} larger_median={larger_median} growth_in_percent={}",
++        larger_median * 100 / smaller_median
++    );
++    assert!(
++        larger_median * 100
++            < HIGHEST_GROWTH_OF_THE_BATCH_CPU_IN_PERCENT_FOR_FOUR_TIMES_THE_DATA_UNITS
++                * smaller_median,
++        "数据单元四倍，一批整理的线程 CPU 中位涨了 {}%，门槛 {HIGHEST_GROWTH_OF_THE_BATCH_CPU_IN_PERCENT_FOR_FOUR_TIMES_THE_DATA_UNITS}%（小池 {smaller_median} ns，大池 {larger_median} ns）",
++        larger_median * 100 / smaller_median
++    );
++}

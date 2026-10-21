@@ -1,0 +1,4 @@
+writes_by_inode_number_of_several_files-7a68870a618974ff rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.54s
+writes_by_inode_number_in_random_histories_judged_by_the_model-5507cf63c2321401 rc=0 test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 18.02s
+attack_histories_of_multi_file_writes_and_unlinks-98db3e89b1a27288 rc=0 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.50s
+unlink_of_files_other_than_the_first-18eea8402292e592 rc=0 test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.64s

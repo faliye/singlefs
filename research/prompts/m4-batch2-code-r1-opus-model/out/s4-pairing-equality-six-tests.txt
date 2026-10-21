@@ -1,0 +1,7 @@
+cargo_rc=0
+test a_snapshot_extent_root_whose_head_is_not_any_snapshot_inode_root_is_refused_by_every_reader ... ok
+test a_snapshot_inode_root_whose_head_is_not_the_live_inode_tree_is_refused_by_every_reader ... ok
+test a_tree_table_carrying_two_snapshot_pairs_is_rebuilt_and_hands_back_both_pairs ... ok
+test a_tree_table_with_one_more_snapshot_extent_root_than_snapshot_inode_roots_is_refused_by_every_reader ... ok
+test an_eleventh_snapshot_is_refused_by_every_reader_while_ten_are_rebuilt ... ok
+test two_snapshot_extent_roots_claiming_the_same_snapshot_inode_root_are_refused_by_every_reader ... ok

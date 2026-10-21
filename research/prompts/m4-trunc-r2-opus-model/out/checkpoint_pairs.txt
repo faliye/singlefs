@@ -1,0 +1,7 @@
+name=checkpoint_pair arm_a=jia_watermark arm_b=bing histories=3000 a_holds_b_not=0 b_holds_a_not=0
+name=checkpoint_pair arm_a=jia_full_no_write_order arm_b=bing histories=3000 a_holds_b_not=0 b_holds_a_not=176
+  first_b_holds_a_not: batch=144 ops=seq(4P),size(1P),size(0P+16317),checkpoint[seq(2P)+size(0P)],checkpoint[size(1P)+size(3P+1)],size(4P),size(1P),size(6P)
+name=checkpoint_pair arm_a=yi arm_b=bing histories=3000 a_holds_b_not=0 b_holds_a_not=0
+name=checkpoint_pair arm_a=yi_full_no_write_order arm_b=jia_full_no_write_order histories=3000 a_holds_b_not=0 b_holds_a_not=83
+  first_b_holds_a_not: batch=144 ops=seq(4P),rb(1),rb(1),checkpoint[seq(3P)+size(1P)],checkpoint[size(2P)+ow(0P+16317)],ow(0P+16317),size(4P),checkpoint[size(1P)+size(3P+1)]
+name=checkpoint_pair arm_a=jia_watermark_by_write_order arm_b=bing_by_write_order histories=3000 a_holds_b_not=0 b_holds_a_not=0

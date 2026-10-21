@@ -1,0 +1,83 @@
+--- stage/make_filesystem.stage-a.rs	2026-10-20 09:57:19.298769341 +0000
++++ tree/crates/singlefs-core/src/make_filesystem.rs	2026-10-20 09:57:19.934203407 +0000
+@@ -754,6 +754,11 @@
+     /// 甲（正文举的例：先在旧池不读的地方写好、最后才动系统配置槽）：两单元 → 屏障 → 根 FUA × 3（只写槽 0，不清环）→ 系统配置 × 4 → 屏障
+     /// → 清 [槽 1 末尾, 根环基址)、每区域槽 1..S、journal 环 → 屏障。
+     NewBytesThenSystemConfiguration,
++    /// 辩方腿加（m3-close-c656-r2，fsid 相同也不丢确认过的写的候选；mkfs 先读旧池的两样由调用方传进来，这里量的只是写序）：
++    /// 单元写进旧池没用的槽（`unit_slot`）→ 屏障 → 第 0 代根写进槽 0（最新的旧根正住在槽 0 的那个区域先不写）→
++    /// 系统配置 × 4（提交）→ 屏障 → 清旧根（最新的那一条除外）→ 屏障 → 清最新的那一条旧根（一次写）→ 屏障 →
++    /// （最新旧根住槽 0 的区域补写第 0 代根）→ 清 [槽 1 末尾, 根环基址) 与 journal 环 → 屏障。
++    LatestRootLast { latest_region: u64, latest_slot: u64, unit_slot: u64 },
+ }
+ 
+ /// 同 [`make_filesystem`] 的字节（单元、根、系统配置逐字节相同），写序按 `order`。
+@@ -773,6 +778,13 @@
+     let unit_area_start = check_geometry(parameters, &sizes)?;
+     let instance_table_placement = instance_table_placement_at(unit_area_start);
+     let tree_table_genesis_placement = tree_table_genesis_placement_at(unit_area_start);
++    let (instance_table_placement, tree_table_genesis_placement) = match order {
++        MakeFilesystemOrderUnderAttack::LatestRootLast { unit_slot, .. } => (
++            Placement { slot: SlotNumber(unit_slot), span: INSTANCE_TABLE_SPAN_SLOTS },
++            Placement { slot: SlotNumber(unit_slot + INSTANCE_TABLE_SPAN_SLOTS), span: TREE_TABLE_GENESIS_SPAN_SLOTS },
++        ),
++        _ => (instance_table_placement, tree_table_genesis_placement),
++    };
+     let identities: Vec<DeviceIdentity> = sizes.iter().map(|(identity, _)| *identity).collect();
+     let instance = MKFS_INSTANCE_GENERATION;
+     let genesis = CheckpointTxg(0);
+@@ -944,6 +956,54 @@
+                 device.write_zeroes_at(journal_ring_start, parameters.geometry.journal_ring_bytes)?;
+             }
+             barriers!();
++        }
++        MakeFilesystemOrderUnderAttack::LatestRootLast { latest_region, latest_slot, .. } => {
++            let slots_per_region = parameters.geometry.root_ring_slots_per_region.count();
++            let write_genesis_root = |devices: &mut [(DeviceIdentity, Device)], region: u64| -> Result<(), MakeFilesystemError> {
++                let ring_slot = RootRingSlot { region, slot: 0 };
++                let region_device = parameters.region_devices[usize::try_from(region).expect("区域号")];
++                let (_, device) = devices.iter_mut().find(|(identity, _)| *identity == region_device).expect("归属");
++                device.write_at(slot_offset(ring_slot, parameters.geometry.fixed_structure_slot_spacing), &root_slot, WriteDurability::ForceUnitAccess)?;
++                Ok(())
++            };
++            units!();
++            barriers!();
++            for region in 0..ROOT_RING_REGIONS {
++                if region == latest_region && latest_slot == 0 { continue; }
++                write_genesis_root(devices, region)?;
++            }
++            system_configurations!();
++            barriers!();
++            for region in 0..ROOT_RING_REGIONS {
++                let region_device = parameters.region_devices[usize::try_from(region).expect("区域号")];
++                let (_, device) = devices.iter_mut().find(|(identity, _)| *identity == region_device).expect("归属");
++                let mut ranges: Vec<(u64, u64)> = Vec::new();
++                if region == latest_region {
++                    if latest_slot > 1 { ranges.push((1, latest_slot)); }
++                    if latest_slot + 1 < slots_per_region { ranges.push((latest_slot + 1, slots_per_region)); }
++                } else {
++                    ranges.push((1, slots_per_region));
++                }
++                for (first, end) in ranges {
++                    device.write_zeroes_at(DeviceOffsetInBytes(region_start(region).0 + first * spacing), (end - first) * spacing)?;
++                }
++            }
++            barriers!();
++            {
++                let region_device = parameters.region_devices[usize::try_from(latest_region).expect("区域号")];
++                let (_, device) = devices.iter_mut().find(|(identity, _)| *identity == region_device).expect("归属");
++                device.write_zeroes_at(DeviceOffsetInBytes(region_start(latest_region).0 + latest_slot * spacing), root_slot_bytes as u64)?;
++            }
++            barriers!();
++            if latest_slot == 0 {
++                write_genesis_root(devices, latest_region)?;
++                barriers!();
++            }
++            for (_, device) in devices.iter_mut() {
++                device.write_zeroes_at(DeviceOffsetInBytes(end_of_slot_one), root_ring_base.0 - end_of_slot_one)?;
++                device.write_zeroes_at(journal_ring_start, parameters.geometry.journal_ring_bytes)?;
++            }
++            barriers!();
+         }
+     }
+     Ok(MakeFilesystemOutput { root, instance_table_unit, tree_table_genesis_unit, unit_area_start })

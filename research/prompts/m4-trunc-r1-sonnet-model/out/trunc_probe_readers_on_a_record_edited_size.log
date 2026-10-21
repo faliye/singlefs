@@ -1,0 +1,9 @@
+running 1 test
+test probe_readers_after_a_record_only_size_change ... C 缩到 2990（尾单元没重写）: 池级 checker 判违例的不变量 = []
+C 缩到 2990（尾单元没重写）: read_at 拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+D 变长到 3010（同一个单元内，尾单元没重写）: 池级 checker 判违例的不变量 = []
+D 变长到 3010（同一个单元内，尾单元没重写）: read_at 拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+E 变长到三个净荷（尾部是洞）: 池级 checker 判违例的不变量 = []
+E 变长到三个净荷（尾部是洞）: open_file 拒：ExtentRecordCountDoesNotMatchTheFileSize { inode: InodeNumber(1), extent_records: 1, data_units_implied_by_the_file_size: 3, file_size_in_bytes: 97902 }
+ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s

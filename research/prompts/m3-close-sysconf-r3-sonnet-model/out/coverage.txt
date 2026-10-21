@@ -1,0 +1,20 @@
+# 部分二：取号写的写法 × 盘数 × 故障模型（崩溃之后每盘至多一槽 / 全池任意至多 2 槽 / 全池任意至多 3 槽，每槽 翻坏 或 持续读错）
+# 状态 = 取号成功之后接着第一次发布的各段落盘组合；撞号 = 下一次可写挂载取到的号不大于崩掉那次的号而盘上已有那个号的单元 / 记录 / 根
+probe=coverage disks=2 acquisition=one_round faults=每盘至多一槽 states=24 acquisition_phase_states=9 撞号=6 R2拒=312 盘全废拒=42 干净=240
+probe=coverage disks=2 acquisition=one_round faults=全池任意至多2槽 states=24 acquisition_phase_states=9 撞号=6 R2拒=348 盘全废拒=198 干净=240
+probe=coverage disks=2 acquisition=one_round faults=全池任意至多3槽 states=24 acquisition_phase_states=9 撞号=6 R2拒=1020 盘全废拒=294 干净=240
+probe=coverage disks=2 acquisition=two_rounds faults=每盘至多一槽 states=32 acquisition_phase_states=17 撞号=0 R2拒=420 盘全废拒=63 干净=317
+probe=coverage disks=2 acquisition=two_rounds faults=全池任意至多2槽 states=32 acquisition_phase_states=17 撞号=0 R2拒=474 盘全废拒=265 干净=317
+probe=coverage disks=2 acquisition=two_rounds faults=全池任意至多3槽 states=32 acquisition_phase_states=17 撞号=0 R2拒=1370 盘全废拒=393 干净=317
+probe=coverage disks=2 acquisition=extra_pass_on_one_disk faults=每盘至多一槽 states=26 acquisition_phase_states=11 撞号=0 R2拒=338 盘全废拒=46 干净=266
+probe=coverage disks=2 acquisition=extra_pass_on_one_disk faults=全池任意至多2槽 states=26 acquisition_phase_states=11 撞号=0 R2拒=377 盘全废拒=215 干净=266
+probe=coverage disks=2 acquisition=extra_pass_on_one_disk faults=全池任意至多3槽 states=26 acquisition_phase_states=11 撞号=0 R2拒=1105 盘全废拒=319 干净=266
+probe=coverage disks=3 acquisition=one_round faults=每盘至多一槽 states=68 acquisition_phase_states=27 撞号=14 R2拒=4492 盘全废拒=878 干净=3116
+probe=coverage disks=3 acquisition=one_round faults=全池任意至多2槽 states=68 acquisition_phase_states=27 撞号=0 R2拒=738 盘全废拒=1458 干净=2768
+probe=coverage disks=3 acquisition=one_round faults=全池任意至多3槽 states=68 acquisition_phase_states=27 撞号=14 R2拒=6058 盘全废拒=6656 干净=3116
+probe=coverage disks=3 acquisition=two_rounds faults=每盘至多一槽 states=94 acquisition_phase_states=53 撞号=0 R2拒=6290 盘全废拒=1317 干净=4143
+probe=coverage disks=3 acquisition=two_rounds faults=全池任意至多2槽 states=94 acquisition_phase_states=53 撞号=0 R2拒=1107 盘全废拒=2091 干净=3664
+probe=coverage disks=3 acquisition=two_rounds faults=全池任意至多3槽 states=94 acquisition_phase_states=53 撞号=0 R2拒=8639 盘全废拒=9120 干净=4143
+probe=coverage disks=3 acquisition=extra_pass_on_one_disk faults=每盘至多一槽 states=70 acquisition_phase_states=29 撞号=0 R2拒=4616 盘全废拒=900 干净=3234
+probe=coverage disks=3 acquisition=extra_pass_on_one_disk faults=全池任意至多2槽 states=70 acquisition_phase_states=29 撞号=0 R2拒=750 盘全废拒=1500 干净=2860
+probe=coverage disks=3 acquisition=extra_pass_on_one_disk faults=全池任意至多3槽 states=70 acquisition_phase_states=29 撞号=0 R2拒=6210 盘全废拒=6866 干净=3234

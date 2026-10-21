@@ -1,0 +1,1 @@
+SINGLEFS_RUN_SCOPE='种类=target; 跑什么=装置 e183_capacity_read_cache_reserve_and_sweep_costs 的单测; 范围=1 个测试目标; 为什么=执行员报告要主 agent 跑的单测，换上之后核装置单测全绿' bash scripts/hosts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-checker-tier --bin e183_capacity_read_cache_reserve_and_sweep_costs

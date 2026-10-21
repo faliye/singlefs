@@ -1,0 +1,7 @@
+eb9d49cdd43521bc062bd2404656c00382889572c092a11976e8ddca5fd4ea90  .claude/kb/milestone/04-fourth-txn.md
+c8885c1a7af2af03110a98cb407e51ca3d0ad345a432ef64f71fd5a4fad42a41  .claude/kb/decisions/26-后台整理与放置回收.md
+ad02c2016a47963b4a1270319fc7ebd7617a9d11fd14cbea0e8d9dc811c59d6a  .claude/kb/checks-owed.md
+4ba65c3e486610277185b659087de6922a43095d798ba8934d64155a6fc8f3e1  .claude/kb/decisions/08-核心索引结构.md
+da098a642cb455251469de5922b68b98171643b0fa7305e5605efa7be6118b2c  .claude/kb/decisions/05-快照-空间记账机制.md
+a063a3e9e56d1092a0392115d6130377ae990391d772079596611a9202dcda4e  crates/singlefs-checker/invariants/01-块自描述.md
+a9699a8ae1d1d9622b94ac41b07025f97150786d54114d851a904a48f8ddc276  crates/singlefs-checker/invariants/README.md

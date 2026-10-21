@@ -1,0 +1,45 @@
+
+running 10 tests
+写空内容之后：2 的单元数 Some(1)，size Some(0)，有条目的号 {1, 2}
+3 的出生 CheckpointTxg(8)，墓碑里 1 的死亡 txg 在
+d1 = CheckpointTxg(6)，b3 = CheckpointTxg(8)
+回退之前写 3：Err(DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 3, object_birth: CheckpointTxg(8), death_txg_of_the_first_file: CheckpointTxg(6) })
+test a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta ... ok
+test an_empty_write_to_another_inode_mounts_and_is_deleted ... ok
+意图之后只读挂载打开 2：Err("打开 2：NoSuchInode { inode: InodeNumber(2) }")
+第一批之后只读挂载打开 2：Err("打开 2：NoSuchInode { inode: InodeNumber(2) }")
+test a_read_only_mount_answers_no_file_for_another_inode_from_its_intent_on ... ok
+d2 = CheckpointTxg(10)
+回退之后：3 的出生 CheckpointTxg(8)，β 读到的死亡 txg Some(CheckpointTxg(10))
+回退到建 3 那一版之后写 3：Ok(())
+删 150（降层）：写 116 次，段长 [26, 2, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2]，闭式状态数 152043545
+写成之后读回 3：Ok(32629) 字节；checker 红 []
+
+thread 'beta_after_two_rollbacks_lets_a_write_to_an_inode_born_after_the_deletion_through' (1168892) panicked at crates/singlefs-harness/tests/attack_histories_of_multi_file_writes_and_unlinks.rs:301:5:
+这条时间线上 3 生于 1 删完（d1 = CheckpointTxg(6)）之后（b3 = CheckpointTxg(8)），β 该拒；实际放过（取了别的时间线上的 d2 = CheckpointTxg(10)）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test beta_after_two_rollbacks_lets_a_write_to_an_inode_born_after_the_deletion_through ... FAILED
+删 1（150 留着）：写 122 次，段长 [26, 2, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 26, 2, 1, 2]，闭式状态数 218103833
+test deleting_another_file_in_batches_under_a_live_snapshot_keeps_every_version_green ... ok
+2 的墓碑条数：2
+test rolling_back_into_the_middle_of_the_deletion_of_another_file_is_continued_by_the_mount ... ok
+写完：根层级 2，上段 [ExtentUpperNodePosition { level: 0, index: 0 }, ExtentUpperNodePosition { level: 0, index: 1 }, ExtentUpperNodePosition { level: 0, index: 147 }, ExtentUpperNodePosition { level: 1, index: 0 }, ExtentUpperNodePosition { level: 1, index: 1 }, ExtentUpperNodePosition { level: 2, index: 0 }]
+各删序终态：[([1, 2, 150], [ExtentUpperNodePosition { level: 0, index: 0 }], false), ([150, 2, 1], [ExtentUpperNodePosition { level: 0, index: 0 }], false), ([2, 1, 150], [ExtentUpperNodePosition { level: 0, index: 0 }], false)]
+test two_deletion_orders_of_three_files_report_their_final_upper_segments ... ok
+删 150（降层）：判了 33 个状态（段边界加短段全展开）
+test every_crash_state_of_deleting_another_file_that_lowers_the_upper_segment_is_continued ... ok
+删 1（150 留着）：判了 33 个状态（段边界加短段全展开）
+test every_crash_state_of_deleting_the_first_file_beside_another_file_is_continued ... ok
+删 1 之后：上段 [ExtentUpperNodePosition { level: 0, index: 1 }, ExtentUpperNodePosition { level: 0, index: 147 }, ExtentUpperNodePosition { level: 1, index: 0 }, ExtentUpperNodePosition { level: 1, index: 1 }, ExtentUpperNodePosition { level: 2, index: 0 }]
+删 21100 之后：上段 [ExtentUpperNodePosition { level: 0, index: 1 }, ExtentUpperNodePosition { level: 1, index: 0 }]
+test the_upper_segment_grown_to_level_two_is_deleted_down_to_one_file_and_then_to_none has been running for over 60 seconds
+删 150 之后：上段 [ExtentUpperNodePosition { level: 0, index: 0 }]，成员 带文件
+test the_upper_segment_grown_to_level_two_is_deleted_down_to_one_file_and_then_to_none ... ok
+
+failures:
+
+failures:
+    beta_after_two_rollbacks_lets_a_write_to_an_inode_born_after_the_deletion_through
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 76.73s
+

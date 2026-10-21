@@ -1,0 +1,4 @@
+UNION kind=ow k=3 img=confirmed fault=last_record_of_r(#1) chosen=Ok(1,7) readers(walk,open,rebuild)=(true,true,false) today rec=Ok(1,7) ro=Ok(1,7) rw=Fail | unified=Fail mount_lost=true read_only_lost=true
+UNION kind=ow k=5 img=confirmed fault=last_record_of_r(#1) chosen=Ok(1,9) readers(walk,open,rebuild)=(true,true,false) today rec=Ok(1,9) ro=Ok(1,9) rw=Fail | unified=Fail mount_lost=true read_only_lost=true
+UNION kind=sw3 k=3 img=confirmed fault=last_record_of_r(#3) chosen=Ok(1,7) readers(walk,open,rebuild)=(true,true,false) today rec=Ok(1,7) ro=Ok(1,7) rw=Fail | unified=Fail mount_lost=true read_only_lost=true
+UNION kind=sw3 k=5 img=confirmed fault=last_record_of_r(#3) chosen=Ok(1,9) readers(walk,open,rebuild)=(true,true,false) today rec=Ok(1,9) ro=Ok(1,9) rw=Fail | unified=Fail mount_lost=true read_only_lost=true

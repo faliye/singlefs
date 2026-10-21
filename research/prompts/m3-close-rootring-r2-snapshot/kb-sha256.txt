@@ -1,0 +1,8 @@
+1cdbf25c59532bdebd79319376008388f2ed5ae07b2ad588fa48066e9d063432  .claude/kb/checks-owed.md
+91df9832877bc1950071ecf0e8f7f4053a815c9be7d4ab4bef79aa2c24b96d55  crates/singlefs-checker/invariants/02-根环.md
+ccb08200f8736e0db929b45f8591ed31b8fcee3cd1ff6c0039aaa2c01a86c61f  .claude/kb/decisions/17-实现分层与第三方管道.en.md
+176b27b4e6b0eafb34423ee7718195315792c390c9efb93cbddd1c2d2ad22e8a  .claude/kb/decisions/17-实现分层与第三方管道.ja.md
+0de99b38654b788efaa77e24d6585ca5942423f455e7b3d25da9528a99c0e4ab  .claude/kb/decisions/17-实现分层与第三方管道.md
+e44490b4d05fa4abd9edb3b52bd8d9964e9cc92604218d4105ecf69632a0bc1f  .claude/kb/decisions/22-单元原子性怎么合成.en.md
+a232ed86b5dd98c986d5d81473cdfb05c1f47f8118846e9d46bef60e35896301  .claude/kb/decisions/22-单元原子性怎么合成.ja.md
+097fba1ccfc805568df4041bf3a426d35aab858cb26af56366702ffbac9fcd03  .claude/kb/decisions/22-单元原子性怎么合成.md

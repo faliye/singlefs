@@ -1,0 +1,2 @@
+name=lifecycle_use h=distinct pool=remade_over_old_pool new_last_root=(1, 6) recover=FileRead(i1t6):new_last_version raw_red=[]
+name=lifecycle_use h=distinct pool=control_fresh_disks new_last_root=(1, 6) recover=FileRead(i1t6):new_last_version raw_red=[]
