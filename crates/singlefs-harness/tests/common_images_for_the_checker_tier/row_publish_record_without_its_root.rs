@@ -95,7 +95,7 @@ pub fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is
     assert!(slots_of_the_crashed_row_publish
         .contains(&row_publish.root.allocation_record_tree_root.locations[0].slot));
 
-    // 崩溃状态：第二次挂载写出去的写里，根槽写之前的全部持久（取号两写、六个单元各两写、记录两写），根槽与之后的一个都没有。
+    // 崩溃状态：第二次挂载写出去的写里，根槽写之前的全部持久（取号两轮四写、六个单元各两写、记录两写），根槽与之后的一个都没有。
     let operations = formatted.retained_operations();
     let mut base = MemoryPool::with_devices(&BOTH_DEVICES, IMAGE_BYTES);
     base.apply(&operations[..operations_before_the_second_mount]);
@@ -113,12 +113,12 @@ pub fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is
         .collect();
     assert_eq!(
         persisted_kinds,
-        [StepKind::SystemConfigurationSlot; 2]
+        [StepKind::SystemConfigurationSlot; 4]
             .into_iter()
             .chain([StepKind::UnitWrite; 12])
             .chain([StepKind::JournalRecord; 2])
             .collect::<Vec<_>>(),
-        "根槽写之前是取号两写、六个单元各两写、记录两写"
+        "根槽写之前是取号两轮四写、六个单元各两写、记录两写"
     );
     let persisted: Vec<bool> = (0..writes.len())
         .map(|write_index| write_index < first_root_write)

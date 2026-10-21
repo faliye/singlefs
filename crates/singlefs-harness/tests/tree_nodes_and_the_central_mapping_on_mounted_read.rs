@@ -38,7 +38,7 @@ use singlefs_core::mounted_read::{
     mount_read_only, open_pool_for_read, CentralMappingTreeReadsAtOpen, ExtentTreeReadsAtOpen,
     MountReadOnlyFailure, MountedReadOnly, OpenFileFailure, OpenPoolForReadFailure,
 };
-use singlefs_core::pointer::{LocationEntry, NodePointer};
+use singlefs_core::pointer::{DataPointer, LocationEntry, NodePointer};
 use singlefs_core::records::{
     build_mapping_entry, mapping_key_for_data, mapping_key_for_node, parse_inode_internal_entry,
     parse_mapping_entry, TreeTableEntry, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION,
@@ -638,9 +638,35 @@ fn role_in_the_rebuilt_version(which: MappedUnitToRelocate) -> TransactionUnit {
     }
 }
 
+/// 搬之前的数据指针，位置项等于被搬单元的提示的那几条换成 [`RELOCATION_TARGET_SLOT`]（设备与校验和不变：搬迁原样拷字节）；
+/// 交回换过之后的整份与换了几条。
+fn data_pointers_with_the_moved_unit_at_its_mapping_position(
+    data_pointers_before_the_move: &[DataPointer],
+    hint_locations_of_the_moved_unit: &[LocationEntry; 2],
+) -> (Vec<DataPointer>, usize) {
+    let mut data_pointers_at_the_moved_unit = 0;
+    let expected = data_pointers_before_the_move
+        .iter()
+        .map(|data_pointer| {
+            if data_pointer.locations != *hint_locations_of_the_moved_unit {
+                return *data_pointer;
+            }
+            data_pointers_at_the_moved_unit += 1;
+            let mut at_the_mapping_position = *data_pointer;
+            for location in &mut at_the_mapping_position.locations {
+                location.slot = RELOCATION_TARGET_SLOT;
+            }
+            at_the_mapping_position
+        })
+        .collect();
+    (expected, data_pointers_at_the_moved_unit)
+}
+
 /// C483 ② 跟着要做的那一件（实六报告第七节 Q5）：从盘上重建上一版（可写挂载与回退走的 `recovery::rebuild_version`）
-/// 与冷走读、挂载态同一条回退——提示指空槽、映射里是真落点 ⇒ 重建做成，那个角色的字节就是搬之前那一份，位置项照抄父指针里的
-/// （提示，不替写者改指针）；重建出来的分配记录与搬之前从盘上读的逐条相等。改之前 `rebuild_version` 只按提示读，报 `UnitUnreadable`。
+/// 与冷走读、挂载态同一条回退——提示指空槽、映射里是真落点 ⇒ 重建做成，那个角色的字节就是搬之前那一份；位置项是映射里的新落点、
+/// 不是父指针里的提示（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3「重建时映射条目的位置覆盖提示」，
+/// `transaction::take_the_mapping_positions_over_the_location_hints`），数据单元那一格连指向它的数据指针也换成映射位置，
+/// 别的角色的数据指针与搬之前逐项相同；重建出来的分配记录与搬之前从盘上读的逐条相等。改之前 `rebuild_version` 只按提示读，报 `UnitUnreadable`。
 /// 数据单元那一格同时分开「经映射读回来」与 N2 的「读不出就照抄位置项、不读内容」：读回来的字节不是空的。
 #[test]
 fn rebuilding_the_previous_version_reads_every_relocated_mapped_unit_through_the_central_mapping() {
@@ -683,19 +709,83 @@ fn rebuilding_the_previous_version_reads_every_relocated_mapped_unit_through_the
             carried.bytes, original_bytes,
             "{which:?}：重建出来的那个角色的字节是经映射读回来的那一份"
         );
+        assert_ne!(
+            hinted_slot, RELOCATION_TARGET_SLOT,
+            "{which:?}：提示与映射里的新落点是两个槽，下面那一判分得开"
+        );
         assert_eq!(
-            carried.slot, hinted_slot,
-            "{which:?}：位置项照抄父指针里的提示（重建不替写者改指针）"
+            carried.slot, RELOCATION_TARGET_SLOT,
+            "{which:?}：位置项是映射里的新落点，不是父指针里的提示（判决 G3「重建时映射条目的位置覆盖提示」）"
         );
         assert_eq!(
             after_the_move.allocation_records, before_the_move.allocation_records,
             "{which:?}：重建出来的分配记录与搬之前逐条相等"
         );
+        let (expected_data_pointers, data_pointers_at_the_moved_unit) =
+            data_pointers_with_the_moved_unit_at_its_mapping_position(
+                &before_the_move.data_pointers,
+                &moved.hint_locations,
+            );
         assert_eq!(
-            after_the_move.data_pointers, before_the_move.data_pointers,
-            "{which:?}：数据指针照抄"
+            data_pointers_at_the_moved_unit,
+            match which {
+                MappedUnitToRelocate::DataUnit => 1,
+                MappedUnitToRelocate::ExtentTreeRoot
+                | MappedUnitToRelocate::InodeTreeRoot
+                | MappedUnitToRelocate::InodeLeafContainer
+                | MappedUnitToRelocate::AllocationTreeRoot
+                | MappedUnitToRelocate::AccountingTreeRoot => 0,
+            },
+            "{which:?}：搬之前恰有这么多条数据指针指着被搬的单元"
+        );
+        assert_eq!(
+            after_the_move.data_pointers, expected_data_pointers,
+            "{which:?}：数据指针是搬之前那几条，指着被搬单元的那一条位置项换成映射里的新落点（G3），别的逐项相同"
         );
     }
+}
+
+/// 重建时盖进指针的映射位置同样按 I-2.5 判（它的射程含中央映射条目的 value）：extent 树根那一条映射条目的两条位置项对调成
+/// （盘 1，盘 0），提示原样、读得出 ⇒ 重建拒成 I-2.5、不交出一版位置项逆序的指针（下一次发布重写父节点时写者在升序断言上 panic）。
+/// 判别力：`recovery::rebuild_version` 盖映射位置之后那一道 I-2.5 拿掉时这一条红（盖之前那一道只看盘上提示，提示是升序的）。
+#[test]
+fn rebuilding_a_version_whose_central_mapping_entry_has_descending_locations_is_refused_by_i_2_5() {
+    let mut built = new_pool_file_creation_image("rebuild-mapping-entry-descending");
+    let moved = mapped_unit(&built, MappedUnitToRelocate::ExtentTreeRoot);
+    let original_entries = parse_index_node(&central_mapping_root_bytes(&built))
+        .expect("映射树根解得开")
+        .entries;
+    let entry_index = original_entries
+        .iter()
+        .position(|entry| {
+            parse_mapping_entry(entry).expect("映射条目解得开").0 == moved.mapping_key
+        })
+        .expect("extent 树根在映射里有一条");
+    let mut entries_with_the_descending_locations = original_entries.clone();
+    entries_with_the_descending_locations[entry_index] = build_mapping_entry(
+        &moved.mapping_key,
+        [moved.hint_locations[1], moved.hint_locations[0]],
+    );
+    assert!(
+        moved.hint_locations[0].device < moved.hint_locations[1].device,
+        "前提：提示本身是升序的，盖之前那一道判不出"
+    );
+    let new_central_mapping_root =
+        central_mapping_root_rebuilt_with(&built, &entries_with_the_descending_locations);
+    write_back_the_central_mapping_root_and_reseal_the_root(&mut built, &new_central_mapping_root);
+    let rebuilt = rebuild_version(&built.image, &built.root, Some(built.record.clone()));
+    assert!(
+        matches!(
+            rebuilt,
+            Err(RebuildVersionFailure::Walk(
+                RecoveryFailure::InvariantViolated {
+                    invariant: "I-2.5",
+                    ..
+                }
+            ))
+        ),
+        "映射条目的位置项逆序：重建拒成 I-2.5，实际 {rebuilt:?}"
+    );
 }
 
 /// 读一条根的分配记录（影子账与重建分配器走的 `recovery::allocation_records_under_root`）同一条回退：分配记录树根的提示指空槽、

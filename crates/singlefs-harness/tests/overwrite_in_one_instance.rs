@@ -41,8 +41,9 @@ use singlefs_core::recovery::{
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
-    mapping_locations_for_key, placements_to_release_via_mapping, publish_overwrite, FirstFile,
-    MappingLookup, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
+    mapping_locations_for_key, placements_to_release_via_mapping, publish_overwrite,
+    FileContentOfThePublish, FirstFile, MappingLookup, PoolWriter, PublishError, TransactionOutput,
+    TransactionUnit,
 };
 use singlefs_core::unit::{build_index_node, data_unit_payload_capacity, parse_index_node};
 use singlefs_format::{
@@ -175,7 +176,7 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     );
     assert_eq!(second.key_order_mismatches, 0);
 
-    // 根槽落区域 4 mod 3 = 1 的槽 (4 div 3) mod 8 = 1，区域 1 归盘 1；系统配置世代号 6、tail = 4。
+    // 根槽落区域 4 mod 3 = 1 的槽 (4 div 3) mod 8 = 1，区域 1 归盘 1；系统配置世代号 7、tail = 4。
     let image = pool.memory_pool();
     let target = target_for_publish(
         CheckpointTxg(4),
@@ -192,8 +193,8 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     let system_configuration = choose_system_configuration(&image).expect("系统配置");
     assert_eq!(system_configuration.quantities.journal_tail, 4);
     assert_eq!(
-        system_configuration.quantities.slot_generation, 6,
-        "mkfs 1、取号 2、暖机 3 / 4、A 5、B 6"
+        system_configuration.quantities.slot_generation, 7,
+        "mkfs 1、取号两轮 2 / 3、暖机 4 / 5、A 6、B 7"
     );
 }
 
@@ -425,8 +426,13 @@ fn release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not
     let mut pool = build_pool("release-via-mapping");
     let first = pool.output.clone();
     // A 重写的十二个单元（七个角色加分配记录树五个节点，D8（核心索引结构） 已定项 14），按 bump 次序。
-    let via_mapping = placements_to_release_via_mapping(&first, &pool.allocator, &first.rewritten)
-        .expect("A 的十条映射都在");
+    let via_mapping = placements_to_release_via_mapping(
+        &first,
+        &pool.allocator,
+        &first.rewritten,
+        FileContentOfThePublish::RewrittenWholeFromTheFirstDataUnit,
+    )
+    .expect("A 的十条映射都在");
     assert_eq!(
         via_mapping,
         first.placements(),

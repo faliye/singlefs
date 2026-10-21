@@ -25,7 +25,7 @@ use singlefs_checker::image::{
     HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES,
 };
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::make_filesystem::{
@@ -36,7 +36,8 @@ use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_overwrite, publish_version,
     publish_without_units, warm_up, FileVersionPlan, FirstFile, InstanceTablePlan, PoolVersion,
-    PoolWriter, PublishPlan, TransactionOutput, ZeroUnitPublishPlan, NEW_POOL_FILE_CREATION_NUMBER,
+    PoolWriter, PublishPlan, TransactionOutput, ZeroUnitPublishPlan, FIRST_INODE_NUMBER,
+    NEW_POOL_FILE_CREATION_NUMBER,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{
@@ -693,6 +694,7 @@ fn a_new_pool_file_of_two_data_units_holds_the_first_data_unit_placement_on_the_
                 instance,
                 back_chain: back_chain_of(&warmed_up.last_record_bytes),
                 file: Some(FileVersionPlan {
+                    inode: InodeNumber(FIRST_INODE_NUMBER),
                     content: &content,
                     write_time_seconds: FIXED_WRITE_TIME_SECONDS,
                     inode_object_birth: txg,

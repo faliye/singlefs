@@ -231,6 +231,10 @@ fn mount_writable_through<Device: BlockDevice>(
     }
 }
 
+/// 再可写挂载取号写的系统配置槽写数：两轮 × 两块盘（`transaction::write_the_witnessed_acquisition`，甲' 取号写两轮）。按「再挂落下几个写」
+/// 摆掉电点的用例要落到写行那次的单元写上，落下的写数从这几个写之后数起：取号写的轮数变了，掉电点跟着挪，不停在取号那几个写上。
+const ACQUISITION_WRITES_OF_THE_REMOUNT: u64 = 4;
+
 /// 形 R 两次崩溃、丢掉一块盘之后要比的几样。
 struct LoneSurvivorAfterACrashedUnmountAndACrashedRemount {
     current_txg_before_the_unmount: CheckpointTxg,
@@ -376,7 +380,7 @@ fn assert_the_lone_survivor_reads_back_what_it_read_before_the_unmount(
 
 /// h2（攻方第一节 1.2）：不补环窗口、准入关着造的窄盘（单元区 176 槽），不先覆盖写，第一个文件顺序写长到 4 个单元，在这个进程里发 unlink 的意图与
 /// 3 批（批大小 1）就崩；重开可写（准入判着、影子账开、批大小 1）续做走完。卸载只落下第一个写（盘 0 的系统配置带新 F）就崩；再可写挂载落下
-/// 6 个写（取号两个系统配置写、写行那次的前 4 个单元写）又崩；丢盘 0。
+/// 8 个写（取号两轮四个系统配置写、写行那次的前 4 个单元写）又崩；丢盘 0。
 /// 判别力：重建分配器照原门槛 max(F_生效, 窗口里最旧有效根) 整截当场放开时，写行那次的单元写进盘 1 上最新的根（txg 13 < F_生效 14）还引用的槽，
 /// 盘 1 只读挂载走树读不出（攻方原型上量过 `MappingStillUnreadable { slot: SlotNumber(1411) }`），最后一项红。
 #[test]
@@ -446,18 +450,18 @@ fn after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_nex
             1,
             RemountEntry::WithDeletionBatchesOfOne,
             RootRingDuringTheRemount::ReadAsUsual,
-            6,
+            ACQUISITION_WRITES_OF_THE_REMOUNT + 4,
             DeviceIdentity(0),
         ),
     );
 }
 
 /// 普通盘（攻方第一节 1.2 普通盘族 `plain W=4 k=1 m=1 k2=1`）：4 GiB 盘（随机历史默认那一档），第一个文件之后覆盖写 1 次、崩了再挂 1 次、
-/// 再覆盖写 1 次。卸载只落下第一个写就崩；再可写挂载（准入判着）落下 33 个写又崩；丢盘 0。
+/// 再覆盖写 1 次。卸载只落下第一个写就崩；再可写挂载（准入判着）落下 35 个写（取号两轮四个系统配置写之后再 31 个写）又崩；丢盘 0。
 /// 判别力：重建分配器整截当场放开时，再挂那一次的单元写进盘 1 上最新的根还引用的槽，盘 1 只读挂载做得成、打开活文件时 extent 树走不下去
 /// （攻方原型上量过 `ExtentTreeWalk(MappingStillUnreadable { slot: SlotNumber(50253) })`），最后一项红。
 #[test]
-fn after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_after_its_thirty_third_write_keeps_what_device_one_reads(
+fn after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_thirty_one_writes_after_its_acquisition_keeps_what_device_one_reads(
 ) {
     let device_width = HistoryDeviceWidth::FourGibibytes;
     let mut pool = start_plain(device_width);
@@ -474,7 +478,7 @@ fn after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writa
             1,
             RemountEntry::WithTheSpaceAdmissionJudged,
             RootRingDuringTheRemount::ReadAsUsual,
-            33,
+            ACQUISITION_WRITES_OF_THE_REMOUNT + 31,
             DeviceIdentity(0),
         ),
     );
@@ -483,8 +487,8 @@ fn after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writa
 /// 攻方 `research/prompts/m3-batch16-code-r1-opus-output.md` 第 1.3 节那一段（判决 `research/prompts/m3-batch16-code-r1-main-verification.md` 第二节
 /// 「再挂期间某块盘根环整段读坏」那一行）：不补环窗口、准入关着造的窄盘（单元区 264 槽），第一个文件之后覆盖写 6 次、顺序写长到 4 个单元，
 /// 在这个进程里发 unlink 的意图就崩；重开可写（准入判着、影子账开、批大小 1）续做走完。卸载落下 15 个写就崩（两块盘的系统配置都带了新 F、
-/// 带新 F 的根一条都没落）；两块盘都在、再可写挂载，这次挂载期间盘 1 的根环每一槽每次读都报错（挂载之后读得出），落下 6 个写又崩
-/// （写行那次的单元写）；丢盘 0。造法照攻方原型 `research/prompts/m3-batch16-code-r1-opus-model/probe/main.rs` 的 `narrow_start` 与 `HIDE_DEV`
+/// 带新 F 的根一条都没落）；两块盘都在、再可写挂载，这次挂载期间盘 1 的根环每一槽每次读都报错（挂载之后读得出），落下 8 个写又崩
+/// （取号两轮四个系统配置写、写行那次的前 4 个单元写）；丢盘 0。造法照攻方原型 `research/prompts/m3-batch16-code-r1-opus-model/probe/main.rs` 的 `narrow_start` 与 `HIDE_DEV`
 /// （原型读回全 0，这里报读错；攻方量过两种结局同数）。
 /// 判别力：重建分配器时盘 1 一条有效根都读不出（m 取不到），照原门槛 max(F_生效, 窗口里最旧有效根) 整截当场放开时，写行那次的单元写进
 /// 盘 1 上最新的根（txg 19 < F_生效 20）还引用的映射树节点，盘 1 只读挂载走树读不出（攻方原型上量过
@@ -543,7 +547,7 @@ fn after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_reading_no_r
     .unwrap_or_else(|error| panic!("崩了之后重开可写、续做：{error:?}"));
     let (_, session) = MountedSession::of_the_mount(mounted);
     pool.session = Some(session);
-    let remount_writes_landed = 6;
+    let remount_writes_landed = ACQUISITION_WRITES_OF_THE_REMOUNT + 4;
     let survivor = lone_survivor_after_a_crashed_unmount_and_a_crashed_remount(
         &pool,
         device_width,

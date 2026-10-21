@@ -24,12 +24,13 @@ use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_TREE_INTERNAL_FANOUT,
     ALLOCATION_RECORD_TREE_LEAF_SLOTS, CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES,
     DATA_UNIT_PAYLOAD_OFFSET, EXTENT_TREE_INTERNAL_FANOUT, EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
-    INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE, INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT,
-    INODE_INTERNAL_ENTRY, INODE_LEAF_RECORDS, INSTANCE_TABLE_PAGE_RECORDS,
-    JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT, LINEAGE_CONTAINER_RECORDS,
-    MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_BYTES, NODE_POINTER_BYTES,
-    NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
-    ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES,
+    EXTENT_TREE_UPPER_LEAF_INODES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
+    INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, INODE_INTERNAL_ENTRY, INODE_LEAF_RECORDS,
+    INSTANCE_TABLE_PAGE_RECORDS, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
+    LINEAGE_CONTAINER_RECORDS, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_BYTES,
+    NODE_POINTER_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RING_REGIONS,
+    ROOT_RING_REGION_DEVICES, ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES,
+    TREE_IDENTIFIER_EXTENT, TREE_IDENTIFIER_INODE,
 };
 
 /// 模型里的 checkpoint 号（D16（发布语义） 已定项 6：每次发布 + 1）。与实现的 `CheckpointTxg` 各自声明（D13（验证路线） 已定项 5）。
@@ -82,8 +83,15 @@ impl ModelInodeLeafContainerRightOfTheLeftmost {
 /// 一版里的一个角色：第一个文件版本的八个单元（D3（空间分配） 已定项 10 ⑤ 的次序）与实例表单元（D18（块里携带什么信息） 已定项 11）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ModelUnitRole {
+    /// 文件的数据单元：一个文件有几个就有几个，各自的分配代按单元号记在 [`ModelRoot::data_unit_written_at`]，不进
+    /// [`ModelRoot::role_written_at`]（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4：截断只重写尾单元之后，
+    /// 一个文件的数据单元不再同一个出生 txg）。
     Data,
     ExtentRoot,
+    /// extent 树上段根之下的一个节点（上段长过层之后才有），按它在上段里的位置各是一个角色：上段的形状只由有条目的 inode 号集合定
+    /// （判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2，规范形），一次发布重写哪几个、照抄哪几个按
+    /// [`extent_upper_node_written_at_after`] 的计划，各节点的分配代模型逐个记、逐个比。
+    ExtentUpperNodeBelowTheRoot(ModelExtentUpperNodePosition),
     /// inode 树最左那片叶容器：第一个文件那条记录住它，删完之后建的 inode 前 233 条也住它。
     InodeLeaf,
     /// inode 树最左那片之外的每一片叶容器各是一个角色（删完之后建满 233 条起才有，D8（核心索引结构） 已定项 6：插入落在最右那片、
@@ -97,6 +105,9 @@ pub enum ModelUnitRole {
     InstanceTable,
     /// `deleted_inodes` 的根（D8（核心索引结构） 已定项 16 第 1 条）：队列里有号的那几版才有。
     DeletedInodesRoot,
+    /// logged_ops 树的根（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1：单树、一条整理意图一个条目，模型罩的历史里
+    /// 至多一条、根兼叶一个节点）：签发那次发布写、之后照抄（分配代 = 签发那次的 txg）、删意图那次根指针置零，有活意图的那几版才有。
+    LoggedOperationsRoot,
     /// 墓碑树的开放容器（D18（块里携带什么信息） 已定项 24 第 1 条）：模型罩的历史里墓碑至多几十条，恒只有容器 1 那一片。
     TombstoneLeaf,
     /// 墓碑树的根。
@@ -123,6 +134,28 @@ impl ModelUnitRole {
         }
     }
 
+    /// extent 树上段的一个节点（根或根之下的）：这几个角色的分配代按规范形计划整组定（[`extent_upper_node_written_at_after`]）。
+    fn is_a_node_of_the_extent_upper_segment(self) -> bool {
+        match self {
+            ModelUnitRole::ExtentRoot | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_) => true,
+            ModelUnitRole::Data
+            | ModelUnitRole::InodeLeaf
+            | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
+            | ModelUnitRole::InodeRoot
+            | ModelUnitRole::AllocationTree
+            | ModelUnitRole::AccountingTree
+            | ModelUnitRole::MappingTree
+            | ModelUnitRole::TreeTable
+            | ModelUnitRole::InstanceTable
+            | ModelUnitRole::DeletedInodesRoot
+            | ModelUnitRole::LoggedOperationsRoot
+            | ModelUnitRole::TombstoneLeaf
+            | ModelUnitRole::TombstoneRoot
+            | ModelUnitRole::RetirementLeaf
+            | ModelUnitRole::RetirementRoot => false,
+        }
+    }
+
     /// 占几个槽：数据单元与打包记录单元（inode 叶、实例表）恒 32 KiB（D4（校验和位置） 已定项 5），索引节点恒 16 KiB
     /// （D8（核心索引结构） 已定项 2），落点粒度 16 KiB（D3（空间分配） 已定项 7）。
     #[must_use]
@@ -135,12 +168,14 @@ impl ModelUnitRole {
             | ModelUnitRole::TombstoneLeaf
             | ModelUnitRole::RetirementLeaf => DATA_UNIT_BYTES / SLOT_BYTES,
             ModelUnitRole::ExtentRoot
+            | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_)
             | ModelUnitRole::InodeRoot
             | ModelUnitRole::AllocationTree
             | ModelUnitRole::AccountingTree
             | ModelUnitRole::MappingTree
             | ModelUnitRole::TreeTable
             | ModelUnitRole::DeletedInodesRoot
+            | ModelUnitRole::LoggedOperationsRoot
             | ModelUnitRole::TombstoneRoot
             | ModelUnitRole::RetirementRoot => NODE_BYTES / SLOT_BYTES,
         }
@@ -169,18 +204,25 @@ enum ModelPublishKind {
     /// 树表 0 条上的空发布：零单元（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）。
     ZeroUnit,
     /// unlink 的意图那次（D8（核心索引结构） 已定项 16 第 1 条）：inode 叶与根（nlink 写 0）、`deleted_inodes` 根（加 key）、
-    /// 墓碑树开放容器与根（追加一条墓碑），加固定点单元；数据单元与 extent 树照抄。
-    UnlinkIntent,
-    /// 不是最后一批的删除批（D8（核心索引结构） 已定项 16 第 2 条：剩下的单元多于产品批大小 144 时从尾部释放 144 个）：
-    /// 留下的数据单元照抄（分配代不变）；重写被截掉那一片下段叶与它的祖先（下段节点不对应角色，占槽按下段层数取上界）、
-    /// extent 上段根、inode 叶与根（记录的 size 改成剩下单元数 × 净荷容量，nlink 仍 0），加固定点单元；
+    /// 墓碑树开放容器与根（追加一条墓碑），加固定点单元；数据单元与 extent 树照抄。`deleted` 是删的那个号（判决
+    /// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1：D8（核心索引结构） 已定项 16 第 1、2 条对任一 inode 同一条）；
+    /// 模型只答 inode 树只有一片叶容器的一版（那条记录住最左那片）。
+    UnlinkIntent { deleted: ModelDeletedInode },
+    /// 不是最后一批的删除批（D8（核心索引结构） 已定项 16 第 2 条：删的那个号剩下的单元多于产品批大小 144 时从尾部释放 144 个）：
+    /// 留下的数据单元照抄（分配代不变）；重写那个文件被截掉那一片下段叶与它的祖先（下段节点不对应角色，占槽按下段层数取上界）、
+    /// extent 上段那个号那一串（连根）、inode 叶与根（记录的 size 改成剩下单元数 × 净荷容量，nlink 仍 0），加固定点单元；
     /// `deleted_inodes` 那条 key 与墓碑树不动。这一版仍是删除中的那一版。
-    DeletionBatchKeepingDataUnits,
-    /// 最后一批（D8（核心索引结构） 已定项 16 第 2 条）：剩下的单元不多于产品批大小 144 时意图之后（或上一批之后）的下一步——释放剩下的单元、
-    /// 删 inode 记录（树里只有 inode 1，叶容器一片都不剩）、删 `deleted_inodes` 那条 key（删空取根指针置零、不写它的节点），
-    /// 同一次发布；重写 extent 零条目根与 inode 零条目根，加固定点单元。唯一那片叶容器身份消失，退役树开放容器追加一条退役记录、
-    /// 连根重写（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 3 条）。
-    FinalDeletionBatch,
+    DeletionBatchKeepingDataUnits { deleted: ModelDeletedInode },
+    /// 最后一批（D8（核心索引结构） 已定项 16 第 2 条）：删的那个号剩下的单元不多于产品批大小 144 时意图之后（或上一批之后）的下一步——
+    /// 释放剩下的单元、删 inode 记录、删 `deleted_inodes` 那条 key（删空取根指针置零、不写它的节点），同一次发布；inode 根与固定点单元重写。
+    /// `inode_tree_after` 说删掉那条记录之后 inode 树空没空（空了那片叶容器身份消失，退役树开放容器追加一条退役记录、连根重写，判决
+    /// `research/prompts/m3-retire-r1-main-verification.md` 第三节第 3 条；没空的那片叶容器重写），`extent_upper_root` 说上段的根这次重写还是照抄
+    /// （规范形：那个号出了有条目的号集合，降层那次上一版里降后层级的第 0 个节点照抄成根；它本来没有条目时上段整段照抄）。
+    FinalDeletionBatch {
+        deleted: ModelDeletedInode,
+        inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch,
+        extent_upper_root: ModelExtentUpperRootOfTheFinalDeletionBatch,
+    },
     /// 建一个 size 0 的 inode（`transaction::publish_new_inodes`，count 1；D8（核心索引结构） 已定项 16 第 5 条：删完之后只许建 inode、
     /// 写行与空发布），新记录落在最左那片叶容器里（删完之后建的前 233 条，[`inode_leaf_container_position_of_a_new_record`]）：
     /// inode 叶与根，加固定点单元；数据单元与 extent 树根照抄（新建的 inode 长度 0）。
@@ -190,6 +232,274 @@ enum ModelPublishKind {
     /// 左边那几片一个字节都不动、分配代不变（D8（核心索引结构） 已定项 6：分裂点取末尾，左半保留全部原有记录与身份；
     /// 「更新一条记录 = COW 叶 + 全部祖先」）。
     NewInodeInALeafContainerRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost),
+    /// 建一个只读快照那次独立发布（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S2）：文件内容与 inode 树都不动，
+    /// 只重写固定点单元（同有树的一版上的空发布那几族），树表追加一对快照条目、活头的 `previous_snapshot_txg` 换成这次的 txg；一个事务。
+    SnapshotCreation,
+    /// 删快照的意图那次（判决 S4）：只重写固定点单元，按建的先后第 `position` 个快照带上「销毁中」、它的前驱传给派生链上的下一侧；
+    /// 一条 deadlist 条目都不动；一个事务。
+    SnapshotDestructionIntent { position: usize },
+    /// 删快照意图之后、不是最后一批的一批（判决 S4）：只重写固定点单元（连同 deadlist 树），放掉第 `position` 个快照那一段里能放的条目中的
+    /// `entries_released` 条；一个事务。
+    SnapshotDestructionBatch {
+        position: usize,
+        entries_released: u64,
+    },
+    /// 删快照的最后一批：放掉剩下能放的全部条目，同一次发布删掉第 `position` 个快照那一对条目；一个事务。
+    SnapshotDestructionFinalBatch { position: usize },
+    /// 整理的一批（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3，`transaction::publish_relocation_batch`）：至多
+    /// `units_at_most` 个进映射的单元原样字节搬到目的地，映射条目换位置、目的地的分配代写单元的诞生代（D26（后台整理与放置回收） 已定项 5 第 2 条）——
+    /// 搬走的单元分配代不变，模型里它们的角色照抄；只重写固定点单元（同删快照那几次），文件内容、extent 树、inode 树、快照与 deadlist 都不动
+    /// （被快照钉住的单元照搬，留存的映射条目跟着换位置，条数不变）；一个事务。模型不答搬哪几个、搬几个（那由选段与区域扫描定，判决 G7「只比
+    /// 成功操作的内容」）：一批搬了几个实现交回几个，模型只按至多 `units_at_most` 个两槽单元给占槽的上界。
+    /// 搬走的是用户可见树的根（inode 树根、extent 树根，活头的或快照条目抄的）时，树表里那条根指针换成映射位置、盘上字节变了，
+    /// 这一版算一个新状态（用户 2026-10-15 定「照字节比，搬根算非空」，[`ModelRoot::user_visible_root_relocations`]）。
+    /// `intent_after_the_batch` 说这一批之后意图照抄还是同一次发布删掉（这一批搬空了 R）。
+    CompactionBatch {
+        units_at_most: u64,
+        intent_after_the_batch: ModelCompactionIntentAfterTheBatch,
+    },
+    /// 签发一条整理意图（判决 G1；丁 3 交回的读法第 1 条：签发单独一次发布，不搬单元）：logged_ops 新写一个根装这一条
+    /// （[`ModelUnitRole::LoggedOperationsRoot`]，分配代 = 这次的 txg），只重写固定点单元，文件内容、extent 树、inode 树、快照与 deadlist 都不动；
+    /// 一个事务（丁 3 读法第 6 条：照建快照取这个实例的下一个号）。
+    CompactionIntentIssue,
+    /// 不搬单元、只删 logged_ops 那一条意图的一次发布（判决 G1、G4；丁 3 读法第 2、3 条）：R 已按记录全空时意图达成、单独删
+    /// （[`ModelCompactionIntentEnding::CompletedWithTheRegionEmptyByTheRecords`]），R 里有隔离槽、区域扫描拒了 R、一个能搬的都没有时
+    /// 丢掉它（[`ModelCompactionIntentEnding::Dropped`]）。logged_ops 删空、根指针置零，只重写固定点单元；一个事务。
+    CompactionIntentDeletion { ending: ModelCompactionIntentEnding },
+    /// 截断的意图那次（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K2「先落目标」、K3）：缩短到 N 一律走
+    /// 「意图 + 若干批 + 最后一批」（K11）；意图那次 inode 记录的 size 写成 N（inode 叶与根），logged_ops 签一条截断条目（种类码 2，
+    /// logged_ops 根这次重写），N 落在单元 k 中间、单元 k 的声明长度不等于 N − k × 净荷时重写单元 k（截到 0 留一个声明长度 0 的单元），
+    /// 连同罩着它的下段叶到根与 extent 上段根；不放单元，加固定点单元；一个事务。这一版读回 N 字节。
+    /// 不重写尾单元而上段叶条目的标签要变时（缩短把尾部的洞整个截掉：标签 3、4 换回 1、2）只为换标签重写 extent 上段根（判决第六节 S1：
+    /// 换标签写在意图那次，目标态的 size、尾单元、标签一起写下）。`extent_tree` 说是三种里的哪一种。
+    TruncationIntent {
+        extent_tree: ModelExtentTreeChangeOfASizeChange,
+    },
+    /// 截断意图之后、不是最后一批的一批（K2）：size 之外还挂着的单元多于批大小 144 时从尾部放 144 个，不碰 inode 记录；重写被截掉那一片
+    /// 下段叶与它的祖先、extent 上段根，加固定点单元；截断条目照抄。一个事务。
+    TruncationBatch,
+    /// 截断的最后一批（K2、K11）：放完 size 之外还挂着的单元（可以 0 个），同一次发布删截断条目；不碰 inode 记录。放了单元时重写下段被截那一片
+    /// 与祖先、extent 上段根（下段只剩一个单元时整段换下、指针内联进上段）；放 0 个时 extent 树不动。加固定点单元；一个事务。
+    FinalTruncationBatch {
+        release: ModelFinalTruncationBatchRelease,
+        logged_operations_after: ModelLoggedOperationsAfterTheTruncationEntryIsDeleted,
+    },
+    /// 不缩短的截断（N ≥ S，K5 的变长与 K12 的 N = S）：不立意图、一次发布做完，inode 记录的 size 写成 N（inode 叶与根），加固定点单元；
+    /// 最后一个存在的单元声明长度小于 min(N − 起点, 净荷) 时把它补零重写到那个长度（连同下段路径与 extent 上段根），之后到 N 都是洞、不写单元；
+    /// 不重写尾单元而上段叶条目的洞标签要变时只重写 extent 上段根（`extent_tree` 说是哪一种）。一个事务。
+    SizeChangeWithoutShrinking {
+        extent_tree: ModelExtentTreeChangeOfASizeChange,
+    },
+    /// 按 inode 号整份写第一个文件之外的一个文件（`transaction::publish_sequential_write_of_an_inode` 与
+    /// `publish_overwrite_of_an_inode`，里程碑「删除与多次 COW」一·1）：那个文件的每个数据单元与它的下段整份重写（一个单元一个事务，
+    /// D16（发布语义） 已定项 5），extent 树上段按这次之后有条目的 inode 号定形状、写的那一串重写（上段根之下的节点与下段节点都不对应角色，
+    /// 占槽与映射条目按形状现算），装着它那条记录的 inode 叶容器（`inode_leaf_container`）与 inode 根，加固定点单元；第一个文件与别的文件的
+    /// 数据单元、下段照抄。
+    WholeWriteOfAnInodeOtherThanTheFirst { inode_leaf_container: ModelUnitRole },
+}
+
+/// 删除那几步删的是哪个号（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1、M3：意图、批、最后一批对任一号）。
+/// 封闭集合：第一个文件的内容、单元与截断字段记在 [`ModelVersionContents`] 里，别的文件记在 [`ModelRoot::inodes_other_than_the_first`] 里，
+/// 两处各走各的。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ModelDeletedInode {
+    FirstFile,
+    OtherThanTheFirst(u64),
+}
+
+impl ModelDeletedInode {
+    fn of_the_inode_number(inode: u64) -> Self {
+        if inode == FIRST_INODE_NUMBER {
+            ModelDeletedInode::FirstFile
+        } else {
+            ModelDeletedInode::OtherThanTheFirst(inode)
+        }
+    }
+
+    fn inode_number(self) -> u64 {
+        match self {
+            ModelDeletedInode::FirstFile => FIRST_INODE_NUMBER,
+            ModelDeletedInode::OtherThanTheFirst(inode) => inode,
+        }
+    }
+}
+
+/// 删除的最后一批删掉那条记录之后 inode 树还有没有记录（D8（核心索引结构） 已定项 16 第 5 条）。模型只答树里只有一片叶容器的一版
+/// （删一条不并、不借，D8（核心索引结构） 已定项 6 的合并只在有邻片时发生）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelInodeTreeAfterTheFinalDeletionBatch {
+    /// 删的是树里最后一条：那片叶容器身份消失（退役），inode 树写零条目根。
+    Emptied,
+    /// 树里还有别的记录：那片叶容器去掉一条、重写，身份不变。
+    StillHoldsRecords,
+}
+
+/// 删除的最后一批之后 extent 上段的根这次重写还是照抄（规范形，判决 m3-multi-file-unlink-r1 第三节 M2）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelExtentUpperRootOfTheFinalDeletionBatch {
+    /// 根罩着删掉的那个号（层级没降），或有条目的号集合删空了（零条目根兼叶）。
+    Rewritten,
+    /// 降层：上一版里降后层级的第 0 个节点照抄成根；或删的号本来就没有条目，上段整段照抄。
+    CarriedFromThePreviousVersion,
+}
+
+/// 截断的最后一批放没放单元（K2「最后一批放完剩下的（可以 0 个）」）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelFinalTruncationBatchRelease {
+    NoDataUnit,
+    AtLeastOneDataUnit,
+}
+
+/// 截断的最后一批删掉截断条目之后 logged_ops 里还剩什么（K1：截断条目与整理意图同住 logged_ops）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelLoggedOperationsAfterTheTruncationEntryIsDeleted {
+    /// 删空：树表条目的根指针置零，这一版没有 logged_ops 根。
+    Emptied,
+    /// 还装着那一条活整理意图：logged_ops 根这次重写。
+    StillHoldsTheCompactionIntent,
+}
+
+/// 改 size 的那一次发布（截断意图与不缩短的截断）对 extent 树做了什么（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K3、K5，
+/// 第六节 S1）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelExtentTreeChangeOfASizeChange {
+    /// 尾单元重写：截断意图重写单元 ⌈N ÷ 净荷⌉.max(1) − 1（K3），不缩短的截断补零重写最后一个存在的单元（K5）；那个单元、罩着它的下段叶到根
+    /// 与 extent 上段根这次写。
+    TailDataUnitRewritten,
+    /// 单元不动，上段叶条目的洞标签变了：变长把标签 1、2 换成 3、4（K5），缩短把洞整个截掉时 3、4 换回 1、2（S1）。只重写 extent 上段根。
+    OnlyTheUpperLeafEntryLabel,
+    /// extent 树不动（N = S，或尾单元不用重写、洞标签不变）。
+    Untouched,
+}
+
+/// 上段叶条目的标签（D8（核心索引结构） 已定项 14；判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 加 3、4 声明尾部的洞，
+/// 用户 2026-10-16 定）。模型按条款自己写一份，不引实现的常量（D13（验证路线） 已定项 5）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ModelExtentUpperLeafEntryLabel {
+    /// 标签 0：没有数据单元；配 size > 0 是整个文件都是洞。
+    NoDataUnit,
+    /// 标签 1：下段根。
+    LowerSegmentRoot,
+    /// 标签 2：内联单元 0。
+    InlineDataUnit,
+    /// 标签 3：下段根，下段最后一个单元之后到 size 是洞。
+    LowerSegmentRootThenTailHole,
+    /// 标签 4：内联单元 0，单元 0 之后到 size 是洞。
+    InlineDataUnitThenTailHole,
+}
+
+impl ModelExtentUpperLeafEntryLabel {
+    /// 盘上的标签值（K5）。
+    #[must_use]
+    pub fn tag(self) -> u8 {
+        match self {
+            ModelExtentUpperLeafEntryLabel::NoDataUnit => 0,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRoot => 1,
+            ModelExtentUpperLeafEntryLabel::InlineDataUnit => 2,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole => 3,
+            ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole => 4,
+        }
+    }
+
+    /// 写上段叶条目那一刻按存在的单元数与 size 罩的单元数（⌈size ÷ 净荷⌉.max(1)）写哪个标签：没有单元是 0；一个单元内联、多个单元下段根；
+    /// 存在的少于 size 罩的就是尾部有洞（K5：只有标签 3、4、0 许单元数少于它）。截断途中 size 之外还挂着单元（存在的多于罩的）时写 1 或 2。
+    #[must_use]
+    pub fn written_for(data_units_present: u64, data_units_within_the_size: u64) -> Self {
+        let has_a_tail_hole = data_units_present < data_units_within_the_size;
+        match (data_units_present, has_a_tail_hole) {
+            (0, true | false) => ModelExtentUpperLeafEntryLabel::NoDataUnit,
+            (1, false) => ModelExtentUpperLeafEntryLabel::InlineDataUnit,
+            (1, true) => ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole,
+            (_, false) => ModelExtentUpperLeafEntryLabel::LowerSegmentRoot,
+            (_, true) => ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole,
+        }
+    }
+
+    /// 带洞的那三个（K5：只有它们许单元数少于 size 罩的）。
+    #[must_use]
+    pub fn declares_a_hole(self) -> bool {
+        match self {
+            ModelExtentUpperLeafEntryLabel::NoDataUnit
+            | ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole
+            | ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole => true,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRoot
+            | ModelExtentUpperLeafEntryLabel::InlineDataUnit => false,
+        }
+    }
+
+    /// 这个标签与存在的单元数、size 罩的单元数对不对得上（判决第三节 K7 的 T-3，模型这一侧的写法，第六节 S1 收成唯一）：标签说的内联 / 下段
+    /// 与存在的单元数相符；标签 1、2 不许有洞（单元数等于 size 罩的），标签 3、4、0 至少有一个洞单元（少于它）；有截断条目时 size 之外可以
+    /// 多挂着单元，那时 size 之内没有洞，只许标签 1、2（size 之外挂着的不算洞单元）。
+    fn admits(
+        self,
+        data_units_present: u64,
+        data_units_within_the_size: u64,
+        is_a_truncation_entry_logged: bool,
+    ) -> bool {
+        let shape_matches = match self {
+            ModelExtentUpperLeafEntryLabel::NoDataUnit => data_units_present == 0,
+            ModelExtentUpperLeafEntryLabel::InlineDataUnit
+            | ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole => data_units_present == 1,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRoot
+            | ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole => {
+                data_units_present >= 2
+            }
+        };
+        let count_matches =
+            if is_a_truncation_entry_logged && data_units_present > data_units_within_the_size {
+                !self.declares_a_hole()
+            } else if self.declares_a_hole() {
+                data_units_present < data_units_within_the_size
+            } else {
+                data_units_present == data_units_within_the_size
+            };
+        shape_matches && count_matches
+    }
+}
+
+/// 整理的一批之后意图怎样（D8（核心索引结构） 已定项 5「删除意图必须与最后一批工作在同一个事务里提交」）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelCompactionIntentAfterTheBatch {
+    /// 这一批之后 R 里还有未释放的记录：logged_ops 照抄。
+    CarriedOn,
+    /// 这一批搬空了 R（按记录）：同一次发布删意图。
+    DeletedWithTheLastBatch,
+}
+
+/// 一条整理意图不随一批、单独一次发布离开 logged_ops 的两种。封闭集合。模型不记分配记录，分不出是哪一种：执行器按实现交回的这一版
+/// R 按记录全空没有交给模型（[`ModelCompactionPublishSeen`]），两种的根一样，只计数分开。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelCompactionIntentEnding {
+    /// R 已按记录全空：意图达成（判决 G4 停机谓词）。
+    CompletedWithTheRegionEmptyByTheRecords,
+    /// R 里还有未释放的记录而推不下去（隔离、区域扫描拒、一个能搬的都没有）：丢掉（攻方 K-c；判决 G2）。
+    Dropped,
+}
+
+impl ModelUnitRole {
+    /// 换下时问不问快照生死判定（判决 S3：只有用户可见子树的六类角色问，其余一律直接进 defer）：模型的角色里数据单元、extent 根、
+    /// inode 叶容器与 inode 根是那六类里的四类（extent 树下段节点不对应角色，按位置另记；上段根之下的节点各是一个角色，同上段根问）。
+    fn asks_the_snapshot_lifetime_judgement(self) -> bool {
+        match self {
+            ModelUnitRole::Data
+            | ModelUnitRole::ExtentRoot
+            | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_)
+            | ModelUnitRole::InodeLeaf
+            | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
+            | ModelUnitRole::InodeRoot => true,
+            ModelUnitRole::AllocationTree
+            | ModelUnitRole::AccountingTree
+            | ModelUnitRole::MappingTree
+            | ModelUnitRole::TreeTable
+            | ModelUnitRole::InstanceTable
+            | ModelUnitRole::DeletedInodesRoot
+            | ModelUnitRole::LoggedOperationsRoot
+            | ModelUnitRole::TombstoneLeaf
+            | ModelUnitRole::TombstoneRoot
+            | ModelUnitRole::RetirementLeaf
+            | ModelUnitRole::RetirementRoot => false,
+        }
+    }
 }
 
 /// inode 号的宽：内部节点条目里的分隔 key 8 字节（D8（核心索引结构） 已定项 6：条目 = 分隔 key 8 + 身份引用 26 + 子指针 86）。
@@ -238,9 +548,21 @@ impl ModelPublishKind {
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::RowsOnVersionWithoutFile
             | ModelPublishKind::ZeroUnit
-            | ModelPublishKind::UnlinkIntent
-            | ModelPublishKind::DeletionBatchKeepingDataUnits
-            | ModelPublishKind::FinalDeletionBatch => false,
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => false,
         }
     }
 
@@ -254,11 +576,23 @@ impl ModelPublishKind {
             | ModelPublishKind::OverwriteFileVersion
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::ZeroUnit
-            | ModelPublishKind::UnlinkIntent
-            | ModelPublishKind::DeletionBatchKeepingDataUnits
-            | ModelPublishKind::FinalDeletionBatch
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
             | ModelPublishKind::NewInode
-            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => false,
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => false,
         }
     }
 
@@ -267,14 +601,32 @@ impl ModelPublishKind {
     /// 空发布、写行、暖机、抬 F、回退的记录事务号 0（D23（journal 的角色与格式） 已定项 19 ①）。
     fn transactions_carried(self, data_units_of_the_new_content: u64) -> u64 {
         match self {
-            ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion => {
+            // 按 inode 号整份写第一个文件之外的文件同一条切分纪律：`data_units_of_the_new_content` 是那个文件这次写的单元数。
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => {
                 data_units_of_the_new_content
             }
-            ModelPublishKind::UnlinkIntent
-            | ModelPublishKind::DeletionBatchKeepingDataUnits
-            | ModelPublishKind::FinalDeletionBatch
+            ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
             | ModelPublishKind::NewInode
             | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => 1,
+            // 建快照与删快照的意图、每一批各一个事务（`transaction::publish_create_snapshot` 与删除那几次共用的计划，事务号接着实例内计数）；
+            // 整理的一批同样一个事务号（`transaction::publish_relocation_batch`）。
+            ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. } => 1,
+            // 截断的意图、每一批与不缩短的那一次各一个事务：至多写一个单元的用户数据（尾单元），D16（发布语义） 已定项 5 末句随
+            // 判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K12 补上「截断的尾单元算」。
+            ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. } => 1,
             ModelPublishKind::RowsOnFileVersion
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::RowsOnVersionWithoutFile
@@ -282,24 +634,59 @@ impl ModelPublishKind {
         }
     }
 
-    /// 这次发布之后这一版不再有的角色：最后一批释放数据单元、删掉唯一那片 inode 叶容器、`deleted_inodes` 删空取根指针置零。
+    /// 这次发布之后这一版不再有的角色（数据单元不在这里，按单元号另记，[`ModelRoot::data_unit_written_at`]）：最后一批 `deleted_inodes`
+    /// 删空取根指针置零，删的是树里最后一条时连唯一那片 inode 叶容器；删整理意图、截断最后一批删空 logged_ops 时取根指针置零。
+    /// extent 上段根之下的节点不在这里（按规范形计划另算，[`extent_upper_node_written_at_after`]）。
     fn removed_roles(self) -> &'static [ModelUnitRole] {
         match self {
-            ModelPublishKind::FinalDeletionBatch => &[
-                ModelUnitRole::Data,
-                ModelUnitRole::InodeLeaf,
-                ModelUnitRole::DeletedInodesRoot,
-            ],
+            ModelPublishKind::FinalDeletionBatch {
+                inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch::Emptied,
+                ..
+            } => &[ModelUnitRole::InodeLeaf, ModelUnitRole::DeletedInodesRoot],
+            ModelPublishKind::FinalDeletionBatch {
+                inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch::StillHoldsRecords,
+                ..
+            } => &[ModelUnitRole::DeletedInodesRoot],
             ModelPublishKind::FirstFileVersion
             | ModelPublishKind::OverwriteFileVersion
             | ModelPublishKind::RowsOnFileVersion
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::RowsOnVersionWithoutFile
             | ModelPublishKind::ZeroUnit
-            | ModelPublishKind::UnlinkIntent
-            | ModelPublishKind::DeletionBatchKeepingDataUnits
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
             | ModelPublishKind::NewInode
-            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => &[],
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionBatch {
+                intent_after_the_batch: ModelCompactionIntentAfterTheBatch::CarriedOn,
+                ..
+            }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch {
+                logged_operations_after:
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::StillHoldsTheCompactionIntent,
+                ..
+            }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => &[],
+            // 删意图（随最后一批、单独删、丢）：logged_ops 删空，树表条目的根指针置零，这一版没有这个角色（判决 G1）；截断的最后一批删掉截断条目、
+            // logged_ops 里没有整理意图时同样删空（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K2）。
+            ModelPublishKind::CompactionBatch {
+                intent_after_the_batch: ModelCompactionIntentAfterTheBatch::DeletedWithTheLastBatch,
+                ..
+            }
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::FinalTruncationBatch {
+                logged_operations_after:
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::Emptied,
+                ..
+            } => &[ModelUnitRole::LoggedOperationsRoot],
         }
     }
 
@@ -311,16 +698,30 @@ impl ModelPublishKind {
             ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(leaf_container) => {
                 roles.push(ModelUnitRole::InodeLeafRightOfTheLeftmost(leaf_container));
             }
+            ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst {
+                inode_leaf_container,
+            } => roles.push(inode_leaf_container),
             ModelPublishKind::FirstFileVersion
             | ModelPublishKind::OverwriteFileVersion
             | ModelPublishKind::RowsOnFileVersion
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::RowsOnVersionWithoutFile
             | ModelPublishKind::ZeroUnit
-            | ModelPublishKind::UnlinkIntent
-            | ModelPublishKind::DeletionBatchKeepingDataUnits
-            | ModelPublishKind::FinalDeletionBatch
-            | ModelPublishKind::NewInode => {}
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. } => {}
         }
         roles
     }
@@ -359,7 +760,7 @@ impl ModelPublishKind {
                 &[ModelUnitRole::InstanceTable, ModelUnitRole::AllocationTree]
             }
             ModelPublishKind::ZeroUnit => &[],
-            ModelPublishKind::UnlinkIntent => &[
+            ModelPublishKind::UnlinkIntent { .. } => &[
                 ModelUnitRole::InodeLeaf,
                 ModelUnitRole::InodeRoot,
                 ModelUnitRole::AllocationTree,
@@ -370,7 +771,7 @@ impl ModelPublishKind {
                 ModelUnitRole::MappingTree,
                 ModelUnitRole::TreeTable,
             ],
-            ModelPublishKind::DeletionBatchKeepingDataUnits => &[
+            ModelPublishKind::DeletionBatchKeepingDataUnits { .. } => &[
                 ModelUnitRole::ExtentRoot,
                 ModelUnitRole::InodeLeaf,
                 ModelUnitRole::InodeRoot,
@@ -379,13 +780,59 @@ impl ModelPublishKind {
                 ModelUnitRole::MappingTree,
                 ModelUnitRole::TreeTable,
             ],
-            ModelPublishKind::FinalDeletionBatch => &[
+            // 删的是树里最后一条：唯一那片叶容器退役（退役树追加一条），inode 树写零条目根。
+            ModelPublishKind::FinalDeletionBatch {
+                inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch::Emptied,
+                extent_upper_root: ModelExtentUpperRootOfTheFinalDeletionBatch::Rewritten,
+                ..
+            } => &[
                 ModelUnitRole::ExtentRoot,
                 ModelUnitRole::InodeRoot,
                 ModelUnitRole::AllocationTree,
                 ModelUnitRole::AccountingTree,
                 ModelUnitRole::RetirementLeaf,
                 ModelUnitRole::RetirementRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            ModelPublishKind::FinalDeletionBatch {
+                inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch::Emptied,
+                extent_upper_root:
+                    ModelExtentUpperRootOfTheFinalDeletionBatch::CarriedFromThePreviousVersion,
+                ..
+            } => &[
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::RetirementLeaf,
+                ModelUnitRole::RetirementRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 树里还有别的记录：那片叶容器去掉一条、重写。
+            ModelPublishKind::FinalDeletionBatch {
+                inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch::StillHoldsRecords,
+                extent_upper_root: ModelExtentUpperRootOfTheFinalDeletionBatch::Rewritten,
+                ..
+            } => &[
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            ModelPublishKind::FinalDeletionBatch {
+                inode_tree_after: ModelInodeTreeAfterTheFinalDeletionBatch::StillHoldsRecords,
+                extent_upper_root:
+                    ModelExtentUpperRootOfTheFinalDeletionBatch::CarriedFromThePreviousVersion,
+                ..
+            } => &[
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
                 ModelUnitRole::MappingTree,
                 ModelUnitRole::TreeTable,
             ],
@@ -405,19 +852,416 @@ impl ModelPublishKind {
                 ModelUnitRole::MappingTree,
                 ModelUnitRole::TreeTable,
             ],
+            // 建快照与删快照的几次、整理的一批：文件内容、extent 树与 inode 树都照抄（`file` 空、不建 inode，判决 S2、S4、G3），只重写固定点单元；
+            // deadlist 树的节点不对应角色（同记账树根之下的节点），占槽与映射条目按上界另算；整理搬走的单元角色照抄（分配代 = 诞生代）。
+            ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentDeletion { .. } => &[
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 签发：只把意图写进 logged_ops（新写它的根，判决 G1），不搬单元；文件内容、extent 树、inode 树、快照照抄，加固定点单元
+            // （丁 3 交回的读法第 1 条：签发单独一次发布）。
+            ModelPublishKind::CompactionIntentIssue => &[
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 截断意图（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K2、K3）：inode 叶与根（size 写成 N）、logged_ops 根
+            // （签截断条目）、固定点单元；重写尾单元时加那个数据单元与 extent 上段根（罩着它的下段节点不对应角色，按位置另记）。
+            ModelPublishKind::TruncationIntent {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+            } => &[
+                ModelUnitRole::Data,
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 把尾部的洞整个截掉、尾单元不用重写：只为换标签重写 extent 上段根（判决第六节 S1）。
+            ModelPublishKind::TruncationIntent {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel,
+            } => &[
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            ModelPublishKind::TruncationIntent {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::Untouched,
+            } => &[
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 截断的批不碰 inode 记录（K2）：extent 上段根（被截那一片下段节点与祖先按位置另记）、固定点单元；截断条目照抄。
+            // 最后一批放了单元的同样重写 extent 上段根。
+            ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch {
+                release: ModelFinalTruncationBatchRelease::AtLeastOneDataUnit,
+                logged_operations_after:
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::Emptied,
+            } => &[
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // logged_ops 删掉截断条目之后还装着整理意图：它的根这次重写。
+            ModelPublishKind::FinalTruncationBatch {
+                release: ModelFinalTruncationBatchRelease::AtLeastOneDataUnit,
+                logged_operations_after:
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::StillHoldsTheCompactionIntent,
+            } => &[
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 放 0 个单元的最后一批：extent 树不动，只删截断条目、写固定点单元。
+            ModelPublishKind::FinalTruncationBatch {
+                release: ModelFinalTruncationBatchRelease::NoDataUnit,
+                logged_operations_after:
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::Emptied,
+            } => &[
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            ModelPublishKind::FinalTruncationBatch {
+                release: ModelFinalTruncationBatchRelease::NoDataUnit,
+                logged_operations_after:
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::StillHoldsTheCompactionIntent,
+            } => &[
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 不缩短的截断（K5、K12）：inode 叶与根（size 写成 N）、固定点单元；补零重写尾单元时加那个数据单元与 extent 上段根，
+            // 只换洞标签时只加 extent 上段根。
+            ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+            } => &[
+                ModelUnitRole::Data,
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel,
+            } => &[
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::Untouched,
+            } => &[
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 第一个文件的数据单元一个不写（数据单元这个角色说的是第一个文件的）；装着那条记录的叶容器由 `rewritten_roles` 另加。
+            ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => &[
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
         }
     }
 }
 
-/// 一版的文件：写出它那次发布的身份与内容。树表里 inode 树、extent 树的根指针由写出它的那次发布唯一定（指针带诞生代号），
-/// 所以「两条根的这两棵树的根指针相同」⟺「两条根的文件是同一次发布写的」（D16（发布语义） 已定项 1「非空」从盘上怎么认）。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ModelFileVersion {
-    pub written_by: ModelRootKey,
-    pub content: Rc<[u8]>,
+/// 第一个文件那条 inode 记录里的截断字段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、R2、R5，第六节用户定案）：
+/// 记录偏移 120 起两段 8 字节，T（截断字段的 txg）与 N_w（截断字段的 size）。截断意图那次，这次放单元之前存在的单元数多于 ⌈N ÷ 净荷⌉.max(1)
+/// 时写成（这次 txg, N），否则照抄上一版（[`ModelTruncationField::after_a_truncation_intent`]）；各批、最后一批、变长与 N = S、unlink 的意图与各批
+/// 照抄；整份写（顺序写、覆盖写）清零；回退随回退目标那一版（R5，`contents` 整个取回退目标的）。模型按条款自己写一份，不引实现的算法
+/// （D13（验证路线） 已定项 5）。封闭集合：没写过的两段都是 0（R1「T = 0 ⇒ N_w = 0」），写过的 T 是那次截断意图的 txg、恒不为 0。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelTruncationField {
+    /// 没写过，或整份写清过：T = 0、N_w = 0。
+    NotWritten,
+    /// 一次放了单元的截断意图写的：T 是那次意图的 txg，N_w 是那次截到的 size。
+    WrittenByATruncationIntent {
+        truncation_txg: ModelCheckpointTxg,
+        size_in_bytes: u64,
+    },
 }
 
-/// 一版里有什么（D8（核心索引结构） 已定项 16 第 4、5 条：树表 0 条的、带文件的、有树而文件集合为空的；模型只罩 inode 1 一个文件）。
+impl ModelTruncationField {
+    /// 截断意图那次之后的字段（用户 2026-10-17 定案「放了单元才写、整个替换」）：`data_units_present_before` 是这次放单元之前存在的单元数
+    /// （截断意图接在带活文件的一版后面，那一版存在的单元数），多于截后 size 罩的 ⌈N ÷ 净荷⌉.max(1) 个时写成（这次 txg, N），否则照抄 `previous`
+    /// ——截到洞里不放单元、截到 0 而只有一个单元的都照抄。
+    #[must_use]
+    pub fn after_a_truncation_intent(
+        previous: ModelTruncationField,
+        data_units_present_before: u64,
+        new_size_in_bytes: u64,
+        intent_txg: ModelCheckpointTxg,
+    ) -> ModelTruncationField {
+        if data_units_present_before > data_units_of_content(new_size_in_bytes) {
+            ModelTruncationField::WrittenByATruncationIntent {
+                truncation_txg: intent_txg,
+                size_in_bytes: new_size_in_bytes,
+            }
+        } else {
+            previous
+        }
+    }
+
+    /// 盘上那两段的值（R1：没写过的两段都是 0）。
+    #[must_use]
+    pub fn recorded_values(self) -> ObservedTruncationField {
+        match self {
+            ModelTruncationField::NotWritten => ObservedTruncationField {
+                truncation_txg: ModelCheckpointTxg(0),
+                size_in_bytes: 0,
+            },
+            ModelTruncationField::WrittenByATruncationIntent {
+                truncation_txg,
+                size_in_bytes,
+            } => ObservedTruncationField {
+                truncation_txg,
+                size_in_bytes,
+            },
+        }
+    }
+}
+
+/// 实现写出的第一个文件那条 inode 记录里截断字段那两段的原样值（R1：偏移 120 是 T、偏移 128 是 N_w，各 8 字节小端），胶水从记录的字节里取，
+/// 不判合法性（T = 0 而 N_w ≠ 0 也原样交回，模型判对不上）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ObservedTruncationField {
+    pub truncation_txg: ModelCheckpointTxg,
+    pub size_in_bytes: u64,
+}
+
+/// 一版的文件：最近写它的 inode 树、extent 树根指针的那次发布的身份与内容。树表里这两棵树的根指针由写出它们的那次发布唯一定（指针带诞生代号），
+/// 所以「两条根的这两棵树的根指针相同」⟺「两条根的 `written_by` 相同」（D16（发布语义） 已定项 1「非空」从盘上怎么认）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelFileVersion {
+    /// 最近一次写这一版 inode 树或 extent 树根指针的那次发布：写内容的、截断意图、截断的批（只写 extent 树，判决
+    /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2「批不碰 inode 记录」）、放了单元的最后一批、不缩短的截断。
+    pub written_by: ModelRootKey,
+    /// 最近一次写 inode 1 那条记录（inode 树的根）的那次发布：截断的批与最后一批不写它（K2），这时与 `written_by` 不同；
+    /// 建快照抄的码 14 根指针是它写的（[`ModelVersionContents::inode_tree_written_by`]）。
+    pub inode_record_written_by: ModelRootKey,
+    /// 读回的整份字节：size 就是它的长度，洞读 0（K5「读者读洞答 0、不读盘」）。截断途中是目标那 N 字节（K2「先落目标」）。
+    pub content: Rc<[u8]>,
+    /// 盘上存在的数据单元数（判决第三节 K8）：从单元 0 起连号；不多于 ⌈size ÷ 净荷⌉.max(1)，少于它时尾部是洞（K5）；截断途中 size 之外还挂着
+    /// 没放的单元时多于它（K2）。
+    pub data_units_present: u64,
+    /// 上段叶条目现在的标签（K5）：最近一次重写 extent 上段根时按那一刻的单元数与 size 写的（[`ModelExtentUpperLeafEntryLabel::written_for`]），
+    /// 之后不重写上段根的发布照抄。
+    pub extent_upper_leaf_entry_label: ModelExtentUpperLeafEntryLabel,
+    /// 这一版第一个文件那条 inode 记录里的截断字段（[`ModelTruncationField`]）。
+    pub truncation_field: ModelTruncationField,
+}
+
+impl ModelFileVersion {
+    /// size 罩几个数据单元（⌈size ÷ 净荷⌉.max(1)，[`data_units_of_content`]）。
+    #[must_use]
+    pub fn data_units_within_the_size(&self) -> u64 {
+        data_units_of_content(u64::try_from(self.content.len()).expect("内容长度"))
+    }
+
+    /// 存在的单元 `index` 的声明长度：min(size − 起点, 净荷)。截断途中 size 之外还挂着的单元不问（读者不读它们，K2）；带洞的文件存在的单元都是满的
+    /// （变长把最后一个存在的单元补零到 min(N − 起点, 净荷)，K5），这个式子同样对。
+    fn declared_length_of_the_data_unit(&self, index: u64) -> u64 {
+        let payload = data_unit_payload_capacity_in_bytes();
+        u64::try_from(self.content.len())
+            .expect("内容长度")
+            .saturating_sub(index * payload)
+            .min(payload)
+    }
+}
+
+/// 第一个文件之外的一个 inode 在一版里的样子（[`ModelRoot::inodes_other_than_the_first`]）：建 inode 那次建出来（size 0、没有数据单元、
+/// extent 树上段里没有它的条目），之后只经按 inode 号写数据的两个入口从偏移 0 整份写（里程碑「删除与多次 COW」一·1，用户 2026-10-18 定
+/// 「先给 core 加多 inode 写数据」）：每次整份重写全部数据单元（同一个分配代），没有洞；截断与变长对它拒。长度 0 的内容也写一个声明长度 0 的单元。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelInodeOtherThanTheFirst {
+    /// 读回的整份字节：size 就是它的长度。没写过数据的是空的。
+    pub content: Rc<[u8]>,
+    /// 最近一次整份写它的那次发布的 txg：它每个数据单元的分配代都是这个。没写过数据为 `None`。
+    pub data_written_at: Option<ModelCheckpointTxg>,
+    /// 它那条记录偏移 8 的对象出生代：建它那次发布的 txg（D8（核心索引结构） 已定项 6；按 inode 号整份写不改它）。
+    /// K-U5 的 β 时序级读法按它判（[`ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted`]）。
+    pub object_birth: ModelCheckpointTxg,
+    /// 活着还是删除中（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1：删任一号）。
+    pub liveness: ModelInodeLiveness,
+}
+
+/// 第一个文件之外的一个 inode 活着还是删除中（D8（核心索引结构） 已定项 16 第 1、2 条：意图那次 nlink 写 0、号进 `deleted_inodes`，
+/// 不是最后一批的批每批从尾部放 144 个单元，最后一批删掉记录）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelInodeLiveness {
+    Live,
+    /// unlink 的意图那次之后、最后一批之前：记录 nlink = 0（读不出），还剩 `data_units_remaining` 个数据单元（单元号 0 起连着，
+    /// 分配代仍是 [`ModelInodeOtherThanTheFirst::data_written_at`]）。
+    BeingDeleted {
+        data_units_remaining: u64,
+    },
+}
+
+impl ModelInodeOtherThanTheFirst {
+    /// 盘上存在的数据单元数：写过数据的是内容切成几个单元（[`data_units_of_content`]，长度 0 也是一个），没写过的 0 个；删除中的取还剩的。
+    #[must_use]
+    pub fn data_units_present(&self) -> u64 {
+        match (self.liveness, self.data_written_at) {
+            (
+                ModelInodeLiveness::BeingDeleted {
+                    data_units_remaining,
+                },
+                _,
+            ) => data_units_remaining,
+            (ModelInodeLiveness::Live, None) => 0,
+            (ModelInodeLiveness::Live, Some(_)) => {
+                data_units_of_content(u64::try_from(self.content.len()).expect("内容长度"))
+            }
+        }
+    }
+
+    /// 活着（nlink 不是 0）：读得出、按 inode 号写与 unlink 点得到它。
+    #[must_use]
+    pub fn is_live(&self) -> bool {
+        match self.liveness {
+            ModelInodeLiveness::Live => true,
+            ModelInodeLiveness::BeingDeleted { .. } => false,
+        }
+    }
+}
+
+/// extent 树上段一个节点的位置（D8（核心索引结构） 已定项 14：按 inode 号按位置寻址、不分裂，叶罩 143 个号、内部扇出 147；层级 0 是叶，
+/// 同层从 inode 0 起数第几个）。模型自己一份，不引实现的类型（D13（验证路线） 已定项 5）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelExtentUpperNodePosition {
+    pub level: u64,
+    pub index_in_level: u64,
+}
+
+/// 上段第 `level` 层一个节点罩几个 inode 号：143 × 147^level（饱和在 u64 的上界）。
+fn extent_upper_span_in_inodes(level: u64) -> u64 {
+    (0..level).fold(EXTENT_TREE_UPPER_LEAF_INODES, |span, _| {
+        span.saturating_mul(EXTENT_TREE_INTERNAL_FANOUT)
+    })
+}
+
+impl ModelExtentUpperNodePosition {
+    /// 这个位置罩不罩 inode 号 `inode`。
+    fn covers(self, inode: u64) -> bool {
+        inode / extent_upper_span_in_inodes(self.level) == self.index_in_level
+    }
+}
+
+/// 上段的规范形（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2）：根层级是罩得住有条目最大号的最低一层
+/// （[`extent_upper_segment_root_level`]），节点是每个有条目的号从它那片叶到根那一串的并；集合空时只有层级 0 第 0 格那个零条目根兼叶。
+/// 模型按条款自己算一份，不调实现的计划（D13（验证路线） 已定项 5）。
+#[must_use]
+pub fn extent_upper_segment_positions(
+    inodes_with_an_entry: &BTreeSet<u64>,
+) -> BTreeSet<ModelExtentUpperNodePosition> {
+    let root_level = extent_upper_segment_root_level(inodes_with_an_entry);
+    if inodes_with_an_entry.is_empty() {
+        return BTreeSet::from([ModelExtentUpperNodePosition {
+            level: 0,
+            index_in_level: 0,
+        }]);
+    }
+    inodes_with_an_entry
+        .iter()
+        .flat_map(|inode| {
+            (0..=root_level).map(move |level| ModelExtentUpperNodePosition {
+                level,
+                index_in_level: inode / extent_upper_span_in_inodes(level),
+            })
+        })
+        .collect()
+}
+
+/// 一次发布之后上段每个节点的分配代（规范形计划，判决第三节 M2「一次发布里进出 S 或条目变了的号那一串上留在新形状里的节点与新出现的节点重写，
+/// 别的照抄」）：新形状里的一个位置，上一版没有它、或它罩着 `inodes_whose_entry_changed` 里的一个号，分配代取这次的 `checkpoint_txg`；
+/// 别的照抄上一版的分配代。长高那次旧根就这样照抄成根之下的节点，降层那次上一版里降后层级的第 0 个节点照抄成根。
+#[must_use]
+pub fn extent_upper_node_written_at_after(
+    previous: &BTreeMap<ModelExtentUpperNodePosition, ModelCheckpointTxg>,
+    inodes_with_an_entry_after: &BTreeSet<u64>,
+    inodes_whose_entry_changed: &BTreeSet<u64>,
+    checkpoint_txg: ModelCheckpointTxg,
+) -> BTreeMap<ModelExtentUpperNodePosition, ModelCheckpointTxg> {
+    extent_upper_segment_positions(inodes_with_an_entry_after)
+        .into_iter()
+        .map(|position| {
+            let covers_a_changed_inode = inodes_whose_entry_changed
+                .iter()
+                .any(|inode| position.covers(*inode));
+            let written_at = match previous.get(&position) {
+                Some(previous_written_at) if !covers_a_changed_inode => *previous_written_at,
+                Some(_) | None => checkpoint_txg,
+            };
+            (position, written_at)
+        })
+        .collect()
+}
+
+/// extent 树上段的根在第几层（D8（核心索引结构） 已定项 14：叶罩 143 个 inode 号、内部扇出 147，按位置寻址、不分裂；层级是罩得住有条目的
+/// 最大 inode 号的最低一层，只有叶兼根是 0 层，一条条目都没有的也是 0 层）：按 inode 号写长高、删除降层那两形看它变没变。
+/// `inodes_with_an_entry`：这一版有数据单元的文件的 inode 号（第一个文件有单元时连 inode 1）。
+#[must_use]
+pub fn extent_upper_segment_root_level(inodes_with_an_entry: &BTreeSet<u64>) -> u64 {
+    let Some(largest_inode_with_an_entry) = inodes_with_an_entry.last().copied() else {
+        return 0;
+    };
+    let mut level = 0;
+    let mut span_in_inodes = EXTENT_TREE_UPPER_LEAF_INODES;
+    // 迭代上界：每一层的罩宽乘 147，罩宽超过最大的号时停（u64 里至多十来层）；跨轮带的是这一层的罩宽与层级。
+    while span_in_inodes <= largest_inode_with_an_entry {
+        level += 1;
+        span_in_inodes = span_in_inodes.saturating_mul(EXTENT_TREE_INTERNAL_FANOUT);
+    }
+    level
+}
+
+/// 一版里有什么（D8（核心索引结构） 已定项 16 第 4、5 条：树表 0 条的、带文件的、有树而文件集合为空的；第一个文件之外的 inode 另记在
+/// [`ModelRoot::inodes_other_than_the_first`]）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ModelVersionContents {
     /// 树表 0 条（第 0 代根、暖机根、零单元发布）：没有树、没有文件。
@@ -428,20 +1272,32 @@ pub enum ModelVersionContents {
     /// `trees_written_by`：写出这一版 inode 树、extent 树根指针的那次发布（意图那次或上一个不是最后一批的删除批；回退到这一版的根照抄它）。
     /// `data_units_remaining`：这一版里这个文件还剩几个数据单元（意图那次 = 文件的单元数，每个不是最后一批的删除批少 144 个）：
     /// 下一步是不是最后一批由它定（D8（核心索引结构） 已定项 16 第 2 条）。
+    /// `truncation_field`：删除中那条记录里的截断字段，unlink 的意图与各批照抄 unlink 之前那一版的（判决
+    /// `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R2）。
     FileBeingDeleted {
         trees_written_by: ModelRootKey,
         data_units_remaining: u64,
+        truncation_field: ModelTruncationField,
     },
     /// 最后一批之后：有树而文件集合为空（`deleted_inodes` 空、inode 树与 extent 树零条目根），读回「没有文件」。
     TreesAndNoFile { trees_written_by: ModelRootKey },
-    /// 删完第一个文件之后建过 inode：inode 树里只有 size 0 的记录、没有 inode 1，没有数据单元、队列空，读回「没有文件」；
-    /// 实现把它归带文件的一版（inode 树有条目，D8（核心索引结构） 已定项 16 第 5 条的判定不成立）。
-    /// `trees_written_by`：最近一次建 inode 那次发布（回退到这一版的根照抄它）。
-    /// `inode_records_in_the_tree`：这一版 inode 树里有几条记录（删完之后建了几个）：下一个建的落在哪一片叶容器由它定
+    /// 第一个文件已删完而 inode 树里还有别的记录（删完之后建过 inode，或删第一个文件时树里还有别的 inode，判决
+    /// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M3）：没有 inode 1，读回「没有文件」；别的文件记在
+    /// [`ModelRoot::inodes_other_than_the_first`]（可以带数据、可以删除中）。实现把它归带文件的一版（inode 树有条目，D8（核心索引结构） 已定项 16
+    /// 第 5 条的判定不成立）。
+    /// `trees_written_by`：最近一次写这一版 inode 树的那次发布（回退到这一版的根照抄它）。
+    /// `inode_records_in_the_tree`：这一版 inode 树里有几条记录（就是第一个文件之外的 inode 数）：下一个建的落在哪一片叶容器由它定
     /// （[`inode_leaf_container_position_of_a_new_record`]）。
     InodesWithoutTheFirstFile {
         trees_written_by: ModelRootKey,
         inode_records_in_the_tree: u64,
+    },
+    /// 截断的意图那次之后、最后一批之前（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2「先落目标」）：inode 1 的记录 size 已是
+    /// 目标 N，读回 N 字节（`file.content`）；logged_ops 里有一条截断条目（签发 txg 是 `truncation_issued_txg`，目标 size 是 `file.content` 的长度）；
+    /// size 之外还挂着 `file.data_units_present` − ⌈N ÷ 净荷⌉.max(1) 个没放的单元，下一步是不是最后一批由它定。
+    FileBeingTruncated {
+        file: ModelFileVersion,
+        truncation_issued_txg: ModelCheckpointTxg,
     },
 }
 
@@ -454,19 +1310,37 @@ impl ModelVersionContents {
             ModelVersionContents::LiveFile(_)
             | ModelVersionContents::FileBeingDeleted { .. }
             | ModelVersionContents::TreesAndNoFile { .. }
-            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => true,
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => true,
         }
     }
 
-    /// 读得出的那个文件（inode 1 是活记录时）。
+    /// 读得出的那个文件（inode 1 是活记录时；截断途中读回目标那 N 字节，K2）。
     #[must_use]
     pub fn live_file(&self) -> Option<&ModelFileVersion> {
         match self {
-            ModelVersionContents::LiveFile(file) => Some(file),
+            ModelVersionContents::LiveFile(file)
+            | ModelVersionContents::FileBeingTruncated { file, .. } => Some(file),
             ModelVersionContents::WithoutTrees
             | ModelVersionContents::FileBeingDeleted { .. }
             | ModelVersionContents::TreesAndNoFile { .. }
             | ModelVersionContents::InodesWithoutTheFirstFile { .. } => None,
+        }
+    }
+
+    /// 这一版盘上存在的数据单元数：带文件的与截断途中的取文件记的（截断途中连 size 之外还挂着的），删除中的取还剩的，别的没有数据单元。
+    #[must_use]
+    pub fn data_units_present(&self) -> u64 {
+        match self {
+            ModelVersionContents::LiveFile(file)
+            | ModelVersionContents::FileBeingTruncated { file, .. } => file.data_units_present,
+            ModelVersionContents::FileBeingDeleted {
+                data_units_remaining,
+                ..
+            } => *data_units_remaining,
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => 0,
         }
     }
 
@@ -475,7 +1349,8 @@ impl ModelVersionContents {
     fn user_visible_trees_written_by(&self) -> Option<ModelRootKey> {
         match self {
             ModelVersionContents::WithoutTrees => None,
-            ModelVersionContents::LiveFile(file) => Some(file.written_by),
+            ModelVersionContents::LiveFile(file)
+            | ModelVersionContents::FileBeingTruncated { file, .. } => Some(file.written_by),
             ModelVersionContents::FileBeingDeleted {
                 trees_written_by, ..
             }
@@ -483,6 +1358,55 @@ impl ModelVersionContents {
             | ModelVersionContents::InodesWithoutTheFirstFile {
                 trees_written_by, ..
             } => Some(*trees_written_by),
+        }
+    }
+
+    /// 这一版 inode 树的根是谁写的（建快照抄进码 14 的那条根指针）：树表 0 条时 None。截断的批与最后一批只写 extent 树（K2），
+    /// 这时与 [`ModelVersionContents::user_visible_trees_written_by`] 不同；删除的各步与建 inode 都写 inode 树，两者相同。
+    fn inode_tree_written_by(&self) -> Option<ModelRootKey> {
+        match self {
+            ModelVersionContents::LiveFile(file)
+            | ModelVersionContents::FileBeingTruncated { file, .. } => {
+                Some(file.inode_record_written_by)
+            }
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => {
+                self.user_visible_trees_written_by()
+            }
+        }
+    }
+
+    /// 这一版第一个文件那条 inode 记录里的截断字段：带活文件的、截断途中的与删除中的那几版有那条记录；树表 0 条的、删完的与删完之后建过 inode 的
+    /// 没有那条记录，None。
+    #[must_use]
+    pub fn first_file_record_truncation_field(&self) -> Option<ModelTruncationField> {
+        match self {
+            ModelVersionContents::LiveFile(file)
+            | ModelVersionContents::FileBeingTruncated { file, .. } => Some(file.truncation_field),
+            ModelVersionContents::FileBeingDeleted {
+                truncation_field, ..
+            } => Some(*truncation_field),
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => None,
+        }
+    }
+
+    /// 截断途中这一版 logged_ops 里那条截断条目的签发 txg（K1：key = 种类 2 + 签发 txg）；不在截断途中为 None。
+    #[must_use]
+    pub fn logged_truncation_issued_txg(&self) -> Option<ModelCheckpointTxg> {
+        match self {
+            ModelVersionContents::FileBeingTruncated {
+                truncation_issued_txg,
+                ..
+            } => Some(*truncation_issued_txg),
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::LiveFile(_)
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => None,
         }
     }
 
@@ -497,17 +1421,19 @@ impl ModelVersionContents {
             } => Some(*inode_records_in_the_tree),
             ModelVersionContents::WithoutTrees
             | ModelVersionContents::LiveFile(_)
-            | ModelVersionContents::FileBeingDeleted { .. } => None,
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => None,
         }
     }
 
-    /// 有树、文件集合不空的那一版（带活文件的、删除中的、删完之后建过 inode 的）：可写会话里覆盖写、回退、抬 F 的执行器只在实现报「带文件」时调，
+    /// 有树、文件集合不空的那一版（带活文件的、删除中的、截断途中的、删完之后建过 inode 的）：可写会话里覆盖写、回退、抬 F 的执行器只在实现报「带文件」时调，
     /// 实现把删除中的那一版（`deleted_inodes` 不空）与只有 size 0 的 inode 的那一版（inode 树有条目）也归带文件。
     fn is_a_version_with_a_file_or_a_file_being_deleted(&self) -> bool {
         match self {
             ModelVersionContents::LiveFile(_)
             | ModelVersionContents::FileBeingDeleted { .. }
-            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => true,
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => true,
             ModelVersionContents::WithoutTrees | ModelVersionContents::TreesAndNoFile { .. } => {
                 false
             }
@@ -533,8 +1459,12 @@ pub struct ModelRoot {
     pub contents: ModelVersionContents,
     pub instance_table_rows: Rc<Vec<ModelInstanceRow>>,
     /// 这一版每个角色的单元是哪次发布写的：它的分配记录的分配代就是这个 txg（D3（空间分配） 已定项 3 / 7：value = 分配代；
-    /// COW：单元只在分配它的那次发布里写）。mkfs 写的实例表与第 0 版树表记 txg 0。
+    /// COW：单元只在分配它的那次发布里写）。mkfs 写的实例表与第 0 版树表记 txg 0。数据单元不在这里，按单元号记在 `data_unit_written_at`。
     pub role_written_at: BTreeMap<ModelUnitRole, ModelCheckpointTxg>,
+    /// 这一版每个存在的数据单元是哪次发布写的，按单元号（第 i 个是单元 i，长度 = [`ModelVersionContents::data_units_present`]）：
+    /// 分配代与映射 key 里的出生 txg 都是它（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4：截断只重写尾单元之后
+    /// 一个文件的数据单元不再同一个出生 txg，换下时各按各的判快照生死）。
+    pub data_unit_written_at: Rc<Vec<ModelCheckpointTxg>>,
     /// 每盘已占槽数的上界：沿来路每次发布写出的单元的槽数之和，释放与回收一概不扣（分配记录树每次重写的节点数取按位置寻址现算的上界）。
     pub occupied_slots_upper_bound_per_device: u64,
     /// 这一版中央映射树节点数的上界（[`central_mapping_tree_nodes_upper_bound`] 沿来路带下来，每盘一个节点占一个槽）；
@@ -560,13 +1490,279 @@ pub struct ModelRoot {
     /// 这个实例到这条根为止发过的最大事务号：事务号按实例计数、从 1 起（D23（journal 的角色与格式） 已定项 7），
     /// 换了实例（写行那次发布）从 0 重新数。
     pub highest_transaction_number_in_its_instance: u64,
+    /// 这一版树表里的只读快照，按（诞生 txg, 树号）升序——就是建的先后（判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+    /// 第三节 S1、S2：每次建快照是一次独立发布，txg 各加一）。树表 0 条的一版一个都没有。
+    pub snapshots: Rc<Vec<ModelSnapshot>>,
+    /// 活头 inode 树那条条目的 `previous_snapshot_txg`（D5（快照 / 空间记账机制） 已定项 9：最近一个快照的 S.txg，还没打过快照为 0；
+    /// 删最后一个快照的意图那次换成被删那一个的前驱，判决 S4）。树表 0 条的一版没有那条条目，记 0、不比。
+    pub previous_snapshot_txg_of_the_live_head: ModelCheckpointTxg,
+    /// 这一版的 deadlist 条目（判决 S3），次序不论：换下的用户可见单元出生 txg 不晚于活头前驱的进这里、不释放。
+    pub deadlist: Rc<Vec<ModelDeadlistEntry>>,
+    /// 这一版留在中央映射树里、被活快照钉住的映射条目条数（判决 S3 的 α）：每钉住一个单元留一条，删快照的批放掉一条删一条。
+    /// 与 deadlist 条目数各按各的来路算（条款说两者一一对应，模型两样都比）。
+    pub pinned_mapping_entries: u64,
+    /// 这一版 deadlist 树节点数的上界（[`deadlist_tree_nodes_upper_bound`] 沿来路带下来；零根时 0）。
+    pub deadlist_tree_nodes_upper_bound: u64,
+    /// 这一版第一个文件 extent 树下段每个节点的分配代（换下时按它判钉不钉，判决 S3）：写内容那次整段重写，不是最后一批的删除批只重写
+    /// 罩着被截掉那一段的节点（K-R3-1）、整个落在留下那一段里的照抄，最后一批整段换下。模型罩的版本里只有第一个文件有下段。
+    pub extent_lower_node_written_at:
+        Rc<BTreeMap<ModelExtentLowerNodePosition, ModelCheckpointTxg>>,
+    /// 这一版 logged_ops 里那一条活整理意图（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1：全池至多一条）；没有为 `None`。
+    /// 签发那次写进、之后每次发布照抄（管理员回退随现行那一版，丁 3 交回的读法第 9 条）、删意图那次没了；崩溃恢复与可写挂载落到哪一版就是那一版的。
+    pub logged_compaction_intent: Option<ModelCompactionIntent>,
+    /// 这一版引用着的用户可见树的根单元（[`ModelRoot::user_visible_root_units`]）里被整理搬过的，最后一次搬它的那次发布的 txg：树表里指着它的
+    /// 根指针从那次起写的是映射位置，盘上字节与搬之前不同（用户 2026-10-15 定「照字节比，搬根算非空」）。只记这一版还引用着的单元。
+    pub user_visible_root_relocations: Rc<BTreeMap<ModelUserVisibleRootUnit, ModelCheckpointTxg>>,
+    /// 这一版 inode 树里第一个文件之外的每个活着的 inode，按 inode 号（建 inode 那次建、按 inode 号写数据那次整份写，
+    /// [`ModelInodeOtherThanTheFirst`]）：随用户可见树走——别的发布照抄，管理员回退取回退目标那一版的。树表 0 条的一版是空的。
+    pub inodes_other_than_the_first: Rc<BTreeMap<u64, ModelInodeOtherThanTheFirst>>,
+    /// 这一版的 inode 号水位：下一个建的 inode 取的号（D5（快照 / 空间记账机制） 已定项 8 池级三行之一）。没写过记账树的一版 0；第一个文件那次
+    /// 发掉 inode 1、水位 2；建 inode 每建一个加一；管理员回退那次取现行那一版的（[`ModelPublishKind::leaves_an_inode_number_watermark_step`]
+    /// 那一段：环里没被崩溃恢复抛弃的根的最大值，模型罩的历史里就是现行那一版的），不取回退目标的；别的发布照抄。
+    pub inode_number_watermark: u64,
+    /// 这一版父链上 inode 1 那条整对象墓碑的死亡 txg（D18（块里携带什么信息） 已定项 24：死亡 txg = 意图那次发布的 txg）：unlink 第一个文件的
+    /// 意图那次写成这次的 txg，别的发布照抄；管理员回退那次取回退目标那一版的——回退那次的父是回退目标（谱系记录读作「T_rb 的父是 T_old」），
+    /// 现行那一版在回退目标之后删第一个文件留下的墓碑虽然随现行那一版留在墓碑树里，却在被回退抛下的那一段上，不管这一版（代码轮判决
+    /// `research/prompts/m3-close-w5-code-r1-main-verification.md` 第三节第 1 条：β 只认这一版父链上的墓碑）。模型不记墓碑树与谱系树的条目，
+    /// 照「一条父链上第一个文件至多删一次」直接带着这一条走。父链上没删过第一个文件为 `None`。
+    /// K-U5 的 β 时序级读法拿它与目标的对象出生代比（用户 2026-10-19 定）。
+    pub death_txg_of_the_first_file: Option<ModelCheckpointTxg>,
 }
 
 impl ModelRoot {
+    /// 这一版 inode 树里有几条记录：第一个文件那条（活着、删除中、截断途中都在）加第一个文件之外的每个 inode。建 inode 的新记录落在哪一片叶容器
+    /// 由它定（[`inode_leaf_container_position_of_a_new_record`]）。
+    fn inode_records_in_the_tree(&self) -> u64 {
+        let first_file_record = match self.contents {
+            ModelVersionContents::LiveFile(_)
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => 1,
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => 0,
+        };
+        first_file_record + u64::try_from(self.inodes_other_than_the_first.len()).expect("条数")
+    }
+
+    /// 这一版 extent 树上段里有条目的 inode 号（[`inodes_with_an_extent_upper_leaf_entry`]）。
+    #[must_use]
+    pub fn inodes_with_an_extent_upper_leaf_entry(&self) -> BTreeSet<u64> {
+        inodes_with_an_extent_upper_leaf_entry(&self.contents, &self.inodes_other_than_the_first)
+    }
+
+    /// 这一版第一个文件之外有没有文件带数据单元：模型的快照、截断、整理、删除那几臂只按第一个文件写，那几种操作在这一形上不答
+    /// （随机历史只在按 inode 号写那一组比重里造出它，那一组不抽那几种）。
+    #[must_use]
+    pub fn has_a_file_other_than_the_first_holding_data_units(&self) -> bool {
+        self.inodes_other_than_the_first
+            .values()
+            .any(|inode| inode.data_units_present() > 0)
+    }
+
+    /// 这一版删除中的那个号（`deleted_inodes` 至多一条 key，D8（核心索引结构） 已定项 16 第 6 条）与它还剩几个数据单元；没有删除中的为 `None`。
+    fn inode_being_deleted(&self) -> Option<(ModelDeletedInode, u64)> {
+        if let ModelVersionContents::FileBeingDeleted {
+            data_units_remaining,
+            ..
+        } = self.contents
+        {
+            return Some((ModelDeletedInode::FirstFile, data_units_remaining));
+        }
+        self.inodes_other_than_the_first
+            .iter()
+            .find_map(|(number, inode)| match inode.liveness {
+                ModelInodeLiveness::BeingDeleted {
+                    data_units_remaining,
+                } => Some((
+                    ModelDeletedInode::OtherThanTheFirst(*number),
+                    data_units_remaining,
+                )),
+                ModelInodeLiveness::Live => None,
+            })
+    }
+
+    /// 这一版 extent 树上段每个节点的分配代：根（罩得住有条目最大号的最低一层的第 0 个）取 [`ModelUnitRole::ExtentRoot`] 的，根之下的取
+    /// [`ModelUnitRole::ExtentUpperNodeBelowTheRoot`] 那几个的。树表 0 条的一版没有上段，空的。
+    fn extent_upper_node_written_at(
+        &self,
+    ) -> BTreeMap<ModelExtentUpperNodePosition, ModelCheckpointTxg> {
+        let root_level =
+            extent_upper_segment_root_level(&self.inodes_with_an_extent_upper_leaf_entry());
+        self.role_written_at
+            .iter()
+            .filter_map(|(role, written_at)| match role {
+                ModelUnitRole::ExtentRoot => Some((
+                    ModelExtentUpperNodePosition {
+                        level: root_level,
+                        index_in_level: 0,
+                    },
+                    *written_at,
+                )),
+                ModelUnitRole::ExtentUpperNodeBelowTheRoot(position) => {
+                    Some((*position, *written_at))
+                }
+                ModelUnitRole::Data
+                | ModelUnitRole::InodeLeaf
+                | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
+                | ModelUnitRole::InodeRoot
+                | ModelUnitRole::AllocationTree
+                | ModelUnitRole::AccountingTree
+                | ModelUnitRole::MappingTree
+                | ModelUnitRole::TreeTable
+                | ModelUnitRole::InstanceTable
+                | ModelUnitRole::DeletedInodesRoot
+                | ModelUnitRole::LoggedOperationsRoot
+                | ModelUnitRole::TombstoneLeaf
+                | ModelUnitRole::TombstoneRoot
+                | ModelUnitRole::RetirementLeaf
+                | ModelUnitRole::RetirementRoot => None,
+            })
+            .collect()
+    }
+}
+
+/// 第一个文件的 inode 号（D8（核心索引结构） 已定项 16：第一版的文件是 inode 1）。模型自己写一份，不引实现的常量（D13（验证路线） 已定项 5）。
+const FIRST_INODE_NUMBER: u64 = 1;
+
+/// 一版 extent 树上段里有条目的 inode 号：第一个文件有数据单元时（活着、截断途中、删除中还剩单元）连 inode 1，加第一个文件之外有数据单元的
+/// 每个文件（建出来没写过数据的没有条目）。
+fn inodes_with_an_extent_upper_leaf_entry(
+    contents: &ModelVersionContents,
+    inodes_other_than_the_first: &BTreeMap<u64, ModelInodeOtherThanTheFirst>,
+) -> BTreeSet<u64> {
+    let first_file = (contents.data_units_present() > 0).then_some(FIRST_INODE_NUMBER);
+    first_file
+        .into_iter()
+        .chain(
+            inodes_other_than_the_first
+                .iter()
+                .filter(|(_, inode)| inode.data_units_present() > 0)
+                .map(|(number, _)| *number),
+        )
+        .collect()
+}
+
+/// 一版的中央映射树里第一个文件之外的文件那几条条目（D19（块指针的结构与宽度预算） 已定项 8：每个数据单元、extent 树每个节点各一条）：
+/// 每个有数据单元的文件，单元数加它下段的节点数（[`extent_lower_segment_nodes`]）。
+fn central_mapping_entries_of_the_files_other_than_the_first(
+    inodes_other_than_the_first: &BTreeMap<u64, ModelInodeOtherThanTheFirst>,
+) -> u64 {
+    inodes_other_than_the_first
+        .values()
+        .map(|inode| {
+            let data_units = inode.data_units_present();
+            data_units + extent_lower_segment_nodes(data_units)
+        })
+        .sum()
+}
+
+/// 一个整理区域 R（判决 G1：一个聚簇段，起始槽 64 对齐、槽数 64；两盘同槽时罩住每块盘上的同号槽，「R 按记录全空」按 `device` 那块盘的记录判）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ModelCompactionRegion {
+    pub device: ModelDeviceIdentity,
+    pub start_slot: u64,
+    pub slot_count: u64,
+}
+
+/// logged_ops 里的一条整理意图，模型记、比的那几样（判决 G1 的字段表）。`segs0` 记签发那次发布之前按记录口径的全空聚簇段数，停机谓词
+/// 「全局差值」相对它比（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H3，用户 2026-10-16 定「取签发之前」）；
+/// 模型不记分配记录、数不出它，这里不记、不比。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ModelCompactionIntent {
+    /// key 里的签发 txg：签发那次发布的 txg。
+    pub issued_txg: ModelCheckpointTxg,
+    pub region: ModelCompactionRegion,
+    /// `c0`：签发那一刻的分配代，就是签发那次发布接在后面的那一版的 txg。
+    pub allocation_generation_at_issue: ModelCheckpointTxg,
+}
+
+/// 用户可见的两种树（D16（发布语义） 已定项 1「非空」比的条目：活头与快照的 inode 树根、extent 树根）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ModelUserVisibleTree {
+    InodeTree,
+    ExtentTree,
+}
+
+/// 用户可见树的一个根单元：哪一种树的根、出生 txg（写它的那次发布）。一次发布至多写一种树的一个根，这两样定一个单元；活头与快照条目抄的是
+/// 同一个单元时是同一个值（搬它，两条根指针一起变）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelUserVisibleRootUnit {
+    pub tree: ModelUserVisibleTree,
+    pub birth_txg: ModelCheckpointTxg,
+}
+
+impl ModelRoot {
+    /// 这一版引用着的用户可见树的根单元，按「非空」比的次序：活头的 inode 树根、extent 树根（树表 0 条的一版没有），再是每个快照的两个
+    /// （按建的先后）。活头的取这一版那个角色的分配代（= 出生 txg，D26（后台整理与放置回收） 已定项 5 第 2 条：搬迁不改它）。
+    #[must_use]
+    pub fn user_visible_root_units(&self) -> Vec<ModelUserVisibleRootUnit> {
+        let live_head = [
+            (ModelUserVisibleTree::InodeTree, ModelUnitRole::InodeRoot),
+            (ModelUserVisibleTree::ExtentTree, ModelUnitRole::ExtentRoot),
+        ]
+        .into_iter()
+        .filter_map(|(tree, role)| {
+            self.role_written_at
+                .get(&role)
+                .map(|birth_txg| ModelUserVisibleRootUnit {
+                    tree,
+                    birth_txg: *birth_txg,
+                })
+        });
+        let of_the_snapshots = self.snapshots.iter().flat_map(|snapshot| {
+            [
+                ModelUserVisibleRootUnit {
+                    tree: ModelUserVisibleTree::InodeTree,
+                    birth_txg: snapshot.inode_tree_written_by.checkpoint_txg,
+                },
+                ModelUserVisibleRootUnit {
+                    tree: ModelUserVisibleTree::ExtentTree,
+                    birth_txg: snapshot.extent_root_written_at,
+                },
+            ]
+        });
+        live_head.chain(of_the_snapshots).collect()
+    }
+
     /// 这条根的用户可见树（inode 树、extent 树）的根指针是谁写的：树表 0 条时 None。
     fn user_visible_trees_written_by(&self) -> Option<ModelRootKey> {
         self.contents.user_visible_trees_written_by()
     }
+
+    /// 「非空」与「4 个不同状态」比的那一样（`mount::user_visible_trees_changed`，判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+    /// 之后用户可见的树连同快照那几对条目的根指针）：inode 树、extent 树是谁写的，加树表里每个快照两条根指针抄的是谁，按表里的次序。
+    /// 只比根指针，不比「销毁中」记号与前驱：删快照的意图那次与不是最后一批的批不改它，建快照与最后一批改它。
+    /// 整理搬过的根单元（[`ModelRoot::user_visible_root_relocations`]）按最后一次搬它的 txg 进来：搬一次根指针就换一次映射位置，字节变了就是新状态
+    /// （用户 2026-10-15 定「照字节比，搬根算非空」）。
+    fn user_visible_state(&self) -> ModelUserVisibleState {
+        ModelUserVisibleState {
+            trees_written_by: self.user_visible_trees_written_by(),
+            snapshot_roots: self
+                .snapshots
+                .iter()
+                .map(|snapshot| {
+                    (
+                        snapshot.inode_tree_written_by,
+                        snapshot.extent_root_written_at,
+                    )
+                })
+                .collect(),
+            root_relocations: self
+                .user_visible_root_units()
+                .iter()
+                .map(|unit| self.user_visible_root_relocations.get(unit).copied())
+                .collect(),
+        }
+    }
+}
+
+/// [`ModelRoot::user_visible_state`] 交回的那一样：两条根相等 ⟺ 它们在盘上的用户可见根指针（连同快照条目的根指针）逐字节相同。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ModelUserVisibleState {
+    trees_written_by: Option<ModelRootKey>,
+    snapshot_roots: Vec<(ModelRootKey, ModelCheckpointTxg)>,
+    /// [`ModelRoot::user_visible_root_units`] 逐个：最后一次搬它的 txg，没搬过为 `None`。
+    root_relocations: Vec<Option<ModelCheckpointTxg>>,
 }
 
 /// 池的几何：盘的身份与每块盘的字节数（与实现的 mkfs 参数由调用方各给一份）。
@@ -820,6 +2016,90 @@ pub fn accounting_tree_nodes_upper_bound(nodes_before: u64, rows: u64) -> u64 {
     }
 }
 
+/// deadlist 树一片叶装几条条目：(节点 − 头) ÷ key 宽（value 空；判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3「叶 376」）。
+fn deadlist_tree_leaf_entry_capacity() -> u64 {
+    index_node_entry_capacity(DEADLIST_KEY_BYTES, DEADLIST_KEY_BYTES)
+}
+
+/// deadlist 树一个内部节点装几个孩子：内部条目 = 本树 key + 子指针 86（判决 S3「内部 125」）。
+fn deadlist_tree_internal_child_capacity() -> u64 {
+    index_node_entry_capacity(DEADLIST_KEY_BYTES, DEADLIST_KEY_BYTES + NODE_POINTER_BYTES)
+}
+
+/// deadlist 树一次发布之后至多几个节点：没有条目时是零根、一个节点都没有；有条目时同中央映射树那一份的取法
+/// （[`central_mapping_tree_nodes_upper_bound`]：先删只摘空节点、后插从中间切，沿来路带一个上界），容量换成 deadlist 树的。
+/// `nodes_before`：上一版这棵树节点数的上界（零根时 0，从一片空的根兼叶起插按 1 算）。
+#[must_use]
+pub fn deadlist_tree_nodes_upper_bound(nodes_before: u64, entries: u64) -> u64 {
+    if entries == 0 {
+        return 0;
+    }
+    let nodes_without_internal_splits = nodes_before.max(1)
+        + 2 * (entries / smallest_half_of_a_split(deadlist_tree_leaf_entry_capacity()));
+    let internal_split_bound = |nodes: u64| {
+        nodes_without_internal_splits
+            + 2 * ((nodes - 1) / smallest_half_of_a_split(deadlist_tree_internal_child_capacity()))
+    };
+    let mut bound = 2 * nodes_without_internal_splits;
+    // 迭代上界：bound 每一轮严格变小，不小于 1。跨轮带的是「这次之后的节点数不超过 bound」。
+    loop {
+        let next = internal_split_bound(bound);
+        if next >= bound {
+            return bound;
+        }
+        bound = next;
+    }
+}
+
+/// 一个 `data_units` 个单元（单元号 0 .. data_units − 1、没有洞）的文件，extent 树下段的全部位置（D8（核心索引结构） 已定项 14：
+/// 只有一个单元时不建下段；第 L 层一个节点罩 144 × 147^L 个单元，从叶往上数到只剩一个节点的那一层为止）。
+#[must_use]
+pub fn extent_lower_node_positions(data_units: u64) -> Vec<ModelExtentLowerNodePosition> {
+    let mut positions = Vec::new();
+    if data_units <= 1 {
+        return positions;
+    }
+    let mut level = 0;
+    let mut span_in_data_units = EXTENT_TREE_LOWER_LEAF_DATA_UNITS;
+    // 迭代上界：每一层的罩宽乘 147，节点数严格变少直到 1。
+    loop {
+        let nodes_in_this_level = data_units.div_ceil(span_in_data_units);
+        positions.extend((0..nodes_in_this_level).map(|index_in_level| {
+            ModelExtentLowerNodePosition {
+                level,
+                index_in_level,
+            }
+        }));
+        if nodes_in_this_level == 1 {
+            return positions;
+        }
+        level += 1;
+        span_in_data_units *= EXTENT_TREE_INTERNAL_FANOUT;
+    }
+}
+
+/// 下段一个位置罩的最后一个单元号（按满罩宽算，不按这个文件截到哪）：删除批判一个节点是不是整个落在留下那一段里用它
+/// （`unlink::plan_the_extent_tree_after_a_deletion_batch` 的条款 K-R3-1）。
+fn last_data_unit_under(position: ModelExtentLowerNodePosition) -> u64 {
+    let span_in_data_units = (0..position.level)
+        .fold(EXTENT_TREE_LOWER_LEAF_DATA_UNITS, |span, _| {
+            span.saturating_mul(EXTENT_TREE_INTERNAL_FANOUT)
+        });
+    position
+        .index_in_level
+        .saturating_mul(span_in_data_units)
+        .saturating_add(span_in_data_units - 1)
+}
+
+/// 下段一个位置罩的第一个单元号（同 [`last_data_unit_under`] 按满罩宽算）。
+fn first_data_unit_under(position: ModelExtentLowerNodePosition) -> u64 {
+    let span_in_data_units = (0..position.level)
+        .fold(EXTENT_TREE_LOWER_LEAF_DATA_UNITS, |span, _| {
+            span.saturating_mul(EXTENT_TREE_INTERNAL_FANOUT)
+        });
+    position.index_in_level.saturating_mul(span_in_data_units)
+}
+
 /// 一版的中央映射树里除分配记录树的节点之外装几条条目的上界（D19（块指针的结构与宽度预算） 已定项 8：进映射的是数据单元、extent 树每个节点、
 /// inode 叶容器与根、分配记录树每个节点、记账树每个节点、`deleted_inodes` 根、墓碑树与谱系树的容器与索引节点；
 /// 映射树自己的节点、树表、实例表豁免）。分配记录树的节点数由调用方按它的上界另加；记账树的节点按调用方给的这一版的上界
@@ -836,29 +2116,22 @@ fn central_mapping_entries_other_than_the_allocation_record_tree(
     accounting_tree_nodes: u64,
     checkpoint_txg: ModelCheckpointTxg,
 ) -> u64 {
-    let data_units = match contents {
-        ModelVersionContents::LiveFile(file) => {
-            data_units_of_content(u64::try_from(file.content.len()).expect("内容长度"))
-        }
-        ModelVersionContents::FileBeingDeleted {
-            data_units_remaining,
-            ..
-        } => *data_units_remaining,
-        ModelVersionContents::WithoutTrees
-        | ModelVersionContents::TreesAndNoFile { .. }
-        | ModelVersionContents::InodesWithoutTheFirstFile { .. } => 0,
-    };
+    // 存在的单元（带洞的文件少于 size 罩的、截断途中连 size 之外还挂着的，判决 `research/prompts/m4-trunc-r1-main-verification.md`
+    // 第三节 K2、K5）各一条，下段按存在的单元建。
+    let data_units = contents.data_units_present();
     let entries_of_one_node_roles: u64 = role_written_at
         .keys()
         .map(|role| match role {
             // 记账树：根与根之下的每个节点各一条（台阶行多到一片叶装不下时长层），按这一版节点数的上界数。
             ModelUnitRole::AccountingTree => accounting_tree_nodes,
-            // 模型罩的一版里这几个角色各一个单元（上段只有根兼叶、每片 inode 叶容器各是一个角色、墓碑树一片容器加根）。
+            // 模型罩的一版里这几个角色各一个单元（上段每个节点各是一个角色、每片 inode 叶容器各是一个角色、墓碑树一片容器加根）。
             ModelUnitRole::ExtentRoot
+            | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_)
             | ModelUnitRole::InodeLeaf
             | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
             | ModelUnitRole::InodeRoot
             | ModelUnitRole::DeletedInodesRoot
+            | ModelUnitRole::LoggedOperationsRoot
             | ModelUnitRole::TombstoneLeaf
             | ModelUnitRole::TombstoneRoot
             | ModelUnitRole::RetirementLeaf
@@ -892,6 +2165,69 @@ enum UserVisibleTreesOfTheNewVersion<'target> {
     AsThisPublishLeavesThem,
     /// 管理员回退那次：取回退目标那一版的（D23（journal 的角色与格式） 已定项 14）。
     TakenFromTheRollbackTarget(&'target ModelRoot),
+}
+
+/// 一次发布对第一个文件之外的 inode（[`ModelRoot::inodes_other_than_the_first`]）做了什么。
+#[derive(Clone, Copy, Debug)]
+enum InodesOtherThanTheFirstChangeOfThePublish<'content> {
+    /// 照抄上一版的（管理员回退那次另取回退目标那一版的）。
+    Carried,
+    /// 建 `count` 个 size 0 的 inode（建 inode 的两种发布）：号从上一版的水位起连着发，水位加 `count`。
+    Created { count: u64 },
+    /// 把 `inode` 那个文件整份写成 `content`（[`ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst`]）。
+    WholeWrite { inode: u64, content: &'content [u8] },
+}
+
+/// 一次发布之后这一版的快照那几样（[`IdealModel::snapshot_bookkeeping_of_the_publish`]）。
+struct SnapshotBookkeepingOfThePublish {
+    snapshots: Rc<Vec<ModelSnapshot>>,
+    previous_snapshot_txg_of_the_live_head: ModelCheckpointTxg,
+    deadlist: Rc<Vec<ModelDeadlistEntry>>,
+    pinned_mapping_entries: u64,
+    deadlist_tree_nodes_upper_bound: u64,
+    /// 这次至多写几个 deadlist 树的节点（占槽用）。
+    deadlist_tree_nodes_written: u64,
+    extent_lower_node_written_at: Rc<BTreeMap<ModelExtentLowerNodePosition, ModelCheckpointTxg>>,
+}
+
+/// 一次不是回退的发布对数据单元做了什么（[`IdealModel::data_unit_change_of_the_publish`]）：之后存在几个、这次写了哪几个。被换下的是上一版存在的单元里
+/// 这次重写的与单元号不小于 `data_units_after` 的（尾部放掉的）；这次新有的单元都是这次写的。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DataUnitChangeOfThePublish {
+    data_units_before: u64,
+    data_units_after: u64,
+    /// 这次写的单元号：写内容的整份 0 .. 新单元数，截断与不缩短的截断至多一个尾单元，别的发布空；都小于 `data_units_after`。
+    rewritten: std::ops::Range<u64>,
+}
+
+impl DataUnitChangeOfThePublish {
+    /// 上一版存在、这次换下的单元号：重写的，与尾部放掉的。
+    fn replaced(&self) -> impl Iterator<Item = u64> + '_ {
+        (0..self.data_units_before)
+            .filter(|index| *index >= self.data_units_after || self.rewritten.contains(index))
+    }
+
+    /// 这次之后每个存在的单元的分配代：重写的取这次的 txg，别的照抄上一版的。
+    ///
+    /// # Panics
+    /// 这次新有的单元不是这次写的（单元只能经写出现）。
+    fn data_unit_written_at_after(
+        &self,
+        previous: &[ModelCheckpointTxg],
+        checkpoint_txg: ModelCheckpointTxg,
+    ) -> Vec<ModelCheckpointTxg> {
+        (0..self.data_units_after)
+            .map(|index| {
+                if self.rewritten.contains(&index) {
+                    checkpoint_txg
+                } else {
+                    *previous
+                        .get(usize::try_from(index).expect("单元号装得进 usize"))
+                        .expect("这次没写的单元是上一版就存在的（单元只能经写出现）")
+                }
+            })
+            .collect()
+    }
 }
 
 /// 整份重写文件内容的入口按哪个契约收内容：覆盖写一个数据单元以内（装不下拒，D4（校验和位置） 已定项 5），顺序写不按单元数拒。
@@ -940,7 +2276,24 @@ pub enum ModelRefusalReason {
     NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread,
     /// 现行那一版有树而文件集合为空（D8（核心索引结构） 已定项 16 第 5 条：删完之后只许建 inode（size 0）、写行与空发布），
     /// 这次改动不是建 inode：覆盖写、unlink 先走空队列（走空把删除中的那一版走成这一形），再拒（`UserChangeRefused::NoFileVersionToChange`）。
+    /// 建快照与删快照不在此列（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）。
     OnlyNewInodesOnAVersionWithTreesAndNoFile,
+    /// 现行那一版带着只读快照：第一版有快照就拒回退（用户 2026-10-13 定，判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+    /// 第三节 S8 与第七节岔路 3）。
+    RollbackWithSnapshotsWhichTheFirstVersionRefuses,
+    /// 现行那一版已经有 [`MODEL_SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION`] 个只读快照：第 11 个拒（用户 2026-10-13 定「10」，判决
+    /// `research/prompts/m4-snapshot-r1-main-verification.md` 第七节岔路 1），在任何写之前。
+    MoreSnapshotsThanTheFirstVersionAllows,
+    /// 截断到的长度 N 按整单元向上取整（⌈N ÷ 净荷⌉ × 净荷）溢出 u64：在任何写之前拒（判决
+    /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K12）。
+    TruncationSizeWhoseWholeDataUnitsOverflow,
+    /// 改 size 点名的是第一个文件之外的 inode、目标与它现在的 size 不同：第一版只有第一个文件写数据，判决没写别的 inode 的上段条目怎么写，
+    /// 主 agent 定在任何写之前拒（调度记录 `records/2026-10-13-里程碑四预开发.md`「截甲交回」那一行第 ① 处）。
+    SizeChangeOfAnInodeOtherThanTheFirstFile,
+    /// 第一个文件已删完的一版上按 inode 号给删完之后才建的 inode 写数据：D8（核心索引结构） 已定项 16 射程「删完之后不再建带数据的文件
+    /// （K-U5，记欠账）」，用户 2026-10-19 定「β 时序级」——目标的对象出生代晚于 inode 1 墓碑的死亡 txg 才拒，删之前就有的别的文件照常能写；
+    /// 在任何写之前拒。删第一个文件时树里还有的别的 inode 照常能写（[`ModelInodeOtherThanTheFirst::object_birth`] 不晚于那个死亡 txg）。
+    DataWriteToAnInodeBornAfterTheFirstFileWasDeleted,
 }
 
 impl ModelRefusalReason {
@@ -969,6 +2322,21 @@ impl ModelRefusalReason {
             ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile => {
                 "有树而文件集合为空的一版只许建 inode"
             }
+            ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses => {
+                "带着只读快照的回退（第一版有快照就拒）"
+            }
+            ModelRefusalReason::MoreSnapshotsThanTheFirstVersionAllows => {
+                "已经有 10 个只读快照（第一版至多 10 个）"
+            }
+            ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow => {
+                "截断到的长度按整单元向上取整溢出 u64"
+            }
+            ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile => {
+                "第一个文件之外的 inode 改成别的 size（第一版只有第一个文件写数据）"
+            }
+            ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted => {
+                "删完第一个文件之后才建的 inode 写数据（K-U5 的 β 时序级读法，第一版不建带数据的文件）"
+            }
         }
     }
 
@@ -986,7 +2354,12 @@ impl ModelRefusalReason {
             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
             | ModelRefusalReason::FloorAboveCeiling
             | ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread
-            | ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile => false,
+            | ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile
+            | ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses
+            | ModelRefusalReason::MoreSnapshotsThanTheFirstVersionAllows
+            | ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow
+            | ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile
+            | ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted => false,
         }
     }
 }
@@ -1018,6 +2391,62 @@ pub enum ModelOperationKind {
     PublishUnlinkIntent,
     PublishDeletionStep,
     PublishNewInode,
+    PublishSnapshotCreation,
+    PublishSnapshotDestructionIntent,
+    /// 删快照意图之后的一批（不是最后一批的与最后一批）：会话与挂载续做的走空走它们。
+    PublishSnapshotDestructionStep,
+    /// 整理的一批（`mounted_session::MountedSession::run_compaction`，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7、G8），
+    /// 照抄意图的与同一次发布删意图的最后一批。
+    PublishCompactionBatch,
+    /// 签发一条整理意图（判决 G1）。
+    PublishCompactionIntentIssue,
+    /// 不搬单元、R 已按记录全空，单独删意图（意图达成，判决 G4）。
+    PublishCompactionIntentCompletion,
+    /// 不搬单元、R 里还有未释放的记录，丢掉意图（攻方 K-c；判决 G2）。
+    PublishCompactionIntentDrop,
+    /// 截断这次用户改动（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2、K5、K11、K12）：缩短发截断意图，之后各批由
+    /// [`ModelOperationKind::PublishTruncationStep`] 答；不缩短（变长与 N = S）一次发布做完。
+    PublishTruncation,
+    /// 截断意图之后的一批（不是最后一批的与最后一批）：会话与挂载续做的走空走它们（K1：次序在 `deleted_inodes`、销毁中的快照之后）。
+    PublishTruncationStep,
+    /// 按 inode 号整份写第一个文件之外的一个文件（里程碑「删除与多次 COW」一·1）；点名 inode 1 的照覆盖写与顺序写那两种。
+    PublishWholeWriteOfAnInodeOtherThanTheFirst,
+}
+
+/// 执行器交给模型的、实现交回的一次整理发布看得见的几样（[`IdealModel::answer_compaction_publish`] 按它与模型自己记的活意图定是哪一种）。
+/// 哪几个单元搬、搬几个、什么时候签发、什么时候丢由实现的选段与区域扫描定（判决 G7「只比成功操作的内容」），模型不答，只判这几样合不合条款。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelCompactionPublishSeen {
+    /// 一批至多搬几个（执行器装的批大小）：占槽上界按它取。
+    pub units_at_most: u64,
+    /// 这一次搬了几个单元。
+    pub units_relocated: u64,
+    /// 搬的里头用户可见树的根单元（活头与快照条目引用的 inode 树根、extent 树根），胶水从实现交回的树表条目与搬迁表认。
+    pub user_visible_root_units_relocated: Vec<ModelUserVisibleRootUnit>,
+    /// 发布之后这一版的 logged_ops 里还有没有活整理意图。
+    pub is_an_intent_logged_after_the_publish: bool,
+    /// 模型那条活意图的 R 在实现交回的这一版里按记录全空没有（模型没有活意图时 false）。
+    pub is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish: bool,
+    /// 执行器强制选的那一段（`CompactionSwitches::forced_region`）：签发的 R 就是它。
+    pub region_forced_for_the_issue: ModelCompactionRegion,
+}
+
+fn describe_compaction_publish_seen(seen: &ModelCompactionPublishSeen) -> String {
+    format!(
+        "搬了 {} 个单元（其中用户可见树的根 {:?}），发布之后 logged_ops 里{}活意图，活意图的 R 按记录{}",
+        seen.units_relocated,
+        seen.user_visible_root_units_relocated,
+        if seen.is_an_intent_logged_after_the_publish {
+            "有"
+        } else {
+            "没有"
+        },
+        if seen.is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish {
+            "全空"
+        } else {
+            "不空（或没有活意图）"
+        }
+    )
 }
 
 /// 一步里计划的一次发布之后的上界（单元区墙区间的上端按它判）。
@@ -1068,6 +2497,16 @@ pub struct ObservedRoot {
     pub file: ObservedFile,
     pub instance_table: ObservedInstanceTable,
     pub unit_allocation_records: ObservedUnitAllocationRecords,
+    /// 这一版的快照那几样（判决 S7）：活头前驱、快照列表、deadlist 条目数、被钉映射条目数。
+    pub snapshot_state: ObservedSnapshotState,
+    /// 这一版 logged_ops 里那一条活整理意图（胶水从实现交回的 logged_ops 条目取；树表 0 条的一版没有）。
+    pub logged_compaction_intent: Option<ModelCompactionIntent>,
+    /// 这一版第一个文件那条 inode 记录里截断字段那两段（胶水从记录的字节里取，[`ObservedTruncationField`]）；这一版没有那条记录（树表 0 条、
+    /// 删完、删完之后建过 inode）为 None。
+    pub first_file_record_truncation_field: Option<ObservedTruncationField>,
+    /// 这一版 inode 树里第一个文件之外的每个活着的 inode（nlink 不是 0）：号 → 读回的内容（按 inode 号写数据写出来的，里程碑「删除与多次 COW」一·1）。
+    /// 胶水从实现交回的那个文件的数据单元按单元号接起来、接到它那条记录的 size；没有数据单元、size 0 的是空内容。树表 0 条的一版是空表。
+    pub inodes_other_than_the_first: BTreeMap<u64, ObservedFile>,
 }
 
 /// 实现交回的这一版的文件。
@@ -1106,8 +2545,8 @@ pub enum ObservedInstanceTable {
 /// 实现交回的这一版的分配记录。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ObservedUnitAllocationRecords {
-    /// 这一版每个角色的单元在这一版分配记录里的那几条，每块盘各一条：实现交回的这一版的全部角色（带文件的一版、树表 0 条的一版上写行的那一版）。
-    EveryRoleOfTheVersion(Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)>),
+    /// 这一版每个单元在这一版分配记录里的那几条，每块盘各一条：实现交回的这一版的全部角色与全部数据单元（带文件的一版、树表 0 条的一版上写行的那一版）。
+    EveryRoleOfTheVersion(ObservedAllocationRecordsOfEveryUnit),
     /// 实现的输出不带这一版的分配记录（树表 0 条的一版上的零单元发布：一个字节都不写、不经分配器），只交回这次发布重写了哪几个角色。
     /// 模型说这次重写了角色的那一版这么交回，判「单元的分配代」对不上。同一次挂载里前一版交回过分配记录的，执行器用的胶水从它往下带、
     /// 交回 [`ObservedUnitAllocationRecords::EveryRoleOfTheVersion`]（实审 B3c-4）；执行器里这一臂只剩一次挂载里第一版就是零单元发布的那几版。
@@ -1115,6 +2554,20 @@ pub enum ObservedUnitAllocationRecords {
     /// 零单元发布交回的根换了分配记录树根指针（该照抄同一次挂载里前一版的那一条，胶水往下带时核出来的，实审 B3c-4）：
     /// 这一版的分配记录说不上是哪一份，模型判「单元的分配代」对不上，不当比不了。`what` 写两条指针。
     AllocationRecordTreeRootChangedByAZeroUnitPublish { what: String },
+}
+
+/// 实现交回的这一版每个单元的分配记录（[`ObservedUnitAllocationRecords::EveryRoleOfTheVersion`]）：数据单元按单元号各一项，别的角色各一项。
+/// 数据单元按单元号交（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4：截断只重写尾单元之后一个文件的数据单元分配代不同，
+/// 模型按单元号逐个比，单元号与分配代的对应判得出）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObservedAllocationRecordsOfEveryUnit {
+    /// 数据单元之外的每个角色：这里不该有 [`ModelUnitRole::Data`]（数据单元在 `data_units` 里按单元号交），有就判对不上。
+    pub roles: Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)>,
+    /// 文件的每个数据单元：单元号与它的那几条分配记录。
+    pub data_units: Vec<(u64, Vec<ObservedAllocationRecord>)>,
+    /// 第一个文件之外的文件的每个数据单元：(inode 号, 单元号) 与它的那几条分配记录。
+    pub data_units_of_the_files_other_than_the_first:
+        Vec<((u64, u64), Vec<ObservedAllocationRecord>)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1205,6 +2658,25 @@ pub enum ModelDisagreementAspect {
     InstanceRows,
     RollbackFloorCeiling,
     ColdStartReadBack,
+    /// 活头 inode 树那条条目的 `previous_snapshot_txg`（判决 S7「活头前驱」）。
+    LiveHeadPreviousSnapshotTxg,
+    /// 树表里的快照列表（判决 S7「快照列表」）：个数、每个的诞生 txg、前驱、销毁中记号、两条根指针抄的是谁。
+    Snapshots,
+    /// deadlist 条目，按盘上 key 的序逐条比（判决 S7 的条目数加删快照一批放的是哪几条，[`ModelDeadlistEntry`]）。
+    DeadlistEntries,
+    /// 留在中央映射树里、被活快照钉住的映射条目条数（判决 S7「被钉映射条目数」）。
+    PinnedMappingEntries,
+    /// 读快照读出的内容。
+    SnapshotReadBack,
+    /// 一次整理发布对意图做的事（签发、照抄、随最后一批删、单独删）与模型记的活意图、R 按记录全空没有对不上（判决 G1、G4；D8（核心索引结构） 已定项 5）。
+    CompactionIntentOfThePublish,
+    /// 这一版 logged_ops 里的整理意图（有没有、签发 txg、R、`c0`）。
+    LoggedCompactionIntent,
+    /// 这一版第一个文件那条 inode 记录里的截断字段（有没有那条记录、T、N_w；判决 `research/prompts/m4-trunc-r2-main-verification.md`
+    /// 第三节 R1、R2）。
+    FirstFileRecordTruncationField,
+    /// 这一版第一个文件之外的 inode：有哪几个号、每个读回的内容（里程碑「删除与多次 COW」一·1）。
+    InodesOtherThanTheFirst,
     NotModeled,
 }
 
@@ -1229,6 +2701,19 @@ impl ModelDisagreementAspect {
             ModelDisagreementAspect::InstanceRows => "写的实例表行",
             ModelDisagreementAspect::RollbackFloorCeiling => "抬 F 的上限",
             ModelDisagreementAspect::ColdStartReadBack => "冷启动读回",
+            ModelDisagreementAspect::LiveHeadPreviousSnapshotTxg => "活头的 previous_snapshot_txg",
+            ModelDisagreementAspect::Snapshots => "这一版的快照列表",
+            ModelDisagreementAspect::DeadlistEntries => "这一版的 deadlist 条目（按 key 逐条）",
+            ModelDisagreementAspect::PinnedMappingEntries => "这一版被钉住的映射条目数",
+            ModelDisagreementAspect::SnapshotReadBack => "读快照读出的内容",
+            ModelDisagreementAspect::CompactionIntentOfThePublish => "这一次整理发布对意图做的事",
+            ModelDisagreementAspect::LoggedCompactionIntent => "这一版 logged_ops 里的整理意图",
+            ModelDisagreementAspect::FirstFileRecordTruncationField => {
+                "这一版第一个文件那条 inode 记录里的截断字段"
+            }
+            ModelDisagreementAspect::InodesOtherThanTheFirst => {
+                "这一版第一个文件之外的 inode 与它们的内容"
+            }
             ModelDisagreementAspect::NotModeled => "模型答不了",
         }
     }
@@ -1307,6 +2792,15 @@ impl ModelDisagreement {
             | ModelDisagreementAspect::InstanceRows
             | ModelDisagreementAspect::RollbackFloorCeiling
             | ModelDisagreementAspect::ColdStartReadBack
+            | ModelDisagreementAspect::Snapshots
+            | ModelDisagreementAspect::LiveHeadPreviousSnapshotTxg
+            | ModelDisagreementAspect::DeadlistEntries
+            | ModelDisagreementAspect::PinnedMappingEntries
+            | ModelDisagreementAspect::SnapshotReadBack
+            | ModelDisagreementAspect::LoggedCompactionIntent
+            | ModelDisagreementAspect::CompactionIntentOfThePublish
+            | ModelDisagreementAspect::FirstFileRecordTruncationField
+            | ModelDisagreementAspect::InodesOtherThanTheFirst
             | ModelDisagreementAspect::NotModeled => false,
         };
         if aspect_is_a_refusal_the_model_did_not_expect && refused_before_any_write {
@@ -1348,6 +2842,65 @@ pub struct ModelJudgementCounts {
     /// 会话里一次用户改动之前先走空时，走空的删除类发布被空间拒、推了抬 F 再试，推的那几串与走空的每一步都比过、对得上的次数
     /// （执行器数；代码轮第二轮判决第二节 N3「走空被空间拒」那一格）。
     pub walks_before_a_user_change_refused_for_space_matched: u64,
+    /// 比过快照那几样（活头前驱、快照列表、deadlist 条目数、被钉映射条目数）的版数。
+    pub snapshot_states_compared: u64,
+    /// 比过的快照条数（逐版逐个加）。
+    pub snapshots_compared: u64,
+    /// 比过的版里 deadlist 不空的那几版（被快照钉住的单元真的走到了）。
+    pub versions_with_deadlist_entries_compared: u64,
+    /// 比过、对得上的读快照（读出的内容逐字节比）。
+    pub snapshot_read_backs_compared: u64,
+    /// 比过、对得上的删快照的批里不是最后一批的那几批（那个快照的条目多于一批 144 条时才有，判决 S4）。
+    pub snapshot_destruction_batches_keeping_the_snapshot_matched: u64,
+    /// 比过、对得上的整理的批（判决 G7「只比成功操作的内容」：每一批写出的那一版逐项与搬之前那一版的内容相同）。
+    pub compaction_batches_matched: u64,
+    /// 比过、对得上的签发（判决 G1）。
+    pub compaction_intents_issued_matched: u64,
+    /// 比过、对得上的同一次发布删意图的最后一批（D8（核心索引结构） 已定项 5）。
+    pub compaction_intents_deleted_with_the_last_batch_matched: u64,
+    /// 比过、对得上的单独删意图（R 已按记录全空，意图达成）。
+    pub compaction_intents_deleted_without_a_batch_matched: u64,
+    /// 比过、对得上的丢意图。
+    pub compaction_intents_dropped_matched: u64,
+    /// 比过 logged_ops 里那一条活整理意图的版数（有活意图的那几版）。
+    pub logged_compaction_intents_compared: u64,
+    /// 比过、对得上的搬了用户可见树根单元的整理发布（这一版算一个新状态，用户 2026-10-15 定「照字节比，搬根算非空」）。
+    pub compaction_publishes_relocating_a_user_visible_root_matched: u64,
+    /// 比过、对得上的截断意图（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2）。
+    pub truncation_intents_matched: u64,
+    /// 比过、对得上的截断的批里不是最后一批的那几批（size 之外挂着的单元多于一批 144 个时才有）。
+    pub truncation_batches_before_the_final_batch_matched: u64,
+    /// 比过、对得上的截断最后一批。
+    pub final_truncation_batches_matched: u64,
+    /// 比过、对得上的不缩短的截断（变长与 N = S，K5、K12）。
+    pub size_changes_without_shrinking_matched: u64,
+    /// 比过第一个文件那条 inode 记录里截断字段的版数（有那条记录的那几版，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R2）。
+    pub truncation_fields_compared: u64,
+    /// 其中模型记的截断字段写过（T ≠ 0）的版数。
+    pub written_truncation_fields_compared: u64,
+    /// 比过的第一个文件之外的 inode（逐版逐个加，里程碑「删除与多次 COW」一·1）。
+    pub inodes_other_than_the_first_compared: u64,
+    /// 其中有数据单元、逐字节比过内容的（逐版逐个加）。
+    pub contents_of_files_other_than_the_first_compared: u64,
+    /// 比过、对得上的按 inode 号写第一个文件之外的文件。
+    pub writes_of_an_inode_other_than_the_first_matched: u64,
+    /// 其中这次让 extent 树上段的根升了一层的（写的号罩不进原来的根）。
+    pub writes_growing_the_extent_upper_segment_matched: u64,
+    /// 其中写的号落在上段第 0 片叶之外的（号不小于一片叶罩的 143 个）。
+    pub writes_past_the_first_extent_upper_leaf_matched: u64,
+    /// 比过、对得上的「删完第一个文件之后给建的 inode 写数据」那一拒（K-U5）。
+    pub data_writes_refused_after_the_first_file_was_deleted_matched: u64,
+    /// 比过、对得上的删第一个文件之外的号的最后一批（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M4「删别的号」）。
+    pub deletions_of_an_inode_other_than_the_first_matched: u64,
+    /// 其中接在第一个文件已删完的一版后面的（代码轮判决 `research/prompts/m3-close-w5-code-r1-main-verification.md` 第三节第 3 条：
+    /// 随机历史在第一个文件删完之后也按号删别的文件）。
+    pub deletions_of_an_inode_other_than_the_first_after_the_first_file_was_deleted_matched: u64,
+    /// 比过、对得上的删第一个文件的最后一批、之后树里还有别的 inode 的（第三节 M4「删第一个文件而别的还在」，这一版归带文件的一版）。
+    pub deletions_of_the_first_file_beside_other_inodes_matched: u64,
+    /// 比过、对得上的删到文件集合为空的最后一批（第三节 M4「删到空」：之后是有树而文件集合为空的一版）。
+    pub final_deletion_batches_emptying_the_version_matched: u64,
+    /// 比过、对得上的让 extent 上段根降了层的最后一批（第三节 M4「上段降层」：上一版里降后层级的第 0 个节点照抄成根）。
+    pub deletions_lowering_the_extent_upper_segment_matched: u64,
 }
 
 impl ModelJudgementCounts {
@@ -1370,6 +2923,35 @@ impl ModelJudgementCounts {
             deletion_batches_keeping_data_units_matched,
             walks_of_several_steps_before_a_user_change_matched,
             walks_before_a_user_change_refused_for_space_matched,
+            snapshot_states_compared,
+            snapshots_compared,
+            versions_with_deadlist_entries_compared,
+            snapshot_read_backs_compared,
+            snapshot_destruction_batches_keeping_the_snapshot_matched,
+            compaction_batches_matched,
+            compaction_intents_issued_matched,
+            compaction_intents_deleted_with_the_last_batch_matched,
+            compaction_intents_deleted_without_a_batch_matched,
+            compaction_intents_dropped_matched,
+            logged_compaction_intents_compared,
+            compaction_publishes_relocating_a_user_visible_root_matched,
+            truncation_intents_matched,
+            truncation_batches_before_the_final_batch_matched,
+            final_truncation_batches_matched,
+            size_changes_without_shrinking_matched,
+            truncation_fields_compared,
+            written_truncation_fields_compared,
+            inodes_other_than_the_first_compared,
+            contents_of_files_other_than_the_first_compared,
+            writes_of_an_inode_other_than_the_first_matched,
+            writes_growing_the_extent_upper_segment_matched,
+            writes_past_the_first_extent_upper_leaf_matched,
+            data_writes_refused_after_the_first_file_was_deleted_matched,
+            deletions_of_an_inode_other_than_the_first_matched,
+            deletions_of_an_inode_other_than_the_first_after_the_first_file_was_deleted_matched,
+            deletions_of_the_first_file_beside_other_inodes_matched,
+            final_deletion_batches_emptying_the_version_matched,
+            deletions_lowering_the_extent_upper_segment_matched,
         } = other;
         self.required_refusals_matched += required_refusals_matched;
         self.permitted_refusals_taken += permitted_refusals_taken;
@@ -1390,6 +2972,50 @@ impl ModelJudgementCounts {
             walks_of_several_steps_before_a_user_change_matched;
         self.walks_before_a_user_change_refused_for_space_matched +=
             walks_before_a_user_change_refused_for_space_matched;
+        self.snapshot_states_compared += snapshot_states_compared;
+        self.snapshots_compared += snapshots_compared;
+        self.versions_with_deadlist_entries_compared += versions_with_deadlist_entries_compared;
+        self.snapshot_read_backs_compared += snapshot_read_backs_compared;
+        self.snapshot_destruction_batches_keeping_the_snapshot_matched +=
+            snapshot_destruction_batches_keeping_the_snapshot_matched;
+        self.compaction_batches_matched += compaction_batches_matched;
+        self.compaction_intents_issued_matched += compaction_intents_issued_matched;
+        self.compaction_intents_deleted_with_the_last_batch_matched +=
+            compaction_intents_deleted_with_the_last_batch_matched;
+        self.compaction_intents_deleted_without_a_batch_matched +=
+            compaction_intents_deleted_without_a_batch_matched;
+        self.compaction_intents_dropped_matched += compaction_intents_dropped_matched;
+        self.logged_compaction_intents_compared += logged_compaction_intents_compared;
+        self.compaction_publishes_relocating_a_user_visible_root_matched +=
+            compaction_publishes_relocating_a_user_visible_root_matched;
+        self.truncation_intents_matched += truncation_intents_matched;
+        self.truncation_batches_before_the_final_batch_matched +=
+            truncation_batches_before_the_final_batch_matched;
+        self.final_truncation_batches_matched += final_truncation_batches_matched;
+        self.size_changes_without_shrinking_matched += size_changes_without_shrinking_matched;
+        self.truncation_fields_compared += truncation_fields_compared;
+        self.written_truncation_fields_compared += written_truncation_fields_compared;
+        self.inodes_other_than_the_first_compared += inodes_other_than_the_first_compared;
+        self.contents_of_files_other_than_the_first_compared +=
+            contents_of_files_other_than_the_first_compared;
+        self.writes_of_an_inode_other_than_the_first_matched +=
+            writes_of_an_inode_other_than_the_first_matched;
+        self.writes_growing_the_extent_upper_segment_matched +=
+            writes_growing_the_extent_upper_segment_matched;
+        self.writes_past_the_first_extent_upper_leaf_matched +=
+            writes_past_the_first_extent_upper_leaf_matched;
+        self.data_writes_refused_after_the_first_file_was_deleted_matched +=
+            data_writes_refused_after_the_first_file_was_deleted_matched;
+        self.deletions_of_an_inode_other_than_the_first_matched +=
+            deletions_of_an_inode_other_than_the_first_matched;
+        self.deletions_of_an_inode_other_than_the_first_after_the_first_file_was_deleted_matched +=
+            deletions_of_an_inode_other_than_the_first_after_the_first_file_was_deleted_matched;
+        self.deletions_of_the_first_file_beside_other_inodes_matched +=
+            deletions_of_the_first_file_beside_other_inodes_matched;
+        self.final_deletion_batches_emptying_the_version_matched +=
+            final_deletion_batches_emptying_the_version_matched;
+        self.deletions_lowering_the_extent_upper_segment_matched +=
+            deletions_lowering_the_extent_upper_segment_matched;
     }
 }
 
@@ -1423,6 +3049,165 @@ pub struct IdealModel {
 pub const MODEL_ROOT_RING_SLOTS: u64 =
     ROOT_RING_REGIONS * MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM;
 
+/// 一版里的一个只读快照：树表里那一对码 14 / 15 条目（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1、S2、S4）。
+/// 快照随根走（每条根带着它那一版树表里的快照），不随模型走：崩溃恢复、可写挂载落到哪一版，就是那一版的快照。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelSnapshot {
+    /// S.txg：建它那次发布的 checkpoint_txg（码 14 的诞生 txg，判决 S2）。
+    pub birth_txg: ModelCheckpointTxg,
+    /// 码 14 条目的 `previous_snapshot_txg`：派生链上排在它前面那一个的诞生 txg，没有为 0（D5（快照 / 空间记账机制） 已定项 9）；
+    /// 删排在它前面那一个的意图那次换成被删那一个的前驱（判决 S4）。
+    pub previous_snapshot_txg: ModelCheckpointTxg,
+    /// 码 14 flags 位 0「销毁中」：删它的意图那次之后、最后一批之前（判决 S4）。
+    pub is_being_destroyed: bool,
+    /// 码 14 的根指针抄的是建它那一刻活头 inode 树的根：那个根是哪次发布写的（指针头部的出生 txg 与指针的实例代号）。
+    pub inode_tree_written_by: ModelRootKey,
+    /// 码 15 的根指针抄的是建它那一刻活头 extent 树的根：那个根的分配代（指针头部的出生 txg）。
+    pub extent_root_written_at: ModelCheckpointTxg,
+    /// 建它那一刻现行那一版里读得出的文件内容（那一版没有活文件时 `None`）：读快照照它答。
+    pub content_at_creation: Option<Rc<[u8]>>,
+}
+
+/// 一条 deadlist 条目（D5（快照 / 空间记账机制） 已定项 12，判决 S3）：一个被活快照钉住、换下时没释放的用户可见单元。条目的 key 是
+/// 头的树号 + 纪元 + 中央映射 key，映射 key 打头三段是类标签、出生树、出生 txg（D19（块指针的结构与宽度预算） 已定项 6）；头恒是活头 inode 树
+/// （第一版只有一个可写头）。模型记纪元与映射 key 的打头三段，字段次序就是盘上 key 逐字段比的次序：删快照一批放「按 key 升序的前 144 条」
+/// （判决 S4），模型照这个序挑。映射 key 末段（码 1 的写序、码 2 / 码 3 的实例代号与出生序号）模型不记：前三段相同的几条（同一次发布写的
+/// 几个数据单元、几个下段节点）在模型里是同一个值，一批放其中哪几条模型分不出，逐条比时它们互相顶替。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelDeadlistEntry {
+    /// 块被杀那一刻活头的 `previous_snapshot_txg`。
+    pub epoch: ModelCheckpointTxg,
+    /// 映射 key 的类标签（[`MODEL_MAPPING_KEY_UNIT_CLASS_DATA`] 那三个）。
+    pub mapping_key_unit_class: u8,
+    /// 映射 key 的出生树：单元所在那棵树的树号（extent 树或 inode 树）。
+    pub mapping_key_birth_tree: u64,
+    /// 映射 key 的出生 txg：写这个单元的那次发布的 txg。
+    pub birth_txg: ModelCheckpointTxg,
+}
+
+/// 中央映射 key 的类标签（D19（块指针的结构与宽度预算） 已定项 6：码 1 数据单元、码 2 索引节点、码 3 打包记录容器）。模型按条款自己写一份，
+/// 不引实现的常量（D13（验证路线） 已定项 5）。
+pub const MODEL_MAPPING_KEY_UNIT_CLASS_DATA: u8 = 1;
+pub const MODEL_MAPPING_KEY_UNIT_CLASS_INDEX_NODE: u8 = 2;
+pub const MODEL_MAPPING_KEY_UNIT_CLASS_PACKED_RECORDS: u8 = 3;
+
+/// 一个换下的用户可见单元在映射 key 里的打头三段（[`ModelDeadlistEntry`] 去掉纪元）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ModelReplacedUnit {
+    mapping_key_unit_class: u8,
+    mapping_key_birth_tree: u64,
+    birth_txg: ModelCheckpointTxg,
+}
+
+impl ModelUnitRole {
+    /// 这个角色的单元在映射 key 里的类标签与出生树：数据单元、extent 根与 extent 下段节点生在 extent 树，inode 根与叶容器生在 inode 树；
+    /// 叶容器是打包记录容器。只问问快照生死判定的那几类（[`ModelUnitRole::asks_the_snapshot_lifetime_judgement`]），别的角色交 `None`。
+    fn mapping_key_unit_class_and_birth_tree(self) -> Option<(u8, u64)> {
+        match self {
+            ModelUnitRole::Data => {
+                Some((MODEL_MAPPING_KEY_UNIT_CLASS_DATA, TREE_IDENTIFIER_EXTENT))
+            }
+            ModelUnitRole::ExtentRoot | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_) => Some((
+                MODEL_MAPPING_KEY_UNIT_CLASS_INDEX_NODE,
+                TREE_IDENTIFIER_EXTENT,
+            )),
+            ModelUnitRole::InodeRoot => Some((
+                MODEL_MAPPING_KEY_UNIT_CLASS_INDEX_NODE,
+                TREE_IDENTIFIER_INODE,
+            )),
+            ModelUnitRole::InodeLeaf | ModelUnitRole::InodeLeafRightOfTheLeftmost(_) => Some((
+                MODEL_MAPPING_KEY_UNIT_CLASS_PACKED_RECORDS,
+                TREE_IDENTIFIER_INODE,
+            )),
+            ModelUnitRole::AllocationTree
+            | ModelUnitRole::AccountingTree
+            | ModelUnitRole::MappingTree
+            | ModelUnitRole::TreeTable
+            | ModelUnitRole::InstanceTable
+            | ModelUnitRole::DeletedInodesRoot
+            | ModelUnitRole::LoggedOperationsRoot
+            | ModelUnitRole::TombstoneLeaf
+            | ModelUnitRole::TombstoneRoot
+            | ModelUnitRole::RetirementLeaf
+            | ModelUnitRole::RetirementRoot => None,
+        }
+    }
+}
+
+/// extent 树下段一个节点的位置（D8（核心索引结构） 已定项 14：按单元号按位置寻址，层级 0 是叶，同层从单元 0 起数第几个）：
+/// 一个没有洞的文件有几个单元就定了下段有哪几个位置。模型自己一份，不引实现的类型（D13（验证路线） 已定项 5）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelExtentLowerNodePosition {
+    pub level: u32,
+    pub index_in_level: u64,
+}
+
+/// 第一版同时活着的只读快照至多几个：用户 2026-10-13 定「10」（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第七节岔路 1）。
+/// 模型按条款自己写一份，不引实现的常量（D13（验证路线） 已定项 5）。
+pub const MODEL_SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION: usize = 10;
+
+/// 删快照每批放几条 deadlist 条目：与 unlink 每批的数据单元数同一个数（判决 S4「批大小 K = 144」）；模型只罩产品批大小
+/// （随机历史的挂载不装只供测试压小批大小的开关，同 [`MODEL_DELETION_BATCH_DATA_UNITS`]）。
+const MODEL_SNAPSHOT_DESTRUCTION_BATCH_ENTRIES: u64 = EXTENT_TREE_LOWER_LEAF_DATA_UNITS;
+
+/// deadlist 树的 key 宽：头树号 8 + 纪元 8 + 映射 key（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3「key 43」），value 空。
+const DEADLIST_KEY_BYTES: u64 = 8 + 8 + MAPPING_KEY_BYTES;
+
+/// 一次读快照，模型说该读出什么（[`IdealModel::judge_snapshot_read_back`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ModelSnapshotReadBack {
+    /// 建快照那一刻没有活文件。
+    NoFile,
+    File(Rc<[u8]>),
+}
+
+/// 实现读一个快照读出了什么（`recovery::read_the_first_file_of_a_snapshot` 的结局，胶水换过来）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ObservedSnapshotReadBack {
+    NoFile,
+    File(Vec<u8>),
+    /// 树表里没有点名的那条码 14。
+    NoSnapshotWithThisTree,
+    /// 读失败（树、叶容器或数据单元读不出、解不开、判红）。
+    Failed {
+        what: String,
+    },
+}
+
+/// 实现交回的这一版树表里的一个只读快照（胶水从码 14 / 15 条目取）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObservedSnapshot {
+    pub birth_txg: ModelCheckpointTxg,
+    pub previous_snapshot_txg: ModelCheckpointTxg,
+    pub is_being_destroyed: bool,
+    /// 码 14 根指针头部的出生 txg 与指针的实例代号。
+    pub inode_tree_written_by: ModelRootKey,
+    /// 码 15 根指针头部的出生 txg。
+    pub extent_root_written_at: ModelCheckpointTxg,
+}
+
+/// 实现交回的这一版的快照那几样（判决 S7「活头前驱、deadlist 条目数、被钉映射条目数、快照列表」）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObservedSnapshotState {
+    /// 活头 inode 树那条条目的 `previous_snapshot_txg`；树表 0 条的一版没有那条条目，是 `None`。
+    pub live_head_previous_snapshot_txg: Option<ModelCheckpointTxg>,
+    /// 树表里的快照，按（诞生 txg, 树号）升序（派生链的次序）。
+    pub snapshots: Vec<ObservedSnapshot>,
+    /// 这一版的 deadlist 条目（胶水从每条的纪元与映射 key 的打头三段取），次序不论：模型排好再逐条比。
+    pub deadlist_entries: Vec<ModelDeadlistEntry>,
+    /// 留在中央映射树里、被活快照钉住的映射条目条数（`TransactionOutput::mapping_entries_kept_for_the_snapshots`）。
+    pub pinned_mapping_entries: u64,
+}
+
+impl ObservedSnapshotState {
+    /// 树表 0 条的一版：没有活头 inode 树那条条目、没有快照、没有 deadlist。
+    pub const OF_A_VERSION_WITHOUT_TREES: ObservedSnapshotState = ObservedSnapshotState {
+        live_head_previous_snapshot_txg: None,
+        snapshots: Vec::new(),
+        deadlist_entries: Vec::new(),
+        pinned_mapping_entries: 0,
+    };
+}
 /// 环长 `journal_ring_bytes` 下的单元区起始槽号：journal 环从槽 [`JOURNAL_RING_START_SLOT`] 起，末尾不落在槽边界上时取下一个整槽
 /// （D3（空间分配） 已定项 10 ④「第一版 = journal 环末尾的下一个槽」）。模型自己的一份式子（D13（验证路线） 已定项 5）。
 fn model_unit_area_start_slot(journal_ring_bytes: u64) -> u64 {
@@ -1456,6 +3241,7 @@ impl IdealModel {
                 (ModelUnitRole::InstanceTable, MAKE_FILESYSTEM_TXG),
                 (ModelUnitRole::TreeTable, MAKE_FILESYSTEM_TXG),
             ]),
+            data_unit_written_at: Rc::new(Vec::new()),
             occupied_slots_upper_bound_per_device: ModelUnitRole::InstanceTable.span_in_slots()
                 + ModelUnitRole::TreeTable.span_in_slots(),
             central_mapping_tree_nodes_upper_bound: 0,
@@ -1464,6 +3250,17 @@ impl IdealModel {
             accounting_tree_nodes_upper_bound: 0,
             highest_transaction_number_of_its_publish: 0,
             highest_transaction_number_in_its_instance: 0,
+            snapshots: Rc::new(Vec::new()),
+            previous_snapshot_txg_of_the_live_head: ModelCheckpointTxg(0),
+            deadlist: Rc::new(Vec::new()),
+            pinned_mapping_entries: 0,
+            deadlist_tree_nodes_upper_bound: 0,
+            extent_lower_node_written_at: Rc::new(BTreeMap::new()),
+            logged_compaction_intent: None,
+            user_visible_root_relocations: Rc::new(BTreeMap::new()),
+            inodes_other_than_the_first: Rc::new(BTreeMap::new()),
+            inode_number_watermark: 0,
+            death_txg_of_the_first_file: None,
         };
         let mut ring = BTreeMap::new();
         ring.insert(ring_position_of(MAKE_FILESYSTEM_TXG), genesis);
@@ -1506,6 +3303,14 @@ impl IdealModel {
             answer.required_refusals
         );
         self.advance_by_success(&answer);
+    }
+
+    /// 可写会话现行那一版树表里的只读快照，按建的先后（没有可写会话时 None）：执行器按它挑删哪一个、读哪一个，用例拿它看模型记的样子。
+    #[must_use]
+    pub fn snapshots_of_the_current_version(&self) -> Option<&[ModelSnapshot]> {
+        self.session
+            .as_ref()
+            .map(|session| session.current.snapshots.as_slice())
     }
 
     /// 关掉这个进程的可写会话（可写挂载、回退、冷启动之前实现都先关）。
@@ -1616,19 +3421,26 @@ impl IdealModel {
             *newest = (*newest).max(root.key.checkpoint_txg);
         }
         let newest_on_every_device = newest_valid_per_device.values().copied().min()?;
-        let mut non_empty: Vec<(ModelRootKey, Option<ModelRootKey>)> = Vec::new();
-        let mut previous_trees_written_by: Option<ModelRootKey> = None;
+        // 「非空」比的是两棵用户可见树连同树表里快照那几对条目的根指针（`mount::user_visible_trees_changed`）：建快照那次与删快照的
+        // 最后一批算非空，意图那次与不是最后一批的批不算（只改记号、前驱与 deadlist）；整理搬了这几个根单元之一的那一批算非空（根指针换成映射位置，
+        // 用户 2026-10-15 定「照字节比，搬根算非空」），签发、删意图与只搬别的单元的那几次不算。
+        let mut non_empty: Vec<(ModelRootKey, ModelUserVisibleState)> = Vec::new();
+        let mut previous_state = ModelUserVisibleState {
+            trees_written_by: None,
+            snapshot_roots: Vec::new(),
+            root_relocations: Vec::new(),
+        };
         for root in &valid {
-            let trees_written_by = root.user_visible_trees_written_by();
-            if trees_written_by != previous_trees_written_by {
-                non_empty.push((root.key, trees_written_by));
+            let state = root.user_visible_state();
+            if state != previous_state {
+                non_empty.push((root.key, state.clone()));
             }
-            previous_trees_written_by = trees_written_by;
+            previous_state = state;
         }
-        // 「4 个不同状态」去重（「非空」从盘上怎么认那一段末尾）：从新到旧数，状态（两棵用户可见树是哪次发布写的）与比它新、
+        // 「4 个不同状态」去重（「非空」从盘上怎么认那一段末尾）：从新到旧数，状态（两棵用户可见树是哪次发布写的、快照条目抄的是谁）与比它新、
         // 已计入的根相同的不计入——管理员回退发出的根状态同回退目标。去重之后不足 4 个取最旧的有效根（根环容量边界）。
         non_empty.sort_unstable_by_key(|(key, _)| std::cmp::Reverse(*key));
-        let mut counted_states: Vec<Option<ModelRootKey>> = Vec::new();
+        let mut counted_states: Vec<ModelUserVisibleState> = Vec::new();
         let mut distinct_newest_first: Vec<ModelCheckpointTxg> = Vec::new();
         for (key, state) in non_empty {
             if !counted_states.contains(&state) {
@@ -1802,6 +3614,7 @@ impl IdealModel {
             new_file_content,
             instance_table_rows,
             UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem,
+            InodesOtherThanTheFirstChangeOfThePublish::Carried,
         )
     }
 
@@ -1822,70 +3635,477 @@ impl IdealModel {
         new_file_content: Option<&[u8]>,
         instance_table_rows: Rc<Vec<ModelInstanceRow>>,
         user_visible_trees: UserVisibleTreesOfTheNewVersion<'_>,
+        inodes_other_than_the_first_change: InodesOtherThanTheFirstChangeOfThePublish<'_>,
     ) -> ModelRoot {
         let key = ModelRootKey {
             checkpoint_txg,
             instance,
         };
+        let creates_inodes = matches!(
+            kind,
+            ModelPublishKind::NewInode
+                | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+        );
+        let writes_an_inode_other_than_the_first = matches!(
+            kind,
+            ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. }
+        );
+        assert_eq!(
+            (
+                creates_inodes,
+                writes_an_inode_other_than_the_first
+            ),
+            match inodes_other_than_the_first_change {
+                InodesOtherThanTheFirstChangeOfThePublish::Carried => (false, false),
+                InodesOtherThanTheFirstChangeOfThePublish::Created { .. } => (true, false),
+                InodesOtherThanTheFirstChangeOfThePublish::WholeWrite { .. } => (false, true),
+            },
+            "建 inode 的两种恰好带建了几个、按 inode 号写那一种恰好带写了谁、写成什么，别的发布照抄：{kind:?}"
+        );
+        // 这次之后第一个文件之外的 inode 与水位（回退那次下面再换成回退目标那一版的 inode）。
+        let mut inodes_other_than_the_first = previous.inodes_other_than_the_first.as_ref().clone();
+        let mut inode_number_watermark = match kind {
+            // 第一个文件那次发掉 inode 1（它接在树表 0 条的一版后面，`answer_publish_first_file` 判过有树的一版必拒）。
+            ModelPublishKind::FirstFileVersion => FIRST_INODE_NUMBER + 1,
+            ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => {
+                previous.inode_number_watermark
+            }
+        };
+        // 删第一个文件之外的一个号（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1）：意图那次它成了删除中的、
+        // 还剩它全部的单元；不是最后一批的批从尾部放 144 个；最后一批删掉它那条记录。删第一个文件的那几步不动这张表。
+        match kind {
+            ModelPublishKind::UnlinkIntent {
+                deleted: ModelDeletedInode::OtherThanTheFirst(inode),
+            } => {
+                let deleted = inodes_other_than_the_first
+                    .get_mut(&inode)
+                    .expect("意图点名的号是这一版树里第一个文件之外活着的号（`answer_unlink_intent_of_an_inode` 判过）");
+                deleted.liveness = ModelInodeLiveness::BeingDeleted {
+                    data_units_remaining: deleted.data_units_present(),
+                };
+            }
+            ModelPublishKind::DeletionBatchKeepingDataUnits {
+                deleted: ModelDeletedInode::OtherThanTheFirst(inode),
+            } => {
+                let deleted = inodes_other_than_the_first
+                    .get_mut(&inode)
+                    .expect("删除批点名的号是这一版删除中的那个（`answer_deletion_step` 判过）");
+                let ModelInodeLiveness::BeingDeleted {
+                    data_units_remaining,
+                } = deleted.liveness
+                else {
+                    panic!("删除批点名的号是这一版删除中的那个（`answer_deletion_step` 判过）：{deleted:?}");
+                };
+                deleted.liveness = ModelInodeLiveness::BeingDeleted {
+                    data_units_remaining: data_units_remaining - MODEL_DELETION_BATCH_DATA_UNITS,
+                };
+            }
+            ModelPublishKind::FinalDeletionBatch {
+                deleted: ModelDeletedInode::OtherThanTheFirst(inode),
+                ..
+            } => {
+                inodes_other_than_the_first
+                    .remove(&inode)
+                    .expect("最后一批点名的号是这一版删除中的那个（`answer_deletion_step` 判过）");
+            }
+            ModelPublishKind::UnlinkIntent {
+                deleted: ModelDeletedInode::FirstFile,
+            }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits {
+                deleted: ModelDeletedInode::FirstFile,
+            }
+            | ModelPublishKind::FinalDeletionBatch {
+                deleted: ModelDeletedInode::FirstFile,
+                ..
+            }
+            | ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => {}
+        }
+        // 这一版父链上 inode 1 的死亡 txg：删第一个文件的意图那次写成这次的；别的照抄上一版的，管理员回退那次下面再换成回退目标那一版的。
+        let death_txg_of_the_first_file_unless_rolled_back = match kind {
+            ModelPublishKind::UnlinkIntent {
+                deleted: ModelDeletedInode::FirstFile,
+            } => Some(checkpoint_txg),
+            ModelPublishKind::UnlinkIntent {
+                deleted: ModelDeletedInode::OtherThanTheFirst(_),
+            }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
+            | ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => {
+                previous.death_txg_of_the_first_file
+            }
+        };
+        // 管理员回退那次的父是回退目标（谱系记录 (T_rb, T_old)）：父链上 inode 1 的死亡 txg 取回退目标那一版的，现行那一版在回退目标之后留下的
+        // 墓碑落在被抛下的那一段里（β 只认这一版父链上的墓碑，代码轮判决 m3-close-w5-code-r1 第三节第 1 条）。
+        let death_txg_of_the_first_file = match user_visible_trees {
+            UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem => {
+                death_txg_of_the_first_file_unless_rolled_back
+            }
+            UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(target_root) => {
+                target_root.death_txg_of_the_first_file
+            }
+        };
+        match inodes_other_than_the_first_change {
+            InodesOtherThanTheFirstChangeOfThePublish::Carried => {}
+            InodesOtherThanTheFirstChangeOfThePublish::Created { count } => {
+                for new_inode in inode_number_watermark..inode_number_watermark + count {
+                    inodes_other_than_the_first.insert(
+                        new_inode,
+                        ModelInodeOtherThanTheFirst {
+                            content: Rc::from(Vec::new()),
+                            data_written_at: None,
+                            object_birth: checkpoint_txg,
+                            liveness: ModelInodeLiveness::Live,
+                        },
+                    );
+                }
+                inode_number_watermark += count;
+            }
+            InodesOtherThanTheFirstChangeOfThePublish::WholeWrite { inode, content } => {
+                let written = inodes_other_than_the_first.get_mut(&inode).expect(
+                    "按 inode 号写只点名这一版树里第一个文件之外活着的号（`answer_whole_write_of_an_inode` 判过）",
+                );
+                written.content = Rc::from(content);
+                written.data_written_at = Some(checkpoint_txg);
+            }
+        }
+        let data_units_written_to_the_file_other_than_the_first =
+            match inodes_other_than_the_first_change {
+                InodesOtherThanTheFirstChangeOfThePublish::WholeWrite { content, .. } => {
+                    data_units_of_content(u64::try_from(content.len()).expect("内容长度"))
+                }
+                InodesOtherThanTheFirstChangeOfThePublish::Carried
+                | InodesOtherThanTheFirstChangeOfThePublish::Created { .. } => 0,
+            };
         let mut role_written_at = previous.role_written_at.clone();
         for role in kind.removed_roles() {
             role_written_at.remove(role);
         }
-        let data_units_of_the_new_content = new_file_content.map_or(0, |content| {
-            data_units_of_content(u64::try_from(content.len()).expect("内容长度"))
-        });
-        let data_units_remaining_before_this_publish = match previous.contents {
-            ModelVersionContents::FileBeingDeleted {
-                data_units_remaining,
-                ..
-            } => Some(data_units_remaining),
-            ModelVersionContents::WithoutTrees
-            | ModelVersionContents::LiveFile(_)
-            | ModelVersionContents::TreesAndNoFile { .. }
-            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => None,
-        };
+        let data_unit_change =
+            Self::data_unit_change_of_the_publish(previous, kind, new_file_content);
+        // 上一版删除中的那个号（第一个文件或别的文件）还剩几个单元：不是最后一批的删除批截的是它的下段。
+        let data_units_remaining_before_this_publish = previous
+            .inode_being_deleted()
+            .map(|(_, data_units_remaining)| data_units_remaining);
         let rewritten = kind.rewritten_roles();
-        for role in &rewritten {
+        // 数据单元按单元号另记（`data_unit_written_at`），不进按角色记的这张表。
+        for role in rewritten
+            .iter()
+            .filter(|role| **role != ModelUnitRole::Data)
+        {
             role_written_at.insert(*role, checkpoint_txg);
         }
+        let rewrites_the_extent_upper_root = rewritten.contains(&ModelUnitRole::ExtentRoot);
+        // 写上段叶条目的发布按这次之后存在的单元数与 size 写标签，不写的照抄（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5）。
+        let extent_upper_leaf_entry_label_after =
+            |previous_file: Option<&ModelFileVersion>, size_in_bytes: usize| match (
+                rewrites_the_extent_upper_root,
+                previous_file,
+            ) {
+                (true, Some(_) | None) => ModelExtentUpperLeafEntryLabel::written_for(
+                    data_unit_change.data_units_after,
+                    data_units_of_content(u64::try_from(size_in_bytes).expect("内容长度")),
+                ),
+                (false, Some(previous_file)) => previous_file.extent_upper_leaf_entry_label,
+                (false, None) => {
+                    panic!("不重写 extent 上段根的发布接在带文件的一版后面，照抄它的标签：{kind:?}")
+                }
+            };
         let mut contents = match (kind, new_file_content) {
             (
                 ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion,
                 Some(content),
             ) => ModelVersionContents::LiveFile(ModelFileVersion {
                 written_by: key,
+                inode_record_written_by: key,
                 content: Rc::from(content),
-            }),
-            (ModelPublishKind::UnlinkIntent, None) => ModelVersionContents::FileBeingDeleted {
-                trees_written_by: key,
-                data_units_remaining: previous.contents.live_file().map_or_else(
-                    || panic!("意图那次只接在带活文件的一版后面（`answer_unlink_intent` 判过）：{:?}", previous.contents),
-                    |file| data_units_of_content(u64::try_from(file.content.len()).expect("内容长度")),
+                data_units_present: data_unit_change.data_units_after,
+                extent_upper_leaf_entry_label: extent_upper_leaf_entry_label_after(
+                    None,
+                    content.len(),
                 ),
-            },
-            (ModelPublishKind::DeletionBatchKeepingDataUnits, None) => {
+                // 整份写清零（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R2、第六节用户定案）。
+                truncation_field: ModelTruncationField::NotWritten,
+            }),
+            // 截断意图（K2「先落目标」）：size 写成 N、读回 N 字节，单元一个不放；只在带活文件的一版上发（`answer_truncation` 判过）。
+            // 截断字段按这次放单元之前存在的单元数写或照抄（判决 m4-trunc-r2 第六节用户定案）。
+            (ModelPublishKind::TruncationIntent { .. }, Some(content)) => {
+                let ModelVersionContents::LiveFile(previous_file) = &previous.contents else {
+                    panic!(
+                        "截断意图只接在带活文件的一版后面（`answer_truncation` 判过）：{:?}",
+                        previous.contents
+                    );
+                };
+                ModelVersionContents::FileBeingTruncated {
+                    file: ModelFileVersion {
+                        written_by: key,
+                        inode_record_written_by: key,
+                        content: Rc::from(content),
+                        data_units_present: data_unit_change.data_units_after,
+                        extent_upper_leaf_entry_label: extent_upper_leaf_entry_label_after(
+                            Some(previous_file),
+                            content.len(),
+                        ),
+                        truncation_field: ModelTruncationField::after_a_truncation_intent(
+                            previous_file.truncation_field,
+                            previous_file.data_units_present,
+                            u64::try_from(content.len()).expect("内容长度"),
+                            checkpoint_txg,
+                        ),
+                    },
+                    truncation_issued_txg: checkpoint_txg,
+                }
+            }
+            // 截断的批（K2）：不碰 inode 记录，内容与截断条目照抄，从尾部放 144 个。
+            (ModelPublishKind::TruncationBatch, None) => {
+                let ModelVersionContents::FileBeingTruncated {
+                    file: previous_file,
+                    truncation_issued_txg,
+                } = &previous.contents
+                else {
+                    panic!(
+                        "截断的批只接在截断途中的那一版后面（`answer_truncation_step` 判过）：{:?}",
+                        previous.contents
+                    );
+                };
+                ModelVersionContents::FileBeingTruncated {
+                    file: ModelFileVersion {
+                        written_by: key,
+                        inode_record_written_by: previous_file.inode_record_written_by,
+                        content: Rc::clone(&previous_file.content),
+                        data_units_present: data_unit_change.data_units_after,
+                        extent_upper_leaf_entry_label: extent_upper_leaf_entry_label_after(
+                            Some(previous_file),
+                            previous_file.content.len(),
+                        ),
+                        truncation_field: previous_file.truncation_field,
+                    },
+                    truncation_issued_txg: *truncation_issued_txg,
+                }
+            }
+            // 截断的最后一批（K2、K11）：放完 size 之外的单元、删截断条目，之后是带活文件的一版；放 0 个时 extent 树不动、用户可见树的根指针照抄。
+            (ModelPublishKind::FinalTruncationBatch { release, .. }, None) => {
+                let ModelVersionContents::FileBeingTruncated {
+                    file: previous_file,
+                    ..
+                } = &previous.contents
+                else {
+                    panic!(
+                        "截断的最后一批只接在截断途中的那一版后面（`answer_truncation_step` 判过）：{:?}",
+                        previous.contents
+                    );
+                };
+                ModelVersionContents::LiveFile(ModelFileVersion {
+                    written_by: match release {
+                        ModelFinalTruncationBatchRelease::AtLeastOneDataUnit => key,
+                        ModelFinalTruncationBatchRelease::NoDataUnit => previous_file.written_by,
+                    },
+                    inode_record_written_by: previous_file.inode_record_written_by,
+                    content: Rc::clone(&previous_file.content),
+                    data_units_present: data_unit_change.data_units_after,
+                    extent_upper_leaf_entry_label: extent_upper_leaf_entry_label_after(
+                        Some(previous_file),
+                        previous_file.content.len(),
+                    ),
+                    truncation_field: previous_file.truncation_field,
+                })
+            }
+            // 不缩短的截断（K5、K12）：size 写成 N、读回补 0 到 N 的内容，单元一个不放、不新增。
+            (ModelPublishKind::SizeChangeWithoutShrinking { .. }, Some(content)) => {
+                let ModelVersionContents::LiveFile(previous_file) = &previous.contents else {
+                    panic!(
+                        "不缩短的截断只接在带活文件的一版后面（`answer_truncation` 判过）：{:?}",
+                        previous.contents
+                    );
+                };
+                ModelVersionContents::LiveFile(ModelFileVersion {
+                    written_by: key,
+                    inode_record_written_by: key,
+                    content: Rc::from(content),
+                    data_units_present: data_unit_change.data_units_after,
+                    extent_upper_leaf_entry_label: extent_upper_leaf_entry_label_after(
+                        Some(previous_file),
+                        content.len(),
+                    ),
+                    // 变长与 N = S 照抄（判决 m4-trunc-r2 第三节 R2）。
+                    truncation_field: previous_file.truncation_field,
+                })
+            }
+            // unlink 的意图与各批照抄截断字段（判决 m4-trunc-r2 第三节 R2）：意图只接在带活文件的一版后面（`answer_unlink_intent` 判过），
+            // 各批只接在删除中的那一版后面（`answer_deletion_step` 判过）。
+            (
+                ModelPublishKind::UnlinkIntent {
+                    deleted: ModelDeletedInode::FirstFile,
+                },
+                None,
+            ) => {
+                let truncation_field_of_the_unlinked_record = previous
+                    .contents
+                    .live_file()
+                    .expect("unlink 的意图只接在带活文件的一版后面（`answer_unlink_intent` 判过）")
+                    .truncation_field;
+                ModelVersionContents::FileBeingDeleted {
+                    trees_written_by: key,
+                    data_units_remaining: data_unit_change.data_units_after,
+                    truncation_field: truncation_field_of_the_unlinked_record,
+                }
+            }
+            (
+                ModelPublishKind::DeletionBatchKeepingDataUnits {
+                    deleted: ModelDeletedInode::FirstFile,
+                },
+                None,
+            ) => {
+                let ModelVersionContents::FileBeingDeleted {
+                    truncation_field, ..
+                } = previous.contents
+                else {
+                    panic!(
+                        "不是最后一批的删除批只接在删除中的那一版后面（`answer_deletion_step` 判过）：{:?}",
+                        previous.contents
+                    );
+                };
                 ModelVersionContents::FileBeingDeleted {
                     trees_written_by: key,
                     data_units_remaining: data_units_remaining_before_this_publish
                         .expect("不是最后一批的删除批只接在删除中的那一版后面（`answer_deletion_step` 判过）")
                         - MODEL_DELETION_BATCH_DATA_UNITS,
+                    truncation_field,
                 }
             }
-            (ModelPublishKind::FinalDeletionBatch, None) => ModelVersionContents::TreesAndNoFile {
-                trees_written_by: key,
-            },
+            // 删第一个文件的最后一批：树里还有别的 inode 时是带文件的一版（D8（核心索引结构） 已定项 16 第 5 条，判决第三节 M3：不管 inode 1 在不在），
+            // 没有了才是有树而文件集合为空的一版。
+            (
+                ModelPublishKind::FinalDeletionBatch {
+                    deleted: ModelDeletedInode::FirstFile,
+                    ..
+                },
+                None,
+            ) => Self::contents_without_the_first_file(
+                key,
+                u64::try_from(inodes_other_than_the_first.len()).expect("条数"),
+            ),
+            // 删第一个文件之外的号的意图、批与最后一批：第一个文件（活着或已删完）照旧，inode 树换了一版（这次写的），批与最后一批连 extent 树。
+            (
+                ModelPublishKind::UnlinkIntent {
+                    deleted: ModelDeletedInode::OtherThanTheFirst(_),
+                }
+                | ModelPublishKind::DeletionBatchKeepingDataUnits {
+                    deleted: ModelDeletedInode::OtherThanTheFirst(_),
+                }
+                | ModelPublishKind::FinalDeletionBatch {
+                    deleted: ModelDeletedInode::OtherThanTheFirst(_),
+                    ..
+                },
+                None,
+            ) => Self::contents_whose_trees_a_change_of_another_inode_rewrote(
+                &previous.contents,
+                key,
+                u64::try_from(inodes_other_than_the_first.len()).expect("条数"),
+                kind,
+            ),
+            // 建 inode：第一个文件活着时文件照旧，inode 树换了一版（这次写的），用户可见树的写者换成这次；删完之后建的数着树里几条。
             (
                 ModelPublishKind::NewInode
                 | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_),
                 None,
-            ) => ModelVersionContents::InodesWithoutTheFirstFile {
-                trees_written_by: key,
-                inode_records_in_the_tree: previous
-                    .contents
-                    .inode_records_created_after_the_first_file_was_deleted()
-                    .expect("建 inode 只接在第一个文件已删完的一版后面（`answer_create_inode` 判过）")
-                    + 1,
+            ) => match &previous.contents {
+                ModelVersionContents::LiveFile(previous_file) => {
+                    ModelVersionContents::LiveFile(Self::file_version_whose_trees_this_publish_rewrote(
+                        previous_file,
+                        key,
+                    ))
+                }
+                ModelVersionContents::WithoutTrees
+                | ModelVersionContents::FileBeingDeleted { .. }
+                | ModelVersionContents::TreesAndNoFile { .. }
+                | ModelVersionContents::InodesWithoutTheFirstFile { .. }
+                | ModelVersionContents::FileBeingTruncated { .. } => {
+                    let created = match inodes_other_than_the_first_change {
+                        InodesOtherThanTheFirstChangeOfThePublish::Created { count } => count,
+                        InodesOtherThanTheFirstChangeOfThePublish::Carried
+                        | InodesOtherThanTheFirstChangeOfThePublish::WholeWrite { .. } => {
+                            unreachable!("建 inode 的两种恰好带建了几个（上面断言过）")
+                        }
+                    };
+                    ModelVersionContents::InodesWithoutTheFirstFile {
+                        trees_written_by: key,
+                        inode_records_in_the_tree: previous
+                            .contents
+                            .inode_records_created_after_the_first_file_was_deleted()
+                            .expect("建 inode 只接在第一个文件活着或已删完的一版后面（`answer_create_inodes` 判过）")
+                            + created,
+                    }
+                }
             },
+            // 按 inode 号写第一个文件之外的文件：第一个文件的内容、单元、标签照旧，inode 树与 extent 树换了一版（这次写的）。
+            // 第一个文件已删完时只写删之前就有的 inode（K-U5 β，`answer_whole_write_of_an_inode` 判过）。
+            (ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. }, None) => {
+                Self::contents_whose_trees_a_change_of_another_inode_rewrote(
+                    &previous.contents,
+                    key,
+                    u64::try_from(inodes_other_than_the_first.len()).expect("条数"),
+                    kind,
+                )
+            }
             (
                 ModelPublishKind::RowsOnFileVersion
                 | ModelPublishKind::EmptyOnFileVersion
@@ -1893,30 +4113,127 @@ impl IdealModel {
                 | ModelPublishKind::ZeroUnit,
                 None,
             ) => previous.contents.clone(),
-            (ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion, None)
+            // 建快照与删快照的几次不动文件内容、extent 树与 inode 树（判决 S2、S4）。
+            (
+                ModelPublishKind::SnapshotCreation
+                | ModelPublishKind::SnapshotDestructionIntent { .. }
+                | ModelPublishKind::SnapshotDestructionBatch { .. }
+                | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+
+                | ModelPublishKind::CompactionBatch { .. }
+                | ModelPublishKind::CompactionIntentIssue
+                | ModelPublishKind::CompactionIntentDeletion { .. },
+                None,
+            ) => previous.contents.clone(),
+            (
+                ModelPublishKind::FirstFileVersion
+                | ModelPublishKind::OverwriteFileVersion
+                | ModelPublishKind::TruncationIntent { .. }
+                | ModelPublishKind::SizeChangeWithoutShrinking { .. },
+                None,
+            )
+            | (
+                ModelPublishKind::TruncationBatch | ModelPublishKind::FinalTruncationBatch { .. },
+                Some(_),
+            )
             | (
                 ModelPublishKind::RowsOnFileVersion
                 | ModelPublishKind::EmptyOnFileVersion
                 | ModelPublishKind::RowsOnVersionWithoutFile
                 | ModelPublishKind::ZeroUnit
-                | ModelPublishKind::UnlinkIntent
-                | ModelPublishKind::DeletionBatchKeepingDataUnits
-                | ModelPublishKind::FinalDeletionBatch
+                | ModelPublishKind::UnlinkIntent { .. }
+                | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+                | ModelPublishKind::FinalDeletionBatch { .. }
                 | ModelPublishKind::NewInode
-                | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_),
+                | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+                | ModelPublishKind::SnapshotCreation
+                | ModelPublishKind::SnapshotDestructionIntent { .. }
+                | ModelPublishKind::SnapshotDestructionBatch { .. }
+                | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+
+                | ModelPublishKind::CompactionBatch { .. }
+                | ModelPublishKind::CompactionIntentIssue
+                | ModelPublishKind::CompactionIntentDeletion { .. }
+                // 按 inode 号写的内容走 `InodesOtherThanTheFirstChangeOfThePublish::WholeWrite`，这个参数说的是第一个文件。
+                | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. },
                 Some(_),
-            ) => panic!("只有写文件内容的两种发布带内容，别的都不带：{kind:?}"),
+            ) => panic!(
+                "带内容的只有写文件内容的两种、截断意图与不缩短的截断（读回的整份），别的都不带：{kind:?}"
+            ),
         };
+        // extent 树上段（规范形，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2）：按这次之后有条目的号集合与
+        // 这次条目变了的号，模型自己的计划（[`extent_upper_node_written_at_after`]）定每个节点这次重写还是照抄；根与根之下的每个节点各是一个角色。
+        // 种类定死的角色里有没有上段根，与计划说根这次重写没有，要一致。树表 0 条的一版没有上段。回退那次下面整组换成目标那一版的。
+        let inodes_with_an_entry_after =
+            inodes_with_an_extent_upper_leaf_entry(&contents, &inodes_other_than_the_first);
+        let inodes_whose_entry_changed =
+            Self::inodes_whose_extent_upper_leaf_entry_the_publish_changes(
+                kind,
+                inodes_other_than_the_first_change,
+                &previous.inodes_with_an_extent_upper_leaf_entry(),
+            );
+        role_written_at.retain(|role, _| !role.is_a_node_of_the_extent_upper_segment());
+        if contents.has_trees() {
+            let root_level_after = extent_upper_segment_root_level(&inodes_with_an_entry_after);
+            for (position, written_at) in extent_upper_node_written_at_after(
+                &previous.extent_upper_node_written_at(),
+                &inodes_with_an_entry_after,
+                &inodes_whose_entry_changed,
+                checkpoint_txg,
+            ) {
+                let role = if position.level == root_level_after {
+                    ModelUnitRole::ExtentRoot
+                } else {
+                    ModelUnitRole::ExtentUpperNodeBelowTheRoot(position)
+                };
+                role_written_at.insert(role, written_at);
+            }
+            assert_eq!(
+                role_written_at.get(&ModelUnitRole::ExtentRoot) == Some(&checkpoint_txg),
+                rewrites_the_extent_upper_root,
+                "种类定死的角色里有没有 extent 上段根，与规范形计划说根这次重写没有，要一致：{kind:?}，有条目的号 {inodes_with_an_entry_after:?}，变了的 {inodes_whose_entry_changed:?}"
+            );
+        }
+        let mut data_unit_written_at = data_unit_change
+            .data_unit_written_at_after(&previous.data_unit_written_at, checkpoint_txg);
+        let mut rollback_rewrites_the_logged_operations_root = false;
         match user_visible_trees {
             UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem => {}
             UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(target_root) => {
                 contents.clone_from(&target_root.contents);
+                data_unit_written_at.clone_from(&target_root.data_unit_written_at);
+                // 第一个文件之外的 inode 随 inode 树、extent 树取目标那一版的（记录、数据单元、下段都是那一版的）；水位不取目标的（照现行那一版）。
+                inodes_other_than_the_first
+                    .clone_from(target_root.inodes_other_than_the_first.as_ref());
+                // 回退时 logged_ops 按种类分来源（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1）：截断条目取回退目标那一版的
+                // （随上面换过的 `contents`），整理意图随现行那一版。截断条目与现行那一版的不同时 logged_ops 这次重写，删空了取根指针置零。
+                let truncation_entry_of_the_target =
+                    target_root.contents.logged_truncation_issued_txg();
+                if truncation_entry_of_the_target
+                    != previous.contents.logged_truncation_issued_txg()
+                {
+                    if truncation_entry_of_the_target.is_some()
+                        || previous.logged_compaction_intent.is_some()
+                    {
+                        role_written_at.insert(ModelUnitRole::LoggedOperationsRoot, checkpoint_txg);
+                        rollback_rewrites_the_logged_operations_root = true;
+                    } else {
+                        role_written_at.remove(&ModelUnitRole::LoggedOperationsRoot);
+                    }
+                }
                 // 新根的 inode 树、extent 树与 `deleted_inodes` 取回退目标那一版的（D23（journal 的角色与格式） 已定项 14）：
-                // 目标那一版有的角色取它的分配代，没有的（删完的一版没有数据单元、叶容器与 `deleted_inodes` 根）这一版也没有；
-                // 墓碑树与退役树随现行那一版。
+                // 目标那一版有的角色取它的分配代，没有的（删完的一版没有叶容器与 `deleted_inodes` 根）这一版也没有；数据单元整组取目标那一版的
+                // （上面）；墓碑树与退役树随现行那一版。
+                // extent 上段的根与根之下的节点同样整组取目标那一版的。
+                role_written_at.retain(|role, _| !role.is_a_node_of_the_extent_upper_segment());
+                for (role, written_at) in target_root
+                    .role_written_at
+                    .iter()
+                    .filter(|(role, _)| role.is_a_node_of_the_extent_upper_segment())
+                {
+                    role_written_at.insert(*role, *written_at);
+                }
                 for role in [
-                    ModelUnitRole::Data,
-                    ModelUnitRole::ExtentRoot,
                     ModelUnitRole::InodeLeaf,
                     ModelUnitRole::InodeRoot,
                     ModelUnitRole::DeletedInodesRoot,
@@ -1945,6 +4262,31 @@ impl IdealModel {
                 );
             }
         }
+        assert_eq!(
+            u64::try_from(data_unit_written_at.len()).expect("单元数"),
+            contents.data_units_present(),
+            "按单元号记的分配代与这一版存在的单元数一一对应：{kind:?}"
+        );
+        if let Some(file) = contents.live_file() {
+            assert!(
+                file.extent_upper_leaf_entry_label.admits(
+                    file.data_units_present,
+                    file.data_units_within_the_size(),
+                    contents.logged_truncation_issued_txg().is_some(),
+                ),
+                "上段叶条目的标签 {:?} 与存在的 {} 个单元、size {} 对得上（判决第三节 K5、K7 的 T-3）：{kind:?}",
+                file.extent_upper_leaf_entry_label,
+                file.data_units_present,
+                file.content.len()
+            );
+        }
+        let snapshot_bookkeeping = Self::snapshot_bookkeeping_of_the_publish(
+            previous,
+            kind,
+            checkpoint_txg,
+            user_visible_trees,
+            &data_unit_change,
+        );
         // 记账行：写记账树的发布照抄上一版的台阶行（回退那次的 `previous` 是现行那一版，台阶从它带），水位变了的再留一级；
         // 不写记账树的发布（树表 0 条的一版上的零单元发布）这一版没有记账树。记账树节点数的上界按这次写的行数从上一版的上界往下带
         // （回退那次实现从现行那一版的形状规划，`previous` 就是它）。
@@ -1972,16 +4314,19 @@ impl IdealModel {
         for role in &rewritten {
             match role {
                 ModelUnitRole::AllocationTree => rewrites_the_allocation_record_tree = true,
-                // 内容的每个数据单元都在这次写（模型把它们记成同一个角色、同一个分配代）。
+                // 这次写的数据单元：写内容的是内容的每一个，截断与不缩短的截断是那一个尾单元。
                 ModelUnitRole::Data => {
-                    slots_written += role.span_in_slots() * data_units_of_the_new_content;
+                    slots_written += role.span_in_slots()
+                        * (data_unit_change.rewritten.end - data_unit_change.rewritten.start);
                 }
                 // 记账树一次至多重写这一版的全部节点（根与根之下的，每个节点每盘占一个槽）：根之下的节点不对应角色，按上界算。
                 ModelUnitRole::AccountingTree => {
                     slots_written += role.span_in_slots() * accounting_tree_nodes;
                 }
-                // 中央映射树在这里只记它的根：根之下的节点数按上界另算（下面）。
+                // 中央映射树在这里只记它的根：根之下的节点数按上界另算（下面）。extent 上段根之下的节点不在种类定死的角色里，
+                // 按这一版的形状另算（下面）。
                 ModelUnitRole::ExtentRoot
+                | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_)
                 | ModelUnitRole::InodeLeaf
                 | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
                 | ModelUnitRole::InodeRoot
@@ -1989,33 +4334,123 @@ impl IdealModel {
                 | ModelUnitRole::TreeTable
                 | ModelUnitRole::InstanceTable
                 | ModelUnitRole::DeletedInodesRoot
+                | ModelUnitRole::LoggedOperationsRoot
                 | ModelUnitRole::TombstoneLeaf
                 | ModelUnitRole::TombstoneRoot
                 | ModelUnitRole::RetirementLeaf
                 | ModelUnitRole::RetirementRoot => slots_written += role.span_in_slots(),
             }
         }
+        // 回退那次截断条目取回退目标那一版的、与现行那一版不同时 logged_ops 根这次重写（K1）。
+        if rollback_rewrites_the_logged_operations_root {
+            slots_written += ModelUnitRole::LoggedOperationsRoot.span_in_slots();
+        }
         // extent 树下段的节点不对应角色（同分配记录树根之下的节点：分配代与位置归池级 checker 判），占槽按条款现算：
-        // 写内容的两种重写整个下段；不是最后一批的删除批只重写被截掉那一片下段叶与它的祖先，每层至多一个。
+        // 写内容的两种重写整个下段；不是最后一批的删除批只重写被截掉那一片下段叶与它的祖先，每层至多一个；截断的批与放了单元的最后一批同
+        // （按截之前的层数取上界）；重写尾单元的截断意图与不缩短的截断重写罩着它的那一片下段叶到根，每层一个（判决
+        // `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K3）。
         let extent_lower_segment_nodes_written = match kind {
             ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion => {
-                extent_lower_segment_nodes(data_units_of_the_new_content)
+                extent_lower_segment_nodes(data_unit_change.data_units_after)
             }
-            ModelPublishKind::DeletionBatchKeepingDataUnits => {
+            ModelPublishKind::DeletionBatchKeepingDataUnits { .. } => {
                 extent_lower_segment_levels(data_units_remaining_before_this_publish.expect(
                     "不是最后一批的删除批只接在删除中的那一版后面（`answer_deletion_step` 判过）",
                 ))
             }
-            ModelPublishKind::RowsOnFileVersion
+            ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch {
+                release: ModelFinalTruncationBatchRelease::AtLeastOneDataUnit,
+                ..
+            } => extent_lower_segment_levels(data_unit_change.data_units_before),
+            ModelPublishKind::TruncationIntent {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+            }
+            | ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+            } => extent_lower_segment_levels(data_unit_change.data_units_after),
+            ModelPublishKind::TruncationIntent {
+                extent_tree:
+                    ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel
+                    | ModelExtentTreeChangeOfASizeChange::Untouched,
+            }
+            | ModelPublishKind::FinalTruncationBatch {
+                release: ModelFinalTruncationBatchRelease::NoDataUnit,
+                ..
+            }
+            | ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree:
+                    ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel
+                    | ModelExtentTreeChangeOfASizeChange::Untouched,
+            }
+            | ModelPublishKind::RowsOnFileVersion
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::RowsOnVersionWithoutFile
             | ModelPublishKind::ZeroUnit
-            | ModelPublishKind::UnlinkIntent
-            | ModelPublishKind::FinalDeletionBatch
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
             | ModelPublishKind::NewInode
-            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => 0,
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            // 第一个文件的下段一个节点都不写；写的那个文件的单元与下段在下面另算。
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => 0,
         };
         slots_written += extent_lower_segment_nodes_written * (NODE_BYTES / SLOT_BYTES);
+        // 按 inode 号写第一个文件之外的文件：那个文件的每个数据单元与它的整个下段这次写（同第一个文件的整份写，D8（核心索引结构） 已定项 14）。
+        slots_written += data_units_written_to_the_file_other_than_the_first
+            * ModelUnitRole::Data.span_in_slots()
+            + extent_lower_segment_nodes(data_units_written_to_the_file_other_than_the_first)
+                * (NODE_BYTES / SLOT_BYTES);
+        // extent 树上段根之下的节点（上段长过层之后才有）各是一个角色，不在种类定死的角色里：这次重写的（规范形计划给它们这次的 txg）各占一个节点的槽。
+        // 只有第一个文件的历史里一个都没有，那几组的占槽不变。
+        let extent_upper_nodes_below_the_root_rewritten = role_written_at
+            .iter()
+            .filter(|(role, written_at)| {
+                matches!(role, ModelUnitRole::ExtentUpperNodeBelowTheRoot(_))
+                    && **written_at == checkpoint_txg
+            })
+            .count();
+        slots_written += u64::try_from(extent_upper_nodes_below_the_root_rewritten)
+            .expect("节点数")
+            * (NODE_BYTES / SLOT_BYTES);
+        // 整理的一批写目的地：至多 `units_at_most` 个单元，每个至多占一个数据单元那么宽（32 KiB 两槽，节点一槽）。
+        let relocation_destination_slots_upper_bound = match kind {
+            ModelPublishKind::CompactionBatch { units_at_most, .. } => {
+                units_at_most * ModelUnitRole::Data.span_in_slots()
+            }
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => 0,
+        };
+        slots_written += relocation_destination_slots_upper_bound;
+        // deadlist 树的节点（码 2 节点，每盘占一个槽）：这一版或上一版有条目时按这一版节点数的上界算它这次全写一遍。
+        slots_written +=
+            snapshot_bookkeeping.deadlist_tree_nodes_written * (NODE_BYTES / SLOT_BYTES);
         // 实例表链多于一片时第 1 片起每一片也是一个重写的单元：`rewritten_roles` 里实例表只记一个角色，多出来的几片在这里补上。
         let instance_table_pages_after_the_first = if kind.rewrites_the_instance_table() {
             instance_table_pages_for_rows(instance_table_rows.len()) - 1
@@ -2040,7 +4475,10 @@ impl IdealModel {
                         &role_written_at,
                         accounting_tree_nodes,
                         checkpoint_txg,
-                    ),
+                    ) + central_mapping_entries_of_the_files_other_than_the_first(
+                        &inodes_other_than_the_first,
+                    ) + snapshot_bookkeeping.pinned_mapping_entries
+                        + snapshot_bookkeeping.deadlist_tree_nodes_upper_bound,
                     previous.occupied_slots_upper_bound_per_device + slots_written,
                 );
             slots_written += (mapping_nodes - 1) * ModelUnitRole::MappingTree.span_in_slots()
@@ -2059,7 +4497,10 @@ impl IdealModel {
         } else {
             0
         };
-        let transactions_of_this_publish = kind.transactions_carried(data_units_of_the_new_content);
+        let transactions_of_this_publish = kind.transactions_carried(
+            data_unit_change.rewritten.end - data_unit_change.rewritten.start
+                + data_units_written_to_the_file_other_than_the_first,
+        );
         let highest_transaction_number_of_its_publish = if transactions_of_this_publish > 0 {
             highest_transaction_number_before_this_publish + transactions_of_this_publish
         } else {
@@ -2069,13 +4510,35 @@ impl IdealModel {
         // jsn 一条记录加一（D23（journal 的角色与格式） 已定项 7），根带的是这次发布末条记录的 jsn。`journal_counter` 是这次第一条记录的。
         // 末条再跨记录（D23 已定项 17）只在最后一个事务要点名的项多于一条记录装得下的 64 项时才有，模型罩的发布点名的项远不到。
         let records_of_this_publish = transactions_of_this_publish.max(1);
-        ModelRoot {
+        // logged_ops 照抄上一版（回退那次的 `previous` 是现行那一版：随现行那一版），删意图的几种删空；签发那一条由
+        // [`IdealModel::answer_compaction_publish`] 装上。
+        let logged_compaction_intent = if kind
+            .removed_roles()
+            .contains(&ModelUnitRole::LoggedOperationsRoot)
+        {
+            None
+        } else {
+            previous.logged_compaction_intent
+        };
+        // 搬过的根单元：照抄上一版的，只留这一版还引用着的；这一批搬的由 [`IdealModel::answer_compaction_publish`] 记上。
+        // 回退那次只取目标那一版的（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H1）：实现回退时树表里用户可见树
+        // 那几条根指针整条取目标那一版的字节，目标那一版之后才搬的根单元在新根里仍指搬之前的位置，现行那一版「最后一次搬它」的记录不并进来。
+        let mut relocations_carried = match user_visible_trees {
+            UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem => {
+                previous.user_visible_root_relocations.as_ref().clone()
+            }
+            UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(target_root) => {
+                target_root.user_visible_root_relocations.as_ref().clone()
+            }
+        };
+        let mut root = ModelRoot {
             key,
             journal_counter: ModelJournalCounter(journal_counter.0 + records_of_this_publish - 1),
             rollback_floor,
             contents,
             instance_table_rows,
             role_written_at,
+            data_unit_written_at: Rc::new(data_unit_written_at),
             occupied_slots_upper_bound_per_device: previous.occupied_slots_upper_bound_per_device
                 + slots_written,
             central_mapping_tree_nodes_upper_bound,
@@ -2086,6 +4549,558 @@ impl IdealModel {
             highest_transaction_number_in_its_instance:
                 highest_transaction_number_before_this_publish
                     .max(highest_transaction_number_of_its_publish),
+            snapshots: snapshot_bookkeeping.snapshots,
+            previous_snapshot_txg_of_the_live_head: snapshot_bookkeeping
+                .previous_snapshot_txg_of_the_live_head,
+            deadlist: snapshot_bookkeeping.deadlist,
+            pinned_mapping_entries: snapshot_bookkeeping.pinned_mapping_entries,
+            deadlist_tree_nodes_upper_bound: snapshot_bookkeeping.deadlist_tree_nodes_upper_bound,
+            extent_lower_node_written_at: snapshot_bookkeeping.extent_lower_node_written_at,
+            logged_compaction_intent,
+            user_visible_root_relocations: Rc::new(BTreeMap::new()),
+            inodes_other_than_the_first: Rc::new(inodes_other_than_the_first),
+            inode_number_watermark,
+            death_txg_of_the_first_file,
+        };
+        let referenced: BTreeSet<ModelUserVisibleRootUnit> =
+            root.user_visible_root_units().into_iter().collect();
+        relocations_carried.retain(|unit, _| referenced.contains(unit));
+        root.user_visible_root_relocations = Rc::new(relocations_carried);
+        root
+    }
+
+    /// 这次发布之后这一版的快照那几样（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3、S4 与 S7）：
+    /// - 这次换下的用户可见单元（[`ModelUnitRole::asks_the_snapshot_lifetime_judgement`] 那几类，加 extent 树下段被换下的节点）按出生 txg 与
+    ///   上一版活头的 `previous_snapshot_txg`（p）判：出生 txg ≤ p 的进 deadlist（纪元 = p）、留一条映射条目，其余照旧释放（D5 已定项 19）。
+    ///   换下的数据单元（[`DataUnitChangeOfThePublish::replaced`]）：覆盖写换下上一版的全部、不是最后一批的删除批与截断的批从尾部放 144 个、
+    ///   最后一批放剩下的、截断意图与不缩短的截断换下重写的那一个尾单元；第一个文件版本没有上一版，什么都不换下。每个按它自己的出生 txg 判
+    ///   （判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4）。
+    /// - 建快照追加一个，活头前驱换成这次的 txg；删快照的意图给第 `position` 个带上「销毁中」、把它的前驱传给下一侧；每一批放掉它那一段
+    ///   （纪元落在 [它的诞生 txg, 下一侧的诞生 txg 或这一批的 txg)、出生 txg 晚于它的前驱）里的条目，最后一批放掉剩下的、删掉它。
+    /// - 管理员回退那次：回退在现行那一版或目标那一版带快照时拒（判决 S8），走到这里两版都没有快照、活头前驱是 0，一个单元都不钉；
+    ///   extent 树下段取目标那一版的。
+    fn snapshot_bookkeeping_of_the_publish(
+        previous: &ModelRoot,
+        kind: ModelPublishKind,
+        checkpoint_txg: ModelCheckpointTxg,
+        user_visible_trees: UserVisibleTreesOfTheNewVersion<'_>,
+        data_unit_change: &DataUnitChangeOfThePublish,
+    ) -> SnapshotBookkeepingOfThePublish {
+        let mut snapshots = previous.snapshots.as_ref().clone();
+        let mut previous_snapshot_txg_of_the_live_head =
+            previous.previous_snapshot_txg_of_the_live_head;
+        let mut deadlist = previous.deadlist.as_ref().clone();
+        let mut pinned_mapping_entries = previous.pinned_mapping_entries;
+        let (extent_lower_node_written_at, births_of_the_replaced_units) = match user_visible_trees
+        {
+            UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(target_root) => {
+                assert!(
+                    previous.snapshots.is_empty() && target_root.snapshots.is_empty(),
+                    "回退在现行那一版或目标那一版带快照时拒（`answer_rollback_while_mounted` 判过）：现行 {:?}，目标 {:?}",
+                    previous.snapshots,
+                    target_root.snapshots
+                );
+                (
+                    Rc::clone(&target_root.extent_lower_node_written_at),
+                    Vec::new(),
+                )
+            }
+            UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem => {
+                Self::units_replaced_by_the_publish(
+                    previous,
+                    kind,
+                    checkpoint_txg,
+                    data_unit_change,
+                )
+            }
+        };
+        let live_head_previous_snapshot_txg = previous.previous_snapshot_txg_of_the_live_head;
+        for replaced in births_of_the_replaced_units {
+            if replaced.birth_txg <= live_head_previous_snapshot_txg {
+                deadlist.push(ModelDeadlistEntry {
+                    epoch: live_head_previous_snapshot_txg,
+                    mapping_key_unit_class: replaced.mapping_key_unit_class,
+                    mapping_key_birth_tree: replaced.mapping_key_birth_tree,
+                    birth_txg: replaced.birth_txg,
+                });
+                pinned_mapping_entries += 1;
+            }
+        }
+        match kind {
+            ModelPublishKind::SnapshotCreation => {
+                snapshots.push(ModelSnapshot {
+                    birth_txg: checkpoint_txg,
+                    previous_snapshot_txg: previous.previous_snapshot_txg_of_the_live_head,
+                    is_being_destroyed: false,
+                    // 码 14 抄的是活头 inode 树的根：截断的批与最后一批只写 extent 树（判决
+                    // `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2），那之后它与用户可见树最近的写者不同。
+                    inode_tree_written_by: previous
+                        .contents
+                        .inode_tree_written_by()
+                        .expect("建快照只接在有树的一版后面（`answer_create_snapshot` 判过）"),
+                    extent_root_written_at: *previous
+                        .role_written_at
+                        .get(&ModelUnitRole::ExtentRoot)
+                        .expect("有树的一版恒有 extent 树的根（删完的一版是零条目根）"),
+                    content_at_creation: previous
+                        .contents
+                        .live_file()
+                        .map(|file| Rc::clone(&file.content)),
+                });
+                previous_snapshot_txg_of_the_live_head = checkpoint_txg;
+            }
+            ModelPublishKind::SnapshotDestructionIntent { position } => {
+                let destroyed = snapshots
+                    .get_mut(position)
+                    .expect("意图点名的快照在上一版里（`answer_destroy_snapshot` 判过）");
+                destroyed.is_being_destroyed = true;
+                let predecessor = destroyed.previous_snapshot_txg;
+                match snapshots.get_mut(position + 1) {
+                    Some(next_snapshot) => next_snapshot.previous_snapshot_txg = predecessor,
+                    None => previous_snapshot_txg_of_the_live_head = predecessor,
+                }
+            }
+            ModelPublishKind::SnapshotDestructionBatch {
+                position,
+                entries_released,
+            } => {
+                let released: Vec<ModelDeadlistEntry> =
+                    Self::deadlist_entries_the_destruction_releases(
+                        previous,
+                        position,
+                        checkpoint_txg,
+                    )
+                    .into_iter()
+                    .take(usize::try_from(entries_released).expect("一批至多 144 条"))
+                    .collect();
+                Self::remove_released_entries(&mut deadlist, &released);
+                pinned_mapping_entries -= u64::try_from(released.len()).expect("条数");
+            }
+            ModelPublishKind::SnapshotDestructionFinalBatch { position } => {
+                let released = Self::deadlist_entries_the_destruction_releases(
+                    previous,
+                    position,
+                    checkpoint_txg,
+                );
+                Self::remove_released_entries(&mut deadlist, &released);
+                pinned_mapping_entries -= u64::try_from(released.len()).expect("条数");
+                snapshots.remove(position);
+            }
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::DeletionBatchKeepingDataUnits { .. }
+            | ModelPublishKind::FinalDeletionBatch { .. }
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. }
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => {}
+        }
+        let deadlist_tree_nodes_upper_bound = deadlist_tree_nodes_upper_bound(
+            previous.deadlist_tree_nodes_upper_bound,
+            u64::try_from(deadlist.len()).expect("条数"),
+        );
+        let deadlist_tree_nodes_written = if previous.deadlist.is_empty() && deadlist.is_empty() {
+            0
+        } else {
+            deadlist_tree_nodes_upper_bound
+        };
+        SnapshotBookkeepingOfThePublish {
+            snapshots: Rc::new(snapshots),
+            previous_snapshot_txg_of_the_live_head,
+            deadlist: Rc::new(deadlist),
+            pinned_mapping_entries,
+            deadlist_tree_nodes_upper_bound,
+            deadlist_tree_nodes_written,
+            extent_lower_node_written_at,
+        }
+    }
+
+    /// 一次不是回退的发布对数据单元做了什么（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2、K3、K5 与 D8（核心索引结构）
+    /// 已定项 16 第 2 条）：写内容的整份重写；删除的批与截断的批从尾部放 144 个，删除的最后一批放光、截断的最后一批放到只剩 size 罩的那几个；
+    /// 截断意图重写尾单元时写单元 ⌈N ÷ 净荷⌉.max(1) − 1，不缩短的截断补零重写时写最后一个存在的单元；别的发布不动数据单元。
+    /// 第一个文件活着时这次发布只换了 inode 树（建 inode）或 inode 树与 extent 树（按 inode 号写第一个文件之外的文件）：第一个文件的内容、单元、
+    /// 上段叶条目的标签与截断字段照旧，两棵用户可见树的根指针换成这次写的（[`ModelFileVersion::written_by`]、
+    /// [`ModelFileVersion::inode_record_written_by`]：「非空」与建快照抄的码 14 按它们认）。
+    fn file_version_whose_trees_this_publish_rewrote(
+        previous_file: &ModelFileVersion,
+        key: ModelRootKey,
+    ) -> ModelFileVersion {
+        ModelFileVersion {
+            written_by: key,
+            inode_record_written_by: key,
+            content: Rc::clone(&previous_file.content),
+            data_units_present: previous_file.data_units_present,
+            extent_upper_leaf_entry_label: previous_file.extent_upper_leaf_entry_label,
+            truncation_field: previous_file.truncation_field,
+        }
+    }
+
+    /// 这次发布让 extent 上段里哪几个号的条目变了（进了有条目的号集合、出了它、或条目内容变了；规范形计划里罩着它们的节点重写，判决
+    /// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2）：按 inode 号写那个号；删除批删的那个号；最后一批删的那个号
+    /// （它本来有条目时，`inodes_with_an_entry_before` 是上一版有条目的号）；意图不动 extent 树；只写第一个文件的那几种（写内容、截断那几样）在
+    /// 重写上段根时是 inode 1；别的发布一个都没有。
+    fn inodes_whose_extent_upper_leaf_entry_the_publish_changes(
+        kind: ModelPublishKind,
+        inodes_other_than_the_first_change: InodesOtherThanTheFirstChangeOfThePublish<'_>,
+        inodes_with_an_entry_before: &BTreeSet<u64>,
+    ) -> BTreeSet<u64> {
+        let first_file_when_the_kind_rewrites_the_upper_root = || {
+            if kind
+                .rewritten_roles_fixed_by_the_kind()
+                .contains(&ModelUnitRole::ExtentRoot)
+            {
+                BTreeSet::from([FIRST_INODE_NUMBER])
+            } else {
+                BTreeSet::new()
+            }
+        };
+        match kind {
+            ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => {
+                match inodes_other_than_the_first_change {
+                    InodesOtherThanTheFirstChangeOfThePublish::WholeWrite { inode, .. } => {
+                        BTreeSet::from([inode])
+                    }
+                    InodesOtherThanTheFirstChangeOfThePublish::Carried
+                    | InodesOtherThanTheFirstChangeOfThePublish::Created { .. } => {
+                        panic!("按 inode 号写那一种恰好带写了谁（`next_root_with_the_user_visible_trees` 开头断言过）")
+                    }
+                }
+            }
+            ModelPublishKind::UnlinkIntent { .. } => BTreeSet::new(),
+            ModelPublishKind::DeletionBatchKeepingDataUnits { deleted } => {
+                BTreeSet::from([deleted.inode_number()])
+            }
+            ModelPublishKind::FinalDeletionBatch { deleted, .. } => {
+                if inodes_with_an_entry_before.contains(&deleted.inode_number()) {
+                    BTreeSet::from([deleted.inode_number()])
+                } else {
+                    BTreeSet::new()
+                }
+            }
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            | ModelPublishKind::TruncationIntent { .. }
+            | ModelPublishKind::TruncationBatch
+            | ModelPublishKind::FinalTruncationBatch { .. }
+            | ModelPublishKind::SizeChangeWithoutShrinking { .. } => {
+                first_file_when_the_kind_rewrites_the_upper_root()
+            }
+        }
+    }
+
+    /// 第一个文件已删完（树里没有 inode 1 的记录）的一版：树里还有 `inode_records_in_the_tree` 条别的 inode 的记录时是带文件的一版
+    /// （D8（核心索引结构） 已定项 16 第 5 条，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M3：inode 树还有任一记录的一版
+    /// 是带文件的一版，不管 inode 1 在不在），一条都没有才是有树而文件集合为空的一版。`key` 是写出这一版 inode 树的那次发布。
+    fn contents_without_the_first_file(
+        key: ModelRootKey,
+        inode_records_in_the_tree: u64,
+    ) -> ModelVersionContents {
+        if inode_records_in_the_tree == 0 {
+            ModelVersionContents::TreesAndNoFile {
+                trees_written_by: key,
+            }
+        } else {
+            ModelVersionContents::InodesWithoutTheFirstFile {
+                trees_written_by: key,
+                inode_records_in_the_tree,
+            }
+        }
+    }
+
+    /// 一次只动第一个文件之外的一个 inode 的发布（按 inode 号写、删它的意图、批与最后一批）之后这一版里有什么：第一个文件活着时它的内容、
+    /// 单元、标签与截断字段照旧，两棵用户可见树的根指针换成这次写的；第一个文件已删完时按这次之后树里还有几条记录
+    /// （`inode_records_in_the_tree_after`，就是第一个文件之外的 inode 数）归带文件的一版或有树而文件集合为空的一版。
+    ///
+    /// # Panics
+    /// 上一版不是这两种（树表 0 条、有树而文件集合为空、第一个文件删除中或截断途中）：答法只在这两种上发这几种发布（会话先走空）。
+    fn contents_whose_trees_a_change_of_another_inode_rewrote(
+        previous_contents: &ModelVersionContents,
+        key: ModelRootKey,
+        inode_records_in_the_tree_after: u64,
+        kind: ModelPublishKind,
+    ) -> ModelVersionContents {
+        match previous_contents {
+            ModelVersionContents::LiveFile(previous_file) => ModelVersionContents::LiveFile(
+                Self::file_version_whose_trees_this_publish_rewrote(previous_file, key),
+            ),
+            ModelVersionContents::InodesWithoutTheFirstFile { .. } => {
+                Self::contents_without_the_first_file(key, inode_records_in_the_tree_after)
+            }
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => panic!(
+                "只动第一个文件之外一个 inode 的发布只接在第一个文件活着、或已删完而树里还有别的 inode 的一版后面（答法判过）：{kind:?} 接在 {previous_contents:?}"
+            ),
+        }
+    }
+
+    fn data_unit_change_of_the_publish(
+        previous: &ModelRoot,
+        kind: ModelPublishKind,
+        new_file_content: Option<&[u8]>,
+    ) -> DataUnitChangeOfThePublish {
+        let data_units_before = u64::try_from(previous.data_unit_written_at.len()).expect("单元数");
+        let unchanged = DataUnitChangeOfThePublish {
+            data_units_before,
+            data_units_after: data_units_before,
+            rewritten: 0..0,
+        };
+        let data_units_of_the_new_content = || {
+            data_units_of_content(
+                u64::try_from(
+                    new_file_content
+                        .expect("写内容的、截断意图与不缩短的截断带读回的整份")
+                        .len(),
+                )
+                .expect("内容长度"),
+            )
+        };
+        match kind {
+            ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion => {
+                let data_units_after = data_units_of_the_new_content();
+                DataUnitChangeOfThePublish {
+                    data_units_before,
+                    data_units_after,
+                    rewritten: 0..data_units_after,
+                }
+            }
+            ModelPublishKind::DeletionBatchKeepingDataUnits {
+                deleted: ModelDeletedInode::FirstFile,
+            }
+            | ModelPublishKind::TruncationBatch => DataUnitChangeOfThePublish {
+                data_units_before,
+                data_units_after: data_units_before - MODEL_DELETION_BATCH_DATA_UNITS,
+                rewritten: 0..0,
+            },
+            ModelPublishKind::FinalDeletionBatch {
+                deleted: ModelDeletedInode::FirstFile,
+                ..
+            } => DataUnitChangeOfThePublish {
+                data_units_before,
+                data_units_after: 0,
+                rewritten: 0..0,
+            },
+            // 删第一个文件之外的号：这里只记第一个文件的单元，它们一个不动（那个号的单元记在它自己那一项里）。
+            ModelPublishKind::DeletionBatchKeepingDataUnits {
+                deleted: ModelDeletedInode::OtherThanTheFirst(_),
+            }
+            | ModelPublishKind::FinalDeletionBatch {
+                deleted: ModelDeletedInode::OtherThanTheFirst(_),
+                ..
+            } => unchanged,
+            // 截回洞里的（存在的单元不多于 size 罩的）一个都不放（K5、K11）。
+            ModelPublishKind::FinalTruncationBatch { .. } => DataUnitChangeOfThePublish {
+                data_units_before,
+                data_units_after: data_units_before.min(
+                    previous
+                        .contents
+                        .live_file()
+                        .expect("截断的最后一批只接在截断途中的那一版后面（`answer_truncation_step` 判过）")
+                        .data_units_within_the_size(),
+                ),
+                rewritten: 0..0,
+            },
+            ModelPublishKind::TruncationIntent {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+            } => {
+                let tail_data_unit = data_units_of_the_new_content() - 1;
+                DataUnitChangeOfThePublish {
+                    data_units_before,
+                    data_units_after: data_units_before,
+                    rewritten: tail_data_unit..tail_data_unit + 1,
+                }
+            }
+            ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+            } => DataUnitChangeOfThePublish {
+                data_units_before,
+                data_units_after: data_units_before,
+                rewritten: data_units_before - 1..data_units_before,
+            },
+            ModelPublishKind::TruncationIntent {
+                extent_tree:
+                    ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel
+                    | ModelExtentTreeChangeOfASizeChange::Untouched,
+            }
+            | ModelPublishKind::SizeChangeWithoutShrinking {
+                extent_tree:
+                    ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel
+                    | ModelExtentTreeChangeOfASizeChange::Untouched,
+            }
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::UnlinkIntent { .. }
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_)
+            | ModelPublishKind::SnapshotCreation
+            | ModelPublishKind::SnapshotDestructionIntent { .. }
+            | ModelPublishKind::SnapshotDestructionBatch { .. }
+            | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
+            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionIntentIssue
+            | ModelPublishKind::CompactionIntentDeletion { .. }
+            // 按 inode 号写第一个文件之外的文件：这里只记第一个文件的单元，它们一个不动。
+            | ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst { .. } => unchanged,
+        }
+    }
+
+    /// 一次不是回退的发布之后 extent 树下段每个节点的分配代，与这次换下的用户可见单元各自的出生 txg（一个单元一项）。
+    ///
+    /// 下段节点按「内容变了才写」（COW）：这次之后存在的单元的每个位置，上一版没有的、罩着这次写的单元的、罩着这次从尾部放掉的单元的
+    /// （孩子少了），这次写；别的照抄上一版的分配代。写内容的整份重写因此整段重写；删除批只重写被截掉那一片下段叶与它的祖先（K-R3-1）；
+    /// 截断意图重写罩着尾单元 k 的那一片到根（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K3「把罩着被重写单元 k 的那片
+    /// 下段叶到根恒并进重写集」，留下的单元数是 144 的倍数时也一样）；只剩一个单元时不建下段（D8（核心索引结构） 已定项 14），整段换下。
+    fn units_replaced_by_the_publish(
+        previous: &ModelRoot,
+        kind: ModelPublishKind,
+        checkpoint_txg: ModelCheckpointTxg,
+        data_unit_change: &DataUnitChangeOfThePublish,
+    ) -> (
+        Rc<BTreeMap<ModelExtentLowerNodePosition, ModelCheckpointTxg>>,
+        Vec<ModelReplacedUnit>,
+    ) {
+        let previous_lower_nodes = &previous.extent_lower_node_written_at;
+        let rewritten = &data_unit_change.rewritten;
+        let lower_nodes_after: BTreeMap<ModelExtentLowerNodePosition, ModelCheckpointTxg> =
+            extent_lower_node_positions(data_unit_change.data_units_after)
+                .into_iter()
+                .map(|position| {
+                    let first_data_unit = first_data_unit_under(position);
+                    let last_data_unit = last_data_unit_under(position);
+                    let covers_a_rewritten_data_unit = !rewritten.is_empty()
+                        && rewritten.start <= last_data_unit
+                        && first_data_unit < rewritten.end;
+                    let covers_a_released_data_unit = data_unit_change.data_units_after
+                        < data_unit_change.data_units_before
+                        && last_data_unit >= data_unit_change.data_units_after;
+                    let written_at = match previous_lower_nodes.get(&position) {
+                        Some(previous_written_at)
+                            if !covers_a_rewritten_data_unit && !covers_a_released_data_unit =>
+                        {
+                            *previous_written_at
+                        }
+                        Some(_) | None => checkpoint_txg,
+                    };
+                    (position, written_at)
+                })
+                .collect();
+        // 换下的数据单元各按自己的出生 txg（K4：截断只重写尾单元之后一个文件的数据单元不再同一个出生 txg）。
+        let mut births: Vec<ModelReplacedUnit> = data_unit_change
+            .replaced()
+            .map(|index| ModelReplacedUnit {
+                mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_DATA,
+                mapping_key_birth_tree: TREE_IDENTIFIER_EXTENT,
+                birth_txg: *previous
+                    .data_unit_written_at
+                    .get(usize::try_from(index).expect("单元号装得进 usize"))
+                    .expect("换下的单元是上一版存在的"),
+            })
+            .collect();
+        // 下段节点（extent 树的索引节点）：上一版有、这一版同一个位置上分配代没变的照抄，别的都是这次换下的（整段重写、截掉、删光）。
+        births.extend(
+            previous_lower_nodes
+                .iter()
+                .filter(|(position, written_at)| {
+                    lower_nodes_after.get(*position) != Some(*written_at)
+                })
+                .map(|(_, written_at)| ModelReplacedUnit {
+                    mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_INDEX_NODE,
+                    mapping_key_birth_tree: TREE_IDENTIFIER_EXTENT,
+                    birth_txg: *written_at,
+                }),
+        );
+        // 别的用户可见角色：这次重写或删掉、上一版里有的（第一个文件版本那一版上没有它们）。数据单元上面按个数另数。
+        let roles_rewritten_or_removed: BTreeSet<ModelUnitRole> = kind
+            .rewritten_roles()
+            .into_iter()
+            .chain(kind.removed_roles().iter().copied())
+            .filter(|role| {
+                role.asks_the_snapshot_lifetime_judgement() && *role != ModelUnitRole::Data
+            })
+            .collect();
+        births.extend(roles_rewritten_or_removed.iter().filter_map(|role| {
+            let birth_txg = previous.role_written_at.get(role).copied()?;
+            let (mapping_key_unit_class, mapping_key_birth_tree) = role
+                .mapping_key_unit_class_and_birth_tree()
+                .expect("问快照生死判定的角色都有映射 key 的类标签与出生树");
+            Some(ModelReplacedUnit {
+                mapping_key_unit_class,
+                mapping_key_birth_tree,
+                birth_txg,
+            })
+        }));
+        (Rc::new(lower_nodes_after), births)
+    }
+
+    /// 删按建的先后第 `position` 个快照、这一批（txg `txg_of_this_batch`）能放的 deadlist 条目（判决 S4）：纪元落在 [lo, hi) 里、出生 txg 晚于
+    /// 它的前驱 P——lo = 它的诞生 txg，hi = 下一侧是快照时取那一个的诞生 txg、是活头时取这一批的 txg（实现取的那一个，丙 2 主体交回的读法第 3 条）。
+    /// 按盘上 key 的序排（[`ModelDeadlistEntry`] 的字段次序：纪元、映射 key 的类标签、出生树、出生 txg）：不是最后一批的一批放排在最前的 144 条，
+    /// 与实现「按 key 升序的前一批」逐条对得上（映射 key 末段模型不记，前三段相同的几条互相顶替）。
+    fn deadlist_entries_the_destruction_releases(
+        version: &ModelRoot,
+        position: usize,
+        txg_of_this_batch: ModelCheckpointTxg,
+    ) -> Vec<ModelDeadlistEntry> {
+        let destroyed = version
+            .snapshots
+            .get(position)
+            .expect("删的快照在这一版里（`answer_snapshot_destruction_step` 判过）");
+        let lowest_epoch = destroyed.birth_txg;
+        let epoch_beyond = version
+            .snapshots
+            .get(position + 1)
+            .map_or(txg_of_this_batch, |next_snapshot| next_snapshot.birth_txg);
+        let mut releasable: Vec<ModelDeadlistEntry> = version
+            .deadlist
+            .iter()
+            .filter(|entry| {
+                (lowest_epoch..epoch_beyond).contains(&entry.epoch)
+                    && entry.birth_txg > destroyed.previous_snapshot_txg
+            })
+            .copied()
+            .collect();
+        releasable.sort_unstable();
+        releasable
+    }
+
+    /// 从 deadlist 里拿掉放掉的那几条（同样的条目可以有几条：同一次发布写的几个数据单元钉在同一个纪元上，各拿一条）。
+    fn remove_released_entries(
+        deadlist: &mut Vec<ModelDeadlistEntry>,
+        released: &[ModelDeadlistEntry],
+    ) {
+        for entry in released {
+            let index = deadlist
+                .iter()
+                .position(|kept| kept == entry)
+                .expect("放掉的条目是从这一版的 deadlist 里挑的");
+            deadlist.swap_remove(index);
         }
     }
 
@@ -2196,7 +5211,8 @@ impl IdealModel {
         {
             return Ok(refused);
         }
-        if current.contents.live_file().is_none() {
+        // 截断途中的那一版读得出文件，但会话先走空（截断的各批），走到这里现行版本只会是带活文件的一版。
+        if !matches!(current.contents, ModelVersionContents::LiveFile(_)) {
             return Err(ModelDisagreement::new(
                 ModelDisagreementAspect::SessionState,
                 format!(
@@ -2261,13 +5277,27 @@ impl IdealModel {
         ))
     }
 
-    /// unlink 第一个文件的意图那次（`mounted_session::UserChange::Unlink`，D8（核心索引结构） 已定项 16 第 1 条）：接在现行那一版后面，
-    /// inode 1 的记录 nlink 写 0、`deleted_inodes` 加 key、墓碑树追加一条；这一版读回「没有文件」。会话接着走空（每一批由
-    /// [`IdealModel::answer_deletion_step`] 答）；两次之间会话为空间推的抬 F 由执行器按 txg 次序插进来比。逐次发布判墙。
+    /// unlink 第一个文件的意图那次（`mounted_session::UserChange::Unlink`，inode 1）：同 [`IdealModel::answer_unlink_intent_of_an_inode`]。
     ///
     /// # Errors
-    /// 模型里没有可写会话，或现行版本没有读得出的文件（执行器只在实现报带文件、队列空时调）：会话状态与实现对不上。
+    /// 同 [`IdealModel::answer_unlink_intent_of_an_inode`]。
     pub fn answer_unlink_intent(&self) -> Result<ModelAnswer, ModelDisagreement> {
+        self.answer_unlink_intent_of_an_inode(FIRST_INODE_NUMBER)
+    }
+
+    /// unlink `inode` 的意图那次（`mounted_session::UserChange::Unlink`，D8（核心索引结构） 已定项 16 第 1 条；判决
+    /// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1、M3：对任一号同一条）：接在现行那一版后面，那条记录 nlink 写 0、
+    /// `deleted_inodes` 加 key、墓碑树追加一条；inode 1 的这一版读回「没有文件」，别的号这一版读不出它、第一个文件照旧。会话接着走空（每一批由
+    /// [`IdealModel::answer_deletion_step`] 答）；两次之间会话为空间推的抬 F 由执行器按 txg 次序插进来比。逐次发布判墙。
+    /// 有树而文件集合为空的一版上必拒（[`ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile`]）。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或 `inode` 不是现行那一版树里活着的号（执行器只点名实现现行那一版里活着的号，会话先走空）：会话状态与实现对不上；
+    /// 现行那一版 inode 树多于一片叶容器（删一条要吸收或借，模型的删除那一臂只答一片的，执行器在那一形上不调）：[`ModelDisagreementAspect::NotModeled`]。
+    pub fn answer_unlink_intent_of_an_inode(
+        &self,
+        inode: u64,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
         let session = self.open_session()?;
         let current = &session.current;
         if let Some(refused) = self.answer_refusing_a_change_on_a_version_with_trees_and_no_file(
@@ -2275,14 +5305,46 @@ impl IdealModel {
         ) {
             return Ok(refused);
         }
-        if current.contents.live_file().is_none() {
+        if current.inode_records_in_the_tree() > INODE_LEAF_RECORDS {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!(
+                    "模型里现行版本 {:?} 的 inode 树有 {} 条记录、多于一片叶容器：删除那一臂只答一片的（删一条不吸收、不借）",
+                    current.key,
+                    current.inode_records_in_the_tree()
+                ),
+                format!("执行器调了 unlink inode {inode}"),
+            ));
+        }
+        let deleted = ModelDeletedInode::of_the_inode_number(inode);
+        let is_a_live_record = match deleted {
+            ModelDeletedInode::FirstFile => {
+                matches!(current.contents, ModelVersionContents::LiveFile(_))
+            }
+            ModelDeletedInode::OtherThanTheFirst(other) => {
+                matches!(
+                    current.contents,
+                    ModelVersionContents::LiveFile(_)
+                        | ModelVersionContents::InodesWithoutTheFirstFile { .. }
+                ) && current
+                    .inodes_other_than_the_first
+                    .get(&other)
+                    .is_some_and(ModelInodeOtherThanTheFirst::is_live)
+            }
+        };
+        if !is_a_live_record {
             return Err(ModelDisagreement::new(
                 ModelDisagreementAspect::SessionState,
                 format!(
-                    "模型里现行版本 {:?} 没有读得出的文件：{:?}",
-                    current.key, current.contents
+                    "模型里现行版本 {:?} 没有活着的 inode {inode}：{:?}，第一个文件之外的 {:?}",
+                    current.key,
+                    current.contents,
+                    current
+                        .inodes_other_than_the_first
+                        .keys()
+                        .collect::<Vec<_>>()
                 ),
-                "实现的现行版本带文件、队列空（执行器调了 unlink）".to_string(),
+                format!("实现的现行版本带文件、队列空（执行器调了 unlink inode {inode}）"),
             ));
         }
         let root = self.next_root(
@@ -2290,7 +5352,7 @@ impl IdealModel {
             session.instance,
             ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
             ModelJournalCounter(self.highest_journal_counter.0 + 1),
-            ModelPublishKind::UnlinkIntent,
+            ModelPublishKind::UnlinkIntent { deleted },
             current.rollback_floor,
             None,
             Rc::clone(&current.instance_table_rows),
@@ -2302,33 +5364,79 @@ impl IdealModel {
         ))
     }
 
-    /// 走空 `deleted_inodes` 的一步（D8（核心索引结构） 已定项 16 第 2、6 条：会话里 unlink 之后、每次用户改动之前，挂载续做）：
-    /// 删除中的那一版这个文件还剩的数据单元多于产品批大小 144 就是一个不是最后一批的删除批（从尾部释放 144 个，之后仍是删除中的那一版），
-    /// 不多于就是最后一批，之后这一版有树而文件集合为空。下一步只由现行那一版定，挂载续做与一路做下来同一个答法。
+    /// 走空 `deleted_inodes` 的一步（D8（核心索引结构） 已定项 16 第 2、6 条：会话里 unlink 之后、每次用户改动之前，挂载续做；判决
+    /// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1：对任一号同一条，剩几个单元取那个号自己的）：删除中的那个号还剩的
+    /// 数据单元多于产品批大小 144 就是一个不是最后一批的删除批（从尾部释放 144 个，之后仍是删除中的那一版），不多于就是最后一批——删掉那条记录：
+    /// 树里还有别的记录时是带文件的一版（删第一个文件而别的文件还在也是，第三节 M3），一条都不剩才是有树而文件集合为空的一版；extent 上段按规范形
+    /// 收缩（[`extent_upper_node_written_at_after`]：降层那次根照抄）。下一步只由现行那一版定，挂载续做与一路做下来同一个答法。
     ///
     /// # Errors
-    /// 模型里没有可写会话，或现行版本没有删除中的文件（执行器只在实现交回了一步删除时问）：会话状态与实现对不上。
+    /// 模型里没有可写会话，或现行版本没有删除中的号（执行器只在实现交回了一步删除时问）：会话状态与实现对不上；inode 树多于一片叶容器：
+    /// [`ModelDisagreementAspect::NotModeled`]（同 [`IdealModel::answer_unlink_intent_of_an_inode`]）。
     pub fn answer_deletion_step(&self) -> Result<ModelAnswer, ModelDisagreement> {
         let session = self.open_session()?;
         let current = &session.current;
-        let ModelVersionContents::FileBeingDeleted {
-            data_units_remaining,
-            ..
-        } = current.contents
-        else {
+        let Some((deleted, data_units_remaining)) = current.inode_being_deleted() else {
             return Err(ModelDisagreement::new(
                 ModelDisagreementAspect::SessionState,
                 format!(
-                    "模型里现行版本 {:?} 没有删除中的文件：{:?}",
+                    "模型里现行版本 {:?} 没有删除中的号：{:?}",
                     current.key, current.contents
                 ),
                 "实现交回了走空 deleted_inodes 的一步".to_string(),
             ));
         };
+        if current.inode_records_in_the_tree() > INODE_LEAF_RECORDS {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!(
+                    "模型里现行版本 {:?} 的 inode 树有 {} 条记录、多于一片叶容器：删除那一臂只答一片的",
+                    current.key,
+                    current.inode_records_in_the_tree()
+                ),
+                "实现交回了走空 deleted_inodes 的一步".to_string(),
+            ));
+        }
         let step = if data_units_remaining > MODEL_DELETION_BATCH_DATA_UNITS {
-            ModelPublishKind::DeletionBatchKeepingDataUnits
+            ModelPublishKind::DeletionBatchKeepingDataUnits { deleted }
         } else {
-            ModelPublishKind::FinalDeletionBatch
+            let inode_tree_after = if current.inode_records_in_the_tree() == 1 {
+                ModelInodeTreeAfterTheFinalDeletionBatch::Emptied
+            } else {
+                ModelInodeTreeAfterTheFinalDeletionBatch::StillHoldsRecords
+            };
+            // 上段的根这次重写还是照抄：按规范形计划先算一遍（`next_root_with_the_user_visible_trees` 里同一份计划再算一遍，断言种类与它一致）。
+            let txg_of_the_batch = ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1);
+            let inodes_with_an_entry_before = current.inodes_with_an_extent_upper_leaf_entry();
+            let mut inodes_with_an_entry_after = inodes_with_an_entry_before.clone();
+            let inodes_whose_entry_changed =
+                if inodes_with_an_entry_after.remove(&deleted.inode_number()) {
+                    BTreeSet::from([deleted.inode_number()])
+                } else {
+                    BTreeSet::new()
+                };
+            let root_after = ModelExtentUpperNodePosition {
+                level: extent_upper_segment_root_level(&inodes_with_an_entry_after),
+                index_in_level: 0,
+            };
+            let root_is_rewritten = extent_upper_node_written_at_after(
+                &current.extent_upper_node_written_at(),
+                &inodes_with_an_entry_after,
+                &inodes_whose_entry_changed,
+                txg_of_the_batch,
+            )
+            .get(&root_after)
+                == Some(&txg_of_the_batch);
+            let extent_upper_root = if root_is_rewritten {
+                ModelExtentUpperRootOfTheFinalDeletionBatch::Rewritten
+            } else {
+                ModelExtentUpperRootOfTheFinalDeletionBatch::CarriedFromThePreviousVersion
+            };
+            ModelPublishKind::FinalDeletionBatch {
+                deleted,
+                inode_tree_after,
+                extent_upper_root,
+            }
         };
         let root = self.next_root(
             current,
@@ -2360,7 +5468,8 @@ impl IdealModel {
             | ModelVersionContents::InodesWithoutTheFirstFile { .. } => {}
             ModelVersionContents::WithoutTrees
             | ModelVersionContents::LiveFile(_)
-            | ModelVersionContents::FileBeingDeleted { .. } => {
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => {
                 return Err(ModelDisagreement::new(
                     ModelDisagreementAspect::SessionState,
                     format!(
@@ -2371,14 +5480,54 @@ impl IdealModel {
                 ));
             }
         }
-        let inode_records_before = current
-            .contents
-            .inode_records_created_after_the_first_file_was_deleted()
-            .expect("上面只放过第一个文件已删完的两种");
+        self.answer_create_inodes(1)
+    }
+
+    /// 建 `count` 个 size 0 的 inode（`mounted_session::UserChange::NewInodes`）：接在第一个文件活着的一版（在第一个文件旁边建：按 inode 号写数据
+    /// 先要有别的 inode，里程碑「删除与多次 COW」一·1）或第一个文件已删完的一版后面。号从这一版的水位起连着发（[`ModelRoot::inode_number_watermark`]），
+    /// 新记录追加在最右那片叶容器、满 233 条在末尾分裂（D8（核心索引结构） 已定项 6），一次一个事务、留一级水位台阶。会话先走空（队列空，一个写都不发）。
+    /// 逐次发布判墙。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本树表 0 条、删除中、截断途中（会话先走空，执行器在走空之后才问这一次）：会话状态与实现对不上；`count` 是 0、
+    /// 或这几条新记录跨了叶容器（一次要重写两片，模型只答一片：执行器把 `count` 压到最右那片装得下的条数）：[`ModelDisagreementAspect::NotModeled`]。
+    pub fn answer_create_inodes(&self, count: u64) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        match current.contents {
+            ModelVersionContents::LiveFile(_)
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => {}
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => {
+                return Err(ModelDisagreement::new(
+                    ModelDisagreementAspect::SessionState,
+                    format!(
+                        "模型里现行版本 {:?} 不是第一个文件活着或已删完、队列空的一版：{:?}",
+                        current.key, current.contents
+                    ),
+                    "实现的现行版本有树、队列空（执行器调了建 inode）".to_string(),
+                ));
+            }
+        }
+        let inode_records_before = current.inode_records_in_the_tree();
         // 新记录落在哪一片叶容器定这次重写哪一片（D8（核心索引结构） 已定项 6）：最左那片之外的那几片各是一个角色。
-        let kind = match NonZeroU64::new(inode_leaf_container_position_of_a_new_record(
-            inode_records_before,
-        )) {
+        let position_of_the_first_new_record =
+            inode_leaf_container_position_of_a_new_record(inode_records_before);
+        let fits_in_one_leaf_container = count > 0
+            && inode_leaf_container_position_of_a_new_record(inode_records_before + count - 1)
+                == position_of_the_first_new_record;
+        if !fits_in_one_leaf_container {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!(
+                    "一次建 {count} 个 inode、树里原有 {inode_records_before} 条：新记录不落在同一片叶容器里，模型只答一次重写一片的"
+                ),
+                "执行器调了建 inode".to_string(),
+            ));
+        }
+        let kind = match NonZeroU64::new(position_of_the_first_new_record) {
             None => ModelPublishKind::NewInode,
             Some(position_from_the_leftmost) => {
                 ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(
@@ -2388,7 +5537,7 @@ impl IdealModel {
                 )
             }
         };
-        let root = self.next_root(
+        let root = self.next_root_with_the_user_visible_trees(
             current,
             session.instance,
             ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
@@ -2397,12 +5546,841 @@ impl IdealModel {
             current.rollback_floor,
             None,
             Rc::clone(&current.instance_table_rows),
+            UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem,
+            InodesOtherThanTheFirstChangeOfThePublish::Created { count },
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishNewInode,
             BTreeSet::new(),
             vec![root],
         ))
+    }
+
+    /// 按 inode 号覆盖写（`mounted_session::UserChange::OverwriteOfAnInode`，`transaction::publish_overwrite_of_an_inode`）：契约是一个数据单元，
+    /// 装不下必须拒。答法见 [`IdealModel::answer_whole_write_of_an_inode`]。
+    ///
+    /// # Errors
+    /// 同 [`IdealModel::answer_whole_write_of_an_inode`]。
+    pub fn answer_overwrite_of_an_inode(
+        &self,
+        inode: u64,
+        content: &[u8],
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        self.answer_whole_write_of_an_inode(inode, content, WholeFileWriteContract::OneDataUnit)
+    }
+
+    /// 按 inode 号顺序写（`mounted_session::UserChange::SequentialWriteOfAnInode`，`transaction::publish_sequential_write_of_an_inode`）：
+    /// 不按单元数拒。答法见 [`IdealModel::answer_whole_write_of_an_inode`]。
+    ///
+    /// # Errors
+    /// 同 [`IdealModel::answer_whole_write_of_an_inode`]。
+    pub fn answer_sequential_write_of_an_inode(
+        &self,
+        inode: u64,
+        content: &[u8],
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        self.answer_whole_write_of_an_inode(
+            inode,
+            content,
+            WholeFileWriteContract::AnyNumberOfDataUnits,
+        )
+    }
+
+    /// 按 inode 号整份写 `inode` 那个文件（里程碑「删除与多次 COW」一·1）：
+    /// - `inode` 是第一个文件：同覆盖写与顺序写（[`IdealModel::answer_publish_overwrite`]，两个入口在实现里就是那两条路）；
+    /// - 现行那一版有树而文件集合为空：必拒（[`ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile`]，会话拒成「没有文件版本可改」）；
+    /// - 第一个文件已删完、目标是删完之后才建的：必拒（[`ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted`]，D8（核心索引结构）
+    ///   已定项 16 射程「删完之后不再建带数据的文件（K-U5，记欠账）」，用户 2026-10-19 定「β 时序级」：对象出生代晚于 inode 1 墓碑死亡 txg 的才拒）；
+    /// - 第一个文件活着，或已删完而目标是删之前就有的：那个文件整份换成 `content`（[`ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst`]），
+    ///   一个数据单元的契约装不下时必拒。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话；现行版本树表 0 条、删除中、截断途中，或 `inode` 不是这一版树里第一个文件之外活着的号（执行器只点名实现
+    /// 现行那一版树里活着的号）：会话状态与实现对不上。
+    fn answer_whole_write_of_an_inode(
+        &self,
+        inode: u64,
+        content: &[u8],
+        contract: WholeFileWriteContract,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        if inode == FIRST_INODE_NUMBER {
+            let operation = match contract {
+                WholeFileWriteContract::OneDataUnit => ModelOperationKind::PublishOverwrite,
+                WholeFileWriteContract::AnyNumberOfDataUnits => {
+                    ModelOperationKind::PublishSequentialWrite
+                }
+            };
+            return self.answer_rewriting_the_whole_file(content, operation, contract);
+        }
+        let operation = ModelOperationKind::PublishWholeWriteOfAnInodeOtherThanTheFirst;
+        let session = self.open_session()?;
+        let current = &session.current;
+        if let Some(refused) =
+            self.answer_refusing_a_change_on_a_version_with_trees_and_no_file(operation)
+        {
+            return Ok(refused);
+        }
+        let first_file_records_in_the_tree = match current.contents {
+            ModelVersionContents::LiveFile(_) => 1,
+            ModelVersionContents::InodesWithoutTheFirstFile { .. } => 0,
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::TreesAndNoFile { .. }
+            | ModelVersionContents::FileBeingDeleted { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => {
+                return Err(ModelDisagreement::new(
+                    ModelDisagreementAspect::SessionState,
+                    format!(
+                        "模型里现行版本 {:?} 不是第一个文件活着、或已删完而树里还有别的 inode 的一版：{:?}",
+                        current.key, current.contents
+                    ),
+                    format!("实现的现行版本树里有 inode {inode}（执行器按 inode 号写它）"),
+                ));
+            }
+        };
+        // 记录按号排：第一个文件活着时 inode 1 在最前，第一个文件之外的按号升序接在后面（删除中的那一条还在树里，也算）；第 r 条（从 0 数）在左起第
+        // ⌊r ÷ 233⌋ 片叶容器里（建 inode 只往右追加、满了在末尾分裂，[`inode_leaf_container_position_of_a_new_record`]；删除只在树里只有一片叶容器时做，
+        // 删完仍是一片，这条数法不破）。
+        let Some((position_among_the_inodes_other_than_the_first, written_inode)) = current
+            .inodes_other_than_the_first
+            .iter()
+            .enumerate()
+            .find(|(_, (number, other_inode))| **number == inode && other_inode.is_live())
+            .map(|(position, (_, other_inode))| (position, other_inode))
+        else {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 第一个文件之外的 inode 是 {:?}，没有活着的 {inode}",
+                    current.key,
+                    current
+                        .inodes_other_than_the_first
+                        .keys()
+                        .collect::<Vec<_>>()
+                ),
+                format!("实现的现行版本树里有 inode {inode}（执行器按 inode 号写它）"),
+            ));
+        };
+        let record_position_in_the_tree = first_file_records_in_the_tree
+            + u64::try_from(position_among_the_inodes_other_than_the_first).expect("条数");
+        let inode_leaf_container = ModelUnitRole::inode_leaf_container_at(
+            record_position_in_the_tree / INODE_LEAF_RECORDS,
+        );
+        let mut required_refusals = BTreeSet::new();
+        match contract {
+            WholeFileWriteContract::OneDataUnit => {
+                if u64::try_from(content.len()).expect("内容长度")
+                    > data_unit_payload_capacity_in_bytes()
+                {
+                    required_refusals.insert(ModelRefusalReason::ContentExceedsDataUnitPayload);
+                }
+            }
+            WholeFileWriteContract::AnyNumberOfDataUnits => {}
+        }
+        // K-U5 的 β 时序级读法（用户 2026-10-19 定）：第一个文件那条记录不在这一版里、墓碑树里有 inode 1 的墓碑、目标的对象出生代晚于它的死亡 txg
+        // 才拒，在任何写之前；删之前就有的别的文件照常能写。
+        let is_born_after_the_first_file_was_deleted = first_file_records_in_the_tree == 0
+            && current
+                .death_txg_of_the_first_file
+                .is_some_and(|death_txg| written_inode.object_birth > death_txg);
+        if is_born_after_the_first_file_was_deleted {
+            required_refusals
+                .insert(ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted);
+            return Ok(self.answer_for_publishes(operation, required_refusals, Vec::new()));
+        }
+        let root = self.next_root_with_the_user_visible_trees(
+            current,
+            session.instance,
+            ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
+            ModelJournalCounter(self.highest_journal_counter.0 + 1),
+            ModelPublishKind::WholeWriteOfAnInodeOtherThanTheFirst {
+                inode_leaf_container,
+            },
+            current.rollback_floor,
+            None,
+            Rc::clone(&current.instance_table_rows),
+            UserVisibleTreesOfTheNewVersion::AsThisPublishLeavesThem,
+            InodesOtherThanTheFirstChangeOfThePublish::WholeWrite { inode, content },
+        );
+        Ok(self.answer_for_publishes(operation, required_refusals, vec![root]))
+    }
+
+    /// 建一个只读快照（`mounted_session::UserChange::CreateSnapshot`，判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S2）：
+    /// 会话先走空（执行器把走空的那几步按「走空的一步」比过之后才问这一次），再接在现行那一版后面发一次独立发布。现行那一版有树而文件集合为空时
+    /// 照建，快照读出「没有文件」（用户 2026-10-16 定「放开」，判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）；
+    /// 已经有 10 个快照时必须拒（第七节岔路 1）。逐次发布判墙。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本树表 0 条（执行器只在有树的一版上调）：会话状态与实现对不上。
+    pub fn answer_create_snapshot(&self) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        Self::refuse_to_answer_with_a_file_other_than_the_first_holding_data_units(
+            current,
+            "建快照",
+        )?;
+        if !current.contents.has_trees() {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!("模型里现行版本 {:?} 树表 0 条", current.key),
+                "实现的现行版本有树（执行器调了建快照）".to_string(),
+            ));
+        }
+        let mut required_refusals = BTreeSet::new();
+        if current.snapshots.len() >= MODEL_SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION {
+            required_refusals.insert(ModelRefusalReason::MoreSnapshotsThanTheFirstVersionAllows);
+        }
+        let root = self.next_root(
+            current,
+            session.instance,
+            ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
+            ModelJournalCounter(self.highest_journal_counter.0 + 1),
+            ModelPublishKind::SnapshotCreation,
+            current.rollback_floor,
+            None,
+            Rc::clone(&current.instance_table_rows),
+        );
+        Ok(self.answer_for_publishes(
+            ModelOperationKind::PublishSnapshotCreation,
+            required_refusals,
+            vec![root],
+        ))
+    }
+
+    /// 删按建的先后第 `position` 个快照的意图那次（`mounted_session::UserChange::DestroySnapshot`，判决第三节 S4 与第七节岔路 2、4）：
+    /// 会话先走空，再接在现行那一版后面发意图；之后的每一批是走空的一步（[`IdealModel::answer_snapshot_destruction_step`]）。
+    /// 现行那一版有树而文件集合为空时照样删（删快照不依赖活头里有没有文件，D8（核心索引结构） 已定项 16 第 5 条那一句管的是写文件的改动；
+    /// 丙 2 交判第 5 条主 agent 定是缺陷，会话放行），与建快照相同（判决 `research/prompts/m4-segment-code-r1-main-verification.md`
+    /// 第三节 F5）。逐次发布判墙。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话、现行版本树表 0 条、没有第 `position` 个快照、或现行那一版已有快照在销毁中（会话先把它走完，走到这里说明模型与实现
+    /// 对不上）：会话状态与实现对不上。
+    pub fn answer_destroy_snapshot(
+        &self,
+        position: usize,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        Self::refuse_to_answer_with_a_file_other_than_the_first_holding_data_units(
+            &session.current,
+            "删快照",
+        )?;
+        let current = &session.current;
+        if !current.contents.has_trees()
+            || position >= current.snapshots.len()
+            || current
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.is_being_destroyed)
+        {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 没有能删的第 {position} 个快照：{:?}",
+                    current.key, current.snapshots
+                ),
+                "实现的现行版本里有这个快照、没有销毁中的（执行器调了删快照）".to_string(),
+            ));
+        }
+        let root = self.next_root(
+            current,
+            session.instance,
+            ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
+            ModelJournalCounter(self.highest_journal_counter.0 + 1),
+            ModelPublishKind::SnapshotDestructionIntent { position },
+            current.rollback_floor,
+            None,
+            Rc::clone(&current.instance_table_rows),
+        );
+        Ok(self.answer_for_publishes(
+            ModelOperationKind::PublishSnapshotDestructionIntent,
+            BTreeSet::new(),
+            vec![root],
+        ))
+    }
+
+    /// 走空销毁中那个快照的一步（判决 S4：会话里删快照的意图之后、每次用户改动之前，挂载续做）：它那一段这一批能放的条目多于一批（144 条）
+    /// 就是不是最后一批的一批，放 144 条；不多于就是最后一批，放剩下的、删掉它。下一步只由现行那一版定。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本没有销毁中的快照：会话状态与实现对不上。
+    pub fn answer_snapshot_destruction_step(&self) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        let Some(position) = current
+            .snapshots
+            .iter()
+            .position(|snapshot| snapshot.is_being_destroyed)
+        else {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 没有销毁中的快照：{:?}",
+                    current.key, current.snapshots
+                ),
+                "实现交回了走空销毁中快照的一步".to_string(),
+            ));
+        };
+        let checkpoint_txg = ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1);
+        let releasable = u64::try_from(
+            Self::deadlist_entries_the_destruction_releases(current, position, checkpoint_txg)
+                .len(),
+        )
+        .expect("条数");
+        let step = if releasable > MODEL_SNAPSHOT_DESTRUCTION_BATCH_ENTRIES {
+            ModelPublishKind::SnapshotDestructionBatch {
+                position,
+                entries_released: MODEL_SNAPSHOT_DESTRUCTION_BATCH_ENTRIES,
+            }
+        } else {
+            ModelPublishKind::SnapshotDestructionFinalBatch { position }
+        };
+        let root = self.next_root(
+            current,
+            session.instance,
+            checkpoint_txg,
+            ModelJournalCounter(self.highest_journal_counter.0 + 1),
+            step,
+            current.rollback_floor,
+            None,
+            Rc::clone(&current.instance_table_rows),
+        );
+        Ok(self.answer_for_publishes(
+            ModelOperationKind::PublishSnapshotDestructionStep,
+            BTreeSet::new(),
+            vec![root],
+        ))
+    }
+
+    /// 走空的下一步（`transaction::walk_the_deletion_queue_until_it_is_empty`：`deleted_inodes` 先走空，再走销毁中的快照，再走截断，判决
+    /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1 的次序）：现行那一版有删除中的文件就是删除的一步
+    /// （[`IdealModel::answer_deletion_step`]），否则有销毁中的快照就是删快照的一批（[`IdealModel::answer_snapshot_destruction_step`]），
+    /// 否则在截断途中就是截断的一批（[`IdealModel::answer_truncation_step`]）。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本三样都没有：会话状态与实现对不上。
+    pub fn answer_next_step_of_the_walk(&self) -> Result<ModelAnswer, ModelDisagreement> {
+        if self.current_version_has_a_file_being_deleted() {
+            self.answer_deletion_step()
+        } else if self.current_version_has_a_snapshot_being_destroyed()
+            || !self.current_version_has_a_file_being_truncated()
+        {
+            self.answer_snapshot_destruction_step()
+        } else {
+            self.answer_truncation_step()
+        }
+    }
+
+    /// 整理的一次发布（`mounted_session::MountedSession::run_compaction` 发成的一版，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节
+    /// G1、G3、G4、G7；丁 3 交回的读法第 1–3 条）：接在现行那一版后面，txg 与 jsn 各加一、一个事务、F 照抄，只重写固定点单元，用户可见的内容、
+    /// 快照、deadlist、每个搬走的单元的分配代都与上一版相同。是哪一种由模型记的活意图与执行器交来的这一版看得见的几样（`seen`）定：
+    /// - 模型这一版没有活意图：只能是签发（不搬单元、发布之后 logged_ops 里有一条）——R 取执行器强制的那一段、`c0` 取上一版的 txg、
+    ///   签发 txg 取这一次的（[`ModelPublishKind::CompactionIntentIssue`]）；别的样子都对不上（全池至多一条，先签发才搬）。
+    /// - 有活意图、搬了单元：发布之后意图还在就是照抄意图的一批，这时 R 按记录还不能全空（搬空了 R 就要同一次发布删意图，D8（核心索引结构）
+    ///   已定项 5）；意图没了就是最后一批同发布删意图，这时 R 要按记录全空（判决 G4 停机谓词「删意图那一刻 R 按记录全空」）。
+    /// - 有活意图、不搬单元：意图要没了（单独删：R 按记录全空是达成，不空是丢），意图还在就对不上（这一次什么都没做）。照抄意图的一批至少搬一个
+    ///   R 里真要搬的单元（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H4，用户 2026-10-16 定「规划时补足」）：计划跳过这次
+    ///   发布本来就重写的节点，一个都没搬而照抄意图的那一次不许发；R 里只剩这次发布本来就重写的节点时那一次不搬单元、同一次发布删意图，发布之后
+    ///   R 按记录全空，就是意图达成那一种。
+    ///
+    /// 搬的里有用户可见树的根单元（`seen.user_visible_root_units_relocated`）时把这一次记进那几个单元的搬迁 txg，这一版算一个新状态
+    /// （[`ModelRoot::user_visible_root_relocations`]）；它们要是这一版引用着的。模型不答推几次、停在哪（判决 G7「只比成功操作的内容」）：
+    /// 执行器按实现交回的每一版各问一次。先走空的删除续做由 [`IdealModel::answer_next_step_of_the_walk`] 答。逐次发布判墙。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话、现行版本树表 0 条、现行那一版还有要走空的：会话状态对不上；这一版对意图做的事与上面那几条对不上：
+    /// [`ModelDisagreementAspect::CompactionIntentOfThePublish`]；搬的根单元模型这一版不引用：[`ModelDisagreementAspect::NotModeled`]。
+    pub fn answer_compaction_publish(
+        &self,
+        seen: &ModelCompactionPublishSeen,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        Self::refuse_to_answer_with_a_file_other_than_the_first_holding_data_units(
+            current,
+            "挂着时整理",
+        )?;
+        if !current.contents.has_trees() || self.current_version_has_a_step_to_walk() {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 不是能整理的一版（树表 0 条或还有要走空的）：{:?}",
+                    current.key, current.contents
+                ),
+                "实现交回了整理的一次发布".to_string(),
+            ));
+        }
+        let checkpoint_txg = ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1);
+        let does_the_publish_relocate_units = seen.units_relocated > 0;
+        let refused_step = |model_answer: String| {
+            Err(ModelDisagreement::new(
+                ModelDisagreementAspect::CompactionIntentOfThePublish,
+                format!("{:?} 之后的这一次整理发布：{model_answer}", current.key),
+                describe_compaction_publish_seen(seen),
+            ))
+        };
+        let (kind, operation, issued) = match current.logged_compaction_intent {
+            None => {
+                if does_the_publish_relocate_units || !seen.is_an_intent_logged_after_the_publish {
+                    return refused_step(
+                        "这一版没有活整理意图：整理只能先签发（只把意图写进 logged_ops、不搬单元，判决 G1）".to_string(),
+                    );
+                }
+                (
+                    ModelPublishKind::CompactionIntentIssue,
+                    ModelOperationKind::PublishCompactionIntentIssue,
+                    Some(ModelCompactionIntent {
+                        issued_txg: checkpoint_txg,
+                        region: seen.region_forced_for_the_issue,
+                        allocation_generation_at_issue: current.key.checkpoint_txg,
+                    }),
+                )
+            }
+            Some(live) => {
+                let is_the_region_empty =
+                    seen.is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish;
+                match (
+                    does_the_publish_relocate_units,
+                    seen.is_an_intent_logged_after_the_publish,
+                    is_the_region_empty,
+                ) {
+                    (true, true, false) => (
+                        ModelPublishKind::CompactionBatch {
+                            units_at_most: seen.units_at_most,
+                            intent_after_the_batch: ModelCompactionIntentAfterTheBatch::CarriedOn,
+                        },
+                        ModelOperationKind::PublishCompactionBatch,
+                        None,
+                    ),
+                    (true, true, true) => {
+                        return refused_step(format!(
+                            "这一批搬空了活意图的 R {:?}（按记录）：意图要与最后一批同一次发布删（D8（核心索引结构） 已定项 5）",
+                            live.region
+                        ));
+                    }
+                    (true, false, true) => (
+                        ModelPublishKind::CompactionBatch {
+                            units_at_most: seen.units_at_most,
+                            intent_after_the_batch:
+                                ModelCompactionIntentAfterTheBatch::DeletedWithTheLastBatch,
+                        },
+                        ModelOperationKind::PublishCompactionBatch,
+                        None,
+                    ),
+                    (true, false, false) => {
+                        return refused_step(format!(
+                            "删意图那一刻活意图的 R {:?} 要按记录全空（判决 G4 停机谓词）",
+                            live.region
+                        ));
+                    }
+                    (false, false, true) => (
+                        ModelPublishKind::CompactionIntentDeletion {
+                            ending:
+                                ModelCompactionIntentEnding::CompletedWithTheRegionEmptyByTheRecords,
+                        },
+                        ModelOperationKind::PublishCompactionIntentCompletion,
+                        None,
+                    ),
+                    (false, false, false) => (
+                        ModelPublishKind::CompactionIntentDeletion {
+                            ending: ModelCompactionIntentEnding::Dropped,
+                        },
+                        ModelOperationKind::PublishCompactionIntentDrop,
+                        None,
+                    ),
+                    (false, true, true | false) => {
+                        return refused_step(format!(
+                            "活意图 {live:?} 在：一次整理发布要么搬一批（至少搬一个 R 里真要搬的单元，判决 H4）、要么删掉意图"
+                        ));
+                    }
+                }
+            }
+        };
+        let referenced: BTreeSet<ModelUserVisibleRootUnit> =
+            current.user_visible_root_units().into_iter().collect();
+        if let Some(unreferenced) = seen
+            .user_visible_root_units_relocated
+            .iter()
+            .find(|unit| !referenced.contains(unit))
+        {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!("{:?} 引用着的用户可见树根单元 {referenced:?}", current.key),
+                format!("实现搬了根单元 {unreferenced:?}"),
+            ));
+        }
+        let mut root = self.next_root(
+            current,
+            session.instance,
+            checkpoint_txg,
+            ModelJournalCounter(self.highest_journal_counter.0 + 1),
+            kind,
+            current.rollback_floor,
+            None,
+            Rc::clone(&current.instance_table_rows),
+        );
+        if let Some(intent) = issued {
+            root.logged_compaction_intent = Some(intent);
+        }
+        if !seen.user_visible_root_units_relocated.is_empty() {
+            let mut relocations = root.user_visible_root_relocations.as_ref().clone();
+            for unit in &seen.user_visible_root_units_relocated {
+                relocations.insert(*unit, checkpoint_txg);
+            }
+            root.user_visible_root_relocations = Rc::new(relocations);
+        }
+        Ok(self.answer_for_publishes(operation, BTreeSet::new(), vec![root]))
+    }
+
+    /// 可写会话现行那一版 logged_ops 里那一条活整理意图（没有可写会话或没有活意图时 None）：执行器拿它的 R 判实现交回的那一版 R 按记录全空没有。
+    #[must_use]
+    pub fn live_compaction_intent_of_the_current_version(&self) -> Option<ModelCompactionIntent> {
+        self.session
+            .as_ref()
+            .and_then(|session| session.current.logged_compaction_intent)
+    }
+
+    /// 模型的现行版本还有没有要走空的（删除中的文件、销毁中的快照，或截断途中的文件，判决
+    /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1「截断进共用走空」）：执行器拿它分一次会话交回的那几版里哪一版是走空的一步。
+    #[must_use]
+    pub fn current_version_has_a_step_to_walk(&self) -> bool {
+        self.current_version_has_a_file_being_deleted()
+            || self.current_version_has_a_snapshot_being_destroyed()
+            || self.current_version_has_a_file_being_truncated()
+    }
+
+    /// 模型的现行版本有没有销毁中的快照。
+    fn current_version_has_a_snapshot_being_destroyed(&self) -> bool {
+        self.session.as_ref().is_some_and(|session| {
+            session
+                .current
+                .snapshots
+                .iter()
+                .any(|snapshot| snapshot.is_being_destroyed)
+        })
+    }
+
+    /// 模型的现行版本是不是截断途中（logged_ops 里有一条截断条目，判决第三节 K1、K2）。
+    #[must_use]
+    pub fn current_version_has_a_file_being_truncated(&self) -> bool {
+        self.session.as_ref().is_some_and(|session| {
+            matches!(
+                session.current.contents,
+                ModelVersionContents::FileBeingTruncated { .. }
+            )
+        })
+    }
+
+    /// 截断这次用户改动（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2、K3、K5、K11、K12；`mounted_session::UserChange::Truncate`
+    /// 接线归下一批）：会话先走空（执行器把走空的那几步按「走空的一步」比过之后才问这一次），再接在现行那一版后面发：
+    /// - N 按整单元向上取整溢出 u64：在任何写之前必须拒（[`ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow`]，K12）；
+    /// - 现行那一版有树而文件集合为空：同覆盖写必须拒（[`ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile`]）；
+    /// - N < S：发截断意图（[`ModelPublishKind::TruncationIntent`]），之后的各批是走空的一步（[`IdealModel::answer_truncation_step`]）；
+    ///   N 落在存在的单元 k 中间、单元 k 的声明长度不等于 N − k × 净荷时重写它（K3）；不重写而上段叶条目的标签要变（缩短把尾部的洞整个截掉）
+    ///   时意图那次只为换标签重写上段根（判决第六节 S1）；
+    /// - N ≥ S：一次只改记录的发布（[`ModelPublishKind::SizeChangeWithoutShrinking`]；N = S 照 K12 发、不拒）：最后一个存在的单元声明长度小于
+    ///   min(N − 起点, 净荷) 时补零重写它，不重写而洞标签要变时只重写 extent 上段根（K5）。
+    ///
+    /// 模型照字节记内容，N 要装得进这个进程的内存：执行器按单元的类取 N（缩到 0、单元边界、单元中间、单元内变长、跨单元变长、变长后截回洞里）。
+    /// 第一个文件之外的 inode 改 size 由 [`IdealModel::answer_size_change_of_an_inode_created_after_the_first_file_was_deleted`] 答。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本没有带活文件的 inode 1（树表 0 条、删除中、截断途中、删完之后只建过 inode：执行器只在实现报带文件、队列空时调）：
+    /// 会话状态与实现对不上；N 装不进这个进程的地址空间：[`ModelDisagreementAspect::NotModeled`]。
+    pub fn answer_truncation(
+        &self,
+        new_size_in_bytes: u64,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        Self::refuse_to_answer_with_a_file_other_than_the_first_holding_data_units(
+            current,
+            "截断与变长",
+        )?;
+        let payload = data_unit_payload_capacity_in_bytes();
+        if new_size_in_bytes
+            .div_ceil(payload)
+            .checked_mul(payload)
+            .is_none()
+        {
+            return Ok(self.answer_for_publishes(
+                ModelOperationKind::PublishTruncation,
+                BTreeSet::from([ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow]),
+                Vec::new(),
+            ));
+        }
+        if let Some(refused) = self.answer_refusing_a_change_on_a_version_with_trees_and_no_file(
+            ModelOperationKind::PublishTruncation,
+        ) {
+            return Ok(refused);
+        }
+        let ModelVersionContents::LiveFile(file) = &current.contents else {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 没有带活文件、队列空的 inode 1：{:?}",
+                    current.key, current.contents
+                ),
+                "实现的现行版本带文件、队列空（执行器调了截断）".to_string(),
+            ));
+        };
+        let size_before = u64::try_from(file.content.len()).expect("内容长度");
+        let new_size = usize::try_from(new_size_in_bytes).map_err(|_| {
+            ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!("模型照字节记内容，{new_size_in_bytes} 字节装不进这个进程的地址空间"),
+                "执行器调了截断".to_string(),
+            )
+        })?;
+        let checkpoint_txg = ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1);
+        let journal_counter = ModelJournalCounter(self.highest_journal_counter.0 + 1);
+        let root = if new_size_in_bytes < size_before {
+            let data_units_within_the_new_size = data_units_of_content(new_size_in_bytes);
+            let tail_data_unit = data_units_within_the_new_size - 1;
+            let tail_data_unit_declared_length = new_size_in_bytes - tail_data_unit * payload;
+            // 意图那次把目标态的 size、尾单元、标签一起写下（K2「先落目标」，判决第六节 S1）：尾单元要重写就连上段根一起写；不重写而标签与
+            // 目标态对不上（缩短把尾部的洞整个截掉，3、4 换回 1、2）就只为换标签重写上段根。size 之外还挂着的单元不算洞（S1），标签按
+            // 存在的单元数与 N 罩的单元数取（[`ModelExtentUpperLeafEntryLabel::written_for`]）。
+            let extent_tree = if tail_data_unit < file.data_units_present
+                && file.declared_length_of_the_data_unit(tail_data_unit)
+                    != tail_data_unit_declared_length
+            {
+                ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten
+            } else if ModelExtentUpperLeafEntryLabel::written_for(
+                file.data_units_present,
+                data_units_within_the_new_size,
+            ) != file.extent_upper_leaf_entry_label
+            {
+                ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel
+            } else {
+                ModelExtentTreeChangeOfASizeChange::Untouched
+            };
+            self.next_root(
+                current,
+                session.instance,
+                checkpoint_txg,
+                journal_counter,
+                ModelPublishKind::TruncationIntent { extent_tree },
+                current.rollback_floor,
+                Some(&file.content[..new_size]),
+                Rc::clone(&current.instance_table_rows),
+            )
+        } else {
+            let mut content = file.content.to_vec();
+            content.resize(new_size, 0);
+            let last_data_unit = file.data_units_present - 1;
+            let last_data_unit_length_after =
+                (new_size_in_bytes - last_data_unit * payload).min(payload);
+            let extent_tree = if file.declared_length_of_the_data_unit(last_data_unit)
+                < last_data_unit_length_after
+            {
+                ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten
+            } else if ModelExtentUpperLeafEntryLabel::written_for(
+                file.data_units_present,
+                data_units_of_content(new_size_in_bytes),
+            ) != file.extent_upper_leaf_entry_label
+            {
+                ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel
+            } else {
+                ModelExtentTreeChangeOfASizeChange::Untouched
+            };
+            self.next_root(
+                current,
+                session.instance,
+                checkpoint_txg,
+                journal_counter,
+                ModelPublishKind::SizeChangeWithoutShrinking { extent_tree },
+                current.rollback_floor,
+                Some(&content),
+                Rc::clone(&current.instance_table_rows),
+            )
+        };
+        Ok(self.answer_for_publishes(
+            ModelOperationKind::PublishTruncation,
+            BTreeSet::new(),
+            vec![root],
+        ))
+    }
+
+    /// 第一个文件删完之后建的一个 inode 改 size（`UserChange::Truncate` 点名的不是 inode 1）：第一版只有第一个文件写数据，别的 inode 要改成
+    /// 别的 size 就要给它在 extent 树上段写一条条目，判决 `research/prompts/m4-trunc-r1-main-verification.md` 没写这一格，主 agent 定
+    /// （调度记录「截甲交回」那一行第 ① 处）在任何写之前拒（[`ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile`]）。拒之前先判 N
+    /// 按整单元向上取整溢不溢出（K12，与第一个文件同一个次序）。模型只罩删完之后建的 inode（size 0，[`ModelVersionContents::InodesWithoutTheFirstFile`]）。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本不是删完之后建过 inode 的那一版：会话状态与实现对不上；N 等于它现在的 size（只改记录、照做的那一格，
+    /// 要写哪片叶容器模型不记）：[`ModelDisagreementAspect::NotModeled`]，执行器不问这一格。
+    pub fn answer_size_change_of_an_inode_created_after_the_first_file_was_deleted(
+        &self,
+        size_in_bytes_before: u64,
+        new_size_in_bytes: u64,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        if !matches!(
+            current.contents,
+            ModelVersionContents::InodesWithoutTheFirstFile { .. }
+        ) {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 不是删完第一个文件之后建过 inode 的一版：{:?}",
+                    current.key, current.contents
+                ),
+                "实现的现行版本里有第一个文件之外的 inode（执行器点名它改 size）".to_string(),
+            ));
+        }
+        let payload = data_unit_payload_capacity_in_bytes();
+        let refusal = if new_size_in_bytes
+            .div_ceil(payload)
+            .checked_mul(payload)
+            .is_none()
+        {
+            ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow
+        } else if new_size_in_bytes != size_in_bytes_before {
+            ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile
+        } else {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!(
+                    "第一个文件之外的 inode 改成它现在的 size {new_size_in_bytes}（只改记录）：模型不记那条记录住哪片叶容器"
+                ),
+                "执行器点名第一个文件之外的 inode 改成同样的 size".to_string(),
+            ));
+        };
+        Ok(self.answer_for_publishes(
+            ModelOperationKind::PublishTruncation,
+            BTreeSet::from([refusal]),
+            Vec::new(),
+        ))
+    }
+
+    /// 走空截断的一步（判决第三节 K2、K11：会话里截断意图之后、每次用户改动之前，挂载续做）：size 之外还挂着的单元多于批大小 144（与 unlink
+    /// 共用）就是不是最后一批的一批，从尾部放 144 个；不多于就是最后一批，放完剩下的（可以 0 个）、同一次发布删截断条目。下一步只由现行那一版定。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话，或现行版本不在截断途中：会话状态与实现对不上。
+    pub fn answer_truncation_step(&self) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        let ModelVersionContents::FileBeingTruncated { file, .. } = &current.contents else {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 不在截断途中：{:?}",
+                    current.key, current.contents
+                ),
+                "实现交回了走空截断的一步".to_string(),
+            ));
+        };
+        // 截回洞里的（存在的单元不多于 size 罩的）size 之外一个都没有。
+        let data_units_beyond_the_size = file
+            .data_units_present
+            .saturating_sub(file.data_units_within_the_size());
+        let step = if data_units_beyond_the_size > MODEL_DELETION_BATCH_DATA_UNITS {
+            ModelPublishKind::TruncationBatch
+        } else {
+            ModelPublishKind::FinalTruncationBatch {
+                release: if data_units_beyond_the_size > 0 {
+                    ModelFinalTruncationBatchRelease::AtLeastOneDataUnit
+                } else {
+                    ModelFinalTruncationBatchRelease::NoDataUnit
+                },
+                logged_operations_after: if current.logged_compaction_intent.is_some() {
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::StillHoldsTheCompactionIntent
+                } else {
+                    ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::Emptied
+                },
+            }
+        };
+        let root = self.next_root(
+            current,
+            session.instance,
+            ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
+            ModelJournalCounter(self.highest_journal_counter.0 + 1),
+            step,
+            current.rollback_floor,
+            None,
+            Rc::clone(&current.instance_table_rows),
+        );
+        Ok(self.answer_for_publishes(
+            ModelOperationKind::PublishTruncationStep,
+            BTreeSet::new(),
+            vec![root],
+        ))
+    }
+
+    /// 读按建的先后第 `position` 个快照（`recovery::read_the_first_file_of_a_snapshot` 经现行那一版的根，判决第三节 S7「读快照」）：
+    /// 读出的要是建它那一刻读得出的文件内容（那一刻没有活文件就是「没有文件」）。读不写盘，模型不动。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话、没有第 `position` 个快照：会话状态与实现对不上；读出的与模型记的不同：读快照那一格对不上。
+    pub fn judge_snapshot_read_back(
+        &self,
+        position: usize,
+        observed: &ObservedSnapshotReadBack,
+    ) -> Result<ModelJudgementCounts, ModelDisagreement> {
+        let session = self.open_session()?;
+        let Some(snapshot) = session.current.snapshots.get(position) else {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SessionState,
+                format!(
+                    "模型里现行版本 {:?} 没有第 {position} 个快照：{:?}",
+                    session.current.key, session.current.snapshots
+                ),
+                "实现的现行版本里有这个快照（执行器读了它）".to_string(),
+            ));
+        };
+        let expected = match &snapshot.content_at_creation {
+            Some(content) => ModelSnapshotReadBack::File(Rc::clone(content)),
+            None => ModelSnapshotReadBack::NoFile,
+        };
+        let matches = match (&expected, observed) {
+            (ModelSnapshotReadBack::NoFile, ObservedSnapshotReadBack::NoFile) => true,
+            (
+                ModelSnapshotReadBack::File(expected_content),
+                ObservedSnapshotReadBack::File(content),
+            ) => expected_content.as_ref() == content.as_slice(),
+            (
+                ModelSnapshotReadBack::NoFile | ModelSnapshotReadBack::File(_),
+                ObservedSnapshotReadBack::NoFile
+                | ObservedSnapshotReadBack::File(_)
+                | ObservedSnapshotReadBack::NoSnapshotWithThisTree
+                | ObservedSnapshotReadBack::Failed { .. },
+            ) => false,
+        };
+        if !matches {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::SnapshotReadBack,
+                format!(
+                    "第 {position} 个快照（诞生 txg {}）读出 {}",
+                    snapshot.birth_txg.0,
+                    describe_snapshot_read_back(&expected)
+                ),
+                describe_observed_snapshot_read_back(observed),
+            ));
+        }
+        let mut counts = ModelJudgementCounts::default();
+        counts.snapshot_read_backs_compared += 1;
+        Ok(counts)
+    }
+
+    /// 模型的快照、截断、整理那几臂只按第一个文件的单元写（换下谁、钉住谁、搬谁）：现行那一版第一个文件之外有文件带数据单元时不答
+    /// （[`ModelRoot::has_a_file_other_than_the_first_holding_data_units`]；随机历史只在按 inode 号写那一组比重里造出这一形，那一组不抽这几种）。
+    fn refuse_to_answer_with_a_file_other_than_the_first_holding_data_units(
+        current: &ModelRoot,
+        operation: &str,
+    ) -> Result<(), ModelDisagreement> {
+        if current.has_a_file_other_than_the_first_holding_data_units() {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::NotModeled,
+                format!(
+                    "模型里现行版本 {:?} 第一个文件之外有文件带数据单元：{operation}那一臂只按第一个文件写",
+                    current.key
+                ),
+                format!("执行器调了{operation}"),
+            ));
+        }
+        Ok(())
     }
 
     /// 现行那一版有树而文件集合为空时，这次不是建 inode 的改动（覆盖写、unlink）必须拒（D8（核心索引结构） 已定项 16 第 5 条，
@@ -2421,19 +6399,17 @@ impl IdealModel {
             ModelVersionContents::WithoutTrees
             | ModelVersionContents::LiveFile(_)
             | ModelVersionContents::FileBeingDeleted { .. }
-            | ModelVersionContents::InodesWithoutTheFirstFile { .. } => None,
+            | ModelVersionContents::InodesWithoutTheFirstFile { .. }
+            | ModelVersionContents::FileBeingTruncated { .. } => None,
         }
     }
 
-    /// 模型的现行版本有没有删除中的文件（`deleted_inodes` 不空）：执行器拿它分一次会话交回的那几版里哪一版是走空的一步。
+    /// 模型的现行版本有没有删除中的号（`deleted_inodes` 不空：第一个文件或别的文件）：执行器拿它分一次会话交回的那几版里哪一版是走空的一步。
     #[must_use]
     pub fn current_version_has_a_file_being_deleted(&self) -> bool {
-        self.session.as_ref().is_some_and(|session| {
-            matches!(
-                session.current.contents,
-                ModelVersionContents::FileBeingDeleted { .. }
-            )
-        })
+        self.session
+            .as_ref()
+            .is_some_and(|session| session.current.inode_being_deleted().is_some())
     }
 
     fn answer_for_publishes(
@@ -2588,6 +6564,19 @@ impl IdealModel {
             ));
         }
         let mut required_refusals = BTreeSet::new();
+        // 第一版有快照就拒回退（判决 S8、岔路 3）：现行那一版带着快照（销毁中的也算）时在任何读之前拒，别的候选判据不再看。
+        if !current.snapshots.is_empty() {
+            required_refusals
+                .insert(ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses);
+            let mut answer = self.answer_for_publishes(
+                ModelOperationKind::RollbackWhileMounted,
+                required_refusals,
+                Vec::new(),
+            );
+            answer.rollback_target = Some(target);
+            answer.walls_are_judged_before_the_first_write = true;
+            return Ok(answer);
+        }
         let target_root = self.root_with_key(target);
         match target_root {
             None => {
@@ -2602,6 +6591,13 @@ impl IdealModel {
                 }
                 if !target_root.contents.has_trees() {
                     required_refusals.insert(ModelRefusalReason::RollbackTargetWithoutFile);
+                }
+                // 目标那一版带快照：实现在候选集那一判之后、把目标那一版重建出来再判（`mount::roll_back_by_a_forward_publish`），
+                // 所以只在候选判据都过了时才是这一条。
+                if required_refusals.is_empty() && !target_root.snapshots.is_empty() {
+                    required_refusals.insert(
+                        ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses,
+                    );
                 }
             }
         }
@@ -2618,6 +6614,7 @@ impl IdealModel {
                     None,
                     Rc::clone(&current.instance_table_rows),
                     UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(target_root),
+                    InodesOtherThanTheFirstChangeOfThePublish::Carried,
                 );
                 vec![rollback_root]
             }
@@ -2930,7 +6927,12 @@ impl IdealModel {
             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
             | ModelRefusalReason::FloorAboveCeiling
             | ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread
-            | ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile => false,
+            | ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile
+            | ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses
+            | ModelRefusalReason::MoreSnapshotsThanTheFirstVersionAllows
+            | ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow
+            | ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile
+            | ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted => false,
         }
     }
 
@@ -3021,6 +7023,11 @@ impl IdealModel {
                 if accepted_reason == ModelRefusalReason::UnitAreaWall {
                     counts.unit_area_wall_refusals_in_the_interval += 1;
                 }
+                if accepted_reason
+                    == ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted
+                {
+                    counts.data_writes_refused_after_the_first_file_was_deleted_matched += 1;
+                }
                 for root in completed {
                     self.write_root(root.clone());
                 }
@@ -3039,16 +7046,173 @@ impl IdealModel {
                 }
                 self.judge_effect(answer, effect, &mut counts)?;
                 counts.successes_matched += 1;
-                if answer.operation == ModelOperationKind::PublishDeletionStep
+                if answer.operation == ModelOperationKind::PublishDeletionStep {
+                    if answer
+                        .expected_roots
+                        .iter()
+                        .any(|root| root.inode_being_deleted().is_some())
+                    {
+                        counts.deletion_batches_keeping_data_units_matched += 1;
+                    } else if let (Some(after), Some(session)) =
+                        (answer.expected_roots.first(), self.session.as_ref())
+                    {
+                        Self::count_the_shape_of_a_final_deletion_batch(
+                            &session.current,
+                            after,
+                            &mut counts,
+                        );
+                    }
+                }
+                if answer.operation == ModelOperationKind::PublishSnapshotDestructionStep
                     && answer.expected_roots.iter().any(|root| {
-                        matches!(root.contents, ModelVersionContents::FileBeingDeleted { .. })
+                        root.snapshots
+                            .iter()
+                            .any(|snapshot| snapshot.is_being_destroyed)
                     })
                 {
-                    counts.deletion_batches_keeping_data_units_matched += 1;
+                    counts.snapshot_destruction_batches_keeping_the_snapshot_matched += 1;
+                }
+                match answer.operation {
+                    ModelOperationKind::PublishCompactionBatch => {
+                        counts.compaction_batches_matched += 1;
+                        if answer
+                            .expected_roots
+                            .iter()
+                            .any(|root| root.logged_compaction_intent.is_none())
+                        {
+                            counts.compaction_intents_deleted_with_the_last_batch_matched += 1;
+                        }
+                    }
+                    ModelOperationKind::PublishCompactionIntentIssue => {
+                        counts.compaction_intents_issued_matched += 1;
+                    }
+                    ModelOperationKind::PublishCompactionIntentCompletion => {
+                        counts.compaction_intents_deleted_without_a_batch_matched += 1;
+                    }
+                    ModelOperationKind::PublishCompactionIntentDrop => {
+                        counts.compaction_intents_dropped_matched += 1;
+                    }
+                    ModelOperationKind::PublishFirstFile
+                    | ModelOperationKind::PublishOverwrite
+                    | ModelOperationKind::PublishSequentialWrite
+                    | ModelOperationKind::PublishWithoutUnits
+                    | ModelOperationKind::MountWritable
+                    | ModelOperationKind::RollbackWhileMounted
+                    | ModelOperationKind::RaiseRollbackFloor
+                    | ModelOperationKind::Unmount
+                    | ModelOperationKind::ColdStartRecover
+                    | ModelOperationKind::PublishUnlinkIntent
+                    | ModelOperationKind::PublishDeletionStep
+                    | ModelOperationKind::PublishNewInode
+                    | ModelOperationKind::PublishSnapshotCreation
+                    | ModelOperationKind::PublishSnapshotDestructionIntent
+                    | ModelOperationKind::PublishSnapshotDestructionStep => {}
+                    // 按 inode 号写第一个文件之外的文件：数这次长没长高、写的号落没落在上段第 0 片叶之外（这一组取样点要罩的两形）。
+                    ModelOperationKind::PublishWholeWriteOfAnInodeOtherThanTheFirst => {
+                        counts.writes_of_an_inode_other_than_the_first_matched += 1;
+                        if let (Some(written_version), Some(session)) =
+                            (answer.expected_roots.first(), self.session.as_ref())
+                        {
+                            let level_before = extent_upper_segment_root_level(
+                                &session.current.inodes_with_an_extent_upper_leaf_entry(),
+                            );
+                            let level_after = extent_upper_segment_root_level(
+                                &written_version.inodes_with_an_extent_upper_leaf_entry(),
+                            );
+                            if level_after > level_before {
+                                counts.writes_growing_the_extent_upper_segment_matched += 1;
+                            }
+                            let written_inode = written_version
+                                .inodes_other_than_the_first
+                                .iter()
+                                .find(|(_, inode)| {
+                                    inode.data_written_at
+                                        == Some(written_version.key.checkpoint_txg)
+                                })
+                                .map(|(number, _)| *number);
+                            if written_inode
+                                .is_some_and(|number| number >= EXTENT_TREE_UPPER_LEAF_INODES)
+                            {
+                                counts.writes_past_the_first_extent_upper_leaf_matched += 1;
+                            }
+                        }
+                    }
+                    // 截断（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2、K5）：缩短发的意图之后这一版在截断途中，
+                    // 不缩短的那一次之后是带活文件的一版。
+                    ModelOperationKind::PublishTruncation => {
+                        if answer.expected_roots.iter().any(|root| {
+                            matches!(
+                                root.contents,
+                                ModelVersionContents::FileBeingTruncated { .. }
+                            )
+                        }) {
+                            counts.truncation_intents_matched += 1;
+                        } else {
+                            counts.size_changes_without_shrinking_matched += 1;
+                        }
+                    }
+                    // 截断的一批之后仍在截断途中的是不是最后一批的那一批，之后是带活文件的一版的是最后一批。
+                    ModelOperationKind::PublishTruncationStep => {
+                        if answer.expected_roots.iter().any(|root| {
+                            matches!(
+                                root.contents,
+                                ModelVersionContents::FileBeingTruncated { .. }
+                            )
+                        }) {
+                            counts.truncation_batches_before_the_final_batch_matched += 1;
+                        } else {
+                            counts.final_truncation_batches_matched += 1;
+                        }
+                    }
+                }
+                if answer.expected_roots.iter().any(|root| {
+                    root.user_visible_root_relocations
+                        .values()
+                        .any(|relocated_at| *relocated_at == root.key.checkpoint_txg)
+                }) {
+                    counts.compaction_publishes_relocating_a_user_visible_root_matched += 1;
                 }
                 self.advance_by_success(answer);
                 Ok(counts)
             }
+        }
+    }
+
+    /// 一次比过、对得上的删除最后一批（`before` 是它接在后面的那一版，`after` 是它写出的那一版）落在判决第三节 M4 那四形里的哪几形，逐形计数：
+    /// 删的是第一个文件之外的号、删第一个文件而别的 inode 还在、删到文件集合为空、extent 上段的根降了层。
+    fn count_the_shape_of_a_final_deletion_batch(
+        before: &ModelRoot,
+        after: &ModelRoot,
+        counts: &mut ModelJudgementCounts,
+    ) {
+        let Some((deleted, _)) = before.inode_being_deleted() else {
+            return;
+        };
+        match deleted {
+            ModelDeletedInode::OtherThanTheFirst(_) => {
+                counts.deletions_of_an_inode_other_than_the_first_matched += 1;
+                if matches!(
+                    before.contents,
+                    ModelVersionContents::InodesWithoutTheFirstFile { .. }
+                ) {
+                    counts
+                        .deletions_of_an_inode_other_than_the_first_after_the_first_file_was_deleted_matched +=
+                        1;
+                }
+            }
+            ModelDeletedInode::FirstFile => {
+                if !after.inodes_other_than_the_first.is_empty() {
+                    counts.deletions_of_the_first_file_beside_other_inodes_matched += 1;
+                }
+            }
+        }
+        if matches!(after.contents, ModelVersionContents::TreesAndNoFile { .. }) {
+            counts.final_deletion_batches_emptying_the_version_matched += 1;
+        }
+        if extent_upper_segment_root_level(&after.inodes_with_an_extent_upper_leaf_entry())
+            < extent_upper_segment_root_level(&before.inodes_with_an_extent_upper_leaf_entry())
+        {
+            counts.deletions_lowering_the_extent_upper_segment_matched += 1;
         }
     }
 
@@ -3243,6 +7407,228 @@ impl IdealModel {
             Self::judge_file_content(expected, &observed.file, counts)?;
             Self::judge_instance_table(expected, &observed.instance_table, counts)?;
             self.judge_allocation_generations(expected, observed, counts)?;
+            Self::judge_snapshot_state(expected, &observed.snapshot_state, counts)?;
+            Self::judge_logged_compaction_intent(expected, observed, counts)?;
+            Self::judge_first_file_record_truncation_field(expected, observed, counts)?;
+            Self::judge_inodes_other_than_the_first(expected, observed, counts)?;
+        }
+        Ok(())
+    }
+
+    /// 这一版第一个文件之外的 inode 与模型记的相同（里程碑「删除与多次 COW」一·1）：号的集合一样，每个读回的内容逐字节一样
+    /// （没写过数据的读回空）。写错了 inode（写成别的号、写成第一个文件）这里与第一个文件的内容那一格必有一格对不上。
+    fn judge_inodes_other_than_the_first(
+        expected: &ModelRoot,
+        observed: &ObservedRoot,
+        counts: &mut ModelJudgementCounts,
+    ) -> Result<(), ModelDisagreement> {
+        // 删除中的那一个（nlink = 0）读不出，实现那一侧也不交（`model_comparison::observed_inodes_other_than_the_first_of_file_version`），
+        // 它还剩的单元按分配代另比。
+        let expected_numbers: Vec<u64> = expected
+            .inodes_other_than_the_first
+            .iter()
+            .filter(|(_, inode)| inode.is_live())
+            .map(|(number, _)| *number)
+            .collect();
+        let observed_numbers: Vec<u64> = observed
+            .inodes_other_than_the_first
+            .keys()
+            .copied()
+            .collect();
+        if expected_numbers != observed_numbers {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::InodesOtherThanTheFirst,
+                format!(
+                    "{:?} 第一个文件之外的 inode {expected_numbers:?}（水位 {}）",
+                    expected.key, expected.inode_number_watermark
+                ),
+                format!("{observed_numbers:?}"),
+            ));
+        }
+        for (number, inode) in expected
+            .inodes_other_than_the_first
+            .iter()
+            .filter(|(_, inode)| inode.is_live())
+        {
+            let observed_content = observed
+                .inodes_other_than_the_first
+                .get(number)
+                .expect("上面比过两边的号一样");
+            match observed_content {
+                ObservedFile::Decoded(content) if content.as_slice() == inode.content.as_ref() => {}
+                ObservedFile::Decoded(_)
+                | ObservedFile::NoFile
+                | ObservedFile::Undecodable { .. } => {
+                    let described = match observed_content {
+                        ObservedFile::Decoded(content) => {
+                            format!("{} 字节（末字节 {:?}）", content.len(), content.last())
+                        }
+                        ObservedFile::NoFile => "读不出这个文件".to_string(),
+                        ObservedFile::Undecodable { what } => format!("解不出内容：{what}"),
+                    };
+                    return Err(ModelDisagreement::new(
+                        ModelDisagreementAspect::InodesOtherThanTheFirst,
+                        format!(
+                            "{:?} 的 inode {number} 是 {:?} 写的 {} 字节（末字节 {:?}）",
+                            expected.key,
+                            inode.data_written_at,
+                            inode.content.len(),
+                            inode.content.last()
+                        ),
+                        described,
+                    ));
+                }
+            }
+            counts.inodes_other_than_the_first_compared += 1;
+            if inode.data_written_at.is_some() {
+                counts.contents_of_files_other_than_the_first_compared += 1;
+            }
+        }
+        Ok(())
+    }
+
+    /// 这一版第一个文件那条 inode 记录里的截断字段与模型记的相同（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、R2、R5，
+    /// 第六节用户定案）：有没有那条记录、T、N_w 两段的值。
+    fn judge_first_file_record_truncation_field(
+        expected: &ModelRoot,
+        observed: &ObservedRoot,
+        counts: &mut ModelJudgementCounts,
+    ) -> Result<(), ModelDisagreement> {
+        let expected_values = expected
+            .contents
+            .first_file_record_truncation_field()
+            .map(ModelTruncationField::recorded_values);
+        if expected_values != observed.first_file_record_truncation_field {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::FirstFileRecordTruncationField,
+                format!(
+                    "{:?} 第一个文件那条记录的截断字段 {:?}（{:?}）",
+                    expected.key,
+                    expected_values,
+                    expected.contents.first_file_record_truncation_field()
+                ),
+                format!("{:?}", observed.first_file_record_truncation_field),
+            ));
+        }
+        match expected.contents.first_file_record_truncation_field() {
+            Some(ModelTruncationField::WrittenByATruncationIntent { .. }) => {
+                counts.truncation_fields_compared += 1;
+                counts.written_truncation_fields_compared += 1;
+            }
+            Some(ModelTruncationField::NotWritten) => counts.truncation_fields_compared += 1,
+            None => {}
+        }
+        Ok(())
+    }
+
+    /// 这一版 logged_ops 里的整理意图与模型记的相同：有没有、签发 txg、R、`c0`（判决 G1 的字段表；`segs0` 不比）。
+    fn judge_logged_compaction_intent(
+        expected: &ModelRoot,
+        observed: &ObservedRoot,
+        counts: &mut ModelJudgementCounts,
+    ) -> Result<(), ModelDisagreement> {
+        if expected.logged_compaction_intent != observed.logged_compaction_intent {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::LoggedCompactionIntent,
+                format!(
+                    "{:?} 的 logged_ops 整理意图 {:?}",
+                    expected.key, expected.logged_compaction_intent
+                ),
+                format!("{:?}", observed.logged_compaction_intent),
+            ));
+        }
+        if expected.logged_compaction_intent.is_some() {
+            counts.logged_compaction_intents_compared += 1;
+        }
+        Ok(())
+    }
+
+    /// 这一版的快照那几样与模型记的逐项相同（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S7）：活头前驱（树表 0 条的一版
+    /// 没有那条条目）、快照列表（个数、每个的诞生 txg、前驱、销毁中记号、两条根指针抄的是谁）、deadlist 条目数、被钉映射条目数，各是一格。
+    fn judge_snapshot_state(
+        expected: &ModelRoot,
+        observed: &ObservedSnapshotState,
+        counts: &mut ModelJudgementCounts,
+    ) -> Result<(), ModelDisagreement> {
+        let expected_live_head_previous_snapshot_txg = expected
+            .contents
+            .has_trees()
+            .then_some(expected.previous_snapshot_txg_of_the_live_head);
+        if expected_live_head_previous_snapshot_txg != observed.live_head_previous_snapshot_txg {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::LiveHeadPreviousSnapshotTxg,
+                format!(
+                    "{:?} 的活头 previous_snapshot_txg {:?}",
+                    expected.key,
+                    expected_live_head_previous_snapshot_txg.map(|txg| txg.0)
+                ),
+                format!(
+                    "{:?}",
+                    observed.live_head_previous_snapshot_txg.map(|txg| txg.0)
+                ),
+            ));
+        }
+        let expected_snapshots: Vec<ObservedSnapshot> = expected
+            .snapshots
+            .iter()
+            .map(|snapshot| ObservedSnapshot {
+                birth_txg: snapshot.birth_txg,
+                previous_snapshot_txg: snapshot.previous_snapshot_txg,
+                is_being_destroyed: snapshot.is_being_destroyed,
+                inode_tree_written_by: snapshot.inode_tree_written_by,
+                extent_root_written_at: snapshot.extent_root_written_at,
+            })
+            .collect();
+        if expected_snapshots != observed.snapshots {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::Snapshots,
+                format!("{:?} 的快照 {expected_snapshots:?}", expected.key),
+                format!("{:?}", observed.snapshots),
+            ));
+        }
+        let mut expected_deadlist_entries = expected.deadlist.as_ref().clone();
+        expected_deadlist_entries.sort_unstable();
+        let mut observed_deadlist_entries = observed.deadlist_entries.clone();
+        observed_deadlist_entries.sort_unstable();
+        if expected_deadlist_entries != observed_deadlist_entries {
+            let first_difference = expected_deadlist_entries
+                .iter()
+                .zip(&observed_deadlist_entries)
+                .position(|(expected_entry, observed_entry)| expected_entry != observed_entry)
+                .unwrap_or_else(|| {
+                    expected_deadlist_entries
+                        .len()
+                        .min(observed_deadlist_entries.len())
+                });
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::DeadlistEntries,
+                format!(
+                    "{:?} 的 deadlist {} 条，按 key 排第 {first_difference} 条起：{:?}",
+                    expected.key,
+                    expected_deadlist_entries.len(),
+                    &expected_deadlist_entries[first_difference..]
+                ),
+                format!(
+                    "{} 条，第 {first_difference} 条起：{:?}",
+                    observed_deadlist_entries.len(),
+                    &observed_deadlist_entries[first_difference..]
+                ),
+            ));
+        }
+        if expected.pinned_mapping_entries != observed.pinned_mapping_entries {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::PinnedMappingEntries,
+                format!(
+                    "{:?} 被钉住的映射条目 {} 条",
+                    expected.key, expected.pinned_mapping_entries
+                ),
+                format!("{} 条", observed.pinned_mapping_entries),
+            ));
+        }
+        counts.snapshot_states_compared += 1;
+        counts.snapshots_compared += u64::try_from(expected_snapshots.len()).expect("个数");
+        if !expected_deadlist_entries.is_empty() {
+            counts.versions_with_deadlist_entries_compared += 1;
         }
         Ok(())
     }
@@ -3365,6 +7751,12 @@ impl IdealModel {
                     .iter()
                     .filter(|(_, written_at)| **written_at == expected.key.checkpoint_txg)
                     .map(|(role, _)| *role)
+                    .chain(
+                        expected
+                            .data_unit_written_at
+                            .contains(&expected.key.checkpoint_txg)
+                            .then_some(ModelUnitRole::Data),
+                    )
                     .collect();
                 counts.rewritten_role_sets_compared += 1;
                 if !rewritten_in_the_model.is_empty() {
@@ -3402,6 +7794,11 @@ impl IdealModel {
                 ));
             }
         };
+        let ObservedAllocationRecordsOfEveryUnit {
+            roles: observed_records,
+            data_units: observed_data_units,
+            data_units_of_the_files_other_than_the_first: observed_data_units_of_the_other_files,
+        } = observed_records;
         let handed_in: BTreeSet<ModelUnitRole> =
             observed_records.iter().map(|(role, _)| *role).collect();
         if let Some(role) = expected
@@ -3420,24 +7817,47 @@ impl IdealModel {
             ));
         }
         for (role, records) in observed_records {
-            let Some(written_at) = expected.role_written_at.get(role) else {
-                return Err(ModelDisagreement::new(
-                    ModelDisagreementAspect::AllocationGeneration,
-                    format!("{:?} 这一版没有 {role:?} 这个角色", expected.key),
-                    format!("实现交回了 {role:?} 的单元"),
-                ));
+            let written_at = match role {
+                // 数据单元按单元号交（`data_units`），混在角色里交的说不上是哪一个。
+                ModelUnitRole::Data => {
+                    return Err(ModelDisagreement::new(
+                        ModelDisagreementAspect::AllocationGeneration,
+                        format!(
+                            "{:?} 的数据单元按单元号逐个交（{} 个）",
+                            expected.key,
+                            expected.data_unit_written_at.len()
+                        ),
+                        format!("在角色里交了一个不带单元号的数据单元：{records:?}"),
+                    ));
+                }
+                ModelUnitRole::ExtentRoot
+                | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_)
+                | ModelUnitRole::InodeLeaf
+                | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
+                | ModelUnitRole::InodeRoot
+                | ModelUnitRole::AllocationTree
+                | ModelUnitRole::AccountingTree
+                | ModelUnitRole::MappingTree
+                | ModelUnitRole::TreeTable
+                | ModelUnitRole::InstanceTable
+                | ModelUnitRole::DeletedInodesRoot
+                | ModelUnitRole::LoggedOperationsRoot
+                | ModelUnitRole::TombstoneLeaf
+                | ModelUnitRole::TombstoneRoot
+                | ModelUnitRole::RetirementLeaf
+                | ModelUnitRole::RetirementRoot => {
+                    let Some(written_at) = expected.role_written_at.get(role) else {
+                        return Err(ModelDisagreement::new(
+                            ModelDisagreementAspect::AllocationGeneration,
+                            format!("{:?} 这一版没有 {role:?} 这个角色", expected.key),
+                            format!("实现交回了 {role:?} 的单元"),
+                        ));
+                    };
+                    *written_at
+                }
             };
-            let devices_seen: BTreeSet<ModelDeviceIdentity> =
-                records.iter().map(|record| record.device).collect();
-            let devices_expected: BTreeSet<ModelDeviceIdentity> =
-                self.geometry.devices.iter().copied().collect();
-            let well_formed = records.len() == self.geometry.devices.len()
-                && devices_seen == devices_expected
-                && records
-                    .iter()
-                    .all(|record| !record.is_released && record.generation == *written_at);
             counts.allocation_records_compared += u64::try_from(records.len()).expect("条数");
-            if !well_formed {
+            if !self.allocation_records_are_one_per_device_allocated_at(records, written_at) {
                 return Err(ModelDisagreement::new(
                     ModelDisagreementAspect::AllocationGeneration,
                     format!(
@@ -3448,7 +7868,108 @@ impl IdealModel {
                 ));
             }
         }
+        // 数据单元按单元号逐个比（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4：截断只重写尾单元之后各单元的分配代不同）：
+        // 交回的单元号恰好是 0 .. 模型这一版的单元数、各一项，单元 i 的分配代等于模型按单元号记的第 i 个。
+        let mut data_units_handed_in: Vec<u64> = observed_data_units
+            .iter()
+            .map(|(index, _)| *index)
+            .collect();
+        data_units_handed_in.sort_unstable();
+        let data_units_in_the_model: Vec<u64> =
+            (0..u64::try_from(expected.data_unit_written_at.len()).expect("单元数")).collect();
+        if data_units_handed_in != data_units_in_the_model {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::AllocationGeneration,
+                format!(
+                    "{:?} 这一版有 {} 个数据单元（单元号 0 起连着、各一项），实现要交回它们的分配记录",
+                    expected.key,
+                    expected.data_unit_written_at.len()
+                ),
+                format!("交回的单元号（排过序）{data_units_handed_in:?}"),
+            ));
+        }
+        for (index, records) in observed_data_units {
+            let written_at = *expected
+                .data_unit_written_at
+                .get(usize::try_from(*index).expect("单元号装得进 usize"))
+                .expect("上面判过交回的单元号恰好是 0 .. 模型这一版的单元数");
+            counts.allocation_records_compared += u64::try_from(records.len()).expect("条数");
+            let data_unit_records_match =
+                self.allocation_records_are_one_per_device_allocated_at(records, written_at);
+            if !data_unit_records_match {
+                return Err(ModelDisagreement::new(
+                    ModelDisagreementAspect::AllocationGeneration,
+                    format!(
+                        "{:?} 的数据单元 {index}：每块盘一条、仍分配、分配代 {}（写它的那次发布）",
+                        expected.key, written_at.0
+                    ),
+                    format!("{records:?}"),
+                ));
+            }
+        }
+        // 第一个文件之外的文件的数据单元按 (inode 号, 单元号) 逐个比（里程碑「删除与多次 COW」一·1）：交回的恰好是模型这一版每个有数据单元的文件的
+        // 0 .. 单元数、各一项，分配代都是最近一次整份写它的那次发布。
+        let mut other_data_units_handed_in: Vec<(u64, u64)> =
+            observed_data_units_of_the_other_files
+                .iter()
+                .map(|(inode_and_index, _)| *inode_and_index)
+                .collect();
+        other_data_units_handed_in.sort_unstable();
+        let other_data_units_in_the_model: Vec<(u64, u64)> = expected
+            .inodes_other_than_the_first
+            .iter()
+            .flat_map(|(number, inode)| {
+                (0..inode.data_units_present()).map(move |index| (*number, index))
+            })
+            .collect();
+        if other_data_units_handed_in != other_data_units_in_the_model {
+            return Err(ModelDisagreement::new(
+                ModelDisagreementAspect::AllocationGeneration,
+                format!(
+                    "{:?} 第一个文件之外的文件的数据单元 (inode 号, 单元号) {other_data_units_in_the_model:?}，实现要交回它们的分配记录",
+                    expected.key
+                ),
+                format!("交回的（排过序）{other_data_units_handed_in:?}"),
+            ));
+        }
+        for ((number, index), records) in observed_data_units_of_the_other_files {
+            let written_at = expected
+                .inodes_other_than_the_first
+                .get(number)
+                .and_then(|inode| inode.data_written_at)
+                .expect(
+                    "上面判过交回的 (inode 号, 单元号) 恰好是模型这一版有数据单元的文件的那几个",
+                );
+            counts.allocation_records_compared += u64::try_from(records.len()).expect("条数");
+            if !self.allocation_records_are_one_per_device_allocated_at(records, written_at) {
+                return Err(ModelDisagreement::new(
+                    ModelDisagreementAspect::AllocationGeneration,
+                    format!(
+                        "{:?} 的 inode {number} 数据单元 {index}：每块盘一条、仍分配、分配代 {}（整份写它的那次发布）",
+                        expected.key, written_at.0
+                    ),
+                    format!("{records:?}"),
+                ));
+            }
+        }
         Ok(())
+    }
+
+    /// 一个单元的那几条分配记录：每块盘恰好一条、仍分配着、分配代等于写它的那次发布的 txg（D3（空间分配） 已定项 3 / 7）。
+    fn allocation_records_are_one_per_device_allocated_at(
+        &self,
+        records: &[ObservedAllocationRecord],
+        written_at: ModelCheckpointTxg,
+    ) -> bool {
+        let devices_expected: BTreeSet<ModelDeviceIdentity> =
+            self.geometry.devices.iter().copied().collect();
+        let devices_seen: BTreeSet<ModelDeviceIdentity> =
+            records.iter().map(|record| record.device).collect();
+        records.len() == self.geometry.devices.len()
+            && devices_seen == devices_expected
+            && records
+                .iter()
+                .all(|record| !record.is_released && record.generation == written_at)
     }
 
     fn write_root(&mut self, root: ModelRoot) {
@@ -3597,6 +8118,26 @@ fn describe_answer(answer: &ModelAnswer) -> String {
             .map(|reason| reason.name())
             .collect();
         format!("{:?} 该拒：{required:?}", answer.operation)
+    }
+}
+
+fn describe_snapshot_read_back(read_back: &ModelSnapshotReadBack) -> String {
+    match read_back {
+        ModelSnapshotReadBack::NoFile => "没有文件".to_string(),
+        ModelSnapshotReadBack::File(content) => {
+            format!("{} 字节（末字节 {:?}）", content.len(), content.last())
+        }
+    }
+}
+
+fn describe_observed_snapshot_read_back(read_back: &ObservedSnapshotReadBack) -> String {
+    match read_back {
+        ObservedSnapshotReadBack::NoFile => "读出没有文件".to_string(),
+        ObservedSnapshotReadBack::File(content) => {
+            format!("读出 {} 字节（末字节 {:?}）", content.len(), content.last())
+        }
+        ObservedSnapshotReadBack::NoSnapshotWithThisTree => "树表里没有这个快照".to_string(),
+        ObservedSnapshotReadBack::Failed { what } => format!("读失败：{what}"),
     }
 }
 
@@ -3839,8 +8380,8 @@ mod tests {
             Some(key(6, 2))
         );
         assert_eq!(
-            rollback_root.role_written_at.get(&ModelUnitRole::Data),
-            Some(&ModelCheckpointTxg(6)),
+            rollback_root.data_unit_written_at.as_slice(),
+            [ModelCheckpointTxg(6)],
             "复活的数据单元分配代写回目标那一版账里的"
         );
         assert_eq!(
@@ -3924,19 +8465,23 @@ mod tests {
                 row_publish.instance_table_rows.as_ref().clone(),
             ),
             unit_allocation_records: ObservedUnitAllocationRecords::EveryRoleOfTheVersion(
-                row_publish
-                    .role_written_at
-                    .iter()
-                    .map(|(role, written_at)| {
-                        let generation = if *role == ModelUnitRole::Data {
-                            data_generation
-                        } else {
-                            written_at.0
-                        };
-                        (*role, records(generation))
-                    })
-                    .collect(),
+                ObservedAllocationRecordsOfEveryUnit {
+                    roles: row_publish
+                        .role_written_at
+                        .iter()
+                        .map(|(role, written_at)| (*role, records(written_at.0)))
+                        .collect(),
+                    data_units: (0_u64..)
+                        .zip(row_publish.data_unit_written_at.iter())
+                        .map(|(index, _)| (index, records(data_generation)))
+                        .collect(),
+                    data_units_of_the_files_other_than_the_first: Vec::new(),
+                },
             ),
+            snapshot_state: snapshot_state_as_the_model_wrote(row_publish),
+            logged_compaction_intent: row_publish.logged_compaction_intent,
+            first_file_record_truncation_field: truncation_field_as_the_model_wrote(row_publish),
+            inodes_other_than_the_first: BTreeMap::new(),
         };
         let mut counts = ModelJudgementCounts::default();
         assert_eq!(
@@ -3976,11 +8521,71 @@ mod tests {
             },
             instance_table: ObservedInstanceTable::Rows(root.instance_table_rows.as_ref().clone()),
             unit_allocation_records: ObservedUnitAllocationRecords::EveryRoleOfTheVersion(
-                root.role_written_at
-                    .iter()
-                    .map(|(role, written_at)| (*role, records(*written_at)))
-                    .collect(),
+                ObservedAllocationRecordsOfEveryUnit {
+                    roles: root
+                        .role_written_at
+                        .iter()
+                        .map(|(role, written_at)| (*role, records(*written_at)))
+                        .collect(),
+                    data_units: (0_u64..)
+                        .zip(root.data_unit_written_at.iter())
+                        .map(|(index, written_at)| (index, records(*written_at)))
+                        .collect(),
+                    data_units_of_the_files_other_than_the_first: root
+                        .inodes_other_than_the_first
+                        .iter()
+                        .flat_map(|(number, inode)| {
+                            let written_at = inode.data_written_at;
+                            (0..inode.data_units_present()).map(move |index| {
+                                (
+                                    (*number, index),
+                                    records(
+                                        written_at.expect("有数据单元的文件记着写它的那次发布"),
+                                    ),
+                                )
+                            })
+                        })
+                        .collect(),
+                },
             ),
+            snapshot_state: snapshot_state_as_the_model_wrote(root),
+            logged_compaction_intent: root.logged_compaction_intent,
+            first_file_record_truncation_field: truncation_field_as_the_model_wrote(root),
+            inodes_other_than_the_first: root
+                .inodes_other_than_the_first
+                .iter()
+                .map(|(number, inode)| (*number, ObservedFile::Decoded(inode.content.to_vec())))
+                .collect(),
+        }
+    }
+
+    /// 第一个文件那条记录里的截断字段照模型记的原样交回（没有那条记录的一版交 None）。
+    fn truncation_field_as_the_model_wrote(root: &ModelRoot) -> Option<ObservedTruncationField> {
+        root.contents
+            .first_file_record_truncation_field()
+            .map(ModelTruncationField::recorded_values)
+    }
+
+    /// 这一版的快照那几样照模型记的原样交回（树表 0 条的一版没有活头那条条目）。
+    fn snapshot_state_as_the_model_wrote(root: &ModelRoot) -> ObservedSnapshotState {
+        ObservedSnapshotState {
+            live_head_previous_snapshot_txg: root
+                .contents
+                .has_trees()
+                .then_some(root.previous_snapshot_txg_of_the_live_head),
+            snapshots: root
+                .snapshots
+                .iter()
+                .map(|snapshot| ObservedSnapshot {
+                    birth_txg: snapshot.birth_txg,
+                    previous_snapshot_txg: snapshot.previous_snapshot_txg,
+                    is_being_destroyed: snapshot.is_being_destroyed,
+                    inode_tree_written_by: snapshot.inode_tree_written_by,
+                    extent_root_written_at: snapshot.extent_root_written_at,
+                })
+                .collect(),
+            deadlist_entries: root.deadlist.as_ref().clone(),
+            pinned_mapping_entries: root.pinned_mapping_entries,
         }
     }
 
@@ -4017,7 +8622,9 @@ mod tests {
         else {
             panic!("照模型写的是带文件的那一版的全部角色");
         };
-        records.retain(|(role, _)| *role != ModelUnitRole::InodeRoot);
+        records
+            .roles
+            .retain(|(role, _)| *role != ModelUnitRole::InodeRoot);
         let missing = model
             .judge_roots(
                 std::slice::from_ref(&row_publish),
@@ -4032,6 +8639,48 @@ mod tests {
         assert!(
             missing.model_answer.contains("InodeRoot"),
             "点名漏交的那个角色：{missing:?}"
+        );
+    }
+
+    /// 数据单元按单元号逐个比（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4）：漏交一个单元、单元号重了，都报单元的分配代
+    /// 对不上，点名交回的单元号。
+    #[test]
+    fn a_data_unit_the_implementation_did_not_hand_in_or_handed_in_twice_is_reported() {
+        let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
+        let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
+        let ObservedUnitAllocationRecords::EveryRoleOfTheVersion(records) =
+            &mut observed.unit_allocation_records
+        else {
+            panic!("照模型写的是带文件的那一版的全部单元");
+        };
+        let only_data_unit = records.data_units.pop().expect("第一个文件一个数据单元");
+        let mut counts = ModelJudgementCounts::default();
+        let missing = model
+            .judge_allocation_generations(&row_publish, &observed, &mut counts)
+            .expect_err("单元 0 这一版有，实现没交");
+        assert_eq!(
+            missing.aspect,
+            ModelDisagreementAspect::AllocationGeneration
+        );
+        assert!(
+            missing.implementation_answer.contains("[]"),
+            "点名交回的单元号：{missing:?}"
+        );
+        let ObservedUnitAllocationRecords::EveryRoleOfTheVersion(records_handed_in_twice) =
+            &mut observed.unit_allocation_records
+        else {
+            panic!("照模型写的是带文件的那一版的全部单元");
+        };
+        records_handed_in_twice
+            .data_units
+            .push(only_data_unit.clone());
+        records_handed_in_twice.data_units.push(only_data_unit);
+        let twice = model
+            .judge_allocation_generations(&row_publish, &observed, &mut counts)
+            .expect_err("单元 0 交了两次");
+        assert!(
+            twice.implementation_answer.contains("[0, 0]"),
+            "点名交回的单元号：{twice:?}"
         );
     }
 
@@ -4061,6 +8710,10 @@ mod tests {
             unit_allocation_records: ObservedUnitAllocationRecords::RewrittenRolesOnly(
                 roles.iter().copied().collect(),
             ),
+            snapshot_state: ObservedSnapshotState::OF_A_VERSION_WITHOUT_TREES,
+            logged_compaction_intent: None,
+            first_file_record_truncation_field: None,
+            inodes_other_than_the_first: BTreeMap::new(),
         };
         let mut counts = ModelJudgementCounts::default();
         assert_eq!(
@@ -4663,6 +9316,7 @@ mod tests {
                     None,
                     Rc::clone(&current.instance_table_rows),
                     UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(&target),
+                    InodesOtherThanTheFirstChangeOfThePublish::Carried,
                 );
                 assert_eq!(
                     inode_leaf_containers_right_of_the_leftmost(&after_the_rollback),
@@ -4681,6 +9335,2079 @@ mod tests {
         assert_eq!(
             pairs_judged,
             CONTAINER_COUNTS.len() * CONTAINER_COUNTS.len()
+        );
+    }
+
+    /// 模型里现行那一版的快照（会话开着）。
+    fn current_snapshots(model: &IdealModel) -> Vec<ModelSnapshot> {
+        model
+            .snapshots_of_the_current_version()
+            .expect("会话开着")
+            .to_vec()
+    }
+
+    /// 建快照进根环（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S2、S7）：会话现行那一版带文件（内容 [9]，txg 9），
+    /// 连建十个，每个是一次独立发布（txg 10 到 19）、各占一个事务；第 k 个的前驱是第 k − 1 个的诞生 txg（第一个是 0），活头前驱是最后一个的；
+    /// 第十一个要求拒成 `MoreSnapshotsThanTheFirstVersionAllows`（第七节岔路 1 的「10」）。之后覆盖写成 [10]，记下的快照内容不跟着变。
+    #[test]
+    fn the_model_publishes_ten_snapshots_into_the_ring_and_requires_the_eleventh_to_be_refused() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        for snapshot_index in 0..MODEL_SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION {
+            let creation = model
+                .answer_create_snapshot()
+                .expect("会话开着、现行那一版带文件");
+            assert!(
+                creation.required_refusals.is_empty(),
+                "第 {snapshot_index} 个照建：{:?}",
+                creation.required_refusals
+            );
+            succeed(&mut model, &creation);
+        }
+        let eleventh = model.answer_create_snapshot().expect("会话开着");
+        assert_eq!(
+            eleventh.required_refusals,
+            BTreeSet::from([ModelRefusalReason::MoreSnapshotsThanTheFirstVersionAllows]),
+            "第十一个拒"
+        );
+        let snapshots = current_snapshots(&model);
+        assert_eq!(
+            snapshots.len(),
+            MODEL_SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION
+        );
+        for (snapshot, birth_txg) in snapshots.iter().zip(10_u64..) {
+            assert_eq!(
+                snapshot.birth_txg,
+                ModelCheckpointTxg(birth_txg),
+                "S.txg 是建它那次发布的 txg"
+            );
+            assert_eq!(
+                snapshot.previous_snapshot_txg,
+                ModelCheckpointTxg(if birth_txg == 10 { 0 } else { birth_txg - 1 }),
+                "前驱是排在它前面那一个的诞生 txg"
+            );
+            assert_eq!(
+                snapshot.inode_tree_written_by,
+                key(9, 2),
+                "两条根指针抄的是 txg 9 那一版的"
+            );
+        }
+        let current = model.current_version_in_the_session().expect("会话开着");
+        assert_eq!(
+            current.previous_snapshot_txg_of_the_live_head,
+            ModelCheckpointTxg(19),
+            "活头前驱是最后一个快照的诞生 txg"
+        );
+        assert_eq!(
+            current.highest_transaction_number_in_its_instance,
+            4 + 10,
+            "四次覆盖写各一个事务，十次建快照各一个事务"
+        );
+        let overwrite = model
+            .answer_publish_overwrite(&[10])
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &overwrite);
+        assert_eq!(
+            current_snapshots(&model)
+                .iter()
+                .map(|snapshot| snapshot.content_at_creation.clone())
+                .collect::<Vec<_>>(),
+            vec![Some(Rc::from(vec![9_u8])); MODEL_SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION],
+            "十个快照记的都是建时的内容 [9]，之后的覆盖写不改它们"
+        );
+    }
+
+    /// 快照那几样逐项比（判决 S7）：实现交回的这一版照模型记的原样时对得上；活头前驱、快照列表、deadlist 条目数、被钉映射条目数各改一样，
+    /// 各报自己那一格。
+    #[test]
+    fn each_snapshot_field_of_a_version_that_differs_is_reported_as_its_own_aspect() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let creation = model.answer_create_snapshot().expect("建快照");
+        succeed(&mut model, &creation);
+        let overwrite = model.answer_publish_overwrite(&[10]).expect("覆盖写");
+        succeed(&mut model, &overwrite);
+        let version = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone();
+        let aspect_of = |observed: ObservedRoot| {
+            model
+                .judge_roots(
+                    std::slice::from_ref(&version),
+                    &[observed],
+                    &mut ModelJudgementCounts::default(),
+                )
+                .map_err(|disagreement| disagreement.aspect)
+        };
+        assert_eq!(
+            aspect_of(observed_exactly_as_the_model_wrote(&version)),
+            Ok(())
+        );
+        let mut wrong_live_head = observed_exactly_as_the_model_wrote(&version);
+        wrong_live_head
+            .snapshot_state
+            .live_head_previous_snapshot_txg = Some(ModelCheckpointTxg(0));
+        assert_eq!(
+            aspect_of(wrong_live_head),
+            Err(ModelDisagreementAspect::LiveHeadPreviousSnapshotTxg)
+        );
+        let mut wrong_snapshots = observed_exactly_as_the_model_wrote(&version);
+        wrong_snapshots.snapshot_state.snapshots[0].is_being_destroyed = true;
+        assert_eq!(
+            aspect_of(wrong_snapshots),
+            Err(ModelDisagreementAspect::Snapshots)
+        );
+        let mut wrong_deadlist = observed_exactly_as_the_model_wrote(&version);
+        wrong_deadlist
+            .snapshot_state
+            .deadlist_entries
+            .push(ModelDeadlistEntry {
+                epoch: ModelCheckpointTxg(0),
+                mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_DATA,
+                mapping_key_birth_tree: TREE_IDENTIFIER_EXTENT,
+                birth_txg: ModelCheckpointTxg(0),
+            });
+        assert_eq!(
+            aspect_of(wrong_deadlist),
+            Err(ModelDisagreementAspect::DeadlistEntries)
+        );
+        // 条数相同、一条的类标签不同（一批放错一条就是这个样子）：逐条比照样报 deadlist 那一格。
+        let mut wrong_deadlist_entry = observed_exactly_as_the_model_wrote(&version);
+        wrong_deadlist_entry.snapshot_state.deadlist_entries[0].mapping_key_unit_class =
+            MODEL_MAPPING_KEY_UNIT_CLASS_PACKED_RECORDS;
+        assert_eq!(
+            aspect_of(wrong_deadlist_entry),
+            Err(ModelDisagreementAspect::DeadlistEntries),
+            "条数相同、有一条不同也报"
+        );
+        let mut wrong_pinned_mapping_entries = observed_exactly_as_the_model_wrote(&version);
+        wrong_pinned_mapping_entries
+            .snapshot_state
+            .pinned_mapping_entries += 1;
+        assert_eq!(
+            aspect_of(wrong_pinned_mapping_entries),
+            Err(ModelDisagreementAspect::PinnedMappingEntries)
+        );
+    }
+
+    /// 快照下覆盖写钉住被换下的用户可见单元、删快照放掉它们（判决第三节 S3、S4）：快照建在 txg 10（内容 [9] 是 txg 9 写的），txg 11 覆盖写换下
+    /// 数据单元、extent 根、inode 叶与根四个（都生在 txg 9 ≤ 10），四条 deadlist 条目、四条被钉的映射条目，纪元 10；读快照仍读出 [9]。
+    /// 删它：意图那次（txg 12）带上销毁中、把前驱 0 传给活头，一条都不放；下一批（txg 13）能放的四条不多于一批，是最后一批，放掉四条、删掉快照。
+    #[test]
+    fn the_model_pins_the_units_a_snapshot_references_and_releases_them_when_the_snapshot_is_destroyed(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let creation = model.answer_create_snapshot().expect("建快照");
+        succeed(&mut model, &creation);
+        let overwrite = model.answer_publish_overwrite(&[10]).expect("覆盖写");
+        succeed(&mut model, &overwrite);
+        let after_the_overwrite = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone();
+        assert_eq!(
+            after_the_overwrite.deadlist.as_ref(),
+            &[
+                ModelDeadlistEntry {
+                    epoch: ModelCheckpointTxg(10),
+                    mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_DATA,
+                    mapping_key_birth_tree: TREE_IDENTIFIER_EXTENT,
+                    birth_txg: ModelCheckpointTxg(9),
+                },
+                ModelDeadlistEntry {
+                    epoch: ModelCheckpointTxg(10),
+                    mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_INDEX_NODE,
+                    mapping_key_birth_tree: TREE_IDENTIFIER_EXTENT,
+                    birth_txg: ModelCheckpointTxg(9),
+                },
+                ModelDeadlistEntry {
+                    epoch: ModelCheckpointTxg(10),
+                    mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_PACKED_RECORDS,
+                    mapping_key_birth_tree: TREE_IDENTIFIER_INODE,
+                    birth_txg: ModelCheckpointTxg(9),
+                },
+                ModelDeadlistEntry {
+                    epoch: ModelCheckpointTxg(10),
+                    mapping_key_unit_class: MODEL_MAPPING_KEY_UNIT_CLASS_INDEX_NODE,
+                    mapping_key_birth_tree: TREE_IDENTIFIER_INODE,
+                    birth_txg: ModelCheckpointTxg(9),
+                },
+            ],
+            "数据单元、extent 根、inode 叶与根各一条，纪元是活头前驱 10（数据单元先进，叶容器与根按角色次序）"
+        );
+        assert_eq!(
+            after_the_overwrite.pinned_mapping_entries, 4,
+            "四条映射条目留着"
+        );
+        assert_eq!(
+            model
+                .judge_snapshot_read_back(0, &ObservedSnapshotReadBack::File(vec![9]))
+                .map(|counts| counts.snapshot_read_backs_compared),
+            Ok(1),
+            "覆盖写之后快照仍读出建时的 [9]"
+        );
+        assert_eq!(
+            model
+                .judge_snapshot_read_back(0, &ObservedSnapshotReadBack::File(vec![10]))
+                .map_err(|disagreement| disagreement.aspect),
+            Err(ModelDisagreementAspect::SnapshotReadBack),
+            "读出活头的 [10] 是读快照那一格对不上"
+        );
+        let intent = model.answer_destroy_snapshot(0).expect("删快照的意图");
+        succeed(&mut model, &intent);
+        let after_the_intent = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone();
+        assert!(
+            after_the_intent.snapshots[0].is_being_destroyed,
+            "带上销毁中"
+        );
+        assert_eq!(
+            after_the_intent.previous_snapshot_txg_of_the_live_head,
+            ModelCheckpointTxg(0),
+            "被删那一个的前驱 0 传给活头"
+        );
+        assert_eq!(after_the_intent.deadlist.len(), 4, "意图那次一条都不放");
+        assert!(
+            model.current_version_has_a_step_to_walk(),
+            "销毁中的快照要走空"
+        );
+        let final_batch = model.answer_next_step_of_the_walk().expect("走空的一步");
+        assert_eq!(
+            final_batch.operation,
+            ModelOperationKind::PublishSnapshotDestructionStep
+        );
+        succeed(&mut model, &final_batch);
+        let after_the_final_batch = model.current_version_in_the_session().expect("会话开着");
+        assert!(
+            after_the_final_batch.snapshots.is_empty(),
+            "最后一批删掉那一对条目"
+        );
+        assert!(after_the_final_batch.deadlist.is_empty(), "四条都放掉");
+        assert_eq!(
+            after_the_final_batch.pinned_mapping_entries, 0,
+            "留存的映射条目跟着删"
+        );
+        assert!(!model.current_version_has_a_step_to_walk(), "走空走完");
+    }
+
+    /// 快照删到一半（意图之后）的那一版与删完的那一版比「非空」（`mount::user_visible_trees_changed` 连同快照条目的根指针）：建快照那次换了状态，
+    /// 意图那次只改记号与前驱、状态不变，最后一批删掉那一对条目又换了状态。
+    #[test]
+    fn a_snapshot_creation_and_the_final_destruction_batch_change_the_user_visible_state_and_the_intent_does_not(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let before = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        let creation = model.answer_create_snapshot().expect("建快照");
+        succeed(&mut model, &creation);
+        let created = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        assert_ne!(created, before, "多了一对快照根：非空");
+        let intent = model.answer_destroy_snapshot(0).expect("意图");
+        succeed(&mut model, &intent);
+        let intended = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        assert_eq!(intended, created, "意图那次不算非空");
+        let final_batch = model.answer_next_step_of_the_walk().expect("最后一批");
+        succeed(&mut model, &final_batch);
+        let destroyed = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        assert_ne!(destroyed, intended, "删掉那一对：非空");
+        assert_eq!(destroyed, before, "删完回到建快照之前的状态");
+    }
+
+    /// 整理的一次发布看得见的几样（[`ModelCompactionPublishSeen`]）：R 取 0 号盘第一个文件那次发布的那一段。
+    fn compaction_publish_seen(
+        units_relocated: u64,
+        is_an_intent_logged_after_the_publish: bool,
+        is_the_region_empty: bool,
+        user_visible_root_units_relocated: Vec<ModelUserVisibleRootUnit>,
+    ) -> ModelCompactionPublishSeen {
+        ModelCompactionPublishSeen {
+            units_at_most: 2,
+            units_relocated,
+            user_visible_root_units_relocated,
+            is_an_intent_logged_after_the_publish,
+            is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish:
+                is_the_region_empty,
+            region_forced_for_the_issue: ModelCompactionRegion {
+                device: ModelDeviceIdentity(0),
+                start_slot: 50_240,
+                slot_count: CLUSTER_SEGMENT_SLOTS,
+            },
+        }
+    }
+
+    fn aspect_of_the_compaction_publish(
+        model: &IdealModel,
+        seen: &ModelCompactionPublishSeen,
+    ) -> Result<ModelOperationKind, ModelDisagreementAspect> {
+        model
+            .answer_compaction_publish(seen)
+            .map(|answer| answer.operation)
+            .map_err(|disagreement| disagreement.aspect)
+    }
+
+    fn succeed_with_the_compaction_publish(
+        model: &mut IdealModel,
+        seen: &ModelCompactionPublishSeen,
+    ) -> ModelRoot {
+        let answer = model
+            .answer_compaction_publish(seen)
+            .expect("这一次整理发布合条款");
+        succeed(model, &answer);
+        model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone()
+    }
+
+    /// 整理意图的三态（判决 G1、G4；D8（核心索引结构） 已定项 5）在模型里：没有活意图时只认签发（不搬、之后 logged_ops 里有一条：签发 txg、R、`c0`
+    /// 是上一版的 txg、logged_ops 根的分配代 = 签发那次），签发之后再签发、搬空 R 而不删意图、删意图而 R 不空、不搬也不删都对不上；
+    /// 照抄意图的一批、随最后一批删意图、单独删意图（R 已空：达成）、丢意图（R 不空）四种各认一次，删了之后这一版没有 logged_ops 根。
+    #[test]
+    fn the_model_takes_the_issue_first_and_lets_the_intent_leave_logged_ops_only_in_the_ways_the_clauses_allow(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(2, true, false, Vec::new())
+            ),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "没有活意图：先签发才搬"
+        );
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(0, false, false, Vec::new())
+            ),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "没有活意图：签发之后 logged_ops 里要有它"
+        );
+        let issue = compaction_publish_seen(0, true, false, Vec::new());
+        assert_eq!(
+            aspect_of_the_compaction_publish(&model, &issue),
+            Ok(ModelOperationKind::PublishCompactionIntentIssue)
+        );
+        let issued = succeed_with_the_compaction_publish(&mut model, &issue);
+        let intent = ModelCompactionIntent {
+            issued_txg: ModelCheckpointTxg(10),
+            region: issue.region_forced_for_the_issue,
+            allocation_generation_at_issue: ModelCheckpointTxg(9),
+        };
+        assert_eq!(
+            issued.logged_compaction_intent,
+            Some(intent),
+            "签发 txg 10、c0 9"
+        );
+        assert_eq!(
+            issued
+                .role_written_at
+                .get(&ModelUnitRole::LoggedOperationsRoot),
+            Some(&ModelCheckpointTxg(10)),
+            "logged_ops 根是签发那次写的"
+        );
+        assert_eq!(
+            aspect_of_the_compaction_publish(&model, &issue),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "活意图在：不再签发（全池至多一条）"
+        );
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(2, true, true, Vec::new())
+            ),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "搬空了 R 而意图照抄"
+        );
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(2, false, false, Vec::new())
+            ),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "删意图而 R 不空"
+        );
+        let carried = succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(2, true, false, Vec::new()),
+        );
+        assert_eq!(
+            carried.logged_compaction_intent,
+            Some(intent),
+            "照抄意图的一批"
+        );
+        assert_eq!(
+            carried
+                .role_written_at
+                .get(&ModelUnitRole::LoggedOperationsRoot),
+            Some(&ModelCheckpointTxg(10)),
+            "logged_ops 根照抄"
+        );
+        let last_batch = succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(1, false, true, Vec::new()),
+        );
+        assert_eq!(
+            last_batch.logged_compaction_intent, None,
+            "最后一批同发布删意图"
+        );
+        assert!(
+            !last_batch
+                .role_written_at
+                .contains_key(&ModelUnitRole::LoggedOperationsRoot),
+            "删空之后没有 logged_ops 根"
+        );
+        succeed_with_the_compaction_publish(&mut model, &issue);
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(0, true, false, Vec::new())
+            ),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "活意图在：不搬也不删"
+        );
+        let completion = compaction_publish_seen(0, false, true, Vec::new());
+        assert_eq!(
+            aspect_of_the_compaction_publish(&model, &completion),
+            Ok(ModelOperationKind::PublishCompactionIntentCompletion)
+        );
+        let completed = succeed_with_the_compaction_publish(&mut model, &completion);
+        assert_eq!(
+            completed.logged_compaction_intent, None,
+            "R 已空：单独删意图"
+        );
+        succeed_with_the_compaction_publish(&mut model, &issue);
+        let drop = compaction_publish_seen(0, false, false, Vec::new());
+        assert_eq!(
+            aspect_of_the_compaction_publish(&model, &drop),
+            Ok(ModelOperationKind::PublishCompactionIntentDrop)
+        );
+        let dropped = succeed_with_the_compaction_publish(&mut model, &drop);
+        assert_eq!(dropped.logged_compaction_intent, None, "R 不空：丢意图");
+        assert!(
+            !dropped
+                .role_written_at
+                .contains_key(&ModelUnitRole::LoggedOperationsRoot),
+            "丢了之后没有 logged_ops 根"
+        );
+        assert_eq!(
+            dropped.key.checkpoint_txg,
+            ModelCheckpointTxg(16),
+            "七次整理发布各一次 txg"
+        );
+    }
+
+    /// 搬根算非空（用户 2026-10-15 定「照字节比，搬根算非空」）：签发与只搬别的单元的一批不换状态，搬了活头 inode 树根的那一批换了状态，
+    /// 抬 F 的上限跟着从第 4 新的非空根 6 挪到 7（不算它时还是 6）；搬一个这一版不引用的根单元模型答不了。
+    #[test]
+    fn a_compaction_publish_relocating_a_user_visible_root_is_a_new_state_for_the_ceiling() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let state_of = |judged_model: &IdealModel| {
+            judged_model
+                .current_version_in_the_session()
+                .expect("会话开着")
+                .user_visible_state()
+        };
+        let before = state_of(&model);
+        assert_eq!(
+            model.rollback_floor_ceiling(),
+            Some(ModelCheckpointTxg(6)),
+            "非空 9、8、7、6、3：第 4 新的是 6"
+        );
+        succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(0, true, false, Vec::new()),
+        );
+        succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(2, true, false, Vec::new()),
+        );
+        assert_eq!(state_of(&model), before, "签发、只搬别的单元：状态不变");
+        assert_eq!(model.rollback_floor_ceiling(), Some(ModelCheckpointTxg(6)));
+        let inode_root_of_the_live_head = ModelUserVisibleRootUnit {
+            tree: ModelUserVisibleTree::InodeTree,
+            birth_txg: ModelCheckpointTxg(9),
+        };
+        let unreferenced_root = ModelUserVisibleRootUnit {
+            tree: ModelUserVisibleTree::InodeTree,
+            birth_txg: ModelCheckpointTxg(3),
+        };
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(1, true, false, vec![unreferenced_root])
+            ),
+            Err(ModelDisagreementAspect::NotModeled),
+            "这一版不引用 txg 3 写的 inode 树根"
+        );
+        let relocated = succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(1, true, false, vec![inode_root_of_the_live_head]),
+        );
+        assert_eq!(
+            relocated
+                .user_visible_root_relocations
+                .get(&inode_root_of_the_live_head),
+            Some(&ModelCheckpointTxg(12)),
+            "搬它的那一次记进去"
+        );
+        assert_ne!(state_of(&model), before, "搬了 inode 树根：非空");
+        assert_eq!(
+            model.rollback_floor_ceiling(),
+            Some(ModelCheckpointTxg(7)),
+            "非空 12、9、8、7：第 4 新的是 7"
+        );
+    }
+
+    /// 一批至少搬一个（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H4，用户 2026-10-16 定「规划时补足」）：签发之后，
+    /// 一个没搬、意图照抄、R 不空的那一次（计划里只有这次发布本来就重写的节点）对不上、模型不动；搬了一个的照抄意图的一批认；R 里只剩这次发布
+    /// 本来就重写的节点时那一次不搬单元、同一次发布删意图、发布之后 R 按记录全空，认成意图达成：这一版没有 logged_ops 根，用户可见状态不变。
+    #[test]
+    fn a_compaction_publish_carrying_the_intent_relocates_at_least_one_unit_and_one_relocating_none_while_the_region_empties_deletes_the_intent(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let before = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(0, true, false, Vec::new()),
+        );
+        let after_the_issue = model.clone();
+        assert_eq!(
+            aspect_of_the_compaction_publish(
+                &model,
+                &compaction_publish_seen(0, true, false, Vec::new())
+            ),
+            Err(ModelDisagreementAspect::CompactionIntentOfThePublish),
+            "一个没搬、意图照抄、R 不空：照抄意图的一批至少搬一个"
+        );
+        assert_eq!(model, after_the_issue, "判不合时模型不动");
+        let carried = succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(1, true, false, Vec::new()),
+        );
+        assert_eq!(carried.key, key(11, 2), "搬了一个的照抄意图的一批");
+        let only_nodes_the_publish_rewrites = compaction_publish_seen(0, false, true, Vec::new());
+        assert_eq!(
+            aspect_of_the_compaction_publish(&model, &only_nodes_the_publish_rewrites),
+            Ok(ModelOperationKind::PublishCompactionIntentCompletion),
+            "R 里只剩这次发布本来就重写的节点：不搬单元、同一次发布删意图，R 按记录全空是达成"
+        );
+        let completed =
+            succeed_with_the_compaction_publish(&mut model, &only_nodes_the_publish_rewrites);
+        assert_eq!(completed.key, key(12, 2));
+        assert_eq!(completed.logged_compaction_intent, None, "意图删了");
+        assert!(
+            !completed
+                .role_written_at
+                .contains_key(&ModelUnitRole::LoggedOperationsRoot),
+            "删空之后没有 logged_ops 根"
+        );
+        assert_eq!(
+            completed.user_visible_state(),
+            before,
+            "整理不改用户可见状态"
+        );
+    }
+
+    /// 回退那一版搬过的根只取目标那一版的（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H1）：签发（txg 10）之后
+    /// 三批各搬一次活头 inode 树根（txg 11、12、13，每次一个新状态），回退到签发那一版 (10, 2) 写 (14, 2)。实现回退时树表根指针取目标那一版的字节，
+    /// 新根与 (10, 2) 同一个状态、与它前一条 (13, 2) 不同：(14, 2) 不带「最后一次搬它」的记录，算非空；从新到旧数 14、13、12、11（9 与 14 同一个状态不计），
+    /// 第 4 新的是 11，两块盘上最新的取小是 13 ⇒ 上限 11。把现行那一版的记录并进来时 14 与 13 同一个状态、不算非空，数成 13、12、11、9，上限 9。
+    #[test]
+    fn a_rollback_after_batches_relocated_a_root_the_target_references_carries_only_the_relocations_of_the_target(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        succeed_with_the_compaction_publish(
+            &mut model,
+            &compaction_publish_seen(0, true, false, Vec::new()),
+        );
+        let target = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone();
+        assert_eq!(target.key, key(10, 2), "签发那一版是回退目标");
+        let inode_root_of_the_live_head = ModelUserVisibleRootUnit {
+            tree: ModelUserVisibleTree::InodeTree,
+            birth_txg: ModelCheckpointTxg(9),
+        };
+        for relocation_txg in 11_u64..=13 {
+            let relocated = succeed_with_the_compaction_publish(
+                &mut model,
+                &compaction_publish_seen(1, true, false, vec![inode_root_of_the_live_head]),
+            );
+            assert_eq!(
+                relocated.key,
+                key(relocation_txg, 2),
+                "照抄意图的一批各一次 txg"
+            );
+        }
+        let before_the_rollback = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone();
+        assert_eq!(
+            before_the_rollback
+                .user_visible_root_relocations
+                .get(&inode_root_of_the_live_head),
+            Some(&ModelCheckpointTxg(13)),
+            "现行那一版最后一次搬 inode 树根是 txg 13"
+        );
+        let rollback = model
+            .answer_rollback_while_mounted(key(10, 2))
+            .expect("会话开着、现行版本带文件");
+        assert!(rollback.required_refusals.is_empty(), "{rollback:?}");
+        let rollback_root = rollback.expected_roots[0].clone();
+        assert_eq!(rollback_root.key, key(14, 2));
+        assert_eq!(
+            rollback_root.user_visible_root_relocations, target.user_visible_root_relocations,
+            "搬过的根只取目标那一版的（目标那一版之后才搬的不并进来）"
+        );
+        assert_eq!(
+            rollback_root.user_visible_state(),
+            target.user_visible_state(),
+            "回退那一版与目标那一版同一个状态"
+        );
+        assert_ne!(
+            rollback_root.user_visible_state(),
+            before_the_rollback.user_visible_state(),
+            "回退那一版与它前一条（搬了根的那一批）不同：非空"
+        );
+        succeed(&mut model, &rollback);
+        assert_eq!(
+            model.rollback_floor_ceiling(),
+            Some(ModelCheckpointTxg(11)),
+            "非空从新到旧 14、13、12、11：第 4 新的是 11"
+        );
+    }
+
+    /// 回退牵涉的两版带快照就拒（判决第三节 S8、岔路 3）：现行那一版带着快照时要求拒成 `RollbackWithSnapshotsWhichTheFirstVersionRefuses`、
+    /// 一条根都不写；删掉快照之后回退到建快照那一版（txg 10，树表里有那一对）同样要求拒；回退到建快照之前的 (6, 2) 不再因为快照拒。
+    #[test]
+    fn the_model_requires_a_rollback_from_or_to_a_version_carrying_a_snapshot_to_be_refused() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let creation = model.answer_create_snapshot().expect("建快照");
+        succeed(&mut model, &creation);
+        let from_the_snapshot = model
+            .answer_rollback_while_mounted(key(6, 2))
+            .expect("会话开着、现行版本带文件");
+        assert_eq!(
+            from_the_snapshot.required_refusals,
+            BTreeSet::from([ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses]),
+            "现行那一版带着快照：要求拒"
+        );
+        assert!(from_the_snapshot.expected_roots.is_empty(), "一条根都不写");
+        let intent = model.answer_destroy_snapshot(0).expect("意图");
+        succeed(&mut model, &intent);
+        let final_batch = model.answer_next_step_of_the_walk().expect("最后一批");
+        succeed(&mut model, &final_batch);
+        let to_the_snapshot = model
+            .answer_rollback_while_mounted(key(10, 2))
+            .expect("会话开着、现行版本带文件");
+        assert_eq!(
+            to_the_snapshot.required_refusals,
+            BTreeSet::from([ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses]),
+            "目标那一版带着快照：要求拒"
+        );
+        let before_the_snapshot = model
+            .answer_rollback_while_mounted(key(6, 2))
+            .expect("会话开着、现行版本带文件");
+        assert!(
+            !before_the_snapshot
+                .required_refusals
+                .contains(&ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses),
+            "两版都没有快照：不因为快照拒：{:?}",
+            before_the_snapshot.required_refusals
+        );
+    }
+
+    /// 没有可写会话时建快照答不了（会话状态对不上）；会话开着而现行那一版树表 0 条（mkfs 之后取号暖机、还没发第一个文件）同样答不了：
+    /// 执行器只在有树的一版上调。
+    #[test]
+    fn the_model_does_not_answer_a_snapshot_creation_without_a_writable_session_or_on_a_version_without_trees(
+    ) {
+        let mut model = two_device_model();
+        assert_eq!(
+            model
+                .answer_create_snapshot()
+                .map_err(|disagreement| disagreement.aspect),
+            Err(ModelDisagreementAspect::SessionState)
+        );
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        assert_eq!(
+            model
+                .answer_create_snapshot()
+                .map_err(|disagreement| disagreement.aspect),
+            Err(ModelDisagreementAspect::SessionState),
+            "树表 0 条的一版"
+        );
+    }
+
+    /// 文件集合为空时建快照照建（用户 2026-10-16 定「放开」，判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）：
+    /// 第一个文件（txg 3）、unlink 意图与最后一批之后那一版有树而文件集合为空，建快照不要求拒、记的内容是「没有文件」；之后建一个 inode，
+    /// 读快照读出「没有文件」，读出一个文件对不上。
+    #[test]
+    fn a_snapshot_created_on_a_version_with_trees_and_no_file_reads_no_file_after_an_inode_is_created(
+    ) {
+        let mut model = two_device_model();
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        let first = model
+            .answer_publish_first_file(&[3])
+            .expect("会话开着、现行 txg 2");
+        succeed(&mut model, &first);
+        let intent = model
+            .answer_unlink_intent()
+            .expect("会话开着、现行版本带活文件");
+        succeed(&mut model, &intent);
+        let final_batch = model
+            .answer_deletion_step()
+            .expect("会话开着、现行版本删除中");
+        succeed(&mut model, &final_batch);
+        let creation = model
+            .answer_create_snapshot()
+            .expect("会话开着、现行那一版有树");
+        assert!(
+            creation.required_refusals.is_empty(),
+            "有树而文件集合为空时照建：{:?}",
+            creation.required_refusals
+        );
+        succeed(&mut model, &creation);
+        assert_eq!(
+            current_snapshots(&model)
+                .iter()
+                .map(|snapshot| snapshot.content_at_creation.clone())
+                .collect::<Vec<_>>(),
+            vec![None],
+            "快照记的是建它那一刻的「没有文件」"
+        );
+        let created = model
+            .answer_create_inode()
+            .expect("会话开着、第一个文件已删完");
+        succeed(&mut model, &created);
+        assert_eq!(
+            model
+                .judge_snapshot_read_back(0, &ObservedSnapshotReadBack::NoFile)
+                .map(|counts| counts.snapshot_read_backs_compared)
+                .map_err(|disagreement| disagreement.aspect),
+            Ok(1),
+            "读快照读出「没有文件」"
+        );
+        assert_eq!(
+            model
+                .judge_snapshot_read_back(0, &ObservedSnapshotReadBack::File(vec![3]))
+                .map_err(|disagreement| disagreement.aspect),
+            Err(ModelDisagreementAspect::SnapshotReadBack),
+            "读出一个文件对不上"
+        );
+    }
+
+    /// 快照个数相同、活头相同、快照抄的根不同的两版，用户可见状态（「非空」与「4 个不同状态」比的那一样）要分得出（判决
+    /// `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F7，攻方 T11 那条用例）：建快照（抄活头 txg 9 的根）、
+    /// 覆盖写成活头 txg 11——这一版记为删之前；删掉那个快照（意图与最后一批）、再建一个（抄活头 txg 11 的根）——这一版记为重建之后。
+    /// 两版的活头都是 txg 11 写的、都只有一个快照、都没搬过根，只差快照抄的根。
+    #[test]
+    fn two_versions_with_one_snapshot_each_differ_in_the_user_visible_state_when_the_snapshots_copy_different_roots(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let creation = model.answer_create_snapshot().expect("建快照");
+        succeed(&mut model, &creation);
+        let overwrite = model.answer_publish_overwrite(&[42]).expect("覆盖写");
+        succeed(&mut model, &overwrite);
+        let before_the_destruction = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        let intent = model.answer_destroy_snapshot(0).expect("意图");
+        succeed(&mut model, &intent);
+        let final_batch = model.answer_next_step_of_the_walk().expect("最后一批");
+        succeed(&mut model, &final_batch);
+        let recreation = model.answer_create_snapshot().expect("再建快照");
+        succeed(&mut model, &recreation);
+        let after_the_recreation = model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .user_visible_state();
+        assert_eq!(
+            (
+                &before_the_destruction.trees_written_by,
+                &before_the_destruction.root_relocations,
+            ),
+            (
+                &after_the_recreation.trees_written_by,
+                &after_the_recreation.root_relocations,
+            ),
+            "两版的活头相同、快照个数相同（根单元逐个都没搬过）"
+        );
+        assert_ne!(
+            before_the_destruction, after_the_recreation,
+            "快照抄的根不同：用户可见状态不同"
+        );
+    }
+
+    /// extent 树下段的位置（D8（核心索引结构） 已定项 14）：一个单元不建下段；145 个单元两片叶加一个根；三片叶的那一档三片加根。
+    #[test]
+    fn extent_lower_node_positions_follow_the_data_unit_count() {
+        assert!(extent_lower_node_positions(1).is_empty());
+        let leaf = |index_in_level| ModelExtentLowerNodePosition {
+            level: 0,
+            index_in_level,
+        };
+        let root = ModelExtentLowerNodePosition {
+            level: 1,
+            index_in_level: 0,
+        };
+        assert_eq!(extent_lower_node_positions(2), vec![leaf(0)]);
+        assert_eq!(
+            extent_lower_node_positions(EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 1),
+            vec![leaf(0), leaf(1), root]
+        );
+        assert_eq!(
+            extent_lower_node_positions(2 * EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 4),
+            vec![leaf(0), leaf(1), leaf(2), root]
+        );
+        assert_eq!(
+            u64::try_from(
+                extent_lower_node_positions(2 * EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 4).len()
+            )
+            .expect("个数"),
+            extent_lower_segment_nodes(2 * EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 4),
+            "与按层数个数的那一份式子数出来的相同"
+        );
+    }
+
+    /// 一个数据单元装多少字节的用户内容（净荷）。
+    fn payload() -> usize {
+        usize::try_from(data_unit_payload_capacity_in_bytes()).expect("三万多")
+    }
+
+    /// `length` 字节、没有一个字节是 0 的内容（补的 0 与洞读出的 0 看得出来）。
+    fn content_without_zeros(length: usize) -> Vec<u8> {
+        (0..length)
+            .map(|index| u8::try_from(index % 251).expect("小于 251") + 1)
+            .collect()
+    }
+
+    /// 实例 2 覆盖写到 txg 9 之后，顺序写一个 `length` 字节的文件（txg 10）。
+    fn model_with_a_file_of(length: usize) -> IdealModel {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let write = model
+            .answer_publish_sequential_write(&content_without_zeros(length))
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &write);
+        model
+    }
+
+    fn current_version(model: &IdealModel) -> ModelRoot {
+        model
+            .current_version_in_the_session()
+            .expect("会话开着")
+            .clone()
+    }
+
+    /// 截到 `new_size` 字节（缩短是意图那次，不缩短是那一次只改记录的发布），做成，交回写出的那一版。
+    fn truncate_to(model: &mut IdealModel, new_size: usize) -> ModelRoot {
+        let answer = model
+            .answer_truncation(u64::try_from(new_size).expect("长度"))
+            .expect("会话开着、现行版本带活文件");
+        assert_eq!(answer.operation, ModelOperationKind::PublishTruncation);
+        assert_eq!(answer.expected_roots.len(), 1, "截断这次用户改动一次发布");
+        succeed(model, &answer);
+        current_version(model)
+    }
+
+    /// 走空的下一步，做成，交回写出的那一版。
+    fn walk_one_step(model: &mut IdealModel) -> ModelRoot {
+        let answer = model
+            .answer_next_step_of_the_walk()
+            .expect("现行版本有要走空的");
+        succeed(model, &answer);
+        current_version(model)
+    }
+
+    /// 这一版里分配代等于它自己那次发布的 txg 的角色（这次重写的），数据单元有一个是这次写的就算上 `Data`。
+    fn roles_rewritten_by_the_publish(root: &ModelRoot) -> BTreeSet<ModelUnitRole> {
+        root.role_written_at
+            .iter()
+            .filter(|(_, written_at)| **written_at == root.key.checkpoint_txg)
+            .map(|(role, _)| *role)
+            .chain(
+                root.data_unit_written_at
+                    .contains(&root.key.checkpoint_txg)
+                    .then_some(ModelUnitRole::Data),
+            )
+            .collect()
+    }
+
+    fn file_of(root: &ModelRoot) -> &ModelFileVersion {
+        root.contents.live_file().expect("这一版读得出文件")
+    }
+
+    /// 每种截断发布重写哪些角色、删掉哪些角色，钉绝对值（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K2、K3、K5、K8）：
+    /// 意图写 inode 叶与根、logged_ops 根，重写尾单元的另写数据单元与 extent 上段根；批不碰 inode 记录；最后一批放了单元的写 extent 上段根、
+    /// 删空 logged_ops 的删掉它的根、还装着整理意图的重写它；不缩短的写 inode 叶与根，补零重写尾单元的另写数据单元与上段根、只换洞标签的只另写上段根。
+    #[test]
+    fn every_truncation_publish_kind_rewrites_and_removes_exactly_the_roles_the_clauses_name() {
+        let emptied = ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::Emptied;
+        let still_holds =
+            ModelLoggedOperationsAfterTheTruncationEntryIsDeleted::StillHoldsTheCompactionIntent;
+        let cases: [(ModelPublishKind, Vec<ModelUnitRole>, Vec<ModelUnitRole>); 11] = [
+            (
+                ModelPublishKind::TruncationIntent {
+                    extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+                },
+                vec![
+                    ModelUnitRole::Data,
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::LoggedOperationsRoot,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::TruncationIntent {
+                    extent_tree: ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel,
+                },
+                vec![
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::LoggedOperationsRoot,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::TruncationIntent {
+                    extent_tree: ModelExtentTreeChangeOfASizeChange::Untouched,
+                },
+                vec![
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::LoggedOperationsRoot,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::TruncationBatch,
+                vec![
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::FinalTruncationBatch {
+                    release: ModelFinalTruncationBatchRelease::AtLeastOneDataUnit,
+                    logged_operations_after: emptied,
+                },
+                vec![
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![ModelUnitRole::LoggedOperationsRoot],
+            ),
+            (
+                ModelPublishKind::FinalTruncationBatch {
+                    release: ModelFinalTruncationBatchRelease::AtLeastOneDataUnit,
+                    logged_operations_after: still_holds,
+                },
+                vec![
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::LoggedOperationsRoot,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::FinalTruncationBatch {
+                    release: ModelFinalTruncationBatchRelease::NoDataUnit,
+                    logged_operations_after: emptied,
+                },
+                vec![
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![ModelUnitRole::LoggedOperationsRoot],
+            ),
+            (
+                ModelPublishKind::FinalTruncationBatch {
+                    release: ModelFinalTruncationBatchRelease::NoDataUnit,
+                    logged_operations_after: still_holds,
+                },
+                vec![
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::LoggedOperationsRoot,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::SizeChangeWithoutShrinking {
+                    extent_tree: ModelExtentTreeChangeOfASizeChange::TailDataUnitRewritten,
+                },
+                vec![
+                    ModelUnitRole::Data,
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::SizeChangeWithoutShrinking {
+                    extent_tree: ModelExtentTreeChangeOfASizeChange::OnlyTheUpperLeafEntryLabel,
+                },
+                vec![
+                    ModelUnitRole::ExtentRoot,
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+            (
+                ModelPublishKind::SizeChangeWithoutShrinking {
+                    extent_tree: ModelExtentTreeChangeOfASizeChange::Untouched,
+                },
+                vec![
+                    ModelUnitRole::InodeLeaf,
+                    ModelUnitRole::InodeRoot,
+                    ModelUnitRole::AllocationTree,
+                    ModelUnitRole::AccountingTree,
+                    ModelUnitRole::MappingTree,
+                    ModelUnitRole::TreeTable,
+                ],
+                vec![],
+            ),
+        ];
+        for (kind, rewritten, removed) in cases {
+            assert_eq!(kind.rewritten_roles(), rewritten, "{kind:?} 重写的角色");
+            assert_eq!(
+                kind.removed_roles().to_vec(),
+                removed,
+                "{kind:?} 删掉的角色"
+            );
+            assert_eq!(kind.transactions_carried(0), 1, "{kind:?} 一个事务");
+            assert!(!kind.rewrites_the_instance_table(), "{kind:?} 不重写实例表");
+            assert!(
+                !kind.leaves_an_inode_number_watermark_step(),
+                "{kind:?} 不发 inode 号"
+            );
+        }
+    }
+
+    /// 上段叶条目的标签（判决第三节 K5，第六节 S1 收成唯一）：一个单元内联、多个单元下段根，存在的少于 size 罩的就是尾部有洞（标签 3、4、0）；
+    /// 标签 1、2 不许洞，标签 3、4、0 至少一个洞单元，截断途中 size 之外可以多挂着，那时只许 1、2（size 之外挂着的不算洞单元）。
+    #[test]
+    fn the_upper_leaf_entry_label_declares_the_tail_hole_with_tags_three_four_and_zero_only() {
+        let cases = [
+            (0, 1, ModelExtentUpperLeafEntryLabel::NoDataUnit, 0),
+            (1, 1, ModelExtentUpperLeafEntryLabel::InlineDataUnit, 2),
+            (
+                1,
+                3,
+                ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole,
+                4,
+            ),
+            (2, 2, ModelExtentUpperLeafEntryLabel::LowerSegmentRoot, 1),
+            (
+                2,
+                5,
+                ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole,
+                3,
+            ),
+            (300, 1, ModelExtentUpperLeafEntryLabel::LowerSegmentRoot, 1),
+        ];
+        for (present, within_the_size, label, tag) in cases {
+            assert_eq!(
+                ModelExtentUpperLeafEntryLabel::written_for(present, within_the_size),
+                label,
+                "存在 {present} 个、size 罩 {within_the_size} 个"
+            );
+            assert_eq!(label.tag(), tag, "{label:?} 的盘上标签值");
+        }
+        assert!(ModelExtentUpperLeafEntryLabel::InlineDataUnit.admits(1, 1, false));
+        assert!(!ModelExtentUpperLeafEntryLabel::InlineDataUnit.admits(1, 2, false));
+        assert!(!ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole.admits(1, 1, false));
+        assert!(!ModelExtentUpperLeafEntryLabel::LowerSegmentRoot.admits(3, 2, false));
+        assert!(ModelExtentUpperLeafEntryLabel::LowerSegmentRoot.admits(3, 2, true));
+        assert!(
+            !ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole.admits(3, 2, true),
+            "截断途中 size 之外挂着的不算洞单元：标签 3 没有洞，不许（判决第六节 S1）"
+        );
+        assert!(ModelExtentUpperLeafEntryLabel::NoDataUnit.admits(0, 4, false));
+    }
+
+    /// 截到 0（判决第三节 K2、K3、K11）：300 个单元的文件，意图那次 size 写 0、单元 0 重写成声明长度 0、一个都不放；之后 299 个挂在 size 之外，
+    /// 两批各从尾部放 144 个（不碰 inode 记录），最后一批放剩下的 11 个、删截断条目（logged_ops 删空），留一个单元、内联。
+    #[test]
+    fn truncating_to_zero_issues_the_intent_then_two_batches_of_144_then_the_final_batch_leaving_one_inline_unit(
+    ) {
+        let mut model = model_with_a_file_of(300 * payload() - 5);
+        let intent = truncate_to(&mut model, 0);
+        let ModelVersionContents::FileBeingTruncated {
+            truncation_issued_txg,
+            ..
+        } = &intent.contents
+        else {
+            panic!("意图之后在截断途中：{:?}", intent.contents);
+        };
+        assert_eq!(*truncation_issued_txg, intent.key.checkpoint_txg);
+        assert_eq!(file_of(&intent).content.len(), 0, "先落目标：读回 0 字节");
+        assert_eq!(file_of(&intent).data_units_present, 300);
+        assert_eq!(
+            file_of(&intent).extent_upper_leaf_entry_label,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRoot
+        );
+        assert_eq!(
+            roles_rewritten_by_the_publish(&intent),
+            BTreeSet::from([
+                ModelUnitRole::Data,
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ])
+        );
+        assert_eq!(
+            intent.data_unit_written_at[0], intent.key.checkpoint_txg,
+            "单元 0 重写成声明长度 0"
+        );
+        assert_eq!(intent.data_unit_written_at[1], ModelCheckpointTxg(10));
+        assert!(
+            model.current_version_has_a_step_to_walk(),
+            "截断进共用走空（K1）：下一次用户改动之前先把各批走完"
+        );
+        let batch_rewritten = BTreeSet::from([
+            ModelUnitRole::ExtentRoot,
+            ModelUnitRole::AllocationTree,
+            ModelUnitRole::AccountingTree,
+            ModelUnitRole::MappingTree,
+            ModelUnitRole::TreeTable,
+        ]);
+        let first_batch = walk_one_step(&mut model);
+        assert_eq!(file_of(&first_batch).data_units_present, 156);
+        assert_eq!(
+            roles_rewritten_by_the_publish(&first_batch),
+            batch_rewritten
+        );
+        assert!(model.current_version_has_a_file_being_truncated());
+        let second_batch = walk_one_step(&mut model);
+        assert_eq!(file_of(&second_batch).data_units_present, 12);
+        let final_batch = walk_one_step(&mut model);
+        let ModelVersionContents::LiveFile(file) = &final_batch.contents else {
+            panic!("最后一批之后是带活文件的一版：{:?}", final_batch.contents);
+        };
+        assert_eq!((file.content.len(), file.data_units_present), (0, 1));
+        assert_eq!(
+            file.extent_upper_leaf_entry_label,
+            ModelExtentUpperLeafEntryLabel::InlineDataUnit
+        );
+        assert_eq!(
+            roles_rewritten_by_the_publish(&final_batch),
+            batch_rewritten
+        );
+        assert!(
+            !final_batch
+                .role_written_at
+                .contains_key(&ModelUnitRole::LoggedOperationsRoot),
+            "截断条目删掉、logged_ops 删空"
+        );
+        assert!(
+            final_batch.extent_lower_node_written_at.is_empty(),
+            "一个单元不建下段"
+        );
+        assert_eq!(
+            final_batch.data_unit_written_at.as_slice(),
+            [intent.key.checkpoint_txg]
+        );
+        assert!(!model.current_version_has_a_step_to_walk());
+    }
+
+    /// 截到单元中间（判决第三节 K2、K3）：三个单元的文件截到 1.5 个净荷，意图那次重写单元 1（声明长度半个净荷）、不放单元；最后一批放单元 2、
+    /// 不碰 inode 记录。之后建快照，码 14 抄的 inode 树根是意图那次写的（批只写 extent 树），不是最后一批。
+    #[test]
+    fn truncating_into_the_middle_of_a_unit_rewrites_that_unit_at_the_intent_and_the_final_batch_leaves_the_inode_tree_of_the_intent(
+    ) {
+        let mut model = model_with_a_file_of(2 * payload() + payload() / 2);
+        let new_size = payload() + payload() / 2;
+        let intent = truncate_to(&mut model, new_size);
+        assert_eq!(
+            file_of(&intent).content.as_ref(),
+            &content_without_zeros(new_size)[..],
+            "先落目标：读回截后那 N 字节"
+        );
+        assert_eq!(
+            intent.data_unit_written_at.as_slice(),
+            [
+                ModelCheckpointTxg(10),
+                intent.key.checkpoint_txg,
+                ModelCheckpointTxg(10)
+            ],
+            "只重写单元 1，单元 2 还挂在 size 之外"
+        );
+        let final_batch = walk_one_step(&mut model);
+        let file = file_of(&final_batch);
+        assert_eq!(file.data_units_present, 2);
+        assert_eq!(
+            file.extent_upper_leaf_entry_label,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRoot
+        );
+        assert_eq!(file.written_by, final_batch.key, "最后一批写了 extent 树");
+        assert_eq!(
+            file.inode_record_written_by, intent.key,
+            "最后一批不碰 inode 记录"
+        );
+        assert_eq!(
+            final_batch.role_written_at.get(&ModelUnitRole::InodeRoot),
+            Some(&intent.key.checkpoint_txg)
+        );
+        assert!(!final_batch
+            .role_written_at
+            .contains_key(&ModelUnitRole::LoggedOperationsRoot));
+        let snapshot = model.answer_create_snapshot().expect("会话开着、有树");
+        succeed(&mut model, &snapshot);
+        let snapshots = current_snapshots(&model);
+        assert_eq!(
+            snapshots[0].inode_tree_written_by, intent.key,
+            "码 14 抄的 inode 树根是意图那次写的"
+        );
+    }
+
+    /// 截到留下 144 个单元（判决第三节 K3「把罩着被重写单元 k 的那片下段叶到根恒并进重写集」，攻方 W3 打中 2 那一形）：150 个单元截到单元 143 中间，
+    /// 意图那次重写单元 143 与罩着它的叶 0、下段根；最后一批放单元 144–149，留下 144 个、下段只剩叶 0，它的分配代是意图那次的（罩着重写的单元 143）。
+    #[test]
+    fn truncating_to_leave_144_units_keeps_the_leaf_the_intent_rewrote_for_the_tail_unit() {
+        let mut model = model_with_a_file_of(150 * payload());
+        let new_size = 143 * payload() + 7;
+        let intent = truncate_to(&mut model, new_size);
+        let leaf = |index_in_level| ModelExtentLowerNodePosition {
+            level: 0,
+            index_in_level,
+        };
+        let lower_root = ModelExtentLowerNodePosition {
+            level: 1,
+            index_in_level: 0,
+        };
+        assert_eq!(
+            intent.extent_lower_node_written_at.as_ref(),
+            &BTreeMap::from([
+                (leaf(0), intent.key.checkpoint_txg),
+                (leaf(1), ModelCheckpointTxg(10)),
+                (lower_root, intent.key.checkpoint_txg),
+            ]),
+            "意图那次重写罩着单元 143 的叶 0 与下段根"
+        );
+        let final_batch = walk_one_step(&mut model);
+        assert_eq!(file_of(&final_batch).data_units_present, 144);
+        assert_eq!(
+            final_batch.extent_lower_node_written_at.as_ref(),
+            &BTreeMap::from([(leaf(0), intent.key.checkpoint_txg)]),
+            "留下的叶 0 照抄意图那次写的"
+        );
+        assert_eq!(
+            final_batch.data_unit_written_at[143],
+            intent.key.checkpoint_txg
+        );
+        assert_eq!(
+            final_batch.data_unit_written_at[142],
+            ModelCheckpointTxg(10)
+        );
+    }
+
+    /// 变长到单元内（判决第三节 K5）：100 字节的文件变长到 200 字节，一次发布做完：单元 0 补零重写到 200、标签照旧内联。
+    #[test]
+    fn growing_within_the_unit_rewrites_it_zero_padded_in_one_publish() {
+        let mut model = model_with_a_file_of(100);
+        let grown = truncate_to(&mut model, 200);
+        let ModelVersionContents::LiveFile(file) = &grown.contents else {
+            panic!("不缩短的截断一次发布做完：{:?}", grown.contents);
+        };
+        let mut expected = content_without_zeros(100);
+        expected.resize(200, 0);
+        assert_eq!(file.content.as_ref(), &expected[..]);
+        assert_eq!(
+            (file.data_units_present, file.extent_upper_leaf_entry_label),
+            (1, ModelExtentUpperLeafEntryLabel::InlineDataUnit)
+        );
+        assert_eq!(
+            roles_rewritten_by_the_publish(&grown),
+            BTreeSet::from([
+                ModelUnitRole::Data,
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ])
+        );
+        assert!(!model.current_version_has_a_step_to_walk(), "变长不立意图");
+    }
+
+    /// 变长跨单元（判决第三节 K5）：100 字节的文件变长到两个半净荷：单元 0 补零重写到满、之后到 size 是洞（标签 4），不写新单元。
+    #[test]
+    fn growing_across_units_fills_the_last_unit_and_declares_the_tail_hole() {
+        let mut model = model_with_a_file_of(100);
+        let new_size = 2 * payload() + 5;
+        let grown = truncate_to(&mut model, new_size);
+        let file = file_of(&grown);
+        assert_eq!(file.content.len(), new_size);
+        assert!(file.content[100..].iter().all(|byte| *byte == 0), "洞读 0");
+        assert_eq!(
+            (file.data_units_present, file.extent_upper_leaf_entry_label),
+            (
+                1,
+                ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole
+            )
+        );
+        assert_eq!(
+            grown.data_unit_written_at.as_slice(),
+            [grown.key.checkpoint_txg]
+        );
+        assert!(roles_rewritten_by_the_publish(&grown).contains(&ModelUnitRole::ExtentRoot));
+    }
+
+    /// 最后一个单元已满的文件变长（判决第三节 K5）：两个满单元变长一个字节，单元不动，只把上段叶条目的标签 1 换成 3（只重写 extent 上段根）。
+    #[test]
+    fn growing_a_file_whose_last_unit_is_full_only_relabels_the_upper_leaf_entry() {
+        let mut model = model_with_a_file_of(2 * payload());
+        let grown = truncate_to(&mut model, 2 * payload() + 1);
+        assert_eq!(
+            file_of(&grown).extent_upper_leaf_entry_label,
+            ModelExtentUpperLeafEntryLabel::LowerSegmentRootThenTailHole
+        );
+        assert_eq!(
+            roles_rewritten_by_the_publish(&grown),
+            BTreeSet::from([
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ])
+        );
+        assert_eq!(
+            grown.data_unit_written_at.as_slice(),
+            [ModelCheckpointTxg(10), ModelCheckpointTxg(10)]
+        );
+    }
+
+    /// 变长后截回洞里（判决第三节 K5、K11）：100 字节变长到 5 个净荷（单元 0 补满、之后是洞），再截到 3 个净荷多 7 字节——落在洞里：
+    /// 意图那次不重写单元、extent 树不动；最后一批没有单元可放（照走单一路径），也不动 extent 树，只删截断条目；标签仍是 4。
+    #[test]
+    fn truncating_back_into_the_hole_after_growing_issues_the_intent_and_a_final_batch_releasing_nothing(
+    ) {
+        let mut model = model_with_a_file_of(100);
+        let grown = truncate_to(&mut model, 5 * payload());
+        let new_size = 3 * payload() + 7;
+        let intent = truncate_to(&mut model, new_size);
+        assert_eq!(
+            roles_rewritten_by_the_publish(&intent),
+            BTreeSet::from([
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ])
+        );
+        assert!(
+            model.current_version_has_a_file_being_truncated(),
+            "缩短一律立意图"
+        );
+        let final_batch = walk_one_step(&mut model);
+        assert_eq!(
+            roles_rewritten_by_the_publish(&final_batch),
+            BTreeSet::from([
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ])
+        );
+        let file = file_of(&final_batch);
+        assert_eq!(file.content.as_ref(), &file_of(&grown).content[..new_size]);
+        assert_eq!(
+            (file.data_units_present, file.extent_upper_leaf_entry_label),
+            (
+                1,
+                ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole
+            )
+        );
+        assert_eq!(file.written_by, intent.key, "最后一批没写用户可见树");
+    }
+
+    /// 缩短把洞整个截掉、而尾单元不用重写、最后一批没有单元可放（变长到三个净荷之后截到恰好一个净荷，判决第六节 S1）：换标签写在意图那次——
+    /// 意图那次只为换标签重写 extent 上段根（单元不写），标签 4 换回 2；最后一批不动 extent 树、只删截断条目，标签照抄 2。
+    #[test]
+    fn cutting_the_whole_hole_at_the_end_of_the_last_unit_relabels_the_upper_leaf_entry_at_the_intent(
+    ) {
+        let mut model = model_with_a_file_of(100);
+        let grown = truncate_to(&mut model, 3 * payload());
+        assert_eq!(
+            file_of(&grown).extent_upper_leaf_entry_label,
+            ModelExtentUpperLeafEntryLabel::InlineDataUnitThenTailHole
+        );
+        let intent = truncate_to(&mut model, payload());
+        assert_eq!(
+            roles_rewritten_by_the_publish(&intent),
+            BTreeSet::from([
+                ModelUnitRole::ExtentRoot,
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::LoggedOperationsRoot,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ]),
+            "意图那次为换标签重写上段根、不写数据单元"
+        );
+        assert_eq!(
+            file_of(&intent).extent_upper_leaf_entry_label,
+            ModelExtentUpperLeafEntryLabel::InlineDataUnit,
+            "标签在意图那次换回 2"
+        );
+        let final_batch = walk_one_step(&mut model);
+        assert!(!roles_rewritten_by_the_publish(&final_batch).contains(&ModelUnitRole::ExtentRoot));
+        assert_eq!(
+            (
+                file_of(&final_batch).data_units_present,
+                file_of(&final_batch).extent_upper_leaf_entry_label
+            ),
+            (1, ModelExtentUpperLeafEntryLabel::InlineDataUnit)
+        );
+    }
+
+    /// 三个满单元的文件变长到五个净荷（标签 3），再截到恰好一个净荷（判决第六节 S1）：尾单元 0 不用重写，size 之外挂着单元 1、2，洞整个截掉——
+    /// 意图那次换标签（3 → 1：size 之外挂着的不算洞单元），之后最后一批放掉两个单元、单元只剩一个，标签照写成 2。
+    #[test]
+    fn cutting_the_whole_hole_and_two_data_units_relabels_at_the_intent_and_the_final_batch_inlines_the_last_unit(
+    ) {
+        let mut model = model_with_a_file_of(3 * payload());
+        truncate_to(&mut model, 5 * payload());
+        let intent = truncate_to(&mut model, payload());
+        assert!(
+            roles_rewritten_by_the_publish(&intent).contains(&ModelUnitRole::ExtentRoot)
+                && !roles_rewritten_by_the_publish(&intent).contains(&ModelUnitRole::Data),
+            "意图那次只为换标签重写上段根：{:?}",
+            roles_rewritten_by_the_publish(&intent)
+        );
+        assert_eq!(
+            (
+                file_of(&intent).data_units_present,
+                file_of(&intent).extent_upper_leaf_entry_label
+            ),
+            (3, ModelExtentUpperLeafEntryLabel::LowerSegmentRoot)
+        );
+        let final_batch = walk_one_step(&mut model);
+        assert_eq!(
+            (
+                file_of(&final_batch).data_units_present,
+                file_of(&final_batch).extent_upper_leaf_entry_label
+            ),
+            (1, ModelExtentUpperLeafEntryLabel::InlineDataUnit)
+        );
+    }
+
+    /// 第一个文件删完之后建的 inode 改成别的 size（调度记录「截甲交回」第 ① 处，主 agent 定）：在任何写之前必须拒，一条根都不写；
+    /// N 按整单元向上取整溢出 u64 的先按溢出拒（与第一个文件同一个次序）。
+    #[test]
+    fn a_size_change_of_an_inode_created_after_the_first_file_was_deleted_must_be_refused_before_any_write(
+    ) {
+        let mut model = model_with_a_file_of(100);
+        let unlink = model
+            .answer_unlink_intent()
+            .expect("会话开着、现行版本带活文件");
+        succeed(&mut model, &unlink);
+        let final_batch = model.answer_next_step_of_the_walk().expect("删除中");
+        succeed(&mut model, &final_batch);
+        let create = model.answer_create_inode().expect("删完之后建 inode");
+        succeed(&mut model, &create);
+        let refused = model
+            .answer_size_change_of_an_inode_created_after_the_first_file_was_deleted(0, 7)
+            .expect("现行版本是删完之后建过 inode 的一版");
+        assert_eq!(
+            refused.required_refusals,
+            BTreeSet::from([ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile])
+        );
+        assert!(refused.expected_roots.is_empty());
+        let overflow = model
+            .answer_size_change_of_an_inode_created_after_the_first_file_was_deleted(0, u64::MAX)
+            .expect("现行版本是删完之后建过 inode 的一版");
+        assert_eq!(
+            overflow.required_refusals,
+            BTreeSet::from([ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow])
+        );
+    }
+
+    /// N = S（判决第三节 K12）：发一次只改记录的发布，不拒、不动 extent 树。
+    #[test]
+    fn truncating_to_the_same_size_publishes_one_record_only_change() {
+        let mut model = model_with_a_file_of(payload() + 3);
+        let same = truncate_to(&mut model, payload() + 3);
+        assert_eq!(
+            roles_rewritten_by_the_publish(&same),
+            BTreeSet::from([
+                ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ])
+        );
+    }
+
+    /// N 按整单元向上取整溢出 u64（判决第三节 K12）：在任何写之前必须拒，一条根都不写。
+    #[test]
+    fn a_truncation_size_whose_whole_data_units_overflow_is_refused_before_any_write() {
+        let model = model_with_a_file_of(100);
+        let answer = model.answer_truncation(u64::MAX).expect("会话开着");
+        assert_eq!(
+            answer.required_refusals,
+            BTreeSet::from([ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow])
+        );
+        assert!(answer.expected_roots.is_empty());
+    }
+
+    /// 回退到截断意图之后、最后一批之前的那一版（判决第三节 K1：logged_ops 里截断条目取回退目标那一版的）：现行那一版截断已做完、logged_ops 删空，
+    /// 回退那次把目标的截断条目带回来、logged_ops 根这次重写；之后走空接着做截断的最后一批，再删空。
+    #[test]
+    fn a_rollback_to_a_version_in_the_middle_of_a_truncation_takes_its_truncation_entry_and_resumes_the_walk(
+    ) {
+        let mut model = model_with_a_file_of(2 * payload() + 9);
+        let intent = truncate_to(&mut model, payload() + 1);
+        walk_one_step(&mut model);
+        let rollback = model
+            .answer_rollback_while_mounted(intent.key)
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &rollback);
+        let rolled_back = current_version(&model);
+        assert_eq!(
+            rolled_back.contents.logged_truncation_issued_txg(),
+            Some(intent.key.checkpoint_txg)
+        );
+        assert_eq!(
+            rolled_back
+                .role_written_at
+                .get(&ModelUnitRole::LoggedOperationsRoot),
+            Some(&rolled_back.key.checkpoint_txg),
+            "logged_ops 换成带截断条目的那一份"
+        );
+        assert_eq!(
+            rolled_back.data_unit_written_at,
+            intent.data_unit_written_at
+        );
+        let final_batch = walk_one_step(&mut model);
+        assert_eq!(file_of(&final_batch).data_units_present, 2);
+        assert!(!final_batch
+            .role_written_at
+            .contains_key(&ModelUnitRole::LoggedOperationsRoot));
+    }
+
+    /// 快照下截断再整份覆盖写（判决第三节 K4，攻方 W4 那段历史）：顺序写三个单元（txg 10）→ 建快照（11）→ 截到 1.5 个净荷，单元 1 重写（12）
+    /// → 最后一批放单元 2（13）→ 快照下整份覆盖写（14）。覆盖写换下的单元 0 出生 10、不晚于快照，进 deadlist；单元 1 出生 12、晚于快照，直接释放。
+    #[test]
+    fn an_overwrite_under_a_snapshot_after_a_truncation_pins_unit_zero_and_releases_the_unit_the_truncation_rewrote(
+    ) {
+        let mut model = model_with_a_file_of(2 * payload() + payload() / 2);
+        let snapshot = model.answer_create_snapshot().expect("会话开着、有树");
+        succeed(&mut model, &snapshot);
+        let intent = truncate_to(&mut model, payload() + payload() / 2);
+        assert_eq!(intent.key.checkpoint_txg, ModelCheckpointTxg(12));
+        let final_batch = walk_one_step(&mut model);
+        let overwrite = model
+            .answer_publish_sequential_write(&content_without_zeros(2 * payload()))
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &overwrite);
+        let after_the_overwrite = current_version(&model);
+        let data_unit_births = |root: &ModelRoot| {
+            let mut births: Vec<ModelCheckpointTxg> = root
+                .deadlist
+                .iter()
+                .filter(|entry| entry.mapping_key_unit_class == MODEL_MAPPING_KEY_UNIT_CLASS_DATA)
+                .map(|entry| entry.birth_txg)
+                .collect();
+            births.sort_unstable();
+            births
+        };
+        assert_eq!(
+            data_unit_births(&final_batch),
+            vec![ModelCheckpointTxg(10), ModelCheckpointTxg(10)],
+            "截断换下的旧单元 1 与放掉的单元 2 都出生在快照之前"
+        );
+        assert_eq!(
+            data_unit_births(&after_the_overwrite),
+            vec![
+                ModelCheckpointTxg(10),
+                ModelCheckpointTxg(10),
+                ModelCheckpointTxg(10)
+            ],
+            "覆盖写只把单元 0 记进 deadlist，单元 1（出生 12）直接释放"
+        );
+    }
+
+    /// 这一版第一个文件那条记录的截断字段（模型记的），没有那条记录时 panic。
+    fn truncation_field_of(root: &ModelRoot) -> ModelTruncationField {
+        root.contents
+            .first_file_record_truncation_field()
+            .expect("这一版有第一个文件那条记录")
+    }
+
+    fn truncation_field_written_at(txg: u64, size_in_bytes: usize) -> ModelTruncationField {
+        ModelTruncationField::WrittenByATruncationIntent {
+            truncation_txg: ModelCheckpointTxg(txg),
+            size_in_bytes: u64::try_from(size_in_bytes).expect("长度"),
+        }
+    }
+
+    /// 放了单元的截断意图写字段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节用户定案「放了单元才写、整个替换」）：
+    /// 三个单元的文件（顺序写 txg 10，字段没写过）截到 1 个净荷 + 5 字节，这次放单元之前存在 3 个、多于截后 size 罩的 2 个，意图那次（txg 11）
+    /// 写成（11, P + 5）；之后再截到 7 字节（存在 2 个、多于罩的 1 个），整个替换成（13, 7），不取 min、不留上一次的。
+    #[test]
+    fn a_truncation_intent_releasing_data_units_writes_its_txg_and_the_new_size_replacing_the_previous_field(
+    ) {
+        let mut model = model_with_a_file_of(3 * payload());
+        assert_eq!(
+            truncation_field_of(&current_version(&model)),
+            ModelTruncationField::NotWritten,
+            "顺序写之后字段没写过"
+        );
+        let intent = truncate_to(&mut model, payload() + 5);
+        assert_eq!(intent.key.checkpoint_txg, ModelCheckpointTxg(11));
+        assert_eq!(
+            truncation_field_of(&intent),
+            truncation_field_written_at(11, payload() + 5)
+        );
+        assert_eq!(
+            truncation_field_of(&intent).recorded_values(),
+            ObservedTruncationField {
+                truncation_txg: ModelCheckpointTxg(11),
+                size_in_bytes: u64::try_from(payload() + 5).expect("长度"),
+            },
+            "盘上两段：T 是意图那次的 txg，N_w 是截到的 size"
+        );
+        walk_one_step(&mut model);
+        let second_intent = truncate_to(&mut model, 7);
+        assert_eq!(second_intent.key.checkpoint_txg, ModelCheckpointTxg(13));
+        assert_eq!(
+            truncation_field_of(&second_intent),
+            truncation_field_written_at(13, 7),
+            "第二次放了单元的截断整个替换"
+        );
+    }
+
+    /// 截到洞里、选择子落在洞里更靠后（攻方 `research/prompts/m4-trunc-r2-opus-output.md`「打中一」那一形）：五个单元的文件（txg 10）截到 1 个净荷
+    /// （txg 11 意图写（11, P），txg 12 最后一批放单元 1–4）→ 变长到 5 个净荷（txg 13，照抄）→ 截到 3 个净荷（txg 14：存在 1 个、不多于罩的 3 个，
+    /// 一个不放，照抄（11, P），不换成「最近一次」的（14, 3P））→ 最后一批不放单元（照抄）→ 再变长（照抄）。
+    #[test]
+    fn a_truncation_intent_into_the_hole_releasing_no_data_unit_copies_the_field_of_the_earlier_truncation(
+    ) {
+        let mut model = model_with_a_file_of(5 * payload());
+        truncate_to(&mut model, payload());
+        let final_batch = walk_one_step(&mut model);
+        assert_eq!(file_of(&final_batch).data_units_present, 1);
+        let grown = truncate_to(&mut model, 5 * payload());
+        assert_eq!(
+            truncation_field_of(&grown),
+            truncation_field_written_at(11, payload())
+        );
+        let intent_into_the_hole = truncate_to(&mut model, 3 * payload());
+        assert_eq!(
+            intent_into_the_hole.key.checkpoint_txg,
+            ModelCheckpointTxg(14)
+        );
+        assert_eq!(
+            truncation_field_of(&intent_into_the_hole),
+            truncation_field_written_at(11, payload()),
+            "截到洞里一个不放：照抄第一次截断写的"
+        );
+        let final_batch_releasing_nothing = walk_one_step(&mut model);
+        assert_eq!(
+            truncation_field_of(&final_batch_releasing_nothing),
+            truncation_field_written_at(11, payload())
+        );
+        let grown_again = truncate_to(&mut model, 5 * payload());
+        assert_eq!(
+            truncation_field_of(&grown_again),
+            truncation_field_written_at(11, payload())
+        );
+    }
+
+    /// 截到 0 而文件只有一个单元（攻方「打中三」那条历史的前三步）：半个净荷的文件截到 0，存在 1 个、不多于 ⌈0 ÷ 净荷⌉.max(1) = 1 个，一个不放，
+    /// 照抄（没写过）；之后变长到 1 个净荷 + 1 字节、截到 1 个净荷，都照抄，字段始终没写过。
+    #[test]
+    fn a_truncation_to_zero_of_a_one_unit_file_releases_nothing_and_copies_the_field() {
+        let mut model = model_with_a_file_of(payload() / 2);
+        let intent = truncate_to(&mut model, 0);
+        assert_eq!(
+            truncation_field_of(&intent),
+            ModelTruncationField::NotWritten
+        );
+        walk_one_step(&mut model);
+        let grown = truncate_to(&mut model, payload() + 1);
+        assert_eq!(
+            truncation_field_of(&grown),
+            ModelTruncationField::NotWritten
+        );
+        let cut_to_one_payload = truncate_to(&mut model, payload());
+        assert_eq!(
+            truncation_field_of(&cut_to_one_payload),
+            ModelTruncationField::NotWritten
+        );
+    }
+
+    /// 截断的各批与最后一批不碰记录、照抄字段（判决 m4-trunc-r2 第三节 R2）：300 个单元截到 0（txg 11 意图写（11, 0)），两批（txg 12、13）与
+    /// 最后一批（txg 14）都是（11, 0）。
+    #[test]
+    fn the_truncation_batches_and_the_final_batch_copy_the_field_the_intent_wrote() {
+        let mut model = model_with_a_file_of(300 * payload());
+        let intent = truncate_to(&mut model, 0);
+        assert_eq!(
+            truncation_field_of(&intent),
+            truncation_field_written_at(11, 0)
+        );
+        for expected_txg in [12, 13] {
+            let batch = walk_one_step(&mut model);
+            assert_eq!(batch.key.checkpoint_txg, ModelCheckpointTxg(expected_txg));
+            assert!(model.current_version_has_a_file_being_truncated());
+            assert_eq!(
+                truncation_field_of(&batch),
+                truncation_field_written_at(11, 0)
+            );
+        }
+        let final_batch = walk_one_step(&mut model);
+        assert_eq!(final_batch.key.checkpoint_txg, ModelCheckpointTxg(14));
+        assert!(matches!(
+            final_batch.contents,
+            ModelVersionContents::LiveFile(_)
+        ));
+        assert_eq!(
+            truncation_field_of(&final_batch),
+            truncation_field_written_at(11, 0)
+        );
+    }
+
+    /// 变长、N = S 与只重写固定点单元的发布（建快照）照抄字段（判决 m4-trunc-r2 第三节 R2）：两个单元截到 7 字节（txg 11 写（11, 7)，txg 12
+    /// 最后一批）→ 跨单元变长（txg 13）→ N = S（txg 14）→ 建快照（txg 15），都是（11, 7）。
+    #[test]
+    fn growing_the_same_size_and_a_snapshot_creation_copy_the_field() {
+        let mut model = model_with_a_file_of(2 * payload());
+        truncate_to(&mut model, 7);
+        walk_one_step(&mut model);
+        let grown = truncate_to(&mut model, 3 * payload() + 1);
+        assert_eq!(grown.key.checkpoint_txg, ModelCheckpointTxg(13));
+        assert_eq!(
+            truncation_field_of(&grown),
+            truncation_field_written_at(11, 7)
+        );
+        let same_size = truncate_to(&mut model, 3 * payload() + 1);
+        assert_eq!(same_size.key.checkpoint_txg, ModelCheckpointTxg(14));
+        assert_eq!(
+            truncation_field_of(&same_size),
+            truncation_field_written_at(11, 7)
+        );
+        let snapshot = model.answer_create_snapshot().expect("会话开着、有树");
+        succeed(&mut model, &snapshot);
+        let after_the_snapshot = current_version(&model);
+        assert_eq!(
+            after_the_snapshot.key.checkpoint_txg,
+            ModelCheckpointTxg(15)
+        );
+        assert_eq!(
+            truncation_field_of(&after_the_snapshot),
+            truncation_field_written_at(11, 7)
+        );
+    }
+
+    /// 整份写清零（判决 m4-trunc-r2 第三节 R2，用户定案取清零）：截过的文件（字段（11, 7)）覆盖写一个单元以内（txg 13）清零；再截一次写上
+    /// （txg 14、15），顺序写跨几个单元（txg 16）也清零。
+    #[test]
+    fn an_overwrite_and_a_sequential_write_clear_the_field() {
+        let mut model = model_with_a_file_of(2 * payload());
+        truncate_to(&mut model, 7);
+        walk_one_step(&mut model);
+        let overwrite = model
+            .answer_publish_overwrite(&content_without_zeros(100))
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &overwrite);
+        let overwritten = current_version(&model);
+        assert_eq!(overwritten.key.checkpoint_txg, ModelCheckpointTxg(13));
+        assert_eq!(
+            truncation_field_of(&overwritten),
+            ModelTruncationField::NotWritten
+        );
+        let sequential = model
+            .answer_publish_sequential_write(&content_without_zeros(3 * payload()))
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &sequential);
+        let intent = truncate_to(&mut model, 9);
+        assert_eq!(
+            truncation_field_of(&intent),
+            truncation_field_written_at(15, 9)
+        );
+        walk_one_step(&mut model);
+        let sequential_again = model
+            .answer_publish_sequential_write(&content_without_zeros(2 * payload()))
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &sequential_again);
+        let rewritten = current_version(&model);
+        assert_eq!(rewritten.key.checkpoint_txg, ModelCheckpointTxg(17));
+        assert_eq!(
+            truncation_field_of(&rewritten),
+            ModelTruncationField::NotWritten
+        );
+    }
+
+    /// unlink 的意图与各批照抄字段（判决 m4-trunc-r2 第三节 R2）：300 个单元截到 150 个净荷（txg 11 写（11, 150 P），一批放 144 个、最后一批放 6 个）
+    /// → unlink 意图（txg 14，删除中、150 个单元）→ 不是最后一批的删除批（txg 15）都是（11, 150 P）；最后一批之后没有第一个文件那条记录。
+    #[test]
+    fn the_unlink_intent_and_the_deletion_batches_copy_the_field_until_the_record_is_deleted() {
+        let mut model = model_with_a_file_of(300 * payload());
+        truncate_to(&mut model, 150 * payload());
+        walk_one_step(&mut model);
+        walk_one_step(&mut model);
+        let unlink = model
+            .answer_unlink_intent()
+            .expect("会话开着、现行版本带活文件");
+        succeed(&mut model, &unlink);
+        let unlink_intent = current_version(&model);
+        assert_eq!(unlink_intent.key.checkpoint_txg, ModelCheckpointTxg(14));
+        assert!(matches!(
+            unlink_intent.contents,
+            ModelVersionContents::FileBeingDeleted {
+                data_units_remaining: 150,
+                ..
+            }
+        ));
+        assert_eq!(
+            truncation_field_of(&unlink_intent),
+            truncation_field_written_at(11, 150 * payload())
+        );
+        let deletion_batch = walk_one_step(&mut model);
+        assert!(matches!(
+            deletion_batch.contents,
+            ModelVersionContents::FileBeingDeleted {
+                data_units_remaining: 6,
+                ..
+            }
+        ));
+        assert_eq!(
+            truncation_field_of(&deletion_batch),
+            truncation_field_written_at(11, 150 * payload())
+        );
+        let final_deletion_batch = walk_one_step(&mut model);
+        assert_eq!(
+            final_deletion_batch
+                .contents
+                .first_file_record_truncation_field(),
+            None,
+            "最后一批删掉第一个文件那条记录"
+        );
+    }
+
+    /// 回退随回退目标那一版（判决 m4-trunc-r2 第三节 R5）：三个单元的文件（txg 10，字段没写过）截到 7 字节（txg 11 写（11, 7)、txg 12 最后一批）
+    /// → 回退到写字段之前那一版（txg 10，txg 13 那次回退）：字段没写过，不把现行那一版的（11, 7）并回去；之后变长（txg 14）照抄，仍没写过。
+    /// 再回退到意图那一版（txg 11）取回（11, 7）。
+    #[test]
+    fn a_rollback_takes_the_field_of_its_target_and_the_growth_after_it_copies_that() {
+        let mut model = model_with_a_file_of(3 * payload());
+        let before_the_truncation = current_version(&model);
+        let intent = truncate_to(&mut model, 7);
+        walk_one_step(&mut model);
+        let rollback = model
+            .answer_rollback_while_mounted(before_the_truncation.key)
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &rollback);
+        let rolled_back = current_version(&model);
+        assert_eq!(rolled_back.key.checkpoint_txg, ModelCheckpointTxg(13));
+        assert_eq!(
+            truncation_field_of(&rolled_back),
+            ModelTruncationField::NotWritten,
+            "回退到写字段之前那一版：字段随它"
+        );
+        let grown = truncate_to(&mut model, 4 * payload());
+        assert_eq!(grown.key.checkpoint_txg, ModelCheckpointTxg(14));
+        assert_eq!(
+            truncation_field_of(&grown),
+            ModelTruncationField::NotWritten
+        );
+        let rollback_to_the_intent = model
+            .answer_rollback_while_mounted(intent.key)
+            .expect("会话开着、现行版本带文件");
+        succeed(&mut model, &rollback_to_the_intent);
+        assert_eq!(
+            truncation_field_of(&current_version(&model)),
+            truncation_field_written_at(11, 7),
+            "回退到意图那一版取回它的字段"
+        );
+    }
+
+    /// 对拍比字段（判决 m4-trunc-r2 第三节 R6「理想模型记字段并在对拍里比」）：截断意图那一版实现交回的记录里两段全零（没写字段）时报
+    /// 截断字段对不上；照模型写的交回对得上、计数加一；模型这一版有那条记录而实现交回没有，也报。
+    #[test]
+    fn a_truncation_field_the_implementation_did_not_write_is_reported() {
+        let model = model_with_a_file_of(3 * payload());
+        let answer = model
+            .answer_truncation(u64::try_from(payload() + 5).expect("长度"))
+            .expect("会话开着、现行版本带活文件");
+        let intent = answer.expected_roots[0].clone();
+        let mut observed = observed_exactly_as_the_model_wrote(&intent);
+        let mut counts = ModelJudgementCounts::default();
+        assert_eq!(
+            IdealModel::judge_first_file_record_truncation_field(&intent, &observed, &mut counts),
+            Ok(())
+        );
+        assert_eq!(
+            (
+                counts.truncation_fields_compared,
+                counts.written_truncation_fields_compared
+            ),
+            (1, 1)
+        );
+        observed.first_file_record_truncation_field =
+            Some(ModelTruncationField::NotWritten.recorded_values());
+        let not_written =
+            IdealModel::judge_first_file_record_truncation_field(&intent, &observed, &mut counts)
+                .expect_err("实现没写字段");
+        assert_eq!(
+            not_written.aspect,
+            ModelDisagreementAspect::FirstFileRecordTruncationField
+        );
+        observed.first_file_record_truncation_field = None;
+        let missing =
+            IdealModel::judge_first_file_record_truncation_field(&intent, &observed, &mut counts)
+                .expect_err("模型这一版有那条记录，实现交了没有");
+        assert_eq!(
+            missing.aspect,
+            ModelDisagreementAspect::FirstFileRecordTruncationField
+        );
+    }
+
+    fn upper_position(level: u64, index_in_level: u64) -> ModelExtentUpperNodePosition {
+        ModelExtentUpperNodePosition {
+            level,
+            index_in_level,
+        }
+    }
+
+    /// 模型自己那一份上段规范形计划（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2）走正推模型的四种走法
+    /// （`research/prompts/m3-multi-file-unlink-r1-sonnet-model/out/run.out` 第 12、13、15、16 行，S = {1, 500}，产品几何）：
+    /// 写 500 长高（旧根 (0, 0) 照抄成根之下、(0, 3) 与新根 (1, 0) 这次写）；删 500 降层（上一版的 (0, 0) 照抄成根，分配代不变）；
+    /// 删 1（(0, 3) 照抄、根 (1, 0) 少了孩子重写）；删空（零条目根兼叶 (0, 0) 重写）。
+    #[test]
+    fn the_model_upper_plan_grows_lowers_and_empties_the_segment_as_the_forward_model_does() {
+        let written_at_three = ModelCheckpointTxg(3);
+        let written_at_five = ModelCheckpointTxg(5);
+        let this_publish = ModelCheckpointTxg(9);
+        let only_the_first_file = BTreeMap::from([(upper_position(0, 0), written_at_three)]);
+        assert_eq!(
+            extent_upper_node_written_at_after(
+                &only_the_first_file,
+                &BTreeSet::from([1, 500]),
+                &BTreeSet::from([500]),
+                this_publish,
+            ),
+            BTreeMap::from([
+                (upper_position(0, 0), written_at_three),
+                (upper_position(0, 3), this_publish),
+                (upper_position(1, 0), this_publish),
+            ]),
+            "写 500 长高：旧根照抄成根之下的节点，500 那一串新写"
+        );
+        let both_files = BTreeMap::from([
+            (upper_position(0, 0), written_at_three),
+            (upper_position(0, 3), written_at_five),
+            (upper_position(1, 0), written_at_five),
+        ]);
+        assert_eq!(
+            extent_upper_node_written_at_after(
+                &both_files,
+                &BTreeSet::from([1]),
+                &BTreeSet::from([500]),
+                this_publish,
+            ),
+            BTreeMap::from([(upper_position(0, 0), written_at_three)]),
+            "删 500 降层：上一版的第 0 片叶照抄成根"
+        );
+        assert_eq!(
+            extent_upper_node_written_at_after(
+                &both_files,
+                &BTreeSet::from([500]),
+                &BTreeSet::from([1]),
+                this_publish,
+            ),
+            BTreeMap::from([
+                (upper_position(0, 3), written_at_five),
+                (upper_position(1, 0), this_publish),
+            ]),
+            "删 1：500 那片叶照抄，根少了孩子重写，第 0 片叶摘掉"
+        );
+        assert_eq!(
+            extent_upper_node_written_at_after(
+                &only_the_first_file,
+                &BTreeSet::new(),
+                &BTreeSet::from([1]),
+                this_publish,
+            ),
+            BTreeMap::from([(upper_position(0, 0), this_publish)]),
+            "删空：零条目根兼叶重写"
         );
     }
 }

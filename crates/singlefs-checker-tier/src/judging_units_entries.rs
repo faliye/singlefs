@@ -18,8 +18,10 @@ pub struct JudgingUnitsEntryGroup {
 
 /// 判器、核对、录入、观察者结论拼块六组的入口。
 ///
-/// - GPU 判器：三个内核的源码怎么拼（`JudgeKernelSources`，连同旋钮那一份）、上卡与派活、回读归位（`GpuCrashJudge::judge_states`
-///   调的 `judge_one_dispatch`：派活里决定结论落到哪个状态的那一段，底稿 L7）、结论字怎么解成红项、恢复字与计数向量。
+/// - GPU 判器：三个内核的源码怎么拼（`JudgeKernelSources`，连同旋钮那一份；扫描内核源码里的第三个入口 `scan_rebuild_main` 在
+///   `crash_judge_checker_scan_rebuild.wgsl`，经拼扫描内核源码那一个函数读进闭包，它的 `@compute` 入口照 WGSL 的收法进组）、上卡与派活
+///   （编五条管线的 `compile_the_judge_kernels`）、回读归位（`GpuCrashJudge::judge_states` 调的 `judge_one_dispatch`：派活里决定结论落到哪个状态的那一段，
+///   底稿 L7）、结论字怎么解成红项、恢复字、计数向量与扫描重建那一截的结局码（`scan_rebuild_outcome_of_the_gpu_verdict`）。
 /// - 判镜像的定义（`judgement_of_the_crash_images`）：CPU 参照判器 `crash::judge_crash_image` 与结论的编码（红项、计数向量）；镜像判定的版本
 ///   就是这一把，不论在 CPU 还是 GPU 上判的（GPU 判器那一组只进块属性当出处）。
 /// - 判给定状态的定义（`judgement_of_the_given_states`）：CPU 参照判器 `crash_given_states` 的判法与它的计数向量、红项编码；同上。
@@ -39,6 +41,7 @@ pub const JUDGING_UNITS_ENTRY_GROUPS: &[JudgingUnitsEntryGroup] = &[
             "singlefs_checker_tier::crash_judge_gpu::gpu_verdict_items",
             "singlefs_checker_tier::crash_judge_gpu::recovery_words_of_the_gpu_verdict",
             "singlefs_checker_tier::crash_judge_gpu::cross_check_words_of_gpu_verdict",
+            "singlefs_checker_tier::crash_judge_gpu::scan_rebuild_outcome_of_the_gpu_verdict",
             "singlefs_checker_tier::crash_judge_conclusions::StateCountsOfABlock::count_the_gpu_bits",
             "singlefs_checker_tier::crash_judge_conclusions::StateCountsOfABlock::into_count_vector",
             "singlefs_checker_tier::crash_judge_conclusions::encoded_verdict_of_the_red_items",
@@ -222,6 +225,36 @@ pub const OBSERVER_ENTRIES: &[ObserverEntry] = &[
         ],
     },
     ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs",
+        observer_name: "rebuilt_instance_table_against_the_allocation_records",
+        target: "test:crash_points_of_the_instance_table_sweep",
+        entry_functions: &[
+            "singlefs_checker_tier::judge_the_rebuilt_instance_table_against_the_allocation_records",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_formatted_pool_remounted_without_a_file_stream.rs",
+        observer_name: "remount_and_publish_the_first_file",
+        target: "test:crash_enumeration_formatted_pool_remounted_without_a_file_stream",
+        entry_functions: &["singlefs_checker_tier::remount_and_publish_the_first_file_after_the_crash"],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_crash_in_the_middle_of_the_acquisition_write_stream.rs",
+        observer_name: "remount_after_the_crash",
+        target: "test:crash_enumeration_crash_in_the_middle_of_the_acquisition_write_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::remount_after_the_crash_with_an_instance_above_every_one_on_the_disks",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_fixed_script_stream.rs",
+        observer_name: "mount_continuation",
+        target: "test:crash_enumeration_unlink_after_the_fixed_script_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_crash_point_observers::observe_the_mount_continuation",
+        ],
+    },
+    ObserverEntry {
         observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs",
         observer_name: "count_each_state_once",
         target: "test:crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume",
@@ -239,12 +272,273 @@ pub const OBSERVER_ENTRIES: &[ObserverEntry] = &[
         target: "test:crash_enumeration_floor_raise_pushed_by_admission",
         entry_functions: &["singlefs_checker_tier::mount_writable_after_the_crash_of_the_floor_raise"],
     },
+    // 里程碑四那几条流的观察者（截断第二轮截壬补登：同步主线那一批立了这张表，里程碑四的这几条没登进来，跑到它们时取键拒算）。
+    // 崩溃点重放那一路：观察者代码文件是设点的用例文件（`crash_state_enumeration` 的 observers_on_the_nodes_of_the_item），用例里的闭包只转调
+    // 公共模块里的一个 fn，入口是被转调的那个。
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_truncate_to_zero_stream.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_truncate_to_zero_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_truncation_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_truncate_into_a_unit_then_extend_stream.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_truncate_into_a_unit_then_extend_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_truncation_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_truncate_under_a_snapshot_stream.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_truncate_under_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_truncation_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocation_stream.rs",
+        observer_name: "landed_version_read_through_the_mapping",
+        target: "test:crash_enumeration_compaction_relocation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_landed_version_reading_through_the_mapping",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocation_stream.rs",
+        observer_name: "mount_continuing_the_compaction",
+        target: "test:crash_enumeration_compaction_relocation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_mount_continuing_the_compaction",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream.rs",
+        observer_name: "landed_version_read_through_the_mapping",
+        target: "test:crash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_landed_version_reading_through_the_mapping",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream.rs",
+        observer_name: "mount_continuing_the_compaction",
+        target: "test:crash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_mount_continuing_the_compaction",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_lifecycle_closure_stream.rs",
+        observer_name: "landed_version_read_through_the_mapping",
+        target: "test:crash_enumeration_lifecycle_closure_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_landed_version_reading_through_the_mapping",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_lifecycle_closure_stream.rs",
+        observer_name: "mount_continuing_the_compaction",
+        target: "test:crash_enumeration_lifecycle_closure_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_mount_continuing_the_compaction",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_snapshot_creation_stream.rs",
+        observer_name: "snapshot_of_the_landed_version",
+        target: "test:crash_enumeration_snapshot_creation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_snapshot_of_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream.rs",
+        observer_name: "snapshot_of_the_landed_version",
+        target: "test:crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_snapshot_of_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream.rs",
+        observer_name: "mount_continuation_under_a_snapshot",
+        target: "test:crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_mount_continuation_under_a_snapshot",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_under_a_snapshot_stream.rs",
+        observer_name: "snapshot_of_the_landed_version",
+        target: "test:crash_enumeration_unlink_under_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_snapshot_of_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_under_a_snapshot_stream.rs",
+        observer_name: "mount_continuation_under_a_snapshot",
+        target: "test:crash_enumeration_unlink_under_a_snapshot_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_mount_continuation_under_a_snapshot",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream.rs",
+        observer_name: "snapshot_of_the_landed_version",
+        target: "test:crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_snapshot_of_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream.rs",
+        observer_name: "mount_continuation_under_a_snapshot",
+        target: "test:crash_enumeration_snapshot_destruction_resumed_after_a_crash_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_mount_continuation_under_a_snapshot",
+        ],
+    },
+    // 崩溃放量那一路：观察者代码文件是观察者所在的公共模块（`common_snapshot_crash_point_observers::amplify_a_snapshot_flow`、
+    // `common_compaction_crash_point_observers::amplify_a_compaction_flow`），几个测试目标共用，挑一个编进它的。
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_snapshot_crash_point_observers/mod.rs",
+        observer_name: "snapshot_of_the_landed_version",
+        target: "test:crash_enumeration_snapshot_creation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_snapshot_of_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_snapshot_crash_point_observers/mod.rs",
+        observer_name: "mount_continuation_under_a_snapshot",
+        target: "test:crash_enumeration_snapshot_creation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_snapshot_crash_point_observers::observe_the_mount_continuation_under_a_snapshot",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_compaction_crash_point_observers/mod.rs",
+        observer_name: "landed_version_read_through_the_mapping",
+        target: "test:crash_enumeration_compaction_relocation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_landed_version_reading_through_the_mapping",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_compaction_crash_point_observers/mod.rs",
+        observer_name: "mount_continuing_the_compaction",
+        target: "test:crash_enumeration_compaction_relocation_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_compaction_crash_point_observers::observe_the_mount_continuing_the_compaction",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_truncation_crash_streams/mod.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_truncate_to_zero_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_truncation_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_truncation_crash_streams/mod.rs",
+        observer_name: "mount_continuing_the_truncation",
+        target: "test:crash_enumeration_truncate_to_zero_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_truncation_crash_streams::observe_the_mount_continuing_the_truncation",
+        ],
+    },
     // E161 的 S3 观察者（4-2a 报告第四节第 6 条）：装置里抽成具名 fn，跑到它时不再走拒算
     ObserverEntry {
         observer_code_file: "crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs",
         observer_name: "e161_crates_comparison",
         target: "bin:e161_crash_state_dedup_and_time_split",
         entry_functions: &["singlefs_checker_tier::observe_the_crates_comparison"],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream.rs",
+        observer_name: "mount_continuation_and_files_read_back",
+        target: "test:crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_mount_continuation_and_the_files_read_back",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_several_inodes_overwritten_in_turn_stream.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_several_inodes_overwritten_in_turn_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_several_inodes_overwritten_in_turn_stream.rs",
+        observer_name: "mount_continuation_and_files_read_back",
+        target: "test:crash_enumeration_several_inodes_overwritten_in_turn_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_mount_continuation_and_the_files_read_back",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_large_file_overwritten_across_lower_leaves_stream.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_large_file_overwritten_across_lower_leaves_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_large_file_overwritten_across_lower_leaves_stream.rs",
+        observer_name: "mount_continuation_and_files_read_back",
+        target: "test:crash_enumeration_large_file_overwritten_across_lower_leaves_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_mount_continuation_and_the_files_read_back",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_of_two_files_holding_data_streams.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_unlink_of_two_files_holding_data_streams",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_of_two_files_holding_data_streams.rs",
+        observer_name: "mount_continuation_and_files_read_back",
+        target: "test:crash_enumeration_unlink_of_two_files_holding_data_streams",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_mount_continuation_and_the_files_read_back",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_multiple_copy_on_write_crash_streams/mod.rs",
+        observer_name: "landed_version",
+        target: "test:crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_landed_version",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/common_multiple_copy_on_write_crash_streams/mod.rs",
+        observer_name: "mount_continuation_and_files_read_back",
+        target: "test:crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_mount_continuation_and_the_files_read_back",
+        ],
     },
 ];
 

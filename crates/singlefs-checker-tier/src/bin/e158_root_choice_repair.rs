@@ -17931,7 +17931,14 @@ mod fourth_run_segment_two {
                 | HistoryOperation::Unlink
                 | HistoryOperation::CreateInode
                 | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
-                | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+                | HistoryOperation::CreateSnapshot
+                | HistoryOperation::ReadSnapshot(_)
+                | HistoryOperation::DestroySnapshot(_)
+                | HistoryOperation::CompactWhileMounted(_)
+                | HistoryOperation::Truncate(_)
+                | HistoryOperation::CreateInodes(_)
+                | HistoryOperation::WriteOfAnInode(_) => {
                     format!("{operation:?}")
                 }
             });
@@ -19089,6 +19096,35 @@ mod fourth_run_segment_two {
                         "WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZerosIsNotDrivenByThisExperiment",
                     )
                 }
+                // 建快照、读快照、删快照只进它们自己那一组比重（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S7，
+                // `GenerationWeights::SNAPSHOT_OPERATIONS`），这个装置用的几组比重不抽它们：照前提不满足记。
+                HistoryOperation::CreateSnapshot => {
+                    not_applicable("CreateSnapshotIsNotDrivenByThisExperiment")
+                }
+                HistoryOperation::ReadSnapshot(_) => {
+                    not_applicable("ReadSnapshotIsNotDrivenByThisExperiment")
+                }
+                HistoryOperation::DestroySnapshot(_) => {
+                    not_applicable("DestroySnapshotIsNotDrivenByThisExperiment")
+                }
+                // 挂着时整理只进它自己那一组比重（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7，
+                // `GenerationWeights::COMPACTION_WHILE_MOUNTED`），这个装置用的几组比重不抽它：照前提不满足记。
+                HistoryOperation::CompactWhileMounted(_) => {
+                    not_applicable("CompactWhileMountedIsNotDrivenByThisExperiment")
+                }
+                // 截断只进它自己那一组比重与带整理的那一组（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8，
+                // `GenerationWeights::TRUNCATION`），这个装置用的几组比重不抽它：照前提不满足记。
+                HistoryOperation::Truncate(_) => {
+                    not_applicable("TruncateIsNotDrivenByThisExperiment")
+                }
+                // 建几个 inode、按 inode 号写只进它们自己那一组比重（里程碑「删除与多次 COW」一·1，
+                // `GenerationWeights::WRITES_BY_INODE_NUMBER`），这个装置用的几组比重不抽它们：照前提不满足记。
+                HistoryOperation::CreateInodes(_) => {
+                    not_applicable("CreateInodesIsNotDrivenByThisExperiment")
+                }
+                HistoryOperation::WriteOfAnInode(_) => {
+                    not_applicable("WriteOfAnInodeIsNotDrivenByThisExperiment")
+                }
             }
         }
 
@@ -19170,6 +19206,7 @@ mod fourth_run_segment_two {
                 instance,
                 shadow_ledger,
                 parameters_and_device_table,
+                compaction: singlefs_core::compaction_plan::CompactionOfThisMount::of_a_new_mount(),
             };
             let change = mounted_session.publish_user_change(
                 &mut self.devices,
@@ -22142,7 +22179,7 @@ mod fourth_run_segment_two {
                 AbandonedRootNamedByThePoolChecker, GivenStateConclusion,
             };
             use singlefs_checker_tier::crash_judge_conclusions::{
-                CrossCheckWords, LandedRootWords,
+                CrossCheckWords, LandedRootWords, SCAN_REBUILD_OUTCOME_NOT_REACHED,
             };
             use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
             let position_of = |invariant: &str| {
@@ -22171,6 +22208,7 @@ mod fourth_run_segment_two {
                     consulted_pass_failure_point: 0,
                     ignored_pass_failure_point: 0,
                     pool_checker_judged_bits: violated_bits,
+                    scan_rebuild_outcome: SCAN_REBUILD_OUTCOME_NOT_REACHED,
                     gpu_could_not_judge: false,
                 },
                 pool_checker_violation_details: Vec::new(),

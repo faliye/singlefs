@@ -437,7 +437,8 @@ pub enum RingWindowOfTheReading {
 }
 
 impl RingWindowOfTheReading {
-    /// 可写挂载那一判的读法：要接的那一版没有树 ⇒ 还没起计；它的 `deleted_inodes` 不空 ⇒ 算作可动用；否则扣。
+    /// 可写挂载那一判的读法：要接的那一版没有树 ⇒ 还没起计；它的承诺类队列不空（`deleted_inodes`、销毁中的快照、截断条目，
+    /// `transaction::TransactionOutput::queue_of_committed_intents_is_empty`，判决 m4-trunc-r1 K1）⇒ 算作可动用；否则扣。
     #[must_use]
     pub fn of_a_writable_mount(
         version_to_build_on: Option<&TransactionOutput>,
@@ -445,7 +446,7 @@ impl RingWindowOfTheReading {
     ) -> Self {
         match version_to_build_on {
             None => RingWindowOfTheReading::NotCountedBeforeTheFirstFileVersion,
-            Some(version) if !version.deleted_inodes.is_empty() => {
+            Some(version) if !version.queue_of_committed_intents_is_empty() => {
                 RingWindowOfTheReading::UsableByTheWritableMountWhileTheDeletionQueueIsNotEmpty
             }
             Some(version) => RingWindowOfTheReading::DeductedOnEachDevice {
@@ -821,6 +822,62 @@ pub fn admit_on_every_device(
     }
 }
 
+/// 合取 7（D3（空间分配） 已定项 7 登记表第 7 行）管不管这一次发布：只拦前台写入类发布，删除类、整理批、挂载与回退的发布免
+/// （用户 2026-10-13 定「只拦前台写入类发布」）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EmptyClusterSegmentsConjunctReach {
+    /// 前台写入类：写文件内容（第一个文件、覆盖写、顺序写）、建 inode、建快照——条款列出的四类免除之外、带普通分配的发布。
+    ForegroundWrite,
+    /// 免这一条：删除类（unlink 与删快照的意图与各批）、整理批、挂载（写行、暖机）与回退、抬 F 的空发布。
+    Exempt,
+}
+
+/// 合取 7 被拒时全空聚簇段少于 `N₀` 的一块盘：它此刻的全空聚簇段数（分配器增量维护的那一个，`DeviceFreeMap::empty_segments`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DeviceWithEmptyClusterSegmentsBelowTheFloor {
+    pub device: DeviceIdentity,
+    pub empty_cluster_segments: u64,
+}
+
+/// 合取 7 被拒（`transaction::PublishError::EmptyClusterSegmentsBelowTheFloor`）：`N₀` 与全空聚簇段少于它的每一块盘（按交进来的次序）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EmptyClusterSegmentsBelowTheFloorOnSomeDevices {
+    pub floor_in_segments: u64,
+    pub short_devices: Vec<DeviceWithEmptyClusterSegmentsBelowTheFloor>,
+}
+
+/// 合取 7 `全空聚簇段数 ≥ N₀`（D26（后台整理与放置回收） 已定项 3 的第二合取式；D3（空间分配） 已定项 7 登记表第 7 行）逐设备判：
+/// `empty_cluster_segments_on_each_device` 是每块盘此刻的全空聚簇段数（分配器增量维护的那一个，`DeviceFreeMap::empty_segments`）。
+/// 一块盘少于 `floor_in_segments` 就拒。这一条约束的是形状、不是标量（D26 已定项 3），拒绝按段数报、不换成字节，
+/// 与空间准入不够分开（调用方要做的决定不同：腾整段靠整理，不是删东西）。
+///
+/// # Errors
+/// [`EmptyClusterSegmentsBelowTheFloorOnSomeDevices`]：至少一块盘全空段少于 `N₀`。
+pub fn admit_the_empty_cluster_segments_floor_on_every_device(
+    empty_cluster_segments_on_each_device: &[(DeviceIdentity, u64)],
+    floor_in_segments: u64,
+) -> Result<(), EmptyClusterSegmentsBelowTheFloorOnSomeDevices> {
+    let short_devices: Vec<DeviceWithEmptyClusterSegmentsBelowTheFloor> =
+        empty_cluster_segments_on_each_device
+            .iter()
+            .filter(|(_, empty_segments)| *empty_segments < floor_in_segments)
+            .map(
+                |(device, empty_segments)| DeviceWithEmptyClusterSegmentsBelowTheFloor {
+                    device: *device,
+                    empty_cluster_segments: *empty_segments,
+                },
+            )
+            .collect();
+    if short_devices.is_empty() {
+        Ok(())
+    } else {
+        Err(EmptyClusterSegmentsBelowTheFloorOnSomeDevices {
+            floor_in_segments,
+            short_devices,
+        })
+    }
+}
+
 /// 「这次的单元落得下」那一判的读数，一块盘一条（C545（空间准入罩不住分裂与聚簇段层），用户 2026-09-27 定准入先拒）：
 /// 这块盘此刻按分配器今天的落点规则（D3（空间分配） 已定项 8、已定项 10）还落得下多少。两个数都是分配器随三种挡位增量维护的
 /// （`DeviceFreeMap::set_blocking_bit`），读它们 O(这次挂载开过的聚簇段数)，不扫单元区（`.claude/rules/fs-design.md`「记账是事务的副产品」）。
@@ -883,11 +940,11 @@ pub fn units_of_a_publish_to_land(
     );
     let data_units = ordinary_allocation_roles
         .iter()
-        .filter(|role| matches!(role, TransactionUnit::Data(_)))
+        .filter(|role| role.is_a_data_unit())
         .count();
     let ordinary_commit_generated_slots: u64 = ordinary_allocation_roles
         .iter()
-        .filter(|role| !matches!(role, TransactionUnit::Data(_)))
+        .filter(|role| !role.is_a_data_unit())
         .map(|role| role.span_slots())
         .sum();
     UnitsOfAPublishToLand {
@@ -1108,8 +1165,12 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
                             MultiLevelCodeTwoTree::CentralMapping,
                         ),
                     ),
-                    u64::try_from(file_version.mapped_units.len())
-                        .expect("进映射的单元数装得进 u64"),
+                    // 映射条目数 = 进映射的单元 + 被活快照钉住、留存的映射条目（判决 S3 的 α）：空发布两样都照抄。
+                    u64::try_from(
+                        file_version.mapped_units.len()
+                            + file_version.mapping_entries_kept_for_the_snapshots.len(),
+                    )
+                    .expect("映射条目数装得进 u64"),
                     CentralMappingEntryChangesOfAnEmptyPublish {
                         deleted_at_most: mapped_changes_with_accounting_nodes(
                             accounting_tree_nodes_of_this_version,
@@ -1420,7 +1481,9 @@ pub enum SpaceBudgetOfARole {
 #[must_use]
 pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
     match role {
-        TransactionUnit::Data(_)
+        TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+        | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+        | TransactionUnit::Data(_)
         | TransactionUnit::ExtentLowerNode(_)
         | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
         | TransactionUnit::ExtentRoot
@@ -1429,6 +1492,7 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
         // 删除那两棵树的节点只在删除类发布里重写：落点那一判照判（普通分配），式子那一判删除类发布整次不判
         // （D28（挂载期承诺量） 已定项 1：它们的空间罩在环窗口与墓碑预付里，`transaction::prepare_the_version_publish`）。
         TransactionUnit::DeletedInodesRoot
+        | TransactionUnit::LoggedOperationsRoot
         | TransactionUnit::TombstoneLeafContainer(_)
         | TransactionUnit::TombstoneRoot
         | TransactionUnit::TombstoneNodeBelowTheRoot(_) => SpaceBudgetOfARole::OrdinaryAllocation,
@@ -1437,6 +1501,12 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
         TransactionUnit::RetirementLeafContainer(_)
         | TransactionUnit::RetirementRoot
         | TransactionUnit::RetirementNodeBelowTheRoot(_) => SpaceBudgetOfARole::OrdinaryAllocation,
+        // deadlist 树的节点只在杀了被活快照引用的块的那次（覆盖写、删除批）与删快照的批里重写（判决
+        // `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3、S4）：条款没写它归哪一格，照删除那两棵树读——落点那一判照判，
+        // 式子那一判跟着它所在的那次发布（删快照的三种与 unlink 同准入、整次不判）。不进 ckpt_cost 的 Σ 名单：空发布不重写它。
+        TransactionUnit::DeadlistTreeNodeBelowTheRoot(_) | TransactionUnit::DeadlistTree => {
+            SpaceBudgetOfARole::OrdinaryAllocation
+        }
         // 谱系容器与谱系树根归固定点、进 ckpt_cost 的 Σ 名单（D28（挂载期承诺量） 已定项 1 接线），只在管理员回退那次重写：
         // 回退不判式子，空间从 checkpoint 保留池里出（[`checkpoint_cost_of_one_lineage_container_cow`]）。
         TransactionUnit::LineageLeafContainer(_)

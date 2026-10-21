@@ -52,12 +52,13 @@ use crate::recovery::{
     RecoveryFailure, TreeTableEntriesRefusal,
 };
 use crate::root_record::RootRecord;
+use crate::system_configuration::InodeRecordTruncationFieldsOfThePool;
 use crate::transaction::MultiLevelCodeTwoTree;
 use crate::unit::{
     data_unit_payload, data_unit_payload_capacity, parse_data_unit, parse_index_node,
     parse_packed_unit, unit_filesystem_identifier, DataUnitHeader, UnitError, PACKED_TYPE_INODE,
 };
-use crate::write_request_split::{data_unit_count_implied_by_the_file_size, DataUnitsOfTheInode};
+use crate::write_request_split::{data_units_read_within_the_file_size, DataUnitsOfTheInode};
 
 /// extent 叶记录 key 第三段（offset 段，文件字节偏移，D8（核心索引结构） 已定项 3）的起点。
 const EXTENT_KEY_THIRD_SEGMENT_OFFSET_IN_BYTES: usize = 16;
@@ -192,8 +193,11 @@ pub enum OpenPoolForReadFailure {
     },
     /// inode 叶容器的头与 inode 树内部条目里的身份引用不符（I-9.2（条目身份与子头相符））。
     InodeLeafContainerDisagreesWithTheInternalEntry { detail: &'static str },
-    /// inode 记录解不开（填充 / flags / 预留非零，I-9.7）。
+    /// inode 记录解不开（108–119 或 136–139 恒零区非零、截断字段 T = 0 而 N_w ≠ 0，I-9.7）。
     InodeRecordMalformed,
+    /// 系统配置不带 incompat 位 2 的池里读到截断字段不是全零的 inode 记录（用户 2026-10-17 定，判决
+    /// `research/prompts/m4-trunc-r2-main-verification.md` 第六节）：这条记录判不可用。`inode` 是那条记录的号。
+    InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo { inode: u64 },
     /// 节点里的一条记录 / 条目解不开：盘上自述的条目宽窄于字段表（这一版的读者不认这一版写的条目布局）。
     RecordMalformed { what: &'static str },
     /// 节点里的一条条目按字段表解得开，而它带的那条指针头部有一段不是第一版的取值（MAC / nonce 非 0、算法类型不是未加密、
@@ -347,11 +351,31 @@ pub struct MountedPoolForRead {
 /// 录制钩子挂在块设备接口上），装置侧的计数器在 `singlefs_harness::read_tally`。
 /// 核心层自己报的那几个数只罩打开之后的每一次读（[`ReadPathObservation`]）。
 ///
+/// inode 记录的截断字段照这个写者写的那一种池（带 incompat 位 2）收：调用方手里没有择好的系统配置时用它；只读挂载按择到的那一份判，走
+/// [`open_pool_for_read_judging_the_truncation_fields_as`]。
+///
 /// # Errors
 /// 见 [`OpenPoolForReadFailure`]：读不到 / 解不开 / 树表 0 条 / 树表里缺树 / 层级不对 / 叶容器身份不符。
 pub fn open_pool_for_read(
     reader: &dyn PoolReader,
     root: &RootRecord,
+) -> Result<MountedPoolForRead, OpenPoolForReadFailure> {
+    open_pool_for_read_judging_the_truncation_fields_as(
+        reader,
+        root,
+        InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
+    )
+}
+
+/// 同 [`open_pool_for_read`]，inode 记录的截断字段按择到的系统配置那一档判：不带 incompat 位 2 的池里截断字段不是全零的记录判不可用
+/// （[`OpenPoolForReadFailure::InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo`]）。
+///
+/// # Errors
+/// 同 [`open_pool_for_read`]，另加上面那一种。
+pub fn open_pool_for_read_judging_the_truncation_fields_as(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+    truncation_fields_of_the_pool: InodeRecordTruncationFieldsOfThePool,
 ) -> Result<MountedPoolForRead, OpenPoolForReadFailure> {
     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
     let filesystem_identifier_in_unit_headers =
@@ -423,7 +447,11 @@ pub fn open_pool_for_read(
             TreeTableEntriesRefusal::EntryMalformed => {
                 OpenPoolForReadFailure::TreeTableEntryMalformed
             }
-            TreeTableEntriesRefusal::OneKindOfTreeAppearsTwice => {
+            TreeTableEntriesRefusal::OneKindOfTreeAppearsTwice
+            | TreeTableEntriesRefusal::SnapshotInodeAndExtentRootEntryCountsDiffer
+            | TreeTableEntriesRefusal::SnapshotExtentRootEntryWithoutItsOwnSnapshotInodeRootEntry
+            | TreeTableEntriesRefusal::MoreSnapshotsThanTheFirstVersionAllows
+            | TreeTableEntriesRefusal::SnapshotInodeRootEntryHeadIsNotTheLiveInodeTree => {
                 OpenPoolForReadFailure::Walk(RecoveryFailure::from(refusal))
             }
         })?;
@@ -525,10 +553,16 @@ pub fn open_pool_for_read(
             );
         }
         for record_bytes in &container.records {
-            inode_records.push(
-                InodeRecord::parse(record_bytes)
-                    .ok_or(OpenPoolForReadFailure::InodeRecordMalformed)?,
-            );
+            let record = InodeRecord::parse(record_bytes)
+                .ok_or(OpenPoolForReadFailure::InodeRecordMalformed)?;
+            if !record.truncation_field_fits_the_pool(truncation_fields_of_the_pool) {
+                return Err(
+                    OpenPoolForReadFailure::InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo {
+                        inode: record.inode,
+                    },
+                );
+            }
+            inode_records.push(record);
         }
     }
 
@@ -600,18 +634,26 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         true,
     )
     .map_err(MountReadOnlyFailure::Recovery)?;
-    let (mounted, chosen_root, effective_root) = match open_pool_for_read(reader, &effective_root) {
-        Ok(mounted) => (mounted, chosen_root, effective_root),
-        // 树表 0 条不是走读失败（这一版还没发布过文件版本），不退。
-        Err(OpenPoolForReadFailure::TreeTableHasNoEntries) => {
-            return Err(MountReadOnlyFailure::Open(
-                OpenPoolForReadFailure::TreeTableHasNoEntries,
-            ));
-        }
-        // 所选那一版走读失败、系统配置没见证它：退到 [见证到的那一版, 所选根) 里最新的那条根（F2 乙，与恢复、可写挂载同一份判法，
-        // `recovery::newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`），不重放、直接打开；打不开照报所选那一版的失败。
-        Err(failure_of_the_selected_version) => {
-            let version_fallen_back_to_opened =
+    let truncation_fields_of_the_pool = system_configuration
+        .immutable
+        .inode_record_truncation_fields;
+    let (mounted, chosen_root, effective_root) =
+        match open_pool_for_read_judging_the_truncation_fields_as(
+            reader,
+            &effective_root,
+            truncation_fields_of_the_pool,
+        ) {
+            Ok(mounted) => (mounted, chosen_root, effective_root),
+            // 树表 0 条不是走读失败（这一版还没发布过文件版本），不退。
+            Err(OpenPoolForReadFailure::TreeTableHasNoEntries) => {
+                return Err(MountReadOnlyFailure::Open(
+                    OpenPoolForReadFailure::TreeTableHasNoEntries,
+                ));
+            }
+            // 所选那一版走读失败、系统配置没见证它：退到 [见证到的那一版, 所选根) 里最新的那条根（F2 乙，与恢复、可写挂载同一份判法，
+            // `recovery::newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`），不重放、直接打开；打不开照报所选那一版的失败。
+            Err(failure_of_the_selected_version) => {
+                let version_fallen_back_to_opened =
                 newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to(
                     reader,
                     &system_configuration,
@@ -620,18 +662,24 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
                     &records,
                 )
                 .and_then(|version_fallen_back_to| {
-                    open_pool_for_read(reader, &version_fallen_back_to)
-                        .ok()
+                    open_pool_for_read_judging_the_truncation_fields_as(
+                        reader,
+                        &version_fallen_back_to,
+                        truncation_fields_of_the_pool,
+                    )
+                    .ok()
                         .map(|mounted| (mounted, version_fallen_back_to))
                 });
-            match version_fallen_back_to_opened {
-                Some((mounted, version_fallen_back_to)) => {
-                    (mounted, version_fallen_back_to, version_fallen_back_to)
+                match version_fallen_back_to_opened {
+                    Some((mounted, version_fallen_back_to)) => {
+                        (mounted, version_fallen_back_to, version_fallen_back_to)
+                    }
+                    None => {
+                        return Err(MountReadOnlyFailure::Open(failure_of_the_selected_version))
+                    }
                 }
-                None => return Err(MountReadOnlyFailure::Open(failure_of_the_selected_version)),
             }
-        }
-    };
+        };
     Ok(MountedReadOnly {
         mounted,
         chosen_root,
@@ -730,18 +778,28 @@ impl MountedPoolForRead {
         let upper_height = upper_nodes_read;
         // 上段这一趟读到叶没有：停下时最后读的那个节点是层级 0 才算读到一片（上段停在内部节点时不算）。
         let upper_leaves = upper_leaves_read_at_open(level_of_the_node_read_last.get());
-        let data_units_of_the_inode = match entry.map(|found| found.target) {
-            None | Some(ExtentUpperLeafTarget::NoDataUnit) => DataUnitsOfTheInode::NoneWritten,
+        let target: Option<ExtentUpperLeafTarget> = entry.map(|found| found.target);
+        // 标签 3、4 与「标签 0 配 size > 0」最后一个存在的单元之后到 size 是洞（判决 m4-trunc-r1 K5）。
+        let data_units_of_the_inode = match target {
+            None => DataUnitsOfTheInode::NoneWritten,
             Some(
                 ExtentUpperLeafTarget::InlineDataUnit(_)
                 | ExtentUpperLeafTarget::LowerSegmentRoot(_),
             ) => DataUnitsOfTheInode::SomeWritten,
+            Some(
+                ExtentUpperLeafTarget::NoDataUnit
+                | ExtentUpperLeafTarget::InlineDataUnitFollowedByAHole(_)
+                | ExtentUpperLeafTarget::LowerSegmentRootFollowedByAHole(_),
+            ) => DataUnitsOfTheInode::HoleAfterTheLastDataUnit,
         };
         let (data_pointers, lower_height, lower_leaves): (Vec<(u64, DataPointer)>, u64, u64) =
-            match entry.map(|found| found.target) {
-                None | Some(ExtentUpperLeafTarget::NoDataUnit) => (Vec::new(), 0, 0),
-                Some(ExtentUpperLeafTarget::InlineDataUnit(pointer)) => (vec![(0, pointer)], 0, 0),
-                Some(ExtentUpperLeafTarget::LowerSegmentRoot(lower_root)) => {
+            match (
+                target.and_then(ExtentUpperLeafTarget::inline_data_unit),
+                target.and_then(ExtentUpperLeafTarget::lower_segment_root),
+            ) {
+                (None, None) => (Vec::new(), 0, 0),
+                (Some(pointer), _) => (vec![(0, pointer)], 0, 0),
+                (None, Some(lower_root)) => {
                     let segment = read_lower_segment(
                         &reading,
                         inode.0,
@@ -771,7 +829,7 @@ impl MountedPoolForRead {
             leaves: upper_leaves + lower_leaves,
         };
         let payload_capacity = payload_capacity_in_bytes();
-        let data_unit_records: Vec<ExtentLeafRecordInMountState> = data_pointers
+        let mut data_unit_records: Vec<ExtentLeafRecordInMountState> = data_pointers
             .into_iter()
             .map(|(unit, data_unit_pointer)| {
                 let key: [u8; 24] =
@@ -801,19 +859,26 @@ impl MountedPoolForRead {
                 );
             }
         }
-        // 文件没有洞、尾巴上也没有多出来的记录：写过内容的与写侧用同一条除法算单元数，一次都没写过的长度 0 就是 0 个
-        // （`write_request_split::data_unit_count_implied_by_the_file_size`），不在这里另写一个。
-        let data_units_implied_by_the_file_size =
-            data_unit_count_implied_by_the_file_size(inode_record.size, data_units_of_the_inode);
+        // 单元数按标签对 size（`write_request_split::data_units_read_within_the_file_size`，不在这里另写一个）：标签 1、2 不少于
+        // size 除出来的数，多出来的是截断中间态里 size 之外还挂着的单元——不读、不判声明长度，从记录里去掉（判决 m4-trunc-r1 K2）；
+        // 标签 3、4、0 少于它，之后到 size 是洞，读出 0（K5）。
         let extent_records = u64::try_from(data_unit_records.len()).expect("记录条数");
-        if extent_records != data_units_implied_by_the_file_size {
-            return Err(OpenFileFailure::ExtentRecordCountDoesNotMatchTheFileSize {
+        let data_units_within_the_size = data_units_read_within_the_file_size(
+            inode_record.size,
+            extent_records,
+            data_units_of_the_inode,
+        )
+        .map_err(
+            |refused| OpenFileFailure::ExtentRecordCountDoesNotMatchTheFileSize {
                 inode,
                 extent_records,
-                data_units_implied_by_the_file_size,
+                data_units_implied_by_the_file_size: refused.data_units_implied_by_the_file_size,
                 file_size_in_bytes: inode_record.size,
-            });
-        }
+            },
+        )?;
+        data_unit_records.truncate(
+            usize::try_from(data_units_within_the_size).expect("size 之内的单元数不多于记录条数"),
+        );
         Ok(OpenFileForRead {
             mount: self,
             inode_record,
@@ -923,12 +988,22 @@ impl OpenFileForRead<'_> {
         // 迭代次数的上界 = 这次读跨的单元数；循环体跨轮携带的只有上一个单元的锚点偏移与已拷出的字节。
         for unit_number in span.first.0..=span.last_inclusive.0 {
             let unit_index_in_file = DataUnitIndexInFile(unit_number);
-            let record = *self
+            let unit_starts_at_file_byte = unit_number * payload_capacity;
+            let Some(record) = self
                 .data_unit_records
                 .get(usize::try_from(unit_number).expect("单元序号装得进 usize"))
-                .expect(
-                    "单元序号由 (文件大小 − 1) ÷ 净荷容量界住，而记录条数在 open_file 里核过等于单元数",
+                .copied()
+            else {
+                // 尾部的洞（标签 3、4、0，判决 m4-trunc-r1 K5）：这一段答 0、不读盘。单元序号由 (文件大小 − 1) ÷ 净荷容量界住，
+                // 记录条数在 open_file 里按标签核过，记录之后到 size 只能是洞。
+                let hole_from = offset.0.max(unit_starts_at_file_byte);
+                let hole_until = end_exclusive.min(unit_starts_at_file_byte + payload_capacity);
+                bytes.resize(
+                    bytes.len() + usize::try_from(hole_until - hole_from).expect("一个单元以内"),
+                    0,
                 );
+                continue;
+            };
             let unit_bytes =
                 self.dereference_data_unit(reader, record, unit_index_in_file, &mut observation)?;
             let header = parse_data_unit(&unit_bytes).map_err(|error| {
@@ -952,7 +1027,6 @@ impl OpenFileForRead<'_> {
                         detail: "声明长度之后的补齐字节非零",
                     }
                 })?;
-            let unit_starts_at_file_byte = unit_number * payload_capacity;
             let copy_from = offset.0.max(unit_starts_at_file_byte) - unit_starts_at_file_byte;
             let copy_until = end_exclusive
                 .min(unit_starts_at_file_byte + u64::from(header.declared_length))
@@ -1350,6 +1424,7 @@ mod tests {
                 size: 0,
                 change_count: 1,
                 write_time_seconds: 1_788_000_000,
+                truncation_field: crate::records::InodeRecordTruncationField::NOT_WRITTEN,
             }],
             central_mapping_entries: Vec::new(),
             central_mapping_tree_reads_at_open: CentralMappingTreeReadsAtOpen {

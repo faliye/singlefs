@@ -387,11 +387,11 @@ fn write_calls_of<'ledger>(
         .write_calls
 }
 
-/// 取号那两次系统配置槽写（每块盘一次）：不是发布，挂载交回的错与输出里的写账都不含它们（`PublishSequenceFailed` 的契约）。
-const ACQUISITION_WRITES: u64 = 2;
+/// 取号那四次系统配置槽写（取号写两轮，每轮每块盘一次）：不是发布，挂载交回的错与输出里的写账都不含它们（`PublishSequenceFailed` 的契约）。
+const ACQUISITION_WRITES: u64 = 4;
 
 /// 一次不注错的可写挂载里，txg 低于 `txg` 的那几次发布（写行、暖机、准入推的与续做推的空发布、续做的各步）与第一次发布低于它的
-/// 那几串抬 F 先写系统配置那一步，一共交给设备几个写（连取号那两次）；交回 (写数, 发布数)。注错点就按它摆在 txg 那一次发布的第一个写上。
+/// 那几串抬 F 先写系统配置那一步，一共交给设备几个写（连取号那四次）；交回 (写数, 发布数)。注错点就按它摆在 txg 那一次发布的第一个写上。
 fn writes_and_publishes_of_the_mount_before(
     output: &singlefs_core::mount::MountOutput,
     txg: CheckpointTxg,
@@ -500,7 +500,7 @@ fn mount_failing_on_a_write_of_a_continuation_publish(
 }
 
 /// 续做那一格交回的 `Publish` 错：已落盘份数 = 设备一层落下的根槽写数，写账合计（这一串里不属于任何发布的写 + 已落盘各份 + 失败账）
-/// = 落下的写 − 取号两次（代码轮 V2 / V3 的判法）。
+/// = 落下的写 − 取号四次（代码轮 V2 / V3 的判法）。
 fn assert_the_continuation_publish_error_accounts_for_every_landed_write(
     refusal: &MountError,
     landed_writes: u64,
@@ -530,13 +530,13 @@ fn assert_the_continuation_publish_error_accounts_for_every_landed_write(
                 .chain(&failed.writes_of_failed_publishes)
         ),
         landed_writes - ACQUISITION_WRITES,
-        "写账合计等于落下的写减去取号那两次（推的每一串先写系统配置那一步在 writes_before_the_first_publish 里）"
+        "写账合计等于落下的写减去取号那四次（推的每一串先写系统配置那一步在 writes_before_the_first_publish 里）"
     );
 }
 
 /// 准入推过抬 F 的起点（代码轮 V3 第一形）：单元区 292 槽、覆盖写 1 次、16 个单元、崩在第 7 批之后；取号之前不够、写行与暖机之后推了一串
 /// （三次空发布），续做 9 步、没再推。续做第二步的第一个写报块设备错：错里 7 份（写行、暖机两次、推的三次、续做第一步）= 落下的 7 个根槽写，
-/// 写账合计 = 落下的写 − 取号两次（推的那一串先写系统配置那 2 个写在内）。
+/// 写账合计 = 落下的写 − 取号四次（推的那一串先写系统配置那 2 个写在内）。
 /// 判别力：续做之前的写账去掉准入推的那几次空发布（攻方 MU1）时份数少 3；先写系统配置那一步不进错（改之前）时合计少 2。
 #[test]
 fn a_continuation_step_failing_after_the_admission_raised_the_floor_hands_back_every_landed_write()
@@ -581,7 +581,7 @@ fn a_continuation_step_failing_after_the_admission_raised_the_floor_hands_back_e
 
 /// 续做里推过抬 F 的起点（代码轮 V3 第二形）：同一种盘崩在第 0 批之后（只发了意图）；续做 16 步，第 14 步之后被落得下那一判拒、推一串两次空发布、
 /// 回收之后接着走。推的那一串之后的第一步的第一个写报块设备错：错里 19 份（写行、暖机两次、续做 14 步、推的两次）= 落下的 16 个根槽写，
-/// 写账合计 = 落下的写 − 取号两次。
+/// 写账合计 = 落下的写 − 取号四次。
 /// 判别力：续做的写账去掉续做推的那几次空发布（攻方 MU2）时份数少 2；先写系统配置那一步不进错时合计少 2。
 #[test]
 fn a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_back_every_landed_write(
@@ -625,7 +625,7 @@ fn a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_bac
 
 /// 准入与续做都推过抬 F 的起点（代码轮 V2 第三形）：单元区 192 槽、不先覆盖写、14 个单元、崩在第 1 批之后；准入推了一串两次空发布，
 /// 续做 13 步、第 7 步之后推了一串两次空发布。续做推的那一串之后的第一步的第一个写报块设备错：错里 13 份 = 落下的 13 个根槽写，
-/// 写账合计 = 落下的写 − 取号两次（两串先写系统配置那 4 个写在内）。
+/// 写账合计 = 落下的写 − 取号四次（两串先写系统配置那 4 个写在内）。
 /// 判别力：先写系统配置那一步不进错时合计少 4。
 #[test]
 fn a_continuation_step_failing_after_both_the_admission_and_the_continuation_raised_the_floor_hands_back_every_landed_write(
@@ -694,7 +694,7 @@ fn first_continuation_step_after_the_continuation_raised_the_floor(
 /// 又推一串）上，续做推的那一串第二次空发布的第一个写报块设备错。挂载不再原样交回抬 F 的错，交 `FloorRaiseFailedAfterTheMountsPublishes`：
 /// `cause` 是那一串的 `RaiseFloorSequencePublishFailed`（第一次空发布已落盘），`writes_of_persisted_publishes` 是之前按 txg 落盘的 11 份
 /// （写行、暖机、准入推的两次、续做 7 步），`floor_raises` 是准入推成的那一串；写账合计（各份 + 推成的那几串先写系统配置那一步 + `cause` 里那一串
-/// 自己的账）= 落下的写 − 取号两次，已落盘份数（这里的 11 份 + `cause` 里的 1 份）= 落下的根槽写数。
+/// 自己的账）= 落下的写 − 取号四次，已落盘份数（这里的 11 份 + `cause` 里的 1 份）= 落下的根槽写数。
 /// 判别力：抬 F 的错照旧原样交回（改之前）时交的是 `RaiseFloorSequencePublishFailed`，第一项就红。
 #[test]
 fn a_floor_raise_failing_on_a_device_error_in_the_continuation_hands_back_the_writes_of_the_mounts_publishes(
@@ -766,7 +766,7 @@ fn a_floor_raise_failing_on_a_device_error_in_the_continuation_hands_back_the_wr
                 .chain(&failed_raise.writes_of_failed_publishes)
         ),
         landed_writes - ACQUISITION_WRITES,
-        "写账合计等于落下的写减去取号那两次"
+        "写账合计等于落下的写减去取号那四次"
     );
 }
 
@@ -826,7 +826,7 @@ fn mount_failing_after_the_first_write_of_the_step_after_the_continuation_raised
 }
 
 /// 续做那一步的第二个单元写报块设备错（N2，注错点在发布第一个写之后）：第一个单元写已落盘、属于失败的那一次发布。
-/// 错是 `Publish`、块设备错；已落盘份数 19 = 落下的根槽写数；写账合计（含失败那一次已记的那 1 个单元写）= 落下的写 − 取号两次。
+/// 错是 `Publish`、块设备错；已落盘份数 19 = 落下的根槽写数；写账合计（含失败那一次已记的那 1 个单元写）= 落下的写 − 取号四次。
 /// 判别力：续做那一格交回的失败账照旧是空的（不带失败那一次已落下的写）时合计少 1，那一项红。
 #[test]
 fn a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_write() {
@@ -852,7 +852,7 @@ fn a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_
 }
 
 /// 续做那一步的 journal 记录写报块设备错（N2）：那一步的单元写全落盘、属于失败的那一次发布，记录与根都没落。
-/// 判法同上一条：份数 19 = 落下的根槽写数，写账合计 = 落下的写 − 取号两次。
+/// 判法同上一条：份数 19 = 落下的根槽写数，写账合计 = 落下的写 − 取号四次。
 /// 判别力：失败账照旧是空的时合计少那一步的单元写数，那一项红。
 #[test]
 fn a_continuation_step_failing_on_its_journal_record_write_hands_back_every_landed_write() {
@@ -870,7 +870,7 @@ fn a_continuation_step_failing_on_its_journal_record_write_hands_back_every_land
 
 /// 续做那一步的根槽写报块设备错（N2）：那一步的单元写与 journal 记录写落盘，根没落（只读恢复会靠那条记录多走一次，见
 /// `unlink_mount_continuation_and_the_emptied_version.rs` 设备错那一条的说明；这里只比根槽写，不比只读挂载走到的版）。
-/// 判法同上：份数 19 = 落下的根槽写数，写账合计 = 落下的写 − 取号两次。
+/// 判法同上：份数 19 = 落下的根槽写数，写账合计 = 落下的写 − 取号四次。
 /// 判别力：失败账照旧是空的时合计少那一步的单元写与记录写，那一项红。
 #[test]
 fn a_continuation_step_failing_on_its_root_slot_write_hands_back_every_landed_write() {
@@ -890,7 +890,7 @@ fn a_continuation_step_failing_on_its_root_slot_write_hands_back_every_landed_wr
 /// （准入推过一串、续做第 7 步之后又推一串，同 [`a_floor_raise_failing_on_a_device_error_in_the_continuation_hands_back_the_writes_of_the_mounts_publishes`]），
 /// 续做推的那一串先写系统配置的第二个写（盘 1 那一个）报错：第一个已落盘、一条带新 F 的根都没发。挂载交 `FloorRaiseFailedAfterTheMountsPublishes`，
 /// `cause` 是那一串的 `RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot`（它的写账是已落下的那 1 个系统配置写）；已落盘份数 11 = 落下的根槽写数；
-/// 写账合计（各份 + 推成的那一串先写系统配置那一步 + `cause` 里那一步的写）= 落下的写 − 取号两次。
+/// 写账合计（各份 + 推成的那一串先写系统配置那一步 + `cause` 里那一步的写）= 落下的写 − 取号四次。
 /// 判别力：先写系统配置那一步报错时不带已落下的写（写账交空）时合计少 1，那一项红。
 #[test]
 fn a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_hands_back_every_landed_write(
@@ -956,7 +956,7 @@ fn a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_h
                 .chain(std::iter::once(&failed_step.writes))
         ),
         landed_writes - ACQUISITION_WRITES,
-        "写账合计等于落下的写减去取号那两次"
+        "写账合计等于落下的写减去取号那四次"
     );
 }
 

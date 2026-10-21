@@ -67,14 +67,14 @@ fn prepare(tag: &str) -> Prepared {
         writes_and_segments(&operations[formatted.mkfs_operation_count..], &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2],
-        "取号两写 | 写行发布的记录两写 | 根 | 系统配置两写 | 暖机的记录两写 | 根 | 系统配置两写（C577：发布末尾那道屏障之后自成一段）| \
+        vec![2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2],
+        "取号两轮各两写（轮后各一道池屏障，各成一段）| 写行发布的记录两写 | 根 | 系统配置两写 | 暖机的记录两写 | 根 | 系统配置两写（C577：发布末尾那道屏障之后自成一段）| \
          第一个文件版本的二十四个单元写（十二个单元各两盘：七个角色加分配记录树五个节点，D8（核心索引结构） 已定项 14）| 记录两写 | 根 | 系统配置两写"
     );
     assert_eq!(
         writes.len(),
-        2 + 2 * 5 + (24 + 2 + 1 + 2),
-        "取号 2 + 两次零单元发布各 5 + 文件版本 29（24 个单元写、两份记录、根槽、两块盘的系统配置槽轮换）"
+        2 * 2 + 2 * 5 + (24 + 2 + 1 + 2),
+        "取号两轮各 2 + 两次零单元发布各 5 + 文件版本 29（24 个单元写、两份记录、根槽、两块盘的系统配置槽轮换）"
     );
     let root_indexes: Vec<usize> = writes
         .iter()
@@ -134,20 +134,20 @@ fn assert_checker_and_record_checker_clean(tally: &CrashPointReplayTally) {
     }
 }
 
-/// 段序列：十一段、每次写只取两态时的闭式 16777240（1 + 七个 2 写段各 3 + 三个 1 写段各 1 + 一个 24 写段 2^24 − 1 = 16777215；
-/// C577 之前暖机那次轮换与单元写同段，十段、1 + 六个 2 写段各 3 + 三个 1 写段各 1 + 26 写段 2^26 − 1 = 67108885），
+/// 段序列：十二段、每次写只取两态时的闭式 16777243（1 + 八个 2 写段各 3 + 三个 1 写段各 1 + 一个 24 写段 2^24 − 1 = 16777215；
+/// 取号写一轮时十一段、七个 2 写段、16777240；C577 之前暖机那次轮换与单元写同段，十段、1 + 六个 2 写段各 3 + 三个 1 写段各 1 + 26 写段 2^26 − 1 = 67108885），
 /// 与 mkfs 同一个进程里跑新池新建文件那条流相同（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`）。
 #[test]
 fn the_formatted_pool_mount_and_first_file_stream_keeps_the_new_pool_file_creation_segment_sequence(
 ) {
     let prepared = prepare("formatted-crash-point-replay-registered");
-    assert_eq!(prepared.segments.len(), 11);
+    assert_eq!(prepared.segments.len(), 12);
     assert_eq!(
         closed_form_state_count(&prepared.segments),
-        1 + 7 * 3 + 3 + ((1 << 24) - 1),
-        "1 + 七个 2 写段各 3 + 三个 1 写段各 1 + 24 写段 2^24 − 1"
+        1 + 8 * 3 + 3 + ((1 << 24) - 1),
+        "1 + 八个 2 写段（取号两轮、三次记录、三次轮换）各 3 + 三个 1 写段各 1 + 24 写段 2^24 − 1"
     );
-    assert_eq!(closed_form_state_count(&prepared.segments), 16_777_240);
+    assert_eq!(closed_form_state_count(&prepared.segments), 16_777_243);
 }
 
 /// 平时跑的那一份：24 个单元写的那一段不展开（只以整段持久进入后面的状态），其余每段每次写各取它的几态、任意组合
@@ -180,8 +180,8 @@ fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recove
         .collect();
     assert_eq!(
         closed_form_state_count(&expanded),
-        25,
-        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 七个 2 写段各 3 + 三个 1 写段各 1（C577 之前 22）"
+        28,
+        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 八个 2 写段各 3 + 三个 1 写段各 1（取号写一轮时 25，C577 之前 22）"
     );
     assert_eq!(
         tally.states,
@@ -201,9 +201,9 @@ fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recove
     );
     assert_eq!(
         tally.states,
-        1 + 4 * (3 * 3 - 1) + 3 * 3 + 3,
-        "1 + 四个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 三个根槽 1 写段各 1（每次写只取两态时 25；\
-         C577 之前暖机那次轮换并在 26 写段里不展开，三个系统配置槽段、37）"
+        1 + 5 * (3 * 3 - 1) + 3 * 3 + 3,
+        "1 + 五个系统配置槽 2 写段（取号两轮、三次轮换）各 3² − 1 + 三个记录 2 写段各 3 + 三个根槽 1 写段各 1（每次写只取两态时 28；\
+         取号写一轮时四个系统配置槽段、45；C577 之前暖机那次轮换并在 26 写段里不展开，三个系统配置槽段、37）"
     );
     assert_eq!(
         tally.violations, 0,

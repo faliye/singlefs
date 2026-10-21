@@ -881,6 +881,235 @@ pub struct StoredConclusionBlock {
     pub circumstances: JudgementCircumstances,
 }
 
+/// 一个红项写进差异说明的样子：池级 checker 那几项（`pool_checker:<不变量名>`）后面接它在违例位里的下标（位 i ↔
+/// `singlefs_checker::image::IMPLEMENTED_INVARIANTS[i]`），别的原样。
+fn red_item_naming_its_violated_bit(item: &str) -> String {
+    let invariant = item
+        .strip_prefix(crate::crash::CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER)
+        .and_then(|rest| rest.strip_prefix(':'));
+    match invariant.and_then(|invariant| {
+        singlefs_checker::image::IMPLEMENTED_INVARIANTS
+            .iter()
+            .position(|candidate| *candidate == invariant)
+    }) {
+        Some(position) => format!("{item}（违例位下标 {position}）"),
+        None => item.to_string(),
+    }
+}
+
+/// 一条不变量名写进差异说明的样子：在池级 checker 的清单里的，后面接它在违例位里的下标。
+fn invariant_naming_its_violated_bit(invariant: &str) -> String {
+    match singlefs_checker::image::IMPLEMENTED_INVARIANTS
+        .iter()
+        .position(|candidate| *candidate == invariant)
+    {
+        Some(position) => format!("{invariant}（违例位下标 {position}）"),
+        None => invariant.to_string(),
+    }
+}
+
+/// 一个状态的判定向量编号认回红项（编号认不回判定向量时写明）。
+fn red_items_of_the_number<'vectors>(
+    number: VerdictVectorNumber,
+    verdict_vector_of_number: &impl Fn(VerdictVectorNumber) -> Option<&'vectors EncodedVerdictVector>,
+) -> Result<BTreeSet<String>, String> {
+    verdict_vector_of_number(number)
+        .map(|vector| {
+            crate::crash_judge_conclusions::red_items_of_the_encoded_verdict(vector)
+                .into_iter()
+                .collect()
+        })
+        .ok_or_else(|| format!("编号 {}（认不回判定向量）", number.0))
+}
+
+/// 同一个（块键，结论种类，版本）下已存的与要存的两份结论差在哪，一处一行（[`VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`]
+/// 带着它）：块内状态数；块内每个判定向量编号不同的状态，两份各自独有的红项（池级 checker 的连同违例位下标）；违例的状态；计数向量里逐条不变量、
+/// 逐个观察者、逐次发布的态数不同的那几行；恢复字不同的状态；点名的被抛弃根不同的状态。只读两份结论与判定向量，不进任何判定。
+fn differences_between_two_conclusions<'vectors>(
+    stored: &StoredConclusionBlock,
+    requested: &StoredConclusionBlock,
+    verdict_vector_of_number: impl Fn(VerdictVectorNumber) -> Option<&'vectors EncodedVerdictVector>,
+) -> Vec<String> {
+    let mut differences = Vec::new();
+    let stored_numbers = stored.block.verdict_vector_number_of_each_state();
+    let requested_numbers = requested.block.verdict_vector_number_of_each_state();
+    if stored_numbers.len() != requested_numbers.len() {
+        differences.push(format!(
+            "块内状态数：已存那一份 {}、要存那一份 {}",
+            stored_numbers.len(),
+            requested_numbers.len()
+        ));
+    }
+    let describe_items = |items: Vec<&String>| -> String {
+        let named: Vec<String> = items
+            .into_iter()
+            .map(|item| red_item_naming_its_violated_bit(item))
+            .collect();
+        format!("[{}]", named.join("、"))
+    };
+    for (state, (stored_number, requested_number)) in
+        stored_numbers.iter().zip(requested_numbers).enumerate()
+    {
+        if stored_number == requested_number {
+            continue;
+        }
+        match (
+            red_items_of_the_number(*stored_number, &verdict_vector_of_number),
+            red_items_of_the_number(*requested_number, &verdict_vector_of_number),
+        ) {
+            (Ok(stored_items), Ok(requested_items)) => differences.push(format!(
+                "块内第 {state} 个状态的红项：只在已存那一份里的 {}，只在要存那一份里的 {}",
+                describe_items(stored_items.difference(&requested_items).collect()),
+                describe_items(requested_items.difference(&stored_items).collect())
+            )),
+            (stored_items, requested_items) => differences.push(format!(
+                "块内第 {state} 个状态的判定向量：已存那一份 {stored_items:?}、要存那一份 {requested_items:?}"
+            )),
+        }
+    }
+    let violating_states = |conclusion: &StoredConclusionBlock| -> BTreeSet<u64> {
+        conclusion
+            .violations
+            .iter()
+            .map(|violation| violation.offset_in_block.0)
+            .collect()
+    };
+    let (stored_violating, requested_violating) =
+        (violating_states(stored), violating_states(requested));
+    if stored_violating != requested_violating {
+        differences.push(format!(
+            "违例的状态（块内序号）：只在已存那一份里的 {:?}，只在要存那一份里的 {:?}",
+            stored_violating
+                .difference(&requested_violating)
+                .collect::<Vec<_>>(),
+            requested_violating
+                .difference(&stored_violating)
+                .collect::<Vec<_>>()
+        ));
+    }
+    let invariants: BTreeSet<&String> = stored
+        .count_vector
+        .per_invariant
+        .keys()
+        .chain(requested.count_vector.per_invariant.keys())
+        .collect();
+    for invariant in invariants {
+        let stored_counts = stored.count_vector.per_invariant.get(invariant);
+        let requested_counts = requested.count_vector.per_invariant.get(invariant);
+        if stored_counts != requested_counts {
+            differences.push(format!(
+                "计数向量里 {}：已存那一份 {stored_counts:?}、要存那一份 {requested_counts:?}",
+                invariant_naming_its_violated_bit(invariant)
+            ));
+        }
+    }
+    for (what, stored_counts, requested_counts) in [
+        (
+            "观察者",
+            &stored.count_vector.per_observer,
+            &requested.count_vector.per_observer,
+        ),
+        (
+            "按发布分的态数",
+            &stored.count_vector.states_by_publish,
+            &requested.count_vector.states_by_publish,
+        ),
+    ] {
+        let names: BTreeSet<&String> = stored_counts
+            .keys()
+            .chain(requested_counts.keys())
+            .collect();
+        for name in names {
+            let (stored_count, requested_count) =
+                (stored_counts.get(name), requested_counts.get(name));
+            if stored_count != requested_count {
+                differences.push(format!(
+                    "计数向量里{what} {name}：已存那一份 {stored_count:?}、要存那一份 {requested_count:?}"
+                ));
+            }
+        }
+    }
+    match (&stored.recovery_words, &requested.recovery_words) {
+        (Some(stored_words), Some(requested_words)) => {
+            for (state, (stored_state_words, requested_state_words)) in
+                stored_words.iter().zip(requested_words).enumerate()
+            {
+                if stored_state_words != requested_state_words {
+                    differences.push(format!(
+                        "块内第 {state} 个状态的恢复字：已存那一份 {:?}、要存那一份 {:?}",
+                        stored_state_words.0, requested_state_words.0
+                    ));
+                }
+            }
+            if stored_words.len() != requested_words.len() {
+                differences.push(format!(
+                    "恢复字的状态数：已存那一份 {}、要存那一份 {}",
+                    stored_words.len(),
+                    requested_words.len()
+                ));
+            }
+        }
+        (stored_words, requested_words) => {
+            if stored_words.is_some() != requested_words.is_some() {
+                differences.push(format!(
+                    "恢复字：已存那一份{}、要存那一份{}",
+                    if stored_words.is_some() {
+                        "有"
+                    } else {
+                        "没有"
+                    },
+                    if requested_words.is_some() {
+                        "有"
+                    } else {
+                        "没有"
+                    }
+                ));
+            }
+        }
+    }
+    match (
+        &stored.abandoned_roots_named_by_the_pool_checker,
+        &requested.abandoned_roots_named_by_the_pool_checker,
+    ) {
+        (Some(stored_roots), Some(requested_roots)) => {
+            for (state, (stored_state_roots, requested_state_roots)) in
+                stored_roots.iter().zip(requested_roots).enumerate()
+            {
+                if stored_state_roots != requested_state_roots {
+                    differences.push(format!(
+                        "块内第 {state} 个状态点名的被抛弃根：已存那一份 {stored_state_roots:?}、要存那一份 {requested_state_roots:?}"
+                    ));
+                }
+            }
+            if stored_roots.len() != requested_roots.len() {
+                differences.push(format!(
+                    "点名的被抛弃根的状态数：已存那一份 {}、要存那一份 {}",
+                    stored_roots.len(),
+                    requested_roots.len()
+                ));
+            }
+        }
+        (stored_roots, requested_roots) => {
+            if stored_roots.is_some() != requested_roots.is_some() {
+                differences.push(format!(
+                    "点名的被抛弃根：已存那一份{}、要存那一份{}",
+                    if stored_roots.is_some() {
+                        "有"
+                    } else {
+                        "没有"
+                    },
+                    if requested_roots.is_some() {
+                        "有"
+                    } else {
+                        "没有"
+                    }
+                ));
+            }
+        }
+    }
+    differences
+}
+
 /// 结论块属性那一行的值：在哪判的（[`JudgingDevice::to_attribute_bytes`]，前面 4 字节大端记它的长度）、判定日期（4 字节大端长度 + UTF-8）、
 /// 跑法码（1 字节）。
 fn conclusion_block_attribute_bytes(
@@ -1499,6 +1728,16 @@ pub enum VerdictBlockStoring {
     AlreadyStoredIdentically,
 }
 
+/// 同一个（块键，结论种类，版本）下已存的与要存的两份结论差在哪（[`differences_between_two_conclusions`]：块内哪个状态、红项里哪几条连同
+/// 池级 checker 的违例位下标与不变量名、违例的状态、计数向量差的那几行、恢复字、点名的被抛弃根，凡不同的都列，一处一行）与两份各在哪判的。
+/// 装在盒里随错误走：错误类型不跟着变大。
+#[derive(Debug)]
+pub struct DifferencesOfTwoConclusionsUnderOneKey {
+    pub differences: Vec<String>,
+    pub stored_judged_on: JudgingDevice,
+    pub requested_judged_on: JudgingDevice,
+}
+
 /// 存储出的错，按调用方要做的决定分。
 #[derive(Debug)]
 pub enum VerdictStoreError {
@@ -1541,9 +1780,11 @@ pub enum VerdictStoreError {
     /// 这个（块键，结论种类，版本）下已经存着不同的结论（块、违例、计数向量或恢复字不同）：覆盖、拒绝还是另记没定，第一版不支持；
     /// 返回之前什么都没写。结论相同、只有块属性（在哪判的）不同的不是错：留库里先存的那一份，什么都不写
     /// （[`VerdictBlockStoring::AlreadyStoredIdentically`]）。
+    /// 带着两份差在哪与两份各在哪判的（[`DifferencesOfTwoConclusionsUnderOneKey`]）：双机导入撞上时只读报错就定得出差在哪一样。
     DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion {
         block_key: VerdictBlockKey,
         kind: ConclusionKind,
+        differences: Box<DifferencesOfTwoConclusionsUnderOneKey>,
     },
     /// 观察者见证那一批被测试开关拒了（[`VerdictStore::refuse_the_observer_witness_batches_after`]，只有测试打开）：
     /// 当作那一批落盘之前进程就被杀掉，这一批一行都没写。
@@ -3595,6 +3836,7 @@ impl VerdictStore {
                 kind,
                 conclusion_version,
                 &requested,
+                &pending.verdict_vectors_registered_in_the_batch,
             )? {
                 StoredConclusionComparison::StoredIdentically
                 | StoredConclusionComparison::StoredIdenticallyOnAnotherJudgingDevice => {
@@ -3980,6 +4222,7 @@ impl VerdictStore {
             kind,
             conclusion_version,
             &requested,
+            &[],
         )? {
             StoredConclusionComparison::StoredIdentically
             | StoredConclusionComparison::StoredIdenticallyOnAnotherJudgingDevice => {
@@ -4004,8 +4247,11 @@ impl VerdictStore {
     /// `NotStored`；块、违例、计数向量、恢复字与块属性都相同交回 `StoredIdentically`；只有块属性（在哪判的）不同交回
     /// `StoredIdenticallyOnAnotherJudgingDevice`。存块与按计划导入都经它，规矩只在这一处。
     ///
+    /// `verdict_vectors_registered_in_the_pending_batch` 是按计划导入这一趟攒在批里、还没写下去的那几种判定向量（编号接在这个库已登记的后面）：
+    /// 报错时把要存那一份的编号认回红项用；存块那一路是空的。
+    ///
     /// # Errors
-    /// 结论不同（`DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`）；恢复字旁表有这一行而结论块表没有；
+    /// 结论不同（`DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`，带着两份差在哪）；恢复字旁表有这一行而结论块表没有；
     /// 已存的行读回来不合布局；RocksDB 读失败。
     fn stored_conclusion_compared_with(
         &self,
@@ -4013,6 +4259,7 @@ impl VerdictStore {
         kind: &ConclusionKind,
         conclusion_version: &ConclusionVersion,
         requested: &StoredConclusionBlock,
+        verdict_vectors_registered_in_the_pending_batch: &[EncodedVerdictVector],
     ) -> Result<StoredConclusionComparison, VerdictStoreError> {
         if let Some(stored) = self.read_conclusion_block(block_key, kind, conclusion_version)? {
             let is_the_same_conclusion = stored.block == requested.block
@@ -4022,10 +4269,30 @@ impl VerdictStore {
                 && stored.abandoned_roots_named_by_the_pool_checker
                     == requested.abandoned_roots_named_by_the_pool_checker;
             if !is_the_same_conclusion {
+                let verdict_vector_of_number = |number: VerdictVectorNumber| {
+                    let position = number.position_in_the_registration_order();
+                    self.verdict_vector_by_number.get(position).or_else(|| {
+                        position
+                            .checked_sub(self.verdict_vector_by_number.len())
+                            .and_then(|position_in_the_batch| {
+                                verdict_vectors_registered_in_the_pending_batch
+                                    .get(position_in_the_batch)
+                            })
+                    })
+                };
                 return Err(
                     VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion {
                         block_key: block_key.clone(),
                         kind: kind.clone(),
+                        differences: Box::new(DifferencesOfTwoConclusionsUnderOneKey {
+                            differences: differences_between_two_conclusions(
+                                &stored,
+                                requested,
+                                verdict_vector_of_number,
+                            ),
+                            stored_judged_on: stored.judged_on.clone(),
+                            requested_judged_on: requested.judged_on.clone(),
+                        }),
                     },
                 );
             }
@@ -7099,6 +7366,7 @@ mod tests {
                 VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion {
                     block_key,
                     kind,
+                    ..
                 },
             ) => {
                 assert_eq!(block_key, flow_f_block(2), "点名判得不同的那一块");
@@ -7111,6 +7379,120 @@ mod tests {
             entries_before,
             "报错之前攒着的那一批一行都没写"
         );
+    }
+
+    /// 按计划导入撞上本库同键不同的结论时，报错带上两份差在哪：两份只差块内第 1 个状态上一条 I-1.13（扫描重建与遍历方向的索引相同）的违例
+    /// （对方库在 GPU 上判红、本库在 CPU 上判成立，计数向量里 I-1.13 那一行的违例数跟着差一），报错的文本点得出那个状态、那一位的下标与不变量名、
+    /// 计数向量那一行，与两份各在哪判的。判别力：报错不带差异（`crates/mutations.tsv` 那一行），文本里没有这几样。
+    #[test]
+    fn a_planned_import_conflict_names_the_state_the_violated_bit_and_the_count_that_differ() {
+        let scan_rebuild_invariant =
+            singlefs_checker::image::SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX;
+        let scan_rebuild_red_item = format!(
+            "{}:{scan_rebuild_invariant}",
+            crate::crash::CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER
+        );
+        let count_vector_violated_on = |violated_states: u64| BlockCountVector {
+            per_invariant: BTreeMap::from([(
+                scan_rebuild_invariant.to_string(),
+                InvariantStateCounts {
+                    judged: 2,
+                    violated: violated_states,
+                    not_applicable: 0,
+                },
+            )]),
+            per_observer: BTreeMap::new(),
+            states_by_publish: BTreeMap::new(),
+        };
+        let block_key = block_key_named("planned-import-conflict-difference", 0);
+        let other_directory =
+            TemporaryLibraryDirectory::new("planned-import-conflict-difference-other");
+        let mut other = VerdictStore::create_empty(&other_directory.path).expect("建库");
+        let other_clean = other
+            .register_verdict_vector(
+                &crate::crash_judge_conclusions::encoded_verdict_of_the_red_items(&[]),
+            )
+            .expect("登记");
+        let other_red = other
+            .register_verdict_vector(
+                &crate::crash_judge_conclusions::encoded_verdict_of_the_red_items(
+                    std::slice::from_ref(&scan_rebuild_red_item),
+                ),
+            )
+            .expect("登记");
+        store_conclusion_in_the_test_library(
+            &mut other,
+            &block_key,
+            &ConclusionKind::ImageJudgement,
+            &JUDGEMENT_CONCLUSION_VERSION,
+            &ConclusionBlockRecord {
+                block: block_of(&[other_clean, other_red]),
+                violating_states: vec![StateOffsetInBlock(1)],
+                count_vector: count_vector_violated_on(1),
+                judged_on: JudgingDevice::Gpu {
+                    card_type: "probe card".to_string(),
+                    driver_version: "probe driver 1".to_string(),
+                    gpu_judge_units_fingerprint: [7; SHA256_DIGEST_BYTES],
+                },
+                recovery_words: Some(recovery_words_of(2)),
+            },
+        );
+        let local_directory =
+            TemporaryLibraryDirectory::new("planned-import-conflict-difference-local");
+        let mut local = VerdictStore::create_empty(&local_directory.path).expect("建库");
+        let local_clean = local
+            .register_verdict_vector(
+                &crate::crash_judge_conclusions::encoded_verdict_of_the_red_items(&[]),
+            )
+            .expect("登记");
+        store_conclusion_in_the_test_library(
+            &mut local,
+            &block_key,
+            &ConclusionKind::ImageJudgement,
+            &JUDGEMENT_CONCLUSION_VERSION,
+            &ConclusionBlockRecord {
+                block: block_of(&[local_clean, local_clean]),
+                violating_states: Vec::new(),
+                count_vector: count_vector_violated_on(0),
+                judged_on: JudgingDevice::Cpu,
+                recovery_words: Some(recovery_words_of(2)),
+            },
+        );
+        let planned = PlannedImportKeys {
+            conclusions: vec![(
+                block_key,
+                ConclusionKind::ImageJudgement,
+                JUDGEMENT_CONCLUSION_VERSION,
+            )],
+            paths: Vec::new(),
+            verifier_blocks: Vec::new(),
+        };
+        let refused = local.import_the_planned_rows_from(&other, &planned);
+        assert!(
+            matches!(
+                refused,
+                Err(VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion { .. })
+            ),
+            "本库同键已有不同的结论应当报错：{refused:?}"
+        );
+        let text = format!("{refused:?}");
+        let scan_rebuild_bit = singlefs_checker::image::IMPLEMENTED_INVARIANTS
+            .iter()
+            .position(|candidate| *candidate == scan_rebuild_invariant)
+            .expect("I-1.13 在池级 checker 的清单里");
+        for expected in [
+            format!("块内第 1 个状态的红项：只在已存那一份里的 []，只在要存那一份里的 [{scan_rebuild_red_item}（违例位下标 {scan_rebuild_bit}）]"),
+            "违例的状态（块内序号）：只在已存那一份里的 []，只在要存那一份里的 [1]".to_string(),
+            format!("计数向量里 {scan_rebuild_invariant}（违例位下标 {scan_rebuild_bit}）"),
+            "stored_judged_on: Cpu".to_string(),
+            "requested_judged_on: Gpu".to_string(),
+        ] {
+            assert!(
+                text.contains(&expected),
+                "报错里点得出「{expected}」：{text}"
+            );
+        }
+        assert!(!text.contains("恢复字"), "两份的恢复字相同，不列：{text}");
     }
 
     /// 一批攒到一个字节就同步写：放完一块一种结论（或一个核对行、一份事实）就换一批，几百字节的库也走多批。

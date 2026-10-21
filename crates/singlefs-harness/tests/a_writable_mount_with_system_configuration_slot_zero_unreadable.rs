@@ -1,10 +1,10 @@
 //! 系统配置见证读取 R2（C331（择根倒挂压过已确认的写），D22（单元原子性怎么合成） 已定项 8 射程，用户 2026-10-03 定「改取 R2」）在
 //! 槽 0（偶数世代）那一侧的可写挂载与取号（遗留改动代码轮判决 `research/prompts/m3-leftover-code-r1-main-verification.md` 第三节 LR1）。
 //!
-//! 新池新建文件之后每块盘两槽是世代 4（槽 0）、世代 5（槽 1）；再可写挂载一次，系统配置轮换两次（世代 7 落在槽 1、世代 8 落在槽 0），
-//! 最新的世代 8，8 mod 2 = 0，在槽 0。
-//! `system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both.rs` 里写坏的都是世代 5
-//! 那一槽（槽 1）：见证读与取号只看每块盘的槽 1 的错实现在那几条上全过（攻方变异 slot1-only-both）。这里写坏的是最新的世代 8 那一槽（槽 0）：
+//! 新池新建文件之后每块盘两槽是世代 5（槽 1）、世代 6（槽 0）；再可写挂载一次，取号两轮写世代 7、8，系统配置再轮换两次（世代 9 落在槽 1、
+//! 世代 10 落在槽 0），最新的世代 10，10 mod 2 = 0，在槽 0。
+//! `system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both.rs` 里写坏的都是槽 1：
+//! 见证读与取号只看每块盘的槽 1 的错实现在那几条上全过（攻方变异 slot1-only-both）。这里写坏的是最新的世代 10 那一槽（槽 0）：
 //! - 两块盘槽 0 都报读错：有槽报读错、没有一块盘两槽都自证过 ⇒ 判不出，可写挂载重读一次仍判不出、取号之前拒，取号那一刻也拒；
 //! - 盘 0 槽 0 读回全零（撕裂的轮换）、盘 1 槽 0 报读错：报读错的是第二块盘，同样判不出、拒可写；
 //! - 读阶段两槽都读得出、到取号之前的逐盘核那一遍盘 1 两槽才读不出（两次读之间的瞬时读错）：逐盘核交 `Err(盘 1)`，以「读阶段判完之后
@@ -33,8 +33,8 @@ use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_core::transaction::{acquire_instance, InstanceAcquisitionFailed, PoolWriter};
 use singlefs_format::{SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, SYSTEM_CONFIGURATION_SLOT_BYTES};
 
-/// 新池新建文件之后可写挂载一次、系统配置轮换两次之后最新的世代号（新池新建文件那次是 5）：落在槽 8 mod 2 = 0。
-const NEWEST_GENERATION_AFTER_THE_WRITABLE_MOUNT: u64 = 8;
+/// 新池新建文件之后可写挂载一次（取号两轮、之后系统配置轮换两次）之后最新的世代号（新池新建文件那次是 6）：落在槽 10 mod 2 = 0。
+const NEWEST_GENERATION_AFTER_THE_WRITABLE_MOUNT: u64 = 10;
 
 const DEVICE_ZERO: DeviceIdentity = DeviceIdentity(0);
 const DEVICE_ONE: DeviceIdentity = DeviceIdentity(1);
@@ -43,7 +43,7 @@ fn slot_spacing_in_bytes() -> u64 {
     u64::from(parameters().geometry.fixed_structure_slot_spacing)
 }
 
-/// 最新的世代 8 那一槽在盘上的偏移：槽 0。
+/// 最新的世代 10 那一槽在盘上的偏移：槽 0。
 fn offset_of_the_newest_slot() -> u64 {
     (NEWEST_GENERATION_AFTER_THE_WRITABLE_MOUNT % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
         * slot_spacing_in_bytes()
@@ -65,8 +65,8 @@ fn self_verified_generation_at(
     .map(|system_configuration| system_configuration.quantities.slot_generation)
 }
 
-/// 新池新建文件之后照常可写挂载一次（取到实例 2，系统配置轮换两次：世代 7 进每块盘的槽 1、世代 8 进槽 0），会话随即丢掉（进程退出）。
-/// 交回之前核这一形：每块盘槽 0 是世代 8、槽 1 是世代 7——最新的那一槽是槽 0。
+/// 新池新建文件之后照常可写挂载一次（取到实例 2，取号两轮写世代 7、8，系统配置再轮换两次：世代 9 进每块盘的槽 1、世代 10 进槽 0），
+/// 会话随即丢掉（进程退出）。交回之前核这一形：每块盘槽 0 是世代 10、槽 1 是世代 9——最新的那一槽是槽 0。
 fn pool_whose_newest_system_configuration_slot_is_slot_zero(tag: &str) -> BuiltPool {
     let mut pool = build_pool(tag);
     let mut devices = pool.reopen_recorded();
@@ -85,13 +85,13 @@ fn pool_whose_newest_system_configuration_slot_is_slot_zero(tag: &str) -> BuiltP
                 Some(NEWEST_GENERATION_AFTER_THE_WRITABLE_MOUNT),
                 Some(NEWEST_GENERATION_AFTER_THE_WRITABLE_MOUNT - 1)
             ),
-            "盘 {device:?}：槽 0 是最新的世代 8、槽 1 是世代 7"
+            "盘 {device:?}：槽 0 是最新的世代 10、槽 1 是世代 9"
         );
     }
     pool
 }
 
-/// `device` 最新的世代 8 那一槽（槽 0），每次读都报读错。
+/// `device` 最新的世代 10 那一槽（槽 0），每次读都报读错。
 fn slot_zero_reporting_a_read_error_on(device: DeviceIdentity) -> UnreadableRange {
     UnreadableRange {
         device,
@@ -138,7 +138,7 @@ fn describe(outcome: &Result<Mounted, MountError>) -> String {
     }
 }
 
-/// 场景：最新的系统配置在槽 0（世代 8），两块盘的槽 0 都报读错。
+/// 场景：最新的系统配置在槽 0（世代 10），两块盘的槽 0 都报读错。
 /// 预期：有槽报读错、没有一块盘两槽都自证过 ⇒ 判不出，重读一次仍判不出，取号之前拒可写；系统配置槽、根环、录制流步数都不变；只读挂载照常。
 /// 判别力：见证读与取号只看每块盘的槽 1 的错实现看不见槽 0 的读错、两槽算一槽，判得出、照常挂上取到实例 3。
 #[test]

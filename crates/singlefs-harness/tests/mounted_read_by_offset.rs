@@ -399,6 +399,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
         size: declared_file_size_in_bytes.unwrap_or(file_size),
         change_count: SYNTHETIC_TXG.0,
         write_time_seconds: common::FIXED_WRITE_TIME_SECONDS,
+        truncation_field: singlefs_core::records::InodeRecordTruncationField::NOT_WRITTEN,
     };
     let container_identity = PackedIdentity {
         birth_tree: TreeIdentifier(TREE_IDENTIFIER_INODE),
@@ -576,6 +577,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
                 instance: SYNTHETIC_INSTANCE,
                 birth_sequence: extent_root_sequence,
             },
+            previous_snapshot_txg: CheckpointTxg(0),
             birth_txg: SYNTHETIC_TXG,
             head_identifier: 0,
         }
@@ -592,6 +594,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
                 instance: SYNTHETIC_INSTANCE,
                 birth_sequence: inode_root_sequence,
             },
+            previous_snapshot_txg: CheckpointTxg(0),
             birth_txg: SYNTHETIC_TXG,
             head_identifier: 0,
         }

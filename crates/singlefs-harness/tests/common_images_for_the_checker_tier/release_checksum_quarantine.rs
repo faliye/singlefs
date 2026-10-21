@@ -1,18 +1,25 @@
 //! harness 测试文件 `crates/singlefs-harness/tests/release_checksum_quarantine.rs` 的场景函数：搭场景、核实现的行为，池级 checker 要判的镜像经 [`PoolCheckerImages`] 交出去
 //! （做法见 `common_images_for_the_checker_tier/mod.rs`）。harness 档那份测试文件与 checker 档的
 //! `crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs` 各经 `#[path]` 引这一份。
+//! [`a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup`] 在 harness 档那一侧的同名用例住在
+//! `crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs`（I-3.15 的合法世界与必红世界都在那一份），它收下这里交的镜像就地判。
 #![allow(dead_code, reason = "两档各只调其中一部分")]
 
 use crate::common::{
-    build_pool, parameters, publish_overwrite_in_process, BuiltPool, Recorded,
-    FIXED_WRITE_TIME_SECONDS,
+    build_pool, file_content, overwrite_in_process_as_instance_one_and_advance_the_pool,
+    parameters, publish_overwrite_in_process, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS,
 };
 use crate::common_images_for_the_checker_tier::{PoolCheckerExpectation, PoolCheckerImages};
 use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+    SlotNumber,
 };
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::mount::{raise_rollback_floor, ShadowLedger};
+use singlefs_core::transaction::{QuarantinedCopyReading, TransactionUnit};
+
+/// 单元头所在的那一个扇区（码 1 的明文头 105 字节在里面）：写零之后 magic 与头校验和都没了，单元头用不了。
+const UNIT_HEADER_SECTOR_BYTES: usize = 512;
 
 pub fn content_of(length: usize, seed: usize) -> Vec<u8> {
     (0..length)
@@ -241,6 +248,67 @@ pub fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_ag
         "隔离的那两份是一个完整的别的单元",
         || image.clone(),
         PoolCheckerExpectation::only_the_named_invariants()
+            .and_holds("I-3.1")
+            .and_holds("I-3.11"),
+    );
+}
+
+/// 合法世界「写者隔离了一份头用不了的单元」（判决 `research/prompts/m4-i315-r1-main-verification.md` 第三节 C1「乙二」，调查员那一形）：
+/// 新池新建文件之后，数据单元盘 1 那一份的头扇区写零（单元头用不了）；覆盖写换下它时写者释放之前读盘核出盘 1 那一份对不上，
+/// 两块盘上那两条记录一起留在已分配（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1），覆盖写那一版的映射里没有 key 指着那一槽。
+/// 隔离判据读这一单元每块盘的那一份，盘 1 那一份对不上位置项，这个单元是隔离的单元：I-3.15 成立；I-3.1、I-3.11 照它们那一份隔离判据也成立。
+/// 组只取头用得了的那一份（改之前的读法）时盘 0 那一份对得上位置项，I-3.15 红。
+/// GPU 与 CPU 对拍罩这一形：组里读不读头用不了、没打对不上映射记号的那一份，扫描内核与 `walk.rs` 各写一份，这一张镜像上两边分得开。
+pub fn a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup(
+    images: &mut PoolCheckerImages,
+) {
+    let mut pool = build_pool("release-checksum-quarantined-unit-with-an-unusable-header");
+    let old_slot = pool
+        .output
+        .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+        .slot;
+    {
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        let (_, device_one) = devices
+            .iter_mut()
+            .find(|(identity, _)| *identity == DeviceIdentity(1))
+            .expect("池里有盘 1");
+        device_one
+            .write_at(
+                old_slot.to_device_offset(),
+                &[0u8; UNIT_HEADER_SECTOR_BYTES],
+                WriteDurability::Plain,
+            )
+            .expect("盘 1 那一份的头扇区写零");
+    }
+    let mut overwritten_content = file_content();
+    overwritten_content[0] ^= 0xff;
+    let overwrite =
+        overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &overwritten_content);
+    assert_ne!(
+        overwrite
+            .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+            .slot,
+        old_slot,
+        "覆盖写把数据单元写到了别的槽"
+    );
+    assert!(
+        overwrite
+            .quarantined_after_release_checksum_mismatch
+            .iter()
+            .any(|copy| copy.device == DeviceIdentity(1)
+                && copy.placement.slot == old_slot
+                && copy.reading == QuarantinedCopyReading::ChecksumMismatch),
+        "写者释放之前核出盘 1 那一份对不上、隔离了它：{:?}",
+        overwrite.quarantined_after_release_checksum_mismatch
+    );
+    let image = pool.memory_pool();
+    // I-3.15、I-3.1、I-3.11：隔离的单元（盘 1 那一份头用不了、覆盖写那一版没有 key 指着那一槽）不判红
+    images.hand_out(
+        "盘 1 那一份头用不了、覆盖写那一版没有 key 指着那一槽",
+        || image.clone(),
+        PoolCheckerExpectation::only_the_named_invariants()
+            .and_holds("I-3.15")
             .and_holds("I-3.1")
             .and_holds("I-3.11"),
     );

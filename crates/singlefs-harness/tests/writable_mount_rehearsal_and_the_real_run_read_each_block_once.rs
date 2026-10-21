@@ -812,9 +812,10 @@ fn without_faults_the_mount_writes_the_same_bytes_per_publish_as_before_the_read
         vec![213_504, 213_504],
         "续做推的抬 F 每一次空发布写的字节数与改之前相同"
     );
+    // 取号写两轮（甲'）之后每块盘多一次 4096 字节的系统配置槽写：3 766 784 → 3 770 880、3 763 712 → 3 767 808。
     for (device, written_bytes_before_the_reads_were_shared) in [
-        (DeviceIdentity(0), 3_766_784_u64),
-        (DeviceIdentity(1), 3_763_712_u64),
+        (DeviceIdentity(0), 3_770_880_u64),
+        (DeviceIdentity(1), 3_767_808_u64),
     ] {
         assert_eq!(
             unarmed.counts_of_device(device).written_bytes,

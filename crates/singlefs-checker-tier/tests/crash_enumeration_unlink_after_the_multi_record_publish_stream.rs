@@ -20,8 +20,8 @@
 //! 两批（12、11 个单元）、最后一批（12 个单元：inode 叶容器删空不写，退役树开第一片容器、写根）各自的单元段、记录段、根槽写与之后的系统配置槽轮换第一次被枚举到；
 //! 多跑的一步是每个状态上的可写挂载（取号、写行、暖机、续做），与挂完的盘上那一遍池级 checker。
 //!
-//! 快档只展开写数小于 10 的段（七个单元段不展开，只以整段持久进入后面的状态）；全量标 ignored（崩溃点重放的枚举域 1463812278 个状态，
-//! 七个单元段占 1463812089；每次写只取两态时的闭式 1463812228），登记成崩溃枚举用例，带断点续跑、可双机分片（与多记录流同一个入口）。
+//! 快档只展开写数小于 10 的段（七个单元段不展开，只以整段持久进入后面的状态）；全量标 ignored（崩溃点重放的枚举域 1463812286 个状态，
+//! 七个单元段占 1463812089；每次写只取两态时的闭式 1463812231），登记成崩溃枚举用例，带断点续跑、可双机分片（与多记录流同一个入口）。
 //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -264,10 +264,9 @@ fn prepare(tag: &str) -> Prepared {
     assert_eq!(
         sizes,
         vec![
-            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2,
-            22, 2, 1, 2, 24, 2, 1, 2
+            2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 22, 2, 1, 2, 24, 2, 1, 2
         ],
-        "前十九段同多记录流；之后意图那次 26 个单元写（13 个单元两盘各一份）、记录 2、根 1、轮换 2；两批 24、22 个单元写；\
+        "前二十段同多记录流（取号两轮各一段）；之后意图那次 26 个单元写（13 个单元两盘各一份）、记录 2、根 1、轮换 2；两批 24、22 个单元写；\
          最后一批 24 个单元写（12 个单元：extent 根、inode 根、分配记录树五个节点、记账树、退役容器与退役树根、映射树、树表）；\
          各自记录 2、根 1、轮换 2"
     );
@@ -570,8 +569,8 @@ fn every_crash_state_of_an_unlink_after_the_multi_record_publish_recovers_to_the
         .collect();
     assert_eq!(
         closed_form_state_count(&expanded),
-        1 + 10 * 3 + 7 * 3 + 9 + 15 + 63,
-        "每次写只取两态时展开的段按闭式数：1 + 十个系统配置槽 2 写段各 3 + 七个记录 2 写段各 3 + 九个 1 写段各 1 + 4 写段 15 + 6 写段 63"
+        1 + 11 * 3 + 7 * 3 + 9 + 15 + 63,
+        "每次写只取两态时展开的段按闭式数：1 + 十一个系统配置槽 2 写段（取号两轮、九次轮换）各 3 + 七个记录 2 写段各 3 + 九个 1 写段各 1 + 4 写段 15 + 6 写段 63"
     );
     assert_eq!(
         tally.states,
@@ -585,8 +584,8 @@ fn every_crash_state_of_an_unlink_after_the_multi_record_publish_recovers_to_the
     );
     assert_eq!(
         tally.states,
-        1 + 10 * (3 * 3 - 1) + 7 * 3 + 9 + 15 + 63,
-        "1 + 十个系统配置槽 2 写段各 3² − 1 + 七个记录 2 写段各 3 + 九个 1 写段各 1 + 4 写段 15 + 6 写段 63"
+        1 + 11 * (3 * 3 - 1) + 7 * 3 + 9 + 15 + 63,
+        "1 + 十一个系统配置槽 2 写段各 3² − 1 + 七个记录 2 写段各 3 + 九个 1 写段各 1 + 4 写段 15 + 6 写段 63"
     );
     assert_eq!(
         tally.observed_states, tally.states,
@@ -654,17 +653,17 @@ fn the_unlink_stream_quick_tier_counts_the_same_when_rerun_from_the_library() {
     );
 }
 
-/// 全量：35 段。七个单元段各 2^n − 1（n = 26、24、22、24 是删除那四次），每个状态两遍恢复 + checker，逐状态核发布边界、删除的中间态，
+/// 全量：36 段。七个单元段各 2^n − 1（n = 26、24、22、24 是删除那四次），每个状态两遍恢复 + checker，逐状态核发布边界、删除的中间态，
 /// 并在工作线程上可写挂载一次核续做走到空。登记成崩溃枚举用例，checker-tier-crash-point-replay 认下面打印的
 /// `CRASH_POINT_REPLAY_UNLINK_AFTER_MULTI_RECORD` 行里 `exhaustive=true`；带断点续跑、可双机分片（同多记录流）。
 #[test]
-#[ignore = "全量 1463812278 个状态（十四亿多）、每个两遍恢复 + checker + 一次可写挂载；门禁 checker-tier-crash-point-replay --full 在 release 下跑，带断点续跑、可双机分片"]
+#[ignore = "全量 1463812286 个状态（十四亿多）、每个两遍恢复 + checker + 一次可写挂载；门禁 checker-tier-crash-point-replay --full 在 release 下跑，带断点续跑、可双机分片"]
 fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhaustive_and_clean() {
     let prepared = prepare("unlink-after-multi-record-crash-point-replay-full");
     let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);
     assert_eq!(
         closed_form_with_two_states_per_write,
-        1 + 10 * 3
+        1 + 11 * 3
             + 7 * 3
             + 9
             + ((1 << 24) - 1)
@@ -676,9 +675,9 @@ fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhau
             + ((1 << 24) - 1)
             + ((1 << 22) - 1)
             + ((1 << 24) - 1),
-        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，三十五段"
+        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，三十六段"
     );
-    assert_eq!(closed_form_with_two_states_per_write, 1_463_812_228);
+    assert_eq!(closed_form_with_two_states_per_write, 1_463_812_231);
     let closed_form = crash_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
@@ -687,7 +686,7 @@ fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhau
     );
     assert_eq!(
         closed_form,
-        1 + 10 * (3 * 3 - 1)
+        1 + 11 * (3 * 3 - 1)
             + 7 * 3
             + 9
             + ((1 << 24) - 1)
@@ -699,9 +698,9 @@ fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhau
             + ((1 << 24) - 1)
             + ((1 << 22) - 1)
             + ((1 << 24) - 1),
-        "枚举域的闭式：十个系统配置槽 2 写段各 3² − 1、七个记录 2 写段各 3、九个 1 写段、七个单元段各 2^n − 1、4 写段 15、6 写段 63"
+        "枚举域的闭式：十一个系统配置槽 2 写段（取号两轮、九次轮换）各 3² − 1、七个记录 2 写段各 3、九个 1 写段、七个单元段各 2^n − 1、4 写段 15、6 写段 63"
     );
-    assert_eq!(closed_form, 1_463_812_278);
+    assert_eq!(closed_form, 1_463_812_286);
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
                    report: &RecoveryReport,

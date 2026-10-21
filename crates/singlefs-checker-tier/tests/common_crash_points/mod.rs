@@ -21,14 +21,16 @@ use singlefs_core::address::CheckpointTxg;
 use singlefs_core::address::{InodeNumber, InstanceGeneration};
 #[cfg(feature = "verdict-store")]
 use singlefs_core::mount::{
-    mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, Mounted,
-    RaisedFloor, RollbackTarget, ShadowLedger, UnmountRaisedTheFloor, Unmounted,
+    mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, RaisedFloor,
+    RollbackTarget, ShadowLedger, UnmountRaisedTheFloor, Unmounted,
 };
+use singlefs_core::mount::{MountOutput, Mounted};
+use singlefs_core::mounted_session::{MountedSession, UserChange, UserChangeRefused};
 #[cfg(feature = "verdict-store")]
-use singlefs_core::transaction::{publish_overwrite, PoolVersion};
+use singlefs_core::transaction::publish_overwrite;
 use singlefs_core::transaction::{
-    publish_sequential_write, publish_unlink_intent, publish_unlink_step, FirstFile, PoolWriter,
-    TransactionOutput, FIRST_INODE_NUMBER,
+    publish_sequential_write, publish_unlink_intent, publish_unlink_step, FirstFile, PoolVersion,
+    PoolWriter, PublishError, TransactionOutput, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_harness::scenario::deletion_history_batch_size;
@@ -180,6 +182,79 @@ pub fn publish_the_next_unlink_step(pool: &mut BuiltPool) -> TransactionOutput {
     output
 }
 
+// ============================== 固定脚本到 E 之后经会话 unlink 第一个文件（里程碑三三·4） ==============================
+// 固定脚本（取号 → 暖机 → A → B → 重开可写挂载 → C → 回退 D → 五次覆盖写 → 抬 F → E）那几步照旧由上面那几个 `*_step` 设点，
+// 这一步接在 E 后面、设点也在这一份：节点 `publish_unlink_through_the_session.<周期>.<步>` 归这一份文件。
+
+/// 经会话 unlink 第一个文件那一次调用发成的每一版（意图、各批、最后一批，按先后），与发完那几版之后会话交回的发布路径的拒绝（没有是 `None`）。
+pub struct UnlinkThroughTheSession {
+    pub versions_published: Vec<TransactionOutput>,
+    pub refusal_after_the_versions_published: Option<PublishError>,
+}
+
+/// 经会话入口 unlink 第一个文件（`UserChange::Unlink`：先把现行那一版的队列走空、发意图、再把队列走空，D8（核心索引结构） 已定项 16 第 6 条）：
+/// 会话接在 `mount_output` 那一次可写挂载后面（固定脚本 B 之后重开的那一次，同一个实例），现行那一版是池上现在那一版（固定脚本的 E），
+/// 分配器是池上现在那一份（带着那次挂载装上的删除开关，产品批大小）。发完把池的现行版本与分配器换成会话的。
+/// 发布路径的拒绝（`UserChangeRefused::Publish`）不在这里断言：被拒之前发成的那几版已落盘、交回在这里，接着照录。改坏「最后一批与删意图同事务」
+/// （D8（核心索引结构） 已定项 5）时最后一批之后号还留在队列里，走空再发一步被拒，录下来的流红在判器上（池级 checker I-9.5），不红在搭建上。
+///
+/// # Panics
+/// 会话交回发布路径之外的拒绝（盘表、可见、本盘设备号、落后、空间不够），或发完之后会话的现行那一版没有树。
+pub fn unlink_the_first_file_through_the_session(
+    pool: &mut BuiltPool,
+    mount_output: MountOutput,
+) -> UnlinkThroughTheSession {
+    let (_mount_output, mut session) = MountedSession::of_the_mount(Mounted {
+        output: mount_output,
+        allocator: pool.allocator.clone(),
+        current: PoolVersion::WithFile(pool.output.clone()),
+    });
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let unlinked = session.publish_user_change(
+        devices,
+        UserChange::Unlink {
+            inode: UNLINKED_FILE,
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS
+                + SECONDS_FROM_THE_SEQUENTIAL_WRITES_TO_THE_INTENT,
+        },
+    );
+    let through_the_session = match unlinked {
+        Ok(published) => UnlinkThroughTheSession {
+            versions_published: published.versions_published,
+            refusal_after_the_versions_published: None,
+        },
+        Err(UserChangeRefused::Publish {
+            cause,
+            versions_published,
+            ..
+        }) => UnlinkThroughTheSession {
+            versions_published,
+            refusal_after_the_versions_published: Some(cause),
+        },
+        Err(refusal) => panic!("会话 unlink 第一个文件被拒在发布路径之外：{refusal:?}"),
+    };
+    pool.allocator = session.allocator;
+    pool.output = match session.current {
+        PoolVersion::WithFile(current) | PoolVersion::WithTreesAndNoFile(current) => current,
+        PoolVersion::WithoutFile(_) => {
+            panic!("会话 unlink 之后现行那一版有树（意图那一版起每一版都有树），实际树表 0 条")
+        }
+    };
+    through_the_session
+}
+
+/// [`unlink_the_first_file_through_the_session`] 设一个崩溃点（设点文件是这一份），接在固定脚本 E 那一步后面。
+#[cfg(feature = "verdict-store")]
+pub fn unlink_the_first_file_through_the_session_step(
+    recorder: &mut CrashPointRecorder,
+    pool: &mut BuiltPool,
+    mount_output: MountOutput,
+) -> UnlinkThroughTheSession {
+    recorder.step(file!(), "publish_unlink_through_the_session", || {
+        unlink_the_first_file_through_the_session(pool, mount_output)
+    })
+}
+
 // ============================== 挂在标准前缀上的观察者：登记表（崩溃点重放合并第三轮判决 J4） ==============================
 
 /// 挂在标准前缀节点上的观察者（封闭的一张：加一种就加一个成员，`common_crash_point_observers::amplify_a_flow_through_the_standard_prefix`
@@ -218,6 +293,111 @@ pub static OBSERVERS_ON_THE_STANDARD_PREFIX: &[(&str, &[ObserverOfTheStandardPre
         &[ObserverOfTheStandardPrefix::WritableMountAndContinuation],
     ),
 ];
+
+// ============================== 标准前缀之后的几步：快照、整理、生命周期闭环（里程碑四一·4、二·3、三·1） ==============================
+// 几条快照流、两条整理流与生命周期闭环流在 A 之后各接几步，每一步的入口名照下面这几个（快照那几步的入口名住在 harness 档的
+// `common_snapshot_prefix::SnapshotFlowStepKind::entry_name`，整理与闭环那几步住在 `common_compaction_prefix::CompactionFlowStepKind::entry_name`）；
+// 设点都在这一份（[`crash_points_of_a_flow_after_the_first_file`]），几条流里同一个入口录出逐字节相同的那一段就是同一个节点、共享判定。
+
+/// 挂在快照那几步节点上的观察者（封闭的一张：加一种就加一个成员，`common_snapshot_crash_point_observers::amplify_a_snapshot_flow` 里的
+/// `match` 跟着补）。观察者的代码在 `tests/common_snapshot_crash_point_observers/mod.rs`，这一份只登记名字（同标准前缀那一张的口径：观察者代码
+/// 不进这份设点文件出发的 CPU 判器版本）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObserverOfTheSnapshotSteps {
+    /// 每个状态上读恢复落到的那一版的每个活快照，读出的要是建它那一刻的内容（只记计数）。
+    SnapshotOfTheLandedVersion,
+    /// 每个状态上可写挂载一次、续做把 unlink 与删快照走到空，挂完之后快照这几样与录流时同一串删除的最后一批那一版逐项相同；挂完的盘过池级 checker。
+    MountContinuationUnderASnapshot,
+}
+
+impl ObserverOfTheSnapshotSteps {
+    /// 观察者的名字：进它的结论种类（`ConclusionKind::Observer`）、计数与判红那一项；崩溃点重放那一路的同一个观察者也用这个名字。
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::SnapshotOfTheLandedVersion => "snapshot_of_the_landed_version",
+            Self::MountContinuationUnderASnapshot => "mount_continuation_under_a_snapshot",
+        }
+    }
+}
+
+/// 快照那几步的节点 → 挂的观察者（入口名与 `common_snapshot_prefix::SnapshotFlowStepKind::entry_name` 逐个相同，
+/// `common_snapshot_crash_point_observers::amplify_a_snapshot_flow` 开跑前核）。几条快照流经过哪几个就照表跑哪几个上的观察者。
+pub static OBSERVERS_ON_THE_SNAPSHOT_STEPS: &[(&str, &[ObserverOfTheSnapshotSteps])] = &[
+    (
+        "publish_create_snapshot",
+        &[
+            ObserverOfTheSnapshotSteps::SnapshotOfTheLandedVersion,
+            ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot,
+        ],
+    ),
+    (
+        "publish_overwrite_under_the_snapshot",
+        &[
+            ObserverOfTheSnapshotSteps::SnapshotOfTheLandedVersion,
+            ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot,
+        ],
+    ),
+    (
+        "publish_unlink_intent_under_the_snapshot",
+        &[
+            ObserverOfTheSnapshotSteps::SnapshotOfTheLandedVersion,
+            ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot,
+        ],
+    ),
+    (
+        "publish_unlink_step_under_the_snapshot",
+        &[
+            ObserverOfTheSnapshotSteps::SnapshotOfTheLandedVersion,
+            ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot,
+        ],
+    ),
+    (
+        "publish_snapshot_destruction_intent",
+        &[
+            ObserverOfTheSnapshotSteps::SnapshotOfTheLandedVersion,
+            ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot,
+        ],
+    ),
+    (
+        "publish_snapshot_destruction_step",
+        &[
+            ObserverOfTheSnapshotSteps::SnapshotOfTheLandedVersion,
+            ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot,
+        ],
+    ),
+];
+
+/// A 之后各步的崩溃点（节点按 `<流程>.<周期>.<步>` 编码，`crash_amplification::CrashPointRecorder`）：取号加暖机、新池新建文件两段照标准前缀设，
+/// 之后每一步按 `entries_after_the_first_file`（入口名、它发出的那段录制流，首尾相接、接在 A 之后、罩到流尾）设，设点文件都是这一份——
+/// 快照那几步、整理那几步、生命周期闭环那几步的节点在几条流之间共享（里程碑四一·4 交判第 2 条）。流已经录完，按每一步记下的区间补记。
+#[cfg(feature = "verdict-store")]
+pub fn crash_points_of_a_flow_after_the_first_file(
+    pool: &BuiltPool,
+    entries_after_the_first_file: &[(&str, std::ops::Range<usize>)],
+    writes: &[singlefs_harness::memory_pool::RetainedWrite],
+    segments: &[Vec<usize>],
+    stream_indexes: &[usize],
+) -> Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan> {
+    let mut recorder = CrashPointRecorder::new(pool.stream.clone(), pool.mkfs_operation_count);
+    let start_of_the_steps_after_the_first_file = entries_after_the_first_file.first().map_or(
+        pool.stream.operation_count(),
+        |(_entry_name, operations)| operations.start,
+    );
+    recorder.record_span(
+        file!(),
+        "acquire_instance_and_warm_up",
+        pool.mkfs_operation_count..pool.warm_up_operation_count,
+    );
+    recorder.record_span(
+        file!(),
+        "publish_first_file",
+        pool.warm_up_operation_count..start_of_the_steps_after_the_first_file,
+    );
+    for (entry_name, operations) in entries_after_the_first_file {
+        recorder.record_span(file!(), entry_name, operations.clone());
+    }
+    recorder.into_crash_points(writes, segments, stream_indexes)
+}
 
 /// `build_pool` 已经发出去的两段：取号加暖机、新池新建文件。
 #[cfg(feature = "verdict-store")]

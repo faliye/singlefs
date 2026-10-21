@@ -180,12 +180,16 @@ fn a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_w
             .collect(),
     );
 
-    // 盘上已落的：取号（两盘各一次系统配置槽写 + 屏障），零单元发布的空记录（两盘镜像）+ 屏障、根槽 FUA（txg 1 → 区域 1 → 盘 1）、
+    // 盘上已落的：取号两轮（每轮两盘各一次系统配置槽写 + 屏障），零单元发布的空记录（两盘镜像）+ 屏障、根槽 FUA（txg 1 → 区域 1 → 盘 1）、
     // 两盘的轮换，再是盘 0 那一道屏障；盘 1 那一道报错、没进录制流。
     let steps = steps_after_the_mkfs(&pool.stream.operations(), pool.mkfs_operation_count);
     assert_eq!(
         steps,
         vec![
+            (DeviceIdentity(0), StepKind::SystemConfigurationSlot),
+            (DeviceIdentity(1), StepKind::SystemConfigurationSlot),
+            (DeviceIdentity(0), StepKind::Barrier),
+            (DeviceIdentity(1), StepKind::Barrier),
             (DeviceIdentity(0), StepKind::SystemConfigurationSlot),
             (DeviceIdentity(1), StepKind::SystemConfigurationSlot),
             (DeviceIdentity(0), StepKind::Barrier),

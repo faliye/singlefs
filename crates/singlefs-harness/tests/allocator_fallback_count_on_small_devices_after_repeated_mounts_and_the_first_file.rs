@@ -12,6 +12,7 @@ use singlefs_core::address::{DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::compaction_plan::{CompactionSwitches, EmptyClusterSegmentsFloor};
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::mount::{mount_writable_with_space_admission, Mounted};
 use singlefs_core::transaction::{
@@ -205,8 +206,26 @@ fn leave_no_empty_cluster_segment(allocator: &mut PoolAllocator) {
     }
 }
 
+/// 整理开关取产品值，只把合取 7 的 `N₀` 压成 0（判决 G6「强制合取 7 的 `N₀`」）：没有全空段的池上前台写入不被合取 7 拦，
+/// 摸得到回落那一支（产品值下这一形被合取 7 拒，钉在 `commit_generated_units_fall_back_when_the_segment_runs_out.rs` 的
+/// `an_overwrite_on_a_pool_without_an_empty_cluster_segment_is_refused_by_the_empty_cluster_segments_floor_by_default`）。
+fn compaction_switches_with_the_empty_cluster_segments_floor_at_zero() -> CompactionSwitches {
+    let product = CompactionSwitches::PRODUCT;
+    CompactionSwitches {
+        batch_size: product.batch_size,
+        forced_region: product.forced_region,
+        run_forcing: product.run_forcing,
+        region_exclusion: product.region_exclusion,
+        destination_policy: product.destination_policy,
+        release_checksum_mismatch_after_issue: product.release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor: EmptyClusterSegmentsFloor::ForcedForTests(0),
+        relocation_publish_order: product.relocation_publish_order,
+    }
+}
+
 /// 阳性对照：新池新建文件之后没有全空段、开放段用满，覆盖写一次——提交内生块走回落，计数大于 0（那一次落点钉在
 /// `commit_generated_units_fall_back_when_the_segment_runs_out.rs` 里）。判别力：回落那一支不加计数时这一条红。
+/// 合取 7 的 `N₀` 压成 0，只测回落那一支（[`compaction_switches_with_the_empty_cluster_segments_floor_at_zero`]）。
 #[test]
 fn the_fallback_count_is_above_zero_once_no_empty_cluster_segment_is_left() {
     let mut pool = build_pool("allocator-fallback-count-positive-control");
@@ -217,6 +236,9 @@ fn the_fallback_count_is_above_zero_once_no_empty_cluster_segment_is_left() {
         "前提：新池新建文件那一次没走回落"
     );
     leave_no_empty_cluster_segment(&mut pool.allocator);
+    pool.allocator.set_compaction_switches(
+        compaction_switches_with_the_empty_cluster_segments_floor_at_zero(),
+    );
     let publish_parameters = parameters();
     let previous = pool.output.clone();
     let content: Vec<u8> = (0..4100usize)

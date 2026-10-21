@@ -61,29 +61,60 @@ pub fn data_unit_count_of_a_sequential_write(content_length_in_bytes: u64) -> u6
     content_length_in_bytes.div_ceil(payload_capacity).max(1)
 }
 
-/// 读侧看一个 inode 在 extent 树上段叶里的那一条（D8（核心索引结构） 已定项 14）：指没指着数据单元。封闭集合，`match` 不写通配臂。
+/// 读侧看一个 inode 在 extent 树上段叶里的那一条（D8（核心索引结构） 已定项 14；标签 3、4 与「标签 0 配 size > 0」是判决
+/// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 加的）。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DataUnitsOfTheInode {
-    /// 上段叶里没有它的条目，或条目标签 0：建出来之后一次都没写过内容（`transaction::publish_new_inodes` 建的 inode
-    /// 长度 0、数据单元与 extent 树都不动）。
+    /// 上段叶里没有它的条目：建出来之后一次都没写过内容（`transaction::publish_new_inodes` 建的 inode 长度 0、数据单元与
+    /// extent 树都不动）。
     NoneWritten,
-    /// 条目指着下段根或一个内联的数据指针：写过内容。
+    /// 条目标签 1、2：指着下段根或一个内联的数据指针，最后一个单元之后没有洞。
     SomeWritten,
+    /// 条目标签 3、4、0：最后一个存在的单元之后到 size 是洞（标签 0 一个单元都没有、整个文件是洞）。
+    HoleAfterTheLastDataUnit,
 }
 
-/// 读侧按 inode 的文件大小该看到几条 extent 记录。写过内容的与写侧同一条除法（[`data_unit_count_of_a_sequential_write`]，
-/// 长度 0 的内容也写了一个声明长度 0 的单元）；一次都没写过的长度 0 ⇒ 0 条。一次都没写过而长度不是 0 的照除法给数，
-/// 与它的 0 条记录对不上，读侧报不一致。
-#[must_use]
-pub fn data_unit_count_implied_by_the_file_size(
+/// 读侧的单元数对不上 size：交回 size 按净荷容量算出来的单元数（报错用）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DataUnitCountDoesNotMatchTheFileSize {
+    pub data_units_implied_by_the_file_size: u64,
+}
+
+/// 读侧：盘上这个 inode 有 `data_units_on_disk` 个数据单元（从 0 起连号）、size 是 `file_size_in_bytes` 时，size 之内要读几个单元
+/// （之后到 size 是洞，读出 0、不读盘）。size 按净荷容量算出的单元数是 ⌈size ÷ 净荷⌉.max(1)，与写侧切分同一条除法
+/// （[`data_unit_count_of_a_sequential_write`]）：
+/// - 没有条目：长度 0、0 个单元；
+/// - 标签 1、2：单元数不少于它（多出来的是截断中间态里 size 之外还挂着的单元，判决 K2「读者容忍」：不读、不判声明长度）；
+/// - 标签 3、4、0：单元数少于它（相等就该写成 1、2）。
+///
+/// # Errors
+/// 三样对不上 ⇒ [`DataUnitCountDoesNotMatchTheFileSize`]（没有条目而 size 不是 0 时带除法给的数）。
+pub fn data_units_read_within_the_file_size(
     file_size_in_bytes: u64,
+    data_units_on_disk: u64,
     data_units_of_the_inode: DataUnitsOfTheInode,
-) -> u64 {
+) -> Result<u64, DataUnitCountDoesNotMatchTheFileSize> {
+    let data_units_implied_by_the_file_size =
+        data_unit_count_of_a_sequential_write(file_size_in_bytes);
+    let refused = Err(DataUnitCountDoesNotMatchTheFileSize {
+        data_units_implied_by_the_file_size,
+    });
     match data_units_of_the_inode {
-        DataUnitsOfTheInode::NoneWritten if file_size_in_bytes == 0 => 0,
-        DataUnitsOfTheInode::NoneWritten | DataUnitsOfTheInode::SomeWritten => {
-            data_unit_count_of_a_sequential_write(file_size_in_bytes)
+        DataUnitsOfTheInode::NoneWritten if file_size_in_bytes == 0 && data_units_on_disk == 0 => {
+            Ok(0)
         }
+        DataUnitsOfTheInode::NoneWritten => refused,
+        DataUnitsOfTheInode::SomeWritten
+            if data_units_on_disk >= data_units_implied_by_the_file_size =>
+        {
+            Ok(data_units_implied_by_the_file_size)
+        }
+        DataUnitsOfTheInode::HoleAfterTheLastDataUnit
+            if data_units_on_disk < data_units_implied_by_the_file_size =>
+        {
+            Ok(data_units_on_disk)
+        }
+        DataUnitsOfTheInode::SomeWritten | DataUnitsOfTheInode::HoleAfterTheLastDataUnit => refused,
     }
 }
 
@@ -283,26 +314,56 @@ mod tests {
         assert_eq!(rejoined, content);
     }
 
-    /// 读侧的单元数：一次都没写过的 inode 长度 0 ⇒ 0 条；写过的长度 0 ⇒ 1 条（写侧的下界）；长度不是 0 的两种都按除法。
+    /// 读侧的单元数：没有条目的长度 0 ⇒ 0 个；标签 1、2 长度 0 ⇒ 1 个（写侧的下界），多出来的（截断中间态）只读 size 之内的；
+    /// 标签 3、4、0 少于除法给的数、读存在的那几个，不少于就拒；没有条目而长度不是 0 拒。
     #[test]
-    fn a_never_written_inode_of_length_zero_implies_no_data_unit_and_a_written_one_implies_one() {
+    fn the_reader_reads_the_data_units_within_the_size_and_refuses_counts_the_tag_does_not_allow() {
+        let refused = |implied: u64| {
+            Err(DataUnitCountDoesNotMatchTheFileSize {
+                data_units_implied_by_the_file_size: implied,
+            })
+        };
         assert_eq!(
-            data_unit_count_implied_by_the_file_size(0, DataUnitsOfTheInode::NoneWritten),
-            0
+            data_units_read_within_the_file_size(0, 0, DataUnitsOfTheInode::NoneWritten),
+            Ok(0)
         );
         assert_eq!(
-            data_unit_count_implied_by_the_file_size(0, DataUnitsOfTheInode::SomeWritten),
-            1
+            data_units_read_within_the_file_size(32_635, 0, DataUnitsOfTheInode::NoneWritten),
+            refused(2)
         );
-        for data_units_of_the_inode in [
-            DataUnitsOfTheInode::NoneWritten,
-            DataUnitsOfTheInode::SomeWritten,
-        ] {
-            assert_eq!(
-                data_unit_count_implied_by_the_file_size(32_635, data_units_of_the_inode),
-                2,
-                "{data_units_of_the_inode:?}：净荷容量加一个字节是两个单元"
-            );
-        }
+        let without_a_hole = DataUnitsOfTheInode::SomeWritten;
+        assert_eq!(
+            data_units_read_within_the_file_size(0, 1, without_a_hole),
+            Ok(1)
+        );
+        assert_eq!(
+            data_units_read_within_the_file_size(32_635, 2, without_a_hole),
+            Ok(2),
+            "净荷容量加一个字节是两个单元"
+        );
+        assert_eq!(
+            data_units_read_within_the_file_size(32_635, 5, without_a_hole),
+            Ok(2),
+            "截断中间态：size 之外还挂着三个，只读 size 之内的两个"
+        );
+        assert_eq!(
+            data_units_read_within_the_file_size(32_635, 1, without_a_hole),
+            refused(2)
+        );
+        let with_a_hole = DataUnitsOfTheInode::HoleAfterTheLastDataUnit;
+        assert_eq!(
+            data_units_read_within_the_file_size(32_635, 1, with_a_hole),
+            Ok(1)
+        );
+        assert_eq!(
+            data_units_read_within_the_file_size(32_635, 0, with_a_hole),
+            Ok(0),
+            "标签 0 配 size > 0：整个文件是洞"
+        );
+        assert_eq!(
+            data_units_read_within_the_file_size(32_635, 2, with_a_hole),
+            refused(2),
+            "单元数与除法相等却声明有洞"
+        );
     }
 }

@@ -15,6 +15,7 @@ use crate::pointer::{
     BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead,
     PointerHeadFieldOutsideTheFirstVersion,
 };
+use crate::system_configuration::InodeRecordTruncationFieldsOfThePool;
 use crate::unit::{PackedIdentity, WriteOrder, UNIT_CLASS_DATA};
 
 /// 统计量标签 = D5（快照 / 空间记账机制） 已定项 4 的行号（已定项 10 的登记表）。
@@ -32,6 +33,9 @@ pub const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 /// 第一版直落叶，seq 一律 1（D8（核心索引结构） 已定项 10）。
 pub const ACCOUNTING_SEQUENCE_DIRECT_TO_LEAF: u32 = 1;
 
+/// inode 记录里截断字段（T 8 字节、N_w 8 字节）的起点（判决 m4-trunc-r2 R1）：之前 108–119、之后 136–139 两段仍恒 0。
+pub const INODE_RECORD_TRUNCATION_FIELD_OFFSET: u64 = 120;
+
 /// inode 记录偏移 48 那个 `blocks` 字段的计量单位：512 字节一块（D8（核心索引结构） 已定项 6）。
 pub const INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES: u64 = 512;
 
@@ -40,6 +44,77 @@ pub const NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES: u32 = 1;
 
 /// unlink 的意图那次发布把记录写成 nlink = 0、size 不变（D8（核心索引结构） 已定项 16 第 1 条）：从那一版起读者答「没有文件」、写入口拒它。
 pub const NLINK_OF_AN_INODE_BEING_DELETED: u32 = 0;
+
+/// inode 记录偏移 120 起的截断字段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1）：T（截断字段的 txg，偏移 120 起
+/// 8 字节小端，0 是没写过）与 N_w（截断字段的 size，偏移 128 起 8 字节小端）。存 size 不存单元数：单元数由 ⌈N_w ÷ 净荷⌉.max(1) 现算。
+/// 合法性只判「T = 0 ⇒ N_w = 0」（截到 0 时 T ≠ 0、N_w = 0）：两段私有，只能经 [`Self::NOT_WRITTEN`]、
+/// [`Self::written_by_the_truncation_intent_of`] 与 [`Self::from_the_two_fields_on_disk`] 进来，T = 0 而 N_w ≠ 0 的值造不出来。
+/// 什么时候写由 `truncate::truncation_field_after_the_truncation_intent` 判（R2 与第六节用户定案）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InodeRecordTruncationField {
+    truncation_txg: CheckpointTxg,
+    truncated_size_in_bytes: u64,
+}
+
+impl InodeRecordTruncationField {
+    /// T = 0、N_w = 0：建出来之后没被截断意图写过，或整份写（顺序写、覆盖写）清零之后。
+    pub const NOT_WRITTEN: Self = Self {
+        truncation_txg: CheckpointTxg(0),
+        truncated_size_in_bytes: 0,
+    };
+
+    /// 截断意图那次写下的（这次 txg, N）。
+    ///
+    /// # Panics
+    /// `truncation_txg` 是 0：T = 0 是「没写过」，截断意图那次发布的 checkpoint_txg 恒大于 0（mkfs 那一版是第 0 代，之后每次发布加一）。
+    #[must_use]
+    pub fn written_by_the_truncation_intent_of(
+        truncation_txg: CheckpointTxg,
+        truncated_size_in_bytes: u64,
+    ) -> Self {
+        assert_ne!(
+            truncation_txg.0, 0,
+            "截断意图那次发布的 checkpoint_txg 不是 0（第 0 代是 mkfs 那一版，不发截断）"
+        );
+        Self {
+            truncation_txg,
+            truncated_size_in_bytes,
+        }
+    }
+
+    /// 盘上读来的两段 8 字节：T = 0 而 N_w ≠ 0 不合法 ⇒ `None`（R1）。
+    #[must_use]
+    pub const fn from_the_two_fields_on_disk(
+        truncation_txg: u64,
+        truncated_size_in_bytes: u64,
+    ) -> Option<Self> {
+        if truncation_txg == 0 && truncated_size_in_bytes != 0 {
+            return None;
+        }
+        Some(Self {
+            truncation_txg: CheckpointTxg(truncation_txg),
+            truncated_size_in_bytes,
+        })
+    }
+
+    /// T：写下字段的那次截断意图的 checkpoint_txg；没写过是 0。
+    #[must_use]
+    pub const fn truncation_txg(self) -> CheckpointTxg {
+        self.truncation_txg
+    }
+
+    /// N_w：写下字段的那次截断意图的目标 size；没写过是 0。
+    #[must_use]
+    pub const fn truncated_size_in_bytes(self) -> u64 {
+        self.truncated_size_in_bytes
+    }
+
+    /// T ≠ 0：被一次截断意图写过。
+    #[must_use]
+    pub const fn is_written(self) -> bool {
+        self.truncation_txg.0 != 0
+    }
+}
 
 /// inode 记录 140（D8（核心索引结构） 已定项 6 的偏移表）；时间是发布参数，不取系统时钟（可复现）。
 ///
@@ -56,6 +131,8 @@ pub struct InodeRecord {
     pub size: u64,
     pub change_count: u64,
     pub write_time_seconds: u64,
+    /// 偏移 120 起两段 8 字节（判决 m4-trunc-r2 R1）。
+    pub truncation_field: InodeRecordTruncationField,
 }
 
 impl InodeRecord {
@@ -82,15 +159,26 @@ impl InodeRecord {
         writer.assert_position(96, "时间纳秒");
         writer.skip(12);
         writer.assert_position(108, "填充 / flags / 预留");
-        writer.skip(4 + 8 + 20);
+        writer.skip(4 + 8);
+        writer.assert_position(INODE_RECORD_TRUNCATION_FIELD_OFFSET, "截断字段 T 与 N_w");
+        writer.put_u64(self.truncation_field.truncation_txg().0);
+        writer.put_u64(self.truncation_field.truncated_size_in_bytes());
+        writer.assert_position(136, "预留");
+        writer.skip(4);
         writer.assert_position(INODE_RECORD_BYTES, "inode 记录");
         writer.into_bytes()
     }
-    /// 读者：三段填充 / flags / 预留（偏移 108 起）非零判不可用（I-9.7）。
+    /// 读者：偏移 108–119 与 136–139 两段恒零区非零、截断字段「T = 0 而 N_w ≠ 0」都判不可用（I-9.7，判决 m4-trunc-r2 R1）。
+    /// 池里认不认截断字段（incompat 位 2）不归这里判：[`Self::truncation_field_fits_the_pool`]。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
+        let truncation_field_offset =
+            usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET).expect("120");
         if bytes.len() != usize::try_from(INODE_RECORD_BYTES).expect("140")
-            || bytes[108..].iter().any(|byte| *byte != 0)
+            || bytes[108..truncation_field_offset]
+                .iter()
+                .chain(&bytes[truncation_field_offset + 16..])
+                .any(|byte| *byte != 0)
         {
             return None;
         }
@@ -104,6 +192,16 @@ impl InodeRecord {
         let write_time_seconds = reader.get_u64();
         reader.skip(16);
         let change_count = reader.get_u64();
+        let mut truncation_field_reader = ByteReader::at(
+            bytes,
+            usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET).expect("120"),
+        );
+        let truncation_txg = truncation_field_reader.get_u64();
+        let truncated_size_in_bytes = truncation_field_reader.get_u64();
+        let truncation_field = InodeRecordTruncationField::from_the_two_fields_on_disk(
+            truncation_txg,
+            truncated_size_in_bytes,
+        )?;
         Some(Self {
             inode,
             object_birth,
@@ -111,7 +209,23 @@ impl InodeRecord {
             size,
             change_count,
             write_time_seconds,
+            truncation_field,
         })
+    }
+
+    /// 这条记录的截断字段在这个池里收不收（incompat 位 2，用户 2026-10-17 定，判决 m4-trunc-r2 第六节）：池的系统配置带位 2 时
+    /// 什么合法的字段都收；不带位 2 时截断字段必须全零（T 与 N_w 都是 0），否则这条记录判不可用。
+    #[must_use]
+    pub fn truncation_field_fits_the_pool(
+        &self,
+        truncation_fields_of_the_pool: InodeRecordTruncationFieldsOfThePool,
+    ) -> bool {
+        match truncation_fields_of_the_pool {
+            InodeRecordTruncationFieldsOfThePool::Carried => true,
+            InodeRecordTruncationFieldsOfThePool::AllZero => {
+                self.truncation_field == InodeRecordTruncationField::NOT_WRITTEN
+            }
+        }
     }
 }
 
@@ -323,10 +437,11 @@ impl AccountingEntry {
         )
     }
     /// 记账条目 34 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 22），
-    /// 窄于 34 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 34 信它。
+    /// 不等于 34 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 34 信它。窄于 34 的切不出整条记录；
+    /// 宽于 34 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C780）。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() < usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34") {
+        if bytes.len() != usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34") {
             return None;
         }
         let mut reader = ByteReader::at(bytes, 0);
@@ -430,6 +545,120 @@ pub const TREE_KIND_LINEAGE: u16 = 11;
 pub const TREE_KIND_LOGGED_OPERATIONS: u16 = 12;
 /// 退役树：码 13，接在 logged_ops 之后追加（D8（核心索引结构） 已定项 9；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）。
 pub const TREE_KIND_RETIREMENT: u16 = 13;
+/// 只读快照的 inode 根：码 14，接在退役树之后追加（D8（核心索引结构） 已定项 9 只追加不重用；判决
+/// `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1）。一个快照一条，字段取值：根指针 = 建快照那一版活头 inode 树的根；
+/// 诞生 txg = S.txg（建快照那次独立发布的 `checkpoint_txg`，同一判决 S2）；`previous_snapshot_txg` = 捕获那一刻活头 inode 树条目里的值；
+/// 头 ID = 活头 inode 树的树 ID；flags 位 0 是「销毁中」（同一判决 S4：删快照的意图写在这里，[`SnapshotDestructionMark`]）。
+/// 一张树表里可以有多条（每个快照一条），与 [`TREE_KIND_SNAPSHOT_EXTENT_ROOT`] 一一配对。
+pub const TREE_KIND_SNAPSHOT_INODE_ROOT: u16 = 14;
+/// 只读快照的 extent 根：码 15，接在码 14 之后追加（同上 S1）。根指针 = 建快照那一版活头 extent 树的根；头 ID = 与它配对的那条
+/// [`TREE_KIND_SNAPSHOT_INODE_ROOT`] 条目的树 ID；`previous_snapshot_txg` 写 0（0 = 不适用，D5（快照 / 空间记账机制） 已定项 9）。
+pub const TREE_KIND_SNAPSHOT_EXTENT_ROOT: u16 = 15;
+/// 第一版同时活着的只读快照至多几个（一张树表里码 14 的条数上界）：用户 2026-10-13 定「10」（判决
+/// `research/prompts/m4-snapshot-r1-main-verification.md` 第七节岔路 1；单节点树表能装 34 个，取 10 是用户给的上界）。
+pub const SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION: usize = 10;
+
+/// 树表条目 flags 的位 0「销毁中」：只在码 14 条目上有含义（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4 与第七节岔路 2：
+/// 删快照的意图写在被删那个快照自己的码 14 条目上，只占这一位，预留字节不写）。别的位、别的种类上的这一位仍按 D8（核心索引结构） 已定项 8 ㊁拒收。
+pub const TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED: u16 = 1;
+
+/// 一条码 14 条目带不带「销毁中」的记号（flags 位 0，[`TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SnapshotDestructionMark {
+    NotBeingDestroyed,
+    BeingDestroyed,
+}
+
+impl SnapshotDestructionMark {
+    /// 这个记号在 flags 那 2 字节里的值。
+    #[must_use]
+    pub const fn flags(self) -> u16 {
+        match self {
+            SnapshotDestructionMark::NotBeingDestroyed => 0,
+            SnapshotDestructionMark::BeingDestroyed => {
+                TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED
+            }
+        }
+    }
+}
+
+/// deadlist 条目的 key 宽：头的树 ID 8 + 纪元 8 + 中央映射 key 27 = 43，value 空（D5（快照 / 空间记账机制） 已定项 12；
+/// 判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：deadlist 是第三棵多层码 2 树，种类 8）。
+pub const DEADLIST_ENTRY_KEY_BYTES: usize = 8 + 8 + 27;
+
+/// 中央映射 key 里出生 txg 那 8 字节的起点：类标签 1 + 出生树 8（[`mapping_key_for_data`]、[`mapping_key_for_node`]）。
+const MAPPING_KEY_BIRTH_TXG_OFFSET_IN_BYTES: usize = 1 + 8;
+
+/// 一把中央映射 key 里的出生 txg（D5（快照 / 空间记账机制） 已定项 19 的 `birth`：判决 S3「birth 从映射 key 的出生 txg 段取」）。
+/// key 不是 27 字节时交回 `None`（盘上读来的 key 由调用方当取不到处置：D5 已定项 14「判据的输入取不到时默认进 deadlist」）。
+#[must_use]
+pub fn birth_txg_of_a_mapping_key(mapping_key: &[u8]) -> Option<CheckpointTxg> {
+    if mapping_key.len() != usize::try_from(MAPPING_KEY_BYTES).expect("27") {
+        return None;
+    }
+    let mut reader = ByteReader::at(mapping_key, MAPPING_KEY_BIRTH_TXG_OFFSET_IN_BYTES);
+    Some(CheckpointTxg(reader.get_u64()))
+}
+
+/// 一条 deadlist 条目（D5（快照 / 空间记账机制） 已定项 12「丙-区间」）：key = 头的树 ID + 纪元 + 中央映射 key，value 空——key 即事实。
+/// 纪元 = 块被杀那一刻头的 `previous_snapshot_txg`；哪个快照的那一份按纪元落在哪一段区间认，建快照与删快照都不改条目的键。
+/// 不派生全序：盘上的序是逐字段按小端无符号整数比（`code_two_tree::CodeTwoKeyFieldWidths::DEADLIST`），映射 key 那一段按字节比与它不同序。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeadlistEntry {
+    pub head: TreeIdentifier,
+    pub epoch: CheckpointTxg,
+    pub mapping_key: Vec<u8>,
+}
+
+impl DeadlistEntry {
+    /// 盘上 43 字节（叶条目就是 key）。
+    ///
+    /// # Panics
+    /// `mapping_key` 不是 27 字节：条目的映射 key 取自一版的 `mapped_units`（写者现算的）或 [`Self::parse`] 判过宽度的盘上字节。
+    #[must_use]
+    pub fn key_bytes(&self) -> Vec<u8> {
+        let mut writer = ByteWriter::new(DEADLIST_ENTRY_KEY_BYTES);
+        writer.put_u64(self.head.0);
+        writer.put_u64(self.epoch.0);
+        assert_eq!(
+            self.mapping_key.len(),
+            usize::try_from(MAPPING_KEY_BYTES).expect("27"),
+            "deadlist 条目里的映射 key 是 27 字节：取自写者现算的 key 或读者判过宽度的字节"
+        );
+        writer.put(&self.mapping_key);
+        writer.assert_position(
+            u64::try_from(DEADLIST_ENTRY_KEY_BYTES).expect("43"),
+            "deadlist 条目",
+        );
+        writer.into_bytes()
+    }
+
+    /// 读者：条目宽窄于 43 交回 `None`（`parse_index_node` 只判了条目宽 ≥ key 宽）。
+    #[must_use]
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() < DEADLIST_ENTRY_KEY_BYTES {
+            return None;
+        }
+        let mut reader = ByteReader::at(bytes, 0);
+        let head = TreeIdentifier(reader.get_u64());
+        let epoch = CheckpointTxg(reader.get_u64());
+        Some(Self {
+            head,
+            epoch,
+            mapping_key: bytes[16..DEADLIST_ENTRY_KEY_BYTES].to_vec(),
+        })
+    }
+
+    /// 这条条目指的那个单元的出生 txg（映射 key 的出生 txg 段）。
+    ///
+    /// # Panics
+    /// 映射 key 不是 27 字节：同 [`Self::key_bytes`]。
+    #[must_use]
+    pub fn birth_txg(&self) -> CheckpointTxg {
+        birth_txg_of_a_mapping_key(&self.mapping_key)
+            .expect("deadlist 条目里的映射 key 是 27 字节：取自写者现算的 key 或读者判过宽度的字节")
+    }
+}
 
 /// 树表条目里根指针的起点：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2（`singlefs_format::TREE_TABLE_ENTRY_BYTES` 的字段表）。
 const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
@@ -440,25 +669,43 @@ pub struct TreeTableEntry {
     pub kind: u16,
     pub tree: TreeIdentifier,
     pub root: NodePointer,
+    /// D5（快照 / 空间记账机制） 已定项 9：写在两处——活头 inode 树那条条目（= 最近一个快照的 S.txg，还没打过快照写 0）与每条码 14
+    /// 快照条目（= 捕获那一刻活头的值）；其余条目写 0（0 = 不适用）。`parse` 照盘上读进来、`to_bytes` 照它写。
+    pub previous_snapshot_txg: CheckpointTxg,
     pub birth_txg: CheckpointTxg,
     /// D5（快照 / 空间记账机制） 已定项 9：这棵树归哪个可写头；无归属写 0。
     pub head_identifier: u64,
 }
 
 impl TreeTableEntry {
+    /// flags 写 0（不带「销毁中」的记号）。
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
+        self.to_bytes_with_destruction_mark(SnapshotDestructionMark::NotBeingDestroyed)
+    }
+
+    /// flags 写 `mark` 的值（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4：删快照的意图只占码 14 条目 flags 位 0）。
+    ///
+    /// # Panics
+    /// 给不是码 14 的条目写「销毁中」：读者对别的种类上的这一位拒收（[`Self::parse_with_destruction_mark`]），写者只给被删的那条码 14 写。
+    #[must_use]
+    pub fn to_bytes_with_destruction_mark(&self, mark: SnapshotDestructionMark) -> Vec<u8> {
+        assert!(
+            mark == SnapshotDestructionMark::NotBeingDestroyed
+                || self.kind == TREE_KIND_SNAPSHOT_INODE_ROOT,
+            "「销毁中」只写在码 14 条目上（判决 S4）"
+        );
         let mut writer = ByteWriter::new(usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"));
         writer.put_u64(self.tree.0);
         writer.put_u16(u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"));
         writer.put_u16(self.kind);
-        writer.put_u16(0);
+        writer.put_u16(mark.flags());
         writer.assert_position(
             u64::try_from(TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES).expect("14"),
             "树表条目的根指针",
         );
         self.root.write_to(&mut writer);
-        writer.put_u64(0); // previous_snapshot_txg：0 = 不适用
+        writer.put_u64(self.previous_snapshot_txg.0);
         writer.put_u64(self.birth_txg.0);
         writer.put_u64(self.head_identifier);
         writer.skip(76);
@@ -476,8 +723,16 @@ impl TreeTableEntry {
     /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零、根指针头部有一段不是第一版的取值
     /// （MAC / nonce 非 0、算法类型不是未加密、压缩算法码不认识、码 0 而压后长度非 0、extent 偏移非 0：D19（块指针的结构与宽度预算） 已定项 3、
     /// D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据），判该指针所在的结构——这条条目——损坏）都判不可用。
+    /// 码 14 条目 flags 位 0（销毁中）收下、丢掉记号；要记号的读者用 [`Self::parse_with_destruction_mark`]。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
+        Self::parse_with_destruction_mark(bytes).map(|(entry, _mark)| entry)
+    }
+
+    /// 同 [`Self::parse`]，连同 flags 读出来的「销毁中」记号：flags 是 0 ⇒ `NotBeingDestroyed`；码 14 条目上 flags 恰是位 0 ⇒ `BeingDestroyed`；
+    /// 别的取值（别的位、别的种类上的位 0）照 D8（核心索引结构） 已定项 8 ㊁拒收。
+    #[must_use]
+    pub fn parse_with_destruction_mark(bytes: &[u8]) -> Option<(Self, SnapshotDestructionMark)> {
         if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200")
             || bytes[bytes.len() - 76..].iter().any(|byte| *byte != 0)
         {
@@ -489,24 +744,34 @@ impl TreeTableEntry {
             return None;
         }
         let kind = reader.get_u16();
-        if reader.get_u16() != 0 {
-            return None;
-        }
+        let mark = match reader.get_u16() {
+            0 => SnapshotDestructionMark::NotBeingDestroyed,
+            TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED
+                if kind == TREE_KIND_SNAPSHOT_INODE_ROOT =>
+            {
+                SnapshotDestructionMark::BeingDestroyed
+            }
+            _flags_this_reader_refuses => return None,
+        };
         let root =
             NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
                 &mut reader,
             )
             .ok()?;
-        let _previous_snapshot_txg = reader.get_u64();
+        let previous_snapshot_txg = CheckpointTxg(reader.get_u64());
         let birth_txg = CheckpointTxg(reader.get_u64());
         let head_identifier = reader.get_u64();
-        Some(Self {
-            kind,
-            tree,
-            root,
-            birth_txg,
-            head_identifier,
-        })
+        Some((
+            Self {
+                kind,
+                tree,
+                root,
+                previous_snapshot_txg,
+                birth_txg,
+                head_identifier,
+            },
+            mark,
+        ))
     }
 }
 
@@ -668,6 +933,7 @@ mod tests {
             // 新池新建文件那条记录的取值：改动计数 = 这次发布的 checkpoint_txg 3（增补 2 第 11 行）。
             change_count: 3,
             write_time_seconds: 1_788_000_000,
+            truncation_field: InodeRecordTruncationField::NOT_WRITTEN,
         };
         let bytes = record.to_bytes();
         assert_eq!(bytes.len(), 140);
@@ -759,6 +1025,7 @@ mod tests {
             kind: TREE_KIND_EXTENT,
             tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
             root: pointer,
+            previous_snapshot_txg: CheckpointTxg(0),
             birth_txg: CheckpointTxg(3),
             head_identifier: TREE_IDENTIFIER_INODE,
         };
@@ -767,6 +1034,140 @@ mod tests {
             TreeTableEntry::parse(&table_entry.to_bytes()),
             Some(table_entry)
         );
+    }
+
+    /// D5（快照 / 空间记账机制） 已定项 9：`previous_snapshot_txg` 写在条目偏移 100 那 8 字节（树 ID 8 + 条目长度 2 + 种类 2 + flags 2 +
+    /// 根指针 86 之后、诞生 txg 之前），`to_bytes` 照结构里的值写、`parse` 照盘上读回来；两个 txg 字段各自独立，换一个不动另一个。
+    #[test]
+    fn previous_snapshot_txg_is_written_at_offset_one_hundred_and_read_back_apart_from_the_birth_txg(
+    ) {
+        let entry = TreeTableEntry {
+            kind: TREE_KIND_INODE,
+            tree: TreeIdentifier(TREE_IDENTIFIER_INODE),
+            root: NodePointer::empty_root(),
+            previous_snapshot_txg: CheckpointTxg(0x0102_0304),
+            birth_txg: CheckpointTxg(0x0506),
+            head_identifier: TREE_IDENTIFIER_INODE,
+        };
+        let bytes = entry.to_bytes();
+        let field_at = |offset: usize| {
+            u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+        };
+        assert_eq!(
+            field_at(100),
+            0x0102_0304,
+            "偏移 100：previous_snapshot_txg"
+        );
+        assert_eq!(field_at(108), 0x0506, "偏移 108：诞生 txg");
+        assert_eq!(
+            TreeTableEntry::parse(&bytes).map(|parsed| parsed.previous_snapshot_txg),
+            Some(CheckpointTxg(0x0102_0304)),
+            "读回来是写进去的值，不是 0"
+        );
+        assert_eq!(TreeTableEntry::parse(&bytes), Some(entry), "逐字段读回相等");
+    }
+
+    /// 删快照的意图只占码 14 条目 flags 位 0（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4）：写进偏移 12 那 2 字节、
+    /// 读回来记号相同、别的字段不动；码 14 上别的位、别的种类上的位 0 读者拒收。
+    #[test]
+    fn the_destruction_mark_sits_in_flags_bit_zero_of_a_snapshot_inode_root_entry_only() {
+        let snapshot_inode_root = TreeTableEntry {
+            kind: TREE_KIND_SNAPSHOT_INODE_ROOT,
+            tree: TreeIdentifier(65549),
+            root: NodePointer::empty_root(),
+            previous_snapshot_txg: CheckpointTxg(4),
+            birth_txg: CheckpointTxg(9),
+            head_identifier: TREE_IDENTIFIER_INODE,
+        };
+        let marked = snapshot_inode_root
+            .to_bytes_with_destruction_mark(SnapshotDestructionMark::BeingDestroyed);
+        assert_eq!(
+            u16::from_le_bytes([marked[12], marked[13]]),
+            TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED,
+            "偏移 12：flags 位 0"
+        );
+        assert_eq!(
+            TreeTableEntry::parse_with_destruction_mark(&marked),
+            Some((snapshot_inode_root, SnapshotDestructionMark::BeingDestroyed)),
+            "读回来带「销毁中」，别的字段与写进去的相同"
+        );
+        assert_eq!(
+            TreeTableEntry::parse_with_destruction_mark(&snapshot_inode_root.to_bytes()),
+            Some((
+                snapshot_inode_root,
+                SnapshotDestructionMark::NotBeingDestroyed
+            )),
+            "不带记号的那一份读回来不带"
+        );
+        let mut another_bit = marked.clone();
+        another_bit[12] = 2;
+        assert_eq!(
+            TreeTableEntry::parse(&another_bit),
+            None,
+            "码 14 上 flags 别的位：拒收"
+        );
+        let snapshot_extent_root = TreeTableEntry {
+            kind: TREE_KIND_SNAPSHOT_EXTENT_ROOT,
+            tree: TreeIdentifier(65550),
+            root: NodePointer::empty_root(),
+            previous_snapshot_txg: CheckpointTxg(0),
+            birth_txg: CheckpointTxg(9),
+            head_identifier: 65549,
+        };
+        let mut bit_zero_on_another_kind = snapshot_extent_root.to_bytes();
+        bit_zero_on_another_kind[12] = 1;
+        assert_eq!(
+            TreeTableEntry::parse(&bit_zero_on_another_kind),
+            None,
+            "码 15 上 flags 位 0：拒收"
+        );
+    }
+
+    /// deadlist 条目 43 字节：头的树 ID 8 + 纪元 8 + 中央映射 key 27（D5（快照 / 空间记账机制） 已定项 12），读回来逐字段相等；
+    /// 出生 txg 取映射 key 偏移 9 那 8 字节（判决 S3），不取纪元。
+    #[test]
+    fn a_deadlist_entry_is_the_head_the_epoch_and_the_mapping_key_and_reads_back() {
+        let mapping_key = mapping_key_for_node(
+            2,
+            NodePointer {
+                head: PointerHead {
+                    birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
+                    birth_txg: CheckpointTxg(7),
+                },
+                locations: NodePointer::empty_root().locations,
+                instance: InstanceGeneration(1),
+                birth_sequence: BirthSequence(3),
+            },
+        );
+        let entry = DeadlistEntry {
+            head: TreeIdentifier(TREE_IDENTIFIER_INODE),
+            epoch: CheckpointTxg(11),
+            mapping_key: mapping_key.clone(),
+        };
+        let bytes = entry.key_bytes();
+        assert_eq!(bytes.len(), DEADLIST_ENTRY_KEY_BYTES, "43 字节");
+        assert_eq!(
+            &bytes[..8],
+            &TREE_IDENTIFIER_INODE.to_le_bytes(),
+            "偏移 0：头的树 ID"
+        );
+        assert_eq!(&bytes[8..16], &11u64.to_le_bytes(), "偏移 8：纪元");
+        assert_eq!(
+            &bytes[16..],
+            mapping_key.as_slice(),
+            "偏移 16：中央映射 key"
+        );
+        assert_eq!(
+            DeadlistEntry::parse(&bytes),
+            Some(entry.clone()),
+            "读回来逐字段相等"
+        );
+        assert_eq!(
+            entry.birth_txg(),
+            CheckpointTxg(7),
+            "出生 txg 取映射 key 那一段"
+        );
+        assert_eq!(DeadlistEntry::parse(&bytes[..42]), None, "窄于 43：解不开");
     }
 
     /// 墓碑记录五个字段落在 `.claude/kb/layout/03-third-txn.md`「二、墓碑记录」那张表的偏移上，读回来逐字段相等。
@@ -839,6 +1240,131 @@ mod tests {
         );
     }
 
+    fn record_with_the_truncation_field(
+        truncation_field: InodeRecordTruncationField,
+    ) -> InodeRecord {
+        InodeRecord {
+            inode: 1,
+            object_birth: CheckpointTxg(3),
+            nlink: NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
+            size: 100,
+            change_count: 9,
+            write_time_seconds: 1_788_000_000,
+            truncation_field,
+        }
+    }
+
+    /// 判决 m4-trunc-r2 R1：T 写在偏移 120 起 8 字节、N_w 写在 128 起 8 字节，都是小端，读者从同一处读回来；两段各取一个每个字节都不同的值，
+    /// 写错位置、读错位置、读成 0、两段对调都对不上。之前 108–119、之后 136–139 两段仍是 0。
+    #[test]
+    fn truncation_field_is_written_little_endian_at_offsets_120_and_128_and_read_back() {
+        let record = record_with_the_truncation_field(
+            InodeRecordTruncationField::written_by_the_truncation_intent_of(
+                CheckpointTxg(0x0807_0605_0403_0201),
+                0x1817_1615_1413_1211,
+            ),
+        );
+        let bytes = record.to_bytes();
+        assert_eq!(bytes.len(), 140);
+        assert_eq!(
+            bytes[120..128],
+            [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
+            "T 在偏移 120 起 8 字节、小端"
+        );
+        assert_eq!(
+            bytes[128..136],
+            [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18],
+            "N_w 在偏移 128 起 8 字节、小端"
+        );
+        assert!(
+            bytes[108..120]
+                .iter()
+                .chain(&bytes[136..])
+                .all(|byte| *byte == 0),
+            "108–119 与 136–139 仍恒 0"
+        );
+        assert_eq!(InodeRecord::parse(&bytes), Some(record), "读回来逐字段相同");
+        let not_written = record_with_the_truncation_field(InodeRecordTruncationField::NOT_WRITTEN);
+        assert!(
+            not_written.to_bytes()[108..].iter().all(|byte| *byte == 0),
+            "没写过的字段：偏移 108 起整段都是 0"
+        );
+    }
+
+    /// 判决 m4-trunc-r2 R1：合法性只判「T = 0 ⇒ N_w = 0」。T = 0 而 N_w ≠ 0 拒；截到 0 是 T ≠ 0、N_w = 0，收。
+    #[test]
+    fn parse_refuses_a_truncation_field_whose_txg_is_zero_while_its_size_is_not() {
+        let mut size_without_txg =
+            record_with_the_truncation_field(InodeRecordTruncationField::NOT_WRITTEN).to_bytes();
+        size_without_txg[128] = 5;
+        assert_eq!(
+            InodeRecord::parse(&size_without_txg),
+            None,
+            "T = 0、N_w = 5：不合法"
+        );
+        let truncated_to_zero = record_with_the_truncation_field(
+            InodeRecordTruncationField::written_by_the_truncation_intent_of(CheckpointTxg(7), 0),
+        );
+        assert_eq!(
+            InodeRecord::parse(&truncated_to_zero.to_bytes()).map(|parsed| parsed.truncation_field),
+            Some(
+                InodeRecordTruncationField::written_by_the_truncation_intent_of(
+                    CheckpointTxg(7),
+                    0
+                )
+            ),
+            "截到 0：T = 7、N_w = 0 合法，读回来 T 仍是 7"
+        );
+        assert_eq!(
+            InodeRecordTruncationField::from_the_two_fields_on_disk(0, 5),
+            None
+        );
+    }
+
+    /// 判决 m4-trunc-r2 R1：截断字段两边那两段恒零区（108–119、136–139）任一字节非零都拒，截断字段那 16 字节里的非零（T 非零）收。
+    #[test]
+    fn parse_refuses_a_nonzero_byte_in_either_always_zero_area_around_the_truncation_field() {
+        let bytes =
+            record_with_the_truncation_field(InodeRecordTruncationField::NOT_WRITTEN).to_bytes();
+        for offset in (108..120).chain(136..140) {
+            let mut tampered = bytes.clone();
+            tampered[offset] = 1;
+            assert_eq!(
+                InodeRecord::parse(&tampered),
+                None,
+                "偏移 {offset} 在恒零区里，非零拒收"
+            );
+        }
+        for offset in 120..128 {
+            let mut txg_byte_set = bytes.clone();
+            txg_byte_set[offset] = 1;
+            assert!(
+                InodeRecord::parse(&txg_byte_set).is_some(),
+                "偏移 {offset} 是 T 的一个字节：T 非零、N_w = 0 合法"
+            );
+        }
+    }
+
+    /// 用户 2026-10-17 定（判决 m4-trunc-r2 第六节）：不带 incompat 位 2 的池里截断字段必须全零；带位 2 的池什么合法的字段都收。
+    #[test]
+    fn a_written_truncation_field_fits_only_a_pool_whose_system_configuration_carries_bit_two() {
+        let not_written = record_with_the_truncation_field(InodeRecordTruncationField::NOT_WRITTEN);
+        let written = record_with_the_truncation_field(
+            InodeRecordTruncationField::written_by_the_truncation_intent_of(CheckpointTxg(7), 0),
+        );
+        assert!(not_written
+            .truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::AllZero));
+        assert!(not_written
+            .truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::Carried));
+        assert!(
+            !written.truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::AllZero),
+            "不带位 2 的池里 T ≠ 0 的记录判不可用"
+        );
+        assert!(
+            written.truncation_field_fits_the_pool(InodeRecordTruncationFieldsOfThePool::Carried)
+        );
+    }
+
     /// D8（核心索引结构） 已定项 16 第 4 条：nlink 由 `to_bytes` 照结构里的值写进偏移 36、由 `parse` 读回来——
     /// 删除中的记录（nlink = 0，size 不变）写出去读回来还是 0，读者与写入口才认得出它；活着的写 1。
     #[test]
@@ -850,6 +1376,7 @@ mod tests {
             size: 40_000,
             change_count: 6,
             write_time_seconds: 1_788_000_000,
+            truncation_field: InodeRecordTruncationField::NOT_WRITTEN,
         };
         for nlink in [
             NLINK_OF_AN_INODE_BEING_DELETED,
@@ -888,6 +1415,7 @@ mod tests {
                 size,
                 change_count: 3,
                 write_time_seconds: 1_788_000_000,
+                truncation_field: InodeRecordTruncationField::NOT_WRITTEN,
             }
             .to_bytes();
             u64::from_le_bytes(bytes[48..56].try_into().expect("偏移 48 起 8 字节"))

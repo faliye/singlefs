@@ -20,12 +20,16 @@
 //! 另两个纯函数核也在这里：择根（`choose_root_slot`，`recovery::choose_root` 取 `(checkpoint_txg, 实例代号)` 最大的那一截）与
 //! 扫环建表（`first_copy_of_each_record_key`，`recovery::scan_journal` 同一 (实例代号, 计数器) 先到先得的那一截）；
 //! 择根与取前缀的合判（C650 的 Verus 一半）写成推论 `corollary_recovery_replays_from_the_newest_self_verified_root`。
+//! 整理的选段核与计划核及其四条性质（里程碑四二·4）在模块 [`compaction_plan_proofs`]：`singlefs-core` 不调它们，它的
+//! `compaction_plan` 单测与它们逐项对拍。
 //! Verus 的必红世界登记在同目录的 `verus-must-red-worlds.tsv`。
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;
 
 use vstd::prelude::*;
+
+pub mod compaction_plan_proofs;
 
 verus! {
 

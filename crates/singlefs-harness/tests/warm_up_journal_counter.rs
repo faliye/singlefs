@@ -300,6 +300,7 @@ fn written_journal_positions(operations: &[RetainedOperation]) -> WrittenJournal
                 ));
             }
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::UnitWrite
             | StepKind::RootRecordFua
             | StepKind::Barrier => {}
@@ -403,11 +404,11 @@ fn a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from
     };
     assert_eq!(
         written.system_configuration_tails.len(),
-        8,
-        "取号两份 + 三次发布各两份"
+        10,
+        "取号两轮四份 + 三次发布各两份"
     );
     assert_eq!(
-        written.system_configuration_tails[2..],
+        written.system_configuration_tails[4..],
         [tail_written(6), tail_written(7), tail_written(8)].concat(),
         "每次发布轮换的系统配置 tail 是那次的 jsn（6、7、8），不是 txg（5、6、7）"
     );

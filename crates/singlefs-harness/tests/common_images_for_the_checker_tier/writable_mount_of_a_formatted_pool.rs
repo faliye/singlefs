@@ -60,15 +60,19 @@ pub fn region_device(txg: u64) -> DeviceIdentity {
 /// I-9.27（树表条目的头 ID 取值） 与 I-5.5（从 mkfs 水位建树那一版的 t1 落点） 三张没有文件的表都有：每条根的树表都是 0 条，
 /// 头 ID 一格都没有，也没有哪一版是从 mkfs 水位第一次建树的那一版（第一个文件版本之后两条都真被评估过且成立）。
 /// 删除线那五条（里程碑三·3）五张没有文件的表都有：I-9.5（删除队列里的号仍在树里） 与 I-3.4（可用空间扣待删占用） 要树表里的
-/// `deleted_inodes`、inode 树与记账树，每一版树表都是 0 条（第一个文件版本之后两条都真被评估过且成立）；I-4.7（删除中 inode 有账） 与
-/// I-4.6（中间态其余不变量成立） 没有处于删除中的号；I-4.4（意图只描述目标态） 第一版恒报不适用（下面每一张表都有它）。
+/// `deleted_inodes`、inode 树与记账树，每一版树表都是 0 条（第一个文件版本之后两条都真被评估过且成立）；I-4.7（删除中 inode 有账） 没有处于删除中的号；
+/// I-4.6（中间态其余不变量成立）、I-4.10（截断中间态有账） 与 I-9.38（数据单元声明长度对 size） 自截断起每条记录都判（m4-trunc-r1 判决 K7 T-2 到 T-4），
+/// I-9.39（截断字段之外的活单元不早于它，m4-trunc-r2 判决 R6）同样每条记录判一次，每一版树表都是 0 条、一条 inode 记录都没有
+/// （第一个文件版本之后四条都真被评估过且成立）；I-4.4（意图只描述目标态） 第一版恒报不适用（下面每一张表都有它）。
+/// I-9.40（extent 上段形状由有条目的 inode 号集合定，判决 m3-multi-file-unlink-r1 第三节 M2）要树表里的 extent 树，每一版树表都是 0 条
+/// （第一个文件版本之后真被评估过且成立）。
 /// 墓碑与谱系那九条（里程碑三·3，第 22 批）五张没有文件的表都有：I-9.17–I-9.23 要墓碑树、谱系树（每一版树表都是 0 条，有了文件版本也是零根，
 /// 下面两张有文件的表照样有这七条），I-9.24（删除队列至多一条 key） 要 `deleted_inodes` 条目、I-9.29（同号只许一个出生代） 要 inode 记录
 /// （第一个文件版本之后两条都真被评估过且成立）。I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上） 要最新根下面的记账树
 /// （第一个文件版本之后真被评估过且成立：那一版自己写的那一行就是第一级台阶）。退役树那五条（I-9.31–I-9.35，第 50 批）同样没有对象：
 /// 每一版树表都是 0 条，没有退役树、没有 inode 树。谱系树与退役树的容器容量那两条（I-9.36、I-9.37，第 53 批）同理没有对象
 /// （有了文件版本两棵也是零根，下面两张有文件的表照样有它们；旧入口没有谱系与退役的旋钮值，I-9.37 一格都不判）。
-pub const NOT_APPLICABLE_WITHOUT_FILE: [&str; 53] = [
+pub const NOT_APPLICABLE_WITHOUT_FILE: [&str; 57] = [
     "I-9.27",
     "I-5.5",
     "I-1.10",
@@ -122,6 +126,10 @@ pub const NOT_APPLICABLE_WITHOUT_FILE: [&str; 53] = [
     "I-9.35",
     "I-9.36",
     "I-9.37",
+    "I-4.10",
+    "I-9.38",
+    "I-9.39",
+    "I-9.40",
 ];
 
 /// mkfs 刚写完那一份比 `NOT_APPLICABLE_WITHOUT_FILE` 多报四条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法）、
@@ -130,7 +138,7 @@ pub const NOT_APPLICABLE_WITHOUT_FILE: [&str; 53] = [
 /// I-3.5（引用区间的精确性） 两张表都有，这一格的理由是回退候选集只剩 mkfs 的第 0 代根一版（环里没有记录、根环里只有它），
 /// 凑不出相邻的一对。
 /// 删除线那五条与墓碑与谱系那九条的理由同 `NOT_APPLICABLE_WITHOUT_FILE`。
-pub const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 57] = [
+pub const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 61] = [
     "I-9.27",
     "I-5.5",
     "I-1.10",
@@ -188,6 +196,10 @@ pub const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 57] = [
     "I-9.35",
     "I-9.36",
     "I-9.37",
+    "I-4.10",
+    "I-9.38",
+    "I-9.39",
+    "I-9.40",
 ];
 
 /// 写完第一个文件版本之后仍报不适用的那六条（I-4.1 的理由见 `NOT_APPLICABLE_WITHOUT_FILE`）：
@@ -200,22 +212,23 @@ pub const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 57] = [
 /// I-8.8（前缀里的事务不被切开）——第一版一事务一条、每条都带提交标记，③ ④ 没有对象。
 /// 三条比得出来的镜像都在 `checker_known_bad_images.rs`（再覆盖写一次：树表两版、事务号 1 与 2；
 /// B 之后再接一事务两条记录的阳性对照与坏镜像）。
-/// I-4.7（删除中 inode 有账） 与 I-4.6（中间态其余不变量成立）——没有删除，没有处于删除中的号、没有 nlink = 0 的记录
-/// （阳性对照与坏镜像在 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）；I-4.4（意图只描述目标态） 第一版恒报不适用；
+/// I-4.7（删除中 inode 有账）——没有删除，没有处于删除中的号
+/// （阳性对照与坏镜像在 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`；I-4.6 自截断起每条记录都判，这一版文件的记录上真被评估过且成立）；
+/// I-4.4（意图只描述目标态） 第一版恒报不适用；
 /// I-9.17–I-9.23——没有删除、没有回退，墓碑树与谱系树都是零根；I-9.31–I-9.34——没有叶容器身份消失，退役树零根
 /// （I-9.35 在第一个文件版本那一版上真被评估过且成立：父版树表 0 条、叶身份集是空集）。
-pub const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 22] = [
-    "I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-4.1", "I-9.28", "I-4.7", "I-4.6", "I-4.4", "I-9.17",
-    "I-9.18", "I-9.19", "I-9.20", "I-9.21", "I-9.22", "I-9.23", "I-9.31", "I-9.32", "I-9.33",
-    "I-9.34", "I-9.36", "I-9.37",
+pub const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 21] = [
+    "I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-4.1", "I-9.28", "I-4.7", "I-4.4", "I-9.17", "I-9.18",
+    "I-9.19", "I-9.20", "I-9.21", "I-9.22", "I-9.23", "I-9.31", "I-9.32", "I-9.33", "I-9.34",
+    "I-9.36", "I-9.37",
 ];
 
 /// 只有实例 1 的池上第一个文件版本之后：比 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION` 多 I-3.12（实例表行 T 低于引用它的根的 txg）——
 /// 实例表一行都没有（写过行的那一份上它真被评估过且成立）。
-pub const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 23] = [
-    "I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-3.12", "I-4.1", "I-9.28", "I-4.7", "I-4.6", "I-4.4",
-    "I-9.17", "I-9.18", "I-9.19", "I-9.20", "I-9.21", "I-9.22", "I-9.23", "I-9.31", "I-9.32",
-    "I-9.33", "I-9.34", "I-9.36", "I-9.37",
+pub const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 22] = [
+    "I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-3.12", "I-4.1", "I-9.28", "I-4.7", "I-4.4", "I-9.17",
+    "I-9.18", "I-9.19", "I-9.20", "I-9.21", "I-9.22", "I-9.23", "I-9.31", "I-9.32", "I-9.33",
+    "I-9.34", "I-9.36", "I-9.37",
 ];
 
 /// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少七条——I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、
@@ -231,7 +244,7 @@ pub const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 23] 
 /// I-3.5（引用区间的精确性） 也不在这张表里：写行那次发布（实例 2、txg 3）把实例表 COW 到新落点、写了自己那棵分配记录树，
 /// 这几个单元前一版（实例 1 的暖机根，txg 2）不引用、诞生代号 3 大于 2，出现规则真判到了它们且成立。
 /// 删除线那五条与墓碑与谱系那九条的理由同 `NOT_APPLICABLE_WITHOUT_FILE`。
-pub const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 46] = [
+pub const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 50] = [
     "I-9.27",
     "I-5.5",
     "I-3.1",
@@ -278,6 +291,10 @@ pub const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 46] = [
     "I-9.35",
     "I-9.36",
     "I-9.37",
+    "I-4.10",
+    "I-9.38",
+    "I-9.39",
+    "I-9.40",
 ];
 
 /// 交 checker 档：这一步的镜像上 checker 的每一条判决逐条核：`not_applicable` 里的报不适用（对拍字只分判到与没判到：核没判到），
@@ -379,7 +396,7 @@ pub fn the_third_writable_mount_keeps_the_instance_table_that_the_row_publish_sw
 /// mkfs 之后的录制流与新池新建文件那条逐字节相同、写出的那一版也相同；冷启动读回文件；checker 一条违例都没有（条数按今天的
 /// `IMPLEMENTED_INVARIANTS` 85 条数）——mkfs 之后 35 条成立（环是空的，I-8.6、I-8.9、I-8.10、I-8.12 也报不适用）、挂载之后 39 条成立，
 /// 没有记账树 / inode 树 / 分配记录树 / 映射条目的那几条报不适用，第一个文件版本之后 68 条成立、I-7.9、I-9.14、I-9.28、I-8.7、I-8.8、
-/// I-3.12、I-4.1、I-4.7、I-4.6、I-4.4 与墓碑树、谱系树那七条（I-9.17–I-9.23）仍报不适用（树表条目只出现在这一条根的树表里；同一实例只有一条非 0 事务号的记录；没有哪个事务号落了两条记录、
+/// I-3.12、I-4.1、I-4.7、I-4.4 与墓碑树、谱系树那七条（I-9.17–I-9.23）仍报不适用（树表条目只出现在这一条根的树表里；同一实例只有一条非 0 事务号的记录；没有哪个事务号落了两条记录、
 /// 每条都带提交标记；只有实例 1，实例表一行都没有；最新根之上没有记录；没有删除；I-4.4 第一版恒报不适用）。
 pub fn writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold(
     images: &mut PoolCheckerImages,

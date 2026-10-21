@@ -919,6 +919,7 @@ fn is_in_place_overwrite(base: &MemoryPool, writes: &[RetainedWrite], write_inde
     let is_unit_write = match write.kind {
         StepKind::UnitWrite => true,
         StepKind::ZeroFill
+        | StepKind::Discard
         | StepKind::JournalRecord
         | StepKind::RootRecordFua
         | StepKind::SystemConfigurationSlot
@@ -1086,6 +1087,7 @@ fn in_place_and_unit_writes(
         .partition(|write_index| match writes[*write_index].kind {
             StepKind::UnitWrite => false,
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::SystemConfigurationSlot
             | StepKind::JournalRecord
             | StepKind::RootRecordFua

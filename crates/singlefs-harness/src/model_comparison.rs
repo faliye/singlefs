@@ -8,33 +8,48 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal};
 use singlefs_core::instance_table::{
     InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex,
 };
+use singlefs_core::logged_operations::{live_compaction_intent_of_the_entries, CompactionRegion};
 use singlefs_core::mount::{
     InstanceRow, MountError, Mounted, RollbackCandidateExclusion, RollbackError,
     StillUnreadableAfterOneReread, Unmounted,
 };
-use singlefs_core::pointer::LocationEntry;
-use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
-use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
+use singlefs_core::pointer::{LocationEntry, NodePointer};
+use singlefs_core::records::{
+    mapping_key_for_node, mapping_key_sort_key, DeadlistEntry, InodeRecord,
+    INODE_RECORD_TRUNCATION_FIELD_OFFSET, NLINK_OF_AN_INODE_BEING_DELETED, TREE_KIND_EXTENT,
+    TREE_KIND_INODE, TREE_KIND_SNAPSHOT_EXTENT_ROOT, TREE_KIND_SNAPSHOT_INODE_ROOT,
+};
+use singlefs_core::recovery::{
+    RecoveryFailure, RecoveryOutcome, RecoveryReport, SnapshotFileReading,
+};
 use singlefs_core::retirement_tree::RetirementContainerIndexInTree;
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::RootRingSlot;
 use singlefs_core::tombstone_tree::TombstoneContainerIndexInTree;
 use singlefs_core::transaction::{
     AllocationRecordsOfTheVersionWithoutFile, PoolVersion, PublishError, PublishedUnit,
-    TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
+    SnapshotCreationRefusal, TransactionOutput, TransactionUnit, TruncationRefusal,
+    VersionWithoutFilePublishOutput, FIRST_INODE_NUMBER,
 };
-use singlefs_core::unit::{data_unit_payload, parse_data_unit};
+use singlefs_core::unit::{
+    data_unit_payload, data_unit_payload_capacity, parse_data_unit, UNIT_CLASS_INDEX_NODE,
+};
 
 use crate::model::{
-    ModelCheckpointTxg, ModelDeviceIdentity, ModelInstanceGeneration, ModelInstanceRow,
+    ModelCheckpointTxg, ModelCompactionIntent, ModelCompactionRegion, ModelDeadlistEntry,
+    ModelDeviceIdentity, ModelExtentUpperNodePosition, ModelInstanceGeneration, ModelInstanceRow,
     ModelJournalCounter, ModelRefusalReason, ModelRingPosition, ModelRootKey,
-    ModelUnitCopyLocation, ModelUnitRole, ObservedAllocationRecord, ObservedEffect, ObservedFile,
-    ObservedInstanceTable, ObservedReadBack, ObservedRefusalReason, ObservedRoot,
+    ModelUnitCopyLocation, ModelUnitRole, ModelUserVisibleRootUnit, ModelUserVisibleTree,
+    ObservedAllocationRecord, ObservedAllocationRecordsOfEveryUnit, ObservedEffect, ObservedFile,
+    ObservedInstanceTable, ObservedReadBack, ObservedRefusalReason, ObservedRoot, ObservedSnapshot,
+    ObservedSnapshotReadBack, ObservedSnapshotState, ObservedTruncationField,
     ObservedUnitAllocationRecords,
 };
 
@@ -62,17 +77,26 @@ pub fn model_root_key(instance: InstanceGeneration, checkpoint_txg: CheckpointTx
 #[must_use]
 pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
     let role = match unit {
-        // 文件的每个数据单元都是这一个角色：写内容的发布（第一个文件版本、覆盖写、顺序写）整份重写、单元同一个分配代，
-        // 不是最后一批的删除批留下的单元照抄（代码轮 U13：随机历史经会话的顺序写长出多于一片下段叶的文件）。
+        // 文件的每个数据单元在「这次重写了哪几个角色」里都是这一个角色；分配记录不走这里，按单元号逐个交
+        // （`allocation_records_of_every_role` 的 `data_units`，判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4：
+        // 截断只重写尾单元之后各单元的分配代不同）。
         TransactionUnit::Data(_) => ModelUnitRole::Data,
-        // 模型只罩 inode 1：extent 树上段只有根兼叶（D8（核心索引结构） 已定项 14）；一个单元的文件那个指针内嵌在它的条目里，
-        // 多个单元的文件条目指着下段根。
+        // extent 树上段的根（D8（核心索引结构） 已定项 14）；一个单元的文件那个指针内嵌在它的条目里，多个单元的文件条目指着下段根。
         TransactionUnit::ExtentRoot => ModelUnitRole::ExtentRoot,
         // 下段的节点不对应角色（同分配记录树根之下的节点）：一次删除批只重写被截掉那一片下段叶与它的祖先、别的照抄，
         // 一版里下段各节点的分配代不止一个，模型不记是哪几片；它们的分配代、位置与记录归池级 checker 判，占槽模型按层数现算上界。
         TransactionUnit::ExtentLowerNode(_) => return None,
+        // 第一个文件之外的文件（按 inode 号写数据写出来的，里程碑「删除与多次 COW」一·1）：数据单元按 (inode 号, 单元号) 另交
+        // （`allocation_records_of_every_role` 的 `data_units_of_the_files_other_than_the_first`），下段节点同第一个文件的下段不对应角色。
+        TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+        | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. } => return None,
+        // 上段根之下的节点（写的号落在上段第 0 片叶之外时上段长层）按位置各是一个角色：形状只由有条目的 inode 号集合定，一次发布重写哪几个、
+        // 照抄哪几个由模型自己的规范形计划答（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2、M4），逐个比分配代。
         TransactionUnit::ExtentUpperNodeBelowTheRoot(position) => {
-            panic!("模型今天只罩 inode 1 一个文件（上段只有根兼叶）：{position:?}")
+            ModelUnitRole::ExtentUpperNodeBelowTheRoot(ModelExtentUpperNodePosition {
+                level: u64::from(position.level),
+                index_in_level: position.index,
+            })
         }
         // inode 树的每片叶容器按它在树里左起的位置各是一个角色（最左那片是 `InodeLeaf`，之后每片各一个）：删完第一个文件之后
         // 一次建一个 inode（`history.rs` 的 `HistoryOperation::CreateInode`），满 233 条在末尾分裂、左半不动（D8（核心索引结构） 已定项 6），
@@ -89,6 +113,11 @@ pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
         // 节点数的上界（`model::accounting_tree_nodes_upper_bound`）。
         TransactionUnit::AccountingTreeNodeBelowTheRoot(_) => return None,
         TransactionUnit::AccountingTree => ModelUnitRole::AccountingTree,
+        // deadlist 树（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3）：只在有快照时有节点，模型不记它的落点与分配代
+        // （同记账树根之下的节点）；它们的分配代、位置与记录归池级 checker 判。
+        TransactionUnit::DeadlistTreeNodeBelowTheRoot(_) | TransactionUnit::DeadlistTree => {
+            return None
+        }
         // 中央映射树根之下的节点不对应角色（同分配记录树根之下的节点）：每个数据单元一条映射条目，数据单元加别的进映射的单元
         // 多于一片叶装的 294 条时（随机历史里是跨三片下段叶的那一档），映射树从中间切开、长出根之下的节点（D8（核心索引结构） 已定项 11）；
         // 哪几片这次重写由这次删插了哪些 key 定，模型不记 key、不记是哪几片。它们的分配代、位置与记录归池级 checker 判，
@@ -96,7 +125,7 @@ pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
         TransactionUnit::MappingTreeNodeBelowTheRoot(_) => return None,
         TransactionUnit::MappingTree => ModelUnitRole::MappingTree,
         TransactionUnit::TreeTable => ModelUnitRole::TreeTable,
-        // 删除那两棵树（里程碑三·2 第 8 条）：`deleted_inodes` 至多一条 key（只有 inode 1），根兼叶一个节点；墓碑一次 unlink 一条、
+        // 删除那两棵树（里程碑三·2 第 8 条）：`deleted_inodes` 至多一条 key（会话每次用户改动先把队列走空、unlink 一次调用走完全部批，D8（核心索引结构） 已定项 16 第 6 条；号可以是任一 inode），根兼叶一个节点；墓碑一次 unlink 一条、
         // 一片容器装几百条，模型罩的历史里墓碑树恒只有容器 1 那一片与根兼索引的根，根之下的节点只在只供测试的容量旋钮压小时出现。
         TransactionUnit::DeletedInodesRoot => ModelUnitRole::DeletedInodesRoot,
         TransactionUnit::TombstoneLeafContainer(index) => {
@@ -116,6 +145,9 @@ pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
         TransactionUnit::LineageLeafContainer(_)
         | TransactionUnit::LineageRoot
         | TransactionUnit::LineageNodeBelowTheRoot(_) => return None,
+        // logged_ops 根（整理意图，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1）：模型罩的历史里至多一条意图、根兼叶一个节点，
+        // 签发那次写、之后照抄、删意图那次没了，模型逐版记它的分配代（= 签发那次的 txg）。
+        TransactionUnit::LoggedOperationsRoot => ModelUnitRole::LoggedOperationsRoot,
         // 退役树（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条，照墓碑树）：模型罩的历史里只有删第一个文件那次最后一批
         // 让唯一那片叶容器身份消失，退役树恒只有容器 1 那一片与根（回退之后再删一次追加进同一片）。
         TransactionUnit::RetirementLeafContainer(index) => {
@@ -164,28 +196,292 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
                 &output.root,
             ),
         ),
+        snapshot_state: observed_snapshot_state_of_file_version(output),
+        logged_compaction_intent: observed_logged_compaction_intent(output),
+        first_file_record_truncation_field: output
+            .inode_record
+            .as_ref()
+            .map(observed_truncation_field_of_the_record),
+        inodes_other_than_the_first: observed_inodes_other_than_the_first_of_file_version(output),
     }
 }
 
-/// 这一版的文件内容：文件第 0、1、2…… 个数据单元的载荷（各按单元头里的声明长度取）按单元号接起来；单元号要从 0 起连着、
-/// 每个号恰好一个单元，不然解不出。
+/// 这一版第一个文件之外的每个活着的 inode（nlink 不是 0）读回的内容（里程碑「删除与多次 COW」一·1）：那个文件的数据单元
+/// （`TransactionUnit::DataOfAFileOtherThanTheFirst`）按单元号接起来，各按单元头里的声明长度取载荷，接到它那条记录的 size；单元号要从 0 起连着、
+/// 每个号恰好一个，接出来的长度要恰好是 size（这个文件只经按 inode 号写数据从偏移 0 整份写，没有洞）。没有数据单元的要 size 0（读回空）。
+#[must_use]
+pub fn observed_inodes_other_than_the_first_of_file_version(
+    output: &TransactionOutput,
+) -> BTreeMap<u64, ObservedFile> {
+    let mut data_units_by_inode: BTreeMap<u64, Vec<(u64, &[u8])>> = BTreeMap::new();
+    for unit in &output.units {
+        if let TransactionUnit::DataOfAFileOtherThanTheFirst { inode, unit: index } = unit.identity
+        {
+            data_units_by_inode
+                .entry(inode.0)
+                .or_default()
+                .push((index.0, unit.bytes.as_slice()));
+        }
+    }
+    output
+        .inode_leaf_containers
+        .iter()
+        .flat_map(|container| container.contents.records.iter())
+        .filter(|record| {
+            record.inode != FIRST_INODE_NUMBER && record.nlink != NLINK_OF_AN_INODE_BEING_DELETED
+        })
+        .map(|record| {
+            let mut data_units = data_units_by_inode
+                .remove(&record.inode)
+                .unwrap_or_default();
+            data_units.sort_by_key(|(index, _)| *index);
+            (
+                record.inode,
+                content_of_a_file_other_than_the_first(record.size, &data_units),
+            )
+        })
+        .collect()
+}
+
+/// 第一个文件之外一个文件读回的内容（[`observed_inodes_other_than_the_first_of_file_version`]）：`data_units` 按单元号升序。
+fn content_of_a_file_other_than_the_first(
+    size_in_bytes: u64,
+    data_units: &[(u64, &[u8])],
+) -> ObservedFile {
+    let mut content_read_back = Vec::new();
+    // 迭代上界：这个文件的数据单元数；跨轮只往内容末尾追加；提前出口两个：单元号断了或重了、一个单元解不开。
+    for (expected_index, (index, bytes)) in (0_u64..).zip(data_units) {
+        if *index != expected_index {
+            return ObservedFile::Undecodable {
+                what: format!(
+                    "数据单元号不是从 0 起连着的：第 {expected_index} 个位置上是 {index}"
+                ),
+            };
+        }
+        match parse_data_unit(bytes)
+            .and_then(|header| data_unit_payload(bytes, header.declared_length))
+        {
+            Ok(payload) => content_read_back.extend_from_slice(payload),
+            Err(error) => {
+                return ObservedFile::Undecodable {
+                    what: format!("第 {index} 个数据单元解不开：{error:?}"),
+                }
+            }
+        }
+    }
+    if u64::try_from(content_read_back.len()).expect("内容长度装得进 u64") != size_in_bytes {
+        return ObservedFile::Undecodable {
+            what: format!(
+                "{} 个数据单元接起来 {} 字节，记录的 size 是 {size_in_bytes}",
+                data_units.len(),
+                content_read_back.len()
+            ),
+        };
+    }
+    ObservedFile::Decoded(content_read_back)
+}
+
+/// 第一个文件那条 inode 记录里截断字段那两段的原样值：取记录写成盘上字节（`InodeRecord::to_bytes`）之后从核心层的截断字段起点
+/// （`singlefs_core::records::INODE_RECORD_TRUNCATION_FIELD_OFFSET`，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1：
+/// 起点是 T、紧接着是 N_w，各 8 字节小端）起的两个小端 u64，不判合法性（模型比）。偏移只认核心层那一处定义，胶水不另写一份数；
+/// 仍从记录写成的字节里取、不读记录的字段：`to_bytes` 把字段写错位置时模型这一侧照样比得出来。
+fn observed_truncation_field_of_the_record(record: &InodeRecord) -> ObservedTruncationField {
+    let bytes = record.to_bytes();
+    let truncation_txg_offset_in_bytes = usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET)
+        .expect("截断字段的起点在 140 字节的 inode 记录里，装得进 usize");
+    let truncated_size_offset_in_bytes =
+        truncation_txg_offset_in_bytes + std::mem::size_of::<u64>();
+    let little_endian_u64_at = |offset_in_bytes: usize| {
+        u64::from_le_bytes(
+            bytes[offset_in_bytes..offset_in_bytes + std::mem::size_of::<u64>()]
+                .try_into()
+                .expect("截断字段两段各 8 字节都在 140 字节的 inode 记录里"),
+        )
+    };
+    ObservedTruncationField {
+        truncation_txg: ModelCheckpointTxg(little_endian_u64_at(truncation_txg_offset_in_bytes)),
+        size_in_bytes: little_endian_u64_at(truncated_size_offset_in_bytes),
+    }
+}
+
+/// 整理区域换成模型那一份（一个聚簇段：盘、起始槽、槽数）。
+#[must_use]
+pub fn model_compaction_region(region: CompactionRegion) -> ModelCompactionRegion {
+    ModelCompactionRegion {
+        device: ModelDeviceIdentity(region.device().0),
+        start_slot: region.start_slot().0,
+        slot_count: region.slot_count(),
+    }
+}
+
+/// 模型那一份整理区域换回实现的（执行器拿它判实现交回的一版 R 按记录全空没有）：起始槽不对齐、装不进 6 字节、槽数不是一个聚簇段的交回 `None`
+/// （模型记的 R 都是从实现的 R 换过来的，走不到）。
+#[must_use]
+pub fn compaction_region_of_the_model(region: ModelCompactionRegion) -> Option<CompactionRegion> {
+    let of_one_segment = CompactionRegion::of_one_cluster_segment(
+        DeviceIdentity(region.device.0),
+        SlotNumber(region.start_slot),
+    )
+    .ok()?;
+    (of_one_segment.slot_count() == region.slot_count).then_some(of_one_segment)
+}
+
+/// 有树的一版 logged_ops 里那一条活整理意图（签发 txg、R、`c0`；`segs0` 模型不比），没有为 `None`。
+#[must_use]
+pub fn observed_logged_compaction_intent(
+    output: &TransactionOutput,
+) -> Option<ModelCompactionIntent> {
+    live_compaction_intent_of_the_entries(&output.logged_operations).map(|(issued_txg, intent)| {
+        ModelCompactionIntent {
+            issued_txg: model_txg(issued_txg),
+            region: model_compaction_region(intent.region),
+            allocation_generation_at_issue: model_txg(intent.allocation_generation_at_issue),
+        }
+    })
+}
+
+/// 这一次整理发布搬走的单元里，有哪几个是这一版树表引用着的用户可见树的根单元（活头的 inode 树、extent 树那两条，与每个快照的码 14、码 15）：
+/// 树表条目的根指针按它的映射 key（码 2，`records::mapping_key_for_node`：出生树、出生 txg、实例代号、出生序号，搬迁不改）去搬迁表里找。
+/// 一个单元被几条条目引用（快照抄的是活头那一个）只交一次。按（树、出生 txg）升序。
+#[must_use]
+pub fn user_visible_root_units_relocated_by_this_publish(
+    version: &TransactionOutput,
+) -> Vec<ModelUserVisibleRootUnit> {
+    let relocated_keys: BTreeSet<&[u8]> = version
+        .units_relocated_by_this_publish
+        .iter()
+        .map(|relocated| relocated.mapping_key.as_slice())
+        .collect();
+    let units: BTreeSet<ModelUserVisibleRootUnit> = version
+        .tree_table_entries
+        .iter()
+        .filter(|entry| entry.root != NodePointer::empty_root())
+        .filter_map(|entry| {
+            let tree = match entry.kind {
+                TREE_KIND_INODE | TREE_KIND_SNAPSHOT_INODE_ROOT => ModelUserVisibleTree::InodeTree,
+                TREE_KIND_EXTENT | TREE_KIND_SNAPSHOT_EXTENT_ROOT => {
+                    ModelUserVisibleTree::ExtentTree
+                }
+                _ => return None,
+            };
+            relocated_keys
+                .contains(mapping_key_for_node(UNIT_CLASS_INDEX_NODE, entry.root).as_slice())
+                .then_some(ModelUserVisibleRootUnit {
+                    tree,
+                    birth_txg: model_txg(entry.root.head.birth_txg),
+                })
+        })
+        .collect();
+    units.into_iter().collect()
+}
+
+/// 有树的一版的快照那几样（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S7）：活头 inode 树那条条目的
+/// `previous_snapshot_txg`、树表里的码 14 条目按（诞生 txg, 树号）升序（派生链的次序，与 `transaction::next_side_of_the_snapshot` 同一个排法）
+/// 连同与它配对的码 15（头 ID 是它的树号）、deadlist 条目数、留存的映射条目数。
+///
+/// # Panics
+/// 一条码 14 没有配对的码 15：发布路径成对写、重建时配对判过（`recovery::snapshot_tree_table_entries_paired_one_to_one`）。
+#[must_use]
+pub fn observed_snapshot_state_of_file_version(
+    output: &TransactionOutput,
+) -> ObservedSnapshotState {
+    let mut snapshot_inode_roots: Vec<_> = output
+        .tree_table_entries
+        .iter()
+        .filter(|entry| entry.kind == TREE_KIND_SNAPSHOT_INODE_ROOT)
+        .collect();
+    snapshot_inode_roots.sort_by_key(|entry| (entry.birth_txg, entry.tree));
+    let snapshots = snapshot_inode_roots
+        .into_iter()
+        .map(|inode_root| {
+            let extent_root = output
+                .tree_table_entries
+                .iter()
+                .find(|entry| {
+                    entry.kind == TREE_KIND_SNAPSHOT_EXTENT_ROOT
+                        && entry.head_identifier == inode_root.tree.0
+                })
+                .expect("每条码 14 配一条头 ID 是它树号的码 15（发布路径成对写，重建时配对判过）");
+            ObservedSnapshot {
+                birth_txg: model_txg(inode_root.birth_txg),
+                previous_snapshot_txg: model_txg(inode_root.previous_snapshot_txg),
+                is_being_destroyed: output.snapshots_being_destroyed.contains(&inode_root.tree),
+                inode_tree_written_by: model_root_key(
+                    inode_root.root.instance,
+                    inode_root.root.head.birth_txg,
+                ),
+                extent_root_written_at: model_txg(extent_root.root.head.birth_txg),
+            }
+        })
+        .collect();
+    ObservedSnapshotState {
+        live_head_previous_snapshot_txg: Some(model_txg(
+            output.previous_snapshot_txg_of_the_live_head(),
+        )),
+        snapshots,
+        deadlist_entries: output
+            .deadlist_entries
+            .iter()
+            .map(observed_deadlist_entry)
+            .collect(),
+        pinned_mapping_entries: u64::try_from(output.mapping_entries_kept_for_the_snapshots.len())
+            .expect("条数"),
+    }
+}
+
+/// 一条 deadlist 条目换成模型那一份：纪元与映射 key 的打头三段（类标签、出生树、出生 txg，`records::mapping_key_sort_key` 的前三段）。
+/// 映射 key 末段模型不比（[`ModelDeadlistEntry`] 的文档）。
+fn observed_deadlist_entry(entry: &DeadlistEntry) -> ModelDeadlistEntry {
+    let (unit_class, birth_tree, birth_txg, _instance, _tail) =
+        mapping_key_sort_key(&entry.mapping_key);
+    ModelDeadlistEntry {
+        epoch: model_txg(entry.epoch),
+        mapping_key_unit_class: unit_class,
+        mapping_key_birth_tree: birth_tree,
+        birth_txg: ModelCheckpointTxg(birth_txg),
+    }
+}
+
+/// 读一个快照读出了什么（`recovery::read_the_first_file_of_a_snapshot` 的结局），换成模型的观测。
+#[must_use]
+pub fn observed_snapshot_read_back(
+    reading: &Result<SnapshotFileReading, RecoveryFailure>,
+) -> ObservedSnapshotReadBack {
+    match reading {
+        Ok(SnapshotFileReading::NoFile) => ObservedSnapshotReadBack::NoFile,
+        Ok(SnapshotFileReading::File(content)) => ObservedSnapshotReadBack::File(content.clone()),
+        Ok(SnapshotFileReading::NoSnapshotWithThisTree) => {
+            ObservedSnapshotReadBack::NoSnapshotWithThisTree
+        }
+        Err(failure) => ObservedSnapshotReadBack::Failed {
+            what: format!("{failure:?}"),
+        },
+    }
+}
+
+/// 这一版的文件内容：文件第 0、1、2…… 个数据单元的载荷（各按单元头里的声明长度取）按单元号接起来，接到记录的 size 为止；单元号要从 0 起连着、
+/// 每个号恰好一个单元，不然解不出。size 罩的单元（⌈size ÷ 净荷⌉.max(1) 个）之外还挂着的不接（截断途中，判决
+/// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2：读者不读它们）；接出来的短于 size 时之后是尾部的洞，补 0 到 size（K5：读洞答 0）；
+/// 长于 size 的解不出。
 /// inode 1 不是活记录（删除中的记录 nlink = 0、删完树里没有它，D8（核心索引结构） 已定项 16 第 4 条）时这一版没有读得出的文件：
 /// 意图那次之后数据单元还在，按单元取会读出被删的内容。
 #[must_use]
 pub fn observed_file_of_file_version(output: &TransactionOutput) -> ObservedFile {
-    match &output.inode_record {
+    let size_in_bytes = match &output.inode_record {
         None => return ObservedFile::NoFile,
         Some(record) if record.nlink == NLINK_OF_AN_INODE_BEING_DELETED => {
             return ObservedFile::NoFile
         }
-        Some(_) => {}
-    }
+        Some(record) => record.size,
+    };
+    let payload_capacity = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+    let data_units_within_the_size = size_in_bytes.div_ceil(payload_capacity).max(1);
     let mut data_units: Vec<(u64, &[u8])> = output
         .units
         .iter()
         .filter_map(|unit| {
             if let TransactionUnit::Data(DataUnitIndexInFile(index)) = unit.identity {
-                Some((index, unit.bytes.as_slice()))
+                (index < data_units_within_the_size).then_some((index, unit.bytes.as_slice()))
             } else {
                 None
             }
@@ -218,6 +514,16 @@ pub fn observed_file_of_file_version(output: &TransactionOutput) -> ObservedFile
             }
         }
     }
+    let size = usize::try_from(size_in_bytes).expect("模型罩的历史里 size 装得进 usize");
+    if content.len() > size {
+        return ObservedFile::Undecodable {
+            what: format!(
+                "size 罩的 {data_units_within_the_size} 个数据单元接起来 {} 字节，长于记录的 size {size_in_bytes}",
+                content.len()
+            ),
+        };
+    }
+    content.resize(size, 0);
     ObservedFile::Decoded(content)
 }
 
@@ -226,7 +532,9 @@ fn instance_table_page_of_role(identity: TransactionUnit) -> Option<InstanceTabl
     match identity {
         TransactionUnit::InstanceTable => Some(InstanceTablePageIndex::FIRST),
         TransactionUnit::InstanceTablePageAfterTheFirst(page) => Some(page),
-        TransactionUnit::Data(_)
+        TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+        | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+        | TransactionUnit::Data(_)
         | TransactionUnit::ExtentLowerNode(_)
         | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
         | TransactionUnit::ExtentRoot
@@ -236,9 +544,12 @@ fn instance_table_page_of_role(identity: TransactionUnit) -> Option<InstanceTabl
         | TransactionUnit::AllocationTree
         | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
         | TransactionUnit::AccountingTree
+        | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
+        | TransactionUnit::DeadlistTree
         | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
         | TransactionUnit::MappingTree
         | TransactionUnit::DeletedInodesRoot
+        | TransactionUnit::LoggedOperationsRoot
         | TransactionUnit::TombstoneLeafContainer(_)
         | TransactionUnit::TombstoneRoot
         | TransactionUnit::TombstoneNodeBelowTheRoot(_)
@@ -385,14 +696,47 @@ fn observed_allocation_records_on_the_slot(
 /// 这一版每个角色的单元在这一版分配记录里的那几条：`units` 里的每个角色按单元的槽号找；根记录直接指着、而 `units` 里没有的
 /// 两个角色按根记录里那条指针的两条位置条目找——实例表（带文件的一版在 mkfs 之后第一次重写之前）与树表（树表 0 条的一版从不重写
 /// mkfs 写的那一片）。这一版仍然有这两个角色，模型那一侧照样问它们（代码审阅第 12 条：两个方向都比，漏交的角色也报）。
-/// 带文件的一版与树表 0 条上写行的那一版共用这一处。
+/// 带文件的一版与树表 0 条上写行的那一版共用这一处。文件的数据单元按单元号另交（`data_units`，判决
+/// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4：截断只重写尾单元之后各单元的分配代不同，模型按单元号逐个比）。
 fn allocation_records_of_every_role(
     units: &[PublishedUnit],
     allocation_records: &[AllocationRecord],
     root: &RootRecord,
-) -> Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> {
+) -> ObservedAllocationRecordsOfEveryUnit {
+    let data_units: Vec<(u64, Vec<ObservedAllocationRecord>)> = units
+        .iter()
+        .filter_map(|unit| {
+            if let TransactionUnit::Data(DataUnitIndexInFile(index)) = unit.identity {
+                Some((
+                    index,
+                    observed_allocation_records_on_the_slot(allocation_records, unit.slot),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+    let data_units_of_the_files_other_than_the_first: Vec<(
+        (u64, u64),
+        Vec<ObservedAllocationRecord>,
+    )> = units
+        .iter()
+        .filter_map(|unit| {
+            if let TransactionUnit::DataOfAFileOtherThanTheFirst { inode, unit: index } =
+                unit.identity
+            {
+                Some((
+                    (inode.0, index.0),
+                    observed_allocation_records_on_the_slot(allocation_records, unit.slot),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
     let mut records_of_roles: Vec<(ModelUnitRole, Vec<ObservedAllocationRecord>)> = units
         .iter()
+        .filter(|unit| !matches!(unit.identity, TransactionUnit::Data(_)))
         .filter_map(|unit| {
             let role = model_unit_role(unit.identity)?;
             Some((
@@ -421,7 +765,11 @@ fn allocation_records_of_every_role(
         );
         records_of_roles.push((ModelUnitRole::TreeTable, records));
     }
-    records_of_roles
+    ObservedAllocationRecordsOfEveryUnit {
+        roles: records_of_roles,
+        data_units,
+        data_units_of_the_files_other_than_the_first,
+    }
 }
 
 /// 一次发布重写的角色（实现交回的 `rewritten`），换成模型的角色；分配记录树根之下的节点不对应角色，不进。
@@ -467,6 +815,10 @@ pub fn observed_root_of_version_without_file(
         file: ObservedFile::NoFile,
         instance_table,
         unit_allocation_records,
+        snapshot_state: ObservedSnapshotState::OF_A_VERSION_WITHOUT_TREES,
+        logged_compaction_intent: None,
+        first_file_record_truncation_field: None,
+        inodes_other_than_the_first: BTreeMap::new(),
     }
 }
 
@@ -572,6 +924,10 @@ fn observed_zero_unit_publish_carried_from_the_version_before(
         file: ObservedFile::NoFile,
         instance_table,
         unit_allocation_records,
+        snapshot_state: ObservedSnapshotState::OF_A_VERSION_WITHOUT_TREES,
+        logged_compaction_intent: None,
+        first_file_record_truncation_field: None,
+        inodes_other_than_the_first: BTreeMap::new(),
     };
     let carried_on =
         (instance_table_pointer_carried && allocation_record_tree_root_carried).then(|| {
@@ -683,9 +1039,17 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         }
         // 空间准入（D28（挂载期承诺量） 已定项 1 的式子）判这次的普通分配不够：模型的「单元区装不下」就是这一条准入（模型答允许拒绝的区间）。
         PublishError::SpaceAdmissionRefused(_) => explained(ModelRefusalReason::UnitAreaWall),
+        // 合取 7（全空聚簇段少于 `N₀`，只拦前台写入类发布）：此前借空间准入不够那一个成员报，模型照单元区墙认；分开报之后照旧认它。
+        PublishError::EmptyClusterSegmentsBelowTheFloor(_) => {
+            explained(ModelRefusalReason::UnitAreaWall)
+        }
         PublishError::ContentExceedsDataUnit { .. } => {
             explained(ModelRefusalReason::ContentExceedsDataUnitPayload)
         }
+        // 第一版同时活着的只读快照至多 10 个（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第七节岔路 1）。
+        PublishError::SnapshotCreationRefused(
+            SnapshotCreationRefusal::MoreSnapshotsThanTheFirstVersionAllows { .. },
+        ) => explained(ModelRefusalReason::MoreSnapshotsThanTheFirstVersionAllows),
         PublishError::FirstFileVersionDoesNotFollowTheVersionItBuildsOn { .. } => {
             explained(ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn)
         }
@@ -694,8 +1058,8 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         }
         // 释放判定路径的五种：上一版的映射或分配记录与上一版对不上、盘上那条指针的两条位置条目不同槽，健康的历史里不该出现。
         // 分配记录树重写集合迭代不收敛那一条同理：只有强制复用窗口为 0 的只供测试的开关下才可能走到，随机历史不装那个开关。
-        // inode 树写入被拒那一条同样：随机历史只在删完第一个文件之后建 inode、一次一个（`HistoryOperation::CreateInode`），
-        // 新记录恒追加在最右那片叶、满 233 条在末尾分裂；叶容器数到一个根装得下的 135 片之前（三万多次建 inode）不拒，
+        // inode 树写入被拒那一条同样：随机历史建 inode 一次一个（`HistoryOperation::CreateInode`）或一次几个、不跨叶容器
+        // （`HistoryOperation::CreateInodes`），号从水位起发、恒大于树里的每个号，新记录恒追加在最右那片叶、满 233 条在末尾分裂；叶容器数到一个根装得下的 135 片之前（三万多次建 inode）不拒，
         // 它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
         // 多层码 2 树算不出形状那一条同理：两棵树装不下一个节点时分裂、不拒，只有长到 257 层或上一版的形状按分隔 key 走不通才拒，
         // 随机历史里两棵树至多长一两层（记账树在建几百个 inode 之后、映射树在跨三片下段叶的文件上）；它出现就是模型与实现对不上。
@@ -730,12 +1094,46 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         | PublishError::WriteToAnInodeThatIsNotInTheTree { .. }
         | PublishError::UnlinkOfAnInodeThatIsNotALiveRecord { .. }
         | PublishError::DeletedInodesQueueRefused(_)
+        // 建快照时有快照在销毁中、水位加二越过 u64::MAX：会话先把销毁中的快照走完（判决第七节岔路 2），水位只在坏镜像上到顶，健康的内存盘上不该出现。
+        | PublishError::SnapshotCreationRefused(
+            SnapshotCreationRefusal::SnapshotBeingDestroyed { .. }
+            | SnapshotCreationRefusal::TreeIdentifierWatermarkLeavesNoRoomForTheSnapshotTrees { .. },
+        )
+        // 删快照点名的快照不在或正在删、deadlist 条目留存的映射条目没有或落点核不过：执行器只点名模型里活着的快照、一次删完，
+        // 健康的内存盘上不该出现。
+        | PublishError::SnapshotDestructionRefused(_)
+        | PublishError::DeadlistEntryNotReleasable { .. }
         | PublishError::BlockDevice(_)
         // 可写挂载取号之前预演读错、读坏那两拒：健康的内存盘上不出读错、读坏，模型里没有它们的理由。
         | PublishError::ReadFailedWhileRehearsingTheContinuationBeforeAcquisition(_)
         | PublishError::ReadBackFailingSelfVerificationWhileRehearsingTheContinuationBeforeAcquisition(_) => {
             ObservedRefusalReason::Unexplained
         }
+        PublishError::TruncationRefused(refusal) => refusal_reason_of_truncation_refusal(*refusal),
+        // 删完第一个文件之后给建的 inode 写数据（D8（核心索引结构） 已定项 16 射程 K-U5，用户 2026-10-19 定「拦」）。
+        PublishError::DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { .. } => {
+            explained(ModelRefusalReason::DataWriteToAnInodeBornAfterTheFirstFileWasDeleted)
+        }
+    }
+}
+
+/// 改 size 被拒说的是哪条理由（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K12）。
+#[must_use]
+pub fn refusal_reason_of_truncation_refusal(refusal: TruncationRefusal) -> ObservedRefusalReason {
+    match refusal {
+        TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows { .. } => {
+            explained(ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow)
+        }
+        // 第一版只有第一个文件写数据，别的 inode 改成别的 size 在任何写之前拒（调度记录「截甲交回」那一行第 ① 处，主 agent 定）。
+        TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
+            ..
+        } => explained(ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile),
+        // 执行器只点名树里活着的记录（第一个文件，或删完之后建的 inode）；尾单元的字节在内存池里都读得出；截断条目只经会话的走空续做，
+        // 走空只在有一条对得上的条目时调：健康的内存盘上这几种都不该出现，模型里没有它们的理由。
+        TruncationRefusal::InodeIsNotALiveRecord { .. }
+        | TruncationRefusal::TailDataUnitBytesNotInTheVersion { .. }
+        | TruncationRefusal::TruncationIntentDoesNotNameTheLiveRecord { .. }
+        | TruncationRefusal::NoTruncationIntentToContinue => ObservedRefusalReason::Unexplained,
     }
 }
 
@@ -786,6 +1184,10 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
         RollbackError::Publish(failed) => refusal_reason_of_publish_error(&failed.cause),
         RollbackError::CurrentVersionUnitNotReleasable { cause } => {
             refusal_reason_of_publish_error(cause)
+        }
+        // 第一版有快照就拒回退（判决 S8、岔路 3）：模型按它记着的活快照判同一条。
+        RollbackError::SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { .. } => {
+            explained(ModelRefusalReason::RollbackWithSnapshotsWhichTheFirstVersionRefuses)
         }
         RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
         | RollbackError::Recovery(_)
@@ -994,6 +1396,7 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_rollback_error(
         | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
         | RollbackError::IsolatedUnitCopyUnreadableOrMismatched { .. }
         | RollbackError::CurrentVersionUnitNotReleasable { .. }
+        | RollbackError::SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { .. }
         | RollbackError::Publish(_) => None,
     }
 }
@@ -1030,6 +1433,7 @@ pub fn unit_copy_unreadable_or_mismatched_of_rollback_error(
         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
         | RollbackError::CurrentVersionUnitNotReleasable { .. }
         | RollbackError::CandidateJudgementStillUnreadableAfterOneReread(_)
+        | RollbackError::SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { .. }
         | RollbackError::Publish(_) => None,
     }
 }
@@ -1494,6 +1898,38 @@ mod tests {
         );
     }
 
+    /// 改 size 被拒（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K12，调度记录「截甲交回」第 ① 处）：N 按整单元取整溢出与
+    /// 第一个文件之外的 inode 改成别的 size 各映射到模型自己那一条理由、互不相同；别的几种（健康的内存盘上走不到）是说不清的理由。
+    #[test]
+    fn each_truncation_refusal_the_model_has_a_reason_for_maps_to_its_own_reason() {
+        let mapped: Vec<ObservedRefusalReason> = [
+            TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows {
+                target_size_in_bytes: u64::MAX,
+            },
+            TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
+                inode: 2,
+            },
+            TruncationRefusal::InodeIsNotALiveRecord { inode: 1 },
+            TruncationRefusal::NoTruncationIntentToContinue,
+        ]
+        .into_iter()
+        .map(|refusal| refusal_reason_of_publish_error(&PublishError::TruncationRefused(refusal)))
+        .collect();
+        assert_eq!(
+            mapped,
+            vec![
+                ObservedRefusalReason::Explained(
+                    ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow
+                ),
+                ObservedRefusalReason::Explained(
+                    ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile
+                ),
+                ObservedRefusalReason::Unexplained,
+                ObservedRefusalReason::Unexplained,
+            ]
+        );
+    }
+
     /// 每一版的文件内容、整张实例表、全部角色的分配代都真的拿实现交回的东西比过（代码审阅第 12 条），不只在形状上对：
     /// 四段带挂载的短历史跑下来一条新发现都没有，四样计数都大于 0——胶水从实现的输出里解出了内容与实例表，
     /// 树表 0 条的那几版比过重写的角色集合。
@@ -1559,6 +1995,7 @@ mod tests {
                 }
                 ModelUnitRole::Data
                 | ModelUnitRole::ExtentRoot
+                | ModelUnitRole::ExtentUpperNodeBelowTheRoot(_)
                 | ModelUnitRole::InodeRoot
                 | ModelUnitRole::AllocationTree
                 | ModelUnitRole::AccountingTree
@@ -1566,6 +2003,7 @@ mod tests {
                 | ModelUnitRole::TreeTable
                 | ModelUnitRole::InstanceTable
                 | ModelUnitRole::DeletedInodesRoot
+                | ModelUnitRole::LoggedOperationsRoot
                 | ModelUnitRole::TombstoneLeaf
                 | ModelUnitRole::TombstoneRoot
                 | ModelUnitRole::RetirementLeaf

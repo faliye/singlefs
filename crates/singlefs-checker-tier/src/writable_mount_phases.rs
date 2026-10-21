@@ -137,6 +137,7 @@ pub(crate) fn writable_mount_phase_of_each_write(
                         StepKind::JournalRecord
                         | StepKind::RootRecordFua
                         | StepKind::ZeroFill
+                        | StepKind::Discard
                         | StepKind::SystemConfigurationSlot,
                         _,
                     ) => WritableMountPhase::InstanceTableSweepPublish,
@@ -179,6 +180,7 @@ pub(crate) fn writable_mount_phase_of_each_write(
                     | StepKind::JournalRecord
                     | StepKind::RootRecordFua
                     | StepKind::ZeroFill
+                    | StepKind::Discard
                     | StepKind::Barrier,
                 )
                 | (
@@ -200,6 +202,7 @@ pub(crate) fn writable_mount_phase_of_each_write(
                     | StepKind::JournalRecord
                     | StepKind::RootRecordFua
                     | StepKind::ZeroFill
+                    | StepKind::Discard
                     | StepKind::Barrier,
                 ) => phase_of_the_publish_after(root_records_written, phase, write),
             };

@@ -150,7 +150,7 @@ fn lowest_witness_at_every_crash_point(operations: &[RetainedOperation]) -> Vec<
                 devices_with_a_system_configuration_slot_write.insert(retained.operation.device);
                 open_system_configuration_writes.push(retained);
             }
-            StepKind::ZeroFill => assert!(
+            StepKind::ZeroFill | StepKind::Discard => assert!(
                 retained.operation.offset.0 >= system_configuration_end_in_bytes
                     || !devices_with_a_system_configuration_slot_write
                         .contains(&retained.operation.device),

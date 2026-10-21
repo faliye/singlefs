@@ -16,7 +16,9 @@ use crate::crash_facts::{
     check_the_slice_starts_against_the_expansions, segment_expansion_code_wgsl_constants,
     verdict_bits, SegmentExpansionFact, BASE_IMAGE_SOURCE, MAXIMUM_ENUMERATED_WRITES,
 };
-use crate::gpu_unit_checks::GpuCard;
+use crate::gpu_unit_checks::{
+    readback_mapping_callback, take_the_readback_after_the_wait_or_record_the_device_lost, GpuCard,
+};
 
 /// 每个工作组 64 个状态。
 const WORKGROUP_SIZE: usize = 64;
@@ -679,16 +681,22 @@ impl<'card> GpuFactsVerifier<'card> {
         self.card.queue().submit(std::iter::once(encoder.finish()));
         let slice = staging.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |result| {
-            sender.send(result).expect("回调送得出去")
+        slice.map_async(wgpu::MapMode::Read, readback_mapping_callback(sender));
+        let polled = device.poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: None,
         });
-        device
-            .poll(wgpu::PollType::Wait {
-                submission_index: None,
-                timeout: None,
-            })
-            .expect("等 GPU 算完");
-        receiver.recv().expect("回调送达").expect("回读映射成功");
+        take_the_readback_after_the_wait_or_record_the_device_lost(
+            self.card.device_condition(),
+            polled,
+            &receiver,
+            |error| {
+                format!(
+                    "卡 {:?} 上等事实表核对算完没等成：{error:?}",
+                    self.card.name
+                )
+            },
+        );
         let mapped = slice.get_mapped_range().expect("读得到回读缓冲区");
         let (entries, remainder) = mapped.as_chunks::<4>();
         assert!(remainder.is_empty(), "回读缓冲区的长度是 4 的整数倍");
@@ -792,16 +800,22 @@ impl<'card> GpuFactsVerifier<'card> {
         self.card.queue().submit(std::iter::once(encoder.finish()));
         let slice = staging.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |result| {
-            sender.send(result).expect("回调送得出去")
+        slice.map_async(wgpu::MapMode::Read, readback_mapping_callback(sender));
+        let polled = device.poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: None,
         });
-        device
-            .poll(wgpu::PollType::Wait {
-                submission_index: None,
-                timeout: None,
-            })
-            .expect("等 GPU 算完");
-        receiver.recv().expect("回调送达").expect("回读映射成功");
+        take_the_readback_after_the_wait_or_record_the_device_lost(
+            self.card.device_condition(),
+            polled,
+            &receiver,
+            |error| {
+                format!(
+                    "卡 {:?} 上等事实表核对算完没等成：{error:?}",
+                    self.card.name
+                )
+            },
+        );
         let mapped = slice.get_mapped_range().expect("读得到回读缓冲区");
         let (entries, remainder) = mapped.as_chunks::<4>();
         assert!(remainder.is_empty(), "回读缓冲区的长度是 4 的整数倍");

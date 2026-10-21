@@ -1,12 +1,16 @@
 //! 把录制流切成段（D13（验证路线） 已定项 4：屏障与 FUA 写切段，段内任意整写子集），并按
 //! `layout/01-first-txn.md` 八那张登记表的写法报出段序列与每段的步骤种类多重集（门禁 doc-registries 的 segment-registry 格比对的形态）。
 //!
-//! 步骤种类六种（D17（实现分层与第三方管道） 已定项 2；第六种 2026-09-22 加，用户 2026-09-19 定案
-//! 「环清零写录制流登记成一种新步骤、崩溃点重放认它」，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行）：
-//! 整段清零、写单元、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障。
+//! 步骤种类七种（D17（实现分层与第三方管道） 已定项 2；整段清零 2026-09-22 加，用户 2026-09-19 定案
+//! 「环清零写录制流登记成一种新步骤、崩溃点重放认它」，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行；
+//! discard 是欠账 C829（discard 与 mkfs 清零在段种类串里同名）的出路，判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S7）：
+//! 整段清零、discard、写单元、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障。
 //! 一次**普通写**属于哪一种由它的落点决定（第一版几何写死：系统配置槽 / 根环区域 / journal 环 / 单元区）；
 //! 整段清零按**动作**归类、不看落点：它在块层就是另一个命令（真设备上映射成 WRITE ZEROES），
 //! 不是「写在某处」的一次写。今天唯一的清零是 mkfs 清 journal 环。
+//! discard（[`RecordedOperationKind::Discard`]）同样按动作归类，自成一种（种类串 `discard`），段种类多重集里与 mkfs 的整段清零分得开；
+//! 崩溃点重放按「范围写零」重建它（持久 → 0、没持久 → 旧字节），取几态照 D13（验证路线） 已定项 4（长于一个扇区、罩住的范围里原来有东西的
+//! 多取第三态，判决同一份第二节 S6），切段时算一次普通写（不放行、不关段）。
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,6 +26,9 @@ pub enum StepKind {
     /// 整段清零一次调用算一步（mkfs 清 journal 环）。声明序排在最前，种类串里它就写在最前面——
     /// mkfs 那一段里它本来也发在最前。
     ZeroFill,
+    /// discard 一次调用算一步（D26（后台整理与放置回收） 未定项 9「discard 的时机」：发布返回之后对可再分配的整段发）。
+    /// 按动作归类、不看落点，与整段清零分开记（C829（discard 与 mkfs 清零在段种类串里同名））。
+    Discard,
     UnitWrite,
     JournalRecord,
     RootRecordFua,
@@ -34,6 +41,7 @@ impl StepKind {
     pub const fn name(self) -> &'static str {
         match self {
             StepKind::ZeroFill => "zero_fill",
+            StepKind::Discard => "discard",
             StepKind::UnitWrite => "unit_write",
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
@@ -61,6 +69,8 @@ impl FixedGeometry {
         match operation.kind {
             RecordedOperationKind::Barrier => StepKind::Barrier,
             RecordedOperationKind::WriteZeroes => StepKind::ZeroFill,
+            // discard 按动作归类、自成一种（文件头）：段种类串里与整段清零分得开。
+            RecordedOperationKind::Discard => StepKind::Discard,
             RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
                 let offset = operation.offset.0;
                 let system_configuration_end = SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
@@ -116,8 +126,10 @@ impl SegmentClosingRule {
     /// 当前段一个写都没有时屏障不关段（流首那道屏障、刚关过段之后别的盘补发的那一道），它并进即将开始的那一段。
     pub fn after(&mut self, operation: &RecordedOperation) -> SegmentAfterOperation {
         match operation.kind {
-            // 清零是普通写那一档：不做持久、不放行，段里多算一个写。
-            RecordedOperationKind::Write | RecordedOperationKind::WriteZeroes => {
+            // 清零与 discard 是普通写那一档：不做持久、不放行，段里多算一个写。
+            RecordedOperationKind::Write
+            | RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard => {
                 self.writes_in_current_segment += 1;
                 self.devices_with_unreleased_writes.insert(operation.device);
                 SegmentAfterOperation::StaysOpen

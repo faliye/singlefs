@@ -11,13 +11,14 @@ mod common_root_ring_holes;
 mod scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount;
 
 use common::{
-    with_unreadable_ranges, FailingReadsOfARange, SharedUnreadableRanges, UnreadableRange,
-    UnreadableRangeReadBack,
+    with_unreadable_ranges, without_unreadable_ranges, FailingReadsOfARange,
+    SharedUnreadableRanges, UnreadableRange, UnreadableRangeReadBack,
 };
 use common_images_for_the_checker_tier::PoolCheckerImages;
 use common_root_ring_holes::{
-    content_of_the_version, parameters_of_the_ring_hole_pools, pool_of, recording_of,
+    content_of_the_version, devices_of, parameters_of_the_ring_hole_pools, pool_of, recording_of,
     RingHoleDevices, DEVICE_BYTES_OF_THE_RING_HOLE_POOLS,
+    WRITE_TIME_SECONDS_OF_THE_RING_HOLE_POOLS,
 };
 use scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::{
     head_bytes_at, image_after, instances_with_a_row_on, pool_with_a_dead_instance,
@@ -34,8 +35,12 @@ use singlefs_core::instance_table_sweep::{
 };
 use singlefs_core::make_filesystem::make_filesystem;
 use singlefs_core::mount::{
-    mount_writable, mount_writable_with_instance_table_sweep_configuration, ShadowLedger,
+    mount_writable, mount_writable_with_instance_table_sweep_configuration, unmount, MountError,
+    ShadowLedger, StillUnreadableAfterOneReread,
 };
+use singlefs_core::recovery::instance_table_chain_of_root;
+use singlefs_core::root_ring::{slot_offset, RootRingSlot};
+use singlefs_core::transaction::{publish_first_file, FirstFile, PoolVersion, PoolWriter};
 use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::SharedStream;
 
@@ -365,5 +370,222 @@ fn a_sweep_on_a_version_without_file_is_not_supported_and_writes_nothing() {
         swept_stream.operations().len(),
         not_swept_stream.operations().len(),
         "录制流一样长"
+    );
+}
+
+/// 读不出那一形接连挂几次（`research/prompts/rot-decisions-r1-opus-output.md`「要主 agent 跑的命令」一节给的 8 次）。
+const MOUNTS_WITH_ONE_ROOT_RING_SLOT_UNREADABLE: usize = 8;
+
+/// 读坏的那一个根环槽：(区域 2, 槽 3)，区域 2 住盘 0（第一版区域归属 0 / 1 / 0）。mkfs 与第一次挂载的那几条根落不到这一槽
+/// （第一次挂载之前就读坏它，择根照样择得到）；接连挂的那几次里根轮到它，写照落、读每次都报设备错。
+const UNREADABLE_ROOT_RING_SLOT: RootRingSlot = RootRingSlot { region: 2, slot: 3 };
+
+/// 一次挂载之后看到的：挂载末尾清扫的结局，与清扫之后现行那一版的实例表行数。
+struct MountWithAWriteAndAnUnmount {
+    sweep: InstanceTableSweepAtTheEndOfTheMount,
+    rows_after_the_sweep: usize,
+}
+
+/// mkfs 之后接连 [`MOUNTS_WITH_ONE_ROOT_RING_SLOT_UNREADABLE`] 次「可写挂载（有一行就扫）→ 写一个文件（树表 0 条就写第一个文件，否则覆盖写）
+/// → 正常卸载」，每次盘外面都包上同一份读故障 `ranges`；交回每次挂载看到的。读坏的那一槽这次挂载里写过根时正常卸载被拒（下面那一处注释），
+/// 盘面留成崩在写文件之后。
+fn mounts_with_a_write_and_an_unmount_each(
+    ranges: &SharedUnreadableRanges,
+) -> Vec<MountWithAWriteAndAnUnmount> {
+    let parameters = parameters_of_the_ring_hole_pools();
+    let mut devices_after_make_filesystem: RingHoleDevices = (0..2u32)
+        .map(|number| {
+            (
+                DeviceIdentity(number),
+                SparseBlockDevice::new(
+                    DEVICE_BYTES_OF_THE_RING_HOLE_POOLS,
+                    PhysicalBlockSizeInBytes(512),
+                ),
+            )
+        })
+        .collect();
+    make_filesystem(&parameters, &mut devices_after_make_filesystem).expect("mkfs");
+    let mut image = pool_of(&devices_after_make_filesystem);
+    let mut seen = Vec::new();
+    // 迭代上界：MOUNTS_WITH_ONE_ROOT_RING_SLOT_UNREADABLE 次挂载；跨轮携带的是上一次卸载之后的盘面。
+    for mount_index in 0..MOUNTS_WITH_ONE_ROOT_RING_SLOT_UNREADABLE {
+        let mut devices = with_unreadable_ranges(devices_of(&image), ranges);
+        let mounted = mount_writable_with_instance_table_sweep_configuration(
+            &parameters,
+            &mut devices,
+            SpaceAdmission::JudgedByTheFormula,
+            ShadowLedger::On,
+            sweeping_at_the_end_of_the_mount_on_any_row(),
+        )
+        .unwrap_or_else(|error| panic!("第 {mount_index} 次可写挂载做成：{error:?}"));
+        let instance = mounted.output.instance;
+        let mut allocator = mounted.allocator;
+        let mut current = mounted.current;
+        let rows_after_the_sweep = instance_table_chain_of_root(&devices, current.root())
+            .expect("现行那一版的实例表读得出")
+            .records
+            .rows
+            .len();
+        let written = match &current {
+            PoolVersion::WithoutFile(_) => {
+                let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+                publish_first_file(
+                    &mut writer,
+                    &mut allocator,
+                    current.root(),
+                    FirstFile {
+                        content: &content_of_the_version(0),
+                        write_time_seconds: WRITE_TIME_SECONDS_OF_THE_RING_HOLE_POOLS,
+                    },
+                    instance,
+                    current.record_bytes(),
+                )
+                .expect("第一个文件")
+            }
+            PoolVersion::WithFile(previous) | PoolVersion::WithTreesAndNoFile(previous) => {
+                let previous = previous.clone();
+                publish_an_overwrite(
+                    &mut devices,
+                    &mut allocator,
+                    &previous,
+                    &content_of_the_version(previous.root.checkpoint_txg.0 + 1),
+                    instance,
+                )
+            }
+        };
+        current = PoolVersion::of_a_version_of_trees(written);
+        // 正常卸载抬 F 时重读这个进程写过根的槽（D16（发布语义） 已定项 1「根槽这一次读坏」）：读坏的那一槽这次挂载里写过根，卸载就拒、
+        // 一个字节都不写，盘面留成崩在写文件之后（下一次挂载照恢复走）；别的拒绝都不该有。
+        match unmount(
+            &parameters,
+            &mut devices,
+            &mut allocator,
+            &mut current,
+            ShadowLedger::On,
+        ) {
+            Ok(_) => {}
+            Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
+                if matches!(
+                    *still_unreadable,
+                    StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { ring_slot, .. }
+                        if ring_slot == UNREADABLE_ROOT_RING_SLOT
+                ) => {}
+            Err(error) => panic!("第 {mount_index} 次正常卸载只会因为读坏的那一槽被拒：{error:?}"),
+        }
+        image = pool_of(&without_unreadable_ranges(devices));
+        seen.push(MountWithAWriteAndAnUnmount {
+            sweep: mounted.output.instance_table_sweep,
+            rows_after_the_sweep,
+        });
+    }
+    seen
+}
+
+/// 读坏的那一槽在盘上的那一段：`failing_reads` 给哪几次读坏，读坏时报设备错。
+fn unreadable_root_ring_slot(failing_reads: FailingReadsOfARange) -> SharedUnreadableRanges {
+    let parameters = parameters_of_the_ring_hole_pools();
+    SharedUnreadableRanges::new(
+        vec![UnreadableRange {
+            device: parameters.region_devices
+                [usize::try_from(UNREADABLE_ROOT_RING_SLOT.region).expect("区域号")],
+            offset_in_bytes: slot_offset(
+                UNREADABLE_ROOT_RING_SLOT,
+                parameters.geometry.fixed_structure_slot_spacing,
+            )
+            .0,
+            length_in_bytes: u64::from(parameters.geometry.physical_block_size),
+            failing_reads,
+        }],
+        UnreadableRangeReadBack::DeviceError,
+    )
+}
+
+/// 场景：根环 (区域 2, 槽 3) 每次读都报设备错（`research/prompts/rot-decisions-r1-opus-output.md`「要主 agent 跑的命令」一节；D18（块里携带什么信息）
+/// 已定项 11「回收」一条：根环每个槽都读成功才算「没有」，读不出的槽按「可能有该实例的根」算）。mkfs 之后接连 8 次「可写挂载（有一行就扫）→ 写一个文件
+/// → 正常卸载」；那一槽在这次挂载里写过根时正常卸载被拒（`RootRingSlotKnownToHoldARoot`），那一次照崩在写文件之后往下挂。
+/// 预期：每次清扫都停在那一槽：结局报 `NoRowDeleted(ARootRingSlotIsUnreadableOrAllZero)`、点名那一槽；清扫之后的实例表行数一次都不降
+/// （每次可写挂载写一行，行只增不删——C597（实例表行只增不删，删行的条件没有条款） 盯着的那笔代价）。对照见
+/// [`without_the_unreadable_root_ring_slot_the_same_mounts_delete_rows`]。
+#[test]
+fn a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_row() {
+    let ranges = unreadable_root_ring_slot(FailingReadsOfARange::Every);
+    let seen = mounts_with_a_write_and_an_unmount_each(&ranges);
+    assert!(ranges.failed_reads() > 0, "前提：那一槽真被读过、读坏过");
+    // 迭代上界：每次挂载一条；跨轮携带的是上一次清扫之后的行数。
+    let mut rows_before = 0;
+    for (mount_index, mount) in seen.iter().enumerate() {
+        if mount_index == 0 {
+            assert!(
+                matches!(
+                    mount.sweep,
+                    InstanceTableSweepAtTheEndOfTheMount::NotSweptAtOrBelowTheThreshold {
+                        rows: 0,
+                        ..
+                    }
+                ),
+                "mkfs 之后第一次挂载（实例 1）不写行、0 行不扫：{:?}",
+                mount.sweep
+            );
+        } else {
+            assert!(
+                matches!(
+                    mount.sweep,
+                    InstanceTableSweepAtTheEndOfTheMount::Swept(
+                        InstanceTableSweepOutcome::NoRowDeleted(
+                            NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { .. }
+                        )
+                    )
+                ),
+                "第 {mount_index} 次挂载的清扫停在根环一个读不出或全零的槽上：{:?}",
+                mount.sweep
+            );
+        }
+        assert!(
+            mount.rows_after_the_sweep >= rows_before,
+            "第 {mount_index} 次挂载清扫之后 {} 行，比上一次的 {rows_before} 行少",
+            mount.rows_after_the_sweep
+        );
+        rows_before = mount.rows_after_the_sweep;
+    }
+    assert!(
+        matches!(
+            seen.last().expect("挂了 8 次").sweep,
+            InstanceTableSweepAtTheEndOfTheMount::Swept(InstanceTableSweepOutcome::NoRowDeleted(
+                NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { ring_slot }
+            )) if ring_slot == UNREADABLE_ROOT_RING_SLOT
+        ),
+        "根环早已写满，最后一次清扫点名的是读坏的那一槽：{:?}",
+        seen.last().expect("挂了 8 次").sweep
+    );
+    assert_eq!(
+        rows_before,
+        MOUNTS_WITH_ONE_ROOT_RING_SLOT_UNREADABLE - 1,
+        "8 次挂载里实例 2 起每次写一行、一行都没删"
+    );
+}
+
+/// 场景：同 [`a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_row`] 那 8 次挂载，那一槽一次都不读坏（只数读了几次）。
+/// 预期：至少一次清扫删了行，最后一次清扫之后的行数比 8 次挂载写下的 7 行少。
+#[test]
+fn without_the_unreadable_root_ring_slot_the_same_mounts_delete_rows() {
+    let ranges = unreadable_root_ring_slot(FailingReadsOfARange::Never);
+    let seen = mounts_with_a_write_and_an_unmount_each(&ranges);
+    assert!(
+        ranges.reads_of_range(0) > 0,
+        "前提：那一槽被读过（对照与读坏那一条读的是同一槽）"
+    );
+    assert!(
+        seen.iter().any(|mount| matches!(
+            mount.sweep,
+            InstanceTableSweepAtTheEndOfTheMount::Swept(
+                InstanceTableSweepOutcome::RowsDeleted { .. }
+            )
+        )),
+        "至少一次清扫删了行"
+    );
+    let rows_after_the_last_sweep = seen.last().expect("挂了 8 次").rows_after_the_sweep;
+    assert!(
+        rows_after_the_last_sweep < MOUNTS_WITH_ONE_ROOT_RING_SLOT_UNREADABLE - 1,
+        "最后一次清扫之后 {rows_after_the_last_sweep} 行，比一行都不删的 7 行少"
     );
 }

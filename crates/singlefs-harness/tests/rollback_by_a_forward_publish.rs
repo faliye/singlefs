@@ -123,7 +123,8 @@ fn rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_i
 /// 回退那次发布 D「每段写几个」（`layout/01-first-txn.md` 八节「实例切换 / 管理员回退」那一行，原来没有用例钉）：
 /// 从录制流上截回退那次发布（回退调用之前流里有几步，到调用返回），按崩溃点重放同一条切段规则切（`split_into_segments`，屏障按设备记）。
 /// D 孤立看是 [24 个单元写] 屏障 [两份记录] 屏障 [根 FUA] [两份系统配置槽] 屏障：重写 12 个单元、两块盘各一份，共 29 次写。
-/// 整条流（mkfs 之后）到 D 为止 36 段，与 checker 档固定脚本那条流 `RollbackToFirstVersion` 那一臂钉的段数相同：
+/// 整条流（mkfs 之后）到 D 为止 38 段（取号写两轮之后，mkfs 那个进程里与之后那次可写挂载的取号各多一段两份系统配置槽写；
+/// checker 档固定脚本那条流 `RollbackToFirstVersion` 那一臂钉的段数跟着要改，那边不在这一批里）：
 /// C 的两份系统配置槽写过了发布末尾那道屏障、自成一段，D 的单元写不与它并段。
 /// 不跑 checker 与冷启动，debug 下单跑几秒，是快档用例。
 #[test]
@@ -140,9 +141,11 @@ fn rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_
     let writes_of_the_rollback = operations_of_the_rollback
         .iter()
         .filter(|operation| match operation.kind {
+            // 切段时 discard 算一次写（`segments` 文件头），这里与段里的写数同一个口径。
             RecordedOperationKind::Write
             | RecordedOperationKind::WriteForceUnitAccess
-            | RecordedOperationKind::WriteZeroes => true,
+            | RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard => true,
             RecordedOperationKind::Barrier => false,
         })
         .count();
@@ -170,15 +173,15 @@ fn rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_
     assert_eq!(
         segment_lengths_after_mkfs,
         vec![
-            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1,
-            2, 24, 2, 1, 2, 24, 2, 1, 2
+            2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
+            2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2
         ],
         "整条流到 D 为止的段序列：C 的系统配置槽写自成一段、D 的单元写自成一段"
     );
     assert_eq!(
         writes_after_mkfs.len(),
-        166 + 29,
-        "到 C 166 次写、D 29 次写"
+        170 + 29,
+        "到 C 170 次写（两次取号各两轮、每轮两写）、D 29 次写"
     );
 }
 
@@ -500,6 +503,17 @@ fn publish_after_a_recovery_that_abandoned_the_third_version(shadow_ledger: Shad
         remounted.output.shadow_ledger_branch,
         shadow_ledger.branch_name(),
         "挂载报出的分支名要与传进去的那一臂相符"
+    );
+    // C482（只供测试的开关有三个走了哪一条看不出来）：上一条两边都取同一臂的名字，两臂合成一个名字时照样绿；这里比另一臂，
+    // 运行时才分得出走的是哪一臂（`.claude/rules/fs-design.md` 五条硬要求第 4 条「分支必须可观测」）。
+    let the_other_arm = match shadow_ledger {
+        ShadowLedger::On => ShadowLedger::Off,
+        ShadowLedger::Off => ShadowLedger::On,
+    };
+    assert_ne!(
+        remounted.output.shadow_ledger_branch,
+        the_other_arm.branch_name(),
+        "{shadow_ledger:?}：挂载报出的分支名与另一臂 {the_other_arm:?} 的不同"
     );
     let expected_isolated = match shadow_ledger {
         ShadowLedger::On => 14,

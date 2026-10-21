@@ -18,7 +18,7 @@
 //! 中央映射里两条、三条码 1 条目。多跑的一步只有恢复本身（这条流上没有重开、挂载）。
 //!
 //! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 24 写、28 写与 30 写不展开，只以整段持久进入后面的状态）；
-//! 全量标 ignored（崩溃点重放的枚举域 1358954634 个状态，B、C 两个单元段占 1342177278；每次写只取两态时的闭式 1358954604、
+//! 全量标 ignored（崩溃点重放的枚举域 1358954642 个状态，B、C 两个单元段占 1342177278；每次写只取两态时的闭式 1358954607、
 //! 两段同样占 1342177278；C577 之前轮换并进单元段，12230590578 与 5435818083），登记成崩溃枚举用例，门禁 checker-tier-crash-point-replay --full 在 release 下跑，带断点续跑、可双机分片（与新池新建文件流、覆盖写固定脚本流同一个入口）。
 //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
@@ -175,8 +175,8 @@ fn prepare(tag: &str) -> Prepared {
     let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
     assert_eq!(
         sizes,
-        vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2],
-        "取号 2、暖机两次、上一次的系统配置槽轮换 2 与 A 的 24 个单元写各自成一段；A 的轮换 2、B 的 28 个单元写、两条记录 4 写；\
+        vec![2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2],
+        "取号两轮各 2、暖机两次、上一次的系统配置槽轮换 2 与 A 的 24 个单元写各自成一段；A 的轮换 2、B 的 28 个单元写、两条记录 4 写；\
          B 的轮换 2、C 的 30 个单元写、三条记录 6 写（C577 之后轮换之后有屏障，改之前轮换并进下一次的单元段：26、30、32）"
     );
     let root_indexes: Vec<usize> = writes
@@ -334,9 +334,9 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
         .collect();
     assert_eq!(
         closed_form_state_count(&expanded),
-        111,
-        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 九个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63\
-         （C577 之前暖机第二次、A、B 的轮换并在单元段里不展开，六个 2 写段、102）"
+        114,
+        "每次写只取两态时展开的段按闭式数（补第三态之前的口径）：1 + 十个 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63\
+         （取号写一轮时九个 2 写段、111；C577 之前暖机第二次、A、B 的轮换并在单元段里不展开，六个 2 写段、102）"
     );
     assert_eq!(
         tally.states,
@@ -356,9 +356,9 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
     );
     assert_eq!(
         tally.states,
-        1 + 6 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
-        "1 + 六个系统配置槽 2 写段各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 111；\
-         C577 之前三个系统配置槽段、117）"
+        1 + 7 * (3 * 3 - 1) + 3 * 3 + 5 + 15 + 63,
+        "1 + 七个系统配置槽 2 写段（取号两轮、五次轮换）各 3² − 1 + 三个记录 2 写段各 3 + 五个 1 写段各 1 + 4 写段 15 + 6 写段 63（每次写只取两态时 114；\
+         取号写一轮时六个系统配置槽段、141；C577 之前三个系统配置槽段、117）"
     );
     // B：记录段 4 写里第一条落了（至少一份）、第二条一份没落 ⇒ 3 × 1 = 3 个状态。
     // C：记录段 6 写里第一条落了、第三条一份没落 ⇒ 第一条 3 种 × 第二条 4 种 = 12 个状态。
@@ -376,24 +376,24 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
     assert_clean(&tally);
 }
 
-/// 全量：19 段、闭式见下。A、B、C 三个单元段各 2^24 − 1、2^28 − 1 与 2^30 − 1 个状态（C577 之前各带上一次发布的两次系统配置槽轮换、
+/// 全量：20 段、闭式见下。A、B、C 三个单元段各 2^24 − 1、2^28 − 1 与 2^30 − 1 个状态（C577 之前各带上一次发布的两次系统配置槽轮换、
 /// 取三态，各 3² · 2^n − 1，共 16 段、12230590578），
 /// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），checker-tier-crash-point-replay 认下面打印的
 /// `CRASH_POINT_REPLAY_MULTI_RECORD_PUBLISH` 行里 `exhaustive=true`。判过的状态都在判定库里（崩溃枚举用例那一类，`crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）。
 /// 双机（`scripts/crash/crash-point-replay-shard-run.sh` 经崩溃放量的双机驱动）：两台各判自己那一份，只录或只判自己那一份的那一趟不打计数行、不判下面的断言；
 /// 导入第二台的库之后再跑的那一趟拿整条流的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量 1358954634 个状态（十三亿多）、每个两遍恢复 + checker；门禁 checker-tier-crash-point-replay --full 在 release 下跑，带断点续跑、可双机分片"]
+#[ignore = "全量 1358954642 个状态（十三亿多）、每个两遍恢复 + checker；门禁 checker-tier-crash-point-replay --full 在 release 下跑，带断点续跑、可双机分片"]
 fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean() {
     let prepared = prepare("multi-record-publish-crash-point-replay-full");
     let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);
     assert_eq!(
         closed_form_with_two_states_per_write,
-        1 + 9 * 3 + 5 + ((1 << 24) - 1) + ((1 << 28) - 1) + 15 + ((1 << 30) - 1) + 63,
-        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，十九段"
+        1 + 10 * 3 + 5 + ((1 << 24) - 1) + ((1 << 28) - 1) + 15 + ((1 << 30) - 1) + 63,
+        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，二十段"
     );
-    assert_eq!(closed_form_with_two_states_per_write, 1_358_954_604);
-    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：六个系统配置槽 2 写段各 3² − 1，每段 3^m · 2^(n−m) − 1。
+    assert_eq!(closed_form_with_two_states_per_write, 1_358_954_607);
+    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态）：七个系统配置槽 2 写段各 3² − 1，每段 3^m · 2^(n−m) − 1。
     let closed_form = crash_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
@@ -402,7 +402,7 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
     );
     assert_eq!(
         closed_form,
-        1 + 6 * (3 * 3 - 1)
+        1 + 7 * (3 * 3 - 1)
             + 3 * 3
             + 5
             + ((1 << 24) - 1)
@@ -410,9 +410,9 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
             + 15
             + ((1 << 30) - 1)
             + 63,
-        "枚举域的闭式：六个只有系统配置槽写的 2 写段各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 2^n − 1、4 写段 15、6 写段 63"
+        "枚举域的闭式：七个只有系统配置槽写的 2 写段（取号两轮、五次轮换）各 3² − 1、三个记录 2 写段各 3、五个 1 写段、A / B / C 的单元段各 2^n − 1、4 写段 15、6 写段 63"
     );
-    assert_eq!(closed_form, 1_358_954_634);
+    assert_eq!(closed_form, 1_358_954_642);
     let Some(tally) = enumerate_crash_states_with_expansion(
         CrashPointReplayItem {
             name: "multi_record_publish::full",

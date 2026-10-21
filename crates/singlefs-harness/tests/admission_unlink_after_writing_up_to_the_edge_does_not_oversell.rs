@@ -54,6 +54,7 @@ fn copy_of_the_pool(pool: &PoolUnderTest<SparseBlockDevice>) -> PoolUnderTest<Sp
             instance: session.instance,
             shadow_ledger: session.shadow_ledger,
             parameters_and_device_table: session.parameters_and_device_table.clone(),
+            compaction: session.compaction.clone(),
         }),
         write_time_seconds: pool.write_time_seconds,
         content_of_the_current_version: pool.content_of_the_current_version.clone(),

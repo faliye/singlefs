@@ -82,9 +82,9 @@ use singlefs_checker_tier::crash_injection::HistoryAfterTheMakeFilesystem;
 use singlefs_checker_tier::crash_judge_conclusions::cross_check_words_without_the_oracle;
 use singlefs_checker_tier::crash_judge_conclusions::ClaimedVersionOfAGivenState;
 use singlefs_checker_tier::crash_judge_gpu::{
-    checker_scan_kernel_source, cross_check_words_of_cpu_judgement,
-    cross_check_words_of_gpu_verdict, verdict_bits, CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD,
-    VERDICT_WORDS,
+    checker_scan_kernel_source, cross_check_words_agree_in_the_cross_check,
+    cross_check_words_of_cpu_judgement, cross_check_words_of_gpu_verdict, verdict_bits,
+    CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables, build_judge_tables_for_the_given_persisted_sets,
@@ -470,7 +470,9 @@ fn assert_every_state_judged_on_the_gpu_like_the_cpu_judge(
         .enumerate()
         .filter_map(|(ordinal, (cpu_words, gpu_words))| {
             let gpu_cross_check_words = cross_check_words_of_gpu_verdict(gpu_words);
-            (gpu_could_not_judge(gpu_words) || gpu_cross_check_words != *cpu_words).then(|| {
+            (gpu_could_not_judge(gpu_words)
+                || !cross_check_words_agree_in_the_cross_check(&gpu_cross_check_words, cpu_words))
+            .then(|| {
                 format!(
                     "状态 {ordinal}：GPU 判不了 {}（恢复第 1 字 {:#x}、池级 checker 原因字 {:#x}）；GPU {gpu_cross_check_words:?}；CPU {cpu_words:?}",
                     gpu_could_not_judge(gpu_words),
@@ -661,7 +663,10 @@ fn the_gpu_judge_leaves_a_version_of_four_thousand_and_ninety_eight_allocation_r
             continue;
         }
         let gpu_cross_check_words = cross_check_words_of_gpu_verdict(gpu_words);
-        if gpu_cross_check_words != cpu_judgement.cross_check_words {
+        if !cross_check_words_agree_in_the_cross_check(
+            &gpu_cross_check_words,
+            &cpu_judgement.cross_check_words,
+        ) {
             problems.push(format!(
                 "状态 {ordinal}：GPU 判得了而与 CPU 不一致：GPU {gpu_cross_check_words:?}；CPU {:?}",
                 cpu_judgement.cross_check_words
@@ -1032,7 +1037,10 @@ fn the_gpu_judge_leaves_roots_whose_own_instance_table_has_twenty_four_thousand_
             continue;
         }
         let gpu_cross_check_words = cross_check_words_of_gpu_verdict(gpu_words);
-        if gpu_cross_check_words != cpu_judgement.cross_check_words {
+        if !cross_check_words_agree_in_the_cross_check(
+            &gpu_cross_check_words,
+            &cpu_judgement.cross_check_words,
+        ) {
             problems.push(format!(
                 "状态 {ordinal}：GPU 判得了而与 CPU 不一致：GPU {gpu_cross_check_words:?}；CPU {:?}",
                 cpu_judgement.cross_check_words

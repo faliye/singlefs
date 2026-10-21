@@ -319,11 +319,11 @@ pub fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data
         "{:?}",
         report.journal
     );
-    // 池级 checker 那一遍交 checker 档：I-8.8、I-4.1、I-5.5、I-4.7、I-4.6、I-4.4 与删除线那几条
+    // 池级 checker 那一遍交 checker 档：I-8.8、I-4.1、I-5.5、I-4.7、I-4.4 与删除线那几条
     // （[`DELETION_INVARIANTS_WITHOUT_AN_OBJECT_ON_A_SESSION_WITHOUT_DELETION`]）没判到（不适用），别的每一条判到且成立
-    // （I-2.1、I-3.1、I-5.2、I-7.2 在里面）。各条不适用的理由串对拍字里没有，checker 档只核没判到。
+    // （I-2.1、I-3.1、I-5.2、I-7.2 在里面；I-4.6、I-4.10、I-9.38 自截断起每条记录都判，m4-trunc-r1 判决 K7 T-2 到 T-4，这一池有文件的记录）。各条不适用的理由串对拍字里没有，checker 档只核没判到。
     let not_applicable_on_this_session: Vec<&'static str> =
-        ["I-8.8", "I-4.1", "I-5.5", "I-4.7", "I-4.6", "I-4.4"]
+        ["I-8.8", "I-4.1", "I-5.5", "I-4.7", "I-4.4"]
             .into_iter()
             .chain(
                 DELETION_INVARIANTS_WITHOUT_AN_OBJECT_ON_A_SESSION_WITHOUT_DELETION

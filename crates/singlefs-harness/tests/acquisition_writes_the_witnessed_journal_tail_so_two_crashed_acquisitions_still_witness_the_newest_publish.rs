@@ -43,6 +43,10 @@ const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
 /// mkfs 写进每个系统配置槽的 tail（`.claude/kb/layout/01-first-txn.md` 一「journal tail」那一行：mkfs 0）。
 const JOURNAL_TAIL_WRITTEN_BY_MAKE_FILESYSTEM: u64 = 0;
 
+/// 新池新建文件之后每块盘两槽的世代号（取号写两轮，甲'）：mkfs 1，取号 2、3，暖机 4、5，新池新建文件那次轮换 6。
+const GENERATION_OF_THE_SECOND_WARM_UP_ROTATION: u64 = 5;
+const GENERATION_OF_THE_NEW_POOL_FILE_CREATION_ROTATION: u64 = 6;
+
 /// 一个自证过的系统配置槽里这几条用例要看的三样。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct SlotReading {
@@ -74,7 +78,7 @@ fn slot_readings_of<Reader: PoolReader + ?Sized>(
     readings
 }
 
-/// 进程退出、重开，取一次号就崩：取号写完两槽、过了取号之后那道屏障，之后一个写都没发（写行与暖机都没开始）。
+/// 进程退出、重开，取一次号就崩：取号写两轮写完两槽、过了第二轮之后那道屏障，之后一个写都没发（写行与暖机都没开始）。
 /// `acquire_instance` 与可写挂载取号走同一个写那一半（`transaction::write_acquired_instance`）。
 fn acquire_once_then_crash(pool: &mut BuiltPool) -> InstanceGeneration {
     let pool_parameters = parameters();
@@ -97,7 +101,7 @@ const SECOND_VERSION_BYTES: usize = 4100;
 const NEWEST_VERSION_BYTES: usize = 2500;
 
 /// 新池新建文件（A，实例 1，txg 3，jsn 3）之后在同一个进程里覆盖写 B（txg 4，jsn 4）、C（txg 5，jsn 5）：C 的根 FUA 之后系统配置轮换，
-/// 每块盘世代 7 那一槽写的是 C 那条记录的计数器 5——系统配置见证了 C。
+/// 每块盘世代 8 那一槽写的是 C 那条记录的计数器 5——系统配置见证了 C。
 struct PoolWithAWitnessedNewestPublish {
     pool: BuiltPool,
     second: TransactionOutput,
@@ -140,17 +144,17 @@ fn pool_with_a_witnessed_newest_publish(tag: &str) -> PoolWithAWitnessedNewestPu
             slot_readings_of(&image, disk),
             vec![
                 SlotReading {
-                    slot_generation: 6,
+                    slot_generation: 7,
                     journal_instance: InstanceGeneration(1),
                     journal_tail: 4,
                 },
                 SlotReading {
-                    slot_generation: 7,
+                    slot_generation: 8,
                     journal_instance: InstanceGeneration(1),
                     journal_tail: 5,
                 },
             ],
-            "{disk:?}：B、C 各轮换一次系统配置，世代 7 见证 C"
+            "{disk:?}：B、C 各轮换一次系统配置，世代 8 见证 C"
         );
     }
     PoolWithAWitnessedNewestPublish {
@@ -181,8 +185,8 @@ fn root_slot_and_data_units_of(publish: &TransactionOutput) -> Vec<UnreadableRan
     .collect()
 }
 
-/// 连着 `crashed_acquisitions` 次取号之后崩溃（每次取号写完两槽、过了屏障，写行与暖机都没开始），中间没有任何发布轮换：
-/// 第二次起每块盘两槽都是取号写，世代 7 那一槽（C 的轮换）已被覆写。取号写带着见证值 5，两槽 tail 都是 5。
+/// 连着 `crashed_acquisitions` 次取号之后崩溃（每次取号写两轮、写完两槽、过了屏障，写行与暖机都没开始），中间没有任何发布轮换：
+/// 每次取号之后每块盘两槽都是那一次的两轮取号写，世代 8 那一槽（C 的轮换）已被覆写。取号写带着见证值 5，两槽 tail 都是 5。
 /// 之后 C 的根槽与数据单元这一次挂载里每次读都坏：读阶段落到 B（末条 jsn 4），系统配置见证到 5，判据为真；重读一遍仍落到 B
 /// ⇒ 拒可写，取号之前拒，`DiskSnapshot` 不变。取号写 tail 写 0 时两槽都是 0、判据为假（`NothingWitnessed`），挂载做成、C 被抛弃。
 fn crashed_acquisitions_in_a_row_still_witness_the_newest_publish(
@@ -261,18 +265,21 @@ fn crashed_acquisitions_in_a_row_still_witness_the_newest_publish(
             .map(|disk| {
                 (
                     disk,
-                    [crashed_acquisitions - 1, crashed_acquisitions]
-                        .into_iter()
-                        .map(|acquisition_number| SlotReading {
-                            slot_generation: 7 + u64::from(acquisition_number),
-                            journal_instance: InstanceGeneration(1 + acquisition_number),
-                            journal_tail: newest.record.counter,
-                        })
-                        .collect(),
+                    [
+                        8 + 2 * u64::from(crashed_acquisitions) - 1,
+                        8 + 2 * u64::from(crashed_acquisitions),
+                    ]
+                    .into_iter()
+                    .map(|slot_generation| SlotReading {
+                        slot_generation,
+                        journal_instance: InstanceGeneration(1 + crashed_acquisitions),
+                        journal_tail: newest.record.counter,
+                    })
+                    .collect(),
                 )
             })
             .collect::<Vec<_>>(),
-        "崩掉的取号之后每块盘两槽都是取号写（世代 7 之后逐次 +1），C 那次轮换写的世代 7 已被覆写；tail 都带着它见证的 jsn {}",
+        "崩掉的取号之后每块盘两槽都是最后一次取号的两轮写（世代 8 之后每次取号 +2），C 那次轮换写的世代 8 已被覆写；tail 都带着它见证的 jsn {}",
         newest.record.counter
     );
 }
@@ -296,7 +303,7 @@ fn three_crashed_acquisitions_in_a_row_carry_the_witness_from_acquisition_write_
     );
 }
 
-/// mkfs 之后的第一次取号：mkfs 写的两槽 tail 都是 0，见证值就是 0，取号写照旧写 0——新池新建文件的字节不变。
+/// mkfs 之后的第一次取号：mkfs 写的两槽 tail 都是 0，见证值就是 0，取号两轮写照旧写 0。
 #[test]
 fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_new_pool_file_creation_bytes_do_not_change(
 ) {
@@ -326,24 +333,28 @@ fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_new_pool_file_
     formatted.devices = Some(devices);
     let image = formatted.memory_pool();
     for disk in DISKS {
-        let newest = *slot_readings_of(&image, disk)
-            .last()
-            .expect("每块盘都有自证过的系统配置");
         assert_eq!(
-            newest,
-            SlotReading {
-                slot_generation: 2,
-                journal_instance: InstanceGeneration(1),
-                journal_tail: JOURNAL_TAIL_WRITTEN_BY_MAKE_FILESYSTEM,
-            },
-            "{disk:?}：取号写世代 2、实例代号 1、tail 0（`.claude/kb/layout/01-first-txn.md` a1 那一行）"
+            slot_readings_of(&image, disk),
+            vec![
+                SlotReading {
+                    slot_generation: 2,
+                    journal_instance: InstanceGeneration(1),
+                    journal_tail: JOURNAL_TAIL_WRITTEN_BY_MAKE_FILESYSTEM,
+                },
+                SlotReading {
+                    slot_generation: 3,
+                    journal_instance: InstanceGeneration(1),
+                    journal_tail: JOURNAL_TAIL_WRITTEN_BY_MAKE_FILESYSTEM,
+                },
+            ],
+            "{disk:?}：取号两轮写世代 2、3，实例代号 1、tail 0（`.claude/kb/layout/01-first-txn.md` 取号那几行）"
         );
     }
 }
 
-/// 新池新建文件之后每块盘两槽：世代 4（暖机第二次，tail 2）、世代 5（新池新建文件，tail 3）。盘 `damaged_device` 世代 5 那一槽退回轮换之前
-/// （崩在新池新建文件那次轮换写完另一块盘、没写到这一块：这一槽还是世代 3 的内容，这里拿世代 4 那一槽改世代号为 3 重新编码写回，两槽都自证得过），
-/// 池里最大的 tail 3 只在另一块盘上读得出：第二次取号写进每块盘的 tail 都是 3——取整池的最大值，不是各盘自己的，也不是最小的。
+/// 新池新建文件之后每块盘两槽：世代 5（暖机第二次，tail 2）、世代 6（新池新建文件，tail 3）。盘 `damaged_device` 世代 6 那一槽退回轮换之前
+/// （崩在新池新建文件那次轮换写完另一块盘、没写到这一块：这一槽还是世代 4 的内容，这里拿世代 5 那一槽改世代号为 4 重新编码写回，两槽都自证得过），
+/// 池里最大的 tail 3 只在另一块盘上读得出：第二次取号两轮写进每块盘的 tail 都是 3——取整池的最大值，不是各盘自己的，也不是最小的。
 /// 不清零：清零那一槽是撕裂的另一形，取号把它重写成自证过的（`an_acquisition_rewrites_the_torn_newest_slot_of_a_device`），这里要的是两槽都自证得过、只差一次轮换。
 fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags_one_rotation(
     tag: &str,
@@ -359,16 +370,17 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags
     {
         let devices: &mut Vec<(DeviceIdentity, Recorded)> =
             pool.devices.as_mut().expect("新池新建文件写完，盘还开着");
-        let mut generation_three = verified_system_configuration_slots(
+        let mut generation_before_the_rotation = verified_system_configuration_slots(
             devices.as_slice(),
             damaged_device,
             slot_spacing_in_bytes,
             &parameters().filesystem_identifier,
         )
         .into_iter()
-        .find(|slot| slot.quantities.slot_generation == 4)
-        .expect("世代 4 那一槽自证得过");
-        generation_three.quantities.slot_generation = 3;
+        .find(|slot| slot.quantities.slot_generation == GENERATION_OF_THE_SECOND_WARM_UP_ROTATION)
+        .expect("暖机第二次轮换那一槽自证得过");
+        generation_before_the_rotation.quantities.slot_generation =
+            GENERATION_OF_THE_SECOND_WARM_UP_ROTATION - 1;
         let (_, device) = devices
             .iter_mut()
             .find(|(identity, _)| *identity == damaged_device)
@@ -376,12 +388,14 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags
         device
             .write_at(
                 DeviceOffsetInBytes(
-                    (5 % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE) * slot_spacing_in_bytes,
+                    (GENERATION_OF_THE_NEW_POOL_FILE_CREATION_ROTATION
+                        % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                        * slot_spacing_in_bytes,
                 ),
-                &generation_three.to_slot(),
+                &generation_before_the_rotation.to_slot(),
                 WriteDurability::Plain,
             )
-            .expect("世代 5 那一槽退回世代 3");
+            .expect("新池新建文件那次轮换那一槽退回轮换之前");
     }
     let before_the_acquisition = pool.memory_pool();
     let tails_on_disk: Vec<(DeviceIdentity, Vec<u64>)> = DISKS
@@ -408,7 +422,7 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags
                 }
             })
             .collect::<Vec<_>>(),
-        "落后一次轮换的那块盘两槽 tail 都是 2（世代 3、4），另一块两槽 tail 2、3"
+        "落后一次轮换的那块盘两槽 tail 都是 2（世代 4、5），另一块两槽 tail 2、3"
     );
     let largest_tail_of_the_pool = tails_on_disk
         .iter()
@@ -429,8 +443,8 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags
                 .iter()
                 .map(|reading| reading.journal_tail)
                 .collect::<Vec<_>>(),
-            vec![largest_tail_of_the_pool],
-            "{disk:?}：一份取号写，tail 是取号前池里两槽最大的 tail {largest_tail_of_the_pool}：{acquisition_writes:?}"
+            vec![largest_tail_of_the_pool, largest_tail_of_the_pool],
+            "{disk:?}：两份取号写（两轮），tail 都是取号前池里两槽最大的 tail {largest_tail_of_the_pool}：{acquisition_writes:?}"
         );
     }
 }
@@ -453,7 +467,7 @@ fn a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_whe
     );
 }
 
-/// 取号写在盘 1 上报错：盘 0 那份已写出、回卷成旧代号 1。回卷是「像没取过号」，回卷写的 tail 与取号写同是取号那一刻读到的见证值 3，
+/// 取号第一轮在盘 1 上那一写报错：盘 0 那份已写出、回卷一次成旧代号 1。回卷是「像没取过号」，回卷写的 tail 与取号写同是取号那一刻读到的见证值 3，
 /// 不退回 0；盘 1 一个字节都没写成。
 #[test]
 fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
@@ -502,28 +516,28 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
         slot_readings_of(devices.as_slice(), DeviceIdentity(0)),
         vec![
             SlotReading {
-                slot_generation: 6,
+                slot_generation: 7,
                 journal_instance: InstanceGeneration(2),
                 journal_tail: new_pool_file_creation_counter,
             },
             SlotReading {
-                slot_generation: 7,
+                slot_generation: 8,
                 journal_instance: InstanceGeneration(1),
                 journal_tail: new_pool_file_creation_counter,
             },
         ],
-        "盘 0：取号写世代 6 带新号 2，回卷写世代 7 带旧号 1；两写的 tail 都是取号前的见证值 {new_pool_file_creation_counter}"
+        "盘 0：取号第一轮写世代 7 带新号 2，回卷写世代 8 带旧号 1；两写的 tail 都是取号前的见证值 {new_pool_file_creation_counter}"
     );
     assert_eq!(
         slot_readings_of(devices.as_slice(), DeviceIdentity(1)),
         vec![
             SlotReading {
-                slot_generation: 4,
+                slot_generation: GENERATION_OF_THE_SECOND_WARM_UP_ROTATION,
                 journal_instance: InstanceGeneration(1),
                 journal_tail: 2,
             },
             SlotReading {
-                slot_generation: 5,
+                slot_generation: GENERATION_OF_THE_NEW_POOL_FILE_CREATION_ROTATION,
                 journal_instance: InstanceGeneration(1),
                 journal_tail: new_pool_file_creation_counter,
             },
@@ -533,9 +547,9 @@ fn a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero() {
 }
 
 /// C331（择根倒挂压过已确认的写） 改取 R2（用户 2026-10-03 定，零轮；D22（单元原子性怎么合成） 已定项 8 射程）：取号那一刻读见证值，
-/// 某块盘最新那一槽撕裂（这里清零世代 5 那一槽：读得出、自证不过，设备没报错），另一槽照样自证得过——R2 判得出（没有槽报读错），
-/// 取号照做：见证值取全部自证过的槽（另一块盘世代 5 那一槽见证新池新建文件那条记录，jsn 3），坏了那块盘的取号写落在撕裂的那一槽
-/// （世代 4 + 1 = 5，槽号 5 mod 2 = 1），把它重写成自证过的；另一块盘照常写世代 6。取甲时这一形在任何写之前拒、之后只剩只读挂载（C596）。
+/// 某块盘最新那一槽撕裂（这里清零世代 6 那一槽：读得出、自证不过，设备没报错），另一槽照样自证得过——R2 判得出（没有槽报读错），
+/// 取号照做：见证值取全部自证过的槽（另一块盘世代 6 那一槽见证新池新建文件那条记录，jsn 3），坏了那块盘的取号第一轮写落在撕裂的那一槽
+/// （世代 5 + 1 = 6，槽号 6 mod 2 = 0），把它重写成自证过的，第二轮再写世代 7；另一块盘照常写世代 7、8。取甲时这一形在任何写之前拒、之后只剩只读挂载（C596）。
 fn an_acquisition_rewrites_the_torn_newest_slot_of_a_device(
     tag: &str,
     damaged_device: DeviceIdentity,
@@ -553,12 +567,14 @@ fn an_acquisition_rewrites_the_torn_newest_slot_of_a_device(
         device
             .write_at(
                 DeviceOffsetInBytes(
-                    (5 % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE) * slot_spacing_in_bytes,
+                    (GENERATION_OF_THE_NEW_POOL_FILE_CREATION_ROTATION
+                        % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                        * slot_spacing_in_bytes,
                 ),
                 &vec![0u8; usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096")],
                 WriteDurability::Plain,
             )
-            .expect("世代 5 那一槽清零");
+            .expect("新池新建文件那次轮换那一槽清零");
     }
     let pool_parameters = parameters();
     let mut devices = pool.reopen_recorded();
@@ -574,9 +590,9 @@ fn an_acquisition_rewrites_the_torn_newest_slot_of_a_device(
     let after = pool.memory_pool();
     for disk in DISKS {
         let expected_generations = if disk == damaged_device {
-            [4, 5]
+            [6, 7]
         } else {
-            [5, 6]
+            [7, 8]
         };
         let readings = slot_readings_of(&after, disk);
         assert_eq!(

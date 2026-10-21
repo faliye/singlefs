@@ -1,5 +1,7 @@
-//! 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；C322（取号那一步的屏障怎么放没有条款） 的定案）：
-//! 第二次取号看得见、世代号逐盘 +1、取号之后那道屏障、取号写或屏障报错时回卷成旧代号。每条都从写完新池新建文件的镜像出发。
+//! 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；C322（取号那一步的屏障怎么放没有条款） 的定案；
+//! 取号写两轮，甲'，三方判决 `research/prompts/m3-close-sysconf-r3-main-verification.md` 第四节「落地」）：
+//! 第二次取号看得见、世代号逐盘逐轮 +1、每轮之后那道屏障、取号写或屏障报错时每块盘回卷一次成旧代号。每条都从写完新池新建文件的镜像出发
+//! （新池新建文件之后每块盘两槽是世代 5、6：mkfs 1，取号两轮 2、3，暖机 4、5，新池新建文件 6）。
 
 mod common;
 
@@ -32,26 +34,33 @@ fn fail_every_barrier() -> FaultSchedule {
     FaultSchedule::every_call_across_the_pool(InjectedFault::BarrierFails)
 }
 
-/// 取号写之后那道池屏障在盘 0 上报错，只这一次：取号写之前那道池屏障是全池第 1、2 次屏障调用（盘 0、盘 1），
-/// 写之后那道从全池第 3 次（盘 0）起（代码审阅第 19 条加了写之前那一道）。
+/// 取号写之前那道池屏障是全池第 1、2 次屏障调用（盘 0、盘 1；代码审阅第 19 条加的那一道），取号第一轮之后那道是第 3、4 次，
+/// 取号第二轮之后那道（取号写都写完之后那一道）从全池第 5 次（盘 0）起。
+const POOL_BARRIER_CALL_AFTER_THE_ACQUISITION_WRITES: u64 = 5;
+
+/// 取号写（两轮）之后那道池屏障在盘 0 上报错，只这一次。
 fn fail_the_barrier_after_the_acquisition_writes_once() -> FaultSchedule {
     FaultSchedule {
         fault: InjectedFault::BarrierFails,
         device: FaultDeviceSelector::EveryDevice,
         placement: FaultPlacement::AnyOffset,
         counting: FaultCounting::AcrossThePool,
-        occurrence: FaultOccurrence::TheNthMatchingCall(3),
+        occurrence: FaultOccurrence::TheNthMatchingCall(
+            POOL_BARRIER_CALL_AFTER_THE_ACQUISITION_WRITES,
+        ),
     }
 }
 
-/// 取号写之后那道池屏障起每一道都报错（全池第 3 次屏障调用起）：回卷写之前那道同样报错。
+/// 取号写（两轮）之后那道池屏障起每一道都报错：回卷写之前那道同样报错。
 fn fail_every_barrier_from_the_one_after_the_acquisition_writes() -> FaultSchedule {
     FaultSchedule {
         fault: InjectedFault::BarrierFails,
         device: FaultDeviceSelector::EveryDevice,
         placement: FaultPlacement::AnyOffset,
         counting: FaultCounting::AcrossThePool,
-        occurrence: FaultOccurrence::EveryMatchingCallFromTheNthOnward(3),
+        occurrence: FaultOccurrence::EveryMatchingCallFromTheNthOnward(
+            POOL_BARRIER_CALL_AFTER_THE_ACQUISITION_WRITES,
+        ),
     }
 }
 
@@ -127,7 +136,8 @@ fn acquire(
 const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
 
 #[test]
-fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisition_gets_three() {
+fn second_acquisition_writes_generations_seven_and_eight_on_both_disks_and_the_next_acquisition_gets_three(
+) {
     let mut built = build_pool("acquire-second");
     let WrappedDevices {
         plan: _,
@@ -140,8 +150,8 @@ fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisiti
     for disk in DISKS {
         assert_eq!(
             slots_of(&devices, disk),
-            vec![(5, InstanceGeneration(1)), (6, InstanceGeneration(2))],
-            "{disk:?}：新池新建文件留下世代 5，第二次取号按那块盘自证过的最大世代号 + 1 写世代 6（D22（单元原子性怎么合成） 已定项 16 逐盘计）"
+            vec![(7, InstanceGeneration(2)), (8, InstanceGeneration(2))],
+            "{disk:?}：新池新建文件留下世代 5、6，第二次取号两轮各按那块盘自证过的最大世代号 + 1 写世代 7、8（D22（单元原子性怎么合成） 已定项 16 逐盘计），两槽都带新号 2"
         );
     }
     assert_eq!(
@@ -150,7 +160,7 @@ fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisiti
             .quantities
             .journal_instance,
         InstanceGeneration(2),
-        "择到的那一份带新号：取号的世代号若恒为 2，会被世代 5 的旧槽藏住、这里读回 1"
+        "择到的那一份带新号：取号的世代号若恒为 2，会被世代 6 的旧槽藏住、这里读回 1"
     );
     assert_eq!(
         acquire(&mut devices).expect("第三次取号"),
@@ -168,13 +178,13 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
         acquire(&mut devices).expect_err("取号之后那道屏障报错，取号必须失败、不交出新号");
     assert!(
         matches!(failure.rollback, AcquisitionRollback::RolledBack),
-        "两份取号写都报过 Ok，都要回卷（回卷写之前那道屏障这一次不报错）：{failure:?}"
+        "两轮取号写都报过 Ok，两块盘都要回卷（回卷写之前那道屏障这一次不报错）：{failure:?}"
     );
     for disk in DISKS {
         assert_eq!(
             slots_of(&devices, disk),
-            vec![(6, InstanceGeneration(2)), (7, InstanceGeneration(1))],
-            "{disk:?}：取号写世代 6 带新号 2，回卷写世代 7 带取号之前全部自证过的槽中最大的号 1"
+            vec![(8, InstanceGeneration(2)), (9, InstanceGeneration(1))],
+            "{disk:?}：取号两轮写世代 7、8 带新号 2，每块盘只回卷一次：回卷写世代 9（覆写第一轮那一槽）带取号之前全部自证过的槽中最大的号 1，第二轮那一槽留着新号"
         );
     }
     plan.disarm();
@@ -186,7 +196,7 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
 }
 
 /// 取号写之前那道屏障报错（代码审阅第 19 条加的那一道：取号写覆写较旧那一槽之前，另一槽里上一次轮换写的先持久）：
-/// 一个取号写都没发，取号失败、没有要回卷的（`NothingWritten`），两块盘两槽照旧是新池新建文件留下的世代 4、5；屏障好了再取号取到 2。
+/// 一个取号写都没发，取号失败、没有要回卷的（`NothingWritten`），两块盘两槽照旧是新池新建文件留下的世代 5、6；屏障好了再取号取到 2。
 #[test]
 fn failed_barrier_before_the_acquisition_writes_writes_nothing_and_the_number_is_handed_out_later()
 {
@@ -201,7 +211,7 @@ fn failed_barrier_before_the_acquisition_writes_writes_nothing_and_the_number_is
     for disk in DISKS {
         assert_eq!(
             slots_of(&devices, disk),
-            vec![(4, InstanceGeneration(1)), (5, InstanceGeneration(1))],
+            vec![(5, InstanceGeneration(1)), (6, InstanceGeneration(1))],
             "{disk:?}：两槽不动"
         );
     }
@@ -213,9 +223,9 @@ fn failed_barrier_before_the_acquisition_writes_writes_nothing_and_the_number_is
     );
 }
 
-/// 取号写之后那道屏障起每一道都报错：回卷写之前那道屏障（代码审阅第 19 条加的：回卷写覆写取号之前最新的那一槽之前，刚写的取号写先持久）
-/// 同样报错，回卷不写（`RollbackFailed`，D18（块里携带什么信息） 已定项 11「回卷不成才只读挂载」）。两块盘上留着带新号 2 的世代 6，
-/// 世代 5 那一槽没被覆写；屏障好了再取号跳过 2、取 3。
+/// 取号写（两轮）之后那道屏障起每一道都报错：回卷写之前那道屏障（代码审阅第 19 条加的：回卷写覆写较旧那一槽之前，刚写的取号写先持久）
+/// 同样报错，回卷不写（`RollbackFailed`，D18（块里携带什么信息） 已定项 11「回卷不成才只读挂载」）。两块盘两槽都留着带新号 2 的世代 7、8，
+/// 一槽都没被回卷写覆写；屏障好了再取号跳过 2、取 3。
 #[test]
 fn barrier_failing_again_before_the_rollback_writes_leaves_the_new_number_and_it_is_never_handed_out_again(
 ) {
@@ -230,15 +240,15 @@ fn barrier_failing_again_before_the_rollback_writes_leaves_the_new_number_and_it
     for disk in DISKS {
         assert_eq!(
             slots_of(&devices, disk),
-            vec![(5, InstanceGeneration(1)), (6, InstanceGeneration(2))],
-            "{disk:?}：取号写世代 6 带新号 2 留着，世代 5 那一槽没被回卷写覆写"
+            vec![(7, InstanceGeneration(2)), (8, InstanceGeneration(2))],
+            "{disk:?}：取号两轮写的世代 7、8 带新号 2 留着，没被回卷写覆写"
         );
     }
     plan.disarm();
     assert_eq!(
         acquire(&mut devices).expect("屏障好了再取号"),
         InstanceGeneration(3),
-        "两槽里躺着号 2：跳过它"
+        "两槽里都躺着号 2：跳过它"
     );
 }
 
@@ -255,11 +265,12 @@ fn failed_system_configuration_write_on_the_second_disk_rolls_the_first_disk_bac
     );
     assert_eq!(
         slots_of(&devices, DeviceIdentity(0)),
-        vec![(6, InstanceGeneration(2)), (7, InstanceGeneration(1))]
+        vec![(7, InstanceGeneration(2)), (8, InstanceGeneration(1))],
+        "盘 0：第一轮取号写世代 7 带新号 2，盘 1 第一轮那一写报错、取号停在第一轮，盘 0 回卷一次写世代 8 带旧号 1"
     );
     assert_eq!(
         slots_of(&devices, DeviceIdentity(1)),
-        vec![(4, InstanceGeneration(1)), (5, InstanceGeneration(1))],
+        vec![(5, InstanceGeneration(1)), (6, InstanceGeneration(1))],
         "盘 1 一个字节都没写成"
     );
 }
@@ -278,8 +289,8 @@ fn barrier_right_after_the_acquisition_barrier_is_not_sent_to_the_devices() {
     for (identity, _) in &devices {
         assert_eq!(
             plan.counts_of_device(*identity).barriers_forwarded,
-            2,
-            "{identity:?}：取号写之前一道（新开的写入口按「发过写」起步，代码审阅第 19 条）、取号写之后一道；紧跟着的那道前面没有写，不再发——\
+            3,
+            "{identity:?}：取号写之前一道（新开的写入口按「发过写」起步，代码审阅第 19 条）、取号两轮之后各一道；紧跟着的那道前面没有写，不再发——\
              首次挂载路径上暖机开场那道就这样并掉"
         );
     }

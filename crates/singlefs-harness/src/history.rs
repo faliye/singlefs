@@ -25,11 +25,18 @@ use std::sync::{Mutex, Once};
 
 use singlefs_checker::image::{chosen_system_configurations, valid_roots, ImageReader};
 use singlefs_checker::walk::allocation_record_count_under_root;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber, TreeIdentifier,
+};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator, UnitAreaStart};
 use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
+use singlefs_core::compaction_plan::{
+    region_is_empty_by_the_records, CompactionBatchSize, CompactionBatchUnits,
+    CompactionOfThisMount, CompactionSwitches,
+};
 use singlefs_core::journal::back_chain_of;
+use singlefs_core::logged_operations::CompactionRegion;
 use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
@@ -39,39 +46,49 @@ use singlefs_core::mount::{
     StillUnreadableAfterOneReread, SystemConfigurationUnreadableWhen,
 };
 use singlefs_core::mounted_session::{
+    CompactionRun, CompactionRunFailure, CompactionRunOutcome, CompactionRunRefused,
     MountedSession, UserChange, UserChangePublished, UserChangeRefused,
+};
+use singlefs_core::records::{
+    birth_txg_of_a_mapping_key, NLINK_OF_AN_INODE_BEING_DELETED, STATISTIC_FREE_BYTES,
+    TREE_KIND_SNAPSHOT_INODE_ROOT,
 };
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_root, choose_system_configuration,
-    instance_table_of_root, readable_roots, recover, JournalPolicy, PoolReader, RecoveryFailure,
-    RecoveryOutcome,
+    instance_table_of_root, read_the_first_file_of_a_snapshot, readable_roots, recover,
+    JournalPolicy, PoolReader, RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_without_units, warm_up, FirstFile, PoolVersion,
-    PoolWriter, PublishError, TransactionOutput, ZeroUnitPublishPlan,
+    PoolWriter, PublishError, RelocationBatchRefused, TransactionOutput, ZeroUnitPublishPlan,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{
-    DATA_UNIT_BYTES, EXTENT_TREE_LOWER_LEAF_DATA_UNITS, JOURNAL_RING_START_SLOT, SLOT_BYTES,
-    SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, EXTENT_TREE_LOWER_LEAF_DATA_UNITS, INODE_LEAF_RECORDS,
+    JOURNAL_RING_START_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+    SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use crate::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::model::{
-    IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
-    ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRingPosition, ModelRootKey,
-    ObservedEffect, ObservedOutcome, ObservedRefusalReason, MODEL_ROOT_RING_SLOTS,
+    IdealModel, ModelAnswer, ModelCheckpointTxg, ModelCompactionPublishSeen, ModelDeviceIdentity,
+    ModelDisagreement, ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason,
+    ModelRingPosition, ModelRootKey, ObservedEffect, ObservedOutcome, ObservedRefusalReason,
+    ObservedSnapshotReadBack, MODEL_ROOT_RING_SLOTS,
 };
 use crate::model_comparison::{
-    model_root_key, observed_mount_carrying_to_zero_unit_publishes,
+    compaction_region_of_the_model, model_compaction_region, model_root_key,
+    observed_logged_compaction_intent, observed_mount_carrying_to_zero_unit_publishes,
     observed_read_back_after_a_crash, observed_root_of_file_version,
-    observed_root_of_version_without_file_carrying, refusal_reason_of_mount_error,
-    refusal_reason_of_publish_error, refusal_reason_of_rollback_error,
-    reported_ceiling_of_mount_error, root_ring_slot_still_bad_after_one_reread_of_mount_error,
+    observed_root_of_version_without_file_carrying, observed_snapshot_read_back,
+    refusal_reason_of_mount_error, refusal_reason_of_publish_error,
+    refusal_reason_of_rollback_error, reported_ceiling_of_mount_error,
+    root_ring_slot_still_bad_after_one_reread_of_mount_error,
     root_ring_slot_still_bad_after_one_reread_of_rollback_error,
-    unit_copy_unreadable_or_mismatched_of_rollback_error, ContentsCarriedToZeroUnitPublishes,
+    unit_copy_unreadable_or_mismatched_of_rollback_error,
+    user_visible_root_units_relocated_by_this_publish, ContentsCarriedToZeroUnitPublishes,
 };
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use crate::segments::FixedGeometry;
@@ -470,6 +487,13 @@ pub struct FloorTargetChoice {
     pub steps_above_current_floor: u64,
 }
 
+/// 读、删哪一个快照：执行时按现行那一版树表里不在销毁中的码 14 条目（按（诞生 txg, 树号）升序，即建的先后）取第
+/// `index_among_the_snapshots mod 个数` 个；一个都没有就记「前提不满足」。生成时不知道那一刻有几个快照，收缩删掉前面几步之后照样有意义。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SnapshotChoice {
+    pub index_among_the_snapshots: u64,
+}
+
 /// 历史里的一步。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HistoryOperation {
@@ -496,13 +520,16 @@ pub enum HistoryOperation {
     /// 这一步不再造出被抛弃的根；乙罩不到的「系统配置没见证到最新那条根」那一形（`tests/common/mod.rs` 的
     /// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before` 另把见证它的系统配置槽清掉）这一步不造。
     CrashRecoveryAbandoningTheNewestRoot,
-    /// 经挂着的会话 unlink 第一个文件（`mounted_session::UserChange::Unlink`，D8（核心索引结构） 已定项 16）：一次调用 = 意图那次 +
+    /// 经挂着的会话 unlink 一个号（`mounted_session::UserChange::Unlink`，D8（核心索引结构） 已定项 16）：一次调用 = 意图那次 +
     /// 从尾部全部分批（文件多于一片下段叶的 144 个单元时先有不是最后一批的删除批，再最后一批），中间为空间推的抬 F 照会话交回的比。
-    /// 现行那一版有第一个文件那条记录时调（删除中的那一版也调：会话先走空、再拒）。
+    /// 删哪个号执行时按号选（`inode_the_unlink_names`：树里只有第一个文件时就是它；第一个文件旁边还有别的 inode 时第一个文件、带数据的别的文件、
+    /// size 0 的别的文件都删得到，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M4）。
+    /// 现行那一版有第一个文件那条记录（或第一个文件已删完而还有带数据单元的别的文件活着）、inode 树只有一片叶容器时调（删除中的那一版也调：
+    /// 会话先走空、再删或拒）。
     Unlink,
     /// 经挂着的会话建一个 size 0 的 inode（`mounted_session::UserChange::NewInodes`，count 1；D8（核心索引结构） 已定项 16 第 5 条：
     /// 删完之后只许建 inode、写行与空发布）。只在第一个文件已删完的一版上调（有树而文件集合为空的一版、或在它上面建过 inode 的一版）：
-    /// 模型只罩 inode 1 一个文件，建在第一个文件旁边的 inode 会让之后那次最后一批留下别的 inode，模型的删除那一臂罩不到。
+    /// 在第一个文件旁边建 inode 的是 [`HistoryOperation::CreateInodes`]（只进按 inode 号写那一组比重），这一步照旧只接在删完之后，别的几组生成的历史与执行不变。
     CreateInode,
     /// 经挂着的会话整份重写文件内容（入口分法同 [`HistoryOperation::PublishOverwrite`]），两块盘在那次改动的第一个 journal 记录写
     /// 到达时掉电：之前发出的写与屏障都落了盘，从那个写起一个都不落、都报 I/O 错（这一份里的 `DeviceLosingPowerAtTheFirstJournalRecordWrite`），
@@ -517,6 +544,213 @@ pub enum HistoryOperation {
     /// 崩溃注入里唯一一种在读故障下真的往盘上发写的步（C696（崩溃注入的读故障一支在随机历史里从没触发））。
     /// 只进它自己那一组比重（[`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`]），已有各组生成的历史不变。
     WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+    /// 经挂着的会话建一个只读快照（`mounted_session::UserChange::CreateSnapshot`，判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+    /// 第三节 S2）：会话先走空，再发一次独立发布。现行那一版有树时调（有树而文件集合为空的一版也调：会话照常发布、读它读到空，
+    /// 用户 2026-10-16 定「放开」，判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）。
+    /// 只进它自己那一组比重（[`GenerationWeights::SNAPSHOT_OPERATIONS`]），已有各组生成的历史不变。
+    CreateSnapshot,
+    /// 读一个只读快照（`recovery::read_the_first_file_of_a_snapshot`，经现行那一版的根）：不写盘，读出的内容交模型比（判决 S7「读快照」）。
+    ReadSnapshot(SnapshotChoice),
+    /// 经挂着的会话删一个只读快照（`mounted_session::UserChange::DestroySnapshot`，判决 S4 与第七节岔路 2、4）：一次调用 = 先走空 + 意图 +
+    /// 全部批，中间为空间推的抬 F 照会话交回的比。
+    DestroySnapshot(SnapshotChoice),
+    /// 挂着时整理一趟（`mounted_session::MountedSession::run_compaction`，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7「对拍：
+    /// `HistoryOperation` 加 `CompactWhileMounted`（含签发、批、批间崩溃）」与 G8 甲）：会话的分配器装上只供测试的整理开关
+    /// （`compaction_plan::CompactionSwitches`：强制批大小与选段，产品路径的批大小条款没写、走不进去），推完换回产品值。一趟里先走空删除续做，
+    /// 再签发（一次只写 logged_ops 的发布）、一批一批搬、最后一批同一次发布删意图；每一版交模型比（[`IdealModel::answer_compaction_publish`]：
+    /// 只比做成的那几次发布的内容与意图在 logged_ops 里的样子，搬几批、停在哪模型不答）。
+    /// [`CompactionRunEnding::CrashesAfterBatchesThenMountsWritable`] 那一种推够批数之后这个进程崩掉、照 [`HistoryOperation::CloseAndMountWritable`]
+    /// 可写挂载一次。只进整理那几组比重（[`GenerationWeights::COMPACTION_WHILE_MOUNTED`]、
+    /// [`GenerationWeights::COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK`]，与故障注入用的
+    /// [`GenerationWeights::BROAD_WITH_COMPACTION_WHILE_MOUNTED`]），已有各组生成的历史不变。
+    CompactWhileMounted(CompactionChoice),
+    /// 经挂着的会话改一个 inode 的 size（`mounted_session::UserChange::Truncate`，判决 `research/prompts/m4-trunc-r1-main-verification.md`
+    /// 第三节 K8）：一次调用 = 先走空 + 改 size 那一次（缩短是截断意图，变长与 N = S 一次发布做完）+ 缩短时之后的全部批，中间为空间推的抬 F
+    /// 照会话交回的比，每一版交模型比（[`IdealModel::answer_truncation`]）。目标 N 按类在执行时取（[`TruncationChoice`]：生成时不知道那一刻
+    /// 文件多长）。现行那一版有第一个文件那条记录时改第一个文件；没有而删完之后建过 inode 时改其中一个（第一版拒，调度记录「截甲交回」第 ① 处）。
+    /// 只进截断那一组比重（[`GenerationWeights::TRUNCATION`]）与带整理的那一组（[`GenerationWeights::BROAD_WITH_COMPACTION_WHILE_MOUNTED`]），
+    /// 别的几组生成的历史不变。
+    Truncate(TruncationChoice),
+    /// 经挂着的会话一次建几个 size 0 的 inode（`mounted_session::UserChange::NewInodes`，里程碑「删除与多次 COW」一·1：按 inode 号写数据先要有
+    /// 别的 inode）：第一个文件活着或已删完的一版上都调（[`IdealModel::answer_create_inodes`]）。建几个执行时压到最右那片叶容器装得下的条数
+    /// （[`InodeCountChoice`]）。只进按 inode 号写那一组比重（[`GenerationWeights::WRITES_BY_INODE_NUMBER`]），别的几组生成的历史不变。
+    CreateInodes(InodeCountChoice),
+    /// 经挂着的会话按 inode 号整份写一个文件（`UserChange::OverwriteOfAnInode`、`UserChange::SequentialWriteOfAnInode`，里程碑「删除与多次 COW」
+    /// 一·1）：号执行时在现行那一版树里活着的号里取（[`WriteOfAnInodeChoice::inode_among`]），入口按内容长度分（同 [`HistoryOperation::PublishOverwrite`]）。
+    /// 第一个文件已删完、之后建过 inode 的一版上照调，必拒（K-U5，用户 2026-10-19 定「拦」）。只进按 inode 号写那一组比重。
+    WriteOfAnInode(WriteOfAnInodeChoice),
+}
+
+/// 一次建几个 inode（[`HistoryOperation::CreateInodes`]）：执行时压到最右那片叶容器还装得下的条数（满 233 条在末尾分裂，一次只重写一片叶容器，
+/// 模型只答这一形），至少 1。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct InodeCountChoice {
+    pub count_drawn: u64,
+}
+
+impl InodeCountChoice {
+    /// 树里此刻有 `live_inode_records` 条活着的记录时这一步建几个：抽到的数，压到最右那片叶容器还装得下的条数，至少 1。
+    #[must_use]
+    pub fn count_fitting_the_rightmost_leaf_container(self, live_inode_records: u64) -> u64 {
+        let room_in_the_rightmost_leaf_container =
+            INODE_LEAF_RECORDS - live_inode_records % INODE_LEAF_RECORDS;
+        self.count_drawn
+            .clamp(1, room_in_the_rightmost_leaf_container)
+    }
+}
+
+/// 一次建 inode 至多抽几个（[`HistoryOperation::CreateInodes`]）：抽到这么多时号能越过 extent 树上段一片叶罩的 143 个，让按 inode 号写的那一组
+/// 取样点罩到「上段长高」与「写的号落在第 0 片叶之外」两形。
+const INODES_CREATED_AT_ONCE_DRAWN_AT_MOST: u64 = 160;
+
+/// 一次建 inode 抽得少的那一半至多抽几个（[`HistoryOperation::CreateInodes`]）：树里的 inode 少，随机历史里的 unlink 删得到删空，
+/// inode 树留在一片叶容器里（模型的删除那一臂只答一片的）。
+const INODES_CREATED_AT_ONCE_IN_A_SMALL_DRAW_AT_MOST: u64 = 3;
+
+/// 按 inode 号写哪个、写什么（[`HistoryOperation::WriteOfAnInode`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct WriteOfAnInodeChoice {
+    pub inode_selector: u64,
+    pub content: ContentChoice,
+}
+
+impl WriteOfAnInodeChoice {
+    /// 从现行那一版树里活着的号（升序）里取写哪个：选择子是 3 的倍数时取最大的那个（新建的号多半在上段第 0 片叶之外），否则按选择子取模。
+    /// 生成时不知道那一刻树里有哪几个号，收缩删掉前面几步之后照样有意义。一个号都没有交回 `None`。
+    #[must_use]
+    pub fn inode_among(self, live_inodes_in_ascending_order: &[u64]) -> Option<u64> {
+        let largest = *live_inodes_in_ascending_order.last()?;
+        if self.inode_selector.is_multiple_of(3) {
+            return Some(largest);
+        }
+        let count = u64::try_from(live_inodes_in_ascending_order.len()).expect("条数装得进 u64");
+        let index = usize::try_from((self.inode_selector / 3) % count).expect("小于条数");
+        Some(live_inodes_in_ascending_order[index])
+    }
+}
+
+/// 截断改到多长（[`HistoryOperation::Truncate`]）：执行时按那一刻文件的 size 与单元数把类与选择子换成字节数（[`TruncationChoice::new_size_in_bytes`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TruncationChoice {
+    pub target: TruncationTarget,
+    pub selector: u64,
+}
+
+/// 截断目标的类（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8「目标按类取」）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TruncationTarget {
+    /// 缩到 0（K3：留一个声明长度 0 的单元）。
+    ToZero,
+    /// 缩到一个单元边界 k × 净荷（k 在 [1, 罩着现在 size 的单元数 − 1] 里按选择子取；文件只罩一个单元时取 0）。
+    ToADataUnitBoundary,
+    /// 缩到一个单元中间（k × 净荷 + r，r 在 [1, 净荷 − 1] 里，比现在短；现在不到一个净荷时在 [0, size) 里取）。
+    IntoTheMiddleOfADataUnit,
+    /// 在最后一个罩着的单元里变长（到那个单元的末尾为止；现在 size 恰在单元末尾时多 1 到半个净荷，跨进下一个单元留洞）。
+    GrowingWithinTheLastDataUnit,
+    /// 跨单元变长：多 1 到 3 个净荷再加 [0, 净荷) 字节（K5：留洞）。
+    GrowingAcrossDataUnits,
+    /// 变长之后截回洞里：文件尾部有洞（存在的单元少于 size 罩的）时，截到存在的单元末尾与 size 之间（含恰在末尾：洞整个截掉，判决第六节 S1）；
+    /// 没有洞时照 [`TruncationTarget::ToTheCurrentSize`]。
+    BackIntoTheHole,
+    /// 改成现在的 size（K12：只改记录）；收缩往这一头换。
+    ToTheCurrentSize,
+}
+
+impl TruncationTarget {
+    /// 统计表里的名字。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            TruncationTarget::ToZero => "缩到 0",
+            TruncationTarget::ToADataUnitBoundary => "缩到单元边界",
+            TruncationTarget::IntoTheMiddleOfADataUnit => "缩到单元中间",
+            TruncationTarget::GrowingWithinTheLastDataUnit => "单元内变长",
+            TruncationTarget::GrowingAcrossDataUnits => "跨单元变长",
+            TruncationTarget::BackIntoTheHole => "变长后截回洞里",
+            TruncationTarget::ToTheCurrentSize => "改成现在的 size",
+        }
+    }
+}
+
+impl TruncationChoice {
+    /// 第一个文件现在 `size_in_bytes` 字节、盘上存在 `data_units_present` 个数据单元时这一步截到多少字节。都装得进内存（至多现在的 size
+    /// 加 4 个净荷）。
+    #[must_use]
+    pub fn new_size_in_bytes(self, size_in_bytes: u64, data_units_present: u64) -> u64 {
+        let payload = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+        let data_units_within_the_size = size_in_bytes.div_ceil(payload).max(1);
+        match self.target {
+            TruncationTarget::ToZero => 0,
+            TruncationTarget::ToADataUnitBoundary => {
+                let inner_boundaries = data_units_within_the_size - 1;
+                if inner_boundaries == 0 {
+                    0
+                } else {
+                    (1 + self.selector % inner_boundaries) * payload
+                }
+            }
+            TruncationTarget::IntoTheMiddleOfADataUnit => {
+                if size_in_bytes <= payload {
+                    self.selector % size_in_bytes.max(1)
+                } else {
+                    let unit = self.selector % (data_units_within_the_size - 1);
+                    let middle = unit * payload + 1 + (self.selector / 7) % (payload - 1);
+                    middle.min(size_in_bytes - 1)
+                }
+            }
+            TruncationTarget::GrowingWithinTheLastDataUnit => {
+                let end_of_the_last_unit = data_units_within_the_size * payload;
+                if size_in_bytes < end_of_the_last_unit {
+                    size_in_bytes + 1 + self.selector % (end_of_the_last_unit - size_in_bytes)
+                } else {
+                    size_in_bytes + 1 + self.selector % (payload / 2)
+                }
+            }
+            TruncationTarget::GrowingAcrossDataUnits => {
+                size_in_bytes + (1 + self.selector % 3) * payload + (self.selector / 3) % payload
+            }
+            TruncationTarget::BackIntoTheHole => {
+                let end_of_the_units_present = data_units_present * payload;
+                if end_of_the_units_present < size_in_bytes {
+                    end_of_the_units_present
+                        + self.selector % (size_in_bytes - end_of_the_units_present)
+                } else {
+                    size_in_bytes
+                }
+            }
+            TruncationTarget::ToTheCurrentSize => size_in_bytes,
+        }
+    }
+}
+
+/// 第一个文件删完之后建的 inode（size 0）改成多少字节：[1, 3 × 净荷] 里按选择子取，恒不等于它的 size 0（改成同样 size 的只改记录那一格
+/// 模型不答，[`IdealModel::answer_size_change_of_an_inode_created_after_the_first_file_was_deleted`]）。
+fn new_size_of_an_inode_created_after_the_first_file_was_deleted(selector: u64) -> u64 {
+    let payload = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+    1 + selector % (3 * payload)
+}
+
+/// 整理一趟怎么推（[`HistoryOperation::CompactWhileMounted`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CompactionChoice {
+    /// 一批至多搬几个单元（`compaction_plan::CompactionBatchSize::ForcedForTests`），至少 1。
+    pub batch_units: u64,
+    /// 强制选哪一段（`CompactionSwitches::forced_region`）：执行时在现行那一版里按段起点升序排的候选段（[`segments_the_compaction_may_be_forced_onto`]）
+    /// 里取第 `region_selector mod 个数` 段；一段都没有记「前提不满足」。生成时不知道那一刻盘上有哪几段。
+    pub region_selector: u64,
+    pub ending: CompactionRunEnding,
+}
+
+/// 整理一趟推到哪、之后怎样。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CompactionRunEnding {
+    /// 显式入口推到停（判据或发布预算 `B_gc`），会话照旧开着；意图没做完的照旧活着（R 排他跟着）。
+    RunsUntilItStops,
+    /// 至多推 `batches` 批（执行器把这一趟的发布预算压到这么多：式子里「已经过去的发布数」先抬到 3S − 4 − `batches`，盘上没有活意图时
+    /// 再减签发那一次，判决 G8 `B_gc`），之后这个进程崩掉（不卸载；已发的写都落了盘），可写挂载一次。意图在 logged_ops 里（判决 G1），
+    /// 推到半路崩掉就是批间崩溃：重建出来的那一版带着意图、按映射条目的位置覆盖提示；执行器的可写挂载装产品开关，挂载里不续做
+    /// （批大小条款没写，`CompactionRunStop::BatchSizeNotDecidedByTheClauses`），下一趟整理接着推盘上那一条。
+    CrashesAfterBatchesThenMountsWritable { batches: u64 },
 }
 
 /// 操作的种类：统计与比重用。
@@ -534,10 +768,17 @@ pub enum HistoryOperationKind {
     CreateInode,
     OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
     WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+    CreateSnapshot,
+    ReadSnapshot,
+    DestroySnapshot,
+    CompactWhileMounted,
+    Truncate,
+    CreateInodes,
+    WriteOfAnInode,
 }
 
 impl HistoryOperationKind {
-    pub const ALL: [HistoryOperationKind; 12] = [
+    pub const ALL: [HistoryOperationKind; 19] = [
         HistoryOperationKind::PublishFirstFile,
         HistoryOperationKind::PublishOverwrite,
         HistoryOperationKind::PublishWithoutUnits,
@@ -550,6 +791,13 @@ impl HistoryOperationKind {
         HistoryOperationKind::CreateInode,
         HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
         HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+        HistoryOperationKind::CreateSnapshot,
+        HistoryOperationKind::ReadSnapshot,
+        HistoryOperationKind::DestroySnapshot,
+        HistoryOperationKind::CompactWhileMounted,
+        HistoryOperationKind::Truncate,
+        HistoryOperationKind::CreateInodes,
+        HistoryOperationKind::WriteOfAnInode,
     ];
 }
 
@@ -575,6 +823,13 @@ impl HistoryOperation {
             HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
                 HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
             }
+            HistoryOperation::CreateSnapshot => HistoryOperationKind::CreateSnapshot,
+            HistoryOperation::ReadSnapshot(_) => HistoryOperationKind::ReadSnapshot,
+            HistoryOperation::DestroySnapshot(_) => HistoryOperationKind::DestroySnapshot,
+            HistoryOperation::CompactWhileMounted(_) => HistoryOperationKind::CompactWhileMounted,
+            HistoryOperation::Truncate(_) => HistoryOperationKind::Truncate,
+            HistoryOperation::CreateInodes(_) => HistoryOperationKind::CreateInodes,
+            HistoryOperation::WriteOfAnInode(_) => HistoryOperationKind::WriteOfAnInode,
         }
     }
 }
@@ -618,6 +873,18 @@ pub enum NamedGenerationWeights {
     LeavingOrphansForTheInstanceTableSweep,
     /// [`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`]。
     NewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+    /// [`GenerationWeights::SNAPSHOT_OPERATIONS`]。
+    SnapshotOperations,
+    /// [`GenerationWeights::COMPACTION_WHILE_MOUNTED`]。
+    CompactionWhileMounted,
+    /// [`GenerationWeights::COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK`]。
+    CompactionWhileMountedWithRollback,
+    /// [`GenerationWeights::BROAD_WITH_COMPACTION_WHILE_MOUNTED`]。
+    BroadWithCompactionWhileMounted,
+    /// [`GenerationWeights::TRUNCATION`]。
+    Truncation,
+    /// [`GenerationWeights::WRITES_BY_INODE_NUMBER`]。
+    WritesByInodeNumber,
 }
 }
 
@@ -648,6 +915,20 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
                 GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS
             }
+            NamedGenerationWeights::SnapshotOperations => GenerationWeights::SNAPSHOT_OPERATIONS,
+            NamedGenerationWeights::CompactionWhileMounted => {
+                GenerationWeights::COMPACTION_WHILE_MOUNTED
+            }
+            NamedGenerationWeights::CompactionWhileMountedWithRollback => {
+                GenerationWeights::COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK
+            }
+            NamedGenerationWeights::BroadWithCompactionWhileMounted => {
+                GenerationWeights::BROAD_WITH_COMPACTION_WHILE_MOUNTED
+            }
+            NamedGenerationWeights::Truncation => GenerationWeights::TRUNCATION,
+            NamedGenerationWeights::WritesByInodeNumber => {
+                GenerationWeights::WRITES_BY_INODE_NUMBER
+            }
         }
     }
 
@@ -665,6 +946,12 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
                 "newest-system-configuration-slot-zeros"
             }
+            NamedGenerationWeights::SnapshotOperations => "snapshots",
+            NamedGenerationWeights::CompactionWhileMounted => "compaction",
+            NamedGenerationWeights::CompactionWhileMountedWithRollback => "compaction-rollback",
+            NamedGenerationWeights::BroadWithCompactionWhileMounted => "broad-compaction",
+            NamedGenerationWeights::Truncation => "truncation",
+            NamedGenerationWeights::WritesByInodeNumber => "inode-writes",
         }
     }
 }
@@ -1034,6 +1321,330 @@ impl GenerationWeights {
             overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
         };
 
+    /// 建快照、读快照、删快照那一格（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S7：`HistoryOperation` 加三种，
+    /// 新操作进自己的权重组，已有各组生成的历史不变）的取样点，配两块 4 GiB 的盘跑：多从第一个文件起；带文件的版本上覆盖写的内容另抽跨几个单元、
+    /// 走顺序写入口的（[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]，多半两片下段叶：快照下覆盖写钉住整段下段、删快照分几批放），
+    /// 夹着建快照、读快照、删快照，与 unlink（快照下删文件，删除批换下的单元钉进 deadlist）、回退（带快照的两版上要求拒，判决 S8）、
+    /// 可写挂载、抬 F、冷启动与崩溃恢复抛弃根；unlink 之后只抽建 inode、三种快照操作、回退与可写挂载。
+    pub const SNAPSHOT_OPERATIONS: GenerationWeights = GenerationWeights {
+        name: "带建快照、读快照、删快照的历史（判决 m4-snapshot-r1 第三节 S7 那一格的取样点）",
+        named: NamedGenerationWeights::SnapshotOperations,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 8),
+            (HistoryOperationKind::PublishWithoutUnits, 4),
+            (HistoryOperationKind::ColdStartRecover, 4),
+            (HistoryOperationKind::CreateSnapshot, 4),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 28),
+            (HistoryOperationKind::CreateSnapshot, 16),
+            (HistoryOperationKind::ReadSnapshot, 10),
+            (HistoryOperationKind::DestroySnapshot, 12),
+            (HistoryOperationKind::Unlink, 5),
+            (HistoryOperationKind::RollBackWhileMounted, 9),
+            (HistoryOperationKind::RaiseRollbackFloor, 6),
+            (HistoryOperationKind::CloseAndMountWritable, 8),
+            (HistoryOperationKind::ColdStartRecover, 3),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 25),
+            (HistoryOperationKind::CreateSnapshot, 15),
+            (HistoryOperationKind::DestroySnapshot, 15),
+            (HistoryOperationKind::ReadSnapshot, 10),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::RaiseRollbackFloor, 5),
+            (HistoryOperationKind::PublishOverwrite, 5),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
+    /// 挂着时整理那一格（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7：`HistoryOperation` 加 `CompactWhileMounted`，
+    /// 新操作进自己的权重组）的取样点，配两块 4 GiB 的盘跑：多从第一个文件起；带文件的版本上覆盖写的内容另抽跨几个单元的
+    /// （[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]：数据单元铺满几段，强制选段落在装着用户数据的段上），夹着整理、建快照、读快照、
+    /// 删快照（被快照钉住的单元照搬）、unlink、可写挂载与冷启动；unlink 之后抽建 inode、整理与三种快照操作。不抽回退、抬 F 与崩溃恢复抛弃根：
+    /// 它们按根环里的位置点名，整理多发的那几条根会让「同一段历史去掉整理」那一份点到别的根上，两份读出的内容不再能逐字比
+    /// （`tests/compaction_while_mounted_in_random_histories.rs` 拿去掉整理的那一份比读出的内容）。整理之后回退那一格另一组比重抽
+    /// （[`GenerationWeights::COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK`]）。
+    pub const COMPACTION_WHILE_MOUNTED: GenerationWeights = GenerationWeights {
+        name: "挂着时整理的历史（判决 m4-gc-r1 第三节 G7 那一格的取样点）",
+        named: NamedGenerationWeights::CompactionWhileMounted,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 8),
+            (HistoryOperationKind::ColdStartRecover, 4),
+            (HistoryOperationKind::CompactWhileMounted, 8),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 30),
+            (HistoryOperationKind::CompactWhileMounted, 25),
+            (HistoryOperationKind::CreateSnapshot, 10),
+            (HistoryOperationKind::ReadSnapshot, 8),
+            (HistoryOperationKind::DestroySnapshot, 8),
+            (HistoryOperationKind::Unlink, 5),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::ColdStartRecover, 4),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 25),
+            (HistoryOperationKind::CompactWhileMounted, 25),
+            (HistoryOperationKind::CreateSnapshot, 10),
+            (HistoryOperationKind::DestroySnapshot, 10),
+            (HistoryOperationKind::ReadSnapshot, 10),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::PublishOverwrite, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
+    /// 整理之后回退那一格（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F1：整理搬过单元之后回退，回退那一版的中央映射
+    /// 要取目标那一版的位置；整理那一组比重不抽回退，随机历史撞不到）的取样点，配两块 4 GiB 的盘跑：在整理那一组的基础上，带文件的版本与
+    /// unlink 之后各切出一份给回退与抬 F（回退按根环里的位置点名，整理多发的那几条根让它多半退到整理半路或整理之前的根上），快照操作压少
+    /// （第一版有快照就拒回退，判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S8），unlink 之后不抽建快照（文件集合为空时建快照
+    /// 那一格归快照那一组比重）。只交给按模型逐版比的用例，不进「去掉整理那一份」的比法。
+    /// 新加的一组，已有各组生成的历史不变。
+    pub const COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK: GenerationWeights = GenerationWeights {
+        name: "挂着时整理夹着回退的历史（判决 m4-segment-code-r1 第三节 F1 那一格的取样点）",
+        named: NamedGenerationWeights::CompactionWhileMountedWithRollback,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 8),
+            (HistoryOperationKind::ColdStartRecover, 4),
+            (HistoryOperationKind::CompactWhileMounted, 8),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 28),
+            (HistoryOperationKind::CompactWhileMounted, 25),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::RaiseRollbackFloor, 4),
+            (HistoryOperationKind::CreateSnapshot, 4),
+            (HistoryOperationKind::ReadSnapshot, 3),
+            (HistoryOperationKind::DestroySnapshot, 4),
+            (HistoryOperationKind::Unlink, 3),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::ColdStartRecover, 4),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 30),
+            (HistoryOperationKind::CompactWhileMounted, 25),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::DestroySnapshot, 5),
+            (HistoryOperationKind::ReadSnapshot, 5),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::PublishOverwrite, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
+    /// 故障注入里瞬时读错与整理一起出现那一格（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J5：故障注入用的
+    /// [`GenerationWeights::BROAD`] 不抽整理，整理两条「核不过就照抄意图」的退路发出的那一版与模型的冲突在对拍历史里一次都走不到）的取样点：
+    /// 起点与关着的会话那张表同快档那一组；开着的三张表各从份数最多的那一格切出一份给挂着时整理（[`HistoryOperation::CompactWhileMounted`]），
+    /// 紧挨在切出它的那一格之后，和照旧 100：没有文件那张从第一个文件切（60 → 52 + 8），带文件那张从覆盖写切（52 → 40 + 12），
+    /// unlink 之后那张从建 inode 切（40 → 30 + 10）。整理那一步照执行器的写法装只供测试的整理开关（强制批大小与选段），故障注入照常摆注入点：
+    /// 落在整理那一步上的读错就是瞬时读错撞上整理。新加的一组，已有各组生成的历史不变；故障注入的快档照旧用快档那一组，这一组经大档入口的
+    /// 比重变量点名跑（`broad-compaction`）。
+    /// 截断（[`HistoryOperation::Truncate`]，判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8「另进带整理的那一组」）同一个切法：
+    /// 带文件那张从覆盖写再切（40 → 32 + 8），unlink 之后那张从建 inode 再切（30 → 24 + 6），紧挨在切出它的那一格之后：故障注入的大档点名这一组时
+    /// 读错、写错、说谎的设备落得到截断的意图与各批上。
+    pub const BROAD_WITH_COMPACTION_WHILE_MOUNTED: GenerationWeights = GenerationWeights {
+        name: "各类操作都抽、夹着挂着时整理（判决 m4-segment-code-r3 第三节 J5 那一格的取样点，故障注入用）",
+        named: NamedGenerationWeights::BroadWithCompactionWhileMounted,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 1),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 92),
+            (HistoryOperationKind::ColdStartRecover, 8),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 52),
+            (HistoryOperationKind::CompactWhileMounted, 8),
+            (HistoryOperationKind::PublishWithoutUnits, 20),
+            (HistoryOperationKind::CloseAndMountWritable, 4),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                2,
+            ),
+            (HistoryOperationKind::RollBackWhileMounted, 4),
+            (HistoryOperationKind::ColdStartRecover, 4),
+            (HistoryOperationKind::PublishOverwrite, 3),
+            (HistoryOperationKind::RaiseRollbackFloor, 3),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 32),
+            (HistoryOperationKind::Truncate, 8),
+            (HistoryOperationKind::CompactWhileMounted, 12),
+            (HistoryOperationKind::RaiseRollbackFloor, 16),
+            (HistoryOperationKind::CloseAndMountWritable, 6),
+            // unlink 一格份数与次序同快档那一组；与前后两格各隔一行注释，`crates/mutations.tsv` 里改快档那一组这几格的变异原文才只在快档那一组里命中一次
+            (HistoryOperationKind::Unlink, 3),
+            // 崩溃恢复抛弃根一格份数与次序同快档那一组；与 unlink 那一格隔开，理由写在 unlink 那一格的注释里
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+            (HistoryOperationKind::RollBackWhileMounted, 10),
+            (HistoryOperationKind::ColdStartRecover, 4),
+            (HistoryOperationKind::PublishFirstFile, 4),
+            (HistoryOperationKind::PublishWithoutUnits, 2),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 24),
+            (HistoryOperationKind::Truncate, 6),
+            (HistoryOperationKind::CompactWhileMounted, 10),
+            (HistoryOperationKind::RaiseRollbackFloor, 15),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+            (HistoryOperationKind::ColdStartRecover, 5),
+            (HistoryOperationKind::PublishOverwrite, 4),
+            (HistoryOperationKind::PublishFirstFile, 4),
+            (HistoryOperationKind::PublishWithoutUnits, 4),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
+    };
+
+    /// 按 inode 号写数据的取样点（里程碑「删除与多次 COW」一·1；C445（模型对拍的取样点不随写路径增长）：新入口要有对拍跑得到它的取样点）：
+    /// 多从第一个文件起，第一个文件活着时多建 inode（一次至多 160 个，号越过 extent 树上段一片叶罩的 143 个）、多按 inode 号写（[`WriteOfAnInodeChoice`]：
+    /// 三分之一取最大的号，上段长高与写的号落在第 0 片叶之外两形都落得到），也写第一个文件、回退、抬 F、可写挂载与冷启动（别的文件跨挂载读回）；
+    /// unlink 按号选（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M4，执行器选，[`inode_the_unlink_names`]：第一个文件、
+    /// 带数据的别的文件、size 0 的别的文件都删得到；inode 树多于一片叶容器时不删，[`MissingPrecondition::InodeTreeSpansMoreThanOneLeafContainer`]），
+    /// 带文件那张表与 unlink 之后那张表都抽（一次抽到 unlink 之后生成就按 unlink 之后那张表抽，删的可能是别的号、第一个文件还在，那张表照样接着删），
+    /// 建 inode 一半只建几个（删得到删空、树留在一片叶容器里），一半至多 160 个；删完第一个文件之后按 inode 号写删之前就有的照写、写删完之后建的必拒
+    /// （K-U5 的 β 时序级读法，用户 2026-10-19 定）。快照、截断、整理不抽：模型的那几臂只按第一个文件写。
+    /// 只进它自己这一组，已有各组生成的历史不变。
+    pub const WRITES_BY_INODE_NUMBER: GenerationWeights = GenerationWeights {
+        name: "按 inode 号写数据（里程碑「删除与多次 COW」一·1 的取样点）",
+        named: NamedGenerationWeights::WritesByInodeNumber,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 4),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 90),
+            (HistoryOperationKind::ColdStartRecover, 10),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 75),
+            (HistoryOperationKind::PublishWithoutUnits, 10),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::WriteOfAnInode, 38),
+            (HistoryOperationKind::CreateInodes, 18),
+            (HistoryOperationKind::PublishOverwrite, 8),
+            (HistoryOperationKind::Unlink, 14),
+            (HistoryOperationKind::RollBackWhileMounted, 8),
+            (HistoryOperationKind::RaiseRollbackFloor, 6),
+            (HistoryOperationKind::CloseAndMountWritable, 8),
+            (HistoryOperationKind::ColdStartRecover, 3),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInodes, 24),
+            (HistoryOperationKind::WriteOfAnInode, 35),
+            (HistoryOperationKind::Unlink, 26),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::RaiseRollbackFloor, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
+    };
+
+    /// 截断那一格（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8：`HistoryOperation` 加 `Truncate`，比重进自己那一组）的
+    /// 取样点，配两块 4 GiB 的盘跑：多从第一个文件起；带文件的版本上截断占三成多（缩到 0、单元边界、单元中间、单元内与跨单元变长、变长后截回洞里、
+    /// 改成现在的 size），覆盖写的内容另抽跨几个单元的（[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]：多半两片下段叶，缩短要不止一批），
+    /// 夹着建快照、删快照（快照下截断，K4）、unlink、回退、抬 F、可写挂载、冷启动与崩溃恢复抛弃根；回退一半取第四新的根（截断的意图与各批
+    /// 一次写出好几条根，退到截断半路那一版，之后的改动先把截断走完，K1）。unlink 之后抽建 inode、截断（点名删完之后建的 inode，第一版拒）、
+    /// 回退与可写挂载。新加的一组，已有各组生成的历史不变。
+    pub const TRUNCATION: GenerationWeights = GenerationWeights {
+        name: "带截断的历史（判决 m4-trunc-r1 第三节 K8 那一格的取样点）",
+        named: NamedGenerationWeights::Truncation,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::PublishWithoutUnits, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 28),
+            (HistoryOperationKind::Truncate, 35),
+            (HistoryOperationKind::Unlink, 4),
+            (HistoryOperationKind::CreateSnapshot, 4),
+            (HistoryOperationKind::DestroySnapshot, 3),
+            (HistoryOperationKind::RollBackWhileMounted, 9),
+            (HistoryOperationKind::RaiseRollbackFloor, 4),
+            (HistoryOperationKind::CloseAndMountWritable, 7),
+            (HistoryOperationKind::ColdStartRecover, 3),
+            (
+                HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
+                3,
+            ),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::CreateInode, 35),
+            (HistoryOperationKind::Truncate, 25),
+            (HistoryOperationKind::RollBackWhileMounted, 25),
+            (HistoryOperationKind::PublishOverwrite, 5),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+        ]),
+        rollback_targets: RollbackTargetDraw::FourthNewestRootHalfTheTime,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
     /// 复现入口认得的每一组比重：按 `environment_value` 找回（[`HistorySampling::from_environment`]）。
     /// 照 [`NamedGenerationWeights::ALL`] 逐个经 [`NamedGenerationWeights::weights`] 生成，不手抄常量名：
     /// 新加一组比重要一个新成员，成员不在 `weights` 的穷举 `match` 里补一臂就编不过（代码三方 test-script-align-code-r1 判决 K4）。
@@ -1137,6 +1748,39 @@ fn draw_content_spanning_several_data_units(source: &mut SeededRandomSource) -> 
     }
 }
 
+/// 按 inode 号写的内容（[`HistoryOperation::WriteOfAnInode`]）：与 `draw_content` 抽的随机数一样多（选择子、长度种类、填充种子各一个）。
+/// 一半在一个数据单元以内或刚越过（走覆盖写入口，刚越过的必拒），其余走顺序写——一片下段叶以内的几个单元（2–16 个）、两片（145–148 个单元）。
+fn draw_content_of_a_write_by_inode_number(source: &mut SeededRandomSource) -> ContentChoice {
+    let selector = source.next_word();
+    let length = draw_weighted(
+        source,
+        &[
+            (ContentLength::Empty, 6),
+            (ContentLength::InsideOneDataUnit { selector }, 34),
+            (ContentLength::ExactlyDataUnitPayloadCapacity, 5),
+            (ContentLength::OneByteAboveDataUnitPayloadCapacity, 5),
+            (
+                ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 2 + selector % 15,
+                    selector,
+                },
+                40,
+            ),
+            (
+                ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: EXTENT_TREE_LOWER_LEAF_DATA_UNITS + 1 + selector % 4,
+                    selector,
+                },
+                10,
+            ),
+        ],
+    );
+    ContentChoice {
+        length,
+        fill_seed: source.next_word(),
+    }
+}
+
 fn draw_operation(
     source: &mut SeededRandomSource,
     kind: HistoryOperationKind,
@@ -1216,8 +1860,74 @@ fn draw_operation(
                 },
             )
         }
+        HistoryOperationKind::CreateSnapshot => HistoryOperation::CreateSnapshot,
+        HistoryOperationKind::ReadSnapshot => HistoryOperation::ReadSnapshot(SnapshotChoice {
+            index_among_the_snapshots: source.next_word(),
+        }),
+        HistoryOperationKind::DestroySnapshot => HistoryOperation::DestroySnapshot(SnapshotChoice {
+            index_among_the_snapshots: source.next_word(),
+        }),
+        HistoryOperationKind::CompactWhileMounted => {
+            let batch_units = 1 + source.below(COMPACTION_BATCH_UNITS_DRAWN_AT_MOST);
+            let region_selector = source.next_word();
+            // 三分之一推够几批就崩掉、可写挂载（批间崩溃）；其余推到停。
+            let ending = if source.below(3) == 0 {
+                CompactionRunEnding::CrashesAfterBatchesThenMountsWritable {
+                    batches: 1 + source.below(COMPACTION_BATCHES_BEFORE_THE_CRASH_DRAWN_AT_MOST),
+                }
+            } else {
+                CompactionRunEnding::RunsUntilItStops
+            };
+            HistoryOperation::CompactWhileMounted(CompactionChoice {
+                batch_units,
+                region_selector,
+                ending,
+            })
+        }
+        HistoryOperationKind::Truncate => {
+            let target = draw_weighted(
+                source,
+                &[
+                    (TruncationTarget::ToZero, 15),
+                    (TruncationTarget::ToADataUnitBoundary, 15),
+                    (TruncationTarget::IntoTheMiddleOfADataUnit, 20),
+                    (TruncationTarget::GrowingWithinTheLastDataUnit, 15),
+                    (TruncationTarget::GrowingAcrossDataUnits, 15),
+                    (TruncationTarget::BackIntoTheHole, 15),
+                    (TruncationTarget::ToTheCurrentSize, 5),
+                ],
+            );
+            HistoryOperation::Truncate(TruncationChoice {
+                target,
+                selector: source.next_word(),
+            })
+        }
+        // 一半只建几个（删得到删空、树留在一片叶容器里，unlink 才删得到），一半至多 160 个（号越过上段第 0 片叶）。
+        HistoryOperationKind::CreateInodes => {
+            let drawn_at_most = if source.below(2) == 0 {
+                INODES_CREATED_AT_ONCE_IN_A_SMALL_DRAW_AT_MOST
+            } else {
+                INODES_CREATED_AT_ONCE_DRAWN_AT_MOST
+            };
+            HistoryOperation::CreateInodes(InodeCountChoice {
+                count_drawn: 1 + source.below(drawn_at_most),
+            })
+        }
+        HistoryOperationKind::WriteOfAnInode => {
+            let inode_selector = source.next_word();
+            HistoryOperation::WriteOfAnInode(WriteOfAnInodeChoice {
+                inode_selector,
+                content: draw_content_of_a_write_by_inode_number(source),
+            })
+        }
     }
 }
+
+/// 整理一批至多搬几个单元，生成时在 1 到这么多里抽：一段 64 槽至多 32 个数据单元，一批取得小，一段要推好几批，批间崩溃才落得在意图半路。
+const COMPACTION_BATCH_UNITS_DRAWN_AT_MOST: u64 = 3;
+
+/// 批间崩溃之前至多推几批，生成时在 1 到这么多里抽。
+const COMPACTION_BATCHES_BEFORE_THE_CRASH_DRAWN_AT_MOST: u64 = 3;
 
 /// 生成时对「这段历史的第一个文件」的估计（只调比重、不进执行）：还没写过、写过、unlink 过之后一直没有（只在比重写了 unlink 之后那张表时进）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1261,7 +1971,17 @@ fn expected_session_after(
         | HistoryOperationKind::PublishWithoutUnits
         | HistoryOperationKind::RollBackWhileMounted
         | HistoryOperationKind::RaiseRollbackFloor
-        | HistoryOperationKind::CreateInode => expected,
+        | HistoryOperationKind::CreateInode
+        | HistoryOperationKind::CreateSnapshot
+        | HistoryOperationKind::ReadSnapshot
+        | HistoryOperationKind::DestroySnapshot
+        // 整理不改用户看得见的东西；批间崩溃之后那次可写挂载落到的就是最后那一批，有没有文件与整理之前相同。
+        | HistoryOperationKind::CompactWhileMounted
+        // 截断只改文件的长度，有没有文件不变（删完之后点名别的 inode 的那一次被拒）。
+        | HistoryOperationKind::Truncate
+        // 建 inode、按 inode 号写不改第一个文件在不在（删完之后按 inode 号写被拒）。
+        | HistoryOperationKind::CreateInodes
+        | HistoryOperationKind::WriteOfAnInode => expected,
         // unlink 之后那一版有树而文件集合为空：比重写了 unlink 之后那张表的按它抽，没写的照旧按「开着、没有文件」抽
         // （第一个文件在它上面照条款被拒）。
         HistoryOperationKind::Unlink => match expected {
@@ -1418,6 +2138,10 @@ struct WritableSession {
     /// 零单元发布从它往下带着比（实审 B3c-4）；一次挂载里第一版就是零单元发布（mkfs 之后第一次可写挂载）、现行那一版带文件
     /// （零单元发布只接在树表 0 条的一版后面）时是 None。
     carried_to_zero_unit_publishes: Option<ContentsCarriedToZeroUnitPublishes>,
+    /// 整理在这次挂载里会话这一侧的状态（`compaction_plan::CompactionOfThisMount`：不合格段表、常驻隔离集、`B_gc` 数的发布数、观测）：
+    /// 生命周期一次挂载，执行器每一步借给会话、推完原样收回，跨步带着（`B_gc` 数的是上一次用户改动之后整理发了几次布，不是这一步里）。
+    /// 可写挂载交回的那一份（`MountOutput::compaction_continuation`）接着用；起点那个进程从新的一份起。
+    compaction: CompactionOfThisMount,
 }
 
 /// 一段历史跑到哪了：两块盘（与它们的宽度）、这个进程的会话、挂载的次数、理想模型、录制流（判「拒绝之前写没写盘」）。
@@ -1435,6 +2159,8 @@ struct HistoryPool {
     operations_written_by_make_filesystem: usize,
     /// 每次掉电之后录制流里第一步的下标，按次序（交回 [`HistoryRun::earliest_stream_index_after_each_power_loss`]）。
     earliest_stream_index_after_each_power_loss: Vec<usize>,
+    /// 每次截断（按步号）交给会话的目标 size（执行时按类取的，交回 [`HistoryRun::sizes_requested_by_the_truncations`]）。
+    sizes_requested_by_the_truncations: BTreeMap<usize, u64>,
 }
 
 /// 模型对一步的判定：对不上的那一格（没有就是 None）与这一步比了多少格。
@@ -1693,6 +2419,7 @@ impl HistoryPool {
                     parameters_and_device_table,
                     publishes_in_this_mount: 3,
                     carried_to_zero_unit_publishes: None,
+                    compaction: CompactionOfThisMount::of_a_new_mount(),
                 })
             }
         };
@@ -1708,6 +2435,7 @@ impl HistoryPool {
                 stream: stream.clone(),
                 operations_written_by_make_filesystem,
                 earliest_stream_index_after_each_power_loss: Vec::new(),
+                sizes_requested_by_the_truncations: BTreeMap::new(),
             },
             verdict,
         ))
@@ -1741,8 +2469,9 @@ pub enum MissingPrecondition {
     /// 崩溃恢复抛弃根：最新那次发布的记录一个单元都没点名（树表 0 条上的零单元发布）——点名验证恒过，恢复照样施加它、
     /// 走到的就是它，抛弃不了。
     NewestPublishNamesNoUnit,
-    /// 现行版本有树、第一个文件已删完（在删完的一版上建过 inode 之后，实现归带文件的一版）：覆盖写与 unlink 只写、只删第一个文件
-    /// （`transaction::live_record_of_the_first_file` 拒成 `WriteToAnInodeThatIsNotInTheTree`），模型只罩 inode 1 一个文件、没有这条理由——执行器不调。
+    /// 现行版本有树、第一个文件已删完（在删完的一版上建过 inode 之后，或删第一个文件时树里还有别的 inode，实现归带文件的一版）：覆盖写只写第一个文件
+    /// （`transaction::live_record_of_the_first_file` 拒成 `WriteToAnInodeThatIsNotInTheTree`），执行器不调；unlink 按号选在第一个文件那条记录还在时调，
+    /// 已删完时只在还有带数据单元的别的文件活着时调（别的几组比重不写别的文件的数据，在这一形上一向不调，执行照旧）。
     CurrentVersionWithoutTheFirstFile,
     /// 现行版本里第一个文件还活着：建 inode 只接在第一个文件已删完的一版上（`HistoryOperation::CreateInode` 的文档）；
     /// 删除中的那一版照调，会话先走空、把它走成删完的一版（代码轮 U11）。
@@ -1750,6 +2479,15 @@ pub enum MissingPrecondition {
     /// 每块盘最新那一槽系统配置读回全 0 的可写挂载：有一块盘两槽里本池自证过的不到两份（mkfs 之后还没取过号的盘只写过一槽）——
     /// 再藏它自证过的那一槽，这块盘一份自证过的系统配置都不剩，那是那块盘两槽都坏，不是单故障（D22（单元原子性怎么合成） 已定项 8）。
     SomeDeviceWithoutTwoSelfVerifiedSystemConfigurationSlots,
+    /// 读快照、删快照：现行那一版树表里没有不在销毁中的快照可点名。
+    NoSnapshotOutsideTheDestructionInTheCurrentVersion,
+    /// 挂着时整理：现行那一版里没有能强制选的段（[`segments_the_compaction_may_be_forced_onto`] 一段都没有）。
+    NoSegmentForTheCompactionInTheCurrentVersion,
+    /// unlink：现行那一版 inode 树多于一片叶容器。实现照删（删一条之后照 D8（核心索引结构） 已定项 6 吸收或借），模型的删除那一臂只答
+    /// 一片叶容器的一版（`IdealModel::answer_unlink_intent_of_an_inode`：删一条不并、不借）——执行器不调。
+    InodeTreeSpansMoreThanOneLeafContainer,
+    /// 按 inode 号写：现行那一版 inode 树里一个活着的号都没有（有树而文件集合为空）。
+    NoInodeToWriteInTheCurrentVersion,
 }
 
 impl MissingPrecondition {
@@ -1769,6 +2507,18 @@ impl MissingPrecondition {
             MissingPrecondition::CurrentVersionStillHasTheFirstFile => "现行版本里第一个文件还在",
             MissingPrecondition::SomeDeviceWithoutTwoSelfVerifiedSystemConfigurationSlots => {
                 "有盘两槽系统配置不是都自证过"
+            }
+            MissingPrecondition::NoSnapshotOutsideTheDestructionInTheCurrentVersion => {
+                "现行那一版没有能点名的快照"
+            }
+            MissingPrecondition::NoSegmentForTheCompactionInTheCurrentVersion => {
+                "现行那一版没有能强制选的整理段"
+            }
+            MissingPrecondition::InodeTreeSpansMoreThanOneLeafContainer => {
+                "现行那一版 inode 树多于一片叶容器"
+            }
+            MissingPrecondition::NoInodeToWriteInTheCurrentVersion => {
+                "现行那一版树里没有活着的 inode"
             }
         }
     }
@@ -1970,7 +2720,10 @@ pub fn harness_judgement_of_outcome(outcome: &StepOutcome) -> Option<HarnessJudg
             AppliedEffect::Published { .. }
             | AppliedEffect::Mounted { .. }
             | AppliedEffect::RaisedFloor { .. }
-            | AppliedEffect::RolledBack { .. },
+            | AppliedEffect::RolledBack { .. }
+            | AppliedEffect::SnapshotPublished { .. }
+            | AppliedEffect::SnapshotRead { .. }
+            | AppliedEffect::Compacted { .. },
         )
         | StepOutcome::Refused { .. }
         | StepOutcome::NotApplicable(_) => None,
@@ -2043,6 +2796,11 @@ pub enum AppliedEffect {
         /// 这次发布之前挂着的会话推了几串抬 F（只有经会话的覆盖写与 unlink 会推，D16（发布语义） 已定项 1「准入」那一行、C283；
         /// unlink 连同走空里删除类发布被空间拒时推的，用户 2026-10-02 定 Q-V；第一个文件与零单元发布不经会话，恒为 0）。
         floor_raises_pushed_by_the_session: usize,
+        /// 这一步写的根里，从这次改动自己那一次发布起（连同之后走空的各步与其间推的抬 F）有几条，按写的先后是最后这么多条：
+        /// 它们读出的都是改动之后的内容，之前的（会话先推的抬 F、先走空的各步）读出改动之前的。一次发布做完的改动恒 1；截断是意图、
+        /// 各批、最后一批与其间推的抬 F（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2「先落目标」：意图那一版起读出的
+        /// 就是截后的）。RefFS 翻译按它给这一步的根映版本。
+        roots_carrying_the_change: usize,
     },
     Mounted {
         instance: InstanceGeneration,
@@ -2069,6 +2827,36 @@ pub enum AppliedEffect {
         outcome: String,
         read_back: ColdStartReadBack,
     },
+    /// 建快照或删快照经会话做成（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S2、S4）：`snapshot` 是那个快照码 14 条目的
+    /// 树号（快照按它点名，第七节岔路 5；RefFS 拿它当快照名）。
+    SnapshotPublished {
+        change: SnapshotChange,
+        snapshot: u64,
+        reuse: RecordReuse,
+        floor_raises_pushed_by_the_session: usize,
+    },
+    /// 读了一个快照：它码 14 条目的树号与读出了什么（模型比过）。
+    SnapshotRead {
+        snapshot: u64,
+        read_back: ObservedSnapshotReadBack,
+    },
+    /// 挂着时整理了一趟（[`HistoryOperation::CompactWhileMounted`]，每一批模型比过）：发了几批、搬了几个单元、停在哪
+    /// （`compaction_plan::CompactionRunStop::name`）、停下时意图还活不活着；批间崩溃那一种之后那次可写挂载也做成了
+    /// （挂载被拒时这一步的结局是那个拒绝）。
+    Compacted {
+        batches_published: u64,
+        units_relocated: u64,
+        stop: &'static str,
+        is_the_intent_live_when_the_run_stopped: bool,
+        crashed_then_mounted: bool,
+    },
+}
+
+/// 一次快照改动是建还是删。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SnapshotChange {
+    Created,
+    Destroyed,
 }
 
 /// 一步操作的结局。
@@ -2373,6 +3161,10 @@ pub struct HistoryTally {
     pub content_lengths_attempted: BTreeMap<&'static str, u64>,
     /// 发布的内容长度，按长度种类 → 入口返回 Ok 几次（代码三方第一轮攻方的 P3：装得下的每一种至少发成一次）。
     pub content_lengths_published: BTreeMap<&'static str, u64>,
+    /// 截断（[`HistoryOperation::Truncate`]）的目标，按类（[`TruncationTarget::name`]）→ 入口被调了几次、返回 Ok 几次（判决
+    /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8「目标按类取」：每一类真的走到了）。
+    pub truncation_targets_attempted: BTreeMap<&'static str, u64>,
+    pub truncation_targets_published: BTreeMap<&'static str, u64>,
     pub refusals_by_member: BTreeMap<String, u64>,
     pub not_applicable_by_precondition: BTreeMap<&'static str, u64>,
     pub recovery_outcomes: BTreeMap<String, u64>,
@@ -2411,6 +3203,16 @@ pub struct HistoryTally {
     pub histories_with_a_walk_of_several_steps_before_a_user_change: u64,
     /// 会话里一次用户改动之前先走空、走空被空间拒推了抬 F、模型逐串逐步比过的段数（N3「走空被空间拒」）。
     pub histories_with_a_walk_before_a_user_change_refused_for_space: u64,
+    /// 挂着时整理（[`HistoryOperation::CompactWhileMounted`]）做成的趟数、其中至少发了一批的趟数、一共发的批数与搬的单元数、
+    /// 按停机原因（`compaction_plan::CompactionRunStop::name`）分的趟数。
+    pub compaction_runs: u64,
+    pub compaction_runs_with_a_batch: u64,
+    pub compaction_batches_published: u64,
+    pub compaction_units_relocated: u64,
+    pub compaction_stops: BTreeMap<&'static str, u64>,
+    /// 批间崩溃（[`CompactionRunEnding::CrashesAfterBatchesThenMountsWritable`]）里崩掉那一刻意图还活着、之后可写挂载做成的次数：
+    /// 意图推到半路随进程丢了（判决 G7「批间崩溃」真的走到了）。
+    pub crashes_between_compaction_batches: u64,
     /// harness 就地跑池级 checker 的次数：那一遍归 checker 档两段，harness 一次都不跑（[`PerStepChecker`]），这一格恒为 0，
     /// 用例照它核 harness 没把逐步 checker 偷回来。
     pub checker_runs: u64,
@@ -2448,6 +3250,12 @@ impl HistoryTally {
         }
         for (length, count) in &other.content_lengths_published {
             *self.content_lengths_published.entry(length).or_insert(0) += count;
+        }
+        for (target, count) in &other.truncation_targets_attempted {
+            *self.truncation_targets_attempted.entry(target).or_insert(0) += count;
+        }
+        for (target, count) in &other.truncation_targets_published {
+            *self.truncation_targets_published.entry(target).or_insert(0) += count;
         }
         for (member, count) in &other.refusals_by_member {
             *self.refusals_by_member.entry(member.clone()).or_insert(0) += count;
@@ -2504,6 +3312,14 @@ impl HistoryTally {
             other.histories_with_a_walk_of_several_steps_before_a_user_change;
         self.histories_with_a_walk_before_a_user_change_refused_for_space +=
             other.histories_with_a_walk_before_a_user_change_refused_for_space;
+        self.compaction_runs += other.compaction_runs;
+        self.compaction_runs_with_a_batch += other.compaction_runs_with_a_batch;
+        self.compaction_batches_published += other.compaction_batches_published;
+        self.compaction_units_relocated += other.compaction_units_relocated;
+        for (stop, count) in &other.compaction_stops {
+            *self.compaction_stops.entry(stop).or_insert(0) += count;
+        }
+        self.crashes_between_compaction_batches += other.crashes_between_compaction_batches;
         self.checker_runs += other.checker_runs;
         self.checker_runs_skipped_because_nothing_was_written +=
             other.checker_runs_skipped_because_nothing_was_written;
@@ -2547,6 +3363,7 @@ impl HistoryTally {
             StepOutcome::Applied(AppliedEffect::Published {
                 reuse,
                 floor_raises_pushed_by_the_session,
+                roots_carrying_the_change: _,
             }) => {
                 self.note_reuse(*reuse);
                 if *floor_raises_pushed_by_the_session > 0 {
@@ -2554,6 +3371,38 @@ impl HistoryTally {
                     self.floor_raises_pushed_by_the_session_before_a_published_change +=
                         u64::try_from(*floor_raises_pushed_by_the_session)
                             .expect("一次准入推的串数装得进 u64");
+                }
+            }
+            StepOutcome::Applied(AppliedEffect::SnapshotPublished {
+                reuse,
+                floor_raises_pushed_by_the_session,
+                ..
+            }) => {
+                self.note_reuse(*reuse);
+                if *floor_raises_pushed_by_the_session > 0 {
+                    self.user_changes_published_after_the_session_raised_the_floor += 1;
+                    self.floor_raises_pushed_by_the_session_before_a_published_change +=
+                        u64::try_from(*floor_raises_pushed_by_the_session)
+                            .expect("一次准入推的串数装得进 u64");
+                }
+            }
+            StepOutcome::Applied(AppliedEffect::SnapshotRead { .. }) => {}
+            StepOutcome::Applied(AppliedEffect::Compacted {
+                batches_published,
+                units_relocated,
+                stop,
+                is_the_intent_live_when_the_run_stopped,
+                crashed_then_mounted,
+            }) => {
+                self.compaction_runs += 1;
+                if *batches_published > 0 {
+                    self.compaction_runs_with_a_batch += 1;
+                }
+                self.compaction_batches_published += batches_published;
+                self.compaction_units_relocated += units_relocated;
+                *self.compaction_stops.entry(stop).or_insert(0) += 1;
+                if *crashed_then_mounted && *is_the_intent_live_when_the_run_stopped {
+                    self.crashes_between_compaction_batches += 1;
                 }
             }
             StepOutcome::Applied(AppliedEffect::RaisedFloor {
@@ -2622,6 +3471,7 @@ impl HistoryTally {
         let content = match operation {
             HistoryOperation::PublishFirstFile(content)
             | HistoryOperation::PublishOverwrite(content) => Some(content),
+            HistoryOperation::WriteOfAnInode(choice) => Some(&choice.content),
             HistoryOperation::PublishWithoutUnits
             | HistoryOperation::CloseAndMountWritable
             | HistoryOperation::RollBackWhileMounted(_)
@@ -2631,6 +3481,13 @@ impl HistoryTally {
             | HistoryOperation::Unlink
             | HistoryOperation::CreateInode
             | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            | HistoryOperation::CreateSnapshot
+            | HistoryOperation::ReadSnapshot(_)
+            | HistoryOperation::DestroySnapshot(_)
+            | HistoryOperation::CompactWhileMounted(_)
+            | HistoryOperation::CreateInodes(_)
+            // 截断的目标按类另记（下面）。
+            | HistoryOperation::Truncate(_)
             // 那次改动掉电在 journal 记录之前、一次都没发布成：内容长度不记进「进过入口」「发布过」（结局是那之后可写挂载的结局）。
             | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_) => {
                 None
@@ -2640,6 +3497,20 @@ impl HistoryTally {
             StepOutcome::Applied(_) | StepOutcome::Refused { .. } => true,
             StepOutcome::NotApplicable(_) => false,
         };
+        if let HistoryOperation::Truncate(choice) = operation {
+            if entrance_was_called {
+                *self
+                    .truncation_targets_attempted
+                    .entry(choice.target.name())
+                    .or_insert(0) += 1;
+            }
+            if let StepOutcome::Applied(_) = outcome {
+                *self
+                    .truncation_targets_published
+                    .entry(choice.target.name())
+                    .or_insert(0) += 1;
+            }
+        }
         if let (Some(content), true) = (content, entrance_was_called) {
             *self
                 .content_lengths_attempted
@@ -2690,6 +3561,17 @@ impl HistoryTally {
             let _ = writeln!(
                 text,
                 "  内容长度 {length}：入口被调 {count} 次、发成 {published} 次"
+            );
+        }
+        for (target, count) in &self.truncation_targets_attempted {
+            let published = self
+                .truncation_targets_published
+                .get(target)
+                .copied()
+                .unwrap_or(0);
+            let _ = writeln!(
+                text,
+                "  截断目标 {target}：入口被调 {count} 次、发成 {published} 次"
             );
         }
         for (member, count) in &self.refusals_by_member {
@@ -2749,6 +3631,35 @@ impl HistoryTally {
             self.model_counts
                 .walks_before_a_user_change_refused_for_space_matched,
             self.histories_with_a_walk_before_a_user_change_refused_for_space
+        );
+        let _ = writeln!(
+            text,
+            "  整理：做成 {} 趟、其中发了批的 {} 趟，共 {} 批、搬了 {} 个单元，模型比过 {} 批；模型比过签发 {} 次、随最后一批删意图 {} 次、单独删意图 {} 次、丢意图 {} 次、logged_ops 里的意图 {} 版、搬了用户可见树的根（算非空）{} 次；批间崩溃（崩时意图还活着）{} 次；停机原因 {:?}",
+            self.compaction_runs,
+            self.compaction_runs_with_a_batch,
+            self.compaction_batches_published,
+            self.compaction_units_relocated,
+            self.model_counts.compaction_batches_matched,
+            self.model_counts.compaction_intents_issued_matched,
+            self.model_counts
+                .compaction_intents_deleted_with_the_last_batch_matched,
+            self.model_counts
+                .compaction_intents_deleted_without_a_batch_matched,
+            self.model_counts.compaction_intents_dropped_matched,
+            self.model_counts.logged_compaction_intents_compared,
+            self.model_counts
+                .compaction_publishes_relocating_a_user_visible_root_matched,
+            self.crashes_between_compaction_batches,
+            self.compaction_stops
+        );
+        let _ = writeln!(
+            text,
+            "  截断：模型比过截断意图 {} 次、不是最后一批的批 {} 次、最后一批 {} 次、不缩短的那一次 {} 次",
+            self.model_counts.truncation_intents_matched,
+            self.model_counts
+                .truncation_batches_before_the_final_batch_matched,
+            self.model_counts.final_truncation_batches_matched,
+            self.model_counts.size_changes_without_shrinking_matched
         );
         let _ = writeln!(
             text,
@@ -2823,6 +3734,9 @@ pub struct HistoryRun {
     /// （`crate::memory_pool::RecordStreamSeam::AfterAPowerLoss`）：那次改动掉电之前落了盘的单元写没有根，
     /// 不归掉电之后的第一次发布。
     pub earliest_stream_index_after_each_power_loss: Vec<usize>,
+    /// 每次截断（[`HistoryOperation::Truncate`]，按步号）交给会话的目标 size：执行时按那一刻的 size 与单元数取（[`TruncationChoice`]），
+    /// RefFS 翻译拿它交 `Operation::Truncate(n)`（入口报错、panic 停下的那一步也在里面）。
+    pub sizes_requested_by_the_truncations: BTreeMap<usize, u64>,
 }
 
 /// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像、跟到这一步的理想模型。
@@ -2834,6 +3748,26 @@ pub struct StepObservation<'run> {
     pub image: &'run MemoryPool,
     /// 崩溃注入（增补 3 第 3 件）每一步之后从它取一次 `committed_versions`，攒成「模型提交过的每一版」。
     pub model: &'run IdealModel,
+    /// 这个进程的会话现行那一版记账里每块盘「空闲」那一行（D5（快照 / 空间记账机制） 已定项 8，`df` 报的就是它）；没有会话、
+    /// 现行那一版树表 0 条时是 `None`。判「整理不把做得成的改动变成空间不够，除非 `df` 也跟着少报」（判决 G7）的用例拿它比。
+    pub free_bytes_reported_by_the_current_version: Option<Vec<(DeviceIdentity, u64)>>,
+    /// 这一步是截断时交给会话的目标 size（[`HistoryRun::sizes_requested_by_the_truncations`] 里这一步那一项）；别的步、前提不满足没调的是 None。
+    pub size_requested_by_the_truncation: Option<u64>,
+}
+
+/// 会话现行那一版记账里每块盘「空闲」那一行（[`StepObservation::free_bytes_reported_by_the_current_version`]）。
+fn free_bytes_reported_by_the_current_version(
+    session: Option<&WritableSession>,
+) -> Option<Vec<(DeviceIdentity, u64)>> {
+    let version = session?.current.version_of_trees()?;
+    Some(
+        version
+            .accounting_entries
+            .iter()
+            .filter(|entry| entry.statistic == STATISTIC_FREE_BYTES)
+            .map(|entry| (entry.device, entry.value))
+            .collect(),
+    )
 }
 
 fn placement_refusal_member(refusal: &PlacementRefusal) -> &'static str {
@@ -2848,6 +3782,32 @@ fn placement_refusal_member(refusal: &PlacementRefusal) -> &'static str {
         PlacementRefusal::CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined {
             ..
         } => "CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined",
+    }
+}
+
+/// 改 size 被拒的成员名（统计表按成员分：删完之后点名别的 inode 被拒与别的拒分得开）。
+fn truncation_refusal_member(
+    refusal: singlefs_core::transaction::TruncationRefusal,
+) -> &'static str {
+    match refusal {
+        singlefs_core::transaction::TruncationRefusal::InodeIsNotALiveRecord { .. } => {
+            "InodeIsNotALiveRecord"
+        }
+        singlefs_core::transaction::TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows {
+            ..
+        } => "TargetSizeRoundedUpToAWholeDataUnitOverflows",
+        singlefs_core::transaction::TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
+            ..
+        } => "SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses",
+        singlefs_core::transaction::TruncationRefusal::TailDataUnitBytesNotInTheVersion { .. } => {
+            "TailDataUnitBytesNotInTheVersion"
+        }
+        singlefs_core::transaction::TruncationRefusal::TruncationIntentDoesNotNameTheLiveRecord {
+            ..
+        } => "TruncationIntentDoesNotNameTheLiveRecord",
+        singlefs_core::transaction::TruncationRefusal::NoTruncationIntentToContinue => {
+            "NoTruncationIntentToContinue"
+        }
     }
 }
 
@@ -2908,10 +3868,23 @@ fn publish_error_member(error: &PublishError) -> String {
         }
         PublishError::WriteToAnInodeBeingDeleted { .. } => "WriteToAnInodeBeingDeleted",
         PublishError::WriteToAnInodeThatIsNotInTheTree { .. } => "WriteToAnInodeThatIsNotInTheTree",
+        PublishError::DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { .. } => {
+            "DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion"
+        }
         PublishError::UnlinkOfAnInodeThatIsNotALiveRecord { .. } => {
             "UnlinkOfAnInodeThatIsNotALiveRecord"
         }
         PublishError::DeletedInodesQueueRefused(_) => "DeletedInodesQueueRefused",
+        PublishError::SnapshotCreationRefused(_) => "SnapshotCreationRefused",
+        PublishError::SnapshotDestructionRefused(_) => "SnapshotDestructionRefused",
+        PublishError::DeadlistEntryNotReleasable { .. } => "DeadlistEntryNotReleasable",
+        PublishError::EmptyClusterSegmentsBelowTheFloor(_) => "EmptyClusterSegmentsBelowTheFloor",
+        PublishError::TruncationRefused(refusal) => {
+            return format!(
+                "PublishError::TruncationRefused({})",
+                truncation_refusal_member(*refusal)
+            )
+        }
         PublishError::ReadFailedWhileRehearsingTheContinuationBeforeAcquisition(read) => {
             return format!(
                 "PublishError::ReadFailedWhileRehearsingTheContinuationBeforeAcquisition({})",
@@ -3211,6 +4184,10 @@ fn rollback_error_member(error: &RollbackError) -> String {
         RollbackError::NextCheckpointTxgPastTheTopOfItsRange { .. } => {
             "NextCheckpointTxgPastTheTopOfItsRange".to_string()
         }
+        RollbackError::SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses {
+            version,
+            ..
+        } => format!("SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses({version:?})"),
         RollbackError::CandidateJudgementStillUnreadableAfterOneReread(still_unreadable) => {
             format!(
                 "CandidateJudgementStillUnreadableAfterOneReread({})",
@@ -3411,6 +4388,7 @@ fn settle_file_publish(
         outcome: StepOutcome::Applied(AppliedEffect::Published {
             reuse,
             floor_raises_pushed_by_the_session: 0,
+            roots_carrying_the_change: 1,
         }),
         harness_judgement,
         model_verdict: Some(verdict),
@@ -3441,6 +4419,9 @@ fn apply_publish_overwrite(
     // 现行那一版有删除中的文件（unlink 的一批被拒之后、回退到删除中的一版之后）：照调，会话先走空、把它走成有树而文件集合为空的一版、
     // 再拒成 `UserChangeRefused::NoFileVersionToChange`，那个成员带着走空的那几步与推的抬 F（代码轮 U10），逐版交模型比（代码轮 U11）。
     let queue_is_walked_first = !current_file_version.deleted_inodes.is_empty();
+    // 有快照在销毁中（挂载续做被空间拒之后）同样先走空：那几批同样逐版交模型比（判决 S4：删快照照 unlink 的过程做）。
+    let snapshot_destruction_is_walked_first =
+        !current_file_version.snapshots_being_destroyed.is_empty();
     let content = content_choice.bytes();
     let records_before = open_session.allocator.records().to_vec();
     let stream_length_before = stream.operation_count();
@@ -3455,6 +4436,7 @@ fn apply_publish_overwrite(
         parameters_and_device_table,
         publishes_in_this_mount,
         carried_to_zero_unit_publishes,
+        compaction,
     } = session_slot.take().expect("上面判过这个进程的会话开着");
     let mut mounted_session = MountedSession {
         allocator,
@@ -3462,6 +4444,7 @@ fn apply_publish_overwrite(
         instance,
         shadow_ledger,
         parameters_and_device_table,
+        compaction,
     };
     let file = FirstFile {
         content: &content,
@@ -3488,10 +4471,11 @@ fn apply_publish_overwrite(
         instance: mounted_session.instance,
         shadow_ledger: mounted_session.shadow_ledger,
         parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
         publishes_in_this_mount,
         carried_to_zero_unit_publishes,
     });
-    if queue_is_walked_first {
+    if queue_is_walked_first || snapshot_destruction_is_walked_first {
         return settle_user_change_comparing_every_version_published(
             session_after_the_change,
             model,
@@ -3674,6 +4658,7 @@ fn settle_user_change(
                 outcome: StepOutcome::Applied(AppliedEffect::Published {
                     reuse: RecordReuse::between(records_before, session.allocator.records()),
                     floor_raises_pushed_by_the_session: floor_raises.len(),
+                    roots_carrying_the_change: 1,
                 }),
                 harness_judgement,
                 model_verdict: Some(verdict),
@@ -3836,11 +4821,15 @@ fn floor_raises_and_versions_in_txg_order<'change>(
         .collect()
 }
 
-/// unlink 第一个文件（`HistoryOperation::Unlink`）：经挂着的会话发（意图那次 + 走空，D8（核心索引结构） 已定项 16）。
-/// 意图那次带这一步的写入时间（与覆盖写、建 inode 同一个取法，用户 2026-10-03 定 Q-F 乙），各批照抄。
-/// 前提：现行那一版带文件、第一个文件那条记录在。删除中的那一版照调：会话先走空、把它走成有树而文件集合为空的一版、再拒成
-/// `UserChangeRefused::NoFileVersionToChange`，走空的那几步逐版交模型比（代码轮 U11）。
-fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep {
+/// unlink 一个号（`HistoryOperation::Unlink`）：经挂着的会话发（意图那次 + 走空，D8（核心索引结构） 已定项 16）。删哪个号按号选
+/// （[`inode_the_unlink_names`]，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M4：第一个文件、带数据的别的文件、
+/// size 0 的别的文件都抽得到；树里只有第一个文件时就是它）。意图那次带这一步的写入时间（与覆盖写、建 inode 同一个取法，用户 2026-10-03 定 Q-F 乙），
+/// 各批照抄。前提：现行那一版带文件、第一个文件那条记录在或已删完而还有带数据单元的别的文件活着（[`some_live_inode_other_than_the_first_holds_data_units`]；
+/// 第一个文件删完之后也按号删别的文件，代码轮判决 `research/prompts/m3-close-w5-code-r1-main-verification.md` 第三节第 3 条；别的几组比重不写别的文件的
+/// 数据，生成的历史与执行照旧）、inode 树只有一片叶容器（[`MissingPrecondition::InodeTreeSpansMoreThanOneLeafContainer`]）。删除中的那一版照调：会话先走空、再删选中的号；
+/// 选中的是第一个文件而它正在删（树里没有别的活着的号）时把它走成有树而文件集合为空的一版、再拒成 `UserChangeRefused::NoFileVersionToChange`，
+/// 走空的那几步逐版交模型比（代码轮 U11）。
+fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64, step_index: usize) -> AppliedStep {
     let HistoryPool {
         devices,
         session: session_slot,
@@ -3854,9 +4843,195 @@ fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep 
     let Some(current_file_version) = open_session.current.file_version() else {
         return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
     };
-    if current_file_version.inode_record.is_none() {
+    // 第一个文件已删完的一版上，只在还有删之前就写过数据的别的文件活着时按号删（代码轮判决
+    // `research/prompts/m3-close-w5-code-r1-main-verification.md` 第三节第 3 条）：带数据的别的文件只由按 inode 号写那一组比重写出，
+    // 别的几组比重在删完的一版上只有删完之后建的 size 0 的 inode，这一形照旧不调，它们生成的历史执行照旧。
+    if current_file_version.inode_record.is_none()
+        && !some_live_inode_other_than_the_first_holds_data_units(current_file_version)
+    {
         return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutTheFirstFile);
     }
+    let records_before = open_session.allocator.records().to_vec();
+    if current_file_version.inode_leaf_containers.len() > 1 {
+        return AppliedStep::not_applicable(
+            MissingPrecondition::InodeTreeSpansMoreThanOneLeafContainer,
+        );
+    }
+    let inode = inode_the_unlink_names(
+        current_file_version,
+        u64::try_from(step_index).expect("步号装得进 u64"),
+    );
+    let stream_length_before = stream.operation_count();
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+        compaction,
+    } = session_slot.take().expect("上面判过这个进程的会话开着");
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        compaction,
+    };
+    let change_result = mounted_session.publish_user_change(
+        devices,
+        UserChange::Unlink {
+            inode: singlefs_core::address::InodeNumber(inode),
+            write_time_seconds,
+        },
+    );
+    let session_after_the_change = session_slot.insert(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，unlink 之后这一版有树。
+        carried_to_zero_unit_publishes: None,
+    });
+    settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &|ideal_model: &IdealModel| ideal_model.answer_unlink_intent_of_an_inode(inode),
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    )
+}
+
+/// unlink 删哪个号（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M4「随机历史 unlink 按号选」）：这一步的步号当选择子
+/// （[`HistoryOperation::Unlink`] 不带参数：给它加参数要多抽一个随机数，别的几组比重生成的历史就变了；步号在生成时不知道那一刻树里有哪几个号，
+/// 收缩删掉前面几步之后照样有意义）。在 `version` 里活着的号（nlink 不是 0，删除中的那一条会话先走掉）里取：步号模 3 是 0 取第一个文件，
+/// 是 1 取带数据单元的别的文件（再按步号一半取其中最大的号——多半罩在上段第 0 片叶之外，删它上段降层——一半按步号取模），是 2 取没有数据单元的
+/// 别的文件；那一类一个都没有时取第一个文件（树里只有第一个文件的历史因此恒删它，与按号选之前相同），第一个文件也不活着时取最小的活着的号，
+/// 一个活着的号都没有时取第一个文件（会话走空之后拒）。
+fn inode_the_unlink_names(version: &TransactionOutput, step_index: u64) -> u64 {
+    let first_file = singlefs_core::transaction::FIRST_INODE_NUMBER;
+    let live_inodes = live_inode_numbers(version);
+    let inodes_with_an_entry = version.inodes_with_an_extent_upper_leaf_entry();
+    let (others_holding_data, others_without_data): (Vec<u64>, Vec<u64>) = live_inodes
+        .iter()
+        .copied()
+        .filter(|number| *number != first_file)
+        .partition(|number| inodes_with_an_entry.contains(number));
+    let nth_of = |numbers: &[u64], selector: u64| {
+        let count = u64::try_from(numbers.len())
+            .ok()
+            .filter(|count| *count > 0)?;
+        numbers
+            .get(usize::try_from(selector % count).expect("小于条数"))
+            .copied()
+    };
+    let selector_within_the_category = step_index / 3;
+    let chosen = match step_index % 3 {
+        0 => None,
+        1 if selector_within_the_category.is_multiple_of(2) => others_holding_data.last().copied(),
+        1 => nth_of(&others_holding_data, selector_within_the_category / 2),
+        _ => nth_of(&others_without_data, selector_within_the_category),
+    };
+    chosen
+        .or_else(|| live_inodes.contains(&first_file).then_some(first_file))
+        .or_else(|| live_inodes.first().copied())
+        .unwrap_or(first_file)
+}
+
+/// 模型对一次经会话的用户改动本身的答法（走空的那几步另按 [`IdealModel::answer_next_step_of_the_walk`] 答）。
+type ModelAnswerOfAUserChange = Box<dyn Fn(&IdealModel) -> Result<ModelAnswer, ModelDisagreement>>;
+
+/// 改一个 inode 的 size（`HistoryOperation::Truncate`，判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8）：经挂着的会话发
+/// （`UserChange::Truncate`）。一次调用 = 先走空 + 改 size 那一次 + 缩短时之后的全部批；会话推的每一串抬 F 与发成的每一版交模型比（走空的一步与
+/// 截断的各批按「走空的一步」，改 size 那一次按 [`IdealModel::answer_truncation`]），照 unlink 的比法。
+/// 点名谁：现行那一版有第一个文件那条记录（活的、删除中的、截断途中的）时改第一个文件，目标按那条记录的 size 与这一版的数据单元数取
+/// （[`TruncationChoice::new_size_in_bytes`]；删除中的那一版会话先走空、再拒成 `NoFileVersionToChange`）；没有而树里有别的 inode（删完之后建过）
+/// 时点名按选择子取的那一个，目标取 [1, 3 × 净荷]（第一版拒，[`IdealModel::answer_size_change_of_an_inode_created_after_the_first_file_was_deleted`]）；
+/// 都没有（有树而文件集合为空）照样点名第一个文件，会话拒成 `NoFileVersionToChange`。写入时间取这一步的（同覆盖写、unlink）。
+/// 前提：会话开着、现行那一版有树。
+fn apply_truncate(
+    pool: &mut HistoryPool,
+    choice: TruncationChoice,
+    step_index: usize,
+    write_time_seconds: u64,
+) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        sizes_requested_by_the_truncations,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let version_of_trees = match &open_session.current {
+        PoolVersion::WithoutFile(_) => {
+            return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+        }
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => version,
+    };
+    let other_inodes: Vec<singlefs_core::records::InodeRecord> = version_of_trees
+        .inode_leaf_containers
+        .iter()
+        .flat_map(|container| container.contents.records.iter())
+        .filter(|record| record.inode != singlefs_core::transaction::FIRST_INODE_NUMBER)
+        .copied()
+        .collect();
+    let (inode, new_size, answer_of_the_change): (u64, u64, ModelAnswerOfAUserChange) =
+        match (version_of_trees.inode_record, other_inodes.as_slice()) {
+            (Some(record), _) => {
+                let data_units_present =
+                    u64::try_from(version_of_trees.data_pointers.len()).expect("单元数装得进 u64");
+                let new_size = choice.new_size_in_bytes(record.size, data_units_present);
+                (
+                    singlefs_core::transaction::FIRST_INODE_NUMBER,
+                    new_size,
+                    Box::new(move |ideal_model: &IdealModel| {
+                        ideal_model.answer_truncation(new_size)
+                    }),
+                )
+            }
+            (None, []) => {
+                let new_size = choice.new_size_in_bytes(0, 0);
+                (
+                    singlefs_core::transaction::FIRST_INODE_NUMBER,
+                    new_size,
+                    Box::new(move |ideal_model: &IdealModel| {
+                        ideal_model.answer_truncation(new_size)
+                    }),
+                )
+            }
+            (None, [_, ..]) => {
+                let index = usize::try_from(
+                    choice.selector % u64::try_from(other_inodes.len()).expect("条数装得进 u64"),
+                )
+                .expect("小于条数");
+                let record = other_inodes[index];
+                let new_size =
+                    new_size_of_an_inode_created_after_the_first_file_was_deleted(choice.selector);
+                (
+                    record.inode,
+                    new_size,
+                    Box::new(move |ideal_model: &IdealModel| {
+                        ideal_model
+                        .answer_size_change_of_an_inode_created_after_the_first_file_was_deleted(
+                            record.size,
+                            new_size,
+                        )
+                    }),
+                )
+            }
+        };
+    sizes_requested_by_the_truncations.insert(step_index, new_size);
     let records_before = open_session.allocator.records().to_vec();
     let stream_length_before = stream.operation_count();
     let WritableSession {
@@ -3867,6 +5042,7 @@ fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep 
         parameters_and_device_table,
         publishes_in_this_mount,
         carried_to_zero_unit_publishes: _,
+        compaction,
     } = session_slot.take().expect("上面判过这个进程的会话开着");
     let mut mounted_session = MountedSession {
         allocator,
@@ -3874,13 +5050,13 @@ fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep 
         instance,
         shadow_ledger,
         parameters_and_device_table,
+        compaction,
     };
     let change_result = mounted_session.publish_user_change(
         devices,
-        UserChange::Unlink {
-            inode: singlefs_core::address::InodeNumber(
-                singlefs_core::transaction::FIRST_INODE_NUMBER,
-            ),
+        UserChange::Truncate {
+            inode: singlefs_core::address::InodeNumber(inode),
+            new_size,
             write_time_seconds,
         },
     );
@@ -3890,14 +5066,15 @@ fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64) -> AppliedStep 
         instance: mounted_session.instance,
         shadow_ledger: mounted_session.shadow_ledger,
         parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
         publishes_in_this_mount,
-        // 零单元发布只接在树表 0 条的一版后面，unlink 之后这一版有树。
+        // 零单元发布只接在树表 0 条的一版后面，改 size 只接在有树的一版后面。
         carried_to_zero_unit_publishes: None,
     });
     settle_user_change_comparing_every_version_published(
         session_after_the_change,
         model,
-        &IdealModel::answer_unlink_intent,
+        answer_of_the_change.as_ref(),
         &records_before,
         &change_result,
         stream,
@@ -3930,13 +5107,13 @@ fn settle_user_change_comparing_every_version_published(
     let mut the_change_itself_was_published = false;
     let mut steps_walked_before_the_change = 0_u64;
     let mut floor_raises_while_walking_before_the_change = 0_u64;
+    // 这次改动自己那一次发布起写的根（`AppliedEffect::Published::roots_carrying_the_change`）。
+    let mut roots_carrying_the_change = 0_usize;
     // 迭代上界是这次落盘的样数；跨轮带的是上一样落盘之后的分配记录与合起来的判定；模型对不上之后不再问模型（分配代照判）。
     for published in &published_in_txg_order {
         let outputs: Vec<&singlefs_core::transaction::TransactionOutput> = match published {
             FloorRaiseOrVersion::FloorRaise(raised) => {
-                if !the_change_itself_was_published
-                    && model.current_version_has_a_file_being_deleted()
-                {
+                if !the_change_itself_was_published && model.current_version_has_a_step_to_walk() {
                     floor_raises_while_walking_before_the_change += 1;
                 }
                 if verdict.disagreement.is_none() {
@@ -3947,7 +5124,8 @@ fn settle_user_change_comparing_every_version_published(
                 raised.publishes.iter().collect()
             }
             FloorRaiseOrVersion::Version(version) => {
-                let walking = model.current_version_has_a_file_being_deleted();
+                // 走空的一步：删除中的文件的一批，或销毁中的快照的一批（`deleted_inodes` 先走空，判决 S4 删快照照 unlink 的过程做）。
+                let walking = model.current_version_has_a_step_to_walk();
                 if walking && !the_change_itself_was_published {
                     steps_walked_before_the_change += 1;
                 }
@@ -3956,7 +5134,7 @@ fn settle_user_change_comparing_every_version_published(
                 }
                 if verdict.disagreement.is_none() {
                     let answer = if walking {
-                        model.answer_deletion_step()
+                        model.answer_next_step_of_the_walk()
                     } else {
                         answer_of_the_change(model)
                     };
@@ -3974,6 +5152,9 @@ fn settle_user_change_comparing_every_version_published(
                 vec![*version]
             }
         };
+        if the_change_itself_was_published {
+            roots_carrying_the_change += outputs.len();
+        }
         for output in outputs {
             let publish_txg = output.root.checkpoint_txg;
             harness_judgement = harness_judgement.or_else(|| {
@@ -4007,6 +5188,7 @@ fn settle_user_change_comparing_every_version_published(
                 outcome: StepOutcome::Applied(AppliedEffect::Published {
                     reuse,
                     floor_raises_pushed_by_the_session: floor_raises.len(),
+                    roots_carrying_the_change,
                 }),
                 harness_judgement,
                 model_verdict: Some(verdict),
@@ -4016,8 +5198,8 @@ fn settle_user_change_comparing_every_version_published(
     };
     let (member, reason) = member_and_reason_of_a_refused_user_change(refusal);
     if verdict.disagreement.is_none() {
-        let answer = if model.current_version_has_a_file_being_deleted() {
-            model.answer_deletion_step()
+        let answer = if model.current_version_has_a_step_to_walk() {
+            model.answer_next_step_of_the_walk()
         } else {
             answer_of_the_change(model)
         };
@@ -4092,6 +5274,7 @@ fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> Applie
         parameters_and_device_table,
         publishes_in_this_mount,
         carried_to_zero_unit_publishes: _,
+        compaction,
     } = session_slot.take().expect("上面判过这个进程的会话开着");
     let mut mounted_session = MountedSession {
         allocator,
@@ -4099,6 +5282,7 @@ fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> Applie
         instance,
         shadow_ledger,
         parameters_and_device_table,
+        compaction,
     };
     let change_result = mounted_session.publish_user_change(
         devices,
@@ -4113,6 +5297,7 @@ fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> Applie
         instance: mounted_session.instance,
         shadow_ledger: mounted_session.shadow_ledger,
         parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
         publishes_in_this_mount,
         // 零单元发布只接在树表 0 条的一版后面，建 inode 之后这一版有树。
         carried_to_zero_unit_publishes: None,
@@ -4126,6 +5311,987 @@ fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> Applie
         stream,
         stream_length_before,
     )
+}
+
+/// 一版 inode 树里活着的记录（nlink 不是 0）的号，升序：删除中的那一条（unlink 的意图之后、最后一批之前）不算，会话改动之前先把它走空。
+fn live_inode_numbers(version: &TransactionOutput) -> Vec<u64> {
+    let mut numbers: Vec<u64> = version
+        .inode_leaf_containers
+        .iter()
+        .flat_map(|container| container.contents.records.iter())
+        .filter(|record| record.nlink != NLINK_OF_AN_INODE_BEING_DELETED)
+        .map(|record| record.inode)
+        .collect();
+    numbers.sort_unstable();
+    numbers
+}
+
+/// 一版里有没有第一个文件之外、活着（nlink 不是 0）而有数据单元的 inode（[`apply_unlink`] 在第一个文件已删完的一版上按它判调不调）。
+fn some_live_inode_other_than_the_first_holds_data_units(version: &TransactionOutput) -> bool {
+    let inodes_with_an_entry = version.inodes_with_an_extent_upper_leaf_entry();
+    live_inode_numbers(version).iter().any(|number| {
+        *number != singlefs_core::transaction::FIRST_INODE_NUMBER
+            && inodes_with_an_entry.contains(number)
+    })
+}
+
+/// 一次建几个 size 0 的 inode（`HistoryOperation::CreateInodes`）：经挂着的会话发（`UserChange::NewInodes`），第一个文件活着或已删完的一版上都调
+/// （删除中的那一版会话先走空、把它走成删完的一版再建）。建几个压到最右那片叶容器装得下的条数（[`InodeCountChoice::count_fitting_the_rightmost_leaf_container`]，
+/// 按活着的记录数算：删除中的那一条会话先走掉）。会话交回的每一版交模型比（走空的一步按「走空的一步」，建 inode 那次按 [`IdealModel::answer_create_inodes`]）。
+/// 前提：会话开着、现行那一版有树。
+fn apply_create_inodes(
+    pool: &mut HistoryPool,
+    choice: InodeCountChoice,
+    write_time_seconds: u64,
+) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let version_of_trees = match &open_session.current {
+        PoolVersion::WithoutFile(_) => {
+            return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+        }
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => version,
+    };
+    let live_inode_records =
+        u64::try_from(live_inode_numbers(version_of_trees).len()).expect("条数装得进 u64");
+    let count = choice.count_fitting_the_rightmost_leaf_container(live_inode_records);
+    let records_before = open_session.allocator.records().to_vec();
+    let stream_length_before = stream.operation_count();
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+        compaction,
+    } = session_slot.take().expect("上面判过这个进程的会话开着");
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        compaction,
+    };
+    let change_result = mounted_session.publish_user_change(
+        devices,
+        UserChange::NewInodes {
+            count,
+            write_time_seconds,
+        },
+    );
+    let session_after_the_change = session_slot.insert(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，建 inode 之后这一版有树。
+        carried_to_zero_unit_publishes: None,
+    });
+    settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &|ideal_model: &IdealModel| ideal_model.answer_create_inodes(count),
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    )
+}
+
+/// 按 inode 号整份写一个文件（`HistoryOperation::WriteOfAnInode`，里程碑「删除与多次 COW」一·1）：经挂着的会话发
+/// （`UserChange::OverwriteOfAnInode` 或 `UserChange::SequentialWriteOfAnInode`，按内容长度分，同覆盖写）。号在现行那一版树里活着的号里取
+/// （[`WriteOfAnInodeChoice::inode_among`]，第一个文件活着时连 inode 1）；第一个文件已删完、之后建过 inode 的一版上照调（必拒，K-U5）。
+/// 会话交回的每一版交模型比（[`IdealModel::answer_overwrite_of_an_inode`]、[`IdealModel::answer_sequential_write_of_an_inode`]）。
+/// 前提：会话开着、现行那一版树里有活着的号。
+fn apply_write_of_an_inode(
+    pool: &mut HistoryPool,
+    choice: WriteOfAnInodeChoice,
+    write_time_seconds: u64,
+) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let version_of_trees = match &open_session.current {
+        PoolVersion::WithoutFile(_) => {
+            return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+        }
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => version,
+    };
+    let Some(inode) = choice.inode_among(&live_inode_numbers(version_of_trees)) else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoInodeToWriteInTheCurrentVersion);
+    };
+    let content = choice.content.bytes();
+    let records_before = open_session.allocator.records().to_vec();
+    let stream_length_before = stream.operation_count();
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+        compaction,
+    } = session_slot.take().expect("上面判过这个进程的会话开着");
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        compaction,
+    };
+    let entry = choice.content.length.whole_file_write_entry();
+    let inode_number = singlefs_core::address::InodeNumber(inode);
+    let change_result = mounted_session.publish_user_change(
+        devices,
+        match entry {
+            WholeFileWriteEntry::Overwrite => UserChange::OverwriteOfAnInode {
+                inode: inode_number,
+                content: &content,
+                write_time_seconds,
+            },
+            WholeFileWriteEntry::SequentialWrite => UserChange::SequentialWriteOfAnInode {
+                inode: inode_number,
+                content: &content,
+                write_time_seconds,
+            },
+        },
+    );
+    let session_after_the_change = session_slot.insert(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，按 inode 号写只接在有树的一版后面。
+        carried_to_zero_unit_publishes: None,
+    });
+    let answer_of_the_change = |ideal_model: &IdealModel| match entry {
+        WholeFileWriteEntry::Overwrite => ideal_model.answer_overwrite_of_an_inode(inode, &content),
+        WholeFileWriteEntry::SequentialWrite => {
+            ideal_model.answer_sequential_write_of_an_inode(inode, &content)
+        }
+    };
+    settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &answer_of_the_change,
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    )
+}
+
+/// 现行那一版树表里的只读快照（码 14 条目），按（诞生 txg, 树号）升序——建的先后，与模型的快照列表同一个次序：树号与带不带「销毁中」记号。
+fn snapshots_in_the_version(version: &TransactionOutput) -> Vec<(TreeIdentifier, bool)> {
+    let mut snapshot_inode_roots: Vec<_> = version
+        .tree_table_entries
+        .iter()
+        .filter(|entry| entry.kind == TREE_KIND_SNAPSHOT_INODE_ROOT)
+        .collect();
+    snapshot_inode_roots.sort_by_key(|entry| (entry.birth_txg, entry.tree));
+    snapshot_inode_roots
+        .into_iter()
+        .map(|entry| {
+            (
+                entry.tree,
+                version.snapshots_being_destroyed.contains(&entry.tree),
+            )
+        })
+        .collect()
+}
+
+/// 经会话发一次快照改动（建快照、删快照）：会话借走这个进程的分配器、现行版本与认下的池，发完原样还回来（同 unlink），
+/// 交回会话的结局与改动之前的分配记录、录制流长度。
+fn publish_a_snapshot_change_through_the_session(
+    devices: &mut Vec<(DeviceIdentity, HistoryDevice)>,
+    session_slot: &mut Option<WritableSession>,
+    stream: &SharedStream,
+    change: UserChange<'_>,
+) -> (
+    Result<UserChangePublished, UserChangeRefused>,
+    Vec<AllocationRecord>,
+    usize,
+) {
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+        compaction,
+    } = session_slot.take().expect("调用方判过这个进程的会话开着");
+    let records_before = allocator.records().to_vec();
+    let stream_length_before = stream.operation_count();
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        compaction,
+    };
+    let change_result = mounted_session.publish_user_change(devices, change);
+    *session_slot = Some(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，快照改动只接在有树的一版后面。
+        carried_to_zero_unit_publishes: None,
+    });
+    (change_result, records_before, stream_length_before)
+}
+
+/// 快照改动经会话做成时把「发成」那一种结局换成带快照树号的那一种（RefFS 按树号点名快照）；别的结局原样交回。
+fn snapshot_change_applied(
+    applied: AppliedStep,
+    change: SnapshotChange,
+    snapshot: u64,
+) -> AppliedStep {
+    let outcome = match applied.outcome {
+        StepOutcome::Applied(AppliedEffect::Published {
+            reuse,
+            floor_raises_pushed_by_the_session,
+            roots_carrying_the_change: _,
+        }) => StepOutcome::Applied(AppliedEffect::SnapshotPublished {
+            change,
+            snapshot,
+            reuse,
+            floor_raises_pushed_by_the_session,
+        }),
+        StepOutcome::Applied(
+            effect @ (AppliedEffect::Mounted { .. }
+            | AppliedEffect::RaisedFloor { .. }
+            | AppliedEffect::RolledBack { .. }
+            | AppliedEffect::Recovered { .. }
+            | AppliedEffect::SnapshotPublished { .. }
+            | AppliedEffect::SnapshotRead { .. }
+            | AppliedEffect::Compacted { .. }),
+        ) => StepOutcome::Applied(effect),
+        refused_or_not_applicable @ (StepOutcome::Refused { .. }
+        | StepOutcome::NotApplicable(_)) => refused_or_not_applicable,
+    };
+    AppliedStep {
+        outcome,
+        harness_judgement: applied.harness_judgement,
+        model_verdict: applied.model_verdict,
+    }
+}
+
+/// 建一个只读快照（`HistoryOperation::CreateSnapshot`）：经挂着的会话发（`UserChange::CreateSnapshot`，先走空再发一次独立发布）。
+/// 前提：现行那一版有树（有树而文件集合为空的一版照调：会话照常发布，用户 2026-10-16 定「放开」，判决
+/// `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）。做成之后新快照的树号取现行那一版树表里最新的那条码 14。
+fn apply_create_snapshot(pool: &mut HistoryPool) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    if open_session.current.version_of_trees().is_none() {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+    }
+    let (change_result, records_before, stream_length_before) =
+        publish_a_snapshot_change_through_the_session(
+            devices,
+            session_slot,
+            stream,
+            UserChange::CreateSnapshot,
+        );
+    let session_after_the_change = session_slot.as_mut().expect("会话发完原样还回来");
+    let applied = settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &IdealModel::answer_create_snapshot,
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    );
+    let created = match &applied.outcome {
+        StepOutcome::Applied(_) => session_after_the_change
+            .current
+            .version_of_trees()
+            .and_then(|version| snapshots_in_the_version(version).last().copied())
+            .map(|(tree, _)| tree.0)
+            .expect("建快照做成之后现行那一版树表里有它那条码 14（建的最晚，排在最后）"),
+        StepOutcome::Refused { .. } | StepOutcome::NotApplicable(_) => return applied,
+    };
+    snapshot_change_applied(applied, SnapshotChange::Created, created)
+}
+
+/// 删一个只读快照（`HistoryOperation::DestroySnapshot`）：经挂着的会话发（`UserChange::DestroySnapshot`，先走空 + 意图 + 全部批）。
+/// 点名的是现行那一版里不在销毁中的快照的第 `index mod 个数` 个；会话先走空会把销毁中的那几个走完，所以它在模型那一侧（走空之后）的位置
+/// 就是它在不在销毁中的那几个里的位置。前提：现行那一版有树、有这样的快照。
+fn apply_destroy_snapshot(pool: &mut HistoryPool, choice: SnapshotChoice) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let Some(version) = open_session.current.version_of_trees() else {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+    };
+    let candidates: Vec<TreeIdentifier> = snapshots_in_the_version(version)
+        .into_iter()
+        .filter(|(_, is_being_destroyed)| !is_being_destroyed)
+        .map(|(tree, _)| tree)
+        .collect();
+    let Some(position) = choose_among(candidates.len(), choice) else {
+        return AppliedStep::not_applicable(
+            MissingPrecondition::NoSnapshotOutsideTheDestructionInTheCurrentVersion,
+        );
+    };
+    let snapshot = candidates[position];
+    let (change_result, records_before, stream_length_before) =
+        publish_a_snapshot_change_through_the_session(
+            devices,
+            session_slot,
+            stream,
+            UserChange::DestroySnapshot { snapshot },
+        );
+    let session_after_the_change = session_slot.as_mut().expect("会话发完原样还回来");
+    let applied = settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &|ideal_model: &IdealModel| ideal_model.answer_destroy_snapshot(position),
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    );
+    snapshot_change_applied(applied, SnapshotChange::Destroyed, snapshot.0)
+}
+
+/// 在 `count` 个里按选择子取第几个；一个都没有是 None。
+fn choose_among(count: usize, choice: SnapshotChoice) -> Option<usize> {
+    let count_as_u64 = u64::try_from(count).expect("快照至多十个");
+    (count_as_u64 > 0).then(|| {
+        usize::try_from(choice.index_among_the_snapshots % count_as_u64).expect("小于个数")
+    })
+}
+
+/// 读一个只读快照（`HistoryOperation::ReadSnapshot`）：经现行那一版的根读（`recovery::read_the_first_file_of_a_snapshot`，读不写盘），
+/// 读出的交模型比（建它那一刻读得出的内容）。点名的是不在销毁中的快照的第 `index mod 个数` 个，它在模型那一侧的位置是它在全部快照里的位置。
+fn apply_read_snapshot(pool: &mut HistoryPool, choice: SnapshotChoice) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session,
+        model,
+        ..
+    } = pool;
+    let Some(open_session) = session.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let Some(version) = open_session.current.version_of_trees() else {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+    };
+    let snapshots = snapshots_in_the_version(version);
+    let positions_outside_the_destruction: Vec<usize> = snapshots
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, is_being_destroyed))| !is_being_destroyed)
+        .map(|(position, _)| position)
+        .collect();
+    let Some(chosen) = choose_among(positions_outside_the_destruction.len(), choice) else {
+        return AppliedStep::not_applicable(
+            MissingPrecondition::NoSnapshotOutsideTheDestructionInTheCurrentVersion,
+        );
+    };
+    let position = positions_outside_the_destruction[chosen];
+    let (snapshot, _) = snapshots[position];
+    let read_back = observed_snapshot_read_back(&read_the_first_file_of_a_snapshot(
+        &*devices,
+        open_session.current.root(),
+        snapshot,
+    ));
+    let verdict = match model.judge_snapshot_read_back(position, &read_back) {
+        Ok(counts) => ModelVerdict {
+            disagreement: None,
+            counts,
+        },
+        Err(disagreement) => ModelVerdict {
+            disagreement: Some(disagreement),
+            counts: ModelJudgementCounts::default(),
+        },
+    };
+    AppliedStep::judged_by_outcome_and_model(
+        StepOutcome::Applied(AppliedEffect::SnapshotRead {
+            snapshot: snapshot.0,
+            read_back,
+        }),
+        verdict,
+    )
+}
+
+/// 现行那一版里整理能强制选的段（[`CompactionChoice::region_selector`] 在这里面挑），按段起点升序：0 号盘上装着这一版至少一条未释放分配记录的整段
+/// （起点取 64 的倍数，`CompactionRegion::of_one_cluster_segment`），去掉这次挂载开着的聚簇段（`PoolAllocator::cluster_segments`：签发时那一判
+/// 不合格）。别的资格（钉住的单元、隔离槽、被区域扫描拒过）照整理自己的判，不合格就停在「没有合格段」，一个写都不发。
+fn segments_the_compaction_may_be_forced_onto(
+    version: &TransactionOutput,
+    allocator: &PoolAllocator,
+) -> Vec<CompactionRegion> {
+    let device_of_the_region = DeviceIdentity(0);
+    let segment_starts: BTreeSet<u64> = version
+        .allocation_records
+        .iter()
+        .filter(|record| record.device == device_of_the_region && !record.is_released)
+        .map(|record| record.slot.0 - record.slot.0 % CLUSTER_SEGMENT_SLOTS)
+        .filter(|segment_start| {
+            !allocator
+                .cluster_segments()
+                .contains(&SlotNumber(*segment_start))
+        })
+        .collect();
+    segment_starts
+        .into_iter()
+        .filter_map(|segment_start| {
+            CompactionRegion::of_one_cluster_segment(
+                device_of_the_region,
+                SlotNumber(segment_start),
+            )
+            .ok()
+        })
+        .collect()
+}
+
+/// 这一趟整理装在会话分配器上的开关：批大小与强制选段取 `choice` 与执行器挑的段，别的取产品值（`CompactionSwitches::PRODUCT`）。
+fn compaction_switches_of_the_choice(
+    batch_units: CompactionBatchUnits,
+    region: CompactionRegion,
+) -> CompactionSwitches {
+    let CompactionSwitches {
+        batch_size: _,
+        forced_region: _,
+        run_forcing,
+        region_exclusion,
+        destination_policy,
+        release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor,
+        relocation_publish_order,
+    } = CompactionSwitches::PRODUCT;
+    CompactionSwitches {
+        batch_size: CompactionBatchSize::ForcedForTests(batch_units),
+        forced_region: Some(region),
+        run_forcing,
+        region_exclusion,
+        destination_policy,
+        release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor,
+        relocation_publish_order,
+    }
+}
+
+/// 整理的一批改写或新增的分配记录（[`records_changed_with_a_generation_outside_the_publish_txgs`] 的判法）：代要是这一批的 txg，
+/// 只有搬迁的目的地例外——目的地那一条已分配记录的分配代写单元的诞生代（映射 key 的出生 txg 段，D26（后台整理与放置回收） 已定项 5 第 2 条）。
+fn allocation_generation_judgement_of_a_relocation_batch(
+    before: &[AllocationRecord],
+    batch: &TransactionOutput,
+) -> Option<HarnessJudgement> {
+    let publish_txg = batch.root.checkpoint_txg;
+    let destinations_at_their_birth: BTreeSet<(DeviceIdentity, u64, CheckpointTxg)> = batch
+        .units_relocated_by_this_publish
+        .iter()
+        .filter_map(|relocated| {
+            let birth_txg = birth_txg_of_a_mapping_key(&relocated.mapping_key)?;
+            Some(
+                relocated
+                    .destination
+                    .iter()
+                    .map(move |location| (location.device, location.slot.0, birth_txg)),
+            )
+        })
+        .flatten()
+        .collect();
+    let records: Vec<AllocationRecord> =
+        records_changed_with_a_generation_outside_the_publish_txgs(
+            before,
+            &batch.allocation_records,
+            publish_txg,
+            publish_txg,
+        )
+        .into_iter()
+        .filter(|record| {
+            record.is_released
+                || !destinations_at_their_birth.contains(&(
+                    record.device,
+                    record.slot.0,
+                    record.generation,
+                ))
+        })
+        .collect();
+    (!records.is_empty()).then_some(HarnessJudgement::AllocationGenerationIsNotThePublishTxg {
+        records,
+        first_publish_txg: publish_txg,
+        last_publish_txg: publish_txg,
+    })
+}
+
+/// 整理那一趟里实现交回的一版，模型此刻怎么答：现行那一版还有要走空的就是走空的一步；否则是整理的一次发布，是哪一种（签发、搬一批、
+/// 随最后一批删意图、单独删意图或丢意图）由模型按它自己记的活意图与这一版看得见的几样判（[`IdealModel::answer_compaction_publish`]）：
+/// 搬了几个单元、搬的里有没有用户可见树的根、发布之后 logged_ops 里还有没有活意图、模型那条活意图的 R 在这一版里按记录全空没有
+/// （按实现交回的这一版的分配记录数，`compaction_plan::region_is_empty_by_the_records`）。签发的 R 取执行器强制的那一段。
+fn model_answer_of_the_next_publish_of_the_compaction(
+    model: &IdealModel,
+    batch_units: u64,
+    version: &TransactionOutput,
+    region_forced_for_the_issue: CompactionRegion,
+) -> Result<ModelAnswer, ModelDisagreement> {
+    if model.current_version_has_a_step_to_walk() {
+        return model.answer_next_step_of_the_walk();
+    }
+    let is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish = model
+        .live_compaction_intent_of_the_current_version()
+        .and_then(|intent| compaction_region_of_the_model(intent.region))
+        .is_some_and(|region| region_is_empty_by_the_records(&version.allocation_records, region));
+    model.answer_compaction_publish(&ModelCompactionPublishSeen {
+        units_at_most: batch_units,
+        units_relocated: u64::try_from(version.units_relocated_by_this_publish.len())
+            .expect("一批的单元数装得进 u64"),
+        user_visible_root_units_relocated: user_visible_root_units_relocated_by_this_publish(
+            version,
+        ),
+        is_an_intent_logged_after_the_publish: observed_logged_compaction_intent(version).is_some(),
+        is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish,
+        region_forced_for_the_issue: model_compaction_region(region_forced_for_the_issue),
+    })
+}
+
+/// 整理那一趟被拒（入口拒了、一次发布没发成）时模型此刻的下一次发布：现行那一版还有要走空的就是走空的一步；否则模型没有活意图时是签发
+/// （R 取执行器强制的那一段），有活意图时是不删意图的一批（至多 `batch_units` 个）。这两种在模型里都该成，只有容量墙区间允许拒，
+/// 判的就是那个拒绝的理由。
+fn model_answer_of_a_refused_publish_of_the_compaction(
+    model: &IdealModel,
+    batch_units: u64,
+    region_forced_for_the_issue: CompactionRegion,
+) -> Result<ModelAnswer, ModelDisagreement> {
+    if model.current_version_has_a_step_to_walk() {
+        return model.answer_next_step_of_the_walk();
+    }
+    let is_an_intent_live = model
+        .live_compaction_intent_of_the_current_version()
+        .is_some();
+    model.answer_compaction_publish(&ModelCompactionPublishSeen {
+        units_at_most: batch_units,
+        units_relocated: if is_an_intent_live { batch_units } else { 0 },
+        user_visible_root_units_relocated: Vec::new(),
+        is_an_intent_logged_after_the_publish: true,
+        is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish: false,
+        region_forced_for_the_issue: model_compaction_region(region_forced_for_the_issue),
+    })
+}
+
+/// 整理一趟（经会话的显式入口）返回之后：发成的每一版按次序交模型比——走空的一步照「走空的一步」、整理的每一次发布（签发、搬一批、
+/// 随最后一批删意图、单独删意图或丢意图）照 [`IdealModel::answer_compaction_publish`]（判决 G7「只比成功操作的内容」；判决 G1 的意图三态）；
+/// 分配代逐版判（搬了单元的一版按 [`allocation_generation_judgement_of_a_relocation_batch`]）。停在判据上算做成；入口拒了、一次发布没发成，
+/// 照模型此刻的下一次发布比那个拒绝（[`model_answer_of_a_refused_publish_of_the_compaction`]：整理与走空在模型里都该成，只有容量墙区间允许拒）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "会话、模型、批大小、强制的段、改动之前的记录、整理的结局、停下时意图活不活着、录制流与它的起点各是一样，收成结构体只会多一层没人验的名字"
+)]
+fn settle_compaction_run(
+    session: &mut WritableSession,
+    model: &mut IdealModel,
+    batch_units: u64,
+    region_forced_for_the_issue: CompactionRegion,
+    records_before: &[AllocationRecord],
+    run_result: &Result<CompactionRun, CompactionRunRefused>,
+    is_the_intent_live_when_the_run_stopped: bool,
+    stream: &SharedStream,
+    stream_length_before: usize,
+) -> AppliedStep {
+    let mut verdict = ModelVerdict::default();
+    let mut harness_judgement = None;
+    let versions_published: &[TransactionOutput] = match run_result {
+        Ok(run) => &run.versions_published,
+        Err(_) => &[],
+    };
+    let mut records_of_the_previous_publish: &[AllocationRecord] = records_before;
+    let mut units_relocated = 0_u64;
+    // 迭代上界是这一趟发成的版数；跨轮带的是上一版之后的分配记录与合起来的判定；模型对不上之后不再问模型（分配代照判）。
+    for version in versions_published {
+        let is_a_relocation_batch = !version.units_relocated_by_this_publish.is_empty();
+        if verdict.disagreement.is_none() {
+            let answer = model_answer_of_the_next_publish_of_the_compaction(
+                model,
+                batch_units,
+                version,
+                region_forced_for_the_issue,
+            );
+            let version_verdict = judge_by_model(
+                model,
+                answer,
+                &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
+                    roots: vec![observed_root_of_file_version(version)],
+                    reported_ceiling: None,
+                }),
+            );
+            verdict.counts.add(&version_verdict.counts);
+            verdict.disagreement = version_verdict.disagreement;
+        }
+        harness_judgement = harness_judgement.or_else(|| {
+            if is_a_relocation_batch {
+                allocation_generation_judgement_of_a_relocation_batch(
+                    records_of_the_previous_publish,
+                    version,
+                )
+            } else {
+                allocation_generation_judgement(
+                    records_of_the_previous_publish,
+                    &version.allocation_records,
+                    version.root.checkpoint_txg,
+                    version.root.checkpoint_txg,
+                )
+            }
+        });
+        units_relocated +=
+            u64::try_from(version.units_relocated_by_this_publish.len()).expect("一批的单元数");
+        records_of_the_previous_publish = &version.allocation_records;
+        session.publishes_in_this_mount += 1;
+    }
+    let (member, reason) = match run_result {
+        Ok(CompactionRun {
+            batches_published,
+            outcome: CompactionRunOutcome::Stopped(stop),
+            ..
+        }) => {
+            return AppliedStep {
+                outcome: StepOutcome::Applied(AppliedEffect::Compacted {
+                    batches_published: *batches_published,
+                    units_relocated,
+                    stop: stop.name(),
+                    is_the_intent_live_when_the_run_stopped,
+                    crashed_then_mounted: false,
+                }),
+                harness_judgement,
+                model_verdict: Some(verdict),
+            };
+        }
+        Ok(CompactionRun {
+            outcome: CompactionRunOutcome::Failed(CompactionRunFailure::DeletionContinuation(cause)),
+            ..
+        }) => (
+            format!(
+                "CompactionRunFailure::DeletionContinuation({})",
+                publish_error_member(cause)
+            ),
+            refusal_reason_of_publish_error(cause),
+        ),
+        Ok(CompactionRun {
+            outcome: CompactionRunOutcome::Failed(CompactionRunFailure::Batch(refused)),
+            ..
+        }) => match refused {
+            RelocationBatchRefused::Publish(cause) => (
+                format!(
+                    "CompactionRunFailure::Batch(RelocationBatchRefused::Publish({}))",
+                    publish_error_member(cause)
+                ),
+                refusal_reason_of_publish_error(cause),
+            ),
+            // 计划对不上上一版（这一批之前刚对 R 重扫过）、或单元的字节不在手里：两块内存盘、不注入故障的历史里走不到，
+            // 走到了就按说不出理由的拒绝判。
+            RelocationBatchRefused::PlannedUnitNotInTheVersion { .. } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::PlannedUnitNotInTheVersion)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            RelocationBatchRefused::PinnedUnitInThePlan { .. } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::PinnedUnitInThePlan)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            RelocationBatchRefused::PlannedSourceIsNotTheMappingPosition { .. } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::PlannedSourceIsNotTheMappingPosition)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            RelocationBatchRefused::UnitBytesNotAvailable { .. } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::UnitBytesNotAvailable)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            // 意图三态那几种是会话推法自己的错（签发前会话判过没有活意图、删之前判过有、R 排他开着时最后一批之后 R 按记录全空）：
+            // 执行器只用产品的 R 排他，走不到；走到了就按说不出理由的拒绝判。
+            RelocationBatchRefused::CompactionIntentAlreadyLive { .. } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::CompactionIntentAlreadyLive)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            RelocationBatchRefused::NoLiveCompactionIntent => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::NoLiveCompactionIntent)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            RelocationBatchRefused::RegionNotEmptyByTheRecordsWhenTheIntentWouldBeDeleted {
+                ..
+            } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::RegionNotEmptyByTheRecordsWhenTheIntentWouldBeDeleted)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+            // 会话照同一批删意图再发，不交上来（判决 m4-segment-code-r1 第三节 F2）：走到了就按说不出理由的拒绝判。
+            RelocationBatchRefused::RegionEmptyByTheRecordsWhileTheIntentWouldBeCarried {
+                ..
+            } => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::RegionEmptyByTheRecordsWhileTheIntentWouldBeCarried)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
+        },
+        // 执行器交整池那两块盘、只在有树的一版上调：走不到，走到了就按说不出理由的拒绝判。
+        Err(CompactionRunRefused::DeviceTableOtherThanTheOneOfTheMount { .. }) => (
+            "CompactionRunRefused::DeviceTableOtherThanTheOneOfTheMount".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+        Err(CompactionRunRefused::NoVersionOfTrees) => (
+            "CompactionRunRefused::NoVersionOfTrees".to_string(),
+            ObservedRefusalReason::Unexplained,
+        ),
+    };
+    if verdict.disagreement.is_none() {
+        let answer = model_answer_of_a_refused_publish_of_the_compaction(
+            model,
+            batch_units,
+            region_forced_for_the_issue,
+        );
+        let writes_of_the_versions_published: u64 = versions_published
+            .iter()
+            .map(|version| version.writes.total().write_calls)
+            .sum();
+        let wrote_anything_besides_what_was_published = if versions_published.is_empty() {
+            stream.operation_count() != stream_length_before
+        } else {
+            writes_in_the_stream_since(stream, stream_length_before)
+                > writes_of_the_versions_published
+        };
+        let refusal_verdict = judge_by_model(
+            model,
+            answer,
+            &ObservedOutcome::Refused {
+                member: member.clone(),
+                reason,
+                publishes_completed: 0,
+                wrote_anything: wrote_anything_besides_what_was_published,
+                reported_ceiling: None,
+                reported_root_ring_slot_still_bad_after_one_reread: None,
+            },
+        );
+        verdict.counts.add(&refusal_verdict.counts);
+        verdict.disagreement = refusal_verdict.disagreement;
+    }
+    AppliedStep {
+        outcome: StepOutcome::Refused { member },
+        harness_judgement,
+        model_verdict: Some(verdict),
+    }
+}
+
+/// 挂着时整理一趟（`HistoryOperation::CompactWhileMounted`）：会话的分配器装上这一趟的开关（批大小、强制选段），经会话的显式入口推
+/// （`MountedSession::run_compaction`），推完换回产品值、交模型逐版比（[`settle_compaction_run`]）。会话这一侧的整理状态（`B_gc` 数的发布数等）
+/// 跨步带着（[`WritableSession::compaction`]）。批间崩溃那一种先把这一趟的发布预算压到 `batches` 批：盘上没有活意图时再加签发那一次
+/// （签发单独一次发布、也算进 `B_gc`，丁 3 交回的读法第 1、4 条），推完之后这个进程崩掉、照 [`HistoryOperation::CloseAndMountWritable`]
+/// 可写挂载一次（两段的判定合起来；挂载被拒时结局是那个拒绝）。意图在 logged_ops 里，崩溃之后的那一版还带着它，下一趟整理接着推它。
+/// 前提：现行那一版有树、有能强制选的段（[`segments_the_compaction_may_be_forced_onto`]）。
+fn apply_compact_while_mounted(
+    pool: &mut HistoryPool,
+    parameters: &MakeFilesystemParameters,
+    choice: CompactionChoice,
+) -> AppliedStep {
+    let run_step = {
+        let HistoryPool {
+            devices,
+            session: session_slot,
+            model,
+            stream,
+            ..
+        } = &mut *pool;
+        let Some(open_session) = session_slot.as_ref() else {
+            return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+        };
+        let Some(version) = open_session.current.version_of_trees() else {
+            return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+        };
+        let candidates =
+            segments_the_compaction_may_be_forced_onto(version, &open_session.allocator);
+        let candidate_count = u64::try_from(candidates.len()).expect("段数装得进 u64");
+        if candidate_count == 0 {
+            return AppliedStep::not_applicable(
+                MissingPrecondition::NoSegmentForTheCompactionInTheCurrentVersion,
+            );
+        }
+        let region = candidates
+            [usize::try_from(choice.region_selector % candidate_count).expect("小于段数")];
+        let batch_units = CompactionBatchUnits::new(
+            usize::try_from(choice.batch_units).expect("一批的单元数装得进 usize"),
+        )
+        .expect("生成时一批至少 1 个单元");
+        let records_before = open_session.allocator.records().to_vec();
+        let stream_length_before = stream.operation_count();
+        let issue_publishes_ahead = u64::from(observed_logged_compaction_intent(version).is_none());
+        let WritableSession {
+            allocator,
+            current,
+            instance,
+            shadow_ledger,
+            parameters_and_device_table,
+            publishes_in_this_mount,
+            carried_to_zero_unit_publishes: _,
+            compaction,
+        } = session_slot.take().expect("上面判过这个进程的会话开着");
+        let mut mounted_session = MountedSession {
+            allocator,
+            current,
+            instance,
+            shadow_ledger,
+            parameters_and_device_table,
+            compaction,
+        };
+        mounted_session
+            .allocator
+            .set_compaction_switches(compaction_switches_of_the_choice(batch_units, region));
+        match choice.ending {
+            CompactionRunEnding::RunsUntilItStops => {}
+            CompactionRunEnding::CrashesAfterBatchesThenMountsWritable { batches } => {
+                // 预算 = max(1, 3S − 4 − 已经过去的发布数)（判决 G8 `B_gc`，签发、搬一批、删意图各算一次）：已经过去的抬到
+                // 3S − 4 − (batches + 签发那一次)，这一趟至多发 batches 批（盘上没有活意图时先签发一次）。
+                let slots_per_region = mounted_session
+                    .parameters_and_device_table
+                    .parameters_on_disk()
+                    .geometry
+                    .root_ring_slots_per_region
+                    .count();
+                let passed_for_the_budget = (3 * slots_per_region)
+                    .saturating_sub(4)
+                    .saturating_sub(batches + issue_publishes_ahead);
+                let compaction_of_this_mount = &mut mounted_session.compaction;
+                compaction_of_this_mount.publishes_since_the_last_user_change =
+                    compaction_of_this_mount
+                        .publishes_since_the_last_user_change
+                        .max(passed_for_the_budget);
+            }
+        }
+        let run_result = mounted_session.run_compaction(devices);
+        let is_the_intent_live_when_the_run_stopped = mounted_session
+            .allocator
+            .compaction()
+            .live_intent()
+            .is_some();
+        mounted_session
+            .allocator
+            .set_compaction_switches(CompactionSwitches::PRODUCT);
+        let session_after_the_run = session_slot.insert(WritableSession {
+            allocator: mounted_session.allocator,
+            current: mounted_session.current,
+            instance: mounted_session.instance,
+            shadow_ledger: mounted_session.shadow_ledger,
+            parameters_and_device_table: mounted_session.parameters_and_device_table,
+            compaction: mounted_session.compaction,
+            publishes_in_this_mount,
+            // 零单元发布只接在树表 0 条的一版后面，整理只接在有树的一版后面。
+            carried_to_zero_unit_publishes: None,
+        });
+        settle_compaction_run(
+            session_after_the_run,
+            model,
+            choice.batch_units,
+            region,
+            &records_before,
+            &run_result,
+            is_the_intent_live_when_the_run_stopped,
+            stream,
+            stream_length_before,
+        )
+    };
+    let crashes_after_the_run = match choice.ending {
+        CompactionRunEnding::RunsUntilItStops => false,
+        CompactionRunEnding::CrashesAfterBatchesThenMountsWritable { .. } => true,
+    };
+    let run_was_judged_without_failure = run_step.harness_judgement.is_none()
+        && run_step
+            .model_verdict
+            .as_ref()
+            .is_some_and(|verdict| verdict.disagreement.is_none());
+    if !crashes_after_the_run || !run_was_judged_without_failure {
+        return run_step;
+    }
+    let AppliedStep {
+        outcome: run_outcome,
+        harness_judgement: _,
+        model_verdict: run_verdict,
+    } = run_step;
+    let mount_step = apply_mount_writable(pool, parameters);
+    let mut verdict = run_verdict.unwrap_or_default();
+    if let Some(mount_verdict) = &mount_step.model_verdict {
+        verdict.counts.add(&mount_verdict.counts);
+        verdict.disagreement = mount_verdict.disagreement.clone();
+    }
+    let outcome = match (run_outcome, mount_step.outcome) {
+        (
+            StepOutcome::Applied(AppliedEffect::Compacted {
+                batches_published,
+                units_relocated,
+                stop,
+                is_the_intent_live_when_the_run_stopped,
+                crashed_then_mounted: _,
+            }),
+            StepOutcome::Applied(AppliedEffect::Mounted { .. }),
+        ) => StepOutcome::Applied(AppliedEffect::Compacted {
+            batches_published,
+            units_relocated,
+            stop,
+            is_the_intent_live_when_the_run_stopped,
+            crashed_then_mounted: true,
+        }),
+        // 整理那一段被拒（模型判过、允许）时，崩溃与挂载照样做；这一步的结局取整理那一段的拒绝。
+        (refused @ StepOutcome::Refused { .. }, _) => refused,
+        // 挂载被拒或交回别的：这一步的结局取挂载那一段的。
+        (_, mount_outcome) => mount_outcome,
+    };
+    AppliedStep {
+        outcome,
+        harness_judgement: mount_step.harness_judgement,
+        model_verdict: Some(verdict),
+    }
 }
 
 fn apply_publish_without_units(
@@ -4181,6 +6347,7 @@ fn apply_publish_without_units(
                 StepOutcome::Applied(AppliedEffect::Published {
                     reuse: RecordReuse::default(),
                     floor_raises_pushed_by_the_session: 0,
+                    roots_carrying_the_change: 1,
                 }),
                 verdict,
             )
@@ -4359,7 +6526,7 @@ fn settle_mount(
                         judge_one_floor_raise_pushed_by_the_session(&mut pool.model, raised)
                     }
                     FloorRaiseOrVersion::Version(continuation_step) => {
-                        let step_answer = pool.model.answer_deletion_step();
+                        let step_answer = pool.model.answer_next_step_of_the_walk();
                         judge_by_model(
                             &mut pool.model,
                             step_answer,
@@ -4386,6 +6553,17 @@ fn settle_mount(
                     .iter()
                     .map(|raised| raised.publishes.len())
                     .sum::<usize>();
+            // 执行器的可写挂载装产品开关（`mount_writable_with_space_admission`）：批大小条款没写，续做盘上那一条整理意图在签任何东西、
+            // 发任何写之前停（`CompactionRunStop::BatchSizeNotDecidedByTheClauses`），上面逐版比的那一串里没有续做整理的发布。
+            assert!(
+                mounted
+                    .output
+                    .compaction_continuation
+                    .run
+                    .as_ref()
+                    .is_none_or(|run| run.versions_published.is_empty()),
+                "执行器的可写挂载装的是产品开关：挂载续做整理在任何写之前停"
+            );
             let space_admission = MountSpaceAdmissionOutcome::of(&mounted.output.space_admission);
             let instance = mounted.output.instance;
             pool.successful_mounts += 1;
@@ -4397,6 +6575,7 @@ fn settle_mount(
                 parameters_and_device_table: mounted.output.parameters_and_device_table,
                 publishes_in_this_mount: publishes,
                 carried_to_zero_unit_publishes,
+                compaction: mounted.output.compaction_continuation.state_of_this_mount,
             });
             AppliedStep {
                 outcome: StepOutcome::Applied(AppliedEffect::Mounted {
@@ -4789,6 +6968,7 @@ fn apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
         instance,
         shadow_ledger,
         parameters_and_device_table,
+        compaction,
         ..
     } = pool.session.take().expect("上面判过这个进程的会话开着");
     let mut session_that_loses_power = MountedSession {
@@ -4797,6 +6977,7 @@ fn apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
         instance,
         shadow_ledger,
         parameters_and_device_table,
+        compaction,
     };
     let content = content_choice.bytes();
     let file = FirstFile {
@@ -5264,7 +7445,7 @@ fn apply_operation(
         HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => {
             apply_crash_recovery_abandoning_the_newest_root(pool, &parameters)
         }
-        HistoryOperation::Unlink => apply_unlink(pool, write_time_seconds),
+        HistoryOperation::Unlink => apply_unlink(pool, write_time_seconds, step_index),
         HistoryOperation::CreateInode => apply_create_inode(pool, write_time_seconds),
         HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(content) => {
             apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
@@ -5279,6 +7460,21 @@ fn apply_operation(
                 pool,
                 &parameters,
             )
+        }
+        HistoryOperation::CreateSnapshot => apply_create_snapshot(pool),
+        HistoryOperation::ReadSnapshot(choice) => apply_read_snapshot(pool, *choice),
+        HistoryOperation::DestroySnapshot(choice) => apply_destroy_snapshot(pool, *choice),
+        HistoryOperation::CompactWhileMounted(choice) => {
+            apply_compact_while_mounted(pool, &parameters, *choice)
+        }
+        HistoryOperation::Truncate(choice) => {
+            apply_truncate(pool, *choice, step_index, write_time_seconds)
+        }
+        HistoryOperation::CreateInodes(choice) => {
+            apply_create_inodes(pool, *choice, write_time_seconds)
+        }
+        HistoryOperation::WriteOfAnInode(choice) => {
+            apply_write_of_an_inode(pool, *choice, write_time_seconds)
         }
     }
 }
@@ -5948,6 +8144,10 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
             outcome: None,
             image: &image,
             model: &pool.model,
+            free_bytes_reported_by_the_current_version: free_bytes_reported_by_the_current_version(
+                pool.session.as_ref(),
+            ),
+            size_requested_by_the_truncation: None,
         });
         for (step_index, operation) in history.operations.iter().enumerate() {
             let step_position = StepPosition::Operation(step_index);
@@ -6040,6 +8240,12 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                 outcome: outcomes.last(),
                 image: &image,
                 model: &pool.model,
+                free_bytes_reported_by_the_current_version:
+                    free_bytes_reported_by_the_current_version(pool.session.as_ref()),
+                size_requested_by_the_truncation: pool
+                    .sizes_requested_by_the_truncations
+                    .get(&step_index)
+                    .copied(),
             });
         }
         let (newest_ring_root_txg, root_ring_slot_count) = newest_ring_root_and_slot_count(&image);
@@ -6150,6 +8356,9 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
             .map_or_else(Vec::new, |pool| {
                 pool.earliest_stream_index_after_each_power_loss.clone()
             }),
+        sizes_requested_by_the_truncations: pool_slot.as_ref().map_or_else(BTreeMap::new, |pool| {
+            pool.sizes_requested_by_the_truncations.clone()
+        }),
     }
 }
 
@@ -6310,9 +8519,92 @@ fn simpler_variants(operation: HistoryOperation) -> Vec<HistoryOperation> {
         | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
         | HistoryOperation::Unlink
         | HistoryOperation::CreateInode
-        | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
-            Vec::new()
-        }
+        | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+        | HistoryOperation::CreateSnapshot => Vec::new(),
+        // 建几个往 1 那一头换。
+        HistoryOperation::CreateInodes(choice) => (1..choice.count_drawn.min(SMALL_SELECTORS_TRIED_WHEN_SHRINKING))
+            .map(|fewer| HistoryOperation::CreateInodes(InodeCountChoice { count_drawn: fewer }))
+            .collect(),
+        // 按 inode 号写：内容往简单那一头换，选择子往小里试（同回退目标）。
+        HistoryOperation::WriteOfAnInode(choice) => simpler_contents(choice.content)
+            .map(|simpler| WriteOfAnInodeChoice {
+                inode_selector: choice.inode_selector,
+                content: simpler,
+            })
+            .chain(
+                smaller_selectors(choice.inode_selector).map(|smaller| WriteOfAnInodeChoice {
+                    inode_selector: smaller,
+                    content: choice.content,
+                }),
+            )
+            .map(HistoryOperation::WriteOfAnInode)
+            .collect(),
+        HistoryOperation::ReadSnapshot(SnapshotChoice {
+            index_among_the_snapshots,
+        }) => smaller_selectors(index_among_the_snapshots)
+            .map(|smaller| {
+                HistoryOperation::ReadSnapshot(SnapshotChoice {
+                    index_among_the_snapshots: smaller,
+                })
+            })
+            .collect(),
+        HistoryOperation::DestroySnapshot(SnapshotChoice {
+            index_among_the_snapshots,
+        }) => smaller_selectors(index_among_the_snapshots)
+            .map(|smaller| {
+                HistoryOperation::DestroySnapshot(SnapshotChoice {
+                    index_among_the_snapshots: smaller,
+                })
+            })
+            .collect(),
+        // 选段的选择子执行时按候选段数取模，同回退目标那样从小到大试；一批的单元数往 1 那一头换。
+        HistoryOperation::CompactWhileMounted(choice) => smaller_selectors(choice.region_selector)
+            .map(|smaller| CompactionChoice {
+                batch_units: choice.batch_units,
+                region_selector: smaller,
+                ending: choice.ending,
+            })
+            .chain((1..choice.batch_units).map(|fewer_units| CompactionChoice {
+                batch_units: fewer_units,
+                region_selector: choice.region_selector,
+                ending: choice.ending,
+            }))
+            .map(HistoryOperation::CompactWhileMounted)
+            .collect(),
+        // 截断往两头换（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8「往 0、往当前 size 两个方向缩」）：缩到 0、
+        // 改成现在的 size（只改记录）；换过去的这两类不再往别处换，收缩因此有界。选择子往小里试，同回退目标。
+        HistoryOperation::Truncate(choice) => match choice.target {
+            TruncationTarget::ToZero | TruncationTarget::ToTheCurrentSize => {
+                smaller_selectors(choice.selector)
+                    .map(|smaller| TruncationChoice {
+                        target: choice.target,
+                        selector: smaller,
+                    })
+                    .map(HistoryOperation::Truncate)
+                    .collect()
+            }
+            TruncationTarget::ToADataUnitBoundary
+            | TruncationTarget::IntoTheMiddleOfADataUnit
+            | TruncationTarget::GrowingWithinTheLastDataUnit
+            | TruncationTarget::GrowingAcrossDataUnits
+            | TruncationTarget::BackIntoTheHole => [
+                TruncationTarget::ToZero,
+                TruncationTarget::ToTheCurrentSize,
+            ]
+            .into_iter()
+            .map(|target| TruncationChoice {
+                target,
+                selector: choice.selector,
+            })
+            .chain(
+                smaller_selectors(choice.selector).map(|smaller| TruncationChoice {
+                    target: choice.target,
+                    selector: smaller,
+                }),
+            )
+            .map(HistoryOperation::Truncate)
+            .collect(),
+        },
     }
 }
 
@@ -7011,6 +9303,7 @@ mod tests {
             operations_written_by_make_filesystem: 0,
             committed_versions_at_the_end: Vec::new(),
             earliest_stream_index_after_each_power_loss: Vec::new(),
+            sizes_requested_by_the_truncations: BTreeMap::new(),
         };
         let finished = vec![
             (
@@ -7517,5 +9810,61 @@ mod tests {
             ),
             "去掉记录核对器那一条，签名是 checker 判红的那几条（收口表第 43 行那一形已从清单里删了）"
         );
+    }
+
+    /// 截断（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8）进自己那一组比重与带整理的那一组：两组的带文件那张表与
+    /// unlink 之后那张表都有截断、份数不为 0；别的每一组比重的每张表都没有截断（已有各组生成的历史不变）。
+    /// 判别力：带整理那一组带文件那张表里截断的份数改成 0（`crates/mutations.tsv` 一行）时这一条红。
+    #[test]
+    fn the_truncation_weights_and_the_broad_compaction_weights_draw_truncations_and_no_other_weights_do(
+    ) {
+        let truncation_weight_of = |table: &[(HistoryOperationKind, u64)]| {
+            table
+                .iter()
+                .filter(|(kind, _)| *kind == HistoryOperationKind::Truncate)
+                .map(|(_, weight)| *weight)
+                .sum::<u64>()
+        };
+        for weights in GenerationWeights::NAMED {
+            let tables = [
+                weights.with_session_closed,
+                weights.with_session_open_without_file,
+                weights.with_session_open_with_file,
+                weights
+                    .with_session_open_after_the_file_was_deleted
+                    .unwrap_or(&[]),
+            ];
+            let truncation_weights: Vec<u64> =
+                tables.into_iter().map(truncation_weight_of).collect();
+            match weights.named {
+                NamedGenerationWeights::Truncation
+                | NamedGenerationWeights::BroadWithCompactionWhileMounted => {
+                    assert!(
+                        truncation_weights[2] > 0 && truncation_weights[3] > 0,
+                        "{} 的带文件那张表与 unlink 之后那张表都抽截断：{truncation_weights:?}",
+                        weights.name
+                    );
+                }
+                NamedGenerationWeights::Broad
+                | NamedGenerationWeights::ReuseAfterRaisingTheFloor
+                | NamedGenerationWeights::RollbackAfterRaisingTheFloor
+                | NamedGenerationWeights::TowardTheAllocationRecordWall
+                | NamedGenerationWeights::TowardTheUnitAreaWall
+                | NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves
+                | NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep
+                | NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros
+                | NamedGenerationWeights::SnapshotOperations
+                | NamedGenerationWeights::CompactionWhileMounted
+                | NamedGenerationWeights::CompactionWhileMountedWithRollback
+                | NamedGenerationWeights::WritesByInodeNumber => {
+                    assert_eq!(
+                        truncation_weights,
+                        vec![0, 0, 0, 0],
+                        "{} 不抽截断",
+                        weights.name
+                    );
+                }
+            }
+        }
     }
 }

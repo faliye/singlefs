@@ -18,7 +18,7 @@
 mod common;
 
 use common::{build_pool, file_content, geometry};
-use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
+use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
 use singlefs_checker_tier::crash::{
     crash_point_replay_plan_state_count, CrashPointReplayOracleViolationKind,
     CrashPointReplaySegmentExpansion, CrashStateJudgement,
@@ -32,9 +32,10 @@ use singlefs_checker_tier::crash_state_enumeration::{
 /// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
 const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_recovery_root_choice_refuses_root_record_pointer_head_fields_like_the_core.rs";
 use singlefs_checker_tier::crash_judge_gpu::{
-    cross_check_words_of_cpu_judgement, cross_check_words_of_gpu_verdict,
-    pool_checker_violated_bits, verdict_bits, CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD,
-    VERDICT_WORDS,
+    cross_check_words_agree_in_the_cross_check, cross_check_words_of_cpu_judgement,
+    cross_check_words_of_gpu_verdict, pool_checker_bits_agree_in_the_cross_check,
+    pool_checker_violated_and_judged_bits, pool_checker_violated_bits, verdict_bits,
+    CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
@@ -266,23 +267,12 @@ fn red_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u32 {
     bits
 }
 
-/// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）。
+/// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）；经 `pool_checker_violated_and_judged_bits` 取
+/// （与 CPU 一侧的对拍字同一个函数），内核不置位、对拍不比的那几条（`crash_judge_gpu::POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS`）
+/// 照判定置位，比较处经 `pool_checker_bits_agree_in_the_cross_check` 两边都去掉再比。
 fn pool_checker_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u128 {
-    judgement
-        .pool_checker
-        .iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(_) => Some(
-                IMPLEMENTED_INVARIANTS
-                    .iter()
-                    .position(|candidate| candidate == invariant)
-                    .expect("池级 checker 报的不变量在清单里"),
-            ),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .fold(0u128, |bits, index| bits | (1u128 << index))
+    let (violated, _judged) = pool_checker_violated_and_judged_bits(&judgement.pool_checker);
+    violated
 }
 
 fn invariant_names(bits: u128) -> Vec<&'static str> {
@@ -372,9 +362,15 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(test_name: &str, flow
             let gpu_cross_check_words = cross_check_words_of_gpu_verdict(gpu_words);
             (undecidable
                 || gpu_red_bits != cpu_judgement.red_bits
-                || gpu_pool_checker_bits != cpu_judgement.pool_checker_bits
+                || !pool_checker_bits_agree_in_the_cross_check(
+                    gpu_pool_checker_bits,
+                    cpu_judgement.pool_checker_bits,
+                )
                 || gpu_recovery != cpu_judgement.recovery_words
-                || gpu_cross_check_words != cpu_judgement.cross_check_words)
+                || !cross_check_words_agree_in_the_cross_check(
+                    &gpu_cross_check_words,
+                    &cpu_judgement.cross_check_words,
+                ))
                 .then(|| {
                     format!(
                         "状态 {ordinal}：CPU 红位 {:#x} 恢复 {:?} checker {:?} 对拍字 {:?}；GPU 红位 {gpu_red_bits:#x} 恢复 {gpu_recovery:?} checker {:?} 对拍字 {gpu_cross_check_words:?}（判不了：{undecidable}）",

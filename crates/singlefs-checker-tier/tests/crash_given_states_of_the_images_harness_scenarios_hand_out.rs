@@ -2462,6 +2462,16 @@ fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_agains
     );
 }
 
+/// 与 harness 档 `crates/singlefs-harness/tests/checker_compaction_intent_and_relocation_must_red_worlds.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_release_checksum_quarantine::a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup`）。
+#[test]
+fn a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup",
+        scenarios_of_release_checksum_quarantine::a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup,
+    );
+}
+
 // ─── harness 档 `tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs` ───
 
 /// 与 harness 档 `crates/singlefs-harness/tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
@@ -3472,9 +3482,10 @@ type ScenarioHandingOutImages = fn(&mut PoolCheckerImages);
 
 /// 对拍取的场景：干净的镜像、改坏记录 / 根槽 / 链指针 / 树根的镜像、隔离豁免、不适用、产品旋钮下判红、一批单扣崩溃态，各取一两个；
 /// 再加 unlink 路径上 inode 叶借、借完再吸收那两个（七百来个 inode：GPU 走读内核 inode → 对象出生代表那张表要装得下，
-/// 这两个场景在对拍里由 GPU 判，那张表收窄时变异副本里也抓得到）。
+/// 这两个场景在对拍里由 GPU 判，那张表收窄时变异副本里也抓得到）；再加 I-3.15 隔离判据读一份头用不了、没有 key 指着的单元那一个
+/// （判决 `research/prompts/m4-i315-r1-main-verification.md` 第三节 C1「乙二」：组里读不读没打对不上映射记号的那一份，扫描内核与 `walk.rs` 各写一份）。
 #[cfg(feature = "gpu")]
-const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages); 13] = [
+const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages); 14] = [
     (
         "writable_mounts_fill_the_instance_table_page_and_the_three_hundred_seventy_first_opens_the_second_page",
         scenarios_of_instance_table_page_full::writable_mounts_fill_the_instance_table_page_and_the_three_hundred_seventy_first_opens_the_second_page,
@@ -3510,6 +3521,10 @@ const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages)
     (
         "quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read",
         scenarios_of_release_checksum_quarantine::quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read,
+    ),
+    (
+        "a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup",
+        scenarios_of_release_checksum_quarantine::a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup,
     ),
     (
         "the_checkers_effective_floor_counts_the_floor_an_abandoned_root_carries",
@@ -4256,6 +4271,98 @@ fn an_accounting_leaf_wider_than_its_field_table_is_judged_alike_on_the_gpu_and_
     assert_eq!(
         gpu_state.words, cpu_state.words,
         "两趟的对拍字相同（违例位、判到位、两遍恢复落到的根）"
+    );
+}
+
+// ============================== 内部条目比字段表宽的记账树根（C780，I-1.10：码 2 内部节点的条目宽要等于字段表宽） ==============================
+
+/// GPU 与 CPU 对拍记账树根的内部条目比字段表宽一个字节（108 → 109）的镜像，比到恢复字（两趟独立、各从自己那一份库读回）：镜像是 harness 档场景
+/// `scenarios_of_accounting_and_mapping_tree_split::image_with_the_root_damaged` 交出的那张（`RootDamage::EntryWiderThanTheInternalEntryFieldTable`：
+/// 两棵树压小写出第一个文件版本，只改记账树的根、补好引用链上的校验和）。核心层恢复读码 2 树照 C780（用户 2026-10-18 定「宽于字段表也拒」）
+/// 条目宽不等于字段表宽就拒，看 journal 那一遍失败在 `EntryNarrowerThanItsFieldTable`；CPU 池级 checker 红 I-1.10。一趟由 GPU 判器判、
+/// 一趟由 CPU 判器判，对拍字整份相同：不只池级 checker 的违例位与判到位，连两遍恢复的结局、失败点与落到的根。
+/// 要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
+/// 判别力（`crates/mutations.tsv`）：GPU 恢复内核读码 2 树时内部节点的条目宽改回只拒窄于字段表的，GPU 那一趟照读这个根、恢复不在这里失败，
+/// 恢复那几个字与 CPU 不同，这条红（同一张镜像经 `the_pool_checker_reddens_each_broken_rule_of_a_multi_level_tree_root` 只比池级 checker，抓不到）。
+#[cfg(feature = "gpu")]
+#[test]
+fn an_accounting_tree_root_wider_than_its_internal_field_table_is_refused_alike_by_the_gpu_and_the_cpu_recovery(
+) {
+    use common_tree_split::{capacities, TreeSplitPool};
+    use scenarios_of_accounting_and_mapping_tree_split::{
+        image_with_the_root_damaged, RootDamage, SMALL_ACCOUNTING, SMALL_CENTRAL_MAPPING,
+    };
+    use singlefs_checker_tier::crash_amplification::JudgedBy;
+    use singlefs_checker_tier::crash_judge_conclusions::{
+        GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE, RECOVERY_OUTCOME_CODE_FAILED,
+    };
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+    use singlefs_core::transaction::MultiLevelCodeTwoTree;
+    /// 条目宽要等于字段表宽的那一条（池级 checker 主走读照它判）。
+    const ENTRY_WIDTH_EQUALS_THE_FIELD_TABLE: &str = "I-1.10";
+    const TEST_NAME: &str =
+        "an_accounting_tree_root_wider_than_its_internal_field_table_is_refused_alike_by_the_gpu_and_the_cpu_recovery";
+    if gpu_card_pool_or_report_not_run(TEST_NAME).is_none() {
+        return;
+    }
+    let pool = TreeSplitPool::with_the_first_file_version_under(capacities(
+        SMALL_ACCOUNTING,
+        SMALL_CENTRAL_MAPPING,
+    ));
+    let image = image_with_the_root_damaged(
+        &pool,
+        MultiLevelCodeTwoTree::Accounting,
+        RootDamage::EntryWiderThanTheInternalEntryFieldTable,
+    );
+    let table = table_of_one_image("记账树根的内部条目宽 109", &image);
+    let (on_the_gpu, gpu_run) = conclusions_of_a_table_judged_with_the_gpu(
+        &table,
+        "given-states-accounting-root-wider-than-its-internal-field-table-on-the-gpu",
+        true,
+    );
+    let (on_the_cpu, cpu_run) = conclusions_of_a_table_judged_with_the_gpu(
+        &table,
+        "given-states-accounting-root-wider-than-its-internal-field-table-on-the-cpu",
+        false,
+    );
+    assert_eq!(
+        (gpu_run.judged_by, cpu_run.judged_by),
+        (JudgedBy::GpuJudge, JudgedBy::CpuJudge),
+        "一趟由 GPU 判器判、一趟由 CPU 判器判"
+    );
+    assert_eq!(
+        (
+            gpu_run.tally.states_judged_by_the_gpu_here,
+            gpu_run.tally.states_the_gpu_could_not_judge.clone()
+        ),
+        (1, Vec::<String>::new()),
+        "GPU 那一趟从空库起、这一个状态在卡上判得了"
+    );
+    let [gpu_state] = on_the_gpu.states.as_slice() else {
+        panic!("一张镜像一个状态");
+    };
+    let [cpu_state] = on_the_cpu.states.as_slice() else {
+        panic!("一张镜像一个状态");
+    };
+    assert!(
+        is_violated(cpu_state, ENTRY_WIDTH_EQUALS_THE_FIELD_TABLE),
+        "前提：CPU 主走读判条目宽比字段表宽（{ENTRY_WIDTH_EQUALS_THE_FIELD_TABLE}）红：{:?}",
+        cpu_state.pool_checker_violations()
+    );
+    assert_eq!(
+        (
+            cpu_state.words.consulted_pass_outcome,
+            cpu_state.words.consulted_pass_failure_point
+        ),
+        (
+            RECOVERY_OUTCOME_CODE_FAILED,
+            GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE
+        ),
+        "前提：CPU 看 journal 那一遍恢复失败在条目宽与字段表不符（C780 宽于字段表也拒）"
+    );
+    assert_eq!(
+        gpu_state.words, cpu_state.words,
+        "两趟的对拍字整份相同（违例位、判到位、两遍恢复的结局、失败点与落到的根）"
     );
 }
 

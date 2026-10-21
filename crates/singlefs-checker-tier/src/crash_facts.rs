@@ -288,7 +288,7 @@ impl SegmentExpansionFact {
     }
 }
 
-/// 一段里的原地写与单元写（COW），各按段内次序：单元写落在新分出来的槽上，其余（系统配置槽、journal 记录、根槽、清零、屏障）都是原地覆盖。
+/// 一段里的原地写与单元写（COW），各按段内次序：单元写落在新分出来的槽上，其余（系统配置槽、journal 记录、根槽、清零、discard、屏障）都是原地覆盖。
 /// 与 `crate::crash` 里甲二拆段的那一份同一条分法（那一份是 `crash.rs` 的私有函数 `in_place_and_copy_on_write_writes_of`，崩溃点重放引擎那一路
 /// 合并时改成调这一份）。
 #[must_use]
@@ -303,6 +303,7 @@ pub fn in_place_and_copy_on_write_writes_of_the_segment(
         .partition(|index| match writes[*index].kind {
             StepKind::UnitWrite => false,
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::SystemConfigurationSlot
             | StepKind::JournalRecord
             | StepKind::RootRecordFua
@@ -433,6 +434,12 @@ pub fn extract_flow_facts_with_slices(
             StepKind::RootRecordFua => {
                 let bytes = write.bytes().expect("根槽写是普通写");
                 roots.push(root_fact(source, bytes));
+            }
+            // discard（与它的撕裂镜像）把罩住的单元改成 0 或撕裂的字节：那几个槽在它持久的状态里不再是原来那个单元。
+            StepKind::Discard => {
+                let units_the_discard_changes =
+                    units_whose_bytes_a_discard_changes(base, enumerated, &units, source, write);
+                units.extend(units_the_discard_changes);
             }
             StepKind::ZeroFill
             | StepKind::JournalRecord
@@ -593,6 +600,72 @@ fn root_fact(source: u32, bytes: &[u8]) -> RootFact {
         self_checksum_holds: view.is_some(),
         pointers,
     }
+}
+
+/// 一次 discard（或它的撕裂镜像，来源号 `source`）落了之后，被它改掉字节的单元各添一条以这次写为来源的单元事实：字节是那个单元
+/// 叠上这次写之后的样子（整单元 CRC 与两道校验和按它算）。状态里这次写持久时 [`current_unit_at`] 取到的是这一条，根指过去按整单元 CRC
+/// 对不上，与 CPU 判器在镜像上读到的一致（discard 罩住的单元读回 0 或撕裂的字节）；没持久时取到的还是原来那个单元。
+/// 「原来那个单元」取这次写之前最后一次落在那个槽上的单元写（没有就取基线里的），与撕裂镜像按「这次写之前的写全落了」取旧字节
+/// 同一个口径（D13（验证路线） 已定项 4 射程「已知边角」）；更早的 discard 添的那几条不是单元，不拿来叠。字节没变的单元不添
+/// （撕裂镜像后一半罩住的还是旧字节）。
+fn units_whose_bytes_a_discard_changes(
+    base: &MemoryPool,
+    enumerated: &[RetainedWrite],
+    units_before_the_discard: &[UnitFact],
+    source: u32,
+    discard: &RetainedWrite,
+) -> Vec<UnitFact> {
+    let discard_start = discard.offset.0;
+    let discard_end = discard_start + discard.length_in_bytes();
+    let write_of_source =
+        |unit_source: u32| &enumerated[usize::try_from(unit_source).expect("写表下标装得进 usize")];
+    // `units_before_the_discard` 按来源号从小到大排（基线的在最前，之后按写表次序），同一槽后来的盖掉先来的。
+    let mut latest_unit_by_slot: BTreeMap<u64, &UnitFact> = BTreeMap::new();
+    for unit in units_before_the_discard {
+        let is_from_the_base_or_a_unit_write = unit.source == BASE_IMAGE_SOURCE
+            || write_of_source(unit.source).kind == StepKind::UnitWrite;
+        let unit_start = unit.slot * SLOT_BYTES;
+        let unit_end = unit_start + u64::from(unit.unit_bytes);
+        if unit.device == discard.device.0
+            && is_from_the_base_or_a_unit_write
+            && unit_start < discard_end
+            && discard_start < unit_end
+        {
+            latest_unit_by_slot.insert(unit.slot, unit);
+        }
+    }
+    latest_unit_by_slot
+        .into_values()
+        .filter_map(|unit| {
+            let unit_start = unit.slot * SLOT_BYTES;
+            let unit_end = unit_start + u64::from(unit.unit_bytes);
+            let original: Vec<u8> = if unit.source == BASE_IMAGE_SOURCE {
+                PoolReader::read(
+                    base,
+                    discard.device,
+                    DeviceOffsetInBytes(unit_start),
+                    usize::try_from(unit.unit_bytes).expect("单元长度装得进 usize"),
+                )
+                .expect("基线里的单元在建事实时读出来过")
+            } else {
+                write_of_source(unit.source)
+                    .bytes()
+                    .expect("单元写是普通写")
+                    .to_vec()
+            };
+            let overlap_start = unit_start.max(discard_start);
+            let overlap_end = unit_end.min(discard_end);
+            let offset_in_the_unit = |position: u64| {
+                usize::try_from(position - unit_start).expect("单元内偏移装得进 usize")
+            };
+            let mut present = original.clone();
+            discard.contents.copy_range_into(
+                usize::try_from(overlap_start - discard_start).expect("写内偏移装得进 usize"),
+                &mut present[offset_in_the_unit(overlap_start)..offset_in_the_unit(overlap_end)],
+            );
+            (present != original).then(|| unit_fact(source, unit.device, unit_start, &present))
+        })
+        .collect()
 }
 
 /// 基线镜像里的单元：写过的扇区里、16 KiB 槽起点上带单元 magic 的，按类读整单元。
@@ -1771,6 +1844,107 @@ mod tests {
         assert!(
             FlowFactsReadBack::from_the_library_bytes(&bytes, &facts.digest()).is_ok(),
             "新布局的照读"
+        );
+    }
+
+    /// 单元区里一个 64 槽对齐的整段起点（784 MiB = 50176 槽）。
+    const DISCARDED_SEGMENT_START: u64 = 784 << 20;
+
+    /// 基线：盘 0 上 `DISCARDED_SEGMENT_START` 那一槽是一个码 2 的单元（16 KiB，内容不必自证得过：这里只看整单元 CRC）。
+    fn base_with_one_unit_at_the_discarded_segment() -> (MemoryPool, Vec<u8>) {
+        let mut unit_bytes = vec![0x33u8; 16384];
+        unit_bytes[..4].copy_from_slice(UNIT_MAGIC);
+        unit_bytes[UNIT_CLASS_OFFSET] = 2;
+        let mut base =
+            MemoryPool::with_devices(&[singlefs_core::address::DeviceIdentity(0)], 1 << 30);
+        base.devices
+            .get_mut(&singlefs_core::address::DeviceIdentity(0))
+            .expect("盘 0")
+            .write(DeviceOffsetInBytes(DISCARDED_SEGMENT_START), &unit_bytes);
+        (base, unit_bytes)
+    }
+
+    /// 罩住 `DISCARDED_SEGMENT_START` 起 64 槽的一次 discard。
+    fn discard_of_the_segment() -> RetainedWrite {
+        RetainedWrite {
+            device: singlefs_core::address::DeviceIdentity(0),
+            kind: StepKind::Discard,
+            is_force_unit_access: false,
+            offset: DeviceOffsetInBytes(DISCARDED_SEGMENT_START),
+            contents: singlefs_harness::memory_pool::WrittenContents::Zeros {
+                length: 64 * SLOT_BYTES,
+            },
+        }
+    }
+
+    /// CPU 参照认 discard（C829（discard 与 mkfs 清零在段种类串里同名））：一次 discard 罩住最新的根指着的单元，它持久或撕裂的状态里
+    /// 根指过去按整单元 CRC 对不上（与 CPU 判器在镜像上读回 0 或撕裂字节一致），没持久的状态里单元还在、判绿。
+    /// 这一段 1 + (3 − 1) 个状态：没持久、撕裂（基线那一槽有旧内容，D13（验证路线） 已定项 4 的第三态）、全部持久。
+    #[test]
+    fn a_persisted_or_torn_discard_over_the_unit_the_newest_root_points_to_is_red_in_the_cpu_reference(
+    ) {
+        let (base, unit_bytes) = base_with_one_unit_at_the_discarded_segment();
+        let writes = vec![discard_of_the_segment()];
+        let segments = vec![vec![0]];
+        let mut facts =
+            extract_flow_facts(&base, &writes, &segments, &crate::crash::full_expansion);
+        let slot = DISCARDED_SEGMENT_START / SLOT_BYTES;
+        let base_crc = crc32_castagnoli_table(&unit_bytes);
+        assert_eq!(
+            facts
+                .units
+                .iter()
+                .map(|unit| (unit.source, unit.slot, unit.whole_crc32c == base_crc))
+                .collect::<Vec<_>>(),
+            vec![
+                (BASE_IMAGE_SOURCE, slot, true),
+                (0, slot, false),
+                (1, slot, false)
+            ],
+            "基线里的单元，discard 与它的撕裂镜像各在那一槽添一条字节变了的"
+        );
+        facts.roots = vec![RootFact {
+            source: BASE_IMAGE_SOURCE,
+            instance: 1,
+            checkpoint_txg: 1,
+            rollback_floor: 0,
+            self_checksum_holds: true,
+            pointers: [
+                pointer_to(0, slot, base_crc),
+                zero_pointer(),
+                zero_pointer(),
+                zero_pointer(),
+            ],
+        }];
+        facts.newest_base_root = Some(0);
+        assert_eq!(facts.state_count, 3);
+        assert_eq!(
+            (0..facts.state_count)
+                .map(|ordinal| verify_state_from_facts(&facts, ordinal))
+                .collect::<Vec<u32>>(),
+            vec![
+                0,
+                verdict_bits::NEWEST_ROOT_POINTER_TARGET,
+                verdict_bits::NEWEST_ROOT_POINTER_TARGET
+            ],
+            "没持久判绿；撕裂与持久两态里根指的单元不在了"
+        );
+    }
+
+    /// 段的拆法里 discard 是原地写那一组（不是单元写那种 COW）。
+    #[test]
+    fn the_segment_expansion_fact_groups_a_discard_with_the_in_place_writes() {
+        let unit_write = RetainedWrite {
+            device: singlefs_core::address::DeviceIdentity(0),
+            kind: StepKind::UnitWrite,
+            is_force_unit_access: false,
+            offset: DeviceOffsetInBytes(DISCARDED_SEGMENT_START + (1 << 20)),
+            contents: singlefs_harness::memory_pool::WrittenContents::Bytes(vec![0u8; 512]),
+        };
+        let writes = vec![unit_write, discard_of_the_segment()];
+        assert_eq!(
+            in_place_and_copy_on_write_writes_of_the_segment(&writes, &[0, 1]),
+            (vec![1], vec![0])
         );
     }
 }

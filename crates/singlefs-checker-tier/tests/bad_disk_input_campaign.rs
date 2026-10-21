@@ -789,7 +789,8 @@ fn memory_pool_of(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> MemoryPool
 }
 
 /// 系统配置自述的区域数越过字段表那三个逐区域设备身份字段（普查 R12）时，池级 checker 不许 panic、也不许把它夹成 3
-/// 往下走：`geometry_of` 交回 `Verdict::RegionCountPastTheRegionDeviceFields`、这一槽不可择，于是整片报不适用。
+/// 往下走：`geometry_of` 交回 `Verdict::RegionCountPastTheRegionDeviceFields`，这是读者不收之值（用户 2026-10-20 定 C663「R 读并整池拒」），
+/// 于是只红 I-7.13、其余整片报不适用。
 /// 「不夹成 3」那一半单钉在 `checker_known_bad_images.rs`
 /// （`region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader`）。
 #[test]
@@ -821,8 +822,8 @@ fn region_count_past_the_three_region_array_leaves_the_checker_standing() {
     );
     assert_eq!(
         observation.invariants_violated,
-        Vec::<&'static str>::new(),
-        "每块盘的系统配置都读不出几何，checker 该整片报不适用、不判任何一条违例"
+        vec!["I-7.13"],
+        "带区域数 4 的槽是读者不收之值：checker 只红 I-7.13、其余整片报不适用"
     );
 }
 

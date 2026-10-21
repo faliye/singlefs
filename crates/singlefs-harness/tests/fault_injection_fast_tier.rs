@@ -29,18 +29,20 @@ use singlefs_harness::fault_injection::{
 };
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
-    count_from_reproduction_environment, environment_assignments_in_line,
+    count_from_reproduction_environment, environment_assignments_in_line, execute_history_with,
     execute_history_with_faults, generate_history_with_weights,
-    number_from_reproduction_environment, render_environment_assignments, FailureSignature,
-    FloorTargetChoice, GeneratedHistory, GenerationWeights, HarnessJudgement, HistoryDeviceWidth,
-    HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind, HistoryRun,
-    HistorySampling, HistorySeed, HistoryStartingPoint, PerStepChecker,
-    ReproductionEnvironmentError, ReproductionVariablePrefix, StartingPointStep, StepPosition,
+    number_from_reproduction_environment, render_environment_assignments, AppliedEffect,
+    CompactionChoice, CompactionRunEnding, FailureSignature, FloorTargetChoice, GeneratedHistory,
+    GenerationWeights, HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
+    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySampling, HistorySeed,
+    HistoryStartingPoint, PerStepChecker, ReproductionEnvironmentError, ReproductionVariablePrefix,
+    StartingPointStep, StepOutcome, StepPosition,
 };
-use singlefs_harness::memory_pool::MemoryPool;
+use singlefs_harness::memory_pool::{root_identity_written_by, MemoryPool};
 use singlefs_harness::model::{ModelDisagreementAspect, ModelReportedUnreadablePlace};
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
-use singlefs_harness::SharedStream;
+use singlefs_harness::segments::StepKind;
+use singlefs_harness::{RecordedOperationKind, SharedStream};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write as _;
 
@@ -351,7 +353,7 @@ fn a_fault_injection_fault_count_of_zero_panics_naming_the_variable_and_the_valu
 /// 大档：规模与取样参数照判红时打的重放行从环境变量取，后台跑（`cargo test --release -p singlefs-harness --test
 /// fault_injection_fast_tier -- --ignored --nocapture`）。
 #[test]
-#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_FAULT_INJECTION_FIRST_SEED 起 SINGLEFS_FAULT_INJECTION_SEEDS 段、每段 SINGLEFS_FAULT_INJECTION_OPERATIONS 步、每段注入 SINGLEFS_FAULT_INJECTION_FAULTS 次，比重 SINGLEFS_FAULT_INJECTION_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_FAULT_INJECTION_CHECKER（只认 skip），盘宽 SINGLEFS_FAULT_INJECTION_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_FAULT_INJECTION_SPACE_ADMISSION（judged、skipped），线程数 SINGLEFS_FAULT_INJECTION_WORKER_THREADS；没设的取大档默认（种子基、512 段、30 步、6 次、broad、skip、4gib、judged）；按里程碑「增补 3」后台跑"]
+#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_FAULT_INJECTION_FIRST_SEED 起 SINGLEFS_FAULT_INJECTION_SEEDS 段、每段 SINGLEFS_FAULT_INJECTION_OPERATIONS 步、每段注入 SINGLEFS_FAULT_INJECTION_FAULTS 次，比重 SINGLEFS_FAULT_INJECTION_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall、broad-compaction 等，取值同随机历史的比重名），checker SINGLEFS_FAULT_INJECTION_CHECKER（只认 skip），盘宽 SINGLEFS_FAULT_INJECTION_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_FAULT_INJECTION_SPACE_ADMISSION（judged、skipped），线程数 SINGLEFS_FAULT_INJECTION_WORKER_THREADS；没设的取大档默认（种子基、512 段、30 步、6 次、broad、skip、4gib、judged）；按里程碑「增补 3」后台跑"]
 fn fault_injection_large_tier_from_the_environment() {
     let started = std::time::Instant::now();
     let report =
@@ -467,6 +469,96 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
         "前提：这一批除每一步的池级 checker 之外的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
     );
     the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(&campaign);
+}
+
+/// 故障注入的段数上限：从这个测试周期的种子基起，在这么多段里找一段整理做成过一批的历史。
+const SEEDS_SEARCHED_FOR_A_COMPACTION_BATCH: u64 = 64;
+
+/// 瞬时读错撞上整理（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J5）：大档入口按比重变量点名「快档加整理」那一组
+/// （`SINGLEFS_FAULT_INJECTION_WEIGHTS=broad-compaction`，`GenerationWeights::BROAD_WITH_COMPACTION_WHILE_MOUNTED`），从种子基起找头一段
+/// 整理做成过一批的历史（那一步读过单元头），在那一步发出的头一次读上摆一次读错（只坏这一次调用，下一次照常读得出），重跑这段历史：
+/// 注入落在整理那一步上，返回错误而不是 panic。注入之后重开落不落在模型允许的版本、有没有「已知红」之外的新发现，归大档入口点名这一组比重
+/// 跑（`fault_injection_large_tier_from_the_environment`）；这里把计数与新发现打出来，不判。
+#[test]
+fn a_transient_read_error_lands_on_a_compaction_step_of_the_weights_the_large_tier_names_broad_compaction(
+) {
+    let campaign = large_tier_campaign_from(&|variable: &str| {
+        (variable == "SINGLEFS_FAULT_INJECTION_WEIGHTS").then(|| "broad-compaction".to_string())
+    });
+    let (history, compaction_step) = (0..SEEDS_SEARCHED_FOR_A_COMPACTION_BATCH)
+        .find_map(|offset| {
+            let history = generate_history_with_weights(
+                HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + offset),
+                FAST_TIER_OPERATIONS_PER_HISTORY,
+                &campaign.weights,
+            );
+            let run = execute_history_with(
+                &history,
+                HANDING_EVERY_STEP_IMAGE_OUT,
+                &SharedStream::new(),
+                &mut |_| {},
+            );
+            let compaction_step = run.outcomes.iter().position(|outcome| {
+                matches!(
+                    outcome,
+                    StepOutcome::Applied(AppliedEffect::Compacted {
+                        batches_published,
+                        ..
+                    }) if *batches_published > 0
+                )
+            })?;
+            Some((history, compaction_step))
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "比重 {} 在种子基起 {SEEDS_SEARCHED_FOR_A_COMPACTION_BATCH} 段里没有一段整理做成过一批：这一组比重不抽整理",
+                campaign.weights.name
+            )
+        });
+    let compaction_segment = FaultedSegment::Operation {
+        step_index: compaction_step,
+        operation_kind: HistoryOperationKind::CompactWhileMounted,
+    };
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        InjectedFault::ReadFails,
+        compaction_segment,
+        1,
+    );
+    let rendered = injection.tally.render();
+    print_uncaptured(&format!(
+        "── 瞬时读错撞上整理（种子 {}、第 {compaction_step} 步）──\n{rendered}新发现 {} 条\n{}",
+        history.seed.0,
+        injection.new_findings.len(),
+        injection
+            .new_findings
+            .iter()
+            .map(|finding| finding.render())
+            .collect::<String>()
+    ));
+    assert_eq!(
+        injection
+            .drawn_faults
+            .iter()
+            .map(|drawn| (drawn.fault, drawn.segment))
+            .collect::<Vec<_>>(),
+        vec![(InjectedFault::ReadFails, compaction_segment)],
+        "注入点就是整理那一步的头一次读\n{rendered}"
+    );
+    assert_eq!(
+        injection
+            .tally
+            .faults_on_segment(FaultedSegmentKind::Operation(
+                HistoryOperationKind::CompactWhileMounted
+            )),
+        1,
+        "这一次注入记在整理那一步上\n{rendered}"
+    );
+    assert_eq!(
+        injection.tally.faults_that_panicked, 0,
+        "注入之后 core panic 了：被测的性质是返回错误而不是 panic\n{rendered}"
+    );
 }
 
 /// 说谎的设备留下的盘面不一致里只判红 `["I-3.1"]` 的那一形的取样点（按注入点认，`fault_injection::left_by_the_lying_device`；
@@ -881,14 +973,14 @@ fn history_that_mounts_once_after_the_first_file() -> GeneratedHistory {
     }
 }
 
-/// 那一步可写挂载里的第几次写：取号是头两次（两块盘各一次系统配置槽写），写行那次发布的第一个单元写是第 3 次；
+/// 那一步可写挂载里的第几次写：取号是头四次（取号写两轮，每轮两块盘各一次系统配置槽写），写行那次发布的第一个单元写是第 5 次；
 /// 写行那次发布一共 23 次写（实例表两盘 2 次、分配记录树按位置寻址这一次重写的节点两盘 10 次、记账 / 映射 / 树表各两盘 6 次、
-/// 记录两盘 2 次、根槽 1 次、系统配置槽轮换 2 次），暖机第一次空发布的第一个单元写是第 2 + 23 + 1 = 26 次
-/// （这一步一共 46 次写：暖机一次 21 次）。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）之前那棵树只有一个节点，
+/// 记录两盘 2 次、根槽 1 次、系统配置槽轮换 2 次），暖机第一次空发布的第一个单元写是第 4 + 23 + 1 = 28 次
+/// （这一步一共 48 次写：暖机一次 21 次）。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）之前那棵树只有一个节点，
 /// 写行那次 15 次写、这一格摆在第 18 次；照旧摆在第 18 次就落进写行那次、记成「新号一条根都没有」。
-const FIRST_ROW_PUBLISH_WRITE_OF_THE_MOUNT: u64 = 3;
+const FIRST_ROW_PUBLISH_WRITE_OF_THE_MOUNT: u64 = 5;
 
-const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 26;
+const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 28;
 
 /// C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）按用户 2026-09-23 定的那一边（认了，写成已知行为；
 /// D23（journal 的角色与格式） 已定项 16 的射程）断言：取号之后写行或暖机那一次写报块设备错，挂载返回错误，
@@ -985,6 +1077,176 @@ fn write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_confi
             "认下的行为不算新发现，别的也不许有\n{rendered}"
         );
     }
+}
+
+/// 写死的整理历史里强制选的那一段在候选段（0 号盘上装着未释放记录、不是挂载开着的聚簇段，按段起点升序）里的位置，同
+/// `compaction_while_mounted_in_random_histories.rs` 的同名常量：起点之后可写挂载一次，候选是第一个文件的数据单元那一段与
+/// 第一个文件那次发布的提交内生块那一段，取后一段。
+const REGION_SELECTOR_OF_THE_SEGMENT_OF_THE_FIRST_PUBLISH: u64 = 1;
+
+/// 起点（mkfs、取号 1、暖机、第一个文件）之后：可写挂载（取号 2）；挂着时整理第一个文件那次发布的那一段，一批一个、推一批就崩，
+/// 再可写挂载（取号 3 → 写行 → 暖机）。整理的签发与那一批在号 2 下发。
+fn history_whose_compaction_crashes_after_one_batch_then_mounts_writable() -> GeneratedHistory {
+    GeneratedHistory {
+        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::CompactWhileMounted(CompactionChoice {
+                batch_units: 1,
+                region_selector: REGION_SELECTOR_OF_THE_SEGMENT_OF_THE_FIRST_PUBLISH,
+                ending: CompactionRunEnding::CrashesAfterBatchesThenMountsWritable { batches: 1 },
+            }),
+        ],
+    }
+}
+
+/// 不注入跑一遍这段历史，核第 `step_index` 步是一趟发了批、崩掉之后又可写挂载做成的整理，数这一步发出的写里头一次写下实例代号
+/// `acquired_instance` 的根的那次根槽写是这一步的第几次写（1 起）：推批的几次发布写的根带的是这次挂载之前的号，带新号的头一条根是
+/// 批间崩溃之后那次挂载写行那次发布的根，取号那两次系统配置槽写在它之前。`inject_one_fault_into_the_segment` 按「这一段发出的第几次写」摆注入点。
+fn ordinal_of_the_row_publish_root_slot_write_of_the_mount_after_the_compaction_crash(
+    history: &GeneratedHistory,
+    step_index: usize,
+    acquired_instance: InstanceGeneration,
+) -> u64 {
+    let stream = SharedStream::retaining_contents();
+    let mut stream_length_after: BTreeMap<StepPosition, usize> = BTreeMap::new();
+    let run = execute_history_with(
+        history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        &stream,
+        &mut |observation| {
+            stream_length_after.insert(observation.position, stream.operation_count());
+        },
+    );
+    assert_eq!(
+        run.ending,
+        HistoryEnding::Completed,
+        "不注入时这段历史跑完：{:?}",
+        run.outcomes
+    );
+    assert!(
+        matches!(
+            run.outcomes[step_index],
+            StepOutcome::Applied(AppliedEffect::Compacted {
+                batches_published: 1..,
+                crashed_then_mounted: true,
+                ..
+            })
+        ),
+        "前提：第 {step_index} 步整理发了批、崩掉之后可写挂载做成：{:?}",
+        run.outcomes[step_index]
+    );
+    let step_start = match step_index.checked_sub(1) {
+        None => stream_length_after[&StepPosition::StartingPoint],
+        Some(previous) => stream_length_after[&StepPosition::Operation(previous)],
+    };
+    let step_end = stream_length_after[&StepPosition::Operation(step_index)];
+    let geometry = HANDING_EVERY_STEP_IMAGE_OUT.device_width.fixed_geometry();
+    let writes_of_the_step: Vec<_> = stream.retained_operations()[step_start..step_end]
+        .iter()
+        .filter(|retained| retained.operation.kind != RecordedOperationKind::Barrier)
+        .cloned()
+        .collect();
+    let index = writes_of_the_step
+        .iter()
+        .position(|retained| {
+            geometry.classify(&retained.operation) == StepKind::RootRecordFua
+                && root_identity_written_by(
+                    retained
+                        .contents
+                        .as_deref()
+                        .expect("开了内容保留的流，根槽写带着字节"),
+                )
+                .0 == acquired_instance
+        })
+        .unwrap_or_else(|| panic!("第 {step_index} 步没写过带实例代号 {acquired_instance:?} 的根"));
+    u64::try_from(index + 1).expect("一步至多几百次写")
+}
+
+/// C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）落在挂着时整理那一步里（判决 `research/prompts/m4-segment-code-r3-main-verification.md`
+/// 第三节 J5 的后续：故障注入的比重 `broad-compaction` 抽得到整理）：整理推一批、崩掉之后可写挂载一次（取号 3），写行那次发布的根槽写报块设备错，
+/// 挂载返回错误；重开的盘上系统配置的实例代号还是新号 3（这一步之前是 2，整理那几次发布不换号），根环里没有带号 3 的根。
+/// 这一次认成取号之后挂载报错、新号没回卷那一格（`acquired_instances_left`、失败账），不算新发现。
+///
+/// 判别力自证：故障注入把整理那一步当成不取号的操作（`system_configuration_instance_before_a_mount_step` 那一臂交 `None`，
+/// `crates/mutations.tsv` 里那一条），这一格记不上，这里红。
+#[test]
+fn write_error_after_the_acquisition_of_the_mount_after_a_compaction_crash_counts_as_the_acquired_instance_left_and_not_a_new_finding(
+) {
+    const COMPACTION_STEP: usize = 1;
+    let instance_before_the_compaction_step = InstanceGeneration(2);
+    let instance_acquired_after_the_crash = InstanceGeneration(3);
+    let history = history_whose_compaction_crashes_after_one_batch_then_mounts_writable();
+    let call_within_the_step =
+        ordinal_of_the_row_publish_root_slot_write_of_the_mount_after_the_compaction_crash(
+            &history,
+            COMPACTION_STEP,
+            instance_acquired_after_the_crash,
+        );
+    let injection = inject_one_fault_into_the_segment(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        InjectedFault::WriteFails,
+        FaultedSegment::Operation {
+            step_index: COMPACTION_STEP,
+            operation_kind: HistoryOperationKind::CompactWhileMounted,
+        },
+        call_within_the_step,
+    );
+    let rendered = injection.tally.render();
+    print_uncaptured(&format!(
+        "── C378 落在整理那一步：批间崩溃之后的可写挂载、这一步第 {call_within_the_step} 次写报错 ──\n{rendered}"
+    ));
+    // 注入真打在整理那一步的根槽写上，那一步返回了挂载发布的错误：不是别处先停了。
+    assert_eq!(
+        injection.tally.faults_by_injection_point,
+        BTreeMap::from([("CompactWhileMounted/root_record_fua".to_string(), 1)]),
+        "注入点\n{rendered}"
+    );
+    assert_eq!(
+        injection
+            .tally
+            .faults_by_outcome
+            .get(FaultOutcome::SurfacedAsAnError.name())
+            .copied(),
+        Some(1),
+        "整理那一步返回了错误\n{rendered}"
+    );
+    assert!(
+        injection.tally.refusal_members.values().sum::<u64>() == 1
+            && injection
+                .tally
+                .refusal_members
+                .keys()
+                .all(|member| member.starts_with("MountError::Publish(")),
+        "返回的是挂载里发布那一步的错误成员，恰好一次\n{rendered}"
+    );
+    assert_eq!(
+        injection.acquired_instances_left,
+        vec![AcquiredInstanceLeft {
+            drawn: injection.drawn_faults[0],
+            kind: AcquiredInstanceLeftAfterAFailedMount::WithoutAnyRoot,
+            system_configuration_instance_before_the_step: instance_before_the_compaction_step,
+            system_configuration_instance_after_the_reopen: instance_acquired_after_the_crash,
+            highest_root_instance_after_the_reopen: Some(instance_before_the_compaction_step),
+        }],
+        "取号之后写行那次的根槽写报错：重开的盘上系统配置还是新号 3、根环里最大的号是 2，记进这一格\n{rendered}"
+    );
+    assert_eq!(
+        injection.tally.acquired_instances_left_after_a_failed_mount,
+        BTreeMap::from([(
+            AcquiredInstanceLeftAfterAFailedMount::WithoutAnyRoot.name(),
+            1
+        )]),
+        "失败账记下这一次\n{rendered}"
+    );
+    assert_eq!(injection.tally.faults_that_panicked, 0, "{rendered}");
+    assert!(
+        injection.new_findings.is_empty(),
+        "认下的行为不算新发现，别的也不许有：{:?}\n{rendered}",
+        injection.new_findings
+    );
 }
 
 /// 按注入点认说谎的设备留下的那两格（主 agent 2026-09-26 定，实七；实四丙交回 ③ offset 339 与 ④ offset 284 那两形）：

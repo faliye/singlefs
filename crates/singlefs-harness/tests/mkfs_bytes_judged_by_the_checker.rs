@@ -412,7 +412,8 @@ fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes(
             RecordedOperationKind::Write
             | RecordedOperationKind::WriteForceUnitAccess
             | RecordedOperationKind::WriteZeroes => operation.length,
-            RecordedOperationKind::Barrier => 0,
+            // discard 一个字节都不写。
+            RecordedOperationKind::Discard | RecordedOperationKind::Barrier => 0,
         })
         .sum();
     assert_eq!(

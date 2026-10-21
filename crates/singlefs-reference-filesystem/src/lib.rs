@@ -15,6 +15,8 @@
 //! 只管串行提交；任意子集的丢法不做（r5 判决第四节第 8 条：串行提交下出局）。自动触发的攒批发布落地之前只接显式发布点（r6 判决第二节 U2 一行）。
 #![forbid(unsafe_code)]
 
+use std::collections::BTreeMap;
+
 /// 一个文件的全部字节。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileContent(pub Vec<u8>);
@@ -25,6 +27,15 @@ pub enum VisibleState {
     NoFile,
     OneFile(FileContent),
 }
+
+/// 一个只读快照的名字：调用方按实现点名它的那个号交入（实现按码 14 条目的树号点名，判决
+/// `research/prompts/m4-snapshot-r1-main-verification.md` 第七节岔路 5）。这个包不解释它，只拿它当键。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SnapshotName(pub u64);
+
+/// 活着的只读快照：每个快照名对应建它那一刻 POSIX 面上看得见的状态（判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+/// 第三节 S7「RefFS 加 CreateSnapshot、DestroySnapshot、读快照，状态加快照集合」）。
+pub type Snapshots = BTreeMap<SnapshotName, VisibleState>;
 
 /// 第一版的操作。崩溃不在这里，它是 [`ReferenceFileSystem::crash_and_recover`]。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,6 +49,14 @@ pub enum Operation {
     /// 回退到第 m 版的内容；m 由调用方按实现报的回退根在「根 → 版本」表里查出来，选得对不对这里不判。
     /// 回退是挂着时的一次向前发布：返回成功时抬起下界 lo，它的下标是发布末尾，它之后的内容是一个新版本。
     RollBackToVersion(VersionNumber),
+    /// 建一个只读快照，名字是 `SnapshotName`：捕获这一刻的状态。它是一次独立发布（判决 S2），返回成功时抬起下界 lo。
+    CreateSnapshot(SnapshotName),
+    /// 删一个只读快照（一次调用 = 意图 + 全部批，判决第七节岔路 2、4）：返回成功时它不在了，抬起下界 lo。POSIX 面上的文件不变。
+    DestroySnapshot(SnapshotName),
+    /// 把文件截到这么多字节（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8）：比现在短就截掉尾部，比现在长就补 0。
+    /// 内容改动型（同 [`Operation::OverwriteTheFile`]），不是发布点：实现的意图与各批落在一次调用里，崩在里面读出的只有截前、截后两样（K2「先落目标」），
+    /// 就是这个操作施加之前与之后的状态，不用另起一类「一个操作的中间内容」。
+    Truncate(u64),
 }
 
 /// 调用方交入的结局。
@@ -88,11 +107,29 @@ pub enum OperationNotAccepted {
     CreatingTheFirstFileWhileAFileExistsIsNotInTheFirstVersion,
     /// 还没有文件时覆盖写：条款没写它在 POSIX 面上是什么，第一版不支持。
     OverwritingWithoutAFileIsNotInTheFirstVersion,
+    /// 还没有文件时截断：实现在任何写之前拒（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1「对 nlink = 0 或不在树里的 inode
+    /// 截断，在任何写之前拒」），调用方交的是「写之前拒」、走不到这里；走到了就是输入不合法。
+    TruncatingWithoutAFileIsNotInTheFirstVersion,
     /// 回退目标 m 不是 1 到「到这一步为止的版本数」之间的数。
     RollBackTargetIsNotAVersion {
         requested: VersionNumber,
         versions_so_far: usize,
     },
+    /// 建快照用了一个已经活着的快照名（允许的每一个快照集合里它都活着）。
+    SnapshotNameAlreadyTaken { name: SnapshotName },
+    /// 删一个不活着的快照（允许的每一个快照集合里它都不在）。
+    NoSnapshotWithThisName { name: SnapshotName },
+    /// 有活快照时回退：第一版有快照就拒回退（用户 2026-10-13 定，判决第三节 S8 与第七节岔路 3）；允许的每一个快照集合都不空。
+    RollBackWithSnapshotsIsNotInTheFirstVersion,
+}
+
+/// 读快照读出的内容不是允许的任何一个快照集合里那个快照的内容：判红；返回它时模型一个字段都没动。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SnapshotReadOutsideTheAllowedReads {
+    pub name: SnapshotName,
+    pub read_out: VisibleState,
+    /// 允许的每一个快照集合里这个快照读出什么（`None` = 那个集合里没有它），去重。
+    pub allowed_reads: Vec<Option<VisibleState>>,
 }
 
 /// 允许集合里的一个状态与它的下标。
@@ -139,6 +176,32 @@ pub enum CrashNotAccepted {
     },
 }
 
+/// 抛弃最新根的那次恢复，被抛弃的那条根与 RefFS 最新那一版（[`ReferenceFileSystem::newest_version`]）是什么关系：调用方按它攒的
+/// 「根 → 版本」表交入（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1，用户 2026-10-16 定「乙：翻译交进来」）。
+/// RefFS 只收操作序列与读出的内容，自己看不出被抛弃的是哪一条根：实现的一版常有几条根（可写挂载的写行与暖机、整理的各批、
+/// 为空间推的抬 F、卸载都映到写它时的现行版本；删快照一次调用写意图与全部批）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AbandonedRoot {
+    /// 被抛弃的是写出最新那一版的那一条根（发布调用、fsync、回退、建快照的根，删快照的最后一批）：恢复落到它前一条根，
+    /// 在之前那一版上。
+    WroteTheNewestVersion,
+    /// 被抛弃的是映到最新那一版、但不是写出它的那一条根（这一版写出之后的写行与暖机、整理的批、抬 F、卸载，恢复重新起头之后写的根）：
+    /// 恢复落到的前一条根仍在这一版上。
+    WrittenAfterTheNewestVersion,
+}
+
+/// 抛弃最新根的那次恢复判不了；返回它时模型一个字段都没动。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AbandonedRootRestartNotAccepted {
+    /// 允许集合判不了：只会是 hi 越界、或写了之后报错的操作后面到崩溃为止又起了操作两种（同
+    /// [`ReferenceFileSystem::allowed_set_for_a_crash_in`]）；读出的内容这一步不判，不会是判红那一种。
+    TheCrashIsNotAccepted(CrashNotAccepted),
+    /// 调用方说被抛弃的根写出了最新那一版，而允许集合里有 S_0（上一次恢复之后没有已确认的发布）：S_0 是上一次恢复读出、
+    /// 重新起头的那一版（还没崩溃过时是起点），它之前那一版在上一次恢复之前（还没崩溃过时没有），RefFS 不记那时的快照集合。
+    /// 判决第三节 J1 没写这一支取什么，第一版不支持。
+    TheRootThatWroteTheStateAtTheLastRecoveryIsNotInTheFirstVersion,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EnteredOutcome {
     Succeeded,
@@ -151,6 +214,8 @@ enum EnteredKind {
     ExplicitPublish,
     Fsync,
     RollBack,
+    CreateSnapshot,
+    DestroySnapshot,
 }
 
 impl EnteredKind {
@@ -162,7 +227,88 @@ impl EnteredKind {
             EnteredKind::ExplicitPublish | EnteredKind::Fsync => true,
             // 回退是挂着时的一次向前发布：D23（journal 的角色与格式） .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
             EnteredKind::RollBack => true,
+            // 建快照是一次独立发布（判决 S2）；删快照一次调用发意图与全部批，返回成功时最后一批已落盘（判决第七节岔路 2、4）。
+            EnteredKind::CreateSnapshot | EnteredKind::DestroySnapshot => true,
             EnteredKind::ContentChange => false,
+        }
+    }
+
+    /// 这个操作写出一版时，最后一条根之前写的那几条根上它的快照改动是不是已经起了头：删快照一次调用写意图与全部批，
+    /// 抛弃最后一批的那次恢复落到意图或不是最后一批的批上，快照带销毁中记号、读照读，下一次用户改动先走空把它删完，
+    /// 前后两份快照集合都可能（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1「删快照这种一个操作写多条根的取前后两份」）。
+    /// 别的发布最后一条之前的根是会话推的抬 F，快照集合还是之前那一版的。
+    fn its_earlier_roots_may_carry_its_snapshot_change(self) -> bool {
+        match self {
+            EnteredKind::DestroySnapshot => true,
+            EnteredKind::ContentChange
+            | EnteredKind::ExplicitPublish
+            | EnteredKind::Fsync
+            | EnteredKind::RollBack
+            | EnteredKind::CreateSnapshot => false,
+        }
+    }
+}
+
+/// 一个操作怎么改快照集合。不按「之后的快照集合」记：恢复之后允许的快照集合可以不止一个（判决
+/// `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F6），同一个操作在每一个上各施加一次。
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SnapshotChangeOfTheOperation {
+    Unchanged,
+    Created {
+        name: SnapshotName,
+        captured: VisibleState,
+    },
+    Destroyed {
+        name: SnapshotName,
+    },
+}
+
+impl SnapshotChangeOfTheOperation {
+    fn apply_to(&self, snapshots: &mut Snapshots) {
+        match self {
+            SnapshotChangeOfTheOperation::Unchanged => {}
+            SnapshotChangeOfTheOperation::Created { name, captured } => {
+                snapshots.insert(*name, captured.clone());
+            }
+            SnapshotChangeOfTheOperation::Destroyed { name } => {
+                snapshots.remove(name);
+            }
+        }
+    }
+}
+
+/// 实现做了这个操作（进了序列）说明它那一刻的快照集合满足什么：实现在任何写之前拒掉不满足的，拒掉的不进序列。
+/// 允许的快照集合里不满足的那几个由此排除（同一段历史里实现只有一个快照集合）。不看快照集合的操作没有这一样。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SnapshotPreconditionOfTheOperation {
+    NameFree(SnapshotName),
+    SnapshotPresent(SnapshotName),
+    NoSnapshotAtAll,
+}
+
+impl SnapshotPreconditionOfTheOperation {
+    fn holds_in(self, snapshots: &Snapshots) -> bool {
+        match self {
+            SnapshotPreconditionOfTheOperation::NameFree(name) => !snapshots.contains_key(&name),
+            SnapshotPreconditionOfTheOperation::SnapshotPresent(name) => {
+                snapshots.contains_key(&name)
+            }
+            SnapshotPreconditionOfTheOperation::NoSnapshotAtAll => snapshots.is_empty(),
+        }
+    }
+
+    /// 允许的快照集合一个都不满足时不收这个操作的那一条。
+    fn refusal_when_no_allowed_snapshot_set_meets_it(self) -> OperationNotAccepted {
+        match self {
+            SnapshotPreconditionOfTheOperation::NameFree(name) => {
+                OperationNotAccepted::SnapshotNameAlreadyTaken { name }
+            }
+            SnapshotPreconditionOfTheOperation::SnapshotPresent(name) => {
+                OperationNotAccepted::NoSnapshotWithThisName { name }
+            }
+            SnapshotPreconditionOfTheOperation::NoSnapshotAtAll => {
+                OperationNotAccepted::RollBackWithSnapshotsIsNotInTheFirstVersion
+            }
         }
     }
 }
@@ -172,6 +318,14 @@ struct EnteredOperation {
     kind: EnteredKind,
     outcome: EnteredOutcome,
     state_after: VisibleState,
+    snapshot_change: SnapshotChangeOfTheOperation,
+}
+
+/// 往允许的快照集合里加一个，已经有相同的就不加（集合按内容去重）。
+fn push_distinct_snapshot_set(snapshot_sets: &mut Vec<Snapshots>, snapshots: Snapshots) {
+    if !snapshot_sets.contains(&snapshots) {
+        snapshot_sets.push(snapshots);
+    }
 }
 
 /// 序列里已确认的发布（返回成功的发布调用、fsync 与回退，原样重发成功的也算）各自发布之后的内容，按历史次序。
@@ -261,6 +415,11 @@ pub struct ReferenceFileSystem {
     operations_since_the_last_recovery: Vec<EnteredOperation>,
     /// 上一次恢复为止的版本，按历史次序：起点、之前各轮里已确认的发布之后的内容、各次恢复读出的那一份；第 m 版在位置 m − 1。
     versions_up_to_the_last_recovery: Vec<VisibleState>,
+    /// S_0 那一刻允许活着的快照集合，去重、至少一个：还没崩溃过时只有「没有快照」；恢复之后是允许集合里与读出的内容相同的每一个状态那一刻的
+    /// 快照集合（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F6），抛弃最新根的那次恢复之后按调用方交的
+    /// [`AbandonedRoot`] 取（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1），再排除之后实现做了的操作说不通的那几个。
+    /// 序列里每个操作在每一个上各施加一次（[`SnapshotChangeOfTheOperation`]），第 k 个下标与 S_0 那一刻的第 k 个一一对应。
+    allowed_snapshot_sets_at_the_last_recovery: Vec<Snapshots>,
 }
 
 impl ReferenceFileSystem {
@@ -270,7 +429,77 @@ impl ReferenceFileSystem {
             operations_since_the_last_recovery: Vec::new(),
             // 起点是第 1 版：mkfs 写的根与 mkfs 之后可写挂载写的根映到它（r6 用户定案 H1-收严「m 的编号覆盖每一个写根的入口」）
             versions_up_to_the_last_recovery: vec![VisibleState::NoFile],
+            allowed_snapshot_sets_at_the_last_recovery: vec![Snapshots::new()],
         }
+    }
+
+    /// S_j 那一刻的快照集合，与 S_0 那一刻允许的快照集合逐个对应（不去重）：每一个施加序列里前 j 个操作。
+    fn snapshot_set_of_each_allowed_start_at(&self, index: StateIndex) -> Vec<Snapshots> {
+        let operations = &self.operations_since_the_last_recovery[..index.0];
+        self.allowed_snapshot_sets_at_the_last_recovery
+            .iter()
+            .map(|snapshots_at_the_last_recovery| {
+                let mut snapshots = snapshots_at_the_last_recovery.clone();
+                for operation in operations {
+                    operation.snapshot_change.apply_to(&mut snapshots);
+                }
+                snapshots
+            })
+            .collect()
+    }
+
+    /// 序列里的操作全都做成时允许活着的快照集合，去重：恢复之后读出的文件定不了落在哪一个发布末尾时不止一个（判决第三节 F6）。
+    pub fn allowed_snapshot_sets(&self) -> Vec<Snapshots> {
+        let mut allowed = Vec::new();
+        for snapshots in self.snapshot_set_of_each_allowed_start_at(StateIndex(
+            self.operations_since_the_last_recovery.len(),
+        )) {
+            push_distinct_snapshot_set(&mut allowed, snapshots);
+        }
+        allowed
+    }
+
+    /// 读快照 `name` 允许读出什么（序列里的操作全都做成时）：允许的每一个快照集合里它活着时是建它那一刻的状态，不活着是 `None`；去重。
+    pub fn allowed_reads_of_the_snapshot(&self, name: SnapshotName) -> Vec<Option<VisibleState>> {
+        let mut allowed_reads = Vec::new();
+        for snapshots in self.allowed_snapshot_sets() {
+            let read = snapshots.get(&name).cloned();
+            if !allowed_reads.contains(&read) {
+                allowed_reads.push(read);
+            }
+        }
+        allowed_reads
+    }
+
+    /// 实现读快照 `name` 读出 `read_out`（序列里的操作全都做成时）：它要是允许的某一个快照集合里那个快照的内容；
+    /// 是的话只留下读得出它的那几个快照集合（实现只有一个快照集合，读出的内容说明是哪几个）。
+    ///
+    /// # Errors
+    /// 允许的快照集合里没有一个读得出它：判红，模型不动。
+    pub fn judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+        &mut self,
+        name: SnapshotName,
+        read_out: &VisibleState,
+    ) -> Result<(), SnapshotReadOutsideTheAllowedReads> {
+        let current = self.snapshot_set_of_each_allowed_start_at(StateIndex(
+            self.operations_since_the_last_recovery.len(),
+        ));
+        let kept: Vec<Snapshots> = self
+            .allowed_snapshot_sets_at_the_last_recovery
+            .iter()
+            .zip(&current)
+            .filter(|(_, snapshots)| snapshots.get(&name) == Some(read_out))
+            .map(|(snapshots_at_the_last_recovery, _)| snapshots_at_the_last_recovery.clone())
+            .collect();
+        if kept.is_empty() {
+            return Err(SnapshotReadOutsideTheAllowedReads {
+                name,
+                read_out: read_out.clone(),
+                allowed_reads: self.allowed_reads_of_the_snapshot(name),
+            });
+        }
+        self.allowed_snapshot_sets_at_the_last_recovery = kept;
+        Ok(())
     }
 
     /// 到这一刻为止的版本，按历史次序（第 m 版在位置 m − 1）。
@@ -345,27 +574,122 @@ impl ReferenceFileSystem {
             // 写了之后报错＝两可：D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
             OperationOutcome::FailedAfterWriting => EnteredOutcome::FailedAfterWriting,
         };
+        // 实现做了这个操作说明它那一刻的快照集合满足什么（[`SnapshotPreconditionOfTheOperation`]）：允许的快照集合里不满足的排除，
+        // 一个都不满足就不收。回退先判快照、再判目标版本（两样都不收时报快照那一条）。
+        let snapshot_precondition = match &operation {
+            Operation::CreateTheFirstFile(_)
+            | Operation::OverwriteTheFile(_)
+            | Operation::ExplicitPublish
+            | Operation::Fsync
+            | Operation::Truncate(_) => None,
+            // 第一版有快照就拒回退（判决 S8）：实现在任何写之前拒，调用方交的是「写之前拒」，走不到这里；允许的快照集合都不空时走到了就是输入不合法。
+            Operation::RollBackToVersion(_) => {
+                Some(SnapshotPreconditionOfTheOperation::NoSnapshotAtAll)
+            }
+            Operation::CreateSnapshot(name) => {
+                Some(SnapshotPreconditionOfTheOperation::NameFree(*name))
+            }
+            Operation::DestroySnapshot(name) => {
+                Some(SnapshotPreconditionOfTheOperation::SnapshotPresent(*name))
+            }
+        };
+        let allowed_snapshot_sets_at_the_last_recovery = match snapshot_precondition {
+            None => self.allowed_snapshot_sets_at_the_last_recovery.clone(),
+            Some(precondition) => {
+                let current = self.snapshot_set_of_each_allowed_start_at(StateIndex(
+                    self.operations_since_the_last_recovery.len(),
+                ));
+                let kept: Vec<Snapshots> = self
+                    .allowed_snapshot_sets_at_the_last_recovery
+                    .iter()
+                    .zip(&current)
+                    .filter(|(_, snapshots)| precondition.holds_in(snapshots))
+                    .map(|(snapshots_at_the_last_recovery, _)| {
+                        snapshots_at_the_last_recovery.clone()
+                    })
+                    .collect();
+                if kept.is_empty() {
+                    return Err(precondition.refusal_when_no_allowed_snapshot_set_meets_it());
+                }
+                kept
+            }
+        };
         let state_so_far = self.state_after_every_operation_so_far();
-        let (kind, state_after) = match operation {
+        let (kind, state_after, snapshot_change) = match operation {
             Operation::CreateTheFirstFile(content) => match state_so_far {
-                VisibleState::NoFile => (EnteredKind::ContentChange, VisibleState::OneFile(content)),
+                VisibleState::NoFile => (
+                    EnteredKind::ContentChange,
+                    VisibleState::OneFile(content),
+                    SnapshotChangeOfTheOperation::Unchanged,
+                ),
                 VisibleState::OneFile(_) => return Err(OperationNotAccepted::CreatingTheFirstFileWhileAFileExistsIsNotInTheFirstVersion),
             },
             Operation::OverwriteTheFile(content) => match state_so_far {
                 VisibleState::NoFile => return Err(OperationNotAccepted::OverwritingWithoutAFileIsNotInTheFirstVersion),
-                VisibleState::OneFile(_) => (EnteredKind::ContentChange, VisibleState::OneFile(content)),
+                VisibleState::OneFile(_) => (
+                    EnteredKind::ContentChange,
+                    VisibleState::OneFile(content),
+                    SnapshotChangeOfTheOperation::Unchanged,
+                ),
             },
-            Operation::ExplicitPublish => (EnteredKind::ExplicitPublish, state_so_far.clone()),
-            Operation::Fsync => (EnteredKind::Fsync, state_so_far.clone()),
-            Operation::RollBackToVersion(number) => {
-                (EnteredKind::RollBack, self.content_of_version(number)?)
-            }
+            // 截短或补 0（K8）：POSIX 面上洞与写过的 0 分不出来，内容就是整份字节。
+            Operation::Truncate(new_size_in_bytes) => match state_so_far {
+                VisibleState::NoFile => {
+                    return Err(OperationNotAccepted::TruncatingWithoutAFileIsNotInTheFirstVersion)
+                }
+                VisibleState::OneFile(FileContent(bytes)) => {
+                    let mut truncated = bytes.clone();
+                    truncated.resize(
+                        usize::try_from(new_size_in_bytes)
+                            .expect("64 位上 usize 与 u64 同宽：截到的长度装得进"),
+                        0,
+                    );
+                    (
+                        EnteredKind::ContentChange,
+                        VisibleState::OneFile(FileContent(truncated)),
+                        SnapshotChangeOfTheOperation::Unchanged,
+                    )
+                }
+            },
+            Operation::ExplicitPublish => (
+                EnteredKind::ExplicitPublish,
+                state_so_far.clone(),
+                SnapshotChangeOfTheOperation::Unchanged,
+            ),
+            Operation::Fsync => (
+                EnteredKind::Fsync,
+                state_so_far.clone(),
+                SnapshotChangeOfTheOperation::Unchanged,
+            ),
+            Operation::RollBackToVersion(number) => (
+                EnteredKind::RollBack,
+                self.content_of_version(number)?,
+                SnapshotChangeOfTheOperation::Unchanged,
+            ),
+            // 文件集合为空时建快照照收，快照读出「没有文件」（用户 2026-10-16 定「放开」，判决
+            // `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）。
+            Operation::CreateSnapshot(name) => (
+                EnteredKind::CreateSnapshot,
+                state_so_far.clone(),
+                SnapshotChangeOfTheOperation::Created {
+                    name,
+                    captured: state_so_far.clone(),
+                },
+            ),
+            Operation::DestroySnapshot(name) => (
+                EnteredKind::DestroySnapshot,
+                state_so_far.clone(),
+                SnapshotChangeOfTheOperation::Destroyed { name },
+            ),
         };
+        self.allowed_snapshot_sets_at_the_last_recovery =
+            allowed_snapshot_sets_at_the_last_recovery;
         self.operations_since_the_last_recovery
             .push(EnteredOperation {
                 kind,
                 outcome: entered_outcome,
                 state_after,
+                snapshot_change,
             });
         Ok(SubmittedOperation::Entered(OperationNumber(
             self.operations_since_the_last_recovery.len(),
@@ -428,30 +752,138 @@ impl ReferenceFileSystem {
                 recovered,
             });
         }
-        self.restart_from_the_recovered_state(crash_falls_in, recovered);
+        // 恢复之后允许活着的快照集合：允许集合里与读出的内容相同的每一个状态那一刻的快照集合（判决
+        // `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F6）。崩溃判定只比文件；建快照与删快照都是发布末尾，
+        // 写了之后报错或崩在里面的那一次落没落盘读出的文件定不了，两种结局都收，不取下标最大的那一个。
+        let indices_whose_state_is_the_recovered_one: Vec<StateIndex> = allowed
+            .allowed
+            .iter()
+            .filter(|allowed_state| allowed_state.state == recovered)
+            .map(|allowed_state| allowed_state.index)
+            .collect();
+        let allowed_snapshot_sets_after_the_recovery =
+            self.distinct_snapshot_sets_at(&indices_whose_state_is_the_recovered_one);
+        self.restart_from_the_recovered_state(
+            crash_falls_in,
+            recovered,
+            allowed_snapshot_sets_after_the_recovery,
+        );
         Ok(allowed)
     }
 
     /// 崩溃恢复抛弃最新根的那一次（恢复时有读故障）：不判读出的内容，以它重新起头（r6 判决第二节 U2 一行：
-    /// 「崩溃恢复抛弃最新根的那一次，RefFS 以读出内容重新起头、不判那一步」）。
+    /// 「崩溃恢复抛弃最新根的那一次，RefFS 以读出内容重新起头、不判那一步」）。重新起头时允许活着的快照集合按调用方交的
+    /// [`AbandonedRoot`] 取（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1）：允许集合里每一个状态 S_j
+    /// 都可能是最新那一版，各取一份、并起来——被抛弃的是写出这一版的那一条，取之前那一版的（写出它的是删快照这种一个操作写多条根的，
+    /// 前后两份都取）；不是写出这一版的那一条，取 S_j 自己那一刻的。
     ///
     /// # Errors
-    /// hi 越界、或写了之后报错的操作后面到崩溃为止又起了操作（同 [`Self::allowed_set_for_a_crash_in`]），返回时模型不动。
+    /// [`AbandonedRootRestartNotAccepted`] 的两种，返回时模型不动。
     pub fn restart_after_a_recovery_that_abandoned_the_newest_root(
         &mut self,
         crash_falls_in: OperationNumber,
+        abandoned_root: AbandonedRoot,
         recovered: VisibleState,
-    ) -> Result<(), CrashNotAccepted> {
+    ) -> Result<(), AbandonedRootRestartNotAccepted> {
         // 只核 hi 判不判得了；读出的内容在不在允许集合里不判
-        self.allowed_set_for_a_crash_in(crash_falls_in)?;
-        self.restart_from_the_recovered_state(crash_falls_in, recovered);
+        let allowed = self
+            .allowed_set_for_a_crash_in(crash_falls_in)
+            .map_err(AbandonedRootRestartNotAccepted::TheCrashIsNotAccepted)?;
+        let mut indices_whose_snapshot_sets_the_restart_allows: Vec<StateIndex> = Vec::new();
+        for allowed_state in &allowed.allowed {
+            let indices_when_this_state_is_the_newest_version = self
+                .indices_whose_snapshot_sets_a_restart_allows_when_the_newest_version_is(
+                    allowed_state.index,
+                    abandoned_root,
+                )?;
+            indices_whose_snapshot_sets_the_restart_allows
+                .extend(indices_when_this_state_is_the_newest_version);
+        }
+        let allowed_snapshot_sets_after_the_recovery =
+            self.distinct_snapshot_sets_at(&indices_whose_snapshot_sets_the_restart_allows);
+        self.restart_from_the_recovered_state(
+            crash_falls_in,
+            recovered,
+            allowed_snapshot_sets_after_the_recovery,
+        );
         Ok(())
+    }
+
+    /// S_j（`newest_state`）是最新那一版、被抛弃的根与它的关系是 `abandoned_root` 时，抛弃最新根的那次恢复之后允许哪几个下标那一刻的快照集合
+    /// （判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1）。
+    ///
+    /// # Errors
+    /// 被抛弃的根写出了 S_0 那一版：[`AbandonedRootRestartNotAccepted::TheRootThatWroteTheStateAtTheLastRecoveryIsNotInTheFirstVersion`]。
+    fn indices_whose_snapshot_sets_a_restart_allows_when_the_newest_version_is(
+        &self,
+        newest_state: StateIndex,
+        abandoned_root: AbandonedRoot,
+    ) -> Result<Vec<StateIndex>, AbandonedRootRestartNotAccepted> {
+        match abandoned_root {
+            // 恢复落到的前一条根仍在这一版上
+            AbandonedRoot::WrittenAfterTheNewestVersion => Ok(vec![newest_state]),
+            AbandonedRoot::WroteTheNewestVersion => {
+                // S_j 由第 j 个操作写出（j 是 lo 或某次发布的末尾）；j = 0 时它是上一次恢复重新起头的那一版，之前那一版 RefFS 不记
+                let Some(position_of_the_operation_that_wrote_it) = newest_state.0.checked_sub(1)
+                else {
+                    return Err(AbandonedRootRestartNotAccepted::TheRootThatWroteTheStateAtTheLastRecoveryIsNotInTheFirstVersion);
+                };
+                let index_of_the_version_before = self
+                    .index_of_the_last_confirmed_publish_before_the_operation_at(
+                        position_of_the_operation_that_wrote_it,
+                    );
+                let operation_that_wrote_it = self
+                    .operations_since_the_last_recovery
+                    .get(position_of_the_operation_that_wrote_it)
+                    .expect("允许集合里 S_0 之后的下标都是某个操作的末尾，不超过序列长度");
+                if operation_that_wrote_it
+                    .kind
+                    .its_earlier_roots_may_carry_its_snapshot_change()
+                {
+                    Ok(vec![index_of_the_version_before, newest_state])
+                } else {
+                    Ok(vec![index_of_the_version_before])
+                }
+            }
+        }
+    }
+
+    /// 第 `position_of_the_operation` + 1 个操作之前那一版的下标：上一次恢复之后、它之前最后一次已确认发布（返回成功的发布调用、fsync、
+    /// 回退、建快照、删快照）的末尾；没有时是 0（上一次恢复读出、重新起头的那一版，还没崩溃过时是起点）。它之前的操作都返回过，
+    /// 写了之后报错的只能是 hi 之前的最后一个（[`Self::allowed_set_for_a_crash_in`] 拒掉别的），所以它之前的发布末尾都已确认。
+    fn index_of_the_last_confirmed_publish_before_the_operation_at(
+        &self,
+        position_of_the_operation: usize,
+    ) -> StateIndex {
+        self.operations_since_the_last_recovery[..position_of_the_operation]
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, operation)| match operation.outcome {
+                EnteredOutcome::Succeeded => operation.kind.ends_a_publish(),
+                EnteredOutcome::FailedAfterWriting => false,
+            })
+            .map_or(StateIndex(0), |(earlier_position, _)| {
+                StateIndex(earlier_position + 1)
+            })
+    }
+
+    /// 这几个下标那一刻允许活着的快照集合，并起来、去重。
+    fn distinct_snapshot_sets_at(&self, indices: &[StateIndex]) -> Vec<Snapshots> {
+        let mut distinct_snapshot_sets = Vec::new();
+        for index in indices {
+            for snapshots in self.snapshot_set_of_each_allowed_start_at(*index) {
+                push_distinct_snapshot_set(&mut distinct_snapshot_sets, snapshots);
+            }
+        }
+        distinct_snapshot_sets
     }
 
     fn restart_from_the_recovered_state(
         &mut self,
         crash_falls_in: OperationNumber,
         recovered: VisibleState,
+        allowed_snapshot_sets_after_the_recovery: Vec<Snapshots>,
     ) {
         // 前 hi − 1 个返回过；第 hi 个没返回，它是发布也不算已确认；第 hi 个之后的没发生。
         let returned_before_the_crash =
@@ -465,6 +897,7 @@ impl ReferenceFileSystem {
             .push(recovered.clone());
         // 每次恢复之后以读出的内容为起点接着走（r5 判决第二节 U2 ②）
         self.state_at_the_last_recovery = recovered;
+        self.allowed_snapshot_sets_at_the_last_recovery = allowed_snapshot_sets_after_the_recovery;
         self.operations_since_the_last_recovery.clear();
     }
 }
@@ -506,6 +939,236 @@ mod tests {
             .iter()
             .map(|allowed_state| allowed_state.index.0)
             .collect()
+    }
+
+    /// 建快照捕获那一刻的文件，之后覆盖写不动它；读快照读出建它那一刻的内容；删掉之后读不到，活头的文件不变
+    /// （判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S7）。
+    #[test]
+    fn a_snapshot_reads_the_file_at_its_creation_until_it_is_destroyed() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(65_549)));
+        succeed(&mut model, Operation::OverwriteTheFile(content("B")));
+        assert_eq!(
+            model.allowed_reads_of_the_snapshot(SnapshotName(65_549)),
+            vec![Some(file_with("A"))],
+            "快照读出建它那一刻的 A"
+        );
+        succeed(&mut model, Operation::DestroySnapshot(SnapshotName(65_549)));
+        assert_eq!(
+            model.allowed_reads_of_the_snapshot(SnapshotName(65_549)),
+            vec![None],
+            "删掉之后读不到"
+        );
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![Snapshots::new()],
+            "快照集合空了"
+        );
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &file_with("B"),
+            "删快照不动活头的文件"
+        );
+    }
+
+    /// 建快照、删快照各是发布末尾（返回成功时抬起下界）：崩在建快照之后，允许集合的下界就是它；恢复读出那一刻的文件，快照接着活着。
+    #[test]
+    fn a_crash_after_a_snapshot_returned_keeps_the_snapshot_and_starts_from_it() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        let creation = succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
+        succeed(&mut model, Operation::OverwriteTheFile(content("B")));
+        let crash = model.crash_after_every_operation_returned();
+        let allowed = model
+            .crash_and_recover(crash, file_with("A"))
+            .expect("A 在允许集合里");
+        assert_eq!(
+            allowed.lower_bound,
+            creation.state_after(),
+            "建快照返回成功：下界是它的末尾"
+        );
+        assert_eq!(
+            model.allowed_reads_of_the_snapshot(SnapshotName(7)),
+            vec![Some(file_with("A"))],
+            "恢复之后快照接着活着"
+        );
+    }
+
+    /// 文件集合为空时建快照照收（用户 2026-10-16 定「放开」，判决 `research/prompts/m4-segment-code-r1-main-verification.md`
+    /// 第三节 F5）：空池上建快照，之后写第一个文件，读快照读出「没有文件」，活头读出写的那份。
+    #[test]
+    fn a_snapshot_created_while_there_is_no_file_reads_no_file_after_the_first_file_is_written() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(3)));
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        assert_eq!(
+            model.allowed_reads_of_the_snapshot(SnapshotName(3)),
+            vec![Some(VisibleState::NoFile)],
+            "快照读出建它那一刻的「没有文件」"
+        );
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &file_with("A"),
+            "活头读出写的 A"
+        );
+    }
+
+    /// 建快照写了之后报错（做没做成两可），之后崩溃、恢复读出 A：建快照之前与之后两个发布末尾都是 A，读出的文件定不了那次发布落没落盘，
+    /// 快照有与没有两种结局都收（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F6）——之后删这个快照照收（落了盘），
+    /// 回退也照收（没落盘：第一版有快照就拒回退，只有快照集合可以是空的才收）。
+    #[test]
+    fn a_crash_after_a_snapshot_creation_that_failed_after_writing_allows_the_snapshot_to_be_there_or_not(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::Fsync);
+        enter(
+            &mut model,
+            Operation::CreateSnapshot(SnapshotName(7)),
+            OperationOutcome::FailedAfterWriting,
+        );
+        let crash = model.crash_after_every_operation_returned();
+        model
+            .crash_and_recover(crash, file_with("A"))
+            .expect("A 在允许集合里");
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![
+                Snapshots::new(),
+                Snapshots::from([(SnapshotName(7), file_with("A"))])
+            ],
+            "快照没有与有两种快照集合都允许"
+        );
+        let mut the_creation_landed = model.clone();
+        succeed(
+            &mut the_creation_landed,
+            Operation::DestroySnapshot(SnapshotName(7)),
+        );
+        let mut the_creation_did_not_land = model.clone();
+        let rollback_target = the_creation_did_not_land.newest_version();
+        succeed(
+            &mut the_creation_did_not_land,
+            Operation::RollBackToVersion(rollback_target),
+        );
+        assert_eq!(
+            the_creation_did_not_land.allowed_snapshot_sets(),
+            vec![Snapshots::new()],
+            "回退做成说明快照没落盘：只剩空的那个快照集合"
+        );
+    }
+
+    /// 删快照写了之后报错（意图落了、批没落完，两可），之后崩溃、恢复读出 A：快照还在与已删两种结局都收（判决第三节 F6）——
+    /// 读快照读出建它那一刻的 A 照收、读出别的内容判红且模型不动；读出 A 之后只剩快照还在的那个集合，回退照拒；
+    /// 没读快照时回退照收（快照已删）。
+    #[test]
+    fn a_crash_after_a_snapshot_destruction_that_failed_after_writing_allows_the_snapshot_to_be_there_or_not(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
+        enter(
+            &mut model,
+            Operation::DestroySnapshot(SnapshotName(7)),
+            OperationOutcome::FailedAfterWriting,
+        );
+        let crash = model.crash_after_every_operation_returned();
+        model
+            .crash_and_recover(crash, file_with("A"))
+            .expect("A 在允许集合里");
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![
+                Snapshots::from([(SnapshotName(7), file_with("A"))]),
+                Snapshots::new()
+            ],
+            "快照还在与已删两种快照集合都允许"
+        );
+        let mut the_destruction_did_not_land = model.clone();
+        let before_the_wrong_read = the_destruction_did_not_land.clone();
+        assert_eq!(
+            the_destruction_did_not_land
+                .judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+                    SnapshotName(7),
+                    &file_with("B")
+                ),
+            Err(SnapshotReadOutsideTheAllowedReads {
+                name: SnapshotName(7),
+                read_out: file_with("B"),
+                allowed_reads: vec![Some(file_with("A")), None],
+            }),
+            "读出建它那一刻之外的内容判红"
+        );
+        assert_eq!(
+            the_destruction_did_not_land, before_the_wrong_read,
+            "判红的读不动模型"
+        );
+        the_destruction_did_not_land
+            .judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+                SnapshotName(7),
+                &file_with("A"),
+            )
+            .expect("快照还在：读出建它那一刻的 A");
+        assert_eq!(
+            the_destruction_did_not_land.allowed_snapshot_sets(),
+            vec![Snapshots::from([(SnapshotName(7), file_with("A"))])],
+            "读出 A 之后只剩快照还在的那个集合"
+        );
+        let rollback_target_while_the_snapshot_is_kept =
+            the_destruction_did_not_land.newest_version();
+        assert_eq!(
+            the_destruction_did_not_land.submit(
+                Operation::RollBackToVersion(rollback_target_while_the_snapshot_is_kept),
+                OperationOutcome::Succeeded
+            ),
+            Err(OperationNotAccepted::RollBackWithSnapshotsIsNotInTheFirstVersion),
+            "快照还在：回退照拒"
+        );
+        let mut the_destruction_landed = model.clone();
+        let rollback_target_after_the_destruction_landed = the_destruction_landed.newest_version();
+        succeed(
+            &mut the_destruction_landed,
+            Operation::RollBackToVersion(rollback_target_after_the_destruction_landed),
+        );
+    }
+
+    /// 不收的三种：快照名已经活着、删一个不活着的快照、有活快照时回退；返回时模型不动。
+    #[test]
+    fn snapshot_operations_the_first_version_does_not_take_are_not_accepted_and_leave_the_model_unchanged(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(1)));
+        let before = model.clone();
+        assert_eq!(
+            model.submit(
+                Operation::CreateSnapshot(SnapshotName(1)),
+                OperationOutcome::Succeeded
+            ),
+            Err(OperationNotAccepted::SnapshotNameAlreadyTaken {
+                name: SnapshotName(1)
+            }),
+            "快照名已经活着"
+        );
+        assert_eq!(
+            model.submit(
+                Operation::DestroySnapshot(SnapshotName(2)),
+                OperationOutcome::Succeeded
+            ),
+            Err(OperationNotAccepted::NoSnapshotWithThisName {
+                name: SnapshotName(2)
+            }),
+            "删一个不活着的快照"
+        );
+        assert_eq!(
+            model.submit(
+                Operation::RollBackToVersion(VersionNumber(1)),
+                OperationOutcome::Succeeded
+            ),
+            Err(OperationNotAccepted::RollBackWithSnapshotsIsNotInTheFirstVersion),
+            "有活快照时回退"
+        );
+        assert_eq!(model, before, "不收的操作不动模型");
     }
 
     #[test]
@@ -1063,8 +1726,13 @@ mod tests {
         succeed(&mut model, Operation::OverwriteTheFile(content("B")));
         succeed(&mut model, Operation::Fsync);
         let crash = model.crash_after_every_operation_returned();
+        // 被抛弃的是 fsync 写出最新那一版的那一条根
         model
-            .restart_after_a_recovery_that_abandoned_the_newest_root(crash, file_with("A"))
+            .restart_after_a_recovery_that_abandoned_the_newest_root(
+                crash,
+                AbandonedRoot::WroteTheNewestVersion,
+                file_with("A"),
+            )
             .expect("抛弃最新根的那一次恢复不判：fsync 之后读出 A 也照收");
         let next_crash = model.crash_after_every_operation_returned();
         let refused = model.crash_and_recover(next_crash, file_with("B"));
@@ -1075,5 +1743,280 @@ mod tests {
             ),
             "以读出的 A 重新起头，之后读回 B 判红：{refused:?}"
         );
+    }
+
+    /// 攻方 R6 那一形（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H5，读法照 U2）：写 A、发布、建快照 7、
+    /// 覆盖写 B、发布，抛弃最新根（B 那次发布）的那次恢复读出 A。读出的 A 不在允许集合里也不判、照收；重新起头时的快照集合取被抛弃那一版
+    /// 之前那一版（建快照那一版）的，快照 7 照在，读它读出 A 不判红。
+    #[test]
+    fn a_recovery_that_abandoned_the_newest_root_keeps_a_snapshot_created_in_the_published_state_before_it(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
+        succeed(&mut model, Operation::OverwriteTheFile(content("B")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        let crash = model.crash_after_every_operation_returned();
+        let allowed = model
+            .allowed_set_for_a_crash_in(crash)
+            .expect("崩溃落在崩溃本身里");
+        assert!(
+            !allowed.contains(&file_with("A")),
+            "读出的 A 不在允许集合里（只有 B 那次发布）：{allowed:?}"
+        );
+        // 被抛弃的是 B 那次发布写出最新那一版的那一条根
+        model
+            .restart_after_a_recovery_that_abandoned_the_newest_root(
+                crash,
+                AbandonedRoot::WroteTheNewestVersion,
+                file_with("A"),
+            )
+            .expect("抛弃最新根的那一次恢复不判读出的内容");
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![Snapshots::from([(SnapshotName(7), file_with("A"))])],
+            "快照集合取被抛弃那一版之前那一版（建快照那一版）的：快照 7 照在"
+        );
+        model
+            .judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+                SnapshotName(7),
+                &file_with("A"),
+            )
+            .expect("读快照 7 读出建它那一刻的 A 不判红");
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &file_with("A"),
+            "以读出的 A 重新起头"
+        );
+    }
+
+    /// 被抛弃的最新根就是建快照 7 的那一次发布：之前那一版（第一个文件那次发布）没有快照，重新起头之后快照 7 不在——
+    /// 读它读出 A 判红，同名再建照收（判决第三节 H5；`research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1 下
+    /// 调用方交「写出最新那一版的那一条」，取的是之前那一版的，不是这一版自己的）。
+    #[test]
+    fn a_recovery_that_abandoned_the_newest_root_written_by_a_snapshot_creation_restarts_without_that_snapshot(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
+        let crash = model.crash_after_every_operation_returned();
+        model
+            .restart_after_a_recovery_that_abandoned_the_newest_root(
+                crash,
+                AbandonedRoot::WroteTheNewestVersion,
+                file_with("A"),
+            )
+            .expect("抛弃最新根的那一次恢复不判读出的内容");
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![Snapshots::new()],
+            "快照集合取建快照之前那一版的：没有快照"
+        );
+        let before_the_read = model.clone();
+        assert_eq!(
+            model.judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+                SnapshotName(7),
+                &file_with("A")
+            ),
+            Err(SnapshotReadOutsideTheAllowedReads {
+                name: SnapshotName(7),
+                read_out: file_with("A"),
+                allowed_reads: vec![None],
+            }),
+            "快照 7 随被抛弃的那一版一起没了：读出 A 判红"
+        );
+        assert_eq!(model, before_the_read, "判红的读不动模型");
+        assert_eq!(
+            model.submit(
+                Operation::CreateSnapshot(SnapshotName(7)),
+                OperationOutcome::Succeeded
+            ),
+            Ok(SubmittedOperation::Entered(OperationNumber(1))),
+            "快照名 7 空着：同名再建照收"
+        );
+    }
+
+    /// 攻方第三轮 Q2 H5 那一格的第一格（`research/prompts/m4-segment-code-r3-opus-output.md`，判决
+    /// `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1）：写 A、发布、建快照 7，实现随后可写挂载一次，写行与暖机的根
+    /// 都映到建快照那一版；抛弃最新根（暖机那一条）的那次恢复落到它前一条根，仍在建快照那一版上，快照 7 在、读出 A。
+    /// 调用方交「不是写出这一版的那一条」，快照集合取这一版自己那一刻的：快照 7 照在，读它读出 A 不判红。
+    #[test]
+    fn a_recovery_that_abandoned_a_root_written_after_a_snapshot_creation_keeps_that_snapshot() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
+        let crash = model.crash_after_every_operation_returned();
+        model
+            .restart_after_a_recovery_that_abandoned_the_newest_root(
+                crash,
+                AbandonedRoot::WrittenAfterTheNewestVersion,
+                file_with("A"),
+            )
+            .expect("抛弃最新根的那一次恢复不判读出的内容");
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![Snapshots::from([(SnapshotName(7), file_with("A"))])],
+            "被抛弃的不是写出建快照那一版的根：快照集合取这一版自己的，快照 7 照在"
+        );
+        model
+            .judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+                SnapshotName(7),
+                &file_with("A"),
+            )
+            .expect("读快照 7 读出建它那一刻的 A 不判红");
+    }
+
+    /// 攻方第三轮 Q2 H5 那一格的第二格（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J1「删快照这种一个操作写多条根的
+    /// 取前后两份」）：写 A、发布、建快照 7、删快照 7（实现一次调用写意图与全部批），抛弃最后一批的那次恢复落到意图那条根，快照 7 带
+    /// 销毁中记号、读照读，下一次用户改动先走空把它删完。调用方交「写出这一版的那一条」，快照集合前后两份都收：读快照 7 读出 A 照收、
+    /// 只留快照在的那一份；走空之后同名再建也照收。
+    #[test]
+    fn a_recovery_that_abandoned_the_last_batch_of_a_snapshot_destruction_allows_the_snapshot_there_or_gone(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
+        succeed(&mut model, Operation::DestroySnapshot(SnapshotName(7)));
+        let crash = model.crash_after_every_operation_returned();
+        model
+            .restart_after_a_recovery_that_abandoned_the_newest_root(
+                crash,
+                AbandonedRoot::WroteTheNewestVersion,
+                file_with("A"),
+            )
+            .expect("抛弃最新根的那一次恢复不判读出的内容");
+        assert_eq!(
+            model.allowed_snapshot_sets(),
+            vec![
+                Snapshots::from([(SnapshotName(7), file_with("A"))]),
+                Snapshots::new(),
+            ],
+            "删快照之前那一版（快照 7 在）与删快照那一版（快照 7 不在）两份都收"
+        );
+        let mut read_before_the_walk = model.clone();
+        read_before_the_walk
+            .judge_a_snapshot_read_and_keep_the_snapshot_sets_it_allows(
+                SnapshotName(7),
+                &file_with("A"),
+            )
+            .expect("落到意图那条根：快照 7 带销毁中记号、读出 A 照收");
+        assert_eq!(
+            read_before_the_walk.allowed_snapshot_sets(),
+            vec![Snapshots::from([(SnapshotName(7), file_with("A"))])],
+            "读出 A 之后只留快照 7 在的那一份"
+        );
+        assert_eq!(
+            model.submit(
+                Operation::CreateSnapshot(SnapshotName(7)),
+                OperationOutcome::Succeeded
+            ),
+            Ok(SubmittedOperation::Entered(OperationNumber(1))),
+            "走空把快照 7 删完之后同名再建照收"
+        );
+    }
+
+    /// 调用方说被抛弃的根写出了最新那一版，而最新那一版是上一次恢复读出、重新起头的那一版（之后没有已确认的发布）：它之前那一版在
+    /// 上一次恢复之前，RefFS 不记那时的快照集合，判决第三节 J1 没写取什么——返回第一版不支持，模型不动。
+    #[test]
+    fn a_recovery_that_abandoned_the_root_that_wrote_the_state_at_the_last_recovery_is_not_in_the_first_version_and_the_model_does_not_move(
+    ) {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        model
+            .crash_and_recover(model.crash_after_every_operation_returned(), file_with("A"))
+            .expect("发布之后读出 A 在允许集合里");
+        let before_the_restart = model.clone();
+        assert_eq!(
+            model.restart_after_a_recovery_that_abandoned_the_newest_root(
+                model.crash_after_every_operation_returned(),
+                AbandonedRoot::WroteTheNewestVersion,
+                file_with("A"),
+            ),
+            Err(AbandonedRootRestartNotAccepted::TheRootThatWroteTheStateAtTheLastRecoveryIsNotInTheFirstVersion),
+            "允许集合只有 S_0：之前那一版在上一次恢复之前，第一版不支持"
+        );
+        assert_eq!(model, before_the_restart, "不收的那一次不动模型");
+    }
+
+    /// 截短（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8）：截到 3 字节留下前 3 个。
+    #[test]
+    fn truncating_to_a_shorter_size_keeps_the_leading_bytes() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
+        succeed(&mut model, Operation::Truncate(3));
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &file_with("abc")
+        );
+    }
+
+    /// 补 0（判决第三节 K8）：截到比现在长，多出来的读 0。
+    #[test]
+    fn truncating_to_a_longer_size_pads_with_zeros() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("ab")));
+        succeed(&mut model, Operation::Truncate(5));
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &VisibleState::OneFile(FileContent(vec![b'a', b'b', 0, 0, 0]))
+        );
+    }
+
+    /// 截断之后读快照（判决第三节 K4、K8）：快照读出截之前的内容，活头是截之后的。
+    #[test]
+    fn a_snapshot_created_before_a_truncation_reads_the_content_before_it() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
+        succeed(&mut model, Operation::CreateSnapshot(SnapshotName(65_549)));
+        succeed(&mut model, Operation::Truncate(2));
+        succeed(&mut model, Operation::ExplicitPublish);
+        assert_eq!(
+            model.allowed_reads_of_the_snapshot(SnapshotName(65_549)),
+            vec![Some(file_with("abcdef"))],
+            "快照读出截之前的内容"
+        );
+        assert_eq!(model.state_after_every_operation_so_far(), &file_with("ab"));
+    }
+
+    /// 崩在截断里（判决第三节 K2「先落目标」：意图那次 size 已是 N，崩在各批之间读出的就是截后）：截断交成内容改动加它那次发布，崩溃落在那次发布里，
+    /// 允许集合恰好两样——截前与截后；截到一半（某一批的边界）的内容不在里面。
+    #[test]
+    fn a_crash_inside_a_truncation_allows_exactly_the_content_before_and_after_it() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        succeed(&mut model, Operation::Truncate(2));
+        let publish_of_the_truncation = succeed(&mut model, Operation::ExplicitPublish);
+        let allowed = model
+            .allowed_set_for_a_crash_in(publish_of_the_truncation)
+            .expect("崩溃落在截断那次发布里");
+        let allowed_states: Vec<VisibleState> = allowed
+            .allowed
+            .iter()
+            .map(|allowed_state| allowed_state.state.clone())
+            .collect();
+        assert_eq!(
+            allowed_states,
+            vec![file_with("abcdef"), file_with("ab")],
+            "截前、截后两样：{allowed:?}"
+        );
+        assert!(!allowed.contains(&file_with("abcd")), "截到一半的不在里面");
+    }
+
+    /// 还没有文件时截断（判决第三节 K1：实现在任何写之前拒）：不收、模型不动。
+    #[test]
+    fn truncating_before_any_file_exists_is_refused_and_the_model_does_not_move() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        let before = model.clone();
+        assert_eq!(
+            model.submit(Operation::Truncate(0), OperationOutcome::Succeeded),
+            Err(OperationNotAccepted::TruncatingWithoutAFileIsNotInTheFirstVersion)
+        );
+        assert_eq!(model, before, "拒时模型不动");
     }
 }

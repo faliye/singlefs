@@ -233,12 +233,15 @@ fn retained(device: u32, kind: RecordedOperationKind, offset: u64) -> RetainedOp
                 RecordedOperationKind::Barrier => 0,
                 RecordedOperationKind::Write
                 | RecordedOperationKind::WriteForceUnitAccess
-                | RecordedOperationKind::WriteZeroes => 512,
+                | RecordedOperationKind::WriteZeroes
+                | RecordedOperationKind::Discard => 512,
             },
             content_hash: 0,
         },
         contents: match kind {
-            RecordedOperationKind::Barrier | RecordedOperationKind::WriteZeroes => None,
+            RecordedOperationKind::Barrier
+            | RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard => None,
             RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
                 Some(vec![0u8; 512])
             }
@@ -442,8 +445,8 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
     };
     assert_eq!(
         every_device_sizes,
-        vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2],
-        "每盘都发屏障：与今天的段序列相同（C577 之后暖机第二次的轮换自成一段，改之前与 A 的单元写并成 26）"
+        vec![2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2],
+        "每盘都发屏障：与今天的段序列相同（取号两轮各一段；C577 之后暖机第二次的轮换自成一段，改之前与 A 的单元写并成 26）"
     );
     assert_eq!(
         (every_device_reports, every_device_violations),
@@ -452,7 +455,7 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
     );
     assert_eq!(
         missing_sizes,
-        vec![2, 2, 1, 2, 2, 1, 2, 24, 5],
+        vec![2, 2, 2, 1, 2, 2, 1, 2, 24, 5],
         "盘 1 漏发那一道：记录两份、根槽、两次系统配置槽写并成一段（轮换之后那道屏障两块盘都发，这一段在那里关）"
     );
     assert!(
@@ -633,8 +636,8 @@ fn in_place_overwrites_take_three_states_and_every_other_write_two() {
 }
 
 /// 新池新建文件那条流（崩溃点重放从 mkfs 之后枚举的整条流）：每盘都发屏障，段序列与补第三态之前的闭式与今天逐字相同；
-/// 取三态的只有系统配置槽写（8 次，每次都罩住更早写下的旧槽），全量 16777260、甲二 46 个状态（C577 之前暖机第二次的轮换与 A 的
-/// 单元写同段，150994980、54）。
+/// 取三态的只有系统配置槽写（10 次，每次都罩住更早写下的旧槽），全量 16777268、甲二 54 个状态（取号写一轮时 8 次、16777260、46；
+/// C577 之前暖机第二次的轮换与 A 的单元写同段，150994980、54）。
 #[test]
 fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_state_on_its_system_configuration_writes(
 ) {
@@ -646,12 +649,12 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
     );
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<usize>>(),
-        vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2]
+        vec![2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2]
     );
-    assert_eq!(closed_form_state_count(&segments), 16_777_240);
+    assert_eq!(closed_form_state_count(&segments), 16_777_243);
     assert_eq!(
         crash_state_count(&writes, &segments, &quick_tier_expansion),
-        26
+        29
     );
     let tearable = TearableInPlaceOverwrites::of(&base, &writes);
     let tearable_kinds: Vec<StepKind> = tearable
@@ -661,13 +664,13 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
         .collect();
     assert_eq!(
         tearable_kinds,
-        vec![StepKind::SystemConfigurationSlot; 8],
-        "取号 2 + 两次暖机各 2 + A 的轮换 2"
+        vec![StepKind::SystemConfigurationSlot; 10],
+        "取号两轮各 2 + 两次暖机各 2 + A 的轮换 2"
     );
     assert_eq!(
         crash_state_count_with_torn_in_place_overwrites(&base, &writes, &segments, &full_expansion),
-        16_777_260,
-        "24 写的单元段 2²⁴ − 1、四个系统配置槽段各 3² − 1、其余同今天"
+        16_777_268,
+        "24 写的单元段 2²⁴ − 1、五个系统配置槽段（取号两轮、三次轮换）各 3² − 1、其余同今天"
     );
     assert_eq!(
         crash_state_count_with_torn_in_place_overwrites(
@@ -676,8 +679,8 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
             &segments,
             &quick_tier_expansion
         ),
-        46,
-        "24 写的单元段全不落 1、四个系统配置槽段各 3² − 1、其余同今天"
+        54,
+        "24 写的单元段全不落 1、五个系统配置槽段各 3² − 1、其余同今天"
     );
 }
 

@@ -2156,9 +2156,11 @@ mod tests {
              inode_tree_root_write_calls=0 inode_tree_root_written_bytes=0 \
              allocation_record_tree_node_write_calls=0 allocation_record_tree_node_written_bytes=0 \
              accounting_tree_node_write_calls=0 accounting_tree_node_written_bytes=0 \
+             deadlist_tree_node_write_calls=0 deadlist_tree_node_written_bytes=0 \
              deleted_inodes_tree_node_write_calls=0 deleted_inodes_tree_node_written_bytes=0 \
              tombstone_tree_node_write_calls=0 tombstone_tree_node_written_bytes=0 \
              lineage_tree_node_write_calls=0 lineage_tree_node_written_bytes=0 \
+             logged_operations_tree_node_write_calls=0 logged_operations_tree_node_written_bytes=0 \
              retirement_tree_node_write_calls=0 retirement_tree_node_written_bytes=0 \
              central_mapping_tree_node_write_calls=0 central_mapping_tree_node_written_bytes=0 \
              tree_table_unit_write_calls=0 tree_table_unit_written_bytes=0 \

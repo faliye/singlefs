@@ -699,9 +699,17 @@ fn c499_remount_on_devices_that_do_not_answer_the_journal_hint_scans_the_whole_r
 
 /// C499 盘答 journal 提示（只记写过的扇区的内存盘，`JournalHintAnswer::PassTheInnerDeviceAnswerThrough`）的那一格：
 /// 恢复扫环只读盘答的记录槽（`singlefs_core::recovery::scan_journal`），所以「走了恢复」量成：两次挂载读的记录槽都恰好是盘答的那几个、
-/// 也恰好是这条历史写过的记录槽（A 那几次与 B 的记录，崩溃那条在根槽写之前已经落了 B 的记录，所以两条相同），每个槽读一次；
+/// 也恰好是这条历史写过的记录槽（A 那几次与 B 的记录，崩溃那条在根槽写之前已经落了 B 的记录，所以两条相同）；逐盘钉两样读：
+/// - 恢复扫环：每块盘先读这块盘写过的每个记录槽，每个槽恰好一次；
+/// - 恢复扫环之后：只有取号之前逐盘核的那一读。D18（块里携带什么信息） 已定项 11 落后支缺单元那一半照系统配置第三轮判决
+///   （`research/prompts/m3-close-sysconf-r3-main-verification.md`「四、落地」）改成「本盘环槽里有那一版末条记录就不算落后」，
+///   这块盘最新那份系统配置的 tail 落后时，在它自己的环里读一次所选那一版末条记录那一槽（`singlefs_core::mount` 的
+///   `last_record_of_the_version_in_its_ring_slot_on_the_device`，读盘、不走读阶段的缓存）。崩溃那条两块盘的 tail 都停在 B 之前，
+///   各读一次 B 的末条记录（jsn 4）那一槽；干净关闭那条 B 之后的系统配置落了、tail 不落后，一读都没有。
+///   这一读来自落后判定，不按上一次是不是干净关闭分支，与 C499 的条款不冲突。
+///
 /// 再照同一套规则恢复（`assert_the_two_histories_recover_by_the_same_rules`）。
-/// 判别力自证：内存盘答的提示漏掉一个写过的记录槽，当场红（`crates/mutations.tsv`）。
+/// 判别力自证：内存盘答的提示漏掉一个写过的记录槽，当场红；取号之前逐盘核不读那一槽，崩溃那条当场红（`crates/mutations.tsv`）。
 #[test]
 fn c499_remount_on_devices_that_answer_the_journal_hint_reads_exactly_the_written_record_slots_after_a_clean_close_and_after_a_crash_and_recovers_by_the_same_rules(
 ) {
@@ -730,18 +738,29 @@ fn c499_remount_on_devices_that_answer_the_journal_hint_reads_exactly_the_writte
         JournalHintAnswer::PassTheInnerDeviceAnswerThrough,
     );
 
-    for (history, mount, hinted_slots, written_record_slots) in [
+    // B 那次发布（txg 4）的末条记录 jsn 4 在环里的那一槽：取号之前逐盘核读的就是它。
+    let last_record_slot_of_the_second_version =
+        singlefs_core::journal::record_offset(4, JOURNAL_RING_DEFAULT_BYTES);
+    for (
+        history,
+        mount,
+        hinted_slots,
+        written_record_slots,
+        reads_per_device_of_the_check_before_the_acquisition,
+    ) in [
         (
             "干净关闭再挂载",
             &clean_close,
             &clean_close_hinted_slots,
             &histories.clean_close_written_record_slots,
+            0usize,
         ),
         (
             "崩溃后再挂载",
             &crash,
             &crash_hinted_slots,
             &histories.crash_written_record_slots,
+            1usize,
         ),
     ] {
         let slots_read = mount.journal_ring_read_slots();
@@ -755,9 +774,41 @@ fn c499_remount_on_devices_that_answer_the_journal_hint_reads_exactly_the_writte
         );
         assert_eq!(
             mount.journal_ring_reads(),
-            written_record_slots.len(),
-            "{history}：起点落在环里的读恰好是写过的记录槽数，每个槽读一次"
+            written_record_slots.len()
+                + reads_per_device_of_the_check_before_the_acquisition * BOTH_DEVICES.len(),
+            "{history}：起点落在环里的读恰好是写过的记录槽数（恢复扫环每个槽读一次）加上取号之前逐盘核每块盘的那几读"
         );
+        for (device, read_log) in &mount.read_logs {
+            let written_on_this_device: BTreeSet<DeviceOffsetInBytes> = written_record_slots
+                .iter()
+                .filter(|(written_device, _)| written_device == device)
+                .map(|(_, offset)| *offset)
+                .collect();
+            let offsets = &read_log.journal_ring_read_offsets;
+            let (reads_of_the_recovery_scan, reads_after_the_recovery_scan) =
+                offsets.split_at(written_on_this_device.len().min(offsets.len()));
+            let slots_of_the_recovery_scan: BTreeSet<DeviceOffsetInBytes> =
+                reads_of_the_recovery_scan.iter().copied().collect();
+            assert_eq!(
+                (
+                    reads_of_the_recovery_scan.len(),
+                    &slots_of_the_recovery_scan
+                ),
+                (written_on_this_device.len(), &written_on_this_device),
+                "{history}：盘 {} 上恢复扫环读的恰好是这块盘写过的记录槽，每个槽一次",
+                device.0
+            );
+            assert_eq!(
+                reads_after_the_recovery_scan,
+                vec![
+                    last_record_slot_of_the_second_version;
+                    reads_per_device_of_the_check_before_the_acquisition
+                ]
+                .as_slice(),
+                "{history}：盘 {} 上恢复扫环之后的环内读只有取号之前逐盘核读 B 末条记录那一槽",
+                device.0
+            );
+        }
     }
     assert_eq!(
         clean_close.journal_ring_read_slots(),

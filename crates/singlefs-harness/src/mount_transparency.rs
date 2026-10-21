@@ -1566,6 +1566,7 @@ fn immutable_configuration_is_the_same_except_this_device(
         sizes: left_sizes,
         journal_ring_start_slot: left_journal_ring_start_slot,
         root_ring_base_slot: left_root_ring_base_slot,
+        inode_record_truncation_fields: left_inode_record_truncation_fields,
     } = left;
     let SystemImmutableConfiguration {
         filesystem_identifier: right_filesystem_identifier,
@@ -1575,6 +1576,7 @@ fn immutable_configuration_is_the_same_except_this_device(
         sizes: right_sizes,
         journal_ring_start_slot: right_journal_ring_start_slot,
         root_ring_base_slot: right_root_ring_base_slot,
+        inode_record_truncation_fields: right_inode_record_truncation_fields,
     } = right;
     (
         left_filesystem_identifier,
@@ -1583,6 +1585,7 @@ fn immutable_configuration_is_the_same_except_this_device(
         left_sizes,
         left_journal_ring_start_slot,
         left_root_ring_base_slot,
+        left_inode_record_truncation_fields,
     ) == (
         right_filesystem_identifier,
         right_device_count,
@@ -1590,6 +1593,7 @@ fn immutable_configuration_is_the_same_except_this_device(
         right_sizes,
         right_journal_ring_start_slot,
         right_root_ring_base_slot,
+        right_inode_record_truncation_fields,
     )
 }
 

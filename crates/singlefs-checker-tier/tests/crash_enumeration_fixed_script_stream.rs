@@ -89,41 +89,47 @@ enum Script {
     ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
 }
 
-/// 到 E 再正常卸载那条流：每次写只取两态时的全量闭式 1 + Σ(2^|段| − 1)（78 段；六个 28 写段各 2^28 − 1 占 96%）。代码审阅第 19 条之后
+/// 到 E 再正常卸载那条流：每次写只取两态时的全量闭式 1 + Σ(2^|段| − 1)（80 段；六个 28 写段各 2^28 − 1 占 96%）。代码审阅第 19 条之后
 /// 取号、抬 F、卸载先写系统配置之前各多一道屏障，把上一次轮换那 2 写与它们的 2 写拆成两段：三处各 15 → 3 + 3，比改之前的 6649413746 少 27。
 /// C577（发布返回之前、系统配置轮换之后加一道屏障）之后每次轮换那 2 写都自成一段，不再与下一次发布的单元写同段：十四处 2 + n 写段
 /// 各拆成 2 与 n，每处 (2^(n+2) − 1) → 3 + (2^n − 1)、少 3 · 2^n − 3（n = 24 三处、16 四处、20 一处、28 六处——A、B、C、写行之后的两次暖机、
 /// 回退 D、五次覆盖写、抬 F 与卸载各第二次空发布、E），64 段 6649413719 → 78 段 1662648449。
 /// 回退那次发布追加一条谱系记录之后（D18（块里携带什么信息） 已定项 24 第 5 条：零根的谱系树上第一次追加，写谱系容器与谱系树根，两块盘各一份），
 /// D 的单元写 20 → 24，那一段 2^20 − 1 → 2^24 − 1、多 15728640：1662648449 → 1678377089，段数不变。
-const FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT: u64 = 1_678_377_089;
-/// 全量枚举的状态数（代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」）：这条流上取三态的只有 46 次系统配置槽写，
-/// 每段 3^m · 2^(n−m) − 1（m 是段里系统配置槽写的个数），再加全部持久那一个。C577 之后 46 次系统配置槽写两两自成 23 个 2 写段，
-/// 每段 3² − 1 比两态时的 2² − 1 多 5：1678377089 + 23 × 5 = 1678377204（D 加谱系记录之前 1662648449 + 23 × 5 = 1662648564；
+/// 取号写两轮（D22（单元原子性怎么合成） 已定项 8 落地，每轮两盘各一写、轮后池屏障）之后这条流上两次取号（mkfs 那个进程里的、
+/// B 之后重开可写挂载的）各多一个 2 写段：每处多 2² − 1 = 3，78 段 1678377089 → 80 段 1678377095。
+const FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT: u64 = 1_678_377_095;
+/// 全量枚举的状态数（代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」）：这条流上取三态的只有 50 次系统配置槽写，
+/// 每段 3^m · 2^(n−m) − 1（m 是段里系统配置槽写的个数），再加全部持久那一个。C577 之后 50 次系统配置槽写两两自成 25 个 2 写段
+/// （取号写两轮之后两次取号各多一段；取号写一轮时 46 次、23 段），每段 3² − 1 比两态时的 2² − 1 多 5：
+/// 1678377095 + 25 × 5 = 1678377220（取号写一轮时 1678377089 + 23 × 5 = 1678377204；D 加谱系记录之前 1662648449 + 23 × 5 = 1662648564；
 /// C577 之前轮换并进 30 写段、3² · 2²⁸ − 1，14960689284）。
-const FULL_STATES_THROUGH_THE_UNMOUNT: u64 = 1_678_377_204;
+const FULL_STATES_THROUGH_THE_UNMOUNT: u64 = 1_678_377_220;
 /// 全量的状态按发布分：每段的状态归它后面最近的那次根槽写，再加全部持久那一个。
 /// C577 之后一次带单元的普通发布：上一次轮换段 3² − 1 = 8 + 单元段 2^n − 1 + 记录段 3 + 根槽段 1 = 2^n + 11
 /// （n = 24：16777227，n = 16：65547，n = 28：268435467；回退 D（txg 9）加谱系记录之后 n = 24、16777227，之前 n = 20、1048587；
 /// C577 之前轮换与单元同段、3² · 2^n − 1 + 4 = 9 · 2^n + 3）；
 /// 写行 txg 5 与抬 F、卸载各第一次空发布（txg 15、18）前面是屏障，没有变。
-const FULL_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=12 instance1_txg2=12 \
-     instance1_txg3=16777227 instance1_txg4=16777227 instance2_txg5=262163 instance2_txg6=65547 \
+/// 取号写两轮之后两次取号各多一个 2 写段（3² − 1 = 8）：mkfs 那个进程里的取号归暖机 txg 1，12 → 20；
+/// B 之后重开的取号归写行 txg 5，262163 → 262171。
+const FULL_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=20 instance1_txg2=12 \
+     instance1_txg3=16777227 instance1_txg4=16777227 instance2_txg5=262171 instance2_txg6=65547 \
      instance2_txg7=65547 instance2_txg8=16777227 instance2_txg9=16777227 instance2_txg10=268435467 \
      instance2_txg11=268435467 instance2_txg12=268435467 instance2_txg13=268435467 \
      instance2_txg14=268435467 instance2_txg15=65555 instance2_txg16=65547 instance2_txg17=268435467 \
      instance2_txg18=65555 instance2_txg19=65547 after_the_last_root=8 every_write_persisted=1";
-/// 甲二快档的状态数（`crash::crash_state_count_with_torn_in_place_overwrites` 按甲二的闭式；每次写只取两态时 163）。
+/// 甲二快档的状态数（`crash::crash_state_count_with_torn_in_place_overwrites` 按甲二的闭式；每次写只取两态时 169）。
 /// C577 之前轮换与单元写同段（3² · 2 − 1 = 17），之后拆成轮换段 8 与只有单元写的一段 1：十四处各少 8，390 → 278
-/// （两态时各少 7 − 3 − 1 = 3，205 → 163）。
-const QUICK_TIER_STATES_THROUGH_THE_UNMOUNT: u64 = 278;
+/// （两态时各少 7 − 3 − 1 = 3，205 → 163）。取号写两轮之后两次取号各多一个 2 写段：各多 8，278 → 294（两态时各多 3，163 → 169）。
+const QUICK_TIER_STATES_THROUGH_THE_UNMOUNT: u64 = 294;
 /// 甲二快档的状态按发布分：一次带单元的普通发布 13（上一次轮换那 2 原地写一段 3² − 1 = 8——C577 之后发布末尾那道屏障把它与单元写隔开——、
 /// 只有单元写的那一段全不落 1、记录段 3、根槽段 1；C577 之前轮换与单元同段 17，共 21），
-/// 暖机 txg 1、2 各 12（2 原地写的那一段 3² − 1 = 8、记录段 3、根槽段 1），写行 txg 5、抬 F 的 txg 15、卸载的 txg 18 各 21（上一次轮换那 2 原地写一段 8、
-/// 取号或先写新 F 那 2 原地写一段 8——代码审阅第 19 条之后两者之间有屏障——只有单元写的那一段 1、记录段 3、根槽段 1）；
-/// 最后一次根槽写之后是 txg 19 的轮换那一段 8，再加全部持久那一个。
-const QUICK_TIER_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=12 instance1_txg2=12 \
-     instance1_txg3=13 instance1_txg4=13 instance2_txg5=21 instance2_txg6=13 instance2_txg7=13 \
+/// 暖机 txg 1 20（取号两轮各一段 3² − 1 = 8、记录段 3、根槽段 1），暖机 txg 2 12（暖机 txg 1 的轮换那 2 原地写一段 8、记录段 3、根槽段 1），
+/// 写行 txg 5 29（上一次轮换那 2 原地写一段 8、取号两轮各一段 8——代码审阅第 19 条之后轮换与取号之间有屏障——只有单元写的那一段 1、
+/// 记录段 3、根槽段 1），抬 F 的 txg 15、卸载的 txg 18 各 21（上一次轮换一段 8、先写新 F 那 2 原地写一段 8、只有单元写的那一段 1、记录段 3、根槽段 1）；
+/// 最后一次根槽写之后是 txg 19 的轮换那一段 8，再加全部持久那一个。取号写一轮时 txg 1 是 12、txg 5 是 21。
+const QUICK_TIER_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=20 instance1_txg2=12 \
+     instance1_txg3=13 instance1_txg4=13 instance2_txg5=29 instance2_txg6=13 instance2_txg7=13 \
      instance2_txg8=13 instance2_txg9=13 instance2_txg10=13 instance2_txg11=13 instance2_txg12=13 \
      instance2_txg13=13 instance2_txg14=13 instance2_txg15=21 instance2_txg16=13 instance2_txg17=13 \
      instance2_txg18=21 instance2_txg19=13 after_the_last_root=8 every_write_persisted=1";
@@ -269,7 +275,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
     ];
     if script != Script::SecondVersionOnly {
         pool.output = second;
-        // 进程重开：取号 2、写行、暖机两次（txg 5 / 6 落盘 0、txg 7 落盘 1），文件还是第二次的内容。
+        // 进程重开：取号两轮各 2、写行、暖机两次（txg 5 / 6 落盘 0、txg 7 落盘 1），文件还是第二次的内容。
         let mut devices = pool.reopen_recorded();
         let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
         pool.devices = Some(devices);
@@ -463,31 +469,36 @@ fn prepare(tag: &str, script: Script) -> Prepared {
     // 2 个——D18（块里携带什么信息） 已定项 24 第 5 条，回退那次追加一条谱系记录；加谱系记录之前 20）、覆盖写与 E 各 28、
     // 抬 F 与卸载推的空发布各 16。取号、抬 F 与卸载那一串开头各多
     // 两块盘一次系统配置写（取号写实例代号，抬 F 与卸载先写新 F，D16（发布语义） 已定项 1「抬 F 那一串」），它们之前各一道屏障
-    // （代码审阅第 19 条：覆写较旧那一槽之前，上一次轮换写的那一槽先持久），与上一次的轮换各自成段（2、2；改之前并成 4 写一段）。
+    // （代码审阅第 19 条：覆写较旧那一槽之前，上一次轮换写的那一槽先持久），与上一次的轮换各自成段（2、2；改之前并成 4 写一段）；
+    // 取号写两轮（D22（单元原子性怎么合成） 已定项 8 落地），每轮两盘各一写、轮后池屏障，两轮各成一段（2、2），这条流开头与 B 之后重开各一处。
     match script {
         Script::SecondVersionOnly => {
             assert_eq!(
                 sizes,
-                vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2],
-                "A 的两个系统配置槽写自成一段、B 的 24 个单元写自成一段：C577 之后轮换之后有屏障（改之前并成 26）"
+                vec![2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2],
+                "取号两轮各成一段；A 的两个系统配置槽写自成一段、B 的 24 个单元写自成一段：C577 之后轮换之后有屏障（改之前并成 26）"
             );
-            assert_eq!(writes.len(), 70, "取号 2 + 暖机 5 × 2 + A 29 + B 29 次写");
+            assert_eq!(
+                writes.len(),
+                72,
+                "取号两轮各 2 + 暖机 5 × 2 + A 29 + B 29 次写"
+            );
         }
         Script::ThirdVersion => {
-            // B 的两个系统配置槽写自成一段、取号的两个自成一段（2、2：取号写之前有屏障）；写行发布 18 个单元写自成一段（取号那两次系统配置写之后有屏障）；
+            // B 的两个系统配置槽写自成一段、取号两轮各两个、各自成一段（2、2、2：取号写之前与每轮之后有屏障）；写行发布 18 个单元写自成一段（取号第二轮之后有屏障）；
             // 暖机两次各 16 个单元写、C 的 24 个单元写各自成一段，上一次发布的两个系统配置槽写在它们前面自成一段（C577 之前并成 18、18、26）。
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2
+                    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1,
+                    2, 16, 2, 1, 2, 24, 2, 1, 2
                 ],
                 "固定脚本到 C 为止的段序列"
             );
             assert_eq!(
                 writes.len(),
-                70 + 2 + 23 + 21 + 21 + 29,
-                "到 B 70 + 取号 2 + 写行 23 + 暖机 21 × 2 + C 29"
+                72 + 4 + 23 + 21 + 21 + 29,
+                "到 B 72 + 取号两轮 4 + 写行 23 + 暖机 21 × 2 + C 29"
             );
         }
         Script::RollbackToFirstVersion => {
@@ -496,12 +507,12 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2
+                    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1,
+                    2, 16, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2
                 ],
                 "固定脚本到 D 为止的段序列"
             );
-            assert_eq!(writes.len(), 166 + 29, "到 C 166 + D 29");
+            assert_eq!(writes.len(), 170 + 29, "到 C 170 + D 29");
         }
         Script::ReuseAfterRaisingFloorThenNormalUnmount => {
             // 五次覆盖写各 28 个单元写自成一段、上一次的两个系统配置槽写在它前面自成一段（C577 之前并成 30）；txg 14 的轮换自成一段、
@@ -510,17 +521,17 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28,
-                    2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2,
-                    16, 2, 1, 2
+                    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1,
+                    2, 16, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1,
+                    2, 28, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16,
+                    2, 1, 2, 16, 2, 1, 2
                 ],
                 "固定脚本到 E 再正常卸载的段序列"
             );
             assert_eq!(
                 writes.len(),
-                195 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
-                "到 D 195 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
+                199 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
+                "到 D 199 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
             );
         }
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => {
@@ -528,17 +539,17 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             assert_eq!(
                 sizes,
                 vec![
-                    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28,
-                    2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
-                    28, 2, 1, 2
+                    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1,
+                    2, 16, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1,
+                    2, 28, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 28, 2,
+                    1, 2, 28, 2, 1, 2
                 ],
                 "固定脚本到 E 之后再覆盖写两次的段序列"
             );
             assert_eq!(
                 writes.len(),
-                195 + 5 * 33 + 44 + 33 + 2 * 33,
-                "到 E 437 + txg 18、19 的覆盖写各 33"
+                199 + 5 * 33 + 44 + 33 + 2 * 33,
+                "到 E 441 + txg 18、19 的覆盖写各 33"
             );
         }
     }
@@ -658,8 +669,10 @@ fn assert_the_rollback_floor_raise_was_judged(tally: &CrashPointReplayTally) {
 }
 
 /// 到 C 为止的固定脚本：段序列登记表（layout/01-first-txn.md 八）「装置钉住」的那条数组由 `prepare` 里的断言钉住；
-/// 崩溃点重放全量与甲二快档都在到 E 再卸载的脚本上跑。32 段、每次写只取两态时闭式 50724921、甲二 69；
-/// 系统配置槽写补第三态（代码审阅第 4 条）之后崩溃点重放枚举的是全量 50724971、甲二 119。
+/// 崩溃点重放全量与甲二快档都在到 E 再卸载的脚本上跑。34 段、每次写只取两态时闭式 50724927、甲二 75；
+/// 系统配置槽写补第三态（代码审阅第 4 条）之后崩溃点重放枚举的是全量 50724987、甲二 135。
+/// 取号写两轮（D22（单元原子性怎么合成） 已定项 8 落地）之前 32 段、50724921、69、50724971、119：两次取号各多一个 2 写段，
+/// 两态闭式与两态甲二每处多 2² − 1 = 3，三态全量与甲二每处多 3² − 1 = 8。
 /// C577（发布末尾轮换之后一道屏障）之前 27 段、202113066、84、454426691、159：A、B、C 的 24 个单元写与写行之后两次暖机的 16 个单元写
 /// 各与上一次的轮换同段（26、26、26、18、18），五处各拆成 2 与 n——两态闭式每处少 3 · 2^n − 3（共 9 · 2^24 + 6 · 2^16 − 15 = 151388145），
 /// 三态全量每处少 8 · 2^n − 8，甲二每处 17 → 8 + 1、两态时 7 → 3 + 1。代码审阅第 19 条之后取号写之前多一道屏障，
@@ -667,11 +680,11 @@ fn assert_the_rollback_floor_raise_was_judged(tally: &CrashPointReplayTally) {
 #[test]
 fn the_fixed_script_through_the_third_publish_keeps_its_registered_segment_sequence() {
     let prepared = prepare("crash-point-replay-c-registered", Script::ThirdVersion);
-    assert_eq!(prepared.segments.len(), 32);
-    assert_eq!(closed_form_state_count(&prepared.segments), 50_724_921);
+    assert_eq!(prepared.segments.len(), 34);
+    assert_eq!(closed_form_state_count(&prepared.segments), 50_724_927);
     assert_eq!(
         crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
-        69
+        75
     );
     assert_eq!(
         (
@@ -688,11 +701,12 @@ fn the_fixed_script_through_the_third_publish_keeps_its_registered_segment_seque
                 &quick_tier_expansion
             )
         ),
-        (50_724_971, 119)
+        (50_724_987, 135)
     );
 }
 
-/// 到 D 为止的固定脚本：同上，36 段、每次写只取两态时闭式 67502143、甲二 77；补第三态之后全量 67502198、甲二 132。
+/// 到 D 为止的固定脚本：同上，38 段、每次写只取两态时闭式 67502149、甲二 83；补第三态之后全量 67502214、甲二 148
+/// （取号写两轮之前 36 段、67502143、77、67502198、132：两次取号各多一个 2 写段，两态每处多 3、三态每处多 8）。
 /// 回退那次追加谱系记录之后 D 的单元写 20 → 24（谱系容器与谱系树根各两块盘，D18（块里携带什么信息） 已定项 24 第 5 条）：
 /// 两态闭式与全量各多 2^24 − 2^20 = 15728640（之前 51773503、51773558）；只有单元写的那一段甲二只取全不落一态，77、132 不变。
 /// C577 之前 30 段、206307373、95、463863878、180（到 C 那五处之外 D 当时的 20 个单元写也与 C 的轮换同段、22）；
@@ -703,11 +717,11 @@ fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_se
         "crash-point-replay-d-registered",
         Script::RollbackToFirstVersion,
     );
-    assert_eq!(prepared.segments.len(), 36);
-    assert_eq!(closed_form_state_count(&prepared.segments), 67_502_143);
+    assert_eq!(prepared.segments.len(), 38);
+    assert_eq!(closed_form_state_count(&prepared.segments), 67_502_149);
     assert_eq!(
         crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
-        77
+        83
     );
     assert_eq!(
         (
@@ -724,7 +738,7 @@ fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_se
                 &quick_tier_expansion
             )
         ),
-        (67_502_198, 132)
+        (67_502_214, 148)
     );
 }
 
@@ -766,8 +780,8 @@ fn every_crash_state_of_the_quick_tier_recovers_to_the_version_its_root_claims()
     );
     assert_eq!(
         crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
-        163,
-        "每次写只取两态时甲二的闭式（补第三态之前的数；C577 之前 205）"
+        169,
+        "每次写只取两态时甲二的闭式（补第三态之前的数；取号写一轮时 163，C577 之前 205）"
     );
     println!(
         "CRASH_POINT_REPLAY_FIXED_SCRIPT_FAST states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
@@ -1030,6 +1044,7 @@ fn residual_record_and_its_named_units(
         .filter(|retained| match geometry().classify(&retained.operation) {
             StepKind::UnitWrite | StepKind::JournalRecord => true,
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::RootRecordFua
             | StepKind::SystemConfigurationSlot
             | StepKind::Barrier => false,
@@ -1138,18 +1153,19 @@ fn prepare_with_residual_record_seeded(tag: &str) -> Prepared {
     let (writes, segments) =
         writes_and_segments(&operations[pool.mkfs_operation_count..], &geometry());
     // 与到 C 的固定脚本同型，只少一次暖机（写行发布落在 txg 6 的盘 0 上，txg 7 就到盘 1）。C577 之后每次轮换自成一段
-    // （改之前 A、B、C 的 24 个单元写与暖机的 16 个单元写各并上一次的轮换：26、26、18、26）。
+    // （改之前 A、B、C 的 24 个单元写与暖机的 16 个单元写各并上一次的轮换：26、26、18、26）；取号写两轮，两次取号各两段。
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<usize>>(),
         vec![
-            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 24, 2, 1, 2
+            2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 24,
+            2, 1, 2
         ],
         "预置残留记录那条流的段序列"
     );
     assert_eq!(
         writes.len(),
-        70 + 2 + 23 + 21 + 29,
-        "到 B 70 + 取号 2 + 写行 23 + 暖机 21 + C 29"
+        72 + 4 + 23 + 21 + 29,
+        "到 B 72 + 取号两轮 4 + 写行 23 + 暖机 21 + C 29"
     );
     let root_indexes: Vec<usize> = writes
         .iter()
@@ -1334,10 +1350,10 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
     assert_eq!(tally.states, states_of_the_expanded_segments);
     assert_eq!(
         (tally.states, states_whose_chain_reaches_the_residual_record),
-        (53, 20),
-        "跑到的：B 的轮换那一段 8 + 取号那一段 8（系统配置槽写各三态，3² − 1；代码审阅第 19 条之后两段之间有屏障，改之前并成一段）\
-         + 写行发布的记录段 3 + 写行发布的根槽段 1；跑不到的 33 个是实例 2 的某条根已持久：写行与暖机的轮换段各 8（C577 之后自成一段、\
-         长度 2 展开，改之前并在 18、26 写段里不展开）、暖机与 C 各记录段 3 + 根槽段 1、C 的轮换那一段 8，再加全部持久 1（改之前 17）"
+        (61, 28),
+        "跑到的：B 的轮换那一段 8 + 取号两轮各一段 8（系统配置槽写各三态，3² − 1；代码审阅第 19 条之后轮换与取号之间有屏障，改之前并成一段；\
+         取号写一轮时只有一段，53、20）+ 写行发布的记录段 3 + 写行发布的根槽段 1；跑不到的 33 个是实例 2 的某条根已持久：写行与暖机的轮换段各 8\
+         （C577 之后自成一段、长度 2 展开，改之前并在 18、26 写段里不展开）、暖机与 C 各记录段 3 + 根槽段 1、C 的轮换那一段 8，再加全部持久 1（改之前 17）"
     );
     assert_eq!(
         tally.violations, 0,
@@ -1414,6 +1430,7 @@ fn writes_with_stale_journal_tail(writes: &[RetainedWrite], stale_tail: u64) -> 
                 }
             }
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::UnitWrite
             | StepKind::JournalRecord
             | StepKind::RootRecordFua

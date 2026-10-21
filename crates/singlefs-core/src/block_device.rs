@@ -1,4 +1,4 @@
-//! 块设备抽象：四个动作（读、写——普通写或 FUA 写、写零、屏障），外加三问（探测 `physical_block_size`、设备字节数、
+//! 块设备抽象：五个动作（读、写——普通写或 FUA 写、写零、discard、屏障），外加三问（探测 `physical_block_size`、设备字节数、
 //! journal 环里可能有字节的记录槽）。
 //!
 //! 第一版两个后端（D17（实现分层与第三方管道） 已定项 5）：文件后端（测试镜像）与 `O_DIRECT` 后端（虚机里的真块设备）。
@@ -15,6 +15,12 @@
 //! 读回全 0、文件长度不变与真写 0 相同；持久同样由后面那次屏障给：打洞是元数据改动，ext4 的 `ext4_punch_hole`
 //! 把它记进 `fdatasync` 要等的那个日志事务（本机 6.17 内核源码 `fs/ext4/inode.c` 里调 `ext4_update_inode_fsync_trans(handle, inode, 1)`）。
 //! `O_DIRECT` 后端照旧真写 0：真设备上的块层计数与设备日志比对（checker 档 `device_log.rs` 的折叠）靠的是那些写。
+//!
+//! discard 是第七个动作（`research/prompts/m4-gc-r1-main-verification.md` 第三节 G5「trait 形态」；D26（后台整理与放置回收）
+//! 未定项 9「还缺一个前提」：盘的 FTL 只有收到 discard 才知道哪些块不用了）。它与写零的差别在**结局由设备定**：
+//! 持久之后那一段读回 0 还是旧字节由设备定，模型（崩溃点重放）按「范围写零」枚举两态（D13（验证路线） 已定项 4：持久 → 0、没持久 → 旧字节）。
+//! 后端不认 discard 时交回 [`DiscardOutcome::Unsupported`]、一个字节不动；文件后端复用打洞，`O_DIRECT` 后端第一版不认（`BLKDISCARD` ioctl 留到真盘线）。
+//! 谁发、什么时候发（分配器的可发谓词、发布返回之后发）不在这一层。
 
 use std::fs::{File, OpenOptions};
 use std::io::{self, Seek, SeekFrom};
@@ -31,6 +37,38 @@ pub enum WriteDurability {
     Plain,
     /// FUA 写：返回时已持久（根槽这样写，D16（发布语义） 已定项 7）。
     ForceUnitAccess,
+}
+
+/// 一次 [`BlockDevice::discard_at`] 在这块盘上落成了什么（`.claude/rules/fs-design.md`「五条硬要求」第 4 条：分支可观测，调用方按它数）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiscardOutcome {
+    /// 后端把这一段交给了底层：之后读这一段可能是 0、也可能还是旧字节，持久之后是哪一个由设备定。
+    Applied,
+    /// 后端不认 discard：这一段一个字节没动，读回仍是旧字节。不是错——discard 只是告诉盘「这一段不用了」。
+    Unsupported,
+}
+
+/// 一个句柄上的 discard 各交回了哪一种结局：两项之和就是这个句柄上交回 `Ok` 的 discard 次数。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DiscardOutcomeCounts {
+    pub applied_calls: u64,
+    pub unsupported_calls: u64,
+}
+
+impl DiscardOutcomeCounts {
+    /// 一次也没交回过。
+    pub const NONE: DiscardOutcomeCounts = DiscardOutcomeCounts {
+        applied_calls: 0,
+        unsupported_calls: 0,
+    };
+
+    /// 记下一次交回的结局。
+    pub fn note(&mut self, outcome: DiscardOutcome) {
+        match outcome {
+            DiscardOutcome::Applied => self.applied_calls += 1,
+            DiscardOutcome::Unsupported => self.unsupported_calls += 1,
+        }
+    }
 }
 
 /// 挂载时探测到的物理块大小；不许硬编码（D20（承重面：单元的原子性与自包含） 推论三）。
@@ -112,8 +150,10 @@ impl std::error::Error for BlockDeviceError {}
 /// 比它大只再快 1–2 ms 而暂存区从 4 MiB 长到 64 MiB（`O_DIRECT` 那条路每次调用要一块对齐暂存区）。
 pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
 
-/// 七个方法：四个动作（[`BlockDevice::read_at`]、[`BlockDevice::write_at`]——FUA 是它的 [`WriteDurability`] 参数、不是另一个方法——、
-/// [`BlockDevice::write_zeroes_at`]、[`BlockDevice::barrier`]），三个只答问题、不碰介质的（物理块大小、设备字节数、journal 记录槽的提示）。
+/// 八个方法：五个动作（[`BlockDevice::read_at`]、[`BlockDevice::write_at`]——FUA 是它的 [`WriteDurability`] 参数、不是另一个方法——、
+/// [`BlockDevice::write_zeroes_at`]、[`BlockDevice::discard_at`]、[`BlockDevice::barrier`]），三个只答问题、不碰介质的（物理块大小、设备字节数、journal 记录槽的提示）。
+/// discard 持久之后那一段读回 0 还是旧字节由设备定（不像写零那样必定是 0），模型按「范围写零」枚举（D13（验证路线） 已定项 4 的两态：持久 → 0、没持久 → 旧字节）；
+/// 它带默认实现，只给不认 discard 的后端（交回不支持）。
 /// 另有四个带默认实现、只给记着这次挂载读过什么的那一层（`mounted_session::DeviceReadOnceInThisMount`）改写的：读坏之后当场重读、
 /// 换上自证过的重读、读成而自证不过的记账丢块、这一刻读盘；默认落回 [`BlockDevice::read_at`] 或什么都不做。
 /// 介质是什么这里看不见。
@@ -143,6 +183,38 @@ pub trait BlockDevice {
         offset: DeviceOffsetInBytes,
         length: u64,
     ) -> Result<(), BlockDeviceError>;
+    /// discard：告诉盘 `[offset, offset + length)` 这一段不用了。偏移与长度同样要按物理块对齐、不越过设备末尾，不合就报
+    /// [`BlockDeviceError::Unaligned`] / [`BlockDeviceError::OutOfRange`]、一个字节不动。
+    ///
+    /// 交回 [`DiscardOutcome::Applied`] 之后，那一段在持久之前读回旧字节或 0 都可能，持久之后读回 0 还是旧字节由设备定；
+    /// 调用方不许指望读回什么（D13（验证路线） 已定项 4：模型按「范围写零」枚举持久 / 没持久两态）。
+    /// 与写零一样没有 [`WriteDurability`] 参数：持久由后面的屏障给。
+    ///
+    /// **长度 0 没有动作**：核过请求（偏移照样要对齐、不越过末尾）就交回 [`DiscardOutcome::Applied`]、一个字节不动、
+    /// 不记进 [`DiscardOutcomeCounts::applied_calls`]；默认实现、文件后端、`O_DIRECT` 后端与 harness 的内存盘结局相同
+    /// （主 agent 2026-10-13 定，判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S5）。
+    ///
+    /// **默认实现只给不认 discard 的后端**：核过请求就交回 [`DiscardOutcome::Unsupported`]（长度 0 除外，见上），一个字节不动。
+    /// 默认实现没有状态、记不了数：「交回了几次不支持」由调用方按返回值数，或由覆盖了它的后端自己数（[`DiscardOutcomeCounts`]）。
+    /// 产品后端必须覆盖它（文件后端、`O_DIRECT` 后端都覆盖了）；包在别的设备外面的包装要转给里面那块盘，
+    /// 不覆盖就把里面那块盘认得的 discard 吞成「不支持」。
+    fn discard_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        check_aligned_and_in_range(
+            offset,
+            length,
+            self.probe_physical_block_size(),
+            self.size_in_bytes(),
+        )?;
+        if length == 0 {
+            // 默认实现：长度 0 没有动作，与认 discard 的后端结局相同。
+            return Ok(DiscardOutcome::Applied);
+        }
+        Ok(DiscardOutcome::Unsupported)
+    }
     /// 屏障：之前发出的写全部持久之后才返回。
     fn barrier(&mut self) -> Result<(), BlockDeviceError>;
     fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes;
@@ -215,6 +287,25 @@ pub enum ZeroFillLanding {
     },
 }
 
+/// 文件后端的 discard 怎么落到镜像文件上：复用写零的打洞（`punch_hole_keeping_the_file_length`）与同一段按 errno 分路的判定
+/// （`classify_hole_punch_failure`）；与写零不同的只在「不支持打洞」那一路：discard 不退回逐块写 0，交回 [`DiscardOutcome::Unsupported`]。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiscardLanding {
+    /// 打洞；报不支持打洞交回 [`DiscardOutcome::Unsupported`]、一个字节不动，被信号打断原样重打，报别的错照常交回
+    /// [`BlockDeviceError::InputOutput`]。
+    PunchHoleOrAnswerUnsupported,
+    /// 只供测试的开关（`.claude/rules/fs-design.md`「五条硬要求」第 2 条）：不调 `fallocate`，当作它报了 `EOPNOTSUPP`，
+    /// 与真失败走同一段判定，落进「不支持」那条路。
+    ActAsIfPunchingWereUnsupported,
+    /// 只供测试的开关：不调 `fallocate`，当作它报了 `EIO`，落进照常报错那条路。
+    ActAsIfPunchingFailedWithAnInputOutputError,
+    /// 只供测试的开关：这一次 discard 的前 `punches_interrupted_before_the_real_one` 次打洞不调 `fallocate`，每次都当作它报了 `EINTR`；
+    /// 之后那一次照 [`DiscardLanding::PunchHoleOrAnswerUnsupported`] 真调 `fallocate`。
+    ActAsIfTheFirstPunchesWereInterruptedBySignal {
+        punches_interrupted_before_the_real_one: u64,
+    },
+}
+
 /// 打洞失败之后走哪条路，按 `fallocate` 交回的 errno 分（用户 2026-09-30 定「只在不支持时退」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum HolePunchFailure {
@@ -255,7 +346,14 @@ pub struct FileBackedBlockDevice {
     physical_block_size: PhysicalBlockSizeInBytes,
     zero_fill_landing: ZeroFillLanding,
     zero_fill_landing_counts: ZeroFillLandingCounts,
+    discard_landing: DiscardLanding,
+    discard_outcome_counts: DiscardOutcomeCounts,
+    /// discard 的打洞被信号打断、原样重打的次数（按打洞的次数数，不按 discard 的次数数）。
+    discard_punch_attempts_interrupted_by_signal: u64,
 }
+
+/// 两个构造入口起步时一样：discard 先打洞。
+const INITIAL_DISCARD_LANDING: DiscardLanding = DiscardLanding::PunchHoleOrAnswerUnsupported;
 
 /// 两个构造入口起步时一样：先打洞，计数从 0 起。
 const INITIAL_ZERO_FILL_LANDING: ZeroFillLanding =
@@ -277,12 +375,44 @@ impl FileBackedBlockDevice {
             physical_block_size: self.physical_block_size,
             zero_fill_landing: landing,
             zero_fill_landing_counts: self.zero_fill_landing_counts,
+            discard_landing: self.discard_landing,
+            discard_outcome_counts: self.discard_outcome_counts,
+            discard_punch_attempts_interrupted_by_signal: self
+                .discard_punch_attempts_interrupted_by_signal,
+        }
+    }
+
+    /// 只供测试：换掉 discard 的落地方式（[`DiscardLanding`] 的三个 `ActAsIf…` 开关各强制走一条路）。
+    #[must_use]
+    pub fn with_test_only_discard_landing(self, landing: DiscardLanding) -> Self {
+        Self {
+            file: self.file,
+            size_in_bytes: self.size_in_bytes,
+            physical_block_size: self.physical_block_size,
+            zero_fill_landing: self.zero_fill_landing,
+            zero_fill_landing_counts: self.zero_fill_landing_counts,
+            discard_landing: landing,
+            discard_outcome_counts: self.discard_outcome_counts,
+            discard_punch_attempts_interrupted_by_signal: self
+                .discard_punch_attempts_interrupted_by_signal,
         }
     }
 
     #[must_use]
     pub fn zero_fill_landing_counts(&self) -> ZeroFillLandingCounts {
         self.zero_fill_landing_counts
+    }
+
+    /// 这个句柄上的 discard 各交回了哪一种结局（`.claude/rules/fs-design.md`「五条硬要求」第 4 条：分支可观测）。
+    #[must_use]
+    pub fn discard_outcome_counts(&self) -> DiscardOutcomeCounts {
+        self.discard_outcome_counts
+    }
+
+    /// 这个句柄上 discard 的打洞被信号打断、原样重打了几次。
+    #[must_use]
+    pub fn discard_punch_attempts_interrupted_by_signal(&self) -> u64 {
+        self.discard_punch_attempts_interrupted_by_signal
     }
 
     /// 排他地建出一个镜像文件并把它撑到 `size_in_bytes`；稀疏文件，不真占盘。
@@ -316,6 +446,9 @@ impl FileBackedBlockDevice {
             physical_block_size,
             zero_fill_landing: INITIAL_ZERO_FILL_LANDING,
             zero_fill_landing_counts: NO_ZERO_FILL_LANDED_YET,
+            discard_landing: INITIAL_DISCARD_LANDING,
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
+            discard_punch_attempts_interrupted_by_signal: 0,
         })
     }
 
@@ -349,6 +482,9 @@ impl FileBackedBlockDevice {
             physical_block_size,
             zero_fill_landing: INITIAL_ZERO_FILL_LANDING,
             zero_fill_landing_counts: NO_ZERO_FILL_LANDED_YET,
+            discard_landing: INITIAL_DISCARD_LANDING,
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
+            discard_punch_attempts_interrupted_by_signal: 0,
         })
     }
 
@@ -440,8 +576,8 @@ fn punch_hole_keeping_the_file_length(
         libc::off_t::try_from(length).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
     // SAFETY: `fallocate` 只读它的四个整数参数，不碰进程内存；描述符取自 `file`，
     // 而 `file` 借用到这次调用返回，调用期间不会被关掉或换成别的文件。偏移与长度由上面的 `try_from`
-    // 转成非负的 `off_t`，放不下就在转换处拒；越界的请求到不了这里：唯一的调用方 `write_zeroes_at` 先过 `check_request`
-    // （对齐、落在设备范围内），长度 0 也在 `write_zeroes_at` 里先交回、不到这里。
+    // 转成非负的 `off_t`，放不下就在转换处拒；越界的请求到不了这里：两个调用方 `write_zeroes_at` 与 `discard_at` 都先过 `check_request`
+    // （对齐、落在设备范围内），长度 0 也在它们里面先交回、不到这里。
     // 跨过文件末尾的打洞，文件内那一半照常打成 0，文件外的部分内核不做，都不碰内存。返回值在下面查了。
     let return_code = unsafe {
         libc::fallocate(
@@ -555,6 +691,68 @@ impl BlockDevice for FileBackedBlockDevice {
         }
     }
 
+    /// 复用写零的打洞：打成洞之后读这一段是全 0，文件长度不变（D13（验证路线） 已定项 4 的「持久 → 0」那一态在镜像文件上就是它）。
+    /// 文件系统不支持打洞时交回 [`DiscardOutcome::Unsupported`]、不退回逐块写 0（discard 不承诺读回 0，写 0 只是白写）；
+    /// 被信号打断原样重打；别的错照常报 [`BlockDeviceError::InputOutput`]。
+    fn discard_at(
+        &mut self,
+        discarded_offset: DeviceOffsetInBytes,
+        discarded_length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        self.check_request(discarded_offset, discarded_length)?;
+        // 长度 0 没有动作（[`BlockDevice::discard_at`] 的文档）：`fallocate(2)` 对它报 `EINVAL`，不调；照「交给了底层」交回、不记数。
+        if discarded_length == 0 {
+            return Ok(DiscardOutcome::Applied);
+        }
+        // 循环：每一轮打一次洞。跨轮的状态只有这一次 discard 里被信号打断的次数（只增）；
+        // 出口三个：打成洞、报不支持、报别的错。被打断就原样再打，轮数的上界是这期间送到的信号数。
+        let mut interrupted_in_this_discard: u64 = 0;
+        loop {
+            let punch_result = match self.discard_landing {
+                DiscardLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal {
+                    punches_interrupted_before_the_real_one,
+                } if interrupted_in_this_discard < punches_interrupted_before_the_real_one => {
+                    Err(io::Error::from_raw_os_error(libc::EINTR))
+                }
+                DiscardLanding::PunchHoleOrAnswerUnsupported
+                | DiscardLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal { .. } => {
+                    punch_hole_keeping_the_file_length(
+                        &self.file,
+                        discarded_offset,
+                        discarded_length,
+                    )
+                }
+                DiscardLanding::ActAsIfPunchingWereUnsupported => {
+                    Err(io::Error::from_raw_os_error(libc::EOPNOTSUPP))
+                }
+                DiscardLanding::ActAsIfPunchingFailedWithAnInputOutputError => {
+                    Err(io::Error::from_raw_os_error(libc::EIO))
+                }
+            };
+            let discard_punch_error = match punch_result {
+                Ok(()) => {
+                    self.discard_outcome_counts.note(DiscardOutcome::Applied);
+                    return Ok(DiscardOutcome::Applied);
+                }
+                Err(discard_punch_error) => discard_punch_error,
+            };
+            match classify_hole_punch_failure(&discard_punch_error) {
+                HolePunchFailure::PunchingUnsupported => {
+                    self.discard_outcome_counts
+                        .note(DiscardOutcome::Unsupported);
+                    return Ok(DiscardOutcome::Unsupported);
+                }
+                HolePunchFailure::InterruptedBySignal => {
+                    interrupted_in_this_discard += 1;
+                    self.discard_punch_attempts_interrupted_by_signal += 1;
+                }
+                HolePunchFailure::OtherFailure => {
+                    return Err(BlockDeviceError::InputOutput(discard_punch_error));
+                }
+            }
+        }
+    }
+
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
         self.file.sync_data().map_err(BlockDeviceError::InputOutput)
     }
@@ -659,6 +857,7 @@ pub struct DirectInputOutputBlockDevice {
     size_in_bytes: u64,
     physical_block_size: PhysicalBlockSizeInBytes,
     policy: PageCachePolicy,
+    discard_outcome_counts: DiscardOutcomeCounts,
 }
 
 impl DirectInputOutputBlockDevice {
@@ -693,7 +892,14 @@ impl DirectInputOutputBlockDevice {
             size_in_bytes,
             physical_block_size,
             policy,
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
         })
+    }
+
+    /// 这个句柄上的 discard 各交回了哪一种结局；第一版每一次都记「不支持」，长度 0 的不记（[`BlockDevice::discard_at`] 在这个后端上的文档）。
+    #[must_use]
+    pub fn discard_outcome_counts(&self) -> DiscardOutcomeCounts {
+        self.discard_outcome_counts
     }
 }
 
@@ -773,6 +979,25 @@ impl BlockDevice for DirectInputOutputBlockDevice {
                 .write_all_at(chunk, chunk_offset.0)
                 .map_err(BlockDeviceError::InputOutput)
         })
+    }
+
+    /// 第一版不认 discard：核过请求就交回 [`DiscardOutcome::Unsupported`]，一个字节不动、不发系统调用，两臂（绕开 / 走页缓存）一样；
+    /// 长度 0 的照 trait 文档交回 [`DiscardOutcome::Applied`]、不记数。
+    /// 真块设备上的 discard 是 `BLKDISCARD` ioctl，留到真盘线（`research/prompts/m4-gc-r1-main-verification.md` 第三节 G5「真盘 ioctl 留到真盘线」）；
+    /// 在那之前虚机里的设备侧日志里不会有 Discard 条目，宿主重跑那一侧要照这个结局投（checker 档 `device_log.rs`）。
+    fn discard_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        check_aligned_and_in_range(offset, length, self.physical_block_size, self.size_in_bytes)?;
+        if length == 0 {
+            // `O_DIRECT` 后端：长度 0 没有动作，交回「交给了底层」、不记数（[`BlockDevice::discard_at`] 的文档）。
+            return Ok(DiscardOutcome::Applied);
+        }
+        self.discard_outcome_counts
+            .note(DiscardOutcome::Unsupported);
+        Ok(DiscardOutcome::Unsupported)
     }
 
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
@@ -1631,6 +1856,268 @@ mod tests {
                 "长度 {length} 的暂存区没有按 4096 对齐"
             );
             assert_eq!(scratch.as_slice().len(), length);
+        }
+    }
+
+    /// discard 用例的镜像：64 KiB、整个先填成 0xC3（稀疏镜像本来就读回全 0，不先弄脏就分不出「打过洞」与「从来没写过」），
+    /// 换上 `landing` 那一种 discard 落地方式。
+    const DISCARD_IMAGE_BYTES: u64 = 65536;
+    const DISCARD_DIRT_BYTE: u8 = 0xC3;
+
+    fn dirty_image_for_discards(
+        tag: &str,
+        landing: DiscardLanding,
+    ) -> (FileBackedBlockDevice, ImageRemovedOnDrop) {
+        let path = temporary_image_path(tag);
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            DISCARD_IMAGE_BYTES,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
+        let dirt = vec![DISCARD_DIRT_BYTE; usize::try_from(DISCARD_IMAGE_BYTES).expect("64 KiB")];
+        device
+            .write_at(DeviceOffsetInBytes(0), &dirt, WriteDurability::Plain)
+            .expect("填脏");
+        (
+            device.with_test_only_discard_landing(landing),
+            ImageRemovedOnDrop(path),
+        )
+    }
+
+    fn sector_at(device: &FileBackedBlockDevice, offset: u64) -> Vec<u8> {
+        let mut sector = vec![0x5Au8; 512];
+        device
+            .read_at(DeviceOffsetInBytes(offset), &mut sector)
+            .expect("读一扇区");
+        sector
+    }
+
+    /// 文件后端的 discard 复用打洞：段内读回全 0、段外一个字节不动、文件长度不变，交回「交给了底层」并记一次。
+    #[test]
+    fn a_discard_on_the_file_backend_punches_the_range_back_to_zero_and_leaves_the_neighbours() {
+        let (mut device, _removed) = dirty_image_for_discards(
+            "discard-punched",
+            DiscardLanding::PunchHoleOrAnswerUnsupported,
+        );
+        let outcome = device
+            .discard_at(DeviceOffsetInBytes(8192), 16384)
+            .expect("discard");
+        assert_eq!(outcome, DiscardOutcome::Applied);
+        for offset in [8192u64, 8192 + 16384 - 512] {
+            assert!(
+                sector_at(&device, offset).iter().all(|byte| *byte == 0),
+                "偏移 {offset} 在 discard 段内，打过洞读回全 0"
+            );
+        }
+        for offset in [8192u64 - 512, 8192 + 16384] {
+            assert!(
+                sector_at(&device, offset)
+                    .iter()
+                    .all(|byte| *byte == DISCARD_DIRT_BYTE),
+                "偏移 {offset} 在 discard 段外，不该被动"
+            );
+        }
+        assert_eq!(
+            device.file.metadata().expect("读文件元数据").len(),
+            DISCARD_IMAGE_BYTES,
+            "打洞不改文件长度"
+        );
+        assert_eq!(
+            device.discard_outcome_counts(),
+            DiscardOutcomeCounts {
+                applied_calls: 1,
+                unsupported_calls: 0
+            }
+        );
+        assert_eq!(
+            device.zero_fill_landing_counts(),
+            NO_ZERO_FILL_LANDED_YET,
+            "discard 不记进写零的落地计数"
+        );
+    }
+
+    /// 文件系统不支持打洞：交回「不支持」、一个 0 都不写（段里还是旧字节），记一次「不支持」。
+    #[test]
+    fn a_discard_where_hole_punching_is_unsupported_answers_unsupported_and_leaves_the_old_bytes() {
+        let (mut device, _removed) = dirty_image_for_discards(
+            "discard-unsupported",
+            DiscardLanding::ActAsIfPunchingWereUnsupported,
+        );
+        let outcome = device
+            .discard_at(DeviceOffsetInBytes(8192), 16384)
+            .expect("discard");
+        assert_eq!(outcome, DiscardOutcome::Unsupported);
+        assert!(
+            sector_at(&device, 8192)
+                .iter()
+                .all(|byte| *byte == DISCARD_DIRT_BYTE),
+            "不支持时一个字节不动"
+        );
+        assert_eq!(
+            device.discard_outcome_counts(),
+            DiscardOutcomeCounts {
+                applied_calls: 0,
+                unsupported_calls: 1
+            }
+        );
+    }
+
+    /// 打洞报 `EIO`：照常交回块设备 I/O 错，不吞成「不支持」，段里还是旧字节，两种结局都不记。
+    #[test]
+    fn a_discard_whose_hole_punch_fails_with_an_input_output_error_is_reported_and_changes_nothing()
+    {
+        let (mut device, _removed) = dirty_image_for_discards(
+            "discard-input-output-error",
+            DiscardLanding::ActAsIfPunchingFailedWithAnInputOutputError,
+        );
+        let outcome = device.discard_at(DeviceOffsetInBytes(8192), 16384);
+        assert!(
+            matches!(&outcome, Err(BlockDeviceError::InputOutput(error)) if error.raw_os_error() == Some(libc::EIO)),
+            "EIO 照常报错：{outcome:?}"
+        );
+        assert!(sector_at(&device, 8192)
+            .iter()
+            .all(|byte| *byte == DISCARD_DIRT_BYTE));
+        assert_eq!(device.discard_outcome_counts(), DiscardOutcomeCounts::NONE);
+    }
+
+    /// 打洞连着被信号打断两次：原样重打到第三次，打成洞、交回「交给了底层」，被打断的次数记 2。
+    #[test]
+    fn a_discard_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time() {
+        let (mut device, _removed) = dirty_image_for_discards(
+            "discard-interrupted",
+            DiscardLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal {
+                punches_interrupted_before_the_real_one: 2,
+            },
+        );
+        let outcome = device
+            .discard_at(DeviceOffsetInBytes(8192), 16384)
+            .expect("被打断之后重打成功");
+        assert_eq!(outcome, DiscardOutcome::Applied);
+        assert!(sector_at(&device, 8192).iter().all(|byte| *byte == 0));
+        assert_eq!(device.discard_punch_attempts_interrupted_by_signal(), 2);
+        assert_eq!(device.discard_outcome_counts().applied_calls, 1);
+    }
+
+    /// 没对齐、越过末尾的 discard 在动文件之前就拒，与读写同一条判据；段里还是旧字节。
+    #[test]
+    fn a_discard_off_the_block_boundaries_or_past_the_end_is_refused_before_touching_the_file() {
+        let (mut device, _removed) = dirty_image_for_discards(
+            "discard-refused",
+            DiscardLanding::PunchHoleOrAnswerUnsupported,
+        );
+        assert!(matches!(
+            device.discard_at(DeviceOffsetInBytes(100), 512),
+            Err(BlockDeviceError::Unaligned { .. })
+        ));
+        assert!(matches!(
+            device.discard_at(DeviceOffsetInBytes(DISCARD_IMAGE_BYTES - 512), 1024),
+            Err(BlockDeviceError::OutOfRange { .. })
+        ));
+        assert!(sector_at(&device, DISCARD_IMAGE_BYTES - 512)
+            .iter()
+            .all(|byte| *byte == DISCARD_DIRT_BYTE));
+        assert_eq!(device.discard_outcome_counts(), DiscardOutcomeCounts::NONE);
+    }
+
+    /// 文件后端上长度 0 的 discard 没有动作：交回「交给了底层」、不调 `fallocate`、两种结局都不记，段里还是旧字节
+    /// （判决 m4-batch2-code-r1 S5，四个后端同一结局）。
+    #[test]
+    fn a_zero_length_discard_on_the_file_backend_is_applied_without_being_counted() {
+        let (mut device, _removed) = dirty_image_for_discards(
+            "discard-zero-length",
+            DiscardLanding::PunchHoleOrAnswerUnsupported,
+        );
+        let outcome = device
+            .discard_at(DeviceOffsetInBytes(8192), 0)
+            .expect("长度 0 的 discard");
+        assert_eq!(outcome, DiscardOutcome::Applied, "长度 0 交回交给了底层");
+        assert_eq!(
+            device.discard_outcome_counts(),
+            DiscardOutcomeCounts::NONE,
+            "长度 0 没有动作，不记数"
+        );
+        assert!(sector_at(&device, 8192)
+            .iter()
+            .all(|byte| *byte == DISCARD_DIRT_BYTE));
+    }
+
+    /// `O_DIRECT` 后端上长度 0 的 discard 没有动作：两臂都交回「交给了底层」、不记「不支持」（判决 m4-batch2-code-r1 S5）。
+    #[test]
+    fn a_zero_length_discard_on_the_direct_backend_is_applied_without_being_counted_on_both_arms() {
+        for policy in [
+            PageCachePolicy::BypassWithDirectInputOutput,
+            PageCachePolicy::GoThroughPageCache,
+        ] {
+            let path = temporary_image_path("direct-discard-zero-length");
+            let _removed = ImageRemovedOnDrop(path.clone());
+            let mut file = std::fs::File::create(&path).expect("建文件");
+            std::io::Write::write_all(&mut file, &[DISCARD_DIRT_BYTE; 65536]).expect("填脏");
+            drop(file);
+            let mut device = DirectInputOutputBlockDevice::open_existing(
+                &path,
+                policy,
+                PhysicalBlockSizeSource::Declared(PhysicalBlockSizeInBytes(512)),
+            )
+            .expect("打开（临时目录在 ext4 上）");
+            assert_eq!(
+                device
+                    .discard_at(DeviceOffsetInBytes(8192), 0)
+                    .expect("长度 0 的 discard"),
+                DiscardOutcome::Applied,
+                "{policy:?}"
+            );
+            assert_eq!(
+                device.discard_outcome_counts(),
+                DiscardOutcomeCounts::NONE,
+                "{policy:?}：长度 0 没有动作，不记数"
+            );
+        }
+    }
+
+    /// `O_DIRECT` 后端第一版不认 discard：两臂都交回「不支持」、一个字节不动、每次记一次；没对齐的照样拒。
+    #[test]
+    fn the_direct_backend_answers_every_discard_unsupported_on_both_arms_and_counts_it() {
+        for policy in [
+            PageCachePolicy::BypassWithDirectInputOutput,
+            PageCachePolicy::GoThroughPageCache,
+        ] {
+            let path = temporary_image_path("direct-discard");
+            let _removed = ImageRemovedOnDrop(path.clone());
+            let mut file = std::fs::File::create(&path).expect("建文件");
+            std::io::Write::write_all(&mut file, &[DISCARD_DIRT_BYTE; 65536]).expect("填脏");
+            drop(file);
+            let mut device = DirectInputOutputBlockDevice::open_existing(
+                &path,
+                policy,
+                PhysicalBlockSizeSource::Declared(PhysicalBlockSizeInBytes(512)),
+            )
+            .expect("打开（临时目录在 ext4 上）");
+            assert_eq!(
+                device
+                    .discard_at(DeviceOffsetInBytes(8192), 16384)
+                    .expect("discard"),
+                DiscardOutcome::Unsupported,
+                "{policy:?}"
+            );
+            assert!(matches!(
+                device.discard_at(DeviceOffsetInBytes(100), 512),
+                Err(BlockDeviceError::Unaligned { .. })
+            ));
+            let mut sector = vec![0u8; 512];
+            device
+                .read_at(DeviceOffsetInBytes(8192), &mut sector)
+                .expect("读");
+            assert!(sector.iter().all(|byte| *byte == DISCARD_DIRT_BYTE));
+            assert_eq!(
+                device.discard_outcome_counts(),
+                DiscardOutcomeCounts {
+                    applied_calls: 0,
+                    unsupported_calls: 1
+                },
+                "{policy:?}"
+            );
         }
     }
 }

@@ -248,6 +248,8 @@ fn mount_writable_after_the_crash_of_the_floor_raise(
 /// 恢复之后 oracle 与池级 checker 0 违例（枚举器自己判）；再可写挂载（空间准入判着），挂载之后的镜像池级 checker 0 违例；
 /// 挂载全做成。状态数照崩溃点重放的口径另算（系统配置槽写是原地覆写、取三态，[`crash_state_count_with_torn_in_place_overwrites`]），
 /// 落在 10⁶ 以内才枚举；挂载那一遍的镜像照观察者交来的枚举用写表叠（录制流里的写在前，撕裂镜像与重放接在后面），不只叠录制流那几次写。
+/// 判完打一行计数行 `CRASH_POINT_REPLAY_FLOOR_RAISE_PUSHED_BY_THE_SESSION`（状态数等于那个闭式时带 `exhaustive=true`），
+/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:floor-raise-pushed-by-the-session`）的 `count-line=`、`exhaustive=`、`threads=` 都按它判。
 #[test]
 #[ignore = "崩溃枚举：用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
 fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount_with_the_checker_green(
@@ -312,6 +314,20 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
     .judged() else {
         return;
     };
+    // 计数行（C564 ①）：门禁 checker-tier-crash-point-replay 只认行首 `CRASH_POINT_REPLAY_FLOOR_RAISE_PUSHED_BY_THE_SESSION ` 与 `exhaustive=true`
+    // （枚举到的状态数等于每一段都展开时按崩溃点重放口径另算的闭式），线程按 states= 找 CRASH_POINT_REPLAY_PARALLEL_FINISHED 那一行判；整行原样报出来。
+    println!(
+        "CRASH_POINT_REPLAY_FLOOR_RAISE_PUSHED_BY_THE_SESSION states={} closed_form={states} exhaustive={} violations={} failed={} checker_violations={} mounted_and_checker_clean={} checker_by_invariant(evaluated/violated/not_applicable) {}",
+        tally.states,
+        tally.states == states,
+        tally.violations,
+        tally.failed_states,
+        tally.checker_violated_states.values().sum::<u64>(),
+        tally
+            .observer_counts
+            .count_named("mounted_and_checker_clean"),
+        tally.checker_counts_by_invariant()
+    );
     assert_eq!(
         tally.states, states,
         "每一段都展开，状态数与按崩溃点重放口径另算的相同（原地覆写三态、其余两态）"

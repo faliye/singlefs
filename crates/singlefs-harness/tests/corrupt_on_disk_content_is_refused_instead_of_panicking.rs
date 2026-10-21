@@ -1848,8 +1848,7 @@ fn allocation_record_span_zero_or_generation_after_the_root() -> RecoveryFailure
 fn mapping_entry_count_is_not_one_per_mapped_unit() -> RecoveryFailure {
     RecoveryFailure::InvariantViolated {
         invariant: "E142 走读同款",
-        detail:
-            "映射条目数不是 1 + extent 树、分配记录树、记账树的节点数 + inode 叶容器数 + 数据单元数",
+        detail: "映射条目数不是 1 + extent 树、分配记录树、记账树、deadlist 树的节点数 + deadlist 条目数 + inode 叶容器数 + 数据单元数",
     }
 }
 

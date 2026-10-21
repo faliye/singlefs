@@ -915,6 +915,7 @@ fn operation_kind_name(kind: RecordedOperationKind) -> &'static str {
         RecordedOperationKind::Write => "write",
         RecordedOperationKind::WriteForceUnitAccess => "write_fua",
         RecordedOperationKind::WriteZeroes => "write_zeroes",
+        RecordedOperationKind::Discard => "discard",
         RecordedOperationKind::Barrier => "barrier",
     }
 }
@@ -980,6 +981,7 @@ fn read_neutral_stream(directory: &Path) -> NeutralStream {
                 "write" => RecordedOperationKind::Write,
                 "write_fua" => RecordedOperationKind::WriteForceUnitAccess,
                 "write_zeroes" => RecordedOperationKind::WriteZeroes,
+                "discard" => RecordedOperationKind::Discard,
                 "barrier" => RecordedOperationKind::Barrier,
                 unknown => panic!("ops.tsv 里认不出的种类 {unknown:?}"),
             };
@@ -1030,7 +1032,7 @@ fn rebuilt_image_digest(stream: &NeutralStream, landing_vector: &str) -> [u8; DI
         let length = usize::try_from(operation.length).expect("写长装得进 usize");
         let bytes: Option<&[u8]> = match (landing, operation.kind) {
             ('0', _) => None,
-            ('2', RecordedOperationKind::WriteZeroes) => {
+            ('2', RecordedOperationKind::WriteZeroes | RecordedOperationKind::Discard) => {
                 let end_sector = (operation.offset + operation.length) / LOCAL_SECTOR_BYTES;
                 let covered: Vec<(u32, u64)> = sectors
                     .range((operation.device, first_sector)..(operation.device, end_sector))
@@ -1486,9 +1488,9 @@ fn operations_file_text_and_payload(stream: &PreparedStream) -> (String, Vec<u8>
                 payload.extend_from_slice(contents);
                 (start.to_string(), sha256_hexadecimal(contents))
             }
-            RecordedOperationKind::WriteZeroes | RecordedOperationKind::Barrier => {
-                ("-".to_string(), "-".to_string())
-            }
+            RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard
+            | RecordedOperationKind::Barrier => ("-".to_string(), "-".to_string()),
         };
         operations_text.push_str(&format!(
             "{stream_index}\t{}\t{}\t{}\t{}\t{payload_start}\t{content_digest}\n",

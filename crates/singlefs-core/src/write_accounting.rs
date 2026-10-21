@@ -18,12 +18,16 @@ pub enum WrittenStructureKind {
     InodeTreeRoot,
     AllocationRecordTreeNode,
     AccountingTreeNode,
+    /// deadlist 树的节点（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：第三棵多层码 2 树）：按树数，不按层数。
+    DeadlistTreeNode,
     /// `deleted_inodes` 树的根（D8（核心索引结构） 已定项 16）。
     DeletedInodesTreeNode,
     /// 墓碑树的容器与根（D18（块里携带什么信息） 已定项 24）：按树数，不按容器与根分。
     TombstoneTreeNode,
     /// 谱系树的容器与根（D18（块里携带什么信息） 已定项 24 第 5 条）：另立一种、不并进墓碑树那一种（用户 2026-10-02 定「另立一种」），按树数。
     LineageTreeNode,
+    /// logged_ops 树的根（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1：单树、只有一个码 2 根）：另立一种，按树数。
+    LoggedOperationsTreeNode,
     /// 退役树的容器与根（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条）：照谱系树另立一种，按树数。
     RetirementTreeNode,
     CentralMappingTreeNode,
@@ -37,16 +41,18 @@ pub enum WrittenStructureKind {
 impl WrittenStructureKind {
     /// 报数的次序：单元按 bump 次序（实例表单元在末尾，同 `TransactionOutput::units`），固定结构按持久顺序（D16（发布语义） 已定项 7）。
     /// 合计不经过这张清单（`WritesByStructureKind::total` 只从记过的账里加）：清单漏一种，报出的各种之和就对不上合计。
-    pub const IN_REPORT_ORDER: [WrittenStructureKind; 16] = [
+    pub const IN_REPORT_ORDER: [WrittenStructureKind; 18] = [
         WrittenStructureKind::DataUnit,
         WrittenStructureKind::ExtentTreeNode,
         WrittenStructureKind::InodeTreeLeafContainer,
         WrittenStructureKind::InodeTreeRoot,
         WrittenStructureKind::AllocationRecordTreeNode,
         WrittenStructureKind::AccountingTreeNode,
+        WrittenStructureKind::DeadlistTreeNode,
         WrittenStructureKind::DeletedInodesTreeNode,
         WrittenStructureKind::TombstoneTreeNode,
         WrittenStructureKind::LineageTreeNode,
+        WrittenStructureKind::LoggedOperationsTreeNode,
         WrittenStructureKind::RetirementTreeNode,
         WrittenStructureKind::CentralMappingTreeNode,
         WrittenStructureKind::TreeTableUnit,
@@ -60,7 +66,13 @@ impl WrittenStructureKind {
     #[must_use]
     pub const fn of_unit(identity: TransactionUnit) -> WrittenStructureKind {
         match identity {
-            TransactionUnit::Data(_) => WrittenStructureKind::DataUnit,
+            TransactionUnit::Data(_) | TransactionUnit::DataOfAFileOtherThanTheFirst { .. } => {
+                WrittenStructureKind::DataUnit
+            }
+            // 第一个文件之外的文件那一棵下段同第一个文件的下段：extent 树节点，按树数、不按文件数。
+            TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. } => {
+                WrittenStructureKind::ExtentTreeNode
+            }
             // 按 key 空间定形状的两棵树同样按树数、不按段与层数（extent 树上段与下段、分配记录树每一层都是这一种）。
             TransactionUnit::ExtentLowerNode(_)
             | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
@@ -72,6 +84,9 @@ impl WrittenStructureKind {
             // 多层之后根之下的节点与根同一种：按树数，不按层数（增补 1 的账按结构种类记）。
             TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
             | TransactionUnit::AccountingTree => WrittenStructureKind::AccountingTreeNode,
+            TransactionUnit::DeadlistTreeNodeBelowTheRoot(_) | TransactionUnit::DeadlistTree => {
+                WrittenStructureKind::DeadlistTreeNode
+            }
             TransactionUnit::DeletedInodesRoot => WrittenStructureKind::DeletedInodesTreeNode,
             TransactionUnit::TombstoneLeafContainer(_) | TransactionUnit::TombstoneRoot => {
                 WrittenStructureKind::TombstoneTreeNode
@@ -84,6 +99,7 @@ impl WrittenStructureKind {
                 WrittenStructureKind::TombstoneTreeNode
             }
             TransactionUnit::LineageNodeBelowTheRoot(_) => WrittenStructureKind::LineageTreeNode,
+            TransactionUnit::LoggedOperationsRoot => WrittenStructureKind::LoggedOperationsTreeNode,
             TransactionUnit::RetirementLeafContainer(_)
             | TransactionUnit::RetirementRoot
             | TransactionUnit::RetirementNodeBelowTheRoot(_) => {
@@ -109,9 +125,11 @@ impl WrittenStructureKind {
             WrittenStructureKind::InodeTreeRoot => "inode_tree_root",
             WrittenStructureKind::AllocationRecordTreeNode => "allocation_record_tree_node",
             WrittenStructureKind::AccountingTreeNode => "accounting_tree_node",
+            WrittenStructureKind::DeadlistTreeNode => "deadlist_tree_node",
             WrittenStructureKind::DeletedInodesTreeNode => "deleted_inodes_tree_node",
             WrittenStructureKind::TombstoneTreeNode => "tombstone_tree_node",
             WrittenStructureKind::LineageTreeNode => "lineage_tree_node",
+            WrittenStructureKind::LoggedOperationsTreeNode => "logged_operations_tree_node",
             WrittenStructureKind::RetirementTreeNode => "retirement_tree_node",
             WrittenStructureKind::CentralMappingTreeNode => "central_mapping_tree_node",
             WrittenStructureKind::TreeTableUnit => "tree_table_unit",
@@ -286,9 +304,11 @@ mod tests {
             TransactionUnit::InodeRoot,
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
+            TransactionUnit::DeadlistTree,
             TransactionUnit::DeletedInodesRoot,
             TransactionUnit::TombstoneRoot,
             TransactionUnit::LineageRoot,
+            TransactionUnit::LoggedOperationsRoot,
             TransactionUnit::RetirementRoot,
             TransactionUnit::MappingTree,
             TransactionUnit::TreeTable,
@@ -312,7 +332,7 @@ mod tests {
             assert_eq!(
                 every_kind_once.of(kind).write_calls,
                 1,
-                "{kind:?}：十三个单元角色各归一种、三种固定结构各一种，每种恰好一笔"
+                "{kind:?}：十五个单元角色各归一种、三种固定结构各一种，每种恰好一笔"
             );
         }
         let reported = WrittenStructureKind::IN_REPORT_ORDER
@@ -328,10 +348,10 @@ mod tests {
         assert_eq!(
             every_kind_once.total(),
             WriteCallsAndBytes {
-                write_calls: 16,
-                written_bytes: 65535
+                write_calls: 18,
+                written_bytes: 262_143
             },
-            "十六笔，长度 1 到 32768 各一次"
+            "十八笔，长度 1 到 131072 各一次"
         );
         let mut names: Vec<&str> = WrittenStructureKind::IN_REPORT_ORDER
             .iter()
@@ -339,6 +359,6 @@ mod tests {
             .collect();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 16, "结果行的字段名前缀互不相同");
+        assert_eq!(names.len(), 18, "结果行的字段名前缀互不相同");
     }
 }

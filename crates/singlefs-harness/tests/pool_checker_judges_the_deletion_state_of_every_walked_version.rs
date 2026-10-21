@@ -51,9 +51,10 @@ use singlefs_checker::image::{
     InvariantVerdict, DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE,
     DELETION_QUEUE_AND_THE_NLINK_ZERO_RECORDS_NAME_THE_SAME_INODES,
     DELETION_QUEUE_HOLDS_AT_MOST_ONE_KEY, INODE_BEING_DELETED_IS_QUEUED_OR_HAS_NO_DATA_UNIT_LEFT,
-    INTENT_DESCRIBES_ONLY_THE_TARGET_STATE, INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION,
+    INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+    NO_INTENT_ENTRY_IN_THE_LOGGED_OPERATIONS_OF_ANY_WALKED_VERSION,
     ONE_OBJECT_BIRTH_PER_INODE_NUMBER, PENDING_DELETION_OCCUPANCY_STATISTIC_IS_ZERO,
-    QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
+    QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE, SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
     TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
     TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT, TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
 };
@@ -479,14 +480,16 @@ fn every_published_step_of_unlinking_a_three_unit_file_holds_the_deletion_invari
         }
         assert_eq!(
             verdict_of(image, INTENT_DESCRIBES_ONLY_THE_TARGET_STATE),
-            InvariantVerdict::NotApplicable(INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION),
+            InvariantVerdict::NotApplicable(
+                NO_INTENT_ENTRY_IN_THE_LOGGED_OPERATIONS_OF_ANY_WALKED_VERSION
+            ),
             "{step}之后 I-4.4 报第一版不适用"
         );
     }
 }
 
 /// L1a（代码轮判决 `research/prompts/m3-batch18-code-r1-main-verification.md` 第二节「K2 漏判 L1」，攻方报告第二节）：意图之后那一版树表里
-/// `deleted_inodes` 那一条的种类码 9 改成没登记的 13——那一版的 inode 树（1 号 nlink 0、三个单元）没有任何 `deleted_inodes` 条目指着它。
+/// `deleted_inodes` 那一条的种类码 9 改成没登记的 16——那一版的 inode 树（1 号 nlink 0、三个单元）没有任何 `deleted_inodes` 条目指着它。
 /// 改法 A 之前只从 `deleted_inodes` 条目一侧去配，这一版一次都不判、也不记判不了，I-9.5 报成立；现在三条在那一版判不了、不报成立。
 /// 判红的只有 I-9.16（树表里十一种各恰好一条，④）。
 #[test]
@@ -685,16 +688,25 @@ fn an_empty_entry_standing_in_for_the_extent_tree_while_the_real_extent_tree_nam
     let clean =
         pool_with_new_inodes("deletion-checker-s1-empty-entry-as-extent-tree", 1).memory_pool();
     assert_the_base_image_is_clean(&clean, "建了一个空 inode 之后");
-    for invariant in [
+    let reason_on_the_legal_image = reason_not_judged(
+        &clean,
         INODE_BEING_DELETED_IS_QUEUED_OR_HAS_NO_DATA_UNIT_LEFT,
-        DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE,
-    ] {
-        let reason = reason_not_judged(&clean, invariant);
-        assert!(
-            !reason.contains(NOT_JUDGED_EXTENT_TREE_HEAD_IDENTIFIER_NAMES_NO_SINGLE_INODE_TREE),
-            "{invariant} 在合法镜像上照旧报没有对象，不报 extent 树配不上：{reason}"
-        );
-    }
+    );
+    assert!(
+        !reason_on_the_legal_image
+            .contains(NOT_JUDGED_EXTENT_TREE_HEAD_IDENTIFIER_NAMES_NO_SINGLE_INODE_TREE),
+        "I-4.7 在合法镜像上照旧报没有对象，不报 extent 树配不上：{reason_on_the_legal_image}"
+    );
+    // I-4.6 自截断起每条记录都判（m4-trunc-r1 判决 K7 T-3）：空 inode 的记录 size 0、没有单元，在合法镜像上真被评估过且成立，
+    // 说明 extent 树从 inode 树一侧配上了。
+    assert_eq!(
+        verdict_of(
+            &clean,
+            DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE
+        ),
+        InvariantVerdict::Holds,
+        "I-4.6 在合法镜像上成立，不报 extent 树配不上"
+    );
     let mut image = clean.clone();
     drop_the_record_of_the_first_file_and_keep_its_data_units(&mut image);
     let tree_table_slot = tree_table_slot_of_the_newest_root(&image);
@@ -974,6 +986,8 @@ fn an_intermediate_version_with_data_units_of_an_inode_without_a_record_reddens_
 /// C708（nlink 为 0 却不在删除队列，checker 判不出） 还差的那一形：I-9.5 正方向「队列里的号在树里 nlink ≠ 0」。
 /// 意图之后队列 {1} 不动，1 号那条记录的 nlink 0 → 1。按条款同红 I-9.19（谱系上的墓碑不指活对象）：墓碑 (1, 1 号的出生代) 在谱系上而那条记录
 /// nlink 1（判决 `research/prompts/m3-delete-checker-r2-main-verification.md` 第二节 T9 那一行）；I-9.18 只要有那条墓碑、不看 nlink，照旧成立。
+/// I-1.13 也红：删除中要两侧那条记录 nlink 都是 0（判决 `research/prompts/m4-c860-r1-main-verification.md` 第三节 C2，用户 2026-10-20 选丙），
+/// 这条 nlink 1 的记录不算删除中，扫描重建按墓碑不认领 1 号的数据单元、遍历方向照收。
 #[test]
 fn a_queue_number_whose_inode_record_has_nlink_one_reddens_the_deletion_queue_invariant() {
     let clean =
@@ -990,9 +1004,12 @@ fn a_queue_number_whose_inode_record_has_nlink_one_reddens_the_deletion_queue_in
         violated,
         vec![
             DELETION_QUEUE_AND_THE_NLINK_ZERO_RECORDS_NAME_THE_SAME_INODES,
-            TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT
+            TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT,
+            SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX
         ],
-        "判红的是 I-9.5 与 I-9.19"
+        "判红的是 I-9.5、I-9.19 与 I-1.13。原先按「只凭扫描一侧认删除中」写死的只有前两条：墓碑压着、记录还在就两侧都摘掉 1 号；\
+         用户 2026-10-20 选丙（判决 `research/prompts/m4-c860-r1-main-verification.md` 第三节 C2）之后删除中要两侧那条记录 nlink 都是 0，\
+         1 号这条 nlink 1 的活记录压着墓碑，不算删除中、两侧照比，它的三个数据单元扫描重建那一侧按墓碑不认领、遍历方向照收，I-1.13 跟着红"
     );
     let live_object_detail =
         first_violation_of(&image, TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT);

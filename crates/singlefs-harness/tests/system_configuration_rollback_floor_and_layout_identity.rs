@@ -20,6 +20,7 @@ use singlefs_core::root_record::{ROOT_CHECKSUM_OFFSET, ROOT_RECORD_FLAG_UNMOUNT_
 use singlefs_core::root_ring::{slot_offset, RootRingSlot};
 use singlefs_core::system_configuration::{
     SystemConfiguration, INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
+    INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT,
     INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT,
     SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
 };
@@ -86,7 +87,8 @@ fn plant_rollback_floor(
         .expect("写回系统配置槽");
 }
 
-/// mkfs 写出的四个系统配置槽（两盘各两槽）：incompat 只带位 1、不带退役的位 0，F 那 8 字节是 0，
+/// mkfs 写出的四个系统配置槽（两盘各两槽）：incompat 带位 1 与位 2（inode 记录带截断字段，判决
+/// `research/prompts/m4-trunc-r2-main-verification.md` 第六节）、不带退役的位 0，F 那 8 字节是 0，
 /// 核心层的读者交回 F = 0，独立实现的 checker 也认这一槽。
 #[test]
 fn make_filesystem_writes_rollback_floor_zero_and_only_the_new_layout_identity_bit_into_every_system_configuration_slot(
@@ -98,8 +100,9 @@ fn make_filesystem_writes_rollback_floor_zero_and_only_the_new_layout_identity_b
             let slot = read_slot(&devices, device, offset);
             assert_eq!(
                 slot[FIRST_INCOMPAT_BYTE_OFFSET],
-                INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
-                "盘 {} 偏移 {}：incompat 第一个字节只有位 1",
+                INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
+                    | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT,
+                "盘 {} 偏移 {}：incompat 第一个字节是位 1 与位 2",
                 device.0,
                 offset.0
             );
@@ -221,20 +224,31 @@ fn system_configuration_write_after_make_filesystem_carries_the_rollback_floor_a
 #[test]
 fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write_when_it_carries_only_the_retired_bit_zero(
 ) {
-    mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT, "只带退役的位 0");
+    mounting_a_pool_whose_system_configuration_carries_an_unrecognized_layout_identity_is_refused_before_any_write(INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT, "只带退役的位 0");
 }
 
 #[test]
 fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write_when_it_carries_bit_zero_and_bit_one(
 ) {
-    mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(
+    mounting_a_pool_whose_system_configuration_carries_an_unrecognized_layout_identity_is_refused_before_any_write(
         INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT
             | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
         "位 0 与位 1 都带",
     );
 }
 
-fn mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write(
+/// 系统配置一个布局身份位都不带（incompat 第一个字节为 0、整槽校验和重封）：同样在任何写之前拒成「incompat 位图不认识」、
+/// 四个槽逐字节不变；checker 判不认识的 incompat 位——判的是 `check_system_configuration_slot` 里「一个布局身份位都不带」那一支
+/// （C312（第一条布局线的 incompat 位没赋值）：前两条落在别的两支上，这一支原来没有会红的用例）。
+#[test]
+fn mounting_a_pool_whose_system_configuration_carries_no_layout_identity_bit_is_refused_before_any_write(
+) {
+    mounting_a_pool_whose_system_configuration_carries_an_unrecognized_layout_identity_is_refused_before_any_write(0, "一个布局身份位都不带");
+}
+
+/// 四个系统配置槽的 incompat 第一个字节都换成 `first_incompat_byte`、整槽校验和重封：checker 判不认识的 incompat 位，
+/// 挂载在任何写之前拒成「系统配置的 incompat 位图不认识」，录制流不多一步、四个槽一个字节不变。
+fn mounting_a_pool_whose_system_configuration_carries_an_unrecognized_layout_identity_is_refused_before_any_write(
     first_incompat_byte: u8,
     what: &str,
 ) {

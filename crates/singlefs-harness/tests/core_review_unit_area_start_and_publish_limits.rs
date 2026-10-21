@@ -1111,6 +1111,9 @@ fn fail_the_system_configuration_write_on_device_zero(
     }
 }
 
+/// 取号写两轮（甲'），每轮每块盘一次系统配置槽写：盘 0 在这次挂载里头两次系统配置槽写是取号的。
+const ACQUISITION_SYSTEM_CONFIGURATION_WRITES_PER_DEVICE: u64 = 2;
+
 /// 同一个池的盘面拷贝上不注入地挂一遍第 10 次：交回那次挂载写行、暖机各次的写账与推成的几串。
 fn the_tenth_mount_on_a_copy(
     pool: &PoolUnderTest<FaultInjectingDevice>,
@@ -1124,7 +1127,7 @@ fn the_tenth_mount_on_a_copy(
     .expect("拷贝上不注入：第 10 次挂载做成")
 }
 
-/// 第 10 次挂载推的第一串抬 F，先写系统配置那一步里盘 0 的写报块设备错（盘 0 这次挂载里的系统配置槽写依次是取号 1 次、写行那次的轮换 1 次、
+/// 第 10 次挂载推的第一串抬 F，先写系统配置那一步里盘 0 的写报块设备错（盘 0 这次挂载里的系统配置槽写依次是取号两轮 2 次、写行那次的轮换 1 次、
 /// 暖机每次 1 次，第一串先写系统配置是再下一次）。挂载交回 `FloorRaiseFailedAfterTheMountsPublishes`：`cause` 是抬 F 的错原样
 /// （`RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot`，一块盘都还没带上新 F），`writes_of_persisted_publishes` 逐项等于
 /// 拷贝上那一遍写行与暖机各次的写账，之前没有推成的串。改之前挂载原样交回抬 F 的错，写行与暖机的账随写入口丢掉。
@@ -1147,7 +1150,9 @@ fn a_block_device_error_in_the_first_floor_raise_after_the_row_publish_hands_bac
         .map(|version| version.writes().clone())
         .collect();
     let system_configuration_writes_on_device_zero_before_the_first_raise =
-        1 + 1 + u64::try_from(rehearsal.output.warm_up_publishes.len()).expect("暖机次数");
+        ACQUISITION_SYSTEM_CONFIGURATION_WRITES_PER_DEVICE
+            + 1
+            + u64::try_from(rehearsal.output.warm_up_publishes.len()).expect("暖机次数");
     plan.arm(fail_the_system_configuration_write_on_device_zero(
         &pool,
         system_configuration_writes_on_device_zero_before_the_first_raise + 1,
@@ -1204,11 +1209,12 @@ fn a_block_device_error_in_the_second_floor_raise_after_the_row_publish_hands_ba
         .iter()
         .map(|published| published.root.checkpoint_txg)
         .collect();
-    let system_configuration_writes_on_device_zero_before_the_second_raise = 1
-        + 1
-        + u64::try_from(rehearsal.output.warm_up_publishes.len()).expect("暖机次数")
-        + 1
-        + u64::try_from(first_raise_txgs.len()).expect("第一串的空发布次数");
+    let system_configuration_writes_on_device_zero_before_the_second_raise =
+        ACQUISITION_SYSTEM_CONFIGURATION_WRITES_PER_DEVICE
+            + 1
+            + u64::try_from(rehearsal.output.warm_up_publishes.len()).expect("暖机次数")
+            + 1
+            + u64::try_from(first_raise_txgs.len()).expect("第一串的空发布次数");
     plan.arm(fail_the_system_configuration_write_on_device_zero(
         &pool,
         system_configuration_writes_on_device_zero_before_the_second_raise + 1,

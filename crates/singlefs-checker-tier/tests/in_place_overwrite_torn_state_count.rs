@@ -37,6 +37,7 @@ fn is_tearable_in_place_overwrite(
     let is_copy_on_write = match write.kind {
         StepKind::UnitWrite => true,
         StepKind::ZeroFill
+        | StepKind::Discard
         | StepKind::JournalRecord
         | StepKind::RootRecordFua
         | StepKind::SystemConfigurationSlot
@@ -95,6 +96,7 @@ fn segment_state_count_with_the_torn_third_state(
                 .partition(|write_index| match writes[*write_index].kind {
                     StepKind::UnitWrite => true,
                     StepKind::ZeroFill
+                    | StepKind::Discard
                     | StepKind::JournalRecord
                     | StepKind::RootRecordFua
                     | StepKind::SystemConfigurationSlot

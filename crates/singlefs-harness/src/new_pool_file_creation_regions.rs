@@ -39,8 +39,9 @@ pub const HEAD_AND_TAIL_BYTES: usize = 32;
 const E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES: u64 = 4096;
 /// E142 几何的根槽宽 = 探到的 `physical_block_size` = 512（字节表零那一节的 m3「371 / 512 槽」）。
 const E142_ROOT_SLOT_BYTES: u64 = 512;
-/// 这次发布写的系统配置槽是槽 1（t15：世代号 5、tail = 3，根槽之后再更新）。
-const NEW_POOL_FILE_CREATION_SYSTEM_CONFIGURATION_SLOT_INDEX: u64 = 1;
+/// 这次发布写的系统配置槽是槽 0（t15：世代号 6、tail = 3，根槽之后再更新）。
+/// 世代号 6 落槽 0：mkfs 写世代号 1，取号写两轮（世代号 2、3），两次暖机各轮换一次（世代号 4、5），这次发布轮换是世代号 6、落槽 `6 mod 2` = 0。
+const NEW_POOL_FILE_CREATION_SYSTEM_CONFIGURATION_SLOT_INDEX: u64 = 0;
 /// 这次发布的根槽：区域 `3 mod 3` = 0 的槽 `(3 div 3) mod 8` = 1（t14）。
 const NEW_POOL_FILE_CREATION_ROOT_RING_REGION: u64 = 0;
 const NEW_POOL_FILE_CREATION_ROOT_RING_SLOT_INDEX: u64 = 1;
@@ -346,9 +347,11 @@ pub fn region_table_against_writes(
             // 整段清零也是一次写调用，落点与长度同样拿去比表：这张表登记的是新池新建文件写了哪几段，
             // 表里没有「清一段」这一项，真在新池新建文件里清了一段就该落进 `writes_outside_the_table` 报出来
             //（今天唯一的清零是 mkfs 清 journal 环，不在新池新建文件的录制流里）。
+            // discard 同样拿去比表：表里没有这一项，新池新建文件里真发了 discard 就落进 `writes_outside_the_table`。
             RecordedOperationKind::Write
             | RecordedOperationKind::WriteForceUnitAccess
-            | RecordedOperationKind::WriteZeroes => {
+            | RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard => {
                 write_calls += 1;
             }
         }

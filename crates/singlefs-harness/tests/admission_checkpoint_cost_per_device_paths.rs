@@ -440,18 +440,23 @@ fn measure(
                 measured.fixed_point_slots_on_each_device += role.span_slots();
             }
             TransactionUnit::Data(_)
+            | TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
             | TransactionUnit::ExtentLowerNode(_)
+            | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
             | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
             | TransactionUnit::ExtentRoot
             | TransactionUnit::InodeLeafContainer(_)
             | TransactionUnit::InodeRoot
             | TransactionUnit::DeletedInodesRoot
+            | TransactionUnit::LoggedOperationsRoot
             | TransactionUnit::TombstoneLeafContainer(_)
             | TransactionUnit::TombstoneRoot
             | TransactionUnit::TombstoneNodeBelowTheRoot(_)
             | TransactionUnit::RetirementLeafContainer(_)
             | TransactionUnit::RetirementRoot
             | TransactionUnit::RetirementNodeBelowTheRoot(_)
+            | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
+            | TransactionUnit::DeadlistTree
             | TransactionUnit::InstanceTable
             | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
                 measured.ordinary_allocation_slots += role.span_slots();
@@ -941,6 +946,7 @@ fn pool_after_the_first_file_on(
             instance,
             shadow_ledger: ShadowLedger::On,
             parameters_and_device_table,
+            compaction: singlefs_core::compaction_plan::CompactionOfThisMount::of_a_new_mount(),
         }),
         write_time_seconds: FIRST_WRITE_TIME_SECONDS,
         content_of_the_current_version: first_content,

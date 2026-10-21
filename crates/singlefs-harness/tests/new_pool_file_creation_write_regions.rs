@@ -136,9 +136,9 @@ fn registry_rows() -> Vec<(&'static str, u32, u64, u64, HexadecimalExtent)> {
         // t13：jsn (1, 3) 那条记录，journal 环从槽 1024（16 MiB）起，环内偏移 8192（两次暖机各占一条 4096）
         ("journal_record",                  0, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
         ("journal_record",                  1, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
-        // t15：系统配置槽 1（世代号 5、tail = 3），槽距 4096、槽宽 4096
-        ("system_configuration",            0, 4096, 4096, WholeRegion),
-        ("system_configuration",            1, 4096, 4096, WholeRegion),
+        // t15：系统配置槽 0（世代号 6、tail = 3），槽距 4096、槽宽 4096
+        ("system_configuration",            0, 0, 4096, WholeRegion),
+        ("system_configuration",            1, 0, 4096, WholeRegion),
     ]
 }
 

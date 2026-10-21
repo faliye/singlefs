@@ -13,8 +13,9 @@
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::{
-    SlotBytesByMutability, SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
-    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+    InodeRecordTruncationFieldsOfThePool, SlotBytesByMutability, SystemConfiguration,
+    SystemImmutableConfiguration, SystemImmutableSizes, SystemMutableConfiguration,
+    SystemRuntimeConfiguration, SystemRuntimeQuantities,
     JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_BYTES};
@@ -37,6 +38,9 @@ fn system_configuration_at_mkfs() -> SystemConfiguration {
             },
             journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
             root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+            // 两份固定样本取不带 incompat 位 2 的那一档（0x02）：写出的字节与分类之前那一版代码逐字相同，两个 sha256 字面量照旧成立；
+            // mkfs 起写的是带位 2 的那一档（`system_configuration_incompat_bit_two_and_the_truncation_fields_of_inode_records.rs` 钉）。
+            inode_record_truncation_fields: InodeRecordTruncationFieldsOfThePool::AllZero,
         },
         mutable: SystemMutableConfiguration,
         runtime: SystemRuntimeConfiguration,
@@ -70,6 +74,9 @@ fn system_configuration_after_the_new_pool_file_creation() -> SystemConfiguratio
             },
             journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
             root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+            // 两份固定样本取不带 incompat 位 2 的那一档（0x02）：写出的字节与分类之前那一版代码逐字相同，两个 sha256 字面量照旧成立；
+            // mkfs 起写的是带位 2 的那一档（`system_configuration_incompat_bit_two_and_the_truncation_fields_of_inode_records.rs` 钉）。
+            inode_record_truncation_fields: InodeRecordTruncationFieldsOfThePool::AllZero,
         },
         mutable: SystemMutableConfiguration,
         runtime: SystemRuntimeConfiguration,

@@ -72,6 +72,7 @@ fn kind_name(kind: RecordedOperationKind) -> &'static str {
         RecordedOperationKind::Write => "write",
         RecordedOperationKind::WriteForceUnitAccess => "write_fua",
         RecordedOperationKind::WriteZeroes => "write_zeroes",
+        RecordedOperationKind::Discard => "discard",
         RecordedOperationKind::Barrier => "barrier",
     }
 }
@@ -83,13 +84,12 @@ fn operation_bytes(retained: &RetainedOperation) -> Option<Vec<u8>> {
         RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
             retained.contents.clone()
         }
-        RecordedOperationKind::WriteZeroes => {
-            Some(vec![
+        // discard 按「范围写零」重建，与写清零同一份。
+        RecordedOperationKind::WriteZeroes | RecordedOperationKind::Discard => Some(vec![
                 0u8;
                 usize::try_from(retained.operation.length)
                     .expect("窗口里的写清零长度装得进 usize")
-            ])
-        }
+            ]),
         RecordedOperationKind::Barrier => None,
     }
 }

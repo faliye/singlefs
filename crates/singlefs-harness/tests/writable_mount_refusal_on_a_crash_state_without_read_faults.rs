@@ -40,6 +40,8 @@ use singlefs_harness::{RetainedOperation, SharedStream};
 const SMALL: HistoryDeviceWidth = HistoryDeviceWidth::UnitAreaOf384Slots;
 /// 撕裂一个系统配置槽时改的那个字节在槽里的位置：槽中间，落在整槽校验和罩着的范围里。
 const TORN_BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT: usize = 2048;
+/// 坏一份单元时改的那个字节在单元里的位置：单元中间，落在整单元校验和罩着的范围里。
+const CORRUPTED_BYTE_INSIDE_THE_UNIT: u64 = 2048;
 
 /// 从第一个文件起、再跑 `operations` 的录制流（内容保留）。
 fn recorded_stream_after_the_first_file_then(
@@ -133,6 +135,32 @@ fn crash_image_where_only_the_rotation_of_an_overwrite_landed() -> (MemoryPool, 
     (healthy, crash_image)
 }
 
+/// 第一个文件那次发布在盘 0 上的最后一个单元写（树表那一份）翻一个字节。盘 0 两槽系统配置全废的那两份盘面都带上它：取号时补写两槽全废的盘
+/// （丙'，用户 2026-10-19 定 S4「开例外」）之后，盘 0 带着第一个文件那一版的全部单元时取号把两槽补写回来、可写挂载做成；
+/// 这几条判的是「拒」那一面，所以让盘 0 少一份那一版的单元（补写闸一不过），取号之前的逐盘核照旧拒、拒因不变。
+/// 那一份在盘 1 上完好，读那一版的单元退到盘 1 那一份。
+fn corrupt_the_last_unit_copy_of_the_first_file_on_device_zero(crash_image: &mut MemoryPool) {
+    let first_file = recorded_stream_after_the_first_file_then(Vec::new());
+    let parameters = SMALL.parameters();
+    let geometry = FixedGeometry {
+        fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+        journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+    };
+    let (writes, _segments, _stream_indexes) =
+        writes_and_segments_with_stream_indexes(&first_file, &geometry);
+    let last_unit_write_on_device_zero = writes
+        .iter()
+        .rev()
+        .find(|write| write.kind == StepKind::UnitWrite && write.device == DeviceIdentity(0))
+        .expect("第一个文件那次发布在盘 0 上写了单元");
+    crash_image.flip_byte(
+        DeviceIdentity(0),
+        last_unit_write_on_device_zero.offset,
+        CORRUPTED_BYTE_INSIDE_THE_UNIT,
+    );
+}
+
 /// 原地覆写写到一半的那份字节：旧字节与新字节不同的那一截，前一半取新、后一半取旧（与崩溃点重放撕裂第三态同一个取法，
 /// checker 档 `crash::torn_image_of_in_place_overwrite`；harness 档不依赖 checker 档，这里留一份）。新旧逐字节相同时交回新字节。
 fn torn_image_of_an_in_place_overwrite(old: &[u8], new: &[u8]) -> Vec<u8> {
@@ -154,7 +182,7 @@ fn torn_image_of_an_in_place_overwrite(old: &[u8], new: &[u8]) -> Vec<u8> {
 
 /// 攻方坏实现 MUT-B1 在 harness 档能摆的最小形状：第一个文件之后的盘面上，覆盖写那次发布在盘 0 的轮换写到一半（撕裂，旧槽内容也没了），
 /// 坏实现紧跟着把盘 0 另一槽清成全 0 的那次写落了（与轮换同在一段里，段内真子集摆得出）；盘 1 不动。盘 0 一份自证过的系统配置都没有，
-/// 设备不报错。
+/// 设备不报错；盘 0 上第一个文件的树表那一份另坏一个字节（[`corrupt_the_last_unit_copy_of_the_first_file_on_device_zero`]）。
 fn crash_image_where_a_rotation_tore_and_the_other_slot_of_device_zero_was_zeroed(
 ) -> (MemoryPool, MemoryPool) {
     let (healthy, rotation) = pool_after_the_first_file_and_rotation_of_an_overwrite();
@@ -200,10 +228,12 @@ fn crash_image_where_a_rotation_tore_and_the_other_slot_of_device_zero_was_zeroe
         &torn_image_of_an_in_place_overwrite(&old_bytes, &new_bytes),
     );
     device_zero.write(other_slot_offset, &vec![0u8; slot_bytes]);
+    corrupt_the_last_unit_copy_of_the_first_file_on_device_zero(&mut crash_image);
     (healthy, crash_image)
 }
 
-/// 第一个文件之后的盘面上，盘 0 两个系统配置槽各改一个字节（读得出、自证不过，设备不报错）：撕裂的系统配置，盘 0 一份自证过的都没有。
+/// 第一个文件之后的盘面上，盘 0 两个系统配置槽各改一个字节（读得出、自证不过，设备不报错）：撕裂的系统配置，盘 0 一份自证过的都没有；
+/// 盘 0 上第一个文件的树表那一份另坏一个字节（[`corrupt_the_last_unit_copy_of_the_first_file_on_device_zero`]）。
 fn crash_image_where_both_system_configuration_slots_of_device_zero_are_torn(
 ) -> (MemoryPool, MemoryPool) {
     let healthy = pool_of(&recorded_stream_after_the_first_file_then(Vec::new()));
@@ -222,6 +252,7 @@ fn crash_image_where_both_system_configuration_slots_of_device_zero_are_torn(
             .expect("有盘 0")
             .write(offset, &bytes);
     }
+    corrupt_the_last_unit_copy_of_the_first_file_on_device_zero(&mut crash_image);
     (healthy, crash_image)
 }
 

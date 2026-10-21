@@ -17,6 +17,13 @@
 //! 挂载那一刻读回全零的根环槽钉在它可能住过的最旧 txg，直到这个进程写掉那一槽、或读出一条根（[`read_hh_state`] 的
 //! `all_zero_slots_still_pinned`）；K10 守门、「每」列的旁路门槛与锚点模型三处吃同一个读数。
 //!
+//! 第 7 次重跑（登记 `research/prompts/e156-r7-prereg.md`，问题单 H1）：洞数档扫到环满一圈并跨圈——Hh(k, 前) 的 k 扫到 `k_满 + 1`、Hh(k, 后) 扫到
+//! `k_满后`、Hc（同一间距一直造到跨过两圈、三圈）与 Hs（洞钉在同一个环槽、每圈一个），排不下的格照跑；每个统计单位 (量, S, ρ, 回收时点) 的档序列
+//! 按 W28 判「仍在涨 / 已平 / 不单调」并报上界数（`name=r7_tier_peaks`、`name=r7_verdict`）。锚点模型加了按给定洞 txg 造历史的入口
+//! （[`anchor_model::HoleSchedule`]），族表按 S 现算并与登记第七节 A20 的本地常量表回比；锚点的摘要与逐观测点两种行（`name=anchor_r7_summary`、
+//! `name=anchor_r7_dump`）去掉前缀之后与登记第十三节命令一的 `anchors_e156_r7.py` 输出逐行比（停机 S20；摘要行的五个键名改过，比之前先照
+//! [`emit_r7_anchor_cells`] 文档里那张对照把脚本输出换名）。
+//!
 //! 判定写在装置里（[`judge_peak_against_threshold`] 那一组函数，单测 U18），不另写 Python 判定脚本：执行员的写范围不含
 //! `scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
 
@@ -92,6 +99,18 @@ const E156_ROOT_RING_REGIONS: u64 = 3;
 /// D3（空间分配） 已定项 7 落点粒度一个 16 KiB 槽、跨度 1 或 2）。只住装置，没有实现侧的对应物，不回比。
 const E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS: i64 = 2;
 const E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS: i64 = 1;
+/// 第 7 次重跑登记（`research/prompts/e156-r7-prereg.md`）第七节 A20 的本地常量表，值抄自该登记第十三节命令一 `anchors_e156_r7.py`
+/// 的输出（`S=4 k_full_front=3 k_full_back=2` 等行，与各族 `holes=` 列），不读 `crates/`：前位置的洞全部落在第一圈（txg < 3S）里的最大洞数
+/// `k_满(S)`、前位置排得下的最大洞数、后位置排得下的最大洞数。[`r7_anchor_cells_of`] 用锚点模型现算，对不上就停机 S20。
+const E156_R7_FRONT_HOLE_COUNT_INSIDE_THE_FIRST_RING: [(u64, u64); 3] = [(4, 2), (8, 4), (16, 8)];
+const E156_R7_FRONT_HOLE_COUNT_THAT_FITS: [(u64, u64); 3] = [(4, 3), (8, 5), (16, 9)];
+const E156_R7_BACK_HOLE_COUNT_THAT_FITS: [(u64, u64); 3] = [(4, 2), (8, 4), (16, 8)];
+/// 族标签（第 7 次重跑登记 W29）：Hh = 间距不变造到洞数为止，Hc = 同一间距一直造到跨过两圈、三圈，Hs = 洞钉在同一个环槽、每圈一个。
+const E156_FAMILY_HOLE_COUNT_SWEEP: &str = "Hh";
+const E156_FAMILY_CONTINUED_SWEEP: &str = "Hc";
+const E156_FAMILY_SAME_RING_SLOT: &str = "Hs";
+/// PC-同槽（登记 5.3、E25）的族标签。
+const E156_FAMILY_SAME_SLOT_CONTROL: &str = "PC-same-slot";
 /// A1：单元区起点槽号。抄自 D3（空间分配） 已定项 7 依据表「落点」行（`.claude/kb/decisions/03-空间分配.md`；
 /// D18（块里携带什么信息） 已定项 9 逼出的粒度）与 `crates/singlefs-format` 的同名常量——[`main`] 第一条断言把它与
 /// `UNIT_AREA_START_SLOT` 回比。
@@ -1180,6 +1199,10 @@ mod anchor_model {
         pub live_holes: u64,
         pub live_holes_closed_form: u64,
         pub missing_txgs_closed_form: u64,
+        /// 第 7 次重跑登记 A23：这一刻的 txg 减门槛（脚本 `--dump` 的 `lag`）。
+        pub lag: u64,
+        /// 第 7 次重跑登记 A24：这一刻还钉着的全零槽数（脚本 `--dump` 的 `pinned`）。
+        pub pinned_slots: u64,
         pub is_observed: bool,
     }
 
@@ -1204,10 +1227,71 @@ mod anchor_model {
         REGION_DEVICE_NUMBERS[usize::try_from(txg % 3).expect("对 3 取模落在 usize 里")]
     }
 
+    /// 造洞的两种规则（第 7 次重跑登记 W29）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum HoleSchedule {
+        /// 造洞之后隔 2 次工作负载发布再造下一个，一直造到 `hole_count` 个（Hh、Hc）。
+        ConsecutiveHoles { front: bool, hole_count: u64 },
+        /// 洞钉在同一个环槽：第 j 个洞的 txg = 第一个洞最早的 txg + j × 3S（Hs）；两个洞之间的发布全是工作负载。
+        HolesOnTheSameRingSlot { front: bool, hole_count: u64 },
+    }
+
+    struct HistoryUnderConstruction {
+        roles: BTreeMap<u64, AnchorPublishRole>,
+        holes: Vec<u64>,
+        recovery_ends: Vec<u64>,
+        latest_txg: u64,
+        workload_publishes_since_the_last_hole: u64,
+    }
+
+    impl HistoryUnderConstruction {
+        fn publish_workload(&mut self) {
+            self.latest_txg += 1;
+            self.roles
+                .insert(self.latest_txg, AnchorPublishRole::Workload);
+            self.workload_publishes_since_the_last_hole = if self.holes.is_empty() {
+                0
+            } else {
+                self.workload_publishes_since_the_last_hole + 1
+            };
+        }
+
+        fn gap_is_long_enough(&self) -> bool {
+            self.holes.is_empty()
+                || self.workload_publishes_since_the_last_hole >= WORKLOAD_PUBLISHES_BETWEEN_HOLES
+        }
+
+        fn record_a_crash_hole_and_its_recovery(&mut self) {
+            self.latest_txg += 1;
+            self.roles.insert(self.latest_txg, AnchorPublishRole::Crash);
+            self.holes.push(self.latest_txg);
+            self.latest_txg += 1;
+            self.roles
+                .insert(self.latest_txg, AnchorPublishRole::InstanceRow);
+            let mut covered_devices = BTreeSet::from([device_of_txg(self.latest_txg)]);
+            while covered_devices.len() < 2 {
+                self.latest_txg += 1;
+                self.roles
+                    .insert(self.latest_txg, AnchorPublishRole::WarmUpAfterRecovery);
+                covered_devices.insert(device_of_txg(self.latest_txg));
+            }
+            self.recovery_ends.push(self.latest_txg);
+            self.workload_publishes_since_the_last_hole = 0;
+        }
+    }
+
+    /// 第一个洞最早落的 txg：前位置是 C380 逐字的 txg 5，后位置是环转过一圈之后的 3S + 4。
+    fn first_hole_earliest_txg(slots_per_region: u64, front: bool) -> u64 {
+        if front {
+            FRONT_HOLE_EARLIEST_TXG
+        } else {
+            3 * slots_per_region + NEW_POOL_FILE_CREATION_TXG + 1
+        }
+    }
+
     fn build_history(
         slots_per_region: u64,
-        hole_count: u64,
-        front: bool,
+        schedule: HoleSchedule,
     ) -> (BTreeMap<u64, AnchorPublishRole>, Vec<u64>, Vec<u64>) {
         let ring_length = 3 * slots_per_region;
         let mut roles = BTreeMap::new();
@@ -1217,54 +1301,80 @@ mod anchor_model {
                 AnchorPublishRole::MakeFilesystemWarmUpOrNewPoolFileCreation,
             );
         }
-        let mut holes: Vec<u64> = Vec::new();
-        let mut recovery_ends: Vec<u64> = Vec::new();
-        let mut latest_txg = NEW_POOL_FILE_CREATION_TXG;
-        let first_hole_at = if front {
-            FRONT_HOLE_EARLIEST_TXG
-        } else {
-            ring_length + NEW_POOL_FILE_CREATION_TXG + 1
+        let mut history = HistoryUnderConstruction {
+            roles,
+            holes: Vec::new(),
+            recovery_ends: Vec::new(),
+            latest_txg: NEW_POOL_FILE_CREATION_TXG,
+            workload_publishes_since_the_last_hole: 0,
         };
-        let mut workload_publishes_since_the_last_hole = 0u64;
-        while u64::try_from(holes.len()).expect("洞数落在 u64 内") < hole_count {
-            let gap_is_long_enough = holes.is_empty()
-                || workload_publishes_since_the_last_hole >= WORKLOAD_PUBLISHES_BETWEEN_HOLES;
-            if latest_txg + 1 >= first_hole_at && gap_is_long_enough {
-                latest_txg += 1;
-                roles.insert(latest_txg, AnchorPublishRole::Crash);
-                holes.push(latest_txg);
-                latest_txg += 1;
-                roles.insert(latest_txg, AnchorPublishRole::InstanceRow);
-                let mut covered_devices = BTreeSet::from([device_of_txg(latest_txg)]);
-                while covered_devices.len() < 2 {
-                    latest_txg += 1;
-                    roles.insert(latest_txg, AnchorPublishRole::WarmUpAfterRecovery);
-                    covered_devices.insert(device_of_txg(latest_txg));
+        match schedule {
+            HoleSchedule::ConsecutiveHoles { front, hole_count } => {
+                let first_hole_at = first_hole_earliest_txg(slots_per_region, front);
+                while u64::try_from(history.holes.len()).expect("洞数落在 u64 内") < hole_count
+                {
+                    if history.latest_txg + 1 >= first_hole_at && history.gap_is_long_enough() {
+                        history.record_a_crash_hole_and_its_recovery();
+                    } else {
+                        history.publish_workload();
+                    }
                 }
-                recovery_ends.push(latest_txg);
-                workload_publishes_since_the_last_hole = 0;
-            } else {
-                latest_txg += 1;
-                roles.insert(latest_txg, AnchorPublishRole::Workload);
-                workload_publishes_since_the_last_hole = if holes.is_empty() {
-                    0
-                } else {
-                    workload_publishes_since_the_last_hole + 1
-                };
+            }
+            HoleSchedule::HolesOnTheSameRingSlot { front, hole_count } => {
+                let first_hole_at = first_hole_earliest_txg(slots_per_region, front);
+                for hole_index in 0..hole_count {
+                    let hole_txg = first_hole_at + hole_index * ring_length;
+                    while history.latest_txg + 1 < hole_txg {
+                        history.publish_workload();
+                    }
+                    assert!(
+                        history.latest_txg + 1 == hole_txg && history.gap_is_long_enough(),
+                        "同槽叠洞：下一个洞 txg {hole_txg} 距上一次挂载做完不足 2 次工作负载发布（E20：下一个洞 ≥ 上一次挂载做完 + 3）"
+                    );
+                    history.record_a_crash_hole_and_its_recovery();
+                }
             }
         }
-        (roles, holes, recovery_ends)
+        (history.roles, history.holes, history.recovery_ends)
     }
 
-    /// 脚本的 `run_the_anchor_hole_script(S, k, pos, end)`：`end_override` 给了就跑到它，没给就跑到最后一个洞 + 3S + 2。
+    /// 脚本 `fits` 的两句：同槽的两个洞相隔不到一圈就撞上；有洞的前面隔整一圈还有一个洞也算撞上（第 4 次 W5）。
+    fn holes_fit_the_ring(holes: &[u64], ring_length: u64) -> bool {
+        let pairs_do_not_collide = holes.iter().enumerate().all(|(index, first)| {
+            holes[index + 1..].iter().all(|second| {
+                !(first % ring_length == second % ring_length
+                    && first.abs_diff(*second) < ring_length)
+            })
+        });
+        let no_hole_one_ring_before_another = holes
+            .iter()
+            .filter(|hole| **hole >= ring_length)
+            .all(|hole| !holes.contains(&(hole - ring_length)));
+        pairs_do_not_collide && no_hole_one_ring_before_another
+    }
+
+    /// 第 4 次重跑脚本的 `run_the_anchor_hole_script(S, k, pos, end)`：间距不变造 `hole_count` 个洞（[`HoleSchedule::ConsecutiveHoles`]）。
     pub fn run_the_anchor_hole_script(
         slots_per_region: u64,
         hole_count: u64,
         front: bool,
         end_override: Option<u64>,
     ) -> AnchorCell {
+        run_the_anchor_schedule(
+            slots_per_region,
+            HoleSchedule::ConsecutiveHoles { front, hole_count },
+            end_override,
+        )
+    }
+
+    /// 第 7 次重跑脚本的 `run(S, schedule, end)`：`end_override` 给了就跑到它，没给就跑到最后一个洞 + 3S + 2。
+    pub fn run_the_anchor_schedule(
+        slots_per_region: u64,
+        schedule: HoleSchedule,
+        end_override: Option<u64>,
+    ) -> AnchorCell {
         let ring_length = 3 * slots_per_region;
-        let (mut roles, holes, recovery_ends) = build_history(slots_per_region, hole_count, front);
+        let (mut roles, holes, recovery_ends) = build_history(slots_per_region, schedule);
         let last_txg = *roles.keys().next_back().expect("至少有 mkfs 那一条");
         let end = end_override
             .unwrap_or_else(|| holes.last().expect("没给终点的格至少有一个洞") + ring_length + 2);
@@ -1365,26 +1475,25 @@ mod anchor_model {
                 live_holes: u64::try_from(live_holes).expect("落在 u64 内"),
                 live_holes_closed_form: u64::try_from(live_closed_form.len()).expect("落在 u64 内"),
                 missing_txgs_closed_form,
+                lag: txg - floor,
+                pinned_slots: u64::try_from(
+                    pins.iter()
+                        .copied()
+                        .filter(|slot| !ring.contains_key(slot))
+                        .count(),
+                )
+                .expect("落在 u64 内"),
                 is_observed: txg == NEW_POOL_FILE_CREATION_TXG
                     || role == AnchorPublishRole::Workload
                     || recovery_ends.contains(&txg),
             });
         }
-        let pairs_do_not_collide = holes.iter().enumerate().all(|(index, first)| {
-            holes[index + 1..].iter().all(|second| {
-                !(first % ring_length == second % ring_length
-                    && first.abs_diff(*second) < ring_length)
-            })
-        });
-        let no_hole_one_ring_before_another = holes
-            .iter()
-            .filter(|hole| **hole >= ring_length)
-            .all(|hole| !holes.contains(&(hole - ring_length)));
+        let fits = holes_fit_the_ring(&holes, ring_length);
         AnchorCell {
             rows,
             holes,
             recovery_ends,
-            fits: pairs_do_not_collide && no_hole_one_ring_before_another,
+            fits,
             end,
         }
     }
@@ -1455,6 +1564,115 @@ mod anchor_model {
             }
         }
         lines
+    }
+
+    /// 脚本的 `k_full(S, pos)`：`Hh(k + 1, 位置)` 开始排不下（`fits = False`）的那个 k，从 1 往上数。
+    pub fn largest_hole_count_that_fits(slots_per_region: u64, front: bool) -> u64 {
+        let ring_length = 3 * slots_per_region;
+        let mut hole_count = 1u64;
+        loop {
+            let (_, holes, _) = build_history(
+                slots_per_region,
+                HoleSchedule::ConsecutiveHoles {
+                    front,
+                    hole_count: hole_count + 1,
+                },
+            );
+            if !holes_fit_the_ring(&holes, ring_length) {
+                return hole_count;
+            }
+            hole_count += 1;
+        }
+    }
+
+    /// `k_满(S)`（登记 W26 读法甲）：前位置的族 `Hh(k, 前)` 里，全部洞都落在第一圈（txg < 3S）的最大 k。
+    pub fn largest_front_hole_count_inside_the_first_ring(slots_per_region: u64) -> u64 {
+        let ring_length = 3 * slots_per_region;
+        let mut hole_count = 1u64;
+        loop {
+            let (_, holes, _) = build_history(
+                slots_per_region,
+                HoleSchedule::ConsecutiveHoles {
+                    front: true,
+                    hole_count: hole_count + 1,
+                },
+            );
+            if holes.iter().any(|hole| *hole >= ring_length) {
+                return hole_count;
+            }
+            hole_count += 1;
+        }
+    }
+
+    /// 登记第十三节命令一 `anchors_e156_r7.py`（不带 `--dump`）每族一行的摘要，除三个键名照 [`crate::emit_r7_anchor_cells`] 文档里那张对照换过之外
+    /// 格式逐字相同（Python 列表的写法与 `{:?}` 一致）。
+    pub fn summary_line(slots_per_region: u64, label: &str, cell: &AnchorCell) -> String {
+        let observed: Vec<&AnchorRow> = cell.rows.iter().filter(|row| row.is_observed).collect();
+        let peak = observed
+            .iter()
+            .map(|row| row.tree_table_lower_bound)
+            .max()
+            .expect("至少一个观测点");
+        let positive_points = observed
+            .iter()
+            .filter(|row| row.tree_table_lower_bound > 0)
+            .count();
+        let final_value = observed
+            .last()
+            .expect("至少一个观测点")
+            .tree_table_lower_bound;
+        let lag_peak = observed
+            .iter()
+            .map(|row| row.lag)
+            .max()
+            .expect("至少一个观测点");
+        let max_missing = observed
+            .iter()
+            .map(|row| row.missing_txgs)
+            .max()
+            .expect("至少一个观测点");
+        let max_live_holes = observed
+            .iter()
+            .map(|row| row.live_holes)
+            .max()
+            .expect("至少一个观测点");
+        let max_pinned = observed
+            .iter()
+            .map(|row| row.pinned_slots)
+            .max()
+            .expect("至少一个观测点");
+        format!(
+            "S={slots_per_region} family={label} holes={:?} recovery_ends={:?} end={} fits={} observations={} q1a_tt_peak={peak} q1a_tt_positive_points={positive_points} q1a_tt_final={final_value} lag_peak={lag_peak} missing_txgs_peak={max_missing} live_holes_peak={max_live_holes} pinned_slots_peak={max_pinned}",
+            cell.holes,
+            cell.recovery_ends,
+            cell.end,
+            if cell.fits { "True" } else { "False" },
+            observed.len(),
+        )
+    }
+
+    /// 脚本 `--dump` 每个观测点一行（`DUMP` 换成调用方加的前缀）。
+    pub fn dump_lines_of_one_family(
+        slots_per_region: u64,
+        label: &str,
+        cell: &AnchorCell,
+    ) -> Vec<String> {
+        cell.rows
+            .iter()
+            .filter(|row| row.is_observed)
+            .map(|row| {
+                format!(
+                    "S={slots_per_region} family={label} txg={} floor={} lag={} h_que={} h_dong={} pinned={} q1a_tree_table_lower_bound={}",
+                    row.txg,
+                    row.floor,
+                    row.lag,
+                    row.missing_txgs,
+                    row.live_holes,
+                    row.pinned_slots,
+                    row.tree_table_lower_bound
+                )
+            })
+            .collect()
     }
 }
 
@@ -1873,6 +2091,8 @@ struct HhStateInputs<'context> {
     all_zero_pins: &'context BTreeMap<RootRingSlot, u64>,
     /// 这次挂载新实例的第一个 txg；mkfs 那个进程为 `None`。
     first_txg_of_this_mount: Option<u64>,
+    /// PC-同槽：「每」列的旁路门槛去掉第一个洞的环槽里那条旧根再算。
+    treat_the_hole_ring_slot_as_rewritten: bool,
 }
 
 fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
@@ -1970,6 +2190,25 @@ fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
         },
     );
     let every_publish_floor = ring_threshold;
+    let every_publish_floor_read = if inputs.treat_the_hole_ring_slot_as_rewritten {
+        let old_root_txg_in_the_hole_slot = inputs.injected_holes.first().and_then(|first_hole| {
+            occupant_by_ring_slot
+                .get(&target_for_publish(
+                    CheckpointTxg(*first_hole),
+                    slots_per_region,
+                ))
+                .copied()
+                .filter(|occupant| occupant < first_hole)
+        });
+        let mut roots_still_counted = valid_root_txgs_without_the_old_root_in_the_slot(
+            &valid_root_txgs,
+            old_root_txg_in_the_hole_slot,
+        );
+        roots_still_counted.extend(all_zero_slots_still_pinned.iter().copied());
+        reclaim_threshold_read_from_the_ring_image(effective_floor, &roots_still_counted)
+    } else {
+        every_publish_floor
+    };
     let interval_rule_root_txgs: BTreeSet<u64> = ring_root_txgs
         .iter()
         .copied()
@@ -1989,7 +2228,7 @@ fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
             device,
             referenced: &referenced,
             ring_threshold,
-            every_publish_floor,
+            every_publish_floor: every_publish_floor_read,
             interval_rule_root_txgs: &interval_rule_root_txgs,
             allocation_generations: inputs.allocation_generations,
         })
@@ -2017,7 +2256,7 @@ fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
         missing_txgs,
         live_holes,
         ring_threshold,
-        every_publish_floor,
+        every_publish_floor: every_publish_floor_read,
         effective_floor,
         abandoned_roots: u64::try_from(abandoned_root_txgs.len()).expect("落在 u64 内"),
         roots_without_version_facts,
@@ -2172,6 +2411,8 @@ struct HhRunRequest<'anchor> {
     check_overwrites_before_the_ring_wraps: bool,
     judge_checker_on_hole_states: bool,
     emit_positive_control_no_reclaim: bool,
+    /// 第 7 次重跑登记 5.3、E25 的 PC-同槽：「每」列的旁路门槛把第一个洞的环槽当作这个进程写过（只改旁路，不碰真实分配器）。
+    treat_the_hole_ring_slot_as_rewritten: bool,
 }
 
 /// 这一格挂在第 4 次重跑登记第十一节停机 S1(k) 的 K13：每一版换下上一版的树表单元，释放代 = 这一版的 txg。
@@ -2397,6 +2638,7 @@ impl HhRunState {
             injected_holes: &self.injected_holes,
             all_zero_pins: &self.all_zero_pins,
             first_txg_of_this_mount: self.first_txg_of_this_mount,
+            treat_the_hole_ring_slot_as_rewritten: request.treat_the_hole_ring_slot_as_rewritten,
         });
         // W18 (a)(b)：解开的槽从这次挂载的钉住表里拿掉，各计一次。
         for ring_slot in reading
@@ -3085,6 +3327,22 @@ fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
                 .is_some_and(|row| row.floor != observation.reading.ring_threshold)
         })
         .count();
+    let anchor_lag_mismatches = observations
+        .iter()
+        .filter(|observation| {
+            observation.anchor.is_some_and(|row| {
+                row.lag != observation.reading.newest_root_txg - observation.reading.ring_threshold
+            })
+        })
+        .count();
+    let anchor_pinned_mismatches = observations
+        .iter()
+        .filter(|observation| {
+            observation.anchor.is_some_and(|row| {
+                row.pinned_slots != observation.reading.all_zero_slots_still_pinned
+            })
+        })
+        .count();
     let anchor_rows_missing = observations
         .iter()
         .filter(|observation| observation.anchor.is_none())
@@ -3120,7 +3378,7 @@ fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
         .map(|recovery| recovery.last_txg_of_the_mount)
         .collect();
     emitter.emit(&format!(
-        "name=q1_cell family={} {} allocator={:?} cut_point={:?} registered_end={} actual_end={} truncated={truncated} truncation_txg={truncation_txg} truncation_error={truncation_error} observations={} holes_injected={} recovery_ends={} genesis_root_in_ring={} slots_per_region_read_back={} new_pool_file_creation_matches_k1_1={} ring_wrap_overwrites_checked={} ring_wrap_overwrite_mismatches={} tree_table_release_checks={} tree_table_release_violations={} mount_schedule_mismatches={} cut_mismatches_restored_image={} w9_roots_compared={} w9_mismatches={} w9_failures={} a11_h_que_mismatches={anchor_missing_txg_mismatches} a11_h_dong_mismatches={anchor_live_hole_mismatches} a14_floor_mismatches={anchor_floor_mismatches} anchor_rows_missing={anchor_rows_missing} a15_real_below_bound={} a15_every_below_bound={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} abandoned_root_points={} roots_without_version_facts_points={} admission_refusals={} mount_admission_not_before_acquisition={} mount_floor_raise_sequences={} effective_floor_positive_points={} q1b_real_positive_points={} q1b_every_positive_points={} q1a_plus_real_positive_points={} q1a_plus_every_positive_points={} q1b_plus_positive_points={} a10_lags_real={} a10_lags_every={} i31_red_on_hole_states={} i31_judged_hole_states={}",
+        "name=q1_cell family={} {} allocator={:?} cut_point={:?} registered_end={} actual_end={} truncated={truncated} truncation_txg={truncation_txg} truncation_error={truncation_error} observations={} holes_injected={} recovery_ends={} genesis_root_in_ring={} slots_per_region_read_back={} new_pool_file_creation_matches_k1_1={} ring_wrap_overwrites_checked={} ring_wrap_overwrite_mismatches={} tree_table_release_checks={} tree_table_release_violations={} mount_schedule_mismatches={} cut_mismatches_restored_image={} w9_roots_compared={} w9_mismatches={} w9_failures={} a11_h_que_mismatches={anchor_missing_txg_mismatches} a11_h_dong_mismatches={anchor_live_hole_mismatches} a14_floor_mismatches={anchor_floor_mismatches} anchor_rows_missing={anchor_rows_missing} anchor_lag_mismatches={anchor_lag_mismatches} anchor_pinned_slot_mismatches={anchor_pinned_mismatches} a15_real_below_bound={} a15_every_below_bound={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} abandoned_root_points={} roots_without_version_facts_points={} admission_refusals={} mount_admission_not_before_acquisition={} mount_floor_raise_sequences={} effective_floor_positive_points={} q1b_real_positive_points={} q1b_every_positive_points={} q1a_plus_real_positive_points={} q1a_plus_every_positive_points={} q1b_plus_positive_points={} a10_lags_real={} a10_lags_every={} i31_red_on_hole_states={} i31_judged_hole_states={}",
         outcome.family,
         shape.fields(),
         outcome.allocator_source,
@@ -3203,7 +3461,7 @@ fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
             .map(|observation| (observation.txg, observation.delta(timing)))
             .collect()
     };
-    let trajectories: [(&str, String); 10] = [
+    let trajectories: [(&str, String); 11] = [
         (
             "q1a_real",
             trajectory_text(
@@ -3286,6 +3544,13 @@ fn emit_cell_summary(emitter: &mut Emitter, outcome: &HhRunOutcome) {
                             .map(|count| (observation.txg, count))
                     })
                     .collect::<Vec<_>>(),
+                after_the_first_ring_txg,
+            ),
+        ),
+        (
+            "pinned_slots",
+            trajectory_text(
+                &series_u64(&|observation| observation.reading.all_zero_slots_still_pinned),
                 after_the_first_ring_txg,
             ),
         ),
@@ -4425,6 +4690,9 @@ struct HoleHistoryVerdictTotals {
     slots_per_region_read_back_mismatches: u64,
     tree_table_lag_every_publish_mismatch: u64,
     tree_table_lag_real_mismatch: u64,
+    /// 第 7 次重跑登记 A23、A24：门槛滞后、被钉住的槽数与锚点模型不同的观测点数。
+    lag_anchor_mismatches: u64,
+    pinned_anchor_mismatches: u64,
 }
 
 impl HoleHistoryVerdictTotals {
@@ -4449,6 +4717,8 @@ impl HoleHistoryVerdictTotals {
         self.slots_per_region_read_back_mismatches += other.slots_per_region_read_back_mismatches;
         self.tree_table_lag_every_publish_mismatch += other.tree_table_lag_every_publish_mismatch;
         self.tree_table_lag_real_mismatch += other.tree_table_lag_real_mismatch;
+        self.lag_anchor_mismatches += other.lag_anchor_mismatches;
+        self.pinned_anchor_mismatches += other.pinned_anchor_mismatches;
     }
 }
 
@@ -4586,6 +4856,16 @@ fn judge_hole_history_outcome(
         tree_table_lag_real_mismatch: u64::from(
             expected_tree_table_lags.is_some_and(|lags| *lags != outcome.tree_table_lags_real),
         ),
+        lag_anchor_mismatches: count_where(observations, |observation| {
+            observation.anchor.is_some_and(|row| {
+                row.lag != observation.reading.newest_root_txg - observation.reading.ring_threshold
+            })
+        }),
+        pinned_anchor_mismatches: count_where(observations, |observation| {
+            observation.anchor.is_some_and(|row| {
+                row.pinned_slots != observation.reading.all_zero_slots_still_pinned
+            })
+        }),
     }
 }
 
@@ -4595,7 +4875,7 @@ fn emit_cell_checks(
     totals: &HoleHistoryVerdictTotals,
 ) {
     emitter.emit(&format!(
-        "name=q1_cell_checks family={} {} a11_mismatches={} a14_mismatches={} a15_every_below={} a15_real_below={} a12_every_nonzero={} a12_real_nonzero={} a13_every_nonzero={} a13_real_nonzero={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} anchor_rows_missing={} real_every_differ_points={} referenced_but_free_points={} s1_failures={} g_adm_nonzero={} abandoned_or_unknown_root_points={} k8_mismatches={} a10_every_mismatch={} a10_real_mismatch={}",
+        "name=q1_cell_checks family={} {} a11_mismatches={} a14_mismatches={} a15_every_below={} a15_real_below={} a12_every_nonzero={} a12_real_nonzero={} a13_every_nonzero={} a13_real_nonzero={} k10_violation_points={} devices_unequal_points={} root_ring_missing_points={} anchor_rows_missing={} real_every_differ_points={} referenced_but_free_points={} s1_failures={} g_adm_nonzero={} abandoned_or_unknown_root_points={} k8_mismatches={} a10_every_mismatch={} a10_real_mismatch={} anchor_lag_mismatches={} anchor_pinned_slot_mismatches={}",
         outcome.family,
         outcome.shape.fields(),
         totals.hole_count_anchor_mismatches,
@@ -4618,6 +4898,8 @@ fn emit_cell_checks(
         totals.slots_per_region_read_back_mismatches,
         totals.tree_table_lag_every_publish_mismatch,
         totals.tree_table_lag_real_mismatch,
+        totals.lag_anchor_mismatches,
+        totals.pinned_anchor_mismatches,
     ));
 }
 
@@ -4709,6 +4991,8 @@ fn hh_request<'anchor>(
 ) -> HhRunRequest<'anchor> {
     let is_first_geometry = shape.slots_per_region == E156_SLOTS_PER_REGION
         && shape.density == WorkloadDensity::EveryPublishOverwrites;
+    // 第 7 次重跑：Hc、Hs 与 PC-同槽 不进第 6 次已有的旁路检查（I-3.1 判洞上状态、不回收对照），这些只对 Hh 一族有定义。
+    let is_hole_count_sweep = family == E156_FAMILY_HOLE_COUNT_SWEEP;
     HhRunRequest {
         family,
         shape,
@@ -4716,10 +5000,719 @@ fn hh_request<'anchor>(
         cut_point: CrashCutPoint::BeforeTheRootSlotWrite,
         anchor,
         check_overwrites_before_the_ring_wraps: is_first_geometry && shape.hole_count == 0,
-        judge_checker_on_hole_states: is_first_geometry,
-        emit_positive_control_no_reclaim: shape.hole_count == 0
-            || (shape.hole_count == 2 && shape.position == Some(HolePosition::Back)),
+        judge_checker_on_hole_states: is_first_geometry && is_hole_count_sweep,
+        emit_positive_control_no_reclaim: is_hole_count_sweep
+            && (shape.hole_count == 0
+                || (shape.hole_count == 2 && shape.position == Some(HolePosition::Back))),
+        treat_the_hole_ring_slot_as_rewritten: false,
     }
+}
+
+// ============================================================================================
+// 第 7 次重跑（登记 `research/prompts/e156-r7-prereg.md`）：洞上多扣的槽随洞数长不长、有没有上界（问题单 H1）。
+// 族表（W29、W31）、档序列的判定（W28）、每个统计单位的上界数（R7e）、PC-档序列与 PC-同槽。
+// ============================================================================================
+
+/// 一个族在一个 S 下的锚点格：族标签、注入的洞数（Hh 的 k、Hc 的 n、Hs 的 m）、位置、锚点模型给的洞 txg 与终点。
+struct R7FamilyCell {
+    family: &'static str,
+    hole_count: u64,
+    position: HolePosition,
+    anchor: anchor_model::AnchorCell,
+}
+
+/// 一个 S 下第 7 次重跑的全部格：k = 0 的基准族单列，其余按 Hh 前、Hh 后、Hc、Hs 的次序（与脚本输出同序）。
+struct R7AnchorCellsOfOneSlotsPerRegion {
+    front_hole_count_inside_the_first_ring: u64,
+    front_hole_count_that_fits: u64,
+    back_hole_count_that_fits: u64,
+    without_holes: anchor_model::AnchorCell,
+    cells: Vec<R7FamilyCell>,
+}
+
+fn r7_table_value(table: &[(u64, u64); 3], slots_per_region: u64) -> u64 {
+    table
+        .iter()
+        .find(|(slots, _)| *slots == slots_per_region)
+        .map(|(_, count)| *count)
+        .expect("登记的 S 都在 A20 的本地常量表里")
+}
+
+fn r7_family_cell(
+    slots_per_region: u64,
+    family: &'static str,
+    hole_count: u64,
+    position: HolePosition,
+    schedule: anchor_model::HoleSchedule,
+) -> R7FamilyCell {
+    R7FamilyCell {
+        family,
+        hole_count,
+        position,
+        anchor: anchor_model::run_the_anchor_schedule(slots_per_region, schedule, None),
+    }
+}
+
+fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion {
+    let front_hole_count_inside_the_first_ring =
+        anchor_model::largest_front_hole_count_inside_the_first_ring(slots_per_region);
+    let front_hole_count_that_fits =
+        anchor_model::largest_hole_count_that_fits(slots_per_region, true);
+    let back_hole_count_that_fits =
+        anchor_model::largest_hole_count_that_fits(slots_per_region, false);
+    assert_eq!(
+        (
+            front_hole_count_inside_the_first_ring,
+            front_hole_count_that_fits,
+            back_hole_count_that_fits
+        ),
+        (
+            r7_table_value(
+                &E156_R7_FRONT_HOLE_COUNT_INSIDE_THE_FIRST_RING,
+                slots_per_region
+            ),
+            r7_table_value(&E156_R7_FRONT_HOLE_COUNT_THAT_FITS, slots_per_region),
+            r7_table_value(&E156_R7_BACK_HOLE_COUNT_THAT_FITS, slots_per_region),
+        ),
+        "停机 S20：锚点模型算的 k_满、前位置排得下的最大洞数、后位置排得下的最大洞数与登记第七节 A20 的本地常量表不同"
+    );
+    assert_eq!(
+        front_hole_count_that_fits,
+        front_hole_count_inside_the_first_ring + 1,
+        "停机 S20：前位置排得下的最大洞数应比 k_满 多一档（多的那一档是第一个落进第二圈的洞，W26）"
+    );
+    let mut cells = Vec::new();
+    for hole_count in 1..=front_hole_count_that_fits {
+        cells.push(r7_family_cell(
+            slots_per_region,
+            E156_FAMILY_HOLE_COUNT_SWEEP,
+            hole_count,
+            HolePosition::Front,
+            anchor_model::HoleSchedule::ConsecutiveHoles {
+                front: true,
+                hole_count,
+            },
+        ));
+    }
+    for hole_count in 1..=back_hole_count_that_fits {
+        cells.push(r7_family_cell(
+            slots_per_region,
+            E156_FAMILY_HOLE_COUNT_SWEEP,
+            hole_count,
+            HolePosition::Back,
+            anchor_model::HoleSchedule::ConsecutiveHoles {
+                front: false,
+                hole_count,
+            },
+        ));
+    }
+    for hole_count in [
+        2 * front_hole_count_that_fits,
+        3 * front_hole_count_that_fits,
+    ] {
+        cells.push(r7_family_cell(
+            slots_per_region,
+            E156_FAMILY_CONTINUED_SWEEP,
+            hole_count,
+            HolePosition::Front,
+            anchor_model::HoleSchedule::ConsecutiveHoles {
+                front: true,
+                hole_count,
+            },
+        ));
+    }
+    for position in [HolePosition::Front, HolePosition::Back] {
+        for hole_count in [1u64, 2, 3] {
+            cells.push(r7_family_cell(
+                slots_per_region,
+                E156_FAMILY_SAME_RING_SLOT,
+                hole_count,
+                position,
+                anchor_model::HoleSchedule::HolesOnTheSameRingSlot {
+                    front: position == HolePosition::Front,
+                    hole_count,
+                },
+            ));
+        }
+    }
+    let end_of_the_longest_family = cells
+        .iter()
+        .map(|cell| cell.anchor.end)
+        .max()
+        .expect("至少一个族");
+    let without_holes = anchor_model::run_the_anchor_schedule(
+        slots_per_region,
+        anchor_model::HoleSchedule::ConsecutiveHoles {
+            front: false,
+            hole_count: 0,
+        },
+        Some(end_of_the_longest_family),
+    );
+    R7AnchorCellsOfOneSlotsPerRegion {
+        front_hole_count_inside_the_first_ring,
+        front_hole_count_that_fits,
+        back_hole_count_that_fits,
+        without_holes,
+        cells,
+    }
+}
+
+/// 锚点脚本 `anchors_e156_r7.py` 里这一族的名字（族标签、位置、洞数前缀 k / n / m）。
+fn r7_python_label(cell: &R7FamilyCell) -> String {
+    let count_prefix = if cell.family == E156_FAMILY_CONTINUED_SWEEP {
+        "n"
+    } else if cell.family == E156_FAMILY_SAME_RING_SLOT {
+        "m"
+    } else {
+        "k"
+    };
+    format!(
+        "{}-{}-{count_prefix}{}",
+        cell.family,
+        cell.position.label(),
+        cell.hole_count
+    )
+}
+
+/// 锚点模型的输出，格式与 `anchors_e156_r7.py`（带与不带 `--dump`）逐字相同，各加一个前缀：`name=anchor_r7_summary` 去掉前缀与脚本输出（58 行）
+/// 逐行比，`name=anchor_r7_dump` 去掉前缀与脚本 `--dump` 的 `DUMP` 行（3567 行）逐行比（停机 S20 的报告命令）。k = 0 的基准族脚本没有，
+/// 另打 `name=anchor_r7_k0_summary` / `name=anchor_r7_k0_dump`（标签 `Hh-none-k0`），由执行员的包装脚本按同一份 `run` 在同一终点上算一份来比。
+/// 摘要行有五个键名与冻结在登记里的脚本不同（2026-10-20 照命名纪律改名，欠账 C430；登记里的脚本不回改）：`k_full_front` → `largest_front_hole_count_that_fits`、
+/// `k_full_back` → `largest_back_hole_count_that_fits`、`max_h_que` → `missing_txgs_peak`、`max_h_dong` → `live_holes_peak`、`max_pinned` → `pinned_slots_peak`；
+/// 拿登记里的脚本重算来比时，先把脚本输出照这五对换名。`research/results/e156-alloc-basis-counts-2026-10-18-support/` 下的两份脚本已照新名改过。
+fn emit_r7_anchor_cells(
+    emitter: &mut Emitter,
+    slots_per_region: u64,
+    cells: &R7AnchorCellsOfOneSlotsPerRegion,
+) {
+    emitter.emit(&format!(
+        "name=anchor_r7_summary S={slots_per_region} largest_front_hole_count_that_fits={} largest_back_hole_count_that_fits={}",
+        cells.front_hole_count_that_fits, cells.back_hole_count_that_fits
+    ));
+    for cell in &cells.cells {
+        let label = r7_python_label(cell);
+        emitter.emit(&format!(
+            "name=anchor_r7_summary {}",
+            anchor_model::summary_line(slots_per_region, &label, &cell.anchor)
+        ));
+        for line in anchor_model::dump_lines_of_one_family(slots_per_region, &label, &cell.anchor) {
+            emitter.emit(&format!("name=anchor_r7_dump {line}"));
+        }
+    }
+    emitter.emit(&format!(
+        "name=anchor_r7_k0_summary {}",
+        anchor_model::summary_line(slots_per_region, "Hh-none-k0", &cells.without_holes)
+    ));
+    for line in
+        anchor_model::dump_lines_of_one_family(slots_per_region, "Hh-none-k0", &cells.without_holes)
+    {
+        emitter.emit(&format!("name=anchor_r7_k0_dump {line}"));
+    }
+}
+
+/// W28：档序列的判定。输入是按注入洞数升序的各档 Q1a 峰值，不看臂的定义（登记第一节 1.1）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TierGrowth {
+    /// 相邻差全 ≥ 0 且最后一个相邻差 > 0：到最后一档仍在涨，没见上界。
+    StillRising,
+    /// 相邻差全 ≥ 0、最后一个相邻差 = 0：最后两档已平，这几档里的上界 = 最后一档的峰值。
+    FlatAtTheLastTiers {
+        upper_bound: i64,
+    },
+    NotMonotonic,
+    FewerThanThreeTiers,
+}
+
+impl TierGrowth {
+    fn label(self) -> String {
+        match self {
+            TierGrowth::StillRising => "still_rising".to_string(),
+            TierGrowth::FlatAtTheLastTiers { upper_bound } => {
+                format!("flat_upper_bound_{upper_bound}")
+            }
+            TierGrowth::NotMonotonic => "not_monotonic".to_string(),
+            TierGrowth::FewerThanThreeTiers => "fewer_than_three_tiers".to_string(),
+        }
+    }
+
+    /// 不带上界数值的判定类别，几何敏感性与判别力自证按它比。
+    fn kind(self) -> &'static str {
+        match self {
+            TierGrowth::StillRising => "still_rising",
+            TierGrowth::FlatAtTheLastTiers { .. } => "flat",
+            TierGrowth::NotMonotonic => "not_monotonic",
+            TierGrowth::FewerThanThreeTiers => "fewer_than_three_tiers",
+        }
+    }
+}
+
+fn judge_tier_peaks(peaks_in_ascending_tier_order: &[i64]) -> TierGrowth {
+    if peaks_in_ascending_tier_order.len() < 3 {
+        return TierGrowth::FewerThanThreeTiers;
+    }
+    let differences: Vec<i64> = peaks_in_ascending_tier_order
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .collect();
+    if differences.iter().any(|difference| *difference < 0) {
+        return TierGrowth::NotMonotonic;
+    }
+    let last_difference = *differences.last().expect("三档至少有两个相邻差");
+    if last_difference > 0 {
+        TierGrowth::StillRising
+    } else {
+        TierGrowth::FlatAtTheLastTiers {
+            upper_bound: *peaks_in_ascending_tier_order.last().expect("至少三档"),
+        }
+    }
+}
+
+/// PC-档序列的合成用例（登记 5.3）：(说明, 实际, 应得)。
+fn tier_sequence_positive_control_cases() -> Vec<(&'static str, String, String)> {
+    vec![
+        (
+            "rising_one_two_three",
+            judge_tier_peaks(&[1, 2, 3]).label(),
+            "still_rising".to_string(),
+        ),
+        (
+            "flat_one_two_two",
+            judge_tier_peaks(&[1, 2, 2]).label(),
+            "flat_upper_bound_2".to_string(),
+        ),
+        (
+            "not_monotonic_one_three_two",
+            judge_tier_peaks(&[1, 3, 2]).label(),
+            "not_monotonic".to_string(),
+        ),
+        (
+            "flat_five_five_five",
+            judge_tier_peaks(&[5, 5, 5]).label(),
+            "flat_upper_bound_5".to_string(),
+        ),
+        (
+            "two_tiers_are_refused",
+            judge_tier_peaks(&[1, 2]).label(),
+            "fewer_than_three_tiers".to_string(),
+        ),
+    ]
+}
+
+/// PC-同槽（登记 5.3、E25）：把洞的环槽当作这个进程在第二个洞的挂载里写过——那一槽里的旧根不再算数，门槛按去掉它之后重算。
+fn valid_root_txgs_without_the_old_root_in_the_slot(
+    valid_root_txgs: &BTreeSet<u64>,
+    old_root_txg_in_the_slot: Option<u64>,
+) -> BTreeSet<u64> {
+    valid_root_txgs
+        .iter()
+        .copied()
+        .filter(|txg| Some(*txg) != old_root_txg_in_the_slot)
+        .collect()
+}
+
+/// R7 的五个量：每个量是一类档序列（登记第六节）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TierQuantity {
+    /// R7a：读法甲，前位置、全部洞落在第一圈里的各档。
+    InsideTheFirstRing,
+    /// R7b：后位置的各档。
+    BackPosition,
+    /// R7c：读法乙，前位置各档（含第一个落进第二圈的洞）接 Hc 的两档。
+    AcrossRings,
+    /// R7d：同槽叠洞，前位置。
+    SameSlotFront,
+    /// R7d：同槽叠洞，后位置。
+    SameSlotBack,
+}
+
+const E156_TIER_QUANTITIES: [TierQuantity; 5] = [
+    TierQuantity::InsideTheFirstRing,
+    TierQuantity::BackPosition,
+    TierQuantity::AcrossRings,
+    TierQuantity::SameSlotFront,
+    TierQuantity::SameSlotBack,
+];
+
+impl TierQuantity {
+    fn label(self) -> &'static str {
+        match self {
+            TierQuantity::InsideTheFirstRing => "r7a",
+            TierQuantity::BackPosition => "r7b",
+            TierQuantity::AcrossRings => "r7c",
+            TierQuantity::SameSlotFront => "r7d_front",
+            TierQuantity::SameSlotBack => "r7d_back",
+        }
+    }
+
+    fn class_label(self) -> &'static str {
+        match self {
+            TierQuantity::InsideTheFirstRing => "Hh-front-inside-the-first-ring",
+            TierQuantity::BackPosition => "Hh-back",
+            TierQuantity::AcrossRings => "Hh-front-then-Hc-front",
+            TierQuantity::SameSlotFront => "Hs-front",
+            TierQuantity::SameSlotBack => "Hs-back",
+        }
+    }
+
+    fn selects(self, outcome: &HhRunOutcome, front_hole_count_inside_the_first_ring: u64) -> bool {
+        let position = outcome.shape.position;
+        let hole_count = outcome.shape.hole_count;
+        let is_family = |family: &str| outcome.family == family;
+        match self {
+            TierQuantity::InsideTheFirstRing => {
+                is_family(E156_FAMILY_HOLE_COUNT_SWEEP)
+                    && position == Some(HolePosition::Front)
+                    && hole_count <= front_hole_count_inside_the_first_ring
+            }
+            TierQuantity::BackPosition => {
+                is_family(E156_FAMILY_HOLE_COUNT_SWEEP) && position == Some(HolePosition::Back)
+            }
+            TierQuantity::AcrossRings => {
+                (is_family(E156_FAMILY_HOLE_COUNT_SWEEP)
+                    && position == Some(HolePosition::Front)
+                    && hole_count <= front_hole_count_inside_the_first_ring + 1)
+                    || (is_family(E156_FAMILY_CONTINUED_SWEEP)
+                        && position == Some(HolePosition::Front))
+            }
+            TierQuantity::SameSlotFront => {
+                is_family(E156_FAMILY_SAME_RING_SLOT) && position == Some(HolePosition::Front)
+            }
+            TierQuantity::SameSlotBack => {
+                is_family(E156_FAMILY_SAME_RING_SLOT) && position == Some(HolePosition::Back)
+            }
+        }
+    }
+}
+
+/// 一个统计单位 (量, S, ρ, 回收时点) 的判定结果。
+#[derive(Clone, Debug)]
+struct TierUnit {
+    quantity: TierQuantity,
+    slots_per_region: u64,
+    density: WorkloadDensity,
+    timing: ReclaimTiming,
+    growth: TierGrowth,
+    growth_without_the_last_tier: TierGrowth,
+    /// 门槛挪到两个观测值之间，第一个越过的档由有变无：`Some(true)`；少于两个不同的峰值做不出：`None`。
+    threshold_moved_flips: Option<bool>,
+}
+
+impl TierUnit {
+    fn sampling_point_name(&self) -> String {
+        format!(
+            "s={}_rho={}_timing={}",
+            self.slots_per_region,
+            self.density.label(),
+            self.timing.label()
+        )
+    }
+}
+
+/// W27：Q1a（甲-T1 多扣，「实」「每」两个回收时点各一份）在一条历史上的峰值与第一次到峰值的 txg，峰值取全部观测点。
+fn q1a_peak_of(outcome: &HhRunOutcome, timing: ReclaimTiming) -> (i64, u64) {
+    let mut peak = 0i64;
+    let mut txg_of_peak = 0u64;
+    for (index, observation) in outcome.observations.iter().enumerate() {
+        let value =
+            i64::try_from(observation.over_withheld(Arm::FloorRule, timing)).expect("落在 i64 内");
+        if index == 0 || value > peak {
+            peak = value;
+            txg_of_peak = observation.txg;
+        }
+    }
+    (peak, txg_of_peak)
+}
+
+fn first_tier_with_peak_above(tiers: &[u64], peaks: &[i64], threshold_slots: i64) -> Option<u64> {
+    tiers
+        .iter()
+        .zip(peaks)
+        .find(|(_, peak)| **peak > threshold_slots)
+        .map(|(tier, _)| *tier)
+}
+
+/// 第 4 次 8.2 ② 的做法：门槛挪到两个不同的峰值之间，第一个越过的档必须由有变无。
+fn threshold_moved_flips(tiers: &[u64], peaks: &[i64]) -> Option<bool> {
+    let distinct: BTreeSet<i64> = peaks.iter().copied().collect();
+    if distinct.len() < 2 {
+        return None;
+    }
+    let largest = *distinct.iter().next_back().expect("至少两个不同的峰值");
+    let second_largest = *distinct.iter().rev().nth(1).expect("至少两个不同的峰值");
+    Some(
+        first_tier_with_peak_above(tiers, peaks, second_largest)
+            != first_tier_with_peak_above(tiers, peaks, largest),
+    )
+}
+
+fn bracketed<Value: ToString>(values: &[Value]) -> String {
+    let parts: Vec<String> = values.iter().map(ToString::to_string).collect();
+    format!("[{}]", parts.join(","))
+}
+
+fn option_text(value: Option<u64>) -> String {
+    value.map_or_else(|| "none".to_string(), |tier| tier.to_string())
+}
+
+fn judge_and_emit_one_tier_unit(
+    emitter: &mut Emitter,
+    quantity: TierQuantity,
+    slots_per_region: u64,
+    density: WorkloadDensity,
+    timing: ReclaimTiming,
+    cells: &[&HhRunOutcome],
+) -> TierUnit {
+    assert!(
+        !cells.is_empty(),
+        "统计单位 {} 在 s={slots_per_region} 上一格都没有",
+        quantity.label()
+    );
+    let tiers: Vec<u64> = cells
+        .iter()
+        .map(|outcome| outcome.shape.hole_count)
+        .collect();
+    let families: Vec<&str> = cells.iter().map(|outcome| outcome.family).collect();
+    let readings: Vec<(i64, u64)> = cells
+        .iter()
+        .map(|outcome| q1a_peak_of(outcome, timing))
+        .collect();
+    let peaks: Vec<i64> = readings.iter().map(|(peak, _)| *peak).collect();
+    let growth = judge_tier_peaks(&peaks);
+    let growth_without_the_last_tier = judge_tier_peaks(&peaks[..peaks.len() - 1]);
+    let max_peak = *peaks.iter().max().expect("至少一档");
+    let max_index = peaks
+        .iter()
+        .position(|peak| *peak == max_peak)
+        .expect("最大值在序列里");
+    let adjacent_differences: Vec<i64> = peaks.windows(2).map(|pair| pair[1] - pair[0]).collect();
+    let moved_threshold_flips = threshold_moved_flips(&tiers, &peaks);
+    let unit = TierUnit {
+        quantity,
+        slots_per_region,
+        density,
+        timing,
+        growth,
+        growth_without_the_last_tier,
+        threshold_moved_flips: moved_threshold_flips,
+    };
+    emitter.emit(&format!(
+        "name=r7_tier_peaks quantity={} class={} s={slots_per_region} rho={} timing={} tiers={} families={} peaks={} adjacent_differences={} growth={} maximum_peak={max_peak} maximum_peak_tier={} maximum_peak_family={} maximum_peak_cell={} maximum_peak_txg={} maximum_peak_is_on_the_largest_tier={} first_tier_above_two_slots={} first_tier_above_one_slot={} growth_without_the_last_tier={} dropping_the_last_tier_changes_the_judgement={} threshold_moved_flips={}",
+        quantity.label(),
+        quantity.class_label(),
+        density.label(),
+        timing.label(),
+        bracketed(&tiers),
+        bracketed(&families),
+        bracketed(&peaks),
+        bracketed(&adjacent_differences),
+        growth.label(),
+        tiers[max_index],
+        families[max_index],
+        unit.sampling_point_name(),
+        readings[max_index].1,
+        max_index + 1 == peaks.len(),
+        option_text(first_tier_with_peak_above(
+            &tiers,
+            &peaks,
+            E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS
+        )),
+        option_text(first_tier_with_peak_above(
+            &tiers,
+            &peaks,
+            E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS
+        )),
+        growth_without_the_last_tier.label(),
+        growth.kind() != growth_without_the_last_tier.kind(),
+        unit.threshold_moved_flips
+            .map_or_else(|| "not_made".to_string(), |flips| flips.to_string()),
+    ));
+    unit
+}
+
+/// R7a–R7e：按量、S、ρ、回收时点逐个统计单位判 W28、报上界数。
+fn judge_and_emit_tier_units(
+    emitter: &mut Emitter,
+    outcomes: &[HhRunOutcome],
+    r7_anchors: &BTreeMap<u64, R7AnchorCellsOfOneSlotsPerRegion>,
+) -> Vec<TierUnit> {
+    let mut units = Vec::new();
+    for quantity in E156_TIER_QUANTITIES {
+        for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+            let inside_the_first_ring =
+                r7_anchors[&slots_per_region].front_hole_count_inside_the_first_ring;
+            for density in [
+                WorkloadDensity::EveryPublishOverwrites,
+                WorkloadDensity::OneOverwriteInFourPublishes,
+            ] {
+                let mut cells: Vec<&HhRunOutcome> = outcomes
+                    .iter()
+                    .filter(|outcome| {
+                        outcome.shape.slots_per_region == slots_per_region
+                            && outcome.shape.density == density
+                            && quantity.selects(outcome, inside_the_first_ring)
+                    })
+                    .collect();
+                cells.sort_by_key(|outcome| outcome.shape.hole_count);
+                for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+                    units.push(judge_and_emit_one_tier_unit(
+                        emitter,
+                        quantity,
+                        slots_per_region,
+                        density,
+                        timing,
+                        &cells,
+                    ));
+                }
+            }
+        }
+    }
+    units
+}
+
+/// PC-同槽的汇总输入：每个 (S, ρ) 一格 Hs(2, 后) 与它的对照格，「每」列 Q1a 峰值各一个。
+#[derive(Clone, Copy, Debug)]
+struct SameSlotControlReading {
+    unchanged_peak_every_publish: i64,
+    control_peak_every_publish: i64,
+}
+
+fn emit_r7_verdict(
+    emitter: &mut Emitter,
+    units: &[TierUnit],
+    tier_sequence_cases_wrong: usize,
+    same_slot_controls: &[SameSlotControlReading],
+) {
+    for quantity in E156_TIER_QUANTITIES {
+        let of_quantity: Vec<&TierUnit> = units
+            .iter()
+            .filter(|unit| unit.quantity == quantity)
+            .collect();
+        let judged: Vec<&TierUnit> = of_quantity
+            .iter()
+            .copied()
+            .filter(|unit| unit.growth != TierGrowth::FewerThanThreeTiers)
+            .collect();
+        let too_few: Vec<String> = of_quantity
+            .iter()
+            .filter(|unit| unit.growth == TierGrowth::FewerThanThreeTiers)
+            .map(|unit| unit.sampling_point_name())
+            .collect();
+        let count_of = |kind: &str| {
+            judged
+                .iter()
+                .filter(|unit| unit.growth.kind() == kind)
+                .count()
+        };
+        let kinds: BTreeSet<&str> = judged.iter().map(|unit| unit.growth.kind()).collect();
+        let geometry = if judged.is_empty() {
+            "no_unit_judged".to_string()
+        } else if kinds.len() == 1 {
+            format!(
+                "consistent_on_{}_sampling_points_only_on_these",
+                judged.len()
+            )
+        } else {
+            "unstable".to_string()
+        };
+        let per_unit: Vec<String> = of_quantity
+            .iter()
+            .map(|unit| format!("{}:{}", unit.sampling_point_name(), unit.growth.label()))
+            .collect();
+        emitter.emit(&format!(
+            "name=r7_verdict quantity={} units={} judged={} fewer_than_three_tiers_units={} still_rising={} flat={} not_monotonic={} geometry_sensitivity={geometry} per_unit={}",
+            quantity.label(),
+            of_quantity.len(),
+            judged.len(),
+            bracketed(&too_few),
+            count_of("still_rising"),
+            count_of("flat"),
+            count_of("not_monotonic"),
+            per_unit.join(","),
+        ));
+    }
+    let names_where = |quantities: &[TierQuantity], predicate: &dyn Fn(TierGrowth) -> bool| {
+        units
+            .iter()
+            .filter(|unit| quantities.contains(&unit.quantity) && predicate(unit.growth))
+            .map(|unit| format!("{}:{}", unit.quantity.label(), unit.sampling_point_name()))
+            .collect::<Vec<String>>()
+    };
+    let f31_units = names_where(
+        &[TierQuantity::InsideTheFirstRing, TierQuantity::AcrossRings],
+        &|growth| growth == TierGrowth::NotMonotonic,
+    );
+    let mut f32_units = names_where(&[TierQuantity::BackPosition], &|growth| {
+        matches!(growth, TierGrowth::StillRising | TierGrowth::NotMonotonic)
+    });
+    f32_units.extend(names_where(
+        &[TierQuantity::SameSlotFront, TierQuantity::SameSlotBack],
+        &|growth| {
+            matches!(
+                growth,
+                TierGrowth::FlatAtTheLastTiers { .. } | TierGrowth::NotMonotonic
+            )
+        },
+    ));
+    let f34_units = names_where(&[TierQuantity::SameSlotBack], &|growth| {
+        matches!(growth, TierGrowth::FlatAtTheLastTiers { .. })
+    });
+    let mut f33_units: Vec<String> = Vec::new();
+    for inside in units
+        .iter()
+        .filter(|unit| unit.quantity == TierQuantity::InsideTheFirstRing)
+    {
+        for across in units.iter().filter(|unit| {
+            unit.quantity == TierQuantity::AcrossRings
+                && unit.sampling_point_name() == inside.sampling_point_name()
+        }) {
+            let kinds = (inside.growth.kind(), across.growth.kind());
+            if kinds == ("flat", "still_rising") || kinds == ("still_rising", "flat") {
+                f33_units.push(format!(
+                    "{}:r7a_{}_r7c_{}",
+                    inside.sampling_point_name(),
+                    kinds.0,
+                    kinds.1
+                ));
+            }
+        }
+    }
+    let ring_units: Vec<&TierUnit> = units
+        .iter()
+        .filter(|unit| {
+            matches!(
+                unit.quantity,
+                TierQuantity::InsideTheFirstRing | TierQuantity::AcrossRings
+            )
+        })
+        .collect();
+    let dropping_changed = ring_units
+        .iter()
+        .filter(|unit| unit.growth.kind() != unit.growth_without_the_last_tier.kind())
+        .count();
+    let threshold_tested = units
+        .iter()
+        .filter(|unit| unit.threshold_moved_flips.is_some())
+        .count();
+    let threshold_flipping = units
+        .iter()
+        .filter(|unit| unit.threshold_moved_flips == Some(true))
+        .count();
+    let same_slot_unseen = same_slot_controls
+        .iter()
+        .filter(|reading| {
+            reading.control_peak_every_publish >= reading.unchanged_peak_every_publish
+        })
+        .count();
+    emitter.emit(&format!(
+        "name=r7_verdict quantity=summary units={} criterion_units_not_monotonic={} report_only_units_unlike_the_prediction={} sampling_points_where_the_two_ring_readings_disagree={} same_slot_back_units_flat_against_the_clause_range={} dropping_the_last_tier_changed_units={dropping_changed}_of_{} threshold_moved_units_flipping={threshold_flipping}_of_{threshold_tested} tier_sequence_control_cases_wrong={tier_sequence_cases_wrong} same_slot_controls_run={} same_slot_controls_without_a_drop={same_slot_unseen}",
+        units.len(),
+        bracketed(&f31_units),
+        bracketed(&f32_units),
+        bracketed(&f33_units),
+        bracketed(&f34_units),
+        ring_units.len(),
+        same_slot_controls.len(),
+    ));
 }
 
 #[allow(
@@ -4776,6 +5769,15 @@ fn main() {
                 .join(",")
         ));
         anchors.insert(slots_per_region, cells);
+    }
+
+    // 第 7 次重跑的锚点模型（登记第七节 7.2 的 `anchors_e156_r7.py` 的移植）：k_满 / 排得下的最大洞数与本地常量表回比（A20，不等即停机 S20），
+    // 摘要与逐观测点两种行去掉前缀之后与脚本的输出逐行比（报告里的命令；摘要行的五个键名先照 `emit_r7_anchor_cells` 文档里那张对照换名）。
+    let mut r7_anchors: BTreeMap<u64, R7AnchorCellsOfOneSlotsPerRegion> = BTreeMap::new();
+    for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+        let cells = r7_anchor_cells_of(slots_per_region);
+        emit_r7_anchor_cells(&mut emitter, slots_per_region, &cells);
+        r7_anchors.insert(slots_per_region, cells);
     }
 
     // ===================== 第一段 =====================
@@ -5010,45 +6012,58 @@ fn main() {
             actual == expected
         ));
     }
+    // PC-档序列（第 7 次重跑登记 5.3）：W28 的判定函数在五个合成序列上逐条判对，错一条即作废 V20。
+    let tier_sequence_cases = tier_sequence_positive_control_cases();
+    let tier_sequence_cases_wrong = tier_sequence_cases
+        .iter()
+        .filter(|(_, actual, expected)| actual != expected)
+        .count();
+    for (case, actual, expected) in &tier_sequence_cases {
+        emitter.emit(&format!(
+            "name=pc_tier_sequence case={case} actual={actual} expected={expected} holds={}",
+            actual == expected
+        ));
+    }
 
     let mut outcomes: Vec<HhRunOutcome> = Vec::new();
     let mut grid_totals = HoleHistoryVerdictTotals::default();
     let mut every_publish_tree_table_lag_mismatch_cells = 0u64;
-    let mut not_fitting = 0u64;
+    let mut cells_run_without_fitting_the_ring = 0u64;
     let mut all_zero_pin_cells: Vec<AllZeroPinCellTotals> = Vec::new();
+    // 第 7 次重跑登记 5.2 / W30 / W31：族表按 S 现算（Hh 前 k = 1 … k_满 + 1、Hh 后 k = 1 … k_满后、Hc 两档、Hs 六格，加 k = 0 的基准族），排不下的格照跑。
     for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
-        let expected_lags = anchor_model::tree_table_reclaim_lags(
-            slots_per_region,
-            anchors[&slots_per_region].without_holes.end,
-        );
+        let r7_cells = &r7_anchors[&slots_per_region];
+        let expected_lags =
+            anchor_model::tree_table_reclaim_lags(slots_per_region, r7_cells.without_holes.end);
         for density in [
             WorkloadDensity::EveryPublishOverwrites,
             WorkloadDensity::OneOverwriteInFourPublishes,
         ] {
-            let mut shapes = vec![shape_of(slots_per_region, density, 0, None)];
-            for position in [HolePosition::Front, HolePosition::Back] {
-                for hole_count in [1u64, 2, 4] {
-                    shapes.push(shape_of(
+            let mut grid_cells: Vec<(&'static str, HhCellShape, &anchor_model::AnchorCell)> =
+                vec![(
+                    E156_FAMILY_HOLE_COUNT_SWEEP,
+                    shape_of(slots_per_region, density, 0, None),
+                    &r7_cells.without_holes,
+                )];
+            for cell in &r7_cells.cells {
+                grid_cells.push((
+                    cell.family,
+                    shape_of(
                         slots_per_region,
                         density,
-                        hole_count,
-                        Some(position),
-                    ));
-                }
+                        cell.hole_count,
+                        Some(cell.position),
+                    ),
+                    &cell.anchor,
+                ));
             }
-            for shape in shapes {
-                let anchor =
-                    anchor_cell_for(&anchors, slots_per_region, shape.hole_count, shape.position);
+            for (family, shape, anchor) in grid_cells {
                 if !anchor.fits {
-                    not_fitting += 1;
-                    emitter.emit(&format!(
-                        "name=q1_cell_not_run {} reason=geometry_does_not_fit",
-                        shape.fields()
-                    ));
-                    continue;
+                    cells_run_without_fitting_the_ring += 1;
                 }
                 let reuse = if slots_per_region == 4
                     && density == WorkloadDensity::EveryPublishOverwrites
+                    && family == E156_FAMILY_HOLE_COUNT_SWEEP
                     && shape.hole_count == 1
                 {
                     match shape.position {
@@ -5067,7 +6082,7 @@ fn main() {
                         ));
                         outcome
                     }
-                    None => run_hh_history(&mut emitter, &hh_request("Hh", shape, anchor)),
+                    None => run_hh_history(&mut emitter, &hh_request(family, shape, anchor)),
                 };
                 let lags = if shape.hole_count == 0 {
                     Some(&expected_lags)
@@ -5093,7 +6108,9 @@ fn main() {
     let mut pinned_floor_seen_real_cells = 0u64;
     let mut pinned_floor_seen_every_cells = 0u64;
     for outcome in outcomes.iter().filter(|outcome| {
-        outcome.shape.hole_count == 1 && outcome.shape.position == Some(HolePosition::Back)
+        outcome.family == E156_FAMILY_HOLE_COUNT_SWEEP
+            && outcome.shape.hole_count == 1
+            && outcome.shape.position == Some(HolePosition::Back)
     }) {
         let slots_per_region = outcome.shape.slots_per_region;
         let expected_lags = anchor_model::tree_table_reclaim_lags(
@@ -5129,8 +6146,10 @@ fn main() {
     // PC-多扣：每个 (S, ρ) 的 Hh(0, —) 与 Hh(2, 后)，四个组合的期末值都要 > 0。
     let mut over_withheld_controls_void = 0u64;
     for outcome in outcomes.iter().filter(|outcome| {
-        outcome.shape.hole_count == 0
-            || (outcome.shape.hole_count == 2 && outcome.shape.position == Some(HolePosition::Back))
+        outcome.family == E156_FAMILY_HOLE_COUNT_SWEEP
+            && (outcome.shape.hole_count == 0
+                || (outcome.shape.hole_count == 2
+                    && outcome.shape.position == Some(HolePosition::Back)))
     }) {
         let last = outcome
             .observations
@@ -5182,6 +6201,62 @@ fn main() {
         ));
     }
 
+    // PC-同槽（第 7 次重跑登记 5.3、E25）：每个 (S, ρ) 的 Hs(2, 后) 再跑一遍，「每」列的旁路门槛把第一个洞的环槽当作这个进程写过（去掉那一槽里的旧根重算，
+    // 不碰真实分配器）；「每」列 Q1a 峰值必须比不改时低，否则 V21（Hs 两族的读数分不出同槽钉住与别的多扣来源）。对照格不进 grid_totals、不进统计单位。
+    let mut same_slot_controls: Vec<SameSlotControlReading> = Vec::new();
+    for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
+        for density in [
+            WorkloadDensity::EveryPublishOverwrites,
+            WorkloadDensity::OneOverwriteInFourPublishes,
+        ] {
+            let unchanged = outcomes
+                .iter()
+                .find(|outcome| {
+                    outcome.family == E156_FAMILY_SAME_RING_SLOT
+                        && outcome.shape.slots_per_region == slots_per_region
+                        && outcome.shape.density == density
+                        && outcome.shape.position == Some(HolePosition::Back)
+                        && outcome.shape.hole_count == 2
+                })
+                .expect("格表里有 Hs(2, 后)");
+            let anchor = &r7_anchors[&slots_per_region]
+                .cells
+                .iter()
+                .find(|cell| {
+                    cell.family == E156_FAMILY_SAME_RING_SLOT
+                        && cell.position == HolePosition::Back
+                        && cell.hole_count == 2
+                })
+                .expect("族表里有 Hs(2, 后)")
+                .anchor;
+            let mut request = hh_request(E156_FAMILY_SAME_SLOT_CONTROL, unchanged.shape, anchor);
+            request.treat_the_hole_ring_slot_as_rewritten = true;
+            let control = run_hh_history(&mut emitter, &request);
+            let reading = SameSlotControlReading {
+                unchanged_peak_every_publish: q1a_peak_of(unchanged, ReclaimTiming::EveryPublish).0,
+                control_peak_every_publish: q1a_peak_of(&control, ReclaimTiming::EveryPublish).0,
+            };
+            emitter.emit(&format!(
+                "name=pc_same_slot {} unchanged_q1a_every_peak={} control_q1a_every_peak={} control_q1a_real_peak={} seen={}",
+                unchanged.shape.fields(),
+                reading.unchanged_peak_every_publish,
+                reading.control_peak_every_publish,
+                q1a_peak_of(&control, ReclaimTiming::Real).0,
+                reading.control_peak_every_publish < reading.unchanged_peak_every_publish
+            ));
+            same_slot_controls.push(reading);
+        }
+    }
+
+    // R7a–R7e：每个统计单位 (量, S, ρ, 回收时点) 的档序列判 W28、报上界数；R7f（每档的多扣）在 `name=q1_trajectory ... quantity=q1a_real` 与 `q1a_every` 行。
+    let tier_units = judge_and_emit_tier_units(&mut emitter, &outcomes, &r7_anchors);
+    emit_r7_verdict(
+        &mut emitter,
+        &tier_units,
+        tier_sequence_cases_wrong,
+        &same_slot_controls,
+    );
+
     // 分组、判定。
     let mut groups: BTreeMap<GroupKey, Vec<DeltaSample>> = BTreeMap::new();
     for outcome in &outcomes {
@@ -5190,6 +6265,12 @@ fn main() {
                 "name=q1_cell_truncated {} note=only_points_before_truncation_are_used",
                 outcome.shape.fields()
             ));
+        }
+        // 第 6 次重跑以来的 Q1c / Q1d 分组只收那一次跑的 Hh(0, 1, 2, 4) 格，Hc、Hs 与 k = 3、5 … 的格不混进去（它们的判定在 `name=r7_*` 行）。
+        let feeds_the_groups_of_the_earlier_reruns = outcome.family == E156_FAMILY_HOLE_COUNT_SWEEP
+            && matches!(outcome.shape.hole_count, 0 | 1 | 2 | 4);
+        if !feeds_the_groups_of_the_earlier_reruns {
+            continue;
         }
         for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
             let key = (
@@ -5354,7 +6435,7 @@ fn main() {
     // 作废与停机（第十一节）。
     let cells_run = outcomes.len();
     emitter.emit(&format!(
-        "name=verdict stage=second cells_run={cells_run} cells_not_fitting={not_fitting} truncated_cells={} v1_over_withheld_controls_void={over_withheld_controls_void} v2_a10_every_mismatch_cells={every_publish_tree_table_lag_mismatch_cells} v2_a12_every_nonzero_points={} v2_a14_mismatch_points={} v2_a15_every_below_points={} v2_pc_pinned_floor_seen={pinned_floor_seen} v2_pc_c2_seen={positive_control_crash_seen} v6_a11_mismatch_points={} v6_devices_unequal_points={} v6_pc_hole_not_seen_cells={hole_controls_not_seen} v16_judge_cases_wrong={judge_wrong} v17_a13_every_nonzero_points={} s1_failures={} s1h_root_ring_missing_points={} s11_a10_real_mismatch_cells={} s11_a12_real_nonzero_points={} s11_a15_real_below_points={} s11_k10_violation_points={} s12_g_adm_nonzero={} k8_mismatches={} referenced_but_free_points={} abandoned_or_unknown_root_points={} anchor_rows_missing={}",
+        "name=verdict stage=second cells_run={cells_run} cells_run_without_fitting_the_ring={cells_run_without_fitting_the_ring} truncated_cells={} v1_over_withheld_controls_void={over_withheld_controls_void} v2_a10_every_mismatch_cells={every_publish_tree_table_lag_mismatch_cells} v2_a12_every_nonzero_points={} v2_a14_mismatch_points={} v2_a15_every_below_points={} v2_pc_pinned_floor_seen={pinned_floor_seen} v2_pc_c2_seen={positive_control_crash_seen} v6_a11_mismatch_points={} v6_devices_unequal_points={} v6_pc_hole_not_seen_cells={hole_controls_not_seen} v16_judge_cases_wrong={judge_wrong} v17_a13_every_nonzero_points={} s1_failures={} s1h_root_ring_missing_points={} s11_a10_real_mismatch_cells={} s11_a12_real_nonzero_points={} s11_a15_real_below_points={} s11_k10_violation_points={} s12_g_adm_nonzero={} k8_mismatches={} referenced_but_free_points={} abandoned_or_unknown_root_points={} anchor_rows_missing={} anchor_lag_mismatch_points={} anchor_pinned_slot_mismatch_points={}",
         outcomes.iter().filter(|outcome| outcome.truncation.is_some()).count(),
         grid_totals.every_publish_nonzero_without_holes,
         grid_totals.threshold_anchor_mismatches,
@@ -5373,6 +6454,8 @@ fn main() {
         grid_totals.q1a_plus_positive,
         grid_totals.abandoned_or_unknown,
         grid_totals.anchor_rows_missing,
+        grid_totals.lag_anchor_mismatches,
+        grid_totals.pinned_anchor_mismatches,
     ));
     for (key, judgement) in &judgements {
         emitter.emit(&format!(
@@ -5405,6 +6488,11 @@ mod tests {
         AnchorCellsOfOneSlotsPerRegion, Arm, Emitter, GeometrySensitivity, GrowthWithHoles,
         HhCellShape, HhRunOutcome, HolePosition, PeakJudgement, ReclaimTiming, WorkloadDensity,
         FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    };
+    use super::{
+        judge_tier_peaks, r7_anchor_cells_of, reclaim_threshold_read_from_the_ring_image,
+        tier_sequence_positive_control_cases, valid_root_txgs_without_the_old_root_in_the_slot,
+        TierGrowth, E156_FAMILY_SAME_RING_SLOT,
     };
     use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
     use singlefs_core::allocator::{
@@ -6286,6 +7374,212 @@ mod tests {
         );
         for (case, actual, expected) in judge_positive_control_cases() {
             assert_eq!(actual, expected, "PC-判定器用例 {case}");
+        }
+    }
+
+    /// PC-档序列（第 7 次重跑登记 5.3、E24）：W28 的判定函数在五个合成序列上逐条判对。M50（最后一个相邻差「> 0」写成「≥ 0」）在 (1, 2, 2) 上红。
+    #[test]
+    fn tier_sequence_judgement_matches_the_five_synthetic_sequences() {
+        assert_eq!(judge_tier_peaks(&[1, 2, 3]), TierGrowth::StillRising);
+        assert_eq!(
+            judge_tier_peaks(&[1, 2, 2]),
+            TierGrowth::FlatAtTheLastTiers { upper_bound: 2 }
+        );
+        assert_eq!(judge_tier_peaks(&[1, 3, 2]), TierGrowth::NotMonotonic);
+        assert_eq!(
+            judge_tier_peaks(&[5, 5, 5]),
+            TierGrowth::FlatAtTheLastTiers { upper_bound: 5 }
+        );
+        assert_eq!(judge_tier_peaks(&[1, 2]), TierGrowth::FewerThanThreeTiers);
+        for (case, actual, expected) in tier_sequence_positive_control_cases() {
+            assert_eq!(actual, expected, "PC-档序列用例 {case}");
+        }
+    }
+
+    /// E24（第 7 次重跑登记 5.4）：同槽叠洞的新入口在 S = 4、m = 2 上造出的洞，前位置 [5, 17]、后位置 [16, 28]；
+    /// 登记第七节 A21 的例子 S = 8、m = 3，前位置 [5, 29, 53]、后位置 [28, 52, 76]。M51（第二个洞起每个洞多隔一个 txg）在这里红。
+    #[test]
+    fn holes_on_the_same_ring_slot_are_spaced_exactly_one_ring_apart() {
+        let anchor_of = |slots_per_region: u64, front: bool, hole_count: u64| {
+            super::anchor_model::run_the_anchor_schedule(
+                slots_per_region,
+                super::anchor_model::HoleSchedule::HolesOnTheSameRingSlot { front, hole_count },
+                None,
+            )
+        };
+        let front_two = anchor_of(4, true, 2);
+        assert_eq!(front_two.holes, vec![5, 17], "S = 4、m = 2、前位置");
+        assert_eq!(front_two.recovery_ends, vec![7, 19]);
+        assert!(!front_two.fits, "两个洞落在同一个环槽，排不下");
+        let back_two = anchor_of(4, false, 2);
+        assert_eq!(back_two.holes, vec![16, 28], "S = 4、m = 2、后位置");
+        assert_eq!(back_two.recovery_ends, vec![19, 31]);
+        let front_one = anchor_of(4, true, 1);
+        assert_eq!(front_one.holes, vec![5], "m = 1 与 Hh(1, 前) 同一个洞");
+        assert!(front_one.fits);
+        let eight_front_three = anchor_of(8, true, 3);
+        assert_eq!(
+            eight_front_three.holes,
+            vec![5, 29, 53],
+            "A21：S = 8、m = 3、前位置"
+        );
+        assert_eq!(eight_front_three.recovery_ends, vec![7, 31, 55]);
+        assert_eq!(eight_front_three.end, 79);
+        let eight_back_three = anchor_of(8, false, 3);
+        assert_eq!(
+            eight_back_three.holes,
+            vec![28, 52, 76],
+            "A21：S = 8、m = 3、后位置"
+        );
+        assert_eq!(eight_back_three.end, 102);
+    }
+
+    /// A20（第 7 次重跑登记第七节）：锚点模型算的 k_满、前位置排得下的最大洞数、后位置排得下的最大洞数，三个 S 上与登记的 2 / 4 / 8、3 / 5 / 9、2 / 4 / 8 相同。
+    /// M52（k_满 的循环多算一档）在这里红。
+    #[test]
+    fn ring_full_and_fitting_hole_counts_match_the_registered_table() {
+        for (slots_per_region, inside_the_first_ring, fitting_front, fitting_back) in
+            [(4u64, 2u64, 3u64, 2u64), (8, 4, 5, 4), (16, 8, 9, 8)]
+        {
+            assert_eq!(
+                super::anchor_model::largest_front_hole_count_inside_the_first_ring(
+                    slots_per_region
+                ),
+                inside_the_first_ring,
+                "k_满，S = {slots_per_region}"
+            );
+            assert_eq!(
+                super::anchor_model::largest_hole_count_that_fits(slots_per_region, true),
+                fitting_front,
+                "前位置排得下的最大洞数，S = {slots_per_region}"
+            );
+            assert_eq!(
+                super::anchor_model::largest_hole_count_that_fits(slots_per_region, false),
+                fitting_back,
+                "后位置排得下的最大洞数，S = {slots_per_region}"
+            );
+        }
+    }
+
+    /// 族表（第 7 次重跑登记 5.2）：每个 ρ 上 S = 4 / 8 / 16 各 14 / 18 / 26 格（含 k = 0 的基准族），k = 0 的终点取各族终点的最大值（Hc 最长一条：66 / 114 / 210）。
+    /// M53（族表少 Hc 两档）在这里红。
+    #[test]
+    fn family_table_has_fourteen_eighteen_and_twenty_six_cells_and_ends_where_the_longest_family_ends(
+    ) {
+        for (slots_per_region, cells_per_density, longest_end) in
+            [(4u64, 14usize, 66u64), (8, 18, 114), (16, 26, 210)]
+        {
+            let table = r7_anchor_cells_of(slots_per_region);
+            assert_eq!(
+                table.cells.len() + 1,
+                cells_per_density,
+                "S = {slots_per_region} 的格数（k = 0 单列，所以 +1）"
+            );
+            assert_eq!(
+                table.without_holes.end, longest_end,
+                "S = {slots_per_region} 的 k = 0 终点"
+            );
+            assert!(table.without_holes.holes.is_empty());
+        }
+    }
+
+    /// PC-同槽（第 7 次重跑登记 5.3、E25）：把洞的环槽当作这个进程写过之后，那一槽里的旧根不再算数，门槛升到下一条根。M54（改法变成不改）在这里红。
+    #[test]
+    fn treating_the_hole_slot_as_rewritten_raises_the_threshold_to_the_next_root() {
+        let valid_roots = BTreeSet::from([4u64, 5, 6]);
+        assert_eq!(
+            reclaim_threshold_read_from_the_ring_image(0, &valid_roots),
+            4,
+            "不改：门槛钉在 txg 4 的旧根上"
+        );
+        let without_the_old_root =
+            valid_root_txgs_without_the_old_root_in_the_slot(&valid_roots, Some(4));
+        assert_eq!(
+            reclaim_threshold_read_from_the_ring_image(0, &without_the_old_root),
+            5,
+            "改：门槛升到下一条根"
+        );
+        assert_eq!(
+            valid_root_txgs_without_the_old_root_in_the_slot(&valid_roots, None),
+            valid_roots,
+            "那一槽里没有旧根：什么都不去掉"
+        );
+    }
+
+    /// 第 7 次重跑登记 P25 与第七节 K21、A22–A24：Hs(2, 后, S = 4, ρ = 1)，洞在 txg 16、28；锚点脚本 `--dump` 的值：txg 31 与 39 门槛 4（那一槽里 txg 4 的根没被写掉），
+    /// txg 39 h_缺 = 24，txg 40 这个进程写掉那一槽、门槛 29；每个观测点门槛、h_缺、h_洞、被钉住的槽数与锚点模型相同，Q1a 不低于锚点的树表下界。
+    #[test]
+    fn hs_two_back_holes_at_four_slots_per_region_keep_the_threshold_on_txg_four_until_the_slot_is_rewritten(
+    ) {
+        let table = r7_anchor_cells_of(4);
+        let cell = table
+            .cells
+            .iter()
+            .find(|cell| {
+                cell.family == E156_FAMILY_SAME_RING_SLOT
+                    && cell.position == HolePosition::Back
+                    && cell.hole_count == 2
+            })
+            .expect("族表里有 Hs(2, 后)");
+        let shape = HhCellShape {
+            slots_per_region: 4,
+            density: WorkloadDensity::EveryPublishOverwrites,
+            hole_count: 2,
+            position: Some(HolePosition::Back),
+        };
+        let mut emitter = Emitter { emitted: 0 };
+        let outcome = run_hh_history(
+            &mut emitter,
+            &hh_request(E156_FAMILY_SAME_RING_SLOT, shape, &cell.anchor),
+        );
+        assert!(outcome.truncation.is_none(), "没有截断");
+        let hole_txgs: Vec<u64> = outcome
+            .recoveries
+            .iter()
+            .map(|recovery| recovery.hole_txg)
+            .collect();
+        assert_eq!(hole_txgs, vec![16, 28], "两个洞钉在同一个环槽");
+        for (txg, threshold) in [(31u64, 4u64), (39, 4), (40, 29)] {
+            assert_eq!(
+                observation_at(&outcome, txg).reading.ring_threshold,
+                threshold,
+                "锚点脚本 --dump：txg {txg} 门槛 {threshold}"
+            );
+        }
+        assert_eq!(
+            observation_at(&outcome, 39).reading.missing_txgs,
+            24,
+            "txg 39 h_缺"
+        );
+        for observation in &outcome.observations {
+            let row = observation.anchor.expect("每个观测点都有锚点那一行");
+            assert_eq!(
+                observation.reading.ring_threshold, row.floor,
+                "A23：门槛，txg {}",
+                observation.txg
+            );
+            assert_eq!(
+                observation.reading.missing_txgs, row.missing_txgs,
+                "A24：h_缺，txg {}",
+                observation.txg
+            );
+            assert_eq!(
+                observation.reading.live_holes, row.live_holes,
+                "A24：h_洞，txg {}",
+                observation.txg
+            );
+            assert_eq!(
+                observation.reading.all_zero_slots_still_pinned, row.pinned_slots,
+                "A24：被钉住的槽数，txg {}",
+                observation.txg
+            );
+            for timing in [ReclaimTiming::Real, ReclaimTiming::EveryPublish] {
+                assert!(
+                    observation.over_withheld(Arm::FloorRule, timing) >= row.tree_table_lower_bound,
+                    "A22：Q1a 不低于树表下界，txg {}",
+                    observation.txg
+                );
+            }
         }
     }
 }

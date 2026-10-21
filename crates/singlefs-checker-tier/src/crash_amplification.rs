@@ -139,6 +139,7 @@ use crate::crash_judge_conclusions::{
     cross_check_words_of_a_stored_given_state, encoded_verdict_of_the_red_items,
     recovery_words_of_the_cross_check_words, red_items_of_a_given_state,
     red_items_of_the_encoded_verdict, CrossCheckWords, LandedRootWords, StateCountsOfABlock,
+    SCAN_REBUILD_OUTCOME_NOT_REACHED,
 };
 /// GPU 结论换红项、GPU 恢复字的换法在判器一侧（`crate::crash_judge_gpu`，崩溃点重放合并第三轮判决 J8：改结论的几处搬进判器一侧），
 /// 这里照旧转出去：对拍用例经这条路径引。
@@ -5267,6 +5268,8 @@ fn step_kind_code(kind: StepKind) -> u8 {
         StepKind::RootRecordFua => 3,
         StepKind::SystemConfigurationSlot => 4,
         StepKind::Barrier => 5,
+        // 新码接在最后，旧库里那几个码的含义不动。
+        StepKind::Discard => 6,
     }
 }
 
@@ -5278,6 +5281,7 @@ fn step_kind_of_code(code: u8) -> Option<StepKind> {
         3 => Some(StepKind::RootRecordFua),
         4 => Some(StepKind::SystemConfigurationSlot),
         5 => Some(StepKind::Barrier),
+        6 => Some(StepKind::Discard),
         _ => None,
     }
 }
@@ -8642,6 +8646,175 @@ mod tests {
         (writes, segments)
     }
 
+    /// 覆盖行逐字是覆盖表脚本读的那一形：行首、五个字段的名字与次序、步骤写 `StepKind` 的成员名（七个成员逐个钉）、两个域的写法。
+    /// 判别力（`crates/mutations.tsv`）：步骤改写成种类串（`StepKind::name` 的蛇形写法），这条红。
+    #[test]
+    fn a_coverage_line_reads_entry_step_segment_expansion_and_domain_word_for_word() {
+        let expanded_in_the_quick_domain = CrashFlowCoverageLine {
+            entry_name: "publish_first_file".to_string(),
+            step_kind: StepKind::RootRecordFua,
+            segment_index: 3,
+            treatment: SegmentTreatmentInTheRun::Expanded,
+            domain: CrashFlowCoverageDomain::Quick,
+        };
+        assert_eq!(
+            expanded_in_the_quick_domain.text(),
+            "CRASH_FLOW_COVERAGE entry=publish_first_file step=RootRecordFua segment=3 expansion=expanded domain=quick"
+        );
+        let not_expanded_in_the_full_domain = CrashFlowCoverageLine {
+            entry_name: "unmount".to_string(),
+            step_kind: StepKind::SystemConfigurationSlot,
+            segment_index: 12,
+            treatment: SegmentTreatmentInTheRun::NotExpanded,
+            domain: CrashFlowCoverageDomain::Full,
+        };
+        assert_eq!(
+            not_expanded_in_the_full_domain.text(),
+            "CRASH_FLOW_COVERAGE entry=unmount step=SystemConfigurationSlot segment=12 expansion=not_expanded domain=full"
+        );
+        assert_eq!(
+            [
+                StepKind::ZeroFill,
+                StepKind::Discard,
+                StepKind::UnitWrite,
+                StepKind::JournalRecord,
+                StepKind::RootRecordFua,
+                StepKind::SystemConfigurationSlot,
+                StepKind::Barrier,
+            ]
+            .map(step_kind_member_name),
+            [
+                "ZeroFill",
+                "Discard",
+                "UnitWrite",
+                "JournalRecord",
+                "RootRecordFua",
+                "SystemConfigurationSlot",
+                "Barrier",
+            ],
+            "步骤写枚举里声明的成员名"
+        );
+    }
+
+    /// 一条流里三种没展开各有一段：归 ignore 的点的段报 `ignored_point`、按段登记的段报 `registered_segment`、写数超过展开上限的段报
+    /// `not_expanded`，照展开上限展开了的报 `expanded`。同一（入口，步骤，段）只一行（7 次单元写的登记段只一行）；入口取点名的第一截；
+    /// 每一段都落在轻型两个域的并里，域是 `quick`。判别力（`crates/mutations.tsv`）：不认 ignore 的点、不认按段登记、不去重，各红这一条。
+    #[test]
+    fn coverage_lines_name_the_ignored_point_the_registered_segment_and_the_segment_past_the_expansion_limit(
+    ) {
+        let (writes, segments) = flow_parts_of_unit_and_journal_writes(&[(1, 1), (7, 0), (2, 0)]);
+        assert_eq!(
+            segments.iter().map(Vec::len).collect::<Vec<_>>(),
+            vec![2, 7, 2, 1, 2]
+        );
+        let base = MemoryPool {
+            devices: BTreeMap::new(),
+            device_size_in_bytes: 1 << 30,
+        };
+        let registered = vec![RegisteredSegment {
+            segment_index: 1,
+            write_count: 7,
+            write_table_digest_text: "dd".repeat(DIGEST_BYTES),
+        }];
+        let limit = ExpandUpToWritesPerSegment(1);
+        // 录入段那一份展开的形（`expansion_in_the_recording`）：登记的段照轻型两个域的并，别的段照展开上限
+        let expansion_in_the_recording_of_the_flow = |segment_index: usize, segment: &[usize]| {
+            if segment_index == 1 {
+                expansion_of_a_registered_segment(segment)
+            } else {
+                limit.expansion_of(segment)
+            }
+        };
+        let setting_file = "crates/singlefs-checker-tier/tests/common_crash_points/mod.rs";
+        let flow = CrashFlow {
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            judged_root_index: 11,
+            versions: &[],
+            versions_without_a_file: &[],
+            expansion: &expansion_in_the_recording_of_the_flow,
+            crash_points: vec![
+                CrashPointSpan {
+                    name: "acquire_instance_and_warm_up.data_unit+journal_record.1".to_string(),
+                    code_file_in_repository: setting_file.to_string(),
+                    writes: 0..2,
+                    ignored: true,
+                },
+                CrashPointSpan {
+                    name: "publish_first_file.data_unit.1".to_string(),
+                    code_file_in_repository: setting_file.to_string(),
+                    writes: 2..writes.len(),
+                    ignored: false,
+                },
+            ],
+        };
+        let texts: Vec<String> = crash_flow_coverage_lines(&flow, &registered)
+            .iter()
+            .map(CrashFlowCoverageLine::text)
+            .collect();
+        assert_eq!(
+            texts,
+            vec![
+                "CRASH_FLOW_COVERAGE entry=acquire_instance_and_warm_up step=UnitWrite segment=0 expansion=ignored_point domain=quick",
+                "CRASH_FLOW_COVERAGE entry=acquire_instance_and_warm_up step=JournalRecord segment=0 expansion=ignored_point domain=quick",
+                "CRASH_FLOW_COVERAGE entry=publish_first_file step=UnitWrite segment=1 expansion=registered_segment domain=quick",
+                "CRASH_FLOW_COVERAGE entry=publish_first_file step=UnitWrite segment=2 expansion=not_expanded domain=quick",
+                "CRASH_FLOW_COVERAGE entry=publish_first_file step=RootRecordFua segment=3 expansion=expanded domain=quick",
+                "CRASH_FLOW_COVERAGE entry=publish_first_file step=SystemConfigurationSlot segment=4 expansion=not_expanded domain=quick",
+            ],
+            "段 0 归 ignore 的点（照展开上限它本来也不展开，ignore 先认）；段 1 登记（7 写只取甲二）；段 2、段 4 两写超过展开上限 1；段 3 一写展开"
+        );
+    }
+
+    /// 一段照全部真子集展开、写数又超过展开 6 的上限：这一趟越过了轻型两个域的并，每一行都报 `domain=full`（段本身照旧 `expanded`）。
+    /// 判别力（`crates/mutations.tsv`）：域恒报 `quick`，这条红。
+    #[test]
+    fn coverage_lines_of_a_run_expanding_a_segment_past_the_light_tier_domains_are_in_the_full_domain(
+    ) {
+        let (writes, segments) = flow_parts_of_unit_and_journal_writes(&[(7, 0)]);
+        assert_eq!(
+            segments.iter().map(Vec::len).collect::<Vec<_>>(),
+            vec![7, 1, 2]
+        );
+        let base = MemoryPool {
+            devices: BTreeMap::new(),
+            device_size_in_bytes: 1 << 30,
+        };
+        let limit = ExpandUpToWritesPerSegment(30);
+        let expansion_up_to_thirty =
+            move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
+        let flow = CrashFlow {
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            judged_root_index: 7,
+            versions: &[],
+            versions_without_a_file: &[],
+            expansion: &expansion_up_to_thirty,
+            crash_points: vec![CrashPointSpan {
+                name: "publish_overwrite.data_unit.1".to_string(),
+                code_file_in_repository:
+                    "crates/singlefs-checker-tier/tests/common_crash_points/mod.rs".to_string(),
+                writes: 0..writes.len(),
+                ignored: false,
+            }],
+        };
+        let texts: Vec<String> = crash_flow_coverage_lines(&flow, &[])
+            .iter()
+            .map(CrashFlowCoverageLine::text)
+            .collect();
+        assert_eq!(
+            texts,
+            vec![
+                "CRASH_FLOW_COVERAGE entry=publish_overwrite step=UnitWrite segment=0 expansion=expanded domain=full",
+                "CRASH_FLOW_COVERAGE entry=publish_overwrite step=RootRecordFua segment=1 expansion=expanded domain=full",
+                "CRASH_FLOW_COVERAGE entry=publish_overwrite step=SystemConfigurationSlot segment=2 expansion=expanded domain=full",
+            ],
+            "段 0 七次单元写全部真子集展开，越过展开 6"
+        );
+    }
+
     /// L3：块键只由内容定——同一份流在两个设点文件、两个点名（崩溃枚举用例的项名就是它那个点的点名）下算出同一把块键；
     /// 起步镜像改一个字节、改一段的展开方式，块键都变。判别力（`crates/mutations.tsv`）：把身份（带设点文件路径与点名）拼回块键，这条红。
     #[test]
@@ -9775,6 +9948,67 @@ mod tests {
                 &[observer.0, pool_checker_version.0].concat(),
             )),
         }
+    }
+
+    /// 观察者那一把版本的文字只由观察者那一组判法单元的键与另读的输入组成（D13（验证路线） 已定项 17：手写的版本常量不进键）：
+    /// 观察者那一把是这两样拼成的那段文字的摘要，代码那一把是同一段文字、另读的输入取全零。文字里多一截手写的写法号，两把都对不上。
+    #[test]
+    fn the_observer_versions_hash_only_the_observer_units_key_and_the_extra_inputs() {
+        let observer_units_key = JudgingUnitsKey::of_the_parts(
+            sha256_digest(b"observer units of the version text unit test\n"),
+            Vec::new(),
+        );
+        let pool_checker_units_key = JudgingUnitsKey::of_the_parts(
+            sha256_digest(b"pool checker units of the version text unit test\n"),
+            Vec::new(),
+        );
+        let composition_units_key = JudgingUnitsKey::of_the_parts(
+            sha256_digest(b"composition units of the version text unit test\n"),
+            Vec::new(),
+        );
+        let extra_inputs_of_the_observer =
+            sha256_digest(b"extra inputs of the version text unit test\n");
+        let observe_nothing =
+            |_ordinal: u64,
+             _image: &CrashImage<'_>,
+             _report: &RecoveryReport,
+             _counts: &mut CrashPointReplayObserverCounts| {};
+        let observer = ObserverOnTheNodes {
+            observer_name: ObserverName::new("version_text_unit_test_observer")
+                .expect("名字合规矩"),
+            observer_code_file: OBSERVER_UNIT_TEST_SETTING_FILE.to_string(),
+            extra_inputs_digest: extra_inputs_of_the_observer,
+            nodes: Vec::new(),
+            observe: ObserverCode::CountsOnly(&observe_nothing),
+        };
+        let versions = observer_versions_of_the_keys(
+            &observer,
+            JudgedBy::CpuJudge,
+            &observer_units_key,
+            &pool_checker_units_key,
+            &composition_units_key,
+        );
+        let version_text_of = |extra_inputs: &[u8; DIGEST_BYTES]| {
+            format!(
+                "singlefs observer units\nunits={}\nextra_inputs={}\n",
+                hexadecimal_text(observer_units_key.fingerprint()),
+                hexadecimal_text(extra_inputs)
+            )
+        };
+        assert_eq!(
+            versions.observer,
+            ConclusionVersion(sha256_digest(
+                version_text_of(&extra_inputs_of_the_observer).as_bytes()
+            )),
+            "观察者那一把是观察者那一组的键与另读的输入拼成的文字的摘要，文字里没有别的"
+        );
+        assert_eq!(
+            versions.observer_code,
+            ConclusionVersion(sha256_digest(
+                version_text_of(&[0; DIGEST_BYTES]).as_bytes()
+            )),
+            "代码那一把是同一段文字、另读的输入取全零"
+        );
     }
 
     /// 观察者两段那几条单测一趟的结果：录入段、判段的账，观察者真跑了几次，逐状态的红项、每块的计数向量与在哪判的、每块录入块里的观察结果几份。
@@ -12175,6 +12409,7 @@ pub fn period_of_write(write: &RetainedWrite) -> &'static str {
         (StepKind::UnitWrite, WrittenContents::Zeros { .. }) => "unit_write",
         (
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::JournalRecord
             | StepKind::RootRecordFua
             | StepKind::SystemConfigurationSlot
@@ -12541,6 +12776,199 @@ fn states_skipped_by_ignore(flow: &CrashFlow<'_>, plan: &CrashPlan) -> u64 {
     without_ignore
         .checked_sub(planned)
         .expect("ignore 只会让段少展开，态数不会比不 ignore 时多")
+}
+
+// ============================== 覆盖行：这一趟里每个（入口，提交步骤，段）展没展开 ==============================
+
+/// 覆盖行的行首（[`CrashFlowCoverageLine::text`]）。
+pub const CRASH_FLOW_COVERAGE_LINE_PREFIX: &str = "CRASH_FLOW_COVERAGE";
+
+/// 一段在这一趟里落到哪一种（覆盖行的 `expansion=`；用户 2026-10-19 定 K3「三样都含」：ignore 的点、按段登记的段、展开上限之外的段都算没展开）。
+/// 判的次序与计划相同：归预设 ignore 的点先于按段登记，按段登记先于这一段自己的展开方式（[`CrashPlan::segment_expansion`]、`expansion_in_the_recording`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SegmentTreatmentInTheRun {
+    /// 这一段照它的展开方式展开了（全部真子集或甲二）。
+    Expanded,
+    /// 这一段归一个预设 ignore 的点（[`CrashPointSpan::ignored`]），一律不展开。
+    IgnoredPoint,
+    /// 这一段在按段登记表里（[`RegisteredSegment`]），只照轻型两个域的并展开。
+    RegisteredSegment,
+    /// 这一段的展开方式是不展开：崩溃放量是写数超过展开上限，崩溃枚举用例是调用方给的展开不展开它。
+    NotExpanded,
+}
+
+impl SegmentTreatmentInTheRun {
+    /// 覆盖行里的写法。
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Expanded => "expanded",
+            Self::IgnoredPoint => "ignored_point",
+            Self::RegisteredSegment => "registered_segment",
+            Self::NotExpanded => "not_expanded",
+        }
+    }
+}
+
+/// 这一趟的状态落在哪个域（覆盖行的 `domain=`；用户 2026-10-19 定 K2：轻型域与全量域都算）。按这一趟每一段实际的展开判，不按是谁起的这一趟。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CrashFlowCoverageDomain {
+    /// 每一段的展开都落在轻型两个域（甲二与展开 [`LIGHT_TIER_EXPAND_UP_TO_WRITES_PER_SEGMENT`]）的并里。
+    Quick,
+    /// 至少有一段的展开越过了轻型两个域的并。
+    Full,
+}
+
+impl CrashFlowCoverageDomain {
+    /// 覆盖行里的写法。
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Quick => "quick",
+            Self::Full => "full",
+        }
+    }
+}
+
+/// 一行覆盖行：一个（入口，提交步骤，段）在这一趟里怎么处置，连同这一趟的域。
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CrashFlowCoverageLine {
+    /// 写所在崩溃点的点名 `<入口>.<写的种类>.<第几段>` 的第一截（点名里没有 `.` 时整个点名就是入口）。
+    pub entry_name: String,
+    pub step_kind: StepKind,
+    /// 段在这条流里的序号，从 0 起，与 [`CrashFlow::segments`] 同序。
+    pub segment_index: usize,
+    pub treatment: SegmentTreatmentInTheRun,
+    pub domain: CrashFlowCoverageDomain,
+}
+
+impl CrashFlowCoverageLine {
+    /// `CRASH_FLOW_COVERAGE entry=<入口名> step=<StepKind 成员名> segment=<段序号> expansion=<expanded|ignored_point|registered_segment|not_expanded> domain=<quick|full>`。
+    /// 覆盖表脚本按这几段逐字读：改写法要同改它。
+    #[must_use]
+    pub fn text(&self) -> String {
+        format!(
+            "{CRASH_FLOW_COVERAGE_LINE_PREFIX} entry={} step={} segment={} expansion={} domain={}",
+            self.entry_name,
+            step_kind_member_name(self.step_kind),
+            self.segment_index,
+            self.treatment.name(),
+            self.domain.name()
+        )
+    }
+}
+
+/// [`StepKind`] 的成员名（枚举里声明的那个名字，不是种类串 [`StepKind::name`] 的蛇形写法）：覆盖表脚本拿它对枚举体的成员。
+#[must_use]
+pub fn step_kind_member_name(step_kind: StepKind) -> &'static str {
+    match step_kind {
+        StepKind::ZeroFill => "ZeroFill",
+        StepKind::Discard => "Discard",
+        StepKind::UnitWrite => "UnitWrite",
+        StepKind::JournalRecord => "JournalRecord",
+        StepKind::RootRecordFua => "RootRecordFua",
+        StepKind::SystemConfigurationSlot => "SystemConfigurationSlot",
+        StepKind::Barrier => "Barrier",
+    }
+}
+
+/// 一段的展开落不落在轻型两个域的并里：不展开与甲二都在；全部真子集要写数不超过 [`LIGHT_TIER_EXPAND_UP_TO_WRITES_PER_SEGMENT`]（展开 6 那一域）才在。
+fn segment_expansion_lies_in_the_light_tier_domains(
+    expansion: CrashPointReplaySegmentExpansion,
+    segment: &[usize],
+) -> bool {
+    match expansion {
+        CrashPointReplaySegmentExpansion::NotExpanded
+        | CrashPointReplaySegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => true,
+        CrashPointReplaySegmentExpansion::EveryProperSubset => {
+            segment.len() <= LIGHT_TIER_EXPAND_UP_TO_WRITES_PER_SEGMENT
+        }
+    }
+}
+
+/// 这一趟录下的写流的覆盖行：每次写取（它所在崩溃点的入口，它带的 [`StepKind`]，它所在的段），连同那一段在这一趟里怎么处置
+/// （[`SegmentTreatmentInTheRun`]）与这一趟的域；同一（入口，步骤，段，处置，域）只留一行，按段序、段内写序排。`registered_segments` 是这一趟
+/// 按段登记的段（崩溃枚举用例没有按段登记，给空的）。
+///
+/// 域按这一趟每一段实际的展开判（归 ignore 的点的段不展开）：全落在轻型两个域的并里是 [`CrashFlowCoverageDomain::Quick`]，有一段越过是
+/// [`CrashFlowCoverageDomain::Full`]。轻型是重型的子集：`quick` 那一趟展开了的段，全量域里同样展开。
+///
+/// # Panics
+/// 有一段没有写，或有一次写不落在任何崩溃点里（崩溃点的写区间没罩住整张写表；计划那一步同样拒）。
+#[must_use]
+pub fn crash_flow_coverage_lines(
+    flow: &CrashFlow<'_>,
+    registered_segments: &[RegisteredSegment],
+) -> Vec<CrashFlowCoverageLine> {
+    let owner_of_segment = owner_of_each_segment(flow);
+    let treatment_of_segment: Vec<SegmentTreatmentInTheRun> = flow
+        .segments
+        .iter()
+        .enumerate()
+        .map(|(segment_index, segment)| {
+            if flow.crash_points[owner_of_segment[segment_index]].ignored {
+                SegmentTreatmentInTheRun::IgnoredPoint
+            } else if registered_segments
+                .iter()
+                .any(|registered| registered.segment_index == segment_index)
+            {
+                SegmentTreatmentInTheRun::RegisteredSegment
+            } else {
+                match (flow.expansion)(segment_index, segment) {
+                    CrashPointReplaySegmentExpansion::NotExpanded => {
+                        SegmentTreatmentInTheRun::NotExpanded
+                    }
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
+                    | CrashPointReplaySegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+                        SegmentTreatmentInTheRun::Expanded
+                    }
+                }
+            }
+        })
+        .collect();
+    let every_segment_lies_in_the_light_tier_domains =
+        flow.segments
+            .iter()
+            .enumerate()
+            .all(|(segment_index, segment)| {
+                treatment_of_segment[segment_index] == SegmentTreatmentInTheRun::IgnoredPoint
+                    || segment_expansion_lies_in_the_light_tier_domains(
+                        (flow.expansion)(segment_index, segment),
+                        segment,
+                    )
+            });
+    let domain = if every_segment_lies_in_the_light_tier_domains {
+        CrashFlowCoverageDomain::Quick
+    } else {
+        CrashFlowCoverageDomain::Full
+    };
+    let mut lines_already_taken: std::collections::HashSet<CrashFlowCoverageLine> =
+        std::collections::HashSet::new();
+    let mut lines = Vec::new();
+    for (segment_index, segment) in flow.segments.iter().enumerate() {
+        for write_index in segment {
+            let point = flow
+                .crash_points
+                .iter()
+                .find(|point| point.writes.contains(write_index))
+                .expect("崩溃点的写区间首尾相接罩住整张写表：每次写都落在某个崩溃点里");
+            let entry_name = point.name.split_once('.').map_or(
+                point.name.as_str(),
+                |(before_the_first_dot, _period_and_step)| before_the_first_dot,
+            );
+            let line = CrashFlowCoverageLine {
+                entry_name: entry_name.to_string(),
+                step_kind: flow.writes[*write_index].kind,
+                segment_index,
+                treatment: treatment_of_segment[segment_index],
+                domain,
+            };
+            if lines_already_taken.insert(line.clone()) {
+                lines.push(line);
+            }
+        }
+    }
+    lines
 }
 
 /// 这一份（`is_mine` 选的块）里录入时库中已有这一判法单元指纹判定的态数。
@@ -12965,6 +13393,11 @@ pub fn run_from_environment_with_observers(
         &flow_of_the_library,
         &read_back.flow.recorded().segment_slices,
     );
+    // 覆盖行：覆盖表脚本从这一趟的日志里读哪个（入口，提交步骤，段）在哪个域里展开了。照读回的流与清单里的按段登记打，
+    // 只录、只排派活计划、被叫停的那一趟同样打（录下的流是同一条）
+    for coverage_line in crash_flow_coverage_lines(&flow_of_the_library, &registered_segments) {
+        println!("{}", coverage_line.text());
+    }
     // 结论的版本（J8）：判法单元键是编进二进制的那一份（不读树）；拒算的那几组取这个进程的占位、照判不入库（观察者的版本同，J4）
     let judged_by = match routes.crash_judge {
         ComputedOn::Gpu => JudgedBy::GpuJudge,
@@ -14621,6 +15054,7 @@ fn placeholder_conclusions_of_a_table(
         consulted_pass_failure_point: 0,
         ignored_pass_failure_point: 0,
         pool_checker_judged_bits: 0,
+        scan_rebuild_outcome: SCAN_REBUILD_OUTCOME_NOT_REACHED,
         gpu_could_not_judge: false,
     };
     let every_word = vec![placeholder_words; state_count];
@@ -14911,7 +15345,8 @@ pub(crate) fn gpu_judge_units_of_this_build(
 }
 
 /// 判这一块的 GPU 判器那一组判法单元的指纹，写进块属性当出处（[`JudgingDevice::Gpu`]）：取这一份二进制的那一把
-/// （[`gpu_judge_units_of_this_build`]），拒算或没编进 `gpu` 特性是全零（出处不明）。只进属性、不进键，取一次全进程共用。
+/// （[`gpu_judge_units_of_this_build`]），拒算是全零（出处不明）。只进属性、不进键，取一次全进程共用；调用点在 GPU 判块那几处与单测里，只随 `gpu` 特性或单测编进来。
+#[cfg(any(feature = "gpu", test))]
 pub(crate) fn gpu_judge_units_fingerprint_of_this_process() -> [u8; DIGEST_BYTES] {
     static FINGERPRINT: std::sync::OnceLock<[u8; DIGEST_BYTES]> = std::sync::OnceLock::new();
     *FINGERPRINT.get_or_init(|| {
@@ -16432,11 +16867,11 @@ fn observer_versions_of_the_keys(
     pool_checker_units: &JudgingUnitsKey,
     composition_units: &JudgingUnitsKey,
 ) -> ObserverVersions {
-    // 去重的做法进版本：做法换了（按整张镜像的字节 → 恢复报告分桶加读集见证），旧做法下录的块与看过的镜像一个都不再引、留作历史
+    // 版本只由观察者那一组判法单元的键与另读的输入组成，不带手写的版本常量（D13（验证路线） 已定项 17）
     let version_with_the_extra_inputs = |extra_inputs_digest: [u8; DIGEST_BYTES]| {
         ConclusionVersion(sha256_digest(
             format!(
-                "singlefs observer units\nunits={}\nextra_inputs={}\ndeduplication={OBSERVER_DEDUPLICATION_SCHEME}\n",
+                "singlefs observer units\nunits={}\nextra_inputs={}\n",
                 hexadecimal_text(observer_units.fingerprint()),
                 hexadecimal_text(&extra_inputs_digest)
             )
@@ -16548,13 +16983,6 @@ fn panic_message_of(payload: &(dyn std::any::Any + Send)) -> String {
 }
 
 // ------------------------------ 恢复报告分桶、读集见证去重 ------------------------------
-
-/// 观察者去重做法的名字，拼进观察者录入与结论的版本（`observer_versions` 那一处）。
-/// 这是全仓唯一一个进判定键的手写版本串：观察者块录的内容不随去重的存法变（见证与读集只是去重用的辅助表，
-/// 存法改了旧行当死数据、不影响已录的块），所以改见证与读集的存法不改这个串；改了它，库里全部观察者块与观察者结论作废、
-/// 要重录几小时。改它只凭用户的话，自己不升；按 D13 已定项 17 手写版本常量不该进键，
-/// 把它从版本里去掉是一笔账，去掉那一次观察者块也重录一次，归用户定时机。
-const OBSERVER_DEDUPLICATION_SCHEME: &str = "recovery-report-buckets-and-read-set-witnesses-1";
 
 fn put_item_count(bytes: &mut Vec<u8>, count: usize) {
     bytes.extend_from_slice(&u64::try_from(count).expect("个数装得进 u64").to_le_bytes());

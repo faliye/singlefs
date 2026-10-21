@@ -33,7 +33,8 @@ use singlefs_checker_tier::crash_state_enumeration::{
 /// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
 const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker.rs";
 use singlefs_checker_tier::crash_judge_gpu::{
-    pool_checker_violated_bits, verdict_bits, POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
+    pool_checker_violated_and_judged_bits, pool_checker_violated_bits, verdict_bits,
+    POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
@@ -228,23 +229,11 @@ fn violations_with_every_write_landed(
     Some(violations)
 }
 
-/// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）。
+/// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）；经 `pool_checker_violated_and_judged_bits` 取
+/// （与 CPU 一侧的对拍字同一个函数），与 GPU 那一份逐位整份比（I-1.13 由扫描重建那一截判、置位，内核不置位的表是空的，C821）。
 fn pool_checker_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u128 {
-    judgement
-        .pool_checker
-        .iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(_) => Some(
-                IMPLEMENTED_INVARIANTS
-                    .iter()
-                    .position(|candidate| candidate == invariant)
-                    .expect("池级 checker 报的不变量在清单里"),
-            ),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .fold(0u128, |bits, index| bits | (1u128 << index))
+    let (violated, _judged) = pool_checker_violated_and_judged_bits(&judgement.pool_checker);
+    violated
 }
 
 fn invariant_names(bits: u128) -> Vec<&'static str> {

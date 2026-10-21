@@ -76,6 +76,9 @@ const UNDECIDABLE_SPLICED_READ_MATCHES: u32 = 7u;
 const UNDECIDABLE_STATE_IN_A_SEGMENT_NOT_EXPANDED: u32 = 8u;
 // 分片的段（C790）：片起点的各位加片内序号之后还有进位（越过段的域），或片内序号装不进 32 位：表与派活的序号对不上
 const UNDECIDABLE_SLICE_PAST_ITS_DOMAIN: u32 = 9u;
+// 读数据单元找下一块数据指针（find_the_next_block_of_data_pointers）时，从下段根往下读回的节点不是 extent 树那一遍核过的那一形
+// （读不出、解不开、含这个单元的叶不在那里）：两遍读同一条指针、同一份表，应当走不到；走到了是内核自己的错，不往下判
+const UNDECIDABLE_DATA_POINTER_BLOCK_NOT_FOUND_AGAIN: u32 = 10u;
 
 // 格式常量
 const SLOT_SHIFT: u32 = 14u;                 // 16384 = 1 << 14
@@ -100,6 +103,10 @@ const SYSTEM_CONFIGURATION_SLOT_BYTES: u32 = 4096u;
 const ROOT_RING_REGION_STRIDE: u32 = 3145728u;     // P × chunk = 3 × 1 MiB
 const ROOT_RING_BASE_BYTES: u32 = 1048576u;        // 64 × 16384
 const DATA_UNIT_PAYLOAD_CAPACITY: u32 = 32634u;
+// 数据单元头里偏移 101 那份载荷区 CRC-32C 罩的字节数：单元 32768 减头 105（预留位 29 + 载荷容量 32634；crash_judge_tables 的 expected_version_chunks 同一个范围）
+const DATA_UNIT_PAYLOAD_REGION_BYTES: u32 = 32663u;
+// CRC-32C（Castagnoli）的生成多项式，反射位序（位 31 是 x 的 0 次）
+const CRC32C_REFLECTED_POLYNOMIAL: u32 = 0x82F63B78u;
 const EXTENT_UPPER_LEAF_INODES: u32 = 143u;
 // extent 上段叶条目宽（key 24 + 标签 1 + 指针 88，D8（核心索引结构） 已定项 11 字段表；extent_tree.rs 的 EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES）
 const EXTENT_UPPER_LEAF_ENTRY_BYTES: u32 = 113u;
@@ -123,6 +130,35 @@ const TREE_KIND_LOGGED_OPERATIONS: u32 = 12u;
 const TREE_KIND_RETIREMENT: u32 = 13u;
 // 进树表的种类有几个（中央映射树 5 不进树表）：I-9.16 ② 按发号次序数这几个，见 tree_kind_in_the_issuing_order
 const TREE_KINDS_OF_THE_TREE_TABLE: u32 = 12u;
+// 只读快照的 inode 根与 extent 根（recovery.rs 与 walk.rs 的 TREE_KIND_SNAPSHOT_INODE_ROOT、TREE_KIND_SNAPSHOT_EXTENT_ROOT，判决
+// `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1）：码 14、15，一个快照一对，一张树表里可以有多对，不进发号次序那十二种
+const TREE_KIND_SNAPSHOT_INODE_ROOT: u32 = 14u;
+const TREE_KIND_SNAPSHOT_EXTENT_ROOT: u32 = 15u;
+// 树表条目 flags 2 字节的偏移（树 ID 8 + 条目长度 2 + 种类 2）与码 14 条目 flags 位 0「销毁中」（records.rs 的
+// TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED，判决 S4）：码 14 上恰是这一位收下，别的位、别的种类上的这一位拒收（TreeTableEntry::parse_with_destruction_mark）
+const TREE_TABLE_ENTRY_FLAGS_OFFSET: u32 = 12u;
+const TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED: u32 = 1u;
+// 树表条目里 previous_snapshot_txg、诞生 txg 8 字节的偏移（D8（核心索引结构） 已定项 8 的字段表：根指针 14..100 之后）
+const TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET: u32 = 100u;
+const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: u32 = 108u;
+// 树表条目里头 ID 8 字节的偏移（诞生 txg 之后；walk.rs 与 recovery.rs 的 TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET）：恢复内核配快照条目、
+// 池级 checker 两个内核判 I-9.27 与 I-9.16 ③ 都读它
+const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: u32 = 116u;
+// 第一版一张树表里至多几个只读快照（records.rs 的 SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION）：码 14 多于它，读树表的每一处都拒（UnitMalformed）
+const SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION: u32 = 10u;
+// 码 2 节点 key 的几种形态（field_width / field_count 与池级 checker 的 schema_field_width 共用的码）：0 记账 [2,8,4,8]、1 映射 [1,8,8,4,6]、
+// 5 deadlist [8,8,1,8,8,4,6]（头的树 ID 8 + 纪元 8 + 中央映射 key 27，lib.rs 的 KEY_SCHEMA_DEADLIST；2、3、4 是池级 checker 那几种单字段与定宽形态）
+const KEY_SCHEMA_DEADLIST: u32 = 5u;
+// deadlist 树叶条目 43 字节里三段的偏移（walk.rs 的 DEADLIST_ENTRY_*_OFFSET；D5（快照 / 空间记账机制） 已定项 12）
+const DEADLIST_ENTRY_BYTES: u32 = 43u;
+const DEADLIST_ENTRY_HEAD_OFFSET: u32 = 0u;
+const DEADLIST_ENTRY_EPOCH_OFFSET: u32 = 8u;
+const DEADLIST_ENTRY_MAPPING_KEY_OFFSET: u32 = 16u;
+// 6 logged_ops [2,8]（种类 2 + 签发 txg 8，lib.rs 的 KEY_SCHEMA_LOGGED_OPERATIONS；判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1）：
+// 第四棵多层码 2 树，叶条目 44（key 10 + value 34，singlefs_format::LOGGED_OPERATIONS_ENTRY_BYTES）、内部条目 key + 子指针 86
+const KEY_SCHEMA_LOGGED_OPERATIONS: u32 = 6u;
+const LOGGED_OPERATIONS_KEY_BYTES: u32 = 10u;
+const LOGGED_OPERATIONS_ENTRY_BYTES: u32 = 44u;
 // deleted_inodes 根的 key 是 inode 号 8 字节；墓碑树、谱系树码 2 节点的 key 是容器号 8 字节（recovery.rs 的 key_width_for_kind）
 const DELETED_INODES_KEY_WIDTH: u32 = 8u;
 const CONTAINER_NUMBER_KEY_WIDTH: u32 = 8u;
@@ -136,7 +172,50 @@ const FIRST_INODE_NUMBER: u32 = 1u;
 const INODE_RECORD_OBJECT_BIRTH_OFFSET: u32 = 8u;
 const INODE_RECORD_NLINK_OFFSET: u32 = 36u;
 const INODE_RECORD_SIZE_OFFSET: u32 = 40u;
+// inode 记录偏移 108 起的三段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1）：108–119 恒 0（填充 4、flags 8），
+// 120 起截断字段 T（8 字节）与 N_w（8 字节），136–139 恒 0（预留 4）。恢复内核照核心层读者、走读内核照 walk.rs 的 I-9.7 读这几个数
+const INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_OFFSET: u32 = 108u;
+const INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_LENGTH: u32 = 12u;
+const INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET: u32 = 120u;
+const INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET: u32 = 128u;
+const INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_OFFSET: u32 = 136u;
+const INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_LENGTH: u32 = 4u;
+// 系统配置 incompat 位图第一个字节里认得的两位（D15（格式冻结政策） 已定项 4）：位 1 布局身份（必须在）、位 2 inode 记录带截断字段
+// （用户 2026-10-17 定新开，判决 m4-trunc-r2 第六节）；读者收 0x02 与 0x06，别的位一律当不认识
+const INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT: u32 = 2u;
+const INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT: u32 = 4u;
+const INCOMPAT_BITS_THIS_READER_RECOGNIZES_IN_THE_FIRST_BYTE: u32 =
+    INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT;
+// 系统配置槽 incompat 位图那 32 字节（偏移 6 起）里这一版读者认得：第一个字节只带认得的位、布局身份那一位在，其余 31 字节全零
+fn incompat_bits_are_recognized(base: u32) -> bool {
+    let incompat0 = rd8(base, 6u);
+    return (incompat0 & ~INCOMPAT_BITS_THIS_READER_RECOGNIZES_IN_THE_FIRST_BYTE) == 0u && all_zero(base, 7u, 31u)
+        && (incompat0 & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT) != 0u;
+}
+// 一槽带不带 incompat 位 2（只在 incompat_bits_are_recognized 之后读）
+fn incompat_bits_carry_the_inode_record_truncation_field(base: u32) -> bool {
+    return (rd8(base, 6u) & INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT) != 0u;
+}
 const NLINK_OF_AN_INODE_BEING_DELETED: u32 = 0u;
+// records::InodeRecord::parse 的那几判（判决 m4-trunc-r2 R1）：偏移 108–119 与 136–139 两段恒零区非零、截断字段「T = 0 而 N_w ≠ 0」都判不可用
+fn inode_record_parses_by_the_core_reader(base: u32, record_offset: u32) -> bool {
+    if (!all_zero(base, record_offset + INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_OFFSET,
+            INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_LENGTH)
+        || !all_zero(base, record_offset + INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_OFFSET,
+            INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_LENGTH)) {
+        return false;
+    }
+    let truncation_field_txg = rd64(base, record_offset + INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET);
+    let truncation_field_size = rd64(base, record_offset + INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET);
+    return !is_zero64(truncation_field_txg) || is_zero64(truncation_field_size);
+}
+// records::InodeRecord::truncation_field_fits_the_pool：池带 incompat 位 2 时合法的字段都收，不带时 T 与 N_w 都要 0
+fn inode_record_truncation_field_fits_the_pool(base: u32, record_offset: u32, carried: bool) -> bool {
+    if (carried) {
+        return true;
+    }
+    return all_zero(base, record_offset + INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET, 16u);
+}
 const MAGIC_SFSB: u32 = 0x42534653u;
 const MAGIC_SFSR: u32 = 0x52534653u;
 const MAGIC_SFSU: u32 = 0x55534653u;
@@ -151,8 +230,12 @@ const RECORD_WORDS: u32 = 6u;
 const R_RECORDS: u32 = 0u;                                   // 12288
 const MAX_ROOTS: u32 = 48u;
 const R_ROOTS: u32 = 12288u;                                 // 96：版本、区域
-const MAX_MAPPING_ENTRIES: u32 = 1024u;
-const R_MAPPING: u32 = 12384u;                               // 3072：字节基、条目偏移、条目宽
+// 中央映射树的叶（读一棵映射树时读到的码 2 叶节点）：一片一行，只记那片叶在表里的字节基；条目逐片从叶的字节里读（mapping_leaf_at），
+// 不抄进表，映射有多少条条目都不判不了（用户 2026-10-19 定「按块分批读，不设上限」，与 R_DATA 那一段的数据指针同一个定案）。
+// 行数受读树时见过的节点数限：恢复内核读一棵树至多 MAX_SEEN 个节点、走读内核一遍至多 C_MAX_VISITED 个单元，都不过这张表的行数（两处 const_assert）
+const R_MAPPING_LEAVES: u32 = 12384u;                        // 3072：叶的字节基
+const R_MAPPING_LEAF_ROWS: u32 = 3072u;
+const_assert MAX_SEEN <= R_MAPPING_LEAF_ROWS;
 const MAX_ACCOUNTING_ENTRIES: u32 = 512u;
 const R_ACCOUNTING: u32 = 15456u;                            // 1536
 // 恢复内核读一版分配记录树的那张表（allocation_count 条，满了记判不了、原因 3）：从 2048 抬到 4096 条，与扫描内核分配记录那张表
@@ -163,9 +246,17 @@ const MAX_ALLOCATION_RECORDS: u32 = 4096u;
 const ALLOCATION_RECORD_WORDS: u32 = 6u;
 const MAX_SEEN: u32 = 512u;
 const R_SEEN: u32 = 29280u;                                  // 1024
-const MAX_DATA_POINTERS: u32 = 256u;
-const R_DATA: u32 = 30304u;                                  // 512：字节基、偏移
-const MAX_UPPER_ENTRIES: u32 = 256u;
+// 恢复内核读第一个文件的数据指针那一段（字节基、指针偏移，每条 2 字）：按块分批读，一块至多 DATA_POINTERS_PER_BLOCK 条，文件有多少个单元
+// 都不判不了（用户 2026-10-19 定「按块分批读，不设上限」）。extent 树那一遍照旧走全树、核每一条指针、数单元，只把头一块记进来；
+// walk_to_file 读数据单元读到这一块末尾时，从下段根往下找含下一个单元的那片叶，把那片叶里从它起的指针记成下一块（find_the_next_block_of_data_pointers）。
+// 走读内核借这一段装由记录施加出来的版本清单（每版 1 字，至多 R_DATA_WORDS 版），扫描内核从这里读它
+const R_DATA: u32 = 30304u;
+const R_DATA_WORDS: u32 = 512u;
+const DATA_POINTERS_PER_BLOCK: u32 = R_DATA_WORDS / 2u;
+// 恢复内核读 extent 上段叶条目的那一段（字节基、条目偏移，每条 2 字）：按块分批读，一批至多 MAX_UPPER_ENTRIES 条，有数据的文件有多少个
+// 都不判不了（用户 2026-10-19 定「按块分批读，不设上限」）；read_extent_tree_of_the_first_file 读完一批的下段再从上段根走一遍记下一批。
+// 一批取 64 条（这一段装得下 256 条）：几十个文件就跨过一批的边界，对拍用例在扫描内核收单元的那张表（C_MAX_SCANNED）装得下的历史上就走得到下一批
+const MAX_UPPER_ENTRIES: u32 = 64u;
 const R_UPPER: u32 = 30816u;                                 // 512：字节基、偏移
 // 恢复内核读一条根的实例表全部行的那张表（load_rows_of_the_instance_table_chain 与恢复落到的那一版那一读，满了记判不了、原因 3）：每行实例、txg lo、txg hi。
 // 从 512 抬到 24576 行，与扫描内核读一条根自己实例表的那张表（C_R_MAX_ROWS）同宽：取号之后崩溃 65 × 369 次再挂载十二次的那个场景，
@@ -192,11 +283,31 @@ var<private> record_count: u32;
 // 7 序号不连续、8 提交标记没到就换事务、9 末条不带提交标记、10 末条之后同发布还有记录、11 点名单元验不过、12 施加了一版）
 var<private> replay_stop_reason: u32;
 var<private> root_count: u32;
+// 中央映射：条目数（读映射树时数的全部叶条目）与 R_MAPPING_LEAVES 里记了几片叶
 var<private> mapping_count: u32;
+var<private> mapping_leaf_count: u32;
 var<private> accounting_count: u32;
 var<private> allocation_count: u32;
 var<private> seen_count: u32;
+// 第一个文件有几个数据单元（extent 树那一遍数的全部，不止记进 R_DATA 的那一块）
 var<private> data_count: u32;
+// 第一个文件之外各有数据单元的文件一共几个数据单元（extent 树那一遍数的；数映射条目要它，recovery 的 data_units_of_every_file）
+var<private> data_units_of_the_files_other_than_the_first: u32;
+// extent 树那一遍正在读的那个文件：读到几个单元、单元号是不是从 0 起连号（read_lower_segment 记，read_extent_tree_of_the_first_file 每条上段叶条目之前复位）
+var<private> units_of_the_file_being_read: u32;
+var<private> units_of_the_file_being_read_are_numbered_from_zero_without_a_gap: bool;
+// 第一个文件那一条上段叶条目在哪（字节基、条目偏移；上段里没有它时字节基是 NONE）：上段叶条目按块分批记进 R_UPPER，读完 extent 树时
+// R_UPPER 里是最后一批，walk_to_file 找第一个文件下一块数据指针时从这里取下段根
+var<private> first_file_upper_entry_base: u32;
+var<private> first_file_upper_entry_offset: u32;
+// R_DATA 里此刻那一块：第一条是第一个文件的第几个单元、有几条
+var<private> data_block_first: u32;
+var<private> data_block_count: u32;
+// extent 树那一遍读到的单元号是不是从 0 起连号（recovery::extents_of_the_first_file 的「没有洞」）：读的时候记、读完由调用方判
+var<private> data_units_are_numbered_from_zero_without_a_gap: bool;
+// 第一个文件在 extent 上段叶里那一条的标签（read_extent_tree_of_the_first_file 记下，上段里没有第一个文件那一条时是 NONE）：walk_to_file 按它核单元数、
+// 读洞（标签 0、3、4 声明最后一个存在的单元之后到 size 是洞，core 的 TailOfAFile::HoleAfterTheLastDataUnit；判决 m4-trunc-r1 第三节 K5）
+var<private> first_file_upper_leaf_tag: u32;
 var<private> upper_count: u32;
 var<private> row_count: u32;
 // 给定状态表里这个状态的序号（crash_judge_tables::JudgeStateSource::GivenPersistedSets：第 k 个持久掩码、第 k 个恢复自称的那一版）；
@@ -240,14 +351,24 @@ fn rd8(base: u32, o: u32) -> u32 {
     let w = tables[base + (o >> 2u)];
     return (w >> ((o & 3u) << 3u)) & 0xFFu;
 }
+// 多字节读按字拼，不逐字节调 rd8：GPU 没有真正的函数调用，每个调用点展开一份被调函数，逐字节读让 rd32 一份展开成四份 rd8，
+// 扫描内核里 rd8 展开近万份、占了展开预算的四成。拼法读的字与逐字节读的完全相同（跨字时才读下一个字），交回的值也相同
 fn rd16(base: u32, o: u32) -> u32 {
-    return rd8(base, o) | (rd8(base, o + 1u) << 8u);
+    let word_index = base + (o >> 2u);
+    let shift_in_bits = (o & 3u) << 3u;
+    var value = tables[word_index] >> shift_in_bits;
+    if ((o & 3u) == 3u) {
+        value = value | (tables[word_index + 1u] << 8u);
+    }
+    return value & 0xFFFFu;
 }
 fn rd32(base: u32, o: u32) -> u32 {
-    if ((o & 3u) == 0u) {
-        return tables[base + (o >> 2u)];
+    let word_index = base + (o >> 2u);
+    let shift_in_bits = (o & 3u) << 3u;
+    if (shift_in_bits == 0u) {
+        return tables[word_index];
     }
-    return rd8(base, o) | (rd8(base, o + 1u) << 8u) | (rd8(base, o + 2u) << 16u) | (rd8(base, o + 3u) << 24u);
+    return (tables[word_index] >> shift_in_bits) | (tables[word_index + 1u] << (32u - shift_in_bits));
 }
 fn rd48(base: u32, o: u32) -> vec2<u32> {
     return vec2<u32>(rd32(base, o), rd16(base, o + 4u));
@@ -753,6 +874,8 @@ struct SysConfig {
     ring_bytes: vec2<u32>,
     floor: vec2<u32>,
     unit_area_start_slot: vec2<u32>,
+    // incompat 位 2：这一池的 inode 记录带截断字段（核心层 SystemImmutableConfiguration 的 inode_record_truncation_fields）
+    carries_the_inode_record_truncation_field: bool,
 };
 fn empty_system_configuration(kind: u32, refusal: u32) -> SysConfig {
     var c: SysConfig;
@@ -771,6 +894,7 @@ fn empty_system_configuration(kind: u32, refusal: u32) -> SysConfig {
     c.ring_bytes = vec2<u32>(0u, 0u);
     c.floor = vec2<u32>(0u, 0u);
     c.unit_area_start_slot = vec2<u32>(0u, 0u);
+    c.carries_the_inode_record_truncation_field = false;
     return c;
 }
 fn parse_system_configuration(s: Slice) -> SysConfig {
@@ -781,8 +905,12 @@ fn parse_system_configuration(s: Slice) -> SysConfig {
     if (rd32(base, 0u) != MAGIC_SFSB || s.c0 != 1u) {
         return empty_system_configuration(1u, 0u);
     }
-    let incompat0 = rd8(base, 6u);
-    if ((incompat0 & 0xFDu) != 0u || !all_zero(base, 7u, 31u) || (incompat0 & 2u) == 0u) {
+    // recovery::mountable_slot_or_refusal 的 IncompatBitsNotRecognized 那一臂：格式版本不是这个读者写的那一版（1）时按格式版本整池拒
+    // （拒收码 2，与下面读者收不收的池级值里格式版本那一判同一个码），是 1 才算 incompat 位图不认识（C663，用户 2026-10-20 定「格式版本先」）
+    if (!incompat_bits_are_recognized(base)) {
+        if (rd16(base, 4u) != 1u) {
+            return empty_system_configuration(3u, 2u);
+        }
         return empty_system_configuration(2u, 0u);
     }
     let slots_per_region = rd8(base, 362u);
@@ -818,6 +946,11 @@ fn parse_system_configuration(s: Slice) -> SysConfig {
     }
     if (!eq64(rd64(base, 325u), u64_of(1024u))) {
         return empty_system_configuration(3u, 7u);
+    }
+    // 根环区域数 R（偏移 361 那 1 字节）不是第一版的 3：整池拒，排在 journal 环起点之后、环长之前（recovery::system_configuration_values_this_reader_accepts
+    // 的 RootRingRegionCountNotTheFirstVersionValue，C663，用户 2026-10-20 定「R 读并整池拒」）。拒收码 14 只是新加的一个，前面那些码不挪
+    if (rd8(base, 361u) != 3u) {
+        return empty_system_configuration(3u, 14u);
     }
     let ring_bytes = rd64(base, 333u);
     let in_flight = divmod64(shr64(ring_bytes, 12u), u64_of(3u)).quotient;
@@ -867,6 +1000,7 @@ fn parse_system_configuration(s: Slice) -> SysConfig {
     c.ring_bytes = ring_bytes;
     c.floor = rd64(base, 481u);
     c.unit_area_start_slot = unit_area_start_slot;
+    c.carries_the_inode_record_truncation_field = incompat_bits_carry_the_inode_record_truncation_field(base);
     return c;
 }
 // 全池没有一个槽 0 可择时逐档找槽 1
@@ -1573,6 +1707,19 @@ fn bad_node() -> Node {
     n.entries_start = 0u;
     return n;
 }
+// 码 2 节点头里条目那一段（unit::parse_index_node 的头布局）：key 宽在偏移 51，头到 86 + 2 × key 宽为止，条数与条目宽是头的最后 4 字节，
+// 条目从头之后 29 字节起。parse_index_node 与中央映射叶表（mapping_leaf_at）都照这一处读
+struct IndexNodeEntries {
+    key_width: u32,
+    entry_count: u32,
+    entry_width: u32,
+    entries_start: u32,
+};
+fn index_node_entries_of_the_header(base: u32) -> IndexNodeEntries {
+    let key_width = rd8(base, 51u);
+    let header_end = 86u + 2u * key_width;
+    return IndexNodeEntries(key_width, rd16(base, header_end - 4u), rd16(base, header_end - 2u), header_end + 29u);
+}
 // unit::parse_index_node（读 16 KiB）
 fn parse_index_node(s: Slice) -> Node {
     if (s.version == NONE || s.length < NODE_BYTES) {
@@ -1585,11 +1732,11 @@ fn parse_index_node(s: Slice) -> Node {
     if ((s.c2 & 11u) != 11u) {
         return bad_node();
     }
-    let key_width = rd8(base, 51u);
-    let header_end = 86u + 2u * key_width;
+    let entries = index_node_entries_of_the_header(base);
+    let key_width = entries.key_width;
     let declared_length = rd16(base, 8u);
-    let entry_count = rd16(base, header_end - 4u);
-    let entry_width = rd16(base, header_end - 2u);
+    let entry_count = entries.entry_count;
+    let entry_width = entries.entry_width;
     if (entry_count * entry_width != declared_length) {
         return bad_node();
     }
@@ -1599,7 +1746,7 @@ fn parse_index_node(s: Slice) -> Node {
     if (entry_width < key_width) {
         return bad_node();
     }
-    let entries_start = header_end + 29u;
+    let entries_start = entries.entries_start;
     if (entries_start + declared_length > NODE_BYTES) {
         return bad_node();
     }
@@ -1763,6 +1910,41 @@ fn parse_data_unit(s: Slice) -> DataUnit {
     return d;
 }
 
+// 两个多项式在 CRC-32C 的生成多项式下相乘取余（反射位序，位 31 是 x 的 0 次）：逐位看乘数，被乘数每过一位乘一次 x。循环恰好 32 圈、没有提前出口
+fn crc32c_product_modulo_the_polynomial(multiplier: u32, multiplicand: u32) -> u32 {
+    var product = 0u;
+    var multiplicand_times_x_to_the_bit = multiplicand;
+    for (var bit = 0u; bit < 32u; bit = bit + 1u) {
+        if ((multiplier & (0x80000000u >> bit)) != 0u) {
+            product = product ^ multiplicand_times_x_to_the_bit;
+        }
+        let shifted_out_a_one = (multiplicand_times_x_to_the_bit & 1u) != 0u;
+        multiplicand_times_x_to_the_bit = multiplicand_times_x_to_the_bit >> 1u;
+        if (shifted_out_a_one) {
+            multiplicand_times_x_to_the_bit = multiplicand_times_x_to_the_bit ^ CRC32C_REFLECTED_POLYNOMIAL;
+        }
+    }
+    return product;
+}
+// byte_count 个 0 字节的 CRC-32C（初值与末尾异或都是全 1）：寄存器读进 n 个 0 字节等于乘 x 的 8n 次再取余，x 的 8n 次按 n 的二进制位平方连乘，
+// 不逐字节走（洞里一个单元的载荷区三万多字节，每个洞的位置逐字节走太慢）。循环圈数是 byte_count 的二进制位数（至多 32）
+fn crc32c_of_zero_bytes(byte_count: u32) -> u32 {
+    var x_to_the_eight_times_this_power_of_two = 0x00800000u;
+    var x_to_the_eight_times_the_bytes_seen = 0x80000000u;
+    var bytes_left = byte_count;
+    loop {
+        if (bytes_left == 0u) {
+            break;
+        }
+        if ((bytes_left & 1u) != 0u) {
+            x_to_the_eight_times_the_bytes_seen = crc32c_product_modulo_the_polynomial(x_to_the_eight_times_this_power_of_two, x_to_the_eight_times_the_bytes_seen);
+        }
+        x_to_the_eight_times_this_power_of_two = crc32c_product_modulo_the_polynomial(x_to_the_eight_times_this_power_of_two, x_to_the_eight_times_this_power_of_two);
+        bytes_left = bytes_left >> 1u;
+    }
+    return ~crc32c_product_modulo_the_polynomial(x_to_the_eight_times_the_bytes_seen, 0xFFFFFFFFu);
+}
+
 // ───────────────────────── 中央映射 ─────────────────────────
 
 struct Lookup {
@@ -1770,49 +1952,61 @@ struct Lookup {
     failed: bool,
     p: Ptr,
 };
-// 在映射叶条目里找一个 27 字节 key：同 key 多条取最后一条；条目窄于 55 判红
+// 中央映射叶表（R_MAPPING_LEAVES）第 leaf_index 行那片叶：字节基与头里条目那一段
+struct MappingLeaf {
+    base: u32,
+    entries: IndexNodeEntries,
+};
+fn mapping_leaf_at(leaf_index: u32) -> MappingLeaf {
+    let base = sw(R_MAPPING_LEAVES + leaf_index);
+    return MappingLeaf(base, index_node_entries_of_the_header(base));
+}
+// 在映射叶条目里找一个 27 字节 key（逐片叶、片里逐条，次序同读树时记叶的次序）：同 key 多条取最后一条；条目窄于 55 判红
+// （一片叶里条目同宽：按片判与逐条判、遇到第一条窄的就判红相同，读树时零条目的叶不收）
 fn mapping_lookup(key_base: u32, key_offset: u32, key_class: u32, key_tail: vec2<u32>, key_tail_is_transaction: bool) -> Lookup {
     var out: Lookup;
     out.found = false;
     out.failed = false;
     out.p = zero_pointer();
-    for (var i = 0u; i < mapping_count; i = i + 1u) {
-        let base = sw(R_MAPPING + i * 3u);
-        let o = sw(R_MAPPING + i * 3u + 1u);
-        let width = sw(R_MAPPING + i * 3u + 2u);
-        if (width < 55u) {
+    for (var leaf_index = 0u; leaf_index < mapping_leaf_count; leaf_index = leaf_index + 1u) {
+        let leaf = mapping_leaf_at(leaf_index);
+        if (leaf.entries.entry_width < 55u) {
             out.failed = true;
             return out;
         }
-        // key：类标签 1 + 出生树 8 + 出生 txg 8 + 实例 4 + 尾段 6
-        if (rd8(base, o) != key_class) {
-            continue;
+        let base = leaf.base;
+        for (var entry_index = 0u; entry_index < leaf.entries.entry_count; entry_index = entry_index + 1u) {
+            let o = leaf.entries.entries_start + entry_index * leaf.entries.entry_width;
+            // key：类标签 1 + 出生树 8 + 出生 txg 8 + 实例 4 + 尾段 6
+            if (rd8(base, o) != key_class) {
+                continue;
+            }
+            if (!bytes_equal(base, o + 1u, key_base, key_offset + 34u, 16u)) {
+                continue;
+            }
+            if (rd32(base, o + 17u) != rd32(key_base, key_offset + 78u)) {
+                continue;
+            }
+            var tail_matches = false;
+            if (key_tail_is_transaction) {
+                tail_matches = eq64(rd48(base, o + 21u), key_tail);
+            } else {
+                tail_matches = rd32(base, o + 21u) == key_tail.x && rd16(base, o + 25u) == 0u;
+            }
+            if (!tail_matches) {
+                continue;
+            }
+            var p = zero_pointer();
+            p.all_zero = false;
+            p.device0 = rd32(base, o + 27u);
+            p.slot0 = rd48(base, o + 31u);
+            p.sum0 = rd32(base, o + 37u);
+            p.device1 = rd32(base, o + 41u);
+            p.slot1 = rd48(base, o + 45u);
+            p.sum1 = rd32(base, o + 51u);
+            out.p = p;
+            out.found = true;
         }
-        if (!bytes_equal(base, o + 1u, key_base, key_offset + 34u, 16u)) {
-            continue;
-        }
-        if (rd32(base, o + 17u) != rd32(key_base, key_offset + 78u)) {
-            continue;
-        }
-        var tail_matches = false;
-        if (key_tail_is_transaction) {
-            tail_matches = eq64(rd48(base, o + 21u), key_tail);
-        } else {
-            tail_matches = rd32(base, o + 21u) == key_tail.x && rd16(base, o + 25u) == 0u;
-        }
-        if (!tail_matches) {
-            continue;
-        }
-        var p = zero_pointer();
-        p.all_zero = false;
-        p.device0 = rd32(base, o + 27u);
-        p.slot0 = rd48(base, o + 31u);
-        p.sum0 = rd32(base, o + 37u);
-        p.device1 = rd32(base, o + 41u);
-        p.slot1 = rd48(base, o + 45u);
-        p.sum1 = rd32(base, o + 51u);
-        out.p = p;
-        out.found = true;
     }
     return out;
 }
@@ -1912,7 +2106,8 @@ fn seen_insert(slot: vec2<u32>) -> bool {
 
 // ───────────────────────── 多层码 2 树（记账、中央映射）─────────────────────────
 
-// key 按字段比：field_widths 0 = 记账 [2,8,4,8]、1 = 映射 [1,8,8,4,6]
+// key 按字段比：field_widths 0 = 记账 [2,8,4,8]、1 = 映射 [1,8,8,4,6]、5 = deadlist [8,8,1,8,8,4,6]（头 8、纪元 8，后五段是中央映射 key）、
+// 6 = logged_ops [2,8]
 fn field_width(schema: u32, field: u32) -> u32 {
     if (schema == 0u) {
         if (field == 0u) { return 2u; }
@@ -1920,17 +2115,40 @@ fn field_width(schema: u32, field: u32) -> u32 {
         if (field == 2u) { return 4u; }
         return 8u;
     }
-    if (field == 0u) { return 1u; }
-    if (field == 1u) { return 8u; }
-    if (field == 2u) { return 8u; }
-    if (field == 3u) { return 4u; }
+    if (schema == KEY_SCHEMA_LOGGED_OPERATIONS) {
+        return select(8u, 2u, field == 0u);
+    }
+    // 映射那五段 [1,8,8,4,6] 从第 field_in_the_mapping_key 段数起：映射 key 从第 0 字段起，deadlist 的 key 前面多头与纪元两段 8 字节
+    var field_in_the_mapping_key = field;
+    if (schema == KEY_SCHEMA_DEADLIST) {
+        if (field < 2u) { return 8u; }
+        field_in_the_mapping_key = field - 2u;
+    }
+    if (field_in_the_mapping_key == 0u) { return 1u; }
+    if (field_in_the_mapping_key == 1u) { return 8u; }
+    if (field_in_the_mapping_key == 2u) { return 8u; }
+    if (field_in_the_mapping_key == 3u) { return 4u; }
     return 6u;
 }
 fn field_count(schema: u32) -> u32 {
     if (schema == 0u) {
         return 4u;
     }
+    if (schema == KEY_SCHEMA_DEADLIST) {
+        return 7u;
+    }
+    if (schema == KEY_SCHEMA_LOGGED_OPERATIONS) {
+        return 2u;
+    }
     return 5u;
+}
+// 一种 key 形态的宽：各字段宽之和（记账 22、映射 27、deadlist 43）
+fn key_width_of_the_schema(schema: u32) -> u32 {
+    var width = 0u;
+    for (var field = 0u; field < field_count(schema); field = field + 1u) {
+        width = width + field_width(schema, field);
+    }
+    return width;
 }
 fn read_field(base: u32, o: u32, width: u32) -> vec2<u32> {
     var v = vec2<u32>(0u, 0u);
@@ -1993,23 +2211,19 @@ fn failed_tree_read() -> TreeRead {
     t.entry_count = 0u;
     return t;
 }
-// code_two_tree::read_code_two_tree（EveryHeaderAgainstItsReference）：schema 0 记账（提示读不出经映射回退）、1 映射（只按位置条目读）
-// 叶条目写进 R_ACCOUNTING / R_MAPPING（字节基、条目偏移、条目宽）
+// code_two_tree::read_code_two_tree（EveryHeaderAgainstItsReference）：schema 0 记账（提示读不出经映射回退）、1 映射（只按位置条目读）、
+// 5 deadlist（同记账：提示读不出经映射回退；recovery.rs walk_to_file 的 deadlist 树那一支，判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+// 第三节 S3）。记账的叶条目写进 R_ACCOUNTING（字节基、条目偏移、条目宽）；映射的叶一片一行记进 R_MAPPING_LEAVES（条目留在叶的字节里，条数不设上限）；
+// deadlist 的叶条目只数不记（冷走读只拿它的条数数映射条目，recovery.rs 的 mapping_entries_kept_for_the_snapshots），不占那两张表、不受记账那张表的条数上限
 fn read_code_two_tree(root_pointer: Ptr, root_pointer_base: u32, root_pointer_offset: u32, tree: vec2<u32>, schema: u32, root: RootFields, fsid_low: vec2<u32>) -> TreeRead {
     var out = failed_tree_read();
     seen_count = 0u;
-    let key_width = field_width(schema, 0u) + field_width(schema, 1u) + field_width(schema, 2u) + field_width(schema, 3u);
-    var kw = key_width;
+    let kw = key_width_of_the_schema(schema);
+    let records_each_leaf_entry = schema == 0u;
     if (schema == 1u) {
-        kw = kw + field_width(schema, 4u);
-    }
-    var region = R_ACCOUNTING;
-    var capacity = MAX_ACCOUNTING_ENTRIES;
-    if (schema == 1u) {
-        region = R_MAPPING;
-        capacity = MAX_MAPPING_ENTRIES;
         mapping_count = 0u;
-    } else {
+        mapping_leaf_count = 0u;
+    } else if (records_each_leaf_entry) {
         accounting_count = 0u;
     }
     var entries = 0u;
@@ -2069,18 +2283,24 @@ fn read_code_two_tree(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
             }
             nodes = nodes + 1u;
             if (n.level == 0u) {
-                // 叶：条目按 key 严格递增，记条目
+                // 叶：条目按 key 严格递增，记条目（映射记叶：这片叶已经进了见过的节点表，行数不过 MAX_SEEN）
+                if (schema == 1u) {
+                    sws(R_MAPPING_LEAVES + mapping_leaf_count, n.base);
+                    mapping_leaf_count = mapping_leaf_count + 1u;
+                }
                 for (var e = 0u; e < n.entry_count; e = e + 1u) {
                     if (e > 0u && compare_keys(schema, n.base, entry_offset(n, e - 1u), n.base, entry_offset(n, e)) != 0u) {
                         return out;
                     }
-                    if (entries >= capacity) {
-                        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES;
-                        return out;
+                    if (records_each_leaf_entry) {
+                        if (entries >= MAX_ACCOUNTING_ENTRIES) {
+                            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES;
+                            return out;
+                        }
+                        sws(R_ACCOUNTING + entries * 3u, n.base);
+                        sws(R_ACCOUNTING + entries * 3u + 1u, entry_offset(n, e));
+                        sws(R_ACCOUNTING + entries * 3u + 2u, n.entry_width);
                     }
-                    sws(region + entries * 3u, n.base);
-                    sws(region + entries * 3u + 1u, entry_offset(n, e));
-                    sws(region + entries * 3u + 2u, n.entry_width);
                     entries = entries + 1u;
                 }
                 // 把叶交给父节点当孩子
@@ -2104,7 +2324,9 @@ fn read_code_two_tree(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                 enter = false;
                 continue;
             }
-            if (n.entry_width < kw + 86u) {
+            // 内部条目宽不等于 key 宽 + 86 就拒，宽了的同样拒（code_two_tree::read_code_two_tree 读内部节点那一判与 parse_internal_entry，
+            // C780，用户 2026-10-18 定「宽于字段表也拒」）；失败点沿用 EntryNarrowerThanItsFieldTable 那一个码，与 core 报的成员相同
+            if (n.entry_width != kw + 86u) {
                 walk_failure_point = FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE;
                 return out;
             }
@@ -2182,7 +2404,7 @@ fn read_code_two_tree(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
     out.entry_count = entries;
     if (schema == 1u) {
         mapping_count = entries;
-    } else {
+    } else if (records_each_leaf_entry) {
         accounting_count = entries;
     }
     return out;
@@ -2533,6 +2755,8 @@ var<private> extent_frames: array<ExtentFrame, 12>;
 struct ExtentRead {
     ok: bool,
     node_count: u32,
+    // 上段叶条目一共几条（read_upper_segment 交回；记进 R_UPPER 的只是从 batch_first 起的那一批）
+    upper_entry_total: u32,
 };
 // 判一个 extent 树节点（extent_tree::ExtentTreeReading::read_and_judge_node，Every）；is_the_root_of_the_tree 说它是不是整棵树的根
 // （上段的根，树表条目指着它；下段的根不算）
@@ -2560,12 +2784,18 @@ fn judge_extent_node(n: Node, tree: vec2<u32>, p: Ptr, root: RootFields, fsid_lo
     }
     return true;
 }
-// 上段：叶条目写进 R_UPPER（字节基、条目偏移）
-fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_offset: u32, tree: vec2<u32>, root: RootFields, fsid_low: vec2<u32>) -> ExtentRead {
+// 上段：按走读次序第 batch_first 条起的叶条目写进 R_UPPER（字节基、条目偏移），至多 MAX_UPPER_ENTRIES 条，upper_count 是这一批记了几条。
+// 按块分批读、不设上限（用户 2026-10-19 定，与 R_DATA 那一段同一个定案）：is_the_judging_pass 那一遍（batch_first 是 0）照 extent_tree::read_upper_segment
+// 逐节点判、记见过、数全部叶条目，记满一批之后的条目照判、不记；后面几批是同一棵已判过的上段从根再走一遍，只按次序记下一批，不再记见过
+// （同一个读法、同一份字节，判得过的一遍读不出别的结局）
+fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_offset: u32, tree: vec2<u32>, root: RootFields, fsid_low: vec2<u32>,
+    is_the_judging_pass: bool, batch_first: u32) -> ExtentRead {
     var out: ExtentRead;
     out.ok = false;
     out.node_count = 0u;
+    out.upper_entry_total = 0u;
     upper_count = 0u;
+    var entry_ordinal = 0u;
     var nodes = 0u;
     var depth = 0u;
     var pending_pointer = root_pointer;
@@ -2577,9 +2807,9 @@ fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
     loop {
         if (enter) {
             // 段的根先读、先解出层级，再记「见过」（extent_tree::read_upper_segment / read_lower_segment 先 read_node、parse_index_node，
-            // read_and_judge_node 才插 units_seen）；段里别的节点先记见过再读
+            // read_and_judge_node 才插 units_seen）；段里别的节点先记见过再读。记下一批的那几遍不记见过（判的那一遍记过了）
             let is_the_root_of_the_segment = depth == 0u;
-            if (!is_the_root_of_the_segment && !seen_insert(pending_pointer.slot0)) {
+            if (is_the_judging_pass && !is_the_root_of_the_segment && !seen_insert(pending_pointer.slot0)) {
                 walk_failure_point = FAILURE_POINT_INVARIANT_VIOLATED;
                 return out;
             }
@@ -2592,7 +2822,7 @@ fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                 walk_failure_point = FAILURE_POINT_UNIT_MALFORMED;
                 return out;
             }
-            if (is_the_root_of_the_segment && !seen_insert(pending_pointer.slot0)) {
+            if (is_the_judging_pass && is_the_root_of_the_segment && !seen_insert(pending_pointer.slot0)) {
                 walk_failure_point = FAILURE_POINT_INVARIANT_VIOLATED;
                 return out;
             }
@@ -2629,7 +2859,9 @@ fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                         if (!all_zero(n.base, o + 25u, 88u)) {
                             return out;
                         }
-                    } else if (tag == 1u) {
+                    } else if (tag == 1u || tag == 3u) {
+                        // 标签 3 的载荷与标签 1 同一个字段表（ExtentUpperLeafEntry::parse 换成没有洞的标签照同一段解，判决 m4-trunc-r1 第三节 K5），
+                        // 下面几判同 1；4 同 2
                         if (!all_zero(n.base, o + 25u + 86u, 2u)) {
                             return out;
                         }
@@ -2643,7 +2875,7 @@ fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                             walk_failure_point = FAILURE_POINT_UNIT_MALFORMED;
                             return out;
                         }
-                    } else if (tag == 2u) {
+                    } else if (tag == 2u || tag == 4u) {
                         // 同上：内联的数据指针（加密、压缩那几段与 extent 偏移各判一次）
                         if (!pointer_encryption_and_compression_fields_are_the_first_version(n.base, o + 25u)) {
                             walk_failure_point = FAILURE_POINT_UNIT_MALFORMED;
@@ -2664,13 +2896,13 @@ fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                         return out;
                     }
                     previous_inode = inode;
-                    if (upper_count >= MAX_UPPER_ENTRIES) {
-                        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES;
-                        return out;
+                    // 这一批从第 batch_first 条起、至多 MAX_UPPER_ENTRIES 条；这一批之外的照判、照数，不记
+                    if (entry_ordinal >= batch_first && upper_count < MAX_UPPER_ENTRIES) {
+                        sws(R_UPPER + upper_count * 2u, n.base);
+                        sws(R_UPPER + upper_count * 2u + 1u, o);
+                        upper_count = upper_count + 1u;
                     }
-                    sws(R_UPPER + upper_count * 2u, n.base);
-                    sws(R_UPPER + upper_count * 2u + 1u, o);
-                    upper_count = upper_count + 1u;
+                    entry_ordinal = entry_ordinal + 1u;
                 }
                 if (depth == 0u) {
                     out.ok = true;
@@ -2745,13 +2977,18 @@ fn read_upper_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
         enter = true;
     }
     out.node_count = nodes;
+    out.upper_entry_total = entry_ordinal;
     return out;
 }
-// 下段：数据指针写进 R_DATA（字节基、指针偏移），按单元号升序；单元号要从 0 起连号由调用方判
-fn read_lower_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_offset: u32, inode: vec2<u32>, tree: vec2<u32>, root: RootFields, fsid_low: vec2<u32>) -> ExtentRead {
+// 下段：数一个文件的每一个数据单元（units_of_the_file_being_read），是第一个文件的下段时头一块的数据指针写进 R_DATA（字节基、指针偏移），
+// 按单元号升序；单元号要从 0 起连号由调用方判（读到的单元号与它在这个文件里的位置不同就记进
+// units_of_the_file_being_read_are_numbered_from_zero_without_a_gap）
+fn read_lower_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_offset: u32, inode: vec2<u32>, tree: vec2<u32>, root: RootFields, fsid_low: vec2<u32>,
+    is_the_first_file: bool) -> ExtentRead {
     var out: ExtentRead;
     out.ok = false;
     out.node_count = 0u;
+    out.upper_entry_total = 0u;
     var nodes = 0u;
     var depth = 0u;
     var pending_pointer = root_pointer;
@@ -2829,18 +3066,15 @@ fn read_lower_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                         return out;
                     }
                     previous_unit = unit;
-                    if (data_count >= MAX_DATA_POINTERS) {
-                        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES;
-                        return out;
+                    if (is_the_first_file && units_of_the_file_being_read < DATA_POINTERS_PER_BLOCK) {
+                        sws(R_DATA + units_of_the_file_being_read * 2u, n.base);
+                        sws(R_DATA + units_of_the_file_being_read * 2u + 1u, o + 24u);
                     }
-                    // 单元号要等于它在整个文件里的位置（extents_of_the_first_file 的「没有洞」）：这里记下来，调用方判
-                    sws(R_DATA + data_count * 2u, n.base);
-                    sws(R_DATA + data_count * 2u + 1u, o + 24u);
-                    if (!eq64(unit, u64_of(data_count))) {
-                        // 记一个不可能的偏移让调用方判红：单元有洞
-                        sws(R_DATA + data_count * 2u + 1u, NONE);
+                    // 单元号要等于它在整个文件里的位置（extents_of_the_first_file 的「没有洞」，第一个文件与别的文件同一条）：这里记下来，调用方判
+                    if (!eq64(unit, u64_of(units_of_the_file_being_read))) {
+                        units_of_the_file_being_read_are_numbered_from_zero_without_a_gap = false;
                     }
-                    data_count = data_count + 1u;
+                    units_of_the_file_being_read = units_of_the_file_being_read + 1u;
                 }
                 if (depth == 0u) {
                     out.ok = true;
@@ -2919,67 +3153,163 @@ fn read_lower_segment(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
     out.node_count = nodes;
     return out;
 }
-// 整棵 extent 树 + extents_of_the_first_file：上段整段，再按每条叶条目读下段；第一版只有第一个文件
+// 整棵 extent 树 + extents_of_the_first_file：上段整段（按块分批记叶条目），再按每条叶条目读那个文件的下段。第一个文件之外有数据单元的文件
+// （按 inode 号写数据写出来的）与 CPU 恢复同一套收法（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M6）：
+// 至少一个单元、单元从 0 起连号、尾部没有洞（标签 1、2）；它们的单元数并进映射条目数（recovery 的 data_units_of_every_file），
+// 冷走读不读它们的数据单元、不找它们的记录（recovery.rs walk_to_file 同）
 fn read_extent_tree_of_the_first_file(root_pointer: Ptr, root_pointer_base: u32, root_pointer_offset: u32, tree: vec2<u32>, root: RootFields, fsid_low: vec2<u32>) -> ExtentRead {
     var out: ExtentRead;
     out.ok = false;
     out.node_count = 0u;
+    out.upper_entry_total = 0u;
     seen_count = 0u;
     data_count = 0u;
-    let upper = read_upper_segment(root_pointer, root_pointer_base, root_pointer_offset, tree, root, fsid_low);
-    if (!upper.ok) {
-        return out;
-    }
-    var nodes = upper.node_count;
-    var files_with_units = 0u;
-    for (var i = 0u; i < upper_count; i = i + 1u) {
-        let base = sw(R_UPPER + i * 2u);
-        let o = sw(R_UPPER + i * 2u + 1u);
-        let inode = extent_key_inode(base, o);
-        let tag = rd8(base, o + 24u);
-        if (tag == 1u) {
-            let lower_root = parse_node_pointer(base, o + 25u);
-            let lower = read_lower_segment(lower_root, base, o + 25u, inode, tree, root, fsid_low);
-            if (!lower.ok) {
-                return out;
+    data_units_of_the_files_other_than_the_first = 0u;
+    data_units_are_numbered_from_zero_without_a_gap = true;
+    first_file_upper_leaf_tag = NONE;
+    first_file_upper_entry_base = NONE;
+    first_file_upper_entry_offset = 0u;
+    // 第一个文件之外的文件有一个没有单元、单元有洞或尾部有洞（recovery::extents_of_the_first_file 在读完整棵树之后才判，读的失败点先报）
+    var files_other_than_the_first_are_well_formed = true;
+    var nodes = 0u;
+    var upper_entry_total = 0u;
+    var batch_first = 0u;
+    // 迭代上界：每一批至少记一条叶条目（记不到就判不了、交回），批数不过叶条目数 ÷ MAX_UPPER_ENTRIES 向上取整；跨轮带着的是下一批从第几条起。
+    // 上段与下段各一个调用点（GPU 程序把每个调用点展开成一份拷贝）
+    loop {
+        let is_the_judging_pass = batch_first == 0u;
+        let upper = read_upper_segment(root_pointer, root_pointer_base, root_pointer_offset, tree, root, fsid_low, is_the_judging_pass, batch_first);
+        if (!upper.ok) {
+            return out;
+        }
+        if (is_the_judging_pass) {
+            nodes = upper.node_count;
+            upper_entry_total = upper.upper_entry_total;
+        }
+        if (upper_count == 0u && batch_first < upper_entry_total) {
+            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES;
+            return out;
+        }
+        for (var i = 0u; i < upper_count; i = i + 1u) {
+            let base = sw(R_UPPER + i * 2u);
+            let o = sw(R_UPPER + i * 2u + 1u);
+            let inode = extent_key_inode(base, o);
+            let tag = rd8(base, o + 24u);
+            let is_the_first_file = eq64(inode, u64_of(FIRST_INODE_NUMBER));
+            // extent_tree::read_extent_tree：标签 1、3 读下段，2、4 是内联的那一个单元（3、4 之后到 size 是洞，判决 m4-trunc-r1 第三节 K5）；标签 0 一个单元都没有
+            let names_a_lower_segment_root = tag == 1u || tag == 3u;
+            let names_an_inline_data_unit = tag == 2u || tag == 4u;
+            units_of_the_file_being_read = 0u;
+            units_of_the_file_being_read_are_numbered_from_zero_without_a_gap = true;
+            if (names_a_lower_segment_root) {
+                let lower_root = parse_node_pointer(base, o + 25u);
+                let lower = read_lower_segment(lower_root, base, o + 25u, inode, tree, root, fsid_low, is_the_first_file);
+                if (!lower.ok) {
+                    return out;
+                }
+                nodes = nodes + lower.node_count;
+            } else if (names_an_inline_data_unit) {
+                if (is_the_first_file) {
+                    sws(R_DATA, base);
+                    sws(R_DATA + 1u, o + 25u);
+                }
+                units_of_the_file_being_read = 1u;
             }
-            nodes = nodes + lower.node_count;
-        } else if (tag == 2u) {
-            if (data_count >= MAX_DATA_POINTERS) {
-                undecidable = UNDECIDABLE_TOO_MANY_ENTRIES;
-                return out;
+            if (is_the_first_file) {
+                first_file_upper_leaf_tag = tag;
+                first_file_upper_entry_base = base;
+                first_file_upper_entry_offset = o;
+                data_count = units_of_the_file_being_read;
+                data_units_are_numbered_from_zero_without_a_gap = units_of_the_file_being_read_are_numbered_from_zero_without_a_gap;
+            } else {
+                data_units_of_the_files_other_than_the_first = data_units_of_the_files_other_than_the_first + units_of_the_file_being_read;
+                // 第一个文件之外的文件只由按 inode 号写数据的入口从偏移 0 整份写：标签 1、2，至少一个单元，从 0 起连号
+                let has_no_hole_after_its_last_data_unit = tag == 1u || tag == 2u;
+                if (units_of_the_file_being_read == 0u || !has_no_hole_after_its_last_data_unit
+                    || !units_of_the_file_being_read_are_numbered_from_zero_without_a_gap) {
+                    files_other_than_the_first_are_well_formed = false;
+                }
             }
-            sws(R_DATA + data_count * 2u, base);
-            sws(R_DATA + data_count * 2u + 1u, o + 25u);
-            data_count = data_count + 1u;
+        }
+        batch_first = batch_first + upper_count;
+        if (batch_first >= upper_entry_total) {
+            break;
         }
     }
-    // extents_of_the_first_file：上段一条叶条目都没有是第一个文件删完之后的零条目根（D8（核心索引结构） 已定项 16 第 5 条），
-    // 没有数据单元、没有下段，读得出（同 recovery.rs extents_of_the_first_file 那一支）；结局由后面 inode 树里第一个文件那条记录定
-    if (upper_count == 0u) {
+    data_block_first = 0u;
+    data_block_count = min(data_count, DATA_POINTERS_PER_BLOCK);
+    // recovery::extents_of_the_first_file：第一个文件之外的文件没有单元、单元有洞或尾部有洞，第一个文件的单元有洞，都是 UnitMalformed
+    walk_failure_point = FAILURE_POINT_UNIT_MALFORMED;
+    if (!files_other_than_the_first_are_well_formed) {
+        return out;
+    }
+    // 上段里没有第一个文件那一条：第一个文件删完之后的零条目根（D8（核心索引结构） 已定项 16 第 5 条），或删完之后只有别的文件有条目，
+    // 第一个文件没有数据单元、没有下段，读得出（同 recovery.rs extents_of_the_first_file 那一支）；结局由后面 inode 树里第一个文件那条记录定
+    if (first_file_upper_leaf_tag == NONE) {
         out.ok = true;
         out.node_count = nodes;
         return out;
     }
-    // 否则恰好一条叶条目、是第一个文件、至少一个数据单元、单元从 0 起连号（recovery::extents_of_the_first_file：都是 UnitMalformed）
-    walk_failure_point = FAILURE_POINT_UNIT_MALFORMED;
-    if (upper_count != 1u) {
+    // 标签 0 配 size > 0 是整个文件都是洞（判决 m4-trunc-r1 第三节 K5、第六节 S1），一个单元都没有也读得出；别的标签至少一个单元
+    if (data_count == 0u && first_file_upper_leaf_tag != 0u) {
         return out;
     }
-    if (!eq64(extent_key_inode(sw(R_UPPER), sw(R_UPPER + 1u)), u64_of(FIRST_INODE_NUMBER))) {
+    if (!data_units_are_numbered_from_zero_without_a_gap) {
         return out;
-    }
-    if (data_count == 0u) {
-        return out;
-    }
-    for (var i = 0u; i < data_count; i = i + 1u) {
-        if (sw(R_DATA + i * 2u + 1u) == NONE) {
-            return out;
-        }
     }
     out.ok = true;
     out.node_count = nodes;
     return out;
+}
+// 找下一块数据指针时往下走的一步（walk_to_file 读了下段里一个节点交给它）：is_the_block_found 为真时 R_DATA 换成了下一块；
+// 否则 pointer_base / pointer_offset 是下一层要读的那条子指针在哪
+struct StepTowardTheNextBlockOfDataPointers {
+    is_the_block_found: bool,
+    pointer_base: u32,
+    pointer_offset: u32,
+};
+// 第一个文件的第 unit 个单元在下段的哪片叶里：节点 read 是从下段根往下读回的一层。内部节点取子区间起点不超过 unit 的最后一条条目往下；
+// 叶里从 unit 那一条起、到叶末尾的数据指针记成下一块（叶不过 EXTENT_LOWER_LEAF_DATA_UNITS 条，装得进一块）。
+// 这几层在 extent 树那一遍都读过、核过（read_lower_segment：键升序、子区间对得上父区间、单元从 0 起连号、没有零条目的下段节点），
+// 这里不再判，只认路；读回的不是那一形记判不了（UNDECIDABLE_DATA_POINTER_BLOCK_NOT_FOUND_AGAIN）
+fn find_the_next_block_of_data_pointers(read: MappedRead, unit: u32) -> StepTowardTheNextBlockOfDataPointers {
+    var step: StepTowardTheNextBlockOfDataPointers;
+    step.is_the_block_found = false;
+    step.pointer_base = NONE;
+    step.pointer_offset = 0u;
+    let payload = u64_of(DATA_UNIT_PAYLOAD_CAPACITY);
+    let n = parse_index_node(read.s);
+    if (read.failed || !n.ok || n.entry_count == 0u) {
+        undecidable = UNDECIDABLE_DATA_POINTER_BLOCK_NOT_FOUND_AGAIN;
+        return step;
+    }
+    if (n.level > 0u) {
+        var chosen = 0u;
+        for (var e = 1u; e < n.entry_count; e = e + 1u) {
+            let first_unit_of_the_child = divmod64(extent_key_offset(n.base, entry_offset(n, e)), payload).quotient;
+            if (lt64(u64_of(unit), first_unit_of_the_child)) {
+                break;
+            }
+            chosen = e;
+        }
+        step.pointer_base = n.base;
+        step.pointer_offset = entry_offset(n, chosen) + 24u;
+        return step;
+    }
+    let first_unit_of_the_leaf = divmod64(extent_key_offset(n.base, entry_offset(n, 0u)), payload).quotient;
+    let entry_of_the_unit = unit - first_unit_of_the_leaf.x;
+    if (first_unit_of_the_leaf.y != 0u || first_unit_of_the_leaf.x > unit || entry_of_the_unit >= n.entry_count) {
+        undecidable = UNDECIDABLE_DATA_POINTER_BLOCK_NOT_FOUND_AGAIN;
+        return step;
+    }
+    data_block_first = unit;
+    data_block_count = min(n.entry_count - entry_of_the_unit, DATA_POINTERS_PER_BLOCK);
+    for (var k = 0u; k < data_block_count; k = k + 1u) {
+        sws(R_DATA + k * 2u, n.base);
+        sws(R_DATA + k * 2u + 1u, entry_offset(n, entry_of_the_unit + k) + 24u);
+    }
+    step.is_the_block_found = true;
+    return step;
 }
 
 // ───────────────────────── 实例表 ─────────────────────────
@@ -3088,6 +3418,8 @@ fn tree_kind_key_width(kind: u32) -> u32 {
     if (kind == TREE_KIND_ALLOCATION) { return 10u; }
     if (kind == TREE_KIND_ACCOUNTING) { return 22u; }
     if (kind == TREE_KIND_DELETED_INODES) { return DELETED_INODES_KEY_WIDTH; }
+    // logged_ops 根（recovery.rs key_width_for_kind 的码 12：种类 2 + 签发 txg 8，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1）
+    if (kind == TREE_KIND_LOGGED_OPERATIONS) { return LOGGED_OPERATIONS_KEY_BYTES; }
     if (kind == TREE_KIND_TOMBSTONE || kind == TREE_KIND_LINEAGE || kind == TREE_KIND_RETIREMENT) { return CONTAINER_NUMBER_KEY_WIDTH; }
     return NONE;
 }
@@ -3214,6 +3546,66 @@ fn expected_version_index(instance: u32, txg: vec2<u32>) -> u32 {
     return NONE;
 }
 // recovery::walk_to_file_in_the_unit_area_starting_at
+// recovery::snapshot_tree_table_entries_paired_one_to_one（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1 与第七节岔路 1）：
+// 码 14 与码 15 条数相等；按盘上次序每条码 15 的头 ID 恰是一条还没被前面的码 15 配上的码 14 的树 ID；码 14 至多 SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION 条；
+// 每条码 14 的头 ID 等于表里第一条码 2 条目的树 ID（表里没有码 2 也不成立）。没有快照条目的表恒成立。四样不成立都是 UnitMalformed，先后不改结论。
+// 条目宽调用方已判过是 200；一张树表的条目装不过 128 条（16 KiB 的码 2 节点、200 字节的条目），配上没有记在四个字的位图里
+fn snapshot_tree_table_entries_are_paired_one_to_one(tree_table: Node) -> bool {
+    var snapshot_inode_roots = 0u;
+    var snapshot_extent_roots = 0u;
+    var live_inode_tree = vec2<u32>(0u, 0u);
+    var has_a_live_inode_tree = false;
+    for (var e = 0u; e < tree_table.entry_count; e = e + 1u) {
+        let o = entry_offset(tree_table, e);
+        let kind = rd16(tree_table.base, o + 10u);
+        if (kind == TREE_KIND_SNAPSHOT_INODE_ROOT) {
+            snapshot_inode_roots = snapshot_inode_roots + 1u;
+        } else if (kind == TREE_KIND_SNAPSHOT_EXTENT_ROOT) {
+            snapshot_extent_roots = snapshot_extent_roots + 1u;
+        } else if (kind == TREE_KIND_INODE && !has_a_live_inode_tree) {
+            live_inode_tree = rd64(tree_table.base, o);
+            has_a_live_inode_tree = true;
+        }
+    }
+    if (snapshot_inode_roots != snapshot_extent_roots) {
+        return false;
+    }
+    var paired: array<u32, 4>;
+    for (var word = 0u; word < 4u; word = word + 1u) {
+        paired[word] = 0u;
+    }
+    for (var e = 0u; e < tree_table.entry_count; e = e + 1u) {
+        let o = entry_offset(tree_table, e);
+        if (rd16(tree_table.base, o + 10u) != TREE_KIND_SNAPSHOT_EXTENT_ROOT) {
+            continue;
+        }
+        let head = rd64(tree_table.base, o + TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET);
+        var paired_position = NONE;
+        for (var candidate = 0u; candidate < tree_table.entry_count && candidate < 128u; candidate = candidate + 1u) {
+            let candidate_o = entry_offset(tree_table, candidate);
+            if (rd16(tree_table.base, candidate_o + 10u) == TREE_KIND_SNAPSHOT_INODE_ROOT && eq64(rd64(tree_table.base, candidate_o), head)
+                && (paired[candidate / 32u] & (1u << (candidate % 32u))) == 0u) {
+                paired_position = candidate;
+                break;
+            }
+        }
+        if (paired_position == NONE) {
+            return false;
+        }
+        paired[paired_position / 32u] = paired[paired_position / 32u] | (1u << (paired_position % 32u));
+    }
+    if (snapshot_inode_roots > SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION) {
+        return false;
+    }
+    for (var e = 0u; e < tree_table.entry_count; e = e + 1u) {
+        let o = entry_offset(tree_table, e);
+        if (rd16(tree_table.base, o + 10u) == TREE_KIND_SNAPSHOT_INODE_ROOT
+            && (!has_a_live_inode_tree || !eq64(rd64(tree_table.base, o + TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET), live_inode_tree))) {
+            return false;
+        }
+    }
+    return true;
+}
 fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
     let fsid_low = vec2<u32>(cfg.fsid.x, cfg.fsid.y);
     // 实例表：根直接持有第 0 片
@@ -3259,7 +3651,11 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
     var kinds_seen = 0u;
     for (var e = 0u; e < tree_table.entry_count; e = e + 1u) {
         let o = entry_offset(tree_table, e);
-        if (rd16(tree_table.base, o + 8u) != 200u || rd16(tree_table.base, o + 12u) != 0u || !all_zero(tree_table.base, o + 124u, 76u)) {
+        // TreeTableEntry::parse_with_destruction_mark：flags 是 0，或码 14 条目上恰是位 0（销毁中）；别的位、别的种类上的位 0 拒收
+        let flags = rd16(tree_table.base, o + TREE_TABLE_ENTRY_FLAGS_OFFSET);
+        let flags_are_accepted = flags == 0u
+            || (flags == TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED && rd16(tree_table.base, o + 10u) == TREE_KIND_SNAPSHOT_INODE_ROOT);
+        if (rd16(tree_table.base, o + 8u) != 200u || !flags_are_accepted || !all_zero(tree_table.base, o + 124u, 76u)) {
             return walk_failed(FAILURE_POINT_UNIT_MALFORMED);
         }
         // TreeTableEntry::parse：树根指针头部加密、压缩那几段不是第一版的取值，这条条目损坏
@@ -3271,6 +3667,10 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
             return walk_failed(FAILURE_POINT_UNIT_MALFORMED);
         }
         let kind = rd16(tree_table.base, o + 10u);
+        // 码 14、15 两种快照条目一个快照一对、可以有多条：不进「每种至多一条」，下面按头 ID 一一配对判
+        if (kind == TREE_KIND_SNAPSHOT_INODE_ROOT || kind == TREE_KIND_SNAPSHOT_EXTENT_ROOT) {
+            continue;
+        }
         // tree_table_entries_each_kind_at_most_once 的 kinds_seen 是整个 u16 的集合：种类 < 32 的记进位图，
         // 种类 ≥ 32 的（第一版写者写不出、坏盘上才有）逐条与前面各条比（树表条目数不超过一个码 2 节点装得下的，与走读内核 ③ 的两两比同一量级）。
         // 走读内核的 ③（crash_judge_checker.wgsl 判 I-9.16 那一段）同样比整个 u16，两个内核在种类 ≥ 32 的重复上都拦得到
@@ -3286,6 +3686,9 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
                 }
             }
         }
+    }
+    if (!snapshot_tree_table_entries_are_paired_one_to_one(tree_table)) {
+        return walk_failed(FAILURE_POINT_UNIT_MALFORMED);
     }
     // I-9.16 ①：树 ID 严格升序
     for (var e = 1u; e < tree_table.entry_count; e = e + 1u) {
@@ -3332,7 +3735,10 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
     var extent_nodes = 0u;
     var allocation_nodes = 0u;
     var accounting_nodes = 0u;
+    var deadlist_nodes = 0u;
+    var deadlist_entries = 0u;
     var have_deleted_inodes = false;
+    var have_logged_operations = false;
     var container_tree_units = 0u;
     var inode_root = bad_node();
     var inode_root_pointer = zero_pointer();
@@ -3343,11 +3749,15 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
         if (!lt64(tree, root.watermark)) {
             return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
         }
+        let kind = rd16(tree_table.base, o + 10u);
+        // 只读快照的两种条目：冷走读读的是活头那一版的文件，跳过它们（recovery.rs walk_to_file 在判过树 ID 水位之后 continue）
+        if (kind == TREE_KIND_SNAPSHOT_INODE_ROOT || kind == TREE_KIND_SNAPSHOT_EXTENT_ROOT) {
+            continue;
+        }
         let pointer = parse_node_pointer(tree_table.base, o + 14u);
         if (pointer.all_zero) {
             continue;
         }
-        let kind = rd16(tree_table.base, o + 10u);
         if (kind == TREE_KIND_ALLOCATION) {
             let read = read_allocation_tree(pointer, tree_table.base, o + 14u, tree, root, fsid_low);
             if (!read.ok) {
@@ -3367,10 +3777,17 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
             have_extent = true;
             continue;
         }
-        if (kind == TREE_KIND_ACCOUNTING) {
-            let read = read_code_two_tree(pointer, tree_table.base, o + 14u, tree, 0u, root, fsid_low);
+        // 记账树与 deadlist 树（第三棵多层码 2 树，判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3）：同一个读法整棵读回来，
+        // 一个调用点（GPU 程序把每个调用点展开成一份拷贝）；deadlist 的节点与叶条目各占映射条目（条目留存的那几条，判决 S3 的 α），数映射条目时要它们
+        if (kind == TREE_KIND_ACCOUNTING || kind == TREE_KIND_DEADLIST) {
+            let read = read_code_two_tree(pointer, tree_table.base, o + 14u, tree, select(0u, KEY_SCHEMA_DEADLIST, kind == TREE_KIND_DEADLIST), root, fsid_low);
             if (!read.ok) {
                 return walk_failed(walk_failure_point);
+            }
+            if (kind == TREE_KIND_DEADLIST) {
+                deadlist_nodes = read.node_count;
+                deadlist_entries = read.entry_count;
+                continue;
             }
             accounting_nodes = read.node_count;
             have_accounting = true;
@@ -3389,7 +3806,8 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
         if (key_width == NONE) {
             return walk_failed(FAILURE_POINT_UNIT_MALFORMED);
         }
-        // inode 树根与 deleted_inodes 根（进映射的树根：提示读不出经映射回退，再核自描述）
+        // inode 树根、deleted_inodes 根与 logged_ops 根（进映射的树根：提示读不出经映射回退，再核自描述；logged_ops 根只数进映射条目数，
+        // 条目不在冷走读里解，recovery.rs walk_to_file 同）
         let m = read_via_hint_then_mapping(pointer, tree_table.base, o + 14u, 2u, NODE_BYTES);
         if (m.failed) {
             return walk_failed(walk_failure_point);
@@ -3405,6 +3823,9 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
         }
         if (kind == TREE_KIND_DELETED_INODES) {
             have_deleted_inodes = true;
+        }
+        if (kind == TREE_KIND_LOGGED_OPERATIONS) {
+            have_logged_operations = true;
         }
     }
     if (!have_extent || !have_inode || !have_allocation || !have_accounting) {
@@ -3484,11 +3905,12 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
             return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
         }
     }
-    // 记账条目：先逐条判宽 ≥ 34（recovery::every_accounting_entry_is_as_wide_as_its_field_table，EntryNarrowerThanItsFieldTable），
+    // 记账条目：先逐条判宽 = 34，窄了宽了都拒（recovery::every_accounting_entry_is_as_wide_as_its_field_table，EntryNarrowerThanItsFieldTable；
+    // records::AccountingEntry::parse 不等于 34 交 None，C780，用户 2026-10-18 定「宽于字段表也拒」），
     // 再逐条判代不晚于根、seq ≠ 0（accounting_entry_parsed_and_judged_against_the_root，InvariantViolated）；
     // 次序同 recovery::walk_to_file_in_the_unit_area_starting_at：分配记录的代与跨度、记账条目宽、逐条判记账条目，之后才数记账条目与映射条目
     for (var a = 0u; a < accounting_count; a = a + 1u) {
-        if (sw(R_ACCOUNTING + a * 3u + 2u) < 34u) {
+        if (sw(R_ACCOUNTING + a * 3u + 2u) != 34u) {
             return walk_failed(FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE);
         }
     }
@@ -3500,13 +3922,14 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
         }
     }
     // 记账条目数 3 + 6 × 盘数，inode 号水位的台阶行不算（recovery.rs accounting_entry_count_is_three_plus_six_per_device：
-    // 标签 12、设备段 0xFFFF_FFFF、代段早于根的 txg 的行；条目宽不到 34 的照算，后面判宽那一道拒它）
+    // 标签 12、设备段 0xFFFF_FFFF、代段早于根的 txg 的行；条目宽不等于 34 的解不开、照算，与 AccountingEntry::parse 交 None 那一支相同；
+    // 走到这里的条目都过了上面判宽那一道，宽都是 34）
     var accounting_entries_other_than_the_inode_number_watermark_steps = 0u;
     for (var a = 0u; a < accounting_count; a = a + 1u) {
         let base = sw(R_ACCOUNTING + a * 3u);
         let o = sw(R_ACCOUNTING + a * 3u + 1u);
         let width = sw(R_ACCOUNTING + a * 3u + 2u);
-        let is_an_inode_number_watermark_step = width >= 34u && rd16(base, o) == 12u && rd32(base, o + 10u) == NONE
+        let is_an_inode_number_watermark_step = width == 34u && rd16(base, o) == 12u && rd32(base, o + 10u) == NONE
             && lt64(rd64(base, o + 14u), root.txg);
         if (!is_an_inode_number_watermark_step) {
             accounting_entries_other_than_the_inode_number_watermark_steps = accounting_entries_other_than_the_inode_number_watermark_steps + 1u;
@@ -3515,10 +3938,13 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
     if (accounting_entries_other_than_the_inode_number_watermark_steps != 3u + 6u * device_count) {
         return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
     }
-    // 映射条目数 = 1 + extent 节点 + 分配记录树节点 + 记账树节点 + inode 叶容器数 + 数据单元数 + 删除那两棵树与谱系树的节点
-    // （recovery.rs 的 deletion_tree_nodes：deleted_inodes 根有就 1，墓碑树、谱系树各自每个码 2 节点加每片容器）
-    let deletion_tree_nodes = select(0u, 1u, have_deleted_inodes) + container_tree_units;
-    if (mapping_count != 1u + extent_nodes + allocation_nodes + accounting_nodes + inode_root.entry_count + data_count + deletion_tree_nodes) {
+    // 映射条目数 = 1 + extent 节点 + 分配记录树节点 + 记账树节点 + deadlist 树节点 + deadlist 条目数 + inode 叶容器数 + 数据单元数
+    // + 删除那两棵树与谱系树的节点（recovery.rs 的 deletion_tree_nodes：deleted_inodes 根有就 1、logged_ops 根有就 1，墓碑树、谱系树各自每个码 2 节点加每片容器；
+    // deadlist 那两项是 mapping_entry_count_is_one_per_mapped_unit 的 deadlist_tree_nodes 与 mapping_entries_kept_for_the_snapshots）
+    let deletion_tree_nodes = select(0u, 1u, have_deleted_inodes) + select(0u, 1u, have_logged_operations) + container_tree_units;
+    // 数据单元数是每个文件的（第一个文件与第一个文件之外各文件，recovery 的 data_units_of_every_file）
+    if (mapping_count != 1u + extent_nodes + allocation_nodes + accounting_nodes + deadlist_nodes + deadlist_entries + inode_root.entry_count + data_count
+        + data_units_of_the_files_other_than_the_first + deletion_tree_nodes) {
         return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
     }
     // inode 树：根层级 1，每条内部条目 → 叶容器 → 记录
@@ -3574,11 +4000,15 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
         }
         for (var rec = 0u; rec < leaf.record_count; rec = rec + 1u) {
             let ro = packed_record_offset(leaf, rec);
-            if (!all_zero(leaf.base, ro + 108u, 32u)) {
+            if (!inode_record_parses_by_the_core_reader(leaf.base, ro)) {
                 return walk_failed(FAILURE_POINT_UNIT_MALFORMED);
             }
             let inode = rd64(leaf.base, ro);
             if (lt64(inode, separator) || lt64(inode, identity_container)) {
+                return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
+            }
+            // records::InodeRecord::truncation_field_fits_the_pool：不带 incompat 位 2 的池里截断字段必须全零（recovery 的 I-9.7 那一判）
+            if (!inode_record_truncation_field_fits_the_pool(leaf.base, ro, cfg.carries_the_inode_record_truncation_field)) {
                 return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
             }
             if (eq64(inode, u64_of(FIRST_INODE_NUMBER))) {
@@ -3597,30 +4027,81 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
     if (inode_nlink == NLINK_OF_AN_INODE_BEING_DELETED) {
         return walk_no_file();
     }
-    // 数据单元数 = max(1, ⌈size ÷ 32634⌉)
+    // 数据单元数按上段叶条目的标签对 size（core 冷走读的 data_unit_count_matches_the_inode_size，即 write_request_split::data_units_read_within_the_file_size）：
+    // size 按净荷容量算出的单元数是 max(1, ⌈size ÷ 32634⌉)；标签 1、2 存在的单元不少于它，多出来的是截断中间态里 size 之外还挂着的单元，
+    // 不读、不判声明长度（判决 m4-trunc-r1 第三节 K2）；标签 3、4、0 少于它，存在的单元之后到 size 是洞、读出 0、不读盘（K5）
     let payload = u64_of(DATA_UNIT_PAYLOAD_CAPACITY);
-    var expected_units = divmod64(add64_saturating(inode_size, sub64(payload, u64_of(1u))), payload).quotient;
-    if (is_zero64(expected_units)) {
-        expected_units = u64_of(1u);
+    var units_implied_by_the_size = divmod64(add64_saturating(inode_size, sub64(payload, u64_of(1u))), payload).quotient;
+    if (is_zero64(units_implied_by_the_size)) {
+        units_implied_by_the_size = u64_of(1u);
     }
-    if (!eq64(expected_units, u64_of(data_count))) {
+    let tail_is_a_hole = first_file_upper_leaf_tag == 0u || first_file_upper_leaf_tag == 3u || first_file_upper_leaf_tag == 4u;
+    if (tail_is_a_hole) {
+        if (!lt64(u64_of(data_count), units_implied_by_the_size)) {
+            return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
+        }
+    } else if (lt64(u64_of(data_count), units_implied_by_the_size)) {
         return walk_failed(FAILURE_POINT_INVARIANT_VIOLATED);
     }
+    // size 之内要读、要核的单元数：有洞时是存在的全部，没有洞时是 size 算出的那几个（不多于 data_count，装得进 32 位）
+    let data_units_within_the_size = select(units_implied_by_the_size.x, data_count, tail_is_a_hole);
     var content_matches = true;
     var chunk_first = 0u;
     var chunk_count = 0u;
     if (expected != NONE) {
         chunk_first = tab(T_EXPECTED, expected * EXPECTED_WORDS + 3u);
         chunk_count = tab(T_EXPECTED, expected * EXPECTED_WORDS + 4u);
-        if (chunk_count != data_count) {
+        // 期望那一版的内容按写侧的切法切成 max(1, ⌈内容长度 ÷ 净荷⌉) 个单元（crash_judge_tables 的 expected_version_chunks），读出的文件是 size 那么长：
+        // 两边单元数不同，内容就不同
+        if (!eq64(u64_of(chunk_count), units_implied_by_the_size)) {
             content_matches = false;
         }
     }
-    for (var i = 0u; i < data_count; i = i + 1u) {
-        let base = sw(R_DATA + i * 2u);
-        let o = sw(R_DATA + i * 2u + 1u);
-        let pointer = parse_data_pointer(base, o);
-        let m = read_via_hint_then_mapping(pointer, base, o, 1u, DATA_UNIT_BYTES);
+    // 数据指针按块读（R_DATA 里是 data_block_first 起的 data_block_count 条）：读到这一块末尾，从下段根一层层往下找含下一个单元的那片叶，
+    // 每一步读一个节点；找下一块时此刻要读的那条节点指针在哪（字节基、偏移），不在找是 NONE
+    var next_block_pointer_base = NONE;
+    var next_block_pointer_offset = 0u;
+    var i = 0u;
+    // 迭代上界：每个单元读一次，加上每找一块往下读的层数（每块至少一个单元，层数不过 MAX_FRAMES，内部节点每一步往下一层）。
+    // 跨轮带着的：i 只增，找块时 next_block_pointer_* 一层层往下、找到就回 NONE；data_block_first ≤ i < data_block_first + data_block_count 时读单元
+    loop {
+        if (i >= data_units_within_the_size) {
+            break;
+        }
+        let finding_the_next_block = i >= data_block_first + data_block_count;
+        if (finding_the_next_block && next_block_pointer_base == NONE) {
+            // 从下段根起：第一个文件那一条上段叶条目偏移 25 起是下段根指针（一块装不下的文件有下段，内联的只有一个单元）
+            next_block_pointer_base = first_file_upper_entry_base;
+            next_block_pointer_offset = first_file_upper_entry_offset + 25u;
+        }
+        var base = next_block_pointer_base;
+        var o = next_block_pointer_offset;
+        var pointer: Ptr;
+        var unit_class = 2u;
+        var unit_bytes = NODE_BYTES;
+        if (finding_the_next_block) {
+            pointer = parse_node_pointer(base, o);
+        } else {
+            base = sw(R_DATA + (i - data_block_first) * 2u);
+            o = sw(R_DATA + (i - data_block_first) * 2u + 1u);
+            pointer = parse_data_pointer(base, o);
+            unit_class = 1u;
+            unit_bytes = DATA_UNIT_BYTES;
+        }
+        // 读下段节点与读数据单元同一个调用点（GPU 程序把每个调用点展开成一份拷贝）
+        let m = read_via_hint_then_mapping(pointer, base, o, unit_class, unit_bytes);
+        if (finding_the_next_block) {
+            let step = find_the_next_block_of_data_pointers(m, i);
+            if (undecidable != 0u) {
+                return walk_failed(FAILURE_POINT_NONE);
+            }
+            next_block_pointer_base = step.pointer_base;
+            next_block_pointer_offset = step.pointer_offset;
+            if (step.is_the_block_found) {
+                next_block_pointer_base = NONE;
+            }
+            continue;
+        }
         if (m.failed) {
             return walk_failed(walk_failure_point);
         }
@@ -3653,6 +4134,25 @@ fn walk_to_file(root: RootFields, cfg: SysConfig, expected: u32) -> WalkResult {
                 content_matches = false;
             }
         }
+        i = i + 1u;
+    }
+    // 洞（存在的单元之后到 size）不读盘，读出 0（core 的 content_padded_with_the_hole_up_to_the_size）。每个洞的位置照期望那一版的那个单元比：
+    // 声明长度是 size 切到这一段的长度，载荷区 CRC 是内核现算的全零那一份——载荷区罩预留位、载荷与补到单元末尾的 0，洞的载荷全是 0，
+    // 所以每个洞的位置都是同一个数（判决 m4-trunc-r1 第六节 S5：判表不加「这一块全零」位、不加从镜像算出的列，期望只来自版本表）。
+    // 只比到期望那一版的单元数为止：两边单元数不同上面已判内容不同，再往后比不出别的，也不让一个很大的 size 拖长这一圈
+    if (expected != NONE && data_units_within_the_size < chunk_count) {
+        let payload_region_crc_of_a_hole = crc32c_of_zero_bytes(DATA_UNIT_PAYLOAD_REGION_BYTES);
+        for (var position = data_units_within_the_size; position < chunk_count; position = position + 1u) {
+            let first_file_byte = mul64_64_saturating(u64_of(position), payload);
+            var length_of_the_hole_here = sub64_saturating(inode_size, first_file_byte);
+            if (lt64(payload, length_of_the_hole_here)) {
+                length_of_the_hole_here = payload;
+            }
+            if (tab(T_CHUNKS, (chunk_first + position) * 2u) != payload_region_crc_of_a_hole
+                || !eq64(u64_of(tab(T_CHUNKS, (chunk_first + position) * 2u + 1u)), length_of_the_hole_here)) {
+                content_matches = false;
+            }
+        }
     }
     var w: WalkResult;
     w.outcome = OUTCOME_FILE_READ;
@@ -3673,10 +4173,14 @@ fn begin_state(local: u32) {
     record_count = 0u;
     root_count = 0u;
     mapping_count = 0u;
+    mapping_leaf_count = 0u;
     accounting_count = 0u;
     allocation_count = 0u;
     seen_count = 0u;
     data_count = 0u;
+    data_units_of_the_files_other_than_the_first = 0u;
+    data_block_first = 0u;
+    data_block_count = 0u;
     upper_count = 0u;
     row_count = 0u;
     var ordinal_lo = dispatch.block_start_lo + local;

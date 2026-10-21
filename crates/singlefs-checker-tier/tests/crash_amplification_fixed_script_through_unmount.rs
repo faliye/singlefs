@@ -2,8 +2,8 @@
 //! 崩溃放量流水线在里程碑「覆盖写、释放、回退与复用」的整条固定脚本上（步 0 到步 5：取号加暖机 → 新池新建文件 A → 覆盖写 B →
 //! 重开可写挂载（取号、写行、暖机两次）→ 覆盖写 C → 挂着回退到 A（D）→ 五次覆盖写（txg 10–14）→ 抬 F 到 11（两次空发布 txg 15、16）→
 //! 复用 E（txg 17，数据单元落回 50176）→ 正常卸载（先写 F、两次带卸载记号的空发布 txg 18、19））：与崩溃点重放全量跑的那条流同一条
-//! （`crash_enumeration_fixed_script_stream.rs` 的 `ReuseAfterRaisingFloorThenNormalUnmount`，78 段、481 次写、19 条根槽写）。
-//! 入口都由 `common_crash_points` 设点，前 36 个点与到 D 那条测试共享。展开上限 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（默认 6），
+//! （`crash_enumeration_fixed_script_stream.rs` 的 `ReuseAfterRaisingFloorThenNormalUnmount`，80 段、485 次写、19 条根槽写；取号写两轮，两次取号各两段）。
+//! 入口都由 `common_crash_points` 设点，前 38 个点与到 D 那条测试共享。展开上限 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（默认 6），
 //! 28 及以上就是全域（`exhaustive=true`）。要 `verdict-store` 特性。
 #![cfg(feature = "verdict-store")]
 
@@ -173,16 +173,16 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
     assert_eq!(
         sizes,
         vec![
-            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1,
-            2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2,
-            1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2
+            2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
+            2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
+            28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2
         ],
         "固定脚本到 E 再正常卸载的段序列（与 crash_enumeration_fixed_script_stream 登记的相同）"
     );
     assert_eq!(
         writes.len(),
-        195 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
-        "到 D 195 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
+        199 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
+        "到 D 199（取号两轮，两次取号各多 2 写）+ 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
     );
     let crash_points = recorder.into_crash_points(&writes, &segments, &stream_indexes);
     assert_eq!(crash_points.len(), segments.len(), "每个屏障段一个崩溃点");
@@ -198,10 +198,10 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
     assert_eq!(
         entries,
         vec![
-            ("acquire_instance_and_warm_up", 12),
+            ("acquire_instance_and_warm_up", 14),
             ("publish_first_file", 29),
             ("publish_overwrite", 29),
-            ("mount_writable", 67),
+            ("mount_writable", 69),
             ("publish_overwrite", 29),
             ("roll_back_by_a_forward_publish", 29),
             ("publish_overwrite", 33 * 5),
@@ -220,12 +220,13 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         names,
         vec![
             "acquire_instance_and_warm_up.system_configuration_slot.1",
+            "acquire_instance_and_warm_up.system_configuration_slot.2",
             "acquire_instance_and_warm_up.journal_record.1",
             "acquire_instance_and_warm_up.root_record_fua.1",
-            "acquire_instance_and_warm_up.system_configuration_slot.2",
+            "acquire_instance_and_warm_up.system_configuration_slot.3",
             "acquire_instance_and_warm_up.journal_record.2",
             "acquire_instance_and_warm_up.root_record_fua.2",
-            "acquire_instance_and_warm_up.system_configuration_slot.3",
+            "acquire_instance_and_warm_up.system_configuration_slot.4",
             "publish_first_file.data_unit+index_node+packed_records.1",
             "publish_first_file.journal_record.1",
             "publish_first_file.root_record_fua.1",
@@ -235,18 +236,19 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
             "publish_overwrite.root_record_fua.1",
             "publish_overwrite.system_configuration_slot.1",
             "mount_writable.system_configuration_slot.1",
+            "mount_writable.system_configuration_slot.2",
             "mount_writable.packed_records+index_node.1",
             "mount_writable.journal_record.1",
             "mount_writable.root_record_fua.1",
-            "mount_writable.system_configuration_slot.2",
+            "mount_writable.system_configuration_slot.3",
             "mount_writable.index_node.1",
             "mount_writable.journal_record.2",
             "mount_writable.root_record_fua.2",
-            "mount_writable.system_configuration_slot.3",
+            "mount_writable.system_configuration_slot.4",
             "mount_writable.index_node.2",
             "mount_writable.journal_record.3",
             "mount_writable.root_record_fua.3",
-            "mount_writable.system_configuration_slot.4",
+            "mount_writable.system_configuration_slot.5",
             "publish_overwrite.data_unit+index_node+packed_records.1",
             "publish_overwrite.journal_record.1",
             "publish_overwrite.root_record_fua.1",
@@ -298,7 +300,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
             "unmount.root_record_fua.2",
             "unmount.system_configuration_slot.3"
         ],
-        "78 个点的名字：前 36 个与到 D 那条相同；五次覆盖写各 4 段；抬 F 9 段（先写 F 的系统配置 2、两次空发布各 16+2+1、末尾轮换 2）；E 4 段；卸载 9 段（与抬 F 同形）"
+        "80 个点的名字：前 38 个与到 D 那条相同（取号两轮，取号加暖机与重开各多一段系统配置槽写）；五次覆盖写各 4 段；抬 F 9 段（先写 F 的系统配置 2、两次空发布各 16+2+1、末尾轮换 2）；E 4 段；卸载 9 段（与抬 F 同形）"
     );
     assert!(
         crash_points

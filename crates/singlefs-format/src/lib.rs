@@ -185,6 +185,21 @@ pub const EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES: u64 = 113;
 /// extent 树上段一片叶罩几个 inode 号：(16384 − 163) ÷ 113 的整数部分（一个 inode 号至多一条上段叶条目，叶永远装得下）。
 pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 143;
 
+/// logged_ops 树条目的 key：种类 2 + 签发 txg 8，按逐字段无符号整数、字段自左向右比较（D8（核心索引结构） 已定项 11；
+/// 判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1「单树、定宽联合条目」）。format-const: LOGGED_OPERATIONS_KEY_BYTES
+pub const LOGGED_OPERATIONS_KEY_BYTES: u64 = 10;
+
+/// logged_ops 树条目的 value，按种类解、定宽：种类 1（整理）= R 的设备 4 + 起始槽 6 + 槽数 2、`c0` 8、`segs0` 8、补零 6；
+/// 别的种类码保留（同一判决 G1）。format-const: LOGGED_OPERATIONS_VALUE_BYTES
+pub const LOGGED_OPERATIONS_VALUE_BYTES: u64 = 34;
+
+/// logged_ops 树条目：key 10 + value 34（同一判决 G1）。format-const: LOGGED_OPERATIONS_ENTRY_BYTES
+pub const LOGGED_OPERATIONS_ENTRY_BYTES: u64 = 44;
+
+/// 一个 logged_ops 码 2 节点装几条：(16384 − 头 `86 + 2 × 10 + 29`) ÷ 44 的整数部分（同一判决 G1「一节点 369 条」）。
+/// format-const: LOGGED_OPERATIONS_ENTRIES_PER_NODE
+pub const LOGGED_OPERATIONS_ENTRIES_PER_NODE: u64 = 369;
+
 /// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案，加宽到 200 是 2026-09-16 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
 pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
@@ -631,6 +646,35 @@ mod tests {
             index_node_header_bytes(MAPPING_KEY_BYTES),
             "中央映射树：key 宽 27"
         );
+    }
+
+    /// logged_ops 树条目的四个宽写成整数字面量，原来的算式留在这里，一个数不差（判决 `m4-gc-r1` 第三节 G1）：
+    /// key = 种类 2 + 签发 txg 8；整理那一种的 value = R 的设备 4 + 起始槽 6 + 槽数 2 + `c0` 8 + `segs0` 8 + 补零 6；
+    /// 一节点条数 = 节点里 key 宽 10 的码 2 头之后装得下几条 44。
+    #[test]
+    fn logged_operations_widths_equal_the_field_sums_and_the_node_capacity_they_stand_for() {
+        assert_eq!(
+            LOGGED_OPERATIONS_KEY_BYTES,
+            2 + 8,
+            "key = 种类 2 + 签发 txg 8"
+        );
+        assert_eq!(
+            LOGGED_OPERATIONS_VALUE_BYTES,
+            4 + 6 + 2 + 8 + 8 + 6,
+            "整理的 value = R 的设备 4 + 起始槽 6 + 槽数 2 + c0 8 + segs0 8 + 补零 6"
+        );
+        assert_eq!(
+            LOGGED_OPERATIONS_ENTRY_BYTES,
+            LOGGED_OPERATIONS_KEY_BYTES + LOGGED_OPERATIONS_VALUE_BYTES,
+            "条目 = key + value"
+        );
+        assert_eq!(
+            LOGGED_OPERATIONS_ENTRIES_PER_NODE,
+            (NODE_BYTES - index_node_header_bytes(LOGGED_OPERATIONS_KEY_BYTES))
+                / LOGGED_OPERATIONS_ENTRY_BYTES,
+            "一节点条数 = (16384 − key 宽 10 的码 2 头) ÷ 44 的整数部分"
+        );
+        assert_eq!(LOGGED_OPERATIONS_ENTRIES_PER_NODE, 369, "判决 G1 写的 369");
     }
 
     /// 系统配置的 489 与它所在的槽：槽宽 4096 时余 3607（D22 已定项 9「槽内余 3607」），装得下下一条 86 字节指针；

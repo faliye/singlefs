@@ -59,7 +59,7 @@ fn fail_the_system_configuration_write_on_device_zero(
 }
 
 /// 第 10 次崩了再挂：取号之前不够，写行与暖机之后推抬 F，那一串先写系统配置那一步里盘 0 的写报块设备错。
-/// 盘 0 在这次挂载里的系统配置槽写依次是取号 1 次、写行那次发布的轮换 1 次、暖机每次轮换 1 次，第一串抬 F 先写系统配置是再下一次——
+/// 盘 0 在这次挂载里的系统配置槽写依次是取号两轮 2 次、写行那次发布的轮换 1 次、暖机每次轮换 1 次，第一串抬 F 先写系统配置是再下一次——
 /// 暖机几次先在盘面拷贝上不注入地挂一遍数出来（那一遍推满仍不够、推了两串）。可写挂载返回抬 F 的错原样
 /// （`RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot`，一块盘都还没带上新 F），不再交回「推满仍不够」、不当挂载做成。
 #[test]
@@ -82,8 +82,12 @@ fn a_block_device_error_in_the_floor_raise_pushed_by_the_mount_fails_the_mount_i
         "拷贝上不注入：第 10 次推了两串、推满仍不够：{:?}",
         rehearsal.output.space_admission
     );
+    /// 取号写两轮（甲'），每轮每块盘一写。
+    const ACQUISITION_SYSTEM_CONFIGURATION_WRITES_PER_DEVICE: u64 = 2;
     let system_configuration_writes_on_device_zero_before_the_first_raise =
-        1 + 1 + u64::try_from(rehearsal.output.warm_up_publishes.len()).expect("暖机次数");
+        ACQUISITION_SYSTEM_CONFIGURATION_WRITES_PER_DEVICE
+            + 1
+            + u64::try_from(rehearsal.output.warm_up_publishes.len()).expect("暖机次数");
     plan.arm(fail_the_system_configuration_write_on_device_zero(
         &pool,
         system_configuration_writes_on_device_zero_before_the_first_raise + 1,

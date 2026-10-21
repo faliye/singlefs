@@ -29,6 +29,7 @@ fn size_zero_inode_record_appended_as(records_before: u64) -> InodeRecord {
         size: 0,
         change_count: 1,
         write_time_seconds: 1,
+        truncation_field: singlefs_core::records::InodeRecordTruncationField::NOT_WRITTEN,
     }
 }
 

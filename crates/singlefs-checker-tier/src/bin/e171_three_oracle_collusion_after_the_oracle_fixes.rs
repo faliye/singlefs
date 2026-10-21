@@ -2499,6 +2499,7 @@ fn operation_kind_name(kind: RecordedOperationKind) -> &'static str {
         RecordedOperationKind::Write => "write",
         RecordedOperationKind::WriteForceUnitAccess => "write_fua",
         RecordedOperationKind::WriteZeroes => "write_zeroes",
+        RecordedOperationKind::Discard => "discard",
         RecordedOperationKind::Barrier => "barrier",
     }
 }
@@ -4597,9 +4598,9 @@ fn operations_file_text_and_payload(stream: &PreparedStream) -> (String, Vec<u8>
                 payload.extend_from_slice(contents);
                 (start.to_string(), sha256_hexadecimal(contents))
             }
-            RecordedOperationKind::WriteZeroes | RecordedOperationKind::Barrier => {
-                ("-".to_string(), "-".to_string())
-            }
+            RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard
+            | RecordedOperationKind::Barrier => ("-".to_string(), "-".to_string()),
         };
         operations_text.push_str(&format!(
             "{stream_index}\t{}\t{}\t{}\t{}\t{payload_start}\t{content_digest}\n",
@@ -7912,7 +7913,8 @@ fn truncation_after_the_first_writes_of_the_in_flight_call(
         match retained.operation.kind {
             RecordedOperationKind::Write
             | RecordedOperationKind::WriteForceUnitAccess
-            | RecordedOperationKind::WriteZeroes => writes_seen += 1,
+            | RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard => writes_seen += 1,
             RecordedOperationKind::Barrier => {}
         }
         if writes_seen == writes_kept {
@@ -9373,7 +9375,7 @@ fn evaluate_the_classes(
             | StepKind::JournalRecord => {
                 checks.in_flight_writes_of_a_forbidden_kind += 1;
             }
-            StepKind::ZeroFill | StepKind::UnitWrite | StepKind::Barrier => {}
+            StepKind::ZeroFill | StepKind::Discard | StepKind::UnitWrite | StepKind::Barrier => {}
         }
     }
     for observation in observations {

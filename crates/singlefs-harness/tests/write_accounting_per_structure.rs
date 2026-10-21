@@ -69,7 +69,8 @@ fn recorded_writes(operations: &[RecordedOperation]) -> WriteCallsAndBytes {
                 | RecordedOperationKind::WriteZeroes => {
                     sum.plus(calls_and_bytes(1, operation.length))
                 }
-                RecordedOperationKind::Barrier => sum,
+                // discard 不是一次写调用：写入口按结构记的写账里没有它。
+                RecordedOperationKind::Discard | RecordedOperationKind::Barrier => sum,
             }
         })
 }
@@ -137,9 +138,11 @@ fn expected_by_kind(
         WrittenStructureKind::InodeTreeRoot,
         WrittenStructureKind::AllocationRecordTreeNode,
         WrittenStructureKind::AccountingTreeNode,
+        WrittenStructureKind::DeadlistTreeNode,
         WrittenStructureKind::DeletedInodesTreeNode,
         WrittenStructureKind::TombstoneTreeNode,
         WrittenStructureKind::LineageTreeNode,
+        WrittenStructureKind::LoggedOperationsTreeNode,
         WrittenStructureKind::RetirementTreeNode,
         WrittenStructureKind::CentralMappingTreeNode,
         WrittenStructureKind::TreeTableUnit,
@@ -161,9 +164,11 @@ fn expected_by_kind(
                         | WrittenStructureKind::InodeTreeLeafContainer
                         | WrittenStructureKind::InodeTreeRoot
                         | WrittenStructureKind::AccountingTreeNode
+                        | WrittenStructureKind::DeadlistTreeNode
                         | WrittenStructureKind::DeletedInodesTreeNode
                         | WrittenStructureKind::TombstoneTreeNode
                         | WrittenStructureKind::LineageTreeNode
+                        | WrittenStructureKind::LoggedOperationsTreeNode
                         | WrittenStructureKind::RetirementTreeNode
                         | WrittenStructureKind::CentralMappingTreeNode
                         | WrittenStructureKind::TreeTableUnit
@@ -411,7 +416,7 @@ fn new_pool_file_creation_and_overwrite_writes_by_kind_add_up_to_the_recorded_wr
     );
 }
 
-/// 验收第 1 条里「写行与暖机的空发布各自一份」：发布 B 之后可写挂载——取号 2 次系统配置槽写不属于任何一次发布；写行那次发布 23 次、
+/// 验收第 1 条里「写行与暖机的空发布各自一份」：发布 B 之后可写挂载——取号 4 次系统配置槽写（两轮，每轮两盘各一次）不属于任何一次发布；写行那次发布 23 次、
 /// 344 576 字节；之后两次暖机空发布各 21 次、279 040 字节（分配记录树五个节点，D8（核心索引结构） 已定项 14）；
 /// 整段录制器记下的写 == 取号 + 三次发布的合计。
 #[test]
@@ -436,7 +441,7 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
                 .expect("带文件的一版之后的暖机仍是带文件的一版")
         })
         .collect();
-    let acquisition = calls_and_bytes(2, 8192);
+    let acquisition = calls_and_bytes(4, 16_384);
 
     assert_eq!(
         warm_up_publishes.iter().fold(
@@ -444,7 +449,7 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
             |sum, warm_up_publish| sum.plus(warm_up_publish.writes.total())
         ),
         recorded_writes(&operations[mount_start..]),
-        "取号两盘各一次系统配置槽 + 写行发布 + 各次暖机按种类的合计 == 录制器在挂载这段里记下的写"
+        "取号两轮、每轮两盘各一次系统配置槽 + 写行发布 + 各次暖机按种类的合计 == 录制器在挂载这段里记下的写"
     );
 
     assert_eq!(
@@ -504,6 +509,10 @@ fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBy
             WriteCallsAndBytes::NONE,
         ),
         (
+            WrittenStructureKind::DeadlistTreeNode,
+            WriteCallsAndBytes::NONE,
+        ),
+        (
             WrittenStructureKind::DeletedInodesTreeNode,
             WriteCallsAndBytes::NONE,
         ),
@@ -513,6 +522,10 @@ fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBy
         ),
         (
             WrittenStructureKind::LineageTreeNode,
+            WriteCallsAndBytes::NONE,
+        ),
+        (
+            WrittenStructureKind::LoggedOperationsTreeNode,
             WriteCallsAndBytes::NONE,
         ),
         (

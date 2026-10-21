@@ -61,9 +61,9 @@ use singlefs_core::recovery::{
 use singlefs_core::root_record::{RootRecord, UnmountMarker};
 use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::{
-    journal_in_flight_record_limit, SystemConfiguration, SystemImmutableConfiguration,
-    SystemImmutableSizes, SystemMutableConfiguration, SystemRuntimeConfiguration,
-    SystemRuntimeQuantities,
+    journal_in_flight_record_limit, InodeRecordTruncationFieldsOfThePool, SystemConfiguration,
+    SystemImmutableConfiguration, SystemImmutableSizes, SystemMutableConfiguration,
+    SystemRuntimeConfiguration, SystemRuntimeQuantities,
 };
 use singlefs_harness::sha256::sha256_hexadecimal;
 
@@ -1476,6 +1476,9 @@ fn system_configuration_for_the_scan(ring: RingGeometry) -> SystemConfiguration 
             root_ring_base_slot: SlotNumber(
                 SCAN_CONFIGURATION_ROOT_RING_BASE_SLOT_THE_SCAN_DOES_NOT_READ,
             ),
+            // 扫环与择根不读 incompat 位：取这个写者写的那一种。
+            inode_record_truncation_fields:
+                InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
         },
         mutable: SystemMutableConfiguration,
         runtime: SystemRuntimeConfiguration,
@@ -10402,6 +10405,9 @@ fn system_configuration_for_the_root_choice(domain: RootChoiceDomain) -> SystemC
             root_ring_base_slot: SlotNumber(
                 SCAN_CONFIGURATION_ROOT_RING_BASE_SLOT_THE_SCAN_DOES_NOT_READ,
             ),
+            // 扫环与择根不读 incompat 位：取这个写者写的那一种。
+            inode_record_truncation_fields:
+                InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
         },
         mutable: SystemMutableConfiguration,
         runtime: SystemRuntimeConfiguration,

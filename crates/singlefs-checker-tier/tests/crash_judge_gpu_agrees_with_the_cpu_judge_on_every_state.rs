@@ -2,7 +2,9 @@
 //! GPU 判器与 CPU 判器逐状态对拍：六条流（新池新建文件；它改坏一次树表单元写两份副本之后的样子；它的 journal 记录提交标记改成 2、
 //! 记录标志改成 0b11、系统配置槽距改成 512 三种重封过校验和的坏法；固定脚本到回退 D）上的每个
 //! 崩溃状态，GPU 判出的红位（两遍 oracle 各七类、记录核对器两条）要与 CPU `judge_crash_image` 的 `red_items` 逐位相同，池级 checker
-//! 每一条不变量的违例位（`IMPLEMENTED_INVARIANTS` 全部，不屏蔽）要与 CPU 池级 checker 逐位相同，一个状态都不许判不了。
+//! 每一条不变量的违例位（`IMPLEMENTED_INVARIANTS` 全部；只屏蔽内核不置位、对拍不比的那几条：`crash_judge_gpu::POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS`，
+//! 第一版只有下标 92 的 I-1.13（C821），CPU 一侧照判定置位，比较处经 `pool_checker_bits_agree_in_the_cross_check` 两边都去掉再比）
+//! 要与 CPU 池级 checker 逐位相同，一个状态都不许判不了。
 //! 改坏那条流上 CPU 有红，GPU 要红在同样的状态、同样的项上——这是 GPU 判器分得出差别的自证；里程碑三二·1 那一批的每一条不变量
 //! 另有一条只改坏它管的那个字段的流（`the_gpu_judge_agrees_with_the_cpu_when_…` 那一组）；I-3.5 的出现规则红与成立各一条，
 //! 恢复施加一条记录取新根段的那几段、施加出来的那一版从记录走实例表与分配记录树、I-8.10 后三段，各有一条同样形态的流；
@@ -98,6 +100,34 @@
 //! 两边对 I-7.7 都报射程里一部分没判：根环槽读不全）。逐档读槽 1 读到带读者不收之值的槽（I-7.13）两形：槽距处本池的槽 1 照旧、
 //! 再远一档那一份带不收之值，与逐档读到的第一个自证得过的槽 1 带不收之值、更远一档有一份读者收的槽 1，各一条流，取卡之前核判表给逐档读到的那几处
 //! 建了系统配置落点，再整份比。
+//! 里程碑四（D13（验证路线） 已定项 15；判决 m4-snapshot-r1 第三节 S1、S3、S4、S5，m4-gc-r1 第三节 G3）：建快照、快照下覆盖写（deadlist）、
+//! 删快照的意图与走空的每一批一条流（CPU 判过 I-3.5、I-3.6、I-3.7 而成立），整理的一批搬第一个文件的数据单元（提示过期）、
+//! 搬只被快照钉住的旧数据单元各一条流，新池新建文件之后盘 0 上罩住数据单元那一份的整段 discard（D13 已定项 4 三态）一条流，都整份比。
+//! 里程碑四自建 GC 新判的那几条（判决 m4-gc-r1 第三节 G1、G3 的 N2–N6：I-3.15、I-5.6、I-4.4、I-3.16、I-1.14）上 GPU：签发整理意图、整理的一批、
+//! 丢意图一条流（logged_ops 树走读、引用、恢复数映射条目，CPU 判过五条而成立），意图补零里塞增量（I-4.4）、c0 改成 0（I-5.6）、
+//! 数据单元那条映射条目两条位置改指没人分配的槽（I-3.15）、盘 0 的 runs 那一行少一（I-3.16）、搬到目的地那一份改一个字节（I-1.14）各一条坏流，
+//! 都整份比、钉 CPU 红那一条。
+//! 里程碑四修复批二（判决 m4-segment-code-r1 第三节 F9 的 GPU 一侧：I-3.5 的用户可见树标签按版本记）：攻方种子下标 2022 缩出的 5 步历史
+//! （无快照时回退 → 建快照 → 快照下覆盖写）从 mkfs 之后录起一条流，CPU 在整条落盘的镜像上判 I-3.5 成立，整份比。
+//! 里程碑四修复批三（同一节 F9「种子下标 1032 那一形」的 GPU 一侧：快照独有的父单元下面与活头共享的孩子照样挂到它下面）：攻方种子下标 1032
+//! 缩出的 16 步历史（建删快照、几次可写挂载、批间崩溃再挂载的整理）从 mkfs 之后录起一条流，CPU 在整条落盘的镜像上判 I-3.5 成立，整份比。
+//! 截断那一批（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5、K7 与第六节 S1、S2：I-4.6 改成每条记录都判、新立的 I-4.10 与 I-9.38、
+//! I-4.4 收截断条目、上段叶条目标签 3、4）：三个单元的文件缩到单元中间、变长出洞（标签 3）、再缩、再变长出洞、缩到 0 的一条合法流（CPU 判过四条而成立），
+//! 截断条目补零塞增量（I-4.4）、截断条目的对象出生代加一（I-4.10）、size 之内的单元声明长度多一（I-9.38）、下段叶一条记录的偏移跳过一个净荷（I-4.6 连号）、
+//! 标签 3 改写成 1（I-4.6 单元数对标签）各一条坏流，钉 CPU 红那一条。这几条流都整份比（红位、池级 checker、两遍恢复的结局与落到的根）：
+//! GPU 恢复内核照 core 读截断中间态与洞（判决 K2、K5 的读者那一半与第六节 S5：上段叶条目收标签 3、4，标签 1、2 的单元不少于 size 要的个数、
+//! size 之外挂着的不读，标签 3、4 之后到 size 读 0、按内核现算的全零载荷区 CRC 与期望那一版逐单元比）；变长出洞那一版的期望内容在洞里塞一个
+//! 非零字节一条流，钉 CPU 红「内容不同」、GPU 逐位跟上。
+//! 截断第二轮（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、R6 与第六节用户定案：inode 记录偏移 120 起的截断字段、
+//! I-9.7 拆段、新立的 I-9.39、incompat 位 2）：三个单元的文件那一版（或新池新建文件、截断意图那一版）第一个文件的记录按字节改、系统配置的
+//! incompat 第一个字节按字节改，各一条流：I-9.7 三种坏法（截断字段之前、之后的预留段非零，带位 2 时 T = 0 而 N_w ≠ 0，不带位 2 而字段非零，
+//! 几块盘里只有一块带位 2）、I-9.39 的必红世界（截断字段之外、size 之内的活单元出生早于 T），合法世界（单元恰在 txg T 写下、截到 0 留下单元 0、
+//! 截断意图那一版 size 之外还挂着的单元、每一槽都带位 2），系统配置 0x04、0x0E、0x07 三种不认得的位。池级 checker 那一半先比、钉 CPU 红哪几条；
+//! 两遍恢复的那一半要核心层的读者认截断字段与位 2（截庚）合进来才对得上（之前 core 拒收带截断字段的记录与 0x06，GPU 恢复内核已经照判决收）。
+//! 里程碑三收尾（用户 2026-10-20 定 C663、C728）：系统配置槽 S 写 17、R 写 2 各一条流钉 CPU 红 I-7.13（R、S 越界整池拒，不再是这一槽不可择），
+//! 系统配置槽末字节（偏移 4095）、根记录之后头一个字节（偏移 457）各写 1 的两条流钉 CPU 红 I-2.4（两段第一版恒 0），GPU 都逐位跟上；
+//! 流里每一次系统配置槽写 incompat 第一个字节写 0x0E、格式版本写 2 的一条流钉格式版本先于 incompat 位判（C663「格式版本先」）：
+//! 两遍恢复都按格式版本整池拒、没有一个状态报 incompat 位不认得，GPU 恢复内核逐态跟上。
 #![cfg(all(feature = "verdict-store", feature = "gpu"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -107,6 +137,8 @@ mod common_crash_points;
 mod common_deletion_in_progress;
 #[path = "../../singlefs-harness/tests/common_pointer_head_corruption/mod.rs"]
 mod common_pointer_head_corruption;
+#[path = "../../singlefs-harness/tests/common_truncation/mod.rs"]
+mod common_truncation;
 
 use singlefs_checker_tier::crash_amplification::record_the_flow_and_read_it_back;
 use std::collections::BTreeMap;
@@ -114,7 +146,8 @@ use std::time::Instant;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, file_content,
-    geometry, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters, BuiltPool,
+    geometry, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
+    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
 };
 use common_crash_points::{mount_writable_step, overwrite_step, record_pool_build, roll_back_step};
 use common_deletion_in_progress::{
@@ -131,7 +164,7 @@ use singlefs_checker::walk::{
 use singlefs_checker_tier::crash::{
     crash_point_replay_plan_state_count, CrashPointReplayOracleViolationKind,
     CrashPointReplaySegmentExpansion, CrashPointReplayVersionTable, CrashStateJudgement,
-    CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+    CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE, CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER,
 };
 use singlefs_checker_tier::crash_amplification::{
     gpu_recovery_words, gpu_verdict_items, judge_my_blocks_on_gpu_cards, plan_crash_points,
@@ -145,11 +178,16 @@ use singlefs_checker_tier::crash_judge_dispatch::{
     PackedJudgeTablesReadBack,
 };
 use singlefs_checker_tier::crash_judge_gpu::{
-    cross_check_words_of_cpu_judgement, cross_check_words_of_gpu_verdict, pool_checker_judged_bits,
-    pool_checker_violated_and_judged_bits, pool_checker_violated_bits, verdict_bits,
-    CrossCheckWords, JudgeKernelSources, POOL_CHECKER_JUDGED_FIRST_WORD, POOL_CHECKER_JUDGED_WORDS,
-    POOL_CHECKER_REACHED_WORD, POOL_CHECKER_UNDECIDABLE_WORD, POOL_CHECKER_VIOLATED_BIT_CAPACITY,
-    POOL_CHECKER_VIOLATED_FIRST_WORD, POOL_CHECKER_VIOLATED_WORDS, VERDICT_WORDS,
+    cross_check_words_agree_in_the_cross_check, cross_check_words_of_cpu_judgement,
+    cross_check_words_of_gpu_verdict, pool_checker_bits_agree_in_the_cross_check,
+    pool_checker_judged_bits, pool_checker_violated_and_judged_bits, pool_checker_violated_bits,
+    verdict_bits, CrossCheckWords, JudgeKernelSources,
+    CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT, CHECKER_SCAN_REBUILD_ENTRY_POINT,
+    KERNEL_ENTRY_POINT, POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS,
+    POOL_CHECKER_JUDGED_FIRST_WORD, POOL_CHECKER_JUDGED_WORDS, POOL_CHECKER_REACHED_WORD,
+    POOL_CHECKER_UNDECIDABLE_WORD, POOL_CHECKER_VIOLATED_BIT_CAPACITY,
+    POOL_CHECKER_VIOLATED_FIRST_WORD, POOL_CHECKER_VIOLATED_WORDS, SCAN_REBUILD_OUTCOMES,
+    SCAN_REBUILD_OUTCOME_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables, build_judge_tables_against_the_version_table, JudgeFlow, JudgeLocationKind,
@@ -171,20 +209,33 @@ use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
 };
 use singlefs_checker_tier::gpu_unit_checks::GpuCard;
 use singlefs_checker_tier::verdict_store::{JudgingUnitsFingerprint, VerdictStore};
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InodeNumber, InstanceGeneration,
+    SlotNumber, TreeIdentifier,
+};
+use singlefs_core::allocator::Placement;
+use singlefs_core::compaction_plan::PlannedRelocation;
 use singlefs_core::container_tree::{
     ContainerTreeCapacities, ContainerTreeNodeEntries, ContainerTreeNodeEntriesCappedForTests,
 };
 use singlefs_core::lineage_tree::LineageContainerCapacity;
+use singlefs_core::logged_operations::{CompactionIntent, CompactionRegion};
 use singlefs_core::mount::RollbackTarget;
+use singlefs_core::records::{
+    SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION, TREE_KIND_SNAPSHOT_INODE_ROOT,
+};
 use singlefs_core::recovery::RecoveryOutcome;
 use singlefs_core::tombstone_tree::{
     TombstoneContainerCapacity, TombstoneRecordsPerContainerCappedForTests,
 };
 use singlefs_core::transaction::{
-    publish_overwrite, publish_unlink_intent, publish_unlink_steps_until_the_queue_is_empty,
-    FirstFile, PoolWriter,
+    central_mapping_locations_in_the_version, publish_compaction_step, publish_create_snapshot,
+    publish_overwrite, publish_relocation_batch, publish_snapshot_destruction_intent,
+    publish_unlink_intent, publish_unlink_steps_until_the_queue_is_empty,
+    walk_the_deletion_queue_until_it_is_empty, CompactionIntentStep, FirstFile, MappingLookup,
+    PoolWriter, RelocatedUnitHolder, TransactionOutput, TransactionUnit,
 };
+use singlefs_core::unit::UNIT_CLASS_DATA;
 use singlefs_core::unlink::UnlinkBatchSize;
 use singlefs_harness::gpu_memory_ledger::{
     reason_for_running_out_of_gpu_memory, GPU_NOT_RUN_MARKER,
@@ -194,6 +245,12 @@ use singlefs_harness::heavy_threads::{
     THREAD_CAP_ENVIRONMENT_VARIABLE,
 };
 use singlefs_harness::hexadecimal::hexadecimal_text;
+use singlefs_harness::history::{
+    execute_history_with, CompactionChoice, CompactionRunEnding, ContentChoice, ContentLength,
+    GeneratedHistory, HistoryEnding, HistoryExecution, HistoryOperation, HistorySeed,
+    HistoryStartingPoint, RollbackTargetChoice, SnapshotChoice,
+    SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+};
 use singlefs_harness::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
     PublishedVersionWithoutAFile, RetainedWrite, WrittenContents,
@@ -975,7 +1032,10 @@ fn corrupt_units_and_carry_their_whole_unit_checksums_up_to_the_root(
                     reseal_journal_record(bytes);
                     journal_records_resealed.push(referrer);
                 }
-                StepKind::ZeroFill | StepKind::SystemConfigurationSlot | StepKind::Barrier => {
+                StepKind::ZeroFill
+                | StepKind::Discard
+                | StepKind::SystemConfigurationSlot
+                | StepKind::Barrier => {
                     panic!("位置条目不该出现在 {kind:?} 里")
                 }
             }
@@ -1907,6 +1967,56 @@ fn record_new_pool_with_a_refused_slot_spacing_and_a_safety_factor_of_two(
     flow
 }
 
+/// 系统配置槽里区域数 R 与每区槽数 S 那两字节的偏移（`.claude/kb/layout/01-first-txn.md` 一：F 357 + 4 → R 361，S 紧随其后）。
+const SYSTEM_CONFIGURATION_REGIONS_OFFSET: usize = 361;
+const SYSTEM_CONFIGURATION_SLOTS_PER_REGION_OFFSET: usize = 362;
+
+/// I-7.13（C663）：最后一次系统配置槽写的每区槽数 S 改成 17（区间 [4, 16] 之外）、重封——S 越界照 D22（单元原子性怎么合成） 已定项 2
+/// 整池拒（用户 2026-10-20 定「S 照条款整池拒」），CPU 只红 I-7.13；GPU 走读内核读这一槽同判带不收之值。
+fn record_new_pool_with_seventeen_slots_per_region(tag: &str) -> RecordedFlow {
+    let mut flow =
+        record_new_pool_file_creation(tag, "new-pool-system-configuration-slots-per-region-17");
+    rewrite_the_last_system_configuration_slot_and_reseal(&mut flow, &|bytes| {
+        assert_eq!(
+            bytes[SYSTEM_CONFIGURATION_SLOTS_PER_REGION_OFFSET], 8,
+            "mkfs 写下的每区槽数是 8"
+        );
+        bytes[SYSTEM_CONFIGURATION_SLOTS_PER_REGION_OFFSET] = 17;
+    });
+    flow
+}
+
+/// I-7.13（C663）：最后一次系统配置槽写的区域数 R 改成 2（与第一版常量 3 不等）、重封——用户 2026-10-20 定「R 读并整池拒」，
+/// CPU 只红 I-7.13；GPU 走读内核读这一槽同判带不收之值。
+fn record_new_pool_with_two_regions(tag: &str) -> RecordedFlow {
+    let mut flow = record_new_pool_file_creation(tag, "new-pool-system-configuration-regions-2");
+    rewrite_the_last_system_configuration_slot_and_reseal(&mut flow, &|bytes| {
+        assert_eq!(
+            bytes[SYSTEM_CONFIGURATION_REGIONS_OFFSET], 3,
+            "mkfs 写下的区域数是 3"
+        );
+        bytes[SYSTEM_CONFIGURATION_REGIONS_OFFSET] = 2;
+    });
+    flow
+}
+
+/// I-2.4 系统配置槽尾（C728）：最后一次系统配置槽写的末字节（偏移 4095，字段表之后那一段 [489, 4096) 的最后一个）写 1、重封整槽校验和——
+/// core 不读这一段，两遍恢复照常；CPU 池级 checker 对每个可择的槽判 [489, 4096) 全 0，那一槽落了的状态上红 I-2.4。
+/// 取末字节：GPU 走读内核那一段先逐字节读到字边界、再按字读，末字节落在按字读那一截里（根槽尾那条流的偏移 457 落在逐字节那一截里）。
+fn record_new_pool_with_a_non_zero_last_byte_in_a_system_configuration_slot(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow =
+        record_new_pool_file_creation(tag, "new-pool-system-configuration-last-slot-byte-one");
+    let last_byte_of_the_slot =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES - 1).expect("4095");
+    rewrite_the_last_system_configuration_slot_and_reseal(&mut flow, &|bytes| {
+        assert_eq!(bytes[last_byte_of_the_slot], 0, "第一版字段表之后写 0");
+        bytes[last_byte_of_the_slot] = 1;
+    });
+    flow
+}
+
 /// I-8.5（tail 槽有效集非空）：流尾另起一段，两块盘的两个系统配置槽各写一份全零——它们都落了的状态上一个自证过的槽都没有。
 fn record_new_pool_with_every_system_configuration_slot_zeroed_at_the_end(
     tag: &str,
@@ -2162,6 +2272,60 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
     );
 }
 
+/// 结局表（[`SCAN_REBUILD_OUTCOMES`]）里名字是 `constant_name` 的那一种的码。
+fn scan_rebuild_outcome_code_named(constant_name: &str) -> u32 {
+    SCAN_REBUILD_OUTCOMES
+        .iter()
+        .find(|outcome| outcome.constant_name == constant_name)
+        .unwrap_or_else(|| panic!("结局表里有 {constant_name}"))
+        .code
+}
+
+/// 这条流上有几个状态 GPU 交回的 I-1.13 结局码（结论的 [`SCAN_REBUILD_OUTCOME_WORD`]）是 `constant_name` 那一种。
+/// 对拍逐状态整份比（对拍字带这一字），没有不一致时 CPU 在同几个状态上换出的也是这一种。
+fn states_whose_scan_rebuild_ends_with(comparison: &Comparison, constant_name: &str) -> usize {
+    let code = scan_rebuild_outcome_code_named(constant_name);
+    comparison
+        .gpu_words_of_each_state
+        .iter()
+        .filter(|words| words[SCAN_REBUILD_OUTCOME_WORD] == code)
+        .count()
+}
+
+/// 同 [`assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening`]，再要这条流上至少一个状态两边判 I-1.13 都是池级 checker
+/// 走到扫描重建之前整池交回的 `outcome_constant_name` 那一种（码 27 到 30：走读内核在那几处早退写的码，对拍逐位比它）。
+fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening_and_ending_the_scan_rebuild_with(
+    test_name: &str,
+    flow: &RecordedFlow,
+    invariant: &'static str,
+    outcome_constant_name: &str,
+) {
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains(invariant),
+        "流 {} 上 CPU 池级 checker 要红 {invariant}（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+    assert!(
+        states_whose_scan_rebuild_ends_with(&comparison, outcome_constant_name) > 0,
+        "流 {} 上至少一个状态两边判 I-1.13 都是 {outcome_constant_name}",
+        flow.name
+    );
+}
+
 /// 一次恢复报出的那条根（(实例代号, checkpoint_txg)）：读出、没有文件两种结局带的那一条，失败时带的那一条（择不到根时没有）。
 fn root_reported_by_the_recovery(outcome: &RecoveryOutcome) -> Option<(u32, u64)> {
     match outcome {
@@ -2205,34 +2369,17 @@ fn expected_bits(judgement: &CrashStateJudgement) -> u32 {
     bits
 }
 
-/// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`。
+/// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`；经 `pool_checker_violated_and_judged_bits` 取（与 CPU 一侧的对拍字同一个函数），
+/// 内核不置位的那几条照判定置位，比较处再去掉。
 fn expected_pool_checker_bits(judgement: &CrashStateJudgement) -> u128 {
-    let mut bits = 0u128;
-    for (invariant, verdict) in &judgement.pool_checker {
-        if let InvariantVerdict::Violated(_) = verdict {
-            let index = IMPLEMENTED_INVARIANTS
-                .iter()
-                .position(|candidate| candidate == invariant)
-                .expect("池级 checker 报的不变量在清单里");
-            bits |= 1u128 << index;
-        }
-    }
-    bits
+    let (violated, _judged) = pool_checker_violated_and_judged_bits(&judgement.pool_checker);
+    violated
 }
 
-/// CPU 池级 checker 在这个状态上判过而成立的不变量（不是报不适用）：一位一条，与违例位同一个下标。
+/// CPU 池级 checker 在这个状态上判过而成立的不变量（不是报不适用）：一位一条，与违例位同一个下标；经同一个函数取，判到而没违例的那几位。
 fn expected_pool_checker_held_bits(judgement: &CrashStateJudgement) -> u128 {
-    let mut bits = 0u128;
-    for (invariant, verdict) in &judgement.pool_checker {
-        if let InvariantVerdict::Holds = verdict {
-            let index = IMPLEMENTED_INVARIANTS
-                .iter()
-                .position(|candidate| candidate == invariant)
-                .expect("池级 checker 报的不变量在清单里");
-            bits |= 1u128 << index;
-        }
-    }
-    bits
+    let (violated, judged) = pool_checker_violated_and_judged_bits(&judgement.pool_checker);
+    judged & !violated
 }
 
 fn invariant_names(bits: u128) -> Vec<&'static str> {
@@ -2242,6 +2389,27 @@ fn invariant_names(bits: u128) -> Vec<&'static str> {
         .filter(|(index, _)| bits & (1u128 << index) != 0)
         .map(|(_, name)| *name)
         .collect()
+}
+
+/// 一份红项（与 `CrashStateJudgement::red_items` 同名、同序）在对拍里比的那一份，排成 `{:?}`：去掉内核不置位的那几条池级 checker 红项
+/// （`POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS`，第一版只有 I-1.13，C821），别的照原序留着。
+/// 与违例位比较处的 `pool_checker_bits_agree_in_the_cross_check` 同一张表：照流水线那样判不了就回落 CPU 的用例两边都经它再比，
+/// CPU 红 I-1.13 的状态上 GPU 交回的红项里没有它，不算不一致。
+fn red_items_compared_by_the_cross_check(items: &[String]) -> String {
+    let left_out: Vec<String> = POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS
+        .iter()
+        .map(|index| {
+            format!(
+                "{CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER}:{}",
+                IMPLEMENTED_INVARIANTS[*index]
+            )
+        })
+        .collect();
+    let compared: Vec<&String> = items
+        .iter()
+        .filter(|item| !left_out.contains(item))
+        .collect();
+    format!("{compared:?}")
 }
 
 struct Comparison {
@@ -2258,6 +2426,9 @@ struct Comparison {
     cpu_checker_bits_of_each_state: Vec<u128>,
     /// CPU 判器在每个状态上的红项（`CrashStateJudgement::red_items` 的 `{:?}`，按状态序号）。
     cpu_red_items_of_each_state: Vec<String>,
+    /// 同一份红项去掉内核不置位的那几条池级 checker 红项之后的样子（[`red_items_compared_by_the_cross_check`]，按状态序号）：
+    /// 照流水线那样判不了就回落 CPU 的用例拿它与 GPU 交回的红项比。
+    cpu_red_items_compared_by_the_cross_check_of_each_state: Vec<String>,
     /// GPU 在每个状态上交回的结论字（按状态序号）：要按判不了的原因分开看、或照流水线那样判不了就回落 CPU 的用例读它。
     gpu_words_of_each_state: Vec<[u32; VERDICT_WORDS]>,
     /// CPU 看 journal 那一遍在每个状态上报的根（`RecoveryOutcome` 里的那一条，(实例代号, checkpoint_txg)；退回见证到的那一版时是退到的那一版，
@@ -2316,6 +2487,7 @@ impl Comparison {
         }
         for texts in [
             &self.cpu_red_items_of_each_state,
+            &self.cpu_red_items_compared_by_the_cross_check_of_each_state,
             &self.mismatches,
             &self.checker_mismatches,
         ] {
@@ -2412,6 +2584,7 @@ impl Comparison {
             .map(|_| reader.u128())
             .collect::<Option<Vec<u128>>>()?;
         let cpu_red_items_of_each_state = reader.texts()?;
+        let cpu_red_items_compared_by_the_cross_check_of_each_state = reader.texts()?;
         let mismatches = reader.texts()?;
         let checker_mismatches = reader.texts()?;
         let gpu_words_of_each_state = (0..reader.length()?)
@@ -2446,6 +2619,7 @@ impl Comparison {
             cpu_checker_held_invariants,
             cpu_checker_bits_of_each_state,
             cpu_red_items_of_each_state,
+            cpu_red_items_compared_by_the_cross_check_of_each_state,
             gpu_words_of_each_state,
             cpu_consulted_reported_root_of_each_state,
             cpu_recovery_words_of_each_state,
@@ -2582,24 +2756,10 @@ fn compare_on_every_state_given_the_container_capacity_knobs(
     )
 }
 
-/// 池级 checker 一份判定的违例位与判过而成立的位（位 i ↔ `IMPLEMENTED_INVARIANTS[i]`）。
+/// 池级 checker 一份判定的违例位与判过而成立的位（位 i ↔ `IMPLEMENTED_INVARIANTS[i]`）：经 `pool_checker_violated_and_judged_bits` 取。
 fn violated_and_held_bits_of(verdicts: &[(&'static str, InvariantVerdict)]) -> (u128, u128) {
-    let index_of = |invariant: &str| {
-        IMPLEMENTED_INVARIANTS
-            .iter()
-            .position(|candidate| *candidate == invariant)
-            .expect("池级 checker 报的不变量在清单里")
-    };
-    verdicts.iter().fold(
-        (0u128, 0u128),
-        |(violated, held), (invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(_) => (violated | (1u128 << index_of(invariant)), held),
-            InvariantVerdict::Holds => (violated, held | (1u128 << index_of(invariant))),
-            InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_) => {
-                (violated, held)
-            }
-        },
-    )
+    let (violated, judged) = pool_checker_violated_and_judged_bits(verdicts);
+    (violated, judged & !violated)
 }
 
 /// [`compare_on_every_state_of_these_segments_against_the_version_table`] 的本体：`knobs` 是 [`ContainerCapacityKnobs::PRODUCT`] 时编判法摘要罩住的那三份内核、
@@ -2698,8 +2858,8 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
     }
 }
 
-/// CPU 判器每个状态交回的那几样（红位、池级 checker 违例位、红项、恢复报告、恢复字、判过而成立的位、看 journal 那一遍报的根、对拍字），
-/// 按状态序号排好交给 [`compare_the_judgements_state_by_state`]。
+/// CPU 判器每个状态交回的那几样（红位、池级 checker 违例位、红项、恢复报告、恢复字、判过而成立的位、看 journal 那一遍报的根、对拍字、
+/// 对拍比的那几条红项），按状态序号排好交给 [`compare_the_judgements_state_by_state`]。
 type JudgedOnCpu = (
     u32,
     u128,
@@ -2709,6 +2869,7 @@ type JudgedOnCpu = (
     u128,
     Option<(u32, u64)>,
     CrossCheckWords,
+    String,
 );
 
 /// 逐状态比 CPU 与 GPU 的判定（对拍的比法）：红位、池级 checker 违例位与判到位、两遍恢复落到的根与结局、对拍字；不一致的状态逐个打一行、
@@ -2730,6 +2891,7 @@ fn compare_the_judgements_state_by_state(
         cpu_checker_held_invariants: std::collections::BTreeSet::new(),
         cpu_checker_bits_of_each_state: Vec::with_capacity(cpu.len()),
         cpu_red_items_of_each_state: Vec::with_capacity(cpu.len()),
+        cpu_red_items_compared_by_the_cross_check_of_each_state: Vec::with_capacity(cpu.len()),
         gpu_words_of_each_state: gpu.to_vec(),
         cpu_consulted_reported_root_of_each_state: Vec::with_capacity(cpu.len()),
         cpu_recovery_words_of_each_state: Vec::with_capacity(cpu.len()),
@@ -2749,6 +2911,7 @@ fn compare_the_judgements_state_by_state(
             cpu_checker_held_bits,
             cpu_consulted_reported_root,
             cpu_cross_check_words,
+            cpu_items_compared_by_the_cross_check,
         ),
     ) in cpu.iter().enumerate()
     {
@@ -2767,6 +2930,9 @@ fn compare_the_judgements_state_by_state(
         comparison
             .cpu_red_items_of_each_state
             .push(cpu_items.clone());
+        comparison
+            .cpu_red_items_compared_by_the_cross_check_of_each_state
+            .push(cpu_items_compared_by_the_cross_check.clone());
         let gpu_words: [u32; VERDICT_WORDS] = gpu[ordinal];
         let gpu_bits = gpu_words[0] & !(1 << verdict_bits::UNDECIDABLE);
         let undecidable = gpu_words[0] & (1 << verdict_bits::UNDECIDABLE) != 0
@@ -2793,13 +2959,22 @@ fn compare_the_judgements_state_by_state(
             comparison.recovery_mismatches += 1;
         }
         let gpu_cross_check_words = cross_check_words_of_gpu_verdict(&gpu_words);
-        if gpu_cross_check_words != *cpu_cross_check_words {
+        // 内核不置位的那几条（第一版是 I-1.13）对拍不比：比较处两边都去掉再比，CPU 一侧照判定置位
+        let cross_check_words_agree = cross_check_words_agree_in_the_cross_check(
+            &gpu_cross_check_words,
+            cpu_cross_check_words,
+        );
+        let checker_bits_agree =
+            pool_checker_bits_agree_in_the_cross_check(gpu_checker_bits, *cpu_checker_bits);
+        if !cross_check_words_agree {
             comparison.cross_check_mismatches += 1;
         }
         if undecidable
-            || gpu_checker_bits != *cpu_checker_bits
-            || gpu_cross_check_words.pool_checker_judged_bits
-                != cpu_cross_check_words.pool_checker_judged_bits
+            || !checker_bits_agree
+            || !pool_checker_bits_agree_in_the_cross_check(
+                gpu_cross_check_words.pool_checker_judged_bits,
+                cpu_cross_check_words.pool_checker_judged_bits,
+            )
         {
             if comparison.checker_mismatches.len() < 12 {
                 comparison.checker_mismatches.push(format!(
@@ -2814,9 +2989,9 @@ fn compare_the_judgements_state_by_state(
         }
         if undecidable
             || gpu_bits != *cpu_bits
-            || gpu_checker_bits != *cpu_checker_bits
+            || !checker_bits_agree
             || gpu_recovery != *cpu_recovery
-            || gpu_cross_check_words != *cpu_cross_check_words
+            || !cross_check_words_agree
         {
             // 每个不一致的状态打一行、不截（下面的说明只留前 12 个，CPU 那一半带读出的文件内容、GPU 的字排在后面）：GPU 结论字整份
             // （第 1 字是恢复内核判不了的原因、第 13 字是池级 checker 判不了的原因）、两侧恢复的四个字与对拍字，不带文件内容；只打、不进判定
@@ -2959,6 +3134,7 @@ fn judge_on_the_cpu_and_the_gpu_and_compare(
                     pool_checker_held_bits,
                     root_reported_by_the_recovery(&judgement.consulted.outcome),
                     cross_check_words,
+                    red_items_compared_by_the_cross_check(&judgement.red_items()),
                 ),
             ));
         },
@@ -3349,22 +3525,75 @@ fn verdicts_are_the_same_whether_one_dispatch_spans_one_scratch_lane_or_several(
     assert_eq!(narrow.len(), wide.len());
 }
 
+/// 扫描内核源码里入口 `entry_point` 那个函数体里头一处 `anchor` 之后插一行 `violate(bit);`，交回插过的源码。
+///
+/// # Panics
+/// 源码里 `fn <entry_point>(` 不是恰好一处，或那个函数体（到它之后第一个 `\n}\n` 为止）里没有 `anchor`。
+fn plant_a_violated_bit_after_the_anchor_inside_the_entry_point(
+    source: &str,
+    entry_point: &str,
+    anchor: &str,
+    bit: usize,
+) -> String {
+    let signature = format!("fn {entry_point}(");
+    assert_eq!(
+        source.matches(signature.as_str()).count(),
+        1,
+        "扫描内核源码里入口 {entry_point} 的函数恰好一个"
+    );
+    let entry_start = source.find(signature.as_str()).expect("上面核过恰好一处");
+    let body_end = entry_start
+        + source[entry_start..]
+            .find("\n}\n")
+            .expect("入口函数以单独一行的 `}` 收尾");
+    let anchor_start = entry_start
+        + source[entry_start..body_end]
+            .find(anchor)
+            .unwrap_or_else(|| panic!("入口 {entry_point} 的函数体里有 {anchor:?}"));
+    let anchor_end = anchor_start + anchor.len();
+    format!(
+        "{}    violate({bit}u);\n{}",
+        &source[..anchor_end],
+        &source[anchor_end..]
+    )
+}
+
 /// 在走读内核清零违例位之后种一个假的违例位（下标取 64 与池级 checker 条数里大的那个，落在高 64 位、不撞真的不变量）、
-/// 在扫描内核读回违例位之后种第 128 位（下标 127）：
-/// 两份种过的内核判出的每个状态，违例位等于没种的那一份判出的再并上种的位（第 65 位每个状态都有，第 128 位只在扫描内核判完的状态上有），
+/// 在扫描内核源码里三个入口读回违例位之后各种一位：主入口（扫描那一截）种第 128 位（下标 127），引用与快照那一截的入口
+/// （[`CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT`]）种第 127 位（下标 126），扫描重建那一截的入口
+/// （[`CHECKER_SCAN_REBUILD_ENTRY_POINT`]，C821 加的第三个入口，判 I-1.13 之前要读另三截写下的违例位）种第 126 位（下标 125）。
+/// 两份种过的内核判出的每个状态，违例位等于没种的那一份判出的再并上种的位（第 65 位每个状态都有，扫描源码三个入口种的那三位只在
+/// 交接段有效、扫描内核判完的状态上有：三个入口都只在交接段有效时读回违例位），
 /// 判到位等于没种的那一份判出的再并上同样种的位（内核存回前把违例位并进判到位），其余的字逐字相同。
-/// 违例位的高 64 位在走读内核写出、扫描内核读回又写出、Rust 读出这三处任一处被截掉，这条红。
-/// 池级 checker 今天 74 条（下标 0..=73，内核每一条都判；I-4.4 第一版报不适用、那一位恒 0），种的是第 75 位（下标 74）。
+/// 违例位的高 64 位在走读内核写出、扫描主入口读回又写出、引用与快照那一截读回又写出、扫描重建那一截读回又写出、Rust 读出这五处任一处被截掉，
+/// 这条红；三个入口任一个不读回前一趟写的违例位（只从零起记），在它之前的入口种的位就丢，这条也红。扫描内核源码里的入口
+/// （`@compute` 那几处）不是这三个时先红：多出来的入口也读回违例位，就要在这里给它也种一位。
 #[test]
 fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels() {
     const FIRST_BIT_OF_THE_HIGH_HALF: usize = 64;
+    const PLANTED_BY_THE_SCAN_REBUILD_ENTRY: usize = 125;
+    const PLANTED_BY_THE_REFERENCES_AND_SNAPSHOTS_ENTRY: usize = 126;
     const PLANTED_BY_THE_SCAN: usize = 127;
     const SCAN_KERNEL_JUDGED_THE_STATE: u32 = 5;
+    // 扫描内核源码里每个读回违例位的入口与它种的那一位（主入口、引用与快照那一截、扫描重建那一截）
+    let planted_by_each_scan_source_entry = [
+        (KERNEL_ENTRY_POINT, PLANTED_BY_THE_SCAN),
+        (
+            CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+            PLANTED_BY_THE_REFERENCES_AND_SNAPSHOTS_ENTRY,
+        ),
+        (
+            CHECKER_SCAN_REBUILD_ENTRY_POINT,
+            PLANTED_BY_THE_SCAN_REBUILD_ENTRY,
+        ),
+    ];
     let planted_by_the_walk = IMPLEMENTED_INVARIANTS.len().max(FIRST_BIT_OF_THE_HIGH_HALF);
     assert!(
-        planted_by_the_walk < PLANTED_BY_THE_SCAN
+        planted_by_the_walk < PLANTED_BY_THE_SCAN_REBUILD_ENTRY
+            && PLANTED_BY_THE_SCAN_REBUILD_ENTRY < PLANTED_BY_THE_REFERENCES_AND_SNAPSHOTS_ENTRY
+            && PLANTED_BY_THE_REFERENCES_AND_SNAPSHOTS_ENTRY < PLANTED_BY_THE_SCAN
             && PLANTED_BY_THE_SCAN < POOL_CHECKER_VIOLATED_BIT_CAPACITY,
-        "种的两位都在违例位容量之内、不撞真的不变量（池级 checker {} 条）",
+        "种的四位都在违例位容量之内、两两不同、不撞真的不变量（池级 checker {} 条）",
         IMPLEMENTED_INVARIANTS.len()
     );
     let judge_sources = JudgeKernelSources::of_the_judge();
@@ -3376,9 +3605,25 @@ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both
         "走读内核里清零违例位的调用恰好一处"
     );
     assert_eq!(
+        judge_sources.checker_scan.matches("@compute").count(),
+        planted_by_each_scan_source_entry.len(),
+        "扫描内核源码里的入口恰好是主入口、引用与快照那一截、扫描重建那一截三个（多了一个入口就在这里给它种一位）"
+    );
+    assert_eq!(
         judge_sources.checker_scan.matches(scan_anchor).count(),
-        1,
-        "扫描内核里读回违例位的调用恰好一处"
+        planted_by_each_scan_source_entry.len(),
+        "扫描内核源码里读回违例位的调用恰好三处：主入口、引用与快照那一截、扫描重建那一截的入口各一处"
+    );
+    let checker_scan_planted_in_every_entry = planted_by_each_scan_source_entry.iter().fold(
+        judge_sources.checker_scan.clone(),
+        |source, (entry_point, bit)| {
+            plant_a_violated_bit_after_the_anchor_inside_the_entry_point(
+                &source,
+                entry_point,
+                scan_anchor,
+                *bit,
+            )
+        },
     );
     let planted_sources = JudgeKernelSources {
         recovery: judge_sources.recovery.clone(),
@@ -3387,11 +3632,7 @@ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both
             &format!("{walk_anchor}    violate({planted_by_the_walk}u);\n"),
             1,
         ),
-        checker_scan: judge_sources.checker_scan.replacen(
-            scan_anchor,
-            &format!("{scan_anchor}    violate({PLANTED_BY_THE_SCAN}u);\n"),
-            1,
-        ),
+        checker_scan: checker_scan_planted_in_every_entry,
     };
     let Some(cards) = gpu_card_pool_or_report_not_run(
         "a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels",
@@ -3463,7 +3704,9 @@ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both
         }
         let planted_bits = (1u128 << planted_by_the_walk)
             | if scan_judged {
-                1u128 << PLANTED_BY_THE_SCAN
+                planted_by_each_scan_source_entry
+                    .iter()
+                    .fold(0u128, |bits, (_, bit)| bits | (1u128 << bit))
             } else {
                 0
             };
@@ -3499,7 +3742,7 @@ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both
     );
     assert!(
         states_the_scan_judged > 0,
-        "这条流上要有扫描内核判完的状态，第 128 位那一路才走得到"
+        "这条流上要有扫描内核判完的状态，第 128、127、126 位那三路才走得到"
     );
     assert!(
         mismatches.is_empty(),
@@ -4347,14 +4590,49 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_replayed_version_cannot_be_walked(
     );
 }
 
-/// I-8.1 三个字段那一支：系统配置槽里的 F 不是格式常量，整池不作保。
+/// I-7.13（C663）：系统配置槽自述 S = 17，整池不作保；GPU 走读内核把这一槽读成带不收之值、不是「这一槽不可择」，逐位跟上 CPU。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_declares_seventeen_slots_per_region(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_declares_seventeen_slots_per_region",
+        &record_new_pool_with_seventeen_slots_per_region("crash-judge-gpu-i713-slots-per-region"),
+        "I-7.13",
+    );
+}
+
+/// I-7.13（C663）：系统配置槽自述 R = 2，整池不作保；GPU 走读内核同判。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_declares_two_regions() {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_declares_two_regions",
+        &record_new_pool_with_two_regions("crash-judge-gpu-i713-regions"),
+        "I-7.13",
+    );
+}
+
+/// I-2.4（C728）：系统配置槽字段表之后有一个非 0 字节；GPU 走读内核对每个可择的槽判 [489, 4096) 全 0，逐位跟上 CPU。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_carries_a_non_zero_byte_past_its_field_table(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_carries_a_non_zero_byte_past_its_field_table",
+        &record_new_pool_with_a_non_zero_last_byte_in_a_system_configuration_slot(
+            "crash-judge-gpu-i24-system-configuration-tail",
+        ),
+        "I-2.4",
+    );
+}
+
+/// I-8.1 三个字段那一支：系统配置槽里的 F 不是格式常量，整池不作保；I-1.13 两边都报环几何三格不等整池拒那一句（码 28）。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_records_a_safety_factor_other_than_the_format_constant(
 ) {
-    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening_and_ending_the_scan_rebuild_with(
         "the_gpu_judge_agrees_with_the_cpu_when_a_system_configuration_slot_records_a_safety_factor_other_than_the_format_constant",
         &record_new_pool_with_a_safety_factor_of_two("crash-judge-gpu-i81-fields"),
         "I-8.1",
+        "SCAN_REBUILD_OUTCOME_POOL_REFUSED_FOR_UNEQUAL_JOURNAL_RING_GEOMETRY_FIELDS",
     );
 }
 
@@ -4380,6 +4658,19 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_refused_value_wins_over_a_wrong_safe
         flow.name,
         comparison.cpu_checker_red_invariants
     );
+    // I-1.13 跟着走带越界值整池拒那一支（码 27），一个状态都不报环几何三格不等那一句（码 28）；对拍逐位比这一字
+    assert!(
+        states_whose_scan_rebuild_ends_with(
+            &comparison,
+            "SCAN_REBUILD_OUTCOME_POOL_REFUSED_FOR_A_SYSTEM_CONFIGURATION_VALUE_THE_READER_DOES_NOT_ACCEPT"
+        ) > 0
+            && states_whose_scan_rebuild_ends_with(
+                &comparison,
+                "SCAN_REBUILD_OUTCOME_POOL_REFUSED_FOR_UNEQUAL_JOURNAL_RING_GEOMETRY_FIELDS"
+            ) == 0,
+        "流 {} 上 I-1.13 报带越界值整池拒那一句、不报环几何三格不等那一句",
+        flow.name
+    );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
@@ -4395,15 +4686,16 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_refused_value_wins_over_a_wrong_safe
     );
 }
 
-/// I-8.5：全池一个自证过的系统配置槽都没有。
+/// I-8.5：全池一个自证过的系统配置槽都没有；I-1.13 两边都报一块盘都交不出有效系统配置那一句（码 29）。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_when_no_system_configuration_slot_verifies_itself() {
-    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening_and_ending_the_scan_rebuild_with(
         "the_gpu_judge_agrees_with_the_cpu_when_no_system_configuration_slot_verifies_itself",
         &record_new_pool_with_every_system_configuration_slot_zeroed_at_the_end(
             "crash-judge-gpu-i85",
         ),
         "I-8.5",
+        "SCAN_REBUILD_OUTCOME_NO_DEVICE_YIELDS_A_VALID_SYSTEM_CONFIGURATION",
     );
 }
 
@@ -4746,6 +5038,283 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_version_references_a_unit_born_no_la
             "crash-judge-gpu-i35",
         ),
         "I-3.5",
+    );
+}
+
+/// 攻方种子区间的起点（`research/prompts/m4-segment-code-r1-opus-model/src/attack_common/weights.rs` 的 `ATTACK_SEED_OFFSET`）
+/// 加种子下标 2022：只当这段历史的名字，执行不读它。同 harness 档
+/// `pool_checker_appearance_rule_labels_each_version_by_its_own_user_visible_trees.rs` 的同名常量（两档不共用代码）。
+const SEED_OF_THE_ATTACK_HISTORY_OF_SEED_INDEX_2022: u64 =
+    SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 7_000_000 + 2022;
+
+/// 攻方种子下标 2022 缩出的 5 步（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 T4、F9）：挂载、一个数据单元以内的覆盖写、
+/// 回退到根环里第三新的那条根（覆盖写之前那一版）、建快照、跨 291 个数据单元的顺序写。取值照抄 harness 档那一份。
+fn rollback_without_snapshots_then_a_snapshot_then_an_overwrite_under_it() -> GeneratedHistory {
+    GeneratedHistory {
+        seed: HistorySeed(SEED_OF_THE_ATTACK_HISTORY_OF_SEED_INDEX_2022),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::InsideOneDataUnit {
+                    selector: 7_879_751_949_923_199_194,
+                },
+                fill_seed: 17_840_163_520_990_143_491,
+            }),
+            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
+                index_from_newest: 2,
+            }),
+            HistoryOperation::CreateSnapshot,
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 291,
+                    selector: 7_664_500_909_322_504_686,
+                },
+                fill_seed: 4_676_315_349_287_084_229,
+            }),
+        ],
+    }
+}
+
+/// 攻方种子下标 2022 那段历史从 mkfs 之后录起的整条流（[`record_the_flow_of_a_history_from_the_make_filesystem`]）。
+fn record_rollback_without_snapshots_then_a_snapshot_and_an_overwrite_under_it(
+) -> (RecordedFlow, Vec<PublishedVersionWithoutAFile>) {
+    record_the_flow_of_a_history_from_the_make_filesystem(
+        &rollback_without_snapshots_then_a_snapshot_then_an_overwrite_under_it(),
+        "rollback-without-snapshots-then-a-snapshot-and-an-overwrite-under-it",
+    )
+}
+
+/// 一段历史从 mkfs 之后录起的整条流，流名是 `flow_name`（起点镜像是空盘上叠 mkfs 那几步，mkfs 不是事务、不枚举；被判的根是流里最后一条根槽写）。
+/// 版本表取理想模型每一步之后根环里的每一版（`IdealModel::committed_versions`，连同历史停下时那一份）：有文件的进 `versions`，
+/// 树表 0 条或没有文件的进交回的那几版。
+///
+/// # Panics
+/// 历史没有每一步都做成（或按前提不适用）、模型对不上；流里一条根槽写都没有；实例代号装不进 u32。
+fn record_the_flow_of_a_history_from_the_make_filesystem(
+    history: &GeneratedHistory,
+    flow_name: &'static str,
+) -> (RecordedFlow, Vec<PublishedVersionWithoutAFile>) {
+    let execution = HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES;
+    let stream = SharedStream::retaining_contents();
+    let mut contents_of_each_committed_version: BTreeMap<(u64, u64), Option<Vec<u8>>> =
+        BTreeMap::new();
+    let run = execute_history_with(history, execution, &stream, &mut |observation| {
+        for (key, file) in observation.model.committed_versions() {
+            contents_of_each_committed_version
+                .entry((key.instance.0, key.checkpoint_txg.0))
+                .or_insert_with(|| file.map(|content| content.to_vec()));
+        }
+    });
+    assert_eq!(
+        run.ending,
+        HistoryEnding::Completed,
+        "流 {flow_name} 那段历史每一步都做成、模型对得上：{:?}",
+        run.outcomes
+    );
+    for (key, file) in &run.committed_versions_at_the_end {
+        contents_of_each_committed_version
+            .entry((key.instance.0, key.checkpoint_txg.0))
+            .or_insert_with(|| file.clone());
+    }
+    let operations = stream.retained_operations();
+    let mkfs_operations = run.operations_written_by_make_filesystem;
+    let mut base = MemoryPool::with_devices(
+        &[DeviceIdentity(0), DeviceIdentity(1)],
+        execution.device_width.device_bytes(),
+    );
+    base.apply(&operations[..mkfs_operations]);
+    let (writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
+        &operations[mkfs_operations..],
+        &execution.device_width.fixed_geometry(),
+    );
+    let judged_root_index = writes
+        .iter()
+        .rposition(|write| write.kind == StepKind::RootRecordFua)
+        .unwrap_or_else(|| panic!("流 {flow_name}：历史里最后那次发布有一条根槽写"));
+    let mut versions = Vec::new();
+    let mut versions_without_a_file = Vec::new();
+    for ((instance, checkpoint_txg), file) in contents_of_each_committed_version {
+        let instance = InstanceGeneration(
+            u32::try_from(instance)
+                .unwrap_or_else(|_| panic!("流 {flow_name}：这段历史的实例代号装得进 u32")),
+        );
+        let checkpoint_txg = CheckpointTxg(checkpoint_txg);
+        match file {
+            Some(content) => versions.push(PublishedVersion {
+                instance,
+                checkpoint_txg,
+                content,
+            }),
+            None => versions_without_a_file.push(PublishedVersionWithoutAFile {
+                instance,
+                checkpoint_txg,
+            }),
+        }
+    }
+    (
+        RecordedFlow {
+            name: flow_name,
+            base,
+            writes,
+            segments,
+            judged_root_index,
+            versions,
+        },
+        versions_without_a_file,
+    )
+}
+
+/// I-3.5 的用户可见树标签按版本记（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F9 的 GPU 一侧）：攻方种子下标 2022
+/// 那段历史里，回退那一版复活的单元在它自己的活头 extent 树里；最新那一版先走、经快照那两棵树走到它（快照树不是用户可见树），回退那一版共享这片子树、
+/// 不重走。CPU 一侧先钉流造对了——整条落盘的镜像上 I-3.5 判成立（不是不适用）。GPU 走读内核按版本记标签（并进来的共享子树落点按这一版此刻
+/// 在哪棵树里打）之后每个状态逐位相同；内核照旧跨版本按落点取标签时，回退那一版的 (b) 款落空、GPU 判红 I-3.5 而 CPU 不红，对不上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_reference_intervals_after_a_rollback_without_snapshots_then_a_snapshot_and_an_overwrite_under_it(
+) {
+    const TEST_NAME: &str = "the_gpu_judge_agrees_with_the_cpu_on_the_reference_intervals_after_a_rollback_without_snapshots_then_a_snapshot_and_an_overwrite_under_it";
+    let (flow, versions_without_a_file) =
+        record_rollback_without_snapshots_then_a_snapshot_and_an_overwrite_under_it();
+    let mut image_after_the_whole_flow = flow.base.clone();
+    image_after_the_whole_flow.apply_writes(&flow.writes);
+    assert_eq!(
+        pool_checker_verdict_on_the_image(&image_after_the_whole_flow, "I-3.5"),
+        InvariantVerdict::Holds,
+        "整条落盘的镜像上 I-3.5 判到了单元、成立：回退那一版复活的单元按这一版自己的标签落在它的活头 extent 树里"
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state_against_the_version_table(
+        cards,
+        &flow,
+        &versions_without_a_file,
+        expand_up_to(),
+    ) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_held_invariants.contains("I-3.5"),
+        "流 {} 上 CPU 池级 checker 至少在一个状态上判过 I-3.5 而成立（成立过的：{:?}；红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_held_invariants,
+        comparison.cpu_checker_red_invariants
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+}
+
+/// 攻方种子区间的起点（`research/prompts/m4-segment-code-r1-opus-model/src/attack_common/weights.rs` 的 `ATTACK_SEED_OFFSET`）
+/// 加种子下标 1032：只当这段历史的名字，执行不读它。同 harness 档
+/// `pool_checker_shared_subtree_below_a_snapshot_only_unit_keeps_the_children_it_shares_with_the_head.rs` 的 `SEED_OF_THE_ATTACK_HISTORY`（两档不共用代码）。
+const SEED_OF_THE_ATTACK_HISTORY_OF_SEED_INDEX_1032: u64 =
+    SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 7_000_000 + 1032;
+
+/// 攻方种子下标 1032 缩出的 16 步（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F9「种子下标 1032 那一形」，攻方 T4）：
+/// 去掉回退那一组比重生成 40 步，留第 0、1、4、5、8、9、24、25、26、27、28、29、35、36、37、38 步。没有回退；有建快照、unlink、几次可写挂载、
+/// 批间崩溃再挂载的整理、删快照。取值照抄 harness 档那一份。
+fn snapshots_created_and_destroyed_around_writable_mounts_and_crashed_compactions(
+) -> GeneratedHistory {
+    GeneratedHistory {
+        seed: HistorySeed(SEED_OF_THE_ATTACK_HISTORY_OF_SEED_INDEX_1032),
+        starting_point: HistoryStartingPoint::AfterMakeFilesystem,
+        operations: vec![
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::PublishFirstFile(ContentChoice {
+                length: ContentLength::InsideOneDataUnit {
+                    selector: 4_908_652_545_014_035_923,
+                },
+                fill_seed: 1_175_750_450_067_266_269,
+            }),
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::SpanningDataUnitsThroughTheSequentialWrite {
+                    data_units: 152,
+                    selector: 1_112_582_400_669_913_327,
+                },
+                fill_seed: 4_144_227_704_568_475_653,
+            }),
+            HistoryOperation::CreateSnapshot,
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::Unlink,
+            HistoryOperation::CompactWhileMounted(CompactionChoice {
+                batch_units: 1,
+                region_selector: 9_802_755_752_694_277_730,
+                ending: CompactionRunEnding::CrashesAfterBatchesThenMountsWritable { batches: 3 },
+            }),
+            HistoryOperation::CreateSnapshot,
+            HistoryOperation::CompactWhileMounted(CompactionChoice {
+                batch_units: 3,
+                region_selector: 16_953_606_325_372_812_583,
+                ending: CompactionRunEnding::CrashesAfterBatchesThenMountsWritable { batches: 2 },
+            }),
+            HistoryOperation::DestroySnapshot(SnapshotChoice {
+                index_among_the_snapshots: 1_939_626_785_022_617_838,
+            }),
+            HistoryOperation::CreateInode,
+            HistoryOperation::DestroySnapshot(SnapshotChoice {
+                index_among_the_snapshots: 10_045_164_462_792_776_581,
+            }),
+            HistoryOperation::CreateSnapshot,
+            HistoryOperation::CreateSnapshot,
+            HistoryOperation::DestroySnapshot(SnapshotChoice {
+                index_among_the_snapshots: 849_968_957_743_593_146,
+            }),
+            HistoryOperation::CreateInode,
+        ],
+    }
+}
+
+/// 快照独有的父单元下面与活头共享的孩子照样挂到它下面（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F9
+/// 「种子下标 1032 那一形」的 GPU 一侧，池级 checker 那一侧是 `walk.rs` 的 `note_references_of_a_pointer_followed_by_the_walk`）：
+/// 攻方种子下标 1032 那段历史里，建快照之后活头改写了一片 extent 叶，改写之前那片叶只从快照那两棵树走得到、它下面的孩子活头也引用；
+/// 根环转过一圈之后改写那一版先走、建快照之前那一版后走，后走那一版不重走那片叶、只按「单元 → 它下面的落点」那张表并进它的孩子。
+/// CPU 一侧先钉流造对了——整条落盘的镜像上 I-3.5 判成立（不是不适用）。GPU 走读内核把孩子一律挂到父单元下面之后每个状态逐位相同；
+/// 内核照旧对这一版已经从活头记过的孩子不挂时（`crates/mutations.tsv` 里「m4 修复批三丁三」那一行），后走那一版少一个落点、
+/// GPU 判红 I-3.5 而 CPU 不红，对不上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_reference_intervals_when_a_snapshot_only_unit_shares_its_children_with_the_head(
+) {
+    const TEST_NAME: &str = "the_gpu_judge_agrees_with_the_cpu_on_the_reference_intervals_when_a_snapshot_only_unit_shares_its_children_with_the_head";
+    let (flow, versions_without_a_file) = record_the_flow_of_a_history_from_the_make_filesystem(
+        &snapshots_created_and_destroyed_around_writable_mounts_and_crashed_compactions(),
+        "snapshots-created-and-destroyed-around-writable-mounts-and-crashed-compactions",
+    );
+    let mut image_after_the_whole_flow = flow.base.clone();
+    image_after_the_whole_flow.apply_writes(&flow.writes);
+    assert_eq!(
+        pool_checker_verdict_on_the_image(&image_after_the_whole_flow, "I-3.5"),
+        InvariantVerdict::Holds,
+        "整条落盘的镜像上 I-3.5 判到了单元、成立：快照独有的那片叶下面与活头共享的孩子并进建快照之前那一版，那一版的引用集合不少落点"
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state_against_the_version_table(
+        cards,
+        &flow,
+        &versions_without_a_file,
+        expand_up_to(),
+    ) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_held_invariants.contains("I-3.5"),
+        "流 {} 上 CPU 池级 checker 至少在一个状态上判过 I-3.5 而成立（成立过的：{:?}；红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_held_invariants,
+        comparison.cpu_checker_red_invariants
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
     );
 }
 
@@ -5520,6 +6089,89 @@ fn every_tree_table_the_new_pool_and_the_rollback_flows_write_fits_the_tree_coun
     }
 }
 
+/// 第一版能出现的最大树表那条流：新池新建文件（txg 3）之后接连建 `SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION`（10）个快照，每一版都是第一个文件的内容。
+/// 最后那一版的树表是进发号次序的 12 条加 10 对码 14 / 15 条目，共 32 条（判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+/// 第七节岔路 1 用户定的上限）。
+///
+/// # Panics
+/// 最后那一版的树表里码 14 条目不是 10 条：那这条流就没走到第一版的上限。
+fn record_new_pool_through_the_most_snapshots_of_the_first_version(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    let mut versions = vec![published_version_of(&pool.output, file_content())];
+    for _snapshot in 0..SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION {
+        let created = create_a_snapshot_and_advance(&mut pool);
+        versions.push(published_version_of(&created, file_content()));
+    }
+    assert_eq!(
+        pool.output
+            .tree_table_entries
+            .iter()
+            .filter(|entry| entry.kind == TREE_KIND_SNAPSHOT_INODE_ROOT)
+            .count(),
+        SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION,
+        "最后那一版的树表里码 14 条目是第一版的快照上限那么多条"
+    );
+    recorded_flow_of_the_pool(&pool, name, versions)
+}
+
+/// 第一版能出现的最大树表（10 个快照：12 + 2 × 10 = 32 条）装得进 GPU 扫描内核一张树表能记的树数，而且恰好装满（上限少一棵这条就红），
+/// CPU 参照一侧照这条流建得出判表（`build_judge_tables`）：快照六条流在 GPU 上判不了（站点 28：扫描内核一张树表只记 12 棵）那一次，
+/// 上限只按发号次序的 12 种取、没把快照条目算进去。取卡之前就判，没卡的机器上也判到。
+#[test]
+fn the_tree_table_of_the_most_snapshots_of_the_first_version_fills_the_tree_count_the_gpu_scan_kernel_records_and_its_judge_tables_build(
+) {
+    const TREE_KINDS_IN_THE_ISSUING_ORDER: usize = 12;
+    let capacity = tree_count_the_gpu_scan_kernel_records_per_tree_table();
+    let flow = record_new_pool_through_the_most_snapshots_of_the_first_version(
+        "crash-judge-gpu-tree-count-most-snapshots",
+        "most-snapshots-of-the-first-version",
+    );
+    let is_a_tree_table = |bytes: &[u8]| {
+        unit_class(bytes) == 2
+            && index_node_key_width(bytes) == 8
+            && index_node_entry_width(bytes) == 200
+    };
+    let largest = flow
+        .writes
+        .iter()
+        .filter(|write| write.kind == StepKind::UnitWrite)
+        .filter_map(|write| write.bytes())
+        .filter(|bytes| is_a_tree_table(bytes))
+        .map(tree_table_entry_count)
+        .max()
+        .expect("这条流写了树表单元");
+    assert_eq!(
+        largest,
+        TREE_KINDS_IN_THE_ISSUING_ORDER + 2 * SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION,
+        "流 {} 最大的那张树表是发号次序的 12 条加每个快照一对",
+        flow.name
+    );
+    assert_eq!(
+        capacity, largest,
+        "GPU 扫描内核一张树表能记的树数（C_MAX_TREES_PER_TABLE）就是第一版能出现的最大树表的条数：少了快照流判不了（站点 28），多了是没有来源的数"
+    );
+    let expansion =
+        |_segment_index: usize, _segment: &[usize]| CrashPointReplaySegmentExpansion::NotExpanded;
+    let judge_flow = JudgeFlow {
+        base: &flow.base,
+        writes: &flow.writes,
+        segments: &flow.segments,
+        judged_root_index: flow.judged_root_index,
+        versions: &flow.versions,
+        expansion: &expansion,
+    };
+    let tables = build_judge_tables(&judge_flow);
+    assert!(
+        tables.is_ok(),
+        "流 {} 上 CPU 参照一侧建得出判表：{:?}",
+        flow.name,
+        tables.err()
+    );
+}
+
 /// 回退流上回退那次发布 D 往谱系树追加的那一片容器（码 3、记录类型 5）：记录宽从 24 改成 25、重封到根。
 /// CPU 池级 checker 走谱系树走到这片容器、按 I-1.7 判它的记录宽不是登记的 24 → 红；恢复不读容器，两遍恢复照常读到文件。
 /// GPU 走读内核不走谱系树、或不认谱系记录的登记宽时这一位对不上。
@@ -5757,8 +6409,11 @@ const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET: usize = 14;
 /// 稀疏旁表与 deadlist 的种类码（D18（块里携带什么信息） 已定项 24 第 6 条那一组）：第一版两棵树都不建根，树表条目的根指针全零，走读与恢复都不读。
 const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
 const TREE_KIND_DEADLIST: u16 = 8;
-/// 一个没登记的种类码：走读与恢复都不认它、不读它的根（13 第 50 批登记给了退役树，改用 14）。
-const UNREGISTERED_TREE_KIND: u16 = 14;
+/// 一个没登记的种类码：走读与恢复都不认它、不读它的根（13 第 50 批登记给了退役树、14 / 15 里程碑四登记给了只读快照的两种条目
+/// （快照 inode 根、快照 extent 根），改用 16，与 harness 档坏镜像里的 `TREE_KIND_NOT_REGISTERED` 同一个码）。
+const UNREGISTERED_TREE_KIND: u16 = 16;
+/// 分配记录树的种类码（D8（核心索引结构） 已定项 9 的登记表）。
+const TREE_KIND_ALLOCATION_RECORD: u16 = 3;
 /// 根记录里树表指针的第 0 条位置条目（盘 4 + 槽 6）的偏移：树表指针在 36，位置条目在指针偏移 50。
 const ROOT_RECORD_TREE_TABLE_POINTER_FIRST_LOCATION_OFFSET: usize = 86;
 /// 根记录里「树表 0 条那一版的分配记录树根」指针的偏移（D22（单元原子性怎么合成） 已定项 7 的字段表）。
@@ -5799,7 +6454,7 @@ fn record_new_pool_with_two_tree_table_entries_of_the_sparse_side_table_kind(
     )
 }
 
-/// I-9.16 ④（树表非空时十一种各恰好一条）：deadlist 那条的种类改成没登记的 13——没有一种重复，deadlist 一条都没有。
+/// I-9.16 ④（树表非空时十一种各恰好一条）：deadlist 那条的种类改成没登记的码（[`UNREGISTERED_TREE_KIND`]）——没有一种重复，deadlist 一条都没有。
 /// core 的只读恢复照常读到文件（只要种类 1–4 四棵有根的树），可写挂载重建这一版时拒「树表里没有那棵树」；GPU 恢复内核也照常读到。
 fn record_new_pool_with_no_tree_table_entry_of_the_deadlist_kind(tag: &str) -> RecordedFlow {
     record_new_pool_with_a_tree_table_entry_kind_rewritten(
@@ -5807,6 +6462,33 @@ fn record_new_pool_with_no_tree_table_entry_of_the_deadlist_kind(tag: &str) -> R
         "new-pool-tree-table-without-the-deadlist-kind",
         TREE_KIND_DEADLIST,
         UNREGISTERED_TREE_KIND,
+    )
+}
+
+/// I-3.16 那道守（最新根那一版一棵分配记录树都没有，按记录口径的全空聚簇段数数不出，记射程里没判、没有违例时整条报不适用）走得到的形：发布那张树表里分配记录树那一条
+/// （种类 3，带根）的种类改成没登记的码（[`UNREGISTERED_TREE_KIND`]）、重封到根。树 ID、根指针与条目次序不动，树表就缺了种类 3（I-9.16 ④ 判它）。
+/// 分配记录树的节点照旧有中央映射条目，走读经映射条目把它们记进引用（`walk.rs` 的 `walk_central_mapping_entries`），I-3.1 那一份占着的槽不变，
+/// I-3.16 走得过「占着的槽数乘 16 KiB 等于记账的已分配」那一格、走到按记录口径数全空段那一步，而这一版读到的分配记录树是 0 棵。
+/// 不是 [`record_new_pool_with_a_tree_table_entry_kind_rewritten`]：那一个要被改的那一条根指针本来全零，分配记录树有根。
+fn record_new_pool_with_no_tree_table_entry_of_the_allocation_record_kind(
+    tag: &str,
+) -> RecordedFlow {
+    record_new_pool_with_a_resealed_field(
+        tag,
+        "new-pool-tree-table-without-the-allocation-record-kind",
+        &is_a_tree_table_unit,
+        false,
+        &|bytes| {
+            let entry = only_tree_table_entry_of_kind(bytes, TREE_KIND_ALLOCATION_RECORD);
+            let root_pointer = entry + TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET;
+            assert_ne!(
+                bytes[root_pointer..root_pointer + NODE_POINTER_BYTES],
+                [0u8; NODE_POINTER_BYTES],
+                "发布那一版的分配记录树有根"
+            );
+            let kind = entry + TREE_TABLE_ENTRY_KIND_OFFSET;
+            bytes[kind..kind + 2].copy_from_slice(&UNREGISTERED_TREE_KIND.to_le_bytes());
+        },
     )
 }
 
@@ -5821,6 +6503,21 @@ fn record_new_pool_with_a_non_zero_byte_in_the_root_record_mac(tag: &str) -> Rec
             "加密关着时根记录的 MAC 恒 0"
         );
         bytes[ROOT_RECORD_LAST_MAC_BYTE_OFFSET] = 1;
+    });
+    flow
+}
+
+/// I-2.4 根槽尾（C728）：发布的根记录之后的头一个字节（偏移 457）写 1、重封根记录。core 不读这一段，两遍恢复照常；
+/// CPU 池级 checker 对根环里每条自证过的根判 [457, 槽宽) 全 0，发布的根落了的状态上红 I-2.4。
+fn record_new_pool_with_a_non_zero_byte_past_the_root_record(tag: &str) -> RecordedFlow {
+    let mut flow =
+        record_new_pool_file_creation(tag, "new-pool-root-slot-byte-past-the-record-one");
+    let publish_root = flow.judged_root_index;
+    let record_end = usize::try_from(singlefs_format::ROOT_RECORD_BYTES).expect("457");
+    rewrite_root_record_and_reseal(&mut flow, publish_root, &|bytes| {
+        assert!(bytes.len() > record_end, "根槽宽过根记录");
+        assert_eq!(bytes[record_end], 0, "第一版根记录之后写 0");
+        bytes[record_end] = 1;
     });
     flow
 }
@@ -6459,6 +7156,53 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_lacks_the_deadlist_kind
     );
 }
 
+/// I-3.16 那道守：树表缺种类 3（分配记录树）那一形（[`record_new_pool_with_no_tree_table_entry_of_the_allocation_record_kind`]）。
+/// 读法（写段收尾件认的）：最新根那一版一棵分配记录树都没有，按记录口径的全空聚簇段数就不判（`walk.rs` 记射程里没判，没有违例时整条报不适用，
+/// 不报部分没判）。CPU 一侧先钉流造对了——整条落盘的镜像上 I-3.16 报不适用、理由点名「一棵分配记录树都没有」（走到了按记录口径数全空段那一步，
+/// 不是更早那几格的射程里没判），I-9.16 红。流上发布的根落了的状态，CPU 与 GPU 扫描内核都不置 I-3.16 的判到位
+/// （`crash_judge_checker_scan.wgsl` 里 `newest_allocation_record_trees_read == 0u` 那一支记射程里没判），每个状态逐位相同；没有这道守的扫描内核
+/// 按空的记录表数出整段都空、与记账对不上而判红，与 CPU 不一致。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_the_statistics_of_a_newest_version_without_an_allocation_record_tree_are_not_judged(
+) {
+    const TEST_NAME: &str = "the_gpu_judge_agrees_with_the_cpu_that_the_statistics_of_a_newest_version_without_an_allocation_record_tree_are_not_judged";
+    let flow = record_new_pool_with_no_tree_table_entry_of_the_allocation_record_kind(
+        "crash-judge-gpu-i316-no-allocation-record-tree",
+    );
+    let mut image_after_the_whole_flow = flow.base.clone();
+    image_after_the_whole_flow.apply_writes(&flow.writes);
+    match pool_checker_verdict_on_the_image(&image_after_the_whole_flow, "I-3.16") {
+        InvariantVerdict::NotApplicable(reason) => assert!(
+            reason.contains("一棵分配记录树都没有"),
+            "不适用的理由点名最新根那一版一棵分配记录树都没有（不是更早那几格）：{reason}"
+        ),
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::PartiallyJudged(_)) => panic!(
+            "树表缺种类 3、分配记录树的节点照旧在映射里：I-3.16 要走到按记录口径那一步、不判（整条报不适用），实际 {other_verdict:?}"
+        ),
+    }
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains("I-9.16"),
+        "流 {} 上树表缺种类 3，CPU 池级 checker 要红 I-9.16（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+}
+
 /// I-2.4：根记录里算法类型 / nonce / MAC 那 29 字节有非 0。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_when_a_root_record_carries_a_non_zero_mac_byte() {
@@ -6467,6 +7211,17 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_root_record_carries_a_non_zero_mac_b
         &record_new_pool_with_a_non_zero_byte_in_the_root_record_mac(
             "crash-judge-gpu-i24-root-mac",
         ),
+        "I-2.4",
+    );
+}
+
+/// I-2.4（C728）：根记录之后到槽宽那一段有一个非 0 字节；GPU 走读内核对每条自证过的根判 [457, 槽宽) 全 0，逐位跟上 CPU。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_root_slot_carries_a_non_zero_byte_past_the_root_record()
+{
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_a_root_slot_carries_a_non_zero_byte_past_the_root_record",
+        &record_new_pool_with_a_non_zero_byte_past_the_root_record("crash-judge-gpu-i24-root-tail"),
         "I-2.4",
     );
 }
@@ -9082,11 +9837,12 @@ fn the_gpu_judge_leaves_to_the_cpu_an_instance_table_chain_longer_than_the_pages
     let mut disagreements: Vec<String> = Vec::new();
     for (ordinal, gpu_words) in comparison.gpu_words_of_each_state.iter().enumerate() {
         let cpu_checker_bits = comparison.cpu_checker_bits_of_each_state[ordinal];
-        let cpu_red_items = &comparison.cpu_red_items_of_each_state[ordinal];
+        let cpu_red_items =
+            &comparison.cpu_red_items_compared_by_the_cross_check_of_each_state[ordinal];
         match gpu_words[POOL_CHECKER_UNDECIDABLE_WORD] {
             0 => {
                 let gpu_checker_bits = pool_checker_violated_bits(gpu_words);
-                if gpu_checker_bits != cpu_checker_bits {
+                if !pool_checker_bits_agree_in_the_cross_check(gpu_checker_bits, cpu_checker_bits) {
                     disagreements.push(format!(
                         "状态 {ordinal}：GPU 池级 checker 判了，违例 {:?}；CPU 违例 {:?}",
                         invariant_names(gpu_checker_bits),
@@ -9114,8 +9870,11 @@ fn the_gpu_judge_leaves_to_the_cpu_an_instance_table_chain_longer_than_the_pages
                 GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES,
             ),
         );
-        let concluded = gpu_verdict_items(gpu_words)
-            .map_or_else(|| cpu_red_items.clone(), |items| format!("{items:?}"));
+        // 内核不置位的那几条（第一版是 I-1.13）两边都去掉再比（`red_items_compared_by_the_cross_check`）
+        let concluded = gpu_verdict_items(gpu_words).map_or_else(
+            || cpu_red_items.clone(),
+            |items| red_items_compared_by_the_cross_check(&items),
+        );
         if concluded != *cpu_red_items {
             disagreements.push(format!(
                 "状态 {ordinal}：判不了就回落 CPU 之后的红项 {concluded} 与 CPU 的 {cpu_red_items} 不同"
@@ -10829,11 +11588,12 @@ fn the_gpu_judge_leaves_to_the_cpu_a_newest_instance_table_chain_longer_than_the
     let mut disagreements: Vec<String> = Vec::new();
     for (ordinal, gpu_words) in comparison.gpu_words_of_each_state.iter().enumerate() {
         let cpu_checker_bits = comparison.cpu_checker_bits_of_each_state[ordinal];
-        let cpu_red_items = &comparison.cpu_red_items_of_each_state[ordinal];
+        let cpu_red_items =
+            &comparison.cpu_red_items_compared_by_the_cross_check_of_each_state[ordinal];
         match gpu_words[POOL_CHECKER_UNDECIDABLE_WORD] {
             0 => {
                 let gpu_checker_bits = pool_checker_violated_bits(gpu_words);
-                if gpu_checker_bits != cpu_checker_bits {
+                if !pool_checker_bits_agree_in_the_cross_check(gpu_checker_bits, cpu_checker_bits) {
                     disagreements.push(format!(
                         "状态 {ordinal}：GPU 池级 checker 判了，违例 {:?}；CPU 违例 {:?}",
                         invariant_names(gpu_checker_bits),
@@ -10859,8 +11619,11 @@ fn the_gpu_judge_leaves_to_the_cpu_a_newest_instance_table_chain_longer_than_the
                 GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES,
             ),
         );
-        let concluded = gpu_verdict_items(gpu_words)
-            .map_or_else(|| cpu_red_items.clone(), |items| format!("{items:?}"));
+        // 内核不置位的那几条（第一版是 I-1.13）两边都去掉再比（`red_items_compared_by_the_cross_check`）
+        let concluded = gpu_verdict_items(gpu_words).map_or_else(
+            || cpu_red_items.clone(),
+            |items| red_items_compared_by_the_cross_check(&items),
+        );
         if concluded != *cpu_red_items {
             disagreements.push(format!(
                 "状态 {ordinal}：判不了就回落 CPU 之后的红项 {concluded} 与 CPU 的 {cpu_red_items} 不同"
@@ -11977,11 +12740,12 @@ fn assert_the_gpu_judge_leaves_to_the_cpu_only_states_undecidable_for(
     let mut disagreements: Vec<String> = Vec::new();
     for (ordinal, gpu_words) in comparison.gpu_words_of_each_state.iter().enumerate() {
         let cpu_checker_bits = comparison.cpu_checker_bits_of_each_state[ordinal];
-        let cpu_red_items = &comparison.cpu_red_items_of_each_state[ordinal];
+        let cpu_red_items =
+            &comparison.cpu_red_items_compared_by_the_cross_check_of_each_state[ordinal];
         let reason = gpu_words[POOL_CHECKER_UNDECIDABLE_WORD];
         if reason == 0 {
             let gpu_checker_bits = pool_checker_violated_bits(gpu_words);
-            if gpu_checker_bits != cpu_checker_bits {
+            if !pool_checker_bits_agree_in_the_cross_check(gpu_checker_bits, cpu_checker_bits) {
                 disagreements.push(format!(
                     "状态 {ordinal}：GPU 池级 checker 判了，违例 {:?}；CPU 违例 {:?}",
                     invariant_names(gpu_checker_bits),
@@ -12005,8 +12769,11 @@ fn assert_the_gpu_judge_leaves_to_the_cpu_only_states_undecidable_for(
                 recovery_reasons_left_to_the_cpu,
             ),
         );
-        let concluded = gpu_verdict_items(gpu_words)
-            .map_or_else(|| cpu_red_items.clone(), |items| format!("{items:?}"));
+        // 内核不置位的那几条（第一版是 I-1.13）两边都去掉再比（`red_items_compared_by_the_cross_check`）
+        let concluded = gpu_verdict_items(gpu_words).map_or_else(
+            || cpu_red_items.clone(),
+            |items| red_items_compared_by_the_cross_check(&items),
+        );
         if concluded != *cpu_red_items {
             disagreements.push(format!(
                 "状态 {ordinal}：判不了就回落 CPU 之后的红项 {concluded} 与 CPU 的 {cpu_red_items} 不同"
@@ -14687,7 +15454,11 @@ fn the_gpu_judge_on_given_persisted_sets_agrees_with_the_cpu_judge_on_every_stat
                 "清单第 {position} 个：CPU 从库里读回判的序号 {ordinal} 与清单那一个是同一个状态"
             );
             let gpu_cross_check_words = cross_check_words_of_gpu_verdict(gpu_words);
-            (*cpu_cross_check_words != gpu_cross_check_words).then(|| {
+            (!cross_check_words_agree_in_the_cross_check(
+                &gpu_cross_check_words,
+                cpu_cross_check_words,
+            ))
+            .then(|| {
                 format!(
                     "清单第 {position} 个（序号 {ordinal}）：CPU {cpu_cross_check_words:?}；GPU {gpu_cross_check_words:?}"
                 )
@@ -15933,7 +16704,11 @@ fn the_gpu_judge_decodes_and_judges_a_sliced_segment_from_its_slice_start_like_t
                 "序号 {ordinal}：CPU 从库里读回判的不分片序号 {whole_ordinal} 与这张表的那一个是同一个状态"
             );
             let gpu_cross_check_words = cross_check_words_of_gpu_verdict(gpu_words);
-            (*cpu_cross_check_words != gpu_cross_check_words).then(|| {
+            (!cross_check_words_agree_in_the_cross_check(
+                &gpu_cross_check_words,
+                cpu_cross_check_words,
+            ))
+            .then(|| {
                 format!(
                     "序号 {ordinal}：CPU {cpu_cross_check_words:?}；GPU {gpu_cross_check_words:?}"
                 )
@@ -15956,5 +16731,1807 @@ fn the_gpu_judge_decodes_and_judges_a_sliced_segment_from_its_slice_start_like_t
             .cloned()
             .collect::<Vec<_>>()
             .join("\n")
+    );
+}
+
+/// 里程碑四快照、搬迁与 discard 那几条流发布用的实例代号：都在建池那个进程里接着发。
+const INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS: InstanceGeneration = InstanceGeneration(1);
+
+/// 快照下覆盖写的内容：与第一个文件（`common::file_content`）不同的一份。
+fn content_overwritten_under_the_snapshot() -> Vec<u8> {
+    (0..2700_u32)
+        .map(|index| u8::try_from((index * 13 + 5) % 239).expect("小于 256"))
+        .collect()
+}
+
+/// 一次发布交回的那一版在版本表里那一行：(实例代号, checkpoint_txg) 取它的根，内容由调用方按条款给。
+fn published_version_of(output: &TransactionOutput, content: Vec<u8>) -> PublishedVersion {
+    PublishedVersion {
+        instance: output.root.instance,
+        checkpoint_txg: output.root.checkpoint_txg,
+        content,
+    }
+}
+
+/// 同一个进程里接着 `pool.output` 建一个快照，池接到它那一版上，交回那一版。
+fn create_a_snapshot_and_advance(pool: &mut BuiltPool) -> TransactionOutput {
+    let publish_parameters = parameters();
+    let previous = pool.output.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let created = publish_create_snapshot(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS,
+    )
+    .expect("建快照");
+    pool.output = created.clone();
+    created
+}
+
+/// 建的那个快照的树号（码 14 条目点名它）。
+///
+/// # Panics
+/// 这一版的树表里码 14 条目不是恰好一条：这几条流只建一个快照。
+fn the_only_snapshot_of(version: &TransactionOutput) -> TreeIdentifier {
+    let snapshots: Vec<TreeIdentifier> = version
+        .tree_table_entries
+        .iter()
+        .filter(|entry| entry.kind == TREE_KIND_SNAPSHOT_INODE_ROOT)
+        .map(|entry| entry.tree)
+        .collect();
+    let [snapshot] = snapshots.as_slice() else {
+        panic!("这一版的树表里恰好一条码 14 条目，实际 {snapshots:?}");
+    };
+    *snapshot
+}
+
+/// 同一个进程里接着 `pool.output` 在快照下覆盖写一次（内容 [`content_overwritten_under_the_snapshot`]），池接到它那一版上，交回那一版。
+fn overwrite_under_the_snapshot_and_advance(pool: &mut BuiltPool) -> TransactionOutput {
+    let previous = pool.output.clone();
+    let overwritten = publish_overwrite_in_process(
+        pool,
+        &previous,
+        &content_overwritten_under_the_snapshot(),
+        FIXED_WRITE_TIME_SECONDS + 60,
+        INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS,
+    )
+    .expect("快照下覆盖写");
+    pool.output = overwritten.clone();
+    overwritten
+}
+
+/// 删快照：意图那次发布，再按产品批大小走空销毁中的快照，池接到最后一版上；交回意图那一版与之后的每一批。
+fn destroy_the_snapshot_and_advance(
+    pool: &mut BuiltPool,
+    snapshot: TreeIdentifier,
+) -> Vec<TransactionOutput> {
+    let publish_parameters = parameters();
+    let previous = pool.output.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let intent = publish_snapshot_destruction_intent(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        snapshot,
+        INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS,
+    )
+    .expect("删快照的意图");
+    let mut current = intent.clone();
+    let walk = walk_the_deletion_queue_until_it_is_empty(
+        &mut writer,
+        &mut pool.allocator,
+        &mut current,
+        UnlinkBatchSize::OneExtentLowerLeaf,
+        INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS,
+    );
+    walk.stopped_by.expect("销毁中的快照走空走到底");
+    pool.output = current;
+    std::iter::once(intent)
+        .chain(walk.steps_published)
+        .collect()
+}
+
+/// 快照、deadlist 与删快照的流：新池新建文件（txg 3）、建快照（txg 4：树表多一对码 14 / 15 条目）、快照下覆盖写（txg 5：换下的
+/// 数据单元、extent 树、inode 叶容器与根进 deadlist、映射条目留存）、删快照的意图（码 14 条目 flags 位 0）与之后走空的每一批
+/// （最后一批删掉那一对条目）。每一版都带文件：建快照那一版是第一个文件的内容，覆盖写那一版起是覆盖写的内容。
+///
+/// # Panics
+/// 覆盖写那一版的 deadlist 是空的、或删到最后那一版的树表里还有码 14 条目：那这条流就没走到要罩的那几种形态。
+fn record_new_pool_through_a_snapshot_its_deadlist_and_its_destruction(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    let mut versions = vec![published_version_of(&pool.output, file_content())];
+    let created = create_a_snapshot_and_advance(&mut pool);
+    versions.push(published_version_of(&created, file_content()));
+    let snapshot = the_only_snapshot_of(&created);
+    let overwritten = overwrite_under_the_snapshot_and_advance(&mut pool);
+    assert!(
+        !overwritten.deadlist_entries.is_empty(),
+        "快照下覆盖写换下的用户可见单元进 deadlist"
+    );
+    versions.push(published_version_of(
+        &overwritten,
+        content_overwritten_under_the_snapshot(),
+    ));
+    for destroyed in destroy_the_snapshot_and_advance(&mut pool, snapshot) {
+        versions.push(published_version_of(
+            &destroyed,
+            content_overwritten_under_the_snapshot(),
+        ));
+    }
+    assert!(
+        pool.output
+            .tree_table_entries
+            .iter()
+            .all(|entry| entry.kind != TREE_KIND_SNAPSHOT_INODE_ROOT),
+        "删到最后那一版的树表里没有码 14 条目"
+    );
+    recorded_flow_of_the_pool(&pool, name, versions)
+}
+
+/// 快照、deadlist 与删快照那条流的每个状态上 GPU 与 CPU 整份相同（红位、池级 checker 的违例位与判到位、两遍恢复落到的根与结局）：
+/// 走读内核按快照树走（码 14 / 15 条目的树、I-9.16 ③ 成对、I-9.27、I-9.25 跳过销毁中的快照），引用与快照那一截判 I-3.5 ③ ④ 与逆向、
+/// I-3.6、I-3.7（判决 m4-snapshot-r1 第三节 S5，D13（验证路线） 已定项 15）。CPU 池级 checker 在这条流上判过 I-3.5、I-3.6、I-3.7 而成立。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_snapshot_its_deadlist_and_its_destruction()
+{
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_snapshot_its_deadlist_and_its_destruction";
+    let flow = record_new_pool_through_a_snapshot_its_deadlist_and_its_destruction(
+        "crash-judge-gpu-snapshot-deadlist-destruction",
+        "snapshot-deadlist-and-destruction",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+    for invariant in ["I-3.5", "I-3.6", "I-3.7"] {
+        assert!(
+            comparison.cpu_checker_held_invariants.contains(invariant),
+            "快照、deadlist 与删快照的流上 CPU 池级 checker 判过 {invariant} 而成立（成立过的：{:?}）",
+            comparison.cpu_checker_held_invariants
+        );
+    }
+}
+
+/// 同一个进程里接着 `pool.output` 发整理的一批（搬 `planned` 里那几个单元），池接到它那一版上，交回那一版。
+fn relocate_and_advance(pool: &mut BuiltPool, planned: &[PlannedRelocation]) -> TransactionOutput {
+    let publish_parameters = parameters();
+    let previous = pool.output.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let relocated = publish_relocation_batch(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        planned,
+        INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS,
+    )
+    .expect("整理的一批");
+    pool.output = relocated.clone();
+    relocated
+}
+
+/// 搬 `version` 里 `identity` 这个角色的那一项计划：映射 key 与它按映射位置的源落点。
+///
+/// # Panics
+/// 这个角色不进映射、或在这一版的映射里查不到。
+fn planned_relocation_of_the_role(
+    version: &TransactionOutput,
+    identity: TransactionUnit,
+) -> PlannedRelocation {
+    let (_, mapping_key) = version
+        .mapped_units
+        .iter()
+        .find(|(role, _)| *role == identity)
+        .expect("这个角色进映射");
+    let locations = match central_mapping_locations_in_the_version(version, mapping_key) {
+        MappingLookup::Found(locations) => locations,
+        MappingLookup::NodeMalformedOrNoEntryWithThisKey
+        | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => {
+            panic!("{identity:?} 在这一版的映射里查得到")
+        }
+    };
+    PlannedRelocation {
+        mapping_key: mapping_key.clone(),
+        source: Placement {
+            slot: locations[0].slot,
+            span: identity.span_slots(),
+        },
+    }
+}
+
+/// 搬迁的流：新池新建文件（txg 3）之后整理的一批搬第一个文件唯一的数据单元（txg 4：原样字节写到目的地、映射条目换到目的地、
+/// 源落点进 defer；extent 树里那条指针的位置条目不动，成了过期的提示）。两版都是第一个文件的内容。
+fn record_new_pool_with_the_data_unit_relocated(tag: &str, name: &'static str) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    let created = pool.output.clone();
+    let planned =
+        planned_relocation_of_the_role(&created, TransactionUnit::Data(DataUnitIndexInFile::FIRST));
+    let batch = relocate_and_advance(&mut pool, std::slice::from_ref(&planned));
+    assert_eq!(
+        batch.units_relocated_by_this_publish.len(),
+        1,
+        "这一批搬了一个单元"
+    );
+    recorded_flow_of_the_pool(
+        &pool,
+        name,
+        vec![
+            published_version_of(&created, file_content()),
+            published_version_of(&batch, file_content()),
+        ],
+    )
+}
+
+/// 搬迁的流（数据单元搬走、提示过期）每个状态上 GPU 与 CPU 整份相同：两个检查内核把码 1 / 2 / 3 的位置条目当提示——先按提示读、
+/// 两份都对不上再按映射位置读，引用记映射位置（判决 m4-gc-r1 第三节 G3）；恢复内核与 core 的冷走读同样经映射回退。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_data_unit_relocation() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_data_unit_relocation";
+    let flow = record_new_pool_with_the_data_unit_relocated(
+        "crash-judge-gpu-data-unit-relocation",
+        "data-unit-relocation",
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_the_flow(TEST_NAME, &flow);
+}
+
+/// 快照钉住的单元被搬的流：新池新建文件（txg 3）、建快照（txg 4）、快照下覆盖写（txg 5，旧数据单元只被快照引用、映射条目留存）、
+/// 整理的一批搬那个旧数据单元（txg 6：留存的映射条目换到目的地，快照树里的提示过期）。覆盖写那一版起是覆盖写的内容。
+fn record_new_pool_with_a_unit_kept_for_the_snapshot_relocated(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    let mut versions = vec![published_version_of(&pool.output, file_content())];
+    let created = create_a_snapshot_and_advance(&mut pool);
+    versions.push(published_version_of(&created, file_content()));
+    let overwritten = overwrite_under_the_snapshot_and_advance(&mut pool);
+    versions.push(published_version_of(
+        &overwritten,
+        content_overwritten_under_the_snapshot(),
+    ));
+    let (kept_key, kept_locations) = overwritten
+        .mapping_entries_kept_for_the_snapshots
+        .iter()
+        .find(|(key, _)| key.first() == Some(&UNIT_CLASS_DATA))
+        .cloned()
+        .expect("旧数据单元的映射条目留存着");
+    let planned = PlannedRelocation {
+        mapping_key: kept_key,
+        source: Placement {
+            slot: kept_locations[0].slot,
+            span: TransactionUnit::Data(DataUnitIndexInFile::FIRST).span_slots(),
+        },
+    };
+    let batch = relocate_and_advance(&mut pool, std::slice::from_ref(&planned));
+    assert_eq!(
+        batch
+            .units_relocated_by_this_publish
+            .iter()
+            .map(|relocated| relocated.holder)
+            .collect::<Vec<_>>(),
+        vec![RelocatedUnitHolder::KeptForTheSnapshots],
+        "搬的是只被快照引用的那一个"
+    );
+    versions.push(published_version_of(
+        &batch,
+        content_overwritten_under_the_snapshot(),
+    ));
+    recorded_flow_of_the_pool(&pool, name, versions)
+}
+
+/// 快照钉住的单元被搬的流每个状态上 GPU 与 CPU 整份相同：走读内核走快照树时同样先按提示读、再按映射位置读，
+/// 引用与快照那一截按映射位置认单元（判决 m4-gc-r1 第三节 G3「被快照引用的块照样能搬」）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_relocation_of_a_unit_kept_for_the_snapshot(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_relocation_of_a_unit_kept_for_the_snapshot";
+    let flow = record_new_pool_with_a_unit_kept_for_the_snapshot_relocated(
+        "crash-judge-gpu-relocation-of-a-unit-kept-for-the-snapshot",
+        "relocation-of-a-unit-kept-for-the-snapshot",
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_the_flow(TEST_NAME, &flow);
+}
+
+/// discard 的流：新池新建文件的流尾另起一段，放一次盘 0 上罩住第一个文件数据单元那一份的整段 discard（64 槽对齐、64 槽长，
+/// 种类 `StepKind::Discard`，写表里按「范围写零」记）。这一段取 D13（验证路线） 已定项 4 的三态：没落、整段是 0、撕裂。
+fn record_new_pool_with_the_segment_of_the_data_unit_discarded_on_device_zero(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_file_creation(
+        tag,
+        "new-pool-segment-of-the-data-unit-discarded-on-device-zero",
+    );
+    let data_unit_slot = flow
+        .writes
+        .iter()
+        .find(|write| {
+            write.kind == StepKind::UnitWrite
+                && write.device == DeviceIdentity(0)
+                && write
+                    .bytes()
+                    .is_some_and(|bytes| unit_class(bytes) == UNIT_CLASS_DATA)
+        })
+        .expect("新池新建文件在盘 0 上写一份数据单元")
+        .offset
+        .0
+        / SLOT_BYTES;
+    let segment_start = data_unit_slot - data_unit_slot % singlefs_format::CLUSTER_SEGMENT_SLOTS;
+    append_a_segment_of_writes(
+        &mut flow,
+        vec![RetainedWrite {
+            device: DeviceIdentity(0),
+            kind: StepKind::Discard,
+            is_force_unit_access: false,
+            offset: singlefs_core::address::DeviceOffsetInBytes(segment_start * SLOT_BYTES),
+            contents: WrittenContents::Zeros {
+                length: singlefs_format::CLUSTER_SEGMENT_SLOTS * SLOT_BYTES,
+            },
+        }],
+    );
+    flow
+}
+
+/// discard 的流建得出判表（第一版不再拒 `StepKind::Discard`）、写表里那一次 discard 不占落点，每个状态上 GPU 与 CPU 整份相同。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_discard_over_the_segment_of_a_data_unit() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_discard_over_the_segment_of_a_data_unit";
+    let flow = record_new_pool_with_the_segment_of_the_data_unit_discarded_on_device_zero(
+        "crash-judge-gpu-discard-over-a-data-unit",
+    );
+    let tables = judge_tables_of_the_flow(&flow);
+    let discard = tables.writes.last().expect("写表里至少有那一次 discard");
+    assert_eq!(discard.kind, StepKind::Discard, "流尾那一次写是 discard");
+    assert_eq!(discard.location, None, "discard 罩多个落点，不占一个落点");
+    assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_the_flow(TEST_NAME, &flow);
+}
+
+// ───────── 里程碑四自建 GC 新判的那几条上 GPU（判决 m4-gc-r1 第三节 G1、G3 的 N2–N6）─────────
+
+/// 同一个进程里接着 `pool.output` 发整理的一次发布（搬 `planned` 里那几个单元、对意图做 `intent_step`），池接到它那一版上，交回那一版。
+fn compaction_step_and_advance(
+    pool: &mut BuiltPool,
+    planned: &[PlannedRelocation],
+    intent_step: CompactionIntentStep,
+) -> TransactionOutput {
+    let publish_parameters = parameters();
+    let previous = pool.output.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let published = publish_compaction_step(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        planned,
+        intent_step,
+        INSTANCE_OF_THE_SNAPSHOT_AND_RELOCATION_FLOWS,
+    )
+    .expect("整理的一次发布");
+    pool.output = published.clone();
+    published
+}
+
+/// 整理意图的流：新池新建文件（txg 3）、签发整理意图（txg 4：logged_ops 写一条，R 是第一个文件数据单元所在的那一段，c0 取新建文件那一版的 txg；
+/// 分配器这一侧同时装上 R 排他）、整理的一批搬那个数据单元（txg 5：意图照抄）、丢意图（txg 6：logged_ops 删掉那一条，树表条目根指针回到全零）。
+/// 四版都是第一个文件的内容。
+fn record_new_pool_through_a_compaction_intent_a_relocation_and_its_drop(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    let created = pool.output.clone();
+    let data_unit_slot = created
+        .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+        .slot;
+    let region = CompactionRegion::of_one_cluster_segment(
+        DeviceIdentity(0),
+        SlotNumber(data_unit_slot.0 - data_unit_slot.0 % singlefs_format::CLUSTER_SEGMENT_SLOTS),
+    )
+    .expect("段起点是 64 的倍数、装得进 6 字节");
+    let intent = CompactionIntent {
+        region,
+        allocation_generation_at_issue: created.root.checkpoint_txg,
+        empty_cluster_segments_at_issue: 0,
+    };
+    pool.allocator.compaction_mut().issue(intent);
+    let issued = compaction_step_and_advance(&mut pool, &[], CompactionIntentStep::Issue(intent));
+    assert_eq!(
+        issued.logged_operations.len(),
+        1,
+        "签发那一版的 logged_ops 里一条意图"
+    );
+    let planned =
+        planned_relocation_of_the_role(&issued, TransactionUnit::Data(DataUnitIndexInFile::FIRST));
+    let batch = compaction_step_and_advance(
+        &mut pool,
+        std::slice::from_ref(&planned),
+        CompactionIntentStep::CarryTheIntent,
+    );
+    assert_eq!(
+        batch.units_relocated_by_this_publish.len(),
+        1,
+        "这一批搬了一个单元"
+    );
+    let dropped = compaction_step_and_advance(&mut pool, &[], CompactionIntentStep::Drop);
+    pool.allocator.compaction_mut().withdraw_the_live_intent();
+    assert!(
+        dropped.logged_operations.is_empty(),
+        "丢意图那一版的 logged_ops 空了"
+    );
+    let versions = [&created, &issued, &batch, &dropped]
+        .into_iter()
+        .map(|version| published_version_of(version, file_content()))
+        .collect();
+    recorded_flow_of_the_pool(&pool, name, versions)
+}
+
+/// 整理意图那条流的每个状态上 GPU 与 CPU 整份相同（红位、池级 checker 的违例位与判到位、两遍恢复落到的根与结局）：走读内核与引用集合那一遍
+/// 把 logged_ops 树当多层码 2 树走、节点记进引用，恢复内核把 logged_ops 根数进映射条目数，扫描内核判 I-3.16，引用与快照那一截之后判 I-4.4、I-5.6、
+/// I-3.15、I-1.14（D13（验证路线） 已定项 15）。CPU 池级 checker 在这条流上判过那五条而成立。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_compaction_intent_a_relocation_and_its_drop(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_compaction_intent_a_relocation_and_its_drop";
+    let flow = record_new_pool_through_a_compaction_intent_a_relocation_and_its_drop(
+        "crash-judge-gpu-compaction-intent-relocation-drop",
+        "compaction-intent-relocation-and-drop",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+    for invariant in ["I-4.4", "I-5.6", "I-3.15", "I-3.16", "I-1.14"] {
+        assert!(
+            comparison.cpu_checker_held_invariants.contains(invariant),
+            "整理意图那条流上 CPU 池级 checker 判过 {invariant} 而成立（成立过的：{:?}）",
+            comparison.cpu_checker_held_invariants
+        );
+    }
+}
+
+/// 流里每一次命中 `select` 的单元写的下标（至少一个单元的两份副本）。
+fn every_unit_write_where(
+    flow: &RecordedFlow,
+    what: &str,
+    select: &dyn Fn(&[u8]) -> bool,
+) -> Vec<usize> {
+    let matching: Vec<usize> = flow
+        .writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| write.kind == StepKind::UnitWrite && write.bytes().is_some_and(select))
+        .map(|(index, _)| index)
+        .collect();
+    assert!(
+        matching.len() >= 2,
+        "流 {} 里命中「{what}」的单元写至少两条（一个单元的两份副本），只有 {} 条",
+        flow.name,
+        matching.len()
+    );
+    matching
+}
+
+/// 码 2 节点的条目从头的末尾再过 29 字节起（同 `only_tree_table_entry_of_kind` 的 131 = 86 + 2 × 8 + 29）。
+fn first_index_node_entry_offset(bytes: &[u8]) -> usize {
+    86 + 2 * usize::from(index_node_key_width(bytes)) + 29
+}
+
+/// logged_ops 条目里 value 的起点（key 10 之后）与 value 里 c0、补零两段的偏移（判决 G1 字段表；walk.rs 的
+/// `COMPACTION_INTENT_ALLOCATION_GENERATION_AT_ISSUE_OFFSET_IN_THE_VALUE`、`COMPACTION_INTENT_PADDING_OFFSET_IN_THE_VALUE`）。
+const LOGGED_OPERATION_VALUE_OFFSET_IN_THE_ENTRY: usize = 10;
+const COMPACTION_INTENT_ALLOCATION_GENERATION_AT_ISSUE_OFFSET_IN_THE_VALUE: usize = 12;
+const COMPACTION_INTENT_PADDING_OFFSET_IN_THE_VALUE: usize = 28;
+
+/// 整理意图那条流上改坏 logged_ops 根（码 2、key 宽 10、条目宽 44）的每一份——签发那次写的与之后照抄时写的都改——里第一条条目，重封到根。
+fn record_the_compaction_intent_flow_with_its_logged_operation_changed(
+    tag: &str,
+    name: &'static str,
+    mutate_the_first_entry: &dyn Fn(&mut [u8]),
+) -> RecordedFlow {
+    let mut flow = record_new_pool_through_a_compaction_intent_a_relocation_and_its_drop(tag, name);
+    let logged_operations_root = |bytes: &[u8]| {
+        unit_class(bytes) == 2
+            && index_node_key_width(bytes) == 10
+            && index_node_entry_width(bytes) == 44
+    };
+    let targets = every_unit_write_where(&flow, "logged_ops 根", &logged_operations_root);
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let entry = first_index_node_entry_offset(bytes);
+        mutate_the_first_entry(&mut bytes[entry..entry + 44]);
+    });
+    flow
+}
+
+/// I-4.4（意图只描述目标态，N4）：整理意图 value 末尾的补零第一个字节写 1（「再搬 N 个」这样的增量只能落在补零里），每个状态 GPU 与 CPU 整份相同、
+/// CPU 红 I-4.4。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_compaction_intent_carries_an_increment_in_its_padding()
+{
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_compaction_intent_carries_an_increment_in_its_padding";
+    let flow = record_the_compaction_intent_flow_with_its_logged_operation_changed(
+        "crash-judge-gpu-compaction-intent-padding",
+        "compaction-intent-with-an-increment-in-its-padding",
+        &|entry| {
+            entry[LOGGED_OPERATION_VALUE_OFFSET_IN_THE_ENTRY
+                + COMPACTION_INTENT_PADDING_OFFSET_IN_THE_VALUE] = 1;
+        },
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(TEST_NAME, &flow, "I-4.4");
+}
+
+/// I-5.6（活整理意图的区域里没有签发之后分配的记录，N3）：整理意图的 c0 改成 0，R 里新建文件那一版分配的数据单元的记录分配代大于它，
+/// 每个状态 GPU 与 CPU 整份相同、CPU 红 I-5.6。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_region_of_a_compaction_intent_holds_records_allocated_after_its_c0(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_region_of_a_compaction_intent_holds_records_allocated_after_its_c0";
+    let flow = record_the_compaction_intent_flow_with_its_logged_operation_changed(
+        "crash-judge-gpu-compaction-intent-c0-zero",
+        "compaction-intent-with-c0-zero",
+        &|entry| {
+            let at = LOGGED_OPERATION_VALUE_OFFSET_IN_THE_ENTRY
+                + COMPACTION_INTENT_ALLOCATION_GENERATION_AT_ISSUE_OFFSET_IN_THE_VALUE;
+            entry[at..at + 8].copy_from_slice(&0u64.to_le_bytes());
+        },
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(TEST_NAME, &flow, "I-5.6");
+}
+
+/// 没人分配也没写副本的一个槽（新池新建文件之后，同 `checker_compaction_intent_and_relocation_must_red_worlds.rs` 的 `SLOT_NOBODY_ALLOCATED`）。
+const SLOT_NOBODY_ALLOCATED: u64 = 50_400;
+
+/// 中央映射叶条目 55 字节里两条位置条目的槽号（6 字节）在条目里的偏移：key 27 之后，各条 盘 4 + 槽 6 + 整单元校验和 4。
+const MAPPING_ENTRY_LOCATION_SLOT_OFFSETS: [usize; 2] = [27 + 4, 27 + 14 + 4];
+
+/// I-3.15（N2 反查）「只改映射不写副本」：新池新建文件之后，中央映射叶里数据单元那一条的两条位置条目改指一个没人分配、也没写副本的槽，
+/// 重封到根。源槽那条未释放记录罩住的数据单元在映射里那把相符的 key 落在别处：每个状态 GPU 与 CPU 整份相同、CPU 红 I-3.15。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_mapping_entry_moved_without_a_copy() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_mapping_entry_moved_without_a_copy";
+    let mut flow = record_new_pool_file_creation(
+        "crash-judge-gpu-mapping-entry-moved-without-a-copy",
+        "new-pool-mapping-entry-moved-without-a-copy",
+    );
+    let data_unit_slot = flow
+        .writes
+        .iter()
+        .find(|write| {
+            write.kind == StepKind::UnitWrite
+                && write.device == DeviceIdentity(0)
+                && write.bytes().is_some_and(|bytes| unit_class(bytes) == 1)
+        })
+        .expect("新池新建文件在盘 0 上写一份数据单元")
+        .offset
+        .0
+        / singlefs_format::SLOT_BYTES;
+    let mapping_leaf = |bytes: &[u8]| {
+        unit_class(bytes) == 2
+            && index_node_key_width(bytes) == 27
+            && index_node_entry_width(bytes) == 55
+    };
+    let targets = last_unit_copies(&flow, "中央映射叶", &mapping_leaf, false);
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let header_end = 86 + 2 * usize::from(index_node_key_width(bytes));
+        let count = usize::from(u16::from_le_bytes(
+            bytes[header_end - 4..header_end - 2].try_into().expect("2"),
+        ));
+        let entry = (0..count)
+            .map(|position| first_index_node_entry_offset(bytes) + position * 55)
+            .find(|entry| {
+                let at = entry + MAPPING_ENTRY_LOCATION_SLOT_OFFSETS[0];
+                let mut slot = [0u8; 8];
+                slot[..6].copy_from_slice(&bytes[at..at + 6]);
+                u64::from_le_bytes(slot) == data_unit_slot
+            })
+            .expect("映射叶里有数据单元那一条");
+        for offset in MAPPING_ENTRY_LOCATION_SLOT_OFFSETS {
+            bytes[entry + offset..entry + offset + 6]
+                .copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+        }
+    });
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(TEST_NAME, &flow, "I-3.15");
+}
+
+/// runs 那一统计量的标签（D5（快照 / 空间记账机制） 已定项 4 第 10 项；walk.rs 的 `STATISTIC_FRAGMENTATION_RUNS`）。记账行里设备、值两段的偏移
+/// 用这份文件里记账那一节的 `ACCOUNTING_ROW_DEVICE_OFFSET`、`ACCOUNTING_ROW_VALUE_OFFSET`。
+const STATISTIC_FRAGMENTATION_RUNS: u16 = 10;
+
+/// I-3.16（N5 = C413）「增量少加一次」：新池新建文件那一版记账叶（根兼叶）里盘 0 的 runs 那一行减一，重封到根。全扫重算的 runs 与它对不上：
+/// 每个状态 GPU 与 CPU 整份相同、CPU 红 I-3.16。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_runs_row_of_a_device_is_one_short() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_runs_row_of_a_device_is_one_short";
+    let accounting_leaf = |bytes: &[u8]| {
+        unit_class(bytes) == 2
+            && index_node_key_width(bytes) == 22
+            && index_node_entry_width(bytes) == 34
+    };
+    let flow = record_new_pool_with_a_resealed_field(
+        "crash-judge-gpu-runs-row-one-short",
+        "new-pool-runs-row-of-device-zero-one-short",
+        &accounting_leaf,
+        false,
+        &|bytes| {
+            let header_end = 86 + 2 * usize::from(index_node_key_width(bytes));
+            let count = usize::from(u16::from_le_bytes(
+                bytes[header_end - 4..header_end - 2].try_into().expect("2"),
+            ));
+            let row = (0..count)
+                .map(|position| first_index_node_entry_offset(bytes) + position * 34)
+                .find(|row| {
+                    u16::from_le_bytes(bytes[*row..*row + 2].try_into().expect("2"))
+                        == STATISTIC_FRAGMENTATION_RUNS
+                        && u32::from_le_bytes(
+                            bytes[row + ACCOUNTING_ROW_DEVICE_OFFSET
+                                ..row + ACCOUNTING_ROW_DEVICE_OFFSET + 4]
+                                .try_into()
+                                .expect("4"),
+                        ) == 0
+                })
+                .expect("记账叶里有盘 0 的 runs 那一行");
+            let value_at = row + ACCOUNTING_ROW_VALUE_OFFSET;
+            let runs = u64::from_le_bytes(bytes[value_at..value_at + 8].try_into().expect("8"));
+            bytes[value_at..value_at + 8].copy_from_slice(
+                &runs
+                    .checked_sub(1)
+                    .expect("新池新建文件那一版盘 0 的 runs 至少 1")
+                    .to_le_bytes(),
+            );
+        },
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(TEST_NAME, &flow, "I-3.16");
+}
+
+/// 数据单元载荷起点（码 1 明文头 105 字节之后）往后第 100 个字节：改它不碰头里的任何字段。
+const A_PAYLOAD_BYTE_OF_THE_DATA_UNIT: usize = 105 + 100;
+
+/// I-1.14（N6）：搬迁的流上搬到目的地的那一份数据单元（流里最后一次码 1 单元写，两份副本）载荷改一个字节、重封，映射条目的校验和跟着补。
+/// 数据单元那把 key 在新建文件那一版指源槽那一份、在这一批指目的槽那一份，两份字节不同：每个状态 GPU 与 CPU 整份相同、CPU 红 I-1.14。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_byte_changed_in_the_relocated_copy() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_byte_changed_in_the_relocated_copy";
+    let mut flow = record_new_pool_with_the_data_unit_relocated(
+        "crash-judge-gpu-relocated-copy-changed",
+        "relocated-copy-with-a-byte-changed",
+    );
+    let data_unit = |bytes: &[u8]| unit_class(bytes) == 1;
+    let targets = last_unit_copies(&flow, "搬到目的地的那份数据单元", &data_unit, false);
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        bytes[A_PAYLOAD_BYTE_OF_THE_DATA_UNIT] ^= 0xff;
+    });
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(TEST_NAME, &flow, "I-1.14");
+}
+
+// ───────────── 截断那一批：I-4.6 改判、I-4.10、I-9.38、I-4.4 收截断条目、上段叶条目标签 3、4（判决 m4-trunc-r1 第三节 K5、K7，第六节 S1、S2）─────────────
+// GPU 恢复内核照 core 读截断中间态与洞（判决 K2、K5 的读者那一半与第六节 S5：size 之外挂着的单元不读、洞读 0），这几条流都整份比：
+// 红位、池级 checker、两遍恢复的结局与落到的根（`Comparison::mismatches` 与 `recovery_mismatches`）。
+
+/// 截断与洞那条流走到哪一步停（[`record_new_pool_through_truncations_and_holes`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum TruncationsAndHolesFlowStop {
+    /// 三个单元的文件（txg 4）：下段根、标签 1，三条下段叶记录偏移 0、P、2P（P 是净荷容量）。
+    AfterTheThreeUnitFile,
+    /// 缩到一个半净荷那次意图（txg 5）：单元 1 重写成半个净荷，单元 2 在 size 之外挂着、截断条目点名第一个文件。
+    AfterTheIntentOfTheFirstTruncation,
+    /// 缩完（最后一批放掉单元 2、删截断条目）再变长到三个半净荷（txg 7）：单元 1 补零重写成一整个净荷，之后到 size 是洞，标签 3。
+    AfterTheHoleBehindALowerSegment,
+    /// 走到底：再缩到一个净荷（意图 + 各批）、变长到两个半净荷（一个单元之后是洞，标签 3 或 4）、缩到 0（意图 + 放 0 个单元的最后一批）。
+    AtTheEnd,
+}
+
+/// 第一个文件改成 `new_size` 字节那一版读出的内容：`current` 截到 `new_size`，或在它后面补 0 到 `new_size`（变长的洞读 0）。
+fn content_after_the_size_change(current: &[u8], new_size: usize) -> Vec<u8> {
+    let mut content = current[..new_size.min(current.len())].to_vec();
+    content.resize(new_size, 0);
+    content
+}
+
+/// 截断的各批（每批一个单元）一直发到截断条目删掉为止（最后一批放完剩下的、同一次发布删条目，可以 0 个单元，判决 K2、K11），
+/// 每一版的内容都是 `content`（意图那次已把 size 写成目标）。
+fn publish_the_truncation_batches_until_the_entry_is_gone(
+    pool: &mut BuiltPool,
+    versions: &mut Vec<PublishedVersion>,
+    content: &[u8],
+) {
+    const MOST_BATCHES_OF_ONE_ON_THIS_FLOW: usize = 4;
+    for _batch_index in 0..MOST_BATCHES_OF_ONE_ON_THIS_FLOW {
+        if common_truncation::truncation_entry_of(&pool.output).is_none() {
+            return;
+        }
+        let published = common_truncation::publish_the_next_truncation_step_and_advance(
+            pool,
+            common_truncation::batches_of_one(),
+        );
+        versions.push(PublishedVersion {
+            instance: published.root.instance,
+            checkpoint_txg: published.root.checkpoint_txg,
+            content: content.to_vec(),
+        });
+    }
+    assert!(
+        common_truncation::truncation_entry_of(&pool.output).is_none(),
+        "这条流上每次截断至多放 {MOST_BATCHES_OF_ONE_ON_THIS_FLOW} 批就删掉截断条目"
+    );
+}
+
+/// 第一个文件改成 `new_size` 字节（截断时只发意图那一次），版本表记下这一版，交回这一版读出的内容。
+fn change_the_size_and_note_the_version(
+    pool: &mut BuiltPool,
+    versions: &mut Vec<PublishedVersion>,
+    current: &[u8],
+    new_size: usize,
+) -> Vec<u8> {
+    let published = common_truncation::change_the_size_of_the_first_file_and_advance(
+        pool,
+        u64::try_from(new_size).expect("装得进 u64"),
+    );
+    let content = content_after_the_size_change(current, new_size);
+    versions.push(PublishedVersion {
+        instance: published.root.instance,
+        checkpoint_txg: published.root.checkpoint_txg,
+        content: content.clone(),
+    });
+    content
+}
+
+/// 截断与洞的流（`common_truncation` 的搭建，批大小 1）：新池新建文件（txg 3）、第一个文件顺序写成三个数据单元（txg 4，两个半净荷）、
+/// 缩到一个半净荷（意图 txg 5，最后一批 txg 6）、变长到三个半净荷（txg 7，标签 3）、缩到一个净荷（意图 + 最后一批：洞整个截掉、换标签写在意图那次，
+/// 判决第六节 S1）、变长到两个半净荷（一个单元之后是洞）、缩到 0（意图把单元 0 重写成声明长度 0，最后一批放 0 个单元）。版本表照每一版读出的内容记。
+fn record_new_pool_through_truncations_and_holes(
+    tag: &str,
+    name: &'static str,
+    stop: TruncationsAndHolesFlowStop,
+) -> RecordedFlow {
+    let payload = singlefs_core::unit::data_unit_payload_capacity();
+    let mut pool = pool_with_a_three_unit_file(tag);
+    let mut versions = versions_with_the_first_file_before_its_deletion();
+    let mut content = content_of_three_data_units();
+    if stop >= TruncationsAndHolesFlowStop::AfterTheIntentOfTheFirstTruncation {
+        content = change_the_size_and_note_the_version(
+            &mut pool,
+            &mut versions,
+            &content,
+            payload + payload / 2,
+        );
+    }
+    if stop >= TruncationsAndHolesFlowStop::AfterTheHoleBehindALowerSegment {
+        publish_the_truncation_batches_until_the_entry_is_gone(&mut pool, &mut versions, &content);
+        content = change_the_size_and_note_the_version(
+            &mut pool,
+            &mut versions,
+            &content,
+            3 * payload + payload / 2,
+        );
+        assert_eq!(
+            common_truncation::upper_leaf_tag_of_the_first_file(&pool.output),
+            3,
+            "两个单元之后到三个半净荷是洞：下段根、标签 3"
+        );
+    }
+    if stop >= TruncationsAndHolesFlowStop::AtTheEnd {
+        content = change_the_size_and_note_the_version(&mut pool, &mut versions, &content, payload);
+        publish_the_truncation_batches_until_the_entry_is_gone(&mut pool, &mut versions, &content);
+        content = change_the_size_and_note_the_version(
+            &mut pool,
+            &mut versions,
+            &content,
+            2 * payload + payload / 2,
+        );
+        assert_eq!(
+            common_truncation::upper_leaf_tag_of_the_first_file(&pool.output),
+            4,
+            "缩到一个净荷之后只剩单元 0、内联（只有一个单元的文件不建下段），变长到两个半净荷之后到 size 是洞：标签 4"
+        );
+        content = change_the_size_and_note_the_version(&mut pool, &mut versions, &content, 0);
+        publish_the_truncation_batches_until_the_entry_is_gone(&mut pool, &mut versions, &content);
+    }
+    recorded_flow_of_the_pool(&pool, name, versions)
+}
+
+/// 截断那几条流上 GPU 判器与 CPU 逐状态整份相同（[`assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_truncation_flow`]），
+/// CPU 池级 checker 在这条流上红 `invariant`。本机没有 NVIDIA 独显适配器时报「本次未跑」返回。
+fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_flow_reddening(
+    test_name: &str,
+    flow: &RecordedFlow,
+    invariant: &'static str,
+) {
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains(invariant),
+        "流 {} 上 CPU 池级 checker 要红 {invariant}（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_truncation_flow(flow, &comparison);
+}
+
+/// 截断那几条流上每个状态整份相同：对拍字、红位、池级 checker 违例位逐位相同、没有判不了的（[`Comparison::mismatches`] 是空的），
+/// 两遍恢复的结局与看 journal 那一遍落到的根相同（[`Comparison::recovery_mismatches`] 是 0；它也算进 `mismatches`，单列一句是为了红的时候
+/// 一眼看出是恢复内核那一半），池级 checker 那一半另核一遍（[`Comparison::checker_mismatches`] 是空的）。
+fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_truncation_flow(
+    flow: &RecordedFlow,
+    comparison: &Comparison,
+) {
+    let first_lines = |lines: &[String]| {
+        lines
+            .iter()
+            .filter(|line| !line.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert_eq!(
+        comparison.recovery_mismatches,
+        0,
+        "流 {}：{} 个状态 GPU 与 CPU 两遍恢复的结局或看 journal 那一遍落到的根不同（不一致的前几个）：\n{}",
+        flow.name,
+        comparison.recovery_mismatches,
+        first_lines(&comparison.mismatches)
+    );
+    assert!(
+        comparison.checker_mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 的池级 checker 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.checker_mismatches.len(),
+        first_lines(&comparison.checker_mismatches)
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        first_lines(&comparison.mismatches)
+    );
+}
+
+/// 截断与洞那条合法流走到底：每个状态 GPU 与 CPU 整份相同（两遍恢复读截断中间态与洞、池级 checker）；CPU 池级 checker 在这条流上判过 I-4.6、
+/// I-4.10、I-9.38、I-4.4（截断条目）与 I-9.39（截断第二轮：每条记录判一次，截庚合进来之前记录的截断字段都是 0、照判成立）而成立、一个状态都不红。GPU 两个池级 checker 内核都认标签 3、4（不认的话走读内核红 I-1.1、扫描内核读不全
+/// extent 树，判到位对不上）；恢复内核认标签 3、4、单元数按标签对 size、size 之外挂着的单元不读、洞按全零比（不照的话截断中间态与有洞的那几版
+/// 两遍恢复报走读失败或内容不同，CPU 读出文件）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_truncations_and_holes() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_on_every_state_of_truncations_and_holes";
+    let flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-truncations-and-holes",
+        "truncations-and-holes",
+        TruncationsAndHolesFlowStop::AtTheEnd,
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_truncation_flow(
+        &flow,
+        &comparison,
+    );
+    for invariant in ["I-4.6", "I-4.10", "I-9.38", "I-4.4", "I-9.39"] {
+        assert!(
+            comparison.cpu_checker_held_invariants.contains(invariant),
+            "截断与洞的流上 CPU 池级 checker 判过 {invariant} 而成立（成立过的：{:?}）",
+            comparison.cpu_checker_held_invariants
+        );
+        assert!(
+            !comparison.cpu_checker_red_invariants.contains(invariant),
+            "截断与洞的流上 CPU 池级 checker 不红 {invariant}（红过的：{:?}）",
+            comparison.cpu_checker_red_invariants
+        );
+    }
+}
+
+/// 截断条目 value 里 inode 号、对象出生代、目标 size 之后的补零（判决 K1：value 34 = 8 + 8 + 8 + 补零 10）的偏移与对象出生代的偏移。
+const TRUNCATION_INTENT_OBJECT_BIRTH_OFFSET_IN_THE_VALUE: usize = 8;
+const TRUNCATION_INTENT_PADDING_OFFSET_IN_THE_VALUE: usize = 24;
+/// logged_ops 条目的种类码：2 是截断（判决 K1）。
+const LOGGED_OPERATION_KIND_TRUNCATION: u16 = 2;
+
+/// 缩到一个半净荷那次意图之后的流上，改坏 logged_ops 根（码 2、key 宽 10、条目宽 44）最后写的那一份（两份副本）里第一条条目——那条截断条目，重封到根。
+fn record_the_first_truncation_intent_with_its_logged_operation_changed(
+    tag: &str,
+    name: &'static str,
+    mutate_the_truncation_entry: &dyn Fn(&mut [u8]),
+) -> RecordedFlow {
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        tag,
+        name,
+        TruncationsAndHolesFlowStop::AfterTheIntentOfTheFirstTruncation,
+    );
+    let logged_operations_root = |bytes: &[u8]| {
+        unit_class(bytes) == 2
+            && index_node_key_width(bytes) == 10
+            && index_node_entry_width(bytes) == 44
+    };
+    let targets = last_unit_copies(
+        &flow,
+        "截断意图那次写的 logged_ops 根",
+        &logged_operations_root,
+        false,
+    );
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let entry = first_index_node_entry_offset(bytes);
+        assert_eq!(
+            read_u16_at(bytes, entry),
+            LOGGED_OPERATION_KIND_TRUNCATION,
+            "logged_ops 根里第一条是截断条目"
+        );
+        mutate_the_truncation_entry(&mut bytes[entry..entry + 44]);
+    });
+    flow
+}
+
+/// I-4.4（截断条目只描述目标态，判决 K7 T-1）：截断条目补零的第一个字节写 1（「再截 N 个」这样的增量只能落在补零里），
+/// 每个状态 GPU 与 CPU 整份相同（两遍恢复与池级 checker）、CPU 红 I-4.4。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_truncation_intent_carries_an_increment_in_its_padding()
+{
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_truncation_intent_carries_an_increment_in_its_padding";
+    let flow = record_the_first_truncation_intent_with_its_logged_operation_changed(
+        "crash-judge-gpu-truncation-intent-padding",
+        "truncation-intent-with-an-increment-in-its-padding",
+        &|entry| {
+            entry[LOGGED_OPERATION_VALUE_OFFSET_IN_THE_ENTRY
+                + TRUNCATION_INTENT_PADDING_OFFSET_IN_THE_VALUE] = 1;
+        },
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_flow_reddening(
+        TEST_NAME, &flow, "I-4.4",
+    );
+}
+
+/// I-4.10（截断中间态有账，判决 K7 T-2）：截断条目的对象出生代加一，它不再对得上第一个文件的记录，size 之外挂着的单元 2 没有账
+/// （I-4.4 与 I-4.6 跟着红），每个状态 GPU 与 CPU 整份相同（两遍恢复与池级 checker）、CPU 红 I-4.10。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_truncation_intent_names_another_object_birth() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_truncation_intent_names_another_object_birth";
+    let flow = record_the_first_truncation_intent_with_its_logged_operation_changed(
+        "crash-judge-gpu-truncation-intent-object-birth",
+        "truncation-intent-naming-another-object-birth",
+        &|entry| {
+            let at = LOGGED_OPERATION_VALUE_OFFSET_IN_THE_ENTRY
+                + TRUNCATION_INTENT_OBJECT_BIRTH_OFFSET_IN_THE_VALUE;
+            let object_birth = read_u64_at(entry, at);
+            entry[at..at + 8].copy_from_slice(&(object_birth + 1).to_le_bytes());
+        },
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_flow_reddening(
+        TEST_NAME, &flow, "I-4.10",
+    );
+}
+
+/// I-9.38（数据单元声明长度对 size，判决 K7 T-4）：缩到一个半净荷那次意图重写的尾单元（单元 1，声明长度半个净荷）声明长度多一（多出来的那个字节是补零，
+/// 单元照样解得开），每个状态 GPU 与 CPU 整份相同（落到意图那一版时两遍恢复都在这个单元上判声明长度不符、走读失败；池级 checker）、CPU 红 I-9.38。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_data_unit_within_the_size_declares_one_byte_more() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_data_unit_within_the_size_declares_one_byte_more";
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-truncation-tail-declared-length",
+        "truncation-tail-declaring-one-byte-more",
+        TruncationsAndHolesFlowStop::AfterTheIntentOfTheFirstTruncation,
+    );
+    let data_unit = |bytes: &[u8]| unit_class(bytes) == 1;
+    let targets = last_unit_copies(&flow, "截断意图重写的尾单元", &data_unit, false);
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let payload =
+            u16::try_from(singlefs_core::unit::data_unit_payload_capacity()).expect("32634");
+        let declared_length = read_u16_at(bytes, UNIT_DECLARED_LENGTH_OFFSET);
+        assert_eq!(declared_length, payload / 2, "尾单元的声明长度是半个净荷");
+        bytes[UNIT_DECLARED_LENGTH_OFFSET..UNIT_DECLARED_LENGTH_OFFSET + 2]
+            .copy_from_slice(&(declared_length + 1).to_le_bytes());
+    });
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_flow_reddening(
+        TEST_NAME, &flow, "I-9.38",
+    );
+}
+
+/// I-4.6 ①（存在的单元从 0 起连号，判决 K7 T-3）：三个单元的文件那一版下段叶里偏移 2P 那条记录的 key 偏移改成 3P（单元 2 跳过一个净荷），
+/// 每个状态 GPU 与 CPU 整份相同（落到三个单元那一版时两遍恢复都判单元不连号、走读失败；池级 checker）、CPU 红 I-4.6。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_data_units_of_a_file_skip_an_offset() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_data_units_of_a_file_skip_an_offset";
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-data-units-skipping-an-offset",
+        "data-units-skipping-an-offset",
+        TruncationsAndHolesFlowStop::AfterTheThreeUnitFile,
+    );
+    let extent_lower_leaf = |bytes: &[u8]| {
+        unit_class(bytes) == 2
+            && usize::from(index_node_key_width(bytes)) == EXTENT_KEY_BYTES
+            && index_node_entry_width(bytes) == EXTENT_LOWER_LEAF_RECORD_BYTES
+    };
+    let targets = last_unit_copies(&flow, "三个单元那一版的下段叶", &extent_lower_leaf, false);
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let payload =
+            u64::try_from(singlefs_core::unit::data_unit_payload_capacity()).expect("32634");
+        let records_start = index_node_entries_start(EXTENT_KEY_BYTES);
+        let record_count = usize::from(read_u16_at(
+            bytes,
+            index_node_entry_count_offset(EXTENT_KEY_BYTES),
+        ));
+        let record_bytes = usize::from(EXTENT_LOWER_LEAF_RECORD_BYTES);
+        let offset_field = (0..record_count)
+            .map(|record_index| {
+                records_start + record_index * record_bytes + EXTENT_KEY_OFFSET_OF_THE_FILE_OFFSET
+            })
+            .find(|offset_field| read_u64_at(bytes, *offset_field) == 2 * payload)
+            .expect("下段叶里有偏移 2P 那条记录");
+        bytes[offset_field..offset_field + 8].copy_from_slice(&(3 * payload).to_le_bytes());
+    });
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_flow_reddening(
+        TEST_NAME, &flow, "I-4.6",
+    );
+}
+
+/// extent key 里文件偏移那一段（locality 8、inode 8 之后）。
+const EXTENT_KEY_OFFSET_OF_THE_FILE_OFFSET: usize = 16;
+/// 上段叶条目标签 3、1（判决 K5：3 是下段根、之后到 size 是洞；1 是下段根、之后没有洞）。
+const EXTENT_UPPER_LEAF_TAG_LOWER_SEGMENT_ROOT_FOLLOWED_BY_A_HOLE: u8 = 3;
+
+/// I-4.6 ②（单元数对标签，判决 K7 T-3 与第六节 S1）：变长出洞那一版上段叶里第一个文件那一条的标签 3 改写成 1——两个单元、size 要四个、没有截断条目，
+/// 标签 1 要不少于四个，每个状态 GPU 与 CPU 整份相同（落到变长出洞那一版时两遍恢复都判单元数对不上 size、走读失败；池级 checker）、CPU 红 I-4.6。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_hole_tag_is_rewritten_as_no_hole() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_hole_tag_is_rewritten_as_no_hole";
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-hole-tag-rewritten-as-no-hole",
+        "hole-tag-rewritten-as-no-hole",
+        TruncationsAndHolesFlowStop::AfterTheHoleBehindALowerSegment,
+    );
+    let targets = last_unit_copies(
+        &flow,
+        "变长出洞那一版的上段叶",
+        &is_an_extent_upper_leaf,
+        false,
+    );
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let tag = pointer_of_the_first_extent_upper_leaf_entry(
+            bytes,
+            EXTENT_UPPER_LEAF_TAG_LOWER_SEGMENT_ROOT_FOLLOWED_BY_A_HOLE,
+        ) - 1;
+        bytes[tag] = EXTENT_UPPER_LEAF_TAG_LOWER_SEGMENT_ROOT;
+    });
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_flow_reddening(
+        TEST_NAME, &flow, "I-4.6",
+    );
+}
+
+/// 洞的内容按期望那一版逐单元比（判决 m4-trunc-r1 第六节 S5：内核读到洞时现算全零的载荷区 CRC，与判表从版本表给的期望比）：变长出洞那一版
+/// （两个单元、size 三个半净荷、标签 3）的期望内容在洞里（单元 2 那一段的中间）塞一个非零字节，盘上一个字都不改。读出的洞是 0，落到这一版的状态上
+/// CPU 看 journal 那一遍红「内容不同」；每个状态 GPU 与 CPU 整份相同——GPU 不比洞（或比洞时不照期望那一版）的话，这些状态上 GPU 判内容相同、对拍红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_expected_content_has_a_nonzero_byte_in_the_hole() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_expected_content_has_a_nonzero_byte_in_the_hole";
+    let payload = singlefs_core::unit::data_unit_payload_capacity();
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-nonzero-byte-in-the-hole",
+        "nonzero-byte-in-the-hole-of-the-expected-content",
+        TruncationsAndHolesFlowStop::AfterTheHoleBehindALowerSegment,
+    );
+    let version_with_the_hole = flow
+        .versions
+        .last_mut()
+        .expect("变长出洞那一版是版本表里最后一版");
+    assert_eq!(
+        version_with_the_hole.content.len(),
+        3 * payload + payload / 2,
+        "变长出洞那一版的期望内容是三个半净荷"
+    );
+    let byte_in_the_hole = 2 * payload + payload / 2;
+    assert_eq!(
+        version_with_the_hole.content[byte_in_the_hole], 0,
+        "洞里的期望内容是 0"
+    );
+    version_with_the_hole.content[byte_in_the_hole] = 1;
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    let wrong_content = consulted_oracle_item(CrashPointReplayOracleViolationKind::WrongContent);
+    assert!(
+        comparison
+            .cpu_red_items_of_each_state
+            .iter()
+            .any(|red_items| red_items.contains(&wrong_content)),
+        "流 {} 上落到变长出洞那一版的状态 CPU 看 journal 那一遍红「内容不同」",
+        flow.name
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_truncation_flow(
+        &flow,
+        &comparison,
+    );
+}
+
+// ───────────── 截断第二轮：截断字段、I-9.7 拆段、I-9.39、incompat 位 2（判决 m4-trunc-r2 第三节 R1、R6 与第六节用户定案）─────────────
+// 记录与系统配置都按字节改：核心层写字段与 mkfs 写位 2 的那一半（截庚）还没合进来时，这几条流照样造得出。
+
+/// inode 记录里截断字段两段与两段恒零区（判决 R1）：T 在偏移 120、N_w 在偏移 128；截断字段之前那一段预留的最后一个字节在 119，之后那一段在 136–139。
+const INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET: usize = 120;
+const INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET: usize = 128;
+const INODE_RECORD_LAST_RESERVED_BYTE_BEFORE_THE_TRUNCATION_FIELD: usize = 119;
+const INODE_RECORD_LAST_RESERVED_BYTE_AFTER_THE_TRUNCATION_FIELD: usize = 139;
+/// 系统配置槽里 incompat 位图第一个字节的偏移（magic 4 + 格式版本 2）与这一字节里认得的两位：位 1 布局身份、位 2 inode 记录带截断字段
+/// （D15（格式冻结政策） 已定项 4）；位 0 退役、位 3 没分出去。
+const FIRST_INCOMPAT_BYTE_OFFSET: usize = 6;
+const INCOMPAT_FIRST_SSD_LINE_BIT: u8 = 0x02;
+const INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT: u8 = 0x04;
+const INCOMPAT_RETIRED_BIT_ZERO: u8 = 0x01;
+const INCOMPAT_UNASSIGNED_BIT_THREE: u8 = 0x08;
+/// 三个单元的文件那次顺序写的 checkpoint_txg（新池新建文件 txg 3 之后的那一次）：三个单元的单元头诞生代号都是它。
+const CHECKPOINT_TXG_OF_THE_THREE_UNIT_FILE: u64 = 4;
+/// 新池新建文件那一版的 checkpoint_txg（取号、两次暖机之后）：它唯一那个单元的诞生代号。
+const CHECKPOINT_TXG_OF_THE_NEW_POOL_FILE: u64 = 3;
+/// 缩到一个半净荷那次截断意图的 checkpoint_txg。
+const CHECKPOINT_TXG_OF_THE_FIRST_TRUNCATION_INTENT: u64 = 5;
+
+/// 截断字段的两段写成 (T, N_w)。
+fn write_the_truncation_field(
+    record: &mut [u8],
+    truncation_field_txg: u64,
+    truncation_field_size_in_bytes: u64,
+) {
+    record[INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET..INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET + 8]
+        .copy_from_slice(&truncation_field_txg.to_le_bytes());
+    record
+        [INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET..INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET + 8]
+        .copy_from_slice(&truncation_field_size_in_bytes.to_le_bytes());
+}
+
+/// 流里最后写的那片 inode 叶容器（两份副本）上第一个文件的记录照 `change` 改、重封到根。
+fn change_the_record_of_the_first_file_in_the_last_inode_leaf(
+    flow: &mut RecordedFlow,
+    change: &dyn Fn(&mut [u8]),
+) {
+    let targets = last_unit_copies(
+        flow,
+        "最后写的那片 inode 叶容器",
+        &is_an_inode_leaf_container,
+        false,
+    );
+    corrupt_units_and_reseal_up_to_the_root(flow, &targets, &|bytes| {
+        let record = offset_of_the_inode_record(bytes, FIRST_FILE.0);
+        change(&mut bytes[record..record + INODE_RECORD_BYTES]);
+    });
+}
+
+/// 一个系统配置槽（magic 对得上的那几份；全零的槽不碰）incompat 第一个字节照 `change` 改、重封整槽校验和。
+fn change_the_first_incompat_byte_of_a_system_configuration_slot(
+    slot: &mut [u8],
+    change: &dyn Fn(u8) -> u8,
+) {
+    if &slot[..4] != b"SFSB" {
+        return;
+    }
+    slot[FIRST_INCOMPAT_BYTE_OFFSET] = change(slot[FIRST_INCOMPAT_BYTE_OFFSET]);
+    let digest = singlefs_core::checksum::wide_checksum_with_field_zeroed(
+        slot,
+        4096,
+        SYSTEM_CONFIGURATION_CHECKSUM_FIELD,
+    );
+    slot[SYSTEM_CONFIGURATION_CHECKSUM_FIELD..SYSTEM_CONFIGURATION_CHECKSUM_FIELD + 32]
+        .copy_from_slice(&digest);
+}
+
+/// 改一条流的哪几处系统配置槽。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SystemConfigurationSlotsToChange {
+    /// 基镜像里 mkfs 写下的两槽，与流里每一次系统配置槽写：每个状态上择到哪一槽都是改过的那一种。
+    TheBaseImageSlotsAndEveryWriteInTheFlow,
+    /// 只改流里的系统配置槽写，基镜像里 mkfs 写下的两槽不动：判表照它们取落点几何（`crash_judge_tables` 的
+    /// `JudgeTablesRefusal::BaseSystemConfigurationUnreadable`：基线两槽都解不开就建不出表）。
+    OnlyTheWritesInTheFlow,
+}
+
+/// `devices` 里每块盘上 `slots_to_change` 点名的那几处系统配置槽 incompat 第一个字节照 `change` 改，交回改了流里几次系统配置槽写。
+fn change_the_first_incompat_byte_of_every_system_configuration_slot_on(
+    flow: &mut RecordedFlow,
+    devices: &[DeviceIdentity],
+    slots_to_change: SystemConfigurationSlotsToChange,
+    change: &dyn Fn(u8) -> u8,
+) -> usize {
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    match slots_to_change {
+        SystemConfigurationSlotsToChange::TheBaseImageSlotsAndEveryWriteInTheFlow => {
+            for (device_identity, device) in &mut flow.base.devices {
+                if !devices.contains(device_identity) {
+                    continue;
+                }
+                for slot_offset in [0, spacing] {
+                    let mut slot = device.read(
+                        singlefs_core::address::DeviceOffsetInBytes(slot_offset),
+                        4096,
+                    );
+                    change_the_first_incompat_byte_of_a_system_configuration_slot(
+                        &mut slot, change,
+                    );
+                    device.write(
+                        singlefs_core::address::DeviceOffsetInBytes(slot_offset),
+                        &slot,
+                    );
+                }
+            }
+        }
+        SystemConfigurationSlotsToChange::OnlyTheWritesInTheFlow => {}
+    }
+    let mut writes_changed = 0;
+    for write in &mut flow.writes {
+        if write.kind != StepKind::SystemConfigurationSlot || !devices.contains(&write.device) {
+            continue;
+        }
+        match &mut write.contents {
+            WrittenContents::Bytes(bytes) => {
+                change_the_first_incompat_byte_of_a_system_configuration_slot(bytes, change);
+                writes_changed += 1;
+            }
+            WrittenContents::Zeros { .. } => panic!("系统配置槽写是普通写"),
+        }
+    }
+    writes_changed
+}
+
+/// 两块盘。
+const BOTH_DEVICES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
+
+/// 每一槽都带 incompat 位 2（第一个字节 0x02 → 0x06）。
+fn set_incompat_bit_two_on_every_system_configuration_slot(flow: &mut RecordedFlow) {
+    change_the_first_incompat_byte_of_every_system_configuration_slot_on(
+        flow,
+        &BOTH_DEVICES,
+        SystemConfigurationSlotsToChange::TheBaseImageSlotsAndEveryWriteInTheFlow,
+        &|first_byte| first_byte | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
+    );
+}
+
+/// 每一槽都清掉 incompat 位 2（第一个字节 0x06 → 0x02）：mkfs 与写者写系统配置都带位 2（截庚），要一个不带位 2 的池就得在录下的流上清。
+fn clear_incompat_bit_two_on_every_system_configuration_slot(flow: &mut RecordedFlow) {
+    change_the_first_incompat_byte_of_every_system_configuration_slot_on(
+        flow,
+        &BOTH_DEVICES,
+        SystemConfigurationSlotsToChange::TheBaseImageSlotsAndEveryWriteInTheFlow,
+        &|first_byte| first_byte & !INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
+    );
+}
+
+/// 三个单元的文件那一版（txg 4）停下的截断与洞流，第一个文件的记录照 `change` 改。
+fn record_the_three_unit_file_with_its_record_changed(
+    tag: &str,
+    name: &'static str,
+    change: &dyn Fn(&mut [u8]),
+) -> RecordedFlow {
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        tag,
+        name,
+        TruncationsAndHolesFlowStop::AfterTheThreeUnitFile,
+    );
+    change_the_record_of_the_first_file_in_the_last_inode_leaf(&mut flow, change);
+    flow
+}
+
+/// 截断字段这几条流上 GPU 判器与 CPU 逐状态比：CPU 池级 checker 红的恰是 `expected_red`、判过而成立的里有 `expected_held`；
+/// 池级 checker 那一半（违例位、判到位）每个状态逐位相同，再比两遍恢复与整份对拍字。恢复那一半在核心层的读者认截断字段与 incompat 位 2
+/// （截庚）合进来之前对不上：那之前 core 把带截断字段的记录判不可用、把 0x06 判成不认得的位，GPU 恢复内核已经照判决收它们。
+fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+    test_name: &str,
+    flow: &RecordedFlow,
+    expected_red: &[&'static str],
+    expected_held: &[&'static str],
+) {
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, flow, expand_up_to()) else {
+        return;
+    };
+    let expected_red: std::collections::BTreeSet<&'static str> =
+        expected_red.iter().copied().collect();
+    assert_eq!(
+        comparison.cpu_checker_red_invariants, expected_red,
+        "流 {} 上 CPU 池级 checker 红的那几条",
+        flow.name
+    );
+    for invariant in expected_held {
+        assert!(
+            comparison.cpu_checker_held_invariants.contains(invariant),
+            "流 {} 上 CPU 池级 checker 判过 {invariant} 而成立（成立过的：{:?}）",
+            flow.name,
+            comparison.cpu_checker_held_invariants
+        );
+    }
+    assert_the_pool_checker_half_then_the_recovery_half_agree(flow, &comparison);
+}
+
+/// 池级 checker 那一半先比（截庚合进来之前就该对上），再比恢复那一半与整份。
+fn assert_the_pool_checker_half_then_the_recovery_half_agree(
+    flow: &RecordedFlow,
+    comparison: &Comparison,
+) {
+    let first_lines = |lines: &[String]| {
+        lines
+            .iter()
+            .filter(|line| !line.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert!(
+        comparison.checker_mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 的池级 checker 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.checker_mismatches.len(),
+        first_lines(&comparison.checker_mismatches)
+    );
+    assert_eq!(
+        comparison.recovery_mismatches,
+        0,
+        "流 {}：{} 个状态 GPU 与 CPU 两遍恢复的结局或落到的根不同（核心层读者认截断字段与 incompat 位 2 的那一份合进来之前这一句红是预期的）：\n{}",
+        flow.name,
+        comparison.recovery_mismatches,
+        first_lines(&comparison.mismatches)
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        first_lines(&comparison.mismatches)
+    );
+}
+
+/// I-9.7 截断字段之前那一段预留（偏移 108–119）的最后一个字节写 1：CPU 只红 I-9.7，两遍恢复都把这条记录判不可用；每个状态整份相同。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_before_the_truncation_field_are_not_zero(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_before_the_truncation_field_are_not_zero";
+    let flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-reserved-byte-before-the-truncation-field",
+        "reserved-byte-before-the-truncation-field",
+        &|record| record[INODE_RECORD_LAST_RESERVED_BYTE_BEFORE_THE_TRUNCATION_FIELD] = 1,
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &["I-9.7"],
+        &[],
+    );
+}
+
+/// I-9.7 截断字段之后那一段预留（偏移 136–139）的最后一个字节写 1：CPU 只红 I-9.7；每个状态整份相同。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_after_the_truncation_field_are_not_zero(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_after_the_truncation_field_are_not_zero";
+    let flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-reserved-byte-after-the-truncation-field",
+        "reserved-byte-after-the-truncation-field",
+        &|record| record[INODE_RECORD_LAST_RESERVED_BYTE_AFTER_THE_TRUNCATION_FIELD] = 1,
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &["I-9.7"],
+        &[],
+    );
+}
+
+/// I-9.7 带 incompat 位 2 的池上截断字段 T = 0 而 N_w = 5（没写过的字段两段都是 0）：CPU 只红 I-9.7，两遍恢复都把这条记录判不可用。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_truncation_field_size_comes_without_its_txg() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_truncation_field_size_comes_without_its_txg";
+    let mut flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-truncation-field-size-without-txg",
+        "truncation-field-size-without-txg",
+        &|record| write_the_truncation_field(record, 0, 5),
+    );
+    set_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &["I-9.7"],
+        &[],
+    );
+}
+
+/// I-9.7 不带 incompat 位 2 的池上截断字段写成 (三个单元那一版的 txg, 0)：截断字段必须全零，CPU 只红 I-9.7（单元恰在 txg T 写下，I-9.39 成立），
+/// 两遍恢复照核心层判这条记录在这个池里不收。录下的流每一槽都带位 2（mkfs 与写者都写 0x06），先在每一槽上清掉它才是不带位 2 的池。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_truncation_field_is_written_without_incompat_bit_two() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_truncation_field_is_written_without_incompat_bit_two";
+    let mut flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-truncation-field-without-the-bit",
+        "truncation-field-without-incompat-bit-two",
+        &|record| write_the_truncation_field(record, CHECKPOINT_TXG_OF_THE_THREE_UNIT_FILE, 0),
+    );
+    clear_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &["I-9.7"],
+        &["I-9.39"],
+    );
+}
+
+/// I-9.7 两块盘里只有盘 0 的系统配置带 incompat 位 2，记录的截断字段 (三个单元那一版的 txg, 0)：各盘择到的槽都带才算带（截辛推的读法第 4 条，
+/// 主 agent 认了），按不带判，CPU 只红 I-9.7。录下的流两块盘每一槽都带位 2，先全清、再只给盘 0 置上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_only_one_device_carries_incompat_bit_two() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_only_one_device_carries_incompat_bit_two";
+    let mut flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-incompat-bit-two-on-one-device",
+        "incompat-bit-two-on-one-device",
+        &|record| write_the_truncation_field(record, CHECKPOINT_TXG_OF_THE_THREE_UNIT_FILE, 0),
+    );
+    clear_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    change_the_first_incompat_byte_of_every_system_configuration_slot_on(
+        &mut flow,
+        &[DeviceIdentity(0)],
+        SystemConfigurationSlotsToChange::TheBaseImageSlotsAndEveryWriteInTheFlow,
+        &|first_byte| first_byte | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &["I-9.7"],
+        &[],
+    );
+}
+
+/// I-9.39 的必红世界：带 incompat 位 2，三个单元（txg 4 写下）那一版的记录截断字段写成 (5, 0)：⌈0 ÷ 净荷⌉.max(1) = 1，单元 1、2 在截断字段之外、
+/// size 之内，诞生代号 4 早于 T——CPU 只红 I-9.39（I-1.13 报不适用，GPU 不比它）；GPU 扫描内核逐位跟上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_live_data_unit_beyond_the_truncation_field_is_born_before_it(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_live_data_unit_beyond_the_truncation_field_is_born_before_it";
+    let mut flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-live-unit-born-before-the-truncation-field",
+        "live-unit-born-before-the-truncation-field",
+        &|record| write_the_truncation_field(record, CHECKPOINT_TXG_OF_THE_THREE_UNIT_FILE + 1, 0),
+    );
+    set_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &["I-9.39"],
+        &[],
+    );
+}
+
+/// 合法世界：带 incompat 位 2，三个单元那一版的记录截断字段写成 (4, 0)，单元 1、2 在截断字段之外而恰在 txg T 写下、不早于它：CPU 一条都不红，
+/// I-9.7 与 I-9.39 判过而成立。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_live_data_units_are_born_at_the_truncation_field_txg() {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_live_data_units_are_born_at_the_truncation_field_txg";
+    let mut flow = record_the_three_unit_file_with_its_record_changed(
+        "crash-judge-gpu-live-units-born-at-the-truncation-field-txg",
+        "live-units-born-at-the-truncation-field-txg",
+        &|record| write_the_truncation_field(record, CHECKPOINT_TXG_OF_THE_THREE_UNIT_FILE, 0),
+    );
+    set_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &[],
+        &["I-9.7", "I-9.39"],
+    );
+}
+
+/// 合法世界：带 incompat 位 2，新池新建文件（一个单元，txg 3 写下）的记录截断字段写成 (4, 0)：⌈0 ÷ 净荷⌉.max(1) = 1，单元 0 不在截断字段之外，
+/// 诞生代号早于 T 也是活的——CPU 一条都不红、I-9.39 判过而成立（去掉 .max(1) 就判死单元 0）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_a_truncation_field_to_size_zero_keeps_the_first_data_unit(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_a_truncation_field_to_size_zero_keeps_the_first_data_unit";
+    let mut flow = record_new_pool_file_creation(
+        "crash-judge-gpu-truncation-field-to-size-zero",
+        "truncation-field-to-size-zero-keeping-the-first-data-unit",
+    );
+    change_the_record_of_the_first_file_in_the_last_inode_leaf(&mut flow, &|record| {
+        write_the_truncation_field(record, CHECKPOINT_TXG_OF_THE_NEW_POOL_FILE + 1, 0);
+    });
+    set_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &[],
+        &["I-9.39"],
+    );
+}
+
+/// 合法世界：带 incompat 位 2，缩到一个半净荷那次意图（txg 5）的记录照用户定案写上截断字段 (5, 一个半净荷)：留下两个单元，单元 2 在 size 之外还挂着、
+/// 诞生代号 4 早于 T——它是截断中间态等着放的单元、不是活单元，I-9.39 不判它（「活单元」取 size 之内的读法），CPU 一条都不红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_truncation_intent_version_carries_its_truncation_field(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_truncation_intent_version_carries_its_truncation_field";
+    let payload = u64::try_from(singlefs_core::unit::data_unit_payload_capacity()).expect("32634");
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-truncation-intent-with-its-field",
+        "truncation-intent-with-its-truncation-field",
+        TruncationsAndHolesFlowStop::AfterTheIntentOfTheFirstTruncation,
+    );
+    change_the_record_of_the_first_file_in_the_last_inode_leaf(&mut flow, &|record| {
+        write_the_truncation_field(
+            record,
+            CHECKPOINT_TXG_OF_THE_FIRST_TRUNCATION_INTENT,
+            payload + payload / 2,
+        );
+    });
+    set_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &[],
+        &["I-9.39"],
+    );
+}
+
+/// 合法世界：每一槽都带 incompat 位 2（0x06），记录不带截断字段：两个池级 checker 内核与恢复内核都收这一槽，CPU 一条都不红、I-9.7 判过而成立。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_incompat_bit_two()
+{
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_incompat_bit_two";
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        "crash-judge-gpu-incompat-bit-two-on-every-slot",
+        "incompat-bit-two-on-every-slot",
+        TruncationsAndHolesFlowStop::AfterTheThreeUnitFile,
+    );
+    set_incompat_bit_two_on_every_system_configuration_slot(&mut flow);
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_truncation_field_flow(
+        TEST_NAME,
+        &flow,
+        &[],
+        &["I-9.7"],
+    );
+}
+
+/// 系统配置 incompat 第一个字节换成 `first_incompat_byte` 的三种不认得的写法：流里每一次系统配置槽写都换，基镜像里 mkfs 写下的两槽不动
+/// （判表照它们取落点几何；那两槽也换就建不出表、GPU 不上卡）。一块盘的两槽都被换过的写盖过之后，那块盘上择不到系统配置，
+/// 两块盘都这样的状态上恢复失败、CPU 判器红；每个状态 GPU 与 CPU 整份相同，GPU 两个池级 checker 内核与恢复内核认 incompat 位的那一判在卡上走到。
+/// 核心层收与不收 0x04、0x0E、0x07 不随截庚变（这三种在哪一版读者都不认）。
+fn assert_the_gpu_judge_agrees_with_the_cpu_when_every_slot_carries_an_unrecognized_first_incompat_byte(
+    test_name: &str,
+    tag: &str,
+    name: &'static str,
+    first_incompat_byte: u8,
+) {
+    let mut flow = record_new_pool_through_truncations_and_holes(
+        tag,
+        name,
+        TruncationsAndHolesFlowStop::AfterTheThreeUnitFile,
+    );
+    let system_configuration_slot_writes_changed =
+        change_the_first_incompat_byte_of_every_system_configuration_slot_on(
+            &mut flow,
+            &BOTH_DEVICES,
+            SystemConfigurationSlotsToChange::OnlyTheWritesInTheFlow,
+            &|_first_byte| first_incompat_byte,
+        );
+    assert!(
+        system_configuration_slot_writes_changed > 0,
+        "流 {} 里有系统配置槽写（每次发布轮换系统配置）：没有就一个状态都换不到不认得的槽",
+        flow.name
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_red > 0,
+        "流 {}：每一槽都带不认得的 incompat 位（第一个字节 {first_incompat_byte:#04x}），CPU 判器在某些状态上红",
+        flow.name
+    );
+    assert_the_pool_checker_half_then_the_recovery_half_agree(&flow, &comparison);
+}
+
+/// incompat 第一个字节 0x04：只带位 2、不带布局身份那一位 1，两边都不认。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_incompat_bit_two_without_bit_one(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_when_every_slot_carries_an_unrecognized_first_incompat_byte(
+        "the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_incompat_bit_two_without_bit_one",
+        "crash-judge-gpu-incompat-0x04",
+        "incompat-first-byte-0x04",
+        INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
+    );
+}
+
+/// incompat 第一个字节 0x0E：位 1、位 2 之外还带没分出去的位 3。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_an_unassigned_incompat_bit(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_when_every_slot_carries_an_unrecognized_first_incompat_byte(
+        "the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_an_unassigned_incompat_bit",
+        "crash-judge-gpu-incompat-0x0e",
+        "incompat-first-byte-0x0e",
+        INCOMPAT_FIRST_SSD_LINE_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT | INCOMPAT_UNASSIGNED_BIT_THREE,
+    );
+}
+
+/// incompat 第一个字节 0x07：位 1、位 2 之外还带退役的位 0。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_the_retired_incompat_bit(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_when_every_slot_carries_an_unrecognized_first_incompat_byte(
+        "the_gpu_judge_agrees_with_the_cpu_when_every_system_configuration_slot_carries_the_retired_incompat_bit",
+        "crash-judge-gpu-incompat-0x07",
+        "incompat-first-byte-0x07",
+        INCOMPAT_RETIRED_BIT_ZERO | INCOMPAT_FIRST_SSD_LINE_BIT | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
+    );
+}
+
+/// 系统配置槽里格式版本那两字节（小端）的偏移：紧跟 magic 之后（池级 checker 的 `FORMAT_VERSION_OFFSET`、核心层恢复读格式版本是同一处）。
+const SYSTEM_CONFIGURATION_FORMAT_VERSION_OFFSET: usize = 4;
+
+/// 流里每一次系统配置槽写的格式版本改成 `format_version`、incompat 第一个字节改成 `first_incompat_byte`，重封整槽校验和，交回改了几次。
+/// 基镜像里 mkfs 写下的两槽不动：判表照它们取落点几何（那两槽也改就建不出表、GPU 不上卡，同
+/// [`SystemConfigurationSlotsToChange::OnlyTheWritesInTheFlow`]）。
+fn rewrite_the_format_version_and_the_first_incompat_byte_of_every_system_configuration_slot_write(
+    flow: &mut RecordedFlow,
+    format_version: u16,
+    first_incompat_byte: u8,
+) -> usize {
+    let system_configuration_slot_writes = flow
+        .writes
+        .iter()
+        .filter(|write| write.kind == StepKind::SystemConfigurationSlot)
+        .count();
+    for nth_from_the_end in 0..system_configuration_slot_writes {
+        rewrite_and_reseal(
+            flow,
+            StepKind::SystemConfigurationSlot,
+            nth_from_the_end,
+            4096,
+            SYSTEM_CONFIGURATION_CHECKSUM_FIELD,
+            &|bytes| {
+                assert_eq!(&bytes[..4], b"SFSB", "流里的系统配置槽写是带 magic 的整槽");
+                let format_version_bytes = SYSTEM_CONFIGURATION_FORMAT_VERSION_OFFSET
+                    ..SYSTEM_CONFIGURATION_FORMAT_VERSION_OFFSET + 2;
+                assert_eq!(
+                    bytes[format_version_bytes.clone()],
+                    singlefs_core::system_configuration::FORMAT_VERSION.to_le_bytes(),
+                    "写者写下的格式版本是这一版读者认的那一版"
+                );
+                bytes[format_version_bytes].copy_from_slice(&format_version.to_le_bytes());
+                bytes[FIRST_INCOMPAT_BYTE_OFFSET] = first_incompat_byte;
+            },
+        );
+    }
+    system_configuration_slot_writes
+}
+
+/// C663「格式版本先」（用户 2026-10-20 定）：新池新建文件流里每一次系统配置槽写 incompat 第一个字节写 0x0E（位 1、位 2 之外带没分出去的位 3）、
+/// 格式版本写 2，重封整槽校验和——一槽同时带不认得的 incompat 位与不是这一版读者写的格式版本。核心层恢复先判格式版本、整池拒
+/// （`SystemConfigurationValueRefused`，失败点 6），不走 incompat 位不认得那一路（失败点 2：那一路这一槽不可择、换一槽换一盘接着择）；
+/// 池级 checker 读这一槽同样先判格式版本、读成带不收之值，红 I-7.13。改过的槽落了的状态上两遍恢复都整池拒，没有一个状态报 incompat 位不认得；
+/// GPU 恢复内核与两个池级 checker 内核逐态跟上，每个状态整份相同。
+/// 判别力（`crates/mutations.tsv`）：GPU 恢复内核在 incompat 位不认得那一臂里不先判格式版本，改过的槽落了的状态上 GPU 把它当不可择的槽、
+/// 换槽接着择，两遍恢复的失败点与落到的根跟 CPU 不同，这条红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_format_version_not_recognized_refuses_the_pool_before_an_unrecognized_incompat_bit(
+) {
+    use singlefs_checker_tier::crash_judge_gpu::{
+        CONSULTED_PASS_FAILURE_POINT_WORD,
+        GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED,
+        GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED, IGNORED_PASS_FAILURE_POINT_WORD,
+    };
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_that_a_format_version_not_recognized_refuses_the_pool_before_an_unrecognized_incompat_bit";
+    let mut flow = record_new_pool_file_creation(
+        "crash-judge-gpu-format-version-2-with-incompat-0x0e",
+        "new-pool-system-configuration-format-version-2-and-incompat-first-byte-0x0e",
+    );
+    let system_configuration_slot_writes_rewritten =
+        rewrite_the_format_version_and_the_first_incompat_byte_of_every_system_configuration_slot_write(
+            &mut flow,
+            singlefs_core::system_configuration::FORMAT_VERSION + 1,
+            INCOMPAT_FIRST_SSD_LINE_BIT
+                | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT
+                | INCOMPAT_UNASSIGNED_BIT_THREE,
+        );
+    assert!(
+        system_configuration_slot_writes_rewritten > 0,
+        "流 {} 里有系统配置槽写（每次发布轮换系统配置）：没有就一个状态都落不到改过的槽",
+        flow.name
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains("I-7.13"),
+        "流 {} 上 CPU 池级 checker 先判格式版本、把改过的槽读成带不收之值，红 I-7.13（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert_the_pool_checker_half_then_the_recovery_half_agree(&flow, &comparison);
+    // 两边逐态整份相同（上一句），下面两个数 GPU 与 CPU 一样
+    let states_whose_both_passes_refuse_the_pool_for_the_format_version = comparison
+        .gpu_words_of_each_state
+        .iter()
+        .filter(|words| {
+            words[CONSULTED_PASS_FAILURE_POINT_WORD]
+                == GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED
+                && words[IGNORED_PASS_FAILURE_POINT_WORD]
+                    == GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED
+        })
+        .count();
+    let states_naming_an_unrecognized_incompat_bit = comparison
+        .gpu_words_of_each_state
+        .iter()
+        .filter(|words| {
+            words[CONSULTED_PASS_FAILURE_POINT_WORD]
+                == GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED
+                || words[IGNORED_PASS_FAILURE_POINT_WORD]
+                    == GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED
+        })
+        .count();
+    assert!(
+        states_whose_both_passes_refuse_the_pool_for_the_format_version > 0,
+        "流 {}：改过的槽落了的状态上两遍恢复都按格式版本整池拒（失败点 {GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED}），实际 0 个状态",
+        flow.name
+    );
+    assert_eq!(
+        states_naming_an_unrecognized_incompat_bit, 0,
+        "流 {}：格式版本先于 incompat 位判，没有一个状态报 incompat 位不认得（失败点 {GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED}）",
+        flow.name
     );
 }

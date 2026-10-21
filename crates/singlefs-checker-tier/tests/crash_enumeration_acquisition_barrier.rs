@@ -3,16 +3,16 @@
 //! I-7.7（系统配置实例代号不低于根环） 那一族判红」要红在的那一条崩溃枚举用例。
 //!
 //! 流：mkfs → 取号 1 → 暖机 → A → B（同一个进程）→ 进程退出、重开可写挂载（取号 2 → 写行 → 暖机）。
-//! 取号写之前一道屏障把取号那两次系统配置槽写与 B 的两次系统配置槽轮换隔开（代码审阅第 19 条；改之前两者同一段，
-//! 进程退出与重开之间没有屏障，登记表八那条 ⚠️），取号之后那道屏障把它们与写行那次发布的单元写隔开
-//! （D23（journal 的角色与格式） 已定项 16「取号那一步的屏障」）。
-//! 平时展开的只有这两段：取号所在的那一段、取号之后第一个带单元写的那一段——少了取号之后那道屏障，两段并成一段，
+//! 取号写之前一道屏障把取号的系统配置槽写与 B 的两次系统配置槽轮换隔开（代码审阅第 19 条；改之前两者同一段，
+//! 进程退出与重开之间没有屏障，登记表八那条 ⚠️）。取号写两轮（D22（单元原子性怎么合成） 已定项 8 落地），每轮两块盘各一次、
+//! 轮后一道池屏障；第二轮之后那道屏障把取号与写行那次发布的单元写隔开（D23（journal 的角色与格式） 已定项 16「取号那一步的屏障」）。
+//! 平时展开的是这三段：取号两轮各一段、取号之后第一个带单元写的那一段——少了每轮之后那道屏障，几段并成一段，
 //! 枚举就摆得出「实例 2 的单元已持久、两块盘的系统配置还都是 1」的状态。
-//! 展开哪几段按写在录制流里的位置挑（重开之后的第一个写起），不按段的写数挑：并段之后段变长，按写数挑会把并出来的那一段漏掉。
+//! 展开哪几段按写在录制流里的位置挑（重开之后的头四个写与第一个单元写），不按段的写数挑：并段之后段变长，按写数挑会把并出来的那一段漏掉。
 //!
-//! 这条流的段序列就是覆盖写固定脚本流（`crash_enumeration_fixed_script_stream.rs`）发 C 之前那一截：28 段逐段相同，
+//! 这条流的段序列就是覆盖写固定脚本流（`crash_enumeration_fixed_script_stream.rs`）发 C 之前那一截：30 段逐段相同，
 //! 末段是暖机第二次的系统配置槽轮换（C577 之后发布末尾那道屏障让它在覆盖写固定脚本流里也自成一段；改之前那边与 C 的单元写并成 26 写一段、
-//! 只有前 23 段相同）。展开的这两段在覆盖写固定脚本流里是第 16、17 段（C577 之前第 14、15 段），
+//! 只有前 23 段相同）。展开的这三段在覆盖写固定脚本流里是第 17、18、19 段（取号写一轮时展开两段、第 16、17 段；C577 之前第 14、15 段），
 //! 全量（门禁 checker-tier-crash-point-replay `--full`）已经罩着；这一条不多罩崩溃状态，多的是在平时的 `cargo test` 里展开它们、按 I-7.7 判——
 //! 覆盖写固定脚本流的快用例按甲二展开，写行那一段（18 个单元写）只取全不落或全落。
 
@@ -51,6 +51,9 @@ fn second_content() -> Vec<u8> {
 
 /// I-7.7（系统配置实例代号不低于根环） 在池级 checker 里的名字。
 const SYSTEM_CONFIGURATION_INSTANCE_INVARIANT: &str = "I-7.7";
+
+/// 取号写的系统配置槽写数：两轮（D22（单元原子性怎么合成） 已定项 8 落地），每轮两块盘各一次。
+const ACQUISITION_SYSTEM_CONFIGURATION_WRITES: usize = 4;
 
 #[test]
 fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_crash_state_of_the_remount(
@@ -107,12 +110,12 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         .collect();
     let first_remount_write = *remount_writes.first().expect("重开之后发过写");
     assert_eq!(
-        remount_writes[..2]
+        remount_writes[..ACQUISITION_SYSTEM_CONFIGURATION_WRITES]
             .iter()
             .map(|write_index| writes[*write_index].kind)
             .collect::<Vec<StepKind>>(),
-        vec![StepKind::SystemConfigurationSlot; 2],
-        "重开之后头两个写是取号那两次系统配置槽写（两块盘各一次）"
+        vec![StepKind::SystemConfigurationSlot; ACQUISITION_SYSTEM_CONFIGURATION_WRITES],
+        "重开之后头四个写是取号那四次系统配置槽写（两轮，每轮两块盘各一次）"
     );
     let first_unit_write_of_the_remount = *remount_writes
         .iter()
@@ -124,10 +127,24 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
             .position(|segment| segment.contains(&write_index))
             .expect("每个写都在某一段里")
     };
-    let acquisition_segment = segment_of(first_remount_write);
+    let acquisition_segments: Vec<usize> = remount_writes
+        [..ACQUISITION_SYSTEM_CONFIGURATION_WRITES]
+        .iter()
+        .map(|write_index| segment_of(*write_index))
+        .fold(Vec::new(), |mut segment_indexes, segment_index| {
+            if !segment_indexes.contains(&segment_index) {
+                segment_indexes.push(segment_index);
+            }
+            segment_indexes
+        });
+    assert_eq!(
+        acquisition_segments.first().copied(),
+        Some(segment_of(first_remount_write)),
+        "取号的第一段就是重开之后第一个写所在的那一段"
+    );
     let first_unit_segment = segment_of(first_unit_write_of_the_remount);
     let expand = |segment_index: usize, _segment: &[usize]| {
-        segment_index == acquisition_segment || segment_index == first_unit_segment
+        acquisition_segments.contains(&segment_index) || segment_index == first_unit_segment
     };
     let judged_root_index = writes
         .iter()
@@ -169,7 +186,7 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
             .copied()
             .unwrap_or(0),
         0,
-        "取号那一段与写行的第一段展开之后，出现了新实例的写先于新号持久的状态：{:?}",
+        "取号那几段与写行的第一段展开之后，出现了新实例的写先于新号持久的状态：{:?}",
         tally
             .checker_first_violation
             .get(SYSTEM_CONFIGURATION_INSTANCE_INVARIANT)
@@ -201,20 +218,20 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         tally.checker_first_violation
     );
 
-    // 状态数钉绝对值：取号那一段只有取号两次系统配置槽写（2 写，原地覆写各取三态，3² − 1 个；B 的两次轮换在它前面、
+    // 状态数钉绝对值：取号两轮各一段，每段两次系统配置槽写（2 写，原地覆写各取三态，3² − 1 个；B 的两次轮换在第一轮前面、
     // 隔着取号写之前那道屏障，代码审阅第 19 条），写行那次发布的单元写一段（18 个单元写，各取两态，2^18 − 1 个），
-    // 再加全部持久那一个。
-    assert_ne!(
-        acquisition_segment, first_unit_segment,
-        "取号那一段与写行的第一段之间隔着一道屏障"
+    // 再加全部持久那一个（取号写一轮时 1 + 8 + 262143）。
+    assert!(
+        !acquisition_segments.contains(&first_unit_segment),
+        "取号那几段与写行的第一段之间隔着一道屏障"
     );
     assert_eq!(
         expanded.iter().map(Vec::len).collect::<Vec<usize>>(),
-        vec![2, 18]
+        vec![2, 2, 18]
     );
     assert_eq!(
         closed_form_state_count(&expanded),
-        1 + 3 + 262_143,
+        1 + 3 + 3 + 262_143,
         "每次写只取两态时的闭式（补第三态之前的数）"
     );
     assert_eq!(
@@ -233,20 +250,21 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         ),
         "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
-    assert_eq!(tally.states, 1 + (3 * 3 - 1) + 262_143);
-    // 与覆盖写固定脚本流发 C 之前那一截逐段相同（门禁 doc-registries 的 segment-registry 格核的那个数组的前 28 段），末段 2 写是暖机第二次的系统配置槽轮换。
+    assert_eq!(tally.states, 1 + 2 * (3 * 3 - 1) + 262_143);
+    // 与覆盖写固定脚本流发 C 之前那一截逐段相同（门禁 doc-registries 的 segment-registry 格核的那个数组的前 30 段），末段 2 写是暖机第二次的系统配置槽轮换。
     // C577 之后每次轮换过了发布末尾那道屏障、自成一段：A、B 的 24 个单元写与暖机两次的 16 个单元写不再并上一次的轮换
-    // （改之前 26、26、18、18），段号跟着后移两位。
+    // （改之前 26、26、18、18），段号跟着后移两位；取号写两轮之后 mkfs 那个进程里的取号与重开之后的取号各多一段，段号再后移。
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<usize>>(),
         vec![
-            2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2
+            2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
+            2, 1, 2
         ],
         "段序列是覆盖写固定脚本流发 C 之前那一截"
     );
     assert_eq!(
-        (acquisition_segment, first_unit_segment),
-        (15, 16),
-        "展开的是覆盖写固定脚本流的第 16、17 段（从 1 数）"
+        (acquisition_segments, first_unit_segment),
+        (vec![16, 17], 18),
+        "展开的是覆盖写固定脚本流的第 17、18、19 段（从 1 数）"
     );
 }

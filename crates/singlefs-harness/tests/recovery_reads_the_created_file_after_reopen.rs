@@ -193,7 +193,9 @@ fn eight_byte_flip_probes_recover_as_the_e142_product_records() {
             0,
             0,
         ),
-        // 陈旧的 tail（槽 1 坏了就择回槽 0：tail 2）：全环扫描不信 tail，结果与 tail 正确时相同。
+        // 槽 1 两块盘各坏一字节（产物里这一条探针的落点）：取号写两轮之后新池新建文件那次轮换落槽 0（世代 6、tail 3），槽 1 是暖机第二次写的
+        // 较旧那一槽，择到的仍是槽 0；全环扫描不信 tail，结果与 tail 正确时相同。陈旧 tail 那一形在下面
+        // `a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply`（坏的是最新那一槽）。
         (
             "system_configuration_slot_one_both_devices",
             file_read(ROOT_ONE_THREE),
@@ -235,7 +237,7 @@ fn eight_byte_flip_probes_recover_as_the_e142_product_records() {
 /// 怎么造出来的两处坏字节，各对一件真实的事：
 /// 1. 最新根槽（第 3 代）坏一字节 —— 一次撕裂或介质错，择根退到暖机的第 2 代根（与探针
 ///    `newest_root_slot_one_byte` 同一处）。
-/// 2. 两块盘的系统配置槽 1 各坏一字节 —— 槽 1 是第 3 代那次发布写的（tail 3），坏了就择回槽 0，
+/// 2. 两块盘的系统配置槽 0 各坏一字节 —— 取号写两轮之后槽 0 是第 3 代那次发布写的（世代 6、tail 3），坏了就择回槽 1，
 ///    它带的是上一次发布留下的 tail 2。系统配置槽是发布序列的最后一步（D23 已定项 3 改动 2），
 ///    所以「tail 比环里的记录旧」本来就是每次崩溃都会出现的常态。
 #[test]
@@ -250,13 +252,13 @@ fn a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply() {
         common::parameters().region_devices[usize::try_from(newest_root.region).expect("区域号")];
     image.flip_byte(newest_root_device, slot_offset(newest_root, 4096), 100);
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
-        image.flip_byte(device, DeviceOffsetInBytes(4096), 50);
+        image.flip_byte(device, DeviceOffsetInBytes(0), 50);
     }
 
     // 前置：这条镜像上真有「tail 之后、而且必须被施加」的记录。
     // 三样都不走 `scan_journal` / `replay_journal`（它们正是被测的那段）：系统配置槽、根环、环里那一格各自直接读。
     // 没有这一段，下面的断言换一条健康镜像照样全绿——那时 applied=0、tail 也不陈旧，什么都没证明。
-    let system_configuration = choose_system_configuration(&image).expect("槽 0 两块盘上都还好着");
+    let system_configuration = choose_system_configuration(&image).expect("槽 1 两块盘上都还好着");
     let stale_tail = system_configuration.quantities.journal_tail;
     assert_eq!(
         stale_tail, 2,

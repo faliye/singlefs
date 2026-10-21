@@ -34,7 +34,7 @@ use std::time::Instant;
 use singlefs_checker::image::SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::block_device::{
-    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
+    BlockDevice, BlockDeviceError, DiscardOutcome, PhysicalBlockSizeInBytes, WriteDurability,
 };
 use singlefs_core::make_filesystem::MKFS_INSTANCE_GENERATION;
 use singlefs_core::recovery::{
@@ -63,7 +63,7 @@ use crate::memory_pool::{
 use crate::model::{
     crash_recovery_disagreement, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreementAspect,
     ModelInstanceRow, ModelReportedUnreadablePlace, ModelRingPosition, ModelRootKey,
-    ModelUnitCopyLocation, ObservedReadBack,
+    ModelUnitCopyLocation, ObservedReadBack, ObservedSnapshotReadBack,
 };
 use crate::model_comparison::{
     model_ring_position, model_root_key, observed_read_back_after_a_crash,
@@ -577,6 +577,10 @@ pub struct FaultDeviceCounts {
     /// 真交给里面那块盘的屏障（被吞掉的那些不算）。
     pub barriers_forwarded: u64,
     pub barriers_swallowed: u64,
+    /// 交给里面那块盘、它交回「交给了底层」的 discard（不算进 `writes` 与 `written_bytes`：块层把 discard 另记一类）。
+    pub discards_applied: u64,
+    /// 交给里面那块盘、它交回「不支持」的 discard。
+    pub discards_answered_unsupported: u64,
 }
 
 impl FaultDeviceCounts {
@@ -591,6 +595,9 @@ impl FaultDeviceCounts {
                 - earlier.force_unit_access_writes,
             barriers_forwarded: self.barriers_forwarded - earlier.barriers_forwarded,
             barriers_swallowed: self.barriers_swallowed - earlier.barriers_swallowed,
+            discards_applied: self.discards_applied - earlier.discards_applied,
+            discards_answered_unsupported: self.discards_answered_unsupported
+                - earlier.discards_answered_unsupported,
         }
     }
 }
@@ -654,6 +661,10 @@ pub enum SwallowedContents {
     Zeroes {
         length: u64,
     },
+    /// discard（`BlockDevice::discard_at`）：报了「交给了底层」，其实没交下去。
+    Discard {
+        length: u64,
+    },
 }
 
 /// 说谎的设备吞掉的那一次写（[`InjectedFault::WriteIsSwallowed`]）：落在哪、本该写下什么、它之前整池交下去了几次写（含写零）。
@@ -692,6 +703,16 @@ impl SwallowedWrite {
                 operation: RecordedOperation {
                     device: self.device,
                     kind: RecordedOperationKind::WriteZeroes,
+                    offset: self.offset,
+                    length: *length,
+                    content_hash: crate::fnv1a_64_of_zeros(*length),
+                },
+                contents: None,
+            },
+            SwallowedContents::Discard { length } => crate::RetainedOperation {
+                operation: RecordedOperation {
+                    device: self.device,
+                    kind: RecordedOperationKind::Discard,
                     offset: self.offset,
                     length: *length,
                     content_hash: crate::fnv1a_64_of_zeros(*length),
@@ -914,6 +935,29 @@ impl SharedFaultPlan {
         }
     }
 
+    /// 一次 discard 交给了里面那块盘、它交回了 `outcome`。「交给了底层」的在整池写数里算一次（录制器在注入层里面时它在录制流里记一步，
+    /// 被吞的写排在第几次写之后按这个数）；「不支持」的不算（录制器不记它）。
+    fn note_forwarded_discard(&self, device: DeviceIdentity, outcome: DiscardOutcome) {
+        let mut state = self.0.borrow_mut();
+        match outcome {
+            DiscardOutcome::Applied => {
+                state.writes_forwarded_across_the_pool += 1;
+                state
+                    .per_device_counts
+                    .entry(device)
+                    .or_default()
+                    .discards_applied += 1;
+            }
+            DiscardOutcome::Unsupported => {
+                state
+                    .per_device_counts
+                    .entry(device)
+                    .or_default()
+                    .discards_answered_unsupported += 1;
+            }
+        }
+    }
+
     fn note_forwarded_barrier(&self, device: DeviceIdentity) {
         self.0
             .borrow_mut()
@@ -1081,6 +1125,48 @@ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
         self.plan
             .note_forwarded_write(self.device, length, WriteDurability::Plain);
         Ok(())
+    }
+
+    /// discard 与写零一样走写的注入判定（`FaultCallKind::Write`，落点 `offset`、长度 `length`）：崩溃点重放按「范围写零」看它。
+    /// `WriteFails` 让它报错、一个字节不动；`WriteIsSwallowed` 让它报「交给了底层」、其实没交下去（另记一笔被吞的写）；
+    /// 不注入就原样转给里面那块盘，交回它的结局。
+    fn discard_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        // 长度 0 没有动作（`BlockDevice::discard_at` 的文档：后端照「交给了底层」交回、不记数）：注入层同一口径——不走注入判定、
+        // 不占整池调用序号、不数 discard、不数整池转下去的写（录制器那一侧同样不给它记一步），只交给里面那块盘核落点、交回它的结局。
+        if length == 0 {
+            return self.inner.discard_at(offset, length);
+        }
+        match self
+            .plan
+            .decide(FaultCallKind::Write, self.device, offset, length)
+        {
+            Some(InjectedFault::WriteFails) => {
+                return Err(injected_block_device_error("discard"));
+            }
+            Some(InjectedFault::WriteIsSwallowed) => {
+                self.plan.note_swallowed_write(
+                    self.device,
+                    offset,
+                    SwallowedContents::Discard { length },
+                    WriteDurability::Plain,
+                );
+                return Ok(DiscardOutcome::Applied);
+            }
+            Some(
+                InjectedFault::ReadFails
+                | InjectedFault::ReadReturnsCorruptedBytes { .. }
+                | InjectedFault::BarrierFails
+                | InjectedFault::BarrierIsSwallowed,
+            )
+            | None => {}
+        }
+        let outcome = self.inner.discard_at(offset, length)?;
+        self.plan.note_forwarded_discard(self.device, outcome);
+        Ok(outcome)
     }
 
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
@@ -1820,7 +1906,7 @@ pub struct HistoryFaultInjection {
 
 /// 注入那一步是不是一次挂载（起点段里有取号与暖机、可写挂载），是就交回这一步之前盘上系统配置的实例代号。
 /// 起点段之前是 mkfs 写的 0；别的步取测量跑里上一步跑完时的那个。不是挂载的几类操作不取号，交回 `None`
-/// （管理员回退是挂着时的一次向前发布，不取号）。
+/// （管理员回退是挂着时的一次向前发布，不取号）。挂着时整理那一步按以批间崩溃收尾的那一种算挂载（臂上的注释写了为什么）。
 fn system_configuration_instance_before_a_mount_step(
     marks: &[StepMark],
     segment: FaultedSegment,
@@ -1833,7 +1919,13 @@ fn system_configuration_instance_before_a_mount_step(
             HistoryOperationKind::CloseAndMountWritable
             | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
             | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
-            | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            // 挂着时整理以批间崩溃收尾的那一种（`CompactionRunEnding::CrashesAfterBatchesThenMountsWritable`）推完批之后，执行器
+            // （`history::apply_compact_while_mounted`）调可写挂载那一步同一个 `apply_mount_writable` 挂一次：取号、写行、暖机。
+            // 整理那几次发布用的是会话开着时那次挂载取的号、不换号，所以这一步之前的号就是上一步跑完时的那个。推到停的那一种不挂载、不取号，
+            // 重开读回的号不比这一步之前大，`acquired_instance_left_after_a_failed_mount` 照样交回 `None`。故障注入的比重
+            // `GenerationWeights::BROAD_WITH_COMPACTION_WHILE_MOUNTED`（`broad-compaction`）会抽到这一步。
+            | HistoryOperationKind::CompactWhileMounted => {
                 let index = marks
                     .iter()
                     .position(|mark| mark.position == segment.position())?;
@@ -1846,7 +1938,15 @@ fn system_configuration_instance_before_a_mount_step(
             | HistoryOperationKind::RaiseRollbackFloor
             | HistoryOperationKind::ColdStartRecover
             | HistoryOperationKind::Unlink
-            | HistoryOperationKind::CreateInode => None,
+            | HistoryOperationKind::CreateInode
+            | HistoryOperationKind::CreateSnapshot
+            | HistoryOperationKind::ReadSnapshot
+            | HistoryOperationKind::DestroySnapshot
+            // 截断经挂着的会话发，不挂载、不取号。
+            | HistoryOperationKind::Truncate
+            // 建 inode、按 inode 号写同样经挂着的会话发。
+            | HistoryOperationKind::CreateInodes
+            | HistoryOperationKind::WriteOfAnInode => None,
         },
     }
 }
@@ -2334,7 +2434,7 @@ impl FaultInjectionAccumulator<'_> {
 }
 
 /// 注入那一段的结局是不是「入口返回了错误」：没 panic、checker 没判红，而且那一段要么返回了 `Err`，
-/// 要么是冷启动、读回报了错。注入的块设备错在模型里没有对应的拒绝理由（`ObservedRefusalReason::Unexplained`），
+/// 要么是冷启动或读快照、读回报了错。注入的块设备错在模型里没有对应的拒绝理由（`ObservedRefusalReason::Unexplained`），
 /// 模型因此必然报「该成却拒了」——那一格不算失败，它就是这一件要的结果。
 ///
 /// 起点段（改法二放开的那一段）按 `HarnessJudgement::TheStartingPointReturnedAnError` 认：起点段的四个入口
@@ -2366,10 +2466,21 @@ fn the_fault_surfaced_as_an_error(
             AppliedEffect::Published { .. }
             | AppliedEffect::Mounted { .. }
             | AppliedEffect::RaisedFloor { .. }
-            | AppliedEffect::RolledBack { .. },
+            | AppliedEffect::RolledBack { .. }
+            | AppliedEffect::SnapshotPublished { .. }
+            | AppliedEffect::Compacted { .. },
         ))
         | Some(StepOutcome::NotApplicable(_))
         | None => false,
+        // 读快照读失败（注入的读错落在它要读的那几处上）：同冷启动读回报错，是注入的错浮出来了。
+        Some(StepOutcome::Applied(AppliedEffect::SnapshotRead { read_back, .. })) => {
+            match read_back {
+                ObservedSnapshotReadBack::Failed { .. } => true,
+                ObservedSnapshotReadBack::NoFile
+                | ObservedSnapshotReadBack::File(_)
+                | ObservedSnapshotReadBack::NoSnapshotWithThisTree => false,
+            }
+        }
     }
 }
 
@@ -2514,6 +2625,15 @@ pub fn left_by_the_lying_device(
             | ModelDisagreementAspect::AllocationGeneration
             | ModelDisagreementAspect::InstanceGeneration
             | ModelDisagreementAspect::ColdStartReadBack
+            | ModelDisagreementAspect::LiveHeadPreviousSnapshotTxg
+            | ModelDisagreementAspect::Snapshots
+            | ModelDisagreementAspect::DeadlistEntries
+            | ModelDisagreementAspect::PinnedMappingEntries
+            | ModelDisagreementAspect::SnapshotReadBack
+            | ModelDisagreementAspect::CompactionIntentOfThePublish
+            | ModelDisagreementAspect::LoggedCompactionIntent
+            | ModelDisagreementAspect::FirstFileRecordTruncationField
+            | ModelDisagreementAspect::InodesOtherThanTheFirst
             | ModelDisagreementAspect::NotModeled => false,
         },
     };
@@ -3152,6 +3272,9 @@ fn run_one_fault_up_to_the_pool_checker(
         .and_then(|operation| match operation {
             HistoryOperation::PublishFirstFile(content)
             | HistoryOperation::PublishOverwrite(content) => Some(content.bytes()),
+            // 按 inode 号写点名的号执行时才取（`history::WriteOfAnInodeChoice::inode_among`），这里分不出写的是不是第一个文件：照写第一个文件放行
+            // 这一步交的内容（写的是别的文件时第一个文件的内容不变，模型认过的那几版里本来就有它）。
+            HistoryOperation::WriteOfAnInode(choice) => Some(choice.content.bytes()),
             HistoryOperation::PublishWithoutUnits
             | HistoryOperation::CloseAndMountWritable
             | HistoryOperation::RollBackWhileMounted(_)
@@ -3161,9 +3284,18 @@ fn run_one_fault_up_to_the_pool_checker(
             | HistoryOperation::Unlink
             | HistoryOperation::CreateInode
             | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
-            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
-                None
-            }
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            // 建快照、读快照、删快照不改文件内容（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S2、S4）。
+            | HistoryOperation::CreateSnapshot
+            | HistoryOperation::ReadSnapshot(_)
+            | HistoryOperation::DestroySnapshot(_)
+            // 整理只搬单元的落点，不改文件内容（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3）。
+            | HistoryOperation::CompactWhileMounted(_)
+            // 截断改到的长度执行时按那一刻的 size 取（`history::TruncationChoice`），这里取不到它的内容：照不改内容的那几种只放行模型认过的
+            // 那几版与测量跑记的那几版（截断那一步不注入时写出的截后内容在后一份里）。
+            | HistoryOperation::Truncate(_)
+            // 建 inode 不改第一个文件的内容。
+            | HistoryOperation::CreateInodes(_) => None,
         });
     let (read_back_root, read_back_content): (Option<ModelRootKey>, Option<&[u8]>) =
         match &read_back {
@@ -3285,7 +3417,7 @@ fn run_one_fault_up_to_the_pool_checker(
             .iter()
             .filter_map(|write| match &write.contents {
                 SwallowedContents::Bytes(bytes) => Some(root_identity_written_by(bytes)),
-                SwallowedContents::Zeroes { .. } => None,
+                SwallowedContents::Zeroes { .. } | SwallowedContents::Discard { .. } => None,
             })
             .map(|(instance, checkpoint_txg)| model_root_key(instance, checkpoint_txg))
             .collect();
@@ -3760,6 +3892,41 @@ mod tests {
         buffer
     }
 
+    /// 长度 0 的 discard 没有动作（`BlockDevice::discard_at` 的文档：后端照「交给了底层」交回、不记数）：注入层同一口径——不走注入判定、
+    /// 不占整池调用序号、不数 discard。计划排在「整池第 1 次写报错」时，长度 0 的 discard 不吃掉那一次，下一个真写才报错。
+    #[test]
+    fn a_zero_length_discard_answers_applied_and_neither_counts_nor_takes_an_injection() {
+        let plan = SharedFaultPlan::armed(
+            TEST_GEOMETRY,
+            FaultSchedule::the_nth_call_across_the_pool(InjectedFault::WriteFails, 1),
+        );
+        let mut devices = two_devices(&plan);
+        assert_eq!(
+            devices[0]
+                .1
+                .discard_at(UNIT_AREA_OFFSET, 0)
+                .expect("长度 0 的 discard 不报错"),
+            DiscardOutcome::Applied
+        );
+        assert_eq!(
+            plan.calls(),
+            FaultCallCounts {
+                reads: 0,
+                writes: 0,
+                barriers: 0
+            },
+            "不占整池调用序号"
+        );
+        assert_eq!(
+            plan.counts_of_device(DeviceIdentity(0)),
+            FaultDeviceCounts::default(),
+            "不数 discard、不数写"
+        );
+        assert!(plan.fired().is_empty(), "注入点没被它吃掉");
+        write(&mut devices[0].1, UNIT_AREA_OFFSET.0, 1).expect_err("整池第 1 次写才报错");
+        assert_eq!(plan.fired().len(), 1);
+    }
+
     /// 计划不开时只数调用：写进去的字节原样读得回来，每块盘的计数与发出的调用一一对上。
     #[test]
     fn an_unarmed_plan_forwards_every_call_and_counts_it() {
@@ -3786,6 +3953,8 @@ mod tests {
                 force_unit_access_writes: 0,
                 barriers_forwarded: 1,
                 barriers_swallowed: 0,
+                discards_applied: 0,
+                discards_answered_unsupported: 0,
             }
         );
         assert!(plan.fired().is_empty(), "没开计划就不该注入");

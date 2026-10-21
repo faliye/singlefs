@@ -1238,9 +1238,18 @@ fn operation_reads_under_injected_faults(kind: HistoryOperationKind) -> bool {
         | HistoryOperationKind::ColdStartRecover
         | HistoryOperationKind::Unlink
         | HistoryOperationKind::CreateInode
-        | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable => {
-            false
-        }
+        | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
+        // 建快照、删快照经会话发、读的是盘上的字节；读快照只读、不经注入的读故障。
+        | HistoryOperationKind::CreateSnapshot
+        | HistoryOperationKind::ReadSnapshot
+        | HistoryOperationKind::DestroySnapshot
+        // 挂着时整理经会话发、读的是盘上的字节（区域扫描读源落点）；批间崩溃之后的可写挂载不藏任何一处。
+        | HistoryOperationKind::CompactWhileMounted
+        // 截断经会话发，读的是盘上的字节（重写尾单元读它的旧净荷）。
+        | HistoryOperationKind::Truncate
+        // 建 inode、按 inode 号写经会话发，读的是盘上的字节。
+        | HistoryOperationKind::CreateInodes
+        | HistoryOperationKind::WriteOfAnInode => false,
     }
 }
 
@@ -3179,7 +3188,12 @@ fn writes_a_structure_only_the_continuation_changes(writes: &WritesByStructureKi
             | WrittenStructureKind::InodeTreeLeafContainer
             | WrittenStructureKind::InodeTreeRoot
             | WrittenStructureKind::DeletedInodesTreeNode
-            | WrittenStructureKind::RetirementTreeNode => true,
+            // logged_ops 根只在整理签发、删意图的发布里写（判决 m4-gc-r1 第三节 G1）：挂载里只可能是续做整理那一步写的。
+            | WrittenStructureKind::LoggedOperationsTreeNode
+            | WrittenStructureKind::RetirementTreeNode
+            // deadlist 树只在杀了被活快照引用的块的发布与删快照的批里写（判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+            // 第三节 S3、S4）：挂载里只可能是续做删快照那一步写的。
+            | WrittenStructureKind::DeadlistTreeNode => true,
             WrittenStructureKind::AllocationRecordTreeNode
             | WrittenStructureKind::AccountingTreeNode
             | WrittenStructureKind::TombstoneTreeNode
@@ -6950,6 +6964,8 @@ mod tests {
             size: 0,
             change_count: txg_of_the_publish.0,
             write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            // 新建的 inode 没被截断过：截断字段是 0（判决 m4-trunc-r2 R2）。
+            truncation_field: singlefs_core::records::InodeRecordTruncationField::NOT_WRITTEN,
         });
         assert_eq!(
             version_after_the_publish.mounted.inode_records(),

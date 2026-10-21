@@ -310,6 +310,7 @@ pub(crate) fn reuse_is_not_proven_illegal_by_the_reclaim_predicate(
                 }
             }
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::UnitWrite
             | StepKind::JournalRecord
             | StepKind::Barrier => {}
@@ -2121,7 +2122,11 @@ impl WriteLandingChoices {
 /// 认法照 `research/prompts/m2-rev-b3a-implementer-report.md` 第四节），三条都成立才算：
 /// 1. 不是单元写：单元写是 COW，落在分配器交出来的槽上，那一槽的旧内容没有谁还要（回收谓词管着），撕裂与没持久一样，照旧两态；
 /// 2. 长于一个扇区：崩溃点重放的撕裂粒度是 [`SECTOR_BYTES`]，一个扇区的写撕不开（根槽写是一个物理块，照旧两态）；
-/// 3. 它罩住的范围里原来有东西：基镜像那一段有非零字节，或写表里更早有一次同一块盘上、带字节（不是整段清零）的写与它重叠。
+/// 3. 它罩住的范围里原来有东西：基镜像那一段有非零字节，或写表里更早有一次同一块盘上、带字节（不是整段清零或 discard）的写与它重叠。
+///
+/// discard 照这三条认（D13（验证路线） 已定项 4 原地覆写的字面，判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S6）：
+/// 它的「新字节」是 0，撕裂镜像前一半清了、后一半还是旧的；不长于一个扇区、或罩住的范围里原来全 0 的只取两态。
+/// 一次 discard 在一个崩溃状态里只取这几态之一，「段内部分落地」（几个扇区落了、别的没落的任意组合）不另枚举。
 ///
 /// 撕裂态原来并进「没持久」（D13（验证路线） 已定项 4 原句）；对原地覆写不成立——撕裂时那一处的旧内容也没了，「没持久」留着完整的旧内容。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2210,6 +2215,9 @@ fn is_tearable_in_place_overwrite(
     let write = &writes[write_index];
     let is_copy_on_write = match write.kind {
         StepKind::UnitWrite => true,
+        // discard 是原地的范围动作（「范围写零」）：照三条认，长于一个扇区、罩住旧内容的取第三态（D13（验证路线） 已定项 4 原地覆写的字面，
+        // 判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S6）。
+        StepKind::Discard => false,
         StepKind::ZeroFill
         | StepKind::JournalRecord
         | StepKind::RootRecordFua
@@ -3426,6 +3434,139 @@ mod tests {
         let mut thirteen = vec![0u8, 0, 0];
         assert!(add_to_the_mixed_radix_digits(&mut thirteen, &[3, 2, 3], 13));
         assert_eq!(thirteen, vec![1, 0, 2], "13 = 1 + 3 × (0 + 2 × 2)");
+    }
+
+    /// 单元区里一个槽的起点（崩溃点重放的池按 512 字节物理块建，单元区从 784 MiB 起）。
+    const DISCARDED_UNIT_SLOT: u64 = 784 << 20;
+    /// 一次 discard 罩住的字节数：一个 16 KiB 槽。
+    const DISCARD_OF_ONE_SLOT_BYTES: u64 = 16384;
+
+    /// 一次 discard（盘 0、`offset` 起 `length_in_bytes` 字节），写表里按「范围写零」记。
+    fn discard_write(offset: u64, length_in_bytes: u64) -> RetainedWrite {
+        RetainedWrite {
+            device: DeviceIdentity(0),
+            kind: StepKind::Discard,
+            is_force_unit_access: false,
+            offset: DeviceOffsetInBytes(offset),
+            contents: WrittenContents::Zeros {
+                length: length_in_bytes,
+            },
+        }
+    }
+
+    /// 基镜像：盘 0 上 `DISCARDED_UNIT_SLOT` 起一整槽是旧的非零字节（discard 罩住的范围里原来有东西）。
+    fn base_with_old_bytes_in_the_discarded_slot() -> MemoryPool {
+        let mut base = MemoryPool::with_devices(&[DeviceIdentity(0)], 1 << 30);
+        base.devices
+            .get_mut(&DeviceIdentity(0))
+            .expect("盘 0")
+            .write(DeviceOffsetInBytes(DISCARDED_UNIT_SLOT), &[0x6Bu8; 16384]);
+        base
+    }
+
+    /// 一次 16 KiB 的 discard 罩住非零旧内容：照 D13（验证路线） 已定项 4 原地覆写的字面取三态（判决 m4-batch2-code-r1 S6），
+    /// 全量与快档都是 1 + (3 − 1) 个状态；撕裂那一态的镜像那一槽前一半是 0、后一半还是旧字节，没持久那一态整槽是旧字节，
+    /// 持久那一态整槽是 0。判据改回「discard 只取两态」时这一条红在「是原地覆写」那一句。
+    #[test]
+    fn a_discard_longer_than_a_sector_over_old_contents_enumerates_a_torn_third_state() {
+        let base = base_with_old_bytes_in_the_discarded_slot();
+        let writes = vec![discard_write(
+            DISCARDED_UNIT_SLOT,
+            DISCARD_OF_ONE_SLOT_BYTES,
+        )];
+        let segments = vec![vec![0]];
+        let tearable = TearableInPlaceOverwrites::of(&base, &writes);
+        assert!(
+            tearable.contains(0),
+            "16 KiB 的 discard 罩住非零旧内容：是原地覆写，多取第三态"
+        );
+        for expansion in [
+            &full_expansion as &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+            &quick_tier_expansion,
+        ] {
+            assert_eq!(
+                crash_state_count_with_torn_in_place_overwrites(
+                    &base, &writes, &segments, expansion
+                ),
+                3,
+                "没持久、撕裂两个，再加全部持久那一个（全量与快档相同）"
+            );
+        }
+        let tables = crash_state_enumeration_tables(&base, &writes, &segments, &full_expansion);
+        assert_eq!(tables.torn_images.len(), 1, "这次 discard 接一条撕裂镜像");
+        let torn_image_index = tables.torn_images[0].torn_image_index;
+        let mut expected_torn_bytes = vec![0x6Bu8; 16384];
+        expected_torn_bytes[..8192].fill(0);
+        assert_eq!(
+            tables.enumerated_writes[torn_image_index].contents,
+            WrittenContents::Bytes(expected_torn_bytes.clone()),
+            "撕裂镜像：前一半清了、后一半还是旧字节"
+        );
+        let writes_with_torn_images =
+            WritesWithTornImages::of(&base, &writes, &segments, &tearable);
+        let plan = CrashStatePlan::new(
+            &writes,
+            &segments,
+            &full_expansion,
+            &no_segment_slices(segments.len()),
+            &tearable,
+            &writes_with_torn_images,
+        );
+        let torn_ordinal = (0..plan.state_count)
+            .find(|ordinal| {
+                let persisted = plan.persisted_writes_of_state(*ordinal);
+                !persisted[0] && persisted[torn_image_index]
+            })
+            .expect("有一个状态是这次 discard 撕裂");
+        let torn_state = CrashImage {
+            base: &base,
+            writes: &writes_with_torn_images.writes,
+            persisted: plan.persisted_writes_of_state(torn_ordinal),
+        };
+        assert_eq!(
+            PoolReader::read(
+                &torn_state,
+                DeviceIdentity(0),
+                DeviceOffsetInBytes(DISCARDED_UNIT_SLOT),
+                16384
+            ),
+            Some(expected_torn_bytes),
+            "撕裂那一态的镜像真的生成出来：那一槽是撕裂镜像的字节"
+        );
+    }
+
+    /// 不长于一个扇区的 discard、罩住的范围里原来全 0 的 discard 都只取两态（D13（验证路线） 已定项 4：不是原地覆写的写，撕裂并进「没持久」）：
+    /// 两段各 2 − 1 个，再加全部持久那一个；写表后面不接撕裂镜像。
+    #[test]
+    fn a_discard_of_one_sector_or_over_zeros_takes_only_two_states() {
+        let base = base_with_old_bytes_in_the_discarded_slot();
+        let writes = vec![
+            discard_write(DISCARDED_UNIT_SLOT, SECTOR_BYTES),
+            discard_write(DISCARDED_UNIT_SLOT + (1 << 20), DISCARD_OF_ONE_SLOT_BYTES),
+        ];
+        let segments = vec![vec![0], vec![1]];
+        let tearable = TearableInPlaceOverwrites::of(&base, &writes);
+        assert_eq!(
+            tearable.write_indexes(),
+            Vec::<usize>::new(),
+            "一个扇区的 discard 撕不开；罩住全 0 的 discard 原来没东西：都不是原地覆写"
+        );
+        assert_eq!(
+            crash_state_count_with_torn_in_place_overwrites(
+                &base,
+                &writes,
+                &segments,
+                &full_expansion
+            ),
+            1 + 1 + 1
+        );
+        assert_eq!(
+            crash_state_enumeration_tables(&base, &writes, &segments, &full_expansion)
+                .enumerated_writes
+                .len(),
+            2,
+            "写表后面不接撕裂镜像"
+        );
     }
 }
 

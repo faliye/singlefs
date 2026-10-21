@@ -8,14 +8,15 @@
 mod common;
 
 use common::{parameters, IMAGE_BYTES};
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration};
 use singlefs_core::allocator::{DeviceFreeMap, PoolAllocator};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::code_two_tree::{parse_internal_entry, CodeTwoTreeNodeContents};
 use singlefs_core::pointer::NodePointer;
 use singlefs_core::transaction::{
     publish_version, FileVersionPlan, InstanceTablePlan, MultiLevelCodeTwoTree, PoolWriter,
-    PublishError, PublishPlan, TransactionOutput, TransactionUnit, NEW_POOL_FILE_CREATION_NUMBER,
+    PublishError, PublishPlan, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
+    NEW_POOL_FILE_CREATION_NUMBER,
 };
 use singlefs_core::unit::{index_node_entry_capacity, parse_index_node};
 use singlefs_format::{
@@ -83,6 +84,7 @@ fn publish_first_file_version(
             instance: InstanceGeneration(1),
             back_chain: 0,
             file: Some(FileVersionPlan {
+                inode: InodeNumber(FIRST_INODE_NUMBER),
                 content: &FILE_CONTENT,
                 write_time_seconds: common::FIXED_WRITE_TIME_SECONDS,
                 inode_object_birth: txg,

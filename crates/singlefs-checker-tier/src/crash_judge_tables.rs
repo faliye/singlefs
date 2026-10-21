@@ -98,6 +98,10 @@ pub fn step_kind_code(kind: StepKind) -> u32 {
         StepKind::RootRecordFua => 3,
         StepKind::SystemConfigurationSlot => 4,
         StepKind::Barrier => 5,
+        // 新码接在最后，旧的几个码不动。discard 不落在任何一个落点上（[`JudgeWrite::location`] 是 `None`）：它罩住的每个单元槽各是一个落点、
+        // 它算进那几个落点的写里，落点的每个版本按 `CrashImage::read` 同一条叠法叠出来（持久那一态读回 0、撕裂那一态是撕裂镜像的字节、
+        // 没持久那一态是旧字节，取几态照 D13（验证路线） 已定项 4），内核只按组合查版本，不按这个码分支。
+        StepKind::Discard => 6,
     }
 }
 
@@ -205,7 +209,8 @@ pub struct JudgeWrite {
     pub offset: u64,
     pub length: u32,
     pub kind: StepKind,
-    /// 这次写落在哪个落点（落点表下标）；清零写不落在任何落点。
+    /// 这次写落在哪个落点（落点表下标）；清零写与 discard（连同它的撕裂镜像）不落在任何落点：一次按 64 槽整段发、罩住几十个落点，
+    /// 它只进它罩住的那几个落点的写（[`JudgeLocation::writes`]）。
     pub location: Option<u32>,
     /// 根槽写写下的根身份（实例代号，checkpoint_txg）。
     pub root_identity: Option<(u32, u64)>,
@@ -623,8 +628,16 @@ fn build_judge_tables_from_the_state_source(
         }
     }
     for (write_index, write) in enumerated.iter().enumerate() {
-        if write.kind == StepKind::ZeroFill {
-            return Err(JudgeTablesRefusal::ZeroFillInTheEnumeratedWrites { write_index });
+        match write.kind {
+            StepKind::ZeroFill => {
+                return Err(JudgeTablesRefusal::ZeroFillInTheEnumeratedWrites { write_index });
+            }
+            StepKind::Discard
+            | StepKind::UnitWrite
+            | StepKind::JournalRecord
+            | StepKind::RootRecordFua
+            | StepKind::SystemConfigurationSlot
+            | StepKind::Barrier => {}
         }
     }
     let devices: Vec<u32> = flow
@@ -1511,13 +1524,26 @@ fn judge_writes(
 ) -> Result<Vec<JudgeWrite>, JudgeTablesRefusal> {
     let mut writes = Vec::with_capacity(enumerated.len());
     for (write_index, write) in enumerated.iter().enumerate() {
-        let location_index = location_index_by_start
-            .get(&(write.device.0, write.offset.0))
-            .copied()
-            .ok_or(JudgeTablesRefusal::WriteNotAlignedToALocation { write_index })?;
-        if write.length_in_bytes() > u64::from(locations[location_index].length) {
-            return Err(JudgeTablesRefusal::WriteNotAlignedToALocation { write_index });
-        }
+        let location = match write.kind {
+            // discard 按段整段发、罩住几十个单元槽，不落在哪一个落点上：它罩住的每个落点各把它记进自己的写（建落点那一步按字节范围记），
+            // 版本的字节按叠法叠出来。写表里它这一行只给持久掩码与「之后与一份副本重叠的写」用。
+            StepKind::Discard => None,
+            StepKind::ZeroFill
+            | StepKind::UnitWrite
+            | StepKind::JournalRecord
+            | StepKind::RootRecordFua
+            | StepKind::SystemConfigurationSlot
+            | StepKind::Barrier => {
+                let location_index = location_index_by_start
+                    .get(&(write.device.0, write.offset.0))
+                    .copied()
+                    .ok_or(JudgeTablesRefusal::WriteNotAlignedToALocation { write_index })?;
+                if write.length_in_bytes() > u64::from(locations[location_index].length) {
+                    return Err(JudgeTablesRefusal::WriteNotAlignedToALocation { write_index });
+                }
+                Some(u32::try_from(location_index).expect("下标装得进 u32"))
+            }
+        };
         let root_identity = (write.kind == StepKind::RootRecordFua).then(|| {
             let (instance, checkpoint_txg) = root_identity_of_write(write);
             (instance.0, checkpoint_txg.0)
@@ -1536,7 +1562,7 @@ fn judge_writes(
             offset: write.offset.0,
             length: u32::try_from(write.length_in_bytes()).expect("写长装得进 u32"),
             kind: write.kind,
-            location: Some(u32::try_from(location_index).expect("下标装得进 u32")),
+            location,
             root_identity,
             root_bytes,
             later_overlapping_writes,
@@ -3183,6 +3209,133 @@ mod tests {
                 .iter()
                 .any(|location| location.kind == JudgeLocationKind::RootSlot),
             "盘 1 上的根环区域 1 照建落点"
+        );
+    }
+
+    /// 枚举写表里一次 discard 按 64 槽整段发、罩住它之前写下的一份数据单元（C829（discard 与 mkfs 清零在段种类串里同名） 把它从清零里分出来之后，
+    /// GPU 判器的落点模型接它）：判表建得出；discard 那一行不落在任何一个落点上，它罩住的 64 个单元槽各是一个落点、各把它记进自己的写；
+    /// 那份数据单元的落点照 D13（验证路线） 已定项 4 的三态各有一个版本——discard 持久那一版读回全 0、没持久那一版是数据单元的字节、
+    /// 撕裂那一版是撕裂镜像（`crash::torn_image_of_in_place_overwrite` 按「这次写之前的写全落了」时的旧字节算的）在这一槽上的那一截。
+    /// 照旧在建表时拒 discard，或把 discard 当成落在它起点那一个落点上（长过那个落点就拒），这条在建表那一步就红。
+    #[test]
+    fn a_discard_over_a_data_unit_lands_in_every_unit_slot_location_it_covers_in_its_three_states()
+    {
+        let base = formatted_pool_of_two_devices();
+        let unit_area_start_slot = slot_after_the_journal_ring(JOURNAL_RING_DEFAULT_BYTES).0;
+        let discard_slots: u64 = 64;
+        let discard_start = (unit_area_start_slot + discard_slots) * SLOT_BYTES;
+        let data_unit_bytes: Vec<u8> = (0..32768_u32)
+            .map(|index| u8::try_from(index % 251 + 1).expect("小于 256"))
+            .collect();
+        let writes = vec![
+            RetainedWrite {
+                device: DeviceIdentity(0),
+                kind: StepKind::UnitWrite,
+                is_force_unit_access: false,
+                offset: DeviceOffsetInBytes(discard_start),
+                contents: WrittenContents::Bytes(data_unit_bytes.clone()),
+            },
+            RetainedWrite {
+                device: DeviceIdentity(0),
+                kind: StepKind::Discard,
+                is_force_unit_access: false,
+                offset: DeviceOffsetInBytes(discard_start),
+                contents: WrittenContents::Zeros {
+                    length: discard_slots * SLOT_BYTES,
+                },
+            },
+        ];
+        let segments = vec![vec![0], vec![1]];
+        let tables = build_judge_tables(&JudgeFlow {
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            judged_root_index: 0,
+            versions: &[],
+            expansion: &crate::crash::full_expansion,
+        })
+        .expect("带 discard 的流建得出判表");
+        assert_eq!(tables.writes[1].kind, StepKind::Discard);
+        assert_eq!(
+            tables.writes[1].location, None,
+            "discard 不落在任何一个落点上"
+        );
+        assert!(
+            tables.is_tearable[1],
+            "长于一个扇区、罩住非零旧内容的 discard 取第三态"
+        );
+        let torn_image_index = u32::try_from(writes.len()).expect("装得进 u32");
+        assert_eq!(
+            tables.writes[2].kind,
+            StepKind::Discard,
+            "枚举写表里接在录制流后面的那一条是 discard 的撕裂镜像"
+        );
+        let unit_slot_locations_the_discard_covers: Vec<u64> = tables
+            .locations
+            .iter()
+            .filter(|location| {
+                location.kind == JudgeLocationKind::UnitSlot
+                    && location.device == 0
+                    && location.offset >= discard_start
+                    && location.writes.contains(&1)
+            })
+            .map(|location| location.offset)
+            .collect();
+        let slots_the_discard_starts_in: Vec<u64> = (0..discard_slots)
+            .map(|slot| discard_start + slot * SLOT_BYTES)
+            .collect();
+        assert_eq!(
+            unit_slot_locations_the_discard_covers, slots_the_discard_starts_in,
+            "discard 罩住的每个单元槽各是一个落点、各把它记进自己的写"
+        );
+        let data_unit_location = tables
+            .locations
+            .iter()
+            .find(|location| location.device == 0 && location.offset == discard_start)
+            .expect("数据单元那一槽是一个落点");
+        assert_eq!(
+            data_unit_location.writes,
+            vec![0, 1, torn_image_index],
+            "数据单元那一槽的写：数据单元、discard、discard 的撕裂镜像"
+        );
+        let version_with = |persisted_bits: u64| {
+            let mut combination =
+                crate::crash_judge_tables::CombinationOfTheWritesOnALocation::NOTHING_PERSISTED;
+            for position in 0..data_unit_location.writes.len() {
+                if (persisted_bits >> position) & 1 == 1 {
+                    combination.mark_persisted(position);
+                }
+            }
+            data_unit_location
+                .versions
+                .iter()
+                .find(|version| version.combination == combination)
+                .unwrap_or_else(|| panic!("数据单元那一槽有组合 {persisted_bits:#b} 的版本"))
+        };
+        assert!(
+            version_with(0b011).bytes.iter().all(|byte| *byte == 0),
+            "discard 持久那一态读回全 0"
+        );
+        assert_eq!(
+            version_with(0b001).bytes,
+            data_unit_bytes,
+            "discard 没持久那一态是数据单元的字节"
+        );
+        let mut old_bytes_under_the_discard = data_unit_bytes.clone();
+        old_bytes_under_the_discard.resize(
+            usize::try_from(discard_slots * SLOT_BYTES).expect("装得进 usize"),
+            0,
+        );
+        let torn_image = crate::crash::torn_image_of_in_place_overwrite(
+            &old_bytes_under_the_discard,
+            &WrittenContents::Zeros {
+                length: discard_slots * SLOT_BYTES,
+            },
+        );
+        assert_eq!(
+            version_with(0b101).bytes,
+            torn_image[..data_unit_bytes.len()],
+            "撕裂那一态是撕裂镜像在这一槽上的那一截"
         );
     }
 

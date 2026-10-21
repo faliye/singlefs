@@ -264,6 +264,7 @@ pub fn copy_the_allocation_record_tree_of_an_old_root_under_another_generation(
                 kind: parsed.kind,
                 tree: parsed.tree,
                 root: copied_root,
+                previous_snapshot_txg: parsed.previous_snapshot_txg,
                 birth_txg: parsed.birth_txg,
                 head_identifier: parsed.head_identifier,
             }

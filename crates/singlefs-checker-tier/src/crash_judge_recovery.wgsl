@@ -70,8 +70,7 @@ fn system_configuration_slot_self_verified_with_the_fsid(s: Slice, fsid: vec4<u3
     if (s.version == NONE || s.length < SYSTEM_CONFIGURATION_SLOT_BYTES || rd32(s.base, 0u) != MAGIC_SFSB || s.c0 != 1u) {
         return false;
     }
-    let incompat0 = rd8(s.base, 6u);
-    if ((incompat0 & 0xFDu) != 0u || !all_zero(s.base, 7u, 31u) || (incompat0 & 2u) == 0u) {
+    if (!incompat_bits_are_recognized(s.base)) {
         return false;
     }
     let slots_per_region = rd8(s.base, 362u);

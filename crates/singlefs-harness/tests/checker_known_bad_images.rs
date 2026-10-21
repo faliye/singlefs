@@ -4,7 +4,11 @@
 
 mod common;
 mod common_deletion_in_progress;
+mod common_images_for_the_checker_tier;
 mod common_pointer_head_corruption;
+// 借它那几个只供测试的开关的搭法（压回水位建 inode、覆盖写第一个文件）造 C479 的坏镜像；那份场景文件交镜像的那一半这里不用。
+#[path = "common_images_for_the_checker_tier/inode_number_watermark_pressed_back_reissues_a_number.rs"]
+mod scenarios_of_inode_number_watermark_pressed_back_reissues_a_number;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool,
@@ -17,29 +21,37 @@ use common::{
 };
 use singlefs_checker::image::{
     InvariantVerdict, ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
+    COMPACTION_REGION_HOLDS_NO_RECORD_ALLOCATED_AFTER_THE_INTENT_WAS_ISSUED,
+    DATA_UNITS_BEYOND_THE_SIZE_ARE_NAMED_BY_A_TRUNCATION_INTENT,
+    DEADLIST_ENTRIES_ARE_BORN_NO_LATER_THAN_THE_PREVIOUS_SNAPSHOT_OF_THEIR_SIDE,
+    DECLARED_LENGTH_OF_EACH_DATA_UNIT_WITHIN_THE_SIZE_MATCHES_THE_SIZE,
     DELETION_QUEUE_HOLDS_AT_MOST_ONE_KEY, DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
     EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
     FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+    FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN,
     HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES,
     INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
     INODE_NUMBER_WATERMARK_STEPS_AGREE_WITH_THE_WATERMARK_THE_RECORDS_AND_THE_LINEAGE,
     INSTANCE_TABLE_PAGE_RECORDS_ARE_WELL_FORMED,
     INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
-    INTENT_DESCRIBES_ONLY_THE_TARGET_STATE, INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION,
-    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
-    LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
+    INTENT_DESCRIBES_ONLY_THE_TARGET_STATE, JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE,
+    JOURNAL_RING_GEOMETRY_FIELDS_AGREE, LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
     LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
-    LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER, NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
+    LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    LIVE_DATA_UNITS_BEYOND_THE_TRUNCATION_FIELD_ARE_BORN_NO_EARLIER_THAN_IT,
+    LIVE_SNAPSHOTS_ARE_ENUMERABLE, NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
     NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
     NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
-    ONE_OBJECT_BIRTH_PER_INODE_NUMBER, POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
-    PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES, QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
-    REFERENCE_INTERVALS_ARE_EXACT,
+    NO_COMPACTION_INTENT_WITH_A_WELL_FORMED_REGION_IN_ANY_WALKED_VERSION,
+    NO_INTENT_ENTRY_IN_THE_LOGGED_OPERATIONS_OF_ANY_WALKED_VERSION,
+    NO_MAPPING_KEY_PLACED_DIFFERENTLY_IN_TWO_WALKED_VERSIONS, ONE_OBJECT_BIRTH_PER_INODE_NUMBER,
+    POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER, PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
+    QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE, REFERENCE_INTERVALS_ARE_EXACT,
     RETIREMENT_RECORDS_ACCOUNT_FOR_EVERY_LEAF_GONE_SINCE_THE_PARENT_VERSION,
     RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
     RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
     RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER, ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES,
-    ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
+    ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH, SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
     SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
     SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
     SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
@@ -50,6 +62,8 @@ use singlefs_checker::image::{
     TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
     TREE_IDENTIFIER_BIRTH_TXG_AGREES_ACROSS_EVERY_READABLE_ROOT,
     UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
+    UNIT_BYTES_OF_ONE_MAPPING_KEY_AGREE_ACROSS_THE_VERSIONS,
+    UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
 };
 use singlefs_checker::walk::{check_pool_image, InstanceTableOfRootRecord};
 use singlefs_core::address::{
@@ -841,11 +855,15 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 81, 0xDEAD), true)
             }),
         ),
-        // 盘 1 被择的那个系统配置槽里 fsid 改成别的池的（一块外来的旧盘）；单元头照旧。
+        // 盘 1 被择的那个系统配置槽（两槽里世代号大的那一槽，按盘上现读）里 fsid 改成别的池的（一块外来的旧盘）；单元头照旧。
         (
             "I-1.4",
             Box::new(|image: &mut MemoryPool| {
-                mutate_system_configuration_slot(image, 1, 4096, |bytes| bytes[102] ^= 0xFF)
+                let [(chosen_slot_offset, _), _] =
+                    system_configuration_slots_chosen_first(image, 1);
+                mutate_system_configuration_slot(image, 1, chosen_slot_offset, |bytes| {
+                    bytes[102] ^= 0xFF
+                })
             }),
         ),
         // 码 3 容器类身份段的首字节改成 1。
@@ -927,15 +945,24 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 )
             }),
         ),
-        // 树表里分配记录树那条的根指针，盘 0 那条位置条目改指槽 50243（压在 inode 叶容器的第二个槽上）。
+        // 中央映射里分配记录树根那一条，盘 0 那条位置条目改指槽 50243（压在 inode 叶容器的第二个槽上）。分配记录树根按映射认位置、
+        // 树表里那条根指针只是提示（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3）：只改树表里的指针，走读按映射认回原槽、不重叠。
         (
             "I-5.1",
             Box::new(|image: &mut MemoryPool| {
                 mutate_unit(
                     image,
-                    TREE_TABLE,
+                    MAPPING_ROOT,
                     |bytes| {
-                        let location = tree_table_entry_offset(2) + 14 + 50 + 4;
+                        let mapping_entry_of_the_allocation_record_tree_root =
+                            (0..usize::from(u16::from_le_bytes([bytes[136], bytes[137]])))
+                                .map(|entry_index| 86 + 54 + 29 + entry_index * 55)
+                                .find(|entry_start| {
+                                    bytes[entry_start + 27 + 4..entry_start + 27 + 10]
+                                        == ALLOCATION_RECORD_TREE_ROOT.to_le_bytes()[..6]
+                                })
+                                .expect("映射里有分配记录树根那一条");
+                        let location = mapping_entry_of_the_allocation_record_tree_root + 27 + 4;
                         bytes[location..location + 6].copy_from_slice(&50243u64.to_le_bytes()[..6]);
                     },
                     true,
@@ -974,11 +1001,13 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 }
             }),
         ),
-        // 盘 0 被择的那个系统配置槽（槽 1，世代 5）里逐区域设备改成 [0, 0, 0]。
+        // 盘 0 被择的那个系统配置槽（两槽里世代号大的那一槽，按盘上现读）里逐区域设备改成 [0, 0, 0]。
         (
             "I-7.6",
             Box::new(|image: &mut MemoryPool| {
-                mutate_system_configuration_slot(image, 0, 4096, |bytes| {
+                let [(chosen_slot_offset, _), _] =
+                    system_configuration_slots_chosen_first(image, 0);
+                mutate_system_configuration_slot(image, 0, chosen_slot_offset, |bytes| {
                     bytes[379..391].copy_from_slice(&[0u8; 12])
                 })
             }),
@@ -1028,7 +1057,8 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 )
             }),
         ),
-        // 盘 0 较新那一槽的实例代号改成 2，再放那份实例代号 2 的孤儿 ⇒ 各盘最大号 [2, 1] 不等而较大者有东西带着，② 红（① 成立）。
+        // 盘 0 槽 1（偏移 4096）的实例代号改成 2，再放那份实例代号 2 的孤儿 ⇒ 各盘最大号 [2, 1] 不等而较大者有东西带着，② 红（① 成立）。
+        // 改的是不是被择的那一槽不碍事：每盘的实例代号取它两槽里全部自证过的槽中最大的，取号写的轮数翻了被择的槽也照样判红。
         (
             "I-7.7",
             Box::new(move |image: &mut MemoryPool| {
@@ -1343,8 +1373,24 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
             FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
             Box::new(move_the_data_unit_of_the_first_file_two_slots_further),
         ),
+        // I-1.13（扫描重建与遍历方向的索引相同） 的必红世界 ②（`scan_rebuild_agrees_with_the_walked_index.rs` 同一形）：A 的数据单元（50180）
+        // 两份副本头里的对象 key（五元组，42..75）清零、不重封——头校验和对不上，扫描重建判它损坏、不认领，遍历方向照样经 extent 树引用它。
+        // 读不出那个单元，I-2.1、I-4.8、I-7.2、I-7.4 跟着红，所以放在这一张表里（只判「它红」，不判「只红它」）。
+        (
+            SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+            Box::new(|image: &mut MemoryPool| {
+                for device in DEVICES {
+                    let mut first_sector = read(image, device, DATA_UNIT * SLOT, 512);
+                    first_sector[DATA_UNIT_OBJECT_KEY].fill(0);
+                    write(image, device, DATA_UNIT * SLOT, &first_sector);
+                }
+            }),
+        ),
     ]
 }
+
+/// 码 1 单元头里对象 key 那一段（五元组：类标签 42、树 43、对象 51、对象出生代 59、锚点偏移 67，D18（块里携带什么信息） 已定项 7）。
+const DATA_UNIT_OBJECT_KEY: std::ops::Range<usize> = 42..75;
 
 /// 新池新建文件写出的那个数据单元（`DATA_UNIT`，32 KiB）原样搬到往后两槽（写完新池新建文件那份镜像上空着，下一个 32 KiB 对齐的槽对）：
 /// 两盘各写一份；`UNITS` 里引用它的单元（extent 树根里的数据指针、中央映射叶）把位置条目的槽号改成新的、重封，
@@ -1855,10 +1901,13 @@ fn expected_verdict_with_one_record_per_transaction(invariant: &str) -> Invarian
         "I-7.9" => InvariantVerdict::NotApplicable(NO_ROOT_RAISED_THE_FLOOR),
         // 最新根之上没有记录：重放之后那一版就是最新根。
         "I-4.1" => InvariantVerdict::NotApplicable(NOTHING_APPLIED_ABOVE_THE_CHOSEN_ROOT),
-        // 用它的镜像上都没有删除：没有处于删除中的号、没有 nlink = 0 的记录；I-4.4 第一版报不适用。
+        // 用它的镜像上都没有删除：没有处于删除中的号；也没有整理意图，I-4.4 报不适用（logged_ops 里没有意图条目）。
         "I-4.7" => InvariantVerdict::NotApplicable(NO_INODE_BEING_DELETED_IN_ANY_WALKED_VERSION),
-        "I-4.6" => InvariantVerdict::NotApplicable(NO_RECORD_OF_NLINK_ZERO_IN_ANY_WALKED_VERSION),
-        "I-4.4" => InvariantVerdict::NotApplicable(INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION),
+        // I-4.6 自截断起每条记录都判（单元连号、单元数对标签，m4-trunc-r1 判决 K7 T-3）：文件的记录有单元，真被评估过且成立。
+        "I-4.6" => InvariantVerdict::Holds,
+        "I-4.4" => InvariantVerdict::NotApplicable(
+            NO_INTENT_ENTRY_IN_THE_LOGGED_OPERATIONS_OF_ANY_WALKED_VERSION,
+        ),
         other_invariant => {
             expected_verdict_of_the_tombstone_and_lineage_invariants_without_deletion(
                 other_invariant,
@@ -1913,6 +1962,16 @@ fn expected_verdict_of_the_tombstone_and_lineage_invariants_without_deletion(
         LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE => {
             InvariantVerdict::NotApplicable(NO_LINEAGE_OR_RETIREMENT_CONTAINER_CAPACITY_KNOB)
         }
+        // 里程碑四自建 GC 那几条（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3）：logged_ops 树是零根，没有整理意图、没有 R；
+        // 没有搬迁过的单元，没有一把映射 key 在两版里落在不同的位置。I-3.15（反查）与 I-3.16（runs 与全空段）真被评估过且成立。
+        COMPACTION_REGION_HOLDS_NO_RECORD_ALLOCATED_AFTER_THE_INTENT_WAS_ISSUED => {
+            InvariantVerdict::NotApplicable(
+                NO_COMPACTION_INTENT_WITH_A_WELL_FORMED_REGION_IN_ANY_WALKED_VERSION,
+            )
+        }
+        UNIT_BYTES_OF_ONE_MAPPING_KEY_AGREE_ACROSS_THE_VERSIONS => InvariantVerdict::NotApplicable(
+            NO_MAPPING_KEY_PLACED_DIFFERENTLY_IN_TWO_WALKED_VERSIONS,
+        ),
         _ => InvariantVerdict::Holds,
     }
 }
@@ -3148,13 +3207,81 @@ const INODE_NUMBER_WATERMARK_STEP_INVARIANT_AND_WHERE_ITS_BAD_IMAGES_LIVE: [(&st
     ),
 ];
 
-/// 清单里不要求坏镜像的几条：I-4.4（意图只描述目标态） 第一版报不适用（用户 2026-10-05 定，`.claude/kb/milestone/03-third-txn.md` 三·3 那一行
-/// 「I-4.4 不要求坏镜像与变异行」）。
-const INVARIANTS_WITHOUT_A_BAD_IMAGE: [&str; 1] = [INTENT_DESCRIBES_ONLY_THE_TARGET_STATE];
-/// 干净镜像上 I-4.7（删除中 inode 有账） 与 I-4.6（中间态其余不变量成立） 没有对象时报的理由（`walk` 的删除态扫描）。
+/// 只读快照那一批的 I-3.6（deadlist 紧界） 与 I-3.7（活快照可枚举）（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S5）：
+/// 坏镜像要写路径建出快照的基底（I-3.7）或一个有 deadlist 条目的世界（I-3.6，deadlist 写者落地之前只有池级 checker 单测里的合成世界），
+/// 不进只改干净镜像一处的表；这里登记它们在哪几个用例里。
+const SNAPSHOT_AND_DEADLIST_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE: [(&str, &str); 3] = [
+    (
+        LIVE_SNAPSHOTS_ARE_ENUMERABLE,
+        "checker_snapshot_space_accounting_must_red_worlds.rs: removing_the_second_snapshot_from_the_newest_tree_table_reddens_the_enumerable_invariant",
+    ),
+    (
+        LIVE_SNAPSHOTS_ARE_ENUMERABLE,
+        "checker_snapshot_space_accounting_must_red_worlds.rs: adding_a_snapshot_pair_with_an_older_txg_to_the_newest_tree_table_reddens_the_enumerable_invariant",
+    ),
+    (
+        DEADLIST_ENTRIES_ARE_BORN_NO_LATER_THAN_THE_PREVIOUS_SNAPSHOT_OF_THEIR_SIDE,
+        "crates/singlefs-checker/src/walk.rs 的测试模块: a_deadlist_entry_born_after_the_previous_snapshot_of_its_side_violates_the_tight_bound",
+    ),
+];
+
+/// 里程碑四自建 GC 的 checker 新判（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1、G3 的 N2–N6）：I-3.15、I-5.6、I-4.4、I-3.16、I-1.14
+/// 的坏镜像在 `checker_compaction_intent_and_relocation_must_red_worlds.rs`（logged_ops 树与整理意图、搬迁那几份都要另搭，不从这里的干净镜像改一处）。
+const COMPACTION_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE: [(&str, &str); 5] = [
+    (
+        UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+        "checker_compaction_intent_and_relocation_must_red_worlds.rs: a_mapping_entry_moved_without_a_copy_reddens_the_reverse_lookup_at_the_source",
+    ),
+    (
+        COMPACTION_REGION_HOLDS_NO_RECORD_ALLOCATED_AFTER_THE_INTENT_WAS_ISSUED,
+        "checker_compaction_intent_and_relocation_must_red_worlds.rs: records_allocated_into_the_region_after_the_intent_was_issued_redden_the_region_exclusion",
+    ),
+    (
+        INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+        "checker_compaction_intent_and_relocation_must_red_worlds.rs: a_compaction_intent_carrying_an_increment_in_its_padding_reddens_only_the_target_state_invariant",
+    ),
+    (
+        FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN,
+        "checker_compaction_intent_and_relocation_must_red_worlds.rs: a_runs_row_one_short_reddens_only_the_full_scan_statistics",
+    ),
+    (
+        UNIT_BYTES_OF_ONE_MAPPING_KEY_AGREE_ACROSS_THE_VERSIONS,
+        "checker_compaction_intent_and_relocation_must_red_worlds.rs: a_byte_changed_in_the_relocated_copy_reddens_the_same_bytes_invariant",
+    ),
+];
+
+/// 截断那一批新立的两条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 T-2、T-4）：I-4.10、I-9.38 的坏镜像在
+/// `checker_truncation_holes_and_intent_must_red_worlds.rs`（截断条目、size 之外挂着的单元、尾单元的声明长度都要另搭，不从这里的干净镜像改一处）。
+/// 截断字段那一批（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）新立的 I-9.39 的坏镜像在
+/// `checker_truncation_field_must_red_worlds.rs`（要另置 incompat 位 2、另写记录的截断字段，不从这里的干净镜像改一处）。
+const TRUNCATION_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE: [(&str, &str); 3] = [
+    (
+        DATA_UNITS_BEYOND_THE_SIZE_ARE_NAMED_BY_A_TRUNCATION_INTENT,
+        "checker_truncation_holes_and_intent_must_red_worlds.rs: deleting_the_truncation_entry_while_units_beyond_the_size_remain_reddens_the_intermediate_state_account",
+    ),
+    (
+        DECLARED_LENGTH_OF_EACH_DATA_UNIT_WITHIN_THE_SIZE_MATCHES_THE_SIZE,
+        "checker_truncation_holes_and_intent_must_red_worlds.rs: shrinking_the_size_into_the_unit_without_rewriting_it_reddens_only_the_declared_length",
+    ),
+    (
+        LIVE_DATA_UNITS_BEYOND_THE_TRUNCATION_FIELD_ARE_BORN_NO_EARLIER_THAN_IT,
+        "checker_truncation_field_must_red_worlds.rs: a_live_data_unit_born_before_the_truncation_field_reddens_only_the_birth_txg_invariant",
+    ),
+];
+
+/// extent 上段规范形那一条（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2）：I-9.40 的坏镜像要上段长到层级 1
+/// 再改根（这里的干净镜像上段只有根兼叶），在 `unlink_of_files_other_than_the_first.rs`；必红世界三形的单测在 `crates/singlefs-checker/src/walk.rs`。
+const EXTENT_UPPER_SHAPE_INVARIANT_AND_WHERE_ITS_BAD_IMAGES_LIVE: [(&str, &str); 1] = [(
+    singlefs_checker::image::EXTENT_UPPER_SEGMENT_IS_THE_CANONICAL_SHAPE_OF_THE_INODES_WITH_AN_ENTRY,
+    "unlink_of_files_other_than_the_first.rs: a_root_left_one_level_above_the_only_leaf_with_an_entry_reddens_the_upper_shape_invariant",
+)];
+
+/// 清单里不要求坏镜像的几条：现在一条都没有。I-4.4（意图只描述目标态） 第一版报不适用、不要求坏镜像（用户 2026-10-05 定，
+/// `.claude/kb/milestone/03-third-txn.md` 三·3 那一行），2026-10-15 起判 logged_ops 里的整理意图，坏镜像登记在
+/// [`COMPACTION_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE`]。
+const INVARIANTS_WITHOUT_A_BAD_IMAGE: [&str; 0] = [];
+/// 干净镜像上 I-4.7（删除中 inode 有账） 没有对象时报的理由（`walk` 的删除态扫描）。
 const NO_INODE_BEING_DELETED_IN_ANY_WALKED_VERSION: &str = "走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）";
-const NO_RECORD_OF_NLINK_ZERO_IN_ANY_WALKED_VERSION: &str =
-    "走读到的每一版 inode 树里都没有 nlink = 0 的记录";
 
 #[test]
 fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
@@ -3197,13 +3324,12 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
             "I-4.7" => {
                 InvariantVerdict::NotApplicable(NO_INODE_BEING_DELETED_IN_ANY_WALKED_VERSION)
             }
-            "I-4.6" => {
-                InvariantVerdict::NotApplicable(NO_RECORD_OF_NLINK_ZERO_IN_ANY_WALKED_VERSION)
-            }
-            // 第一版报不适用并写理由（用户 2026-10-05 定），不要求坏镜像（`INVARIANTS_WITHOUT_A_BAD_IMAGE`）。
-            "I-4.4" => {
-                InvariantVerdict::NotApplicable(INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION)
-            }
+            // I-4.6 自截断起每条记录都判（单元连号、单元数对标签，m4-trunc-r1 判决 K7 T-3）：inode 1 的记录 size 与单元数对得上，成立。
+            "I-4.6" => InvariantVerdict::Holds,
+            // logged_ops 树是零根、没有意图条目：报不适用并写理由；坏镜像在 `COMPACTION_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE`。
+            "I-4.4" => InvariantVerdict::NotApplicable(
+                NO_INTENT_ENTRY_IN_THE_LOGGED_OPERATIONS_OF_ANY_WALKED_VERSION,
+            ),
             // 墓碑与谱系那九条：这一份上没有删除、没有回退，墓碑树与谱系树都是零根。坏镜像见
             // `TOMBSTONE_AND_LINEAGE_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE`。
             other_invariant => {
@@ -3277,6 +3403,26 @@ fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target()
         )
         .chain(
             LINEAGE_AND_RETIREMENT_CONTAINER_CAPACITY_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE
+                .iter()
+                .map(|(invariant, _)| *invariant),
+        )
+        .chain(
+            SNAPSHOT_AND_DEADLIST_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE
+                .iter()
+                .map(|(invariant, _)| *invariant),
+        )
+        .chain(
+            COMPACTION_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE
+                .iter()
+                .map(|(invariant, _)| *invariant),
+        )
+        .chain(
+            TRUNCATION_INVARIANTS_AND_WHERE_THEIR_BAD_IMAGES_LIVE
+                .iter()
+                .map(|(invariant, _)| *invariant),
+        )
+        .chain(
+            EXTENT_UPPER_SHAPE_INVARIANT_AND_WHERE_ITS_BAD_IMAGES_LIVE
                 .iter()
                 .map(|(invariant, _)| *invariant),
         )
@@ -3439,6 +3585,38 @@ fn hang_an_empty_leaf_below_the_root_of_the_allocation_record_tree(image: &mut M
         image,
         ALLOCATION_LEVEL_ONE_NODE_OF_DEVICE_ZERO,
         |bytes| bytes.copy_from_slice(&rebuilt_level_one),
+        false,
+    );
+    // 中央映射（根兼叶）里加那片空叶的一条条目：分配记录树的每个节点都进映射（D19（块指针的结构与宽度预算） 已定项 8），
+    // 不加的话它的未释放记录在映射里找不到相符的 key，I-3.15（N2 反查）跟着红，这份镜像就不只红 I-1.1 了。按 key 升序放好、叶头区间贴紧首末条目。
+    let mapping = parse_index_node(&read(image, 0, MAPPING_ROOT * SLOT, 16384)).expect("映射根");
+    let mut mapping_entries = mapping.entries.clone();
+    mapping_entries.push(singlefs_core::records::build_mapping_entry(
+        &singlefs_core::records::mapping_key_for_node(
+            singlefs_core::unit::UNIT_CLASS_INDEX_NODE,
+            pointer,
+        ),
+        pointer.locations,
+    ));
+    mapping_entries.sort_by_key(|entry| singlefs_core::records::mapping_key_sort_key(entry));
+    let mapping_key_width = mapping.key_width;
+    let rebuilt_mapping = build_index_node(
+        mapping.tree,
+        mapping.level,
+        mapping_key_width,
+        &mapping_entries.first().expect("有条目")[..mapping_key_width],
+        &mapping_entries.last().expect("有条目")[..mapping_key_width],
+        mapping.birth_txg,
+        &filesystem_identifier,
+        mapping.instance,
+        mapping.birth_sequence,
+        u16::try_from(mapping.entry_width).expect("55"),
+        &mapping_entries,
+    );
+    mutate_unit(
+        image,
+        MAPPING_ROOT,
+        |bytes| bytes.copy_from_slice(&rebuilt_mapping),
         false,
     );
 }
@@ -3748,9 +3926,19 @@ fn an_entry_width_that_is_not_the_field_table_width_reddens_only_the_entry_width
         .collect();
     assert_eq!(
         turned_not_applicable,
-        ["I-3.1", "I-3.11", "I-5.2", "I-9.6", "I-3.13", "I-3.4", "I-9.30"],
-        "跟着转成不适用的该只有这七条（走读在 I-1.10 那一步停下，记账条目不再解；I-3.13 判的就是记账行的代段；\
-         I-3.4 的删除态扫描读记账树也按条目宽 ≥ 34 才解，读不全那一版报射程里判不了；I-9.30 的台阶行取自走全了的记账树）：{verdicts:?}"
+        [
+            "I-3.1",
+            "I-3.11",
+            "I-5.2",
+            "I-9.6",
+            "I-3.13",
+            "I-3.4",
+            "I-9.30",
+            FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN
+        ],
+        "跟着转成不适用的该只有这八条（走读在 I-1.10 那一步停下，记账条目不再解；I-3.13 判的就是记账行的代段；\
+         I-3.4 的删除态扫描读记账树也按条目宽 ≥ 34 才解，读不全那一版报射程里判不了；I-9.30 的台阶行取自走全了的记账树；\
+         I-3.16 比的 runs 与全空段那两行也取自走全了的记账树）：{verdicts:?}"
     );
 }
 
@@ -3929,6 +4117,10 @@ fn birth_txg_that_the_line_after_a_rollback_records_differently_from_the_rollbac
             if invariant == LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER {
                 // 回退那次发布写出谱系树（一片容器、一条谱系记录）：它的根条目真被评估过且成立。
                 InvariantVerdict::Holds
+            } else if invariant == SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX {
+                // 谱系树里有记录：扫描重建按「不是任何现行版本的成员」认领回退抛弃的那一段（用户 2026-10-14 定，岔路单
+                // `research/prompts/m4-batch2-code-r1-forks.md` 第 1 行），择回退目标那一版，与遍历方向真比过、成立。
+                InvariantVerdict::Holds
             } else {
                 expected_verdict_with_one_record_per_transaction(invariant)
             },
@@ -3991,6 +4183,17 @@ fn birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_recovery_hol
     let (clean, birth_txg, tree_table_slot_of_the_abandoned_root, abandoned_publish_txg) =
         image_after_a_recovery_abandoned_the_third_root("known-good-after-recovery-abandoned-line");
     for (invariant, found) in check_pool_image(&clean) {
+        // I-3.16 的全空段那一半在这一张上真判、成立：崩溃恢复之后盘 0 有一段只剩 defer 槽，按记录口径全空、按占用口径不空（两个口径分得开），
+        // 核心层记账行写的与 checker 从最新根的记录现扫的都是记录口径（C372（全空聚簇段数两份定义相反） 代码那一半收口），两边相等。
+        // 核心层改回占用口径（释放不让槽离开未释放的记录）时这里判红。
+        if invariant == FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN {
+            assert_eq!(
+                found,
+                InvariantVerdict::Holds,
+                "崩溃恢复抛弃了 C 之后的干净镜像上 I-3.16 连全空段那一半都真判、成立（核心层计数与 checker 重算相等）"
+            );
+            continue;
+        }
         assert_eq!(
             found,
             expected_verdict_with_one_record_per_transaction(invariant),
@@ -5022,14 +5225,30 @@ fn pure_leak_that_keeps_free_plus_allocated_equal_to_the_unit_area_reddens_only_
             expected_violations,
             "判红的该只有 {expected_violations:?}：{verdicts:?}"
         );
+        // I-3.16（碎片度与全空段统计对得上） 跟着报不适用：已分配那一行对不上 I-3.1 那一份占着的槽，占着的是哪几槽认不出，runs 不比。
+        assert!(
+            matches!(
+                verdict_among(
+                    &verdicts,
+                    FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN
+                ),
+                InvariantVerdict::NotApplicable(_)
+            ),
+            "泄漏之后 I-3.16 报不适用、不报违例"
+        );
+        let allowed_to_differ: Vec<&str> = expected_violations
+            .iter()
+            .copied()
+            .chain([FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN])
+            .collect();
         assert_eq!(
             verdicts_that_differ_outside(
                 &verdicts,
                 &verdicts_on_the_clean_image,
-                expected_violations
+                &allowed_to_differ
             ),
             [],
-            "{expected_violations:?} 之外每一条的判定与干净镜像逐项相同"
+            "{expected_violations:?} 与 I-3.16 之外每一条的判定与干净镜像逐项相同"
         );
     }
 }
@@ -5728,6 +5947,7 @@ fn image_after_a_writable_mount_over_a_version_applied_only_by_its_journal_recor
         .filter(|retained| match classifier.classify(&retained.operation) {
             StepKind::UnitWrite | StepKind::JournalRecord => true,
             StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::RootRecordFua
             | StepKind::SystemConfigurationSlot
             | StepKind::Barrier => false,
@@ -5857,14 +6077,19 @@ fn version_applied_only_by_its_journal_record_is_walked_so_the_allocated_statist
         ["I-3.1", "I-3.11"],
         "再泄漏一槽只该红 I-3.1 与 I-3.11：{verdicts:?}"
     );
+    // I-3.16 跟着报不适用（已分配那一行对不上 I-3.1 那一份占着的槽），不报违例。
     assert_eq!(
         verdicts_that_differ_outside(
             &verdicts,
             &verdicts_on_the_clean_image,
-            &["I-3.1", "I-3.11"]
+            &[
+                "I-3.1",
+                "I-3.11",
+                FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN
+            ]
         ),
         [],
-        "I-3.1 与 I-3.11 之外每一条的判定与泄漏之前逐项相同"
+        "I-3.1、I-3.11 与 I-3.16 之外每一条的判定与泄漏之前逐项相同"
     );
     let InvariantVerdict::Violated(detail) = verdict(&leaked, "I-3.1") else {
         panic!("上面判过 I-3.1 红");
@@ -8075,13 +8300,15 @@ fn each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_inva
     );
 }
 
-/// 盘 0 两个系统配置槽：(偏移, 世代号)，被择的那一槽（世代号大的）在前。
-fn system_configuration_slots_of_device_zero_chosen_first(image: &MemoryPool) -> [(u64, u64); 2] {
-    let slots = [0, system_configuration_slot_one_offset(image, 0)].map(|slot_offset| {
+/// 一块盘的两个系统配置槽：(偏移, 世代号)，被择的那一槽（世代号大的）在前。只在两槽都自证过的镜像上用（不核自证）。
+/// 被择的是槽 0 还是槽 1 随取号写几轮、暖机几次翻（系统配置第三轮判决第四节甲' 取号写两轮之后从槽 1 翻到槽 0），
+/// 坏镜像要改被择的那一槽时按盘上现读的找，不写死偏移。
+fn system_configuration_slots_chosen_first(image: &MemoryPool, device: u32) -> [(u64, u64); 2] {
+    let slots = [0, system_configuration_slot_one_offset(image, device)].map(|slot_offset| {
         (
             slot_offset,
             get_u64(
-                &read(image, 0, slot_offset, 4096),
+                &read(image, device, slot_offset, 4096),
                 SYSTEM_CONFIGURATION_SLOT_GENERATION_OFFSET,
             ),
         )
@@ -8097,7 +8324,7 @@ fn system_configuration_slots_of_device_zero_chosen_first(image: &MemoryPool) ->
 /// 改成被择那个减 3（仍比它小、择哪一槽不变，与被择那个奇偶相反——住的槽对），整槽校验和重封：两槽相差 3。
 fn lower_the_generation_of_the_unchosen_slot_of_device_zero_by_three(image: &mut MemoryPool) {
     let [(_, chosen_generation), (unchosen_offset, unchosen_generation)] =
-        system_configuration_slots_of_device_zero_chosen_first(image);
+        system_configuration_slots_chosen_first(image, 0);
     assert_eq!(
         chosen_generation,
         unchosen_generation + 1,
@@ -8120,7 +8347,7 @@ fn lower_the_generation_of_the_unchosen_slot_of_device_zero_by_three(image: &mut
 /// 整槽校验和各自重封：两槽的世代号都 ≥ 2 而都住在对方的槽里。
 fn swap_the_parities_of_the_two_system_configuration_slots_of_device_zero(image: &mut MemoryPool) {
     let [(chosen_offset, chosen_generation), (unchosen_offset, unchosen_generation)] =
-        system_configuration_slots_of_device_zero_chosen_first(image);
+        system_configuration_slots_chosen_first(image, 0);
     assert_eq!(
         chosen_generation,
         unchosen_generation + 1,
@@ -9190,13 +9417,14 @@ fn a_replay_stops_at_the_in_flight_limit_and_a_publish_longer_than_it_is_not_app
     );
 }
 
-/// 系统配置槽里区域数 R 那 1 字节的偏移（`.claude/kb/layout/01-first-txn.md` 一：F 357 + 4 → R 361）。
-const SYSTEM_CONFIGURATION_REGION_COUNT_OFFSET: usize = 361;
-/// 比系统配置字段表留的三个逐区域设备字段多一个区域：这一槽自证过，而这一版读者不可择（`RegionCountPastTheRegionDeviceFields`）。
-const REGION_COUNT_PAST_THE_REGION_DEVICE_FIELDS: u8 = 4;
+/// 系统配置槽里 incompat 位图第一个字节的偏移（magic 4、格式版本 2 之后，D22（单元原子性怎么合成） 已定项 9 的字段表）。
+const SYSTEM_CONFIGURATION_FIRST_INCOMPAT_BYTE_OFFSET: usize = 6;
+/// incompat 位 3（第一个字节的 0x08）没登记：带上它的槽自证过，而这一版读者不认得这一位、不可择（`UnknownIncompatBit`）。
+/// R、S 越界自 2026-10-20 起归读者不收之值、整池拒（C663），不再能造「自证过而不可择」的槽。
+const INCOMPAT_UNREGISTERED_BIT_THREE: u8 = 0x08;
 
 /// I-8.5（tail 槽有效集非空）数的是自证过的槽，「自证过而不可择」的也算（`research/prompts/m3-batch4-code-r1-sonnet-output.md`
-/// 第五节盲区第 9 条）：全池四个槽的 R 都写 4、整槽校验和重封 ⇒ 一槽都择不出、每一槽都自证过 ⇒ 全池皆废那一格不成立、I-8.5 不判红；
+/// 第五节盲区第 9 条）：全池四个槽的 incompat 都带一个不认得的位、整槽校验和重封 ⇒ 一槽都择不出、每一槽都自证过 ⇒ 全池皆废那一格不成立、I-8.5 不判红；
 /// 而一块盘都交不出可择的系统配置，这不是一个挂得上的镜像：I-8.5 与别的每一条一样报不适用、带理由，不判成立
 /// （`InvariantVerdict`「不适用必须带理由，不许静默算成立」；改之前 I-8.5 在 `chosen.is_empty()` 早退之前判成成立）。一条都不红。
 #[test]
@@ -9207,11 +9435,13 @@ fn self_verified_system_configuration_slots_no_reader_can_choose_leave_every_inv
     for (device, offset) in every_system_configuration_slot(&clean) {
         mutate_system_configuration_slot(&mut image, device, offset, |bytes| {
             assert_eq!(
-                bytes[SYSTEM_CONFIGURATION_REGION_COUNT_OFFSET], 3,
-                "三个区域"
+                bytes[SYSTEM_CONFIGURATION_FIRST_INCOMPAT_BYTE_OFFSET]
+                    & INCOMPAT_UNREGISTERED_BIT_THREE,
+                0,
+                "干净镜像不带位 3"
             );
-            bytes[SYSTEM_CONFIGURATION_REGION_COUNT_OFFSET] =
-                REGION_COUNT_PAST_THE_REGION_DEVICE_FIELDS;
+            bytes[SYSTEM_CONFIGURATION_FIRST_INCOMPAT_BYTE_OFFSET] |=
+                INCOMPAT_UNREGISTERED_BIT_THREE;
         });
     }
     let verdicts = check_pool_image(&image);
@@ -9411,8 +9641,8 @@ const DEADLIST_TREE_TABLE_ENTRY_INDEX: usize = 6;
 const LOGGED_OPERATIONS_TREE_TABLE_ENTRY_INDEX: usize = 10;
 const RETIREMENT_TREE_TABLE_ENTRY_INDEX: usize = 11;
 /// 种类码登记表（D8（核心索引结构） 已定项 9）里没有的一个码：分配记录那一条改成它，树表里就一条种类 3 都没有。
-/// 13 第 50 批登记给了退役树，改用 14。
-const TREE_KIND_NOT_REGISTERED: u16 = 14;
+/// 13 第 50 批登记给了退役树、14 / 15 里程碑四登记给了只读快照的两种条目（快照 inode 根、快照 extent 根），改用 16。
+const TREE_KIND_NOT_REGISTERED: u16 = 16;
 /// 新池新建文件那一版树表里 extent 树那条的树 ID（mkfs 的水位 65536）与 inode 树那条的树 ID（65537）：
 /// 改成种类 1 的那一条头 ID 照 extent 条目写成 inode 树的号，I-9.27 不先红。
 const INODE_TREE_IDENTIFIER_OF_THE_FIRST_FILE_VERSION: u64 = 65537;
@@ -10916,6 +11146,68 @@ fn a_retirement_record_naming_the_live_leaf_reddens_only_the_no_live_leaf_invari
         [RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF],
         "谱系上的退役记录指这一版的活叶：只红 I-9.34：{verdicts:?}"
     );
+    // 退役树与这一版 inode 树点名同一片叶容器：I-1.13 不另报一条违例，报不适用、理由点名 I-9.34。这一张镜像上那片叶在死亡 txg 之后又写过一版，
+    // 是扫描方向看得见的那一形（`rebuild::ScanRebuildNotDecided::RetiredLeafContainerHasAVersionBornAfterItsDeath` 的理由点名 I-9.34）；
+    // 看不见的那一形（叶死后没再写过）由用户 2026-10-14 定「乙」进 `walk::INVARIANTS_WHOSE_VIOLATION_MEANS_THE_WALKED_INDEX_IS_DAMAGED`，
+    // 它的镜像在下一条用例里（`a_retirement_record_naming_the_live_leaf_the_scan_cannot_see_…`）。
+    match verdict(&image, SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX) {
+        InvariantVerdict::NotApplicable(reason) => assert!(
+            reason.contains("I-9.34"),
+            "I-1.13 报不适用、理由点名 I-9.34，实际 {reason}"
+        ),
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
+            panic!("I-9.34 红时 I-1.13 报不适用（用户 2026-10-14 定乙），实际 {other:?}")
+        }
+    }
+}
+
+/// 退役树与这一版 inode 树点名同一片叶容器、扫描方向看不见的那一形（己 2 交回时没造的那一张，用户 2026-10-14 弹窗定「乙」）：
+/// 同一份删到底、建新叶、根环转过一圈的镜像上，那条退役记录改指最新那一版唯一那片叶，死亡 txg 取最新那一版的 txg——那片叶择出的那一版
+/// 诞生代号不晚于死亡 txg（叶死后没再写过），扫描重建按退役记录不认领它、不报「条款没写」，遍历方向照样读得到它的记录。
+/// I-9.34 红（I-9.35 在最新那一版上跟着红：死于这一版的记录点名的叶并没有从父版消失）；I-1.13 不另报一条违例，报不适用、
+/// 理由是遍历方向损坏表里 I-9.34 那一句（`walk::INVARIANTS_WHOSE_VIOLATION_MEANS_THE_WALKED_INDEX_IS_DAMAGED`），不是扫描重建自己的不适用。
+#[test]
+fn a_retirement_record_naming_the_live_leaf_the_scan_cannot_see_leaves_the_scan_rebuild_invariant_not_applicable_naming_the_no_live_leaf_invariant(
+) {
+    let (pool, _, _) =
+        pool_with_the_file_unlinked_to_the_end_a_new_leaf_and_the_root_ring_turned_over(
+            "known-bad-retirement-record-live-leaf-the-scan-cannot-see",
+        );
+    let newest_txg = pool.output.root.checkpoint_txg.0;
+    let mut image = pool.memory_pool();
+    let live_leaf_identity_bytes =
+        common_deletion_in_progress::identity_of_the_first_inode_leaf_of_the_newest_root(&image);
+    common_deletion_in_progress::change_the_first_retirement_record_of_the_newest_root(
+        &mut image,
+        |record| {
+            record[..common_deletion_in_progress::RETIREMENT_RECORD_IDENTITY_BYTES]
+                .copy_from_slice(&live_leaf_identity_bytes);
+            common_deletion_in_progress::set_retirement_record_field(
+                record,
+                common_deletion_in_progress::RETIREMENT_RECORD_DEATH_TXG_OFFSET,
+                newest_txg,
+            );
+        },
+    );
+    let verdicts = check_pool_image(&image);
+    assert!(
+        violated_invariants(&verdicts)
+            .contains(&RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF),
+        "谱系上的退役记录指这一版的活叶：I-9.34 红：{verdicts:?}"
+    );
+    match verdict(&image, SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX) {
+        InvariantVerdict::NotApplicable(reason) => assert!(
+            reason.contains("I-9.34") && reason.contains("扫描重建按退役记录不认领那片叶"),
+            "I-1.13 报不适用、理由是遍历方向损坏表里 I-9.34 那一句（扫描方向看不见，不是扫描重建自己停下），实际 {reason}"
+        ),
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
+            panic!("I-9.34 红时 I-1.13 报不适用（用户 2026-10-14 定乙），实际 {other:?}")
+        }
+    }
 }
 
 /// 一个打包记录容器身份按退役记录里被退役身份那 26 字节排（出生树 8、类型 2、容器号 8、容器出生代 8，小端）。
@@ -15259,6 +15551,13 @@ fn image_after_the_rollback_whose_shared_leaf_container_is_born_after_the_target
                     }
                 },
             );
+            // 中央映射是唯一入口、指针里的位置只是提示（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3）：D 那一版的映射条目
+            // 也改指那一份，D 才真走它自己的树根（只改树表里的指针，走读按映射认回原来那一个、两版照旧共享它）。
+            point_the_newest_mapping_entries_of_a_slot_at(
+                &mut image,
+                common_pointer_head_corruption::the_slot_of(&inode_root_pointer).0,
+                copy_slot,
+            );
         }
     }
     write(
@@ -15268,6 +15567,60 @@ fn image_after_the_rollback_whose_shared_leaf_container_is_born_after_the_target
         &vec![0xa5u8; data_unit_bytes],
     );
     image
+}
+
+/// 最新那条根的中央映射根（单层）里两条位置条目都在槽 `from_slot` 的那几条，两条位置条目的槽号改成 `to_slot`（整单元校验和不动），重封、
+/// 新的整单元校验和沿引用链补到根槽。中央映射根里 key 宽 27：条目数 2 字节在 82 + 54、条目区从 86 + 54 + 29 起、每条 55
+/// （key 27 + 位置条目 14 × 2，D19（块指针的结构与宽度预算） 已定项 10）。
+fn point_the_newest_mapping_entries_of_a_slot_at(
+    image: &mut MemoryPool,
+    from_slot: u64,
+    to_slot: u64,
+) {
+    const MAPPING_NODE_ENTRY_COUNT_OFFSET: usize = 82 + 54;
+    const MAPPING_NODE_FIRST_ENTRY_OFFSET: usize = 86 + 54 + 29;
+    const MAPPING_ENTRY_BYTES_IN_THE_NODE: usize = 55;
+    const MAPPING_KEY_BYTES_IN_THE_ENTRY: usize = 27;
+    let mapping_root = common_pointer_head_corruption::newest_root(image).mapping_root;
+    let mut entries_changed = 0;
+    common_deletion_in_progress::change_the_unit_and_propagate_its_checksum(
+        image,
+        common_pointer_head_corruption::the_slot_of(&mapping_root),
+        common_pointer_head_corruption::node_bytes(),
+        |node| {
+            let entry_count = usize::from(u16::from_le_bytes(
+                node[MAPPING_NODE_ENTRY_COUNT_OFFSET..MAPPING_NODE_ENTRY_COUNT_OFFSET + 2]
+                    .try_into()
+                    .expect("2 字节"),
+            ));
+            for entry_index in 0..entry_count {
+                let entry_start =
+                    MAPPING_NODE_FIRST_ENTRY_OFFSET + entry_index * MAPPING_ENTRY_BYTES_IN_THE_NODE;
+                let slot_at = |location_index: usize| {
+                    entry_start
+                        + MAPPING_KEY_BYTES_IN_THE_ENTRY
+                        + location_index * POINTER_LOCATION_BYTES
+                        + LOCATION_DEVICE_BYTES
+                };
+                let names_the_slot = (0..2).all(|location_index| {
+                    node[slot_at(location_index)..slot_at(location_index) + LOCATION_SLOT_BYTES]
+                        == from_slot.to_le_bytes()[..LOCATION_SLOT_BYTES]
+                });
+                if names_the_slot {
+                    for location_index in 0..2 {
+                        node[slot_at(location_index)
+                            ..slot_at(location_index) + LOCATION_SLOT_BYTES]
+                            .copy_from_slice(&to_slot.to_le_bytes()[..LOCATION_SLOT_BYTES]);
+                    }
+                    entries_changed += 1;
+                }
+            }
+        },
+    );
+    assert_eq!(
+        entries_changed, 1,
+        "最新那一版的映射里恰好一条指着槽 {from_slot}"
+    );
 }
 
 /// 分叉形的判法：L 坏的那一份在位置条目 0 / 1 两种盘序各判一次，红的都是 `expected_violations`，I-4.9（A 引用 L、L 读得出的那一份诞生代号 9 > 3）
@@ -15299,6 +15652,7 @@ fn assert_the_shared_leaf_container_born_after_the_rollback_target_reddens_alike
 }
 
 /// 分叉形、两版经同一个 inode 树根共享叶容器（攻方 `direct=false`）：A 走到树根时「走过」命中，按树根下面记下的落点并进来。
+/// A 那一版的账里叶容器那一槽的记录未释放、那一槽却装着诞生代号 9 的另一版叶：A 的映射里那把 key（诞生代号 3）对不上它，I-3.15（N2 反查）跟着红。
 #[test]
 fn a_shared_leaf_container_born_after_the_rollback_target_with_a_garbled_copy_reddens_the_birth_and_appearance_rules_on_either_device(
 ) {
@@ -15310,6 +15664,7 @@ fn a_shared_leaf_container_born_after_the_rollback_target_with_a_garbled_copy_re
             "I-1.2",
             "I-2.1",
             "I-3.10",
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
             REFERENCE_INTERVALS_ARE_EXACT,
             "I-4.2",
             "I-4.8",
@@ -15320,7 +15675,9 @@ fn a_shared_leaf_container_born_after_the_rollback_target_with_a_garbled_copy_re
 }
 
 /// 分叉形、两版各走自己的 inode 树根、直接共享叶容器（攻方 `direct=true`）：A 走到叶容器时「走过」命中，按叶容器读回那一份的落点并进来。
-/// 树根另写一份的那两槽没有分配记录（I-3.1、I-3.11 跟着红）。
+/// 树根另写一份的那一槽没有分配记录：D 的树表与映射都改指它，A 照旧引用原来那一槽，两版合起来多引用一槽、I-3.1 跟着红。
+/// D 自己引用的槽数照旧（原来那一槽换成另写的那一槽、分配记录一条不动），I-3.11 按槽数比看不见这一换；「映射换位、分配记录不动」由判决
+/// `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 的新判 N2（I-3.15 反查）判红，A 那一版叶容器那一槽装着另一版叶也由它判红。
 #[test]
 fn a_leaf_container_directly_shared_and_born_after_the_rollback_target_with_a_garbled_copy_reddens_the_birth_and_appearance_rules_on_either_device(
 ) {
@@ -15333,7 +15690,7 @@ fn a_leaf_container_directly_shared_and_born_after_the_rollback_target_with_a_ga
             "I-2.1",
             "I-3.1",
             "I-3.10",
-            "I-3.11",
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
             REFERENCE_INTERVALS_ARE_EXACT,
             "I-4.2",
             "I-4.8",
@@ -16809,11 +17166,45 @@ fn assert_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_i
     let mut image =
         image_with_records_in_one_container_tree_and_the_root_ring_turned_over(tree, tag, 3);
     empty_the_rightmost_container_of_the_newest_tree(&mut image, tree);
-    assert_only_the_knob_capacity_invariant_of_the_tree_reddens(
-        &image,
-        tree,
-        "容器 3 一条记录都没有",
-    );
+    match tree {
+        ContainerTreeOfTheCapacityInvariants::Tombstone
+        | ContainerTreeOfTheCapacityInvariants::Lineage => {
+            assert_only_the_knob_capacity_invariant_of_the_tree_reddens(
+                &image,
+                tree,
+                "容器 3 一条记录都没有",
+            );
+        }
+        ContainerTreeOfTheCapacityInvariants::Retirement => {
+            // 抹空的那片退役容器里那条退役记录没了：扫描重建按退役树认领叶容器（用户 2026-10-14 定，岔路单
+            // `research/prompts/m4-batch2-code-r1-forks.md` 第 1 行），那条记录点名的叶容器最后那一版失去认领、它的记录被扫描重建收进
+            // inode 记录集合，I-1.13 跟着红——`scan_rebuild_reads_lineage_and_retirement_records.rs` 抹掉退役记录那个必红世界的同一形。
+            let verdicts =
+                singlefs_checker::walk::check_pool_image_given_the_container_capacity_knobs(
+                    &image,
+                    tree.checker_knobs(1),
+                );
+            assert_eq!(
+                violated_invariants(&verdicts),
+                [
+                    tree.knob_capacity_invariant(),
+                    SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX
+                ],
+                "{tree:?}（旋钮值 1）：红 {} 与 I-1.13：{verdicts:?}",
+                tree.knob_capacity_invariant()
+            );
+            assert!(
+                matches!(
+                    verdict_among(&verdicts, tree.knob_capacity_invariant()),
+                    InvariantVerdict::Violated(detail)
+                        if detail.contains(tree.name_in_the_violation())
+                            && detail.contains("容器 3 一条记录都没有")
+                ),
+                "{tree:?}：违例说明写出「容器 3 一条记录都没有」：{:?}",
+                verdict_among(&verdicts, tree.knob_capacity_invariant())
+            );
+        }
+    }
 }
 
 /// 攻方 `mut-w-same` 那一形（下一个号 = 最右号）：两片容器 1、2 号改成 1、1 号。
@@ -17545,5 +17936,231 @@ fn the_old_tombstone_knob_entry_judges_the_retirement_tree_by_its_product_capaci
     assert_the_old_tombstone_knob_entry_judges_the_tree_by_its_product_capacity(
         ContainerTreeOfTheCapacityInvariants::Retirement,
         "known-bad-old-tombstone-knob-entry-retirement",
+    );
+}
+
+// ─── 根轮出环之后压低的树 ID 水位（C147）、读得出孩子时子指针出生树与身份引用不同（C297）、旧版转出回退候选集之后的重发号（C479） ───
+
+/// C147（树 ID 水位的不变量还没有） 判别力第 ② 格「根轮出环」（判决 `research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 10 行，
+/// 采攻方的造法）：新池新建文件那一次发布（txg 3）发出十三棵树、把水位推到发第一个文件之后那一档；同一个进程接着覆盖写一圈根环那么多次
+/// （3 个区域各 8 槽，txg 4 到 27），发树那条根与它之前的根全被轮出根环，环里每条根都是覆盖写发的、一棵树都没新发。
+/// 再把环里每条根的水位压到 mkfs 那一档（[`set_the_tree_identifier_watermark_of_every_root`]）：只红 I-7.8，红在盘上出现过的最大树 ID 上
+/// （十三棵树的条目还在每一版的树表里）。
+/// 这一格钉住「累计高水位」那个读法（D8（核心索引结构） 已定项 8 ②「累计这两个字是承重的」）：判法改成「本 checkpoint 发出的最高号」
+/// ——只数最新那一次发布才头一回出现的树 ID——时，环里最新那次发布一个号都没发，I-7.8 照绿，这一条红。
+#[test]
+fn a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant(
+) {
+    let mut pool = build_pool("known-bad-watermark-after-the-tree-issuing-root-rotated-out");
+    let tree_issuing_root = pool.output.root;
+    assert_eq!(
+        (
+            tree_issuing_root.checkpoint_txg,
+            tree_issuing_root.tree_identifier_watermark
+        ),
+        (
+            CheckpointTxg(3),
+            singlefs_format::TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH
+        ),
+        "发树那次发布是 txg 3、水位推到发第一个文件之后那一档"
+    );
+    let roots_in_the_ring = singlefs_format::ROOT_RING_REGIONS
+        * singlefs_format::ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM;
+    // 迭代上界：根环的槽数；每次覆盖写换一份内容，没有提前出口。
+    for overwrite_index in 0..roots_in_the_ring {
+        let content: Vec<u8> = (0..3000_u64)
+            .map(|index| {
+                u8::try_from((index * 11 + overwrite_index * 7 + 5) % 251).expect("小于 256")
+            })
+            .collect();
+        overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &content);
+    }
+    let clean = pool.memory_pool();
+    let system_configuration =
+        singlefs_core::recovery::choose_system_configuration(&clean).expect("系统配置");
+    let roots_left_in_the_ring = singlefs_core::recovery::readable_roots(
+        &clean,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    );
+    assert_eq!(
+        u64::try_from(roots_left_in_the_ring.len()).expect("根数装得进 u64"),
+        roots_in_the_ring,
+        "根环每一槽都住着一条覆盖写发的根"
+    );
+    assert!(
+        roots_left_in_the_ring.iter().all(|root| {
+            root.checkpoint_txg > tree_issuing_root.checkpoint_txg
+                && root.tree_identifier_watermark
+                    == singlefs_format::TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH
+        }),
+        "发树那条根与它之前的根都轮出了根环；环里每条根照累计高水位带着发第一个文件之后那一档：{:?}",
+        roots_left_in_the_ring
+            .iter()
+            .map(|root| (root.checkpoint_txg, root.tree_identifier_watermark))
+            .collect::<Vec<_>>()
+    );
+    assert_lowering_the_watermark_reddens_only_the_watermark_invariant(
+        &clean,
+        singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+        singlefs_format::TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH - 1,
+        "发树那条根轮出根环之后，环里每条根的水位压到 mkfs 那一档",
+    );
+}
+
+/// C297（inode 内部条目里出生树两份没有定处理） 孩子读得出的那一支的判法：种类 `kind` 那棵树的根（层级 1）第一条条目类型段是容器那一类
+/// （`container_entry_type`），只把条目里子指针头部的出生树加 1（身份引用、孩子都不改，根重封、新的整单元校验和沿引用链补到根槽）。
+/// 孩子照指针自己的位置条目读得出（映射按改过的出生树查不到这把 key，走读退回位置条目），孩子头与身份引用逐段相等，
+/// 只有「子指针头部的出生树 == 身份引用的出生树」那一比不成立：`entry_invariant` 红，违例说明是孩子读得出那一句（不是「两份都读不出」那一句）。
+/// 干净镜像上 `entry_invariant` 判过且成立。判别力：拿掉读得出那一支里的那一比（`walk.rs` 的 `entry_holds` / `container_entry_holds`），这一条红。
+fn assert_a_child_pointer_birth_tree_one_off_over_a_child_that_reads_back_reddens_the_entry_invariant(
+    clean: &MemoryPool,
+    kind: u16,
+    container_entry_type: u16,
+    entry_invariant: &'static str,
+) {
+    assert_eq!(
+        verdict(clean, entry_invariant),
+        InvariantVerdict::Holds,
+        "对照：干净镜像上 {entry_invariant} 判过且成立"
+    );
+    let mut image = clean.clone();
+    let mut birth_trees_after_the_change = (0, 0);
+    let level = change_an_entry_of_the_root_of_kind(&mut image, kind, 0, |entry| {
+        assert_eq!(
+            entry_type_of(entry),
+            container_entry_type,
+            "根第一条条目指容器"
+        );
+        add_one_to_a_birth_tree_field_of_the_entry(entry, INTERNAL_ENTRY_CHILD_POINTER_BIRTH_TREE);
+        birth_trees_after_the_change = (
+            get_u64(entry, INTERNAL_ENTRY_CHILD_POINTER_BIRTH_TREE.start),
+            get_u64(entry, INTERNAL_ENTRY_IDENTITY_BIRTH_TREE.start),
+        );
+    });
+    assert_eq!(level, 1, "根层级 1、直接管容器");
+    let (pointer_birth_tree, identity_birth_tree) = birth_trees_after_the_change;
+    assert_eq!(
+        pointer_birth_tree,
+        identity_birth_tree + 1,
+        "子指针头部的出生树比身份引用的大 1"
+    );
+    let found = verdict(&image, entry_invariant);
+    assert!(
+        matches!(
+            &found,
+            InvariantVerdict::Violated(detail)
+                if detail.contains("内部条目的身份") && !detail.contains("两份都读不出")
+        ),
+        "子指针头部的出生树 {pointer_birth_tree} 不等于身份引用的出生树 {identity_birth_tree}、孩子读得出：{entry_invariant} 照读得出那一支红：{found:?}"
+    );
+}
+
+#[test]
+fn an_inode_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_leaf_that_reads_back_reddens_the_inode_entry_invariant(
+) {
+    assert_a_child_pointer_birth_tree_one_off_over_a_child_that_reads_back_reddens_the_entry_invariant(
+        &build_pool("known-bad-inode-entry-pointer-birth-tree-readable-leaf").memory_pool(),
+        TREE_KIND_INODE,
+        PACKED_RECORD_TYPE_INODE,
+        "I-9.2",
+    );
+}
+
+#[test]
+fn a_tombstone_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_container_that_reads_back_reddens_the_tombstone_entry_invariant(
+) {
+    assert_a_child_pointer_birth_tree_one_off_over_a_child_that_reads_back_reddens_the_entry_invariant(
+        &common_deletion_in_progress::image_after_the_intent_of_a_three_unit_file(
+            "known-bad-tombstone-entry-pointer-birth-tree-readable-container",
+        ),
+        TREE_KIND_TOMBSTONE,
+        PACKED_RECORD_TYPE_TOMBSTONE,
+        TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    );
+}
+
+/// C479（inode 号复用已发过的号今天造不出来） 「活记录被原地换」那一形在被换之前那一版转出回退候选集之后（欠账那一行 2026-10-11 在仓副本里造过的盘面）：
+/// 新池新建文件之后建 inode 2、3、4（水位 5，那次发布留台阶 (txg 4, 5)），只供测试的开关把水位压回 4 再建一个——4 号那条活记录被原地换成新对象；
+/// 再覆盖写第一个文件 3 次、把 F 抬到准入上限（第 4 新的非空有效根，就是重发那一版）：还留着 4 号旧对象的那几版都低于 F、转出回退候选集。
+/// I-9.29（同号只许一个出生代） 看不见两份出生代、成立；水位 5 仍大于树里最大的 key 4、I-9.6 成立；
+/// 只有 I-9.30 ② 判红——台阶 (4, 5) 说 4 号在 txg 4 之前就发过，4 号的新对象晚于它出生，单凭最新根就判得出。
+/// 判别力：关掉 ② 里按 inode 树记录比台阶那一判（`walk.rs` 的 `judge_inode_number_watermark_steps_of_the_newest_root`），这一条红。
+#[test]
+fn a_reissued_inode_number_whose_old_object_left_the_rollback_candidate_set_reddens_only_the_watermark_step_invariant(
+) {
+    let mut pool = common_deletion_in_progress::pool_with_new_inodes(
+        "known-bad-reissued-inode-number-after-the-old-version-left-the-candidates",
+        3,
+    );
+    let (reissued, _) =
+        scenarios_of_inode_number_watermark_pressed_back_reissues_a_number::create_one_inode_with_the_watermark_from(
+            &mut pool,
+            scenarios_of_inode_number_watermark_pressed_back_reissues_a_number::pressed_back_to(4),
+        );
+    let txg_of_the_reissue = reissued.root.checkpoint_txg;
+    assert_eq!(
+        (
+            reissued.inode_number_watermark(),
+            scenarios_of_inode_number_watermark_pressed_back_reissues_a_number::object_birth_of(
+                &reissued, 4
+            ),
+        ),
+        (5, Some(txg_of_the_reissue.0)),
+        "从压回去的 4 起发一个：4 号那条活记录换成这次发布建的新对象，水位写成 5"
+    );
+    scenarios_of_inode_number_watermark_pressed_back_reissues_a_number::overwrite_the_first_file_in_process(
+        &mut pool, 3,
+    );
+    let raised = {
+        let publish_parameters = parameters();
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        singlefs_core::mount::raise_rollback_floor_to_the_admission_ceiling(
+            &publish_parameters,
+            devices,
+            &mut pool.allocator,
+            &mut pool.output,
+            ShadowLedger::Off,
+        )
+        .unwrap_or_else(|error| panic!("抬 F 到准入上限：{error:?}"))
+    };
+    assert!(
+        matches!(
+            raised,
+            singlefs_core::mount::RaiseToTheAdmissionCeiling::Raised(_)
+        ),
+        "重发之后覆盖写三次，上限高于 F：{raised:?}"
+    );
+    assert!(
+        pool.output.root.rollback_floor >= txg_of_the_reissue,
+        "F 抬到 {:?}，不低于重发那一版的 txg {txg_of_the_reissue:?}：还留着 4 号旧对象的那几版都转出了回退候选集",
+        pool.output.root.rollback_floor
+    );
+    let image = pool.memory_pool();
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        violated_invariants(&verdicts),
+        [INODE_NUMBER_WATERMARK_STEPS_AGREE_WITH_THE_WATERMARK_THE_RECORDS_AND_THE_LINEAGE],
+        "旧版转出候选集之后只红 I-9.30：{verdicts:?}"
+    );
+    for invariant_judged_and_holding in ["I-9.6", ONE_OBJECT_BIRTH_PER_INODE_NUMBER] {
+        assert_eq!(
+            verdict(&image, invariant_judged_and_holding),
+            InvariantVerdict::Holds,
+            "{invariant_judged_and_holding} 判过且成立"
+        );
+    }
+    let found = verdict(
+        &image,
+        INODE_NUMBER_WATERMARK_STEPS_AGREE_WITH_THE_WATERMARK_THE_RECORDS_AND_THE_LINEAGE,
+    );
+    assert!(
+        matches!(
+            &found,
+            InvariantVerdict::Violated(detail)
+                if detail.contains("inode 树里 4 号的对象出生代") && detail.contains("(4, 5)")
+        ),
+        "I-9.30 红在 ② 那一判上：说明点名重发的 4 号与它晚于的那一级台阶 (4, 5)：{found:?}"
     );
 }

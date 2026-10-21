@@ -1996,12 +1996,7 @@ fn a_crash_enumeration_case_without_the_gpu_feature_records_and_reports_the_judg
         .stored_conclusion_keys()
         .expect("列得出库里的结论")
         .into_iter()
-        .filter(|(_key, kind, _version)| {
-            matches!(
-                kind,
-                ConclusionKind::ImageJudgement | ConclusionKind::ImageJudgement
-            )
-        })
+        .filter(|(_key, kind, _version)| matches!(kind, ConclusionKind::ImageJudgement))
         .count();
     assert_eq!(
         judge_conclusions, 0,

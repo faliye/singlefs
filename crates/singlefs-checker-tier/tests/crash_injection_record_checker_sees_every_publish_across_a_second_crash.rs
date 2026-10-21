@@ -317,6 +317,7 @@ fn unit_writes_of_each_publish(
             )),
             StepKind::JournalRecord
             | StepKind::ZeroFill
+            | StepKind::Discard
             | StepKind::SystemConfigurationSlot
             | StepKind::Barrier => {}
         }

@@ -43,9 +43,15 @@ use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// 新立那一条不变量：I-1.11（映射 key 与单元头相符），登记在 `crates/singlefs-checker/invariants/01-块自描述.md`。
 const MAPPING_KEY_INVARIANT: &str = "I-1.11";
+/// I-3.15（未释放记录罩住的单元由映射指在这一槽，N2 反查）。
+const REVERSE_LOOKUP_INVARIANT: &str = "I-3.15";
 
 /// 第一个文件版本的单元区只用到 50 26x 附近：这两个槽在两块盘上都没被分配、没被引用。
 const SLOT_NOBODY_ALLOCATED: u64 = 50_400;
+/// 手放进 [`SLOT_NOBODY_ALLOCATED`] 的第二片 inode 叶容器的出生序号：inode 树在第一个文件那一版（txg 3）里发过的号之外的一个。
+const SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE: u32 = 200;
+/// 码 3 单元头里出生序号 4 字节的偏移（D18（块里携带什么信息） 已定项 11）。
+const PACKED_BIRTH_SEQUENCE_OFFSET: usize = 103;
 
 /// 根槽：判定宽度 512，自证校验和 32 字节在 138；实例代号在 24、checkpoint_txg 在 28；实例表指针 86 字节在 170
 /// （D22（单元原子性怎么合成） 已定项 7 的偏移表）。
@@ -91,6 +97,8 @@ const ACCOUNTING_ROW_VALUE_OFFSET: usize = 2 + 8 + 4 + 8;
 const STATISTIC_ALLOCATED_BYTES: u16 = 1;
 const STATISTIC_FREE_BYTES: u16 = 2;
 const STATISTIC_INODE_WATERMARK: u16 = 12;
+/// runs（D5（快照 / 空间记账机制） 已定项 4 第 10 项：单元区空闲槽的连续段数，带设备维）。
+const STATISTIC_FRAGMENTATION_RUNS: u16 = 10;
 const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 
 /// 中央映射条目 55（D19（块指针的结构与宽度预算） 已定项 6 / 10）：key 27 = 类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6，
@@ -407,6 +415,9 @@ fn adjust_accounting_row(rows: &mut [Vec<u8>], statistic: u16, device: u32, delt
 }
 
 /// 两块盘上各多占 `slots` 个槽：记账的「已分配」加、「空闲」减（新放进去的单元不在树里别处记账，这一步让 I-3.1 / I-3.11 / I-5.2 仍对得上）。
+/// 手放的单元都在 [`SLOT_NOBODY_ALLOCATED`] 起、挨着放，离第一个文件版本用到的槽隔着一大段空闲：一个新的占用块把一段空闲劈成两段，
+/// runs 加一（I-3.16（碎片度与全空段统计对得上） 照全扫重算比它）。全空聚簇段数不动：手放的单元没有分配记录，按记录口径那一段仍是全空的
+/// （按占用口径少一段，两个口径在这块盘上分得开，I-3.16 那一半报部分没判）。
 fn account_for_units_placed_by_hand(
     image: &mut MemoryPool,
     output: &TransactionOutput,
@@ -418,6 +429,7 @@ fn account_for_units_placed_by_hand(
         for device in [0u32, 1] {
             adjust_accounting_row(rows, STATISTIC_ALLOCATED_BYTES, device, bytes);
             adjust_accounting_row(rows, STATISTIC_FREE_BYTES, device, -bytes);
+            adjust_accounting_row(rows, STATISTIC_FRAGMENTATION_RUNS, device, 1);
         }
         if let Some(watermark) = inode_watermark {
             // 台阶行与每次发布写的那一行同统计量、同设备段，代段更早、排在前面：改的是排在最后（代段最大）的那一行。
@@ -855,7 +867,8 @@ fn a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_
 // ─── ⑤ I-9.4（容器号不超最小 key） 三句都判 ───
 
 /// 第一个文件版本那片叶容器 C1（容器号 1）改成装 inode 1 与 10 两条记录；新放一片 C2（容器号 `second_container`，装 inode 20 与 30），
-/// 根里加一条分隔 key 15 的类型段 2 条目指它。两片占的槽记进记账，inode 号水位抬到 31。
+/// 根里加一条分隔 key 15 的类型段 2 条目指它。C2 照写路径那样有自己的出生序号（头里与指它的指针里同写），中央映射里也给它加一条条目
+/// （I-1.13（扫描重建与遍历方向的索引相同） 在这几份上才真比得上）。两片占的槽记进记账，inode 号水位抬到 31。
 /// I-9.12（分隔 key 落在孩子区间之外） 在这几份上都成立：15 ≤ 20、15 > 1、15 > 10。
 fn image_with_two_leaf_containers(pool: &TreeSplitPool, second_container: u64) -> MemoryPool {
     let mut image = pool.memory_pool();
@@ -895,7 +908,11 @@ fn image_with_two_leaf_containers(pool: &TreeSplitPool, second_container: u64) -
         unit
     };
     let first_container = container_with(1, [1, 10]);
-    let second_container_unit = container_with(second_container, [20, 30]);
+    // 第二片照写路径那样有自己的出生序号（同一棵树、同一 txg 里每片叶各发一个号），映射 key 才与第一片不同。
+    let mut second_container_unit = container_with(second_container, [20, 30]);
+    second_container_unit[PACKED_BIRTH_SEQUENCE_OFFSET..PACKED_BIRTH_SEQUENCE_OFFSET + 4]
+        .copy_from_slice(&SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE.to_le_bytes());
+    reseal_unit_by_its_class(&mut second_container_unit);
     let units = units_found_on_device_zero(&image);
     replace_unit(&mut image, &units, leaf.slot.0, &first_container);
     write_unit_to_the_same_slot_on_both_devices(
@@ -919,6 +936,9 @@ fn image_with_two_leaf_containers(pool: &TreeSplitPool, second_container: u64) -
             [start + LOCATION_ENTRY_CHECKSUM_OFFSET..start + LOCATION_ENTRY_CHECKSUM_OFFSET + 4]
             .copy_from_slice(&crc32_castagnoli(&second_container_unit).to_le_bytes());
     }
+    let pointer_birth_sequence = INODE_ENTRY_CHILD_POINTER_OFFSET + POINTER_BIRTH_SEQUENCE_OFFSET;
+    entry_to_the_second[pointer_birth_sequence..pointer_birth_sequence + 4]
+        .copy_from_slice(&SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE.to_le_bytes());
     let entries = vec![root_header.entries[0].clone(), entry_to_the_second];
     let grown_root = rebuilt_index_node(
         &root_header,
@@ -929,8 +949,64 @@ fn image_with_two_leaf_containers(pool: &TreeSplitPool, second_container: u64) -
         &entries,
     );
     replace_unit(&mut image, &units, inode_root_slot, &grown_root);
+    add_the_mapping_entry_of_a_unit_placed_by_hand(
+        &mut image,
+        &pool.output,
+        leaf.slot.0,
+        SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE,
+        &second_container_unit,
+    );
     account_for_units_placed_by_hand(&mut image, &pool.output, 2, Some(31));
     image
+}
+
+/// 中央映射（产品容量下第一个文件版本是根兼叶）里给手放进 [`SLOT_NOBODY_ALLOCATED`] 的那一片码 3 加一条条目：照 `template_slot`
+/// 那一片（同树、同 txg、同实例）的条目抄，key 尾段的出生序号换成 `birth_sequence`，两条位置条目改指那个槽、整单元校验和换成它的；
+/// 按 key 重新排序、头里的区间贴紧首末条目，重建、补校验和。写路径上每片码 3 都进映射（D19（块指针的结构与宽度预算） 已定项 5）。
+fn add_the_mapping_entry_of_a_unit_placed_by_hand(
+    image: &mut MemoryPool,
+    output: &TransactionOutput,
+    template_slot: u64,
+    birth_sequence: u32,
+    unit_placed_by_hand: &[u8],
+) {
+    let mapping_slot = output.unit(TransactionUnit::MappingTree).slot.0;
+    let mapping = read_unit_on_device(image, 0, mapping_slot, node_bytes());
+    let header = parse_index_node(&mapping).expect("映射根解得开");
+    assert_eq!(header.level, 0, "产品容量下第一个文件版本的映射树是根兼叶");
+    let mut entries = header.entries.clone();
+    let mut added = entries
+        .iter()
+        .find(|entry| {
+            entry[MAPPING_KEY_CLASS_OFFSET] == UNIT_CLASS_PACKED
+                && read_six_byte_slot_at(entry, MAPPING_KEY_BYTES + LOCATION_ENTRY_SLOT_OFFSET)
+                    == template_slot
+        })
+        .expect("映射里有照着抄的那一片的条目")
+        .clone();
+    added[MAPPING_KEY_TAIL_OFFSET..MAPPING_KEY_TAIL_OFFSET + 4]
+        .copy_from_slice(&birth_sequence.to_le_bytes());
+    for location in 0..2 {
+        let start = MAPPING_KEY_BYTES + location * LOCATION_ENTRY_BYTES;
+        added[start + LOCATION_ENTRY_SLOT_OFFSET..start + LOCATION_ENTRY_SLOT_OFFSET + 6]
+            .copy_from_slice(&SLOT_NOBODY_ALLOCATED.to_le_bytes()[..6]);
+        added[start + LOCATION_ENTRY_CHECKSUM_OFFSET..start + LOCATION_ENTRY_CHECKSUM_OFFSET + 4]
+            .copy_from_slice(&crc32_castagnoli(unit_placed_by_hand).to_le_bytes());
+    }
+    entries.push(added);
+    entries.sort_by_key(|entry| mapping_key_order(entry));
+    let smallest_key = entries.first().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let largest_key = entries.last().expect("有条目")[..MAPPING_KEY_BYTES].to_vec();
+    let grown = rebuilt_index_node(
+        &header,
+        header.level,
+        &smallest_key,
+        &largest_key,
+        header.birth_sequence,
+        &entries,
+    );
+    let units = units_found_on_device_zero(image);
+    replace_unit(image, &units, mapping_slot, &grown);
 }
 
 /// 阳性对照：第二片的容器号 11（> 左边最大 key 10、> 左边容器号 1）：三句都成立，一条都不红，I-9.4 真被评估过。
@@ -941,6 +1017,11 @@ fn two_leaf_containers_in_key_order_hold_every_invariant() {
     let red = violations(&image);
     assert_eq!(red, Vec::new(), "两片叶按序排好，一条都不许红：{red:?}");
     assert_eq!(verdict_of(&image, "I-9.4"), InvariantVerdict::Holds);
+    assert_eq!(
+        verdict_of(&image, "I-1.13"),
+        InvariantVerdict::Holds,
+        "两片叶各有自己的出生序号与映射条目：扫描重建的三张表与遍历方向逐项相同，真比过、成立"
+    );
 }
 
 /// 第二片的容器号 8：它装的 20、30 都 ≥ 8（第一句成立），容器号 1 < 8（第二句成立），左边容器的最大 key 10 不小于右边的容器号 8，
@@ -958,6 +1039,11 @@ fn a_borrowed_right_container_numbered_below_the_largest_key_on_its_left_holds_e
         "借之后的两片叶是合法形状，一条都不许红：{red:?}"
     );
     assert_eq!(verdict_of(&image, "I-9.4"), InvariantVerdict::Holds);
+    assert_eq!(
+        verdict_of(&image, "I-1.13"),
+        InvariantVerdict::Holds,
+        "借之后的两片叶各有自己的出生序号与映射条目：扫描重建与遍历方向逐项相同"
+    );
 }
 
 /// 第二片的容器号 0：沿叶序容器号 1 → 0 往回走（第二句不成立；第三句跟着不成立）。违例说明取第一处，要是第二句那一格。
@@ -1438,11 +1524,23 @@ fn a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only
         "只该红映射 key 那一条：{red:?}"
     );
     assert!(red[0].1.contains("补零"), "说明要点出补零：{}", red[0].1);
+    match verdict_of(&image, "I-1.13") {
+        InvariantVerdict::NotApplicable(reason) => assert!(
+            reason.contains("I-1.11"),
+            "遍历方向的映射 key 已判损坏：I-1.13 报不适用，理由点名红的那一条，实际 {reason}"
+        ),
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::PartiallyJudged(_)) => panic!(
+            "映射 key 已被 I-1.11 判损坏的镜像上 I-1.13 应当报不适用（主 agent 2026-10-13 定的口径），实际 {other:?}"
+        ),
+    }
 }
 
 /// 数据单元（码 1）与 inode 叶容器（码 3）那条映射条目 key 里的出生树加一：与被指单元头里偏移 43 的出生树不再相等。改之前全绿。
+/// 从分配记录那一头看是同一处对不上：那个单元的未释放记录在映射里找不到出生树相符的 key（I-3.15（未释放记录罩住的单元由映射指在这一槽），N2 反查）。
 #[test]
-fn a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant(
+fn a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_the_mapping_key_and_the_reverse_lookup_invariants(
 ) {
     let pool = product_capacity_pool();
     for unit_class in [UNIT_CLASS_DATA, UNIT_CLASS_PACKED] {
@@ -1455,8 +1553,8 @@ fn a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only
         let red = violations(&image);
         assert_eq!(
             violated_names(&red),
-            [MAPPING_KEY_INVARIANT],
-            "类标签 {unit_class}：只该红映射 key 那一条：{red:?}"
+            [MAPPING_KEY_INVARIANT, REVERSE_LOOKUP_INVARIANT],
+            "类标签 {unit_class}：只该红映射 key 那一条与反查那一条：{red:?}"
         );
         assert!(
             red[0].1.contains("出生树"),

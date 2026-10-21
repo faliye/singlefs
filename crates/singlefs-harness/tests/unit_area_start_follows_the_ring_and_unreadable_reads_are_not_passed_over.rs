@@ -173,7 +173,14 @@ fn crc32_of_the_images(devices: &[(DeviceIdentity, SparseBlockDevice)], device_b
 /// 第 50 批退役树 day-1 零根注册（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）：树表 11 → 12 条（声明长度 2400、
 /// 末条是退役树、key 区间末端 65548）、根记录与新根段里的树 ID 水位 65548 → 65549、记账标签 6 加退役那一份，连带各处校验和；
 /// 钉值随之换成 3497143766（第 50 批实现员副本上这条断言红出来的 left 值）。
-const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 3_497_143_766;
+/// 截庚（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节用户定案）让 mkfs 与之后每一次写系统配置都带 incompat 位 2（inode 记录带截断字段）：
+/// 两块盘各两个系统配置槽偏移 6（incompat 位图第一个字节）从 0x02 换成 0x06，连带 [155, 159)（整槽校验和的 CRC-32C 那 4 字节）；
+/// 根环、journal 环与单元区逐字节不变（截断第 12 批实现员把钉 3497143766 的那一版与 mkfs 写 incompat 0x06 这一版各自写出的两块盘逐扇区比过，
+/// 不同的只有这 4 个槽各 5 字节）。钉值随之换成 1426540258（mkfs 写 incompat 0x06 这一版，与合入后验证里这条断言红出来的 left 值相同）。
+/// 取号写两轮（甲'，判决 `research/prompts/m3-close-sysconf-r3-main-verification.md` 第四节「落地」）：取号多写一轮，之后每次系统配置写的世代号
+/// 都大 1、落的槽换一边（新池新建文件之后两槽是世代 5、6，原来 4、5，最新一槽从槽 1 换到槽 0），两块盘四个系统配置槽的内容跟着变；
+/// 根环、journal 环与单元区不带系统配置的世代号，推的是不变（这一回没逐扇区比过）。钉值随之换成 1715986665（批 8 实现员副本上这条断言红出来的 left 值）。
+const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 1_715_986_665;
 
 /// 默认环 768 MiB：mkfs 按环长现算的单元区起点就是 50176（`INSTANCE_TABLE_SLOT`），树表第 0 版在 50178（`TREE_TABLE_GENESIS_SLOT`），
 /// 系统配置偏移 417 的 8 字节写 50176；mkfs 到第一个文件写出的两块盘与钉值那一版（钉值说明里最后一次换钉的那一版）逐字节相同（整盘 CRC-32C 钉值）。
@@ -208,7 +215,7 @@ fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_f
     assert_eq!(
         crc32_of_the_images(&pool.devices, pool.device_bytes),
         DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32,
-        "默认环下 mkfs 到第一个文件写出的两块盘与钉值那一版（T_time 改毫秒之后）逐字节相同"
+        "默认环下 mkfs 到第一个文件写出的两块盘与钉值那一版（取号写两轮之后）逐字节相同"
     );
 }
 

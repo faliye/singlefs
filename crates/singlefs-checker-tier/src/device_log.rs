@@ -6,12 +6,17 @@
 //! 扇区 0 是系统配置（magic 8、version 8、nr_entries 8、sectorsize 4）；条目从扇区 1 起，每条一个扇区的头
 //! （sector 8、nr_sectors 8、flags 8、data_len 8，补齐到一个扇区），写条目的数据紧跟其后、占 nr_sectors 个扇区。
 
+use std::collections::BTreeSet;
 use std::ops::Range;
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::block_device::ZERO_FILL_CHUNK_BYTES;
 
-use singlefs_harness::{fnv1a_64, fnv1a_64_of_zeros, RecordedOperationKind, RetainedOperation};
+use singlefs_harness::memory_pool::MemoryPool;
+use singlefs_harness::segments::{FixedGeometry, StepKind};
+use singlefs_harness::{
+    fnv1a_64, fnv1a_64_of_zeros, RecordedOperation, RecordedOperationKind, RetainedOperation,
+};
 
 pub const WRITE_LOG_MAGIC: u64 = 0x006a_7366_7773_6872;
 pub const WRITE_LOG_VERSION: u64 = 1;
@@ -147,7 +152,7 @@ pub fn parse_device_log(bytes: &[u8]) -> Result<DeviceLog, DeviceLogError> {
     })
 }
 
-/// 程序的信念投到一块盘上：这块盘上的每个写照录制流原样，FUA 写之后跟一个 FLUSH，
+/// 程序的信念投到一块盘上：这块盘上的每个写照录制流原样，FUA 写之后跟一个 FLUSH，每次 discard 是一条同偏移同长度的 Discard，
 /// 这块盘自己的每道屏障是一个 FLUSH（录制器按设备记屏障，代码审阅第 1 条；`PoolWriter` 与 mkfs 的池屏障逐盘发，每块盘各记一步，
 /// 别的盘的屏障不投到这块盘上）。
 #[must_use]
@@ -190,6 +195,17 @@ pub fn expected_device_events(
                 if operation.kind == RecordedOperationKind::WriteForceUnitAccess {
                     events.push(DeviceEvent::Flush);
                 }
+            }
+            // discard：录制流只记交回「交给了底层」的那几次（`RecordedOperationKind::Discard`），盘上该恰好收到同一段、同一个次序的一条
+            // Discard 条目；漏了、多了、段不同、次序不同，逐项比对都判红。不支持 discard 的后端交回「不支持」，流里没有这一步、期望侧也不摆。
+            RecordedOperationKind::Discard => {
+                if operation.device != device {
+                    continue;
+                }
+                events.push(DeviceEvent::Discard {
+                    offset: operation.offset,
+                    length: operation.length,
+                });
             }
         }
     }
@@ -399,6 +415,263 @@ pub fn compare_allowing_trailing_flushes(
         divergence: first_divergence(expected, observed),
         trailing_flushes: 0,
     }
+}
+
+/// 一次发布返回之后、下一次发布返回之前，这块盘上可以发 discard 的字节区间（判决 `research/prompts/m4-gc-r1-main-verification.md`
+/// 第三节 G5：发布返回之后，「可再分配」谓词为真的槽按 64 槽对齐的整段发）。区间由判器自己从录制流里的发布独立算
+/// （[`discardable_ranges_after_each_publish_found_in_the_stream`]，主 agent 2026-10-13 定：不取实现那一侧的可再分配谓词）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiscardableRangesAfterAPublish {
+    /// 程序录制流里这次发布返回时已经录下的步数（`SharedStream::operation_count`）：前面这几步投到这块盘上的事件里，
+    /// 有这次发布在这块盘上的最后一道屏障。
+    pub operations_recorded_when_the_publish_returned: usize,
+    /// 这块盘上可以发 discard 的字节区间（半开，可以有几段）。
+    pub discardable_ranges: Vec<Range<u64>>,
+}
+
+/// 一条盘上事件里的 discard 落错了地方（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G5「设备日志判器判每个 Discard
+/// 落在可发区间里且在那次发布最后一道屏障之后」）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MisplacedDiscard {
+    /// 罩住的范围在它之前最近返回的那次发布之后不可发，要到之后某次发布返回才可发：discard 提前到了那次发布的最后一道屏障
+    /// （连同它的根 FUA 写）之前。
+    BeforeTheLastBarrierOfThePublishThatMakesItDiscardable {
+        event_index: usize,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    },
+    /// 罩住的范围在它之前最近返回的那次发布之后不可发，之后也没有哪次发布让它可发：落在不可发的槽上。
+    OutsideTheDiscardableRanges {
+        event_index: usize,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    },
+}
+
+/// `[start, end)` 是不是整段落在 `ranges` 的并里。
+fn is_covered_by_the_union_of(ranges: &[Range<u64>], start: u64, end: u64) -> bool {
+    let mut sorted_ranges: Vec<&Range<u64>> = ranges.iter().collect();
+    sorted_ranges.sort_by_key(|range| range.start);
+    let mut covered_up_to = start;
+    // 按起点从小到大走一遍：`covered_up_to` 只增不减，接不上就停。
+    for range in sorted_ranges {
+        if covered_up_to >= end {
+            break;
+        }
+        if range.start > covered_up_to {
+            return false;
+        }
+        covered_up_to = covered_up_to.max(range.end);
+    }
+    covered_up_to >= end
+}
+
+/// 录制流里每次发布的返回点（发布返回时流里已经录下的步数，按先后、不重复）：每一次根槽写（`StepKind::RootRecordFua`）之后，跳过紧接着的
+/// 系统配置槽写（发布的系统配置轮换）与屏障，停在下一步不是这两种的地方（流尾也算）。只看录制流里每一步落在哪一类位置上（几何是这个池的，
+/// `segments::FixedGeometry`），不读实现那一侧的发布记账。
+#[must_use]
+pub fn publish_return_points_of_the_stream(
+    operations: &[RetainedOperation],
+    geometry: &FixedGeometry,
+) -> Vec<usize> {
+    let mut return_points: Vec<usize> = Vec::new();
+    for (root_record_write, retained) in operations.iter().enumerate() {
+        if geometry.classify(&retained.operation) != StepKind::RootRecordFua {
+            continue;
+        }
+        let mut returned_at = root_record_write + 1;
+        // 只往后走、至多走到流尾：每一步要么停、要么下标加一
+        while operations.get(returned_at).is_some_and(|following| {
+            matches!(
+                geometry.classify(&following.operation),
+                StepKind::SystemConfigurationSlot | StepKind::Barrier
+            )
+        }) {
+            returned_at += 1;
+        }
+        if return_points.last() != Some(&returned_at) {
+            return_points.push(returned_at);
+        }
+    }
+    return_points
+}
+
+/// 池级 checker 在这张镜像上判违例的不变量名。
+fn invariants_violated_on(image: &MemoryPool) -> BTreeSet<&'static str> {
+    singlefs_checker::walk::check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            singlefs_checker::image::InvariantVerdict::Violated(_) => Some(invariant),
+            singlefs_checker::image::InvariantVerdict::Holds
+            | singlefs_checker::image::InvariantVerdict::NotApplicable(_)
+            | singlefs_checker::image::InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect()
+}
+
+/// 判器自己算的可发区间（主 agent 2026-10-13 定：判器从录制流里的发布独立算，不取实现那一侧的可再分配谓词；checker 与实现不共用判法）：
+/// 每次发布返回的那一刻（[`publish_return_points_of_the_stream`]），`base` 加上流里到那一步为止除 discard 之外的每一步就是那一刻的盘；流里这块盘上发过的每一段
+/// discard（候选）各施加到这张盘的一份拷贝上，池级 checker 在拷贝上判违例的不变量不多于没施加那一份的，这一段在那次发布之后可发。
+/// 流里已经发过的 discard（两块盘的都算）不施加进那一刻的盘：它们正是要判的那几条。施加了的话，一条落错地方的 discard 之后的每个返回点上，
+/// 候选抹的都是已经抹掉的内容，违例集合不会再变大，那一段就被算成之后可发，判成「提前到了使它可发的那次发布之前」，
+/// 「落在不可发的槽上」在它之后还有发布时永远报不出来（生命周期闭环流「挪到实例表那一段」的必红世界就是这样）。不施加 discard 的盘是设备不清零那一种结局，
+/// 与清零一样合法。
+/// 判据是「这一刻抹掉它，恢复能落到、能退到的版本里没有一个单元读不对」（判决 G5 的 I-7.4 / I-2.1 照判，判法是池级 checker 的走读，
+/// 不是实现分配器的回收谓词）。候选只取流里真发过的那几段（判器只回答「发了的这几段在哪几次发布之后可发」），一段都没发过时不判池级 checker。
+/// 交回每次发布一项，按返回的先后。
+///
+/// 代价：返回点数 ×（候选段数 + 1）次池级 checker；用在崩溃流的录制流上（几十次发布、几段 discard），不在崩溃状态的全域上逐状态跑。
+#[must_use]
+pub fn discardable_ranges_after_each_publish_found_in_the_stream(
+    base: &MemoryPool,
+    operations: &[RetainedOperation],
+    geometry: &FixedGeometry,
+    device: DeviceIdentity,
+) -> Vec<DiscardableRangesAfterAPublish> {
+    let candidate_discards: BTreeSet<(u64, u64)> = operations
+        .iter()
+        .filter(|retained| {
+            retained.operation.kind == RecordedOperationKind::Discard
+                && retained.operation.device == device
+                && retained.operation.length > 0
+        })
+        .map(|retained| (retained.operation.offset.0, retained.operation.length))
+        .collect();
+    let mut image_when_the_publish_returned = base.clone();
+    let mut operations_applied = 0usize;
+    let mut publishes = Vec::new();
+    for returned_at in publish_return_points_of_the_stream(operations, geometry) {
+        for retained in &operations[operations_applied..returned_at] {
+            if retained.operation.kind != RecordedOperationKind::Discard {
+                image_when_the_publish_returned.apply(std::slice::from_ref(retained));
+            }
+        }
+        operations_applied = returned_at;
+        let mut discardable_ranges = Vec::new();
+        if !candidate_discards.is_empty() {
+            let violated_without_the_discard =
+                invariants_violated_on(&image_when_the_publish_returned);
+            for (offset, length) in &candidate_discards {
+                let mut discarded = image_when_the_publish_returned.clone();
+                discarded.apply(&[RetainedOperation {
+                    operation: RecordedOperation {
+                        device,
+                        kind: RecordedOperationKind::Discard,
+                        offset: DeviceOffsetInBytes(*offset),
+                        length: *length,
+                        content_hash: fnv1a_64_of_zeros(*length),
+                    },
+                    contents: None,
+                }]);
+                if invariants_violated_on(&discarded).is_subset(&violated_without_the_discard) {
+                    discardable_ranges.push(*offset..*offset + *length);
+                }
+            }
+        }
+        publishes.push(DiscardableRangesAfterAPublish {
+            operations_recorded_when_the_publish_returned: returned_at,
+            discardable_ranges,
+        });
+    }
+    publishes
+}
+
+/// 判这块盘上每条 Discard 落没落在可发区间里、在不在使它可发的那次发布的最后一道屏障之后（判决 G5）：可发区间由判器自己从录制流里的发布算
+/// （[`discardable_ranges_after_each_publish_found_in_the_stream`]），再照 [`judge_discards_against_discardable_ranges`] 判。交回判过的 discard 条数。
+///
+/// `base` 是 `operations` 第一步之前的盘（崩溃流里是 mkfs 之后那一张，`operations` 是 mkfs 之后的录制流）；`events` 照
+/// [`judge_discards_against_discardable_ranges`] 那一条的要求给。
+///
+/// # Errors
+/// 有一条 discard 落错了地方（[`MisplacedDiscard`]）。
+pub fn judge_discards_against_the_publishes(
+    base: &MemoryPool,
+    operations: &[RetainedOperation],
+    geometry: &FixedGeometry,
+    device: DeviceIdentity,
+    events: &[DeviceEvent],
+) -> Result<usize, MisplacedDiscard> {
+    let publishes = discardable_ranges_after_each_publish_found_in_the_stream(
+        base, operations, geometry, device,
+    );
+    judge_discards_against_discardable_ranges(operations, device, events, &publishes)
+}
+
+/// 判这块盘上每条 Discard：它之前最近返回的那次发布（返回点投到这块盘上的事件下标不大于它的下标），那次发布之后的可发区间要罩住它；
+/// 罩不住的，按之后有没有哪次发布让它可发，分成「提前到了那次发布的最后一道屏障之前」与「落在不可发的槽上」。交回判过的 discard 条数。
+///
+/// `events` 是这块盘上的事件（设备侧日志折过整段清零之后，或程序投到这块盘上的事件）；每次发布的返回点按程序录制流的前缀投到这块盘上
+/// 数事件下标（[`expected_device_events`]），所以只在盘上日志与程序那一侧逐项对得上时有意义——调用方先过
+/// [`compare_allowing_trailing_flushes`]，那一道判红时不再看这一道。`publishes` 按返回的先后给。
+///
+/// # Panics
+/// `publishes` 的返回点不是按先后给的，或越过了 `operations` 的长度。
+fn judge_discards_against_discardable_ranges(
+    operations: &[RetainedOperation],
+    device: DeviceIdentity,
+    events: &[DeviceEvent],
+    publishes: &[DiscardableRangesAfterAPublish],
+) -> Result<usize, MisplacedDiscard> {
+    assert!(
+        publishes
+            .windows(2)
+            .all(|pair| pair[0].operations_recorded_when_the_publish_returned
+                <= pair[1].operations_recorded_when_the_publish_returned),
+        "发布按返回的先后给"
+    );
+    let events_before_each_return: Vec<usize> = publishes
+        .iter()
+        .map(|publish| {
+            expected_device_events(
+                &operations[..publish.operations_recorded_when_the_publish_returned],
+                device,
+            )
+            .len()
+        })
+        .collect();
+    let mut judged_discards = 0usize;
+    for (event_index, event) in events.iter().enumerate() {
+        let DeviceEvent::Discard { offset, length } = event else {
+            continue;
+        };
+        let start = offset.0;
+        let end = offset.0 + length;
+        let publishes_returned_before_it = events_before_each_return
+            .iter()
+            .take_while(|events_before_the_return| **events_before_the_return <= event_index)
+            .count();
+        let is_discardable_now =
+            publishes_returned_before_it
+                .checked_sub(1)
+                .is_some_and(|latest_returned| {
+                    is_covered_by_the_union_of(
+                        &publishes[latest_returned].discardable_ranges,
+                        start,
+                        end,
+                    )
+                });
+        if is_discardable_now {
+            judged_discards += 1;
+            continue;
+        }
+        let a_later_publish_makes_it_discardable = publishes[publishes_returned_before_it..]
+            .iter()
+            .any(|later| is_covered_by_the_union_of(&later.discardable_ranges, start, end));
+        return Err(if a_later_publish_makes_it_discardable {
+            MisplacedDiscard::BeforeTheLastBarrierOfThePublishThatMakesItDiscardable {
+                event_index,
+                offset: *offset,
+                length: *length,
+            }
+        } else {
+            MisplacedDiscard::OutsideTheDiscardableRanges {
+                event_index,
+                offset: *offset,
+                length: *length,
+            }
+        });
+    }
+    Ok(judged_discards)
 }
 
 #[cfg(test)]
@@ -878,6 +1151,328 @@ mod tests {
             fold_declared_zero_fills(&observed, &declared),
             observed,
             "最后一条接在末端、伸出段尾：一条都不折"
+        );
+    }
+
+    /// 录制流里一次 discard 投成盘上同一段、同一个次序的一条 Discard：一次写、一次 discard、一道屏障的流，
+    /// 盘上日志照收判绿；日志里缺那条 discard、段不同、与写换了次序，都在第一处不同的下标判红。
+    #[test]
+    fn a_discard_in_the_recorded_stream_must_reach_the_device_log_as_the_same_range_in_the_same_order(
+    ) {
+        let data = vec![7u8; 512];
+        let retained = |kind, offset, length, content_hash, contents| RetainedOperation {
+            operation: RecordedOperation {
+                device: DeviceIdentity(0),
+                kind,
+                offset: DeviceOffsetInBytes(offset),
+                length,
+                content_hash,
+            },
+            contents,
+        };
+        let stream = vec![
+            retained(
+                RecordedOperationKind::Write,
+                4096,
+                512,
+                fnv1a_64(&data),
+                Some(data.clone()),
+            ),
+            retained(
+                RecordedOperationKind::Discard,
+                8192,
+                16384,
+                fnv1a_64_of_zeros(16384),
+                None,
+            ),
+            retained(RecordedOperationKind::Barrier, 0, 0, 0, None),
+        ];
+        let expected = expected_device_events(&stream, DeviceIdentity(0));
+        assert_eq!(
+            expected,
+            vec![
+                DeviceEvent::Write {
+                    offset: DeviceOffsetInBytes(4096),
+                    length: 512,
+                    content_hash: fnv1a_64(&data),
+                },
+                DeviceEvent::Discard {
+                    offset: DeviceOffsetInBytes(8192),
+                    length: 16384,
+                },
+                DeviceEvent::Flush,
+            ],
+            "程序那一侧：discard 投成一条 Discard，排在写与屏障之间"
+        );
+        assert_eq!(
+            expected_device_events(&stream, DeviceIdentity(1)),
+            vec![],
+            "别的盘上的 discard 不投到这块盘上"
+        );
+        let divergence_against = |entries: &[(u64, u64, u64, Vec<u8>)]| {
+            let log = parse_device_log(&log_with(entries)).expect("解析");
+            compare_allowing_trailing_flushes(&expected, &log.events)
+                .divergence
+                .map(|(index, _, _)| index)
+        };
+        let write_entry = (8, 1, 0, data.clone());
+        let flush_entry = (0, 0, LOG_FLUSH_FLAG, Vec::new());
+        assert_eq!(
+            divergence_against(&[
+                write_entry.clone(),
+                (16, 32, LOG_DISCARD_FLAG, Vec::new()),
+                flush_entry.clone(),
+            ]),
+            None,
+            "盘上收到同一段的 discard：对得上"
+        );
+        assert_eq!(
+            divergence_against(&[write_entry.clone(), flush_entry.clone()]),
+            Some(1),
+            "程序发了 discard、盘上没收到：判红在那一项"
+        );
+        assert_eq!(
+            divergence_against(&[
+                write_entry.clone(),
+                (16, 16, LOG_DISCARD_FLAG, Vec::new()),
+                flush_entry.clone(),
+            ]),
+            Some(1),
+            "盘上收到的 discard 只有一半长：判红"
+        );
+        assert_eq!(
+            divergence_against(&[
+                (16, 32, LOG_DISCARD_FLAG, Vec::new()),
+                write_entry,
+                flush_entry,
+            ]),
+            Some(0),
+            "discard 跑到写前面：次序不同判红"
+        );
+    }
+
+    /// 单元区里两段 64 槽对齐的整段（784 MiB 起），各 1 MiB。
+    const SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH: u64 = 784 << 20;
+    const SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH: u64 = (784 << 20) + (1 << 20);
+    const SEGMENT_BYTES: u64 = 1 << 20;
+
+    /// 盘 0 上的一步。
+    fn step_on_device_zero(
+        kind: RecordedOperationKind,
+        offset: u64,
+        length: u64,
+    ) -> RetainedOperation {
+        RetainedOperation {
+            operation: RecordedOperation {
+                device: DeviceIdentity(0),
+                kind,
+                offset: DeviceOffsetInBytes(offset),
+                length,
+                content_hash: offset ^ 0x5A5A,
+            },
+            contents: None,
+        }
+    }
+
+    /// 一次发布在盘 0 上的样子：单元写、屏障、根槽 FUA 写、系统配置槽写、屏障（最后那道屏障之后发布返回）。
+    fn publish_on_device_zero(unit_offset: u64, root_offset: u64) -> Vec<RetainedOperation> {
+        vec![
+            step_on_device_zero(RecordedOperationKind::Write, unit_offset, 16384),
+            step_on_device_zero(RecordedOperationKind::Barrier, 0, 0),
+            step_on_device_zero(
+                RecordedOperationKind::WriteForceUnitAccess,
+                root_offset,
+                512,
+            ),
+            step_on_device_zero(RecordedOperationKind::Write, 0, 4096),
+            step_on_device_zero(RecordedOperationKind::Barrier, 0, 0),
+        ]
+    }
+
+    /// 两次发布：先一次什么都不让发；第二次释放了 `SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH` 那一段、返回之后那一段可发。
+    /// 交回录制流（discard 插在 `discard_position` 那一步之前，罩住 `discarded_segment` 那一段）与两次发布的可发区间。
+    fn two_publishes_with_one_discard(
+        discard_position: usize,
+        discarded_segment: u64,
+    ) -> (Vec<RetainedOperation>, Vec<DiscardableRangesAfterAPublish>) {
+        let mut stream = publish_on_device_zero(SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH, 1 << 20);
+        stream.extend(publish_on_device_zero(
+            SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH,
+            (1 << 20) + 512,
+        ));
+        stream.insert(
+            discard_position,
+            step_on_device_zero(
+                RecordedOperationKind::Discard,
+                discarded_segment,
+                SEGMENT_BYTES,
+            ),
+        );
+        let discard_comes_before = |returned_at: usize| {
+            if discard_position < returned_at {
+                returned_at + 1
+            } else {
+                returned_at
+            }
+        };
+        let publishes = vec![
+            DiscardableRangesAfterAPublish {
+                operations_recorded_when_the_publish_returned: discard_comes_before(5),
+                discardable_ranges: vec![],
+            },
+            DiscardableRangesAfterAPublish {
+                operations_recorded_when_the_publish_returned: discard_comes_before(10),
+                discardable_ranges: std::iter::once(
+                    SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH
+                        ..SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH + SEGMENT_BYTES,
+                )
+                .collect(),
+            },
+        ];
+        (stream, publishes)
+    }
+
+    /// 第二次发布返回之后对它释放的那一段发 discard：落在可发区间里、在那次发布最后一道屏障之后，判绿、判过一条。
+    #[test]
+    fn a_discard_of_a_released_segment_after_the_publish_returned_is_green() {
+        let (stream, publishes) =
+            two_publishes_with_one_discard(10, SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH);
+        let events = expected_device_events(&stream, DeviceIdentity(0));
+        assert_eq!(
+            judge_discards_against_discardable_ranges(
+                &stream,
+                DeviceIdentity(0),
+                &events,
+                &publishes
+            ),
+            Ok(1)
+        );
+    }
+
+    /// 必红世界（判决 m4-gc-r1 G5）：同一次 discard 提前到第二次发布的根 FUA 写之前——那时最近返回的是第一次发布，那一段还不可发，
+    /// 要到第二次发布返回才可发，判红在那条 Discard 上。
+    #[test]
+    fn a_discard_moved_before_the_root_record_write_of_the_publish_that_releases_it_is_red() {
+        let (stream, publishes) =
+            two_publishes_with_one_discard(7, SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH);
+        let events = expected_device_events(&stream, DeviceIdentity(0));
+        assert_eq!(
+            events[8],
+            DeviceEvent::Discard {
+                offset: DeviceOffsetInBytes(SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH),
+                length: SEGMENT_BYTES,
+            },
+            "盘上：第二次发布的单元写与屏障之后、根 FUA 写之前就收到 discard"
+        );
+        assert_eq!(
+            judge_discards_against_discardable_ranges(
+                &stream,
+                DeviceIdentity(0),
+                &events,
+                &publishes
+            ),
+            Err(
+                MisplacedDiscard::BeforeTheLastBarrierOfThePublishThatMakesItDiscardable {
+                    event_index: 8,
+                    offset: DeviceOffsetInBytes(SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH),
+                    length: SEGMENT_BYTES,
+                }
+            )
+        );
+    }
+
+    /// 必红世界（判决 m4-gc-r1 G5）：第二次发布返回之后对它刚写了单元的那一段发 discard——那一段不在任何一次发布的可发区间里，判红。
+    #[test]
+    fn a_discard_on_a_segment_that_is_not_discardable_is_red() {
+        let (stream, publishes) =
+            two_publishes_with_one_discard(10, SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH);
+        let events = expected_device_events(&stream, DeviceIdentity(0));
+        assert_eq!(
+            judge_discards_against_discardable_ranges(
+                &stream,
+                DeviceIdentity(0),
+                &events,
+                &publishes
+            ),
+            Err(MisplacedDiscard::OutsideTheDiscardableRanges {
+                event_index: 12,
+                offset: DeviceOffsetInBytes(SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH),
+                length: SEGMENT_BYTES,
+            })
+        );
+    }
+
+    /// 可发区间按并判：一次 discard 跨两段相邻的可发区间算罩住，跨出去一个字节不算。
+    #[test]
+    fn a_discard_spanning_two_adjacent_discardable_ranges_is_covered_and_one_byte_past_them_is_not()
+    {
+        let ranges = vec![2048..4096, 0..2048];
+        assert!(is_covered_by_the_union_of(&ranges, 0, 4096));
+        assert!(!is_covered_by_the_union_of(&ranges, 0, 4097));
+        assert!(!is_covered_by_the_union_of(&[0..1024, 2048..4096], 0, 4096));
+    }
+
+    /// 上面那几条手摆的流用的几何：系统配置两槽从偏移 0 起、根环从 1 MiB 起、单元区在 journal 环之后（崩溃流的池同一套）。
+    fn geometry_of_the_hand_written_streams() -> FixedGeometry {
+        FixedGeometry {
+            fixed_structure_slot_spacing: 4096,
+            journal_ring_bytes: singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
+            root_ring_slots_per_region:
+                singlefs_core::root_ring::RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+        }
+    }
+
+    /// 判器自己从录制流里找发布的返回点：每次根槽写之后跳过系统配置轮换与屏障，停在下一步——与手摆的两次发布写明的返回点逐个相同；
+    /// discard 挪到第二次发布的根槽写之前时，第二次发布的返回点跟着往后挪一步（discard 不在根槽写与轮换之间，不被跳过）。
+    #[test]
+    fn publish_return_points_are_found_after_the_rotation_that_follows_each_root_record_write() {
+        for discard_position in [10, 7] {
+            let (stream, publishes) = two_publishes_with_one_discard(
+                discard_position,
+                SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH,
+            );
+            let written: Vec<usize> = publishes
+                .iter()
+                .map(|publish| publish.operations_recorded_when_the_publish_returned)
+                .collect();
+            assert_eq!(
+                publish_return_points_of_the_stream(
+                    &stream,
+                    &geometry_of_the_hand_written_streams()
+                ),
+                written,
+                "discard 插在第 {discard_position} 步之前：返回点在根槽写、轮换与屏障之后"
+            );
+        }
+    }
+
+    /// 判器自己算可发区间的那一半在没有 discard 的流上不判池级 checker：每次发布交回一项、区间都空（候选只取流里真发过的段）。
+    #[test]
+    fn a_stream_without_any_discard_has_no_discardable_range_after_any_publish() {
+        let mut stream = publish_on_device_zero(SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH, 1 << 20);
+        stream.extend(publish_on_device_zero(
+            SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH,
+            (1 << 20) + 512,
+        ));
+        let empty_pool = MemoryPool::with_devices(&[DeviceIdentity(0)], 4 << 30);
+        let publishes = discardable_ranges_after_each_publish_found_in_the_stream(
+            &empty_pool,
+            &stream,
+            &geometry_of_the_hand_written_streams(),
+            DeviceIdentity(0),
+        );
+        assert_eq!(
+            publishes,
+            vec![
+                DiscardableRangesAfterAPublish {
+                    operations_recorded_when_the_publish_returned: 5,
+                    discardable_ranges: vec![],
+                },
+                DiscardableRangesAfterAPublish {
+                    operations_recorded_when_the_publish_returned: 10,
+                    discardable_ranges: vec![],
+                },
+            ]
         );
     }
 }

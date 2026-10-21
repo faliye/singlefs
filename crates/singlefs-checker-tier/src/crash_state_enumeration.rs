@@ -15,6 +15,7 @@
 //! 行：开跑一行 `CRASH_POINT_REPLAY_PARALLEL_START`、跑完一行 `CRASH_POINT_REPLAY_PARALLEL_FINISHED`（门禁 checker-tier-crash-point-replay 的准入模块按它判线程；
 //! `slices=` 是块数、`resumed_slices=` 是库里复用的块、`freshly_run_slices=` 是这一趟判的块），每个新签名一行 `CRASH_POINT_REPLAY_FINDING`、
 //! 收尾一行 `CRASH_POINT_REPLAY_FINDINGS`；设了 `SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE` 时发现日志写一节定稿（`crate::crash_point_replay_progress`）。
+//! 每一趟开头（不论只查块键、只录还是只判）照调用方的流打覆盖行 `CRASH_FLOW_COVERAGE`（`crate::crash_amplification::crash_flow_coverage_lines`）。
 
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
@@ -49,16 +50,17 @@ use crate::crash::{
 };
 use crate::crash_amplification::{
     changed_units_line_of_the_stale_verdicts, check_blocks_where_until_with_threads,
-    count_vector_disagreements_of_the_flow, import_the_planned_blocks_of_the_other_hosts,
-    judge_the_observers_of_the_flow, observer_versions_keeping_the_refused_out,
-    observers_whose_recorded_blocks_are_missing, pending_blocks, plan_crash_points,
-    record_the_observers_of_the_flow, states_with_the_root_slot_write_persisted,
-    stop_is_requested_by_the_environment, unjudged_blocks_of_the_flow, write_the_recorded_blocks,
-    ConclusionVersionsOfThePlan, CpuJudgementsOfSampledBlocks, CrashFlow, CrashPlan,
-    CrashPointSpan, FlowOfTheLibrary, JudgedBy, NodeOfAnObserver, ObserveACrashState,
-    ObserveACrashStateHandingBackAnImage, ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
-    ObserverVersions, PoolCheckerOfTheImagesAfterTheObservers, RecordedFlow, RecordedFlowReadBack,
-    WeightedShares, END_OF_FLOW_NODE_NAME,
+    count_vector_disagreements_of_the_flow, crash_flow_coverage_lines,
+    import_the_planned_blocks_of_the_other_hosts, judge_the_observers_of_the_flow,
+    observer_versions_keeping_the_refused_out, observers_whose_recorded_blocks_are_missing,
+    pending_blocks, plan_crash_points, record_the_observers_of_the_flow,
+    states_with_the_root_slot_write_persisted, stop_is_requested_by_the_environment,
+    unjudged_blocks_of_the_flow, write_the_recorded_blocks, ConclusionVersionsOfThePlan,
+    CpuJudgementsOfSampledBlocks, CrashFlow, CrashPlan, CrashPointSpan, FlowOfTheLibrary, JudgedBy,
+    NodeOfAnObserver, ObserveACrashState, ObserveACrashStateHandingBackAnImage, ObserverCode,
+    ObserverDeduplication, ObserverOnTheNodes, ObserverVersions,
+    PoolCheckerOfTheImagesAfterTheObservers, RecordedFlow, RecordedFlowReadBack, WeightedShares,
+    END_OF_FLOW_NODE_NAME,
 };
 use crate::crash_identity::{
     judging_units_key, ConclusionKind, ConclusionVersion, JudgingUnits, ObserverName,
@@ -761,8 +763,8 @@ fn flow_of_the_inputs<'flow>(
 /// 一条崩溃枚举用例的流按步切成前缀树的节点（L6）：写下标区间互相交叠的几段并成一步，每一步一个崩溃点，点的写区间首尾相接罩住整张写表；
 /// 点名 `<项名>.<周期>.<步序>`（周期取这一步最后一次写的，`crash_amplification::period_of_write`）只作索引。块键照崩溃放量的同一个算法
 /// （段写表、起步镜像、计划哈希），几条流共有的前几步就是同几个节点，只判一次。切不成首尾相接的几步（某一段的写落在前一步之前）就
-/// 整条流一个点，与改之前一样。
-fn crash_points_of_the_steps(
+/// 整条流一个点，与改之前一样。实验装置（E184（常规层与大负载层的代价计数））也调它，按同一套切法数节点，不另抄一份。
+pub fn crash_points_of_the_steps(
     item: CrashPointReplayItem<'_>,
     writes: &[RetainedWrite],
     segments: &[Vec<usize>],
@@ -1043,6 +1045,13 @@ fn enumerate_crash_states_through_the_library(
         versions,
         expansion,
     );
+    // 覆盖行：覆盖表脚本从这一趟的日志里读哪个（入口，提交步骤，段）在哪个域里展开了。崩溃枚举用例没有按段登记；
+    // 只查块键、只录、只判的那几趟同样打（录下的流是同一条）
+    flow_to_record.with_the_flow(|flow| {
+        for coverage_line in crash_flow_coverage_lines(flow, &[]) {
+            println!("{}", coverage_line.text());
+        }
+    });
     let (outcome, blocks) = enumerate_the_flow_through_the_library_with_the_keys(
         item,
         &flow_to_record,

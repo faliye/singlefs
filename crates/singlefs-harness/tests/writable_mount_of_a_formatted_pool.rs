@@ -82,7 +82,8 @@ fn fail_the_nth_read_of_system_configuration_slot_zero_on_each_device(
 const DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT: u64 = 5;
 
 /// 取号之前判定算出的号与取号写之前重算的号不同，取号不写、报错（m2-emptypool-nonempty-r1 云端攻方腿 Z2）：mkfs 之后第一次可写挂载崩在
-/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1），重开时两块盘在判定那一读上（第 5 次读系统配置槽 0，
+/// 取号第一轮两写之后、第二轮落盘之前（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1，槽 1 还是 mkfs 写的号 0——取号写两轮
+/// （甲'）之后这一形只在两轮之间崩才有，用例取完号把两盘槽 1 写回取号之前的字节来造），重开时两块盘在判定那一读上（第 5 次读系统配置槽 0，
 /// `DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT`）各报一次瞬时读错——
 /// 判定那一遍只看到 mkfs 的槽 1（号 0）、算出号 1、要写的行区间为空放行；取号重算读到号 1、算出号 2 ⇒ 返回
 /// `InstanceGenerationChangedBeforeAcquisition { expected: 1, recomputed: 2 }`，`DiskSnapshot` 不变。
@@ -92,12 +93,36 @@ fn transient_system_configuration_read_errors_between_the_refusal_and_the_acquis
     let mut formatted = format_pool("step-three-formatted-transient-read-error");
     {
         let publish_parameters = parameters();
+        let slot_one_offset = DeviceOffsetInBytes(u64::from(
+            publish_parameters.geometry.fixed_structure_slot_spacing,
+        ));
         let open_devices = formatted.devices.as_mut().expect("镜像还开着");
-        let mut writer = PoolWriter::new(&publish_parameters, open_devices.as_mut_slice());
-        assert_eq!(
-            acquire_instance(&mut writer).expect("取号"),
-            InstanceGeneration(1)
-        );
+        let slot_one_before_the_acquisition: Vec<Vec<u8>> = open_devices
+            .iter()
+            .map(|(_, device)| {
+                let mut bytes = vec![0u8; 4096];
+                device
+                    .read_at(slot_one_offset, &mut bytes)
+                    .expect("读得到槽 1");
+                bytes
+            })
+            .collect();
+        {
+            let mut writer = PoolWriter::new(&publish_parameters, open_devices.as_mut_slice());
+            assert_eq!(
+                acquire_instance(&mut writer).expect("取号"),
+                InstanceGeneration(1)
+            );
+        }
+        // 崩在取号两轮之间：第二轮那一写（落槽 1）没落盘，槽 1 还是取号之前那一份。
+        for ((_, device), bytes) in open_devices
+            .iter_mut()
+            .zip(&slot_one_before_the_acquisition)
+        {
+            device
+                .write_at(slot_one_offset, bytes, WriteDurability::Plain)
+                .expect("槽 1 写回取号之前的字节");
+        }
     }
     let before = disk_snapshot(&formatted.memory_pool(), &formatted.stream);
     let plan = SharedFaultPlan::armed(
@@ -217,25 +242,28 @@ fn writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_f
 
 /// 环里留着一条孤记录时，只做过 mkfs 的池照常可写挂载（2026-09-23 用户定案收窄 R4：`NEW_POOL_FILE_CREATION_TXG` 只管 mkfs
 /// 同一个进程里那条流，不管任何池的第一个文件版本，所以「新实例的第一次发布不是 txg 1、jsn 1」不再是拒绝的理由）：
-/// mkfs 之后第一次可写挂载取号那两次写（两块盘系统配置槽 0，写进号 1 的那一槽）被说谎的设备吞掉（`InjectedFault::WriteIsSwallowed`：报成功、
-/// 一个字节都没落盘），之后崩在 txg 1 的记录两写持久、txg 1 的根槽没持久（真崩溃留不下这一形：取号写与记录写之间有屏障，记录持久而取号写没持久
-/// 只有说谎的设备做得出；代码轮 LR6 把用例自己改写系统配置槽的造法换成这一种）——两块盘槽 0 仍是 mkfs 写的那一份，择系统配置只剩 mkfs 的那一份、
+/// mkfs 之后第一次可写挂载取号写两轮那四次写（两块盘各两槽，写进号 1）被说谎的设备吞掉（`InjectedFault::WriteIsSwallowed`：报成功、
+/// 一个字节都没落盘；这次挂载之后的系统配置槽写一并吞掉，它们都在 txg 1 的根槽写之后、不进崩溃状态），之后崩在 txg 1 的记录两写持久、
+/// txg 1 的根槽没持久（真崩溃留不下这一形：取号写与记录写之间有屏障，记录持久而取号写没持久
+/// 只有说谎的设备做得出；代码轮 LR6 把用例自己改写系统配置槽的造法换成这一种）——两块盘两槽仍是 mkfs 写的那一份，择系统配置只剩 mkfs 的那一份、
 /// 根环只有第 0 代根，要取的号 1、要写的行为空；环里那条 txg 1 的记录让新实例从
 /// txg 2、jsn 2 起 ⇒ 零单元发布 txg 2（落盘 0），暖机推到 txg 4（落盘 1）才覆盖两块盘，之后第一个文件版本接着写 txg 5。
 #[test]
 fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next_txg() {
     let mut formatted = format_pool("step-three-formatted-leftover-record");
-    // 取号那两次写（每块盘头一次写系统配置槽 0）被设备吞掉：注入层包在录制器外面，吞掉的写不进录制流，录制流里的就是落到设备上的。
+    // 取号写两轮那四次写（每块盘头两次写系统配置槽，两槽各一次）被设备吞掉：注入层包在录制器外面，吞掉的写不进录制流，录制流里的就是落到设备上的。
+    // 只吞取号第一轮那一写不够（改前的造法）：取号写两轮之后第二轮把号 1 写进槽 1，号 1 留在盘上、下一次取 2，测不到「号 1 不在盘上、重取 1 无害」。
     // 不吞成撕裂：C331（择根倒挂压过已确认的写） 取甲之后见证读缺一槽就拒可写（用户 2026-09-28 定），撕裂造的走不到孤记录这一支；
-    // 吞掉之后槽 0 仍是 mkfs 写的那一份（mkfs 两槽写同一份字节），两槽都自证得过。
+    // 吞掉之后两槽仍是 mkfs 写的那一份（mkfs 两槽写同一份字节），两槽都自证得过。
+    let system_configuration_slots_end = 2 * u64::from(geometry().fixed_structure_slot_spacing);
     let swallowing_the_acquisition = SharedFaultPlan::armed(
         geometry(),
         FaultSchedule {
             fault: InjectedFault::WriteIsSwallowed,
             device: FaultDeviceSelector::EveryDevice,
-            placement: FaultPlacement::OffsetExactly(DeviceOffsetInBytes(0)),
+            placement: FaultPlacement::OffsetBelow(system_configuration_slots_end),
             counting: FaultCounting::PerDevice,
-            occurrence: FaultOccurrence::TheNthMatchingCall(1),
+            occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
         },
     );
     let mut first_mount_devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<_>)> = formatted
@@ -254,10 +282,10 @@ fn formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next
         .collect();
     // 说谎的设备之后这次挂载自己怎么收尾不判：只要它在 txg 1 的根槽之前那几次写（录制流里）。
     let _first_mount = mount_writable(&parameters(), &mut first_mount_devices);
-    assert_eq!(
-        swallowing_the_acquisition.fired().len(),
-        2,
-        "两块盘各吞了一次写系统配置槽 0（取号那两次）"
+    assert!(
+        swallowing_the_acquisition.fired().len() >= 4,
+        "两块盘各吞了取号两轮那两次系统配置槽写（之后的轮换写一并吞掉）：{}",
+        swallowing_the_acquisition.fired().len()
     );
     drop(first_mount_devices);
     let operations = formatted.retained_operations();

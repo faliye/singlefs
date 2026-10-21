@@ -194,8 +194,8 @@ fn build_pool(tag: &str) -> BuiltPool {
         let acquisition_operation_count = stream.operations().len();
         assert_eq!(
             acquisition_operation_count,
-            mkfs_operation_count + 4,
-            "取号两写 + 取号之后那道屏障，两块盘各记一步（录制器按设备记屏障，代码审阅第 1 条；C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案；暖机开场那道因此不再发）"
+            mkfs_operation_count + 8,
+            "取号写两轮（甲'），每轮两写 + 那一轮之后那道屏障，两块盘各记一步（录制器按设备记屏障，代码审阅第 1 条；C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案；暖机开场那道因此不再发）"
         );
         let warm_up = warm_up(&mut pool, &genesis.root, instance).expect("暖机");
         warm_up_operation_count = stream.operations().len();
@@ -221,7 +221,8 @@ fn build_pool(tag: &str) -> BuiltPool {
         warm_up,
         output,
         mkfs_operation_count,
-        acquisition_operation_count: mkfs_operation_count + 2,
+        // 取号那一截切到第二轮那两写为止（第二轮之后那道屏障归暖机那一截的第一段，与只写一轮时切在取号两写之后同一个切法）。
+        acquisition_operation_count: mkfs_operation_count + 6,
         warm_up_operation_count,
     }
 }
@@ -269,6 +270,8 @@ fn read_journal_record(pool: &BuiltPool, identity: DeviceIdentity, counter: u64)
 
 fn unit_length(identity: TransactionUnit) -> usize {
     match identity {
+        TransactionUnit::DataOfAFileOtherThanTheFirst { .. } => 32768,
+        TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. } => 16384,
         TransactionUnit::Data(_)
         | TransactionUnit::InodeLeafContainer(_)
         | TransactionUnit::TombstoneLeafContainer(_)
@@ -284,9 +287,12 @@ fn unit_length(identity: TransactionUnit) -> usize {
         | TransactionUnit::AllocationTreeNodeBelowTheRoot(_)
         | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
         | TransactionUnit::AccountingTree
+        | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
+        | TransactionUnit::DeadlistTree
         | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
         | TransactionUnit::MappingTree
         | TransactionUnit::DeletedInodesRoot
+        | TransactionUnit::LoggedOperationsRoot
         | TransactionUnit::TombstoneRoot
         | TransactionUnit::TombstoneNodeBelowTheRoot(_)
         | TransactionUnit::LineageRoot
@@ -350,6 +356,8 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     // mkfs 清 [0, 根环基址)（C651 第一轮判决用户定案 W1）之后每块盘多一步整段清零、两块盘多 2 步，都在第一段（第一道屏障之前）：
     // mkfs 23 → 25 步，第一段 12 → 14 个写，闭式 1 + (2^14 − 1) + 1 + 1 + 1 + (2^4 − 1) = 16402（改之前 1 + 4095 + 3 + 15 = 4114）；
     // mkfs 之后的各段不变。
+    // 取号写两轮（甲'，`research/prompts/m3-close-sysconf-r3-main-verification.md` 第四节「落地」）之后取号那一截 2 步 → 6 步（两轮各两写，中间一道屏障两盘各一步），
+    // 段 [2] → [2+2]、闭式 4 → 7；mkfs 之后整条 57 → 61 步，段前面多一个 2 写的段，闭式 16777240 → 16777243；暖机与新池新建文件那两截不变。
     assert_eq!(
         (
             mkfs_operations.len(),
@@ -368,11 +376,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
             sizes(acquisition_operations),
             closed_form(acquisition_operations)
         ),
-        (2, "2".to_string(), 4)
+        (6, "2+2".to_string(), 7)
     );
     assert_eq!(
         kinds(acquisition_operations),
-        "[system_configuration_slot×2]"
+        "[system_configuration_slot×2,barrier×2]|[system_configuration_slot×2]"
     );
     assert_eq!(
         (
@@ -404,11 +412,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
             sizes(post_mkfs_operations),
             closed_form(post_mkfs_operations)
         ),
-        (57, "2+2+1+2+2+1+2+24+2+1+2".to_string(), 16_777_240)
+        (61, "2+2+2+1+2+2+1+2+24+2+1+2".to_string(), 16_777_243)
     );
     assert_eq!(
         kinds(post_mkfs_operations),
-        "[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]"
+        "[system_configuration_slot×2,barrier×2]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]"
     );
     // 每一步恰好落在一个段里。
     for slice in [
@@ -491,13 +499,13 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
         (0, 0),
         "mkfs 种的根还在"
     );
-    // 系统配置：取号写世代 2 槽 0，暖机写 3 / 4，事务写 5 槽 1、tail = jsn 3；两盘同。
+    // 系统配置：取号两轮写世代 2（槽 0）、3（槽 1），暖机写 4 / 5，事务写 6 槽 0、tail = jsn 3；两盘同。
     for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
         let slot_zero = read(device(&pool, identity), DeviceOffsetInBytes(0), 4096);
         let slot_one = read(device(&pool, identity), DeviceOffsetInBytes(4096), 4096);
         let (chosen_index, chosen) =
             choose_system_configuration(&[&slot_zero, &slot_one]).expect("可择");
-        assert_eq!(chosen_index, 1);
+        assert_eq!(chosen_index, 0);
         assert_eq!(
             (
                 chosen.slot_generation,
@@ -505,17 +513,17 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
                 chosen.journal_instance,
                 chosen.this_device
             ),
-            (5, 3, 1, identity.0)
+            (6, 3, 1, identity.0)
         );
-        let older = check_system_configuration_slot(&slot_zero).expect("槽 0");
+        let older = check_system_configuration_slot(&slot_one).expect("槽 1");
         assert_eq!(
             (
                 older.slot_generation,
                 older.journal_tail,
                 older.journal_instance
             ),
-            (4, 2, 1),
-            "暖机第二次写的槽 0"
+            (5, 2, 1),
+            "暖机第二次写的槽 1"
         );
     }
     // journal 环：jsn 1、2 是空记录（事务号 0、不点名、新根段照 mkfs 根），jsn 3 点名 8 项；反向链按实例算，第一条 0。
@@ -662,7 +670,8 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
             }
             // 新池新建文件只有一个数据单元（内联），extent 树没有下段、上段只有根兼叶。
             TransactionUnit::ExtentLowerNode(_)
-            | TransactionUnit::ExtentUpperNodeBelowTheRoot(_) => {
+            | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
+            | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. } => {
                 unreachable!("新池新建文件的 extent 树只有上段根兼叶")
             }
             TransactionUnit::MappingTree => DeclaredKeyRange::TightOverTheEntries {
@@ -687,12 +696,14 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
                 unreachable!("新池新建文件的记账树与中央映射树都是根兼叶")
             }
             TransactionUnit::Data(_)
+            | TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
             | TransactionUnit::InodeLeafContainer(_)
             | TransactionUnit::InstanceTable
             | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
                 unreachable!("上面按类跳过了")
             }
             TransactionUnit::DeletedInodesRoot
+            | TransactionUnit::LoggedOperationsRoot
             | TransactionUnit::TombstoneLeafContainer(_)
             | TransactionUnit::TombstoneRoot
             | TransactionUnit::TombstoneNodeBelowTheRoot(_)
@@ -701,8 +712,10 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
             | TransactionUnit::LineageNodeBelowTheRoot(_)
             | TransactionUnit::RetirementLeafContainer(_)
             | TransactionUnit::RetirementRoot
-            | TransactionUnit::RetirementNodeBelowTheRoot(_) => {
-                unreachable!("新池新建文件不删除、不回退：删除那两棵树、谱系树与退役树零根")
+            | TransactionUnit::RetirementNodeBelowTheRoot(_)
+            | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
+            | TransactionUnit::DeadlistTree => {
+                unreachable!("新池新建文件不删除、不回退、没有快照：删除那两棵树、谱系树、退役树与 deadlist 树零根")
             }
         };
         match declared_key_range {
@@ -880,7 +893,9 @@ fn inode_and_extent_lookups_from_the_root_read_the_first_file_back() {
             // 改动计数 = 最后一次改动所在发布的 checkpoint_txg（D8（核心索引结构） 已定项 6 偏移 88）：
             // 新池新建文件发布在 txg 3（增补 2 第 11 行，2026-09-18 用户定案；此前钉的 1 是暖机把 txg 推到 3 之前的值）。
             change_count: 3,
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            // 新池新建文件是整份写：截断字段是 0（判决 m4-trunc-r2 R2）。
+            truncation_field: singlefs_core::records::InodeRecordTruncationField::NOT_WRITTEN,
         },
         "逐字段回读等于写入"
     );

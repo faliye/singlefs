@@ -590,6 +590,7 @@ mod tests {
             size,
             change_count,
             write_time_seconds: 1_788_000_000,
+            truncation_field: crate::records::InodeRecordTruncationField::NOT_WRITTEN,
         }
     }
 

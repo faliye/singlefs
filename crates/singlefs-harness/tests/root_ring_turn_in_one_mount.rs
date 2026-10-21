@@ -197,7 +197,9 @@ fn unit_area_slots_placed_step_by_step_on_each_device(
         for operation in &stream_operations[step_range[0]..step_range[1]] {
             match operation.kind {
                 RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {}
-                RecordedOperationKind::WriteZeroes | RecordedOperationKind::Barrier => continue,
+                RecordedOperationKind::WriteZeroes
+                | RecordedOperationKind::Discard
+                | RecordedOperationKind::Barrier => continue,
             }
             let first_slot = operation.offset.0 / SLOT_BYTES;
             if first_slot < unit_area_start_slot || operation.length == 0 {

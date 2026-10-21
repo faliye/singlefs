@@ -58,7 +58,8 @@ fn second_system_configuration_writes_in_one_segment(
             StepKind::UnitWrite
             | StepKind::JournalRecord
             | StepKind::RootRecordFua
-            | StepKind::ZeroFill => {}
+            | StepKind::ZeroFill
+            | StepKind::Discard => {}
         }
     }
     violations

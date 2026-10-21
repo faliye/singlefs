@@ -10,7 +10,7 @@ use singlefs_checker::image::ImageReader;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
-use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
+use singlefs_core::block_device::{BlockDeviceError, DiscardOutcome, PhysicalBlockSizeInBytes};
 use singlefs_core::recovery::PoolReader;
 use singlefs_core::system_configuration::unit_area_start_slot_recorded_in_the_slot;
 use singlefs_format::{
@@ -206,6 +206,16 @@ impl singlefs_core::block_device::BlockDevice for SparseBlockDevice {
         self.image.zero_fill(offset, length);
         Ok(())
     }
+    /// 内存盘认 discard，把它当整段清零应用：之后读这一段是全 0（崩溃点重放「持久 → 0」那一态），交回「交给了底层」。
+    fn discard_at(
+        &mut self,
+        discarded_offset: DeviceOffsetInBytes,
+        discarded_length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        self.check_request(discarded_offset, discarded_length)?;
+        self.image.zero_fill(discarded_offset, discarded_length);
+        Ok(DiscardOutcome::Applied)
+    }
     fn barrier(&mut self) -> Result<(), singlefs_core::block_device::BlockDeviceError> {
         Ok(())
     }
@@ -351,6 +361,14 @@ impl MemoryPool {
                     self.devices
                         .get_mut(&retained.operation.device)
                         .expect("录到的写都落在池里的盘上")
+                        .zero_fill(retained.operation.offset, retained.operation.length);
+                    continue;
+                }
+                // discard 整个施加时取「持久 → 0」那一态（这一份是「整段流都落了」的镜像）。
+                RecordedOperationKind::Discard => {
+                    self.devices
+                        .get_mut(&retained.operation.device)
+                        .expect("录到的 discard 都落在池里的盘上")
                         .zero_fill(retained.operation.offset, retained.operation.length);
                     continue;
                 }
@@ -578,6 +596,22 @@ pub fn writes_and_segments_with_stream_indexes_and_entries(
         match retained.operation.kind {
             RecordedOperationKind::Barrier => {}
             RecordedOperationKind::WriteZeroes => {
+                writes.push(RetainedWrite {
+                    device: retained.operation.device,
+                    kind: geometry.classify(&retained.operation),
+                    is_force_unit_access: false,
+                    offset: retained.operation.offset,
+                    contents: WrittenContents::Zeros {
+                        length: retained.operation.length,
+                    },
+                });
+                stream_indexes.push(stream_index);
+                current.push(writes.len() - 1);
+            }
+            // discard 按「范围写零」进写表：持久那一态这一段是 0，没持久那一态是这次之前的旧字节；取几态照 D13（验证路线） 已定项 4
+            // （长于一个扇区、罩住的范围里原来有东西的多取第三态「新旧都读不出」，`crash` 的撕裂判据认它；判决
+            // `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S6）。种类自成一种 `discard`（C829）。
+            RecordedOperationKind::Discard => {
                 writes.push(RetainedWrite {
                     device: retained.operation.device,
                     kind: geometry.classify(&retained.operation),
@@ -1107,8 +1141,12 @@ pub fn publishes_of_one_recording(
                     checkpoint_txg: checkpoint_txg.0,
                 });
             }
-            // 整段清零不属于任何一次发布（今天唯一的清零是 mkfs 清 journal 环，在第一次发布之前）。
-            StepKind::ZeroFill | StepKind::SystemConfigurationSlot | StepKind::Barrier => {}
+            // 整段清零不属于任何一次发布（今天唯一的清零是 mkfs 清 journal 环，在第一次发布之前）；discard 在发布返回之后发
+            // （D26（后台整理与放置回收） 未定项 9），也不属于哪一次发布。
+            StepKind::ZeroFill
+            | StepKind::Discard
+            | StepKind::SystemConfigurationSlot
+            | StepKind::Barrier => {}
         }
     }
     publishes

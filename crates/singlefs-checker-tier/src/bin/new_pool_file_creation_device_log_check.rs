@@ -273,6 +273,15 @@ fn count_kinds(events: &[DeviceEvent]) -> (usize, usize) {
     (writes, flushes)
 }
 
+/// 一串事件里有几条 discard：结果行的 `expected_discards` / `observed_discards`。新池新建文件那条写路一次 discard 都不发，两边都是 0；
+/// 逐项比对本来就把 Discard 按偏移、长度、次序比（`device_log::expected_device_events` 投出它），这两个数只是让结果行看得见。
+fn count_discards(events: &[DeviceEvent]) -> usize {
+    events
+        .iter()
+        .filter(|event| matches!(event, DeviceEvent::Discard { .. }))
+        .count()
+}
+
 /// 一块盘上的比对：结果行，与这块盘对不对得上。
 struct DeviceComparison {
     line: String,
@@ -350,10 +359,12 @@ fn compare_one_device(
     let zero_fill_bytes: u64 = zero_fills.iter().map(|(_, length)| *length).sum();
     DeviceComparison {
         line: format!(
-            "name=device_log device={} declared_entries={} expected_writes={expected_writes} expected_flushes={expected_flushes} observed_writes={observed_writes} observed_flushes={observed_flushes} zero_fills={} zero_fill_bytes={zero_fill_bytes} trailing_flushes={} expected_events_by_window={} divergence_window={divergence_window} divergence={divergence_text}",
+            "name=device_log device={} declared_entries={} expected_writes={expected_writes} expected_flushes={expected_flushes} observed_writes={observed_writes} observed_flushes={observed_flushes} expected_discards={} observed_discards={} zero_fills={} zero_fill_bytes={zero_fill_bytes} trailing_flushes={} expected_events_by_window={} divergence_window={divergence_window} divergence={divergence_text}",
             identity.0,
             log.declared_entries
                 .map_or_else(|| "NA".to_string(), |declared| declared.to_string()),
+            count_discards(&expected),
+            count_discards(&observed),
             zero_fills.len(),
             comparison.trailing_flushes,
             events_by_window.join(","),
@@ -489,9 +500,12 @@ mod tests {
         declared_zero_fills, expected_device_events, DeviceEvent, DeviceLog,
     };
     use singlefs_checker_tier::on_device_modes::OnDeviceRunMode;
-    use singlefs_core::address::DeviceIdentity;
+    use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
     use singlefs_harness::scenario::e142_parameters;
-    use singlefs_harness::{fnv1a_64_of_zeros, SharedStream};
+    use singlefs_harness::{
+        fnv1a_64_of_zeros, RecordedOperation, RecordedOperationKind, RetainedOperation,
+        SharedStream,
+    };
 
     /// 门禁 checker-tier-qemu-device-streams 给虚机的两块 virtio 盘各 4096 MiB（`VM_DISK_MB=4096`）。
     const VIRTIO_DEVICE_BYTES: u64 = 4096 * 1024 * 1024;
@@ -930,5 +944,85 @@ mod tests {
         assert_eq!(window_of_event(3, &counts), "warm_up", "空的一段不认领下标");
         assert_eq!(window_of_event(4, &counts), "warm_up");
         assert_eq!(window_of_event(5, &counts), AFTER_THE_PROGRAM);
+    }
+
+    /// 程序录制流里有一次 discard（盘 0 上一次 discard、一道屏障，记在新池新建文件那一段）：盘上日志收到同一段的 Discard 判绿；
+    /// 日志里没有那条 Discard 判红，第一处不一致落在新池新建文件那一段，结果行报程序 1 条、盘上 0 条。
+    #[test]
+    fn a_discard_the_program_recorded_but_the_device_never_received_is_red_and_one_it_received_is_green(
+    ) {
+        let operations = vec![
+            RetainedOperation {
+                operation: RecordedOperation {
+                    device: DeviceIdentity(0),
+                    kind: RecordedOperationKind::Discard,
+                    offset: DeviceOffsetInBytes(1 << 30),
+                    length: 1 << 20,
+                    content_hash: fnv1a_64_of_zeros(1 << 20),
+                },
+                contents: None,
+            },
+            RetainedOperation {
+                operation: RecordedOperation {
+                    device: DeviceIdentity(0),
+                    kind: RecordedOperationKind::Barrier,
+                    offset: DeviceOffsetInBytes(0),
+                    length: 0,
+                    content_hash: 0,
+                },
+                contents: None,
+            },
+        ];
+        let rerun = HostRerun {
+            operations,
+            window_ends: vec![(ProgramWindow::NewPoolFileCreation, 2)],
+        };
+        let log_of = |events: Vec<DeviceEvent>| DeviceLog {
+            sector_bytes: 512,
+            declared_entries: None,
+            events,
+        };
+        let received = compare_one_device(
+            &rerun,
+            DeviceIdentity(0),
+            &log_of(vec![
+                DeviceEvent::Discard {
+                    offset: DeviceOffsetInBytes(1 << 30),
+                    length: 1 << 20,
+                },
+                DeviceEvent::Flush,
+            ]),
+        );
+        assert!(received.matches, "{}", received.line);
+        assert_eq!(field(&received.line, "expected_discards"), Some("1"));
+        assert_eq!(field(&received.line, "observed_discards"), Some("1"));
+        let never_received =
+            compare_one_device(&rerun, DeviceIdentity(0), &log_of(vec![DeviceEvent::Flush]));
+        assert!(!never_received.matches, "{}", never_received.line);
+        assert_eq!(
+            field(&never_received.line, "divergence_window"),
+            Some("new_pool_file_creation"),
+            "{}",
+            never_received.line
+        );
+        assert_eq!(field(&never_received.line, "expected_discards"), Some("1"));
+        assert_eq!(field(&never_received.line, "observed_discards"), Some("0"));
+    }
+
+    /// 新池新建文件那条写路一次 discard 都不发：每块盘上程序那一侧与盘上那一侧都是 0 条。
+    #[test]
+    fn the_new_pool_file_creation_rerun_issues_no_discard_on_either_device() {
+        let rerun = rerun_of(OnDeviceRunMode::Direct);
+        for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
+            let log = device_log_that_received(
+                &rerun,
+                identity,
+                flattened(events_by_window(&rerun, identity)),
+            );
+            let comparison = compare_one_device(&rerun, identity, &log);
+            assert!(comparison.matches, "{}", comparison.line);
+            assert_eq!(field(&comparison.line, "expected_discards"), Some("0"));
+            assert_eq!(field(&comparison.line, "observed_discards"), Some("0"));
+        }
     }
 }

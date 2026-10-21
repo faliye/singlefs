@@ -910,14 +910,15 @@ const SEED_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED: u64 = 7_463_871_0
 const OPERATIONS_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED: usize = 30;
 /// 那一段交出的每步镜像数（全量日志里那一张表的状态数）。
 const STEP_IMAGES_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED: usize = 24;
-/// 那一段的录制流写了盘 0 的系统配置槽 0 号几次（调查员探针量的 `slot00_recorded`）。
-const RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE: usize = 34;
+/// 那一段的录制流写了盘 0 的系统配置槽 0 号几次（调查员探针量的 `slot00_recorded` 是 34；取号写两轮（D22（单元原子性怎么合成） 已定项 8）
+/// 之后每次可写挂载的取号多写一轮系统配置槽，这一段 2026-10-21 在 harness 侧现量是 38，退回一轮现量回到 34）。
+const RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE: usize = 38;
 
 /// 复用那一族种子 [`SEED_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED`]、30 步：全量日志的拒绝原文是
-/// `TooManyWritesOnOneLocation { device: 0, offset: 0, writes: 68 }`——那一槽录制写 34 次，枚举写表照崩溃点重放接撕裂镜像，每次系统配置轮换
-/// 另接一条从不落的撕裂镜像，写数翻倍。随机历史的给定状态表不接撕裂镜像
+/// `TooManyWritesOnOneLocation { device: 0, offset: 0, writes: 68 }`——那时那一槽录制写 34 次，枚举写表照崩溃点重放接撕裂镜像，每次系统配置轮换
+/// 另接一条从不落的撕裂镜像，写数翻倍（取号写两轮之后是 38 次、翻倍 76）。随机历史的给定状态表不接撕裂镜像
 /// （`build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions`）：
-/// 只建表、不判，不要卡；建得出，枚举写表就是录制流，那一槽 34 次写。
+/// 只建表、不判，不要卡；建得出，枚举写表就是录制流，那一槽 38 次写。
 /// 判别力（`crates/mutations.tsv`）：不接改回接（`crash::TornImagesOfTheInPlaceOverwrites::LeftOut` 那一臂取 `TearableInPlaceOverwrites::of`），
 /// 枚举写表比掩码长，建表拒，这条红。
 #[test]
@@ -1009,7 +1010,7 @@ fn the_smallest_reuse_history_the_full_run_refused_builds_its_given_states_table
             RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE,
             2 * RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE
         ),
-        "前提：那一槽录制写 34 次；接撕裂镜像的枚举写表里 68 次（全量日志拒绝原文里的写数）"
+        "前提：那一槽录制写 38 次；接撕裂镜像的枚举写表里 76 次（全量日志拒绝原文里的 34、68 是取号写两轮之前的写数）"
     );
     let claimed_versions =
         vec![ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery; persisted_sets.len()];
@@ -1220,7 +1221,8 @@ fn small_tier_judged_in_a_gpu_run_and_in_a_cpu_run(
 }
 
 /// GPU 与 CPU 对拍（用户 2026-10-11 定：独立的两趟，一段里 CPU 不既跑数据又对拍；用户 2026-10-13 定：两趟都从库里读）：
-/// 同一小批一趟配了 GPU、由 GPU 判器判，一趟没开 GPU、由 CPU 判器判，各写各的库、从空库起；逐张表逐状态的对拍字相同，
+/// 同一小批一趟配了 GPU、由 GPU 判器判，一趟没开 GPU、由 CPU 判器判，各写各的库、从空库起；逐张表逐状态的对拍字整份相同
+/// （连同 I-1.13：扫描重建那一截补上之后内核不置位的表是空的，C821），
 /// 两趟建出的表与状态一样多，GPU 那一趟判不了的只许是 mkfs 没做完的那几张（它们交的是 CPU 判器的结论，对拍里不算 GPU 判过）。
 /// 要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
 #[cfg(feature = "gpu")]
@@ -1273,22 +1275,21 @@ fn the_small_tier_judged_in_a_gpu_run_and_in_a_cpu_run_gives_the_same_words_on_e
         (cpu_judged.tables, cpu_judged.states),
         "两趟建出的表与状态一样多"
     );
-    let mismatches: Vec<String> = gpu_judged
-        .words_by_table
+    let gpu_words_by_table = &gpu_judged.words_by_table;
+    let cpu_words_by_table = &cpu_judged.words_by_table;
+    let mismatches: Vec<String> = gpu_words_by_table
         .iter()
-        .filter(|(table_name, gpu_words)| {
-            cpu_judged.words_by_table.get(*table_name) != Some(gpu_words)
-        })
+        .filter(|(table_name, gpu_words)| cpu_words_by_table.get(*table_name) != Some(gpu_words))
         .map(|(table_name, gpu_words)| {
             format!(
                 "{table_name}：GPU {gpu_words:?}；CPU {:?}",
-                cpu_judged.words_by_table.get(table_name)
+                cpu_words_by_table.get(table_name)
             )
         })
         .collect();
     assert!(
         mismatches.is_empty(),
-        "{} 张表上 GPU 一趟与 CPU 一趟的对拍字不同：\n{}",
+        "{} 张表上 GPU 一趟与 CPU 一趟的对拍字（整份，连同 I-1.13）不同：\n{}",
         mismatches.len(),
         mismatches
             .iter()
@@ -1304,6 +1305,7 @@ fn the_small_tier_judged_in_a_gpu_run_and_in_a_cpu_run_gives_the_same_words_on_e
 }
 
 /// 上一条的判别力：往 GPU 那一侧塞一个已知故障（每张表第一个状态的第一条不变量违例位翻过来），GPU 那一趟的对拍字与 CPU 那一趟不同。
+/// 两边同上一条一样整份比：不塞故障时两趟整份相同（上一条），塞了这条不绿，证得出上一条的比较抓得到 GPU 那一侧的错。
 #[cfg(feature = "gpu")]
 #[test]
 fn a_fault_put_on_the_gpu_side_of_the_small_tier_makes_the_gpu_run_differ_from_the_cpu_run() {
@@ -1322,6 +1324,6 @@ fn a_fault_put_on_the_gpu_side_of_the_small_tier_makes_the_gpu_run_differ_from_t
     );
     assert_ne!(
         gpu_judged.words_by_table, cpu_judged.words_by_table,
-        "GPU 那一侧塞了故障，两趟的对拍字却相同"
+        "GPU 那一侧塞了故障，两趟的对拍字却整份相同"
     );
 }

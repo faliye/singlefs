@@ -6,16 +6,20 @@
 //! 下一步只由「现行那一版这个文件还剩几个数据单元」与批大小定（[`next_unlink_step`]），不看这一串是从哪一步续上的：
 //! 会话里的队列每次从现行那一版读、不缓存（第 6 条），续做与不崩溃一路做下来的计划因此逐步相同（第 7 条 ①「计划相等」）。
 
+use std::collections::BTreeSet;
+
 use singlefs_format::EXTENT_TREE_LOWER_LEAF_DATA_UNITS;
 
 use crate::container_tree::{ContainerTreeCapacities, ContainerTreeNodeEntries};
-use crate::extent_tree::{lower_segment_nodes_of_a_file_without_holes, upper_path_of_inode};
+use crate::extent_tree::lower_segment_nodes_of_a_file_without_holes;
 use crate::extent_tree::{ExtentLowerNodePosition, ExtentTreeVersion};
 use crate::lineage_tree::LineageContainerCapacity;
+use crate::pointer::NodePointer;
 use crate::retirement_tree::RetirementContainerCapacity;
 use crate::tombstone_tree::TombstoneContainerCapacity;
 use crate::transaction::{
-    role_of_extent_upper_node, ExtentTreeNodeOrigin, ExtentTreePlan, TransactionUnit,
+    extent_tree_plan_with_the_unified_upper_segment, ExtentTreeNodeOrigin, ExtentTreePlan,
+    FIRST_INODE_NUMBER,
 };
 use crate::unit::data_unit_payload_capacity;
 
@@ -102,6 +106,17 @@ impl UnlinkBatchSize {
     }
 }
 
+/// 删快照的一批放几条 deadlist 条目（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S4：批大小 K = 144、测试开关压小，
+/// 「`DeletionSwitches` 旁」）：与 unlink 每批的数据单元数共用同一个开关（[`UnlinkBatchSize`]），产品 144、压小时取压的那个数——
+/// 删快照照 unlink 的过程做（第七节岔路 4），两件事的批同一个大小，开关不另立一个。
+///
+/// # Panics
+/// 批大小装不进 `usize`：产品 144、压小的至多 144。
+#[must_use]
+pub fn deadlist_entries_per_snapshot_destruction_batch(batch_size: UnlinkBatchSize) -> usize {
+    usize::try_from(batch_size.data_units_per_batch()).expect("批大小至多 144")
+}
+
 /// unlink 意图之后的一步（D8（核心索引结构） 已定项 16 第 2 条）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnlinkStep {
@@ -134,21 +149,45 @@ pub fn next_unlink_step(data_units_remaining: u64, batch_size: UnlinkBatchSize) 
     }
 }
 
-/// 删除的一批（[`UnlinkStep::Batch`]）之后 inode `inode` 那棵 extent 树：下段截到前 `data_units_kept` 个单元——
-/// 罩的单元全在留下那一段里的节点一个字节都不变、照抄；罩着被截掉那一段的，在新下段里只剩每层最右那一个（被截掉那一片下段叶与它的祖先），
-/// 它们重写；整个落在被截掉那一段里的节点不再出现、换下（K-R3-1：删除批只重写被截掉那一片下段叶与它的祖先）。
-/// 只剩一个单元时不建下段（内联，同写路径）。上段：这个文件那片叶到根那一串重写（上段叶条目里下段根的指针或内联指针变了），上段别的照抄，
-/// 上段根的层级不变（这一批不改 inode 号的集合）。
+/// 删除的一批（[`UnlinkStep::Batch`]）之后一个文件的下段（第一个文件与第一个文件之外的文件共用，判决
+/// `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1）：`nodes` 是这一版的节点与来历（bump 次序），
+/// `previous_nodes_rewritten` 是上一版里这次重写的那几个（有同名后继：被截掉那一片叶与它的祖先），`previous_nodes_dropped` 是上一版里
+/// 不再出现的那几个（没有同名后继：整个落在被截掉那一段里的），都按上一版的 bump 次序。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LowerSegmentAfterADeletionBatch {
+    pub nodes: Vec<(ExtentLowerNodePosition, ExtentTreeNodeOrigin)>,
+    pub previous_nodes_rewritten: Vec<ExtentLowerNodePosition>,
+    pub previous_nodes_dropped: Vec<ExtentLowerNodePosition>,
+}
+
+impl LowerSegmentAfterADeletionBatch {
+    /// 上一版里被这次换下的全部下段节点（重写的与不再出现的），按上一版的 bump 次序。
+    #[must_use]
+    pub fn previous_nodes_replaced(&self) -> Vec<ExtentLowerNodePosition> {
+        let mut replaced: Vec<ExtentLowerNodePosition> = self
+            .previous_nodes_rewritten
+            .iter()
+            .chain(&self.previous_nodes_dropped)
+            .copied()
+            .collect();
+        replaced.sort_unstable();
+        replaced
+    }
+}
+
+/// 删除的一批之后一个文件的下段：截到前 `data_units_kept` 个单元——罩的单元全在留下那一段里的节点一个字节都不变、照抄；罩着被截掉那一段的，
+/// 在新下段里只剩每层最右那一个（被截掉那一片下段叶与它的祖先），它们重写；整个落在被截掉那一段里的节点不再出现、换下
+/// （K-R3-1：删除批只重写被截掉那一片下段叶与它的祖先）。只剩一个单元时不建下段（内联，同写路径）。`previous_lower_nodes` 是这个文件
+/// 上一版下段的节点（bump 次序）。
 ///
 /// # Panics
 /// `data_units_kept` 是 0、或不少于 `data_units_before_the_batch`：0 是最后一批，那一步不走这里；不少于说明这一批什么都没截。
 #[must_use]
-pub fn plan_the_extent_tree_after_a_deletion_batch(
-    previous: &ExtentTreeVersion,
-    inode: u64,
+pub fn plan_the_lower_segment_after_a_deletion_batch(
+    previous_lower_nodes: &[(ExtentLowerNodePosition, NodePointer)],
     data_units_before_the_batch: u64,
     data_units_kept: u64,
-) -> ExtentTreePlan {
+) -> LowerSegmentAfterADeletionBatch {
     assert!(
         (1..data_units_before_the_batch).contains(&data_units_kept),
         "删除的一批留下至少一个单元、至少截掉一个（留下 0 个是最后一批）"
@@ -163,7 +202,9 @@ pub fn plan_the_extent_tree_after_a_deletion_batch(
             .map(|position| {
                 if is_entirely_kept(&position) {
                     assert!(
-                        previous.lower_pointer_of(position).is_some(),
+                        previous_lower_nodes
+                            .iter()
+                            .any(|(previous_position, _)| *previous_position == position),
                         "罩的单元全在留下那一段里的节点，上一版（单元更多）同一个位置上必有"
                     );
                     (
@@ -175,80 +216,125 @@ pub fn plan_the_extent_tree_after_a_deletion_batch(
                 }
             })
             .collect();
-    let upper_root_level = previous.upper_root().level;
-    let path_of_the_file = upper_path_of_inode(inode, upper_root_level);
-    let upper_nodes = previous
-        .upper_nodes
-        .iter()
-        .map(|(position, _)| {
-            let origin = if path_of_the_file.contains(position) {
-                ExtentTreeNodeOrigin::RewrittenThisPublish
-            } else {
-                ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
-            };
-            (*position, origin)
-        })
-        .collect();
     let carried_lower: Vec<ExtentLowerNodePosition> = lower_nodes
         .iter()
         .filter(|(_, origin)| *origin == ExtentTreeNodeOrigin::CarriedFromThePreviousVersion)
         .map(|(position, _)| *position)
         .collect();
-    let replaced_previous_roles = previous
-        .lower_nodes
+    let (previous_nodes_rewritten, previous_nodes_dropped): (
+        Vec<ExtentLowerNodePosition>,
+        Vec<ExtentLowerNodePosition>,
+    ) = previous_lower_nodes
         .iter()
         .filter(|(position, _)| !carried_lower.contains(position))
-        .map(|(position, _)| TransactionUnit::ExtentLowerNode(*position))
-        .chain(
-            previous
-                .upper_nodes
+        .map(|(position, _)| *position)
+        .partition(|position| {
+            lower_nodes
                 .iter()
-                .filter(|(position, _)| path_of_the_file.contains(position))
-                .map(|(position, _)| role_of_extent_upper_node(*position, upper_root_level)),
-        )
-        .collect();
-    ExtentTreePlan {
-        lower_nodes,
-        upper_nodes,
-        replaced_previous_roles,
+                .any(|(position_after_the_batch, _)| position_after_the_batch == position)
+        });
+    LowerSegmentAfterADeletionBatch {
+        nodes: lower_nodes,
+        previous_nodes_rewritten,
+        previous_nodes_dropped,
     }
 }
 
-/// 删 inode 1 的最后一批之后的 extent 树（D8（核心索引结构） 已定项 16 第 2、5 条）：下段整段换下、一个节点都不剩；上段那片根兼叶重写成
-/// 零条目根（key 区间照旧按位置规定）。第一版只有第一个文件在 extent 树里有条目、它在第 0 片叶里，上段因此只有根兼叶那一个节点。
+/// 删 `inode` 的一批（[`UnlinkStep::Batch`]）之后第一个文件那一份 extent 计划（D8（核心索引结构） 已定项 16 第 2 条，判决 m3-multi-file-unlink-r1
+/// 第三节 M1、M2）：`inode` 是第一个文件时它的下段按 [`plan_the_lower_segment_after_a_deletion_batch`] 截（`data_units_before_the_batch`、
+/// `data_units_kept` 是它的单元数），别的文件时第一个文件的下段整段照抄（那个文件自己的下段由发布路径按它上一版的下段截，进
+/// `transaction::FilesOtherThanTheFirstPlan`）。上段走统一计划：这一批不改有条目的 inode 号集合 `inodes_with_an_entry`（截完至少留一个单元），
+/// 条目变了的是 `inode`（上段叶条目里下段根的指针或内联指针变了），它那片叶到根那一串重写，别的照抄。
 ///
 /// # Panics
-/// 上一版上段不止根兼叶一个节点：那一版有别的 inode 的条目，第一版写不出来（只有第一个文件写数据）。
+/// `inode` 是第一个文件而 `data_units_kept` 不在 `1..data_units_before_the_batch` 里（[`plan_the_lower_segment_after_a_deletion_batch`]）。
 #[must_use]
-pub fn plan_the_extent_tree_after_the_final_batch_of_the_first_file(
+pub fn plan_the_extent_tree_after_a_deletion_batch(
     previous: &ExtentTreeVersion,
+    inodes_with_an_entry: &BTreeSet<u64>,
+    inode: u64,
+    data_units_before_the_batch: u64,
+    data_units_kept: u64,
 ) -> ExtentTreePlan {
-    let upper_root = previous.upper_root();
-    assert!(
-        upper_root.level == 0 && previous.upper_nodes.len() == 1,
-        "第一版只有第一个文件在 extent 树里有条目：上段只有根兼叶一个节点"
-    );
-    ExtentTreePlan {
-        lower_nodes: Vec::new(),
-        upper_nodes: vec![(upper_root, ExtentTreeNodeOrigin::RewrittenThisPublish)],
-        replaced_previous_roles: previous
-            .lower_nodes
-            .iter()
-            .map(|(position, _)| TransactionUnit::ExtentLowerNode(*position))
-            .chain(std::iter::once(role_of_extent_upper_node(
-                upper_root,
-                upper_root.level,
-            )))
-            .collect(),
-    }
+    let (first_file_lower_nodes, first_file_lower_nodes_replaced) = if inode == FIRST_INODE_NUMBER {
+        let lower = plan_the_lower_segment_after_a_deletion_batch(
+            &previous.lower_nodes,
+            data_units_before_the_batch,
+            data_units_kept,
+        );
+        let replaced = lower.previous_nodes_replaced();
+        (lower.nodes, replaced)
+    } else {
+        (lower_nodes_carried_whole(previous), Vec::new())
+    };
+    extent_tree_plan_with_the_unified_upper_segment(
+        Some(previous),
+        first_file_lower_nodes,
+        first_file_lower_nodes_replaced,
+        inodes_with_an_entry,
+        &BTreeSet::from([inode]),
+    )
+}
+
+/// 删 `inode` 的最后一批（[`UnlinkStep::FinalBatch`]）之后第一个文件那一份 extent 计划（D8（核心索引结构） 已定项 16 第 2、5 条，判决
+/// m3-multi-file-unlink-r1 第三节 M1、M3）：`inode` 是第一个文件时它的下段整段换下、一个节点都不剩，别的文件时第一个文件的下段整段照抄
+/// （那个文件的数据单元与下段由发布路径点名换下）。上段走统一计划：`inode` 出了有条目的号集合（`inodes_with_an_entry_before` 是上一版的；
+/// 它不在里面时——没有数据单元的 inode——集合不变、上段整段照抄），它的条目去掉、不写标签 0（D8（核心索引结构） 已定项 14），
+/// 集合空了是层级 0 的零条目根兼叶，上段跟着降层（上一版里降后层级的第 0 个节点照抄成根，旧根与脊线上方摘掉的节点换下）。
+#[must_use]
+pub fn plan_the_extent_tree_after_the_final_batch(
+    previous: &ExtentTreeVersion,
+    inodes_with_an_entry_before: &BTreeSet<u64>,
+    inode: u64,
+) -> ExtentTreePlan {
+    let (first_file_lower_nodes, first_file_lower_nodes_replaced) = if inode == FIRST_INODE_NUMBER {
+        (
+            Vec::new(),
+            previous
+                .lower_nodes
+                .iter()
+                .map(|(position, _)| *position)
+                .collect(),
+        )
+    } else {
+        (lower_nodes_carried_whole(previous), Vec::new())
+    };
+    let mut inodes_with_an_entry_after = inodes_with_an_entry_before.clone();
+    let inodes_whose_entry_changed = if inodes_with_an_entry_after.remove(&inode) {
+        BTreeSet::from([inode])
+    } else {
+        BTreeSet::new()
+    };
+    extent_tree_plan_with_the_unified_upper_segment(
+        Some(previous),
+        first_file_lower_nodes,
+        first_file_lower_nodes_replaced,
+        &inodes_with_an_entry_after,
+        &inodes_whose_entry_changed,
+    )
+}
+
+/// 第一个文件的下段整段照抄（删的不是它的那几步）。
+fn lower_nodes_carried_whole(
+    previous: &ExtentTreeVersion,
+) -> Vec<(ExtentLowerNodePosition, ExtentTreeNodeOrigin)> {
+    previous
+        .lower_nodes
+        .iter()
+        .map(|(position, _)| {
+            (
+                *position,
+                ExtentTreeNodeOrigin::CarriedFromThePreviousVersion,
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::extent_tree::ExtentUpperNodePosition;
-    use crate::pointer::NodePointer;
-    use crate::transaction::FIRST_INODE_NUMBER;
+    use crate::transaction::TransactionUnit;
 
     const PAYLOAD_IN_BYTES: u64 = 32634;
 
@@ -297,6 +383,32 @@ mod tests {
 
     fn lower(level: u8, index: u64) -> ExtentLowerNodePosition {
         ExtentLowerNodePosition { level, index }
+    }
+
+    fn upper(level: u8, index: u64) -> ExtentUpperNodePosition {
+        ExtentUpperNodePosition { level, index }
+    }
+
+    /// 只有第一个文件在 extent 树里有条目时有条目的 inode 号集合。
+    fn only_the_first_file() -> BTreeSet<u64> {
+        BTreeSet::from([FIRST_INODE_NUMBER])
+    }
+
+    /// 上段是 `upper_nodes` 这几个位置（bump 次序）、第一个文件下段是 `first_file_data_units` 个单元的 extent 树，指针取全 0。
+    fn extent_tree_with_the_upper_nodes(
+        upper_nodes: &[ExtentUpperNodePosition],
+        first_file_data_units: u64,
+    ) -> ExtentTreeVersion {
+        ExtentTreeVersion {
+            upper_nodes: upper_nodes
+                .iter()
+                .map(|position| (*position, NodePointer::empty_root()))
+                .collect(),
+            lower_nodes: lower_segment_nodes_of_a_file_without_holes(first_file_data_units)
+                .into_iter()
+                .map(|position| (position, NodePointer::empty_root()))
+                .collect(),
+        }
     }
 
     /// 产品批大小是一片下段叶的单元数 144；只供测试的开关至少 1、至多 144，两条分支各报自己的名字。
@@ -391,8 +503,13 @@ mod tests {
     #[test]
     fn a_deletion_batch_rewrites_only_the_cut_lower_leaf_and_its_ancestors() {
         let previous = extent_tree_of_a_file_without_holes(300);
-        let plan =
-            plan_the_extent_tree_after_a_deletion_batch(&previous, FIRST_INODE_NUMBER, 300, 200);
+        let plan = plan_the_extent_tree_after_a_deletion_batch(
+            &previous,
+            &only_the_first_file(),
+            FIRST_INODE_NUMBER,
+            300,
+            200,
+        );
         assert_eq!(
             plan.lower_nodes,
             vec![
@@ -429,8 +546,13 @@ mod tests {
     #[test]
     fn a_deletion_batch_cut_on_a_leaf_boundary_carries_the_kept_leaf_as_the_new_lower_root() {
         let previous = extent_tree_of_a_file_without_holes(300);
-        let plan =
-            plan_the_extent_tree_after_a_deletion_batch(&previous, FIRST_INODE_NUMBER, 300, 144);
+        let plan = plan_the_extent_tree_after_a_deletion_batch(
+            &previous,
+            &only_the_first_file(),
+            FIRST_INODE_NUMBER,
+            300,
+            144,
+        );
         assert_eq!(
             plan.lower_nodes,
             vec![(
@@ -454,7 +576,13 @@ mod tests {
     #[test]
     fn a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment() {
         let previous = extent_tree_of_a_file_without_holes(3);
-        let plan = plan_the_extent_tree_after_a_deletion_batch(&previous, FIRST_INODE_NUMBER, 3, 1);
+        let plan = plan_the_extent_tree_after_a_deletion_batch(
+            &previous,
+            &only_the_first_file(),
+            FIRST_INODE_NUMBER,
+            3,
+            1,
+        );
         assert!(plan.lower_nodes.is_empty(), "一个单元内联、不建下段");
         assert_eq!(plan.rewritten_roles(), vec![TransactionUnit::ExtentRoot]);
         assert_eq!(
@@ -464,5 +592,139 @@ mod tests {
                 TransactionUnit::ExtentRoot,
             ]
         );
+    }
+
+    /// 删第一个文件之外的 inode 500 的一批（判决 m3-multi-file-unlink-r1 第三节 M1）：第一个文件的下段整段照抄、一个都不换下，
+    /// 上段只重写罩着 500 的那一串（它那片叶 (0, 3) 与根 (1, 0)），第一个文件那片叶 (0, 0) 照抄；有条目的号集合不变、根层级不变。
+    #[test]
+    fn a_deletion_batch_of_another_inode_carries_the_first_file_and_rewrites_only_the_upper_path_of_that_inode(
+    ) {
+        let previous =
+            extent_tree_with_the_upper_nodes(&[upper(0, 0), upper(0, 3), upper(1, 0)], 3);
+        let plan = plan_the_extent_tree_after_a_deletion_batch(
+            &previous,
+            &BTreeSet::from([FIRST_INODE_NUMBER, 500]),
+            500,
+            300,
+            200,
+        );
+        assert!(
+            plan.lower_nodes
+                .iter()
+                .all(|(_, origin)| *origin == ExtentTreeNodeOrigin::CarriedFromThePreviousVersion),
+            "第一个文件的下段整段照抄"
+        );
+        assert_eq!(
+            plan.upper_nodes,
+            vec![
+                (
+                    upper(0, 0),
+                    ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
+                ),
+                (upper(0, 3), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (upper(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+            ]
+        );
+        assert_eq!(
+            plan.replaced_previous_roles,
+            vec![
+                TransactionUnit::ExtentUpperNodeBelowTheRoot(upper(0, 3)),
+                TransactionUnit::ExtentRoot,
+            ],
+            "只换下 500 那一串：第一个文件的下段与它那片叶都不换下"
+        );
+    }
+
+    /// 别的文件 500 还在时删第一个文件的最后一批（判决 m3-multi-file-unlink-r1 第三节 M3）：第一个文件的下段整段换下，上段去掉 inode 1、
+    /// 第 0 片叶不再出现（换下），根 (1, 0) 少了一个孩子、重写，500 那片叶照抄；根层级不降（500 要层级 1）。
+    #[test]
+    fn the_final_batch_of_the_first_file_beside_another_file_drops_the_leaf_of_inode_one_and_rewrites_the_root(
+    ) {
+        let previous =
+            extent_tree_with_the_upper_nodes(&[upper(0, 0), upper(0, 3), upper(1, 0)], 3);
+        let plan = plan_the_extent_tree_after_the_final_batch(
+            &previous,
+            &BTreeSet::from([FIRST_INODE_NUMBER, 500]),
+            FIRST_INODE_NUMBER,
+        );
+        assert!(plan.lower_nodes.is_empty(), "第一个文件的下段一个不剩");
+        assert_eq!(
+            plan.upper_nodes,
+            vec![
+                (
+                    upper(0, 3),
+                    ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
+                ),
+                (upper(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+            ]
+        );
+        assert_eq!(
+            plan.replaced_previous_roles,
+            vec![
+                TransactionUnit::ExtentLowerNode(lower(0, 0)),
+                TransactionUnit::ExtentUpperNodeBelowTheRoot(upper(0, 0)),
+                TransactionUnit::ExtentRoot,
+            ]
+        );
+    }
+
+    /// 第一个文件还在时删 inode 500 的最后一批：上段降层——上一版第 0 片叶 (0, 0) 照抄成根（它不罩 500，内容没变），500 那片叶与旧根换下，
+    /// 旧根按上一版的根层级点名（`ExtentRoot`），第 0 片叶这一版是根、上一版是根之下的节点。第一个文件的下段整段照抄。
+    #[test]
+    fn the_final_batch_of_another_file_lowers_the_upper_segment_and_carries_the_first_leaf_as_the_root(
+    ) {
+        let previous =
+            extent_tree_with_the_upper_nodes(&[upper(0, 0), upper(0, 3), upper(1, 0)], 3);
+        let plan = plan_the_extent_tree_after_the_final_batch(
+            &previous,
+            &BTreeSet::from([FIRST_INODE_NUMBER, 500]),
+            500,
+        );
+        assert_eq!(
+            plan.upper_nodes,
+            vec![(
+                upper(0, 0),
+                ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
+            )]
+        );
+        assert_eq!(
+            plan.upper_root_level(),
+            0,
+            "根层级降到罩得住 inode 1 的最低一层"
+        );
+        assert_eq!(
+            plan.replaced_previous_roles,
+            vec![
+                TransactionUnit::ExtentUpperNodeBelowTheRoot(upper(0, 3)),
+                TransactionUnit::ExtentRoot,
+            ]
+        );
+        assert!(
+            plan.rewritten_roles().is_empty(),
+            "降层那次一个上段节点都不重写"
+        );
+    }
+
+    /// 删一个没有数据单元的 inode（size 0，上段里没有它的条目）的最后一批：有条目的号集合不变，extent 树整棵照抄、一个都不换下。
+    #[test]
+    fn the_final_batch_of_an_inode_without_data_units_leaves_the_extent_tree_carried() {
+        let previous = extent_tree_of_a_file_without_holes(3);
+        let plan = plan_the_extent_tree_after_the_final_batch(&previous, &only_the_first_file(), 7);
+        assert!(plan.rewritten_roles().is_empty());
+        assert!(plan.replaced_previous_roles.is_empty());
+    }
+
+    /// 删除的一批截别的文件的下段（共用那一份）：300 截到 200 时上一版第 1 片叶与根重写（有同名后继），第 2 片叶不再出现（没有同名后继）。
+    #[test]
+    fn the_lower_segment_of_a_deletion_batch_splits_the_replaced_nodes_by_whether_they_have_a_successor(
+    ) {
+        let previous = extent_tree_of_a_file_without_holes(300);
+        let lower_segment =
+            plan_the_lower_segment_after_a_deletion_batch(&previous.lower_nodes, 300, 200);
+        assert_eq!(
+            lower_segment.previous_nodes_rewritten,
+            vec![lower(0, 1), lower(1, 0)]
+        );
+        assert_eq!(lower_segment.previous_nodes_dropped, vec![lower(0, 2)]);
     }
 }

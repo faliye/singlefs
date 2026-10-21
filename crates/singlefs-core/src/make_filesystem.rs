@@ -32,9 +32,10 @@ use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{region_length_in_bytes, region_start, ring_end, slot_offset, RootRingSlot};
 use crate::system_configuration::{
     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
-    SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
-    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
-    JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+    InodeRecordTruncationFieldsOfThePool, SystemConfiguration, SystemImmutableConfiguration,
+    SystemImmutableSizes, SystemMutableConfiguration, SystemRuntimeConfiguration,
+    SystemRuntimeQuantities, JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
+    ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
 };
 use crate::unit::{
     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
@@ -638,6 +639,9 @@ pub fn make_filesystem<Device: BlockDevice>(
                 sizes: parameters.geometry,
                 journal_ring_start_slot: JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION,
                 root_ring_base_slot: ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+                // mkfs 起就置上 incompat 位 2（用户 2026-10-17 定，判决 m4-trunc-r2 第六节）。
+                inode_record_truncation_fields:
+                    InodeRecordTruncationFieldsOfThePool::WRITTEN_BY_THIS_WRITER,
             },
             mutable: SystemMutableConfiguration,
             runtime: SystemRuntimeConfiguration,

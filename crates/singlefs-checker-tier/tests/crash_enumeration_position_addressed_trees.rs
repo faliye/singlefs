@@ -36,8 +36,8 @@ use common::{
 };
 use common_tree_split::TreeSplitPool;
 use singlefs_checker_tier::crash::{
-    crash_state_count_with_torn_in_place_overwrites, CrashPointReplaySegmentExpansion,
-    CrashPointReplayTally,
+    crash_state_count_with_torn_in_place_overwrites, full_expansion,
+    CrashPointReplaySegmentExpansion, CrashPointReplayTally,
 };
 use singlefs_checker_tier::crash_state_enumeration::{
     enumerate_crash_states_selecting_versions, CrashPointReplayItem,
@@ -123,6 +123,29 @@ impl PositionAddressedStream {
         PositionAddressedStream::AllocationRecordTreeTwoLeavesPerDevice,
         PositionAddressedStream::VersionWithoutFileRowPublishWithItsOwnTree,
     ];
+
+    /// 全量那条每条流打的计数行的前缀（C564 ①）：一条用例几条流，门禁 checker-tier-crash-point-replay 的 `count-line=` 要每个前缀恰好一行，
+    /// 所以一条流一个前缀，不共用 `CRASH_POINT_REPLAY_POSITION_ADDRESSED`（那一行每条流都打、快档与全量都打，只给人看）。
+    /// 第三条不在全量里，它的前缀不会打出来、不登记。
+    fn full_enumeration_count_line_prefix(self) -> &'static str {
+        match self {
+            PositionAddressedStream::ExtentInlineToLowerSegment => {
+                "CRASH_POINT_REPLAY_POSITION_ADDRESSED_EXTENT_INLINE_TO_LOWER_SEGMENT"
+            }
+            PositionAddressedStream::ExtentLowerSegmentBackToInline => {
+                "CRASH_POINT_REPLAY_POSITION_ADDRESSED_EXTENT_LOWER_SEGMENT_BACK_TO_INLINE"
+            }
+            PositionAddressedStream::ExtentLowerSegmentGrowsToTwoLevels => {
+                "CRASH_POINT_REPLAY_POSITION_ADDRESSED_EXTENT_LOWER_SEGMENT_GROWS_TO_TWO_LEVELS"
+            }
+            PositionAddressedStream::AllocationRecordTreeTwoLeavesPerDevice => {
+                "CRASH_POINT_REPLAY_POSITION_ADDRESSED_ALLOCATION_RECORD_TREE_TWO_LEAVES_PER_DEVICE"
+            }
+            PositionAddressedStream::VersionWithoutFileRowPublishWithItsOwnTree => {
+                "CRASH_POINT_REPLAY_POSITION_ADDRESSED_VERSION_WITHOUT_FILE_ROW_PUBLISH_WITH_ITS_OWN_TREE"
+            }
+        }
+    }
 }
 
 struct PreparedStream {
@@ -429,11 +452,12 @@ fn closed_form_of_every_segment_for_the_count_line(segments: &[Vec<usize>]) -> S
 /// 枚举一条流：`expand` 为真的段展开（每次写各取它的几态、任意组合，系统配置槽写是原地覆写、取三态），
 /// 别的段只以整段持久进入后面的状态。
 /// 只录那一趟（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）流写进判定库就交回 `None`，不判。
+/// 判了的连同录好的那条流一起交回（全量那条要按它算每一段都展开时的闭式）。
 fn enumerate(
     stream: PositionAddressedStream,
     item_label: &str,
     expand: &dyn Fn(usize, &[usize]) -> bool,
-) -> Option<CrashPointReplayTally> {
+) -> Option<(CrashPointReplayTally, PreparedStream)> {
     let prepared = prepare(stream);
     let item_name = format!("position_addressed::{stream:?}::{item_label}");
     let tally = enumerate_crash_states_selecting_versions(
@@ -476,7 +500,7 @@ fn enumerate(
         tally.checker_counts_by_invariant()
     );
     assert_clean(stream, &tally);
-    Some(tally)
+    Some((tally, prepared))
 }
 
 /// 平时跑的那一份：每条流写数不到 10 的段全展开（记录段、根槽、系统配置槽轮换，第五条的取号与暖机那几段），
@@ -484,9 +508,11 @@ fn enumerate(
 #[test]
 fn every_position_addressed_tree_stream_recovers_cleanly_in_every_state_of_its_small_segments() {
     for stream in PositionAddressedStream::ALL {
-        let Some(tally) = enumerate(stream, "small_segments", &|_segment_index, segment| {
-            segment.len() < 10
-        }) else {
+        let Some((tally, _prepared)) =
+            enumerate(stream, "small_segments", &|_segment_index, segment| {
+                segment.len() < 10
+            })
+        else {
             continue;
         };
         assert!(tally.states > 1, "{stream:?}：至少展开了一段");
@@ -495,13 +521,44 @@ fn every_position_addressed_tree_stream_recovers_cleanly_in_every_state_of_its_s
 
 /// 全量：单元写段的全部子集也展开（分配记录树那一条单元写段约 2 × 14 写，状态数上亿级；两条 extent 流约 2 × 10 写）。
 /// 第三条（145 个数据单元）不在里面：单元写段约 300 写、记录段 290 写，全量枚举不出来——那一格要按段内取样，条款与装置都没有，交回里写明。
+/// 每条流判完打一行计数行（前缀 `full_enumeration_count_line_prefix`，一条流一个，C564 ①）：状态数等于每一段都展开时按崩溃点重放口径另算的闭式
+/// （原地覆写取三态）就带 `exhaustive=true`；登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:position-addressed-tree-streams`），
+/// 四个前缀各登记一条 `count-line=`、`exhaustive=`、`threads=`。
 #[test]
 #[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 在 release 下跑，提交时的快档只核它的全绿标记"]
 fn full_enumeration_of_every_enumerable_position_addressed_tree_stream_is_exhaustive_and_clean() {
     for stream in PositionAddressedStream::ENUMERABLE_IN_FULL {
-        let Some(tally) = enumerate(stream, "full", &|_segment_index, _segment| true) else {
+        let Some((tally, prepared)) = enumerate(stream, "full", &|_segment_index, _segment| true)
+        else {
             continue;
         };
+        let closed_form = crash_state_count_with_torn_in_place_overwrites(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            &full_expansion,
+        );
+        // 门禁 checker-tier-crash-point-replay 只认行首 `<这条流的前缀> ` 与 `exhaustive=true`，线程按 states= 找
+        // CRASH_POINT_REPLAY_PARALLEL_FINISHED 那一行判（状态数相同的几条流判到的是其中第一行，同一个进程、同一套线程配置）；整行原样报出来。
+        println!(
+            "{} states={} closed_form={closed_form} exhaustive={} violations={} ignored_violations={} failed={} root_persisted_states={} journal_differing_states={} record_root_without_record={} record_claimed_state_missing_unit={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+            stream.full_enumeration_count_line_prefix(),
+            tally.states,
+            tally.states == closed_form,
+            tally.violations,
+            tally.ignored_violations,
+            tally.failed_states,
+            tally.root_persisted_states,
+            tally.journal_differing_states,
+            tally.record_root_without_record,
+            tally.record_claimed_state_missing_unit,
+            tally.states_by_publish_text(),
+            tally.checker_counts_by_invariant()
+        );
+        assert_eq!(
+            tally.states, closed_form,
+            "{stream:?}：每一段都展开，枚举到的状态数要等于闭式（每段 3^m · 2^(n−m) − 1 之和再加 1）"
+        );
         assert!(tally.states > 1, "{stream:?}");
     }
 }

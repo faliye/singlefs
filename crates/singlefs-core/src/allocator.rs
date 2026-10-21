@@ -20,8 +20,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use crate::admission::SpaceAdmission;
 use crate::bytes::ByteWriter;
+use crate::compaction_plan::CompactionSwitchesAndTheExcludedRegion;
 use crate::instance_table::InstanceTableRecords;
 use crate::journal::slot_after_the_journal_ring;
+use crate::logged_operations::CompactionRegion;
 use crate::root_record::RootRecord;
 use crate::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
 use crate::transaction::FrozenPublish;
@@ -248,8 +250,15 @@ pub struct DeviceFreeMap {
     unit_area_slots: u64,
     /// 每个 16 KiB 槽一位：true = 已分配。
     allocated: Vec<bool>,
-    /// 每个 64 槽聚簇段里已分配的槽数（增量维护全空段数用）。
+    /// 每个 64 槽聚簇段里分配位置着的槽数（仍分配的与已释放、还在 defer 窗口里的都算）：开段、discard 判整段可再分配用。
     used_per_segment: Vec<u64>,
+    /// 每个 64 槽聚簇段里罩在未释放分配记录下的槽数：仍分配的算，已释放、还在 defer 窗口里的不算（D3（空间分配） 已定项 10 ① 的
+    /// 记录口径，C372（全空聚簇段数两份定义相反））。与 `used_per_segment` 只差 defer 里的那几槽。分配与复活时加、释放时减，
+    /// 回收不动（回收的本来就是已释放的）。
+    unreleased_per_segment: Vec<u64>,
+    /// 单元区里凑满 64 槽的整段中 `unreleased_per_segment` 为 0 的段数：记账第 11 项「全空聚簇段数」（[`Self::empty_segments`]），
+    /// 随 `unreleased_per_segment` 每变一次增量维护，不扫段（`.claude/rules/fs-design.md`「记账是事务的副产品」：合取 7 在准入路径上读它）。
+    full_segments_without_an_unreleased_record: u64,
     /// 空闲槽的连续段数（增量维护）。
     free_runs: u64,
     /// 占着的槽数：仍分配的加上已释放、还在 defer 窗口里的——它们仍被根环里的有效根引用、仍占着空间
@@ -283,6 +292,18 @@ pub struct DeviceFreeMap {
     unblocked_slot_pairs_per_segment: Vec<u64>,
     /// 上一项全部段之和。
     unblocked_slot_pairs: u64,
+    /// 回收过槽、还没发过 discard 的段（段号）：回收那一刻记（[`Self::mark_reclaimed`]），发布返回之后整段可再分配时发 discard 并摘掉
+    /// （判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G5；[`Self::take_the_segments_to_discard`]）。只住内存。
+    segments_reclaimed_not_yet_discarded: BTreeSet<usize>,
+}
+
+/// 一段槽进出未释放分配记录的方向（[`DeviceFreeMap::empty_segments`] 的记录口径按它增量维护）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnreleasedRecordTransition {
+    /// 分配，或管理员回退把 defer 里的已释放记录复活成已分配。
+    SlotsComeUnderAnUnreleasedRecord,
+    /// 释放：记录改写成已释放、槽进 defer 队列。
+    SlotsLeaveTheirUnreleasedRecord,
 }
 
 /// 挡住一个槽的三种位（[`DeviceFreeMap`] 的三张位图）：一个都没置的槽才发得出去。
@@ -386,6 +407,8 @@ impl DeviceFreeMap {
             unit_area_slots,
             allocated: vec![false; usize::try_from(unit_area_slots).expect("单元区槽数")],
             used_per_segment: vec![0; usize::try_from(segments).expect("段数")],
+            unreleased_per_segment: vec![0; usize::try_from(segments).expect("段数")],
+            full_segments_without_an_unreleased_record: unit_area_slots / CLUSTER_SEGMENT_SLOTS,
             free_runs: u64::from(unit_area_slots > 0),
             allocated_slots: 0,
             free_slots: unit_area_slots,
@@ -402,6 +425,7 @@ impl DeviceFreeMap {
             unblocked_slots: unit_area_slots,
             unblocked_slot_pairs: unblocked_slot_pairs_per_segment.iter().sum(),
             unblocked_slot_pairs_per_segment,
+            segments_reclaimed_not_yet_discarded: BTreeSet::new(),
         }
     }
 
@@ -547,13 +571,50 @@ impl DeviceFreeMap {
         self.deferred_slots
     }
 
-    /// 把一个仍分配的落点放进 defer 队列：槽仍占着（分配器不许再发它），只是记账上从「仍分配」挪到「待释放」。
+    /// 位图下标 `[start, end)` 的槽进出未释放分配记录：逐槽改 `unreleased_per_segment`，一段的数在 0 与非 0 之间翻过去、
+    /// 那一段又是凑满 64 槽的整段时，记录口径的全空整段数跟着减一或加一（[`Self::empty_segments`]）。
+    fn note_slots_under_an_unreleased_record(
+        &mut self,
+        start: usize,
+        end: usize,
+        transition: UnreleasedRecordTransition,
+    ) {
+        let slots_per_segment = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+        for index in start..end {
+            let segment = index / slots_per_segment;
+            let is_a_full_segment = (segment + 1) * slots_per_segment <= self.allocated.len();
+            match transition {
+                UnreleasedRecordTransition::SlotsComeUnderAnUnreleasedRecord => {
+                    if self.unreleased_per_segment[segment] == 0 && is_a_full_segment {
+                        self.full_segments_without_an_unreleased_record -= 1;
+                    }
+                    self.unreleased_per_segment[segment] += 1;
+                }
+                UnreleasedRecordTransition::SlotsLeaveTheirUnreleasedRecord => {
+                    self.unreleased_per_segment[segment] = self.unreleased_per_segment[segment]
+                        .checked_sub(1)
+                        .expect("释放的槽此前罩在未释放的记录下：mark_released 先断言过这些槽分配位置着，分配与复活都给它们加过");
+                    if self.unreleased_per_segment[segment] == 0 && is_a_full_segment {
+                        self.full_segments_without_an_unreleased_record += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /// 把一个仍分配的落点放进 defer 队列：槽仍占着（分配器不许再发它），只是记账上从「仍分配」挪到「待释放」；
+    /// 记录改写成已释放，按记录口径它的槽从此不罩在未释放的记录下（[`Self::empty_segments`]）。
     pub fn mark_released(&mut self, slot: SlotNumber, span: u64) {
         let start = self.index(slot);
         let end = start + usize::try_from(span).expect("跨度");
         assert!(
             self.allocated[start..end].iter().all(|taken| *taken),
             "释放的跨度里有没分配的槽"
+        );
+        self.note_slots_under_an_unreleased_record(
+            start,
+            end,
+            UnreleasedRecordTransition::SlotsLeaveTheirUnreleasedRecord,
         );
         self.deferred_slots += span;
     }
@@ -570,6 +631,11 @@ impl DeviceFreeMap {
             .deferred_slots
             .checked_sub(span)
             .expect("复活的落点在 defer 里，defer 槽数不小于它的跨度");
+        self.note_slots_under_an_unreleased_record(
+            start,
+            end,
+            UnreleasedRecordTransition::SlotsComeUnderAnUnreleasedRecord,
+        );
     }
 
     /// 隔离一个只被被抛弃根引用的落点：不进已分配、不进 defer、不动空闲计数，只让分配器绕开它（用户数据落点与开放段都不落在它上面）。
@@ -718,25 +784,67 @@ impl DeviceFreeMap {
             self.set_blocking_bit(index, SlotBlockingBit::Allocated, false);
             let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
             self.used_per_segment[segment] -= 1;
+            self.segments_reclaimed_not_yet_discarded.insert(segment);
         }
         self.allocated_slots -= span;
         self.deferred_slots -= span;
         self.free_slots += span;
     }
 
+    /// 段号 → 段起点的槽号。
+    fn segment_start_slot(&self, segment_index: usize) -> SlotNumber {
+        SlotNumber(
+            self.unit_area_start.slot().0
+                + u64::try_from(segment_index).expect("段号") * CLUSTER_SEGMENT_SLOTS,
+        )
+    }
+
+    /// 这一段是不是整段都可再分配（判决 G5「可再分配」谓词逐槽为真）：没有已分配（仍分配与 defer 窗口里的都算占着）、没有影子账隔离、
+    /// 没有抬 F 扣住（扣住 = F 还没在每块盘上生效）。单元区末尾凑不满 64 槽的那一截不是整段。
+    #[must_use]
+    pub fn segment_is_reusable_as_a_whole(&self, segment_index: usize) -> bool {
+        let per_segment = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+        let is_a_full_segment = (segment_index + 1) * per_segment <= self.allocated.len();
+        is_a_full_segment
+            && self.used_per_segment[segment_index] == 0
+            && self.isolated_per_segment[segment_index] == 0
+            && self.held_per_segment[segment_index] == 0
+    }
+
+    /// 发布返回之后要发 discard 的段起点（判决 G5：可再分配谓词为真的槽按 64 槽对齐的整段发）：回收过槽、还没发过的段里，
+    /// 整段可再分配的交出去并摘掉；段里又有槽被分配了的也摘掉（之后再回收会重新记上）；只差扣住或隔离的留着，等它们放开。
+    /// 只看回收时记下的段，不扫单元区（`.claude/rules/fs-design.md`「记账是事务的副产品」：discard 不在决策路径上，也不为它遍历）。
+    pub fn take_the_segments_to_discard(&mut self) -> Vec<SlotNumber> {
+        let noted: Vec<usize> = self
+            .segments_reclaimed_not_yet_discarded
+            .iter()
+            .copied()
+            .collect();
+        let mut segments_to_discard = Vec::new();
+        for segment_index in noted {
+            if self.segment_is_reusable_as_a_whole(segment_index) {
+                segments_to_discard.push(self.segment_start_slot(segment_index));
+                self.segments_reclaimed_not_yet_discarded
+                    .remove(&segment_index);
+            } else if self.used_per_segment[segment_index] > 0 {
+                self.segments_reclaimed_not_yet_discarded
+                    .remove(&segment_index);
+            }
+        }
+        segments_to_discard
+    }
+
     #[must_use]
     pub fn free_runs(&self) -> u64 {
         self.free_runs
     }
+    /// 全空聚簇段数（记账第 11 项）：单元区里凑满 64 槽的整段中、段内 64 槽都没有未释放分配记录的段数（D3（空间分配） 已定项 10 ①、
+    /// D26（后台整理与放置回收） 已定项 1 第 1 条收口的记录口径，C372（全空聚簇段数两份定义相反））。defer 窗口里的已释放槽不算占用：
+    /// 一段里只剩 defer 槽时这里算它全空，[`Self::segment_is_empty`] 与开段（[`Self::lowest_empty_segment`]）照旧算它占着。
+    /// 隔离位与抬 F 扣住位不看（「可开聚簇段」是另一个量，C379）。增量维护，读一次 O(1)。
     #[must_use]
     pub fn empty_segments(&self) -> u64 {
-        u64::try_from(
-            self.used_per_segment
-                .iter()
-                .filter(|used| **used == 0)
-                .count(),
-        )
-        .expect("段数")
+        self.full_segments_without_an_unreleased_record
     }
 
     /// 段内是不是整段空闲。
@@ -771,6 +879,11 @@ impl DeviceFreeMap {
             let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
             self.used_per_segment[segment] += 1;
         }
+        self.note_slots_under_an_unreleased_record(
+            start,
+            end,
+            UnreleasedRecordTransition::SlotsComeUnderAnUnreleasedRecord,
+        );
         self.allocated_slots += span;
         self.free_slots -= span;
     }
@@ -782,6 +895,17 @@ impl DeviceFreeMap {
         &self,
         cluster_segments: &BTreeSet<SlotNumber>,
     ) -> Option<SlotNumber> {
+        self.lowest_user_data_slot_outside_the_region(cluster_segments, None)
+    }
+
+    /// 同 [`Self::lowest_user_data_slot`]，另加一条合取「候选落点不在活整理意图的 `R` 里」（D3（空间分配） 已定项 7 登记表第 5 行、
+    /// D26（后台整理与放置回收） 已定项 1 第 3 条）。`excluded_region` 是 `None` 时与它相同。
+    #[must_use]
+    pub fn lowest_user_data_slot_outside_the_region(
+        &self,
+        cluster_segments: &BTreeSet<SlotNumber>,
+        excluded_region: Option<CompactionRegion>,
+    ) -> Option<SlotNumber> {
         // 起点在聚簇段边界上（`UnitAreaStart` 的不变量）⇒ 是偶数槽，按 2 槽步进的候选都 32768 对齐。
         let mut candidate = self.unit_area_start.slot().0;
         let end = self.unit_area_end_slot();
@@ -789,7 +913,10 @@ impl DeviceFreeMap {
             let inside_cluster_segment = cluster_segments.iter().any(|segment| {
                 candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS
             });
+            let inside_the_excluded_region =
+                excluded_region.is_some_and(|region| region.contains_slot(SlotNumber(candidate)));
             if !inside_cluster_segment
+                && !inside_the_excluded_region
                 && self.is_free(SlotNumber(candidate))
                 && self.is_free(SlotNumber(candidate + 1))
             {
@@ -803,6 +930,15 @@ impl DeviceFreeMap {
     /// 单元区内最低的 64 槽对齐全空段的起点。
     #[must_use]
     pub fn lowest_empty_segment(&self) -> Option<SlotNumber> {
+        self.lowest_empty_segment_outside_the_region(None)
+    }
+
+    /// 同 [`Self::lowest_empty_segment`]，活整理意图的 `R` 那一段不开（D26（后台整理与放置回收） 已定项 1 第 3 条）。
+    #[must_use]
+    pub fn lowest_empty_segment_outside_the_region(
+        &self,
+        excluded_region: Option<CompactionRegion>,
+    ) -> Option<SlotNumber> {
         let per_segment = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
         let full_segments = self.allocated.len() / per_segment;
         (0..full_segments)
@@ -810,6 +946,9 @@ impl DeviceFreeMap {
                 self.used_per_segment[*segment] == 0
                     && self.isolated_per_segment[*segment] == 0
                     && self.held_per_segment[*segment] == 0
+                    && !excluded_region.is_some_and(|region| {
+                        region.contains_slot(self.segment_start_slot(*segment))
+                    })
             })
             .map(|segment| {
                 SlotNumber(
@@ -827,11 +966,23 @@ impl DeviceFreeMap {
         &self,
         footprint: UnitFootprint,
     ) -> Option<SlotNumber> {
+        self.lowest_commit_generated_fallback_slot_outside_the_region(footprint, None)
+    }
+
+    /// 同 [`Self::lowest_commit_generated_fallback_slot`]，排除活整理意图的 `R`（D3（空间分配） 已定项 8 ②「同样排除 `R`」）。
+    #[must_use]
+    pub fn lowest_commit_generated_fallback_slot_outside_the_region(
+        &self,
+        footprint: UnitFootprint,
+        excluded_region: Option<CompactionRegion>,
+    ) -> Option<SlotNumber> {
         let unit_area_end = self.unit_area_end_slot();
         let mut candidate = self.unit_area_start.slot().0;
         while candidate + footprint.slots() <= unit_area_end {
-            let is_whole_span_unblocked = (candidate..candidate + footprint.slots())
-                .all(|slot| !self.is_blocked_for_commit_generated(SlotNumber(slot)));
+            let is_whole_span_unblocked = (candidate..candidate + footprint.slots()).all(|slot| {
+                !self.is_blocked_for_commit_generated(SlotNumber(slot))
+                    && !excluded_region.is_some_and(|region| region.contains_slot(SlotNumber(slot)))
+            });
             if is_whole_span_unblocked {
                 return Some(SlotNumber(candidate));
             }
@@ -846,12 +997,25 @@ impl DeviceFreeMap {
         &self,
         footprint: UnitFootprint,
     ) -> Option<CommitGeneratedDeviceAnswer> {
-        match self.lowest_empty_segment() {
+        self.commit_generated_answer_without_open_segment_outside_the_region(footprint, None)
+    }
+
+    /// 同 [`Self::commit_generated_answer_without_open_segment`]，开段与回落都排除活整理意图的 `R`。
+    #[must_use]
+    pub fn commit_generated_answer_without_open_segment_outside_the_region(
+        &self,
+        footprint: UnitFootprint,
+        excluded_region: Option<CompactionRegion>,
+    ) -> Option<CommitGeneratedDeviceAnswer> {
+        match self.lowest_empty_segment_outside_the_region(excluded_region) {
             Some(segment_start) => {
                 Some(CommitGeneratedDeviceAnswer::OpenEmptySegment(segment_start))
             }
             None => self
-                .lowest_commit_generated_fallback_slot(footprint)
+                .lowest_commit_generated_fallback_slot_outside_the_region(
+                    footprint,
+                    excluded_region,
+                )
                 .map(CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot),
         }
     }
@@ -1614,6 +1778,10 @@ pub struct PoolAllocator {
     /// 删除那几次发布的两个只供测试的开关（`unlink::DeletionSwitches`）。只住内存：`new` 与 `rebuild_from_records` 起步是产品值；
     /// 可写挂载按调用方给的装（`mount::mount_writable_with_test_only_switches_and_deletion_switches`），挂载续做与会话照它。
     deletion_switches: DeletionSwitches,
+    /// 整理在分配器这一侧的状态（`compaction_plan::CompactionSwitchesAndTheExcludedRegion`：只供测试的开关、活意图的 R 排他、
+    /// 发布路径隔离过还没交给会话的槽）。R 排他就是分配器的一条合取（D26（后台整理与放置回收） 已定项 1 第 3 条）；不合格段表、常驻隔离集与观测
+    /// 住会话（`compaction_plan::CompactionOfThisMount`）。`new` 与 `rebuild_from_records` 起步是产品值、没有活意图。
+    compaction: CompactionSwitchesAndTheExcludedRegion,
 }
 
 impl PoolAllocator {
@@ -1636,7 +1804,93 @@ impl PoolAllocator {
             instance_rows_after_this_mounts_row_publish: 0,
             space_admission: SpaceAdmission::JudgedByTheFormula,
             deletion_switches: DeletionSwitches::PRODUCT,
+            compaction: CompactionSwitchesAndTheExcludedRegion::of_a_new_mount(),
         }
+    }
+
+    /// 装上整理的只供测试的开关（`compaction_plan::CompactionSwitches`）。产品路径一处都不调它。
+    pub fn set_compaction_switches(
+        &mut self,
+        switches: crate::compaction_plan::CompactionSwitches,
+    ) {
+        self.compaction.switches = switches;
+    }
+
+    /// 整理在分配器这一侧的状态（开关、活意图的 R 排他、发布路径隔离过还没交给会话的槽）。
+    #[must_use]
+    pub fn compaction(&self) -> &CompactionSwitchesAndTheExcludedRegion {
+        &self.compaction
+    }
+
+    /// 同 [`Self::compaction`]，可改：会话签发、删、丢、暂停意图时装上与撤掉 R 排他，挂载按盘上的活意图装上，发布路径记隔离都经它。
+    pub fn compaction_mut(&mut self) -> &mut CompactionSwitchesAndTheExcludedRegion {
+        &mut self.compaction
+    }
+
+    /// 落点此刻要排除的 R（活整理意图且排他时；D3（空间分配） 已定项 7 登记表第 5 行）。
+    #[must_use]
+    pub fn region_excluded_from_placement(&self) -> Option<CompactionRegion> {
+        self.compaction.region_excluded_from_placement()
+    }
+
+    /// 只供测试的目的地政策（`compaction_plan::RelocationDestinationPolicy::LowestUnblockedSlotForEveryUnitForTests`）：每块盘取单元区里
+    /// 起点最小、整跨度没挡、不在活 R 里的落点，各盘一致才分配，记一条分配代为 `generation` 的记录。
+    ///
+    /// # Errors
+    /// 同 [`Self::try_allocate_commit_generated`]：拒绝时分配器一样都没动。
+    pub fn try_allocate_at_the_lowest_unblocked_slot_for_tests(
+        &mut self,
+        footprint: UnitFootprint,
+        generation: CheckpointTxg,
+    ) -> Result<Placement, PlacementRefusal> {
+        let excluded_region = self.region_excluded_from_placement();
+        let slot_per_device: Vec<(DeviceIdentity, Option<SlotNumber>)> = self
+            .devices
+            .iter()
+            .map(|device| {
+                (
+                    device.device,
+                    device.lowest_commit_generated_fallback_slot_outside_the_region(
+                        footprint,
+                        excluded_region,
+                    ),
+                )
+            })
+            .collect();
+        let slot = match agreement_across_devices(&slot_per_device) {
+            DeviceAgreement::Agreed(slot) => slot,
+            DeviceAgreement::NoAnswerOnAnyDevice => {
+                return Err(PlacementRefusal::NoFreeSlotOnAnyDevice);
+            }
+            DeviceAgreement::SomeDevicesWithoutAnswer(full_devices) => {
+                return Err(
+                    PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined { full_devices },
+                );
+            }
+            DeviceAgreement::AnswersDiffer(slot_per_device) => {
+                return Err(
+                    PlacementRefusal::UserDataSlotsDifferAcrossDevicesPerDeviceSlotsUnsupported {
+                        slot_per_device,
+                    },
+                );
+            }
+        };
+        let placement = Placement {
+            slot,
+            span: footprint.slots(),
+        };
+        self.record(placement, generation);
+        Ok(placement)
+    }
+
+    /// 发布返回之后每块盘要发 discard 的段起点（[`DeviceFreeMap::take_the_segments_to_discard`]）：按盘，每块盘自己的那几段。
+    pub fn take_the_segments_to_discard_on_every_device(
+        &mut self,
+    ) -> Vec<(DeviceIdentity, Vec<SlotNumber>)> {
+        self.devices
+            .iter_mut()
+            .map(|device_map| (device_map.device, device_map.take_the_segments_to_discard()))
+            .collect()
     }
 
     /// 装上删除那几次发布的只供测试的开关（`unlink::DeletionSwitches`）。产品路径一处都不调它。
@@ -1948,13 +2202,17 @@ impl PoolAllocator {
         generation: CheckpointTxg,
     ) -> Result<Placement, PlacementRefusal> {
         let cluster_segments = &self.cluster_segments;
+        let excluded_region = self.compaction.region_excluded_from_placement();
         let slot_per_device: Vec<(DeviceIdentity, Option<SlotNumber>)> = self
             .devices
             .iter()
             .map(|device| {
                 (
                     device.device,
-                    device.lowest_user_data_slot(cluster_segments),
+                    device.lowest_user_data_slot_outside_the_region(
+                        cluster_segments,
+                        excluded_region,
+                    ),
                 )
             })
             .collect();
@@ -2007,13 +2265,17 @@ impl PoolAllocator {
                 return Ok(self.record_bumped(slot, footprint, generation));
             }
         }
+        let excluded_region = self.compaction.region_excluded_from_placement();
         let answer_per_device: Vec<(DeviceIdentity, Option<CommitGeneratedDeviceAnswer>)> = self
             .devices
             .iter()
             .map(|device| {
                 (
                     device.device,
-                    device.commit_generated_answer_without_open_segment(footprint),
+                    device.commit_generated_answer_without_open_segment_outside_the_region(
+                        footprint,
+                        excluded_region,
+                    ),
                 )
             })
             .collect();
@@ -2851,6 +3113,68 @@ mod tests {
         );
         assert_eq!(pool.devices[0].empty_segments(), 3310);
         assert_eq!(pool.devices[1].free_runs(), 4, "两盘同构");
+    }
+
+    /// 全空聚簇段数按记录口径（D3（空间分配） 已定项 10 ①、D26（后台整理与放置回收） 已定项 1 第 1 条，C372（全空聚簇段数两份定义相反））：
+    /// 一段里只剩已释放、还在 defer 窗口里的槽时它算全空，而那几槽照旧占着（[`DeviceFreeMap::segment_is_empty`] 不收它）；
+    /// 复活把它减回去，回收不动这个数。单元区末尾凑不满 64 槽的那一截不是聚簇段：开头不数它，往里分配也不动这个数。
+    #[test]
+    fn a_segment_left_with_only_deferred_slots_counts_as_empty_by_the_records_while_its_slots_stay_occupied(
+    ) {
+        let full_segments = 3u64;
+        let slots_past_the_last_full_segment = 10u64;
+        let device_bytes = (UNIT_AREA_START_SLOT
+            + full_segments * CLUSTER_SEGMENT_SLOTS
+            + slots_past_the_last_full_segment)
+            * SLOT_BYTES;
+        let mut map = DeviceFreeMap::new(DeviceIdentity(0), device_bytes);
+        assert_eq!(
+            map.empty_segments(),
+            full_segments,
+            "末尾那 10 槽凑不满一段，不数"
+        );
+        let segment_index = 1usize;
+        let slot_in_the_segment =
+            SlotNumber(map.unit_area_start().slot().0 + CLUSTER_SEGMENT_SLOTS + 4);
+        map.mark_allocated(slot_in_the_segment, 2);
+        assert_eq!(
+            map.empty_segments(),
+            full_segments - 1,
+            "分配进第 1 段：那一段罩着未释放的记录"
+        );
+        map.mark_released(slot_in_the_segment, 2);
+        assert_eq!(
+            map.empty_segments(),
+            full_segments,
+            "释放之后第 1 段只剩 defer 槽：按记录口径全空"
+        );
+        assert!(
+            !map.segment_is_empty(segment_index),
+            "defer 槽仍占着：按占用第 1 段不空"
+        );
+        map.mark_resurrected_out_of_the_defer_queue(slot_in_the_segment, 2);
+        assert_eq!(
+            map.empty_segments(),
+            full_segments - 1,
+            "复活之后那条记录又是未释放的"
+        );
+        map.mark_released(slot_in_the_segment, 2);
+        map.mark_reclaimed(slot_in_the_segment, 2);
+        assert_eq!(
+            map.empty_segments(),
+            full_segments,
+            "回收的是已释放的记录，不动记录口径的数"
+        );
+        assert!(map.segment_is_empty(segment_index), "回收之后按占用也空了");
+        map.mark_allocated(
+            SlotNumber(map.unit_area_start().slot().0 + full_segments * CLUSTER_SEGMENT_SLOTS),
+            2,
+        );
+        assert_eq!(
+            map.empty_segments(),
+            full_segments,
+            "分配进末尾那一截不动全空聚簇段数"
+        );
     }
 
     #[test]

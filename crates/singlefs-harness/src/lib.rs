@@ -10,7 +10,8 @@ use std::rc::Rc;
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::block_device::{
-    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
+    BlockDevice, BlockDeviceError, DiscardOutcome, DiscardOutcomeCounts, PhysicalBlockSizeInBytes,
+    WriteDurability,
 };
 
 pub mod fault_injection;
@@ -38,12 +39,18 @@ pub enum RecordedOperationKind {
     /// 整段清零：一次 [`BlockDevice::write_zeroes_at`] 记成**一步**，不是底下拆出来的那几次写
     /// （用户 2026-09-19 定案「录制流登记成一种新步骤、崩溃点重放认它」）。内容由 `offset` 与 `length` 全定：整段全 0。
     WriteZeroes,
+    /// discard：一次 [`BlockDevice::discard_at`] 交回 [`DiscardOutcome::Applied`] 时记**一步**；交回「不支持」的不记
+    /// （那一段一个字节没动，与「录制器只录落下了的写」同一个口径），只记进 [`SharedStream::discard_outcome_counts`]。
+    /// 长度 0 的没有动作，不记一步也不计数（与后端同一口径，`singlefs_core::block_device::BlockDevice::discard_at` 的文档）。
+    /// 崩溃点重放按「范围写零」重建它（持久 → 0、没持久 → 旧字节），取几态照 D13（验证路线） 已定项 4（长于一个扇区、罩住的范围里
+    /// 原来有东西的多取第三态），切段时算一次普通写。内容由 `offset` 与 `length` 全定，不留字节。
+    Discard,
     Barrier,
 }
 
 impl RecordedOperationKind {
     /// 流文本（[`RecordedOperation::to_stream_line`] 的 `kind=`）与各导出装置结果行（`kind=`）里的种类名。新写的地方都调它，不再抄一份；
-    /// checker 档里还有四份装置各自手抄着同样四个名字（`src/bin/` 下 `e170_o3_spec_executor_export.rs`、`e171_three_oracle_collusion.rs`、
+    /// checker 档里还有四份装置各自手抄着同样五个名字（`src/bin/` 下 `e170_o3_spec_executor_export.rs`、`e171_three_oracle_collusion.rs`、
     /// `e171_three_oracle_collusion_after_the_oracle_fixes.rs`、`e142_new_pool_file_creation_write_dump_one_device.rs`；前三份另有一份
     /// 按名字反查种类的），没挪过来，改名时那四份要跟着改。
     #[must_use]
@@ -52,6 +59,7 @@ impl RecordedOperationKind {
             RecordedOperationKind::Write => "write",
             RecordedOperationKind::WriteForceUnitAccess => "write_fua",
             RecordedOperationKind::WriteZeroes => "write_zeroes",
+            RecordedOperationKind::Discard => "discard",
             RecordedOperationKind::Barrier => "barrier",
         }
     }
@@ -123,7 +131,7 @@ pub struct RetainedOperation {
 }
 
 impl RetainedOperation {
-    /// 这一步写到盘上的字节：普通写与 FUA 写是留下的内容（没开内容保留的流里是 `None`）；写清零按长度现铺 0
+    /// 这一步写到盘上的字节：普通写与 FUA 写是留下的内容（没开内容保留的流里是 `None`）；写清零与 discard 按长度现铺 0
     /// （录制器不为它留内容，整段全 0 由偏移与长度全定，见 [`RecordingBlockDevice`] 的 `write_zeroes_at`）；屏障没有字节，`None`。
     /// 写清零真的摆进内存：mkfs 那一次清 768 MiB，调用方只对窗口里的写调它。
     ///
@@ -142,6 +150,15 @@ impl RetainedOperation {
                         "写清零的长度装得进 usize：64 位目标上恒成立"
                     )
             ]),
+            // discard 按「范围写零」重建（持久那一态读回 0），与写清零一样不留内容、按长度铺 0。
+            RecordedOperationKind::Discard => Some(
+                std::iter::repeat_n(
+                    0u8,
+                    usize::try_from(self.operation.length)
+                        .expect("discard 的长度装得进 usize：64 位目标上恒成立"),
+                )
+                .collect(),
+            ),
             RecordedOperationKind::Barrier => None,
         }
     }
@@ -178,6 +195,8 @@ struct StreamState {
     contents: Vec<Option<Vec<u8>>>,
     retain_contents: bool,
     entry_spans: Vec<RecordedEntrySpan>,
+    /// 经这条流的录制器发下去的 discard 各交回了哪一种结局：「不支持」的不进流，只在这里看得见。
+    discard_outcome_counts: DiscardOutcomeCounts,
     /// `Some` 时记每一次读与每一次槽提示问到的段（[`SharedStream::retaining_contents_and_reads`]）。
     read_ranges: Option<Vec<RecordedReadRange>>,
 }
@@ -202,6 +221,7 @@ impl SharedStream {
             contents: Vec::new(),
             retain_contents: true,
             entry_spans: Vec::new(),
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
             read_ranges: None,
         })))
     }
@@ -214,6 +234,7 @@ impl SharedStream {
             contents: Vec::new(),
             retain_contents: true,
             entry_spans: Vec::new(),
+            discard_outcome_counts: DiscardOutcomeCounts::NONE,
             read_ranges: Some(Vec::new()),
         })))
     }
@@ -228,6 +249,16 @@ impl SharedStream {
     #[must_use]
     pub fn read_ranges(&self) -> Vec<RecordedReadRange> {
         self.0.borrow().read_ranges.clone().unwrap_or_default()
+    }
+
+    /// 经这条流的录制器发下去的 discard 各交回了哪一种结局（`.claude/rules/fs-design.md`「五条硬要求」第 4 条：分支可观测）。
+    #[must_use]
+    pub fn discard_outcome_counts(&self) -> DiscardOutcomeCounts {
+        self.0.borrow().discard_outcome_counts
+    }
+
+    fn note_discard_outcome(&self, outcome: DiscardOutcome) {
+        self.0.borrow_mut().discard_outcome_counts.note(outcome);
     }
 
     /// 调 `run`（驱动这条流的一方调一个入口），把它期间录下的操作记成 `entry` 发的一段（[`RecordedEntrySpan`]）。
@@ -454,6 +485,36 @@ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
             None,
         );
         Ok(())
+    }
+
+    /// 转给里面那块盘，交回它的结局。「交给了底层」的记成**一步**（`RecordedOperationKind::Discard`，内容不留、哈希按全 0 记：
+    /// 崩溃点重放按「范围写零」重建它）；「不支持」的那一段一个字节没动，不进流，只记进这条流的
+    /// [`SharedStream::discard_outcome_counts`]。报错的不记。长度 0 的照样转给里面那块盘（偏移对齐与越界由它核），
+    /// 核过了没有动作：不记一步、不计数，与后端同一口径（判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 S5）。
+    fn discard_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        let outcome = self.inner.discard_at(offset, length)?;
+        if length == 0 {
+            return Ok(outcome);
+        }
+        self.stream.note_discard_outcome(outcome);
+        match outcome {
+            DiscardOutcome::Applied => self.stream.push(
+                RecordedOperation {
+                    device: self.device,
+                    kind: RecordedOperationKind::Discard,
+                    offset,
+                    length,
+                    content_hash: fnv1a_64_of_zeros(length),
+                },
+                None,
+            ),
+            DiscardOutcome::Unsupported => {}
+        }
+        Ok(outcome)
     }
 
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {

@@ -19,9 +19,13 @@ use common::{build_pool, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_
 use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
 };
+use singlefs_core::admission::{
+    DeviceWithEmptyClusterSegmentsBelowTheFloor, EmptyClusterSegmentsBelowTheFloorOnSomeDevices,
+};
 use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
 use singlefs_core::allocator::{PlacementRefusal, PoolAllocator, UnitFootprint};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::compaction_plan::{CompactionSwitches, EmptyClusterSegmentsFloor};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
 use singlefs_core::mount::{
@@ -101,7 +105,58 @@ fn leave_no_empty_cluster_segment(allocator: &mut PoolAllocator) {
     }
 }
 
+/// 整理开关取产品值，只把合取 7 的 `N₀` 压成 0（判决 G6「强制合取 7 的 `N₀`」）：没有全空段的池上前台写入不被合取 7 拦，
+/// 摸得到回落那一支；产品值下同一形被合取 7 拒，钉在
+/// [`an_overwrite_on_a_pool_without_an_empty_cluster_segment_is_refused_by_the_empty_cluster_segments_floor_by_default`]。
+fn compaction_switches_with_the_empty_cluster_segments_floor_at_zero() -> CompactionSwitches {
+    let product = CompactionSwitches::PRODUCT;
+    CompactionSwitches {
+        batch_size: product.batch_size,
+        forced_region: product.forced_region,
+        run_forcing: product.run_forcing,
+        region_exclusion: product.region_exclusion,
+        destination_policy: product.destination_policy,
+        release_checksum_mismatch_after_issue: product.release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor: EmptyClusterSegmentsFloor::ForcedForTests(0),
+        relocation_publish_order: product.relocation_publish_order,
+    }
+}
+
+/// 产品值下（合取 7 的 `N₀` 是第一版的 1，D3（空间分配） 已定项 7 登记表第 7 行，只拦前台写入类发布）：新池新建文件 A 之后
+/// 每块盘上一个全空段都不剩，覆盖写被拒成合取 7 自己的成员，带着 `N₀` 与两块盘各 0 个全空段，在任何写之前（盘上逐项不变）。
+#[test]
+fn an_overwrite_on_a_pool_without_an_empty_cluster_segment_is_refused_by_the_empty_cluster_segments_floor_by_default(
+) {
+    let mut pool = build_pool("supplement-two-fallback-refused-by-the-floor");
+    leave_no_empty_cluster_segment(&mut pool.allocator);
+    let disk_before = common::disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let refused = try_overwrite_in_process(&mut pool, &content_of(4100, 3), InstanceGeneration(1));
+    let Err(PublishError::EmptyClusterSegmentsBelowTheFloor(below_the_floor)) = refused else {
+        panic!("产品值下没有全空段的池上覆盖写被合取 7 拒：{refused:?}");
+    };
+    assert_eq!(
+        below_the_floor,
+        EmptyClusterSegmentsBelowTheFloorOnSomeDevices {
+            floor_in_segments: 1,
+            short_devices: [DeviceIdentity(0), DeviceIdentity(1)]
+                .into_iter()
+                .map(|device| DeviceWithEmptyClusterSegmentsBelowTheFloor {
+                    device,
+                    empty_cluster_segments: 0,
+                })
+                .collect(),
+        },
+        "N₀ 是第一版的 1，两块盘都一个全空段不剩"
+    );
+    assert_eq!(
+        common::disk_snapshot(&pool.memory_pool(), &pool.stream),
+        disk_before,
+        "拒在任何写之前：盘上逐项不变"
+    );
+}
+
 /// C369 的验收：新池新建文件 A 之后开放段 [50240, 50304) 用满、别的段都不全空，覆盖写 B 要成功。
+/// 合取 7 的 `N₀` 压成 0，只测回落那一支（[`compaction_switches_with_the_empty_cluster_segments_floor_at_zero`]）。
 /// 回落政策函数在这张空闲图上给的落点（手算，不调分配器）：B 先释放 A 的十二个落点（进 defer、槽仍占着），数据单元不受段约束、
 /// 取 A 的 50180 之后最低的偶数空槽对 50182；extent 树根是第一个提交内生块，开放段装不下、没有全空段 ⇒ 回落到槽号最小的空槽 50179
 /// （mkfs 的 50176–50178 与 A 的数据单元之间那个从没分配过的洞）；inode 树叶容器两槽、起点 32768 对齐，50182–50183 刚给了数据单元 ⇒ 50184；
@@ -111,6 +166,9 @@ fn leave_no_empty_cluster_segment(allocator: &mut PoolAllocator) {
 fn publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_on_every_device() {
     let mut pool = build_pool("supplement-two-fallback-publish");
     leave_no_empty_cluster_segment(&mut pool.allocator);
+    pool.allocator.set_compaction_switches(
+        compaction_switches_with_the_empty_cluster_segments_floor_at_zero(),
+    );
     for device_map in &pool.allocator.devices {
         assert_eq!(
             device_map.lowest_empty_segment(),
@@ -248,7 +306,8 @@ fn recorded_writes_since(stream: &SharedStream, from: usize) -> WriteCallsAndByt
             RecordedOperationKind::Write
             | RecordedOperationKind::WriteForceUnitAccess
             | RecordedOperationKind::WriteZeroes => true,
-            RecordedOperationKind::Barrier => false,
+            // discard 不是一次写调用，写入口下面那一层的写数里没有它。
+            RecordedOperationKind::Discard | RecordedOperationKind::Barrier => false,
         })
         .fold(WriteCallsAndBytes::NONE, |sum, operation| {
             sum.plus(WriteCallsAndBytes {

@@ -1563,6 +1563,7 @@ fn operation_kind_name(kind: RecordedOperationKind) -> &'static str {
         RecordedOperationKind::Write => "write",
         RecordedOperationKind::WriteForceUnitAccess => "write_fua",
         RecordedOperationKind::WriteZeroes => "write_zeroes",
+        RecordedOperationKind::Discard => "discard",
         RecordedOperationKind::Barrier => "barrier",
     }
 }
@@ -2279,9 +2280,9 @@ fn operations_file_text_and_payload(stream: &PreparedStream) -> (String, Vec<u8>
                 payload.extend_from_slice(contents);
                 (start.to_string(), sha256_hexadecimal(contents))
             }
-            RecordedOperationKind::WriteZeroes | RecordedOperationKind::Barrier => {
-                ("-".to_string(), "-".to_string())
-            }
+            RecordedOperationKind::WriteZeroes
+            | RecordedOperationKind::Discard
+            | RecordedOperationKind::Barrier => ("-".to_string(), "-".to_string()),
         };
         operations_text.push_str(&format!(
             "{stream_index}\t{}\t{}\t{}\t{}\t{payload_start}\t{content_digest}\n",

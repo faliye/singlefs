@@ -192,6 +192,7 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
                 instance,
                 shadow_ledger: ShadowLedger::On,
                 parameters_and_device_table,
+                compaction: singlefs_core::compaction_plan::CompactionOfThisMount::of_a_new_mount(),
             }),
             write_time_seconds: FIRST_WRITE_TIME_SECONDS,
             content_of_the_current_version: first_content,

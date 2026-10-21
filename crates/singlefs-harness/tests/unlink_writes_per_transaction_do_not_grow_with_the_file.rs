@@ -17,11 +17,19 @@ use common::{
 };
 use singlefs_core::address::{InodeNumber, InstanceGeneration};
 use singlefs_core::admission::ring_window_on_one_device;
+use singlefs_core::extent_tree::{
+    lower_root_level_for, lower_segment_nodes_of_a_file_without_holes, lower_span_in_data_units,
+    ExtentLowerNodePosition, ExtentTreeVersion, ExtentUpperNodePosition,
+};
+use singlefs_core::pointer::NodePointer;
 use singlefs_core::transaction::{
-    publish_unlink_intent, publish_unlink_step, PoolWriter, TransactionOutput, FIRST_INODE_NUMBER,
+    publish_unlink_intent, publish_unlink_step, ExtentTreeNodeOrigin, PoolWriter,
+    TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
-use singlefs_core::unlink::{next_unlink_step, UnlinkBatchSize, UnlinkStep};
+use singlefs_core::unlink::{
+    next_unlink_step, plan_the_extent_tree_after_a_deletion_batch, UnlinkBatchSize, UnlinkStep,
+};
 use singlefs_format::{
     EXTENT_TREE_LOWER_LEAF_DATA_UNITS, JOURNAL_NAMED_ENTRIES_PER_RECORD, ROOT_RING_REGIONS,
     SLOT_BYTES,
@@ -333,6 +341,99 @@ const DATA_UNITS_REMAINING_JUDGED_WITHOUT_A_POOL: [u64; 7] =
 /// 判别力：每批取 max(144, ⌈剩下 ÷ 32⌉)（批数封顶 32，攻方 `research/prompts/m3-batch21-code-r1-opus-model/patches/c2cap32.patch`）时
 /// 剩下 4609 个单元那一点这一批换下 145 个，这一条红；那一刀在建池的 1 到 4608 个单元上与产品逐项相同，另两条照绿。
 /// 批数封顶在 N 而 N 小于 2⁴⁰ ÷ 144 的同一族都在 2⁴⁰ 那一点红。批大小不经这个函数、在发布路径另算的写法这一条碰不到，靠建池的那两条。
+/// 不建池时量下段第二层内部节点那一段的文件（D8（核心索引结构） 已定项 16 第 2 条；欠账 C2（无界操作做成单事务） 那一行
+/// 「建池取样点最大 4 608 个单元，到不了 extent 下段长出第二层内部节点（> 21 168 个单元）那一段」）：
+/// 21 313 个单元（第一批之后留 21 169 个，下段根仍在第二层）与 42 481 个单元（留 42 337 个，第二层根下三个第一层节点）。
+/// 21 168 = 一片下段叶 144 个单元 × 扇出 147。
+const DATA_UNITS_OF_FILES_PAST_THE_SECOND_LOWER_INTERNAL_LEVEL: [u64; 2] = [21_313, 42_481];
+
+/// 一个 `data_units` 个单元、没有洞的第一个文件那一版 extent 树：下段每个节点、上段只有根兼叶（第一版只有第一个文件有条目）。
+/// 删除一批的规划只看位置与上一版有没有这个节点（指针不读盘），指针一律取空根。
+fn extent_tree_of_the_first_file_without_holes(data_units: u64) -> ExtentTreeVersion {
+    ExtentTreeVersion {
+        upper_nodes: vec![(
+            ExtentUpperNodePosition { level: 0, index: 0 },
+            NodePointer::empty_root(),
+        )],
+        lower_nodes: lower_segment_nodes_of_a_file_without_holes(data_units)
+            .into_iter()
+            .map(|position| (position, NodePointer::empty_root()))
+            .collect(),
+    }
+}
+
+/// 下段长出第二层内部节点之后（> 21 168 个单元）删除的一批仍只重写被截掉那一片下段叶与它的祖先（K-R3-1，`unlink::plan_the_extent_tree_after_a_deletion_batch`
+/// 的文档）：不建池，照产品批大小取第一批（`next_unlink_step`），交给发布路径用的那一份规划，数这一批的 extent 树写。
+/// 每份文件：① 这一版重写的下段节点恰好每层一个、都是留下那一段每层最末那一个（3 个：叶、第一层、第二层根）；
+/// ② 上一版被换下的下段节点 4 个（被截的两片叶、第一层最末那一个、第二层根），加上段根兼叶；③ 上段只重写根兼叶。
+/// 建池那几条的文件最大 4 608 个单元，下段至多一层内部节点，这一段它们走不到（欠账 C2 那一行的材料）。
+/// 判别力：下段根在第二层时把第一层整层（连全在留下那一段里的）都重写，建池那几条逐项照绿（它们的下段没有第二层），这一条 ① ② 红。
+#[test]
+fn the_product_unlink_batch_rewrites_one_extent_lower_node_per_level_on_files_past_the_second_lower_internal_level(
+) {
+    for data_units_of_the_file in DATA_UNITS_OF_FILES_PAST_THE_SECOND_LOWER_INTERNAL_LEVEL {
+        let UnlinkStep::Batch {
+            data_units_kept, ..
+        } = next_unlink_step(data_units_of_the_file, UnlinkBatchSize::OneExtentLowerLeaf)
+        else {
+            panic!("{data_units_of_the_file} 个单元的文件第一步是一批，不是最后一批")
+        };
+        assert_eq!(
+            (
+                lower_root_level_for(data_units_of_the_file),
+                lower_root_level_for(data_units_kept)
+            ),
+            (2, 2),
+            "{data_units_of_the_file} 个单元的文件与这一批之后留下的 {data_units_kept} 个，下段根都在第二层"
+        );
+        let plan = plan_the_extent_tree_after_a_deletion_batch(
+            &extent_tree_of_the_first_file_without_holes(data_units_of_the_file),
+            &std::collections::BTreeSet::from([FIRST_INODE_NUMBER]),
+            FIRST_INODE_NUMBER,
+            data_units_of_the_file,
+            data_units_kept,
+        );
+        let rewritten_lower_nodes: Vec<ExtentLowerNodePosition> = plan
+            .lower_nodes
+            .iter()
+            .filter(|(_, origin)| *origin == ExtentTreeNodeOrigin::RewrittenThisPublish)
+            .map(|(position, _)| *position)
+            .collect();
+        let last_node_of_each_level_of_the_kept_file: Vec<ExtentLowerNodePosition> = (0..=2u8)
+            .map(|level| ExtentLowerNodePosition {
+                level,
+                index: (data_units_kept - 1) / lower_span_in_data_units(level),
+            })
+            .collect();
+        assert_eq!(
+            rewritten_lower_nodes, last_node_of_each_level_of_the_kept_file,
+            "{data_units_of_the_file} 个单元的文件第一批：下段只重写留下那一段每层最末那一个（被截掉那一片叶与它的祖先）"
+        );
+        let replaced_lower_nodes = plan
+            .replaced_previous_roles
+            .iter()
+            .filter(|role| matches!(role, TransactionUnit::ExtentLowerNode(_)))
+            .count();
+        assert_eq!(
+            (
+                replaced_lower_nodes,
+                plan.replaced_previous_roles.len() - replaced_lower_nodes
+            ),
+            (4, 1),
+            "{data_units_of_the_file} 个单元的文件第一批：换下上一版下段 4 个节点（被截的两片叶、第一层最末那一个、第二层根）与上段根兼叶：{:?}",
+            plan.replaced_previous_roles
+        );
+        assert_eq!(
+            plan.upper_nodes,
+            vec![(
+                ExtentUpperNodePosition { level: 0, index: 0 },
+                ExtentTreeNodeOrigin::RewrittenThisPublish
+            )],
+            "{data_units_of_the_file} 个单元的文件第一批：上段只重写根兼叶"
+        );
+    }
+}
+
 #[test]
 fn the_product_unlink_batch_releases_one_extent_lower_leaf_from_a_file_of_any_size_up_to_two_to_the_fortieth_data_units(
 ) {

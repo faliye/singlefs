@@ -244,6 +244,7 @@ pub fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_t
                 size: 0,
                 change_count: split_txg.0,
                 write_time_seconds,
+                truncation_field: singlefs_core::records::InodeRecordTruncationField::NOT_WRITTEN,
             },
             "inode {inode} 的记录逐字段等于写入"
         );

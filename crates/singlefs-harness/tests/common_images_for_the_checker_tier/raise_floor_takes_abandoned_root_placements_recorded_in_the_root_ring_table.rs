@@ -4075,6 +4075,7 @@ pub fn copy_of_the_session(session: &MountedSession) -> MountedSession {
         instance: session.instance,
         shadow_ledger: session.shadow_ledger,
         parameters_and_device_table: session.parameters_and_device_table.clone(),
+        compaction: session.compaction.clone(),
     }
 }
 

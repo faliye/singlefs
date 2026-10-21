@@ -8,13 +8,15 @@
 
 pub mod image;
 pub mod position_addressed;
+mod rebuild;
 pub mod walk;
 
 use singlefs_format::{
     DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
     INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, JOURNAL_HEADER_BYTES, JOURNAL_NAMED_ENTRY_BYTES,
     JOURNAL_RECORD_BYTES, NODE_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES,
-    ROOT_RECORD_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
+    ROOT_RECORD_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    WIDE_CHECKSUM_BYTES,
 };
 
 /// checker 自己解析出来的判定宽度：探测到的，或系统配置声明的（探不到时报「声明值，未探测」，不许当成探到的）。
@@ -116,7 +118,8 @@ pub enum Verdict {
     UnknownRecordType,
     /// 系统配置自述的区域数 R 大于字段表给逐区域设备身份留的字段数
     /// （[`crate::image::REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION`]）：
-    /// 第 3 个及以后的区域没有设备身份可读，这份系统配置这个格式版本读不了，这一槽不可择。
+    /// 第 3 个及以后的区域没有设备身份可读，这份系统配置这个格式版本读不了。R 不等于第一版常量 3 是这一版读者不收的值
+    /// （用户 2026-10-20 定 C663「R 读并整池拒」）：[`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
     RegionCountPastTheRegionDeviceFields,
     /// 系统配置自述的每区槽数 S（偏移 362 那一字节）落在格式承诺的区间之外
     /// （`singlefs_format::ROOT_RING_SLOTS_PER_REGION_MINIMUM`..`_MAXIMUM`，D22（单元原子性怎么合成） 已定项 1 的字段表）：
@@ -124,11 +127,18 @@ pub enum Verdict {
     /// （`image::root_slot_positions` 枚举 R × S 个槽、`walk` 按 R × S 算环长）。
     /// 不夹到区间里往下走（那是按一个池里根本不存在的几何走读，少读或多读几个槽而没人说），
     /// 也不 panic：S = 0 会让环长变 0、实现侧取模除零。挂载侧同一条判定是
-    /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`。
+    /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`，整池拒绝挂载；checker 同一个处置
+    /// （D22（单元原子性怎么合成） 已定项 2「越界整池拒绝挂载，与每区槽数 S 越界同一个处置」，用户 2026-10-20 定 C663「S 照条款整池拒」）：
+    /// [`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
     RootRingSlotsPerRegionOutsideTheFormatInterval,
     /// 系统配置自述的区域数 R（偏移 361 那一字节）是 0：根环一个槽都没有，择根与 `image::root_slot_positions` 按 R 取模、除，R = 0 除零。
-    /// 与 [`Self::RegionCountPastTheRegionDeviceFields`] 同一条理由：R 是盘上读来的一字节，不夹、不 panic，这一槽不可择。
+    /// 与 [`Self::RegionCountPastTheRegionDeviceFields`] 同一条理由、同一个处置：R 是盘上读来的一字节，不夹、不 panic，整池不作保。
     RegionCountZero,
+    /// 系统配置自述的区域数 R（偏移 361 那一字节）是 1 或 2：小于第一版的格式常量 `ROOT_RING_REGIONS`（3，D22（单元原子性怎么合成）
+    /// 已定项 2 参数表「区域数 R = 3」）。实现按常量写根，checker 若按字段读就少读几个区域。用户 2026-10-20 定 C663「R 读并整池拒」：
+    /// R 与 3 不等归这一版读者不收的值；0 与大于 3 的两头各报自己的成员（[`Self::RegionCountZero`]、
+    /// [`Self::RegionCountPastTheRegionDeviceFields`]），同一个处置。
+    RegionCountBelowTheFirstVersionConstant,
     /// 系统配置自述的根环几何（基槽、区域步长 × 区块字节、槽距）算出的根槽偏移装不进 u64：几样都是盘上读来的数，
     /// 坏盘上任意大，`image::root_slot_positions` 的乘加会溢出；这一槽不可择，不往下按它枚举槽。
     RootRingSlotOffsetOverflowsTheOffsetSpace,
@@ -193,6 +203,46 @@ pub struct SystemConfigurationView {
     /// 系统配置里另记的那一份回退下界 F（D22（单元原子性怎么合成） 已定项 9 字段表最后一行；D16（发布语义） 已定项 1「生效」取
     /// max(根上带的, 系统配置里读得出的)）。C556（checker 与崩溃点重放不读系统配置里的 F） 那一半读它。
     pub rollback_floor: u64,
+    /// incompat 位 2 带没带（inode 记录偏移 120 起的截断字段，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节用户定案）。
+    pub inode_record_truncation_field: InodeRecordTruncationField,
+    /// 字段表之后到槽末那一段（[`SYSTEM_CONFIGURATION_BYTES`]（489）起到 4096）里第一个非 0 的字节；整段全 0 时是 None。
+    /// 第一版写 0（用户 2026-10-20 定 C728「恒 0，由 checker 判」），池级 checker 按 I-2.4 判
+    /// （[`image::judge_system_configuration_slot_bytes_past_the_field_table_are_zero`]）。
+    pub first_non_zero_byte_past_the_field_table:
+        Option<FirstNonZeroByteInTheSystemConfigurationSlot>,
+}
+
+/// 系统配置槽字段表之后那一段里第一个非 0 的字节：在槽里的偏移与它的值。偏移取 u16（槽 4096 字节装得下）：
+/// [`image::SystemConfigurationSlotReading::Usable`] 带着整份视图，宽一点的偏移会让那个成员比别的成员大出 clippy 的
+/// `large_enum_variant` 线，而那个枚举在 `walk.rs` 里按成员解构，换成装箱要改 `walk.rs`。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FirstNonZeroByteInTheSystemConfigurationSlot {
+    pub offset_in_the_slot: u16,
+    pub value: u8,
+}
+
+/// 根槽根记录之后那一段里第一个非 0 的字节：在槽里的偏移与它的值。偏移取 u32：槽宽是盘上 4 字节的 `physical_block_size`。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FirstNonZeroByteInTheRootSlot {
+    pub offset_in_the_slot: u32,
+    pub value: u8,
+}
+
+/// `slot` 从 `start` 到槽末那一段里第一个非 0 的字节（槽内偏移，值）；整段全 0、或 `start` 已在槽末之后时交 None。
+fn first_non_zero_byte_from(slot: &[u8], start: usize) -> Option<(usize, u8)> {
+    slot.iter()
+        .enumerate()
+        .skip(start)
+        .find(|(_, byte)| **byte != 0)
+        .map(|(offset_in_the_slot, byte)| (offset_in_the_slot, *byte))
+}
+
+/// 一槽系统配置的 incompat 位 2（inode 记录带截断字段，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、第六节用户定案）：
+/// 带这一位的池，inode 记录偏移 120 起两段 8 字节是截断字段的 txg T 与 size N_w；不带的池里这 16 字节必须全零（I-9.7）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InodeRecordTruncationField {
+    CarriedUnderIncompatBitTwo,
+    AbsentWithoutIncompatBitTwo,
 }
 
 /// 根记录 flags 位 0 的卸载记号（D22（单元原子性怎么合成） 已定项 7）照实读出来：池级 checker 按它给
@@ -224,6 +274,10 @@ const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = SYSTEM_CONFIGURATION_T
 /// （D15（格式冻结政策） 已定项 4，用户 2026-09-26）。位 n 住第 n div 8 个字节的第 n mod 8 低位（D22（单元原子性怎么合成） 已定项 13）。
 /// checker 自己写一份，不从 `singlefs-core` 引。
 const INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT: u8 = 0x02;
+/// incompat 位 2 = inode 记录带截断字段（D15（格式冻结政策） 已定项 4 登记，用户 2026-10-17 定新开这一位，
+/// 判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节）。只与位 1 同时出现才认（第一字节 0x06）；
+/// checker 自己写一份，不从 `singlefs-core` 引。
+const INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT: u8 = 0x04;
 const ROOT_CHECKSUM_OFFSET: usize = 138;
 /// 根记录 flags 那 4 字节的偏移：magic 4 + fsid 16。
 const ROOT_FLAGS_OFFSET: usize = 20;
@@ -283,12 +337,21 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
     }
     let incompat = &slot
         [SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 32];
-    if incompat[0] & !INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT != 0
+    if incompat[0]
+        & !(INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT
+            | INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT)
+        != 0
         || incompat[1..].iter().any(|byte| *byte != 0)
         || incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT == 0
     {
         return Err(Verdict::UnknownIncompatBit);
     }
+    let inode_record_truncation_field =
+        if incompat[0] & INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT == 0 {
+            InodeRecordTruncationField::AbsentWithoutIncompatBitTwo
+        } else {
+            InodeRecordTruncationField::CarriedUnderIncompatBitTwo
+        };
     if u64::from(read_u32(slot, SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET)) != NODE_BYTES {
         return Err(Verdict::NodeBytesNotTheFormatConstant);
     }
@@ -311,6 +374,18 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
         journal_tail: read_u64(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET),
         journal_instance: read_u32(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET + 8),
         rollback_floor: read_u64(slot, SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET),
+        inode_record_truncation_field,
+        first_non_zero_byte_past_the_field_table: first_non_zero_byte_from(
+            &slot[..slot_bytes],
+            usize::try_from(SYSTEM_CONFIGURATION_BYTES).expect("489"),
+        )
+        .map(
+            |(offset_in_the_slot, value)| FirstNonZeroByteInTheSystemConfigurationSlot {
+                offset_in_the_slot: u16::try_from(offset_in_the_slot)
+                    .expect("只看槽的前 4096 字节，槽内偏移装得进 u16"),
+                value,
+            },
+        ),
     })
 }
 
@@ -338,6 +413,10 @@ pub struct RootView {
     pub unmount_marker: UnmountMarkerView,
     /// 457 字节记录本身（含校验和字段），三个区域比对用。
     pub record_bytes: Vec<u8>,
+    /// 根记录之后到槽宽那一段（[`ROOT_RECORD_BYTES`]（457）起到读进来的槽宽）里第一个非 0 的字节；整段全 0 时是 None。
+    /// 第一版写 0（用户 2026-10-20 定 C728「恒 0，由 checker 判」），池级 checker 按 I-2.4 判
+    /// （[`image::judge_root_slot_bytes_past_the_record_are_zero`]）。
+    pub first_non_zero_byte_past_the_record: Option<FirstNonZeroByteInTheRootSlot>,
 }
 
 /// 判一个根槽（判定宽度那么宽）。
@@ -374,6 +453,14 @@ pub fn check_root_slot(
         rollback_floor: read_u64(slot, 36 + 86 + 8),
         unmount_marker,
         record_bytes: slot[..record_bytes].to_vec(),
+        first_non_zero_byte_past_the_record: first_non_zero_byte_from(slot, record_bytes).map(
+            |(offset_in_the_slot, value)| FirstNonZeroByteInTheRootSlot {
+                offset_in_the_slot: u32::try_from(offset_in_the_slot).expect(
+                    "读进来的根槽宽是盘上 4 字节的 physical_block_size，槽内偏移装得进 u32",
+                ),
+                value,
+            },
+        ),
     })
 }
 
@@ -583,6 +670,17 @@ pub const KEY_SCHEMA_MAPPING: KeySchema = KeySchema {
 pub const KEY_SCHEMA_TREE_TABLE: KeySchema = KeySchema { field_widths: &[8] };
 /// 墓碑树与谱系树的 key：容器号 8 字节（D18（块里携带什么信息） 已定项 24 第 1、5 条，根条目照 inode 树内部节点的 120 字节形态）。
 pub const KEY_SCHEMA_CONTAINER_NUMBER: KeySchema = KeySchema { field_widths: &[8] };
+/// deadlist 树（种类 8）的 key 43：头的树 ID 8 + 纪元 8 + 中央映射 key 27（类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6），
+/// value 空（D5（快照 / 空间记账机制） 已定项 12；判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：
+/// 第三棵多层码 2 树，叶条目就是 key、内部条目 = key + 子指针 86）。
+pub const KEY_SCHEMA_DEADLIST: KeySchema = KeySchema {
+    field_widths: &[8, 8, 1, 8, 8, 4, 6],
+};
+/// logged_ops 树（种类 12）的 key 10：种类 2 + 签发 txg 8，先按种类、再按签发先后（判决 `research/prompts/m4-gc-r1-main-verification.md`
+/// 第三节 G1「单树、定宽联合条目」；`singlefs_format::LOGGED_OPERATIONS_KEY_BYTES`）。
+pub const KEY_SCHEMA_LOGGED_OPERATIONS: KeySchema = KeySchema {
+    field_widths: &[2, 8],
+};
 
 impl KeySchema {
     #[must_use]
@@ -610,9 +708,11 @@ impl KeySchema {
     }
 }
 
-/// 树的种类码 → key 形态（D8（核心索引结构） 已定项 9 / 已定项 11）；livelist 6、稀疏旁表 7、deadlist 8 三棵 day-1 只注册、没有节点要解，
-/// logged_ops 12 字段表未定（D8（核心索引结构） 已定项 5）。`deleted_inodes` 9 的 key 是 inode 号 8 字节（D8（核心索引结构） 已定项 16），
-/// 墓碑树 10、谱系树 11 的 key 是容器号 8 字节（D18（块里携带什么信息） 已定项 24）。
+/// 树的种类码 → key 形态（D8（核心索引结构） 已定项 9 / 已定项 11）；livelist 6、稀疏旁表 7 两棵 day-1 只注册、没有节点要解，
+/// logged_ops 12 的 key 是 [`KEY_SCHEMA_LOGGED_OPERATIONS`]（字段表判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1）。`deleted_inodes` 9 的 key 是 inode 号 8 字节（D8（核心索引结构） 已定项 16），
+/// 墓碑树 10、谱系树 11 的 key 是容器号 8 字节（D18（块里携带什么信息） 已定项 24）。deadlist 8 的 key 是 [`KEY_SCHEMA_DEADLIST`]
+/// （判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：只读快照落地之后它有节点）。
+/// 快照的两种条目（码 14、码 15）不在这里：它们的根指着的是活头那两种树（inode 树、extent 树）的节点，没有自己的 key 形态。
 #[must_use]
 pub fn key_schema_for_tree_kind(kind: u16) -> Option<KeySchema> {
     match kind {
@@ -621,8 +721,10 @@ pub fn key_schema_for_tree_kind(kind: u16) -> Option<KeySchema> {
         3 => Some(KEY_SCHEMA_ALLOCATION),
         4 => Some(KEY_SCHEMA_ACCOUNTING),
         5 => Some(KEY_SCHEMA_MAPPING),
+        8 => Some(KEY_SCHEMA_DEADLIST),
         // 墓碑树 10、谱系树 11、退役树 13：码 2 节点的 key 是容器号 8 字节。
         10 | 11 | 13 => Some(KEY_SCHEMA_CONTAINER_NUMBER),
+        12 => Some(KEY_SCHEMA_LOGGED_OPERATIONS),
         _ => None,
     }
 }
@@ -721,6 +823,136 @@ pub fn packed_unit_view(unit: &[u8]) -> Result<PackedUnitView, Verdict> {
         record_width,
         records,
     })
+}
+
+/// 码 1 数据单元与码 3 打包记录单元：I-1.8（归并后版本全序） 罩得到的两类，也是扫描重建（`rebuild` 模块）第一版重建的两类。
+/// 码 2 不在这里（`crates/singlefs-checker/invariants/01-块自描述.md` I-1.8 逐字「码 2 不进这条」：它的写序已收窄成只有实例代号，
+/// 多版在条目级合并、不在容器级择版本）。头里各段的偏移是格式解析——扫描方向与遍历方向之间唯一许共享的那一样
+/// （D13（验证路线） 已定项 12），所以住在 crate 根上，`walk` 与 `rebuild` 各自读它，谁也不调谁。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ContentUnitClass {
+    /// 码 1 数据单元。
+    Data,
+    /// 码 3 打包记录单元。
+    PackedRecord,
+}
+
+/// 一类内容单元的头里要读的那几段。码 1 按 D18（块里携带什么信息） 已定项 7 的字段表（五元组 42：类标签 42、树 43、对象 51、
+/// 对象出生代 59、锚点偏移 67；诞生代号 75、fsid 83、写序 91、载荷 CRC 101、明文头末尾 105）；码 3 按已定项 11 的类身份段表
+/// （标签 42、出生树 43、类型 51、容器号 53、容器出生代 61、记录数 69、记录宽 71、诞生代号 73、fsid 81、载荷校验和 89、写序 93、
+/// 出生序号 103、明文头末尾 107）。
+pub(crate) struct ContentUnitHeaderOffsets {
+    pub(crate) plain_header_end: usize,
+    pub(crate) payload_checksum: usize,
+    pub(crate) filesystem_identifier: usize,
+    pub(crate) birth_tree: usize,
+    pub(crate) birth_txg: usize,
+    pub(crate) write_order: usize,
+    /// 码 3 的打包记录类型（2 字节）；码 1 头里没有这一段。
+    pub(crate) packed_record_type: Option<usize>,
+    /// 码 3 的出生序号（4 字节，中央映射 key 的尾段，D19（块指针的结构与宽度预算） 已定项 10）；码 1 头里没有这一段，
+    /// 它的 key 尾段是写序的事务号。
+    pub(crate) birth_sequence: Option<usize>,
+    /// 类身份段里与版本无关的那一段：码 1 的五元组、码 3 的（标签, 出生树, 类型, 容器号, 容器出生代）。
+    pub(crate) object_key: std::ops::Range<usize>,
+    /// 归并键的两段：「类身份段全部字段含写序」**去掉载荷校验和那一段**。
+    /// 载荷校验和不进归并键——它正是「同一组的成员载荷相同」要比的那个量，进了键这一条就恒真。
+    pub(crate) merge_key_before_payload_checksum: std::ops::Range<usize>,
+    pub(crate) merge_key_after_payload_checksum: std::ops::Range<usize>,
+}
+
+/// 写序那 10 字节里事务号低 48 位从第 4 字节起（D18（块里携带什么信息） 已定项 7：实例代号 4 + 事务号 6）。
+pub(crate) const WRITE_ORDER_TRANSACTION_OFFSET: usize = 4;
+
+/// 中央映射 key 里各段的偏移（D19（块指针的结构与宽度预算） 已定项 6 / 10：类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6；
+/// 尾段码 1 是事务号 6 字节，码 2 / 码 3 是出生序号 4 + 补零 2）。按字段表另写一份，不用实现的解析；
+/// 遍历方向（`walk` 判映射 key 与单元头相符）与扫描重建（`rebuild` 从单元头现算 key）各自读它。
+pub(crate) const MAPPING_KEY_UNIT_CLASS_OFFSET: usize = 0;
+pub(crate) const MAPPING_KEY_BIRTH_TREE_OFFSET: usize = 1;
+pub(crate) const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 1 + 8;
+pub(crate) const MAPPING_KEY_INSTANCE_OFFSET: usize = 1 + 8 + 8;
+pub(crate) const MAPPING_KEY_TAIL_OFFSET: usize = 1 + 8 + 8 + 4;
+/// 码 2 / 码 3 的尾段是出生序号 4 字节，其后补零 2 字节（D19（块指针的结构与宽度预算） 已定项 10「末尾补零到 27」）。
+pub(crate) const MAPPING_KEY_TAIL_PADDING: std::ops::Range<usize> =
+    MAPPING_KEY_TAIL_OFFSET + 4..MAPPING_KEY_TAIL_OFFSET + 6;
+
+/// 码 1 五元组里对象、对象出生代、锚点偏移三段的位置（D18（块里携带什么信息） 已定项 7：类标签 42、树 43、对象 51、对象出生代 59、锚点偏移 67）。
+pub(crate) const DATA_UNIT_OBJECT_OFFSET: usize = 51;
+pub(crate) const DATA_UNIT_OBJECT_BIRTH_OFFSET: usize = 59;
+pub(crate) const DATA_UNIT_ANCHOR_OFFSET_IN_BYTES_OFFSET: usize = 67;
+
+/// 码 3 的打包记录类型（D18（块里携带什么信息） 已定项 11 的登记表）：墓碑 1、inode 2、退役 3（记录宽 34，判决 m3-retire-r1 第三节第 2 条）、
+/// 实例表 4、谱系 5（D18（块里携带什么信息） 已定项 24 第 5 条，不复用登记过的 3）。
+pub(crate) const PACKED_TYPE_TOMBSTONE: u16 = 1;
+pub(crate) const PACKED_TYPE_INODE: u16 = 2;
+pub(crate) const PACKED_TYPE_RETIREMENT: u16 = 3;
+pub(crate) const PACKED_TYPE_INSTANCE_TABLE: u16 = 4;
+pub(crate) const PACKED_TYPE_LINEAGE: u16 = 5;
+
+/// inode 记录 140 里对象出生代（偏移 8）与 `size`（偏移 40）的位置（D8（核心索引结构） 已定项 6 的偏移表），按字段表另写一份、不用实现的解析。
+pub(crate) const INODE_RECORD_OBJECT_BIRTH_OFFSET: usize = 8;
+pub(crate) const INODE_RECORD_SIZE_OFFSET: usize = 40;
+/// inode 记录偏移 120 起两段 8 字节（小端）的截断字段：T（截断字段的 txg，0 是没写过）与 N_w（截断字段的 size），
+/// 判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1；带 incompat 位 2 的池才有（第六节用户定案）。
+pub(crate) const INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET: usize = 120;
+pub(crate) const INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET: usize = 128;
+
+/// 墓碑记录 40 字节里前四段的偏移（`.claude/kb/layout/03-third-txn.md`「二、墓碑记录」；D18（块里携带什么信息） 已定项 24 第 2 条：
+/// 对象 ID 8（被删的 inode 号）+ 对象出生代 8 + 区间起 8 + 区间止 8 + 死亡 txg 8），按字段表另写一份、不用实现的解析。
+pub(crate) const TOMBSTONE_RECORD_OBJECT_IDENTIFIER_OFFSET: usize = 0;
+pub(crate) const TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET: usize = 8;
+pub(crate) const TOMBSTONE_RECORD_RANGE_START_OFFSET: usize = 16;
+pub(crate) const TOMBSTONE_RECORD_RANGE_END_OFFSET: usize = 24;
+/// 第一版墓碑只许整对象：区间 [0, 2⁶⁴ − 1]（D18（块里携带什么信息） 已定项 24 第 2 条）。
+pub(crate) const TOMBSTONE_WHOLE_OBJECT_RANGE_START: u64 = 0;
+pub(crate) const TOMBSTONE_WHOLE_OBJECT_RANGE_END: u64 = u64::MAX;
+
+impl ContentUnitClass {
+    pub(crate) fn of(unit_class_tag: u8) -> Option<Self> {
+        match unit_class_tag {
+            1 => Some(ContentUnitClass::Data),
+            3 => Some(ContentUnitClass::PackedRecord),
+            _outside_the_two_content_unit_classes => None,
+        }
+    }
+
+    pub(crate) fn header_offsets(self) -> ContentUnitHeaderOffsets {
+        match self {
+            ContentUnitClass::Data => ContentUnitHeaderOffsets {
+                plain_header_end: 105,
+                payload_checksum: 101,
+                filesystem_identifier: 83,
+                birth_tree: 43,
+                birth_txg: 75,
+                write_order: 91,
+                packed_record_type: None,
+                birth_sequence: None,
+                object_key: 42..75,
+                merge_key_before_payload_checksum: 42..101,
+                merge_key_after_payload_checksum: 105..105,
+            },
+            ContentUnitClass::PackedRecord => ContentUnitHeaderOffsets {
+                plain_header_end: 107,
+                payload_checksum: 89,
+                filesystem_identifier: 81,
+                birth_tree: 43,
+                birth_txg: 73,
+                write_order: 93,
+                packed_record_type: Some(51),
+                birth_sequence: Some(103),
+                object_key: 42..69,
+                merge_key_before_payload_checksum: 42..89,
+                merge_key_after_payload_checksum: 93..107,
+            },
+        }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            ContentUnitClass::Data => "码 1 数据",
+            ContentUnitClass::PackedRecord => "码 3 打包记录",
+        }
+    }
 }
 
 /// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）：magic 4 + 类型 2 + 算法类型 1 之后是记录标志 1；
@@ -985,6 +1217,54 @@ mod tests {
             check_system_configuration_slot(&slot_declaring_node_bytes(16384)).is_ok(),
             "节点大小是格式常量的同一份槽照收"
         );
+    }
+
+    /// 一槽只有 magic、格式版本、incompat 第一个字节与节点大小、整槽校验和照 checker 自己的算法封上的系统配置。
+    fn system_configuration_slot_with_the_first_incompat_byte(first_incompat_byte: u8) -> Vec<u8> {
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        let mut slot = vec![0u8; slot_bytes];
+        slot[..4].copy_from_slice(SYSTEM_CONFIGURATION_MAGIC);
+        slot[FORMAT_VERSION_OFFSET..FORMAT_VERSION_OFFSET + 2]
+            .copy_from_slice(&SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS.to_le_bytes());
+        slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = first_incompat_byte;
+        slot[SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET..SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET + 4]
+            .copy_from_slice(&u32::try_from(NODE_BYTES).expect("16384").to_le_bytes());
+        let checksum = crc32_castagnoli_bitwise(&slot);
+        slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 4]
+            .copy_from_slice(&checksum.to_le_bytes());
+        slot
+    }
+
+    /// incompat 第一个字节收 0x02（只带位 1）与 0x06（位 1 加位 2，inode 记录带截断字段；判决 m4-trunc-r2 第六节用户定案），
+    /// 交回的视图照实说带没带截断字段；位 2 不配位 1（0x04）、再带位 3（0x0E）、带退役的位 0（0x07）都拒成不认识的位。
+    #[test]
+    fn incompat_bit_two_is_accepted_only_alongside_bit_one_and_reports_the_truncation_field() {
+        assert_eq!(
+            check_system_configuration_slot(
+                &system_configuration_slot_with_the_first_incompat_byte(0x02)
+            )
+            .map(|view| view.inode_record_truncation_field),
+            Ok(InodeRecordTruncationField::AbsentWithoutIncompatBitTwo),
+            "只带位 1：照收，inode 记录不带截断字段"
+        );
+        assert_eq!(
+            check_system_configuration_slot(
+                &system_configuration_slot_with_the_first_incompat_byte(0x06)
+            )
+            .map(|view| view.inode_record_truncation_field),
+            Ok(InodeRecordTruncationField::CarriedUnderIncompatBitTwo),
+            "位 1 加位 2：照收，inode 记录带截断字段"
+        );
+        for first_incompat_byte in [0x04u8, 0x0E, 0x07] {
+            assert_eq!(
+                check_system_configuration_slot(
+                    &system_configuration_slot_with_the_first_incompat_byte(first_incompat_byte)
+                )
+                .err(),
+                Some(Verdict::UnknownIncompatBit),
+                "incompat 第一个字节 {first_incompat_byte:#04x}：不认识的位组合要拒"
+            );
+        }
     }
 
     #[test]

@@ -212,6 +212,44 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
                     "快档那一组比重不抽 {kind:?}"
                 );
             }
+            // 建快照、读快照、删快照只进它们自己那一组比重（`GenerationWeights::SNAPSHOT_OPERATIONS`），快档那一组不抽；跑到了没有在那一组的
+            // 取样点那条用例里核（`snapshot_operations_in_random_histories.rs`）。
+            HistoryOperationKind::CreateSnapshot
+            | HistoryOperationKind::ReadSnapshot
+            | HistoryOperationKind::DestroySnapshot => {
+                assert_eq!(
+                    (operation.applied, operation.refused, operation.not_applicable),
+                    (0, 0, 0),
+                    "快档那一组比重不抽 {kind:?}"
+                );
+            }
+            // 挂着时整理只进它自己那一组比重（`GenerationWeights::COMPACTION_WHILE_MOUNTED`），快档那一组不抽；跑到了没有在那一组的
+            // 取样点那条用例里核（`compaction_while_mounted_in_random_histories.rs`）。
+            HistoryOperationKind::CompactWhileMounted => {
+                assert_eq!(
+                    (operation.applied, operation.refused, operation.not_applicable),
+                    (0, 0, 0),
+                    "快档那一组比重不抽 {kind:?}"
+                );
+            }
+            // 截断只进它自己那一组比重（`GenerationWeights::TRUNCATION`）与带整理的那一组，快档那一组不抽；跑到了没有在那一组的
+            // 取样点那条用例里核（`truncation_random_histories_against_the_model.rs`）。
+            HistoryOperationKind::Truncate => {
+                assert_eq!(
+                    (operation.applied, operation.refused, operation.not_applicable),
+                    (0, 0, 0),
+                    "快档那一组比重不抽 {kind:?}"
+                );
+            }
+            // 一次建几个 inode、按 inode 号写只进它们自己那一组比重（`GenerationWeights::WRITES_BY_INODE_NUMBER`），快档那一组不抽；跑到了没有在那一组的
+            // 取样点那条用例里核（`writes_by_inode_number_in_random_histories_judged_by_the_model.rs`）。
+            HistoryOperationKind::CreateInodes | HistoryOperationKind::WriteOfAnInode => {
+                assert_eq!(
+                    (operation.applied, operation.refused, operation.not_applicable),
+                    (0, 0, 0),
+                    "快档那一组比重不抽 {kind:?}"
+                );
+            }
             HistoryOperationKind::PublishFirstFile
             | HistoryOperationKind::PublishOverwrite
             | HistoryOperationKind::PublishWithoutUnits

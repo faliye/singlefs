@@ -88,8 +88,8 @@ const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: usize = 116;
 const TREE_TABLE_ENTRY_ROOT_POINTER_START: usize = 14;
 const TREE_TABLE_ENTRY_ROOT_POINTER_END: usize = 100;
 /// 种类码登记表（D8（核心索引结构） 已定项 9）里没有的一个码（攻方 L1a 把 `deleted_inodes` 那一条的种类 9 改成它）：
-/// 13 第 50 批登记给了退役树，改用 14。
-const TREE_KIND_NOT_REGISTERED: u16 = 14;
+/// 13 第 50 批登记给了退役树、14 / 15 里程碑四登记给了只读快照的两种条目（快照 inode 根、快照 extent 根），改用 16。
+const TREE_KIND_NOT_REGISTERED: u16 = 16;
 /// 码 2 节点头里条目宽 2 字节在 84 + 2k、最大 key 在 52 + k（D18（块里携带什么信息） 已定项 7、18）。
 fn index_node_entry_width_offset(key_width: usize) -> usize {
     84 + 2 * key_width

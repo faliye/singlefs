@@ -38,6 +38,10 @@ impl CodeTwoKeyFieldWidths {
     /// 中央映射 key 27：类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 尾段 6（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10：
     /// 码 1 的尾段是事务号低 48 位；码 2 / 码 3 是出生序号 4 + 补零 2，按 6 字节整数比与按出生序号比同序）。
     pub const CENTRAL_MAPPING: Self = Self(&[1, 8, 8, 4, 6]);
+    /// deadlist 条目的 key 43：头的树 ID 8 + 纪元 8 + 中央映射 key 的五段（D5（快照 / 空间记账机制） 已定项 12；
+    /// 判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3）。按头、纪元、映射 key 逐字段比，
+    /// 同一个头同一段纪元的条目挨着（「按头 / 按快照删一段」那一读法要的次序）。
+    pub const DEADLIST: Self = Self(&[8, 8, 1, 8, 8, 4, 6]);
 
     /// key 宽：各字段宽之和。
     #[must_use]
@@ -131,8 +135,9 @@ pub fn build_internal_entry(separator_key: &[u8], child: NodePointer) -> Vec<u8>
 /// 一条内部节点条目解不开是哪一种（[`parse_internal_entry`] 交回）。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InternalEntryRefusal {
-    /// 条目宽（节点头里的盘上字段）窄于 key 宽 + 86：调用方报「条目窄于字段表」。
-    NarrowerThanTheKeyAndTheChildPointer,
+    /// 条目宽（节点头里的盘上字段）不等于 key 宽 + 86（窄的切不出子指针，宽的同样不收：I-1.10（码 2 条目宽等于字段表宽） 写「等于」，
+    /// 用户 2026-10-18 定「宽于字段表也拒」，欠账 C780）：调用方报条目宽与字段表不符。
+    WidthOtherThanTheKeyAndTheChildPointer,
     /// 子指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值（代码审阅第 29 条；extent 偏移是 C581）。
     ChildPointerHeadOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
 }
@@ -141,14 +146,14 @@ pub enum InternalEntryRefusal {
 /// 这里是盘上字节进字段表的边界。
 ///
 /// # Errors
-/// 条目窄于 key 宽 + 86 ⇒ `NarrowerThanTheKeyAndTheChildPointer`；子指针头部那几段不是第一版的取值 ⇒
+/// 条目宽不等于 key 宽 + 86（窄于、宽于都算）⇒ `WidthOtherThanTheKeyAndTheChildPointer`；子指针头部那几段不是第一版的取值 ⇒
 /// `ChildPointerHeadOutsideTheFirstVersion`。
 pub fn parse_internal_entry(
     entry: &[u8],
     key_width_in_bytes: usize,
 ) -> Result<(Vec<u8>, NodePointer), InternalEntryRefusal> {
-    if entry.len() < internal_entry_width_in_bytes(key_width_in_bytes) {
-        return Err(InternalEntryRefusal::NarrowerThanTheKeyAndTheChildPointer);
+    if entry.len() != internal_entry_width_in_bytes(key_width_in_bytes) {
+        return Err(InternalEntryRefusal::WidthOtherThanTheKeyAndTheChildPointer);
     }
     let mut reader = ByteReader::at(entry, key_width_in_bytes);
     let child = NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
@@ -690,6 +695,27 @@ pub fn plan_the_tree_after_this_publish(
     })
 }
 
+/// 同 [`plan_the_tree_after_this_publish`]，另收这一版一把 key 都不剩的那一格：这次之后零根（形状一个节点都没有），
+/// 上一版的每个节点都换下（deadlist 树：删快照放掉最后几条之后零根，判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3、S4；
+/// 树表条目的根指针置零，同 day-1 注册的那一形）。上一版也是零根、这一版也一把 key 都没有时一个节点都不写。
+///
+/// # Errors
+/// 同 [`plan_the_tree_after_this_publish`]。
+pub fn plan_the_tree_after_this_publish_down_to_a_zero_root(
+    previous: &CodeTwoTreeShape,
+    keys_after_this_publish: &BTreeSet<CodeTwoTreeKey>,
+    capacity: CodeTwoTreeNodeCapacity,
+) -> Result<CodeTwoTreePlan, CodeTwoTreeRefusal> {
+    if !keys_after_this_publish.is_empty() {
+        return plan_the_tree_after_this_publish(previous, keys_after_this_publish, capacity);
+    }
+    Ok(CodeTwoTreePlan {
+        shape: CodeTwoTreeShape { nodes: Vec::new() },
+        origins: Vec::new(),
+        replaced_previous_nodes: previous.nodes().iter().map(|node| node.position).collect(),
+    })
+}
+
 /// 一版树在内存里的样子：形状加每个节点这一版的指针（与 `shape.nodes()` 同序）。节点的字节住
 /// `TransactionOutput::units` 里它那个角色的单元（`transaction::TransactionUnit` 的记账树 / 中央映射树两族）。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -732,7 +758,7 @@ impl CodeTwoTreeVersion {
     }
 }
 
-/// 从盘上读一棵多层码 2 树时对它的期望：哪棵树、key 怎么比，内部条目窄于 key 宽 + 86 时报错叫它什么。
+/// 从盘上读一棵多层码 2 树时对它的期望：哪棵树、key 怎么比，内部条目宽不等于 key 宽 + 86 时报错叫它什么。
 #[derive(Clone, Copy, Debug)]
 pub struct CodeTwoTreeReadExpectation {
     pub tree: TreeIdentifier,
@@ -764,8 +790,8 @@ pub enum CodeTwoTreeHeaderJudgement {
     /// 按 key 严格递增，与走读核别的树根同一套口径、同一组判定名（根那一个节点的报错逐字沿用 `recovery` 核树根的那几句）。
     EveryHeaderAgainstItsReference,
     /// 读别的根的账（`recovery::allocation_records_under_root`：影子账、抬 F 的上限按它们读中央映射树回退）：只核把节点拼成一棵树
-    /// 非核不可的那几样——层级逐层减一、节点不空、内部条目不窄于 key 宽 + 86、子指针头部是第一版的取值、同一个节点不被两条父条目引用；
-    /// 头里的出生身份、区间、分隔 key 与 key 次序不核（解得开就收，叶条目窄于字段表由解条目的一方报）。那几棵树只拿来查映射，
+    /// 非核不可的那几样——层级逐层减一、节点不空、内部条目宽等于 key 宽 + 86、子指针头部是第一版的取值、同一个节点不被两条父条目引用；
+    /// 头里的出生身份、区间、分隔 key 与 key 次序不核（解得开就收，叶条目宽与字段表不符由解条目的一方报）。那几棵树只拿来查映射，
     /// 不交给发布路径规划下一版，所以 key 次序在这里不是「拼得成一棵树」非要不可的。
     OnlyWhatTheShapeNeeds,
 }
@@ -866,7 +892,7 @@ fn judge_the_header_against_its_reference(
 /// `read_node` 按指针读一个节点的字节：不进映射的树（中央映射树）只按位置条目读，进映射的树（记账树）走读时提示读不出经映射回退。
 ///
 /// # Errors
-/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；内部条目窄于 key 宽 + 86 ⇒ `EntryNarrowerThanItsFieldTable`；
+/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；内部条目宽不等于 key 宽 + 86（窄于、宽于都算）⇒ `EntryNarrowerThanItsFieldTable`；
 /// 上面任一条核不过 ⇒ `InvariantViolated`（I-1.1 / I-1.2 / I-1.3 / I-1.4 / E142 走读同款）。
 pub(crate) fn read_code_two_tree(
     root_pointer: &NodePointer,
@@ -988,7 +1014,9 @@ impl TreeReading<'_> {
             return self.leaf_read_from_disk(pointer, bytes, header);
         }
         let internal_width = internal_entry_width_in_bytes(key_width);
-        if header.entry_width < internal_width {
+        // 宽于 key 宽 + 86 的同样拒（C780，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
+        // `EntryNarrowerThanItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
+        if header.entry_width != internal_width {
             return Err(RecoveryFailure::EntryNarrowerThanItsFieldTable {
                 what: self.expectation.internal_entry_name,
                 entry_bytes: header.entry_width,
@@ -1001,8 +1029,8 @@ impl TreeReading<'_> {
         for entry in &header.entries {
             let (separator_bytes, child_pointer) =
                 parse_internal_entry(entry, key_width).map_err(|refusal| match refusal {
-                    InternalEntryRefusal::NarrowerThanTheKeyAndTheChildPointer => {
-                        panic!("条目宽上面判过不窄于 key 宽 + 86")
+                    InternalEntryRefusal::WidthOtherThanTheKeyAndTheChildPointer => {
+                        panic!("条目宽上面判过等于 key 宽 + 86")
                     }
                     InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion(_field) => {
                         RecoveryFailure::UnitMalformed {
@@ -1057,7 +1085,8 @@ impl TreeReading<'_> {
         bytes: Vec<u8>,
         header: IndexNodeHeader,
     ) -> Result<NodeReadFromDisk, RecoveryFailure> {
-        // 叶条目窄于它那棵树的字段表（记账 34、映射 55）不在这里判：这一步只切 key（`parse_index_node` 判过条目宽 ≥ key 宽），
+        // 叶条目宽与它那棵树的字段表不符（记账 34 窄于、宽于都拒；映射 55 只拒窄于，宽于的欠在 C307）不在这里判：
+        // 这一步只切 key（`parse_index_node` 判过条目宽 ≥ key 宽），
         // 解条目的一方各按各的报（冷走读与重建报 `EntryNarrowerThanItsFieldTable`，挂载态报 `RecordMalformed`），
         // 与树长成多层之前逐字相同。
         if self.judges_every_header() {
@@ -1201,6 +1230,74 @@ mod tests {
                 CodeTwoTreeNodeContents::Internal { .. } => None,
             })
             .collect()
+    }
+
+    /// deadlist 树按节点格式算的容量：叶 376、内部 125（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S3：
+    /// key 43、value 空，叶条目宽 = key 宽；内部条目 = key 43 + 子指针 86）。
+    #[test]
+    fn a_deadlist_node_holds_three_hundred_seventy_six_leaf_entries_or_one_hundred_twenty_five_children(
+    ) {
+        let key_width = CodeTwoKeyFieldWidths::DEADLIST.key_width_in_bytes();
+        assert_eq!(key_width, 43, "key 43：头 8 + 纪元 8 + 映射 key 27");
+        assert_eq!(
+            CodeTwoTreeNodeCapacity::of_the_node_format(key_width, key_width),
+            CodeTwoTreeNodeCapacity {
+                leaf_entries: 376,
+                internal_entries: 125,
+            }
+        );
+    }
+
+    /// 这一版一把 key 都不剩：零根，上一版的节点全部换下；上一版也是零根时一个节点都不写也不换。
+    #[test]
+    fn a_tree_whose_last_key_is_deleted_plans_a_zero_root_and_replaces_every_previous_node() {
+        let previous = two_leaves_under_a_root(5);
+        let plan = plan_the_tree_after_this_publish_down_to_a_zero_root(
+            &previous,
+            &BTreeSet::new(),
+            CodeTwoTreeNodeCapacity {
+                leaf_entries: 2,
+                internal_entries: 2,
+            },
+        )
+        .expect("零根那一格不拒");
+        assert!(plan.shape.nodes().is_empty(), "零根：一个节点都没有");
+        assert_eq!(
+            plan.replaced_previous_nodes,
+            previous
+                .nodes()
+                .iter()
+                .map(|node| node.position)
+                .collect::<Vec<_>>(),
+            "上一版的三个节点都换下"
+        );
+        let still_zero = plan_the_tree_after_this_publish_down_to_a_zero_root(
+            &CodeTwoTreeShape::default(),
+            &BTreeSet::new(),
+            CodeTwoTreeNodeCapacity {
+                leaf_entries: 2,
+                internal_entries: 2,
+            },
+        )
+        .expect("零根接零根");
+        assert!(
+            still_zero.shape.nodes().is_empty() && still_zero.replaced_previous_nodes.is_empty(),
+            "零根接零根：不写也不换"
+        );
+        let with_keys = plan_the_tree_after_this_publish_down_to_a_zero_root(
+            &CodeTwoTreeShape::default(),
+            &keys([4]),
+            CodeTwoTreeNodeCapacity {
+                leaf_entries: 2,
+                internal_entries: 2,
+            },
+        )
+        .expect("零根上插一把");
+        assert_eq!(
+            with_keys.shape.nodes().len(),
+            1,
+            "有 key 时照常规划：一片叶"
+        );
     }
 
     #[test]

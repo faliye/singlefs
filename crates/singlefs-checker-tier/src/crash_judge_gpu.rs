@@ -1,10 +1,14 @@
 //! GPU 判器（用户 2026-09-28 定「GPU 判器现在实现、整套做完」）：把 `crate::crash_judge_tables` 摊出来的表整份上卡，
 //! 每个调用判一个崩溃状态——恢复（看 journal 与不看 journal 各一遍：择系统配置、择根、扫环重放、走到第一个文件）、
 //! 七类 oracle、记录核对器两条判据，判法与 CPU 判器（`crate::crash::judge_crash_image`）逐条相同；GPU 与 CPU 逐状态比是它的判别力自证。
-//! 内核分五份源码：`crash_judge_common.wgsl`（各内核共用的解析与查表）、`crash_judge_recovery.wgsl`（恢复、oracle、记录核对器）、
+//! 内核分六份源码：`crash_judge_common.wgsl`（各内核共用的解析与查表）、`crash_judge_recovery.wgsl`（恢复、oracle、记录核对器）、
 //! `crash_judge_checker_common.wgsl`（池级 checker 两个内核共用的读法与交接段）、`crash_judge_checker.wgsl`（走读内核：第一、二批不变量，
 //! 连同里程碑三二·1 那一批里的十五条、I-9.27 与 I-3.5，与里程碑三·3 墓碑树、谱系树条目身份那两条 I-9.17、I-9.23）、`crash_judge_checker_scan.wgsl`
-//! （扫描内核：第三批、I-3.12、I-5.5、I-9.28，与里程碑三·3 删除线的删除态扫描、I-9.6 墓碑那一半、墓碑与谱系那一遍）；判不了的状态（表越过内核容量）置最高位，
+//! （扫描内核：第三批、I-3.12、I-5.5、I-9.28，与里程碑三·3 删除线的删除态扫描、I-9.6 墓碑那一半、墓碑与谱系那一遍，里程碑四自建 GC 的 I-3.16；
+//! 同一份源码里第二个入口是引用与快照那一截：I-3.9、I-9.14 与里程碑四只读快照那几条，再是自建 GC 的 I-4.4、I-5.6、I-3.15、I-1.14，
+//! [`CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT`]，另编一条管线、接在扫描那一趟之后派）、`crash_judge_checker_scan_rebuild.wgsl`
+//! （接在扫描内核源码之后、同一份源码里的第三个入口 [`CHECKER_SCAN_REBUILD_ENTRY_POINT`]：I-1.13 扫描重建，另编一条管线、接在引用与快照那一截之后派）；
+//! 判不了的状态（表越过内核容量）置最高位，
 //! 放量路径（`crate::crash_amplification` 收卡上结论那一段）遇到它就让整趟停下、报哪张表满了，配置开了 GPU 不退回 CPU 判器。
 //!
 //! 一个状态的结论 [`VERDICT_WORDS`] 个 u32：第 0 字是红位（位 0..6 看 journal 那一遍 oracle 的七类、位 8..14 不看那一遍、
@@ -15,9 +19,12 @@
 //! 第 14 / 15 字不看 journal 那一遍落到的实例代号与 checkpoint_txg 低 32 位（判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md`
 //! 第二节 L1-6）；第 16..20 字池级 checker 逐条不变量的「判到」位（成立或违例，与 CPU 计数里「评估过」同一口径；同一判决 L1-4）；
 //! 第 20..24 字池级 checker 判 I-7.4 时违例细节里点名的那一条被抛弃的根（点没点名、实例代号、checkpoint_txg 低 / 高 32 位，
-//! [`ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD`]）。
-//! 这几个字号、打包表的表号与段表宽、段的展开方式码、失败点码在内核里的常量由 [`kernel_prelude_wgsl_constants`] 从 Rust 生成、
-//! 接在每个内核源码前面，不在 WGSL 里另写一份。对拍比的是 [`CrossCheckWords`]：GPU 与 CPU 两侧各由一个构造函数换出来。
+//! [`ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD`]）；第 24 字扫描重建那一截判 I-1.13 的结局（[`SCAN_REBUILD_OUTCOME_WORD`]：成立、违例、
+//! 报不适用的哪一种理由，[`SCAN_REBUILD_OUTCOMES`]）。
+//! 这几个字号、打包表的表号与段表宽、段的展开方式码、失败点码、扫描重建的结局码在内核里的常量由 [`kernel_prelude_wgsl_constants`] 从 Rust 生成、
+//! 接在每个内核源码前面，不在 WGSL 里另写一份。对拍比的是 [`CrossCheckWords`]：GPU 与 CPU 两侧各由一个构造函数换出来，
+//! 经 [`cross_check_words_agree_in_the_cross_check`] 逐字段比（内核不置位、对拍不比的表 [`POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS`]
+//! 补上扫描重建内核之后是空的，每一位都比）。
 //! 判定表的键里判器那一半是 GPU 判器那一组判法单元的键（`crate::crash_identity::judging_units_key`，入口登记在
 //! `crate::judging_units_entries`）：拼内核源码的函数、`.wgsl` 里从 `@compute` 入口够得着的函数、派活回读归位那一段都在里面，
 //! 改一个字（注释除外）旧行留着当历史，新行另起。
@@ -49,11 +56,14 @@ use crate::crash_judge_tables::{
 };
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 
+use crate::crash_judge_conclusions::invariant_names_are_equal;
 /// 不挂 `gpu` 特性的那一半（失败点码表、红位、走读结局的码、对拍比的那几个字与它的 CPU 一侧）在 `crate::crash_judge_conclusions`
 /// （崩溃点重放合并第三轮判决 J8：改结论的几处搬进判器一侧；失败点码表挪出 `gpu` 特性，没编进卡的 CPU 结论也带恢复字），
 /// 这里照旧转出去：派活、对拍用例与内核常量的生成照这条路径引。
 pub use crate::crash_judge_conclusions::{
+    cross_check_words_agree_in_the_cross_check, cross_check_words_compared_by_the_cross_check,
     cross_check_words_of_cpu_judgement, gpu_failure_point_code,
+    pool_checker_bits_agree_in_the_cross_check, pool_checker_bits_compared_by_the_cross_check,
     pool_checker_violated_and_judged_bits, verdict_bits, CrossCheckWords, LandedRootWords,
     GPU_FAILURE_POINTS, GPU_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY,
     GPU_FAILURE_POINT_DEVICE_ENDS_BEFORE_THE_UNIT_AREA_START,
@@ -68,8 +78,16 @@ pub use crate::crash_judge_conclusions::{
     GPU_FAILURE_POINT_SYSTEM_CONFIGURATIONS_DISAGREE,
     GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED,
     GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED, GPU_FAILURE_POINT_UNIT_MALFORMED,
-    GPU_FAILURE_POINT_UNIT_UNREADABLE, RECOVERY_OUTCOME_CODE_FAILED,
+    GPU_FAILURE_POINT_UNIT_UNREADABLE, POOL_CHECKER_BITS_LEFT_OUT_OF_THE_CROSS_CHECK,
+    POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS, RECOVERY_OUTCOME_CODE_FAILED,
     RECOVERY_OUTCOME_CODE_FILE_READ, RECOVERY_OUTCOME_CODE_NO_FILE,
+};
+/// 扫描重建那一截的结局码表（I-1.13 的结局并进对拍字之后 CPU 一侧也要它，挪进 `crate::crash_judge_conclusions`、不挂特性），这里照旧转出去：
+/// 内核常量照它生成，对拍用例照这条路径引。
+pub use crate::crash_judge_conclusions::{
+    scan_rebuild_outcome_name, scan_rebuild_outcome_of_the_pool_checker_verdicts,
+    ScanRebuildOutcome, ScanRebuildVerdictOfThePoolChecker, SCAN_REBUILD_OUTCOMES,
+    SCAN_REBUILD_OUTCOME_NOT_REACHED,
 };
 
 /// 两个内核共用的那一半源码：表的读法、u64、落点与版本、指针与单元的解析、系统配置与根与 journal 的解析、掩码。
@@ -80,8 +98,24 @@ pub const GPU_JUDGE_RECOVERY_SOURCE: &str = include_str!("crash_judge_recovery.w
 pub const GPU_JUDGE_CHECKER_COMMON_SOURCE: &str = include_str!("crash_judge_checker_common.wgsl");
 /// 池级 checker 走读内核：第一、二批不变量的违例位（写违例位那几个字、走到第几步与判不了的原因），走完把计数与几何交进草稿区的交接段。
 pub const GPU_JUDGE_CHECKER_SOURCE: &str = include_str!("crash_judge_checker.wgsl");
-/// 池级 checker 扫描内核：第三批（扫描方向与记账那九条），违例位并进违例位那几个字。
+/// 池级 checker 扫描内核：第三批（扫描方向与记账那九条），违例位并进违例位那几个字。同一份源码里另有第二个入口
+/// [`CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT`]（引用与快照那一截：I-3.9、I-9.14 与只读快照那几条），另编一条管线、接在扫描那一趟之后派。
 pub const GPU_JUDGE_CHECKER_SCAN_SOURCE: &str = include_str!("crash_judge_checker_scan.wgsl");
+/// 池级 checker 的扫描重建：I-1.13（扫描重建与遍历方向的索引相同），接在扫描内核源码之后、同一份源码里的第三个入口
+/// [`CHECKER_SCAN_REBUILD_ENTRY_POINT`]（欠账 C821；用户 2026-10-18 定「补 GPU 扫描重建内核」，两路结论逐位相同、导入比较不改）。
+pub const GPU_JUDGE_CHECKER_SCAN_REBUILD_SOURCE: &str =
+    include_str!("crash_judge_checker_scan_rebuild.wgsl");
+/// 恢复、走读、扫描三条管线的入口名。
+pub const KERNEL_ENTRY_POINT: &str = "main";
+/// 扫描重建那一截的入口名（扫描内核源码里的第三个入口）：I-1.13 是池级 checker 最后判的一条，比对之前要看别的不变量有没有违例
+/// （`singlefs_checker::walk::INVARIANTS_WHOSE_VIOLATION_MEANS_THE_WALKED_INDEX_IS_DAMAGED`），所以另编一条管线、接在引用与快照那一截之后派；
+/// 扫描主入口离展开预算只剩四万多个表达式，不并进它（展开预算各量各的）。
+pub const CHECKER_SCAN_REBUILD_ENTRY_POINT: &str = "scan_rebuild_main";
+/// 引用与快照那一截的入口名（扫描内核源码里的第二个入口）：I-3.9 与 I-9.14（每条候选根引用了什么，判决 `research/prompts/m4-gc-r1-main-verification.md`
+/// 第三节 G3 起按每条根自己的中央映射认位置、数活快照的两棵树与映射叶里留存的条目），与只读快照那几条（I-3.5 ③ ④ 与逆向并进下标 65、
+/// I-3.6、I-3.7，判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S5）。扫描那一截展开之后离预算只剩几千个表达式，装不下这几样，
+/// 挪进同一份源码的第二个入口：两个入口共用全部函数与草稿区，各编一条管线、各量各的展开预算。
+pub const CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT: &str = "references_and_snapshots_main";
 
 /// 池级 checker 违例位的第一个字（位 i 在第 `POOL_CHECKER_VIOLATED_FIRST_WORD + i / 32` 字的第 `i % 32` 位，
 /// 位 i ↔ `singlefs_checker::image::IMPLEMENTED_INVARIANTS[i]`）。
@@ -129,10 +163,15 @@ pub const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD: usi
 /// 点名那一字的两个值。
 pub const NO_ABANDONED_ROOT_NAMED: u32 = 0;
 pub const ABANDONED_ROOT_NAMED: u32 = 1;
-/// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因，不看 journal 那一遍落到的根，判到位，
-/// I-7.4 点名的被抛弃根。
-pub const VERDICT_WORDS: usize =
+/// 扫描重建那一截判 I-1.13 的结局（[`SCAN_REBUILD_OUTCOMES`] 里的码：成立、违例、报不适用的哪一种理由；没走到 I-1.13 的状态是
+/// [`SCAN_REBUILD_OUTCOME_NOT_REACHED`]）：对拍用例拿它与 CPU 池级 checker 那一句不适用的理由逐个比（违例位与判到位之外，C821 的验收
+/// 「报不适用及其理由逐位相同」）。走读内核先写：池级 checker 走到扫描重建之前整池交回的那四种（码 27 到 30）在它那几处早退写码，
+/// 别的状态写没走到；交接段有效时扫描重建那一截再写它判成的那一种（池级 checker 那几处早退之后不走扫描重建，交接段那时无效）。
+pub const SCAN_REBUILD_OUTCOME_WORD: usize =
     ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD + 1;
+/// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因，不看 journal 那一遍落到的根，判到位，
+/// I-7.4 点名的被抛弃根，I-1.13 的结局。
+pub const VERDICT_WORDS: usize = SCAN_REBUILD_OUTCOME_WORD + 1;
 
 // 违例位装得下池级 checker 的每一条不变量；读出来的是一个 u128，字数再多就装不进。
 const _: () = assert!(
@@ -144,15 +183,18 @@ const _: () = assert!(
     "违例位读成一个 u128"
 );
 
-/// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：全部 92 条——三批 49 条，加里程碑三二·1 那一批 16 条
+/// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：全部 103 条——三批 49 条，加里程碑三二·1 那一批 16 条
 /// （判决 `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 11 行），下标 65 的 I-3.5（引用区间的精确性，
 /// 走读内核在回退候选集的版本都走完之后逐对判），再加 C673（三 oracle 合谋测试的补 oracle 改法没做）⑤ ⑥ 那两条
 /// （下标 66 是 I-9.27，走读内核挨着 I-9.16 按表判；下标 67 是 I-5.5，扫描内核每一版重读树表与 extent 树判），
 /// 再加下标 68 的 I-9.28（全部可读根里同一树 ID 的诞生 txg 相同，扫描内核挨着 I-9.14 读根表里每一条根的树表判；
 /// 部分没判与不适用一样不置违例位，结论里只有违例位），再加里程碑三·3 删除线那五条：下标 69 的 I-9.5、70 的 I-3.4、71 的 I-4.7、
 /// 72 的 I-4.6 由扫描内核的删除态扫描在回退候选集的每一版上判（判哪几版、经头 ID 配对、读不全不置位，照 `singlefs_checker::walk` 的
-/// `judge_deletion_state_of_the_versions`），73 的 I-4.4 第一版池级 checker 恒报不适用、内核不置位；I-9.6 墓碑那一半（水位 > 所选根墓碑树里
-/// 已发布墓碑的最大对象 ID）也在扫描内核里判、并进下标 41 那一位。对拍逐位比、不屏蔽。
+/// `judge_deletion_state_of_the_versions`），73 的 I-4.4 起初池级 checker 恒报不适用、内核不置位，里程碑四判 logged_ops 条目之后照下面下标 96 那一段判；
+/// I-9.6 墓碑那一半（水位 > 所选根墓碑树里
+/// 已发布墓碑的最大对象 ID）也在扫描内核里判、并进下标 41 那一位。对拍逐位比：[`POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS`]
+/// 原来只有下标 92 的 I-1.13，补上扫描重建内核之后是空表，比较处经 [`cross_check_words_agree_in_the_cross_check`]、
+/// [`pool_checker_bits_agree_in_the_cross_check`] 不再去掉哪一位。
 /// 下标 74–82 是里程碑三·3 墓碑与谱系那九条（I-9.17、I-9.18、I-9.19、I-9.20、I-9.21、I-9.22、I-9.23、I-9.24、I-9.29，CPU 第 22 批、GPU 第 23 批）：
 /// 走读内核在墓碑树、谱系树的每条内部条目上判 I-9.17、I-9.23（身份不符置位、不记走读失败；孩子是哪一类按它头里的类标签认、不按类型段定读多长，
 /// 头里是另一类、按那一类的长度自证得过的按它自己那一类登记引用、不往下走，第 24 批跟 CPU 同改，inode 树内部条目的 I-9.2 同改）；
@@ -177,13 +219,154 @@ const _: () = assert!(
 /// 下标 90、91 是第 53 批谱系树与退役树的容器容量那两条（判决 `research/prompts/m3-batch50-code-r1-main-verification.md` 第三节 F2）：扫描内核在
 /// 墓碑与谱系那一遍判 I-9.36（谱系树读完容器那一处、退役树读完容器那一处，各一个调用点）；下标 91 的 I-9.37 同下标 79：编进了旋钮值的那一份内核
 /// 才判、没装旋钮的那一份恒不置位。第 56 批 G2 给 I-9.21、I-9.22、I-9.36、I-9.37 补「第一片容器号是 1、相邻加一、每片至少一条」，与 CPU 同判。
+/// 下标 92 的 I-1.13（扫描重建与遍历方向的索引相同）：用户 2026-10-13 定「先进覆盖表但内核不置位，记欠账」（C821），用户 2026-10-18 定
+/// 「补 GPU 扫描重建内核」——扫描内核源码里的第三个入口（[`CHECKER_SCAN_REBUILD_ENTRY_POINT`]，`crash_judge_checker_scan_rebuild.wgsl`）照
+/// `singlefs_checker::walk` 的 `judge_scan_rebuild_agrees_with_the_walked_index` 与 `singlefs_checker::rebuild` 判、置位，接在另三个池级 checker 入口之后派
+/// （比对之前要读那几条别的不变量的违例位）；对拍逐位比，结局另写进 [`SCAN_REBUILD_OUTCOME_WORD`]（不适用的理由逐个比）。
+/// 下标 93 的 I-3.6（deadlist 紧界）与 94 的 I-3.7（活快照可枚举）、并进下标 65 的 I-3.5 ③ ④ 与逆向（判决 `research/prompts/m4-snapshot-r1-main-verification.md`
+/// 第三节 S5）由扫描内核源码里的第二个入口（[`CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT`]，引用与快照那一截）照 `singlefs_checker::walk` 的
+/// `judge_snapshots_and_deadlists_of_the_versions` 在回退候选集每一版上判，对拍逐位比。走读内核另照 CPU 走活快照的两棵树（码 14 照 inode 树、
+/// 码 15 照 extent 树，与活头共享的单元不判第二次引用、销毁中的不走）与 deadlist 树（种类 8，多层码 2 树），判树表里快照条目的配对（I-9.16 ③）、
+/// 头 ID（I-9.27）与跳过销毁中记号的前驱链（I-9.25）；豁免三类之外的指针按这一版中央映射认位置（判决 `research/prompts/m4-gc-r1-main-verification.md`
+/// 第三节 G3：先按提示读、两份都对不上再按映射位置读，引用集合与 I-3.5 的折叠表按映射位置与映射 key）。
+/// 下标 95–98 是里程碑四自建 GC 新判的四条（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1、G3 的 N2、N3、N5、N6），连同下标 73 的
+/// I-4.4 改判 logged_ops 条目（N4），都照 `singlefs_checker::walk` 那几个函数判、置位，对拍逐位比：走读内核与引用集合那一遍把 logged_ops 树（种类 12）
+/// 当多层码 2 树走、节点记进引用（同 CPU 的主走读与 `TreeKindForReferenceScan::LoggedOperations`），恢复内核与 core 的冷走读一样把 logged_ops 根
+/// 数进映射条目数；扫描内核主入口在记账那一判之后判下标 97 的 I-3.16（占着的槽取 I-3.1 那一份并集：全部走过的版本的引用、第一遍隔离豁免的组、
+/// F 之下仍在 defer 的槽，排一次序逐盘按序走一遍，`judge_fragmentation_and_empty_segment_statistics`）；引用与快照那一截之后在版本清单每一版上
+/// 判 73 的 I-4.4 与 96 的 I-5.6（`judge_compaction_intents_of_the_versions`）、95 的 I-3.15（`judge_unreleased_allocation_records_against_the_central_mapping`，
+/// 隔离判据接着 I-3.1 那两遍的位置项校验和）、98 的 I-1.14（`judge_unit_bytes_of_each_mapping_key_across_the_versions`）。表越过上限的判不了
+/// （扫描内核站点 100–104）。
+/// 下标 99 的 I-4.10（截断中间态有账）与 100 的 I-9.38（数据单元声明长度对 size）是截断那一批新立的两条（判决
+/// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 T-2、T-4，T-2 只判一个方向见第六节 S2），连同下标 72 的 I-4.6 改成每条记录都判
+/// （T-3：单元从 0 起连号、单元数对上段叶条目的标签，标签判法照第六节 S1）：扫描内核的删除态扫描照 `singlefs_checker::walk` 的
+/// `judge_data_unit_counts_of_the_inodes_against_their_size`、`judge_data_units_beyond_the_size_against_the_truncation_intents`、
+/// `judge_declared_lengths_of_the_data_units_within_the_size` 判（extent 树读出每个号的声明与每个单元，这一版 logged_ops 里的截断条目照读）；
+/// 下标 73 的 I-4.4 在引用与快照那一截收截断条目（T-1，`judge_truncation_intent_against_its_record`）；走读与扫描两个内核的 extent 树都认上段叶条目
+/// 标签 3、4（K5）。四条都置位、对拍逐位比；单元表越过上限的判不了（扫描内核站点 105）。I-1.13 照第六节 S4 两侧按 size 滤，在扫描重建那一截判。
+/// 下标 101 的 I-9.39（截断字段之外的活单元不早于它，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）是截断第二轮新立的一条：
+/// 扫描内核的删除态扫描照 `singlefs_checker::walk` 的 `judge_birth_txgs_of_the_live_data_units_beyond_the_truncation_field` 每条记录判一次
+/// （inode 记录那张表一行加 T、N_w 两段，读 size 之内、截断字段之外的单元头诞生代号），置位、对拍逐位比；读法 Z 第四条只在 I-1.13 里，由扫描重建那一截判。
+/// 同一轮 I-9.7 拆段（走读内核判 108–119、136–139 恒 0 与截断字段，incompat 位 2 按各盘择到的槽）不加下标。
+/// 下标 102 的 I-9.40（extent 上段形状由有条目的 inode 号集合定、根层级最低，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md`
+/// 第三节 M2）是多文件删除那一批新立的一条：扫描内核的删除态扫描照 `singlefs_checker::walk` 的 `judge_extent_upper_segment_shape_of_a_version`
+/// 每一版的每一棵 extent 树判（深度优先走上段、按后序记子树里有没有落在自己那片叶区间里的条目，不把节点位置与号抄进表；只有改过字节的镜像才
+/// 逐个再走上段找罩着那个节点的号、找那个号的那片叶），置位、对拍逐位比——两路逐位相同照用户 2026-10-19 定的双机导入冲突岔路的同一口径，
+/// 不进内核不置位的表。
 /// 用户 2026-10-04 定「改回要求全覆盖」：没有「内核还没判」那一张表。
 pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &[
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
     26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
     50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
-    74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
+    74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97,
+    98, 99, 100, 101, 102,
 ];
+
+/// 内核源码里写死下标的那几条（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_4_4`、`INVARIANT_I_3_15`、`INVARIANT_I_5_6`、`INVARIANT_I_3_16`、
+/// `INVARIANT_I_1_14`）：里程碑四自建 GC 那几条判法照这几个下标置位，池级 checker 的清单在别处插进一条、下标挪了，这里编译不过
+/// （内核里全部 `INVARIANT_I_*` 常量另由 `tests::every_invariant_index_written_into_the_checker_kernels_names_that_invariant_in_the_pool_checker_list` 逐个核）。
+pub const KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES: [(&str, usize); 5] = [
+    (
+        singlefs_checker::image::INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+        73,
+    ),
+    (
+        singlefs_checker::image::UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+        95,
+    ),
+    (
+        singlefs_checker::image::COMPACTION_REGION_HOLDS_NO_RECORD_ALLOCATED_AFTER_THE_INTENT_WAS_ISSUED,
+        96,
+    ),
+    (
+        singlefs_checker::image::FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN,
+        97,
+    ),
+    (
+        singlefs_checker::image::UNIT_BYTES_OF_ONE_MAPPING_KEY_AGREE_ACROSS_THE_VERSIONS,
+        98,
+    ),
+];
+
+/// 截断那一批内核里写死下标的那几条（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_4_6`、`INVARIANT_I_4_10`、`INVARIANT_I_9_38`、`INVARIANT_I_9_39`；判决
+/// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 T-2 到 T-4、`research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）：
+/// 同 [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了这里编译不过（I-4.4 收截断条目那一判照那张表里的下标 73 置位）。
+pub const KERNEL_INVARIANT_INDEXES_OF_THE_TRUNCATION_JUDGES: [(&str, usize); 4] = [
+    (
+        singlefs_checker::image::DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE,
+        72,
+    ),
+    (
+        singlefs_checker::image::DATA_UNITS_BEYOND_THE_SIZE_ARE_NAMED_BY_A_TRUNCATION_INTENT,
+        99,
+    ),
+    (
+        singlefs_checker::image::DECLARED_LENGTH_OF_EACH_DATA_UNIT_WITHIN_THE_SIZE_MATCHES_THE_SIZE,
+        100,
+    ),
+    (
+        singlefs_checker::image::LIVE_DATA_UNITS_BEYOND_THE_TRUNCATION_FIELD_ARE_BORN_NO_EARLIER_THAN_IT,
+        101,
+    ),
+];
+
+/// 内核里写死下标的一张表：每条在池级 checker 清单里的下标就是写死的那个、在覆盖表里、不在内核不置位的表里（对拍逐位比）。不成立就在编译期 panic。
+const fn assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    kernel_invariant_indexes: &[(&str, usize)],
+) {
+    let mut position = 0;
+    while position < kernel_invariant_indexes.len() {
+        let (name, index) = kernel_invariant_indexes[position];
+        assert!(
+            index < IMPLEMENTED_INVARIANTS.len()
+                && invariant_names_are_equal(IMPLEMENTED_INVARIANTS[index], name),
+            "内核里写死的下标与池级 checker 清单里那一条的下标不同：改内核的 INVARIANT_I_* 常量与这张表"
+        );
+        assert!(
+            index < POOL_CHECKER_COVERED_INVARIANT_INDEXES.len()
+                && POOL_CHECKER_COVERED_INVARIANT_INDEXES[index] == index,
+            "内核里写死下标的那几条在 GPU 判器的覆盖表里"
+        );
+        let mut unset_position = 0;
+        while unset_position < POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS.len() {
+            assert!(
+                POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS[unset_position]
+                    != index,
+                "内核里写死下标的那几条上了内核、对拍逐位比，不进内核不置位的表"
+            );
+            unset_position += 1;
+        }
+        position += 1;
+    }
+}
+
+/// 扫描重建那一截在内核里写死下标的那一条（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_1_13`）：同
+/// [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了、或它又登记回内核不置位的表，这里编译不过。
+pub const KERNEL_INVARIANT_INDEX_OF_THE_SCAN_REBUILD_JUDGE: [(&str, usize); 1] = [(
+    singlefs_checker::image::SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+    92,
+)];
+
+/// 上段规范形那一条在内核里写死下标（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_9_40`）：同
+/// [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了、或它登记进内核不置位的表，这里编译不过。
+pub const KERNEL_INVARIANT_INDEX_OF_THE_UPPER_SHAPE_JUDGE: [(&str, usize); 1] = [(
+    singlefs_checker::image::EXTENT_UPPER_SEGMENT_IS_THE_CANONICAL_SHAPE_OF_THE_INODES_WITH_AN_ENTRY,
+    102,
+)];
+
+// 里程碑四自建 GC 那几条、截断那一批那几条、扫描重建那一条与上段规范形那一条。
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEX_OF_THE_UPPER_SHAPE_JUDGE,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEX_OF_THE_SCAN_REBUILD_JUDGE,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEXES_OF_THE_TRUNCATION_JUDGES,
+);
 
 // 覆盖表就是池级 checker 的每一条，按下标升序：第 k 项是 k。新立一条不变量而内核没跟上时这里编译不过，不悄悄让 GPU 那一位恒 0。
 const _: () = {
@@ -197,6 +380,28 @@ const _: () = {
         assert!(
             POOL_CHECKER_COVERED_INVARIANT_INDEXES[position] == position,
             "覆盖表按下标升序、一条不缺一条不重：第 k 项是 k"
+        );
+        position += 1;
+    }
+};
+
+// 内核不置位、对拍不比的下标都在覆盖表里：不在覆盖表里的那一位本来就不比，不该登记成「进了覆盖表而内核不置位」。
+const _: () = {
+    let mut position = 0;
+    while position < POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS.len() {
+        let mut is_covered = false;
+        let mut covered_position = 0;
+        while covered_position < POOL_CHECKER_COVERED_INVARIANT_INDEXES.len() {
+            if POOL_CHECKER_COVERED_INVARIANT_INDEXES[covered_position]
+                == POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS[position]
+            {
+                is_covered = true;
+            }
+            covered_position += 1;
+        }
+        assert!(
+            is_covered,
+            "内核不置位的下标都在 GPU 判器的覆盖表（POOL_CHECKER_COVERED_INVARIANT_INDEXES）里"
         );
         position += 1;
     }
@@ -249,6 +454,7 @@ pub fn verdict_layout_wgsl_constants() -> String {
          const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD}u;\n\
          const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD}u;\n\
          const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD}u;\n\
+         const SCAN_REBUILD_OUTCOME_WORD: u32 = {SCAN_REBUILD_OUTCOME_WORD}u;\n\
          const NO_ABANDONED_ROOT_NAMED: u32 = {NO_ABANDONED_ROOT_NAMED}u;\n\
          const ABANDONED_ROOT_NAMED: u32 = {ABANDONED_ROOT_NAMED}u;\n\
          const OUTCOME_NO_FILE: u32 = {RECOVERY_OUTCOME_CODE_NO_FILE}u;\n\
@@ -283,16 +489,41 @@ pub fn judge_table_layout_wgsl_constants() -> String {
     constants
 }
 
-/// 接在每个判器内核源码最前面的全部常量：结论字号、打包表的表号与段表宽、段的展开方式码、失败点码。
+/// 接在每个判器内核源码最前面的全部常量：结论字号、打包表的表号与段表宽、段的展开方式码、失败点码、扫描重建的结局码。
 #[must_use]
 pub fn kernel_prelude_wgsl_constants() -> String {
     format!(
-        "{}{}{}{}",
+        "{}{}{}{}{}",
         verdict_layout_wgsl_constants(),
         judge_table_layout_wgsl_constants(),
         segment_expansion_code_wgsl_constants(),
-        failure_point_wgsl_constants()
+        failure_point_wgsl_constants(),
+        scan_rebuild_outcome_wgsl_constants()
     )
+}
+
+/// 扫描重建结局码在内核里的常量（WGSL 源码）：[`SCAN_REBUILD_OUTCOMES`] 每一行一个，再加 [`SCAN_REBUILD_OUTCOME_NOT_REACHED`]。
+#[must_use]
+pub fn scan_rebuild_outcome_wgsl_constants() -> String {
+    let mut constants: String = SCAN_REBUILD_OUTCOMES
+        .iter()
+        .map(|outcome| {
+            format!(
+                "const {}: u32 = {}u;\n",
+                outcome.constant_name, outcome.code
+            )
+        })
+        .collect();
+    constants.push_str(&format!(
+        "const SCAN_REBUILD_OUTCOME_NOT_REACHED: u32 = {SCAN_REBUILD_OUTCOME_NOT_REACHED}u;\n"
+    ));
+    constants
+}
+
+/// GPU 一个状态的结论里 I-1.13 的结局码（[`SCAN_REBUILD_OUTCOME_WORD`]）。
+#[must_use]
+pub fn scan_rebuild_outcome_of_the_gpu_verdict(words: &[u32; VERDICT_WORDS]) -> u32 {
+    words[SCAN_REBUILD_OUTCOME_WORD]
 }
 
 /// 失败点码在内核里的常量（WGSL 源码）：[`GPU_FAILURE_POINTS`] 每一行一个，名字去掉 `GPU_` 前缀（`FAILURE_POINT_*`）。
@@ -336,6 +567,7 @@ pub fn cross_check_words_of_gpu_verdict(words: &[u32]) -> CrossCheckWords {
         consulted_pass_failure_point: words[CONSULTED_PASS_FAILURE_POINT_WORD],
         ignored_pass_failure_point: words[IGNORED_PASS_FAILURE_POINT_WORD],
         pool_checker_judged_bits: pool_checker_judged_bits(words),
+        scan_rebuild_outcome: scan_rebuild_outcome_of_the_gpu_verdict(words),
         gpu_could_not_judge: words[0] & undecidable_bit != 0
             || words[POOL_CHECKER_UNDECIDABLE_WORD] != 0,
     }
@@ -496,8 +728,8 @@ pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
 /// `C_MAX_INSTANCE_ROWS` 从 1024 抬到 32 768 行（5 字一行 163 840 字，加桶表 65 536 字、同实例下一行 32 768 字）；主走读 inode → 对象出生代
 /// `C_MAX_INODE_BIRTHS`、扫描内核一版的 inode 记录 `D_MAX_INODE_RECORDS` 与 I-9.29 跨版本那张表 `D_MAX_OBJECT_BIRTHS` 抬到 16 384 条
 /// （4、7、6 字一条 65 536 + 114 688 + 98 304 字，各加桶表 32 768 字；点名超过一条 journal 记录的那个场景 12 582 个号）：
-/// 423 864 + 24 576 + 73 728 + 32 768 + 20 480 + 8192 + 163 840 + 65 536 + 32 768 + 73 728 + 65 536 + 32 768 + 114 688 + 32 768
-/// + 98 304 + 32 768 = 1 296 312（每个状态 5 185 248 字节，原来 1 695 456 字节）。
+/// 423 864 + 24 576 + 73 728 + 32 768 + 20 480 + 8192 + 163 840 + 65 536 + 32 768 + 73 728 + 65 536 + 32 768 + 114 688 + 32 768 +
+/// 98 304 + 32 768 = 1 296 312（每个状态 5 185 248 字节，原来 1 695 456 字节）。
 ///
 /// 再之后扫描内核释放代高于 F 的已释放记录 `C_MAX_RELEASED_ABOVE` 从 2048 抬到与 `C_MAX_ALLOC_RECORDS` 同宽的 4096 条（容器树旋钮下的随机历史
 /// F = 0，第 53、55 步起最新根的已释放记录多于 2048 条，在站点 34 判不了）：挪到末尾（原处 8192 字空着），4 字一条 × 4096 = 16 384 字，
@@ -508,8 +740,33 @@ pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
 /// （原处 10 240 字扫描内核不再用），5 字一条 × 4096 = 20 480 字，1 312 696 + 20 480 = 1 333 176（每个状态 5 332 704 字节）；
 /// 它的桶表照旧借 `C_JOURNAL_GROUP_KEYS` 那一段（桶数跟着翻倍到 8192，那一段正好 8192 字），不占草稿区。
 /// 那张表满了之后不再记判不了（站点 31 没有了）：新来的记录不进表、照判，I-3.10 是置位，同一条记录判两遍结论相同；表的大小不变。
-pub const SCRATCH_WORDS: usize = 1_333_176;
-/// 内核的工作组大小（三个内核都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
+///
+/// 再之后里程碑四接在后面的几张（`crash_judge_checker_common.wgsl` 的 ⑭；判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3、
+/// `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S5）：主走读的「中央映射 key → 单元」11 字一条 × 4096 = 45 056 字加桶表 8192 字，
+/// 一版的中央映射 16 字一条 × 1024 = 16 384 字加桶表 2048 字，引用与快照那一截的单元表 10 字一条 × 8192 = 81 920 字加桶表 16 384 字、
+/// deadlist 叶条目 2 字一条 × 4096 = 8192 字、版本清单 12 字一行 × 560 = 6720 字、读树的显式栈 4 字一行 × 1024 = 4096 字：
+/// 1 333 176 + 45 056 + 8192 + 16 384 + 2048 + 81 920 + 16 384 + 8192 + 6720 + 4096 = 1 522 168（每个状态 6 088 672 字节）。
+/// 里程碑四自建 GC 新判的那几条（I-3.16、I-4.4、I-5.6、I-3.15、I-1.14，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1、G3）
+/// 不另加：扫描内核主入口 I-3.16 的占着的槽区间表，与引用与快照那一截之后 I-3.15 的落点表、logged_ops 叶条目、读树的栈、I-1.14 跨版本那张 key 表，
+/// 都借引用与快照那一截的单元表起到草稿区末尾那一段（117 312 字；两处各自从头写、用完不再读，`crash_judge_checker_scan.wgsl` 的 `C_OCCUPIED` 与
+/// `G_PLACEMENTS` 那几处的 `const_assert` 守着装得下）；I-3.15 接着 I-3.1 那两遍隔离豁免用的「补没补过根环里没走过的根」那一个字记在原处空着的
+/// 185 056（`C_HARVESTED_BY_THE_ACCOUNTING_QUARANTINE`）。
+///
+/// 再之后截断第二轮的 I-9.39（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）要每条记录的截断字段：扫描内核一版的 inode 记录
+/// `D_INODE_RECORDS` 一行从 7 字加到 11 字（多 T、N_w 两段各 2 字），16 384 条多 4 × 16 384 = 65 536 字，其后各表照偏移链往后挪：
+/// 1 522 168 + 65 536 = 1 587 704（每个状态 6 350 816 字节）。
+///
+/// 再之后走读内核 `w_merge_below`（别的版本先走过的单元下面的落点并进这一版）的显式栈与展开过的单元从各 1024 条抬到各
+/// `C_MAX_BELOW + 1` = 4097 条（一个 900 个数据单元的长文件被后一版共用时展开过的落点多于 1024 个，在站点 5 判不了；为什么这个条数够见
+/// `crash_judge_checker_common.wgsl` 定义 `C_MERGE_PENDING` 那一处）：挪到末尾（原处 6144 字留给原来就借它的中央映射只读读法的显式栈与
+/// I-3.5 摊单元），3 字一条两张 2 × 4097 × 3 = 24 582 字，1 587 704 + 24 582 = 1 612 286（每个状态 6 449 144 字节）。
+///
+/// 再之后 `w_merge_below` 的两样找法加散列索引（抬到 4097 条之后从表头比到表尾去重、每展开一个单元把挂父单元那张表从头比到尾，
+/// 长文件旁边那条流一次派活撞驱动的上下文切换时限；`crash_judge_checker_common.wgsl` 定义 `W_MERGE_EXPANDED_BUCKETS` 那一处）：
+/// 展开过的单元的桶表 16 384 字，挂父单元那张表两套上下文各一份桶表 8192 字、下一行 4096 字、最后一行 4096 字，
+/// 1 612 286 + 16 384 + 2 × 16 384 = 1 661 438（每个状态 6 645 752 字节）。
+pub const SCRATCH_WORDS: usize = 1_661_438;
+/// 内核的工作组大小（四个入口都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
 pub const WORKGROUP_SIZE: usize = 64;
 /// 内核的四个绑定（`crash_judge_common.wgsl` 开头）：派活参数、打包的表、结论、草稿区。
 pub const DISPATCH_BINDING: u32 = 0;
@@ -533,6 +790,12 @@ pub fn dispatch_words(first_ordinal: u64, state_count: usize) -> [u32; 4] {
 
 /// 结论缓冲的初值：每个字全 1。两个内核都写过的状态第 0、1 字不会同时全 1、走到第几步那一字也不会全 1。
 pub const VERDICT_WORD_NOT_WRITTEN: u32 = u32::MAX;
+
+// 扫描重建那一字的「没走到」就是结论缓冲的初值（走读内核在不是整池交回的状态上写的也是它）：两处各写一份数，这里核相等。
+const _: () = assert!(
+    SCAN_REBUILD_OUTCOME_NOT_REACHED == VERDICT_WORD_NOT_WRITTEN,
+    "扫描重建那一字没走到的码是结论缓冲的初值"
+);
 
 /// 这个状态的结论是不是两个内核都写过（不是初值）。
 #[must_use]
@@ -643,13 +906,14 @@ pub fn checker_scan_kernel_source() -> String {
     checker_scan_kernel_source_given_the_container_capacity_knobs(ContainerCapacityKnobs::PRODUCT)
 }
 
-/// 池级 checker 扫描内核的整份源码，三棵容器树的旋钮值编进内核（[`container_capacity_knob_wgsl_constants`]）。
+/// 池级 checker 扫描内核的整份源码，三棵容器树的旋钮值编进内核（[`container_capacity_knob_wgsl_constants`]）。扫描重建那一截
+/// （[`GPU_JUDGE_CHECKER_SCAN_REBUILD_SOURCE`]，入口 [`CHECKER_SCAN_REBUILD_ENTRY_POINT`]）接在最后：它用扫描内核里只读不判的那几遍读法。
 #[must_use]
 pub fn checker_scan_kernel_source_given_the_container_capacity_knobs(
     knobs: ContainerCapacityKnobs,
 ) -> String {
     format!(
-        "{}\n{}\n{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_SCAN_SOURCE}",
+        "{}\n{}\n{GPU_JUDGE_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_COMMON_SOURCE}\n{GPU_JUDGE_CHECKER_SCAN_SOURCE}\n{GPU_JUDGE_CHECKER_SCAN_REBUILD_SOURCE}",
         kernel_prelude_wgsl_constants(),
         container_capacity_knob_wgsl_constants(knobs)
     )
@@ -752,6 +1016,45 @@ mod tests {
         );
     }
 
+    /// 两个检查内核共用那一半里每一个 `const INVARIANT_I_<类>_<号>: u32 = <下标>u;`，下标处的那一条就是 `I-<类>.<号>`（两个内核照这几个常量置违例位与判到位；
+    /// 清单只往末尾追加，下标写错、清单里插进一条而常量没跟上，这里红）；里程碑四自建 GC 那五条都在里面。
+    #[test]
+    fn every_invariant_index_written_into_the_checker_kernels_names_that_invariant_in_the_pool_checker_list(
+    ) {
+        let mut constants_checked = Vec::new();
+        for line in super::GPU_JUDGE_CHECKER_COMMON_SOURCE.lines() {
+            let Some(rest) = line.strip_prefix("const INVARIANT_I_") else {
+                continue;
+            };
+            let (name_part, index_part) = rest.split_once(": u32 = ").unwrap_or_else(|| {
+                panic!("常量行的形态是 `const INVARIANT_I_x_y: u32 = Nu;`：{line}")
+            });
+            let invariant = format!("I-{}", name_part.replacen('_', ".", 1));
+            let index: usize = index_part
+                .strip_suffix("u;")
+                .and_then(|digits| digits.parse().ok())
+                .unwrap_or_else(|| panic!("下标写成十进制加 u：{line}"));
+            assert_eq!(
+                super::IMPLEMENTED_INVARIANTS.get(index).copied(),
+                Some(invariant.as_str()),
+                "内核常量 INVARIANT_I_{name_part} 的下标 {index} 处不是 {invariant}"
+            );
+            constants_checked.push(invariant);
+        }
+        for (invariant, index) in
+            super::KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES
+                .into_iter()
+                .chain(super::KERNEL_INVARIANT_INDEXES_OF_THE_TRUNCATION_JUDGES)
+                .chain(super::KERNEL_INVARIANT_INDEX_OF_THE_SCAN_REBUILD_JUDGE)
+                .chain(super::KERNEL_INVARIANT_INDEX_OF_THE_UPPER_SHAPE_JUDGE)
+        {
+            assert!(
+                constants_checked.iter().any(|checked| checked == invariant),
+                "内核里有 {invariant}（下标 {index}）那个常量"
+            );
+        }
+    }
+
     /// 结论的每个字号互不相同、都在 VERDICT_WORDS 之内；不看 journal 那一遍的根与判到位接在池级 checker 那几个字之后，不挪老字号
     /// （放量流水线的 gpu_recovery_words 按第 2、3、4、6 字取）。
     #[test]
@@ -773,6 +1076,7 @@ mod tests {
             super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD,
             super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD,
             super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD,
+            super::SCAN_REBUILD_OUTCOME_WORD,
         ];
         indexes.extend(
             POOL_CHECKER_VIOLATED_FIRST_WORD
@@ -817,6 +1121,99 @@ mod tests {
             "const SEGMENT_WORDS: u32 = {}u;",
             crate::crash_judge_tables::SEGMENT_WORDS
         )));
+    }
+
+    /// 扫描重建的结局码一种一个码、互不相同、不撞没走到的那个初值；内核里每个码都有一行常量；CPU 池级 checker 判 I-1.13 的每一种
+    /// （成立、违例、表里每一句不适用的理由原文）换回表里那一行的码，判定里没有 I-1.13 换成没走到，表外的理由与部分没判报错。
+    #[test]
+    fn every_scan_rebuild_outcome_has_its_own_code_generated_into_the_kernels_and_read_back_from_the_pool_checker(
+    ) {
+        use singlefs_checker::image::{
+            InvariantVerdict, SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+        };
+        let mut codes: Vec<u32> = super::SCAN_REBUILD_OUTCOMES
+            .iter()
+            .map(|outcome| outcome.code)
+            .collect();
+        codes.push(super::SCAN_REBUILD_OUTCOME_NOT_REACHED);
+        let count = codes.len();
+        codes.sort_unstable();
+        codes.dedup();
+        assert_eq!(codes.len(), count, "结局码不重，也不撞没走到的初值");
+        let constants = super::scan_rebuild_outcome_wgsl_constants();
+        for outcome in super::SCAN_REBUILD_OUTCOMES {
+            let line = format!("const {}: u32 = {}u;", outcome.constant_name, outcome.code);
+            assert_eq!(constants.matches(&line).count(), 1, "恰好一行 {line}");
+            let verdict = match outcome.verdict_of_the_pool_checker {
+                super::ScanRebuildVerdictOfThePoolChecker::Holds => InvariantVerdict::Holds,
+                super::ScanRebuildVerdictOfThePoolChecker::Violated => {
+                    InvariantVerdict::Violated("扫描重建的三张表与遍历方向的不同".to_string())
+                }
+                super::ScanRebuildVerdictOfThePoolChecker::NotApplicable(reason) => {
+                    InvariantVerdict::NotApplicable(reason)
+                }
+            };
+            assert_eq!(
+                super::scan_rebuild_outcome_of_the_pool_checker_verdicts(&[(
+                    SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+                    verdict
+                )]),
+                Ok(outcome.code),
+                "{} 换回自己的码",
+                outcome.constant_name
+            );
+        }
+        assert_eq!(
+            super::scan_rebuild_outcome_of_the_pool_checker_verdicts(&[]),
+            Ok(super::SCAN_REBUILD_OUTCOME_NOT_REACHED),
+            "判定里没有 I-1.13：池级 checker 没走到它"
+        );
+        assert!(
+            super::scan_rebuild_outcome_of_the_pool_checker_verdicts(&[(
+                SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+                InvariantVerdict::NotApplicable("表外的一句理由")
+            )])
+            .is_err(),
+            "表外的理由认不得"
+        );
+        assert!(
+            super::scan_rebuild_outcome_of_the_pool_checker_verdicts(&[(
+                SCAN_REBUILD_AGREES_WITH_THE_WALKED_INDEX,
+                InvariantVerdict::PartiallyJudged("部分没判".to_string())
+            )])
+            .is_err(),
+            "扫描重建没有部分没判这一种"
+        );
+        assert!(
+            super::kernel_prelude_wgsl_constants().contains(&constants),
+            "结局码接在每个内核源码最前面的常量里"
+        );
+        // 每一种结局都有内核写它：池级 checker 走到扫描重建之前整池交回的四种由走读内核在那几处早退写，别的由扫描重建那一截写
+        const WRITTEN_BY_THE_WALK_KERNEL: [&str; 4] = [
+            "SCAN_REBUILD_OUTCOME_POOL_REFUSED_FOR_A_SYSTEM_CONFIGURATION_VALUE_THE_READER_DOES_NOT_ACCEPT",
+            "SCAN_REBUILD_OUTCOME_POOL_REFUSED_FOR_UNEQUAL_JOURNAL_RING_GEOMETRY_FIELDS",
+            "SCAN_REBUILD_OUTCOME_NO_DEVICE_YIELDS_A_VALID_SYSTEM_CONFIGURATION",
+            "SCAN_REBUILD_OUTCOME_ROOT_RING_HOLDS_NO_SELF_VERIFIED_ROOT",
+        ];
+        for outcome in super::SCAN_REBUILD_OUTCOMES {
+            let is_a_whole_pool_return =
+                WRITTEN_BY_THE_WALK_KERNEL.contains(&outcome.constant_name);
+            let (kernel, kernel_source) = if is_a_whole_pool_return {
+                ("走读内核", super::GPU_JUDGE_CHECKER_SOURCE)
+            } else {
+                (
+                    "扫描重建那一截",
+                    super::GPU_JUDGE_CHECKER_SCAN_REBUILD_SOURCE,
+                )
+            };
+            assert!(
+                kernel_source.contains(&format!("{};", outcome.constant_name))
+                    || kernel_source.contains(&format!("{},", outcome.constant_name))
+                    || kernel_source.contains(&format!("{})", outcome.constant_name)),
+                "{} 由{kernel}写",
+                outcome.constant_name
+            );
+        }
     }
 
     /// 失败点码一码一个成员、互不相同；内核里每个码都有一行常量（名字去掉 GPU_）。
@@ -983,7 +1380,8 @@ mod tests {
         GPU_FAILURE_POINT_ROOT_PUBLISH_CARRIES_MORE_THAN_ONE_LAST_RECORD_FLAG_WHOSE_ANCHOR_IS_UNDECIDED
     );
 
-    /// GPU 结论字换成对拍字：红位去掉判不了那一位、两遍的根与结局与失败点各取各的字、违例位与判到位各读四个字；判不了两种来路都认。
+    /// GPU 结论字换成对拍字：红位去掉判不了那一位、两遍的根与结局与失败点各取各的字、违例位与判到位各读四个字、I-1.13 的结局码取第 24 字；
+    /// 判不了两种来路都认。
     #[test]
     fn the_cross_check_words_of_a_gpu_verdict_take_each_field_from_its_word() {
         let mut words = [0u32; VERDICT_WORDS];
@@ -997,6 +1395,7 @@ mod tests {
         words[super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD] = 8;
         words[POOL_CHECKER_VIOLATED_FIRST_WORD + 3] = 1 << 31;
         words[super::POOL_CHECKER_JUDGED_FIRST_WORD + 2] = 1;
+        words[super::SCAN_REBUILD_OUTCOME_WORD] = 25;
         let cross = super::cross_check_words_of_gpu_verdict(&words);
         assert_eq!(
             cross,
@@ -1016,6 +1415,7 @@ mod tests {
                 consulted_pass_failure_point: super::GPU_FAILURE_POINT_MAPPING_MISS,
                 ignored_pass_failure_point: super::GPU_FAILURE_POINT_NONE,
                 pool_checker_judged_bits: 1u128 << 64,
+                scan_rebuild_outcome: 25,
                 gpu_could_not_judge: true,
             }
         );

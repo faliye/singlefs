@@ -1,7 +1,9 @@
 //! 池级 checker 的三处盲区（代码审阅 6c 第 5、6、8 条，里程碑二收尾批「实审 B1」）各配会红的坏镜像：
 //! ① 同一个根（或由记录施加出来的同一版）里第二次引用同一个单元，判 I-5.1（物理范围不重叠）；不同根之间共享没改过的单元照旧合法；
 //! ② 盘上自述的 key 宽 / 层级 / journal 计数器是坏值时 checker 不许 panic（panic 等于那个状态上一条不变量都没判）；
-//! ③ 中央映射条目：key 的类标签与出生身份要与它指的单元头相符，认不得的类标签不按 32 KiB 硬读，指的物理范围进引用集合。
+//! ③ 中央映射条目：key 的类标签与出生身份要与它指的单元头相符，认不得的类标签不按 32 KiB 硬读；映射条目改坏或改指别处时，
+//! 未释放记录罩住的那个单元在映射里找不到相符的 key（I-3.15（未释放记录罩住的单元由映射指在这一槽），判决
+//! `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 的 N2 反查）跟着红。
 //! 镜像都从 `TreeSplitPool` 的第一个文件版本（或再覆盖写一次）出发，改一处，被改单元重封、新校验和沿引用链补到根槽。
 
 mod common;
@@ -13,7 +15,12 @@ use common_tree_split::{
     write_unit_to_the_same_slot_on_both_devices, TreeSplitPool, ACCOUNTING_OF_THE_NODE_FORMAT,
     CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
 };
-use singlefs_checker::image::{ImageReader, InvariantVerdict, MAPPING_KEY_MATCHES_THE_UNIT_HEADER};
+use singlefs_checker::image::{
+    ImageReader, InvariantVerdict,
+    FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+    MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
@@ -737,8 +744,9 @@ fn entry_of_class(entries: &mut [Vec<u8>], unit_class: u8) -> &mut Vec<u8> {
 
 /// 数据单元那条映射条目的 key 尾段（码 1 的事务号）加一：key 说的出生身份与它指的数据单元头里的不再相同，
 /// 判映射 key 与单元头相符那一条（实审 B2 从 I-1.2 搬过去）。改之前 checker 只核映射条目的校验和与升序，全绿。
+/// 从分配记录那一头看是同一处对不上：那个数据单元的未释放记录在映射里找不到出生身份相符的 key（I-3.15，N2 反查）。
 #[test]
-fn a_mapping_key_whose_birth_identity_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant(
+fn a_mapping_key_whose_birth_identity_is_not_the_one_in_the_unit_header_reddens_the_mapping_key_and_the_reverse_lookup_invariants(
 ) {
     let pool = product_capacity_pool();
     let image = image_with_the_mapping_entries_changed(&pool, |entries| {
@@ -748,8 +756,11 @@ fn a_mapping_key_whose_birth_identity_is_not_the_one_in_the_unit_header_reddens_
     let red = violations(&image);
     assert_eq!(
         violated_names(&red),
-        [MAPPING_KEY_MATCHES_THE_UNIT_HEADER],
-        "判红的该只有映射 key 与单元头相符那一条：{red:?}"
+        [
+            MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+        ],
+        "判红的该只有映射 key 与单元头相符那一条与反查那一条：{red:?}"
     );
     assert!(
         red[0].1.contains("映射条目"),
@@ -759,9 +770,9 @@ fn a_mapping_key_whose_birth_identity_is_not_the_one_in_the_unit_header_reddens_
 }
 
 /// inode 叶容器（码 3）那条映射条目的 key 类标签改成 1：key 说它是数据单元，指的单元头里是码 3（两者都是 32 KiB，读得出、校验和对得上），
-/// 判映射 key 与单元头相符那一条（实审 B2 从 I-1.6 搬过去）。改之前全绿。
+/// 判映射 key 与单元头相符那一条（实审 B2 从 I-1.6 搬过去）。改之前全绿。叶容器的未释放记录在映射里找不到码 3 的相符 key（I-3.15）。
 #[test]
-fn a_mapping_key_whose_class_is_not_the_class_of_the_unit_it_names_reddens_only_the_mapping_key_invariant(
+fn a_mapping_key_whose_class_is_not_the_class_of_the_unit_it_names_reddens_the_mapping_key_and_the_reverse_lookup_invariants(
 ) {
     let pool = product_capacity_pool();
     let image = image_with_the_mapping_entries_changed(&pool, |entries| {
@@ -770,8 +781,11 @@ fn a_mapping_key_whose_class_is_not_the_class_of_the_unit_it_names_reddens_only_
     let red = violations(&image);
     assert_eq!(
         violated_names(&red),
-        [MAPPING_KEY_MATCHES_THE_UNIT_HEADER],
-        "判红的该只有映射 key 与单元头相符那一条：{red:?}"
+        [
+            MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+        ],
+        "判红的该只有映射 key 与单元头相符那一条与反查那一条：{red:?}"
     );
     assert!(
         red[0].1.contains("映射条目"),
@@ -782,10 +796,10 @@ fn a_mapping_key_whose_class_is_not_the_class_of_the_unit_it_names_reddens_only_
 
 /// 数据单元那条映射条目的 key 类标签改成登记表之外的码（0、4、255），同时把它两条位置条目里的整单元校验和改坏：
 /// 认不得的类标签判映射 key 与单元头相符那一条（实审 B2 从 I-1.6 搬过去）、不去读那个单元——读了就会在校验和上再红 I-2.1。
-/// 改之前按 32 KiB 硬读，红在 I-2.1 上。
+/// 改之前按 32 KiB 硬读，红在 I-2.1 上。数据单元的未释放记录在映射里找不到码 1 的相符 key（I-3.15）。
 #[test]
-fn a_mapping_key_with_an_unregistered_class_reddens_only_the_mapping_key_invariant_and_is_not_read()
-{
+fn a_mapping_key_with_an_unregistered_class_reddens_the_mapping_key_and_the_reverse_lookup_invariants_and_is_not_read(
+) {
     let pool = product_capacity_pool();
     for unregistered_class in [0u8, 4, u8::MAX] {
         let image = image_with_the_mapping_entries_changed(&pool, |entries| {
@@ -800,17 +814,23 @@ fn a_mapping_key_with_an_unregistered_class_reddens_only_the_mapping_key_invaria
         let red = violations(&image);
         assert_eq!(
             violated_names(&red),
-            [MAPPING_KEY_MATCHES_THE_UNIT_HEADER],
-            "类标签 {unregistered_class}：判红的该只有映射 key 与单元头相符那一条（不读、I-2.1 不红）：{red:?}"
+            [
+                MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+                UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+            ],
+            "类标签 {unregistered_class}：判红的该只有映射 key 与单元头相符那一条与反查那一条（不读、I-2.1 不红）：{red:?}"
         );
     }
 }
 
-/// 数据单元那条映射条目的两条位置条目改指一个没人分配的槽，那里放一份逐字节相同的数据单元（校验和对得上）：
-/// 映射是解引用的唯一入口（D19（块指针的结构与宽度预算） 已定项 5），它指的物理范围占着空间，要进引用集合。
-/// 改之前映射条目不进引用集合，I-3.1 与 I-3.11 照旧对得上、全绿。
+/// 数据单元那条映射条目的两条位置条目改指一个没人分配的槽，那里放一份逐字节相同的数据单元（校验和对得上），分配记录一条不动：
+/// 映射是解引用的唯一入口（D19（块指针的结构与宽度预算） 已定项 5），走读按映射认位置，引用集合记 50400、不再记过期的提示 50180
+/// （判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3），按槽数加总 I-3.1 / I-3.11 看不见（源换成目的，槽数不变），
+/// 扫描重建在 50180 多扫到的同一版副本也按子集读法对得上（I-1.13）。看得见的是两条：这一版是从 mkfs 水位第一次建树的那一版，落点按它的中央映射
+/// 认过的位置取（D19（块指针的结构与宽度预算） 已定项 8 射程「引用集合记映射位置」），盘上落点最小的数据单元在 50400、不是分配记录算出的 50180（I-5.5）；
+/// 50180 的未释放记录罩住的数据单元在映射里的位置不含 50180（I-3.15，N2；主 agent 2026-10-15 定加 N2，`records/2026-10-13-里程碑四预开发.md`「己 2 交回」那一条）。
 #[test]
-fn a_mapping_entry_naming_an_unallocated_copy_counts_as_a_reference_and_reddens_the_allocated_bytes_invariants(
+fn a_mapping_entry_moved_to_an_unallocated_copy_reddens_the_first_data_unit_placement_and_the_reverse_lookup_at_the_allocated_source(
 ) {
     let pool = product_capacity_pool();
     let data_unit = pool
@@ -836,7 +856,23 @@ fn a_mapping_entry_naming_an_unallocated_copy_counts_as_a_reference_and_reddens_
     let red = violations(&image);
     assert_eq!(
         violated_names(&red),
-        ["I-3.1", "I-3.11"],
-        "映射条目指的那一份算进遍历：已分配统计两条对不上，别的不红：{red:?}"
+        [
+            FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+            UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE
+        ],
+        "映射条目改指一份没人分配的副本：看得见的是建树落点那一条与反查那一条：{red:?}"
+    );
+    let source_slot = data_unit.slot.0;
+    assert!(
+        red[0].1.contains(&format!("槽 {SLOT_NOBODY_ALLOCATED}，"))
+            && red[0].1.contains(&format!("落点 {source_slot}")),
+        "建树落点那一条的说明点名映射给的 {SLOT_NOBODY_ALLOCATED} 与分配记录算出的 {source_slot}：{}",
+        red[0].1
+    );
+    assert!(
+        red[1].1.contains(&format!("槽 {source_slot} 的分配记录"))
+            && red[1].1.contains(&format!("{SLOT_NOBODY_ALLOCATED})")),
+        "反查那一条的说明点名源槽 {source_slot} 的记录、映射里相符的 key 落在 {SLOT_NOBODY_ALLOCATED}：{}",
+        red[1].1
     );
 }

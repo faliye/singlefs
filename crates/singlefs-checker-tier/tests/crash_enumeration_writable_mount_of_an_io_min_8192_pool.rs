@@ -1,9 +1,9 @@
 //! checker 档模块：crash、crash_state_enumeration、crash_judge_tables
-//! io_min 8192（固定结构槽距 8192）的池上第一次可写挂载在崩溃点重放的证据：mkfs(io_min 8192) → 可写挂载（取号 1、写行发布 txg 1、暖机 txg 2），
+//! io_min 8192（固定结构槽距 8192）的池上第一次可写挂载在崩溃点重放的证据：mkfs(io_min 8192) → 可写挂载（取号 1 写两轮、写行发布 txg 1、暖机 txg 2），
 //! 把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4 取崩溃状态，跑恢复 + 多版本 oracle、池级 checker、记录核对器。
 //!
 //! 比已有的流多罩的崩溃状态：已有的崩溃点重放流全是槽距 4096 的池（`crates/singlefs-harness/tests/common/mod.rs` 的 `parameters()`），
-//! 这一条的基线镜像是槽距 8192 的池，系统配置槽 1 在 8192 处。取号那一段与暖机那次轮换那一段各有一个「两块盘的槽 0 同时撕裂」的状态
+//! 这一条的基线镜像是槽距 8192 的池，系统配置槽 1 在 8192 处。取号第一轮那一段与写行发布那次轮换那一段（这两段写槽 0）各有一个「两块盘的槽 0 同时撕裂」的状态
 //! （全池没有可用的槽 0），恢复与池级 checker 都要逐档找槽 1（C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同）
 //! 第一轮判决第四节第 3 条，`research/prompts/m3-c651-r1-main-verification.md`）：checker 按最小槽距 4096 读时这两个状态判 I-8.5 红。
 //! 多跑的一步：没有；流到第一次可写挂载为止（取号、两次零单元发布），不发文件版本，每个状态只跑恢复与 checker、不重开挂载。
@@ -45,9 +45,9 @@ const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-iomin8k";
 /// mkfs 时探测的 io_min：槽距 = 4096 向上取整到它的整数倍 = 8192（D2（RAID 条带策略） 已定项 19）。
 const MINIMUM_INPUT_OUTPUT_BYTES: u32 = 8192;
 const SLOT_SPACING_IN_BYTES: u64 = 8192;
-/// 全量的状态数：七段，取号与两次轮换三个系统配置槽 2 写段（原地覆写各取三态）各 3² − 1，两个记录 2 写段各 2² − 1，
-/// 两个根槽 1 写段各 1，再加全部持久那一个：1 + 3 × 8 + 2 × 3 + 2 × 1。
-const FULL_STATES: u64 = 33;
+/// 全量的状态数：八段，取号两轮与两次轮换四个系统配置槽 2 写段（原地覆写各取三态）各 3² − 1，两个记录 2 写段各 2² − 1，
+/// 两个根槽 1 写段各 1，再加全部持久那一个：1 + 4 × 8 + 2 × 3 + 2 × 1 = 41（取号写一轮时七段、33）。
+const FULL_STATES: u64 = 41;
 
 fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
@@ -111,8 +111,8 @@ fn prepare() -> Prepared {
     let (writes, segments) = writes_and_segments(&operations[mkfs_operation_count..], &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 2, 1, 2, 2, 1, 2],
-        "取号两写 | 写行发布的记录两写 | 根 | 系统配置两写 | 暖机的记录两写 | 根 | 系统配置两写"
+        vec![2, 2, 2, 1, 2, 2, 1, 2],
+        "取号第一轮两写 | 取号第二轮两写 | 写行发布的记录两写 | 根 | 系统配置两写 | 暖机的记录两写 | 根 | 系统配置两写"
     );
     assert_eq!(
         segments
@@ -121,6 +121,7 @@ fn prepare() -> Prepared {
             .collect::<Vec<StepKind>>(),
         vec![
             StepKind::SystemConfigurationSlot,
+            StepKind::SystemConfigurationSlot,
             StepKind::JournalRecord,
             StepKind::RootRecordFua,
             StepKind::SystemConfigurationSlot,
@@ -128,7 +129,7 @@ fn prepare() -> Prepared {
             StepKind::RootRecordFua,
             StepKind::SystemConfigurationSlot,
         ],
-        "七段的种类"
+        "八段的种类"
     );
     let judged_root_index = writes
         .iter()
@@ -177,10 +178,10 @@ fn assert_recovery_checker_and_record_checker_clean(tally: &CrashPointReplayTall
 }
 
 /// 判表建得出（崩溃点重放合并第三轮判决 J14 第二批开工前的事实核：io_min 8192 的池判表建不建得出；J5「能走 GPU 的必须走」）：
-/// 这条流整域展开交 GPU 判器建表，不拒（槽距 8192 的系统配置槽 1、根环槽都是落点），表里的状态数就是全量的 33 个。只建表、不上卡，
+/// 这条流整域展开交 GPU 判器建表，不拒（槽距 8192 的系统配置槽 1、根环槽都是落点），表里的状态数就是全量的 [`FULL_STATES`] 个。只建表、不上卡，
 /// 不要 `gpu` 特性。
 #[test]
-fn the_gpu_judge_tables_of_the_first_writable_mount_of_an_io_min_8192_pool_build_with_its_33_crash_states(
+fn the_gpu_judge_tables_of_the_first_writable_mount_of_an_io_min_8192_pool_build_with_every_crash_state_of_the_full_enumeration(
 ) {
     use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
     let prepared = prepare();
@@ -201,14 +202,15 @@ fn the_gpu_judge_tables_of_the_first_writable_mount_of_an_io_min_8192_pool_build
     );
 }
 
-/// 快档：段序列与全量的状态数钉住（七段、33 态），每段按甲二展开跑一遍恢复与 checker。
+/// 快档：段序列与全量的状态数钉住（八段、[`FULL_STATES`] 态），每段按甲二展开跑一遍恢复与 checker。
 #[test]
-fn the_first_writable_mount_of_an_io_min_8192_pool_has_seven_segments_and_33_crash_states() {
+fn the_first_writable_mount_of_an_io_min_8192_pool_keeps_its_segment_sequence_and_full_state_count()
+{
     let prepared = prepare();
     assert_eq!(
         closed_form_state_count(&prepared.segments),
-        1 + 5 * 3 + 2,
-        "每次写只取两态时：1 + 五个 2 写段各 3 + 两个 1 写段各 1"
+        1 + 6 * 3 + 2,
+        "每次写只取两态时：1 + 六个 2 写段各 3 + 两个 1 写段各 1"
     );
     assert_eq!(
         crash_state_count_with_torn_in_place_overwrites(
@@ -218,7 +220,7 @@ fn the_first_writable_mount_of_an_io_min_8192_pool_has_seven_segments_and_33_cra
             &full_expansion,
         ),
         FULL_STATES,
-        "原地覆写取三态的全量：1 + 3 × (3² − 1) + 2 × 3 + 2 × 1"
+        "原地覆写取三态的全量：1 + 4 × (3² − 1) + 2 × 3 + 2 × 1"
     );
     let Some(tally) = enumerate_crash_states_quick_tier_versions(
         CrashPointReplayItem {
@@ -278,8 +280,9 @@ fn observe_slot_one_at_8192(
         );
 }
 
-/// 全量：33 个崩溃状态逐个跑恢复与 checker，零违例；两块盘的槽 0 都不可用的状态恰好两个（取号那一段、暖机那次轮换那一段各一个
-/// 两盘同撕），每一个上 checker 两块盘的槽 1 都在 8192 处读成可用，checker 与恢复择到的世代号相同。
+/// 全量：[`FULL_STATES`] 个崩溃状态逐个跑恢复与 checker，零违例；两块盘的槽 0 都不可用的状态恰好两个（取号第一轮那一段写世代号 2、
+/// 写行发布那次轮换那一段写世代号 4，都落槽 0，各一个两盘同撕；取号写一轮时是取号那一段与暖机那次轮换那一段），
+/// 每一个上 checker 两块盘的槽 1 都在 8192 处读成可用，checker 与恢复择到的世代号相同。
 #[test]
 #[ignore = "checker 档全量：崩溃枚举用例，由门禁 checker-tier-crash-point-replay --full 按 crash-case 登记跑"]
 fn every_crash_state_of_the_first_writable_mount_of_an_io_min_8192_pool_recovers_and_the_checker_reads_slot_one_at_8192(
@@ -323,11 +326,11 @@ fn every_crash_state_of_the_first_writable_mount_of_an_io_min_8192_pool_recovers
         tally.failed_states,
         tally.checker_counts_by_invariant()
     );
-    assert_eq!(tally.states, FULL_STATES, "全量 33 态");
+    assert_eq!(tally.states, FULL_STATES, "全量 41 态");
     assert_recovery_checker_and_record_checker_clean(&tally);
     assert_eq!(
         states_without_a_usable_slot_zero, 2,
-        "两块盘的槽 0 都不可用的状态：取号那一段两盘同撕、暖机那次轮换两盘同撕，各一个"
+        "两块盘的槽 0 都不可用的状态：取号第一轮那一段两盘同撕、写行发布那次轮换两盘同撕，各一个"
     );
 }
 

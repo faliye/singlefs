@@ -12,12 +12,16 @@ use std::ops::Range;
 
 use crate::crash_judge_gpu::{
     dispatch_words, pack_tables, persisted_mask_probe_kernel_source,
-    verdict_was_written_by_both_kernels, JudgeKernelSources, DISPATCH_BINDING,
-    PERSISTED_MASK_PROBE_WORDS, SCRATCH_BINDING, SCRATCH_WORDS, TABLES_BINDING, VERDICTS_BINDING,
-    VERDICT_WORDS, VERDICT_WORD_NOT_WRITTEN, WORKGROUP_SIZE,
+    verdict_was_written_by_both_kernels, JudgeKernelSources,
+    CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT, CHECKER_SCAN_REBUILD_ENTRY_POINT,
+    DISPATCH_BINDING, KERNEL_ENTRY_POINT, PERSISTED_MASK_PROBE_WORDS, SCRATCH_BINDING,
+    SCRATCH_WORDS, TABLES_BINDING, VERDICTS_BINDING, VERDICT_WORDS, VERDICT_WORD_NOT_WRITTEN,
+    WORKGROUP_SIZE,
 };
 use crate::crash_judge_tables::JudgeTables;
-use crate::gpu_unit_checks::GpuCard;
+use crate::gpu_unit_checks::{
+    readback_mapping_callback, take_the_readback_after_the_wait_or_record_the_device_lost, GpuCard,
+};
 use singlefs_harness::gpu_memory_ledger::states_in_one_dispatch_capped_by_the_state_count;
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
@@ -259,6 +263,8 @@ pub struct GpuCrashJudge<'card> {
     recovery_pipeline: wgpu::ComputePipeline,
     checker_walk_pipeline: wgpu::ComputePipeline,
     checker_scan_pipeline: wgpu::ComputePipeline,
+    checker_references_and_snapshots_pipeline: wgpu::ComputePipeline,
+    checker_scan_rebuild_pipeline: wgpu::ComputePipeline,
     tables: wgpu::Buffer,
     /// 草稿区，一条缓冲装 `states_per_lane` 个状态（最后一条可以不满），条数照一次派活带的状态数定。
     scratch_lanes: Vec<wgpu::Buffer>,
@@ -336,11 +342,25 @@ pub struct KernelInlinedSize {
 }
 
 /// 量一份内核源码全部调用逐处展开之后多大：函数自己的表达式数，加上它每个调用点上被调函数展开后的表达式数（WGSL 不许递归，调用关系无环）。
+/// 量的是入口 `main`（[`KERNEL_ENTRY_POINT`]）；一份源码里的别的入口用 [`kernel_inlined_size_of_the_entry_point`]。
 ///
 /// # Panics
 /// 源码解析不了（内核源码自己的单测先判这一条）。
 #[must_use]
 pub fn kernel_inlined_size(source: &str) -> KernelInlinedSize {
+    kernel_inlined_size_of_the_entry_point(source, KERNEL_ENTRY_POINT)
+}
+
+/// 同 [`kernel_inlined_size`]，量的是名叫 `entry_point` 的那个入口（扫描内核源码里的第二个入口，引用与快照那一截，
+/// [`CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT`]）：驱动按入口编一条管线，展开预算各量各的。
+///
+/// # Panics
+/// 源码解析不了；源码里没有这个入口。
+#[must_use]
+pub fn kernel_inlined_size_of_the_entry_point(
+    source: &str,
+    entry_point: &str,
+) -> KernelInlinedSize {
     use std::collections::HashMap;
     use wgpu::naga::{Block, Function, Handle, Statement};
     #[allow(
@@ -393,8 +413,8 @@ pub fn kernel_inlined_size(source: &str) -> KernelInlinedSize {
     let entry = module
         .entry_points
         .iter()
-        .find(|entry| entry.name == "main")
-        .expect("内核的入口叫 main");
+        .find(|entry| entry.name == entry_point)
+        .unwrap_or_else(|| panic!("内核源码里有入口 {entry_point}"));
     let mut own: HashMap<Handle<Function>, u64> = HashMap::new();
     let mut calls: HashMap<Handle<Function>, Vec<Handle<Function>>> = HashMap::new();
     for (handle, function) in module.functions.iter() {
@@ -464,12 +484,24 @@ pub fn kernel_inlined_size(source: &str) -> KernelInlinedSize {
     }
 }
 
-/// 内核展开之后超过 [`LARGEST_INLINED_EXPRESSIONS_OF_A_KERNEL`] 就拒绝，不交给驱动去编。
+/// 内核展开之后超过 [`LARGEST_INLINED_EXPRESSIONS_OF_A_KERNEL`] 就拒绝，不交给驱动去编（量入口 `main`）。
 ///
 /// # Panics
 /// 超过预算：消息里给展开份数最多的几个函数。
 pub fn refuse_a_kernel_too_large_for_the_driver(label: &str, source: &str) {
-    let size = kernel_inlined_size(source);
+    refuse_a_kernel_entry_point_too_large_for_the_driver(label, source, KERNEL_ENTRY_POINT);
+}
+
+/// 同 [`refuse_a_kernel_too_large_for_the_driver`]，量的是名叫 `entry_point` 的那个入口。
+///
+/// # Panics
+/// 超过预算；源码里没有这个入口。
+pub fn refuse_a_kernel_entry_point_too_large_for_the_driver(
+    label: &str,
+    source: &str,
+    entry_point: &str,
+) {
+    let size = kernel_inlined_size_of_the_entry_point(source, entry_point);
     assert!(
         size.expressions <= LARGEST_INLINED_EXPRESSIONS_OF_A_KERNEL,
         "内核 {label} 全部调用展开之后 {} 个表达式，超过预算 {}：驱动的编译器把每个调用点展开成一份拷贝，\
@@ -485,8 +517,13 @@ pub fn refuse_a_kernel_too_large_for_the_driver(label: &str, source: &str) {
 /// 编一个内核（编之前先照 [`refuse_a_kernel_too_large_for_the_driver`] 量一遍）。冷编由驱动做（checker 内核几分钟）；
 /// 驱动自己的盘上着色器缓存（NVIDIA 的 `~/.nv/GLCache`）管跨进程复用，
 /// wgpu 的 `PipelineCache` 要 `unsafe` 装数据、本 crate `forbid(unsafe_code)`，不用它。
-fn compute_pipeline(card: &GpuCard, label: &str, source: &str) -> wgpu::ComputePipeline {
-    refuse_a_kernel_too_large_for_the_driver(label, source);
+fn compute_pipeline(
+    card: &GpuCard,
+    label: &str,
+    source: &str,
+    entry_point: &str,
+) -> wgpu::ComputePipeline {
+    refuse_a_kernel_entry_point_too_large_for_the_driver(label, source, entry_point);
     let device = card.device();
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(label),
@@ -496,59 +533,91 @@ fn compute_pipeline(card: &GpuCard, label: &str, source: &str) -> wgpu::ComputeP
         label: Some(label),
         layout: None,
         module: &module,
-        entry_point: Some("main"),
+        entry_point: Some(entry_point),
         compilation_options: wgpu::PipelineCompilationOptions::default(),
         cache: None,
     })
 }
 
-/// 在这张卡上编判器的三个内核，按恢复、走读、扫描的次序交回。
-/// 三个内核各在一条线程上编（驱动的编译是单线程的，checker 两个内核冷编各要几分钟；盘上缓存装好之后几秒）。
+/// 在这张卡上编判器的五条管线，按恢复、走读、扫描、引用与快照（扫描内核源码里的第二个入口，[`CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT`]）、
+/// 扫描重建（第三个入口，[`CHECKER_SCAN_REBUILD_ENTRY_POINT`]）的次序交回。五条各在一条线程上编（驱动的编译是单线程的，checker 两个内核冷编各要几分钟；
+/// 盘上缓存装好之后几秒）。
 /// 驱动编大内核吃内存（595 版三个一起编常驻 8.6 GiB，580 版一起编撞过 40G 上限）：内存紧的机器写
-/// `SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME=1`，三个内核一个一个编。
+/// `SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME=1`，五条一条一条编。
 ///
 /// # Panics
-/// 有一个内核超了展开预算（[`refuse_a_kernel_too_large_for_the_driver`]）。
-fn compile_the_three_judge_kernels(
+/// 有一条管线超了展开预算（[`refuse_a_kernel_entry_point_too_large_for_the_driver`]）。
+fn compile_the_judge_kernels(
     card: &GpuCard,
     kernel_sources: &JudgeKernelSources,
-) -> [wgpu::ComputePipeline; 3] {
+) -> [wgpu::ComputePipeline; 5] {
+    let recovery = || {
+        compute_pipeline(
+            card,
+            "crash-judge-recovery",
+            &kernel_sources.recovery,
+            KERNEL_ENTRY_POINT,
+        )
+    };
+    let walk = || {
+        compute_pipeline(
+            card,
+            "crash-judge-checker-walk",
+            &kernel_sources.checker_walk,
+            KERNEL_ENTRY_POINT,
+        )
+    };
+    let scan = || {
+        compute_pipeline(
+            card,
+            "crash-judge-checker-scan",
+            &kernel_sources.checker_scan,
+            KERNEL_ENTRY_POINT,
+        )
+    };
+    let references_and_snapshots = || {
+        compute_pipeline(
+            card,
+            "crash-judge-checker-references-and-snapshots",
+            &kernel_sources.checker_scan,
+            CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+        )
+    };
+    let scan_rebuild = || {
+        compute_pipeline(
+            card,
+            "crash-judge-checker-scan-rebuild",
+            &kernel_sources.checker_scan,
+            CHECKER_SCAN_REBUILD_ENTRY_POINT,
+        )
+    };
     let one_at_a_time =
         std::env::var("SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME").is_ok_and(|value| value == "1");
     if one_at_a_time {
         return [
-            compute_pipeline(card, "crash-judge-recovery", &kernel_sources.recovery),
-            compute_pipeline(
-                card,
-                "crash-judge-checker-walk",
-                &kernel_sources.checker_walk,
-            ),
-            compute_pipeline(
-                card,
-                "crash-judge-checker-scan",
-                &kernel_sources.checker_scan,
-            ),
+            recovery(),
+            walk(),
+            scan(),
+            references_and_snapshots(),
+            scan_rebuild(),
         ];
     }
     std::thread::scope(|scope| {
-        let recovery = scope
-            .spawn(|| compute_pipeline(card, "crash-judge-recovery", &kernel_sources.recovery));
-        let scan = scope.spawn(|| {
-            compute_pipeline(
-                card,
-                "crash-judge-checker-scan",
-                &kernel_sources.checker_scan,
-            )
-        });
-        let walk = compute_pipeline(
-            card,
-            "crash-judge-checker-walk",
-            &kernel_sources.checker_walk,
-        );
+        let recovery = scope.spawn(recovery);
+        let scan = scope.spawn(scan);
+        let references_and_snapshots = scope.spawn(references_and_snapshots);
+        let scan_rebuild = scope.spawn(scan_rebuild);
+        let walk = walk();
         [
             recovery.join().expect("恢复内核的编译线程不 panic"),
             walk,
             scan.join().expect("扫描内核的编译线程不 panic"),
+            references_and_snapshots
+                .join()
+                .expect("引用与快照那一截的编译线程不 panic"),
+            scan_rebuild
+                .join()
+                .expect("扫描重建那一截的编译线程不 panic"),
         ]
     })
 }
@@ -624,18 +693,20 @@ impl<'card> GpuCrashJudge<'card> {
             })
             .collect();
         // 同一张卡（同一个设备）上同一套源码只编一次：共用一张卡的几条用例里第一条编，别的等它编完直接拿
-        let [recovery_pipeline, checker_walk_pipeline, checker_scan_pipeline]: [wgpu::ComputePipeline;
-            3] = card
+        let [recovery_pipeline, checker_walk_pipeline, checker_scan_pipeline, checker_references_and_snapshots_pipeline, checker_scan_rebuild_pipeline]: [wgpu::ComputePipeline;
+            5] = card
             .pipelines_compiled_once_on_this_device(kernel_sources_digest(kernel_sources), || {
-                compile_the_three_judge_kernels(card, kernel_sources).to_vec()
+                compile_the_judge_kernels(card, kernel_sources).to_vec()
             })
             .try_into()
-            .expect("这个摘要那一格只由 compile_the_three_judge_kernels 填，里面恰好三条管线");
+            .expect("这个摘要那一格只由 compile_the_judge_kernels 填，里面恰好五条管线");
         Self {
             card,
             recovery_pipeline,
             checker_walk_pipeline,
             checker_scan_pipeline,
+            checker_references_and_snapshots_pipeline,
+            checker_scan_rebuild_pipeline,
             tables: tables_buffer,
             scratch_lanes,
             state_count: tables.state_count,
@@ -861,12 +932,14 @@ impl<'card> GpuCrashJudge<'card> {
         });
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        // 三趟按次序：扫描内核读走读内核留在草稿区交接段里的东西，同一个编码器里的派活按提交次序可见；
-        // 一趟里每条草稿缓冲各派一次活，它们碰的草稿与结论缓冲互不相同、读的是同一份只读的表
+        // 五趟按次序：扫描内核、引用与快照那一截与扫描重建那一截读走读内核留在草稿区交接段里的东西（后两截接着前一截的违例位与判到位记，
+        // 扫描重建那一截要读另三截写下的违例位），同一个编码器里的派活按提交次序可见；一趟里每条草稿缓冲各派一次活，它们碰的草稿与结论缓冲互不相同、读的是同一份只读的表
         for pipeline in [
             &self.recovery_pipeline,
             &self.checker_walk_pipeline,
             &self.checker_scan_pipeline,
+            &self.checker_references_and_snapshots_pipeline,
+            &self.checker_scan_rebuild_pipeline,
         ] {
             let layout = pipeline.get_bind_group_layout(0);
             let bind_groups: Vec<wgpu::BindGroup> = parts
@@ -925,23 +998,27 @@ impl<'card> GpuCrashJudge<'card> {
         let waiting_started = std::time::Instant::now();
         let slice = staging.slice(..);
         let (sender, receiver) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |result| {
-            sender.send(result).expect("回调送得出去")
-        });
+        slice.map_async(wgpu::MapMode::Read, readback_mapping_callback(sender));
         // 只等这一次提交：几条用例共用这张卡的设备时，等整个设备会把别的用例的活算进这一次的用时（量宽度、超时都跟着偏）
-        if let Err(error) = device.poll(wgpu::PollType::Wait {
+        let polled = device.poll(wgpu::PollType::Wait {
             submission_index: Some(submission),
             timeout: Some(std::time::Duration::from_secs(
                 LONGEST_WAIT_FOR_THE_CARD_SECONDS,
             )),
-        }) {
-            panic!(
-                "等了 {LONGEST_WAIT_FOR_THE_CARD_SECONDS} 秒，卡 {:?} 没把这次派活（{count} 个状态，序号 {} 起）算完：{error:?}。\
-                 多半是单次派活跑得太久被驱动掐了通道（看内核日志里的 Xid 109）；一次派活带的状态数按 LONGEST_DISPATCH_SECONDS 调",
-                self.card.name, ordinals.start
-            );
-        }
-        receiver.recv().expect("回调送达").expect("回读映射成功");
+        });
+        // 等不成：这张卡的设备记成丢了（下一条用例借这张卡时重起），只这一次派活红
+        take_the_readback_after_the_wait_or_record_the_device_lost(
+            self.card.device_condition(),
+            polled,
+            &receiver,
+            |error| {
+                format!(
+                    "等了 {LONGEST_WAIT_FOR_THE_CARD_SECONDS} 秒，卡 {:?} 没把这次派活（{count} 个状态，序号 {} 起）算完：{error:?}。\
+                     多半是单次派活跑得太久被驱动掐了通道（看内核日志里的 Xid 109）；一次派活带的状态数按 LONGEST_DISPATCH_SECONDS 调",
+                    self.card.name, ordinals.start
+                )
+            },
+        );
         let reading_started = std::time::Instant::now();
         let mapped = slice.get_mapped_range().expect("读得到回读缓冲区");
         let (entries, remainder) = mapped.as_chunks::<4>();
@@ -1007,6 +1084,7 @@ pub fn persisted_masks_on_the_card(
         card,
         "crash-judge-persisted-mask-probe",
         &persisted_mask_probe_kernel_source(),
+        KERNEL_ENTRY_POINT,
     );
     let tables_buffer = wgpu::util::DeviceExt::create_buffer_init(
         device,
@@ -1080,18 +1158,24 @@ pub fn persisted_masks_on_the_card(
     let submission = card.queue().submit(std::iter::once(encoder.finish()));
     let slice = staging.slice(..);
     let (sender, receiver) = std::sync::mpsc::channel();
-    slice.map_async(wgpu::MapMode::Read, move |result| {
-        sender.send(result).expect("回调送得出去")
+    slice.map_async(wgpu::MapMode::Read, readback_mapping_callback(sender));
+    let polled = device.poll(wgpu::PollType::Wait {
+        submission_index: Some(submission),
+        timeout: Some(std::time::Duration::from_secs(
+            LONGEST_WAIT_FOR_THE_CARD_SECONDS,
+        )),
     });
-    device
-        .poll(wgpu::PollType::Wait {
-            submission_index: Some(submission),
-            timeout: Some(std::time::Duration::from_secs(
-                LONGEST_WAIT_FOR_THE_CARD_SECONDS,
-            )),
-        })
-        .expect("卡在等待上限之内把探针算完");
-    receiver.recv().expect("回调送达").expect("回读映射成功");
+    take_the_readback_after_the_wait_or_record_the_device_lost(
+        card.device_condition(),
+        polled,
+        &receiver,
+        |error| {
+            format!(
+                "等了 {LONGEST_WAIT_FOR_THE_CARD_SECONDS} 秒，卡 {:?} 没把持久掩码探针算完：{error:?}",
+                card.name
+            )
+        },
+    );
     let mapped = slice.get_mapped_range().expect("读得到回读缓冲区");
     let (entries, remainder) = mapped.as_chunks::<4>();
     assert!(remainder.is_empty(), "回读缓冲区的长度是 4 的整数倍");
@@ -1155,7 +1239,9 @@ pub fn judge_every_state_on_a_card_leased_from_the_pool(
 mod tests {
     use super::{states_per_dispatch, states_per_scratch_lane, MAXIMUM_SCRATCH_LANES};
     use crate::crash_judge_gpu::{
-        recovery_kernel_source, GPU_JUDGE_CHECKER_COMMON_SOURCE, VERDICT_WORDS,
+        recovery_kernel_source, CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+        CHECKER_SCAN_REBUILD_ENTRY_POINT, GPU_JUDGE_CHECKER_COMMON_SOURCE, KERNEL_ENTRY_POINT,
+        VERDICT_WORDS,
     };
 
     /// NVIDIA 卡上 wgpu 给的存储绑定上限。
@@ -1183,7 +1269,7 @@ mod tests {
     }
 
     /// 一条草稿缓冲装几个状态由绑定上限定；一次派活带几个由给草稿区的显存定，到 [`MAXIMUM_SCRATCH_LANES`] 条为止，至少 1 个。
-    /// 此刻每个状态 1 333 176 × 4 = 5 332 704 字节：一条缓冲 2 147 483 644 ÷ 5 332 704 = 402 个、12 GiB 装 2416 个（都向下取整）。
+    /// 此刻每个状态 1 661 438 × 4 = 6 645 752 字节：一条缓冲 2 147 483 644 ÷ 6 645 752 = 323 个、12 GiB 装 1938 个（都向下取整）。
     #[test]
     fn states_in_one_dispatch_follow_the_scratch_memory_up_to_the_lane_limit() {
         let bytes_per_state = scratch_words_of_the_kernels() * BYTES_PER_WORD;
@@ -1222,8 +1308,8 @@ mod tests {
 
     /// 卡池按 [`super::mebibytes_a_judge_needs`] 借给用例的卡（额度是借的量加驱动那一份）上，判器开的草稿区不少于借的时候算进去的状态数：
     /// 小流（45、489 个状态）照状态数、大流（131 195 个）照要的宽度（一条缓冲那么窄、三条缓冲加窄的那一档那么宽）。
-    /// 表取 1 MiB：45 个状态要 1 + ⌈45 × (每个状态的草稿区 + 两份结论字 2 × 24 × 4) ÷ 1 048 576⌉ MiB；
-    /// 此刻 1 + ⌈45 × 5 332 896 ÷ 1 048 576⌉ = 1 + ⌈239 980 320 ÷ 1 048 576⌉ = 1 + 229 = 230 MiB。
+    /// 表取 1 MiB：45 个状态要 1 + ⌈45 × (每个状态的草稿区 + 两份结论字 2 × 25 × 4) ÷ 1 048 576⌉ MiB；
+    /// 此刻 1 + ⌈45 × 6 645 952 ÷ 1 048 576⌉ = 1 + ⌈299 067 840 ÷ 1 048 576⌉ = 1 + 286 = 287 MiB。
     #[test]
     fn a_card_lent_what_a_judge_needs_opens_scratch_for_every_state_it_was_lent_for() {
         use super::{mebibytes_a_judge_needs, states_in_flight_within, PackedJudgeTables};
@@ -1377,10 +1463,28 @@ mod tests {
             card.free_memory_mebibytes,
             peak_resident_mebibytes()
         );
-        for (kernel, source) in [
-            ("recovery", recovery_kernel_source()),
-            ("checker-scan", checker_scan_kernel_source()),
-            ("checker-walk", checker_walk_kernel_source()),
+        for (kernel, source, entry_point) in [
+            ("recovery", recovery_kernel_source(), KERNEL_ENTRY_POINT),
+            (
+                "checker-scan",
+                checker_scan_kernel_source(),
+                KERNEL_ENTRY_POINT,
+            ),
+            (
+                "checker-references-and-snapshots",
+                checker_scan_kernel_source(),
+                CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+            ),
+            (
+                "checker-scan-rebuild",
+                checker_scan_kernel_source(),
+                CHECKER_SCAN_REBUILD_ENTRY_POINT,
+            ),
+            (
+                "checker-walk",
+                checker_walk_kernel_source(),
+                KERNEL_ENTRY_POINT,
+            ),
         ] {
             println!(
                 "GPU_KERNEL_COMPILE_STARTED kernel={kernel} source_bytes={}",
@@ -1388,7 +1492,7 @@ mod tests {
             );
             std::io::stdout().flush().expect("刷得出去");
             let started = std::time::Instant::now();
-            let _pipeline = super::compute_pipeline(&card, kernel, &source);
+            let _pipeline = super::compute_pipeline(&card, kernel, &source, entry_point);
             println!(
                 "GPU_KERNEL_COMPILE kernel={kernel} seconds={:.1} peak_resident_mebibytes={}",
                 started.elapsed().as_secs_f64(),
@@ -1435,28 +1539,40 @@ mod tests {
         );
     }
 
-    /// 三个内核都在预算之内；打各自展开之后的大小。
+    /// 五条管线（三个内核，扫描内核源码另有引用与快照那一截、扫描重建那一截两个入口）都在预算之内；打各自展开之后的大小。
     #[test]
     fn every_kernel_stays_within_the_inlined_size_budget() {
-        for (name, source) in [
-            ("recovery", recovery_kernel_source()),
+        for (name, source, entry_point) in [
+            ("recovery", recovery_kernel_source(), KERNEL_ENTRY_POINT),
             (
                 "checker-scan",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
+                KERNEL_ENTRY_POINT,
+            ),
+            (
+                "checker-references-and-snapshots",
+                crate::crash_judge_gpu::checker_scan_kernel_source(),
+                CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+            ),
+            (
+                "checker-scan-rebuild",
+                crate::crash_judge_gpu::checker_scan_kernel_source(),
+                CHECKER_SCAN_REBUILD_ENTRY_POINT,
             ),
             (
                 "checker-walk",
                 crate::crash_judge_gpu::checker_walk_kernel_source(),
+                KERNEL_ENTRY_POINT,
             ),
         ] {
-            let size = super::kernel_inlined_size(&source);
+            let size = super::kernel_inlined_size_of_the_entry_point(&source, entry_point);
             println!(
                 "GPU_KERNEL_INLINED kernel={name} expressions={} budget={} largest={:?}",
                 size.expressions,
                 super::LARGEST_INLINED_EXPRESSIONS_OF_A_KERNEL,
                 size.largest_contributors
             );
-            super::refuse_a_kernel_too_large_for_the_driver(name, &source);
+            super::refuse_a_kernel_entry_point_too_large_for_the_driver(name, &source, entry_point);
         }
     }
 
@@ -1632,33 +1748,133 @@ mod tests {
     /// harness 场景交出来的镜像上 GPU 判不了的四处（分配记录、实例表行、inode → 对象出生代、一版 inode 记录与 I-9.29 跨版本那张表抬上限，
     /// 后四张加散列索引：`crash_judge_checker_common.wgsl` 的 ⑫ ⑬，找与记各合成一个调用点）恢复不变、扫描 392 398 → 395 761、余量 7 602 → 4 239，
     /// 走读 341 149 → 345 743、余量 58 851 → 54 257（实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，
-    /// 五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回 334 651 / 392 398 / 341 149，与旧钉值逐个相等）；
-    /// 走读内核 I-7.7 照 CPU 判「根环槽读不全」（池里少一块盘时 ① 报射程里一部分没判、② 只在找到较大者时判，`checker_some_root_slot_is_unreadable`）
-    /// 走读 345 743 → 345 991、余量 54 257 → 54 009，扫描内核释放代高于 F 的已释放记录那张表挪到草稿区末尾、行宽改用命名常量（一行四个字的行首只算一次）
-    /// 扫描 395 761 → 395 746、余量 4 239 → 4 254，恢复不变（实现员副本上用同一个草稿工具量的：在改之前那一份上量回 334 651 / 395 761 / 345 743，
-    /// 与旧钉值逐个相等；改之后四个内核都经 naga 30.0.1 解析、校验得过）；
-    /// 扫描内核 I-3.10 的去重表满了之后照判、不再记判不了（站点 31 那一判换成「表还没满才往表里记」）扫描 395 746 → 395 742、余量 4 254 → 4 258，
-    /// 恢复与走读不变（第四轮 C 实现员副本上用第四轮 B 那一份草稿工具量的：在改之前那一份上量回 334 651 / 395 746 / 345 991，与旧钉值逐个相等；
-    /// 改之后三个内核都经 naga 30.0.1 解析、校验得过）：
+    /// 五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回 334 651 / 392 398 / 341 149，与旧钉值逐个相等）：
+    /// 里程碑四 GPU 判器跟上 CPU 池级 checker（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3 以中央映射位置为准、
+    /// `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1、S3、S5 快照与 deadlist；恢复内核认码 14 / 15 与 deadlist 树，
+    /// 走读内核走快照两棵树与 deadlist 树、按映射认位置，扫描内核「非空」比快照树根，I-3.9 与 I-9.14 挪进扫描内核源码里的第二个入口、
+    /// 那个入口另判只读快照那几条）恢复 334 651 → 337 093、余量 65 349 → 62 907，扫描 395 761 → 343 859、余量 4 239 → 56 141，
+    /// 走读 345 743 → 384 829、余量 54 257 → 15 171，引用与快照那一截新起 165 895、余量 234 105（实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，
+    /// 展开的数法照抄 `kernel_inlined_size`，五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回 334 651 / 395 761 / 345 743，
+    /// 与旧钉值逐个相等）；
+    /// 里程碑四自建 GC 新判的那几条上 GPU（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1、G3 的 N2–N6：走读内核与引用集合那一遍把
+    /// logged_ops 树当多层码 2 树走、恢复内核把 logged_ops 根数进映射条目数，扫描内核主入口在记账那一判之后判 I-3.16，引用与快照那一截之后判
+    /// I-4.4、I-5.6、I-3.15、I-1.14）恢复 337 093 → 337 359、余量 62 907 → 62 641，扫描 343 859 → 359 703、余量 56 141 → 40 297，
+    /// 引用与快照那一截 165 895 → 231 701、余量 234 105 → 168 299，走读 384 829 → 386 050、余量 15 171 → 13 950（实现员副本上用草稿工具量的：
+    /// naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回
+    /// 337 093 / 343 859 / 165 895 / 384 829，与旧钉值逐个相等）；
+    /// 里程碑四验证段修复（扫描内核一张树表记的树数从 12 抬到 32、候选根信息行挪进草稿区里空着的一段，只改常量；扫描主入口 I-3.16 去掉
+    /// 「记录口径与占用口径不等就不判」那道门、加「最新根那一版一棵分配记录树都没有就不判」，`g_allocation_records_of_the_version` 记读到几棵；
+    /// 走读内核 I-7.7 认根环区域落在池外的盘上的根槽读不出，照 CPU ① 报部分没判、② 只在找到较大者时判）恢复不变、余量 62 641，
+    /// 扫描 359 703 → 359 336、余量 40 297 → 40 664，引用与快照那一截 231 701 → 231 708、余量 168 299 → 168 292，
+    /// 走读 386 050 → 386 080、余量 13 950 → 13 920（实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，
+    /// 五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回 337 359 / 359 703 / 231 701 / 386 050，与旧钉值逐个相等）；
+    /// 里程碑四修复批二（走读内核 I-3.5 的用户可见树标签按版本记：落点表那一行带打标签那一版的戳，一版走完连同落点下标冻进那一版引用的落点表，
+    /// 并进来的共享子树落点按这一版此刻在哪棵树里打，共享树表照先走那一版冻下的接上；判决 `research/prompts/m4-segment-code-r1-main-verification.md`
+    /// 第三节 F9 的 GPU 一侧）恢复、扫描、引用与快照那一截不变，走读 386 080 → 389 640、余量 13 920 → 10 360（实现员副本上用草稿工具量的，量法同上；
+    /// 在改之前那一份上量回 337 359 / 359 336 / 231 708 / 386 080，与旧钉值逐个相等）；
+    /// 里程碑四修复批三（走读内核的落点一律挂到父单元下面，走快照那两棵树时这一版已经从活头记过的也挂；记引用集合那一处不再交回此前记没记过；
+    /// 判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F9「种子下标 1032 那一形」的 GPU 一侧）恢复、扫描、引用与快照那一截不变，
+    /// 走读 389 640 → 389 318、余量 10 360 → 10 682（实现员副本上用草稿工具量的，量法同上；在改之前那一份上量回 389 640，与旧钉值相等；
+    /// 扫描内核与引用与快照那一截改之后量回 359 336 / 231 708）；
+    /// 截断那一批 GPU 判器跟上 CPU（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5、K7 与第六节 S1、S2：走读与扫描两个内核的
+    /// extent 树认上段叶条目标签 3、4，扫描内核删除态扫描记每个号的声明与每个单元、读这一版的截断条目，判 I-4.6 改判、I-4.10、I-9.38，
+    /// 引用与快照那一截 I-4.4 收截断条目、读那一版的 inode 记录）恢复不变、余量 62 641，扫描 359 336 → 370 564、余量 40 664 → 29 436，
+    /// 引用与快照那一截 231 708 → 247 023、余量 168 292 → 152 977，走读 389 318 → 389 329、余量 10 682 → 10 671（实现员副本上用草稿工具量的：
+    /// naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回
+    /// 337 359 / 359 336 / 231 708 / 389 318，与旧钉值逐个相等）；
+    /// 截断那一批 GPU 恢复内核跟上 core 的读法（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2、K5 与第六节 S1、S5：
+    /// 上段叶条目收标签 3、4，第一个文件的单元数按标签对 size、size 之外挂着的单元不读，洞读 0、按现算的全零载荷区 CRC 与期望那一版逐单元比）
+    /// 恢复 337 359 → 338 571、余量 62 641 → 61 429，扫描、引用与快照那一截、走读不变（实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，
+    /// 展开的数法照抄 `kernel_inlined_size`，五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回
+    /// 337 359 / 370 564 / 247 023 / 389 329，与旧钉值逐个相等）；
+    /// 主线同期另改了三处（在里程碑四之前那一份上量的，与上面几段的数不接续）：走读内核 I-7.7 照 CPU 判「根环槽读不全」
+    /// （`checker_some_root_slot_is_unreadable`）走读 345 743 → 345 991，扫描内核释放代高于 F 的已释放记录那张表挪到草稿区末尾、行宽改用命名常量
+    /// 扫描 395 761 → 395 746，扫描内核 I-3.10 的去重表满了之后照判、不再记判不了扫描 395 746 → 395 742；
+    /// 两边合进同一份内核之后、截断第二轮之前那一份（主工作区合了截辛、截癸两份补丁那一刻）量回恢复 339 509、扫描 371 385、引用与快照那一截 247 485、
+    /// 走读 390 527（与上面里程碑四那几个钉值不接续：主线那三处与合并本身各改了几个函数）；截断第二轮 GPU 判器跟上 CPU（判决
+    /// `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、R6 与第六节用户定案：恢复内核与两个池级 checker 内核收 incompat 位 2、恢复内核的
+    /// inode 记录照核心层读者拆段、走读内核 I-9.7 拆成三判、扫描内核删除态扫描的 inode 记录表一行加截断字段两段并判 I-9.39）恢复 339 509 → 340 737、
+    /// 余量 60 491 → 59 263，扫描 371 385 → 376 542、余量 28 615 → 23 458，引用与快照那一截 247 485 → 247 953、余量 152 515 → 152 047，
+    /// 走读 390 527 → 391 287、余量 9 473 → 8 713（实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，
+    /// 五份 WGSL 照库里的拼法拼、生成的那几行常量照 Rust 源码现值抄；这把工具在主线 HEAD 那一份上量回 335 589 / 396 666 / 347 181，
+    /// 与那时的钉值逐个相等）；
+    /// 截断第 12 批先压展开量、再让 GPU 次级读法走中央映射（用户 2026-10-18 定「先优化你的算法看看是不是算法的问题」，不抬预算）：
+    /// 共用那一半的 rd16 / rd32 原来逐字节调 rd8 拼（一份 rd32 展开成四份 rd8，扫描主入口里 rd8 展开 9 739 份、rd32 1 959 份，两样占三十二万余），
+    /// 改成按字拼读（读的字与逐字节读的完全相同，交回的值也相同），恢复 340 737 → 219 659、扫描 376 542 → 245 532、
+    /// 引用与快照那一截 247 953 → 161 612、走读 391 287 → 285 053；再照 D19（块指针的结构与宽度预算） 已定项 5、8 接上扫描内核两个入口的次级读法
+    /// （豁免三类之外的码 1 / 2 / 3 按这一版的中央映射认位置、先试提示，各遍进每一版之前装这一版的映射，I-3.10 读不全一棵树记射程里判不了），
+    /// 扫描 245 532 → 349 334、余量 50 666，引用与快照那一截 161 612 → 189 563、余量 210 437，恢复与走读不再变，余量 180 341、114 947
+    /// （实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，五份 WGSL 照库里的拼法拼、生成的那几行常量照 Rust 源码现值抄；
+    /// 在改之前那一份上量回 340 737 / 376 542 / 247 953 / 391 287，与旧钉值逐个相等）；
+    /// 数据指针与谱系记录按块分批读（用户 2026-10-19 定「按块分批读，不设上限」）：恢复内核读数据单元读到一块末尾从下段根往下找下一块，
+    /// 读下段节点与读数据单元同一个调用点，恢复 219 659 → 224 047、余量 175 953；扫描内核谱系记录从容器字节里读、「在谱系上」按 T_rb 从大到小一步步找，
+    /// 扫描 349 334 → 352 704、余量 47 296；三个内核共用的开场多记两个块的变量，引用与快照那一截 189 563 → 189 567、走读 285 053 → 285 057
+    /// （实现员副本上用同一把草稿工具量的，在改之前那一份上量回 219 659 / 349 334 / 189 563 / 285 053，与旧钉值逐个相等）；
+    /// 中央映射的条目按叶分批读（同一个定案）：恢复内核与走读内核记映射叶、不抄条目，查映射与走映射条目逐片从叶的字节里读，码 2 节点头里条目那一段的读法
+    /// 抽成一处（parse_index_node 与映射叶表共用），恢复 224 047 → 225 711、余量 174 289；扫描 352 704 → 353 098、余量 46 902；
+    /// 引用与快照那一截 189 567 → 189 758、余量 210 242；走读 285 057 → 285 248、余量 114 752
+    /// （实现员副本上用同一把草稿工具量的，在改之前那一份上量回 224 047 / 352 704 / 189 567 / 285 057，与旧钉值逐个相等）；
+    /// 扫描重建那一截（C821，扫描内核源码里的第三个入口，单起一条管线、不并进扫描主入口）66 663、余量 333 337，另四个入口与它们的钉值逐个不变
+    /// （实现员副本上用同一把草稿工具量的：naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，六份 WGSL 照库里的拼法拼、
+    /// 生成的那几行常量照 Rust 源码现值抄，含结论第 24 字与扫描重建结局码；在改之前那一份上量回 225 711 / 353 098 / 189 758 / 285 248）；
+    /// 多文件那一批（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2、M5、M6）：恢复内核按上段条目逐条收多文件、
+    /// 上段叶条目按块分批记，恢复 225 711 → 225 633、余量 174 367；扫描内核删除态扫描每一版判 I-9.40（上段规范形，深度优先走上段、不抄集合），
+    /// 扫描 353 098 → 359 742、余量 40 258；扫描重建那一截删除中的对象只对它自己两侧不比、认 I-9.32，66 663 → 68 137、余量 331 863；
+    /// 三个内核共用的开场多复位一个变量，引用与快照那一截 189 758 → 189 760、走读 285 248 → 285 250（实现员副本上用同一把草稿工具量的，
+    /// 在改之前那一份上量回 225 711 / 353 098 / 189 758 / 66 663 / 285 248，与旧钉值逐个相等）；
+    /// 池级 checker 走到扫描重建之前整池交回的四处由走读内核写 I-1.13 的结局码（码 27 到 30），走读 285 250 → 285 266、余量 114 734，
+    /// 另四个入口不变（实现员副本上用同一把草稿工具量的，在改之前那一份上量回 225 633 / 359 742 / 189 760 / 68 137 / 285 250）；
+    /// 扫描重建那一截删除中改由两侧一起认（判决 `research/prompts/m4-c860-r1-main-verification.md` 第三节 C2，用户 2026-10-20 选丙：遍历方向也有
+    /// 同号、同对象出生代的记录，两侧 nlink 都是 0），68 137 → 68 686、余量 331 314；扫描与引用与快照两个入口不变（实现员副本上用草稿工具量的：
+    /// 拼扫描内核那四份 WGSL，生成的常量一律写成同一个值——值不改函数里的表达式个数——在改之前那一份上量回 359 742 / 189 760 / 68 137）；
+    /// 走读内核把区域数 R 不等于 3、每区槽数 S 越界读成读者不收的值（C663），可择的系统配置槽字段表之后与根槽记录之后判全 0（C728，I-2.4），
+    /// 走读 285 266 → 285 940、余量 114 060；恢复内核判系统配置格式版本先于 incompat 位、R 不等于 3 整池拒（C663），码 2 内部条目与记账条目宽不等于字段表宽都拒（C780，I-1.10），
+    /// 恢复 225 633 → 226 086、余量 173 914；扫描与引用与快照、扫描重建三个入口不变（实现员副本上用同一把草稿工具量的：拼三个内核那六份 WGSL，
+    /// 生成的常量一律补成假值——值不改函数里的表达式个数——在改之前那一份上量回 225 633 / 285 266 / 359 742 / 189 760 / 68 686）；
+    /// 走读内核 `w_merge_below` 去重与找孩子改按散列索引找、记挂父单元那张表时顺带记索引（`crash_judge_checker_common.wgsl` 定义
+    /// `W_MERGE_EXPANDED_BUCKETS` 那一处），走读 285 940 → 303 906、余量 96 094，另四个入口不变（实现员副本上用同一把草稿工具量的，
+    /// 在改之前那一份上量回 226 086 / 359 742 / 189 760 / 68 686 / 285 940）。
     /// 改了哪个内核的源码，这里先红，量过新数、确认余量还够之后再改钉值，免得余量悄悄耗光、等上卡时才撞预算。
     #[test]
     fn each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget() {
-        for (name, source, pinned_expressions, pinned_margin) in [
-            ("recovery", recovery_kernel_source(), 335_589, 64_411),
+        for (name, source, entry_point, pinned_expressions, pinned_margin) in [
+            (
+                "recovery",
+                recovery_kernel_source(),
+                KERNEL_ENTRY_POINT,
+                226_086,
+                173_914,
+            ),
             (
                 "checker-scan",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
-                396_666,
-                3_334,
+                KERNEL_ENTRY_POINT,
+                359_742,
+                40_258,
+            ),
+            (
+                "checker-references-and-snapshots",
+                crate::crash_judge_gpu::checker_scan_kernel_source(),
+                CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+                189_760,
+                210_240,
+            ),
+            (
+                "checker-scan-rebuild",
+                crate::crash_judge_gpu::checker_scan_kernel_source(),
+                CHECKER_SCAN_REBUILD_ENTRY_POINT,
+                68_686,
+                331_314,
             ),
             (
                 "checker-walk",
                 crate::crash_judge_gpu::checker_walk_kernel_source(),
-                347_181,
-                52_819,
+                KERNEL_ENTRY_POINT,
+                303_906,
+                96_094,
             ),
         ] {
-            let size = super::kernel_inlined_size(&source);
+            let size = super::kernel_inlined_size_of_the_entry_point(&source, entry_point);
             assert_eq!(
                 size.expressions, pinned_expressions,
                 "内核 {name} 展开之后的表达式数变了：量过、确认余量还够之后改这里的钉值"
@@ -1711,8 +1927,12 @@ mod tests {
             return;
         };
         let started = std::time::Instant::now();
-        let _pipeline =
-            super::compute_pipeline(&card, "crash-judge-recovery", &recovery_kernel_source());
+        let _pipeline = super::compute_pipeline(
+            &card,
+            "crash-judge-recovery",
+            &recovery_kernel_source(),
+            KERNEL_ENTRY_POINT,
+        );
         println!(
             "GPU_KERNEL_COMPILE kernel=recovery seconds={:.1}",
             started.elapsed().as_secs_f64()

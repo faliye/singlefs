@@ -5,7 +5,8 @@
 //!   它的层级是最小的 R ≥ 1 使 Σ_盘 ⌈盘上槽数 ÷ W·F^(R−1)⌉ ≤ F。节点头的 key 区间写这个节点按位置规定罩的那一段
 //!   （D18（块里携带什么信息） 已定项 2 对按位置寻址的树那一句）；父条目的 key 是孩子那一段的起点。
 //! - extent 树：上段按 inode 号的位置（叶罩 143 个 inode 号、内部扇出 147），下段一个文件一棵按数据单元号的位置（叶罩 144 个单元、扇出 147），
-//!   上段叶条目 113 带标签 0 / 1 / 2（没有单元 / 下段根指针 / 内联数据指针）。
+//!   上段叶条目 113 带标签 0 到 4（没有单元 / 下段根指针 / 内联数据指针 / 下段根指针、之后到 size 是洞 / 内联单元 0、之后到 size 是洞；
+//!   标签 3、4 是判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5，用户 2026-10-16 定「加标签声明洞」）。
 
 use singlefs_format::{
     ALLOCATION_RECORD_TREE_INTERNAL_FANOUT, ALLOCATION_RECORD_TREE_LEAF_SLOTS, DATA_POINTER_BYTES,
@@ -267,7 +268,17 @@ pub fn extent_lower_child_of_entry_key(
         .then_some((child_level, child_index))
 }
 
-/// 上段叶条目的样子（按字段表另写一份）：inode 号与标签；标签 1 的载荷是节点指针 86（后 2 字节补零），标签 2 的是数据指针 88。
+/// 上段叶条目声明的、最后一个存在的数据单元之后到 size 那一段（判决 m4-trunc-r1 K5 与第六节 S1）：标签 1、2 不许有洞，
+/// 标签 3、4 之后到 size 是洞（存在的单元少于 ⌈size ÷ 净荷⌉.max(1)、至少一个洞单元）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TailAfterTheLastDataUnit {
+    /// 标签 1、2。
+    NoHole,
+    /// 标签 3、4。
+    HoleUpToTheSize,
+}
+
+/// 上段叶条目的样子（按字段表另写一份）：inode 号与标签；标签 1、3 的载荷是节点指针 86（后 2 字节补零），标签 2、4 的是数据指针 88。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExtentUpperLeafEntryView {
     NoDataUnit {
@@ -276,14 +287,23 @@ pub enum ExtentUpperLeafEntryView {
     LowerSegmentRoot {
         inode: u64,
         pointer: Vec<u8>,
+        tail: TailAfterTheLastDataUnit,
     },
     InlineDataUnit {
         inode: u64,
         pointer: Vec<u8>,
+        tail: TailAfterTheLastDataUnit,
     },
-    /// 条目窄于 113、标签不是 0 / 1 / 2、key 的 locality 或 offset 段不是 0、字段表写零的字节不是零。
+    /// 条目窄于 113、标签不是 0 到 4、key 的 locality 或 offset 段不是 0、字段表写零的字节不是零。
     Malformed,
 }
+
+/// 上段叶条目标签的五个值（D8（核心索引结构） 已定项 14 与判决 m4-trunc-r1 K5），按字段表另写一份。
+const EXTENT_UPPER_LEAF_ENTRY_TAG_NO_DATA_UNIT: u8 = 0;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT: u8 = 1;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT: u8 = 2;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT_FOLLOWED_BY_A_HOLE: u8 = 3;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT_FOLLOWED_BY_A_HOLE: u8 = 4;
 
 /// 解一条上段叶条目。
 #[must_use]
@@ -296,20 +316,38 @@ pub fn extent_upper_leaf_entry_view(entry: &[u8]) -> ExtentUpperLeafEntryView {
     let payload = &entry[25..entry_bytes];
     let node_pointer_bytes = usize::try_from(NODE_POINTER_BYTES).expect("86");
     let data_pointer_bytes = usize::try_from(DATA_POINTER_BYTES).expect("88");
-    match entry[24] {
-        0 if payload.iter().all(|byte| *byte == 0) => {
-            ExtentUpperLeafEntryView::NoDataUnit { inode }
-        }
-        1 if payload[node_pointer_bytes..].iter().all(|byte| *byte == 0) => {
+    let lower_segment_root = |tail| {
+        if payload[node_pointer_bytes..].iter().all(|byte| *byte == 0) {
             ExtentUpperLeafEntryView::LowerSegmentRoot {
                 inode,
                 pointer: payload[..node_pointer_bytes].to_vec(),
+                tail,
             }
+        } else {
+            ExtentUpperLeafEntryView::Malformed
         }
-        2 => ExtentUpperLeafEntryView::InlineDataUnit {
-            inode,
-            pointer: payload[..data_pointer_bytes].to_vec(),
-        },
+    };
+    let inline_data_unit = |tail| ExtentUpperLeafEntryView::InlineDataUnit {
+        inode,
+        pointer: payload[..data_pointer_bytes].to_vec(),
+        tail,
+    };
+    match entry[24] {
+        EXTENT_UPPER_LEAF_ENTRY_TAG_NO_DATA_UNIT if payload.iter().all(|byte| *byte == 0) => {
+            ExtentUpperLeafEntryView::NoDataUnit { inode }
+        }
+        EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT => {
+            lower_segment_root(TailAfterTheLastDataUnit::NoHole)
+        }
+        EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT => {
+            inline_data_unit(TailAfterTheLastDataUnit::NoHole)
+        }
+        EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT_FOLLOWED_BY_A_HOLE => {
+            lower_segment_root(TailAfterTheLastDataUnit::HoleUpToTheSize)
+        }
+        EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT_FOLLOWED_BY_A_HOLE => {
+            inline_data_unit(TailAfterTheLastDataUnit::HoleUpToTheSize)
+        }
         _tag_or_padding_the_field_table_does_not_allow => ExtentUpperLeafEntryView::Malformed,
     }
 }

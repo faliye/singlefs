@@ -385,6 +385,7 @@ pub fn image_with_the_root_damaged(
     let root_role = match tree {
         MultiLevelCodeTwoTree::Accounting => TransactionUnit::AccountingTree,
         MultiLevelCodeTwoTree::CentralMapping => TransactionUnit::MappingTree,
+        MultiLevelCodeTwoTree::Deadlist => TransactionUnit::DeadlistTree,
     };
     let root_unit = output.unit(root_role);
     let root = parse_index_node(&root_unit.bytes).expect("根解得开");
@@ -532,12 +533,23 @@ pub fn the_pool_checker_reddens_each_broken_rule_of_a_multi_level_tree_root(
             PoolCheckerExpectation::only_the_named_invariants()
                 .and_violated_with_a_detail_containing(invariant, detail_fragment),
         );
-        // 冷走读同一套读者（`code_two_tree::read_code_two_tree`）：条目宽只多不少的那一份读得过去，其余四份走读失败。
+        // 冷走读同一套读者（`code_two_tree::read_code_two_tree`）：五份都走读失败。条目宽只多不少的那一份报条目宽与字段表不符
+        // （C780，用户 2026-10-18 定「宽于字段表也拒」），其余四份按 I-1.1 拒。
         let recovered = recover(&image, JournalPolicy::Consult).outcome;
         match damage {
             RootDamage::EntryWiderThanTheInternalEntryFieldTable => assert!(
-                matches!(recovered, RecoveryOutcome::FileRead { .. }),
-                "{tree:?} {damage:?}：条目比字段表宽，读者照样切得动：{recovered:?}"
+                matches!(
+                    recovered,
+                    RecoveryOutcome::Failed {
+                        failure: RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                            what: "记账树内部条目",
+                            entry_bytes: 109,
+                            field_table_bytes: 108,
+                        },
+                        ..
+                    }
+                ),
+                "{tree:?} {damage:?}：条目比字段表宽，冷走读拒、不照读：{recovered:?}"
             ),
             RootDamage::LevelOneAboveItsChildren
             | RootDamage::SeparatorAboveTheSmallestKeyOfItsChild
