@@ -34,7 +34,7 @@
 //! | 库布局 | `00` | 布局号，4 字节大端（5：块键只由内容定、有下面这几张表、观察者那一种结论不带名字、判定向量编号 4 字节）；没有这一行的是这一套之前的库；布局号 2、3、4 的判定向量编号还是一个字节，开库就拒 |
 //! | 结论块 | `0A` ‖ 块键 ‖ 结论种类 ‖ 版本（32 字节） | 块里每个状态一个判定向量编号（4 字节） |
 //! | 结论违例 | `0B` ‖ 块键 ‖ 结论种类 ‖ 版本 ‖ 块内序号（8 字节） | 那个状态的判定向量编号（4 字节） |
-//! | 恢复字 | `0C` ‖ 块键 ‖ 结论种类 ‖ 版本 | 每个状态八个字（两遍各自落到的根两个字、结局、失败点），每字 4 字节小端；不进判定向量编号 |
+//! | 恢复字 | `0C` ‖ 块键 ‖ 结论种类 ‖ 版本 | 每个状态 `RECOVERY_WORDS_PER_STATE` 个字（两遍各自落到的根四个字：落没落到根的标记、实例代号、checkpoint_txg 低 32 位与高 32 位，再是结局、失败点；原先每遍只两个根字、共八个字，用户 2026-10-24 定 checkpoint_txg「存完整 u64」之后换了这一布局：这一张表的行跟着结论版本走，判法单元变了版本就换，旧行对不上键、照旧现判，不迁移），每字 4 字节小端；不进判定向量编号 |
 //! | 计数向量 | `0D` ‖ 块键 ‖ 结论种类 ‖ 版本 | 逐条不变量判到 / 违例 / 不适用、各观察者计数、按发布分的态数（[`BlockCountVector`]） |
 //! | 块属性 | `0E` ‖ 块键 ‖ 结论种类 ‖ 版本 | 在哪判的（CPU，或 GPU 连同卡型与驱动版本，[`JudgingDevice`]）、判定日期（东京日期 `YYYY-MM-DD`）与跑法（全量、剪枝、逐条，[`JudgementCircumstances`]）；都不进键 |
 //! | 点名的被抛弃根 | `19` ‖ 块键 ‖ 结论种类 ‖ 版本 | 每个状态上池级 checker 判 I-7.4 时违例细节里点名的被抛弃根：条数 4 字节小端，再逐条实例代号 4 字节、checkpoint_txg 8 字节小端；存的时候给了才有（给定状态表那一路每块都给） |
@@ -600,7 +600,7 @@ pub struct StoredViolation {
     pub verdict_vector_number: VerdictVectorNumber,
 }
 
-/// 恢复字旁表里一个状态占几个字节：八个字，每字 4 字节小端。
+/// 恢复字旁表里一个状态占几个字节：[`RECOVERY_WORDS_PER_STATE`] 个字，每字 4 字节小端。
 const RECOVERY_WORD_BYTES_PER_STATE: usize = RECOVERY_WORDS_PER_STATE * std::mem::size_of::<u32>();
 
 fn recovery_words_value_bytes(words_of_each_state: &[RecoveryWordsOfState]) -> Vec<u8> {
@@ -1255,7 +1255,7 @@ pub enum VerdictStoreTable {
     ConclusionBlocks,
     /// 结论违例：键是块键 + 结论种类 + 版本 + 块内序号，值是那个状态的判定向量编号。
     ConclusionViolations,
-    /// 恢复字旁表：键是块键 + 结论种类 + 版本（与结论块同形：几种结论共用一把版本时各存各的），值是每个状态八个字。
+    /// 恢复字旁表：键是块键 + 结论种类 + 版本（与结论块同形：几种结论共用一把版本时各存各的），值是每个状态 [`RECOVERY_WORDS_PER_STATE`] 个字。
     RecoveryWords,
     /// 点名的被抛弃根旁表（用户 2026-10-14 弹窗定「GPU 判器加细节输出」）：键是块键 + 结论种类 + 版本（与恢复字旁表同形），
     /// 值是每个状态上池级 checker 判 I-7.4 时违例细节里点名的被抛弃根（[`abandoned_roots_named_value_bytes`]）。与结论块同一批写、一起读回。
@@ -4409,7 +4409,7 @@ impl VerdictStore {
                     stored_bytes_mismatch(
                         VerdictStoreTable::RecoveryWords,
                         &recovery_words_key.0,
-                        "恢复字不是块里每个状态八个字",
+                        "恢复字不是块里每个状态 RECOVERY_WORDS_PER_STATE 个字",
                     )
                 })?,
             ),
@@ -4550,6 +4550,7 @@ impl VerdictStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crash_judge_conclusions::{LandedRootWords, RecoveryWordsOfAPass};
     use std::sync::atomic::{AtomicU64, Ordering};
 
     /// 测试用的库目录：放在 `${TMPDIR:-/tmp}` 下，名字带测试名、进程号与序号，丢掉时连同里面的库一起删。
@@ -5497,9 +5498,29 @@ mod tests {
         }
     }
 
+    /// 测试块每个状态的恢复字：看 journal 那一遍落到 checkpoint_txg 高 32 位非 0 的根（随状态变），不看那一遍落到 txg 4 那条根。
     fn recovery_words_of(states: u32) -> Vec<RecoveryWordsOfState> {
         (0..states)
-            .map(|state| RecoveryWordsOfState([2, 5 + state, 1, 0, 2, 4, 1, 100 + state]))
+            .map(|state| {
+                RecoveryWordsOfState::of_the_two_passes(
+                    RecoveryWordsOfAPass {
+                        landed_root: LandedRootWords::of_the_landed_root(
+                            InstanceGeneration(2),
+                            CheckpointTxg((u64::from(state + 1) << 32) | u64::from(5 + state)),
+                        ),
+                        outcome: 1,
+                        failure_point: 0,
+                    },
+                    RecoveryWordsOfAPass {
+                        landed_root: LandedRootWords::of_the_landed_root(
+                            InstanceGeneration(2),
+                            CheckpointTxg(4),
+                        ),
+                        outcome: 1,
+                        failure_point: 100 + state,
+                    },
+                )
+            })
             .collect()
     }
 
@@ -5702,7 +5723,7 @@ mod tests {
             assert_eq!(
                 recovery_words_row.len(),
                 3 * RECOVERY_WORDS_PER_STATE * 4,
-                "旁表里每个状态八个字、每字四个字节"
+                "旁表里每个状态 RECOVERY_WORDS_PER_STATE 个字、每字四个字节"
             );
             (record, red)
         };
@@ -5746,6 +5767,104 @@ mod tests {
                 && stored.circumstances.judged_date.as_bytes()[7] == b'-',
             "判定日期写成 YYYY-MM-DD：{}",
             stored.circumstances.judged_date
+        );
+    }
+
+    /// 审计复核 T01（`records/2026-10-24-singlefs-checker-tier-审计复核.md`，用户 2026-10-24 定 checkpoint_txg「存完整 u64」）：恢复字里落到的根
+    /// checkpoint_txg 高 32 位非 0（1、`0xFFFF_FFFF`）、低 32 位相同的两个状态，连同一遍没落到根与落到实例代号 `u32::MAX`、checkpoint_txg
+    /// `u64::MAX` 那条根的一个状态，存进判定库、关库重开再读回逐字相同；读回的每一遍落到的根照完整的 checkpoint_txg 认得出。
+    #[test]
+    fn recovery_words_landing_on_checkpoint_txgs_past_thirty_two_bits_read_back_word_for_word() {
+        let directory = TemporaryLibraryDirectory::new("recovery-words-past-thirty-two-bits");
+        let block_key = block_key_named("node", 0);
+        let pass_landed_on = |instance: u32, checkpoint_txg: u64| RecoveryWordsOfAPass {
+            landed_root: LandedRootWords::of_the_landed_root(
+                InstanceGeneration(instance),
+                CheckpointTxg(checkpoint_txg),
+            ),
+            outcome: 1,
+            failure_point: 0,
+        };
+        let pass_landed_on_no_root = RecoveryWordsOfAPass {
+            landed_root: LandedRootWords::NOT_LANDED,
+            outcome: 2,
+            failure_point: 3,
+        };
+        let recovery_words = vec![
+            RecoveryWordsOfState::of_the_two_passes(
+                pass_landed_on(1, (1 << 32) | 7),
+                pass_landed_on(1, 7),
+            ),
+            RecoveryWordsOfState::of_the_two_passes(
+                pass_landed_on(1, (0xFFFF_FFFF << 32) | 7),
+                pass_landed_on(1, (1 << 32) | 7),
+            ),
+            RecoveryWordsOfState::of_the_two_passes(
+                pass_landed_on(u32::MAX, u64::MAX),
+                pass_landed_on_no_root,
+            ),
+        ];
+        {
+            let mut store = VerdictStore::create_empty(&directory.path).expect("建库");
+            let clean = store
+                .register_verdict_vector(&verdict_vector(b""))
+                .expect("登记");
+            let mut record = conclusion_record(block_of(&[clean, clean, clean]), &[]);
+            record.recovery_words = Some(recovery_words.clone());
+            assert_eq!(
+                store
+                    .store_conclusion_block(
+                        &block_key,
+                        &ConclusionKind::ImageJudgement,
+                        &ANOTHER_JUDGEMENT_CONCLUSION_VERSION,
+                        &record
+                    )
+                    .expect("存"),
+                VerdictBlockStoring::WrittenAndSynced
+            );
+        }
+        let (store, _opening) =
+            VerdictStore::open_existing_with_conclusion_kinds(&directory.path).expect("重开");
+        let read_back = store
+            .read_conclusion_block(
+                &block_key,
+                &ConclusionKind::ImageJudgement,
+                &ANOTHER_JUDGEMENT_CONCLUSION_VERSION,
+            )
+            .expect("读")
+            .expect("存过")
+            .recovery_words
+            .expect("恢复字随块存过");
+        assert_eq!(
+            read_back, recovery_words,
+            "恢复字逐字读回，连同高 32 位与标记"
+        );
+        assert_eq!(
+            read_back
+                .iter()
+                .map(|words| (
+                    words.consulted_pass().landed_root.landed_root(),
+                    words.ignored_pass().landed_root.landed_root()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    Some((InstanceGeneration(1), CheckpointTxg((1 << 32) | 7))),
+                    Some((InstanceGeneration(1), CheckpointTxg(7)))
+                ),
+                (
+                    Some((
+                        InstanceGeneration(1),
+                        CheckpointTxg((0xFFFF_FFFF << 32) | 7)
+                    )),
+                    Some((InstanceGeneration(1), CheckpointTxg((1 << 32) | 7)))
+                ),
+                (
+                    Some((InstanceGeneration(u32::MAX), CheckpointTxg(u64::MAX))),
+                    None
+                ),
+            ],
+            "读回的每一遍落到的根照完整的 checkpoint_txg 认得出，没落到根读回 None"
         );
     }
 
@@ -6337,17 +6456,18 @@ mod tests {
 
     /// rocksdb 的错误类型只能由它自己造：往一个普通文件上开库，拿它报的错当测试里的「库读错」。
     fn a_real_library_read_error() -> rocksdb::Error {
-        let not_a_directory = std::env::temp_dir().join(format!(
-            "singlefs-verdict-store-not-a-library-directory-{}-{}",
-            std::process::id(),
-            NEXT_TEMPORARY_DIRECTORY_SUFFIX.fetch_add(1, Ordering::Relaxed)
-        ));
+        // 守卫认领这个普通文件：开库那一步没按预期失败而 panic 时也删掉它
+        let not_a_directory =
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join(format!(
+                    "singlefs-verdict-store-not-a-library-directory-{}-{}",
+                    std::process::id(),
+                    NEXT_TEMPORARY_DIRECTORY_SUFFIX.fetch_add(1, Ordering::Relaxed)
+                )),
+            );
         std::fs::write(&not_a_directory, b"not a library directory")
             .expect("临时目录可写：建一个普通文件");
-        let read_error =
-            rocksdb::DB::open_default(&not_a_directory).expect_err("往一个普通文件上开库必失败");
-        std::fs::remove_file(&not_a_directory).expect("删掉自己建的普通文件");
-        read_error
+        rocksdb::DB::open_default(&not_a_directory).expect_err("往一个普通文件上开库必失败")
     }
 
     fn kept_out_row(key_number: u32) -> (Vec<u8>, Vec<u8>) {

@@ -9,7 +9,7 @@
 //!   量甲-T1 与 G12 两条臂的多扣（Q1a、Q1b）与它们的差 Δ，按洞的计数分组判（Q1c、Q1c-洞、Q1c-前、Q1c-后、Q1d）。
 //!
 //! 只读驱动 `singlefs-core` / `singlefs-checker` 的公开入口，不改这两个 crate 的生产代码；产物按 `E7RESULT` 行打印，复跑登记在
-//! `scripts/experiments/replay.sh`。洞的 txg、挂载做完的 txg、终点 txg 从本地 S 与装置里的锚点模型（[`anchor_model`]，登记第七节 7.2
+//! `scripts/experiment-apparatus/replay.sh`。洞的 txg、挂载做完的 txg、终点 txg 从本地 S 与装置里的锚点模型（[`anchor_model`]，登记第七节 7.2
 //! 命令四 `anchors_e156_r4.py` 的逐行移植，门槛那一处照第 6 次重跑登记 `research/prompts/e156-r6-prereg.md` 第十三节命令四
 //! `anchors_e156_r6.py` 改）算，不从 `crates/` 算；装置跑的时候从盘上现量，两边比。
 //!
@@ -90,7 +90,7 @@ const E156_SLOTS_PER_REGION: u64 = 8;
 const E156_SLOTS_PER_REGION_SAMPLING_POINTS: [u64; 3] = [4, 8, 16];
 const E156_SLOTS_PER_REGION_MINIMUM: u64 = 4;
 const E156_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
-/// 区域设备（登记表头第 2 行，D22（单元原子性怎么合成） 已定项 1 的区域归属 [0, 1, 0]）；[`main`] 开头与 mkfs 参数回比。
+/// 区域设备（登记表头第 2 行，D22（单元原子性怎么合成） 已定项 16 第 4 句的区域归属 [0, 1, 0]）；[`main`] 开头与 mkfs 参数回比。
 const E156_REGION_DEVICE_NUMBERS: [u32; 3] = [0, 1, 0];
 /// 区域数 R（登记表头第 2 行；`.claude/kb/decisions/22-单元原子性怎么合成.md`「`| **区域数 R** | **3**`」那一行）：根环 3S 槽、U13 (a) 的 3N 次覆盖写都从它算；
 /// [`main`] 开头与 `singlefs_format::ROOT_RING_REGIONS` 回比。
@@ -1171,7 +1171,7 @@ fn record_release_generations(
 mod anchor_model {
     use std::collections::{BTreeMap, BTreeSet};
 
-    /// 区域设备 [0, 1, 0]（D22（单元原子性怎么合成） 已定项 1）。
+    /// 区域设备 [0, 1, 0]（D22（单元原子性怎么合成） 已定项 16 第 4 句）。
     const REGION_DEVICE_NUMBERS: [u64; 3] = [0, 1, 0];
     /// 造洞之后隔几次工作负载发布再造下一个（登记表头第 4 行）。
     const WORKLOAD_PUBLISHES_BETWEEN_HOLES: u64 = 2;
@@ -6829,6 +6829,8 @@ mod tests {
                 span_slots: 1,
                 generation: txg,
                 is_released: true,
+                quarantine_mark:
+                    singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
             },
             AllocationRecord {
                 device: DeviceIdentity(0),
@@ -6836,6 +6838,8 @@ mod tests {
                 span_slots: 1,
                 generation: txg,
                 is_released: false,
+                quarantine_mark:
+                    singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
             },
         ];
         let allocator = PoolAllocator::rebuild_from_records(devices, records);

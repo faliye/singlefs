@@ -1,6 +1,5 @@
 //! 里程碑「新池新建文件」步 1 的验收：mkfs 写出的字节由 checker（独立实现）判，录制流的段序列与登记表逐字相同。
 
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use singlefs_core::address::{
@@ -10,7 +9,8 @@ use singlefs_core::block_device::{
     BlockDevice, FileBackedBlockDevice, PhysicalBlockSizeInBytes, WriteDurability,
 };
 use singlefs_core::make_filesystem::{
-    make_filesystem, MakeFilesystemError, MakeFilesystemOutput, MakeFilesystemParameters,
+    make_filesystem, make_filesystem_drawing_the_filesystem_identifier, MakeFilesystemError,
+    MakeFilesystemOutput, MakeFilesystemParameters,
 };
 use singlefs_core::mount::mount_writable;
 use singlefs_core::recovery::{choose_root, choose_system_configuration, readable_roots};
@@ -25,8 +25,10 @@ use singlefs_format::{
 };
 use singlefs_harness::scenario::run_new_pool_file_creation;
 use singlefs_harness::segments::{
-    segment_kinds_text, segment_sizes_text, split_into_segments, FixedGeometry,
+    closed_form_state_count, segment_kinds_text, segment_sizes_text, split_into_segments,
+    FixedGeometry,
 };
+use singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop;
 use singlefs_harness::{
     check_stream_integrity, RecordedOperationKind, RecordingBlockDevice, SharedStream,
     StreamIntegrity,
@@ -36,12 +38,13 @@ static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 /// 4 GiB 稀疏镜像：环 768 MiB ≤ 容量 / 4（D23 已定项 19）。
 const IMAGE_BYTES: u64 = 4 << 30;
 
-fn image_path(tag: &str, device: u32) -> PathBuf {
+/// 一份镜像的路径，建之前就由守卫认领：用例做完、断言失败、panic 都删掉它。
+fn image_path(tag: &str, device: u32) -> TemporaryPathRemovedOnDrop {
     let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
-    std::env::temp_dir().join(format!(
+    TemporaryPathRemovedOnDrop::claiming(std::env::temp_dir().join(format!(
         "singlefs-step1-{tag}-{}-{sequence}-dev{device}.img",
         std::process::id()
-    ))
+    )))
 }
 
 fn parameters() -> MakeFilesystemParameters {
@@ -59,15 +62,25 @@ fn parameters() -> MakeFilesystemParameters {
 }
 
 struct Pool {
-    paths: Vec<PathBuf>,
+    /// 只为丢掉时删镜像而留着。
+    _images: Vec<TemporaryPathRemovedOnDrop>,
     devices: Vec<(DeviceIdentity, RecordingBlockDevice<FileBackedBlockDevice>)>,
     stream: SharedStream,
     output: MakeFilesystemOutput,
 }
 
-fn run_mkfs(tag: &str) -> Pool {
+type RecordedFileDevices = Vec<(DeviceIdentity, RecordingBlockDevice<FileBackedBlockDevice>)>;
+
+/// 两个新建的全零 4 GiB 稀疏文件镜像，外面包录制器、录进同一条流：认领着镜像的守卫、设备、流。
+fn recorded_blank_images(
+    tag: &str,
+) -> (
+    Vec<TemporaryPathRemovedOnDrop>,
+    RecordedFileDevices,
+    SharedStream,
+) {
     let stream = SharedStream::new();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     let mut devices = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
@@ -85,20 +98,20 @@ fn run_mkfs(tag: &str) -> Pool {
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(path);
     }
+    (images, devices, stream)
+}
+
+/// 内层入口照 [`parameters`]（固定 fsid）做 mkfs。
+fn run_mkfs(tag: &str) -> Pool {
+    let (images, mut devices, stream) = recorded_blank_images(tag);
     let output = make_filesystem(&parameters(), &mut devices).expect("mkfs");
     Pool {
-        paths,
+        _images: images,
         devices,
         stream,
         output,
-    }
-}
-
-fn remove_images(pool: &Pool) {
-    for path in &pool.paths {
-        std::fs::remove_file(path).expect("清理镜像");
     }
 }
 
@@ -114,8 +127,11 @@ fn read(
     buffer
 }
 
+/// 内层入口（D22（单元原子性怎么合成） 已定项 8 第 3 条「内层入口可给 fsid」）：同参数、同一个 fsid 两次 mkfs，
+/// 写过的每一段与录制流逐字节相同（里程碑步 1 验收，用户 2026-10-20 改成「同参数同 fsid」）。
 #[test]
-fn same_parameters_twice_give_byte_identical_images() {
+fn the_inner_entry_with_the_same_parameters_and_filesystem_identifier_twice_gives_byte_identical_images(
+) {
     let first = run_mkfs("twice-a");
     let second = run_mkfs("twice-b");
     for device_number in 0..2 {
@@ -142,8 +158,44 @@ fn same_parameters_twice_give_byte_identical_images() {
         second.stream.render(),
         "录制流也逐字相同"
     );
-    remove_images(&first);
-    remove_images(&second);
+}
+
+/// 对外入口（D22（单元原子性怎么合成） 已定项 8 第 3 条「fsid 由 mkfs 的对外入口生成，前 8 字节取自随机源」，用户 2026-10-20 定
+/// 「对外生成，留内层入口」）：同一组几何在两组空盘上各做一次，两次取到的 fsid 前 8 字节不同（单元头只带这 8 字节，
+/// C659（fsid 前 8 字节相同时重做 mkfs 实例代号不变式红） 的来路就是它相同）；每次交回的参数里的 fsid 就是写进两块盘
+/// 系统配置槽 0 与第 0 代根的那一个。两次撞上同一个前 8 字节的概率按 2⁻⁶⁴ 算（推的）。
+#[test]
+fn the_outer_entry_draws_filesystem_identifiers_whose_first_eight_bytes_differ_between_two_runs() {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut drawn = Vec::new();
+    for tag in ["drawn-a", "drawn-b"] {
+        let (_images, mut devices, _stream) = recorded_blank_images(tag);
+        let made = make_filesystem_drawing_the_filesystem_identifier(
+            parameters().region_devices,
+            parameters().geometry,
+            &mut devices,
+        )
+        .expect("对外入口 mkfs");
+        assert_eq!(
+            made.output.root.filesystem_identifier, made.parameters.filesystem_identifier,
+            "第 0 代根带的 fsid 就是交回的那一个"
+        );
+        for (_, device) in &devices {
+            let view =
+                singlefs_checker::check_system_configuration_slot(&read(device, 0, slot_bytes))
+                    .expect("系统配置槽 0 自证过");
+            assert_eq!(
+                view.filesystem_identifier, made.parameters.filesystem_identifier,
+                "系统配置槽 0 写的 fsid 就是交回的那一个"
+            );
+        }
+        drawn.push(made.parameters.filesystem_identifier);
+    }
+    assert_ne!(
+        drawn[0][..8],
+        drawn[1][..8],
+        "对外入口两次 mkfs 的 fsid 前 8 字节相同：fsid 不是从随机源取的"
+    );
 }
 
 #[test]
@@ -193,7 +245,6 @@ fn checker_reads_the_same_generation_zero_root_from_all_three_regions_and_isolat
             "别的区域不受影响"
         );
     }
-    remove_images(&pool);
 }
 
 #[test]
@@ -230,7 +281,6 @@ fn both_system_configuration_slots_verify_with_the_same_generation_and_a_corrupt
     let (chosen, _) = singlefs_checker::choose_system_configuration(&[&slot_zero, &slot_one])
         .expect("还有一槽可择");
     assert_eq!(chosen, 1, "挂载选没坏的那一槽");
-    remove_images(&pool);
 }
 
 #[test]
@@ -260,7 +310,6 @@ fn units_named_by_the_root_pass_their_own_header_checks() {
         pool.output.instance_table_unit[136], 1,
         "实例表第一条是 kind 1 链指针记录"
     );
-    remove_images(&pool);
 }
 
 #[test]
@@ -273,27 +322,34 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
         root_ring_slots_per_region: parameters().geometry.root_ring_slots_per_region,
     };
     let segments = split_into_segments(&operations, &geometry);
-    // mkfs 清 [0, 根环基址)（C651 第一轮判决用户定案 W1）之后每块盘多一次清零、都在第一段：第一段 12 → 14 个写、操作 23 → 25；
+    // mkfs 清 [0, 根环基址)（C651 第一轮判决用户定案 W1）之后每块盘多一次清零：第一段 12 → 14 个写、操作 23 → 25；
+    // 两趟写序（D22（单元原子性怎么合成） 已定项 8 第 3 条，`research/prompts/m3-close-c656-r3-main-verification.md` 第二节 S3）
+    // 把两块盘的 [0, 根环基址) 清零与作废那道屏障（两块盘各一步）提到最前、自成一段：14 写一段拆成 2 与 12，操作 25 → 27，
+    // 每次写只取两态时的闭式 16402 → 1 + 3 + (2^12 − 1) + 1 + 1 + 1 + (2^4 − 1) = 4117。
     // layout/01-first-txn.md 八 mkfs 那一行要跟着改（写回另派）。
     assert_eq!(
         segment_sizes_text(&segments),
-        "14+1+1+1+4",
+        "2+12+1+1+1+4",
         "layout/01-first-txn.md 八 mkfs 那一行"
     );
     assert_eq!(
         segment_kinds_text(&segments),
-        "[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
+        "[zero_fill×2,barrier×2]|[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
+    );
+    assert_eq!(
+        closed_form_state_count(&segments),
+        4117,
+        "每次写只取两态时的闭式：1 + (2^2 − 1) + (2^12 − 1) + 三个 1 写段各 1 + (2^4 − 1)"
     );
     assert_eq!(
         operations.len(),
-        25,
-        "mkfs 25 次操作（每盘 [0, 根环基址) 一段 + 3 段根环 + 1 段环共十次清零、四个单元写、三次根 FUA、四次系统配置槽写、两道池屏障——录制器按设备记屏障，每道两块盘各记一步）"
+        27,
+        "mkfs 27 次操作（每盘 [0, 根环基址) 一段 + 3 段根环 + 1 段环共十次清零、四个单元写、三次根 FUA、四次系统配置槽写、三道池屏障——录制器按设备记屏障，每道两块盘各记一步）"
     );
     assert_eq!(
         check_stream_integrity(&pool.stream.render()),
-        StreamIntegrity::Consistent { operations: 25 }
+        StreamIntegrity::Consistent { operations: 27 }
     );
-    remove_images(&pool);
 }
 
 /// 并行线四的验收第一条：mkfs 之后抽样读 journal 环全 0，mkfs 交给设备的写字节数
@@ -311,7 +367,7 @@ fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes(
     const BELOW_THE_ROOT_RING_BASE_BYTES: u64 = 1 << 20;
 
     let stream = SharedStream::new();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     let mut devices = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path("ring-zero", device_number);
@@ -342,7 +398,7 @@ fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes(
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(path);
     }
     make_filesystem(&parameters(), &mut devices).expect("mkfs");
 
@@ -430,10 +486,6 @@ fn mkfs_zeroes_the_whole_journal_ring_and_writes_the_registered_number_of_bytes(
         768 * 1024 * 1024,
         "验收那个数里的 768 MiB 就是这个常量"
     );
-
-    for path in &paths {
-        std::fs::remove_file(path).expect("清理镜像");
-    }
 }
 
 /// C484（mkfs 不清根环，同 fsid 重来旧根还择得中）的正题：在一块**已经有池**的盘上拿**同一个 fsid** 重做 mkfs，
@@ -454,7 +506,7 @@ fn remaking_the_pool_with_the_same_filesystem_identifier_leaves_no_root_of_the_o
     let spacing = parameters.geometry.fixed_structure_slot_spacing;
     let root_slot_bytes = usize::try_from(parameters.geometry.physical_block_size).expect("根槽宽");
     let stream = SharedStream::new();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     let mut devices = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path("remake", device_number);
@@ -472,7 +524,7 @@ fn remaking_the_pool_with_the_same_filesystem_identifier_leaves_no_root_of_the_o
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(path);
     }
     let old_pool =
         run_new_pool_file_creation(&parameters, &mut devices, &stream, |_point, _devices| {})
@@ -620,11 +672,6 @@ fn remaking_the_pool_with_the_same_filesystem_identifier_leaves_no_root_of_the_o
         (CheckpointTxg(0), InstanceGeneration(0)),
         "挂载择到的是新池刚种下的第 0 代根，不是旧池那条 txg 3"
     );
-
-    drop(devices);
-    for path in &paths {
-        std::fs::remove_file(path).expect("清理镜像");
-    }
 }
 
 /// 第一版两块盘时根环区域归属写死盘 0 / 盘 1 / 盘 0（D2（RAID 条带策略） 已定项 7：不是 mkfs 参数），参数给别的归属就在任何写之前拒绝
@@ -644,7 +691,7 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
     ] {
         let stream = SharedStream::new();
         let mut devices = Vec::new();
-        let mut paths = Vec::new();
+        let mut images = Vec::new();
         for device_number in 0..2u32 {
             let path = image_path(tag, device_number);
             let file = FileBackedBlockDevice::create_image_file_exclusively(
@@ -661,7 +708,7 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
                     stream.clone(),
                 ),
             ));
-            paths.push(path);
+            images.push(path);
         }
         let mut layout_parameters = parameters();
         layout_parameters.region_devices = layout;
@@ -696,10 +743,6 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
                 );
             }
         }
-        drop(devices);
-        for path in paths {
-            std::fs::remove_file(path).expect("清理镜像");
-        }
     }
 }
 
@@ -707,7 +750,7 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
 fn ring_larger_than_a_quarter_of_the_device_is_refused_before_any_write() {
     let stream = SharedStream::new();
     let mut devices = Vec::new();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path("small", device_number);
         let file = FileBackedBlockDevice::create_image_file_exclusively(
@@ -724,7 +767,7 @@ fn ring_larger_than_a_quarter_of_the_device_is_refused_before_any_write() {
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(path);
     }
     let result = make_filesystem(&parameters(), &mut devices);
     assert!(
@@ -735,7 +778,4 @@ fn ring_larger_than_a_quarter_of_the_device_is_refused_before_any_write() {
         "1 GiB 镜像装不下 768 MiB 的环"
     );
     assert!(stream.operations().is_empty(), "拒绝之前一个字节都没写");
-    for path in paths {
-        std::fs::remove_file(path).expect("清理镜像");
-    }
 }

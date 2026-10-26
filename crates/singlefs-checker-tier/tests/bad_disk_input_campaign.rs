@@ -353,25 +353,25 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
         // extent 树按位置寻址（D8（核心索引结构） 已定项 14）：第一个文件那一版的 extent 树根是上段根兼叶，条目是上段叶条目 113。
         (
             DamageKind::NarrowedEntryWidthOfTheExtentTreeRoot,
-            "EntryNarrowerThanItsFieldTable { what: \"extent 上段叶条目\"",
-            "EntryNarrowerThanItsFieldTable { what: \"extent 上段叶条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"extent 上段叶条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"extent 上段叶条目\"",
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheInodeTreeRoot,
-            "EntryNarrowerThanItsFieldTable { what: \"inode 树内部条目\"",
-            "EntryNarrowerThanItsFieldTable { what: \"inode 树内部条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"inode 树内部条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"inode 树内部条目\"",
         ),
         // 分配记录树按位置寻址、根恒在第 1 层以上（D8（核心索引结构） 已定项 14）：根的条目是内部条目 96，两个读者都走整棵读，
         // 先红在内部条目的宽度上。
         (
             DamageKind::NarrowedEntryWidthOfTheAllocationRecordsTreeRoot,
-            "EntryNarrowerThanItsFieldTable { what: \"分配记录树内部条目\"",
-            "EntryNarrowerThanItsFieldTable { what: \"分配记录树内部条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"分配记录树内部条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"分配记录树内部条目\"",
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot,
-            "EntryNarrowerThanItsFieldTable { what: \"记账条目\"",
-            "EntryNarrowerThanItsFieldTable { what: \"记账条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"记账条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"记账条目\"",
         ),
         // 这四条坏的是最左那片叶的记录（分配记录树按位置寻址，D8（核心索引结构） 已定项 14）：记录的槽号、跨度、设备改了，
         // 它就不在它所在叶按位置罩的那一段里，读树那一步的叶判先接走，两个读者同一个成员；两条记录的 key 撞在一起时
@@ -400,7 +400,7 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
         (
             DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot,
             "FileRead（实例 2 第 9 代根",
-            "EntryNarrowerThanItsFieldTable { what: \"映射条目\"",
+            "EntryWidthDiffersFromItsFieldTable { what: \"映射条目\"",
         ),
         (
             DamageKind::RelabelledInodeWatermarkAccountingRow,
@@ -517,7 +517,7 @@ fn observation_of(base: &BaseImageForOneHistory, damaged: &DamagedImage) -> BadD
 /// [`DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot`] 原来的样子。冷走读与可写挂载的重建调同一个叶判，
 /// 两个读者都在解记账条目之前红在「根 key 区间与条目不符」上（末条的 key 与头里的最大 key 对不上）。
 /// 判别力：重建读记账树时不判节点头（`recovery.rs` 的 `rebuild_version` 那一处改回 `OnlyWhatTheShapeNeeds`），
-/// 可写挂载改报记账条目窄于字段表（`EntryNarrowerThanItsFieldTable`：重建先核条目宽、后数条目）——`crates/mutations.tsv` 里以
+/// 可写挂载改报记账条目窄于字段表（`EntryWidthDiffersFromItsFieldTable`：重建先核条目宽、后数条目）——`crates/mutations.tsv` 里以
 /// 「实审 A3d：重建读记账树不判节点头（记账根只剩一条」开头的那一行。
 #[test]
 fn an_accounting_root_narrowed_to_its_first_entry_is_refused_at_the_header_judgement_by_both_readers(

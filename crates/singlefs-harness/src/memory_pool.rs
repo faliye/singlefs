@@ -12,7 +12,6 @@ use singlefs_core::address::{
 };
 use singlefs_core::block_device::{BlockDeviceError, DiscardOutcome, PhysicalBlockSizeInBytes};
 use singlefs_core::recovery::PoolReader;
-use singlefs_core::system_configuration::unit_area_start_slot_recorded_in_the_slot;
 use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
@@ -20,7 +19,6 @@ use singlefs_format::{
 use crate::segments::{FixedGeometry, SegmentAfterOperation, SegmentClosingRule, StepKind};
 use crate::{RecordedEntrySpan, RecordedOperationKind, RecordedPublishEntry, RetainedOperation};
 use singlefs_core::root_record::{UnmountMarker, ROOT_RECORD_FLAG_UNMOUNT_MARKER};
-use singlefs_core::system_configuration::SystemConfiguration;
 
 /// 稀疏设备的扇区宽：第一版测试镜像的 physical_block_size。
 pub const SECTOR_BYTES: u64 = 512;
@@ -760,18 +758,15 @@ impl MemoryPool {
         let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
         PoolReader::read(self, device, DeviceOffsetInBytes(0), slot_bytes)
             .and_then(|slot| {
-                SystemConfiguration::parse_slot(&slot)
+                singlefs_checker::check_system_configuration_slot(&slot)
                     .ok()
-                    .map(|system_configuration| {
-                        RecordedGeometryForScanCandidates::RecordedInSlotZero {
-                            journal_ring_bytes: system_configuration
-                                .immutable
-                                .sizes
-                                .journal_ring_bytes,
-                            unit_area_start_slot: unit_area_start_slot_recorded_in_the_slot(&slot)
-                                .0,
-                        }
-                    })
+                    .and_then(|view| singlefs_checker::image::geometry_of(&slot, &view).ok())
+                    .map(
+                        |geometry| RecordedGeometryForScanCandidates::RecordedInSlotZero {
+                            journal_ring_bytes: geometry.journal_ring_bytes,
+                            unit_area_start_slot: geometry.unit_area_start_slot,
+                        },
+                    )
             })
             .unwrap_or(RecordedGeometryForScanCandidates::SlotZeroNotSelfDescribing)
     }

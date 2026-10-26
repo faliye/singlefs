@@ -13,3 +13,7 @@ singlefs-format = { path = "../singlefs-format" }
 # （门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 ⑤⑥⑦）。
 singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
 
+[dev-dependencies]
+# 七·6 的用例读核心层各处按身份查的计数（`singlefs_core::transaction::lookup_work`），只在测试构建打开（核心层的特性默认关）。
+# 发布触发阈值的只供测试来源（`system_configuration::PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring`）同样只在测试构建打开。
+singlefs-core = { path = "../singlefs-core", features = ["lookup-work-counters", "test-only-publish-thresholds"] }

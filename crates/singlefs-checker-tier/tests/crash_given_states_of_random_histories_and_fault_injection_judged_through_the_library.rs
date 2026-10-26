@@ -37,7 +37,7 @@ use singlefs_checker_tier::crash_given_states::{
 };
 use singlefs_checker_tier::crash_injection::HistoryAfterTheMakeFilesystem;
 use singlefs_checker_tier::crash_judge_conclusions::{
-    ClaimedVersionOfAGivenState, CrossCheckWords,
+    BlockCountVector, ClaimedVersionOfAGivenState, CrossCheckWords,
 };
 use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions,
@@ -47,11 +47,15 @@ use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchai
 
 #[cfg(feature = "gpu")]
 mod common_gpu_cards_of_the_caller;
+use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::walk::check_pool_image_naming_the_violation_sites;
+use singlefs_core::address::DeviceIdentity;
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_harness::fault_injection::{
     classify_the_pool_checker_verdicts_of_the_images_after_a_fault,
     inject_faults_into_history_handing_out_the_images, FailureAfterAFault, ImagesAfterAFault,
-    RecordedStreamOfAnImage, SharedFaultPlan,
+    PoolCheckerVerdictsOfTheImagesAfterAFault, RecordedStreamOfAnImage, SharedFaultPlan,
+    ViolationsNamingTheSites,
 };
 use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
 use singlefs_harness::heavy_threads::{
@@ -62,7 +66,9 @@ use singlefs_harness::history::{
     HistoryDeviceWidth, HistoryExecution, HistorySeed, PerStepChecker, StartingPointStep,
     StepPosition, SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
 };
-use singlefs_harness::memory_pool::{writes_and_segments_with_stream_indexes, RecordStreamSeam};
+use singlefs_harness::memory_pool::{
+    writes_and_segments_with_stream_indexes, MemoryPool, RecordStreamSeam,
+};
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::SharedStream;
 
@@ -239,8 +245,8 @@ const FAULT_INJECTION_SAMPLINGS_OF_THE_SMALL_RUN: [FaultInjectionSampling; 1] =
 /// 引擎照 H6 记一条「GPU 判不了」、交 CPU 判器的结论；只有这几张许判不了，别的一张都不许。
 const MAKE_FILESYSTEM_UNFINISHED_MARKER: &str = "make-filesystem-unfinished";
 
-/// 一趟判下来的账：判了几段、几张表、几个状态，逐张表逐状态的对拍字（GPU 与 CPU 两趟比的就是它），哪几条不变量判成立过，
-/// 清单外的失败，故障注入归类的几格。
+/// 一趟判下来的账：判了几段、几张表、几个状态，逐张表逐状态的对拍字（GPU 与 CPU 两趟比的就是它）与逐张表的计数向量，
+/// 随机历史上哪几条不变量判成立过（照计数向量取，[`invariants_held_in_the_count_vector`]），清单外的失败，故障注入归类的几格。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct JudgedThroughTheLibrary {
     random_histories: u64,
@@ -250,6 +256,7 @@ struct JudgedThroughTheLibrary {
     tables: u64,
     states: u64,
     words_by_table: BTreeMap<String, Vec<CrossCheckWords>>,
+    count_vector_by_table: BTreeMap<String, BlockCountVector>,
     invariants_held_at_least_once: BTreeSet<&'static str>,
     findings: Vec<String>,
     known_red_after_a_fault: BTreeMap<String, u64>,
@@ -271,6 +278,7 @@ impl JudgedThroughTheLibrary {
             tables: 0,
             states: 0,
             words_by_table: BTreeMap::new(),
+            count_vector_by_table: BTreeMap::new(),
             invariants_held_at_least_once: BTreeSet::new(),
             findings: Vec::new(),
             known_red_after_a_fault: BTreeMap::new(),
@@ -291,6 +299,8 @@ impl JudgedThroughTheLibrary {
         self.tables += following.tables;
         self.states += following.states;
         self.words_by_table.extend(following.words_by_table);
+        self.count_vector_by_table
+            .extend(following.count_vector_by_table);
         self.invariants_held_at_least_once
             .extend(following.invariants_held_at_least_once);
         self.findings.extend(following.findings);
@@ -308,24 +318,40 @@ impl JudgedThroughTheLibrary {
             .extend(following.tables_the_gpu_may_not_judge);
     }
 
-    /// 判成立的那几条记进「判成立过」：判到位而没违例。
-    fn note_the_invariants_held(&mut self, conclusion: &GivenStateConclusion) {
-        let held = conclusion.words.pool_checker_judged_bits
-            & !conclusion.words.pool_checker_violated_bits;
-        for (position, invariant) in singlefs_checker::image::IMPLEMENTED_INVARIANTS
-            .iter()
-            .enumerate()
-        {
-            if held & (1u128 << position) != 0 {
-                self.invariants_held_at_least_once.insert(invariant);
-            }
-        }
+    /// 一张表上判成立过的那几条记进「判成立过」（[`invariants_held_in_the_count_vector`]）。
+    fn note_the_invariants_held_in_the_table(&mut self, count_vector: &BlockCountVector) {
+        self.invariants_held_at_least_once
+            .extend(invariants_held_in_the_count_vector(count_vector));
     }
+}
+
+/// 一张表的计数向量里判成立过的不变量：判到的状态数大于违例的状态数（至少一个状态上判到而没违例），按 `IMPLEMENTED_INVARIANTS` 的次序。
+/// 每个状态都违例或都不适用的那一条不算成立过，不把哪一条一律补成成立。
+/// 照计数向量取、不读逐状态的判到位（审计复核 T02，`records/2026-10-24-singlefs-checker-tier-审计复核.md`）：从判定库读回的给定状态里判到位那一字是 0
+/// （`crash_judge_conclusions::cross_check_words_of_a_stored_given_state` 不存它，契约如此），计数向量随块存、读回照存的那一份，冷判与复用同一个数。
+fn invariants_held_in_the_count_vector(count_vector: &BlockCountVector) -> BTreeSet<&'static str> {
+    singlefs_checker::image::IMPLEMENTED_INVARIANTS
+        .iter()
+        .copied()
+        .filter(|invariant| {
+            count_vector
+                .per_invariant
+                .get(*invariant)
+                .is_some_and(|counts| counts.judged > counts.violated)
+        })
+        .collect()
+}
+
+/// 一张录制流的若干个前缀交引擎判的结论（[`judge_prefixes_of_a_recorded_stream`]）：与前缀同序的逐状态结论，连同建出的每张表的计数向量
+/// （逐条不变量判到 / 违例 / 不适用；从判定库复用的照读回的那一份）。
+struct ConclusionsOfThePrefixes {
+    conclusions: Vec<GivenStateConclusion>,
+    count_vector_of_each_table: Vec<BlockCountVector>,
 }
 
 /// 一张镜像的录制流的若干个前缀（`prefixes`：每个是录制流里的步数）建成给定状态表交引擎判：录制流里 mkfs 写的那几步进基线，
 /// 每个前缀一个持久集合（前缀里的写全落、之后的一个都没落），掉电接缝相同的几个前缀一张表（记录核对器照每个前缀之前掉过的电断开）。
-/// 交回与 `prefixes` 同序的结论。判不了就 panic：配了 GPU 卡用不上、判定库读写失败都判红，不退回 CPU。
+/// 交回与 `prefixes` 同序的结论与每张表的计数向量（[`ConclusionsOfThePrefixes`]）。判不了就 panic：配了 GPU 卡用不上、判定库读写失败都判红，不退回 CPU。
 fn judge_prefixes_of_a_recorded_stream(
     judge: &dyn GivenStatesJudge,
     table_name: &str,
@@ -333,7 +359,7 @@ fn judge_prefixes_of_a_recorded_stream(
     execution: HistoryExecution,
     prefixes: &[usize],
     judged: &mut JudgedThroughTheLibrary,
-) -> Vec<GivenStateConclusion> {
+) -> ConclusionsOfThePrefixes {
     let geometry = execution.device_width.fixed_geometry();
     let (writes, segments, stream_indexes) =
         writes_and_segments_with_stream_indexes(&recorded.operations, &geometry);
@@ -378,6 +404,7 @@ fn judge_prefixes_of_a_recorded_stream(
             .push(prefix_index);
     }
     let mut conclusions: Vec<Option<GivenStateConclusion>> = vec![None; prefixes.len()];
+    let mut count_vector_of_each_table: Vec<BlockCountVector> = Vec::new();
     for (power_losses, prefix_indexes) in prefixes_by_power_losses {
         let seams: Vec<RecordStreamSeam> = power_losses
             .iter()
@@ -444,14 +471,21 @@ fn judge_prefixes_of_a_recorded_stream(
                 .map(|state| state.words)
                 .collect(),
         );
+        judged
+            .count_vector_by_table
+            .insert(table.table_name.clone(), judged_table.count_vector.clone());
+        count_vector_of_each_table.push(judged_table.count_vector);
         for (prefix_index, conclusion) in prefix_indexes.into_iter().zip(judged_table.states) {
             conclusions[prefix_index] = Some(conclusion);
         }
     }
-    conclusions
-        .into_iter()
-        .map(|conclusion| conclusion.expect("每个前缀恰好落在一组掉电接缝里"))
-        .collect()
+    ConclusionsOfThePrefixes {
+        conclusions: conclusions
+            .into_iter()
+            .map(|conclusion| conclusion.expect("每个前缀恰好落在一组掉电接缝里"))
+            .collect(),
+        count_vector_of_each_table,
+    }
 }
 
 /// 一段随机历史：harness 跑一遍（不跑池级 checker），每一步的镜像经钩子交出来，按录制流前缀建成给定状态表交引擎判；
@@ -493,7 +527,10 @@ fn judge_the_step_images_of_a_random_history(
         .iter()
         .map(|(_, operations_recorded)| *operations_recorded)
         .collect();
-    let conclusions = judge_prefixes_of_a_recorded_stream(
+    let ConclusionsOfThePrefixes {
+        conclusions,
+        count_vector_of_each_table,
+    } = judge_prefixes_of_a_recorded_stream(
         judge,
         &format!("random-history/{}/seed={}", sampling.name, seed.0),
         &recorded,
@@ -501,8 +538,10 @@ fn judge_the_step_images_of_a_random_history(
         &prefixes,
         &mut judged,
     );
+    for count_vector in &count_vector_of_each_table {
+        judged.note_the_invariants_held_in_the_table(count_vector);
+    }
     for ((position, _), conclusion) in step_images.iter().zip(conclusions) {
-        judged.note_the_invariants_held(&conclusion);
         let red_items = conclusion.red_items();
         if !red_items.is_empty() {
             judged.findings.push(format!(
@@ -572,12 +611,13 @@ fn judge_the_images_after_the_faults_of_a_history(
             sampling.execution,
             &prefixes,
             &mut judged,
-        );
+        )
+        .conclusions;
         let conclusion_after_the_fault = conclusions.pop().expect("整条录制流那一个前缀在最后");
-        let invariants_still_violated_if_the_swallowed_writes_had_landed = images
+        let conclusion_with_the_swallowed_writes_landed = images
             .image_with_the_swallowed_writes_landed
             .as_ref()
-            .map_or_else(BTreeSet::new, |landed| {
+            .map(|landed| {
                 judge_prefixes_of_a_recorded_stream(
                     judge,
                     &format!("{table_name}/swallowed-writes-landed"),
@@ -586,11 +626,35 @@ fn judge_the_images_after_the_faults_of_a_history(
                     &[landed.operations.len()],
                     &mut judged,
                 )
-                .into_iter()
-                .flat_map(|conclusion| conclusion.pool_checker_violations())
-                .map(|(invariant, _)| invariant)
-                .collect()
+                .conclusions
+                .pop()
+                .expect("被吞的写插回去那张盘一个前缀")
             });
+        let violations_of_the_step_images: Vec<Vec<(&'static str, String)>> = conclusions
+            .iter()
+            .map(GivenStateConclusion::pool_checker_violations)
+            .collect();
+        // 按步对照盘（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3）：第一张判红的每步镜像那一刻之前吞过写才有，同样建表交引擎判
+        let first_red_step_image = violations_of_the_step_images
+            .iter()
+            .position(|violations| !violations.is_empty());
+        let step_comparison_stream = first_red_step_image.and_then(|index| {
+            images.image_at_the_step_image_with_the_swallowed_writes_before_it_landed(index)
+        });
+        let violations_at_the_step = step_comparison_stream.as_ref().map(|stream| {
+            judge_prefixes_of_a_recorded_stream(
+                judge,
+                &format!("{table_name}/at-the-first-red-step-image-with-the-swallowed-writes-before-it-landed"),
+                stream,
+                sampling.execution,
+                &[stream.operations.len()],
+                &mut judged,
+            )
+            .conclusions
+            .pop()
+            .expect("按步对照盘一个前缀")
+            .pool_checker_violations()
+        });
         judged.record_checker_red_states_after_a_fault += u64::try_from(
             conclusions
                 .iter()
@@ -602,15 +666,17 @@ fn judge_the_images_after_the_faults_of_a_history(
                 .count(),
         )
         .expect("装得进 u64");
-        let failures = classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
+        let verdicts = verdicts_naming_the_sites_by_the_cpu_reference(
             images,
-            conclusions
-                .iter()
-                .map(GivenStateConclusion::pool_checker_violations)
-                .collect(),
+            violations_of_the_step_images,
+            first_red_step_image,
             conclusion_after_the_fault.pool_checker_violations(),
-            invariants_still_violated_if_the_swallowed_writes_had_landed,
+            step_comparison_stream.as_ref().zip(violations_at_the_step),
+            conclusion_with_the_swallowed_writes_landed
+                .map(|conclusion| conclusion.pool_checker_violations()),
         );
+        let failures =
+            classify_the_pool_checker_verdicts_of_the_images_after_a_fault(images, verdicts);
         for failure in failures {
             match failure {
                 FailureAfterAFault::KnownRed(form) => {
@@ -639,6 +705,128 @@ fn judge_the_images_after_the_faults_of_a_history(
         }
     }
     judged
+}
+
+/// 空盘叠上一张录制流的头 `operations_recorded` 步（录制流只记落了盘的写）：CPU 参照判的那几张盘。
+fn pool_image_of_a_stream_prefix(
+    stream: &RecordedStreamOfAnImage,
+    operations_recorded: usize,
+    device_width: HistoryDeviceWidth,
+) -> MemoryPool {
+    let mut image = MemoryPool::with_devices(
+        &[DeviceIdentity(0), DeviceIdentity(1)],
+        device_width.device_bytes(),
+    );
+    image.apply(&stream.operations[..operations_recorded]);
+    image
+}
+
+/// 一张盘经引擎判下来判红的那几条，连同 CPU 参照判同一张盘时违例点名的（不变量, 盘, 槽）：GPU 判器只交违例位、交不回点名的槽，
+/// 故障归类器按（不变量, 盘, 槽）比（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3）要的槽由池级 checker 的 CPU 那一份交；
+/// 判红的是哪几条与引擎那一趟（配了 GPU 是 GPU 判器）逐条对拍，对不上判红。引擎那一趟一条都不红、或这个注入点没吞写（归类不比槽）时不判，点名为空。
+// cpu-reference-for-gpu-comparison
+fn violations_naming_the_sites_by_the_cpu_reference(
+    image: Option<&MemoryPool>,
+    violations_judged_through_the_engine: Vec<(&'static str, String)>,
+    which_image: &str,
+) -> ViolationsNamingTheSites {
+    let Some(image) = image.filter(|_| !violations_judged_through_the_engine.is_empty()) else {
+        return ViolationsNamingTheSites {
+            violations: violations_judged_through_the_engine,
+            violation_sites: BTreeSet::new(),
+        };
+    };
+    let named = check_pool_image_naming_the_violation_sites(image);
+    let violated_on_the_cpu: BTreeSet<&'static str> = named
+        .verdicts
+        .iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(_) => Some(*invariant),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect();
+    let violated_through_the_engine: BTreeSet<&'static str> = violations_judged_through_the_engine
+        .iter()
+        .map(|(invariant, _)| *invariant)
+        .collect();
+    assert_eq!(
+        violated_on_the_cpu, violated_through_the_engine,
+        "{which_image}：CPU 参照判红的与引擎那一趟判红的逐条相同"
+    );
+    ViolationsNamingTheSites {
+        violations: violations_judged_through_the_engine,
+        violation_sites: named.violation_sites,
+    }
+}
+
+/// 一个注入点上引擎判回的结论拼成归类器收的那一份：这个注入点吞过写时，拿来比的那几张（第一张判红的每步镜像、重开那张、按步对照盘、
+/// 被吞的写都插回去那张）各由 CPU 参照补上违例点名的槽；没吞写时归类不比槽，一张都不另判。
+fn verdicts_naming_the_sites_by_the_cpu_reference(
+    images: &ImagesAfterAFault,
+    violations_of_the_step_images: Vec<Vec<(&'static str, String)>>,
+    first_red_step_image: Option<usize>,
+    violations_after_the_fault: Vec<(&'static str, String)>,
+    at_the_step: Option<(&RecordedStreamOfAnImage, Vec<(&'static str, String)>)>,
+    violations_with_the_swallowed_writes_landed: Option<Vec<(&'static str, String)>>,
+) -> PoolCheckerVerdictsOfTheImagesAfterAFault {
+    let some_write_was_swallowed = !images.swallowed_writes.is_empty();
+    let image_if_some_write_was_swallowed =
+        |stream: &RecordedStreamOfAnImage, operations_recorded: usize| {
+            some_write_was_swallowed.then(|| {
+                pool_image_of_a_stream_prefix(stream, operations_recorded, images.device_width)
+            })
+        };
+    let violation_sites_of_the_first_red_step_image = first_red_step_image
+        .map(|index| {
+            violations_naming_the_sites_by_the_cpu_reference(
+                image_if_some_write_was_swallowed(
+                    &images.image_after_the_fault,
+                    images.step_images_of_the_run_with_the_fault[index].operations_recorded,
+                )
+                .as_ref(),
+                violations_of_the_step_images[index].clone(),
+                "第一张判红的每步镜像",
+            )
+            .violation_sites
+        })
+        .unwrap_or_default();
+    let after_the_fault = violations_naming_the_sites_by_the_cpu_reference(
+        image_if_some_write_was_swallowed(
+            &images.image_after_the_fault,
+            images.image_after_the_fault.operations.len(),
+        )
+        .as_ref(),
+        violations_after_the_fault,
+        "注入之后重开的那张盘",
+    );
+    let at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed =
+        at_the_step.map(|(stream, violations)| {
+            violations_naming_the_sites_by_the_cpu_reference(
+                image_if_some_write_was_swallowed(stream, stream.operations.len()).as_ref(),
+                violations,
+                "第一张判红的每步镜像的按步对照盘",
+            )
+        });
+    let with_the_swallowed_writes_landed = images
+        .image_with_the_swallowed_writes_landed
+        .as_ref()
+        .zip(violations_with_the_swallowed_writes_landed)
+        .map(|(landed, violations)| {
+            violations_naming_the_sites_by_the_cpu_reference(
+                image_if_some_write_was_swallowed(landed, landed.operations.len()).as_ref(),
+                violations,
+                "被吞的写都插回去之后的那张盘",
+            )
+        });
+    PoolCheckerVerdictsOfTheImagesAfterAFault {
+        violations_of_the_step_images,
+        violation_sites_of_the_first_red_step_image,
+        after_the_fault,
+        at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed,
+        with_the_swallowed_writes_landed,
+    }
 }
 
 /// 一段要判的历史：随机历史那几段取样里的一段，或故障注入那几段里的一段。
@@ -900,6 +1088,145 @@ fn the_small_tier_of_random_histories_and_fault_injection_judged_through_the_lib
     assert!(
         judged.step_images > 0 && judged.injection_points > 0 && judged.states > 0,
         "每步镜像、注入点与状态都不为 0：{judged:?}"
+    );
+}
+
+/// 审计复核 T02（`records/2026-10-24-singlefs-checker-tier-审计复核.md`）的反面：一张三个状态的表，第一条不变量三个状态都判到而都违例，
+/// 第二条三个状态都不适用（判到位没置），第三条三个状态都判到、只一个违例。照计数向量取「判成立过」只记第三条：都违例的、都不适用的不算成立过，
+/// 不把哪一条一律补成成立。计数向量照 CPU 判器那一份数法（`crash_given_states::count_vector_of_the_given_states`）现数。
+/// 判别力：`crates/mutations.tsv` 里以「T02 判成立过只看判到数」开头的那一行（判到数大于 0 就算成立过）让这一条红。
+#[test]
+fn an_invariant_violated_or_not_applicable_on_every_state_of_a_table_is_not_counted_as_held() {
+    use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
+    use singlefs_checker_tier::crash_given_states::count_vector_of_the_given_states;
+    use singlefs_checker_tier::crash_judge_conclusions::{
+        LandedRootWords, RECOVERY_OUTCOME_CODE_FAILED, SCAN_REBUILD_OUTCOME_NOT_REACHED,
+    };
+    let violated_on_every_state = 1u128 << 0;
+    let not_applicable_on_every_state = 1u128 << 1;
+    let held_on_some_state = 1u128 << 2;
+    let words_of_a_state = |violated_bits: u128| CrossCheckWords {
+        red_bits: 0,
+        pool_checker_violated_bits: violated_bits,
+        consulted_pass_landed_root: LandedRootWords::NOT_LANDED,
+        ignored_pass_landed_root: LandedRootWords::NOT_LANDED,
+        consulted_pass_outcome: RECOVERY_OUTCOME_CODE_FAILED,
+        ignored_pass_outcome: RECOVERY_OUTCOME_CODE_FAILED,
+        consulted_pass_failure_point: 0,
+        ignored_pass_failure_point: 0,
+        pool_checker_judged_bits: violated_on_every_state | held_on_some_state,
+        scan_rebuild_outcome: SCAN_REBUILD_OUTCOME_NOT_REACHED,
+        gpu_could_not_judge: false,
+    };
+    let count_vector = count_vector_of_the_given_states(&[
+        words_of_a_state(violated_on_every_state | held_on_some_state),
+        words_of_a_state(violated_on_every_state),
+        words_of_a_state(violated_on_every_state),
+    ]);
+    assert_eq!(
+        (
+            count_vector.per_invariant[IMPLEMENTED_INVARIANTS[0]].judged,
+            count_vector.per_invariant[IMPLEMENTED_INVARIANTS[0]].violated,
+            count_vector.per_invariant[IMPLEMENTED_INVARIANTS[1]].not_applicable,
+        ),
+        (3, 3, 3),
+        "前提：第一条三个状态判到而都违例、第二条三个状态都不适用（{not_applicable_on_every_state:#x} 那一位一个状态都没置判到）"
+    );
+    assert_eq!(
+        invariants_held_in_the_count_vector(&count_vector),
+        BTreeSet::from([IMPLEMENTED_INVARIANTS[2]]),
+        "判成立过只记判到而有状态没违例的第三条"
+    );
+}
+
+/// 审计复核 T02：同一小批随机历史（[`RANDOM_HISTORY_SAMPLINGS_OF_THE_SMALL_RUN`]）在一份一次性的库上判两趟、只开 CPU：头一趟冷判（表都在这一趟判）、
+/// 第二趟照库复用（一张都不判）。两趟的「判成立过」集合相同、不为空——它照每张表的计数向量取（[`invariants_held_in_the_count_vector`]），
+/// 计数向量随块存、复用读回同一份；改前照逐状态判到位取，复用那一趟读回的判到位是 0，一条都记不上（审计实测同一张表冷判 83 条、复用 0 条）。
+/// 两趟逐张表的红项与计数向量也相同。
+/// 判别力：`crates/mutations.tsv` 里以「T02 判成立过改回读逐状态判到位」开头的那一行让这一条红。
+#[test]
+fn the_invariants_held_on_a_small_tier_judged_cold_and_reused_from_the_library_are_the_same() {
+    use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+    use singlefs_checker_tier::crash_judge_conclusions::red_items_of_a_given_state;
+    use singlefs_checker_tier::crash_library::DisposableLibraryDirectory;
+    use singlefs_checker_tier::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE;
+    const TEST_NAME: &str =
+        "the_invariants_held_on_a_small_tier_judged_cold_and_reused_from_the_library_are_the_same";
+    let directory =
+        DisposableLibraryDirectory::new("random-histories-invariants-held-cold-and-reused")
+            .expect("流水线单元测试那一类里这条用例的一次性库目录");
+    let configuration = directory.join("multi-host-on-the-cpu.env");
+    std::fs::write(&configuration, "ENABLE_GPU=0\n").expect("写得了只开 CPU 的配置");
+    let library = directory.library();
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[
+        (
+            MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+            configuration.as_os_str(),
+        ),
+        ("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()),
+    ]);
+    let (cold, _cold_histories, _cold_threads, cold_run) = judge_through_the_given_states_engine(
+        &RANDOM_HISTORY_SAMPLINGS_OF_THE_SMALL_RUN,
+        &[],
+        FaultPutOnTheGpuSide::NoFault,
+        2,
+    );
+    let (reused, _reused_histories, _reused_threads, reused_run) =
+        judge_through_the_given_states_engine(
+            &RANDOM_HISTORY_SAMPLINGS_OF_THE_SMALL_RUN,
+            &[],
+            FaultPutOnTheGpuSide::NoFault,
+            2,
+        );
+    drop(environment);
+    if !the_run_counts(&cold_run, &cold, TEST_NAME)
+        || !the_run_counts(&reused_run, &reused, TEST_NAME)
+    {
+        return;
+    }
+    assert!(
+        cold_run.tally.tables_judged_here > 0 && cold_run.tally.tables_reused == 0,
+        "前提：头一趟从空库起、表都在这一趟判：{:?}",
+        cold_run.tally
+    );
+    assert_eq!(
+        (
+            reused_run.tally.tables_judged_here,
+            reused_run.tally.tables_reused
+        ),
+        (0, reused.tables),
+        "前提：第二趟每张表都照库复用：{:?}",
+        reused_run.tally
+    );
+    assert!(
+        !cold.invariants_held_at_least_once.is_empty(),
+        "冷判那一趟有不变量判成立过"
+    );
+    assert_eq!(
+        reused.invariants_held_at_least_once, cold.invariants_held_at_least_once,
+        "冷判与复用的「判成立过」集合相同"
+    );
+    let red_items_by_table =
+        |judged: &JudgedThroughTheLibrary| -> BTreeMap<String, Vec<Vec<String>>> {
+            judged
+                .words_by_table
+                .iter()
+                .map(|(table_name, words)| {
+                    (
+                        table_name.clone(),
+                        words.iter().map(red_items_of_a_given_state).collect(),
+                    )
+                })
+                .collect()
+        };
+    assert_eq!(
+        red_items_by_table(&reused),
+        red_items_by_table(&cold),
+        "冷判与复用逐张表逐状态的红项相同"
+    );
+    assert_eq!(
+        reused.count_vector_by_table, cold.count_vector_by_table,
+        "冷判与复用逐张表的计数向量相同"
     );
 }
 

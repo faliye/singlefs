@@ -20,7 +20,10 @@ use common::{
 use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::admission::{AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand};
+use singlefs_core::admission::{
+    AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand,
+    JudgementThatFoundTheDeviceShort,
+};
 use singlefs_core::allocator::{
     AllocationRecord, CommitGeneratedDeviceAnswer, DeviceFreeMap, Placement, PlacementRefusal,
     PoolAllocator, UnitFootprint,
@@ -36,6 +39,7 @@ use singlefs_core::transaction::{
     PublishError, TransactionOutput, TransactionUnit,
 };
 use singlefs_format::{SLOT_BYTES, UNIT_AREA_START_SLOT};
+use singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 /// 盘 0：4 GiB，单元区 211968 槽 = 3312 个整段。
@@ -48,19 +52,12 @@ const DEVICE_BYTES: [u64; 2] = [LARGER_DEVICE_BYTES, SMALLER_DEVICE_BYTES];
 const SMALLER_UNIT_AREA_END_SLOT: u64 = 196_641;
 
 struct UnequalPool {
-    paths: Vec<PathBuf>,
+    /// 只为丢掉时删镜像而留着。
+    _images: Vec<TemporaryPathRemovedOnDrop>,
     devices: Vec<(DeviceIdentity, Recorded)>,
     stream: SharedStream,
     allocator: PoolAllocator,
     output: TransactionOutput,
-}
-
-impl Drop for UnequalPool {
-    fn drop(&mut self) {
-        for path in &self.paths {
-            let _ = std::fs::remove_file(path);
-        }
-    }
 }
 
 /// 这一轮是新建镜像还是接着用上一轮那两块盘：新建一律排他（撞上同名报错），重开要求文件已经在。
@@ -107,7 +104,11 @@ fn open_recorded_devices(
 
 /// 两块不等大的盘：mkfs、取号、暖机、新池新建文件 A，冷启动读回 A，再可写挂载（实例 2）。每一步今天都接受，接不接受就在这里判红。
 fn build_unequal_pool(tag: &str) -> UnequalPool {
-    let paths: Vec<PathBuf> = (0..2u32).map(|device| image_path(tag, device)).collect();
+    // 镜像建之前就由守卫认领：搭池途中哪一步 panic 都删掉它们，池搭成时守卫随池走、池丢掉时删
+    let images: Vec<TemporaryPathRemovedOnDrop> = (0..2u32)
+        .map(|device| TemporaryPathRemovedOnDrop::claiming(image_path(tag, device)))
+        .collect();
+    let paths: Vec<PathBuf> = images.iter().map(|image| image.to_path_buf()).collect();
     let stream = SharedStream::new();
     let mut formatting_process_devices =
         open_recorded_devices(&paths, &stream, &ImageFileOpening::CreateNew);
@@ -181,7 +182,7 @@ fn build_unequal_pool(tag: &str) -> UnequalPool {
     let mounted =
         mount_writable(&parameters(), &mut remounted_devices).expect("盘不等大的可写挂载今天接受");
     UnequalPool {
-        paths,
+        _images: images,
         devices: remounted_devices,
         stream,
         allocator: mounted.allocator,
@@ -336,6 +337,7 @@ fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placem
             refusal.short_devices,
             vec![DeviceShortOfDemand {
                 device: DeviceIdentity(1),
+                judged_short_by: JudgementThatFoundTheDeviceShort::SlotPairsOutsideTheClusterSegmentsForDataUnits,
                 available: AvailableBytesOnOneDevice(0),
                 demand: BytesOnOneDevice(32_768),
             }],
@@ -402,6 +404,7 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
             refusal.short_devices,
             vec![DeviceShortOfDemand {
                 device: DeviceIdentity(1),
+                judged_short_by: JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
                 available: AvailableBytesOnOneDevice(16_384),
                 demand: BytesOnOneDevice(7_651_328),
             }],

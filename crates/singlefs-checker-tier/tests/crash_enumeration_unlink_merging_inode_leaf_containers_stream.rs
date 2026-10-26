@@ -37,6 +37,9 @@ use singlefs_checker_tier::crash::{
     crash_state_count_with_torn_in_place_overwrites, full_expansion,
     CrashPointReplaySegmentExpansion, CrashPointReplayTally,
 };
+use singlefs_checker_tier::crash_point_replay_provenance::{
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow, RunOfTheFlow,
+};
 use singlefs_checker_tier::crash_state_enumeration::{
     enumerate_crash_states_selecting_versions, CrashPointReplayItem,
 };
@@ -392,6 +395,11 @@ fn every_crash_state_after_the_unit_writes_of_the_borrowing_and_the_absorbing_un
         tally.checker_counts_by_invariant()
     );
     assert_clean(&tally);
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        "unlink_merging_inode_leaf_containers",
+        &tally,
+    );
     assert_the_shape_of_the_merges(&prepared);
     assert_eq!(
         tally.states,
@@ -461,6 +469,11 @@ fn full_enumeration_of_the_unlink_merging_inode_leaf_containers_stream_is_exhaus
         tally.first_violation.as_deref().unwrap_or("none")
     );
     assert_clean(&tally);
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        "unlink_merging_inode_leaf_containers",
+        &tally,
+    );
     assert_the_shape_of_the_merges(&prepared);
     assert_eq!(tally.states, closed_form, "枚举到的状态数要等于闭式");
     assert_eq!(

@@ -83,8 +83,8 @@ fn persisted_through_segments(
     persisted
 }
 
-/// 新池新建文件那条流（取号、两次暖机、新池新建文件）的崩溃状态上逐个比：12 个段边界（前 k 段全持久；C577 之后暖机第二次的轮换自成一段，
-/// 改之前 11 个），
+/// 新池新建文件那条流（取号、两次暖机、新池新建文件）的崩溃状态上逐个比：13 个段边界（前 k 段全持久；取号写两轮（D22（单元原子性怎么合成）
+/// 已定项 8）之后取号自成两段，只写一轮时 12 个；C577 之后暖机第二次的轮换自成一段，那之前 11 个），
 /// 再加每段 journal 记录写里只落一份的那几个状态（两块盘各一份，只落一块盘上那份时提示只该给那块盘）。
 #[test]
 fn on_the_new_pool_file_creation_stream_the_hint_finds_what_the_full_ring_scan_finds_in_every_compared_state(
@@ -97,8 +97,9 @@ fn on_the_new_pool_file_creation_stream_the_hint_finds_what_the_full_ring_scan_f
     );
     assert_eq!(
         segments.len(),
-        11,
-        "新池新建文件那条流 2+2+1+2+2+1+2+24+2+1+2（C577 之前轮换与单元写同段，2+2+1+2+2+1+26+2+1+2）"
+        12,
+        "新池新建文件那条流 2+2+2+1+2+2+1+2+24+2+1+2（取号写两轮之后取号自成两段；只写一轮时 2+2+1+2+2+1+2+24+2+1+2；\
+         C577 之前轮换与单元写同段，2+2+1+2+2+1+26+2+1+2）"
     );
 
     let mut records_found_on_each_boundary = Vec::new();
@@ -117,7 +118,7 @@ fn on_the_new_pool_file_creation_stream_the_hint_finds_what_the_full_ring_scan_f
     }
     assert_eq!(
         records_found_on_each_boundary,
-        vec![0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3],
+        vec![0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3],
         "三次发布（两次暖机、新池新建文件）的记录各在它的记录段落盘之后读得出：两种扫法都读到了记录，比对不是两边都空"
     );
 

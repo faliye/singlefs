@@ -161,7 +161,7 @@ fn writable_mount_refusal_with_the_disks_left_unchanged(image: &MemoryPool) -> M
 }
 
 /// 场景：记账树一片叶的条目宽 35（字段表 34），每条末尾多一个 0，别处不动。
-/// 预期：冷走读在所选根上报 `EntryNarrowerThanItsFieldTable { what: "记账条目", entry_bytes: 35, field_table_bytes: 34 }`，不读出文件；
+/// 预期：冷走读在所选根上报 `EntryWidthDiffersFromItsFieldTable { what: "记账条目", entry_bytes: 35, field_table_bytes: 34 }`，不读出文件；
 /// 没改的那一份照常读出文件（前提：拒的只是条目宽）。
 #[test]
 fn recovery_refuses_an_accounting_leaf_whose_entries_are_wider_than_the_field_table() {
@@ -178,7 +178,7 @@ fn recovery_refuses_an_accounting_leaf_whose_entries_are_wider_than_the_field_ta
         recover(&image, JournalPolicy::Consult).outcome,
         RecoveryOutcome::Failed {
             root: Some(chosen_root_of(&pool)),
-            failure: RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            failure: RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: "记账条目",
                 entry_bytes: ACCOUNTING_ENTRY_FIELD_TABLE_BYTES + 1,
                 field_table_bytes: ACCOUNTING_ENTRY_FIELD_TABLE_BYTES,
@@ -190,7 +190,7 @@ fn recovery_refuses_an_accounting_leaf_whose_entries_are_wider_than_the_field_ta
 
 /// 场景：同上一条的坏镜像，交给可写挂载。
 /// 预期：重建那一版读记账树时同样判条目宽，在取号与任何写之前交回
-/// `Recovery(EntryNarrowerThanItsFieldTable { what: "记账条目", entry_bytes: 35, field_table_bytes: 34 })`，盘上逐字节不变。
+/// `Recovery(EntryWidthDiffersFromItsFieldTable { what: "记账条目", entry_bytes: 35, field_table_bytes: 34 })`，盘上逐字节不变。
 #[test]
 fn writable_mount_refuses_an_accounting_leaf_whose_entries_are_wider_than_the_field_table_before_any_write(
 ) {
@@ -200,7 +200,7 @@ fn writable_mount_refuses_an_accounting_leaf_whose_entries_are_wider_than_the_fi
     assert!(
         matches!(
             refusal,
-            MountError::Recovery(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            MountError::Recovery(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: "记账条目",
                 entry_bytes: 35,
                 field_table_bytes: 34,
@@ -211,7 +211,7 @@ fn writable_mount_refuses_an_accounting_leaf_whose_entries_are_wider_than_the_fi
 }
 
 /// 场景：记账树根（层级 1 的内部节点）的条目宽 109（字段表 key 22 + 子指针 86 = 108），每条末尾多一个 0，别处不动。
-/// 预期：冷走读在所选根上报 `EntryNarrowerThanItsFieldTable { what: "记账树内部条目", entry_bytes: 109, field_table_bytes: 108 }`，
+/// 预期：冷走读在所选根上报 `EntryWidthDiffersFromItsFieldTable { what: "记账树内部条目", entry_bytes: 109, field_table_bytes: 108 }`，
 /// 不往下读孩子、不读出文件；没改的那一份照常读出文件（前提：拒的只是条目宽）。
 #[test]
 fn recovery_refuses_an_accounting_tree_internal_node_whose_entries_are_wider_than_the_field_table()
@@ -229,7 +229,7 @@ fn recovery_refuses_an_accounting_tree_internal_node_whose_entries_are_wider_tha
         recover(&image, JournalPolicy::Consult).outcome,
         RecoveryOutcome::Failed {
             root: Some(chosen_root_of(&pool)),
-            failure: RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            failure: RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: "记账树内部条目",
                 entry_bytes: ACCOUNTING_INTERNAL_ENTRY_FIELD_TABLE_BYTES + 1,
                 field_table_bytes: ACCOUNTING_INTERNAL_ENTRY_FIELD_TABLE_BYTES,
@@ -241,7 +241,7 @@ fn recovery_refuses_an_accounting_tree_internal_node_whose_entries_are_wider_tha
 
 /// 场景：同上一条的坏镜像，交给可写挂载。
 /// 预期：重建那一版读记账树时同样判内部条目宽，在取号与任何写之前交回
-/// `Recovery(EntryNarrowerThanItsFieldTable { what: "记账树内部条目", entry_bytes: 109, field_table_bytes: 108 })`，盘上逐字节不变。
+/// `Recovery(EntryWidthDiffersFromItsFieldTable { what: "记账树内部条目", entry_bytes: 109, field_table_bytes: 108 })`，盘上逐字节不变。
 #[test]
 fn writable_mount_refuses_an_accounting_tree_internal_node_whose_entries_are_wider_than_the_field_table_before_any_write(
 ) {
@@ -251,7 +251,7 @@ fn writable_mount_refuses_an_accounting_tree_internal_node_whose_entries_are_wid
     assert!(
         matches!(
             refusal,
-            MountError::Recovery(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            MountError::Recovery(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: "记账树内部条目",
                 entry_bytes: 109,
                 field_table_bytes: 108,

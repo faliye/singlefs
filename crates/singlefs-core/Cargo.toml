@@ -4,10 +4,22 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 description = "核心层：地址 newtype 与块设备抽象（步 0），事务层与写路径随后各步接上"
+# 构建脚本（build.rs）把这一次编译里开了哪些特性交给直接依赖本包的构建脚本（DEP_SINGLEFS_CORE_ENABLED_FEATURES）：
+# checker 档的构建脚本拿它算判法单元键，认得出别的包在同一次构建里并上来的特性（harness 档的 dev 依赖打开的 lookup-work-counters）。
+# 不链接任何本地库，links 只用来交这一份元数据。
+links = "singlefs-core"
 
 [dependencies]
 # 文件后端写零打洞要调 fallocate(2)（`src/block_device.rs`）；与 Cargo.lock 里已有的 libc 同一份，不新增包。
 libc = "0.2"
 singlefs-format = { path = "../singlefs-format" }
-# 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它；compaction_plan 的单测拿它的整理选段核、计划核对拍。
+# 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它；compaction_plan 直接调用整理选段核、计划核，allocator 调用释放代比较核。
 singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
+
+[features]
+# 七·6 各处按身份查的计数（`transaction::lookup_work`：查了几次、每次看过索引几项、建了几次索引、解了几次中央映射叶）：只给测试读，默认关；
+# harness 档的 dev 依赖打开它。不开时计数的几处什么都不做，发布构建不多出开销。
+lookup-work-counters = []
+# 发布触发两个阈值的只供测试来源（`system_configuration::PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring`，判决
+# `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「只供测试的开关」那一格）：默认关，发布构建里调不到；harness 档的 dev 依赖打开它。
+test-only-publish-thresholds = []

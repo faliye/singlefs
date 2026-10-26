@@ -2604,7 +2604,7 @@ fn fit_through_two_points(
     ))
 }
 
-/// `du -sb` 的输出里路径以 `suffix` 结尾的那一行的字节数。
+/// `du -system_configuration` 的输出里路径以 `suffix` 结尾的那一行的字节数。
 fn library_bytes_of(du_text: &str, suffix: &str) -> Result<u64, String> {
     du_text
         .lines()
@@ -2909,11 +2909,13 @@ fn candidate_is_over_a_day(seconds: f64) -> bool {
 
 /// J2 小项（建快照流）的全量态数：值抄自 `crash_enumeration_snapshot_creation_stream.rs` 文件头「崩溃点重放的枚举域 16842807 个状态」
 /// （锚 A7，停机 T5 拿它与装置重录的建快照流的全量态数回比）。
+/// 取号写两轮之后那份文件头已是 16842815；这个数同时是跑前登记作废条款 X3 写死的数，第一段的 J2 冷跑按它判过，改不改由登记定。
 const SNAPSHOT_CREATION_FULL_STATES_PINNED_BY_THE_TEST: u64 = 16_842_807;
 
 /// J2 中项（覆盖写与 unlink 在快照之下的流）的全量态数：值抄自 `crash_enumeration_overwrite_and_unlink_under_a_snapshot_stream.rs`
-/// 文件头与全量用例的 `ignore` 说明（「崩溃点重放的枚举域 167837784 个状态」，锚 A8）；对不上不作废，只在 `name=anchor` 行报不符。
-const OVERWRITE_AND_UNLINK_FULL_STATES_PINNED_BY_THE_TEST: u64 = 167_837_784;
+/// 文件头与全量用例的 `ignore` 说明（「崩溃点重放的枚举域 167837792 个状态」，锚 A8）；对不上不作废，只在 `name=anchor` 行报不符。
+/// 取号写两轮之后测试文件改成 167837792（取号写一轮时 167837784），这里照新值重抄。
+const OVERWRITE_AND_UNLINK_FULL_STATES_PINNED_BY_THE_TEST: u64 = 167_837_792;
 #[cfg(test)]
 const OVERWRITE_AND_UNLINK_TEST_TEXT: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -4480,14 +4482,15 @@ const SNAPSHOT_TEST_TEXT: &str = include_str!(concat!(
     "/tests/crash_enumeration_snapshot_creation_stream.rs"
 ));
 
-/// 建快照流的段形（测试文件 `SEGMENT_SIZES`，也是登记锚 A1 的输入）。
-const SNAPSHOT_CREATION_SEGMENT_SIZES: [usize; 15] =
-    [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 16, 2, 1, 2];
-/// 建快照流前 11 段（新池新建文件流的段形，锚 A2 的输入）。
-const NEW_POOL_SEGMENT_SIZES: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
-/// 多记录流的段形（测试文件 `prepare` 里钉的）。
-const MULTI_RECORD_SEGMENT_SIZES: [usize; 19] =
-    [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2];
+/// 建快照流的段形（测试文件 `SEGMENT_SIZES`，也是登记锚 A1 的输入）。取号写两轮之后开头多一个 2 写的系统配置槽段（取号写一轮时 15 段、62 写）。
+const SNAPSHOT_CREATION_SEGMENT_SIZES: [usize; 16] =
+    [2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 16, 2, 1, 2];
+/// 建快照流前 12 段（新池新建文件流的段形，锚 A2 的输入；取号写一轮时前 11 段、41 写）。
+const NEW_POOL_SEGMENT_SIZES: [usize; 12] = [2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
+/// 多记录流的段形（测试文件 `prepare` 里钉的；取号写一轮时 19 段、115 写）。
+const MULTI_RECORD_SEGMENT_SIZES: [usize; 20] = [
+    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 28, 4, 1, 2, 30, 6, 1, 2,
+];
 
 /// 测试文件钉的常量：两态闭式、全量态数，和有的话甲二快档态数、段形、段数、写数（`None` 是测试文件没钉）。
 #[derive(Clone, Copy, Debug)]
@@ -4502,42 +4505,44 @@ struct PinnedByTheTest {
     writes: Option<usize>,
 }
 
+/// 取号写两轮之后照四份测试文件现钉的数重抄（取号写一轮时依次是 16777240、16777260、46、41 写；1678377089、1678377204、278、78 段；
+/// 1358954604、1358954634、115 写；16842782、16842807），`selfcheck` 现录的四条流与它们逐个相等。
 const PINNED_BY_THE_TESTS: [PinnedByTheTest; 4] = [
     PinnedByTheTest {
         label: "smoke-new_pool_file_creation_stream",
         test_text: NEW_POOL_TEST_TEXT,
-        two_state: 16_777_240,
-        full: 16_777_260,
-        quick_tier: Some(46),
+        two_state: 16_777_243,
+        full: 16_777_268,
+        quick_tier: Some(54),
         segment_sizes: Some(&NEW_POOL_SEGMENT_SIZES),
         segment_count: None,
-        writes: Some(41),
+        writes: Some(43),
     },
     PinnedByTheTest {
         label: "smoke-overwrite_fixed_script_stream",
         test_text: FIXED_SCRIPT_TEST_TEXT,
-        two_state: 1_678_377_089,
-        full: 1_678_377_204,
-        quick_tier: Some(278),
+        two_state: 1_678_377_095,
+        full: 1_678_377_220,
+        quick_tier: Some(294),
         segment_sizes: None,
-        segment_count: Some(78),
+        segment_count: Some(80),
         writes: None,
     },
     PinnedByTheTest {
         label: "smoke-multi_record_publish_stream",
         test_text: MULTI_RECORD_TEST_TEXT,
-        two_state: 1_358_954_604,
-        full: 1_358_954_634,
+        two_state: 1_358_954_607,
+        full: 1_358_954_642,
         quick_tier: None,
         segment_sizes: Some(&MULTI_RECORD_SEGMENT_SIZES),
         segment_count: None,
-        writes: Some(115),
+        writes: Some(117),
     },
     PinnedByTheTest {
         label: "smoke-snapshot_creation_stream",
         test_text: SNAPSHOT_TEST_TEXT,
-        two_state: 16_842_782,
-        full: 16_842_807,
+        two_state: 16_842_785,
+        full: 16_842_815,
         quick_tier: None,
         segment_sizes: Some(&SNAPSHOT_CREATION_SEGMENT_SIZES),
         segment_count: None,
@@ -4839,21 +4844,21 @@ fn run_selfcheck_command(arguments: &[String]) -> i32 {
     let mut anchors = vec![
         anchor_body(
             "snapshot_creation_two_state",
-            "16842782",
+            "16842785",
             &count_field(two_state_closed_form(&segments_of_sizes(
                 &SNAPSHOT_CREATION_SEGMENT_SIZES,
             ))),
         ),
         anchor_body(
             "new_pool_two_state",
-            "16777240",
+            "16777243",
             &count_field(two_state_closed_form(&segments_of_sizes(
                 &NEW_POOL_SEGMENT_SIZES,
             ))),
         ),
         anchor_body(
             "new_pool_writes",
-            "41",
+            "43",
             &NEW_POOL_SEGMENT_SIZES.iter().sum::<usize>().to_string(),
         ),
         anchor_body(
@@ -5030,13 +5035,13 @@ mod tests {
     ) {
         assert_eq!(
             two_state_closed_form(&segments_of_sizes(&SNAPSHOT_CREATION_SEGMENT_SIZES)),
-            Some(16_842_782)
+            Some(16_842_785)
         );
         assert_eq!(
             two_state_closed_form(&segments_of_sizes(&NEW_POOL_SEGMENT_SIZES)),
-            Some(16_777_240)
+            Some(16_777_243)
         );
-        assert_eq!(NEW_POOL_SEGMENT_SIZES.iter().sum::<usize>(), 41);
+        assert_eq!(NEW_POOL_SEGMENT_SIZES.iter().sum::<usize>(), 43);
         assert_eq!(
             two_state_closed_form(&segments_of_sizes(&[1, 2, 3])),
             Some(1 + 1 + 3 + 7),
@@ -6106,7 +6111,7 @@ mod tests {
                 &output,
                 "E7RESULT name=anchor identifier=medium_item_states "
             )
-            .ends_with("expected=167837784 actual=100000000 match=false"),
+            .ends_with("expected=167837792 actual=100000000 match=false"),
             "中项的态数与测试文件钉的不符只报不符，不作废、不改退出码"
         );
         let input = line_with(&output, "E7RESULT name=compose_input ");
@@ -6392,11 +6397,15 @@ mod tests {
         );
     }
 
-    fn scratch_directory(name: &str) -> PathBuf {
-        let directory =
-            std::env::temp_dir().join(format!("e184-main-test-{}-{name}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&directory);
-        std::fs::create_dir_all(&directory).expect("建临时目录");
+    /// 这条用例自己的临时目录，交回认领着它的守卫：用例做完、断言失败、panic 都删掉它。
+    fn scratch_directory(
+        name: &str,
+    ) -> singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop {
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e184-main-test-{}-{name}", std::process::id())),
+        );
+        let _ = std::fs::remove_dir_all(&*directory);
+        std::fs::create_dir_all(&*directory).expect("建临时目录");
         directory
     }
 
@@ -6498,8 +6507,6 @@ mod tests {
             EXIT_CODE_POSITIVE_CONTROL_FAILED,
             "期望两份逐字相同而实际不同：阳性对照没过"
         );
-        std::fs::remove_dir_all(&before_directory).expect("清掉");
-        std::fs::remove_dir_all(&after_directory).expect("清掉");
     }
 
     fn planned_blocks_of(
@@ -6803,11 +6810,11 @@ mod tests {
                 reading.row.segments,
                 reading.row.longest_segment
             ),
-            (62, 15, 24)
+            (64, 16, 24)
         );
         assert_eq!(
             (reading.row.two_state, reading.row.full),
-            (Some(16_842_782), Some(16_842_807))
+            (Some(16_842_785), Some(16_842_815))
         );
         assert_eq!(reading.row.two_state_agrees_with_crates, Some(true));
         assert!(
@@ -6817,7 +6824,7 @@ mod tests {
         );
         let full = reading.full.as_ref().expect("全量计划");
         let quick = reading.quick.as_ref().expect("甲二计划");
-        assert_eq!(full.state_count, 16_842_807);
+        assert_eq!(full.state_count, 16_842_815);
         assert!(quick.state_count < full.state_count);
         assert_eq!(reading.row.blocks_full, Some(full.blocks.len()));
         let controls = controls_of_the_flow(&dump, &prepared.base, &reading).expect("对照造得出");
@@ -6966,7 +6973,7 @@ mod tests {
         let dump = prepared.dump();
         let refusal =
             plan_blocks_under(&prepared.base, &dump, Expansion::Full, default_item(), 100)
-                .expect_err("16777260 个状态切 257 块，上界 270 超过 100");
+                .expect_err("16777268 个状态切 257 块，上界 271 超过 100");
         assert!(refusal.contains("超过上限 100"), "{refusal}");
         let quick = plan_blocks_under(
             &prepared.base,
@@ -6975,8 +6982,8 @@ mod tests {
             default_item(),
             100,
         )
-        .expect("46 个状态的快档排得了");
-        assert_eq!(quick.state_count, 46);
+        .expect("54 个状态的快档排得了");
+        assert_eq!(quick.state_count, 54);
         let reading = read_the_flow_under(&dump, &prepared.base, 100).expect("读得出");
         assert_eq!(
             (
@@ -6986,7 +6993,7 @@ mod tests {
                 reading.full.is_none(),
                 reading.quick.is_some()
             ),
-            (Some(16_777_260), None, true, true, true),
+            (Some(16_777_268), None, true, true, true),
             "态数照报，全量不排计划写 not_planned，快档照排"
         );
         assert!(
@@ -6995,7 +7002,7 @@ mod tests {
             reading.row.body()
         );
         let unrestricted = read_the_flow(&dump, &prepared.base).expect("读得出");
-        assert_eq!(unrestricted.row.full, Some(16_777_260));
+        assert_eq!(unrestricted.row.full, Some(16_777_268));
         assert!(unrestricted.row.blocks_full.is_some() && unrestricted.full.is_some());
     }
 
@@ -7047,7 +7054,7 @@ mod tests {
             "{readings:?}"
         );
         let dump = prepared.dump();
-        assert_eq!((dump.writes.len(), dump.segments.len()), (41, 11));
+        assert_eq!((dump.writes.len(), dump.segments.len()), (43, 12));
         assert_eq!(
             (
                 dump.family.as_str(),
@@ -7071,7 +7078,7 @@ mod tests {
             3,
             "A、B、C 三版带文件的版本"
         );
-        assert_eq!(prepared.writes.len(), 115);
+        assert_eq!(prepared.writes.len(), 117);
     }
 
     #[test]
@@ -7082,7 +7089,7 @@ mod tests {
             readings.iter().all(|reading| reading.passed),
             "{readings:?}"
         );
-        assert_eq!(prepared.segments.len(), 78);
+        assert_eq!(prepared.segments.len(), 80);
         assert_eq!(
             prepared.versions_with_a_file.len(),
             17,
@@ -7184,7 +7191,7 @@ mod tests {
         .expect("读得回");
         assert_eq!(
             (full.expansion, full.row.full, full.state_total()),
-            (Expansion::Full, Some(16_842_807), 16_842_807)
+            (Expansion::Full, Some(16_842_815), 16_842_815)
         );
         let quick = KeysFile::from_text(
             &std::fs::read_to_string(keys.join("smoke-snapshot_creation_stream.quick.keys"))
@@ -7216,8 +7223,6 @@ mod tests {
             }
             KeysOutcome::Failed { message, .. } => panic!("第二趟不该失败：{message}"),
         }
-        std::fs::remove_dir_all(&dumps).expect("清掉");
-        std::fs::remove_dir_all(&keys).expect("清掉");
     }
 
     #[test]
@@ -7226,7 +7231,7 @@ mod tests {
         let arguments = vec!["--out".to_string(), out.to_str().expect("路径").to_string()];
         assert_eq!(run_record_fixed_chains_command(&arguments), EXIT_CODE_OK);
         let dumps =
-            files_with_suffix(std::slice::from_ref(&out), DUMP_FILE_SUFFIX, None).expect("列得出");
+            files_with_suffix(&[out.to_path_buf()], DUMP_FILE_SUFFIX, None).expect("列得出");
         assert_eq!(dumps.len(), 7);
         for path in &dumps {
             let dump = FlowDump::read_from(path).expect("每份转储读得回");
@@ -7247,7 +7252,6 @@ mod tests {
             EXIT_CODE_OK,
             "已有写完的转储整份跳过"
         );
-        std::fs::remove_dir_all(&out).expect("清掉");
     }
 
     #[test]
@@ -7263,7 +7267,6 @@ mod tests {
         .map(|word| (*word).to_string())
         .collect();
         assert_eq!(run_library_command(&arguments), EXIT_CODE_USAGE);
-        std::fs::remove_dir_all(&keys).expect("清掉");
     }
 
     #[test]

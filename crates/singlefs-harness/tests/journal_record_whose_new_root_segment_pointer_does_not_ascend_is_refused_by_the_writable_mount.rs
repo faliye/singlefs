@@ -79,7 +79,7 @@ fn set_the_pointer_of_the_record(
 
 /// 记录头里 `pointer` 那 86 字节出现在哪几个偏移上。
 fn offsets_of_the_pointer_in_the_header(record_bytes: &[u8], pointer: &[u8]) -> BTreeSet<usize> {
-    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("487");
+    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("496");
     (0..=header_bytes - pointer.len())
         .filter(|&start| record_bytes[start..start + pointer.len()] == *pointer)
         .collect()
@@ -97,7 +97,7 @@ fn swap_the_location_entries_in_the_record_of_the_newest_root(
     let filesystem_identifier = unit_filesystem_identifier(&parameters.filesystem_identifier);
     let ring_bytes = parameters.geometry.journal_ring_bytes;
     let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
-    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("487");
+    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("496");
     let pointer_bytes = usize::try_from(NODE_POINTER_BYTES).expect("86");
     let location_entry_bytes = usize::try_from(LOC_ENTRY).expect("14");
     let pointer_head_bytes = usize::try_from(POINTER_HEAD_BYTES).expect("50");

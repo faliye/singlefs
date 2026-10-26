@@ -108,7 +108,7 @@ use singlefs_core::mount::{
 use singlefs_core::mounted_session::{
     MountedSession, NoSpaceAfterRaisingTheFloor, RootRingPushRefused, RootRingPushRehearsal,
     StuckBehindTheWideProtection, UserChange, UserChangeRefused, WaysOutOfTheWideProtection,
-    WideProtectionAtTheCeiling,
+    WhatIsLeftAfterThePush, WideProtectionAtTheCeiling,
 };
 use singlefs_core::pointer::LocationEntry;
 use singlefs_core::recovery::{
@@ -1825,6 +1825,7 @@ fn the_slots_the_way_out_by_the_push_releases_with_two_ring_slots_holding_overla
         &stuck,
         &ways_out[1],
         &released_in_the_rehearsal,
+        WhatIsLeftAfterThePush::PublishTheChangeAgain,
         "两槽 C、落点重叠",
     );
     let isolated_before_the_push = isolated_slots_on_each_device_of(&pool.session().allocator);
@@ -2395,27 +2396,13 @@ fn an_unlink_whose_walk_after_the_intent_fits_after_the_push_lists_the_push_sayi
                 panic!("{why}：预演推完之后走空放得下，而预演的结局是 {pushing_the_root_ring:?}")
             });
     assert_eq!(ways_out.len(), 2, "{why}：列卸载再挂与推环：{ways_out:?}");
-    let way_out_by_the_push = &ways_out[1];
+    // 报里只剩走空：推环那一条说推完之后剩下的走空在下一次改动开头走、不再发这次改动（照它再发同一个 unlink 被拒）。
     assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
         &stuck,
-        way_out_by_the_push,
+        &ways_out[1],
         &released_on_each_device,
+        WhatIsLeftAfterThePush::WalkTheQueueAtTheStartOfTheNextChange,
         why,
-    );
-    for expected in [
-        "这次 unlink 的意图已发成，报里只剩它之后的走空",
-        "推完之后剩下的走空在下一次改动开头走、放得下",
-        "不再发这次改动",
-    ] {
-        assert!(
-            way_out_by_the_push.ends_with("不再发这次改动。")
-                && way_out_by_the_push.contains(expected),
-            "{why}：出路二末句写明「{expected}」：{way_out_by_the_push}"
-        );
-    }
-    assert!(
-        !way_out_by_the_push.contains("推完之后这次改动放得下"),
-        "{why}：报里只剩走空，出路二不说推完之后这次改动放得下（照它再发同一个 unlink 被拒）：{way_out_by_the_push}"
     );
     let refusal_of_the_same_unlink =
         refusal_of_the_same_change_after_pushing_the_root_ring_on_a_copy_of(&pool, unlink, why);

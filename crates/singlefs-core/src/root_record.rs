@@ -1,7 +1,9 @@
-//! 根记录（D22（单元原子性怎么合成） 已定项 7）：457 字节住一个判定宽度（physical_block_size）的根槽，
+//! 根记录（D22（单元原子性怎么合成） 已定项 7）：466 字节住一个判定宽度（physical_block_size）的根槽，
 //! 自证校验和罩整槽含补齐、自身按 0 参与。行序即盘上顺序，偏移按行累加。
 
-use singlefs_format::{NODE_POINTER_BYTES, ROOT_RECORD_BYTES, WIDE_CHECKSUM_BYTES};
+use singlefs_format::{
+    NODE_POINTER_BYTES, ROOT_RECORD_BYTES, ROOT_RECORD_NO_RING_SLOT_PINNED, WIDE_CHECKSUM_BYTES,
+};
 
 use crate::address::{CheckpointTxg, InstanceGeneration};
 use crate::bytes::{ByteReader, ByteWriter};
@@ -61,6 +63,40 @@ impl UnmountMarker {
     }
 }
 
+/// 根记录与 journal 新根段里的钉槽 p（D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，C773（读坏与全零根槽的回收门槛钉只在内存里），
+/// 用户 2026-10-20 定）：建这一版的账时还钉着的根环槽里钉值最小的那个的钉值。钉值是那一槽可能住过的最旧 txg，也就是 `3·槽 + 区域`
+/// （0 到 3S 之内 `root_ring::target_for_publish` 是 (txg mod 3, txg div 3)，一槽一个钉值），所以这一个字节同时说了哪一槽、钉在哪个 txg；
+/// 没有钉着的槽写 [`ROOT_RECORD_NO_RING_SLOT_PINNED`]。
+///
+/// 盘上那 1 字节原样：core 的读者不判它的取值（core 只在施加记录拼根时把它原样带进拼出的根，不拿它建状态），
+/// 取值判在池级 checker 的 I-7.18（根记录的回收门槛等于现算的门槛） 与 I-7.19（钉着的槽不住本实例写的根）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PinnedRingSlot(pub u8);
+
+impl PinnedRingSlot {
+    /// 建账时一个槽都没钉着；mkfs 的第 0 代也写它。
+    pub const NO_SLOT_PINNED: Self = Self(ROOT_RECORD_NO_RING_SLOT_PINNED);
+
+    /// 钉着的槽里钉值最小的那个（`None` = 一个都没钉着）写成的字节。
+    ///
+    /// # Panics
+    /// 钉值装不进一个字节、或撞上「没有钉着」那个值：钉值是一槽可能住过的最旧 txg，小于环长 3S（S ≤ 16，
+    /// `singlefs_format::ROOT_RING_SLOTS_PER_REGION_MAXIMUM`），装得进也撞不上；装不进说明钉值不是按那一槽可能住过的最旧 txg 算的。
+    #[must_use]
+    pub fn of_the_lowest_pin(lowest_pinned_txg: Option<CheckpointTxg>) -> Self {
+        match lowest_pinned_txg {
+            None => Self::NO_SLOT_PINNED,
+            Some(pinned_txg) => {
+                let pin = u8::try_from(pinned_txg.0)
+                    .ok()
+                    .filter(|pin| *pin != ROOT_RECORD_NO_RING_SLOT_PINNED)
+                    .expect("钉值是那一槽可能住过的最旧 txg，小于环长 3S ≤ 48：装得进一个字节、撞不上「没有钉着」的 255");
+                Self(pin)
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RootRecord {
     pub filesystem_identifier: [u8; 16],
@@ -81,14 +117,21 @@ pub struct RootRecord {
     /// ——那一版的分配记录树住树表条目（D8（核心索引结构） 已定项 8），两处都写就成了同一个量的两份手抄。
     /// mkfs 的第 0 代也恒全零：那一版的账由 `mount::format_time_allocator` 从实例表与树表两条指针直接算。
     pub allocation_record_tree_root: NodePointer,
+    /// 回收门槛 t（D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）：
+    /// 带单元的发布写 max(这条根自己带的 F, 分配器记这条根时的回收门槛)，采样在回收之后、装根之前
+    /// （`PoolAllocator::record_root_written_by_this_process` 交回的那一对）；零单元发布照抄上一版的；mkfs 第 0 代写 0；
+    /// 由记录施加出来的那一版取那条记录新根段里的。池级 checker 的 I-7.18（根记录的回收门槛等于现算的门槛） 在建账的发布上求等。
+    pub reclaim_threshold: CheckpointTxg,
+    /// 钉槽 p，写法同 `reclaim_threshold`（同一处采样、同样照抄、同样从记录新根段带进拼出的根）。
+    pub pinned_ring_slot: PinnedRingSlot,
 }
 
 impl RootRecord {
-    /// 写成一个 `slot_bytes` 宽的槽；记录 457 字节，其余补 0。
+    /// 写成一个 `slot_bytes` 宽的槽；记录 466 字节，其余补 0。
     #[must_use]
     pub fn to_slot(&self, slot_bytes: usize) -> Vec<u8> {
         assert!(
-            slot_bytes >= usize::try_from(ROOT_RECORD_BYTES).expect("457"),
+            slot_bytes >= usize::try_from(ROOT_RECORD_BYTES).expect("466"),
             "根槽装不下根记录"
         );
         let mut writer = ByteWriter::new(slot_bytes);
@@ -108,6 +151,9 @@ impl RootRecord {
         self.instance_table.write_to(&mut writer);
         self.mapping_root.write_to(&mut writer);
         self.allocation_record_tree_root.write_to(&mut writer);
+        // 回收门槛 t 与钉槽 p 接在分配记录树根指针之后、算法类型之前（根环三方第二轮正推 Y4.2 的摆法）：偏移 428、436。
+        writer.put_u64(self.reclaim_threshold.0);
+        writer.put_u8(self.pinned_ring_slot.0);
         writer.put_u8(0); // 算法类型：未加密
         writer.skip(12 + 16); // nonce、MAC：第一版留位全 0
         writer.assert_position(ROOT_RECORD_BYTES, "根记录");
@@ -126,7 +172,7 @@ impl RootRecord {
     /// `pointer::PointerHeadFieldOutsideTheFirstVersion`）：拒收的根与自证不过的根同一个处置，择根时不可择。
     #[must_use]
     pub fn parse_slot(bytes: &[u8], expected_filesystem_identifier: &[u8; 16]) -> Option<Self> {
-        if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("457")
+        if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("466")
             || bytes[..4] != ROOT_MAGIC
         {
             return None;
@@ -173,6 +219,8 @@ impl RootRecord {
             reader.position(),
             ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86")
         );
+        let reclaim_threshold = CheckpointTxg(reader.get_u64());
+        let pinned_ring_slot = PinnedRingSlot(reader.get_u8());
         Some(Self {
             filesystem_identifier,
             unmount_marker,
@@ -184,6 +232,8 @@ impl RootRecord {
             instance_table,
             mapping_root,
             allocation_record_tree_root,
+            reclaim_threshold,
+            pinned_ring_slot,
         })
     }
 }
@@ -204,14 +254,16 @@ mod tests {
             instance_table: NodePointer::empty_root(),
             mapping_root: NodePointer::empty_root(),
             allocation_record_tree_root: NodePointer::empty_root(),
+            reclaim_threshold: CheckpointTxg(0),
+            pinned_ring_slot: PinnedRingSlot::NO_SLOT_PINNED,
         }
     }
 
     #[test]
-    fn root_record_is_457_bytes_with_the_checksum_at_138_and_round_trips() {
+    fn root_record_is_466_bytes_with_the_checksum_at_138_and_round_trips() {
         let slot = sample().to_slot(512);
         assert_eq!(slot.len(), 512);
-        assert!(slot[457..].iter().all(|byte| *byte == 0));
+        assert!(slot[466..].iter().all(|byte| *byte == 0));
         assert_eq!(&slot[..4], b"SFSR");
         assert_eq!(RootRecord::parse_slot(&slot, &[5u8; 16]), Some(sample()));
         assert_eq!(
@@ -225,6 +277,42 @@ mod tests {
             RootRecord::parse_slot(&torn, &[5u8; 16]),
             None,
             "补齐区改一字节：自证校验和罩整槽"
+        );
+    }
+
+    /// 回收门槛 t 与钉槽 p（C773（读坏与全零根槽的回收门槛钉只在内存里）；根环三方第二轮正推 Y4.2 的摆法）：t 8 字节小端在 [428, 436)、
+    /// p 1 字节在 436，算法类型挪到 437、nonce [438, 450)、MAC [450, 466) 照旧全 0；两项各取一个与别的字段都不同的值，写得出、读得回。
+    /// 偏移按字段表手算、写成字面量，不从写者用的常量推。
+    #[test]
+    fn the_reclaim_threshold_and_the_pinned_ring_slot_sit_after_the_allocation_record_tree_root_and_round_trip(
+    ) {
+        let root = RootRecord {
+            reclaim_threshold: CheckpointTxg(0x0102_0304_0506_0708),
+            pinned_ring_slot: PinnedRingSlot(7),
+            ..sample()
+        };
+        let slot = root.to_slot(512);
+        assert_eq!(
+            &slot[428..436],
+            &0x0102_0304_0506_0708u64.to_le_bytes(),
+            "回收门槛 t 紧跟分配记录树根指针（[342, 428)），在 [428, 436)"
+        );
+        assert_eq!(slot[436], 7, "钉槽 p 在 436");
+        assert!(
+            slot[437..466].iter().all(|byte| *byte == 0),
+            "算法类型 437、nonce [438, 450)、MAC [450, 466) 第一版全 0"
+        );
+        assert_eq!(RootRecord::parse_slot(&slot, &[5u8; 16]), Some(root));
+        assert_eq!(sample().to_slot(512)[436], 255, "没有钉着的槽写 255");
+    }
+
+    /// 钉值写成钉槽字节：没有钉着写 255，钉在 txg 6 的（区域 0 槽 2）写 6。
+    #[test]
+    fn the_pinned_ring_slot_byte_is_the_lowest_pinned_txg_or_255_when_nothing_is_pinned() {
+        assert_eq!(PinnedRingSlot::of_the_lowest_pin(None), PinnedRingSlot(255));
+        assert_eq!(
+            PinnedRingSlot::of_the_lowest_pin(Some(CheckpointTxg(6))),
+            PinnedRingSlot(6)
         );
     }
 

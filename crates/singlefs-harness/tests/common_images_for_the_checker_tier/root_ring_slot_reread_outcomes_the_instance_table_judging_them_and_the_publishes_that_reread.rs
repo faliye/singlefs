@@ -449,9 +449,11 @@ pub fn a_valid_root_read_on_the_reread_holds_the_reclaim_threshold_at_its_txg(
 /// 场景（攻方 `front_hole_eio 4 9 mount`）：实例 1 写到 3，实例 2 覆盖写到 8，txg 9 那次覆盖写崩在根槽写之前
 /// （记录已持久；环还没转过来，那一槽从没写过、盘上全零）；实例 3 可写挂载那一刻读那一槽报读错，之后照读；覆盖写到 9 + 2 × 3S。
 /// 预期：那一槽钉在它可能住过的最旧 txg 9；环里还有比 9 旧的有效根时不重读，txg 20 那一版它成了根环表里最小的那个、重读读回全零：
-/// 不算确认为空，照旧钉在 9（用户 2026-10-05 定乙），txg 21 这个进程写掉那一槽才解开。被引用单元那几条每一版都不红；只有 txg 20 那一版
-/// I-3.1 红、只许红在记账多的一边——钉着的 9 比盘上环里最旧的有效根 10 旧，池级 checker 读盘上全零的那一槽、按 10 算门槛，安全方向，
-/// 定案的代价（与改法 A 当初认下的是同一版）。照「从没写过」拿掉时 txg 20 那一版也不红。
+/// 不算确认为空，照旧钉在 9（用户 2026-10-05 定乙），txg 21 这个进程写掉那一槽才解开。每一版那几条（[`INVARIANTS_THE_REREAD_KEEPS_GREEN`]）
+/// 都不红，txg 20 那一版也一样：这是 C773（读坏与全零根槽的回收门槛钉只在内存里）定案「钉也落盘」之后的口径——根记录带着钉出来的
+/// 回收门槛，池级 checker 把「钉带出来的那一截」不看引用并进遍历得到的和（`walk::released_slots_the_pin_kept_in_defer`），
+/// 盘上环里最旧的有效根 10 与钉着的 9 之间那一截不再落在记账多的一边。C773 之前钉只在内存里，checker 按 10 算门槛，
+/// txg 20 那一版 I-3.1 红在记账多的一边，是当时认下的代价。
 pub fn a_front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_the_process_overwrites_it(
     images: &mut PoolCheckerImages,
 ) {
@@ -528,27 +530,16 @@ pub fn a_front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_th
     while session.current.root.checkpoint_txg.0 < TXG_OF_THE_FRONT_HOLE + 2 * ring_length {
         session.overwrite_once();
         let txg = session.current.root.checkpoint_txg.0;
-        // 只有重读读回全零、照旧钉着的 txg 20 那一版红，而且只许 I-3.1 红在记账多的一边；别的每一版那几条都不红
-        if txg == TXG_AT_WHICH_THE_FRONT_HOLE_IS_REREAD {
-            images.hand_out(
-                &format!("覆盖写到 txg {txg}（重读读回全零、照旧钉着）"),
-                || session.image_now(),
-                PoolCheckerExpectation::only_the_named_invariants()
-                    .and_violated(INVARIANTS_THE_REREAD_KEEPS_GREEN[0])
-                    .and_none_of_these_violated(&INVARIANTS_THE_REREAD_KEEPS_GREEN[1..])
-                    .and_if_violated_the_detail_satisfies(
-                        INVARIANTS_THE_REREAD_KEEPS_GREEN[0],
-                        "记账的已分配多于遍历全部有效根得到的",
-                        allocated_statistic_counts_more_than_the_walk,
-                    ),
-            );
+        // 每一版那几条都不红；重读读回全零、照旧钉着的 txg 20 那一版也一样（C773 钉落盘之后，钉带出来的那一截并进遍历），
+        // 只在名字上标出来
+        let label = if txg == TXG_AT_WHICH_THE_FRONT_HOLE_IS_REREAD {
+            format!("覆盖写到 txg {txg}（重读读回全零、照旧钉着）")
         } else {
-            hand_out_expecting_the_reread_keeps_its_invariants_green(
-                images,
-                &format!("覆盖写到 txg {txg}"),
-                || session.image_now(),
-            );
-        }
+            format!("覆盖写到 txg {txg}")
+        };
+        hand_out_expecting_the_reread_keeps_its_invariants_green(images, &label, || {
+            session.image_now()
+        });
         if txg == TXG_AT_WHICH_THE_FRONT_HOLE_IS_REREAD - 1 {
             assert!(
                 session.txgs_recorded_as_bad_at_mount().is_some(),
@@ -582,24 +573,6 @@ pub fn a_front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_th
             );
         }
     }
-}
-
-/// I-3.1 那一条红在记账比遍历多的一边：说明里「记账的已分配 Some(a)，遍历全部有效根得到 b」a 大于 b
-/// （与 `raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs` 同一个判法另写一份）。
-pub fn allocated_statistic_counts_more_than_the_walk(violation: &str) -> bool {
-    let after = |marker: &str| {
-        violation.split(marker).nth(1).and_then(|rest| {
-            rest.chars()
-                .take_while(char::is_ascii_digit)
-                .collect::<String>()
-                .parse::<u64>()
-                .ok()
-        })
-    };
-    matches!(
-        (after("记账的已分配 Some("), after("遍历全部有效根得到 ")),
-        (Some(counted), Some(walked)) if counted > walked
-    )
 }
 
 /// 场景：实例 1 覆盖写到 txg 5（最新那条根 a = 5）；崩溃恢复抛弃 a（它的根槽与数据单元一时读不出，择根落到 4，实例 2 写行 6、暖机 7），

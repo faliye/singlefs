@@ -19,6 +19,7 @@
 use std::collections::BTreeMap;
 
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
+use singlefs_core::transaction::FIRST_INODE_NUMBER;
 use singlefs_reference_filesystem::{
     AbandonedRoot, AbandonedRootRestartNotAccepted, AllowedState, CrashNotAccepted, FileContent,
     Operation, OperationNotAccepted, OperationNumber, OperationOutcome, ReferenceFileSystem,
@@ -28,7 +29,8 @@ use singlefs_reference_filesystem::{
 use crate::fault_injection::{FaultOutcome, InjectedFault};
 use crate::history::{
     AppliedEffect, HarnessJudgement, HistoryEnding, HistoryOperation, HistoryRun,
-    HistoryStartingPoint, SnapshotChange, StepObservation, StepOutcome, StepPosition,
+    HistoryStartingPoint, PartialWriteRequested, SnapshotChange, StepObservation, StepOutcome,
+    StepPosition,
 };
 use crate::memory_pool::root_identity_written_by;
 use crate::model::{ModelDisagreement, ModelRootKey, ObservedReadBack, ObservedSnapshotReadBack};
@@ -68,6 +70,11 @@ struct StepSeenByTheTranslation {
     stream_length_after_the_step: usize,
     /// 这一步是截断时交给会话的目标 size（执行器交回的，`history::HistoryRun::sizes_requested_by_the_truncations`）：翻成 `Operation::Truncate(n)` 的 n。
     size_requested_by_the_truncation: Option<u64>,
+    /// 这一步是截断时点名的 inode 号（`history::HistoryRun::inodes_named_by_the_truncations`）：不是第一个文件而写了盘的那一步翻不出。
+    inode_named_by_the_truncation: Option<u64>,
+    /// 这一步是按偏移写时交给会话的号、偏移与长度（`history::HistoryRun::partial_writes_requested`）：第一个文件的翻成 `Operation::WriteAtOffset`，
+    /// 别的号写了盘的那一步翻不出。
+    partial_write_requested: Option<PartialWriteRequested>,
 }
 
 /// 一段历史跑的过程中攒下的东西：起点、每一步的操作与结局、每一步跑完时流有多长。跑完之后 [`Self::translate`] 翻成 RefFS 的输入。
@@ -138,6 +145,8 @@ impl ReferenceFileSystemTranslation {
             ending,
             stream_length_after_the_step,
             size_requested_by_the_truncation: observation.size_requested_by_the_truncation,
+            inode_named_by_the_truncation: observation.inode_named_by_the_truncation,
+            partial_write_requested: observation.partial_write_requested,
         });
     }
 
@@ -161,6 +170,19 @@ impl ReferenceFileSystemTranslation {
                 .sizes_requested_by_the_truncations
                 .get(&step_index)
                 .copied(),
+        };
+        let inode_named_by_the_truncation = match observation.position {
+            StepPosition::StartingPoint => None,
+            StepPosition::Operation(step_index) => run
+                .inodes_named_by_the_truncations
+                .get(&step_index)
+                .copied(),
+        };
+        let partial_write_requested = match observation.position {
+            StepPosition::StartingPoint => None,
+            StepPosition::Operation(step_index) => {
+                run.partial_writes_requested.get(&step_index).copied()
+            }
         };
         let (operation, ending) = match observation.position {
             StepPosition::StartingPoint => {
@@ -210,6 +232,8 @@ impl ReferenceFileSystemTranslation {
             ending,
             stream_length_after_the_step: stream_length_at_the_end,
             size_requested_by_the_truncation,
+            inode_named_by_the_truncation,
+            partial_write_requested,
         });
     }
 
@@ -396,6 +420,21 @@ impl ReferenceFileSystemTranslation {
                     | StepEndingSeenByTheTranslation::NotCalled,
                     Some(_) | None,
                 ) => EventsOfAStep::nothing(),
+                // 改第一个文件之外的 inode 的 size 写了盘（任意活 inode 都能缩短与变长，判决
+                // `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5）：RefFS 第一版只有第一个文件，翻不出（同按 inode 号写）。
+                (
+                    StepEndingSeenByTheTranslation::ReturnedOk { .. }
+                    | StepEndingSeenByTheTranslation::ReturnedAnErrorAfterItMayHaveWritten
+                    | StepEndingSeenByTheTranslation::NeverReturned,
+                    Some(_) | None,
+                ) if seen
+                    .inode_named_by_the_truncation
+                    .is_some_and(|inode| inode != FIRST_INODE_NUMBER) =>
+                {
+                    return Err(
+                        TranslationStopReason::TheReferenceFileSystemHasNoFileOtherThanTheFirstInTheFirstVersion,
+                    );
+                }
                 (
                     StepEndingSeenByTheTranslation::ReturnedOk {
                         effect:
@@ -480,6 +519,40 @@ impl ReferenceFileSystemTranslation {
                     return Err(
                         TranslationStopReason::TheReferenceFileSystemHasNoFileOtherThanTheFirstInTheFirstVersion,
                     );
+                }
+            },
+            // 按偏移写（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）：第一个文件的那一次交一个 `WriteAtOffset` 连同它那次发布
+            // （一次发布做完，同覆盖写：任何写之前拒的交空、写了之后报错与没返回的交「写了之后报错」）；偏移与长度执行时才取，由执行器交回，字节由这一步的
+            // 选择按那个长度现算。写别的文件写了盘的：RefFS 第一版只有第一个文件，翻不出（同按 inode 号写与改别的 inode 的 size）。
+            HistoryOperation::WriteAtOffset(choice) => match (&seen.ending, seen.partial_write_requested) {
+                (
+                    StepEndingSeenByTheTranslation::RefusedBeforeAnyWrite
+                    | StepEndingSeenByTheTranslation::NotCalled,
+                    None | Some(_),
+                ) => EventsOfAStep::nothing(),
+                (
+                    StepEndingSeenByTheTranslation::ReturnedOk { .. }
+                    | StepEndingSeenByTheTranslation::ReturnedAnErrorAfterItMayHaveWritten
+                    | StepEndingSeenByTheTranslation::NeverReturned,
+                    Some(requested),
+                ) => {
+                    if requested.inode != FIRST_INODE_NUMBER {
+                        return Err(
+                            TranslationStopReason::TheReferenceFileSystemHasNoFileOtherThanTheFirstInTheFirstVersion,
+                        );
+                    }
+                    publish_with_content(Some(Operation::WriteAtOffset {
+                        offset_in_bytes: requested.offset_in_bytes,
+                        bytes: FileContent(choice.bytes_of_length(requested.length_in_bytes)),
+                    }))
+                }
+                (
+                    StepEndingSeenByTheTranslation::ReturnedOk { .. }
+                    | StepEndingSeenByTheTranslation::ReturnedAnErrorAfterItMayHaveWritten
+                    | StepEndingSeenByTheTranslation::NeverReturned,
+                    None,
+                ) => {
+                    return Err(TranslationStopReason::ThePartialWriteDidNotReportItsOffset);
                 }
             },
             HistoryOperation::Unlink => match &seen.ending {
@@ -976,6 +1049,9 @@ pub enum TranslationStopReason {
     /// 截断调了入口、执行器却没交回它交给会话的目标 size（截断那一步的观察里没有 `size_requested_by_the_truncation`），
     /// 或做成了却不是 `AppliedEffect::Published`：翻不出 `Operation::Truncate(n)`。执行器每次调截断都记下目标 size，走到这里是执行器漏记了。
     TheSizeChangeDidNotReportItsSize,
+    /// 按偏移写调了入口、执行器却没交回它交给会话的号、偏移与长度（那一步的观察里没有 `partial_write_requested`）：翻不出 `Operation::WriteAtOffset`。
+    /// 执行器每次调按偏移写都记下，走到这里是执行器漏记了。
+    ThePartialWriteDidNotReportItsOffset,
 }
 
 impl TranslationStopReason {
@@ -984,6 +1060,9 @@ impl TranslationStopReason {
         match self {
             TranslationStopReason::TheSizeChangeDidNotReportItsSize => {
                 "截断调了入口、执行器没交回目标 size"
+            }
+            TranslationStopReason::ThePartialWriteDidNotReportItsOffset => {
+                "按偏移写调了入口、执行器没交回号、偏移与长度"
             }
             TranslationStopReason::TheRollbackTargetRootHasNoVersion { .. } => {
                 "回退目标根在 m 表里查不到"
@@ -1427,6 +1506,65 @@ impl TranslatedHistory {
     }
 }
 
+/// 攒批会话的一段调用翻成 RefFS 的操作序列（判决 `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「RefFS」那一格：RefFS 本体不改，
+/// 翻译把会话报告的每次发布翻成一个显式发布点；一个请求不被触发切开，所以不要「一个操作的中间内容」）。起点是第一个文件已发布的那一版
+/// （建第一个文件 + 一个显式发布点）；之后每一次调用：收下的第一个文件整份写翻成一个内容改动（不跟显式发布点：收下不等于落盘），
+/// 会话在这次调用里报的每一次发布按先后各翻成一个显式发布点（触发只在收下一个完整改动之后判，内容改动在前、发布点在后）。
+/// 收下的别的改动（建 inode）不改第一个文件，RefFS 的状态只有这一个文件，不进序列；它们并进的那一次发布照样是一个发布点。
+///
+/// 今天的接法（每次改动返回就跟一个显式发布点，「返回即落盘」）放在攒批的历史上会把收下而没发布的改动当成已落盘：恢复读出最近一次发布那一版是合法的，
+/// 照今天的接法判红（攻方 P5 那十格）。
+///
+/// # Errors
+/// RefFS 不收的那一次操作（[`OperationNotAccepted`]），原样交回。
+pub fn reference_filesystem_after_the_batching_session_calls(
+    first_file_content_published_at_the_start: &[u8],
+    calls_seen: &[crate::history::BatchingSessionCallSeen],
+) -> Result<ReferenceFileSystem, OperationNotAccepted> {
+    let mut reference_filesystem = ReferenceFileSystem::on_a_freshly_formatted_pool();
+    reference_filesystem.submit(
+        Operation::CreateTheFirstFile(FileContent(
+            first_file_content_published_at_the_start.to_vec(),
+        )),
+        OperationOutcome::Succeeded,
+    )?;
+    reference_filesystem.submit(Operation::ExplicitPublish, OperationOutcome::Succeeded)?;
+    // 迭代上界是调用数；跨轮携带的只有 RefFS 自己的状态。
+    for call_seen in calls_seen {
+        if let Some(content) = &call_seen.first_file_content_accepted {
+            reference_filesystem.submit(
+                Operation::OverwriteTheFile(FileContent(content.clone())),
+                OperationOutcome::Succeeded,
+            )?;
+        }
+        for _publish in 0..call_seen.publishes_reported {
+            reference_filesystem.submit(Operation::ExplicitPublish, OperationOutcome::Succeeded)?;
+        }
+    }
+    Ok(reference_filesystem)
+}
+
+/// 攒批会话的那一段调用都返回之后崩溃、恢复读出 `recovered`：照 [`reference_filesystem_after_the_batching_session_calls`] 的序列判它在不在允许集合里
+/// （崩溃落在崩溃本身里：序列里的操作都返回过）。
+///
+/// # Errors
+/// RefFS 不收那一段调用（`OperationNotAccepted` 的说明），或判不了、判红（`CrashNotAccepted` 的说明）。
+pub fn judge_a_crash_after_every_batching_session_call_returned(
+    first_file_content_published_at_the_start: &[u8],
+    calls_seen: &[crate::history::BatchingSessionCallSeen],
+    recovered: VisibleState,
+) -> Result<singlefs_reference_filesystem::AllowedSet, String> {
+    let mut reference_filesystem = reference_filesystem_after_the_batching_session_calls(
+        first_file_content_published_at_the_start,
+        calls_seen,
+    )
+    .map_err(|not_accepted| format!("RefFS 不收这一段调用：{not_accepted:?}"))?;
+    let crash_falls_in = reference_filesystem.crash_after_every_operation_returned();
+    reference_filesystem
+        .crash_and_recover(crash_falls_in, recovered)
+        .map_err(|not_accepted| format!("{REFERENCE_FILESYSTEM_VIOLATION_NAME}：{not_accepted:?}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1543,7 +1681,111 @@ mod tests {
             ending,
             stream_length_after_the_step: 0,
             size_requested_by_the_truncation: Some(new_size),
+            inode_named_by_the_truncation: Some(FIRST_INODE_NUMBER),
+            partial_write_requested: None,
         }
+    }
+
+    /// 按偏移写那一步的观察：第 0 步，结局 `ending`，执行器交给会话的是写 `inode` 的偏移 `offset_in_bytes` 起 `length_in_bytes` 字节。
+    fn partial_write_step_seen(
+        ending: StepEndingSeenByTheTranslation,
+        inode: u64,
+        offset_in_bytes: u64,
+        length_in_bytes: u64,
+    ) -> StepSeenByTheTranslation {
+        StepSeenByTheTranslation {
+            position: StepPosition::Operation(0),
+            operation: Some(HistoryOperation::WriteAtOffset(
+                crate::history::PartialWriteChoice {
+                    inode_selector: 0,
+                    cell: crate::history::PartialWriteOffsetCell::InsideAnExistingDataUnit,
+                    selector: 0,
+                    fill_seed: 5,
+                },
+            )),
+            ending,
+            stream_length_after_the_step: 0,
+            size_requested_by_the_truncation: None,
+            inode_named_by_the_truncation: None,
+            partial_write_requested: Some(PartialWriteRequested {
+                inode,
+                offset_in_bytes,
+                length_in_bytes,
+                offset_cell: crate::history::PartialWriteOffsetCell::InsideAnExistingDataUnit,
+            }),
+        }
+    }
+
+    /// 第一个文件的按偏移写做成（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）：交一个 `WriteAtOffset`（偏移与长度是执行器
+    /// 交回的那一次、字节由那一步的选择按长度现算）连同它那次发布；写别的文件写了盘的停在「RefFS 第一版只有第一个文件」。判别力：翻译把别的号的写
+    /// 当第一个文件的交出去时第二段断言红，偏移取错时第一段断言红（`crates/mutations.tsv` 一行）。
+    #[test]
+    fn a_write_at_an_offset_of_the_first_file_is_handed_as_one_write_at_that_offset_and_another_inode_stops_the_translation(
+    ) {
+        let translation = ReferenceFileSystemTranslation::for_a_history_starting(
+            HistoryStartingPoint::AfterFirstFile,
+        );
+        let seen = partial_write_step_seen(
+            StepEndingSeenByTheTranslation::ReturnedOk {
+                effect: None,
+                read_out_of_the_recovery_in_the_step: None,
+            },
+            FIRST_INODE_NUMBER,
+            100,
+            7,
+        );
+        let events = translation
+            .events_of(
+                &seen,
+                &BTreeMap::new(),
+                RootsBeforeTheStep::before_any_step(),
+                VersionNumber(1),
+            )
+            .unwrap_or_else(|reason| panic!("第一个文件的按偏移写翻得出：{reason:?}"));
+        let expected_bytes = crate::history::PartialWriteChoice {
+            inode_selector: 0,
+            cell: crate::history::PartialWriteOffsetCell::InsideAnExistingDataUnit,
+            selector: 0,
+            fill_seed: 5,
+        }
+        .bytes_of_length(7);
+        assert_eq!(
+            events.events,
+            vec![
+                ReferenceFileSystemEvent::Submit {
+                    operation: Operation::WriteAtOffset {
+                        offset_in_bytes: 100,
+                        bytes: FileContent(expected_bytes),
+                    },
+                    outcome: OperationOutcome::Succeeded,
+                },
+                ReferenceFileSystemEvent::Submit {
+                    operation: Operation::ExplicitPublish,
+                    outcome: OperationOutcome::Succeeded,
+                },
+            ]
+        );
+        let of_another_inode = partial_write_step_seen(
+            StepEndingSeenByTheTranslation::ReturnedOk {
+                effect: None,
+                read_out_of_the_recovery_in_the_step: None,
+            },
+            2,
+            100,
+            7,
+        );
+        assert_eq!(
+            translation
+                .events_of(
+                    &of_another_inode,
+                    &BTreeMap::new(),
+                    RootsBeforeTheStep::before_any_step(),
+                    VersionNumber(1),
+                )
+                .err(),
+            Some(TranslationStopReason::TheReferenceFileSystemHasNoFileOtherThanTheFirstInTheFirstVersion),
+            "写别的文件写了盘的停下"
+        );
     }
 
     fn events_of_a_truncation_step(seen: &StepSeenByTheTranslation) -> EventsOfAStep {
@@ -1558,6 +1800,53 @@ mod tests {
                 VersionNumber(1),
             )
             .unwrap_or_else(|reason| panic!("截断那一步翻得出：{reason:?}"))
+    }
+
+    /// 改第一个文件之外的 inode 的 size 写了盘（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5「翻译层对 inode ≠ 1
+    /// 且写了盘的截断停下」）：做成、写了之后报错、没返回三种都停在「RefFS 第一版只有第一个文件」，不把别的文件的 size 当第一个文件的交出去；
+    /// 任何写之前拒的照旧什么都不交。
+    #[test]
+    fn a_truncation_of_an_inode_other_than_the_first_that_wrote_stops_the_translation() {
+        let translation = ReferenceFileSystemTranslation::for_a_history_starting(
+            HistoryStartingPoint::AfterFirstFile,
+        );
+        let written_endings = [
+            StepEndingSeenByTheTranslation::ReturnedOk {
+                effect: Some(AppliedEffect::Published {
+                    reuse: crate::history::RecordReuse::default(),
+                    floor_raises_pushed_by_the_session: 0,
+                    roots_carrying_the_change: 1,
+                }),
+                read_out_of_the_recovery_in_the_step: None,
+            },
+            StepEndingSeenByTheTranslation::ReturnedAnErrorAfterItMayHaveWritten,
+            StepEndingSeenByTheTranslation::NeverReturned,
+        ];
+        for ending in written_endings {
+            let mut seen = truncation_step_seen(ending.clone(), 6);
+            seen.inode_named_by_the_truncation = Some(2);
+            let stopped = translation.events_of(
+                &seen,
+                &BTreeMap::new(),
+                RootsBeforeTheStep::before_any_step(),
+                VersionNumber(1),
+            );
+            assert!(
+                matches!(
+                    stopped,
+                    Err(TranslationStopReason::TheReferenceFileSystemHasNoFileOtherThanTheFirstInTheFirstVersion)
+                ),
+                "inode 2 改 size、结局 {ending:?}：翻译停下"
+            );
+        }
+        let mut refused =
+            truncation_step_seen(StepEndingSeenByTheTranslation::RefusedBeforeAnyWrite, 6);
+        refused.inode_named_by_the_truncation = Some(2);
+        assert_eq!(
+            events_of_a_truncation_step(&refused).events,
+            Vec::new(),
+            "任何写之前拒的什么都不交"
+        );
     }
 
     /// 截断做成（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8「截断发成（不论几个版本）交一个 `Truncate(n)`」）：会话推了一串抬 F、

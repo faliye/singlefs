@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_state_enumeration、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
+//! checker 档模块：crash、crash_state_enumeration、crash_injection、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
 //! GPU 判器与 CPU 判器逐状态对拍：六条流（新池新建文件；它改坏一次树表单元写两份副本之后的样子；它的 journal 记录提交标记改成 2、
 //! 记录标志改成 0b11、系统配置槽距改成 512 三种重封过校验和的坏法；固定脚本到回退 D）上的每个
 //! 崩溃状态，GPU 判出的红位（两遍 oracle 各七类、记录核对器两条）要与 CPU `judge_crash_image` 的 `red_items` 逐位相同，池级 checker
@@ -15,7 +15,7 @@
 //! GPU 恢复内核与 CPU 冷走读一样把 nlink = 0 的第一个文件答成没有文件，C712（GPU 恢复内核不判 nlink = 0））；另一条流删到最后一批，
 //! 那一版起 extent 树只剩上段零条目根，同样整份比（两边都答没有文件）；删除中间态那条流上展开上限
 //! 不展开的段（新建文件、顺序写、意图、第一批那几次发布的单元写）另把「之前的段全落、这一段只差一个写」的每个状态各比一次。
-//! I-9.16 ③ ④（种类重复、缺 deadlist）、根槽 428..457（I-2.4）、带树一版根记录里的分配记录树根（I-5.4）各一条坏流整份比；指针头部的
+//! I-9.16 ③ ④（种类重复、缺 deadlist；另有一条十二种齐、只多一条重复的流只红 ③）、根槽 437..466（I-2.4）、带树一版根记录里的分配记录树根（I-5.4）各一条坏流整份比；指针头部的
 //! 墓碑与谱系那九条（第 23 批）：I-9.17、I-9.23 各一条改坏容器树根条目身份或类型段的流，I-9.18、I-9.19、I-9.20（两句各一条）、I-9.29
 //! （连同 I-9.10 墓碑那一个等号）各一条改坏墓碑或记录的流，I-9.24 并在队列 {1, 7} 那一条上，I-9.21 一条墓碑容器旋钮压到一片 1 条的流
 //! （旋钮下合法、CPU 判器按旧入口判就红），I-9.4 第四句一条叶里记录对调的流，删 → 回退 → 再删一条合法流钉九条不红；零条目的 extent 上段根
@@ -125,9 +125,16 @@
 //! 截断意图那一版 size 之外还挂着的单元、每一槽都带位 2），系统配置 0x04、0x0E、0x07 三种不认得的位。池级 checker 那一半先比、钉 CPU 红哪几条；
 //! 两遍恢复的那一半要核心层的读者认截断字段与位 2（截庚）合进来才对得上（之前 core 拒收带截断字段的记录与 0x06，GPU 恢复内核已经照判决收）。
 //! 里程碑三收尾（用户 2026-10-20 定 C663、C728）：系统配置槽 S 写 17、R 写 2 各一条流钉 CPU 红 I-7.13（R、S 越界整池拒，不再是这一槽不可择），
-//! 系统配置槽末字节（偏移 4095）、根记录之后头一个字节（偏移 457）各写 1 的两条流钉 CPU 红 I-2.4（两段第一版恒 0），GPU 都逐位跟上；
+//! 系统配置槽末字节（偏移 4095）、根记录之后头一个字节（偏移 466）各写 1 的两条流钉 CPU 红 I-2.4（两段第一版恒 0），GPU 都逐位跟上；
 //! 流里每一次系统配置槽写 incompat 第一个字节写 0x0E、格式版本写 2 的一条流钉格式版本先于 incompat 位判（C663「格式版本先」）：
 //! 两遍恢复都按格式版本整池拒、没有一个状态报 incompat 位不认得，GPU 恢复内核逐态跟上。
+//! 里程碑三收尾（用户 2026-10-22 定 F6「代码该做一定要做」与两槽全废盘面观察者「你做你的 GPU版让GPU去做」）：GPU 恢复内核判退看冷走读、只读挂载的打开、
+//! 建上一版连同实例表三样读者的并集（C755）——两次覆盖写的流上 R 的数据单元没落而建上一版拒收 R 的记录、R 的 extent 树根没落而打开拒收 R 的 inode 记录
+//! 各一条流，CPU 都不退、GPU 逐态跟上；走读内核交逐盘自证过的系统配置槽数，一段里盘 0 两槽撕裂清零的流上逐状态逐盘与池级 checker 的逐盘数相同。
+//! 种违例位那条用例（按名字排在用卡的用例里头一个，冷编判器内核落在它身上）要两套内核源码（没种的与种过的），两套各建判器、判同一条流，
+//! 按区间切片分给工作线程（`crash_injection::seed_slices`，同崩溃注入读故障用例的切法），两套的冷编叠在一起、不再一套编完才编下一套；
+//! 工作线程数取 CPU 判器线程数那一个变量（没设取每台默认重活线程数），编内核一套一套编的变量写了 `1` 时只起 1 个；合并按片号放回两套的次序，
+//! 判定与线程数无关（快档用例 `units_judged_in_slices_on_several_worker_threads_and_on_one_come_back_identical_and_in_unit_order` 对拍）。
 #![cfg(all(feature = "verdict-store", feature = "gpu"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -141,8 +148,11 @@ mod common_pointer_head_corruption;
 mod common_truncation;
 
 use singlefs_checker_tier::crash_amplification::record_the_flow_and_read_it_back;
+use singlefs_checker_tier::crash_injection::seed_slices;
 use std::collections::BTreeMap;
-use std::time::Instant;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, file_content,
@@ -162,17 +172,23 @@ use singlefs_checker::walk::{
     LineageContainerCapacityKnob, RetirementContainerCapacityKnob, TombstoneContainerCapacityKnob,
 };
 use singlefs_checker_tier::crash::{
-    crash_point_replay_plan_state_count, CrashPointReplayOracleViolationKind,
-    CrashPointReplaySegmentExpansion, CrashPointReplayVersionTable, CrashStateJudgement,
+    crash_point_replay_plan_state_count, crash_state_enumeration_tables,
+    CrashPointReplayOracleViolationKind, CrashPointReplaySegmentExpansion,
+    CrashPointReplayVersionTable, CrashStateJudgement,
     CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE, CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER,
 };
 use singlefs_checker_tier::crash_amplification::{
     gpu_recovery_words, gpu_verdict_items, judge_my_blocks_on_gpu_cards, plan_crash_points,
     record_crash_points, recovery_words_of, unjudged_blocks, CrashFlow, CrashPointRecorder,
-    CrashPointSpan, RecordedGivenStatesTable,
+    CrashPointSpan, RecordedGivenStatesTable, RecoveryRootAndOutcomesOfState,
+    RECOVERY_ROOT_AND_OUTCOMES_WORDS,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
 use singlefs_checker_tier::crash_identity::{judging_units_key, JudgingUnits, SectorImage};
+use singlefs_checker_tier::crash_judge_conclusions::{
+    devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts,
+    self_verified_system_configuration_slots_of_each_device,
+};
 use singlefs_checker_tier::crash_judge_dispatch::{
     mebibytes_a_judge_needs, states_per_scratch_lane, GpuCrashJudge, PackedJudgeTables,
     PackedJudgeTablesReadBack,
@@ -181,13 +197,13 @@ use singlefs_checker_tier::crash_judge_gpu::{
     cross_check_words_agree_in_the_cross_check, cross_check_words_of_cpu_judgement,
     cross_check_words_of_gpu_verdict, pool_checker_bits_agree_in_the_cross_check,
     pool_checker_judged_bits, pool_checker_violated_and_judged_bits, pool_checker_violated_bits,
-    verdict_bits, CrossCheckWords, JudgeKernelSources,
-    CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT, CHECKER_SCAN_REBUILD_ENTRY_POINT,
-    KERNEL_ENTRY_POINT, POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS,
-    POOL_CHECKER_JUDGED_FIRST_WORD, POOL_CHECKER_JUDGED_WORDS, POOL_CHECKER_REACHED_WORD,
-    POOL_CHECKER_UNDECIDABLE_WORD, POOL_CHECKER_VIOLATED_BIT_CAPACITY,
-    POOL_CHECKER_VIOLATED_FIRST_WORD, POOL_CHECKER_VIOLATED_WORDS, SCAN_REBUILD_OUTCOMES,
-    SCAN_REBUILD_OUTCOME_WORD, VERDICT_WORDS,
+    self_verified_system_configuration_slots_of_each_device_of_the_gpu_verdict, verdict_bits,
+    CrossCheckWords, JudgeKernelSources, CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
+    CHECKER_SCAN_REBUILD_ENTRY_POINT, KERNEL_ENTRY_POINT,
+    POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS, POOL_CHECKER_JUDGED_FIRST_WORD,
+    POOL_CHECKER_JUDGED_WORDS, POOL_CHECKER_REACHED_WORD, POOL_CHECKER_UNDECIDABLE_WORD,
+    POOL_CHECKER_VIOLATED_BIT_CAPACITY, POOL_CHECKER_VIOLATED_FIRST_WORD,
+    POOL_CHECKER_VIOLATED_WORDS, SCAN_REBUILD_OUTCOMES, SCAN_REBUILD_OUTCOME_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables, build_judge_tables_against_the_version_table, JudgeFlow, JudgeLocationKind,
@@ -197,6 +213,7 @@ use singlefs_checker_tier::crash_library::{
     judge_tables_through_the_pairing_library, pairing_conclusion_reused_or_judged,
     toolchain_of_this_process, CrashLibrary, CrashLibraryClass, StageOutcome,
 };
+use singlefs_checker_tier::crash_point_replay_provenance::DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage;
 use singlefs_checker_tier::crash_state_enumeration::{
     sample_crash_states_on_the_cpu,
     sample_crash_states_on_the_cpu_with_threads_against_the_version_table, CrashPointReplayItem,
@@ -252,7 +269,7 @@ use singlefs_harness::history::{
     SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
 };
 use singlefs_harness::memory_pool::{
-    writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
+    writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, PublishedVersion,
     PublishedVersionWithoutAFile, RetainedWrite, WrittenContents,
 };
 use singlefs_harness::numeric_environment_variable::{
@@ -910,7 +927,7 @@ fn reseal_journal_record(bytes: &mut [u8]) {
     bytes[46..78].copy_from_slice(&digest);
 }
 
-/// 下一条记录该带的反向链：这一条 487 字节头、校验和字段按 0 参与的 CRC-32C。
+/// 下一条记录该带的反向链：这一条 496 字节头、校验和字段按 0 参与的 CRC-32C。
 fn journal_chain_value(bytes: &[u8]) -> u32 {
     let mut header = bytes[..JOURNAL_RECORD_HEADER_BYTES].to_vec();
     header[46..78].fill(0);
@@ -1390,8 +1407,8 @@ const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: usize = 99;
 const ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET: usize = 170;
 /// 码 2 / 码 3 指针头里出生树的偏移。
 const POINTER_BIRTH_TREE_OFFSET: usize = 34;
-/// journal 记录头 487 字节（D23（journal 的角色与格式） 已定项 4），点名项从这里起、每项 56 字节（诞生代号在点名项偏移 37）。
-const JOURNAL_RECORD_HEADER_BYTES: usize = 487;
+/// journal 记录头 496 字节（D23（journal 的角色与格式） 已定项 4），点名项从这里起、每项 56 字节（诞生代号在点名项偏移 37）。
+const JOURNAL_RECORD_HEADER_BYTES: usize = 496;
 /// 点名项宽（D23（journal 的角色与格式） 已定项 17）。
 const JOURNAL_NAMED_ENTRY_BYTES_IN_THE_RECORD: usize = 56;
 
@@ -2336,7 +2353,7 @@ fn root_reported_by_the_recovery(outcome: &RecoveryOutcome) -> Option<(u32, u64)
     }
 }
 
-/// 恢复字（[`recovery_words_of`]）第 2、3 字的结局类别：没有文件、读出、失败。
+/// 恢复摘要（[`recovery_words_of`]）里两遍的结局码：没有文件、读出、失败。
 const RECOVERY_WORD_CLASS_NO_FILE: u32 = 0;
 const RECOVERY_WORD_CLASS_FILE_READ: u32 = 1;
 const RECOVERY_WORD_CLASS_FAILED: u32 = 2;
@@ -2434,9 +2451,9 @@ struct Comparison {
     /// CPU 看 journal 那一遍在每个状态上报的根（`RecoveryOutcome` 里的那一条，(实例代号, checkpoint_txg)；退回见证到的那一版时是退到的那一版，
     /// 择不到根时 `None`），按状态序号：要钉「落到哪一版、所选根是谁」的用例读它。
     cpu_consulted_reported_root_of_each_state: Vec<Option<(u32, u64)>>,
-    /// CPU 在每个状态上的恢复字（[`recovery_words_of`]：看 journal 那一遍实际走的那条根的实例与 txg 低 32 位、两遍的结局类别 0 没有文件 / 1 读出 / 2 失败），
-    /// 按状态序号。
-    cpu_recovery_words_of_each_state: Vec<[u32; 4]>,
+    /// CPU 在每个状态上的恢复摘要（[`recovery_words_of`]：看 journal 那一遍实际走的那条根的标记、实例代号、checkpoint_txg 低 32 位与高 32 位，
+    /// 两遍的结局码 0 没有文件 / 1 读出 / 2 失败），按状态序号。
+    cpu_recovery_words_of_each_state: Vec<RecoveryRootAndOutcomesOfState>,
     /// 看 journal 那一遍落到的根或两遍的结局类别与 CPU 不同的状态数（算进不一致）。
     recovery_mismatches: u64,
     /// 对拍字（`CrossCheckWords`：红项、两遍各自落到的根、结局、失败点、池级 checker 判到位、判不了）与 CPU 不同的状态数；
@@ -2517,8 +2534,8 @@ impl Comparison {
             }
         }
         put_length(&mut bytes, self.cpu_recovery_words_of_each_state.len());
-        for words in &self.cpu_recovery_words_of_each_state {
-            for word in words {
+        for summary in &self.cpu_recovery_words_of_each_state {
+            for word in summary.words() {
                 bytes.extend_from_slice(&word.to_le_bytes());
             }
         }
@@ -2604,8 +2621,14 @@ impl Comparison {
             })
             .collect::<Option<Vec<Option<(u32, u64)>>>>()?;
         let cpu_recovery_words_of_each_state = (0..reader.length()?)
-            .map(|_| Some([reader.u32()?, reader.u32()?, reader.u32()?, reader.u32()?]))
-            .collect::<Option<Vec<[u32; 4]>>>()?;
+            .map(|_| {
+                let mut words = [0u32; RECOVERY_ROOT_AND_OUTCOMES_WORDS];
+                for word in &mut words {
+                    *word = reader.u32()?;
+                }
+                Some(RecoveryRootAndOutcomesOfState::of_the_words(words))
+            })
+            .collect::<Option<Vec<RecoveryRootAndOutcomesOfState>>>()?;
         if !reader.rest.is_empty() {
             return None;
         }
@@ -2858,14 +2881,14 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
     }
 }
 
-/// CPU 判器每个状态交回的那几样（红位、池级 checker 违例位、红项、恢复报告、恢复字、判过而成立的位、看 journal 那一遍报的根、对拍字、
+/// CPU 判器每个状态交回的那几样（红位、池级 checker 违例位、红项、恢复报告、恢复摘要、判过而成立的位、看 journal 那一遍报的根、对拍字、
 /// 对拍比的那几条红项），按状态序号排好交给 [`compare_the_judgements_state_by_state`]。
 type JudgedOnCpu = (
     u32,
     u128,
     String,
     String,
-    [u32; 4],
+    RecoveryRootAndOutcomesOfState,
     u128,
     Option<(u32, u64)>,
     CrossCheckWords,
@@ -3525,6 +3548,215 @@ fn verdicts_are_the_same_whether_one_dispatch_spans_one_scratch_lane_or_several(
     assert_eq!(narrow.len(), wide.len());
 }
 
+/// 编判器内核一套一套地编的变量：写 `1` 时一套编完才编下一套（驱动编大内核吃几 GiB 主机内存，内存紧的机器写它）。
+/// 与 `crash_judge_dispatch` 里 `compile_the_judge_kernels` 读的是同一个变量、同一种认法（那边一套里的五条也一条一条编）。
+const GPU_KERNELS_ONE_AT_A_TIME_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME";
+
+/// 按片判的单位跑得超过它的，每过它一次每片至少打一行进度（`.claude/rules/test-script-discipline.md`「编译与算法都要快」；
+/// 与崩溃注入读故障用例同一个间隔：5 分钟）。
+const PROGRESS_INTERVAL_OF_THE_SLICES: Duration = Duration::from_secs(5 * 60);
+
+/// 几套内核源码各建判器、判同一条流时起几个工作线程：编内核一套一套编的变量（值 `one_at_a_time_value`，`None` 是没设）写了 `1`
+/// 只起 1 个（几套一起冷编，主机内存跟着翻倍）；否则取 CPU 判器线程数（[`cpu_threads_from_the_value_of_the_variable`]）与套数里小的那个，
+/// 至少 1。认法同 `compile_the_judge_kernels`：只有恰好 `1` 算写了，别的值照没写。
+fn worker_threads_for_the_kernel_source_sets(
+    cpu_threads: std::num::NonZeroUsize,
+    one_at_a_time_value: Option<&str>,
+    kernel_source_sets: usize,
+) -> usize {
+    match one_at_a_time_value {
+        Some("1") => 1,
+        Some(_) | None => cpu_threads.get().min(kernel_source_sets).max(1),
+    }
+}
+
+/// 起几个工作线程：CPU 判器线程数照它自己的变量取（没设取每台默认重活线程数）、取到 3 条，两套源码起 2 个；
+/// 编内核一套一套编的变量写了 `1` 时只起 1 个；CPU 判器线程数取到 1 条时也只起 1 个；那个变量写了别的值照没写。不用卡。
+/// 判别力：`crates/mutations.tsv` 里「GPU 对拍 种违例位那条用例不认一套一套编的变量」一行让这一条红。
+#[test]
+fn kernel_source_sets_take_as_many_worker_threads_as_the_cpu_judge_threads_allow_and_one_when_compiled_one_at_a_time(
+) {
+    let three = std::num::NonZeroUsize::new(3).expect("3 不是 0");
+    let one = std::num::NonZeroUsize::new(1).expect("1 不是 0");
+    assert_eq!(
+        worker_threads_for_the_kernel_source_sets(three, None, 2),
+        2,
+        "CPU 判器线程数 3、两套源码：起 2 个"
+    );
+    assert_eq!(
+        worker_threads_for_the_kernel_source_sets(three, Some("1"), 2),
+        1,
+        "编内核一套一套编的变量写了 1：只起 1 个"
+    );
+    assert_eq!(
+        worker_threads_for_the_kernel_source_sets(one, None, 2),
+        1,
+        "CPU 判器线程数 1：只起 1 个"
+    );
+    assert_eq!(
+        worker_threads_for_the_kernel_source_sets(three, Some("0"), 2),
+        2,
+        "那个变量写了 1 之外的值照没写"
+    );
+}
+
+/// 把 `units` 切成首尾相接的片（`crash_injection::seed_slices`：片数取 min(单位数, 4 × 线程数)，各片长度相差至多 1），起
+/// min(`worker_threads`, 片数) 个工作线程（`worker_threads` 是 0 时照 1 算）按片号从小到大领片、每片各自判自己那几个单位
+/// （同崩溃注入读故障用例的切法）。调用线程收到一片打一行（`line_prefix`_SLICE_FINISHED），每过 [`PROGRESS_INTERVAL_OF_THE_SLICES`]
+/// 给每片各打一行（`line_prefix`_PROGRESS：等着 / 在判 / 判完），全部收回之后按片号放回单位的次序：交回与 `units` 逐个对应，
+/// 与线程数、调度次序无关。
+///
+/// # Panics
+/// 某个工作线程 panic：原样往外抛（卡上的断言、判器 panic 的原话不换成「工作线程 panic」）；有一片没交回。
+fn outcomes_of_units_judged_in_slices_on_worker_threads<Unit: Sync, Outcome: Send>(
+    line_prefix: &str,
+    units: &[Unit],
+    worker_threads: usize,
+    judge_a_unit: &(dyn Fn(&Unit) -> Outcome + Sync),
+) -> Vec<Outcome> {
+    let unit_count = u64::try_from(units.len()).expect("单位数装得进 u64");
+    let slices: Vec<std::ops::Range<usize>> = seed_slices(unit_count, worker_threads.max(1))
+        .into_iter()
+        .map(|slice| {
+            usize::try_from(slice.start).expect("片首不超过单位数，装得进 usize")
+                ..usize::try_from(slice.end).expect("片尾不超过单位数，装得进 usize")
+        })
+        .collect();
+    let spawned_worker_threads = worker_threads.max(1).min(slices.len());
+    let slice_is_claimed: Vec<AtomicBool> = slices.iter().map(|_| AtomicBool::new(false)).collect();
+    let next_slice_index = AtomicUsize::new(0);
+    let started = Instant::now();
+    let finished_slices: BTreeMap<usize, Vec<Outcome>> = std::thread::scope(|scope| {
+        let (sender, receiver) = mpsc::channel::<(usize, Vec<Outcome>)>();
+        let worker_handles: Vec<std::thread::ScopedJoinHandle<'_, ()>> = (0
+            ..spawned_worker_threads)
+            .map(|_| {
+                let sender = sender.clone();
+                let slices = &slices;
+                let slice_is_claimed = &slice_is_claimed;
+                let next_slice_index = &next_slice_index;
+                scope.spawn(move || loop {
+                    let slice_index = next_slice_index.fetch_add(1, Ordering::Relaxed);
+                    let Some(slice) = slices.get(slice_index) else {
+                        break;
+                    };
+                    slice_is_claimed[slice_index].store(true, Ordering::Relaxed);
+                    let outcomes: Vec<Outcome> =
+                        units[slice.clone()].iter().map(judge_a_unit).collect();
+                    if sender.send((slice_index, outcomes)).is_err() {
+                        break;
+                    }
+                })
+            })
+            .collect();
+        drop(sender);
+        let mut finished_slices: BTreeMap<usize, Vec<Outcome>> = BTreeMap::new();
+        let mut next_progress_report = started + PROGRESS_INTERVAL_OF_THE_SLICES;
+        // 迭代上界：每片收一次，加每个进度间隔醒一次；工作线程都退了（发送端全丢了，panic 的也算）就停
+        loop {
+            match receiver
+                .recv_timeout(next_progress_report.saturating_duration_since(Instant::now()))
+            {
+                Ok((slice_index, outcomes)) => {
+                    let slice = &slices[slice_index];
+                    println!(
+                        "{line_prefix}_SLICE_FINISHED slice={}/{} units=[{},{}) finished_slices={}/{} elapsed_seconds={:.1}",
+                        slice_index + 1,
+                        slices.len(),
+                        slice.start,
+                        slice.end,
+                        finished_slices.len() + 1,
+                        slices.len(),
+                        started.elapsed().as_secs_f64()
+                    );
+                    finished_slices.insert(slice_index, outcomes);
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            if Instant::now() >= next_progress_report {
+                for (slice_index, slice) in slices.iter().enumerate() {
+                    let state = if finished_slices.contains_key(&slice_index) {
+                        "finished"
+                    } else if slice_is_claimed[slice_index].load(Ordering::Relaxed) {
+                        "running"
+                    } else {
+                        "waiting"
+                    };
+                    println!(
+                        "{line_prefix}_PROGRESS slice={}/{} units=[{},{}) state={state} elapsed_seconds={:.1}",
+                        slice_index + 1,
+                        slices.len(),
+                        slice.start,
+                        slice.end,
+                        started.elapsed().as_secs_f64()
+                    );
+                }
+                next_progress_report = Instant::now() + PROGRESS_INTERVAL_OF_THE_SLICES;
+            }
+        }
+        for worker_handle in worker_handles {
+            if let Err(panic) = worker_handle.join() {
+                std::panic::resume_unwind(panic);
+            }
+        }
+        finished_slices
+    });
+    assert_eq!(
+        finished_slices.len(),
+        slices.len(),
+        "每一片都交回了：少了说明有工作线程领了片却没交回"
+    );
+    println!(
+        "{line_prefix}_FINISHED units={} slices={} worker_threads={spawned_worker_threads} configured_worker_threads={worker_threads} elapsed_seconds={:.1}",
+        units.len(),
+        slices.len(),
+        started.elapsed().as_secs_f64()
+    );
+    let mut outcomes_in_unit_order: Vec<Outcome> = Vec::with_capacity(units.len());
+    for (slice_index, outcomes_of_the_slice) in finished_slices {
+        assert_eq!(
+            outcomes_of_the_slice.len(),
+            slices[slice_index].len(),
+            "片 {slice_index} 交回的结论与它的单位逐个对应"
+        );
+        outcomes_in_unit_order.extend(outcomes_of_the_slice);
+    }
+    outcomes_in_unit_order
+}
+
+/// 多线程与单线程的对拍（同切法、小输入，不用卡）：7 个单位，单线程那一趟 1 个工作线程切 4 片、多线程那一趟 3 个工作线程每个单位一片，
+/// 两趟的切法不同；每个单位的结论由单位自己定（单位号与它的平方），两趟交回逐个相同、都按单位次序。
+/// 判别力：`crates/mutations.tsv` 里「GPU 对拍 按片判合并时漏掉片号最大的那一片」「GPU 对拍 按片判每片只判头一个单位」两行各让这一条红。
+#[test]
+fn units_judged_in_slices_on_several_worker_threads_and_on_one_come_back_identical_and_in_unit_order(
+) {
+    const UNIT_COUNT: u64 = 7;
+    let units: Vec<u64> = (0..UNIT_COUNT).collect();
+    let judge_a_unit = |unit: &u64| (*unit, unit * unit);
+    let on_one_worker_thread = outcomes_of_units_judged_in_slices_on_worker_threads(
+        "CRASH_JUDGE_SLICES_COMPARISON_ON_ONE_WORKER_THREAD",
+        &units,
+        1,
+        &judge_a_unit,
+    );
+    let on_several_worker_threads = outcomes_of_units_judged_in_slices_on_worker_threads(
+        "CRASH_JUDGE_SLICES_COMPARISON_ON_SEVERAL_WORKER_THREADS",
+        &units,
+        3,
+        &judge_a_unit,
+    );
+    let expected: Vec<(u64, u64)> = units.iter().map(judge_a_unit).collect();
+    assert_eq!(
+        on_one_worker_thread, expected,
+        "单线程那一趟每个单位一条结论、按单位次序"
+    );
+    assert_eq!(
+        on_several_worker_threads, on_one_worker_thread,
+        "多线程与单线程逐个相同"
+    );
+}
+
 /// 扫描内核源码里入口 `entry_point` 那个函数体里头一处 `anchor` 之后插一行 `violate(bit);`，交回插过的源码。
 ///
 /// # Panics
@@ -3670,23 +3902,46 @@ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both
         return;
     };
     let card = lease.card();
-    let Some((unplanted, planted)) = on_the_card_or_report_not_run_when_out_of_memory(
-        "a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels",
-        card,
-        "建没种与种过的两个判器与判这条流",
-        || {
-            let unplanted = GpuCrashJudge::on_card_with_packed_tables(card, &packed, usize::MAX)
-                .judge_states(0..state_count);
-            let planted = GpuCrashJudge::on_card_compiling_these_kernel_sources(
+    // 两套源码各建一个判器、判这条流，按区间切片分给工作线程：冷编一套要几分钟（驱动编一个内核是单线程的），两套的编叠在一起；
+    // 判器在哪条线程上建就在哪条线程上接 Out of Memory（wgpu 的错误范围按线程分），合并按片号放回「没种、种过」的次序
+    let kernel_source_sets = [
+        ("建没种的判器、判这条流", &judge_sources),
+        ("建种过的判器、判这条流", &planted_sources),
+    ];
+    let worker_threads = worker_threads_for_the_kernel_source_sets(
+        cpu_threads_from_the_value_of_the_variable(
+            process_environment_variable(CPU_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
+            process_environment_variable(THREAD_CAP_ENVIRONMENT_VARIABLE).as_deref(),
+        ),
+        process_environment_variable(GPU_KERNELS_ONE_AT_A_TIME_ENVIRONMENT_VARIABLE).as_deref(),
+        kernel_source_sets.len(),
+    );
+    let judged_by_each_kernel_source_set = outcomes_of_units_judged_in_slices_on_worker_threads(
+        "CRASH_JUDGE_PLANTED_BIT_KERNEL_SOURCE_SETS",
+        &kernel_source_sets,
+        worker_threads,
+        &|(what_ran, kernel_sources): &(&str, &JudgeKernelSources)| {
+            on_the_card_or_report_not_run_when_out_of_memory(
+                "a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels",
                 card,
-                &packed,
-                usize::MAX,
-                &planted_sources,
+                what_ran,
+                || {
+                    GpuCrashJudge::on_card_compiling_these_kernel_sources(
+                        card,
+                        &packed,
+                        usize::MAX,
+                        kernel_sources,
+                    )
+                    .judge_states(0..state_count)
+                },
             )
-            .judge_states(0..state_count);
-            (unplanted, planted)
         },
-    ) else {
+    );
+    let [Some(unplanted), Some(planted)]: [Option<Vec<[u32; VERDICT_WORDS]>>; 2] =
+        judged_by_each_kernel_source_set
+            .try_into()
+            .expect("两套源码各交回一份结论")
+    else {
         return;
     };
     assert_eq!(unplanted.len(), planted.len());
@@ -3758,16 +4013,19 @@ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both
 }
 
 /// 卡领块的时候被叫停：不再领新的块，已经领的判完写进库（块序连着）；下一趟只判剩下的，对账为空。
-/// 配置开了 GPU、判器却建不出这条流的表（这里把一次写换成同样长的清零，判器的表不接清零写）：报错，
+/// 配置开了 GPU、判器却建不出这条流的表（这里把流里第一次单元写往后挪一个扇区：单元区的落点按 16 KiB 槽起，挪过的写起点不在
+/// 任何落点上，判器的表不接，`JudgeTablesRefusal::WriteNotAlignedToALocation`；清零写判表已收（批 13），拿它造不出建不出）：报错，
 /// 不退回 CPU 判器，库里一块判定都不写（用户 2026-09-29 定：配了 GPU 就一定要 GPU 判，做不到就明确报错）。建表在上卡之前，不用卡。
+/// 判别力：`crates/mutations.tsv` 里「B16 GPU 判表把起点不在落点上的单元写当成不占落点」与「崩溃放量 建不出表时悄悄交回空结果」两行各让这一条红。
 #[test]
 fn a_flow_whose_judge_tables_cannot_be_built_is_refused_and_not_judged_on_the_cpu() {
     let recorded = record_fixed_script_through_rollback("crash-judge-gpu-refused");
     let mut writes = recorded.writes.clone();
-    let moved = *recorded.segments[0].first().expect("段里至少一次写");
-    let length = writes[moved].length_in_bytes();
-    writes[moved].contents = WrittenContents::Zeros { length };
-    writes[moved].kind = StepKind::ZeroFill;
+    let moved = writes
+        .iter()
+        .position(|write| write.kind == StepKind::UnitWrite)
+        .expect("流里至少一次单元写");
+    writes[moved].offset.0 += 512;
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= 8 {
             CrashPointReplaySegmentExpansion::EveryProperSubset
@@ -3818,6 +4076,10 @@ fn a_flow_whose_judge_tables_cannot_be_built_is_refused_and_not_judged_on_the_cp
     assert!(
         error.contains("建不出这条流的表"),
         "报错说清是表建不出：{error}"
+    );
+    assert!(
+        error.contains("WriteNotAlignedToALocation"),
+        "建不出表是因为挪过的单元写起点不在落点上：{error}"
     );
     assert_eq!(
         unjudged_blocks(&store, &version).expect("对得了账").len(),
@@ -4463,12 +4725,16 @@ fn the_gpu_judge_agrees_with_the_cpu_when_an_uncommitted_transaction_is_followed
     );
 }
 
-/// I-8.10 只比带末条标志恰一条的组：三个数据单元那条流上，顺序写那次发布（实例 1、txg 4，三条记录）两块盘各一份的第一条记录也带上末条标志、
-/// 最后一条记录新根段里的树 ID 水位加 1，都重封、同实例后面的记录重链。那次发布带末条标志的有两条：CPU 池级 checker 红 I-8.9（多于一条末条），
-/// I-8.10 不比这一组（walk.rs `judge_new_root_segment_of_the_last_record_against_the_roots`：末条标志不唯一的组归 I-8.9）。
+/// I-8.10 记录与根那一半只比带末条标志恰一条的组：三个数据单元那条流上，顺序写那次发布（实例 1、txg 4，三条记录）两块盘各一份的第一条记录也带上末条标志、
+/// 三条记录新根段里的树 ID 水位都加 1，都重封、同实例后面的记录重链。那次发布带末条标志的有两条：CPU 池级 checker 红 I-8.9（多于一条末条），
+/// I-8.10 记录与根那一半不比这一组（walk.rs `judge_new_root_segment_of_the_last_record_against_the_roots`：末条标志不唯一的组归 I-8.9）。
+/// 三条记录一起改水位是因为 I-8.10 往非末条扩的那一半（C738（同一次发布几条记录的新根段一致没有不变量判））不给末条标志不唯一的组让路：
+/// 条文写「同（实例代号, `checkpoint_txg`）的每条记录（一次发布写出的全部记录，带不带末条标志都算），新根段整段逐字节相同」，
+/// 只改末条的水位时组内三条不相同，那一半在 CPU 与 GPU 两侧都红 I-8.10，「至少一条就比」的变异就分不出来了；三条一起改，组内照旧相同、那一半不红，
+/// 红不红只看记录与根那一半比不比。
 /// 走读内核按 (实例, checkpoint_txg) 排好次序之后数一遍这一组带末条标志的，恰一条才比（`crash_judge_checker.wgsl`
 /// `judge_new_root_segment_of_the_last_record_against_the_roots_of_device`）：放成「至少一条就比」时，它拿段里最后那条带标志的
-/// （水位加了 1 的末条）去比 (1, 4) 的根，三条记录与那条根都落了的状态上 GPU 红 I-8.10 而 CPU 不红，对拍字不同。
+/// （水位加了 1）去比 (1, 4) 的根，三条记录与那条根都落了的状态上 GPU 红 I-8.10 而 CPU 不红，对拍字不同。
 fn record_three_unit_file_whose_three_record_publish_carries_two_last_record_flags(
     tag: &str,
 ) -> RecordedFlow {
@@ -4514,24 +4780,22 @@ fn record_three_unit_file_whose_three_record_publish_carries_two_last_record_fla
         );
     }
     for (index, counter) in records {
-        if counter == first_counter {
-            rewrite_journal_record_and_reseal(&mut flow, index, &|bytes| {
+        rewrite_journal_record_and_reseal(&mut flow, index, &|bytes| {
+            if counter == first_counter {
                 bytes[JOURNAL_RECORD_FLAGS_OFFSET] |=
                     JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH;
-            });
-        } else if counter == last_counter {
-            rewrite_journal_record_and_reseal(&mut flow, index, &|bytes| {
-                let watermark =
-                    JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK;
-                bytes[watermark] = bytes[watermark].wrapping_add(1);
-            });
-        }
+            }
+            let watermark =
+                JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK;
+            bytes[watermark] = bytes[watermark].wrapping_add(1);
+        });
     }
     flow
 }
 
 /// I-8.10 末条标志不唯一的组不比：[`record_three_unit_file_whose_three_record_publish_carries_two_last_record_flags`]。CPU 一侧先钉流造对了：
-/// 整条落盘的镜像上 I-8.9 红在「多于一条末条」、I-8.10 不红（水位加了 1 的末条所在那一组不比）；再整份比，GPU 逐状态与 CPU 相同。
+/// 整条落盘的镜像上 I-8.9 红在「多于一条末条」、I-8.10 不红（三条记录新根段相同，往非末条扩的那一半成立；水位加了 1 的这一组带两条末条标志，
+/// 记录与根那一半不比）；再整份比，GPU 逐状态与 CPU 相同。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_with_two_last_record_flags_is_not_compared_with_its_root(
 ) {
@@ -6400,7 +6664,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_and_logged_operations_entr
     );
 }
 
-// ───────────── 第 26 批 26-5：I-9.16 ③ ④、根槽 428..457、带树一版的分配记录树根、码 2 节点指针头部的 extent 偏移 ─────────────
+// ───────────── 第 26 批 26-5：I-9.16 ③ ④、根槽 437..466、带树一版的分配记录树根、码 2 节点指针头部的 extent 偏移 ─────────────
 
 /// 树表条目里种类那 2 字节的偏移（D8（核心索引结构） 已定项 8 的字段表：树 ID 8、条目长度 2 之后）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
@@ -6418,8 +6682,8 @@ const TREE_KIND_ALLOCATION_RECORD: u16 = 3;
 const ROOT_RECORD_TREE_TABLE_POINTER_FIRST_LOCATION_OFFSET: usize = 86;
 /// 根记录里「树表 0 条那一版的分配记录树根」指针的偏移（D22（单元原子性怎么合成） 已定项 7 的字段表）。
 const ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT_OFFSET: usize = 342;
-/// 根记录里算法类型 1 + nonce 12 + MAC 16 那 29 字节的最后一个字节（428..457 的末字节）。
-const ROOT_RECORD_LAST_MAC_BYTE_OFFSET: usize = 456;
+/// 根记录里算法类型 1 + nonce 12 + MAC 16 那 29 字节的最后一个字节（437..466 的末字节）。
+const ROOT_RECORD_LAST_MAC_BYTE_OFFSET: usize = 465;
 
 /// 发布那张树表里种类是 `from_kind` 的那条（恰好一条、根指针全零）的种类改成 `to_kind`、重封到根。树 ID 与条目次序不动。
 fn record_new_pool_with_a_tree_table_entry_kind_rewritten(
@@ -6452,6 +6716,144 @@ fn record_new_pool_with_two_tree_table_entries_of_the_sparse_side_table_kind(
         TREE_KIND_DEADLIST,
         TREE_KIND_SPARSE_SIDE_TABLE,
     )
+}
+
+/// 树表非空时进树表的种类数（I-9.16 ④ 那一串：extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist、`deleted_inodes`、墓碑树、谱系树、
+/// logged_ops、退役树），新池新建文件那一版的树表就是这十二种各一条。
+const TREE_KINDS_OF_EVERY_NON_EMPTY_TREE_TABLE: usize = 12;
+/// 根记录里树 ID 水位那 8 字节的偏移：树表指针（36 起、86 字节）之后（`singlefs_core::root_record` 的 `to_slot` 的字段次序）。
+const ROOT_RECORD_TREE_IDENTIFIER_WATERMARK_OFFSET: usize = 122;
+/// journal 记录新根段里树 ID 水位那 8 字节的偏移：新根段起点之后的树表指针、映射根指针各 86 字节之后。
+const JOURNAL_NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK_OFFSET: usize =
+    JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 2 * NODE_POINTER_BYTES;
+/// 码 2 节点头里 key 区间上界的偏移（D18（块里携带什么信息） 已定项 18 的偏移表「52 key 区间 2k」：下界在 52、上界在 52 + key 宽），
+/// 树表的 key 是树 ID、key 宽 8。
+const TREE_TABLE_UNIT_LARGEST_KEY_OFFSET: usize = 52 + 8;
+
+/// I-9.16 ③ 单独不成立的那一形（C675）：发布那张树表十二种各一条，末尾再接一条种类 7（稀疏旁表）——照抄种类 7 那一条
+/// （根指针全零、头 ID 0、诞生 txg 照旧），只把树 ID 换成下一个可用号（第一次发布之后的水位 65549）；条目数加 1、头里 key 区间的上界跟到 65549、
+/// 单元重封到根。① 盘上次序与 ② 发号次序照旧成立（② 按每种第一次出现的那条），④ 十二种都在，只剩 ③ 种类 7 两条。
+/// 点 ③ 的另两条流（[`record_new_pool_with_two_tree_table_entries_of_the_sparse_side_table_kind`] 与
+/// [`record_new_pool_with_two_tree_table_entries_of_a_kind_not_below_thirty_two`]）重复一种的同时都少了一种，④ 也红。
+/// 发布那条根与它那几份 journal 记录新根段里的树 ID 水位一起从 65549 抬到 65550、重封：不抬的话新那条的树 ID 不低于水位，
+/// I-7.8 跟着红；两处一起抬，I-8.10（记录新根段与同代根相同）照旧成立。
+/// core 的只读恢复在读任何一棵树之前拒（`tree_table_entries_each_kind_at_most_once`），GPU 恢复内核种类重复那一支同样拒。
+fn record_new_pool_with_every_tree_kind_and_one_more_entry_of_the_sparse_side_table_kind(
+    tag: &str,
+) -> RecordedFlow {
+    let first_entry_offset =
+        usize::try_from(singlefs_format::TREE_TABLE_UNIT_INDEX_NODE_HEADER_BYTES).expect("131");
+    let entry_bytes = usize::try_from(singlefs_format::TREE_TABLE_ENTRY_BYTES).expect("200");
+    let appended_tree_identifier = singlefs_format::TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH;
+    let raised_watermark = appended_tree_identifier + 1;
+    fn read_u64_at(bytes: &[u8], offset: usize) -> u64 {
+        u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8"))
+    }
+    let mut flow = record_new_pool_with_a_resealed_field(
+        tag,
+        "new-pool-tree-table-every-kind-and-one-more-sparse-side-table-entry",
+        &is_a_tree_table_unit,
+        false,
+        &|bytes| {
+            let entry_count = tree_table_entry_count(bytes);
+            let kinds: std::collections::BTreeSet<u16> = (0..entry_count)
+                .map(|entry| {
+                    let kind =
+                        first_entry_offset + entry * entry_bytes + TREE_TABLE_ENTRY_KIND_OFFSET;
+                    u16::from_le_bytes(bytes[kind..kind + 2].try_into().expect("2"))
+                })
+                .collect();
+            assert_eq!(
+                (entry_count, kinds.len()),
+                (
+                    TREE_KINDS_OF_EVERY_NON_EMPTY_TREE_TABLE,
+                    TREE_KINDS_OF_EVERY_NON_EMPTY_TREE_TABLE
+                ),
+                "发布那张树表是十二种各一条（种类 {kinds:?}）"
+            );
+            let last_entry = first_entry_offset + (entry_count - 1) * entry_bytes;
+            assert_eq!(
+                read_u64_at(bytes, last_entry),
+                appended_tree_identifier - 1,
+                "最后一条是发号次序上最后发的那棵树（退役树），树 ID 比第一次发布之后的水位小 1"
+            );
+            assert_eq!(
+                read_u64_at(bytes, TREE_TABLE_UNIT_LARGEST_KEY_OFFSET),
+                appended_tree_identifier - 1,
+                "树表头里 key 区间的上界是最后一条的树 ID"
+            );
+            let appended_entry = last_entry + entry_bytes;
+            assert!(
+                bytes[appended_entry..appended_entry + entry_bytes]
+                    .iter()
+                    .all(|byte| *byte == 0),
+                "最后一条之后那 200 字节还空着"
+            );
+            let sparse_side_table_entry =
+                only_tree_table_entry_of_kind(bytes, TREE_KIND_SPARSE_SIDE_TABLE);
+            let root_pointer = sparse_side_table_entry + TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET;
+            assert_eq!(
+                bytes[root_pointer..root_pointer + NODE_POINTER_BYTES],
+                [0u8; NODE_POINTER_BYTES],
+                "种类 {TREE_KIND_SPARSE_SIDE_TABLE} 那条的根指针本来全零（这棵树第一版不建根，走读与恢复都不读它）"
+            );
+            let copied_entry =
+                bytes[sparse_side_table_entry..sparse_side_table_entry + entry_bytes].to_vec();
+            bytes[appended_entry..appended_entry + entry_bytes].copy_from_slice(&copied_entry);
+            bytes[appended_entry..appended_entry + 8]
+                .copy_from_slice(&appended_tree_identifier.to_le_bytes());
+            bytes[TREE_TABLE_UNIT_LARGEST_KEY_OFFSET..TREE_TABLE_UNIT_LARGEST_KEY_OFFSET + 8]
+                .copy_from_slice(&appended_tree_identifier.to_le_bytes());
+            let entry_count_offset = 86 + 2 * usize::from(index_node_key_width(bytes)) - 4;
+            bytes[entry_count_offset..entry_count_offset + 2].copy_from_slice(
+                &u16::try_from(entry_count + 1)
+                    .expect("十三条装得进 2 字节")
+                    .to_le_bytes(),
+            );
+        },
+    );
+    let (publish_instance, publish_checkpoint_txg) = publish_root_identity(&flow);
+    let publish_roots: Vec<usize> = flow
+        .writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| {
+            write.kind == StepKind::RootRecordFua
+                && write.bytes().is_some_and(|bytes| {
+                    u32::from_le_bytes(bytes[24..28].try_into().expect("4")) == publish_instance
+                        && u64::from_le_bytes(bytes[28..36].try_into().expect("8"))
+                            == publish_checkpoint_txg
+                })
+        })
+        .map(|(index, _)| index)
+        .collect();
+    assert!(
+        !publish_roots.is_empty(),
+        "流 {} 里有发布那条根（实例 {publish_instance}、txg {publish_checkpoint_txg}）的根槽写",
+        flow.name
+    );
+    let raise_the_watermark_at = |offset: usize| {
+        move |bytes: &mut [u8]| {
+            assert_eq!(
+                read_u64_at(bytes, offset),
+                appended_tree_identifier,
+                "发布那一版的树 ID 水位是第一次发布之后的 65549"
+            );
+            bytes[offset..offset + 8].copy_from_slice(&raised_watermark.to_le_bytes());
+        }
+    };
+    for publish_root in publish_roots {
+        rewrite_root_record_and_reseal(
+            &mut flow,
+            publish_root,
+            &raise_the_watermark_at(ROOT_RECORD_TREE_IDENTIFIER_WATERMARK_OFFSET),
+        );
+    }
+    rewrite_every_journal_record_of_the_publish(
+        &mut flow,
+        &raise_the_watermark_at(JOURNAL_NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK_OFFSET),
+    );
+    flow
 }
 
 /// I-9.16 ④（树表非空时十一种各恰好一条）：deadlist 那条的种类改成没登记的码（[`UNREGISTERED_TREE_KIND`]）——没有一种重复，deadlist 一条都没有。
@@ -6492,7 +6894,7 @@ fn record_new_pool_with_no_tree_table_entry_of_the_allocation_record_kind(
     )
 }
 
-/// I-2.4 根记录那一处：发布的根记录里 MAC 末字节（偏移 456）写 1、重封根记录。core 不读这 29 字节（`root_record.rs` 的 `parse_slot` 跳过），
+/// I-2.4 根记录那一处：发布的根记录里 MAC 末字节（偏移 465）写 1、重封根记录。core 不读这 29 字节（`root_record.rs` 的 `parse_slot` 跳过），
 /// 两遍恢复照常；CPU 池级 checker 对根环里每条自证过的根判这 29 字节全 0，发布的根落了的状态上红 I-2.4。
 fn record_new_pool_with_a_non_zero_byte_in_the_root_record_mac(tag: &str) -> RecordedFlow {
     let mut flow = record_new_pool_file_creation(tag, "new-pool-root-record-mac-last-byte-one");
@@ -6507,18 +6909,102 @@ fn record_new_pool_with_a_non_zero_byte_in_the_root_record_mac(tag: &str) -> Rec
     flow
 }
 
-/// I-2.4 根槽尾（C728）：发布的根记录之后的头一个字节（偏移 457）写 1、重封根记录。core 不读这一段，两遍恢复照常；
-/// CPU 池级 checker 对根环里每条自证过的根判 [457, 槽宽) 全 0，发布的根落了的状态上红 I-2.4。
+/// I-2.4 根槽尾（C728）：发布的根记录之后的头一个字节（偏移 466）写 1、重封根记录。core 不读这一段，两遍恢复照常；
+/// CPU 池级 checker 对根环里每条自证过的根判 [466, 槽宽) 全 0，发布的根落了的状态上红 I-2.4。
 fn record_new_pool_with_a_non_zero_byte_past_the_root_record(tag: &str) -> RecordedFlow {
     let mut flow =
         record_new_pool_file_creation(tag, "new-pool-root-slot-byte-past-the-record-one");
     let publish_root = flow.judged_root_index;
-    let record_end = usize::try_from(singlefs_format::ROOT_RECORD_BYTES).expect("457");
+    let record_end = usize::try_from(singlefs_format::ROOT_RECORD_BYTES).expect("466");
     rewrite_root_record_and_reseal(&mut flow, publish_root, &|bytes| {
         assert!(bytes.len() > record_end, "根槽宽过根记录");
         assert_eq!(bytes[record_end], 0, "第一版根记录之后写 0");
         bytes[record_end] = 1;
     });
+    flow
+}
+
+/// 根记录里回收门槛 t 8 字节与钉槽 p 1 字节的偏移（C773；`crates/singlefs-core/src/root_record.rs` 的写者：分配记录树根指针 342..428 之后）。
+const ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET: usize = 428;
+const ROOT_RECORD_PINNED_RING_SLOT_OFFSET: usize = 436;
+/// journal 记录里同一对字段：新根段从 99 起，t 在段内 364、p 在段内 372（`crates/singlefs-core/src/journal.rs` 的写者）。
+const JOURNAL_RECORD_RECLAIM_THRESHOLD_OFFSET: usize = 99 + 364;
+const JOURNAL_RECORD_PINNED_RING_SLOT_OFFSET: usize = 99 + 372;
+
+/// 发布的根记录与它那次发布的每一份 journal 记录里的 t、p 一起改成给定的值、重封（I-8.10 照旧成立，只红 I-7.18 或 I-7.19）。
+fn rewrite_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_publish(
+    flow: &mut RecordedFlow,
+    reclaim_threshold: u64,
+    pinned_ring_slot: u8,
+) {
+    let publish_root = flow.judged_root_index;
+    rewrite_root_record_and_reseal(flow, publish_root, &|bytes| {
+        bytes[ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET..ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET + 8]
+            .copy_from_slice(&reclaim_threshold.to_le_bytes());
+        bytes[ROOT_RECORD_PINNED_RING_SLOT_OFFSET] = pinned_ring_slot;
+    });
+    rewrite_every_journal_record_of_the_publish(flow, &|bytes| {
+        bytes[JOURNAL_RECORD_RECLAIM_THRESHOLD_OFFSET..JOURNAL_RECORD_RECLAIM_THRESHOLD_OFFSET + 8]
+            .copy_from_slice(&reclaim_threshold.to_le_bytes());
+        bytes[JOURNAL_RECORD_PINNED_RING_SLOT_OFFSET] = pinned_ring_slot;
+    });
+}
+
+/// 发布的根记录里写着的 t 与 p。
+fn reclaim_threshold_and_pinned_ring_slot_of_the_publish(flow: &RecordedFlow) -> (u64, u8) {
+    let bytes = flow.writes[flow.judged_root_index]
+        .bytes()
+        .expect("根槽写带字节");
+    (
+        u64::from_le_bytes(
+            bytes[ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET..ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET + 8]
+                .try_into()
+                .expect("8"),
+        ),
+        bytes[ROOT_RECORD_PINNED_RING_SLOT_OFFSET],
+    )
+}
+
+/// I-7.18（C773）：新池新建文件那次发布的根与记录里 t 写成 1。那一刻 F = 0、环里最旧有效根是第 0 代（txg 0）、没有钉着的槽，
+/// 写者写 t = 0；CPU 池级 checker 现算 0，发布的根落了的状态上红 I-7.18。
+fn record_new_pool_with_a_reclaim_threshold_above_the_recomputed_one(tag: &str) -> RecordedFlow {
+    let mut flow =
+        record_new_pool_file_creation(tag, "new-pool-publish-root-reclaim-threshold-one");
+    assert_eq!(
+        reclaim_threshold_and_pinned_ring_slot_of_the_publish(&flow),
+        (0, 255),
+        "新池新建文件那次发布写 t = 0、p = 255（F = 0，第 0 代根还在环里，没有钉着的槽）"
+    );
+    rewrite_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_publish(&mut flow, 1, 255);
+    flow
+}
+
+/// I-7.19（C773）：新池新建文件那次发布的根与记录里 p 写成 1——还原出区域 1 槽 0，那一槽住着同一实例（1）写的暖机根（txg 1）。
+/// t 不动：钉值 1 不比环里最旧有效根（第 0 代，txg 0）小，现算照旧是 0，I-7.18 不红。
+fn record_new_pool_with_a_pinned_ring_slot_holding_a_root_of_the_same_instance(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_file_creation(
+        tag,
+        "new-pool-publish-root-pinned-on-a-root-of-the-same-instance",
+    );
+    rewrite_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_publish(&mut flow, 0, 1);
+    flow
+}
+
+/// I-7.18 连带 I-3.1 钉带出来的那一截（C773）：固定脚本到回退 D，那次发布的根与记录里 t 改掉（写者写的 t 大于 0 就写成 0，
+/// 那一截 (0, 不带钉现算的门槛] 里的已释放槽 CPU 不看引用并进遍历；是 0 就写成 1）。两遍都要 GPU 逐位跟上 CPU（I-3.1 判不判、红不红一并比）。
+fn record_rollback_with_the_reclaim_threshold_of_the_publish_moved(tag: &str) -> RecordedFlow {
+    let mut flow = record_fixed_script_through_rollback(tag);
+    flow.name = "rollback-publish-root-reclaim-threshold-moved";
+    let (reclaim_threshold, pinned_ring_slot) =
+        reclaim_threshold_and_pinned_ring_slot_of_the_publish(&flow);
+    let moved = if reclaim_threshold > 0 { 0 } else { 1 };
+    rewrite_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_publish(
+        &mut flow,
+        moved,
+        pinned_ring_slot,
+    );
     flow
 }
 
@@ -7144,6 +7630,72 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_carries_two_entries_of_
     );
 }
 
+/// I-9.16 ③ 单独不成立（C675）：树表十二种齐、只多一条种类 7
+/// （[`record_new_pool_with_every_tree_kind_and_one_more_entry_of_the_sparse_side_table_kind`]）。点 ③ 的另两条流同时缺一种、④ 也红，
+/// GPU 走读内核 `w_judge_tree_table_entries_ordering` 关掉 ③ 那一处比较它们照样红 I-9.16；这条流上只有 ③ 不成立，关掉 ③ 的 GPU 判器
+/// 在根落了的状态上不置 I-9.16、与 CPU 不一致。CPU 一侧先钉流造对了——整条落盘的镜像上 I-9.16 红、违例说明点名 ③ 种类 7 两条、
+/// 不提 ① ② ④；I-7.8 与 I-8.10 成立（水位在根与记录新根段里一起抬过）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_carries_every_kind_and_one_of_them_twice()
+{
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_carries_every_kind_and_one_of_them_twice";
+    let flow =
+        record_new_pool_with_every_tree_kind_and_one_more_entry_of_the_sparse_side_table_kind(
+            "crash-judge-gpu-i916-every-kind-and-one-twice",
+        );
+    let mut image_after_the_whole_flow = flow.base.clone();
+    image_after_the_whole_flow.apply_writes(&flow.writes);
+    match pool_checker_verdict_on_the_image(&image_after_the_whole_flow, "I-9.16") {
+        InvariantVerdict::Violated(detail) => {
+            let duplicated_kind =
+                format!("种类 {TREE_KIND_SPARSE_SIDE_TABLE} 有 2 条（③ 每种至多一条）");
+            assert!(
+                detail.contains(&duplicated_kind),
+                "I-9.16 的违例说明点名 ③「{duplicated_kind}」：{detail}"
+            );
+            for other_clause in ["①", "②", "④"] {
+                assert!(
+                    !detail.contains(other_clause),
+                    "十二种齐、只多一条重复的树表只违反 ③，违例说明不提 {other_clause}：{detail}"
+                );
+            }
+        }
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => panic!(
+            "树表里种类 {TREE_KIND_SPARSE_SIDE_TABLE} 两条：I-9.16 要红在 ③，实际 {other_verdict:?}"
+        ),
+    }
+    for invariant_that_holds in ["I-7.8", "I-8.10"] {
+        let verdict =
+            pool_checker_verdict_on_the_image(&image_after_the_whole_flow, invariant_that_holds);
+        assert!(
+            matches!(verdict, InvariantVerdict::Holds),
+            "水位在根与记录新根段里一起抬过，{invariant_that_holds} 照旧成立，实际 {verdict:?}"
+        );
+    }
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains("I-9.16"),
+        "流 {} 上 CPU 池级 checker 要红 I-9.16（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+}
+
 /// I-9.16 ④：树表非空而十一种里缺 deadlist（种类 1–4 之外的那七种之一，CPU 的 ④ 按十一种判时才红）。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_lacks_the_deadlist_kind() {
@@ -7203,6 +7755,45 @@ fn the_gpu_judge_agrees_with_the_cpu_that_the_statistics_of_a_newest_version_wit
     );
 }
 
+/// I-7.18（C773）：建账的发布带的回收门槛高过现算的；GPU 走读内核逐位跟上 CPU。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_publish_root_carries_a_reclaim_threshold_above_the_recomputed_one(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_publish_root_carries_a_reclaim_threshold_above_the_recomputed_one",
+        &record_new_pool_with_a_reclaim_threshold_above_the_recomputed_one(
+            "crash-judge-gpu-i718-reclaim-threshold",
+        ),
+        "I-7.18",
+    );
+}
+
+/// I-7.19（C773）：建账的发布带的钉槽指着同一实例写的根；GPU 走读内核逐位跟上 CPU。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_pinned_ring_slot_holds_a_root_of_the_same_instance() {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_pinned_ring_slot_holds_a_root_of_the_same_instance",
+        &record_new_pool_with_a_pinned_ring_slot_holding_a_root_of_the_same_instance(
+            "crash-judge-gpu-i719-pinned-ring-slot",
+        ),
+        "I-7.19",
+    );
+}
+
+/// I-7.18 与 I-3.1 钉带出来的那一截（C773）：固定脚本到回退 D 那次发布的 t 改掉；GPU 走读内核（I-7.18）与扫描内核（I-3.1 那一截、I-3.16 占着的槽）
+/// 逐位跟上 CPU。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_rollback_publish_root_carries_a_moved_reclaim_threshold(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_rollback_publish_root_carries_a_moved_reclaim_threshold",
+        &record_rollback_with_the_reclaim_threshold_of_the_publish_moved(
+            "crash-judge-gpu-i718-rollback-reclaim-threshold",
+        ),
+        "I-7.18",
+    );
+}
+
 /// I-2.4：根记录里算法类型 / nonce / MAC 那 29 字节有非 0。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_when_a_root_record_carries_a_non_zero_mac_byte() {
@@ -7215,7 +7806,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_root_record_carries_a_non_zero_mac_b
     );
 }
 
-/// I-2.4（C728）：根记录之后到槽宽那一段有一个非 0 字节；GPU 走读内核对每条自证过的根判 [457, 槽宽) 全 0，逐位跟上 CPU。
+/// I-2.4（C728）：根记录之后到槽宽那一段有一个非 0 字节；GPU 走读内核对每条自证过的根判 [466, 槽宽) 全 0，逐位跟上 CPU。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_when_a_root_slot_carries_a_non_zero_byte_past_the_root_record()
 {
@@ -8504,6 +9095,52 @@ fn record_deletion_through_the_last_batch_with_a_narrow_empty_inode_root(
         "deletion-through-the-last-batch-empty-inode-root-of-entry-width-eight",
         inode_key_width,
         u16::from(inode_key_width),
+    )
+}
+
+/// 新池新建文件的流上 extent 上段根兼叶（key 宽 24、条目宽 113、一条条目）每条条目末尾补一个 0、条目宽 113 → 114，按原来的头重建、
+/// 重封到根（I-1.10（码 2 条目宽等于字段表宽） 写「等于」，宽了的同样拒）。core 冷走读逐条 `ExtentUpperLeafEntry::parse` 判宽不等于 113 就拒、
+/// 报 `EntryWidthDiffersFromItsFieldTable`；GPU 恢复内核读上段那一判（`crash_judge_common.wgsl` 有条目时宽不等于
+/// `EXTENT_UPPER_LEAF_ENTRY_BYTES` 就拒）同判。池级 checker 两边都按字段表判 I-1.10 红。
+fn record_new_pool_with_the_extent_upper_leaf_entries_one_byte_wider(tag: &str) -> RecordedFlow {
+    const EXTENT_KEY_WIDTH: u8 = 24;
+    const EXTENT_UPPER_LEAF_ENTRY_FIELD_TABLE_BYTES: u16 = 113;
+    record_new_pool_with_a_resealed_field(
+        tag,
+        "new-pool-extent-upper-leaf-entries-one-byte-wider",
+        &|bytes| {
+            unit_class(bytes) == 2
+                && index_node_key_width(bytes) == EXTENT_KEY_WIDTH
+                && index_node_entry_width(bytes) == EXTENT_UPPER_LEAF_ENTRY_FIELD_TABLE_BYTES
+                && index_node_entry_count(bytes) > 0
+        },
+        false,
+        &|bytes| {
+            let node = singlefs_core::unit::parse_index_node(bytes).expect("上段叶解得开");
+            let wider_entries: Vec<Vec<u8>> = node
+                .entries
+                .iter()
+                .map(|entry| {
+                    let mut wider = entry.clone();
+                    wider.push(0);
+                    wider
+                })
+                .collect();
+            let wider_node = singlefs_core::unit::build_index_node(
+                node.tree,
+                node.level,
+                node.key_width,
+                &node.smallest_key,
+                &node.largest_key,
+                node.birth_txg,
+                &parameters().filesystem_identifier,
+                node.instance,
+                node.birth_sequence,
+                EXTENT_UPPER_LEAF_ENTRY_FIELD_TABLE_BYTES + 1,
+                &wider_entries,
+            );
+            bytes.copy_from_slice(&wider_node);
+        },
     )
 }
 
@@ -10323,6 +10960,144 @@ fn the_gpu_judge_agrees_with_the_cpu_that_an_empty_inode_root_narrower_than_its_
             "crash-judge-gpu-empty-inode-root-narrow",
         ),
         "I-1.10",
+    );
+}
+
+/// 恢复那一半整份比：extent 上段叶条目宽于字段表（113 → 114）的镜像上，两边都拒（CPU 冷走读报 `EntryWidthDiffersFromItsFieldTable`，
+/// GPU 恢复内核同一个失败点）；CPU 池级 checker 判 I-1.10 红。判别力：`crates/mutations.tsv`「根环一簇 R9」那一行（GPU 读上段那一判改回
+/// 只拒窄于），GPU 照读出文件、与 CPU 不一致，这一条红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_an_extent_upper_leaf_wider_than_its_field_table_is_refused(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_that_an_extent_upper_leaf_wider_than_its_field_table_is_refused",
+        &record_new_pool_with_the_extent_upper_leaf_entries_one_byte_wider(
+            "crash-judge-gpu-extent-upper-leaf-wider",
+        ),
+        "I-1.10",
+    );
+}
+
+/// deadlist 叶条目字段表的宽：头的树 ID 8 + 纪元 8 + 中央映射 key 27，value 空（D5（快照 / 空间记账机制） 已定项 12）。写死在这里，
+/// 不从 checker 或实现里取：取了的话，两边把宽挪了这条流也跟着走。
+const DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES: u16 = 43;
+
+/// 新池新建文件（txg 3）、建快照（txg 4）、快照下覆盖写（txg 5：换下的单元进 deadlist，deadlist 树根兼叶装着条目）的流上，
+/// 覆盖写那一版的 deadlist 树根每条条目末尾补一个 0、条目宽 43 → 44，按原来的头重建、重封到根（I-1.10（码 2 条目宽等于字段表宽） 写「等于」）。
+/// 核心层冷走读读 deadlist 树只数叶条目、不逐条解（`recovery::walk_to_file_judging_the_truncation_fields_as` 的 deadlist 树那一支）；
+/// 叶条目宽不等于 43 就拒的那一判（C867，`recovery.rs` 的 `deadlist_entries_parsed`）在建上一版里，可写挂载那一样读者才走到。
+/// GPU 恢复内核照冷走读只数不判（`crash_judge_common.wgsl` 的 `read_code_two_tree` deadlist 那一支）。池级 checker 两边都按字段表判 I-1.10 红。
+fn record_new_pool_through_a_snapshot_and_an_overwrite_under_it_with_the_deadlist_leaf_entries_one_byte_wider(
+    tag: &str,
+) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    let mut versions = vec![published_version_of(&pool.output, file_content())];
+    let created = create_a_snapshot_and_advance(&mut pool);
+    versions.push(published_version_of(&created, file_content()));
+    let overwritten = overwrite_under_the_snapshot_and_advance(&mut pool);
+    assert!(
+        !overwritten.deadlist_entries.is_empty(),
+        "前提：快照下覆盖写换下的用户可见单元进 deadlist"
+    );
+    versions.push(published_version_of(
+        &overwritten,
+        content_overwritten_under_the_snapshot(),
+    ));
+    let mut flow = recorded_flow_of_the_pool(
+        &pool,
+        "new-pool-snapshot-overwrite-deadlist-leaf-entries-one-byte-wider",
+        versions,
+    );
+    let deadlist_key_width = u8::try_from(DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES).expect("43");
+    let targets = last_unit_copies(
+        &flow,
+        "deadlist 树根兼叶（key 宽 43、条目宽 43、有条目）",
+        &|bytes| {
+            unit_class(bytes) == 2
+                && index_node_key_width(bytes) == deadlist_key_width
+                && index_node_entry_width(bytes) == DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES
+                && index_node_entry_count(bytes) > 0
+        },
+        false,
+    );
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        let leaf = singlefs_core::unit::parse_index_node(bytes).expect("deadlist 树根解得开");
+        assert_eq!(leaf.level, 0, "前提：deadlist 树根兼叶");
+        let wider_entries: Vec<Vec<u8>> = leaf
+            .entries
+            .iter()
+            .map(|entry| {
+                let mut wider = entry.clone();
+                wider.push(0);
+                wider
+            })
+            .collect();
+        let wider_leaf = singlefs_core::unit::build_index_node(
+            leaf.tree,
+            leaf.level,
+            leaf.key_width,
+            &leaf.smallest_key,
+            &leaf.largest_key,
+            leaf.birth_txg,
+            &parameters().filesystem_identifier,
+            leaf.instance,
+            leaf.birth_sequence,
+            DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES + 1,
+            &wider_entries,
+        );
+        bytes.copy_from_slice(&wider_leaf);
+    });
+    flow
+}
+
+/// 恢复那一半整份比：deadlist 叶条目宽于字段表（43 → 44）的流上，每个状态两边两遍恢复的结局、失败点与落到的根都相同；全部写都落了的那个状态
+/// CPU 看 journal 那一遍读出覆盖写那一版的文件（冷走读只数 deadlist 叶条目，C867 那一判在建上一版里，Q5 前提）；CPU 池级 checker 判 I-1.10 红。
+/// 判别力：`crates/mutations.tsv`「GPU 恢复内核读 deadlist 叶条目时宽不等于 43 就拒」那一行（照可写挂载的建上一版判、不照冷走读），
+/// GPU 那一遍在全部写都落了的状态上恢复失败、与 CPU 不一致，这一条红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_recovery_that_a_deadlist_leaf_wider_than_its_field_table_still_reads_the_file(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_recovery_that_a_deadlist_leaf_wider_than_its_field_table_still_reads_the_file";
+    let flow =
+        record_new_pool_through_a_snapshot_and_an_overwrite_under_it_with_the_deadlist_leaf_entries_one_byte_wider(
+            "crash-judge-gpu-deadlist-leaf-wider",
+        );
+    let overwrite_version = flow
+        .versions
+        .last()
+        .map(|version| (version.instance.0, version.checkpoint_txg.0))
+        .expect("流里有覆盖写那一版");
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains("I-1.10"),
+        "流 {} 上 CPU 池级 checker 要红 I-1.10（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    let every_write_persisted = comparison
+        .cpu_recovery_words_of_each_state
+        .last()
+        .expect("流至少一个状态");
+    assert_eq!(
+        (
+            consulted_landed_root_of(*every_write_persisted),
+            every_write_persisted.consulted_pass_outcome
+        ),
+        (Some(overwrite_version), RECOVERY_WORD_CLASS_FILE_READ),
+        "前提：全部写都落了的状态上 CPU 看 journal 那一遍落在覆盖写那一版、读出文件（冷走读不判 deadlist 叶条目宽）"
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
     );
 }
 
@@ -13573,13 +14348,12 @@ fn the_gpu_judge_agrees_with_the_cpu_on_states_holding_a_version_applied_by_its_
         .cpu_consulted_reported_root_of_each_state
         .iter()
         .zip(&comparison.cpu_recovery_words_of_each_state)
-        .filter(|(reported_root, recovery_words)| {
-            let effective_root_reported = recovery_words[0] != u32::MAX;
+        .filter(|(reported_root, recovery_summary)| {
+            let effective_root = consulted_landed_root_of(**recovery_summary);
             reported_root.is_some_and(|(instance, txg)| {
                 instance == INSTANCE_OF_THE_MOUNT
-                    && effective_root_reported
-                    && (recovery_words[0], u64::from(recovery_words[1]))
-                        != (instance, txg & 0xFFFF_FFFF)
+                    && effective_root
+                        .is_some_and(|effective_root| effective_root != (instance, txg))
             })
         })
         .count();
@@ -13713,14 +14487,16 @@ fn the_gpu_judge_agrees_with_the_cpu_on_the_deleted_flow_against_a_version_table
     );
     let intent_version = (
         INSTANCE_OF_THE_PUBLISHES.0,
-        u32::try_from(versions_without_a_file[0].checkpoint_txg.0).expect("txg 5 装得进 u32"),
+        versions_without_a_file[0].checkpoint_txg.0,
     );
     assert!(
         comparison
             .cpu_recovery_words_of_each_state
             .iter()
-            .any(|words| (words[0], words[1]) == intent_version
-                && words[2] == RECOVERY_WORD_CLASS_NO_FILE),
+            .any(
+                |summary| consulted_landed_root_of(*summary) == Some(intent_version)
+                    && summary.consulted_pass_outcome == RECOVERY_WORD_CLASS_NO_FILE
+            ),
         "流 {}：至少一个状态看 journal 那一遍落到意图那一版 {intent_version:?}、报没有文件",
         flow.name
     );
@@ -13771,35 +14547,7 @@ fn record_two_overwrites_whose_second_tree_table_does_not_read_back(
     tag: &str,
     name: &'static str,
 ) -> RecordedFlow {
-    let mut pool = build_pool(tag);
-    overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &second_content());
-    overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &third_content());
-    let mut flow = recorded_flow_of_the_pool(
-        &pool,
-        name,
-        vec![
-            PublishedVersion {
-                instance: InstanceGeneration(1),
-                checkpoint_txg: CheckpointTxg(3),
-                content: file_content(),
-            },
-            PublishedVersion {
-                instance: InstanceGeneration(1),
-                checkpoint_txg: CheckpointTxg(4),
-                content: second_content(),
-            },
-            PublishedVersion {
-                instance: InstanceGeneration(1),
-                checkpoint_txg: CheckpointTxg(5),
-                content: third_content(),
-            },
-        ],
-    );
-    assert_eq!(
-        root_write_of_txg(&flow, R_OF_THE_F2_FLOWS.1),
-        flow.judged_root_index,
-        "流里最后一条根槽写是 R 的"
-    );
+    let mut flow = record_two_overwrites(tag, name);
     let root_of_r = flow.judged_root_index;
     break_both_copies_of_the_tree_table_named_by_the_root_write(&mut flow, root_of_r);
     flow
@@ -13818,15 +14566,23 @@ fn consulted_oracle_item(kind: CrashPointReplayOracleViolationKind) -> String {
     )
 }
 
-/// 看 journal 那一遍在状态 `ordinal` 上实际走的那条根是 `version`（恢复字只带 txg 低 32 位）、结局类别是 `class`。
+/// 看 journal 那一遍在状态 `ordinal` 上实际走的那条根是 `version`（实例代号与完整的 checkpoint_txg）、结局码是 `class`。
 fn consulted_recovery_lands_on(
     comparison: &Comparison,
     ordinal: usize,
     version: (u32, u64),
     class: u32,
 ) -> bool {
-    let words = comparison.cpu_recovery_words_of_each_state[ordinal];
-    (words[0], u64::from(words[1]), words[2]) == (version.0, version.1, class)
+    let summary = comparison.cpu_recovery_words_of_each_state[ordinal];
+    consulted_landed_root_of(summary) == Some(version) && summary.consulted_pass_outcome == class
+}
+
+/// 恢复摘要里看 journal 那一遍实际走的那条根，换成 (实例代号, 完整的 checkpoint_txg)；没落到根是 `None`。
+fn consulted_landed_root_of(summary: RecoveryRootAndOutcomesOfState) -> Option<(u32, u64)> {
+    summary
+        .consulted_pass_landed_root
+        .landed_root()
+        .map(|(instance, checkpoint_txg)| (instance.0, checkpoint_txg.0))
 }
 
 /// F2 设计里那一退（判决 `research/prompts/m3-batch33t-code-r1-main-verification.md` 第二节 T5 行「设计那一退照旧落 V」）：R 的根槽落了、走读失败，
@@ -16256,32 +17012,31 @@ const ALLOCATION_LEAF_RECORD_BYTES: usize = 20;
 /// 记账树里「defer 待释放」那一项（D5（快照 / 空间记账机制） 已定项 4 第 5 项，`singlefs_core::records::STATISTIC_DEFER_QUEUE_BYTES`）。
 const STATISTIC_DEFER_QUEUE_BYTES: u16 = 5;
 
-/// 隔离的那个数据单元的两份副本读回来什么样（[`record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined`]）。
+/// 改回仍分配的那两条记录带不带隔离记号（[`record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined`]）。
 #[derive(Clone, Copy, Debug)]
-enum CopiesOfTheQuarantinedDataUnit {
-    /// 盘号大的那一份载荷首字节翻转、不重封：与每一条指着它的位置条目都对不上，这个单元整组豁免。
-    TheSecondReadsBackOtherBytes,
-    /// 两份都是原样；带着指它的位置条目的几片单元（下段叶、映射叶）按写的次序轮流把盘 0、盘 1 那一条的校验和写错：每一份都对得上
-    /// 另一片里指着它的那一条，不豁免。
-    EachMatchesOneOfTheLocationEntriesNamingIt,
+enum QuarantineMarkOfTheRecords {
+    /// 两块盘那两条都带记号（跨度段 0x4000）：写者照 D19（块指针的结构与宽度预算） 已定项 5 隔离的样子，整组豁免。
+    OnBothDevices,
+    /// 两条都不带：与「写者把一个单元泄漏在已分配里」逐字节同形，只认记号就不豁免。
+    Absent,
 }
 
-/// 隔离豁免那一支（I-3.1 / I-3.11 的隔离的记录，D19（块指针的结构与宽度预算） 已定项 5；池级 checker `quarantined_slots_exempted_per_device`，
-/// GPU 扫描内核 `c_quarantine_exempted`、读走读内核主走读记的位置项校验和那张表）：
+/// 隔离豁免那一支（I-3.1 / I-3.11 的隔离的记录，D19（块指针的结构与宽度预算） 已定项 5 只认记号；池级 checker `quarantined_slots_exempted_per_device`，
+/// GPU 扫描内核 `c_quarantine_exempted`、读分配记录那一行的记号位）：
 /// 三个数据单元的文件发完意图（txg 5）与按批大小 1 的前两批（txg 6 放掉第三个单元、txg 7 放掉第二个单元）。txg 7 那一版改成「写者把放掉的
-/// 第二个单元隔离了」：分配记录叶里那个单元两块盘上的记录改回第一批那一版的样子（仍分配、分配代），记账叶里两块盘的 defer 待释放各减一个单元，
-/// 重封到根。最新根不引用它、更早的候选根（txg 4、5、6）引用它，判 I-3.11 那一遍它是一条已分配而没有根引用的记录，豁免不豁免看 `copies`：
-/// 豁免时 I-3.11 成立，不豁免时 I-3.11 红（已分配多一个单元）。I-3.1 那一遍走的是全部候选根，这个单元有根引用，不进隔离。
+/// 第二个单元隔离了」：分配记录叶里那个单元两块盘上的记录改回第一批那一版的样子（仍分配、分配代），按 `mark` 带不带隔离记号，记账叶里两块盘的
+/// defer 待释放各减一个单元，重封到根。最新根不引用它、更早的候选根（txg 4、5、6）引用它，判 I-3.11 那一遍它是一条已分配而没有根引用的记录，
+/// 两条都带记号时豁免、I-3.11 成立，不带时不豁免、I-3.11 红（已分配多一个单元）。I-3.1 那一遍走的是全部候选根，这个单元有根引用，不进隔离。
 fn record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
     tag: &str,
-    copies: CopiesOfTheQuarantinedDataUnit,
+    mark: QuarantineMarkOfTheRecords,
 ) -> RecordedFlow {
-    let name = match copies {
-        CopiesOfTheQuarantinedDataUnit::TheSecondReadsBackOtherBytes => {
-            "second-deletion-batch-quarantined-data-unit-second-copy-reads-back-other-bytes"
+    let name = match mark {
+        QuarantineMarkOfTheRecords::OnBothDevices => {
+            "second-deletion-batch-quarantined-data-unit-records-carry-the-mark"
         }
-        CopiesOfTheQuarantinedDataUnit::EachMatchesOneOfTheLocationEntriesNamingIt => {
-            "second-deletion-batch-quarantined-data-unit-copies-each-match-one-location-entry"
+        QuarantineMarkOfTheRecords::Absent => {
+            "second-deletion-batch-quarantined-data-unit-records-carry-no-mark"
         }
     };
     let mut pool = pool_with_a_three_unit_file(tag);
@@ -16326,7 +17081,22 @@ fn record_three_unit_file_through_its_second_deletion_batch_with_the_released_da
                 released.is_released && !allocated.is_released,
                 "第二批那一版这一条已释放、第一批那一版仍分配：{released:?} / {allocated:?}"
             );
-            (released.to_bytes(), allocated.to_bytes())
+            let quarantined_record = singlefs_core::allocator::AllocationRecord {
+                device: allocated.device,
+                slot: allocated.slot,
+                span_slots: allocated.span_slots,
+                generation: allocated.generation,
+                is_released: false,
+                quarantine_mark: match mark {
+                    QuarantineMarkOfTheRecords::OnBothDevices => {
+                        singlefs_core::allocator::AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck
+                    }
+                    QuarantineMarkOfTheRecords::Absent => {
+                        singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined
+                    }
+                },
+            };
+            (released.to_bytes(), quarantined_record.to_bytes())
         })
         .collect();
     let records_of_an_allocation_leaf = |bytes: &[u8]| -> Vec<usize> {
@@ -16426,108 +17196,19 @@ fn record_three_unit_file_through_its_second_deletion_batch_with_the_released_da
         }
     });
 
-    match copies {
-        CopiesOfTheQuarantinedDataUnit::TheSecondReadsBackOtherBytes => {
-            let second = quarantined.locations[1];
-            let second_copy_writes: Vec<usize> = flow
-                .writes
-                .iter()
-                .enumerate()
-                .filter(|(_, write)| {
-                    write.kind == StepKind::UnitWrite
-                        && write.device == second.device
-                        && write.offset == second.slot.to_device_offset()
-                })
-                .map(|(index, _)| index)
-                .collect();
-            assert_eq!(
-                second_copy_writes.len(),
-                1,
-                "被隔离的那个数据单元盘 {} 那一份流里只写过一次",
-                second.device.0
-            );
-            let WrittenContents::Bytes(bytes) = &mut flow.writes[second_copy_writes[0]].contents
-            else {
-                panic!("单元写是普通写");
-            };
-            bytes[134] ^= 0xFF;
-        }
-        CopiesOfTheQuarantinedDataUnit::EachMatchesOneOfTheLocationEntriesNamingIt => {
-            let entry_bytes = |location: &singlefs_core::pointer::LocationEntry| -> Vec<u8> {
-                let mut entry = Vec::with_capacity(14);
-                entry.extend_from_slice(&location.device.0.to_le_bytes());
-                entry.extend_from_slice(&location.slot.0.to_le_bytes()[..6]);
-                entry.extend_from_slice(&location.unit_checksum.to_le_bytes());
-                entry
-            };
-            let entries_naming_it = [
-                entry_bytes(&quarantined.locations[0]),
-                entry_bytes(&quarantined.locations[1]),
-            ];
-            // 带着指它的位置条目的单元（下段叶里的数据指针、映射叶里的映射条目，走读都把那条位置条目的校验和记下），按第一次写的次序，
-            // 每个单元的几份副本。每一片都写错一条：哪一片先被走到，它写错的那一盘只记一个校验和的话就只剩错的那一个
-            let mut referrers: Vec<(u64, Vec<usize>)> = Vec::new();
-            for (index, write) in flow.writes.iter().enumerate() {
-                let Some(bytes) = write.bytes() else {
-                    continue;
-                };
-                if write.kind != StepKind::UnitWrite
-                    || !entries_naming_it.iter().any(|entry| {
-                        bytes
-                            .windows(entry.len())
-                            .any(|window| window == &entry[..])
-                    })
-                {
-                    continue;
-                }
-                match referrers
-                    .iter_mut()
-                    .find(|(offset, _)| *offset == write.offset.0)
-                {
-                    Some((_, copies_of_the_referrer)) => copies_of_the_referrer.push(index),
-                    None => referrers.push((write.offset.0, vec![index])),
-                }
-            }
-            assert!(
-                referrers.len() >= 2,
-                "流 {name} 里至少两片单元带着指被隔离的那个数据单元的位置条目（第一批之前那一版与第一批那一版各有下段叶），只找到 {}",
-                referrers.len()
-            );
-            for (position, (_, copies_of_the_referrer)) in referrers.iter().enumerate() {
-                let stale = &entries_naming_it[position % 2];
-                corrupt_units_and_reseal_up_to_the_root(
-                    &mut flow,
-                    copies_of_the_referrer,
-                    &|bytes| {
-                        let occurrences: Vec<usize> = (0..=bytes.len() - stale.len())
-                            .filter(|start| bytes[*start..*start + stale.len()] == stale[..])
-                            .collect();
-                        assert_eq!(
-                            occurrences.len(),
-                            1,
-                            "这片单元里指着那一份的位置条目恰好一条"
-                        );
-                        let checksum = occurrences[0] + 10;
-                        let written_wrong = read_u32_at(bytes, checksum) ^ 0xFFFF_FFFF;
-                        bytes[checksum..checksum + 4].copy_from_slice(&written_wrong.to_le_bytes());
-                    },
-                );
-            }
-        }
-    }
     flow
 }
 
-/// 豁免那一形：被隔离的单元盘 1 那一份对不上任何一条指着它的位置条目，整组豁免，第二批那一版上 I-3.11 照样成立
-/// （不豁免的话已分配多一个单元、红）。CPU 一个状态都不红 I-3.11，GPU 每个状态逐位相同。
+/// 豁免那一形：被隔离的单元两块盘那两条记录都带隔离记号，整组豁免，第二批那一版上 I-3.11 照样成立（不豁免的话已分配多一个单元、红）。
+/// 两份副本都是原样：只认记号、不读副本。CPU 一个状态都不红 I-3.11，GPU 每个状态逐位相同。
 #[test]
-fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_second_copy_reads_back_other_bytes_is_exempted(
+fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_records_carry_the_mark_on_both_devices_is_exempted(
 ) {
-    let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_second_copy_reads_back_other_bytes_is_exempted";
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_records_carry_the_mark_on_both_devices_is_exempted";
     let flow =
         record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
-            "crash-judge-gpu-quarantine-second-copy-reads-back-other-bytes",
-            CopiesOfTheQuarantinedDataUnit::TheSecondReadsBackOtherBytes,
+            "crash-judge-gpu-quarantine-records-carry-the-mark",
+            QuarantineMarkOfTheRecords::OnBothDevices,
         );
     let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
@@ -16552,16 +17233,15 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_second_c
     );
 }
 
-/// 不豁免那一形：被隔离的单元两份都对得上某一条指着它的位置条目（带着这两条的每一片单元各写错一条），不豁免，CPU 判 I-3.11 红。
-/// 位置项校验和那张表要把同 (盘, 槽) 的每一个不同的校验和都记下：只记一个的话，先走到的那一片写错的那一盘只剩错的那一个，那一份就对不上、整组豁免。
+/// 不豁免那一形：两条记录都不带隔离记号（与写者泄漏一个单元逐字节同形），不豁免，CPU 判 I-3.11 红，GPU 每个状态逐位相同。
 #[test]
-fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_copies_each_match_one_location_entry_is_not_exempted(
+fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_records_carry_no_mark_is_not_exempted(
 ) {
     assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
-        "the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_copies_each_match_one_location_entry_is_not_exempted",
+        "the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_records_carry_no_mark_is_not_exempted",
         &record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
-            "crash-judge-gpu-quarantine-copies-each-match-one-location-entry",
-            CopiesOfTheQuarantinedDataUnit::EachMatchesOneOfTheLocationEntriesNamingIt,
+            "crash-judge-gpu-quarantine-records-carry-no-mark",
+            QuarantineMarkOfTheRecords::Absent,
         ),
         "I-3.11",
     );
@@ -18533,5 +19213,401 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_format_version_not_recognized_refuse
         states_naming_an_unrecognized_incompat_bit, 0,
         "流 {}：格式版本先于 incompat 位判，没有一个状态报 incompat 位不认得（失败点 {GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED}）",
         flow.name
+    );
+}
+
+// ─── 里程碑三收尾（C755 的 GPU 一侧，用户 2026-10-22 定 F6「代码该做一定要做」）：GPU 恢复内核判退看三样读者的并集 ───
+
+/// 去掉流里的几次写：写表按剩下的写重新编号，切段跟着改、空了的段不留，被判的根槽写跟着挪（它自己不许被去掉）。
+fn drop_writes(flow: &mut RecordedFlow, dropped: &[usize]) {
+    assert!(
+        !dropped.contains(&flow.judged_root_index),
+        "流 {}：被判的根槽写不去掉",
+        flow.name
+    );
+    let index_after_the_drop =
+        |index: usize| index - dropped.iter().filter(|gone| **gone < index).count();
+    flow.segments = flow
+        .segments
+        .iter()
+        .map(|segment| {
+            segment
+                .iter()
+                .filter(|index| !dropped.contains(index))
+                .map(|index| index_after_the_drop(*index))
+                .collect::<Vec<usize>>()
+        })
+        .filter(|segment| !segment.is_empty())
+        .collect();
+    flow.judged_root_index = index_after_the_drop(flow.judged_root_index);
+    let mut write_index = 0;
+    flow.writes.retain(|_write| {
+        let kept = !dropped.contains(&write_index);
+        write_index += 1;
+        kept
+    });
+}
+
+/// 两次覆盖写那条流（新池新建文件 V⁻ txg 3 → 覆盖写成第二份内容 V txg 4 → 再覆盖写成第三份内容 R txg 5，同一个进程、实例 1）原样录下来，
+/// 连同它的三版：R 的根槽落了而 R 那次系统配置轮换没落的状态上系统配置见证到 V、没见证 R。
+fn record_two_overwrites(tag: &str, name: &'static str) -> RecordedFlow {
+    let mut pool = build_pool(tag);
+    overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &second_content());
+    overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &third_content());
+    let flow = recorded_flow_of_the_pool(
+        &pool,
+        name,
+        vec![
+            PublishedVersion {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(3),
+                content: file_content(),
+            },
+            PublishedVersion {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(4),
+                content: second_content(),
+            },
+            PublishedVersion {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(5),
+                content: third_content(),
+            },
+        ],
+    );
+    assert_eq!(
+        root_write_of_txg(&flow, R_OF_THE_F2_FLOWS.1),
+        flow.judged_root_index,
+        "流里最后一条根槽写是 R 的"
+    );
+    flow
+}
+
+/// R 那次发布在流里的写：V 的根槽写之后、R 的根槽写之前。
+fn writes_of_the_publish_of_r(flow: &RecordedFlow) -> std::ops::Range<usize> {
+    root_write_of_txg(flow, V_OF_THE_F2_FLOWS.1) + 1..flow.judged_root_index
+}
+
+/// 两次覆盖写那条流上：R 写出的那个数据单元两份都不落盘（流里去掉那两次单元写：R 的根槽落了的状态上冷走读读不出它、经映射仍读不出——字节丢了），
+/// R 那条记录第一个点名项的两条位置条目对调成按盘降序、重封（扫环照收；建上一版判记录的位置条目按盘升序，不收——内容拒收）。
+/// 只读挂载的打开不读数据单元、不读记录，读得通；沿链读 R 的实例表读得通。
+fn record_two_overwrites_whose_second_data_unit_is_lost_and_whose_second_record_the_rebuild_refuses(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut flow = record_two_overwrites(tag, name);
+    let data_unit_writes_of_r: Vec<usize> = writes_of_the_publish_of_r(&flow)
+        .filter(|index| {
+            flow.writes[*index].kind == StepKind::UnitWrite
+                && flow.writes[*index]
+                    .bytes()
+                    .is_some_and(|bytes| unit_class(bytes) == UNIT_CLASS_DATA)
+        })
+        .collect();
+    assert_eq!(
+        data_unit_writes_of_r.len(),
+        2,
+        "前提：R 只写了一个数据单元、两份"
+    );
+    rewrite_every_journal_record_of_the_publish(&mut flow, &|bytes| {
+        let named_units = u32::from_le_bytes(bytes[12..16].try_into().expect("4"));
+        assert!(named_units >= 1, "前提：R 的记录点名了单元");
+        let first_location = JOURNAL_RECORD_HEADER_BYTES;
+        let second_location = first_location + LOCATION_ENTRY_BYTES_IN_A_NAMED_UNIT;
+        let device_of =
+            |offset: usize| u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4"));
+        assert!(
+            device_of(first_location) < device_of(second_location),
+            "前提：写者按盘升序写点名项的位置条目"
+        );
+        let (first_part, second_part) = bytes.split_at_mut(second_location);
+        first_part[first_location..second_location]
+            .swap_with_slice(&mut second_part[..LOCATION_ENTRY_BYTES_IN_A_NAMED_UNIT]);
+    });
+    drop_writes(&mut flow, &data_unit_writes_of_r);
+    flow
+}
+
+/// journal 记录点名项里一条位置条目的宽：盘 4 + 槽 6 + 整单元校验和 4。
+const LOCATION_ENTRY_BYTES_IN_A_NAMED_UNIT: usize = 14;
+
+/// 打包记录单元里第一条记录在单元里的偏移（码 3 头 136 字节）与 inode 记录里恒零的那一段的起点（偏移 108，`InodeRecord::parse` 判非零拒收）。
+const FIRST_RECORD_OF_A_PACKED_UNIT: usize = 136;
+const INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD: usize = 108;
+
+/// 两次覆盖写那条流上：R 写出的 extent 树根两份都不落盘（冷走读与建上一版读 extent 树那一步读不出、经映射仍读不出——字节丢了，两样都停在那里；
+/// extent 树在树表里排第一，冷走读读它之前不读别的树），R 的 inode 叶容器第一条记录偏移 108 那一段恒零区写成非零、重封到根
+/// （只读挂载的打开不读 extent 树，读到这条记录拒收——内容拒收）。沿链读 R 的实例表读得通。
+fn record_two_overwrites_whose_second_extent_root_is_lost_and_whose_second_inode_record_the_opening_refuses(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut flow = record_two_overwrites(tag, name);
+    let inode_leaf_of_r = last_unit_copies(
+        &flow,
+        "inode 叶容器",
+        &|bytes| unit_class(bytes) == 3 && packed_record_type(bytes) == 2,
+        false,
+    );
+    assert!(
+        inode_leaf_of_r
+            .iter()
+            .all(|index| writes_of_the_publish_of_r(&flow).contains(index)),
+        "前提：流里最后那个 inode 叶容器是 R 写的"
+    );
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &inode_leaf_of_r, &|bytes| {
+        bytes[FIRST_RECORD_OF_A_PACKED_UNIT
+            + INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD] = 1;
+    });
+    let extent_root_of_r = last_unit_copies(
+        &flow,
+        "extent 树根",
+        &|bytes| unit_class(bytes) == 2 && index_node_key_width(bytes) == 24,
+        false,
+    );
+    assert!(
+        extent_root_of_r
+            .iter()
+            .all(|index| writes_of_the_publish_of_r(&flow).contains(index)),
+        "前提：流里最后那个 extent 树节点是 R 写的"
+    );
+    drop_writes(&mut flow, &extent_root_of_r);
+    flow
+}
+
+/// 一条判退看并集的流比完之后核两样：至少一个状态上 CPU 看 journal 那一遍落在 R、结局读失败（并集里有内容拒收，不退到 V）；每个状态对拍字逐位相同。
+fn assert_the_gpu_falls_back_on_the_union_like_the_cpu(
+    flow: &RecordedFlow,
+    comparison: &Comparison,
+) {
+    let states_staying_on_r = (0..comparison.cpu_red_items_of_each_state.len())
+        .filter(|ordinal| {
+            consulted_recovery_lands_on(
+                comparison,
+                *ordinal,
+                R_OF_THE_F2_FLOWS,
+                RECOVERY_WORD_CLASS_FAILED,
+            )
+        })
+        .count();
+    eprintln!(
+        "CRASH_JUDGE_GPU_FALL_BACK_UNION flow={} states={} states_staying_on_r={states_staying_on_r}",
+        flow.name, comparison.states
+    );
+    assert!(
+        states_staying_on_r > 0,
+        "流 {}：R 的根槽落了而系统配置没见证 R 的状态上，三样读者的并集里有内容拒收，CPU 看 journal 那一遍不退、落在 R {R_OF_THE_F2_FLOWS:?} 报读不出",
+        flow.name
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(comparison)
+    );
+}
+
+/// 场景：两次覆盖写那条流，R 写出的数据单元两份都没落、R 的记录第一个点名项的位置条目按盘降序（重封过）
+/// （[`record_two_overwrites_whose_second_data_unit_is_lost_and_whose_second_record_the_rebuild_refuses`]）的每个状态。
+/// R 的根槽落了而系统配置没见证 R 的状态上，冷走读字节丢了、建上一版拒收 R 的记录、打开读得通：并集里有内容拒收，CPU 恢复不退、报 R 读不出。
+/// 预期：GPU 恢复内核判退看同一个并集（`crash_judge_recovery.wgsl` 的 `selected_version_under_the_three_readers`），每个状态对拍字逐位相同。
+/// 判别力：只看走读的 GPU（改之前那一份）在这几个状态上退到 V、与 CPU 分家；`crates/mutations.tsv` 里「GPU 判退并集漏了建上一版那一样」那一行让这一条红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_walk_lost_bytes_and_whose_rebuild_refused_content_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_walk_lost_bytes_and_whose_rebuild_refused_content_is_not_fallen_back_from";
+    let flow = record_two_overwrites_whose_second_data_unit_is_lost_and_whose_second_record_the_rebuild_refuses(
+        "crash-judge-gpu-fall-back-union-rebuild-refuses",
+        "two-overwrites-second-data-unit-lost-and-second-record-refused-by-the-rebuild",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 场景：两次覆盖写那条流，R 写出的 extent 树根两份都没落、R 的 inode 叶容器第一条记录恒零区写成非零（重封到根）
+/// （[`record_two_overwrites_whose_second_extent_root_is_lost_and_whose_second_inode_record_the_opening_refuses`]）的每个状态。
+/// R 的根槽落了而系统配置没见证 R 的状态上，冷走读与建上一版都停在 extent 树根上（字节丢了）、只读挂载的打开拒收那条 inode 记录：
+/// 并集里有内容拒收，CPU 恢复不退、报 R 读不出。
+/// 预期：GPU 恢复内核判退看同一个并集，每个状态对拍字逐位相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 判退并集漏了只读挂载打开那一样」那一行让这一条红（漏了打开，并集只剩字节丢了，GPU 退到 V）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_walk_lost_bytes_and_whose_opening_refused_content_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_walk_lost_bytes_and_whose_opening_refused_content_is_not_fallen_back_from";
+    let flow = record_two_overwrites_whose_second_extent_root_is_lost_and_whose_second_inode_record_the_opening_refuses(
+        "crash-judge-gpu-fall-back-union-opening-refuses",
+        "two-overwrites-second-extent-root-lost-and-second-inode-record-refused-by-the-opening",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+// ─── 里程碑三收尾（G4 第三轮判决丙-置的 GPU 一侧，用户 2026-10-22 定「你做你的 GPU版让GPU去做」）：逐盘自证过的系统配置槽数上 GPU ───
+
+/// 新池新建文件那条流，流尾另起一段：盘 0 的槽 0 原地覆写成盘 0 槽 1 那一份自证过的字节、盘 0 的槽 1 整槽清零（攻方坏实现 MUT-B1 那一形：
+/// 一段里一块盘的系统配置槽写不止一个）。槽 0 那次写撕裂、槽 1 清零落了的那一态，盘 0 一个自证过的系统配置槽都没有，基镜像上它两槽都有。
+fn record_new_pool_with_both_system_configuration_slots_of_device_zero_lost_in_one_segment(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_file_creation(
+        tag,
+        "new-pool-both-system-configuration-slots-of-device-zero-lost-in-one-segment",
+    );
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    let mut landed = flow.base.clone();
+    landed.apply_writes(&flow.writes);
+    let slot_one_of_device_zero = singlefs_core::recovery::PoolReader::read(
+        &landed,
+        singlefs_core::address::DeviceIdentity(0),
+        singlefs_core::address::DeviceOffsetInBytes(spacing),
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096"),
+    )
+    .expect("新池新建文件之后盘 0 的槽 1 读得出");
+    let slot_write = |offset: u64, contents: WrittenContents| RetainedWrite {
+        device: singlefs_core::address::DeviceIdentity(0),
+        kind: StepKind::SystemConfigurationSlot,
+        is_force_unit_access: false,
+        offset: singlefs_core::address::DeviceOffsetInBytes(offset),
+        contents,
+    };
+    append_a_segment_of_writes(
+        &mut flow,
+        vec![
+            slot_write(0, WrittenContents::Bytes(slot_one_of_device_zero)),
+            slot_write(
+                spacing,
+                WrittenContents::Bytes(vec![
+                    0u8;
+                    usize::try_from(
+                        singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES
+                    )
+                    .expect("4096")
+                ]),
+            ),
+        ],
+    );
+    flow
+}
+
+/// 场景：[`record_new_pool_with_both_system_configuration_slots_of_device_zero_lost_in_one_segment`] 那条流的每个状态（撕裂那一态在内）。
+/// 预期：GPU 走读内核交的逐盘自证过的系统配置槽数（`crash_judge_gpu::SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD`）与 CPU 参照
+/// （`crash_judge_conclusions::self_verified_system_configuration_slots_of_each_device`，池级 checker 的逐盘数）逐状态逐盘相同；判段那一判
+/// （`devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts`）拿 GPU 那一份与拿 CPU 参照那一份（没配 GPU 时判段
+/// CPU 那一路交的）对基镜像比，逐状态结局相同，且至少一个状态记盘 0 是新出现的死盘；对拍字逐状态相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 逐盘自证槽数恒数满两槽」那一行让这一条红（撕裂那一态上 GPU 报 2、CPU 报 0）。
+#[test]
+fn the_gpu_judge_hands_back_the_self_verified_system_configuration_slots_of_each_device_like_the_pool_checker_on_every_state(
+) {
+    let test_name = "the_gpu_judge_hands_back_the_self_verified_system_configuration_slots_of_each_device_like_the_pool_checker_on_every_state";
+    let flow =
+        record_new_pool_with_both_system_configuration_slots_of_device_zero_lost_in_one_segment(
+            "crash-judge-gpu-self-verified-system-configuration-slots",
+        );
+    let limit = expand_up_to();
+    let expansion = move |_segment_index: usize, segment: &[usize]| {
+        if segment.len() <= limit {
+            CrashPointReplaySegmentExpansion::EveryProperSubset
+        } else {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        }
+    };
+    let judge_tables = build_judge_tables(&JudgeFlow {
+        base: &flow.base,
+        writes: &flow.writes,
+        segments: &flow.segments,
+        judged_root_index: flow.judged_root_index,
+        versions: &flow.versions,
+        expansion: &expansion,
+    })
+    .expect("这条流的 GPU 判表建得出");
+    let enumeration =
+        crash_state_enumeration_tables(&flow.base, &flow.writes, &flow.segments, &expansion);
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, limit) else {
+        return;
+    };
+    assert_eq!(
+        comparison.states, judge_tables.state_count,
+        "前提：对拍那一趟与这里的判表同一份计划（状态数）"
+    );
+    let slots_on_the_base_image =
+        self_verified_system_configuration_slots_of_each_device(&flow.base);
+    let mut slot_mismatches: Vec<String> = Vec::new();
+    let mut states_with_a_new_dead_device_zero = 0usize;
+    for (ordinal, gpu_words) in comparison.gpu_words_of_each_state.iter().enumerate() {
+        let ordinal_of_the_tables = u64::try_from(ordinal).expect("序号装得进 u64");
+        let image = CrashImage {
+            base: &flow.base,
+            writes: &enumeration.enumerated_writes,
+            persisted: judge_tables.persisted_writes_of_state(ordinal_of_the_tables),
+        };
+        let on_the_cpu = self_verified_system_configuration_slots_of_each_device(&image);
+        let on_the_gpu = self_verified_system_configuration_slots_of_each_device_of_the_gpu_verdict(
+            gpu_words,
+            &judge_tables.devices,
+        );
+        let judged_from_the_gpu_counts =
+            devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
+                &on_the_gpu,
+                &slots_on_the_base_image,
+            );
+        let judged_from_the_cpu_counts =
+            devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
+                &on_the_cpu,
+                &slots_on_the_base_image,
+            );
+        if on_the_cpu != on_the_gpu || judged_from_the_gpu_counts != judged_from_the_cpu_counts {
+            slot_mismatches.push(format!(
+                "第 {ordinal} 个状态：CPU 逐盘 {on_the_cpu:?}、GPU 逐盘 {on_the_gpu:?}；判段拿 GPU 那一份 {judged_from_the_gpu_counts:?}、拿 CPU 参照那一份 {judged_from_the_cpu_counts:?}"
+            ));
+        }
+        if judged_from_the_gpu_counts
+            == DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::New(vec![0])
+        {
+            states_with_a_new_dead_device_zero += 1;
+        }
+    }
+    eprintln!(
+        "CRASH_JUDGE_GPU_SELF_VERIFIED_SLOTS flow={} states={} states_with_a_new_dead_device_zero={states_with_a_new_dead_device_zero} slot_mismatches={}",
+        flow.name,
+        comparison.states,
+        slot_mismatches.len()
+    );
+    assert!(
+        slot_mismatches.is_empty(),
+        "流 {}：{} 个状态上逐盘自证槽数或判段那一判两边不同（前几个）：\n{}",
+        flow.name,
+        slot_mismatches.len(),
+        slot_mismatches
+            .iter()
+            .take(5)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    assert!(
+        states_with_a_new_dead_device_zero > 0,
+        "流 {}：槽 0 撕裂、槽 1 清零落了的状态上盘 0 是新出现的死盘",
+        flow.name
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
     );
 }

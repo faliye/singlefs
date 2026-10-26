@@ -26,10 +26,14 @@ use std::sync::{Mutex, Once};
 use singlefs_checker::image::{chosen_system_configurations, valid_roots, ImageReader};
 use singlefs_checker::walk::allocation_record_count_under_root;
 use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber, TreeIdentifier,
+    CheckpointTxg, DeviceIdentity, FileOffsetInBytes, InodeNumber, InstanceGeneration, SlotNumber,
+    TreeIdentifier,
 };
 use singlefs_core::admission::SpaceAdmission;
-use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator, UnitAreaStart};
+use singlefs_core::allocator::{
+    AllocationRecord, AllocationRecordQuarantineMark, PlacementRefusal, PoolAllocator,
+    UnitAreaStart,
+};
 use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::compaction_plan::{
     region_is_empty_by_the_records, CompactionBatchSize, CompactionBatchUnits,
@@ -41,9 +45,10 @@ use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
 use singlefs_core::mount::{
-    mount_writable_with_space_admission, raise_rollback_floor, roll_back_by_a_forward_publish,
-    MountError, ParametersAndDeviceTableOfTheMount, RollbackError, RollbackTarget, ShadowLedger,
-    StillUnreadableAfterOneReread, SystemConfigurationUnreadableWhen,
+    mount_writable_with_space_admission, raise_rollback_floor,
+    roll_back_by_a_forward_publish_in_the_session, MountError, ParametersAndDeviceTableOfTheMount,
+    ResurrectedCopy, RollbackError, RollbackTarget, ShadowLedger, StillUnreadableAfterOneReread,
+    SystemConfigurationUnreadableWhen,
 };
 use singlefs_core::mounted_session::{
     CompactionRun, CompactionRunFailure, CompactionRunOutcome, CompactionRunRefused,
@@ -60,8 +65,10 @@ use singlefs_core::recovery::{
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, publish_without_units, warm_up, FirstFile, PoolVersion,
-    PoolWriter, PublishError, RelocationBatchRefused, TransactionOutput, ZeroUnitPublishPlan,
+    acquire_instance, publish_first_file, publish_without_units, warm_up,
+    CopyQuarantinedAfterReleaseChecksumMismatch, FirstFile, PartialWriteBytes, PoolVersion,
+    PoolWriter, PublishError, RelocationBatchRefused, TransactionOutput,
+    UnitRelocatedByThisPublish, ZeroUnitPublishPlan,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{
@@ -579,6 +586,228 @@ pub enum HistoryOperation {
     /// 一·1）：号执行时在现行那一版树里活着的号里取（[`WriteOfAnInodeChoice::inode_among`]），入口按内容长度分（同 [`HistoryOperation::PublishOverwrite`]）。
     /// 第一个文件已删完、之后建过 inode 的一版上照调，必拒（K-U5，用户 2026-10-19 定「拦」）。只进按 inode 号写那一组比重。
     WriteOfAnInode(WriteOfAnInodeChoice),
+    /// 经挂着的会话按偏移写一个活 inode（`mounted_session::UserChange::WriteAtOffset`，判决
+    /// `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）：号执行时在现行那一版树里活着的号里取（同
+    /// [`WriteOfAnInodeChoice::inode_among`]），偏移与长度执行时按那一刻那个文件的 size 与单元数取（[`PartialWriteChoice`]），
+    /// 会话交回的每一版交模型比（[`IdealModel::answer_partial_write`]）。只进按偏移写那一组比重（[`GenerationWeights::PARTIAL_WRITES`]），
+    /// 已有各组生成的历史不变。
+    WriteAtOffset(PartialWriteChoice),
+}
+
+/// 按偏移写的偏移落在哪一格（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R2、R5 那几格：已有单元中间、盖满一个单元、
+/// 跨末尾、起点越过末尾留空隙、写进洞里）。生成时从前五格里抽一格（[`PartialWriteOffsetCell::DRAWN`]），执行时按那一刻文件的 size 与单元数换成偏移与
+/// 长度（[`PartialWriteChoice::offset_and_length_in_bytes`]）；计数按这次写真落到的那一格记（[`PartialWriteOffsetCell::of_the_write`]）——文件太短、
+/// 没有洞时抽到的那一格落不到，换成别的格，不冒充。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PartialWriteOffsetCell {
+    /// 落在一个已有单元里面、没盖满它，终点不越过末尾。
+    InsideAnExistingDataUnit,
+    /// 盖满至少一个已有单元的整个净荷（`[单元号 × 净荷, (单元号 + 1) × 净荷)`）。
+    CoveringAWholeExistingDataUnit,
+    /// 起点在末尾之内或恰在末尾（不在洞里），终点越过末尾：同时是一次变长。
+    AcrossTheEnd,
+    /// 起点越过末尾：写之前的末尾到偏移之间是空隙，补整单元零（R5）。
+    PastTheEndLeavingAGap,
+    /// 起点落在尾部的洞里（存在的单元之后、size 之内）。
+    IntoTheHole,
+    /// 只在归格时出现、生成时不抽：落在 size 之内、跨了单元边界而一个已有单元都没盖满。
+    WithinTheSizeAcrossADataUnitBoundary,
+}
+
+impl PartialWriteOffsetCell {
+    /// 生成时抽的五格（判决第二节那五格）。
+    pub const DRAWN: [PartialWriteOffsetCell; 5] = [
+        PartialWriteOffsetCell::InsideAnExistingDataUnit,
+        PartialWriteOffsetCell::CoveringAWholeExistingDataUnit,
+        PartialWriteOffsetCell::AcrossTheEnd,
+        PartialWriteOffsetCell::PastTheEndLeavingAGap,
+        PartialWriteOffsetCell::IntoTheHole,
+    ];
+
+    /// 统计表里的名字。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            PartialWriteOffsetCell::InsideAnExistingDataUnit => "已有单元中间",
+            PartialWriteOffsetCell::CoveringAWholeExistingDataUnit => "盖满一个单元",
+            PartialWriteOffsetCell::AcrossTheEnd => "跨末尾",
+            PartialWriteOffsetCell::PastTheEndLeavingAGap => "起点越过末尾留空隙",
+            PartialWriteOffsetCell::IntoTheHole => "写进洞里",
+            PartialWriteOffsetCell::WithinTheSizeAcrossADataUnitBoundary => {
+                "size 之内跨单元边界、没盖满一个单元"
+            }
+        }
+    }
+
+    /// 写之前 size 为 `size_in_bytes`、存在 `data_units_present` 个单元（从 0 起连号）的文件上写 `[offset_in_bytes, offset_in_bytes + length_in_bytes)`
+    /// 落在哪一格。次序：起点越过末尾、起点在洞里、盖满一个已有单元、终点越过末尾、落在一个单元里，都不是的是跨单元边界那一格。`length_in_bytes`
+    /// 至少 1。
+    #[must_use]
+    pub fn of_the_write(
+        size_in_bytes: u64,
+        data_units_present: u64,
+        offset_in_bytes: u64,
+        length_in_bytes: u64,
+    ) -> PartialWriteOffsetCell {
+        let payload = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+        let end_exclusive = offset_in_bytes.saturating_add(length_in_bytes);
+        let end_of_the_units_present = data_units_present.saturating_mul(payload);
+        let first_unit_starting_within_the_write = offset_in_bytes.div_ceil(payload);
+        let covers_a_whole_existing_unit = first_unit_starting_within_the_write
+            < data_units_present
+            && (first_unit_starting_within_the_write + 1).saturating_mul(payload) <= end_exclusive;
+        if offset_in_bytes > size_in_bytes {
+            PartialWriteOffsetCell::PastTheEndLeavingAGap
+        } else if end_of_the_units_present <= offset_in_bytes && offset_in_bytes < size_in_bytes {
+            PartialWriteOffsetCell::IntoTheHole
+        } else if covers_a_whole_existing_unit {
+            PartialWriteOffsetCell::CoveringAWholeExistingDataUnit
+        } else if end_exclusive > size_in_bytes {
+            PartialWriteOffsetCell::AcrossTheEnd
+        } else if offset_in_bytes / payload == (end_exclusive - 1) / payload {
+            PartialWriteOffsetCell::InsideAnExistingDataUnit
+        } else {
+            PartialWriteOffsetCell::WithinTheSizeAcrossADataUnitBoundary
+        }
+    }
+}
+
+/// 按偏移写哪个、写在哪一格、写什么（[`HistoryOperation::WriteAtOffset`]）：生成时不知道那一刻文件多长，偏移与长度执行时按格与选择子取，
+/// 字节由填充种子按那个长度现算（同一个选择、同一个文件逐字节复现）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PartialWriteChoice {
+    /// 写哪个号：同 [`WriteOfAnInodeChoice::inode_among`]。
+    pub inode_selector: u64,
+    pub cell: PartialWriteOffsetCell,
+    pub selector: u64,
+    pub fill_seed: u64,
+}
+
+impl PartialWriteChoice {
+    /// 从现行那一版树里活着的号（升序）里取写哪个：第一个文件活着而选择子不是 4 的倍数时取它（按偏移写第一个文件是这一组要罩的大头，
+    /// RefFS 也只翻得出它；建出来的别的号多半 size 0，写上去只落得到「跨末尾」那一格），别的照 [`WriteOfAnInodeChoice::inode_among`]
+    /// （选择子是 3 的倍数取最大的号，否则按选择子取模）。一个号都没有交回 `None`。
+    #[must_use]
+    pub fn inode_among(self, live_inodes_in_ascending_order: &[u64]) -> Option<u64> {
+        let first_file = singlefs_core::transaction::FIRST_INODE_NUMBER;
+        if !self.inode_selector.is_multiple_of(4)
+            && live_inodes_in_ascending_order.contains(&first_file)
+        {
+            return Some(first_file);
+        }
+        WriteOfAnInodeChoice {
+            inode_selector: self.inode_selector,
+            content: ContentChoice {
+                length: ContentLength::Empty,
+                fill_seed: self.fill_seed,
+            },
+        }
+        .inode_among(live_inodes_in_ascending_order)
+    }
+
+    /// size 为 `size_in_bytes`、存在 `data_units_present` 个单元的文件上这一步写的偏移与长度（长度至少 1、至多两个净荷出头，都装得进内存）：
+    /// - 已有单元中间：在第 `选择子 mod 单元数` 个单元的声明长度以内取一段，短于一个净荷（不盖满它）；文件是空的时写偏移 0；
+    /// - 盖满一个单元：从那个单元起点往前至多半个净荷起，盖住它整个净荷再多至多半个净荷；一个单元都没有时从 0 写一个净荷；
+    /// - 跨末尾：从末尾往前退 1 到最后一个单元的声明长度减 1 起（不从它的起点起，不盖满它），越过末尾 1 到两个净荷；
+    /// - 起点越过末尾留空隙：从末尾往后 1 到两个净荷起，写 1 到一个净荷；
+    /// - 写进洞里：起点在存在的单元之后、size 之内，写 1 到一个净荷；没有洞时照「已有单元中间」取。
+    #[must_use]
+    pub fn offset_and_length_in_bytes(
+        self,
+        size_in_bytes: u64,
+        data_units_present: u64,
+    ) -> (u64, u64) {
+        let payload = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+        let declared_length_of =
+            |unit: u64| size_in_bytes.saturating_sub(unit * payload).min(payload);
+        let lower_selector = self.selector;
+        let middle_selector = self.selector >> 21;
+        let upper_selector = self.selector >> 42;
+        let inside_an_existing_unit = || {
+            if size_in_bytes == 0 || data_units_present == 0 {
+                return (0, 1 + lower_selector % 64);
+            }
+            let unit = lower_selector % data_units_present;
+            let declared_length = declared_length_of(unit).max(1);
+            let offset_in_the_unit = middle_selector % declared_length;
+            let longest = (declared_length - offset_in_the_unit)
+                .min(payload - 1)
+                .max(1);
+            (
+                unit * payload + offset_in_the_unit,
+                1 + upper_selector % longest,
+            )
+        };
+        match self.cell {
+            PartialWriteOffsetCell::InsideAnExistingDataUnit
+            | PartialWriteOffsetCell::WithinTheSizeAcrossADataUnitBoundary => {
+                inside_an_existing_unit()
+            }
+            PartialWriteOffsetCell::CoveringAWholeExistingDataUnit => {
+                if data_units_present == 0 {
+                    return (0, payload);
+                }
+                let unit_start = (lower_selector % data_units_present) * payload;
+                let before_the_unit = middle_selector % (unit_start.min(payload / 2) + 1);
+                (
+                    unit_start - before_the_unit,
+                    before_the_unit + payload + upper_selector % (payload / 2),
+                )
+            }
+            PartialWriteOffsetCell::AcrossTheEnd => {
+                if size_in_bytes == 0 || data_units_present == 0 {
+                    return (size_in_bytes, 1 + lower_selector % (2 * payload));
+                }
+                let last_declared_length = declared_length_of(data_units_present - 1).max(1);
+                let back_from_the_end = 1 + lower_selector % (last_declared_length - 1).max(1);
+                let offset = size_in_bytes - back_from_the_end.min(size_in_bytes);
+                // 起点恰在一个单元的起点上时，写得短于一个净荷，不盖满它。
+                let beyond_the_end = if offset.is_multiple_of(payload) {
+                    1 + middle_selector % (payload - back_from_the_end - 1).max(1)
+                } else {
+                    1 + middle_selector % (2 * payload)
+                };
+                (offset, size_in_bytes - offset + beyond_the_end)
+            }
+            PartialWriteOffsetCell::PastTheEndLeavingAGap => (
+                size_in_bytes + 1 + lower_selector % (2 * payload),
+                1 + middle_selector % payload,
+            ),
+            PartialWriteOffsetCell::IntoTheHole => {
+                let end_of_the_units_present = data_units_present * payload;
+                if end_of_the_units_present >= size_in_bytes {
+                    return inside_an_existing_unit();
+                }
+                (
+                    end_of_the_units_present
+                        + lower_selector % (size_in_bytes - end_of_the_units_present),
+                    1 + middle_selector % payload,
+                )
+            }
+        }
+    }
+
+    /// 这一步写的字节：`length_in_bytes` 个，由填充种子现算。
+    #[must_use]
+    pub fn bytes_of_length(self, length_in_bytes: u64) -> Vec<u8> {
+        let length = usize::try_from(length_in_bytes).expect("至多两个净荷出头，装得进 usize");
+        let mut source = SeededRandomSource::from_seed(self.fill_seed);
+        let mut bytes = Vec::with_capacity(length + 8);
+        while bytes.len() < length {
+            bytes.extend_from_slice(&source.next_word().to_le_bytes());
+        }
+        bytes.truncate(length);
+        bytes
+    }
+}
+
+/// 执行器交给会话的一次按偏移写（按步号，[`HistoryRun::partial_writes_requested`]）：执行时取的号、偏移、长度与真落到的格。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PartialWriteRequested {
+    pub inode: u64,
+    pub offset_in_bytes: u64,
+    pub length_in_bytes: u64,
+    pub offset_cell: PartialWriteOffsetCell,
 }
 
 /// 一次建几个 inode（[`HistoryOperation::CreateInodes`]）：执行时压到最右那片叶容器还装得下的条数（满 233 条在末尾分裂，一次只重写一片叶容器，
@@ -723,8 +952,8 @@ impl TruncationChoice {
     }
 }
 
-/// 第一个文件删完之后建的 inode（size 0）改成多少字节：[1, 3 × 净荷] 里按选择子取，恒不等于它的 size 0（改成同样 size 的只改记录那一格
-/// 模型不答，[`IdealModel::answer_size_change_of_an_inode_created_after_the_first_file_was_deleted`]）。
+/// 第一个文件删完之后建的 inode 改成多少字节：[1, 3 × 净荷] 里按选择子取（比它现在的 size 长是变长、短是截断、相同是只改记录，
+/// 模型都答，[`IdealModel::answer_size_change_of_an_inode_other_than_the_first`]）。
 fn new_size_of_an_inode_created_after_the_first_file_was_deleted(selector: u64) -> u64 {
     let payload = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
     1 + selector % (3 * payload)
@@ -775,10 +1004,11 @@ pub enum HistoryOperationKind {
     Truncate,
     CreateInodes,
     WriteOfAnInode,
+    WriteAtOffset,
 }
 
 impl HistoryOperationKind {
-    pub const ALL: [HistoryOperationKind; 19] = [
+    pub const ALL: [HistoryOperationKind; 20] = [
         HistoryOperationKind::PublishFirstFile,
         HistoryOperationKind::PublishOverwrite,
         HistoryOperationKind::PublishWithoutUnits,
@@ -798,6 +1028,7 @@ impl HistoryOperationKind {
         HistoryOperationKind::Truncate,
         HistoryOperationKind::CreateInodes,
         HistoryOperationKind::WriteOfAnInode,
+        HistoryOperationKind::WriteAtOffset,
     ];
 }
 
@@ -830,6 +1061,7 @@ impl HistoryOperation {
             HistoryOperation::Truncate(_) => HistoryOperationKind::Truncate,
             HistoryOperation::CreateInodes(_) => HistoryOperationKind::CreateInodes,
             HistoryOperation::WriteOfAnInode(_) => HistoryOperationKind::WriteOfAnInode,
+            HistoryOperation::WriteAtOffset(_) => HistoryOperationKind::WriteAtOffset,
         }
     }
 }
@@ -885,6 +1117,10 @@ pub enum NamedGenerationWeights {
     Truncation,
     /// [`GenerationWeights::WRITES_BY_INODE_NUMBER`]。
     WritesByInodeNumber,
+    /// [`GenerationWeights::SIZE_CHANGES_OF_INODES_OTHER_THAN_THE_FIRST`]。
+    SizeChangesOfInodesOtherThanTheFirst,
+    /// [`GenerationWeights::PARTIAL_WRITES`]。
+    PartialWrites,
 }
 }
 
@@ -929,6 +1165,10 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::WritesByInodeNumber => {
                 GenerationWeights::WRITES_BY_INODE_NUMBER
             }
+            NamedGenerationWeights::SizeChangesOfInodesOtherThanTheFirst => {
+                GenerationWeights::SIZE_CHANGES_OF_INODES_OTHER_THAN_THE_FIRST
+            }
+            NamedGenerationWeights::PartialWrites => GenerationWeights::PARTIAL_WRITES,
         }
     }
 
@@ -952,6 +1192,10 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::BroadWithCompactionWhileMounted => "broad-compaction",
             NamedGenerationWeights::Truncation => "truncation",
             NamedGenerationWeights::WritesByInodeNumber => "inode-writes",
+            NamedGenerationWeights::SizeChangesOfInodesOtherThanTheFirst => {
+                "size-changes-of-inodes-other-than-the-first"
+            }
+            NamedGenerationWeights::PartialWrites => "partial-writes",
         }
     }
 }
@@ -1596,6 +1840,101 @@ impl GenerationWeights {
         overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
     };
 
+    /// 别的 inode 带数据单元时改 size 那一格（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5 的验收：随机历史点名
+    /// 别的 inode 截断、变长、快照下截断、整理时截断）的取样点：多从第一个文件起；带文件的版本上在第一个文件旁边建 inode、按 inode 号写（内容另抽跨几个
+    /// 单元的，[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]：缩短要不止一批）、截断（第一个文件活着而树里有别的 inode 时一半点名别的 inode，
+    /// `apply_truncate`）占大半，夹着建快照、删快照、挂着时整理、覆盖写、unlink、回退、可写挂载与冷启动；unlink 第一个文件之后接着按号写删之前就有的
+    /// inode、截断与建 inode。新加的一组，已有各组生成的历史不变。
+    pub const SIZE_CHANGES_OF_INODES_OTHER_THAN_THE_FIRST: GenerationWeights = GenerationWeights {
+        name:
+            "别的 inode 带数据单元时改 size（判决 m4-multi-inode-size-r1 第二节 S5 那一格的取样点）",
+        named: NamedGenerationWeights::SizeChangesOfInodesOtherThanTheFirst,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::PublishWithoutUnits, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::CreateInodes, 12),
+            (HistoryOperationKind::WriteOfAnInode, 22),
+            (HistoryOperationKind::Truncate, 30),
+            (HistoryOperationKind::CreateSnapshot, 6),
+            (HistoryOperationKind::DestroySnapshot, 4),
+            (HistoryOperationKind::CompactWhileMounted, 8),
+            (HistoryOperationKind::PublishOverwrite, 4),
+            (HistoryOperationKind::Unlink, 3),
+            (HistoryOperationKind::RollBackWhileMounted, 3),
+            (HistoryOperationKind::CloseAndMountWritable, 5),
+            (HistoryOperationKind::ColdStartRecover, 3),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::WriteOfAnInode, 25),
+            (HistoryOperationKind::Truncate, 30),
+            (HistoryOperationKind::CreateInodes, 15),
+            (HistoryOperationKind::Unlink, 10),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::RollBackWhileMounted, 10),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
+    /// 按偏移写的取样点（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节；C445（模型对拍的取样点不随写路径增长）：新入口要有对拍
+    /// 跑得到它的取样点）：多从第一个文件起；带文件的版本上按偏移写占四成（[`PartialWriteChoice`]：五格偏移各抽到），覆盖写的内容另抽跨几个单元的
+    /// （[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]：「已有单元中间」「盖满一个单元」与「写到 o 时 o 之后一起重写」要多单元的文件），截断里的
+    /// 变长留洞（「写进洞里」那一格只在有洞的文件上落得到），夹着在第一个文件旁边建 inode（按偏移写别的文件，R6）、建快照与删快照（快照下按偏移写，
+    /// 换下的单元进 deadlist）、回退、抬 F、unlink、可写挂载与冷启动；unlink 之后那张表按偏移写删之前就有的 inode、截断与建 inode。
+    /// 新加的一组，已有各组生成的历史不变。
+    pub const PARTIAL_WRITES: GenerationWeights = GenerationWeights {
+        name: "按偏移写（判决 m4-partial-write-r1 第二节那五格的取样点）",
+        named: NamedGenerationWeights::PartialWrites,
+        starting_points: &[
+            (HistoryStartingPoint::AfterMakeFilesystem, 1),
+            (HistoryStartingPoint::AfterFirstFile, 9),
+        ],
+        with_session_closed: &[
+            (HistoryOperationKind::CloseAndMountWritable, 95),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 80),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+            (HistoryOperationKind::PublishWithoutUnits, 5),
+            (HistoryOperationKind::ColdStartRecover, 5),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::WriteAtOffset, 40),
+            (HistoryOperationKind::PublishOverwrite, 12),
+            (HistoryOperationKind::Truncate, 18),
+            (HistoryOperationKind::CreateInodes, 3),
+            (HistoryOperationKind::CreateSnapshot, 4),
+            (HistoryOperationKind::DestroySnapshot, 3),
+            (HistoryOperationKind::RollBackWhileMounted, 5),
+            (HistoryOperationKind::RaiseRollbackFloor, 3),
+            (HistoryOperationKind::Unlink, 2),
+            (HistoryOperationKind::CloseAndMountWritable, 6),
+            (HistoryOperationKind::ColdStartRecover, 4),
+        ],
+        with_session_open_after_the_file_was_deleted: Some(&[
+            (HistoryOperationKind::WriteAtOffset, 35),
+            (HistoryOperationKind::CreateInodes, 25),
+            (HistoryOperationKind::Truncate, 15),
+            (HistoryOperationKind::RollBackWhileMounted, 15),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+        ]),
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
+    };
+
     /// 截断那一格（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8：`HistoryOperation` 加 `Truncate`，比重进自己那一组）的
     /// 取样点，配两块 4 GiB 的盘跑：多从第一个文件起；带文件的版本上截断占三成多（缩到 0、单元边界、单元中间、单元内与跨单元变长、变长后截回洞里、
     /// 改成现在的 size），覆盖写的内容另抽跨几个单元的（[`OverwriteContentDraw::AlsoSpanningSeveralDataUnits`]：多半两片下段叶，缩短要不止一批），
@@ -1920,6 +2259,26 @@ fn draw_operation(
                 content: draw_content_of_a_write_by_inode_number(source),
             })
         }
+        // 五格各占一份（判决第二节那五格）。
+        HistoryOperationKind::WriteAtOffset => {
+            let inode_selector = source.next_word();
+            let cell = draw_weighted(
+                source,
+                &[
+                    (PartialWriteOffsetCell::InsideAnExistingDataUnit, 1),
+                    (PartialWriteOffsetCell::CoveringAWholeExistingDataUnit, 1),
+                    (PartialWriteOffsetCell::AcrossTheEnd, 1),
+                    (PartialWriteOffsetCell::PastTheEndLeavingAGap, 1),
+                    (PartialWriteOffsetCell::IntoTheHole, 1),
+                ],
+            );
+            HistoryOperation::WriteAtOffset(PartialWriteChoice {
+                inode_selector,
+                cell,
+                selector: source.next_word(),
+                fill_seed: source.next_word(),
+            })
+        }
     }
 }
 
@@ -1981,7 +2340,9 @@ fn expected_session_after(
         | HistoryOperationKind::Truncate
         // 建 inode、按 inode 号写不改第一个文件在不在（删完之后按 inode 号写被拒）。
         | HistoryOperationKind::CreateInodes
-        | HistoryOperationKind::WriteOfAnInode => expected,
+        | HistoryOperationKind::WriteOfAnInode
+        // 按偏移写同样不改第一个文件在不在（删完之后按偏移写删完之后才建的 inode 被拒）。
+        | HistoryOperationKind::WriteAtOffset => expected,
         // unlink 之后那一版有树而文件集合为空：比重写了 unlink 之后那张表的按它抽，没写的照旧按「开着、没有文件」抽
         // （第一个文件在它上面照条款被拒）。
         HistoryOperationKind::Unlink => match expected {
@@ -2161,6 +2522,88 @@ struct HistoryPool {
     earliest_stream_index_after_each_power_loss: Vec<usize>,
     /// 每次截断（按步号）交给会话的目标 size（执行时按类取的，交回 [`HistoryRun::sizes_requested_by_the_truncations`]）。
     sizes_requested_by_the_truncations: BTreeMap<usize, u64>,
+    /// 每次截断（按步号）点名的 inode 号（交回 [`HistoryRun::inodes_named_by_the_truncations`]）。
+    inodes_named_by_the_truncations: BTreeMap<usize, u64>,
+    /// 每次按偏移写（按步号）交给会话的号、偏移、长度与真落到的格（交回 [`HistoryRun::partial_writes_requested`]）。
+    partial_writes_requested: BTreeMap<usize, PartialWriteRequested>,
+    /// 这一步里实现交回的隔离（[`copies_quarantined_by_the_versions`] 那几处收进来），这一步跑完由执行器记上步号并进下一格。
+    copies_quarantined_in_this_step: Vec<CopyQuarantinedAfterReleaseChecksumMismatch>,
+    /// 到此为止实现交回的每一份隔离，跨重挂累积（池在整段历史里只有这一个，会话随挂载换）：交回
+    /// [`HistoryRun::copies_quarantined_by_the_implementation`]。
+    copies_quarantined_by_the_implementation: Vec<CopyQuarantinedByTheImplementation>,
+}
+
+/// 实现交回的一份「释放之前读盘核出对不上、隔离了」的单元副本（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1；
+/// 判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3「实现的隔离清单收齐发布、删快照、整理、回退四条路并跨重挂累积」）：
+/// 哪一步交回的、交回的那一份。故障归类器拿它认「插回去那张盘上仍红的那一份是说谎的设备逼出来的隔离」。
+///
+/// 收的是执行器拿得到的每一处：经会话的用户改动（覆盖写、顺序写、按 inode 号写、unlink、截断、建 inode、建与删快照）交回的每一版、
+/// 会话为它推的抬 F 的空发布与改动之后那一趟整理；挂着时整理一趟发成的每一版；新池新建文件那一版；管理员回退交回的
+/// `quarantined_user_visible_copies` 与回退那次发布自己那一版；抬 F 的空发布；可写挂载的写行、暖机、删除续做、续做推的抬 F、
+/// 挂载里那一趟整理与挂载交回的现行那一版。零单元发布不释放单元、没有这一栏；掉电那一截的发布结局实现自己丢了，收不到。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CopyQuarantinedByTheImplementation {
+    pub step: StepPosition,
+    pub copy: CopyQuarantinedAfterReleaseChecksumMismatch,
+}
+
+/// 一批发成的版里实现交回的隔离（每一版的 `quarantined_after_release_checksum_mismatch`，按版的先后）。
+fn copies_quarantined_by_the_versions<'version>(
+    versions: impl IntoIterator<Item = &'version TransactionOutput>,
+) -> Vec<CopyQuarantinedAfterReleaseChecksumMismatch> {
+    versions
+        .into_iter()
+        .flat_map(|version| {
+            version
+                .quarantined_after_release_checksum_mismatch
+                .iter()
+                .copied()
+        })
+        .collect()
+}
+
+/// 一次经会话的用户改动发成的每一版里实现交回的隔离：推的抬 F 的空发布、推的抬 F 之外发成的每一版（改动那一版在里面，
+/// `mounted_session::VersionsPublishedInThisChange`）；被拒的几种照带着的那几版收。整理不在用户改动里跑（挪出了调用线程，
+/// `mounted_session::MountedSession::run_compaction_in_the_background`）。
+fn copies_quarantined_by_a_user_change(
+    change_result: &Result<UserChangePublished, UserChangeRefused>,
+) -> Vec<CopyQuarantinedAfterReleaseChecksumMismatch> {
+    let (floor_raises, versions_published) =
+        floor_raises_and_versions_published_of_a_user_change(change_result);
+    copies_quarantined_by_the_versions(
+        floor_raises
+            .iter()
+            .flat_map(|raised| raised.publishes.iter())
+            .chain(versions_published),
+    )
+}
+
+/// 一次可写挂载交回的每一版里实现交回的隔离：写行那一版、暖机、删除续做、续做推的抬 F、挂载里那一趟整理、挂载交回的现行那一版
+/// （几样里同一版会重复，并进来时去重）。
+fn copies_quarantined_by_a_mount(
+    mounted: &singlefs_core::mount::Mounted,
+) -> Vec<CopyQuarantinedAfterReleaseChecksumMismatch> {
+    let output = &mounted.output;
+    let versions_of_the_compaction_continuation: &[TransactionOutput] = output
+        .compaction_continuation
+        .run
+        .as_ref()
+        .map(|run| run.versions_published.as_slice())
+        .unwrap_or_default();
+    copies_quarantined_by_the_versions(
+        std::iter::once(&output.row_publish)
+            .chain(&output.warm_up_publishes)
+            .chain(std::iter::once(&mounted.current))
+            .filter_map(|version| version.version_of_trees())
+            .chain(&output.deletion_queue_continuation)
+            .chain(
+                output
+                    .floor_raises_pushed_by_the_continuation
+                    .iter()
+                    .flat_map(|raised| raised.publishes.iter()),
+            )
+            .chain(versions_of_the_compaction_continuation),
+    )
 }
 
 /// 模型对一步的判定：对不上的那一格（没有就是 None）与这一步比了多少格。
@@ -2436,9 +2879,27 @@ impl HistoryPool {
                 operations_written_by_make_filesystem,
                 earliest_stream_index_after_each_power_loss: Vec::new(),
                 sizes_requested_by_the_truncations: BTreeMap::new(),
+                inodes_named_by_the_truncations: BTreeMap::new(),
+                partial_writes_requested: BTreeMap::new(),
+                copies_quarantined_in_this_step: Vec::new(),
+                copies_quarantined_by_the_implementation: Vec::new(),
             },
             verdict,
         ))
+    }
+
+    /// 这一步里实现交回的隔离记上步号、并进到此为止那一格（同一份在一步里从几处收到的只记一次）。
+    fn note_the_copies_quarantined_in_the_step(&mut self, step: StepPosition) {
+        for copy in std::mem::take(&mut self.copies_quarantined_in_this_step) {
+            let quarantined = CopyQuarantinedByTheImplementation { step, copy };
+            if !self
+                .copies_quarantined_by_the_implementation
+                .contains(&quarantined)
+            {
+                self.copies_quarantined_by_the_implementation
+                    .push(quarantined);
+            }
+        }
     }
 
     /// 两块盘此刻的整份镜像（拷一份，checker 与观察者读它）。
@@ -2599,9 +3060,82 @@ impl RecordReuse {
     }
 }
 
-/// 一次发布改写或新增的分配记录（发布之后有、发布之前没有一模一样的一条）里，代不在 [`first_publish_txg`, `last_publish_txg`] 里的那些。
-/// 一次发布改写的记录只有三种，代都是这次发布的 txg：新分配的（分配代）、复用改写已回收的（分配代改成这次的，D3（空间分配） 的
-/// 「value = 分配代」）、这次释放的（释放代，`crates/singlefs-core/src/transaction.rs` 的 `allocator.release(*placement, txg);`）。
+/// 一次（几次）发布里，执行器认下的「只改了隔离记号」的记录改法（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」：
+/// 隔离那次发布置记号、分配代不变；回退复活那一次，同一次发布清掉记号）。认下的记录与发布之前同一盘同一槽上那一条跨度相同、分配代相同、
+/// 前后都未释放，只差记号。
+#[derive(Clone, Copy, Debug)]
+pub struct QuarantineMarkChangesVouchedFor<'copies> {
+    /// 这次（几次）发布里实现交回的隔离：没有记号改成带记号的记录，要在这里有同一块盘、同一个起点槽、同一个跨度的那一份。
+    pub copies_quarantined_by_the_publishes:
+        &'copies [CopyQuarantinedAfterReleaseChecksumMismatch],
+    /// 带记号的记录改回没有记号，是不是这次发布该做的。
+    pub clearing: QuarantineMarkClearing,
+}
+
+/// 带隔离记号的记录改回没有记号（分配代不变、仍未释放），是不是这次发布该做的。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuarantineMarkClearing {
+    /// 不是回退那次发布：清了记号的记录照挑。
+    NotDoneByThisPublish,
+    /// 回退那次发布：回退目标引用的单元，同一次发布清掉两块盘上的记号。
+    DoneByTheRollbackPublish,
+}
+
+/// `record`（发布之后）与发布之前同一盘同一槽上的一条只差隔离记号（跨度、分配代相同，前后都未释放），而且这一改是 `vouched_for` 认下的。
+fn is_a_quarantine_mark_change_vouched_for(
+    before: &[AllocationRecord],
+    record: &AllocationRecord,
+    vouched_for: QuarantineMarkChangesVouchedFor<'_>,
+) -> bool {
+    before.iter().any(|record_before| {
+        let differs_only_in_the_quarantine_mark = record_before.device == record.device
+            && record_before.slot == record.slot
+            && record_before.span_slots == record.span_slots
+            && record_before.generation == record.generation
+            && !record_before.is_released
+            && !record.is_released;
+        if !differs_only_in_the_quarantine_mark {
+            return false;
+        }
+        match (record_before.quarantine_mark, record.quarantine_mark) {
+            (
+                AllocationRecordQuarantineMark::NotQuarantined,
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+            ) => vouched_for
+                .copies_quarantined_by_the_publishes
+                .iter()
+                .any(|copy| {
+                    copy.device == record.device
+                        && copy.placement.slot == record.slot
+                        && copy.placement.span == u64::from(record.span_slots)
+                }),
+            (
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+                AllocationRecordQuarantineMark::NotQuarantined,
+            ) => match vouched_for.clearing {
+                QuarantineMarkClearing::NotDoneByThisPublish => false,
+                QuarantineMarkClearing::DoneByTheRollbackPublish => true,
+            },
+            // 记号也相同就是一模一样的一条，不是改写。
+            (
+                AllocationRecordQuarantineMark::NotQuarantined,
+                AllocationRecordQuarantineMark::NotQuarantined,
+            )
+            | (
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+            ) => false,
+        }
+    })
+}
+
+/// 一次发布改写或新增的分配记录（发布之后有、发布之前没有一模一样的一条）里，代不在 [`first_publish_txg`, `last_publish_txg`] 里的那些，
+/// 去掉 `quarantine_mark_changes` 认下的只改隔离记号的那几条。
+/// 一次发布改写的记录有五种。三种改代，代都是这次发布的 txg：新分配的（分配代）、复用改写已回收的（分配代改成这次的，D3（空间分配） 的
+/// 「value = 分配代」）、这次释放的（释放代，`crates/singlefs-core/src/transaction.rs` 的 `allocator.release(*placement, txg);`；
+/// 释放隔离记录时记号随之清掉，也是这一种）。两种只改隔离记号、分配代不变（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」）：
+/// 隔离那次发布置记号，回退复活那一次清记号。这两种不在通用的判法里一并放过：置记号的只放过这次实现交回了隔离的那几份，清记号的只在
+/// 回退那一处放过（[`QuarantineMarkChangesVouchedFor`]），别的只差记号的记录代不在这次的 txg 里照挑。
 /// 盘上 checker 判不出分配代没改（33 条不变量里只有 I-3.9 看代，只看已释放的；增补 2 收口表第 44 行），这里在执行器里判。
 #[must_use]
 pub fn records_changed_with_a_generation_outside_the_publish_txgs(
@@ -2609,6 +3143,7 @@ pub fn records_changed_with_a_generation_outside_the_publish_txgs(
     after: &[AllocationRecord],
     first_publish_txg: CheckpointTxg,
     last_publish_txg: CheckpointTxg,
+    quarantine_mark_changes: QuarantineMarkChangesVouchedFor<'_>,
 ) -> Vec<AllocationRecord> {
     let records_before: BTreeSet<&AllocationRecord> = before.iter().collect();
     after
@@ -2616,6 +3151,9 @@ pub fn records_changed_with_a_generation_outside_the_publish_txgs(
         .filter(|record| !records_before.contains(record))
         .filter(|record| {
             record.generation < first_publish_txg || record.generation > last_publish_txg
+        })
+        .filter(|record| {
+            !is_a_quarantine_mark_change_vouched_for(before, record, quarantine_mark_changes)
         })
         .copied()
         .collect()
@@ -3165,6 +3703,10 @@ pub struct HistoryTally {
     /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8「目标按类取」：每一类真的走到了）。
     pub truncation_targets_attempted: BTreeMap<&'static str, u64>,
     pub truncation_targets_published: BTreeMap<&'static str, u64>,
+    /// 按偏移写（[`HistoryOperation::WriteAtOffset`]）真落到的格（[`PartialWriteOffsetCell::name`]）→ 入口被调了几次、返回 Ok 几次（判决
+    /// `research/prompts/m4-partial-write-r1-main-verification.md` 第二节那五格：每一格真的走到了）。
+    pub partial_write_offset_cells_attempted: BTreeMap<&'static str, u64>,
+    pub partial_write_offset_cells_published: BTreeMap<&'static str, u64>,
     pub refusals_by_member: BTreeMap<String, u64>,
     pub not_applicable_by_precondition: BTreeMap<&'static str, u64>,
     pub recovery_outcomes: BTreeMap<String, u64>,
@@ -3256,6 +3798,18 @@ impl HistoryTally {
         }
         for (target, count) in &other.truncation_targets_published {
             *self.truncation_targets_published.entry(target).or_insert(0) += count;
+        }
+        for (cell, count) in &other.partial_write_offset_cells_attempted {
+            *self
+                .partial_write_offset_cells_attempted
+                .entry(cell)
+                .or_insert(0) += count;
+        }
+        for (cell, count) in &other.partial_write_offset_cells_published {
+            *self
+                .partial_write_offset_cells_published
+                .entry(cell)
+                .or_insert(0) += count;
         }
         for (member, count) in &other.refusals_by_member {
             *self.refusals_by_member.entry(member.clone()).or_insert(0) += count;
@@ -3472,6 +4026,8 @@ impl HistoryTally {
             HistoryOperation::PublishFirstFile(content)
             | HistoryOperation::PublishOverwrite(content) => Some(content),
             HistoryOperation::WriteOfAnInode(choice) => Some(&choice.content),
+            // 按偏移写的长度执行时按格取，真落到的格另记（[`HistoryTally::note_partial_write_offset_cell`]）。
+            HistoryOperation::WriteAtOffset(_) => None,
             HistoryOperation::PublishWithoutUnits
             | HistoryOperation::CloseAndMountWritable
             | HistoryOperation::RollBackWhileMounted(_)
@@ -3525,6 +4081,30 @@ impl HistoryTally {
         }
     }
 
+    /// 一次按偏移写真落到的格进过入口（调了就算）、做成了没有（返回 Ok）。
+    pub fn note_partial_write_offset_cell(
+        &mut self,
+        offset_cell: PartialWriteOffsetCell,
+        outcome: &StepOutcome,
+    ) {
+        let entrance_was_called = match outcome {
+            StepOutcome::Applied(_) | StepOutcome::Refused { .. } => true,
+            StepOutcome::NotApplicable(_) => false,
+        };
+        if entrance_was_called {
+            *self
+                .partial_write_offset_cells_attempted
+                .entry(offset_cell.name())
+                .or_insert(0) += 1;
+        }
+        if let StepOutcome::Applied(_) = outcome {
+            *self
+                .partial_write_offset_cells_published
+                .entry(offset_cell.name())
+                .or_insert(0) += 1;
+        }
+    }
+
     /// 给人看的一整块：每类操作的结局、见过的 `Err` 成员、冷启动的结局、会话与挂载的最大值、复用、checker 跑了几次与每条不变量判绿几次。
     #[must_use]
     pub fn render(&self) -> String {
@@ -3572,6 +4152,17 @@ impl HistoryTally {
             let _ = writeln!(
                 text,
                 "  截断目标 {target}：入口被调 {count} 次、发成 {published} 次"
+            );
+        }
+        for (cell, count) in &self.partial_write_offset_cells_attempted {
+            let published = self
+                .partial_write_offset_cells_published
+                .get(cell)
+                .copied()
+                .unwrap_or(0);
+            let _ = writeln!(
+                text,
+                "  按偏移写落在「{cell}」：入口被调 {count} 次、发成 {published} 次"
             );
         }
         for (member, count) in &self.refusals_by_member {
@@ -3663,6 +4254,13 @@ impl HistoryTally {
         );
         let _ = writeln!(
             text,
+            "  按偏移写：模型比过写第一个文件 {} 次、写别的文件 {} 次",
+            self.model_counts.partial_writes_of_the_first_file_matched,
+            self.model_counts
+                .partial_writes_of_an_inode_other_than_the_first_matched
+        );
+        let _ = writeln!(
+            text,
             "  checker 跑了 {} 次；一个写都没发、沿用上一次结论的 {} 步；每步镜像交出去 {} 张",
             self.checker_runs,
             self.checker_runs_skipped_because_nothing_was_written,
@@ -3737,6 +4335,14 @@ pub struct HistoryRun {
     /// 每次截断（[`HistoryOperation::Truncate`]，按步号）交给会话的目标 size：执行时按那一刻的 size 与单元数取（[`TruncationChoice`]），
     /// RefFS 翻译拿它交 `Operation::Truncate(n)`（入口报错、panic 停下的那一步也在里面）。
     pub sizes_requested_by_the_truncations: BTreeMap<usize, u64>,
+    /// 每次截断（按步号）点名的 inode 号：RefFS 翻译对第一个文件之外的号写了盘的那一步停下（判决
+    /// `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5「翻译层对 inode ≠ 1 且写了盘的截断停下」）。
+    pub inodes_named_by_the_truncations: BTreeMap<usize, u64>,
+    /// 每次按偏移写（[`HistoryOperation::WriteAtOffset`]，按步号）交给会话的号、偏移、长度与真落到的格：RefFS 翻译拿它交按偏移写的那一个
+    /// 内容改动（字节由那一步的选择按这个长度现算），对第一个文件之外的号写了盘的那一步停下（入口报错、panic 停下的那一步也在里面）。
+    pub partial_writes_requested: BTreeMap<usize, PartialWriteRequested>,
+    /// 实现交回的每一份隔离，按交回的先后，跨重挂累积（[`CopyQuarantinedByTheImplementation`]；停下的那一步、panic 的那一步交回的也在里面）。
+    pub copies_quarantined_by_the_implementation: Vec<CopyQuarantinedByTheImplementation>,
 }
 
 /// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像、跟到这一步的理想模型。
@@ -3753,6 +4359,10 @@ pub struct StepObservation<'run> {
     pub free_bytes_reported_by_the_current_version: Option<Vec<(DeviceIdentity, u64)>>,
     /// 这一步是截断时交给会话的目标 size（[`HistoryRun::sizes_requested_by_the_truncations`] 里这一步那一项）；别的步、前提不满足没调的是 None。
     pub size_requested_by_the_truncation: Option<u64>,
+    /// 这一步是截断时点名的 inode 号（[`HistoryRun::inodes_named_by_the_truncations`] 里这一步那一项）；别的步、前提不满足没调的是 None。
+    pub inode_named_by_the_truncation: Option<u64>,
+    /// 这一步是按偏移写时交给会话的那一次（[`HistoryRun::partial_writes_requested`] 里这一步那一项）；别的步、前提不满足没调的是 None。
+    pub partial_write_requested: Option<PartialWriteRequested>,
 }
 
 /// 会话现行那一版记账里每块盘「空闲」那一行（[`StepObservation::free_bytes_reported_by_the_current_version`]）。
@@ -3785,7 +4395,7 @@ fn placement_refusal_member(refusal: &PlacementRefusal) -> &'static str {
     }
 }
 
-/// 改 size 被拒的成员名（统计表按成员分：删完之后点名别的 inode 被拒与别的拒分得开）。
+/// 改 size 与按偏移写被拒的成员名（统计表按成员分：溢出、点名不是活记录、读—改—写读不回旧单元各拒分得开）。
 fn truncation_refusal_member(
     refusal: singlefs_core::transaction::TruncationRefusal,
 ) -> &'static str {
@@ -3796,11 +4406,8 @@ fn truncation_refusal_member(
         singlefs_core::transaction::TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows {
             ..
         } => "TargetSizeRoundedUpToAWholeDataUnitOverflows",
-        singlefs_core::transaction::TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
-            ..
-        } => "SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses",
-        singlefs_core::transaction::TruncationRefusal::TailDataUnitBytesNotInTheVersion { .. } => {
-            "TailDataUnitBytesNotInTheVersion"
+        singlefs_core::transaction::TruncationRefusal::OldDataUnitToRewriteNotReadBack { .. } => {
+            "OldDataUnitToRewriteNotReadBack"
         }
         singlefs_core::transaction::TruncationRefusal::TruncationIntentDoesNotNameTheLiveRecord {
             ..
@@ -3949,8 +4556,8 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
         RecoveryFailure::InvariantViolated { invariant, .. } => {
             format!("RecoveryFailure::InvariantViolated（{invariant}）")
         }
-        RecoveryFailure::EntryNarrowerThanItsFieldTable { what, .. } => {
-            format!("RecoveryFailure::EntryNarrowerThanItsFieldTable（{what}）")
+        RecoveryFailure::EntryWidthDiffersFromItsFieldTable { what, .. } => {
+            format!("RecoveryFailure::EntryWidthDiffersFromItsFieldTable（{what}）")
         }
         RecoveryFailure::AllocationRecordOutsideThePoolGeometry { what } => {
             format!("RecoveryFailure::AllocationRecordOutsideThePoolGeometry（{what}）")
@@ -3979,6 +4586,7 @@ fn mount_error_member(error: &MountError) -> String {
         }
         MountError::FileVersionWithoutAnyJournalRecord => "FileVersionWithoutAnyJournalRecord",
         MountError::InstanceTableMalformed => "InstanceTableMalformed",
+        MountError::InstanceTableUnreadable => "InstanceTableUnreadable",
         MountError::Acquisition(acquisition) => {
             return format!(
                 "MountError::Acquisition({})",
@@ -4270,18 +4878,24 @@ impl AppliedStep {
     }
 }
 
-/// 一次发布前后的分配记录：改写或新增的记录的代要在这次（几次）发布的 txg 里。
+/// 一次发布前后的分配记录：改写或新增的记录的代要在这次（几次）发布的 txg 里；只改隔离记号的，置记号的只放过
+/// `copies_quarantined_by_the_publishes`（这次几次发布里实现交回的隔离）点名的那几份，清记号的不放过（只有回退那一处放过，不走这里）。
 fn allocation_generation_judgement(
     before: &[AllocationRecord],
     after: &[AllocationRecord],
     first_publish_txg: CheckpointTxg,
     last_publish_txg: CheckpointTxg,
+    copies_quarantined_by_the_publishes: &[CopyQuarantinedAfterReleaseChecksumMismatch],
 ) -> Option<HarnessJudgement> {
     let records = records_changed_with_a_generation_outside_the_publish_txgs(
         before,
         after,
         first_publish_txg,
         last_publish_txg,
+        QuarantineMarkChangesVouchedFor {
+            copies_quarantined_by_the_publishes,
+            clearing: QuarantineMarkClearing::NotDoneByThisPublish,
+        },
     );
     (!records.is_empty()).then_some(HarnessJudgement::AllocationGenerationIsNotThePublishTxg {
         records,
@@ -4301,6 +4915,7 @@ fn apply_publish_first_file(
         session,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(session) = session.as_mut() else {
@@ -4324,7 +4939,10 @@ fn apply_publish_first_file(
         session.instance,
         &previous_record_bytes,
     ) {
-        Ok(output) => settle_file_publish(session, model, answer, &records_before, output),
+        Ok(output) => {
+            copies_quarantined_in_this_step.extend(copies_quarantined_by_the_versions([&output]));
+            settle_file_publish(session, model, answer, &records_before, output)
+        }
         Err(error) => {
             settle_refused_file_publish(model, answer, &error, stream, stream_length_before)
         }
@@ -4372,6 +4990,7 @@ fn settle_file_publish(
         session.allocator.records(),
         publish_txg,
         publish_txg,
+        &output.quarantined_after_release_checksum_mismatch,
     );
     let verdict = judge_by_model(
         model,
@@ -4405,6 +5024,7 @@ fn apply_publish_overwrite(
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -4465,6 +5085,7 @@ fn apply_publish_overwrite(
             ideal_model.answer_publish_sequential_write(&content)
         }
     };
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -4622,6 +5243,7 @@ fn settle_user_change(
                 &publish.allocation_records,
                 publish_txg,
                 publish_txg,
+                &publish.quarantined_after_release_checksum_mismatch,
             )
         });
         records_of_the_previous_publish = &publish.allocation_records;
@@ -4639,6 +5261,7 @@ fn settle_user_change(
                     session.allocator.records(),
                     publish_txg,
                     publish_txg,
+                    &output.quarantined_after_release_checksum_mismatch,
                 )
             });
             if verdict.disagreement.is_none() {
@@ -4835,6 +5458,7 @@ fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64, step_index: usi
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -4887,6 +5511,7 @@ fn apply_unlink(pool: &mut HistoryPool, write_time_seconds: u64, step_index: usi
             write_time_seconds,
         },
     );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -4952,8 +5577,10 @@ type ModelAnswerOfAUserChange = Box<dyn Fn(&IdealModel) -> Result<ModelAnswer, M
 /// （`UserChange::Truncate`）。一次调用 = 先走空 + 改 size 那一次 + 缩短时之后的全部批；会话推的每一串抬 F 与发成的每一版交模型比（走空的一步与
 /// 截断的各批按「走空的一步」，改 size 那一次按 [`IdealModel::answer_truncation`]），照 unlink 的比法。
 /// 点名谁：现行那一版有第一个文件那条记录（活的、删除中的、截断途中的）时改第一个文件，目标按那条记录的 size 与这一版的数据单元数取
-/// （[`TruncationChoice::new_size_in_bytes`]；删除中的那一版会话先走空、再拒成 `NoFileVersionToChange`）；没有而树里有别的 inode（删完之后建过）
-/// 时点名按选择子取的那一个，目标取 [1, 3 × 净荷]（第一版拒，[`IdealModel::answer_size_change_of_an_inode_created_after_the_first_file_was_deleted`]）；
+/// （[`TruncationChoice::new_size_in_bytes`]；删除中的那一版会话先走空、再拒成 `NoFileVersionToChange`），树里另有别的 inode 时选择子最高位是 1 的
+/// 那一半改其中一个（带数据单元的先挑，目标按它自己的 size 与单元数取，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5）；没有而树里有别的 inode（删完之后建过）
+/// 时点名按选择子取的那一个，目标取 [1, 3 × 净荷]（[`IdealModel::answer_size_change_of_an_inode_other_than_the_first`]；任意活 inode 都能缩短与变长，
+/// 判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S6）；
 /// 都没有（有树而文件集合为空）照样点名第一个文件，会话拒成 `NoFileVersionToChange`。写入时间取这一步的（同覆盖写、unlink）。
 /// 前提：会话开着、现行那一版有树。
 fn apply_truncate(
@@ -4968,6 +5595,8 @@ fn apply_truncate(
         model,
         stream,
         sizes_requested_by_the_truncations,
+        inodes_named_by_the_truncations,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -4988,6 +5617,53 @@ fn apply_truncate(
         .collect();
     let (inode, new_size, answer_of_the_change): (u64, u64, ModelAnswerOfAUserChange) =
         match (version_of_trees.inode_record, other_inodes.as_slice()) {
+            // 第一个文件活着、树里还有别的 inode（只有在第一个文件旁边建过 inode 的那几组比重造得出这一形）：选择子最高位是 1 的那一半点名别的 inode
+            // （按选择子的高 32 位取），目标按它自己的 size 与单元数取类（判决 m4-multi-inode-size-r1 第二节 S5「随机历史点名别的 inode 截断、变长」）。
+            (Some(_), [_, ..]) if choice.selector >> 63 == 1 => {
+                // 带数据单元的别的 inode 先挑（这一组要罩的是它们的截断与变长）；一个都没有时在全部别的 inode 里挑。
+                let holding_data_units: Vec<singlefs_core::records::InodeRecord> = other_inodes
+                    .iter()
+                    .filter(|record| {
+                        version_of_trees
+                            .file_other_than_the_first(singlefs_core::address::InodeNumber(
+                                record.inode,
+                            ))
+                            .is_some_and(|file| !file.data_pointers.is_empty())
+                    })
+                    .copied()
+                    .collect();
+                let candidates = if holding_data_units.is_empty() {
+                    other_inodes.as_slice()
+                } else {
+                    holding_data_units.as_slice()
+                };
+                let index = usize::try_from(
+                    (choice.selector >> 32)
+                        % u64::try_from(candidates.len()).expect("条数装得进 u64"),
+                )
+                .expect("小于条数");
+                let record = candidates[index];
+                let data_units_present = u64::try_from(
+                    version_of_trees
+                        .file_other_than_the_first(singlefs_core::address::InodeNumber(
+                            record.inode,
+                        ))
+                        .map_or(0, |file| file.data_pointers.len()),
+                )
+                .expect("单元数装得进 u64");
+                let new_size = choice.new_size_in_bytes(record.size, data_units_present);
+                let changed_inode = record.inode;
+                (
+                    changed_inode,
+                    new_size,
+                    Box::new(move |ideal_model: &IdealModel| {
+                        ideal_model.answer_size_change_of_an_inode_other_than_the_first(
+                            changed_inode,
+                            new_size,
+                        )
+                    }),
+                )
+            }
             (Some(record), _) => {
                 let data_units_present =
                     u64::try_from(version_of_trees.data_pointers.len()).expect("单元数装得进 u64");
@@ -5022,9 +5698,8 @@ fn apply_truncate(
                     record.inode,
                     new_size,
                     Box::new(move |ideal_model: &IdealModel| {
-                        ideal_model
-                        .answer_size_change_of_an_inode_created_after_the_first_file_was_deleted(
-                            record.size,
+                        ideal_model.answer_size_change_of_an_inode_other_than_the_first(
+                            record.inode,
                             new_size,
                         )
                     }),
@@ -5032,6 +5707,7 @@ fn apply_truncate(
             }
         };
     sizes_requested_by_the_truncations.insert(step_index, new_size);
+    inodes_named_by_the_truncations.insert(step_index, inode);
     let records_before = open_session.allocator.records().to_vec();
     let stream_length_before = stream.operation_count();
     let WritableSession {
@@ -5060,6 +5736,7 @@ fn apply_truncate(
             write_time_seconds,
         },
     );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -5163,6 +5840,7 @@ fn settle_user_change_comparing_every_version_published(
                     &output.allocation_records,
                     publish_txg,
                     publish_txg,
+                    &output.quarantined_after_release_checksum_mismatch,
                 )
             });
             records_of_the_previous_publish = &output.allocation_records;
@@ -5245,6 +5923,7 @@ fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> Applie
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -5291,6 +5970,7 @@ fn apply_create_inode(pool: &mut HistoryPool, write_time_seconds: u64) -> Applie
             write_time_seconds,
         },
     );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -5349,6 +6029,7 @@ fn apply_create_inodes(
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -5390,6 +6071,7 @@ fn apply_create_inodes(
             write_time_seconds,
         },
     );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -5427,6 +6109,7 @@ fn apply_write_of_an_inode(
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -5479,6 +6162,7 @@ fn apply_write_of_an_inode(
             },
         },
     );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.insert(WritableSession {
         allocator: mounted_session.allocator,
         current: mounted_session.current,
@@ -5500,6 +6184,127 @@ fn apply_write_of_an_inode(
         session_after_the_change,
         model,
         &answer_of_the_change,
+        &records_before,
+        &change_result,
+        stream,
+        stream_length_before,
+    )
+}
+
+/// 按偏移写一个活 inode（`HistoryOperation::WriteAtOffset`，判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）：经挂着的会话发
+/// （`UserChange::WriteAtOffset`）。号在现行那一版树里活着的号里取（[`PartialWriteChoice::inode_among`]），偏移与长度按那个文件此刻的 size 与单元数取
+/// （[`PartialWriteChoice::offset_and_length_in_bytes`]；单元数取它与 size 罩的单元数里小的那个——截断途中 size 之外还挂着的单元会话先走空放掉），
+/// 交给会话的那一次按步号记下（RefFS 翻译与计数用）。会话交回的每一版交模型比（走空的一步按「走空的一步」，这一次按 [`IdealModel::answer_partial_write`]）。
+/// 前提：会话开着、现行那一版树里有活着的号。
+fn apply_write_at_offset(
+    pool: &mut HistoryPool,
+    choice: PartialWriteChoice,
+    step_index: usize,
+    write_time_seconds: u64,
+) -> AppliedStep {
+    let HistoryPool {
+        devices,
+        session: session_slot,
+        model,
+        stream,
+        partial_writes_requested,
+        copies_quarantined_in_this_step,
+        ..
+    } = pool;
+    let Some(open_session) = session_slot.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let version_of_trees = match &open_session.current {
+        PoolVersion::WithoutFile(_) => {
+            return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+        }
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => version,
+    };
+    let Some(inode) = choice.inode_among(&live_inode_numbers(version_of_trees)) else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoInodeToWriteInTheCurrentVersion);
+    };
+    let size_in_bytes = version_of_trees
+        .inode_leaf_containers
+        .iter()
+        .flat_map(|container| container.contents.records.iter())
+        .find(|record| record.inode == inode)
+        .map_or(0, |record| record.size);
+    let data_units_existing = if inode == singlefs_core::transaction::FIRST_INODE_NUMBER {
+        version_of_trees.data_pointers.len()
+    } else {
+        version_of_trees
+            .file_other_than_the_first(InodeNumber(inode))
+            .map_or(0, |file| file.data_pointers.len())
+    };
+    let payload = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+    let data_units_present = u64::try_from(data_units_existing)
+        .expect("单元数装得进 u64")
+        .min(size_in_bytes.div_ceil(payload).max(1));
+    let (offset_in_bytes, length_in_bytes) =
+        choice.offset_and_length_in_bytes(size_in_bytes, data_units_present);
+    partial_writes_requested.insert(
+        step_index,
+        PartialWriteRequested {
+            inode,
+            offset_in_bytes,
+            length_in_bytes,
+            offset_cell: PartialWriteOffsetCell::of_the_write(
+                size_in_bytes,
+                data_units_present,
+                offset_in_bytes,
+                length_in_bytes,
+            ),
+        },
+    );
+    let bytes = choice.bytes_of_length(length_in_bytes);
+    let records_before = open_session.allocator.records().to_vec();
+    let stream_length_before = stream.operation_count();
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        publishes_in_this_mount,
+        carried_to_zero_unit_publishes: _,
+        compaction,
+    } = session_slot.take().expect("上面判过这个进程的会话开着");
+    let mut mounted_session = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        compaction,
+    };
+    let change_result = mounted_session.publish_user_change(
+        devices,
+        UserChange::WriteAtOffset {
+            inode: InodeNumber(inode),
+            offset: FileOffsetInBytes(offset_in_bytes),
+            bytes: PartialWriteBytes::new(&bytes)
+                .expect("长度至少 1（`offset_and_length_in_bytes` 的契约）"),
+            write_time_seconds,
+        },
+    );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
+    let session_after_the_change = session_slot.insert(WritableSession {
+        allocator: mounted_session.allocator,
+        current: mounted_session.current,
+        instance: mounted_session.instance,
+        shadow_ledger: mounted_session.shadow_ledger,
+        parameters_and_device_table: mounted_session.parameters_and_device_table,
+        compaction: mounted_session.compaction,
+        publishes_in_this_mount,
+        // 零单元发布只接在树表 0 条的一版后面，按偏移写只接在有树的一版后面。
+        carried_to_zero_unit_publishes: None,
+    });
+    settle_user_change_comparing_every_version_published(
+        session_after_the_change,
+        model,
+        &|ideal_model: &IdealModel| {
+            ideal_model.answer_partial_write(inode, offset_in_bytes, &bytes)
+        },
         &records_before,
         &change_result,
         stream,
@@ -5618,6 +6423,7 @@ fn apply_create_snapshot(pool: &mut HistoryPool) -> AppliedStep {
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -5633,6 +6439,7 @@ fn apply_create_snapshot(pool: &mut HistoryPool) -> AppliedStep {
             stream,
             UserChange::CreateSnapshot,
         );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.as_mut().expect("会话发完原样还回来");
     let applied = settle_user_change_comparing_every_version_published(
         session_after_the_change,
@@ -5664,6 +6471,7 @@ fn apply_destroy_snapshot(pool: &mut HistoryPool, choice: SnapshotChoice) -> App
         session: session_slot,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(open_session) = session_slot.as_ref() else {
@@ -5690,6 +6498,7 @@ fn apply_destroy_snapshot(pool: &mut HistoryPool, choice: SnapshotChoice) -> App
             stream,
             UserChange::DestroySnapshot { snapshot },
         );
+    copies_quarantined_in_this_step.extend(copies_quarantined_by_a_user_change(&change_result));
     let session_after_the_change = session_slot.as_mut().expect("会话发完原样还回来");
     let applied = settle_user_change_comparing_every_version_published(
         session_after_the_change,
@@ -5829,42 +6638,63 @@ fn allocation_generation_judgement_of_a_relocation_batch(
     batch: &TransactionOutput,
 ) -> Option<HarnessJudgement> {
     let publish_txg = batch.root.checkpoint_txg;
-    let destinations_at_their_birth: BTreeSet<(DeviceIdentity, u64, CheckpointTxg)> = batch
-        .units_relocated_by_this_publish
-        .iter()
-        .filter_map(|relocated| {
-            let birth_txg = birth_txg_of_a_mapping_key(&relocated.mapping_key)?;
-            Some(
-                relocated
-                    .destination
-                    .iter()
-                    .map(move |location| (location.device, location.slot.0, birth_txg)),
-            )
-        })
-        .flatten()
-        .collect();
-    let records: Vec<AllocationRecord> =
-        records_changed_with_a_generation_outside_the_publish_txgs(
-            before,
-            &batch.allocation_records,
-            publish_txg,
-            publish_txg,
-        )
-        .into_iter()
-        .filter(|record| {
-            record.is_released
-                || !destinations_at_their_birth.contains(&(
-                    record.device,
-                    record.slot.0,
-                    record.generation,
-                ))
-        })
-        .collect();
+    let records = records_a_relocation_batch_changed_with_a_generation_outside_its_txg(
+        before,
+        &batch.allocation_records,
+        publish_txg,
+        &batch.units_relocated_by_this_publish,
+        &batch.quarantined_after_release_checksum_mismatch,
+    );
     (!records.is_empty()).then_some(HarnessJudgement::AllocationGenerationIsNotThePublishTxg {
         records,
         first_publish_txg: publish_txg,
         last_publish_txg: publish_txg,
     })
+}
+
+/// [`allocation_generation_judgement_of_a_relocation_batch`] 挑出的那几条：整理的一批（txg `publish_txg`）前后的分配记录里，代不是这一批的 txg、
+/// 也不是搬迁目的地写的诞生代的；只改隔离记号的，置记号的只放过这一批实现交回的隔离（`copies_quarantined_by_the_batch`），清记号的照挑。
+fn records_a_relocation_batch_changed_with_a_generation_outside_its_txg(
+    before: &[AllocationRecord],
+    after: &[AllocationRecord],
+    publish_txg: CheckpointTxg,
+    units_relocated_by_the_batch: &[UnitRelocatedByThisPublish],
+    copies_quarantined_by_the_batch: &[CopyQuarantinedAfterReleaseChecksumMismatch],
+) -> Vec<AllocationRecord> {
+    let destinations_at_their_birth: BTreeSet<(DeviceIdentity, u64, CheckpointTxg)> =
+        units_relocated_by_the_batch
+            .iter()
+            .filter_map(|relocated| {
+                let birth_txg = birth_txg_of_a_mapping_key(&relocated.mapping_key)?;
+                Some(
+                    relocated
+                        .destination
+                        .iter()
+                        .map(move |location| (location.device, location.slot.0, birth_txg)),
+                )
+            })
+            .flatten()
+            .collect();
+    records_changed_with_a_generation_outside_the_publish_txgs(
+        before,
+        after,
+        publish_txg,
+        publish_txg,
+        QuarantineMarkChangesVouchedFor {
+            copies_quarantined_by_the_publishes: copies_quarantined_by_the_batch,
+            clearing: QuarantineMarkClearing::NotDoneByThisPublish,
+        },
+    )
+    .into_iter()
+    .filter(|record| {
+        record.is_released
+            || !destinations_at_their_birth.contains(&(
+                record.device,
+                record.slot.0,
+                record.generation,
+            ))
+    })
+    .collect()
 }
 
 /// 整理那一趟里实现交回的一版，模型此刻怎么答：现行那一版还有要走空的就是走空的一步；否则是整理的一次发布，是哪一种（签发、搬一批、
@@ -5981,6 +6811,7 @@ fn settle_compaction_run(
                     &version.allocation_records,
                     version.root.checkpoint_txg,
                     version.root.checkpoint_txg,
+                    &version.quarantined_after_release_checksum_mismatch,
                 )
             }
         });
@@ -6143,6 +6974,7 @@ fn apply_compact_while_mounted(
             session: session_slot,
             model,
             stream,
+            copies_quarantined_in_this_step,
             ..
         } = &mut *pool;
         let Some(open_session) = session_slot.as_ref() else {
@@ -6211,6 +7043,10 @@ fn apply_compact_while_mounted(
             }
         }
         let run_result = mounted_session.run_compaction(devices);
+        if let Ok(run) = &run_result {
+            copies_quarantined_in_this_step
+                .extend(copies_quarantined_by_the_versions(&run.versions_published));
+        }
         let is_the_intent_live_when_the_run_stopped = mounted_session
             .allocator
             .compaction()
@@ -6440,6 +7276,7 @@ fn mount_publish_allocation_judgement(
                 &output.allocation_records,
                 publish_txg,
                 publish_txg,
+                &output.quarantined_after_release_checksum_mismatch,
             )
         });
         reuse = reuse.plus(RecordReuse::between(
@@ -6469,6 +7306,8 @@ fn settle_mount(
 ) -> AppliedStep {
     match mounted {
         Ok(mounted) => {
+            pool.copies_quarantined_in_this_step
+                .extend(copies_quarantined_by_a_mount(&mounted));
             let (allocation_records_compared, reuse, harness_judgement) =
                 mount_publish_allocation_judgement(image_before_mount, &mounted);
             // 暖机的零单元发布从这次挂载里写行那一版交回的那一份往下带着比（实审 B3c-4），带到最后的那一份交给会话。
@@ -7127,6 +7966,39 @@ fn apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device
     )
 }
 
+/// 回退那次发布（txg `rollback_txg`）前后的分配记录里，代不是这次的 txg 的那几条：复活的那几份例外——分配代写回回退目标那一版账里的
+/// （D23（journal 的角色与格式） 已定项 14「复活」）。只改隔离记号的：置记号的只放过这一步交回的隔离（`copies_quarantined_in_the_step`：
+/// 释放集里的与回退那次发布自己那一版的），清记号的放过（回退目标引用、现行账带着记号的那几份，D19（块指针的结构与宽度预算） 已定项 5
+/// 「回退复活那一次，同一次发布清掉两块盘上的 0x4000」；执行器只在这一处放过清记号）。
+fn records_the_rollback_publish_changed_with_a_generation_outside_its_txg(
+    before: &[AllocationRecord],
+    after: &[AllocationRecord],
+    rollback_txg: CheckpointTxg,
+    resurrected_user_visible_copies: &[ResurrectedCopy],
+    copies_quarantined_in_the_step: &[CopyQuarantinedAfterReleaseChecksumMismatch],
+) -> Vec<AllocationRecord> {
+    records_changed_with_a_generation_outside_the_publish_txgs(
+        before,
+        after,
+        rollback_txg,
+        rollback_txg,
+        QuarantineMarkChangesVouchedFor {
+            copies_quarantined_by_the_publishes: copies_quarantined_in_the_step,
+            clearing: QuarantineMarkClearing::DoneByTheRollbackPublish,
+        },
+    )
+    .into_iter()
+    .filter(|record| {
+        !resurrected_user_visible_copies.iter().any(|copy| {
+            copy.device == record.device
+                && copy.placement.slot == record.slot
+                && copy.allocation_generation == record.generation
+                && !record.is_released
+        })
+    })
+    .collect()
+}
+
 fn apply_rollback_while_mounted(
     pool: &mut HistoryPool,
     parameters: &MakeFilesystemParameters,
@@ -7138,6 +8010,7 @@ fn apply_rollback_while_mounted(
         session,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(session) = session.as_mut() else {
@@ -7147,6 +8020,7 @@ fn apply_rollback_while_mounted(
         allocator,
         current,
         publishes_in_this_mount,
+        compaction,
         ..
     } = session;
     let PoolVersion::WithFile(current) = current else {
@@ -7188,8 +8062,16 @@ fn apply_rollback_while_mounted(
         model.answer_rollback_while_mounted(model_root_key(target.instance, target.checkpoint_txg));
     let records_on_disk_before = current.allocation_records.clone();
     let stream_length_before = stream.operation_count();
-    match roll_back_by_a_forward_publish(parameters, devices, allocator, current, target) {
+    // 会话内回滚：做成时清掉会话上的上一条完成的意图（`mount::roll_back_by_a_forward_publish_in_the_session`）。
+    match roll_back_by_a_forward_publish_in_the_session(
+        parameters, devices, allocator, current, compaction, target,
+    ) {
         Ok(rolled_back) => {
+            // 回退那条路交回两样：释放集里核出对不上的用户可见单元（`quarantined_user_visible_copies`），与回退那次发布换下的固定点单元里的
+            // （那一版自己的 `quarantined_after_release_checksum_mismatch`）
+            copies_quarantined_in_this_step
+                .extend(rolled_back.quarantined_user_visible_copies.iter().copied());
+            copies_quarantined_in_this_step.extend(copies_quarantined_by_the_versions([&*current]));
             *publishes_in_this_mount += 1;
             let verdict = judge_by_model(
                 model,
@@ -7199,28 +8081,16 @@ fn apply_rollback_while_mounted(
                     reported_ceiling: None,
                 }),
             );
-            // 盘上的分配记录：改写或新增的记录代是这次的 txg；复活的那几份例外——分配代写回回退目标那一版账里的
-            // （D23（journal 的角色与格式） 已定项 14「复活」）。
+            // 盘上的分配记录：改写或新增的记录代是这次的 txg，例外见 `records_the_rollback_publish_changed_with_a_generation_outside_its_txg`；
+            // 这一步交回的隔离上面刚收齐（释放集里的与回退那次发布自己那一版的）。
             let rollback_txg = current.root.checkpoint_txg;
-            let records = records_changed_with_a_generation_outside_the_publish_txgs(
+            let records = records_the_rollback_publish_changed_with_a_generation_outside_its_txg(
                 &records_on_disk_before,
                 &current.allocation_records,
                 rollback_txg,
-                rollback_txg,
-            )
-            .into_iter()
-            .filter(|record| {
-                !rolled_back
-                    .resurrected_user_visible_copies
-                    .iter()
-                    .any(|copy| {
-                        copy.device == record.device
-                            && copy.placement.slot == record.slot
-                            && copy.allocation_generation == record.generation
-                            && !record.is_released
-                    })
-            })
-            .collect::<Vec<_>>();
+                &rolled_back.resurrected_user_visible_copies,
+                copies_quarantined_in_this_step,
+            );
             let harness_judgement = (!records.is_empty()).then_some(
                 HarnessJudgement::AllocationGenerationIsNotThePublishTxg {
                     records,
@@ -7278,6 +8148,7 @@ fn apply_raise_rollback_floor(
         session,
         model,
         stream,
+        copies_quarantined_in_this_step,
         ..
     } = pool;
     let Some(session) = session.as_mut() else {
@@ -7315,6 +8186,8 @@ fn apply_raise_rollback_floor(
     *publishes_in_this_mount += publishes_completed;
     match raised {
         Ok(raised) => {
+            copies_quarantined_in_this_step
+                .extend(copies_quarantined_by_the_versions(&raised.publishes));
             let verdict = judge_by_model(
                 model,
                 answer,
@@ -7338,6 +8211,7 @@ fn apply_raise_rollback_floor(
                         &publish.allocation_records,
                         publish_txg,
                         publish_txg,
+                        &publish.quarantined_after_release_checksum_mismatch,
                     )
                 });
                 records_of_previous_publish = &publish.allocation_records;
@@ -7378,6 +8252,7 @@ fn apply_raise_rollback_floor(
                     &current.allocation_records,
                     CheckpointTxg(txg_before_raise + 1),
                     current.root.checkpoint_txg,
+                    &current.quarantined_after_release_checksum_mismatch,
                 ),
                 model_verdict: Some(verdict),
             }
@@ -7475,6 +8350,9 @@ fn apply_operation(
         }
         HistoryOperation::WriteOfAnInode(choice) => {
             apply_write_of_an_inode(pool, *choice, write_time_seconds)
+        }
+        HistoryOperation::WriteAtOffset(choice) => {
+            apply_write_at_offset(pool, *choice, step_index, write_time_seconds)
         }
     }
 }
@@ -8008,6 +8886,8 @@ pub struct StepImage<'step> {
     /// 这一刻录制流里有几步（写与屏障；[`SharedStream::operation_count`]）。
     pub operations_recorded: usize,
     pub image: &'step MemoryPool,
+    /// 到这一刻为止实现交回了几份隔离（[`HistoryRun::copies_quarantined_by_the_implementation`] 的头这么多份；这一步自己交回的在里面）。
+    pub copies_quarantined_by_the_implementation_up_to_this_step: usize,
 }
 
 /// 同 [`execute_history_with_faults`]，另把池级 checker 本来要判的每一张镜像交给 `step_images`（harness 一条不变量都不判，
@@ -8078,6 +8958,7 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                             operation_kind: None,
                             operations_recorded: stream.operation_count(),
                             image: &failure.image,
+                            copies_quarantined_by_the_implementation_up_to_this_step: 0,
                         },
                     );
                     given_pool_checker_violations(step_image_index)
@@ -8118,6 +8999,9 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                 operation_kind: None,
                 operations_recorded: checked_stream_length,
                 image: &image,
+                copies_quarantined_by_the_implementation_up_to_this_step: pool
+                    .copies_quarantined_by_the_implementation
+                    .len(),
             },
         );
         let violations_after_the_starting_point =
@@ -8148,6 +9032,8 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                 pool.session.as_ref(),
             ),
             size_requested_by_the_truncation: None,
+            inode_named_by_the_truncation: None,
+            partial_write_requested: None,
         });
         for (step_index, operation) in history.operations.iter().enumerate() {
             let step_position = StepPosition::Operation(step_index);
@@ -8157,6 +9043,7 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                 harness_judgement,
                 model_verdict,
             } = apply_operation(pool, operation, step_index);
+            pool.note_the_copies_quarantined_in_the_step(step_position);
             roots_written_by_the_model_before_this_step =
                 measure_the_roots_the_model_wrote_in_one_step(
                     &mut tally,
@@ -8165,6 +9052,9 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                     step_position,
                 );
             tally.note_outcome(operation, &outcome);
+            if let Some(requested) = pool.partial_writes_requested.get(&step_index) {
+                tally.note_partial_write_offset_cell(requested.offset_cell, &outcome);
+            }
             if let Some(verdict) = &model_verdict {
                 tally.note_model_verdict(verdict);
             }
@@ -8207,6 +9097,9 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                         operation_kind: Some(operation.kind()),
                         operations_recorded: stream_length,
                         image: &image,
+                        copies_quarantined_by_the_implementation_up_to_this_step: pool
+                            .copies_quarantined_by_the_implementation
+                            .len(),
                     },
                 );
                 violations = given_pool_checker_violations(step_image_index);
@@ -8246,6 +9139,11 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                     .sizes_requested_by_the_truncations
                     .get(&step_index)
                     .copied(),
+                inode_named_by_the_truncation: pool
+                    .inodes_named_by_the_truncations
+                    .get(&step_index)
+                    .copied(),
+                partial_write_requested: pool.partial_writes_requested.get(&step_index).copied(),
             });
         }
         let (newest_ring_root_txg, root_ring_slot_count) = newest_ring_root_and_slot_count(&image);
@@ -8358,6 +9256,17 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
             }),
         sizes_requested_by_the_truncations: pool_slot.as_ref().map_or_else(BTreeMap::new, |pool| {
             pool.sizes_requested_by_the_truncations.clone()
+        }),
+        inodes_named_by_the_truncations: pool_slot.as_ref().map_or_else(BTreeMap::new, |pool| {
+            pool.inodes_named_by_the_truncations.clone()
+        }),
+        partial_writes_requested: pool_slot
+            .as_ref()
+            .map_or_else(BTreeMap::new, |pool| pool.partial_writes_requested.clone()),
+        // panic 的那一步收进来、还没记上步号的那几份，记在 panic 的那一步上
+        copies_quarantined_by_the_implementation: pool_slot.map_or_else(Vec::new, |mut pool| {
+            pool.note_the_copies_quarantined_in_the_step(position.get());
+            pool.copies_quarantined_by_the_implementation
         }),
     }
 }
@@ -8538,6 +9447,24 @@ fn simpler_variants(operation: HistoryOperation) -> Vec<HistoryOperation> {
                 }),
             )
             .map(HistoryOperation::WriteOfAnInode)
+            .collect(),
+        // 按偏移写：格不换，号与偏移的选择子往小里试（同回退目标）。
+        HistoryOperation::WriteAtOffset(choice) => smaller_selectors(choice.selector)
+            .map(|smaller| PartialWriteChoice {
+                inode_selector: choice.inode_selector,
+                cell: choice.cell,
+                selector: smaller,
+                fill_seed: choice.fill_seed,
+            })
+            .chain(
+                smaller_selectors(choice.inode_selector).map(|smaller| PartialWriteChoice {
+                    inode_selector: smaller,
+                    cell: choice.cell,
+                    selector: choice.selector,
+                    fill_seed: choice.fill_seed,
+                }),
+            )
+            .map(HistoryOperation::WriteAtOffset)
             .collect(),
         HistoryOperation::ReadSnapshot(SnapshotChoice {
             index_among_the_snapshots,
@@ -9013,6 +9940,365 @@ fn campaign_report_of_finished_histories(
     }
 }
 
+/// 攒批会话随机历史里的一次调用（D16（发布语义） 已定项 2、10；判决 `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「返回即落盘」
+/// 那一格：随机历史的「返回即落盘」改成按会话报告的发布点判）。每一次调用之前调用方的钟往前走 `clock_advance_in_milliseconds`。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BatchingSessionCall {
+    /// `accept` 覆盖写第一个文件（一个数据单元以内）。
+    AcceptOverwriteOfTheFirstFile {
+        length: usize,
+        clock_advance_in_milliseconds: u64,
+    },
+    /// `accept` 顺序写第一个文件（可以跨几个数据单元）。
+    AcceptSequentialWriteOfTheFirstFile {
+        length: usize,
+        clock_advance_in_milliseconds: u64,
+    },
+    /// `accept` 建 `count` 个空 inode。
+    AcceptNewInodes {
+        count: u64,
+        clock_advance_in_milliseconds: u64,
+    },
+    /// `publish_when_due`。
+    PublishWhenDue { clock_advance_in_milliseconds: u64 },
+    /// `publish_pending_now`。
+    PublishPendingNow { clock_advance_in_milliseconds: u64 },
+}
+
+impl BatchingSessionCall {
+    fn clock_advance_in_milliseconds(self) -> u64 {
+        match self {
+            BatchingSessionCall::AcceptOverwriteOfTheFirstFile {
+                clock_advance_in_milliseconds,
+                ..
+            }
+            | BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile {
+                clock_advance_in_milliseconds,
+                ..
+            }
+            | BatchingSessionCall::AcceptNewInodes {
+                clock_advance_in_milliseconds,
+                ..
+            }
+            | BatchingSessionCall::PublishWhenDue {
+                clock_advance_in_milliseconds,
+            }
+            | BatchingSessionCall::PublishPendingNow {
+                clock_advance_in_milliseconds,
+            } => clock_advance_in_milliseconds,
+        }
+    }
+}
+
+/// 一段攒批会话随机历史：`seed` 定的 `calls` 次调用。钟每次往前走 0 到 `largest_clock_advance_in_milliseconds` 毫秒（含两端），内容长度在两个数据单元的
+/// 净荷以内，建 inode 一次 1 到 3 个。
+#[must_use]
+pub fn random_batching_session_calls(
+    seed: u64,
+    calls: usize,
+    largest_clock_advance_in_milliseconds: u64,
+) -> Vec<BatchingSessionCall> {
+    let mut state = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let payload = usize::try_from(crate::model::data_unit_payload_capacity_in_bytes())
+        .expect("一个数据单元的净荷装得进 usize");
+    // 迭代上界是 `calls`；跨轮携带的只有随机数状态。
+    (0..calls)
+        .map(|_call_index| {
+            let clock_advance_in_milliseconds =
+                next() % (largest_clock_advance_in_milliseconds + 1);
+            match next() % 5 {
+                0 => BatchingSessionCall::AcceptOverwriteOfTheFirstFile {
+                    length: usize::try_from(next() % u64::try_from(payload).expect("净荷"))
+                        .expect("小于净荷")
+                        + 1,
+                    clock_advance_in_milliseconds,
+                },
+                1 => BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile {
+                    length: usize::try_from(next() % u64::try_from(2 * payload).expect("两份净荷"))
+                        .expect("小于两份净荷")
+                        + 1,
+                    clock_advance_in_milliseconds,
+                },
+                2 => BatchingSessionCall::AcceptNewInodes {
+                    count: next() % 3 + 1,
+                    clock_advance_in_milliseconds,
+                },
+                3 => BatchingSessionCall::PublishWhenDue {
+                    clock_advance_in_milliseconds,
+                },
+                _ => BatchingSessionCall::PublishPendingNow {
+                    clock_advance_in_milliseconds,
+                },
+            }
+        })
+        .collect()
+}
+
+/// 攒批会话随机历史里写的内容：长度与第几次调用定，逐字节确定。
+#[must_use]
+pub fn content_of_a_batching_session_call(length: usize, call_index: usize) -> Vec<u8> {
+    let seed = u64::try_from(call_index).expect("调用序号装得进 u64");
+    (0..length)
+        .map(|position| {
+            let position = u64::try_from(position).expect("长度装得进 u64");
+            u8::try_from((position * 167 + seed * 31 + 7) % 253).expect("小于 256")
+        })
+        .collect()
+}
+
+/// 一次调用之后看到的：调用本身、这一刻的读数、收下的那一次是不是第一个文件的整份写（RefFS 翻译成一个内容改动）、会话报了几次发布（每一次翻成一个显式发布点）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BatchingSessionCallSeen {
+    pub call: BatchingSessionCall,
+    pub reading_in_milliseconds: u64,
+    pub first_file_content_accepted: Option<Vec<u8>>,
+    pub publishes_reported: usize,
+}
+
+/// 一段攒批会话历史跑完：每一次调用看到的、与模型比过的发布次数、按触发的哪一支数的发布次数。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BatchingSessionHistoryRun {
+    pub calls_seen: Vec<BatchingSessionCallSeen>,
+    pub publishes_compared_with_the_model: u64,
+    pub publishes_triggered_by_time: u64,
+    pub publishes_triggered_by_the_dirty_journal_bytes: u64,
+    pub publishes_triggered_by_both: u64,
+    pub publishes_on_request: u64,
+}
+
+/// 实现报的触发那一支换成模型的写法（两边各自声明）。
+fn model_cause_of(
+    cause: singlefs_core::mounted_session::PublishTriggerCause,
+) -> crate::model::ModelPublishTriggerCause {
+    match cause {
+        singlefs_core::mounted_session::PublishTriggerCause::TimeThreshold => {
+            crate::model::ModelPublishTriggerCause::TimeThreshold
+        }
+        singlefs_core::mounted_session::PublishTriggerCause::DirtyThreshold => {
+            crate::model::ModelPublishTriggerCause::DirtyThreshold
+        }
+        singlefs_core::mounted_session::PublishTriggerCause::BothThresholds => {
+            crate::model::ModelPublishTriggerCause::BothThresholds
+        }
+    }
+}
+
+/// 在攒批的会话上逐次跑 `calls`，每一次调用之后判三样：会话报的发布与模型判的触发一致（该发的发了、哪一支先到对得上、不该发的没发、待发空时不推空发布）；
+/// 报了发布就拿那一版与模型比（[`crate::model_comparison::compare_a_publish_of_the_pending_changes_with_the_model`]：模型对拍只放在会话报告的发布之后）；
+/// 这一刻的盘过池级 checker。`image_of_the_devices` 取这一刻盘上的镜像（恢复读第一个文件、池级 checker 都读它）。
+///
+/// # Errors
+/// 第一处对不上：哪一次调用、哪一样、两边各是什么。
+pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevice>(
+    session: &mut singlefs_core::mounted_session::MountedSessionWithPendingChanges,
+    devices: &mut Vec<(DeviceIdentity, Device)>,
+    image_of_the_devices: &dyn Fn(&[(DeviceIdentity, Device)]) -> MemoryPool,
+    calls: &[BatchingSessionCall],
+    model: &mut crate::model::ModelOfThePendingChanges,
+    write_time_seconds_of_the_first_call: u64,
+) -> Result<BatchingSessionHistoryRun, String> {
+    use singlefs_core::compaction_plan::CallerMonotonicClockReading;
+    use singlefs_core::mounted_session::{HowTheChangeWasTaken, ReasonOfThePublish, UserChange};
+    let mut run = BatchingSessionHistoryRun {
+        calls_seen: Vec::new(),
+        publishes_compared_with_the_model: 0,
+        publishes_triggered_by_time: 0,
+        publishes_triggered_by_the_dirty_journal_bytes: 0,
+        publishes_triggered_by_both: 0,
+        publishes_on_request: 0,
+    };
+    let mut now_in_milliseconds = 0_u64;
+    // 迭代上界是 `calls` 的条数；跨轮携带的是钟（只增）、模型与会话（各自只经自己的入口改），每一次调用都可能提前返回错误。
+    for (call_index, call) in calls.iter().copied().enumerate() {
+        now_in_milliseconds += call.clock_advance_in_milliseconds();
+        let now =
+            CallerMonotonicClockReading(std::time::Duration::from_millis(now_in_milliseconds));
+        model.note_a_reading(now_in_milliseconds);
+        let write_time_seconds = write_time_seconds_of_the_first_call
+            + u64::try_from(call_index).expect("调用序号装得进 u64");
+        let mut first_file_content_accepted = None;
+        let reported = match call {
+            BatchingSessionCall::AcceptOverwriteOfTheFirstFile { length, .. }
+            | BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile { length, .. } => {
+                let content = content_of_a_batching_session_call(length, call_index);
+                let file = FirstFile {
+                    content: &content,
+                    write_time_seconds,
+                };
+                let change = match call {
+                    BatchingSessionCall::AcceptOverwriteOfTheFirstFile { .. } => {
+                        UserChange::Overwrite(file)
+                    }
+                    BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile { .. }
+                    | BatchingSessionCall::AcceptNewInodes { .. }
+                    | BatchingSessionCall::PublishWhenDue { .. }
+                    | BatchingSessionCall::PublishPendingNow { .. } => {
+                        UserChange::SequentialWrite(file)
+                    }
+                };
+                let accepted = session.accept(devices, change, now).map_err(|refusal| {
+                    format!("第 {call_index} 次调用 {call:?}：accept 被拒 {refusal:?}")
+                })?;
+                let HowTheChangeWasTaken::KeptPending {
+                    journal_bytes_of_this_change,
+                } = accepted.taken
+                else {
+                    return Err(format!(
+                        "第 {call_index} 次调用 {call:?}：整份写被当成屏障单发"
+                    ));
+                };
+                model
+                    .accept(
+                        crate::model::ModelPendingChange::WholeWrite {
+                            inode: singlefs_core::transaction::FIRST_INODE_NUMBER,
+                            content: content.clone(),
+                        },
+                        journal_bytes_of_this_change.0,
+                    )
+                    .map_err(|below| format!("第 {call_index} 次调用 {call:?}：{below:?}"))?;
+                first_file_content_accepted = Some(content);
+                accepted.publishes
+            }
+            BatchingSessionCall::AcceptNewInodes { count, .. } => {
+                let accepted = session
+                    .accept(
+                        devices,
+                        UserChange::NewInodes {
+                            count,
+                            write_time_seconds,
+                        },
+                        now,
+                    )
+                    .map_err(|refusal| {
+                        format!("第 {call_index} 次调用 {call:?}：accept 被拒 {refusal:?}")
+                    })?;
+                let HowTheChangeWasTaken::KeptPending {
+                    journal_bytes_of_this_change,
+                } = accepted.taken
+                else {
+                    return Err(format!(
+                        "第 {call_index} 次调用 {call:?}：建 inode 被当成屏障单发"
+                    ));
+                };
+                model
+                    .accept(
+                        crate::model::ModelPendingChange::NewInodes { count },
+                        journal_bytes_of_this_change.0,
+                    )
+                    .map_err(|below| format!("第 {call_index} 次调用 {call:?}：{below:?}"))?;
+                accepted.publishes
+            }
+            BatchingSessionCall::PublishWhenDue { .. } => session
+                .publish_when_due(devices, now)
+                .map_err(|refused| format!("第 {call_index} 次调用 {call:?}：{refused:?}"))?
+                .into_iter()
+                .collect(),
+            BatchingSessionCall::PublishPendingNow { .. } => session
+                .publish_pending_now(devices, now)
+                .map_err(|refused| format!("第 {call_index} 次调用 {call:?}：{refused:?}"))?
+                .into_iter()
+                .collect(),
+        };
+        let expected_publish = match call {
+            BatchingSessionCall::PublishPendingNow { .. } => {
+                (!model.pending_is_empty()).then_some(None)
+            }
+            BatchingSessionCall::AcceptOverwriteOfTheFirstFile { .. }
+            | BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile { .. }
+            | BatchingSessionCall::AcceptNewInodes { .. }
+            | BatchingSessionCall::PublishWhenDue { .. } => {
+                model.expected_trigger(now_in_milliseconds).map(Some)
+            }
+        };
+        let reported_cause = match reported.as_slice() {
+            [] => None,
+            [one] => Some(match one.reason {
+                ReasonOfThePublish::TriggeredAfterTheAccept(cause)
+                | ReasonOfThePublish::TriggeredWhenDue(cause) => Some(model_cause_of(cause)),
+                ReasonOfThePublish::PendingChangesPublishedOnRequest => None,
+                other => {
+                    return Err(format!(
+                        "第 {call_index} 次调用 {call:?}：会话报的发布理由 {other:?} 不是这几种入口报得出的"
+                    ))
+                }
+            }),
+            several => {
+                return Err(format!(
+                    "第 {call_index} 次调用 {call:?}：一次调用报了 {} 次发布（这几种入口至多排空一次）",
+                    several.len()
+                ))
+            }
+        };
+        if reported_cause != expected_publish {
+            return Err(format!(
+                "第 {call_index} 次调用 {call:?}（读数 {now_in_milliseconds} ms，待发 journal 字节 {}）：模型判 {expected_publish:?}，会话报 {reported_cause:?}",
+                model.journal_bytes_of_the_pending_changes()
+            ));
+        }
+        let image = image_of_the_devices(devices);
+        if let Some(cause) = reported_cause {
+            model.publish_the_pending_changes(now_in_milliseconds);
+            let version = session
+                .session()
+                .current
+                .version_of_trees()
+                .ok_or_else(|| format!("第 {call_index} 次调用：发布之后现行那一版没有树"))?;
+            let first_file_read_back = match recover(&image, JournalPolicy::Consult).outcome {
+                RecoveryOutcome::FileRead { content, .. } => Some(content),
+                RecoveryOutcome::NoFile { .. } | RecoveryOutcome::Failed { .. } => None,
+            };
+            crate::model_comparison::compare_a_publish_of_the_pending_changes_with_the_model(
+                version,
+                first_file_read_back.as_deref(),
+                model,
+            )
+            .map_err(|disagreement| format!("第 {call_index} 次调用 {call:?}：{disagreement}"))?;
+            run.publishes_compared_with_the_model += 1;
+            match cause {
+                Some(crate::model::ModelPublishTriggerCause::TimeThreshold) => {
+                    run.publishes_triggered_by_time += 1;
+                }
+                Some(crate::model::ModelPublishTriggerCause::DirtyThreshold) => {
+                    run.publishes_triggered_by_the_dirty_journal_bytes += 1;
+                }
+                Some(crate::model::ModelPublishTriggerCause::BothThresholds) => {
+                    run.publishes_triggered_by_both += 1;
+                }
+                None => run.publishes_on_request += 1,
+            }
+        }
+        let violated: Vec<String> = singlefs_checker::walk::check_pool_image(&image)
+            .into_iter()
+            .filter_map(|(name, verdict)| match verdict {
+                singlefs_checker::image::InvariantVerdict::Violated(detail) => {
+                    Some(format!("{name}：{detail}"))
+                }
+                singlefs_checker::image::InvariantVerdict::Holds
+                | singlefs_checker::image::InvariantVerdict::NotApplicable(_)
+                | singlefs_checker::image::InvariantVerdict::PartiallyJudged(_) => None,
+            })
+            .collect();
+        if !violated.is_empty() {
+            return Err(format!(
+                "第 {call_index} 次调用 {call:?} 之后池级 checker 红：{violated:?}"
+            ));
+        }
+        run.calls_seen.push(BatchingSessionCallSeen {
+            call,
+            reading_in_milliseconds: now_in_milliseconds,
+            first_file_content_accepted,
+            publishes_reported: reported.len(),
+        });
+    }
+    Ok(run)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -9304,6 +10590,9 @@ mod tests {
             committed_versions_at_the_end: Vec::new(),
             earliest_stream_index_after_each_power_loss: Vec::new(),
             sizes_requested_by_the_truncations: BTreeMap::new(),
+            inodes_named_by_the_truncations: BTreeMap::new(),
+            partial_writes_requested: BTreeMap::new(),
+            copies_quarantined_by_the_implementation: Vec::new(),
         };
         let finished = vec![
             (
@@ -9593,6 +10882,8 @@ mod tests {
             span_slots,
             generation: CheckpointTxg(generation),
             is_released,
+            quarantine_mark:
+                singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         }
     }
 
@@ -9618,7 +10909,8 @@ mod tests {
                 &before,
                 &rewritten_and_new_and_released,
                 CheckpointTxg(12),
-                CheckpointTxg(12)
+                CheckpointTxg(12),
+                no_quarantine_mark_change_vouched_for()
             ),
             Vec::new(),
             "新分配、复用改写、释放的代都是这次的 txg"
@@ -9635,7 +10927,8 @@ mod tests {
                 &before,
                 &rewritten_without_the_generation,
                 CheckpointTxg(12),
-                CheckpointTxg(12)
+                CheckpointTxg(12),
+                no_quarantine_mark_change_vouched_for()
             ),
             vec![record(50178, 1, 5, false)],
             "复用改写的那一条还写着释放代 5"
@@ -9645,10 +10938,331 @@ mod tests {
                 &before,
                 &rewritten_without_the_generation,
                 CheckpointTxg(12),
-                CheckpointTxg(12)
+                CheckpointTxg(12),
+                &[]
             )
             .is_some(),
             "报出来就是执行器判的失败"
+        );
+    }
+
+    /// 不是回退那次发布、也没有交回隔离：只改隔离记号的记录一条都不放过。
+    fn no_quarantine_mark_change_vouched_for() -> QuarantineMarkChangesVouchedFor<'static> {
+        QuarantineMarkChangesVouchedFor {
+            copies_quarantined_by_the_publishes: &[],
+            clearing: QuarantineMarkClearing::NotDoneByThisPublish,
+        }
+    }
+
+    fn with_the_quarantine_mark(record: AllocationRecord) -> AllocationRecord {
+        AllocationRecord {
+            device: record.device,
+            slot: record.slot,
+            span_slots: record.span_slots,
+            generation: record.generation,
+            is_released: record.is_released,
+            quarantine_mark:
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+        }
+    }
+
+    /// 实现交回的一份隔离：盘、起点槽与跨度如给。
+    fn copy_quarantined_on(
+        device: DeviceIdentity,
+        slot: u64,
+        span_slots: u64,
+    ) -> CopyQuarantinedAfterReleaseChecksumMismatch {
+        CopyQuarantinedAfterReleaseChecksumMismatch {
+            unit: singlefs_core::transaction::TransactionUnit::AllocationTree,
+            device,
+            placement: singlefs_core::allocator::Placement {
+                slot: SlotNumber(slot),
+                span: span_slots,
+            },
+            reading: singlefs_core::transaction::QuarantinedCopyReading::ChecksumMismatch,
+        }
+    }
+
+    /// 隔离那次发布（txg 12）把分配代 7 的那条记录置上记号、别的不动，这次发布交回了这一份隔离：不报（D19 已定项 5「隔离的盘上记号」）。
+    #[test]
+    fn quarantine_mark_set_on_a_copy_the_publish_reported_is_not_reported() {
+        let before = vec![record(50186, 2, 7, false)];
+        let after = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        let copies = [copy_quarantined_on(DeviceIdentity(0), 50186, 2)];
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                QuarantineMarkChangesVouchedFor {
+                    copies_quarantined_by_the_publishes: &copies,
+                    clearing: QuarantineMarkClearing::NotDoneByThisPublish,
+                }
+            ),
+            Vec::new(),
+            "只差记号、这次交回了这一份隔离的记录不算改了代"
+        );
+        assert_eq!(
+            allocation_generation_judgement(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                &copies
+            ),
+            None,
+            "通用的判法认这次发布交回的隔离"
+        );
+    }
+
+    /// 记号变了而这次发布没交回那一份隔离（一份都没交、交的是别的槽、交的是同槽而跨度不同、交的是别的盘）：照报。
+    #[test]
+    fn quarantine_mark_set_on_a_copy_the_publish_did_not_report_is_reported() {
+        let before = vec![record(50186, 2, 7, false)];
+        let after = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        for (what, copies) in [
+            ("一份都没交", Vec::new()),
+            (
+                "交的是别的槽",
+                vec![copy_quarantined_on(DeviceIdentity(0), 50188, 2)],
+            ),
+            (
+                "交的是同槽而跨度不同",
+                vec![copy_quarantined_on(DeviceIdentity(0), 50186, 1)],
+            ),
+            (
+                "交的是别的盘",
+                vec![copy_quarantined_on(DeviceIdentity(1), 50186, 2)],
+            ),
+        ] {
+            assert_eq!(
+                records_changed_with_a_generation_outside_the_publish_txgs(
+                    &before,
+                    &after,
+                    CheckpointTxg(12),
+                    CheckpointTxg(12),
+                    QuarantineMarkChangesVouchedFor {
+                        copies_quarantined_by_the_publishes: &copies,
+                        clearing: QuarantineMarkClearing::DoneByTheRollbackPublish,
+                    }
+                ),
+                after,
+                "{what}：置记号的记录代 7 不是这次的 txg 12，照报"
+            );
+        }
+    }
+
+    /// 记号连同分配代一起变（代 7 改成 5）：照报。
+    #[test]
+    fn quarantine_mark_set_together_with_a_generation_change_is_reported() {
+        let before = vec![record(50186, 2, 7, false)];
+        let after = vec![with_the_quarantine_mark(record(50186, 2, 5, false))];
+        let copies = [copy_quarantined_on(DeviceIdentity(0), 50186, 2)];
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                QuarantineMarkChangesVouchedFor {
+                    copies_quarantined_by_the_publishes: &copies,
+                    clearing: QuarantineMarkClearing::DoneByTheRollbackPublish,
+                }
+            ),
+            after,
+            "记号之外分配代也变了，不是只改记号"
+        );
+    }
+
+    /// 置记号又改了跨度（2 改成 1；交回的隔离跨度也是 1，只有前后两条比得出跨度变了）：照报。
+    #[test]
+    fn quarantine_mark_set_together_with_a_span_change_is_reported() {
+        let before = vec![record(50186, 2, 7, false)];
+        let after = vec![with_the_quarantine_mark(record(50186, 1, 7, false))];
+        let copies = [copy_quarantined_on(DeviceIdentity(0), 50186, 1)];
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                QuarantineMarkChangesVouchedFor {
+                    copies_quarantined_by_the_publishes: &copies,
+                    clearing: QuarantineMarkClearing::DoneByTheRollbackPublish,
+                }
+            ),
+            after,
+            "记号之外跨度也变了，不是只改记号"
+        );
+    }
+
+    /// 前后有一条是已释放的不放过：已释放（代 7）改成未释放带记号；带记号未释放改成已释放而代还是 7（回退那一处也不放过）。
+    #[test]
+    fn released_records_are_not_passed_as_quarantine_mark_changes() {
+        let copies = [copy_quarantined_on(DeviceIdentity(0), 50186, 2)];
+        let vouched_for = QuarantineMarkChangesVouchedFor {
+            copies_quarantined_by_the_publishes: &copies,
+            clearing: QuarantineMarkClearing::DoneByTheRollbackPublish,
+        };
+        let released_before = vec![record(50186, 2, 7, true)];
+        let marked_after = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &released_before,
+                &marked_after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                vouched_for
+            ),
+            marked_after,
+            "发布之前那一条已释放：不是只改记号"
+        );
+        let marked_before = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        let released_after = vec![record(50186, 2, 7, true)];
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &marked_before,
+                &released_after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                vouched_for
+            ),
+            released_after,
+            "发布之后那一条已释放：不是只清记号"
+        );
+    }
+
+    /// 带记号的记录改回没有记号、别的不动：回退那次发布放过；不是回退的发布（连同通用的判法）照报。
+    #[test]
+    fn quarantine_mark_cleared_is_passed_only_by_the_rollback_publish() {
+        let before = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        let after = vec![record(50186, 2, 7, false)];
+        let vouched_for = |clearing| QuarantineMarkChangesVouchedFor {
+            copies_quarantined_by_the_publishes: &[],
+            clearing,
+        };
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                vouched_for(QuarantineMarkClearing::DoneByTheRollbackPublish)
+            ),
+            Vec::new(),
+            "回退那次发布清掉回退目标引用的单元的记号"
+        );
+        assert_eq!(
+            records_changed_with_a_generation_outside_the_publish_txgs(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                vouched_for(QuarantineMarkClearing::NotDoneByThisPublish)
+            ),
+            after,
+            "不是回退的发布清了记号，照报"
+        );
+        assert!(
+            allocation_generation_judgement(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                CheckpointTxg(12),
+                &[]
+            )
+            .is_some(),
+            "通用的判法不放过清记号"
+        );
+    }
+
+    /// 回退那次发布（txg 12）清掉回退目标引用的单元那条记录的记号（分配代 7 不变）：回退那一处放过。
+    #[test]
+    fn the_rollback_publish_clearing_the_quarantine_mark_is_not_reported() {
+        let before = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        let after = vec![record(50186, 2, 7, false)];
+        assert_eq!(
+            records_the_rollback_publish_changed_with_a_generation_outside_its_txg(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                &[],
+                &[]
+            ),
+            Vec::new(),
+            "回退复活那一次同一次发布清掉记号"
+        );
+    }
+
+    /// 回退那次发布释放的一份核出对不上、置上记号（分配代 7 不变）：这一步交回了这一份才放过，没交回照报。
+    #[test]
+    fn the_rollback_publish_setting_the_quarantine_mark_is_not_reported_only_on_a_copy_the_step_reported(
+    ) {
+        let before = vec![record(50186, 2, 7, false)];
+        let after = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        assert_eq!(
+            records_the_rollback_publish_changed_with_a_generation_outside_its_txg(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                &[],
+                &[copy_quarantined_on(DeviceIdentity(0), 50186, 2)]
+            ),
+            Vec::new(),
+            "这一步交回了这一份隔离"
+        );
+        assert_eq!(
+            records_the_rollback_publish_changed_with_a_generation_outside_its_txg(
+                &before,
+                &after,
+                CheckpointTxg(12),
+                &[],
+                &[]
+            ),
+            after,
+            "这一步没交回这一份隔离，照报"
+        );
+    }
+
+    /// 整理的一批（txg 12）释放的一份核出对不上、置上记号（分配代 7 不变）：这一批交回了这一份才放过，没交回照报；清记号照报。
+    #[test]
+    fn a_relocation_batch_setting_the_quarantine_mark_is_not_reported_only_on_a_copy_it_reported() {
+        let unmarked = vec![record(50186, 2, 7, false)];
+        let marked = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
+        let copies = [copy_quarantined_on(DeviceIdentity(0), 50186, 2)];
+        assert_eq!(
+            records_a_relocation_batch_changed_with_a_generation_outside_its_txg(
+                &unmarked,
+                &marked,
+                CheckpointTxg(12),
+                &[],
+                &copies
+            ),
+            Vec::new(),
+            "这一批交回了这一份隔离"
+        );
+        assert_eq!(
+            records_a_relocation_batch_changed_with_a_generation_outside_its_txg(
+                &unmarked,
+                &marked,
+                CheckpointTxg(12),
+                &[],
+                &[]
+            ),
+            marked,
+            "这一批没交回这一份隔离，照报"
+        );
+        assert_eq!(
+            records_a_relocation_batch_changed_with_a_generation_outside_its_txg(
+                &marked,
+                &unmarked,
+                CheckpointTxg(12),
+                &[],
+                &copies
+            ),
+            unmarked,
+            "整理的一批不清记号"
         );
     }
 
@@ -9838,7 +11452,10 @@ mod tests {
                 tables.into_iter().map(truncation_weight_of).collect();
             match weights.named {
                 NamedGenerationWeights::Truncation
-                | NamedGenerationWeights::BroadWithCompactionWhileMounted => {
+                | NamedGenerationWeights::BroadWithCompactionWhileMounted
+                | NamedGenerationWeights::SizeChangesOfInodesOtherThanTheFirst
+                // 按偏移写那一组抽截断里的变长留洞（「写进洞里」那一格要有洞）。
+                | NamedGenerationWeights::PartialWrites => {
                     assert!(
                         truncation_weights[2] > 0 && truncation_weights[3] > 0,
                         "{} 的带文件那张表与 unlink 之后那张表都抽截断：{truncation_weights:?}",

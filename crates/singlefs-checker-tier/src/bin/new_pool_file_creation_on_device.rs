@@ -723,8 +723,18 @@ where
     publish_the_third_version_and_describe(parameters, mounted, stream, geometry, clock)
 }
 
-/// 可写挂载里每块盘收到过写之后的第一道屏障（取号写之后那一道；取号写之前那一道前面没有写，不算，代码审阅第 19 条）那一刻的计数：
-/// 挂载窗口（成功与失败两条路）从这里算起。某块盘写之后一道屏障都没收到（取号那道屏障没发）：交回停下的那一行与原因。
+/// 取号写几轮，每轮每块盘一写（D22（单元原子性怎么合成） 已定项 8「取号写两轮」；`singlefs-core` 的 `transaction.rs` 里
+/// `ACQUISITION_WRITE_ROUNDS` 那一份不开放，这里照条款另写一份，两份对不上由挂载窗口那几条用例判红）。
+const ACQUISITION_WRITE_ROUNDS: u64 = 2;
+
+/// 新池上取号那一截在录制流里几步：两轮各两写（每轮两块盘各一写）、中间那道屏障两块盘各一步；第二轮之后那道屏障归暖机那一截的
+/// 第一段，与 `new_pool_file_creation_publish.rs` 的 `acquisition_operation_count: mkfs_operation_count + 6` 同一切法。
+const ACQUISITION_OPERATIONS_RECORDED_AFTER_MKFS: usize = 6;
+
+/// 可写挂载里每块盘第二轮取号写之后的那一道屏障（这块盘写数到了 [`ACQUISITION_WRITE_ROUNDS`] 之后进来的第一道；取号写之前那一道
+/// 前面没有写，不算，代码审阅第 19 条；第一轮之后那一道在第二轮那一写之前，也不算）那一刻的计数：第二轮那道屏障完成才把新号交出去
+/// （`singlefs-core` 的 `transaction.rs` 取号那一段），挂载窗口（成功与失败两条路）从这里算起。某块盘第二轮写之后一道屏障都没收到
+/// （取号那道屏障没发）：交回停下的那一行与原因。
 fn counts_when_the_acquisition_barrier_arrived<Inner: BlockDevice>(
     devices: &[(DeviceIdentity, CountedDevice<Inner>)],
     plan: &SharedFaultPlan,
@@ -732,14 +742,17 @@ fn counts_when_the_acquisition_barrier_arrived<Inner: BlockDevice>(
     devices
         .iter()
         .map(|(identity, _)| {
-            plan.counts_when_the_first_barrier_after_a_write_arrived_at(*identity)
-                .map(DeviceCallCounts::of)
-                .ok_or_else(|| {
-                    format!(
-                        "盘 {} 在可写挂载里一道屏障都没收到：取号那道屏障没发",
-                        identity.0
-                    )
-                })
+            plan.counts_when_the_first_barrier_after_this_many_writes_arrived_at(
+                *identity,
+                ACQUISITION_WRITE_ROUNDS,
+            )
+            .map(DeviceCallCounts::of)
+            .ok_or_else(|| {
+                format!(
+                    "盘 {} 在可写挂载里第二轮取号写之后一道屏障都没收到：取号那道屏障没发",
+                    identity.0
+                )
+            })
         })
         .collect::<Result<_, _>>()
         .map_err(|cause: String| FailedRun {
@@ -748,8 +761,8 @@ fn counts_when_the_acquisition_barrier_arrived<Inner: BlockDevice>(
         })
 }
 
-/// 冷重开、可写挂载。挂载那一段窗口从每块盘收到过写之后的第一道屏障（取号写之后那一道）算起、到挂载返回为止，按种类的合计是写行与每次暖机之和：
-/// 取号的系统配置槽写不是发布、不进按种类的账，与新池新建文件那条路上暖机窗口从取号之后算起同一个口径。
+/// 冷重开、可写挂载。挂载那一段窗口从每块盘第二轮取号写之后的那一道屏障算起、到挂载返回为止，按种类的合计是写行与每次暖机之和：
+/// 取号两轮的系统配置槽写不是发布、不进按种类的账，与新池新建文件那条路上暖机窗口从取号之后算起同一个口径。
 ///
 /// # Errors
 /// 可写挂载失败（取号之后那一串发布里失败的，挂载随错交回写入口的账，照成功路径的窗口口径与设备一层判相等；
@@ -794,7 +807,7 @@ where
             let cause = format!("{failure:?}");
             let failure_lines = match &failure {
                 // 取号之后那一串发布里有一次没做成：挂载把写入口的账随错交回（已经落盘的写行与前几次暖机、失败那一次已记的写），
-                // 窗口与成功路径的挂载窗口同一个起点——取号那道屏障，取号的两次系统配置槽写不是发布、不在账里。
+                // 窗口与成功路径的挂载窗口同一个起点——第二轮取号写之后那道屏障，取号两轮的系统配置槽写不是发布、不在账里。
                 MountError::Publish(failed) => {
                     let counts_after_acquisition =
                         counts_when_the_acquisition_barrier_arrived(&devices, &plan)?;
@@ -814,6 +827,7 @@ where
                 MountError::Recovery(_)
                 | MountError::FileVersionWithoutAnyJournalRecord
                 | MountError::InstanceTableMalformed
+                | MountError::InstanceTableUnreadable
                 | MountError::Acquisition(_)
                 | MountError::RaiseFloorSequencePublishFailed(_)
                 | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
@@ -1237,6 +1251,7 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
                 MountError::Recovery(_)
                 | MountError::FileVersionWithoutAnyJournalRecord
                 | MountError::InstanceTableMalformed
+                | MountError::InstanceTableUnreadable
                 | MountError::Acquisition(_)
                 | MountError::Publish(_)
                 | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
@@ -1341,7 +1356,8 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
     })
 }
 
-/// 五段路径：mkfs、取号、暖机、新池新建文件、mkfs 之后整条。暖机与事务的分界是 `operation_count_before_new_pool_file_creation`
+/// 五段路径：mkfs、取号、暖机、新池新建文件、mkfs 之后整条。取号那一截取 mkfs 之后 [`ACQUISITION_OPERATIONS_RECORDED_AFTER_MKFS`] 步
+/// （取号写两轮，第二轮之后那道屏障归暖机）。暖机与事务的分界是 `operation_count_before_new_pool_file_creation`
 /// ——`ScenarioPoint::BeforeNewPoolFileCreation` 处量到的流长度，暖机 `warm_up()` 已调完、`publish_first_file()`
 /// 还没调，与 `new_pool_file_creation_publish.rs` 的 `warm_up_operation_count` 量的是同一处；
 /// 不是从流尾往回数几步（里程碑「覆盖写、释放、回退与复用」收尾批「55 号装置步数」；`crates/mutations.tsv` 里点名这个函数的那条变异钉住这一点）。
@@ -1354,11 +1370,13 @@ fn new_pool_file_creation_paths(
         ("mkfs", &operations[..mkfs_operation_count]),
         (
             "instance_acquisition",
-            &operations[mkfs_operation_count..mkfs_operation_count + 2],
+            &operations[mkfs_operation_count
+                ..mkfs_operation_count + ACQUISITION_OPERATIONS_RECORDED_AFTER_MKFS],
         ),
         (
             "warm_up",
-            &operations[mkfs_operation_count + 2..operation_count_before_new_pool_file_creation],
+            &operations[mkfs_operation_count + ACQUISITION_OPERATIONS_RECORDED_AFTER_MKFS
+                ..operation_count_before_new_pool_file_creation],
         ),
         (
             "transaction",
@@ -2648,9 +2666,11 @@ mod tests {
     /// 暖机与新池新建文件的分界不是从流尾往回数几步：`ScenarioPoint::BeforeNewPoolFileCreation` 处量到的流长度，
     /// 与 `new_pool_file_creation_publish.rs` 的 `warm_up_operation_count`（该文件第 189、201 行）量的是同一处
     /// ——暖机 `warm_up()` 已调完、`publish_first_file()` 还没调。这里在内存盘上走同一条路径，用它切出五段，
-    /// 钉住该文件那五处断言的操作数：25、2、20、35、57（mkfs 清 [0, 根环基址)（C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同））之后每块盘多一步整段清零：mkfs 23 → 25；C577（系统配置没见证到的最新根，乙罩不到） 之后每次发布末尾轮换之后多一道池屏障、两块盘各记一步：暖机两次发布
+    /// 钉住该文件那五处断言的操作数：27、2、20、35、57（mkfs 清 [0, 根环基址)（C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同））之后每块盘多一步整段清零：mkfs 23 → 25；
+    /// 两趟写序（D22（单元原子性怎么合成） 已定项 8 第 3 条）在 [0, 根环基址) 清零之后加作废那道屏障、两块盘各记一步：mkfs 25 → 27；C577（系统配置没见证到的最新根，乙罩不到） 之后每次发布末尾轮换之后多一道池屏障、两块盘各记一步：暖机两次发布
     /// 18 → 20——第一次末尾那一道顶替了第二次开头那道没有写在前的屏障、只多第二次末尾那 2 步——、新池新建文件 33 → 35，
-    /// mkfs 之后整条 2 + 20 + 35 = 57）。
+    /// mkfs 之后整条 2 + 20 + 35 = 57）；取号写两轮（D22（单元原子性怎么合成） 已定项 8）之后取号多第二轮两写与第一轮之后那道屏障
+    /// 两块盘各一步、2 → 6（第二轮之后那道屏障归暖机，暖机照旧 20），mkfs 之后整条 6 + 20 + 35 = 61。
     #[test]
     fn the_boundary_marked_before_the_new_pool_file_creation_splits_warm_up_from_the_transaction() {
         let parameters = e142_parameters(512, 512);
@@ -2678,7 +2698,7 @@ mod tests {
         let lengths: Vec<usize> = paths.into_iter().map(|(_, slice)| slice.len()).collect();
         assert_eq!(
             lengths,
-            vec![25, 2, 20, 35, 57],
+            vec![27, 6, 20, 35, 61],
             "mkfs / instance_acquisition / warm_up / transaction / post_mkfs_stream 五段的操作数：\
              与 new_pool_file_creation_publish.rs 断言的五个数逐字相同"
         );
@@ -2772,9 +2792,10 @@ mod tests {
     }
 
     /// 可写挂载失败（增补 2 收口表第 58 行）：挂载把这次写入口的账随 `MountError::Publish` 交回，窗口从取号那道屏障算起，
-    /// 与设备一层逐项相等。发布 B 之后冷重开，注入摆在重开之后整池第 N 次写（取号那两次系统配置槽写是第 1、2 次）：
-    /// 第 3 次是写行那次发布的第一个写——没有已经落盘的发布、失败账 0 次写、窗口 0 次；
-    /// 第 53 次是第二次暖机的第 3 个写——写行 27 次与第一次暖机 21 次已经落盘、失败账 2 次写、窗口 50 次。
+    /// 与设备一层逐项相等。发布 B 之后冷重开，注入摆在重开之后整池第 N 次写（取号写两轮，四次系统配置槽写是第 1 到 4 次）：
+    /// 第 5 次是写行那次发布的第一个写——没有已经落盘的发布、失败账 0 次写、窗口 0 次；
+    /// 第 55 次是第二次暖机的第 3 个写——写行 27 次与第一次暖机 21 次已经落盘、失败账 2 次写、窗口 50 次
+    /// （只写一轮取号时这两格摆在第 3、53 次）。
     /// 写行 27 = 实例表两盘 2、分配记录树 14、记账 / 映射 / 树表各两盘 6、记录两盘 2、根槽 1、系统配置轮换 2；
     /// 暖机 21 = 分配记录树 10、记账 / 映射 / 树表 6、记录 2、根槽 1、系统配置 2（分配记录树按位置寻址之后每次重写几个节点，
     /// D8（核心索引结构） 已定项 14；之前那棵树只有一个节点，写行 15、暖机 13、这一格摆在第 33 次）。
@@ -2784,7 +2805,7 @@ mod tests {
         let parameters = e142_parameters(512, 512);
         let geometry = geometry_of(&parameters);
         for (failing_write, persisted_write_calls, failed_write_calls, window_write_calls) in
-            [(3, &[][..], "0", "0"), (53, &["27", "21"][..], "2", "50")]
+            [(5, &[][..], "0", "0"), (55, &["27", "21"][..], "2", "50")]
         {
             let stream = SharedStream::new();
             let plan = SharedFaultPlan::unarmed(geometry);

@@ -23,7 +23,9 @@ use singlefs_checker_tier::crash::{
     crash_point_replay_plan_state_count, CrashPointReplayOracleViolationKind,
     CrashPointReplaySegmentExpansion, CrashStateJudgement,
 };
-use singlefs_checker_tier::crash_amplification::{gpu_recovery_words, recovery_words_of};
+use singlefs_checker_tier::crash_amplification::{
+    gpu_recovery_words, recovery_words_of, RecoveryRootAndOutcomesOfState,
+};
 use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_checker_tier::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
@@ -284,11 +286,12 @@ fn invariant_names(bits: u128) -> Vec<&'static str> {
         .collect()
 }
 
-/// 一个状态上 CPU 判出的三样：红位、池级 checker 违例位、两遍恢复落到的根与结局（`recovery_words_of` 的口径）。
+/// 一个状态上 CPU 判出的三样：红位、池级 checker 违例位、看 journal 那一遍落到的根（标记、实例代号、checkpoint_txg 低 32 位与高 32 位）
+/// 与两遍的结局（`recovery_words_of` 的口径）。
 struct JudgedOnTheCpu {
     red_bits: u32,
     pool_checker_bits: u128,
-    recovery_words: [u32; 4],
+    recovery_words: RecoveryRootAndOutcomesOfState,
     cross_check_words: CrossCheckWords,
 }
 

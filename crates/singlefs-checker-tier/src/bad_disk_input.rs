@@ -2118,6 +2118,8 @@ pub fn release_check_of_the_instance_table_placement_released_on_the_second_devi
             span_slots,
             generation: CheckpointTxg(newest_root.checkpoint_txg),
             is_released: false,
+            quarantine_mark:
+                singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         },
         AllocationRecord {
             device: second_location.device,
@@ -2125,6 +2127,8 @@ pub fn release_check_of_the_instance_table_placement_released_on_the_second_devi
             span_slots,
             generation: CheckpointTxg(RELEASE_GENERATION_ABOVE_EVERY_ROOT),
             is_released: true,
+            quarantine_mark:
+                singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         },
     ];
     let devices = image

@@ -9,6 +9,7 @@
 //! 被换下的十二个单元在同一次发布里释放（分配记录改写成已释放 + 释放代，条目不删，D3（空间分配） 已定项 7）。
 //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_format::{
@@ -36,9 +37,10 @@ use crate::admission::{
     committed_reservation_for_tombstones_and_retirement_records,
     demand_of_the_roles_on_each_device, inode_records_of_the_inode_tree,
     live_objects_of_the_inode_tree, publish_has_an_ordinary_allocation, units_of_a_publish_to_land,
-    AdmissionRefusedOnSomeDevices, BytesSummedOverAllReplicas,
-    EmptyClusterSegmentsBelowTheFloorOnSomeDevices, EmptyClusterSegmentsConjunctReach,
-    PlacementRoomOnOneDevice, ReplicaCount, SpaceAdmission, TombstoneAndRetirementPrepayBasis,
+    worst_case_occupancy_of_a_compaction_batch, AdmissionRefusedOnSomeDevices,
+    BytesSummedOverAllReplicas, EmptyClusterSegmentsBelowTheFloorOnSomeDevices,
+    EmptyClusterSegmentsConjunctReach, PlacementRoomOnOneDevice, ReplicaCount, SpaceAdmission,
+    TombstoneAndRetirementPrepayBasis,
 };
 use crate::allocation_record_tree::{
     build_allocation_record_tree_node, children_of, nodes_holding_records,
@@ -87,8 +89,8 @@ use crate::instance_table::{
     InstanceRow, InstanceTableChainRecord, InstanceTablePageIndex,
 };
 use crate::journal::{
-    back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
-    JournalRecordPlaceInPublish, NamedUnit,
+    back_chain_of, record_offset, JournalBytesToWrite, JournalRecord,
+    JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish, NamedUnit,
 };
 use crate::lineage_tree::{
     append_lineage_record_to_the_open_container, LineageContainer, LineageContainerIndexInTree,
@@ -152,9 +154,10 @@ use crate::tombstone_tree::{
     TombstoneTreeAfterThisPublish, CONTAINER_NUMBER_KEY_WIDTH_IN_BYTES,
 };
 use crate::truncate::{
-    next_truncation_step, plan_the_extent_tree_after_a_size_change,
-    tail_data_unit_rewrite_of_a_truncation, tail_data_unit_rewrite_of_an_extension,
-    target_size_rounded_up_to_a_whole_data_unit_fits, truncation_field_after_the_truncation_intent,
+    declared_length_within_a_size, next_truncation_step, plan_the_extent_tree_after_a_size_change,
+    plan_the_lower_segment_after_a_size_change, tail_data_unit_rewrite_of_a_truncation,
+    tail_data_unit_rewrite_of_an_extension, target_size_rounded_up_to_a_whole_data_unit_fits,
+    truncation_field_after_the_truncation_intent, DataUnitsRewrittenInOnePublish,
     SizeChangeOfARequest, SizeChangeOfTheFile, TailDataUnitRewrite, TruncationStep,
 };
 use crate::unit::{
@@ -170,7 +173,7 @@ use crate::unlink::{
 };
 use crate::write_accounting::{WritesByStructureKind, WrittenStructureKind};
 use crate::write_request_split::{
-    split_sequential_write_into_one_unit_transactions, OneUnitTransaction,
+    split_sequential_write_into_one_unit_transactions, OneUnitTransaction, PartialWriteOfAFile,
 };
 
 /// 第一个文件的 inode 号（里程碑步 3 预想）。
@@ -213,7 +216,7 @@ pub enum CommitStep<'publish> {
 /// 64 片（两万三千多行），带文件的一版要五十几片 inode 叶容器；压小这个数就能用几个单元造出跨记录的发布。产品路径恒 `FromTheRecordFormat`。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JournalRecordNamedEntryCapacity {
-    /// 记录格式装得下的：(4096 − 487) ÷ 56 = 64 项（`JOURNAL_NAMED_ENTRIES_PER_RECORD`）。
+    /// 记录格式装得下的：(4096 − 496) ÷ 56 = 64 项（`JOURNAL_NAMED_ENTRIES_PER_RECORD`）。
     FromTheRecordFormat,
     /// 压到这么多项（1..=64）。
     CappedForTests { named_entries_per_record: usize },
@@ -361,6 +364,24 @@ pub struct PoolWriter<'pool, Device: BlockDevice> {
     inode_number_watermark_source: InodeNumberWatermarkSource,
     /// 被杀的用户可见单元走释放判定的哪一臂，只供测试的开关（[`SnapshotLifetimeJudgement`]）；新开的写入口照判定。
     snapshot_lifetime_judgement: SnapshotLifetimeJudgement,
+    /// 这个写入口上读新槽残留的账（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R2：残留那一读出错记数、
+    /// 不拒写，读到的字节不进新单元）。只记，发布照成；新开的写入口从 0 起。
+    residue_reads: Cell<ResidueReadsOfTheWriter>,
+}
+
+/// 一个写入口上读新槽残留的账（[`PoolWriter::residue_reads`]）：发了几次、读不出几次。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResidueReadsOfTheWriter {
+    pub issued: u64,
+    pub failed: u64,
+}
+
+impl ResidueReadsOfTheWriter {
+    /// 一次都没读。
+    pub const NONE: Self = ResidueReadsOfTheWriter {
+        issued: 0,
+        failed: 0,
+    };
 }
 
 impl<'pool, Device: BlockDevice> PoolWriter<'pool, Device> {
@@ -382,11 +403,27 @@ impl<'pool, Device: BlockDevice> PoolWriter<'pool, Device> {
             inode_number_watermark_source:
                 InodeNumberWatermarkSource::FromThePreviousVersionsAccounting,
             snapshot_lifetime_judgement: SnapshotLifetimeJudgement::FollowTheJudgement,
+            residue_reads: Cell::new(ResidueReadsOfTheWriter::NONE),
         }
     }
 }
 
 impl<Device: BlockDevice> PoolWriter<'_, Device> {
+    /// 这个写入口上读新槽残留发了几次、读不出几次（判决 m4-partial-write-r1 第二节 R2「残留读出错记数、不拒写」）。
+    #[must_use]
+    pub fn residue_reads(&self) -> ResidueReadsOfTheWriter {
+        self.residue_reads.get()
+    }
+
+    /// 记一次读新槽残留：`read_back` 是那一读读没读回字节。
+    fn note_a_residue_read(&self, read_back: bool) {
+        let before = self.residue_reads.get();
+        self.residue_reads.set(ResidueReadsOfTheWriter {
+            issued: before.issued + 1,
+            failed: before.failed + u64::from(!read_back),
+        });
+    }
+
     /// 装上节点容量这个只供测试的开关（`CodeTwoTreeNodeCapacities`）。产品路径一处都不调它。
     ///
     /// # Panics
@@ -1682,6 +1719,10 @@ pub fn prepare_the_publish_without_units<Device: BlockDevice>(
         mapping_root: previous_root.mapping_root,
         // 零单元发布一个字节都不写：分配记录树照抄上一版的那一条指针，账也因此一条都没变。
         allocation_record_tree_root: previous_root.allocation_record_tree_root,
+        // 零单元发布不建账、不经分配器记根（根落盘之后才记）：回收门槛 t 与钉槽 p 照抄上一版的（C773（读坏与全零根槽的回收门槛钉只在内存里），
+        // 用户 2026-10-20 定；池级 checker 的 I-7.18、I-7.19 只判建账的发布，这一版下面没有记账树、报不适用）。
+        reclaim_threshold: previous_root.reclaim_threshold,
+        pinned_ring_slot: previous_root.pinned_ring_slot,
     };
     let record = JournalRecord {
         instance: plan.instance,
@@ -1701,6 +1742,8 @@ pub fn prepare_the_publish_without_units<Device: BlockDevice>(
         new_mapping_root: root.mapping_root,
         new_tree_identifier_watermark: root.tree_identifier_watermark,
         new_rollback_floor: root.rollback_floor,
+        new_reclaim_threshold: root.reclaim_threshold,
+        new_pinned_ring_slot: root.pinned_ring_slot,
         new_instance_table: root.instance_table,
         new_allocation_record_tree_root: root.allocation_record_tree_root,
         new_unmount_marker: root.unmount_marker,
@@ -2067,6 +2110,12 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
         allocator,
         txg,
     );
+    // 记完这条根、回收完之后的门槛与最小钉值就是根记录 t 与 p 的采样点（回收之后、装根之前，C773）。
+    let reclaim_floor_when_the_root_was_recorded = allocator
+        .reclaim_floor_when_the_latest_root_was_recorded()
+        .expect(
+            "上一句刚记过这条根：record_root_written_by_this_process 记完就记下回收门槛与最小钉值",
+        );
     // 这一次发布的提交内生块（实例表链的各片、分配记录树的节点）都归树 0（这一版还没登记过任何树），在 (txg, 实例) 上连着发出生序号：
     // 实例表各片按 bump 次序（尾片先）在前，分配记录树的节点在后（先叶后根）。
     let mut sequences = BirthSequenceAllocator::default();
@@ -2207,6 +2256,10 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
         instance_table: instance_table_pointer,
         mapping_root: previous_root.mapping_root,
         allocation_record_tree_root,
+        // 带单元的发布：t = max(这条根自己带的 F, 分配器记这条根时的回收门槛)，p = 记完之后还钉着的槽里最小的钉值（C773，用户 2026-10-20 定）。
+        reclaim_threshold: reclaim_floor_when_the_root_was_recorded
+            .reclaim_threshold_of_a_root_carrying(plan.rollback_floor),
+        pinned_ring_slot: reclaim_floor_when_the_root_was_recorded.pinned_ring_slot(),
     };
     let mut written_records: Vec<WrittenJournalRecord> =
         Vec::with_capacity(roles_named_by_each_record.len());
@@ -2246,6 +2299,8 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
             new_mapping_root: root.mapping_root,
             new_tree_identifier_watermark: root.tree_identifier_watermark,
             new_rollback_floor: root.rollback_floor,
+            new_reclaim_threshold: root.reclaim_threshold,
+            new_pinned_ring_slot: root.pinned_ring_slot,
             new_instance_table: root.instance_table,
             new_allocation_record_tree_root: root.allocation_record_tree_root,
             new_unmount_marker: root.unmount_marker,
@@ -3250,29 +3305,360 @@ pub struct TransactionOutput {
 const EVERY_ROLE_LOOKED_UP_HAS_A_UNIT_IN_THE_VERSION: &str =
     "八个文件 / 固定点角色每种一个；实例表单元要先重写过一次才在";
 
-/// 一版里一张按身份查的表（`units`、`mapped_units`、`files_other_than_the_first`）的索引：建的时候走一遍整张表，之后每次查是一次
-/// 有序表查找，不再走整张表。发布与整理在一次调用里要对约 P 个身份各查一次，在表上 `iter().find` 是 P 的平方
+/// 七·6 按身份查在产品里实际做了多少事（判决 `research/prompts/m4-publish-lookup-code-r2-main-verification.md` 第三节）：
+/// 在索引上查了几次、每次看过索引里几项、建了几次索引、解了几次中央映射叶，按点名的几处（[`lookup_work::LookupSite`]）分开记。
+/// 数的是产品调用点上的次数，不是测试自己另建的索引；测试读它判增长与「每片叶至多解一次」，不读挂钟与 CPU 时间。
+///
+/// 只在特性 `lookup-work-counters` 下记（harness 档的 dev 依赖打开它）：不开时 [`lookup_work::entering`] 与 [`lookup_work::count`]
+/// 什么都不做，发布构建不多出开销。计数记在本线程上：核心层不起线程，一次发布或一趟整理的查找都在调它的那个线程里做；
+/// 测试的各条用例各在自己的线程里跑，互不串数。
+pub mod lookup_work {
+    #[cfg(feature = "lookup-work-counters")]
+    use std::cell::RefCell;
+    #[cfg(feature = "lookup-work-counters")]
+    use std::collections::BTreeMap;
+
+    /// 本包构建脚本这一次交给依赖方的特性：`build.rs` 打的 `cargo::metadata=enabled_features=` 那一行的值，同一个值经
+    /// `cargo::rustc-env` 编进本包。依赖方读到的就是它，测试拿它判「cargo 真开着这个特性时构建脚本报开着」
+    /// （七·6 后续批代码轮第二轮判决第三节第 7 条：构建脚本里那一格 cfg 写死成假时，依赖方当它没开，别的检查都看不见）。
+    pub const ENABLED_FEATURES_REPORTED_BY_THE_BUILD_SCRIPT: &str =
+        env!("SINGLEFS_CORE_ENABLED_FEATURES_REPORTED_BY_THE_BUILD_SCRIPT");
+
+    /// 七·6 按身份查的几处里，测试要分开判的那几处。封闭集合；不在其中任何一处里做的查找记在「不在点名的几处里」那一格（`None`）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum LookupSite {
+        /// 快照判定那一圈：换下的用户可见角色各取一次映射 key，进 deadlist 的再取映射条目（`deadlist_changes_of_this_publish`）。
+        SnapshotJudgement,
+        /// 经映射释放的角色取映射条目，释放判定路径那一遍（`placements_to_release_via_mapping_except_the_units_kept_for_the_snapshots`）。
+        /// 释放的三处各记各的（七·6 代码轮第三轮判决第三节第 2 条）：一处改回线性，另两处补不上它的数。
+        MappingEntriesOfTheReleaseJudgement,
+        /// 经映射释放的角色取映射条目，核两条位置项各指池里一块不同的盘那一遍（`refuse_mapping_entries_that_do_not_name_two_pool_devices`）。
+        MappingEntriesCheckedForTwoPoolDevices,
+        /// 经映射释放的角色取映射条目，释放之前读盘核校验和那一遍（`copies_failing_the_release_checksum_check`）。
+        MappingEntriesCheckedAgainstTheReleaseChecksums,
+        /// 删快照的批放掉的 deadlist 条目按映射 key 取它留存的映射条目（`deadlist_changes_of_this_publish`）。
+        KeptMappingEntriesReleasedByTheSnapshotDestruction,
+        /// 释放判定路径那一遍，换下的第一个文件之外那一族角色在上一版里有没有落点：按 inode 号找上一版的那个文件
+        /// （`has_a_placement_in_the_previous_version`）。每问一个角色进一次。
+        FilesOfTheReplacedRolesInThePreviousVersion,
+        /// 经映射释放的角色清单（`mapped_roles_released_by_this_publish`：核两条位置项、读盘核校验和、释放那一段与快照判定对账各调它）
+        /// 问换下的角色在上一版里有没有落点时按 inode 号找文件。每调一次进一次（七·6 后续批代码轮第一轮判决第三节第 3 条：建索引次数恰好等于走了几遍）。
+        FilesOfTheMappedRolesReleasedByThisPublish,
+        /// 快照判定那一圈问换下的用户可见角色在上一版里有没有落点时按 inode 号找文件（`deadlist_changes_of_this_publish`）。每走一遍进一次。
+        FilesOfTheUserVisibleRolesOfTheSnapshotJudgement,
+        /// 释放判定路径那一遍，换下的角色在不在留给快照的角色清单里：清单建一次按角色的索引、每个角色查一次
+        /// （`placements_to_release_via_mapping_except_the_units_kept_for_the_snapshots`；七·6 后续批，用户 2026-10-22 定并进）。每走一遍进一次。
+        RolesKeptForTheSnapshotsInTheReleaseJudgement,
+        /// 经映射释放的角色清单那一处，换下的角色在不在留给快照的角色清单里（`mapped_roles_released_by_this_publish`）。每调一次进一次。
+        RolesKeptForTheSnapshotsAmongTheMappedRolesReleased,
+        /// 记录点名的角色清单：这次重写的角色在不在最后一条之前那几条已经点名的数据角色里（`roles_named_by_each_record_of_the_publish`）。
+        /// 每调一次进一次。
+        DataRolesNamedBeforeTheLastRecord,
+        /// 一版里进映射的角色换成映射位置时，按角色找它在 `units` 里的那一项（`take_the_mapping_positions_over_the_location_hints`：
+        /// 整理发批与恢复重建一版都调它；七·6 后续批，用户 2026-10-22 定并进）。每调一次至多进一次（一把有位置的 key 都没有的不进、不建）。
+        UnitsOfTheMappedRolesTakingTheirMappingPositions,
+        /// 装一次发布要写的单元：这次重写的每个角色按角色取它在这一版 `units` 里的单元（`publish_admitted` 的 `written_units`）。
+        /// 这一版 `units` 按角色的索引在这里建，每次装进一次。
+        UnitsOfTheRolesWrittenByThisPublish,
+        /// 装一次发布的记录：点名的每个角色按角色取它在这一版 `units` 里的单元（`publish_admitted` 的 `named_unit_of`），
+        /// 查的是 [`LookupSite::UnitsOfTheRolesWrittenByThisPublish`] 那里建的同一份索引。每点名一个角色进一次。
+        UnitsOfTheRolesNamedByTheRecords,
+        /// 照抄第一个文件的发布装这一版 `units` 时，第一个文件的每个数据单元问它在不在这次重写的角色里（`publish_admitted`）：
+        /// 这次重写的角色清单建一次按角色的索引、每个数据单元查一次（七·6 后续批代码轮第二轮判决第五节，用户 2026-10-23 定并进）。
+        /// 每装一次照抄第一个文件的进一次；第一个文件有新版本的发布不进、不建。
+        RewrittenRolesAmongTheDataUnitsOfTheCarriedFirstFile,
+        /// 恢复重建一版时数据单元照 inode 记录核，按 inode 号找记录（`recovery::data_units_judged_against_the_inode_records`）：
+        /// 全部 inode 叶容器的记录建一次按 inode 号的索引，第一个文件与第一个文件之外每个有数据单元的文件各查一次
+        /// （七·6 后续批代码轮第二轮判决第五节，用户 2026-10-23 定并进）。每调一次进一次。
+        InodeRecordsOfTheFilesJudgedByTheRecovery,
+        /// 发布照抄 extent 树的节点：按角色取上一版那个节点的单元（`build_extent_tree` 的 `carried_node`）。
+        /// 整棵 extent 树装的时候都在这一处里（七·6 后续批代码轮第一轮判决第三节第 3 条：照抄那一处的作用域包住建），
+        /// 照抄每个节点时再进一次；里面按 inode 号找文件的记在 [`LookupSite::FilesOfTheCarriedExtentLowerNodes`]。
+        CarriedExtentTreeNodes,
+        /// 发布照抄第一个文件之外一个文件的下段节点：按 inode 号找上一版的那个文件、取那个节点的指针（`build_extent_tree`）。
+        FilesOfTheCarriedExtentLowerNodes,
+        /// 发布照抄记账树的节点：按角色取上一版那个节点的单元（`build_multi_level_tree`）。三棵多层码 2 树按树分开记
+        /// （七·6 后续批代码轮第一轮判决第三节第 3 条）：一棵退回线性找，另两棵补不上它的数。
+        CarriedNodesOfTheAccountingTree,
+        /// 发布照抄 deadlist 树的节点（同 [`LookupSite::CarriedNodesOfTheAccountingTree`]）。
+        CarriedNodesOfTheDeadlistTree,
+        /// 发布照抄中央映射树的节点（同 [`LookupSite::CarriedNodesOfTheAccountingTree`]）。
+        CarriedNodesOfTheCentralMappingTree,
+        /// 整理读一版取全部进映射单元的映射条目（`mounted_session::central_mapping_as_the_compaction_reads_it`）。
+        CompactionReadsTheCentralMapping,
+        /// 整理发批核计划里每一项的源落点：按映射 key 找角色、取映射条目，找不到的按 key 找留存的映射条目，
+        /// 角色的单元按角色取字节（`relocation_checked_against_the_version`）。
+        RelocationSources,
+    }
+
+    /// 一处（或几处合起来）做的查找。
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct LookupWork {
+        /// 建了几次按身份的索引（[`super::FirstEntryOfEachIdentity::of_the_table`]）。
+        pub index_builds: u64,
+        /// 在索引上按身份查了几次。
+        pub index_lookups: u64,
+        /// 查与走索引一共看过索引里几项：有序查一次至多看「索引项数的二进制位数」那么多项；在索引上逐项走，走过一项算一项。
+        pub index_entries_examined: u64,
+        /// 查过的索引里最大那一份有几项（判「每次查至多看几项」用）。
+        pub largest_index_looked_up: u64,
+        /// 解了几次中央映射叶：批量读者每解一片算一次，逐 key 查（`central_mapping_locations_in_the_version`）每查到一片叶算一次。
+        pub mapping_leaf_decodes: u64,
+        /// 进了这一处几次（[`entering`] 每调一次算一次）：每一处在哪一层进写在 [`LookupSite`] 那一成员上，
+        /// 按「走一遍进一次」进的那几处，测试拿它判「建索引次数恰好等于走了几遍」。
+        pub times_entered: u64,
+    }
+
+    impl LookupWork {
+        /// 两份合起来：次数相加，最大的索引取两份里大的那一份。
+        #[must_use]
+        pub fn plus(self, other: Self) -> Self {
+            Self {
+                index_builds: self.index_builds + other.index_builds,
+                index_lookups: self.index_lookups + other.index_lookups,
+                index_entries_examined: self.index_entries_examined + other.index_entries_examined,
+                largest_index_looked_up: self
+                    .largest_index_looked_up
+                    .max(other.largest_index_looked_up),
+                mapping_leaf_decodes: self.mapping_leaf_decodes + other.mapping_leaf_decodes,
+                times_entered: self.times_entered + other.times_entered,
+            }
+        }
+    }
+
+    /// 一段代码在点名的每一处做的查找；不在任何一处里做的记在 `None` 下。
+    #[cfg(feature = "lookup-work-counters")]
+    #[derive(Clone, Debug, Default, PartialEq, Eq)]
+    pub struct LookupWorkOfEachSite {
+        pub work_of_each_site: BTreeMap<Option<LookupSite>, LookupWork>,
+    }
+
+    #[cfg(feature = "lookup-work-counters")]
+    impl LookupWorkOfEachSite {
+        /// `site` 那一处做的；一次都没进过那一处就是全 0。
+        #[must_use]
+        pub fn of_the_site(&self, site: LookupSite) -> LookupWork {
+            self.work_of_each_site
+                .get(&Some(site))
+                .copied()
+                .unwrap_or_default()
+        }
+
+        /// 每一处（连同不在点名的几处里的）合起来。
+        #[must_use]
+        pub fn of_every_site(&self) -> LookupWork {
+            self.work_of_each_site
+                .values()
+                .fold(LookupWork::default(), |sum, work| sum.plus(*work))
+        }
+
+        fn add(&mut self, other: &Self) {
+            // 迭代上界是 `other` 里的格数（至多点名的几处加一）。
+            for (site, work) in &other.work_of_each_site {
+                let sum = self.work_of_each_site.entry(*site).or_default();
+                *sum = sum.plus(*work);
+            }
+        }
+    }
+
+    /// 本线程上进了哪几处（里层的在后）与到此刻各处的计数。
+    #[cfg(feature = "lookup-work-counters")]
+    struct LookupWorkOnThisThread {
+        sites_entered: Vec<LookupSite>,
+        work_of_each_site: LookupWorkOfEachSite,
+    }
+
+    #[cfg(feature = "lookup-work-counters")]
+    thread_local! {
+        static LOOKUP_WORK_ON_THIS_THREAD: RefCell<LookupWorkOnThisThread> = const {
+            RefCell::new(LookupWorkOnThisThread {
+                sites_entered: Vec::new(),
+                work_of_each_site: LookupWorkOfEachSite {
+                    work_of_each_site: BTreeMap::new(),
+                },
+            })
+        };
+    }
+
+    /// 跑 `action`，交回它的结果与它在本线程上做的查找。量的时候先把此前的计数挪开、量完加回去：套着量也各量各的。
+    #[cfg(feature = "lookup-work-counters")]
+    pub fn lookup_work_while<Output>(
+        action: impl FnOnce() -> Output,
+    ) -> (Output, LookupWorkOfEachSite) {
+        let counted_before = LOOKUP_WORK_ON_THIS_THREAD
+            .with(|state| std::mem::take(&mut state.borrow_mut().work_of_each_site));
+        let output = action();
+        let counted_while = LOOKUP_WORK_ON_THIS_THREAD.with(|state| {
+            let mut state = state.borrow_mut();
+            let counted_while = std::mem::replace(&mut state.work_of_each_site, counted_before);
+            state.work_of_each_site.add(&counted_while);
+            counted_while
+        });
+        (output, counted_while)
+    }
+
+    /// 进了点名的一处：活着的时候本线程的查找记在这一处，丢掉时退出（里层的先退）。
+    #[must_use = "进了一处要把它留到那一处的查找做完：丢掉就退出了"]
+    pub(crate) struct InsideALookupSite {
+        _constructed_only_by_entering: (),
+    }
+
+    /// 进 `site` 那一处，直到交回的值被丢掉；那一处进的次数加一（[`LookupWork::times_entered`]）。
+    pub(crate) fn entering(site: LookupSite) -> InsideALookupSite {
+        #[cfg(feature = "lookup-work-counters")]
+        LOOKUP_WORK_ON_THIS_THREAD.with(|state| state.borrow_mut().sites_entered.push(site));
+        count(|work| work.times_entered += 1);
+        #[cfg(not(feature = "lookup-work-counters"))]
+        let _ = site;
+        InsideALookupSite {
+            _constructed_only_by_entering: (),
+        }
+    }
+
+    // 不开特性时也实现 `Drop`（什么都不做）：调用方在一处的查找做完时 `drop` 它退出，两种编法写法相同。
+    impl Drop for InsideALookupSite {
+        fn drop(&mut self) {
+            #[cfg(feature = "lookup-work-counters")]
+            LOOKUP_WORK_ON_THIS_THREAD.with(|state| {
+                state.borrow_mut().sites_entered.pop().expect(
+                    "每个 InsideALookupSite 都由 entering 进过一处：退出时栈里至少有它那一处",
+                );
+            });
+        }
+    }
+
+    /// 把 `update` 记到本线程此刻所在的那一处（最里层的；不在任何一处里记在 `None` 下）。
+    pub(crate) fn count(update: impl FnOnce(&mut LookupWork)) {
+        #[cfg(feature = "lookup-work-counters")]
+        LOOKUP_WORK_ON_THIS_THREAD.with(|state| {
+            let mut state = state.borrow_mut();
+            let site = state.sites_entered.last().copied();
+            update(
+                state
+                    .work_of_each_site
+                    .work_of_each_site
+                    .entry(site)
+                    .or_default(),
+            );
+        });
+        #[cfg(not(feature = "lookup-work-counters"))]
+        let _ = update;
+    }
+}
+
+/// 按身份排好序、每个身份只留一项的索引存放：查与走都经这里，各自记看过几项（[`lookup_work`]）。
+/// 放在自己的模块里，外面拿不到那张排好序的表，只能经 `get` 与 `iter`：按身份查与逐项走都逃不过计数。
+mod sorted_identity_index {
+    use super::lookup_work::count;
+
+    pub(super) struct SortedIdentityIndex<Identity, Value> {
+        /// 按身份严格升序，没有两项身份相同。
+        sorted: Vec<(Identity, Value)>,
+    }
+
+    impl<Identity: Ord, Value> SortedIdentityIndex<Identity, Value> {
+        /// `pairs` 按身份稳定排序（同一身份的几项保持进来的次序），同一身份只留进来最先的那一项。
+        pub(super) fn keeping_the_first_value_of_each_identity(
+            mut pairs: Vec<(Identity, Value)>,
+        ) -> Self {
+            pairs.sort_by(|(left, _), (right, _)| left.cmp(right));
+            // `dedup_by` 拿后一项与前一项比，判相同就丢后一项：留下的是稳定排序后每个身份的最先那一项。
+            pairs.dedup_by(|(later, _), (earlier, _)| later == earlier);
+            count(|work| work.index_builds += 1);
+            Self { sorted: pairs }
+        }
+
+        /// 身份是 `identity` 的那一项。折半查：一次至多看 `sorted` 项数的二进制位数那么多项。
+        pub(super) fn get(&self, identity: &Identity) -> Option<&Value> {
+            let mut entries_examined: u64 = 0;
+            let mut low = 0;
+            let mut high = self.sorted.len();
+            // 迭代上界是 `sorted` 项数的二进制位数；跨轮携带的是还没排除的区间 [low, high)，要找的若在表里就在其中。
+            let found = loop {
+                if low >= high {
+                    break None;
+                }
+                let middle = low + (high - low) / 2;
+                entries_examined += 1;
+                let (candidate, value) = &self.sorted[middle];
+                match candidate.cmp(identity) {
+                    std::cmp::Ordering::Less => low = middle + 1,
+                    std::cmp::Ordering::Greater => high = middle,
+                    std::cmp::Ordering::Equal => break Some(value),
+                }
+            };
+            let index_entries = u64::try_from(self.sorted.len()).expect("索引项数装得进 u64");
+            count(|work| {
+                work.index_lookups += 1;
+                work.index_entries_examined += entries_examined;
+                work.largest_index_looked_up = work.largest_index_looked_up.max(index_entries);
+            });
+            found
+        }
+
+        /// 按身份升序逐项走；走过一项算看过一项。
+        pub(super) fn iter(&self) -> WalkOfTheSortedIdentityIndex<'_, Identity, Value> {
+            WalkOfTheSortedIdentityIndex {
+                remaining: self.sorted.iter(),
+            }
+        }
+    }
+
+    /// [`SortedIdentityIndex::iter`]：每交出一项记看过一项（从哪一头走都算）。
+    pub(super) struct WalkOfTheSortedIdentityIndex<'index, Identity, Value> {
+        remaining: std::slice::Iter<'index, (Identity, Value)>,
+    }
+
+    impl<'index, Identity, Value> Iterator for WalkOfTheSortedIdentityIndex<'index, Identity, Value> {
+        type Item = (&'index Identity, &'index Value);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let (identity, value) = self.remaining.next()?;
+            count(|work| work.index_entries_examined += 1);
+            Some((identity, value))
+        }
+    }
+
+    impl<Identity, Value> DoubleEndedIterator for WalkOfTheSortedIdentityIndex<'_, Identity, Value> {
+        fn next_back(&mut self) -> Option<Self::Item> {
+            let (identity, value) = self.remaining.next_back()?;
+            count(|work| work.index_entries_examined += 1);
+            Some((identity, value))
+        }
+    }
+}
+
+use lookup_work::LookupSite;
+use sorted_identity_index::SortedIdentityIndex;
+
+/// 一版里一张按身份查的表（`units`、`mapped_units`、`files_other_than_the_first`）的索引：建的时候走一遍整张表、按身份排一次序，
+/// 之后每次查是一次折半查找，不再走整张表。发布与整理在一次调用里要对约 P 个身份各查一次，在表上 `iter().find` 是 P 的平方
 /// （里程碑四七·6；量的出处 `records/2026-10-19-里程碑四GPU垃圾回收开工.md` 2026-10-20 调查员交回那一条）。
 ///
 /// 同一身份在表里出现几次时取最先那一项，与在表上 `iter().find` 逐项相同：换成索引行为一个字节不变（七·6 的验收）。
 /// 索引借着那张表（`'table`）：索引活着时那一版改不了，「索引与表一致」由借用检查守住；表换了就要重建，不跨版本留着。
+/// 建、查、走各记进 [`lookup_work`]（只在特性 `lookup-work-counters` 下）。
 pub struct FirstEntryOfEachIdentity<'table, Identity, Entry> {
-    first_entry_of_each_identity: BTreeMap<Identity, &'table Entry>,
+    first_entry_of_each_identity: SortedIdentityIndex<Identity, &'table Entry>,
 }
 
 impl<'table, Identity: Ord, Entry> FirstEntryOfEachIdentity<'table, Identity, Entry> {
     /// 走一遍 `table`，每个身份记下最先那一项。
     #[must_use]
-    pub fn of_the_table(table: &'table [Entry], identity_of: impl Fn(&Entry) -> Identity) -> Self {
-        let mut first_entry_of_each_identity = BTreeMap::new();
-        // 迭代上界是表长；跨轮携带的是已经见过的身份，见过的不覆盖（取最先那一项，与 `iter().find` 同义）。
+    pub fn of_the_table(
+        table: &'table [Entry],
+        identity_of: impl Fn(&'table Entry) -> Identity,
+    ) -> Self {
+        let mut identities_with_their_entries = Vec::with_capacity(table.len());
+        // 迭代上界是表长；按表的次序收：同一身份留最先那一项靠的就是这个次序（`keeping_the_first_value_of_each_identity`）。
         for entry in table {
-            first_entry_of_each_identity
-                .entry(identity_of(entry))
-                .or_insert(entry);
+            identities_with_their_entries.push((identity_of(entry), entry));
         }
         Self {
-            first_entry_of_each_identity,
+            first_entry_of_each_identity:
+                SortedIdentityIndex::keeping_the_first_value_of_each_identity(
+                    identities_with_their_entries,
+                ),
         }
     }
 
@@ -3280,6 +3666,13 @@ impl<'table, Identity: Ord, Entry> FirstEntryOfEachIdentity<'table, Identity, En
     #[must_use]
     pub fn first_entry_of(&self, identity: &Identity) -> Option<&'table Entry> {
         self.first_entry_of_each_identity.get(identity).copied()
+    }
+
+    /// 索引里的每个身份与它在表里的最先那一项，按身份升序：表里每个不同的身份恰好一项。走一项记看过一项。
+    pub fn first_entries(&self) -> impl DoubleEndedIterator<Item = (&Identity, &'table Entry)> {
+        self.first_entry_of_each_identity
+            .iter()
+            .map(|(identity, entry)| (identity, *entry))
     }
 }
 
@@ -3309,16 +3702,20 @@ impl<'table> FirstEntryOfEachIdentity<'table, TransactionUnit, (TransactionUnit,
     }
 }
 
-/// 第一个文件之外一个有数据单元的文件在一版里的样子（[`TransactionOutput::files_other_than_the_first`]）。
-/// 数据单元从 0 起连号、没有洞，尾部也没有洞：这个文件只由按 inode 号写数据的两个入口从偏移 0 整份写（长度 0 的内容也写一个声明长度 0 的
-/// 单元），截断与变长对它拒（[`TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses`]）。
+/// 第一个文件之外一个在 extent 树上段里有条目的文件在一版里的样子（[`TransactionOutput::files_other_than_the_first`]）。
+/// 数据单元从 0 起连号、中间没有洞；尾部的洞由上段叶条目的标签声明（`tail`，标签 3、4），一个单元都没有的是标签 0（整个文件是洞，
+/// size 0 也写这一条：判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S2「粘住的标签 0」——变长到 size > 0 而零单元时
+/// 写上，之后缩短、缩到 0、再变长都留着，到 unlink 最后一批才去掉）。`publish_new_inodes` 建出来、size 0、没改过 size 的 inode 不在这里。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileOfAnInodeOtherThanTheFirst {
     pub inode: InodeNumber,
-    /// 第 i 项是这个文件第 i 个数据单元的指针（下段叶记录，或内联在上段叶条目里的那一个，按同一次序）。
+    /// 第 i 项是这个文件第 i 个数据单元的指针（下段叶记录，或内联在上段叶条目里的那一个，按同一次序）；标签 0 时为空。
     pub data_pointers: Vec<DataPointer>,
-    /// 这个文件 extent 树下段每个节点与它这一版的指针，bump 次序（先叶后根、同层按位置升序）；只有一个数据单元（内联）时为空。
+    /// 这个文件 extent 树下段每个节点与它这一版的指针，bump 次序（先叶后根、同层按位置升序）；只有一个数据单元（内联）或一个都没有时为空。
     pub extent_lower_nodes: Vec<(ExtentLowerNodePosition, NodePointer)>,
+    /// 上段叶条目标签声明的尾部：标签 1、2 没有洞，标签 3、4 最后一个单元之后到 size 是洞（判决 m4-trunc-r1 K5，推到任意活 inode：
+    /// 判决 m4-multi-inode-size-r1 第二节 S2）。标签 0 时不读它。
+    pub tail: TailOfAFile,
 }
 
 impl FileOfAnInodeOtherThanTheFirst {
@@ -3471,15 +3868,34 @@ pub fn take_the_mapping_positions_over_the_location_hints<PositionOfKey>(
     for entry in &mut version.tree_table_entries {
         refresh_node_pointer(&mut entry.root, UNIT_CLASS_INDEX_NODE);
     }
-    for (identity, key) in &version.mapped_units {
-        if let Some(locations) = position_of_key(key) {
-            if let Some(unit) = version
+    // 进映射的角色按 `mapped_units` 的次序各问一次映射位置；有位置的那几个再按角色找 `units` 里的那一项（同一角色取最先那一项，
+    // 与在 `units` 上 `iter_mut().find` 同一项）。找走建一次的索引（七·6 后续批，用户 2026-10-22 定并进）：整理发批一批搬 K 项、
+    // 恢复重建一版每把 key 都有位置，逐个在 `units` 上找是 K 或 P 乘单元数。`position_of_key` 不读 `units`，先问完再改与边问边改一样。
+    let new_slot_of_each_mapped_role: Vec<(TransactionUnit, SlotNumber)> = version
+        .mapped_units
+        .iter()
+        .filter_map(|(identity, key)| {
+            position_of_key(key).map(|locations| (*identity, locations[0].slot))
+        })
+        .collect();
+    if new_slot_of_each_mapped_role.is_empty() {
+        return;
+    }
+    let _inside_the_units_of_the_mapped_roles =
+        lookup_work::entering(LookupSite::UnitsOfTheMappedRolesTakingTheirMappingPositions);
+    let position_in_the_units_of_each_role =
+        SortedIdentityIndex::keeping_the_first_value_of_each_identity(
+            version
                 .units
-                .iter_mut()
-                .find(|unit| unit.identity == *identity)
-            {
-                unit.slot = locations[0].slot;
-            }
+                .iter()
+                .enumerate()
+                .map(|(position, unit)| (unit.identity, position))
+                .collect(),
+        );
+    // 迭代上界是有位置的进映射角色数。
+    for (identity, slot) in new_slot_of_each_mapped_role {
+        if let Some(position) = position_in_the_units_of_each_role.get(&identity) {
+            version.units[*position].slot = slot;
         }
     }
 }
@@ -3618,11 +4034,18 @@ impl TransactionOutput {
     }
 
     /// 这一版 extent 树上段里有条目的 inode 号（上段规范形的 S，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md`
-    /// 第三节 M2）：第一个文件有数据单元时连 inode 1，加第一个文件之外每个有数据单元的文件。写者不写标签 0（D8（核心索引结构） 已定项 14），
-    /// 有条目的号就是有数据单元的号。
+    /// 第三节 M2）：第一个文件有数据单元、或一个单元都没有而记录还在（上段叶标签 0，size 0 也算：
+    /// [`ExtentUpperLeafTarget::of_a_file_without_data_units`]，判决 m4-validate-code-r2 T1 用户定「甲」）时连 inode 1，
+    /// 加第一个文件之外每个在上段里有条目的文件（有数据单元的，与粘住的标签 0：判决 m4-multi-inode-size-r1 第二节 S2）。
+    /// 与装上段叶写不写第一个文件那一条（`build_extent_tree`）同一条判法，形状与条目才对得上。
     #[must_use]
     pub fn inodes_with_an_extent_upper_leaf_entry(&self) -> BTreeSet<u64> {
-        let first_file = (!self.data_pointers.is_empty()).then_some(FIRST_INODE_NUMBER);
+        let first_file_has_an_entry = !self.data_pointers.is_empty()
+            || ExtentUpperLeafTarget::of_a_file_without_data_units(
+                self.inode_record.map(|record| record.size),
+            )
+            .is_some();
+        let first_file = first_file_has_an_entry.then_some(FIRST_INODE_NUMBER);
         first_file
             .into_iter()
             .chain(
@@ -3689,7 +4112,7 @@ impl TransactionOutput {
         rollbacks_on_the_chain
     }
 
-    /// 这一版里第一个文件之外 inode `inode` 那个文件（有数据单元时）。
+    /// 这一版里第一个文件之外 inode `inode` 那个文件（在上段里有条目时：有数据单元，或粘住的标签 0）。
     #[must_use]
     pub fn file_other_than_the_first(
         &self,
@@ -3797,6 +4220,27 @@ impl TransactionOutput {
         &self,
     ) -> FirstEntryOfEachIdentity<'_, TransactionUnit, (TransactionUnit, Vec<u8>)> {
         FirstEntryOfEachIdentity::of_the_table(&self.mapped_units, |(identity, _)| *identity)
+    }
+
+    /// `mapped_units` 按映射 key 的索引（整理发批按计划里的映射 key 找它在这一版里的角色，七·6）：同一把 key 取最先那一项，
+    /// 与在 `mapped_units` 上按 key `iter().find` 同一项。
+    #[must_use]
+    pub fn mapped_units_by_key(
+        &self,
+    ) -> FirstEntryOfEachIdentity<'_, &[u8], (TransactionUnit, Vec<u8>)> {
+        FirstEntryOfEachIdentity::of_the_table(&self.mapped_units, |(_, key)| key.as_slice())
+    }
+
+    /// `mapping_entries_kept_for_the_snapshots` 按映射 key 的索引（删快照的批取放掉的条目留存的映射条目、整理发批找计划里留存的那一项，
+    /// 七·6 代码轮第三轮判决第三节第 1 条）：同一把 key 取最先那一项，与在表上按 key `iter().find` 同一项。
+    #[must_use]
+    pub fn mapping_entries_kept_for_the_snapshots_by_key(
+        &self,
+    ) -> FirstEntryOfEachIdentity<'_, &[u8], (Vec<u8>, [LocationEntry; 2])> {
+        FirstEntryOfEachIdentity::of_the_table(
+            &self.mapping_entries_kept_for_the_snapshots,
+            |(key, _)| key.as_slice(),
+        )
     }
 
     /// `files_other_than_the_first` 按 inode 号的索引（[`TransactionOutput::file_other_than_the_first`] 的批量形态，七·6）。
@@ -4018,11 +4462,17 @@ pub fn placements_to_release_via_mapping_except_the_units_kept_for_the_snapshots
     roles: &[TransactionUnit],
     kept_for_the_snapshots: &[TransactionUnit],
 ) -> Result<Vec<Placement>, PublishError> {
+    let _inside_the_releases =
+        lookup_work::entering(LookupSite::MappingEntriesOfTheReleaseJudgement);
     let mut placements = Vec::new();
-    for identity in roles_replaced_via_mapping(previous, roles, file_content)
-        .into_iter()
-        .filter(|identity| !kept_for_the_snapshots.contains(identity))
-    {
+    // 换下的角色逐个取上一版的映射条目：key 与落点都走建一次的索引（七·6），不逐个在 `mapped_units` 上找、逐 key 重解叶。
+    let mut previous_read_by_role = MappedUnitsOfAVersionReadByRole::of_the_version(previous);
+    let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+    for identity in roles_other_than_the_ones_kept_for_the_snapshots(
+        roles_replaced_via_mapping(previous, roles, file_content),
+        kept_for_the_snapshots,
+        LookupSite::RolesKeptForTheSnapshotsInTheReleaseJudgement,
+    ) {
         let locations = match identity {
             TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
             | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
@@ -4049,10 +4499,16 @@ pub fn placements_to_release_via_mapping_except_the_units_kept_for_the_snapshots
             | TransactionUnit::RetirementLeafContainer(_)
             | TransactionUnit::RetirementRoot
             | TransactionUnit::RetirementNodeBelowTheRoot(_) => {
-                if !has_a_placement_in_the_previous_version(previous, identity) {
+                let has_a_placement = {
+                    let _inside_the_file_lookups = lookup_work::entering(
+                        LookupSite::FilesOfTheReplacedRolesInThePreviousVersion,
+                    );
+                    has_a_placement_in_the_previous_version(previous, &mut previous_files, identity)
+                };
+                if !has_a_placement {
                     continue;
                 }
-                match mapping_locations_of_a_mapped_unit(previous, identity) {
+                match previous_read_by_role.locations_of_role(identity) {
                     MappingLookup::Found(locations) => locations,
                     MappingLookup::NodeMalformedOrNoEntryWithThisKey => {
                         return Err(PublishError::ReleaseNotInMapping { unit: identity })
@@ -4174,11 +4630,35 @@ fn roles_replaced_via_mapping(
         .collect()
 }
 
+/// `roles` 里不在 `kept_for_the_snapshots`（这次进 deadlist、留给快照的用户可见角色）里的那几个，次序不变。
+/// 与 `roles.into_iter().filter(|identity| !kept_for_the_snapshots.contains(identity))` 逐个相同，但留给快照的角色清单先建一次按角色的索引、
+/// 每个角色查一次（七·6 后续批，用户 2026-10-22 定并进）：快照下整份重写一个 N 单元的文件时两份清单各约 N 项，逐个 `contains` 是 N 的平方。
+/// 建与查记在 `site`，进一次。
+fn roles_other_than_the_ones_kept_for_the_snapshots(
+    roles: Vec<TransactionUnit>,
+    kept_for_the_snapshots: &[TransactionUnit],
+    site: LookupSite,
+) -> Vec<TransactionUnit> {
+    let _inside_the_kept_roles = lookup_work::entering(site);
+    let kept_for_the_snapshots_by_role =
+        FirstEntryOfEachIdentity::of_the_table(kept_for_the_snapshots, |identity| *identity);
+    roles
+        .into_iter()
+        .filter(|identity| {
+            kept_for_the_snapshots_by_role
+                .first_entry_of(identity)
+                .is_none()
+        })
+        .collect()
+}
+
 /// 这个角色在上一版里有没有落点。这次发布新建的叶容器（末尾分裂出来的右半）在上一版里没有落点 ⇒ 没有东西要释放、要核；
 /// 数据单元同一条：文件变长时新多出来的那几个单元在上一版里没有落点。
 /// 判据取上一版的容器数、单元数，不取「映射里查不到」：查不到要报 `ReleaseNotInMapping`，那是另一件事。
+/// 第一个文件之外那一族按 inode 号找文件走 `previous_files`（它就是 `previous` 的那张表的索引，七·6）。
 fn has_a_placement_in_the_previous_version(
     previous: &TransactionOutput,
+    previous_files: &mut FilesOtherThanTheFirstOfAVersionReadByInode<'_>,
     identity: TransactionUnit,
 ) -> bool {
     match identity {
@@ -4189,18 +4669,20 @@ fn has_a_placement_in_the_previous_version(
             index.0 < u64::try_from(previous.data_pointers.len()).expect("单元数")
         }
         // 第一个文件之外的文件：上一版里那个文件有没有这个单元、这个下段位置（这次第一次写它、或写长了，新多出来的在上一版里没有落点）。
-        TransactionUnit::DataOfAFileOtherThanTheFirst { inode, unit } => previous
+        TransactionUnit::DataOfAFileOtherThanTheFirst { inode, unit } => previous_files
             .file_other_than_the_first(inode)
             .is_some_and(|file| unit.0 < u64::try_from(file.data_pointers.len()).expect("单元数")),
-        TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { inode, position } => previous
-            .file_other_than_the_first(inode)
-            .is_some_and(|file| {
-                file.extent_lower_nodes
-                    .iter()
-                    .any(|(position_in_the_previous_version, _)| {
-                        *position_in_the_previous_version == position
-                    })
-            }),
+        TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { inode, position } => {
+            previous_files
+                .file_other_than_the_first(inode)
+                .is_some_and(|file| {
+                    file.extent_lower_nodes
+                        .iter()
+                        .any(|(position_in_the_previous_version, _)| {
+                            *position_in_the_previous_version == position
+                        })
+                })
+        }
         // 按位置寻址的两棵树的节点：上一版有没有那个位置（这次新长出来的节点在上一版里没有落点）。
         TransactionUnit::ExtentLowerNode(position) => {
             previous.extent_tree.lower_pointer_of(position).is_some()
@@ -4281,20 +4763,88 @@ fn has_a_placement_in_the_previous_version(
     }
 }
 
-/// 一个进映射的角色在上一版映射节点里的那条映射条目（按上一版记的 key 查）。
-///
-/// # Panics
-/// `identity` 不是进映射的角色（映射树、树表、实例表豁免映射）：调用方按角色分过。
-fn mapping_locations_of_a_mapped_unit(
-    previous: &TransactionOutput,
-    identity: TransactionUnit,
-) -> MappingLookup {
-    let (_, key) = previous
-        .mapped_units
-        .iter()
-        .find(|(mapped, _)| *mapped == identity)
-        .expect("进映射的单元每个一把 key（数据、extent 根、每片 inode 叶容器、inode 根、分配记录树、记账树的每个节点）");
-    central_mapping_locations_in_the_version(previous, key)
+/// 一版的 `files_other_than_the_first` 按 inode 号找文件的批量形态（七·6 代码轮第三轮判决第三节第 1 条）：每个 inode 号的答案与
+/// [`TransactionOutput::file_other_than_the_first`]（在表上 `iter().find`，取最先那一项）相同，但走 [`TransactionOutput::files_other_than_the_first_by_inode`]
+/// 那个索引。释放的三处与快照判定那一圈对换下的每个角色问一次它在上一版里有没有落点，逐个在表上找是角色数乘文件数。
+/// 索引在第一次查时才建：一个第一个文件之外的角色都不问的不建。建与查记在调用方此刻所在的那一处（调用方各进各的：
+/// [`LookupSite::FilesOfTheReplacedRolesInThePreviousVersion`]、[`LookupSite::FilesOfTheMappedRolesReleasedByThisPublish`]、
+/// [`LookupSite::FilesOfTheUserVisibleRolesOfTheSnapshotJudgement`]）：每问一个角色现建一份读者的，建的那几份也记在那一处。
+pub(crate) struct FilesOtherThanTheFirstOfAVersionReadByInode<'version> {
+    version: &'version TransactionOutput,
+    index_built_at_the_first_lookup:
+        Option<FirstEntryOfEachIdentity<'version, InodeNumber, FileOfAnInodeOtherThanTheFirst>>,
+}
+
+impl<'version> FilesOtherThanTheFirstOfAVersionReadByInode<'version> {
+    /// 还什么都没建。
+    pub(crate) fn of_the_version(version: &'version TransactionOutput) -> Self {
+        Self {
+            version,
+            index_built_at_the_first_lookup: None,
+        }
+    }
+
+    /// 同 [`TransactionOutput::file_other_than_the_first`]`(inode)`。
+    pub(crate) fn file_other_than_the_first(
+        &mut self,
+        inode: InodeNumber,
+    ) -> Option<&'version FileOfAnInodeOtherThanTheFirst> {
+        let version = self.version;
+        self.index_built_at_the_first_lookup
+            .get_or_insert_with(|| version.files_other_than_the_first_by_inode())
+            .first_entry_of(&inode)
+    }
+}
+
+/// 一版里进映射的角色按角色取那条映射条目的批量形态（七·6，用户 2026-10-21 定并进）：每个角色的答案与「在 `mapped_units` 上按角色
+/// `iter().find` 取最先那一把 key、再 [`central_mapping_locations_in_the_version`]」逐个相同，但 key 走 `mapped_units` 按角色的索引、
+/// 落点走批量读者（每片叶只解一次）。释放判定路径、核位置项、释放前读盘核校验和、快照判定那一圈进 deadlist 的那一支各对一串角色逐个查，
+/// 逐个在表上找、逐 key 重解叶是角色数乘表长。两个索引在第一次查时才建：一个角色都不查的不建。
+pub struct MappedUnitsOfAVersionReadByRole<'version> {
+    version: &'version TransactionOutput,
+    indexes_built_at_the_first_lookup: Option<IndexesOfAVersionReadByRole<'version>>,
+}
+
+/// [`MappedUnitsOfAVersionReadByRole`] 第一次查时建的两样。
+struct IndexesOfAVersionReadByRole<'version> {
+    /// `mapped_units` 按角色的索引：取角色的映射 key。
+    mapped_units_by_role:
+        FirstEntryOfEachIdentity<'version, TransactionUnit, (TransactionUnit, Vec<u8>)>,
+    /// 中央映射的批量读者：按 key 取映射条目，每片叶只解一次。
+    central_mapping: CentralMappingOfAVersionReadLeafByLeaf<'version>,
+}
+
+impl<'version> MappedUnitsOfAVersionReadByRole<'version> {
+    /// 还什么都没建。
+    #[must_use]
+    pub fn of_the_version(version: &'version TransactionOutput) -> Self {
+        Self {
+            version,
+            indexes_built_at_the_first_lookup: None,
+        }
+    }
+
+    /// 进映射的角色 `identity` 在这一版映射节点里的那条映射条目（按这一版记的 key 查）。
+    ///
+    /// # Panics
+    /// `identity` 不是这一版里进映射的角色（映射树、树表、实例表豁免映射）：调用方按角色分过。
+    /// key 走到的那片叶的角色不在这一版的 `units` 里（同 [`central_mapping_locations_in_the_version`]）。
+    pub fn locations_of_role(&mut self, identity: TransactionUnit) -> MappingLookup {
+        let version = self.version;
+        let IndexesOfAVersionReadByRole {
+            mapped_units_by_role,
+            central_mapping,
+        } = self
+            .indexes_built_at_the_first_lookup
+            .get_or_insert_with(|| IndexesOfAVersionReadByRole {
+                mapped_units_by_role: version.mapped_units_by_role(),
+                central_mapping: CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version),
+            });
+        let (_, key) = mapped_units_by_role
+            .first_entry_of(&identity)
+            .expect("进映射的单元每个一把 key（数据、extent 根、每片 inode 叶容器、inode 根、分配记录树、记账树的每个节点）");
+        central_mapping.locations_of_key(key)
+    }
 }
 
 /// 在一版的中央映射树里按 key 查落点：按这一版的形状从根沿分隔 key 走到那片叶（D8（核心索引结构） 已定项 11：
@@ -4313,6 +4863,7 @@ pub fn central_mapping_locations_in_the_version(
         return MappingLookup::NodeMalformedOrNoEntryWithThisKey;
     };
     let leaf_role = MultiLevelCodeTwoTree::CentralMapping.role_of_node(leaf, shape);
+    lookup_work::count(|work| work.mapping_leaf_decodes += 1);
     mapping_locations_for_key(&version.unit(leaf_role).bytes, key)
 }
 
@@ -4320,6 +4871,7 @@ pub fn central_mapping_locations_in_the_version(
 /// （走到哪片叶、叶解不开、叶里有切不动的条目、同一把 key 有几条取最后一条，几种情形都同），但每片叶只解一次、叶的单元按角色从索引取。
 /// 整理读一版时对全部进映射单元的 key 各查一次，逐 key 查是每把 key 线性找叶再整片重解（里程碑四七·6）。
 /// 一片叶在第一次有 key 走到它时才解：没有 key 走到的叶不碰，与逐 key 查一样（那片叶的角色不在 `units` 里时同样 panic）。
+/// 每解一片记一次解叶（[`lookup_work`]）：测试读的是解了几次，不是缓存里有几片。
 pub struct CentralMappingOfAVersionReadLeafByLeaf<'version> {
     shape: &'version CodeTwoTreeShape,
     units_by_role: FirstEntryOfEachIdentity<'version, TransactionUnit, PublishedUnit>,
@@ -4339,6 +4891,7 @@ enum CentralMappingLeafRead {
 
 impl CentralMappingLeafRead {
     fn of_the_leaf_bytes(mapping_node_bytes: &[u8]) -> Self {
+        lookup_work::count(|work| work.mapping_leaf_decodes += 1);
         let Ok(node) = parse_index_node(mapping_node_bytes) else {
             return Self::NodeMalformed;
         };
@@ -4384,6 +4937,15 @@ impl<'version> CentralMappingOfAVersionReadLeafByLeaf<'version> {
         }
     }
 
+    /// 同 [`TransactionOutput::unit`]：这一版里角色是 `identity` 的那个单元，按角色从这份读者建好的单元索引取（整理发批取计划里单元的字节，
+    /// 七·6 代码轮第三轮判决第三节第 1 条），不另建索引、不在 `units` 上线性找。
+    ///
+    /// # Panics
+    /// 同 [`TransactionOutput::unit`]。
+    pub(crate) fn unit_of_role(&self, identity: TransactionUnit) -> &'version PublishedUnit {
+        self.units_by_role.unit(identity)
+    }
+
     /// 同 [`central_mapping_locations_in_the_version`]`(version, key)`。
     ///
     /// # Panics
@@ -4404,14 +4966,6 @@ impl<'version> CentralMappingOfAVersionReadLeafByLeaf<'version> {
             })
             .locations_of_key(key)
     }
-
-    /// 到此刻解过几片叶：每片叶在第一次有 key 走到它时解一次、之后不再解，所以至多是这一版中央映射树的节点数。
-    /// 测试拿它判「整理读一版每片叶至多解一次、每把 key 都经这个读者查」（七·6 的增长判据数次数，不读挂钟与 CPU 时间）；
-    /// 读的是已有的那张表的长度，不另加计数。
-    #[must_use]
-    pub fn leaves_decoded(&self) -> usize {
-        self.leaves_read.len()
-    }
 }
 
 /// 经映射释放的角色（数据、extent 根、inode 叶容器与根、分配记录树、记账树）：这次重写的角色里走得到映射条目的那几个，按角色次序。
@@ -4423,9 +4977,17 @@ fn mapped_roles_released_by_this_publish(
     kept_for_the_snapshots: &[TransactionUnit],
     file_content: FileContentOfThePublish,
 ) -> Vec<TransactionUnit> {
-    roles_replaced_via_mapping(previous, roles, file_content)
+    let roles_not_kept_for_the_snapshots = roles_other_than_the_ones_kept_for_the_snapshots(
+        roles_replaced_via_mapping(previous, roles, file_content),
+        kept_for_the_snapshots,
+        LookupSite::RolesKeptForTheSnapshotsAmongTheMappedRolesReleased,
+    );
+    // 按 inode 号找文件的那份读者一调建至多一次：每调一次进一次这一处，建的次数与进的次数相同才是一调一份。
+    let _inside_the_file_lookups =
+        lookup_work::entering(LookupSite::FilesOfTheMappedRolesReleasedByThisPublish);
+    let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+    roles_not_kept_for_the_snapshots
         .into_iter()
-        .filter(|identity| !kept_for_the_snapshots.contains(identity))
         .filter(|identity| match identity {
             TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
             | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
@@ -4458,7 +5020,9 @@ fn mapped_roles_released_by_this_publish(
             | TransactionUnit::InstanceTable
             | TransactionUnit::InstanceTablePageAfterTheFirst(_) => false,
         })
-        .filter(|identity| has_a_placement_in_the_previous_version(previous, *identity))
+        .filter(|identity| {
+            has_a_placement_in_the_previous_version(previous, &mut previous_files, *identity)
+        })
         .collect()
 }
 
@@ -4468,10 +5032,10 @@ fn mapped_roles_released_by_this_publish(
 /// 在上一版的映射里查不到：调用方先走 `placements_to_release_via_mapping`、它按同一个上一版、同一串角色查过，
 /// 查不到时它已经报了 `ReleaseNotInMapping` 或 `MappingEntryNarrowerThanItsFieldTable`，走不到这里。
 fn mapping_locations_of_a_released_unit(
-    previous: &TransactionOutput,
+    previous_read_by_role: &mut MappedUnitsOfAVersionReadByRole<'_>,
     identity: TransactionUnit,
 ) -> [LocationEntry; 2] {
-    match mapping_locations_of_a_mapped_unit(previous, identity) {
+    match previous_read_by_role.locations_of_role(identity) {
         MappingLookup::Found(locations) => locations,
         MappingLookup::NodeMalformedOrNoEntryWithThisKey
         | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => panic!(
@@ -4499,10 +5063,14 @@ pub fn refuse_mapping_entries_that_do_not_name_two_pool_devices(
     pool_devices: &[DeviceIdentity],
     file_content: FileContentOfThePublish,
 ) -> Result<(), PublishError> {
+    let _inside_the_releases =
+        lookup_work::entering(LookupSite::MappingEntriesCheckedForTwoPoolDevices);
+    // 同释放判定路径：key 与落点都走建一次的索引（七·6）。
+    let mut previous_read_by_role = MappedUnitsOfAVersionReadByRole::of_the_version(previous);
     for identity in
         mapped_roles_released_by_this_publish(previous, roles, kept_for_the_snapshots, file_content)
     {
-        let locations = mapping_locations_of_a_released_unit(previous, identity);
+        let locations = mapping_locations_of_a_released_unit(&mut previous_read_by_role, identity);
         refuse_locations_that_do_not_name_two_pool_devices(identity, &locations, pool_devices)?;
     }
     Ok(())
@@ -4571,11 +5139,15 @@ pub fn copies_failing_the_release_checksum_check<Reader: PoolReader + ?Sized>(
         &pool_devices,
         file_content,
     )?;
+    let _inside_the_releases =
+        lookup_work::entering(LookupSite::MappingEntriesCheckedAgainstTheReleaseChecksums);
     let mut quarantined = Vec::new();
+    // 同释放判定路径：key 与落点都走建一次的索引（七·6）。
+    let mut previous_read_by_role = MappedUnitsOfAVersionReadByRole::of_the_version(previous);
     for identity in
         mapped_roles_released_by_this_publish(previous, roles, kept_for_the_snapshots, file_content)
     {
-        let locations = mapping_locations_of_a_released_unit(previous, identity);
+        let locations = mapping_locations_of_a_released_unit(&mut previous_read_by_role, identity);
         quarantined.extend(
             copies_of_a_released_unit_failing_the_release_checksum_check(
                 identity, &locations, reader,
@@ -5018,14 +5590,18 @@ pub enum TruncationRefusal {
     InodeIsNotALiveRecord { inode: u64 },
     /// ⌈N ÷ 净荷⌉ × 净荷装不进 u64（K12）。
     TargetSizeRoundedUpToAWholeDataUnitOverflows { target_size_in_bytes: u64 },
-    /// 第一个文件之外的 inode 改成别的 size：截断与变长的各步（截尾、补零、洞标签）只按第一个文件写，判决 m4-trunc-r1 没写别的文件这一格
-    /// （N = S 的只改记录照做）。第一版不支持。别的文件按 inode 号写数据之后它们已经在 extent 树上段里有条目，拒的理由不是「要写标签 0」——
-    /// 写者不写标签 0（D8（核心索引结构） 已定项 14）——而是截断各步没有对任一号的条款。
-    SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses { inode: u64 },
-    /// 要重写的尾单元在这一版里没有字节（从盘上重建时提示与映射都读不出那一个，D19（块指针的结构与宽度预算） 已定项 5 N2）：
-    /// 截断取它旧净荷的前一段、变长在它后面补零，都要读它。
-    TailDataUnitBytesNotInTheVersion { unit: DataUnitIndexInFile },
-    /// 续做截断时 logged_ops 里那一条截断条目点名的对象不是现行那一版里那条活记录（号或对象出生代对不上）：条款没写这一格怎么续，第一版拒。
+    /// 读—改—写要读回的旧数据单元读盘读不回或核不过（D4（校验和位置） 已定项 4：读不回就失败，不拿零填充凑一个合法的零；判决
+    /// `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R3「读盘」）：按偏移部分写要读回的旧单元（[`publish_partial_write`]）
+    /// 与截断意图、变长重写的尾单元（截断取它旧净荷的前一段、变长在它后面补零）都报这一个，`read_back` 说是哪一样没过。调用方要做的决定
+    /// 两条路一样（这个单元盘上读不回，写不了），所以同一个成员；它住在改 size 的拒绝里、外层是 `PublishError::TruncationRefused`，是因为
+    /// [`PublishError`] 被挂载与会话两处穷举 `match`，另立外层成员要动那两份文件（这一批不碰）。
+    OldDataUnitToRewriteNotReadBack {
+        inode: InodeNumber,
+        unit: DataUnitIndexInFile,
+        read_back: OldDataUnitReadBackFailure,
+    },
+    /// 续做截断时 logged_ops 里那一条截断条目点名的对象不是现行那一版里那条活记录（按条目点名的号找记录：没有、nlink = 0、对象出生代或
+    /// size 对不上目标）：条款没写这一格怎么续，第一版拒。
     TruncationIntentDoesNotNameTheLiveRecord { intent: TruncationIntent },
     /// 续做截断时现行那一版没有截断条目：调用方（共用走空）只在有截断条目时调它。
     NoTruncationIntentToContinue,
@@ -5284,33 +5860,55 @@ pub enum DeletionStepOfThePublish {
     FinalBatch {
         inode: InodeNumber,
     },
-    /// 截断的意图那次（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2「先落目标」）：第一个文件那条记录换成 size = N、
-    /// 改动计数与时间照 unlink 意图的写法的一版；尾单元要重写的（K3）按 `tail_data_unit_rewrite` 重写，别的数据单元连同 size 之外还挂着的照抄。
+    /// 截断的意图那次（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K2「先落目标」）：`record_after_the_intent.inode` 那条记录
+    /// 换成 size = N、改动计数与时间照 unlink 意图的写法的一版（任意活 inode，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md`
+    /// 第二节 S3）；尾单元要重写的（K3）按 `tail_data_unit_rewrite` 重写那个文件的那一个单元，别的数据单元连同 size 之外还挂着的照抄。
     /// 截断条目由同一次发布的 [`LoggedOperationsStepOfThePublish::IssueTheTruncationIntent`] 签。删除类（K10）。
     TruncationIntent {
         record_after_the_intent: InodeRecord,
         tail_data_unit_rewrite: Option<TailDataUnitRewrite>,
     },
-    /// 截断的一批（不是最后一批）：第一个文件只留下前 `data_units_kept` 个数据单元（尾部的经映射释放），不碰 inode 记录（K2）。删除类。
+    /// 截断的一批（不是最后一批）：`inode` 那个文件（截断条目点名的那一个）只留下前 `data_units_kept` 个数据单元（尾部的经映射释放），
+    /// 不碰 inode 记录（K2）。删除类。
     TruncationBatch {
+        inode: InodeNumber,
         data_units_kept: u64,
     },
-    /// 截断的最后一批：留下前 `data_units_kept` 个（可以一个都不放），截断条目由同一次发布的
+    /// 截断的最后一批：`inode` 那个文件留下前 `data_units_kept` 个（可以一个都不放），截断条目由同一次发布的
     /// [`LoggedOperationsStepOfThePublish::DeleteTheTruncationIntent`] 删（D8（核心索引结构） 已定项 5「删除意图必须与最后一批工作在同一个事务里提交」）。删除类。
     TruncationFinalBatch {
+        inode: InodeNumber,
         data_units_kept: u64,
     },
-    /// 不是删除：变长（K5，一次发布、不立意图）与 N = S（K12，只改记录）那一次：那条记录换成 `record_after_the_change`，
-    /// 变长时最后一个存在的单元按 `tail_data_unit_rewrite` 补零重写。准入照普通写判（K10）。
+    /// 不是删除：变长（K5，一次发布、不立意图）与 N = S（K12，只改记录）那一次：`record_after_the_change.inode` 那条记录换成它，
+    /// 变长时那个文件最后一个存在的单元按 `tail_data_unit_rewrite` 补零重写。准入照普通写判（K10）。
     SizeChangeWithoutAnIntent {
         record_after_the_change: InodeRecord,
         tail_data_unit_rewrite: Option<TailDataUnitRewrite>,
     },
+    /// 不是删除：按偏移的部分写（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R2–R6，[`publish_partial_write`]）：
+    /// `record_after_the_write.inode` 那条记录换成它（size 取写之前与写的终点里大的，改动计数与时间照写，截断字段照抄），那个文件
+    /// `rewritten_data_units` 那一段按读回的旧单元（或零）连同这次的字节重写——从偏移 o 所在的单元起到写之后最后一个单元（R4），段里单元号
+    /// 不小于写之前单元数的是这次新加的（写跨末尾、写进洞里、空隙补零，R5）。准入照普通写判。
+    PartialWrite {
+        record_after_the_write: InodeRecord,
+        rewritten_data_units: DataUnitsRewrittenInOnePublish,
+    },
+}
+
+/// 一步按读回的旧单元（或零）重写的那一段数据单元（[`DeletionStepOfThePublish::data_units_rewritten_from_their_payloads`]）：
+/// 哪个 inode、哪一段、这一步之后那条记录的 size（每个重写单元的声明长度 = min(size − 起点, 净荷)）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DataUnitsRewrittenByTheStep {
+    pub inode: InodeNumber,
+    pub units: DataUnitsRewrittenInOnePublish,
+    pub size_after_in_bytes: u64,
 }
 
 impl DeletionStepOfThePublish {
-    /// 这一步之后第一个文件还剩几个数据单元：删 inode 1 的一批留下 `data_units_kept` 个；删 inode 1 的最后一批一个不剩；截断的两种批留下
-    /// `data_units_kept` 个；删别的号的一批与最后一批、别的步照旧（判决 m3-multi-file-unlink-r1 第三节 M1：别的号的批不当成第一个文件的）。
+    /// 这一步之后第一个文件还剩几个数据单元：删 inode 1 的一批与截 inode 1 的两种批留下 `data_units_kept` 个；删 inode 1 的最后一批一个不剩；
+    /// 删、截别的号的批与最后一批、别的步照旧（判决 m3-multi-file-unlink-r1 第三节 M1、m4-multi-inode-size-r1 第二节 S3：别的号的批不当成
+    /// 第一个文件的）。
     #[must_use]
     pub fn data_units_after_this_publish(self, data_units_before_this_publish: usize) -> usize {
         match self {
@@ -5318,21 +5916,69 @@ impl DeletionStepOfThePublish {
                 inode,
                 data_units_kept,
                 ..
+            }
+            | DeletionStepOfThePublish::TruncationBatch {
+                inode,
+                data_units_kept,
+            }
+            | DeletionStepOfThePublish::TruncationFinalBatch {
+                inode,
+                data_units_kept,
             } if inode.0 == FIRST_INODE_NUMBER => {
                 usize::try_from(data_units_kept).expect("一批留下的单元数不多于上一版的单元数")
             }
-            DeletionStepOfThePublish::TruncationBatch { data_units_kept }
-            | DeletionStepOfThePublish::TruncationFinalBatch { data_units_kept } => {
-                usize::try_from(data_units_kept).expect("一批留下的单元数不多于上一版的单元数")
-            }
             DeletionStepOfThePublish::FinalBatch { inode } if inode.0 == FIRST_INODE_NUMBER => 0,
+            // 部分写第一个文件：写之后的单元数 = 写之前的与重写的那一段的终点里大的（加单元时多于上一版，判决 m4-partial-write-r1 第二节 R4、R5）。
+            DeletionStepOfThePublish::PartialWrite {
+                record_after_the_write,
+                rewritten_data_units,
+            } if record_after_the_write.inode == FIRST_INODE_NUMBER => {
+                usize::try_from(rewritten_data_units.end_exclusive)
+                    .expect("写之后的单元数装得进 usize：每个单元都要在内存里装一份")
+                    .max(data_units_before_this_publish)
+            }
             DeletionStepOfThePublish::Batch { .. }
             | DeletionStepOfThePublish::FinalBatch { .. }
+            | DeletionStepOfThePublish::TruncationBatch { .. }
+            | DeletionStepOfThePublish::TruncationFinalBatch { .. }
             | DeletionStepOfThePublish::Intent { .. }
             | DeletionStepOfThePublish::TruncationIntent { .. }
             | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+            | DeletionStepOfThePublish::PartialWrite { .. }
             | DeletionStepOfThePublish::NotADeletion => data_units_before_this_publish,
         }
+    }
+
+    /// 截断三步与变长、只改记录那一次改的是哪个 inode 的 size（判决 m4-multi-inode-size-r1 第二节 S3：任意活 inode）；别的步没有。
+    #[must_use]
+    pub const fn inode_whose_size_changes(self) -> Option<InodeNumber> {
+        match self {
+            DeletionStepOfThePublish::TruncationIntent {
+                record_after_the_intent: record,
+                ..
+            }
+            | DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
+                record_after_the_change: record,
+                ..
+            }
+            | DeletionStepOfThePublish::PartialWrite {
+                record_after_the_write: record,
+                ..
+            } => Some(InodeNumber(record.inode)),
+            DeletionStepOfThePublish::TruncationBatch { inode, .. }
+            | DeletionStepOfThePublish::TruncationFinalBatch { inode, .. } => Some(inode),
+            DeletionStepOfThePublish::NotADeletion
+            | DeletionStepOfThePublish::Intent { .. }
+            | DeletionStepOfThePublish::Batch { .. }
+            | DeletionStepOfThePublish::FinalBatch { .. } => None,
+        }
+    }
+
+    /// 这一步重写的那一个尾单元与它属于哪个 inode（[`Self::tail_data_unit_rewrite`] 配上 [`Self::inode_whose_size_changes`]）。
+    #[must_use]
+    pub fn tail_data_unit_rewrite_of_the_inode(self) -> Option<(InodeNumber, TailDataUnitRewrite)> {
+        self.inode_whose_size_changes()
+            .zip(self.tail_data_unit_rewrite())
     }
 
     /// 这一步重写的那一个尾单元（截断意图那次、变长那次，K3、K5）；别的发布没有。
@@ -5348,6 +5994,49 @@ impl DeletionStepOfThePublish {
                 ..
             } => tail_data_unit_rewrite,
             DeletionStepOfThePublish::NotADeletion
+            | DeletionStepOfThePublish::Intent { .. }
+            | DeletionStepOfThePublish::Batch { .. }
+            | DeletionStepOfThePublish::FinalBatch { .. }
+            | DeletionStepOfThePublish::TruncationBatch { .. }
+            | DeletionStepOfThePublish::TruncationFinalBatch { .. }
+            | DeletionStepOfThePublish::PartialWrite { .. } => None,
+        }
+    }
+
+    /// 这一步按读回的旧单元（或零）重写的那一段数据单元（[`DataUnitsRewrittenByTheStep`]）：截断意图与变长重写的那一个尾单元（K3、K5），
+    /// 按偏移部分写的那一段（判决 m4-partial-write-r1 第二节 R4）；别的步没有。计划的数据角色、切出的一单元事务、映射 key 与装单元都读它。
+    #[must_use]
+    pub fn data_units_rewritten_from_their_payloads(self) -> Option<DataUnitsRewrittenByTheStep> {
+        match self {
+            DeletionStepOfThePublish::TruncationIntent {
+                record_after_the_intent: record,
+                tail_data_unit_rewrite: Some(rewrite),
+            }
+            | DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
+                record_after_the_change: record,
+                tail_data_unit_rewrite: Some(rewrite),
+            } => Some(DataUnitsRewrittenByTheStep {
+                inode: InodeNumber(record.inode),
+                units: DataUnitsRewrittenInOnePublish::of_one_unit(rewrite.unit),
+                size_after_in_bytes: record.size,
+            }),
+            DeletionStepOfThePublish::PartialWrite {
+                record_after_the_write: record,
+                rewritten_data_units,
+            } => Some(DataUnitsRewrittenByTheStep {
+                inode: InodeNumber(record.inode),
+                units: rewritten_data_units,
+                size_after_in_bytes: record.size,
+            }),
+            DeletionStepOfThePublish::TruncationIntent {
+                tail_data_unit_rewrite: None,
+                ..
+            }
+            | DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
+                tail_data_unit_rewrite: None,
+                ..
+            }
+            | DeletionStepOfThePublish::NotADeletion
             | DeletionStepOfThePublish::Intent { .. }
             | DeletionStepOfThePublish::Batch { .. }
             | DeletionStepOfThePublish::FinalBatch { .. }
@@ -5369,6 +6058,8 @@ impl DeletionStepOfThePublish {
             | DeletionStepOfThePublish::TruncationFinalBatch { .. } => true,
             DeletionStepOfThePublish::NotADeletion
             | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. } => false,
+            // 部分写当普通写（判决 m4-partial-write-r1：准入照普通写判）。
+            DeletionStepOfThePublish::PartialWrite { .. } => false,
         }
     }
 
@@ -5391,6 +6082,7 @@ impl DeletionStepOfThePublish {
             | DeletionStepOfThePublish::TruncationBatch { .. }
             | DeletionStepOfThePublish::TruncationFinalBatch { .. }
             | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+            | DeletionStepOfThePublish::PartialWrite { .. }
             | DeletionStepOfThePublish::NotADeletion => {}
         }
         keys
@@ -5631,8 +6323,8 @@ pub fn snapshot_inode_root_entry(
 /// 删快照 `snapshot` 时能放掉的 deadlist 条目，按 key 升序（D5（快照 / 空间记账机制） 已定项 12 定案表「销毁 S」那一行，判决 S4）：
 /// 头是活头 inode 树、纪元落在 [lo, hi) 里、birth > P——lo = 它那条码 14 的诞生 txg，P = 它的前驱，hi 现取：下一侧是快照时取那条码 14 的
 /// 诞生 txg；下一侧是活头时条款取「写意图那次发布的 txg」，它不落盘（判决 S4「续做点不存」）——这里取 `hi_when_the_next_side_is_the_live_head`
-/// （调用方给这一批自己的 txg）：删快照串行（第七节岔路 2），意图之后到最后一批之间的发布只有这次销毁的批与挂载自己的写行、暖机、抬 F，
-/// 都不杀用户可见单元，纪元 ≥ 写意图那次 txg 的条目一条都不会有，两种取法放的是同一组。余下的条目键不动，它们按纪元落进下一侧的那一段
+/// （调用方给这一批自己的 txg）：条目的纪元只取自上一版活头的前驱，活头前驱只在建快照与写销毁意图两处变，而意图挂着时这两样都被拒
+/// （判决 m4-c145-destruction-bound-r1 B1），所以纪元 ≥ 写意图那次 txg 的条目一条都不会有，两种取法放的是同一组。余下的条目键不动，它们按纪元落进下一侧的那一段
 /// （约定 B，已定项 16：下一侧的前驱在意图那次已经换成 P）。`snapshot` 不在树表里交回空表。
 #[must_use]
 pub fn deadlist_entries_the_destruction_of_a_snapshot_releases(
@@ -5713,17 +6405,33 @@ fn deadlist_changes_of_this_publish(
     let Some(previous_version) = previous else {
         return Ok(DeadlistChangesOfThisPublish::default());
     };
+    let _inside_the_snapshot_judgement = lookup_work::entering(LookupSite::SnapshotJudgement);
+    // 换下的用户可见角色问在上一版里有没有落点：按 inode 号找文件的那份读者每走一遍建至多一次，这一遍进一次这一处。
+    let inside_the_file_lookups =
+        lookup_work::entering(LookupSite::FilesOfTheUserVisibleRolesOfTheSnapshotJudgement);
+    let mut previous_files =
+        FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous_version);
     let user_visible_roles_replaced: Vec<TransactionUnit> =
         roles_replaced_via_mapping(previous_version, candidate_roles, file_content)
             .into_iter()
             .filter(|identity| asks_the_snapshot_lifetime_judgement(*identity))
-            .filter(|identity| has_a_placement_in_the_previous_version(previous_version, *identity))
+            .filter(|identity| {
+                has_a_placement_in_the_previous_version(
+                    previous_version,
+                    &mut previous_files,
+                    *identity,
+                )
+            })
             .collect();
+    drop(inside_the_file_lookups);
     let previous_snapshot_txg_of_the_live_head =
         previous_version.previous_snapshot_txg_of_the_live_head();
     let mut user_visible_roles_kept_for_the_snapshots = Vec::new();
     let mut entries_killed_this_publish: Vec<DeadlistEntry> = Vec::new();
     let mut mapping_entries_kept_this_publish: Vec<(Vec<u8>, [LocationEntry; 2])> = Vec::new();
+    // 进 deadlist 的角色取映射条目：同释放判定路径，key 与落点都走建一次的索引（七·6，用户 2026-10-21 定并进），没有进 deadlist 的不建。
+    let mut previous_version_read_by_role =
+        MappedUnitsOfAVersionReadByRole::of_the_version(previous_version);
     // 换下的角色各查一次映射 key，查法与照抄全部角色那一圈同一个索引（七·6）：建一次走完上一版的 `mapped_units`，
     // 之后每次查不再走整张表；同一角色取最先那一项、查不到时的 panic 文案与在 `mapped_units` 上 `iter().find` 相同。
     let mapped_units_of_the_previous_version = previous_version.mapped_units_by_role();
@@ -5744,21 +6452,19 @@ fn deadlist_changes_of_this_publish(
                     CheckpointTxg(0),
                     "进 deadlist 的条目纪元非 0：活头没打过快照时没有单元该进 deadlist（只供测试的强制进 deadlist 那一臂要在活头打过快照之后用）；单元 {identity:?}"
                 );
-                let locations =
-                    match mapping_locations_of_a_mapped_unit(previous_version, *identity) {
-                        MappingLookup::Found(locations) => locations,
-                        MappingLookup::NodeMalformedOrNoEntryWithThisKey => {
-                            return Err(PublishError::ReleaseNotInMapping { unit: *identity })
-                        }
-                        MappingLookup::EntryNarrowerThanItsFieldTable { entry_bytes } => {
-                            return Err(PublishError::MappingEntryNarrowerThanItsFieldTable {
-                                unit: *identity,
-                                entry_bytes,
-                                field_table_bytes: usize::try_from(MAPPING_ENTRY_BYTES)
-                                    .expect("55"),
-                            })
-                        }
-                    };
+                let locations = match previous_version_read_by_role.locations_of_role(*identity) {
+                    MappingLookup::Found(locations) => locations,
+                    MappingLookup::NodeMalformedOrNoEntryWithThisKey => {
+                        return Err(PublishError::ReleaseNotInMapping { unit: *identity })
+                    }
+                    MappingLookup::EntryNarrowerThanItsFieldTable { entry_bytes } => {
+                        return Err(PublishError::MappingEntryNarrowerThanItsFieldTable {
+                            unit: *identity,
+                            entry_bytes,
+                            field_table_bytes: usize::try_from(MAPPING_ENTRY_BYTES).expect("55"),
+                        })
+                    }
+                };
                 user_visible_roles_kept_for_the_snapshots.push(*identity);
                 entries_killed_this_publish.push(DeadlistEntry {
                     head: trees.inode,
@@ -5787,11 +6493,17 @@ fn deadlist_changes_of_this_publish(
         | SnapshotStepOfThePublish::DestructionIntent { .. } => Vec::new(),
     };
     let mut entries_released_by_the_destruction = Vec::with_capacity(entries_released.len());
+    // 放掉的每条条目按映射 key 取它留存的映射条目：走建一次的索引（七·6 代码轮第三轮判决第三节第 1 条），同一把 key 取最先那一项，
+    // 与在 `mapping_entries_kept_for_the_snapshots` 上 `iter().find` 同一项；一条都不放的不建。放条目的每一遍进一次这一处
+    // （七·6 后续批代码轮第一轮判决第三节第 3 条：建索引次数恰好等于走了几遍）。
+    let inside_the_destruction = (!entries_released.is_empty()).then(|| {
+        lookup_work::entering(LookupSite::KeptMappingEntriesReleasedByTheSnapshotDestruction)
+    });
+    let mut kept_mapping_entries_by_key = None;
     for entry in entries_released {
-        let locations = previous_version
-            .mapping_entries_kept_for_the_snapshots
-            .iter()
-            .find(|(key, _)| *key == entry.mapping_key)
+        let locations = kept_mapping_entries_by_key
+            .get_or_insert_with(|| previous_version.mapping_entries_kept_for_the_snapshots_by_key())
+            .first_entry_of(&entry.mapping_key.as_slice())
             .map(|(_, locations)| *locations)
             .ok_or_else(|| PublishError::DeadlistEntryNotReleasable {
                 mapping_key: entry.mapping_key.clone(),
@@ -5799,6 +6511,7 @@ fn deadlist_changes_of_this_publish(
             })?;
         entries_released_by_the_destruction.push((entry, locations));
     }
+    drop(inside_the_destruction);
     let mut entries_after: BTreeMap<CodeTwoTreeKey, DeadlistEntry> = previous_version
         .deadlist_entries
         .iter()
@@ -5821,10 +6534,18 @@ fn deadlist_changes_of_this_publish(
             })
             .collect();
     for (entry, _) in &entries_released_by_the_destruction {
-        entries_after.remove(&CodeTwoTreeKey::new(
+        let released_entry = entries_after.remove(&CodeTwoTreeKey::new(
             &entry.key_bytes(),
             CodeTwoKeyFieldWidths::DEADLIST,
         ));
+        // C145 第三条（用户 2026-10-26 定「加断言并留档」）：放块时要删的那条 deadlist 条目必须还在。放掉的条目是
+        // `deadlist_entries_the_destruction_of_a_snapshot_releases` 从上一版的 deadlist 里挑的、`entries_after` 也从同一份建，构造上恒成立；
+        // 删掉这条断言的变异是等价变异，等价性由 harness 档用例
+        // `every_deadlist_entry_a_snapshot_destruction_releases_is_in_the_deadlist_the_release_starts_from` 钉住。
+        assert!(
+            released_entry.is_some(),
+            "删快照放掉的 deadlist 条目在上一版的 deadlist 里（放掉的是从它挑的，C145）"
+        );
         kept_mapping_after.remove(&CodeTwoTreeKey::new(
             &entry.mapping_key,
             CodeTwoKeyFieldWidths::CENTRAL_MAPPING,
@@ -6208,8 +6929,9 @@ pub struct ResolvedPublish {
     /// 上一版里有、这一版没有同一个单元接着的角色（删除批截掉的尾部数据单元、身份消失的 inode 叶容器——按它在上一版里的叶序、
     /// 删空的 `deleted_inodes` 根），照样被这次换下。
     pub previous_roles_without_a_successor: Vec<TransactionUnit>,
-    /// 这次重写的那一个尾单元（截断意图、变长，判决 m4-trunc-r1 K3、K5）；别的发布 `None`。
-    pub tail_data_unit_rewrite: Option<TailDataUnitRewrite>,
+    /// 这次按读回的旧单元（或零）重写的那一段数据单元与它属于哪个 inode（截断意图、变长的那一个尾单元，判决 m4-trunc-r1 K3、K5；
+    /// 任意活 inode，判决 m4-multi-inode-size-r1 第二节 S3；按偏移部分写的那一段，判决 m4-partial-write-r1 第二节 R4）；别的发布 `None`。
+    pub data_units_rewritten_from_their_payloads: Option<DataUnitsRewrittenByTheStep>,
 }
 
 impl ResolvedPublish {
@@ -6649,25 +7371,49 @@ pub fn extent_tree_plan_with_the_unified_upper_segment(
     }
 }
 
-/// 第一个文件之外一个文件这次之后的单元从哪来：这次整份重写（按 inode 号写数据的入口写的就是它）、照抄上一版，或被删除的一批截到前几个
-/// （数据单元照抄留下的那几个，下段按节点各自的来历，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1）。
+/// 第一个文件之外一个文件这次之后的单元从哪来：这次整份重写（按 inode 号写数据的入口写的就是它）、照抄上一版，被删除的一批截到前几个
+/// （数据单元照抄留下的那几个，下段按节点各自的来历，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1），
+/// 或这次改了它的 size（截断三步、变长、只改记录，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3）或按偏移写了它
+/// （判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R4、R6）：数据单元照抄留下的那几个、`rewritten_data_units` 那一段
+/// （截断意图与变长重写的尾单元，K3、K5；部分写从偏移所在的单元起到最后一个）按这次的事务重写，下段按节点各自的来历。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FileOtherThanTheFirstOrigin {
     CarriedFromThePreviousVersion,
     RewrittenThisPublish,
     CutByADeletionBatch,
+    SizeChangedThisPublish {
+        rewritten_data_units: DataUnitsRewrittenInOnePublish,
+    },
 }
 
-/// 第一个文件之外一个有数据单元的文件这次之后的样子（[`FilesOtherThanTheFirstPlan`] 的一项）。
+impl FileOtherThanTheFirstOrigin {
+    /// 这个文件第 `unit` 个数据单元这次是不是重写的（不是就照抄上一版那一个）：整份重写的每一个都是，改 size 与部分写的是重写的那一段里的。
+    #[must_use]
+    pub fn rewrites_the_data_unit(self, unit: DataUnitIndexInFile) -> bool {
+        match self {
+            FileOtherThanTheFirstOrigin::RewrittenThisPublish => true,
+            FileOtherThanTheFirstOrigin::SizeChangedThisPublish {
+                rewritten_data_units,
+            } => rewritten_data_units.contains(unit),
+            FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
+            | FileOtherThanTheFirstOrigin::CutByADeletionBatch => false,
+        }
+    }
+}
+
+/// 第一个文件之外一个在上段里有条目的文件这次之后的样子（[`FilesOtherThanTheFirstPlan`] 的一项）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileOtherThanTheFirstPlan {
     pub inode: InodeNumber,
-    /// 这次之后它有几个数据单元（从 0 起连号、没有洞，至少一个）。
+    /// 这次之后它有几个数据单元（从 0 起连号、中间没有洞；0 个是粘住的标签 0，判决 m4-multi-inode-size-r1 第二节 S2）。
     pub data_units: u64,
     pub origin: FileOtherThanTheFirstOrigin,
-    /// 它下段这次之后的节点与各自的来历，bump 次序（先叶后根）；只有一个数据单元（内联）时为空。整份重写时下段每个节点都重写，照抄时都照抄，
-    /// 被删除的一批截时只重写被截掉那一片叶与它的祖先（K-R3-1）。
+    /// 它下段这次之后的节点与各自的来历，bump 次序（先叶后根）；只有一个数据单元（内联）或一个都没有时为空。整份重写时下段每个节点都重写，
+    /// 照抄时都照抄，被删除的一批截时只重写被截掉那一片叶与它的祖先（K-R3-1），改 size 时照
+    /// [`crate::truncate::plan_the_lower_segment_after_a_size_change`]。
     pub lower_nodes: Vec<(ExtentLowerNodePosition, ExtentTreeNodeOrigin)>,
+    /// 这次之后上段叶条目标签声明的尾部（有单元时标签 1、2 或 3、4；0 个单元时写标签 0、不读它）。
+    pub tail: TailOfAFile,
 }
 
 impl FileOtherThanTheFirstPlan {
@@ -6704,6 +7450,14 @@ pub enum ChangeOfAFileOtherThanTheFirst {
     },
     /// 删 `inode` 的最后一批：它的数据单元与下段一个不剩（没有数据单元的 inode 这一步什么都不换下）。
     FinalDeletionBatch { inode: InodeNumber },
+    /// 改 `inode` 的 size（截断三步、变长、只改记录，判决 m4-multi-inode-size-r1 第二节 S3）：单元数、重写的尾单元与尾部照 `change`，
+    /// `size_after_in_bytes` 是这次之后那条记录的 size。上一版上段里没有它（size 0、没改过 size）而这次之后 size > 0 的，这次起写它那一条
+    /// 标签 0、之后一直留着（第二节 S2「粘住的标签 0」）；上一版有的照旧有。
+    SizeChange {
+        inode: InodeNumber,
+        change: SizeChangeOfTheFile,
+        size_after_in_bytes: u64,
+    },
 }
 
 impl ChangeOfAFileOtherThanTheFirst {
@@ -6714,7 +7468,8 @@ impl ChangeOfAFileOtherThanTheFirst {
             ChangeOfAFileOtherThanTheFirst::NoFileChanges => None,
             ChangeOfAFileOtherThanTheFirst::WholeWrite { inode, .. }
             | ChangeOfAFileOtherThanTheFirst::DeletionBatch { inode, .. }
-            | ChangeOfAFileOtherThanTheFirst::FinalDeletionBatch { inode } => Some(inode),
+            | ChangeOfAFileOtherThanTheFirst::FinalDeletionBatch { inode }
+            | ChangeOfAFileOtherThanTheFirst::SizeChange { inode, .. } => Some(inode),
         }
     }
 }
@@ -6785,6 +7540,7 @@ pub fn plan_the_files_other_than_the_first_after_this_publish(
                             )
                         })
                         .collect(),
+                    tail: file.tail,
                 })
                 .collect()
         })
@@ -6806,6 +7562,7 @@ pub fn plan_the_files_other_than_the_first_after_this_publish(
                 replaced_previous_data_roles = previous_file.data_roles();
                 replaced_previous_lower_node_roles = previous_file.extent_lower_node_roles();
             }
+            // 整份写从偏移 0 写满 size：切出的单元数就是 ⌈size ÷ 净荷⌉.max(1)，尾部没有洞（标签 1、2）。
             files.push(FileOtherThanTheFirstPlan {
                 inode,
                 data_units,
@@ -6814,6 +7571,7 @@ pub fn plan_the_files_other_than_the_first_after_this_publish(
                     .into_iter()
                     .map(|position| (position, ExtentTreeNodeOrigin::RewrittenThisPublish))
                     .collect(),
+                tail: TailOfAFile::NoHoleAfterTheLastDataUnit,
             });
         }
         ChangeOfAFileOtherThanTheFirst::DeletionBatch {
@@ -6847,11 +7605,14 @@ pub fn plan_the_files_other_than_the_first_after_this_publish(
                 })
                 .chain(lower.previous_nodes_dropped.iter().map(lower_node_role))
                 .collect();
+            // 删除的一批把 size 改成「剩下单元数 × 净荷」（D8（核心索引结构） 已定项 16 第 2 条）：剩下的单元恰好装满它，尾部没有洞——
+            // 上一版尾部有洞（标签 3、4）的，这一批换回标签 1、2。
             files.push(FileOtherThanTheFirstPlan {
                 inode,
                 data_units: data_units_kept,
                 origin: FileOtherThanTheFirstOrigin::CutByADeletionBatch,
                 lower_nodes: lower.nodes,
+                tail: TailOfAFile::NoHoleAfterTheLastDataUnit,
             });
         }
         ChangeOfAFileOtherThanTheFirst::FinalDeletionBatch { inode } => {
@@ -6861,6 +7622,65 @@ pub fn plan_the_files_other_than_the_first_after_this_publish(
                     .into_iter()
                     .chain(previous_file.extent_lower_node_roles())
                     .collect();
+            }
+        }
+        ChangeOfAFileOtherThanTheFirst::SizeChange {
+            inode,
+            change,
+            size_after_in_bytes,
+        } => {
+            let previous_file = previous_file_of(inode);
+            let previous_lower_positions: Vec<ExtentLowerNodePosition> = previous_file
+                .map(|file| {
+                    file.extent_lower_nodes
+                        .iter()
+                        .map(|(position, _)| *position)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let lower =
+                plan_the_lower_segment_after_a_size_change(&previous_lower_positions, change);
+            let lower_node_role = |position: &ExtentLowerNodePosition| {
+                TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst {
+                    inode,
+                    position: *position,
+                }
+            };
+            let data_role = |unit: u64| TransactionUnit::DataOfAFileOtherThanTheFirst {
+                inode,
+                unit: DataUnitIndexInFile(unit),
+            };
+            // 重写的尾单元（K3、K5）与部分写重写的那一段里上一版有的那几个，上一版那一份有同名后继，进快照判定那一圈经
+            // `replaced_previous_roles` 那条链（判决 m4-multi-inode-size-r1 第二节 S3「快照下被换下的上一版角色进 deadlist 那条链」；
+            // 部分写只换下这次真重写的那几个，判决 m4-partial-write-r1 第二节 R7、截断判决 K4）。
+            replaced_previous_data_roles = change
+                .rewritten_data_units
+                .units()
+                .filter(|unit| *unit < change.data_units_before)
+                .map(data_role)
+                .collect();
+            replaced_previous_lower_node_roles = lower
+                .previous_nodes_rewritten
+                .iter()
+                .map(lower_node_role)
+                .collect();
+            previous_roles_without_a_successor = (change.data_units_after
+                ..change.data_units_before)
+                .map(data_role)
+                .chain(lower.previous_nodes_dropped.iter().map(lower_node_role))
+                .collect();
+            let has_an_entry_after_this_publish =
+                previous_file.is_some() || change.data_units_after > 0 || size_after_in_bytes > 0;
+            if has_an_entry_after_this_publish {
+                files.push(FileOtherThanTheFirstPlan {
+                    inode,
+                    data_units: change.data_units_after,
+                    origin: FileOtherThanTheFirstOrigin::SizeChangedThisPublish {
+                        rewritten_data_units: change.rewritten_data_units,
+                    },
+                    lower_nodes: lower.nodes,
+                    tail: change.tail_after,
+                });
             }
         }
     }
@@ -7085,8 +7905,9 @@ struct MappedPositionAddressedTrees<'plans> {
 /// 这次之后删除那两棵树、谱系树与照抄几个数据单元（`resolve` 给映射排 key 要它们）。
 struct DeletionTreesOfThisPublish<'plans> {
     carried_data_units: usize,
-    /// 截断意图与变长那一次重写的尾单元（判决 m4-trunc-r1 K3、K5）：它的映射 key 按这次的出生身份现算，别的数据单元照抄。
-    tail_data_unit_rewrite: Option<TailDataUnitRewrite>,
+    /// 这一步按读回的旧单元（或零）重写的那一段数据单元切成的一单元事务（截断意图与变长的那一个尾单元，判决 m4-trunc-r1 K3、K5；部分写的那一段，
+    /// 判决 m4-partial-write-r1 第二节 R4）与它们属于哪个 inode：它们的映射 key 按这次的出生身份与各自的事务号现算，那个文件别的数据单元照抄。
+    data_units_rewritten_from_their_payloads: Option<(InodeNumber, Vec<OneUnitTransaction>)>,
     deleted_inodes_root: DeletedInodesRootOrigin,
     tombstone_tree: &'plans TombstoneTreeAfterThisPublish,
     lineage_tree: &'plans LineageTreeAfterThisPublish,
@@ -7249,28 +8070,41 @@ impl PublishPlan<'_> {
         }
     }
 
-    /// 这次发布写的数据单元按一单元事务排：有文件版本就是 [`Self::file_content_transactions`]；没有而这一步重写一个尾单元
-    /// （截断意图、变长，判决 m4-trunc-r1 K3、K5）就是那一个单元一个事务，事务号是这次发布的 `transaction`，载荷区间是它在文件里那一段
-    /// （声明长度那么长）；都没有为空。
+    /// 这次发布写的数据单元按一单元事务排：有文件版本就是 [`Self::file_content_transactions`]；没有而这一步按读回的旧单元重写一段单元
+    /// （截断意图、变长的那一个尾单元，判决 m4-trunc-r1 K3、K5；部分写从偏移所在的单元起的那一段，判决 m4-partial-write-r1 第二节 R4）
+    /// 就是那一段里每个单元一个事务，按单元号升序、事务号从这次发布的 `transaction` 起连号（切分纪律一事务一单元，D16（发布语义） 已定项 5），
+    /// 载荷区间是它在文件里那一段（声明长度 = min(这一步之后的 size − 起点, 净荷) 那么长）；都没有为空。
     #[must_use]
-    pub fn file_content_transactions_and_the_tail_data_unit(
+    pub fn file_content_transactions_and_the_rewritten_data_units(
         &self,
-        tail_data_unit_rewrite: Option<TailDataUnitRewrite>,
+        data_units_rewritten_from_their_payloads: Option<DataUnitsRewrittenByTheStep>,
     ) -> Vec<OneUnitTransaction> {
-        match (&self.file, tail_data_unit_rewrite) {
+        match (&self.file, data_units_rewritten_from_their_payloads) {
             (Some(_), _) => self.file_content_transactions(),
-            (None, Some(rewrite)) => {
-                let payload_start = rewrite
-                    .unit
-                    .first_file_byte(u64::try_from(data_unit_payload_capacity()).expect("32634"));
-                vec![OneUnitTransaction {
-                    transaction_number: self.transaction,
-                    unit_index_in_file: rewrite.unit,
-                    payload_start,
-                    payload_end_exclusive: FileOffsetInBytes(
-                        payload_start.0 + rewrite.declared_length_in_bytes,
-                    ),
-                }]
+            (None, Some(rewritten)) => {
+                let payload_capacity = u64::try_from(data_unit_payload_capacity()).expect("32634");
+                // 迭代次数的上界是重写的单元数；不跨轮携带状态、没有提前出口。
+                rewritten
+                    .units
+                    .units()
+                    .zip(self.transaction..)
+                    .map(|(unit, transaction_number)| {
+                        let unit = DataUnitIndexInFile(unit);
+                        let payload_start = unit.first_file_byte(payload_capacity);
+                        OneUnitTransaction {
+                            transaction_number,
+                            unit_index_in_file: unit,
+                            payload_start,
+                            payload_end_exclusive: FileOffsetInBytes(
+                                payload_start.0
+                                    + declared_length_within_a_size(
+                                        unit,
+                                        rewritten.size_after_in_bytes,
+                                    ),
+                            ),
+                        }
+                    })
+                    .collect()
             }
             (None, None) => Vec::new(),
         }
@@ -7303,10 +8137,18 @@ impl PublishPlan<'_> {
             .filter(|inode| inode.0 != FIRST_INODE_NUMBER)
     }
 
-    /// 这次发布重写的一个数据单元的角色：写第一个文件之外的文件时是那个文件的那一族，别的（写第一个文件、重写第一个文件的尾单元）是
-    /// [`TransactionUnit::Data`]。
-    fn role_of_a_data_unit_written(&self, unit: DataUnitIndexInFile) -> TransactionUnit {
-        match self.inode_of_the_file_other_than_the_first_written() {
+    /// 这次发布重写的一个数据单元的角色：写第一个文件之外的文件、或按读回的旧单元重写第一个文件之外那个文件的一段单元
+    /// （`inode_whose_tail_is_rewritten`：截断意图与变长的尾单元，判决 m4-multi-inode-size-r1 第二节 S3；部分写，判决 m4-partial-write-r1
+    /// 第二节 R6）时是那个文件的那一族，别的（写第一个文件、重写第一个文件的单元）是 [`TransactionUnit::Data`]。
+    fn role_of_a_data_unit_written(
+        &self,
+        unit: DataUnitIndexInFile,
+        inode_whose_tail_is_rewritten: Option<InodeNumber>,
+    ) -> TransactionUnit {
+        match self
+            .inode_of_the_file_other_than_the_first_written()
+            .or(inode_whose_tail_is_rewritten.filter(|inode| inode.0 != FIRST_INODE_NUMBER))
+        {
             Some(inode) => TransactionUnit::DataOfAFileOtherThanTheFirst { inode, unit },
             None => TransactionUnit::Data(unit),
         }
@@ -7356,6 +8198,10 @@ impl PublishPlan<'_> {
             | DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
                 record_after_the_change: record,
                 ..
+            }
+            | DeletionStepOfThePublish::PartialWrite {
+                record_after_the_write: record,
+                ..
             } => record_writes.push(record),
             DeletionStepOfThePublish::FinalBatch { .. }
             | DeletionStepOfThePublish::TruncationBatch { .. }
@@ -7376,6 +8222,7 @@ impl PublishPlan<'_> {
             | DeletionStepOfThePublish::TruncationBatch { .. }
             | DeletionStepOfThePublish::TruncationFinalBatch { .. }
             | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+            | DeletionStepOfThePublish::PartialWrite { .. }
             | DeletionStepOfThePublish::NotADeletion => write_records_into_leaf_containers(
                 &containers_before,
                 &record_writes,
@@ -7383,22 +8230,45 @@ impl PublishPlan<'_> {
                 trees.inode,
             )?,
         };
-        let file_content_transactions = self.file_content_transactions_and_the_tail_data_unit(
-            deletion_and_lineage.step.tail_data_unit_rewrite(),
-        );
+        let file_content_transactions = self
+            .file_content_transactions_and_the_rewritten_data_units(
+                deletion_and_lineage
+                    .step
+                    .data_units_rewritten_from_their_payloads(),
+            );
         let data_units_before = previous.map_or(0, |version| version.data_pointers.len());
         let carried_data_units = deletion_and_lineage
             .step
             .data_units_after_this_publish(data_units_before);
-        let size_change_of_the_first_file =
-            size_change_of_the_first_file(deletion_and_lineage.step, previous, carried_data_units);
-        // 第一个文件之外的文件这次改哪一个：按 inode 号写的那一个，或删除的一批与最后一批删的那一个（判决
-        // `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1：批与最后一批按 `inode` 分，不把别的号的批当第一个文件的）。
+        // 截断三步与变长、只改记录那一次改的那个文件（任意活 inode，判决 m4-multi-inode-size-r1 第二节 S3）改 size 之前与之后的样子。
+        let size_change_of_a_file = size_change_of_a_file(deletion_and_lineage.step, previous);
+        let size_change_of_the_first_file = size_change_of_a_file
+            .filter(|size_change| size_change.inode.0 == FIRST_INODE_NUMBER)
+            .map(|size_change| size_change.change);
+        // 第一个文件之外的文件这次改哪一个：按 inode 号写的那一个，删除的一批与最后一批删的那一个（判决
+        // `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1：批与最后一批按 `inode` 分，不把别的号的批当第一个文件的），
+        // 或改 size 的那一个（判决 m4-multi-inode-size-r1 第二节 S3：截断两种批带号，不当成第一个文件的）。
         let change_of_a_file_other_than_the_first = match self.file_other_than_the_first_written() {
             Some((inode, data_units)) => {
                 ChangeOfAFileOtherThanTheFirst::WholeWrite { inode, data_units }
             }
             None => match deletion_and_lineage.step {
+                DeletionStepOfThePublish::TruncationIntent { .. }
+                | DeletionStepOfThePublish::TruncationBatch { .. }
+                | DeletionStepOfThePublish::TruncationFinalBatch { .. }
+                | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+                | DeletionStepOfThePublish::PartialWrite { .. }
+                    if size_change_of_a_file
+                        .is_some_and(|size_change| size_change.inode.0 != FIRST_INODE_NUMBER) =>
+                {
+                    let size_change =
+                        size_change_of_a_file.expect("上一句判过：改 size 的是第一个文件之外的号");
+                    ChangeOfAFileOtherThanTheFirst::SizeChange {
+                        inode: size_change.inode,
+                        change: size_change.change,
+                        size_after_in_bytes: size_change.size_after_in_bytes,
+                    }
+                }
                 DeletionStepOfThePublish::Batch {
                     inode,
                     data_units_kept,
@@ -7419,6 +8289,7 @@ impl PublishPlan<'_> {
                 | DeletionStepOfThePublish::TruncationBatch { .. }
                 | DeletionStepOfThePublish::TruncationFinalBatch { .. }
                 | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+                | DeletionStepOfThePublish::PartialWrite { .. }
                 | DeletionStepOfThePublish::NotADeletion => {
                     ChangeOfAFileOtherThanTheFirst::NoFileChanges
                 }
@@ -7433,13 +8304,31 @@ impl PublishPlan<'_> {
                 DeletionStepOfThePublish::TruncationIntent { .. }
                 | DeletionStepOfThePublish::TruncationBatch { .. }
                 | DeletionStepOfThePublish::TruncationFinalBatch { .. }
-                | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. },
+                | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+                | DeletionStepOfThePublish::PartialWrite { .. },
                 Some(previous_version),
             ) if size_change_of_the_first_file.is_some() => {
                 plan_the_extent_tree_after_a_size_change(
                     &previous_version.extent_tree,
                     FIRST_INODE_NUMBER,
                     size_change_of_the_first_file.expect("上一句判过是 Some"),
+                )
+            }
+            // 第一个文件之外的文件改 size：第一个文件的下段整段照抄，上段走统一计划（同写别的文件那一支）——这次之后有条目的是上一版的那几个，
+            // 加这次第一次写上标签 0 的它（粘住的标签 0，判决 m4-multi-inode-size-r1 第二节 S2）；它那一条变了才重写它那一串。
+            (
+                DeletionStepOfThePublish::TruncationIntent { .. }
+                | DeletionStepOfThePublish::TruncationBatch { .. }
+                | DeletionStepOfThePublish::TruncationFinalBatch { .. }
+                | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+                | DeletionStepOfThePublish::PartialWrite { .. },
+                Some(previous_version),
+            ) if size_change_of_a_file.is_some() => {
+                let size_change = size_change_of_a_file.expect("上一句判过是 Some");
+                plan_the_extent_tree_after_the_size_change_of_a_file_other_than_the_first(
+                    previous_version,
+                    &files_other_than_the_first,
+                    size_change,
                 )
             }
             // 删除的一批与最后一批按 `inode` 分（判决 m3-multi-file-unlink-r1 第三节 M1、M3），上段都走统一计划（M2）。
@@ -7481,6 +8370,7 @@ impl PublishPlan<'_> {
                 | DeletionStepOfThePublish::TruncationBatch { .. }
                 | DeletionStepOfThePublish::TruncationFinalBatch { .. }
                 | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+                | DeletionStepOfThePublish::PartialWrite { .. }
                 | DeletionStepOfThePublish::NotADeletion,
                 _,
             ) => plan_the_extent_tree_after_this_publish(
@@ -7507,7 +8397,15 @@ impl PublishPlan<'_> {
         };
         let data_roles_rewritten: Vec<TransactionUnit> = file_content_transactions
             .iter()
-            .map(|transaction| self.role_of_a_data_unit_written(transaction.unit_index_in_file))
+            .map(|transaction| {
+                self.role_of_a_data_unit_written(
+                    transaction.unit_index_in_file,
+                    deletion_and_lineage
+                        .step
+                        .data_units_rewritten_from_their_payloads()
+                        .map(|rewritten| rewritten.inode),
+                )
+            })
             .collect();
         let deleted_inodes_before: &[InodeNumber] = match previous {
             Some(version) => &version.deleted_inodes,
@@ -7559,6 +8457,7 @@ impl PublishPlan<'_> {
             | DeletionStepOfThePublish::TruncationBatch { .. }
             | DeletionStepOfThePublish::TruncationFinalBatch { .. }
             | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+            | DeletionStepOfThePublish::PartialWrite { .. }
             | DeletionStepOfThePublish::NotADeletion => TombstoneTreeAfterThisPublish::carried(
                 tombstone_containers_before,
                 tombstone_shape_before,
@@ -7758,7 +8657,17 @@ impl PublishPlan<'_> {
             &inode_tree,
             &DeletionTreesOfThisPublish {
                 carried_data_units,
-                tail_data_unit_rewrite: deletion_and_lineage.step.tail_data_unit_rewrite(),
+                data_units_rewritten_from_their_payloads: deletion_and_lineage
+                    .step
+                    .data_units_rewritten_from_their_payloads()
+                    .map(|rewritten| {
+                        (
+                            rewritten.inode,
+                            self.file_content_transactions_and_the_rewritten_data_units(Some(
+                                rewritten,
+                            )),
+                        )
+                    }),
                 deleted_inodes_root,
                 tombstone_tree: &tombstone_tree,
                 lineage_tree: &lineage_tree,
@@ -7826,7 +8735,9 @@ impl PublishPlan<'_> {
             logged_operations,
             logged_operations_root,
             previous_roles_without_a_successor,
-            tail_data_unit_rewrite: deletion_and_lineage.step.tail_data_unit_rewrite(),
+            data_units_rewritten_from_their_payloads: deletion_and_lineage
+                .step
+                .data_units_rewritten_from_their_payloads(),
         })
     }
 
@@ -7981,21 +8892,26 @@ impl PublishPlan<'_> {
                 }
             }
             None => {
-                assert!(
-                    previous.is_some_and(|carried_version| {
-                        deletion_trees.carried_data_units <= carried_version.data_pointers.len()
-                    }),
-                    "没有文件版本的发布要接在上一版之后：文件角色从它照抄（删除的一批只照抄前几个）"
-                );
+                let data_units_of_the_carried_version = previous
+                    .expect("没有文件版本的发布要接在上一版之后：文件角色从它照抄（删除的一批只照抄前几个）")
+                    .data_pointers
+                    .len();
+                let transactions_rewritten_in_the_first_file: &[OneUnitTransaction] =
+                    deletion_trees
+                        .data_units_rewritten_from_their_payloads
+                        .as_ref()
+                        .filter(|(inode, _)| inode.0 == FIRST_INODE_NUMBER)
+                        .map_or(&[], |(_, transactions)| transactions.as_slice());
                 for position in 0..deletion_trees.carried_data_units {
                     let unit = DataUnitIndexInFile(u64::try_from(position).expect("单元序号"));
                     let identity = TransactionUnit::Data(unit);
-                    let is_the_rewritten_tail = deletion_trees
-                        .tail_data_unit_rewrite
-                        .is_some_and(|rewrite| rewrite.unit == unit);
-                    if is_the_rewritten_tail {
-                        // 这次唯一的数据角色，一个事务，事务号是这次发布的那一个（`file_content_transactions_and_the_tail_data_unit`）。
-                        mapped_units.push((
+                    match transaction_of_a_rewritten_data_unit(
+                        transactions_rewritten_in_the_first_file,
+                        unit,
+                    ) {
+                        // 按读回的旧单元（或零）重写的那一段：各一个事务，事务号是切给它的那一个
+                        // （`file_content_transactions_and_the_rewritten_data_units`）。
+                        Some(transaction) => mapped_units.push((
                             identity,
                             mapping_key_for_data(
                                 PointerHead {
@@ -8004,12 +8920,17 @@ impl PublishPlan<'_> {
                                 },
                                 WriteOrder {
                                     instance,
-                                    transaction: self.transaction,
+                                    transaction: transaction.transaction_number,
                                 },
                             ),
-                        ));
-                    } else {
-                        mapped_units.push((identity, carried(identity)));
+                        )),
+                        None => {
+                            assert!(
+                                position < data_units_of_the_carried_version,
+                                "照抄的数据单元在上一版里：删除的一批只照抄前几个，加单元的只有部分写、它重写到最后一个"
+                            );
+                            mapped_units.push((identity, carried(identity)));
+                        }
                     }
                 }
             }
@@ -8024,6 +8945,38 @@ impl PublishPlan<'_> {
             for position in 0..file.data_units {
                 let identity = file.data_role_at(position);
                 match file.origin {
+                    // 改 size 那次重写的尾单元（截断意图、变长，判决 m4-multi-inode-size-r1 第二节 S3）与部分写重写的那一段（判决 m4-partial-write-r1
+                    // 第二节 R6）：各一个事务，事务号是切给它的那一个（同第一个文件，`file_content_transactions_and_the_rewritten_data_units`）。
+                    FileOtherThanTheFirstOrigin::SizeChangedThisPublish { .. }
+                        if file
+                            .origin
+                            .rewrites_the_data_unit(DataUnitIndexInFile(position)) =>
+                    {
+                        let transaction = deletion_trees
+                            .data_units_rewritten_from_their_payloads
+                            .as_ref()
+                            .filter(|(inode, _)| *inode == file.inode)
+                            .and_then(|(_, transactions)| {
+                                transaction_of_a_rewritten_data_unit(
+                                    transactions,
+                                    DataUnitIndexInFile(position),
+                                )
+                            })
+                            .expect("计划里重写的单元就是这一步重写的那一段里的（同一份计划拼的）");
+                        mapped_units.push((
+                            identity,
+                            mapping_key_for_data(
+                                PointerHead {
+                                    birth_tree: trees.extent,
+                                    birth_txg: txg,
+                                },
+                                WriteOrder {
+                                    instance,
+                                    transaction: transaction.transaction_number,
+                                },
+                            ),
+                        ));
+                    }
                     FileOtherThanTheFirstOrigin::RewrittenThisPublish => {
                         let transaction = transactions_of_the_file_other_than_the_first_written
                             .get(usize::try_from(position).expect("单元序号"))
@@ -8043,7 +8996,8 @@ impl PublishPlan<'_> {
                         ));
                     }
                     FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
-                    | FileOtherThanTheFirstOrigin::CutByADeletionBatch => {
+                    | FileOtherThanTheFirstOrigin::CutByADeletionBatch
+                    | FileOtherThanTheFirstOrigin::SizeChangedThisPublish { .. } => {
                         mapped_units.push((identity, carried(identity)));
                     }
                 }
@@ -8358,19 +9312,19 @@ fn plan_rewriting_the_paths_to_the_moved_entries(
     plan
 }
 
-/// 文件版本那条 inode 记录（D8（核心索引结构） 已定项 6 的字段表）：size = 这次写的内容长度；
-/// blocks 由 size 现算（⌈size ÷ 512⌉，[`InodeRecord::to_bytes`]），不按这个对象分到几个数据单元填。
-/// 截断的三步与变长、只改记录那一次，第一个文件改 size 之前与之后的样子（[`plan_the_extent_tree_after_a_size_change`] 的输入）：
-/// 之前取上一版的单元数与 size，之后取这一步留下的单元数与这一步之后的 size（意图与变长、只改记录写进记录的那一个；各批不碰记录）。
-/// 改的不是第一个文件（只改记录那一格）、或不是这几步，交回 `None`：extent 树整棵照抄。
-fn size_change_of_the_first_file(
+/// 截断的三步与变长、只改记录那一次改 size 的那个文件（[`DeletionStepOfThePublish::inode_whose_size_changes`]，任意活 inode：判决
+/// `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3）改 size 之前与之后的样子：之前取上一版这个文件的单元数与那条记录的 size，
+/// 之后取这一步留下的单元数（意图、变长、只改记录不放单元，两种批留下 `data_units_kept` 个）与这一步之后的 size（意图与变长、只改记录写进
+/// 记录的那一个；各批不碰记录）。不是这几步、或上一版里没有那条记录，交回 `None`：extent 树整棵照抄。
+fn size_change_of_a_file(
     step: DeletionStepOfThePublish,
     previous: Option<&TransactionOutput>,
-    data_units_after: usize,
-) -> Option<SizeChangeOfTheFile> {
+) -> Option<SizeChangeOfAFileOfThePublish> {
     let previous_version = previous?;
-    let record_before = previous_version.inode_record?;
-    let size_after = match step {
+    let inode = step.inode_whose_size_changes()?;
+    let record_before = previous_version.inode_record_of(inode)?;
+    let data_units_before = data_units_of_the_file_in_the_version(previous_version, inode);
+    let (size_after_in_bytes, data_units_after) = match step {
         DeletionStepOfThePublish::TruncationIntent {
             record_after_the_intent: record,
             ..
@@ -8378,27 +9332,104 @@ fn size_change_of_the_first_file(
         | DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
             record_after_the_change: record,
             ..
-        } if record.inode == FIRST_INODE_NUMBER => record.size,
-        DeletionStepOfThePublish::TruncationBatch { .. }
-        | DeletionStepOfThePublish::TruncationFinalBatch { .. } => record_before.size,
-        DeletionStepOfThePublish::TruncationIntent { .. }
-        | DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
-        | DeletionStepOfThePublish::NotADeletion
+        } => (record.size, data_units_before),
+        // 部分写：写之后的单元数（写之前的与写到的最后一个单元号加一里大的），size 取写之后那条记录的（判决 m4-partial-write-r1 第二节 R5）。
+        DeletionStepOfThePublish::PartialWrite {
+            record_after_the_write: record,
+            rewritten_data_units,
+        } => (
+            record.size,
+            rewritten_data_units.end_exclusive.max(data_units_before),
+        ),
+        DeletionStepOfThePublish::TruncationBatch {
+            data_units_kept, ..
+        }
+        | DeletionStepOfThePublish::TruncationFinalBatch {
+            data_units_kept, ..
+        } => (record_before.size, data_units_kept),
+        DeletionStepOfThePublish::NotADeletion
         | DeletionStepOfThePublish::Intent { .. }
         | DeletionStepOfThePublish::Batch { .. }
         | DeletionStepOfThePublish::FinalBatch { .. } => return None,
     };
-    let data_units_before = u64::try_from(previous_version.data_pointers.len()).expect("单元数");
-    let data_units_after = u64::try_from(data_units_after).expect("单元数");
-    Some(SizeChangeOfTheFile {
-        data_units_before,
-        data_units_after,
-        rewritten_data_unit: step.tail_data_unit_rewrite().map(|rewrite| rewrite.unit),
-        tail_before: TailOfAFile::of_data_units_and_size(data_units_before, record_before.size),
-        tail_after: TailOfAFile::of_data_units_and_size(data_units_after, size_after),
+    Some(SizeChangeOfAFileOfThePublish {
+        inode,
+        change: SizeChangeOfTheFile {
+            data_units_before,
+            data_units_after,
+            rewritten_data_units: step
+                .data_units_rewritten_from_their_payloads()
+                .map_or(DataUnitsRewrittenInOnePublish::NONE, |rewritten| {
+                    rewritten.units
+                }),
+            tail_before: TailOfAFile::of_data_units_and_size(data_units_before, record_before.size),
+            tail_after: TailOfAFile::of_data_units_and_size(data_units_after, size_after_in_bytes),
+        },
+        size_after_in_bytes,
     })
 }
 
+/// 一次改 size 的发布改的那个文件（[`size_change_of_a_file`] 的结果）：号、改之前与之后的样子、这一步之后那条记录的 size。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SizeChangeOfAFileOfThePublish {
+    inode: InodeNumber,
+    change: SizeChangeOfTheFile,
+    size_after_in_bytes: u64,
+}
+
+/// 第一个文件之外 `size_change.inode` 那个文件改 size 那次发布之后的 extent 树（第一个文件那一份 [`ExtentTreePlan`]）：第一个文件的下段整段照抄；
+/// 上段走统一计划（[`extent_tree_plan_with_the_unified_upper_segment`]）——这次之后有条目的是 `files_other_than_the_first`（这次之后那一份计划，
+/// 它在不在里面已按粘住的标签 0 定好）连同第一个文件，条目变了的是它（它那一条这次变了：上一版没有、或
+/// [`SizeChangeOfTheFile::rewrites_the_upper_leaf_entry`]）。那个文件自己的下段在 `files_other_than_the_first` 里（判决 m4-multi-inode-size-r1 第二节 S3）。
+fn plan_the_extent_tree_after_the_size_change_of_a_file_other_than_the_first(
+    previous: &TransactionOutput,
+    files_other_than_the_first: &FilesOtherThanTheFirstPlan,
+    size_change: SizeChangeOfAFileOfThePublish,
+) -> ExtentTreePlan {
+    let first_file_has_an_entry = previous
+        .inodes_with_an_extent_upper_leaf_entry()
+        .contains(&FIRST_INODE_NUMBER);
+    let inodes_with_an_entry_after_this_publish: BTreeSet<u64> = first_file_has_an_entry
+        .then_some(FIRST_INODE_NUMBER)
+        .into_iter()
+        .chain(
+            files_other_than_the_first
+                .files
+                .iter()
+                .map(|file| file.inode.0),
+        )
+        .collect();
+    let had_an_entry = previous
+        .file_other_than_the_first(size_change.inode)
+        .is_some();
+    let has_an_entry = inodes_with_an_entry_after_this_publish.contains(&size_change.inode.0);
+    let entry_changed =
+        had_an_entry != has_an_entry || size_change.change.rewrites_the_upper_leaf_entry();
+    let inodes_whose_entry_changed: BTreeSet<u64> = entry_changed
+        .then_some(size_change.inode.0)
+        .into_iter()
+        .collect();
+    extent_tree_plan_with_the_unified_upper_segment(
+        Some(&previous.extent_tree),
+        previous
+            .extent_tree
+            .lower_nodes
+            .iter()
+            .map(|(position, _)| {
+                (
+                    *position,
+                    ExtentTreeNodeOrigin::CarriedFromThePreviousVersion,
+                )
+            })
+            .collect(),
+        Vec::new(),
+        &inodes_with_an_entry_after_this_publish,
+        &inodes_whose_entry_changed,
+    )
+}
+
+/// 文件版本那条 inode 记录（D8（核心索引结构） 已定项 6 的字段表）：size = 这次写的内容长度；
+/// blocks 由 size 现算（⌈size ÷ 512⌉，[`InodeRecord::to_bytes`]），不按这个对象分到几个数据单元填。
 fn inode_record_of_file_version(file: &FileVersionPlan<'_>) -> InodeRecord {
     InodeRecord {
         inode: file.inode.0,
@@ -8839,15 +9870,15 @@ fn plan_of_a_whole_write_of_a_file_other_than_the_first<'content>(
         inode.0
     );
     let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
-    // 改动计数与这次请求的第一个事务号先取成局部量：`crates/mutations.tsv` 有几条变异按 `publish_overwrite` 里那几串字面锚着，
+    // 改动计数与这次请求的新池新建文件号先取成局部量：`crates/mutations.tsv` 有几条变异按 `publish_overwrite` 里那几串字面锚着，
     // 同一份文件里再出现一次它们就腐化（同 `publish_sequential_write` 那一句）。
     let change_count_of_this_write = txg.0;
-    let first_transaction_of_this_request =
+    let new_pool_file_creation_of_this_request =
         previous.highest_transaction_number_in_this_instance + 1;
     Ok(PublishPlan {
         txg,
         counter: previous.record.counter + 1,
-        transaction: first_transaction_of_this_request,
+        transaction: new_pool_file_creation_of_this_request,
         highest_transaction_number_before_this_publish: previous
             .highest_transaction_number_in_this_instance,
         instance,
@@ -8868,6 +9899,221 @@ fn plan_of_a_whole_write_of_a_file_other_than_the_first<'content>(
         tree_identifier_watermark: previous.root.tree_identifier_watermark,
         rollback_floor: previous.root.rollback_floor,
     })
+}
+
+/// 一次用户改动里建的 inode：几个、写进它们记录的时间秒。几次建 inode 并进一次发布时个数相加、时间秒逐次保留在各自那几条记录里
+/// （D16（发布语义） 已定项 10「建 inode 求和」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NewInodesOfOneChange {
+    pub count: u64,
+    pub write_time_seconds: u64,
+}
+
+/// 按 inode 号整份写一个文件：同一个 inode 的几次写并进一次发布时折叠成最后那一次（D16（发布语义） 已定项 10「同一 inode 的写折叠」）。
+/// `inode` 是第一个文件（inode 1）时写的是 [`TransactionUnit::Data`] 那一族，同 [`publish_sequential_write`]；别的号同
+/// [`publish_sequential_write_of_an_inode`]。按切分纪律切成几个一单元事务（不按单元数拒）。
+#[derive(Clone, Copy, Debug)]
+pub struct WholeWriteOfOneInode<'content> {
+    pub inode: InodeNumber,
+    pub content: &'content [u8],
+    pub write_time_seconds: u64,
+}
+
+/// 并进一次发布的数据写类改动（D16（发布语义） 已定项 10「数据写类可并：同一 inode 的写折叠、建 inode 求和」；会话的待发排空时交进来，
+/// `mounted_session::MountedSessionWithPendingChanges`）：至多一个文件的整份写（折叠过的），与按收下的次序的几次建 inode。
+/// 一次发布写一个文件以内是这一版发布计划的形状（[`PublishPlan::file`] 只装一个文件），不同 inode 的写不在同一次发布里——会话在收下时拒
+/// 第二个文件的写，不在这里拆。
+///
+/// 写的那个文件那条记录与新建的那几条一起写进 inode 树：写的那个号在上一版树里，新建的号从记账水位起发、都大于树里每一个 key，号严格升序。
+/// 事务照切分纪律：文件内容切成 N 个一单元事务、N 条记录，新建 inode 的记录与这次发布共享的提交内生块在最后一个事务的记录里点名；
+/// 没有文件写时整次发布一个事务（同 [`publish_new_inodes`]）。
+#[derive(Clone, Copy, Debug)]
+pub struct DataChangesPublishedTogether<'content> {
+    pub whole_write: Option<WholeWriteOfOneInode<'content>>,
+    pub new_inodes: &'content [NewInodesOfOneChange],
+}
+
+impl DataChangesPublishedTogether<'_> {
+    /// 这一批里建的 inode 一共几个。
+    ///
+    /// # Panics
+    /// 个数之和装不进 u64：每一次的个数都是一次用户改动交进来的，加起来过 u64 说明调用方交的不是一批真改动。
+    #[must_use]
+    pub fn new_inodes_in_total(&self) -> u64 {
+        self.new_inodes
+            .iter()
+            .try_fold(0_u64, |total, change| total.checked_add(change.count))
+            .expect("一批里建的 inode 个数之和装得进 u64")
+    }
+}
+
+/// 这一批要新建的那几条 inode 记录，按收下的次序：号从这一版的记账水位起连着发（只供测试的水位开关装着时从压回去的那个号起，C479，
+/// 与 [`publish_new_inodes`] 读同一个开关、同一份上一版），对象出生代与改动计数都是这次发布的 txg，时间秒是各自那一次改动交进来的。
+fn new_inode_records_of_data_changes_published_together<Device: BlockDevice>(
+    pool: &PoolWriter<'_, Device>,
+    previous: &TransactionOutput,
+    batch: &DataChangesPublishedTogether<'_>,
+    txg_of_the_batch: CheckpointTxg,
+) -> Vec<InodeRecord> {
+    let mut next_inode_number = pool
+        .inode_number_watermark_source()
+        .watermark_this_publish_starts_from(previous.inode_number_watermark());
+    let mut records_of_the_batch = Vec::new();
+    // 迭代上界是这一批的改动数乘各自的个数；跨轮携带的是下一个要发的号（只增）。
+    for change in batch.new_inodes {
+        for _created_in_this_change in 0..change.count {
+            records_of_the_batch.push(InodeRecord {
+                inode: next_inode_number,
+                object_birth: txg_of_the_batch,
+                nlink: NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
+                size: 0,
+                change_count: txg_of_the_batch.0,
+                write_time_seconds: change.write_time_seconds,
+                truncation_field: InodeRecordTruncationField::NOT_WRITTEN,
+            });
+            next_inode_number = next_inode_number
+                .checked_add(1)
+                .expect("inode 号水位装得进 u64：号从记账水位起发，水位本身是这一版记账里读出的");
+        }
+    }
+    records_of_the_batch
+}
+
+/// 这一批那一次发布的计划：接在 `previous` 后面，txg、jsn、事务号各接着走；写的那个文件照它是不是第一个文件分两路判（第一个文件要活着；
+/// 别的号要在树里、不在删除中、不是第一个文件删完之后才建的，[`plan_of_a_whole_write_of_a_file_other_than_the_first`]），新建的记录由调用方
+/// 照 [`new_inode_records_of_data_changes_published_together`] 先算好交进来。只读上一版的内存态。
+///
+/// # Errors
+/// `WriteToAnInodeThatIsNotInTheTree`、`WriteToAnInodeBeingDeleted`、`DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion`、
+/// `NextCheckpointTxgPastTheTopOfItsRange`，都在任何读写之前。
+///
+/// # Panics
+/// 写的是第一个文件之外的号而上一版的承诺类意图队列不空（同 [`publish_sequential_write_of_an_inode`]：会话先走空）。
+fn plan_of_data_changes_published_together<'content>(
+    previous: &TransactionOutput,
+    batch: &DataChangesPublishedTogether<'content>,
+    new_inode_records: &'content [InodeRecord],
+    instance: InstanceGeneration,
+) -> Result<PublishPlan<'content>, PublishError> {
+    let txg_of_the_batch = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
+    let file_of_the_batch = match batch.whole_write {
+        None => None,
+        Some(whole_write) if whole_write.inode.0 == FIRST_INODE_NUMBER => {
+            let record_of_the_first_file = live_record_of_the_first_file(previous)?;
+            Some(FileVersionPlan {
+                inode: whole_write.inode,
+                content: whole_write.content,
+                write_time_seconds: whole_write.write_time_seconds,
+                // 对象出生代不改（D8（核心索引结构） 已定项 6）；改动计数取这次发布的 txg。
+                inode_object_birth: record_of_the_first_file.object_birth,
+                change_count: txg_of_the_batch.0,
+            })
+        }
+        Some(whole_write) => {
+            plan_of_a_whole_write_of_a_file_other_than_the_first(
+                previous,
+                whole_write.inode,
+                whole_write.content,
+                whole_write.write_time_seconds,
+                instance,
+            )?
+            .file
+        }
+    };
+    let first_transaction_of_the_batch = previous.highest_transaction_number_in_this_instance + 1;
+    Ok(PublishPlan {
+        txg: txg_of_the_batch,
+        counter: previous.record.counter + 1,
+        transaction: first_transaction_of_the_batch,
+        highest_transaction_number_before_this_publish: previous
+            .highest_transaction_number_in_this_instance,
+        instance,
+        back_chain: back_chain_of(&previous.record_bytes),
+        file: file_of_the_batch,
+        new_inode_records,
+        instance_table: InstanceTablePlan::Carry(previous.root.instance_table),
+        tree_birth_txg: previous.tree_birth_txg(),
+        // 这次一个树 ID 都不发：上一版的水位就是根环里全部根记录的 max。
+        tree_identifier_watermark: previous.root.tree_identifier_watermark,
+        rollback_floor: previous.root.rollback_floor,
+    })
+}
+
+/// 并在一起的数据写类改动发成一次发布（[`DataChangesPublishedTogether`]，会话的待发排空走这一条）：走 [`publish_version`] 那一条发布路径
+/// （`.claude/rules/fs-design.md`「一个事务层，所有结构共用」：这里不另开一条）。只有一个文件写、没有建 inode 时写出的字节与同内容的
+/// [`publish_sequential_write_of_an_inode`] 一个不差；只有建 inode、各次时间秒相同时与同个数的 [`publish_new_inodes`] 一个不差。
+///
+/// # Errors
+/// 计划那几种（[`plan_of_data_changes_published_together`]），其余同 [`publish_version`]（冻结、准入、落点、释放判定、记录条数、块设备错）。
+///
+/// # Panics
+/// 同 [`plan_of_data_changes_published_together`]。
+pub fn publish_data_changes_published_together<Device: BlockDevice>(
+    pool: &mut PoolWriter<'_, Device>,
+    allocator: &mut PoolAllocator,
+    previous: &TransactionOutput,
+    batch: DataChangesPublishedTogether<'_>,
+    instance: InstanceGeneration,
+) -> Result<TransactionOutput, PublishError> {
+    let txg_of_the_batch = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
+    let new_inode_records = new_inode_records_of_data_changes_published_together(
+        pool,
+        previous,
+        &batch,
+        txg_of_the_batch,
+    );
+    let plan =
+        plan_of_data_changes_published_together(previous, &batch, &new_inode_records, instance)?;
+    publish_version(pool, allocator, plan, Some(previous))
+}
+
+/// 并在一起的这一批要是此刻接在 `previous` 后面发，过不过得了落盘之前那几判、要写多少 journal 字节（D16（发布语义） 已定项 10「accept 进门先做这一批
+/// 合起来的准入与条数预判，过不了就在任何读写之前拒」；已定项 5「脏量按待发改动要写的 journal 字节算」）：冻结着一次没重发的发布就拒，
+/// 再照 [`publish_data_changes_published_together`] 拼同一份计划，走发布路径落盘之前、读盘之前那一段（[`judge_the_publish_before_any_read_or_write`]：
+/// 这次的单元落不落得下、分配记录树的固定点、切成几条记录与在飞上限、合取 7、空间准入的式子）。分配器只读（固定点在它的拷贝上走，同发布路径），
+/// 一个盘都不读、一个写都不发；`pool` 只读它的参数与开关。过了交回这一次要写的 journal 字节（记录条数 × 4096）。
+///
+/// 判的是「此刻接在 `previous` 后面」：会话里收下与排空之间不再有别的发布（收下与排空都拿着 `&mut` 会话，屏障类先排空），排空那一次与这里判的
+/// 是同一份上一版与分配器；被空间拒时这里不推抬 F（推是写），会话排空那一次照旧推抬 F 再判。
+///
+/// # Errors
+/// `PublishFrozenAfterAWriteFailureIsNotResentYet`；计划那几种；`SpaceAdmissionRefused`、`PlacementRefused`、`JournalRecordsOfThePublishExceedTheLimit`、
+/// `EmptyClusterSegmentsBelowTheFloor` 与 [`judge_the_publish_before_any_read_or_write`] 别的几种。
+///
+/// # Panics
+/// 同 [`plan_of_data_changes_published_together`]。
+pub fn journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write<
+    Device: BlockDevice,
+>(
+    pool: &PoolWriter<'_, Device>,
+    allocator: &PoolAllocator,
+    previous: &TransactionOutput,
+    batch: DataChangesPublishedTogether<'_>,
+    instance: InstanceGeneration,
+) -> Result<JournalBytesToWrite, PublishError> {
+    refuse_while_a_publish_is_frozen(allocator)?;
+    let txg_of_the_batch = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
+    let new_inode_records = new_inode_records_of_data_changes_published_together(
+        pool,
+        previous,
+        &batch,
+        txg_of_the_batch,
+    );
+    let plan =
+        plan_of_data_changes_published_together(previous, &batch, &new_inode_records, instance)?;
+    let judged = judge_the_publish_before_any_read_or_write(
+        pool,
+        allocator,
+        &plan,
+        Some(previous),
+        &previous.tree_identifiers,
+        &DeletionAndLineageOfThePublish::NEITHER_A_DELETION_NOR_A_ROLLBACK,
+        &[],
+        &[],
+    )?;
+    Ok(JournalBytesToWrite::of_records(
+        u64::try_from(judged.journal_records_of_the_publish).expect("一次发布的记录条数装得进 u64"),
+    ))
 }
 
 /// 建一个只读快照那次发布（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S1、S2）：**独立发布**，不与别的用户改动合在一个事务里，
@@ -8995,6 +10241,7 @@ pub fn publish_snapshot_destruction_intent<Device: BlockDevice>(
         previous,
         txg,
         &deletion_and_lineage,
+        &[],
         instance,
     )
 }
@@ -9046,6 +10293,7 @@ pub fn publish_snapshot_destruction_step<Device: BlockDevice>(
         previous,
         txg,
         &deletion_and_lineage,
+        &[],
         instance,
     )
 }
@@ -9111,9 +10359,12 @@ impl From<PublishError> for RelocationBatchRefused {
 /// 这次重写本来就换下的角色（记账树、分配记录树里内容变了的节点）不另搬：它们的新落点本来就不在活 R 里。
 /// logged_ops 照抄上一版（意图的签发与删在 [`publish_compaction_step`]，这一个入口就是它的「只搬、意图照抄」那一支）。
 /// 照删除的三种发布同一张计划：不写文件内容、不建 inode、实例表照抄、不发树号；准入不归删除类，走 `DeletionStepOfThePublish::NotADeletion`
-/// 那一臂（`prepare_the_version_publish_relocating_units`）：落点那一判与式子那一判都只在这次重写的角色里有普通分配时判
-/// （`admission::publish_has_an_ordinary_allocation`）。这一个入口照抄 logged_ops，重写的只有记账树、分配记录树、中央映射树与树表
-/// （固定点，空间归 checkpoint 保留池），搬迁副本不进重写的角色、不进需求，所以两判都不判；合取 7 免（带搬迁的发布不是前台写入，
+/// 那一臂（`prepare_the_version_publish_relocating_units`）。整理不是释放路径、走常规准入（D26（后台整理与放置回收） 已定项 3 第 2 句；
+/// 用户 2026-10-26 定 C906「照条款：整理批走常规准入」）：式子那一判照判，需求是这次重写的角色（这一个入口照抄 logged_ops，重写的只有记账树、
+/// 分配记录树、中央映射树与树表这几样固定点），批次最坏占用（计划里每一项在目的地各占它的跨度、每份副本各一份，
+/// `admission::worst_case_occupancy_of_a_compaction_batch`）加进这一次读数的已承诺预留；可用压到需求之下就拒成 `SpaceAdmissionRefused`，
+/// 在任何写之前，会话照暂停办（意图留在盘上，下次再试）。落点那一判只在重写的角色里有普通分配时判（`admission::publish_has_an_ordinary_allocation`），
+/// 搬迁副本的落点由取目的地那一步在任何写之前判（取不到交回 `PlacementRefused`）。合取 7 免（带搬迁的发布不是前台写入，
 /// `reach_of_the_empty_cluster_segments_conjunct`）。同一发布路径上签发、删意图、丢意图那几次重写 logged_ops 根（普通分配），两判照判
 /// （[`publish_compaction_step`]）。
 ///
@@ -9364,12 +10615,20 @@ pub(crate) fn publish_compaction_step_in_the_session<Device: BlockDevice>(
         ),
     };
     let mut relocations = Vec::with_capacity(planned.len());
-    for planned_relocation in planned {
-        relocations.push(relocation_checked_against_the_version(
-            &*pool.devices,
-            previous,
-            planned_relocation,
-        )?);
+    {
+        let _inside_the_relocation_sources = lookup_work::entering(LookupSite::RelocationSources);
+        // 计划里每一项按映射 key 查一次上一版：按 key 的索引与批量读者在第一项要查时建一次（七·6，用户 2026-10-21 定并进），
+        // 不逐项在 `mapped_units` 上找、逐 key 重解叶。
+        let mut previous_read_by_key = None;
+        for planned_relocation in planned {
+            relocations.push(relocation_checked_against_the_version(
+                &*pool.devices,
+                previous_read_by_key.get_or_insert_with(|| {
+                    MappedUnitsOfAVersionReadByKey::of_the_version(previous)
+                }),
+                planned_relocation,
+            )?);
+        }
     }
     publish_compaction_step_after_its_check(
         pool,
@@ -9442,6 +10701,7 @@ fn publish_compaction_step_after_its_check<Device: BlockDevice>(
         UnmountMarker::NotWrittenByTheUnmountSequence,
         &deletion_and_lineage,
         relocations,
+        &[],
         &[],
         |version_after_this_publish| {
             compaction_step_check_on_the_version_after_this_publish(
@@ -9531,24 +10791,66 @@ fn compaction_step_check_on_the_version_after_this_publish(
     }
 }
 
+/// 整理发批核计划时按映射 key 查上一版的两样（[`relocation_checked_against_the_version`]）：`mapped_units` 按 key 的索引
+/// （同一把 key 取最先那一项，同在表上按 key `iter().find`），与中央映射的批量读者（答案同逐 key 查 [`central_mapping_locations_in_the_version`]）。
+/// 计划里的单元是这一版的角色时，它的字节按角色从批量读者手里那份单元索引取（不另建一份）；不是这一版进映射的单元时，按 key 在留存的映射条目里找，
+/// 那个索引在第一次要找时才建（七·6 代码轮第三轮判决第三节第 1 条，同一把 key 取最先那一项，同在表上 `iter().find`）。
+struct MappedUnitsOfAVersionReadByKey<'version> {
+    version: &'version TransactionOutput,
+    mapped_units_by_key:
+        FirstEntryOfEachIdentity<'version, &'version [u8], (TransactionUnit, Vec<u8>)>,
+    central_mapping: CentralMappingOfAVersionReadLeafByLeaf<'version>,
+    kept_mapping_entries_by_key_built_at_the_first_lookup:
+        Option<KeptMappingEntriesOfAVersionByKey<'version>>,
+}
+
+/// 一版留存的映射条目按映射 key 的索引（[`TransactionOutput::mapping_entries_kept_for_the_snapshots_by_key`]）。
+type KeptMappingEntriesOfAVersionByKey<'version> =
+    FirstEntryOfEachIdentity<'version, &'version [u8], (Vec<u8>, [LocationEntry; 2])>;
+
+impl<'version> MappedUnitsOfAVersionReadByKey<'version> {
+    fn of_the_version(version: &'version TransactionOutput) -> Self {
+        Self {
+            version,
+            mapped_units_by_key: version.mapped_units_by_key(),
+            central_mapping: CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version),
+            kept_mapping_entries_by_key_built_at_the_first_lookup: None,
+        }
+    }
+
+    /// 这一版留存的映射条目里 key 是 `mapping_key` 的最先那一项（同在 `mapping_entries_kept_for_the_snapshots` 上按 key `iter().find`）。
+    fn kept_mapping_entry_of_key(
+        &mut self,
+        mapping_key: &[u8],
+    ) -> Option<&'version (Vec<u8>, [LocationEntry; 2])> {
+        let version = self.version;
+        self.kept_mapping_entries_by_key_built_at_the_first_lookup
+            .get_or_insert_with(|| version.mapping_entries_kept_for_the_snapshots_by_key())
+            .first_entry_of(&mapping_key)
+    }
+}
+
 /// 计划里的一项对着上一版核过、带上搬它要的东西（[`publish_relocation_batch`]）：它是这一版进映射的单元（取它的角色与内存里的字节），
 /// 或是留存的映射条目（字节从盘上按映射位置读、核位置项里的校验和，两份取先核得上的那一份）；源落点要就是映射位置、跨度合它的类。
+/// 按 key 找角色、取映射条目、找留存的映射条目、取角色的字节都走 `previous_read_by_key`（它就是上一版的索引与批量读者）。
 ///
 /// # Errors
 /// [`RelocationBatchRefused`] 的四种计划错。
 fn relocation_checked_against_the_version<Reader: PoolReader + ?Sized>(
     reader: &Reader,
-    previous: &TransactionOutput,
+    previous_read_by_key: &mut MappedUnitsOfAVersionReadByKey<'_>,
     planned: &PlannedRelocation,
 ) -> Result<RelocationOfThePublish, RelocationBatchRefused> {
     let mapping_key = planned.mapping_key.clone();
-    let holder_and_locations = match previous
-        .mapped_units
-        .iter()
-        .find(|(_, key)| *key == mapping_key)
+    let holder_and_locations = match previous_read_by_key
+        .mapped_units_by_key
+        .first_entry_of(&mapping_key.as_slice())
     {
         Some((role, _)) => {
-            let locations = match central_mapping_locations_in_the_version(previous, &mapping_key) {
+            let locations = match previous_read_by_key
+                .central_mapping
+                .locations_of_key(&mapping_key)
+            {
                 MappingLookup::Found(locations) => Some(locations),
                 MappingLookup::NodeMalformedOrNoEntryWithThisKey
                 | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => None,
@@ -9559,10 +10861,8 @@ fn relocation_checked_against_the_version<Reader: PoolReader + ?Sized>(
                 locations,
             ))
         }
-        None => previous
-            .mapping_entries_kept_for_the_snapshots
-            .iter()
-            .find(|(key, _)| *key == mapping_key)
+        None => previous_read_by_key
+            .kept_mapping_entry_of_key(&mapping_key)
             .and_then(|(_, locations)| {
                 user_visible_role_standing_for_a_unit_class(
                     mapping_key.first().copied().unwrap_or(0),
@@ -9631,7 +10931,11 @@ fn relocation_checked_against_the_version<Reader: PoolReader + ?Sized>(
         );
     };
     let bytes = match holder {
-        RelocatedUnitHolder::RoleOfThisVersion(role) => previous.unit(role).bytes.clone(),
+        RelocatedUnitHolder::RoleOfThisVersion(role) => previous_read_by_key
+            .central_mapping
+            .unit_of_role(role)
+            .bytes
+            .clone(),
         RelocatedUnitHolder::KeptForTheSnapshots => {
             let unit_bytes = usize::try_from(planned.source.span * SLOT_BYTES)
                 .expect("一个单元两槽以内，字节数装得进 usize");
@@ -9727,6 +11031,7 @@ pub fn publish_unlink_intent<Device: BlockDevice>(
         previous,
         txg,
         &deletion_and_lineage,
+        &[],
         instance,
     )
 }
@@ -9759,6 +11064,7 @@ pub fn publish_unlink_step<Device: BlockDevice>(
         previous,
         txg,
         &deletion_and_lineage,
+        &[],
         instance,
     )
 }
@@ -9788,13 +11094,7 @@ fn next_unlink_step_after(
     // 剩下几个单元取 `inode` 自己的（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M1，D8（核心索引结构）
     // 已定项 16 第 2 条对任一 inode 同一条）：第一个文件取它那一棵，别的文件取 `files_other_than_the_first` 那一项，没有的（size 0 的 inode）
     // 取 0、只有最后一批。
-    let data_units_remaining = if inode.0 == FIRST_INODE_NUMBER {
-        u64::try_from(previous.data_pointers.len()).expect("单元数")
-    } else {
-        previous.file_other_than_the_first(inode).map_or(0, |file| {
-            u64::try_from(file.data_pointers.len()).expect("单元数")
-        })
-    };
+    let data_units_remaining = data_units_of_the_file_in_the_version(previous, inode);
     let step = match next_unlink_step(data_units_remaining, batch_size) {
         UnlinkStep::Batch {
             data_units_kept,
@@ -9829,8 +11129,22 @@ fn next_unlink_step_after(
     ))
 }
 
+/// `version` 里 `inode` 那个文件存在几个数据单元：第一个文件取它那一棵，别的文件取 `files_other_than_the_first` 那一项（标签 0 的是 0），
+/// 上段里没有条目的取 0（unlink 的批、截断三步与变长共用这一份，判决 m3-multi-file-unlink-r1 第三节 M1、m4-multi-inode-size-r1 第二节 S3）。
+fn data_units_of_the_file_in_the_version(version: &TransactionOutput, inode: InodeNumber) -> u64 {
+    let data_units = if inode.0 == FIRST_INODE_NUMBER {
+        version.data_pointers.len()
+    } else {
+        version
+            .file_other_than_the_first(inode)
+            .map_or(0, |file| file.data_pointers.len())
+    };
+    u64::try_from(data_units).expect("单元数")
+}
+
 /// 改一个 inode 的 size（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K2、K3、K5、K11、K12）：会话里 `UserChange::Truncate`
-/// 发的那一次。按现在的 size S 与目标 N 分三条（[`SizeChangeOfARequest`]，只看两样操作期间不变的输入）：
+/// 发的那一次。任意活 inode 都能缩短与变长（用户 2026-10-26 定射程，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3、S6；
+/// 删完第一个文件之后才建的 inode 也照这一条办）。按现在的 size S 与目标 N 分三条（[`SizeChangeOfARequest`]，只看两样操作期间不变的输入）：
 /// - N = S：一次只改记录（改动计数、时间）的发布（K12）；
 /// - N > S：变长，一次发布、不立意图（K5）：最后一个存在的单元声明长度小于 min(N − 起点, 净荷) 时补零重写，之后到 N 是洞；
 /// - N < S：截断的意图那次（K2「先落目标」）：记录写 size = N，签截断条目，截到单元 k 中间时重写单元 k（K3），size 之外的单元照挂着，
@@ -9840,9 +11154,9 @@ fn next_unlink_step_after(
 ///
 /// # Errors
 /// 都在任何落盘动作之前：`inode` 不是一条活记录（没有、或 nlink = 0）⇒ `TruncationRefused(InodeIsNotALiveRecord)`；⌈N ÷ 净荷⌉ × 净荷
-/// 溢出 u64 ⇒ `TruncationRefused(TargetSizeRoundedUpToAWholeDataUnitOverflows)`；不是第一个文件而 N ≠ S ⇒
-/// `TruncationRefused(SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses)`；要重写的尾单元在上一版里没有字节 ⇒
-/// `TruncationRefused(TailDataUnitBytesNotInTheVersion)`；其余同 `publish_version`。
+/// 溢出 u64 ⇒ `TruncationRefused(TargetSizeRoundedUpToAWholeDataUnitOverflows)`；要重写的尾单元读盘读不回或核不过（判决
+/// `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R3：截断尾单元那条路与通用部分写同一读法，读盘、不取内存里的字节）⇒
+/// `TruncationRefused(OldDataUnitToRewriteNotReadBack)`；其余同 `publish_version`。
 ///
 /// # Panics
 /// 截断那一条而上一版的承诺类队列不空（`deleted_inodes`、销毁中的快照、截断条目）：发截断意图的入口断言三样都空（K1），
@@ -9873,22 +11187,9 @@ pub fn publish_size_change<Device: BlockDevice>(
         ));
     }
     let size_change = SizeChangeOfARequest::of(record.size, target_size_in_bytes);
-    let is_the_first_file = inode.0 == FIRST_INODE_NUMBER;
-    match (size_change, is_the_first_file) {
-        (SizeChangeOfARequest::SizeUnchanged, _) | (_, true) => {}
-        (SizeChangeOfARequest::Extension | SizeChangeOfARequest::Truncation, false) => {
-            return Err(PublishError::TruncationRefused(
-                TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
-                    inode: inode.0,
-                },
-            ));
-        }
-    }
-    let data_units_existing = if is_the_first_file {
-        u64::try_from(previous.data_pointers.len()).expect("单元数")
-    } else {
-        0
-    };
+    // 单元数取 `inode` 自己的（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3，同 unlink 的
+    // [`next_unlink_step_after`]）：第一个文件取它那一棵，别的文件取 `files_other_than_the_first` 那一项，没有的（size 0、上段没有条目）取 0。
+    let data_units_existing = data_units_of_the_file_in_the_version(previous, inode);
     let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
     // 改动计数取成局部量，理由同 [`publish_unlink_intent`] 那一处。
     let change_count_of_the_size_change = txg.0;
@@ -9955,10 +11256,40 @@ pub fn publish_size_change<Device: BlockDevice>(
             )
         }
     };
-    // 要重写的尾单元在任何写之前读得出（重建时读不出的单元字节是空的）：读不出就拒，盘上逐字节不变。
-    if let Some(rewrite) = step.tail_data_unit_rewrite() {
-        payload_of_the_rewritten_tail_data_unit(previous, rewrite)?;
-    }
+    // 要重写的尾单元在任何分配与写之前读盘读回（判决 m4-partial-write-r1 第二节 R3；D4（校验和位置） 已定项 4）：读不回或核不过就拒，
+    // 盘上逐字节不变。新净荷是旧净荷截到新的声明长度（截断），或在后面补零到它（变长）；装单元那一步取这一份，不再读一次。
+    let payloads_of_the_rewritten_data_units: Vec<RewrittenDataUnitPayload> =
+        match step.tail_data_unit_rewrite() {
+            Some(rewrite) => {
+                let mut payload = read_back_the_old_payload_of_a_data_unit(
+                    &*pool.devices,
+                    previous,
+                    inode,
+                    record,
+                    rewrite.unit,
+                    &pool.parameters.filesystem_identifier,
+                )
+                .map_err(|read_back| {
+                    PublishError::TruncationRefused(
+                        TruncationRefusal::OldDataUnitToRewriteNotReadBack {
+                            inode,
+                            unit: rewrite.unit,
+                            read_back,
+                        },
+                    )
+                })?;
+                payload.resize(
+                    usize::try_from(rewrite.declared_length_in_bytes).expect("一个单元的净荷以内"),
+                    0,
+                );
+                vec![RewrittenDataUnitPayload {
+                    unit: rewrite.unit,
+                    payload,
+                    residue_read: ResidueReadOfTheNewSlot::NotRead,
+                }]
+            }
+            None => Vec::new(),
+        };
     let deletion_and_lineage = DeletionAndLineageOfThePublish {
         step,
         container_tree_capacities: pool.container_tree_capacities(),
@@ -9972,16 +11303,342 @@ pub fn publish_size_change<Device: BlockDevice>(
         previous,
         txg,
         &deletion_and_lineage,
+        &payloads_of_the_rewritten_data_units,
         instance,
     )
 }
 
-/// 截断意图之后的下一步（判决 m4-trunc-r1 K2、K11）：现行那一版的截断条目点名第一个文件、目标 N；size 之外还挂着的单元多于一批就从尾部
+/// 一次按偏移的写交进来的字节，至少一个（[`publish_partial_write`]、会话的 `UserChange::WriteAtOffset`）。长度 0 的写条款没写（照 POSIX
+/// 什么都不做、还是发一次只改时间的发布，判决 `research/prompts/m4-partial-write-r1-main-verification.md` 没判），类型上写不出来。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PartialWriteBytes<'content> {
+    bytes: &'content [u8],
+}
+
+impl<'content> PartialWriteBytes<'content> {
+    /// `bytes` 是空的 ⇒ `None`。
+    #[must_use]
+    pub fn new(bytes: &'content [u8]) -> Option<Self> {
+        (!bytes.is_empty()).then_some(PartialWriteBytes { bytes })
+    }
+
+    #[must_use]
+    pub const fn bytes(self) -> &'content [u8] {
+        self.bytes
+    }
+
+    #[must_use]
+    pub fn length_in_bytes(self) -> std::num::NonZeroU64 {
+        std::num::NonZeroU64::new(
+            u64::try_from(self.bytes.len()).expect("一段内存里的字节数装得进 u64"),
+        )
+        .expect("构造时核过不是空的")
+    }
+}
+
+/// 一步按读回的旧单元（或零）重写的一个数据单元交给装单元那一步的新净荷（长度就是它这次的声明长度），与装之前读不读一次这次分到的新槽的
+/// 残留（判决 m4-partial-write-r1 第二节 R2）。读—改—写在任何分配与写之前读完旧单元、改好这一段全部新净荷，装单元那一步不再读旧单元。
+/// 一步里的新净荷按单元号连号升序。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RewrittenDataUnitPayload {
+    pub unit: DataUnitIndexInFile,
+    pub payload: Vec<u8>,
+    pub residue_read: ResidueReadOfTheNewSlot,
+}
+
+/// 装一个新单元之前读不读这次分到的槽的残留（判决 m4-partial-write-r1 第二节 R2：没有旧单元、这次写到它而没盖满的读一次）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResidueReadOfTheNewSlot {
+    /// 取定落点之后、任何写之前读一次，字节丢掉，读不出记数、不拒写。
+    ReadOnceAndDiscardTheBytes,
+    NotRead,
+}
+
+/// 读—改—写读回一个旧数据单元没读成的那几样（[`read_back_the_old_payload_of_a_data_unit`]）：调用方一律让那个写失败（D4（校验和位置） 已定项 4），
+/// 成员只说是哪一样没过。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OldDataUnitReadBackFailure {
+    /// 两条位置提示都读不出、或读出来整单元 CRC-32C 与位置条目里的对不上，上一版的中央映射里又查不到它的落点。
+    UnreadableAtTheHintsAndMissingFromTheMapping,
+    /// 两条位置提示与映射里的两条落点都读不出、或整单元 CRC-32C 对不上。
+    UnreadableAtTheHintsAndAtTheMappedLocations,
+    /// 读到的整单元 CRC-32C 对得上，单元头却解不开、与走到它的查找路径不符、或声明长度之后的补齐非零：`detail` 说是哪一样。
+    DisagreesWithTheLookupPath { detail: &'static str },
+}
+
+/// 读—改—写读回 `inode` 那个文件第 `unit` 个旧数据单元的净荷（D4（校验和位置） 已定项 3「先把旧单元整个读回来并验」，判决
+/// `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R3「读盘」）：先按上一版数据指针里的两条位置提示逐条读整单元，整单元 CRC-32C
+/// 等于那条位置条目里的才算读到；两条都不算数，再按上一版的中央映射查它的落点、照那两条再读一遍（与挂载态读者
+/// `mounted_read::OpenFileForRead::read_at` 同一种读法）。读到之后单元头对查找路径：出生树是 extent 树、对象是这个 inode、对象出生代与它那条记录
+/// 相同、fsid 是本池的、出生 txg 与写序与指针的相同、锚点偏移是这个单元第一个字节的文件偏移、声明长度是按写之前的 size 算的那个，补齐为零（I-2.3）。
+/// 只读盘，不动分配器、不发写；`record_before` 是写之前那条记录。
+///
+/// # Errors
+/// 见 [`OldDataUnitReadBackFailure`]。
+///
+/// # Panics
+/// 上一版里这个文件没有第 `unit` 个单元：调用方只读写之前存在的单元。
+pub fn read_back_the_old_payload_of_a_data_unit<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    previous: &TransactionOutput,
+    inode: InodeNumber,
+    record_before: InodeRecord,
+    unit: DataUnitIndexInFile,
+    filesystem_identifier: &[u8; 16],
+) -> Result<Vec<u8>, OldDataUnitReadBackFailure> {
+    let position = usize::try_from(unit.0).expect("单元序号");
+    let pointer = if inode.0 == FIRST_INODE_NUMBER {
+        previous.data_pointers.get(position)
+    } else {
+        previous
+            .file_other_than_the_first(inode)
+            .and_then(|file| file.data_pointers.get(position))
+    }
+    .copied()
+    .expect("读回的是写之前这个文件存在的单元");
+    let role = role_of_a_data_unit_of_the_inode(inode, unit);
+    let unit_bytes = usize::try_from(role.span_slots() * SLOT_BYTES)
+        .expect("一个单元两槽以内，字节数装得进 usize");
+    let read_by_the_locations = |locations: &[LocationEntry; 2]| {
+        locations.iter().find_map(|location| {
+            reader
+                .read(
+                    location.device,
+                    location.slot.to_device_offset(),
+                    unit_bytes,
+                )
+                .filter(|bytes| crc32_castagnoli(bytes) == location.unit_checksum)
+        })
+    };
+    let bytes = match read_by_the_locations(&pointer.locations) {
+        Some(bytes) => bytes,
+        None => {
+            let mapped_locations =
+                match MappedUnitsOfAVersionReadByRole::of_the_version(previous)
+                    .locations_of_role(role)
+                {
+                    MappingLookup::Found(locations) => locations,
+                    MappingLookup::NodeMalformedOrNoEntryWithThisKey
+                    | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => return Err(
+                        OldDataUnitReadBackFailure::UnreadableAtTheHintsAndMissingFromTheMapping,
+                    ),
+                };
+            read_by_the_locations(&mapped_locations)
+                .ok_or(OldDataUnitReadBackFailure::UnreadableAtTheHintsAndAtTheMappedLocations)?
+        }
+    };
+    let disagrees =
+        |detail: &'static str| OldDataUnitReadBackFailure::DisagreesWithTheLookupPath { detail };
+    let header = parse_data_unit(&bytes).map_err(|_unit_error| disagrees("单元头解不开"))?;
+    if header.identity.tree != previous.tree_identifiers.extent {
+        return Err(disagrees("出生树不是 extent 树"));
+    }
+    if header.identity.object != inode.0 {
+        return Err(disagrees("对象不是这个 inode"));
+    }
+    if header.identity.object_birth != record_before.object_birth {
+        return Err(disagrees("对象出生代与 inode 记录不符"));
+    }
+    if header.filesystem_identifier != unit_filesystem_identifier(filesystem_identifier) {
+        return Err(disagrees("fsid 不是本池的"));
+    }
+    if header.birth_txg != pointer.head.birth_txg || header.write_order != pointer.write_order {
+        return Err(disagrees("出生身份与指针不符"));
+    }
+    let payload_capacity = u64::try_from(data_unit_payload_capacity()).expect("32634");
+    if header.identity.anchor_offset != unit.first_file_byte(payload_capacity).0 {
+        return Err(disagrees("锚点偏移不是这个单元第一个字节的文件偏移"));
+    }
+    if u64::from(header.declared_length) != declared_length_within_a_size(unit, record_before.size)
+    {
+        return Err(disagrees("声明长度与写之前的 size 按净荷算出来的不符"));
+    }
+    let payload = data_unit_payload(&bytes, header.declared_length)
+        .map_err(|_unit_error| disagrees("声明长度之后的补齐字节非零"))?;
+    Ok(payload.to_vec())
+}
+
+/// 按偏移写一个活 inode（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节；任意活 inode，R6）：把 `bytes` 写到文件偏移
+/// `offset` 起，一次发布（`.claude/rules/fs-design.md`「一个事务层，所有结构共用」：与截断、变长走同一条发布路径，只是重写的那一段不同）。
+/// 怎么切由 [`PartialWriteOfAFile`] 定：从偏移所在的单元起到写之后最后一个单元一起重写（R4，用户 2026-10-26 定「保留写序，写到 o 时把 o 之后的单元
+/// 一起重写」），每个单元照 [`crate::write_request_split::DataUnitOfAPartialWrite`] 那一格装——有旧单元而没盖满的读盘读回旧单元（R3），没有旧单元而写到的读新槽残留一次、
+/// 字节丢掉、旧内容按零（R2，用户 2026-10-26 定「首次写也读回」「残留读出错记数、不拒写」），空隙补整单元零、不读（R5）。写跨末尾时 size 换成写的
+/// 终点、上段叶标签按写之后的单元数与 size 换（R5），截断字段照抄（T、N_w 部分写不碰）；对象出生代照记录、不改，改动计数取这次的 txg。
+/// 快照下只把这次真换下的单元进 deadlist（计划交 `NotRewrittenWhole`，R7、截断判决 K4）。
+///
+/// # Errors
+/// 都在任何分配与写之前，盘上逐字节不变：`inode` 不在上一版的 inode 树里 ⇒ `WriteToAnInodeThatIsNotInTheTree`；第一个文件已经删完而 `inode`
+/// 的对象出生代晚于它墓碑的死亡 txg ⇒ `DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion`（同整份写，K-U5 的 β 读法）；
+/// nlink = 0 ⇒ `WriteToAnInodeBeingDeleted`；写的终点越过 u64 ⇒ `TruncationRefused(TargetSizeRoundedUpToAWholeDataUnitOverflows)`（带 `u64::MAX`），
+/// ⌈写之后的 size ÷ 净荷⌉ × 净荷越过 u64 ⇒ 同一个成员带写之后的 size；这次重写的单元数多于一次发布的 journal 记录上限（一个单元一个事务一条记录）⇒
+/// `JournalRecordsOfThePublishExceedTheLimit`；要读回的旧单元读盘读不回或核不过 ⇒ `TruncationRefused(OldDataUnitToRewriteNotReadBack)`
+/// （外层为什么是改 size 的拒绝，见那个成员的文档）；其余同 `publish_version`。
+///
+/// # Panics
+/// 上一版的承诺类意图队列不空（`deleted_inodes`、销毁中的快照、截断条目）：会话里每一次用户改动先走空再做它自己（D8（核心索引结构） 已定项 16
+/// 第 6 条），直接调这个函数的调用方同样先走空（同 [`publish_sequential_write_of_an_inode`]）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各是一样东西：写入口、分配器、上一版、写哪个 inode、从哪个偏移写、写什么、写入时间、实例"
+)]
+pub fn publish_partial_write<Device: BlockDevice>(
+    pool: &mut PoolWriter<'_, Device>,
+    allocator: &mut PoolAllocator,
+    previous: &TransactionOutput,
+    inode: InodeNumber,
+    offset: FileOffsetInBytes,
+    bytes: PartialWriteBytes<'_>,
+    write_time_seconds: u64,
+    instance: InstanceGeneration,
+) -> Result<TransactionOutput, PublishError> {
+    // 三判与整份写同一套（[`plan_of_a_whole_write_of_a_file_other_than_the_first`]），写法另起：`crates/mutations.tsv` 按字面锚着那边的几串。
+    let Some(record) = previous.inode_record_of(inode) else {
+        let refusal = PublishError::WriteToAnInodeThatIsNotInTheTree { inode: inode.0 };
+        return Err(refusal);
+    };
+    let born_after_the_first_file_was_deleted = previous
+        .death_txg_of_the_deleted_first_file()
+        .filter(|death_txg_of_the_first_file| *death_txg_of_the_first_file < record.object_birth);
+    if let Some(death_txg_of_the_first_file) = born_after_the_first_file_was_deleted {
+        let refusal =
+            PublishError::DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion {
+                inode: inode.0,
+                object_birth: record.object_birth,
+                death_txg_of_the_first_file,
+            };
+        return Err(refusal);
+    }
+    if NLINK_OF_AN_INODE_BEING_DELETED == record.nlink {
+        return Err(PublishError::WriteToAnInodeBeingDeleted { inode: inode.0 });
+    }
+    assert!(
+        previous.queue_of_committed_intents_is_empty(),
+        "部分写之前承诺类意图队列已走空（D8（核心索引结构） 已定项 16 第 6 条：会话与挂载续做都先走空）：inode {}",
+        inode.0
+    );
+    let Some(write) = PartialWriteOfAFile::new(
+        data_units_of_the_file_in_the_version(previous, inode),
+        record.size,
+        offset,
+        bytes.length_in_bytes(),
+    ) else {
+        return Err(PublishError::TruncationRefused(
+            TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows {
+                target_size_in_bytes: u64::MAX,
+            },
+        ));
+    };
+    let size_after_the_write = write.size_after_in_bytes();
+    if !target_size_rounded_up_to_a_whole_data_unit_fits(size_after_the_write) {
+        return Err(PublishError::TruncationRefused(
+            TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows {
+                target_size_in_bytes: size_after_the_write,
+            },
+        ));
+    }
+    // 一个数据单元一个事务一条记录（C310（事务切分纪律与记录数口径打架） 用户定案）：重写的单元数多于一次发布的记录上限就在读旧单元、
+    // 装新净荷之前拒，不为一次注定被拒的发布在内存里装那么多个单元（空隙补零的代价线性于空隙单元数，判决第二节 R5）。
+    let rewritten_units = write.rewritten_units();
+    refuse_a_publish_of_more_journal_records_than_the_limit(
+        usize::try_from(rewritten_units.end - rewritten_units.start).unwrap_or(usize::MAX),
+        pool.parameters.geometry.journal_ring_bytes,
+    )?;
+    let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
+    // 读回旧单元、改好新净荷都在任何分配与写之前（判决第二节 R3）：读不回或核不过就拒，盘上逐字节不变。
+    let mut payloads_of_the_rewritten_data_units = Vec::new();
+    // 迭代次数的上界是这次重写的单元数（上面按记录上限界住）；跨轮携带的只有往新净荷表里追加的那一项，提前出口只有读回失败那一个。
+    for unit_number in rewritten_units {
+        let unit = DataUnitIndexInFile(unit_number);
+        let data_unit = write.data_unit(unit);
+        let mut payload = if data_unit.reads_the_old_unit_back() {
+            read_back_the_old_payload_of_a_data_unit(
+                &*pool.devices,
+                previous,
+                inode,
+                record,
+                unit,
+                &pool.parameters.filesystem_identifier,
+            )
+            .map_err(|read_back| {
+                PublishError::TruncationRefused(
+                    TruncationRefusal::OldDataUnitToRewriteNotReadBack {
+                        inode,
+                        unit,
+                        read_back,
+                    },
+                )
+            })?
+        } else {
+            Vec::new()
+        };
+        // 旧内容之外的字节（空隙、洞里、新单元、末尾单元补满的那一段）一律按零：残留读到的字节一个都不进来（R2）。
+        payload.resize(
+            usize::try_from(write.declared_length_after_the_write(unit))
+                .expect("一个单元的净荷以内"),
+            0,
+        );
+        if let Some(written) = write.bytes_written_into(unit) {
+            let into_the_payload =
+                usize::try_from(written.offset_in_the_payload).expect("一个单元的净荷以内");
+            let from_the_bytes_written = usize::try_from(written.offset_in_the_bytes_written)
+                .expect("一段内存里的偏移装得进 usize");
+            let length = usize::try_from(written.length_in_bytes).expect("一个单元的净荷以内");
+            payload[into_the_payload..into_the_payload + length].copy_from_slice(
+                &bytes.bytes()[from_the_bytes_written..from_the_bytes_written + length],
+            );
+        }
+        payloads_of_the_rewritten_data_units.push(RewrittenDataUnitPayload {
+            unit,
+            payload,
+            residue_read: if data_unit.reads_the_residue_of_its_slot() {
+                ResidueReadOfTheNewSlot::ReadOnceAndDiscardTheBytes
+            } else {
+                ResidueReadOfTheNewSlot::NotRead
+            },
+        });
+    }
+    // 改动计数取成局部量，理由同 [`publish_unlink_intent`] 那一处（`crates/mutations.tsv` 按字面锚着别处的那几串）。
+    let change_count_of_the_partial_write = txg.0;
+    let deletion_and_lineage = DeletionAndLineageOfThePublish {
+        step: DeletionStepOfThePublish::PartialWrite {
+            record_after_the_write: InodeRecord {
+                inode: record.inode,
+                object_birth: record.object_birth,
+                nlink: record.nlink,
+                size: size_after_the_write,
+                change_count: change_count_of_the_partial_write,
+                write_time_seconds,
+                // 部分写不碰截断字段（判决第二节 R5：T、N_w 照抄，同变长）。
+                truncation_field: record.truncation_field,
+            },
+            rewritten_data_units: DataUnitsRewrittenInOnePublish {
+                first: write.first_rewritten_unit().0,
+                end_exclusive: write.data_units_after(),
+            },
+        },
+        container_tree_capacities: pool.container_tree_capacities(),
+        lineage: LineageStepOfThePublish::NoLineageRecord,
+        snapshot: SnapshotStepOfThePublish::NoNewSnapshot,
+        logged_operations: LoggedOperationsStepOfThePublish::CarryTheLoggedOperations,
+    };
+    publish_deletion_step(
+        pool,
+        allocator,
+        previous,
+        txg,
+        &deletion_and_lineage,
+        &payloads_of_the_rewritten_data_units,
+        instance,
+    )
+}
+
+/// 截断意图之后的下一步（判决 m4-trunc-r1 K2、K11）：现行那一版的截断条目点名一个 inode、目标 N；size 之外还挂着的单元多于一批就从尾部
 /// 放一批（不碰 inode 记录），不多于一批就是最后一批（放完剩下的、可以 0 个，同一次发布删截断条目）。下一步只由现行那一版定
 /// （`truncate::next_truncation_step`），续做与一路做下来同一个计划。
 ///
 /// # Errors
-/// 现行那一版没有截断条目 ⇒ `TruncationRefused(NoTruncationIntentToContinue)`；条目点名的不是第一个文件那条活记录（号或对象出生代对不上）⇒
+/// 现行那一版没有截断条目 ⇒ `TruncationRefused(NoTruncationIntentToContinue)`；条目点名的号在现行那一版里不是一条活记录（没有、nlink = 0、
+/// 对象出生代或 size 对不上）⇒
 /// `TruncationRefused(TruncationIntentDoesNotNameTheLiveRecord)`；其余同 `publish_version`。都在任何落盘动作之前。
 pub fn publish_truncation_step<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
@@ -9994,27 +11651,36 @@ pub fn publish_truncation_step<Device: BlockDevice>(
         .ok_or(PublishError::TruncationRefused(
         TruncationRefusal::NoTruncationIntentToContinue,
     ))?;
-    let names_the_live_first_file = intent.inode.0 == FIRST_INODE_NUMBER
-        && previous.inode_record.is_some_and(|record| {
+    // 按条目点名的号认领（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3、S4：续做按号认领是 K1 能留的前提）。
+    let names_the_live_record = previous
+        .inode_record_of(intent.inode)
+        .is_some_and(|record| {
             record.object_birth == intent.object_birth
                 && record.nlink != NLINK_OF_AN_INODE_BEING_DELETED
                 && record.size == intent.target_size_in_bytes
         });
-    if !names_the_live_first_file {
+    if !names_the_live_record {
         return Err(PublishError::TruncationRefused(
             TruncationRefusal::TruncationIntentDoesNotNameTheLiveRecord { intent },
         ));
     }
     let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
-    let data_units_existing = u64::try_from(previous.data_pointers.len()).expect("单元数");
+    let data_units_existing = data_units_of_the_file_in_the_version(previous, intent.inode);
+    let inode = intent.inode;
     let (step, logged_operations) =
         match next_truncation_step(data_units_existing, intent.target_size_in_bytes, batch_size) {
             TruncationStep::Batch { data_units_kept } => (
-                DeletionStepOfThePublish::TruncationBatch { data_units_kept },
+                DeletionStepOfThePublish::TruncationBatch {
+                    inode,
+                    data_units_kept,
+                },
                 LoggedOperationsStepOfThePublish::CarryTheLoggedOperations,
             ),
             TruncationStep::FinalBatch { data_units_kept } => (
-                DeletionStepOfThePublish::TruncationFinalBatch { data_units_kept },
+                DeletionStepOfThePublish::TruncationFinalBatch {
+                    inode,
+                    data_units_kept,
+                },
                 LoggedOperationsStepOfThePublish::DeleteTheTruncationIntent { issued_txg },
             ),
         };
@@ -10031,6 +11697,7 @@ pub fn publish_truncation_step<Device: BlockDevice>(
         previous,
         txg,
         &deletion_and_lineage,
+        &[],
         instance,
     )
 }
@@ -10155,16 +11822,18 @@ pub fn walk_the_deletion_queue_until_it_is_empty<Device: BlockDevice>(
     }
 }
 
-/// 删除的三种发布共用的计划：不写文件内容、不建 inode、实例表照抄、一个树 ID 都不发，接在 `previous` 后面一个事务。
+/// 删除的三种发布、改 size 与按偏移部分写共用的计划：不带整份文件内容、不建 inode、实例表照抄、一个树 ID 都不发，接在 `previous` 后面。
+/// `payloads_of_the_rewritten_data_units` 是这一步按读回的旧单元（或零）重写的那一段单元的新净荷（入口在任何写之前读好、改好），别的步给空的。
 fn publish_deletion_step<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     allocator: &mut PoolAllocator,
     previous: &TransactionOutput,
     txg: CheckpointTxg,
     deletion_and_lineage: &DeletionAndLineageOfThePublish,
+    payloads_of_the_rewritten_data_units: &[RewrittenDataUnitPayload],
     instance: InstanceGeneration,
 ) -> Result<TransactionOutput, PublishError> {
-    publish_version_of_trees(
+    publish_version_of_trees_relocating_units_after_a_check(
         pool,
         allocator,
         deletion_step_plan(previous, txg, instance),
@@ -10172,6 +11841,10 @@ fn publish_deletion_step<Device: BlockDevice>(
         previous.tree_identifiers,
         UnmountMarker::NotWrittenByTheUnmountSequence,
         deletion_and_lineage,
+        &[],
+        &[],
+        payloads_of_the_rewritten_data_units,
+        |_version_after_this_publish| Ok::<(), PublishError>(()),
     )
 }
 
@@ -10398,6 +12071,7 @@ pub fn publish_version_appending_a_lineage_record<Device: BlockDevice>(
         },
         &[],
         mapping_keys_the_rollback_moves_back_to_the_target_locations,
+        &[],
         |_version_after_this_publish| Ok::<(), PublishError>(()),
     )
 }
@@ -10432,7 +12106,8 @@ fn publish_version_of_trees<Device: BlockDevice>(
 /// `check_before_persisting` 的拒绝；其余同 [`publish_version_of_trees_relocating_units`]（经 `From<PublishError>` 换成 `Refusal`）。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各是一样东西：写入口、分配器、计划、上一版、树号、卸载记号、删除这一步、这次要搬的单元、不搬而换了位置的映射 key、落盘之前的核"
+    reason = "参数各是一样东西：写入口、分配器、计划、上一版、树号、卸载记号、删除这一步、这次要搬的单元、不搬而换了位置的映射 key、\
+              读回旧单元改好的新净荷、落盘之前的核"
 )]
 fn publish_version_of_trees_relocating_units_after_a_check<Device: BlockDevice, Refusal, Check>(
     pool: &mut PoolWriter<'_, Device>,
@@ -10444,6 +12119,7 @@ fn publish_version_of_trees_relocating_units_after_a_check<Device: BlockDevice, 
     deletion_and_lineage: &DeletionAndLineageOfThePublish,
     relocations: &[RelocationOfThePublish],
     mapping_keys_whose_entries_change_without_a_relocation: &[Vec<u8>],
+    payloads_of_the_rewritten_data_units: &[RewrittenDataUnitPayload],
     check_before_persisting: Check,
 ) -> Result<TransactionOutput, Refusal>
 where
@@ -10465,6 +12141,7 @@ where
         deletion_and_lineage,
         relocations,
         mapping_keys_whose_entries_change_without_a_relocation,
+        payloads_of_the_rewritten_data_units,
     );
     let (writes, output) = match built {
         Ok(built) => built,
@@ -10518,6 +12195,7 @@ fn publish_version_of_trees_relocating_units<Device: BlockDevice>(
         deletion_and_lineage,
         relocations,
         &[],
+        &[],
         |_version_after_this_publish| Ok(()),
     )
 }
@@ -10567,6 +12245,7 @@ pub fn prepare_the_version_publish<Device: BlockDevice>(
         deletion_and_lineage,
         &[],
         &[],
+        &[],
     )
 }
 
@@ -10591,7 +12270,8 @@ fn reach_of_the_empty_cluster_segments_conjunct(
     };
     // 变长与只改记录（判决 m4-trunc-r1 K10「变长当普通写」）也是前台写入类；截断的意图与各批是删除类、免。
     let changes_the_size_without_an_intent = match deletion_and_lineage.step {
-        DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. } => true,
+        DeletionStepOfThePublish::SizeChangeWithoutAnIntent { .. }
+        | DeletionStepOfThePublish::PartialWrite { .. } => true,
         DeletionStepOfThePublish::NotADeletion
         | DeletionStepOfThePublish::Intent { .. }
         | DeletionStepOfThePublish::Batch { .. }
@@ -10611,25 +12291,29 @@ fn reach_of_the_empty_cluster_segments_conjunct(
     }
 }
 
-/// 同 [`prepare_the_version_publish`]，另带这次要搬的单元（整理的一批，[`publish_relocation_batch`]；别的发布给空的）：
-/// 固定点与真发都按「释放（换下的与搬走的源落点）→ 取目的地 → 取这次重写的角色的落点」走同一串，源落点照释放判定路径逐盘核、
-/// 读盘核校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）；这次重写要换下的角色不另搬（它的新落点本来就不在活 R 里）。
+/// 一次发布落盘之前、读盘与动分配器之前的那几判（[`prepare_the_version_publish_relocating_units`] 开头那一段，发布路径与
+/// [`journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write`] 共用这一份，判定与之后的写读同一份输入）：
+/// 算这次之后每棵树的样子与这次重写的角色（分配记录树的固定点在分配器的拷贝上走）、这次的单元落不落得下、切成几条记录、合取 7、
+/// 空间准入的式子。分配器只读、一个盘都不读、一个写都不发。
+///
+/// # Errors
+/// 同 [`prepare_the_version_publish`] 里排在读盘核之前的那几种：`InodeTreeWriteRefused`、`SpaceAdmissionRefused`、`MultiLevelCodeTwoTreeRefused`、
+/// 释放判定路径的错、`PlacementRefused`、`AllocationRecordTreeRewriteSetDidNotSettle`、`JournalRecordsOfThePublishExceedTheLimit`、
+/// `EmptyClusterSegmentsBelowTheFloor`。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各是一样东西：写入口、分配器、计划、上一版、树号、读不读盘核、卸载记号、删除这一步、这次要搬的单元、不搬而换了位置的映射 key"
+    reason = "参数各是一样东西：写入口、分配器、计划、上一版、树号、删除这一步、这次要搬的单元、不搬而换了位置的映射 key"
 )]
-fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
+fn judge_the_publish_before_any_read_or_write<Device: BlockDevice>(
     pool: &PoolWriter<'_, Device>,
-    allocator: &mut PoolAllocator,
+    allocator: &PoolAllocator,
     plan: &PublishPlan<'_>,
     previous: Option<&TransactionOutput>,
-    trees: FileVersionTreeIdentifiers,
-    release_checksum_check: ReleaseChecksumCheck,
-    unmount_marker: UnmountMarker,
+    trees: &FileVersionTreeIdentifiers,
     deletion_and_lineage: &DeletionAndLineageOfThePublish,
     relocations: &[RelocationOfThePublish],
     mapping_keys_whose_entries_change_without_a_relocation: &[Vec<u8>],
-) -> Result<(PublishWrites, TransactionOutput), PublishError> {
+) -> Result<PublishJudgedBeforeAnyReadOrWrite, PublishError> {
     // 先算这次之后每棵树是什么样、这次重写哪些角色、换下哪些：只读（固定点在分配器的拷贝上走），条款没写的那几格与多层码 2 树的拒绝、
     // 释放判定的错、取不到落点都在这里交回，盘上逐字节不变。记账行按分配器里的那几块盘展开（装记账行时读的是同一批）。
     let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator
@@ -10642,7 +12326,7 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
     // 准入判着。数据单元要段外成对的空槽、提交内生块要没挡的槽（普通分配那一半照计划数，固定点按 ckpt_cost 的最坏数），
     // 读的是分配器增量维护的两个数；不够交回 `SpaceAdmissionRefused`（会话照旧推抬 F 再判），在动分配器与任何写之前，盘上逐字节不变。
     let ordinary_allocation_roles = plan
-        .ordinary_allocation_part(previous, &trees, deletion_and_lineage)?
+        .ordinary_allocation_part(previous, trees, deletion_and_lineage)?
         .rewritten_roles();
     let units_landing_is_judged = match allocator.space_admission() {
         SpaceAdmission::JudgedByTheFormula => {
@@ -10670,7 +12354,7 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
     let settled = settle_the_allocation_record_tree(
         plan,
         previous,
-        &trees,
+        trees,
         &device_identities_of_the_accounting_rows,
         pool.code_two_tree_node_capacities(),
         allocator,
@@ -10680,12 +12364,13 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
         pool.snapshot_lifetime_judgement(),
     )?;
     // 这次发布切出来的记录条数（代码审阅第 26 条）：角色定下来就数得出，在准入、读盘核与动分配器之前判。
+    let journal_records_of_the_publish = records_of_a_publish_naming_the_relocated_copies(
+        &settled.resolved.rewritten_roles,
+        settled.relocations_in_effect.len(),
+        pool.journal_record_named_entry_capacity(),
+    );
     refuse_a_publish_of_more_journal_records_than_the_limit(
-        records_of_a_publish_naming_the_relocated_copies(
-            &settled.resolved.rewritten_roles,
-            settled.relocations_in_effect.len(),
-            pool.journal_record_named_entry_capacity(),
-        ),
+        journal_records_of_the_publish,
         pool.parameters.geometry.journal_ring_bytes,
     )?;
     // 合取 7（D3（空间分配） 已定项 7 登记表第 7 行：`全空聚簇段数 ≥ N₀`，只拦前台写入类发布）：判不判与式子那一判同一个开关、
@@ -10728,18 +12413,29 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
     );
     // 删除类发布（意图、各批、最后一批）不判式子那一判、落点那一判照判（D28（挂载期承诺量） 已定项 1：它们的空间罩在环窗口里）。
     // 删快照的三种发布与 unlink 同准入（判决第七节岔路 4「删快照照 unlink 的过程做、同等准入」）：式子那一判同样不判。
-    // 整理的各次发布（`publish_compaction_step`）不是删除类，走 `NotADeletion` 那一臂：只照抄 logged_ops 的一批只重写固定点、没有普通分配，
-    // 不判；签发、删意图、丢意图重写 logged_ops 根（普通分配），照判（`publish_relocation_batch` 的文档注释）。
+    // 整理的各次发布（`publish_compaction_step`）不是删除类，走 `NotADeletion` 那一臂。整理不是释放路径、走常规准入（D26（后台整理与放置回收）
+    // 已定项 3 第 2 句；用户 2026-10-26 定 C906「照条款：整理批走常规准入」）：搬了单元的一批照判式子那一判，哪怕重写的角色只有固定点，
+    // 批次最坏占用（计划里每一项都真搬，[`worst_case_occupancy_of_a_compaction_batch`]）加进这一次读数的已承诺预留；签发、删意图、丢意图
+    // 重写 logged_ops 根（普通分配），照判。可用压到需求之下就拒（`SpaceAdmissionRefused`），会话照暂停办：意图留在盘上，下次再试。
     // 截断的意图、各批、最后一批同样当删除类（判决 m4-trunc-r1 K10）；变长与只改记录当普通写，照判。
     let demand_is_judged = match (allocator.space_admission(), deletion_and_lineage.step) {
         (SpaceAdmission::JudgedByTheFormula, step) => {
             !step.is_a_deletion_class_publish()
                 && !deletion_and_lineage.snapshot.is_a_snapshot_destruction()
-                && publish_has_an_ordinary_allocation(&settled.resolved.rewritten_roles)
+                && (publish_has_an_ordinary_allocation(&settled.resolved.rewritten_roles)
+                    || !relocations.is_empty())
         }
         (SpaceAdmission::SkippedByTheTestOnlySwitch, _) => false,
     };
     if demand_is_judged {
+        let replicas = ReplicaCount::of_every_device_in_the_pool(allocator);
+        let worst_case_occupancy_of_the_batch = worst_case_occupancy_of_a_compaction_batch(
+            relocations
+                .iter()
+                .map(|relocation| relocation.source.span)
+                .sum(),
+            replicas,
+        );
         admit_on_every_device(
             &admission_reading_before_a_publish_on_a_ring_of(
                 allocator,
@@ -10747,14 +12443,64 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
                 committed_reservation_for_tombstones_and_retirement_records_after_this_publish(
                     &settled.resolved,
                     previous,
-                    ReplicaCount::of_every_device_in_the_pool(allocator),
-                ),
+                    replicas,
+                )
+                .plus(worst_case_occupancy_of_the_batch),
                 pool.parameters.geometry.root_ring_slots_per_region,
             ),
             &demand,
         )
         .map_err(PublishError::SpaceAdmissionRefused)?;
     }
+    Ok(PublishJudgedBeforeAnyReadOrWrite {
+        settled,
+        device_identities_of_the_accounting_rows,
+        journal_records_of_the_publish,
+    })
+}
+
+/// [`judge_the_publish_before_any_read_or_write`] 判过的：走到固定点的这一次发布、记账行的盘、这次切成几条 journal 记录。
+struct PublishJudgedBeforeAnyReadOrWrite {
+    settled: SettledPublish,
+    device_identities_of_the_accounting_rows: Vec<DeviceIdentity>,
+    journal_records_of_the_publish: usize,
+}
+
+/// 同 [`prepare_the_version_publish`]，另带这次要搬的单元（整理的一批，[`publish_relocation_batch`]；别的发布给空的）：
+/// 固定点与真发都按「释放（换下的与搬走的源落点）→ 取目的地 → 取这次重写的角色的落点」走同一串，源落点照释放判定路径逐盘核、
+/// 读盘核校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）；这次重写要换下的角色不另搬（它的新落点本来就不在活 R 里）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各是一样东西：写入口、分配器、计划、上一版、树号、读不读盘核、卸载记号、删除这一步、这次要搬的单元、不搬而换了位置的映射 key、\
+              读回旧单元改好的新净荷"
+)]
+fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
+    pool: &PoolWriter<'_, Device>,
+    allocator: &mut PoolAllocator,
+    plan: &PublishPlan<'_>,
+    previous: Option<&TransactionOutput>,
+    trees: FileVersionTreeIdentifiers,
+    release_checksum_check: ReleaseChecksumCheck,
+    unmount_marker: UnmountMarker,
+    deletion_and_lineage: &DeletionAndLineageOfThePublish,
+    relocations: &[RelocationOfThePublish],
+    mapping_keys_whose_entries_change_without_a_relocation: &[Vec<u8>],
+    payloads_of_the_rewritten_data_units: &[RewrittenDataUnitPayload],
+) -> Result<(PublishWrites, TransactionOutput), PublishError> {
+    let PublishJudgedBeforeAnyReadOrWrite {
+        settled,
+        device_identities_of_the_accounting_rows,
+        journal_records_of_the_publish: _,
+    } = judge_the_publish_before_any_read_or_write(
+        pool,
+        allocator,
+        plan,
+        previous,
+        &trees,
+        deletion_and_lineage,
+        relocations,
+        mapping_keys_whose_entries_change_without_a_relocation,
+    )?;
     // 经映射核到的那几个单元，释放之前再按位置项读盘核一次校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）：只读，
     // 读不到就在动分配器、发任何一个写之前返回。第一个文件版本换下的 mkfs 那片树表与树表 0 条那一版的分配记录树节点不经映射，不核。
     let kept_for_the_snapshots = &settled
@@ -10867,6 +12613,7 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
         deletion_and_lineage.lineage,
         deletion_and_lineage.snapshot,
         &settled.relocations_in_effect,
+        payloads_of_the_rewritten_data_units,
     )
 }
 
@@ -11239,11 +12986,10 @@ pub fn roles_named_by_each_record_of_the_publish(
             .map(|data_role| vec![*data_role])
             .collect();
     roles_named_by_each_record.push(
-        rewritten
-            .iter()
-            .copied()
-            .filter(|identity| !data_roles_named_before_the_last_record.contains(identity))
-            .collect(),
+        roles_other_than_the_data_roles_named_before_the_last_record(
+            rewritten,
+            data_roles_named_before_the_last_record,
+        ),
     );
     // 末条再跨记录（已定项 17）：最后一个事务那一项装不下一条记录时切成几条，装满一条再开下一条。
     let roles_named_by_the_last_transaction = roles_named_by_each_record
@@ -11261,6 +13007,31 @@ pub fn roles_named_by_each_record_of_the_publish(
         );
     }
     roles_named_by_each_record
+}
+
+/// `rewritten` 里不在 `data_roles_named_before_the_last_record`（最后一个事务之前那几条记录各点名的那一个数据角色）里的那几个，次序不变：
+/// 与 `rewritten.iter().copied().filter(|identity| !data_roles_named_before_the_last_record.contains(identity))` 逐个相同，但那几个数据角色先建一次
+/// 按角色的索引、每个角色查一次（七·6 后续批，用户 2026-10-22 定并进）：整份重写一个 N 单元的文件时两边各约 N 项，逐个 `contains` 是 N 的平方。
+/// 建与查记在 [`LookupSite::DataRolesNamedBeforeTheLastRecord`]，进一次。
+fn roles_other_than_the_data_roles_named_before_the_last_record(
+    rewritten: &[TransactionUnit],
+    data_roles_named_before_the_last_record: &[TransactionUnit],
+) -> Vec<TransactionUnit> {
+    let _inside_the_named_data_roles =
+        lookup_work::entering(LookupSite::DataRolesNamedBeforeTheLastRecord);
+    let data_roles_named_before_the_last_record_by_role = FirstEntryOfEachIdentity::of_the_table(
+        data_roles_named_before_the_last_record,
+        |identity| *identity,
+    );
+    rewritten
+        .iter()
+        .copied()
+        .filter(|identity| {
+            data_roles_named_before_the_last_record_by_role
+                .first_entry_of(identity)
+                .is_none()
+        })
+        .collect()
 }
 
 /// 一次发布至多切成几条 journal 记录（代码审阅第 26 条）：在飞记录数上限（环槽数 ÷ F，D23（journal 的角色与格式） 已定项 18，
@@ -11437,8 +13208,10 @@ struct BuiltExtentTree {
 /// 按计划装 extent 树这一版的全部节点（D8（核心索引结构） 已定项 14 的两段）：重写的节点按 bump 次序逐个装、发出生序号、取这次的落点——
 /// 下段先叶后根（叶装它罩的那几个单元的 extent 叶记录，内部节点装「孩子那一段的起点 key + 孩子这一版的指针」；第一个文件的下段在前，
 /// 第一个文件之外各文件的下段按 inode 号接着），再上段先叶后根（重写的一片叶装它罩的那几个 inode 号上每个有数据单元的文件那一条叶条目：
-/// 一个数据单元就内联它的数据指针（标签 2），多个就放下段根这一版的指针（标签 1）；第一个文件尾部有洞的写标签 3、4。条目都取这一版内存里的指针）。
+/// 一个数据单元就内联它的数据指针（标签 2），多个就放下段根这一版的指针（标签 1）；第一个文件尾部有洞的写标签 3、4，一个单元都没有而
+/// 记录还在的写标签 0，size 0 也写。条目都取这一版内存里的指针）。
 /// 照抄的节点字节、落点、指针全取上一版同一个位置上的。`data_pointers` 是第一个文件这一版每个数据单元的指针（第 i 项是单元 i），
+/// `size_of_the_first_file_after_this_publish` 是这一版第一个文件那条记录的 size（这一版没有那条记录时为 `None`：不写它那一条），
 /// `data_pointers_of_the_files_other_than_the_first` 是第一个文件之外各文件这一版的数据指针（与 `files_other_than_the_first.files` 同序）。
 ///
 /// # Panics
@@ -11446,20 +13219,29 @@ struct BuiltExtentTree {
 /// （角色清单按同一份计划排、上一版的字节是这个进程装的或重建时核过的、两份清单由 `publish_admitted` 按同一份计划拼）。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各是一样东西：计划、第一个文件之外各文件的计划、上一版、第一个文件的数据指针、它尾部有没有洞、别的文件的数据指针、树号、身份、落点、出生序号"
+    reason = "参数各是一样东西：计划、第一个文件之外各文件的计划、上一版、上一版按身份的两份索引、第一个文件的数据指针、它这一版的 size、别的文件的数据指针、树号、身份、落点、出生序号"
 )]
 fn build_extent_tree(
     plan: &ExtentTreePlan,
     files_other_than_the_first: &FilesOtherThanTheFirstPlan,
     previous: Option<&TransactionOutput>,
+    units_of_the_previous_version: Option<
+        &FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit>,
+    >,
+    files_of_the_previous_version: Option<
+        &FirstEntryOfEachIdentity<'_, InodeNumber, FileOfAnInodeOtherThanTheFirst>,
+    >,
     data_pointers: &[DataPointer],
-    tail_of_the_first_file: TailOfAFile,
+    size_of_the_first_file_after_this_publish: Option<u64>,
     data_pointers_of_the_files_other_than_the_first: &[(InodeNumber, Vec<DataPointer>)],
     tree: TreeIdentifier,
     context: &MultiLevelTreeBuildContext<'_>,
     slots: &BTreeMap<TransactionUnit, SlotNumber>,
     sequences: &mut BirthSequenceAllocator,
 ) -> BuiltExtentTree {
+    // 装整棵 extent 树都在照抄那一处里（七·6 后续批代码轮第一轮判决第三节第 3 条）：每照抄一个节点在这里面现建一份上一版的单元索引的，
+    // 建的那几份记在这一处，不漏到没点名的那一格。按 inode 号找文件的那几次在里面另进一处。
+    let _inside_the_extent_tree_build = lookup_work::entering(LookupSite::CarriedExtentTreeNodes);
     let identity = ExtentTreeNodeIdentity {
         tree,
         birth_txg: context.txg,
@@ -11467,6 +13249,10 @@ fn build_extent_tree(
         instance: context.instance,
     };
     let data_units = u64::try_from(data_pointers.len()).expect("单元数");
+    let tail_of_the_first_file = size_of_the_first_file_after_this_publish
+        .map_or(TailOfAFile::NoHoleAfterTheLastDataUnit, |size_in_bytes| {
+            TailOfAFile::of_data_units_and_size(data_units, size_in_bytes)
+        });
     let mut units: Vec<PublishedUnit> = Vec::new();
     let mut birth_sequences_of_rewritten_nodes = BTreeMap::new();
     let mut rewritten_node = |role: TransactionUnit,
@@ -11498,8 +13284,10 @@ fn build_extent_tree(
     let carried_node = |role_in_the_previous_version: TransactionUnit,
                         role: TransactionUnit,
                         units_so_far: &mut Vec<PublishedUnit>| {
-        let previous_version = previous.expect("照抄的 extent 树节点只出现在接着上一版的发布里");
-        let carried = previous_version.unit(role_in_the_previous_version);
+        let _inside_the_carried_nodes = lookup_work::entering(LookupSite::CarriedExtentTreeNodes);
+        let carried = units_of_the_previous_version
+            .expect("照抄的 extent 树节点只出现在接着上一版的发布里")
+            .unit(role_in_the_previous_version);
         units_so_far.push(PublishedUnit {
             slot: carried.slot,
             identity: role,
@@ -11628,10 +13416,10 @@ fn build_extent_tree(
                 }
                 ExtentTreeNodeOrigin::CarriedFromThePreviousVersion => {
                     carried_node(role, role, &mut units);
-                    previous
-                        .and_then(|previous_version| {
-                            previous_version.file_other_than_the_first(*inode)
-                        })
+                    let _inside_the_carried_files =
+                        lookup_work::entering(LookupSite::FilesOfTheCarriedExtentLowerNodes);
+                    files_of_the_previous_version
+                        .and_then(|previous_files| previous_files.first_entry_of(inode))
                         .and_then(|previous_file| {
                             previous_file
                                 .extent_lower_nodes
@@ -11648,27 +13436,32 @@ fn build_extent_tree(
         }
         lower_nodes_of_the_files_other_than_the_first.push((*inode, file_lower_nodes));
     }
-    // 第一个文件之外各文件在上段叶里那一条的载荷（按 inode 号）：下段有根就指下段根这一版的指针，只有一个单元就内联它（尾部恒没有洞）。
+    // 第一个文件之外各文件在上段叶里那一条的载荷（按 inode 号）：下段有根就指下段根这一版的指针，只有一个单元就内联它，最后一个单元之后
+    // 到 size 是洞的换成标签 3、4；一个单元都没有的写标签 0（粘住的标签 0，判决 m4-multi-inode-size-r1 第二节 S2：这个文件在计划里就是
+    // 上段里有它那一条，重写这片叶的发布照写、不丢）。
     let upper_leaf_entries_of_the_files_other_than_the_first: Vec<ExtentUpperLeafEntry> =
         lower_nodes_of_the_files_other_than_the_first
             .iter()
             .zip(data_pointers_of_the_files_other_than_the_first)
-            .map(|((inode, file_lower_nodes), (_, file_data_pointers))| {
-                let target = match (file_lower_nodes.last(), file_data_pointers.first()) {
-                    (Some((_, lower_root_pointer)), _) => {
-                        ExtentUpperLeafTarget::LowerSegmentRoot(*lower_root_pointer)
+            .zip(&files_other_than_the_first.files)
+            .map(
+                |(((inode, file_lower_nodes), (_, file_data_pointers)), file_plan)| {
+                    let target = match (file_lower_nodes.last(), file_data_pointers.first()) {
+                        (Some((_, lower_root_pointer)), _) => {
+                            ExtentUpperLeafTarget::LowerSegmentRoot(*lower_root_pointer)
+                        }
+                        (None, Some(only_pointer)) => {
+                            ExtentUpperLeafTarget::InlineDataUnit(*only_pointer)
+                        }
+                        (None, None) => ExtentUpperLeafTarget::NoDataUnit,
                     }
-                    (None, Some(only_pointer)) => ExtentUpperLeafTarget::InlineDataUnit(*only_pointer),
-                    (None, None) => panic!(
-                        "第一个文件之外的文件只在有数据单元时才在计划里（按 inode 号写数据至少写一个单元）：inode {}",
-                        inode.0
-                    ),
-                };
-                ExtentUpperLeafEntry {
-                    inode: inode.0,
-                    target,
-                }
-            })
+                    .with_the_tail(file_plan.tail);
+                    ExtentUpperLeafEntry {
+                        inode: inode.0,
+                        target,
+                    }
+                },
+            )
             .collect();
     let upper_root_level = plan.upper_root_level();
     let previous_upper_root_level =
@@ -11681,8 +13474,10 @@ fn build_extent_tree(
             .map(|previous_root_level| role_of_extent_upper_node(*position, previous_root_level));
         let pointer = match origin {
             ExtentTreeNodeOrigin::RewrittenThisPublish if position.level == 0 => {
-                // 第一个文件这一版的那条叶条目：下段有根就指下段根，只有一个单元就内联它；一个单元都不剩（unlink 最后一批）就不写这一条，
-                // 只剩它一条时这片叶成了零条目根（D8（核心索引结构） 已定项 16 第 5 条）。
+                // 第一个文件这一版的那条叶条目：下段有根就指下段根，只有一个单元就内联它；一个单元都没有时按记录在不在取
+                // （`ExtentUpperLeafTarget::of_a_file_without_data_units`）：记录在就照写标签 0，size 0 与 size > 0 一样（判决 m4-trunc-r1 K5、S1，
+                // m4-validate-code-r1 用户定案「丑」：重写这片叶的发布不丢这一条；m4-validate-code-r2 T1 用户定「甲」：截到 0 之后也不丢）；
+                // 记录没了（unlink 最后一批）就不写这一条，只剩它一条时这片叶成了零条目根（D8（核心索引结构） 已定项 16 第 5 条）。
                 // 最后一个单元之后到 size 是洞的换成标签 3、4（判决 m4-trunc-r1 K5，`ExtentUpperLeafTarget::with_the_tail`）。
                 let target = match (lower_nodes.last(), data_pointers.first()) {
                     (Some((_, lower_root_pointer)), _) => {
@@ -11691,7 +13486,9 @@ fn build_extent_tree(
                     (None, Some(only_data_pointer)) => {
                         Some(ExtentUpperLeafTarget::InlineDataUnit(*only_data_pointer))
                     }
-                    (None, None) => None,
+                    (None, None) => ExtentUpperLeafTarget::of_a_file_without_data_units(
+                        size_of_the_first_file_after_this_publish,
+                    ),
                 }
                 .map(|target| target.with_the_tail(tail_of_the_first_file));
                 // 这片叶罩的 inode 号上第一个文件之外的文件，条目照这一版内存里的指针装（照抄的文件的指针整理之后已换成映射位置，
@@ -11979,18 +13776,30 @@ fn build_inode_tree_units(
         };
     }
     // t4 inode 树根：层级 1，每片叶一条 120 字节条目（按分隔 key 升序）。
-    // key 区间 = 第一条与最后一条**条目的 key**（码 2 节点的 key 区间恒是这样，I-1.1（key 区间罩住条目）：
-    // 条目的 key 打头，内部节点条目打头的是分隔 key），不是树里最小 / 最大的 inode 号——最右那片装到第二条记录起，
-    // 树里的最大 key 就大于最后一条分隔 key 了。
+    // key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2「孩子是码 3 容器的内部节点上，max_key 是最后那片容器里最后一条记录的 key，
+    // 不是最后一条条目的分隔 key」）：[最左那片的最小记录号, 最右那片的最大记录号]。不取首末两条分隔 key——最右那片装到第二条记录起、
+    // 最左那片删掉了打头那几条之后，子树里到得了的 key 就不是分隔 key 了。叶序 = key 升序、容器里记录按号升序，所以首末两片的首末两条就是全树的最小、最大。
     // 一片叶都不剩（unlink 删掉树里最后一条记录）⇒ 零条目根，key 区间 [0, 0]（D8（核心索引结构） 已定项 6、已定项 16 第 5 条）。
     let root_sequence = sequences.next(inode_tree_identifier, txg, instance);
     let smallest_key = leaf_containers
         .first()
-        .map_or(0, |container| container.contents.separator_key())
+        .map_or(0, |container| {
+            container
+                .contents
+                .smallest_inode_number()
+                .expect("树里的叶容器至少装一条记录（记录数为 0 的类型 2 容器不落盘，D8（核心索引结构） 已定项 6）")
+                .0
+        })
         .to_le_bytes();
     let largest_key = leaf_containers
         .last()
-        .map_or(0, |container| container.contents.separator_key())
+        .map_or(0, |container| {
+            container
+                .contents
+                .largest_inode_number()
+                .expect("树里的叶容器至少装一条记录（记录数为 0 的类型 2 容器不落盘，D8（核心索引结构） 已定项 6）")
+                .0
+        })
         .to_le_bytes();
     let root_unit = build_index_node(
         inode_tree_identifier,
@@ -12085,7 +13894,7 @@ struct ContainerTreeToBuild<'plans, Index, Record> {
 
 /// 装一棵容器树这一版的单元：先按叶序给重写的每片容器发出生序号、装码 3 容器，再按 bump 次序（层级升序、根最末）装码 2 节点
 /// （条目照 inode 树内部节点的 120 字节形态：分隔 key 8 + 身份引用 26 + 子指针 86。层级 1 的孩子是容器，身份引用取容器的；层级更高的
-/// 孩子是码 2 节点，身份引用全 0、类型段 0，D8（核心索引结构） 已定项 6；分隔 key 是孩子那一枝最左那片容器的号，key 区间是首末两条条目的分隔 key）。
+/// 孩子是码 2 节点，身份引用全 0、类型段 0，D8（核心索引结构） 已定项 6；分隔 key 是孩子那一枝最左那片容器的号，key 区间是子树覆盖区间 [最左那片的号, 最右那片的号]，D18（块里携带什么信息） 已定项 2）。
 /// 没重写的照抄上一版同一个位置的指针（长高那次的旧根取上一版的根指针）。节点有没有重写跟着「最右那一条路径上有容器重写」走（COW 叶 + 祖先）。
 fn build_container_tree_units<Index: Copy, Record>(
     to_build: &ContainerTreeToBuild<'_, Index, Record>,
@@ -12152,52 +13961,71 @@ where
             node,
         });
     }
-    // 每个码 2 节点的指针与它那一枝最左那片容器的号，按 bump 次序排：上一层的条目要读下一层已装好的这两样。
-    let mut built_nodes: BTreeMap<ContainerTreeNodePosition, (NodePointer, u64)> = BTreeMap::new();
+    // 每个码 2 节点的指针与它那一枝最左、最右那片容器的号，按 bump 次序排：上一层的条目与 key 区间要读下一层已装好的这三样。
+    let mut built_nodes: BTreeMap<ContainerTreeNodePosition, (NodePointer, u64, u64)> =
+        BTreeMap::new();
     let mut nodes_below_the_root = Vec::new();
     let mut root = None;
     for (position, origin) in after.node_origins() {
         let identity = to_build.roles.of_node(position, &after.shape);
         let children = after.shape.children_of(position);
-        // 这个节点的条目：(分隔 key, 身份引用, 子指针)，按孩子的次序。
-        let entries: Vec<(u64, PackedIdentity, NodePointer)> = children
-            .map(|child| {
-                if position.level == 1 {
-                    let container = &containers[child];
-                    (
-                        container.contents.separator_key(),
-                        container.contents.identity,
-                        container.node.pointer,
-                    )
-                } else {
-                    let child_position = ContainerTreeNodePosition {
-                        level: position.level - 1,
-                        index_in_level: u32::try_from(child).expect("同层节点数装得进 u32"),
-                    };
-                    let (child_pointer, smallest_container_number) = built_nodes
-                        .get(&child_position)
-                        .copied()
-                        .expect("bump 次序里下一层的节点都在上一层之前装好");
-                    (
-                        smallest_container_number,
-                        IDENTITY_OF_A_CODE_TWO_CHILD,
-                        child_pointer,
-                    )
-                }
-            })
-            .collect();
+        // 这个节点的条目：(分隔 key, 身份引用, 子指针)，按孩子的次序；连同每个孩子那一枝最右那片容器的号。
+        let entries_and_largest_container_numbers: Vec<((u64, PackedIdentity, NodePointer), u64)> =
+            children
+                .map(|child| {
+                    if position.level == 1 {
+                        let container = &containers[child];
+                        (
+                            (
+                                container.contents.separator_key(),
+                                container.contents.identity,
+                                container.node.pointer,
+                            ),
+                            container.contents.separator_key(),
+                        )
+                    } else {
+                        let child_position = ContainerTreeNodePosition {
+                            level: position.level - 1,
+                            index_in_level: u32::try_from(child).expect("同层节点数装得进 u32"),
+                        };
+                        let (child_pointer, smallest_container_number, largest_container_number) =
+                            built_nodes
+                                .get(&child_position)
+                                .copied()
+                                .expect("bump 次序里下一层的节点都在上一层之前装好");
+                        (
+                            (
+                                smallest_container_number,
+                                IDENTITY_OF_A_CODE_TWO_CHILD,
+                                child_pointer,
+                            ),
+                            largest_container_number,
+                        )
+                    }
+                })
+                .collect();
+        let entries: Vec<(u64, PackedIdentity, NodePointer)> =
+            entries_and_largest_container_numbers
+                .iter()
+                .map(|(entry, _)| *entry)
+                .collect();
+        // 节点头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2）：这棵树的 key 是容器号，最小的是第一个孩子那一枝最左那片的号
+        // （= 第一条条目的分隔 key），最大的是最后一个孩子那一枝最右那片的号。层级 1 的节点上它就是末条条目的分隔 key；层级 ≥ 2 的不是——
+        // 末条条目的分隔 key 是最后一个孩子那一枝**最左**那片的号。
         let smallest_container_number = entries.first().expect("形状里每个节点至少一个孩子").0;
+        let largest_container_number = entries_and_largest_container_numbers
+            .last()
+            .expect("形状里每个节点至少一个孩子")
+            .1;
         let node = match origin {
             ContainerTreeNodeOrigin::RewrittenThisPublish => {
                 let birth_sequence = sequences.next(to_build.tree, txg, instance);
-                let first = entries.first().expect("形状里每个节点至少一个孩子");
-                let last = entries.last().expect("形状里每个节点至少一个孩子");
                 let bytes = build_index_node(
                     to_build.tree,
                     position.level,
                     CONTAINER_NUMBER_KEY_WIDTH_IN_BYTES,
-                    &first.0.to_le_bytes(),
-                    &last.0.to_le_bytes(),
+                    &smallest_container_number.to_le_bytes(),
+                    &largest_container_number.to_le_bytes(),
                     txg,
                     checkpoint.filesystem_identifier,
                     instance,
@@ -12231,7 +14059,14 @@ where
                 rewritten: None,
             },
         };
-        built_nodes.insert(position, (node.pointer, smallest_container_number));
+        built_nodes.insert(
+            position,
+            (
+                node.pointer,
+                smallest_container_number,
+                largest_container_number,
+            ),
+        );
         if after.shape.is_the_root(position) {
             root = Some(node);
         } else {
@@ -12254,7 +14089,7 @@ where
 
 /// 装这次发布的删除那两棵树：`deleted_inodes` 根是码 2 层级 0（条目 = key 8 字节、无 value，key 区间是首末两个号），
 /// 墓碑树先按叶序给重写的每片容器发出生序号、装码 3 类型 1 容器（记录 40 字节），再装码 2 层级 1 的根（条目照 inode 树内部节点的 120 字节形态：
-/// 分隔 key 容器号 8 + 身份引用 26 + 子指针 86；key 区间是首末两条条目的分隔 key）。没重写的照抄上一版的指针。
+/// 分隔 key 容器号 8 + 身份引用 26 + 子指针 86；key 区间是子树覆盖区间，层级 1 的根上就是首末两条条目的分隔 key）。没重写的照抄上一版的指针。
 ///
 /// # Panics
 /// 重写的节点没拿到落点、照抄的不在上一版里、`deleted_inodes` 的号多于一个根装得下的：前两样是角色清单与这里对不上，
@@ -12470,30 +14305,132 @@ fn build_deletion_tree_units(
     }
 }
 
-/// 删除的一批只照抄前 `carried_data_units` 个（尾部那几个这次经映射释放），最后一批一个不抄。
-/// 截断意图与变长那一次重写的尾单元的新净荷（判决 m4-trunc-r1 K3、K5）：上一版那个单元的净荷截到新的声明长度，或在后面补零到它。
-///
-/// # Errors
-/// 上一版这个单元没有字节（重建时提示与映射都读不出）、或解不开 ⇒ `TruncationRefused(TailDataUnitBytesNotInTheVersion)`。
-fn payload_of_the_rewritten_tail_data_unit(
-    previous: &TransactionOutput,
-    rewrite: TailDataUnitRewrite,
-) -> Result<Vec<u8>, PublishError> {
-    let not_in_the_version = |_error| {
-        PublishError::TruncationRefused(TruncationRefusal::TailDataUnitBytesNotInTheVersion {
-            unit: rewrite.unit,
-        })
-    };
-    let bytes = &previous.unit(TransactionUnit::Data(rewrite.unit)).bytes;
-    let header = parse_data_unit(bytes).map_err(not_in_the_version)?;
-    let old_payload =
-        data_unit_payload(bytes, header.declared_length).map_err(not_in_the_version)?;
-    let mut payload = old_payload.to_vec();
-    payload.resize(
-        usize::try_from(rewrite.declared_length_in_bytes).expect("一个单元的净荷以内"),
-        0,
+/// 第一个文件之外那个文件这一步按读回的旧单元（或零）重写的一个数据单元（截断意图与变长的尾单元，判决 m4-multi-inode-size-r1 第二节 S3；
+/// 部分写那一段里的一个，判决 m4-partial-write-r1 第二节 R6）：这次装出来的字节与它这一版的数据指针。
+struct RewrittenDataUnitOfAFileOtherThanTheFirst {
+    inode: InodeNumber,
+    unit: DataUnitIndexInFile,
+    bytes: Vec<u8>,
+    pointer: DataPointer,
+}
+
+/// `rewritten`（一步重写的那一段，单元号连号升序）里 `inode` 那个文件第 `unit` 个单元那一个；不在里面交回 `None`。按偏移取、不逐个找。
+fn rewritten_data_unit_of_a_file_other_than_the_first(
+    rewritten: &[RewrittenDataUnitOfAFileOtherThanTheFirst],
+    inode: InodeNumber,
+    unit: DataUnitIndexInFile,
+) -> Option<&RewrittenDataUnitOfAFileOtherThanTheFirst> {
+    let first = rewritten.first()?;
+    if first.inode != inode {
+        return None;
+    }
+    let found = rewritten.get(usize::try_from(unit.0.checked_sub(first.unit.0)?).ok()?)?;
+    assert_eq!(found.unit, unit, "一步重写的那一段单元号连号升序");
+    Some(found)
+}
+
+/// 一步重写的那一段一单元事务（[`PublishPlan::file_content_transactions_and_the_rewritten_data_units`]，单元号连号升序）里第 `unit` 个单元那一个；
+/// 不在里面交回 `None`。按偏移取、不逐个找（部分写从单元 0 起重写一个大文件时那一段与文件一样长）。
+fn transaction_of_a_rewritten_data_unit(
+    transactions: &[OneUnitTransaction],
+    unit: DataUnitIndexInFile,
+) -> Option<OneUnitTransaction> {
+    let first = transactions.first()?.unit_index_in_file.0;
+    let transaction = *transactions.get(usize::try_from(unit.0.checked_sub(first)?).ok()?)?;
+    assert_eq!(
+        transaction.unit_index_in_file, unit,
+        "一步重写的那一段单元号连号升序"
     );
-    Ok(payload)
+    Some(transaction)
+}
+
+/// 一步重写的那一段里 `transaction` 那个单元的新净荷（入口读好、改好交进来的，[`RewrittenDataUnitPayload`]）。
+///
+/// # Panics
+/// 交进来的新净荷里没有这个单元、或长度不是它这次的声明长度：入口与计划按同一步切出同一段，不等说明调用方给错了输入。
+fn payload_of_a_rewritten_data_unit(
+    payloads_of_the_rewritten_data_units: &[RewrittenDataUnitPayload],
+    transaction: OneUnitTransaction,
+) -> &[u8] {
+    let first = payloads_of_the_rewritten_data_units
+        .first()
+        .expect("这一步重写的单元在入口里都读好、改好了新净荷")
+        .unit
+        .0;
+    let rewritten = payloads_of_the_rewritten_data_units
+        .get(
+            usize::try_from(
+                transaction
+                    .unit_index_in_file
+                    .0
+                    .checked_sub(first)
+                    .expect("新净荷按单元号连号升序、从这一段的第一个起"),
+            )
+            .expect("单元序号"),
+        )
+        .expect("这一步重写的单元在入口里都读好、改好了新净荷");
+    assert_eq!(
+        rewritten.unit, transaction.unit_index_in_file,
+        "新净荷按单元号连号升序"
+    );
+    assert_eq!(
+        u64::try_from(rewritten.payload.len()).expect("净荷长度"),
+        transaction.payload_length_in_bytes(),
+        "新净荷的长度就是这个单元这次的声明长度"
+    );
+    &rewritten.payload
+}
+
+/// 读新槽残留（判决 m4-partial-write-r1 第二节 R2，用户 2026-10-26 定「首次写也读回」）：这一步要读残留的那几个新单元，在取定落点之后、
+/// 任何写之前，在这次分到的槽、第一条位置项那块盘上各读一次整单元。读到的字节丢掉（新净荷在入口里已按零装好，残留一个字节都不进新单元：
+/// 残留常是同一文件放掉的旧单元），读不出记进写入口的账（[`PoolWriter::residue_reads`]）、不拒写。
+fn read_the_residue_of_the_new_slots<Device: BlockDevice>(
+    pool: &PoolWriter<'_, Device>,
+    data_units_rewritten_from_their_payloads: Option<DataUnitsRewrittenByTheStep>,
+    payloads_of_the_rewritten_data_units: &[RewrittenDataUnitPayload],
+    slots: &BTreeMap<TransactionUnit, SlotNumber>,
+) {
+    let Some(rewritten) = data_units_rewritten_from_their_payloads else {
+        return;
+    };
+    let reader: &[(DeviceIdentity, Device)] = &*pool.devices;
+    let Some((device_of_the_first_location_entry, _)) = reader.first() else {
+        return;
+    };
+    // 迭代次数的上界是这一步重写的单元数；每一轮只读一次、记一笔，没有提前出口。
+    for payload in payloads_of_the_rewritten_data_units {
+        match payload.residue_read {
+            ResidueReadOfTheNewSlot::ReadOnceAndDiscardTheBytes => {
+                let role = role_of_a_data_unit_of_the_inode(rewritten.inode, payload.unit);
+                let slot = *slots
+                    .get(&role)
+                    .expect("读残留的单元是这次重写的角色，上面取过落点");
+                let unit_bytes = usize::try_from(role.span_slots() * SLOT_BYTES)
+                    .expect("一个单元两槽以内，字节数装得进 usize");
+                let read_back = reader
+                    .read(
+                        *device_of_the_first_location_entry,
+                        slot.to_device_offset(),
+                        unit_bytes,
+                    )
+                    .is_some();
+                pool.note_a_residue_read(read_back);
+            }
+            ResidueReadOfTheNewSlot::NotRead => {}
+        }
+    }
+}
+
+/// `inode` 那个文件第 `unit` 个数据单元的角色：第一个文件是 [`TransactionUnit::Data`]，别的是 [`TransactionUnit::DataOfAFileOtherThanTheFirst`]。
+fn role_of_a_data_unit_of_the_inode(
+    inode: InodeNumber,
+    unit: DataUnitIndexInFile,
+) -> TransactionUnit {
+    if inode.0 == FIRST_INODE_NUMBER {
+        TransactionUnit::Data(unit)
+    } else {
+        TransactionUnit::DataOfAFileOtherThanTheFirst { inode, unit }
+    }
 }
 
 fn carried_file_version_units(
@@ -12524,7 +14461,7 @@ fn carried_file_version_units(
     clippy::too_many_lines,
     clippy::too_many_arguments,
     reason = "一次发布就是一件能单独验证的事：九个角色的装法与一条持久顺序，拆开只会把顺序藏进几个函数；\
-              参数各是一样东西：写入口、分配器、计划、上一版、算好的树、要释放的、要隔离的、树号、卸载记号、谱系这一步"
+              参数各是一样东西：写入口、分配器、计划、上一版、算好的树、要释放的、要隔离的、树号、卸载记号、谱系这一步、读回旧单元改好的新净荷"
 )]
 fn publish_admitted<Device: BlockDevice>(
     pool: &PoolWriter<'_, Device>,
@@ -12539,6 +14476,7 @@ fn publish_admitted<Device: BlockDevice>(
     lineage: LineageStepOfThePublish,
     snapshot: SnapshotStepOfThePublish,
     relocations: &[RelocationOfThePublish],
+    payloads_of_the_rewritten_data_units: &[RewrittenDataUnitPayload],
 ) -> Result<(PublishWrites, TransactionOutput), PublishError> {
     let rewritten = &resolved.rewritten_roles;
     let txg = plan.txg;
@@ -12575,7 +14513,8 @@ fn publish_admitted<Device: BlockDevice>(
 
     // 释放先于分配（D3（空间分配） 已定项 7）：被换下的落点进 defer 队列、槽仍占着，这次的落点不会落到它们上面。
     // 释放之前读盘核校验和核出对不上（读不出也算）的那几份：逻辑上照样释放（映射条目这次不再写它），那一份在它那块盘上的分配记录
-    // 留在已分配、不改成已释放（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-09-24 定案），核得上的那一份照常释放。
+    // 留在已分配、不改成已释放、分配代不变，跨度段置上隔离记号 0x4000、随这次发布落盘（D19（块指针的结构与宽度预算） 已定项 5，
+    // 用户 2026-09-24 定案、记号 2026-10-22 定落点甲），核得上的那一份照常释放。
     for placement in release {
         let devices_whose_copy_failed_the_checksum: Vec<DeviceIdentity> = quarantine
             .iter()
@@ -12700,6 +14639,12 @@ fn publish_admitted<Device: BlockDevice>(
         txg,
     );
     let slot_of = |identity: TransactionUnit| slots[&identity];
+    // 记完这条根、回收完之后的门槛与最小钉值就是根记录 t 与 p 的采样点（回收之后、装根之前，C773（读坏与全零根槽的回收门槛钉只在内存里））。
+    let reclaim_floor_when_the_root_was_recorded = allocator
+        .reclaim_floor_when_the_latest_root_was_recorded()
+        .expect(
+            "上面刚记过这条根：record_root_written_by_this_process 记完就记下回收门槛与最小钉值",
+        );
     let device_identities: Vec<DeviceIdentity> =
         pool.devices.iter().map(|(identity, _)| *identity).collect();
     let checkpoint = FileVersionCheckpoint {
@@ -12710,6 +14655,13 @@ fn publish_admitted<Device: BlockDevice>(
         device_identities: &device_identities,
     };
 
+    // 部分写的新单元：落点取定之后、任何写之前（写都在这一段交回之后落盘）读一次这次分到的槽的残留（读到的不用、读不出只记数）。
+    read_the_residue_of_the_new_slots(
+        pool,
+        resolved.data_units_rewritten_from_their_payloads,
+        payloads_of_the_rewritten_data_units,
+        &slots,
+    );
     // 文件内容角色：第一个文件有新版本就按切分装每个数据单元，没有就照抄上一版的指针与字节（写第一个文件之外的文件的发布也照抄第一个文件）。
     let first_file_version = plan.first_file_version();
     let carried_file = match first_file_version {
@@ -12734,51 +14686,81 @@ fn publish_admitted<Device: BlockDevice>(
                     .collect(),
             },
         ),
-        (None, Some(carried)) => carried_file_version_units(carried, resolved.carried_data_units),
+        // 照抄上一版有的那几个（部分写加单元时这一版比上一版多，多出来的由下面按新净荷装、接在后面）。
+        (None, Some(carried)) => carried_file_version_units(
+            carried,
+            resolved.carried_data_units.min(carried.data_pointers.len()),
+        ),
         (None, None) => {
             unreachable!("上面按 plan.file 分过：没有文件版本时 carried_file 一定是 Some")
         }
     };
-    // 截断意图与变长那一次重写的尾单元（判决 m4-trunc-r1 K3、K5）：别的单元照抄，它按新的声明长度装（截断取旧净荷的前一段、
-    // 变长在旧净荷后面补零），一个单元一个事务，事务号是这次发布的那一个（它是这次唯一的数据角色，与提交内生块同一条记录）。
-    if let (None, Some(rewrite), Some(carried)) = (
-        first_file_version,
-        resolved.tail_data_unit_rewrite,
-        carried_file,
-    ) {
-        let record = record_of_the_first_file_after_this_publish
-            .expect("重写尾单元的只有第一个文件：截断与变长的入口判过 inode");
-        let payload = payload_of_the_rewritten_tail_data_unit(carried, rewrite)
-            .expect("截断与变长的入口在任何写之前核过上一版有这个单元的字节");
-        let data_unit = build_data_unit(
-            DataUnitIdentity {
-                tree: trees.extent,
-                object: FIRST_INODE_NUMBER,
-                object_birth: record.object_birth,
-                anchor_offset: rewrite
-                    .unit
-                    .first_file_byte(u64::try_from(data_unit_payload_capacity()).expect("32634"))
-                    .0,
-            },
-            txg,
-            filesystem_identifier,
-            write_order,
-            &payload,
+    // 按读回的旧单元（或零）重写的那一段（截断意图与变长的尾单元，判决 m4-trunc-r1 K3、K5；部分写从偏移所在的单元起到最后一个，判决
+    // m4-partial-write-r1 第二节 R4）：别的单元照抄，这一段每个按入口在任何写之前读好、改好的新净荷装（不在这里再读一次旧单元），
+    // 一个单元一个事务、写序带切给它的那个事务号（只有一个时就是这次发布的那一个，与提交内生块同一条记录）；单元号到了上一版单元数的
+    // 是这次新加的，连号接在后面。
+    let transactions_of_the_rewritten_data_units = plan
+        .file_content_transactions_and_the_rewritten_data_units(
+            resolved.data_units_rewritten_from_their_payloads,
         );
-        let position = usize::try_from(rewrite.unit.0).expect("单元序号");
-        data_pointers[position] = DataPointer {
-            head: PointerHead {
-                birth_tree: trees.extent,
-                birth_txg: txg,
-            },
-            locations: location_entries(
-                &device_identities,
-                slot_of(TransactionUnit::Data(rewrite.unit)),
-                &data_unit,
-            ),
-            write_order,
-        };
-        data_units[position] = data_unit;
+    let rewrites_data_units_of_the_first_file = resolved
+        .data_units_rewritten_from_their_payloads
+        .is_some_and(|rewritten_by_the_step| rewritten_by_the_step.inode.0 == FIRST_INODE_NUMBER);
+    if first_file_version.is_none()
+        && carried_file.is_some()
+        && rewrites_data_units_of_the_first_file
+    {
+        let record = record_of_the_first_file_after_this_publish.expect(
+            "按读回的旧单元重写第一个文件的那一步改的是它那条记录：截断意图、变长与部分写写的那一版记录在这一版里",
+        );
+        // 迭代次数的上界是这一步重写的单元数；跨轮携带的是往两张表里换进或接上的那一项，没有提前出口。
+        for transaction in &transactions_of_the_rewritten_data_units {
+            let data_unit_write_order = WriteOrder {
+                instance,
+                transaction: transaction.transaction_number,
+            };
+            let anchor_offset_of_the_rewritten_unit = transaction.payload_start.0;
+            let data_unit = build_data_unit(
+                DataUnitIdentity {
+                    tree: trees.extent,
+                    object: FIRST_INODE_NUMBER,
+                    object_birth: record.object_birth,
+                    anchor_offset: anchor_offset_of_the_rewritten_unit,
+                },
+                txg,
+                filesystem_identifier,
+                data_unit_write_order,
+                payload_of_a_rewritten_data_unit(
+                    payloads_of_the_rewritten_data_units,
+                    *transaction,
+                ),
+            );
+            let pointer = DataPointer {
+                head: PointerHead {
+                    birth_tree: trees.extent,
+                    birth_txg: txg,
+                },
+                locations: location_entries(
+                    &device_identities,
+                    slot_of(TransactionUnit::Data(transaction.unit_index_in_file)),
+                    &data_unit,
+                ),
+                write_order: data_unit_write_order,
+            };
+            let position = usize::try_from(transaction.unit_index_in_file.0).expect("单元序号");
+            if position < data_pointers.len() {
+                data_pointers[position] = pointer;
+                data_units[position] = data_unit;
+            } else {
+                assert_eq!(
+                    position,
+                    data_pointers.len(),
+                    "部分写新加的单元从上一版的单元数起连号接在后面"
+                );
+                data_pointers.push(pointer);
+                data_units.push(data_unit);
+            }
+        }
     }
     // 第一个文件之外这次写的那个文件（按 inode 号写数据的入口）：按切分装它的每个数据单元——五元组与 extent key 的对象是它，
     // 写序各带自己那个事务的号，落点取它那一族角色的。
@@ -12807,6 +14789,76 @@ fn publish_admitted<Device: BlockDevice>(
                 ),
             )
         });
+    // 第一个文件之外那个文件这一步按读回的旧单元（或零）重写的那一段（截断意图、变长的尾单元，判决 m4-multi-inode-size-r1 第二节 S3；
+    // 部分写的那一段，判决 m4-partial-write-r1 第二节 R6）：对象、角色、对象出生代全按它（不取第一个文件那条记录），新净荷取入口交进来的；
+    // 一个单元一个事务，写序同第一个文件那一段。
+    let data_units_of_a_file_other_than_the_first_rewritten: Vec<
+        RewrittenDataUnitOfAFileOtherThanTheFirst,
+    > = match (
+        resolved.data_units_rewritten_from_their_payloads,
+        carried_file,
+    ) {
+        (Some(rewritten_by_the_step), Some(_))
+            if rewritten_by_the_step.inode.0 != FIRST_INODE_NUMBER =>
+        {
+            let inode = rewritten_by_the_step.inode;
+            let record = resolved
+                    .inode_tree
+                    .containers
+                    .iter()
+                    .flat_map(|container| container.records.iter())
+                    .find(|record| record.inode == inode.0)
+                    .copied()
+                    .expect("按读回的旧单元重写的那一步改的是这个文件那条记录：截断意图、变长与部分写写的那一版记录在这一版里");
+            transactions_of_the_rewritten_data_units
+                .iter()
+                .map(|transaction| {
+                    let data_unit_write_order = WriteOrder {
+                        instance,
+                        transaction: transaction.transaction_number,
+                    };
+                    let anchor_offset_of_the_rewritten_unit = transaction.payload_start.0;
+                    let bytes = build_data_unit(
+                        DataUnitIdentity {
+                            tree: trees.extent,
+                            object: inode.0,
+                            object_birth: record.object_birth,
+                            anchor_offset: anchor_offset_of_the_rewritten_unit,
+                        },
+                        txg,
+                        filesystem_identifier,
+                        data_unit_write_order,
+                        payload_of_a_rewritten_data_unit(
+                            payloads_of_the_rewritten_data_units,
+                            *transaction,
+                        ),
+                    );
+                    let pointer = DataPointer {
+                        head: PointerHead {
+                            birth_tree: trees.extent,
+                            birth_txg: txg,
+                        },
+                        locations: location_entries(
+                            &device_identities,
+                            slot_of(TransactionUnit::DataOfAFileOtherThanTheFirst {
+                                inode,
+                                unit: transaction.unit_index_in_file,
+                            }),
+                            &bytes,
+                        ),
+                        write_order: data_unit_write_order,
+                    };
+                    RewrittenDataUnitOfAFileOtherThanTheFirst {
+                        inode,
+                        unit: transaction.unit_index_in_file,
+                        bytes,
+                        pointer,
+                    }
+                })
+                .collect()
+        }
+        (Some(_) | None, _) => Vec::new(),
+    };
     let key_order_mismatches_of_this_publish = key_order_mismatches
         + file_other_than_the_first_written
             .as_ref()
@@ -12815,6 +14867,8 @@ fn publish_admitted<Device: BlockDevice>(
     // （整理的一批之后上一版的拷贝里它们已换成映射位置）。照抄的文件约有上一版那么多个，按 inode 号查走上一版的索引（七·6）。
     let files_of_the_previous_version =
         previous.map(TransactionOutput::files_other_than_the_first_by_inode);
+    // 上一版 `units` 按角色的索引一次发布建一次（七·6）：照抄 extent 树与多层码 2 树的节点、照抄全部单元那一圈都按角色查它。
+    let units_of_the_previous_version = previous.map(TransactionOutput::units_by_role);
     let data_pointers_of_the_files_other_than_the_first: Vec<(InodeNumber, Vec<DataPointer>)> =
         resolved
             .files_other_than_the_first
@@ -12826,6 +14880,45 @@ fn publish_admitted<Device: BlockDevice>(
                         .as_ref()
                         .expect("计划里整份重写的那个文件就是这次写的那一个（同一份计划拼的）");
                     (file_plan.inode, written_units.data_pointers.clone())
+                }
+                // 改 size 的那一个照抄留下的前几个，重写的尾单元换成这次装的那一个（判决 m4-multi-inode-size-r1 第二节 S3）；部分写的那一个
+                // 照抄上一版的、重写的那一段换成这次装的，新加的连号接在后面（判决 m4-partial-write-r1 第二节 R6）。
+                FileOtherThanTheFirstOrigin::SizeChangedThisPublish { .. } => {
+                    let mut file_data_pointers: Vec<DataPointer> = files_of_the_previous_version
+                        .as_ref()
+                        .and_then(|files| files.first_entry_of(&file_plan.inode))
+                        .map(|previous_file| {
+                            previous_file
+                                .data_pointers
+                                .iter()
+                                .take(usize::try_from(file_plan.data_units).expect("单元数"))
+                                .copied()
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    for rewritten_data_unit in data_units_of_a_file_other_than_the_first_rewritten
+                        .iter()
+                        .filter(|rewritten_data_unit| rewritten_data_unit.inode == file_plan.inode)
+                    {
+                        let position =
+                            usize::try_from(rewritten_data_unit.unit.0).expect("单元序号");
+                        if position < file_data_pointers.len() {
+                            file_data_pointers[position] = rewritten_data_unit.pointer;
+                        } else {
+                            assert_eq!(
+                                position,
+                                file_data_pointers.len(),
+                                "部分写新加的单元从上一版的单元数起连号接在后面"
+                            );
+                            file_data_pointers.push(rewritten_data_unit.pointer);
+                        }
+                    }
+                    assert_eq!(
+                        u64::try_from(file_data_pointers.len()).expect("单元数"),
+                        file_plan.data_units,
+                        "改 size 与部分写之后这个文件的数据指针数就是计划里的单元数"
+                    );
+                    (file_plan.inode, file_data_pointers)
                 }
                 // 删除的一批截的那一个照抄留下的前几个（判决 m3-multi-file-unlink-r1 第三节 M1）。
                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
@@ -12854,16 +14947,10 @@ fn publish_admitted<Device: BlockDevice>(
         &resolved.extent_tree,
         &resolved.files_other_than_the_first,
         previous,
+        units_of_the_previous_version.as_ref(),
+        files_of_the_previous_version.as_ref(),
         &data_pointers,
-        record_of_the_first_file_after_this_publish.map_or(
-            TailOfAFile::NoHoleAfterTheLastDataUnit,
-            |record| {
-                TailOfAFile::of_data_units_and_size(
-                    u64::try_from(data_pointers.len()).expect("单元数"),
-                    record.size,
-                )
-            },
-        ),
+        record_of_the_first_file_after_this_publish.map(|record| record.size),
         &data_pointers_of_the_files_other_than_the_first,
         trees.extent,
         &multi_level_tree_context,
@@ -12922,7 +15009,8 @@ fn publish_admitted<Device: BlockDevice>(
 
     // t5 分配记录树（字节表五；D8（核心索引结构） 已定项 14 按绝对槽号按位置寻址）：mkfs 的两个单元分配代 0、其余是各自分配那次发布的 txg，
     // 每盘各一条，按 (设备, 槽号) 升序分装进各自那片叶。重写哪几个节点在准入之前走到固定点定下来（`settle_the_allocation_record_tree`）：
-    // 这里取完落点之后内容变了的节点都在里面（释放之前读盘核出对不上的那几份留在已分配，只会让变了的更少）。
+    // 这里取完落点之后内容变了的节点都在里面（释放之前读盘核出对不上的那几份留在已分配、带上隔离记号：那条记录照样变了，
+    // 变的是拷贝上照常释放的同一片叶）。
     let mut allocation_records: Vec<AllocationRecord> = allocator.records().to_vec();
     allocation_records.sort_by_key(AllocationRecord::sort_key);
     let allocation_geometry = AllocationRecordTreeGeometry::of_allocator(allocator);
@@ -13050,6 +15138,7 @@ fn publish_admitted<Device: BlockDevice>(
         trees.accounting,
         &resolved.accounting_tree,
         previous,
+        units_of_the_previous_version.as_ref(),
         &accounting_entries
             .iter()
             .map(|entry| {
@@ -13071,6 +15160,7 @@ fn publish_admitted<Device: BlockDevice>(
         trees.deadlist,
         &resolved.deadlist_tree,
         previous,
+        units_of_the_previous_version.as_ref(),
         &resolved
             .deadlist
             .entries_after_this_publish
@@ -13364,6 +15454,7 @@ fn publish_admitted<Device: BlockDevice>(
         trees.central_mapping,
         &resolved.central_mapping_tree,
         previous,
+        units_of_the_previous_version.as_ref(),
         &mapping_entries_by_key,
         &multi_level_tree_context,
         &slots,
@@ -13694,19 +15785,44 @@ fn publish_admitted<Device: BlockDevice>(
         identity,
         bytes,
     };
-    let units_of_the_previous_version = previous.map(TransactionOutput::units_by_role);
+    let data_role_at = |position: usize| {
+        TransactionUnit::Data(DataUnitIndexInFile(
+            u64::try_from(position).expect("单元序号"),
+        ))
+    };
+    // 照抄第一个文件的发布：第一个文件的每个数据单元问它在不在这次重写的角色里（截断与变长重写的尾单元在里面）。这次重写的角色清单
+    // 建一次按角色的索引、每个数据单元查一次（七·6 后续批代码轮第二轮判决第五节，用户 2026-10-23 定并进）：逐个在清单上找是第一个文件的
+    // 数据单元数乘这次重写的角色数，第一个文件占池的大头又整份重写一个大文件时两样都到池大小的量级。先问完再退出那一处：
+    // 下面照抄单元时按角色取上一版单元的那几次查不记在这里。第一个文件有新版本的发布一个都不问。
+    let is_each_data_unit_of_the_carried_first_file_rewritten: Vec<bool> = match carried_file {
+        None => Vec::new(),
+        Some(_) => {
+            let _inside_the_rewritten_roles = lookup_work::entering(
+                LookupSite::RewrittenRolesAmongTheDataUnitsOfTheCarriedFirstFile,
+            );
+            let rewritten_by_role =
+                FirstEntryOfEachIdentity::of_the_table(rewritten, |identity| *identity);
+            (0..data_units.len())
+                .map(|position| {
+                    rewritten_by_role
+                        .first_entry_of(&data_role_at(position))
+                        .is_some()
+                })
+                .collect()
+        }
+    };
     let mut units: Vec<PublishedUnit> = Vec::new();
     for (position, data_unit) in data_units.iter().enumerate() {
-        let identity = TransactionUnit::Data(DataUnitIndexInFile(
-            u64::try_from(position).expect("单元序号"),
-        ));
+        let identity = data_role_at(position);
         units.push(match carried_file {
-            Some(_) if !rewritten.contains(&identity) => carried_unit(
-                units_of_the_previous_version
-                    .as_ref()
-                    .expect("照抄第一个文件的发布接在上一版之后：carried_file 就是上一版"),
-                identity,
-            ),
+            Some(_) if !is_each_data_unit_of_the_carried_first_file_rewritten[position] => {
+                carried_unit(
+                    units_of_the_previous_version
+                        .as_ref()
+                        .expect("照抄第一个文件的发布接在上一版之后：carried_file 就是上一版"),
+                    identity,
+                )
+            }
             None | Some(_) => rewritten_unit(identity, data_unit.clone()),
         });
     }
@@ -13728,8 +15844,26 @@ fn publish_admitted<Device: BlockDevice>(
                             .clone(),
                     )
                 }
+                FileOtherThanTheFirstOrigin::SizeChangedThisPublish { .. }
+                    if file_plan
+                        .origin
+                        .rewrites_the_data_unit(DataUnitIndexInFile(position)) =>
+                {
+                    rewritten_unit(
+                        identity,
+                        rewritten_data_unit_of_a_file_other_than_the_first(
+                            &data_units_of_a_file_other_than_the_first_rewritten,
+                            file_plan.inode,
+                            DataUnitIndexInFile(position),
+                        )
+                        .expect("计划里重写的单元就是这次装的那一段里的（同一份计划拼的）")
+                        .bytes
+                        .clone(),
+                    )
+                }
                 FileOtherThanTheFirstOrigin::CarriedFromThePreviousVersion
-                | FileOtherThanTheFirstOrigin::CutByADeletionBatch => carried_unit(
+                | FileOtherThanTheFirstOrigin::CutByADeletionBatch
+                | FileOtherThanTheFirstOrigin::SizeChangedThisPublish { .. } => carried_unit(
                     units_of_the_previous_version
                         .as_ref()
                         .expect("照抄的文件只出现在接着上一版的发布里"),
@@ -13889,9 +16023,8 @@ fn publish_admitted<Device: BlockDevice>(
     }
 
     // 点名项（D23（journal 的角色与格式） 已定项 17）：这次重写的每个角色一项，key 尾段与映射 key 共用；照抄的不点名。
-    let key_tail_of =
-        |identity: TransactionUnit| -> [u8; 10] {
-            match identity {
+    let key_tail_of = |identity: TransactionUnit| -> [u8; 10] {
+        match identity {
                 TransactionUnit::Data(index) => data_key_tail(
                     data_pointers
                         .get(usize::try_from(index.0).expect("单元序号"))
@@ -13907,7 +16040,15 @@ fn publish_admitted<Device: BlockDevice>(
                                 .data_pointers
                                 .get(usize::try_from(unit.0).expect("单元序号"))
                         })
-                        .expect("点名的第一个文件之外的数据单元是这次写的那个文件的")
+                        .or_else(|| {
+                            rewritten_data_unit_of_a_file_other_than_the_first(
+                                &data_units_of_a_file_other_than_the_first_rewritten,
+                                inode,
+                                unit,
+                            )
+                            .map(|rewritten_data_unit| &rewritten_data_unit.pointer)
+                        })
+                        .expect("点名的第一个文件之外的数据单元是这次写的那个文件的、或这次重写的它的那一段里的")
                         .write_order,
                 ),
                 TransactionUnit::ExtentLowerNode(_)
@@ -14084,22 +16225,30 @@ fn publish_admitted<Device: BlockDevice>(
                         .birth_sequence,
                 ),
             }
-        };
+    };
+    // 这一版 `units` 按角色的索引一次装建一次（七·6 后续批，用户 2026-10-22 定并进）：要写的单元与记录点名的单元都对这次重写的角色
+    // 各取一次，逐个在 `units` 上找是重写的角色数乘单元数。同一角色取最先那一项，与在 `units` 上 `iter().find` 同一项。
+    let inside_the_written_units =
+        lookup_work::entering(LookupSite::UnitsOfTheRolesWrittenByThisPublish);
+    let units_by_role = FirstEntryOfEachIdentity::of_the_table(&units, |unit| unit.identity);
     let written_units: Vec<&PublishedUnit> = relocated_copies
         .iter()
         .map(|(copy, _, _)| copy)
         .chain(rewritten.iter().map(|identity| {
-            units
-                .iter()
-                .find(|unit| unit.identity == *identity)
+            units_by_role
+                .first_entry_of(identity)
                 .expect("重写的角色都装了单元")
         }))
         .collect();
+    drop(inside_the_written_units);
     let named_unit_of = |identity: TransactionUnit| -> NamedUnit {
-        let unit = units
-            .iter()
-            .find(|unit| unit.identity == identity)
-            .expect("点名的角色都是这次重写、装过单元的");
+        let unit = {
+            let _inside_the_named_units =
+                lookup_work::entering(LookupSite::UnitsOfTheRolesNamedByTheRecords);
+            units_by_role
+                .first_entry_of(&identity)
+                .expect("点名的角色都是这次重写、装过单元的")
+        };
         NamedUnit {
             locations: pool.location_entries(unit.slot, &unit.bytes),
             unit_class: identity.unit_class(),
@@ -14126,6 +16275,11 @@ fn publish_admitted<Device: BlockDevice>(
         // 带文件的一版的分配记录树住树表条目（D8（核心索引结构） 已定项 8）：根记录这一项恒全零，
         // 两处都写就成了同一个量的两份手抄。`root_record_of_a_file_version_leaves_the_allocation_record_tree_pointer_zero` 钉住。
         allocation_record_tree_root: NodePointer::empty_root(),
+        // 带单元的发布建了这一版的账：t = max(这条根自己带的 F, 分配器记这条根时的回收门槛)，p = 记完之后还钉着的槽里最小的钉值
+        // （C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定；池级 checker 的 I-7.18 求等、I-7.19 判钉槽）。
+        reclaim_threshold: reclaim_floor_when_the_root_was_recorded
+            .reclaim_threshold_of_a_root_carrying(plan.rollback_floor),
+        pinned_ring_slot: reclaim_floor_when_the_root_was_recorded.pinned_ring_slot(),
     };
     // 每条记录点名哪几项：整理的一批（不重写数据单元，一个事务）点名搬迁副本在前、这次重写的角色在后，按一条记录装几个点名项切
     // （判决 G3「journal 点名项 = 搬迁副本 + 新写的节点，一个事务号」）；别的发布照角色切法。
@@ -14201,6 +16355,8 @@ fn publish_admitted<Device: BlockDevice>(
             new_mapping_root: root.mapping_root,
             new_tree_identifier_watermark: root.tree_identifier_watermark,
             new_rollback_floor: root.rollback_floor,
+            new_reclaim_threshold: root.reclaim_threshold,
+            new_pinned_ring_slot: root.pinned_ring_slot,
             new_instance_table: root.instance_table,
             new_allocation_record_tree_root: root.allocation_record_tree_root,
             new_unmount_marker: root.unmount_marker,
@@ -14246,13 +16402,17 @@ fn publish_admitted<Device: BlockDevice>(
             .lower_nodes_of_the_files_other_than_the_first
             .into_iter()
             .zip(data_pointers_of_the_files_other_than_the_first)
-            .map(|((inode, extent_lower_nodes), (_, file_data_pointers))| {
-                FileOfAnInodeOtherThanTheFirst {
-                    inode,
-                    data_pointers: file_data_pointers,
-                    extent_lower_nodes,
-                }
-            })
+            .zip(&resolved.files_other_than_the_first.files)
+            .map(
+                |(((inode, extent_lower_nodes), (_, file_data_pointers)), file_plan)| {
+                    FileOfAnInodeOtherThanTheFirst {
+                        inode,
+                        data_pointers: file_data_pointers,
+                        extent_lower_nodes,
+                        tail: file_plan.tail,
+                    }
+                },
+            )
             .collect(),
         mapping_keys,
         allocation_records,
@@ -14349,6 +16509,15 @@ fn publish_admitted<Device: BlockDevice>(
     Ok((writes, output))
 }
 
+/// 照抄 `tree` 这棵树的节点那几次查记在哪一处：三棵树各记各的（七·6 后续批代码轮第一轮判决第三节第 3 条）。
+fn lookup_site_of_the_carried_nodes_of(tree: MultiLevelCodeTwoTree) -> LookupSite {
+    match tree {
+        MultiLevelCodeTwoTree::Accounting => LookupSite::CarriedNodesOfTheAccountingTree,
+        MultiLevelCodeTwoTree::CentralMapping => LookupSite::CarriedNodesOfTheCentralMappingTree,
+        MultiLevelCodeTwoTree::Deadlist => LookupSite::CarriedNodesOfTheDeadlistTree,
+    }
+}
+
 /// 装一棵多层码 2 树时整次发布共用的身份字段。
 struct MultiLevelTreeBuildContext<'build> {
     txg: CheckpointTxg,
@@ -14393,18 +16562,23 @@ impl BuiltMultiLevelTree {
 /// 同一个进程里接着的上一版是发布路径自己装的，key 取自 `BTreeMap`。
 #[allow(
     clippy::too_many_arguments,
-    reason = "装一棵树要的八样：哪一棵、它的号、计划、上一版、条目、身份字段、落点、发号器，各自独立"
+    reason = "装一棵树要的九样：哪一棵、它的号、计划、上一版、上一版按角色的单元索引、条目、身份字段、落点、发号器，各自独立"
 )]
 fn build_multi_level_tree(
     tree: MultiLevelCodeTwoTree,
     tree_identifier: TreeIdentifier,
     plan: &CodeTwoTreePlan,
     previous: Option<&TransactionOutput>,
+    units_of_the_previous_version: Option<
+        &FirstEntryOfEachIdentity<'_, TransactionUnit, PublishedUnit>,
+    >,
     leaf_entry_bytes_by_key: &BTreeMap<CodeTwoTreeKey, Vec<u8>>,
     context: &MultiLevelTreeBuildContext<'_>,
     slots: &BTreeMap<TransactionUnit, SlotNumber>,
     sequences: &mut BirthSequenceAllocator,
 ) -> BuiltMultiLevelTree {
+    // 装整棵树都在这棵树照抄节点那一处里（同 `build_extent_tree`）：每照抄一个节点现建一份索引的，建的那几份记在这一处。
+    let _inside_the_tree_build = lookup_work::entering(lookup_site_of_the_carried_nodes_of(tree));
     let planned_keys: Vec<&CodeTwoTreeKey> = plan.shape.keys_in_order();
     assert!(
         planned_keys.len() == leaf_entry_bytes_by_key.len()
@@ -14430,7 +16604,12 @@ fn build_multi_level_tree(
             CodeTwoTreeNodeOrigin::CarriedFrom(previous_position) => {
                 let previous_version = previous.expect("照抄的节点只出现在接着上一版的发布里");
                 let previous_tree = previous_version.multi_level_tree(tree);
-                let carried = previous_version
+                let _inside_the_carried_nodes =
+                    lookup_work::entering(lookup_site_of_the_carried_nodes_of(tree));
+                let carried = units_of_the_previous_version
+                    .expect(
+                        "照抄的节点只出现在接着上一版的发布里：上一版的单元索引与上一版一起交进来",
+                    )
                     .unit(tree.role_of_node(*previous_position, &previous_tree.shape));
                 (
                     previous_tree.pointer_of(*previous_position),
@@ -14721,8 +16900,10 @@ mod tests {
                         previous_roles_without_a_successor: Vec::new(),
                     },
                     None,
+                    None,
+                    None,
                     &units.data_pointers,
-                    TailOfAFile::NoHoleAfterTheLastDataUnit,
+                    Some(u64::try_from(content.len()).expect("内容长度")),
                     &[],
                     checkpoint.trees.extent,
                     &context,

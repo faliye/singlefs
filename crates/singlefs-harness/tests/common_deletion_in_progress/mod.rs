@@ -780,10 +780,30 @@ pub fn set_the_record_width_of_the_first_container_of_the_tree_of_kind(
 
 /// I-4.7 只红自己的那一形（判决第二节 F1：孤儿单元，今天的实现走不到，在 checker 侧直接改字节造）：第一个文件（inode 1，有一个内联数据单元）
 /// 与空 inode 2 同在最左那片叶里，把 1 号那条记录从叶里拿掉（2 号挪到第 0 条、记录数 2 → 1、声明长度 280 → 140），extent 树不动：
-/// 1 号在 extent 树里还有数据单元、inode 树里没有它的记录、号也不在队列里。
+/// 1 号在 extent 树里还有数据单元、inode 树里没有它的记录、号也不在队列里。inode 树根头里的最小 key 跟着改成 2
+/// （子树覆盖区间，D18（块里携带什么信息） 已定项 2，C478：不跟着改的话根头里还是 [1, 2]，I-1.1 也红，这一形就不只红 I-4.7 了）。
 pub fn drop_the_record_of_the_first_file_and_keep_its_data_units(image: &mut MemoryPool) {
     let (leaf_slot, _) = inode_leaf_holding(image, FIRST_INODE_NUMBER);
     drop_the_record_of_the_first_file_in_the_leaf_at_and_keep_its_data_units(image, leaf_slot);
+    let inode_root_slot = the_slot_of(&tree_table_entry_of_kind(image, TREE_KIND_INODE).root);
+    set_the_smallest_key_of_the_inode_root_at(image, inode_root_slot, FIRST_INODE_NUMBER + 1);
+}
+
+/// `root_slot` 那个 inode 树根（哪一版的都行）头里的最小 key 改成 `smallest`，重封，新的整单元校验和沿引用链补到根槽：
+/// 叶里打头的记录被拿掉之后，根头里的子树覆盖区间（D18（块里携带什么信息） 已定项 2）跟着叶走，坏镜像只红它要红的那一条。
+pub fn set_the_smallest_key_of_the_inode_root_at(
+    image: &mut MemoryPool,
+    root_slot: SlotNumber,
+    smallest: u64,
+) {
+    let key_width = parse_index_node(&unit_bytes_at(image, root_slot, node_bytes()))
+        .expect("inode 树根解得开")
+        .key_width;
+    assert_eq!(key_width, 8, "inode 树的 key 是 8 字节的 inode 号");
+    change_the_unit_and_propagate_its_checksum(image, root_slot, node_bytes(), |root| {
+        // 码 2 头里 key 区间从偏移 52 起（`crates/singlefs-core/src/unit.rs` 码 2 头的字段表「52 key 区间 2k」），先最小、后最大。
+        set_u64(root, 52, smallest);
+    });
 }
 
 /// [`drop_the_record_of_the_first_file_and_keep_its_data_units`] 改的是 `leaf_slot` 那片叶（哪一版的都行，叶里恰好 1 号与 2 号两条）。

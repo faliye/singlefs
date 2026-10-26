@@ -57,6 +57,13 @@ pub enum Operation {
     /// 内容改动型（同 [`Operation::OverwriteTheFile`]），不是发布点：实现的意图与各批落在一次调用里，崩在里面读出的只有截前、截后两样（K2「先落目标」），
     /// 就是这个操作施加之前与之后的状态，不用另起一类「一个操作的中间内容」。
     Truncate(u64),
+    /// 把 `bytes` 写到文件偏移 `offset_in_bytes` 起（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）：盖住那一段，写的终点越过
+    /// 现在的长度时文件长到终点，现在的末尾与偏移之间补 0（POSIX 面上洞、空隙与写过的 0 分不出来，内容就是整份字节）。内容改动型（同
+    /// [`Operation::OverwriteTheFile`]、[`Operation::Truncate`]），不是发布点：实现一次发布做完，崩在里面读出的只有写前、写后两样。
+    WriteAtOffset {
+        offset_in_bytes: u64,
+        bytes: FileContent,
+    },
 }
 
 /// 调用方交入的结局。
@@ -110,6 +117,8 @@ pub enum OperationNotAccepted {
     /// 还没有文件时截断：实现在任何写之前拒（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1「对 nlink = 0 或不在树里的 inode
     /// 截断，在任何写之前拒」），调用方交的是「写之前拒」、走不到这里；走到了就是输入不合法。
     TruncatingWithoutAFileIsNotInTheFirstVersion,
+    /// 还没有文件时按偏移写：同截断，实现对不在树里的 inode 在任何写之前拒，调用方交的是「写之前拒」、走不到这里；走到了就是输入不合法。
+    WritingAtAnOffsetWithoutAFileIsNotInTheFirstVersion,
     /// 回退目标 m 不是 1 到「到这一步为止的版本数」之间的数。
     RollBackTargetIsNotAVersion {
         requested: VersionNumber,
@@ -581,6 +590,7 @@ impl ReferenceFileSystem {
             | Operation::OverwriteTheFile(_)
             | Operation::ExplicitPublish
             | Operation::Fsync
+            | Operation::WriteAtOffset { .. }
             | Operation::Truncate(_) => None,
             // 第一版有快照就拒回退（判决 S8）：实现在任何写之前拒，调用方交的是「写之前拒」，走不到这里；允许的快照集合都不空时走到了就是输入不合法。
             Operation::RollBackToVersion(_) => {
@@ -647,6 +657,34 @@ impl ReferenceFileSystem {
                     (
                         EnteredKind::ContentChange,
                         VisibleState::OneFile(FileContent(truncated)),
+                        SnapshotChangeOfTheOperation::Unchanged,
+                    )
+                }
+            },
+            // 按偏移盖上、越过末尾的补 0 到终点（判决 m4-partial-write-r1 第二节 R5）。
+            Operation::WriteAtOffset {
+                offset_in_bytes,
+                bytes: FileContent(written),
+            } => match state_so_far {
+                VisibleState::NoFile => {
+                    return Err(
+                        OperationNotAccepted::WritingAtAnOffsetWithoutAFileIsNotInTheFirstVersion,
+                    )
+                }
+                VisibleState::OneFile(FileContent(bytes)) => {
+                    let offset = usize::try_from(offset_in_bytes)
+                        .expect("64 位上 usize 与 u64 同宽：写的偏移装得进");
+                    let end = offset
+                        .checked_add(written.len())
+                        .expect("调用方交的是实现做成的写：终点装得进 u64");
+                    let mut written_over = bytes.clone();
+                    if written_over.len() < end {
+                        written_over.resize(end, 0);
+                    }
+                    written_over[offset..end].copy_from_slice(&written);
+                    (
+                        EnteredKind::ContentChange,
+                        VisibleState::OneFile(FileContent(written_over)),
                         SnapshotChangeOfTheOperation::Unchanged,
                     )
                 }
@@ -2006,6 +2044,89 @@ mod tests {
             "截前、截后两样：{allowed:?}"
         );
         assert!(!allowed.contains(&file_with("abcd")), "截到一半的不在里面");
+    }
+
+    /// 按偏移写盖住中间一段（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）：前后的字节不动，长度不变。
+    #[test]
+    fn writing_at_an_offset_inside_the_file_covers_that_range_and_keeps_the_rest() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
+        succeed(
+            &mut model,
+            Operation::WriteAtOffset {
+                offset_in_bytes: 2,
+                bytes: content("XY"),
+            },
+        );
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &file_with("abXYef")
+        );
+    }
+
+    /// 起点越过末尾（第二节 R5）：末尾与偏移之间读 0，文件长到写的终点。
+    #[test]
+    fn writing_past_the_end_fills_the_gap_with_zeros_and_extends_to_the_end_of_the_write() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("ab")));
+        succeed(
+            &mut model,
+            Operation::WriteAtOffset {
+                offset_in_bytes: 4,
+                bytes: content("Z"),
+            },
+        );
+        assert_eq!(
+            model.state_after_every_operation_so_far(),
+            &VisibleState::OneFile(FileContent(vec![b'a', b'b', 0, 0, b'Z']))
+        );
+    }
+
+    /// 崩在按偏移写那次发布里：允许集合恰好写前、写后两样（一次发布做完，没有写到一半的内容）。
+    #[test]
+    fn a_crash_inside_a_write_at_an_offset_allows_exactly_the_content_before_and_after_it() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
+        succeed(&mut model, Operation::ExplicitPublish);
+        succeed(
+            &mut model,
+            Operation::WriteAtOffset {
+                offset_in_bytes: 4,
+                bytes: content("XYZ"),
+            },
+        );
+        let publish_of_the_write = succeed(&mut model, Operation::ExplicitPublish);
+        let allowed = model
+            .allowed_set_for_a_crash_in(publish_of_the_write)
+            .expect("崩溃落在按偏移写那次发布里");
+        let allowed_states: Vec<VisibleState> = allowed
+            .allowed
+            .iter()
+            .map(|allowed_state| allowed_state.state.clone())
+            .collect();
+        assert_eq!(
+            allowed_states,
+            vec![file_with("abcdef"), file_with("abcdXYZ")],
+            "写前、写后两样：{allowed:?}"
+        );
+    }
+
+    /// 还没有文件时按偏移写：不收、模型不动。
+    #[test]
+    fn writing_at_an_offset_before_any_file_exists_is_refused_and_the_model_does_not_move() {
+        let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
+        let before = model.clone();
+        assert_eq!(
+            model.submit(
+                Operation::WriteAtOffset {
+                    offset_in_bytes: 0,
+                    bytes: content("a"),
+                },
+                OperationOutcome::Succeeded
+            ),
+            Err(OperationNotAccepted::WritingAtAnOffsetWithoutAFileIsNotInTheFirstVersion)
+        );
+        assert_eq!(model, before, "拒时模型不动");
     }
 
     /// 还没有文件时截断（判决第三节 K1：实现在任何写之前拒）：不收、模型不动。

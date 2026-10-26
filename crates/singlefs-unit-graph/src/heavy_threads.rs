@@ -1,4 +1,4 @@
-//! 没给 `--threads` 时用几个线程：取法与 `scripts/experiments/heavy_threads_default/threads.rs` 相同——
+//! 没给 `--threads` 时用几个线程：取法与 `scripts/experiment-apparatus/heavy_threads_default/threads.rs` 相同——
 //! `SINGLEFS_THREAD_CAP` 是正整数照它（`scripts/hosts/capped.sh` 设），否则取登记文件 `.claude/heavy-thread-default`
 //! 第一条非注释行的头一个词。登记文件在构建时编进来，运行时不找仓根；本 crate 不依赖 `singlefs-harness`，所以不用它那一份。
 

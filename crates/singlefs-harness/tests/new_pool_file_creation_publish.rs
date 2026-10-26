@@ -3,7 +3,6 @@
 //! 逐字对（`name=segments` 五行、`name=root_record` 的反向链、`name=accounting` 的数），盘上的每个单元都由 checker 另一份解析判过。
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use singlefs_checker::position_addressed::{
@@ -52,6 +51,7 @@ use singlefs_harness::segments::{
     closed_form_state_count, segment_kinds_text, segment_sizes_text, split_into_segments,
     FixedGeometry,
 };
+use singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop;
 use singlefs_harness::{RecordedOperation, RecordingBlockDevice, SharedStream};
 
 static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -64,7 +64,7 @@ const E142_FILESYSTEM_IDENTIFIER: [u8; 16] = [
 ];
 /// E142 装置里的固定写入时间（`FIXED_WRITE_TIME_SECONDS`）。
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 新池新建文件那条记录的反向链 = CRC32C(暖机第二条记录的 487 字节头)。E142 产物第 37 行（`back_chain=628216162`）是 307 字节头下的值；
+/// 新池新建文件那条记录的反向链 = CRC32C(暖机第二条记录的 496 字节头)。E142 产物第 37 行（`back_chain=628216162`）是 307 字节头下的值；
 /// 记录头加本次发布内序号（D23（journal 的角色与格式） 已定项 4）之后是 1057457588（那一段独立换算：307 字节头下的三条记录在提交标记
 /// 之后插 4 字节序号 1）。记录标志位 0（原「填充 1」那个字节，偏移 7，D23（journal 的角色与格式） 已定项 4 / 已定项 17）在
 /// w1、w4、t9 上都写 1（每次只有一条记录的发布那一条也带「本次发布末条」标志）之后，这个值又由一段独立的换算得出：
@@ -77,14 +77,17 @@ const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 /// 「回到甲」）之后，暖机第二条记录头多出那 176 字节（实例表指针照 mkfs 那一片、分配记录树根全零、卸载记号 0），钉值从 2213468031 换成
 /// 2660362816：实现员 2026-10-03 在副本上同一段流程现算；同一条用例里每条记录的反向链另由池级 checker 自己那份逐位 CRC-32C 对盘上那 487 字节头
 /// 现算一遍再比（`back_chain_of_record_header`），两边对得上，不是只抄实现的数。E142 装置按新头宽重跑之后要逐字对上。
-const E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION: u32 = 2_660_362_816;
+/// 新根段末尾加回收门槛 t 8 字节与钉槽 p 1 字节（C773（读坏与全零根槽的回收门槛钉只在内存里），头 487 → 496：暖机第二条记录带 t = 0、p = 255，
+/// fsid 与 MAC 后挪 9 字节），钉值从 2660362816 换成 2864069229（C773 实现员副本上这条断言红出来的 left 值；同一条用例里 checker 那一份逐位 CRC-32C 照旧现算再比）。
+const E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION: u32 = 2_864_069_229;
 
-fn image_path(tag: &str, device: u32) -> PathBuf {
+/// 一份镜像的路径，建之前就由守卫认领：搭池途中哪一步 panic、用例做完、断言失败都删掉它。
+fn image_path(tag: &str, device: u32) -> TemporaryPathRemovedOnDrop {
     let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
-    std::env::temp_dir().join(format!(
+    TemporaryPathRemovedOnDrop::claiming(std::env::temp_dir().join(format!(
         "singlefs-step5-{tag}-{}-{sequence}-dev{device}.img",
         std::process::id()
-    ))
+    )))
 }
 
 fn parameters() -> MakeFilesystemParameters {
@@ -118,7 +121,8 @@ fn file_content() -> Vec<u8> {
 type Recorded = RecordingBlockDevice<FileBackedBlockDevice>;
 
 struct BuiltPool {
-    paths: Vec<PathBuf>,
+    /// 只为丢掉时删镜像而留着。
+    _images: Vec<TemporaryPathRemovedOnDrop>,
     devices: Vec<(DeviceIdentity, Recorded)>,
     stream: SharedStream,
     genesis: MakeFilesystemOutput,
@@ -129,19 +133,11 @@ struct BuiltPool {
     warm_up_operation_count: usize,
 }
 
-impl Drop for BuiltPool {
-    fn drop(&mut self) {
-        for path in &self.paths {
-            let _ = std::fs::remove_file(path);
-        }
-    }
-}
-
 /// 整条路：mkfs → 取号 → 暖机 → 新池新建文件；每一步之后记下录制流的长度，按路径切段用。
 fn build_pool(tag: &str) -> BuiltPool {
     let parameters = parameters();
     let stream = SharedStream::new();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     let mut devices: Vec<(DeviceIdentity, Recorded)> = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
@@ -159,7 +155,7 @@ fn build_pool(tag: &str) -> BuiltPool {
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(path);
     }
     let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
     let mkfs_operation_count = stream.operations().len();
@@ -214,7 +210,7 @@ fn build_pool(tag: &str) -> BuiltPool {
         (warm_up, output)
     };
     BuiltPool {
-        paths,
+        _images: images,
         devices,
         stream,
         genesis,
@@ -356,6 +352,9 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     // mkfs 清 [0, 根环基址)（C651 第一轮判决用户定案 W1）之后每块盘多一步整段清零、两块盘多 2 步，都在第一段（第一道屏障之前）：
     // mkfs 23 → 25 步，第一段 12 → 14 个写，闭式 1 + (2^14 − 1) + 1 + 1 + 1 + (2^4 − 1) = 16402（改之前 1 + 4095 + 3 + 15 = 4114）；
     // mkfs 之后的各段不变。
+    // 两趟写序（D22（单元原子性怎么合成） 已定项 8 第 3 条，`research/prompts/m3-close-c656-r3-main-verification.md` 第二节 S3）：
+    // 两块盘的 [0, 根环基址) 清零连同作废那道屏障（两块盘各一步）提到最前、自成一段，mkfs 25 → 27 步，段 14+1+1+1+4 → 2+12+1+1+1+4，
+    // 闭式 16402 → 1 + 3 + (2^12 − 1) + 1 + 1 + 1 + (2^4 − 1) = 4117；mkfs 之后的各段不变。
     // 取号写两轮（甲'，`research/prompts/m3-close-sysconf-r3-main-verification.md` 第四节「落地」）之后取号那一截 2 步 → 6 步（两轮各两写，中间一道屏障两盘各一步），
     // 段 [2] → [2+2]、闭式 4 → 7；mkfs 之后整条 57 → 61 步，段前面多一个 2 写的段，闭式 16777240 → 16777243；暖机与新池新建文件那两截不变。
     assert_eq!(
@@ -364,11 +363,11 @@ fn recorded_paths_match_the_registered_segment_sequences() {
             sizes(mkfs_operations),
             closed_form(mkfs_operations)
         ),
-        (25, "14+1+1+1+4".to_string(), 16402)
+        (27, "2+12+1+1+1+4".to_string(), 4117)
     );
     assert_eq!(
         kinds(mkfs_operations),
-        "[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
+        "[zero_fill×2,barrier×2]|[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"
     );
     assert_eq!(
         (
@@ -470,7 +469,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
         newest.tree_identifier_watermark, 65549,
         "D8 已定项 11：第一个文件版本那次之后树 ID 水位是 65549（十三棵树 65536..65548，退役树是第 50 批加的）"
     );
-    assert_eq!(newest.record_bytes, pool.output.root.to_slot(512)[..457]);
+    assert_eq!(newest.record_bytes, pool.output.root.to_slot(512)[..466]);
     for (region, expected_txg) in [(1u64, 1u64), (2, 2)] {
         let warm = check_root_slot(
             &read_root_slot(&pool, region, 0),
@@ -489,7 +488,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
         assert_eq!(
             warm.record_bytes,
             pool.warm_up.roots[usize::try_from(expected_txg - 1).expect("下标")].to_slot(512)
-                [..457]
+                [..466]
         );
     }
     let genesis = check_root_slot(&read_root_slot(&pool, 0, 0), &E142_FILESYSTEM_IDENTIFIER)
@@ -548,7 +547,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
             .map_or(0, back_chain_of_record_header);
         assert_eq!(
             view.back_chain, expected_back_chain,
-            "反向链 = 本实例内逻辑前一条记录的 487 字节头的 CRC-32C"
+            "反向链 = 本实例内逻辑前一条记录的 496 字节头的 CRC-32C"
         );
         assert_eq!(
             view.ordinal_within_publish, 1,
@@ -582,7 +581,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
             );
             assert_eq!(
                 view.back_chain, E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION,
-                "与 487 字节头下现算、checker 独立 CRC 核过的 back_chain 逐字相同（E142 第八次跑产物第 37 行是 307 字节头、偏移 7 写 0 下的值）"
+                "与 496 字节头下现算、checker 独立 CRC 核过的 back_chain 逐字相同（E142 第八次跑产物第 37 行是 307 字节头、偏移 7 写 0 下的值）"
             );
             assert_eq!(
                 &view.new_root_segment[..86],

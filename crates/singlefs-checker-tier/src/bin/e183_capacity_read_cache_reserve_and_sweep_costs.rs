@@ -6900,8 +6900,11 @@ mod tests {
     /// 来源：2026-10-18 入库的第一段 `all` 产物（`research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out`，
     /// 459 行、152434 字节、每行都以 `E7RESULT ` 起头），对整个文件现算：`sha256sum <产物>` 与 `wc -l <产物>`。
     /// 2026-10-20 数据形态名字改名（欠账 C430）之后重钉：产物里 `name=h4_reading_checks` 那三个键名照装置一起换过，别的字节不动。
+    /// 取号写两轮与欠账 C755（恢复与两种挂载触发退回的失败不同）每次可写挂载问一次 F2 之后重钉：只有 `name=h4_mount_tally` 那 28 行的 `system_configuration=` 读写数变了
+    /// （`r26/106496,w3/12288` → `r30/122880,w4/16384`），行数与字节数不变；对的是 2026-10-23 重出的第一段 `all` 产物
+    /// （`research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-23.out`），算法同上。
     const SEGMENT_ONE_PINNED_SHA256: &str =
-        "7ed2e16c6cc42b914f740f943a05440bef6a43c0917baac0114d5084f558adc8";
+        "b4ff64f11be3b2d07137458ca66ebbeca9607111e1f62b152ecc82b41a7de6fe";
     const SEGMENT_ONE_PINNED_LINE_COUNT: usize = 459;
 
     /// SHA-256（FIPS 180-4），小写十六进制。测试里自带一份，免得给 checker 档包加依赖；
@@ -7205,9 +7208,11 @@ mod tests {
 
     #[test]
     fn a_shard_file_counts_as_finished_only_when_its_last_line_counts_every_line() {
-        let directory =
-            std::env::temp_dir().join(format!("e183-shard-file-{}", std::process::id()));
-        std::fs::create_dir_all(&directory).expect("临时目录");
+        // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e183-shard-file-{}", std::process::id())),
+        );
+        std::fs::create_dir_all(&*directory).expect("临时目录");
         let path = directory.join("h5-example");
         let lines = vec!["E7RESULT name=a".to_string(), "E7RESULT name=b".to_string()];
         write_shard_file_atomically(&path, "h5-example", &lines).expect("写得成");
@@ -7236,7 +7241,6 @@ mod tests {
             "行数对不上不算"
         );
         let leftovers = std::fs::read_dir(&directory).expect("列目录").count();
-        std::fs::remove_dir_all(&directory).expect("删临时目录");
         assert_eq!(leftovers, 1, "临时名已改名，目录里只剩片文件");
     }
 
@@ -7618,9 +7622,11 @@ mod tests {
 
     #[test]
     fn a_missing_shard_with_a_wrapper_exit_of_250_reads_as_beyond_the_memory_upper_limit() {
-        let directory =
-            std::env::temp_dir().join(format!("e183-h2-statuses-{}", std::process::id()));
-        std::fs::create_dir_all(&directory).expect("临时目录");
+        // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e183-h2-statuses-{}", std::process::id())),
+        );
+        std::fs::create_dir_all(&*directory).expect("临时目录");
         let (first_shard, _, _) = capacity_shards()[0].clone();
         let (second_shard, _, _) = capacity_shards()[1].clone();
         std::fs::write(
@@ -7646,7 +7652,6 @@ mod tests {
         )
         .expect("写退出码");
         let statuses = read_capacity_statuses(&directory, "same");
-        std::fs::remove_dir_all(&directory).expect("删临时目录");
         assert_eq!(
             statuses[0].2,
             CellRoundStatus::BeyondTheMemoryUpperLimit(250)
@@ -8342,9 +8347,11 @@ mod tests {
     fn a_small_capacity_cell_on_file_images_reaches_every_measurement() {
         let mut records_by_units = Vec::new();
         for units in [0u64, 16] {
-            let directory =
-                std::env::temp_dir().join(format!("e183-h2-cell-{}-{units}", std::process::id()));
-            std::fs::create_dir_all(&directory).expect("临时目录");
+            // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它
+            let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join(format!("e183-h2-cell-{}-{units}", std::process::id())),
+            );
+            std::fs::create_dir_all(&*directory).expect("临时目录");
             let cell = CapacityCell {
                 device_bytes: 256 * MEBIBYTE,
                 sequentially_written_units: units,
@@ -8360,7 +8367,6 @@ mod tests {
                 &mut emitter,
             );
             let left_behind = std::fs::read_dir(&directory).expect("列目录").count();
-            std::fs::remove_dir_all(&directory).expect("删临时目录");
             let lines = emitter.into_collected_lines();
             assert_eq!(end, ShardEnd::Finished);
             assert_eq!(left_behind, 0, "镜像文件跑完就删");

@@ -7,12 +7,19 @@
 //! 打分是 [`greedy_score`]；cost-benefit 与轮转留给 E10（老化：结构抗老化 vs 事后整理） 的臂。
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU64, NonZeroUsize};
+use std::time::Duration;
 
 use singlefs_format::CLUSTER_SEGMENT_SLOTS;
+use singlefs_replay_prefix::compaction_plan_proofs::{
+    choose_compaction_segment, plan_compaction_batch, CompactionKernelAllocationClass,
+    CompactionKernelPlannedBatch, CompactionKernelRegionChoice, CompactionKernelScannedAllocation,
+    CompactionKernelSegment, CompactionKernelSegmentScan,
+};
 
 use crate::address::{DeviceIdentity, SlotNumber};
 use crate::allocator::{AllocationRecord, Placement, UnitAreaStart};
+use crate::background_compute::{BackgroundTaskAfterTheComputeError, ClusterSegmentEntryKey};
 use crate::logged_operations::{CompactionIntent, CompactionRegion};
 use crate::region_scan::{AllocationInRegion, RegionScan, RegionScanRefusal, ScannedAllocation};
 
@@ -95,21 +102,33 @@ pub fn choose_region(
     segments_refused_by_the_region_scan: &SegmentsRefusedByTheRegionScan,
     criterion: RegionChoiceCriterion,
 ) -> RegionChoice {
-    // 按段起点索引一次（同一段有几份时取最前那一份）：下面每个候选段查一次，不逐份线性找。
-    let mut scans_by_start_slot: BTreeMap<SlotNumber, &RegionScan> = BTreeMap::new();
-    for scan in region_scans
-        .iter()
-        .filter(|scan| scan.region.device() == unit_area.device)
-    {
-        scans_by_start_slot
-            .entry(scan.region.start_slot())
-            .or_insert(scan);
-    }
-    let scan_of_the_segment =
-        |start_slot: SlotNumber| scans_by_start_slot.get(&start_slot).copied();
+    let live_slots_per_segment: Vec<LiveSlotsOfAClusterSegment> =
+        live_slots_per_cluster_segment_by_the_records(allocation_records, unit_area)
+            .into_iter()
+            .map(LiveSlotsOfAClusterSegment::Counted)
+            .collect();
+    choose_region_over_the_live_slots(
+        &live_slots_per_segment,
+        unit_area,
+        cluster_segments,
+        live_intent_region,
+        pinned_slots,
+        region_scans,
+        segments_refused_by_the_region_scan,
+        criterion,
+    )
+}
+
+/// 按分配记录数 `unit_area` 那块盘上每个整段的活槽数（未释放记录罩住的槽数；末尾凑不满 64 槽的那一截不算，记录落在单元区之前的槽不算），
+/// 按段起点从小到大一段一个（[`choose_region`] 打分前的那一步，D26（后台整理与放置回收） 已定项 13 第 1 条「选段打分」放上 GPU 的那一段的
+/// CPU 写法）。纯函数，不读设备。
+#[must_use]
+pub fn live_slots_per_cluster_segment_by_the_records(
+    allocation_records: &[AllocationRecord],
+    unit_area: UnitAreaOfOneDevice,
+) -> Vec<u64> {
     let unit_area_start = unit_area.start.slot().0;
     let full_segments = unit_area.slots / CLUSTER_SEGMENT_SLOTS;
-    let segment_slots = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
     let mut live_slots_per_segment =
         vec![0u64; usize::try_from(full_segments).expect("一块盘的段数装得进 usize")];
     for record in allocation_records
@@ -128,49 +147,124 @@ pub fn choose_region(
             }
         }
     }
-    let eligible_segments = live_slots_per_segment
+    live_slots_per_segment
+}
+
+/// `unit_area` 那块盘上每个整段的条目键，按段起点从小到大（与 [`live_slots_per_cluster_segment_by_the_records`] 一段一个、次序相同）。
+#[must_use]
+pub fn cluster_segment_entry_keys_of_the_unit_area(
+    unit_area: UnitAreaOfOneDevice,
+) -> Vec<ClusterSegmentEntryKey> {
+    let unit_area_start = unit_area.start.slot().0;
+    let full_segments = unit_area.slots / CLUSTER_SEGMENT_SLOTS;
+    (0..full_segments)
+        .map(|segment| ClusterSegmentEntryKey {
+            device: unit_area.device,
+            start_slot: SlotNumber(unit_area_start + segment * CLUSTER_SEGMENT_SLOTS),
+        })
+        .collect()
+}
+
+/// 一个整段这一批的活槽数。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LiveSlotsOfAClusterSegment {
+    /// 数出来了（CPU 写法，或 GPU 两份核确认、交 CPU 判的）。
+    Counted(u64),
+    /// GPU 两份核这一轮数得不一样（D26（后台整理与放置回收） 已定项 13 第 8 条）：这一段这一批不当候选，下一轮重算。
+    UncertainThisRound,
+}
+
+/// 同 [`choose_region`]，每段的活槽数由调用方算好交进来（`live_slots_per_segment` 按段起点从小到大、一个整段一个，同
+/// [`live_slots_per_cluster_segment_by_the_records`] 的次序；GPU 路径上来自丙段）。[`choose_region`] 就是先数再交给它，判法逐项相同。
+/// 这一轮数得不确定的段（[`LiveSlotsOfAClusterSegment::UncertainThisRound`]）不进候选：其余的段照原次序交选段核，同分取起点槽号最小的不变。
+///
+/// # Panics
+/// `live_slots_per_segment` 的个数与 `unit_area` 的整段数不等。
+#[must_use]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "同 choose_region 的八个输入，只是记录换成了算好的每段活槽数（code-discipline.md「参数不按个数限」）"
+)]
+pub fn choose_region_over_the_live_slots(
+    live_slots_per_segment: &[LiveSlotsOfAClusterSegment],
+    unit_area: UnitAreaOfOneDevice,
+    cluster_segments: &BTreeSet<SlotNumber>,
+    live_intent_region: Option<CompactionRegion>,
+    pinned_slots: &BTreeSet<SlotNumber>,
+    region_scans: &[RegionScan],
+    segments_refused_by_the_region_scan: &SegmentsRefusedByTheRegionScan,
+    criterion: RegionChoiceCriterion,
+) -> RegionChoice {
+    // 按段起点索引一次（同一段有几份时取最前那一份）：下面每个候选段查一次，不逐份线性找。
+    let mut scans_by_start_slot: BTreeMap<SlotNumber, &RegionScan> = BTreeMap::new();
+    for scan in region_scans
+        .iter()
+        .filter(|scan| scan.region.device() == unit_area.device)
+    {
+        scans_by_start_slot
+            .entry(scan.region.start_slot())
+            .or_insert(scan);
+    }
+    let scan_of_the_segment =
+        |start_slot: SlotNumber| scans_by_start_slot.get(&start_slot).copied();
+    let unit_area_start = unit_area.start.slot().0;
+    let full_segments = unit_area.slots / CLUSTER_SEGMENT_SLOTS;
+    let segment_slots = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+    assert_eq!(
+        u64::try_from(live_slots_per_segment.len()).expect("段数装得进 u64"),
+        full_segments,
+        "每段的活槽数一个整段一个（live_slots_per_cluster_segment_by_the_records 的次序）"
+    );
+    // 下标按段起点递增：核的“同分取最早下标”等价于原算法的“同分取最小槽号”。
+    // 仍按设备过滤扫描，再保留同一起点的第一份；不得在这里重新排序或改成最后一份。
+    // 数得不确定的段跳过，其余的照原次序进核：核交回的下标是这几段里的下标，按 `start_slots_of_the_candidates` 换回段起点。
+    let mut start_slots_of_the_candidates: Vec<SlotNumber> = Vec::new();
+    let segments: Vec<CompactionKernelSegment> = live_slots_per_segment
         .iter()
         .enumerate()
+        .filter_map(|(segment, live_slots)| match live_slots {
+            LiveSlotsOfAClusterSegment::Counted(live_slots) => Some((segment, live_slots)),
+            LiveSlotsOfAClusterSegment::UncertainThisRound => None,
+        })
         .map(|(segment, live_slots)| {
             let start_slot = SlotNumber(
                 unit_area_start + u64::try_from(segment * segment_slots).expect("槽号装得进 u64"),
             );
-            (start_slot, *live_slots)
-        })
-        .filter(|(start_slot, _live_slots)| {
+            start_slots_of_the_candidates.push(start_slot);
             let end_slot = SlotNumber(start_slot.0 + CLUSTER_SEGMENT_SLOTS);
-            let opened_in_this_mount = cluster_segments.contains(start_slot);
-            let is_the_live_intent_region =
-                live_intent_region.is_some_and(|region| region.start_slot() == *start_slot);
-            let holds_a_pinned_slot = pinned_slots.range(*start_slot..end_slot).next().is_some();
-            let refused_by_the_region_scan =
-                segments_refused_by_the_region_scan.contains(*start_slot);
-            // 没扫过的段还不知道有没有能搬的单元：留作候选，轮到它时让调用方先扫。
-            let may_hold_a_movable_unit = match scan_of_the_segment(*start_slot) {
-                Some(scan) => scan.movable_units().next().is_some(),
-                None => true,
-            };
-            !opened_in_this_mount
-                && !is_the_live_intent_region
-                && !holds_a_pinned_slot
-                && !refused_by_the_region_scan
-                && may_hold_a_movable_unit
-        });
-    let first_start_slot = match criterion {
-        RegionChoiceCriterion::Greedy => eligible_segments
-            .min_by_key(|(start_slot, live_slots)| (greedy_score(*live_slots), *start_slot))
-            .map(|(start_slot, _live_slots)| start_slot),
+            CompactionKernelSegment {
+                live_slots: match criterion {
+                    RegionChoiceCriterion::Greedy => greedy_score(*live_slots),
+                },
+                is_opened_in_this_mount: cluster_segments.contains(&start_slot),
+                is_the_live_intent_region: live_intent_region
+                    .is_some_and(|region| region.start_slot() == start_slot),
+                holds_a_pinned_slot: pinned_slots.range(start_slot..end_slot).next().is_some(),
+                is_refused_by_the_region_scan: segments_refused_by_the_region_scan
+                    .contains(start_slot),
+                scan: match scan_of_the_segment(start_slot) {
+                    None => CompactionKernelSegmentScan::NotScanned,
+                    Some(scan) if scan.movable_units().next().is_some() => {
+                        CompactionKernelSegmentScan::ScannedWithAMovableUnit
+                    }
+                    Some(_) => CompactionKernelSegmentScan::ScannedWithoutAMovableUnit,
+                },
+            }
+        })
+        .collect();
+    let region_at = |position: usize| {
+        CompactionRegion::of_one_cluster_segment(
+            unit_area.device,
+            start_slots_of_the_candidates[position],
+        )
+        .expect("单元区的整段起点在聚簇段边界上且装得进六字节")
     };
-    let Some(first_start_slot) = first_start_slot else {
-        return RegionChoice::NoEligibleSegment;
-    };
-    let first_region = CompactionRegion::of_one_cluster_segment(unit_area.device, first_start_slot)
-        .expect(
-            "单元区起点在聚簇段边界上（UnitAreaStart 的不变量），整段的起点都是 64 的倍数；槽号来自一块盘的单元区，装得进 6 字节",
-        );
-    match scan_of_the_segment(first_start_slot) {
-        Some(_scan_with_a_movable_unit) => RegionChoice::Chosen(first_region),
-        None => RegionChoice::ScanBeforeChoosing(first_region),
+    match choose_compaction_segment(&segments) {
+        CompactionKernelRegionChoice::Chosen(position) => RegionChoice::Chosen(region_at(position)),
+        CompactionKernelRegionChoice::ScanBeforeChoosing(position) => {
+            RegionChoice::ScanBeforeChoosing(region_at(position))
+        }
+        CompactionKernelRegionChoice::NoEligibleSegment => RegionChoice::NoEligibleSegment,
     }
 }
 
@@ -221,24 +315,64 @@ pub enum PlannedBatch {
 pub fn plan_batch(region_scan: &RegionScan, batch: CompactionBatchUnits) -> PlannedBatch {
     assert!(
         region_scan.movable_mapping_keys_are_pairwise_distinct(),
-        "扫描结果里能搬的映射 key 两两不同：scan_region 见到同一把 key 判成可搬两次就拒这个 R，计划只收它交回的 Ok"
+        "扫描结果里能搬的映射 key 两两不同"
     );
-    let relocations: Vec<PlannedRelocation> = region_scan
-        .movable_units()
-        .take(batch.units())
-        .map(|(source, unit)| PlannedRelocation {
-            mapping_key: unit.mapping_key.clone(),
-            source,
+    let allocations = compaction_kernel_allocations(region_scan);
+    match plan_compaction_batch(&allocations, batch.units()) {
+        CompactionKernelPlannedBatch::Relocate(positions) => PlannedBatch::Relocate(
+            positions
+                .into_iter()
+                .map(|position| {
+                    let allocation = &region_scan.allocations[position];
+                    let AllocationInRegion::Movable(unit) = &allocation.class else {
+                        panic!("核证过：计划里每一项都是能搬的（P2），这里是第 {position} 项 {allocation:?}");
+                    };
+                    PlannedRelocation {
+                        mapping_key: unit.mapping_key.clone(),
+                        source: allocation.placement,
+                    }
+                })
+                .collect(),
+        ),
+        CompactionKernelPlannedBatch::RegionEmptied => PlannedBatch::RegionEmptied,
+        CompactionKernelPlannedBatch::NothingMovableButTheRegionIsNotEmpty => {
+            PlannedBatch::NothingMovableButTheRegionIsNotEmpty
+        }
+    }
+}
+
+/// 保持扫描的条目顺序，并将完整 key 字节的相等关系保留为核身份的相等关系。
+/// 独立成函数以便直接验证证明输入；产品输出不能观测仅参与 ghost 规格的身份字段。
+fn compaction_kernel_allocations(
+    region_scan: &RegionScan,
+) -> Vec<CompactionKernelScannedAllocation> {
+    // 身份按完整 key 字节相等分配，不按指针或哈希分配；借用输入，避免为整张扫描表复制 key。
+    // allocations 与原扫描一一对应且不重排，核交回的下标可直接取回完整 Placement（包括 span）。
+    let mut identities_of_the_keys: BTreeMap<&[u8], u64> = BTreeMap::new();
+    region_scan
+        .allocations
+        .iter()
+        .map(|allocation| CompactionKernelScannedAllocation {
+            source_slot: allocation.placement.slot.0,
+            class: match &allocation.class {
+                AllocationInRegion::Movable(unit) => {
+                    let next_identity = u64::try_from(identities_of_the_keys.len())
+                        .expect("内存中的 key 数装得进 u64");
+                    CompactionKernelAllocationClass::Movable {
+                        mapping_key_identity: *identities_of_the_keys
+                            .entry(unit.mapping_key.as_slice())
+                            .or_insert(next_identity),
+                    }
+                }
+                AllocationInRegion::Pinned => CompactionKernelAllocationClass::Pinned,
+                AllocationInRegion::Quarantined => CompactionKernelAllocationClass::Quarantined,
+                AllocationInRegion::Dead => CompactionKernelAllocationClass::Dead,
+                AllocationInRegion::Inconsistent(_) => {
+                    CompactionKernelAllocationClass::Inconsistent
+                }
+            },
         })
-        .collect();
-    if !relocations.is_empty() {
-        return PlannedBatch::Relocate(relocations);
-    }
-    if region_scan.allocations.is_empty() {
-        PlannedBatch::RegionEmptied
-    } else {
-        PlannedBatch::NothingMovableButTheRegionIsNotEmpty
-    }
+        .collect()
 }
 
 /// 下一批要搬的，跳过这次发布本来就重写的节点（判决 `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H4，用户 2026-10-16
@@ -307,10 +441,12 @@ pub enum CompactionBatchSize {
 /// 整理什么时候起跑。封闭集合。产品路径照水位（[`CompactionRunForcing::FollowTheWatermarks`]）；另两种只供测试（判决 G6「强制起跑 / 停」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionRunForcing {
-    /// 用户改动发成之后按水位判起不起跑（判决 G8 丁）。第一版三条水位恒 0、0 = 关（判决 G4 V-a；内置默认改非零不在这一批），
-    /// 所以这一支在产品路径上不起跑；显式入口（`mounted_session::MountedSession::run_compaction`）不看水位、照常跑。
+    /// 用户改动发成之后与定时兜底那一次按水位判起不起跑（判决 G8 丁；D26（后台整理与放置回收） 已定项 13 第 5 条）。第一版三条水位恒 0、
+    /// 0 = 关（判决 G4 V-a；内置默认改非零不在这一批），所以这一支在产品路径上不起跑；显式入口（`mounted_session::MountedSession::run_compaction`）
+    /// 不看水位、照常跑。
     FollowTheWatermarks,
-    /// 只供测试：用户改动发成之后不看水位，照样跑至多一批。
+    /// 只供测试：起跑判据不看水位、恒为真——用户改动发成之后记下「该跑了」，定时兜底查到的也是「该跑」，由后台入口
+    /// （`mounted_session::MountedSession::run_compaction_in_the_background`）去跑。
     ForcedToStartForTests,
     /// 只供测试：两个入口都不起跑，停机原因 [`CompactionRunStop::ForcedToStopForTests`]。
     ForcedToStopForTests,
@@ -436,8 +572,29 @@ pub enum CompactionRunStop {
     NoLiveIntentLeftToContinue,
     /// R 里一个能搬的都没有、却还有未释放的记录（[`PlannedBatch::NothingMovableButTheRegionIsNotEmpty`]）：意图连同 R 排他丢掉。
     NothingMovableButTheRegionIsNotEmpty,
-    /// 用户改动之后那一次只跑至多一批（判决 G8 丁），跑完了。
+    /// 用户改动之后起跑的那一趟只跑至多一批（判决 G8 丁），跑完了。
     OneBatchAfterTheUserChangeDone,
+    /// 后台入口：前台有 fsync 在等，不发下一批（D26（后台整理与放置回收） 已定项 13 第 6 条）。
+    YieldedToAForegroundFsync,
+    /// 后台入口：这一个写带宽窗口里整理写的字节已到写带宽上限，不发下一批（D26 已定项 13 第 6 条，[`CompactionWriteBandwidthLimit`]）。
+    WriteBandwidthLimitReached {
+        bytes_written_in_the_window: u64,
+        limit_in_bytes_per_second: u64,
+    },
+    /// 这一批算着出了错（D26 已定项 13 第 4 条）：这一批放弃、一个写都没发，意图留在盘上；整理这个后台任务停下或当场解除停下见
+    /// `task_after_the_error`。
+    BatchAbandonedAfterABackgroundComputeError {
+        task_after_the_error: BackgroundTaskAfterTheComputeError,
+    },
+    /// 整理这个后台任务此前因一批出错停着（D26 已定项 13 第 4 条）：这一趟一个写都不发，等一次通过校验的切换请求解除停下
+    /// （用户 2026-10-26 定「停着时收到切换请求就当场解除停下」）。
+    BackgroundTaskStoppedAfterAnEarlierComputeError,
+    /// GPU 路径上 R 里除了这一轮两份核判得不一样的记录，再没有判定了可搬的（D26 已定项 13 第 8 条「这一批不回收、不搬，留到下一轮重算」）：
+    /// 这一批不发，意图照留（不删也不丢），下一批重扫照判。
+    OnlyRecordsUncertainThisRoundLeftToMove { records_uncertain_this_round: u64 },
+    /// GPU 路径上选中要签的那一段里有这一轮两份核判得不一样的记录（D26 已定项 13 第 8 条）：R 里要搬几个数不准，签发前那一判判不了，
+    /// 这一批不签，下一批重扫照判。
+    IssueHeldBackByRecordsUncertainThisRound { records_uncertain_this_round: u64 },
 }
 
 impl CompactionRunStop {
@@ -471,6 +628,24 @@ impl CompactionRunStop {
             }
             CompactionRunStop::OneBatchAfterTheUserChangeDone => {
                 "compaction_stopped_after_one_batch_following_the_user_change"
+            }
+            CompactionRunStop::YieldedToAForegroundFsync => {
+                "compaction_yielded_to_a_foreground_fsync"
+            }
+            CompactionRunStop::WriteBandwidthLimitReached { .. } => {
+                "compaction_paced_by_the_write_bandwidth_limit"
+            }
+            CompactionRunStop::BatchAbandonedAfterABackgroundComputeError { .. } => {
+                "compaction_batch_abandoned_after_a_background_compute_error"
+            }
+            CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError => {
+                "compaction_stopped_after_an_earlier_background_compute_error"
+            }
+            CompactionRunStop::OnlyRecordsUncertainThisRoundLeftToMove { .. } => {
+                "compaction_stopped_only_records_uncertain_on_the_gpu_left_to_move"
+            }
+            CompactionRunStop::IssueHeldBackByRecordsUncertainThisRound { .. } => {
+                "compaction_issue_held_back_by_records_uncertain_on_the_gpu"
             }
         }
     }
@@ -612,6 +787,8 @@ impl CompactionSwitchesAndTheExcludedRegion {
 /// 会话这一侧的整理状态（丁 1 交判第 2 点：不合格段表挂会话；生命周期一次挂载）：这次挂载里被区域扫描拒过的段、这次挂载里释放前核出对不上
 /// 而隔离的槽（常驻隔离集，攻方 K-c 读它）、上一次用户改动之后整理发了几次布（`B_gc`）、观测。住在挂着的会话上
 /// （`mounted_session::MountedSession::compaction`），可写挂载续做意图时先建一份、交给会话接着用（`mount::MountOutput::compaction_continuation`）。
+/// 整理挪出用户改动的调用线程之后（用户 2026-10-26 定「挪出调用线程，补齐三样保证」）另住四样：起跑判据记下的「该跑了」、上一条完成的意图
+/// （签下一条之前那一判跨趟读它）、定时兜底上一次查的钟读数、写带宽这一个窗口里整理写了多少。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompactionOfThisMount {
     pub segments_refused_by_the_region_scan: SegmentsRefusedByTheRegionScan,
@@ -619,10 +796,20 @@ pub struct CompactionOfThisMount {
     /// 上一次用户改动之后整理发了几次布（判决 G8 `B_gc` 式子里「已经过去的发布数」）：会话发成一次用户改动就归零。
     pub publishes_since_the_last_user_change: u64,
     pub observations: CompactionObservations,
+    /// 用户改动发成之后起跑判据查出来的结果，后台入口取走（[`CompactionStartJudgement`]）。
+    pub start_judgement: CompactionStartJudgement,
+    /// 这次挂载里上一条完成的意图（攻方 K-h「上一条无产出就不签」读它的 `segs0`）：跨趟留着，不随一趟结束丢掉
+    /// （第三轮判决 `research/prompts/m4-gpugc-design-r3-main-verification.md` 第二节 G8、岔路单第 11 行乙的第二样保证），
+    /// 可写挂载续做做完的那一条也记在这里、交给会话。
+    pub last_completed_intent: Option<CompactionIntent>,
+    /// 定时兜底上一次查起跑判据时调用方的钟读数；还没查过是 `None`。
+    timer_fallback_last_check: Option<CallerMonotonicClockReading>,
+    /// 写带宽上限的这一个窗口（[`COMPACTION_WRITE_BANDWIDTH_WINDOW`]）：开了上限的后台入口推第一批时开、过了一个窗口长就换新的。
+    write_bandwidth_window: Option<CompactionWriteBandwidthWindow>,
 }
 
 impl CompactionOfThisMount {
-    /// 一次挂载起步：三样都空。
+    /// 一次挂载起步：各样都空，没有「该跑了」。
     #[must_use]
     pub fn of_a_new_mount() -> Self {
         Self {
@@ -630,6 +817,90 @@ impl CompactionOfThisMount {
             quarantined_slots: BTreeSet::new(),
             publishes_since_the_last_user_change: 0,
             observations: CompactionObservations::default(),
+            start_judgement: CompactionStartJudgement::NotDue,
+            last_completed_intent: None,
+            timer_fallback_last_check: None,
+            write_bandwidth_window: None,
+        }
+    }
+
+    /// 定时兜底这一次该不该再查一次起跑判据（D26（后台整理与放置回收） 已定项 13 第 5 条「另有定时兜底，每隔一段时间再查一次」）：
+    /// 关着就不查；开着而还没查过、或离上一次查过了一个间隔，就该查，并把 `now` 记成上一次查的读数。调用方的钟往回走时按没过间隔算。
+    pub(crate) fn check_the_timer_fallback(
+        &mut self,
+        timer_fallback: CompactionTimerFallback,
+        now: CallerMonotonicClockReading,
+    ) -> TimerFallbackCheck {
+        let interval = match timer_fallback {
+            CompactionTimerFallback::Off => return TimerFallbackCheck::Off,
+            CompactionTimerFallback::EveryMilliseconds(interval_in_milliseconds) => {
+                Duration::from_millis(interval_in_milliseconds.get())
+            }
+        };
+        let is_due = match self.timer_fallback_last_check {
+            None => true,
+            Some(last_check) => now.0.saturating_sub(last_check.0) >= interval,
+        };
+        if is_due {
+            self.timer_fallback_last_check = Some(now);
+            TimerFallbackCheck::Due
+        } else {
+            TimerFallbackCheck::IntervalNotElapsed
+        }
+    }
+
+    /// 写带宽上限放不放下一批（D26（后台整理与放置回收） 已定项 13 第 6 条）：不限就放；限着就看这一个窗口——没有窗口、或离窗口起点过了
+    /// [`COMPACTION_WRITE_BANDWIDTH_WINDOW`]，在 `now` 开一个新窗口；窗口里已写的字节到了上限就不放。所以一个窗口里整理至多写上限加一批的字节。
+    ///
+    /// # Errors
+    /// [`CompactionRunStop::WriteBandwidthLimitReached`]：这一个窗口里已写的字节不少于上限。
+    pub(crate) fn admit_the_next_batch_under_the_write_bandwidth_limit(
+        &mut self,
+        write_bandwidth_limit: CompactionWriteBandwidthLimit,
+        now: CallerMonotonicClockReading,
+    ) -> Result<(), CompactionRunStop> {
+        let limit_in_bytes_per_second = match write_bandwidth_limit {
+            CompactionWriteBandwidthLimit::Unlimited => return Ok(()),
+            CompactionWriteBandwidthLimit::BytesPerSecond(limit) => limit.get(),
+        };
+        let window = match self.write_bandwidth_window {
+            Some(window)
+                if now.0.saturating_sub(window.started_at.0)
+                    < COMPACTION_WRITE_BANDWIDTH_WINDOW =>
+            {
+                window
+            }
+            Some(_) | None => CompactionWriteBandwidthWindow {
+                started_at: now,
+                bytes_written: 0,
+            },
+        };
+        self.write_bandwidth_window = Some(window);
+        if window.bytes_written >= limit_in_bytes_per_second {
+            Err(CompactionRunStop::WriteBandwidthLimitReached {
+                bytes_written_in_the_window: window.bytes_written,
+                limit_in_bytes_per_second,
+            })
+        } else {
+            Ok(())
+        }
+    }
+
+    /// 后台入口发成一次整理发布之后记下它写的字节（限着写带宽时才记；窗口在放这一批时已开好）。
+    pub(crate) fn note_the_bytes_written_by_a_compaction_publish(
+        &mut self,
+        write_bandwidth_limit: CompactionWriteBandwidthLimit,
+        bytes_written: u64,
+    ) {
+        match write_bandwidth_limit {
+            CompactionWriteBandwidthLimit::Unlimited => {}
+            CompactionWriteBandwidthLimit::BytesPerSecond(_) => {
+                let window = self
+                    .write_bandwidth_window
+                    .as_mut()
+                    .expect("限着写带宽时放这一批之前开了窗口（admit_the_next_batch_under_the_write_bandwidth_limit）");
+                window.bytes_written = window.bytes_written.saturating_add(bytes_written);
+            }
         }
     }
 
@@ -802,6 +1073,93 @@ pub fn region_holds_a_quarantined_slot(
         .is_some()
 }
 
+/// 用户改动发成之后起跑判据查出的结果（判决 G8 丁）。整理挪出了用户改动的调用线程（用户 2026-10-26 定「挪出调用线程」；
+/// D24（后台重活能不能卸给 GPU） 已定项 2 第 2 条「不许进前台路径」）：发布路径只查、一批都不发，查出「该跑了」记在会话上，
+/// 由后台入口（`mounted_session::MountedSession::run_compaction_in_the_background`）取走去跑。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompactionStartJudgement {
+    NotDue,
+    /// 一次用户改动发成之后起跑判据为真，后台入口还没来取；几次改动之间没来取的并成这一个。
+    DueAfterAUserChange,
+}
+
+/// 调用方单调钟的一次读数（从调用方自己定的起点算）：核心层不起线程、不读钟，后台入口的定时兜底与写带宽上限只读调用方交进来的读数。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CallerMonotonicClockReading(pub Duration);
+
+/// 定时兜底（D26（后台整理与放置回收） 已定项 13 第 5 条「另有定时兜底，每隔一段时间再查一次，间隔是挂载参数」）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompactionTimerFallback {
+    Off,
+    /// 每隔这么多毫秒查一次起跑判据。
+    EveryMilliseconds(NonZeroU64),
+}
+
+/// 定时兜底间隔的默认：关（第一轮正推 `research/prompts/m4-gpugc-design-r1-sonnet-output.md`「G6.5」推荐（2）「兜底间隔默认 0（关），
+/// 与水位恒 0 同一个读法」）。默认值待 C412（整理的挂钟代价没量过） 与 E10（老化：结构抗老化 vs 事后整理）。
+pub const COMPACTION_TIMER_FALLBACK_BY_DEFAULT: CompactionTimerFallback =
+    CompactionTimerFallback::Off;
+
+/// 定时兜底这一次查不查（[`CompactionOfThisMount::check_the_timer_fallback`]）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimerFallbackCheck {
+    Off,
+    IntervalNotElapsed,
+    Due,
+}
+
+/// 整理占盘写带宽的上限（D26（后台整理与放置回收） 已定项 13 第 6 条，挂载参数）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompactionWriteBandwidthLimit {
+    Unlimited,
+    BytesPerSecond(NonZeroU64),
+}
+
+/// 写带宽上限的默认：不限（第一轮正推「G6.5」推荐（1）「写带宽上限默认不限」）。默认值待 C412（整理的挂钟代价没量过） 与
+/// E10（老化：结构抗老化 vs 事后整理）。
+pub const COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT: CompactionWriteBandwidthLimit =
+    CompactionWriteBandwidthLimit::Unlimited;
+
+/// 写带宽上限按字节每秒给，一个窗口就是一秒（[`CompactionOfThisMount::admit_the_next_batch_under_the_write_bandwidth_limit`]）。
+pub const COMPACTION_WRITE_BANDWIDTH_WINDOW: Duration = Duration::from_secs(1);
+
+/// 写带宽的一个窗口：从哪一刻起、窗口里整理已写了多少字节。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CompactionWriteBandwidthWindow {
+    started_at: CallerMonotonicClockReading,
+    bytes_written: u64,
+}
+
+/// 后台入口的节奏参数（D26（后台整理与放置回收） 已定项 13 第 5、6 条；每次调用由调用方交进来，挂载参数那一层有了之后从那里取）。
+/// 定时兜底那几趟没有自己的发布预算：与用户改动共用同一份 `B_gc`（[`publishes_left_of_the_budget_given_by_the_last_user_change`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CompactionPacing {
+    pub timer_fallback: CompactionTimerFallback,
+    pub write_bandwidth_limit: CompactionWriteBandwidthLimit,
+}
+
+impl CompactionPacing {
+    /// 两样都取默认（[`COMPACTION_TIMER_FALLBACK_BY_DEFAULT`]、[`COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT`]）。
+    pub const BY_DEFAULT: CompactionPacing = CompactionPacing {
+        timer_fallback: COMPACTION_TIMER_FALLBACK_BY_DEFAULT,
+        write_bandwidth_limit: COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT,
+    };
+}
+
+/// 前台此刻有没有 fsync 在等（D26（后台整理与放置回收） 已定项 13 第 6 条「前台有 fsync 在等时不发下一批」）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForegroundFsync {
+    NoneWaiting,
+    Waiting,
+}
+
+/// 后台入口每推一批之前问调用方的两样：此刻的钟、前台有没有 fsync 在等。核心层不起线程，调用方在自己的线程上驱动后台入口，
+/// 钟与前台的 fsync 队列都在调用方手里；测试里由一份假的实现。
+pub trait CallerOfTheBackgroundCompaction {
+    fn clock_reading(&self) -> CallerMonotonicClockReading;
+    fn foreground_fsync(&self) -> ForegroundFsync;
+}
+
 /// 一次整理运行的发布预算（判决 G8 `B_gc`，正推 O11：整理的发布不改用户可见状态，连发会把回退候选集挤成 1 个状态）：
 /// `3S − 4 − 已经过去的发布数`，至少 1。`S` 是每区根槽数。
 #[must_use]
@@ -815,9 +1173,23 @@ pub fn publish_budget_of_a_compaction_run(
         .max(1)
 }
 
-/// 用户改动发成之后起不起跑整理（判决 G8 丁：水位越线再跑至多一批）。第一版三条水位恒 0（关），产品路径恒不起跑；只供测试的开关强制。
+/// 后台入口的一趟还能发几次整理发布（岔路单 `research/prompts/m4-gpugc-design-r1-forks.md` 第 18 行甲，用户 2026-10-26 定「与用户改动共用
+/// `B_gc`」）：一次用户改动给出一份 `B_gc`（[`publish_budget_of_a_compaction_run`] 在已经过去的发布数为 0 时的值，至少 1），之后用户改动那一趟
+/// 与定时兜底那几趟都从这同一份里扣；扣完是 0，等下一次用户改动（会话发成一次用户改动就把已经过去的发布数归零）才再有。
+/// 不像显式入口那样每一趟至少 1：那一条加上定时兜底，闲置时整理发布就没有上限（第二轮攻方模型 200 拍连着 213 次，线是 `3S − 4`）。
 #[must_use]
-pub const fn compaction_starts_after_a_user_change(forcing: CompactionRunForcing) -> bool {
+pub fn publishes_left_of_the_budget_given_by_the_last_user_change(
+    root_ring_slots_per_region: u64,
+    publishes_since_the_last_user_change: u64,
+) -> u64 {
+    publish_budget_of_a_compaction_run(root_ring_slots_per_region, 0)
+        .saturating_sub(publishes_since_the_last_user_change)
+}
+
+/// 起跑判据（判决 G8 丁：水位越线再跑；D26（后台整理与放置回收） 已定项 13 第 5 条：每次用户改动发成之后查一次，定时兜底每隔一段时间再查一次，
+/// 两处查的都是它）。第一版三条水位恒 0（关），产品路径恒不起跑；只供测试的开关强制。
+#[must_use]
+pub const fn compaction_starts_by_the_watermarks(forcing: CompactionRunForcing) -> bool {
     match forcing {
         CompactionRunForcing::FollowTheWatermarks | CompactionRunForcing::ForcedToStopForTests => {
             false
@@ -829,22 +1201,118 @@ pub const fn compaction_starts_after_a_user_change(forcing: CompactionRunForcing
 /// 与 Verus 证过的选段核、计划核逐项对拍（`.claude/kb/milestone/04-fourth-txn.md` 二·4；判决 `research/prompts/m4-gc-r1-main-verification.md`
 /// 第三节 G7 的 P1、P2、P3 证在 `singlefs_replay_prefix::compaction_plan_proofs` 的两个核上）：小输入上每一种形状都喂给这里的
 /// [`choose_region`]、[`plan_batch`] 与核，答案逐项相同。核那一侧的入参由用例按形状直接写出，不经这里的代码算，
-/// 所以两边对上就是这里的实现在这些输入上合核证过的性质。核心层不调核：`crates/mutations.tsv` 里锚在这里现在写法上的变异行要原样留着。
+/// 所以两边对上就是这里的实现在这些输入上合核证过的性质。产品直接调用核；测试保留独立的原算法，核的证明不覆盖输入转换。
 #[cfg(test)]
 mod tests {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "独立参考保留原选段算法的完整输入"
+    )]
+    fn reference_choose_region(
+        allocation_records: &[AllocationRecord],
+        unit_area: UnitAreaOfOneDevice,
+        cluster_segments: &BTreeSet<SlotNumber>,
+        live_intent_region: Option<CompactionRegion>,
+        pinned_slots: &BTreeSet<SlotNumber>,
+        region_scans: &[RegionScan],
+        segments_refused_by_the_region_scan: &SegmentsRefusedByTheRegionScan,
+        criterion: RegionChoiceCriterion,
+    ) -> RegionChoice {
+        // 按段起点索引一次（同一段有几份时取最前那一份）：下面每个候选段查一次，不逐份线性找。
+        let mut scans_by_start_slot: BTreeMap<SlotNumber, &RegionScan> = BTreeMap::new();
+        for scan in region_scans
+            .iter()
+            .filter(|scan| scan.region.device() == unit_area.device)
+        {
+            scans_by_start_slot
+                .entry(scan.region.start_slot())
+                .or_insert(scan);
+        }
+        let scan_of_the_segment =
+            |start_slot: SlotNumber| scans_by_start_slot.get(&start_slot).copied();
+        let unit_area_start = unit_area.start.slot().0;
+        let full_segments = unit_area.slots / CLUSTER_SEGMENT_SLOTS;
+        let segment_slots = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+        let mut live_slots_per_segment =
+            vec![0u64; usize::try_from(full_segments).expect("一块盘的段数装得进 usize")];
+        for record in allocation_records
+            .iter()
+            .filter(|record| record.device == unit_area.device && !record.is_released)
+        {
+            // 迭代上界是这条记录的跨度；只数落在整段里的槽。
+            for slot in record.slot.0..record.slot.0 + u64::from(record.span_slots) {
+                let Some(offset_in_unit_area) = slot.checked_sub(unit_area_start) else {
+                    continue;
+                };
+                let segment = usize::try_from(offset_in_unit_area / CLUSTER_SEGMENT_SLOTS)
+                    .expect("段号装得进 usize");
+                if let Some(live_slots) = live_slots_per_segment.get_mut(segment) {
+                    *live_slots += 1;
+                }
+            }
+        }
+        let eligible_segments = live_slots_per_segment
+            .iter()
+            .enumerate()
+            .map(|(segment, live_slots)| {
+                let start_slot = SlotNumber(
+                    unit_area_start
+                        + u64::try_from(segment * segment_slots).expect("槽号装得进 u64"),
+                );
+                (start_slot, *live_slots)
+            })
+            .filter(|(start_slot, _live_slots)| {
+                let end_slot = SlotNumber(start_slot.0 + CLUSTER_SEGMENT_SLOTS);
+                let opened_in_this_mount = cluster_segments.contains(start_slot);
+                let is_the_live_intent_region =
+                    live_intent_region.is_some_and(|region| region.start_slot() == *start_slot);
+                let holds_a_pinned_slot =
+                    pinned_slots.range(*start_slot..end_slot).next().is_some();
+                let refused_by_the_region_scan =
+                    segments_refused_by_the_region_scan.contains(*start_slot);
+                // 没扫过的段还不知道有没有能搬的单元：留作候选，轮到它时让调用方先扫。
+                let may_hold_a_movable_unit = match scan_of_the_segment(*start_slot) {
+                    Some(scan) => scan.movable_units().next().is_some(),
+                    None => true,
+                };
+                !opened_in_this_mount
+                    && !is_the_live_intent_region
+                    && !holds_a_pinned_slot
+                    && !refused_by_the_region_scan
+                    && may_hold_a_movable_unit
+            });
+        let first_start_slot = match criterion {
+            RegionChoiceCriterion::Greedy => eligible_segments
+                .min_by_key(|(start_slot, live_slots)| (greedy_score(*live_slots), *start_slot))
+                .map(|(start_slot, _live_slots)| start_slot),
+        };
+        let Some(first_start_slot) = first_start_slot else {
+            return RegionChoice::NoEligibleSegment;
+        };
+        let first_region = CompactionRegion::of_one_cluster_segment(unit_area.device, first_start_slot)
+            .expect(
+                "单元区起点在聚簇段边界上（UnitAreaStart 的不变量），整段的起点都是 64 的倍数；槽号来自一块盘的单元区，装得进 6 字节",
+            );
+        match scan_of_the_segment(first_start_slot) {
+            Some(_scan_with_a_movable_unit) => RegionChoice::Chosen(first_region),
+            None => RegionChoice::ScanBeforeChoosing(first_region),
+        }
+    }
+
     use std::collections::{BTreeMap, BTreeSet};
 
     use singlefs_format::CLUSTER_SEGMENT_SLOTS;
     use singlefs_replay_prefix::compaction_plan_proofs::{
-        choose_compaction_segment, plan_compaction_batch, CompactionKernelAllocationClass,
-        CompactionKernelPlannedBatch, CompactionKernelRegionChoice,
-        CompactionKernelScannedAllocation, CompactionKernelSegment, CompactionKernelSegmentScan,
+        choose_compaction_segment, CompactionKernelRegionChoice, CompactionKernelSegment,
+        CompactionKernelSegmentScan,
     };
 
     use super::{
-        choose_region, plan_batch, plan_batch_skipping_the_units_this_publish_rewrites_anyway,
-        CompactionBatchUnits, PlannedBatch, PlannedRelocation, RegionChoice, RegionChoiceCriterion,
-        SegmentsRefusedByTheRegionScan, UnitAreaOfOneDevice,
+        choose_region, choose_region_over_the_live_slots, compaction_kernel_allocations,
+        greedy_score, live_slots_per_cluster_segment_by_the_records, plan_batch,
+        plan_batch_skipping_the_units_this_publish_rewrites_anyway, CompactionBatchUnits,
+        LiveSlotsOfAClusterSegment, PlannedBatch, PlannedRelocation, RegionChoice,
+        RegionChoiceCriterion, SegmentsRefusedByTheRegionScan, UnitAreaOfOneDevice,
     };
     use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
     use crate::allocator::{AllocationRecord, Placement, UnitAreaStart};
@@ -974,6 +1442,7 @@ mod tests {
             span_slots,
             generation: CheckpointTxg(1),
             is_released,
+            quarantine_mark: crate::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         }
     }
 
@@ -1061,7 +1530,7 @@ mod tests {
                 });
             }
         }
-        choose_region(
+        let reference = reference_choose_region(
             &allocation_records,
             UnitAreaOfOneDevice {
                 device: DEVICE_OF_THE_UNIT_AREA,
@@ -1074,7 +1543,23 @@ mod tests {
             &region_scans,
             &segments_refused,
             RegionChoiceCriterion::Greedy,
-        )
+        );
+        let actual = choose_region(
+            &allocation_records,
+            UnitAreaOfOneDevice {
+                device: DEVICE_OF_THE_UNIT_AREA,
+                start: UnitAreaStart::of_the_default_journal_ring(),
+                slots: u64::try_from(shapes.len()).expect("至多三段") * CLUSTER_SEGMENT_SLOTS,
+            },
+            &cluster_segments,
+            live_intent_segment.map(region_of_the_segment),
+            &pinned_slots,
+            &region_scans,
+            &segments_refused,
+            RegionChoiceCriterion::Greedy,
+        );
+        assert_eq!(actual, reference, "产品输入转换必须与独立参考一致");
+        actual
     }
 
     /// 同一种形状直接写成核的入参，核交回的下标换回段。
@@ -1191,53 +1676,30 @@ mod tests {
         }
     }
 
-    /// 同一份扫描结果写成核的入参（映射 key 换成身份：同一把 key 同一个数），核交回的下标换回（映射 key, 源落点）。
-    fn plan_of_the_verified_kernel(region_scan: &RegionScan, batch_units: usize) -> PlannedBatch {
-        let mut identities_of_the_keys: BTreeMap<Vec<u8>, u64> = BTreeMap::new();
-        let allocations: Vec<CompactionKernelScannedAllocation> = region_scan
-            .allocations
-            .iter()
-            .map(|allocation| CompactionKernelScannedAllocation {
-                source_slot: allocation.placement.slot.0,
-                class: match &allocation.class {
-                    AllocationInRegion::Movable(unit) => {
-                        let next_identity =
-                            u64::try_from(identities_of_the_keys.len()).expect("至多四项");
-                        CompactionKernelAllocationClass::Movable {
-                            mapping_key_identity: *identities_of_the_keys
-                                .entry(unit.mapping_key.clone())
-                                .or_insert(next_identity),
-                        }
-                    }
-                    AllocationInRegion::Pinned => CompactionKernelAllocationClass::Pinned,
-                    AllocationInRegion::Quarantined => CompactionKernelAllocationClass::Quarantined,
-                    AllocationInRegion::Dead => CompactionKernelAllocationClass::Dead,
-                    AllocationInRegion::Inconsistent(_) => {
-                        CompactionKernelAllocationClass::Inconsistent
-                    }
-                },
+    /// 独立参考保留直接 filter/take 的算法，避免产品调用核后与自己对拍。
+    fn plan_of_the_independent_reference(
+        region_scan: &RegionScan,
+        batch_units: usize,
+    ) -> PlannedBatch {
+        assert!(
+            region_scan.movable_mapping_keys_are_pairwise_distinct(),
+            "扫描结果里能搬的映射 key 两两不同：scan_region 见到同一把 key 判成可搬两次就拒这个 R，计划只收它交回的 Ok"
+        );
+        let relocations: Vec<PlannedRelocation> = region_scan
+            .movable_units()
+            .take(batch_units)
+            .map(|(source, unit)| PlannedRelocation {
+                mapping_key: unit.mapping_key.clone(),
+                source,
             })
             .collect();
-        match plan_compaction_batch(&allocations, batch_units) {
-            CompactionKernelPlannedBatch::Relocate(positions) => PlannedBatch::Relocate(
-                positions
-                    .into_iter()
-                    .map(|position| {
-                        let allocation = &region_scan.allocations[position];
-                        let AllocationInRegion::Movable(unit) = &allocation.class else {
-                            panic!("核证过：计划里每一项都是能搬的（P2），这里是第 {position} 项 {allocation:?}");
-                        };
-                        PlannedRelocation {
-                            mapping_key: unit.mapping_key.clone(),
-                            source: allocation.placement,
-                        }
-                    })
-                    .collect(),
-            ),
-            CompactionKernelPlannedBatch::RegionEmptied => PlannedBatch::RegionEmptied,
-            CompactionKernelPlannedBatch::NothingMovableButTheRegionIsNotEmpty => {
-                PlannedBatch::NothingMovableButTheRegionIsNotEmpty
-            }
+        if !relocations.is_empty() {
+            return PlannedBatch::Relocate(relocations);
+        }
+        if region_scan.allocations.is_empty() {
+            PlannedBatch::RegionEmptied
+        } else {
+            PlannedBatch::NothingMovableButTheRegionIsNotEmpty
         }
     }
 
@@ -1263,9 +1725,9 @@ mod tests {
                         &region_scan,
                         CompactionBatchUnits::new(batch_units).expect("K 从 1 起"),
                     );
-                    let verified_kernel = plan_of_the_verified_kernel(&region_scan, batch_units);
+                    let reference = plan_of_the_independent_reference(&region_scan, batch_units);
                     assert_eq!(
-                        this_implementation, verified_kernel,
+                        this_implementation, reference,
                         "扫描结果的形状 {shapes:?}、K = {batch_units}：这里的计划与证过的核不同"
                     );
                     let kind = match this_implementation {
@@ -1411,6 +1873,573 @@ mod tests {
             ),
             PlannedBatch::NothingMovableButTheRegionIsNotEmpty,
             "能搬的都跳过、还剩一条钉住的记录"
+        );
+    }
+
+    /// 专门核对适配层：重复扫描的第一份、异盘过滤、半开 pin 区间和不足整段的尾部。
+    #[test]
+    fn verified_choice_adapter_preserves_scan_precedence_and_segment_boundaries() {
+        let start = unit_area_start_slot();
+        let area = UnitAreaOfOneDevice {
+            device: DEVICE_OF_THE_UNIT_AREA,
+            start: UnitAreaStart::of_the_default_journal_ring(),
+            slots: 2 * CLUSTER_SEGMENT_SLOTS + CLUSTER_SEGMENT_SLOTS - 1,
+        };
+        let records = vec![
+            record(DEVICE_OF_THE_UNIT_AREA, start, 2, false),
+            record(DEVICE_OF_THE_UNIT_AREA, segment_start_slot(1), 1, false),
+            record(ANOTHER_DEVICE, segment_start_slot(1), 20, false),
+            record(DEVICE_OF_THE_UNIT_AREA, segment_start_slot(1) + 2, 20, true),
+            record(DEVICE_OF_THE_UNIT_AREA, start - 2, 1, false),
+            record(DEVICE_OF_THE_UNIT_AREA, segment_start_slot(2), 1, false),
+        ];
+        let scan = |region: CompactionRegion, class| RegionScan {
+            region,
+            allocations: vec![ScannedAllocation {
+                placement: Placement {
+                    slot: region.start_slot(),
+                    span: 1,
+                },
+                class,
+            }],
+        };
+        let other_region =
+            CompactionRegion::of_one_cluster_segment(ANOTHER_DEVICE, SlotNumber(start))
+                .expect("对齐起点");
+        let scans = vec![
+            scan(other_region, AllocationInRegion::Dead),
+            scan(
+                region_of_the_segment(0),
+                AllocationInRegion::Movable(movable_unit(vec![9])),
+            ),
+            scan(region_of_the_segment(0), AllocationInRegion::Dead),
+            scan(region_of_the_segment(1), AllocationInRegion::Dead),
+            scan(
+                region_of_the_segment(1),
+                AllocationInRegion::Movable(movable_unit(vec![8])),
+            ),
+        ];
+        let opened = BTreeSet::new();
+        let refused = SegmentsRefusedByTheRegionScan::default();
+        let check = |scans: &[RegionScan], pins: &BTreeSet<SlotNumber>, expected| {
+            let actual = choose_region(
+                &records,
+                area,
+                &opened,
+                None,
+                pins,
+                scans,
+                &refused,
+                RegionChoiceCriterion::Greedy,
+            );
+            assert_eq!(actual, expected);
+            assert_eq!(
+                actual,
+                reference_choose_region(
+                    &records,
+                    area,
+                    &opened,
+                    None,
+                    pins,
+                    scans,
+                    &refused,
+                    RegionChoiceCriterion::Greedy
+                )
+            );
+        };
+        check(
+            &scans,
+            &BTreeSet::new(),
+            RegionChoice::Chosen(region_of_the_segment(0)),
+        );
+        // 第一段末端属于第二段，不能误把第一段钉住。
+        check(
+            &scans,
+            &BTreeSet::from([SlotNumber(segment_start_slot(1))]),
+            RegionChoice::Chosen(region_of_the_segment(0)),
+        );
+        check(
+            &scans,
+            &BTreeSet::from([SlotNumber(start)]),
+            RegionChoice::NoEligibleSegment,
+        );
+        // 交换同段两份扫描，结果必须随“第一份”改变；异盘扫描仍不得抢先。
+        let mut reversed = scans.clone();
+        reversed.swap(1, 2);
+        reversed.swap(3, 4);
+        check(
+            &reversed,
+            &BTreeSet::new(),
+            RegionChoice::Chosen(region_of_the_segment(1)),
+        );
+        check(
+            &[],
+            &BTreeSet::new(),
+            RegionChoice::ScanBeforeChoosing(region_of_the_segment(1)),
+        );
+        for slots in [0, CLUSTER_SEGMENT_SLOTS - 1] {
+            assert_eq!(
+                choose_region(
+                    &records,
+                    UnitAreaOfOneDevice { slots, ..area },
+                    &opened,
+                    None,
+                    &BTreeSet::new(),
+                    &scans,
+                    &refused,
+                    RegionChoiceCriterion::Greedy
+                ),
+                RegionChoice::NoEligibleSegment
+            );
+        }
+    }
+
+    /// 字节 key 的大小次序不能重排计划；空 key、共同前缀与内嵌零均按完整字节比较。
+    #[test]
+    fn verified_plan_adapter_preserves_byte_keys_input_order_and_full_placements() {
+        let keys = [vec![255, 0], vec![], vec![1, 0], vec![1]];
+        let mut scan = region_scan_of(&[
+            AllocationShape::Movable,
+            AllocationShape::Pinned,
+            AllocationShape::Movable,
+            AllocationShape::Movable,
+            AllocationShape::Movable,
+        ]);
+        for (ordinal, position) in [0, 2, 3, 4].into_iter().enumerate() {
+            scan.allocations[position].class =
+                AllocationInRegion::Movable(movable_unit(keys[ordinal].clone()));
+            scan.allocations[position].placement = Placement {
+                slot: SlotNumber(
+                    unit_area_start_slot() + 12 - 2 * u64::try_from(ordinal).expect("四项"),
+                ),
+                span: if ordinal % 2 == 0 { 2 } else { 1 },
+            };
+        }
+        for limit in [1, 2, 4, usize::MAX] {
+            let actual = plan_batch(&scan, CompactionBatchUnits::new(limit).expect("正批大小"));
+            let expected = PlannedBatch::Relocate(
+                [0, 2, 3, 4]
+                    .into_iter()
+                    .take(limit)
+                    .map(|position| planned_relocation_at(&scan, position))
+                    .collect(),
+            );
+            assert_eq!(actual, expected);
+            assert_eq!(actual, plan_of_the_independent_reference(&scan, limit));
+        }
+    }
+
+    /// 即使重复 key 在本批范围以外，也必须保持原来的全输入拒绝，不能把前提检查改成只验 K 项。
+    #[test]
+    #[should_panic(expected = "扫描结果里能搬的映射 key 两两不同")]
+    fn verified_plan_adapter_rejects_a_duplicate_key_beyond_the_batch() {
+        let mut scan = region_scan_of(&[
+            AllocationShape::Movable,
+            AllocationShape::Pinned,
+            AllocationShape::Movable,
+        ]);
+        scan.allocations[2].class = scan.allocations[0].class.clone();
+        let _plan = plan_batch(&scan, CompactionBatchUnits::new(1).expect("一项"));
+    }
+
+    /// 独立检查证明输入本身：ID 不参与运行时选取，不能只靠最终计划输出检查它。
+    #[test]
+    fn verified_plan_conversion_preserves_key_equality_in_the_proof_input() {
+        let keys = [vec![], vec![1], vec![1, 0], vec![], vec![255], vec![1]];
+        let scan = RegionScan {
+            region: region_of_the_segment(0),
+            allocations: keys
+                .iter()
+                .enumerate()
+                .map(|(position, key)| ScannedAllocation {
+                    placement: Placement {
+                        slot: SlotNumber(
+                            unit_area_start_slot() + u64::try_from(position).expect("六项"),
+                        ),
+                        span: 1,
+                    },
+                    class: AllocationInRegion::Movable(movable_unit(key.clone())),
+                })
+                .collect(),
+        };
+        let converted = compaction_kernel_allocations(&scan);
+        assert_eq!(converted.len(), scan.allocations.len());
+        for (i, allocation) in converted.iter().enumerate() {
+            assert_eq!(allocation.source_slot, scan.allocations[i].placement.slot.0);
+            let singlefs_replay_prefix::compaction_plan_proofs::CompactionKernelAllocationClass::Movable {
+                mapping_key_identity: identity,
+            } = allocation.class else { panic!("所有输入均为可搬项"); };
+            for (j, other) in converted.iter().enumerate() {
+                let singlefs_replay_prefix::compaction_plan_proofs::CompactionKernelAllocationClass::Movable {
+                    mapping_key_identity: other_identity,
+                } = other.class else { panic!("所有输入均为可搬项"); };
+                assert_eq!(
+                    identity == other_identity,
+                    keys[i] == keys[j],
+                    "输入 {i}、{j} 的字节相等关系必须保留"
+                );
+            }
+        }
+    }
+
+    /// 拆开之前的 `choose_region`，逐字留在这里当参照（D26（后台整理与放置回收） 已定项 13 第 1 条「选段打分」放上 GPU 时把它拆成
+    /// [`super::live_slots_per_cluster_segment_by_the_records`] 与 [`super::choose_region_over_the_live_slots`] 两步）：每段的活槽数内联着数。
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "与被测的 choose_region 同八个输入，逐字照抄拆开之前的写法"
+    )]
+    fn choose_region_with_the_live_slots_counted_inline_as_before_the_split(
+        allocation_records: &[AllocationRecord],
+        unit_area: UnitAreaOfOneDevice,
+        segments_opened_in_this_mount: &BTreeSet<SlotNumber>,
+        region_of_the_live_intent: Option<CompactionRegion>,
+        slots_pinned_by_the_roots: &BTreeSet<SlotNumber>,
+        region_scans: &[RegionScan],
+        segments_the_region_scan_refused: &SegmentsRefusedByTheRegionScan,
+        criterion: RegionChoiceCriterion,
+    ) -> RegionChoice {
+        let mut scans_by_start_slot: BTreeMap<SlotNumber, &RegionScan> = BTreeMap::new();
+        for scan in region_scans
+            .iter()
+            .filter(|scan| scan.region.device() == unit_area.device)
+        {
+            scans_by_start_slot
+                .entry(scan.region.start_slot())
+                .or_insert(scan);
+        }
+        let scan_of_the_segment =
+            |start_slot: SlotNumber| scans_by_start_slot.get(&start_slot).copied();
+        let unit_area_start = unit_area.start.slot().0;
+        let full_segments = unit_area.slots / CLUSTER_SEGMENT_SLOTS;
+        let segment_slots = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+        let mut live_slots_per_segment =
+            vec![0u64; usize::try_from(full_segments).expect("一块盘的段数装得进 usize")];
+        for record in allocation_records
+            .iter()
+            .filter(|record| record.device == unit_area.device && !record.is_released)
+        {
+            for slot in record.slot.0..record.slot.0 + u64::from(record.span_slots) {
+                let Some(offset_in_unit_area) = slot.checked_sub(unit_area_start) else {
+                    continue;
+                };
+                let segment = usize::try_from(offset_in_unit_area / CLUSTER_SEGMENT_SLOTS)
+                    .expect("段号装得进 usize");
+                if let Some(live_slots) = live_slots_per_segment.get_mut(segment) {
+                    *live_slots += 1;
+                }
+            }
+        }
+        let segments: Vec<CompactionKernelSegment> = live_slots_per_segment
+            .iter()
+            .enumerate()
+            .map(|(segment, live_slots)| {
+                let start_slot = SlotNumber(
+                    unit_area_start
+                        + u64::try_from(segment * segment_slots).expect("槽号装得进 u64"),
+                );
+                let end_slot = SlotNumber(start_slot.0 + CLUSTER_SEGMENT_SLOTS);
+                CompactionKernelSegment {
+                    live_slots: match criterion {
+                        RegionChoiceCriterion::Greedy => greedy_score(*live_slots),
+                    },
+                    is_opened_in_this_mount: segments_opened_in_this_mount.contains(&start_slot),
+                    is_the_live_intent_region: region_of_the_live_intent
+                        .is_some_and(|region| region.start_slot() == start_slot),
+                    holds_a_pinned_slot: slots_pinned_by_the_roots
+                        .range(start_slot..end_slot)
+                        .next()
+                        .is_some(),
+                    is_refused_by_the_region_scan: segments_the_region_scan_refused
+                        .contains(start_slot),
+                    scan: match scan_of_the_segment(start_slot) {
+                        None => CompactionKernelSegmentScan::NotScanned,
+                        Some(scan_of_this_segment)
+                            if scan_of_this_segment.movable_units().next().is_some() =>
+                        {
+                            CompactionKernelSegmentScan::ScannedWithAMovableUnit
+                        }
+                        Some(_) => CompactionKernelSegmentScan::ScannedWithoutAMovableUnit,
+                    },
+                }
+            })
+            .collect();
+        let region_at = |position: usize| {
+            CompactionRegion::of_one_cluster_segment(
+                unit_area.device,
+                SlotNumber(
+                    unit_area_start
+                        + u64::try_from(position * segment_slots).expect("槽号装得进 u64"),
+                ),
+            )
+            .expect("单元区的整段起点在聚簇段边界上且装得进六字节")
+        };
+        match choose_compaction_segment(&segments) {
+            CompactionKernelRegionChoice::Chosen(position) => {
+                RegionChoice::Chosen(region_at(position))
+            }
+            CompactionKernelRegionChoice::ScanBeforeChoosing(position) => {
+                RegionChoice::ScanBeforeChoosing(region_at(position))
+            }
+            CompactionKernelRegionChoice::NoEligibleSegment => RegionChoice::NoEligibleSegment,
+        }
+    }
+
+    /// 确定的伪随机源（xorshift64*，种子写死）：同一个种子每次造出同一串输入，红了能原样重放。
+    struct DeterministicRandomSource {
+        state: u64,
+    }
+
+    impl DeterministicRandomSource {
+        fn below(&mut self, bound: u64) -> u64 {
+            self.state ^= self.state >> 12;
+            self.state ^= self.state << 25;
+            self.state ^= self.state >> 27;
+            self.state.wrapping_mul(0x2545_F491_4F6C_DD1D) % bound
+        }
+
+        fn one_in(&mut self, odds: u64) -> bool {
+            self.below(odds) == 0
+        }
+    }
+
+    /// 随机造的一份选段输入：单元区（整段数加凑不满 64 槽的尾巴）、两块盘上的记录（有落在单元区之前与之后的、跨度 1 到 3、四分之一已释放）、
+    /// 开过的段、活 R、钉住的槽、扫过的段（有能搬的、没有能搬的、另一块盘上的）、被扫描拒过的段。
+    struct RandomChoiceInput {
+        unit_area: UnitAreaOfOneDevice,
+        allocation_records: Vec<AllocationRecord>,
+        cluster_segments: BTreeSet<SlotNumber>,
+        live_intent_region: Option<CompactionRegion>,
+        pinned_slots: BTreeSet<SlotNumber>,
+        region_scans: Vec<RegionScan>,
+        segments_refused: SegmentsRefusedByTheRegionScan,
+    }
+
+    const FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA: u64 = 6;
+    const RANDOM_CHOICE_INPUTS: u64 = 3000;
+    const RANDOM_CHOICE_SEED: u64 = 0x5EED_0D26_0013_0001;
+
+    fn random_choice_input(random: &mut DeterministicRandomSource) -> RandomChoiceInput {
+        let start = unit_area_start_slot();
+        let unit_area = UnitAreaOfOneDevice {
+            device: DEVICE_OF_THE_UNIT_AREA,
+            start: UnitAreaStart::of_the_default_journal_ring(),
+            slots: FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA * CLUSTER_SEGMENT_SLOTS
+                + random.below(CLUSTER_SEGMENT_SLOTS),
+        };
+        let segment_start = |segment: u64| SlotNumber(start + segment * CLUSTER_SEGMENT_SLOTS);
+        let region_of = |segment: u64, device: DeviceIdentity| {
+            CompactionRegion::of_one_cluster_segment(device, segment_start(segment))
+                .expect("单元区起点在聚簇段边界上")
+        };
+        let records_count = random.below(48);
+        let allocation_records = (0..records_count)
+            .map(|_record| {
+                let device = if random.one_in(3) {
+                    ANOTHER_DEVICE
+                } else {
+                    DEVICE_OF_THE_UNIT_AREA
+                };
+                // 从单元区起点之前 8 槽到整段之后一段多：有落在单元区之前、尾巴里与单元区之外的。
+                let slot = start - 8
+                    + random.below(
+                        (FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA + 1) * CLUSTER_SEGMENT_SLOTS + 16,
+                    );
+                let span_slots = u16::try_from(1 + random.below(3)).expect("1 到 3");
+                record(device, slot, span_slots, random.one_in(4))
+            })
+            .collect();
+        let segments_of_the_area = FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA + 1;
+        let cluster_segments = (0..segments_of_the_area)
+            .filter(|_segment| random.one_in(5))
+            .map(segment_start)
+            .collect();
+        let live_intent_region = if random.one_in(3) {
+            Some(region_of(
+                random.below(FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA),
+                DEVICE_OF_THE_UNIT_AREA,
+            ))
+        } else {
+            None
+        };
+        let pinned_slots = (0..random.below(3))
+            .map(|_pinned| {
+                SlotNumber(start + random.below(segments_of_the_area * CLUSTER_SEGMENT_SLOTS))
+            })
+            .collect();
+        let mut region_scans = Vec::new();
+        let mut segments_refused = SegmentsRefusedByTheRegionScan::default();
+        for segment in 0..FULL_SEGMENTS_OF_THE_RANDOM_UNIT_AREA {
+            match random.below(6) {
+                0 => region_scans.push(RegionScan {
+                    region: region_of(segment, DEVICE_OF_THE_UNIT_AREA),
+                    allocations: vec![ScannedAllocation {
+                        placement: Placement {
+                            slot: segment_start(segment),
+                            span: 1,
+                        },
+                        class: AllocationInRegion::Movable(movable_unit(vec![u8::try_from(
+                            segment,
+                        )
+                        .expect("至多六段")])),
+                    }],
+                }),
+                1 => region_scans.push(RegionScan {
+                    region: region_of(segment, DEVICE_OF_THE_UNIT_AREA),
+                    allocations: Vec::new(),
+                }),
+                2 => region_scans.push(RegionScan {
+                    region: region_of(segment, ANOTHER_DEVICE),
+                    allocations: Vec::new(),
+                }),
+                3 => segments_refused.note_refusal(
+                    region_of(segment, DEVICE_OF_THE_UNIT_AREA),
+                    RegionScanRefusal::RecordStraddlesTheRegionBoundaryUnsupported {
+                        device: DEVICE_OF_THE_UNIT_AREA,
+                        slot: segment_start(segment),
+                        span_slots: 2,
+                    },
+                ),
+                _ => {}
+            }
+        }
+        RandomChoiceInput {
+            unit_area,
+            allocation_records,
+            cluster_segments,
+            live_intent_region,
+            pinned_slots,
+            region_scans,
+            segments_refused,
+        }
+    }
+
+    #[test]
+    fn choosing_over_the_live_slots_counted_per_segment_picks_the_segment_the_inline_scoring_picked(
+    ) {
+        let mut random = DeterministicRandomSource {
+            state: RANDOM_CHOICE_SEED,
+        };
+        let mut answers_seen: BTreeSet<String> = BTreeSet::new();
+        for input_number in 0..RANDOM_CHOICE_INPUTS {
+            let input = random_choice_input(&mut random);
+            let before_the_split =
+                choose_region_with_the_live_slots_counted_inline_as_before_the_split(
+                    &input.allocation_records,
+                    input.unit_area,
+                    &input.cluster_segments,
+                    input.live_intent_region,
+                    &input.pinned_slots,
+                    &input.region_scans,
+                    &input.segments_refused,
+                    RegionChoiceCriterion::Greedy,
+                );
+            let live_slots_per_segment: Vec<LiveSlotsOfAClusterSegment> =
+                live_slots_per_cluster_segment_by_the_records(
+                    &input.allocation_records,
+                    input.unit_area,
+                )
+                .into_iter()
+                .map(LiveSlotsOfAClusterSegment::Counted)
+                .collect();
+            let over_the_live_slots = choose_region_over_the_live_slots(
+                &live_slots_per_segment,
+                input.unit_area,
+                &input.cluster_segments,
+                input.live_intent_region,
+                &input.pinned_slots,
+                &input.region_scans,
+                &input.segments_refused,
+                RegionChoiceCriterion::Greedy,
+            );
+            let through_choose_region = choose_region(
+                &input.allocation_records,
+                input.unit_area,
+                &input.cluster_segments,
+                input.live_intent_region,
+                &input.pinned_slots,
+                &input.region_scans,
+                &input.segments_refused,
+                RegionChoiceCriterion::Greedy,
+            );
+            assert_eq!(
+                over_the_live_slots, before_the_split,
+                "第 {input_number} 份输入：先数每段活槽数、再吃它选段，与拆开之前内联着数的选出的相同"
+            );
+            assert_eq!(
+                through_choose_region, before_the_split,
+                "第 {input_number} 份输入：拆开之后的 choose_region 与拆开之前的选出的相同"
+            );
+            answers_seen.insert(format!("{before_the_split:?}").chars().take(12).collect());
+        }
+        assert_eq!(
+            answers_seen.len(),
+            3,
+            "随机输入走到了选中、先扫、一段都没资格三种答案：{answers_seen:?}"
+        );
+    }
+
+    /// GPU 路径上一段的活槽数这一轮不确定（D26（后台整理与放置回收） 已定项 13 第 8 条）：它这一批不进候选，选的是其余各段里活槽最少的；
+    /// 同样的输入把它记成数出来的，它活槽最少、选的就是它。
+    #[test]
+    fn a_segment_whose_live_slots_are_uncertain_this_round_is_left_out_of_the_candidates() {
+        let unit_area = UnitAreaOfOneDevice {
+            device: DEVICE_OF_THE_UNIT_AREA,
+            start: UnitAreaStart::of_the_default_journal_ring(),
+            slots: 3 * CLUSTER_SEGMENT_SLOTS,
+        };
+        let region_scans: Vec<RegionScan> = (0..3)
+            .map(|segment_index| RegionScan {
+                region: region_of_the_segment(segment_index),
+                allocations: vec![ScannedAllocation {
+                    placement: Placement {
+                        slot: SlotNumber(segment_start_slot(segment_index)),
+                        span: 1,
+                    },
+                    class: AllocationInRegion::Movable(movable_unit(vec![u8::try_from(
+                        segment_index,
+                    )
+                    .expect("三段")])),
+                }],
+            })
+            .collect();
+        let choose_over = |live_slots_per_segment: &[LiveSlotsOfAClusterSegment]| {
+            choose_region_over_the_live_slots(
+                live_slots_per_segment,
+                unit_area,
+                &BTreeSet::new(),
+                None,
+                &BTreeSet::new(),
+                &region_scans,
+                &SegmentsRefusedByTheRegionScan::default(),
+                RegionChoiceCriterion::Greedy,
+            )
+        };
+        assert_eq!(
+            choose_over(&[
+                LiveSlotsOfAClusterSegment::Counted(9),
+                LiveSlotsOfAClusterSegment::Counted(1),
+                LiveSlotsOfAClusterSegment::Counted(5),
+            ]),
+            RegionChoice::Chosen(region_of_the_segment(1)),
+            "三段都数出来了：活槽最少的中间那一段"
+        );
+        assert_eq!(
+            choose_over(&[
+                LiveSlotsOfAClusterSegment::Counted(9),
+                LiveSlotsOfAClusterSegment::UncertainThisRound,
+                LiveSlotsOfAClusterSegment::Counted(5),
+            ]),
+            RegionChoice::Chosen(region_of_the_segment(2)),
+            "中间那一段这一轮不确定：不进候选，选其余两段里活槽最少的末一段"
+        );
+        assert_eq!(
+            choose_over(&[
+                LiveSlotsOfAClusterSegment::UncertainThisRound,
+                LiveSlotsOfAClusterSegment::UncertainThisRound,
+                LiveSlotsOfAClusterSegment::UncertainThisRound,
+            ]),
+            RegionChoice::NoEligibleSegment,
+            "三段都不确定：这一批一段都不选"
         );
     }
 }

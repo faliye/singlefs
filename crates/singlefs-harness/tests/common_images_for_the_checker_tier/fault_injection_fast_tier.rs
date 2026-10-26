@@ -4,9 +4,10 @@
 #![allow(dead_code, reason = "两档各只调其中一部分")]
 
 use crate::common_images_for_the_checker_tier::{PoolCheckerExpectation, PoolCheckerImages};
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity};
-use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, SlotNumber};
+use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
 use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
+use singlefs_core::mount::{raise_rollback_floor, ShadowLedger};
 use singlefs_core::recovery::{
     choose_system_configuration, readable_roots, recover, JournalPolicy, RecoveryOutcome,
 };
@@ -16,10 +17,13 @@ use singlefs_core::transaction::{
 };
 use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
 use singlefs_harness::fault_injection::{
-    inject_one_fault_into_the_segment_handing_out_the_images, FailureAfterAFault, FaultCounting,
-    FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement, FaultSchedule,
-    FaultedSegment, HistoryFaultInjection, ImagesAfterAFault, InjectedFault,
-    RecordedStreamOfAnImage, SharedFaultPlan,
+    inject_faults_into_history_handing_out_the_images,
+    inject_one_fault_into_the_segment_handing_out_the_images,
+    stream_with_the_swallowed_writes_landed, DrawnFault, FactsAfterTheFault, FailureAfterAFault,
+    FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
+    FaultSchedule, FaultedSegment, HistoryFaultInjection, ImagesAfterAFault, InjectedFault,
+    RecordedStreamOfAnImage, ReopenedVersion, SharedFaultPlan, StepImageInTheRecordedStream,
+    SwallowedWriteByteRange, WhatTheSwallowedWritesExplain,
 };
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
@@ -27,11 +31,15 @@ use singlefs_harness::history::{
     GeneratedHistory, GenerationWeights, HistoryEnding, HistoryExecution, HistoryOperation,
     HistoryOperationKind, HistorySeed, HistoryStartingPoint, StepPosition,
 };
-use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::history::{
+    newest_ring_root_and_slot_count, CopyQuarantinedByTheImplementation, FailureObservation,
+    HistoryDeviceWidth,
+};
+use singlefs_harness::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use singlefs_harness::segments::{FixedGeometry, StepKind};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// 写死的那几条用例里两块内存盘各多大（与各步用例、随机历史的 4 GiB 档相同）。
 pub const IMAGE_BYTES: u64 = 4 << 30;
@@ -393,4 +401,385 @@ pub fn readable_root_txgs(image: &MemoryPool) -> Vec<u64> {
     .collect();
     txgs.sort_unstable();
     txgs
+}
+
+/// 一个注入点交出去的一张录制流（每步镜像那一刻的前缀不在这里取：整条叠上空盘）重建成镜像：按步对照盘、被吞的写都插回去那张都用它。
+pub fn pool_image_of_a_recorded_stream(
+    images: &ImagesAfterAFault,
+    stream: &RecordedStreamOfAnImage,
+) -> MemoryPool {
+    let mut image = MemoryPool::with_devices(
+        &[DeviceIdentity(0), DeviceIdentity(1)],
+        images.device_width.device_bytes(),
+    );
+    image.apply(&stream.operations);
+    image
+}
+
+/// 放大档那一点 K2-1（判决 `research/prompts/m4-i315-r3-main-verification.md` 第二节 K2 那几行）：种子基 + 1282（7463871032432356395），
+/// 快档的比重、每段 60 步、每段 4 个注入点（第一轮攻方的放大档口径）。
+pub const SEED_WHOSE_FIRST_INJECTION_POINT_SWALLOWS_A_WRITE_ON_A_REUSED_SLOT: u64 =
+    SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 1282;
+
+/// 那一段每段几步。
+pub const OPERATIONS_OF_THE_HISTORY_SWALLOWING_A_WRITE_ON_A_REUSED_SLOT: usize = 60;
+
+/// 那一段每段几个注入点（K2-1 是头一个）。
+pub const FAULTS_OF_THE_HISTORY_SWALLOWING_A_WRITE_ON_A_REUSED_SLOT: usize = 4;
+
+/// [`SEED_WHOSE_FIRST_INJECTION_POINT_SWALLOWS_A_WRITE_ON_A_REUSED_SLOT`] 那一段照放大档摆四个注入点，交回头一个注入点交出去的盘
+/// （被吞的写落在复用过的槽上：槽里留着上一个住户，写者释放之前读盘核出对不上、隔离两块盘那一份）。池级 checker 那一遍与归类在
+/// checker 档同名用例：照必绿世界归说谎的设备，不报新发现。
+pub fn the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot(
+) -> ImagesAfterAFault {
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_WHOSE_FIRST_INJECTION_POINT_SWALLOWS_A_WRITE_ON_A_REUSED_SLOT),
+        OPERATIONS_OF_THE_HISTORY_SWALLOWING_A_WRITE_ON_A_REUSED_SLOT,
+        &GenerationWeights::BROAD,
+    );
+    let mut first_injection_point: Option<ImagesAfterAFault> = None;
+    let _injection = inject_faults_into_history_handing_out_the_images(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        FAULTS_OF_THE_HISTORY_SWALLOWING_A_WRITE_ON_A_REUSED_SLOT,
+        &mut |images| {
+            if first_injection_point.is_none() {
+                first_injection_point = Some(images);
+            }
+        },
+    );
+    first_injection_point.expect("这一段摆出了注入点：头一个注入点交出去了一份盘")
+}
+
+/// 一块盘上某个槽起的那一份单元翻一个字节（第 4096 字节起那个扇区的第一个字节：数据单元与索引节点都罩得住这一处），再翻一次就改回原样。
+/// 写经注入层与录制器落盘，与别的写一样进录制流。
+fn flip_a_byte_of_the_copy<Device: BlockDevice>(
+    devices: &mut [(DeviceIdentity, Device)],
+    device: DeviceIdentity,
+    slot: SlotNumber,
+) {
+    let (_, block_device) = devices
+        .iter_mut()
+        .find(|(identity, _)| *identity == device)
+        .expect("池里有这块盘");
+    let sector_offset = DeviceOffsetInBytes(slot.to_device_offset().0 + 4096);
+    let mut sector = vec![0u8; 512];
+    block_device
+        .read_at(sector_offset, &mut sector)
+        .expect("读那一个扇区");
+    sector[0] ^= 0xff;
+    block_device
+        .write_at(sector_offset, &sector, WriteDurability::Plain)
+        .expect("写回翻过的扇区");
+}
+
+/// 写死那一段里第 `seed` 次覆盖写的内容（4100 字节，各次不同）。
+fn content_of_the_scripted_overwrite(seed: usize) -> Vec<u8> {
+    (0..4100usize)
+        .map(|index| u8::try_from((index * 13 + seed) % 241).expect("小于 256"))
+        .collect()
+}
+
+/// 必红世界（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3：「无关泄漏与吞写隔离同在一段历史里，归类报新发现」，
+/// 三方两腿 `leak_once` 那一类；两腿的探针 `research/prompts/m4-i315-r3-opus-model/tools/attack_probe3.rs`、
+/// `research/prompts/m4-i315-r3-sonnet-model/tools/r3_probe.rs` 的 `landed_prefix_length` 是按步对照盘的写法）。
+/// 泄漏照 D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」那一句造：池级 checker 只认记号，两块盘都带记号的未释放记录豁免
+/// I-3.1、I-3.11、I-3.15，没有记号的已分配无引用记录照判违例。一段写死的历史，同一个进程里接着发：
+///
+/// 1. 新池新建文件 A（txg 3）；
+/// 2. 覆盖写 X（txg 4）：说谎的设备吞掉 X 交给盘 1 的头一次写（一次单元写）；X 之前 A 的数据单元两块盘那一份各翻一个字节，X 释放之前读盘核出
+///    两份都对不上、隔离两份（两块盘那条记录留在已分配、带着记号随 X 落盘），X 之后再把那两份翻回去（两份完好）；
+/// 3. X 之后、Y 之前去掉内存里的分配器上 A 的数据单元两块盘那两条记录的记号（代替一个漏写记号的写者，同
+///    `quarantine_mark_agrees_with_the_references.rs` 世界四），Y 照内存里的账重写分配记录树：从 Y 起盘上那两条记录仍分配、两块盘都不带记号、
+///    没有根引用——与被吞的写毫无关系的泄漏；
+/// 4. 覆盖写 Y（txg 5）：释放 X 那一版的单元时读盘核出被吞的那一份对不上、隔离两份（吞写隔离：两块盘都带记号，照条款豁免）；
+/// 5. 再覆盖写两次（txg 6、7），抬 F 到 X 的 txg（A 的根掉出候选集，泄漏的那个单元没有任何候选根引用）。
+///
+/// 每一步之后记一张每步镜像。X 之后那一张是头一张判红的（只红在被吞的写上，A 那两条记录这时还带着记号），按步对照盘（那一刻的前缀插回被吞的写）
+/// 上一条都不红，归说谎的设备；重开那张（抬 F 之后）红在被吞的写与泄漏两样上，被吞的写都插回去那张盘上泄漏在 A 的数据单元那一槽照红，
+/// 归类报新发现。交出去的这一份照故障注入入口交出去的那一份的样子拼（入口一段历史只注一次，摆不出这一对）：被吞的写、实现交回的每一份隔离、
+/// 每步镜像各在哪一刻都照这一段真跑出来的记。
+///
+/// # Panics
+/// 实现的行为不是上面写的那样：X 没发成或没隔离两份、被吞的不是一次单元写、Y 没隔离两份、最新那一版的数据单元落在泄漏的那个单元上。
+pub fn a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces(
+) -> ImagesAfterAFault {
+    let parameters = e142_parameters(512, 512);
+    let geometry = FixedGeometry {
+        fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+        journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+    };
+    let stream = SharedStream::retaining_contents();
+    let plan = SharedFaultPlan::unarmed(geometry);
+    let mut devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<_>)> = (0..2u32)
+        .map(|device_number| {
+            let identity = DeviceIdentity(device_number);
+            (
+                identity,
+                FaultInjectingBlockDevice::new(
+                    identity,
+                    RecordingBlockDevice::with_shared_stream(
+                        identity,
+                        SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+                        stream.clone(),
+                    ),
+                    plan.clone(),
+                ),
+            )
+        })
+        .collect();
+    let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
+    let operations_written_by_make_filesystem = stream.operation_count();
+    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
+    let instance;
+    let first = {
+        let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
+        instance = acquire_instance(&mut writer).expect("取号");
+        let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
+        publish_first_file(
+            &mut writer,
+            &mut allocator,
+            warmed.roots.last().expect("暖机两代根"),
+            FirstFile {
+                content: &first_file_content(),
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+            instance,
+            &warmed.last_record_bytes,
+        )
+        .expect("新池新建文件")
+    };
+    assert_eq!(first.root.checkpoint_txg, CheckpointTxg(3));
+    let leaked_slot = first.data_pointers[0].locations[0].slot;
+    let mut step_images: Vec<StepImageInTheRecordedStream> = Vec::new();
+    let mut copies_quarantined: Vec<CopyQuarantinedByTheImplementation> = Vec::new();
+    let note_a_step_image =
+        |step_images_so_far: &mut Vec<StepImageInTheRecordedStream>,
+         copies_quarantined_so_far: &[CopyQuarantinedByTheImplementation],
+         position: StepPosition,
+         operation_kind: Option<HistoryOperationKind>| {
+            let (newest_ring_root_txg, root_ring_slot_count) =
+                newest_ring_root_and_slot_count(&image_from(&stream));
+            step_images_so_far.push(StepImageInTheRecordedStream {
+                position,
+                operation_kind,
+                operations_recorded: stream.operation_count(),
+                newest_ring_root_txg,
+                root_ring_slot_count,
+                swallowed_writes_before_it: plan.swallowed_write_count(),
+                copies_quarantined_by_the_implementation_before_it: copies_quarantined_so_far.len(),
+            });
+        };
+    note_a_step_image(
+        &mut step_images,
+        &copies_quarantined,
+        StepPosition::StartingPoint,
+        None,
+    );
+    let mut step_index = 0usize;
+    let overwrite =
+        |devices_of_the_pool: &mut Vec<(DeviceIdentity, FaultInjectingBlockDevice<_>)>,
+         allocator_of_the_pool: &mut singlefs_core::allocator::PoolAllocator,
+         previous: &singlefs_core::transaction::TransactionOutput,
+         index_of_the_step: usize| {
+            let mut writer = PoolWriter::new(&parameters, devices_of_the_pool.as_mut_slice());
+            publish_overwrite(
+                &mut writer,
+                allocator_of_the_pool,
+                previous,
+                FirstFile {
+                    content: &content_of_the_scripted_overwrite(index_of_the_step),
+                    write_time_seconds: FIXED_WRITE_TIME_SECONDS
+                        + 60 * (u64::try_from(index_of_the_step).expect("几十步") + 1),
+                },
+                instance,
+            )
+            .expect("覆盖写照成")
+        };
+    // 一、覆盖写 X：吞掉它交给盘 1 的头一次写；之前把 A 的数据单元两份各翻一个字节（X 释放时隔离两份），之后翻回去（泄漏）
+    let step_index_of_the_swallowed_write = step_index;
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        flip_a_byte_of_the_copy(&mut devices, device, leaked_slot);
+    }
+    plan.arm(FaultSchedule {
+        fault: InjectedFault::WriteIsSwallowed,
+        device: FaultDeviceSelector::OnlyDevice(DeviceIdentity(1)),
+        placement: FaultPlacement::AnyOffset,
+        counting: FaultCounting::AcrossThePool,
+        occurrence: FaultOccurrence::TheNthMatchingCall(1),
+    });
+    let mut current = overwrite(&mut devices, &mut allocator, &first, step_index);
+    plan.disarm();
+    let fired = plan.fired();
+    let [swallowed_call] = fired.as_slice() else {
+        panic!("X 那一次注入恰好发生一次：{fired:?}");
+    };
+    assert_eq!(
+        swallowed_call.written_structure,
+        Some(StepKind::UnitWrite),
+        "被吞的是 X 交给盘 1 的一次单元写：{}",
+        swallowed_call.render()
+    );
+    assert_eq!(
+        current.quarantined_after_release_checksum_mismatch.len(),
+        2,
+        "X 释放之前读盘核出 A 的数据单元两份都对不上、隔离两份"
+    );
+    copies_quarantined.extend(
+        current
+            .quarantined_after_release_checksum_mismatch
+            .iter()
+            .map(|copy| CopyQuarantinedByTheImplementation {
+                step: StepPosition::Operation(step_index),
+                copy: *copy,
+            }),
+    );
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        flip_a_byte_of_the_copy(&mut devices, device, leaked_slot);
+    }
+    note_a_step_image(
+        &mut step_images,
+        &copies_quarantined,
+        StepPosition::Operation(step_index),
+        Some(HistoryOperationKind::PublishOverwrite),
+    );
+    // 二、去掉 A 的数据单元两块盘那两条记录的记号（X 那一次隔离的两份，代替一个漏写记号的写者）：Y 照内存里的账重写分配记录树，
+    // 从 Y 起那两条记录在盘上仍分配、不带记号（泄漏）
+    for copy in &current.quarantined_after_release_checksum_mismatch {
+        allocator.clear_the_quarantine_mark_of_a_record_the_rollback_target_references(
+            copy.device,
+            copy.placement,
+        );
+    }
+    // 三、覆盖写 Y：释放 X 那一版的单元时隔离被吞的那一份
+    step_index += 1;
+    current = overwrite(&mut devices, &mut allocator, &current, step_index);
+    assert_eq!(
+        current.quarantined_after_release_checksum_mismatch.len(),
+        2,
+        "Y 释放之前读盘核出 X 那一版被吞的那一份对不上、隔离两份"
+    );
+    copies_quarantined.extend(
+        current
+            .quarantined_after_release_checksum_mismatch
+            .iter()
+            .map(|copy| CopyQuarantinedByTheImplementation {
+                step: StepPosition::Operation(step_index),
+                copy: *copy,
+            }),
+    );
+    note_a_step_image(
+        &mut step_images,
+        &copies_quarantined,
+        StepPosition::Operation(step_index),
+        Some(HistoryOperationKind::PublishOverwrite),
+    );
+    // 四、再覆盖写两次（txg 7：抬 F 到 X 的 txg 4 要的上限，同 `release_checksum_quarantine.rs` 那一段）
+    for _ in 0..2 {
+        step_index += 1;
+        current = overwrite(&mut devices, &mut allocator, &current, step_index);
+        note_a_step_image(
+            &mut step_images,
+            &copies_quarantined,
+            StepPosition::Operation(step_index),
+            Some(HistoryOperationKind::PublishOverwrite),
+        );
+    }
+    assert_eq!(current.root.checkpoint_txg, CheckpointTxg(7));
+    // 五、抬 F 到 X 的 txg（A 的根掉出候选集，没有一条候选根再引用 A 的数据单元）
+    step_index += 1;
+    let raised = raise_rollback_floor(
+        &parameters,
+        &mut devices,
+        &mut allocator,
+        &mut current,
+        CheckpointTxg(first.root.checkpoint_txg.0 + 1),
+        ShadowLedger::On,
+    )
+    .expect("抬 F 到 X 的 txg");
+    copies_quarantined.extend(
+        raised
+            .publishes
+            .iter()
+            .flat_map(|publish| publish.quarantined_after_release_checksum_mismatch.iter())
+            .map(|copy| CopyQuarantinedByTheImplementation {
+                step: StepPosition::Operation(step_index),
+                copy: *copy,
+            }),
+    );
+    assert_ne!(
+        current.data_pointers[0].locations[0].slot, leaked_slot,
+        "最新那一版的数据单元不落在泄漏的那个单元上（泄漏的那个单元没有根引用）"
+    );
+    note_a_step_image(
+        &mut step_images,
+        &copies_quarantined,
+        StepPosition::Operation(step_index),
+        Some(HistoryOperationKind::RaiseRollbackFloor),
+    );
+    // 六、照故障注入入口交出去的那一份的样子拼
+    let swallowed_writes = plan.swallowed_writes();
+    let image_after_the_fault = RecordedStreamOfAnImage {
+        operations: stream.retained_operations(),
+        operations_written_by_make_filesystem,
+        earliest_stream_index_after_each_power_loss: Vec::new(),
+    };
+    let image_with_the_swallowed_writes_landed =
+        stream_with_the_swallowed_writes_landed(&image_after_the_fault, &swallowed_writes);
+    let (newest_ring_root_txg, root_ring_slot_count) =
+        newest_ring_root_and_slot_count(&image_from(&stream));
+    let drawn = DrawnFault {
+        fault: InjectedFault::WriteIsSwallowed,
+        call_ordinal: swallowed_call.call_ordinal_across_the_pool,
+        segment: FaultedSegment::Operation {
+            step_index: step_index_of_the_swallowed_write,
+            operation_kind: HistoryOperationKind::PublishOverwrite,
+        },
+    };
+    let system_configuration_slot_writes_that_landed = stream
+        .operations()
+        .iter()
+        .filter(|operation| geometry.classify(operation) == StepKind::SystemConfigurationSlot)
+        .count();
+    ImagesAfterAFault {
+        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        drawn,
+        device_width: HistoryDeviceWidth::FourGibibytes,
+        image_after_the_fault,
+        step_images_of_the_run_with_the_fault: step_images,
+        image_with_the_swallowed_writes_landed: Some(image_with_the_swallowed_writes_landed),
+        swallowed_writes: swallowed_writes.clone(),
+        copies_quarantined_by_the_implementation: copies_quarantined,
+        observation_without_the_pool_checker_violations: FailureObservation {
+            position: drawn.segment.position(),
+            operation_kind: drawn.segment.operation_kind(),
+            violations: Vec::new(),
+            panic: None,
+            newest_ring_root_txg,
+            root_ring_slot_count,
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        },
+        facts_after_the_fault: FactsAfterTheFault {
+            starting_point_step_that_returned_an_error: None,
+            system_configuration_slot_writes_that_landed,
+            reopened: ReopenedVersion::CommittedByTheModel,
+        },
+        what_the_swallowed_writes_explain_without_the_pool_checker: Some(
+            WhatTheSwallowedWritesExplain {
+                invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet::new(),
+                ceiling_without_the_swallowed_roots: None,
+                root_ring_slots_of_the_swallowed_root_slot_writes: BTreeSet::new(),
+                instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: None,
+                byte_ranges_of_the_swallowed_writes: swallowed_writes
+                    .iter()
+                    .map(SwallowedWriteByteRange::of)
+                    .collect(),
+            },
+        ),
+        reopen: "写死的那一段跑完、没有重开（这一形只看池级 checker 的归类）".to_string(),
+    }
 }

@@ -16,6 +16,7 @@ use singlefs_checker::image::{
     EXTENT_UPPER_SEGMENT_IS_THE_CANONICAL_SHAPE_OF_THE_INODES_WITH_AN_ENTRY,
     FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN,
     INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+    JOURNAL_RECORDS_LIVE_IN_THE_RING_SLOT_THEIR_COUNTER_NAMES,
     LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
     LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
     LIVE_DATA_UNITS_BEYOND_THE_TRUNCATION_FIELD_ARE_BORN_NO_EARLIER_THAN_IT,
@@ -142,7 +143,7 @@ fn checker_line(tally: &CrashPointReplayTally) -> String {
 /// I-9.14（树表条目的诞生 txg 跨根不变）在这条流上一个状态都评估不到，I-9.28（全部读得出的根之间同一树 ID 的诞生 txg 相同） 同一个理由；
 /// I-3.12（实例表行 T 低于引用它的根的 txg） 也评估不到：这条流上没有哪次发布重写实例表（取号只写系统配置，暖机与 A 照抄
 /// mkfs 那张只有链记录、没有行的实例表）；
-/// I-8.6（反向链算法） 要环里至少有一条自证过的记录，环还空着的那几个状态上报「不适用」；
+/// I-8.6（反向链算法） 与 I-8.13（记录落在它的计数器该落的环槽） 要环里至少有一条自证过的记录，环还空着的那几个状态上报「不适用」；
 /// I-8.7（实例内事务号不重号）、I-8.8（前缀里的事务不被切开） 与 I-7.9（回退下界 F 不高于抬 F 的上限） 在这条流上一个状态都评估不到；
 /// I-8.10、I-8.11、I-8.12、I-4.1、I-7.16 各自一类，评估过的状态数逐条写在函数里那几张表旁边；
 /// 删除与回退那九条（I-4.7、I-4.4 与墓碑、谱系那七条 I-9.17–I-9.23）与退役那四条（I-9.31–I-9.34）在这条流上一个状态都评估不到，
@@ -153,6 +154,7 @@ fn checker_line(tally: &CrashPointReplayTally) -> String {
 /// 里程碑四进清单的那几条：I-3.6（deadlist 紧界）、I-3.7（活快照可枚举） 每个状态都评估，I-3.15（未释放记录罩住的单元由映射指在这一槽）
 /// 与 I-3.16（碎片度与全空段统计对得上） 只在根已落的状态上评估，I-5.6（活整理意图的区域里没有签发之后分配的记录） 与 I-1.14（同一映射 key 在各版里的单元逐字节相同）
 /// 一个状态都评估不到，I-1.13（扫描重建与遍历方向的索引相同） 照 CPU 判法每个状态都评估、GPU 判器那一趟不比，理由逐条写在函数里那几张表旁边。
+/// 根环那两条 I-7.18（根记录的回收门槛等于现算的门槛）、I-7.19（钉着的槽不住本实例写的根） 只判建账的发布，只在根已落的状态上评估，理由写在表旁边。
 /// 违例只许出现在 I-7.7（系统配置实例代号不低于根环）：C322（取号那一步的屏障怎么放没有条款） 未还，
 /// 取号只落了一块盘的那 2 个状态里两份系统配置的实例代号不等。
 fn assert_checker_counts(
@@ -228,11 +230,22 @@ fn assert_checker_counts(
         // 回退候选集里各版分配记录树里的未释放记录：这条流上只有 txg 3 那一版有分配记录树，它要在候选集里（根已落）；
         // 由记录施加出来的那一版同 I-1.11 那一行的理由不进版本清单。根没落的状态上一条记录都走不到，报不适用。
         UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+        // I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数，`walk::judge_allocation_record_spans_against_the_classes_of_the_units_they_cover`）
+        // 与 I-3.15 同一份版本清单、同一个读集：根已落的状态上 txg 3 那一版的未释放记录罩住的单元头都用得了，每个这样的状态判一次；
+        // 根没落的状态上一条记录都走不到，报不适用。推的（乙簇报告「受影响的崩溃点重放 流与崩溃枚举用例」第 1 条），没在 checker 档跑过。
+        singlefs_checker::image::ALLOCATION_RECORD_SPAN_EQUALS_THE_SLOTS_OF_THE_CLASS_OF_THE_UNIT_IT_COVERS,
         // I-3.16（碎片度与全空段统计对得上，`walk::judge_fragmentation_and_empty_segment_statistics`）与 I-3.1 同在「最新根下面有记账树」那一支里：
         // 根没落的状态上最新根是暖机或种子根、第 0 版树表没有记账树，报不适用；根已落的状态上 I-3.1 判成立（占着的槽数乘 16 KiB 等于记账的已分配）、
         // txg 3 那一版读得到分配记录树，runs 与按记录口径的全空段数两半都判。这是 CPU 现在的判法（读到的分配记录树 0 棵才报部分没判，
         // 没有「两个口径不等就不判」那道门）；GPU 那道门去掉之前它在这条流上判出的也是 9（这些状态上两个口径相等）。
         FRAGMENTATION_AND_EMPTY_SEGMENT_STATISTICS_EQUAL_A_FULL_SCAN,
+        // I-7.18（根记录的回收门槛等于现算的门槛）、I-7.19（钉着的槽不住本实例写的根） 只判建账的发布、最新根下面没有记账树时报不适用
+        // （`crates/singlefs-checker/invariants/02-根环.md` 那两行，`walk::judge_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_newest_root`）：
+        // 根没落的状态上最新根是种子根或暖机根，指着的第 0 版树表 0 条、没有记账树（同 I-3.16（碎片度与全空段统计对得上） 那一行），两条报不适用；
+        // 根已落的状态上 txg 3 那条根的记账树根指针出生 txg 是 3（这次发布建了账），实例表是 mkfs 那张只有链记录的一片、走得到末片，两条都判。
+        // 9 对得上 2026-10-22 崩溃轻型这条流快档那一行 `CHECKER` 的 `I-7.18=9/0`、`I-7.19=9/0`（那一趟用例把它们算进「其余」、期望 54 而红）。
+        singlefs_checker::image::ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
+        singlefs_checker::image::PINNED_RING_SLOT_HOLDS_NO_ROOT_OF_THE_SAME_INSTANCE,
     ];
     // I-3.10 除了回退候选集，还读下一次挂载会先施加的那一版（射程 ④）：新根没落而 txg 3 的记录已落时，
     // 恢复要由那条记录重建 txg 3 那一版，它的分配记录树在记录的新根段指着的树表下面。
@@ -301,6 +314,10 @@ fn assert_checker_counts(
         COMPACTION_REGION_HOLDS_NO_RECORD_ALLOCATED_AFTER_THE_INTENT_WAS_ISSUED,
         UNIT_BYTES_OF_ONE_MAPPING_KEY_AGREE_ACROSS_THE_VERSIONS,
     ];
+    // 这条流上不隔离：I-3.17（隔离记号与引用相符，D19（块指针的结构与宽度预算） 已定项 5） 要最新根的分配记录树里有带隔离记号的记录，
+    // 每个状态都报不适用。
+    let never_has_a_quarantine_mark_on_this_stream =
+        [singlefs_checker::image::QUARANTINE_MARK_AGREES_WITH_THE_REFERENCES];
     // I-3.6（deadlist 紧界）、I-3.7（活快照可枚举） 落在「其余」那一类、每个状态都评估：一条 deadlist 条目、一条码 14 条目都没有的一版报成立
     // （同 I-9.24 空队列报成立）。I-3.6、I-3.7、I-3.15、I-3.16、I-5.6、I-1.14 这几个数对得上 2026-10-15 崩溃轻型那一趟这条流快档的
     // `CHECKER` 行（GPU 判器判：`I-3.6=46/0 I-3.7=46/0 I-3.15=9/0 I-5.6=0/0 I-3.16=9/0 I-1.14=0/0`）；这几位 GPU 与 CPU 对拍逐位比，
@@ -313,7 +330,15 @@ fn assert_checker_counts(
     // w1 的记录一落盘（两盘任一份）就判得了：它的计数器是 1 ⇒ 本实例第一条 ⇒ 反向链恒 0。
     // I-8.9（一次发布的记录序号连续且只有末条带标志） 同一个理由：环里有一条自证过的记录就判得了（记录标志其余位、序号 0 逐条判），
     // 没有就报不适用；这条流上 w1、w4、t9 各是一次只有一条记录的发布（序号 1、带末条标志）。
-    let judged_once_a_record_is_on_disk = ["I-8.6", "I-8.9"];
+    // I-8.13（记录落在它的计数器该落的环槽） 同一个读集：池级 checker 扫环时每条自证过、计数器从 1 起的记录判一次
+    // （`walk::judge_journal_records_live_in_the_ring_slot_their_counter_names`，与 I-8.6 读同一遍扫环、判在同一处，一条都没有时报不适用）；
+    // 这条流上每条记录的计数器都从 1 起（w1 是 1），判到的状态与 I-8.6 逐个相同。GPU 判器那一判（走读内核 `checker_scan_journal_of_device`）
+    // 同样只判计数器不是 0 的记录，两边计数一样。推的（读码），没在 checker 档跑过。
+    let judged_once_a_record_is_on_disk = [
+        "I-8.6",
+        "I-8.9",
+        JOURNAL_RECORDS_LIVE_IN_THE_RING_SLOT_THEIR_COUNTER_NAMES,
+    ];
     // I-8.10 拿带末条标志的记录的新根段去比根环里同 (实例, txg) 的根：环里有记录还不够，还要它那次发布的根已落。
     // 环空着的 [`STATES_WITH_AN_EMPTY_JOURNAL_RING`] 个之外，暖机第一次的记录落了而它的根没落的
     // [`STATES_WITH_ONLY_RECORDS_OF_THE_FIRST_WARM_UP_BEFORE_ITS_ROOT`] 个也没有可比的根（mkfs 的种子根是实例 0、txg 0）。
@@ -335,6 +360,7 @@ fn assert_checker_counts(
             || not_applicable_in_the_first_version.contains(&invariant)
             || never_has_a_compaction_intent_or_two_versions_of_one_mapping_key_on_this_stream
                 .contains(&invariant)
+            || never_has_a_quarantine_mark_on_this_stream.contains(&invariant)
         {
             0
         } else if only_under_the_new_root.contains(&invariant) {

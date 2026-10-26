@@ -789,6 +789,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
+name = "singlefs-background-gpu"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "libc",
+ "singlefs-core",
+ "wgpu",
+]
+
+[[package]]
 name = "singlefs-checker"
 version = "0.1.0"
 dependencies = [
@@ -806,6 +816,7 @@ dependencies = [
  "singlefs-format",
  "singlefs-harness",
  "singlefs-reference-filesystem",
+ "singlefs-replay-prefix",
  "singlefs-unit-graph",
  "wgpu",
 ]
@@ -847,6 +858,11 @@ dependencies = [
 [[package]]
 name = "singlefs-unit-graph"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "verus_syn",
+]
 
 [[package]]
 name = "slab"

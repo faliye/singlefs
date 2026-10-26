@@ -4,6 +4,8 @@
 //! 取前缀的核（`singlefs_replay_prefix::replay_core`）走到那一判才调两个读盘回调；Verus 的 spec 只说「据以判的那一次回调交回了什么」，
 //! 不管调了几次、按什么次序调（代码轮第二轮判决 `research/prompts/m3-verus-land-code-r2-main-verification.md` 第二节 H2、H4 两行）。
 //! 这里在块层逐次记下读，每条用例钉一种形状下扫完环之后的读：判候选的读的绝对次数与次序，之后环里再没有读。
+//! 一条都没施加的那几形，判完候选之后、打开之前另有判退那一步读一遍见证（每块盘两个系统配置槽，D23（journal 的角色与格式） 已定项 14 F2 段；
+//! 读法在 `reads_of_the_system_configuration_witness_before_judging_the_fall_back`），不在环里。
 //! 钉住的只有这几种形状（代码轮第三轮判决 `research/prompts/m3-verus-land-code-r3-main-verification.md` J2、用户定案 U2）：
 //! 锚点读得出、两次单条发布都施加；锚点那条记录撕了；锚点读不出、链首序号不是 1；一次发布两条记录；
 //! 候选在末条的提交标记上被断；候选的反向链断了；到了在飞上限（3 槽的环，6-1 交回第 2 条的 H08、H09 两形）。
@@ -37,12 +39,13 @@ use singlefs_core::journal::{
 };
 use singlefs_core::mounted_read::{mount_read_only, open_pool_for_read, MountedReadOnly};
 use singlefs_core::recovery::{
-    choose_root, choose_system_configuration, replay_journal, scan_journal, PoolReader,
+    choose_root, choose_system_configuration, replay_journal, scan_journal, NamedUnitVerification,
+    PoolReader,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::system_configuration::journal_in_flight_record_limit;
 use singlefs_core::unit::data_unit_payload_capacity;
-use singlefs_format::JOURNAL_RECORD_BYTES;
+use singlefs_format::{JOURNAL_RECORD_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES};
 use singlefs_harness::memory_pool::MemoryPool;
 
 /// B、C 两版文件的填充字节：两版长度（在 `common`）与内容各不相同。
@@ -214,6 +217,33 @@ fn mount_read_only_logging_every_read(
             events_after_the_scan,
         },
     )
+}
+
+/// 一条记录都没施加（施加之后那一版就是所选根）时，判完候选之后、打开挂载态之前判退那一步先读一遍见证：每块盘两个系统配置槽各读一次，
+/// 按盘的次序（`recovery::fall_back_judged_on_the_three_readers` 先问的那一次 F2 判法）。这几次读是条款要的：三处判退看「三样读者的并集里有一样
+/// 读不出，且系统配置没见证它」（D23（journal 的角色与格式） 已定项 14 F2 段，C755），只读挂载打得开所选那一版也要判退不退；两样里先判见证、
+/// 见证过就不读另两样读者，是读得最少的那个次序。施加过记录的那一版不退（判法第一句），这一遍不读。
+fn reads_of_the_system_configuration_witness_before_judging_the_fall_back(
+    image: &MemoryPool,
+) -> Vec<ReaderEvent> {
+    let configuration = choose_system_configuration(image).expect("镜像上择得到系统配置");
+    let slot_spacing_in_bytes =
+        u64::from(configuration.immutable.sizes.fixed_structure_slot_spacing);
+    let slot_bytes =
+        usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("系统配置槽 4096 字节");
+    image
+        .device_identities()
+        .into_iter()
+        .flat_map(|device| {
+            [0, slot_spacing_in_bytes].map(|offset| {
+                ReaderEvent::Read(BlockLayerRead {
+                    device,
+                    offset: DeviceOffsetInBytes(offset),
+                    length_in_bytes: slot_bytes,
+                })
+            })
+        })
+        .collect()
 }
 
 /// 单独沿 `root` 打开一次挂载态时块层的读：挂载在判完候选之后正是做这一步。
@@ -514,10 +544,15 @@ fn without_a_last_record_flag_in_the_chosen_roots_publish_a_chain_head_whose_ord
         (first_version, first_version, 2, 0, 0),
         "锚点读不出、链首序号不是 1：一条都不施加、一条都没验，挂载在 A"
     );
+    let mut expected_events_after_the_scan =
+        reads_of_the_system_configuration_witness_before_judging_the_fall_back(&image);
+    expected_events_after_the_scan.extend(reads_of_opening_the_pool_at(
+        &image,
+        &mounted.effective_root,
+    ));
     assert_eq!(
-        reads.events_after_the_scan,
-        reads_of_opening_the_pool_at(&image, &mounted.effective_root),
-        "扫完环之后判候选的读一次都没有（不重读 jsn 3、不读点名单元），只剩沿 A 打开挂载态的读"
+        reads.events_after_the_scan, expected_events_after_the_scan,
+        "扫完环之后判候选的读一次都没有（不重读 jsn 3、不读点名单元）；一条都没施加，判退先读一遍见证，然后只剩沿 A 打开挂载态的读"
     );
     assert_eq!(
         reads.scan_reads_inside_the_ring,
@@ -661,13 +696,16 @@ fn a_last_record_without_its_commit_marker_is_cut_after_rereading_its_previous_r
         "判两条的读：jsn 4 一次反向链重读加它点名单元的两份，jsn 5 只有一次反向链重读"
     );
     let mut expected_events_after_the_scan = expected_reads_judging_the_candidates;
+    expected_events_after_the_scan
+        .extend(reads_of_the_system_configuration_witness_before_judging_the_fall_back(&image));
     expected_events_after_the_scan.extend(reads_of_opening_the_pool_at(
         &image,
         &mounted.effective_root,
     ));
     assert_eq!(
         reads.events_after_the_scan, expected_events_after_the_scan,
-        "扫完环之后：jsn 4 重读 jsn 3、读它点名的单元，jsn 5 重读 jsn 4 一次就断、不读点名单元，然后只剩沿 A 打开挂载态的读"
+        "扫完环之后：jsn 4 重读 jsn 3、读它点名的单元，jsn 5 重读 jsn 4 一次就断、不读点名单元；一条都没施加，判退先读一遍见证，\
+         然后只剩沿 A 打开挂载态的读"
     );
     assert_eq!(
         reads.scan_reads_inside_the_ring,
@@ -797,7 +835,7 @@ fn at_the_in_flight_limit_the_next_candidate_is_cut_before_rereading_its_previou
         &chosen_root,
         THREE_RECORD_RING_BYTES,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .expect("所选根那次发布只有 jsn 3 带末条标志：锚点认得出");
     assert_eq!(

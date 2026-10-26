@@ -230,8 +230,12 @@ pub const TREE_IDENTIFIER_RETIREMENT: u64 = 65548;
 pub const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 65536;
 pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 65549;
 
-/// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案；分配记录树根指针 2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加）。format-const: ROOT_RECORD_BYTES
-pub const ROOT_RECORD_BYTES: u64 = 457;
+/// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 回收门槛 t 8 + 钉槽 p 1 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案；分配记录树根指针 2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加；回收门槛 t 与钉槽 p 随 C773（读坏与全零根槽的回收门槛钉只在内存里） 加，D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，用户 2026-10-20 定）。format-const: ROOT_RECORD_BYTES
+pub const ROOT_RECORD_BYTES: u64 = 466;
+
+/// 根记录与 journal 新根段里钉槽 p 那 1 字节的「没有钉着的槽」（D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，
+/// C773（读坏与全零根槽的回收门槛钉只在内存里）；用户 2026-10-20 定）：钉着的槽的钉值是 `3·槽 + 区域`，S ≤ 16 时小于 48，取不到这个值。
+pub const ROOT_RECORD_NO_RING_SLOT_PINNED: u8 = 255;
 
 /// journal 记录定长 4 KiB（D23（journal 的角色与格式） 已定项 12）。
 pub const JOURNAL_RECORD_BYTES: u64 = 4096;
@@ -239,17 +243,18 @@ pub const JOURNAL_RECORD_BYTES: u64 = 4096;
 /// journal 记录头的十个基础字段（D23（journal 的角色与格式） 已定项 4）。format-const: JOURNAL_HEADER_TEN_FIELD_BYTES
 pub const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 
-/// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4
-/// （D23（journal 的角色与格式） 已定项 15；后三项随用户 2026-10-02「回到甲」加，卸载记号 4 字节是判决没单独定宽、照第一轮正推腿的算法取的）。format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES
-pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 364;
+/// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4 +
+/// 回收门槛 t 8 + 钉槽 p 1（D23（journal 的角色与格式） 已定项 15；实例表指针、分配记录树根指针与卸载记号随用户 2026-10-02「回到甲」加，卸载记号 4 字节是判决没单独定宽、照第一轮正推腿的算法取的；
+/// t 与 p 随 C773（读坏与全零根槽的回收门槛钉只在内存里） 加在末尾，与根记录同一对字段）。format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES
+pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 373;
 
-/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 364 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
-pub const JOURNAL_HEADER_BYTES: u64 = 487;
+/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 373 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
+pub const JOURNAL_HEADER_BYTES: u64 = 496;
 
 /// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。format-const: JOURNAL_NAMED_ENTRY_BYTES
 pub const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 
-/// 一条 4 KiB 记录装几个点名项：(4096 − 487) ÷ 56 的整数部分（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD
+/// 一条 4 KiB 记录装几个点名项：(4096 − 496) ÷ 56 的整数部分（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD
 pub const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;
 
 /// journal 环从槽 1024（16 MiB）起（D23（journal 的角色与格式） 已定项 2）。
@@ -285,24 +290,25 @@ pub const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 每区槽数 S **不在这里**：它是系统配置字段，见下面那三个常量。
 pub const ROOT_RING_REGIONS: u64 = 3;
 
-/// 每区槽数 S 的下界 = k_tol + 2（D22（单元原子性怎么合成） 已定项 1 的字段表逐字：S 要装得下
+/// 每区槽数 S 的下界 = k_tol + 2（D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格：S 要装得下
 /// 4 个状态加一次带 k_tol 次根槽写失败的处置）。
 ///
-/// ⚠️ **S 自己不是格式常量**：字段表逐字写「具体取多少不是格式决策——格式承诺的是『S 是系统配置字段 +
-/// 挂载时判区间』」。它住系统配置槽偏移 362 那一字节，mkfs 写进去、挂载时读回来判这两条边
-/// （`singlefs_core::root_ring::RootRingSlotsPerRegion`）。格式承诺的、因而登记成格式常量的，只有区间的两条边。
+/// ⚠️ **S 自己不是格式常量**：它是系统配置字段，住系统配置槽偏移 362 那一字节，mkfs 写进去、挂载时读回来判这两条边
+/// （`singlefs_core::root_ring::RootRingSlotsPerRegion`），连同 S × 固定结构槽距不超过 P × chunk 那一判（D22（单元原子性怎么合成）
+/// 已定项 16 第 1 句，I-7.13）。格式承诺的、因而登记成格式常量的，只有区间的两条边。
 /// format-const: ROOT_RING_SLOTS_PER_REGION_MINIMUM
 pub const ROOT_RING_SLOTS_PER_REGION_MINIMUM: u64 = 4;
 
-// placeholder: C506（每区槽数 S 写成编译期常量，条文说它住系统配置） —— 字段表给的上界是「由 I-7.4（近 K 代块未被复用）
-// 扣住的块数挂载时算」，那个数今天算不出来：I-7.4 的「K 代」2026-09-13 起就指回退候选集本身（按实例表判仍有效 ∧ txg ≥ F_生效），
-// 候选集又按 F 与实例表现算，仓里没有一条式子从池的参数给得出 S 的上界。在它算得出来之前按 16 收着，区间判用的是这个收着的数。
+/// 每区槽数 S 的上界 16（D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格，用户 2026-10-22 定「上界 16 是格式常量」）。
+/// format-const: ROOT_RING_SLOTS_PER_REGION_MAXIMUM
 pub const ROOT_RING_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
 
-// placeholder: D22（单元原子性怎么合成） 已定项 1 —— S 取多少不是格式决策，是 mkfs 参数（字段表逐字「取值由第一版实现按
-// D25（目标负载优先级） 的负载形态定」）；第一版 mkfs 写 8，与 `.claude/kb/layout/01-first-txn.md` 一字段表「每区槽数 S」那一行的值相同。
+/// 第一版 mkfs 默认 S 的上限：默认 S = min(8, ⌊P × chunk ÷ 固定结构槽距⌋)，小于 5 拒绝 mkfs（D22（单元原子性怎么合成） 已定项 16
+/// 第 3 句，用户 2026-10-22 定）；式子住 `singlefs_core::root_ring::RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing`。
+/// 显式给 S 的建池入口（测试与装置）取它当 S 时也是这个值，与 `.claude/kb/layout/01-first-txn.md` 一字段表「每区槽数 S」那一行的值相同。
 pub const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
 
+/// 根环区域间距的素数步长 P = 3（D22（单元原子性怎么合成） 已定项 16 第 3 句：第一版常量，读者只收它）。format-const: ROOT_RING_PRIME_STEP
 pub const ROOT_RING_PRIME_STEP: u64 = 3;
 /// 根环 chunk 1 MiB = 1048576 字节（D22（单元原子性怎么合成） 已定项 2）。format-const: ROOT_RING_CHUNK_BYTES
 pub const ROOT_RING_CHUNK_BYTES: u64 = 1_048_576;
@@ -424,10 +430,12 @@ mod tests {
                 + NODE_POINTER_BYTES
                 + NODE_POINTER_BYTES
                 + NODE_POINTER_BYTES
+                + 8
+                + 1
                 + 1
                 + 12
                 + 16,
-            "根记录十五段"
+            "根记录十七段"
         );
         assert_eq!(
             JOURNAL_HEADER_BYTES,
@@ -447,9 +455,9 @@ mod tests {
         assert_eq!(ALLOCATION_RECORD_BYTES, 20, "分配记录");
         assert_eq!(ACCOUNTING_ENTRY_BYTES, 34, "记账条目");
         assert_eq!(TREE_TABLE_ENTRY_BYTES, 200, "树表条目");
-        assert_eq!(ROOT_RECORD_BYTES, 457, "根记录");
-        assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 364, "journal 新根段");
-        assert_eq!(JOURNAL_HEADER_BYTES, 487, "journal 记录头");
+        assert_eq!(ROOT_RECORD_BYTES, 466, "根记录");
+        assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 373, "journal 新根段");
+        assert_eq!(JOURNAL_HEADER_BYTES, 496, "journal 记录头");
         assert_eq!(JOURNAL_NAMED_ENTRY_BYTES, 56, "journal 点名项");
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64, "一条记录装几个点名项");
         assert_eq!(
@@ -578,8 +586,8 @@ mod tests {
         );
         assert_eq!(
             JOURNAL_NEW_ROOT_SEGMENT_BYTES,
-            NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8 + NODE_POINTER_BYTES + NODE_POINTER_BYTES + 4,
-            "新根段 = 树表指针 + 中央映射树根指针 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 + 分配记录树根指针 + 卸载记号 4（D23 已定项 15）"
+            NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8 + NODE_POINTER_BYTES + NODE_POINTER_BYTES + 4 + 8 + 1,
+            "新根段 = 树表指针 + 中央映射树根指针 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 + 分配记录树根指针 + 卸载记号 4 + 回收门槛 t 8 + 钉槽 p 1（D23 已定项 15）"
         );
         assert_eq!(
             JOURNAL_NAMED_ENTRY_BYTES,

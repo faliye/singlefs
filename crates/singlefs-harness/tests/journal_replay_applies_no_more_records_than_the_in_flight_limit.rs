@@ -21,7 +21,7 @@ use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::journal::record_offset;
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, recover, replay_journal, scan_journal, JournalPolicy,
-    PoolReader, RecoveryOutcome,
+    NamedUnitVerification, PoolReader, RecoveryOutcome,
 };
 use singlefs_core::system_configuration::journal_in_flight_record_limit;
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
@@ -168,7 +168,7 @@ fn with_an_in_flight_limit_of_one_only_the_first_of_two_single_record_publishes_
         &chosen_root,
         THREE_RECORD_RING_BYTES,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .expect("所选根那次发布只有 jsn 3 带末条标志：锚点认得出");
     assert_eq!(

@@ -3,7 +3,7 @@ name = "singlefs-replay-prefix"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "取 journal 前缀并施加的纯函数核：singlefs-core 的恢复路径调它，Verus 验的就是这一份；只依赖 vstd，让 Verus 只编这一个文件（用户 2026-10-01 定拆）。另有整理选段与计划的核与证明（compaction_plan_proofs，里程碑四二·4），singlefs-core 的 compaction_plan 单测与它对拍"
+description = "取 journal 前缀并施加的纯函数核：singlefs-core 的恢复路径调它，Verus 验的就是这一份；只依赖 vstd，让 Verus 验证这个独立 crate（用户 2026-10-01 定拆）。另有整理选段与计划的核与证明（compaction_plan_proofs，里程碑四二·4），singlefs-core 的 compaction_plan 直接调用，另有 GC 抽象协议与回收比较核（gc_crash_proofs）"
 
 # vstd 与 Verus 工具钉同一个发布：crates.io 的 vstd / verus_builtin_macros 0.0.0-2026-09-20-0158 出自提交 3204118，
 # 与 Verus 发布 0.2026.09.20.aef82ed 之间这几个包的源码目录只有 Cargo.toml 不同（主 agent 2026-10-01 现查）。写精确版本，不许 cargo 自己升。

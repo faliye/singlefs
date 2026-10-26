@@ -40,7 +40,9 @@ use singlefs_core::recovery::{
     SystemConfigurationValueOutsideWhatThisReaderAccepts,
 };
 use singlefs_core::root_record::{RootRecord, UnmountMarker};
-use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
+use singlefs_core::root_ring::{
+    slot_offset, target_for_publish, RootRingSlot, RootRingSlotsPerRegion,
+};
 use singlefs_core::system_configuration::{
     SystemConfiguration, SystemImmutableSizes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
 };
@@ -51,8 +53,7 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::{
     build_data_unit, build_index_node, build_packed_unit, parse_data_unit, parse_index_node,
     parse_packed_unit, seal_header_checksum, DataUnitIdentity, PackedIdentity, UnitError,
-    WriteOrder, ENTRY_WIDTH_ZERO_WITH_ENTRIES, PACKED_TYPE_INODE, RECORD_WIDTH_ZERO_WITH_RECORDS,
-    UNIT_CLASS_INDEX_NODE,
+    UnitStructureDefect, WriteOrder, PACKED_TYPE_INODE, UNIT_CLASS_INDEX_NODE,
 };
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_KEY_BYTES, DATA_UNIT_BYTES,
@@ -573,8 +574,9 @@ fn a_format_time_instance_table_pointer_below_the_unit_area_is_refused_before_th
     );
 }
 
-/// 场景：第一个文件那一版之后重开一次（实例 2 写行 (1, 3, W)、暖机），再往根环一个空槽里放一条实例 1、txg 4 的根——照抄实例 1 暖机那条
-/// 树表 0 条的根、只改 txg 与实例表指针：实例表指针两条位置条目都指槽 100（单元区起点之下）。按最新那条根的实例表，它是被抛弃的根。
+/// 场景：第一个文件那一版之后重开一次（实例 2 写行 (1, 3, W)、暖机），再往 txg 4 按落点公式该住的那一槽（盖掉实例 2 写行那次发布的根；
+/// 读根环核落点公式，C743，手摆进别的槽的根照读坏算）放一条实例 1、txg 4 的根——照抄实例 1 暖机那条
+/// 树表 0 条的根、只改 txg 与实例表指针：实例表指针两条位置条目都指槽 100（单元区起点之下）。按最新那条根（实例 2 暖机那一条）的实例表，它是被抛弃的根。
 /// 预期：这条根的账算「解不开」，它是树表 0 条的一版、从中央映射也现算不成，第二次重开在取号之前拒可写、报出这条根（C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算，用户 2026-09-28 定），不 panic。
 /// 改之前影子账只判了两条位置条目同槽，槽 100 进 `isolate_abandoned`，在 `DeviceFreeMap::index` 的 expect 上 panic。
 #[test]
@@ -592,19 +594,28 @@ fn an_abandoned_root_whose_instance_table_pointer_sits_below_the_unit_area_refus
         })
         .copied()
         .expect("实例 1 暖机那条 txg 1 的根还在环里");
-    let occupied: Vec<RootRingSlot> = roots.iter().map(|(ring_slot, _)| *ring_slot).collect();
     let system_configuration = system_configuration_of(&devices);
-    let empty_ring_slot = every_root_ring_slot(&system_configuration.immutable.sizes)
-        .into_iter()
-        .rev()
-        .find(|ring_slot| !occupied.contains(ring_slot))
-        .expect("根环里还有空槽");
     let mut abandoned = warm_up_root_of_instance_one;
     abandoned.checkpoint_txg = CheckpointTxg(first.root.checkpoint_txg.0 + 1);
     for location in &mut abandoned.instance_table.locations {
         location.slot = SLOT_BELOW_THE_UNIT_AREA_NOBODY_USES;
     }
-    write_root_into_the_ring_slot(&mut devices, empty_ring_slot, &abandoned);
+    let formula_ring_slot = target_for_publish(
+        abandoned.checkpoint_txg,
+        system_configuration
+            .immutable
+            .sizes
+            .root_ring_slots_per_region,
+    );
+    assert!(
+        roots
+            .iter()
+            .any(|(ring_slot, root)| *ring_slot == formula_ring_slot
+                && root.instance == first_remount.output.instance
+                && root.checkpoint_txg == abandoned.checkpoint_txg),
+        "前提：txg 4 的落点槽里是实例 2 写行那次发布的根，它之后还有实例 2 暖机那一条更新的根"
+    );
+    write_root_into_the_ring_slot(&mut devices, formula_ring_slot, &abandoned);
     // 指针槽号不在单元区里的那条被抛弃根算「账读不出」；它是暖机那一版（树表 0 条、映射根是空指针），从中央映射也现算不成，
     // 重读一次仍不成就在取号之前拒可写（C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算那一条的最后一支，用户 2026-09-28 定）——不 panic。
     let refusal = mount_writable(&parameters(), &mut devices)
@@ -762,7 +773,7 @@ fn a_system_configuration_whose_encryption_type_is_not_off_is_refused() {
     );
 }
 
-/// 场景：四个系统配置槽的 `physical_block_size` 写成 256（装不下 457 字节的根记录），整槽校验和重封。
+/// 场景：四个系统配置槽的 `physical_block_size` 写成 256（装不下 466 字节的根记录），整槽校验和重封。
 /// 预期：整池拒（根槽宽下界），盘上逐字节不变。改之前：只读恢复按 256 字节读根槽、一条根都自证不过，报「根环里一条根都没有」；
 /// 可写挂载因为调用方给的 512 与盘上不一致报 `CallerParametersDisagreeWithTheSelectedSystemConfiguration`——只读那条路没有调用方参数挡着。
 #[test]
@@ -1157,6 +1168,8 @@ fn a_journal_record_whose_new_tree_table_pointer_carries_compression_is_not_pars
         new_allocation_record_tree_root: NodePointer::empty_root(),
         new_unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
         named: Vec::new(),
+        new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+        new_pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
     };
     let mut bytes = record.to_bytes();
     assert_eq!(
@@ -1198,7 +1211,9 @@ fn an_index_node_declaring_entries_of_width_zero_is_refused() {
     reseal_index_node(&mut node);
     assert_eq!(
         parse_index_node(&node),
-        Err(UnitError::Structure(ENTRY_WIDTH_ZERO_WITH_ENTRIES))
+        Err(UnitError::Structure(
+            UnitStructureDefect::IndexNodeEntryWidthZeroWithEntries
+        ))
     );
 }
 
@@ -1228,7 +1243,9 @@ fn a_packed_unit_declaring_records_of_width_zero_is_refused() {
     reseal_packed_unit(&mut unit);
     assert_eq!(
         parse_packed_unit(&unit),
-        Err(UnitError::Structure(RECORD_WIDTH_ZERO_WITH_RECORDS))
+        Err(UnitError::Structure(
+            UnitStructureDefect::PackedUnitRecordWidthZeroWithRecords
+        ))
     );
 }
 
@@ -1538,7 +1555,7 @@ fn pool_whose_accounting_root_carrying_a_step_row_is_narrowed_to_its_keys() -> D
 
 /// 记账条目窄于字段表那个成员：22 对 34。
 fn accounting_entry_narrower_than_its_field_table() -> RecoveryFailure {
-    RecoveryFailure::EntryNarrowerThanItsFieldTable {
+    RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
         what: "记账条目",
         entry_bytes: usize::try_from(ACCOUNTING_KEY_BYTES).expect("22"),
         field_table_bytes: usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34"),
@@ -1547,7 +1564,7 @@ fn accounting_entry_narrower_than_its_field_table() -> RecoveryFailure {
 
 /// 场景：第一个文件之后再建一个空 inode（txg 4），记账树根 16 条里有一级代段 3 的 inode 号水位台阶行；根节点自述的条目宽缩到 key 宽、
 /// 每条只留 key（条目数 16 不变），节点与指着它的每一道校验和重算。
-/// 预期：只读恢复交回 `EntryNarrowerThanItsFieldTable`（记账条目，22 对 34）。台阶行要解开才认得出（统计量标签与代段都在条目里）：
+/// 预期：只读恢复交回 `EntryWidthDiffersFromItsFieldTable`（记账条目，22 对 34）。台阶行要解开才认得出（统计量标签与代段都在条目里）：
 /// 数记账条目那一判排在条目宽之前时，解不开的台阶行被算进 3 + 6 × 盘数，16 ≠ 15，报成「记账条目数（inode 号水位的台阶行不算）
 /// 不是 3 + 6 × 盘数」。checker 档坏盘战役 `every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking` 的
 /// 「条目宽：记账树根」那一种是同一个坏法，这条在 harness 档钉住次序。
@@ -1566,7 +1583,7 @@ fn a_narrowed_accounting_root_carrying_a_step_row_is_refused_for_its_entry_width
 }
 
 /// 场景：同上一条的坏镜像，交给可写挂载。
-/// 预期：可写挂载在任何写之前交回 `EntryNarrowerThanItsFieldTable`（记账条目，22 对 34）：重建那一版读记账树时同样先核条目宽，
+/// 预期：可写挂载在任何写之前交回 `EntryWidthDiffersFromItsFieldTable`（记账条目，22 对 34）：重建那一版读记账树时同样先核条目宽，
 /// 后数条目（判法与上一条同一个理由）。
 #[test]
 fn a_narrowed_accounting_root_carrying_a_step_row_is_refused_for_its_entry_width_by_the_writable_mount(

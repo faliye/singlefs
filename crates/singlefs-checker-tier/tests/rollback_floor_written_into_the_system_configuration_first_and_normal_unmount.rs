@@ -566,120 +566,135 @@ fn system_configuration_write_after_both_slots_of_one_device_became_unreadable_c
 /// 这一串写的根全带卸载记号，写出去的根槽读回来也带；卸载之前那条根不带；头几步照样先写系统配置（带新 F）、过一道池屏障。
 /// 卸载之后的镜像 checker 一条都不红，I-7.9（回退下界 F 不高于抬 F 的上限） 按带记号那一支真被评估过且成立（按准入上限 3 判就红了），
 /// I-7.12（系统配置 F 不低于同盘根上的 F） 成立；再可写挂载，择到带记号的最后一条根，新实例的根带 F 生效值、不带记号。
+// 一条用例一个场景（`.claude/rules/verification.md`「harness 档里再分快档用例与慢档用例」）：现行 txg 除以 3 余 0 与余 1 两格各建一个池，
+// 拆成两条用例，各调这一份。
+fn normal_unmount_after_overwrites_raises_the_floor_with_marked_empty_publishes(
+    overwrites: usize,
+    expected_txgs: Vec<CheckpointTxg>,
+) {
+    let mut pool = build_pool(&format!("rbf2-unmount-{overwrites}"));
+    overwrite_times(&mut pool, overwrites);
+    let current_txg = pool.output.root.checkpoint_txg;
+    assert_eq!(
+        pool.output.root.unmount_marker,
+        UnmountMarker::NotWrittenByTheUnmountSequence
+    );
+    let operations_before_the_unmount = pool.stream.operation_count();
+    let unmounted = unmount_recorded(&mut pool).expect("正常卸载");
+    assert_eq!(
+        unmounted.rollback_floor, current_txg,
+        "F 抬到现行那一版的 txg"
+    );
+    assert_eq!(
+        unmounted
+            .publishes
+            .iter()
+            .map(|publish| publish.root.checkpoint_txg)
+            .collect::<Vec<_>>(),
+        expected_txgs,
+        "现行 txg {} 除以 3 余 {}：推 {} 次",
+        current_txg.0,
+        current_txg.0 % 3,
+        expected_txgs.len()
+    );
+    for publish in &unmounted.publishes {
+        assert_eq!(
+            (publish.root.rollback_floor, publish.root.unmount_marker),
+            (current_txg, UnmountMarker::WrittenByTheUnmountSequence),
+            "txg {}：带新 F、带卸载记号",
+            publish.root.checkpoint_txg.0
+        );
+    }
+    assert_eq!(
+        step_kinds_since(&pool.stream, operations_before_the_unmount - 2)[..6],
+        [
+            (StepKind::Barrier, DeviceIdentity(0)),
+            (StepKind::Barrier, DeviceIdentity(1)),
+            (StepKind::SystemConfigurationSlot, DeviceIdentity(0)),
+            (StepKind::SystemConfigurationSlot, DeviceIdentity(1)),
+            (StepKind::Barrier, DeviceIdentity(0)),
+            (StepKind::Barrier, DeviceIdentity(1)),
+        ],
+        "卸载那一串照抬 F 那一串：上一次发布返回之前那道池屏障（C577；卸载开头那道与它之间没有写，录制流里并成一道）、\
+         先写系统配置、过池屏障（录制流按设备记屏障，每道两块盘各一步）"
+    );
+    let image = pool.memory_pool();
+    let roots_on_disk = readable_roots_of(&image);
+    for root in &roots_on_disk {
+        let expected_marker = if expected_txgs.contains(&root.checkpoint_txg) {
+            UnmountMarker::WrittenByTheUnmountSequence
+        } else {
+            UnmountMarker::NotWrittenByTheUnmountSequence
+        };
+        assert_eq!(
+            root.unmount_marker, expected_marker,
+            "盘上读回的 txg {} 那条根",
+            root.checkpoint_txg.0
+        );
+    }
+    let Some(conclusion) = pool_checker_conclusion_through_the_given_states_engine(
+        &format!("after-the-unmount-of-{overwrites}-overwrites"),
+        &image,
+    ) else {
+        return;
+    };
+    let violations = conclusion.pool_checker_violations();
+    assert_eq!(
+        violations
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect::<Vec<&str>>(),
+        Vec::<&str>::new(),
+        "卸载之后的镜像一条都不红：{violations:?}"
+    );
+    for invariant in ["I-7.9", "I-7.12"] {
+        assert!(
+            invariant_is_judged_and_holds(&conclusion, invariant),
+            "{invariant} 真被评估过且成立"
+        );
+    }
+    let mut devices = pool.reopen_recorded();
+    let mounted = mount_writable(&parameters(), &mut devices).expect("卸载之后再可写挂载");
+    pool.devices = Some(devices);
+    assert_eq!(
+        (
+            mounted.output.chosen_root.checkpoint_txg,
+            mounted.output.chosen_root.unmount_marker
+        ),
+        (
+            *expected_txgs.last().expect("至少一次"),
+            UnmountMarker::WrittenByTheUnmountSequence
+        ),
+        "择到卸载那一串的最后一条根"
+    );
+    assert_eq!(
+        (
+            mounted.output.row_publish.root().rollback_floor,
+            mounted.output.row_publish.root().unmount_marker
+        ),
+        (current_txg, UnmountMarker::NotWrittenByTheUnmountSequence),
+        "新实例写行那次发布的根带 F 生效值、不带记号"
+    );
+}
+
+/// 覆盖写三次到 txg 6（除以 3 余 0）：推 2 次空发布（txg 7 落盘 1、8 落盘 0）。
 #[test]
 fn normal_unmount_raises_the_floor_to_the_current_txg_with_marked_empty_publishes_on_every_device_after_writing_the_system_configuration(
 ) {
-    for (overwrites, expected_txgs) in [
-        (3usize, vec![CheckpointTxg(7), CheckpointTxg(8)]),
-        (
-            4,
-            vec![CheckpointTxg(8), CheckpointTxg(9), CheckpointTxg(10)],
-        ),
-    ] {
-        let mut pool = build_pool(&format!("rbf2-unmount-{overwrites}"));
-        overwrite_times(&mut pool, overwrites);
-        let current_txg = pool.output.root.checkpoint_txg;
-        assert_eq!(
-            pool.output.root.unmount_marker,
-            UnmountMarker::NotWrittenByTheUnmountSequence
-        );
-        let operations_before_the_unmount = pool.stream.operation_count();
-        let unmounted = unmount_recorded(&mut pool).expect("正常卸载");
-        assert_eq!(
-            unmounted.rollback_floor, current_txg,
-            "F 抬到现行那一版的 txg"
-        );
-        assert_eq!(
-            unmounted
-                .publishes
-                .iter()
-                .map(|publish| publish.root.checkpoint_txg)
-                .collect::<Vec<_>>(),
-            expected_txgs,
-            "现行 txg {} 除以 3 余 {}：推 {} 次",
-            current_txg.0,
-            current_txg.0 % 3,
-            expected_txgs.len()
-        );
-        for publish in &unmounted.publishes {
-            assert_eq!(
-                (publish.root.rollback_floor, publish.root.unmount_marker),
-                (current_txg, UnmountMarker::WrittenByTheUnmountSequence),
-                "txg {}：带新 F、带卸载记号",
-                publish.root.checkpoint_txg.0
-            );
-        }
-        assert_eq!(
-            step_kinds_since(&pool.stream, operations_before_the_unmount - 2)[..6],
-            [
-                (StepKind::Barrier, DeviceIdentity(0)),
-                (StepKind::Barrier, DeviceIdentity(1)),
-                (StepKind::SystemConfigurationSlot, DeviceIdentity(0)),
-                (StepKind::SystemConfigurationSlot, DeviceIdentity(1)),
-                (StepKind::Barrier, DeviceIdentity(0)),
-                (StepKind::Barrier, DeviceIdentity(1)),
-            ],
-            "卸载那一串照抬 F 那一串：上一次发布返回之前那道池屏障（C577；卸载开头那道与它之间没有写，录制流里并成一道）、\
-             先写系统配置、过池屏障（录制流按设备记屏障，每道两块盘各一步）"
-        );
-        let image = pool.memory_pool();
-        let roots_on_disk = readable_roots_of(&image);
-        for root in &roots_on_disk {
-            let expected_marker = if expected_txgs.contains(&root.checkpoint_txg) {
-                UnmountMarker::WrittenByTheUnmountSequence
-            } else {
-                UnmountMarker::NotWrittenByTheUnmountSequence
-            };
-            assert_eq!(
-                root.unmount_marker, expected_marker,
-                "盘上读回的 txg {} 那条根",
-                root.checkpoint_txg.0
-            );
-        }
-        let Some(conclusion) = pool_checker_conclusion_through_the_given_states_engine(
-            &format!("after-the-unmount-of-{overwrites}-overwrites"),
-            &image,
-        ) else {
-            return;
-        };
-        let violations = conclusion.pool_checker_violations();
-        assert_eq!(
-            violations
-                .iter()
-                .map(|(invariant, _)| *invariant)
-                .collect::<Vec<&str>>(),
-            Vec::<&str>::new(),
-            "卸载之后的镜像一条都不红：{violations:?}"
-        );
-        for invariant in ["I-7.9", "I-7.12"] {
-            assert!(
-                invariant_is_judged_and_holds(&conclusion, invariant),
-                "{invariant} 真被评估过且成立"
-            );
-        }
-        let mut devices = pool.reopen_recorded();
-        let mounted = mount_writable(&parameters(), &mut devices).expect("卸载之后再可写挂载");
-        pool.devices = Some(devices);
-        assert_eq!(
-            (
-                mounted.output.chosen_root.checkpoint_txg,
-                mounted.output.chosen_root.unmount_marker
-            ),
-            (
-                *expected_txgs.last().expect("至少一次"),
-                UnmountMarker::WrittenByTheUnmountSequence
-            ),
-            "择到卸载那一串的最后一条根"
-        );
-        assert_eq!(
-            (
-                mounted.output.row_publish.root().rollback_floor,
-                mounted.output.row_publish.root().unmount_marker
-            ),
-            (current_txg, UnmountMarker::NotWrittenByTheUnmountSequence),
-            "新实例写行那次发布的根带 F 生效值、不带记号"
-        );
-    }
+    normal_unmount_after_overwrites_raises_the_floor_with_marked_empty_publishes(
+        3,
+        vec![CheckpointTxg(7), CheckpointTxg(8)],
+    );
+}
+
+/// 覆盖写四次到 txg 7（除以 3 余 1）：推 3 次空发布（txg 8、9 落盘 0，10 落盘 1）。
+#[test]
+fn normal_unmount_raises_the_floor_with_three_marked_empty_publishes_when_the_current_txg_leaves_remainder_one_by_three(
+) {
+    normal_unmount_after_overwrites_raises_the_floor_with_marked_empty_publishes(
+        4,
+        vec![CheckpointTxg(8), CheckpointTxg(9), CheckpointTxg(10)],
+    );
 }
 
 /// 树表 0 条的一版（还没写过文件）上正常卸载：一个字节都不写，卸载照常做成（主 agent 2026-09-26 定，实二交回第一问：回退候选要带文件，

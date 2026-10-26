@@ -16,7 +16,7 @@ use singlefs_core::journal::{
     JournalRecord, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
 };
 use singlefs_core::pointer::NodePointer;
-use singlefs_core::recovery::{replay_journal, RecoveryFailure};
+use singlefs_core::recovery::{replay_journal, NamedUnitVerification, RecoveryFailure};
 use singlefs_core::root_record::{RootRecord, UnmountMarker};
 use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
@@ -40,6 +40,8 @@ fn chosen_root() -> RootRecord {
         instance_table: NodePointer::empty_root(),
         mapping_root: NodePointer::empty_root(),
         allocation_record_tree_root: NodePointer::empty_root(),
+        reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+        pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
     }
 }
 
@@ -63,6 +65,8 @@ fn single_record_publish(counter: u64, checkpoint_txg: CheckpointTxg) -> Journal
         new_allocation_record_tree_root: NodePointer::empty_root(),
         new_unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
         named: Vec::new(),
+        new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+        new_pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
     }
 }
 
@@ -93,7 +97,7 @@ fn two_last_record_flags_in_the_chosen_roots_publish_return_the_error_with_only_
         &chosen_root(),
         JOURNAL_RING_DEFAULT_BYTES,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     );
     assert_eq!(
         replayed,
@@ -124,7 +128,7 @@ fn last_record_flags_of_other_publishes_of_the_same_instance_leave_the_anchor_al
         &chosen_root(),
         JOURNAL_RING_DEFAULT_BYTES,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .expect("所选根那次发布只有 jsn 2 带末条标志：锚点认得出");
     assert_eq!(
@@ -160,7 +164,7 @@ fn a_table_whose_keys_disagree_with_its_records_trips_the_glue_assertion_before_
         &chosen_root(),
         JOURNAL_RING_DEFAULT_BYTES,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     );
     panic!("键与记录不等的表没被胶水的断言拦下，取前缀交回了 {replayed:?}");
 }
@@ -179,7 +183,7 @@ fn a_record_whose_counter_is_the_largest_value_trips_the_glue_assertion_before_t
         &chosen_root(),
         JOURNAL_RING_DEFAULT_BYTES,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     );
     panic!("计数器是 u64 最大值的记录没被胶水的断言拦下，取前缀交回了 {replayed:?}");
 }

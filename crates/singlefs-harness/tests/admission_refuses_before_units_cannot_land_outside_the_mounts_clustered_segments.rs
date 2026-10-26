@@ -16,7 +16,7 @@ use singlefs_core::address::{DeviceIdentity, InodeNumber, InstanceGeneration, Sl
 use singlefs_core::admission::{
     admission_reading_before_a_publish, checkpoint_cost_of_the_version_to_build_on,
     space_budget_of_role, AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand,
-    SpaceBudgetOfARole,
+    JudgementThatFoundTheDeviceShort, SpaceBudgetOfARole,
 };
 use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::transaction::{
@@ -71,12 +71,14 @@ fn free_slot_pairs_outside_and_inside_the_cluster_segments_of_this_mount(
 
 /// 两块盘上各一条、同样的 `available` 与 `demand`（第一版每个单元落每块盘，两块盘此刻的空闲图相同）。
 fn the_same_shortage_on_both_devices(
+    judged_short_by: JudgementThatFoundTheDeviceShort,
     available: AvailableBytesOnOneDevice,
     demand: BytesOnOneDevice,
 ) -> Vec<DeviceShortOfDemand> {
     [DeviceIdentity(0), DeviceIdentity(1)]
         .map(|device| DeviceShortOfDemand {
             device,
+            judged_short_by,
             available,
             demand,
         })
@@ -218,6 +220,7 @@ fn an_unlink_intent_whose_commit_generated_units_find_no_unblocked_slot_is_refus
     assert_eq!(
         refusal.short_devices,
         the_same_shortage_on_both_devices(
+            JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
             AvailableBytesOnOneDevice(0),
             BytesOnOneDevice::of_slots(demand_in_slots),
         ),
@@ -292,6 +295,7 @@ fn a_deletion_batch_on_the_narrower_pool_whose_commit_generated_units_find_no_un
     assert_eq!(
         refusal.short_devices,
         the_same_shortage_on_both_devices(
+            JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
             AvailableBytesOnOneDevice(0),
             BytesOnOneDevice::of_slots(demand_in_slots),
         ),
@@ -363,6 +367,7 @@ fn a_write_whose_slot_pairs_outside_this_mounts_cluster_segments_are_all_taken_i
     assert_eq!(
         refusal.short_devices,
         the_same_shortage_on_both_devices(
+            JudgementThatFoundTheDeviceShort::SlotPairsOutsideTheClusterSegmentsForDataUnits,
             AvailableBytesOnOneDevice(0),
             BytesOnOneDevice::of_slots(slots_of_data_units(1)),
         ),
@@ -461,6 +466,7 @@ fn a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unbloc
     assert_eq!(
         refusal.short_devices,
         the_same_shortage_on_both_devices(
+            JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
             AvailableBytesOnOneDevice(0),
             BytesOnOneDevice::of_slots(commit_generated_slots),
         ),

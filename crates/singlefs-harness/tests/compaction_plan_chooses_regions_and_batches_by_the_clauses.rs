@@ -84,6 +84,7 @@ fn records_on_both_devices(slot: u64, span_slots: u16) -> [AllocationRecord; 2] 
         span_slots,
         generation: BIRTH_TXG,
         is_released: false,
+        quarantine_mark: singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
     })
 }
 

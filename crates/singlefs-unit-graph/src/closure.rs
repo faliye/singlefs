@@ -26,6 +26,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
 
+use crate::build_features::FeaturesEnabledByTheBuild;
 use crate::conditional_compilation::{
     atom_of_the_leaf, leaves_of_the_predicate, parse_predicate, rendered_predicate,
     target_platform_of_triple, CompilationConditions, ConditionalCompilationSet, Evaluation,
@@ -179,13 +180,15 @@ pub struct ExternalKeyInputs {
     pub lock_lines: Vec<String>,
 }
 
-/// 入口目标的条件：特性、`test`、命令行给的别的名字与键值、开不开默认特性。
+/// 入口目标的条件：特性、`test`、命令行给的别的名字与键值、开不开默认特性，连同这一次编译里 cargo 给各依赖包并上来的特性
+/// （`build_features`；解特性时这些包一被链进来就照请求）。
 struct EntryConditions {
     features: BTreeSet<String>,
     is_test: bool,
     extra_names: BTreeSet<String>,
     extra_key_values: BTreeSet<(String, String)>,
     uses_default_features: bool,
+    features_enabled_on_the_dependencies_by_the_build: BTreeMap<CrateIndex, BTreeSet<String>>,
 }
 
 /// 一次解析特性：每个被链进来的 crate 开了哪些特性、依赖边。
@@ -219,7 +222,7 @@ impl Link {
     }
 }
 
-fn dependency_crate_of(
+pub(crate) fn dependency_crate_of(
     workspace: &Workspace,
     crate_index: CrateIndex,
     path: &str,
@@ -257,12 +260,15 @@ fn request_feature(
 }
 
 /// 照 cargo 的特性统一（在这一次链接里）：根 crate 的请求起，展开 `[features]`（`dep:x`、`x/y`、`x?/y`），顺依赖边把请求传下去，到不再变为止。
+/// 非根的 crate 只顺普通依赖（它们的 dev 依赖不编）；同一次构建里别的根（别的包的测试与它们的 dev 依赖）并上来的特性从这一根的清单里看不出，
+/// 由 `features_enabled_by_the_build` 交进来：哪个 crate 一被链进来，就照这一次编译的样子再请求它那几个特性。
 fn resolve_features(
     workspace: &Workspace,
     root_crate: CrateIndex,
     root_sections: &[DependencySection],
     requested: &BTreeSet<String>,
     uses_default_features: bool,
+    features_enabled_by_the_build: &BTreeMap<CrateIndex, BTreeSet<String>>,
 ) -> FeatureResolution {
     let mut features: BTreeMap<CrateIndex, BTreeSet<String>> = BTreeMap::new();
     let mut enabled_optional: BTreeMap<CrateIndex, BTreeSet<String>> = BTreeMap::new();
@@ -293,6 +299,19 @@ fn resolve_features(
             + features.len();
         let crates_now: Vec<CrateIndex> = features.keys().copied().collect();
         for crate_index in crates_now {
+            for feature_enabled_by_the_build in features_enabled_by_the_build
+                .get(&crate_index)
+                .into_iter()
+                .flatten()
+            {
+                request_feature(
+                    workspace,
+                    crate_index,
+                    feature_enabled_by_the_build,
+                    &mut features,
+                    &mut enabled_optional,
+                );
+            }
             let manifest = &workspace.crates[crate_index.0].manifest;
             let enabled_now: Vec<String> = features
                 .get(&crate_index)
@@ -530,12 +549,26 @@ fn build_link(
         } else {
             (BTreeSet::new(), true)
         };
+        // 构建脚本是给宿主编的，它的依赖不与目标那一侧并特性（resolver 2）：并上来的特性只给目标那一侧的根
+        let no_features_enabled_by_the_build = BTreeMap::new();
+        let features_enabled_by_the_build = match root_target.kind {
+            TargetKind::BuildScript => &no_features_enabled_by_the_build,
+            TargetKind::Library
+            | TargetKind::Binary
+            | TargetKind::IntegrationTest
+            | TargetKind::Example
+            | TargetKind::Benchmark
+            | TargetKind::DocumentationTest => {
+                &entry_conditions.features_enabled_on_the_dependencies_by_the_build
+            }
+        };
         let resolution = resolve_features(
             workspace,
             root_target.crate_index,
             &dependency_sections_of(root_target.kind, is_test),
             &requested,
             uses_default,
+            features_enabled_by_the_build,
         );
         let root_visible = visible_from_root(workspace, root, &resolution);
         for visible_target in &root_visible {
@@ -1593,13 +1626,18 @@ impl<'workspace> ClosureRun<'workspace> {
     }
 }
 
-fn entry_conditions_of(request: &ClosureRequest, target_kind: TargetKind) -> EntryConditions {
+fn entry_conditions_of(
+    request: &ClosureRequest,
+    target_kind: TargetKind,
+    features_enabled_on_the_dependencies_by_the_build: BTreeMap<CrateIndex, BTreeSet<String>>,
+) -> EntryConditions {
     let mut conditions = EntryConditions {
         features: BTreeSet::new(),
         is_test: target_kind.is_compiled_as_test(),
         extra_names: BTreeSet::new(),
         extra_key_values: BTreeSet::new(),
         uses_default_features: request.uses_default_features,
+        features_enabled_on_the_dependencies_by_the_build,
     };
     for requested in &request.requested_conditions {
         match requested {
@@ -1804,6 +1842,7 @@ pub fn compute_closure(
 
 /// 从一组入口一起收闭包：`request.entry_path` 与 `additional_entry_paths`，都在 `request` 点名的那个目标里（同一个 crate），
 /// 按同一次收法从全部入口出发（R-方法 见过的方法名、点过名的类型几个入口共用），不是各收各的再并。
+/// 依赖包的特性只按清单解（没有别的包在同一次构建里并上来的特性）：同 [`compute_closure_of_entries_with_the_features_of_the_build`] 交空表。
 ///
 /// # Errors
 /// 同 [`compute_closure`]；另给的入口不在头一个入口的 crate 里。
@@ -1813,6 +1852,35 @@ pub fn compute_closure_of_entries(
     additional_entry_paths: &[String],
     switches: &RuleSwitches,
 ) -> Result<ClosureOutcome, EntryError> {
+    compute_closure_of_entries_with_the_features_of_the_build(
+        workspace,
+        request,
+        additional_entry_paths,
+        &FeaturesEnabledByTheBuild::default(),
+        switches,
+    )
+}
+
+/// 同 [`compute_closure_of_entries`]，另按这一次编译里 cargo 给各依赖包实际打开的特性（`build_features`，连别的包在同一次构建里
+/// 并上来的）解 cfg：那些包一被链进来，就照请求它们那几个特性，闭包与原子真值是这一次编出来的代码的样子。表里没有的包按清单解；
+/// 表是空的，与 [`compute_closure_of_entries`] 逐字相同。
+///
+/// # Errors
+/// 同 [`compute_closure_of_entries`]；表里点名的包工作区里没有（[`EntryError::CrateNotFound`]）。
+pub fn compute_closure_of_entries_with_the_features_of_the_build(
+    workspace: &Workspace,
+    request: &ClosureRequest,
+    additional_entry_paths: &[String],
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    switches: &RuleSwitches,
+) -> Result<ClosureOutcome, EntryError> {
+    let mut features_enabled_on_the_dependencies_by_the_build = BTreeMap::new();
+    for (package_name, features) in &features_enabled_by_the_build.features_of_each_package {
+        let crate_index = workspace
+            .crate_named(package_name)
+            .ok_or_else(|| EntryError::CrateNotFound(package_name.clone()))?;
+        features_enabled_on_the_dependencies_by_the_build.insert(crate_index, features.clone());
+    }
     let entry_target = resolve_entry_target(workspace, request)?;
     let crate_name = request
         .entry_path
@@ -1831,7 +1899,11 @@ pub fn compute_closure_of_entries(
             });
         }
     }
-    let entry_conditions = entry_conditions_of(request, workspace.targets[entry_target.0].kind);
+    let entry_conditions = entry_conditions_of(
+        request,
+        workspace.targets[entry_target.0].kind,
+        features_enabled_on_the_dependencies_by_the_build,
+    );
     let platform = target_platform_of_triple(&request.target_triple);
     let mut extra_roots: BTreeSet<TargetIndex> = BTreeSet::new();
     loop {

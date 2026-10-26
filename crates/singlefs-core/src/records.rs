@@ -633,10 +633,11 @@ impl DeadlistEntry {
         writer.into_bytes()
     }
 
-    /// 读者：条目宽窄于 43 交回 `None`（`parse_index_node` 只判了条目宽 ≥ key 宽）。
+    /// 读者：条目宽不等于 43 交回 `None`（`parse_index_node` 只判了条目宽 ≥ key 宽）。宽于 43 的同样不收
+    /// （I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C780、C867）。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() < DEADLIST_ENTRY_KEY_BYTES {
+        if bytes.len() != DEADLIST_ENTRY_KEY_BYTES {
             return None;
         }
         let mut reader = ByteReader::at(bytes, 0);
@@ -779,15 +780,16 @@ impl TreeTableEntry {
 /// 两种都是盘上读来的字节、不是我们的不变量：调用方把这条条目当损坏处置，不拿里面的指针去解引用。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PointerCarryingEntryRefusal {
-    /// 条目宽（索引节点头里的盘上字段）窄于字段表：调用方报「条目窄于字段表」。
-    NarrowerThanItsFieldTable,
+    /// 条目宽（索引节点头里的盘上字段）不等于字段表（窄于、宽于都算：I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，
+    /// 用户 2026-10-18 定「宽于字段表也拒」，欠账 C867）：调用方报「条目宽与字段表不符」。
+    WidthOtherThanItsFieldTable,
     /// 条目里那条指针的头部有一段不是第一版的取值（MAC / nonce、算法类型、压缩算法码与压后长度、extent 偏移）：判该指针所在的结构
     /// （这条条目）损坏（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。
     PointerHeadFieldOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
 }
 
 /// inode 内部条目 120 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 8），
-/// 窄于字段表、或子指针头部有一段不是第一版的取值时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
+/// 不等于字段表宽（窄于、宽于都算）、或子指针头部有一段不是第一版的取值时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
 /// 要分清是哪一种的调用方（冷启动走读、只读挂载打开池）用 [`parse_inode_internal_entry_or_refusal`]；只要知道解不解得开的（用例）用这一个。
 #[must_use]
 pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, NodePointer)> {
@@ -797,12 +799,12 @@ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, 
 /// 同 [`parse_inode_internal_entry`]，解不开时交回是哪一种。
 ///
 /// # Errors
-/// 窄于 120 ⇒ `NarrowerThanItsFieldTable`；子指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
+/// 不等于 120（窄于、宽于都算，欠账 C867）⇒ `WidthOtherThanItsFieldTable`；子指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
 pub fn parse_inode_internal_entry_or_refusal(
     bytes: &[u8],
 ) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
-    if bytes.len() < usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
-        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
+    if bytes.len() != usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
+        return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
     }
     let mut reader = ByteReader::at(bytes, 0);
     let separator_key = reader.get_u64();
@@ -823,12 +825,12 @@ pub fn parse_inode_internal_entry_or_refusal(
 /// 切到偏移 112 之前要在这里判一次；数据指针头部第一版之外的取值也在这里判）。
 ///
 /// # Errors
-/// 窄于 112 ⇒ `NarrowerThanItsFieldTable`；数据指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
+/// 不等于 112（窄于、宽于都算，欠账 C867）⇒ `WidthOtherThanItsFieldTable`；数据指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
 pub fn parse_extent_record(
     bytes: &[u8],
 ) -> Result<([u8; 24], DataPointer), PointerCarryingEntryRefusal> {
-    if bytes.len() < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
-        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
+    if bytes.len() != usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
+        return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
     }
     let key: [u8; 24] = bytes[..24].try_into().expect("24");
     let pointer =
@@ -1447,12 +1449,12 @@ mod tests {
         let entry_narrowed_to_the_key_width = |key_width: usize| vec![0u8; key_width];
         assert_eq!(
             parse_extent_record(&entry_narrowed_to_the_key_width(24)),
-            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
+            Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable),
             "extent 叶记录该有 112 字节，条目宽缩到 key 宽 24 时不解"
         );
         assert_eq!(
             parse_extent_record(&[0u8; 111]),
-            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
+            Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable),
             "差一个字节也不解"
         );
         assert!(

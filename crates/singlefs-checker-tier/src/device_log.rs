@@ -537,6 +537,17 @@ pub fn discardable_ranges_after_each_publish_found_in_the_stream(
         })
         .map(|retained| (retained.operation.offset.0, retained.operation.length))
         .collect();
+    // 一段都没发过时不判池级 checker，也就用不着那一刻的盘：不建、不施加，每次发布照返回点交回空区间。
+    // 施加要每个写都带着内容（`MemoryPool::apply`），没有候选时不该对流提这个要求。
+    if candidate_discards.is_empty() {
+        return publish_return_points_of_the_stream(operations, geometry)
+            .into_iter()
+            .map(|returned_at| DiscardableRangesAfterAPublish {
+                operations_recorded_when_the_publish_returned: returned_at,
+                discardable_ranges: Vec::new(),
+            })
+            .collect();
+    }
     let mut image_when_the_publish_returned = base.clone();
     let mut operations_applied = 0usize;
     let mut publishes = Vec::new();

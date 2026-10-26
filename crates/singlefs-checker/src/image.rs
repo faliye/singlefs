@@ -1,13 +1,14 @@
 //! 池级 checker 的输入与第一层判定：读盘的口子、每条不变量的四种判定、系统配置与根环（I-7 类）、指针与位置条目。
 //! 与实现只共享 `singlefs-format` 这一个常量模块（D13（验证路线） 已定项 5）：偏移在这里按字段表各写一份。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_format::{
     CLUSTER_SEGMENT_SLOTS, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
     JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, ROOT_RING_BASE_SLOT,
-    ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM,
-    SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS,
+    ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::{
@@ -53,7 +54,10 @@ pub const MAPPING_KEY_MATCHES_THE_UNIT_HEADER: &str = "I-1.11";
 /// `UnitAreaStartNotTheSlotAfterTheJournalRing` / `UnitAreaStartOffTheClusterSegmentBoundary`；实审 Y4-a，用户 2026-09-27 定
 /// 「读字段，不等于常量就整池拒」，与实现收同一张表）；区域数 R（偏移 361）与第一版常量 3 不等、每区槽数 S（偏移 362）越界同样归这一条
 /// （`RegionCountZero` / `RegionCountBelowTheFirstVersionConstant` / `RegionCountPastTheRegionDeviceFields` /
-/// `RootRingSlotsPerRegionOutsideTheFormatInterval`；用户 2026-10-20 定 C663）。**编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
+/// `RootRingSlotsPerRegionOutsideTheFormatInterval`；用户 2026-10-20 定 C663）；根环区域步长 P（偏移 363）、chunk（偏移 367）与第一版常量不等、
+/// S × 槽距大于 P × chunk 同样归这一条（`RootRingPrimeStepNotTheFirstVersionConstant` / `RootRingChunkBytesNotTheFirstVersionConstant` /
+/// `RootRingRegionLongerThanTheRegionStride`；D22（单元原子性怎么合成） 已定项 16 第 1 句，用户 2026-10-22 定）。
+/// **编号是暂立的，待 kb 第六批登记时定**；改号只改这一处。
 pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I-7.13";
 
 /// 「每块盘每个自证过的系统配置槽里的本盘设备号，等于这块盘在池里的身份」那一条（实审 Y2-b 越格线索：盘体对调之后的池
@@ -134,19 +138,35 @@ pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = 
 /// 第 100、101 条（下标 99、100）是截断那一批的两条新判（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 的 T-2、T-4）：
 /// 下标 99 的 I-4.10（截断中间态有账）与下标 100 的 I-9.38（数据单元声明长度对 size），同样只往末尾追加；判在删除态扫描里每一版各判
 /// （照 I-9.5 的共用判法）。同一批改了三条已有的判法：I-4.4 收截断条目（T-1）、I-4.6 每条记录都判单元数对 size 与标签（T-3）、
-/// I-1.13 两侧按 size 滤（T-5）。GPU 判器这一批不改（判决第四节「截戊」下一批）：两条新判还没进覆盖表，挂 `gpu` 特性的 checker 档编不过
-/// （`crash_judge_gpu` 的「覆盖表就是池级 checker 的每一条」编译期断言），等 GPU 一侧补内核与下标。
+/// I-1.13 两侧按 size 滤（T-5）。GPU 判器的扫描内核在删除态扫描里同判这两条、置位，覆盖表收了下标 99、100，对拍逐位比（判决第四节「截戊」那一批补的）。
 ///
 /// 第 102 条（下标 101）是截断字段那一批的新判（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6，方向照第四节第 2 条改写）：
 /// I-9.39（截断字段之外的活单元不早于它），同样只往末尾追加；判在删除态扫描里每一版各判（照 I-9.5 的共用判法）。同一批改了 I-9.7 的判法
 /// （偏移 108–119、136–139 恒 0，120 起的截断字段按 incompat 位 2 判）、系统配置那一判收 incompat 位 2、扫描重建加读法 Z 第四条（R3）。
-/// GPU 判器这一批不改（判决第四节、派发「截壬」下一批）：下标 101 还没进覆盖表，挂 `gpu` 特性的 checker 档同样编不过，等 GPU 一侧补。
+/// GPU 判器的扫描内核在删除态扫描里同判、置位，覆盖表收了下标 101，对拍逐位比（判决第四节、派发「截壬」那一批补的）。
 ///
 /// 第 103 条（下标 102）是 extent 上段规范形那一条（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M2）：
 /// I-9.40（extent 上段形状由有条目的 inode 号集合定），同样只往末尾追加；判在删除态扫描里每一版各判（与 I-9.5 那几条同一份版本清单，
 /// 每一版自己的树表与 extent 树另读一遍）。GPU 判器的扫描内核在删除态扫描里同判、置位，覆盖表收了下标 102，对拍逐位比
 /// （`crash_judge_conclusions` 的 `POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS` 是空表：GPU 内核今天没有不置位的不变量）。
-pub const IMPLEMENTED_INVARIANTS: [&str; 103] = [
+///
+/// 第 104 条（下标 103）是隔离记号那一条（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」，用户 2026-10-22 定落点甲、checker 只认记号）：
+/// I-3.17（隔离记号与引用相符），同样只往末尾追加；判在 `walk::check_pool_image` 里最新根那棵分配记录树上（`judge_quarantine_marks_against_the_references`）。
+/// 同一批把 I-3.1、I-3.11、I-3.15 的隔离豁免改成只认记号。GPU 判器的扫描内核同判、置位，覆盖表收了下标 103，对拍逐位比。
+///
+/// 第 105、106 条（下标 104、105）是钉也落盘那一批（C773（读坏与全零根槽的回收门槛钉只在内存里），根环三方第二、三轮判决与用户 2026-10-20 定案）：
+/// I-7.18（根记录的回收门槛等于现算的门槛）、I-7.19（钉着的槽不住本实例写的根），同样只往末尾追加；只判最新根、只判建账的发布
+/// （[`ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD`]）。GPU 判器的走读内核同判、置位。
+///
+/// 第 107、108 条（下标 106、107）是里程碑三收尾补的两条（`.claude/kb/checks-owed.md` 的 C868（系统配置管道身份没有 checker 判定）、
+/// C411（分配记录的跨度段与单元类别不符没检查））：I-1.5（系统配置记管道身份）判在择系统配置那一段（逐盘），I-3.18（分配记录的跨度等于它罩住的单元
+/// 那一类的槽数）判在 `walk::check_pool_image` 末尾那几遍（与 I-3.15 同一份版本清单），同样只往末尾追加。GPU 判器同判、置位：走读内核择系统配置时
+/// 逐盘判 I-1.5，引用与快照那一截判 I-3.18，`crash_judge_gpu` 的覆盖表收了下标 106、107，对拍逐位比。
+///
+/// 第 109 条（下标 108）是同盘冲突的 journal 记录布局那一条（`.claude/kb/checks-owed.md` 的 C897（同盘冲突的 journal 记录布局没有判据））：
+/// I-8.13（[`JOURNAL_RECORDS_LIVE_IN_THE_RING_SLOT_THEIR_COUNTER_NAMES`]），同样只往末尾追加；判在 `walk::check_pool_image` 扫 journal 环那一段
+/// （`judge_journal_records_live_in_the_ring_slot_their_counter_names`）。GPU 判器的那一位由 checker 档按这个下标补（`crash_judge_gpu` 的覆盖表）。
+pub const IMPLEMENTED_INVARIANTS: [&str; 109] = [
     "I-1.1",
     "I-1.2",
     "I-1.3",
@@ -250,7 +270,54 @@ pub const IMPLEMENTED_INVARIANTS: [&str; 103] = [
     DECLARED_LENGTH_OF_EACH_DATA_UNIT_WITHIN_THE_SIZE_MATCHES_THE_SIZE,
     LIVE_DATA_UNITS_BEYOND_THE_TRUNCATION_FIELD_ARE_BORN_NO_EARLIER_THAN_IT,
     EXTENT_UPPER_SEGMENT_IS_THE_CANONICAL_SHAPE_OF_THE_INODES_WITH_AN_ENTRY,
+    QUARANTINE_MARK_AGREES_WITH_THE_REFERENCES,
+    ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
+    PINNED_RING_SLOT_HOLDS_NO_ROOT_OF_THE_SAME_INSTANCE,
+    SYSTEM_CONFIGURATION_RECORDS_THE_WRITER_IDENTITY,
+    ALLOCATION_RECORD_SPAN_EQUALS_THE_SLOTS_OF_THE_CLASS_OF_THE_UNIT_IT_COVERS,
+    JOURNAL_RECORDS_LIVE_IN_THE_RING_SLOT_THEIR_COUNTER_NAMES,
 ];
+
+/// I-8.13（记录落在它的计数器该落的环槽，C897（同盘冲突的 journal 记录布局没有判据））：逐盘，每条自证过（池级 checker 的记录读者收得下、
+/// fsid 是本池的）的 journal 记录坐在环槽 `(计数器 − 1) mod 槽数`（D23（journal 的角色与格式） 已定项 18 的落点式），不在判红；
+/// 同盘同 (实例代号, 计数器) 两条坐两槽时至少一条不在该落的槽上，连带判红。计数器 0 不判（归 I-8.6）。
+/// 登记在 `crates/singlefs-checker/invariants/03-journal.md`。
+pub const JOURNAL_RECORDS_LIVE_IN_THE_RING_SLOT_THEIR_COUNTER_NAMES: &str = "I-8.13";
+/// I-8.13 一条都没判到时的理由。
+pub const NO_SELF_VERIFIED_JOURNAL_RECORD_WITH_A_COUNTER_FROM_ONE: &str =
+    "每块盘的 journal 环里都没有计数器从 1 起的自证过的记录";
+
+/// I-1.5（系统配置记管道身份，C868（系统配置管道身份没有 checker 判定））：每块盘择到的系统配置（自证过、世代号最大的那一槽）自举头里
+/// 「写入者身份 20」的实现标识 16 字节不全零（D22（单元原子性怎么合成） 已定项 9；core 写 `singlefs-rs`）。逐盘判一次。
+/// 登记在 `crates/singlefs-checker/invariants/01-块自描述.md`。
+pub const SYSTEM_CONFIGURATION_RECORDS_THE_WRITER_IDENTITY: &str = "I-1.5";
+
+/// I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数，C411（分配记录的跨度段与单元类别不符没检查））：回退候选集里每条根与由记录施加出来的
+/// 那几版，各自的分配记录树里每条未释放的记录，起点槽上的单元头用得了（头校验和对、类标签是码 1 / 2 / 3）时，跨度段 × 16384 等于那一类的
+/// 单元大小（D18（块里携带什么信息） 已定项 11 的登记表：码 1 与码 3 是 32768 两槽，码 2 是 16384 一槽）。几版照抄同一棵分配记录树的只判一次。
+/// 已释放的记录不判（落点可以已被别的类的单元合法复用），头用不了的没有对象（读不出归 I-1.1 与 I-2.1）。
+/// 登记在 `crates/singlefs-checker/invariants/05-空间记账.md`。
+pub const ALLOCATION_RECORD_SPAN_EQUALS_THE_SLOTS_OF_THE_CLASS_OF_THE_UNIT_IT_COVERS: &str =
+    "I-3.18";
+/// I-3.18 一条都没判到时的理由。
+pub const NO_UNRELEASED_ALLOCATION_RECORD_COVERING_A_USABLE_UNIT_HEADER: &str =
+    "回退候选集里没有一版的分配记录树走得到未释放、起点槽上单元头用得了的记录";
+
+/// I-3.17（隔离记号与引用相符，D19（块指针的结构与宽度预算） 已定项 5「新加判据『记号与引用相符』」）：最新根的分配记录树里，
+/// ① 带隔离记号（跨度段 0x4000）的记录未释放；② 带记号的记录罩住的槽不被最新根引用；③ 同一单元各盘那条记录的记号要么都有、要么都没有。
+/// 任一句不成立判红。登记在 `crates/singlefs-checker/invariants/05-空间记账.md`。
+pub const QUARANTINE_MARK_AGREES_WITH_THE_REFERENCES: &str = "I-3.17";
+/// I-3.17 没有对象时报的理由（`walk::judge_quarantine_marks_against_the_references`）。
+pub const NO_RECORD_CARRYING_THE_QUARANTINE_MARK_UNDER_THE_NEWEST_ROOT: &str =
+    "最新根的分配记录树里没有带隔离记号的记录";
+
+/// I-7.18（根记录的回收门槛等于现算的门槛，`crates/singlefs-checker/invariants/02-根环.md`）：最新根的账是它自己那次发布建的（树表里记账树那一条的
+/// 根指针出生 txg 等于这条根的 txg）时，根记录里的回收门槛 t = max(这条根自己带的 F, min(环里按最新根的实例表仍有效的根的最小 txg, 钉值 p))
+/// （p 是 255 时第二项只取前者，环里一条有效根都没有时取 F）。不是建账的发布（零单元发布、照抄上一版账的根）、最新根下面没有记账树时报不适用。
+pub const ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD: &str = "I-7.18";
+/// I-7.19（钉着的槽不住本实例写的根）：建账的最新根带的钉槽 p 不是 255 时，p 小于环长 3S、还原出的槽（区域 p mod 3、槽 p div 3）
+/// 里没有一条实例代号等于最新根的自证过的根。适用条件同 I-7.18。
+pub const PINNED_RING_SLOT_HOLDS_NO_ROOT_OF_THE_SAME_INSTANCE: &str = "I-7.19";
 
 /// I-4.10（截断中间态有账，判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 T-2）：每条 inode 记录，存在的数据单元多于
 /// ⌈size ÷ 净荷⌉.max(1)（size 之外还挂着单元）时，同一版 logged_ops 里有一条对得上的截断条目（inode 号、对象出生代相同、目标 = 记录的 size）。
@@ -279,8 +346,8 @@ pub const EXTENT_UPPER_SEGMENT_IS_THE_CANONICAL_SHAPE_OF_THE_INODES_WITH_AN_ENTR
 /// 与 G9「已死」类）：回退候选集里每条根与由记录施加出来的那几版，各自的分配记录树里每条未释放的记录，罩住的那一槽上单元头里的出生身份
 /// （类标签、诞生代号、写序实例、尾段，码 1 / 码 3 再加出生树）在同一版的中央映射里有一把 key 相符、且那把 key 的位置条目指着这一槽；
 /// 豁免三类（映射树各节点、树表、实例表各片）与根记录直接持有的那几样，改成要被根记录或映射树、实例表链里的父指针直接指着。
-/// 隔离的单元（已分配而读盘核出与位置项对不上，D19（块指针的结构与宽度预算） 已定项 5 硬规则 1，G9 单列的「隔离」类）不判；
-/// 单元头用不了的那一格没有对象（读不出本身归 I-1.1 与 I-2.1）。抓「只改映射不写副本」「只写副本不改映射」「有记录没人引用」三形。
+/// 隔离的单元（这一版这一单元每块盘上的未释放记录都带隔离记号，D19（块指针的结构与宽度预算） 已定项 5「池级 checker 只认记号」，
+/// G9 单列的「隔离」类）不判；单元头用不了的那一格没有对象（读不出本身归 I-1.1 与 I-2.1）。抓「只改映射不写副本」「只写副本不改映射」「有记录没人引用」三形。
 /// 登记在 `crates/singlefs-checker/invariants/05-空间记账.md`。
 pub const UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE: &str =
     "I-3.15";
@@ -347,8 +414,8 @@ pub const JOURNAL_RING_GEOMETRY_FIELDS_AGREE: &str = "I-8.1";
 /// I-7.5：每个根槽的起始偏移是判定宽度的整数倍；判定宽度 = 各盘所选系统配置声明的 max(physical_block_size, io_min) 里最大的那个
 /// （声明值，未探测：[`crate::DecisionWidth::DeclaredOnly`]）。R × S 个槽逐个判。
 pub const ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH: &str = "I-7.5";
-/// I-8.5（V-池）：全池至少一块盘有一个自证过的系统配置槽，全池皆废判红。单盘全废、哪块盘少于两槽自证过（可写挂载会拒）
-/// 不进违例通道，走旁路报告 [`system_configuration_redundancy_report`]。
+/// I-8.5（V-池）：全池至少一块盘有一个自证过的系统配置槽，全池皆废判红。单盘全废、哪块盘少于两槽自证过（带读故障时可能判不出而拒；
+/// 没有读故障时挂得上，取号写两轮补回那一槽）不进违例通道，走旁路报告 [`system_configuration_redundancy_report`]。
 pub const SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION: &str = "I-8.5";
 /// I-3.5（引用区间的精确性）的出现规则：回退候选集按 txg 升序、同 txg 并成一条，相邻两版 (R⁻, R)，R 引用而 R⁻ 不引用的每个单元
 /// 诞生代号大于 R⁻.txg，或落在 R 的一棵整棵继承下来的用户可见树里（按树继承下界）；候选集有洞时按实例表行判接不接得上，
@@ -479,10 +546,30 @@ pub struct Judgements {
     not_applicable: BTreeMap<&'static str, &'static str>,
     part_of_the_range_not_judged: BTreeMap<&'static str, &'static str>,
     partially_judged: BTreeMap<&'static str, String>,
+    /// 判红时点名的每一个（不变量, 盘, 槽），收全（[`Judgements::judge_naming_the_slots`]）；只有点名槽的那几判往里记。
+    violation_sites: BTreeSet<ViolationSite>,
+}
+
+/// 一处违例点名的（不变量, 盘, 起点槽）：故障归类器按它比「被吞的写插回去之后仍红」（判决 `research/prompts/m4-i315-r3-main-verification.md`
+/// 第三节 C3）。槽是那条分配记录的起点槽。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ViolationSite {
+    pub invariant: &'static str,
+    pub device: u32,
+    pub slot: u64,
+}
+
+/// 一张镜像的判定连同判红时点名的（不变量, 盘, 槽）（[`Judgements::into_report_naming_the_violation_sites`]）。
+/// 点名槽的只有 I-3.1、I-3.11（已分配、没有根引用、没被隔离豁免的单元）、I-3.10 与 I-3.15（判红的那条记录）；
+/// 别的不变量判红时这里没有它的行，要比就按名比。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerdictsNamingTheViolationSites {
+    pub verdicts: Vec<(&'static str, InvariantVerdict)>,
+    pub violation_sites: BTreeSet<ViolationSite>,
 }
 
 impl Judgements {
-    /// 评估一次：条件不成立就记下这一处（只留第一处）。
+    /// 评估一次：条件不成立就记下这一处的说明（说明只留第一处；要收全违例点名的槽用 [`Judgements::judge_naming_the_slots`]）。
     pub fn judge(&mut self, invariant: &'static str, holds: bool, detail: impl FnOnce() -> String) {
         assert!(
             IMPLEMENTED_INVARIANTS.contains(&invariant),
@@ -533,6 +620,35 @@ impl Judgements {
     pub fn first_violation_of(&self, invariant: &'static str) -> Option<&str> {
         self.first_violation.get(invariant).map(String::as_str)
     }
+    /// 同 [`Judgements::judge`]，条件不成立时另把 `slots` 交回的每一个（盘, 起点槽）记进违例点名表（全记，不只留第一处）。
+    pub fn judge_naming_the_slots(
+        &mut self,
+        invariant: &'static str,
+        holds: bool,
+        slots: impl FnOnce() -> Vec<(u32, u64)>,
+        detail: impl FnOnce() -> String,
+    ) {
+        self.judge(invariant, holds, detail);
+        if !holds {
+            self.violation_sites
+                .extend(slots().into_iter().map(|(device, slot)| ViolationSite {
+                    invariant,
+                    device,
+                    slot,
+                }));
+        }
+    }
+
+    /// 同 [`Judgements::into_report`]，另交回判红时点名的（不变量, 盘, 槽）。
+    #[must_use]
+    pub fn into_report_naming_the_violation_sites(mut self) -> VerdictsNamingTheViolationSites {
+        let violation_sites = std::mem::take(&mut self.violation_sites);
+        VerdictsNamingTheViolationSites {
+            verdicts: self.into_report(),
+            violation_sites,
+        }
+    }
+
     #[must_use]
     pub fn into_report(self) -> Vec<(&'static str, InvariantVerdict)> {
         IMPLEMENTED_INVARIANTS
@@ -580,6 +696,8 @@ pub struct PoolGeometry {
     pub declared_minimum_input_output_bytes: u32,
     pub regions: u64,
     pub slots_per_region: u64,
+    /// 槽里自述的区域步长 P（偏移 363）与 chunk（偏移 367）：[`geometry_of`] 判过两样都等于第一版常量才交出 [`PoolGeometry`]。
+    /// 放区域不读这两个字段，按格式常量放（[`root_slot_positions`]，与实现的 `root_ring::region_start` 一致）。
     pub prime_step: u64,
     pub chunk_bytes: u64,
     pub base_slot: u64,
@@ -612,6 +730,12 @@ pub const REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION: usize = 3;
 /// 「带这一版读者不收的值」（[`value_refused_by_this_reader`]），报违例、整池不作保（用户 2026-09-27 定系统配置越界整池拒；
 /// R、S 两样用户 2026-10-20 定 C663「S 照条款整池拒，R 读并整池拒」，S 那一半照 D22（单元原子性怎么合成） 已定项 2
 /// 「越界整池拒绝挂载，与每区槽数 S 越界同一个处置」）。槽距先判：它是根槽宽的上界。
+///
+/// 根环区域步长 P（363）、chunk（367）不等于第一版的格式常量 ⇒ [`crate::Verdict::RootRingPrimeStepNotTheFirstVersionConstant`] /
+/// [`crate::Verdict::RootRingChunkBytesNotTheFirstVersionConstant`]；两样都等而 S × 槽距大于 P × chunk ⇒
+/// [`crate::Verdict::RootRingRegionLongerThanTheRegionStride`]（D22（单元原子性怎么合成） 已定项 16 第 1 句，用户 2026-10-22 定）。
+/// 这三判排在根槽宽之后、环长之前，与实现的 `system_configuration_values_this_reader_accepts` 同在 R 之后、环长之前；
+/// 区域按常量放之后根槽偏移装得进 u64（基槽等于 64、R 等于 3、S ≤ 16、槽距是 4 字节），不另判溢出。
 ///
 /// journal 环起点（325）、根环起点（371）不等于第一版的格式常量，单元区起始槽号（417）不是环长现算的那个槽或不在聚簇段边界上，
 /// 同样各报一个成员、同样认成「带这一版读者不收的值」（实审 Y4-a，用户 2026-09-27 定「读字段，不等于常量就整池拒」）。
@@ -655,6 +779,17 @@ pub fn geometry_of(
     if !physical_block_size_fits_a_root_slot(view.declared_physical_block_size, slot_spacing) {
         return Err(crate::Verdict::PhysicalBlockSizeOutsideTheRootSlotBounds);
     }
+    let prime_step = u64::from(read_u32(slot, 363));
+    let chunk_bytes = u64::from(read_u32(slot, 367));
+    if prime_step != ROOT_RING_PRIME_STEP {
+        return Err(crate::Verdict::RootRingPrimeStepNotTheFirstVersionConstant);
+    }
+    if chunk_bytes != ROOT_RING_CHUNK_BYTES {
+        return Err(crate::Verdict::RootRingChunkBytesNotTheFirstVersionConstant);
+    }
+    if slots_per_region * u64::from(slot_spacing) > ROOT_RING_PRIME_STEP * ROOT_RING_CHUNK_BYTES {
+        return Err(crate::Verdict::RootRingRegionLongerThanTheRegionStride);
+    }
     if !journal_ring_bytes_lie_in_the_supported_range(
         journal_ring_start_slot,
         journal_ring_bytes,
@@ -671,22 +806,6 @@ pub fn geometry_of(
     }
     if !unit_area_start_slot.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
         return Err(crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary);
-    }
-    let prime_step = u64::from(read_u32(slot, 363));
-    let chunk_bytes = u64::from(read_u32(slot, 367));
-    // 最末一个根槽的偏移要装得进 u64：`root_slot_positions` 按 基槽 × 槽字节 + 区域 × 步长 × 区块字节 + 槽 × 槽距 算，
-    // 步长与区块字节是盘上读来的 u32，坏盘上两个都顶满、乘以区域号就溢出
-    let last_root_slot_offset = base_slot.checked_mul(SLOT_BYTES).and_then(|base| {
-        let last_region_start = (regions - 1)
-            .checked_mul(prime_step)?
-            .checked_mul(chunk_bytes)?
-            .checked_add(base)?;
-        (slots_per_region - 1)
-            .checked_mul(u64::from(slot_spacing))?
-            .checked_add(last_region_start)
-    });
-    if last_root_slot_offset.is_none() {
-        return Err(crate::Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace);
     }
     Ok(PoolGeometry {
         filesystem_identifier: view.filesystem_identifier,
@@ -867,6 +986,10 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
         | crate::Verdict::RegionCountPastTheRegionDeviceFields
         | crate::Verdict::RegionCountZero
         | crate::Verdict::RegionCountBelowTheFirstVersionConstant => true,
+        // P、chunk 与第一版常量不等、S × 槽距大于 P × chunk 整池拒：D22（单元原子性怎么合成） 已定项 16 第 1 句，用户 2026-10-22 定
+        crate::Verdict::RootRingPrimeStepNotTheFirstVersionConstant
+        | crate::Verdict::RootRingChunkBytesNotTheFirstVersionConstant
+        | crate::Verdict::RootRingRegionLongerThanTheRegionStride => true,
         crate::Verdict::FormatVersionNotRecognized
         | crate::Verdict::EncryptionTypeNotOff
         | crate::Verdict::FixedStructureSlotSpacingOutsideTheFormatRange
@@ -889,7 +1012,6 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
         | crate::Verdict::KeysNotStrictlyAscending
         | crate::Verdict::KeyOutsideDeclaredRange
         | crate::Verdict::UnknownRecordType
-        | crate::Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace
         | crate::Verdict::EncryptionReservedBytesNotZero
         | crate::Verdict::EntryWidthZeroWithEntries
         | crate::Verdict::RecordWidthZeroWithRecords
@@ -931,7 +1053,9 @@ pub const fn verdict_says_the_slot_does_not_verify_itself(verdict: &crate::Verdi
         | crate::Verdict::RootRingSlotsPerRegionOutsideTheFormatInterval
         | crate::Verdict::RegionCountZero
         | crate::Verdict::RegionCountBelowTheFirstVersionConstant
-        | crate::Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace
+        | crate::Verdict::RootRingPrimeStepNotTheFirstVersionConstant
+        | crate::Verdict::RootRingChunkBytesNotTheFirstVersionConstant
+        | crate::Verdict::RootRingRegionLongerThanTheRegionStride
         | crate::Verdict::EncryptionReservedBytesNotZero
         | crate::Verdict::EntryWidthZeroWithEntries
         | crate::Verdict::RecordWidthZeroWithRecords
@@ -1199,13 +1323,13 @@ pub fn root_slot_positions(geometry: &PoolGeometry) -> Vec<(u64, u64, u32, u64)>
     for region in 0..geometry.regions {
         // 下标在范围内不是这里判的：`geometry_of` 是盘上那一字节进 `PoolGeometry` 的唯一入口，
         // 它已经把 R > 3 的槽拒成 `Verdict::RegionCountPastTheRegionDeviceFields`、R = 0 拒成 `Verdict::RegionCountZero`、
-        // 下面这几步乘加会溢出的拒成 `Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace`，不交出 `PoolGeometry`。
+        // 基槽、R、S、槽距都过了它的判（基槽等于 64、R 等于 3、S ≤ 16、槽距是 4 字节），下面这几步乘加装得进 u64。
         let device = geometry.region_devices[usize::try_from(region).expect(
             "区域号：geometry_of 判过 R ≤ REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION",
         )];
         for slot in 0..geometry.slots_per_region {
             let offset = geometry.base_slot * SLOT_BYTES
-                + region * geometry.prime_step * geometry.chunk_bytes
+                + region * ROOT_RING_PRIME_STEP * ROOT_RING_CHUNK_BYTES
                 + slot * geometry.slot_spacing;
             positions.push((region, slot, device, offset));
         }
@@ -1481,9 +1605,9 @@ pub fn judge_some_device_carries_a_self_verified_system_configuration(
 pub struct SystemConfigurationRedundancyReport {
     /// 两个槽都没自证过的盘（单盘全废）。
     pub devices_without_a_self_verified_slot: Vec<u32>,
-    /// 少于两个槽自证过的盘：可写挂载读阶段读每块盘两槽，有一槽读不出或自证不过就判不出、按真，重读一次仍不成就拒可写
-    /// （D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）。单盘全废的盘也在这里。
-    pub devices_whose_writable_mount_would_be_refused: Vec<u32>,
+    /// 少于两个槽自证过的盘（少一槽自证过；单盘全废的盘也在这里）。这类盘的可写挂载带读故障时可能判不出而拒（判不出要有槽设备报读错，
+    /// D23（journal 的角色与格式） 已定项 14「可写挂载读到的更新状态读不出」）；没有读故障时挂得上，取号写两轮补回那一槽。
+    pub devices_with_fewer_than_two_self_verified_slots: Vec<u32>,
 }
 
 /// 逐盘数自证过的系统配置槽（magic 与整槽校验和都对），交回 [`SystemConfigurationRedundancyReport`]。槽的读法同
@@ -1494,7 +1618,7 @@ pub fn system_configuration_redundancy_report(
 ) -> SystemConfigurationRedundancyReport {
     let mut report = SystemConfigurationRedundancyReport {
         devices_without_a_self_verified_slot: Vec::new(),
-        devices_whose_writable_mount_would_be_refused: Vec::new(),
+        devices_with_fewer_than_two_self_verified_slots: Vec::new(),
     };
     for (device, slots) in system_configuration_slot_readings(reader) {
         let self_verified_slots = slots
@@ -1506,7 +1630,7 @@ pub fn system_configuration_redundancy_report(
         }
         if self_verified_slots < slots.len() {
             report
-                .devices_whose_writable_mount_would_be_refused
+                .devices_with_fewer_than_two_self_verified_slots
                 .push(device);
         }
     }
@@ -1716,10 +1840,10 @@ pub fn judge_pointer_encryption_and_compression_fields_take_the_first_version_va
     });
 }
 
-/// 根记录里算法类型 1 + nonce 12 + MAC 16 那 29 字节（D22（单元原子性怎么合成） 已定项 7 的字段表：偏移 428、429、441，合计到 457）。
-const ROOT_RECORD_ALGORITHM_NONCE_AND_MAC: std::ops::Range<usize> = 428..457;
+/// 根记录里算法类型 1 + nonce 12 + MAC 16 那 29 字节（D22（单元原子性怎么合成） 已定项 7 的字段表：回收门槛 t 与钉槽 p 之后，偏移 437、438、450，合计到 466）。
+const ROOT_RECORD_ALGORITHM_NONCE_AND_MAC: std::ops::Range<usize> = 437..466;
 
-/// I-2.4（头校验和覆盖范围） 射程里根记录那一处：根环里每一条读得出、自证过的根（`valid_roots`，不按候选集滤），根槽偏移 428..457
+/// I-2.4（头校验和覆盖范围） 射程里根记录那一处：根环里每一条读得出、自证过的根（`valid_roots`，不按候选集滤），根槽偏移 437..466
 /// （算法类型、nonce、MAC）全是 0。这一版 checker 只收加密类型 0 的系统配置，加密关着时它们恒 0、读者遇到非 0 判该结构损坏——
 /// 与单元头那 29 字节、指针头部 MAC / nonce 由同一条规则守（`crates/singlefs-checker/invariants/04-校验和.md` I-2.4 那一行；判决
 /// `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1「算法、nonce、MAC」那一行：单镜像性质，归池级 checker，
@@ -1741,7 +1865,7 @@ pub fn judge_root_record_algorithm_nonce_and_mac_are_zero(
                 .position(|byte| *byte != 0)
                 .expect("判红时这 29 字节里有非 0 的");
             format!(
-                "区域 {region} 槽 {slot} 的根（实例 {}、txg {}）：根槽偏移 {} 的字节是 {:#04x}，算法类型 / nonce / MAC 那 29 字节（428..457）加密关着时恒 0",
+                "区域 {region} 槽 {slot} 的根（实例 {}、txg {}）：根槽偏移 {} 的字节是 {:#04x}，算法类型 / nonce / MAC 那 29 字节（437..466）加密关着时恒 0",
                 root.instance,
                 root.checkpoint_txg,
                 ROOT_RECORD_ALGORITHM_NONCE_AND_MAC.start + first_non_zero,
@@ -1752,7 +1876,7 @@ pub fn judge_root_record_algorithm_nonce_and_mac_are_zero(
 }
 
 /// I-2.4（头校验和覆盖范围） 射程里根槽尾那一处：根环里每一条读得出、自证过的根（`valid_roots`，不按候选集滤），根记录之后到槽宽
-/// （[457, 槽宽)，槽宽是 `physical_block_size`，D22（单元原子性怎么合成） 已定项 7「512 槽内余量 55」那一段）全是 0，每条根判一格。
+/// （[466, 槽宽)，槽宽是 `physical_block_size`，D22（单元原子性怎么合成） 已定项 7「512 槽内余量 46」那一段）全是 0，每条根判一格。
 /// 第一版写 0（core 的 `RootRecord::to_slot` 补 0）、core 的读者不读这一段，往余量里加字段时同一次改动改这里的端点
 /// （用户 2026-10-20 定 C728「恒 0，由 checker 判」）。只判不断：这条根照样进候选集、照样走。
 pub fn judge_root_slot_bytes_past_the_record_are_zero(
@@ -2205,11 +2329,11 @@ mod tests {
         );
     }
 
-    /// C728 根槽尾：第 0 代根的根记录之后头一个字节（偏移 457）写 1、重封自证校验和——池级 checker 判 I-2.4 红、点名那个偏移。
+    /// C728 根槽尾：第 0 代根的根记录之后头一个字节（偏移 466）写 1、重封自证校验和——池级 checker 判 I-2.4 红、点名那个偏移。
     #[test]
     fn a_non_zero_byte_right_past_the_root_record_reddens_header_checksum_coverage() {
         let mut pool = pool_holding_only_first_version_values();
-        let record_end = usize::try_from(ROOT_RECORD_BYTES).expect("457");
+        let record_end = usize::try_from(ROOT_RECORD_BYTES).expect("466");
         let mut root_slot = genesis_root_slot();
         root_slot[record_end] = 1;
         seal(&mut root_slot, ROOT_CHECKSUM_OFFSET);
@@ -2222,8 +2346,8 @@ mod tests {
             );
         };
         assert!(
-            detail.contains("根槽偏移 457 "),
-            "违例点名根槽偏移 457：{detail}"
+            detail.contains("根槽偏移 466 "),
+            "违例点名根槽偏移 466：{detail}"
         );
     }
 }

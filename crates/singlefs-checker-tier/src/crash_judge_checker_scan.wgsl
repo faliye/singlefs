@@ -41,25 +41,29 @@ var<private> c_seen_node_walked_to_its_leaves: array<u32, 8>;
 
 var<private> c_examined_count: u32;
 
-var<private> c_harvested: bool;
-
 var<private> c_exempted: array<u32, 8>;
 
 var<private> c_deferred_per_device: array<u32, 8>;
 
+// I-3.1 钉带出来的那一截（walk.rs released_slots_the_pin_kept_in_defer）逐盘几个槽，与它们在 C_DEFERRED 里接在 F 之下的推迟后面的行数
+var<private> c_kept_in_defer_by_the_pin_per_device: array<u32, 8>;
+
+var<private> c_kept_in_defer_by_the_pin_count: u32;
+
 // 已释放记录那张表（C_RELEASED）按 (盘, 槽) 的桶表，写法同 crash_judge_checker_common.wgsl 的 slot_key_first_bucket 那一段：最新根那一遍收完
-// 已释放记录之后建，候选根那几遍里 r_note 按它找。借 C_JOURNAL_GROUP_KEYS 的前 C_RELEASED_BUCKET_COUNT 个字：I-1.8 在这之前用完，
-// I-3.10 在这之后自己清桶
+// 已释放记录之后建，候选根那几遍里 r_note 按它找。借 crash_judge_checker_common.wgsl ⑮ 的 C_ALLOCATION_RECORD_BUCKETS 那一段（与 I-3.10 的去重桶表
+// 先后借，为什么不同时用见那一处）：C_MAX_RELEASED 随分配记录那张表抬到 8192 条时桶表 16384 个字，原来借的 C_JOURNAL_GROUP_KEYS 那 8192 个字装不下
 const C_RELEASED_BUCKET_COUNT: u32 = 2u * C_MAX_RELEASED;
 
-const C_RELEASED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
+const C_RELEASED_BUCKETS: u32 = C_ALLOCATION_RECORD_BUCKETS;
 
-// 借的那几段装得下（解析内核时判，不进展开量）：已释放记录的桶表与 I-1.8 的检查字在 C_JOURNAL_GROUP_KEYS 里，I-1.8 的次序在 C_ROW_ORDER 里
-const_assert C_RELEASED_BUCKET_COUNT <= C_JOURNAL_GROUP_KEYS_END - C_JOURNAL_GROUP_KEYS;
+// 借的那几段装得下（解析内核时判，不进展开量）：已释放记录的桶表在 C_ALLOCATION_RECORD_BUCKETS 里，I-1.8 的检查字在 C_JOURNAL_GROUP_KEYS 里、
+// 次序在 C_ROW_ORDER 里
+const_assert C_RELEASED_BUCKET_COUNT <= C_ALLOCATION_RECORD_BUCKET_WORDS;
 
 const_assert C_MAX_SCANNED <= C_JOURNAL_GROUP_KEYS_END - C_JOURNAL_GROUP_KEYS;
 
-const_assert C_MAX_SCANNED <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
+const_assert C_MAX_SCANNED <= C_ROW_ORDER_END - C_ROW_ORDER;
 
 // 引用集合这一遍「记一条指针」：只回答「这条指针指着哪条已释放记录的落点」，位记在 (记录, 候选根) 上。原来每记一条指针都把已释放记录从头比到尾，
 // 改成两条位置条目各按桶表找一遍：同 (盘, 槽) 的几条记录都在从首桶起到第一个空桶那一段里，一条记录两条位置条目都对上时同一位置两次，与原来一样
@@ -301,7 +305,11 @@ fn r_seen_insert(device: u32, slot: vec2<u32>) -> bool {
     return true;
 }
 
-fn c_append_allocation_record(device: u32, slot: vec2<u32>, span: u32, generation: vec2<u32>, released: u32) -> bool {
+// C_ALLOC_RECORDS 一行第八个字里这一位：跨度段带隔离记号（0x4000，D19（块指针的结构与宽度预算） 已定项 5；walk.rs AllocationRecordView 的
+// quarantine_mark）。同一个字的低两位是 I-3.15 那一遍的记号（G_RECORD_OFF_THE_CENTRAL_MAPPING 那两个值），两样各占各的位
+const C_ALLOC_RECORD_QUARANTINE_MARK_BIT: u32 = 0x80000000u;
+
+fn c_append_allocation_record(device: u32, slot: vec2<u32>, span: u32, generation: vec2<u32>, released: u32, quarantine_mark: u32) -> bool {
     if (c_alloc_record_count >= C_MAX_ALLOC_RECORDS) {
         undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (20u << 8u);
         return false;
@@ -314,7 +322,7 @@ fn c_append_allocation_record(device: u32, slot: vec2<u32>, span: u32, generatio
     sws(row + 4u, generation.x);
     sws(row + 5u, generation.y);
     sws(row + 6u, released);
-    sws(row + 7u, 0u);
+    sws(row + 7u, select(0u, C_ALLOC_RECORD_QUARANTINE_MARK_BIT, quarantine_mark == 1u));
     c_alloc_record_count = c_alloc_record_count + 1u;
     return true;
 }
@@ -362,7 +370,9 @@ fn r_allocation_tree(base: u32, offset: u32) -> bool {
             for (var e = 0u; e < n.entry_count; e = e + 1u) {
                 let o = entry_offset(n, e);
                 let span_field = rd16(n.base, o + 10u);
-                if (!c_append_allocation_record(rd32(n.base, o), rd48(n.base, o + 4u), span_field & 0x7FFFu, rd64(n.base, o + 12u), span_field >> 15u)) {
+                // 跨度去掉已释放标志与隔离记号；两个标志各记一个字（walk.rs parse_allocation_record：同时置的也照读，由 I-3.17 判红）
+                if (!c_append_allocation_record(rd32(n.base, o), rd48(n.base, o + 4u), span_field & 0x3FFFu, rd64(n.base, o + 12u), span_field >> 15u,
+                    (span_field >> 14u) & 1u)) {
                     ok = false;
                     break;
                 }
@@ -1223,10 +1233,10 @@ fn judge_allocation_record_ranges() {
     if (c_alloc_record_count > 0u) {
         judge(INVARIANT_I_5_4, true);
     }
-    order_rows_by_their_first_four_words(C_ALLOC_RECORDS, C_ALLOC_RECORD_WORDS, c_alloc_record_count, C_ROW_ORDER);
+    order_rows_by_their_first_four_words(C_ALLOC_RECORDS, C_ALLOC_RECORD_WORDS, c_alloc_record_count, C_ALLOCATION_RECORD_ROW_ORDER);
     for (var position = 1u; position < c_alloc_record_count; position = position + 1u) {
-        let earlier = C_ALLOC_RECORDS + sw(C_ROW_ORDER + position - 1u) * C_ALLOC_RECORD_WORDS;
-        let later = C_ALLOC_RECORDS + sw(C_ROW_ORDER + position) * C_ALLOC_RECORD_WORDS;
+        let earlier = C_ALLOC_RECORDS + sw(C_ALLOCATION_RECORD_ROW_ORDER + position - 1u) * C_ALLOC_RECORD_WORDS;
+        let later = C_ALLOC_RECORDS + sw(C_ALLOCATION_RECORD_ROW_ORDER + position) * C_ALLOC_RECORD_WORDS;
         if (sw(earlier) == sw(later)
             && lt64(vec2<u32>(sw(later + 1u), sw(later + 2u)), add64(vec2<u32>(sw(earlier + 1u), sw(earlier + 2u)), u64_of(sw(earlier + 3u))))) {
             violate(INVARIANT_I_5_4);
@@ -1329,14 +1339,14 @@ fn judge_allocation_records_disjoint() {
 // I-3.10 去重表 C_EXAMINED（每行 5 字：盘、槽 lo/hi、代 lo/hi）的桶：每个桶记一行的下标 + 1，0 是空桶，按 (盘, 槽, 代) 散列、撞了往后挪一个桶。
 // 原来每条记录从头比到表尾，各版的记录多半已判过，条数平方长。桶数取表的两倍，表满（C_MAX_EXAMINED 行）时也至少一半是空桶，往后挪总停得下；
 // 表满之后新来的记录不进表、照判（judge_allocation_generations_of_the_records），去重只省重读单元头。
-// 借 C_JOURNAL_GROUP_KEYS 那一段：那是走读内核逐盘 journal 用的；扫描内核里 I-1.8（检查字）与 I-3.9（已释放记录的桶表）在这之前借过、
-// 各自用完，这里开判时从头清
+// 借 crash_judge_checker_common.wgsl ⑮ 的 C_ALLOCATION_RECORD_BUCKETS 那一段：I-3.9 已释放记录的桶表在引用与快照那一截（这一趟之后的那一趟）也借它，
+// 两处各自开判时从头清（原来借 C_JOURNAL_GROUP_KEYS 那 8192 个字，C_MAX_EXAMINED 随分配记录那张表抬到 8192 条时桶表 16384 个字装不下）
 const C_EXAMINED_BUCKET_COUNT: u32 = 2u * C_MAX_EXAMINED;
 
-const C_EXAMINED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
+const C_EXAMINED_BUCKETS: u32 = C_ALLOCATION_RECORD_BUCKETS;
 
-// 借的那一段装得下：越过 C_JOURNAL_GROUP_KEYS_END 就压到它后面的表上
-const_assert C_EXAMINED_BUCKET_COUNT <= C_JOURNAL_GROUP_KEYS_END - C_JOURNAL_GROUP_KEYS;
+// 借的那一段装得下：越过 C_ALLOCATION_RECORD_BUCKET_WORDS 就越过草稿区末端（SCRATCH_END）
+const_assert C_EXAMINED_BUCKET_COUNT <= C_ALLOCATION_RECORD_BUCKET_WORDS;
 
 fn c_examined_first_bucket(device: u32, slot: vec2<u32>, generation: vec2<u32>) -> u32 {
     var hash = device * 0x9E3779B1u;
@@ -1865,84 +1875,24 @@ fn judge_rollback_floor_raises_against_their_ceilings() {
     }
 }
 
-// 位置项里指着 (盘, 槽) 的校验和：走过的版本收到的，查不到时把根环里没走过的根整遍走一次补进来（只补这一次）
-fn c_location_entry_checksum_known(device: u32, slot: vec2<u32>, fsid_low: vec2<u32>) -> bool {
-    for (var i = 0u; i < w_checksum_count; i = i + 1u) {
-        if (sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS) == device && sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS + 1u) == slot.x && sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS + 2u) == slot.y) {
-            return true;
-        }
-    }
-    // 根环里没走过的根那一遍走读内核已经走过（`hand_off_to_the_scan_kernel`）、位置项校验和在 C_HARVEST；
-    // 与 CPU 同一个懒法：第一次查不到才开始用它
-    if (!c_harvested) {
-        c_harvested = true;
-    }
-    for (var i = 0u; i < w_harvest_count; i = i + 1u) {
-        if (sw(C_HARVEST + i * C_CHECKSUM_WORDS) == device && sw(C_HARVEST + i * C_CHECKSUM_WORDS + 1u) == slot.x && sw(C_HARVEST + i * C_CHECKSUM_WORDS + 2u) == slot.y) {
-            return true;
-        }
-    }
-    return false;
-}
-
-fn c_location_entry_checksum_contains(device: u32, slot: vec2<u32>, checksum: u32) -> bool {
-    for (var i = 0u; i < w_checksum_count; i = i + 1u) {
-        if (sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS) == device && sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS + 1u) == slot.x && sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS + 2u) == slot.y
-            && sw(C_CHECKSUMS + i * C_CHECKSUM_WORDS + 3u) == checksum) {
-            return true;
-        }
-    }
-    if (!c_harvested) {
-        return false;
-    }
-    for (var i = 0u; i < w_harvest_count; i = i + 1u) {
-        if (sw(C_HARVEST + i * C_CHECKSUM_WORDS) == device && sw(C_HARVEST + i * C_CHECKSUM_WORDS + 1u) == slot.x && sw(C_HARVEST + i * C_CHECKSUM_WORDS + 2u) == slot.y
-            && sw(C_HARVEST + i * C_CHECKSUM_WORDS + 3u) == checksum) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// 隔离的记录那一份读回来对不对：读得出、整单元 CRC 在指着它的位置项里；没有位置项指着它时退回自证（check_unit）
-fn c_copy_matches_its_location_entry(device: u32, slot: vec2<u32>, span: u32, fsid_low: vec2<u32>) -> bool {
-    let s = read_at(device, slot_to_bytes(slot), span << SLOT_SHIFT);
-    if (s.version == NONE) {
-        return false;
-    }
-    var checksum = s.c0;
-    if (span == 2u) {
-        checksum = s.c1;
-    }
-    if (c_location_entry_checksum_known(device, slot, fsid_low)) {
-        return c_location_entry_checksum_contains(device, slot, checksum);
-    }
-    // check_unit：magic、flags、类 1 / 2 / 3、长度按类、头校验和、载荷 CRC、版本、预留位
-    if (rd32(s.base, 0u) != MAGIC_SFSU || rd8(s.base, 7u) != 0u || rd16(s.base, 4u) != 1u) {
-        return false;
-    }
-    let unit_class = rd8(s.base, 6u);
-    var expected_span = 2u;
-    if (unit_class == 2u) {
-        expected_span = 1u;
-    } else if (unit_class != 1u && unit_class != 3u) {
-        return false;
-    }
-    if (span != expected_span) {
-        return false;
-    }
-    return (s.c2 & 11u) == 11u;
-}
-
 // C_GROUPS 一行第四个字（盘位掩码）里这一位：这一组整组豁免了（I-3.16 收占着的槽读它；盘位只占低 MAX_DEVICES 位）
 const C_GROUP_EXEMPTED_AS_QUARANTINED: u32 = 0x80000000u;
+
+// 同一个字里这一位：组里有一条记录不带隔离记号（walk.rs quarantined_slots_exempted_per_device：组里每一条都带记号才豁免，
+// every_copy_of_the_unit_carries_the_quarantine_mark；归组那一刻就记）
+const C_GROUP_SOME_COPY_UNMARKED: u32 = 0x40000000u;
 
 // 最近那一次 c_quarantine_exempted 记进 C_GROUPS 的组数
 var<private> c_quarantine_group_count: u32;
 
-// quarantined_slots_exempted_per_device：最新根的分配记录树里未释放、没有根引用起在它那一槽的记录，按单元归组；有一份读回来对不上，整组豁免
-// （整组豁免的那一行掩码字带上 C_GROUP_EXEMPTED_AS_QUARANTINED：walk.rs 交回的 slots 就是这几组每块盘上罩住的槽）
-fn c_quarantine_exempted(newest_base: u32, reference_limit: u32, fsid_low: vec2<u32>) {
+// quarantined_slots_exempted_per_device：最新根的分配记录树里未释放、没有根引用起在它那一槽的记录，按单元归组；组里每一条都带隔离记号的整组豁免，
+// 只认记号、不读副本（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-10-22 定）。整组豁免的那一行掩码字带上 C_GROUP_EXEMPTED_AS_QUARANTINED：
+// walk.rs 交回的 slots 就是这几组每块盘上罩住的槽
+// judging_the_quarantine_marks：这一遍顺带判 I-3.17（第二遍、读的就是最新根那几棵；不另走一遍分配记录树，免得 r_allocation_tree 多展开一份）。
+// 树表里种类 3 的每一棵读进 C_ALLOC_RECORDS 时接着上一棵往后记、不从 0 数（同 g_allocation_records_of_the_version）：walk.rs
+// allocation_records_of_the_newest_root_without_judging 把最新根的全部分配记录树合成一张表，I-3.17 第三句按单元归组归的是这张合起来的表，
+// 同一单元的几条记录分落几棵树时也归进一组；读不全的那一棵 r_allocation_tree 复位到它之前的条数，与 walk.rs 跳过那一棵相同
+fn c_quarantine_exempted(newest_base: u32, reference_limit: u32, judging_the_quarantine_marks: bool) {
     let device_count = hdr(3u);
     for (var d = 0u; d < 8u; d = d + 1u) {
         c_exempted[d] = 0u;
@@ -1954,22 +1904,26 @@ fn c_quarantine_exempted(newest_base: u32, reference_limit: u32, fsid_low: vec2<
     }
     let tt = r_read_index_node(tree_table_pointer);
     if (!tt.ok || tt.entry_width < 200u) {
+        if (judging_the_quarantine_marks) {
+            mark_part_of_the_range_not_judged(INVARIANT_I_3_17);
+        }
         return;
     }
     // 分配记录树的节点按最新根自己的中央映射认位置（walk.rs quarantined_slots_exempted_per_device 的 central_mapping）
     s_use_the_central_mapping_named_at(newest_base, G_ROOT_RECORD_MAPPING_ROOT_POINTER);
     var groups = 0u;
     r_noting = false;
+    c_alloc_record_count = 0u;
     for (var e = 0u; e < tt.entry_count; e = e + 1u) {
         let o = entry_offset(tt, e);
         if (rd16(tt.base, o + 10u) != TREE_KIND_ALLOCATION || parse_node_pointer(tt.base, o + 14u).all_zero) {
             continue;
         }
-        c_alloc_record_count = 0u;
+        let records_of_the_earlier_trees = c_alloc_record_count;
         if (!r_allocation_tree(tt.base, o + 14u)) {
             continue;
         }
-        for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
+        for (var i = records_of_the_earlier_trees; i < c_alloc_record_count; i = i + 1u) {
             let a = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
             let device = sw(a);
             let slot = vec2<u32>(sw(a + 1u), sw(a + 2u));
@@ -1986,11 +1940,15 @@ fn c_quarantine_exempted(newest_base: u32, reference_limit: u32, fsid_low: vec2<
             if (device_index == NONE) {
                 continue;
             }
+            var copy_bits = 1u << device_index;
+            if ((sw(a + 7u) & C_ALLOC_RECORD_QUARANTINE_MARK_BIT) == 0u) {
+                copy_bits = copy_bits | C_GROUP_SOME_COPY_UNMARKED;
+            }
             var found = false;
             for (var k = 0u; k < groups; k = k + 1u) {
                 let group = C_GROUPS + k * 4u;
                 if (sw(group) == slot.x && sw(group + 1u) == slot.y && sw(group + 2u) == span) {
-                    sws(group + 3u, sw(group + 3u) | (1u << device_index));
+                    sws(group + 3u, sw(group + 3u) | copy_bits);
                     found = true;
                 }
             }
@@ -2002,23 +1960,21 @@ fn c_quarantine_exempted(newest_base: u32, reference_limit: u32, fsid_low: vec2<
                 sws(C_GROUPS + groups * 4u, slot.x);
                 sws(C_GROUPS + groups * 4u + 1u, slot.y);
                 sws(C_GROUPS + groups * 4u + 2u, span);
-                sws(C_GROUPS + groups * 4u + 3u, 1u << device_index);
+                sws(C_GROUPS + groups * 4u + 3u, copy_bits);
                 groups = groups + 1u;
             }
         }
     }
+    if (judging_the_quarantine_marks) {
+        c_judge_the_quarantine_marks_of_the_records_read();
+    }
     for (var k = 0u; k < groups; k = k + 1u) {
         let group = C_GROUPS + k * 4u;
-        let slot = vec2<u32>(sw(group), sw(group + 1u));
+        let mask = sw(group + 3u) & ~C_GROUP_SOME_COPY_UNMARKED;
         let span = sw(group + 2u);
-        let mask = sw(group + 3u);
-        var some_copy_fails = false;
-        for (var d = 0u; d < device_count; d = d + 1u) {
-            if ((mask & (1u << d)) != 0u && !c_copy_matches_its_location_entry(hdr(12u + d), slot, span, fsid_low)) {
-                some_copy_fails = true;
-            }
-        }
-        if (some_copy_fails) {
+        let every_copy_is_marked = (sw(group + 3u) & C_GROUP_SOME_COPY_UNMARKED) == 0u;
+        sws(group + 3u, mask);
+        if (every_copy_is_marked) {
             for (var d = 0u; d < device_count; d = d + 1u) {
                 if ((mask & (1u << d)) != 0u) {
                     c_exempted[d] = c_exempted[d] + span;
@@ -2038,8 +1994,10 @@ fn c_deferred_below_the_floor(newest_base: u32) {
     let device_count = hdr(3u);
     for (var d = 0u; d < 8u; d = d + 1u) {
         c_deferred_per_device[d] = 0u;
+        c_kept_in_defer_by_the_pin_per_device[d] = 0u;
     }
     c_deferred_count = 0u;
+    c_kept_in_defer_by_the_pin_count = 0u;
     let tree_table_pointer = parse_node_pointer(newest_base, 36u);
     if (tree_table_pointer.all_zero) {
         return;
@@ -2051,6 +2009,11 @@ fn c_deferred_below_the_floor(newest_base: u32) {
     // 分配记录树的节点按最新根自己的中央映射认位置（walk.rs deferred_slots_referenced_only_below_the_floor_per_device 的 central_mapping）
     s_use_the_central_mapping_named_at(newest_base, G_ROOT_RECORD_MAPPING_ROOT_POINTER);
     var released_above = 0u;
+    // 钉带出来的那一截的记录从 C_RELEASED_ABOVE 表尾往前放（与上面那张共用这一段、两头往中间长），只在有记账、t 低于不带钉现算的门槛时收
+    let reclaim_threshold_on_the_root = rd64(newest_base, ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET);
+    let reclaim_threshold_without_the_pin = c_reclaim_threshold_without_the_pin();
+    let collects_the_band_the_pin_kept = w_accounting_seen && lt64(reclaim_threshold_on_the_root, reclaim_threshold_without_the_pin);
+    var band_records = 0u;
     r_noting = false;
     for (var e = 0u; e < tt.entry_count; e = e + 1u) {
         let o = entry_offset(tt, e);
@@ -2063,8 +2026,27 @@ fn c_deferred_below_the_floor(newest_base: u32) {
         }
         for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
             let a = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-            if (sw(a + 6u) == 0u || !lt64(c_effective_floor, vec2<u32>(sw(a + 4u), sw(a + 5u)))) {
+            let generation = vec2<u32>(sw(a + 4u), sw(a + 5u));
+            if (collects_the_band_the_pin_kept && sw(a + 6u) != 0u && lt64(reclaim_threshold_on_the_root, generation)
+                && le64(generation, reclaim_threshold_without_the_pin)) {
+                if (released_above + band_records >= C_MAX_RELEASED_ABOVE) {
+                    undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (115u << 8u);
+                    return;
+                }
+                let band_row = C_RELEASED_ABOVE + (C_MAX_RELEASED_ABOVE - 1u - band_records) * C_RELEASED_ABOVE_WORDS;
+                sws(band_row, sw(a));
+                sws(band_row + 1u, sw(a + 1u));
+                sws(band_row + 2u, sw(a + 2u));
+                sws(band_row + 3u, sw(a + 3u));
+                band_records = band_records + 1u;
+            }
+            if (sw(a + 6u) == 0u || !lt64(c_effective_floor, generation)) {
                 continue;
+            }
+            // 两头往中间长，碰上了判不了（与上面收那一截那一处同一个站点）
+            if (released_above + band_records >= C_MAX_RELEASED_ABOVE) {
+                undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (115u << 8u);
+                return;
             }
             if (released_above >= C_MAX_RELEASED_ABOVE) {
                 undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (34u << 8u);
@@ -2078,12 +2060,9 @@ fn c_deferred_below_the_floor(newest_base: u32) {
             released_above = released_above + 1u;
         }
     }
-    if (released_above == 0u) {
-        return;
-    }
     // F 之下、没被抛弃的根引用的、候选版本没走到的槽（走读内核交过来的清单，已去重）里，落在释放代高于 F 的已释放记录罩住的槽上的
     var deferred = 0u;
-    let below_floor_slot_count = sw(H_BASE + H_BELOW_FLOOR_SLOT_COUNT);
+    let below_floor_slot_count = select(0u, sw(H_BASE + H_BELOW_FLOOR_SLOT_COUNT), released_above > 0u);
     for (var i = 0u; i < below_floor_slot_count; i = i + 1u) {
         let device = sw(H_BELOW_FLOOR_SLOTS + i * 3u);
         let slot = vec2<u32>(sw(H_BELOW_FLOOR_SLOTS + i * 3u + 1u), sw(H_BELOW_FLOOR_SLOTS + i * 3u + 2u));
@@ -2118,6 +2097,90 @@ fn c_deferred_below_the_floor(newest_base: u32) {
             }
         }
     }
+    // I-3.1 钉带出来的那一截（walk.rs released_slots_the_pin_kept_in_defer）：释放代落在 (t, 不带钉现算的门槛] 的记录罩住的槽，去掉候选版本走到的、
+    // 第一遍整组豁免的、F 之下仍在 defer 的与被抛弃根引用着的，去重之后接在 C_DEFERRED 那几行后面
+    var kept_by_the_pin = 0u;
+    for (var k = 0u; k < band_records; k = k + 1u) {
+        let record = C_RELEASED_ABOVE + (C_MAX_RELEASED_ABOVE - 1u - k) * C_RELEASED_ABOVE_WORDS;
+        let device = sw(record);
+        let record_slot = vec2<u32>(sw(record + 1u), sw(record + 2u));
+        for (var s = 0u; s < sw(record + 3u); s = s + 1u) {
+            let slot = add64(record_slot, u64_of(s));
+            if (c_walked_slot(device, slot) || c_slot_exempted_as_quarantined(device, slot)
+                || c_slot_referenced_by_an_abandoned_root(device, slot)) {
+                continue;
+            }
+            var already_counted = false;
+            for (var q = 0u; q < deferred + kept_by_the_pin; q = q + 1u) {
+                if (sw(C_DEFERRED + q * 3u) == device && sw(C_DEFERRED + q * 3u + 1u) == slot.x && sw(C_DEFERRED + q * 3u + 2u) == slot.y) {
+                    already_counted = true;
+                }
+            }
+            if (already_counted) {
+                continue;
+            }
+            if (deferred + kept_by_the_pin >= C_MAX_DEFERRED) {
+                undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (116u << 8u);
+                return;
+            }
+            let row = C_DEFERRED + (deferred + kept_by_the_pin) * 3u;
+            sws(row, device);
+            sws(row + 1u, slot.x);
+            sws(row + 2u, slot.y);
+            kept_by_the_pin = kept_by_the_pin + 1u;
+        }
+    }
+    c_kept_in_defer_by_the_pin_count = kept_by_the_pin;
+    for (var q = 0u; q < kept_by_the_pin; q = q + 1u) {
+        for (var d = 0u; d < device_count; d = d + 1u) {
+            if (hdr(12u + d) == sw(C_DEFERRED + (deferred + q) * 3u)) {
+                c_kept_in_defer_by_the_pin_per_device[d] = c_kept_in_defer_by_the_pin_per_device[d] + 1u;
+            }
+        }
+    }
+}
+
+// 第一遍整组豁免的那几组（C_GROUPS 掩码字带 C_GROUP_EXEMPTED_AS_QUARANTINED）罩不罩住 (盘, 槽)：walk.rs 交回的隔离豁免 slots
+fn c_slot_exempted_as_quarantined(device: u32, slot: vec2<u32>) -> bool {
+    let device_count = hdr(3u);
+    for (var k = 0u; k < c_quarantine_group_count; k = k + 1u) {
+        let group = C_GROUPS + k * 4u;
+        let mask = sw(group + 3u);
+        if ((mask & C_GROUP_EXEMPTED_AS_QUARANTINED) == 0u) {
+            continue;
+        }
+        let group_slot = vec2<u32>(sw(group), sw(group + 1u));
+        if (!le64(group_slot, slot) || !lt64(slot, add64(group_slot, u64_of(sw(group + 2u))))) {
+            continue;
+        }
+        for (var d = 0u; d < device_count; d = d + 1u) {
+            if ((mask & (1u << d)) != 0u && hdr(12u + d) == device) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// 不带钉现算的门槛（walk.rs deferred_slots_reclaim_threshold）：max(F 生效值, 环里按最新根的实例表仍有效的根的最小 txg)
+fn c_reclaim_threshold_without_the_pin() -> vec2<u32> {
+    var threshold = c_effective_floor;
+    var have_oldest = false;
+    var oldest = vec2<u32>(0u, 0u);
+    for (var i = 0u; i < root_count; i = i + 1u) {
+        let r = checker_root_of(i);
+        if (w_root_abandoned(r.instance, r.txg)) {
+            continue;
+        }
+        if (!have_oldest || lt64(r.txg, oldest)) {
+            oldest = r.txg;
+            have_oldest = true;
+        }
+    }
+    if (have_oldest && lt64(threshold, oldest)) {
+        threshold = oldest;
+    }
+    return threshold;
 }
 
 // 记账行 (统计量, 盘)：找到写进 value 交回 true
@@ -2211,7 +2274,8 @@ const C_OCCUPIED: u32 = S_KEYED_UNITS;
 
 const C_OCCUPIED_ORDER: u32 = C_OCCUPIED + C_OCCUPIED_WORDS * C_MAX_OCCUPIED;
 
-const_assert C_OCCUPIED_ORDER + C_MAX_OCCUPIED <= SCRATCH_END;
+// 区间表与它的次序不越进 I-3.16 同时在用的分配记录次序表（crash_judge_checker_common.wgsl ⑮ 的 C_ALLOCATION_RECORD_ROW_ORDER）
+const_assert C_OCCUPIED_ORDER + C_MAX_OCCUPIED <= C_ALLOCATION_RECORD_ROW_ORDER;
 
 // 区间表满了（「条目太多」一类，站点号与别处不撞）
 const C_SITE_OCCUPIED_INTERVALS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (100u << 8u);
@@ -2290,7 +2354,8 @@ fn judge_fragmentation_and_empty_segment_statistics() {
         let row = C_REFERENCES0 + i * C_REFERENCE_WORDS;
         c_note_an_occupied_interval(sw(row), vec2<u32>(sw(row + 1u), sw(row + 2u)), sw(row + 3u));
     }
-    for (var q = 0u; q < c_deferred_count; q = q + 1u) {
+    // F 之下仍在 defer 的与钉带出来的那一截（C_DEFERRED 里两段首尾相接）
+    for (var q = 0u; q < c_deferred_count + c_kept_in_defer_by_the_pin_count; q = q + 1u) {
         c_note_an_occupied_interval(sw(C_DEFERRED + q * 3u), vec2<u32>(sw(C_DEFERRED + q * 3u + 1u), sw(C_DEFERRED + q * 3u + 2u)), 1u);
     }
     if (undecidable != 0u) {
@@ -2312,7 +2377,7 @@ fn judge_fragmentation_and_empty_segment_statistics() {
             break;
         }
         order_rows_by_their_first_four_words(select(C_OCCUPIED, C_ALLOC_RECORDS, table == 1u), select(C_OCCUPIED_WORDS, C_ALLOC_RECORD_WORDS, table == 1u),
-            select(c_occupied_count, c_alloc_record_count, table == 1u), select(C_OCCUPIED_ORDER, C_ROW_ORDER, table == 1u));
+            select(c_occupied_count, c_alloc_record_count, table == 1u), select(C_OCCUPIED_ORDER, C_ALLOCATION_RECORD_ROW_ORDER, table == 1u));
     }
     let unit_area_start = handoff_unit_area_start_slot();
     let device_end_slot = shr64(device_bytes(), SLOT_SHIFT);
@@ -2388,7 +2453,7 @@ fn judge_fragmentation_and_empty_segment_statistics() {
         segments_holding_a_record.counted = vec2<u32>(0u, 0u);
         segments_holding_a_record.next_uncounted = vec2<u32>(0u, 0u);
         for (var position = 0u; position < c_alloc_record_count; position = position + 1u) {
-            let record = C_ALLOC_RECORDS + sw(C_ROW_ORDER + position) * C_ALLOC_RECORD_WORDS;
+            let record = C_ALLOC_RECORDS + sw(C_ALLOCATION_RECORD_ROW_ORDER + position) * C_ALLOC_RECORD_WORDS;
             if (sw(record) != device || sw(record + 6u) != 0u) {
                 continue;
             }
@@ -2411,14 +2476,63 @@ fn judge_fragmentation_and_empty_segment_statistics() {
     }
 }
 
-fn judge_accounting(fsid_low: vec2<u32>) {
+// 最新根引用的槽里有没有 (盘, 槽)（按跨度展开，引用集合前 c_newest_reference_count 行是最新根那一遍记下的；walk.rs slots_covered_by_the_newest_root）
+fn c_slot_covered_by_the_newest_root(device: u32, slot: vec2<u32>) -> bool {
+    for (var i = 0u; i < c_newest_reference_count; i = i + 1u) {
+        let row = C_REFERENCES0 + i * C_REFERENCE_WORDS;
+        if (sw(row) != device) {
+            continue;
+        }
+        let start = vec2<u32>(sw(row + 1u), sw(row + 2u));
+        if (le64(start, slot) && lt64(slot, add64(start, u64_of(sw(row + 3u))))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// walk.rs judge_quarantine_marks_against_the_references（I-3.17）：C_ALLOC_RECORDS 里刚读进来的最新根那几棵分配记录树（树表里种类 3 的每一棵，
+// 读得全的合成一张表，c_quarantine_exempted）里，每条带隔离记号的记录判 ①（未释放）与 ②（罩住的槽不被最新根引用），再拿这张合起来的表里
+// 它那一单元（起点槽、跨度）的每条记录判 ③（都带记号；同一单元分落几棵树的记录也归进一组，walk.rs records_of_each_unit）。一条带记号的记录都没有时不判
+// （CPU 报不适用，这里不置判到位）；树表读不出时调用方记射程里有一部分判不了
+fn c_judge_the_quarantine_marks_of_the_records_read() {
+    for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
+        let a = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
+        if ((sw(a + 7u) & C_ALLOC_RECORD_QUARANTINE_MARK_BIT) == 0u) {
+            continue;
+        }
+        let device = sw(a);
+        let slot = vec2<u32>(sw(a + 1u), sw(a + 2u));
+        let span = sw(a + 3u);
+        // ①
+        judge(INVARIANT_I_3_17, sw(a + 6u) == 0u);
+        // ②
+        var covered_slot_referenced = false;
+        for (var covered = 0u; covered < span; covered = covered + 1u) {
+            if (c_slot_covered_by_the_newest_root(device, add64(slot, u64_of(covered)))) {
+                covered_slot_referenced = true;
+            }
+        }
+        judge(INVARIANT_I_3_17, !covered_slot_referenced);
+        // ③：同一单元每条记录都带记号
+        var every_copy_is_marked = true;
+        for (var j = 0u; j < c_alloc_record_count; j = j + 1u) {
+            let b = C_ALLOC_RECORDS + j * C_ALLOC_RECORD_WORDS;
+            if (sw(b + 1u) == slot.x && sw(b + 2u) == slot.y && sw(b + 3u) == span
+                && (sw(b + 7u) & C_ALLOC_RECORD_QUARANTINE_MARK_BIT) == 0u) {
+                every_copy_is_marked = false;
+            }
+        }
+        judge(INVARIANT_I_3_17, every_copy_is_marked);
+    }
+}
+
+fn judge_accounting() {
     let device_count = hdr(3u);
     let newest_root = checker_root_of(c_newest_index);
     let written_under_effective_floor = eq64(newest_root.floor, c_effective_floor);
-    c_harvested = false;
     // 两遍同一个调用点：第一遍到走读的引用数为止，存下它的豁免数、算完 F 之下的推迟，第二遍到最新根自己的引用数为止。
-    // 两遍隔离豁免与 F 之下的推迟照 walk.rs check_pool_image 不看有没有记账都算（根环里没走过的根那一份位置项校验和补没补过，
-    // 经 C_HARVESTED_BY_THE_ACCOUNTING_QUARANTINE 交给引用与快照那一截的 I-3.15）；判 I-3.1 那几条才要记账
+    // 两遍隔离豁免与 F 之下的推迟照 walk.rs check_pool_image 不看有没有记账都算；判 I-3.1 那几条才要记账
     var exempted_all: array<u32, 8>;
     for (var exemption_pass = 0u; exemption_pass < 2u; exemption_pass = exemption_pass + 1u) {
         var reference_limit = w_reference_count[0];
@@ -2432,9 +2546,9 @@ fn judge_accounting(fsid_low: vec2<u32>) {
             c_deferred_below_the_floor(newest_root.base);
             reference_limit = c_newest_reference_count;
         }
-        c_quarantine_exempted(newest_root.base, reference_limit, fsid_low);
+        // I-3.17（walk.rs 在记账那几条之后、不看有没有记账都判）随第二遍一起判：读的同是最新根那棵分配记录树
+        c_quarantine_exempted(newest_root.base, reference_limit, exemption_pass == 1u);
     }
-    sws(C_HARVESTED_BY_THE_ACCOUNTING_QUARANTINE, select(0u, 1u, c_harvested));
     if (!w_accounting_seen) {
         return;
     }
@@ -2442,7 +2556,8 @@ fn judge_accounting(fsid_low: vec2<u32>) {
         let device = hdr(12u + d);
         var allocated = vec2<u32>(0u, 0u);
         let have_allocated = c_accounting_row(1u, device, &allocated);
-        let walked = shl64(add64(add64(c_slots_referenced(device, w_reference_count[0]), u64_of(exempted_all[d])), u64_of(c_deferred_per_device[d])), SLOT_SHIFT);
+        let walked = shl64(add64(add64(add64(c_slots_referenced(device, w_reference_count[0]), u64_of(exempted_all[d])), u64_of(c_deferred_per_device[d])),
+            u64_of(c_kept_in_defer_by_the_pin_per_device[d])), SLOT_SHIFT);
         if (written_under_effective_floor) {
             judge(INVARIANT_I_3_1, have_allocated && eq64(allocated, walked));
         }
@@ -2485,9 +2600,13 @@ const C_OBJECT_KEY_BYTES: u32 = 27u;
 
 const C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES: u32 = 45u;
 
+// 码 1 的归并键不换次序（[42, 101) 原样）：对象 key（五元组）是前 33 个字节；全序键 (诞生代号, 实例代号, 事务号) 是诞生代号 [75, 83) 与写序
+// [91, 101) 两段，中间隔着 fsid [83, 91)，不是一段前缀，逐段比
+const C_OBJECT_KEY_BYTES_OF_A_DATA_UNIT: u32 = 33u;
+
 // 扫描项按归并键排好的次序借 C_ROW_ORDER（至多 C_MAX_SCANNED 个，那张表 C_MAX_REFERENCES 个字）；每一项读出来那一份切片的检查字（c2）
-// 借 C_JOURNAL_GROUP_KEYS 的前 C_MAX_SCANNED 个字（那一段 C_JOURNAL_GROUP_KEY_WORDS × MAX_RECORDS 个字）。I-1.8 是扫描内核第一判，
-// 之后 I-5.4 借 C_ROW_ORDER、I-3.9 与 I-3.10 借 C_JOURNAL_GROUP_KEYS 都各自从头写
+// 借 C_JOURNAL_GROUP_KEYS 的前 C_MAX_SCANNED 个字（那一段 C_JOURNAL_GROUP_KEY_WORDS × MAX_RECORDS 个字，crash_judge_checker_common.wgsl ⑯）。I-1.8 是扫描内核第一判，
+// 之后墓碑两两比那一处借 C_ROW_ORDER、各自从头写（I-5.4、I-3.16 排分配记录与 I-3.9、I-3.10 的两张桶表借 crash_judge_checker_common.wgsl ⑮ 的两段）
 const C_SCANNED_CHECK_WORDS: u32 = C_JOURNAL_GROUP_KEYS;
 
 fn c_merge_key_bytes(unit_class: u32) -> u32 {
@@ -2592,6 +2711,21 @@ fn c_order_the_scanned_units_by_merge_key(count: u32) {
     }
 }
 
+// 扫描项的对象 key 在换过次序的归并键里占前几个字节
+fn c_object_key_bytes(unit_class: u32) -> u32 {
+    return select(C_OBJECT_KEY_BYTES, C_OBJECT_KEY_BYTES_OF_A_DATA_UNIT, unit_class == 1u);
+}
+
+// 两个同类、同对象 key 的扫描项（字节基）全序键 (诞生代号, 实例代号, 事务号) 相同（walk.rs TotalOrderKey，码 1 与码 3 同形，C464 定 ①）。
+// 码 3 的全序键在换过次序的归并键里紧接对象 key，公共前缀够长就是相同；码 1 的隔着 fsid，逐段比诞生代号与写序
+fn c_total_order_keys_are_equal(base_a: u32, base_b: u32, unit_class: u32, common_merge_key_prefix: u32) -> bool {
+    if (unit_class == 3u) {
+        return common_merge_key_prefix >= C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES;
+    }
+    return eq64(rd64(base_a, 75u), rd64(base_b, 75u)) && rd32(base_a, 91u) == rd32(base_b, 91u)
+        && eq64(rd48(base_a, 95u), rd48(base_b, 95u));
+}
+
 fn c_payload_checksum(base: u32) -> u32 {
     if (rd8(base, 6u) == 1u) {
         return rd32(base, 101u);
@@ -2640,8 +2774,8 @@ fn judge_merged_version_total_order(fsid_low: vec2<u32>) {
         scanned = scanned + 1u;
     }
     c_order_the_scanned_units_by_merge_key(scanned);
-    // ② 那一串（同对象 key 的码 3 各组）：上一组的代表、这一串几组、串里有没有两组全序键相同
-    var previous_packed_representative = NONE;
+    // ② 那一串（同对象 key 的各组，码 1 与码 3 都判）：上一组的代表、这一串几组、串里有没有两组全序键相同
+    var previous_representative = NONE;
     var representatives_of_the_object_key = 0u;
     var two_representatives_share_the_total_order_key = false;
     var group_start = 0u;
@@ -2674,27 +2808,27 @@ fn judge_merged_version_total_order(fsid_low: vec2<u32>) {
         if (group_end - group_start >= 2u) {
             judge(INVARIANT_I_1_8, !more_than_one);
         }
-        // ② 同对象 key 的各组两两全序键不等（只判码 3，码 3 排在码 1 后面）：同对象 key 的组连成一串、串里全序键相同的组挨在一起，
-        // 比相邻两组的代表就够；一串两组以上判一次
-        if (unit_class == 3u) {
-            var same_object_key = false;
-            if (previous_packed_representative != NONE) {
-                let prefix = c_scanned_units_common_merge_key_prefix(previous_packed_representative, representative);
-                same_object_key = prefix >= C_OBJECT_KEY_BYTES;
-                if (prefix >= C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES) {
-                    two_representatives_share_the_total_order_key = true;
-                }
+        // ② 同对象 key 的各组两两全序键不等（码 1 与码 3 都判，码 1 排在码 3 前面，两类之间公共前缀是 0、串在类的边界上断开）：
+        // 同对象 key 的组连成一串、串里全序键相同的组挨在一起（码 3 的全序键紧接对象 key；码 1 的归并键里对象 key 之后是诞生代号、fsid、写序，
+        // 扫描项的 fsid 都等于本池的，全序键相同的两组归并键也相同、是同一组），比相邻两组的代表就够；一串两组以上判一次
+        var same_object_key = false;
+        if (previous_representative != NONE) {
+            let prefix = c_scanned_units_common_merge_key_prefix(previous_representative, representative);
+            same_object_key = prefix >= c_object_key_bytes(unit_class);
+            if (same_object_key && c_total_order_keys_are_equal(sw(C_SCANNED + previous_representative),
+                sw(C_SCANNED + representative), unit_class, prefix)) {
+                two_representatives_share_the_total_order_key = true;
             }
-            if (!same_object_key) {
-                if (representatives_of_the_object_key >= 2u) {
-                    judge(INVARIANT_I_1_8, !two_representatives_share_the_total_order_key);
-                }
-                representatives_of_the_object_key = 0u;
-                two_representatives_share_the_total_order_key = false;
-            }
-            representatives_of_the_object_key = representatives_of_the_object_key + 1u;
-            previous_packed_representative = representative;
         }
+        if (!same_object_key) {
+            if (representatives_of_the_object_key >= 2u) {
+                judge(INVARIANT_I_1_8, !two_representatives_share_the_total_order_key);
+            }
+            representatives_of_the_object_key = 0u;
+            two_representatives_share_the_total_order_key = false;
+        }
+        representatives_of_the_object_key = representatives_of_the_object_key + 1u;
+        previous_representative = representative;
         group_start = group_end;
     }
     if (representatives_of_the_object_key >= 2u) {
@@ -3060,7 +3194,8 @@ const D_MAX_DATA_UNITS: u32 = 8192u;
 const D_DATA_UNITS: u32 = D_DATA_UNITS_OF_EACH_INODE + D_DATA_UNITS_OF_AN_INODE_WORDS * D_MAX_DATA_UNIT_INODES;
 // ③ I-4.6 ① 判一个号的单元连号时，单元序号 k（偏移 ÷ 净荷）见过没有的位表：位 k 在第 k / 32 字的第 k % 32 位，一个号一个号地清
 const D_DATA_UNIT_POSITIONS_SEEN: u32 = D_DATA_UNITS + D_DATA_UNIT_WORDS * D_MAX_DATA_UNITS;
-const_assert D_DATA_UNIT_POSITIONS_SEEN + D_MAX_DATA_UNITS / 32u <= SCRATCH_END;
+// 上界是 ⑯ 的起点（journal 记录表挪到末尾之前的草稿区末端）：⑯ 那三张扫描内核要读，借的这一段不越进去
+const_assert D_DATA_UNIT_POSITIONS_SEEN + D_MAX_DATA_UNITS / 32u <= R_RECORDS;
 const_assert G_PENDING + G_PENDING_WORDS * G_MAX_PENDING <= D_DATA_UNITS_OF_EACH_INODE;
 // 单元多于 D_MAX_DATA_UNITS 个判不了（「条目太多」一类的站点号，与别处不撞）
 const D_SITE_DATA_UNITS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (105u << 8u);
@@ -3182,9 +3317,12 @@ fn d_judge_the_data_units_of_each_record(tt: Node) {
             let names_a_truncation_intent = d_a_truncation_intent_names_the_record(inode, d_inode_record_object_birth(record), size_in_bytes);
             let existing = u64_of(data_unit_count);
             // 单元数对标签：标签 1、2 等于 size 要的个数，有一条对得上的截断条目时 size 之外可以多；标签 3、4 至少一个、少于它（至少一个洞单元）；
-            // 标签 0 与没有上段叶条目的号一个单元都没有
+            // 标签 0 的号一个单元都没有；没有上段叶条目的号一个单元都没有、而且 size 是 0（判决 m4-multi-inode-size-r1 第二节 S2 与第三节第 4 句：
+            // 「有记录、没有条目、size > 0」与 CPU 一侧同红，walk.rs 那一判的 None 那一支）
             var count_matches_the_declaration = data_unit_count == 0u;
-            if (declaration == D_DECLARED_DATA_UNITS_WITHOUT_A_HOLE_AFTER_THEM) {
+            if (declaration == D_DECLARED_BY_NO_UPPER_LEAF_ENTRY) {
+                count_matches_the_declaration = data_unit_count == 0u && is_zero64(size_in_bytes);
+            } else if (declaration == D_DECLARED_DATA_UNITS_WITHOUT_A_HOLE_AFTER_THEM) {
                 count_matches_the_declaration = eq64(existing, asked_for) || (names_a_truncation_intent && le64(asked_for, existing));
             } else if (declaration == D_DECLARED_A_HOLE_UP_TO_THE_SIZE_AFTER_THE_LAST_DATA_UNIT) {
                 count_matches_the_declaration = data_unit_count >= 1u && lt64(existing, asked_for);
@@ -4712,7 +4850,8 @@ fn d_judge_every_tombstone_is_well_formed(version_txg: vec2<u32>) {
 
 // I-9.20 不重号那一句：在谱系上的墓碑的 (号 lo、号 hi、对象出生代 lo、对象出生代 hi) 每条一行、4 个字，按 order_rows_by_their_first_four_words 排、
 // 行号次序借 C_ROW_ORDER。借 C_ALLOC_RECORDS 那一段（C_MAX_ALLOC_RECORDS × C_ALLOC_RECORD_WORDS 个字）：读它的几处（I-5.4、I-3.10、I-5.5、记账那几条的
-// r_allocation_tree）都把记录数复位、从头写过才读，墓碑与谱系那一遍里没有谁读它；C_ROW_ORDER 在扫描内核里 I-1.8、I-5.4 之后就没有谁读
+// r_allocation_tree）都把记录数复位、从头写过才读，墓碑与谱系那一遍里没有谁读它；C_ROW_ORDER 在扫描内核里 I-1.8 之后就没有谁读
+// （I-5.4、I-3.16 排分配记录借的是 crash_judge_checker_common.wgsl ⑮ 的 C_ALLOCATION_RECORD_ROW_ORDER）
 const D_TOMBSTONE_KEY_WORDS: u32 = 4u;
 
 const D_TOMBSTONE_KEYS: u32 = C_ALLOC_RECORDS;
@@ -4720,7 +4859,7 @@ const D_TOMBSTONE_KEYS: u32 = C_ALLOC_RECORDS;
 // 借的两段装得下墓碑总数的上限（解析内核时判，不进展开量）
 const_assert DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE * D_TOMBSTONE_KEY_WORDS <= C_MAX_ALLOC_RECORDS * C_ALLOC_RECORD_WORDS;
 
-const_assert DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
+const_assert DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE <= C_ROW_ORDER_END - C_ROW_ORDER;
 
 // I-9.20 不重号那一句（walk.rs judge_tombstones_on_the_lineage_of_a_version_are_distinct，只判在谱系上的）：这一版在谱系上的墓碑按 (号, 对象出生代)
 // 不重复。原来每条在谱系上的墓碑跟叶序在它之前的每一条比（每版 T² / 2）；改成每条在谱系上的墓碑记一行键、按键排一次序，同键的在次序里挨着，
@@ -5786,20 +5925,33 @@ struct NearestLiveSnapshotBound {
     txg: vec2<u32>,
 };
 
-// walk.rs entry_is_pending_release：这条条目（头、纪元、birth）在某个未完成销毁意图的待放集里——头是活头、纪元 ∈ [D.S.txg, D 之后第一个活快照的 S.txg 或 ∞)、
-// birth > D 的前驱
-fn s_entry_is_pending_release(head: vec2<u32>, epoch: vec2<u32>, birth: vec2<u32>, head_inode_tree: vec2<u32>, live_count: u32, destroyed_count: u32) -> bool {
+// walk.rs entry_is_pending_release：这条条目（头、纪元、birth）在某个未完成销毁意图的待放集里——头是活头、纪元 ∈ [D.S.txg, D 之后第一个活快照的 S.txg，
+// 下一侧是活头时取被判这一版的 txg version_txg)、birth > D 的前驱（判决 m4-c145-destruction-bound-r1 第二节 B2）
+fn s_entry_is_pending_release(head: vec2<u32>, epoch: vec2<u32>, birth: vec2<u32>, head_inode_tree: vec2<u32>, live_count: u32, destroyed_count: u32,
+    version_txg: vec2<u32>) -> bool {
     if (!eq64(head, head_inode_tree)) {
         return false;
     }
     for (var destroyed = 0u; destroyed < destroyed_count; destroyed = destroyed + 1u) {
         let bound = s_next_live_side_upper_bound_after(live_count, s_snapshot_being_destroyed_txg[destroyed], s_snapshot_being_destroyed_tree[destroyed]);
-        if (le64(s_snapshot_being_destroyed_txg[destroyed], epoch) && (!bound.found || lt64(epoch, bound.txg))
+        let upper_bound = select(version_txg, bound.txg, bound.found);
+        if (le64(s_snapshot_being_destroyed_txg[destroyed], epoch) && lt64(epoch, upper_bound)
             && lt64(s_snapshot_being_destroyed_previous_txg[destroyed], birth)) {
             return true;
         }
     }
     return false;
+}
+
+// walk.rs previous_snapshot_chain_of_the_sides_is_contiguous：活快照（按（S.txg, 树 ID）升序）与活头的前驱链首尾相接——每个活快照的前驱等于前一个活快照的
+// S.txg，活头的前驱等于最后一个活快照的 S.txg（一个活快照都没有时只有活头一侧，恒相接）
+fn s_previous_snapshot_chain_of_the_sides_is_contiguous(head_previous_snapshot_txg: vec2<u32>, live_count: u32) -> bool {
+    for (var live = 1u; live < live_count; live = live + 1u) {
+        if (!eq64(s_live_snapshot_previous_txg[live], s_live_snapshot_txg[live - 1u])) {
+            return false;
+        }
+    }
+    return live_count == 0u || eq64(head_previous_snapshot_txg, s_live_snapshot_txg[live_count - 1u]);
 }
 
 fn s_mark_the_deadlist_of_a_version_not_judged() {
@@ -5809,10 +5961,11 @@ fn s_mark_the_deadlist_of_a_version_not_judged() {
 
 // walk.rs judge_the_deadlist_against_the_head_and_the_live_snapshots：
 // ④ deadlist 每一条钉的单元活头都不引用；逆向：每一条钉的单元有一个活快照引用、或在待放集里；I-3.6 每一条的 birth 不大于它归属那一侧的前驱（待放的豁免，
-// 头不是活头、纪元落不进恰好一侧的那一条判不了）；③ 活快照引用而活头不引用的每个单元，deadlist 里恰好一条钉它、头是活头、纪元落在引用它的最晚那个
+// 头不是活头、纪元落不进恰好一侧而前驱链不首尾相接的那一条判不了；前驱链首尾相接而落不进任何一侧的判红，待放的豁免）；I-3.6 每一条的映射 key 在这一版
+// 装着的中央映射里查得到（C300，映射读不全时这一格判不了）；③ 活快照引用而活头不引用的每个单元，deadlist 里恰好一条钉它、头是活头、纪元落在引用它的最晚那个
 // 活快照的 S.txg 与链上下一侧的上界之间。一条条目都没有时 I-3.6 判一次、成立
 fn s_judge_the_deadlist_against_the_head_and_the_live_snapshots(head_inode_tree: vec2<u32>, head_previous_snapshot_txg: vec2<u32>, live_count: u32,
-    destroyed_count: u32) {
+    destroyed_count: u32, version_txg: vec2<u32>) {
     // deadlist 里钉每个单元的有几条、最后一条是哪一条（③ 要「恰好一条」）
     for (var entry_index = 0u; entry_index < s_deadlist_entry_count; entry_index = entry_index + 1u) {
         let base = sw(S_DEADLIST_ENTRIES + entry_index * 2u);
@@ -5826,7 +5979,10 @@ fn s_judge_the_deadlist_against_the_head_and_the_live_snapshots(head_inode_tree:
     }
     if (s_deadlist_entry_count == 0u) {
         judge(INVARIANT_I_3_6, true);
+    } else if (!version_mapping_read_in_full) {
+        mark_part_of_the_range_not_judged(INVARIANT_I_3_6);
     }
+    let chain_is_contiguous = s_previous_snapshot_chain_of_the_sides_is_contiguous(head_previous_snapshot_txg, live_count);
     for (var entry_index = 0u; entry_index < s_deadlist_entry_count; entry_index = entry_index + 1u) {
         let base = sw(S_DEADLIST_ENTRIES + entry_index * 2u);
         let o = sw(S_DEADLIST_ENTRIES + entry_index * 2u + 1u);
@@ -5838,7 +5994,10 @@ fn s_judge_the_deadlist_against_the_head_and_the_live_snapshots(head_inode_tree:
         if (found != NONE) {
             referenced_by = sw(s_keyed_unit_row(found) + 7u);
         }
-        let is_pending_release = s_entry_is_pending_release(head, epoch, key.birth_txg, head_inode_tree, live_count, destroyed_count);
+        let is_pending_release = s_entry_is_pending_release(head, epoch, key.birth_txg, head_inode_tree, live_count, destroyed_count, version_txg);
+        if (version_mapping_read_in_full) {
+            judge(INVARIANT_I_3_6, version_mapping_first_row_of(key) != NONE);
+        }
         judge(INVARIANT_I_3_5, (referenced_by & S_REFERENCED_BY_THE_HEAD) == 0u);
         judge(INVARIANT_I_3_5, (referenced_by & ~S_REFERENCED_BY_THE_HEAD) != 0u || is_pending_release);
         if (!eq64(head, head_inode_tree)) {
@@ -5857,6 +6016,10 @@ fn s_judge_the_deadlist_against_the_head_and_the_live_snapshots(head_inode_tree:
         if (le64(head_previous_snapshot_txg, epoch)) {
             owning_sides = owning_sides + 1u;
             owning_side_previous_snapshot_txg = head_previous_snapshot_txg;
+        }
+        if (owning_sides == 0u && chain_is_contiguous) {
+            judge(INVARIANT_I_3_6, is_pending_release);
+            continue;
         }
         if (owning_sides != 1u) {
             mark_part_of_the_range_not_judged(INVARIANT_I_3_6);
@@ -5888,7 +6051,7 @@ fn s_judge_the_deadlist_against_the_head_and_the_live_snapshots(head_inode_tree:
 }
 
 // walk.rs deadlist_and_snapshot_reach_of_a_version 连同判那一步：一版（树表读得出、条目不窄）的快照、活头两棵树与 deadlist 读出来再判
-fn s_judge_the_snapshots_and_the_deadlist_of_a_tree_table(tt: Node) {
+fn s_judge_the_snapshots_and_the_deadlist_of_a_tree_table(tt: Node, version_txg: vec2<u32>) {
     var deadlist_tree_entries = 0u;
     var deadlist_tree_entry = NONE;
     var snapshot_entries = 0u;
@@ -6024,7 +6187,7 @@ fn s_judge_the_snapshots_and_the_deadlist_of_a_tree_table(tt: Node) {
         live_count = live_count + 1u;
     }
     s_judge_the_deadlist_against_the_head_and_the_live_snapshots(head_inode_tree, rd64(tt.base, head_o + TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET),
-        live_count, destroyed_count);
+        live_count, destroyed_count, version_txg);
 }
 
 // walk.rs judge_live_snapshots_are_captures_before_their_version：这一版每一个活快照诞生 txg 不大于这一版的 txg、两条根指针（非全零的；码 15 恰好一条配它时
@@ -6188,7 +6351,7 @@ fn judge_snapshots_and_deadlists_of_the_versions() {
             // 活头、快照与 deadlist 几棵树里豁免三类之外的单元按这一版自己的中央映射认位置（walk.rs judge_snapshots_and_deadlists_of_the_versions
             // 的 central_mapping；树表单元相同的几版只判第一版，用的是第一版的映射）
             s_use_the_central_mapping_named_at(version.base, version.mapping_root_offset);
-            s_judge_the_snapshots_and_the_deadlist_of_a_tree_table(tt);
+            s_judge_the_snapshots_and_the_deadlist_of_a_tree_table(tt, version.txg);
         }
     }
     // I-3.7 跨版本那一格：txg 相接（后一版 = 前一版 + 1）、各恰好一版树表读得出的两版之间
@@ -6271,8 +6434,8 @@ const G_KEY_GROUP_NOT_READ_YET: u32 = 0u;
 const G_KEY_GROUP_UNREADABLE: u32 = 1u;
 const G_KEY_GROUP_READ: u32 = 2u;
 
-// 借的那一段装得下（解析内核时判，不进展开量）
-const_assert G_KEY_GROUP_BUCKETS + G_KEY_GROUP_BUCKET_COUNT <= SCRATCH_END;
+// 借的那一段装得下（解析内核时判，不进展开量）；上界是 ⑯ 的起点（crash_judge_checker_common.wgsl：⑯ 那三张扫描内核要读，借的这一段不越进去）
+const_assert G_KEY_GROUP_BUCKETS + G_KEY_GROUP_BUCKET_COUNT <= R_RECORDS;
 
 // 这一节判不了的站点号（「条目太多」一类，与别处不撞）
 const G_SITE_PLACEMENTS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (101u << 8u);
@@ -6680,43 +6843,25 @@ fn g_placement_is_accounted_for(device: u32, slot: vec2<u32>, looking_for_a_key:
     return false;
 }
 
-// 落点表里 (盘, 槽) 那几行有一行是这一版映射叶的位置条目（不是直接指着的那一种）：walk.rs keys_at_each_placement 里有 (盘, 槽) 这一格
-fn g_some_mapping_location_entry_names_the_placement(device: u32, slot: vec2<u32>) -> bool {
-    var bucket = slot_key_first_bucket(device, slot, G_PLACEMENT_BUCKET_COUNT);
-    for (var probe = 0u; probe < G_PLACEMENT_BUCKET_COUNT; probe = probe + 1u) {
-        let row_plus_one = sw(G_PLACEMENT_BUCKETS + bucket);
-        if (row_plus_one == 0u) {
-            return false;
-        }
-        let row = G_PLACEMENTS + (row_plus_one - 1u) * G_PLACEMENT_WORDS;
-        if (sw(row) == device && sw(row + 1u) == slot.x && sw(row + 2u) == slot.y && sw(row + 3u) != G_NAMED_DIRECTLY) {
-            return true;
-        }
-        bucket = (bucket + 1u) & (G_PLACEMENT_BUCKET_COUNT - 1u);
-    }
-    return false;
-}
-
-// 这一版映射里没有一条位置条目指着 slot（这一版分配记录里这一槽有记录的每块盘上都没有）：walk.rs 的
-// no_mapping_key_of_the_version_names_the_slot（判决 m4-i315-r1 第三节 C1「乙二」）
-fn g_no_mapping_location_entry_of_the_version_names_the_slot(slot: vec2<u32>) -> bool {
-    for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
-        let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-        if (eq64(vec2<u32>(sw(record + 1u), sw(record + 2u)), slot) && g_some_mapping_location_entry_names_the_placement(sw(record), slot)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// C_ALLOC_RECORDS 一行第八个字（c_append_allocation_record 写 0）在 I-3.15 里的记号：对不上映射的、它那一组已判过的
+// C_ALLOC_RECORDS 一行第八个字低两位在 I-3.15 里的记号：对不上映射的、它那一组已判过的（高位那一位是隔离记号，C_ALLOC_RECORD_QUARANTINE_MARK_BIT）
 const G_RECORD_OFF_THE_CENTRAL_MAPPING: u32 = 1u;
 const G_RECORD_OFF_THE_CENTRAL_MAPPING_JUDGED: u32 = 2u;
+const G_RECORD_MARKER_BITS: u32 = 3u;
+
+// 一行分配记录在 I-3.15 那一遍里的记号（第八个字的低两位）
+fn g_record_marker(record: u32) -> u32 {
+    return sw(record + 7u) & G_RECORD_MARKER_BITS;
+}
+
+// 换掉一行分配记录在 I-3.15 那一遍里的记号，隔离记号那一位不动
+fn g_set_the_record_marker(record: u32, marker: u32) {
+    sws(record + 7u, (sw(record + 7u) & ~G_RECORD_MARKER_BITS) | marker);
+}
 
 // 一版（它的分配记录在 C_ALLOC_RECORDS，中央映射在 C_VERSION_MAPPING_ROWS，都读全了）上的 I-3.15。对不上的记录按单元（起点槽、跨度）归组，
-// 组按 (起点槽, 跨度) 升序判（walk.rs 那张 BTreeMap 的次序：隔离判据查位置项校验和时补不补根环里没走过的根，次序影响得到）；组里按记录次序逐块盘
-// 读回来核位置项，有一份对不上就停（同 walk.rs 的 any），这一组不判，否则组里每条判红
-fn g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(version: VersionWithItsRootPointersOfTheScan, fsid_low: vec2<u32>) {
+// 组按 (起点槽, 跨度) 升序判（walk.rs 那张 BTreeMap 的次序）；这一版这一单元每块盘上的未释放记录都带隔离记号的那一组不判
+// （walk.rs every_copy_of_the_unit_carries_the_quarantine_mark：只认记号、不读副本，D19（块指针的结构与宽度预算） 已定项 5），否则组里每条判红
+fn g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(version: VersionWithItsRootPointersOfTheScan) {
     // 上一版记进桶表的那几行，按各自记的桶清掉（桶表在这一截开头整张清过）
     for (var placement = 0u; placement < g_placement_count; placement = placement + 1u) {
         sws(G_PLACEMENT_BUCKETS + sw(G_PLACEMENTS + placement * G_PLACEMENT_WORDS + 4u), 0u);
@@ -6751,7 +6896,7 @@ fn g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(ver
     var nothing_off_the_mapping = true;
     for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
         let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-        sws(record + 7u, 0u);
+        g_set_the_record_marker(record, 0u);
         if (sw(record + 6u) != 0u) {
             continue;
         }
@@ -6771,7 +6916,7 @@ fn g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(ver
             judge(INVARIANT_I_3_15, true);
             continue;
         }
-        sws(record + 7u, G_RECORD_OFF_THE_CENTRAL_MAPPING);
+        g_set_the_record_marker(record, G_RECORD_OFF_THE_CENTRAL_MAPPING);
         nothing_off_the_mapping = false;
     }
     if (nothing_off_the_mapping) {
@@ -6782,7 +6927,7 @@ fn g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(ver
         var first_of_the_group = NONE;
         for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
             let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-            if (sw(record + 7u) != G_RECORD_OFF_THE_CENTRAL_MAPPING) {
+            if (g_record_marker(record) != G_RECORD_OFF_THE_CENTRAL_MAPPING) {
                 continue;
             }
             if (first_of_the_group == NONE) {
@@ -6802,29 +6947,57 @@ fn g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(ver
         let first = C_ALLOC_RECORDS + first_of_the_group * C_ALLOC_RECORD_WORDS;
         let group_slot = vec2<u32>(sw(first + 1u), sw(first + 2u));
         let group_span = sw(first + 3u);
-        // 隔离判据读哪几份（walk.rs devices_of_the_unit，判决 m4-i315-r1 第三节 C1「乙二」）：这一版映射里没有位置条目指着这一槽时，
-        // 这一单元每块盘上未释放的记录（头用不了、没打记号的那几条也在里面），否则只是打了对不上映射记号的那几条；都按记录次序
-        let every_unreleased_copy_of_the_unit = g_no_mapping_location_entry_of_the_version_names_the_slot(group_slot);
-        var some_copy_fails = false;
-        for (var i = 0u; i < c_alloc_record_count && !some_copy_fails; i = i + 1u) {
-            let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-            let read_for_the_quarantine = select(sw(record + 7u) == G_RECORD_OFF_THE_CENTRAL_MAPPING, sw(record + 6u) == 0u,
-                every_unreleased_copy_of_the_unit);
-            if (read_for_the_quarantine && eq64(vec2<u32>(sw(record + 1u), sw(record + 2u)), group_slot)
-                && sw(record + 3u) == group_span) {
-                some_copy_fails = !c_copy_matches_its_location_entry(sw(record), group_slot, group_span, fsid_low);
-            }
-        }
+        // 隔离的单元只认记号：这一版这一单元（起点槽、跨度）每块盘上的未释放记录都带隔离记号（至少一条）就不判，不读副本
+        var unreleased_copies = 0u;
+        var every_unreleased_copy_is_marked = true;
         for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
             let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-            if (sw(record + 7u) == G_RECORD_OFF_THE_CENTRAL_MAPPING && eq64(vec2<u32>(sw(record + 1u), sw(record + 2u)), group_slot)
+            if (sw(record + 6u) == 0u && eq64(vec2<u32>(sw(record + 1u), sw(record + 2u)), group_slot) && sw(record + 3u) == group_span) {
+                unreleased_copies = unreleased_copies + 1u;
+                if ((sw(record + 7u) & C_ALLOC_RECORD_QUARANTINE_MARK_BIT) == 0u) {
+                    every_unreleased_copy_is_marked = false;
+                }
+            }
+        }
+        let quarantined = unreleased_copies > 0u && every_unreleased_copy_is_marked;
+        for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
+            let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
+            if (g_record_marker(record) == G_RECORD_OFF_THE_CENTRAL_MAPPING && eq64(vec2<u32>(sw(record + 1u), sw(record + 2u)), group_slot)
                 && sw(record + 3u) == group_span) {
-                sws(record + 7u, G_RECORD_OFF_THE_CENTRAL_MAPPING_JUDGED);
-                if (!some_copy_fails) {
+                g_set_the_record_marker(record, G_RECORD_OFF_THE_CENTRAL_MAPPING_JUDGED);
+                if (!quarantined) {
                     judge(INVARIANT_I_3_15, false);
                 }
             }
         }
+    }
+}
+
+// ── I-3.18（walk.rs judge_allocation_record_spans_against_the_classes_of_the_units_they_cover）
+
+// 一版（它的分配记录在 C_ALLOC_RECORDS，读全了）上每条未释放的记录：起点槽上的单元头用得了（同 I-3.15 那一判的读法：magic、类 1 / 2 / 3、
+// 头校验和过）时，跨度要等于那一类占的槽数（码 1、码 3 两槽，码 2 一槽；walk.rs slots_spanned_by_a_unit_of_the_class）；头用不了的没有对象。
+// 不要这一版的中央映射读全（walk.rs 那一判不读映射）
+fn g_judge_the_spans_of_the_unreleased_records_of_the_version_against_the_classes_of_their_units() {
+    for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
+        let record = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
+        if (sw(record + 6u) != 0u) {
+            continue;
+        }
+        let s = read_at(sw(record), slot_to_bytes(vec2<u32>(sw(record + 1u), sw(record + 2u))), 4096u);
+        if (s.version == NONE || rd32(s.base, 0u) != MAGIC_SFSU || (s.c2 & 1u) == 0u) {
+            continue;
+        }
+        let unit_class = rd8(s.base, 6u);
+        var slots_of_the_class = 0u;
+        if (unit_class == 1u || unit_class == 3u) {
+            slots_of_the_class = DATA_UNIT_BYTES >> SLOT_SHIFT;
+        } else if (unit_class == 2u) {
+            slots_of_the_class = NODE_BYTES >> SLOT_SHIFT;
+        } else {
+            continue;
+        }
+        judge(INVARIANT_I_3_18, sw(record + 3u) == slots_of_the_class);
     }
 }
 
@@ -6966,9 +7139,6 @@ fn g_judge_the_unit_bytes_of_each_mapping_key_across_the_versions() {
 
 // 这一节的入口：版本清单里每一版各判 I-4.4 / I-5.6、记 I-1.14 那张表、判 I-3.15，最后跨版本判 I-1.14
 fn judge_compaction_intents_relocations_and_the_unit_bytes_of_the_versions() {
-    let fsid_low = vec2<u32>(sw(H_BASE + H_FSID0), sw(H_BASE + H_FSID1));
-    // I-3.15 的隔离判据接着扫描内核记账那一判两遍隔离豁免之后的状态（walk.rs 的位置项校验和在 I-3.1 与 I-3.15 之间是同一份）
-    c_harvested = sw(C_HARVESTED_BY_THE_ACCOUNTING_QUARANTINE) == 1u;
     for (var bucket = 0u; bucket < G_PLACEMENT_BUCKET_COUNT; bucket = bucket + 1u) {
         sws(G_PLACEMENT_BUCKETS + bucket, 0u);
     }
@@ -6992,6 +7162,7 @@ fn judge_compaction_intents_relocations_and_the_unit_bytes_of_the_versions() {
             mark_part_of_the_range_not_judged(INVARIANT_I_4_4);
             mark_part_of_the_range_not_judged(INVARIANT_I_5_6);
             mark_part_of_the_range_not_judged(INVARIANT_I_3_15);
+            mark_part_of_the_range_not_judged(INVARIANT_I_3_18);
             continue;
         }
         let records_read_in_full = g_allocation_records_of_the_version(version.base, version.allocation_root_offset, tt);
@@ -6999,11 +7170,19 @@ fn judge_compaction_intents_relocations_and_the_unit_bytes_of_the_versions() {
         if (g_root_pointers_seen_in_an_earlier_version(version_index)) {
             continue;
         }
-        if (!records_read_in_full || !mapping_read_in_full) {
+        // I-3.18 只要这一版的分配记录读全（walk.rs 那一判不读映射）；几版照抄同一棵分配记录树时 walk.rs 只判一次，这里按 I-3.15 那四样指针去重、
+        // 照抄的那几版可能再判一遍：读的是同一批记录、同一批单元头，判到与违例都一样
+        if (!records_read_in_full) {
+            mark_part_of_the_range_not_judged(INVARIANT_I_3_15);
+            mark_part_of_the_range_not_judged(INVARIANT_I_3_18);
+            continue;
+        }
+        g_judge_the_spans_of_the_unreleased_records_of_the_version_against_the_classes_of_their_units();
+        if (!mapping_read_in_full) {
             mark_part_of_the_range_not_judged(INVARIANT_I_3_15);
             continue;
         }
-        g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(version, fsid_low);
+        g_judge_the_unreleased_records_of_the_version_against_its_central_mapping(version);
     }
     g_judge_the_unit_bytes_of_each_mapping_key_across_the_versions();
 }
@@ -7027,7 +7206,7 @@ fn scan_stage(fsid_low: vec2<u32>) {
     judge_tombstones_and_the_lineage_of_the_versions();
     judge_inode_number_watermark_above_every_published_tombstone();
     judge_rollback_floor_raises_against_their_ceilings();
-    judge_accounting(fsid_low);
+    judge_accounting();
     judge_instance_table_rows_against_the_roots_referencing_them();
 }
 

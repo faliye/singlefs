@@ -180,12 +180,27 @@ impl DisposableLibraryDirectory {
                 )
             })?;
         }
-        std::fs::create_dir_all(&directory)
-            .map_err(|error| format!("建不了一次性库目录 {}：{error}", directory.display()))?;
-        std::fs::write(directory.join(DISPOSABLE_LIBRARY_MARKER_FILE_NAME), b"").map_err(
-            |error| format!("一次性库目录 {} 里写不了记号：{error}", directory.display()),
-        )?;
-        Ok(Self { directory })
+        // 先认领、再建：建了目录却写不了记号而交回错误时，Drop 删掉建了的那一半
+        let disposable = Self { directory };
+        std::fs::create_dir_all(&disposable.directory).map_err(|error| {
+            format!(
+                "建不了一次性库目录 {}：{error}",
+                disposable.directory.display()
+            )
+        })?;
+        std::fs::write(
+            disposable
+                .directory
+                .join(DISPOSABLE_LIBRARY_MARKER_FILE_NAME),
+            b"",
+        )
+        .map_err(|error| {
+            format!(
+                "一次性库目录 {} 里写不了记号：{error}",
+                disposable.directory.display()
+            )
+        })?;
+        Ok(disposable)
     }
 
     /// 上层目录（用例自己的配置文件这类也放这里）。

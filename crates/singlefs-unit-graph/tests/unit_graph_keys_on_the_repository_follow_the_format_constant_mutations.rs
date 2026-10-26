@@ -85,13 +85,12 @@ fn copy_directory(from: &Path, to: &Path) {
 fn repository_copy(label: &str) -> FixtureTree {
     let repository = repository_root();
     let copy_number = NEXT_COPY_NUMBER.fetch_add(1, Ordering::SeqCst);
-    let root = std::env::temp_dir().join(format!(
+    // 先认领、再拷：拷到一半 panic（盘满、读不了某个文件）时守卫删掉拷了的那一半
+    let tree = FixtureTree::adopt(std::env::temp_dir().join(format!(
         "singlefs-unit-graph-{label}-{}-{copy_number}",
         std::process::id()
-    ));
-    if root.exists() {
-        std::fs::remove_dir_all(&root).expect("上一趟同名的临时目录删得掉");
-    }
+    )));
+    let root = tree.root();
     copy_directory(&repository.join("crates"), &root.join("crates"));
     copy_directory(&repository.join("litmus"), &root.join("litmus"));
     for file in ["Cargo.toml", "Cargo.lock", ".claude/heavy-thread-default"] {
@@ -100,7 +99,7 @@ fn repository_copy(label: &str) -> FixtureTree {
         std::fs::copy(repository.join(file), destination)
             .unwrap_or_else(|error| panic!("拷 {file}：{error}"));
     }
-    FixtureTree::adopt(root)
+    tree
 }
 
 /// 变异表里按名字找那一行：（文件，原文，替换文），`\n` 还原成换行。

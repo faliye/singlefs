@@ -43,6 +43,9 @@ use singlefs_checker_tier::crash::{
     CrashPointReplayObserverCounts, CrashPointReplaySegmentExpansion, CrashPointReplayTally,
 };
 use singlefs_checker_tier::crash_amplification::ObserverDeduplication;
+use singlefs_checker_tier::crash_point_replay_provenance::{
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow, RunOfTheFlow,
+};
 use singlefs_checker_tier::crash_state_enumeration::{
     enumerate_crash_states_with_every_kind_of_observer, CrashPointReplayItem,
     CrashPointReplayObserver, CrashPointReplayObserverHandingBackAnImage,
@@ -217,6 +220,11 @@ fn quick_tier_of(stream: MultipleCopyOnWriteCrashStream, tag: &str) {
         "{stream:?}：展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_every_state_was_observed(&prepared, &tally);
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        stream.flow_name(),
+        &tally,
+    );
 }
 
 /// 先删别的文件那一支的快档：每个状态记落点、可写挂载一次续做走完删除、读回第一个文件与 150，落到删除中的再续做一遍逐字节相同。
@@ -303,6 +311,11 @@ fn full_enumeration_of(stream: MultipleCopyOnWriteCrashStream, tag: &str) {
     assert_eq!(tally.states, closed_form);
     assert_the_shape_of_the_flow(&prepared);
     assert_every_state_was_observed(&prepared, &tally);
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        stream.flow_name(),
+        &tally,
+    );
 }
 
 /// 全量：先删别的文件那一支。登记成崩溃枚举用例，checker-tier-crash-point-replay 认 `CRASH_POINT_REPLAY_OTHER_FILE_DELETED_BEFORE_THE_FIRST_FILE` 行里 `exhaustive=true`。

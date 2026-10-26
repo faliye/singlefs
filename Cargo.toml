@@ -1,5 +1,5 @@
 # singlefs workspace：成员是 crates/ 下的各包。
-# scripts/experiments/ 是实验 workspace，自己有 Cargo.toml，这里显式排除。
+# scripts/experiment-apparatus/ 是实验 workspace，自己有 Cargo.toml，这里显式排除。
 [workspace]
 resolver = "2"
 members = [
@@ -11,10 +11,11 @@ members = [
     "crates/singlefs-checker-tier",
     "crates/singlefs-reference-filesystem",
     "crates/singlefs-unit-graph",
+    "crates/singlefs-background-gpu",
 ]
-exclude = ["scripts/experiments"]
+exclude = ["scripts/experiment-apparatus"]
 
-# 与 scripts/experiments/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
+# 与 scripts/experiment-apparatus/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
 [profile.release]
 opt-level = 3
 debug = true

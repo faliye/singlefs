@@ -39,7 +39,11 @@ use singlefs_checker_tier::crash_state_enumeration::{
 const THIS_FILE: &str =
     "crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs";
 
-/// 这一趟掩码切片的工作线程数与它从哪来（崩溃点重放判段同一个读法：`SINGLEFS_CRASH_POINT_REPLAY_THREADS`，`scripts/hosts/capped.sh` 设它）。
+/// 这一趟掩码切片的工作线程数与它从哪来（σ 全量那条崩溃枚举用例用；崩溃点重放判段同一个读法：`SINGLEFS_CRASH_POINT_REPLAY_THREADS`，
+/// 没设读 `SINGLEFS_CRASH_AMPLIFICATION_THREADS`，再没设取每台默认重活线程数，`scripts/hosts/capped.sh` 设前一个）。
+/// 来源随线程行的 `worker_threads_source=` 打出去，门禁 checker-tier-crash-point-replay 按它判线程用没用上（`admission.py` 的 `judge_worker_threads`）。
+/// 这里不是 GPU 对拍：σ 对拍那条用例的 CPU 一侧另读 `SINGLEFS_CRASH_JUDGE_CPU_THREADS`（`cpu_threads_from_the_value_of_the_variable`，带 `gpu` 特性才编），
+/// 两处各管各的，不合成一个变量。
 #[derive(Clone, Copy, Debug)]
 struct WorkerThreadsOfTheRun {
     worker_threads: std::num::NonZeroUsize,
@@ -527,18 +531,11 @@ fn given_states_engine_of_this_test(
     .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
 }
 
-/// 一遍恢复落到的根在结论里那两个字换回 (实例, txg)：txg 只带低 32 位（这几段历史的 txg 都在几十以内），没落到根是 `None`。
+/// 一遍恢复落到的根在结论里那四个字换回 (实例, 完整的 txg)（`LandedRootWords::landed_root`），没落到根是 `None`。
 fn effective_root_of_the_landed_root_words(
     landed: singlefs_checker_tier::crash_judge_conclusions::LandedRootWords,
 ) -> Option<(InstanceGeneration, CheckpointTxg)> {
-    (landed != singlefs_checker_tier::crash_judge_conclusions::LandedRootWords::NOT_LANDED).then(
-        || {
-            (
-                InstanceGeneration(landed.instance),
-                CheckpointTxg(u64::from(landed.checkpoint_txg_low)),
-            )
-        },
-    )
+    landed.landed_root()
 }
 
 /// 一个状态上恢复实际走的根与记录核对器的判定。
@@ -1438,8 +1435,12 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
         .filter(|range| !range.is_empty())
         .collect();
     let next_slice = std::sync::atomic::AtomicUsize::new(0);
-    /// 一个状态的 CPU 判定：红项与落到的根、两遍的结局（[`recovery_words_of`] 的四个数）。
-    type CpuVerdict = (Vec<String>, [u32; 4]);
+    /// 一个状态的 CPU 判定：红项与落到的根、两遍的结局（[`recovery_words_of`] 的恢复摘要：看 journal 那一遍落到的根的标记、实例代号、
+    /// checkpoint_txg 低 32 位与高 32 位，两遍的结局码）。
+    type CpuVerdict = (
+        Vec<String>,
+        singlefs_checker_tier::crash_amplification::RecoveryRootAndOutcomesOfState,
+    );
     let mut judged_slices: Vec<(usize, Vec<CpuVerdict>)> = std::thread::scope(|scope| {
         let workers: Vec<_> = (0..threads)
             .map(|_| {

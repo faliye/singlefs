@@ -203,9 +203,9 @@ fn a_data_write_after_the_first_file_was_deleted_is_refused_by_the_implementatio
 }
 
 /// 写死的那一段（判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md` 第三节 M4「模型对拍逐版比删除各步」）：第一个文件旁边建 160 个 inode，
-/// 写号 2（三个单元）、号 161（上段长到层 1）、号 150（145 个单元、两片下段叶），之后 unlink 按号选（[`HistoryOperation::Unlink`] 用步号当选择子）：
-/// 第 4 步删号 2、第 7 步删号 161（还剩号 150，上段仍是层 1）、第 10 步删号 150（先一个不是最后一批的批截掉 144 个，最后一批之后有条目的只剩 inode 1，
-/// 上段降回层 0——上一版的第 0 片叶照抄成根）、第 12 步删第一个文件（树里还有 157 个 size 0 的 inode，这一版归带文件的一版），之后第 13 步给删之前
+/// 写号 2（三个单元）、号 161（上段长到常规层）、号 150（145 个单元、两片下段叶），之后 unlink 按号选（[`HistoryOperation::Unlink`] 用步号当选择子）：
+/// 第 4 步删号 2、第 7 步删号 161（还剩号 150，上段仍是常规层）、第 10 步删号 150（先一个不是最后一批的批截掉 144 个，最后一批之后有条目的只剩 inode 1，
+/// 上段降回崩溃点重放——上一版的第 0 片叶照抄成根）、第 12 步删第一个文件（树里还有 157 个 size 0 的 inode，这一版归带文件的一版），之后第 13 步给删之前
 /// 就有的 inode 4 写数据照写、第 15 步给删完之后建的 inode 162 写数据必拒（K-U5 β）。每一版连同上段每个节点的分配代都交模型比。
 fn history_deleting_files_beside_the_first_file_until_only_size_zero_inodes_remain(
 ) -> GeneratedHistory {
@@ -217,7 +217,7 @@ fn history_deleting_files_beside_the_first_file_until_only_size_zero_inodes_rema
             HistoryOperation::CreateInodes(InodeCountChoice { count_drawn: 160 }),
             // 第 1 步：号 2 顺序写三个单元。
             write_of_an_inode(4, spanning_data_units(3, 0x0211)),
-            // 第 2 步：号 161 覆盖写（上段长到层 1）。
+            // 第 2 步：号 161 覆盖写（上段长到常规层）。
             write_of_an_inode(0, inside_one_data_unit(31, 0x1621)),
             // 第 3 步：号 150 顺序写 145 个单元（下段两片叶）。
             write_of_an_inode(448, spanning_data_units(145, 0x1511)),
@@ -290,7 +290,7 @@ fn a_fixed_history_deleting_files_beside_the_first_file_agrees_with_the_model_at
             counts.deletion_batches_keeping_data_units_matched,
         ),
         (3, 1, 0, 1, 1),
-        "删别的号 3 次（号 2、161、150）、删第一个文件而别的还在 1 次、删到空 0 次、上段降层 1 次（删号 150）、不是最后一批的批 1 次（号 150 的 145 个单元）"
+        "删别的号 3 次（号 2、161、150）、删第一个文件而别的还在 1 次、删到空 0 次、上段降常规层 次（删号 150）、不是最后一批的批 1 次（号 150 的 145 个单元）"
     );
     assert_eq!(
         (

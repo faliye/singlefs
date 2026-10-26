@@ -44,10 +44,12 @@ const CARD_TAKING_FUNCTIONS_THROUGH_THE_ENTRY: [&str; 3] = [
 ];
 
 /// 改走卡池的测试文件（相对包根）：每份至少一处调 [`CARD_POOL_FUNCTION`]，[`NAMES_THAT_BYPASS_THE_POOL`] 一处都不许有。
-const FILES_THAT_TAKE_CARDS_ONLY_FROM_THE_POOL: [&str; 8] = [
+const FILES_THAT_TAKE_CARDS_ONLY_FROM_THE_POOL: [&str; 10] = [
     "tests/crash_amplification_pipeline_records_checks_and_reuses.rs",
     "tests/crash_amplification_product_path_books_its_scratch_on_the_card_pool.rs",
     "tests/crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs",
+    "tests/crash_judge_fall_back_on_the_union_of_readers_matches_the_walk_alone.rs",
+    "tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_root_ring_stride_refusals.rs",
     "tests/gpu_judge_root_choice_tie_takes_the_earlier_root_like_the_cpu_checker.rs",
     "tests/gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker.rs",
     "tests/gpu_recovery_root_choice_refuses_root_record_pointer_head_fields_like_the_core.rs",

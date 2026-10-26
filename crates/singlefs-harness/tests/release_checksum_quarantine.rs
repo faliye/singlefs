@@ -15,10 +15,12 @@
 //! 6. 隔离之后重挂：那一槽的记录从盘上读回来仍是已分配，能回收的都回收了它也不回空闲池、不被再发出去；
 //! 7. 准入照已分配算：与不改坏的同一段历史比，两块盘的已分配各多那一份的两槽、可用各少两槽，被抛弃根独占量那一项是 0；
 //! 8. 位置项指的盘不在池里、9. 两条位置项指同一块盘：当映射条目损坏，在任何落盘动作之前拒绝，盘上不变；
-//! 10. 池级 checker 的 I-3.1 / I-3.11 怎么认隔离的记录：已分配而没有根引用的记录，checker 自己读它罩住的那一份
-//!     也读不出或自证不过才豁免，读得出且对得上的照旧判违例。
+//! 10. 池级 checker 的 I-3.1 / I-3.11 怎么认隔离的记录：只认记号（D19 已定项 5「隔离的盘上记号」，用户 2026-10-22 定）——
+//!     已分配而没有根引用、每块盘上那条记录都带隔离记号的豁免，不读副本。
 //! 12. 读得出而核出对不上一次（瞬时坏读）、重读对得上：照常释放，一份都不隔离（对不上也先重读一次）；
-//! 13. 每一读都核出对不上：重读恰好一次，之后按对不上处置。
+//! 13. 每一读都核出对不上：重读恰好一次，之后按对不上处置；
+//! 15. 读得出而核出对不上一次、重读对得上：这次发布落到盘上的那棵分配记录树里，两块盘那条记录都是已释放、都不带隔离记号
+//!     （用例 12 看的是分配器在内存里的账与交回的隔离清单，这一条看写进盘里的记号）。
 mod common;
 mod common_images_for_the_checker_tier;
 #[path = "common_images_for_the_checker_tier/release_checksum_quarantine.rs"]
@@ -39,7 +41,9 @@ use singlefs_core::address::{
 use singlefs_core::admission::{
     AdmissionReading, BytesOnOneDevice, BytesSummedOverAllReplicas, PoolWideCommitments,
 };
-use singlefs_core::allocator::{Placement, ReclaimedReuse, ReuseWindow};
+use singlefs_core::allocator::{
+    AllocationRecordQuarantineMark, Placement, ReclaimedReuse, ReuseWindow,
+};
 use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
 };
@@ -611,6 +615,69 @@ fn release_checksum_read_that_returns_corrupted_bytes_once_is_read_again_and_the
     );
 }
 
+/// 用例 15：同用例 12 那一形（盘 0 那一份的第一读交回坏了一个字节、重读对得上），看的是这次发布写到盘上的东西：
+/// 最新根那棵分配记录树里，那一槽两块盘的记录都是已释放、释放代 4、不带隔离记号（D19（块指针的结构与宽度预算） 已定项 5
+/// 「隔离的盘上记号」：只有隔离那次发布才把两块盘那条记录的跨度段置 0x4000）。对不上不重读的实现在这里把一对好槽隔离掉：
+/// 两块盘那条记录留在已分配、分配代 3、带着记号落盘。池级 checker 只认记号、不读副本（I-3.17（隔离记号与引用相符） 判的是记号与引用相符），
+/// 那样的盘面它判不红，所以「一次瞬时坏读不许让单元永久隔离」这一条只能在写者交回之后对着盘上的记号判。
+#[test]
+fn release_checksum_read_that_returns_corrupted_bytes_once_writes_both_records_released_without_the_quarantine_mark(
+) {
+    let mut pool = build_pool("release-checksum-read-corrupted-once-mark-on-disk");
+    let data_slot = data_slot_of_the_first_version(&pool);
+    let (result, _reads_seen) = overwrite_with_the_first_reads_of_the_data_copies_failing(
+        &mut pool,
+        FailedReadForm::CorruptedBytes,
+        [1, 0],
+    );
+    let second = result.expect("重读对得上：发布照成");
+    assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
+    let image = pool.memory_pool();
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
+    let newest = choose_root(&image, &system_configuration).expect("最新根");
+    let records_on_disk: Vec<(
+        DeviceIdentity,
+        bool,
+        CheckpointTxg,
+        AllocationRecordQuarantineMark,
+    )> = allocation_records_under_root(&image, &newest)
+        .expect("最新根那棵账读得出")
+        .into_iter()
+        .filter(|record| record.slot == data_slot)
+        .map(|record| {
+            (
+                record.device,
+                record.is_released,
+                record.generation,
+                record.quarantine_mark,
+            )
+        })
+        .collect();
+    assert_eq!(
+        records_on_disk,
+        vec![
+            (
+                DeviceIdentity(0),
+                true,
+                CheckpointTxg(4),
+                AllocationRecordQuarantineMark::NotQuarantined
+            ),
+            (
+                DeviceIdentity(1),
+                true,
+                CheckpointTxg(4),
+                AllocationRecordQuarantineMark::NotQuarantined
+            ),
+        ],
+        "盘上最新根那棵账里那一槽两块盘的记录都已释放、释放代 4、不带隔离记号"
+    );
+    assert_eq!(
+        second.quarantined_after_release_checksum_mismatch,
+        Vec::new(),
+        "交回的隔离清单是空的"
+    );
+}
+
 /// 用例 13：盘 0 上那一份每一读都交回坏了一个字节的内容（坏读一直在，盘上的字节是好的）：先重读一次（恰好一次），
 /// 两次都对不上才按对不上处置——两块盘的记录一起留在已分配，盘 0 那一份报「重读之后仍对不上」、盘 1 那一份报「对得上而一起留」。
 /// 这一格是故障注入里「每次读都给坏字节」的形态：隔离的是一对好槽，那是「两次都对不上才隔离」这条规则认下的代价，不是实现的错。
@@ -925,22 +992,22 @@ fn two_mapping_locations_on_the_same_device_are_refused_as_a_damaged_mapping_ent
     assert!(records_unchanged, "分配器一条记录都没改写");
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_release_checksum_quarantine::quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_release_checksum_quarantine::quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read(
+fn quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back(
 ) {
-    scenarios_of_release_checksum_quarantine::quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read(&mut PoolCheckerImages::left_to_the_checker_tier());
+    scenarios_of_release_checksum_quarantine::quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not() {
-    scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not(&mut PoolCheckerImages::left_to_the_checker_tier());
+fn unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back(
+) {
+    scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry(
-) {
-    scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry(&mut PoolCheckerImages::left_to_the_checker_tier());
+fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark() {
+    scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark(&mut PoolCheckerImages::left_to_the_checker_tier());
 }

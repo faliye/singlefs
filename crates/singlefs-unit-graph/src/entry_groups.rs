@@ -3,8 +3,12 @@
 //!
 //! 一组 = 同一个目标里的几个入口 fn（[`crate::closure::compute_closure_of_entries`] 一次收），开哪几个特性、工具链行
 //! （[`crate::build_toolchain::toolchain_lines_of_the_build`]）与 `Cargo.lock`（按闭包收窄，[`crate::lock_file::narrowed_lock_lines`]）。
-//! 键就是 [`crate::closure::reuse_key`] 那一把：与命令行 `unit-graph key <根> <入口>… --target … --cfg feature=… --toolchain-of-the-build …
-//! --lock-file Cargo.lock` 算的逐字相同。
+//! 键就是 [`crate::closure::reuse_key`] 那一把：没有别的包并上来的特性时，与命令行 `unit-graph key <根> <入口>… --target … --cfg feature=…
+//! --toolchain-of-the-build … --lock-file Cargo.lock` 算的逐字相同；构建脚本另交这一次编译里依赖包被并上来的特性
+//! （[`crate::build_features`]，[`entry_group_key_with_the_features_of_the_build`]）时，等于把那些特性写进入口包对那个依赖的 `features` 之后
+//! 命令行算的那一把。
+//! 判器组都是产品行为判定（崩溃判定库的判器组与观察者）：键与组成清单都在 [`Workspace::view_for_judgment`] 交的产品行为视图上算，
+//! `verus!` 里的规格与证明块不进指纹、不当边（m4-exit5-relocation-proof-r3 判决第二节 Z4）；与命令行对得上要另给 `--judgment-kind product-behavior`。
 //!
 //! 表的写法（一行一项、制表符隔开；组名与限定名、文件:行只当索引，不进键）：
 //!   `# singlefs entry group keys`                                   头一行
@@ -16,16 +20,24 @@
 //!   `unit\t<组名>\t<种类>\t<限定名>\t<文件>:<起>-<止>\t<指纹十六进制>`  组成清单（Rust、WGSL、数据单元，数据单元的限定名是数据文件路径）
 //!   `refusal\t<组名>\t<形态>\t<文件>:<行>\t<原样片段>`               拒算行
 //!   `watched\t<从仓根起的路径>`                                       构建脚本要看的文件（改了就重算），只给构建脚本打 `rerun-if-changed`
+//!   `build-feature\t<包名>\t<特性>`                                   这一次编译里依赖包被打开、算键时照请求的特性（一个都没有就没有这种行）；
+//!                                                                    写在表末，读表的脚本按行头认行、认不出就停的（`crash-amplification-two-hosts.sh`
+//!                                                                    取观察者版本那一段）在它前面就取完了
 
 use std::collections::BTreeSet;
 
-use crate::closure::{compute_closure_of_entries, reuse_key, ClosureRequest, EntryError};
+use crate::build_features::FeaturesEnabledByTheBuild;
+use crate::closure::{
+    compute_closure_of_entries_with_the_features_of_the_build, reuse_key, ClosureRequest,
+    EntryError,
+};
 use crate::closure::{ExternalKeyInputs, RequestedCondition};
 use crate::conditional_compilation::target_triple_of_toolchain_lines;
 use crate::lock_file::{narrowed_lock_lines, LockedPackage};
 use crate::output::{closure_lines, refusal_line};
 use crate::rule_switches::RuleSwitches;
 use crate::sha256::{Sha256Digest, DIGEST_BYTES};
+use crate::verus_ghost_code::JudgmentKind;
 use crate::workspace::{TargetKind, TargetSelector, Workspace};
 
 /// 表的头一行。
@@ -67,7 +79,7 @@ pub struct EntryGroupKey {
 }
 
 /// 收一组入口、算键。组里在这组特性下不编进来的入口不收、记进 `entries_not_compiled`，键照其余的入口算；一个都编不进来的交
-/// [`EntryGroupVerdict::NotCompiled`]。
+/// [`EntryGroupVerdict::NotCompiled`]。依赖包的特性只按清单解：同 [`entry_group_key_with_the_features_of_the_build`] 交空表。
 ///
 /// # Errors
 /// 入口找不到、不唯一、写法不对、不在同一个 crate 里（登记表写错了，调用方应当停下）。
@@ -78,6 +90,31 @@ pub fn entry_group_key(
     locked_packages: &[LockedPackage],
     switches: &RuleSwitches,
 ) -> Result<EntryGroupKey, EntryError> {
+    entry_group_key_with_the_features_of_the_build(
+        workspace,
+        request,
+        &FeaturesEnabledByTheBuild::default(),
+        toolchain_lines,
+        locked_packages,
+        switches,
+    )
+}
+
+/// 同 [`entry_group_key`]，另按这一次编译里 cargo 给各依赖包实际打开的特性解 cfg（[`crate::build_features`]：构建脚本读依赖包经
+/// `links` 交出的那一份，连别的包在同一次构建里并上来的）。表是空的，与 [`entry_group_key`] 逐字相同。
+/// `workspace` 交装出来的那一份（原样）或它的产品行为视图都行：键一律在产品行为视图上算（文件头）。
+///
+/// # Errors
+/// 同 [`entry_group_key`]；表里点名的包工作区里没有。
+pub fn entry_group_key_with_the_features_of_the_build(
+    workspace: &Workspace,
+    request: &EntryGroupRequest,
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    toolchain_lines: &[String],
+    locked_packages: &[LockedPackage],
+    switches: &RuleSwitches,
+) -> Result<EntryGroupKey, EntryError> {
+    let workspace = workspace.view_for_judgment(JudgmentKind::ProductBehavior);
     if request.entry_paths.is_empty() {
         return Err(EntryError::MalformedEntryPath(format!(
             "组「{}」没有入口",
@@ -117,8 +154,13 @@ pub fn entry_group_key(
             uses_default_features: false,
             target_triple: target_triple.clone(),
         };
-        match compute_closure_of_entries(workspace, &closure_request, additional_entries, switches)
-        {
+        match compute_closure_of_entries_with_the_features_of_the_build(
+            workspace,
+            &closure_request,
+            additional_entries,
+            features_enabled_by_the_build,
+            switches,
+        ) {
             Ok(outcome) => break outcome,
             Err(EntryError::EntryInactive(path)) => {
                 compiled_entries.retain(|entry| *entry != path);
@@ -220,9 +262,23 @@ fn watched_files_of_the_closure(
     watched
 }
 
-/// 把几组的结果与工具链行写成表（文件头那一种写法）。
+/// 把几组的结果与工具链行写成表（文件头那一种写法），没有并上来的特性。
 #[must_use]
 pub fn entry_group_table_text(toolchain_lines: &[String], groups: &[EntryGroupKey]) -> String {
+    entry_group_table_text_with_the_features_of_the_build(
+        toolchain_lines,
+        &FeaturesEnabledByTheBuild::default(),
+        groups,
+    )
+}
+
+/// 同 [`entry_group_table_text`]，表末另写这一次编译里依赖包被打开、算键时照请求的特性（`build-feature` 行）。
+#[must_use]
+pub fn entry_group_table_text_with_the_features_of_the_build(
+    toolchain_lines: &[String],
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    groups: &[EntryGroupKey],
+) -> String {
     let mut lines = vec![ENTRY_GROUP_TABLE_HEADER.to_string()];
     lines.extend(
         toolchain_lines
@@ -267,6 +323,13 @@ pub fn entry_group_table_text(toolchain_lines: &[String], groups: &[EntryGroupKe
         watched.extend(group.watched_files.iter().cloned());
     }
     lines.extend(watched.iter().map(|path| format!("watched\t{path}")));
+    for (package_name, features) in &features_enabled_by_the_build.features_of_each_package {
+        lines.extend(
+            features
+                .iter()
+                .map(|feature| format!("build-feature\t{package_name}\t{feature}")),
+        );
+    }
     let mut text = lines.join("\n");
     text.push('\n');
     text
@@ -298,12 +361,13 @@ pub struct ReadBackEntryGroup {
     pub composition: Vec<CompositionUnit>,
 }
 
-/// 读回的整张表：工具链行、各组（按表里的次序）、要看的文件。
+/// 读回的整张表：工具链行、各组（按表里的次序）、要看的文件、这一次编译里依赖包被打开的特性（拿同一份输入重算键用）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReadBackEntryGroupTable {
     pub toolchain_lines: Vec<String>,
     pub groups: Vec<ReadBackEntryGroup>,
     pub watched_files: Vec<String>,
+    pub features_enabled_by_the_build: FeaturesEnabledByTheBuild,
 }
 
 fn digest_of_hexadecimal(text: &str) -> Option<[u8; DIGEST_BYTES]> {
@@ -330,6 +394,7 @@ pub fn parse_entry_group_table(text: &str) -> Result<ReadBackEntryGroupTable, St
         toolchain_lines: Vec::new(),
         groups: Vec::new(),
         watched_files: Vec::new(),
+        features_enabled_by_the_build: FeaturesEnabledByTheBuild::default(),
     };
     for line in lines.filter(|line| !line.is_empty()) {
         let fields: Vec<&str> = line.split('\t').collect();
@@ -344,6 +409,14 @@ pub fn parse_entry_group_table(text: &str) -> Result<ReadBackEntryGroupTable, St
                 table.toolchain_lines.push((*toolchain_line).to_string())
             }
             ["watched", path] => table.watched_files.push((*path).to_string()),
+            ["build-feature", package_name, feature] => {
+                table
+                    .features_enabled_by_the_build
+                    .features_of_each_package
+                    .entry((*package_name).to_string())
+                    .or_default()
+                    .insert((*feature).to_string());
+            }
             ["group", name, verdict @ ..] => {
                 if group_position(name, &table).is_some() {
                     return Err(format!("组「{name}」出现了两次：{line}"));
@@ -448,6 +521,11 @@ mod tests {
         ];
         let text = entry_group_table_text(&["host: x86_64-unknown-linux-gnu".to_string()], &groups);
         let table = parse_entry_group_table(&text).expect("自己写的表读得回");
+        assert_eq!(
+            table.features_enabled_by_the_build,
+            FeaturesEnabledByTheBuild::default(),
+            "没交并上来的特性，表里没有 build-feature 行"
+        );
         assert_eq!(table.toolchain_lines, ["host: x86_64-unknown-linux-gnu"]);
         assert_eq!(table.watched_files, ["crates/a/src/lib.rs"]);
         assert_eq!(
@@ -477,6 +555,45 @@ mod tests {
             table.groups[2].verdict,
             ReadBackEntryGroupVerdict::NotCompiled { .. }
         ));
+    }
+
+    /// 一起编时并上来的特性写在表末、读得回；表末之前的行（工具链、组、组成、要看的文件）与不带它们时逐行相同。
+    #[test]
+    fn the_features_enabled_by_the_build_go_after_every_other_line_and_read_back() {
+        let groups = vec![EntryGroupKey {
+            group_name: "judgement_of_the_crash_images".to_string(),
+            verdict: EntryGroupVerdict::Keyed {
+                key: Sha256Digest([0x5e; DIGEST_BYTES]),
+            },
+            entries_not_compiled: Vec::new(),
+            composition_lines: Vec::new(),
+            watched_files: ["crates/a/src/lib.rs".to_string()].into_iter().collect(),
+        }];
+        let features_enabled_by_the_build = FeaturesEnabledByTheBuild {
+            features_of_each_package: [(
+                "singlefs-core".to_string(),
+                ["lookup-work-counters".to_string()].into_iter().collect(),
+            )]
+            .into_iter()
+            .collect(),
+        };
+        let toolchain_lines = ["host: x86_64-unknown-linux-gnu".to_string()];
+        let without = entry_group_table_text(&toolchain_lines, &groups);
+        let with = entry_group_table_text_with_the_features_of_the_build(
+            &toolchain_lines,
+            &features_enabled_by_the_build,
+            &groups,
+        );
+        assert_eq!(
+            with,
+            format!("{without}build-feature\tsinglefs-core\tlookup-work-counters\n"),
+            "并上来的特性只在表末多一行"
+        );
+        let table = parse_entry_group_table(&with).expect("自己写的表读得回");
+        assert_eq!(
+            table.features_enabled_by_the_build,
+            features_enabled_by_the_build
+        );
     }
 
     #[test]

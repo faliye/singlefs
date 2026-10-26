@@ -65,12 +65,13 @@ pub const DEVICE_OF_THE_COPY_READ_FIRST: DeviceIdentity = DeviceIdentity(0);
 /// 一份树表的长度：一个索引节点 16 KiB。
 pub const BYTES_OF_A_TREE_TABLE: u64 = 16 * 1024;
 /// 攻方量的（`research/prompts/m3-b44-code-r3-opus-model/out/trace-after-unchanged.txt` 与 `trace-after-corrupted.txt` 第 303、304 行）：
-/// 两份窄盘可写挂载整池第 303 次读是盘 0 槽 0、第 304 次是盘 0 槽 1，是这次挂载头一次把它们读进预演与真做共用的那一份
-/// （判号那一读，`transaction::next_instance_generation_to_acquire`）；之前那 302 次是读阶段、恢复与重建分配器的读与判号读根环。
+/// 两份窄盘可写挂载那时整池第 303 次读是盘 0 槽 0、第 304 次是盘 0 槽 1；可写挂载改成每次先判退（C755，`recovery::fall_back_judged_on_the_three_readers`
+/// 逐盘读两个系统配置槽当见证，读阶段之后多 4 次读）之后是第 307、308 次，是这次挂载头一次把它们读进预演与真做共用的那一份
+/// （判号那一读，`transaction::next_instance_generation_to_acquire`）；之前那 306 次是读阶段、判退读见证、恢复与重建分配器的读与判号读根环。
 /// 用例开头核这两次读的是哪一块。
-pub const READ_OF_SLOT_ZERO_OF_DEVICE_ZERO_INTO_THE_SHARED_READS: u64 = 303;
+pub const READ_OF_SLOT_ZERO_OF_DEVICE_ZERO_INTO_THE_SHARED_READS: u64 = 307;
 /// 紧接着的那一次：盘 0 槽 1。
-pub const READ_OF_SLOT_ONE_OF_DEVICE_ZERO_INTO_THE_SHARED_READS: u64 = 304;
+pub const READ_OF_SLOT_ONE_OF_DEVICE_ZERO_INTO_THE_SHARED_READS: u64 = 308;
 /// 读回坏字节那一次把第一个字节按位取反：系统配置槽的整槽校验和、单元的 CRC-32C 都对不上。
 const BITS_FLIPPED_IN_THE_FIRST_BYTE: u8 = 0xFF;
 

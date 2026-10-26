@@ -1,6 +1,11 @@
 //! 判法单元的入口登记表：每一组判法单元从哪几个入口 fn 收闭包（`crate::crash_identity::JudgingUnits` 每一种一行，挂得上的观察者每个一行）。
 //! 构建脚本（`build.rs`）经 `#[path]` 编同一份，经 `singlefs-unit-graph` 逐组算键与组成清单、写进 `OUT_DIR`；库按组名读回编进去的那一把，
-//! 跑时不读盘上的树（剪枝复查第二轮 design 路报告 3.8「build.rs 做什么」，4-2a）。表里的文字（组名、路径、观察者名）只用来找入口，不进键。
+//! 跑时不读盘上的树（剪枝复查第二轮 design 路报告 3.8「build.rs 做什么」，4-2a）。表里的文字（组名、路径、观察者名）只用来找入口，
+//! 一般不进键；例外是 `observer_conclusion_composition` 一组开 `gpu` 编的那一把：它的闭包够着 GPU 判器的 `.wgsl`，`.wgsl` 里没定义的外名
+//! 按 `singlefs-unit-graph` 的着落规则在链接集里找供名字的单元并进闭包（`crates/singlefs-unit-graph/src/closure.rs` 文件头「WGSL 外名」那一段：
+//! 按名字定义它、以 `_` 加它收尾、串字面量里有它这个词的单元都算，是超集），观察者登记表 [`OBSERVER_ENTRIES`] 这个常量就这样进了这一组的闭包
+//! （里程碑三收尾批 14 的实现员按名字与指纹比两边闭包量到的；经哪一个外名并进来没查）。所以 [`OBSERVER_ENTRIES`] 每加、改一行，这一组带 `gpu`
+//! 的键就变，交回镜像的观察者在判段重判一次；不带 `gpu` 编的那一把与别的组照旧不受表里文字影响。
 //! 这份文件只放数据与拼组名的一个函数，只用 `std`：构建脚本单独编它。
 //!
 //! 一组的入口都在同一个编译目标里（`lib`、`test:<测试目标>`、`bin:<名>`）；只在某个特性下编进来的入口，这一趟没开那个特性就不收
@@ -21,8 +26,10 @@ pub struct JudgingUnitsEntryGroup {
 /// - GPU 判器：三个内核的源码怎么拼（`JudgeKernelSources`，连同旋钮那一份；扫描内核源码里的第三个入口 `scan_rebuild_main` 在
 ///   `crash_judge_checker_scan_rebuild.wgsl`，经拼扫描内核源码那一个函数读进闭包，它的 `@compute` 入口照 WGSL 的收法进组）、上卡与派活
 ///   （编五条管线的 `compile_the_judge_kernels`）、回读归位（`GpuCrashJudge::judge_states` 调的 `judge_one_dispatch`：派活里决定结论落到哪个状态的那一段，
-///   底稿 L7）、结论字怎么解成红项、恢复字、计数向量与扫描重建那一截的结局码（`scan_rebuild_outcome_of_the_gpu_verdict`）。
-/// - 判镜像的定义（`judgement_of_the_crash_images`）：CPU 参照判器 `crash::judge_crash_image` 与结论的编码（红项、计数向量）；镜像判定的版本
+///   底稿 L7）、结论字怎么解成红项、恢复字、计数向量、扫描重建那一截的结局码（`scan_rebuild_outcome_of_the_gpu_verdict`）与逐盘自证过的系统配置槽数
+///   （`self_verified_system_configuration_slots_of_each_device_of_the_gpu_verdict`）。
+/// - 判镜像的定义（`judgement_of_the_crash_images`）：CPU 参照判器 `crash::judge_crash_image`、结论的编码（红项、计数向量）与判器随结论块交回的
+///   逐盘自证过的系统配置槽数（CPU 参照 `self_verified_system_configuration_slots_of_each_device`：两槽全废盘面观察者在判段读它）；镜像判定的版本
 ///   就是这一把，不论在 CPU 还是 GPU 上判的（GPU 判器那一组只进块属性当出处）。
 /// - 判给定状态的定义（`judgement_of_the_given_states`）：CPU 参照判器 `crash_given_states` 的判法与它的计数向量、红项编码；同上。
 /// - 两种核对：第 ② 段的 CPU 参照与 GPU 内核。
@@ -42,6 +49,7 @@ pub const JUDGING_UNITS_ENTRY_GROUPS: &[JudgingUnitsEntryGroup] = &[
             "singlefs_checker_tier::crash_judge_gpu::recovery_words_of_the_gpu_verdict",
             "singlefs_checker_tier::crash_judge_gpu::cross_check_words_of_gpu_verdict",
             "singlefs_checker_tier::crash_judge_gpu::scan_rebuild_outcome_of_the_gpu_verdict",
+            "singlefs_checker_tier::crash_judge_gpu::self_verified_system_configuration_slots_of_each_device_of_the_gpu_verdict",
             "singlefs_checker_tier::crash_judge_conclusions::StateCountsOfABlock::count_the_gpu_bits",
             "singlefs_checker_tier::crash_judge_conclusions::StateCountsOfABlock::into_count_vector",
             "singlefs_checker_tier::crash_judge_conclusions::encoded_verdict_of_the_red_items",
@@ -52,6 +60,7 @@ pub const JUDGING_UNITS_ENTRY_GROUPS: &[JudgingUnitsEntryGroup] = &[
         target: "lib",
         entry_functions: &[
             "singlefs_checker_tier::crash::judge_crash_image",
+            "singlefs_checker_tier::crash_judge_conclusions::self_verified_system_configuration_slots_of_each_device",
             "singlefs_checker_tier::crash_judge_conclusions::StateCountsOfABlock::count_the_cpu_judgement",
             "singlefs_checker_tier::crash_judge_conclusions::StateCountsOfABlock::into_count_vector",
             "singlefs_checker_tier::crash_judge_conclusions::encoded_verdict_of_the_red_items",
@@ -538,6 +547,39 @@ pub const OBSERVER_ENTRIES: &[ObserverEntry] = &[
         target: "test:crash_enumeration_one_file_overwritten_across_two_writable_remounts_stream",
         entry_functions: &[
             "singlefs_checker_tier::common_multiple_copy_on_write_crash_streams::observe_the_mount_continuation_and_the_files_read_back",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_make_filesystem_over_a_used_pool_stream.rs",
+        observer_name: "make_filesystem_clause",
+        target: "test:crash_enumeration_make_filesystem_over_a_used_pool_stream",
+        entry_functions: &["singlefs_checker_tier::observe_the_outcome_allowed_by_the_clause"],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_deletion_interleaved_with_compaction_across_a_rollback_stream.rs",
+        observer_name: "landed_version_reading_both_files_through_the_mapping",
+        target: "test:crash_enumeration_deletion_interleaved_with_compaction_across_a_rollback_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::observe_the_landed_version_reading_both_files_through_the_mapping",
+        ],
+    },
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/tests/crash_enumeration_deletion_interleaved_with_compaction_across_a_rollback_stream.rs",
+        observer_name: "mount_continuing_the_deletion_and_the_compaction",
+        target: "test:crash_enumeration_deletion_interleaved_with_compaction_across_a_rollback_stream",
+        entry_functions: &[
+            "singlefs_checker_tier::observe_the_mount_continuing_the_deletion_and_the_compaction",
+        ],
+    },
+    // 按来历统一挂的观察者（G4 第三轮判决丙-置，用户 2026-10-22 定「按流登记+相对基镜像」与「你做你的 GPU版让GPU去做」）：跑流的两处
+    // （崩溃枚举用例的枚举入口、崩溃放量）按来历表挂，观察者代码文件就是来历表那一份，入口是那里的 fn（判段看），编在库里。
+    // F6 并集对走读观察者撤了（主 agent 2026-10-22 定），它那一行跟着删。
+    ObserverEntry {
+        observer_code_file: "crates/singlefs-checker-tier/src/crash_point_replay_provenance.rs",
+        observer_name: "devices_without_a_self_verified_system_configuration_slot",
+        target: "lib",
+        entry_functions: &[
+            "singlefs_checker_tier::crash_point_replay_provenance::observe_the_devices_without_a_self_verified_system_configuration_slot",
         ],
     },
 ];

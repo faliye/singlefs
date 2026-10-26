@@ -1,20 +1,26 @@
 //! 整理的选段与计划的 Verus 核与证明（里程碑四二·4；判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7 的 V-1：
 //! 放进这个 crate 的一个模块）。`singlefs-core` 的 `compaction_plan::choose_region` 与 `compaction_plan::plan_batch` 去掉读记录、
 //! 读扫描结果之后剩下的判定写成两个可执行的核（[`choose_compaction_segment`]、[`plan_compaction_batch`]），证判决 G7 点名的四条：
-//! - P1 选段健全（先不证最优）：选出的段合 G2 的资格——不是这次挂载开过的段、不是活意图的 R、没装钉住的槽、没被区域扫描拒过、
+//! - P1 选段健全与贪心选择（活槽数最少、平局取最前）：选出的段合 G2 的资格——不是这次挂载开过的段、不是活意图的 R、没装钉住的槽、没被区域扫描拒过、
 //!   扫过而且至少一个能搬的单元；「一段都没资格」时真没有一段是候选。
 //! - P2 计划健全：一批至多 K 项、每一项是能搬的单元、各项互异；扫描结果里能搬的单元映射 key 互异时，一批里的 key 互异。
 //!   目的地那一半（不在 R 内、两两不重叠、跨度相同）按判决 G2 是分配器的性质，计划函数不交目的地，这里只证 key 一侧。
 //! - P3 进展：交「搬」时至少一项；不搬时分「搬空」（R 里一条未释放记录都没有）与「搬不动」（有记录、一个能搬的都没有）。
-//! - P4 抽象恒等引理：映射（key → 落点）加落点上的字节是具体状态，每个 key 经映射读到的字节是抽象状态。按计划搬一批（源字节原样写到
-//!   目的地、映射条目换到目的地）不改任何一个 key 读到的字节；在前提「R 内每条未释放记录都有映射 key 且不在隔离集里」（攻方 H-G7-1）下，
-//!   一批批搬到 R 空也不改。
+//! - P4 抽象恒等引理：映射（key → 落点的槽区间，起点加跨度）加每个槽上的字节是具体状态，每个 key 经映射读到的单元是抽象状态。
+//!   目的区间两两不重叠、不与现行映射的区间重叠、不压住回退候选与读者的区间、跨度等于源区间时，按计划搬一批（源区间的字节原样写到
+//!   目的区间、映射条目换到目的区间）不改现行映射与回退候选、读者任何一个 key 读到的单元；在前提「R 内每条未释放记录都有映射 key 且
+//!   不在隔离集里」（攻方 H-G7-1）下，一批批搬到 R 空也不改（判决 m4-exit5-relocation-proof-r1 第二节按区间、r3 第二节 Z1 回退候选进前提）。
 //!
-//! 核心层不调这两个核（`crates/mutations.tsv` 里有十二行变异锚在 `compaction_plan` 现在的写法上，换成调核那几行原文就没了）：
-//! `singlefs-core` 的 `compaction_plan` 单测在小输入上把它的 `choose_region`、`plan_batch` 与这两个核逐项对拍。
-//! 执行层（发布路径是不是把字节原样写到目的地、写序、崩溃）不在 Verus 里，靠 N6、模型对拍与必出反例的世界（判决 G7）。
+//! 核心层 `compaction_plan::choose_region` 与 `plan_batch` 直接调用这两个核；输入转换仍是普通 Rust，
+//! 单测保留独立参考算法并对拍适配层。协议层的根环、回退候选、两层 F、读者与崩溃历史模型见 `gc_ring_interval_proofs`；
+//! 设备屏障、字节解码与实际发布路径到该模型的精化仍是证明边界。
 //! 必红世界与 `src/lib.rs` 的同登记在 `verus-must-red-worlds.tsv`。
 
+#[allow(
+    unused_imports,
+    reason = "只有 Verus 编译时留下的证明代码用这些名字；普通构建擦掉证明代码之后没人用，擦掉的 spec fn 也不在，所以整模块导入"
+)]
+use crate::gc_ring_interval_proofs::*;
 use vstd::pervasive::unreached;
 use vstd::prelude::*;
 
@@ -81,12 +87,31 @@ pub open spec fn region_choice_is_sound(
     }
 }
 
+// 候选中活槽数最少，平局取输入中最前的一段；输入由胶水按槽号升序排列。
+pub open spec fn region_choice_is_greedy(
+    segments: Seq<CompactionKernelSegment>,
+    choice: CompactionKernelRegionChoice,
+) -> bool {
+    match choice {
+        CompactionKernelRegionChoice::Chosen(best)
+        | CompactionKernelRegionChoice::ScanBeforeChoosing(best) => {
+            &&& best < segments.len()
+            &&& forall|other: int| 0 <= other < segments.len()
+                && segment_is_a_candidate(#[trigger] segments[other]) ==>
+                segments[best as int].live_slots < segments[other].live_slots
+                || (segments[best as int].live_slots == segments[other].live_slots && best <= other)
+        },
+        CompactionKernelRegionChoice::NoEligibleSegment => true,
+    }
+}
+
 // singlefs-core 的 compaction_plan::choose_region 按记录与集合算完每段之后的那一截：候选里活槽数最少的先，同分取起点槽号最小的
 // （入参里最前的）；排在最前的那一段扫过就选它，没扫过就要调用方先扫。
 pub fn choose_compaction_segment(segments: &[CompactionKernelSegment]) -> (choice:
     CompactionKernelRegionChoice)
     ensures
         region_choice_is_sound(segments@, choice),
+        region_choice_is_greedy(segments@, choice),
 {
     let mut best: Option<usize> = None;
     let mut best_live_slots: u64 = 0;
@@ -96,6 +121,11 @@ pub fn choose_compaction_segment(segments: &[CompactionKernelSegment]) -> (choic
             position <= segments.len(),
             best matches Some(best_position) ==> best_position < position
                 && segment_is_a_candidate(segments@[best_position as int]),
+            best matches Some(best_position) ==> best_live_slots == segments@[best_position as int].live_slots,
+            best matches Some(best_position) ==> forall|earlier: int|
+                0 <= earlier < position && segment_is_a_candidate(#[trigger] segments@[earlier]) ==>
+                best_live_slots < segments@[earlier].live_slots
+                || (best_live_slots == segments@[earlier].live_slots && best_position <= earlier),
             best is None ==> forall|earlier: int|
                 0 <= earlier < position ==> !segment_is_a_candidate(#[trigger] segments@[earlier]),
         decreases segments.len() - position,
@@ -462,24 +492,31 @@ pub fn plan_compaction_batch(
 }
 
 // ===== P4：抽象恒等引理（执行层的模型，不是执行层）=====
-// 具体状态：映射（key 的身份 → 落点起点槽号），加上每个槽号上的字节。抽象状态：每个 key 经映射读到的字节。
-pub open spec fn bytes_read_through_the_mapping(
-    mapping: Map<u64, u64>,
-    storage: spec_fn(u64) -> Seq<u8>,
-    mapping_key_identity: u64,
-) -> Seq<u8> {
-    storage(mapping[mapping_key_identity])
+// 具体状态：映射（key 的身份 → 落点的槽区间，起点加跨度），加上每个槽号上的字节；抽象状态：每个 key 经映射读到的单元
+// （区间里每个槽上的字节，按槽序）。目的地的前提按区间不重叠说，不只比起点（判决 m4-exit5-relocation-proof-r1 第二节）；
+// 回退候选与读者还在读的区间也进前提（判决 m4-exit5-relocation-proof-r3 第二节 Z1：只看现行映射的区间版前提放得过
+// 「目的地压住回退目标两槽单元的第二槽」）。槽号与跨度用 int，接 core 的 u64 时要另证起点加跨度不溢出。
+pub open spec fn unit_read_through_the_storage(storage: spec_fn(int) -> Seq<u8>, run: SlotRun) -> Seq<Seq<u8>> {
+    Seq::new(run.span as nat, |offset: int| storage(run.start + offset))
 }
 
-// 搬一个单元的写：源落点上的字节原样写到目的落点（判决 G3：头不盖戳、birth 不变），别的槽不动。
+pub open spec fn bytes_read_through_the_mapping(
+    mapping: Map<u64, SlotRun>,
+    storage: spec_fn(int) -> Seq<u8>,
+    mapping_key_identity: u64,
+) -> Seq<Seq<u8>> {
+    unit_read_through_the_storage(storage, mapping[mapping_key_identity])
+}
+
+// 搬一个单元的写：源区间每个槽上的字节原样写到目的区间对应的槽（判决 G3：头不盖戳、birth 不变），别的槽不动。
 pub open spec fn storage_after_copying(
-    storage: spec_fn(u64) -> Seq<u8>,
-    source_slot: u64,
-    destination_slot: u64,
-) -> spec_fn(u64) -> Seq<u8> {
-    |slot: u64|
-        if slot == destination_slot {
-            storage(source_slot)
+    storage: spec_fn(int) -> Seq<u8>,
+    source: SlotRun,
+    destination: SlotRun,
+) -> spec_fn(int) -> Seq<u8> {
+    |slot: int|
+        if run_covers(destination, slot) {
+            storage(source.start + (slot - destination.start))
         } else {
             storage(slot)
         }
@@ -487,11 +524,11 @@ pub open spec fn storage_after_copying(
 
 // 按次序搬前 count 项：第 j 项把 keys[j] 的映射条目换到 destinations[j]。
 pub open spec fn mapping_after_relocating(
-    mapping: Map<u64, u64>,
+    mapping: Map<u64, SlotRun>,
     keys: Seq<u64>,
-    destinations: Seq<u64>,
+    destinations: Seq<SlotRun>,
     count: int,
-) -> Map<u64, u64>
+) -> Map<u64, SlotRun>
     decreases count,
 {
     if count <= 0 {
@@ -504,13 +541,13 @@ pub open spec fn mapping_after_relocating(
     }
 }
 
-// 按次序搬前 count 项：第 j 项把 sources[j] 上的字节写到 destinations[j]。
+// 按次序搬前 count 项：第 j 项把 sources[j] 区间上的字节写到 destinations[j]。
 pub open spec fn storage_after_relocating(
-    storage: spec_fn(u64) -> Seq<u8>,
-    sources: Seq<u64>,
-    destinations: Seq<u64>,
+    storage: spec_fn(int) -> Seq<u8>,
+    sources: Seq<SlotRun>,
+    destinations: Seq<SlotRun>,
     count: int,
-) -> spec_fn(u64) -> Seq<u8>
+) -> spec_fn(int) -> Seq<u8>
     decreases count,
 {
     if count <= 0 {
@@ -524,41 +561,83 @@ pub open spec fn storage_after_relocating(
     }
 }
 
-// 目的地是分配器的性质（判决 G2）：分配器交的落点此刻没被映射里任何一个 key 占着（「目的地不在 R 内」是它的一个特例：R 里能搬的单元
-// 都在映射里）。
-pub open spec fn destination_is_free_in_the_mapping(mapping: Map<u64, u64>, destination: u64) -> bool {
-    forall|mapping_key_identity: u64|
-        #[trigger] mapping.contains_key(mapping_key_identity) ==> mapping[mapping_key_identity]
-            != destination
+// 每个 key 的区间至少一槽。
+pub open spec fn every_run_of_the_mapping_has_a_slot(mapping: Map<u64, SlotRun>) -> bool {
+    forall|mapping_key_identity: u64| #[trigger] mapping.contains_key(mapping_key_identity) ==> mapping[mapping_key_identity].span >= 1
 }
 
-// 前 count 个目的地两两不重叠、都不被映射占着。
+// 目的地是分配器的性质（判决 G2）：分配器交的落点区间此刻不与映射里任何一个 key 的区间重叠（「目的地不在 R 内」是它的一个特例：
+// R 里能搬的单元都在映射里）。
+pub open spec fn destination_is_free_in_the_mapping(mapping: Map<u64, SlotRun>, destination: SlotRun) -> bool {
+    forall|mapping_key_identity: u64|
+        #[trigger] mapping.contains_key(mapping_key_identity) ==> !runs_overlap(mapping[mapping_key_identity], destination)
+}
+
+// 回退候选与读者的每个映射里，每个 key 的区间也至少一槽。
+pub open spec fn every_protected_mapping_has_slots(protected_mappings: Seq<Map<u64, SlotRun>>) -> bool {
+    forall|protected_index: int| 0 <= protected_index < protected_mappings.len() ==> every_run_of_the_mapping_has_a_slot(#[trigger] protected_mappings[protected_index])
+}
+
+// 回退候选与读者还在读的映射（gc_ring_interval_proofs 的保护范围：持久 F 之上的每个根、每个读者），目的地一个区间都不许压住。
+pub open spec fn destination_spares_the_protected_mappings(
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    destination: SlotRun,
+) -> bool {
+    forall|protected_index: int|
+        0 <= protected_index < protected_mappings.len() ==> destination_is_free_in_the_mapping(#[trigger] protected_mappings[protected_index], destination)
+}
+
+// 前 count 个目的区间两两不重叠。
+pub open spec fn destinations_are_pairwise_apart(destinations: Seq<SlotRun>, count: int) -> bool {
+    forall|earlier: int, later: int|
+        #![trigger destinations[earlier], destinations[later]]
+        0 <= earlier < later < count ==> !runs_overlap(destinations[earlier], destinations[later])
+}
+
+// 两两不重叠落到一对目的区间上；证明里每一处要用它都经这一条，两两不重叠那一条前提被弄坏时红在这里。
+proof fn lemma_two_destinations_of_the_batch_are_apart(destinations: Seq<SlotRun>, count: int, earlier: int, later: int)
+    requires
+        destinations_are_pairwise_apart(destinations, count),
+        0 <= earlier < later < count,
+    ensures
+        !runs_overlap(destinations[earlier], destinations[later]),
+{
+    assert(!runs_overlap(destinations[earlier], destinations[later]));
+}
+
+// 前 count 个目的区间两两不重叠、都不与现行映射的区间重叠、都不压住回退候选与读者的区间。
 pub open spec fn destinations_are_distinct_and_free(
-    mapping: Map<u64, u64>,
-    destinations: Seq<u64>,
+    mapping: Map<u64, SlotRun>,
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    destinations: Seq<SlotRun>,
     count: int,
 ) -> bool {
     &&& count <= destinations.len()
-    &&& forall|earlier: int, later: int|
-        #![trigger destinations[earlier], destinations[later]]
-        0 <= earlier < later < count ==> destinations[earlier] != destinations[later]
+    &&& destinations_are_pairwise_apart(destinations, count)
+    &&& forall|index: int| 0 <= index < count ==> destination_is_free_in_the_mapping(mapping, #[trigger] destinations[index])
     &&& forall|index: int|
-        0 <= index < count ==> destination_is_free_in_the_mapping(
-            mapping,
-            #[trigger] destinations[index],
-        )
+        0 <= index < count ==> destination_spares_the_protected_mappings(protected_mappings, #[trigger] destinations[index])
 }
 
-// 区域扫描的「可搬」：key 在映射里、映射的位置就是这一项的源落点。
+// 目的区间的跨度等于它的源区间（被搬的 key 在映射里的区间）。
+pub open spec fn destinations_take_the_spans_of_their_sources(
+    mapping: Map<u64, SlotRun>,
+    keys: Seq<u64>,
+    destinations: Seq<SlotRun>,
+    count: int,
+) -> bool {
+    forall|index: int| 0 <= index < count ==> (#[trigger] destinations[index]).span == mapping[keys[index]].span
+}
+
+// 区域扫描的「可搬」：key 在映射里、映射区间的起点就是这一项的源落点。
 pub open spec fn scan_agrees_with_the_mapping(
     allocations: Seq<CompactionKernelScannedAllocation>,
-    mapping: Map<u64, u64>,
+    mapping: Map<u64, SlotRun>,
 ) -> bool {
     forall|position: int|
         0 <= position < allocations.len() && allocation_is_movable(#[trigger] allocations[position])
             ==> mapping.contains_key(mapping_key_identity_of(allocations[position]))
-            && mapping[mapping_key_identity_of(allocations[position])]
-            == allocations[position].source_slot
+            && mapping[mapping_key_identity_of(allocations[position])].start == allocations[position].source_slot as int
 }
 
 pub open spec fn planned_mapping_keys(
@@ -568,42 +647,51 @@ pub open spec fn planned_mapping_keys(
     positions.map_values(|position: int| mapping_key_identity_of(allocations[position]))
 }
 
-pub open spec fn planned_sources(
-    allocations: Seq<CompactionKernelScannedAllocation>,
-    positions: Seq<int>,
-) -> Seq<u64> {
-    positions.map_values(|position: int| allocations[position].source_slot)
+// 被搬的每个 key 的源区间：它在映射里的区间。
+pub open spec fn source_runs(mapping: Map<u64, SlotRun>, keys: Seq<u64>) -> Seq<SlotRun> {
+    keys.map_values(|mapping_key_identity: u64| mapping[mapping_key_identity])
 }
 
-proof fn lemma_relocating_in_order_keeps_every_read(
-    mapping: Map<u64, u64>,
-    storage: spec_fn(u64) -> Seq<u8>,
+// 两个区间逐槽读出来相同，读出的单元就相同。
+proof fn lemma_two_runs_read_the_same_unit_when_their_slots_agree(
+    this_storage: spec_fn(int) -> Seq<u8>,
+    this_run: SlotRun,
+    that_storage: spec_fn(int) -> Seq<u8>,
+    that_run: SlotRun,
+)
+    requires
+        this_run.span == that_run.span,
+        this_run.span >= 0,
+        forall|offset: int|
+            0 <= offset < this_run.span ==> #[trigger] this_storage(this_run.start + offset) == that_storage(that_run.start + offset),
+    ensures
+        unit_read_through_the_storage(this_storage, this_run) =~= unit_read_through_the_storage(that_storage, that_run),
+{
+    assert forall|offset: int| 0 <= offset < unit_read_through_the_storage(this_storage, this_run).len() implies #[trigger] unit_read_through_the_storage(
+        this_storage,
+        this_run,
+    )[offset] == unit_read_through_the_storage(that_storage, that_run)[offset] by {
+        assert(this_storage(this_run.start + offset) == that_storage(that_run.start + offset));
+    }
+}
+
+// 按次序搬前 count 项之后的映射：定义域不变；被搬的 key 指到各自的目的区间；没被搬的 key 原样；每个区间要么是原来的、要么是某个目的区间。
+proof fn lemma_mapping_after_relocating_has_the_moved_shape(
+    mapping: Map<u64, SlotRun>,
     keys: Seq<u64>,
-    sources: Seq<u64>,
-    destinations: Seq<u64>,
+    destinations: Seq<SlotRun>,
     count: int,
 )
     requires
         0 <= count <= keys.len(),
-        count <= sources.len(),
         forall|earlier: int, later: int|
             #![trigger keys[earlier], keys[later]]
             0 <= earlier < later < count ==> keys[earlier] != keys[later],
-        forall|index: int|
-            0 <= index < count ==> mapping.contains_key(#[trigger] keys[index]) && mapping[keys[index]]
-                == sources[index],
-        destinations_are_distinct_and_free(mapping, destinations, count),
+        forall|index: int| 0 <= index < count ==> mapping.contains_key(#[trigger] keys[index]),
     ensures
         ({
             let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
-            let moved_storage = storage_after_relocating(storage, sources, destinations, count);
             &&& moved_mapping.dom() == mapping.dom()
-            &&& forall|mapping_key_identity: u64|
-                #[trigger] mapping.contains_key(mapping_key_identity) ==> bytes_read_through_the_mapping(
-                    moved_mapping,
-                    moved_storage,
-                    mapping_key_identity,
-                ) == bytes_read_through_the_mapping(mapping, storage, mapping_key_identity)
             &&& forall|index: int|
                 0 <= index < count ==> moved_mapping[#[trigger] keys[index]] == destinations[index]
             &&& forall|mapping_key_identity: u64|
@@ -614,41 +702,17 @@ proof fn lemma_relocating_in_order_keeps_every_read(
                 #[trigger] moved_mapping.contains_key(mapping_key_identity) ==> moved_mapping[mapping_key_identity]
                     == mapping[mapping_key_identity] || exists|index: int|
                     0 <= index < count && moved_mapping[mapping_key_identity] == destinations[index]
-            &&& forall|slot: u64|
-                (forall|index: int| 0 <= index < count ==> destinations[index] != slot) ==> #[trigger] moved_storage(slot)
-                    == storage(slot)
         }),
     decreases count,
 {
     if count > 0 {
         let previous_count = count - 1;
-        lemma_relocating_in_order_keeps_every_read(
-            mapping,
-            storage,
-            keys,
-            sources,
-            destinations,
-            previous_count,
-        );
+        lemma_mapping_after_relocating_has_the_moved_shape(mapping, keys, destinations, previous_count);
         let previous_mapping = mapping_after_relocating(mapping, keys, destinations, previous_count);
-        let previous_storage = storage_after_relocating(storage, sources, destinations, previous_count);
         let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
-        let moved_storage = storage_after_relocating(storage, sources, destinations, count);
         let moved_key = keys[previous_count];
-        let source = sources[previous_count];
-        let destination = destinations[previous_count];
-        assert(moved_mapping == previous_mapping.insert(moved_key, destination));
-        assert(moved_storage == storage_after_copying(previous_storage, source, destination));
-        assert(mapping.contains_key(moved_key) && mapping[moved_key] == source);
-        assert forall|index: int| 0 <= index < previous_count implies keys[index] != moved_key by {
-            assert(keys[index] != keys[previous_count]);
-        }
-        assert(previous_mapping[moved_key] == mapping[moved_key]);
-        assert forall|index: int| 0 <= index < previous_count implies destinations[index] != source by {
-            assert(destination_is_free_in_the_mapping(mapping, destinations[index]));
-        }
-        assert(previous_storage(source) == storage(source));
-        assert(destination_is_free_in_the_mapping(mapping, destination));
+        assert(moved_mapping == previous_mapping.insert(moved_key, destinations[previous_count]));
+        assert(mapping.contains_key(moved_key));
         assert(moved_mapping.dom() =~= mapping.dom());
         assert forall|mapping_key_identity: u64| #[trigger]
             moved_mapping.contains_key(mapping_key_identity) implies moved_mapping[mapping_key_identity]
@@ -660,6 +724,73 @@ proof fn lemma_relocating_in_order_keeps_every_read(
                 assert(previous_mapping.contains_key(mapping_key_identity));
             }
         }
+        assert forall|index: int| 0 <= index < count implies moved_mapping[#[trigger] keys[index]]
+            == destinations[index] by {
+            if index < previous_count {
+                assert(keys[index] != keys[previous_count]);
+            }
+        }
+    }
+}
+
+// 按次序搬前 count 项之后，现行映射每个 key 读到的单元不变；没被任何目的区间罩住的槽字节不变。
+proof fn lemma_relocating_in_order_keeps_every_read(
+    mapping: Map<u64, SlotRun>,
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    storage: spec_fn(int) -> Seq<u8>,
+    keys: Seq<u64>,
+    destinations: Seq<SlotRun>,
+    count: int,
+)
+    requires
+        0 <= count <= keys.len(),
+        every_run_of_the_mapping_has_a_slot(mapping),
+        forall|earlier: int, later: int|
+            #![trigger keys[earlier], keys[later]]
+            0 <= earlier < later < count ==> keys[earlier] != keys[later],
+        forall|index: int| 0 <= index < count ==> mapping.contains_key(#[trigger] keys[index]),
+        destinations_are_distinct_and_free(mapping, protected_mappings, destinations, count),
+        destinations_take_the_spans_of_their_sources(mapping, keys, destinations, count),
+    ensures
+        ({
+            let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
+            let moved_storage = storage_after_relocating(storage, source_runs(mapping, keys), destinations, count);
+            &&& forall|mapping_key_identity: u64|
+                #[trigger] mapping.contains_key(mapping_key_identity) ==> bytes_read_through_the_mapping(
+                    moved_mapping,
+                    moved_storage,
+                    mapping_key_identity,
+                ) == bytes_read_through_the_mapping(mapping, storage, mapping_key_identity)
+            &&& forall|slot: int|
+                (forall|index: int| 0 <= index < count ==> !run_covers(destinations[index], slot)) ==> #[trigger] moved_storage(slot)
+                    == storage(slot)
+        }),
+    decreases count,
+{
+    if count > 0 {
+        let previous_count = count - 1;
+        let sources = source_runs(mapping, keys);
+        lemma_relocating_in_order_keeps_every_read(
+            mapping,
+            protected_mappings,
+            storage,
+            keys,
+            destinations,
+            previous_count,
+        );
+        lemma_mapping_after_relocating_has_the_moved_shape(mapping, keys, destinations, previous_count);
+        let previous_mapping = mapping_after_relocating(mapping, keys, destinations, previous_count);
+        let previous_storage = storage_after_relocating(storage, sources, destinations, previous_count);
+        let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
+        let moved_storage = storage_after_relocating(storage, sources, destinations, count);
+        let moved_key = keys[previous_count];
+        let source = sources[previous_count];
+        let destination = destinations[previous_count];
+        assert(moved_mapping == previous_mapping.insert(moved_key, destination));
+        assert(moved_storage == storage_after_copying(previous_storage, source, destination));
+        assert(mapping.contains_key(moved_key));
+        assert(source == mapping[moved_key]);
+        assert(destination_is_free_in_the_mapping(mapping, destination));
         assert forall|mapping_key_identity: u64| #[trigger]
             mapping.contains_key(mapping_key_identity) implies bytes_read_through_the_mapping(
             moved_mapping,
@@ -668,19 +799,36 @@ proof fn lemma_relocating_in_order_keeps_every_read(
         ) == bytes_read_through_the_mapping(mapping, storage, mapping_key_identity) by {
             if mapping_key_identity == moved_key {
                 assert(moved_mapping[mapping_key_identity] == destination);
-                assert(moved_storage(destination) == previous_storage(source));
+                assert forall|offset: int| 0 <= offset < destination.span implies #[trigger] moved_storage(
+                    destination.start + offset,
+                ) == storage(source.start + offset) by {
+                    let source_slot = source.start + offset;
+                    assert(run_covers(destination, destination.start + offset));
+                    assert(moved_storage(destination.start + offset) == previous_storage(source_slot));
+                    assert forall|index: int| 0 <= index < previous_count implies !run_covers(destinations[index], source_slot) by {
+                        assert(destination_is_free_in_the_mapping(mapping, destinations[index]));
+                        assert(!runs_overlap(mapping[moved_key], destinations[index]));
+                    }
+                    assert(previous_storage(source_slot) == storage(source_slot));
+                }
+                lemma_two_runs_read_the_same_unit_when_their_slots_agree(moved_storage, destination, storage, source);
             } else {
                 assert(previous_mapping.contains_key(mapping_key_identity));
-                let previous_slot = previous_mapping[mapping_key_identity];
-                assert(moved_mapping[mapping_key_identity] == previous_slot);
-                if previous_slot == mapping[mapping_key_identity] {
-                    assert(previous_slot != destination);
+                let previous_run = previous_mapping[mapping_key_identity];
+                assert(moved_mapping[mapping_key_identity] == previous_run);
+                if previous_run == mapping[mapping_key_identity] {
+                    assert(!runs_overlap(previous_run, destination));
                 } else {
                     let index = choose|index: int|
-                        0 <= index < previous_count && previous_slot == destinations[index];
-                    assert(destinations[index] != destinations[previous_count]);
+                        0 <= index < previous_count && previous_run == destinations[index];
+                    lemma_two_destinations_of_the_batch_are_apart(destinations, count, index, previous_count);
                 }
-                assert(moved_storage(previous_slot) == previous_storage(previous_slot));
+                assert forall|offset: int| 0 <= offset < previous_run.span implies #[trigger] moved_storage(
+                    previous_run.start + offset,
+                ) == previous_storage(previous_run.start + offset) by {
+                    assert(!run_covers(destination, previous_run.start + offset));
+                }
+                lemma_two_runs_read_the_same_unit_when_their_slots_agree(moved_storage, previous_run, previous_storage, previous_run);
                 assert(bytes_read_through_the_mapping(
                     previous_mapping,
                     previous_storage,
@@ -688,55 +836,99 @@ proof fn lemma_relocating_in_order_keeps_every_read(
                 ) == bytes_read_through_the_mapping(mapping, storage, mapping_key_identity));
             }
         }
-        assert forall|index: int| 0 <= index < count implies moved_mapping[#[trigger] keys[index]]
-            == destinations[index] by {
-            if index < previous_count {
-                assert(keys[index] != keys[previous_count]);
-            }
-        }
-        assert forall|slot: u64|
-            (forall|index: int| 0 <= index < count ==> destinations[index] != slot) implies #[trigger] moved_storage(
+        assert forall|slot: int|
+            (forall|index: int| 0 <= index < count ==> !run_covers(destinations[index], slot)) implies #[trigger] moved_storage(
             slot,
         ) == storage(slot) by {
-            assert(destinations[previous_count] != slot);
-            assert forall|index: int| 0 <= index < previous_count implies destinations[index] != slot by {
+            assert(!run_covers(destinations[previous_count], slot));
+            assert forall|index: int| 0 <= index < previous_count implies !run_covers(destinations[index], slot) by {
                 assert(0 <= index < count);
             }
         }
     }
 }
 
-// P4，一批：计划合 P2（key 互异来自扫描结果里能搬的 key 互异）、扫描的「可搬」与映射对得上、目的地两两不重叠且没被映射占着
-// （分配器的性质），按计划搬完这一批，每个 key 读到的字节不变，映射里的 key 一个不多一个不少。
+// 目的地都不压住回退候选与读者的区间，只改目的地那几槽的写之后，它们每个 key 读到的单元不变。
+proof fn lemma_storage_outside_the_destinations_keeps_the_protected_reads(
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    storage: spec_fn(int) -> Seq<u8>,
+    moved_storage: spec_fn(int) -> Seq<u8>,
+    destinations: Seq<SlotRun>,
+    count: int,
+)
+    requires
+        0 <= count <= destinations.len(),
+        every_protected_mapping_has_slots(protected_mappings),
+        forall|index: int|
+            0 <= index < count ==> destination_spares_the_protected_mappings(protected_mappings, #[trigger] destinations[index]),
+        forall|slot: int|
+            (forall|index: int| 0 <= index < count ==> !run_covers(destinations[index], slot)) ==> #[trigger] moved_storage(slot)
+                == storage(slot),
+    ensures
+        forall|protected_index: int, mapping_key_identity: u64|
+            0 <= protected_index < protected_mappings.len() && #[trigger] protected_mappings[protected_index].contains_key(mapping_key_identity)
+                ==> bytes_read_through_the_mapping(protected_mappings[protected_index], moved_storage, mapping_key_identity)
+                == bytes_read_through_the_mapping(protected_mappings[protected_index], storage, mapping_key_identity),
+{
+    assert forall|protected_index: int, mapping_key_identity: u64|
+        0 <= protected_index < protected_mappings.len() && #[trigger] protected_mappings[protected_index].contains_key(mapping_key_identity) implies bytes_read_through_the_mapping(
+        protected_mappings[protected_index],
+        moved_storage,
+        mapping_key_identity,
+    ) == bytes_read_through_the_mapping(protected_mappings[protected_index], storage, mapping_key_identity) by {
+        let run = protected_mappings[protected_index][mapping_key_identity];
+        assert(every_run_of_the_mapping_has_a_slot(protected_mappings[protected_index]));
+        assert forall|offset: int| 0 <= offset < run.span implies #[trigger] moved_storage(run.start + offset) == storage(
+            run.start + offset,
+        ) by {
+            assert forall|index: int| 0 <= index < count implies !run_covers(destinations[index], run.start + offset) by {
+                assert(destination_spares_the_protected_mappings(protected_mappings, destinations[index]));
+                assert(destination_is_free_in_the_mapping(protected_mappings[protected_index], destinations[index]));
+                assert(!runs_overlap(protected_mappings[protected_index][mapping_key_identity], destinations[index]));
+            }
+        }
+        lemma_two_runs_read_the_same_unit_when_their_slots_agree(moved_storage, run, storage, run);
+    }
+}
+
+// P4，一批：计划合 P2（key 互异来自扫描结果里能搬的 key 互异）、扫描的「可搬」与映射对得上、目的区间两两不重叠、不与现行映射的区间重叠、
+// 不压住回退候选与读者的区间、跨度等于源区间（分配器的性质），按计划搬完这一批，现行映射每个 key 读到的单元不变、映射里的 key 一个不多一个不少，
+// 回退候选与读者每个 key 读到的单元也不变。
 pub proof fn lemma_a_planned_batch_keeps_every_read(
     allocations: Seq<CompactionKernelScannedAllocation>,
     batch_units: usize,
     planned: CompactionKernelPlannedBatch,
-    mapping: Map<u64, u64>,
-    storage: spec_fn(u64) -> Seq<u8>,
-    destinations: Seq<u64>,
+    mapping: Map<u64, SlotRun>,
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    storage: spec_fn(int) -> Seq<u8>,
+    destinations: Seq<SlotRun>,
 )
     requires
         planned_batch_is_sound(allocations, batch_units, planned),
         movable_mapping_keys_are_distinct(allocations),
         scan_agrees_with_the_mapping(allocations, mapping),
+        every_run_of_the_mapping_has_a_slot(mapping),
+        every_protected_mapping_has_slots(protected_mappings),
         destinations_are_distinct_and_free(
             mapping,
+            protected_mappings,
+            destinations,
+            planned_positions(planned).len() as int,
+        ),
+        destinations_take_the_spans_of_their_sources(
+            mapping,
+            planned_mapping_keys(allocations, planned_positions(planned)),
             destinations,
             planned_positions(planned).len() as int,
         ),
     ensures
         ({
             let positions = planned_positions(planned);
-            let moved_mapping = mapping_after_relocating(
-                mapping,
-                planned_mapping_keys(allocations, positions),
-                destinations,
-                positions.len() as int,
-            );
+            let keys = planned_mapping_keys(allocations, positions);
+            let moved_mapping = mapping_after_relocating(mapping, keys, destinations, positions.len() as int);
             let moved_storage = storage_after_relocating(
                 storage,
-                planned_sources(allocations, positions),
+                source_runs(mapping, keys),
                 destinations,
                 positions.len() as int,
             );
@@ -747,11 +939,14 @@ pub proof fn lemma_a_planned_batch_keeps_every_read(
                     moved_storage,
                     mapping_key_identity,
                 ) == bytes_read_through_the_mapping(mapping, storage, mapping_key_identity)
+            &&& forall|protected_index: int, mapping_key_identity: u64|
+                0 <= protected_index < protected_mappings.len() && #[trigger] protected_mappings[protected_index].contains_key(mapping_key_identity)
+                    ==> bytes_read_through_the_mapping(protected_mappings[protected_index], moved_storage, mapping_key_identity)
+                    == bytes_read_through_the_mapping(protected_mappings[protected_index], storage, mapping_key_identity)
         }),
 {
     let positions = planned_positions(planned);
     let keys = planned_mapping_keys(allocations, positions);
-    let sources = planned_sources(allocations, positions);
     assert forall|earlier: int, later: int|
         #![trigger keys[earlier], keys[later]]
         0 <= earlier < later < positions.len() implies keys[earlier] != keys[later] by {
@@ -759,17 +954,23 @@ pub proof fn lemma_a_planned_batch_keeps_every_read(
         assert(allocation_is_movable(allocations[positions[earlier]]));
         assert(allocation_is_movable(allocations[positions[later]]));
     }
-    assert forall|index: int| 0 <= index < positions.len() implies mapping.contains_key(
-        #[trigger] keys[index],
-    ) && mapping[keys[index]] == sources[index] by {
+    assert forall|index: int| 0 <= index < positions.len() implies mapping.contains_key(#[trigger] keys[index]) by {
         assert(0 <= positions[index] < allocations.len());
         assert(allocation_is_movable(allocations[positions[index]]));
     }
     lemma_relocating_in_order_keeps_every_read(
         mapping,
+        protected_mappings,
         storage,
         keys,
-        sources,
+        destinations,
+        positions.len() as int,
+    );
+    lemma_mapping_after_relocating_has_the_moved_shape(mapping, keys, destinations, positions.len() as int);
+    lemma_storage_outside_the_destinations_keeps_the_protected_reads(
+        protected_mappings,
+        storage,
+        storage_after_relocating(storage, source_runs(mapping, keys), destinations, positions.len() as int),
         destinations,
         positions.len() as int,
     );
@@ -793,18 +994,14 @@ pub open spec fn mapping_key_identities(allocations: Seq<CompactionKernelScanned
     )
 }
 
-pub open spec fn source_slots(allocations: Seq<CompactionKernelScannedAllocation>) -> Seq<u64> {
-    allocations.map_values(|allocation: CompactionKernelScannedAllocation| allocation.source_slot)
-}
-
 // 一批批搬到 R 空：每一批搬剩下的最前 min(K, 剩下几项) 项（前提下计划就交这几项，lemma_under_the_premise_a_plan_takes_the_leading_allocations），
 // 目的地按次序从 destinations 里取；这一批发布之后它们离开 R，下一次扫描就是剩下的那几项（singlefs-core 的 compaction_plan::plan_batch 文档）。
 pub open spec fn mapping_after_compacting_the_region(
     allocations: Seq<CompactionKernelScannedAllocation>,
     batch_units: int,
-    mapping: Map<u64, u64>,
-    destinations: Seq<u64>,
-) -> Map<u64, u64>
+    mapping: Map<u64, SlotRun>,
+    destinations: Seq<SlotRun>,
+) -> Map<u64, SlotRun>
     decreases allocations.len(),
 {
     if allocations.len() == 0 || batch_units <= 0 {
@@ -820,22 +1017,26 @@ pub open spec fn mapping_after_compacting_the_region(
     }
 }
 
+// 源区间取这一批开搬时映射里的区间，所以按批推进时带着映射走。
 pub open spec fn storage_after_compacting_the_region(
     allocations: Seq<CompactionKernelScannedAllocation>,
     batch_units: int,
-    storage: spec_fn(u64) -> Seq<u8>,
-    destinations: Seq<u64>,
-) -> spec_fn(u64) -> Seq<u8>
+    mapping: Map<u64, SlotRun>,
+    storage: spec_fn(int) -> Seq<u8>,
+    destinations: Seq<SlotRun>,
+) -> spec_fn(int) -> Seq<u8>
     decreases allocations.len(),
 {
     if allocations.len() == 0 || batch_units <= 0 {
         storage
     } else {
         let count = units_in_the_batch(allocations.len() as int, batch_units);
+        let keys = mapping_key_identities(allocations);
         storage_after_compacting_the_region(
             allocations.skip(count),
             batch_units,
-            storage_after_relocating(storage, source_slots(allocations), destinations, count),
+            mapping_after_relocating(mapping, keys, destinations, count),
+            storage_after_relocating(storage, source_runs(mapping, keys), destinations, count),
             destinations.skip(count),
         )
     }
@@ -869,20 +1070,173 @@ pub proof fn lemma_under_the_premise_a_plan_takes_the_leading_allocations(
     assert(allocation_is_movable(allocations[0]));
 }
 
-// P4：前提下按计划一批批搬到 R 空，每个 key 读到的字节不变，映射里的 key 一个不多一个不少。
+// 搬完一批之后剩下的那几项照样合前提：都能搬、key 互异、扫描与搬后的映射对得上（剩下的 key 这一批没搬）、搬后映射的每个区间至少一槽、
+// 剩下的目的区间两两不重叠、不与搬后映射的区间重叠（搬后的区间要么是原来的、要么是这一批的目的区间）、不压住回退候选与读者、跨度对得上。
+proof fn lemma_after_a_batch_the_remaining_region_meets_the_premise(
+    allocations: Seq<CompactionKernelScannedAllocation>,
+    batch_units: int,
+    mapping: Map<u64, SlotRun>,
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    destinations: Seq<SlotRun>,
+)
+    requires
+        batch_units >= 1,
+        allocations.len() > 0,
+        every_allocation_in_the_region_is_movable(allocations),
+        movable_mapping_keys_are_distinct(allocations),
+        scan_agrees_with_the_mapping(allocations, mapping),
+        every_run_of_the_mapping_has_a_slot(mapping),
+        destinations_are_distinct_and_free(mapping, protected_mappings, destinations, allocations.len() as int),
+        destinations_take_the_spans_of_their_sources(
+            mapping,
+            mapping_key_identities(allocations),
+            destinations,
+            allocations.len() as int,
+        ),
+    ensures
+        ({
+            let count = units_in_the_batch(allocations.len() as int, batch_units);
+            let moved_mapping = mapping_after_relocating(mapping, mapping_key_identities(allocations), destinations, count);
+            let remaining = allocations.skip(count);
+            let remaining_destinations = destinations.skip(count);
+            &&& every_allocation_in_the_region_is_movable(remaining)
+            &&& movable_mapping_keys_are_distinct(remaining)
+            &&& scan_agrees_with_the_mapping(remaining, moved_mapping)
+            &&& every_run_of_the_mapping_has_a_slot(moved_mapping)
+            &&& destinations_are_distinct_and_free(moved_mapping, protected_mappings, remaining_destinations, remaining.len() as int)
+            &&& destinations_take_the_spans_of_their_sources(
+                moved_mapping,
+                mapping_key_identities(remaining),
+                remaining_destinations,
+                remaining.len() as int,
+            )
+        }),
+{
+    let count = units_in_the_batch(allocations.len() as int, batch_units);
+    let keys = mapping_key_identities(allocations);
+    assert forall|earlier: int, later: int|
+        #![trigger keys[earlier], keys[later]]
+        0 <= earlier < later < count implies keys[earlier] != keys[later] by {
+        assert(allocation_is_movable(allocations[earlier]));
+        assert(allocation_is_movable(allocations[later]));
+    }
+    assert forall|index: int| 0 <= index < count implies mapping.contains_key(#[trigger] keys[index]) by {
+        assert(allocation_is_movable(allocations[index]));
+    }
+    lemma_mapping_after_relocating_has_the_moved_shape(mapping, keys, destinations, count);
+    let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
+    let remaining = allocations.skip(count);
+    let remaining_destinations = destinations.skip(count);
+    let remaining_keys = mapping_key_identities(remaining);
+    assert forall|position: int| 0 <= position < remaining.len() implies allocation_is_movable(
+        #[trigger] remaining[position],
+    ) by {
+        assert(remaining[position] == allocations[position + count]);
+    }
+    assert forall|one: int, other: int|
+        #![trigger remaining[one], remaining[other]]
+        0 <= one < remaining.len() && 0 <= other < remaining.len() && one != other
+            && allocation_is_movable(remaining[one]) && allocation_is_movable(remaining[other])
+            implies mapping_key_identity_of(remaining[one]) != mapping_key_identity_of(
+        remaining[other],
+    ) by {
+        assert(remaining[one] == allocations[one + count]);
+        assert(remaining[other] == allocations[other + count]);
+    }
+    // 剩下的 key 这一批没搬，它们在搬后的映射里还是原来的区间。
+    assert forall|position: int| 0 <= position < remaining.len() implies moved_mapping.contains_key(
+        #[trigger] remaining_keys[position],
+    ) && moved_mapping[remaining_keys[position]] == mapping[keys[position + count]] by {
+        let original = position + count;
+        assert(remaining[position] == allocations[original]);
+        assert(remaining_keys[position] == keys[original]);
+        assert(allocation_is_movable(allocations[original]));
+        let key = keys[original];
+        assert(mapping.contains_key(key));
+        assert forall|index: int| 0 <= index < count implies keys[index] != key by {
+            assert(allocation_is_movable(allocations[index]));
+        }
+        assert(moved_mapping[key] == mapping[key]);
+    }
+    assert forall|position: int|
+        0 <= position < remaining.len() && allocation_is_movable(
+            #[trigger] remaining[position],
+        ) implies moved_mapping.contains_key(mapping_key_identity_of(remaining[position]))
+        && moved_mapping[mapping_key_identity_of(remaining[position])].start == remaining[position].source_slot as int by {
+        let original = position + count;
+        assert(remaining[position] == allocations[original]);
+        assert(remaining_keys[position] == mapping_key_identity_of(remaining[position]));
+        assert(allocation_is_movable(allocations[original]));
+    }
+    assert forall|mapping_key_identity: u64| #[trigger] moved_mapping.contains_key(mapping_key_identity) implies moved_mapping[mapping_key_identity].span
+        >= 1 by {
+        if moved_mapping[mapping_key_identity] != mapping[mapping_key_identity] {
+            let moved_index = choose|moved_index: int|
+                0 <= moved_index < count && moved_mapping[mapping_key_identity] == destinations[moved_index];
+            assert(destinations[moved_index].span == mapping[keys[moved_index]].span);
+        }
+    }
+    assert forall|earlier: int, later: int|
+        #![trigger remaining_destinations[earlier], remaining_destinations[later]]
+        0 <= earlier < later < remaining.len() implies !runs_overlap(
+        remaining_destinations[earlier],
+        remaining_destinations[later],
+    ) by {
+        assert(remaining_destinations[earlier] == destinations[earlier + count]);
+        assert(remaining_destinations[later] == destinations[later + count]);
+        lemma_two_destinations_of_the_batch_are_apart(destinations, allocations.len() as int, earlier + count, later + count);
+    }
+    assert forall|index: int| 0 <= index < remaining.len() implies destination_is_free_in_the_mapping(
+        moved_mapping,
+        #[trigger] remaining_destinations[index],
+    ) && destination_spares_the_protected_mappings(protected_mappings, remaining_destinations[index]) by {
+        let original = index + count;
+        assert(remaining_destinations[index] == destinations[original]);
+        assert(destination_is_free_in_the_mapping(mapping, destinations[original]));
+        assert(destination_spares_the_protected_mappings(protected_mappings, destinations[original]));
+        assert forall|mapping_key_identity: u64| #[trigger]
+            moved_mapping.contains_key(mapping_key_identity) implies !runs_overlap(
+            moved_mapping[mapping_key_identity],
+            destinations[original],
+        ) by {
+            if moved_mapping[mapping_key_identity] != mapping[mapping_key_identity] {
+                let moved_index = choose|moved_index: int|
+                    0 <= moved_index < count && moved_mapping[mapping_key_identity]
+                        == destinations[moved_index];
+                lemma_two_destinations_of_the_batch_are_apart(destinations, allocations.len() as int, moved_index, original);
+            }
+        }
+    }
+    assert forall|index: int| 0 <= index < remaining.len() implies (#[trigger] remaining_destinations[index]).span
+        == moved_mapping[remaining_keys[index]].span by {
+        assert(remaining_destinations[index] == destinations[index + count]);
+        assert(destinations[index + count].span == mapping[keys[index + count]].span);
+    }
+}
+
+// P4：前提下按计划一批批搬到 R 空，现行映射每个 key 读到的单元不变、映射里的 key 一个不多一个不少，回退候选与读者每个 key 读到的单元也不变。
 pub proof fn corollary_compacting_the_region_until_it_is_empty_keeps_every_read(
     allocations: Seq<CompactionKernelScannedAllocation>,
     batch_units: int,
-    mapping: Map<u64, u64>,
-    storage: spec_fn(u64) -> Seq<u8>,
-    destinations: Seq<u64>,
+    mapping: Map<u64, SlotRun>,
+    protected_mappings: Seq<Map<u64, SlotRun>>,
+    storage: spec_fn(int) -> Seq<u8>,
+    destinations: Seq<SlotRun>,
 )
     requires
         batch_units >= 1,
         every_allocation_in_the_region_is_movable(allocations),
         movable_mapping_keys_are_distinct(allocations),
         scan_agrees_with_the_mapping(allocations, mapping),
-        destinations_are_distinct_and_free(mapping, destinations, allocations.len() as int),
+        every_run_of_the_mapping_has_a_slot(mapping),
+        every_protected_mapping_has_slots(protected_mappings),
+        destinations_are_distinct_and_free(mapping, protected_mappings, destinations, allocations.len() as int),
+        destinations_take_the_spans_of_their_sources(
+            mapping,
+            mapping_key_identities(allocations),
+            destinations,
+            allocations.len() as int,
+        ),
     ensures
         ({
             let moved_mapping = mapping_after_compacting_the_region(
@@ -894,6 +1248,7 @@ pub proof fn corollary_compacting_the_region_until_it_is_empty_keeps_every_read(
             let moved_storage = storage_after_compacting_the_region(
                 allocations,
                 batch_units,
+                mapping,
                 storage,
                 destinations,
             );
@@ -904,101 +1259,156 @@ pub proof fn corollary_compacting_the_region_until_it_is_empty_keeps_every_read(
                     moved_storage,
                     mapping_key_identity,
                 ) == bytes_read_through_the_mapping(mapping, storage, mapping_key_identity)
+            &&& forall|protected_index: int, mapping_key_identity: u64|
+                0 <= protected_index < protected_mappings.len() && #[trigger] protected_mappings[protected_index].contains_key(mapping_key_identity)
+                    ==> bytes_read_through_the_mapping(protected_mappings[protected_index], moved_storage, mapping_key_identity)
+                    == bytes_read_through_the_mapping(protected_mappings[protected_index], storage, mapping_key_identity)
         }),
     decreases allocations.len(),
 {
     if allocations.len() > 0 {
         let count = units_in_the_batch(allocations.len() as int, batch_units);
         let keys = mapping_key_identities(allocations);
-        let sources = source_slots(allocations);
         assert forall|earlier: int, later: int|
             #![trigger keys[earlier], keys[later]]
             0 <= earlier < later < count implies keys[earlier] != keys[later] by {
             assert(allocation_is_movable(allocations[earlier]));
             assert(allocation_is_movable(allocations[later]));
         }
-        assert forall|index: int| 0 <= index < count implies mapping.contains_key(
-            #[trigger] keys[index],
-        ) && mapping[keys[index]] == sources[index] by {
+        assert forall|index: int| 0 <= index < count implies mapping.contains_key(#[trigger] keys[index]) by {
             assert(allocation_is_movable(allocations[index]));
         }
-        lemma_relocating_in_order_keeps_every_read(
-            mapping,
+        lemma_relocating_in_order_keeps_every_read(mapping, protected_mappings, storage, keys, destinations, count);
+        lemma_mapping_after_relocating_has_the_moved_shape(mapping, keys, destinations, count);
+        let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
+        let moved_storage = storage_after_relocating(storage, source_runs(mapping, keys), destinations, count);
+        lemma_storage_outside_the_destinations_keeps_the_protected_reads(
+            protected_mappings,
             storage,
-            keys,
-            sources,
+            moved_storage,
             destinations,
             count,
         );
-        let moved_mapping = mapping_after_relocating(mapping, keys, destinations, count);
-        let moved_storage = storage_after_relocating(storage, sources, destinations, count);
-        let remaining = allocations.skip(count);
-        let remaining_destinations = destinations.skip(count);
-        assert forall|position: int| 0 <= position < remaining.len() implies allocation_is_movable(
-            #[trigger] remaining[position],
-        ) by {
-            assert(remaining[position] == allocations[position + count]);
-        }
-        assert forall|one: int, other: int|
-            #![trigger remaining[one], remaining[other]]
-            0 <= one < remaining.len() && 0 <= other < remaining.len() && one != other
-                && allocation_is_movable(remaining[one]) && allocation_is_movable(remaining[other])
-                implies mapping_key_identity_of(remaining[one]) != mapping_key_identity_of(
-            remaining[other],
-        ) by {
-            assert(remaining[one] == allocations[one + count]);
-            assert(remaining[other] == allocations[other + count]);
-        }
-        assert forall|position: int|
-            0 <= position < remaining.len() && allocation_is_movable(
-                #[trigger] remaining[position],
-            ) implies moved_mapping.contains_key(mapping_key_identity_of(remaining[position]))
-            && moved_mapping[mapping_key_identity_of(remaining[position])]
-            == remaining[position].source_slot by {
-            let original = position + count;
-            assert(remaining[position] == allocations[original]);
-            assert(allocation_is_movable(allocations[original]));
-            let key = mapping_key_identity_of(allocations[original]);
-            assert(mapping.contains_key(key));
-            assert forall|index: int| 0 <= index < count implies keys[index] != key by {
-                assert(allocation_is_movable(allocations[index]));
-                assert(keys[index] == mapping_key_identity_of(allocations[index]));
-            }
-            assert(moved_mapping[key] == mapping[key]);
-        }
-        assert forall|earlier: int, later: int|
-            #![trigger remaining_destinations[earlier], remaining_destinations[later]]
-            0 <= earlier < later < remaining.len() implies remaining_destinations[earlier]
-            != remaining_destinations[later] by {
-            assert(remaining_destinations[earlier] == destinations[earlier + count]);
-            assert(remaining_destinations[later] == destinations[later + count]);
-        }
-        assert forall|index: int| 0 <= index < remaining.len() implies destination_is_free_in_the_mapping(
-            moved_mapping,
-            #[trigger] remaining_destinations[index],
-        ) by {
-            let original = index + count;
-            assert(remaining_destinations[index] == destinations[original]);
-            assert(destination_is_free_in_the_mapping(mapping, destinations[original]));
-            assert forall|mapping_key_identity: u64| #[trigger]
-                moved_mapping.contains_key(mapping_key_identity) implies moved_mapping[mapping_key_identity]
-                != destinations[original] by {
-                if moved_mapping[mapping_key_identity] != mapping[mapping_key_identity] {
-                    let moved_index = choose|moved_index: int|
-                        0 <= moved_index < count && moved_mapping[mapping_key_identity]
-                            == destinations[moved_index];
-                    assert(destinations[moved_index] != destinations[original]);
-                }
-            }
-        }
+        lemma_after_a_batch_the_remaining_region_meets_the_premise(
+            allocations,
+            batch_units,
+            mapping,
+            protected_mappings,
+            destinations,
+        );
         corollary_compacting_the_region_until_it_is_empty_keeps_every_read(
-            remaining,
+            allocations.skip(count),
             batch_units,
             moved_mapping,
+            protected_mappings,
             moved_storage,
-            remaining_destinations,
+            destinations.skip(count),
         );
     }
+}
+
+// 第三轮攻方 A2（Z1 变体一）：现行映射只有 key 7 在 [10, 11)，回退目标里 key 4 是 [20, 22) 两槽单元，把 key 7 搬到 [21, 22)。
+// 只看现行映射的区间前提放得过；回退候选进了前提，这一批的目的地就不合格。
+pub proof fn lemma_a_destination_on_the_second_slot_of_a_rollback_target_unit_breaks_the_premise()
+    ensures
+        ({
+            let mapping = Map::<u64, SlotRun>::empty().insert(7u64, SlotRun { start: 10, span: 1 });
+            let rollback_target = Map::<u64, SlotRun>::empty().insert(4u64, SlotRun { start: 20, span: 2 });
+            let destinations = seq![SlotRun { start: 21, span: 1 }];
+            &&& destinations_are_distinct_and_free(mapping, Seq::empty(), destinations, 1)
+            &&& !destinations_are_distinct_and_free(mapping, seq![rollback_target], destinations, 1)
+        }),
+{
+    let mapping = Map::<u64, SlotRun>::empty().insert(7u64, SlotRun { start: 10, span: 1 });
+    let rollback_target = Map::<u64, SlotRun>::empty().insert(4u64, SlotRun { start: 20, span: 2 });
+    let destinations = seq![SlotRun { start: 21, span: 1 }];
+    assert(destination_is_free_in_the_mapping(mapping, destinations[0])) by {
+        assert forall|mapping_key_identity: u64| #[trigger] mapping.contains_key(mapping_key_identity) implies !runs_overlap(
+            mapping[mapping_key_identity],
+            destinations[0],
+        ) by {
+            assert(mapping_key_identity == 7u64);
+        }
+    }
+    let protected_mappings = seq![rollback_target];
+    assert(protected_mappings[0].contains_key(4u64));
+    assert(runs_overlap(protected_mappings[0][4u64], destinations[0]));
+    assert(!destination_is_free_in_the_mapping(protected_mappings[0], destinations[0]));
+    assert(!destination_spares_the_protected_mappings(protected_mappings, destinations[0]));
+}
+
+// 第一轮攻方的两槽目的地（只比起点那一版放得过）：映射 key 5 在 [3, 4)，key 9 在 [6, 8)，目的区间 [2, 4) 压住了槽 3。
+pub proof fn lemma_a_two_slot_destination_over_a_one_slot_unit_breaks_the_premise()
+    ensures
+        ({
+            let mapping = Map::<u64, SlotRun>::empty().insert(5u64, SlotRun { start: 3, span: 1 }).insert(
+                9u64,
+                SlotRun { start: 6, span: 2 },
+            );
+            !destinations_are_distinct_and_free(mapping, Seq::empty(), seq![SlotRun { start: 2, span: 2 }], 1)
+        }),
+{
+    let mapping = Map::<u64, SlotRun>::empty().insert(5u64, SlotRun { start: 3, span: 1 }).insert(
+        9u64,
+        SlotRun { start: 6, span: 2 },
+    );
+    let destinations = seq![SlotRun { start: 2, span: 2 }];
+    assert(mapping.contains_key(5u64));
+    assert(mapping[5u64] == (SlotRun { start: 3, span: 1 }));
+    assert(runs_overlap(mapping[5u64], destinations[0]));
+}
+
+// 无前提的见证（防空真）：两个单元（一槽、两槽）、一个回退目标拿着 [20, 22)，目的区间合格、跨度对得上。
+pub proof fn witness_a_two_unit_batch_beside_a_rollback_target_satisfies_the_premise()
+    ensures
+        ({
+            let mapping = Map::<u64, SlotRun>::empty().insert(5u64, SlotRun { start: 3, span: 1 }).insert(
+                9u64,
+                SlotRun { start: 6, span: 2 },
+            );
+            let protected_mappings = seq![Map::<u64, SlotRun>::empty().insert(4u64, SlotRun { start: 20, span: 2 })];
+            let keys = seq![9u64, 5u64];
+            let destinations = seq![SlotRun { start: 10, span: 2 }, SlotRun { start: 12, span: 1 }];
+            &&& every_run_of_the_mapping_has_a_slot(mapping)
+            &&& destinations_are_distinct_and_free(mapping, protected_mappings, destinations, 2)
+            &&& destinations_take_the_spans_of_their_sources(mapping, keys, destinations, 2)
+        }),
+{
+    let mapping = Map::<u64, SlotRun>::empty().insert(5u64, SlotRun { start: 3, span: 1 }).insert(
+        9u64,
+        SlotRun { start: 6, span: 2 },
+    );
+    let rollback_target = Map::<u64, SlotRun>::empty().insert(4u64, SlotRun { start: 20, span: 2 });
+    let protected_mappings = seq![rollback_target];
+    let keys = seq![9u64, 5u64];
+    let destinations = seq![SlotRun { start: 10, span: 2 }, SlotRun { start: 12, span: 1 }];
+    assert forall|mapping_key_identity: u64| #[trigger] mapping.contains_key(mapping_key_identity) implies mapping[mapping_key_identity].span
+        >= 1 by {
+        assert(mapping_key_identity == 5u64 || mapping_key_identity == 9u64);
+    }
+    assert forall|index: int| 0 <= index < 2 implies destination_is_free_in_the_mapping(mapping, #[trigger] destinations[index])
+        && destination_spares_the_protected_mappings(protected_mappings, destinations[index]) by {
+        assert forall|mapping_key_identity: u64| #[trigger] mapping.contains_key(mapping_key_identity) implies !runs_overlap(
+            mapping[mapping_key_identity],
+            destinations[index],
+        ) by {
+            assert(mapping_key_identity == 5u64 || mapping_key_identity == 9u64);
+        }
+        assert forall|protected_index: int| 0 <= protected_index < protected_mappings.len() implies destination_is_free_in_the_mapping(
+            #[trigger] protected_mappings[protected_index],
+            destinations[index],
+        ) by {
+            assert(protected_index == 0);
+            assert forall|mapping_key_identity: u64| #[trigger] rollback_target.contains_key(mapping_key_identity) implies !runs_overlap(
+                rollback_target[mapping_key_identity],
+                destinations[index],
+            ) by {
+                assert(mapping_key_identity == 4u64);
+            }
+        }
+    }
+    assert(mapping[keys[0]] == (SlotRun { start: 6, span: 2 }));
+    assert(mapping[keys[1]] == (SlotRun { start: 3, span: 1 }));
 }
 
 // ===== spec 自己的冒烟（防 spec 恒真或恒假）=====

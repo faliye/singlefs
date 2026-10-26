@@ -34,12 +34,11 @@ use singlefs_core::recovery::{
     allocation_records_under_root, choose_system_configuration, rebuild_version, recover,
     user_visible_tree_root_pointers, walk_to_file, JournalPolicy, PoolReader,
     RebuildVersionFailure, RecoveryFailure, RecoveryOutcome,
+    SystemConfigurationValueOutsideWhatThisReaderAccepts,
     CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR, TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_core::root_ring::{
-    slot_offset, target_for_publish, RootRingSlot, RootRingSlotsPerRegion,
-};
+use singlefs_core::root_ring::{slot_offset, target_for_publish, RootRingSlotsPerRegion};
 use singlefs_core::system_configuration::{
     SystemConfiguration, SystemImmutableSizes,
     INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT,
@@ -52,8 +51,8 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::{build_index_node, parse_index_node};
 use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
-    JOURNAL_SAFETY_FACTOR, NODE_BYTES, ROOT_RING_REGION_DEVICES, SLOT_BYTES,
-    SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+    JOURNAL_SAFETY_FACTOR, NODE_BYTES, ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP,
+    ROOT_RING_REGION_DEVICES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -461,7 +460,8 @@ fn root_whose_accounting_rows_are_rewritten(
     root_whose_tree_table_carries(image, root, &rewritten_tree_table_entries)
 }
 
-/// 在根环区域 0 的槽 7（txg 3 之前的发布都没用到它）写一条 `root` 的根记录、checkpoint_txg 换成 `checkpoint_txg`，
+/// 在 `checkpoint_txg` 按落点公式该住的那一槽（`target_for_publish`：u64 最大值落区域 0 槽 5，最大值减一落区域 2 槽 4，txg 3 之前的发布都没用到它们）
+/// 写一条 `root` 的根记录、checkpoint_txg 换成 `checkpoint_txg`（读根环的读者核落点公式，C743：手摆进别的槽的根照读坏算），
 /// 记账行的代段跟着换成 `checkpoint_txg`（I-3.13：记账行代段等于这一版的 txg；恢复要代段 = 根 txg 的那一行 inode 号水位）：
 /// 它的 txg 最大，择根择中它。记账叶与树表原地改写，txg 3 那条根的两条校验和就对不上了，种的这条用不到它。
 fn image_whose_chosen_root_has_the_checkpoint_txg(
@@ -476,11 +476,13 @@ fn image_whose_chosen_root_has_the_checkpoint_txg(
             }
         });
     planted.checkpoint_txg = checkpoint_txg;
-    let ring_slot = RootRingSlot { region: 0, slot: 7 };
+    let ring_slot = target_for_publish(checkpoint_txg, pool.geometry.root_ring_slots_per_region);
     image
         .devices
-        .get_mut(&DeviceIdentity(0))
-        .expect("区域 0 在盘 0")
+        .get_mut(&DeviceIdentity(
+            ROOT_RING_REGION_DEVICES[usize::try_from(ring_slot.region).expect("区域号小于 3")],
+        ))
+        .expect("根环区域所在的盘在池里")
         .write(
             slot_offset(ring_slot, pool.geometry.fixed_structure_slot_spacing),
             &planted.to_slot(usize::try_from(pool.geometry.physical_block_size).expect("根槽宽")),
@@ -937,6 +939,9 @@ fn devices_whose_highest_found_slots_disagree_on_the_filesystem_identifier_refus
 }
 
 /// 上界：槽 1 整槽落在根环基址之前，槽距最大是 1 MiB − 4096；那一档也试（盘 0 那里放一份记着这个槽距、世代号 2 的槽）。
+/// 这一档上自证得过的槽一定带这一版读者不收的值：S 至少 4，4 × (1 MiB − 4096) 大于 P × chunk = 3 MiB（D22（单元原子性怎么合成）
+/// 已定项 16 第 1 句「S × 固定结构槽距 ≤ P × chunk」）；逐档读到自证过而池级字段越界的槽整池拒（同一项「逐档」那一段），
+/// 所以试到这一档的结局是点名盘 0 与这个槽距的整池拒。不试这一档的读者择到 4096 处世代号 1 的槽 1、挂得上。
 #[test]
 fn the_search_tries_the_largest_spacing_whose_slot_one_ends_at_the_root_ring_base() {
     let largest_spacing = ROOT_RING_BASE_IN_BYTES - SYSTEM_CONFIGURATION_SLOT_BYTES;
@@ -954,15 +959,26 @@ fn the_search_tries_the_largest_spacing_whose_slot_one_ends_at_the_root_ring_bas
         &at_the_upper_end,
     );
     flip_slot_zero_on_every_device(&mut image);
-    let chosen = choose_system_configuration(&image).expect("盘 0 上两处、盘 1 上一处自证得过");
+    let slots_per_region = at_the_upper_end
+        .immutable
+        .sizes
+        .root_ring_slots_per_region
+        .count();
     assert_eq!(
-        (
-            chosen.immutable.this_device,
-            u64::from(chosen.immutable.sizes.fixed_structure_slot_spacing),
-            chosen.quantities.slot_generation,
-        ),
-        (DeviceIdentity(0), largest_spacing, 2),
-        "盘 0 择到 1 MiB − 4096 处世代号 2 的那一份"
+        choose_system_configuration(&image).err(),
+        Some(RecoveryFailure::SystemConfigurationValueRefused {
+            device: DeviceIdentity(0),
+            value:
+                SystemConfigurationValueOutsideWhatThisReaderAccepts::RootRingRegionLongerThanTheRegionStride {
+                    slots_per_region,
+                    fixed_structure_slot_spacing: at_the_upper_end
+                        .immutable
+                        .sizes
+                        .fixed_structure_slot_spacing,
+                    region_stride_bytes: ROOT_RING_PRIME_STEP * ROOT_RING_CHUNK_BYTES,
+                },
+        }),
+        "试到 1 MiB − 4096 那一档：盘 0 那份槽过了槽距上界、在 S × 槽距 ≤ P × chunk 上整池拒；没试到就择到 4096 处的槽 1"
     );
 }
 

@@ -15,7 +15,9 @@
 //! 每个崩溃状态判三截（[`CrashStateStage`]；代码审阅第 2 条，用户 2026-09-27 定案「崩溃注入层补可写挂载」）：
 //! 崩溃镜像本身（只读恢复、模型、checker、记录核对器）；在那份崩溃后镜像上真的起一次可写挂载（取号、写行、暖机）再发一次布之后的池
 //! （checker 与记录核对器，挂载或那次发布被拒也判）；挂载途中再崩一次的镜像（二次崩溃，取号、写行、暖机三段各摆一个；只读恢复、模型、
-//! checker、记录核对器）。崩溃点重放不跑可写挂载，这两截只在这里有。后两截交给记录核对器的是整条历史录制流接上挂载那一段
+//! checker、记录核对器）。崩溃点重放的枚举流上也做可写挂载：挂在节点上的可写挂载续做观察者在每个状态上真挂一次、挂完的盘过池级 checker
+//! （`tests/common_crash_point_observers/mod.rs`）；mkfs 返回之后的枚举流上另挂两槽全废盘面的观察者（同一份文件），相对流的基镜像
+//! 判新出现的、一个自证过的系统配置槽都没有的盘（D13（验证路线） 已定项 6）。这两截是随机历史上抽样摆出的崩溃状态那一份。后两截交给记录核对器的是整条历史录制流接上挂载那一段
 //! （与之后那次发布）的录制流（[`GivenStatesTableAfterTheFirstCrash`]，与 [`HistoryThenWritableMountRecords`] 同一种断法），
 //! 历史那几次发布在挂载之后的池与二次崩溃镜像上还在不在也核得到；第二截的记录核对器读两份镜像（第一条判据读第一次崩溃那份、
 //! 第二条读挂载之后的池，[`ConclusionsAfterTheWritableMount::record_check`]）。
@@ -1249,7 +1251,9 @@ fn operation_reads_under_injected_faults(kind: HistoryOperationKind) -> bool {
         | HistoryOperationKind::Truncate
         // 建 inode、按 inode 号写经会话发，读的是盘上的字节。
         | HistoryOperationKind::CreateInodes
-        | HistoryOperationKind::WriteOfAnInode => false,
+        | HistoryOperationKind::WriteOfAnInode
+        // 按偏移写经会话发，读的是盘上的字节（读—改—写读回旧单元、读新槽残留）。
+        | HistoryOperationKind::WriteAtOffset => false,
     }
 }
 
@@ -1387,7 +1391,8 @@ pub fn history_whose_writable_mount_after_the_crash_deletes_an_instance_table_ro
 /// 最后一步的第一个写落在第几段随历史的写数变：先把这段历史跑一遍、按同一条切段规则取出来，不写死段号。
 ///
 /// # Panics
-/// 历史没跑到最后一步；最后一步的第一个写不是一段的段首（上一步发布返回之前那道屏障把它与上一步隔开：不是段首说明切段变了，
+/// 历史没跑到最后一步；含最后一步第一个写的那一段里，段首到它之前有 discard 以外的写（上一步发布返回之前那道屏障把上一步的写与它隔开，
+/// 隔不开的只有上一步发布返回之后发的 discard：它们与最后一步之间没有屏障，切段把它们并进同一段；有别的写说明切段变了，
 /// 「最后一步一个写都没落」那个状态摆不准）。
 #[must_use]
 pub fn inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row(
@@ -1424,8 +1429,12 @@ pub fn inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_e
 /// 有一行就扫（[`INSTANCE_TABLE_SWEPT_ON_ANY_ROW`]）。最后一步的第一个写落在第几段随历史的写数变：先把这段历史跑一遍、
 /// 按同一条切段规则取出来，不写死段号。
 ///
+/// 上一步发布返回之后核心层发的 discard（整段可再分配的那几段）与最后一步之间没有屏障（核心层 discard 之后不补屏障；补不补连着
+/// D26（后台整理与放置回收） 未定项 9，没定，这里照今天的写流摆），切段把它们与最后一步的写并成一段，最后一步的第一个写就不是段首。这里不要求它是段首：找含它的那一段，
+/// 段首到它之前那几个 discard 算更早的写、持久，它扣下，它之后的一个都不持久。没有这样的 discard 时它就是段首，摆法不变。
+///
 /// # Panics
-/// 历史没跑到最后一步；最后一步的第一个写不是一段的段首。
+/// 历史没跑到最后一步；含最后一步第一个写的那一段里，段首到它之前有 discard 以外的写。
 fn inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
     history: &GeneratedHistory,
     execution: HistoryExecution,
@@ -1442,7 +1451,7 @@ fn inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
     let operations_before_the_last_step = operations_before_the_last_step.expect(
         "这段历史的每一步都做得成（覆盖写落在 4 GiB 的盘上），倒数第二步之后观察者一定被调过",
     );
-    let (_writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+    let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
         &stream.retained_operations(),
         &execution.device_width.fixed_geometry(),
     );
@@ -1452,15 +1461,25 @@ fn inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
         .expect("最后一步（覆盖写）写过东西");
     let segment_index = segments
         .iter()
-        .position(|segment| segment.first() == Some(&first_write_of_the_last_step))
-        .expect("最后一步的第一个写是一段的段首：上一步发布返回之前那道屏障把它与上一步隔开");
+        .position(|segment| segment.contains(&first_write_of_the_last_step))
+        .expect("切段时录到的每个写都恰好落在一段里");
+    let position_of_the_first_write_of_the_last_step = segments[segment_index]
+        .iter()
+        .position(|write| *write == first_write_of_the_last_step)
+        .expect("这一段是按含它挑出来的");
+    assert!(
+        segments[segment_index][..position_of_the_first_write_of_the_last_step]
+            .iter()
+            .all(|write| writes[*write].kind == StepKind::Discard),
+        "段首到最后一步的第一个写之间只许是上一步发布返回之后发的 discard：上一步发布返回之前那道屏障把上一步别的写与它隔开"
+    );
     inject_crashes_into_history_with_the_instance_table_sweep_configuration(
         history,
         execution,
         CrashPointDraw::ExactlyOneCrashState {
             segment_index,
-            writes_from_the_segment_on: 1,
-            withheld_among_them: &[0],
+            writes_from_the_segment_on: position_of_the_first_write_of_the_last_step + 1,
+            withheld_among_them: vec![position_of_the_first_write_of_the_last_step].leak(),
         },
         INSTANCE_TABLE_SWEPT_ON_ANY_ROW,
         None,
@@ -2506,13 +2525,16 @@ impl ConclusionsAfterTheWritableMount {
                 .on_the_pool_after_the_mount
                 .words
                 .consulted_pass_landed_root;
+            let landed_on_text = landed_on.landed_root().map_or_else(
+                || format!("没落到根（结论里落到的根那几个字是 {landed_on:?}）"),
+                |(instance, checkpoint_txg)| {
+                    format!("实例 {}、checkpoint_txg {}", instance.0, checkpoint_txg.0)
+                },
+            );
             violations.push((
                 RECOVERY_AFTER_THE_MOUNT_LANDED_ON_ANOTHER_VERSION_THAN_THE_NEWEST_ROOT_WRITTEN,
                 format!(
-                    "挂载与那次发布之后的池上看 journal 那一遍恢复落到的根（实例 {}、checkpoint_txg 低 32 位 {}；都是 {} 是没落到根）不是挂载与那次发布写出的最新那条根",
-                    landed_on.instance,
-                    landed_on.checkpoint_txg_low,
-                    u32::MAX
+                    "挂载与那次发布之后的池上看 journal 那一遍恢复落到的根（{landed_on_text}）不是挂载与那次发布写出的最新那条根"
                 ),
             ));
         }
@@ -3232,6 +3254,7 @@ fn publishes_before_the_continuation_of_a_mount_that_failed(error: &MountError) 
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
+        | MountError::InstanceTableUnreadable
         | MountError::Acquisition(_)
         | MountError::RaiseFloorSequencePublishFailed(_)
         | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
@@ -5560,6 +5583,57 @@ fn settle_the_image_directory_of_the_call(
     }
 }
 
+/// 一次战役调用的镜像目录（[`create_the_image_directory_of_a_campaign_call`] 建的那一份）的守卫：照常跑完由
+/// [`Self::settle_into_the_report`] 收尾（照 `retention` 留或删、交回报告里点名的路径）；没走到那一步就丢掉（工作线程 panic、
+/// 并片的断言失败）时 Drop 照同一份收尾：没写镜像的空目录删掉，写了镜像的照 `retention` 留或删，留下时把路径打到标准错误
+/// （`.claude/singlefs-ai-sop/rules/command-safety.md`「测试镜像一律放临时目录」：成功、失败、panic 都删，留现场走显式开关）。
+struct ImageDirectoryOfACampaignCall {
+    /// 收尾过一次之后是 `None`，Drop 不再碰它。
+    directory: Option<PathBuf>,
+    retention: FailureImageRetention,
+}
+
+impl ImageDirectoryOfACampaignCall {
+    fn of(directory: Option<PathBuf>, retention: FailureImageRetention) -> Self {
+        Self {
+            directory,
+            retention,
+        }
+    }
+
+    fn path(&self) -> Option<&Path> {
+        self.directory.as_deref()
+    }
+
+    /// 照常跑完的收尾：交回报告里点名的镜像目录（[`settle_the_image_directory_of_the_call`]）。
+    fn settle_into_the_report(mut self) -> Option<PathBuf> {
+        self.directory.take().and_then(|directory| {
+            settle_the_image_directory_of_the_call(&directory, self.retention)
+        })
+    }
+}
+
+impl Drop for ImageDirectoryOfACampaignCall {
+    fn drop(&mut self) {
+        let Some(directory) = self.directory.take() else {
+            return;
+        };
+        let left_behind = settle_the_image_directory_of_the_call(&directory, self.retention);
+        match (left_behind, self.retention) {
+            (Some(kept), FailureImageRetention::KeepTheImageFiles) => eprintln!(
+                "崩溃注入这一次调用没跑完就停了，判红的崩溃镜像留在 {}",
+                kept.display()
+            ),
+            (Some(_), FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes)
+            | (
+                None,
+                FailureImageRetention::KeepTheImageFiles
+                | FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+            ) => {}
+        }
+    }
+}
+
 /// 跑种子 [`first_seed`, `first_seed` + `seed_count`)，分给 `worker_threads.count()` 个工作线程：种子区间切成首尾相接的片，
 /// 线程按片号从小到大领片，调用线程收到一片就打一行 `CRASH_INJECTION_PROGRESS`（片号、种子区间、已跑完的片数与段数），
 /// 再按片号从小到大并计数。计数按片的次序相加、新发现按种子从小到大留第一个，所以
@@ -5605,7 +5679,10 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
     let slices = seed_slices(seed_count, worker_threads.count());
     let spawned_worker_threads = worker_threads.count().min(slices.len().max(1));
     let started = Instant::now();
-    let image_directory = create_the_image_directory_of_a_campaign_call(first_seed);
+    let image_directory = ImageDirectoryOfACampaignCall::of(
+        create_the_image_directory_of_a_campaign_call(first_seed),
+        image_retention,
+    );
     println!(
         "CRASH_INJECTION_START seeds=[{first_seed},{}) slices={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={} images={}",
         first_seed + seed_count,
@@ -5613,7 +5690,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
         worker_threads.count(),
         worker_threads.source_name(),
         image_directory
-            .as_deref()
+            .path()
             .map_or_else(|| "none".to_string(), |directory| directory.display().to_string())
     );
     let next_slice_index = AtomicUsize::new(0);
@@ -5623,7 +5700,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
             let sender = sender.clone();
             let slices = &slices;
             let next_slice_index = &next_slice_index;
-            let image_directory = image_directory.as_deref();
+            let image_directory = image_directory.path();
             scope.spawn(move || loop {
                 // 领一片之前问叫停（同流水线那一侧「每领一块之前先问」）：叫停了就不再领，领了的片照样判完交回
                 if given_states_judge.stop_is_requested() {
@@ -5711,9 +5788,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
             }
         }
     }
-    let image_directory_of_the_report = image_directory
-        .as_deref()
-        .and_then(|directory| settle_the_image_directory_of_the_call(directory, image_retention));
+    let image_directory_of_the_report = image_directory.settle_into_the_report();
     CrashInjectionReport {
         first_seed,
         seed_count,
@@ -5820,6 +5895,119 @@ mod tests {
             "写了镜像的那一次：报告点名它自己那一份目录"
         );
         assert!(!one_call.exists(), "写了镜像的那一次跑完删掉自己那一份");
+    }
+
+    /// 只为看镜像目录收没收尾的判器替身：`stop_is_requested` 照 `stop` 答（`Panic` 是问它就 panic，造工作线程 panic），一张表都不判。
+    struct JudgeOnlyAnsweringTheStopRequest {
+        stop: StopRequestAnswer,
+    }
+
+    /// 判器替身怎么答叫停。
+    enum StopRequestAnswer {
+        StopBeforeAnySlice,
+        Panic,
+    }
+
+    impl GivenStatesJudge for JudgeOnlyAnsweringTheStopRequest {
+        fn stop_is_requested(&self) -> bool {
+            match self.stop {
+                StopRequestAnswer::StopBeforeAnySlice => true,
+                StopRequestAnswer::Panic => panic!("判器替身问叫停就 panic：造一次工作线程 panic"),
+            }
+        }
+
+        fn judge_the_given_states(
+            &self,
+            table: &GivenStatesOfATable<'_>,
+        ) -> Result<GivenStatesConclusionsOfATable, String> {
+            Err(format!(
+                "判器替身只答叫停、不判表 {}：领片之前就停了，走不到这里",
+                table.table_name
+            ))
+        }
+    }
+
+    /// 一次战役：种子基 `first_seed` 起 4 段、每段 1 步，两个工作线程，判红的镜像跑完就删。
+    fn campaign_of_four_histories_from(first_seed: u64) -> CrashInjectionCampaign {
+        CrashInjectionCampaign {
+            first_seed,
+            seed_count: 4,
+            operations_per_history: 1,
+            draw: CrashPointDraw::Sampled {
+                crash_points_per_history: 1,
+            },
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+            worker_threads: CrashInjectionWorkerThreads::GivenByCaller(2),
+            image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+            assertions: CrashInjectionAssertions::NewFindingsOnly,
+        }
+    }
+
+    /// 临时目录里这个进程以种子基 `first_seed` 建的战役镜像目录（名字照 [`create_the_image_directory_of_a_campaign_call`]）。
+    fn image_directories_of_this_process_with_the_seed_base(first_seed: u64) -> Vec<String> {
+        let prefix = format!(
+            "singlefs-crash-injection-{}-seedbase-{first_seed}-call-",
+            std::process::id()
+        );
+        std::fs::read_dir(std::env::temp_dir())
+            .expect("临时目录读得了")
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(&prefix))
+            .collect()
+    }
+
+    /// 只给「照常跑完收尾」那一条用的种子基：别的用例不用它，临时目录里带它的镜像目录只会是那一条建的。
+    const SEED_BASE_OF_THE_CAMPAIGN_THAT_ENDS_NORMALLY: u64 = 0x7e3a_0d1e_c7a5_e001;
+
+    /// 只给「工作线程 panic」那一条用的种子基。
+    const SEED_BASE_OF_THE_CAMPAIGN_WHOSE_WORKER_PANICS: u64 = 0x7e3a_0d1e_c7a5_e002;
+
+    /// 场景：一次战役照常跑完（判器在领第一片之前就叫停，一段历史都不跑）。
+    /// 预期：报告不点名镜像目录，这次调用建的那一份镜像目录不在临时目录里了。
+    /// 判别力（`crates/mutations.tsv`）：照常跑完那一步收尾不删目录，目录还在，这条红。
+    #[test]
+    fn a_campaign_call_that_ends_normally_leaves_no_image_directory_behind() {
+        let first_seed = SEED_BASE_OF_THE_CAMPAIGN_THAT_ENDS_NORMALLY;
+        let report = run_crash_injection_campaign(
+            &campaign_of_four_histories_from(first_seed),
+            &JudgeOnlyAnsweringTheStopRequest {
+                stop: StopRequestAnswer::StopBeforeAnySlice,
+            },
+        );
+        assert_eq!(
+            report.histories_left_by_the_stop_request, 4,
+            "四段都被叫停留下"
+        );
+        assert_eq!(report.image_directory, None, "没写镜像：报告不点名镜像目录");
+        assert_eq!(
+            image_directories_of_this_process_with_the_seed_base(first_seed),
+            Vec::<String>::new(),
+            "照常跑完之后这次调用的镜像目录不在了"
+        );
+    }
+
+    /// 场景：一次战役的工作线程 panic（判器替身被问叫停就 panic），战役没走到照常收尾那一步就 panic 着出去。
+    /// 预期：panic 接住之后，这次调用建的那一份镜像目录不在临时目录里了。
+    /// 判别力（`crates/mutations.tsv`）：镜像目录守卫的 Drop 不收尾，目录还在，这条红。
+    #[test]
+    fn a_campaign_call_whose_worker_thread_panics_leaves_no_image_directory_behind() {
+        let first_seed = SEED_BASE_OF_THE_CAMPAIGN_WHOSE_WORKER_PANICS;
+        let panicked = std::panic::catch_unwind(|| {
+            run_crash_injection_campaign(
+                &campaign_of_four_histories_from(first_seed),
+                &JudgeOnlyAnsweringTheStopRequest {
+                    stop: StopRequestAnswer::Panic,
+                },
+            )
+        });
+        assert!(panicked.is_err(), "工作线程 panic 之后战役 panic 着出去");
+        assert_eq!(
+            image_directories_of_this_process_with_the_seed_base(first_seed),
+            Vec::<String>::new(),
+            "panic 之后这次调用的镜像目录不在了"
+        );
     }
 
     /// 一份落了镜像的报告：一个新发现，这一批的镜像目录与那个新发现的镜像都落在 `image_directory` 底下。
@@ -6262,7 +6450,8 @@ mod tests {
     /// 二次崩溃的种子在段号过 63 之后也两两不同（攻方改法 F3-e 的 A2，判决 `research/prompts/m3-formal-code-b24-r1-main-verification.md`
     /// 第二节「K1 改法 F3-e」与第三节第 2 条；原型 `research/prompts/m3-formal-code-b24-r1-opus-model/probe/opus-b24-probe/src/main.rs` 的
     /// `f3_proposed`）：历史种子 0，段号 0..=63 再加 2^k、2^k + 1（k = 6..=20）共 94 个段号，各取长 12 的段上扣下集合非空的 4095 个第一次崩溃态，
-    /// 384930 个种子合成一个集合数，两两不同。真历史里的段号到 210（战役大档），段号 0..=63 那一条看不见只取段号低 6 位的种子。
+    /// 384930 个种子合成一个集合数，两两不同。真历史里的段号过得了 63（2026-10-10 写这一句时量的战役大档到 210；战役的段从整条流起点数、含 mkfs，
+    /// mkfs 作废屏障之后同一段历史各段号加 1，今天的数没量），段号 0..=63 那一条看不见只取段号低 6 位的种子。
     /// 被攻过零轮：这一组取样（段号 2^k、2^k + 1）对更长的历史、别的种子基罩不罩得住没人攻过。
     /// 判别力：段号只取低 6 位（`crates/mutations.tsv` 一行，攻方 M7d）时段号 64 与 0 撞，这一条红。
     #[test]
@@ -8956,10 +9145,91 @@ mod tests {
         );
     }
 
+    /// Q3 在第三截的计数（m3-close-g4-rewrite-r1 判决第二节 V4 那一行：Q3 第三截的计数没有测试断言、变异表也没有行点名）：一份不合法的 Q3 拒
+    /// （崩溃态没注入读故障、判据复算为真）与一份合法的 Q3 拒各交一次给第三截那一判，再把这一份计数并进另一份已记过一次判过、一次不合法的计数。
+    /// 预期：这一份判过 1 + 1 次、不合法 1 次，不合法那一份交回拒因与那一条条件、合法那一份交回 None；并起来判过 1 + 2、不合法 1 + 1，
+    /// 渲染里 Q3 那一行带这两个数。判别力：`crates/mutations.tsv`「根环一簇 R12」那一行（第三截不记 Q3 那一条不合法），这一条红。
+    #[test]
+    fn the_third_cut_counts_each_q3_refusal_and_each_one_whose_criterion_is_true_without_read_faults(
+    ) {
+        let mut tally = CrashInjectionTally::default();
+        let criterion_true_without_read_faults = vec![
+            RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults,
+        ];
+        assert_eq!(
+            reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
+                &mut tally,
+                WritableMountRefusalVerdict::Illegal {
+                    reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                    conditions_not_met: criterion_true_without_read_faults.clone(),
+                },
+            ),
+            Some((
+                RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                criterion_true_without_read_faults
+            )),
+            "不合法的 Q3 拒：交回拒因与那一条条件（报红用）"
+        );
+        assert_eq!(
+            reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
+                &mut tally,
+                WritableMountRefusalVerdict::Legal(
+                    RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator
+                ),
+            ),
+            None,
+            "合法的 Q3 拒：只记判过、不报红"
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator,
+                tally.remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults
+            ),
+            (1 + 1, 1),
+            "这一份：判过两次（不合法、合法各一），不合法一次：{}",
+            tally.render()
+        );
+        let mut earlier = CrashInjectionTally::default();
+        assert!(
+            reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
+                &mut earlier,
+                WritableMountRefusalVerdict::Illegal {
+                    reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                    conditions_not_met: vec![
+                        RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults,
+                    ],
+                },
+            )
+            .is_some(),
+            "另一份先记过一次不合法的 Q3 拒"
+        );
+        earlier.absorb(&tally);
+        assert_eq!(
+            (
+                earlier.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator,
+                earlier.remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults
+            ),
+            (1 + 2, 1 + 1),
+            "并起来：判过、不合法各按两份相加：{}",
+            earlier.render()
+        );
+        assert!(
+            earlier.render().contains(
+                "（第三截判 Q3 那一条）：3 次，崩溃态没注入读故障而判据复算为真、拒得不合法 2"
+            ),
+            "渲染里 Q3 那一行带判过与不合法两个数：{}",
+            earlier.render()
+        );
+    }
+
     /// 改法 G4 在第三截的判法（与 C670 那一条同一个接法）：第一个文件之后的盘面上，盘 0 两个系统配置槽各改一个字节（读得出、自证不过，设备不报错），
-    /// 当成一个二次崩溃镜像交给第三截，没崩过的那一次挂载做成过（`once` 有内容）。再挂以「读阶段判完之后系统配置又读不出」拒；崩溃态没注入读故障、
-    /// 那一拒的判据在这份盘面上复算为真（盘 0 一份自证过的系统配置都没有）：I-8.4 照旧记「再挂被拒」不判，G4 那一条判过一次、不合法一次，
-    /// 记一条第三截的发现；判据 N-配置 那两样计数不动。判别力：第三截不认 G4 那一条（`crates/mutations.tsv` 一行），这一条红。
+    /// 另把盘 0 上所选那一版的一个单元（两盘同槽的那一个，盘 1 那一份不动）改一个字节，当成一个二次崩溃镜像交给第三截，没崩过的那一次挂载做成过
+    /// （`once` 有内容）。盘 0 两槽全废，可写挂载照丙' 过补写闸；那个单元在盘 0 上读出的字节与验得过的那一份不同，补写闸闸一
+    /// （`RewriteGateNotMet::UnitsOfTheSelectedVersionNotAllOnTheDevice`，`singlefs_core::mount` 的补写闸）不过，不补写、照旧拒。
+    /// 只改两槽、单元都在的盘面过得了补写闸、挂上了，拒不出来（三方判决 `research/prompts/m3-close-g4-rewrite-r1-main-verification.md` 第三节，测试走甲）。
+    /// 再挂以「读阶段判完之后系统配置又读不出」拒；崩溃态没注入读故障、那一拒的判据在这份盘面上复算为真（盘 0 一份自证过的系统配置都没有）：
+    /// I-8.4 照旧记「再挂被拒」不判，G4 那一条判过一次、不合法一次，记一条第三截的发现；判据 N-配置 那两样计数不动。
+    /// 判别力：第三截不认 G4 那一条（`crates/mutations.tsv` 一行），这一条红。
     #[test]
     fn a_remount_refused_on_a_second_crash_image_where_device_zero_has_both_system_configuration_slots_torn_is_an_illegal_refusal_after_the_read_stage(
     ) {
@@ -8995,6 +9265,36 @@ mod tests {
                 .expect("池里有盘 0")
                 .write(offset, &slot);
         }
+        // 补写闸闸一不过：盘 0 上所选那一版的一个单元改一个字节。挑第一个文件那次发布在盘 0 上写的最后一个单元、而盘 1 同一落点也写过
+        // （两盘同槽，盘 1 那一份验得过，择到的那一版照旧是它）
+        let unit_write_on_both_devices = writes[..first_write_of_the_overwrite]
+            .iter()
+            .rev()
+            .find(|write| {
+                write.kind == StepKind::UnitWrite
+                    && write.device == DeviceIdentity(0)
+                    && writes[..first_write_of_the_overwrite].iter().any(|mirror| {
+                        mirror.kind == StepKind::UnitWrite
+                            && mirror.device == DeviceIdentity(1)
+                            && mirror.offset == write.offset
+                    })
+            })
+            .expect("前提：第一个文件那次发布在两块盘的同一落点上各写了一份单元");
+        let unit_length = usize::try_from(unit_write_on_both_devices.length_in_bytes())
+            .expect("一个单元装得进 usize");
+        let mut unit_on_device_zero = PoolReader::read(
+            &second_crash_image,
+            DeviceIdentity(0),
+            unit_write_on_both_devices.offset,
+            unit_length,
+        )
+        .expect("内存盘上单元读得出");
+        unit_on_device_zero[unit_length / 2] ^= 0xFF;
+        second_crash_image
+            .devices
+            .get_mut(&DeviceIdentity(0))
+            .expect("池里有盘 0")
+            .write(unit_write_on_both_devices.offset, &unit_on_device_zero);
         let recovered =
             read_recovery_fields(&second_crash_image, ComparedVersion::TheRecoveredVersion);
         let crash_point = CrashPoint {
@@ -9678,6 +9978,8 @@ mod tests {
                 instance_table: empty_pointer,
                 mapping_root: empty_pointer,
                 allocation_record_tree_root: empty_pointer,
+                reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+                pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
             },
             root_record_bytes: Vec::new(),
             content: singlefs_harness::mount_transparency::PosixContentRead::NoFile,

@@ -7,7 +7,7 @@
 //! `… reading --geometry <几何名> --family <族名> --shard-output <文件>`（只跑一片，写片文件，见 [`shard_text`]）；
 //! `… list-shards`（全部片与各占的线程数）；`… merge <片目录>`（把齐了的片合成与一次跑全部逐字节相同的产物）；
 //! `e180_admission_reading_versus_writable_bytes calibrate`（在默认几何上量探测与恢复的挂钟，外推整段，不进产物）。
-//! 分片、续跑与多机的跑法在 `scripts/experiments/e180-reading-shards.sh`。
+//! 分片、续跑与多机的跑法在 `scripts/experiment-apparatus/e180-reading-shards.sh`。
 //! 每一行产物以 `E name=` 开头；停机条款不过打 `E name=stop reason=…` 并退 4。
 //!
 //! 「这一刻写得进的最大字节数」T 的探测（登记 5.1）：在状态的拷贝上经会话做一次 `SequentialWrite`，设备是写时复制的叠层，
@@ -63,9 +63,9 @@ const DEFAULT_JOURNAL_RING_BYTES: u64 = 805_306_368;
 const JOURNAL_RING_START_SLOT: u64 = 1024;
 /// 一条 journal 记录字节：D23 已定项 19；实现侧 `singlefs_format::JOURNAL_RECORD_BYTES`。
 const JOURNAL_RECORD_BYTES: u64 = 4096;
-/// mkfs 的每区槽数 S：D22 已定项 1 字段表；实现侧 `singlefs_format::ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM`。
+/// mkfs 的每区槽数 S：D22 已定项 2 参数表与已定项 16 第 3 句（默认 min(8, …)，这个装置的槽距下取 8）；实现侧 `singlefs_format::ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM`。
 const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
-/// 根环区数：D22 已定项 1；实现侧 `singlefs_format::ROOT_RING_REGIONS`。
+/// 根环区数：D22 已定项 2；实现侧 `singlefs_format::ROOT_RING_REGIONS`。
 const ROOT_RING_REGIONS: u64 = 3;
 /// 一次准入的发布数 B = 4 + 2 k_tol（k_tol = 2）：D16 已定项 1「准入」一行；实现侧 `singlefs_core::mount::PUBLISHES_PER_ADMISSION_AT_MOST`。
 const PUBLISHES_PER_ADMISSION_AT_MOST: u64 = 8;
@@ -4864,12 +4864,12 @@ mod tests {
             non_data_demand_upper_bound_slots(144, 0, 10),
             1 + 1 + 2 + 10
         );
-        // n = 145：下段叶 2 个，内部层 1 个。
+        // n = 145：下段叶 2 个，内部常规层 个。
         assert_eq!(
             non_data_demand_upper_bound_slots(145, 0, 10),
             (2 + 1) + 1 + 2 + 10
         );
-        // n = 144 × 147 + 1：叶 148 个，内部层 2 个，再 1 个根。
+        // n = 144 × 147 + 1：叶 148 个，内部大负载层 个，再 1 个根。
         assert_eq!(
             non_data_demand_upper_bound_slots(144 * 147 + 1, 1, 0),
             (148 + 2 + 1) + 1 + 2 + 1
@@ -5212,6 +5212,8 @@ mod arm_and_residual_tests {
             span_slots,
             generation: singlefs_core::address::CheckpointTxg(generation),
             is_released,
+            quarantine_mark:
+                singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         }
     }
 

@@ -9982,26 +9982,82 @@ fn main() {
 mod tests {
     use super::*;
 
+    /// 写明这份库是一次性的那个变量（`crash_library::refuse_a_library_that_a_reboot_would_erase`）：只在起引擎那一刻设
+    /// （与 `tests/common_given_states_of_harness_scenario_images/mod.rs` 同名常量同一个变量）。
+    const LIBRARY_IS_TEMPORARY_VARIABLE: &str = "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY";
+
     /// 单测里判池级 checker 的给定状态引擎（用户 2026-10-13 定「能走两段的都走两段」）：每张要判的盘作一张给定状态表（基线就是那张盘、写表空、
-    /// 一个空持久集合），录入段写进家目录下给定状态表那一类的判定库，判段从库里读回判（配了 GPU 且编进了 `gpu` 特性在卡上判，否则由 CPU 判器判），
-    /// 判过的复用。交回每张盘上池级 checker 判到而没违例的不变量与违例的不变量；只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+    /// 一个空持久集合），录入段写进这一次新建的一次性库（`${TMPDIR:-/tmp}` 下这个进程独占的一份，用完连同库一起删；长期库不碰），
+    /// 判段从库里读回判（配了 GPU 且编进了 `gpu` 特性在卡上判，否则由 CPU 判器判）。交回每张盘上池级 checker 判到而没违例的不变量与违例的不变量；
+    /// 只录或只判那一趟（两段分进程跑，拿不到同一份一次性库，打「本次未跑」那一行）、表归别的机器判的那一趟交 `None`（用例当场返回）。
+    /// 为什么每次都新建库：判到位库里不存，从库里复用来的结论判到位读回是 0（`crash_judge_conclusions` 的
+    /// `cross_check_words_of_a_stored_given_state`），在长期库里判时这几张从前一趟复用，「判到而成立」一条都没有
+    /// （2026-10-23 带特性那一趟 `tables_reused=33`）；所以起引擎核库目录就是这一份、收尾核一张都没复用。
     ///
     /// # Panics
-    /// 引擎起不了、判不了某一张（不退回别处判）；GPU 判不了某一张（第三轮正文 H6 判红）。
+    /// 一次性库建不了、引擎起不了、判不了某一张（不退回别处判）；GPU 判不了某一张（第三轮正文 H6 判红）；
+    /// 引擎用的库不是这一份一次性库，或有一张是从库里复用的。
     fn pool_checker_holds_and_violations_through_the_given_states_engine(
         images: &[(String, MemoryPool)],
     ) -> Option<Vec<(Vec<&'static str>, Vec<&'static str>)>> {
-        use singlefs_checker_tier::crash_amplification::{GivenStatesEngine, GivenStatesItem};
+        use singlefs_checker_tier::crash_amplification::{
+            one_test_changes_the_environment_at_a_time, GivenStatesEngine, GivenStatesItem,
+        };
         use singlefs_checker_tier::crash_given_states::{
             GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
         };
-        let engine = GivenStatesEngine::start_from_environment(
-            GivenStatesItem {
-                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes::tests::fixed".to_string(),
-            },
-            &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        )
-        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"));
+        use singlefs_checker_tier::crash_library::{
+            ExclusiveTemporaryDirectory, RunStage, CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+        };
+        const TEST_NAME: &str = "e171_three_oracle_collusion_after_the_oracle_fixes::tests::fixed";
+        let library_of_the_judgement = match RunStage::of_this_process() {
+            RunStage::RecordThenJudge => {
+                ExclusiveTemporaryDirectory::create("e171-given-states-judged-afresh")
+                    .unwrap_or_else(|reason| panic!("{TEST_NAME} 的一次性库建不了：{reason}"))
+            }
+            stage @ (RunStage::RecordOnly | RunStage::JudgeOnly) => {
+                println!(
+                    "{}",
+                    singlefs_harness::gpu_memory_ledger::gpu_not_run_line(
+                        TEST_NAME,
+                        &format!(
+                            "这几张盘在一次性库里现判，录入段与判段分进程跑（这一趟只跑 {}）时两段拿不到同一份库",
+                            stage.name()
+                        )
+                    )
+                );
+                return None;
+            }
+        };
+        // 库目录本身由引擎建（建库时目录已在会拒）；上一层是这一次独占的那一份一次性目录，刚建、是空的
+        let library_directory = library_of_the_judgement.join("library");
+        let engine = {
+            let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
+            let previous = std::env::var_os(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE);
+            let previous_temporary_mark = std::env::var_os(LIBRARY_IS_TEMPORARY_VARIABLE);
+            std::env::set_var(
+                CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+                &library_directory,
+            );
+            std::env::set_var(LIBRARY_IS_TEMPORARY_VARIABLE, "1");
+            let started = GivenStatesEngine::start_from_environment(
+                GivenStatesItem {
+                    item_name: TEST_NAME.to_string(),
+                },
+                &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            );
+            match previous {
+                Some(value) => {
+                    std::env::set_var(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE, value)
+                }
+                None => std::env::remove_var(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE),
+            }
+            match previous_temporary_mark {
+                Some(value) => std::env::set_var(LIBRARY_IS_TEMPORARY_VARIABLE, value),
+                None => std::env::remove_var(LIBRARY_IS_TEMPORARY_VARIABLE),
+            }
+            started.unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+        };
         let mut judged_images = Vec::with_capacity(images.len());
         let mut every_table_judged_here = true;
         for (table_name, image) in images {
@@ -10046,10 +10102,19 @@ mod tests {
                 invariants_with(conclusion.words.pool_checker_violated_bits),
             ));
         }
+        let run = engine.finish();
         assert_eq!(
-            engine.finish().red_items(),
+            run.red_items(),
             Vec::<String>::new(),
             "GPU 判不了的盘照第三轮正文 H6 判红"
+        );
+        assert_eq!(
+            run.library_directory, library_directory,
+            "这几张盘判在这一次新建的一次性库里，不在长期库里"
+        );
+        assert_eq!(
+            run.tally.tables_reused, 0,
+            "在这一次新建的一次性库里判，结论都该是这一趟现判的（判到位库里不存，复用来的读回是 0）"
         );
         every_table_judged_here.then_some(judged_images)
     }
@@ -11299,8 +11364,10 @@ mod tests {
             writable_mount_probe: false,
         };
         let stream = prepare_stream(StreamName::FixedScriptThroughEThenUnmount, switches, false);
-        let directory =
-            std::env::temp_dir().join(format!("e171r1-unit-panic-export-{}", std::process::id()));
+        // 守卫认领导出目录：用例做完、断言失败、panic 都删掉它
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e171r1-unit-panic-export-{}", std::process::id())),
+        );
         let export = export_prepared_stream(
             &stream,
             &directory,
@@ -11311,8 +11378,6 @@ mod tests {
             0,
             None,
         );
-        std::fs::remove_dir_all(&directory)
-            .unwrap_or_else(|error| panic!("删 {}：{error}", directory.display()));
         assert!(
             matches!(
                 stream.ending,
@@ -12132,8 +12197,13 @@ mod tests {
     /// （只把 `judged_root_index` 设成 `usize::MAX`，写流不变），都在对拍之前退 3、记 `q5_not_run=no_root_write`。
     #[test]
     fn a_shape_without_a_root_write_stops_before_the_pairing() {
+        // 守卫认领输出目录：走岔了真写进去时，用例做完、断言失败、panic 都删掉它
+        let output_directory =
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join("e171r1-unit-no-root-write-not-exported"),
+            );
         let command_line = ConfirmedLossCommandLine {
-            output_directory: std::env::temp_dir().join("e171r1-unit-no-root-write-not-exported"),
+            output_directory: output_directory.to_path_buf(),
             truncate_at_the_return_point: false,
         };
         enum ShapeWithoutARootWrite {
@@ -12686,11 +12756,16 @@ mod tests {
                 sampling_point_export: None,
             },
         );
+        // 守卫认领输出目录：用例做完、断言失败、panic 都删掉它
+        let output_directory =
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join(format!(
+                    "e171r1-unit-unattributed-in-the-pairing-{}",
+                    std::process::id()
+                )),
+            );
         let command_line = ConfirmedLossCommandLine {
-            output_directory: std::env::temp_dir().join(format!(
-                "e171r1-unit-unattributed-in-the-pairing-{}",
-                std::process::id()
-            )),
+            output_directory: output_directory.to_path_buf(),
             truncate_at_the_return_point: false,
         };
         let mut lines = ResultLines {
@@ -12730,11 +12805,16 @@ mod tests {
                 sampling_point_export: None,
             },
         );
+        // 守卫认领输出目录：用例做完、断言失败、panic 都删掉它
+        let output_directory =
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join(format!(
+                    "e171r1-unit-unattributed-in-the-control-{}",
+                    std::process::id()
+                )),
+            );
         let command_line = ConfirmedLossCommandLine {
-            output_directory: std::env::temp_dir().join(format!(
-                "e171r1-unit-unattributed-in-the-control-{}",
-                std::process::id()
-            )),
+            output_directory: output_directory.to_path_buf(),
             truncate_at_the_return_point: false,
         };
         let mut lines = ResultLines {
@@ -12803,12 +12883,16 @@ mod tests {
             states.insert(tables.state_count - 1);
             states.len()
         };
-        let output_directory = std::env::temp_dir().join(format!(
-            "e171r1-unit-unattributed-at-the-reverse-sampling-point-{}",
-            std::process::id()
-        ));
+        // 守卫认领输出目录：用例做完、断言失败、panic 都删掉它
+        let output_directory =
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join(format!(
+                    "e171r1-unit-unattributed-at-the-reverse-sampling-point-{}",
+                    std::process::id()
+                )),
+            );
         let command_line = ConfirmedLossCommandLine {
-            output_directory: output_directory.clone(),
+            output_directory: output_directory.to_path_buf(),
             truncate_at_the_return_point: true,
         };
         let mut lines = ResultLines {
@@ -12816,8 +12900,6 @@ mod tests {
             collected: Some(Vec::new()),
         };
         let exit_code = judge_the_confirmed_loss_shapes(&mut lines, &command_line, shapes, 0);
-        std::fs::remove_dir_all(&output_directory)
-            .unwrap_or_else(|error| panic!("删 {}：{error}", output_directory.display()));
         let collected = lines.collected.expect("收集模式");
         assert_the_q5_stopped_as_unattributed(exit_code, &collected, judged_states);
         assert!(
@@ -12861,12 +12943,16 @@ mod tests {
             );
             classification.judged_ordinals(&digits).len()
         };
-        let output_directory = std::env::temp_dir().join(format!(
-            "e171r1-unit-unattributed-at-the-main-sampling-point-{}",
-            std::process::id()
-        ));
+        // 守卫认领输出目录：用例做完、断言失败、panic 都删掉它
+        let output_directory =
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir().join(format!(
+                    "e171r1-unit-unattributed-at-the-main-sampling-point-{}",
+                    std::process::id()
+                )),
+            );
         let command_line = ConfirmedLossCommandLine {
-            output_directory: output_directory.clone(),
+            output_directory: output_directory.to_path_buf(),
             truncate_at_the_return_point: false,
         };
         let mut lines = ResultLines {
@@ -12874,8 +12960,6 @@ mod tests {
             collected: Some(Vec::new()),
         };
         let exit_code = judge_the_confirmed_loss_shapes(&mut lines, &command_line, shapes, 0);
-        std::fs::remove_dir_all(&output_directory)
-            .unwrap_or_else(|error| panic!("删 {}：{error}", output_directory.display()));
         let collected = lines.collected.expect("收集模式");
         assert_the_q5_stopped_as_unattributed(exit_code, &collected, judged_states);
         assert!(

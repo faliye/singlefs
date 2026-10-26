@@ -45,11 +45,12 @@ use crate::records::{
 };
 use crate::recovery::{
     choose_root, choose_system_configuration_naming_devices_without_a_mountable_slot,
-    newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to,
+    fall_back_judged_on_the_three_readers, inode_tree_root_key_range_is_the_subtree_coverage,
     read_mapped_tree_node_via_hint_then_central_mapping, read_mapped_tree_root,
     read_unit_via_locations, replay_journal, scan_journal,
-    tree_table_entries_each_kind_at_most_once, JournalScanReport, MappedTreeNodeClass, PoolReader,
-    RecoveryFailure, TreeTableEntriesRefusal,
+    tree_table_entries_each_kind_at_most_once, FailureKindForTheFallBack, JournalScanReport,
+    MappedTreeNodeClass, NamedUnitVerification, PoolReader, RecoveryFailure,
+    TreeTableEntriesRefusal,
 };
 use crate::root_record::RootRecord;
 use crate::system_configuration::InodeRecordTruncationFieldsOfThePool;
@@ -213,6 +214,34 @@ pub enum OpenPoolForReadFailure {
 impl From<RecoveryFailure> for OpenPoolForReadFailure {
     fn from(failure: RecoveryFailure) -> Self {
         OpenPoolForReadFailure::Walk(failure)
+    }
+}
+
+impl OpenPoolForReadFailure {
+    /// 打开这一样读者没读通在 F2 判退里算哪一类（`recovery::FailureKindForTheFallBack`，C866 改法甲）：沿根读单元那一步的失败照
+    /// `RecoveryFailure::failure_kind_for_the_fall_back`（只有读不出、经映射仍读不出是字节丢了）；读回来的单元解不开（[`Self::UnitMalformed`]：
+    /// 位置条目里的整单元校验和对得上、节点自述的头或载荷校验和不对）与别的解不开、判不过都是内容拒收——判决
+    /// `research/prompts/m3-close-c693-r3-main-verification.md` 第二节 T2-甲 打中的就是把它算成字节丢了。
+    /// 树表 0 条（[`Self::TreeTableHasNoEntries`]）不是读坏、交回 `None`：这一版还没发布过文件版本，三样读者里它算读通。
+    #[must_use]
+    pub fn failure_kind_for_the_fall_back(&self) -> Option<FailureKindForTheFallBack> {
+        match self {
+            OpenPoolForReadFailure::Walk(failure) => Some(failure.failure_kind_for_the_fall_back()),
+            OpenPoolForReadFailure::TreeTableHasNoEntries => None,
+            OpenPoolForReadFailure::TreeTableEntryMalformed
+            | OpenPoolForReadFailure::TreeTableHasNoTreeOfKind { .. }
+            | OpenPoolForReadFailure::TreeLevelUnexpected { .. }
+            | OpenPoolForReadFailure::UnitMalformed { .. }
+            | OpenPoolForReadFailure::InodeLeafContainerDisagreesWithTheInternalEntry { .. }
+            | OpenPoolForReadFailure::InodeRecordMalformed
+            | OpenPoolForReadFailure::InodeRecordCarriesATruncationFieldInAPoolWithoutIncompatBitTwo {
+                ..
+            }
+            | OpenPoolForReadFailure::RecordMalformed { .. }
+            | OpenPoolForReadFailure::PointerInTheRecordCannotBeDereferenced { .. } => {
+                Some(FailureKindForTheFallBack::ContentRefused)
+            }
+        }
     }
 }
 
@@ -499,7 +528,7 @@ pub fn open_pool_for_read_judging_the_truncation_fields_as(
             entry_bytes,
         )
         .map_err(|refusal| match refusal {
-            PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
+            PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable => {
                 OpenPoolForReadFailure::RecordMalformed {
                     what: "inode 树内部条目",
                 }
@@ -565,6 +594,12 @@ pub fn open_pool_for_read_judging_the_truncation_fields_as(
             inode_records.push(record);
         }
     }
+    // inode 树根头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2）：`read_mapped_tree_root` 对层级 ≥ 1 的根不判区间，
+    // 读完叶容器在这里判，与冷走读同一个函数。
+    inode_tree_root_key_range_is_the_subtree_coverage(
+        &inode_root,
+        inode_records.iter().map(|record| record.inode),
+    )?;
 
     Ok(MountedPoolForRead {
         root: *root,
@@ -608,9 +643,9 @@ pub struct MountedReadOnly {
 }
 
 /// 只读挂载：择系统配置 → 择根 → 全环扫描 journal → 按前缀口径施加 → 沿施加之后的根打开挂载态。
-/// 一个字节都不写（并行线二「这条线不写盘」）。施加之后那一版打不开（树表 0 条除外）、系统配置没见证它时，退到 [见证到的那一版, 所选根) 里最新的那条根打开
-/// （F2 乙，[`newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`]）：`chosen_root` 与 `effective_root` 都是退到的那一条，
-/// `journal` 仍是对原来所选根扫环、施加那一趟的报告。
+/// 一个字节都不写（并行线二「这条线不写盘」）。施加之后那一版三样读者的并集里有字节丢了、没有内容拒收、系统配置没见证它时，
+/// 退到 [见证到的那一版, 所选根) 里最新的那条根打开（F2 乙，[`fall_back_judged_on_the_three_readers`]）：`chosen_root` 与 `effective_root`
+/// 都是退到的那一条，`journal` 仍是对原来所选根扫环、施加那一趟的报告；那一条打不开就留在所选那一版。
 ///
 /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
 /// 崩溃点重放的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
@@ -631,55 +666,45 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         &chosen_root,
         system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .map_err(MountReadOnlyFailure::Recovery)?;
     let truncation_fields_of_the_pool = system_configuration
         .immutable
         .inode_record_truncation_fields;
-    let (mounted, chosen_root, effective_root) =
-        match open_pool_for_read_judging_the_truncation_fields_as(
+    // 判退不看打开通没通，看三样读者的并集（C755，用户 2026-10-20 定「三句都补」；C866 改法甲：并集里有内容拒收不退），与恢复、可写挂载同一份
+    // （`recovery::fall_back_judged_on_the_three_readers`）：退到的那一版打得开就打开它（不重放）；打不开、或不退，留在所选那一版，
+    // 成不成照打开它（树表 0 条照报 `TreeTableHasNoEntries`）。
+    let version_fallen_back_to_opened = fall_back_judged_on_the_three_readers(
+        reader,
+        &system_configuration,
+        &chosen_root,
+        &effective_root,
+        &records,
+    )
+    .and_then(|fall_back| {
+        open_pool_for_read_judging_the_truncation_fields_as(
             reader,
-            &effective_root,
+            &fall_back.version_fallen_back_to,
             truncation_fields_of_the_pool,
-        ) {
-            Ok(mounted) => (mounted, chosen_root, effective_root),
-            // 树表 0 条不是走读失败（这一版还没发布过文件版本），不退。
-            Err(OpenPoolForReadFailure::TreeTableHasNoEntries) => {
-                return Err(MountReadOnlyFailure::Open(
-                    OpenPoolForReadFailure::TreeTableHasNoEntries,
-                ));
-            }
-            // 所选那一版走读失败、系统配置没见证它：退到 [见证到的那一版, 所选根) 里最新的那条根（F2 乙，与恢复、可写挂载同一份判法，
-            // `recovery::newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`），不重放、直接打开；打不开照报所选那一版的失败。
-            Err(failure_of_the_selected_version) => {
-                let version_fallen_back_to_opened =
-                newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to(
-                    reader,
-                    &system_configuration,
-                    &chosen_root,
-                    &effective_root,
-                    &records,
-                )
-                .and_then(|version_fallen_back_to| {
-                    open_pool_for_read_judging_the_truncation_fields_as(
-                        reader,
-                        &version_fallen_back_to,
-                        truncation_fields_of_the_pool,
-                    )
-                    .ok()
-                        .map(|mounted| (mounted, version_fallen_back_to))
-                });
-                match version_fallen_back_to_opened {
-                    Some((mounted, version_fallen_back_to)) => {
-                        (mounted, version_fallen_back_to, version_fallen_back_to)
-                    }
-                    None => {
-                        return Err(MountReadOnlyFailure::Open(failure_of_the_selected_version))
-                    }
-                }
-            }
-        };
+        )
+        .ok()
+        .map(|mounted| (mounted, fall_back.version_fallen_back_to))
+    });
+    let (mounted, chosen_root, effective_root) = match version_fallen_back_to_opened {
+        Some((mounted, version_fallen_back_to)) => {
+            (mounted, version_fallen_back_to, version_fallen_back_to)
+        }
+        None => {
+            let mounted = open_pool_for_read_judging_the_truncation_fields_as(
+                reader,
+                &effective_root,
+                truncation_fields_of_the_pool,
+            )
+            .map_err(MountReadOnlyFailure::Open)?;
+            (mounted, chosen_root, effective_root)
+        }
+    };
     Ok(MountedReadOnly {
         mounted,
         chosen_root,
@@ -1411,6 +1436,8 @@ mod tests {
                 instance_table: NodePointer::empty_root(),
                 mapping_root: NodePointer::empty_root(),
                 allocation_record_tree_root: NodePointer::empty_root(),
+                reclaim_threshold: crate::address::CheckpointTxg(0),
+                pinned_ring_slot: crate::root_record::PinnedRingSlot::NO_SLOT_PINNED,
             },
             filesystem_identifier_in_unit_headers: unit_filesystem_identifier(
                 &filesystem_identifier,

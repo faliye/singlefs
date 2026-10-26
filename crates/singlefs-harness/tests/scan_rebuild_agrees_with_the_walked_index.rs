@@ -17,10 +17,11 @@ use common::{
     parameters, sequential_write_in_process_as_instance_one_and_advance_the_pool, BuiltPool,
 };
 use common_deletion_in_progress::{
-    content_of_three_data_units, image_after_the_intent_of_a_three_unit_file,
-    pool_with_a_three_unit_file, pool_with_new_inodes, publish_new_inodes_and_advance_the_pool,
-    publish_the_intent, publish_the_next_step_in_batches_of_one, unlink_to_the_end,
-    INSTANCE_OF_THE_PUBLISHES, WRITE_TIME_SECONDS_OF_THE_NEW_INODES,
+    change_the_inode_record, content_of_three_data_units,
+    image_after_the_intent_of_a_three_unit_file, pool_with_a_three_unit_file, pool_with_new_inodes,
+    publish_new_inodes_and_advance_the_pool, publish_the_intent,
+    publish_the_next_step_in_batches_of_one, unlink_to_the_end, INSTANCE_OF_THE_PUBLISHES,
+    WRITE_TIME_SECONDS_OF_THE_NEW_INODES,
 };
 use common_pointer_head_corruption::{
     newest_root, node_bytes, replace_the_unit_and_propagate_its_checksum, the_slot_of,
@@ -36,7 +37,7 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::InodeNumber;
 use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::pointer::LocationEntry;
-use singlefs_core::records::mapping_key_for_data;
+use singlefs_core::records::{mapping_key_for_data, INODE_RECORD_TRUNCATION_FIELD_OFFSET};
 use singlefs_core::transaction::{
     publish_sequential_write_of_an_inode, PoolWriter, FIRST_INODE_NUMBER,
 };
@@ -54,6 +55,8 @@ const DATA_UNIT_OBJECT_KEY: std::ops::Range<usize> = 42..75;
 const HEADER_SECTOR_BYTES: usize = 512;
 /// 码 1 数据单元在中央映射 key 里的类标签。
 const MAPPING_KEY_CLASS_OF_A_DATA_UNIT: u8 = 1;
+/// inode 记录里截断字段的宽：T（8 字节）与 N_w（8 字节），起点 [`INODE_RECORD_TRUNCATION_FIELD_OFFSET`]。
+const INODE_RECORD_TRUNCATION_FIELD_BYTES: usize = 16;
 /// 换上去的那个槽离原槽多远：单元区里新池新建文件之后没写过的一格（一个 32 KiB 单元占两槽，挪两槽正好落在下一个单元的位置上）。
 const SLOTS_THE_MAPPING_LOCATION_IS_MOVED_BY: u64 = 2;
 
@@ -448,6 +451,44 @@ fn the_intent_version_of_a_truncation_at_a_data_unit_boundary_holds_the_scan_reb
         verdict_of_the_scan_rebuild(&pool.memory_pool()),
         InvariantVerdict::Holds,
         "截在单元边界上的中间态：size 之外的两个单元两侧都不收"
+    );
+}
+
+/// 同上那一版，再把第一个文件记录里的截断字段 (T, N_w) 清零：单元 0 不重写、三个单元出生 txg 相同，写序那一条判不死 size 之外的单元 1、2；
+/// 截断字段清零，读法 Z 第四条（截断字段之外、早于 T）也不判它们；只剩 size 那一条不认领，遍历方向也不收它们，三张表相同、成立。
+/// 读法 Z 的 size 那一条在 CPU 一侧的取样点：写路径写出的意图那一版带着截断字段，第四条先判死单元 1、2，那一形上改掉 size 那一条照样成立。
+/// 判别力（`crates/mutations.tsv`「扫描重建 size 之外的单元照认领」那一行）：size 那一条不判，扫描重建认领单元 1、2，「中央映射」差 2 处，这条红。
+#[test]
+fn the_intent_version_of_a_truncation_at_a_data_unit_boundary_whose_truncation_field_is_cleared_holds_the_scan_rebuild(
+) {
+    let mut pool =
+        pool_with_a_three_unit_file("scan-rebuild-truncation-at-a-boundary-field-cleared");
+    let before = pool.output.clone();
+    let intent = change_the_size_of_the_first_file_and_advance(&mut pool, payload_capacity());
+    assert!(
+        truncation_entry_of(&intent).is_some()
+            && intent.data_pointers.len() == 3
+            && intent.data_pointers[0] == before.data_pointers[0],
+        "意图那一版：条目挂着、三个单元都在、单元 0 没重写"
+    );
+    let mut image = pool.memory_pool();
+    let truncation_field_start =
+        usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET).expect("120 装得进 usize");
+    let mut truncation_field_the_write_path_wrote = [0u8; INODE_RECORD_TRUNCATION_FIELD_BYTES];
+    change_the_inode_record(&mut image, FIRST_INODE_NUMBER, |record| {
+        let field = &mut record
+            [truncation_field_start..truncation_field_start + INODE_RECORD_TRUNCATION_FIELD_BYTES];
+        truncation_field_the_write_path_wrote.copy_from_slice(field);
+        field.fill(0);
+    });
+    assert_ne!(
+        truncation_field_the_write_path_wrote, [0u8; INODE_RECORD_TRUNCATION_FIELD_BYTES],
+        "写路径写出的意图那一版带着截断字段（清零之前 T 与 N_w 不全为 0）"
+    );
+    assert_eq!(
+        verdict_of_the_scan_rebuild(&image),
+        InvariantVerdict::Holds,
+        "截断字段清零之后只剩 size 那一条：size 之外的两个单元两侧都不收"
     );
 }
 

@@ -570,7 +570,7 @@ fn zero_pointer() -> PointerFact {
 }
 
 fn root_fact(source: u32, bytes: &[u8]) -> RootFact {
-    let record_bytes = usize::try_from(ROOT_RECORD_BYTES).expect("457");
+    let record_bytes = usize::try_from(ROOT_RECORD_BYTES).expect("466");
     let mut filesystem_identifier = [0u8; 16];
     if bytes.len() >= 20 {
         filesystem_identifier.copy_from_slice(&bytes[4..20]);
@@ -1903,6 +1903,15 @@ mod tests {
             ],
             "基线里的单元，discard 与它的撕裂镜像各在那一槽添一条字节变了的"
         );
+        // 夹具单元不自证（`check_unit` 判它 flags 字节非零）：这里要判的只是根指过去整单元 CRC 对不对得上，
+        // 基线来源的单元事实当成两道校验和都过，没持久那一态才只剩 discard 这一个变量。
+        for unit in facts
+            .units
+            .iter_mut()
+            .filter(|unit| unit.source == BASE_IMAGE_SOURCE)
+        {
+            unit.checksums_hold = true;
+        }
         facts.roots = vec![RootFact {
             source: BASE_IMAGE_SOURCE,
             instance: 1,

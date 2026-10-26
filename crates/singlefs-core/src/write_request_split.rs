@@ -165,6 +165,220 @@ pub fn split_sequential_write_into_one_unit_transactions(
     transactions
 }
 
+/// 一次按偏移的写（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节）里一个要装的数据单元从哪来、读不读盘。
+/// 封闭集合，`match` 不写通配臂。「有没有旧单元」只看写之前的单元数，不看任何一次读的结果；「盖满」是这次的字节罩住这个单元整个净荷容量
+/// （`[单元号 × 净荷, (单元号 + 1) × 净荷)`），不是只罩住它的声明长度（R2「盖满不读」那一格）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataUnitOfAPartialWrite {
+    /// 有旧单元、净荷没被这次的字节整单元盖满（含写到偏移 o 时一起重写、这次一个字节都没写到的 o 之后那几个，R4）：读回旧单元（读盘），
+    /// 旧内容取它、这次的字节盖在上面。读不回或校验不过整个写失败（D4（校验和位置） 已定项 4）。
+    OldUnitReadBack,
+    /// 有旧单元、净荷被这次的字节整单元盖满：不读，内容全取这次的字节。
+    OldUnitCoveredWhole,
+    /// 没有旧单元、这次写到它而没盖满：读这次发布分到的新槽的残留一次，字节丢掉、旧内容按零（用户 2026-10-26 定「首次写也读回」，
+    /// 残留读出错记数、不拒写）。
+    NewUnitReadingTheResidueOfItsSlot,
+    /// 没有旧单元、净荷被这次的字节整单元盖满：不读。
+    NewUnitCoveredWhole,
+    /// 起点越过末尾或落在洞里时它前面的空隙：补整单元零、不读（存在的单元从 0 起连号，R5）。
+    GapFilledWithZeros,
+}
+
+impl DataUnitOfAPartialWrite {
+    /// 运行时报出这个单元走的是哪一格（`.claude/rules/fs-design.md` 五条硬要求第 4 条）。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            DataUnitOfAPartialWrite::OldUnitReadBack => "partial_write_old_unit_read_back",
+            DataUnitOfAPartialWrite::OldUnitCoveredWhole => "partial_write_old_unit_covered_whole",
+            DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot => {
+                "partial_write_new_unit_reading_the_residue_of_its_slot"
+            }
+            DataUnitOfAPartialWrite::NewUnitCoveredWhole => "partial_write_new_unit_covered_whole",
+            DataUnitOfAPartialWrite::GapFilledWithZeros => "partial_write_gap_filled_with_zeros",
+        }
+    }
+
+    /// 这个单元在读回旧单元那一步读不读盘（读的是旧单元）。残留读不在这里：它在分配之后读这次分到的槽。
+    #[must_use]
+    pub const fn reads_the_old_unit_back(self) -> bool {
+        match self {
+            DataUnitOfAPartialWrite::OldUnitReadBack => true,
+            DataUnitOfAPartialWrite::OldUnitCoveredWhole
+            | DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot
+            | DataUnitOfAPartialWrite::NewUnitCoveredWhole
+            | DataUnitOfAPartialWrite::GapFilledWithZeros => false,
+        }
+    }
+
+    /// 这个单元在分配之后、任何写之前读不读这次分到的槽的残留。
+    #[must_use]
+    pub const fn reads_the_residue_of_its_slot(self) -> bool {
+        match self {
+            DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot => true,
+            DataUnitOfAPartialWrite::OldUnitReadBack
+            | DataUnitOfAPartialWrite::OldUnitCoveredWhole
+            | DataUnitOfAPartialWrite::NewUnitCoveredWhole
+            | DataUnitOfAPartialWrite::GapFilledWithZeros => false,
+        }
+    }
+}
+
+/// 一次按偏移的写在一个文件上要做的事（只算，不读不写、不动分配器）：写之前这个文件挂着几个单元、size 多少，这次写 `[offset, offset + 长度)`。
+/// 写之后的 size 取写之前的与写的终点里大的（跨末尾的写同时是一次变长，判决第二节 R5 那一格）；写之后的单元数取写之前的与这次写到的最后一个
+/// 单元号加一里大的（单元从 0 起连号，洞只在尾部）。重写的是从 [`Self::first_rewritten_unit`] 起到写之后最后一个单元的那一段（R4：写到偏移 o
+/// 时把 o 之后的单元一起重写，「出生 txg 随偏移不降」照旧成立，读法 Z 加写序不改）：
+/// - 写落在已有的单元上（o 小于写之前的单元数）：从 o 起；
+/// - 写落在最后一个存在的单元之后（空隙、洞里、紧接末尾）：最后一个存在的单元声明长度不满一个净荷时从它起（它要补满，按已有单元读回），
+///   否则从写之前的单元数起（之前的单元一个都不重写）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PartialWriteOfAFile {
+    pub data_units_before: u64,
+    pub size_before_in_bytes: u64,
+    pub offset: FileOffsetInBytes,
+    pub length_in_bytes: std::num::NonZeroU64,
+    /// `offset + length_in_bytes`（构造时核过不越过 u64）。
+    end_exclusive: u64,
+}
+
+impl PartialWriteOfAFile {
+    /// 写的终点越过 u64 ⇒ `None`（调用方在任何读写之前拒）。
+    #[must_use]
+    pub fn new(
+        data_units_before: u64,
+        size_before_in_bytes: u64,
+        offset: FileOffsetInBytes,
+        length_in_bytes: std::num::NonZeroU64,
+    ) -> Option<Self> {
+        let end_exclusive = offset.0.checked_add(length_in_bytes.get())?;
+        Some(PartialWriteOfAFile {
+            data_units_before,
+            size_before_in_bytes,
+            offset,
+            length_in_bytes,
+            end_exclusive,
+        })
+    }
+
+    /// 写的终点（不含）。
+    #[must_use]
+    pub const fn end_exclusive(self) -> FileOffsetInBytes {
+        FileOffsetInBytes(self.end_exclusive)
+    }
+
+    /// 写之后那条记录的 size。
+    #[must_use]
+    pub fn size_after_in_bytes(self) -> u64 {
+        self.size_before_in_bytes.max(self.end_exclusive)
+    }
+
+    /// 这次的字节落到的第一个单元（o）。
+    #[must_use]
+    pub fn first_written_unit(self) -> DataUnitIndexInFile {
+        DataUnitIndexInFile(self.offset.0 / payload_capacity_in_bytes())
+    }
+
+    /// 这次的字节落到的最后一个单元。
+    #[must_use]
+    pub fn last_written_unit(self) -> DataUnitIndexInFile {
+        DataUnitIndexInFile((self.end_exclusive - 1) / payload_capacity_in_bytes())
+    }
+
+    /// 写之后这个文件挂着几个单元（从 0 起连号）。
+    #[must_use]
+    pub fn data_units_after(self) -> u64 {
+        self.data_units_before.max(self.last_written_unit().0 + 1)
+    }
+
+    /// 这次从第几个单元起一起重写（到 [`Self::data_units_after`] 为止，见类型的文档）。
+    #[must_use]
+    pub fn first_rewritten_unit(self) -> DataUnitIndexInFile {
+        let first_written = self.first_written_unit().0;
+        if first_written < self.data_units_before {
+            return DataUnitIndexInFile(first_written);
+        }
+        match self.data_units_before.checked_sub(1) {
+            Some(last_existing)
+                if payload_length_within_a_size(last_existing, self.size_before_in_bytes)
+                    < payload_capacity_in_bytes() =>
+            {
+                DataUnitIndexInFile(last_existing)
+            }
+            Some(_) | None => DataUnitIndexInFile(self.data_units_before),
+        }
+    }
+
+    /// 这次重写的每个单元号，升序。
+    #[must_use]
+    pub fn rewritten_units(self) -> std::ops::Range<u64> {
+        self.first_rewritten_unit().0..self.data_units_after()
+    }
+
+    /// 第 `unit` 个单元写之后的声明长度：min(写之后的 size − 起点, 净荷)。
+    #[must_use]
+    pub fn declared_length_after_the_write(self, unit: DataUnitIndexInFile) -> u64 {
+        payload_length_within_a_size(unit.0, self.size_after_in_bytes())
+    }
+
+    /// 第 `unit` 个单元（在 [`Self::rewritten_units`] 里）这次怎么装。
+    ///
+    /// # Panics
+    /// `unit` 不在这次重写的那一段里：调用方只问那一段。
+    #[must_use]
+    pub fn data_unit(self, unit: DataUnitIndexInFile) -> DataUnitOfAPartialWrite {
+        assert!(
+            self.rewritten_units().contains(&unit.0),
+            "只问这次重写的那一段里的单元"
+        );
+        let payload_capacity = payload_capacity_in_bytes();
+        let unit_start = unit.0 * payload_capacity;
+        let unit_end_exclusive = unit_start + payload_capacity;
+        let is_written = self.offset.0 < unit_end_exclusive && unit_start < self.end_exclusive;
+        let is_covered_whole =
+            self.offset.0 <= unit_start && unit_end_exclusive <= self.end_exclusive;
+        let has_an_old_unit = unit.0 < self.data_units_before;
+        match (has_an_old_unit, is_written, is_covered_whole) {
+            (true, _, true) => DataUnitOfAPartialWrite::OldUnitCoveredWhole,
+            (true, _, false) => DataUnitOfAPartialWrite::OldUnitReadBack,
+            (false, false, _) => DataUnitOfAPartialWrite::GapFilledWithZeros,
+            (false, true, true) => DataUnitOfAPartialWrite::NewUnitCoveredWhole,
+            (false, true, false) => DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot,
+        }
+    }
+
+    /// 这次的字节落在第 `unit` 个单元净荷里的那一段（[`BytesOfTheWriteInOneUnit`]）；这次没写到它交回 `None`。
+    #[must_use]
+    pub fn bytes_written_into(self, unit: DataUnitIndexInFile) -> Option<BytesOfTheWriteInOneUnit> {
+        let payload_capacity = payload_capacity_in_bytes();
+        let unit_start = unit.0 * payload_capacity;
+        let unit_end_exclusive = unit_start + payload_capacity;
+        let from = self.offset.0.max(unit_start);
+        let until = self.end_exclusive.min(unit_end_exclusive);
+        (from < until).then(|| BytesOfTheWriteInOneUnit {
+            offset_in_the_payload: from - unit_start,
+            offset_in_the_bytes_written: from - self.offset.0,
+            length_in_bytes: until - from,
+        })
+    }
+}
+
+/// 一次按偏移的写落在一个单元里的那一段（[`PartialWriteOfAFile::bytes_written_into`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BytesOfTheWriteInOneUnit {
+    pub offset_in_the_payload: u64,
+    pub offset_in_the_bytes_written: u64,
+    pub length_in_bytes: u64,
+}
+
+/// 第 `unit` 个单元在 size 为 `size_in_bytes` 的文件里装几字节：min(size − 起点, 净荷)，起点在 size 之外是 0
+/// （与 `truncate::declared_length_within_a_size` 同一条式子；`truncate` 依赖这个模块，这里不反过来引它）。
+fn payload_length_within_a_size(unit: u64, size_in_bytes: u64) -> u64 {
+    let payload_capacity = payload_capacity_in_bytes();
+    size_in_bytes
+        .saturating_sub(unit.saturating_mul(payload_capacity))
+        .min(payload_capacity)
+}
+
 /// 一个数据单元装得下多少字节用户数据，换成 `u64`：唯一的来源是
 /// [`crate::unit::data_unit_payload_capacity`]，这里不另写一个数。
 fn payload_capacity_in_bytes() -> u64 {
@@ -365,5 +579,158 @@ mod tests {
             refused(2),
             "单元数与除法相等却声明有洞"
         );
+    }
+
+    fn payload() -> u64 {
+        payload_capacity_in_bytes()
+    }
+
+    fn partial_write(
+        data_units_before: u64,
+        size_before_in_bytes: u64,
+        offset: u64,
+        length_in_bytes: u64,
+    ) -> PartialWriteOfAFile {
+        PartialWriteOfAFile::new(
+            data_units_before,
+            size_before_in_bytes,
+            FileOffsetInBytes(offset),
+            std::num::NonZeroU64::new(length_in_bytes).expect("用例给的长度不是 0"),
+        )
+        .expect("用例的终点装得进 u64")
+    }
+
+    fn kinds_of_the_rewritten_units(write: PartialWriteOfAFile) -> Vec<DataUnitOfAPartialWrite> {
+        write
+            .rewritten_units()
+            .map(|unit| write.data_unit(DataUnitIndexInFile(unit)))
+            .collect()
+    }
+
+    /// 判决 m4-partial-write-r1 第二节 R2 逐格表与 R4：三个单元的文件改单元 1 中间 4 KiB，单元 1、2 一起重写、都读回旧单元；
+    /// 整单元盖满单元 1 时单元 1 不读、单元 2 照读；单元数与 size 不变。
+    #[test]
+    fn a_write_inside_existing_units_rewrites_every_unit_from_the_offset_and_reads_back_what_it_does_not_cover(
+    ) {
+        let size = 3 * payload() - 7;
+        let inside = partial_write(3, size, payload() + 100, 4096);
+        assert_eq!(inside.first_rewritten_unit(), DataUnitIndexInFile(1));
+        assert_eq!(inside.data_units_after(), 3);
+        assert_eq!(inside.size_after_in_bytes(), size);
+        assert_eq!(
+            kinds_of_the_rewritten_units(inside),
+            vec![
+                DataUnitOfAPartialWrite::OldUnitReadBack,
+                DataUnitOfAPartialWrite::OldUnitReadBack
+            ]
+        );
+        let covering_unit_one = partial_write(3, size, payload(), payload());
+        assert_eq!(
+            kinds_of_the_rewritten_units(covering_unit_one),
+            vec![
+                DataUnitOfAPartialWrite::OldUnitCoveredWhole,
+                DataUnitOfAPartialWrite::OldUnitReadBack
+            ],
+            "盖满单元 1 的净荷容量：不读它；单元 2 一起重写、照读"
+        );
+    }
+
+    /// 0 个单元的 inode（新建、size 0）写 4 KiB：单元 0 读残留；起点在第三个单元里：前两个补零、不读，第三个读残留。
+    #[test]
+    fn a_write_into_an_inode_without_units_reads_the_residue_of_the_units_it_writes_and_zeroes_the_gap(
+    ) {
+        let first_write = partial_write(0, 0, 0, 4096);
+        assert_eq!(first_write.first_rewritten_unit(), DataUnitIndexInFile(0));
+        assert_eq!(first_write.data_units_after(), 1);
+        assert_eq!(first_write.size_after_in_bytes(), 4096);
+        assert_eq!(
+            kinds_of_the_rewritten_units(first_write),
+            vec![DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot]
+        );
+        let past_a_gap = partial_write(0, 0, 2 * payload() + 5, 10);
+        assert_eq!(past_a_gap.data_units_after(), 3);
+        assert_eq!(
+            kinds_of_the_rewritten_units(past_a_gap),
+            vec![
+                DataUnitOfAPartialWrite::GapFilledWithZeros,
+                DataUnitOfAPartialWrite::GapFilledWithZeros,
+                DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot
+            ]
+        );
+        assert_eq!(
+            past_a_gap.declared_length_after_the_write(DataUnitIndexInFile(0)),
+            payload(),
+            "空隙补整单元零"
+        );
+        assert_eq!(
+            past_a_gap.declared_length_after_the_write(DataUnitIndexInFile(2)),
+            15
+        );
+    }
+
+    /// 写落在最后一个存在的单元之后：它满一个净荷就不重写（从写之前的单元数起），不满就从它起、按已有单元读回；洞里写换不了 size。
+    #[test]
+    fn a_write_after_the_last_existing_unit_rewrites_that_unit_only_when_it_is_not_full() {
+        let after_a_full_unit = partial_write(1, payload(), payload(), 10);
+        assert_eq!(
+            after_a_full_unit.first_rewritten_unit(),
+            DataUnitIndexInFile(1)
+        );
+        assert_eq!(
+            kinds_of_the_rewritten_units(after_a_full_unit),
+            vec![DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot]
+        );
+        let after_a_short_unit = partial_write(1, 3000, payload() + 7, 10);
+        assert_eq!(
+            after_a_short_unit.first_rewritten_unit(),
+            DataUnitIndexInFile(0)
+        );
+        assert_eq!(after_a_short_unit.size_after_in_bytes(), payload() + 17);
+        assert_eq!(
+            kinds_of_the_rewritten_units(after_a_short_unit),
+            vec![
+                DataUnitOfAPartialWrite::OldUnitReadBack,
+                DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot
+            ],
+            "末尾单元要补满：按已有单元读回"
+        );
+        let into_the_hole = partial_write(1, 3 * payload(), 2 * payload() + 1, 10);
+        assert_eq!(into_the_hole.first_rewritten_unit(), DataUnitIndexInFile(1));
+        assert_eq!(into_the_hole.data_units_after(), 3);
+        assert_eq!(into_the_hole.size_after_in_bytes(), 3 * payload());
+        assert_eq!(
+            kinds_of_the_rewritten_units(into_the_hole),
+            vec![
+                DataUnitOfAPartialWrite::GapFilledWithZeros,
+                DataUnitOfAPartialWrite::NewUnitReadingTheResidueOfItsSlot
+            ]
+        );
+    }
+
+    /// 终点越过 u64 不成计划；跨单元的写在两个单元里各落一段。
+    #[test]
+    fn the_end_of_a_write_past_u64_is_refused_and_a_write_across_a_boundary_lands_in_two_units() {
+        assert_eq!(
+            PartialWriteOfAFile::new(1, 0, FileOffsetInBytes(u64::MAX), std::num::NonZeroU64::MIN),
+            None
+        );
+        let across = partial_write(3, 3 * payload(), payload() - 4, 10);
+        assert_eq!(
+            across.bytes_written_into(DataUnitIndexInFile(0)),
+            Some(BytesOfTheWriteInOneUnit {
+                offset_in_the_payload: payload() - 4,
+                offset_in_the_bytes_written: 0,
+                length_in_bytes: 4
+            })
+        );
+        assert_eq!(
+            across.bytes_written_into(DataUnitIndexInFile(1)),
+            Some(BytesOfTheWriteInOneUnit {
+                offset_in_the_payload: 0,
+                offset_in_the_bytes_written: 4,
+                length_in_bytes: 6
+            })
+        );
+        assert_eq!(across.bytes_written_into(DataUnitIndexInFile(2)), None);
     }
 }

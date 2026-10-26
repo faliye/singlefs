@@ -11,7 +11,9 @@
 
 use std::collections::BTreeMap;
 
-use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
+use singlefs_checker::image::{
+    system_configuration_redundancy_report, ImageReader, InvariantVerdict, IMPLEMENTED_INVARIANTS,
+};
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::recovery::{RecoveryFailure, RecoveryOutcome};
 
@@ -20,6 +22,7 @@ use crate::crash::{
     CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER, CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER,
     RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT, RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
+use crate::crash_point_replay_provenance::DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage;
 
 // ============================== 红项的编码 ==============================
 
@@ -51,33 +54,111 @@ pub fn red_items_of_the_encoded_verdict(vector: &EncodedVerdictVector) -> Vec<St
 
 // ============================== 恢复字 ==============================
 
-/// 每个状态的恢复字有几个：看 journal 与不看 journal 两遍，各自落到的根两个字（实例代号、checkpoint_txg 低 32 位）、结局、失败点。
-pub const RECOVERY_WORDS_PER_STATE: usize = 8;
+/// 一遍恢复在恢复字里占几个字：落到的根（[`LANDED_ROOT_WORDS`] 个字：落没落到根的标记、实例代号、checkpoint_txg 低 32 位与高 32 位）、
+/// 走读结局、失败点。
+pub const RECOVERY_WORDS_PER_PASS: usize = LANDED_ROOT_WORDS + 2;
 
-/// 一个状态的恢复字（判定向量里的红项之外，第二轮判决 L1-6、L1-8）：存进恢复字旁表、不进判定向量编号；八个字的次序见
-/// [`recovery_words_of_the_cross_check_words`]。
+/// 每个状态的恢复字有几个：看 journal 与不看 journal 两遍，各 [`RECOVERY_WORDS_PER_PASS`] 个字（用户 2026-10-24 定 checkpoint_txg「存完整 u64」，
+/// `records/2026-10-24-singlefs-checker-tier-审计复核.md` 的 T01：原先每遍只存实例代号与 checkpoint_txg 低 32 位，共八个字）。
+pub const RECOVERY_WORDS_PER_STATE: usize = 2 * RECOVERY_WORDS_PER_PASS;
+
+/// 一个状态的恢复字（判定向量里的红项之外，第二轮判决 L1-6、L1-8）：存进恢复字旁表、不进判定向量编号；字的次序见
+/// [`RecoveryWordsOfState::of_the_two_passes`]，按遍取用 [`RecoveryWordsOfState::consulted_pass`]、[`RecoveryWordsOfState::ignored_pass`]，
+/// 不按下标挑字。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecoveryWordsOfState(pub [u32; RECOVERY_WORDS_PER_STATE]);
 
-/// 一个状态在对拍里比的那几个字里，存进恢复字旁表的八个：两遍各自落到的根（实例代号、checkpoint_txg 低 32 位）、走读结局、失败点
-/// （看 journal 那一遍在前；第二轮判决 L1-6、L1-8，第三轮判决 J6）。红项在判定向量里，判到位进计数向量，不在这八个字里。
-#[must_use]
-pub fn recovery_words_of_the_cross_check_words(words: &CrossCheckWords) -> RecoveryWordsOfState {
-    RecoveryWordsOfState([
-        words.consulted_pass_landed_root.instance,
-        words.consulted_pass_landed_root.checkpoint_txg_low,
-        words.consulted_pass_outcome,
-        words.consulted_pass_failure_point,
-        words.ignored_pass_landed_root.instance,
-        words.ignored_pass_landed_root.checkpoint_txg_low,
-        words.ignored_pass_outcome,
-        words.ignored_pass_failure_point,
-    ])
+/// 一遍恢复在恢复字里的那几个字：落到的根、走读结局码、失败点码（[`gpu_failure_point_code`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RecoveryWordsOfAPass {
+    pub landed_root: LandedRootWords,
+    pub outcome: u32,
+    pub failure_point: u32,
 }
 
-/// 两遍恢复（看 journal 与不看 journal）落到的根、结局码或失败点有没有不同：崩溃点重放计数 `journal_differing_states` 的判据，CPU 现判
-/// （`crash` 的取样路径、E161 装置）与从库里的恢复字重建（`crash_state_enumeration`）都按这八个字比，GPU 判过的块重建出同一个数。
-/// 读到的内容不进恢复字，两遍都读到文件、根相同而内容不同的状态不算（那是 oracle 的红，另计）。
+impl RecoveryWordsOfAPass {
+    /// 这一遍的字：落到的根那几个字（[`LandedRootWords::words`] 的次序）、结局、失败点。
+    #[must_use]
+    pub fn words(self) -> [u32; RECOVERY_WORDS_PER_PASS] {
+        let landed_root = self.landed_root.words();
+        std::array::from_fn(|position| {
+            if position < LANDED_ROOT_WORDS {
+                landed_root[position]
+            } else if position == LANDED_ROOT_WORDS {
+                self.outcome
+            } else {
+                self.failure_point
+            }
+        })
+    }
+
+    /// [`Self::words`] 的逆。
+    #[must_use]
+    pub fn of_the_words(words: [u32; RECOVERY_WORDS_PER_PASS]) -> Self {
+        Self {
+            landed_root: LandedRootWords::of_the_words(std::array::from_fn(|position| {
+                words[position]
+            })),
+            outcome: words[LANDED_ROOT_WORDS],
+            failure_point: words[LANDED_ROOT_WORDS + 1],
+        }
+    }
+}
+
+impl RecoveryWordsOfState {
+    /// 两遍的字接起来：看 journal 那一遍在前、不看 journal 那一遍在后，各是 [`RecoveryWordsOfAPass::words`]。
+    #[must_use]
+    pub fn of_the_two_passes(
+        consulted: RecoveryWordsOfAPass,
+        ignored: RecoveryWordsOfAPass,
+    ) -> Self {
+        let consulted_words = consulted.words();
+        let ignored_words = ignored.words();
+        Self(std::array::from_fn(|position| {
+            if position < RECOVERY_WORDS_PER_PASS {
+                consulted_words[position]
+            } else {
+                ignored_words[position - RECOVERY_WORDS_PER_PASS]
+            }
+        }))
+    }
+
+    /// 看 journal 那一遍的字。
+    #[must_use]
+    pub fn consulted_pass(self) -> RecoveryWordsOfAPass {
+        RecoveryWordsOfAPass::of_the_words(std::array::from_fn(|position| self.0[position]))
+    }
+
+    /// 不看 journal 那一遍的字。
+    #[must_use]
+    pub fn ignored_pass(self) -> RecoveryWordsOfAPass {
+        RecoveryWordsOfAPass::of_the_words(std::array::from_fn(|position| {
+            self.0[RECOVERY_WORDS_PER_PASS + position]
+        }))
+    }
+}
+
+/// 一个状态在对拍里比的那几个字里，存进恢复字旁表的那几个：两遍各自落到的根（落没落到根的标记、实例代号、checkpoint_txg 低 32 位与高 32 位）、
+/// 走读结局、失败点（看 journal 那一遍在前；第二轮判决 L1-6、L1-8，第三轮判决 J6）。红项在判定向量里，判到位进计数向量，不在恢复字里。
+#[must_use]
+pub fn recovery_words_of_the_cross_check_words(words: &CrossCheckWords) -> RecoveryWordsOfState {
+    RecoveryWordsOfState::of_the_two_passes(
+        RecoveryWordsOfAPass {
+            landed_root: words.consulted_pass_landed_root,
+            outcome: words.consulted_pass_outcome,
+            failure_point: words.consulted_pass_failure_point,
+        },
+        RecoveryWordsOfAPass {
+            landed_root: words.ignored_pass_landed_root,
+            outcome: words.ignored_pass_outcome,
+            failure_point: words.ignored_pass_failure_point,
+        },
+    )
+}
+
+/// 两遍恢复（看 journal 与不看 journal）落到的根（实例代号与完整的 checkpoint_txg）、结局码或失败点有没有不同：崩溃点重放计数
+/// `journal_differing_states` 的判据，CPU 现判（`crash` 的取样路径、E161 装置）与从库里的恢复字重建（`crash_state_enumeration`）都按恢复字比，
+/// GPU 判过的块重建出同一个数。读到的内容不进恢复字，两遍都读到文件、根相同而内容不同的状态不算（那是 oracle 的红，另计）。
 #[must_use]
 pub fn recovery_passes_differ(
     consulted: &singlefs_core::recovery::RecoveryReport,
@@ -92,7 +173,7 @@ pub fn recovery_passes_differ(
 }
 
 impl CrashStateJudgement {
-    /// CPU 判器这个状态的恢复字（[`cross_check_words_of_cpu_judgement`] 换出来的那几个字里的八个）：GPU 判器同一个状态的那一份由
+    /// CPU 判器这个状态的恢复字（[`cross_check_words_of_cpu_judgement`] 换出来的那几个字里存进恢复字旁表的那几个）：GPU 判器同一个状态的那一份由
     /// `crate::crash_judge_gpu` 从结论字换出来，两份逐字比（第三轮判决 J6 的对照）。
     #[must_use]
     pub fn recovery_words(&self) -> RecoveryWordsOfState {
@@ -278,7 +359,7 @@ gpu_failure_points! {
     GPU_FAILURE_POINT_UNIT_UNREADABLE = 9,
     GPU_FAILURE_POINT_UNIT_MALFORMED = 10,
     GPU_FAILURE_POINT_INVARIANT_VIOLATED = 11,
-    GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE = 12,
+    GPU_FAILURE_POINT_ENTRY_WIDTH_DIFFERS_FROM_ITS_FIELD_TABLE = 12,
     GPU_FAILURE_POINT_INODE_NUMBER_WATERMARK_ROW_MISSING_FROM_THE_ACCOUNTING_TREE = 13,
     GPU_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY = 14,
     GPU_FAILURE_POINT_MAPPING_MISS = 15,
@@ -314,8 +395,8 @@ pub fn gpu_failure_point_code(failure: &RecoveryFailure) -> u32 {
         RecoveryFailure::UnitUnreadable { .. } => GPU_FAILURE_POINT_UNIT_UNREADABLE,
         RecoveryFailure::UnitMalformed { .. } => GPU_FAILURE_POINT_UNIT_MALFORMED,
         RecoveryFailure::InvariantViolated { .. } => GPU_FAILURE_POINT_INVARIANT_VIOLATED,
-        RecoveryFailure::EntryNarrowerThanItsFieldTable { .. } => {
-            GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE
+        RecoveryFailure::EntryWidthDiffersFromItsFieldTable { .. } => {
+            GPU_FAILURE_POINT_ENTRY_WIDTH_DIFFERS_FROM_ITS_FIELD_TABLE
         }
         RecoveryFailure::InodeNumberWatermarkRowMissingFromTheAccountingTree => {
             GPU_FAILURE_POINT_INODE_NUMBER_WATERMARK_ROW_MISSING_FROM_THE_ACCOUNTING_TREE
@@ -332,7 +413,8 @@ pub fn gpu_failure_point_code(failure: &RecoveryFailure) -> u32 {
 }
 
 /// 一个状态在对拍里比的那几个字（判决 `research/prompts/m3-crash-enumeration-merge-r3-main-verification.md` 第三节 J6，用户 2026-10-10 定失败点这一版就比）：
-/// 红项（两遍 oracle 与记录核对器的红位、池级 checker 的违例位）、两遍各自落到的根（实例代号、checkpoint_txg 低 32 位；没落到根时两个都是 `u32::MAX`）、
+/// 红项（两遍 oracle 与记录核对器的红位、池级 checker 的违例位）、两遍各自落到的根（[`LandedRootWords`]：落没落到根的标记、实例代号、
+/// checkpoint_txg 低 32 位与高 32 位）、
 /// 两遍的走读结局与失败点（[`gpu_failure_point_code`]）、池级 checker 逐条判到位、GPU 判不了。GPU 那一侧由 `crate::crash_judge_gpu::cross_check_words_of_gpu_verdict`（挂 `gpu` 特性）、
 /// CPU 那一侧由 [`cross_check_words_of_cpu_judgement`] 换出来，两份经 [`cross_check_words_agree_in_the_cross_check`] 去掉内核不置位的那几位之后逐字段相等才算对上
 /// （CPU 那一侧判不了恒为假：GPU 判不了的状态对不上）。
@@ -359,33 +441,93 @@ pub struct CrossCheckWords {
     pub gpu_could_not_judge: bool,
 }
 
-/// 一遍恢复落到的根在结论里的两个字：实例代号、checkpoint_txg 低 32 位；没落到根时两个都是 `u32::MAX`。
+/// 一遍恢复落到的根在结论里占几个字（[`LandedRootWords::words`]）。
+pub const LANDED_ROOT_WORDS: usize = 4;
+
+/// 一遍恢复落到的根在结论里的四个字：落没落到根的标记（[`LandedRootWords::LANDED_ON_A_ROOT`] 或 [`LandedRootWords::LANDED_ON_NO_ROOT`]）、
+/// 实例代号、checkpoint_txg 低 32 位与高 32 位（用户 2026-10-24 定「存完整 u64」，`records/2026-10-24-singlefs-checker-tier-审计复核.md` 的 T01：
+/// 只存低 32 位时同实例、低 32 位相同的两条根在对拍、恢复字与判定库里分不开）。没落到根是 [`LandedRootWords::NOT_LANDED`]。
+/// 标记单占一个字，不拿实例代号与 checkpoint_txg 的哪一组值当「没落到」：两样都是盘上读来的（坏镜像、外来镜像上实例代号可以是 `u32::MAX`、
+/// checkpoint_txg 可以是 `u64::MAX`，`singlefs_core::transaction::InstanceGenerationPastTheTopOfItsRange` 那一条），落到这样一条根与没落到根照样分得开。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LandedRootWords {
+    pub landed_marker: u32,
     pub instance: u32,
     pub checkpoint_txg_low: u32,
+    pub checkpoint_txg_high: u32,
 }
 
 impl LandedRootWords {
-    /// 没落到根（择不到系统配置或根、重放在施加任何记录之前停下）。
+    /// 标记那一字：这一遍落到了一条根。
+    pub const LANDED_ON_A_ROOT: u32 = 1;
+    /// 标记那一字：这一遍没落到根（择不到系统配置或根、重放在施加任何记录之前停下）。
+    pub const LANDED_ON_NO_ROOT: u32 = 0;
+
+    /// 没落到根：标记是 [`Self::LANDED_ON_NO_ROOT`]，另三个字都是 `u32::MAX`（GPU 恢复内核写的也是这一组）。
     pub const NOT_LANDED: Self = Self {
+        landed_marker: Self::LANDED_ON_NO_ROOT,
         instance: u32::MAX,
         checkpoint_txg_low: u32::MAX,
+        checkpoint_txg_high: u32::MAX,
     };
+
+    /// 落到 (`instance`, `checkpoint_txg`) 那条根：checkpoint_txg 拆成低 32 位与高 32 位两个字。
+    #[must_use]
+    pub fn of_the_landed_root(instance: InstanceGeneration, checkpoint_txg: CheckpointTxg) -> Self {
+        Self {
+            landed_marker: Self::LANDED_ON_A_ROOT,
+            instance: instance.0,
+            checkpoint_txg_low: u32::try_from(checkpoint_txg.0 & 0xFFFF_FFFF)
+                .expect("与 0xFFFF_FFFF 按位与之后装得进 u32"),
+            checkpoint_txg_high: u32::try_from(checkpoint_txg.0 >> 32)
+                .expect("右移 32 位之后装得进 u32"),
+        }
+    }
+
+    /// 落到的那条根（实例代号与完整的 checkpoint_txg）；标记不是 [`Self::LANDED_ON_A_ROOT`] 的（没落到根，或 GPU 写了别的值）交 `None`。
+    #[must_use]
+    pub fn landed_root(self) -> Option<(InstanceGeneration, CheckpointTxg)> {
+        if self.landed_marker != Self::LANDED_ON_A_ROOT {
+            return None;
+        }
+        Some((
+            InstanceGeneration(self.instance),
+            CheckpointTxg(
+                (u64::from(self.checkpoint_txg_high) << 32) | u64::from(self.checkpoint_txg_low),
+            ),
+        ))
+    }
+
+    /// 这四个字按存放的次序：标记、实例代号、checkpoint_txg 低 32 位、高 32 位（恢复字与对拍结论都照这个次序摊）。
+    #[must_use]
+    pub fn words(self) -> [u32; LANDED_ROOT_WORDS] {
+        [
+            self.landed_marker,
+            self.instance,
+            self.checkpoint_txg_low,
+            self.checkpoint_txg_high,
+        ]
+    }
+
+    /// [`Self::words`] 的逆。
+    #[must_use]
+    pub fn of_the_words(words: [u32; LANDED_ROOT_WORDS]) -> Self {
+        let [landed_marker, instance, checkpoint_txg_low, checkpoint_txg_high] = words;
+        Self {
+            landed_marker,
+            instance,
+            checkpoint_txg_low,
+            checkpoint_txg_high,
+        }
+    }
 }
 
-/// 一遍恢复的报告换成落到的根那两个字：`effective_root`（施加 journal 之后实际走的那条根；退回见证到的那一版时是退到的那一版）。
+/// 一遍恢复的报告换成落到的根那四个字：`effective_root`（施加 journal 之后实际走的那条根；退回见证到的那一版时是退到的那一版）。
 fn landed_root_words_of(
-    effective_root: Option<(
-        singlefs_core::address::InstanceGeneration,
-        singlefs_core::address::CheckpointTxg,
-    )>,
+    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> LandedRootWords {
     effective_root.map_or(LandedRootWords::NOT_LANDED, |(instance, checkpoint_txg)| {
-        LandedRootWords {
-            instance: instance.0,
-            checkpoint_txg_low: u32::try_from(checkpoint_txg.0 & 0xFFFF_FFFF).expect("低 32 位"),
-        }
+        LandedRootWords::of_the_landed_root(instance, checkpoint_txg)
     })
 }
 
@@ -808,10 +950,10 @@ pub const SCAN_REBUILD_OUTCOMES: [ScanRebuildOutcome; 30] = [
         ),
     },
     ScanRebuildOutcome {
-        constant_name: "SCAN_REBUILD_OUTCOME_DATA_UNIT_VERSIONS_TIED_ON_THE_WRITE_ORDER",
+        constant_name: "SCAN_REBUILD_OUTCOME_DATA_UNIT_VERSIONS_TIED_ON_THE_TOTAL_ORDER_KEY",
         code: 16,
         verdict_of_the_pool_checker: ScanRebuildVerdictOfThePoolChecker::NotApplicable(
-            "扫描重建：码 1 同一对象身份上两版写序逐字节相同，C113 定案 P3 择写序最大者择不出，码 1 的全序键停在 C464（I-1.8 对码 1 的全序键写窄了）",
+            "扫描重建：码 1 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同，I-1.8 ② 不成立，择不出当前版本",
         ),
     },
     ScanRebuildOutcome {
@@ -1097,23 +1239,17 @@ pub fn cross_check_words_of_a_stored_given_state(
             }
         }
     }
-    let [consulted_instance, consulted_txg_low, consulted_pass_outcome, consulted_pass_failure_point, ignored_instance, ignored_txg_low, ignored_pass_outcome, ignored_pass_failure_point] =
-        recovery_words.0;
+    let consulted_pass = recovery_words.consulted_pass();
+    let ignored_pass = recovery_words.ignored_pass();
     Ok(CrossCheckWords {
         red_bits,
         pool_checker_violated_bits,
-        consulted_pass_landed_root: LandedRootWords {
-            instance: consulted_instance,
-            checkpoint_txg_low: consulted_txg_low,
-        },
-        ignored_pass_landed_root: LandedRootWords {
-            instance: ignored_instance,
-            checkpoint_txg_low: ignored_txg_low,
-        },
-        consulted_pass_outcome,
-        ignored_pass_outcome,
-        consulted_pass_failure_point,
-        ignored_pass_failure_point,
+        consulted_pass_landed_root: consulted_pass.landed_root,
+        ignored_pass_landed_root: ignored_pass.landed_root,
+        consulted_pass_outcome: consulted_pass.outcome,
+        ignored_pass_outcome: ignored_pass.outcome,
+        consulted_pass_failure_point: consulted_pass.failure_point,
+        ignored_pass_failure_point: ignored_pass.failure_point,
         pool_checker_judged_bits: 0,
         scan_rebuild_outcome: SCAN_REBUILD_OUTCOME_NOT_REACHED,
         gpu_could_not_judge: false,
@@ -1231,6 +1367,81 @@ pub fn abandoned_roots_named_in_a_pool_checker_detail(
     named
 }
 
+// ============================== 两槽全废盘面观察者在判段那一判（逐盘自证过的系统配置槽数对基镜像） ==============================
+
+/// 一张镜像上逐盘自证过的系统配置槽数（盘按读者列盘的次序，(盘, 槽数)，槽数 0、1、2）：取池级 checker 的逐盘数
+/// （`singlefs_checker::image::system_configuration_redundancy_report`：两槽都没自证过的盘 0、只少一槽的 1、别的 2；「自证过」= magic 与整槽校验和都对，
+/// 不分 fsid，自证过而不可择的、带这一版读者不收之值的也算，同 I-8.5）。GPU 走读内核那一字
+/// （`crate::crash_judge_gpu::SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD`）的 CPU 参照：对拍用例逐状态比两边；
+/// 判段拿它算流的基镜像那一份（基镜像不是崩溃状态，不上卡），没配 GPU 时 CPU 判器那一路逐状态交回的也是它（`crate::crash_amplification` 判一块那一处）。
+/// 判镜像的定义那一组判法单元（`judgement_of_the_crash_images`，`crate::judging_units_entries`）收它当入口：判器交回的逐盘槽数随结论块存，定义变了结论与它一起重判。
+// cpu-reference-for-gpu-comparison
+#[must_use]
+pub fn self_verified_system_configuration_slots_of_each_device(
+    image: &dyn ImageReader,
+) -> Vec<(u32, u32)> {
+    let report = system_configuration_redundancy_report(image);
+    image
+        .devices()
+        .into_iter()
+        .map(|device| {
+            let self_verified_slots = if report
+                .devices_without_a_self_verified_slot
+                .contains(&device)
+            {
+                0
+            } else if report
+                .devices_with_fewer_than_two_self_verified_slots
+                .contains(&device)
+            {
+                1
+            } else {
+                2
+            };
+            (device, self_verified_slots)
+        })
+        .collect()
+}
+
+/// 两槽全废盘面观察者在判段那一判（G4 第三轮判决丙-置，用户 2026-10-22 定「按流登记+相对基镜像」与「你做你的 GPU版让GPU去做」）：
+/// 崩溃镜像上逐盘自证过的系统配置槽数（GPU 走读内核交的那一字，或 [`self_verified_system_configuration_slots_of_each_device`] 算的）对这条流基镜像上的
+/// 逐盘数，只记新出现的死盘——基镜像上还有自证过的槽、崩溃镜像上一个都没有的盘，盘按崩溃镜像那一份的次序；池里每块盘都一个没有的（全池皆废）交 I-8.5、
+/// 不重记。观察者在判段经 `crate::crash_point_replay_provenance::observe_the_devices_without_a_self_verified_system_configuration_slot` 调它
+/// （录入段对这个观察者什么都不跑）。
+#[must_use]
+pub fn devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
+    slots_of_each_device_on_the_crash_image: &[(u32, u32)],
+    slots_of_each_device_on_the_base_image: &[(u32, u32)],
+) -> DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage {
+    let devices_without_a_self_verified_slot = |slots_of_each_device: &[(u32, u32)]| -> Vec<u32> {
+        slots_of_each_device
+            .iter()
+            .filter(|(_device, self_verified_slots)| *self_verified_slots == 0)
+            .map(|(device, _self_verified_slots)| *device)
+            .collect()
+    };
+    let without_a_self_verified_slot_on_the_crash_image =
+        devices_without_a_self_verified_slot(slots_of_each_device_on_the_crash_image);
+    if without_a_self_verified_slot_on_the_crash_image.len()
+        == slots_of_each_device_on_the_crash_image.len()
+    {
+        return DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::EveryDeviceLeftToTheTailSlotInvariant;
+    }
+    let without_a_self_verified_slot_on_the_base_image =
+        devices_without_a_self_verified_slot(slots_of_each_device_on_the_base_image);
+    let new_against_the_base_image: Vec<u32> = without_a_self_verified_slot_on_the_crash_image
+        .into_iter()
+        .filter(|device| !without_a_self_verified_slot_on_the_base_image.contains(device))
+        .collect();
+    if new_against_the_base_image.is_empty() {
+        DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::NoneNew
+    } else {
+        DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::New(
+            new_against_the_base_image,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1329,10 +1540,10 @@ mod tests {
                 | (1 << verdict_bits::CONSULTED_ORACLE_FIRST)
                 | (1 << (verdict_bits::IGNORED_ORACLE_FIRST + 6)),
             pool_checker_violated_bits: (1u128 << 0) | (1u128 << 2),
-            consulted_pass_landed_root: LandedRootWords {
-                instance: 3,
-                checkpoint_txg_low: 9,
-            },
+            consulted_pass_landed_root: LandedRootWords::of_the_landed_root(
+                InstanceGeneration(3),
+                CheckpointTxg((5 << 32) | 9),
+            ),
             ignored_pass_landed_root: LandedRootWords::NOT_LANDED,
             consulted_pass_outcome: RECOVERY_OUTCOME_CODE_FILE_READ,
             ignored_pass_outcome: RECOVERY_OUTCOME_CODE_FAILED,
@@ -1467,18 +1678,18 @@ mod tests {
         );
     }
 
-    /// J8、M4 第 8 条：失败点码表不挂 `gpu` 特性；恢复字八个字的次序是看 journal 那一遍落到的根两个字、结局、失败点，
-    /// 再是不看 journal 那一遍的同四样（这一份用例在不编 `gpu` 特性的库单测里也跑）。
+    /// J8、M4 第 8 条：失败点码表不挂 `gpu` 特性；恢复字的次序是看 journal 那一遍落到的根四个字（标记、实例代号、checkpoint_txg 低 32 位与
+    /// 高 32 位）、结局、失败点，再是不看 journal 那一遍的同六样（这一份用例在不编 `gpu` 特性的库单测里也跑）。
     #[test]
     fn the_recovery_words_of_a_state_are_the_two_passes_roots_outcomes_and_failure_points_without_the_gpu_feature(
     ) {
         let words = CrossCheckWords {
             red_bits: 0,
             pool_checker_violated_bits: 0,
-            consulted_pass_landed_root: LandedRootWords {
-                instance: 2,
-                checkpoint_txg_low: 7,
-            },
+            consulted_pass_landed_root: LandedRootWords::of_the_landed_root(
+                InstanceGeneration(2),
+                CheckpointTxg((3 << 32) | 7),
+            ),
             ignored_pass_landed_root: LandedRootWords::NOT_LANDED,
             consulted_pass_outcome: RECOVERY_OUTCOME_CODE_FILE_READ,
             ignored_pass_outcome: RECOVERY_OUTCOME_CODE_FAILED,
@@ -1491,10 +1702,14 @@ mod tests {
         assert_eq!(
             recovery_words_of_the_cross_check_words(&words),
             RecoveryWordsOfState([
+                LandedRootWords::LANDED_ON_A_ROOT,
                 2,
                 7,
+                3,
                 RECOVERY_OUTCOME_CODE_FILE_READ,
                 GPU_FAILURE_POINT_NONE,
+                LandedRootWords::LANDED_ON_NO_ROOT,
+                u32::MAX,
                 u32::MAX,
                 u32::MAX,
                 RECOVERY_OUTCOME_CODE_FAILED,
@@ -1520,6 +1735,164 @@ mod tests {
             mapping_fallbacks: 0,
             devices_without_a_mountable_system_configuration_slot: Vec::new(),
         }
+    }
+
+    /// 一遍落到 `effective_root` 的恢复（结局与失败点同 [`recovery_report_that_chose_no_root`]：下面几条用例只看落到的根）。
+    fn recovery_report_that_landed_on(
+        effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
+    ) -> singlefs_core::recovery::RecoveryReport {
+        let mut report = recovery_report_that_chose_no_root();
+        report.effective_root = effective_root;
+        report
+    }
+
+    /// 两遍各落到给定的根时，CPU 两个构造函数换出的对拍字（崩溃点重放那一份、给定状态那一份），池级 checker 一条都不报。
+    fn cross_check_words_of_both_cpu_constructors_landed_on(
+        consulted_root: Option<(InstanceGeneration, CheckpointTxg)>,
+        ignored_root: Option<(InstanceGeneration, CheckpointTxg)>,
+    ) -> [CrossCheckWords; 2] {
+        let judgement = CrashStateJudgement {
+            consulted: recovery_report_that_landed_on(consulted_root),
+            ignored: recovery_report_that_landed_on(ignored_root),
+            root_persisted: false,
+            consulted_oracle: None,
+            ignored_oracle: None,
+            pool_checker: Vec::new(),
+            records: singlefs_harness::memory_pool::RecordCheck::default(),
+        };
+        [
+            cross_check_words_of_cpu_judgement(&judgement),
+            cross_check_words_of_a_given_state(
+                &recovery_report_that_landed_on(consulted_root),
+                &recovery_report_that_landed_on(ignored_root),
+                &[],
+                singlefs_harness::memory_pool::RecordCheck::default(),
+                ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery,
+            ),
+        ]
+    }
+
+    /// 两条根（或没落到根）在对拍与恢复字里分不分得开：两遍都落到 `left` 的那一份与两遍都落到 `right` 的那一份，CPU 两个构造函数各比一次——
+    /// 对拍字不同、对拍比较判对不上、恢复字不同；一个状态看 journal 那一遍落到 `left`、不看那一遍落到 `right`，判两遍不同。
+    /// `scenario` 是这一对的说法，写进断言消息。
+    fn assert_the_two_landings_are_told_apart(
+        left: Option<(InstanceGeneration, CheckpointTxg)>,
+        right: Option<(InstanceGeneration, CheckpointTxg)>,
+        scenario: &str,
+    ) {
+        let left_words = cross_check_words_of_both_cpu_constructors_landed_on(left, left);
+        let right_words = cross_check_words_of_both_cpu_constructors_landed_on(right, right);
+        for (left_of_the_constructor, right_of_the_constructor) in
+            left_words.iter().zip(&right_words)
+        {
+            assert_ne!(
+                left_of_the_constructor, right_of_the_constructor,
+                "{scenario}：{left:?} 与 {right:?} 的对拍字相同"
+            );
+            assert!(
+                !cross_check_words_agree_in_the_cross_check(
+                    left_of_the_constructor,
+                    right_of_the_constructor
+                ),
+                "{scenario}：{left:?} 与 {right:?} 在对拍比较里判对得上"
+            );
+            assert_ne!(
+                recovery_words_of_the_cross_check_words(left_of_the_constructor),
+                recovery_words_of_the_cross_check_words(right_of_the_constructor),
+                "{scenario}：{left:?} 与 {right:?} 的恢复字相同"
+            );
+        }
+        assert!(
+            recovery_passes_differ(
+                &recovery_report_that_landed_on(left),
+                &recovery_report_that_landed_on(right)
+            ),
+            "{scenario}：看 journal 那一遍落到 {left:?}、不看那一遍落到 {right:?}，判成两遍相同"
+        );
+    }
+
+    /// 审计复核 T01（`records/2026-10-24-singlefs-checker-tier-审计复核.md`，用户 2026-10-24 定「存完整 u64」）：同一个实例、checkpoint_txg
+    /// 低 32 位相同（0、1、7、`u32::MAX`）而高 32 位不同（0 对 1、2、`0xFFFF_FFFF`）的两条根，十二对都分得开——对拍字、对拍比较、恢复字、
+    /// 两遍恢复相不相同那一判。
+    #[test]
+    fn two_roots_of_one_instance_whose_checkpoint_txgs_differ_only_in_the_high_thirty_two_bits_are_told_apart(
+    ) {
+        for low in [0u64, 1, 7, u64::from(u32::MAX)] {
+            for high in [1u64, 2, 0xFFFF_FFFF] {
+                assert_the_two_landings_are_told_apart(
+                    Some((InstanceGeneration(1), CheckpointTxg(low))),
+                    Some((InstanceGeneration(1), CheckpointTxg((high << 32) | low))),
+                    &format!("低 32 位 {low}、高 32 位 0 对 {high}"),
+                );
+            }
+        }
+    }
+
+    /// T01：checkpoint_txg 2^32 − 1 与 2^32（低 32 位一个全 1、一个全 0，跨过低 32 位的进位）分得开。
+    #[test]
+    fn the_checkpoint_txg_just_below_two_to_the_thirty_second_and_two_to_the_thirty_second_are_told_apart(
+    ) {
+        assert_the_two_landings_are_told_apart(
+            Some((InstanceGeneration(1), CheckpointTxg((1 << 32) - 1))),
+            Some((InstanceGeneration(1), CheckpointTxg(1 << 32))),
+            "2^32 − 1 对 2^32",
+        );
+    }
+
+    /// T01：没落到根与落到一条实例代号 `u32::MAX`、checkpoint_txg `u64::MAX` 的根（坏镜像、外来镜像才有，每个字都与没落到根的那一组相同，
+    /// 只差标记）分得开；落到的那条根读得回完整的实例代号与 checkpoint_txg，没落到根读回 `None`。
+    #[test]
+    fn landing_on_no_root_and_landing_on_the_root_whose_every_word_is_at_its_maximum_are_told_apart(
+    ) {
+        let root_at_the_maximum = (InstanceGeneration(u32::MAX), CheckpointTxg(u64::MAX));
+        assert_the_two_landings_are_told_apart(
+            None,
+            Some(root_at_the_maximum),
+            "没落到根对最大的那条根",
+        );
+        assert_eq!(
+            landed_root_words_of(Some(root_at_the_maximum)).landed_root(),
+            Some(root_at_the_maximum),
+            "落到的那条根读得回"
+        );
+        assert_eq!(
+            landed_root_words_of(None),
+            LandedRootWords::NOT_LANDED,
+            "没落到根换出的是没落到那一组"
+        );
+        assert_eq!(
+            LandedRootWords::NOT_LANDED.landed_root(),
+            None,
+            "没落到根读回 None"
+        );
+    }
+
+    /// T01 的对照：低 32 位不同的 txg 7 与 txg 8 照旧分得开；两遍落到同一条高 32 位非 0 的根时对拍判对得上、两遍判相同。
+    #[test]
+    fn the_checkpoint_txgs_seven_and_eight_are_told_apart_and_one_root_past_thirty_two_bits_agrees_with_itself(
+    ) {
+        assert_the_two_landings_are_told_apart(
+            Some((InstanceGeneration(1), CheckpointTxg(7))),
+            Some((InstanceGeneration(1), CheckpointTxg(8))),
+            "txg 7 对 txg 8",
+        );
+        let root_past_thirty_two_bits = Some((InstanceGeneration(1), CheckpointTxg((2 << 32) | 7)));
+        for words in cross_check_words_of_both_cpu_constructors_landed_on(
+            root_past_thirty_two_bits,
+            root_past_thirty_two_bits,
+        ) {
+            assert!(
+                cross_check_words_agree_in_the_cross_check(&words, &words),
+                "同一份对拍字判对得上"
+            );
+        }
+        assert!(
+            !recovery_passes_differ(
+                &recovery_report_that_landed_on(root_past_thirty_two_bits),
+                &recovery_report_that_landed_on(root_past_thirty_two_bits)
+            ),
+            "两遍落到同一条根、结局与失败点相同：判两遍相同"
+        );
     }
 
     /// CPU 一侧两个构造函数换出的对拍字：崩溃点重放那一份（[`cross_check_words_of_cpu_judgement`]）与给定状态那一份
@@ -1628,6 +2001,29 @@ mod tests {
         );
     }
 
+    /// 内核不置位的表是空的，对拍比较处去掉的位也是空的：任何一组位经 [`pool_checker_bits_compared_by_the_cross_check`] 都原样交回。
+    /// 这是一条等价变异的留档（`.claude/rules/mutation-sampling.md`「没红的三类，判据不同」等价那一行）：C821 那一条「比较处不屏蔽表里那几位」
+    /// （把 `bits & !POOL_CHECKER_BITS_LEFT_OUT_OF_THE_CROSS_CHECK` 换成 `bits`）在今天的空表上对每一组位都与原式同值，换哪个取样点都抓不到；
+    /// `crates/mutations.tsv` 里 C821 那一行换成「比较处又去掉第 92 位」，由 `the_cross_check_comparison_of_pool_checker_bits_compares_the_scan_rebuild_bit` 判出。
+    /// 表里又登记回一条时这里红，那时 C821 原来那一条变异重新会改行为。
+    #[test]
+    fn the_cross_check_comparison_passes_every_pool_checker_bit_through_while_no_invariant_is_left_unset(
+    ) {
+        for position in 0..u128::BITS {
+            let bit = 1u128 << position;
+            assert_eq!(
+                pool_checker_bits_compared_by_the_cross_check(bit),
+                bit,
+                "第 {position} 位原样交回"
+            );
+        }
+        assert_eq!(
+            pool_checker_bits_compared_by_the_cross_check(u128::MAX),
+            u128::MAX,
+            "全部位一起原样交回"
+        );
+    }
+
     /// 对拍字的比较不再去掉违例位与判到位的第 92 位：CPU 判 I-1.13 违例、GPU 那一份只在第 92 位上不同时判对不上。
     #[test]
     fn the_cross_check_words_differing_only_in_the_scan_rebuild_bits_disagree() {
@@ -1689,6 +2085,16 @@ mod tests {
             ),
             102,
             "I-9.40 是清单第 103 条（下标 102），扫描内核删除态扫描里的 INVARIANT_I_9_40 照这个下标置位、不进内核不置位的表"
+        );
+        assert_eq!(
+            (
+                position_of(
+                    singlefs_checker::image::ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD
+                ),
+                position_of(singlefs_checker::image::PINNED_RING_SLOT_HOLDS_NO_ROOT_OF_THE_SAME_INSTANCE)
+            ),
+            (104, 105),
+            "I-7.18、I-7.19 是清单第 105、106 条（下标 104、105），走读内核里的 INVARIANT_I_7_18、INVARIANT_I_7_19 照这两个下标置位"
         );
         assert_eq!(
             (
@@ -1963,13 +2369,55 @@ mod tests {
         string_literal_contents(after[..literal_end].trim())
     }
 
-    /// 调用所在的那个函数从哪个字节起（往前找最近的一个顶格 `fn`）。
+    /// 调用所在的那个函数从哪个字节起（往前找最近的一个顶格函数，或 `impl` 块里缩进四格的方法开头）。
+    /// 认缩进的方法是因为池级 checker 的判定累加器上有转交 `invariant` 的方法（`Judgements::judge_naming_the_slots` 调
+    /// `self.judge(invariant, …)`）：它在 `impl` 块里，往前不一定有顶格函数；往前有的话那一个也不是包住它的函数，
+    /// 那个函数里遍历 `IMPLEMENTED_INVARIANTS` 的一圈不该算成这一处的绑定。
     fn start_of_the_function_enclosing(source: &str, position: usize) -> usize {
-        ["\nfn ", "\npub fn ", "\npub(crate) fn "]
-            .iter()
-            .filter_map(|opening| source[..position].rfind(opening))
-            .max()
-            .expect("调用在某个顶格的函数里")
+        [
+            "\nfn ",
+            "\npub fn ",
+            "\npub(crate) fn ",
+            "\n    fn ",
+            "\n    pub fn ",
+            "\n    pub(crate) fn ",
+        ]
+        .iter()
+        .filter_map(|opening| source[..position].rfind(opening))
+        .max()
+        .expect("调用在某个顶格的函数或 impl 块里缩进四格的方法里")
+    }
+
+    /// 判定累加器 `impl` 块里转交 `invariant` 的方法（形如 `Judgements::judge_naming_the_slots`）不算点名 I-1.13：
+    /// 包住调用的是那个方法，不是它前面那个遍历 `IMPLEMENTED_INVARIANTS` 的顶格函数；往前没有顶格函数时也不 panic。
+    #[test]
+    fn a_method_in_an_impl_block_forwarding_invariant_does_not_name_the_scan_rebuild_invariant() {
+        let forwarding_method = concat!(
+            "impl Judgements {\n",
+            "    pub fn judge_naming_the_slots(&mut self, invariant: &'static str, holds: bool) {\n",
+            "        self.judge(invariant, holds, detail);\n",
+            "    }\n",
+            "}\n",
+        );
+        let loop_over_every_invariant_then_the_forwarding_method = format!(
+            "\npub fn walk_every_invariant(judgements: &mut Judgements) {{\n    for invariant in IMPLEMENTED_INVARIANTS {{\n        judgements.not_applicable(invariant, \"走不到\");\n    }}\n}}\n{forwarding_method}"
+        );
+        for source in [
+            forwarding_method.to_string(),
+            loop_over_every_invariant_then_the_forwarding_method,
+        ] {
+            let calls = method_calls_in(&source, "judge");
+            assert_eq!(calls.len(), 1, "造的源码里恰好一处 .judge(：{source}");
+            let (call_start, arguments) = &calls[0];
+            assert!(
+                !first_argument_names_the_scan_rebuild_invariant(
+                    &source,
+                    *call_start,
+                    &arguments[0].text
+                ),
+                "impl 块里转交 invariant 的方法不点名 I-1.13（包住它的是那个方法，不是前面遍历全部不变量的顶格函数）：{source}"
+            );
+        }
     }
 
     /// 第一个实参点不点名 I-1.13：直接写那个常量或 `"I-1.13"`，或是遍历 `IMPLEMENTED_INVARIANTS` 那一圈的 `invariant`
@@ -2282,5 +2730,47 @@ mod tests {
                 "结局表里 {verdict:?} 恰好一行"
             );
         }
+    }
+
+    /// 场景：两块盘的池，崩溃镜像上盘 0 一个自证过的系统配置槽都没有、盘 1 两槽都在；基镜像上两块盘都有。
+    /// 预期：判段那一判记盘 0 是新出现的死盘。
+    #[test]
+    fn a_device_dead_on_the_crash_image_and_alive_on_the_base_image_is_reported_new() {
+        assert_eq!(
+            devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
+                &[(0, 0), (1, 2)],
+                &[(0, 2), (1, 2)],
+            ),
+            DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::New(vec![0]),
+            "盘 0 在基镜像上还有自证过的槽、崩溃镜像上一个都没有"
+        );
+    }
+
+    /// 场景：基镜像上盘 1 已经两槽全废（补写流的起点），崩溃镜像上它照旧全废、盘 0 只剩一槽。
+    /// 预期：盘 1 不是新出现的，盘 0 还有一槽，判段那一判不记。
+    #[test]
+    fn a_device_already_dead_on_the_base_image_is_not_reported_again() {
+        assert_eq!(
+            devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
+                &[(0, 1), (1, 0)],
+                &[(0, 2), (1, 0)],
+            ),
+            DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::NoneNew,
+            "盘 1 在基镜像上就两槽全废，盘 0 还有一槽自证过"
+        );
+    }
+
+    /// 场景：崩溃镜像上两块盘都一个自证过的槽都没有（全池皆废），基镜像上都有。
+    /// 预期：交 I-8.5，判段那一判不重记。
+    #[test]
+    fn every_device_dead_on_the_crash_image_is_left_to_the_tail_slot_invariant() {
+        assert_eq!(
+            devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
+                &[(0, 0), (1, 0)],
+                &[(0, 2), (1, 2)],
+            ),
+            DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage::EveryDeviceLeftToTheTailSlotInvariant,
+            "全池皆废留给 I-8.5"
+        );
     }
 }

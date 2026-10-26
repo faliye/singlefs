@@ -1,6 +1,7 @@
-//! 每区槽数 S 住系统配置（D22（单元原子性怎么合成） 已定项 1 的字段表逐字：「具体取多少不是格式决策——
-//! 格式承诺的是『S 是系统配置字段 + 挂载时判区间』」，区间 4..16）。C506（每区槽数 S 写成编译期常量，条文说它住系统配置）
-//! 之前 S 是 `singlefs-format` 里的一个编译期常量，全仓零处区间判。
+//! 每区槽数 S 住系统配置（D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格：格式承诺的是「S 是系统配置字段 +
+//! 挂载时判区间」，区间 4..16）。C506（每区槽数 S 写成编译期常量，条文说它住系统配置）
+//! 之前 S 是 `singlefs-format` 里的一个编译期常量，全仓零处区间判。S × 槽距对区域间距 P × chunk 那一判与 P、chunk 等于第一版常量那两判
+//! 在 `system_configuration_root_ring_stride_fields_and_region_length_are_refused_by_core_and_the_pool_checker.rs`。
 //!
 //! 两条用例各钉一半：
 //! 一、**区间判**：盘上自述 S = 3 或 17 的池挂不上，报点名的成员、盘上逐字节不变；S = 4 / 8 / 16 三档都挂得上。
@@ -20,6 +21,7 @@ use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, readable_roots, PoolReader, RecoveryFailure,
+    SystemConfigurationValueOutsideWhatThisReaderAccepts,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{region_start, RootRingSlotsPerRegion};
@@ -176,10 +178,11 @@ fn the_pool_checker_refuses_a_slot_declaring_zero_regions() {
     );
 }
 
-/// 区域步长与区块字节（偏移 363、367 各 4 字节）是盘上读来的数：都顶满时区域 1 起的根槽偏移装不进 u64，checker 拒这一槽，
-/// 不在 `root_slot_positions` 里乘加溢出（外部审阅 2026-10-16 报的）。
+/// 区域步长与区块字节（偏移 363、367 各 4 字节）是盘上读来的数：都顶满时（外部审阅 2026-10-16 报的那一形，那时按字段放区域，
+/// 区域 1 起的根槽偏移装不进 u64）checker 拒这一槽，报的是步长不等于第一版常量——P 先于 chunk 判（D22（单元原子性怎么合成） 已定项 16
+/// 第 1 句，用户 2026-10-22 定），区域按常量放之后乘加溢出那一判没有了；core 择系统配置报同一格。
 #[test]
-fn the_pool_checker_refuses_a_slot_whose_root_ring_geometry_overflows_the_slot_offsets() {
+fn a_slot_whose_root_ring_step_and_chunk_are_both_at_their_widest_is_refused_for_the_step() {
     let (_, mut devices, _) = formatted_pool(8, 0);
     declare_bytes_in_the_slot_on_disk(
         &mut devices,
@@ -190,8 +193,22 @@ fn the_pool_checker_refuses_a_slot_whose_root_ring_geometry_overflows_the_slot_o
     let view = check_system_configuration_slot(&slot).expect("这一槽自证得过");
     assert_eq!(
         geometry_of(&slot, &view).err(),
-        Some(Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace),
-        "步长 × 区块字节 × 区域号装不进 u64 的槽拒掉"
+        Some(Verdict::RootRingPrimeStepNotTheFirstVersionConstant),
+        "步长与区块字节都顶满的槽拒掉，报步长那一格（P 先于 chunk 判）"
+    );
+    let refusal = choose_system_configuration(&devices);
+    assert!(
+        matches!(
+            refusal,
+            Err(RecoveryFailure::SystemConfigurationValueRefused {
+                value: SystemConfigurationValueOutsideWhatThisReaderAccepts::RootRingPrimeStepNotTheFirstVersionValue {
+                    recorded_root_ring_prime_step: u32::MAX,
+                    first_version_root_ring_prime_step: 3,
+                },
+                ..
+            })
+        ),
+        "core 择系统配置整池拒、报步长那一格：{refusal:?}"
     );
 }
 

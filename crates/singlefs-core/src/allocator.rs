@@ -32,7 +32,33 @@ use crate::unlink::DeletionSwitches;
 /// 跨度段的最高位借作已释放标志（D3（空间分配） 已定项 7 / 已定项 11）：0 = 仍分配、1 = 已释放，不占表达跨度值的位。
 pub const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
 
-/// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志, 分配代或释放代 8)。
+/// 跨度段的次高位借作隔离记号（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」，落点甲；D3（空间分配） 已定项 7 跨度段那一行）：
+/// 写者隔离那次发布置上，回退复活与释放时清掉；不占表达跨度值的位。与已释放标志同时置的记录是坏的（[`AllocationRecordEntryRefusal`]）。
+pub const ALLOCATION_RECORD_QUARANTINE_MARK: u16 = 0x4000;
+
+/// 跨度段里表达跨度值的那几位：去掉已释放标志与隔离记号。
+const ALLOCATION_RECORD_SPAN_VALUE_BITS: u16 =
+    !(ALLOCATION_RECORD_RELEASED_FLAG | ALLOCATION_RECORD_QUARANTINE_MARK);
+
+/// 一条分配记录跨度段次高位的读法（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AllocationRecordQuarantineMark {
+    /// 次高位 0：不是隔离记录。已释放的记录恒取这一个（释放隔离记录时记号随之清掉）。
+    NotQuarantined,
+    /// 次高位 1：释放之前读盘核出这个单元有一份对不上，隔离那次发布在每块盘上那条记录里置上；记录仍分配、分配代不变。
+    QuarantinedAfterTheReleaseChecksumCheck,
+}
+
+/// 盘上 20 字节解不成一条分配记录的样子。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AllocationRecordEntryRefusal {
+    /// 条目宽不等于字段表的 20（窄了切不出整条，宽了同样不收：I-1.10、C867）。
+    EntryWidthDiffersFromTheFieldTable { entry_bytes: usize },
+    /// 跨度段的隔离记号与已释放标志同时置（0x4000 与 0x8000，D19（块指针的结构与宽度预算） 已定项 5「带记号的记录必须未释放」）。
+    QuarantineMarkOnAReleasedRecord,
+}
+
+/// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志与隔离记号, 分配代或释放代 8)。
 /// 释放时条目不删、不点删：改写成已释放 + 释放代，留到该落点被重新分配时覆盖（覆盖是步 5 回收接上时的事：
 /// 回收过的落点被再分配时那条记录改写、不追加，槽号在每盘仍唯一；新落点罩住的别的已回收记录随这次分配删掉，同一块盘上的记录
 /// 罩住的槽互不相交（I-5.4（分配记录罩住的槽互不相交））；回收要 F_生效 抬到释放代之上，见 `reclaim_released_up_to`）。
@@ -40,26 +66,42 @@ pub const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
 pub struct AllocationRecord {
     pub device: DeviceIdentity,
     pub slot: SlotNumber,
-    /// 纯跨度，不含标志位。
+    /// 纯跨度，不含已释放标志与隔离记号。
     pub span_slots: u16,
     /// 仍分配时是分配代；已释放时是释放代。
     pub generation: CheckpointTxg,
     pub is_released: bool,
+    /// 已释放的记录恒是 [`AllocationRecordQuarantineMark::NotQuarantined`]（[`Self::to_bytes`] 断言）。
+    pub quarantine_mark: AllocationRecordQuarantineMark,
 }
 
 impl AllocationRecord {
+    /// # Panics
+    /// 跨度值占到已释放标志或隔离记号那一位；已释放的记录带着隔离记号（释放隔离记录时记号随之清掉，
+    /// [`PoolAllocator::release_leaving_the_record_allocated_on`]）。
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         assert_eq!(
-            self.span_slots & ALLOCATION_RECORD_RELEASED_FLAG,
+            self.span_slots & !ALLOCATION_RECORD_SPAN_VALUE_BITS,
             0,
-            "跨度值不许占到标志位"
+            "跨度值不许占到已释放标志与隔离记号那两位"
         );
-        let span_field = if self.is_released {
-            self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG
+        let released_flag = if self.is_released {
+            ALLOCATION_RECORD_RELEASED_FLAG
         } else {
-            self.span_slots
+            0
         };
+        let quarantine_mark = match self.quarantine_mark {
+            AllocationRecordQuarantineMark::NotQuarantined => 0,
+            AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck => {
+                assert!(
+                    !self.is_released,
+                    "已释放的记录不带隔离记号：释放隔离记录时记号随之清掉（D19 已定项 5）"
+                );
+                ALLOCATION_RECORD_QUARANTINE_MARK
+            }
+        };
+        let span_field = self.span_slots | released_flag | quarantine_mark;
         let mut writer = ByteWriter::new(20);
         writer.put_u32(self.device.0);
         writer.put_six_byte_unsigned(self.slot.0);
@@ -74,23 +116,41 @@ impl AllocationRecord {
         (self.device.0, self.slot.0)
     }
     /// 分配记录 20 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 10），
-    /// 窄于 20 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 20 信它。
-    #[must_use]
-    pub fn parse(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() < usize::try_from(ALLOCATION_RECORD_BYTES).expect("20") {
-            return None;
+    /// 不等于 20 时拒：这里是盘上字节进字段表的边界，往里就按 20 信它。窄于 20 的切不出整条记录；
+    /// 宽于 20 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C867）。
+    /// 跨度段次高位 0x4000 读成隔离记号、跨度取去掉两个标志位之后的值（D19（块指针的结构与宽度预算） 已定项 5）。
+    ///
+    /// # Errors
+    /// 条目宽不是 20 ⇒ [`AllocationRecordEntryRefusal::EntryWidthDiffersFromTheFieldTable`]；
+    /// 隔离记号与已释放标志同时置 ⇒ [`AllocationRecordEntryRefusal::QuarantineMarkOnAReleasedRecord`]。
+    pub fn parse(bytes: &[u8]) -> Result<Self, AllocationRecordEntryRefusal> {
+        if bytes.len() != usize::try_from(ALLOCATION_RECORD_BYTES).expect("20") {
+            return Err(
+                AllocationRecordEntryRefusal::EntryWidthDiffersFromTheFieldTable {
+                    entry_bytes: bytes.len(),
+                },
+            );
         }
         let mut reader = crate::bytes::ByteReader::at(bytes, 0);
         let device = DeviceIdentity(reader.get_u32());
         let slot = SlotNumber(reader.get_six_byte_unsigned());
         let span_field = reader.get_u16();
         let generation = CheckpointTxg(reader.get_u64());
-        Some(Self {
+        let is_released = span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0;
+        let quarantine_mark = if span_field & ALLOCATION_RECORD_QUARANTINE_MARK == 0 {
+            AllocationRecordQuarantineMark::NotQuarantined
+        } else if is_released {
+            return Err(AllocationRecordEntryRefusal::QuarantineMarkOnAReleasedRecord);
+        } else {
+            AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck
+        };
+        Ok(Self {
             device,
             slot,
-            span_slots: span_field & !ALLOCATION_RECORD_RELEASED_FLAG,
+            span_slots: span_field & ALLOCATION_RECORD_SPAN_VALUE_BITS,
             generation,
-            is_released: span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0,
+            is_released,
+            quarantine_mark,
         })
     }
 }
@@ -1722,6 +1782,37 @@ pub fn oldest_txg_in_the_ring_rereading_slots_bad_at_mount(
     }
 }
 
+/// 分配器记一条根那一刻的回收门槛与还钉着的槽里最小的钉值（D16（发布语义） 已定项 1「根槽这一次读坏」那一行「钉也落盘」，
+/// C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）：[`PoolAllocator::record_root_written_by_this_process`] 记完这条根、
+/// 按谓词回收之后记下（[`PoolAllocator::reclaim_floor_when_the_latest_root_was_recorded`]），带单元的发布在记根之后、装根之前读它，
+/// 写根记录里的回收门槛 t 与钉槽 p（采样点在回收之后、装根之前）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReclaimFloorWhenTheRootWasRecorded {
+    /// 这一次回收用的门槛：max(挂载时生效的 F, 环里最旧有效根并上钉值)（`mount::reclaim_floor`）。
+    pub reclaim_floor: CheckpointTxg,
+    /// 记了这条根之后还钉着的槽（挂载那一刻读坏或读回全零、这个进程还没写掉、重读也没解开的）里钉值最小的那个；一个都没钉着是 `None`。
+    pub lowest_pinned_txg: Option<CheckpointTxg>,
+}
+
+impl ReclaimFloorWhenTheRootWasRecorded {
+    /// 根记录里的回收门槛 t：max(这条根自己带的 F, 分配器记这条根时的回收门槛)（用户 2026-10-20 认的取法）。
+    /// 分配器那一半用的是挂载时生效的 F、抬 F 生效之后不跟着抬（[`RootRingOccupancy`] 的 `effective_floor`），所以要再与这条根自己的 F 取大：
+    /// 抬 F 那一串自己已经回收到新 F（根环三方第三轮攻方 Z4.2）。
+    #[must_use]
+    pub fn reclaim_threshold_of_a_root_carrying(
+        self,
+        rollback_floor_of_the_root: CheckpointTxg,
+    ) -> CheckpointTxg {
+        self.reclaim_floor.max(rollback_floor_of_the_root)
+    }
+
+    /// 根记录里的钉槽 p。
+    #[must_use]
+    pub fn pinned_ring_slot(self) -> crate::root_record::PinnedRingSlot {
+        crate::root_record::PinnedRingSlot::of_the_lowest_pin(self.lowest_pinned_txg)
+    }
+}
+
 /// 池级分配器：每块盘按同一条规则各自取，各盘取得一致才给号（盘可以不等大，D2（RAID 条带策略） 已定项 2）。
 #[derive(Clone, Debug)]
 pub struct PoolAllocator {
@@ -1782,6 +1873,9 @@ pub struct PoolAllocator {
     /// 发布路径隔离过还没交给会话的槽）。R 排他就是分配器的一条合取（D26（后台整理与放置回收） 已定项 1 第 3 条）；不合格段表、常驻隔离集与观测
     /// 住会话（`compaction_plan::CompactionOfThisMount`）。`new` 与 `rebuild_from_records` 起步是产品值、没有活意图。
     compaction: CompactionSwitchesAndTheExcludedRegion,
+    /// 上一次记根时回收用的门槛与还钉着的槽里最小的钉值（[`ReclaimFloorWhenTheRootWasRecorded`]，C773）。只住内存，`new` 与
+    /// `rebuild_from_records` 起步是 `None`；随分配器整个换回发布之前（失败的发布）一起退回。
+    reclaim_floor_when_the_latest_root_was_recorded: Option<ReclaimFloorWhenTheRootWasRecorded>,
 }
 
 impl PoolAllocator {
@@ -1805,6 +1899,7 @@ impl PoolAllocator {
             space_admission: SpaceAdmission::JudgedByTheFormula,
             deletion_switches: DeletionSwitches::PRODUCT,
             compaction: CompactionSwitchesAndTheExcludedRegion::of_a_new_mount(),
+            reclaim_floor_when_the_latest_root_was_recorded: None,
         }
     }
 
@@ -2086,6 +2181,7 @@ impl PoolAllocator {
                         span_slots: u16::try_from(placement.span).expect("跨度 2 字节"),
                         generation,
                         is_released: false,
+                        quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
                     });
                 }
             }
@@ -2101,10 +2197,12 @@ impl PoolAllocator {
         self.release_leaving_the_record_allocated_on(placement, release_generation, &[]);
     }
 
-    /// 同 [`Self::release`]，只是 `devices_whose_record_stays_allocated` 那几块盘上的那条分配记录一个字节都不动、留在「已分配」：
-    /// 释放之前按位置项读盘核校验和、核出对不上（读不出也算）的那一份（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-09-24 定案）——
-    /// 那一份的槽不还回空闲池；记录落盘即跨重挂，重挂之后从分配记录树重建的分配器照样认它已分配，准入里照已分配算、不另进式子。
-    /// 逐盘各算：另一块盘上核得上的那一份照常释放。
+    /// 同 [`Self::release`]，只是 `devices_whose_record_stays_allocated` 那几块盘上的那条分配记录留在「已分配」、分配代不变，
+    /// 跨度段置上隔离记号：释放之前按位置项读盘核校验和、核出对不上（读不出也算）的那个单元（D19（块指针的结构与宽度预算） 已定项 5，
+    /// 用户 2026-09-24 定案；记号是同一项「隔离的盘上记号」，用户 2026-10-22 定落点甲）——那一份的槽不还回空闲池；记录与这次发布的别的改动
+    /// 一起落盘，重挂之后从分配记录树重建的分配器照样认它已分配、带着记号，准入里照已分配算、不另进式子。
+    /// 逐盘各算：不在 `devices_whose_record_stays_allocated` 里的盘上那一份照常释放；释放的记录带着隔离记号时记号随之清掉
+    /// （「释放隔离记录时改写成已释放，0x4000 随之清掉」）。
     pub fn release_leaving_the_record_allocated_on(
         &mut self,
         placement: Placement,
@@ -2112,9 +2210,6 @@ impl PoolAllocator {
         devices_whose_record_stays_allocated: &[DeviceIdentity],
     ) {
         for device in &mut self.devices {
-            if devices_whose_record_stays_allocated.contains(&device.device) {
-                continue;
-            }
             let record = self
                 .records
                 .iter_mut()
@@ -2129,7 +2224,13 @@ impl PoolAllocator {
                 placement.span,
                 "释放的跨度与分配记录不符：这块盘的记录跨度由 transaction::placement_registered_unreleased_on_every_device 逐盘判过"
             );
+            if devices_whose_record_stays_allocated.contains(&device.device) {
+                record.quarantine_mark =
+                    AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck;
+                continue;
+            }
             record.is_released = true;
+            record.quarantine_mark = AllocationRecordQuarantineMark::NotQuarantined;
             record.generation = release_generation;
             device.mark_released(placement.slot, placement.span);
         }
@@ -2185,6 +2286,36 @@ impl PoolAllocator {
         } else {
             device_map.mark_resurrected_out_of_the_defer_queue(placement.slot, placement.span);
         }
+    }
+
+    /// 管理员回退那一次清掉隔离记号（D19（块指针的结构与宽度预算） 已定项 5「回退复活那一次，同一次发布清掉两块盘上的 0x4000」）：
+    /// 回退目标引用的单元在 `device` 上那条记录仍分配、带着记号，改成不带记号；分配代与位图都不动（隔离的槽本来就占着）。
+    ///
+    /// # Panics
+    /// 这块盘上没有起点是这个槽的记录、它已释放、不带记号或跨度对不上：调用方在任何写之前逐盘判过
+    /// （`mount::roll_back_by_a_forward_publish`）。
+    pub fn clear_the_quarantine_mark_of_a_record_the_rollback_target_references(
+        &mut self,
+        device: DeviceIdentity,
+        placement: Placement,
+    ) {
+        let record = self
+            .records
+            .iter_mut()
+            .find(|record| record.device == device && record.slot == placement.slot)
+            .expect("清记号的落点在这块盘上有记录：回退在任何写之前逐盘判过");
+        assert!(
+            !record.is_released
+                && record.quarantine_mark
+                    == AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+            "清记号的是仍分配、带着隔离记号的记录：回退在任何写之前逐盘判过"
+        );
+        assert_eq!(
+            u64::from(record.span_slots),
+            placement.span,
+            "清记号的跨度与记录相同：回退在任何写之前逐盘判过"
+        );
+        record.quarantine_mark = AllocationRecordQuarantineMark::NotQuarantined;
     }
 
     /// 用户数据：见 `try_allocate_user_data`；拒绝的原因在这里丢掉，只给不看原因的调用方（测试里「一定分得到」的那几处）。
@@ -2426,7 +2557,13 @@ impl PoolAllocator {
         let candidates: Vec<AllocationRecord> = self
             .records
             .iter()
-            .filter(|record| record.is_released && record.generation <= floor)
+            .filter(|record| {
+                singlefs_replay_prefix::gc_crash_proofs::released_record_can_be_reclaimed(
+                    record.is_released,
+                    record.generation.0,
+                    floor.0,
+                )
+            })
             .copied()
             .collect();
         for record in candidates {
@@ -2588,6 +2725,9 @@ impl PoolAllocator {
     ///   出路是建分配器的一方装上根环表：mkfs 同一个进程里用 `make_filesystem::allocator_after_make_filesystem`，或
     ///   `install_root_ring_occupancy(make_filesystem::root_ring_occupancy_after_make_filesystem(..))`；挂载建的分配器（`mount::rebuilt_allocator`）装着。
     /// - 这条根的 txg 不是上一条记到的加一：有一条根没经分配器写出去，这张表说的环已经不是盘上的环，再按它回收会把还被环里的根引用的槽发出去。
+    ///
+    /// 记完、回收完之后把这一次回收用的门槛与还钉着的槽里最小的钉值记下（[`Self::reclaim_floor_when_the_latest_root_was_recorded`]，C773）：
+    /// 带单元的发布拿它写根记录的 t 与 p；零单元发布在根落盘之后才调，它的 t、p 照抄上一版，用不到这一对。
     pub fn record_root_written_by_this_process(&mut self, checkpoint_txg: CheckpointTxg) {
         let occupancy = self.root_ring.as_mut().expect(
             "分配器没装根环表却记了一条根：写根的分配器都由建它的一方装上根环表（挂载在 mount::rebuilt_allocator 装，\
@@ -2618,6 +2758,11 @@ impl PoolAllocator {
             .remove(&ring_slot)
             .unwrap_or_default();
         let still_protected_by_the_isolation = occupancy.placements_the_isolation_still_protects();
+        // 钉槽 p 的采样与回收门槛同一刻：这条根已经盖掉它那一槽（盖掉的若是钉着的槽，钉随之解开），之后到装根之前不再记根。
+        let lowest_pinned_txg = occupancy
+            .ring_slots_pinned_since_the_mount_at_the_oldest_txg_they_can_have_held()
+            .into_values()
+            .min();
         match displaced {
             Some(
                 RootRingOccupant::AbandonedRoot {
@@ -2657,6 +2802,20 @@ impl PoolAllocator {
             &reclaimed,
             &still_protected_by_the_isolation,
         );
+        self.reclaim_floor_when_the_latest_root_was_recorded =
+            Some(ReclaimFloorWhenTheRootWasRecorded {
+                reclaim_floor,
+                lowest_pinned_txg,
+            });
+    }
+
+    /// 这个分配器上一次记根（[`Self::record_root_written_by_this_process`]）回收用的门槛与记完之后还钉着的槽里最小的钉值；
+    /// 这个分配器还没记过根时 `None`。带单元的发布在记这次的根之后、装根之前读它（C773 的采样点）。
+    #[must_use]
+    pub fn reclaim_floor_when_the_latest_root_was_recorded(
+        &self,
+    ) -> Option<ReclaimFloorWhenTheRootWasRecorded> {
+        self.reclaim_floor_when_the_latest_root_was_recorded
     }
 
     /// 同 [`Self::record_root_written_by_this_process`]，记之前先照 E2 重读挂载那一刻读坏或读回全零、记了这条根之后会是环里最小的那个槽
@@ -3196,10 +3355,14 @@ mod tests {
             assert_eq!(record.generation, CheckpointTxg(4), "释放代");
             assert_eq!(record.span_slots, 2, "跨度值不含标志位");
             let parsed = AllocationRecord::parse(&record.to_bytes());
-            assert_eq!(parsed, Some(*record), "标志位进跨度段最高位再读回来");
+            assert_eq!(parsed, Ok(*record), "标志位进跨度段最高位再读回来");
             assert_eq!(
                 AllocationRecord::parse(&record.to_bytes()[..19]),
-                None,
+                Err(
+                    AllocationRecordEntryRefusal::EntryWidthDiffersFromTheFieldTable {
+                        entry_bytes: 19
+                    }
+                ),
                 "窄于字段表的 20 字节一律不解（条目宽是盘上的值）"
             );
             assert_eq!(
@@ -3216,6 +3379,148 @@ mod tests {
         );
     }
 
+    /// 一条分配记录的 20 字节，跨度段换成 `span_field`（别的段照一条盘 1、槽 50180、分配代 3 的记录）。
+    fn allocation_record_bytes_with_the_span_field(span_field: u16) -> Vec<u8> {
+        let mut bytes = AllocationRecord {
+            device: DeviceIdentity(1),
+            slot: SlotNumber(50180),
+            span_slots: 2,
+            generation: CheckpointTxg(3),
+            is_released: false,
+            quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
+        }
+        .to_bytes();
+        bytes[10..12].copy_from_slice(&span_field.to_le_bytes());
+        bytes
+    }
+
+    /// 跨度段次高位 0x4000 是隔离记号（D19 已定项 5「隔离的盘上记号」）：0x4001、0x4002 读成跨度 1、2 且带记号，
+    /// 写回去逐字节相同；0x4000 与 0x8000 同时置（0xC001）拒。
+    #[test]
+    fn span_field_with_the_quarantine_mark_parses_to_the_span_in_the_low_bits_and_the_mark() {
+        for span_slots in [1u16, 2] {
+            let bytes = allocation_record_bytes_with_the_span_field(
+                ALLOCATION_RECORD_QUARANTINE_MARK | span_slots,
+            );
+            let parsed = AllocationRecord::parse(&bytes).expect("带隔离记号、未释放的记录解得开");
+            assert_eq!(parsed.span_slots, span_slots, "跨度取去掉记号之后的低位");
+            assert_eq!(
+                parsed.quarantine_mark,
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+                "0x4000 读成隔离记号"
+            );
+            assert!(!parsed.is_released, "带记号的记录仍分配");
+            assert_eq!(parsed.generation, CheckpointTxg(3), "分配代照读");
+            assert_eq!(parsed.to_bytes(), bytes, "记号写回跨度段次高位");
+        }
+        assert_eq!(
+            AllocationRecord::parse(&allocation_record_bytes_with_the_span_field(
+                ALLOCATION_RECORD_RELEASED_FLAG | ALLOCATION_RECORD_QUARANTINE_MARK | 1
+            )),
+            Err(AllocationRecordEntryRefusal::QuarantineMarkOnAReleasedRecord),
+            "0xC001：隔离记号与已释放标志同时置，判坏"
+        );
+    }
+
+    /// 隔离（`release_leaving_the_record_allocated_on` 点名两块盘）：两块盘上那条记录仍分配、分配代不变、带隔离记号，
+    /// 落盘的跨度段是 0x4002；槽不进 defer、仍占着。
+    #[test]
+    fn quarantining_a_placement_marks_the_record_on_every_named_device_and_keeps_its_generation() {
+        let mut pool = pool_after_mkfs();
+        let data = pool.allocate_user_data(CheckpointTxg(3)).expect("t1");
+        pool.release_leaving_the_record_allocated_on(
+            data,
+            CheckpointTxg(4),
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+        );
+        let quarantined: Vec<&AllocationRecord> = pool
+            .records()
+            .iter()
+            .filter(|record| record.slot == data.slot)
+            .collect();
+        assert_eq!(quarantined.len(), 2, "每盘一条");
+        for record in quarantined {
+            assert!(!record.is_released, "隔离的记录留在已分配");
+            assert_eq!(record.generation, CheckpointTxg(3), "分配代不变");
+            assert_eq!(
+                record.quarantine_mark,
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+                "隔离那次发布置上记号"
+            );
+            assert_eq!(
+                u16::from_le_bytes([record.to_bytes()[10], record.to_bytes()[11]]),
+                2 | ALLOCATION_RECORD_QUARANTINE_MARK,
+                "落盘的跨度段是 0x4002"
+            );
+        }
+        assert_eq!(pool.devices[0].deferred_slots(), 0, "隔离的槽不进 defer");
+    }
+
+    /// 释放隔离记录时改写成已释放、记号随之清掉（D19 已定项 5）：跨度段落盘是 0x8002。
+    #[test]
+    fn releasing_a_quarantined_record_rewrites_it_released_and_clears_the_mark() {
+        let mut pool = pool_after_mkfs();
+        let data = pool.allocate_user_data(CheckpointTxg(3)).expect("t1");
+        pool.release_leaving_the_record_allocated_on(
+            data,
+            CheckpointTxg(4),
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+        );
+        pool.release(data, CheckpointTxg(5));
+        for record in pool
+            .records()
+            .iter()
+            .filter(|record| record.slot == data.slot)
+        {
+            assert!(record.is_released, "改写成已释放");
+            assert_eq!(record.generation, CheckpointTxg(5), "释放代");
+            assert_eq!(
+                record.quarantine_mark,
+                AllocationRecordQuarantineMark::NotQuarantined,
+                "记号随释放清掉"
+            );
+            assert_eq!(
+                u16::from_le_bytes([record.to_bytes()[10], record.to_bytes()[11]]),
+                2 | ALLOCATION_RECORD_RELEASED_FLAG,
+                "落盘的跨度段是 0x8002"
+            );
+        }
+    }
+
+    /// 回退清记号：记录仍分配、分配代不变，记号去掉，槽照旧占着。
+    #[test]
+    fn clearing_the_quarantine_mark_keeps_the_record_allocated_under_its_generation() {
+        let mut pool = pool_after_mkfs();
+        let data = pool.allocate_user_data(CheckpointTxg(3)).expect("t1");
+        pool.release_leaving_the_record_allocated_on(
+            data,
+            CheckpointTxg(4),
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+        );
+        let allocated_slots_while_quarantined = pool.devices[0].allocated_slots();
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            pool.clear_the_quarantine_mark_of_a_record_the_rollback_target_references(device, data);
+        }
+        for record in pool
+            .records()
+            .iter()
+            .filter(|record| record.slot == data.slot)
+        {
+            assert!(!record.is_released, "仍分配");
+            assert_eq!(record.generation, CheckpointTxg(3), "分配代不变");
+            assert_eq!(
+                record.quarantine_mark,
+                AllocationRecordQuarantineMark::NotQuarantined,
+                "回退那一次清掉记号"
+            );
+        }
+        assert_eq!(
+            pool.devices[0].allocated_slots(),
+            allocated_slots_while_quarantined,
+            "位图不动"
+        );
+    }
+
     /// 重建时认出还没被换下的第 0 版树表单元（分配代 0、跨度 1、未释放）；换下之后（已释放）就不认。
     #[test]
     fn rebuild_from_records_remembers_the_genesis_tree_table_until_it_is_released() {
@@ -3228,6 +3533,7 @@ mod tests {
                     span_slots: 2,
                     generation: CheckpointTxg(0),
                     is_released: false,
+                    quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
                 },
                 AllocationRecord {
                     device: DeviceIdentity(0),
@@ -3239,6 +3545,7 @@ mod tests {
                         CheckpointTxg(0)
                     },
                     is_released: released,
+                    quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
                 },
             ]
         };
@@ -3274,6 +3581,7 @@ mod tests {
                             span_slots: *span_slots,
                             generation: CheckpointTxg(*generation),
                             is_released: *is_released,
+                            quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
                         },
                     )
             })
@@ -3668,6 +3976,8 @@ mod tests {
             instance_table: crate::pointer::NodePointer::empty_root(),
             mapping_root: crate::pointer::NodePointer::empty_root(),
             allocation_record_tree_root: crate::pointer::NodePointer::empty_root(),
+            reclaim_threshold: crate::address::CheckpointTxg(0),
+            pinned_ring_slot: crate::root_record::PinnedRingSlot::NO_SLOT_PINNED,
         };
         let occupancy = RootRingOccupancy::read_from_the_ring(
             slots_per_region,
@@ -3743,6 +4053,8 @@ mod tests {
             instance_table: crate::pointer::NodePointer::empty_root(),
             mapping_root: crate::pointer::NodePointer::empty_root(),
             allocation_record_tree_root: crate::pointer::NodePointer::empty_root(),
+            reclaim_threshold: crate::address::CheckpointTxg(0),
+            pinned_ring_slot: crate::root_record::PinnedRingSlot::NO_SLOT_PINNED,
         }
     }
 
@@ -4132,5 +4444,34 @@ mod tests {
             "前提：new 不装根环表"
         );
         without_a_root_ring.record_root_written_by_this_process(CheckpointTxg(1));
+    }
+
+    /// newtype 的序关系与核的 u64 比较一致，覆盖相等边界及最高位，防止接核时窄化或误改成严格小于。
+    #[test]
+    fn verified_reclaim_predicate_preserves_txg_order_at_unsigned_boundaries() {
+        let generations = [
+            0,
+            1,
+            u64::from(u32::MAX),
+            u64::from(u32::MAX) + 1,
+            u64::MAX - 1,
+            u64::MAX,
+        ];
+        for released in [false, true] {
+            for generation in generations {
+                for floor in generations {
+                    let generation = CheckpointTxg(generation);
+                    let floor = CheckpointTxg(floor);
+                    assert_eq!(
+                        singlefs_replay_prefix::gc_crash_proofs::released_record_can_be_reclaimed(
+                            released,
+                            generation.0,
+                            floor.0
+                        ),
+                        released && generation <= floor
+                    );
+                }
+            }
+        }
     }
 }

@@ -15,7 +15,7 @@ use singlefs_core::mount::{mount_writable, InstanceRow};
 use singlefs_core::pointer::NodePointer;
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, recover, replay_journal, scan_journal, JournalPolicy,
-    PoolReader, RecoveryOutcome,
+    NamedUnitVerification, PoolReader, RecoveryOutcome,
 };
 use singlefs_core::transaction::PoolVersion;
 use singlefs_core::unit::{unit_filesystem_identifier, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
@@ -194,7 +194,7 @@ pub fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is
         &chosen_root,
         system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .expect("所选根那次发布只有一条记录带末条标志：锚点认得出");
     assert_eq!(rebuilt_root, chosen_root, "重建出来的根就是所选根本身");

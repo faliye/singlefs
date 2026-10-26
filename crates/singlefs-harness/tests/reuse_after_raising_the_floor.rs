@@ -530,7 +530,7 @@ fn raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads
 }
 
 /// C502 那一格改成从根指针读表之后，读不出的那一格：现行那一版的根指着的实例表两份都读不出，抬 F 在任何写之前拒绝
-/// （`InstanceTableMalformed`：判不了候选集），盘上逐字节不变（系统配置槽、根环、录制流步数）。
+/// （`InstanceTableUnreadable`：判不了候选集；读不出与解不开各报各的成员，C866 改法甲），盘上逐字节不变（系统配置槽、根环、录制流步数）。
 #[test]
 fn raising_the_floor_when_the_current_roots_instance_table_is_unreadable_is_refused_before_any_write(
 ) {
@@ -556,7 +556,7 @@ fn raising_the_floor_when_the_current_roots_instance_table_is_unreadable_is_refu
     let before = common::disk_snapshot(&pool.memory_pool(), &pool.stream);
     let refused = raise_floor(&mut pool, CheckpointTxg(3));
     assert!(
-        matches!(refused, Err(MountError::InstanceTableMalformed)),
+        matches!(refused, Err(MountError::InstanceTableUnreadable)),
         "现行那一版的实例表两份都读不出：{:?}",
         refused.as_ref().err()
     );

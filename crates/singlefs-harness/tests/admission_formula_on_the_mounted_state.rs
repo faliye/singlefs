@@ -31,8 +31,8 @@ use singlefs_core::admission::{
     admit_on_every_device, checkpoint_reserve_pool, instance_switch_reserve_on_one_device,
     space_budget_of_role, AdmissionReading, AdmissionRefusedOnSomeDevices,
     AvailableBytesOnOneDevice, BytesOnOneDevice, BytesSummedOverAllReplicas, DemandOnDevice,
-    DeviceAdmissionTerms, DeviceShortOfDemand, MetadataBlocks, PoolWideCommitments, ReplicaCount,
-    SpaceBudgetOfARole,
+    DeviceAdmissionTerms, DeviceShortOfDemand, JudgementThatFoundTheDeviceShort, MetadataBlocks,
+    PoolWideCommitments, ReplicaCount, SpaceBudgetOfARole,
 };
 use singlefs_core::mount::{
     mount_writable, mount_writable_with_space_admission, mount_writable_with_test_only_switches,
@@ -371,6 +371,8 @@ fn after_a_recovery_abandoned_a_root_the_admission_reading_with_the_shadow_ledge
                     .zip(&demand_that_fits_only_without_the_isolation)
                     .map(|((device, available), demand)| DeviceShortOfDemand {
                         device: *device,
+                        judged_short_by:
+                            JudgementThatFoundTheDeviceShort::FormulaAvailableAgainstDemand,
                         available: *available,
                         demand: demand.bytes,
                     })
@@ -520,6 +522,7 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
                 .into_iter()
                 .map(|device| DeviceShortOfDemand {
                     device,
+                    judged_short_by: JudgementThatFoundTheDeviceShort::FormulaAvailableAgainstDemand,
                     available: AvailableBytesOnOneDevice(
                         14 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
                     ),

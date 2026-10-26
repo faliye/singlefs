@@ -32,7 +32,7 @@ use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::transaction::PublishError;
 use singlefs_harness::memory_pool::MemoryPool;
 
-/// 整池第 303、304 次读（盘 0 两个系统配置槽头一次读进共用的那一份）读回坏字节各一次：先核不带故障那一次这两次读的确是它们。
+/// 整池第 307、308 次读（盘 0 两个系统配置槽头一次读进共用的那一份）读回坏字节各一次：先核不带故障那一次这两次读的确是它们。
 fn mount_with_both_slots_of_device_zero_read_back_garbage_once_into_the_shared_reads(
     image: &MemoryPool,
     geometry: &PoolImageGeometry,
@@ -62,7 +62,7 @@ fn mount_with_both_slots_of_device_zero_read_back_garbage_once_into_the_shared_r
             (DeviceIdentity(0), DeviceOffsetInBytes(0), true),
             (DeviceIdentity(0), DeviceOffsetInBytes(spacing), true),
         ],
-        "前提：整池第 303、304 次读是第一个写之前读盘 0 两个系统配置槽"
+        "前提：整池第 307、308 次读是第一个写之前读盘 0 两个系统配置槽"
     );
     let faulted = mount_writable_on_recording_devices(
         image,

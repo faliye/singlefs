@@ -7,7 +7,7 @@
 //! 加末节点（整张写表全部持久那一个状态，`crash_amplification::END_OF_FLOW_NODE_NAME`）；块键与崩溃放量同一个算法、只由内容定
 //! （段写表、起步镜像、计划哈希），几条流共有的前几步只判一次；判器那一半是判法单元指纹（`crate::crash_identity::judging_units_key`），
 //! 设点文件、项名都不进键。录入段按录入键入库，命中就不再录（`crate::crash_library::two_stages`）。
-//! 跑完打一行 `CRASH_CASE_BLOCKS blocks= reused= fresh= red= refused=`（[`CrashCaseBlocks`]）；`SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1` 只算块键、
+//! 跑完打一行 `CRASH_CASE_BLOCKS blocks= reused= fresh= red= refused= states=`（[`CrashCaseBlocks`]）；`SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1` 只算块键、
 //! 只读地查库、一块不判；`SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1` 库不读、全部块现判、照键写回同一份库；判器那一半拒算的整条用例在一次性的库里
 //! 照判、不入库，块计入 `refused=`。
 //! 两台分片与崩溃放量同一种读法（`SINGLEFS_CRASH_AMPLIFICATION_SHARE`、`…_HOST_WEIGHTS`、`…_IMPORT`）。
@@ -79,6 +79,9 @@ use crate::crash_point_replay_progress::{
     findings_log_final_lines, findings_standard_output_new_signature_line,
     findings_standard_output_summary_line, CrashPointReplayFindingsLog,
     CrashPointReplayFindingsLogBegin, CrashPointReplayFindingsLogSection,
+};
+use crate::crash_point_replay_provenance::{
+    observers_on_the_nodes_with_the_ones_attached_to_the_flow, RunOfTheFlow,
 };
 use crate::verdict_store::{StoredConclusionBlock, VerdictStore};
 
@@ -352,10 +355,13 @@ pub fn enumerate_crash_states_quick_tier_versions(
 
 /// 崩溃点重放枚举的总入口：`expansion` 定每一段怎么展开，`versions` 是 oracle 读的版本表（带「没有文件的那几版」的删除流也经它），
 /// `observers` 逐状态看（没有就空）。录入段把流（连同每段的展开）写进库、登清单；判段读回、按块判、存结论、重建计数。
+/// 调用方挂的观察者之外，按这条流在来历表里那一行另挂几个（`crate::crash_point_replay_provenance`：登记位上的流挂并集对走读观察者，
+/// 来历是 mkfs 返回之后的另挂两槽全废盘面观察者），设点文件里不手挂。
 ///
 /// # Panics
 /// 开不了库、写不进、读不回；选路要卡而卡用不上（配了 GPU 不退回 CPU）；结论版本与编译时对不上（整趟不写库）；判段判完还有块没结论
-/// （不是两台分片时）；计数向量与计划对不上；某个观察者在某个状态上 panic（它那一句原样带出）；项名撞了。
+/// （不是两台分片时）；计数向量与计划对不上；某个观察者在某个状态上 panic（它那一句原样带出）；项名撞了；来历表里没有这条流、有几行，
+/// 或调用方挂的观察者与按来历挂的同名（录任何东西之前）。
 #[allow(
     clippy::too_many_arguments,
     reason = "前六个是同一条流的几样输入（与 crash::judge_crash_state_range_of_the_read_back_flow 同一组），其余是展开、版本表与观察者"
@@ -503,7 +509,7 @@ const SAMPLING_SLICES_PER_THREAD: u64 = 8;
 
 /// 同 [`sample_crash_states_on_the_cpu_against_the_version_table`]，判段分 `threads` 条线程：`ordinals` 切成每线程
 /// [`SAMPLING_SLICES_PER_THREAD`] 段轮着领，`judge_state` 跨线程调、按序号各报各的，调用方要按序号排；录入段只录一次，
-/// 流只从库里读回一次、各线程共用。
+/// 流只从库里读回一次、各线程共用；判段的撕裂表也只建一份、各线程借用（判完核恰好建了一份，不是一份就 panic）。
 /// 交回的与单线程那一支相同：整条流的状态数（不是 `ordinals` 的长度）；各线程判的状态数合起来等于 `ordinals` 的长度，不等就 panic。
 ///
 /// # Panics
@@ -542,15 +548,32 @@ pub fn sample_crash_states_on_the_cpu_with_threads_against_the_version_table(
             .max(1);
         let slice_count = state_count.div_ceil(slice);
         let next_slice = AtomicU64::new(0);
-        if slice_count == 0 {
-            // 空序号段：一个状态都不判，照单线程那一支交回整条流的状态数
-            return crate::crash::judge_crash_state_range_of_the_read_back_flow(
+        // 撕裂表只随流定，一份可上 GB（用过的盘上重做 mkfs 那条流两块盘各一次清零罩着旧 journal 环，一份留着 1.5 GiB）：
+        // 判段只建这一份、各线程经同一份排好次序的状态借用，不在每一段里各建一份（`TornImageTablesOfTheReadBackFlow` 的文档
+        // 「一个阶段只建一份」；每段各建时三十一条线程同时留着三十一份，挤掉了 40G 的内存上限）。建了几份数在这里，判完核恰好一份。
+        let torn_image_tables_built = AtomicU64::new(0);
+        let build_the_torn_image_tables_of_the_flow = || {
+            torn_image_tables_built.fetch_add(1, Ordering::SeqCst);
+            crate::crash::TornImageTablesOfTheReadBackFlow::of_the_read_back_flow(
                 flow.base,
                 flow.writes,
                 flow.segments,
+            )
+        };
+        let torn_image_tables_of_the_flow = build_the_torn_image_tables_of_the_flow();
+        let crash_states_of_the_flow = torn_image_tables_of_the_flow.crash_states_planned_by(
+            flow.base,
+            flow.writes,
+            flow.segments,
+            flow.expansion,
+            &crate::crash::no_segment_slices(flow.segments.len()),
+        );
+        if slice_count == 0 {
+            // 空序号段：一个状态都不判，照单线程那一支交回整条流的状态数
+            return crate::crash::judge_crash_state_range_of_the_read_back_flow_with_slices(
+                &crash_states_of_the_flow,
                 flow.judged_root_index,
                 flow.version_table(),
-                flow.expansion,
                 ordinals.clone(),
                 &mut |_ordinal, _publish, _image, _judgement| {},
             );
@@ -560,6 +583,7 @@ pub fn sample_crash_states_on_the_cpu_with_threads_against_the_version_table(
                 .map(|_| {
                     let next_slice = &next_slice;
                     let ordinals = &ordinals;
+                    let crash_states_of_the_flow = &crash_states_of_the_flow;
                     scope.spawn(move || {
                         let mut judged_here = 0u64;
                         let mut states_of_the_whole_flow: Option<u64> = None;
@@ -571,13 +595,10 @@ pub fn sample_crash_states_on_the_cpu_with_threads_against_the_version_table(
                             let range = ordinals.start + index * slice
                                 ..(ordinals.start + (index + 1) * slice).min(ordinals.end);
                             // 交回的是整条流的状态数（与单线程那一支同一个契约），不是这一段判了几个：判了几个按段的长度数
-                            let states = crate::crash::judge_crash_state_range_of_the_read_back_flow(
-                                flow.base,
-                                flow.writes,
-                                flow.segments,
+                            let states = crate::crash::judge_crash_state_range_of_the_read_back_flow_with_slices(
+                                crash_states_of_the_flow,
                                 flow.judged_root_index,
                                 flow.version_table(),
-                                flow.expansion,
                                 range.clone(),
                                 &mut |ordinal, publish, image, judgement| {
                                     note(ordinal, publish, judgement);
@@ -617,6 +638,11 @@ pub fn sample_crash_states_on_the_cpu_with_threads_against_the_version_table(
                 states_of_the_whole_flow.expect("序号段不空，至少一条线程领到了段"),
             )
         });
+        assert_eq!(
+            torn_image_tables_built.load(Ordering::SeqCst),
+            1,
+            "判段的撕裂表只建一份、各线程借用，不按段各建一份"
+        );
         assert_eq!(judged, state_count, "各线程判的状态数合起来是序号段的长度");
         states_of_the_whole_flow
     })
@@ -926,7 +952,8 @@ fn record_the_judge_tables(
 /// （库目录里一个文件都不动、修改时刻不变），打 [`CRASH_CASE_BLOCKS_LINE_PREFIX`] 那一行，交只录（`StageOutcome::RecordedOnly`），退 0。
 pub const CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_CASE_BLOCKS_QUERY";
 
-/// 一条崩溃枚举用例跑完打的那一行的头（字段次序照 `scripts/gate/admission.py` 的 `CRASH_CASE_BLOCKS_FIELDS`）。
+/// 一条崩溃枚举用例跑完打的那一行的头（前五个字段次序照 `scripts/gate/admission.py` 的 `CRASH_CASE_BLOCKS_FIELDS`，它按字段名读、不看后面多出的
+/// `states=`）。
 pub const CRASH_CASE_BLOCKS_LINE_PREFIX: &str = "CRASH_CASE_BLOCKS";
 
 /// 一条崩溃枚举用例这一趟这台机器那一份的块账（[`CRASH_CASE_BLOCKS_LINE_PREFIX`] 那一行）：`blocks = reused + fresh + refused`。
@@ -939,16 +966,19 @@ pub struct CrashCaseBlocks {
     pub fresh: u64,
     pub red: u64,
     pub refused: u64,
+    /// 这一份的块里一共几个状态（[`states_of_the_blocks_of_this_share`]；只查块键那一趟也数，出口 10「每项态数现数」）。
+    pub states: u64,
 }
 
 impl CrashCaseBlocks {
-    /// `CRASH_CASE_BLOCKS blocks=<n> reused=<n> fresh=<n> red=<n> refused=<n>`。
+    /// `CRASH_CASE_BLOCKS blocks=<n> reused=<n> fresh=<n> red=<n> refused=<n> states=<n>`。
     #[must_use]
     pub fn line(&self) -> String {
-        format!(
+        let counted_blocks = format!(
             "{CRASH_CASE_BLOCKS_LINE_PREFIX} blocks={} reused={} fresh={} red={} refused={}",
             self.blocks, self.reused, self.fresh, self.red, self.refused
-        )
+        );
+        format!("{counted_blocks} states={}", self.states)
     }
 }
 
@@ -1032,9 +1062,15 @@ fn enumerate_crash_states_through_the_library(
     observers: &[CrashPointReplayObserver<'_>],
     observers_handing_back_images: &[CrashPointReplayObserverHandingBackAnImage<'_>],
 ) -> Result<StageOutcome<CrashPointReplayTally>, String> {
+    // 按来历统一挂（主 agent 对 G4 实现员五问的定案）：来历表里查不到这条流就拒，在录任何东西之前
+    let observers_on_the_nodes = observers_on_the_nodes_with_the_ones_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        item.name,
+        &observers_on_the_nodes_of_the_item(item, observers, observers_handing_back_images)?,
+        &nodes_of_the_item(item),
+    )
+    .map_err(|refusal| refusal.sentence())?;
     let route = crash_point_replay_judge_route()?;
-    let observers_on_the_nodes =
-        observers_on_the_nodes_of_the_item(item, observers, observers_handing_back_images)?;
     let keys = keys_of_the_item(route, &observers_on_the_nodes);
     let flow_to_record = flow_of_the_inputs(
         item,
@@ -1065,6 +1101,22 @@ fn enumerate_crash_states_through_the_library(
     Ok(outcome)
 }
 
+/// 这一份的块里一共几个状态（`CRASH_CASE_BLOCKS` 行的 `states=`；出口 10「每项态数现数」的办法 (a)：只查块键那一趟顺带数，录入段本来就排了计划）：
+/// 块是点内序号区间，状态数是区间长，块号的数法与 [`blocks_of_this_host`] 相同。分片的段（C790）只数这一趟的片，分片跑的流数出来的是这一趟那一截。
+fn states_of_the_blocks_of_this_share(plan: &CrashPlan, is_mine: &dyn Fn(u64) -> bool) -> u64 {
+    let mut states = 0u64;
+    let mut block_sequence = 0u64;
+    for point in &plan.points {
+        for local in point.blocks() {
+            if is_mine(block_sequence) {
+                states += local.end - local.start;
+            }
+            block_sequence += 1;
+        }
+    }
+    states
+}
+
 /// 只查块键那一趟（[`CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE`]`=1`）：照调用方这一趟的流排计划、算块键，只读地开库、查每一块有没有
 /// 键相同的判定，一块都不判、一行都不写。判器那一半拒算的块全部计入 `refused=`。
 fn blocks_queried_without_judging(
@@ -1076,6 +1128,7 @@ fn blocks_queried_without_judging(
         let plan = plan_crash_points(flow);
         let selected = blocks_of_this_host(&plan)?;
         let blocks = u64::try_from(selected.len()).expect("块数装得进 u64");
+        let states = states_of_the_blocks_of_this_share(&plan, &|block| selected.contains(&block));
         if keys.are_refused() {
             for sentence in &keys.refusal_sentences {
                 println!("CRASH_CASE_BLOCKS_KEY_REFUSED {sentence}");
@@ -1086,6 +1139,7 @@ fn blocks_queried_without_judging(
                 fresh: 0,
                 red: 0,
                 refused: blocks,
+                states,
             });
         }
         let log_directory = DisposableLibraryDirectory::new("crash-case-blocks-query")?;
@@ -1096,6 +1150,7 @@ fn blocks_queried_without_judging(
                 fresh: blocks,
                 red: 0,
                 refused: 0,
+                states,
             });
         };
         let conclusion_versions =
@@ -1108,6 +1163,7 @@ fn blocks_queried_without_judging(
             fresh: 0,
             red: 0,
             refused: 0,
+            states,
         };
         let mut block_sequence = 0u64;
         for (point_index, point) in plan.points.iter().enumerate() {
@@ -1363,7 +1419,22 @@ fn blocks_of_this_host(plan: &CrashPlan) -> Result<HashSet<u64>, String> {
         .collect())
 }
 
-/// 一条崩溃枚举用例的观察者挂在它自己那个点与末节点上（设点文件就是用例文件，观察者代码文件也是它）。
+/// 一条崩溃枚举用例的两个节点：它自己那个点（`<项名>.<周期>.<步序>` 都是它的）与末节点，设点文件就是用例文件。
+fn nodes_of_the_item(item: CrashPointReplayItem<'_>) -> Vec<NodeOfAnObserver> {
+    vec![
+        NodeOfAnObserver {
+            setting_file: item.setting_file.to_string(),
+            entry_name: item.name.to_string(),
+        },
+        NodeOfAnObserver {
+            setting_file: item.setting_file.to_string(),
+            entry_name: END_OF_FLOW_NODE_NAME.to_string(),
+        },
+    ]
+}
+
+/// 一条崩溃枚举用例自己挂的观察者挂在它自己那个点与末节点上（设点文件就是用例文件，观察者代码文件也是它）；按来历挂的另由
+/// `crate::crash_point_replay_provenance::observers_on_the_nodes_with_the_ones_attached_to_the_flow` 接在后面。
 ///
 /// # Errors
 /// 观察者名字不合规矩。
@@ -1372,18 +1443,7 @@ fn observers_on_the_nodes_of_the_item<'observer>(
     observers: &[CrashPointReplayObserver<'observer>],
     observers_handing_back_images: &[CrashPointReplayObserverHandingBackAnImage<'observer>],
 ) -> Result<Vec<ObserverOnTheNodes<'observer>>, String> {
-    let nodes = || {
-        vec![
-            NodeOfAnObserver {
-                setting_file: item.setting_file.to_string(),
-                entry_name: item.name.to_string(),
-            },
-            NodeOfAnObserver {
-                setting_file: item.setting_file.to_string(),
-                entry_name: END_OF_FLOW_NODE_NAME.to_string(),
-            },
-        ]
-    };
+    let nodes = || nodes_of_the_item(item);
     let observer_name = |name: &str| {
         ObserverName::new(name).map_err(|rejected| format!("观察者名字不合规矩：{rejected:?}"))
     };
@@ -1750,6 +1810,7 @@ fn crash_case_blocks_of_the_share(
         fresh,
         red,
         refused,
+        states: states_of_the_blocks_of_this_share(plan, is_mine),
     })
 }
 
@@ -2041,25 +2102,17 @@ fn crash_point_replay_tally_from_the_library(
                 tally.states += 1;
                 let (segment, publish) = positions.position_of(ordinal);
                 *tally.states_by_publish.entry(publish).or_insert(0) += 1;
-                let [consulted_instance, consulted_txg, consulted_outcome, consulted_failure_point, ignored_instance, ignored_txg, ignored_outcome, ignored_failure_point] =
-                    words.0;
-                match consulted_outcome {
+                // 两遍各自的恢复字（落到的根连同完整的 checkpoint_txg、结局、失败点）整份比：与现判的
+                // `crash_judge_conclusions::recovery_passes_differ` 同一组字
+                let consulted_pass = words.consulted_pass();
+                let ignored_pass = words.ignored_pass();
+                match consulted_pass.outcome {
                     RECOVERY_OUTCOME_CODE_NO_FILE => tally.no_file_states += 1,
                     RECOVERY_OUTCOME_CODE_FILE_READ => tally.file_read_states += 1,
                     RECOVERY_OUTCOME_CODE_FAILED => tally.failed_states += 1,
                     other => return Err(format!("恢复字里的结局码认不得：{other}")),
                 }
-                if (
-                    consulted_instance,
-                    consulted_txg,
-                    consulted_outcome,
-                    consulted_failure_point,
-                ) != (
-                    ignored_instance,
-                    ignored_txg,
-                    ignored_outcome,
-                    ignored_failure_point,
-                ) {
+                if consulted_pass != ignored_pass {
                     tally.journal_differing_states += 1;
                 }
                 let mut is_red_state = false;
@@ -2554,6 +2607,67 @@ mod tests {
         assert_ne!(nodes_of_a[3], nodes_of_b[3], "第四步内容不同，节点键不同");
     }
 
+    /// 出口 10「每项态数现数」的办法 (a)：`CRASH_CASE_BLOCKS` 行带 `states=`，数的是这一份的块里的状态。三次单元写一段、一次根槽写一段的流
+    /// （盘上原本没有内容，没有原地覆写，每次写两态），全量展开：每段 2^|段| − 1 个、末节点全部持久 1 个，(2³ − 1) + (2¹ − 1) + 1 = 9 个，
+    /// 与崩溃点重放排的状态计划（`crash_state_ranges_by_segment`）数的一样；只领一部分块时只数领到的。
+    /// 判别力（`crates/mutations.tsv`）：一块里的状态只记一个，这条红。
+    #[test]
+    fn the_blocks_line_reports_the_states_in_the_blocks_of_this_share() {
+        let (writes, segments) = writes_and_segments_of(&[
+            &[
+                (StepKind::UnitWrite, 1, 0),
+                (StepKind::UnitWrite, 2, 0),
+                (StepKind::UnitWrite, 3, 0),
+            ],
+            &[(StepKind::RootRecordFua, 0, 1)],
+        ]);
+        let base = MemoryPool {
+            devices: std::collections::BTreeMap::new(),
+            device_size_in_bytes: 1 << 30,
+        };
+        let item = CrashPointReplayItem {
+            name: "states_probe",
+            setting_file: "crates/singlefs-checker-tier/src/crash_state_enumeration.rs",
+        };
+        let judged_root_index = writes
+            .iter()
+            .rposition(|write| write.kind == StepKind::RootRecordFua)
+            .expect("造的流最后一段是一次根槽写");
+        let (states_of_every_block, states_of_no_block) = flow_of_the_inputs(
+            item,
+            &base,
+            &writes,
+            &segments,
+            judged_root_index,
+            CrashPointReplayVersionTable::with_a_file_only(&[]),
+            &every_proper_subset,
+        )
+        .with_the_flow(|flow| {
+            let plan = plan_crash_points(flow);
+            (
+                states_of_the_blocks_of_this_share(&plan, &|_block| true),
+                states_of_the_blocks_of_this_share(&plan, &|_block| false),
+            )
+        });
+        assert_eq!(states_of_every_block, 9, "(2³ − 1) + (2¹ − 1) + 1");
+        assert_eq!(
+            states_of_every_block,
+            crash_state_ranges_by_segment(&base, &writes, &segments, &every_proper_subset).1,
+            "与状态计划数的一样"
+        );
+        assert_eq!(states_of_no_block, 0, "一块都没领就是 0 个");
+        let line = CrashCaseBlocks {
+            blocks: 0,
+            reused: 0,
+            fresh: 0,
+            red: 0,
+            refused: 0,
+            states: states_of_every_block,
+        }
+        .line();
+        assert!(line.ends_with(" states=9"), "{line}");
+    }
+
     /// 这几条库单测的判路照这台机器的多机配置取（配 GPU 必用 GPU、做不到报错不降级；门禁 checker-tier-crash-point-replay 的
     /// `cpu_judging_lines` 判配了 GPU 的判段不许落在 CPU）：配了 GPU 的机器只有编进 gpu 特性的那一趟判得了，所以这几条只编进带特性的那一趟，
     /// 「没编进特性不跑判段」那一路在这里到不了。
@@ -2768,6 +2882,11 @@ mod tests {
             "键相同的块全部复用"
         );
         assert_eq!(query_run.red, fresh_run.red, "查到的红块与判出的一样多");
+        assert!(fresh_run.states > 0, "判段那一趟数了块里的状态");
+        assert_eq!(
+            query_run.states, fresh_run.states,
+            "只查块键那一趟数的态与判段那一趟的一样多"
+        );
         environment.set_variable(
             CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE,
             std::ffi::OsStr::new("0"),
@@ -2788,8 +2907,8 @@ mod tests {
             assert_eq!(
                 run.line(),
                 format!(
-                    "CRASH_CASE_BLOCKS blocks={} reused={} fresh={} red={} refused={}",
-                    run.blocks, run.reused, run.fresh, run.red, run.refused
+                    "CRASH_CASE_BLOCKS blocks={} reused={} fresh={} red={} refused={} states={}",
+                    run.blocks, run.reused, run.fresh, run.red, run.refused, run.states
                 )
             );
         }

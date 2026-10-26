@@ -1,9 +1,9 @@
 //! 命令行 `unit-graph`：
 //!
-//!   unit-graph dump <根> [--threads <N>]
+//!   unit-graph dump <根> [--judgment-kind <种类>] [--threads <N>]
 //!   unit-graph closure <根> <入口 fn 路径> [<入口 fn 路径>…] [--target <目标>] [--cfg <谓词>]… [--no-default-features]
 //!                      [--toolchain-line <行>…] [--toolchain-of-the-build <profile>]
-//!                      [--lock-line <行>… | --lock-file <Cargo.lock>] [--threads <N>]
+//!                      [--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <种类>] [--threads <N>]
 //!   unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]
 //!
 //! 给几个入口时一起收一个闭包（`compute_closure_of_entries`：几个入口都在 `--target` 点名的那个目标里、同一个 crate）。
@@ -11,8 +11,10 @@
 //! `singlefs-checker-tier` 的构建脚本同一份拼法）：跑 `$RUSTC -vV`（没设跑 `rustc`）与 `$CARGO -V`（没设跑 `cargo`），目标取
 //! `CARGO_BUILD_TARGET`、没设取 `rustc -vV` 的 `host:`，RUSTFLAGS 取 `CARGO_ENCODED_RUSTFLAGS`、没设按空白切 `RUSTFLAGS`，
 //! profile 的生效值从 `<根>` 那棵树的根 `Cargo.toml` 算（`CARGO_PROFILE_<名>_<键>` 照盖）；拼出的行接在 `--toolchain-line` 给的后面。
-//! 要与构建脚本写进 `OUT_DIR` 的键逐字相同，另给 `--no-default-features` 与构建时开的每个特性（`--cfg 'feature="default"'` 这样逐个写）
-//! 和 `--lock-file <根>/Cargo.lock`。
+//! 要与构建脚本写进 `OUT_DIR` 的键逐字相同，另给 `--no-default-features` 与构建时开的每个特性（`--cfg 'feature="default"'` 这样逐个写）、
+//! `--lock-file <根>/Cargo.lock` 和 `--judgment-kind product-behavior`（判器组是产品行为判定）。
+//! `--judgment-kind` 定这一趟在哪个视图上切、收、算（`singlefs_unit_graph::verus_ghost_code`）：`product-behavior` 剥掉 `verus!` 里的规格与证明块，
+//! `formal-verification` 照源码原样；不给是 `formal-verification`——规格与证明都进键，多判不假绿，原先不带它的调用照旧得同一把键。
 //!
 //! `<根>` 是仓根或 `crates/` 目录。目标写 `lib`（不给时）、`bin:<名>`、`test:<名>`、`example:<名>`、`bench:<名>`、`build`、`doctest`；
 //! 库里的单测要另给 `--cfg test`。`--cfg` 写 `名字` 或 `键="值"`（`feature="gpu"` 当本 crate 的特性）。
@@ -49,13 +51,14 @@ use singlefs_unit_graph::output::{
     closure_lines, dump_lines, key_line, parse_time_refusals, refusal_lines,
 };
 use singlefs_unit_graph::rule_switches::RuleSwitches;
+use singlefs_unit_graph::verus_ghost_code::JudgmentKind;
 use singlefs_unit_graph::workspace::{load_workspace, TargetSelector, Workspace};
 
 const USAGE: &str = concat!(
-    "用法：unit-graph dump <根> [--threads <N>]\n",
+    "用法：unit-graph dump <根> [--judgment-kind <product-behavior|formal-verification>] [--threads <N>]\n",
     "      unit-graph closure <根> <入口 fn 路径> [<入口 fn 路径>…] [--target <目标>] [--cfg <谓词>]… [--no-default-features] ",
     "[--toolchain-line <行>…（其中一行 host: <三元组> 或 target: <三元组>）] [--toolchain-of-the-build <profile>] ",
-    "[--lock-line <行>… | --lock-file <Cargo.lock>] [--threads <N>]\n",
+    "[--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <product-behavior|formal-verification>] [--threads <N>]\n",
     "      unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]"
 );
 
@@ -82,6 +85,7 @@ struct Arguments {
     lock_lines: Vec<String>,
     lock_file: Option<PathBuf>,
     build_profile: Option<String>,
+    judgment_kind: JudgmentKind,
     threads: Option<NonZeroUsize>,
 }
 
@@ -107,6 +111,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
         lock_lines: Vec::new(),
         lock_file: None,
         build_profile: None,
+        judgment_kind: JudgmentKind::FormalVerification,
         threads: None,
     };
     let mut position = 1usize;
@@ -120,7 +125,8 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
             | "--toolchain-line"
             | "--lock-line"
             | "--lock-file"
-            | "--toolchain-of-the-build" => {
+            | "--toolchain-of-the-build"
+            | "--judgment-kind" => {
                 let Some(value) = value else {
                     return Err(format!("{current} 后面缺值"));
                 };
@@ -145,6 +151,15 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
                     "--toolchain-line" => arguments.toolchain_lines.push(value.clone()),
                     "--lock-file" => arguments.lock_file = Some(PathBuf::from(value)),
                     "--toolchain-of-the-build" => arguments.build_profile = Some(value.clone()),
+                    "--judgment-kind" => {
+                        arguments.judgment_kind = JudgmentKind::parse(value).map_err(|text| {
+                            format!(
+                                "--judgment-kind 只认 {} 与 {}，给的是「{text}」",
+                                JudgmentKind::ProductBehavior.option_value(),
+                                JudgmentKind::FormalVerification.option_value()
+                            )
+                        })?;
+                    }
                     _ => arguments.lock_lines.push(value.clone()),
                 }
                 position += 2;
@@ -364,14 +379,15 @@ fn main() -> ExitCode {
     let threads = arguments.threads.unwrap_or_else(default_heavy_threads);
     let started = Instant::now();
     let switches = RuleSwitches::every_rule_intact();
-    let workspace = match load_workspace(&arguments.root, threads, &switches) {
+    let loaded_workspace = match load_workspace(&arguments.root, threads, &switches) {
         Ok(workspace) => workspace,
         Err(error) => {
             eprintln!("unit-graph：{error}");
             return ExitCode::from(EXIT_USAGE);
         }
     };
-    let (lines, summary, exit_code) = lines_of(&workspace, &arguments, &switches);
+    let workspace = loaded_workspace.view_for_judgment(arguments.judgment_kind);
+    let (lines, summary, exit_code) = lines_of(workspace, &arguments, &switches);
     let mut text = lines.join("\n");
     if !lines.is_empty() {
         text.push('\n');

@@ -5,8 +5,8 @@
 //!
 //! M6：恢复内核按上段叶条目逐条收文件，与 CPU 恢复（`crates/singlefs-core/src/recovery.rs` 的 `extents_of_the_first_file` 与冷走读）同一套——
 //! 第一个文件之外的文件至少一个单元、单元从 0 起连号、尾部没有洞，它们的单元数并进映射条目数；上段叶条目按块分批读（一批 64 条，
-//! `crash_judge_common.wgsl` 的 `MAX_UPPER_ENTRIES`），七十一个文件那一形跨过一批的边界。镜像：按 inode 号写出的两文件、上段长到层 1、
-//! 删到只剩别的文件、删掉别的文件降回层 0、别的文件删除中途、七十一个文件。
+//! `crash_judge_common.wgsl` 的 `MAX_UPPER_ENTRIES`），七十一个文件那一形跨过一批的边界。镜像：按 inode 号写出的两文件、上段长到常规层、
+//! 删到只剩别的文件、删掉别的文件降回崩溃点重放、别的文件删除中途、七十一个文件。
 //! M2：池级 checker 新立的 I-9.40（extent 上段形状由有条目的 inode 号集合定、根层级最低，下标 102）GPU 扫描内核在删除态扫描里同判、置位：
 //! 上面那几形都成立，三个必红世界（根层级高一层、多一个脊线节点、少一片该有的叶——号 150 的条目挪进第 0 片叶，规范形要的 (0, 1) 不在）
 //! 两边都红、GPU 红在下标 102。必红世界在写路径的镜像上换节点字节造（新的整单元校验和沿引用链补上去），镜像照 harness 档
@@ -104,7 +104,7 @@ impl<'bytes> ConclusionBytesReader<'bytes> {
 }
 
 impl JudgementsOfBothJudgesOnAnImage {
-    /// CPU 那一份对拍字逐字段（小端：红位、违例位、两遍的根各两字、两遍的结局、两遍的失败点、判到位、I-1.13 的结局码、判不了一字节），
+    /// CPU 那一份对拍字逐字段（小端：红位、违例位、两遍的根各四字（`LandedRootWords::words`：标记、实例代号、checkpoint_txg 低 32 位与高 32 位）、两遍的结局、两遍的失败点、判到位、I-1.13 的结局码、判不了一字节），
     /// 之后接 GPU 结论字（小端）。
     fn to_bytes(&self) -> Vec<u8> {
         let words = &self.cpu_words;
@@ -115,8 +115,9 @@ impl JudgementsOfBothJudgesOnAnImage {
             words.consulted_pass_landed_root,
             words.ignored_pass_landed_root,
         ] {
-            bytes.extend_from_slice(&root.instance.to_le_bytes());
-            bytes.extend_from_slice(&root.checkpoint_txg_low.to_le_bytes());
+            for word in root.words() {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
         }
         for word in [
             words.consulted_pass_outcome,
@@ -140,14 +141,18 @@ impl JudgementsOfBothJudgesOnAnImage {
         let mut reader = ConclusionBytesReader { remaining: bytes };
         let red_bits = reader.take_u32()?;
         let pool_checker_violated_bits = reader.take_u128()?;
-        let consulted_pass_landed_root = LandedRootWords {
-            instance: reader.take_u32()?,
-            checkpoint_txg_low: reader.take_u32()?,
-        };
-        let ignored_pass_landed_root = LandedRootWords {
-            instance: reader.take_u32()?,
-            checkpoint_txg_low: reader.take_u32()?,
-        };
+        let consulted_pass_landed_root = LandedRootWords::of_the_words([
+            reader.take_u32()?,
+            reader.take_u32()?,
+            reader.take_u32()?,
+            reader.take_u32()?,
+        ]);
+        let ignored_pass_landed_root = LandedRootWords::of_the_words([
+            reader.take_u32()?,
+            reader.take_u32()?,
+            reader.take_u32()?,
+            reader.take_u32()?,
+        ]);
         let consulted_pass_outcome = reader.take_u32()?;
         let ignored_pass_outcome = reader.take_u32()?;
         let consulted_pass_failure_point = reader.take_u32()?;
@@ -423,7 +428,7 @@ const WRITE_TIME_SECONDS_AFTER_THE_FIRST_FILE: u64 = FIXED_WRITE_TIME_SECONDS + 
 const INODES_CREATED_PER_PUBLISH_AT_MOST: u64 = 200;
 /// 第一个文件之外那个号落在上段第 3 片叶（产品几何：上段叶罩 143 个号），要层级 1。
 const INODE_ON_THE_FOURTH_UPPER_LEAF: u64 = 500;
-/// 第一个文件之外那个号落在上段第 1 片叶，写它上段长到层 1。
+/// 第一个文件之外那个号落在上段第 1 片叶，写它上段长到常规层。
 const INODE_ON_THE_SECOND_UPPER_LEAF: u64 = 150;
 /// 删除的各步至多走这么多步：走不到最后一批说明计划出错，不无限循环。
 const DELETION_STEPS_AT_MOST: usize = 16;
@@ -632,7 +637,7 @@ fn the_gpu_judge_recovers_two_files_written_by_inode_number_like_the_cpu_judge()
     );
 }
 
-/// 上段长到层 1：第一个文件与 inode 500（上段第 3 片叶）。两边的恢复都走两片叶、读到第一个文件。
+/// 上段长到常规层：第一个文件与 inode 500（上段第 3 片叶）。两边的恢复都走两片叶、读到第一个文件。
 #[test]
 fn the_gpu_judge_recovers_files_under_an_upper_segment_grown_to_level_one_like_the_cpu_judge() {
     let pool = pool_with_the_first_file_and_inode_five_hundred("gpu-upper-segment-at-level-one");
@@ -644,7 +649,7 @@ fn the_gpu_judge_recovers_files_under_an_upper_segment_grown_to_level_one_like_t
     );
 }
 
-/// 删到只剩别的文件：上段在层 1 时删掉第一个文件，inode 500 那片叶留在层级 1 的根下面。上段里没有第一个文件那一条，两边都答没有文件。
+/// 删到只剩别的文件：上段在常规层 时删掉第一个文件，inode 500 那片叶留在层级 1 的根下面。上段里没有第一个文件那一条，两边都答没有文件。
 #[test]
 fn the_gpu_judge_recovers_the_version_left_with_another_file_after_the_first_file_is_deleted_like_the_cpu_judge(
 ) {

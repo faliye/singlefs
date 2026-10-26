@@ -1,11 +1,11 @@
 //! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_library、crash_amplification
 //! 崩溃点重放放量的发现日志（里程碑「覆盖写、释放、回退与复用」收尾批「崩溃点重放发现日志」）：在新池新建文件流上（mkfs → 取号 → 暖机 → A，按甲二展开，
-//! 原地覆写取三态，46 个状态；C577 之前 54 个）把版本表故意写错——暖机第二次发布（实例 1、txg 2）下面说有文件、A（txg 3）的内容说成别的——
+//! 原地覆写取三态，54 个状态；取号写一轮时 46 个，C577 之前 54 个）把版本表故意写错——暖机第二次发布（实例 1、txg 2）下面说有文件、A（txg 3）的内容说成别的——
 //! 落在 txg 2 的状态报「有文件却报没有」，读出 A 的状态报「读回的内容不对」，两遍恢复（看 journal、不看 journal）各红几段。
 //! 判段从崩溃判定库里读回的结论重建发现表：按签名去重之后是几个签名、各几个状态、最先是哪几个状态，拿一份与判器分开写的 CPU 重判来核
 //! （重判也走两段：同一条流经 CPU 取样那一路写进崩溃点重放枚举那一类的库、读回来逐状态重判，不在录入段的内存里判），再核发现日志那一节定稿的
 //! 每一行；同一条流再跑一遍全照库里复用，发现日志逐字节相同，观察者的计数从库里读回。
-//! 它不是崩溃点重放全量那一类用例：只跑甲二那 46 个状态，平时跑得起。
+//! 它不是崩溃点重放全量那一类用例：只跑甲二那 54 个状态，平时跑得起。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -46,7 +46,10 @@ use singlefs_harness::sha256::sha256_digest;
 /// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
 const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs";
 /// 新池新建文件流按甲二展开的状态数（`crash_enumeration_new_pool_file_creation_stream.rs` 的 `QUICK_TIER_STATES`，那里写了怎么数出来的）。
-const QUICK_TIER_STATES: u64 = 46;
+/// 取号写两轮（D22（单元原子性怎么合成） 已定项 8 落地）之后两轮各成一个系统配置槽段、各 3² − 1：段长
+/// [2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2] 里五个系统配置槽段各 8、三个两写段各 3、三个一写段各 1、A 的单元段 1，再加全部持久那一个，
+/// 5 × 8 + 3 × 3 + 3 × 1 + 1 + 1 = 54（取号写一轮时四个系统配置槽段，46）。
+const QUICK_TIER_STATES: u64 = 54;
 /// 发现日志 begin 行里的流名：就是这一项的项名。
 const ITEM_NAME: &str = "findings_new_pool_file_creation_stream";
 /// 逐状态重判那一趟（CPU 取样那一路）的项名：与枚举那一项分开登清单、分开存取样的结论。
@@ -610,7 +613,8 @@ fn red_states_are_deduplicated_by_signature_and_the_findings_log_section_is_fina
         .map(|finding| finding.states)
         .max()
         .expect("有签名");
-    // 钉值出处：2026-10-04 主工作区 checker 档日志 `CRASH_POINT_REPLAY_FINDINGS signatures=15 red_states=25 states=46`
+    // 钉值出处：2026-10-04 主工作区 checker 档日志 `CRASH_POINT_REPLAY_FINDINGS signatures=15 red_states=25 states=46`；
+    // 取号写两轮之后 2026-10-23 带特性那一趟的日志是 `signatures=15 red_states=25 states=54`（多出来的 8 个状态环都空着、不红）
     assert!(
         tally.findings.by_signature.len() >= 4 && largest_signature_states >= 8,
         "至少四个签名、至少一个签名跨过 8 个状态：{} 个签名，最多的 {largest_signature_states} 个状态",

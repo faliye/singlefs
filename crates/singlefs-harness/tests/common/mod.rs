@@ -30,6 +30,9 @@ use singlefs_format::{
 };
 use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::FixedGeometry;
+use singlefs_harness::temporary_files::{
+    remove_or_keep_the_temporary_path, TemporaryPathOnDrop, TemporaryPathRemovedOnDrop,
+};
 use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
 
 static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -132,9 +135,15 @@ pub struct BuiltPool {
 
 impl Drop for BuiltPool {
     fn drop(&mut self) {
-        for path in &self.paths {
-            let _ = std::fs::remove_file(path);
-        }
+        remove_or_keep_the_image_files(&self.paths);
+    }
+}
+
+/// 池丢掉时删它的镜像文件：照留现场的开关（`singlefs_harness::temporary_files`），没开就删。
+fn remove_or_keep_the_image_files(paths: &[PathBuf]) {
+    let on_drop = TemporaryPathOnDrop::from_the_environment();
+    for path in paths {
+        remove_or_keep_the_temporary_path(path, on_drop);
     }
 }
 
@@ -189,23 +198,24 @@ fn reopen_cold_images(paths: &[PathBuf]) -> Vec<(DeviceIdentity, FileBackedBlock
         .collect()
 }
 
-/// 两个新建的全零文件镜像上 mkfs，录制流开内容保留：返回镜像路径、录着的设备、流、mkfs 写出的东西与 mkfs 占了流里几步。
-fn formatted_recorded_images(
+/// 两个新建的全零文件镜像上 mkfs，录制流开内容保留：返回认领着镜像的守卫、录着的设备、流、mkfs 写出的东西与 mkfs 占了流里几步。
+/// 镜像在建之前就由守卫认领：mkfs 或之后搭池的哪一步 panic，守卫都删掉镜像；池搭成时守卫把路径交给池，池丢掉时删。
+pub fn formatted_recorded_images(
     tag: &str,
 ) -> (
-    Vec<PathBuf>,
+    Vec<TemporaryPathRemovedOnDrop>,
     Vec<(DeviceIdentity, Recorded)>,
     SharedStream,
     MakeFilesystemOutput,
     usize,
 ) {
     let stream = SharedStream::retaining_contents();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     let mut devices: Vec<(DeviceIdentity, Recorded)> = Vec::new();
     for device_number in 0..2u32 {
-        let path = image_path(tag, device_number);
+        let image = TemporaryPathRemovedOnDrop::claiming(image_path(tag, device_number));
         let file = FileBackedBlockDevice::create_image_file_exclusively(
-            &path,
+            image.path(),
             IMAGE_BYTES,
             PhysicalBlockSizeInBytes(512),
         )
@@ -218,11 +228,19 @@ fn formatted_recorded_images(
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(image);
     }
     let genesis = make_filesystem(&parameters(), &mut devices).expect("mkfs");
     let mkfs_operation_count = stream.operations().len();
-    (paths, devices, stream, genesis, mkfs_operation_count)
+    (images, devices, stream, genesis, mkfs_operation_count)
+}
+
+/// 守卫认领着的镜像交给池：池丢掉时删（[`remove_or_keep_the_image_files`]）。
+fn image_paths_handed_to_the_pool(images: Vec<TemporaryPathRemovedOnDrop>) -> Vec<PathBuf> {
+    images
+        .into_iter()
+        .map(TemporaryPathRemovedOnDrop::into_path_handed_to_another_owner)
+        .collect()
 }
 
 impl BuiltPool {
@@ -263,9 +281,7 @@ pub struct FormattedPool {
 
 impl Drop for FormattedPool {
     fn drop(&mut self) {
-        for path in &self.paths {
-            let _ = std::fs::remove_file(path);
-        }
+        remove_or_keep_the_image_files(&self.paths);
     }
 }
 
@@ -609,6 +625,8 @@ pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records_on(
                 rewritten.new_instance_table = root.instance_table;
                 rewritten.new_allocation_record_tree_root = root.allocation_record_tree_root;
                 rewritten.new_unmount_marker = root.unmount_marker;
+                rewritten.new_reclaim_threshold = root.reclaim_threshold;
+                rewritten.new_pinned_ring_slot = root.pinned_ring_slot;
             }
             if let Some((previous_instance, previous_bytes)) = &rewritten_previous_record {
                 if *previous_instance == record.instance {
@@ -734,9 +752,9 @@ pub fn write_back_system_configuration_slots(
 }
 
 pub fn format_pool(tag: &str) -> FormattedPool {
-    let (paths, devices, stream, genesis, mkfs_operation_count) = formatted_recorded_images(tag);
+    let (images, devices, stream, genesis, mkfs_operation_count) = formatted_recorded_images(tag);
     FormattedPool {
-        paths,
+        paths: image_paths_handed_to_the_pool(images),
         devices: Some(devices),
         stream,
         genesis,
@@ -746,7 +764,7 @@ pub fn format_pool(tag: &str) -> FormattedPool {
 
 pub fn build_pool(tag: &str) -> BuiltPool {
     let parameters = parameters();
-    let (paths, mut devices, stream, genesis, mkfs_operation_count) =
+    let (images, mut devices, stream, genesis, mkfs_operation_count) =
         formatted_recorded_images(tag);
     let mut allocator = PoolAllocator::new(vec![
         DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES),
@@ -792,7 +810,7 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         (warm_up, output)
     };
     BuiltPool {
-        paths,
+        paths: image_paths_handed_to_the_pool(images),
         devices: Some(devices),
         stream,
         genesis,

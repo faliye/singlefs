@@ -68,7 +68,7 @@ use singlefs_core::records::{
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_system_configuration, instance_table_chain_of_root,
     recover, replay_journal, scan_journal, tree_table_has_no_entries, JournalPolicy,
-    RecoveryOutcome,
+    NamedUnitVerification, RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{RootRingSlot, RootRingSlotsPerRegion};
@@ -117,7 +117,7 @@ const FIRST_FILE_BYTES: usize = 96;
 const OVERWRITE_FILE_BYTES: usize = 96;
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_800_000_000;
 
-/// 项目全仓统一的产物完整性闸口径（`scripts/experiments/replay.sh` 文件头「收尾行必须是
+/// 项目全仓统一的产物完整性闸口径（`scripts/experiment-apparatus/replay.sh` 文件头「收尾行必须是
 /// `name=done emitted=N`」那一条）：每一条结果行都以 `E7RESULT` 起头，`main` 收尾打一条
 /// `E7RESULT name=done emitted=N`，N = 本进程打过的 `E7RESULT` 行数（含收尾这一条）。
 static EMITTED_RESULT_LINES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -244,7 +244,7 @@ fn local_constants_checks() -> Vec<ConstantCheck> {
         },
         ConstantCheck {
             name: "根记录宽 ROOT_RECORD_BYTES",
-            local_value: 457,
+            local_value: 466,
             crates_value: singlefs_format::ROOT_RECORD_BYTES,
         },
         ConstantCheck {
@@ -1621,9 +1621,9 @@ fn location_key(location: &LocationEntry) -> (u32, u64) {
 
 /// 从孪生（未注入）镜像上，按 (实例, txg) 取回完整的 `RootRecord`（要它的 `tree_table` /
 /// `allocation_record_tree_root` 两条指针，`RootView` 没有暴露它们）。**不能**直接拿
-/// `RootView::record_bytes`（`checker_image::valid_roots` 截到 457 字节）喂给 `RootRecord::parse_slot`：
+/// `RootView::record_bytes`（`checker_image::valid_roots` 截到 466 字节）喂给 `RootRecord::parse_slot`：
 /// 自证校验和是按整槽宽（`geometry.physical_block_size`，本装置是 512）算的，截短之后再解，
-/// `wide_checksum_field_holds` 拿 457 当整槽宽重算，跟原校验和对不上，`parse_slot` 会稳定交回 `None`
+/// `wide_checksum_field_holds` 拿 466 当整槽宽重算，跟原校验和对不上，`parse_slot` 会稳定交回 `None`
 /// （这是这一段调试打中的一个坑，交回报告点名）。改成按 `checker_image::root_slot_positions` 给的
 /// (区域, 槽, 设备, 偏移) 自己重新整槽读一遍——与 `valid_roots` 内部读的是同一段字节、同一个宽度。
 fn root_record_of(
@@ -2419,7 +2419,11 @@ fn tree_table_crates_has_a_path(
         &older_root,
         geometry.journal_ring_bytes,
         &records,
-        verify_named_units,
+        if verify_named_units {
+            NamedUnitVerification::Verify
+        } else {
+            NamedUnitVerification::Skip
+        },
     )
     .expect("装置里的记录都由写者写出，所选根那次发布只有一条带末条标志：锚点认得出");
     if replayed_root.instance != target.instance
@@ -5023,7 +5027,7 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
 // 十、第 2 次跑（`research/prompts/e158-r2-prereg.md`）：5.6 常量回比与第七节锚点（第 2 次跑那一份）、
 //    H1d（5.5 末尾主 agent 跑前修订加的历史族）、Q1-0（H1c 的抛弃步，前提 1 在装置上的读数）、
 //    实七两段复现历史。这一节只加：第一次跑的各模式（上面一至九）原样留着，它们的旧产物由
-//    `scripts/experiments/replay.sh` 里 E158 那几行复跑；第一节处理表里的删与改归后面的段。
+//    `scripts/experiment-apparatus/replay.sh` 里 E158 那几行复跑；第一节处理表里的删与改归后面的段。
 // ============================================================================
 
 use std::cell::RefCell;
@@ -11034,7 +11038,7 @@ fn run_third_run_mode(mode: &str, command_line_arguments: &[String]) -> bool {
 }
 
 /// 产物文件头（登记开头「产物文件头第一行写这个汇总 sha256」）：快照的汇总 sha256 由跑的人经环境变量交进来；
-/// `E7INPUT` 开头，`scripts/experiments/replay.sh` 比对前删掉，`name=done` 不数它。
+/// `E7INPUT` 开头，`scripts/experiment-apparatus/replay.sh` 比对前删掉，`name=done` 不数它。
 fn emit_input_header() {
     println!(
         "E7INPUT name=crates_snapshot key=E158 sha256={}",
@@ -11201,7 +11205,7 @@ mod third_run_tests {
             &chosen,
             system_configuration.immutable.sizes.journal_ring_bytes,
             &records,
-            true,
+            NamedUnitVerification::Verify,
         )
         .expect("重放");
         assert_eq!(judgement.chosen, Some(root_pair(&chosen)));
@@ -17938,7 +17942,8 @@ mod fourth_run_segment_two {
                 | HistoryOperation::CompactWhileMounted(_)
                 | HistoryOperation::Truncate(_)
                 | HistoryOperation::CreateInodes(_)
-                | HistoryOperation::WriteOfAnInode(_) => {
+                | HistoryOperation::WriteOfAnInode(_)
+                | HistoryOperation::WriteAtOffset(_) => {
                     format!("{operation:?}")
                 }
             });
@@ -19124,6 +19129,11 @@ mod fourth_run_segment_two {
                 }
                 HistoryOperation::WriteOfAnInode(_) => {
                     not_applicable("WriteOfAnInodeIsNotDrivenByThisExperiment")
+                }
+                // 按偏移写只进它自己那一组比重（判决 `research/prompts/m4-partial-write-r1-main-verification.md` 第二节，
+                // `GenerationWeights::PARTIAL_WRITES`），这个装置用的几组比重不抽它：照前提不满足记。
+                HistoryOperation::WriteAtOffset(_) => {
+                    not_applicable("WriteAtOffsetIsNotDrivenByThisExperiment")
                 }
             }
         }
@@ -22483,6 +22493,8 @@ mod fourth_run_segment_two {
         /// seg2b 修的装置记账撞键：崩溃分支那次可写挂载写出的根，读回按这次挂载承接的那一版判，不按主路径在同一个 (实例, txg) 上记的那一版判。
         /// 主路径的账在分支落到的那个键上改记成另一版（照 -配置 各臂实七-乙 `crash0`：主路径第 8 步那次挂载在同一个键上发布过内容号 1），
         /// 读回仍是最后确认那一版、内容号 0（变异 M39 让读回改回拿主路径的账，M40 让分支写出的根一条都不改记）。
+        /// 崩溃点是第 0 步里暖机第一条根槽写那一段（1 写、没落）：段号 9。C656 两趟写序把 mkfs 开头那一段切成 2 写与 12 写两段、
+        /// 取号写两轮（D22（单元原子性怎么合成） 已定项 8）让取号自成两段，这两样之前同一条根槽写是段号 7。
         #[test]
         fn crash_branch_read_back_after_its_mount_goes_by_the_roots_that_branch_wrote() {
             let segment = seventh_crash_history();
@@ -22492,7 +22504,7 @@ mod fourth_run_segment_two {
             let point = CrashPointKey {
                 index: 0,
                 order_of_the_first_write: 0,
-                segment_within_the_step: 7,
+                segment_within_the_step: 9,
                 persisted_within_the_segment: vec![false],
             };
             let after_mount_read_back_of = |branch: &BranchResult| -> RandomReadBack {

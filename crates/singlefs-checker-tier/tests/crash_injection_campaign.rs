@@ -1826,10 +1826,10 @@ fn replay_lines_of_the_rollback_sampling_run_the_same_campaign_on_the_large_tier
 
 /// 记录核对器两条判据的靶向用例（代码三方 m2-supp3-item3-code-r2 判决第四节第 1 题，用户 2026-09-28 选「靶向用例 + 变异行」；
 /// 攻方报告第四节改法甲、丙）用的那段历史：起点发完第一个文件 (1, 3)，再覆盖写两次 (1, 4)、(1, 5)。
-/// 两块 4 GiB 的盘上这段历史的录制流切成 25 段（2026-10-21 在 harness 侧现量的；取号写两轮（D22（单元原子性怎么合成） 已定项 8）
-/// 之前是 24 段，第一次可写挂载的取号多一个两写的系统配置槽段，之后的段号都加 1）：第 13 段起是 (1, 3) 的单元写
-/// （段内第 0、1 个是它的数据单元在两块盘上的两份），第 22 段是 (1, 5) 的两份 journal 记录，第 23 段是 (1, 5) 的根槽写；
-/// 从第 13 段的第一个写数到 (1, 4) 的根槽写共 56 个写。两条用例都先核这几处，段形变了先在那里红，不悄悄判别的状态。
+/// 两块 4 GiB 的盘上这段历史的录制流切成 26 段（2026-10-22 在 harness 侧现量的；mkfs 作废那道屏障（C656）把 mkfs 那一段切成 2 + 12、之后的段号再加 1；取号写两轮（D22（单元原子性怎么合成） 已定项 8）
+/// 之前是 24 段，第一次可写挂载的取号多一个两写的系统配置槽段，之后的段号都加 1）：第 14 段起是 (1, 3) 的单元写
+/// （段内第 0、1 个是它的数据单元在两块盘上的两份），第 23 段是 (1, 5) 的两份 journal 记录，第 24 段是 (1, 5) 的根槽写；
+/// 从第 14 段的第一个写数到 (1, 4) 的根槽写共 56 个写。两条用例都先核这几处，段形变了先在那里红，不悄悄判别的状态。
 fn history_of_a_first_file_and_two_overwrites() -> GeneratedHistory {
     GeneratedHistory {
         seed: HistorySeed(0),
@@ -1890,7 +1890,7 @@ fn the_root_without_either_of_its_records_is_found_by_the_record_checker_alone(
 ) -> TargetedCaseOutcome {
     let history = history_of_a_first_file_and_two_overwrites();
     let (writes, segments) = writes_and_segments_of(&history);
-    let first_write = segments[22][0];
+    let first_write = segments[23][0];
     assert_eq!(
         writes[first_write..first_write + 3]
             .iter()
@@ -1913,7 +1913,7 @@ fn the_root_without_either_of_its_records_is_found_by_the_record_checker_alone(
         &history,
         UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
         CrashPointDraw::ExactlyOneCrashState {
-            segment_index: 22,
+            segment_index: 23,
             writes_from_the_segment_on: 3,
             withheld_among_them: &[0, 1],
         },
@@ -1976,7 +1976,7 @@ fn the_claimed_state_missing_a_data_unit_is_found_by_the_record_checker(
 ) -> TargetedCaseOutcome {
     let history = history_of_a_first_file_and_two_overwrites();
     let (writes, segments) = writes_and_segments_of(&history);
-    let first_write = segments[13][0];
+    let first_write = segments[14][0];
     let withheld_copies = &writes[first_write..first_write + 2];
     assert!(
         withheld_copies
@@ -2008,7 +2008,7 @@ fn the_claimed_state_missing_a_data_unit_is_found_by_the_record_checker(
         &history,
         UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
         CrashPointDraw::ExactlyOneCrashState {
-            segment_index: 13,
+            segment_index: 14,
             writes_from_the_segment_on: 56,
             withheld_among_them: &[0, 1],
         },
@@ -2125,21 +2125,21 @@ fn a_version_rebuilt_from_records_missing_a_unit_is_judged_only_on_the_whole_str
 ) {
     let history = history_of_a_first_file_and_two_overwrites();
     let (writes, segments) = writes_and_segments_of(&history);
-    let root_of_the_second_overwrite = segments[23][0];
+    let root_of_the_second_overwrite = segments[24][0];
     assert_eq!(
         root_identity_of_a_root_slot_write(&writes[root_of_the_second_overwrite]),
         Some((InstanceGeneration(1), CheckpointTxg(5))),
         "第 23 段的头一个写是第二次覆盖写 (1, 5) 的根槽写"
     );
     assert_eq!(
-        segments[22]
+        segments[23]
             .iter()
             .map(|index| writes[*index].kind)
             .collect::<Vec<_>>(),
         vec![StepKind::JournalRecord, StepKind::JournalRecord],
         "第 22 段是 (1, 5) 的两份 journal 记录"
     );
-    let first_write = segments[21][0];
+    let first_write = segments[22][0];
     let withheld_copies = &writes[first_write..first_write + 2];
     assert!(
         withheld_copies
@@ -2150,7 +2150,7 @@ fn a_version_rebuilt_from_records_missing_a_unit_is_judged_only_on_the_whole_str
             && withheld_copies[0].device != withheld_copies[1].device,
         "第 21 段的头两个写是 (1, 5) 一个数据单元在两块盘上的两份：{withheld_copies:?}"
     );
-    let end_of_the_window = segments[22][0] + segments[22].len();
+    let end_of_the_window = segments[23][0] + segments[23].len();
     assert_eq!(
         end_of_the_window, root_of_the_second_overwrite,
         "窗口（第 21、22 段）截在 (1, 5) 的根槽写之前"
@@ -2247,7 +2247,7 @@ fn a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_findi
 ) {
     let history = history_of_a_first_file_and_overwrites_that_turn_the_root_ring();
     let (writes, segments) = writes_and_segments_of(&history);
-    let first_write = segments[13][0];
+    let first_write = segments[14][0];
     let withheld_copies = [&writes[first_write + 4], &writes[first_write + 5]];
     assert!(
         withheld_copies
@@ -2292,7 +2292,7 @@ fn a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_findi
         &history,
         UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
         CrashPointDraw::ExactlyOneCrashState {
-            segment_index: 13,
+            segment_index: 14,
             writes_from_the_segment_on: 793,
             withheld_among_them: &[4, 5],
         },
@@ -3584,11 +3584,8 @@ fn a_pool_after_the_mount_whose_recovery_lands_below_the_newest_root_written_is_
         .words
         .consulted_pass_landed_root;
     assert_ne!(
-        (landed_on.instance, landed_on.checkpoint_txg_low),
-        (
-            claimed_root.0 .0,
-            u32::try_from(claimed_root.1 .0 & 0xFFFF_FFFF).expect("低 32 位")
-        ),
+        landed_on.landed_root(),
+        Some(claimed_root),
         "前提：挂载之后的池那个状态上看 journal 那一遍恢复落到那一栏写的根 {claimed_root:?} 之下"
     );
     let old_reading = &under_the_landed_root.states[pool_after_the_mount];

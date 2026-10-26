@@ -14,9 +14,23 @@ use scenarios_of_fault_injection_fast_tier::{
     the_history_whose_make_filesystem_fails_at_its_first_barrier, FAST_TIER_OPERATIONS_PER_HISTORY,
     HANDING_EVERY_STEP_IMAGE_OUT,
 };
+use singlefs_checker::image::ViolationSite;
+use singlefs_core::address::SlotNumber;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
-use singlefs_core::recovery::{recover, JournalPolicy};
+use singlefs_core::allocator::{AllocationRecord, AllocationRecordQuarantineMark, Placement};
+use singlefs_core::recovery::{
+    allocation_records_under_root, choose_root, choose_system_configuration, recover, JournalPolicy,
+};
+use singlefs_core::transaction::{
+    CopyQuarantinedAfterReleaseChecksumMismatch, QuarantinedCopyReading, TransactionUnit,
+};
+use singlefs_harness::fault_injection::{
+    classify_the_pool_checker_verdicts_of_the_images_after_a_fault,
+    invariants_still_violated_on_the_comparison_image,
+    unit_start_slots_quarantined_over_a_swallowed_write, FailureAfterAFault,
+    PoolCheckerVerdictsOfTheImagesAfterAFault, SwallowedWriteByteRange, ViolationsNamingTheSites,
+};
 use singlefs_harness::fault_injection::{
     inject_faults_into_history,
     inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier,
@@ -27,6 +41,7 @@ use singlefs_harness::fault_injection::{
     FaultedSegmentKind, FlippedBit, ImagesAfterAFault, InjectedFault,
     PoolCheckerVerdictsAfterAFault, SharedFaultPlan,
 };
+use singlefs_harness::history::CopyQuarantinedByTheImplementation;
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     count_from_reproduction_environment, environment_assignments_in_line, execute_history_with,
@@ -589,6 +604,417 @@ fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_in
     assert!(
         images.image_with_the_swallowed_writes_landed.is_some(),
         "被吞了写，要交被吞的写插回去之后的那张盘"
+    );
+}
+
+/// 写死那一段（[`the_fixed_history_with_its_root_slot_write_swallowed`]）的那一个注入点交出去的盘，与被吞那次写之后的头一张每步镜像在里面的下标。
+fn the_fixed_history_handed_out_and_the_first_step_image_after_the_swallowed_write(
+) -> (ImagesAfterAFault, usize) {
+    let (_injection, handed_out) = the_fixed_history_with_its_root_slot_write_swallowed();
+    let [images] = handed_out.as_slice() else {
+        panic!("一个注入点交出去一份盘：交了 {} 份", handed_out.len());
+    };
+    assert_eq!(images.swallowed_writes.len(), 1, "这一段只吞了一次写");
+    let first_step_image_after_the_swallowed_write = images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .position(|step_image| step_image.swallowed_writes_before_it > 0)
+        .expect("被吞那次写之后还有每步镜像");
+    (images.clone(), first_step_image_after_the_swallowed_write)
+}
+
+/// 合成的一份违例：`invariant` 判红，点名 `slots` 里的每一个（盘, 槽）。
+fn violations_naming(invariant: &'static str, slots: &[(u32, u64)]) -> ViolationsNamingTheSites {
+    ViolationsNamingTheSites {
+        violations: vec![(invariant, "合成的违例".to_string())],
+        violation_sites: slots
+            .iter()
+            .map(|(device, slot)| ViolationSite {
+                invariant,
+                device: *device,
+                slot: *slot,
+            })
+            .collect(),
+    }
+}
+
+/// 写死那一段交出去的盘上，第 `observed_step_image` 张每步镜像判红 `observed`、它的按步对照盘判红 `at_the_step`、
+/// 被吞的写都插回去那张判红 `with_every_swallowed_write_landed`、重开那张不红：交归类器，交回归好的那几条。
+fn classified_with_given_verdicts(
+    images: &ImagesAfterAFault,
+    observed_step_image: usize,
+    observed: ViolationsNamingTheSites,
+    at_the_step: ViolationsNamingTheSites,
+    with_every_swallowed_write_landed: ViolationsNamingTheSites,
+) -> Vec<FailureAfterAFault> {
+    let mut violations_of_the_step_images =
+        vec![Vec::new(); images.step_images_of_the_run_with_the_fault.len()];
+    violations_of_the_step_images[observed_step_image] = observed.violations;
+    classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
+        images,
+        PoolCheckerVerdictsOfTheImagesAfterAFault {
+            violations_of_the_step_images,
+            violation_sites_of_the_first_red_step_image: observed.violation_sites,
+            after_the_fault: ViolationsNamingTheSites::default(),
+            at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed: Some(
+                at_the_step,
+            ),
+            with_the_swallowed_writes_landed: Some(with_every_swallowed_write_landed),
+        },
+    )
+}
+
+/// 按步对照盘（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3）：被吞那次写之前的每步镜像没有按步对照盘（插回去就是它本身）；
+/// 之后的每一张，按步对照盘是那一刻的录制流前缀插回那一次被吞的写——与被吞的写都插回去那张盘的头这么多步逐步相同。
+#[test]
+fn the_step_comparison_image_lands_only_the_writes_swallowed_before_that_step_image() {
+    let (images, first_step_image_after_the_swallowed_write) =
+        the_fixed_history_handed_out_and_the_first_step_image_after_the_swallowed_write();
+    let landed = images
+        .image_with_the_swallowed_writes_landed
+        .as_ref()
+        .expect("被吞了写，要交被吞的写插回去之后的那张盘");
+    for (index, step_image) in images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .enumerate()
+    {
+        let at_the_step =
+            images.image_at_the_step_image_with_the_swallowed_writes_before_it_landed(index);
+        if index < first_step_image_after_the_swallowed_write {
+            assert_eq!(
+                at_the_step, None,
+                "第 {index} 张每步镜像那一刻之前没吞写，没有按步对照盘"
+            );
+            continue;
+        }
+        let at_the_step = at_the_step
+            .unwrap_or_else(|| panic!("第 {index} 张每步镜像那一刻之前吞过一次写，要有按步对照盘"));
+        assert_eq!(
+            at_the_step.operations.as_slice(),
+            &landed.operations[..step_image.operations_recorded + 1],
+            "第 {index} 张：那一刻的前缀插回被吞的那一次写，与全部插回去那张的头几步逐步相同"
+        );
+        assert_eq!(
+            at_the_step.operations_written_by_make_filesystem,
+            landed.operations_written_by_make_filesystem,
+            "第 {index} 张：被吞的写落在 mkfs 之后，mkfs 的步数不跟着挪"
+        );
+    }
+}
+
+/// 按步对照，不对照末尾那张（判决第三节 C3：第二轮 C3 原句「对照插回去的最终那张盘」作废）：被吞那次写之后的头一张每步镜像点名
+/// （盘 0 与盘 1, 槽 777）判红 I-3.1，它的按步对照盘上同一处照红，被吞的写都插回去那张盘上一条都不红（那一处只在中间那一步的镜像上红，
+/// 两腿 `leak_once` 量到的那一类）：仍红、不是被吞的写留下的，报新发现。对照末尾那张盘就把它归成说谎的设备。
+#[test]
+fn a_violation_still_named_at_its_slot_on_the_step_comparison_image_is_a_new_finding_though_the_last_comparison_image_no_longer_shows_it(
+) {
+    let (images, step_image) =
+        the_fixed_history_handed_out_and_the_first_step_image_after_the_swallowed_write();
+    let failures = classified_with_given_verdicts(
+        &images,
+        step_image,
+        violations_naming("I-3.1", &[(0, 777), (1, 777)]),
+        violations_naming("I-3.1", &[(0, 777), (1, 777)]),
+        ViolationsNamingTheSites::default(),
+    );
+    assert!(
+        matches!(
+            failures.as_slice(),
+            [FailureAfterAFault::NewFinding { signature, .. }]
+                if *signature == FailureSignature::CheckerViolations { invariants: vec!["I-3.1"] }
+        ),
+        "按步对照盘上同一处照红：报新发现一条，判成 {failures:?}"
+    );
+}
+
+/// 按（不变量, 盘, 槽）比，不按名比（判决第三节 C3）：被比那一张点名（盘 0, 槽 777）判红 I-3.1，按步对照盘上 I-3.1 也红、点名的却是
+/// 另一处（盘 0, 槽 888）：被比那一张点名的那一处插回去就不红了，这一条是被吞的写留下的，归说谎的设备。按名比就照报新发现。
+#[test]
+fn a_violation_named_at_another_slot_on_the_step_comparison_image_is_left_by_the_lying_device() {
+    let (images, step_image) =
+        the_fixed_history_handed_out_and_the_first_step_image_after_the_swallowed_write();
+    let failures = classified_with_given_verdicts(
+        &images,
+        step_image,
+        violations_naming("I-3.1", &[(0, 777)]),
+        violations_naming("I-3.1", &[(0, 888)]),
+        violations_naming("I-3.1", &[(0, 888)]),
+    );
+    assert!(
+        matches!(
+            failures.as_slice(),
+            [FailureAfterAFault::LeftByTheLyingDevice { .. }]
+        ),
+        "点名的那一处插回去就不红：归说谎的设备一条，判成 {failures:?}"
+    );
+}
+
+/// 实现交回的隔离（判决第三节 C3「实现的隔离清单收齐四条路」）：被比那一张点名（两块盘, 槽 s）判红 I-3.1，按步对照盘上同一处照红，
+/// 而槽 s 正是实现在那一刻之前交回的一份隔离、那一份压在被吞的写上——插回去之后两份都对得上、记录却留在已分配，是实现在说谎的设备上
+/// 读盘核出对不上才隔离的：减掉之后不再仍红，归说谎的设备。不减（隔离清单不进比较）就照报新发现。槽 s 取被吞那次写落的槽，
+/// 隔离那一份合成（这一段被吞的是根槽写，实现没有隔离）。
+#[test]
+fn a_violation_named_only_at_a_unit_the_implementation_quarantined_over_a_swallowed_write_is_left_by_the_lying_device(
+) {
+    let (mut images, step_image) =
+        the_fixed_history_handed_out_and_the_first_step_image_after_the_swallowed_write();
+    let swallowed = images.swallowed_writes[0].clone();
+    let slot_of_the_swallowed_write = swallowed.offset.0 / singlefs_format::SLOT_BYTES;
+    images
+        .copies_quarantined_by_the_implementation
+        .push(CopyQuarantinedByTheImplementation {
+            step: images.step_images_of_the_run_with_the_fault[step_image].position,
+            copy: CopyQuarantinedAfterReleaseChecksumMismatch {
+                unit: TransactionUnit::InodeRoot,
+                device: swallowed.device,
+                placement: Placement {
+                    slot: SlotNumber(slot_of_the_swallowed_write),
+                    span: 1,
+                },
+                reading: QuarantinedCopyReading::ChecksumMismatch,
+            },
+        });
+    images.step_images_of_the_run_with_the_fault[step_image]
+        .copies_quarantined_by_the_implementation_before_it = 1;
+    assert_eq!(
+        unit_start_slots_quarantined_over_a_swallowed_write(
+            &images.copies_quarantined_by_the_implementation,
+            &images.swallowed_writes,
+        ),
+        BTreeSet::from([slot_of_the_swallowed_write]),
+        "合成的那一份隔离压在被吞的写上"
+    );
+    let sites = [
+        (0, slot_of_the_swallowed_write),
+        (1, slot_of_the_swallowed_write),
+    ];
+    let failures = classified_with_given_verdicts(
+        &images,
+        step_image,
+        violations_naming("I-3.1", &sites),
+        violations_naming("I-3.1", &sites),
+        ViolationsNamingTheSites::default(),
+    );
+    assert!(
+        matches!(
+            failures.as_slice(),
+            [FailureAfterAFault::LeftByTheLyingDevice { .. }]
+        ),
+        "插回去之后仍红的只有压在被吞的写上的那一份隔离：归说谎的设备一条，判成 {failures:?}"
+    );
+}
+
+/// 隔离判据那三条之外的不变量不减隔离（I-3.10 判的是分配代与诞生代号，隔离不豁免它）；点了槽的一边没有槽可比时按名比。
+#[test]
+fn only_the_quarantine_criterion_invariants_drop_the_quarantined_slots_and_a_side_without_slots_compares_by_name(
+) {
+    let quarantined = BTreeSet::from([777]);
+    assert_eq!(
+        invariants_still_violated_on_the_comparison_image(
+            &violations_naming("I-3.10", &[(1, 777)]),
+            Some(&violations_naming("I-3.10", &[(1, 777)])),
+            &quarantined,
+        ),
+        BTreeSet::from(["I-3.10"]),
+        "I-3.10 不归隔离判据：同一处照红就仍红"
+    );
+    assert_eq!(
+        invariants_still_violated_on_the_comparison_image(
+            &violations_naming("I-3.15", &[(1, 777)]),
+            Some(&violations_naming("I-3.15", &[(1, 777)])),
+            &quarantined,
+        ),
+        BTreeSet::new(),
+        "I-3.15 随 I-3.1 那一份隔离判据：压在被吞的写上的隔离减掉"
+    );
+    assert_eq!(
+        invariants_still_violated_on_the_comparison_image(
+            &violations_naming("I-2.1", &[]),
+            Some(&violations_naming("I-2.1", &[])),
+            &quarantined,
+        ),
+        BTreeSet::from(["I-2.1"]),
+        "没点槽的按名比：对照盘上也红就仍红"
+    );
+    assert_eq!(
+        invariants_still_violated_on_the_comparison_image(
+            &violations_naming("I-3.1", &[(0, 5)]),
+            Some(&violations_naming("I-3.1", &[])),
+            &quarantined,
+        ),
+        BTreeSet::from(["I-3.1"]),
+        "对照盘上这一条红而一个槽都没点：按名比，仍红"
+    );
+    assert_eq!(
+        invariants_still_violated_on_the_comparison_image(
+            &violations_naming("I-3.1", &[(0, 5)]),
+            None,
+            &quarantined,
+        ),
+        BTreeSet::from(["I-3.1"]),
+        "没有对照盘（那一刻之前没吞写）：每一条都仍红"
+    );
+}
+
+/// 镜像上最新根那棵分配记录树里起点是某一槽的一条记录读回来的样子（盘上的隔离记号，D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」）。
+#[derive(Debug, PartialEq, Eq)]
+enum AllocatedRecordReadBack {
+    Released,
+    CarryingTheQuarantineMark,
+    WithoutTheQuarantineMark,
+}
+
+/// 镜像上最新根那棵分配记录树里起点是 `slot` 的那几条记录（按盘号从小到大）各读成什么样。
+fn records_of_the_newest_root_starting_at(
+    image: &MemoryPool,
+    slot: u64,
+) -> Vec<AllocatedRecordReadBack> {
+    let system_configuration = choose_system_configuration(image).expect("择系统配置");
+    let newest = choose_root(image, &system_configuration).expect("最新根");
+    let mut records: Vec<AllocationRecord> = allocation_records_under_root(image, &newest)
+        .expect("最新根那棵分配记录树读得回来（读者认隔离记号）")
+        .into_iter()
+        .filter(|record| record.slot.0 == slot)
+        .collect();
+    records.sort_by_key(|record| record.device.0);
+    records
+        .iter()
+        .map(|record| {
+            if record.is_released {
+                return AllocatedRecordReadBack::Released;
+            }
+            match record.quarantine_mark {
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck => {
+                    AllocatedRecordReadBack::CarryingTheQuarantineMark
+                }
+                AllocationRecordQuarantineMark::NotQuarantined => {
+                    AllocatedRecordReadBack::WithoutTheQuarantineMark
+                }
+            }
+        })
+        .collect()
+}
+
+/// 必红世界那一段（场景 [`a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces`]）的实现那一半：
+/// 实现交回两次隔离、各两份——X 那一次（泄漏的那个单元，不压在被吞的写上）与 Y 那一次（被吞的那一份所在的单元，压在被吞的写上）；
+/// X 之后那一张每步镜像那一刻之前吞过写，交出去的盘里它的按步对照盘、被吞的写都插回去那张都在。盘上的记号（D19（块指针的结构与宽度预算）
+/// 已定项 5「隔离的盘上记号」）：X 之后那一张每步镜像上泄漏的那个单元两块盘那两条记录仍分配、带记号；重开那张上它们仍分配、两块盘都不带记号
+/// （泄漏），Y 隔离的那个单元两块盘那两条仍分配、都带记号（照条款豁免）。池级 checker 那一遍与归类在 checker 档同名用例：重开那张报新发现。
+#[test]
+fn a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces() {
+    let images =
+        scenarios_of_fault_injection_fast_tier::a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces();
+    let quarantined = &images.copies_quarantined_by_the_implementation;
+    assert_eq!(quarantined.len(), 4, "两次隔离各两份：{quarantined:?}");
+    let leaked_slot = quarantined[0].copy.placement.slot.0;
+    let slot_quarantined_over_the_swallowed_write = quarantined[2].copy.placement.slot.0;
+    let pool_images = scenarios_of_fault_injection_fast_tier::pool_images_after_a_fault(&images);
+    let step_image_after_the_swallowed_write = images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .position(|step_image| step_image.swallowed_writes_before_it > 0)
+        .expect("X 之后那一张每步镜像那一刻之前吞过写");
+    assert_eq!(
+        records_of_the_newest_root_starting_at(
+            &pool_images.step_images[step_image_after_the_swallowed_write],
+            leaked_slot
+        ),
+        vec![
+            AllocatedRecordReadBack::CarryingTheQuarantineMark,
+            AllocatedRecordReadBack::CarryingTheQuarantineMark
+        ],
+        "X 之后那一张：泄漏的那个单元两块盘那两条记录仍分配、带着 X 写下的记号（头一张判红的每步镜像上没有泄漏）"
+    );
+    assert_eq!(
+        records_of_the_newest_root_starting_at(&pool_images.after_the_fault, leaked_slot),
+        vec![
+            AllocatedRecordReadBack::WithoutTheQuarantineMark,
+            AllocatedRecordReadBack::WithoutTheQuarantineMark
+        ],
+        "重开那张：泄漏的那个单元两块盘那两条记录仍分配、都不带记号"
+    );
+    assert_eq!(
+        records_of_the_newest_root_starting_at(
+            &pool_images.after_the_fault,
+            slot_quarantined_over_the_swallowed_write
+        ),
+        vec![
+            AllocatedRecordReadBack::CarryingTheQuarantineMark,
+            AllocatedRecordReadBack::CarryingTheQuarantineMark
+        ],
+        "重开那张：Y 隔离的那个单元两块盘那两条记录仍分配、都带记号"
+    );
+    assert_ne!(
+        leaked_slot, slot_quarantined_over_the_swallowed_write,
+        "泄漏的那个单元与被吞的那一份所在的单元不是同一个"
+    );
+    assert_eq!(
+        unit_start_slots_quarantined_over_a_swallowed_write(quarantined, &images.swallowed_writes),
+        BTreeSet::from([slot_quarantined_over_the_swallowed_write]),
+        "压在被吞的写上的只有 Y 那一次隔离的那个单元"
+    );
+    let step_image_of_the_swallowed_write = images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .position(|step_image| step_image.swallowed_writes_before_it > 0)
+        .expect("X 之后那一张每步镜像那一刻之前吞过写");
+    assert!(
+        images
+            .image_at_the_step_image_with_the_swallowed_writes_before_it_landed(
+                step_image_of_the_swallowed_write
+            )
+            .is_some()
+            && images.image_with_the_swallowed_writes_landed.is_some(),
+        "按步对照盘与被吞的写都插回去那张盘都交出去"
+    );
+}
+
+/// 必绿世界 K2-1 那一点（场景 [`the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot`]）的实现那一半：
+/// 头一个注入点吞掉盘 1 上一次落在复用过的槽上的 16 KiB 写，实现之后释放那一版时读盘核出盘 1 那一份对不上、隔离两块盘那一份，
+/// 清单经交出去的盘带出来（跨重挂累积：之后的挂载不清掉它）。池级 checker 那一遍与归类在 checker 档同名用例：归说谎的设备，不报新发现。
+#[test]
+fn the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot_hands_out_the_quarantine_of_both_copies(
+) {
+    let images = scenarios_of_fault_injection_fast_tier::the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot();
+    assert_eq!(
+        images.drawn.fault,
+        InjectedFault::WriteIsSwallowed,
+        "头一个注入点是一次被吞的写：{}",
+        images.drawn.render()
+    );
+    let [swallowed] = images.swallowed_writes.as_slice() else {
+        panic!("吞了一次写：{:?}", images.swallowed_writes.len());
+    };
+    let swallowed_range = SwallowedWriteByteRange::of(swallowed);
+    let swallowed_slot = swallowed.offset.0 / singlefs_format::SLOT_BYTES;
+    assert_eq!(
+        (
+            swallowed.device.0,
+            swallowed_range.end_in_bytes - swallowed_range.start_in_bytes
+        ),
+        (1, singlefs_format::SLOT_BYTES),
+        "被吞的是盘 1 上一槽那么长的一次写"
+    );
+    assert_eq!(
+        unit_start_slots_quarantined_over_a_swallowed_write(
+            &images.copies_quarantined_by_the_implementation,
+            &images.swallowed_writes,
+        ),
+        BTreeSet::from([swallowed_slot]),
+        "实现隔离了被吞的写落的那一槽：{:?}",
+        images.copies_quarantined_by_the_implementation
+    );
+    let devices_quarantined_at_the_slot: BTreeSet<u32> = images
+        .copies_quarantined_by_the_implementation
+        .iter()
+        .filter(|quarantined| quarantined.copy.placement.slot.0 == swallowed_slot)
+        .map(|quarantined| quarantined.copy.device.0)
+        .collect();
+    assert_eq!(
+        devices_quarantined_at_the_slot,
+        BTreeSet::from([0, 1]),
+        "两块盘那一份一起隔离（账保持对称）"
     );
 }
 

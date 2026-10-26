@@ -1,6 +1,9 @@
 //! checker 档模块：crash、crash_state_enumeration
 //! 里程碑「覆盖写、释放、回退与复用」步 3 验收的变异「取号之后没有屏障 ⇒ 崩溃点重放里出现「系统配置已是 2、单元却先持久」的状态，
 //! I-7.7（系统配置实例代号不低于根环） 那一族判红」要红在的那一条崩溃枚举用例。
+//! `crates/mutations.tsv` 里那一行点名的是 harness 档
+//! `acquisition_rounds_and_the_row_publish_units_of_a_remount_are_separated_by_barriers.rs`（只钉段的形状）：改坏之后取号两轮与写行的单元写
+//! 并成一段 22 写，这一条展开的域从 262160 态涨到 3⁴ × 2¹⁸ = 21233664 态，一小时跑不完。
 //!
 //! 流：mkfs → 取号 1 → 暖机 → A → B（同一个进程）→ 进程退出、重开可写挂载（取号 2 → 写行 → 暖机）。
 //! 取号写之前一道屏障把取号的系统配置槽写与 B 的两次系统配置槽轮换隔开（代码审阅第 19 条；改之前两者同一段，
@@ -178,7 +181,7 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         tally.checker_counts_by_invariant()
     );
 
-    // 变异「取号之后没有屏障」要红在这一条上：新实例的单元先于新号持久，I-7.7 ① 判红。
+    // 取号之后没有屏障时这里判红：新实例的单元先于新号持久，I-7.7 ① 判红。
     assert_eq!(
         tally
             .checker_violated_states

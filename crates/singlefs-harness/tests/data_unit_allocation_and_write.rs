@@ -1,6 +1,5 @@
 //! 里程碑「新池新建文件」步 2 的验收：分配一个数据单元、写一个小文件的数据，两盘各一份，读回自检；分配记录与记账增量在内存里。
 
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use singlefs_core::address::{
@@ -19,6 +18,7 @@ use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::unit::{build_data_unit, declared_length, DataUnitIdentity, WriteOrder};
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, TREE_IDENTIFIER_EXTENT};
+use singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop;
 use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
 
 static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -26,12 +26,13 @@ const IMAGE_BYTES: u64 = 4 << 30;
 /// E142 的第一个文件 3000 字节（`name=config file_bytes=3000`）。
 const FILE_BYTES: usize = 3000;
 
-fn image_path(tag: &str, device: u32) -> PathBuf {
+/// 一份镜像的路径，建之前就由守卫认领：用例做完、断言失败、panic 都删掉它。
+fn image_path(tag: &str, device: u32) -> TemporaryPathRemovedOnDrop {
     let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
-    std::env::temp_dir().join(format!(
+    TemporaryPathRemovedOnDrop::claiming(std::env::temp_dir().join(format!(
         "singlefs-step2-{tag}-{}-{sequence}-dev{device}.img",
         std::process::id()
-    ))
+    )))
 }
 
 fn parameters() -> MakeFilesystemParameters {
@@ -55,7 +56,8 @@ fn file_content() -> Vec<u8> {
 }
 
 struct Pool {
-    paths: Vec<PathBuf>,
+    /// 只为丢掉时删镜像而留着。
+    _images: Vec<TemporaryPathRemovedOnDrop>,
     devices: Vec<(DeviceIdentity, RecordingBlockDevice<FileBackedBlockDevice>)>,
     stream: SharedStream,
     allocator: PoolAllocator,
@@ -63,7 +65,7 @@ struct Pool {
 
 fn mkfs_pool(tag: &str) -> Pool {
     let stream = SharedStream::new();
-    let mut paths = Vec::new();
+    let mut images = Vec::new();
     let mut devices = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
@@ -81,7 +83,7 @@ fn mkfs_pool(tag: &str) -> Pool {
                 stream.clone(),
             ),
         ));
-        paths.push(path);
+        images.push(path);
     }
     make_filesystem(&parameters(), &mut devices).expect("mkfs");
     let mut allocator = PoolAllocator::new(vec![
@@ -99,7 +101,7 @@ fn mkfs_pool(tag: &str) -> Pool {
         },
     );
     Pool {
-        paths,
+        _images: images,
         devices,
         stream,
         allocator,
@@ -174,12 +176,6 @@ fn write_first_file(pool: &mut Pool) -> (Placement, Vec<u8>, DataPointer) {
     (placement, unit, pointer)
 }
 
-fn remove_images(pool: &Pool) {
-    for path in &pool.paths {
-        std::fs::remove_file(path).expect("清理镜像");
-    }
-}
-
 #[test]
 fn data_unit_reads_back_from_both_devices_with_content_then_zeroes() {
     let mut pool = mkfs_pool("readback");
@@ -214,7 +210,6 @@ fn data_unit_reads_back_from_both_devices_with_content_then_zeroes() {
         pointer.locations[0].unit_checksum,
         "位置条目里的整单元校验和"
     );
-    remove_images(&pool);
 }
 
 #[test]
@@ -249,7 +244,6 @@ fn corrupting_payload_or_header_is_caught_by_the_matching_checksum() {
         singlefs_checker::Verdict::NonZeroFlags,
         "flags 非 0 拒收"
     );
-    remove_images(&pool);
 }
 
 #[test]
@@ -294,5 +288,4 @@ fn exactly_two_new_allocation_records_whose_slot_matches_the_recorded_write_offs
     );
     assert_eq!(pool.allocator.devices[0].allocated_slots(), 5);
     assert_eq!(pool.allocator.devices[0].free_runs(), 2);
-    remove_images(&pool);
 }

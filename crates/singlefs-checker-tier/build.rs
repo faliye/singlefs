@@ -2,10 +2,13 @@
 //! `OUT_DIR/judging_units_keys.tsv`；库经 `include_str!(concat!(env!("OUT_DIR"), …))` 读回编进去的那一份，跑时不读盘上的树
 //! （剪枝复查第二轮 design 路报告 3.8「build.rs 做什么」，4-2a）。
 //!
-//! 只做生成、不藏逻辑：切分、闭包、键、工具链行的拼法、表的写法都在 `singlefs-unit-graph` 里（`entry_groups`、`build_toolchain`），
-//! 命令行 `unit-graph key … --toolchain-of-the-build <profile> --lock-file Cargo.lock` 用的是同一份。这里只取 cargo 给的环境：
-//! 开了哪些特性（`CARGO_FEATURE_*`）、`$RUSTC -vV`、`$CARGO -V`、`TARGET`、`CARGO_ENCODED_RUSTFLAGS`、`PROFILE`（profile 的生效值另从工作区根
-//! `Cargo.toml` 算，`CARGO_PROFILE_<名>_<键>` 照盖），连同 `Cargo.lock`。
+//! 只做生成、不藏逻辑：切分、闭包、键、工具链行的拼法、表的写法、特性的取法都在 `singlefs-unit-graph` 里（`entry_groups`、
+//! `build_toolchain`、`build_features`），命令行 `unit-graph key … --toolchain-of-the-build <profile> --lock-file Cargo.lock` 用的是同一份。
+//! 这里只取 cargo 给的：本包开了哪些特性（cargo 编本构建脚本时带着本包这一次开了的特性的 cfg，[`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`]；
+//! 不读进程环境里的 `CARGO_FEATURE_*`，外面带进来的同名变量分不出，七·6 后续批代码轮第一轮判决第二节 T4）、依赖包在这一次编译里开了哪些特性（带 `links` 的依赖包构建脚本交出的
+//! `DEP_<links>_ENABLED_FEATURES`：一起编 harness 档测试时它的 dev 依赖替 `singlefs-core` 并上的特性，本包的 `CARGO_FEATURE_*` 看不到）、
+//! `$RUSTC -vV`、`$CARGO -V`、`TARGET`、`CARGO_ENCODED_RUSTFLAGS`、`PROFILE`（profile 的生效值另从工作区根 `Cargo.toml` 算，
+//! `CARGO_PROFILE_<名>_<键>` 照盖），连同 `Cargo.lock`。
 
 #[allow(
     dead_code,
@@ -19,18 +22,30 @@ use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use singlefs_unit_graph::build_features::{
+    features_enabled_on_the_dependencies, features_of_the_crate_being_built,
+};
 use singlefs_unit_graph::build_toolchain::{
     effective_profile_lines, profile_environment_variable,
     profile_name_of_the_build_script_profile_variable, toolchain_lines_of_the_build,
     BuildToolchainInputs, PROFILE_SETTING_KEYS,
 };
 use singlefs_unit_graph::entry_groups::{
-    entry_group_key, entry_group_table_text, EntryGroupKey, EntryGroupRequest,
+    entry_group_key_with_the_features_of_the_build,
+    entry_group_table_text_with_the_features_of_the_build, EntryGroupKey, EntryGroupRequest,
 };
 use singlefs_unit_graph::{load_workspace, parse_lock_file, RuleSwitches, TargetSelector};
 
 /// 写进 `OUT_DIR` 的那份表的文件名（库按同一个名字读回）。
 const JUDGING_UNITS_KEYS_FILE_NAME: &str = "judging_units_keys.tsv";
+
+/// 本包清单 `[features]` 里的每个特性（清单里的写法，按名字排好）与 cargo 这一次开没开它。与清单对不上（漏写、写错名字）的，
+/// `features_of_the_crate_being_built` 交错误、构建脚本停下。
+const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG: [(&str, bool); 3] = [
+    ("default", cfg!(feature = "default")),
+    ("gpu", cfg!(feature = "gpu")),
+    ("verdict-store", cfg!(feature = "verdict-store")),
+];
 
 fn environment_variable(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("cargo 起构建脚本时设 {name}"))
@@ -70,19 +85,16 @@ fn main() {
     let own_crate = workspace
         .crate_named(&environment_variable("CARGO_PKG_NAME"))
         .expect("工作区里有正在编的这个包");
-    let features: Vec<String> = workspace.crates[own_crate.0]
-        .manifest
-        .features
-        .keys()
-        .filter(|feature| {
-            std::env::var_os(format!(
-                "CARGO_FEATURE_{}",
-                feature.to_ascii_uppercase().replace('-', "_")
-            ))
-            .is_some()
-        })
-        .cloned()
-        .collect();
+    let read_environment = |name: &str| std::env::var(name).ok();
+    let features = features_of_the_crate_being_built(
+        &workspace,
+        own_crate,
+        &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG,
+    )
+    .unwrap_or_else(|error| panic!("本包这一次开了哪些特性取不了：{error}"));
+    let features_enabled_by_the_build =
+        features_enabled_on_the_dependencies(&workspace, own_crate, &read_environment)
+            .unwrap_or_else(|error| panic!("依赖包在这一次编译里开了哪些特性取不全：{error}"));
     let profile_name =
         profile_name_of_the_build_script_profile_variable(&environment_variable("PROFILE"))
             .to_string();
@@ -139,9 +151,10 @@ fn main() {
                 features: features.clone(),
                 group_name,
             };
-            entry_group_key(
+            entry_group_key_with_the_features_of_the_build(
                 &workspace,
                 &request,
+                &features_enabled_by_the_build,
                 &toolchain_lines,
                 &locked_packages,
                 &switches,
@@ -155,7 +168,11 @@ fn main() {
         PathBuf::from(environment_variable("OUT_DIR")).join(JUDGING_UNITS_KEYS_FILE_NAME);
     std::fs::write(
         &output_path,
-        entry_group_table_text(&toolchain_lines, &keys),
+        entry_group_table_text_with_the_features_of_the_build(
+            &toolchain_lines,
+            &features_enabled_by_the_build,
+            &keys,
+        ),
     )
     .unwrap_or_else(|error| panic!("写不了 {}：{error}", output_path.display()));
     let mut watched: BTreeSet<String> = [

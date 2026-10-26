@@ -14,7 +14,7 @@ use common_images_for_the_checker_tier::PoolCheckerImages;
 use scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::{COUNTER_OF_THE_NEW_POOL_FILE_CREATION_RECORD, image_with_the_new_pool_file_creation_record_but_not_its_root, pointer_whose_checksums_do_not_match};
 use singlefs_core::address::CheckpointTxg;
 use singlefs_core::recovery::{
-    choose_root, choose_system_configuration, replay_journal, scan_journal,
+    choose_root, choose_system_configuration, replay_journal, NamedUnitVerification, scan_journal,
 };
 
 /// 实现恢复：所选根是暖机第二条（txg 2），施加 txg 3 那条记录；施加出来的根的实例表指针是那条记录新根段里改过的那一条，
@@ -44,7 +44,7 @@ fn the_root_rebuilt_from_a_record_takes_the_instance_table_pointer_of_its_new_ro
         &chosen_root,
         system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .expect("恢复施加 txg 3 那条记录");
     assert_eq!(journal.prefix_applied, 1, "施加了那一条");

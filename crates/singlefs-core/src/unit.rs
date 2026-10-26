@@ -319,13 +319,36 @@ pub enum UnitError {
     /// 类身份段之后那 29 字节 nonce / MAC / 算法类型预留位有非 0 字节：它们不在头校验和覆盖内（在载荷 CRC 覆盖内），
     /// 由「恒 0、读者遇到非 0 一律判该结构损坏」这条规则守（I-2.4（头校验和覆盖范围）；D18（块里携带什么信息） 已定项 16 / 已定项 17）。
     EncryptionReservedBytesNotZero,
-    Structure(&'static str),
+    /// 头里的结构字段自相矛盾或越界：哪一样矛盾见 [`UnitStructureDefect`]。
+    Structure(UnitStructureDefect),
 }
 
-/// 码 2 节点头里条目宽是 0、条目数不是 0 时 [`parse_index_node`] 报 [`UnitError::Structure`]，带这一句。
-pub const ENTRY_WIDTH_ZERO_WITH_ENTRIES: &str = "条目宽为 0 而条目数不为 0";
-/// 码 3 单元头里记录宽是 0、记录数不是 0 时 [`parse_packed_unit`] 报 [`UnitError::Structure`]，带这一句。
-pub const RECORD_WIDTH_ZERO_WITH_RECORDS: &str = "记录宽为 0 而记录数不为 0";
+/// 单元头里自相矛盾或越界的是哪一样结构字段（[`UnitError::Structure`] 带它）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnitStructureDefect {
+    /// 码 2 节点：声明长度 ≠ 条目数 × 条目宽（[`parse_index_node`]）。
+    IndexNodeDeclaredLengthIsNotEntryCountTimesEntryWidth,
+    /// 码 2 节点：条目宽是 0、条目数不是 0（[`parse_index_node`]）——声明长度 0 过得了上一判，切出来的条目却一条都没有。
+    IndexNodeEntryWidthZeroWithEntries,
+    /// 码 2 节点：条目宽小于 key 宽（[`parse_index_node`]）。
+    IndexNodeEntryWidthBelowTheKeyWidth,
+    /// 码 2 节点：条目区越过节点末尾（[`parse_index_node`]）。
+    IndexNodeEntryAreaPastTheNodeEnd,
+    /// 码 3 单元：类身份段里的类标签副本不是 3（[`parse_packed_unit`]）。
+    PackedUnitClassTagCopyIsNotThePackedClass,
+    /// 码 3 单元：声明长度 ≠ 记录数 × 记录宽（[`parse_packed_unit`]）。
+    PackedUnitDeclaredLengthIsNotRecordCountTimesRecordWidth,
+    /// 码 3 单元：记录宽是 0、记录数不是 0（[`parse_packed_unit`]），与码 2 那一格同一个坏法。
+    PackedUnitRecordWidthZeroWithRecords,
+    /// 码 3 单元：记录区越过单元末尾（[`parse_packed_unit`]）。
+    PackedUnitRecordAreaPastTheUnitEnd,
+    /// 码 1 数据单元：类身份段里的类标签副本不是 1（[`parse_data_unit`]）。
+    DataUnitClassTagCopyIsNotTheDataClass,
+    /// 码 1 数据单元：声明长度越过单元末尾（[`parse_data_unit`]、[`data_unit_payload`]）。
+    DataUnitDeclaredLengthPastTheUnitEnd,
+    /// 码 1 数据单元：声明长度之后到单元末尾的补齐字节有非 0 的（[`data_unit_payload`]，I-2.3）。
+    DataUnitPaddingBytesNotZero,
+}
 
 /// 类身份段之后那 29 字节预留位（从 `header_end` 起）全 0 才过（I-2.4（头校验和覆盖范围））：三类单元的读者共用这一判。
 fn check_encryption_reserved_bytes_are_zero(
@@ -428,18 +451,26 @@ pub fn parse_index_node(bytes: &[u8]) -> Result<IndexNodeHeader, UnitError> {
     let entry_width = usize::from(reader.get_u16());
     assert_eq!(reader.position(), header_end);
     if entry_count * entry_width != declared_length {
-        return Err(UnitError::Structure("声明长度 ≠ 条目数 × 条目宽"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::IndexNodeDeclaredLengthIsNotEntryCountTimesEntryWidth,
+        ));
     }
     // 条目宽 0 而条目数不为 0：声明长度 0 过得了上一判，切出来的条目却一条都没有，读者看到的条数与头里写的不符（代码审阅第 38 条）。
     if entry_width == 0 && entry_count != 0 {
-        return Err(UnitError::Structure(ENTRY_WIDTH_ZERO_WITH_ENTRIES));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::IndexNodeEntryWidthZeroWithEntries,
+        ));
     }
     if entry_width < key_width {
-        return Err(UnitError::Structure("条目宽小于 key 宽"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::IndexNodeEntryWidthBelowTheKeyWidth,
+        ));
     }
     let entries_start = header_end + reserved_bytes();
     if entries_start + declared_length > bytes.len() {
-        return Err(UnitError::Structure("条目区越过节点末尾"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::IndexNodeEntryAreaPastTheNodeEnd,
+        ));
     }
     let entries = bytes[entries_start..entries_start + declared_length]
         .chunks(entry_width.max(1))
@@ -483,7 +514,9 @@ pub fn parse_packed_unit(bytes: &[u8]) -> Result<PackedUnitHeader, UnitError> {
     check_encryption_reserved_bytes_are_zero(bytes, header_end)?;
     let mut reader = ByteReader::at(bytes, 42);
     if reader.get_u8() != UNIT_CLASS_PACKED {
-        return Err(UnitError::Structure("类标签副本不是 3"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::PackedUnitClassTagCopyIsNotThePackedClass,
+        ));
     }
     let identity = PackedIdentity {
         birth_tree: TreeIdentifier(reader.get_u64()),
@@ -503,15 +536,21 @@ pub fn parse_packed_unit(bytes: &[u8]) -> Result<PackedUnitHeader, UnitError> {
     let birth_sequence = BirthSequence(reader.get_u32());
     assert_eq!(reader.position(), header_end);
     if record_count * record_width != declared_length {
-        return Err(UnitError::Structure("声明长度 ≠ 记录数 × 记录宽"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::PackedUnitDeclaredLengthIsNotRecordCountTimesRecordWidth,
+        ));
     }
     // 记录宽 0 而记录数不为 0：与码 2 那一格同一个坏法（代码审阅第 38 条）。
     if record_width == 0 && record_count != 0 {
-        return Err(UnitError::Structure(RECORD_WIDTH_ZERO_WITH_RECORDS));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::PackedUnitRecordWidthZeroWithRecords,
+        ));
     }
     let records_start = header_end + reserved_bytes();
     if records_start + declared_length > bytes.len() {
-        return Err(UnitError::Structure("记录区越过单元末尾"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::PackedUnitRecordAreaPastTheUnitEnd,
+        ));
     }
     let records = bytes[records_start..records_start + declared_length]
         .chunks(record_width.max(1))
@@ -549,7 +588,9 @@ pub fn parse_data_unit(bytes: &[u8]) -> Result<DataUnitHeader, UnitError> {
     check_encryption_reserved_bytes_are_zero(bytes, header_end)?;
     let mut reader = ByteReader::at(bytes, 42);
     if reader.get_u8() != UNIT_CLASS_DATA {
-        return Err(UnitError::Structure("类标签副本不是 1"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::DataUnitClassTagCopyIsNotTheDataClass,
+        ));
     }
     let identity = DataUnitIdentity {
         tree: TreeIdentifier(reader.get_u64()),
@@ -565,7 +606,9 @@ pub fn parse_data_unit(bytes: &[u8]) -> Result<DataUnitHeader, UnitError> {
     };
     let payload_start = header_end + reserved_bytes();
     if payload_start + usize::from(declared_length) > bytes.len() {
-        return Err(UnitError::Structure(DECLARED_LENGTH_PAST_THE_UNIT_END));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::DataUnitDeclaredLengthPastTheUnitEnd,
+        ));
     }
     Ok(DataUnitHeader {
         identity,
@@ -576,24 +619,25 @@ pub fn parse_data_unit(bytes: &[u8]) -> Result<DataUnitHeader, UnitError> {
     })
 }
 
-/// 码 1 数据单元的声明长度越过单元末尾时 [`parse_data_unit`] 与 [`data_unit_payload`] 报 [`UnitError::Structure`]，带这一句。
-pub const DECLARED_LENGTH_PAST_THE_UNIT_END: &str = "声明长度越过单元末尾";
-
 /// 载荷从 134 起、长声明长度；之后到单元末尾必须全 0（I-2.3），不是就报结构错。
 ///
 /// # Errors
-/// 载荷末尾（134 + 声明长度）越过 `bytes` 末尾 ⇒ [`UnitError::Structure`]（[`DECLARED_LENGTH_PAST_THE_UNIT_END`]）：声明长度是盘上读来的，
+/// 载荷末尾（134 + 声明长度）越过 `bytes` 末尾 ⇒ [`UnitError::Structure`]（[`UnitStructureDefect::DataUnitDeclaredLengthPastTheUnitEnd`]）：声明长度是盘上读来的，
 /// 两字节最大 65535、比一个单元的载荷容量大，这里自己判、不越界切片——今天的调用方都先经 [`parse_data_unit`] 核过这一格，
 /// 这一判让本函数不靠调用方的那一步也不 panic（坏的是盘上数据，按「能恢复的写进类型」报错，不断言）。
-/// 补齐字节非零 ⇒ [`UnitError::Structure`]。
+/// 补齐字节非零 ⇒ [`UnitError::Structure`]（[`UnitStructureDefect::DataUnitPaddingBytesNotZero`]）。
 pub fn data_unit_payload(bytes: &[u8], declared_length: u16) -> Result<&[u8], UnitError> {
     let payload_start = usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105") + reserved_bytes();
     let payload_end = payload_start + usize::from(declared_length);
     if payload_end > bytes.len() {
-        return Err(UnitError::Structure(DECLARED_LENGTH_PAST_THE_UNIT_END));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::DataUnitDeclaredLengthPastTheUnitEnd,
+        ));
     }
     if bytes[payload_end..].iter().any(|byte| *byte != 0) {
-        return Err(UnitError::Structure("补齐字节非零"));
+        return Err(UnitError::Structure(
+            UnitStructureDefect::DataUnitPaddingBytesNotZero,
+        ));
     }
     Ok(&bytes[payload_start..payload_end])
 }
@@ -841,7 +885,9 @@ mod tests {
         );
         assert_eq!(
             data_unit_payload(&unit, 40_000),
-            Err(UnitError::Structure(DECLARED_LENGTH_PAST_THE_UNIT_END)),
+            Err(UnitError::Structure(
+                UnitStructureDefect::DataUnitDeclaredLengthPastTheUnitEnd,
+            )),
             "声明长度 40000：载荷末尾越过 32768 字节的单元"
         );
     }

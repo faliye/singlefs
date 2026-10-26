@@ -3,5 +3,9 @@
 # 找不到 stdbool.h；给它指到 gcc 自带的那一份头文件目录（13 与 14 都列上：两台机器各装的版本不同，不在的目录 -I 无害）。不开特性的编法不读这个变量。
 # 值要与 scripts/crash/crash-amplification-two-hosts.sh 的 BINDGEN_INCLUDE_ARGUMENTS 逐字相同：这个变量进 librocksdb-sys 构建脚本的指纹，
 # 两处不一样，同一个 target 目录里 RocksDB 的 C++ 就会被反复重编。
+# RocksDB 与 snappy 的 C++ 不在编译目录里编：每台主机编一次（scripts/hosts/rocksdb-prebuilt.py build），四个变量 ROCKSDB_LIB_DIR、ROCKSDB_STATIC、
+# SNAPPY_LIB_DIR、SNAPPY_STATIC 只走进程环境（来源与入口见那份脚本文件头「入口怎么拿到取值」），不写进这里或别的哪一层 cargo 配置的 [env]：
+# [env] 进 crates 变异的行键与广谱变异的全局键（scripts/mutation/lib_mutation_units.py 的 toolchain_lines、scripts/mutation/mutation-prune.py 的 build_environment_lines），
+# rocksdb-prebuilt.py check 见到这几个变量写在 [env] 里判红。
 [env]
 BINDGEN_EXTRA_CLANG_ARGS = "-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include"

@@ -130,20 +130,15 @@ pub fn truncation_field_after_the_truncation_intent(
 }
 
 /// 变长那次要不要重写尾单元（K5）：最后一个存在的单元声明长度小于 min(N − 起点, 净荷) 时补零重写到那个长度；之后到 N 是洞、不写单元。
-///
-/// # Panics
-/// 一个单元都不存在：第一个文件至少一个数据单元（长度 0 的内容也写一个声明长度 0 的单元）。
+/// 一个单元都不存在（上段叶标签 0：整个文件都是洞，K5、S1）时没有单元可补：不重写、不加单元，变长只改记录、标签留 0
+/// （判决 `research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」）。
 #[must_use]
 pub fn tail_data_unit_rewrite_of_an_extension(
     data_units_existing: u64,
     size_before_in_bytes: u64,
     target_size_in_bytes: u64,
 ) -> Option<TailDataUnitRewrite> {
-    let unit = DataUnitIndexInFile(
-        data_units_existing
-            .checked_sub(1)
-            .expect("第一个文件至少一个数据单元"),
-    );
+    let unit = DataUnitIndexInFile(data_units_existing.checked_sub(1)?);
     let declared_length_in_bytes = declared_length_within_a_size(unit, target_size_in_bytes);
     (declared_length_within_a_size(unit, size_before_in_bytes) < declared_length_in_bytes)
         .then_some(TailDataUnitRewrite {
@@ -206,50 +201,132 @@ pub fn every_truncation_step_from(
     }
 }
 
-/// 一个文件改 size 之前与之后的样子（[`plan_the_extent_tree_after_a_size_change`] 的输入）：单元数、这次重写哪一个单元、上段叶条目声明的尾部。
+/// 一次发布重写的那一段数据单元：单元号 `[first, end_exclusive)`，空段是一个都不重写。截断意图与变长重写的尾单元是一个单元的一段
+/// （K3、K5）；按偏移的部分写从偏移 o 所在的单元起到写之后最后一个单元（判决 `research/prompts/m4-partial-write-r1-main-verification.md`
+/// 第二节 R4），段里单元号不小于写之前单元数的那几个是这次新加的。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DataUnitsRewrittenInOnePublish {
+    pub first: u64,
+    pub end_exclusive: u64,
+}
+
+impl DataUnitsRewrittenInOnePublish {
+    /// 一个都不重写。
+    pub const NONE: Self = DataUnitsRewrittenInOnePublish {
+        first: 0,
+        end_exclusive: 0,
+    };
+
+    /// 只重写 `unit` 那一个。
+    #[must_use]
+    pub const fn of_one_unit(unit: DataUnitIndexInFile) -> Self {
+        DataUnitsRewrittenInOnePublish {
+            first: unit.0,
+            end_exclusive: unit.0 + 1,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.end_exclusive <= self.first
+    }
+
+    #[must_use]
+    pub const fn contains(self, unit: DataUnitIndexInFile) -> bool {
+        self.first <= unit.0 && unit.0 < self.end_exclusive
+    }
+
+    /// 这一段与单元号 `[first_data_unit, last_data_unit]`（含两端）有没有交。
+    #[must_use]
+    pub const fn meets(self, first_data_unit: u64, last_data_unit: u64) -> bool {
+        !self.is_empty() && self.first <= last_data_unit && first_data_unit < self.end_exclusive
+    }
+
+    /// 这一段里的单元号，升序。
+    #[must_use]
+    pub const fn units(self) -> std::ops::Range<u64> {
+        self.first..self.end_exclusive
+    }
+}
+
+/// 一个文件改 size（或按偏移部分写）之前与之后的样子（[`plan_the_extent_tree_after_a_size_change`] 与 [`plan_the_lower_segment_after_a_size_change`]
+/// 的输入）：单元数、这次重写哪一段单元、上段叶条目声明的尾部。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SizeChangeOfTheFile {
     pub data_units_before: u64,
     pub data_units_after: u64,
-    pub rewritten_data_unit: Option<DataUnitIndexInFile>,
+    pub rewritten_data_units: DataUnitsRewrittenInOnePublish,
     pub tail_before: TailOfAFile,
     pub tail_after: TailOfAFile,
 }
 
-/// 截断（意图、各批、最后一批）与变长、只改记录那几次发布之后 inode `inode` 那棵 extent 树（K3：截断的 extent 计划自己写，
-/// 不调 `unlink::plan_the_extent_tree_after_a_deletion_batch`）：下段按这次之后的单元数排，一个节点照抄的条件是它罩着的、存在的单元
-/// 两版一样（罩的单元全在留下那一段里，或这次单元数没变）**而且**不罩着这次重写的那个单元——罩着被重写单元 k 的下段叶到根恒重写，
-/// 留下的单元数正在叶边界上（144 的倍数）时也一样；被截掉那一段里的节点换下。只剩一个单元时不建下段（内联）。上段这个文件那一串
-/// 在单元数变了、有单元重写、或上段叶条目的标签变了（尾部有没有洞）时重写，否则整棵照抄、什么都不换下。
+impl SizeChangeOfTheFile {
+    /// 这个文件在上段叶里那一条这次变不变（变了那一串到根重写）：单元数变了、有单元重写（下段叶到根或内联的那一个指针变了）、
+    /// 或标签声明的尾部变了（有没有洞）。都没变（N = S、标签 0 上的改 size、截在洞里而什么都不放的最后一批）时那一条照抄。
+    #[must_use]
+    pub fn rewrites_the_upper_leaf_entry(self) -> bool {
+        !self.rewritten_data_units.is_empty()
+            || self.data_units_after != self.data_units_before
+            || self.tail_before != self.tail_after
+    }
+}
+
+/// 一个文件的下段在改 size（截断三步、变长、只改记录）之后的样子（[`plan_the_lower_segment_after_a_size_change`] 的结果）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LowerSegmentAfterASizeChange {
+    /// 这次之后的节点与来历，bump 次序（先叶后根）；只剩一个单元（内联）或一个都没有时为空。
+    pub nodes: Vec<(ExtentLowerNodePosition, ExtentTreeNodeOrigin)>,
+    /// 上一版里有、这次重写的位置（同名后继），按上一版的 bump 次序。
+    pub previous_nodes_rewritten: Vec<ExtentLowerNodePosition>,
+    /// 上一版里有、这次之后没有的位置（被截掉那一段里的节点、降成内联时的整段），按上一版的 bump 次序。
+    pub previous_nodes_dropped: Vec<ExtentLowerNodePosition>,
+}
+
+/// 截断（意图、各批、最后一批）与变长、只改记录那几次发布之后一个文件的下段（K3：截断的 extent 计划自己写，不调
+/// `unlink::plan_the_extent_tree_after_a_deletion_batch`），按偏移的部分写（判决 m4-partial-write-r1 第二节 R4、R5）也走这一份。
+/// 入参是这个文件自己上一版下段的节点位置（bump 次序）：第一个文件与第一个文件之外的
+/// 文件各交自己那一份（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S3「抽出下段计划」）。
+/// 下段按这次之后的单元数排，一个节点照抄的条件是它罩着的、存在的单元两版一样（罩的单元全在两版都有的那一段里，或这次单元数没变）**而且**不罩着
+/// 这次重写的那一段里的任何一个单元——罩着被重写单元的下段叶到根恒重写，留下的单元数正在叶边界上（144 的倍数）时也一样（K9 叶边界对任意 inode）；
+/// 被截掉那一段里的节点换下、没有同名后继。只剩一个单元时不建下段（内联）。部分写加单元时，新加的单元都在重写的那一段里。
+///
+/// 之前一个单元都没有（上段叶标签 0：整个文件都是洞，K5、S1）的：截短、N = S、变长都不加单元、不重写单元，下段为空；部分写加的单元整段重写。
 ///
 /// # Panics
-/// 这次之后的单元数是 0 或多于之前的：截断留至少一个单元、变长不加单元。
+/// 之前有单元而之后是 0 个：截断留至少一个单元。这次之后的单元数多于之前的、而多出来的单元不全在重写的那一段里：只有部分写加单元，它重写到最后一个。
+/// 照抄的位置不在 `previous_lower_nodes` 里：罩的存在单元两版一样的节点，上一版同一个位置上必有。
 #[must_use]
-pub fn plan_the_extent_tree_after_a_size_change(
-    previous: &ExtentTreeVersion,
-    inode: u64,
+pub fn plan_the_lower_segment_after_a_size_change(
+    previous_lower_nodes: &[ExtentLowerNodePosition],
     change: SizeChangeOfTheFile,
-) -> ExtentTreePlan {
+) -> LowerSegmentAfterASizeChange {
     let SizeChangeOfTheFile {
         data_units_before,
         data_units_after,
-        rewritten_data_unit,
-        tail_before,
-        tail_after,
+        rewritten_data_units,
+        ..
     } = change;
+    let keeps_at_least_one_unit_or_had_none = data_units_after >= 1 || data_units_before == 0;
     assert!(
-        (1..=data_units_before).contains(&data_units_after),
-        "截断留至少一个单元、变长不加单元"
+        keeps_at_least_one_unit_or_had_none,
+        "截断留至少一个单元（一个单元都没有的整文件洞照旧 0 个）"
+    );
+    assert!(
+        data_units_after <= data_units_before
+            || (rewritten_data_units.first <= data_units_before
+                && rewritten_data_units.end_exclusive == data_units_after),
+        "加单元的只有部分写：新加的单元都在重写的那一段里、重写到最后一个"
     );
     let covers_the_rewritten_unit = |position: &ExtentLowerNodePosition| {
         let (first_data_unit, last_data_unit) = position.data_unit_range();
-        rewritten_data_unit.is_some_and(|unit| (first_data_unit..=last_data_unit).contains(&unit.0))
+        rewritten_data_units.meets(first_data_unit, last_data_unit)
     };
     let covers_the_same_existing_units = |position: &ExtentLowerNodePosition| {
         let (_, last_data_unit) = position.data_unit_range();
-        last_data_unit < data_units_after || data_units_after == data_units_before
+        last_data_unit < data_units_after.min(data_units_before)
+            || data_units_after == data_units_before
     };
-    let lower_nodes: Vec<(ExtentLowerNodePosition, ExtentTreeNodeOrigin)> =
+    let nodes: Vec<(ExtentLowerNodePosition, ExtentTreeNodeOrigin)> =
         lower_segment_nodes_of_a_file_without_holes(data_units_after)
             .into_iter()
             .map(|position| {
@@ -257,7 +334,7 @@ pub fn plan_the_extent_tree_after_a_size_change(
                     && !covers_the_rewritten_unit(&position)
                 {
                     assert!(
-                        previous.lower_pointer_of(position).is_some(),
+                        previous_lower_nodes.contains(&position),
                         "罩的存在单元两版一样的节点，上一版（单元不更少）同一个位置上必有"
                     );
                     (
@@ -269,9 +346,51 @@ pub fn plan_the_extent_tree_after_a_size_change(
                 }
             })
             .collect();
-    let upper_path_is_rewritten = rewritten_data_unit.is_some()
-        || data_units_after != data_units_before
-        || tail_before != tail_after;
+    let origin_after_this_publish = |position: &ExtentLowerNodePosition| {
+        nodes
+            .iter()
+            .find(|(position_after, _)| position_after == position)
+            .map(|(_, origin)| *origin)
+    };
+    let previous_nodes_rewritten = previous_lower_nodes
+        .iter()
+        .filter(|position| {
+            origin_after_this_publish(position) == Some(ExtentTreeNodeOrigin::RewrittenThisPublish)
+        })
+        .copied()
+        .collect();
+    let previous_nodes_dropped = previous_lower_nodes
+        .iter()
+        .filter(|position| origin_after_this_publish(position).is_none())
+        .copied()
+        .collect();
+    LowerSegmentAfterASizeChange {
+        nodes,
+        previous_nodes_rewritten,
+        previous_nodes_dropped,
+    }
+}
+
+/// 截断（意图、各批、最后一批）与变长、只改记录那几次发布之后第一个文件那棵 extent 树：下段照 [`plan_the_lower_segment_after_a_size_change`]
+/// （入参是第一个文件上一版的下段），上段第一个文件那一串在那一条变了时（[`SizeChangeOfTheFile::rewrites_the_upper_leaf_entry`]）重写，
+/// 否则整棵照抄、什么都不换下。上段有条目的号集合不变（第一个文件改 size 时那条记录一直在、条目一直在）：第一个文件之外的文件改 size
+/// 不经这里，它的上段走统一计划（`transaction::extent_tree_plan_with_the_unified_upper_segment`，号集合可以多出它那一条粘住的标签 0）。
+///
+/// # Panics
+/// 同 [`plan_the_lower_segment_after_a_size_change`]。
+#[must_use]
+pub fn plan_the_extent_tree_after_a_size_change(
+    previous: &ExtentTreeVersion,
+    inode: u64,
+    change: SizeChangeOfTheFile,
+) -> ExtentTreePlan {
+    let previous_lower_positions: Vec<ExtentLowerNodePosition> = previous
+        .lower_nodes
+        .iter()
+        .map(|(position, _)| *position)
+        .collect();
+    let lower = plan_the_lower_segment_after_a_size_change(&previous_lower_positions, change);
+    let upper_path_is_rewritten = change.rewrites_the_upper_leaf_entry();
     let upper_root_level = previous.upper_root().level;
     let path_of_the_file = upper_path_of_inode(inode, upper_root_level);
     let upper_nodes = previous
@@ -286,7 +405,8 @@ pub fn plan_the_extent_tree_after_a_size_change(
             (*position, origin)
         })
         .collect();
-    let carried_lower: Vec<ExtentLowerNodePosition> = lower_nodes
+    let carried_lower: Vec<ExtentLowerNodePosition> = lower
+        .nodes
         .iter()
         .filter(|(_, origin)| *origin == ExtentTreeNodeOrigin::CarriedFromThePreviousVersion)
         .map(|(position, _)| *position)
@@ -307,7 +427,7 @@ pub fn plan_the_extent_tree_after_a_size_change(
         )
         .collect();
     ExtentTreePlan {
-        lower_nodes,
+        lower_nodes: lower.nodes,
         upper_nodes,
         replaced_previous_roles,
     }
@@ -440,7 +560,9 @@ mod tests {
             SizeChangeOfTheFile {
                 data_units_before: data_units,
                 data_units_after: data_units,
-                rewritten_data_unit: Some(DataUnitIndexInFile(unit)),
+                rewritten_data_units: DataUnitsRewrittenInOnePublish::of_one_unit(
+                    DataUnitIndexInFile(unit),
+                ),
                 tail_before: TailOfAFile::NoHoleAfterTheLastDataUnit,
                 tail_after: TailOfAFile::NoHoleAfterTheLastDataUnit,
             },
@@ -610,7 +732,7 @@ mod tests {
             SizeChangeOfTheFile {
                 data_units_before: 150,
                 data_units_after: 144,
-                rewritten_data_unit: None,
+                rewritten_data_units: DataUnitsRewrittenInOnePublish::NONE,
                 tail_before: TailOfAFile::NoHoleAfterTheLastDataUnit,
                 tail_after: TailOfAFile::NoHoleAfterTheLastDataUnit,
             },
@@ -659,13 +781,71 @@ mod tests {
             SizeChangeOfTheFile {
                 data_units_before: 3,
                 data_units_after: 3,
-                rewritten_data_unit: None,
+                rewritten_data_units: DataUnitsRewrittenInOnePublish::NONE,
                 tail_before: TailOfAFile::NoHoleAfterTheLastDataUnit,
                 tail_after: TailOfAFile::NoHoleAfterTheLastDataUnit,
             },
         );
         assert!(plan.rewritten_roles().is_empty());
         assert!(plan.replaced_previous_roles.is_empty());
+    }
+
+    /// 部分写加单元（判决 m4-partial-write-r1 第二节 R4、R5）：144 个单元正好一片叶，写到第 145 个单元（单元 143 满、不重写）——
+    /// 第 0 片叶罩的单元两版一样、照抄，第 1 片新叶与新的下段根重写，上一版那片叶（兼下段根）不被换下；从单元 100 起重写到 145 个——
+    /// 第 0 片叶罩着重写的单元，叶与根都重写、上一版那一片换下。
+    #[test]
+    fn a_partial_write_adding_units_carries_only_the_leaves_below_the_first_rewritten_unit() {
+        let past_a_full_leaf = plan_the_lower_segment_after_a_size_change(
+            &[lower(0, 0)],
+            SizeChangeOfTheFile {
+                data_units_before: 144,
+                data_units_after: 145,
+                rewritten_data_units: DataUnitsRewrittenInOnePublish {
+                    first: 144,
+                    end_exclusive: 145,
+                },
+                tail_before: TailOfAFile::NoHoleAfterTheLastDataUnit,
+                tail_after: TailOfAFile::NoHoleAfterTheLastDataUnit,
+            },
+        );
+        assert_eq!(
+            past_a_full_leaf.nodes,
+            vec![
+                (
+                    lower(0, 0),
+                    ExtentTreeNodeOrigin::CarriedFromThePreviousVersion
+                ),
+                (lower(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+            ]
+        );
+        assert!(past_a_full_leaf.previous_nodes_rewritten.is_empty());
+        assert!(past_a_full_leaf.previous_nodes_dropped.is_empty());
+        let from_unit_one_hundred = plan_the_lower_segment_after_a_size_change(
+            &[lower(0, 0)],
+            SizeChangeOfTheFile {
+                data_units_before: 144,
+                data_units_after: 145,
+                rewritten_data_units: DataUnitsRewrittenInOnePublish {
+                    first: 100,
+                    end_exclusive: 145,
+                },
+                tail_before: TailOfAFile::NoHoleAfterTheLastDataUnit,
+                tail_after: TailOfAFile::NoHoleAfterTheLastDataUnit,
+            },
+        );
+        assert_eq!(
+            from_unit_one_hundred.nodes,
+            vec![
+                (lower(0, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (lower(0, 1), ExtentTreeNodeOrigin::RewrittenThisPublish),
+                (lower(1, 0), ExtentTreeNodeOrigin::RewrittenThisPublish),
+            ]
+        );
+        assert_eq!(
+            from_unit_one_hundred.previous_nodes_rewritten,
+            vec![lower(0, 0)]
+        );
     }
 
     /// K12：⌈N ÷ 净荷⌉ × 净荷装得进 u64 的上限；N 走哪一条只看 N 与 S。

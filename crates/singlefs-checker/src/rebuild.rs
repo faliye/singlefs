@@ -126,9 +126,10 @@ pub(crate) struct RebuiltIndexTables {
 /// 不当成立、也不当违例。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScanRebuildNotDecided {
-    /// 码 1 同一对象身份上两版写序逐字节相同：C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3 择写序最大者择不出，
-    /// 而码 1 的全序键要不要加诞生代号打头停在 C464（I-1.8 对码 1 的全序键写窄了）。
-    DataUnitVersionsTiedOnTheWriteOrderUntilC464IsDecided,
+    /// 码 1 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8（归并后版本全序） ② 不成立，择新键择不出
+    /// （码 1 的全序键与码 3 同形，C464（I-1.8 对码 1 的全序键写窄了） 用户 2026-10-26 定「① 加诞生代号打头」）。
+    /// 扫描方向交来的副本 fsid 都等于本池的，那样两组的归并键相同、合成一版，这一支只在交进来的副本 fsid 不同时走到。
+    DataUnitVersionsTiedOnTheTotalOrderKeyOfI18,
     /// 码 3 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8（归并后版本全序） ② 不成立，择新键择不出。
     PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18,
     /// 同一版（归并键相同）的副本头里的载荷校验和不同：I-1.8（归并后版本全序） ① 判损坏、不择。
@@ -153,8 +154,8 @@ pub(crate) enum ScanRebuildNotDecided {
 impl ScanRebuildNotDecided {
     pub(crate) fn reason(self) -> &'static str {
         match self {
-            ScanRebuildNotDecided::DataUnitVersionsTiedOnTheWriteOrderUntilC464IsDecided => {
-                "扫描重建：码 1 同一对象身份上两版写序逐字节相同，C113 定案 P3 择写序最大者择不出，码 1 的全序键停在 C464（I-1.8 对码 1 的全序键写窄了）"
+            ScanRebuildNotDecided::DataUnitVersionsTiedOnTheTotalOrderKeyOfI18 => {
+                "扫描重建：码 1 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同，I-1.8 ② 不成立，择不出当前版本"
             }
             ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18 => {
                 "扫描重建：码 3 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同，I-1.8 ② 不成立，择不出当前版本"
@@ -184,20 +185,15 @@ impl ScanRebuildNotDecided {
     }
 }
 
-/// C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3 的择新键，按单元类分：码 1 取写序 (实例代号, 事务号) 最大者；
-/// 码 3 取 (诞生代号, 实例代号) 最大者，同一 checkpoint 里写过几次的由事务号定——这就是 I-1.8（归并后版本全序） 码 3 的全序键三元，
-/// 诞生代号打头。只在同一个对象身份的各版之间比：对象身份首字节是类标签，一个身份上的各版必然同类。
+/// C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3 的择新键：取 (诞生代号, 实例代号, 事务号) 最大者，诞生代号打头、
+/// 同一 checkpoint 里写过几次的由事务号定——这就是 I-1.8（归并后版本全序） 的全序键三元，码 1 与码 3 同形（码 1 那一半是
+/// C464（I-1.8 对码 1 的全序键写窄了） 用户 2026-10-26 定的「① 加诞生代号打头」：一个事务跨两个 checkpoint 时两版写序逐字节相同，
+/// 只有诞生代号分得开）。字段次序就是比较次序。只在同一个对象身份的各版之间比：对象身份首字节是类标签，一个身份上的各版必然同类。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum CurrentVersionOrderKey {
-    DataUnitWriteOrder {
-        instance: u32,
-        transaction: u64,
-    },
-    PackedRecordUnit {
-        birth_txg: u64,
-        instance: u32,
-        transaction: u64,
-    },
+struct CurrentVersionOrderKey {
+    birth_txg: u64,
+    instance: u32,
+    transaction: u64,
 }
 
 fn current_version_order_key_of(
@@ -205,21 +201,13 @@ fn current_version_order_key_of(
     plain_header: &[u8],
 ) -> CurrentVersionOrderKey {
     let offsets = class.header_offsets();
-    let instance = read_u32(plain_header, offsets.write_order);
-    let transaction = read_six_byte_unsigned(
-        plain_header,
-        offsets.write_order + WRITE_ORDER_TRANSACTION_OFFSET,
-    );
-    match class {
-        ContentUnitClass::Data => CurrentVersionOrderKey::DataUnitWriteOrder {
-            instance,
-            transaction,
-        },
-        ContentUnitClass::PackedRecord => CurrentVersionOrderKey::PackedRecordUnit {
-            birth_txg: read_u64(plain_header, offsets.birth_txg),
-            instance,
-            transaction,
-        },
+    CurrentVersionOrderKey {
+        birth_txg: read_u64(plain_header, offsets.birth_txg),
+        instance: read_u32(plain_header, offsets.write_order),
+        transaction: read_six_byte_unsigned(
+            plain_header,
+            offsets.write_order + WRITE_ORDER_TRANSACTION_OFFSET,
+        ),
     }
 }
 
@@ -267,8 +255,7 @@ fn current_version_is_left_for_the_lineage(class: ContentUnitClass, plain_header
     }
 }
 
-/// 一个对象身份按择新键升序排好的候选版本里取最大的：最大的两版键相同就择不出（码 1 停在 C464（I-1.8 对码 1 的全序键写窄了），
-/// 码 3 是 I-1.8（归并后版本全序） ② 不成立）。一版都没有交回 `None`。各版可以是拿着的，也可以是借来的（第二步滤谱系时借第一步那一份）。
+/// 一个对象身份按择新键升序排好的候选版本里取最大的：最大的两版键相同就择不出（I-1.8（归并后版本全序） ② 不成立，码 1 与码 3 同判）。一版都没有交回 `None`。各版可以是拿着的，也可以是借来的（第二步滤谱系时借第一步那一份）。
 fn latest_of_the_ordered_versions<Version: std::borrow::Borrow<VersionOfAnObject>>(
     mut ordered: Vec<(CurrentVersionOrderKey, Version)>,
 ) -> Result<Option<Version>, ScanRebuildNotDecided> {
@@ -281,7 +268,7 @@ fn latest_of_the_ordered_versions<Version: std::borrow::Borrow<VersionOfAnObject
     {
         return Err(match current.borrow().class {
             ContentUnitClass::Data => {
-                ScanRebuildNotDecided::DataUnitVersionsTiedOnTheWriteOrderUntilC464IsDecided
+                ScanRebuildNotDecided::DataUnitVersionsTiedOnTheTotalOrderKeyOfI18
             }
             ContentUnitClass::PackedRecord => {
                 ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18
@@ -1235,6 +1222,9 @@ mod tests {
         UnitPlacement { device: 0, slot }
     }
 
+    /// 码 1 头里 fsid 低 8 字节的偏移（D18（块里携带什么信息） 已定项 7 的字段表：诞生代号 75 之后）。
+    const DATA_UNIT_FILESYSTEM_IDENTIFIER_OFFSET: usize = 83;
+
     /// 码 1 数据单元一个版本的头里这一组单测要的几段。
     struct DataUnitVersion {
         tree: u64,
@@ -1391,11 +1381,11 @@ mod tests {
     }
 
     #[test]
-    fn the_current_version_of_a_data_unit_is_the_one_with_the_largest_write_order() {
-        let later_placement = placement_on_device_zero(50254);
+    fn the_current_version_of_a_data_unit_is_led_by_the_birth_txg_before_the_write_order() {
+        let later_birth_placement = placement_on_device_zero(50180);
         let copies = [
             data_unit_copy(
-                later_placement,
+                placement_on_device_zero(50254),
                 &DataUnitVersion {
                     birth_txg: 4,
                     instance: 2,
@@ -1404,7 +1394,7 @@ mod tests {
                 },
             ),
             data_unit_copy(
-                placement_on_device_zero(50180),
+                later_birth_placement,
                 &DataUnitVersion {
                     birth_txg: 5,
                     instance: 1,
@@ -1414,17 +1404,19 @@ mod tests {
             ),
         ];
         let tables =
-            rebuilt_from(&copies, &[]).expect("写序互不相同，择得出；没有墓碑也没有记录，照认领");
+            rebuilt_from(&copies, &[]).expect("全序键互不相同，择得出；没有墓碑也没有记录，照认领");
         let placements: Vec<&BTreeSet<UnitPlacement>> = tables.central_mapping.values().collect();
         assert_eq!(
             placements,
-            vec![&BTreeSet::from([later_placement])],
-            "写序 (实例 2, 事务 1) 大于 (实例 1, 事务 9)：当前版本是实例 2 那一版（C113 定案 P3 码 1 取写序最大者），与诞生代号无关"
+            vec![&BTreeSet::from([later_birth_placement])],
+            "诞生代号 5 大于 4：当前版本是诞生代号 5 那一版，写序 (实例 1, 事务 9) 小于 (实例 2, 事务 1) 也不改它（码 1 的全序键诞生代号打头，C464 定 ①）"
         );
     }
 
     #[test]
-    fn two_data_unit_versions_with_the_same_write_order_are_not_decided_until_c464() {
+    fn of_two_data_unit_versions_sharing_the_write_order_the_one_with_the_larger_birth_txg_is_current(
+    ) {
+        let larger_birth_placement = placement_on_device_zero(50254);
         let copies = [
             data_unit_copy(
                 placement_on_device_zero(50180),
@@ -1435,7 +1427,7 @@ mod tests {
                 },
             ),
             data_unit_copy(
-                placement_on_device_zero(50254),
+                larger_birth_placement,
                 &DataUnitVersion {
                     birth_txg: 5,
                     transaction: 7,
@@ -1443,10 +1435,37 @@ mod tests {
                 },
             ),
         ];
+        let tables = rebuilt_from(&copies, &[])
+            .expect("两版写序逐字节相同、诞生代号不同（一个事务跨两个 checkpoint）：全序键诞生代号打头，择得出");
+        let placements: Vec<&BTreeSet<UnitPlacement>> = tables.central_mapping.values().collect();
+        assert_eq!(
+            placements,
+            vec![&BTreeSet::from([larger_birth_placement])],
+            "写序相同时诞生代号 5 那一版是当前版本（C464 定 ①：码 1 的全序键 (诞生代号, 实例代号, 事务号)）"
+        );
+    }
+
+    /// 两版对象身份、诞生代号、写序都相同而 fsid 不同（归并键不同，是两组）：全序键相同，I-1.8 ② 不成立，择不出。
+    /// fsid 不同的副本扫描方向交不进来（它只交本池 fsid 的），这里直接交给扫描重建，钉住它自己的停法。
+    #[test]
+    fn two_data_unit_versions_with_the_same_total_order_key_are_not_decided() {
+        let version = DataUnitVersion {
+            birth_txg: 5,
+            transaction: 7,
+            ..DataUnitVersion::of_the_first_inode_at(0)
+        };
+        let mut copy_under_another_filesystem_identifier =
+            data_unit_copy(placement_on_device_zero(50254), &version);
+        copy_under_another_filesystem_identifier.plain_header
+            [DATA_UNIT_FILESYSTEM_IDENTIFIER_OFFSET] ^= 0xFF;
+        let copies = [
+            data_unit_copy(placement_on_device_zero(50180), &version),
+            copy_under_another_filesystem_identifier,
+        ];
         assert_eq!(
             rebuilt_from(&copies, &[]).err(),
-            Some(ScanRebuildNotDecided::DataUnitVersionsTiedOnTheWriteOrderUntilC464IsDecided),
-            "两版写序逐字节相同、诞生代号不同：P3 择不出，码 1 的键停在 C464，交回没定、不猜"
+            Some(ScanRebuildNotDecided::DataUnitVersionsTiedOnTheTotalOrderKeyOfI18),
+            "两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8 ② 不成立，交回没定、不猜"
         );
     }
 

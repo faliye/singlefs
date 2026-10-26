@@ -18,6 +18,7 @@ use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_unit_graph::entry_groups::{
     parse_entry_group_table, ReadBackEntryGroup, ReadBackEntryGroupTable, ReadBackEntryGroupVerdict,
 };
+use singlefs_unit_graph::FeaturesEnabledByTheBuild;
 
 use crate::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 
@@ -582,6 +583,136 @@ pub fn compiled_judging_units_keys() -> &'static ReadBackEntryGroupTable {
     })
 }
 
+/// 核心层的包名（清单 `[package] name`，编进去的那份表 `build-feature` 行里点名它的写法）。
+pub const CORE_LAYER_PACKAGE_NAME: &str = "singlefs-core";
+
+/// 核心层按身份查的计数那个特性（harness 档的 dev 依赖打开它）。
+pub const LOOKUP_WORK_COUNTERS_FEATURE: &str = "lookup-work-counters";
+
+/// 核心层发布触发阈值的只供测试来源那个特性（harness 档的 dev 依赖打开它，判决 `research/prompts/m4-publish-trigger-r1-main-verification.md`
+/// 第二节「只供测试的开关」那一格）。
+pub const TEST_ONLY_PUBLISH_THRESHOLDS_FEATURE: &str = "test-only-publish-thresholds";
+
+/// 核心层清单 `[features]` 里的特性，[`features_the_core_layer_was_compiled_with`] 认得出开没开的就是这几个（按清单里的名字排好）。
+pub const CORE_LAYER_FEATURES_RECOGNIZED_FROM_ITS_CODE: [&str; 2] = [
+    LOOKUP_WORK_COUNTERS_FEATURE,
+    TEST_ONLY_PUBLISH_THRESHOLDS_FEATURE,
+];
+
+/// 这个二进制链进来的核心层实际开着哪些特性，从核心层编出来的代码里认、不经构建脚本：拿来对照编进去的那份表里依赖包的特性
+/// （`build-feature` 行，构建脚本读核心层经 `links` 交出的那一份）。只编 checker 档时一个都不开；与 harness 档测试一起编时，
+/// harness 档的 dev 依赖替核心层并上 `lookup-work-counters` 与 `test-only-publish-thresholds`。一个都没开时交空表（与构建脚本取到空集时一样，不留核心层那一项）。
+#[must_use]
+pub fn features_the_core_layer_was_compiled_with() -> FeaturesEnabledByTheBuild {
+    let mut features_of_each_package = BTreeMap::new();
+    let mut features_of_the_core_layer = BTreeSet::new();
+    if core_layer_feature_probe::lookup_work_counters_are_compiled_into_the_core_layer() {
+        features_of_the_core_layer.insert(LOOKUP_WORK_COUNTERS_FEATURE.to_string());
+    }
+    if core_layer_publish_thresholds_probe::test_only_publish_thresholds_are_compiled_into_the_core_layer()
+    {
+        features_of_the_core_layer.insert(TEST_ONLY_PUBLISH_THRESHOLDS_FEATURE.to_string());
+    }
+    if !features_of_the_core_layer.is_empty() {
+        features_of_each_package.insert(
+            CORE_LAYER_PACKAGE_NAME.to_string(),
+            features_of_the_core_layer,
+        );
+    }
+    FeaturesEnabledByTheBuild {
+        features_of_each_package,
+    }
+}
+
+/// 认核心层开没开 `lookup-work-counters`：开着时核心层才有 `transaction::lookup_work::lookup_work_while`。函数体里 glob 引入那个模块，
+/// 名字在那里找得到就用核心层的；找不到，落到本模块里同名的替身上。再按交回的计数是不是替身的类型认是哪一个。
+/// 核心层把那个函数改名、或改成不挂特性，这里认错的那一边会让对照它的测试红，不会静默。
+mod core_layer_feature_probe {
+    /// 替身交回的计数（核心层没编进计数时才构造）。
+    #[allow(
+        dead_code,
+        reason = "核心层开着计数时名字落到核心层那一个上，替身不构造这个值"
+    )]
+    pub(super) struct CountersNotCompiledIntoTheCoreLayer;
+
+    /// 核心层没编进计数时，`lookup_work_while` 这个名字落到这里。
+    #[allow(
+        dead_code,
+        reason = "核心层开着计数时名字落到核心层那一个上，替身用不到"
+    )]
+    pub(super) fn lookup_work_while<Output>(
+        action: impl FnOnce() -> Output,
+    ) -> (Output, CountersNotCompiledIntoTheCoreLayer) {
+        (action(), CountersNotCompiledIntoTheCoreLayer)
+    }
+
+    pub(super) fn lookup_work_counters_are_compiled_into_the_core_layer() -> bool {
+        #[allow(
+            unused_imports,
+            reason = "核心层没编进计数时这个模块里没有这里用得上的名字"
+        )]
+        use singlefs_core::transaction::lookup_work::*;
+        let ((), work_while_doing_nothing) = lookup_work_while(|| ());
+        !is_the_stand_in(&work_while_doing_nothing)
+    }
+
+    fn is_the_stand_in<Work: 'static>(_work: &Work) -> bool {
+        std::any::TypeId::of::<Work>()
+            == std::any::TypeId::of::<CountersNotCompiledIntoTheCoreLayer>()
+    }
+}
+
+/// 认核心层开没开 `test-only-publish-thresholds`：开着时核心层的 `PublishTriggerThresholds` 才有固有的
+/// `of_test_only_values_clamped_by_the_journal_ring`。按类型名调它：固有的那个先于本模块里同名的特征方法（替身），没有固有的才落到替身上；
+/// 再按交回的值是不是替身的类型认是哪一个。核心层把那个函数改名、或改成不挂特性，这里认错的那一边会让对照它的测试红，不会静默。
+mod core_layer_publish_thresholds_probe {
+    use singlefs_core::system_configuration::PublishTriggerThresholds;
+
+    /// 替身交回的值（核心层没编进只供测试来源时才构造）。
+    #[allow(
+        dead_code,
+        reason = "核心层开着那个特性时名字落到核心层固有的那一个上，替身不构造这个值"
+    )]
+    pub(super) struct ThresholdsNotCompiledIntoTheCoreLayer;
+
+    /// 核心层没编进只供测试来源时，`PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring` 这个名字落到这里。
+    #[allow(
+        dead_code,
+        reason = "核心层开着那个特性时名字落到核心层固有的那一个上，替身用不到"
+    )]
+    trait StandInForTheTestOnlyPublishThresholds {
+        fn of_test_only_values_clamped_by_the_journal_ring(
+            time_threshold: std::time::Duration,
+            dirty_threshold_before_the_clamp: u64,
+            journal_ring_bytes: u64,
+        ) -> ThresholdsNotCompiledIntoTheCoreLayer;
+    }
+
+    impl StandInForTheTestOnlyPublishThresholds for PublishTriggerThresholds {
+        fn of_test_only_values_clamped_by_the_journal_ring(
+            _time_threshold: std::time::Duration,
+            _dirty_threshold_before_the_clamp: u64,
+            _journal_ring_bytes: u64,
+        ) -> ThresholdsNotCompiledIntoTheCoreLayer {
+            ThresholdsNotCompiledIntoTheCoreLayer
+        }
+    }
+
+    pub(super) fn test_only_publish_thresholds_are_compiled_into_the_core_layer() -> bool {
+        let made = PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring(
+            std::time::Duration::ZERO,
+            0,
+            0,
+        );
+        !is_the_stand_in(&made)
+    }
+
+    fn is_the_stand_in<Made: 'static>(_made: &Made) -> bool {
+        std::any::TypeId::of::<Made>()
+            == std::any::TypeId::of::<ThresholdsNotCompiledIntoTheCoreLayer>()
+    }
+}
+
 /// 表里一组的组成清单换成组成清单行：一个单元一行，单元写 `<种类> <限定名> @ <文件>`（不带行号：行挪了不算单元变了），
 /// 同一份文件里种类与限定名都相同的几个单元按出现次序另加 `#<第几个>`。
 fn composition_of_the_compiled_group(group: &ReadBackEntryGroup) -> Vec<JudgingUnitFingerprint> {
@@ -664,7 +795,7 @@ mod tests {
         effective_profile_lines, toolchain_lines_of_the_build, BuildToolchainInputs,
     };
     use singlefs_unit_graph::entry_groups::{
-        entry_group_key, EntryGroupRequest, EntryGroupVerdict,
+        entry_group_key_with_the_features_of_the_build, EntryGroupRequest, EntryGroupVerdict,
     };
     use singlefs_unit_graph::heavy_threads::default_heavy_threads;
     use singlefs_unit_graph::{load_workspace, parse_lock_file, RuleSwitches, TargetSelector};
@@ -799,6 +930,9 @@ mod tests {
     }
 
     /// 照入口登记表在 `root` 那棵树上逐组算键（与构建脚本同一套）：组名 → 键（拒算或不编进来的是 `None`）。
+    /// 依赖包的特性取编进去的那份表里的 `build-feature` 行（构建脚本读依赖包经 `links` 交出的那一份）：与 harness 档测试一起编时，
+    /// 那一趟核心层带着并上来的特性，编进去的键认它，重算这一侧也要认；那几行与核心层实际开着的对不对，另由
+    /// `the_dependency_features_compiled_into_the_table_are_the_ones_the_core_layer_was_built_with` 判。
     fn registry_keys_under(root: &Path) -> KeysOfEachGroup {
         let switches = RuleSwitches::every_rule_intact();
         let workspace =
@@ -834,9 +968,15 @@ mod tests {
                         .collect(),
                     features: features_of_this_build(),
                 };
-                let computed =
-                    entry_group_key(&workspace, &request, &toolchain_lines, &packages, &switches)
-                        .unwrap_or_else(|error| panic!("组 {group_name} 的入口写错了：{error}"));
+                let computed = entry_group_key_with_the_features_of_the_build(
+                    &workspace,
+                    &request,
+                    &compiled_judging_units_keys().features_enabled_by_the_build,
+                    &toolchain_lines,
+                    &packages,
+                    &switches,
+                )
+                .unwrap_or_else(|error| panic!("组 {group_name} 的入口写错了：{error}"));
                 let key = match computed.verdict {
                     EntryGroupVerdict::Keyed { key } => Some(key.0),
                     EntryGroupVerdict::Refused { .. } | EntryGroupVerdict::NotCompiled { .. } => {
@@ -996,6 +1136,39 @@ mod tests {
                 .get("judgement_of_the_crash_images")
                 .is_some_and(Option::is_some),
             "CPU 判器那一组算得出键：{compiled:?}"
+        );
+    }
+
+    /// 编进去的那份表里依赖包的特性（`build-feature` 行，构建脚本读核心层经 `links` 交出的那一份），与这个测试二进制链进来的核心层
+    /// 实际开着的（[`features_the_core_layer_was_compiled_with`]，从核心层编出来的代码里认）逐个相同：只编 checker 档时两边都空，
+    /// 与 harness 档测试一起编（`cargo test -p singlefs-checker-tier -p singlefs-harness`、`cargo test --all`）时两边都是核心层的
+    /// `lookup-work-counters`。核心层清单里的特性也要都是认得出的那几个，多了一个没法认的，这一条先红。
+    /// 判别力（`crates/mutations.tsv`，一起编的那一行）：构建脚本改回只读本包特性（不读核心层交出的那一份），一起编时这条红。
+    #[test]
+    fn the_dependency_features_compiled_into_the_table_are_the_ones_the_core_layer_was_built_with()
+    {
+        let core_manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("本 crate 在 crates/ 下")
+            .join("singlefs-core")
+            .join("Cargo.toml");
+        let core_manifest = singlefs_unit_graph::manifest::parse_crate_manifest(
+            &std::fs::read_to_string(core_manifest_path).expect("核心层清单读得了"),
+        )
+        .expect("核心层清单解析得了");
+        assert_eq!(
+            core_manifest
+                .features
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<&str>>(),
+            CORE_LAYER_FEATURES_RECOGNIZED_FROM_ITS_CODE,
+            "核心层清单里的特性就是 features_the_core_layer_was_compiled_with 认得出的那几个（多了的要在那里加认法）"
+        );
+        assert_eq!(
+            compiled_judging_units_keys().features_enabled_by_the_build,
+            features_the_core_layer_was_compiled_with(),
+            "编进去的表里依赖包的特性（构建脚本读到的）与链进来的核心层实际开着的逐个相同"
         );
     }
 

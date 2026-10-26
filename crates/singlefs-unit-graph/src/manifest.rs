@@ -361,6 +361,9 @@ pub struct CrateManifest {
     pub discovers_benchmarks: bool,
     pub dependencies: Vec<Dependency>,
     pub features: BTreeMap<String, Vec<String>>,
+    /// `[package] links`：带它的包的构建脚本交出的元数据，cargo 以 `DEP_<links>_<键>` 交给直接依赖它的包的构建脚本
+    /// （`build_features::features_enabled_on_the_dependencies` 按它找变量名）。
+    pub links: Option<String>,
 }
 
 fn text_of(value: &TomlValue) -> Option<String> {
@@ -443,11 +446,13 @@ pub fn parse_crate_manifest(text: &str) -> Result<CrateManifest, ManifestError> 
     let mut discovers = BTreeMap::new();
     let mut dependencies: BTreeMap<(DependencySection, String), Dependency> = BTreeMap::new();
     let mut features = BTreeMap::new();
+    let mut links = None;
     for entry in &entries {
         let table: Vec<&str> = entry.table_path.iter().map(String::as_str).collect();
         let key: Vec<&str> = entry.key_path.iter().map(String::as_str).collect();
         match (table.as_slice(), key.as_slice()) {
             (["package"], ["name"]) => package_name = text_of(&entry.value),
+            (["package"], ["links"]) => links = text_of(&entry.value),
             (["package"], ["build"]) => {
                 build_script = match (&entry.value, text_of(&entry.value)) {
                     (TomlValue::Boolean(false), _) => BuildScriptDeclaration::Disabled,
@@ -555,6 +560,7 @@ pub fn parse_crate_manifest(text: &str) -> Result<CrateManifest, ManifestError> 
         discovers_benchmarks: discovers_of("autobenches"),
         dependencies: dependencies.into_values().collect(),
         features,
+        links,
     })
 }
 

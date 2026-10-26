@@ -212,6 +212,8 @@ pub fn write_two_page_chain(
             instance_table: first_page_pointer,
             mapping_root: root.mapping_root,
             allocation_record_tree_root: root.allocation_record_tree_root,
+            reclaim_threshold: root.reclaim_threshold,
+            pinned_ring_slot: root.pinned_ring_slot,
         };
         let target = target_for_publish(root.checkpoint_txg, slots_per_region);
         let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];

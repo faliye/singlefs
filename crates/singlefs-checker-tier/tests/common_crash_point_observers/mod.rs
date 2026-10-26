@@ -535,6 +535,57 @@ pub fn amplify_a_flow_through_the_standard_prefix(
                 }
             }
         }
+        assert_the_observers_attached_by_the_provenance_saw_the_flow(flow_name, observing);
     }
     run
+}
+
+/// 崩溃放量那一处按来历挂的观察者（`singlefs_checker_tier::crash_point_replay_provenance`：登记位上、来历是 mkfs 返回之后的流挂两槽全废盘面观察者，
+/// 它在判段从判器交回的逐盘自证槽数看）在这条流上挂上了、看过状态、一个都没判红，看过的状态数计数等于它看过的状态数。这一份不挂它，只核跑流那一处挂了。
+#[cfg(feature = "verdict-store")]
+fn assert_the_observers_attached_by_the_provenance_saw_the_flow(
+    flow_name: &str,
+    observing: &singlefs_checker_tier::crash_amplification::ObservingOfTheRun,
+) {
+    use singlefs_checker_tier::crash_point_replay_provenance::{
+        observers_attached_to_the_flow, RunOfTheFlow,
+    };
+    let attached = observers_attached_to_the_flow(RunOfTheFlow::CrashAmplification, flow_name)
+        .unwrap_or_else(|refusal| panic!("{}", refusal.sentence()));
+    assert!(
+        !attached.is_empty(),
+        "流 {flow_name} 走过标准前缀、登在崩溃放量的 ITEMS 上、来历是 mkfs 返回之后：按来历挂两槽全废盘面观察者"
+    );
+    for observer in attached {
+        let name = observer.observer_name();
+        let states = observing
+            .states_of_each_observer
+            .get(name)
+            .copied()
+            .unwrap_or(0);
+        assert!(
+            states > 0,
+            "流 {flow_name}：按来历挂的观察者 {name} 一个状态都没看（跑流那一处没挂上）"
+        );
+        assert_eq!(
+            observing
+                .red_states_of_each_observer
+                .get(name)
+                .copied()
+                .unwrap_or(0),
+            0,
+            "流 {flow_name}：按来历挂的观察者 {name} 判红的状态（这一趟看出来的前几个）：{:?}",
+            observing.red_texts
+        );
+        assert_eq!(
+            observing
+                .counts_of_each_observer
+                .get(name)
+                .and_then(|counts| counts.get(observer.states_seen_counter()))
+                .copied()
+                .unwrap_or(0),
+            states,
+            "流 {flow_name}：按来历挂的观察者 {name} 看过的每个状态都记了数"
+        );
+    }
 }

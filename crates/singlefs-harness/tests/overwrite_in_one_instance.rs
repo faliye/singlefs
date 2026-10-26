@@ -20,7 +20,8 @@ use singlefs_core::address::{
     SlotNumber,
 };
 use singlefs_core::admission::{
-    AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand, SpaceAdmission,
+    AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand,
+    JudgementThatFoundTheDeviceShort, SpaceAdmission,
 };
 use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
 use singlefs_core::allocator::{
@@ -777,6 +778,7 @@ fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
         [DeviceIdentity(0), DeviceIdentity(1)]
             .map(|device| DeviceShortOfDemand {
                 device,
+                judged_short_by: JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
                 available: AvailableBytesOnOneDevice(0),
                 demand: BytesOnOneDevice(8_962_048),
             })

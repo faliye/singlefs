@@ -131,12 +131,12 @@ pub fn pool_whose_quarantined_records_no_root_references_with_the_newest_data_sl
     (pool, data_slot, newest_data_slot)
 }
 
-/// 用例 10：I-3.1（已分配统计对得上） 与 I-3.11（已分配减 defer 等于最新根走读） 怎么认隔离的记录（用户 2026-09-25 定，
-/// D19（块指针的结构与宽度预算） 已定项 5 的隔离；按单元判是主 agent 同日定的读法）：已分配而没有任何根引用的记录，它罩住的单元
-/// 只要有一份 checker 自己读出来读不出或校验和对不上，那个单元每块盘上的记录都豁免；每一份都读得出且对得上的照旧判违例。
-/// 1. 两盘那一份都改坏：两条记录豁免，I-3.1、I-3.11 都成立（改之前 checker 不认隔离，两条都红）；
-/// 2. 把那两份改回对得上（再翻一次同一个字节）：同样两条记录不再豁免，I-3.1、I-3.11 照红。
-pub fn quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read(
+/// 用例 10：I-3.1（已分配统计对得上） 与 I-3.11（已分配减 defer 等于最新根走读） 怎么认隔离的记录：只认记号（D19（块指针的结构与宽度预算）
+/// 已定项 5「隔离的盘上记号」，用户 2026-10-22 定落点甲、checker 只认记号）——已分配而没有任何根引用、每块盘上那条记录都带隔离记号的，
+/// 那个单元每块盘上的记录都豁免，不读副本。
+/// 1. 两盘那一份都改坏：写者隔离时置了记号，两条记录豁免，I-3.1、I-3.11 都成立；
+/// 2. 把那两份改回对得上（再翻一次同一个字节）：记号还在，照样豁免、两条都成立（之前按副本判的读法在这一张上两条都红，用户 2026-10-22 定案退役）。
+pub fn quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back(
     images: &mut PoolCheckerImages,
 ) {
     let (mut pool, data_slot) = pool_whose_quarantined_records_no_root_references(
@@ -144,7 +144,7 @@ pub fn quarantined_record_is_exempted_from_the_allocated_statistics_only_while_i
         &[DeviceIdentity(0), DeviceIdentity(1)],
     );
     let image_with_the_damaged_copies = pool.memory_pool();
-    // I-3.1、I-3.11：隔离的那两条记录没有根引用，checker 读那一份自证不过 ⇒ 豁免
+    // I-3.1、I-3.11：隔离的那两条记录没有根引用、两块盘都带记号 ⇒ 豁免
     images.hand_out(
         "两盘那一份都改坏",
         || image_with_the_damaged_copies.clone(),
@@ -159,20 +159,20 @@ pub fn quarantined_record_is_exempted_from_the_allocated_statistics_only_while_i
         corrupt_the_copy_on(devices, DeviceIdentity(1), data_slot);
     }
     let image_with_the_copies_intact_again = pool.memory_pool();
-    // I-3.1、I-3.11：那两份改回对得上，同样两条记录读得出且对得上 ⇒ 不豁免、照红
+    // I-3.1、I-3.11：那两份改回对得上，记号还在 ⇒ 照样豁免、不看副本
     images.hand_out(
         "那两份改回对得上",
         || image_with_the_copies_intact_again.clone(),
         PoolCheckerExpectation::only_the_named_invariants()
-            .and_violated("I-3.1")
-            .and_violated("I-3.11"),
+            .and_holds("I-3.1")
+            .and_holds("I-3.11"),
     );
 }
 
-/// 用例 11（按单元判，主 agent 2026-09-25 定）：只盘 0 那一份改坏——覆盖写把两块盘的记录一起留在已分配（D19 已定项 5），
-/// 盘 1 那一份对得上。那个单元有一份坏，两块盘上的两条记录都豁免：I-3.1、I-3.11 都成立（按份判的话盘 1 那条恒红）。
-/// 把盘 0 那一份改回对得上：单元两份都好，两条记录照红。
-pub fn unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not(
+/// 用例 11（按单元判，主 agent 2026-09-25 定）：只盘 0 那一份改坏——覆盖写把两块盘的记录一起留在已分配、一起置上隔离记号（D19 已定项 5），
+/// 盘 1 那一份对得上。两块盘上的两条记录都带记号、都豁免：I-3.1、I-3.11 都成立（按份判的话盘 1 那条恒红）。
+/// 把盘 0 那一份改回对得上：单元两份都好，记号还在，照样豁免（只认记号，用户 2026-10-22 定）。
+pub fn unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back(
     images: &mut PoolCheckerImages,
 ) {
     let (mut pool, data_slot) = pool_whose_quarantined_records_no_root_references(
@@ -180,7 +180,7 @@ pub fn unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_in
         &[DeviceIdentity(0)],
     );
     let image_with_one_damaged_copy = pool.memory_pool();
-    // I-3.1、I-3.11：单元有一份坏 ⇒ 两块盘上的两条记录都豁免
+    // I-3.1、I-3.11：两块盘上的两条记录都带记号 ⇒ 都豁免
     images.hand_out(
         "只盘 0 那一份改坏",
         || image_with_one_damaged_copy.clone(),
@@ -194,22 +194,21 @@ pub fn unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_in
         data_slot,
     );
     let image_with_both_copies_intact = pool.memory_pool();
-    // I-3.1、I-3.11：单元两份都好 ⇒ 不豁免、照红
+    // I-3.1、I-3.11：单元两份都好，记号还在 ⇒ 照样豁免
     images.hand_out(
         "单元两份都好",
         || image_with_both_copies_intact.clone(),
         PoolCheckerExpectation::only_the_named_invariants()
-            .and_violated("I-3.1")
-            .and_violated("I-3.11"),
+            .and_holds("I-3.1")
+            .and_holds("I-3.11"),
     );
 }
 
 /// 用例 14（实七；实四丙交回 ⑤ 那一形）：隔离的记录罩住的那一份是一个**完整的别的单元**——magic、头校验和、载荷 CRC 都过得去（自证过），
 /// 与指着它的位置项里的单元校验和对不上。丢一次写落在复用过的槽上时就是这样：槽里留着上一个单元，写者释放之前读盘核按位置项核出对不上、
-/// 隔离（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）。checker 的豁免与写者同一个判据（对位置项里的校验和）：两条记录豁免，
-/// I-3.1、I-3.11 都成立；按自证判（改之前的读法）两份都过得去、不豁免，两条都红。
-/// 指着那一份的位置项只在 A 的根（txg 3）里，而 F 已抬到 4、A 不在候选集里：checker 要把根环里没走过的根也走一遍才收得到它。
-pub fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry(
+/// 隔离并置上记号（D19（块指针的结构与宽度预算） 已定项 5）。checker 只认记号：两条记录豁免，I-3.1、I-3.11 都成立，不读那两份
+/// （按自证判那一种读法两份都过得去、不豁免、两条都红）。
+pub fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark(
     images: &mut PoolCheckerImages,
 ) {
     let (mut pool, data_slot, newest_data_slot) =
@@ -243,7 +242,7 @@ pub fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_ag
         }
     }
     let image = pool.memory_pool();
-    // I-3.1、I-3.11：隔离的那两份自证过得去、与 A 的根里的位置项对不上 ⇒ 按位置项判、豁免
+    // I-3.1、I-3.11：隔离的那两份自证过得去，两块盘的记录都带记号 ⇒ 豁免
     images.hand_out(
         "隔离的那两份是一个完整的别的单元",
         || image.clone(),
@@ -256,9 +255,8 @@ pub fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_ag
 /// 合法世界「写者隔离了一份头用不了的单元」（判决 `research/prompts/m4-i315-r1-main-verification.md` 第三节 C1「乙二」，调查员那一形）：
 /// 新池新建文件之后，数据单元盘 1 那一份的头扇区写零（单元头用不了）；覆盖写换下它时写者释放之前读盘核出盘 1 那一份对不上，
 /// 两块盘上那两条记录一起留在已分配（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1），覆盖写那一版的映射里没有 key 指着那一槽。
-/// 隔离判据读这一单元每块盘的那一份，盘 1 那一份对不上位置项，这个单元是隔离的单元：I-3.15 成立；I-3.1、I-3.11 照它们那一份隔离判据也成立。
-/// 组只取头用得了的那一份（改之前的读法）时盘 0 那一份对得上位置项，I-3.15 红。
-/// GPU 与 CPU 对拍罩这一形：组里读不读头用不了、没打对不上映射记号的那一份，扫描内核与 `walk.rs` 各写一份，这一张镜像上两边分得开。
+/// 两块盘那两条记录都带隔离记号（只认记号，D19（块指针的结构与宽度预算） 已定项 5，用户 2026-10-22 定），这个单元是隔离的单元：
+/// I-3.15 成立；I-3.1、I-3.11 照同一个判据也成立。GPU 与 CPU 对拍罩这一形（一份头用不了的记录在组里，扫描内核与 `walk.rs` 各写一份）。
 pub fn a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup(
     images: &mut PoolCheckerImages,
 ) {

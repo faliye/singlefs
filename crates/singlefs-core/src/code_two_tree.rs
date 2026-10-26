@@ -892,7 +892,7 @@ fn judge_the_header_against_its_reference(
 /// `read_node` 按指针读一个节点的字节：不进映射的树（中央映射树）只按位置条目读，进映射的树（记账树）走读时提示读不出经映射回退。
 ///
 /// # Errors
-/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；内部条目宽不等于 key 宽 + 86（窄于、宽于都算）⇒ `EntryNarrowerThanItsFieldTable`；
+/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；内部条目宽不等于 key 宽 + 86（窄于、宽于都算）⇒ `EntryWidthDiffersFromItsFieldTable`；
 /// 上面任一条核不过 ⇒ `InvariantViolated`（I-1.1 / I-1.2 / I-1.3 / I-1.4 / E142 走读同款）。
 pub(crate) fn read_code_two_tree(
     root_pointer: &NodePointer,
@@ -1015,9 +1015,9 @@ impl TreeReading<'_> {
         }
         let internal_width = internal_entry_width_in_bytes(key_width);
         // 宽于 key 宽 + 86 的同样拒（C780，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
-        // `EntryNarrowerThanItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
+        // `EntryWidthDiffersFromItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
         if header.entry_width != internal_width {
-            return Err(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            return Err(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: self.expectation.internal_entry_name,
                 entry_bytes: header.entry_width,
                 field_table_bytes: internal_width,
@@ -1087,7 +1087,7 @@ impl TreeReading<'_> {
     ) -> Result<NodeReadFromDisk, RecoveryFailure> {
         // 叶条目宽与它那棵树的字段表不符（记账 34 窄于、宽于都拒；映射 55 只拒窄于，宽于的欠在 C307）不在这里判：
         // 这一步只切 key（`parse_index_node` 判过条目宽 ≥ key 宽），
-        // 解条目的一方各按各的报（冷走读与重建报 `EntryNarrowerThanItsFieldTable`，挂载态报 `RecordMalformed`），
+        // 解条目的一方各按各的报（冷走读与重建报 `EntryWidthDiffersFromItsFieldTable`，挂载态报 `RecordMalformed`），
         // 与树长成多层之前逐字相同。
         if self.judges_every_header() {
             let key_width = self.expectation.field_widths.key_width_in_bytes();

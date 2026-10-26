@@ -2007,9 +2007,9 @@ const FIRST_RUN_MK_PLUS_ROW_NAME: &str = "P9-Mk+";
 const BLIND_PSEUDO_ROOT_STEPS: u64 = 7;
 const BLIND_LOWEST_WATERMARK_STEP: u64 = 1000;
 const BLIND_HIGHEST_WATERMARK_STEP: u64 = 1_000_000;
-/// 记录的点名项区起点 = 记录头字节数（D23（journal 的角色与格式） 已定项 4：记录头 487 字节）；新根段起点 = 本次发布内序号 4 + 反向链 4 + 载荷校验和 4
+/// 记录的点名项区起点 = 记录头字节数（D23（journal 的角色与格式） 已定项 4：记录头 496 字节）；新根段起点 = 本次发布内序号 4 + 反向链 4 + 载荷校验和 4
 /// 之后。两个数写成本地常量，`bad-states` 开头与 core 的公开常量回比（S1 同形，回比不过照打、退 3）。
-const BAD_RECORD_NAMED_ITEM_AREA_START: usize = 487;
+const BAD_RECORD_NAMED_ITEM_AREA_START: usize = 496;
 const BAD_RECORD_NEW_ROOT_SEGMENT_START: usize = 99;
 /// 系统配置槽里「根环起点」那 8 字节的偏移（`layout/01-first-txn.md` 一）：core 里是私有常量，补丁之后由 `SystemConfiguration::parse_slot`
 /// 读回 65 来核这个偏移（`bad_s1` 行 `p1_root_ring_base_reads_back`）。
@@ -2502,7 +2502,7 @@ impl BadStreamFacts<'_> {
         (patches, reads_back)
     }
 
-    /// P2 型：根 n 的 457 字节、txg 改成给定值、重封，落在区域公式给这个 txg 的那一槽（区域 txg mod R、槽 (txg div R) mod S，
+    /// P2 型：根 n 的 466 字节、txg 改成给定值、重封，落在区域公式给这个 txg 的那一槽（区域 txg mod R、槽 (txg div R) mod S，
     /// 盘按逐区域设备身份；几何取底态择到的系统配置，位置由 core 的 `target_for_publish`、`slot_offset` 算）。根 n 不动。
     fn pseudo_root_patch(
         &self,
@@ -2612,6 +2612,8 @@ impl BadStreamFacts<'_> {
                 new_instance_table: template.new_instance_table,
                 new_allocation_record_tree_root: template.new_allocation_record_tree_root,
                 new_unmount_marker: template.new_unmount_marker,
+                new_reclaim_threshold: template.new_reclaim_threshold,
+                new_pinned_ring_slot: template.new_pinned_ring_slot,
                 named: Vec::new(),
             };
             let bytes = record.to_bytes();
@@ -3154,7 +3156,7 @@ fn bad_local_constant_checks(facts: &BadStreamFacts<'_>, full: &BaseState) -> Ve
             &format!("{label}_record_named_item_area_start"),
             BAD_RECORD_NAMED_ITEM_AREA_START,
             usize::try_from(singlefs_format::JOURNAL_HEADER_BYTES)
-                .expect("记录头 487 字节装得进 usize"),
+                .expect("记录头 496 字节装得进 usize"),
         ),
         StopCheck::new(
             &format!("{label}_record_new_root_segment_start"),

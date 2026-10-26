@@ -69,7 +69,7 @@ const SLOT_SPACING_OF_THE_POOL: u32 = 4096;
 const ROOT_RING_BASE_OFFSET_OF_THE_POOL: u32 = 64 * 16384;
 const JOURNAL_RING_BYTES_OF_THE_POOL: u64 = 805_306_368;
 /// 根记录宽（D22（单元原子性怎么合成） 已定项 7）。
-const ROOT_RECORD_BYTES: u32 = 457;
+const ROOT_RECORD_BYTES: u32 = 466;
 /// 在飞记录数上限 = 环槽数 ÷ F，F = 3（D23（journal 的角色与格式） 已定项 18）：环长至少 3 条 4096 字节的记录。
 const SMALLEST_JOURNAL_RING_BYTES_HOLDING_THE_SAFETY_FACTOR_RECORDS: u64 = 3 * 4096;
 
@@ -413,6 +413,9 @@ fn a_system_configuration_slot_whose_encryption_type_is_not_off_is_refused() {
     }
 }
 
+/// 槽距上界那一档（1 MiB − 4096）过了槽距那一判，停在后面的 S × 槽距 ≤ P × chunk（D22（单元原子性怎么合成） 已定项 16 第 1 句）：
+/// 池的 S 是 8，8 × (1 MiB − 4096) 大于 3 MiB；S 至少 4，这一档上没有过得了全部判定的槽。上界钉在报哪一格上：
+/// 上界那一档报区域越过步长、多 1 字节报槽距越界。
 #[test]
 fn a_fixed_structure_slot_spacing_below_four_kibibytes_or_reaching_into_the_root_ring_is_refused() {
     let image = first_file_version_pool().memory_pool();
@@ -427,7 +430,10 @@ fn a_fixed_structure_slot_spacing_below_four_kibibytes_or_reaching_into_the_root
             0,
             Err(Verdict::FixedStructureSlotSpacingOutsideTheFormatRange),
         ),
-        (largest_slot_spacing_before_the_root_ring, Ok(())),
+        (
+            largest_slot_spacing_before_the_root_ring,
+            Err(Verdict::RootRingRegionLongerThanTheRegionStride),
+        ),
         (
             largest_slot_spacing_before_the_root_ring + 1,
             Err(Verdict::FixedStructureSlotSpacingOutsideTheFormatRange),
@@ -444,7 +450,7 @@ fn a_fixed_structure_slot_spacing_below_four_kibibytes_or_reaching_into_the_root
         assert_eq!(
             verdict_of_the_slot(&slot),
             expected,
-            "槽距 {slot_spacing}：下界 4096，上界是槽 1 整槽落在根环起点 {ROOT_RING_BASE_OFFSET_OF_THE_POOL} 之前"
+            "槽距 {slot_spacing}：下界 4096，上界是槽 1 整槽落在根环起点 {ROOT_RING_BASE_OFFSET_OF_THE_POOL} 之前；过了上界那一判的再判 S × 槽距 ≤ 3 MiB"
         );
     }
 }
@@ -557,7 +563,7 @@ fn a_pool_whose_every_system_configuration_slot_carries_a_refused_value_gets_no_
             Box::new(with_u32_at(SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET, 4095)),
         ),
         (
-            "physical_block_size 456",
+            "physical_block_size 465",
             Box::new(with_u32_at(
                 SYSTEM_CONFIGURATION_PHYSICAL_BLOCK_SIZE_OFFSET,
                 ROOT_RECORD_BYTES - 1,
@@ -939,7 +945,7 @@ fn a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reporte
             Box::new(with_u32_at(SYSTEM_CONFIGURATION_SLOT_SPACING_OFFSET, 4095)),
         ),
         (
-            "physical_block_size 456",
+            "physical_block_size 465",
             Box::new(with_u32_at(
                 SYSTEM_CONFIGURATION_PHYSICAL_BLOCK_SIZE_OFFSET,
                 ROOT_RECORD_BYTES - 1,

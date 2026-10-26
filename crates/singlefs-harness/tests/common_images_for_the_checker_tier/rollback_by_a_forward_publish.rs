@@ -145,66 +145,90 @@ pub fn hand_out_without_any_violation(
     images.hand_out(step, build_the_image, expected);
 }
 
-/// I-3.1 的违例细节里记账的已分配多于遍历全部有效根得到的。
-pub fn allocated_statistic_counts_more_than_the_walk(detail: &str) -> bool {
-    singlefs_harness::history::allocated_and_walked_bytes(detail)
-        .is_some_and(|(allocated, walked)| allocated > walked)
+/// 钉槽带出来的那几条：I-3.1（已分配统计对得上） 按根记录带的回收门槛 t 把「钉带出来的那一截」并进遍历，
+/// I-7.18（根记录的回收门槛等于现算的门槛） 判 t，I-7.19（钉着的槽不住本实例写的根） 判钉槽 p。
+pub const INVARIANTS_THE_PINNED_RING_SLOT_BEARS_ON: [&str; 3] = ["I-3.1", "I-7.18", "I-7.19"];
+
+/// `label` 之后紧跟着的那串十进制数字；`label` 不在、或它后面不是数字，都是 None。
+fn leading_number_after(text: &str, label: &str) -> Option<u64> {
+    text.split_once(label)?
+        .1
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>()
+        .parse()
+        .ok()
 }
 
-/// I-3.1 的违例细节里记账的已分配比遍历全部有效根得到的恰好多 `bytes`。
-pub fn allocated_statistic_counts_these_bytes_more_than_the_walk(detail: &str, bytes: u64) -> bool {
-    singlefs_harness::history::allocated_and_walked_bytes(detail)
-        .is_some_and(|(allocated, walked)| allocated > walked && allocated - walked == bytes)
+/// I-7.18 的违例细节里最新根带的回收门槛 t 与池级 checker 现算的门槛（`walk.rs` 写的那一句「带的回收门槛 t ……现算是 ……」）。
+pub fn reclaim_threshold_written_and_recomputed(detail: &str) -> Option<(u64, u64)> {
+    Some((
+        leading_number_after(detail, "带的回收门槛 t ")?,
+        leading_number_after(detail, " 现算是 ")?,
+    ))
 }
 
-/// 挂载那一刻读坏（撕裂）或读回全零的那个根槽钉在它可能住过的最旧 txg，回收门槛停在那里（用户 2026-10-05 认下的代价：「钉最旧 txg 让 I-3.1
-/// 在合法盘面上红在记账多的一边……用例钉『只许红在记账多的一边』，池级 checker 不放宽」，`records/2026-09-30-里程碑三开工第一轮.md`「钉最旧 txg 让 I-3.1 在合法盘面上红在记账多的一边」那一句；
-/// 读回全零照自证不过钉住，同一条记录里「② 读回全零的槽在回收门槛里照自证不过钉住」那一句，第 10c 批）：池级 checker 只判 I-3.1 红，而且红在记账多的一边（记账的已分配比遍历全部有效根多）。
-/// 交 checker 档：只核方向，不核大小（用户认的口径是方向加时长，判决 `research/prompts/m3-batch10-code-r3-main-verification.md` 第三节第一行）。
-pub fn hand_out_red_only_by_the_allocated_statistic_counting_more_than_the_walk(
-    images: &mut PoolCheckerImages,
-    step: &str,
-    build_the_image: impl FnOnce() -> MemoryPool,
-) {
-    images.hand_out(
-        step,
-        build_the_image,
-        PoolCheckerExpectation::exactly_these_violated(&["I-3.1"])
-            .and_if_violated_the_detail_satisfies(
-                "I-3.1",
-                "记账的已分配多于遍历全部有效根得到的",
-                allocated_statistic_counts_more_than_the_walk,
-            ),
-    );
+/// I-7.18 的违例细节里最新根带的回收门槛 t 恰好是 `txg`。
+pub fn reclaim_threshold_written_by_the_newest_root_is(detail: &str, txg: u64) -> bool {
+    reclaim_threshold_written_and_recomputed(detail).is_some_and(|(written, _)| written == txg)
 }
 
-/// 同 [`hand_out_red_only_by_the_allocated_statistic_counting_more_than_the_walk`]，再钉多出来的字节数
-/// `expected_bytes_counted_more_than_the_walk`（挂载那一刻：慢档 4 条调查报告第 3.1 节，判决 `research/prompts/m3-batch10-code-r2-main-verification.md`
-/// 第三节最后一行：多出来的是盘 0 上释放代在 (钉住的 txg, checker 取的环里最旧的自证根] 里的已释放字节）。
-pub fn hand_out_red_only_by_the_allocated_statistic_counting_these_bytes_more_than_the_walk(
-    images: &mut PoolCheckerImages,
-    step: &str,
-    build_the_image: impl FnOnce() -> MemoryPool,
-    expected_bytes_counted_more_than_the_walk: u64,
-) {
-    images.hand_out(
-        step,
-        build_the_image,
-        PoolCheckerExpectation::exactly_these_violated(&["I-3.1"])
-            .and_if_violated_the_detail_satisfies_given_a_value(
-                "I-3.1",
-                "记账的已分配比遍历全部有效根得到的恰好多这些字节",
-                expected_bytes_counted_more_than_the_walk,
-                allocated_statistic_counts_these_bytes_more_than_the_walk,
-            ),
-    );
+/// I-7.18 的违例细节里池级 checker 现算的门槛恰好是 `txg`。
+pub fn reclaim_threshold_recomputed_by_the_checker_is(detail: &str, txg: u64) -> bool {
+    reclaim_threshold_written_and_recomputed(detail)
+        .is_some_and(|(_, recomputed)| recomputed == txg)
 }
 
-/// 恢复之后重开的那个进程接着覆盖写（实例 3），一直写到 txg `txg_writing_the_pinned_slot`（它的根槽就是挂载时钉住的那一槽，28 + 一圈）：
-/// 写到它前一次为止，每一次覆盖写之后 I-3.1 都只红在记账多的一边（逐步核方向、不钉大小：多记的字节随覆盖写涨，第三轮两腿量过），
-/// 写掉那一槽那一次之后池级 checker 一条违例都没有（钉住只到这个进程把那个槽写掉为止，
-/// `allocator.rs` 的 `RootRingOccupant::AllZeroAtMount` / `BadAtMount`）。
-pub fn overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statistic_holds(
+/// 镜像上自证过的根里最旧的那一条的 txg（实现一侧的读根代码 `readable_roots`，不经池级 checker 的走读）。
+pub fn oldest_readable_root_txg(image: &MemoryPool) -> u64 {
+    let system_configuration = choose_system_configuration(image).expect("系统配置");
+    readable_roots(
+        image,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    )
+    .iter()
+    .map(|root| root.checkpoint_txg.0)
+    .min()
+    .expect("环里至少有一条自证过的根")
+}
+
+/// 满环时下一次发布的根槽写落在环里最旧那条根住的槽上、写成 0 或撕裂，进程在重发之前崩了：恢复之前的镜像上池级 checker 只判
+/// I-7.18 红，I-3.1、I-7.19 成立。这是认下的已知红，记在 C560（满环时根槽写坏的恢复前镜像上记账多于遍历）：写者照 D16（发布语义）
+/// 已定项 1「环里最旧有效根」那一行「写失败的槽按旧内容算」取 t（建最新根那一刻环里最旧的有效根，就是被写坏那一槽住的根）没错，
+/// 池级 checker 读不到写坏那一槽的旧内容，按镜像上剩下的根现算出更高的门槛（用户 2026-10-23 定「丙：认成已知红」，
+/// 判决 `research/prompts/m3-close-i718-oldslot-r3-main-verification.md`「四、去向」一节的「用户定案」）。
+/// 依据：三方辩方在四个场景交的 74 张镜像上量过（`research/prompts/m3-close-i718-oldslot-r3-sonnet-output.md`「6.1 给定状态：C560 那几个场景交给池级 checker 的镜像」），
+/// 恢复之前这三张红单恰为 I-7.18，其余 71 张一条不红。违例细节里的两个数也钉住：t 是 `reclaim_threshold_written`、
+/// 现算的是 `recomputed_from_the_roots_left`（调查员在普通覆盖写那一形上量到 t 4、现算 5）。
+pub fn red_only_by_the_reclaim_threshold_after_the_oldest_ring_root_slot_is_written_over(
+    reclaim_threshold_written: u64,
+    recomputed_from_the_roots_left: u64,
+) -> PoolCheckerExpectation {
+    PoolCheckerExpectation::exactly_these_violated(&["I-7.18"])
+        .and_holds("I-3.1")
+        .and_holds("I-7.19")
+        .and_if_violated_the_detail_satisfies_given_a_value(
+            "I-7.18",
+            "最新根带的回收门槛 t 是被写坏那一槽住的根的 txg",
+            reclaim_threshold_written,
+            reclaim_threshold_written_by_the_newest_root_is,
+        )
+        .and_if_violated_the_detail_satisfies_given_a_value(
+            "I-7.18",
+            "池级 checker 现算的门槛是写坏那一槽之后镜像上剩下最旧的根的 txg",
+            recomputed_from_the_roots_left,
+            reclaim_threshold_recomputed_by_the_checker_is,
+        )
+}
+
+/// 恢复之后重开的那个进程接着覆盖写（实例 3），一直写到 txg `txg_writing_the_pinned_slot`（它的根槽就是挂载时钉住的那一槽，28 + 一圈）。
+/// 挂载那一刻读坏（撕裂）或读回全零的那个根槽钉在它可能住过的最旧 txg（D16（发布语义） 已定项 1「根槽这一次读坏」），钉也落盘
+/// （C773（读坏与全零根槽的回收门槛钉只在内存里） 的合成形态：根记录带回收门槛 t 与钉槽 p），池级 checker 的 I-3.1 把钉带出来的那一截并进遍历：
+/// 每一次覆盖写之后池级 checker 一条违例都没有，I-3.1、I-7.18、I-7.19 都真被判过且成立；写掉那一槽那一次之后同样一条违例都没有
+/// （钉只到这个进程把那个槽写掉为止，`allocator.rs` 的 `RootRingOccupant::AllZeroAtMount` / `BadAtMount`）。
+pub fn overwrite_until_the_pinned_root_slot_is_written_with_no_invariant_violated(
     images: &mut PoolCheckerImages,
     pool: &mut BuiltPool,
     txg_writing_the_pinned_slot: u64,
@@ -216,7 +240,7 @@ pub fn overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statist
         "txg {txg_writing_the_pinned_slot} 的根槽就是挂载时钉住的那一槽"
     );
     let mut overwrite = 0usize;
-    // 迭代上界：从挂载交回的那一版写到钉住那一槽的前一次（不到一圈）；没有提前出口（方向不对就断言失败）。
+    // 迭代上界：从挂载交回的那一版写到钉住那一槽的前一次（不到一圈）；没有提前出口。
     while pool.output.root.checkpoint_txg.0 + 1 < txg_writing_the_pinned_slot {
         overwrite_in_process(
             pool,
@@ -224,13 +248,14 @@ pub fn overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statist
             InstanceGeneration(3),
         );
         overwrite += 1;
-        hand_out_red_only_by_the_allocated_statistic_counting_more_than_the_walk(
+        hand_out_without_any_violation(
             images,
             &format!(
                 "{step}：第 {overwrite} 次覆盖写之后（txg {}），那一槽还没被写掉",
                 pool.output.root.checkpoint_txg.0
             ),
             || pool.memory_pool(),
+            &INVARIANTS_THE_PINNED_RING_SLOT_BEARS_ON,
         );
     }
     assert!(
@@ -918,9 +943,9 @@ pub fn roll_back_to_the_oldest_ring_root_with_its_root_slot_write_failing(
 ///   读回 B 的内容；B 的根槽哪怕被撕坏，回退也已经生效，不用再做一次。
 ///
 /// 两条路上回退都没有丢，C558 说的「退不回去」这两条路上走不到。checker 在重发之后全绿；崩在重发之前、
-/// B 的根槽被写坏的两格，恢复之前的镜像上 I-3.1（已分配统计对得上） 红，与普通发布同形（见用例里那一段）；崩溃之后重开时一字节不写那一格全绿，
-/// 撕裂、写成 0 那两格挂载把那一槽钉在它可能住过的最旧 txg（用户 2026-10-05 认下的代价），只许 I-3.1 红在记账多的一边、差 819200，
-/// 这个进程写掉那一槽（txg 52）之后全绿。
+/// B 的根槽被写坏的两格，恢复之前的镜像上只有 I-7.18（根记录的回收门槛等于现算的门槛） 红，是认下的已知红（C560，
+/// [`red_only_by_the_reclaim_threshold_after_the_oldest_ring_root_slot_is_written_over`]），与普通发布同形；崩溃之后重开时一字节不写那一格全绿，
+/// 撕裂、写成 0 那两格挂载把那一槽钉在它可能住过的最旧 txg、钉也落盘，重开之后与之后每一次覆盖写都全绿，这个进程写掉那一槽（txg 52）之后也全绿。
 pub fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash(
     images: &mut PoolCheckerImages,
 ) {
@@ -1011,19 +1036,32 @@ pub fn failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in
             "step-four-c558-crash-{mode:?}"
         ));
     roll_back_to_the_oldest_ring_root_with_its_root_slot_write_failing(&mut crashed, mode);
-    let expected_violated_before_recovery: &[&str] = match mode {
-        RootSlotWriteFailure::RefusedBeforeWriting => &[],
-        // B 的根槽被写坏、D 的记录还没被哪次恢复施加：最新根 txg 27 的账还算着只被 B 引用、释放代 5 的单元，遍历里少了 B——
-        // I-3.1（已分配统计对得上） 记账多于遍历。普通覆盖写在同一格上把根槽写坏，checker 判出的是逐字相同的一条（实三草稿里量过），
-        // 与回退无关；恢复重开之后全绿（下面）。这一格 checker 该不该判红交主 agent（实三报告「交主 agent 的设计问题」）。
+    let expected_before_recovery = match mode {
+        // B 的根槽一字节没写：环里仍是 txg 4–27，什么都不红。
+        RootSlotWriteFailure::RefusedBeforeWriting => {
+            PoolCheckerExpectation::no_invariant_violated()
+        }
+        // B 的根槽被写坏、D 的记录还没被哪次恢复施加：最新根 (2, 27) 带的回收门槛 t 是它记根那一刻环里最旧的 B 的 txg 4，
+        // 镜像上 B 没了、剩下最旧的是 txg 5，池级 checker 现算出 5，I-7.18 红——认下的已知红（C560）；I-3.1 按 t 4 把钉带出来的那一截
+        // 并进遍历，成立。普通覆盖写在同一格上把根槽写坏是同一形（`plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_…` 那一个场景），
+        // 与回退无关；恢复重开之后全绿（下面）。
         RootSlotWriteFailure::TornAfterTheFirstHalf | RootSlotWriteFailure::ZeroesWritten => {
-            &["I-3.1"]
+            let oldest_root_left = oldest_readable_root_txg(&crashed.memory_pool());
+            assert_eq!(
+                oldest_root_left,
+                oldest_ring_root().checkpoint_txg.0 + 1,
+                "{mode:?}：B 那一槽被写坏，镜像上剩下最旧的根是满环里紧跟 B 的 txg 5"
+            );
+            red_only_by_the_reclaim_threshold_after_the_oldest_ring_root_slot_is_written_over(
+                oldest_ring_root().checkpoint_txg.0,
+                oldest_root_left,
+            )
         }
     };
     images.hand_out(
         &format!("{mode:?}：崩在重发之前、恢复之前"),
         || crashed.memory_pool(),
-        PoolCheckerExpectation::exactly_these_violated(expected_violated_before_recovery),
+        expected_before_recovery,
     );
     let cold_after_the_crash = crashed.reopen_cold();
     let report_after_the_crash = recover(&cold_after_the_crash, JournalPolicy::Consult);
@@ -1054,21 +1092,22 @@ pub fn failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in
         RootSlotWriteFailure::RefusedBeforeWriting => {
             hand_out_without_any_violation(images, &step, || crashed.memory_pool(), &[]);
         }
-        // B 的根槽（D 那一次写坏的那一槽）挂载时撕裂读坏、或读回全零：钉在它可能住过的最旧 txg 4，回收门槛停在 4，checker 取环里最旧的自证根 8；
-        // 多记账的是盘 0 上释放代 5–8 的已释放字节（慢档调查报告第 3.1 节：Torn、Zeroes 两种都是 819200 = 6406144 − 5586944）。
+        // B 的根槽（D 那一次写坏的那一槽）挂载时撕裂读坏、或读回全零：钉在它可能住过的最旧 txg 4，根记录带 t 4、p 指着那一槽（钉也落盘，C773），
+        // 池级 checker 现算的门槛带上钉值也是 4，I-3.1 把释放代在 (4, 环里最旧的自证根 8] 的那一截并进遍历（C773 之前这一截没并，
+        // I-3.1 红在记账多的一边、差 819200）：全绿。
         RootSlotWriteFailure::TornAfterTheFirstHalf | RootSlotWriteFailure::ZeroesWritten => {
-            hand_out_red_only_by_the_allocated_statistic_counting_these_bytes_more_than_the_walk(
+            hand_out_without_any_violation(
                 images,
                 &step,
                 || crashed.memory_pool(),
-                819_200,
+                &INVARIANTS_THE_PINNED_RING_SLOT_BEARS_ON,
             );
             crashed.allocator = remounted.allocator;
             crashed.output = remounted
                 .current
                 .into_file_version()
                 .expect("崩溃之后重开，现行那一版带文件");
-            overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statistic_holds(
+            overwrite_until_the_pinned_root_slot_is_written_with_no_invariant_violated(
                 images,
                 &mut crashed,
                 52,
@@ -1228,18 +1267,17 @@ pub fn writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_relea
     );
 }
 
-/// 实三交回 Q2 立的新欠账（满环时根槽写坏的恢复前镜像，checker 判 I-3.1 红）查原因：与回退无关，普通覆盖写同一格逐字相同；
-/// 红的量正好是被盖掉的那条根独占的那几个单元。
+/// C560（满环时根槽写坏的恢复前镜像上记账多于遍历） 普通覆盖写那一形：与回退无关，回退那一形（C558 那一个场景）在同一格上判得相同。
 ///
 /// 满环（txg 4–27，最旧 B (1, 4)）之后普通覆盖写 D（txg 28），D 的根槽就是 B 住的那一槽；那一次根槽写把整块写成 0、报错，进程在重发之前崩了。
-/// 恢复之前的镜像：B 的根槽没了，D 的记录已持久（根槽写之前落盘）但还没被哪次恢复施加，环里最新的是 C（txg 27）。checker 只判 I-3.1 红，
-/// 每块盘「记账的已分配 − 遍历全部有效根」= 只被 B 引用的那几个单元的字节数（229 376 = 14 槽）；这几个单元在 C 的账里是已释放、释放代 5
-/// （txg 5 那次换下的），回收要环里最旧的有效根 ≥ 5——B 还在环里时回收不了，C 的账照算它们；B 的根槽被 D 那一次写坏之后遍历里没有 B，
-/// 而 checker 只把「已被某次恢复施加」的记录并进遍历（`walk.rs` 的 `versions_applied_only_by_records`），D 不在其内，用的仍是 C 的账。
-/// D 那一版的账（D 盖掉 B 的槽之后环里最旧的有效根是 5，释放代 5 的已回收）与这个环对得上。恢复（由 D 的记录重建 D）之后重开：
-/// 挂载时 B 那一槽读回全零，钉在它可能住过的最旧 txg 4（用户 2026-10-05 认下的代价），只许 I-3.1 红在记账多的一边、差 917504；
-/// 这个进程写掉那一槽（txg 52）之后全绿。
-/// checker 在这一格上该不该判红、要不要把「根槽写坏、记录已持久没施加」那一版并进来，是 checker 判法的事，交主 agent。
+/// 恢复之前的镜像：B 的根槽没了，D 的记录已持久（根槽写之前落盘）但还没被哪次恢复施加，环里最新的是 C（txg 27）。
+/// C 的账还算着只被 B 引用的那几个单元（盘 0 上 229 376 字节 = 14 槽，在 C 的账里是已释放、释放代 5）：C 带的回收门槛 t 是它记根那一刻
+/// 环里最旧的 B 的 txg 4，I-3.1 按 t 4 把钉带出来的那一截并进遍历，成立；池级 checker 读不到 B 那一槽的旧内容，按镜像上剩下最旧的 txg 5
+/// 现算门槛，与 t 4 不等，I-7.18 红——认下的已知红（C560，用户 2026-10-23 定，
+/// [`red_only_by_the_reclaim_threshold_after_the_oldest_ring_root_slot_is_written_over`]）。
+/// C773（读坏与全零根槽的回收门槛钉只在内存里） 之前这一张红的是 I-3.1、差的正好是这 229 376 字节（checker 只把「已被某次恢复施加」的记录
+/// 并进遍历，`walk.rs` 的 `versions_applied_only_by_records`，D 不在其内）。恢复（由 D 的记录重建 D）之后重开：挂载时 B 那一槽读回全零，
+/// 钉在它可能住过的最旧 txg 4、钉也落盘，重开之后、之后每一次覆盖写之后与这个进程写掉那一槽（txg 52）之后都全绿。
 pub fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced(
     images: &mut PoolCheckerImages,
 ) {
@@ -1344,26 +1382,28 @@ pub fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_
             .collect(),
     );
 
-    let bytes_only_the_oldest_references_on_the_first_red_device: u64 = only_the_oldest_references
+    let bytes_only_the_oldest_references_on_device_zero: u64 = only_the_oldest_references
         .iter()
         .filter(|(device, _, _)| *device == DeviceIdentity(0))
         .map(|(_, _, span)| u64::from(*span) * singlefs_format::SLOT_BYTES)
         .sum();
     assert_eq!(
-        bytes_only_the_oldest_references_on_the_first_red_device, 229_376,
+        bytes_only_the_oldest_references_on_device_zero, 229_376,
         "盘 0 上只被 B 引用的那几个单元（14 槽）"
     );
-    // 恢复之前的镜像：只有 I-3.1 红；盘 0 记账多于遍历的正好是只被 B 引用的那几个单元
+    // 恢复之前的镜像：只有 I-7.18 红（认下的已知红，C560）；t 是写坏之前环里最旧的 B 的 txg，现算的是写坏之后剩下最旧的那一条
+    let oldest_root_left = oldest_readable_root_txg(&pool.memory_pool());
+    assert_eq!(
+        oldest_root_left, ring[1].checkpoint_txg.0,
+        "B 那一槽被写坏，镜像上剩下最旧的根是满环里紧跟 B 的那一条"
+    );
     images.hand_out(
         "D 的根槽写报错、恢复之前",
         || pool.memory_pool(),
-        PoolCheckerExpectation::exactly_these_violated(&["I-3.1"])
-            .and_if_violated_the_detail_satisfies_given_a_value(
-                "I-3.1",
-                "记账的已分配比遍历全部有效根得到的恰好多只被 B 引用的那几个单元（14 槽）",
-                bytes_only_the_oldest_references_on_the_first_red_device,
-                allocated_statistic_counts_these_bytes_more_than_the_walk,
-            ),
+        red_only_by_the_reclaim_threshold_after_the_oldest_ring_root_slot_is_written_over(
+            ring[0].checkpoint_txg.0,
+            oldest_root_left,
+        ),
     );
 
     let cold = pool.reopen_cold();
@@ -1376,20 +1416,20 @@ pub fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_
     let mut reopened_devices = pool.reopen_recorded();
     let remounted = mount_writable(&parameters(), &mut reopened_devices).expect("恢复之后可写挂载");
     pool.devices = Some(reopened_devices);
-    // B 的根槽读回全零：钉在它可能住过的最旧 txg 4（用户 2026-10-05 认下的代价，第 10c 批读回全零照自证不过钉住），多记账的是盘 0 上
-    // 释放代 5–8 的已释放字节（慢档调查报告第 3.1 节：917504 = 6455296 − 5537792）；写掉那一槽（txg 52）之后转绿。
-    hand_out_red_only_by_the_allocated_statistic_counting_these_bytes_more_than_the_walk(
+    // B 的根槽读回全零：钉在它可能住过的最旧 txg 4（读回全零照自证不过钉住），根记录带 t 4、p 指着那一槽（钉也落盘，C773）；
+    // I-3.1 把释放代在 (4, 环里最旧的自证根 8] 的那一截并进遍历（C773 之前这一截没并，I-3.1 红在记账多的一边、差 917504）：全绿。
+    hand_out_without_any_violation(
         images,
         "恢复之后重开",
         || pool.memory_pool(),
-        917_504,
+        &INVARIANTS_THE_PINNED_RING_SLOT_BEARS_ON,
     );
     pool.allocator = remounted.allocator;
     pool.output = remounted
         .current
         .into_file_version()
         .expect("恢复之后重开，现行那一版带文件");
-    overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statistic_holds(
+    overwrite_until_the_pinned_root_slot_is_written_with_no_invariant_violated(
         images,
         &mut pool,
         52,

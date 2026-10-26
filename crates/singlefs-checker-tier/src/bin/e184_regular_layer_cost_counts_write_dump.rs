@@ -1546,12 +1546,15 @@ mod tests {
 
     #[test]
     fn dump_run_writes_one_file_per_seed_and_a_second_run_skips_them() {
-        let directory = std::env::temp_dir().join(format!(
-            "e184-write-dump-test-{}-{}",
-            std::process::id(),
-            "dump-run"
-        ));
-        let _ = std::fs::remove_dir_all(&directory);
+        // 守卫认领输出目录：用例做完、断言失败、panic 都删掉它
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!(
+                "e184-write-dump-test-{}-{}",
+                std::process::id(),
+                "dump-run"
+            )),
+        );
+        let _ = std::fs::remove_dir_all(&*directory);
         let arguments: Vec<String> = [
             "--steps",
             "20",
@@ -1593,7 +1596,6 @@ mod tests {
             std::fs::read(directory.join(&names[0])).expect("读得到"),
             file_before_the_second_run
         );
-        std::fs::remove_dir_all(&directory).expect("清掉临时目录");
     }
 
     #[test]

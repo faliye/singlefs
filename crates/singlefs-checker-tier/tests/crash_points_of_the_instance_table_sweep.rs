@@ -18,7 +18,9 @@
 //! 在同一条根的分配记录里都有一条仍分配的记录罩住（被引用的片没有记成释放）；重建出来的是清扫发布那一版时，它的实例表里没有被删的行。
 //!
 //! 跨片流（C597 跨片那一半）：同一个池，产品路径的配置（开关关着、阈值取占位 369）接连崩了再挂到实例表 369 行，下一次挂载写到 370 行、链长出第二片，
-//! 挂载末尾越过阈值清扫，链回到一片；基线是那次挂载之前的盘面，枚举的是那次挂载的全部写，每个状态照 C333 判。
+//! 挂载末尾越过阈值清扫，链回到一片；基线是那次挂载之前的盘面，枚举的是那次挂载的全部写，每个状态照 F5 与 C333 判。
+//! 越过之前隔 `MOUNTS_FROM_THE_ORPHANS_TO_THE_CROSSING_MOUNT` 次挂载的那个实例留一次崩掉的顺序写的孤儿，它的行在越过那一次被删：
+//! F5 在这条流上判的不是空集（有状态里孤儿还在，删行那一版生效的状态里一个不剩）。
 #[path = "../../singlefs-harness/tests/common_root_ring_holes/mod.rs"]
 mod common_root_ring_holes;
 
@@ -68,7 +70,8 @@ use singlefs_core::mount::{
 };
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_root, choose_system_configuration,
-    instance_table_chain_of_root, readable_roots, replay_journal, scan_journal, RecoveryReport,
+    instance_table_chain_of_root, readable_roots, replay_journal, scan_journal,
+    NamedUnitVerification, RecoveryReport,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{
@@ -253,6 +256,44 @@ fn publish_an_overwrite(
     .expect("覆盖写")
 }
 
+/// `before` 上 `instance` 接着 `current` 做一次顺序写（`ORPHAN_DATA_UNITS` 个数据单元），崩在第一条 journal 记录写之前：
+/// 交回那一刻的盘面（单元已落盘、记录与根都没有，按这个实例那一行判未发布的孤儿）。分配器只借一份拷贝走，调用方手里的不动。
+fn image_with_the_orphans_of_a_sequential_write_crashed_before_its_first_record(
+    before: MemoryPool,
+    allocator: &singlefs_core::allocator::PoolAllocator,
+    current: &TransactionOutput,
+    instance: InstanceGeneration,
+) -> MemoryPool {
+    let parameters = parameters_of_the_ring_hole_pools();
+    let stream = SharedStream::retaining_contents();
+    let mut recording = recording_of(&before, &stream);
+    {
+        let mut writer = PoolWriter::new(&parameters, recording.as_mut_slice());
+        publish_sequential_write(
+            &mut writer,
+            &mut allocator.clone(),
+            current,
+            FirstFile {
+                content: &vec![7u8; ORPHAN_DATA_UNITS * data_unit_payload_capacity()],
+                write_time_seconds: WRITE_TIME_SECONDS_OF_THE_RING_HOLE_POOLS + 100,
+            },
+            instance,
+        )
+        .expect("顺序写（录下来、之后截掉）");
+    }
+    let (writes, _segments) = writes_and_segments(
+        &stream.retained_operations(),
+        &fixed_geometry_of_the_ring_hole_pools(),
+    );
+    let first_record_write = writes
+        .iter()
+        .position(|write| write.kind == StepKind::JournalRecord)
+        .expect("顺序写有 journal 记录写");
+    let mut image = before;
+    image.apply_writes(&writes[..first_record_write]);
+    image
+}
+
 /// 清扫那次挂载之前的盘面：实例 1 的孤儿留在盘上、实例 1 的根全部轮出环。
 fn pool_with_a_dead_instance() -> MemoryPool {
     let parameters = parameters_of_the_ring_hole_pools();
@@ -299,33 +340,12 @@ fn pool_with_a_dead_instance() -> MemoryPool {
             instance,
         );
     }
-    let before = pool_of(&devices);
-    let stream = SharedStream::retaining_contents();
-    let mut recording = recording_of(&before, &stream);
-    {
-        let mut writer = PoolWriter::new(&parameters, recording.as_mut_slice());
-        publish_sequential_write(
-            &mut writer,
-            &mut allocator.clone(),
-            &current,
-            FirstFile {
-                content: &vec![7u8; ORPHAN_DATA_UNITS * data_unit_payload_capacity()],
-                write_time_seconds: WRITE_TIME_SECONDS_OF_THE_RING_HOLE_POOLS + 100,
-            },
-            instance,
-        )
-        .expect("顺序写（录下来、之后截掉）");
-    }
-    let (writes, _segments) = writes_and_segments(
-        &stream.retained_operations(),
-        &fixed_geometry_of_the_ring_hole_pools(),
+    let image = image_with_the_orphans_of_a_sequential_write_crashed_before_its_first_record(
+        pool_of(&devices),
+        &allocator,
+        &current,
+        instance,
     );
-    let first_record_write = writes
-        .iter()
-        .position(|write| write.kind == StepKind::JournalRecord)
-        .expect("顺序写有 journal 记录写");
-    let mut image = before;
-    image.apply_writes(&writes[..first_record_write]);
     let mut devices_of_instance_two = devices_of(&image);
     let mounted =
         mount_writable(&parameters, &mut devices_of_instance_two).expect("实例 2 的可写挂载");
@@ -446,25 +466,57 @@ fn record_the_sweeping_mount() -> RecordedSweepingMount {
     }
 }
 
-/// F5 那一判在一个崩溃态上：恢复落到清扫发布那一版（删行那一版生效）时，删前那一行判未发布的单元一个都不许剩；交回这个态是不是删行那一版生效的。
-fn deletion_took_effect_and_no_unpublished_unit_is_left(
-    recorded: &RecordedSweepingMount,
+impl RecordedSweepingMount {
+    fn rows_deleted_by_the_sweep_publish(&self) -> RowsDeletedByTheSweepPublish {
+        RowsDeletedByTheSweepPublish {
+            rows_deleted: vec![self.row_deleted],
+            sweep_publish: self.sweep_publish,
+        }
+    }
+}
+
+/// F5 对着的两样：清扫发布删掉的那几行（删前的样子，被删实例按它判未发布），与清扫发布那一版（它生效就是删行那一版生效）。
+#[derive(Clone, Debug)]
+struct RowsDeletedByTheSweepPublish {
+    rows_deleted: Vec<InstanceRow>,
+    sweep_publish: (InstanceGeneration, CheckpointTxg),
+}
+
+impl RowsDeletedByTheSweepPublish {
+    /// 观察者另读的输入的摘要（进它的版本）。
+    fn digest(&self) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+        singlefs_harness::sha256::sha256_digest(
+            format!(
+                "rows_deleted={:?}\nsweep_publish={:?}\n",
+                self.rows_deleted, self.sweep_publish
+            )
+            .as_bytes(),
+        )
+    }
+}
+
+/// F5 那一判在一个崩溃态上：按删前那几行判未发布、还留在盘上的单元数一遍；恢复落到清扫发布那一版（删行那一版生效）时一个都不许剩。
+/// 交回（留下的个数，这个态是不是删行那一版生效的）：留下的不为 0 的态说明 F5 判的不是空集（C597 跨片流上要判到这一格）。
+fn unpublished_units_left_and_whether_the_deletion_took_effect(
+    rows: &RowsDeletedByTheSweepPublish,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
-) -> bool {
-    if report.effective_root != Some(recorded.sweep_publish) {
-        return false;
+) -> (u64, bool) {
+    let materialized = materialized_crash_image(image);
+    let left: u64 = rows
+        .rows_deleted
+        .iter()
+        .map(|row| unpublished_units_of_the_row_left_on(&materialized, row))
+        .sum();
+    let deletion_took_effect = report.effective_root == Some(rows.sweep_publish);
+    if deletion_took_effect {
+        assert_eq!(
+            left, 0,
+            "F5：删行那一版生效的崩溃态里，按删前那几行 {:?} 判未发布的单元剩 {left} 个",
+            rows.rows_deleted
+        );
     }
-    let left = unpublished_units_of_the_row_left_on(
-        &materialized_crash_image(image),
-        &recorded.row_deleted,
-    );
-    assert_eq!(
-        left, 0,
-        "F5：删行那一版生效的崩溃态里，按删前那一行 {:?} 判未发布的单元剩 {left} 个",
-        recorded.row_deleted
-    );
-    true
+    (left, deletion_took_effect)
 }
 
 fn assert_the_recovery_and_the_checker_are_clean(tally: &CrashPointReplayTally) {
@@ -492,7 +544,11 @@ fn remount_after_the_sweep_phases_without_the_deleted_row(
     report: &RecoveryReport,
     counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
-    deletion_took_effect_and_no_unpublished_unit_is_left(recorded, image, report);
+    unpublished_units_left_and_whether_the_deletion_took_effect(
+        &recorded.rows_deleted_by_the_sweep_publish(),
+        image,
+        report,
+    );
     let mut materialized = recorded.base.clone();
     let landed: Vec<RetainedWrite> = image
         .writes
@@ -543,17 +599,40 @@ fn remount_after_the_sweep_phases_without_the_deleted_row(
     }
 }
 
-/// 观察者「删行之后 F5」（`f5_after_the_deletion`）：这个状态上删行那一版生效、删前那一行判未发布的单元一个不剩的，记一次
-/// `deletion_took_effect`。观察者的身份是这个 fn 的闭包键（入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+/// 观察者「删行之后 F5」（`f5_after_the_deletion`，清扫流与跨片流共用）：这个状态上删行那一版生效、删前那几行判未发布的单元一个不剩的，记一次
+/// `deletion_took_effect`；按删前那几行判未发布的单元还留在盘上的（删行那一版还没生效），记一次 `unpublished_units_of_the_deleted_rows_left`。
+/// 观察者的身份是这个 fn 的闭包键（入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
 fn count_the_states_where_the_deletion_took_effect(
-    recorded: &RecordedSweepingMount,
+    rows: &RowsDeletedByTheSweepPublish,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
     counts: &mut CrashPointReplayObserverCounts,
 ) {
-    if deletion_took_effect_and_no_unpublished_unit_is_left(recorded, image, report) {
+    let (left, deletion_took_effect) =
+        unpublished_units_left_and_whether_the_deletion_took_effect(rows, image, report);
+    if left > 0 {
+        counts.add("unpublished_units_of_the_deleted_rows_left", 1);
+    }
+    if deletion_took_effect {
         counts.add("deletion_took_effect", 1);
     }
+}
+
+/// F5 在这一趟枚举里判到了两头（C597）：有状态里删前那几行判未发布的单元还留着（判的不是空集），也有状态里删行那一版生效、一个不剩。
+fn assert_the_unpublished_units_were_judged_on_a_non_empty_set(tally: &CrashPointReplayTally) {
+    assert!(
+        tally
+            .observer_counts
+            .count_named("unpublished_units_of_the_deleted_rows_left")
+            > 0,
+        "F5 判的不是空集：{} 个状态里没有一个留着按删前那几行判未发布的单元（被删实例没有孤儿）",
+        tally.states
+    );
+    assert!(
+        tally.observer_counts.count_named("deletion_took_effect") > 0,
+        "F5 判到了删行那一版生效的状态（{} 个状态里 0 个）",
+        tally.states
+    );
 }
 
 /// 删行那次发布（清扫发布）在 C333（删行那次发布被重放） 那一判里要对着的两样：删掉的是哪几个实例的行，清扫发布那一版的 (实例, txg)。
@@ -589,7 +668,7 @@ fn root_rebuilt_by_the_recovery(image: &CrashImage<'_>, report: &RecoveryReport)
         &chosen,
         system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
-        true,
+        NamedUnitVerification::Verify,
     )
     .unwrap_or_else(|failure| panic!("恢复走到了重建根那一步、施加得了记录：{failure:?}"));
     assert_eq!(
@@ -690,11 +769,17 @@ fn enumerate_the_sweeping_mount_judging_f5(
     item_label: &str,
     expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
 ) -> Option<(CrashPointReplayTally, u64)> {
+    let rows_deleted_by_the_sweep_publish = recorded.rows_deleted_by_the_sweep_publish();
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
                    report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts| {
-        count_the_states_where_the_deletion_took_effect(recorded, image, report, counts);
+        count_the_states_where_the_deletion_took_effect(
+            &rows_deleted_by_the_sweep_publish,
+            image,
+            report,
+            counts,
+        );
     };
     let deletion_publish = DeletionPublishToJudgeTheRebuiltStateAgainst {
         deleted_instances: BTreeSet::from([recorded.row_deleted.instance]),
@@ -724,13 +809,11 @@ fn enumerate_the_sweeping_mount_judging_f5(
         recorded.judged_root_index,
         CrashPointReplayVersionTable::with_a_file_only(&recorded.versions),
         expansion,
-        // 观察者另读的输入：删前那一行（F5 对着它判未发布的单元剩几个）；删掉的实例与清扫发布那一版（C333 那一判对着它们）
+        // 观察者另读的输入：删前那一行与清扫发布那一版（F5 对着它们判未发布的单元剩几个）；删掉的实例与清扫发布那一版（C333 那一判对着它们）
         &[
             CrashPointReplayObserver {
                 name: "f5_after_the_deletion",
-                extra_inputs_digest: singlefs_harness::sha256::sha256_digest(
-                    format!("row_deleted={:?}\n", recorded.row_deleted).as_bytes(),
-                ),
+                extra_inputs_digest: rows_deleted_by_the_sweep_publish.digest(),
                 observe: &observe,
             },
             CrashPointReplayObserver {
@@ -868,6 +951,12 @@ fn every_crash_state_inside_the_two_sweep_phases_remounts_writable_and_ends_with
 /// 跨片流至多挂几次（mkfs 那个实例不写行、之后每次挂载写一行：第 370 次挂载之后 369 行，下一次挂载越过阈值）。
 const MOUNTS_UNTIL_THE_ROWS_REACH_THE_THRESHOLD_AT_MOST: usize = 400;
 
+/// 跨片流里留孤儿的那个实例，与越过阈值那次挂载隔几次挂载（C597：F5 在跨片流上要判到非空集，被删实例得有孤儿）：实例表到
+/// 「阈值减这个数」行的那次挂载之后，那个实例做一次顺序写、崩在第一条记录之前。隔得太远孤儿会被后来的挂载写满：
+/// 2026-10-22 草稿探针（实现员 m3-close-b16-crates-17 的报告）量过，隔 20、40 次的到越过那一刻盘上一个不剩，隔 5、8、12 次的留下 20–24 个，
+/// 五个实例的行都在越过那一次被删。取 8：根早已轮出环（行会被删），孤儿也还在。
+const MOUNTS_FROM_THE_ORPHANS_TO_THE_CROSSING_MOUNT: u64 = 8;
+
 /// 实例切换预留按这一个 ckpt_cost 算（只看链重写那一半随行数怎么变；暖机那一半与行数无关，取 0 不碍比较）。
 const CHECKPOINT_COST_COMPARED_ACROSS_THE_MOUNTS: MetadataBlocks = MetadataBlocks(0);
 
@@ -882,6 +971,7 @@ struct RecordedCrossingMount {
     versions: Vec<PublishedVersion>,
     rows_deleted: Vec<InstanceRow>,
     sweep_publish: (InstanceGeneration, CheckpointTxg),
+    instance_leaving_the_orphans: InstanceGeneration,
     sweep_of_the_mount_before: InstanceTableSweepAtTheEndOfTheMount,
     rows_at_the_judgement: Vec<InstanceRow>,
     pages_at_the_judgement: usize,
@@ -960,7 +1050,8 @@ fn record_the_mount_whose_rows_cross_the_threshold() -> RecordedCrossingMount {
     }
     let mut switch_reserve_of_the_first_mount_writing_a_row = None;
     let mut sweep_of_the_mount_before = None;
-    // 迭代上界：MOUNTS_UNTIL_THE_ROWS_REACH_THE_THRESHOLD_AT_MOST 次崩了再挂；跨轮携带的是盘与第一次写行那次挂载的切换预留；
+    let mut instance_leaving_the_orphans = None;
+    // 迭代上界：MOUNTS_UNTIL_THE_ROWS_REACH_THE_THRESHOLD_AT_MOST 次崩了再挂；跨轮携带的是盘、第一次写行那次挂载的切换预留与留孤儿的实例；
     // 提前出口是实例表到了阈值那一次。
     for mount_index in 0..MOUNTS_UNTIL_THE_ROWS_REACH_THE_THRESHOLD_AT_MOST {
         let mounted = mount_writable(&parameters, &mut devices)
@@ -980,9 +1071,26 @@ fn record_the_mount_whose_rows_cross_the_threshold() -> RecordedCrossingMount {
             sweep_of_the_mount_before = Some(mounted.output.instance_table_sweep);
             break;
         }
+        if rows == threshold.0 - MOUNTS_FROM_THE_ORPHANS_TO_THE_CROSSING_MOUNT {
+            let version_leaving_the_orphans = mounted
+                .current
+                .into_file_version()
+                .expect("接连崩了再挂的每一版都带实例 1 的第一个文件");
+            let image =
+                image_with_the_orphans_of_a_sequential_write_crashed_before_its_first_record(
+                    pool_of(&devices),
+                    &mounted.allocator,
+                    &version_leaving_the_orphans,
+                    mounted.output.instance,
+                );
+            devices = devices_of(&image);
+            instance_leaving_the_orphans = Some(mounted.output.instance);
+        }
     }
     let sweep_of_the_mount_before =
         sweep_of_the_mount_before.expect("前提：接连崩了再挂，实例表到了阈值");
+    let instance_leaving_the_orphans =
+        instance_leaving_the_orphans.expect("前提：越过阈值之前留了孤儿");
     let base = pool_of(&devices);
     let stream = SharedStream::retaining_contents();
     let mut recording = recording_of(&base, &stream);
@@ -1058,6 +1166,7 @@ fn record_the_mount_whose_rows_cross_the_threshold() -> RecordedCrossingMount {
             mounted.current.root().instance,
             mounted.current.root().checkpoint_txg,
         ),
+        instance_leaving_the_orphans,
         sweep_of_the_mount_before,
         rows_at_the_judgement: chain_at_the_judgement.records.rows,
         pages_at_the_judgement: chain_at_the_judgement.page_pointers.len(),
@@ -1121,6 +1230,14 @@ fn assert_the_crossing_mount_sweeps_back_to_one_page(recorded: &RecordedCrossing
     );
     assert_eq!(recorded.pages_after_the_sweep, 1, "清扫之后链回到一片");
     assert!(
+        recorded
+            .rows_deleted
+            .iter()
+            .any(|row| row.instance == recorded.instance_leaving_the_orphans),
+        "留了孤儿的实例 {:?} 的行在越过阈值那一次被删（F5 才判得到它的孤儿）",
+        recorded.instance_leaving_the_orphans
+    );
+    assert!(
         recorded.switch_reserve_of_the_crossing_mount
             > recorded.switch_reserve_of_the_first_mount_writing_a_row,
         "越过的那一次挂载的切换预留按两片留：{:?} 对 {:?}",
@@ -1134,12 +1251,28 @@ fn assert_the_crossing_mount_sweeps_back_to_one_page(recorded: &RecordedCrossing
     );
 }
 
-/// 枚举越过阈值的那次挂载的写，每个状态照 C333 判重建态的实例表与分配记录；交回 tally。
+/// 枚举越过阈值的那次挂载的写，每个状态照 F5 判（C597 跨片那一半：删前那几行判未发布的单元，删行那一版生效之后一个不剩）、
+/// 再照 C333 判重建态的实例表与分配记录；交回 tally。
 fn enumerate_the_crossing_mount_judging_the_rebuilt_state(
     recorded: &RecordedCrossingMount,
     item_label: &str,
     expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
 ) -> Option<CrashPointReplayTally> {
+    let rows_deleted_by_the_sweep_publish = RowsDeletedByTheSweepPublish {
+        rows_deleted: recorded.rows_deleted.clone(),
+        sweep_publish: recorded.sweep_publish,
+    };
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        count_the_states_where_the_deletion_took_effect(
+            &rows_deleted_by_the_sweep_publish,
+            image,
+            report,
+            counts,
+        );
+    };
     let deletion_publish = DeletionPublishToJudgeTheRebuiltStateAgainst {
         deleted_instances: recorded
             .rows_deleted
@@ -1172,12 +1305,19 @@ fn enumerate_the_crossing_mount_judging_the_rebuilt_state(
         recorded.judged_root_index,
         CrashPointReplayVersionTable::with_a_file_only(&recorded.versions),
         expansion,
-        // 观察者另读的输入：删掉的实例与清扫发布那一版（C333 那一判对着它们）
-        &[CrashPointReplayObserver {
-            name: "rebuilt_instance_table_against_the_allocation_records",
-            extra_inputs_digest: deletion_publish.digest(),
-            observe: &judge_the_rebuilt_state,
-        }],
+        // 观察者另读的输入：删前那几行与清扫发布那一版（F5 对着它们）；删掉的实例与清扫发布那一版（C333 那一判对着它们）
+        &[
+            CrashPointReplayObserver {
+                name: "f5_after_the_deletion",
+                extra_inputs_digest: rows_deleted_by_the_sweep_publish.digest(),
+                observe: &observe,
+            },
+            CrashPointReplayObserver {
+                name: "rebuilt_instance_table_against_the_allocation_records",
+                extra_inputs_digest: deletion_publish.digest(),
+                observe: &judge_the_rebuilt_state,
+            },
+        ],
     )
     .judged()
 }
@@ -1186,7 +1326,8 @@ fn enumerate_the_crossing_mount_judging_the_rebuilt_state(
 /// 清扫发布照 D18（块里携带什么信息） 已定项 11「回收」一条删掉根环里没有根的实例的行、链回到一片，之后那一次挂载的切换预留回到一片的量；
 /// 那次挂载的写按甲二展开，每个状态跑恢复、oracle、池级 checker 与 C333（重建态的实例表与分配记录）。
 /// 比已有的流多罩的：已有的清扫流实例表都是一片（有一行就扫的配置），这一条是产品路径的阈值、写行那次发布重写两片的链、清扫发布换下两片换上一片。
-/// 判别力：清扫发布不删行（实例表整链照原样重写）时，清扫之后还是 370 行、两片，切换预留不回落，这一条红。
+/// 判别力：清扫发布不删行（实例表整链照原样重写）时，清扫之后还是 370 行、两片，切换预留不回落，这一条红；
+/// 判的那一半不记要抹的头（「不抹就删」）时，删行那一版生效的态里留孤儿的那个实例的孤儿都还在，F5 红。
 #[test]
 fn quick_tier_of_the_mount_whose_instance_table_rows_cross_the_threshold_sweeps_the_chain_back_to_one_page(
 ) {
@@ -1201,6 +1342,7 @@ fn quick_tier_of_the_mount_whose_instance_table_rows_cross_the_threshold_sweeps_
     };
     assert_the_recovery_and_the_checker_are_clean(&tally);
     assert_the_rebuilt_state_was_judged(&tally);
+    assert_the_unpublished_units_were_judged_on_a_non_empty_set(&tally);
 }
 
 /// 全量：跨片流越过阈值的那次挂载每一段都展开（D13（验证路线） 已定项 4 的全量），每个状态跑恢复、oracle、池级 checker 与 C333。
@@ -1217,4 +1359,5 @@ fn every_crash_state_of_the_mount_whose_instance_table_rows_cross_the_threshold_
     };
     assert_the_recovery_and_the_checker_are_clean(&tally);
     assert_the_rebuilt_state_was_judged(&tally);
+    assert_the_unpublished_units_were_judged_on_a_non_empty_set(&tally);
 }

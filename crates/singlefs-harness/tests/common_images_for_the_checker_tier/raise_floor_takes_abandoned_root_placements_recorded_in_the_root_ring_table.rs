@@ -31,7 +31,8 @@ use singlefs_core::mount::{
 use singlefs_core::mounted_session::{
     MountedSession, NoSpaceAfterRaisingTheFloor, RootRingPushRefused, RootRingPushRehearsal,
     RootRingPushed, StuckBehindTheWideProtection, UserChange, UserChangeRefused,
-    WaysOutOfTheWideProtection, WaysOutOfTheWideProtectionRefused, WideProtectionAtTheCeiling,
+    WayOutOfTheWideProtection, WaysOutOfTheWideProtection, WaysOutOfTheWideProtectionRefused,
+    WhatIsLeftAfterThePush, WideProtectionAtTheCeiling,
 };
 use singlefs_core::pointer::{LocationEntry, NodePointer};
 use singlefs_core::recovery::choose_system_configuration;
@@ -2819,6 +2820,7 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
     );
     assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permanently_unreadable_account(
         &ways_out[0],
+        &stuck,
         recorded.key.1,
         &why,
     );
@@ -2832,6 +2834,7 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
         &stuck,
         &ways_out[1],
         &released_in_the_rehearsal,
+        WhatIsLeftAfterThePush::PublishTheChangeAgain,
         &why,
     );
     let isolated_before_the_push = isolated_slots_on_each_device_of(&pool.session().allocator);
@@ -3452,95 +3455,62 @@ pub fn released_by_the_push_if_the_change_is_admitted_after_it(
     }
 }
 
-/// 出路一那句话在 R 那一槽记着有效根时的说法：R（带 txg）再挂时判成被抛弃；R 的账读不出若是盘上永久坏，卸载之后再挂会被拒、会话已断开。
+/// 卸载重挂那一条出路在 R 那一槽记着有效根时：点名 R 那一槽、带 R 的 txg（再挂时它按新实例的实例表判成被抛弃；它的账读不出若是盘上永久坏，
+/// 卸载之后再挂会被拒、会话已断开——这几句由调用方照这两个数写）。
 pub fn assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permanently_unreadable_account(
-    way_out_by_unmounting: &str,
-    checkpoint_txg_of_r: CheckpointTxg,
-    why: &str,
-) {
-    for expected in [
-        "正常卸载".to_string(),
-        "再可写挂载".to_string(),
-        format!(
-            "R（txg {}）按新实例的实例表判成被抛弃",
-            checkpoint_txg_of_r.0
-        ),
-        "R 的账读不出若是盘上永久坏，卸载之后再挂会被拒".to_string(),
-        "会话在卸载时已断开".to_string(),
-    ] {
-        assert!(
-            way_out_by_unmounting.contains(&expected),
-            "{why}：出路一写明「{expected}」：{way_out_by_unmounting}"
-        );
-    }
-}
-
-/// 出路一那句话在 R 那一槽没有读得出的有效根时的说法：点名那一槽、说再挂之后 C 那一圈不再有这一槽，不说 R 判成被抛弃
-/// （攻方 `research/prompts/m3-batch10z-pqrs-code-r1-opus-output.md` 第一节末：实测卸载再挂之后 C 那一圈直接没了）。
-pub fn assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readable_root(
-    way_out_by_unmounting: &str,
+    way_out_by_unmounting: &WayOutOfTheWideProtection,
     stuck: &StuckBehindTheWideProtection,
+    checkpoint_txg_of_the_root_in_that_ring_slot: CheckpointTxg,
     why: &str,
 ) {
-    for expected in [
-        "正常卸载".to_string(),
-        "再可写挂载".to_string(),
-        format!(
-            "R 那一槽（根环槽 {}.{}）没有读得出的有效根",
-            stuck.ring_slot_of_r.region, stuck.ring_slot_of_r.slot
-        ),
-        "C 那一圈照它重算、不再有这一槽".to_string(),
-    ] {
-        assert!(
-            way_out_by_unmounting.contains(&expected),
-            "{why}：出路一写明「{expected}」：{way_out_by_unmounting}"
-        );
-    }
-    assert!(
-        !way_out_by_unmounting.contains("判成被抛弃"),
-        "{why}：R 没有根，出路一不说它判成被抛弃：{way_out_by_unmounting}"
+    assert_eq!(
+        *way_out_by_unmounting,
+        WayOutOfTheWideProtection::UnmountThenMountWritableAgain {
+            ring_slot_held_by_the_wide_protection: stuck.ring_slot_of_r,
+            checkpoint_txg_of_the_root_in_that_ring_slot: Some(
+                checkpoint_txg_of_the_root_in_that_ring_slot
+            ),
+        },
+        "{why}：头一条出路是卸载重挂，点名 R 那一槽、带 R 的 txg"
     );
 }
 
-/// 出路二那句话：推环入口的名字、推几次、写掉环里几槽、R 那一槽的槽号、放出来的隔离槽数（总数与逐盘，与预演的数相同）、回退候选的代价，
-/// 不写「整环」。
-pub fn assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+/// 卸载重挂那一条出路在 R 那一槽没有读得出的有效根时：点名那一槽、不带 txg（再挂之后 C 那一圈不再有这一槽，不说 R 判成被抛弃；
+/// 攻方 `research/prompts/m3-batch10z-pqrs-code-r1-opus-output.md` 第一节末：实测卸载再挂之后 C 那一圈直接没了）。
+pub fn assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readable_root(
+    way_out_by_unmounting: &WayOutOfTheWideProtection,
     stuck: &StuckBehindTheWideProtection,
-    way_out_by_the_push: &str,
-    released_on_each_device: &[(DeviceIdentity, u64)],
     why: &str,
 ) {
-    let publishes = stuck.empty_publishes_until_the_ring_slot_of_r_is_written;
-    let released: u64 = released_on_each_device
-        .iter()
-        .map(|(_, released_on_the_device)| *released_on_the_device)
-        .sum();
-    let mut expected_phrases = vec![
-        "push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states"
-            .to_string(),
-        format!("发 {publishes} 次 F 不变的空发布"),
-        format!("写掉根环里接下来轮到的 {publishes} 槽"),
-        format!(
-            "根环槽 {}.{}",
-            stuck.ring_slot_of_r.region, stuck.ring_slot_of_r.slot
-        ),
-        format!("隔离的槽放出来 {released} 个"),
-        "少于 4 个不同状态".to_string(),
-    ];
-    expected_phrases.extend(released_on_each_device.iter().map(
-        |(device, released_on_the_device)| {
-            format!("盘 {} 上 {released_on_the_device} 个", device.0)
+    assert_eq!(
+        *way_out_by_unmounting,
+        WayOutOfTheWideProtection::UnmountThenMountWritableAgain {
+            ring_slot_held_by_the_wide_protection: stuck.ring_slot_of_r,
+            checkpoint_txg_of_the_root_in_that_ring_slot: None,
         },
-    ));
-    for expected in &expected_phrases {
-        assert!(
-            way_out_by_the_push.contains(expected.as_str()),
-            "{why}：出路二写明「{expected}」：{way_out_by_the_push}"
-        );
-    }
-    assert!(
-        !way_out_by_the_push.contains("整环"),
-        "{why}：出路二写推几次、写掉几槽，不写「整环」：{way_out_by_the_push}"
+        "{why}：头一条出路是卸载重挂，点名 R 那一槽、那一槽没有读得出的有效根"
+    );
+}
+
+/// 推环那一条出路：R 那一槽、推几次（就是报里写的那个数，写掉根环里同样多槽）、预演里每块盘放出来的隔离槽数（与预演的数相同）、
+/// 推完之后是再发这次改动还是只剩走空（`after_the_push`）。
+pub fn assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+    stuck: &StuckBehindTheWideProtection,
+    way_out_by_the_push: &WayOutOfTheWideProtection,
+    released_on_each_device: &[(DeviceIdentity, u64)],
+    after_the_push: WhatIsLeftAfterThePush,
+    why: &str,
+) {
+    assert_eq!(
+        *way_out_by_the_push,
+        WayOutOfTheWideProtection::PushTheRootRingUpToTheRingSlotHeldByTheWideProtection {
+            ring_slot_held_by_the_wide_protection: stuck.ring_slot_of_r,
+            empty_publishes_until_that_ring_slot_is_written: stuck
+                .empty_publishes_until_the_ring_slot_of_r_is_written,
+            isolated_slots_released_on_each_device: released_on_each_device.to_vec(),
+            after_the_push,
+        },
+        "{why}：第二条出路是推环到 R 那一槽，推的次数与报里的相同、放出来的隔离槽数与预演的相同"
     );
 }
 
@@ -3809,6 +3779,7 @@ pub fn a_write_stuck_behind_the_wide_protection_that_fits_after_the_push_lists_b
         &stuck,
         &ways_out[1],
         &released_in_the_rehearsal,
+        WhatIsLeftAfterThePush::PublishTheChangeAgain,
         "长 13 个单元",
     );
     let isolated_before_the_push = isolated_slots_on_each_device_of(&pool.session().allocator);
@@ -3985,6 +3956,7 @@ pub fn a_long_sequential_write_stuck_behind_the_wide_protection_lists_only_unmou
     );
     assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permanently_unreadable_account(
         &ways_out[0],
+        &stuck,
         recorded.key.1,
         &why,
     );

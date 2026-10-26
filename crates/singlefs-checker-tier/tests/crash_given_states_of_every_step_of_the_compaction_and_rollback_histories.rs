@@ -17,6 +17,12 @@
 //! 有表归别的机器判的那一趟打 `NOT_RUN_NO_GPU_ADAPTER` 那一行报本次未跑。
 #![cfg(feature = "verdict-store")]
 
+mod common_compaction_and_rollback_histories;
+
+use common_compaction_and_rollback_histories::{
+    compaction_and_rollback_history, is_a_rollback_step, run_the_history_keeping_the_step_images,
+    seed_of_the_compaction_and_rollback_sampling, HistoryWithItsStepImages,
+};
 use singlefs_checker_tier::crash_amplification::{
     one_test_changes_the_environment_at_a_time, GivenStatesEngine, GivenStatesItem,
 };
@@ -25,54 +31,23 @@ use singlefs_checker_tier::crash_given_states::{
 };
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
+use singlefs_harness::heavy_threads::default_heavy_threads;
 use singlefs_harness::history::{
-    execute_history_with, generate_history_with_weights, AppliedEffect, CompactionChoice,
-    CompactionRunEnding, ContentChoice, ContentLength, FloorTargetChoice, GeneratedHistory,
-    GenerationWeights, HistoryEnding, HistoryExecution, HistoryOperation, HistoryRun, HistorySeed,
-    HistoryStartingPoint, RollbackTargetChoice, StepOutcome, SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+    AppliedEffect, CompactionChoice, CompactionRunEnding, ContentChoice, ContentLength,
+    FloorTargetChoice, GeneratedHistory, HistoryEnding, HistoryOperation, HistoryRun, HistorySeed,
+    HistoryStartingPoint, RollbackTargetChoice, StepOutcome,
 };
 use singlefs_harness::memory_pool::MemoryPool;
-use singlefs_harness::SharedStream;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 /// 攻方腿那段前缀里整理强制选段用的选择子（执行时对候选段个数取余）。
 const REGION_SELECTOR_OF_THE_ATTACK: u64 = 16_033_315_046_779_662_336;
 /// 回退目标在根环里从最新往旧数的下标，扫这么多条（攻方腿扫的 0 到 7）。
 const RING_ROOTS_SWEPT_BY_THE_ROLLBACK: u64 = 8;
-/// 整理夹着回退那一组比重的种子区间：从种子基往后的这一段（整理那一组在偏移 50000 起，这一段在它之后）。
-const SEED_OFFSET_OF_THE_COMPACTION_AND_ROLLBACK_SAMPLING: u64 = 60_000;
 /// 那一组比重跑的几段、每段几步（与 harness 档原先那一条逐项相同）。
 const COMPACTION_AND_ROLLBACK_SAMPLING_SEEDS: u64 = 4;
 const COMPACTION_AND_ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY: usize = 40;
-
-/// 一段历史在 harness 的执行器上跑完：执行器交回的这一趟，与交给观察者、要过池级 checker 的那几张镜像（表名、镜像）。
-struct HistoryWithItsStepImages {
-    run: HistoryRun,
-    step_images: Vec<(String, MemoryPool)>,
-}
-
-/// 在两块 4 GiB 的盘上跑 `history`，`image_is_judged` 认下的那几步交给观察者的镜像拷下来（表名以 `table_name_prefix` 起头、接这一步的位置）。
-/// 观察者在每一步没判出失败时调（起点之后一次、之后每一步一次），交的就是 harness 档原先就地交池级 checker 的那一张。
-fn run_the_history_keeping_the_step_images(
-    history: &GeneratedHistory,
-    table_name_prefix: &str,
-    image_is_judged: &dyn Fn(Option<&HistoryOperation>) -> bool,
-) -> HistoryWithItsStepImages {
-    let mut step_images: Vec<(String, MemoryPool)> = Vec::new();
-    let run = execute_history_with(
-        history,
-        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
-        &SharedStream::new(),
-        &mut |observation| {
-            if image_is_judged(observation.operation) {
-                step_images.push((
-                    format!("{table_name_prefix}/step-image/{:?}", observation.position),
-                    observation.image.clone(),
-                ));
-            }
-        },
-    );
-    HistoryWithItsStepImages { run, step_images }
-}
 
 /// `step_images` 每一张作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）交给定状态引擎（项名 `test_name`）：录入段写进判定库、
 /// 判段从库里读回判。交回池级 checker 判红的那几条（「<表名> <不变量>：<细节>」，GPU 判的与从库里读回的结论不带细节，细节写那一句占位）；
@@ -452,46 +427,28 @@ fn a_writable_mount_and_two_compactions_after_rolling_back_a_compaction_keep_the
 /// 至少有一次回退做在同一段历史里整理搬过单元之后（取样点真撞到这一格）。只判回退那几步之后的镜像（与 harness 档原先那一条同一个取法：
 /// 回退那一版的映射照抄现行那一版时红在回退那一步，I-3.9、I-3.15）。判别力：整理夹着回退那一组不抽回退
 /// （`crates/mutations.tsv`「m4 修复批甲 F1 取样」那一行）时一次都没有在整理搬过单元之后回退，这一条红。
+/// 各段种子的历史在执行器上跑那一截按段切片、在每台默认重活线程数条线程上跑（[`compaction_and_rollback_segments_on_worker_threads`]），
+/// 按偏移的次序并回来：交判定库的表的次序、张数与串行跑逐字相同（对拍
+/// `the_compaction_and_rollback_segments_on_several_threads_come_back_like_the_segments_run_one_after_another`）；判定库那一截照旧在这条线程上逐张交。
 #[test]
 fn the_compaction_and_rollback_weights_run_every_history_to_the_end_with_the_model_agreeing() {
     let mut rollbacks_after_a_relocation = 0_u64;
     let mut step_images_after_the_rollbacks: Vec<(String, MemoryPool)> = Vec::new();
-    for offset in 0..COMPACTION_AND_ROLLBACK_SAMPLING_SEEDS {
-        let seed = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE
-            .wrapping_add(SEED_OFFSET_OF_THE_COMPACTION_AND_ROLLBACK_SAMPLING)
-            .wrapping_add(offset);
-        let history = generate_history_with_weights(
-            HistorySeed(seed),
-            COMPACTION_AND_ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY,
-            &GenerationWeights::COMPACTION_WHILE_MOUNTED_WITH_ROLLBACK,
-        );
-        let HistoryWithItsStepImages { run, step_images } = run_the_history_keeping_the_step_images(
-            &history,
-            &format!("seed-{seed}"),
-            &|operation| matches!(operation, Some(HistoryOperation::RollBackWhileMounted(_))),
-        );
+    for (offset, segment) in
+        compaction_and_rollback_segments_on_worker_threads(default_heavy_threads().get())
+            .into_iter()
+            .enumerate()
+    {
         assert_eq!(
-            run.ending,
+            segment.run.ending,
             HistoryEnding::Completed,
-            "种子 {seed}（偏移 {offset}）：{:?}；结局 {:?}",
-            history.operations,
-            run.outcomes
+            "种子 {}（偏移 {offset}）：{:?}；结局 {:?}",
+            segment.seed,
+            segment.history.operations,
+            segment.run.outcomes
         );
-        step_images_after_the_rollbacks.extend(step_images);
-        let mut has_relocated_a_unit = false;
-        for outcome in &run.outcomes {
-            match outcome {
-                StepOutcome::Applied(AppliedEffect::Compacted {
-                    units_relocated, ..
-                }) if *units_relocated > 0 => has_relocated_a_unit = true,
-                StepOutcome::Applied(AppliedEffect::RolledBack { .. }) if has_relocated_a_unit => {
-                    rollbacks_after_a_relocation += 1;
-                }
-                StepOutcome::Applied(_)
-                | StepOutcome::Refused { .. }
-                | StepOutcome::NotApplicable(_) => {}
-            }
-        }
+        step_images_after_the_rollbacks.extend(segment.step_images);
+        rollbacks_after_a_relocation += segment.rollbacks_after_a_relocation;
     }
     eprintln!(
         "整理夹着回退那一组比重 {COMPACTION_AND_ROLLBACK_SAMPLING_SEEDS} 段：整理搬过单元之后做成的回退 {rollbacks_after_a_relocation} 次；回退之后交判定库的镜像 {} 张",
@@ -510,5 +467,138 @@ fn the_compaction_and_rollback_weights_run_every_history_to_the_end_with_the_mod
     assert!(
         violations.is_empty(),
         "{COMPACTION_AND_ROLLBACK_SAMPLING_SEEDS} 段：每次回退之后的镜像池级 checker 一条都不红，实际 {violations:?}"
+    );
+}
+
+/// 整理夹着回退那一组比重一段种子的历史在执行器上跑完的样子：种子、生成的历史、执行器交回的这一趟、回退那几步之后交给观察者的镜像、
+/// 这一段里整理搬过单元之后做成的回退几次。
+#[derive(PartialEq, Eq)]
+struct CompactionAndRollbackSegment {
+    seed: u64,
+    history: GeneratedHistory,
+    run: HistoryRun,
+    step_images: Vec<(String, MemoryPool)>,
+    rollbacks_after_a_relocation: u64,
+}
+
+/// 种子区间里偏移 `offset` 那一段：生成历史、在两块 4 GiB 的盘上跑、只拷回退那几步之后的镜像（与 harness 档原先那一条同一个取法），
+/// 数这一段里整理搬过单元之后做成的回退。每段自己生成历史、自己建池，不读别的段留下的东西。
+fn run_the_compaction_and_rollback_segment(offset: u64) -> CompactionAndRollbackSegment {
+    let seed = seed_of_the_compaction_and_rollback_sampling(offset);
+    let history = compaction_and_rollback_history(
+        seed,
+        COMPACTION_AND_ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY,
+    );
+    let HistoryWithItsStepImages { run, step_images } = run_the_history_keeping_the_step_images(
+        &history,
+        &format!("seed-{seed}"),
+        &is_a_rollback_step,
+    );
+    let mut rollbacks_after_a_relocation = 0_u64;
+    let mut has_relocated_a_unit = false;
+    for outcome in &run.outcomes {
+        match outcome {
+            StepOutcome::Applied(AppliedEffect::Compacted {
+                units_relocated, ..
+            }) if *units_relocated > 0 => has_relocated_a_unit = true,
+            StepOutcome::Applied(AppliedEffect::RolledBack { .. }) if has_relocated_a_unit => {
+                rollbacks_after_a_relocation += 1;
+            }
+            StepOutcome::Applied(_)
+            | StepOutcome::Refused { .. }
+            | StepOutcome::NotApplicable(_) => {}
+        }
+    }
+    CompactionAndRollbackSegment {
+        seed,
+        history,
+        run,
+        step_images,
+        rollbacks_after_a_relocation,
+    }
+}
+
+/// 每一段在这条线程上依次跑，按偏移的次序交回：多线程那一份的对照。
+fn compaction_and_rollback_segments_one_after_another() -> Vec<CompactionAndRollbackSegment> {
+    (0..COMPACTION_AND_ROLLBACK_SAMPLING_SEEDS)
+        .map(run_the_compaction_and_rollback_segment)
+        .collect()
+}
+
+/// 同一批段切成片，在 `worker_threads` 条线程上跑（多于段数的不起）：每条线程按偏移领下一段，跑完的段放进它偏移那一格，
+/// 全部跑完按偏移的次序并起来交回（与 [`compaction_and_rollback_segments_one_after_another`] 逐段相同，与线程数、谁先跑完无关）。
+///
+/// # Panics
+/// 有一段跑的时候 panic（`std::thread::scope` 等齐之后照样 panic）；并的时候有一格空着。
+fn compaction_and_rollback_segments_on_worker_threads(
+    worker_threads: usize,
+) -> Vec<CompactionAndRollbackSegment> {
+    let segment_count = usize::try_from(COMPACTION_AND_ROLLBACK_SAMPLING_SEEDS)
+        .expect("段数是个小常量，装得进 usize");
+    let next_segment_index = AtomicUsize::new(0);
+    let segment_of_each_offset: Mutex<Vec<Option<CompactionAndRollbackSegment>>> =
+        Mutex::new((0..segment_count).map(|_| None).collect());
+    std::thread::scope(|scope| {
+        for _worker in 0..worker_threads.clamp(1, segment_count) {
+            scope.spawn(|| loop {
+                let segment_index = next_segment_index.fetch_add(1, Ordering::SeqCst);
+                if segment_index >= segment_count {
+                    break;
+                }
+                let offset = u64::try_from(segment_index).expect("段的下标小于段数，装得进 u64");
+                let segment = run_the_compaction_and_rollback_segment(offset);
+                segment_of_each_offset
+                    .lock()
+                    .expect("别的跑段线程 panic 时 scope 等齐之后照样 panic，走不到这里")
+                    [segment_index] = Some(segment);
+            });
+        }
+    });
+    let segments_in_the_order_of_their_offsets = segment_of_each_offset
+        .into_inner()
+        .expect("跑段的线程都已等齐，没有一条 panic 着放下锁");
+    segments_in_the_order_of_their_offsets
+        .into_iter()
+        .enumerate()
+        .map(|(segment_index, segment)| {
+            segment.unwrap_or_else(|| panic!("偏移 {segment_index} 那一段没有线程跑"))
+        })
+        .collect()
+}
+
+/// 多线程与单线程的对拍（`.claude/rules/test-script-discipline.md`「编译与算法都要快」：合并要确定、逐字相同，进快档）：整理夹着回退那一组比重的各段
+/// 切片在几条线程上跑、按偏移并回来的，与依次跑的逐段相同——种子、历史、结局与每一步的结局、回退之后的镜像（表名与逐字节的盘面）、
+/// 整理搬过单元之后的回退次数都一样，交判定库的表的次序与张数因此不变。不经判定库、不起 GPU。线程数取每台默认重活线程数，至少两条
+/// （一条就比不出合并的次序）。放 checker 档：被并的那份函数住在这个测试文件里，harness 档的包不依赖 checker 档。
+/// 判别力：合并时不按偏移的次序（`crates/mutations.tsv` 里点名这一条的那一行把并好的次序倒过来）这条红。
+#[test]
+fn the_compaction_and_rollback_segments_on_several_threads_come_back_like_the_segments_run_one_after_another(
+) {
+    let worker_threads = default_heavy_threads().get().max(2);
+    let on_worker_threads = compaction_and_rollback_segments_on_worker_threads(worker_threads);
+    let one_after_another = compaction_and_rollback_segments_one_after_another();
+    let seeds_and_table_names = |segments: &[CompactionAndRollbackSegment]| {
+        segments
+            .iter()
+            .map(|segment| {
+                (
+                    segment.seed,
+                    segment
+                        .step_images
+                        .iter()
+                        .map(|(table_name, _image)| table_name.clone())
+                        .collect::<Vec<String>>(),
+                )
+            })
+            .collect::<Vec<(u64, Vec<String>)>>()
+    };
+    assert_eq!(
+        seeds_and_table_names(&on_worker_threads),
+        seeds_and_table_names(&one_after_another),
+        "{worker_threads} 条线程上跑的各段按偏移的次序并回来：种子与交判定库的表名同依次跑的逐个相同"
+    );
+    assert!(
+        on_worker_threads == one_after_another,
+        "{worker_threads} 条线程上跑的各段：历史、结局、每一步的结局、回退之后的镜像逐字节、搬过单元之后的回退次数同依次跑的逐段相同"
     );
 }

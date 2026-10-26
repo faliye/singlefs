@@ -15,13 +15,15 @@ pub struct RootRingSlot {
     pub slot: u64,
 }
 
-/// 每区槽数 S：**系统配置字段，不是格式常量**（D22（单元原子性怎么合成） 已定项 1 的字段表逐字：
-/// 「具体取多少不是格式决策——格式承诺的是『S 是系统配置字段 + 挂载时判区间』」）。
+/// 每区槽数 S：**系统配置字段，不是格式常量**（D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格：
+/// 格式承诺的是「S 是系统配置字段 + 挂载时判区间」，区间的两条边 4、16 才是格式常量）。
 /// mkfs 把它写进系统配置槽偏移 362 那一字节，挂载时读回来；环几何的每一处都拿这个运行时的值算，
-/// 不拿编译期常量算。
+/// 不拿编译期常量算。读者另判 S × 固定结构槽距不超过 P × chunk（D22（单元原子性怎么合成） 已定项 16 第 1 句，
+/// `recovery` 的 `system_configuration_values_this_reader_accepts`）：那一判要槽距，不在这个类型里。
 ///
 /// 带不变量（落在 `[ROOT_RING_SLOTS_PER_REGION_MINIMUM, ROOT_RING_SLOTS_PER_REGION_MAXIMUM]` 闭区间里），
-/// 所以字段私有、只从 [`RootRingSlotsPerRegion::from_system_configuration_field`] 或
+/// 所以字段私有、只从 [`RootRingSlotsPerRegion::from_system_configuration_field`]、
+/// [`RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing`] 或
 /// [`RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM`] 进来，也不实现 `Default`（`code-discipline.md`
 /// 「带不变量的类型不实现 `Default`」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,20 +40,76 @@ pub struct RootRingSlotsPerRegionOutOfRange {
     pub maximum: u64,
 }
 
+/// 第一版 mkfs 默认 S 的下限 5：小于它拒绝 mkfs（D22（单元原子性怎么合成） 已定项 16 第 3 句，用户 2026-10-22 定）。
+/// 取区间下界加一：mkfs 的默认值不取两条边，下界那一条边是 [`ROOT_RING_SLOTS_PER_REGION_MINIMUM`]。
+pub const FIRST_VERSION_MAKE_FILESYSTEM_SMALLEST_DEFAULT_SLOTS_PER_REGION: u64 =
+    ROOT_RING_SLOTS_PER_REGION_MINIMUM + 1;
+
+/// 第一版 mkfs 按固定结构槽距算出的默认 S 小于 5：区域间距 P × chunk 里按这个槽距放不下 5 个槽
+/// （D22（单元原子性怎么合成） 已定项 16 第 3 句「小于 5 拒绝 mkfs」）。带上算式两边的数，调用方报得出拒的是什么。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DefaultSlotsPerRegionBelowTheFirstVersionFloor {
+    pub fixed_structure_slot_spacing: u32,
+    /// ⌊P × chunk ÷ 槽距⌋：这个槽距下区域间距里装得下几个槽。
+    pub slots_fitting_in_the_region_stride: u64,
+    /// [`FIRST_VERSION_MAKE_FILESYSTEM_SMALLEST_DEFAULT_SLOTS_PER_REGION`]。
+    pub smallest_default_slots_per_region: u64,
+}
+
 impl RootRingSlotsPerRegion {
-    /// mkfs 第一版写进系统配置的 S。`const fn` 里的断言是编译期的：碰到区间的边连编译都过不去
-    /// （字段表逐字「4..16 之间取值不碰任何一条边」）。
-    pub const AT_MAKE_FILESYSTEM: Self = Self::at_make_filesystem_checked_at_compile_time(
+    /// 显式给 S 的建池入口（测试与装置）常取的那个 S，也是第一版 mkfs 默认值的上限
+    /// （[`Self::first_version_make_filesystem_default_for_the_slot_spacing`] 的 min 里那个 8）。
+    /// 在常量上下文里求值：碰到区间的边连编译都过不去（[`Self::strictly_between_the_edges_of_the_format_interval`]）。
+    pub const AT_MAKE_FILESYSTEM: Self = Self::strictly_between_the_edges_of_the_format_interval(
         ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM,
     );
 
-    const fn at_make_filesystem_checked_at_compile_time(slots_per_region: u64) -> Self {
+    /// mkfs 默认值进这个类型的口子：值严格落在区间两条边之间（D22（单元原子性怎么合成） 已定项 16 第 3 句「默认值不取两条边」）。
+    /// [`Self::AT_MAKE_FILESYSTEM`] 在常量上下文里调它，断言在编译期判；[`Self::first_version_make_filesystem_default_for_the_slot_spacing`]
+    /// 在运行时调它，同一条断言罩住按槽距算出来的每一个值。
+    ///
+    /// # Panics
+    /// 值碰到或越过区间的边：mkfs 默认值的式子（min(8, …)、小于 5 拒）出了错。
+    const fn strictly_between_the_edges_of_the_format_interval(slots_per_region: u64) -> Self {
         assert!(
             slots_per_region > ROOT_RING_SLOTS_PER_REGION_MINIMUM
                 && slots_per_region < ROOT_RING_SLOTS_PER_REGION_MAXIMUM,
-            "mkfs 写的 S 碰到了区间的边（D22 已定项 1 字段表：4..16 之间取值不碰任何一条边）"
+            "mkfs 默认的 S 碰到了区间的边（D22 已定项 16 第 3 句：默认值不取 4、16 两条边）"
         );
         Self { slots_per_region }
+    }
+
+    /// 第一版 mkfs 的默认 S：min(8, ⌊P × chunk ÷ 固定结构槽距⌋)，小于 5 拒（D22（单元原子性怎么合成） 已定项 16 第 3 句，用户 2026-10-22 定）。
+    /// 算出来的值落在 [5, 8] 里，不碰区间的两条边；这一条在运行时经 [`Self::strictly_between_the_edges_of_the_format_interval`] 判。
+    /// 只管 mkfs 的默认取值：显式给 S 的建池入口（`MakeFilesystemParameters` 的 `geometry` 里直接放一个 S）不经这里，
+    /// 只受读者的区间判与 S × 槽距判。
+    ///
+    /// # Errors
+    /// ⌊P × chunk ÷ 槽距⌋ 小于 5 ⇒ [`DefaultSlotsPerRegionBelowTheFirstVersionFloor`]（槽距 1 MiB 时是 3）。
+    ///
+    /// # Panics
+    /// 槽距是 0：mkfs 的槽距由 `SystemImmutableSizes::slot_spacing_for` 算，不小于 4096。
+    pub fn first_version_make_filesystem_default_for_the_slot_spacing(
+        fixed_structure_slot_spacing: u32,
+    ) -> Result<Self, DefaultSlotsPerRegionBelowTheFirstVersionFloor> {
+        let slots_fitting_in_the_region_stride = (ROOT_RING_PRIME_STEP * ROOT_RING_CHUNK_BYTES)
+            .checked_div(u64::from(fixed_structure_slot_spacing))
+            .expect("槽距不是 0：mkfs 的槽距由 slot_spacing_for 算，不小于 4096");
+        let default_slots_per_region =
+            slots_fitting_in_the_region_stride.min(ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM);
+        if default_slots_per_region
+            < FIRST_VERSION_MAKE_FILESYSTEM_SMALLEST_DEFAULT_SLOTS_PER_REGION
+        {
+            return Err(DefaultSlotsPerRegionBelowTheFirstVersionFloor {
+                fixed_structure_slot_spacing,
+                slots_fitting_in_the_region_stride,
+                smallest_default_slots_per_region:
+                    FIRST_VERSION_MAKE_FILESYSTEM_SMALLEST_DEFAULT_SLOTS_PER_REGION,
+            });
+        }
+        Ok(Self::strictly_between_the_edges_of_the_format_interval(
+            default_slots_per_region,
+        ))
     }
 
     /// 盘上读来的那一字节进这个类型的唯一入口：落在区间外就交不出这个类型，于是「按越界的 S 算环几何」
@@ -114,6 +172,24 @@ pub fn target_for_publish(
         region: checkpoint_txg.0 % ROOT_RING_REGIONS,
         slot: (checkpoint_txg.0 / ROOT_RING_REGIONS) % slots_per_region.count(),
     }
+}
+
+/// 读出来的一条根住在 `ring_slot` 这一槽合不合落点公式（D22（单元原子性怎么合成） 已定项 7 实例代号那一行、已定项 16；
+/// 欠账 C743「重建分配器记新类时不核根住不住这一槽」）：合法写者只有发布路径（按 [`target_for_publish`] 写）与 mkfs
+/// （第 0 代根种进三个区域各自的槽 0，[`crate::make_filesystem::genesis_root_ring_slots`]），所以第 0 代根
+/// （txg 是 [`crate::make_filesystem::GENESIS_CHECKPOINT_TXG`]）照 mkfs 种根的槽另认，别的根只住公式算出的那一槽。
+/// 不合的是错位读（读回别的槽里一条自证得过的根）：读根环的读者照「这一槽这一次读坏」记，不当这一槽住着那条根。
+#[must_use]
+pub fn root_sits_in_the_ring_slot_the_formula_gives(
+    checkpoint_txg: CheckpointTxg,
+    ring_slot: RootRingSlot,
+    slots_per_region: RootRingSlotsPerRegion,
+) -> bool {
+    if checkpoint_txg == crate::make_filesystem::GENESIS_CHECKPOINT_TXG {
+        return crate::make_filesystem::genesis_root_ring_slots()
+            .any(|genesis_slot| genesis_slot == ring_slot);
+    }
+    target_for_publish(checkpoint_txg, slots_per_region) == ring_slot
 }
 
 /// 一个区域占多少字节：S 个槽 × 槽距。区域之间隔着 P × chunk，这一段之外的字节不归根环。
@@ -217,7 +293,58 @@ mod tests {
         );
     }
 
-    /// 区间判（D22 已定项 1 字段表：下界 k_tol + 2 = 4，上界今天算不出来、按 16 收着）：
+    /// 落点公式核（C743）：txg 4 的根只住公式算出的那一槽（S = 8：区域 1 槽 1），住在别的槽里（同区域的槽 2、别的区域的槽 1）判错位；
+    /// 第 0 代根（txg 0）住三个区域各自的槽 0 都认（mkfs 种根的槽），住槽 1 判错位。
+    /// 判别力：`crates/mutations.tsv`「根环一簇 R1：落点公式核恒认」那一行（谓词恒真）与「第 0 代根照公式只认区域 0」那一行，各让这一条红。
+    #[test]
+    fn a_root_sits_only_in_the_ring_slot_its_txg_targets_and_a_genesis_root_in_any_region_slot_zero(
+    ) {
+        let slots = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let formula_slot_of_txg_four = target_for_publish(CheckpointTxg(4), slots);
+        assert_eq!(
+            formula_slot_of_txg_four,
+            RootRingSlot { region: 1, slot: 1 },
+            "前提：S = 8 时 txg 4 落区域 1 槽 1"
+        );
+        assert!(
+            root_sits_in_the_ring_slot_the_formula_gives(
+                CheckpointTxg(4),
+                formula_slot_of_txg_four,
+                slots
+            ),
+            "txg 4 的根住在它的落点槽：认"
+        );
+        for misplaced in [
+            RootRingSlot { region: 1, slot: 2 },
+            RootRingSlot { region: 0, slot: 1 },
+            RootRingSlot { region: 2, slot: 1 },
+        ] {
+            assert!(
+                !root_sits_in_the_ring_slot_the_formula_gives(CheckpointTxg(4), misplaced, slots),
+                "txg 4 的根住在 {misplaced:?}：错位读，不认"
+            );
+        }
+        for region in 0..ROOT_RING_REGIONS {
+            assert!(
+                root_sits_in_the_ring_slot_the_formula_gives(
+                    CheckpointTxg(0),
+                    RootRingSlot { region, slot: 0 },
+                    slots
+                ),
+                "第 0 代根住区域 {region} 的槽 0：mkfs 种根的槽，认"
+            );
+        }
+        assert!(
+            !root_sits_in_the_ring_slot_the_formula_gives(
+                CheckpointTxg(0),
+                RootRingSlot { region: 1, slot: 1 },
+                slots
+            ),
+            "第 0 代根住区域 1 的槽 1：不是 mkfs 种根的槽，不认"
+        );
+    }
+
+    /// 区间判（D22 已定项 2 参数表「每区槽数 S」那一格：下界 k_tol + 2 = 4，上界是格式常量 16）：
     /// 两条边上的值收，边外的值拒，拒的时候把盘上读到的值与两条边一起带出来。
     #[test]
     fn slots_per_region_outside_the_format_interval_is_refused_with_the_value_it_read() {

@@ -186,6 +186,7 @@ fn pool_checker_violations_of_the_prefixes(
 /// 验收「崩在 D 的每个崩溃点」：录制流里 D 那一段的每一个前缀各恢复一次——D 的记录还没持久（它那一段写之前、屏障之前）⇒ 恢复到 C (2, 8)、
 /// 读回第三次的内容；D 的记录已持久、根槽还没 ⇒ 恢复由记录重建 D 的根（D23（journal 的角色与格式） 已定项 15）；根槽已持久 ⇒ 择 D。
 /// 后两种都读回第一次的内容；前缀越长只会从前一种走到后一种、不回头。每个前缀 checker 全绿。
+// harness-test-granularity:one-scenario 循环里每轮建的是同一条回退发布 D 录制流的一个前缀崩溃镜像，不是新场景；「恢复到过 D 之后前缀更长不回到 C」那一句跨轮判，拆开就判不了
 #[test]
 fn every_crash_point_of_the_rollback_publish_recovers_to_the_third_version_or_to_the_rollback_publish_and_every_image_is_green(
 ) {

@@ -229,8 +229,8 @@ fn two_inodes_whose_extents_name_one_data_unit_in_one_root_redden_the_disjoint_r
     let red = violations(&image);
     assert_eq!(
         violated_names(&red),
-        ["I-5.1", "I-4.7"],
-        "判红的该恰好是 I-5.1 与 I-4.7：{red:?}"
+        ["I-1.1", "I-5.1", "I-4.7"],
+        "判红的该恰好是 I-1.1、I-5.1 与 I-4.7（inode 2 那条 extent 指着五元组写对象 1 的数据单元，I-1.1）：{red:?}"
     );
     let disjoint_ranges_detail = &red
         .iter()

@@ -645,6 +645,8 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
         },
         // 这是一条带文件的根（树表里有条目）：分配记录树住树表条目，根记录那一项恒全零。
         allocation_record_tree_root: NodePointer::empty_root(),
+        reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+        pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
     };
 
     SyntheticMultiUnitImage {
@@ -1233,7 +1235,7 @@ fn central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_inste
         .expect("层级 1 的根装着 55 字节的条目就要拒绝");
     assert_eq!(
         failure,
-        OpenPoolForReadFailure::Walk(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+        OpenPoolForReadFailure::Walk(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
             what: "中央映射树内部条目",
             entry_bytes: 55,
             field_table_bytes: 113,

@@ -1,7 +1,7 @@
 //! 随机历史加截断（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K8、第六节 S1）：执行器经挂着的会话发 `UserChange::Truncate`，
 //! 会话交回的每一版（先走空的各步、截断意图、各批、最后一批、变长与 N = S 那一次、其间推的抬 F）逐版交理想模型比，数据单元的分配代按单元号逐个比；
 //! RefFS 翻译把一次截断翻成一个 `Truncate(n)` 连同它那次发布。这里钉三样：一段写死的历史走遍截断目标的每一类（缩到单元边界、跨单元变长、
-//! 把洞整个截掉（S1）、留洞的变长、截到单元中间、留下 144 个单元（叶边界）、回退到截断半路再截到 0、N = S、删完之后点名别的 inode 被拒），
+//! 把洞整个截掉（S1）、留洞的变长、截到单元中间、留下 144 个单元（叶边界）、回退到截断半路再截到 0、N = S、删完之后点名别的 inode 变长），
 //! 每一版模型都对得上、计数钉绝对值；截断那一组比重在它自己那一段种子下跑完、每一类目标都进过入口、模型每一步都对得上、RefFS 不判红；
 //! 慢档多跑几段。第一个文件那条记录的截断字段（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1、R2、R5，第六节用户定案）
 //! 逐版交模型比；写死的历史另补「回退到写字段之前再变长」「截到洞里更靠后再变长」两步。
@@ -42,7 +42,8 @@ const TRUNCATION_SAMPLING_SEEDS_OF_THE_SLOW_TIER: u64 = 16;
 
 /// 写死的那一段历史每一版模型都对得上（跑完、没有新发现），而且模型真的比到了每一种截断发布：意图 8 次（第 1、3、5、7、9、12、15、17 步）、
 /// 不是最后一批的批 2 次（第 1 步）、最后一批 9 次（第 1、3、5、7、12、15、17 步各一次，第 9 步先走完回退带回来的那次截断、再走自己的）、
-/// 不缩短的 6 次（第 2、4、10、14、16、18 步），删完之后点名别的 inode 被拒是模型要求的拒；交给会话的目标 size 逐步钉绝对值；
+/// 不缩短的 7 次（第 2、4、10、14、16、18 步，与第 21 步删完之后点名别的 inode 变长那一次：任意活 inode 都能缩短与变长，判决
+/// `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S6），模型要求的拒一次都没有；交给会话的目标 size 逐步钉绝对值；
 /// 第一个文件那条记录的截断字段逐版比过（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6「理想模型记字段并在对拍里比」），
 /// 比过的版数与其中字段写过的版数钉绝对值。
 /// 判别力：模型或实现在任一种截断发布上改错一样（重写的角色、标签时点、分配代、截断条目、截断字段），这一段在那一步判对不上
@@ -57,7 +58,7 @@ fn a_fixed_history_through_every_truncation_target_agrees_with_the_model_at_ever
         &mut |_| {},
     );
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.outcomes);
-    for (step, outcome) in run.outcomes.iter().enumerate().take(21) {
+    for (step, outcome) in run.outcomes.iter().enumerate().take(22) {
         assert!(
             matches!(
                 outcome,
@@ -68,11 +69,6 @@ fn a_fixed_history_through_every_truncation_target_agrees_with_the_model_at_ever
             "第 {step} 步做成：{outcome:?}"
         );
     }
-    assert!(
-        matches!(&run.outcomes[21], StepOutcome::Refused { member } if member.contains("SizeChangeOfAnInodeOtherThanTheFirstFile")),
-        "删完之后点名别的 inode 改 size：第一版拒：{:?}",
-        run.outcomes[21]
-    );
     let payload = 32_634_u64;
     assert_eq!(
         run.sizes_requested_by_the_truncations
@@ -108,8 +104,8 @@ fn a_fixed_history_through_every_truncation_target_agrees_with_the_model_at_ever
             counts.size_changes_without_shrinking_matched,
             counts.required_refusals_matched,
         ),
-        (8, 2, 9, 6, 1),
-        "意图、不是最后一批的批、最后一批、不缩短的、模型要求的拒"
+        (8, 2, 9, 7, 0),
+        "意图、不是最后一批的批、最后一批、不缩短的（删完之后点名别的 inode 变长那一次也是）、模型要求的拒"
     );
     assert_eq!(
         (

@@ -19,30 +19,42 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 
 use singlefs_format::{CLUSTER_SEGMENT_SLOTS, SLOT_BYTES};
 
 use crate::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InodeNumber, InstanceGeneration,
-    SlotNumber, TreeIdentifier,
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, FileOffsetInBytes, InodeNumber,
+    InstanceGeneration, SlotNumber, TreeIdentifier,
 };
-use crate::allocator::{AllocationRecord, PlacementOnDevice, PoolAllocator};
+use crate::allocator::{AllocationRecord, Placement, PlacementOnDevice, PoolAllocator};
+use crate::background_compute::{
+    decisions_of_one_segment, BackgroundComputeError, BackgroundComputeOfOneBatch,
+    BackgroundComputeOfThisMount, BackgroundComputeSettings, BackgroundComputeSettingsRefused,
+    BackgroundGpuCompute, BackgroundGpuComputeHandle, BackgroundTask, GpuComputedSegment,
+    GpuEntryDecision, GpuWorkOfTheBatch, InTheMiddleOfEachBackgroundBatch,
+};
 use crate::block_device::{
     check_aligned_and_in_range, BlockDevice, BlockDeviceError, DiscardOutcome,
     PhysicalBlockSizeInBytes, WriteDurability,
 };
 use crate::compaction_plan::{
-    choose_region, compaction_starts_after_a_user_change, empty_cluster_segments_by_the_records,
+    choose_region, choose_region_over_the_live_slots, cluster_segment_entry_keys_of_the_unit_area,
+    compaction_starts_by_the_watermarks, empty_cluster_segments_by_the_records,
     holes_admit_the_issue, holes_outside_the_region_in_segments_holding_user_data,
     plan_batch_skipping_the_units_this_publish_rewrites_anyway, publish_budget_of_a_compaction_run,
-    region_holds_a_quarantined_slot, region_is_empty_by_the_records,
-    region_scans_of_the_segments_without_an_unreleased_record, the_completed_intent_yielded,
-    CompactionBatchSize, CompactionBatchUnits, CompactionOfThisMount, CompactionRunForcing,
-    CompactionRunStop, PlannedBatch, PlannedRelocation, RegionChoice, RegionChoiceCriterion,
+    publishes_left_of_the_budget_given_by_the_last_user_change, region_holds_a_quarantined_slot,
+    region_is_empty_by_the_records, region_scans_of_the_segments_without_an_unreleased_record,
+    the_completed_intent_yielded, CallerMonotonicClockReading, CallerOfTheBackgroundCompaction,
+    CompactionBatchSize, CompactionBatchUnits, CompactionOfThisMount, CompactionPacing,
+    CompactionRunForcing, CompactionRunStop, CompactionStartJudgement,
+    CompactionWriteBandwidthLimit, ForegroundFsync, LiveSlotsOfAClusterSegment, PlannedBatch,
+    PlannedRelocation, RegionChoice, RegionChoiceCriterion, TimerFallbackCheck,
     UnitAreaOfOneDevice,
 };
 use crate::instance_table::InstanceRow;
 use crate::instance_table_sweep::unit_head_read_by_sweep;
+use crate::journal::JournalBytesToWrite;
 use crate::logged_operations::{
     live_compaction_intent_of_the_entries, CompactionIntent, CompactionRegion,
 };
@@ -58,22 +70,31 @@ use crate::mount::{
     RaisedFloor, ShadowLedger,
 };
 use crate::recovery::{instance_table_chain_of_root, PoolReader, ReadPassOverThePool};
-use crate::region_scan::{scan_region, AllocationInRegion, CentralMappingEntry, RegionScan};
+use crate::region_scan::{
+    scan_region_on_the_gpu, scan_region_over_the_identity_index, AllocationInRegion,
+    CentralMappingEntry, CentralMappingIdentityIndex, RegionScan, RegionScanRefusal,
+    RegionScanWithTheRecordsUncertainThisRound,
+};
 use crate::root_record::{RootRecord, UnmountMarker};
 use crate::root_ring::{target_for_publish, RootRingSlot};
+use crate::system_configuration::PublishTriggerThresholds;
+use crate::transaction::lookup_work::{self, LookupSite};
 use crate::transaction::{
+    journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write,
     prepare_the_version_publish, publish_compaction_step_in_the_session,
     publish_compaction_step_with_the_region_check_of_the_intent_deletion, publish_create_snapshot,
-    publish_new_inodes, publish_overwrite, publish_overwrite_of_an_inode, publish_sequential_write,
+    publish_data_changes_published_together, publish_new_inodes, publish_overwrite,
+    publish_overwrite_of_an_inode, publish_partial_write, publish_sequential_write,
     publish_sequential_write_of_an_inode, publish_size_change, publish_snapshot_destruction_intent,
     publish_unlink_intent, publish_version, walk_the_deletion_queue_until_it_is_empty,
     CentralMappingOfAVersionReadLeafByLeaf, CompactionIntentStep, CompactionStepRefused,
-    DeletionAndLineageOfThePublish, DeletionQueueWalk, FirstFile, MappingLookup,
-    PlannedUnitsRewrittenAnyway, PoolVersion, PoolWriter, PublishError, ReadFailedOnTheDisk,
-    ReadFailingSelfVerification, RegionCheckOfTheIntentDeletion, ReleaseChecksumCheck,
-    RelocationBatchRefused, TransactionOutput, TransactionUnit,
+    DataChangesPublishedTogether, DeletionAndLineageOfThePublish, DeletionQueueWalk, FirstFile,
+    MappingLookup, NewInodesOfOneChange, PartialWriteBytes, PlannedUnitsRewrittenAnyway,
+    PoolVersion, PoolWriter, PublishError, ReadFailedOnTheDisk, ReadFailingSelfVerification,
+    RegionCheckOfTheIntentDeletion, ReleaseChecksumCheck, RelocationBatchRefused,
+    TransactionOutput, TransactionUnit, WholeWriteOfOneInode,
 };
-use crate::unit::{unit_filesystem_identifier, UNIT_CLASS_DATA};
+use crate::unit::{data_unit_payload_capacity, unit_filesystem_identifier, UNIT_CLASS_DATA};
 use crate::unlink::DeletionSwitches;
 use singlefs_format::ROOT_RING_REGIONS;
 
@@ -145,6 +166,18 @@ pub enum UserChange<'content> {
         content: &'content [u8],
         write_time_seconds: u64,
     },
+    /// 按偏移写一个活 inode（判决 `research/prompts/m4-partial-write-r1-main-verification.md`，`transaction::publish_partial_write`）：把 `bytes`
+    /// 写到 `inode` 那个文件偏移 `offset` 起，一次发布；先把现行那一版的承诺类队列走空，同别的改动。拒绝同 `transaction::publish_partial_write`。
+    WriteAtOffset {
+        inode: InodeNumber,
+        offset: FileOffsetInBytes,
+        bytes: PartialWriteBytes<'content>,
+        write_time_seconds: u64,
+    },
+    /// 几次数据写类改动并进一次发布（D16（发布语义） 已定项 10「数据写类可并：同一 inode 的写折叠、建 inode 求和」，
+    /// `transaction::publish_data_changes_published_together`）：攒批的会话（[`MountedSessionWithPendingChanges`]）排空待发时交这一种。
+    /// 先把现行那一版的承诺类队列走空，同别的改动；有树而文件集合为空的一版上只放只建 inode 的那一批（同 [`UserChange::NewInodes`]）。
+    DataChangesPublishedTogether(DataChangesPublishedTogether<'content>),
 }
 
 /// 一次用户改动发成了：新的一版在会话的 `current` 里。
@@ -154,12 +187,10 @@ pub struct UserChangePublished {
     pub floor_raises: Vec<RaisedFloor>,
     /// 每一串是因为哪一次被拒才推的（与 `floor_raises` 一一对应）：`SpaceAdmissionRefused` 或 `PlacementRefused`。
     pub refusals_that_pushed_the_floor_raises: Vec<PublishError>,
-    /// 这次调用里推的抬 F 之外发成的每一版，按先后（[`VersionsPublishedInThisChange`]）。
+    /// 这次调用里推的抬 F 之外发成的每一版，按先后（[`VersionsPublishedInThisChange`]）。整理一批都不在这里：整理挪出了用户改动的调用线程
+    /// （用户 2026-10-26 定），改动发成之后起跑判据为真只记成「该跑了」（`compaction_plan::CompactionStartJudgement`），
+    /// 由后台入口 [`MountedSession::run_compaction_in_the_background`] 去跑。
     pub versions_published: VersionsPublishedInThisChange,
-    /// 改动发成之后水位越线跑的那至多一批整理（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G8 丁；次序在删除续做、
-    /// 为这次请求推的抬 F 之后）。没起跑是 `None`；起跑了的那一趟停在哪、发了哪几版在里面。整理没发成不让这次改动算没发成。
-    /// 至多一批数的是搬了单元的发布，那一趟连同收尾、签发可以发几次见 `CompactionRunReach::AtMostOneBatchAfterAUserChange`。
-    pub compaction_after_the_change: Option<CompactionRun>,
     /// 这次调用的发布都返回之后发的 discard（判决 G5，[`discard_the_segments_reusable_as_a_whole`]）。
     pub discards_after_the_change: DiscardsAfterThePublishes,
 }
@@ -179,7 +210,7 @@ pub struct DiscardsAfterThePublishes {
     pub withheld_after_a_failed_read: Vec<(DeviceIdentity, SlotNumber)>,
 }
 
-/// 一次整理运行（显式入口 [`MountedSession::run_compaction`]，或用户改动之后的那至多一批）做成了什么。
+/// 一次整理运行（显式入口 [`MountedSession::run_compaction`]，或后台入口 [`MountedSession::run_compaction_in_the_background`] 起跑的那一趟）做成了什么。
 #[derive(Debug)]
 pub struct CompactionRun {
     /// 这一趟发成的每一版，按先后：先走空的删除续做、再是整理的各批。最后一个就是会话的 `current`。
@@ -188,8 +219,12 @@ pub struct CompactionRun {
     /// 一个没搬的删意图与丢意图不算。
     pub batches_published: u64,
     pub outcome: CompactionRunOutcome,
-    /// 这一趟的发布都返回之后发的 discard（只有显式入口在这里发；用户改动之后那一趟的归改动那一份）。
+    /// 这一趟的发布都返回之后发的 discard（显式入口与后台入口在这里发；可写挂载续做那一趟不发）。
     pub discards: DiscardsAfterThePublishes,
+    /// 整理每推一次发布（[`advance_compaction_by_one_publish`] 每进一次门：签发、搬一批、删意图，停在判据上的那一次也算）是后台任务的一批，
+    /// 按先后一批一项：请求的后端（这一批开头读到的设置）与实际走的路（D26（后台整理与放置回收） 已定项 13 第 1 条；
+    /// `.claude/rules/fs-design.md` 五条硬要求第 4 条）。删除续做那几步不是整理的批，不在这里。
+    pub background_compute_of_each_batch: Vec<BackgroundComputeOfOneBatch>,
 }
 
 /// 一次整理运行停在哪：照判据停（[`CompactionRunStop`]），或一次发布没发成。
@@ -218,6 +253,77 @@ pub enum CompactionRunRefused {
     },
     /// 现行那一版树表 0 条：没有可搬的单元。
     NoVersionOfTrees,
+}
+
+/// 后台入口一次调用做成了什么（[`MountedSession::run_compaction_in_the_background`]）。
+#[derive(Debug)]
+pub enum BackgroundCompactionCall {
+    /// 没起跑，一个写都没发。
+    NotStarted(BackgroundCompactionNotStarted),
+    /// 起跑了一趟：为什么起跑、那一趟停在哪、发了哪几版。装箱：不装箱这一个成员比另一个大两百多字节（clippy `large_enum_variant`）。
+    Ran {
+        trigger: BackgroundCompactionTrigger,
+        run: Box<CompactionRun>,
+    },
+}
+
+/// 后台入口这一次为什么没起跑。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BackgroundCompactionNotStarted {
+    /// 整理因一批出错停着（D26（后台整理与放置回收） 已定项 13 第 4 条）：「该跑了」留着，解除之后下一次调用再取。
+    BackgroundTaskStoppedAfterAComputeError,
+    /// 没有「该跑了」，定时兜底关着。
+    NothingDueAndTheTimerFallbackOff,
+    /// 没有「该跑了」，离定时兜底上一次查还不到一个间隔。
+    TimerFallbackIntervalNotElapsed,
+    /// 没有「该跑了」，定时兜底这一次查了起跑判据，为假。
+    NotDueByTheWatermarksAtTheTimerFallback,
+    /// 上一次用户改动给的那一份 `B_gc` 已经扣完（岔路单第 18 行甲：定时兜底与用户改动共用这一份）：等下一次用户改动才再有。
+    /// 「该跑了」也取走、不留：下一次用户改动发成之后起跑判据再记。
+    PublishBudgetOfTheLastUserChangeSpent,
+}
+
+/// 后台入口这一趟为什么起跑。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BackgroundCompactionTrigger {
+    /// 用户改动发成之后起跑判据记下的「该跑了」（判决 G8 丁：至多一批，预算 `B_gc`）。
+    DueAfterAUserChange,
+    /// 定时兜底这一次查起跑判据为真（D26 已定项 13 第 5 条）。这一趟没有自己的预算，与用户改动共用上一次用户改动给的那一份 `B_gc`
+    /// （岔路单 `research/prompts/m4-gpugc-design-r1-forks.md` 第 18 行甲，用户 2026-10-26 定）。
+    TimerFallback,
+}
+
+/// 后台入口这一次起不起跑（[`MountedSession::run_compaction_in_the_background`] 开头那几判的结论）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BackgroundCompactionStart {
+    NotStarted(BackgroundCompactionNotStarted),
+    /// 起跑：为什么起跑、这一趟推到哪、预算按哪一条算。
+    Starts {
+        trigger: BackgroundCompactionTrigger,
+        reach: CompactionRunReach,
+        budget: CompactionRunBudget,
+    },
+}
+
+/// 一趟整理的发布预算按哪一条算。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CompactionRunBudget {
+    /// 判决 G8 `B_gc`：上一次用户改动之后已经过去的发布数之外还剩的（[`publish_budget_of_a_compaction_run`]，至少 1）。
+    /// 显式入口与可写挂载续做照它算。
+    SinceTheLastUserChange,
+    /// 后台入口的一趟（用户改动之后那一趟与定时兜底那几趟）：上一次用户改动给的那一份 `B_gc` 还剩的，没有至少 1，扣完是 0
+    /// （[`publishes_left_of_the_budget_given_by_the_last_user_change`]；岔路单 `research/prompts/m4-gpugc-design-r1-forks.md` 第 18 行甲）。
+    LeftOfTheBudgetGivenByTheLastUserChange,
+}
+
+/// 一趟整理每一批之前看不看调用方（D26（后台整理与放置回收） 已定项 13 第 6 条）。封闭集合：显式入口与可写挂载续做不看，后台入口看。
+#[derive(Clone, Copy)]
+enum PacingOfTheRun<'caller> {
+    NotPaced,
+    PacedByTheCaller {
+        write_bandwidth_limit: CompactionWriteBandwidthLimit,
+        caller: &'caller dyn CallerOfTheBackgroundCompaction,
+    },
 }
 
 /// 一次用户改动里推的抬 F 之外发成的每一版，按先后：先走空的删除步（D8（核心索引结构） 已定项 16 第 6 条）、这次改动本身
@@ -388,9 +494,42 @@ pub enum RootRingPushRehearsal {
 pub struct WaysOutOfTheWideProtection {
     /// 在分配器的拷贝与只进内存的盘上预演推环、推完再预演这次改动（连同它会推的抬 F）的结局：推环这条出路列不列按它定。
     pub pushing_the_root_ring: RootRingPushRehearsal,
-    /// 出路，调用方照抄就能报给用户：卸载重挂一定列；推环（会丢掉最近可退到的状态，调用即确认）只在预演过推完这次改动放得下时列
-    /// （[`RootRingPushRehearsal::ChangeAdmittedAfterThePush`]）。按这个次序。
-    pub ways_out: Vec<String>,
+    /// 出路：卸载重挂一定列；推环（会丢掉最近可退到的状态，调用即确认）只在预演过推完这次改动放得下时列
+    /// （[`RootRingPushRehearsal::ChangeAdmittedAfterThePush`]）。按这个次序。报给用户的文字由调用方照每一条带的数写。
+    pub ways_out: Vec<WayOutOfTheWideProtection>,
+}
+
+/// 被宽护卡住时的一条出路（[`WaysOutOfTheWideProtection::ways_out`]）：说清做什么、做了会怎样要的数，文字由调用方写。封闭集合。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WayOutOfTheWideProtection {
+    /// 正常卸载（`mount::unmount`）之后再可写挂载一次。`checkpoint_txg_of_the_root_in_that_ring_slot` 是宽护挡着的那一槽（R 那一槽）记着的有效根的 txg：有它时再挂按新实例的实例表
+    /// 判它被抛弃，影子账只护它自己账里引用的落点，宽护不再出现；它的账读不出若是盘上永久坏，卸载之后再挂会被拒（C694 的 B），而会话在卸载时
+    /// 已断开。`None`：R 那一槽（`ring_slot_held_by_the_wide_protection`）没有读得出的有效根，再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，
+    /// C 那一圈照它重算、不再有这一槽，宽护不再出现。
+    UnmountThenMountWritableAgain {
+        ring_slot_held_by_the_wide_protection: RootRingSlot,
+        checkpoint_txg_of_the_root_in_that_ring_slot: Option<CheckpointTxg>,
+    },
+    /// 调 [`MountedSession::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states`]：从现行那一版起发
+    /// `empty_publishes_until_that_ring_slot_is_written` 次 F 不变的空发布，写掉根环里接下来轮到的同样多槽，R 那一槽（`ring_slot_held_by_the_wide_protection`）
+    /// 是最后一槽；宽护随之解开，预演里每块盘放出来的隔离槽数是 `isolated_slots_released_on_each_device`。这几槽里原来的根换成同一个用户状态的
+    /// 空发布根，回退候选集可以掉到少于 4 个不同状态（D16（发布语义） 已定项 1），调用即确认。推完之后做什么见 `after_the_push`。
+    PushTheRootRingUpToTheRingSlotHeldByTheWideProtection {
+        ring_slot_held_by_the_wide_protection: RootRingSlot,
+        empty_publishes_until_that_ring_slot_is_written: u64,
+        isolated_slots_released_on_each_device: Vec<(DeviceIdentity, u64)>,
+        after_the_push: WhatIsLeftAfterThePush,
+    },
+}
+
+/// 推环那一条出路推完之后还剩什么（按报里剩下什么分）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WhatIsLeftAfterThePush {
+    /// 报里还剩这次改动：预演过推完之后这次改动放得下，调用方推完再发它。
+    PublishTheChangeAgain,
+    /// 这次 unlink 的意图已发成，报里只剩它之后的走空：预演过推完之后剩下的走空在下一次改动开头走、放得下；不再发这次改动
+    /// （照「再发这次改动」再发，开头的走空走完、要 unlink 的文件已不在，被拒）。
+    WalkTheQueueAtTheStartOfTheNextChange,
 }
 
 /// 要出路时没预演。成员按调用方要做的决定分：再发一次这次改动拿新的报、换回挂载时那一份盘表。
@@ -405,8 +544,8 @@ pub enum WaysOutOfTheWideProtectionRefused {
     ///
     /// 这一道只比实例代号与 txg，报里不记是哪个会话报的。别的会话（同一份 mkfs 起的另一个池、读盘造的另一条会话）
     /// 的报若这两个数恰好与这个会话的现行那一版相同，这里不拦：照这个会话的状态（分配器、盘、现行那一版）预演，预演发的是报里拷下的那一份改动
-    /// （不是这个会话自己要发的），出路一的文字仍是报里的数
-    /// （R 的 txg 或 R 那一槽），列出路二时其中的 R 那一槽与要推的次数也是报里的（第 10z 批代码轮攻方「打中一」；用户 2026-10-09 定撤掉会话身份、照实写）。
+    /// （不是这个会话自己要发的），卸载重挂那一条带的仍是报里的数
+    /// （R 的 txg 或 R 那一槽），列推环那一条时其中的 R 那一槽与要推的次数也是报里的（第 10z 批代码轮攻方「打中一」；用户 2026-10-09 定撤掉会话身份、照实写）。
     /// 调用方要拿报去问报它的那个会话。
     SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion {
         instance_refused_on: InstanceGeneration,
@@ -428,52 +567,36 @@ pub enum WaysOutOfTheWideProtectionRefused {
 
 impl StuckBehindTheWideProtection {
     /// 照这一份报与要出路时那一份预演列出路：卸载重挂一定列；推环只在预演过推完这次改动放得下时列。按这个次序。
-    /// 出路二末句按报里剩下什么分：还剩这次改动时说推完之后这次改动放得下（调用方推完再发它）；只剩走空时说意图已发成、
-    /// 剩下的走空在下一次改动开头走、放得下，不再发这次改动。
-    fn ways_out_after(&self, pushing_the_root_ring: &RootRingPushRehearsal) -> Vec<String> {
-        let way_one = match self.checkpoint_txg_of_r {
-            Some(txg_of_r) => format!(
-                "出路一：正常卸载（mount::unmount）之后再可写挂载一次。再挂时 R（txg {}）按新实例的实例表判成被抛弃，影子账只护它自己账里引用的落点，宽护不再出现。R 的账读不出若是盘上永久坏，卸载之后再挂会被拒（C694 的 B），而会话在卸载时已断开。",
-                txg_of_r.0
-            ),
-            None => format!(
-                "出路一：正常卸载（mount::unmount）之后再可写挂载一次。R 那一槽（根环槽 {}.{}）没有读得出的有效根：再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，C 那一圈照它重算、不再有这一槽，宽护不再出现。",
-                self.ring_slot_of_r.region, self.ring_slot_of_r.slot
-            ),
-        };
-        let mut ways_out = vec![way_one];
+    /// 推环那一条推完之后还剩什么按报里剩下什么分：还剩这次改动时是推完再发它；只剩走空时是意图已发成、剩下的走空在下一次改动开头走、
+    /// 不再发这次改动。
+    fn ways_out_after(
+        &self,
+        pushing_the_root_ring: &RootRingPushRehearsal,
+    ) -> Vec<WayOutOfTheWideProtection> {
+        let mut ways_out = vec![WayOutOfTheWideProtection::UnmountThenMountWritableAgain {
+            ring_slot_held_by_the_wide_protection: self.ring_slot_of_r,
+            checkpoint_txg_of_the_root_in_that_ring_slot: self.checkpoint_txg_of_r,
+        }];
         match pushing_the_root_ring {
             RootRingPushRehearsal::ChangeAdmittedAfterThePush {
                 isolated_slots_released_by_the_push_on_each_device,
             } => {
-                // 报里只剩走空时这次 unlink 的意图已发成：照「再发这次改动」再发，开头的走空走完、要 unlink 的文件已不在，被拒
-                // （第 10z 批代码轮攻方 H 形，判决 `research/prompts/m3-batch10z-xy-code-r1-main-verification.md` 第三节甲）。
-                let what_the_rehearsal_found_after_the_push = match &self.remainder_of_the_change {
-                    RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueueThenPublishTheChange(_) => {
-                        "预演过：推完之后这次改动放得下。"
-                    }
+                let after_the_push = match &self.remainder_of_the_change {
+                    RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueueThenPublishTheChange(
+                        _,
+                    ) => WhatIsLeftAfterThePush::PublishTheChangeAgain,
                     RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueue => {
-                        "这次 unlink 的意图已发成，报里只剩它之后的走空：预演过，推完之后剩下的走空在下一次改动开头走、放得下；不再发这次改动。"
+                        WhatIsLeftAfterThePush::WalkTheQueueAtTheStartOfTheNextChange
                     }
                 };
-                let released_on_each_device: Vec<String> =
-                    isolated_slots_released_by_the_push_on_each_device
-                        .iter()
-                        .map(|(device, released)| format!("盘 {} 上 {released} 个", device.0))
-                        .collect();
-                ways_out.push(format!(
-                    "出路二：调 MountedSession::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states（推环到 R 那一槽，根环槽 {}.{}）：从现行那一版起发 {} 次 F 不变的空发布，写掉根环里接下来轮到的 {} 槽，R 那一槽是最后一槽；宽护随之解开，隔离的槽放出来 {} 个（{}）。这几槽里原来的根换成同一个用户状态的空发布根，回退候选集可以掉到少于 4 个不同状态（D16（发布语义） 已定项 1），调用即确认。{}",
-                    self.ring_slot_of_r.region,
-                    self.ring_slot_of_r.slot,
-                    self.empty_publishes_until_the_ring_slot_of_r_is_written,
-                    self.empty_publishes_until_the_ring_slot_of_r_is_written,
-                    isolated_slots_released_by_the_push_on_each_device
-                        .iter()
-                        .map(|(_, released)| *released)
-                        .sum::<u64>(),
-                    released_on_each_device.join("，"),
-                    what_the_rehearsal_found_after_the_push,
-                ));
+                ways_out.push(WayOutOfTheWideProtection::PushTheRootRingUpToTheRingSlotHeldByTheWideProtection {
+                    ring_slot_held_by_the_wide_protection: self.ring_slot_of_r,
+                    empty_publishes_until_that_ring_slot_is_written: self
+                        .empty_publishes_until_the_ring_slot_of_r_is_written,
+                    isolated_slots_released_on_each_device:
+                        isolated_slots_released_by_the_push_on_each_device.clone(),
+                    after_the_push,
+                });
             }
             RootRingPushRehearsal::ChangeStillRefusedAfterThePush { .. }
             | RootRingPushRehearsal::PushRefused(_) => {}
@@ -1188,6 +1311,18 @@ enum UserChangeKeptByTheRefusal {
         content: Vec<u8>,
         write_time_seconds: u64,
     },
+    /// 字节至少一个（从 [`PartialWriteBytes`] 拷来的）。
+    WriteAtOffset {
+        inode: InodeNumber,
+        offset: FileOffsetInBytes,
+        bytes: Vec<u8>,
+        write_time_seconds: u64,
+    },
+    /// 整份写的那个文件（号、内容、时间秒）与几次建 inode，内容自有。
+    DataChangesPublishedTogether {
+        whole_write: Option<(InodeNumber, Vec<u8>, u64)>,
+        new_inodes: Vec<NewInodesOfOneChange>,
+    },
 }
 
 impl UserChangeKeptByTheRefusal {
@@ -1246,6 +1381,29 @@ impl UserChangeKeptByTheRefusal {
                 content: content.to_vec(),
                 write_time_seconds,
             },
+            UserChange::WriteAtOffset {
+                inode,
+                offset,
+                bytes,
+                write_time_seconds,
+            } => UserChangeKeptByTheRefusal::WriteAtOffset {
+                inode,
+                offset,
+                bytes: bytes.bytes().to_vec(),
+                write_time_seconds,
+            },
+            UserChange::DataChangesPublishedTogether(batch) => {
+                UserChangeKeptByTheRefusal::DataChangesPublishedTogether {
+                    whole_write: batch.whole_write.map(|whole_write| {
+                        (
+                            whole_write.inode,
+                            whole_write.content.to_vec(),
+                            whole_write.write_time_seconds,
+                        )
+                    }),
+                    new_inodes: batch.new_inodes.to_vec(),
+                }
+            }
         }
     }
 
@@ -1312,6 +1470,33 @@ impl UserChangeKeptByTheRefusal {
                 content,
                 write_time_seconds: *write_time_seconds,
             },
+            UserChangeKeptByTheRefusal::WriteAtOffset {
+                inode,
+                offset,
+                bytes,
+                write_time_seconds,
+            } => UserChange::WriteAtOffset {
+                inode: *inode,
+                offset: *offset,
+                bytes: PartialWriteBytes::new(bytes)
+                    .expect("拷的是一段 PartialWriteBytes：至少一个字节"),
+                write_time_seconds: *write_time_seconds,
+            },
+            UserChangeKeptByTheRefusal::DataChangesPublishedTogether {
+                whole_write,
+                new_inodes,
+            } => {
+                UserChange::DataChangesPublishedTogether(DataChangesPublishedTogether {
+                    whole_write: whole_write.as_ref().map(
+                        |(inode, content, write_time_seconds)| WholeWriteOfOneInode {
+                            inode: *inode,
+                            content,
+                            write_time_seconds: *write_time_seconds,
+                        },
+                    ),
+                    new_inodes,
+                })
+            }
         }
     }
 }
@@ -1783,6 +1968,28 @@ fn publish_the_change_once<Device: BlockDevice>(
             write_time_seconds,
             instance,
         ),
+        UserChange::WriteAtOffset {
+            inode,
+            offset,
+            bytes,
+            write_time_seconds,
+        } => publish_partial_write(
+            &mut writer,
+            allocator,
+            previous,
+            inode,
+            offset,
+            bytes,
+            write_time_seconds,
+            instance,
+        ),
+        UserChange::DataChangesPublishedTogether(batch) => publish_data_changes_published_together(
+            &mut writer,
+            allocator,
+            previous,
+            batch,
+            instance,
+        ),
     }
 }
 
@@ -1825,6 +2032,8 @@ impl MountedSession {
     /// 删除那几次发布的两个只供测试的开关取分配器上装的（可写挂载的开关链装上去的，`unlink::DeletionSwitches`）。
     /// 每发成一次（走空的每一步、这次改动）`current` 都按 `PoolVersion::of_a_version_of_trees` 重新归成员；现行那一版是有树而文件集合为空的
     /// 一版时只放建 inode（D8（核心索引结构） 已定项 16 第 5 条），别的改动拒成 `NoFileVersionToChange`。
+    /// 发成之后查一次整理的起跑判据，为真只记成「该跑了」（`compaction_plan::CompactionStartJudgement::DueAfterAUserChange`），
+    /// 返回之前一批整理都不发（整理挪出了调用线程，用户 2026-10-26 定；后台入口 [`Self::run_compaction_in_the_background`]）。
     ///
     /// # Errors
     /// [`UserChangeRefused`] 的八种。
@@ -1903,19 +2112,18 @@ impl MountedSession {
             *shadow_ledger,
             change,
         )?;
-        // 改动发成：整理「已经过去的发布数」从这里重新数（判决 G8 `B_gc`）。之后水位越线就跑至多一批（判决 G8 丁），
-        // 次序在这次改动的删除续做与为它推的抬 F 之后；整理没发成不让这次改动算没发成。
+        // 改动发成：整理「已经过去的发布数」从这里重新数（判决 G8 `B_gc`）。起跑判据照旧在这里查一次（判决 G8 丁），整理却挪出了用户改动的
+        // 调用线程（用户 2026-10-26 定「挪出调用线程」；D24（后台重活能不能卸给 GPU） 已定项 2 第 2 条「不许进前台路径」）：这里只把「该跑了」
+        // 记在会话上，一批都不发，由后台入口 [`Self::run_compaction_in_the_background`] 在调用方自己的线程上去跑。这一次调用拿着 `&mut self`
+        // 从头到尾，为这次改动推的抬 F 与之后的再判之间插不进整理批（第三轮判决第二节 G8 的第三样保证）。
         compaction.publishes_since_the_last_user_change = 0;
-        if compaction_starts_after_a_user_change(allocator.compaction().switches.run_forcing) {
-            published.compaction_after_the_change = Some(run_compaction_on(
-                parameters,
-                devices.as_mut_slice(),
-                allocator,
-                compaction,
-                current,
-                *instance,
-                CompactionRunReach::AtMostOneBatchAfterAUserChange,
-            ));
+        // 改动发成：清掉会话上跨趟留着的上一条完成的意图（用户 2026-10-26 定「每次用户改动发成就清掉」，
+        // `records/2026-10-19-里程碑四GPU垃圾回收开工.md`「调查员交回」那一行）。D26（后台整理与放置回收） 已定项 13 第 6 条
+        // 「签下一条意图那一判跨趟留着」只留到下一次用户改动发成为止：池子一直被写满时全空段数只降不升，留到回滚或重挂会让整理一直停着；
+        // 下一趟从空起照常签新意图，预算照旧是这一次改动给的那一份 `B_gc`（岔路单第 18 行甲）。被拒、没发成的改动在上面 `?` 交回，这一条照旧留着。
+        compaction.last_completed_intent = None;
+        if compaction_starts_by_the_watermarks(allocator.compaction().switches.run_forcing) {
+            compaction.start_judgement = CompactionStartJudgement::DueAfterAUserChange;
         }
         published.discards_after_the_change = discard_the_segments_reusable_as_a_whole(
             devices.as_mut_slice(),
@@ -1960,6 +2168,67 @@ impl MountedSession {
         devices: &mut Vec<(DeviceIdentity, Device)>,
         region_check: RegionCheckOfTheIntentDeletion,
     ) -> Result<CompactionRun, CompactionRunRefused> {
+        self.run_compaction_with_the_region_check_and_a_hook_in_the_middle_of_each_batch(
+            devices,
+            region_check,
+            InTheMiddleOfEachBackgroundBatch::NothingHappens,
+        )
+    }
+
+    /// 同 [`Self::run_compaction`]，只差一处：整理的每一批读完后台计算设置、开算之前调用例给的钩子（只供测试，
+    /// `.claude/rules/fs-design.md`「五条硬要求」第 2 条）。钩子拿到这次挂载的后台计算状态，在这一刻请求切换，强制进入
+    /// 「一批跑到一半时请求切换：这一批照旧、下一批才换」那一格（D26（后台整理与放置回收） 已定项 13 第 1 条）。产品路径只经
+    /// [`Self::run_compaction`] 进来，钩子那一处什么都不做。
+    ///
+    /// # Errors
+    /// 同 [`Self::run_compaction`]。
+    pub fn run_compaction_calling_a_test_only_hook_in_the_middle_of_each_batch<
+        Device: BlockDevice,
+    >(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        hook_in_the_middle_of_each_batch: &mut dyn FnMut(&mut BackgroundComputeOfThisMount),
+    ) -> Result<CompactionRun, CompactionRunRefused> {
+        self.run_compaction_with_the_region_check_and_a_hook_in_the_middle_of_each_batch(
+            devices,
+            RegionCheckOfTheIntentDeletion::JudgedByTheRecords,
+            InTheMiddleOfEachBackgroundBatch::CallTheTestOnlyHook(hook_in_the_middle_of_each_batch),
+        )
+    }
+
+    /// 后台计算的设置在这次挂载里的状态：生效的那一组与待生效的切换。
+    #[must_use]
+    pub fn background_compute(&self) -> &BackgroundComputeOfThisMount {
+        self.parameters_and_device_table
+            .background_compute_of_this_mount()
+    }
+
+    /// 挂着切换后台计算的设置（D26（后台整理与放置回收） 已定项 13 第 1 条：一次切全部后台任务，从下一批开始生效、一批之内不换）：
+    /// 与挂载同一套校验（第 4 条，`background_compute::admit_background_compute_settings_with_the_gpu_compute`；`gpu_compute` 是这一次递进来的 GPU 实现，
+    /// `None` 是沿用这次挂载已有的那一份，都没有而切到 `gpu` 就是 GPU 不在）；
+    /// 过了就记成待生效，下一批开头起用（整理的每一批在 [`advance_compaction_by_one_publish`] 进门读一次）。不读写盘。
+    ///
+    /// # Errors
+    /// 校验不过：拒绝切换，生效的与待生效的设置都留着原样，不降级到 `cpu`。
+    pub fn switch_background_compute_from_the_next_batch(
+        &mut self,
+        background_compute_settings: BackgroundComputeSettings,
+        gpu_compute: Option<BackgroundGpuComputeHandle>,
+    ) -> Result<(), BackgroundComputeSettingsRefused> {
+        self.parameters_and_device_table
+            .background_compute_of_this_mount_mut()
+            .request_switch_from_the_next_batch(background_compute_settings, gpu_compute)
+    }
+
+    /// 显式入口的三种起法共用的那一段：盘表核过、现行那一版有树，就推一趟、发 discard。
+    fn run_compaction_with_the_region_check_and_a_hook_in_the_middle_of_each_batch<
+        Device: BlockDevice,
+    >(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        region_check: RegionCheckOfTheIntentDeletion,
+        mut in_the_middle_of_each_batch: InTheMiddleOfEachBackgroundBatch<'_>,
+    ) -> Result<CompactionRun, CompactionRunRefused> {
         let MountedSession {
             allocator,
             current,
@@ -1980,7 +2249,8 @@ impl MountedSession {
             PoolVersion::WithFile(_) | PoolVersion::WithTreesAndNoFile(_) => {}
             PoolVersion::WithoutFile(_) => return Err(CompactionRunRefused::NoVersionOfTrees),
         }
-        let parameters = parameters_and_device_table.parameters_on_disk();
+        let (parameters, background_compute) = parameters_and_device_table
+            .parameters_on_disk_and_the_background_compute_of_this_mount_mut();
         let mut run = run_compaction_on_with_the_region_check_of_the_intent_deletion(
             parameters,
             devices.as_mut_slice(),
@@ -1989,7 +2259,11 @@ impl MountedSession {
             current,
             *instance,
             CompactionRunReach::UntilAStopOrTheBudget,
+            CompactionRunBudget::SinceTheLastUserChange,
+            PacingOfTheRun::NotPaced,
             region_check,
+            background_compute,
+            &mut in_the_middle_of_each_batch,
         );
         run.discards = discard_the_segments_reusable_as_a_whole(
             devices.as_mut_slice(),
@@ -1998,6 +2272,200 @@ impl MountedSession {
             current.root(),
         );
         Ok(run)
+    }
+
+    /// 整理的后台入口（D26（后台整理与放置回收） 已定项 13 第 5、6 条；用户 2026-10-26 定 GC「挪出调用线程，补齐三样保证」）：调用方在它自己的线程上
+    /// 一次次调，核心层不起线程、不读钟（钟与前台的 fsync 由 `caller` 答）。每次调用先看起不起跑，依次：
+    /// 1. 整理因一批出错停着（第 4 条）⇒ 不起跑，「该跑了」留着；
+    /// 2. 用户改动之后起跑判据记下了「该跑了」⇒ 取走，照用户改动之后那一趟推（判决 G8 丁：至多一批）；
+    /// 3. 没有 ⇒ 看定时兜底（`pacing.timer_fallback`）：关着、或离上一次查还不到一个间隔就不起跑；到了就再查一次起跑判据，为真就推一趟到停；
+    /// 4. 用户改动之后那一趟与定时兜底那一趟都从上一次用户改动给的那一份 `B_gc` 里扣（岔路单 `research/prompts/m4-gpugc-design-r1-forks.md` 第 18 行甲，
+    ///    用户 2026-10-26 定「与用户改动共用 `B_gc`」；[`publishes_left_of_the_budget_given_by_the_last_user_change`]）：那一份扣完就不起跑
+    ///    （[`BackgroundCompactionNotStarted::PublishBudgetOfTheLastUserChangeSpent`]），等下一次用户改动才再有。闲置时整理发布因此合计不过
+    ///    一份 `B_gc`，不随定时兜底查了几次涨。
+    ///
+    /// 起跑之后每一批之前问调用方：前台有 fsync 在等就不发下一批（[`CompactionRunStop::YieldedToAForegroundFsync`]），这一个写带宽窗口里
+    /// 整理写的字节到了 `pacing.write_bandwidth_limit` 也不发（[`CompactionRunStop::WriteBandwidthLimitReached`]）；用户改动之后起跑的那一趟
+    /// 停在这两样上时「该跑了」放回去，下一次调用接着推（不发下一批是缓发，不是做完）。签下一条意图那一判
+    /// 读会话上跨趟留着的上一条完成的意图（`compaction_plan::CompactionOfThisMount::last_completed_intent`）。发布都返回之后发 discard（判决 G5）。
+    ///
+    /// # Errors
+    /// 盘表与挂载核过的不同、现行那一版树表 0 条 ⇒ [`CompactionRunRefused`]，在任何读写之前（「该跑了」留着）。
+    pub fn run_compaction_in_the_background<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        pacing: CompactionPacing,
+        caller: &dyn CallerOfTheBackgroundCompaction,
+    ) -> Result<BackgroundCompactionCall, CompactionRunRefused> {
+        match self.whether_the_background_compaction_starts(devices, pacing, caller)? {
+            BackgroundCompactionStart::NotStarted(not_started) => {
+                Ok(BackgroundCompactionCall::NotStarted(not_started))
+            }
+            BackgroundCompactionStart::Starts {
+                trigger,
+                reach,
+                budget,
+            } => Ok(self.run_the_background_compaction_that_starts(
+                devices, pacing, caller, trigger, reach, budget,
+            )),
+        }
+    }
+
+    /// [`Self::run_compaction_in_the_background`] 开头那几判：盘表、有没有树、整理停没停、有没有「该跑了」、定时兜底、上一次用户改动给的那一份
+    /// `B_gc` 还剩不剩。取走「该跑了」与定时兜底记下这一次查的读数都在这里做，一个盘都不读、一个写都不发。攒批的会话
+    /// （[`MountedSessionWithPendingChanges::run_compaction_in_the_background`]）在这一判说起跑之后、跑之前先排空待发。
+    ///
+    /// # Errors
+    /// 同 [`Self::run_compaction_in_the_background`]。
+    fn whether_the_background_compaction_starts<Device: BlockDevice>(
+        &mut self,
+        devices: &[(DeviceIdentity, Device)],
+        pacing: CompactionPacing,
+        caller: &dyn CallerOfTheBackgroundCompaction,
+    ) -> Result<BackgroundCompactionStart, CompactionRunRefused> {
+        let MountedSession {
+            allocator,
+            current,
+            instance: _,
+            shadow_ledger: _,
+            parameters_and_device_table,
+            compaction,
+        } = self;
+        if !parameters_and_device_table.is_the_device_table_of_the_mount(devices) {
+            return Err(CompactionRunRefused::DeviceTableOtherThanTheOneOfTheMount {
+                device_table_of_the_mount: parameters_and_device_table
+                    .device_identities_in_table_order()
+                    .to_vec(),
+                device_table_handed_in: devices.iter().map(|(identity, _)| *identity).collect(),
+            });
+        }
+        match &*current {
+            PoolVersion::WithFile(_) | PoolVersion::WithTreesAndNoFile(_) => {}
+            PoolVersion::WithoutFile(_) => return Err(CompactionRunRefused::NoVersionOfTrees),
+        }
+        let parameters = parameters_and_device_table.parameters_on_disk();
+        let background_compute = parameters_and_device_table.background_compute_of_this_mount();
+        if background_compute.is_stopped_after_a_compute_error(BackgroundTask::CompactionRelocation)
+        {
+            return Ok(BackgroundCompactionStart::NotStarted(
+                BackgroundCompactionNotStarted::BackgroundTaskStoppedAfterAComputeError,
+            ));
+        }
+        let (trigger, reach) = match compaction.start_judgement {
+            CompactionStartJudgement::DueAfterAUserChange => {
+                compaction.start_judgement = CompactionStartJudgement::NotDue;
+                (
+                    BackgroundCompactionTrigger::DueAfterAUserChange,
+                    CompactionRunReach::AtMostOneBatchAfterAUserChange,
+                )
+            }
+            CompactionStartJudgement::NotDue => {
+                match compaction
+                    .check_the_timer_fallback(pacing.timer_fallback, caller.clock_reading())
+                {
+                    TimerFallbackCheck::Off => {
+                        return Ok(BackgroundCompactionStart::NotStarted(
+                            BackgroundCompactionNotStarted::NothingDueAndTheTimerFallbackOff,
+                        ))
+                    }
+                    TimerFallbackCheck::IntervalNotElapsed => {
+                        return Ok(BackgroundCompactionStart::NotStarted(
+                            BackgroundCompactionNotStarted::TimerFallbackIntervalNotElapsed,
+                        ))
+                    }
+                    TimerFallbackCheck::Due => {}
+                }
+                if !compaction_starts_by_the_watermarks(allocator.compaction().switches.run_forcing)
+                {
+                    return Ok(BackgroundCompactionStart::NotStarted(
+                        BackgroundCompactionNotStarted::NotDueByTheWatermarksAtTheTimerFallback,
+                    ));
+                }
+                (
+                    BackgroundCompactionTrigger::TimerFallback,
+                    CompactionRunReach::UntilAStopOrTheBudget,
+                )
+            }
+        };
+        // 两种起跑共用上一次用户改动给的那一份 `B_gc`：扣完就不起跑，等下一次用户改动。
+        if publishes_left_of_the_budget_given_by_the_last_user_change(
+            parameters.geometry.root_ring_slots_per_region.count(),
+            compaction.publishes_since_the_last_user_change,
+        ) == 0
+        {
+            return Ok(BackgroundCompactionStart::NotStarted(
+                BackgroundCompactionNotStarted::PublishBudgetOfTheLastUserChangeSpent,
+            ));
+        }
+        Ok(BackgroundCompactionStart::Starts {
+            trigger,
+            reach,
+            budget: CompactionRunBudget::LeftOfTheBudgetGivenByTheLastUserChange,
+        })
+    }
+
+    /// [`Self::run_compaction_in_the_background`] 判过起跑之后那一段：推一趟（每一批之前问调用方）、节奏截住时把「该跑了」放回去、发 discard。
+    fn run_the_background_compaction_that_starts<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        pacing: CompactionPacing,
+        caller: &dyn CallerOfTheBackgroundCompaction,
+        trigger: BackgroundCompactionTrigger,
+        reach: CompactionRunReach,
+        budget: CompactionRunBudget,
+    ) -> BackgroundCompactionCall {
+        let MountedSession {
+            allocator,
+            current,
+            instance,
+            shadow_ledger: _,
+            parameters_and_device_table,
+            compaction,
+        } = self;
+        let (parameters, background_compute) = parameters_and_device_table
+            .parameters_on_disk_and_the_background_compute_of_this_mount_mut();
+        let mut run = run_compaction_on_with_the_region_check_of_the_intent_deletion(
+            parameters,
+            devices.as_mut_slice(),
+            allocator,
+            compaction,
+            current,
+            *instance,
+            reach,
+            budget,
+            PacingOfTheRun::PacedByTheCaller {
+                write_bandwidth_limit: pacing.write_bandwidth_limit,
+                caller,
+            },
+            RegionCheckOfTheIntentDeletion::JudgedByTheRecords,
+            background_compute,
+            &mut InTheMiddleOfEachBackgroundBatch::NothingHappens,
+        );
+        // 节奏让下一批缓发（前台 fsync 在等、写带宽到了上限）不是做完：用户改动之后那一趟被它截住时「该跑了」放回去，下一次调用接着推。
+        let is_held_back_by_the_pacing = matches!(
+            run.outcome,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::YieldedToAForegroundFsync
+                    | CompactionRunStop::WriteBandwidthLimitReached { .. }
+            )
+        );
+        match trigger {
+            BackgroundCompactionTrigger::DueAfterAUserChange if is_held_back_by_the_pacing => {
+                compaction.start_judgement = CompactionStartJudgement::DueAfterAUserChange;
+            }
+            BackgroundCompactionTrigger::DueAfterAUserChange
+            | BackgroundCompactionTrigger::TimerFallback => {}
+        }
+        run.discards = discard_the_segments_reusable_as_a_whole(
+            devices.as_mut_slice(),
+            allocator,
+            parameters,
+            current.root(),
+        );
+        BackgroundCompactionCall::Ran {
+            trigger,
+            run: Box::new(run),
+        }
     }
 
     /// [`Self::publish_user_change`] 核过盘表之后那一半：先走空、再发这次改动（unlink 连同它之后的走空），被拒是空间不够就推抬 F 再判。
@@ -2054,6 +2522,13 @@ impl MountedSession {
                 UserChange::NewInodes { .. } | UserChange::DestroySnapshot { .. } => {
                     emptied_version
                 }
+                // 只建 inode 的那一批同建 inode；带文件写的那一批同写文件的改动。
+                UserChange::DataChangesPublishedTogether(batch) if batch.whole_write.is_none() => {
+                    emptied_version
+                }
+                UserChange::DataChangesPublishedTogether(_) => {
+                    return Err(no_file_version_to_change(published_in_this_change));
+                }
                 // 文件集合为空时建快照放行、照常发布，读它读到空（用户 2026-10-16 定「放开」，判决 m4-segment-code-r1 第三节 F5）。
                 UserChange::CreateSnapshot => emptied_version,
                 // 改 size 同写文件的改动：删完之后只许建 inode、写行与空发布（D8（核心索引结构） 已定项 16 第 5 条）。
@@ -2064,6 +2539,7 @@ impl MountedSession {
                 | UserChange::SequentialWrite(_)
                 | UserChange::OverwriteOfAnInode { .. }
                 | UserChange::SequentialWriteOfAnInode { .. }
+                | UserChange::WriteAtOffset { .. }
                 | UserChange::Unlink { .. }
                 | UserChange::Truncate { .. } => {
                     return Err(no_file_version_to_change(published_in_this_change));
@@ -2108,7 +2584,6 @@ impl MountedSession {
                         floor_raises,
                         refusals_that_pushed_the_floor_raises,
                         versions_published,
-                        compaction_after_the_change: None,
                         discards_after_the_change: DiscardsAfterThePublishes::default(),
                     });
                 }
@@ -2522,9 +2997,9 @@ fn segment_holding_unswept_orphan_heads<Reader: PoolReader + ?Sized>(
 /// 一次整理运行推到哪为止。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CompactionRunReach {
-    /// 显式入口：推到停机原因或发布预算用完。
+    /// 显式入口与定时兜底起跑的那一趟：推到停机原因或发布预算用完。
     UntilAStopOrTheBudget,
-    /// 用户改动之后（判决 G8 丁）：至多一批。一批 = 搬了单元的那一次发布（判决 `research/prompts/m4-segment-code-r1-main-verification.md`
+    /// 后台入口取走用户改动之后记下的「该跑了」（判决 G8 丁）：至多一批。一批 = 搬了单元的那一次发布（判决 `research/prompts/m4-segment-code-r1-main-verification.md`
     /// 第三节 F2）；不搬单元的发布不算批：上一条意图的收尾（一个没搬就删意图、R 已按记录全空只删意图、丢意图）与签发。所以一趟可以发
     /// 「收尾 + 签发 + 一批」三次；签发之后计划里只剩这次发布本来就重写的节点时，那一次也是一个没搬就删意图，全局差值为真就再签再搬。
     /// 一趟发几次的上界是这一趟的发布预算 `B_gc`（[`publish_budget_of_a_compaction_run`]），每签一条之前照判签发前判与「上一条无产出就不签」
@@ -2561,11 +3036,18 @@ enum CompactionStep {
     Stopped(CompactionRunStop),
 }
 
-/// 整理一趟（显式入口、用户改动之后、可写挂载续做共用）：先走空删除续做（G8 次序），再照预算一次一次推（[`advance_compaction_by_one_publish`]）。
-/// 预算 `B_gc` 数的是整理的每一次发布（签发、搬一批、删意图：每一次都用掉一个根槽）。discard 由调用方在这一趟之后发。
+/// 整理推一次发布（后台任务的一批）交回的两样：这一步的结局，与这一批的后台计算记账（请求的后端、实际走的路）。
+struct CompactionPublishAdvanced {
+    step: Result<CompactionStep, RelocationBatchRefused>,
+    background_compute_of_the_batch: BackgroundComputeOfOneBatch,
+}
+
+/// 整理一趟（显式入口、可写挂载续做共用；后台入口另经 [`run_compaction_on_with_the_region_check_of_the_intent_deletion`]）：先走空删除续做（G8 次序），
+/// 再照预算一次一次推（[`advance_compaction_by_one_publish`]）。预算 `B_gc` 数的是整理的每一次发布（签发、搬一批、删意图：每一次都用掉一个根槽）。
+/// 每一批之前不看调用方。discard 由调用方在这一趟之后发。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、推到哪为止"
+    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、推到哪为止、这次挂载的后台计算状态"
 )]
 pub(crate) fn run_compaction_on<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
@@ -2575,6 +3057,7 @@ pub(crate) fn run_compaction_on<Device: BlockDevice>(
     current: &mut PoolVersion,
     instance: InstanceGeneration,
     reach: CompactionRunReach,
+    background_compute: &mut BackgroundComputeOfThisMount,
 ) -> CompactionRun {
     run_compaction_on_with_the_region_check_of_the_intent_deletion(
         parameters,
@@ -2584,15 +3067,23 @@ pub(crate) fn run_compaction_on<Device: BlockDevice>(
         current,
         instance,
         reach,
+        CompactionRunBudget::SinceTheLastUserChange,
+        PacingOfTheRun::NotPaced,
         RegionCheckOfTheIntentDeletion::JudgedByTheRecords,
+        background_compute,
+        &mut InTheMiddleOfEachBackgroundBatch::NothingHappens,
     )
 }
 
-/// 同 [`run_compaction_on`]，一批腾空了 R、照同一批删意图再发时删意图那一支的核照 `region_check` 判
-/// （[`MountedSession::run_compaction_with_the_region_check_of_the_intent_deletion_after_a_batch_emptying_the_region`]）。
+/// 同 [`run_compaction_on`]，另带三样：这一趟的发布预算按 `budget_rule` 算；每一批之前照 `pacing` 问调用方（后台入口：前台有 fsync 在等、
+/// 写带宽到了上限就不发下一批，D26（后台整理与放置回收） 已定项 13 第 6 条）；一批腾空了 R、照同一批删意图再发时删意图那一支的核照 `region_check` 判
+/// （[`MountedSession::run_compaction_with_the_region_check_of_the_intent_deletion_after_a_batch_emptying_the_region`]），
+/// 每一批读完后台计算设置之后照 `in_the_middle_of_each_batch` 做（产品路径什么都不做，
+/// [`MountedSession::run_compaction_calling_a_test_only_hook_in_the_middle_of_each_batch`]）。整理因一批出错停着时一个写都不发
+/// （[`CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError`]）。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、推到哪为止、删意图那一支的核怎么判"
+    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、推到哪为止、预算按哪一条算、每批之前看不看调用方、删意图那一支的核怎么判、这次挂载的后台计算状态、一批读完设置之后做什么"
 )]
 fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
@@ -2602,12 +3093,18 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
     current: &mut PoolVersion,
     instance: InstanceGeneration,
     reach: CompactionRunReach,
+    budget_rule: CompactionRunBudget,
+    pacing: PacingOfTheRun<'_>,
     region_check: RegionCheckOfTheIntentDeletion,
+    background_compute: &mut BackgroundComputeOfThisMount,
+    in_the_middle_of_each_batch: &mut InTheMiddleOfEachBackgroundBatch<'_>,
 ) -> CompactionRun {
     compaction.observations.runs_started += 1;
     let mut versions_published: Vec<TransactionOutput> = Vec::new();
+    let mut background_compute_of_each_batch: Vec<BackgroundComputeOfOneBatch> = Vec::new();
     let finish = |compaction_of_the_run: &mut CompactionOfThisMount,
                   versions_published_by_the_run: Vec<TransactionOutput>,
+                  background_compute_of_each_batch_of_the_run: Vec<BackgroundComputeOfOneBatch>,
                   batches_published: u64,
                   outcome: CompactionRunOutcome| {
         if let CompactionRunOutcome::Stopped(stop) = &outcome {
@@ -2618,6 +3115,7 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
             batches_published,
             outcome,
             discards: DiscardsAfterThePublishes::default(),
+            background_compute_of_each_batch: background_compute_of_each_batch_of_the_run,
         }
     };
     let switches = allocator.compaction().switches;
@@ -2626,6 +3124,7 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
             return finish(
                 compaction,
                 versions_published,
+                background_compute_of_each_batch,
                 0,
                 CompactionRunOutcome::Stopped(CompactionRunStop::ForcedToStopForTests),
             );
@@ -2633,11 +3132,24 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
         CompactionRunForcing::FollowTheWatermarks | CompactionRunForcing::ForcedToStartForTests => {
         }
     }
+    // D26（后台整理与放置回收） 已定项 13 第 4 条：整理因一批出错停着，等一次通过校验的切换请求解除；停着时一个写都不发（删除续做也不走）。
+    if background_compute.is_stopped_after_a_compute_error(BackgroundTask::CompactionRelocation) {
+        return finish(
+            compaction,
+            versions_published,
+            background_compute_of_each_batch,
+            0,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError,
+            ),
+        );
+    }
     let batch_units = match switches.batch_size {
         CompactionBatchSize::NotDecidedByTheClauses => {
             return finish(
                 compaction,
                 versions_published,
+                background_compute_of_each_batch,
                 0,
                 CompactionRunOutcome::Stopped(CompactionRunStop::BatchSizeNotDecidedByTheClauses),
             );
@@ -2670,25 +3182,34 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
             return finish(
                 compaction,
                 versions_published,
+                background_compute_of_each_batch,
                 0,
                 CompactionRunOutcome::Failed(CompactionRunFailure::DeletionContinuation(cause)),
             );
         }
     }
-    let budget = publish_budget_of_a_compaction_run(
-        parameters.geometry.root_ring_slots_per_region.count(),
-        compaction.publishes_since_the_last_user_change,
-    );
+    let budget = match budget_rule {
+        CompactionRunBudget::SinceTheLastUserChange => publish_budget_of_a_compaction_run(
+            parameters.geometry.root_ring_slots_per_region.count(),
+            compaction.publishes_since_the_last_user_change,
+        ),
+        CompactionRunBudget::LeftOfTheBudgetGivenByTheLastUserChange => {
+            publishes_left_of_the_budget_given_by_the_last_user_change(
+                parameters.geometry.root_ring_slots_per_region.count(),
+                compaction.publishes_since_the_last_user_change,
+            )
+        }
+    };
     let mut publishes_of_the_run: u64 = 0;
     let mut batches_published: u64 = 0;
-    // 循环：每一轮发成一次整理发布或停。迭代上界是预算（每发成一次计一次，到 budget 停）；跨轮携带的是现行那一版、上一条完成的意图、
-    // 已发的次数与批数。
-    let mut last_completed_intent: Option<CompactionIntent> = None;
+    // 循环：每一轮发成一次整理发布或停。迭代上界是预算（每发成一次计一次，到 budget 停）；跨轮携带的是现行那一版、已发的次数与批数。
+    // 上一条完成的意图住会话（`CompactionOfThisMount::last_completed_intent`）：跨趟留着，签下一条之前那一判（攻方 K-h）读它。
     loop {
         if publishes_of_the_run >= budget {
             return finish(
                 compaction,
                 versions_published,
+                background_compute_of_each_batch,
                 batches_published,
                 CompactionRunOutcome::Stopped(CompactionRunStop::PublishBudgetSpent { budget }),
             );
@@ -2697,11 +3218,51 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
             return finish(
                 compaction,
                 versions_published,
+                background_compute_of_each_batch,
                 batches_published,
                 CompactionRunOutcome::Stopped(CompactionRunStop::OneBatchAfterTheUserChangeDone),
             );
         }
-        match advance_compaction_by_one_publish(
+        // D26（后台整理与放置回收） 已定项 13 第 6 条：后台入口每一批之前问调用方，前台有 fsync 在等、写带宽到了上限就不发下一批。
+        let write_bandwidth_limit = match pacing {
+            PacingOfTheRun::NotPaced => CompactionWriteBandwidthLimit::Unlimited,
+            PacingOfTheRun::PacedByTheCaller {
+                write_bandwidth_limit,
+                caller,
+            } => {
+                match caller.foreground_fsync() {
+                    ForegroundFsync::Waiting => {
+                        return finish(
+                            compaction,
+                            versions_published,
+                            background_compute_of_each_batch,
+                            batches_published,
+                            CompactionRunOutcome::Stopped(
+                                CompactionRunStop::YieldedToAForegroundFsync,
+                            ),
+                        );
+                    }
+                    ForegroundFsync::NoneWaiting => {}
+                }
+                if let Err(stop) = compaction.admit_the_next_batch_under_the_write_bandwidth_limit(
+                    write_bandwidth_limit,
+                    caller.clock_reading(),
+                ) {
+                    return finish(
+                        compaction,
+                        versions_published,
+                        background_compute_of_each_batch,
+                        batches_published,
+                        CompactionRunOutcome::Stopped(stop),
+                    );
+                }
+                write_bandwidth_limit
+            }
+        };
+        let CompactionPublishAdvanced {
+            step,
+            background_compute_of_the_batch,
+        } = advance_compaction_by_one_publish(
             parameters,
             devices,
             allocator,
@@ -2710,13 +3271,20 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
             instance,
             batch_units,
             reach,
-            &mut last_completed_intent,
             region_check,
-        ) {
+            background_compute,
+            in_the_middle_of_each_batch,
+        );
+        background_compute_of_each_batch.push(background_compute_of_the_batch);
+        match step {
             Ok(CompactionStep::Published { version, kind }) => {
                 publishes_of_the_run += 1;
                 compaction.publishes_since_the_last_user_change += 1;
                 compaction.observations.root_ring_slots_used += 1;
+                compaction.note_the_bytes_written_by_a_compaction_publish(
+                    write_bandwidth_limit,
+                    bytes_written_by_a_compaction_publish(&version, devices.len()),
+                );
                 match kind {
                     // 一批 = 搬了单元的那一次（判决 m4-segment-code-r1 第三节 F2：没搬单元的发布不记成一批——删意图的那一批计划里的单元
                     // 都是这次发布本来就重写的节点时，它就是一次只删意图的发布）。
@@ -2744,6 +3312,7 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
                     return finish(
                         compaction,
                         versions_published,
+                        background_compute_of_each_batch,
                         batches_published,
                         CompactionRunOutcome::Stopped(
                             CompactionRunStop::NothingMovableButTheRegionIsNotEmpty,
@@ -2755,6 +3324,7 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
                 return finish(
                     compaction,
                     versions_published,
+                    background_compute_of_each_batch,
                     batches_published,
                     CompactionRunOutcome::Stopped(stop),
                 );
@@ -2763,6 +3333,7 @@ fn run_compaction_on_with_the_region_check_of_the_intent_deletion<Device: BlockD
                 return finish(
                     compaction,
                     versions_published,
+                    background_compute_of_each_batch,
                     batches_published,
                     CompactionRunOutcome::Failed(CompactionRunFailure::Batch(refused)),
                 );
@@ -2779,22 +3350,18 @@ struct VersionAsTheCompactionReadsIt {
     slots_holding_user_data: BTreeSet<SlotNumber>,
 }
 
-/// 整理读一版时中央映射那一半（[`central_mapping_as_the_compaction_reads_it`]）。
-pub struct CentralMappingAsTheCompactionReadsIt {
-    /// 每个进映射单元按 key 在这一版的映射树里查到的映射条目，按 `mapped_units` 的次序（查不到、条目窄于字段表的不收），
-    /// 后面接这一版留存的映射条目，按留存的次序。
-    pub mapping_entries: Vec<CentralMappingEntry>,
-    /// 取上面那些条目时批量读者解过几片映射叶（[`CentralMappingOfAVersionReadLeafByLeaf::leaves_decoded`]）。
-    pub mapping_leaves_decoded: usize,
-}
-
 /// 整理读一版时取映射条目的那一步：整理选段与搬单元读版本（`version_as_the_compaction_reads_it`）经它取，别处不调。
-/// 公开给测试：七·6 的用例拿它逐项比逐 key 查（`central_mapping_locations_in_the_version`）的参照、数整理读一版解了几片叶，
-/// 判整理读漏、读错与退回逐 key 查（七·6 代码轮第一轮判决第三节 T4）。
+/// 交回每个进映射单元按 key 在这一版的映射树里查到的映射条目，按 `mapped_units` 的次序（查不到、条目窄于字段表的不收），
+/// 后面接这一版留存的映射条目，按留存的次序。
+/// 公开给测试：七·6 的用例拿它逐项比逐 key 查（`central_mapping_locations_in_the_version`）的参照，判整理读漏、读错；
+/// 它做的查找记在 [`LookupSite::CompactionReadsTheCentralMapping`] 那一处（`transaction::lookup_work`），用例读那一处的
+/// 解叶次数与建索引次数判退回逐 key 查、每把 key 现建读者、每片叶重解（七·6 代码轮第二轮判决第三节）。
 #[must_use]
 pub fn central_mapping_as_the_compaction_reads_it(
     version: &TransactionOutput,
-) -> CentralMappingAsTheCompactionReadsIt {
+) -> Vec<CentralMappingEntry> {
+    let _inside_the_compaction_read =
+        lookup_work::entering(LookupSite::CompactionReadsTheCentralMapping);
     // 每把 key 查一次，叶按片解一次（七·6）：答案与逐 key 查 `central_mapping_locations_in_the_version` 逐个相同。
     let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
     let mut mapping_entries: Vec<CentralMappingEntry> = version
@@ -2815,19 +3382,13 @@ pub fn central_mapping_as_the_compaction_reads_it(
             locations: *locations,
         },
     ));
-    CentralMappingAsTheCompactionReadsIt {
-        mapping_entries,
-        mapping_leaves_decoded: central_mapping.leaves_decoded(),
-    }
+    mapping_entries
 }
 
 fn version_as_the_compaction_reads_it(
     version: &TransactionOutput,
 ) -> VersionAsTheCompactionReadsIt {
-    let CentralMappingAsTheCompactionReadsIt {
-        mapping_entries,
-        mapping_leaves_decoded: _,
-    } = central_mapping_as_the_compaction_reads_it(version);
+    let mapping_entries = central_mapping_as_the_compaction_reads_it(version);
     let mut pinned_slots = BTreeSet::new();
     for unit in &version.units {
         let is_exempt_from_the_mapping = match unit.identity {
@@ -2937,6 +3498,31 @@ fn publish_the_compaction_step_once_with_the_region_check_of_the_intent_deletion
     )
 }
 
+/// 整理的一次发布写了多少单元字节（写带宽上限数的就是它，D26（后台整理与放置回收） 已定项 13 第 6 条）：这次重写的角色加搬到目的地的单元，
+/// 按槽数乘 16384、每块盘各一份（第一版每个单元落池里每一块盘）；journal 记录与根槽那几次写不计。搬走的单元的跨度取这一版里它目的落点那条
+/// 分配记录的（目的地那条记录就是这次发布记下的，找不到不计）。
+fn bytes_written_by_a_compaction_publish(version: &TransactionOutput, devices: usize) -> u64 {
+    let slots_of_the_rewritten_roles: u64 =
+        version.rewritten.iter().map(|role| role.span_slots()).sum();
+    let slots_of_the_relocated_units: u64 = version
+        .units_relocated_by_this_publish
+        .iter()
+        .filter_map(|relocated| {
+            let destination = relocated.destination[0];
+            version
+                .allocation_records
+                .iter()
+                .find(|record| {
+                    record.device == destination.device && record.slot == destination.slot
+                })
+                .map(|record| u64::from(record.span_slots))
+        })
+        .sum();
+    (slots_of_the_rewritten_roles + slots_of_the_relocated_units)
+        .saturating_mul(SLOT_BYTES)
+        .saturating_mul(u64::try_from(devices).expect("盘数装得进 u64"))
+}
+
 /// 整理的一次发布被拒是不是空间不够的那几种（[`refusal_is_short_of_space`]）：是就暂停、不推抬 F（判决 G8 g1）。
 fn compaction_publish_refused_short_of_space(refused: &RelocationBatchRefused) -> bool {
     match refused {
@@ -2952,6 +3538,207 @@ fn compaction_publish_refused_short_of_space(refused: &RelocationBatchRefused) -
         }
         | RelocationBatchRefused::RegionEmptyByTheRecordsWhileTheIntentWouldBeCarried { .. } => {
             false
+        }
+    }
+}
+
+/// 整理的一批（推一次发布，后台任务种类 [`BackgroundTask::CompactionRelocation`]）：进门读一次这次挂载的后台计算设置
+/// （D26（后台整理与放置回收） 已定项 13 第 1 条：挂着请求的切换在这里换上，从这一批起生效；一趟里每一批各读一次，不在一趟开头读一次），
+/// 按它定这一批走哪条路，一批之内不再读（`.claude/rules/fs-design.md` 五条硬要求第 5 条，`background_compute::BackgroundComputeOfThisMount::end_the_batch`
+/// 断言没换）。选 `gpu` 时这一批的甲、乙、丙三段经设置带着的那一份 GPU 实现算（[`CompactionComputeOfTheBatch::OnTheGpu`]），
+/// 三段各自确认、不确定、交 CPU 判的条目数记进这一批的记账；发布那一半照旧在 CPU 上，照发布路径逐条核计划与读盘核（第 8 条）。
+/// 读完设置之后、开算之前照 `in_the_middle_of_each_batch` 做（只供测试的钩子在这一刻请求切换、或注入一次出错）。
+/// 这一批算着出了错（第 4 条：GPU 实现交回出错，或只供测试的钩子注入）：这一批放弃，一个写都不发、意图留在盘上（撤 R 排他，同暂停），
+/// 不换回 CPU；整理这个后台任务停下，出错之前就挂着待生效的切换时当场解除（`background_compute::BackgroundComputeOfThisMount::stop_the_task_after_a_compute_error`）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、批大小、推到哪为止、一批腾空了 R 之后删意图那一支的核怎么判、这次挂载的后台计算状态、一批读完设置之后做什么"
+)]
+fn advance_compaction_by_one_publish<Device: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    devices: &mut [(DeviceIdentity, Device)],
+    allocator: &mut PoolAllocator,
+    compaction: &mut CompactionOfThisMount,
+    current: &mut PoolVersion,
+    instance: InstanceGeneration,
+    batch_units: CompactionBatchUnits,
+    reach: CompactionRunReach,
+    region_check_of_the_intent_deletion_after_a_batch_emptying_the_region: RegionCheckOfTheIntentDeletion,
+    background_compute: &mut BackgroundComputeOfThisMount,
+    in_the_middle_of_each_batch: &mut InTheMiddleOfEachBackgroundBatch<'_>,
+) -> CompactionPublishAdvanced {
+    let batch_under_way = background_compute.begin_a_batch(BackgroundTask::CompactionRelocation);
+    in_the_middle_of_each_batch.in_the_middle_of_the_batch(background_compute);
+    let gpu_compute = batch_under_way.gpu_compute_of_the_route().cloned();
+    let mut gpu_work = GpuWorkOfTheBatch::default();
+    let advanced = match background_compute.take_the_compute_error_of_the_batch_under_way() {
+        Some(error) => Err(CompactionBatchNotCompleted::ComputeFailed(error)),
+        None => match &gpu_compute {
+            None => advance_compaction_by_one_publish_computing_on(
+                parameters,
+                devices,
+                allocator,
+                compaction,
+                current,
+                instance,
+                batch_units,
+                reach,
+                region_check_of_the_intent_deletion_after_a_batch_emptying_the_region,
+                &mut CompactionComputeOfTheBatch::OnTheCpu,
+            ),
+            Some(gpu_compute) => {
+                let mut implementation = gpu_compute.lock();
+                advance_compaction_by_one_publish_computing_on(
+                    parameters,
+                    devices,
+                    allocator,
+                    compaction,
+                    current,
+                    instance,
+                    batch_units,
+                    reach,
+                    region_check_of_the_intent_deletion_after_a_batch_emptying_the_region,
+                    &mut CompactionComputeOfTheBatch::OnTheGpu {
+                        gpu_compute: &mut *implementation,
+                        gpu_work: &mut gpu_work,
+                    },
+                )
+            }
+        },
+    };
+    let mut compute_error_that_abandoned_the_batch = None;
+    let step = match advanced {
+        Ok(step) => Ok(step),
+        Err(CompactionBatchNotCompleted::Refused(refused)) => Err(refused),
+        Err(CompactionBatchNotCompleted::ComputeFailed(error)) => {
+            allocator.compaction_mut().pause_the_live_intent();
+            let task_after_the_error = background_compute.stop_the_task_after_a_compute_error(
+                BackgroundTask::CompactionRelocation,
+                error.clone(),
+            );
+            compute_error_that_abandoned_the_batch = Some(error);
+            Ok(CompactionStep::Stopped(
+                CompactionRunStop::BatchAbandonedAfterABackgroundComputeError {
+                    task_after_the_error,
+                },
+            ))
+        }
+    };
+    CompactionPublishAdvanced {
+        step,
+        background_compute_of_the_batch: background_compute.end_the_batch(
+            batch_under_way,
+            gpu_compute.map(|_| gpu_work),
+            compute_error_that_abandoned_the_batch,
+        ),
+    }
+}
+
+/// 一批整理这一次在哪算（[`advance_compaction_by_one_publish`] 进门定下，一批之内不变）。封闭集合。
+enum CompactionComputeOfTheBatch<'gpu> {
+    /// 区域扫描、选段打分都照 CPU 写法（`scan_region_over_the_identity_index`、`choose_region`）。
+    OnTheCpu,
+    /// 甲、乙两段经 [`scan_region_on_the_gpu`]，丙段经 [`live_slots_per_cluster_segment_computing_on`]，都交这一份实现；
+    /// 各段的条目数记进 `gpu_work`。
+    OnTheGpu {
+        gpu_compute: &'gpu mut (dyn BackgroundGpuCompute + Send),
+        gpu_work: &'gpu mut GpuWorkOfTheBatch,
+    },
+}
+
+/// 一批整理没推成一步的两种：发布路径拒了（照旧交给一趟去判停还是失败），或这一批算着出了错（第 4 条：放弃这一批、停下整理）。
+enum CompactionBatchNotCompleted {
+    Refused(RelocationBatchRefused),
+    ComputeFailed(BackgroundComputeError),
+}
+
+impl From<RelocationBatchRefused> for CompactionBatchNotCompleted {
+    fn from(refused: RelocationBatchRefused) -> Self {
+        CompactionBatchNotCompleted::Refused(refused)
+    }
+}
+
+/// 扫一个 R，照这一批在哪算：CPU 那一条交回 `scan_on_the_cpu` 的结果（没有不确定的记录）；GPU 那一条经 [`scan_region_on_the_gpu`]，
+/// 读盘、钉住、隔离与 CPU 那一条读同一版、同一份索引与同两张集合。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各是一样东西：R、CPU 那一条的扫法、这一版的记录、按身份索引、钉住与隔离的槽、读的盘、这一批在哪算"
+)]
+fn scan_the_region_computing_on<Device: BlockDevice>(
+    region: CompactionRegion,
+    scan_on_the_cpu: impl Fn(
+        CompactionRegion,
+        &[(DeviceIdentity, Device)],
+    ) -> Result<RegionScan, RegionScanRefusal>,
+    allocation_records: &[AllocationRecord],
+    mapping_index: &CentralMappingIdentityIndex<'_>,
+    pinned_slots: &BTreeSet<SlotNumber>,
+    quarantined_slots: &BTreeSet<SlotNumber>,
+    devices_to_read: &[(DeviceIdentity, Device)],
+    compute: &mut CompactionComputeOfTheBatch<'_>,
+) -> Result<RegionScanWithTheRecordsUncertainThisRound, BackgroundComputeError> {
+    match compute {
+        CompactionComputeOfTheBatch::OnTheCpu => Ok(RegionScanWithTheRecordsUncertainThisRound {
+            scan: scan_on_the_cpu(region, devices_to_read),
+            records_uncertain_this_round: Vec::new(),
+        }),
+        CompactionComputeOfTheBatch::OnTheGpu {
+            gpu_compute,
+            gpu_work,
+        } => scan_region_on_the_gpu(
+            region,
+            allocation_records,
+            mapping_index,
+            pinned_slots,
+            quarantined_slots,
+            |device, slot, bytes| devices_to_read.read(device, slot.to_device_offset(), bytes),
+            &mut **gpu_compute,
+            gpu_work,
+        ),
+    }
+}
+
+/// 丙段（选段打分）在 GPU 上数每个整段的活槽数：CPU 那一条交 `None`（由 `choose_region` 自己数）；GPU 那一条一个整段一个，
+/// 这一轮不确定的段记成 [`LiveSlotsOfAClusterSegment::UncertainThisRound`]。
+///
+/// # Errors
+/// GPU 实现交回出错 ⇒ [`BackgroundComputeError::GpuSegmentFailed`]。
+fn live_slots_per_cluster_segment_computing_on(
+    allocation_records: &[AllocationRecord],
+    unit_area: UnitAreaOfOneDevice,
+    compute: &mut CompactionComputeOfTheBatch<'_>,
+) -> Result<Option<Vec<LiveSlotsOfAClusterSegment>>, BackgroundComputeError> {
+    match compute {
+        CompactionComputeOfTheBatch::OnTheCpu => Ok(None),
+        CompactionComputeOfTheBatch::OnTheGpu {
+            gpu_compute,
+            gpu_work,
+        } => {
+            let segments = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+            let decisions = decisions_of_one_segment(
+                GpuComputedSegment::LiveSlotsPerClusterSegment,
+                segments.len(),
+                gpu_compute.count_live_slots_per_cluster_segment(
+                    allocation_records,
+                    unit_area,
+                    &segments,
+                ),
+                &mut gpu_work.live_slots_per_cluster_segment,
+            )?;
+            Ok(Some(
+                decisions
+                    .into_iter()
+                    .map(|decision| match decision {
+                        GpuEntryDecision::ConfirmedByBothKernels(live_slots)
+                        | GpuEntryDecision::JudgedByTheCpuReference(live_slots) => {
+                            LiveSlotsOfAClusterSegment::Counted(live_slots)
+                        }
+                        GpuEntryDecision::UncertainThisRound => {
+                            LiveSlotsOfAClusterSegment::UncertainThisRound
+                        }
+                    })
+                    .collect(),
+            ))
         }
     }
 }
@@ -2974,11 +3761,18 @@ fn compaction_publish_refused_short_of_space(refused: &RelocationBatchRefused) -
 ///
 /// 一次调用至多算 R 里能搬的单元数加三次账、发一次（每跳过一次本来就重写的单元再算一次；照抄那一支核出腾空了 R 换删意图再算，删意图那一支核不过
 /// 换照抄再算），选段那一圈的上界是单元区的整段数。
+///
+/// 区域扫描与选段打分照 `compute` 在哪算（[`CompactionComputeOfTheBatch`]）：走 GPU 时三段交实现，判定都确认（或交 CPU 判）时每一步与 CPU 那一条
+/// 逐项相同；这一轮不确定的条目这一批不回收、不搬（D26（后台整理与放置回收） 已定项 13 第 8 条）——不确定的段不进选段候选，不确定的记录不当可搬；
+/// 选中要签的那一段里有不确定的记录就这一批不签、停在 [`CompactionRunStop::IssueHeldBackByRecordsUncertainThisRound`]；
+/// 有活意图时 R 里除了不确定的记录再没有可搬的就这一批不发、停在
+/// [`CompactionRunStop::OnlyRecordsUncertainThisRoundLeftToMove`]（意图照留，不删也不丢），下一批重扫照判。
+/// 实现交回出错 ⇒ [`CompactionBatchNotCompleted::ComputeFailed`]，在任何一次发布之前。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、批大小、推到哪为止、上一条完成的意图、一批腾空了 R 之后删意图那一支的核怎么判"
+    reason = "参数各是一样东西：参数、盘表、分配器、会话这一侧的整理状态、现行那一版、实例代号、批大小、推到哪为止、一批腾空了 R 之后删意图那一支的核怎么判、这一批在哪算"
 )]
-fn advance_compaction_by_one_publish<Device: BlockDevice>(
+fn advance_compaction_by_one_publish_computing_on<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
     devices: &mut [(DeviceIdentity, Device)],
     allocator: &mut PoolAllocator,
@@ -2987,9 +3781,9 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
     instance: InstanceGeneration,
     batch_units: CompactionBatchUnits,
     reach: CompactionRunReach,
-    last_completed_intent: &mut Option<CompactionIntent>,
     region_check_of_the_intent_deletion_after_a_batch_emptying_the_region: RegionCheckOfTheIntentDeletion,
-) -> Result<CompactionStep, RelocationBatchRefused> {
+    compute: &mut CompactionComputeOfTheBatch<'_>,
+) -> Result<CompactionStep, CompactionBatchNotCompleted> {
     compaction.take_the_quarantines_noted_by_the_publishes(allocator.compaction_mut());
     let version = current
         .version_of_trees()
@@ -3017,23 +3811,41 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
     };
     let read_of_the_version = version_as_the_compaction_reads_it(&version);
     let quarantined_slots = compaction.quarantined_slots().clone();
+    // 映射条目的按身份索引每读一版建一次（用户 2026-10-26 定「每读一版建一次」）：这一版里扫几个 R（选段时逐段先扫、续做意图时扫 R）都共用它。
+    let mapping_index =
+        CentralMappingIdentityIndex::of_the_mapping_entries(&read_of_the_version.mapping_entries);
     let scan_of = |region: CompactionRegion, devices_to_read: &[(DeviceIdentity, Device)]| {
-        scan_region(
+        scan_region_over_the_identity_index(
             region,
             &version.allocation_records,
-            &read_of_the_version.mapping_entries,
+            &mapping_index,
             &read_of_the_version.pinned_slots,
             &quarantined_slots,
             |device, slot, bytes| devices_to_read.read(device, slot.to_device_offset(), bytes),
         )
     };
+    let scan_of_the_batch =
+        |region: CompactionRegion,
+         devices_to_read: &[(DeviceIdentity, Device)],
+         compute_of_the_batch: &mut CompactionComputeOfTheBatch<'_>| {
+            scan_the_region_computing_on(
+                region,
+                scan_of,
+                &version.allocation_records,
+                &mapping_index,
+                &read_of_the_version.pinned_slots,
+                &quarantined_slots,
+                devices_to_read,
+                compute_of_the_batch,
+            )
+        };
     let Some((_issued_txg, intent)) = live_on_disk else {
         if reach == CompactionRunReach::ContinueTheLiveIntentAtTheMount {
             return Ok(CompactionStep::Stopped(
                 CompactionRunStop::NoLiveIntentLeftToContinue,
             ));
         }
-        if let Some(completed) = *last_completed_intent {
+        if let Some(completed) = compaction.last_completed_intent {
             let empty_now =
                 empty_cluster_segments_by_the_records(&version.allocation_records, unit_area);
             if !the_completed_intent_yielded(empty_now, completed.empty_cluster_segments_at_issue) {
@@ -3051,68 +3863,129 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
             .union(&quarantined_slots)
             .copied()
             .collect();
-        let chosen_scan: Option<RegionScan> = match allocator.compaction().switches.forced_region {
-            Some(forced_region) => {
-                let is_disqualified = allocator
-                    .cluster_segments()
-                    .contains(&forced_region.start_slot())
-                    || slots_that_disqualify_a_segment
-                        .range(forced_region.start_slot()..forced_region.end_slot())
-                        .next()
-                        .is_some()
-                    || compaction
-                        .segments_refused_by_the_region_scan
-                        .contains(forced_region.start_slot());
-                match (is_disqualified, scan_of(forced_region, &*devices)) {
-                    (false, Ok(scan)) if scan.movable_units().next().is_some() => Some(scan),
-                    (false, Ok(_)) | (true, _) => None,
-                    (false, Err(refusal)) => {
-                        compaction
+        // 选中的那一段的扫描与它这一轮不确定的记录（CPU 那一条恒空）。
+        let chosen_scan: Option<(RegionScan, Vec<Placement>)> =
+            match allocator.compaction().switches.forced_region {
+                Some(forced_region) => {
+                    let is_disqualified = allocator
+                        .cluster_segments()
+                        .contains(&forced_region.start_slot())
+                        || slots_that_disqualify_a_segment
+                            .range(forced_region.start_slot()..forced_region.end_slot())
+                            .next()
+                            .is_some()
+                        || compaction
                             .segments_refused_by_the_region_scan
-                            .note_refusal(forced_region, refusal);
-                        None
+                            .contains(forced_region.start_slot());
+                    let scanned = scan_of_the_batch(forced_region, &*devices, compute)
+                        .map_err(CompactionBatchNotCompleted::ComputeFailed)?;
+                    match (is_disqualified, scanned.scan) {
+                        (false, Ok(scan)) if scan.movable_units().next().is_some() => {
+                            Some((scan, scanned.records_uncertain_this_round))
+                        }
+                        (false, Ok(_)) | (true, _) => None,
+                        (false, Err(refusal)) => {
+                            compaction
+                                .segments_refused_by_the_region_scan
+                                .note_refusal(forced_region, refusal);
+                            None
+                        }
                     }
                 }
-            }
-            None => {
-                let mut region_scans: Vec<RegionScan> =
-                    region_scans_of_the_segments_without_an_unreleased_record(
-                        &version.allocation_records,
-                        unit_area,
-                    );
-                // 迭代上界：每答一次「先扫」下一次就多一段有结论（扫成了进 region_scans，被拒了进不合格段表），不超过单元区的整段数。
-                loop {
-                    match choose_region(
-                        &version.allocation_records,
-                        unit_area,
-                        allocator.cluster_segments(),
-                        None,
-                        &slots_that_disqualify_a_segment,
-                        &region_scans,
-                        &compaction.segments_refused_by_the_region_scan,
-                        RegionChoiceCriterion::Greedy,
-                    ) {
-                        RegionChoice::Chosen(region) => {
-                            break region_scans.into_iter().find(|scan| scan.region == region);
-                        }
-                        RegionChoice::ScanBeforeChoosing(region) => {
-                            match scan_of(region, &*devices) {
-                                Ok(scan) => region_scans.push(scan),
-                                Err(refusal) => compaction
-                                    .segments_refused_by_the_region_scan
-                                    .note_refusal(region, refusal),
+                None => {
+                    let mut region_scans: Vec<RegionScan> =
+                        region_scans_of_the_segments_without_an_unreleased_record(
+                            &version.allocation_records,
+                            unit_area,
+                        );
+                    // 扫过的段这一轮不确定的记录（按段起点；CPU 那一条恒空）。
+                    let mut records_uncertain_in_each_scanned_segment: BTreeMap<
+                        SlotNumber,
+                        Vec<Placement>,
+                    > = BTreeMap::new();
+                    // 丙段：GPU 那一条这一批数一次每段的活槽数（这一圈里记录不变）；CPU 那一条是 `None`，照 `choose_region` 自己数。
+                    let live_slots_counted_on_the_gpu =
+                        live_slots_per_cluster_segment_computing_on(
+                            &version.allocation_records,
+                            unit_area,
+                            compute,
+                        )
+                        .map_err(CompactionBatchNotCompleted::ComputeFailed)?;
+                    // 迭代上界：每答一次「先扫」下一次就多一段有结论（扫成了进 region_scans，被拒了进不合格段表），不超过单元区的整段数。
+                    loop {
+                        let choice = match &live_slots_counted_on_the_gpu {
+                            None => choose_region(
+                                &version.allocation_records,
+                                unit_area,
+                                allocator.cluster_segments(),
+                                None,
+                                &slots_that_disqualify_a_segment,
+                                &region_scans,
+                                &compaction.segments_refused_by_the_region_scan,
+                                RegionChoiceCriterion::Greedy,
+                            ),
+                            Some(live_slots_per_segment) => choose_region_over_the_live_slots(
+                                live_slots_per_segment,
+                                unit_area,
+                                allocator.cluster_segments(),
+                                None,
+                                &slots_that_disqualify_a_segment,
+                                &region_scans,
+                                &compaction.segments_refused_by_the_region_scan,
+                                RegionChoiceCriterion::Greedy,
+                            ),
+                        };
+                        match choice {
+                            RegionChoice::Chosen(region) => {
+                                break region_scans
+                                    .into_iter()
+                                    .find(|scan| scan.region == region)
+                                    .map(|scan| {
+                                        let records_uncertain =
+                                            records_uncertain_in_each_scanned_segment
+                                                .remove(&region.start_slot())
+                                                .unwrap_or_default();
+                                        (scan, records_uncertain)
+                                    });
                             }
+                            RegionChoice::ScanBeforeChoosing(region) => {
+                                let scanned = scan_of_the_batch(region, &*devices, compute)
+                                    .map_err(CompactionBatchNotCompleted::ComputeFailed)?;
+                                match scanned.scan {
+                                    Ok(scan) => {
+                                        records_uncertain_in_each_scanned_segment.insert(
+                                            region.start_slot(),
+                                            scanned.records_uncertain_this_round,
+                                        );
+                                        region_scans.push(scan);
+                                    }
+                                    Err(refusal) => compaction
+                                        .segments_refused_by_the_region_scan
+                                        .note_refusal(region, refusal),
+                                }
+                            }
+                            RegionChoice::NoEligibleSegment => break None,
                         }
-                        RegionChoice::NoEligibleSegment => break None,
                     }
                 }
-            }
-        };
-        let Some(scan) = chosen_scan else {
+            };
+        let Some((scan, records_uncertain_in_the_chosen_region)) = chosen_scan else {
             return Ok(CompactionStep::Stopped(
                 CompactionRunStop::NoEligibleSegment,
             ));
         };
+        // GPU 那一条选中的这一段里有这一轮不确定的记录：R 里要搬几个还数不准，签发前那一判（空洞够不够装下 R 里要搬的）判不了，
+        // 这一批不签，下一批重扫照判（第 8 条「这一批不回收、不搬」；CPU 那一条恒空）。
+        if !records_uncertain_in_the_chosen_region.is_empty() {
+            return Ok(CompactionStep::Stopped(
+                CompactionRunStop::IssueHeldBackByRecordsUncertainThisRound {
+                    records_uncertain_this_round: u64::try_from(
+                        records_uncertain_in_the_chosen_region.len(),
+                    )
+                    .expect("一段 64 槽"),
+                },
+            ));
+        }
         let units_to_move = u64::try_from(scan.movable_units().count()).expect("一段 64 槽");
         let device_map = allocator
             .devices
@@ -3167,7 +4040,7 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
                         CompactionRunStop::IssueRefusedShortOfSpace,
                     ))
                 } else {
-                    Err(refused)
+                    Err(refused.into())
                 }
             }
         };
@@ -3180,27 +4053,31 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
         allocator.compaction_mut().resume_the_live_intent();
     }
     let region = intent.region;
-    let scan = if region_holds_a_quarantined_slot(region, &quarantined_slots) {
-        None
-    } else {
-        match scan_of(region, &*devices) {
-            Ok(scan)
-                if !scan
-                    .allocations
-                    .iter()
-                    .any(|allocation| allocation.class == AllocationInRegion::Quarantined) =>
-            {
-                Some(scan)
+    // 对 R 重扫的结果与这一轮不确定的记录（CPU 那一条恒空）。
+    let scan: Option<(RegionScan, Vec<Placement>)> =
+        if region_holds_a_quarantined_slot(region, &quarantined_slots) {
+            None
+        } else {
+            let scanned = scan_of_the_batch(region, &*devices, compute)
+                .map_err(CompactionBatchNotCompleted::ComputeFailed)?;
+            match scanned.scan {
+                Ok(scan)
+                    if !scan
+                        .allocations
+                        .iter()
+                        .any(|allocation| allocation.class == AllocationInRegion::Quarantined) =>
+                {
+                    Some((scan, scanned.records_uncertain_this_round))
+                }
+                Ok(_scan_with_a_quarantined_slot) => None,
+                Err(refusal) => {
+                    compaction
+                        .segments_refused_by_the_region_scan
+                        .note_refusal(region, refusal);
+                    None
+                }
             }
-            Ok(_scan_with_a_quarantined_slot) => None,
-            Err(refusal) => {
-                compaction
-                    .segments_refused_by_the_region_scan
-                    .note_refusal(region, refusal);
-                None
-            }
-        }
-    };
+        };
     // 这一次发布要搬哪几个、对意图做什么、发成了是哪一种：计划跳过这次发布本来就重写的节点、补上 R 里真要搬的单元（判决
     // `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H4，用户 2026-10-16 定「规划时补足」）。照抄意图的一批在算好的账上
     // 核计划里每个单元都真搬，核出本来就重写的那几把 key 就并进跳过的集合、再计划一次（[`compaction_publish_planned_for_the_region_scan`]）。
@@ -3208,13 +4085,27 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
     // 能搬的都跳过之后计划要么罩住 R 里每一条记录（删意图那一支，不再核这一样），要么没有可搬的。跨轮携带的只有跳过的集合。
     let mut units_this_publish_rewrites_anyway: BTreeSet<Vec<u8>> = BTreeSet::new();
     let (published, kind) = loop {
-        let (planned, intent_step, kind) = compaction_publish_planned_for_the_region_scan(
-            scan.as_ref(),
-            batch_units,
-            &units_this_publish_rewrites_anyway,
-            &version.allocation_records,
-            region,
-        );
+        let Some((planned, intent_step, kind)) =
+            compaction_publish_planned_with_the_records_uncertain_this_round(
+                scan.as_ref()
+                    .map(|(scan, records_uncertain)| (scan, records_uncertain.as_slice())),
+                batch_units,
+                &units_this_publish_rewrites_anyway,
+                &version.allocation_records,
+                region,
+            )
+        else {
+            return Ok(CompactionStep::Stopped(
+                CompactionRunStop::OnlyRecordsUncertainThisRoundLeftToMove {
+                    records_uncertain_this_round: scan.as_ref().map_or(
+                        0,
+                        |(_, records_uncertain)| {
+                            u64::try_from(records_uncertain.len()).expect("一段 64 槽")
+                        },
+                    ),
+                },
+            ));
+        };
         match publish_the_planned_compaction_step_falling_back_on_the_region_check(
             parameters,
             devices,
@@ -3239,6 +4130,7 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
             }
             Err(CompactionStepRefused::Refused(refused)) => {
                 return pause_or_hand_up(allocator, refused)
+                    .map_err(CompactionBatchNotCompleted::from)
             }
         }
     };
@@ -3247,7 +4139,7 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
         | CompactionPublishKind::IntentCompletedWithoutABatch => {
             allocator.compaction_mut().withdraw_the_live_intent();
             compaction.observations.intents_completed += 1;
-            *last_completed_intent = Some(intent);
+            compaction.last_completed_intent = Some(intent);
         }
         CompactionPublishKind::IntentDropped
         | CompactionPublishKind::IntentDroppedWithNothingMovable => {
@@ -3261,6 +4153,58 @@ fn advance_compaction_by_one_publish<Device: BlockDevice>(
         version: Box::new(published),
         kind,
     })
+}
+
+/// 同 [`compaction_publish_planned_for_the_region_scan`]，扫描带着这一轮不确定的记录（GPU 那一条，D26（后台整理与放置回收） 已定项 13 第 8 条）：
+/// 没有不确定的记录就是它；有的时候 R 里还留着不确定的未释放记录，这一批只搬判定了可搬的那几个、照抄意图（R 被这一批腾空时照 F2 同一批删意图，
+/// 发布路径在算好的账上核），不删意图也不因「一个能搬的都没有」丢意图；判定了可搬的一个都没有时交 `None`：这一批不发。
+fn compaction_publish_planned_with_the_records_uncertain_this_round(
+    scan: Option<(&RegionScan, &[Placement])>,
+    batch_units: CompactionBatchUnits,
+    rewritten_anyway: &BTreeSet<Vec<u8>>,
+    allocation_records_of_the_version: &[AllocationRecord],
+    region: CompactionRegion,
+) -> Option<(
+    Vec<PlannedRelocation>,
+    CompactionIntentStep,
+    CompactionPublishKind,
+)> {
+    match scan {
+        Some((scan, records_uncertain)) if !records_uncertain.is_empty() => {
+            match plan_batch_skipping_the_units_this_publish_rewrites_anyway(
+                scan,
+                batch_units,
+                rewritten_anyway,
+            ) {
+                PlannedBatch::Relocate(planned) => {
+                    // 照抄意图那一支：R 被这一批腾空时发布路径照 F2 同一批删意图（R 里还留着不确定的记录时腾不空）。
+                    let carry_the_intent_unless_the_region_is_emptied =
+                        CompactionIntentStep::CarryTheIntentUnlessThisPublishEmptiesTheRegion;
+                    Some((
+                        planned,
+                        carry_the_intent_unless_the_region_is_emptied,
+                        CompactionPublishKind::Batch,
+                    ))
+                }
+                PlannedBatch::RegionEmptied
+                | PlannedBatch::NothingMovableButTheRegionIsNotEmpty => None,
+            }
+        }
+        Some((scan, _no_record_uncertain)) => Some(compaction_publish_planned_for_the_region_scan(
+            Some(scan),
+            batch_units,
+            rewritten_anyway,
+            allocation_records_of_the_version,
+            region,
+        )),
+        None => Some(compaction_publish_planned_for_the_region_scan(
+            None,
+            batch_units,
+            rewritten_anyway,
+            allocation_records_of_the_version,
+            region,
+        )),
+    }
 }
 
 /// 有活意图时这一次整理发布的计划：要搬哪几个、对意图做什么、发成了是哪一种（[`advance_compaction_by_one_publish`]）。`scan` 是对 R 重扫的结果
@@ -3606,6 +4550,928 @@ fn publish_the_queue_until_it_is_empty_raising_the_floor_for_space<Device: Block
                 refusal,
             )?;
         publishes_pushed_in_this_admission += publishes_of_this_raise;
+    }
+}
+
+/// 攒批的会话（D16（发布语义） 已定项 2、5、10，判决 `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节；用户 2026-10-26 定射程
+/// 「串行下时间与脏量两种触发」）：一次可写挂载之后的会话（[`MountedSession`]）连同收下、还没发布的改动（待发）。数据写类改动经 [`Self::accept`]
+/// 收进待发，不当场发布；触发 ⟺ 待发非空 ∧（now − 上次发布的读数 ≥ `T_time` ∨ 待发改动要写的 journal 字节 ≥ 有效 `T_dirty`），
+/// 只在 [`Self::accept`] 收下一个完整改动之后与调用方按周期调的 [`Self::publish_when_due`] 里判，一个请求不被触发切开；触发就把待发整个并成一次发布
+/// （[`UserChange::DataChangesPublishedTogether`]）。核心层不起线程、不读钟：`now` 是调用方交进来的单调读数，读数倒退当作没过时间、不回拨。
+///
+/// 屏障（unlink、截断、建删快照、整理、回退、卸载）进门先排空待发、自己单发：经 [`Self::accept`] 交进来的 unlink、截断、建删快照先排空、再照
+/// [`MountedSession::publish_user_change`] 单发；整理只在后台入口里跑（[`Self::run_compaction_in_the_background`]：判过起跑之后、跑之前先排空），
+/// [`Self::accept`] 与 [`Self::publish_when_due`] 发成之后只记「该跑了」，不在调用线程上跑整理（用户 2026-10-26 定「挪出调用线程」）；
+/// 回退与卸载要的是会话本身，只经 [`Self::into_session_after_publishing_the_pending_changes`] 交出——它先排空待发，所以类型上卸载、回退之前待发一定空了，
+/// 不会静默丢掉。原入口 [`MountedSession::publish_user_change`] 语义不变：这里的 [`Self::publish_user_change`] 先排空待发再交给它。
+///
+/// 待发与会话都是私有字段：只有这几个入口动得了它们，读只经 [`Self::session`] 与几个观测。
+#[derive(Debug)]
+pub struct MountedSessionWithPendingChanges {
+    session: MountedSession,
+    pending: PendingDataChanges,
+    thresholds: PublishTriggerThresholds,
+    /// 上一次发布那次调用交进来的读数（还没发布过时是第一次见到的读数，D16（发布语义） 已定项 5「上次 checkpoint 的时刻」）；一次读数都还没见过是 `None`。
+    /// 只往前走：读数倒退时不回拨。
+    reading_of_the_last_publish: Option<CallerMonotonicClockReading>,
+}
+
+/// 收下、还没发布的数据写类改动：折叠过的那一份整份写（同一 inode 的几次写只留最后一次）、按收下的次序的几次建 inode，
+/// 与收下的这几次改动各自单独发布要写的 journal 字节之和（D16（发布语义） 已定项 5：按待发改动要写的 journal 字节算，批内覆盖写 K 次按 K 次的记录照实算、不折叠）。
+#[derive(Debug)]
+struct PendingDataChanges {
+    whole_write: Option<PendingWholeWrite>,
+    new_inodes: Vec<NewInodesOfOneChange>,
+    journal_bytes_of_the_changes_accepted: JournalBytesToWrite,
+    changes_accepted: u64,
+}
+
+/// 待发里那一份整份写（内容自有）。
+#[derive(Clone, Debug)]
+struct PendingWholeWrite {
+    inode: InodeNumber,
+    content: Vec<u8>,
+    write_time_seconds: u64,
+}
+
+impl PendingDataChanges {
+    fn empty() -> Self {
+        Self {
+            whole_write: None,
+            new_inodes: Vec::new(),
+            journal_bytes_of_the_changes_accepted: JournalBytesToWrite::ZERO,
+            changes_accepted: 0,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.changes_accepted == 0
+    }
+
+    /// 待发并成一次发布的样子。
+    fn as_published_together(&self) -> DataChangesPublishedTogether<'_> {
+        DataChangesPublishedTogether {
+            whole_write: self
+                .whole_write
+                .as_ref()
+                .map(|whole_write| WholeWriteOfOneInode {
+                    inode: whole_write.inode,
+                    content: &whole_write.content,
+                    write_time_seconds: whole_write.write_time_seconds,
+                }),
+            new_inodes: &self.new_inodes,
+        }
+    }
+
+    /// 这一批里建的 inode 一共几个（之后建的号从记账水位加上它起发）。
+    fn new_inodes_in_total(&self) -> u64 {
+        self.as_published_together().new_inodes_in_total()
+    }
+
+    /// 收下一次数据写类改动：整份写折叠（后到的盖掉先到的），建 inode 追加在后面；这次改动单独发布要写的 journal 字节加进合计。
+    fn take_in(
+        &mut self,
+        change: DataChangeAccepted<'_>,
+        journal_bytes_of_this_change: JournalBytesToWrite,
+    ) {
+        match change {
+            DataChangeAccepted::WholeWrite(whole_write) => {
+                self.whole_write = Some(PendingWholeWrite {
+                    inode: whole_write.inode,
+                    content: whole_write.content.to_vec(),
+                    write_time_seconds: whole_write.write_time_seconds,
+                });
+            }
+            DataChangeAccepted::NewInodes(new_inodes) => self.new_inodes.push(new_inodes),
+        }
+        self.journal_bytes_of_the_changes_accepted = self
+            .journal_bytes_of_the_changes_accepted
+            .plus(journal_bytes_of_this_change);
+        self.changes_accepted += 1;
+    }
+}
+
+/// 收得进待发的一次数据写类改动（D16（发布语义） 已定项 10「数据写类可并」）。封闭集合。
+#[derive(Clone, Copy, Debug)]
+enum DataChangeAccepted<'content> {
+    WholeWrite(WholeWriteOfOneInode<'content>),
+    NewInodes(NewInodesOfOneChange),
+}
+
+impl<'content> DataChangeAccepted<'content> {
+    /// 这一次改动单独并成一批的样子（单独发布要写多少 journal 字节按它判）。`new_inodes` 是装建 inode 那一项的一格槽（借给返回值）。
+    fn alone(
+        self,
+        new_inodes: &'content mut [NewInodesOfOneChange; 1],
+    ) -> DataChangesPublishedTogether<'content> {
+        match self {
+            DataChangeAccepted::WholeWrite(whole_write) => DataChangesPublishedTogether {
+                whole_write: Some(whole_write),
+                new_inodes: &[],
+            },
+            DataChangeAccepted::NewInodes(created) => {
+                new_inodes[0] = created;
+                DataChangesPublishedTogether {
+                    whole_write: None,
+                    new_inodes: &new_inodes[..],
+                }
+            }
+        }
+    }
+}
+
+/// 交给 [`MountedSessionWithPendingChanges::accept`] 的一次改动按什么收。封闭集合。
+#[derive(Clone, Copy, Debug)]
+enum ChangeAtTheAccept<'content> {
+    /// 数据写类：收进待发。覆盖写那两种（一个数据单元的契约）带 `fits_one_data_unit_only`。
+    Data {
+        change: DataChangeAccepted<'content>,
+        contract: WholeWriteContractAtTheAccept,
+    },
+    /// 屏障：先排空待发、再单发（unlink、截断、建删快照）。
+    Barrier,
+    /// 按偏移写：进不进待发、算哪一类条款没写（D16（发布语义） 已定项 10 只列了整份写、建 inode 与屏障），第一版不收。
+    WriteAtOffset,
+    /// 已经并好的一批：它是排空待发时交给会话的，不是用户的一次改动，收进待发条款没写，第一版不收。
+    DataChangesPublishedTogether,
+}
+
+/// 整份写的入口契约（同会话两条入口：覆盖写一个数据单元以内，顺序写不按单元数拒）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WholeWriteContractAtTheAccept {
+    OneDataUnit,
+    AnyNumberOfDataUnits,
+    /// 不是整份写（建 inode）。
+    NotAWholeWrite,
+}
+
+impl<'content> ChangeAtTheAccept<'content> {
+    fn of(change: UserChange<'content>) -> Self {
+        let whole_write = |inode: InodeNumber,
+                           content: &'content [u8],
+                           write_time_seconds: u64,
+                           contract: WholeWriteContractAtTheAccept| {
+            ChangeAtTheAccept::Data {
+                change: DataChangeAccepted::WholeWrite(WholeWriteOfOneInode {
+                    inode,
+                    content,
+                    write_time_seconds,
+                }),
+                contract,
+            }
+        };
+        let first_file = InodeNumber(crate::transaction::FIRST_INODE_NUMBER);
+        match change {
+            UserChange::Overwrite(file) => whole_write(
+                first_file,
+                file.content,
+                file.write_time_seconds,
+                WholeWriteContractAtTheAccept::OneDataUnit,
+            ),
+            UserChange::SequentialWrite(file) => whole_write(
+                first_file,
+                file.content,
+                file.write_time_seconds,
+                WholeWriteContractAtTheAccept::AnyNumberOfDataUnits,
+            ),
+            UserChange::OverwriteOfAnInode {
+                inode,
+                content,
+                write_time_seconds,
+            } => whole_write(
+                inode,
+                content,
+                write_time_seconds,
+                WholeWriteContractAtTheAccept::OneDataUnit,
+            ),
+            UserChange::SequentialWriteOfAnInode {
+                inode,
+                content,
+                write_time_seconds,
+            } => whole_write(
+                inode,
+                content,
+                write_time_seconds,
+                WholeWriteContractAtTheAccept::AnyNumberOfDataUnits,
+            ),
+            UserChange::NewInodes {
+                count,
+                write_time_seconds,
+            } => ChangeAtTheAccept::Data {
+                change: DataChangeAccepted::NewInodes(NewInodesOfOneChange {
+                    count,
+                    write_time_seconds,
+                }),
+                contract: WholeWriteContractAtTheAccept::NotAWholeWrite,
+            },
+            UserChange::Unlink { .. }
+            | UserChange::Truncate { .. }
+            | UserChange::CreateSnapshot
+            | UserChange::DestroySnapshot { .. } => ChangeAtTheAccept::Barrier,
+            UserChange::WriteAtOffset { .. } => ChangeAtTheAccept::WriteAtOffset,
+            UserChange::DataChangesPublishedTogether(_) => {
+                ChangeAtTheAccept::DataChangesPublishedTogether
+            }
+        }
+    }
+}
+
+/// 一次触发是哪一支先到（`.claude/rules/fs-design.md` 五条硬要求第 4 条：分支可观测）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PublishTriggerCause {
+    /// now − 上次发布的读数 ≥ `T_time`，脏量还没到。
+    TimeThreshold,
+    /// 待发改动要写的 journal 字节 ≥ 有效 `T_dirty`，时间还没到。
+    DirtyThreshold,
+    /// 两支同时到。
+    BothThresholds,
+}
+
+/// D16（发布语义） 已定项 2 的触发式：待发非空 ∧（离上次发布过了 `T_time` ∨ 待发改动要写的 journal 字节到了有效 `T_dirty`）。待发空时两支都不看
+/// （空闲时不推空发布：照不带这一合取的式子，空闲时每 `T_time` 一次空发布，把回退候选集挤掉——判决第二节「时间那一支」那一格）。
+/// `time_since_the_last_publish` 是调用方按读数算好的间隔（读数倒退时是 0：当作没过时间）。纯函数。
+#[must_use]
+pub fn publish_trigger_cause(
+    pending_is_empty: bool,
+    time_since_the_last_publish: Duration,
+    journal_bytes_of_the_pending_changes: JournalBytesToWrite,
+    thresholds: PublishTriggerThresholds,
+) -> Option<PublishTriggerCause> {
+    if pending_is_empty {
+        return None;
+    }
+    let is_time_reached = time_since_the_last_publish >= thresholds.time_threshold();
+    let is_dirty_reached = journal_bytes_of_the_pending_changes >= thresholds.dirty_threshold();
+    match (is_time_reached, is_dirty_reached) {
+        (true, true) => Some(PublishTriggerCause::BothThresholds),
+        (true, false) => Some(PublishTriggerCause::TimeThreshold),
+        (false, true) => Some(PublishTriggerCause::DirtyThreshold),
+        (false, false) => None,
+    }
+}
+
+/// 攒批的会话这一次为什么发布（报给调用方，RefFS 翻译按它把每一次发布翻成一个显式发布点，判决第二节「RefFS」那一格）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReasonOfThePublish {
+    /// [`MountedSessionWithPendingChanges::accept`] 收下这次改动之后触发，待发整个并成一次发布（这次改动在里面）。
+    TriggeredAfterTheAccept(PublishTriggerCause),
+    /// [`MountedSessionWithPendingChanges::publish_when_due`] 里触发。
+    TriggeredWhenDue(PublishTriggerCause),
+    /// 屏障进门之前排空待发（屏障自己不在里面）。
+    PendingChangesPublishedBeforeABarrier,
+    /// 屏障自己那一次（[`MountedSession::publish_user_change`] 单发：unlink、截断连同它们的全部批）。
+    BarrierPublishedAlone,
+    /// [`MountedSessionWithPendingChanges::publish_pending_now`]：立即排空。
+    PendingChangesPublishedOnRequest,
+    /// [`MountedSessionWithPendingChanges::publish_user_change`] 之前排空待发。
+    PendingChangesPublishedBeforeTheUserChange,
+    /// [`MountedSessionWithPendingChanges::publish_user_change`] 那一次改动自己。
+    UserChangePublishedAlone,
+    /// 后台整理判过起跑、跑之前排空待发。
+    PendingChangesPublishedBeforeTheBackgroundCompaction,
+    /// 交出会话（卸载、回退之前）排空待发。
+    PendingChangesPublishedBeforeHandingBackTheSession,
+}
+
+/// 攒批的会话报的一次发布：为什么发、发成了什么（推的抬 F、发成的每一版、之后发的 discard，同 [`UserChangePublished`]）。
+#[derive(Debug)]
+pub struct PublishReportedByTheSession {
+    pub reason: ReasonOfThePublish,
+    pub published: UserChangePublished,
+}
+
+/// [`MountedSessionWithPendingChanges::accept`] 收下了：怎么收的、这次调用里报的每一次发布（按先后）。
+#[derive(Debug)]
+pub struct ChangeAccepted {
+    pub taken: HowTheChangeWasTaken,
+    pub publishes: Vec<PublishReportedByTheSession>,
+}
+
+/// 一次改动在 [`MountedSessionWithPendingChanges::accept`] 里怎么收的。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HowTheChangeWasTaken {
+    /// 收进待发；`journal_bytes_of_this_change` 是这次改动单独发布要写的 journal 字节（加进待发的合计）。收下之后触发了，待发连同它已经发成
+    /// （报在 [`ChangeAccepted::publishes`] 里）。
+    KeptPending {
+        journal_bytes_of_this_change: JournalBytesToWrite,
+    },
+    /// 屏障：先排空待发、再单发，都已发成。
+    PublishedAloneAsABarrier,
+}
+
+/// [`MountedSessionWithPendingChanges::accept`] 没收下，或收下之后触发的那一次发布没发成。成员按调用方要做的决定分。
+#[derive(Debug)]
+pub enum AcceptRefused {
+    /// 分配器上冻结着一次写失败、没重发的发布（D23（journal 的角色与格式） 已定项 14；判决第二节「串行下不立的」那一格「冻结时 `accept` 拒」）：
+    /// 在任何读写之前拒，待发不动、不长。调用方要做的是先原样重发那一次（交出会话，`transaction::resend_the_frozen_publish`）。
+    PublishFrozenAfterAWriteFailureIsNotResentYet {
+        checkpoint_txg: CheckpointTxg,
+        instance: InstanceGeneration,
+    },
+    /// 同 [`UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount`]，在任何读写之前。
+    DeviceTableOtherThanTheOneOfTheMount {
+        device_table_of_the_mount: Vec<DeviceIdentity>,
+        device_table_handed_in: Vec<DeviceIdentity>,
+    },
+    /// 现行那一版没有可改的文件（树表 0 条；或有树而文件集合为空而这次是整份写），同 [`UserChangeRefused::NoFileVersionToChange`]，在任何读写之前。
+    NoFileVersionToChange,
+    /// 现行那一版的承诺类意图队列（`deleted_inodes`、销毁中的快照、截断条目）没走空：会话里每一次用户改动先走空（D8（核心索引结构） 已定项 16 第 6 条），
+    /// 走空是写，而这次的预判要在任何读写之前做、要接在走空之后的那一版上判——两样合不到一起，条款没写，第一版不支持。在任何读写之前拒；
+    /// 调用方要做的是先经 [`MountedSessionWithPendingChanges::publish_user_change`] 发一次（它先走空）。
+    QueueOfCommittedIntentsNotWalkedBeforeTheAcceptNotSupportedInTheFirstVersion,
+    /// 按偏移写进不进待发、算数据写类还是屏障，条款没写（D16（发布语义） 已定项 10 只列整份写、建 inode 与屏障），第一版不支持。在任何读写之前拒；
+    /// 调用方要做的是经 [`MountedSessionWithPendingChanges::publish_user_change`] 单发它。
+    WriteAtOffsetIntoThePendingChangesNotSupportedInTheFirstVersion,
+    /// 交进来的是已经并好的一批（[`UserChange::DataChangesPublishedTogether`]）：把一批再收进待发条款没写，第一版不支持。在任何读写之前拒。
+    DataChangesPublishedTogetherIntoThePendingChangesNotSupportedInTheFirstVersion,
+    /// 待发里已经有另一个文件的整份写：一次发布写一个文件以内是这一版发布计划的形状（`transaction::PublishPlan::file`），不同 inode 的写并不并进一次发布
+    /// 条款没写（D16（发布语义） 已定项 10「同一 inode 的写折叠」管不到两个号），第一版不支持。在任何读写之前拒；调用方要做的是先
+    /// [`MountedSessionWithPendingChanges::publish_pending_now`]、再交这次的写。
+    WriteToASecondInodeInOneBatchNotSupportedInTheFirstVersion {
+        inode_pending: InodeNumber,
+        inode_written: InodeNumber,
+    },
+    /// 写的号是待发里建 inode 那几次要发的号（还不在现行那一版的树里）：同一次发布里建一个 inode 又写它，条款没写，第一版不支持。在任何读写之前拒。
+    WriteToAnInodeCreatedByThePendingChangesNotSupportedInTheFirstVersion { inode: InodeNumber },
+    /// 这一次改动单独发布就过不了落盘之前那几判（`transaction::journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write`：
+    /// 号不在树里、删除中、内容装不进覆盖写的一个数据单元、准入、落点、记录条数……），`cause` 原样。在任何读写之前拒，待发不动。
+    ChangeRefusedByThePublishJudgement(Box<PublishError>),
+    /// 这一次改动单独过得了，并进待发合起来这一批过不了（判决第二节「一次发布里攒什么」那一格：`accept` 进门先做这一批合起来的准入与条数预判，
+    /// 过不了就在任何读写之前拒，不在返回成功之后拒），`cause` 原样。在任何读写之前拒，待发不动；调用方要做的是先排空待发、再交这一次。
+    PendingChangesTogetherWithThisChangeRefusedByThePublishJudgement(Box<PublishError>),
+    /// 屏障进门之前排空待发没发成（`refusal` 原样；推的抬 F、发成的走空步在里面）：屏障没发。
+    PublishOfThePendingChangesBeforeTheBarrierRefused(Box<UserChangeRefused>),
+    /// 待发已排空（`publishes_before_the_refusal`），屏障自己没发成（`refusal` 原样）。
+    BarrierRefused {
+        publishes_before_the_refusal: Vec<PublishReportedByTheSession>,
+        refusal: Box<UserChangeRefused>,
+    },
+    /// 这次改动已收进待发，收下之后触发的那一次发布没发成（`refusal` 原样）：没冻结时待发原样留着（连同这一次），下一次触发再发；
+    /// 冻结了时待发并进了冻结的那一次（D16（发布语义） 已定项 17：报错之后这次发布可能已成也可能未成），待发清空。
+    AcceptedButTheTriggeredPublishRefused(Box<UserChangeRefused>),
+}
+
+/// 排空待发那一次没发成（[`MountedSessionWithPendingChanges::publish_when_due`]、[`MountedSessionWithPendingChanges::publish_pending_now`]）：
+/// `refusal` 原样。没冻结时待发原样留着；冻结了时待发并进了冻结的那一次、清空（D16（发布语义） 已定项 17）。
+#[derive(Debug)]
+pub struct PublishOfThePendingChangesRefused {
+    pub refusal: Box<UserChangeRefused>,
+}
+
+/// [`MountedSessionWithPendingChanges::publish_user_change`] 没发成：之前排空的那一次（发成了就在 `publishes_before_the_refusal` 里）与这一次的拒绝。
+#[derive(Debug)]
+pub struct UserChangeAfterThePendingChangesRefused {
+    pub publishes_before_the_refusal: Vec<PublishReportedByTheSession>,
+    pub refusal: Box<UserChangeRefused>,
+}
+
+/// [`MountedSessionWithPendingChanges::run_compaction_in_the_background`] 做成了什么：判过起跑之后先排空的那一次（待发空、没起跑时 `None`）与后台入口这一次。
+#[derive(Debug)]
+pub struct BackgroundCompactionAfterThePendingChanges {
+    pub pending_changes_published_before_the_run: Option<PublishReportedByTheSession>,
+    pub call: BackgroundCompactionCall,
+}
+
+/// [`MountedSessionWithPendingChanges::run_compaction_in_the_background`] 没跑。成员按调用方要做的决定分。
+#[derive(Debug)]
+pub enum BackgroundCompactionAfterThePendingChangesRefused {
+    /// 后台入口自己在任何读写之前拒（同 [`MountedSession::run_compaction_in_the_background`]）。
+    CompactionRefused(CompactionRunRefused),
+    /// 判过起跑、跑之前排空待发没发成：这一趟整理没跑，用户改动之后记下的「该跑了」放回去。
+    PublishOfThePendingChangesRefused(Box<UserChangeRefused>),
+}
+
+/// [`MountedSessionWithPendingChanges::into_session_after_publishing_the_pending_changes`] 交不出会话：排空待发没发成，攒批的会话原样交回。
+#[derive(Debug)]
+pub struct HandingBackTheSessionRefused {
+    pub session_with_pending_changes: MountedSessionWithPendingChanges,
+    pub refusal: Box<UserChangeRefused>,
+}
+
+impl MountedSessionWithPendingChanges {
+    /// 会话接上待发（一开始空的），两个阈值取这次挂载的有效值（[`PublishTriggerThresholds::of_the_mount`]：`T_time` 5000 ms，
+    /// `T_dirty` = min(2 GiB, 环长 ÷ F)）。
+    #[must_use]
+    pub fn of_the_session(session: MountedSession) -> Self {
+        let thresholds = PublishTriggerThresholds::of_the_mount(
+            session
+                .parameters_and_device_table
+                .parameters_on_disk()
+                .geometry
+                .journal_ring_bytes,
+        );
+        Self::of_the_session_with_thresholds(session, thresholds)
+    }
+
+    /// 同 [`Self::of_the_session`]，两个阈值由调用方给：产品路径上只拿得到 [`PublishTriggerThresholds::of_the_mount`] 那一份，只供测试的那一份
+    /// 在默认关的特性后面（[`PublishTriggerThresholds`] 文档）。
+    #[must_use]
+    pub fn of_the_session_with_thresholds(
+        session: MountedSession,
+        thresholds: PublishTriggerThresholds,
+    ) -> Self {
+        Self {
+            session,
+            pending: PendingDataChanges::empty(),
+            thresholds,
+            reading_of_the_last_publish: None,
+        }
+    }
+
+    /// 底下那个会话（只读）。
+    #[must_use]
+    pub fn session(&self) -> &MountedSession {
+        &self.session
+    }
+
+    /// 这次挂载生效的两个阈值。
+    #[must_use]
+    pub fn thresholds(&self) -> PublishTriggerThresholds {
+        self.thresholds
+    }
+
+    /// 待发里收下了几次改动（排空之后归零）。
+    #[must_use]
+    pub fn pending_changes_accepted(&self) -> u64 {
+        self.pending.changes_accepted
+    }
+
+    /// 待发里那几次改动各自单独发布要写的 journal 字节之和（脏量那一支比的量）。
+    #[must_use]
+    pub fn journal_bytes_of_the_pending_changes(&self) -> JournalBytesToWrite {
+        self.pending.journal_bytes_of_the_changes_accepted
+    }
+
+    /// 上一次发布那次调用交进来的读数（还没发布过时是第一次见到的读数）。
+    #[must_use]
+    pub fn reading_of_the_last_publish(&self) -> Option<CallerMonotonicClockReading> {
+        self.reading_of_the_last_publish
+    }
+
+    /// 第一次见到的读数当基线（还没发布过时「上次发布的时刻」取它）。
+    fn note_the_reading_seen(&mut self, now: CallerMonotonicClockReading) {
+        if self.reading_of_the_last_publish.is_none() {
+            self.reading_of_the_last_publish = Some(now);
+        }
+    }
+
+    /// 发成一次：上次发布的读数取这次调用交进来的那一个，只往前走（读数倒退时不回拨）。
+    fn note_a_publish(&mut self, now: CallerMonotonicClockReading) {
+        self.reading_of_the_last_publish = Some(match self.reading_of_the_last_publish {
+            Some(before) => before.max(now),
+            None => now,
+        });
+    }
+
+    /// 此刻（`now`）触不触发：读数倒退时间隔是 0（当作没过时间）。
+    fn trigger_cause_at(&self, now: CallerMonotonicClockReading) -> Option<PublishTriggerCause> {
+        let time_since_the_last_publish = match self.reading_of_the_last_publish {
+            Some(last) => now.0.saturating_sub(last.0),
+            None => Duration::ZERO,
+        };
+        publish_trigger_cause(
+            self.pending.is_empty(),
+            time_since_the_last_publish,
+            self.pending.journal_bytes_of_the_changes_accepted,
+            self.thresholds,
+        )
+    }
+
+    /// 把待发整个并成一次发布交给会话（[`UserChange::DataChangesPublishedTogether`]，先走空队列、被空间拒照旧推抬 F 再判）。待发空就什么都不发、交回 `None`
+    /// （不推空发布）。发成：待发清空、记下这次的读数。没发成：没冻结时待发原样放回；冻结了时待发并进了冻结的那一次，不放回（D16（发布语义） 已定项 17）。
+    fn publish_the_pending_changes<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        now: CallerMonotonicClockReading,
+        reason: ReasonOfThePublish,
+    ) -> Result<Option<PublishReportedByTheSession>, Box<UserChangeRefused>> {
+        if self.pending.is_empty() {
+            return Ok(None);
+        }
+        let pending = std::mem::replace(&mut self.pending, PendingDataChanges::empty());
+        match self.session.publish_user_change(
+            devices,
+            UserChange::DataChangesPublishedTogether(pending.as_published_together()),
+        ) {
+            Ok(published) => {
+                self.note_a_publish(now);
+                Ok(Some(PublishReportedByTheSession { reason, published }))
+            }
+            Err(refusal) => {
+                if self.session.allocator.frozen_publish().is_none() {
+                    self.pending = pending;
+                }
+                Err(Box::new(refusal))
+            }
+        }
+    }
+
+    /// 收下一次用户改动（D16（发布语义） 已定项 10，判决第二节「一次发布里攒什么」「串行下不立的」两格）：
+    /// 1. 冻结着一次没重发的发布、交进来的盘表与挂载核过的不同：在任何读写之前拒。
+    /// 2. 屏障（unlink、截断、建删快照）：先排空待发（一次发布）、再照 [`MountedSession::publish_user_change`] 单发，两次都报。
+    /// 3. 数据写类（整份写、建 inode）：在任何读写之前先判——现行那一版有可改的文件、队列走空了、并得进待发（至多一个文件、不写待发里建的号）、
+    ///    这一次单独发布过得了落盘之前那几判、并进待发合起来的这一批也过得了（准入与条数预判，`transaction::journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write`）；
+    ///    有一样不过就拒，一个盘都不读、一个写都不发、待发不动。都过了才收进待发（同一 inode 的写折叠、建 inode 追加），脏量加上这一次单独发布要写的 journal 字节；
+    ///    收下之后判一次触发（[`publish_trigger_cause`]），触发就把待发整个并成一次发布。
+    /// 4. 按偏移写、已经并好的一批：条款没写，在任何读写之前拒。
+    ///
+    /// 整理不在这里跑：发成之后起跑判据为真只记「该跑了」（[`MountedSession::publish_user_change`]），由后台入口去跑。
+    ///
+    /// # Errors
+    /// [`AcceptRefused`] 的几种。
+    pub fn accept<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        change: UserChange<'_>,
+        now: CallerMonotonicClockReading,
+    ) -> Result<ChangeAccepted, AcceptRefused> {
+        self.note_the_reading_seen(now);
+        if let Some(frozen) = self.session.allocator.frozen_publish() {
+            return Err(
+                AcceptRefused::PublishFrozenAfterAWriteFailureIsNotResentYet {
+                    checkpoint_txg: frozen.checkpoint_txg(),
+                    instance: frozen.instance(),
+                },
+            );
+        }
+        if !self
+            .session
+            .parameters_and_device_table
+            .is_the_device_table_of_the_mount(devices)
+        {
+            return Err(AcceptRefused::DeviceTableOtherThanTheOneOfTheMount {
+                device_table_of_the_mount: self
+                    .session
+                    .parameters_and_device_table
+                    .device_identities_in_table_order()
+                    .to_vec(),
+                device_table_handed_in: devices.iter().map(|(identity, _)| *identity).collect(),
+            });
+        }
+        let (data_change, contract) = match ChangeAtTheAccept::of(change) {
+            ChangeAtTheAccept::Barrier => return self.publish_a_barrier_alone(devices, change, now),
+            ChangeAtTheAccept::WriteAtOffset => {
+                return Err(
+                    AcceptRefused::WriteAtOffsetIntoThePendingChangesNotSupportedInTheFirstVersion,
+                )
+            }
+            ChangeAtTheAccept::DataChangesPublishedTogether => {
+                return Err(AcceptRefused::DataChangesPublishedTogetherIntoThePendingChangesNotSupportedInTheFirstVersion)
+            }
+            ChangeAtTheAccept::Data { change, contract } => (change, contract),
+        };
+        let journal_bytes_of_this_change =
+            self.judge_a_data_change_before_any_read_or_write(devices, data_change, contract)?;
+        self.pending
+            .take_in(data_change, journal_bytes_of_this_change);
+        let mut publishes = Vec::new();
+        if let Some(cause) = self.trigger_cause_at(now) {
+            if let Some(published) = self
+                .publish_the_pending_changes(
+                    devices,
+                    now,
+                    ReasonOfThePublish::TriggeredAfterTheAccept(cause),
+                )
+                .map_err(AcceptRefused::AcceptedButTheTriggeredPublishRefused)?
+            {
+                publishes.push(published);
+            }
+        }
+        Ok(ChangeAccepted {
+            taken: HowTheChangeWasTaken::KeptPending {
+                journal_bytes_of_this_change,
+            },
+            publishes,
+        })
+    }
+
+    /// [`Self::accept`] 收数据写类改动之前那几判，在任何读写之前：交回这一次单独发布要写的 journal 字节。
+    ///
+    /// # Errors
+    /// [`AcceptRefused::NoFileVersionToChange`]、`QueueOfCommittedIntentsNotWalkedBeforeTheAcceptNotSupportedInTheFirstVersion`、
+    /// `WriteToASecondInodeInOneBatchNotSupportedInTheFirstVersion`、`WriteToAnInodeCreatedByThePendingChangesNotSupportedInTheFirstVersion`、
+    /// `ChangeRefusedByThePublishJudgement`、`PendingChangesTogetherWithThisChangeRefusedByThePublishJudgement`。
+    fn judge_a_data_change_before_any_read_or_write<Device: BlockDevice>(
+        &self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        data_change: DataChangeAccepted<'_>,
+        contract: WholeWriteContractAtTheAccept,
+    ) -> Result<JournalBytesToWrite, AcceptRefused> {
+        let current_version = match (&self.session.current, data_change) {
+            (PoolVersion::WithFile(version), _)
+            | (PoolVersion::WithTreesAndNoFile(version), DataChangeAccepted::NewInodes(_)) => {
+                version
+            }
+            (PoolVersion::WithTreesAndNoFile(_), DataChangeAccepted::WholeWrite(_))
+            | (PoolVersion::WithoutFile(_), _) => return Err(AcceptRefused::NoFileVersionToChange),
+        };
+        if !current_version.queue_of_committed_intents_is_empty() {
+            return Err(AcceptRefused::QueueOfCommittedIntentsNotWalkedBeforeTheAcceptNotSupportedInTheFirstVersion);
+        }
+        if let DataChangeAccepted::WholeWrite(whole_write) = data_change {
+            if let Some(pending_whole_write) = &self.pending.whole_write {
+                if pending_whole_write.inode != whole_write.inode {
+                    return Err(
+                        AcceptRefused::WriteToASecondInodeInOneBatchNotSupportedInTheFirstVersion {
+                            inode_pending: pending_whole_write.inode,
+                            inode_written: whole_write.inode,
+                        },
+                    );
+                }
+            }
+            let first_number_created_by_the_pending_changes =
+                current_version.inode_number_watermark();
+            let is_created_by_the_pending_changes = whole_write.inode.0
+                >= first_number_created_by_the_pending_changes
+                && whole_write.inode.0 - first_number_created_by_the_pending_changes
+                    < self.pending.new_inodes_in_total();
+            if is_created_by_the_pending_changes {
+                return Err(
+                    AcceptRefused::WriteToAnInodeCreatedByThePendingChangesNotSupportedInTheFirstVersion {
+                        inode: whole_write.inode,
+                    },
+                );
+            }
+            if contract == WholeWriteContractAtTheAccept::OneDataUnit
+                && whole_write.content.len() > data_unit_payload_capacity()
+            {
+                return Err(AcceptRefused::ChangeRefusedByThePublishJudgement(Box::new(
+                    PublishError::ContentExceedsDataUnit {
+                        bytes: whole_write.content.len(),
+                        capacity: data_unit_payload_capacity(),
+                    },
+                )));
+            }
+        }
+        let parameters = self
+            .session
+            .parameters_and_device_table
+            .parameters_on_disk();
+        let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+        writer.set_container_tree_capacities(
+            self.session
+                .allocator
+                .deletion_switches()
+                .container_tree_capacities(),
+        );
+        let mut slot_of_the_new_inodes = [NewInodesOfOneChange {
+            count: 0,
+            write_time_seconds: 0,
+        }];
+        let journal_bytes_of_this_change =
+            journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write(
+                &writer,
+                &self.session.allocator,
+                current_version,
+                data_change.alone(&mut slot_of_the_new_inodes),
+                self.session.instance,
+            )
+            .map_err(|cause| AcceptRefused::ChangeRefusedByThePublishJudgement(Box::new(cause)))?;
+        let mut new_inodes_together = self.pending.new_inodes.clone();
+        let whole_write_together = match data_change {
+            DataChangeAccepted::WholeWrite(whole_write) => Some(whole_write),
+            DataChangeAccepted::NewInodes(created) => {
+                new_inodes_together.push(created);
+                self.pending
+                    .whole_write
+                    .as_ref()
+                    .map(|pending_whole_write| WholeWriteOfOneInode {
+                        inode: pending_whole_write.inode,
+                        content: &pending_whole_write.content,
+                        write_time_seconds: pending_whole_write.write_time_seconds,
+                    })
+            }
+        };
+        journal_bytes_of_data_changes_published_together_judged_before_any_read_or_write(
+            &writer,
+            &self.session.allocator,
+            current_version,
+            DataChangesPublishedTogether {
+                whole_write: whole_write_together,
+                new_inodes: &new_inodes_together,
+            },
+            self.session.instance,
+        )
+        .map_err(|cause| {
+            AcceptRefused::PendingChangesTogetherWithThisChangeRefusedByThePublishJudgement(
+                Box::new(cause),
+            )
+        })?;
+        Ok(journal_bytes_of_this_change)
+    }
+
+    /// 屏障进门：先排空待发、再单发。
+    fn publish_a_barrier_alone<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        change: UserChange<'_>,
+        now: CallerMonotonicClockReading,
+    ) -> Result<ChangeAccepted, AcceptRefused> {
+        let mut publishes = Vec::new();
+        if let Some(drained) = self
+            .publish_the_pending_changes(
+                devices,
+                now,
+                ReasonOfThePublish::PendingChangesPublishedBeforeABarrier,
+            )
+            .map_err(AcceptRefused::PublishOfThePendingChangesBeforeTheBarrierRefused)?
+        {
+            publishes.push(drained);
+        }
+        match self.session.publish_user_change(devices, change) {
+            Ok(published) => {
+                self.note_a_publish(now);
+                publishes.push(PublishReportedByTheSession {
+                    reason: ReasonOfThePublish::BarrierPublishedAlone,
+                    published,
+                });
+                Ok(ChangeAccepted {
+                    taken: HowTheChangeWasTaken::PublishedAloneAsABarrier,
+                    publishes,
+                })
+            }
+            Err(refusal) => Err(AcceptRefused::BarrierRefused {
+                publishes_before_the_refusal: publishes,
+                refusal: Box::new(refusal),
+            }),
+        }
+    }
+
+    /// 调用方按周期调（D16（发布语义） 已定项 2、5：丢失窗口里的 P 是这个周期，归调用方）：判一次触发，触发就把待发整个并成一次发布。
+    /// 待发空、或两支都没到，就什么都不发、交回 `None`，一个盘都不读。
+    ///
+    /// # Errors
+    /// 触发的那一次没发成：[`PublishOfThePendingChangesRefused`]。
+    pub fn publish_when_due<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        now: CallerMonotonicClockReading,
+    ) -> Result<Option<PublishReportedByTheSession>, PublishOfThePendingChangesRefused> {
+        self.note_the_reading_seen(now);
+        let Some(cause) = self.trigger_cause_at(now) else {
+            return Ok(None);
+        };
+        self.publish_the_pending_changes(devices, now, ReasonOfThePublish::TriggeredWhenDue(cause))
+            .map_err(|refusal| PublishOfThePendingChangesRefused { refusal })
+    }
+
+    /// 立即排空（D16（发布语义） 已定项 11：只是提前触发一次发布，同一个 journal、同一条发布路径）：待发非空就整个并成一次发布；待发空就什么都不发、交回 `None`
+    /// （不推空发布）。
+    ///
+    /// # Errors
+    /// 同 [`Self::publish_when_due`]。
+    pub fn publish_pending_now<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        now: CallerMonotonicClockReading,
+    ) -> Result<Option<PublishReportedByTheSession>, PublishOfThePendingChangesRefused> {
+        self.note_the_reading_seen(now);
+        self.publish_the_pending_changes(
+            devices,
+            now,
+            ReasonOfThePublish::PendingChangesPublishedOnRequest,
+        )
+        .map_err(|refusal| PublishOfThePendingChangesRefused { refusal })
+    }
+
+    /// 原入口（[`MountedSession::publish_user_change`]）语义不变，只多一条先排空待发：待发非空就先并成一次发布，再交这一次改动（任何一种）单发。
+    ///
+    /// # Errors
+    /// 排空或这一次没发成：[`UserChangeAfterThePendingChangesRefused`]（排空发成了的那一次在里面）。
+    pub fn publish_user_change<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        change: UserChange<'_>,
+        now: CallerMonotonicClockReading,
+    ) -> Result<Vec<PublishReportedByTheSession>, UserChangeAfterThePendingChangesRefused> {
+        self.note_the_reading_seen(now);
+        let mut publishes = Vec::new();
+        match self.publish_the_pending_changes(
+            devices,
+            now,
+            ReasonOfThePublish::PendingChangesPublishedBeforeTheUserChange,
+        ) {
+            Ok(Some(drained)) => publishes.push(drained),
+            Ok(None) => {}
+            Err(refusal) => {
+                return Err(UserChangeAfterThePendingChangesRefused {
+                    publishes_before_the_refusal: publishes,
+                    refusal,
+                })
+            }
+        }
+        match self.session.publish_user_change(devices, change) {
+            Ok(published) => {
+                self.note_a_publish(now);
+                publishes.push(PublishReportedByTheSession {
+                    reason: ReasonOfThePublish::UserChangePublishedAlone,
+                    published,
+                });
+                Ok(publishes)
+            }
+            Err(refusal) => Err(UserChangeAfterThePendingChangesRefused {
+                publishes_before_the_refusal: publishes,
+                refusal: Box::new(refusal),
+            }),
+        }
+    }
+
+    /// 整理的后台入口（[`MountedSession::run_compaction_in_the_background`]）连同待发：整理是屏障——待发里不并进整理的发布，判过起跑之后、
+    /// 那一趟起跑之前先把待发排空（判决第二节「一次发布里攒什么」那一格；整理仍只在后台入口里跑）。没起跑就不排空。
+    /// 排空那一次是一次用户改动的发布：`B_gc` 从它重新数、起跑判据为真记「该跑了」（同 [`MountedSession::publish_user_change`]）。
+    ///
+    /// # Errors
+    /// [`BackgroundCompactionAfterThePendingChangesRefused`] 的两种。
+    pub fn run_compaction_in_the_background<Device: BlockDevice>(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        pacing: CompactionPacing,
+        caller: &dyn CallerOfTheBackgroundCompaction,
+    ) -> Result<
+        BackgroundCompactionAfterThePendingChanges,
+        BackgroundCompactionAfterThePendingChangesRefused,
+    > {
+        let now = caller.clock_reading();
+        self.note_the_reading_seen(now);
+        let (trigger, reach, budget) = match self
+            .session
+            .whether_the_background_compaction_starts(devices, pacing, caller)
+            .map_err(BackgroundCompactionAfterThePendingChangesRefused::CompactionRefused)?
+        {
+            BackgroundCompactionStart::NotStarted(not_started) => {
+                return Ok(BackgroundCompactionAfterThePendingChanges {
+                    pending_changes_published_before_the_run: None,
+                    call: BackgroundCompactionCall::NotStarted(not_started),
+                })
+            }
+            BackgroundCompactionStart::Starts {
+                trigger,
+                reach,
+                budget,
+            } => (trigger, reach, budget),
+        };
+        let pending_changes_published_before_the_run = match self.publish_the_pending_changes(
+            devices,
+            now,
+            ReasonOfThePublish::PendingChangesPublishedBeforeTheBackgroundCompaction,
+        ) {
+            Ok(drained) => drained,
+            Err(refusal) => {
+                match trigger {
+                    BackgroundCompactionTrigger::DueAfterAUserChange => {
+                        self.session.compaction.start_judgement =
+                            CompactionStartJudgement::DueAfterAUserChange;
+                    }
+                    BackgroundCompactionTrigger::TimerFallback => {}
+                }
+                return Err(
+                    BackgroundCompactionAfterThePendingChangesRefused::PublishOfThePendingChangesRefused(
+                        refusal,
+                    ),
+                );
+            }
+        };
+        let call = self.session.run_the_background_compaction_that_starts(
+            devices, pacing, caller, trigger, reach, budget,
+        );
+        let has_published = match &call {
+            BackgroundCompactionCall::Ran { run, .. } => !run.versions_published.is_empty(),
+            BackgroundCompactionCall::NotStarted(_) => false,
+        };
+        if has_published {
+            self.note_a_publish(now);
+        }
+        Ok(BackgroundCompactionAfterThePendingChanges {
+            pending_changes_published_before_the_run,
+            call,
+        })
+    }
+
+    /// 交出会话（卸载、回退、重发冻结的那一次要的是会话本身）：先把待发排空，交回排空那一次（待发空时 `None`）与会话。类型上卸载、回退之前待发一定空了
+    /// （判决第二节「一次发布里攒什么」那一格：回退、卸载是屏障）。
+    ///
+    /// # Errors
+    /// 排空没发成：[`HandingBackTheSessionRefused`]，攒批的会话原样交回（没冻结时待发还在里面）。
+    pub fn into_session_after_publishing_the_pending_changes<Device: BlockDevice>(
+        mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        now: CallerMonotonicClockReading,
+    ) -> Result<
+        (Option<PublishReportedByTheSession>, MountedSession),
+        Box<HandingBackTheSessionRefused>,
+    > {
+        self.note_the_reading_seen(now);
+        match self.publish_the_pending_changes(
+            devices,
+            now,
+            ReasonOfThePublish::PendingChangesPublishedBeforeHandingBackTheSession,
+        ) {
+            Ok(drained) => Ok((drained, self.session)),
+            Err(refusal) => Err(Box::new(HandingBackTheSessionRefused {
+                session_with_pending_changes: self,
+                refusal,
+            })),
+        }
     }
 }
 

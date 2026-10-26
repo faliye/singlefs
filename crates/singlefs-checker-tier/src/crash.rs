@@ -1223,7 +1223,9 @@ fn judge_crash_image_against_the_version_table(
     }
 }
 
-/// [`judge_crash_state_range_against_the_version_table_naming_the_publish`] 的本体：只给已经从判定库读回的流用（崩溃放量判段）。
+/// [`judge_crash_state_range_against_the_version_table_naming_the_publish`] 的本体：只给已经从判定库读回的流用（崩溃放量判段、取样）。
+/// 每调一次现建一份枚举的表（[`TornImageTablesOfTheReadBackFlow`]）：几条线程判同一条流的，由调用方建一份、经
+/// [`CrashStatesOfTheReadBackFlow`] 共用，不逐段调这一个。
 ///
 /// # Panics
 /// `ordinals` 越过整条流的状态数。
@@ -1247,37 +1249,33 @@ pub(crate) fn judge_crash_state_range_of_the_read_back_flow(
         &CrashStateJudgement,
     ),
 ) -> u64 {
+    let tables = TornImageTablesOfTheReadBackFlow::of_the_read_back_flow(base, writes, segments);
     judge_crash_state_range_of_the_read_back_flow_with_slices(
-        base,
-        writes,
-        segments,
+        &tables.crash_states_planned_by(
+            base,
+            writes,
+            segments,
+            expansion,
+            &no_segment_slices(segments.len()),
+        ),
         judged_root_index,
         versions,
-        expansion,
-        &no_segment_slices(segments.len()),
         ordinals,
         judge_state,
     )
 }
 
-/// 同 [`judge_crash_state_range_of_the_read_back_flow`]，分片的段照 `segment_slices`（[`CrashPointReplaySegmentSlice`]，与段同序）只判那一截
-/// （崩溃放量判段读回的流带着录入段定的片）。
+/// 判 `crash_states_of_the_flow`（读回的流排好次序的全部状态，分片的段照录入段定的片只排那一截）里 `ordinals` 那几个状态
+/// （[`judge_crash_image_against_the_version_table`]），连同镜像交 `judge_state`，交回整条流的状态数。崩溃放量判段的 CPU 那一路：
+/// 几条核对线程各判一段时借同一份 `crash_states_of_the_flow`，枚举的表只建一份。
 ///
 /// # Panics
-/// 同 [`judge_crash_state_range_of_the_read_back_flow`]；片越过了段的域（`CrashStatePlan::new`）。
-#[allow(
-    clippy::too_many_arguments,
-    reason = "与 judge_crash_state_range_of_the_read_back_flow 同一组参数，另加每段的片"
-)]
+/// `ordinals` 越过整条流的状态数。
 #[must_use]
 pub(crate) fn judge_crash_state_range_of_the_read_back_flow_with_slices(
-    base: &MemoryPool,
-    writes: &[RetainedWrite],
-    segments: &[Vec<usize>],
+    crash_states_of_the_flow: &CrashStatesOfTheReadBackFlow<'_>,
     judged_root_index: usize,
     versions: CrashPointReplayVersionTable<'_>,
-    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
-    segment_slices: &[Option<CrashPointReplaySegmentSlice>],
     ordinals: Range<u64>,
     judge_state: &mut dyn FnMut(
         u64,
@@ -1286,12 +1284,7 @@ pub(crate) fn judge_crash_state_range_of_the_read_back_flow_with_slices(
         &CrashStateJudgement,
     ),
 ) -> u64 {
-    visit_crash_state_range_of_the_read_back_flow_with_slices(
-        base,
-        writes,
-        segments,
-        expansion,
-        segment_slices,
+    crash_states_of_the_flow.visit_the_states_in_the_ordinals(
         ordinals,
         &mut |ordinal, publish, image| {
             let judgement =
@@ -1301,46 +1294,104 @@ pub(crate) fn judge_crash_state_range_of_the_read_back_flow_with_slices(
     )
 }
 
-/// [`judge_crash_state_range_of_the_read_back_flow_with_slices`] 走状态的那一半（逐个交镜像、不判）：只给已经从判定库读回的流用（崩溃放量判段、过库之后），分片的段照 `segment_slices`
-/// （与段同序，不分片的段是 `None`）只走那一截。
-///
-/// # Panics
-/// `ordinals` 越过整条流的状态数；片越过了段的域（`CrashStatePlan::new`）。
-#[must_use]
-pub(crate) fn visit_crash_state_range_of_the_read_back_flow_with_slices(
-    base: &MemoryPool,
-    writes: &[RetainedWrite],
-    segments: &[Vec<usize>],
-    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
-    segment_slices: &[Option<CrashPointReplaySegmentSlice>],
-    ordinals: Range<u64>,
-    visit_state: &mut dyn FnMut(u64, CrashPointReplayPublishOfState, &CrashImage<'_>),
-) -> u64 {
-    let tearable = TearableInPlaceOverwrites::of(base, writes);
-    let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
-    let plan = CrashStatePlan::new(
-        writes,
-        segments,
-        expansion,
-        segment_slices,
-        &tearable,
-        &writes_with_torn_images,
-    );
-    assert!(
-        ordinals.end <= plan.state_count,
-        "序号段 {ordinals:?} 越过整条流的 {} 个状态",
-        plan.state_count
-    );
-    let enumerated_writes = writes_with_torn_images.writes.as_slice();
-    for ordinal in ordinals {
-        let image = CrashImage {
-            base,
-            writes: enumerated_writes,
-            persisted: plan.persisted_writes_of_state(ordinal),
-        };
-        visit_state(ordinal, plan.publish_of_state(ordinal), &image);
+/// 一条读回的流按序号段走状态要的两张表：哪几次写取三态（[`TearableInPlaceOverwrites`]）、枚举写表（录制流里的写在前，撕裂镜像与重放
+/// 接在后面，[`WritesWithTornImages`]）。两张表只随流（基镜像、写表、分段）定，与展开、片、序号段都无关。
+/// 建一次要把每次原地覆写罩住的范围整段读出、摆出等长的撕裂镜像：用过的盘上重做 mkfs、清零罩着旧 journal 环那一类，一份上 GB。
+/// 所以一个阶段只建一份、各核对线程经 [`CrashStatesOfTheReadBackFlow`] 借用，不在每一段（每条线程）里各建一份
+/// （`tests/crash_enumeration_make_filesystem_over_a_used_pool_stream.rs` 的快档：观察者录入段原来每条线程各建一份，八条线程同时建就撞了 16G 的内存上限）。
+pub(crate) struct TornImageTablesOfTheReadBackFlow {
+    tearable: TearableInPlaceOverwrites,
+    writes_with_torn_images: WritesWithTornImages,
+}
+
+impl TornImageTablesOfTheReadBackFlow {
+    /// 按崩溃点重放的口径建：每次原地覆写取三态（[`TearableInPlaceOverwrites::of`]），撕裂镜像与重放接在录制流后面。
+    ///
+    /// # Panics
+    /// 同 [`TearableInPlaceOverwrites::of`]。
+    #[must_use]
+    pub(crate) fn of_the_read_back_flow(
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+    ) -> Self {
+        let tearable = TearableInPlaceOverwrites::of(base, writes);
+        let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
+        Self {
+            tearable,
+            writes_with_torn_images,
+        }
     }
-    plan.state_count
+
+    /// 枚举写表：每个状态的镜像都叠在这一份上（[`CrashImage::writes`]）。
+    #[must_use]
+    pub(crate) fn enumerated_writes(&self) -> &[RetainedWrite] {
+        &self.writes_with_torn_images.writes
+    }
+
+    /// 按每段的展开与片排好状态的次序，交回能按序号段走状态的那一份；它只借这两张表，几条线程可以同时借用同一份。
+    /// `writes`、`segments` 与建表时给的相同。`expansion` 只在这里逐段问一次，所以它不必能跨线程。
+    ///
+    /// # Panics
+    /// 片越过了段的域（`CrashStatePlan::new`）。
+    #[must_use]
+    pub(crate) fn crash_states_planned_by<'tables>(
+        &'tables self,
+        base: &'tables MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &'tables [Vec<usize>],
+        expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+        segment_slices: &[Option<CrashPointReplaySegmentSlice>],
+    ) -> CrashStatesOfTheReadBackFlow<'tables> {
+        CrashStatesOfTheReadBackFlow {
+            base,
+            plan: CrashStatePlan::new(
+                writes,
+                segments,
+                expansion,
+                segment_slices,
+                &self.tearable,
+                &self.writes_with_torn_images,
+            ),
+        }
+    }
+}
+
+/// 一条读回的流排好次序的全部状态（[`TornImageTablesOfTheReadBackFlow::crash_states_planned_by`]）：按序号段逐个交镜像或判。
+/// 只读，几条核对线程同时借同一份、各走各的序号段（崩溃放量判段的 CPU 那一路、观察者录入段）。
+pub(crate) struct CrashStatesOfTheReadBackFlow<'tables> {
+    base: &'tables MemoryPool,
+    plan: CrashStatePlan<'tables>,
+}
+
+impl CrashStatesOfTheReadBackFlow<'_> {
+    /// 逐个交 `ordinals` 里每个状态的镜像（不判），交回整条流的状态数。
+    ///
+    /// # Panics
+    /// `ordinals` 越过整条流的状态数。
+    #[must_use]
+    pub(crate) fn visit_the_states_in_the_ordinals(
+        &self,
+        ordinals: Range<u64>,
+        visit_state: &mut dyn FnMut(u64, CrashPointReplayPublishOfState, &CrashImage<'_>),
+    ) -> u64 {
+        let plan = &self.plan;
+        assert!(
+            ordinals.end <= plan.state_count,
+            "序号段 {ordinals:?} 越过整条流的 {} 个状态",
+            plan.state_count
+        );
+        let enumerated_writes = plan.writes_with_torn_images.writes.as_slice();
+        for ordinal in ordinals {
+            let image = CrashImage {
+                base: self.base,
+                writes: enumerated_writes,
+                persisted: plan.persisted_writes_of_state(ordinal),
+            };
+            visit_state(ordinal, plan.publish_of_state(ordinal), &image);
+        }
+        plan.state_count
+    }
 }
 
 /// 每一段展开出来的状态序号区间（与 `segments` 同序，不展开的段是空区间），与整条流的状态数（最后那个全持久状态的序号是它减一）。

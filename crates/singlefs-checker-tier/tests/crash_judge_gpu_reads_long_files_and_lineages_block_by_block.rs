@@ -53,8 +53,8 @@ use singlefs_checker_tier::crash::{
 use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_checker_tier::crash_judge_gpu::{
     cross_check_words_agree_in_the_cross_check, cross_check_words_of_cpu_judgement,
-    cross_check_words_of_gpu_verdict, verdict_bits, CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD,
-    RECOVERY_OUTCOME_CODE_FILE_READ, VERDICT_WORDS,
+    cross_check_words_of_gpu_verdict, verdict_bits, CrossCheckWords, LandedRootWords,
+    POOL_CHECKER_UNDECIDABLE_WORD, RECOVERY_OUTCOME_CODE_FILE_READ, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
 use singlefs_checker_tier::crash_state_enumeration::{
@@ -80,8 +80,8 @@ use singlefs_core::unit::{
 };
 use singlefs_core::unlink::DeletionSwitches;
 use singlefs_format::{
-    INODE_LEAF_RECORDS, LINEAGE_CONTAINER_RECORDS, LINEAGE_RECORD_BYTES, MAPPING_ENTRY_BYTES,
-    MAPPING_KEY_BYTES, PACKED_UNIT_RECORDS_OFFSET,
+    INODE_LEAF_RECORDS, JOURNAL_HEADER_BYTES, JOURNAL_NAMED_ENTRY_BYTES, LINEAGE_CONTAINER_RECORDS,
+    LINEAGE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, PACKED_UNIT_RECORDS_OFFSET,
 };
 use singlefs_harness::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, RetainedWrite,
@@ -795,13 +795,14 @@ fn the_gpu_judge_reddens_like_the_cpu_judge_when_a_lineage_container_short_of_th
     assert_every_state_judged_on_the_gpu_like_the_cpu_judge(FLOW_NAME, &gpu, &cpu);
 }
 
-/// 一个状态 CPU 与 GPU 对拍字里恢复内核写的那一半：两遍 oracle 与记录核对器的红位、两遍落到的根（实例代号、checkpoint_txg 低 32 位）、
+/// 一个状态 CPU 与 GPU 对拍字里恢复内核写的那一半：两遍 oracle 与记录核对器的红位、两遍落到的根（`LandedRootWords`：落没落到根的标记、
+/// 实例代号、checkpoint_txg 低 32 位与高 32 位）、
 /// 两遍的走读结局与失败点。池级 checker 的违例位、判到位与判不了的原因字不在里面。
 #[derive(Debug, PartialEq, Eq)]
 struct RecoveryHalfOfTheCrossCheckWords {
     red_bits: u32,
-    consulted_pass_landed_root: (u32, u32),
-    ignored_pass_landed_root: (u32, u32),
+    consulted_pass_landed_root: LandedRootWords,
+    ignored_pass_landed_root: LandedRootWords,
     consulted_pass_outcome: u32,
     ignored_pass_outcome: u32,
     consulted_pass_failure_point: u32,
@@ -813,14 +814,8 @@ fn recovery_half_of_the_cross_check_words(
 ) -> RecoveryHalfOfTheCrossCheckWords {
     RecoveryHalfOfTheCrossCheckWords {
         red_bits: words.red_bits,
-        consulted_pass_landed_root: (
-            words.consulted_pass_landed_root.instance,
-            words.consulted_pass_landed_root.checkpoint_txg_low,
-        ),
-        ignored_pass_landed_root: (
-            words.ignored_pass_landed_root.instance,
-            words.ignored_pass_landed_root.checkpoint_txg_low,
-        ),
+        consulted_pass_landed_root: words.consulted_pass_landed_root,
+        ignored_pass_landed_root: words.ignored_pass_landed_root,
         consulted_pass_outcome: words.consulted_pass_outcome,
         ignored_pass_outcome: words.ignored_pass_outcome,
         consulted_pass_failure_point: words.consulted_pass_failure_point,
@@ -930,9 +925,15 @@ fn the_cpu_judges_the_invariant_on_the_states_where_the_judged_root_persisted(
 
 // ───────── 改坏被判那次的单元写、一路重封到根（另抄一份 `crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs` 那几个函数的写法）
 
-/// journal 记录头 487 字节（D23（journal 的角色与格式） 已定项 4），点名项从这里起、每项 56 字节（已定项 17）。
-const JOURNAL_RECORD_HEADER_BYTES: usize = 487;
-const JOURNAL_NAMED_ENTRY_BYTES_IN_THE_RECORD: usize = 56;
+/// journal 记录头的字节数（D23（journal 的角色与格式） 已定项 4），点名项从这里起：随格式常量 `singlefs_format::JOURNAL_HEADER_BYTES` 走，
+/// 不在这里另写数——记录头加宽过，写死的数会留在旧宽度上。
+fn journal_record_header_bytes() -> usize {
+    usize::try_from(JOURNAL_HEADER_BYTES).expect("journal 记录头的字节数装得进 usize")
+}
+/// journal 记录里一个点名项的字节数（已定项 17）：随格式常量 `singlefs_format::JOURNAL_NAMED_ENTRY_BYTES` 走。
+fn journal_named_entry_bytes() -> usize {
+    usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("journal 点名项的字节数装得进 usize")
+}
 /// 一条位置条目的字节数：盘 4 + 槽 6 + 整单元校验和 4（D19（块指针的结构与宽度预算））。
 const LOCATION_ENTRY_BYTES: usize = 14;
 /// 单元头里类标签的偏移；码 2 节点头里层级与 key 宽的偏移（`unit::parse_index_node`）。
@@ -1016,17 +1017,17 @@ fn reseal_journal_record(bytes: &mut [u8]) {
     let named = usize::try_from(u32::from_le_bytes(bytes[12..16].try_into().expect("4")))
         .expect("点名项数");
     let payload_crc = crc32_castagnoli(
-        &bytes[JOURNAL_RECORD_HEADER_BYTES
-            ..JOURNAL_RECORD_HEADER_BYTES + named * JOURNAL_NAMED_ENTRY_BYTES_IN_THE_RECORD],
+        &bytes[journal_record_header_bytes()
+            ..journal_record_header_bytes() + named * journal_named_entry_bytes()],
     );
     bytes[95..99].copy_from_slice(&payload_crc.to_le_bytes());
     let digest = wide_checksum_with_field_zeroed(bytes, 4096, 46);
     bytes[46..78].copy_from_slice(&digest);
 }
 
-/// 下一条记录该带的反向链：这一条 487 字节头、校验和字段按 0 参与的 CRC-32C。
+/// 下一条记录该带的反向链：这一条记录头（[`journal_record_header_bytes`] 那么长）、校验和字段按 0 参与的 CRC-32C。
 fn journal_chain_value(bytes: &[u8]) -> u32 {
-    let mut header = bytes[..JOURNAL_RECORD_HEADER_BYTES].to_vec();
+    let mut header = bytes[..journal_record_header_bytes()].to_vec();
     header[46..78].fill(0);
     crc32_castagnoli(&header)
 }

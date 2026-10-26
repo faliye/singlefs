@@ -73,17 +73,18 @@ fn fail_the_nth_read_of_system_configuration_slot_zero_on_each_device(
 }
 
 /// 一次可写挂载里每块盘上第几次读系统配置槽 0 是取号之前的判定那一读（`transaction::instance_generation_to_acquire`）。
-/// 判定之前每块盘各读槽 0 四次：`mount_writable` 择系统配置一次（`recovery::choose_system_configuration`）、核盘表里这块盘的本盘设备号
+/// 判定之前每块盘各读槽 0 五次：`mount_writable` 择系统配置一次（`recovery::choose_system_configuration`）、核盘表里这块盘的本盘设备号
 /// 一次（`mount::device_table_disagreeing_with` 读两槽，实审 A1b Q4）、重放里择系统配置一次（`recovery::replay_journal`）、
-/// 读阶段判「系统配置见证过比所选那一版新的发布」一次（C554 乙，`mount::newer_publish_witness` 读两槽；判假不重读）。
-/// 判定之后取号写之前重算一次。回退见证删掉之前是 7（择根、重放、影子账各读一次见证，判定之后写见证表之前
-/// 再读一次）；核本盘设备号之前是 3，C554 乙之前是 4。数法：注入点从 1 挨个试到 8，只有判定那一读让判定与重算分叉成「判定号 1、重算号 2」（实三草稿里量的）；
+/// 读阶段判「系统配置见证过比所选那一版新的发布」一次（C554 乙，`mount::newer_publish_witness` 读两槽；判假不重读）、
+/// 读阶段之后判退那一步先问一次 F2 判法的见证（`recovery::fall_back_judged_on_the_three_readers`，读两槽：判退看三样读者的并集之后
+/// 一条记录都没施加的挂载每次都读，C755）。判定之后取号写之前重算一次。回退见证删掉之前是 7（择根、重放、影子账各读一次见证，判定之后写见证表之前
+/// 再读一次）；核本盘设备号之前是 3，C554 乙之前是 4，判退看并集之前是 5。数法：注入点从 1 挨个试到 8，只有判定那一读让判定与重算分叉成「判定号 1、重算号 2」（实三草稿里量的）；
 /// 读法变了（多读或少读一次），这个数跟着改，注入点就还是判定那一读。
-const DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT: u64 = 5;
+const DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT: u64 = 6;
 
 /// 取号之前判定算出的号与取号写之前重算的号不同，取号不写、报错（m2-emptypool-nonempty-r1 云端攻方腿 Z2）：mkfs 之后第一次可写挂载崩在
 /// 取号第一轮两写之后、第二轮落盘之前（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1，槽 1 还是 mkfs 写的号 0——取号写两轮
-/// （甲'）之后这一形只在两轮之间崩才有，用例取完号把两盘槽 1 写回取号之前的字节来造），重开时两块盘在判定那一读上（第 5 次读系统配置槽 0，
+/// （甲'）之后这一形只在两轮之间崩才有，用例取完号把两盘槽 1 写回取号之前的字节来造），重开时两块盘在判定那一读上（第 6 次读系统配置槽 0，
 /// `DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT`）各报一次瞬时读错——
 /// 判定那一遍只看到 mkfs 的槽 1（号 0）、算出号 1、要写的行区间为空放行；取号重算读到号 1、算出号 2 ⇒ 返回
 /// `InstanceGenerationChangedBeforeAcquisition { expected: 1, recomputed: 2 }`，`DiskSnapshot` 不变。
@@ -709,7 +710,7 @@ fn a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before
 }
 
 /// 根记录里分配记录树根指针那 86 字节在根槽里的位置（D22（单元原子性怎么合成） 已定项 7 的偏移表：
-/// 中央映射树根指针 256、分配记录树根指针 342、算法类型 428）。
+/// 中央映射树根指针 256、分配记录树根指针 342、回收门槛 t 428）。
 const ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT_POINTER: std::ops::Range<usize> = 342..428;
 
 /// 一条根在根环里那个槽的原样字节，从盘上那一份读（不经核心层的解析）。

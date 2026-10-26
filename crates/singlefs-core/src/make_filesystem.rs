@@ -1,8 +1,13 @@
 //! mkfs（里程碑「新池新建文件」步 1）：吃 N 块设备，写出一个能被挂载、但一个文件都没有的池。
 //!
-//! 写序（字节表零 m1..m4；段序列 `12+1+1+1+4`）：根环三个区域与 journal 环整环清零（每块盘 4 次写零调用）→
-//! 实例表单元第 0 片与树表单元第 0 版（两盘各一份）→ 屏障 →
+//! 写序（字节表零 m1..m4；段序列 `2+12+1+1+1+4`，D22（单元原子性怎么合成） 已定项 8 第 3 条的两趟写序）：
+//! 每块盘 [0, 根环基址) 整段清零（两块盘各一次写零调用）→ 两块盘各一道屏障（作废：旧池的系统配置槽从此读不出）→
+//! 根环三个区域与 journal 环整环清零（每块盘 4 次写零调用）→ 实例表单元第 0 片与树表单元第 0 版（两盘各一份）→ 屏障 →
 //! 第 0 代根记录种进三个区域各自槽 0（各一道 FUA 写）→ 每盘两个系统配置槽都写世代号 1 → 屏障。
+//!
+//! 两个入口（用户 2026-10-20 定「对外生成，留内层入口」）：对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
+//! 从随机源取 fsid（前 8 字节就是随机源给的，单元头只带这 8 字节）；内层入口 [`make_filesystem`] 的 fsid 由调用方给，
+//! 给测试、装置、崩溃点重放与 C484、C651 的回归用例用：同参数同 fsid 两次逐字节相同。
 //!
 //! 清零 2026-09-22 起由 mkfs 自己做（用户 2026-09-19 定案「块设备抽象加写零」，
 //! `records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行；里程碑「覆盖写、释放、回退与复用」并行线四）：
@@ -28,8 +33,11 @@ use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::bytes::ByteWriter;
 use crate::checksum::crc32_castagnoli;
 use crate::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
-use crate::root_record::{RootRecord, UnmountMarker};
-use crate::root_ring::{region_length_in_bytes, region_start, ring_end, slot_offset, RootRingSlot};
+use crate::root_record::{PinnedRingSlot, RootRecord, UnmountMarker};
+use crate::root_ring::{
+    region_length_in_bytes, region_start, ring_end, slot_offset,
+    DefaultSlotsPerRegionBelowTheFirstVersionFloor, RootRingSlot, RootRingSlotsPerRegion,
+};
 use crate::system_configuration::{
     journal_in_flight_record_limit, journal_in_flight_record_limit_fits_its_four_byte_field,
     InodeRecordTruncationFieldsOfThePool, SystemConfiguration, SystemImmutableConfiguration,
@@ -43,6 +51,9 @@ use crate::unit::{
 
 /// mkfs 写实例代号 0（D23（journal 的角色与格式） 已定项 16）。
 pub const MKFS_INSTANCE_GENERATION: InstanceGeneration = InstanceGeneration(0);
+/// mkfs 种进根环的第 0 代根的 checkpoint_txg：读根环时它照 [`genesis_root_ring_slots`] 另认槽位，不按落点公式
+/// （`root_ring::root_sits_in_the_ring_slot_the_formula_gives`，C743）。
+pub const GENESIS_CHECKPOINT_TXG: CheckpointTxg = CheckpointTxg(0);
 /// 系统配置槽世代号从 1 起，mkfs 把两个槽都种上 1（D22（单元原子性怎么合成） 已定项 16）。
 pub const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
 /// mkfs 写的回退下界 F：第 0 代根与每个系统配置槽两处都写 0（`.claude/kb/layout/01-first-txn.md` 一「回退下界 F」、
@@ -63,7 +74,9 @@ pub const TREE_TABLE_KEY_WIDTH: usize = 8;
 pub const FIRST_VERSION_REGION_DEVICES: [DeviceIdentity; 3] =
     [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)];
 
-/// mkfs 的参数：fsid 与时间戳都是参数，同参数两次 mkfs 逐字节相同（里程碑步 1 验收）。
+/// mkfs 的参数。内层入口 [`make_filesystem`] 照 `filesystem_identifier` 写，同参数（连同同一个 fsid）两次逐字节相同
+/// （里程碑步 1 验收，用户 2026-10-20 改成「同参数同 fsid」）；对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
+/// 不收 fsid，从随机源取、填进交回的这一份参数里。
 ///
 /// 三样都进系统不可变配置那一档（D22（单元原子性怎么合成） 已定项 26 第一档：改了要重建文件系统）；
 /// 那一档里剩下的本盘设备号与设备数不是参数——mkfs 逐盘现填、按池里的盘数现数。
@@ -118,7 +131,7 @@ pub enum SlotJudgedForAlignment {
 /// mkfs 能出的错：几何放不下，或底层块设备错。几何那几样都在任何写之前判（[`make_filesystem`] 的第一步）。
 #[derive(Debug)]
 pub enum MakeFilesystemError {
-    /// 根槽宽（= 参数里的 physical_block_size）装不下根记录（457 字节，D22（单元原子性怎么合成） 已定项 7）。
+    /// 根槽宽（= 参数里的 physical_block_size）装不下根记录（466 字节，D22（单元原子性怎么合成） 已定项 7）。
     RootSlotNarrowerThanTheRootRecord {
         physical_block_size: u32,
         root_record_bytes: u64,
@@ -201,6 +214,14 @@ pub enum MakeFilesystemError {
     RegionDevicesNotTheFirstVersionLayout {
         region_devices: [DeviceIdentity; 3],
     },
+    /// 第一版 mkfs 按固定结构槽距算出的默认每区槽数 S 小于 5（[`first_version_make_filesystem_geometry`]，D22（单元原子性怎么合成）
+    /// 已定项 16 第 3 句「小于 5 拒绝 mkfs」）：算几何那一步就交回，盘上一个字节都没动。显式给 S 的建池入口（[`make_filesystem`]
+    /// 照 `geometry` 里的 S 写）不出这一个。
+    DefaultSlotsPerRegionBelowTheFirstVersionFloor(DefaultSlotsPerRegionBelowTheFirstVersionFloor),
+    /// 对外入口取 fsid 的随机源（默认 [`RANDOM_SOURCE_PATH`]，或调用方点名的那个文件）打不开或读不满 16 字节：在任何写之前交回，
+    /// 盘上一个字节都没动。只有两个对外入口（[`make_filesystem_drawing_the_filesystem_identifier`] 与
+    /// [`make_filesystem_drawing_the_filesystem_identifier_from_the_random_source_at`]）出这一个。
+    RandomSourceUnreadable(std::io::Error),
     BlockDevice(BlockDeviceError),
 }
 
@@ -208,6 +229,86 @@ impl From<BlockDeviceError> for MakeFilesystemError {
     fn from(error: BlockDeviceError) -> Self {
         MakeFilesystemError::BlockDevice(error)
     }
+}
+
+/// 对外入口取 fsid 的随机源：内核的随机数设备，只用 std 读（不加第三方依赖）。
+pub const RANDOM_SOURCE_PATH: &str = "/dev/urandom";
+
+/// 从默认随机源（[`RANDOM_SOURCE_PATH`]）读一个 16 字节的 fsid。前 8 字节进每个单元头（`unit::unit_filesystem_identifier`），
+/// 两次 mkfs 撞上同一个前 8 字节的概率按 2⁻⁶⁴ 算（推的）；撞上的那一形是 C659（fsid 前 8 字节相同时重做 mkfs 实例代号不变式红）
+/// 认下的已知形态。
+///
+/// # Errors
+/// 随机源打不开或读不满 16 字节：[`MakeFilesystemError::RandomSourceUnreadable`]。
+pub fn filesystem_identifier_from_the_random_source() -> Result<[u8; 16], MakeFilesystemError> {
+    filesystem_identifier_from_the_random_source_at(std::path::Path::new(RANDOM_SOURCE_PATH))
+}
+
+/// 从 `random_source_path` 那个随机源读一个 16 字节的 fsid。打不开、读不满都只交回错，不退回别的来源
+/// （m3-close-w13-code-r1 判决第二节 K2「随机源打不开、读不满都在任何写之前拒，不退回别的来源」）。
+///
+/// # Errors
+/// 随机源打不开或读不满 16 字节：[`MakeFilesystemError::RandomSourceUnreadable`]。
+pub fn filesystem_identifier_from_the_random_source_at(
+    random_source_path: &std::path::Path,
+) -> Result<[u8; 16], MakeFilesystemError> {
+    use std::io::Read;
+    let mut filesystem_identifier = [0u8; 16];
+    std::fs::File::open(random_source_path)
+        .and_then(|mut random_source| random_source.read_exact(&mut filesystem_identifier))
+        .map_err(MakeFilesystemError::RandomSourceUnreadable)?;
+    Ok(filesystem_identifier)
+}
+
+/// 对外入口做成的池：带着随机源取的 fsid 的那一份参数（挂载、接着写都要它），与 mkfs 写出的东西。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FilesystemMadeWithADrawnIdentifier {
+    pub parameters: MakeFilesystemParameters,
+    pub output: MakeFilesystemOutput,
+}
+
+/// 对外入口：fsid 从随机源取（[`filesystem_identifier_from_the_random_source`]），再照内层入口 [`make_filesystem`] 写
+/// （D22（单元原子性怎么合成） 已定项 8 第 3 条「fsid 由 mkfs 的对外入口生成，前 8 字节取自随机源」）。
+/// 取 fsid 在任何写之前：随机源读不出就一个字节都不写。
+///
+/// # Errors
+/// 随机源读不出（[`MakeFilesystemError::RandomSourceUnreadable`]），或内层入口的错。
+pub fn make_filesystem_drawing_the_filesystem_identifier<Device: BlockDevice>(
+    region_devices: [DeviceIdentity; 3],
+    geometry: SystemImmutableSizes,
+    devices: &mut [(DeviceIdentity, Device)],
+) -> Result<FilesystemMadeWithADrawnIdentifier, MakeFilesystemError> {
+    make_filesystem_drawing_the_filesystem_identifier_from_the_random_source_at(
+        std::path::Path::new(RANDOM_SOURCE_PATH),
+        region_devices,
+        geometry,
+        devices,
+    )
+}
+
+/// 同 [`make_filesystem_drawing_the_filesystem_identifier`]，随机源换成 `random_source_path` 那个文件（对外入口能换随机源：
+/// 打不开、读不满两支要在测试里造得出来，m3-close-w13-code-r1 判决第三节改法表「K2 失败分支没有用例」那一行）。
+/// 取 fsid 在任何写之前：随机源读不出就一个字节都不写，也不退回 [`RANDOM_SOURCE_PATH`] 或别的来源。
+///
+/// # Errors
+/// 随机源读不出（[`MakeFilesystemError::RandomSourceUnreadable`]），或内层入口的错。
+pub fn make_filesystem_drawing_the_filesystem_identifier_from_the_random_source_at<
+    Device: BlockDevice,
+>(
+    random_source_path: &std::path::Path,
+    region_devices: [DeviceIdentity; 3],
+    geometry: SystemImmutableSizes,
+    devices: &mut [(DeviceIdentity, Device)],
+) -> Result<FilesystemMadeWithADrawnIdentifier, MakeFilesystemError> {
+    let drawn_filesystem_identifier =
+        filesystem_identifier_from_the_random_source_at(random_source_path)?;
+    let parameters = MakeFilesystemParameters {
+        filesystem_identifier: drawn_filesystem_identifier,
+        region_devices,
+        geometry,
+    };
+    let output = make_filesystem(&parameters, devices)?;
+    Ok(FilesystemMadeWithADrawnIdentifier { parameters, output })
 }
 
 /// mkfs 写出的三样东西与它按环长现算的单元区起点，给验收与步 5 用。
@@ -468,7 +569,40 @@ fn check_geometry(
     Ok(unit_area_start)
 }
 
-/// 对两块设备做 mkfs。`devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
+/// 第一版 mkfs 的几何：槽距 = 4096 向上取整到 io_min 的整数倍（[`SystemImmutableSizes::slot_spacing_for`]，D2（RAID 条带策略） 已定项 19），
+/// 每区槽数 S 取第一版 mkfs 的默认值 min(8, ⌊P × chunk ÷ 槽距⌋)（[`RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing`]，
+/// D22（单元原子性怎么合成） 已定项 16 第 3 句）。交回的几何放进 [`MakeFilesystemParameters::geometry`] 交 [`make_filesystem`]，
+/// 根槽宽、环长那几判照旧在那里（[`check_geometry`]）。显式给 S 的建池入口不经这里：调用方自己填 `geometry` 里的 S。
+///
+/// # Errors
+/// 默认 S 小于 5（槽距大于 3 MiB ÷ 5，例如 io_min 1 MiB）：[`MakeFilesystemError::DefaultSlotsPerRegionBelowTheFirstVersionFloor`]。
+pub fn first_version_make_filesystem_geometry(
+    physical_block_size: u32,
+    minimum_input_output_bytes: u32,
+    journal_ring_bytes: u64,
+) -> Result<SystemImmutableSizes, MakeFilesystemError> {
+    let fixed_structure_slot_spacing =
+        SystemImmutableSizes::slot_spacing_for(minimum_input_output_bytes);
+    let root_ring_slots_per_region =
+        RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing(
+            fixed_structure_slot_spacing,
+        )
+        .map_err(MakeFilesystemError::DefaultSlotsPerRegionBelowTheFirstVersionFloor)?;
+    Ok(SystemImmutableSizes {
+        physical_block_size,
+        minimum_input_output_bytes,
+        fixed_structure_slot_spacing,
+        journal_ring_bytes,
+        root_ring_slots_per_region,
+    })
+}
+
+/// 内层入口：对两块设备做 mkfs，fsid 照调用方给的 `parameters.filesystem_identifier` 写，不另取。给测试、装置、崩溃点重放
+/// 与 C484、C651 的回归用例用（同参数同 fsid 两次逐字节相同）；对外的入口是 [`make_filesystem_drawing_the_filesystem_identifier`]。
+/// `devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
+///
+/// # Errors
+/// 几何判定不过（都在任何写之前），或底层块设备错。
 pub fn make_filesystem<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
     devices: &mut [(DeviceIdentity, Device)],
@@ -478,6 +612,8 @@ pub fn make_filesystem<Device: BlockDevice>(
         2,
         "第一版跑 2 块盘（D2（RAID 条带策略） 已定项 9）"
     );
+    // 单元、根、系统配置三处写的 fsid 都取这一个：内层入口照调用方给的写。
+    let filesystem_identifier = parameters.filesystem_identifier;
     let sizes: Vec<(DeviceIdentity, u64)> = devices
         .iter()
         .map(|(identity, device)| (*identity, device.size_in_bytes()))
@@ -487,7 +623,7 @@ pub fn make_filesystem<Device: BlockDevice>(
     let tree_table_genesis_placement = tree_table_genesis_placement_at(unit_area_start);
     let identities: Vec<DeviceIdentity> = sizes.iter().map(|(identity, _)| *identity).collect();
     let instance = MKFS_INSTANCE_GENERATION;
-    let genesis = CheckpointTxg(0);
+    let genesis = GENESIS_CHECKPOINT_TXG;
     let genesis_write_order = WriteOrder {
         instance,
         transaction: 0,
@@ -507,7 +643,7 @@ pub fn make_filesystem<Device: BlockDevice>(
         u16::try_from(INSTANCE_ROW_BYTES).expect("88"),
         &[instance_table_chain_record()],
         genesis,
-        &parameters.filesystem_identifier,
+        &filesystem_identifier,
         genesis_write_order,
         instance_table_sequence,
     );
@@ -518,7 +654,7 @@ pub fn make_filesystem<Device: BlockDevice>(
         &[0u8; 8],
         &[0u8; 8],
         genesis,
-        &parameters.filesystem_identifier,
+        &filesystem_identifier,
         instance,
         tree_table_sequence,
         u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"),
@@ -529,19 +665,22 @@ pub fn make_filesystem<Device: BlockDevice>(
     // 凑出一条合法记录的概率不是 0（上一次 mkfs 留下的就是真合法的记录），而「这块盘是新建的全零镜像」
     // 是装置的假设、真设备上不成立。
     // 根环非清不可（C484（mkfs 不清根环，同 fsid 重来旧根还择得中））：挡住旧池那几条根的只有 fsid，
-    // 而 fsid 是调用方给的（`MakeFilesystemParameters::filesystem_identifier`，mkfs 自己不生成）⇒
-    // 拿同一个 fsid 在用过的盘上重做 mkfs，旧池留在槽 1..7 里的根照样自证得过、解得开，
+    // 而内层入口的 fsid 是调用方给的（`MakeFilesystemParameters::filesystem_identifier`；对外入口才从随机源取）⇒
+    // 经内层入口拿同一个 fsid 在用过的盘上重做 mkfs，旧池留在槽 1..7 里的根照样自证得过、解得开，
     // `choose_root` 按 (checkpoint_txg, 实例代号) 取最大还会择中它——而它指着的树表、实例表、分配记录都是旧池的账。
     // 三个区域在每块盘上都清，不按 `region_devices` 只清本盘要读的那几段：区域归属是参数、设备身份是调用方给的，
     // 按参数清要多查一次表，还会在别的盘上留下「本池 fsid、自证得过、这一版读不到」的根记录，
     // 它今天读不到全靠择根与 checker 两处各自按归属读（`recovery::visit_valid_roots`、
     // `singlefs-checker` 的 `image.rs`），任一处以后改成扫全部盘，漏就回来了。
     // 按几何清之后 mkfs 的后置条件只有一句：根环三段在每块盘上只剩这次写下的三条第 0 代根，别处全 0。
-    // 次序与屏障：清零按设备内偏移升序发（[0, 1 MiB)，根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
+    // 次序与屏障（D22（单元原子性怎么合成） 已定项 8 第 3 条的两趟写序，三方判决 `research/prompts/m3-close-c656-r3-main-verification.md`
+    // 第二节 S3，用户 2026-10-20 定）：每块盘先清 [0, 根环基址)，两块盘各过一道屏障（作废），之后才写别的。
+    // 作废那道屏障把 mkfs 中途崩溃的结局分成两截：作废持久之前，两块盘是同一个池时旧池读回最后确认的一版；作废持久之后，
+    // 下一次挂载只有整池拒（`NoValidSystemConfiguration`）或恢复读回第 0 代空池两种结局，不读回旧池的任何一版，也不让新系统配置与旧池的根并存
+    // （少了它，清根环、清 journal 环与清 [0, 根环基址) 同在一段，旧池的系统配置还在而它的根已被清掉的状态摆得出来）。
+    // 其余清零按设备内偏移升序发（根环 1 / 4 / 7 MiB，journal 环 16 MiB），与单元写同段、之间不另加屏障——
     // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过固定结构两两不重叠；单元区起点是环末尾的下一个槽）；真正重叠的是清根环与根槽 FUA 写
-    //（区域 r 的槽 0）、清 [0, 1 MiB) 与系统配置两槽的写，这两对都由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
-    // mkfs 中途崩溃第一版没有条款（崩溃点重放从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
-    // mkfs 那一行的「崩溃点重放枚举」格写「不在」），不为一个没有条款的语义加屏障。
+    //（区域 r 的槽 0）、清 [0, 1 MiB) 与系统配置两槽的写，前一对由单元写之后、根 FUA 之前那道屏障隔开，后一对由作废那道屏障隔开，不靠发出次序。
     // 清的是 S 个槽那么长的一段，S 取 mkfs 参数里的那个——这一次写进系统配置的也是它，
     // 于是「mkfs 清了多长」与「挂载时按多长读」出自同一个数。
     let root_ring_region_bytes = region_length_in_bytes(
@@ -549,7 +688,7 @@ pub fn make_filesystem<Device: BlockDevice>(
         parameters.geometry.root_ring_slots_per_region,
     );
     let journal_ring_start = DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES);
-    // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前（按偏移升序）：系统配置两槽住在这一段里，
+    // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前、自成一段：系统配置两槽住在这一段里，
     // 槽 1 的偏移随槽距走。在用过的盘上换一个 io_min 重做 mkfs，旧池写在别的槽距上的槽 1 自证得过、记的槽距也等于它所在的偏移，
     // 全池没有可用的槽 0 时逐档读槽 1 的读者（恢复与池级 checker）分不出它与本池的槽 1、按世代号会择中它
     // （C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同） 第一轮判决岔路 W，用户 2026-10-02 定 W1 mkfs 清零，
@@ -557,6 +696,12 @@ pub fn make_filesystem<Device: BlockDevice>(
     let root_ring_base = region_start(0);
     for (_, device) in devices.iter_mut() {
         device.write_zeroes_at(DeviceOffsetInBytes(0), root_ring_base.0)?;
+    }
+    // 作废那道屏障：两块盘的 [0, 根环基址) 清零都持久之后，旧池的系统配置槽一槽都读不出，才写别的。
+    for (_, device_whose_system_configuration_area_was_zeroed) in devices.iter_mut() {
+        device_whose_system_configuration_area_was_zeroed.barrier()?;
+    }
+    for (_, device) in devices.iter_mut() {
         for region_to_clear in 0..ROOT_RING_REGIONS {
             device.write_zeroes_at(region_start(region_to_clear), root_ring_region_bytes)?;
         }
@@ -579,7 +724,7 @@ pub fn make_filesystem<Device: BlockDevice>(
     }
 
     let root = RootRecord {
-        filesystem_identifier: parameters.filesystem_identifier,
+        filesystem_identifier,
         unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
         instance,
         checkpoint_txg: genesis,
@@ -615,6 +760,9 @@ pub fn make_filesystem<Device: BlockDevice>(
         // mkfs 的第 0 代不写分配记录树：这一版的账由实例表与树表两条指针直接算得出
         // （`mount::format_time_allocator`，字节表五里 m1 / m2 两条分配代 0 的记录）。
         allocation_record_tree_root: NodePointer::empty_root(),
+        // mkfs 第 0 代：回收门槛 t = 0、钉槽 p = 255（没有钉着的槽；C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）。
+        reclaim_threshold: CheckpointTxg(0),
+        pinned_ring_slot: PinnedRingSlot::NO_SLOT_PINNED,
     };
     let root_slot_bytes = usize::try_from(parameters.geometry.physical_block_size).expect("根槽宽");
     let root_slot = root.to_slot(root_slot_bytes);
@@ -632,7 +780,7 @@ pub fn make_filesystem<Device: BlockDevice>(
     for (identity, device) in devices.iter_mut() {
         let system_configuration = SystemConfiguration {
             immutable: SystemImmutableConfiguration {
-                filesystem_identifier: parameters.filesystem_identifier,
+                filesystem_identifier,
                 this_device: *identity,
                 device_count: u32::try_from(identities.len()).expect("设备数"),
                 region_devices: parameters.region_devices,
@@ -672,8 +820,9 @@ pub fn make_filesystem<Device: BlockDevice>(
 }
 
 /// mkfs 在根环上种第 0 代根的那几个槽：三个区域各自的槽 0。`make_filesystem` 按它写，
-/// `root_ring_occupancy_after_make_filesystem` 按它记——两处出自同一份，各写一份会分叉。
-fn genesis_root_ring_slots() -> impl Iterator<Item = RootRingSlot> {
+/// `root_ring_occupancy_after_make_filesystem` 按它记，读根环核落点时第 0 代根按它另认
+/// （`root_ring::root_sits_in_the_ring_slot_the_formula_gives`）——几处出自同一份，各写一份会分叉。
+pub fn genesis_root_ring_slots() -> impl Iterator<Item = RootRingSlot> {
     (0..ROOT_RING_REGIONS).map(|region| RootRingSlot { region, slot: 0 })
 }
 

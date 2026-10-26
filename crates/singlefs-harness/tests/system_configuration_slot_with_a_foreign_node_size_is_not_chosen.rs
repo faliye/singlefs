@@ -92,7 +92,8 @@ fn every_slot_with_a_foreign_node_size_refuses_choosing_the_system_configuration
 }
 
 /// 场景：盘 0 槽 0 的节点大小换成 8192，别的三槽不动。
-/// 预期：池级 checker 判这一槽点名节点大小；旁路报告把盘 0 记成少一槽自证过（可写挂载会拒），盘 0 槽 1 还自证过、不算两槽全废。
+/// 预期：池级 checker 判这一槽点名节点大小；旁路报告把盘 0 记成少一槽自证过（带读故障时可能判不出而拒；没有读故障时挂得上，
+/// 取号写两轮补回那一槽），盘 0 槽 1 还自证过、不算两槽全废。
 #[test]
 fn the_pool_checker_refuses_the_slot_with_a_foreign_node_size_as_not_self_verified() {
     let mut image = build_pool("foreign-node-size-checker-one-slot").memory_pool();
@@ -100,7 +101,7 @@ fn the_pool_checker_refuses_the_slot_with_a_foreign_node_size_as_not_self_verifi
         system_configuration_redundancy_report(&image),
         SystemConfigurationRedundancyReport {
             devices_without_a_self_verified_slot: Vec::new(),
-            devices_whose_writable_mount_would_be_refused: Vec::new(),
+            devices_with_fewer_than_two_self_verified_slots: Vec::new(),
         },
         "改之前每块盘两槽都自证过"
     );
@@ -116,7 +117,7 @@ fn the_pool_checker_refuses_the_slot_with_a_foreign_node_size_as_not_self_verifi
         system_configuration_redundancy_report(&image),
         SystemConfigurationRedundancyReport {
             devices_without_a_self_verified_slot: Vec::new(),
-            devices_whose_writable_mount_would_be_refused: vec![0],
+            devices_with_fewer_than_two_self_verified_slots: vec![0],
         },
         "盘 0 少一槽自证过：节点大小不对的槽当自证不过"
     );

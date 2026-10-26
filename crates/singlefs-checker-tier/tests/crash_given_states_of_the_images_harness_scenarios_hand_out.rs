@@ -84,6 +84,8 @@ mod scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring;
 mod scenarios_of_overwrite_in_one_instance;
 #[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/publish_failure_resent_unchanged.rs"]
 mod scenarios_of_publish_failure_resent_unchanged;
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/quarantine_mark_agrees_with_the_references.rs"]
+mod scenarios_of_quarantine_mark_agrees_with_the_references;
 #[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs"]
 mod scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table;
 #[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs"]
@@ -173,13 +175,15 @@ use common_given_states_of_harness_scenario_images::{
 use common_images_for_the_checker_tier::{
     PoolCheckerExpectation, PoolCheckerImage, PoolCheckerImages,
 };
-use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
-use singlefs_checker::walk::ContainerCapacityKnobs;
+use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
+use singlefs_checker::walk::{check_pool_image_naming_the_violation_sites, ContainerCapacityKnobs};
 use singlefs_checker_tier::crash_given_states::GivenStatesOfATable;
 use singlefs_harness::fault_injection::{
     classify_the_pool_checker_verdicts_of_the_images_after_a_fault, FailureAfterAFault,
     ImagesAfterAFault, KnownRedFormAtAFault, KnownRedFormOnlyAfterAFault,
+    PoolCheckerVerdictsOfTheImagesAfterAFault, ViolationsNamingTheSites,
 };
+use singlefs_harness::history::FailureSignature;
 #[cfg(feature = "gpu")]
 use {
     common_given_states_of_harness_scenario_images::ITEM_NAME,
@@ -498,6 +502,60 @@ fn c393_checker_on_a_persistently_damaged_tree_table_without_reuse() {
     judge_the_images_a_harness_scenario_hands_out(
         "c393_checker_on_a_persistently_damaged_tree_table_without_reuse",
         scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_checker_on_a_persistently_damaged_tree_table_without_reuse,
+    );
+}
+
+// ─── harness 档 `tests/checker_quarantine_mark_agrees_with_the_references.rs` ───
+
+/// 与 harness 档 `crates/singlefs-harness/tests/checker_quarantine_mark_agrees_with_the_references.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_carrying_the_mark_on_both_devices_is_exempted_without_reading_its_copies`）。
+#[test]
+fn a_quarantine_carrying_the_mark_on_both_devices_is_exempted_without_reading_its_copies() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_quarantine_carrying_the_mark_on_both_devices_is_exempted_without_reading_its_copies",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_carrying_the_mark_on_both_devices_is_exempted_without_reading_its_copies,
+    );
+}
+
+/// 与 harness 档 `crates/singlefs-harness/tests/checker_quarantine_mark_agrees_with_the_references.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_carrying_the_mark_on_one_device_only_is_violated_by_the_third_sentence`）。
+#[test]
+fn a_quarantine_carrying_the_mark_on_one_device_only_is_violated_by_the_third_sentence() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_quarantine_carrying_the_mark_on_one_device_only_is_violated_by_the_third_sentence",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_carrying_the_mark_on_one_device_only_is_violated_by_the_third_sentence,
+    );
+}
+
+/// 与 harness 档 `crates/singlefs-harness/tests/checker_quarantine_mark_agrees_with_the_references.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_quarantine_mark_agrees_with_the_references::a_record_carrying_the_mark_under_a_unit_the_newest_root_references_is_violated_by_the_second_sentence`）。
+#[test]
+fn a_record_carrying_the_mark_under_a_unit_the_newest_root_references_is_violated_by_the_second_sentence(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_record_carrying_the_mark_under_a_unit_the_newest_root_references_is_violated_by_the_second_sentence",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_record_carrying_the_mark_under_a_unit_the_newest_root_references_is_violated_by_the_second_sentence,
+    );
+}
+
+/// 与 harness 档 `crates/singlefs-harness/tests/checker_quarantine_mark_agrees_with_the_references.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_without_the_mark_is_violated_whether_or_not_its_copies_read_back`）。
+#[test]
+fn a_quarantine_without_the_mark_is_violated_whether_or_not_its_copies_read_back() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_quarantine_without_the_mark_is_violated_whether_or_not_its_copies_read_back",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_without_the_mark_is_violated_whether_or_not_its_copies_read_back,
+    );
+}
+
+/// 与 harness 档 `crates/singlefs-harness/tests/checker_quarantine_mark_agrees_with_the_references.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_quarantine_mark_agrees_with_the_references::a_unit_whose_records_fall_into_two_allocation_record_trees_carrying_the_mark_in_one_only_is_violated_by_the_third_sentence`）。
+#[test]
+fn a_unit_whose_records_fall_into_two_allocation_record_trees_carrying_the_mark_in_one_only_is_violated_by_the_third_sentence(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_unit_whose_records_fall_into_two_allocation_record_trees_carrying_the_mark_in_one_only_is_violated_by_the_third_sentence",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_unit_whose_records_fall_into_two_allocation_record_trees_carrying_the_mark_in_one_only_is_violated_by_the_third_sentence,
     );
 }
 
@@ -2431,34 +2489,34 @@ fn one_crash_before_the_row_root_then_a_mount_keeps_the_allocated_statistic_with
 // ─── harness 档 `tests/release_checksum_quarantine.rs` ───
 
 /// 与 harness 档 `crates/singlefs-harness/tests/release_checksum_quarantine.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
-/// `scenarios_of_release_checksum_quarantine::quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read`）。
+/// `scenarios_of_release_checksum_quarantine::quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back`）。
 #[test]
-fn quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read(
+fn quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back(
 ) {
     judge_the_images_a_harness_scenario_hands_out(
-        "quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read",
-        scenarios_of_release_checksum_quarantine::quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read,
+        "quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back",
+        scenarios_of_release_checksum_quarantine::quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back,
     );
 }
 
 /// 与 harness 档 `crates/singlefs-harness/tests/release_checksum_quarantine.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
-/// `scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not`）。
+/// `scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back`）。
 #[test]
-fn unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not() {
+fn unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back(
+) {
     judge_the_images_a_harness_scenario_hands_out(
-        "unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not",
-        scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_exempts_its_records_on_every_device_and_two_intact_copies_do_not,
+        "unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back",
+        scenarios_of_release_checksum_quarantine::unit_with_one_failing_copy_carries_the_mark_on_every_device_and_stays_exempted_once_both_copies_read_back,
     );
 }
 
 /// 与 harness 档 `crates/singlefs-harness/tests/release_checksum_quarantine.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
-/// `scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry`）。
+/// `scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark`）。
 #[test]
-fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry(
-) {
+fn quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark() {
     judge_the_images_a_harness_scenario_hands_out(
-        "quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry",
-        scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_against_the_checksum_in_its_location_entry,
+        "quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark",
+        scenarios_of_release_checksum_quarantine::quarantined_copy_that_is_a_whole_other_self_verifying_unit_is_exempted_by_the_mark,
     );
 }
 
@@ -3345,9 +3403,11 @@ fn checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_r
 const MAKE_FILESYSTEM_UNFINISHED: &str =
     "mkfs 在写到系统配置之前就报错：盘上没有一份自证过的系统配置，GPU 判器建不出判表";
 
-/// 一个注入点交出去的盘（`fault_injection::ImagesAfterAFault`）重建成镜像（每步镜像、重开的那张、被吞的写插回去那张各一张表），
-/// 经给定状态引擎判池级 checker，结论交 harness 的归类（`fault_injection::classify_the_pool_checker_verdicts_of_the_images_after_a_fault`）。
-/// 交回归好类的失败；这一趟不作数交 `None`。`the_gpu_may_refuse_the_reopened_image_because` 给了就是许 GPU 建不出重开那一张的判表。
+/// 一个注入点交出去的盘（`fault_injection::ImagesAfterAFault`）重建成镜像（每步镜像、重开的那张、被吞的写插回去那张各一张表；第一张判红的每步镜像那一刻之前
+/// 吞过写时，再加它的按步对照盘一张，另起一趟引擎判），经给定状态引擎判池级 checker，结论交 harness 的归类
+/// （`fault_injection::classify_the_pool_checker_verdicts_of_the_images_after_a_fault`）。归类器按（不变量, 盘, 槽）比要的违例点名由 CPU 参照判同一张盘交
+/// （[`violations_naming_the_sites_by_the_cpu_reference`]）。交回归好类的失败；这一趟不作数交 `None`。
+/// `the_gpu_may_refuse_the_reopened_image_because` 给了就是许 GPU 建不出重开那一张的判表。
 fn failures_after_a_fault_judged_through_the_library(
     scenario_name: &str,
     handed_out: &ImagesAfterAFault,
@@ -3382,36 +3442,140 @@ fn failures_after_a_fault_judged_through_the_library(
         ContainerCapacityKnobs::PRODUCT,
         JudgedAfreshRegardlessOfTheExpectations::OnlyIfAnImageExpectsIt,
     )?;
-    let violations_of = |judged: &ConclusionsOfAnImage| -> Vec<(&'static str, String)> {
-        let [state] = judged.states.as_slice() else {
-            panic!("一张镜像一个状态，交回 {} 个", judged.states.len());
-        };
-        state.pool_checker_violations()
-    };
     let step_images = pool_images.step_images.len();
     let violations_of_the_step_images: Vec<Vec<(&'static str, String)>> = conclusions
         [..step_images]
         .iter()
-        .map(violations_of)
+        .map(pool_checker_violations_of_the_only_state)
         .collect();
-    let violations_after_the_fault = violations_of(&conclusions[step_images]);
-    let invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet<&'static str> =
-        conclusions
-            .get(step_images + 1)
-            .map_or_else(BTreeSet::new, |landed| {
-                violations_of(landed)
-                    .into_iter()
-                    .map(|(invariant, _)| invariant)
-                    .collect()
+    let first_red_step_image = violations_of_the_step_images
+        .iter()
+        .position(|violations| !violations.is_empty());
+    let step_comparison_image = first_red_step_image
+        .and_then(|index| {
+            handed_out.image_at_the_step_image_with_the_swallowed_writes_before_it_landed(index)
+        })
+        .map(|stream| {
+            scenarios_of_fault_injection_fast_tier::pool_image_of_a_recorded_stream(
+                handed_out, &stream,
+            )
+        });
+    let violations_at_the_step = match &step_comparison_image {
+        Some(image) => {
+            let mut collected_at_the_first_red_step_image =
+                PoolCheckerImages::collected_for_the_checker_tier();
+            collected_at_the_first_red_step_image.hand_out(
+                "第一张判红的每步镜像那一刻、那一刻之前被吞的写插回去的那张盘",
+                || image.clone(),
+                PoolCheckerExpectation::only_the_named_invariants(),
+            );
+            let (conclusions_at_the_first_red_step_image, _, _) = judge_the_collected_images(
+                &format!("{scenario_name}/at-the-first-red-step-image"),
+                &collected_at_the_first_red_step_image.into_collected(),
+                ContainerCapacityKnobs::PRODUCT,
+                JudgedAfreshRegardlessOfTheExpectations::OnlyIfAnImageExpectsIt,
+            )?;
+            Some(pool_checker_violations_of_the_only_state(
+                &conclusions_at_the_first_red_step_image[0],
+            ))
+        }
+        None => None,
+    };
+    let violation_sites_of_the_first_red_step_image = first_red_step_image
+        .map(|index| {
+            violations_naming_the_sites_by_the_cpu_reference(
+                &pool_images.step_images[index],
+                &violations_of_the_step_images[index],
+                "第一张判红的每步镜像",
+            )
+            .violation_sites
+        })
+        .unwrap_or_default();
+    let after_the_fault = violations_naming_the_sites_by_the_cpu_reference(
+        &pool_images.after_the_fault,
+        &pool_checker_violations_of_the_only_state(&conclusions[step_images]),
+        "注入之后重开的那张盘",
+    );
+    let at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed =
+        step_comparison_image
+            .as_ref()
+            .zip(violations_at_the_step.as_ref())
+            .map(|(image, violations)| {
+                violations_naming_the_sites_by_the_cpu_reference(
+                    image,
+                    violations,
+                    "第一张判红的每步镜像的按步对照盘",
+                )
             });
+    let with_the_swallowed_writes_landed = pool_images
+        .with_the_swallowed_writes_landed
+        .as_ref()
+        .map(|landed| {
+            violations_naming_the_sites_by_the_cpu_reference(
+                landed,
+                &pool_checker_violations_of_the_only_state(&conclusions[step_images + 1]),
+                "被吞的写都插回去之后的那张盘",
+            )
+        });
     Some(
         classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
             handed_out,
-            violations_of_the_step_images,
-            violations_after_the_fault,
-            invariants_still_violated_if_the_swallowed_writes_had_landed,
+            PoolCheckerVerdictsOfTheImagesAfterAFault {
+                violations_of_the_step_images,
+                violation_sites_of_the_first_red_step_image,
+                after_the_fault,
+                at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed,
+                with_the_swallowed_writes_landed,
+            },
         ),
     )
+}
+
+/// 一张镜像经引擎判下来（一张镜像一个状态）池级 checker 判红的那几条。
+fn pool_checker_violations_of_the_only_state(
+    judged: &ConclusionsOfAnImage,
+) -> Vec<(&'static str, String)> {
+    let [state] = judged.states.as_slice() else {
+        panic!("一张镜像一个状态，交回 {} 个", judged.states.len());
+    };
+    state.pool_checker_violations()
+}
+
+/// CPU 参照判同一张盘，交回引擎那一趟判红的那几条连同违例点名的（不变量, 盘, 槽）：GPU 判器只交违例位、交不回点名的槽，
+/// 故障归类器按（不变量, 盘, 槽）比（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3）要的槽由池级 checker 的 CPU 那一份交；
+/// 判红的是哪几条与引擎那一趟（配了 GPU 是 GPU 判器）逐条对拍，对不上判红。引擎那一趟一条都不红时不判，点名为空。
+// cpu-reference-for-gpu-comparison
+fn violations_naming_the_sites_by_the_cpu_reference(
+    image: &singlefs_harness::memory_pool::MemoryPool,
+    violations_judged_through_the_engine: &[(&'static str, String)],
+    which_image: &str,
+) -> ViolationsNamingTheSites {
+    if violations_judged_through_the_engine.is_empty() {
+        return ViolationsNamingTheSites::default();
+    }
+    let named = check_pool_image_naming_the_violation_sites(image);
+    let violated_on_the_cpu: BTreeSet<&'static str> = named
+        .verdicts
+        .iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(_) => Some(*invariant),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect();
+    let violated_through_the_engine: BTreeSet<&'static str> = violations_judged_through_the_engine
+        .iter()
+        .map(|(invariant, _)| *invariant)
+        .collect();
+    assert_eq!(
+        violated_on_the_cpu, violated_through_the_engine,
+        "{which_image}：CPU 参照判红的与引擎那一趟判红的逐条相同"
+    );
+    ViolationsNamingTheSites {
+        violations: violations_judged_through_the_engine.to_vec(),
+        violation_sites: named.violation_sites,
+    }
 }
 
 /// 与 harness 档 `tests/fault_injection_fast_tier.rs` 里同名的用例同一个注入点（第一个文件之后覆盖写五次，txg 7 那次的根槽 FUA 写被吞；
@@ -3474,6 +3638,103 @@ fn make_filesystem_failing_at_its_first_barrier_before_any_system_configuration_
     );
 }
 
+/// 与 harness 档 `tests/fault_injection_fast_tier.rs` 里同名的用例同一个注入点（必绿世界 K2-1，判决 `research/prompts/m4-i315-r3-main-verification.md`
+/// 第三节 C3「必红、必绿世界在入库装置上先验它」；场景见 `scenarios_of_fault_injection_fast_tier::the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot`）：
+/// 被吞的写落在复用过的槽上，盘 1 那一份是上一个住户、实现释放之前读盘核出对不上隔离两份。交出去的盘经引擎判池级 checker、交归类：
+/// 判红的每一处插回去（按步对照盘、被吞的写都插回去那张）都不红，每一条都归说谎的设备，不报新发现。
+/// 判别力：按步对照盘不交进比较（每一条都算仍红，`crates/mutations.tsv` 同名那一条），这一点落成新发现，这里红。
+#[test]
+fn the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot_hands_out_the_quarantine_of_both_copies(
+) {
+    const TEST_NAME: &str = "the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot_hands_out_the_quarantine_of_both_copies";
+    let images = scenarios_of_fault_injection_fast_tier::the_first_injection_point_of_the_history_swallowing_a_write_on_a_reused_slot();
+    let Some(failures) =
+        failures_after_a_fault_judged_through_the_library(TEST_NAME, &images, None)
+    else {
+        return;
+    };
+    assert!(
+        !failures.is_empty(),
+        "被吞的写落在复用过的槽上之后池级 checker 判红过（不然这一点什么也没测）"
+    );
+    assert!(
+        failures
+            .iter()
+            .all(|failure| matches!(failure, FailureAfterAFault::LeftByTheLyingDevice { .. })),
+        "必绿世界：每一条都归说谎的设备、不报新发现：{}",
+        scenarios_of_fault_injection_fast_tier::rendered_failures_after_a_fault(&failures)
+            .join("；")
+    );
+}
+
+/// 与 harness 档 `tests/fault_injection_fast_tier.rs` 里同名的用例同一段写死的历史（必红世界：无关泄漏与吞写隔离同在一段历史里，判决
+/// `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3；场景见
+/// `scenarios_of_fault_injection_fast_tier::a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces`）。
+/// 泄漏照 D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」造：池级 checker 只认记号，两块盘都带记号的未释放记录豁免 I-3.1、I-3.11、I-3.15，
+/// 没有记号的已分配无引用记录照判违例。被吞的写逼出的隔离（Y 释放 X 那一版时隔离被吞的那一份）两块盘都带记号、照条款豁免；
+/// 旁边 A 的数据单元那两条记录从 Y 起仍分配、两块盘都不带记号、抬 F 之后没有根引用，与被吞的写无关。
+/// 归类两条：头一张判红的每步镜像（X 之后，A 那两条记录还带着记号）只红在被吞的写上，按步对照盘上一条都不红，归说谎的设备；
+/// 重开那张红在被吞的写与泄漏两样上，被吞的写都插回去那张盘上泄漏在 A 那一槽照红（它不压在被吞的写上，不减），报新发现恰好一条。
+/// 判别力：仍红的一条都不算（每一条都当被吞的写留下的，`crates/mutations.tsv` 同名那一条）时重开那张归成说谎的设备，这里红。
+#[test]
+fn a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces() {
+    const TEST_NAME: &str =
+        "a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces";
+    /// 隔离判据那三条：没有记号的已分配无引用记录照判违例的三条（两块盘都带记号时豁免）。
+    const INVARIANTS_OF_THE_QUARANTINE_CRITERION: [&str; 3] = ["I-3.1", "I-3.11", "I-3.15"];
+    let images = scenarios_of_fault_injection_fast_tier::a_leak_unrelated_to_the_swallowed_write_beside_the_quarantine_the_swallowed_write_forces();
+    let Some(failures) =
+        failures_after_a_fault_judged_through_the_library(TEST_NAME, &images, None)
+    else {
+        return;
+    };
+    let rendered =
+        scenarios_of_fault_injection_fast_tier::rendered_failures_after_a_fault(&failures);
+    let [at_the_first_red_step_image, on_the_reopened_image] = failures.as_slice() else {
+        panic!(
+            "头一张判红的每步镜像一条、重开那张一条，判成 {}",
+            rendered.join("；")
+        );
+    };
+    let FailureAfterAFault::LeftByTheLyingDevice {
+        signature:
+            FailureSignature::CheckerViolations {
+                invariants: invariants_left_by_the_swallowed_write,
+            },
+    } = at_the_first_red_step_image
+    else {
+        panic!(
+            "头一张判红的每步镜像只红在被吞的写上，归说谎的设备：{}",
+            rendered.join("；")
+        );
+    };
+    assert!(
+        !invariants_left_by_the_swallowed_write.is_empty()
+            && INVARIANTS_OF_THE_QUARANTINE_CRITERION
+                .iter()
+                .all(|invariant| !invariants_left_by_the_swallowed_write.contains(invariant)),
+        "归说谎的设备那一条是被吞的写留下的，隔离判据那三条一条都不在里面（A 那两条记录这时还带着记号）：{}",
+        rendered.join("；")
+    );
+    let FailureAfterAFault::NewFinding { observation, .. } = on_the_reopened_image else {
+        panic!(
+            "必红世界：重开那张报新发现（与被吞的写无关的泄漏），判成 {}",
+            rendered.join("；")
+        );
+    };
+    let invariants_of_the_new_finding: BTreeSet<&str> = observation
+        .violations
+        .iter()
+        .map(|(invariant, _)| *invariant)
+        .collect();
+    assert!(
+        INVARIANTS_OF_THE_QUARANTINE_CRITERION
+            .iter()
+            .all(|invariant| invariants_of_the_new_finding.contains(invariant)),
+        "报出来的那一条里有隔离判据那三条判出的泄漏：{observation:?}"
+    );
+}
+
 // ─── GPU 判器与 CPU 判器在这几类镜像上对拍（编进 `gpu` 特性才有） ───
 
 /// 一个交镜像的 harness 场景函数。
@@ -3483,9 +3744,16 @@ type ScenarioHandingOutImages = fn(&mut PoolCheckerImages);
 /// 对拍取的场景：干净的镜像、改坏记录 / 根槽 / 链指针 / 树根的镜像、隔离豁免、不适用、产品旋钮下判红、一批单扣崩溃态，各取一两个；
 /// 再加 unlink 路径上 inode 叶借、借完再吸收那两个（七百来个 inode：GPU 走读内核 inode → 对象出生代表那张表要装得下，
 /// 这两个场景在对拍里由 GPU 判，那张表收窄时变异副本里也抓得到）；再加 I-3.15 隔离判据读一份头用不了、没有 key 指着的单元那一个
-/// （判决 `research/prompts/m4-i315-r1-main-verification.md` 第三节 C1「乙二」：组里读不读没打对不上映射记号的那一份，扫描内核与 `walk.rs` 各写一份）。
+/// （判决 `research/prompts/m4-i315-r1-main-verification.md` 第三节 C1「乙二」：组里读不读没打对不上映射记号的那一份，扫描内核与 `walk.rs` 各写一份）；
+/// 再加只认隔离记号的四个世界（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」，用户 2026-10-22 定：两块盘都带记号的豁免、
+/// 一块盘带一块盘不带、带记号而被最新根引用、没记号的照判违例；扫描内核 `c_quarantine_exempted`、I-3.15 那一组与 I-3.17 的三句和 `walk.rs`
+/// 各写一份，对拍逐位比）；再加同一单元两条记录分落两棵分配记录树、只有一条带记号那一个（I-3.17 第三句按最新根全部分配记录树合起来归组，
+/// 扫描内核 `c_judge_the_quarantine_marks_of_the_records_read` 与 `walk.rs` `judge_quarantine_marks_against_the_references` 各写一份）。
+/// 两块盘都带记号的豁免那一个世界由隔离豁免那一个场景交（`quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back`）：
+/// `a_quarantine_carrying_the_mark_on_both_devices_is_exempted_without_reading_its_copies` 交的两张与它交的两张逐字节相同（两条照同一个造法造，
+/// 块键只由内容定），列进来同一趟里后一张复用前一张判过的块、对拍那一趟就不是全在卡上判的，所以不列（[`images_of_the_paired_scenarios`] 断言每张只出现一次）。
 #[cfg(feature = "gpu")]
-const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages); 14] = [
+const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages); 18] = [
     (
         "writable_mounts_fill_the_instance_table_page_and_the_three_hundred_seventy_first_opens_the_second_page",
         scenarios_of_instance_table_page_full::writable_mounts_fill_the_instance_table_page_and_the_three_hundred_seventy_first_opens_the_second_page,
@@ -3519,8 +3787,8 @@ const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages)
         scenarios_of_named_unit_verification_stands_in_for_the_barrier_before_the_record::with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations,
     ),
     (
-        "quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read",
-        scenarios_of_release_checksum_quarantine::quarantined_record_is_exempted_from_the_allocated_statistics_only_while_its_copy_fails_the_checker_read,
+        "quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back",
+        scenarios_of_release_checksum_quarantine::quarantined_record_carrying_the_mark_is_exempted_from_the_allocated_statistics_whether_or_not_its_copy_reads_back,
     ),
     (
         "a_quarantined_unit_whose_copy_on_one_device_has_an_unusable_header_holds_the_reverse_lookup",
@@ -3542,17 +3810,50 @@ const SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU: [(&str, ScenarioHandingOutImages)
         "the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it",
         scenarios_of_inode_leaf_absorb_and_borrow_on_the_unlink_path::the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it,
     ),
+    (
+        "a_quarantine_carrying_the_mark_on_one_device_only_is_violated_by_the_third_sentence",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_carrying_the_mark_on_one_device_only_is_violated_by_the_third_sentence,
+    ),
+    (
+        "a_record_carrying_the_mark_under_a_unit_the_newest_root_references_is_violated_by_the_second_sentence",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_record_carrying_the_mark_under_a_unit_the_newest_root_references_is_violated_by_the_second_sentence,
+    ),
+    (
+        "a_quarantine_without_the_mark_is_violated_whether_or_not_its_copies_read_back",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_quarantine_without_the_mark_is_violated_whether_or_not_its_copies_read_back,
+    ),
+    // I-3.17 第三句的归组口径：同一单元的两条记录分落两棵分配记录树。GPU 扫描内核只在一棵树里归组时这一张判成立、CPU 判红
+    (
+        "a_unit_whose_records_fall_into_two_allocation_record_trees_carrying_the_mark_in_one_only_is_violated_by_the_third_sentence",
+        scenarios_of_quarantine_mark_agrees_with_the_references::a_unit_whose_records_fall_into_two_allocation_record_trees_carrying_the_mark_in_one_only_is_violated_by_the_third_sentence,
+    ),
 ];
 
 /// 对拍那几个场景交出来的镜像，名字前面接上场景名（几个场景合进一趟，名字不撞）。
+///
+/// # Panics
+/// 有两张镜像的内容（基线镜像、写表、切段、持久集合）逐样相同：块键只由内容定，同一趟里后一张复用前一张判过的块，
+/// 对拍那一趟「状态都是这一趟在卡上判的」那一条就不成立，换一个场景或去掉重复的那一个。
 #[cfg(feature = "gpu")]
 fn images_of_the_paired_scenarios() -> Vec<PoolCheckerImage> {
-    let mut images = Vec::new();
+    let mut images: Vec<PoolCheckerImage> = Vec::new();
     for (scenario_name, scenario) in SCENARIOS_PAIRED_ON_THE_GPU_AND_THE_CPU {
         let mut handed_out = PoolCheckerImages::collected_for_the_checker_tier();
         scenario(&mut handed_out);
         for mut image in handed_out.into_collected() {
             image.label = format!("{scenario_name}/{}", image.label);
+            let same_content_handed_out_earlier = images.iter().find(|earlier| {
+                earlier.image == image.image
+                    && earlier.writes == image.writes
+                    && earlier.segments == image.segments
+                    && earlier.persisted_sets == image.persisted_sets
+            });
+            assert!(
+                same_content_handed_out_earlier.is_none(),
+                "对拍那一批里每张镜像只出现一次：{} 与 {:?} 逐字节相同",
+                image.label,
+                same_content_handed_out_earlier.map(|earlier| earlier.label.as_str())
+            );
             images.push(image);
         }
     }
@@ -4279,7 +4580,7 @@ fn an_accounting_leaf_wider_than_its_field_table_is_judged_alike_on_the_gpu_and_
 /// GPU 与 CPU 对拍记账树根的内部条目比字段表宽一个字节（108 → 109）的镜像，比到恢复字（两趟独立、各从自己那一份库读回）：镜像是 harness 档场景
 /// `scenarios_of_accounting_and_mapping_tree_split::image_with_the_root_damaged` 交出的那张（`RootDamage::EntryWiderThanTheInternalEntryFieldTable`：
 /// 两棵树压小写出第一个文件版本，只改记账树的根、补好引用链上的校验和）。核心层恢复读码 2 树照 C780（用户 2026-10-18 定「宽于字段表也拒」）
-/// 条目宽不等于字段表宽就拒，看 journal 那一遍失败在 `EntryNarrowerThanItsFieldTable`；CPU 池级 checker 红 I-1.10。一趟由 GPU 判器判、
+/// 条目宽不等于字段表宽就拒，看 journal 那一遍失败在 `EntryWidthDiffersFromItsFieldTable`；CPU 池级 checker 红 I-1.10。一趟由 GPU 判器判、
 /// 一趟由 CPU 判器判，对拍字整份相同：不只池级 checker 的违例位与判到位，连两遍恢复的结局、失败点与落到的根。
 /// 要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
 /// 判别力（`crates/mutations.tsv`）：GPU 恢复内核读码 2 树时内部节点的条目宽改回只拒窄于字段表的，GPU 那一趟照读这个根、恢复不在这里失败，
@@ -4294,7 +4595,7 @@ fn an_accounting_tree_root_wider_than_its_internal_field_table_is_refused_alike_
     };
     use singlefs_checker_tier::crash_amplification::JudgedBy;
     use singlefs_checker_tier::crash_judge_conclusions::{
-        GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE, RECOVERY_OUTCOME_CODE_FAILED,
+        GPU_FAILURE_POINT_ENTRY_WIDTH_DIFFERS_FROM_ITS_FIELD_TABLE, RECOVERY_OUTCOME_CODE_FAILED,
     };
     use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
     use singlefs_core::transaction::MultiLevelCodeTwoTree;
@@ -4356,13 +4657,183 @@ fn an_accounting_tree_root_wider_than_its_internal_field_table_is_refused_alike_
         ),
         (
             RECOVERY_OUTCOME_CODE_FAILED,
-            GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE
+            GPU_FAILURE_POINT_ENTRY_WIDTH_DIFFERS_FROM_ITS_FIELD_TABLE
         ),
         "前提：CPU 看 journal 那一遍恢复失败在条目宽与字段表不符（C780 宽于字段表也拒）"
     );
     assert_eq!(
         gpu_state.words, cpu_state.words,
         "两趟的对拍字整份相同（违例位、判到位、两遍恢复的结局、失败点与落到的根）"
+    );
+}
+
+// ============================== 叶条目比字段表宽的 deadlist 树（I-1.10：deadlist 叶条目宽要等于 43） ==============================
+
+/// deadlist 树根（根兼叶）的条目比字段表宽一个字节（43 → 44，每一条末尾补一个 0）的镜像：新池新建文件、建快照、快照下覆盖写
+/// （换下的单元进 deadlist），改 deadlist 树根、按原来的身份重建重封，新的整单元校验和沿引用链补到根槽
+/// （`common_pointer_head_corruption::replace_the_unit_and_propagate_its_checksum`），镜像上只剩这一处说话。造法与 harness 档
+/// `crates/singlefs-harness/tests/checker_judges_deadlist_entry_widths_against_the_field_table.rs` 的同名场景相同（两档不共用代码）。
+#[cfg(feature = "gpu")]
+fn image_whose_deadlist_leaf_entries_are_wider_than_the_field_table(
+) -> singlefs_harness::memory_pool::MemoryPool {
+    use common::{
+        build_pool, parameters, publish_overwrite_in_process, FIXED_WRITE_TIME_SECONDS,
+        OVERWRITE_SECONDS_AFTER_THE_FIRST_WRITE,
+    };
+    use common_pointer_head_corruption::{
+        node_bytes, replace_the_unit_and_propagate_its_checksum, the_slot_of,
+        tree_table_entry_of_kind, unit_bytes_at,
+    };
+    use singlefs_core::address::InstanceGeneration;
+    use singlefs_core::records::TREE_KIND_DEADLIST;
+    use singlefs_core::transaction::{publish_create_snapshot, PoolWriter};
+    use singlefs_core::unit::{build_index_node, parse_index_node};
+    /// deadlist 叶条目字段表的宽：头的树 ID 8 + 纪元 8 + 中央映射 key 27，value 空（D5（快照 / 空间记账机制） 已定项 12）。
+    const DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES: usize = 43;
+    /// 建快照与快照下覆盖写都在实例 1 上（`build_pool` 取的号）。
+    const INSTANCE_OF_THE_SNAPSHOT_AND_THE_OVERWRITE: InstanceGeneration = InstanceGeneration(1);
+    let mut pool = build_pool("given-states-deadlist-leaf-wider-than-its-field-table");
+    let publish_parameters = parameters();
+    let before_the_snapshot = pool.output.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    pool.output = publish_create_snapshot(
+        &mut writer,
+        &mut pool.allocator,
+        &before_the_snapshot,
+        INSTANCE_OF_THE_SNAPSHOT_AND_THE_OVERWRITE,
+    )
+    .expect("建快照");
+    let before_the_overwrite = pool.output.clone();
+    let overwrite_content: Vec<u8> = (0..2700_u32)
+        .map(|index| u8::try_from((index * 13 + 11) % 239).expect("小于 256"))
+        .collect();
+    pool.output = publish_overwrite_in_process(
+        &mut pool,
+        &before_the_overwrite,
+        &overwrite_content,
+        FIXED_WRITE_TIME_SECONDS + OVERWRITE_SECONDS_AFTER_THE_FIRST_WRITE,
+        INSTANCE_OF_THE_SNAPSHOT_AND_THE_OVERWRITE,
+    )
+    .expect("快照下覆盖写");
+    let mut image = pool.memory_pool();
+    let deadlist_root = tree_table_entry_of_kind(&image, TREE_KIND_DEADLIST).root;
+    let leaf = parse_index_node(&unit_bytes_at(
+        &image,
+        the_slot_of(&deadlist_root),
+        node_bytes(),
+    ))
+    .expect("deadlist 树根解得开");
+    assert!(
+        leaf.level == 0
+            && !leaf.entries.is_empty()
+            && leaf.entry_width == DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES,
+        "前提：deadlist 树根兼叶、装着条目，写者写的条目宽等于字段表宽（层级 {}、{} 条、条目宽 {}）",
+        leaf.level,
+        leaf.entries.len(),
+        leaf.entry_width
+    );
+    let wider_entries: Vec<Vec<u8>> = leaf
+        .entries
+        .iter()
+        .map(|entry| {
+            let mut wider = entry.clone();
+            wider.push(0);
+            wider
+        })
+        .collect();
+    let wider_leaf = build_index_node(
+        leaf.tree,
+        leaf.level,
+        leaf.key_width,
+        &leaf.smallest_key,
+        &leaf.largest_key,
+        leaf.birth_txg,
+        &parameters().filesystem_identifier,
+        leaf.instance,
+        leaf.birth_sequence,
+        u16::try_from(DEADLIST_LEAF_ENTRY_FIELD_TABLE_BYTES + 1).expect("条目宽装得进 u16"),
+        &wider_entries,
+    );
+    replace_the_unit_and_propagate_its_checksum(
+        &mut image,
+        the_slot_of(&deadlist_root),
+        &wider_leaf,
+    );
+    image
+}
+
+/// GPU 与 CPU 对拍 deadlist 叶条目比字段表宽的镜像（两趟独立、各从自己那一份库读回）：
+/// [`image_whose_deadlist_leaf_entries_are_wider_than_the_field_table`] 一趟由 GPU 判器判、一趟由 CPU 判器判，池级 checker 那几个字
+/// （违例位、判到位、扫描重建的结局码）相同；CPU 那一趟 I-1.10 红（判决 `research/prompts/m3-close-w13-code-r1-main-verification.md`
+/// 第二节 K5 那一行：池级 checker 的 deadlist 那一支按字段表宽判等于，GPU 走读内核同判）。两遍恢复那几个字不比：GPU 恢复内核读 deadlist 的
+/// 条目宽与判退归下一批（`crash_judge_recovery.wgsl` 这一批不动）。
+/// 要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
+/// 判别力（`crates/mutations.tsv`）：GPU 走读内核的 deadlist 树改回只守不窄于字段表，GPU 那一趟不红 I-1.10，违例位与 CPU 不同，这条红。
+#[cfg(feature = "gpu")]
+#[test]
+fn a_deadlist_leaf_wider_than_its_field_table_is_judged_alike_by_the_pool_checker_on_the_gpu_and_the_cpu(
+) {
+    use singlefs_checker_tier::crash_amplification::JudgedBy;
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+    /// 条目宽要等于字段表宽的那一条（池级 checker 主走读照它判）。
+    const ENTRY_WIDTH_EQUALS_THE_FIELD_TABLE: &str = "I-1.10";
+    const TEST_NAME: &str =
+        "a_deadlist_leaf_wider_than_its_field_table_is_judged_alike_by_the_pool_checker_on_the_gpu_and_the_cpu";
+    if gpu_card_pool_or_report_not_run(TEST_NAME).is_none() {
+        return;
+    }
+    let image = image_whose_deadlist_leaf_entries_are_wider_than_the_field_table();
+    let table = table_of_one_image("deadlist 树根兼叶的条目宽 44", &image);
+    let (on_the_gpu, gpu_run) = conclusions_of_a_table_judged_with_the_gpu(
+        &table,
+        "given-states-deadlist-leaf-wider-than-its-field-table-on-the-gpu",
+        true,
+    );
+    let (on_the_cpu, cpu_run) = conclusions_of_a_table_judged_with_the_gpu(
+        &table,
+        "given-states-deadlist-leaf-wider-than-its-field-table-on-the-cpu",
+        false,
+    );
+    assert_eq!(
+        (gpu_run.judged_by, cpu_run.judged_by),
+        (JudgedBy::GpuJudge, JudgedBy::CpuJudge),
+        "一趟由 GPU 判器判、一趟由 CPU 判器判"
+    );
+    assert_eq!(
+        (
+            gpu_run.tally.states_judged_by_the_gpu_here,
+            gpu_run.tally.states_the_gpu_could_not_judge.clone()
+        ),
+        (1, Vec::<String>::new()),
+        "GPU 那一趟从空库起、这一个状态在卡上判得了"
+    );
+    let [gpu_state] = on_the_gpu.states.as_slice() else {
+        panic!("一张镜像一个状态");
+    };
+    let [cpu_state] = on_the_cpu.states.as_slice() else {
+        panic!("一张镜像一个状态");
+    };
+    assert!(
+        is_violated(cpu_state, ENTRY_WIDTH_EQUALS_THE_FIELD_TABLE),
+        "前提：CPU 主走读判 deadlist 叶条目宽比字段表宽（{ENTRY_WIDTH_EQUALS_THE_FIELD_TABLE}）红：{:?}",
+        cpu_state.pool_checker_violations()
+    );
+    assert!(!gpu_state.words.gpu_could_not_judge, "GPU 判得了这一个状态");
+    assert_eq!(
+        (
+            gpu_state.words.pool_checker_violated_bits,
+            gpu_state.words.pool_checker_judged_bits,
+            gpu_state.words.scan_rebuild_outcome
+        ),
+        (
+            cpu_state.words.pool_checker_violated_bits,
+            cpu_state.words.pool_checker_judged_bits,
+            cpu_state.words.scan_rebuild_outcome
+        ),
+        "两趟池级 checker 那几个字相同（违例位、判到位、扫描重建的结局码）：GPU 违例 {:?}，CPU 违例 {:?}",
+        gpu_state.pool_checker_violations(),
+        cpu_state.pool_checker_violations()
     );
 }
 
@@ -4404,4 +4875,274 @@ fn two_libraries_of_one_test_name_in_one_process_are_different_directories_named
         "丢掉的那一份连上层一起删掉"
     );
     assert!(another.library().exists(), "丢掉一份不碰另一份的库");
+}
+
+// 原 CPU 就地判调用点迁入同一套给定状态两段流程。
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/acquisition_rewrites_a_device_that_lost_both_system_configuration_slots_only_through_the_gates.rs"]
+mod scenarios_of_acquisition_rewrites_a_device_that_lost_both_system_configuration_slots_only_through_the_gates;
+#[test]
+fn a_device_holding_the_version_whose_both_slots_were_zeroed_is_rewritten_by_the_acquisition_and_the_checker_stays_green(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_device_holding_the_version_whose_both_slots_were_zeroed_is_rewritten_by_the_acquisition_and_the_checker_stays_green",
+        scenarios_of_acquisition_rewrites_a_device_that_lost_both_system_configuration_slots_only_through_the_gates::a_device_holding_the_version_whose_both_slots_were_zeroed_is_rewritten_by_the_acquisition_and_the_checker_stays_green,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/publish_lookup_by_identity.rs"]
+mod scenarios_of_publish_lookup_by_identity;
+#[test]
+fn every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units",
+        scenarios_of_publish_lookup_by_identity::every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units,
+    );
+}
+#[test]
+fn every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units",
+        scenarios_of_publish_lookup_by_identity::every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/snapshot_and_compaction_over_a_file_other_than_the_first.rs"]
+mod scenarios_of_snapshot_and_compaction_over_a_file_other_than_the_first;
+#[test]
+fn overwriting_another_file_under_a_live_snapshot_puts_its_replaced_units_on_the_deadlist() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "overwriting_another_file_under_a_live_snapshot_puts_its_replaced_units_on_the_deadlist",
+        scenarios_of_snapshot_and_compaction_over_a_file_other_than_the_first::overwriting_another_file_under_a_live_snapshot_puts_its_replaced_units_on_the_deadlist,
+    );
+}
+#[test]
+fn a_relocation_batch_moving_the_data_unit_of_another_file_takes_its_mapping_position_over_the_hint(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_relocation_batch_moving_the_data_unit_of_another_file_takes_its_mapping_position_over_the_hint",
+        scenarios_of_snapshot_and_compaction_over_a_file_other_than_the_first::a_relocation_batch_moving_the_data_unit_of_another_file_takes_its_mapping_position_over_the_hint,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units.rs"]
+mod scenarios_of_unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units;
+#[test]
+fn inode_150_of_three_data_units_in_batches_of_one_takes_two_batches_and_a_final_batch() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "inode_150_of_three_data_units_in_batches_of_one_takes_two_batches_and_a_final_batch",
+        scenarios_of_unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units::inode_150_of_three_data_units_in_batches_of_one_takes_two_batches_and_a_final_batch,
+    );
+}
+#[test]
+fn inode_150_of_seven_data_units_in_batches_of_two_takes_three_batches_and_a_final_batch() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "inode_150_of_seven_data_units_in_batches_of_two_takes_three_batches_and_a_final_batch",
+        scenarios_of_unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units::inode_150_of_seven_data_units_in_batches_of_two_takes_three_batches_and_a_final_batch,
+    );
+}
+#[test]
+fn inode_150_of_144_data_units_with_the_product_batch_goes_straight_to_the_final_batch() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "inode_150_of_144_data_units_with_the_product_batch_goes_straight_to_the_final_batch",
+        scenarios_of_unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units::inode_150_of_144_data_units_with_the_product_batch_goes_straight_to_the_final_batch,
+    );
+}
+#[test]
+fn inode_150_of_145_data_units_with_the_product_batch_cuts_144_and_then_releases_the_last_one() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "inode_150_of_145_data_units_with_the_product_batch_cuts_144_and_then_releases_the_last_one",
+        scenarios_of_unlink_batches_of_an_inode_other_than_the_first_follow_its_own_data_units::inode_150_of_145_data_units_with_the_product_batch_cuts_144_and_then_releases_the_last_one,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/unlink_of_files_other_than_the_first.rs"]
+mod scenarios_of_unlink_of_files_other_than_the_first;
+#[test]
+fn unlinking_another_file_holding_three_data_units_releases_them_and_drops_its_upper_entry() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unlinking_another_file_holding_three_data_units_releases_them_and_drops_its_upper_entry",
+        scenarios_of_unlink_of_files_other_than_the_first::unlinking_another_file_holding_three_data_units_releases_them_and_drops_its_upper_entry,
+    );
+}
+#[test]
+fn each_deletion_batch_of_another_file_cuts_only_that_file_and_the_first_file_reads_back_unchanged()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "each_deletion_batch_of_another_file_cuts_only_that_file_and_the_first_file_reads_back_unchanged",
+        scenarios_of_unlink_of_files_other_than_the_first::each_deletion_batch_of_another_file_cuts_only_that_file_and_the_first_file_reads_back_unchanged,
+    );
+}
+#[test]
+fn unlinking_the_first_file_after_the_upper_segment_grew_to_level_one_keeps_the_leaf_of_the_other_file(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unlinking_the_first_file_after_the_upper_segment_grew_to_level_one_keeps_the_leaf_of_the_other_file",
+        scenarios_of_unlink_of_files_other_than_the_first::unlinking_the_first_file_after_the_upper_segment_grew_to_level_one_keeps_the_leaf_of_the_other_file,
+    );
+}
+#[test]
+fn deleting_inode_five_hundred_beside_the_first_file_lowers_the_upper_segment_to_the_first_leaf() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "deleting_inode_five_hundred_beside_the_first_file_lowers_the_upper_segment_to_the_first_leaf",
+        scenarios_of_unlink_of_files_other_than_the_first::deleting_inode_five_hundred_beside_the_first_file_lowers_the_upper_segment_to_the_first_leaf,
+    );
+}
+#[test]
+fn deleting_the_first_file_beside_inode_five_hundred_leaves_its_leaf_under_a_level_one_root() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "deleting_the_first_file_beside_inode_five_hundred_leaves_its_leaf_under_a_level_one_root",
+        scenarios_of_unlink_of_files_other_than_the_first::deleting_the_first_file_beside_inode_five_hundred_leaves_its_leaf_under_a_level_one_root,
+    );
+}
+#[test]
+fn deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root",
+        scenarios_of_unlink_of_files_other_than_the_first::deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root,
+    );
+}
+#[test]
+fn one_set_of_files_with_data_reaches_one_upper_segment_through_two_histories() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "one_set_of_files_with_data_reaches_one_upper_segment_through_two_histories",
+        scenarios_of_unlink_of_files_other_than_the_first::one_set_of_files_with_data_reaches_one_upper_segment_through_two_histories,
+    );
+}
+#[test]
+fn a_file_created_before_the_first_file_was_deleted_is_still_written_after_it() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_file_created_before_the_first_file_was_deleted_is_still_written_after_it",
+        scenarios_of_unlink_of_files_other_than_the_first::a_file_created_before_the_first_file_was_deleted_is_still_written_after_it,
+    );
+}
+#[test]
+fn a_writable_remount_after_the_intent_of_another_file_continues_its_deletion_to_the_end() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_writable_remount_after_the_intent_of_another_file_continues_its_deletion_to_the_end",
+        scenarios_of_unlink_of_files_other_than_the_first::a_writable_remount_after_the_intent_of_another_file_continues_its_deletion_to_the_end,
+    );
+}
+#[test]
+fn a_root_left_one_level_above_the_only_leaf_with_an_entry_reddens_the_upper_shape_invariant() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_root_left_one_level_above_the_only_leaf_with_an_entry_reddens_the_upper_shape_invariant",
+        scenarios_of_unlink_of_files_other_than_the_first::a_root_left_one_level_above_the_only_leaf_with_an_entry_reddens_the_upper_shape_invariant,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/writes_by_inode_number_after_rollbacks_past_the_deletion_of_the_first_file.rs"]
+mod scenarios_of_writes_by_inode_number_after_rollbacks_past_the_deletion_of_the_first_file;
+#[test]
+fn after_two_rollbacks_beta_refuses_a_write_to_an_inode_born_after_the_deletion_on_the_parent_chain(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "after_two_rollbacks_beta_refuses_a_write_to_an_inode_born_after_the_deletion_on_the_parent_chain",
+        scenarios_of_writes_by_inode_number_after_rollbacks_past_the_deletion_of_the_first_file::after_two_rollbacks_beta_refuses_a_write_to_an_inode_born_after_the_deletion_on_the_parent_chain,
+    );
+}
+#[test]
+fn a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta",
+        scenarios_of_writes_by_inode_number_after_rollbacks_past_the_deletion_of_the_first_file::a_write_after_rolling_back_past_the_deletion_of_the_first_file_is_not_judged_by_beta,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/writes_by_inode_number_in_the_interleaved_histories_of_the_attack.rs"]
+mod scenarios_of_writes_by_inode_number_in_the_interleaved_histories_of_the_attack;
+#[test]
+#[ignore = "harness 慢档用例：攻方种子 200 那一段 40 步交错历史，每次发布与每一步都跑池级 checker、只读挂载读回，debug 下单条量到 87 秒"]
+fn the_interleaved_history_of_the_attack_seed_two_hundred_agrees_with_beta_on_its_parent_chain() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_interleaved_history_of_the_attack_seed_two_hundred_agrees_with_beta_on_its_parent_chain",
+        scenarios_of_writes_by_inode_number_in_the_interleaved_histories_of_the_attack::the_interleaved_history_of_the_attack_seed_two_hundred_agrees_with_beta_on_its_parent_chain,
+    );
+}
+#[test]
+fn the_interleaved_history_of_the_attack_seed_one_thousand_and_fifty_one_agrees_with_beta_on_its_parent_chain(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_interleaved_history_of_the_attack_seed_one_thousand_and_fifty_one_agrees_with_beta_on_its_parent_chain",
+        scenarios_of_writes_by_inode_number_in_the_interleaved_histories_of_the_attack::the_interleaved_history_of_the_attack_seed_one_thousand_and_fifty_one_agrees_with_beta_on_its_parent_chain,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/writes_by_inode_number_of_several_files.rs"]
+mod scenarios_of_writes_by_inode_number_of_several_files;
+#[test]
+fn two_inodes_overwritten_in_turn_across_two_writable_remounts_each_read_back_what_was_last_written_to_it(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "two_inodes_overwritten_in_turn_across_two_writable_remounts_each_read_back_what_was_last_written_to_it",
+        scenarios_of_writes_by_inode_number_of_several_files::two_inodes_overwritten_in_turn_across_two_writable_remounts_each_read_back_what_was_last_written_to_it,
+    );
+}
+#[test]
+fn writing_one_inode_leaves_the_data_units_and_extent_lower_nodes_of_the_other_files_untouched_on_disk(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "writing_one_inode_leaves_the_data_units_and_extent_lower_nodes_of_the_other_files_untouched_on_disk",
+        scenarios_of_writes_by_inode_number_of_several_files::writing_one_inode_leaves_the_data_units_and_extent_lower_nodes_of_the_other_files_untouched_on_disk,
+    );
+}
+#[test]
+fn a_write_to_an_inode_past_the_first_upper_leaf_grows_the_upper_segment_and_every_file_reads_back_after_a_remount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "a_write_to_an_inode_past_the_first_upper_leaf_grows_the_upper_segment_and_every_file_reads_back_after_a_remount",
+        scenarios_of_writes_by_inode_number_of_several_files::a_write_to_an_inode_past_the_first_upper_leaf_grows_the_upper_segment_and_every_file_reads_back_after_a_remount,
+    );
+}
+#[test]
+fn unlink_while_a_file_other_than_the_first_holds_data_units_deletes_it_and_then_the_first_file() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unlink_while_a_file_other_than_the_first_holds_data_units_deletes_it_and_then_the_first_file",
+        scenarios_of_writes_by_inode_number_of_several_files::unlink_while_a_file_other_than_the_first_holds_data_units_deletes_it_and_then_the_first_file,
+    );
+}
+#[test]
+fn writing_a_file_after_the_first_file_emptied_the_upper_segment_replaces_the_zero_entry_root() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "writing_a_file_after_the_first_file_emptied_the_upper_segment_replaces_the_zero_entry_root",
+        scenarios_of_writes_by_inode_number_of_several_files::writing_a_file_after_the_first_file_emptied_the_upper_segment_replaces_the_zero_entry_root,
+    );
+}
+
+#[path = "../../singlefs-harness/tests/common_images_for_the_checker_tier/root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot.rs"]
+mod scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot;
+#[test]
+fn a_ring_slot_reading_back_all_zero_at_the_mount_is_carried_as_the_pinned_ring_slot_and_the_allocated_statistic_holds(
+) {
+    judge_the_images_a_harness_scenario_hands_out("a_ring_slot_reading_back_all_zero_at_the_mount_is_carried_as_the_pinned_ring_slot_and_the_allocated_statistic_holds", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::a_ring_slot_reading_back_all_zero_at_the_mount_is_carried_as_the_pinned_ring_slot_and_the_allocated_statistic_holds);
+}
+#[test]
+fn a_mount_without_read_faults_pins_nothing_and_writes_the_oldest_valid_root_as_the_reclaim_threshold(
+) {
+    judge_the_images_a_harness_scenario_hands_out("a_mount_without_read_faults_pins_nothing_and_writes_the_oldest_valid_root_as_the_reclaim_threshold", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::a_mount_without_read_faults_pins_nothing_and_writes_the_oldest_valid_root_as_the_reclaim_threshold);
+}
+#[test]
+fn the_unmount_raising_the_floor_writes_the_raised_floor_as_the_reclaim_threshold() {
+    judge_the_images_a_harness_scenario_hands_out("the_unmount_raising_the_floor_writes_the_raised_floor_as_the_reclaim_threshold", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::the_unmount_raising_the_floor_writes_the_raised_floor_as_the_reclaim_threshold);
+}
+#[test]
+fn a_reclaim_threshold_written_as_the_floor_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out("a_reclaim_threshold_written_as_the_floor_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::a_reclaim_threshold_written_as_the_floor_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant);
+}
+#[test]
+fn a_pinned_ring_slot_written_as_none_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out("a_pinned_ring_slot_written_as_none_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::a_pinned_ring_slot_written_as_none_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant);
+}
+#[test]
+fn a_pinned_ring_slot_left_on_a_slot_this_instance_wrote_reddens_the_pinned_slot_invariant() {
+    judge_the_images_a_harness_scenario_hands_out("a_pinned_ring_slot_left_on_a_slot_this_instance_wrote_reddens_the_pinned_slot_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::a_pinned_ring_slot_left_on_a_slot_this_instance_wrote_reddens_the_pinned_slot_invariant);
+}
+#[test]
+fn a_root_slot_torn_at_a_sector_boundary_with_four_kibibyte_physical_blocks_does_not_redden_the_reclaim_threshold_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out("a_root_slot_torn_at_a_sector_boundary_with_four_kibibyte_physical_blocks_does_not_redden_the_reclaim_threshold_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::a_root_slot_torn_at_a_sector_boundary_with_four_kibibyte_physical_blocks_does_not_redden_the_reclaim_threshold_invariant);
 }

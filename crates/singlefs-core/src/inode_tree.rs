@@ -182,7 +182,7 @@ impl InodeLeafContainersAfterThisPublish {
 }
 
 /// 左从右借的下限：一片叶删完一条之后记录数少于它、这次又没并过、它有右邻，就从右邻借（E176 M3 那一臂的主取样点
-/// f = ⌈233 ÷ 2⌉ = 117，`scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs` 的 `BORROW_FLOOR_MAIN`）。
+/// f = ⌈233 ÷ 2⌉ = 117，`scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs` 的 `BORROW_FLOOR_MAIN`）。
 #[must_use]
 pub fn records_below_which_a_leaf_borrows_from_its_right_neighbour() -> usize {
     usize::try_from(INODE_LEAF_RECORDS.div_ceil(2)).expect("117")

@@ -563,7 +563,7 @@ where
 /// 返回非 0 时交回 `errno`，由调用方按 `classify_hole_punch_failure` 决定退回逐块写 0、原样重打还是照常报错。
 #[allow(
     unsafe_code,
-    reason = "std 没有 fallocate 的安全封装；全 crate 只在这一处放开 unsafe（C603（测试与验证的资源浪费没有自检））"
+    reason = "std 没有 fallocate 的安全封装；全 crate 放开 unsafe 的两处之一，另一处是 checksum::crc32_castagnoli_on_route 调硬件 CRC 指令（C603（测试与验证的资源浪费没有自检））"
 )]
 fn punch_hole_keeping_the_file_length(
     file: &File,
@@ -1021,26 +1021,112 @@ mod tests {
     static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     /// 测试镜像一律放临时目录（`command-safety.md`），文件名带进程号与计数器免得并行测试互相盖。
-    fn temporary_image_path(tag: &str) -> std::path::PathBuf {
+    /// 交回的是认领着这条路径的守卫：建镜像之前就认领，用例做完、断言失败、panic 都删掉它。
+    fn temporary_image_path(tag: &str) -> TemporaryPathRemovedOnDrop {
         let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
-        std::env::temp_dir().join(format!(
+        TemporaryPathRemovedOnDrop(std::env::temp_dir().join(format!(
             "singlefs-core-{tag}-{}-{sequence}.img",
             std::process::id()
-        ))
+        )))
     }
 
-    /// 镜像的删除守卫：用例做完、断言失败、panic 都在离开作用域时删掉镜像（`command-safety.md`「测试镜像一律放临时目录」）。
-    /// 删不掉只打一行，不在 Drop 里 panic（panic 途中再 panic 会直接中止进程）。
-    struct ImageRemovedOnDrop(std::path::PathBuf);
+    /// 临时路径的删除守卫：用例做完、断言失败、panic 都在离开作用域时删掉它（文件删文件，目录连同里面的一起删，不在就算了；
+    /// `command-safety.md`「测试镜像一律放临时目录」）。核心层不依赖 harness 档，这里留一份与 `singlefs_harness::temporary_files`
+    /// 同名同删法的。删不掉只打一行，不在 Drop 里 panic（panic 途中再 panic 会直接中止进程）。
+    struct TemporaryPathRemovedOnDrop(PathBuf);
 
-    impl Drop for ImageRemovedOnDrop {
+    impl std::ops::Deref for TemporaryPathRemovedOnDrop {
+        type Target = Path;
+
+        fn deref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl AsRef<Path> for TemporaryPathRemovedOnDrop {
+        fn as_ref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TemporaryPathRemovedOnDrop {
         fn drop(&mut self) {
-            if let Err(error) = std::fs::remove_file(&self.0) {
+            let removed = match std::fs::symlink_metadata(&self.0) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => return,
+                Err(error) => Err(error),
+                Ok(metadata) if metadata.is_dir() => std::fs::remove_dir_all(&self.0),
+                Ok(_not_a_directory) => std::fs::remove_file(&self.0),
+            };
+            if let Err(error) = removed {
                 if error.kind() != io::ErrorKind::NotFound {
-                    eprintln!("删不掉测试镜像 {}：{error}", self.0.display());
+                    eprintln!("删不掉临时路径 {}：{error}", self.0.display());
                 }
             }
         }
+    }
+
+    /// 场景：守卫认领一份镜像与一个带文件的目录，作用域照常走完。预期：两条路径都不在了。
+    /// 判别力（`crates/mutations.tsv`）：守卫的 Drop 不删，两条都还在，这条红。
+    #[test]
+    fn a_temporary_image_and_directory_are_gone_once_the_scope_ends_normally() {
+        let image_path;
+        let directory_path;
+        {
+            let image = temporary_image_path("guard-normal-end");
+            FileBackedBlockDevice::create_image_file_exclusively(
+                &image,
+                4096,
+                PhysicalBlockSizeInBytes(512),
+            )
+            .expect("建镜像");
+            let directory = TemporaryPathRemovedOnDrop(std::env::temp_dir().join(format!(
+                "singlefs-core-guard-directory-{}-{}",
+                std::process::id(),
+                IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst)
+            )));
+            std::fs::create_dir_all(directory.join("nested")).expect("建目录");
+            std::fs::write(directory.join("nested").join("attribute"), "1\n").expect("写文件");
+            image_path = image.to_path_buf();
+            directory_path = directory.to_path_buf();
+            assert!(
+                image_path.exists() && directory_path.exists(),
+                "作用域里两条路径都在"
+            );
+        }
+        assert!(
+            !image_path.exists(),
+            "作用域走完镜像 {} 不在了",
+            image_path.display()
+        );
+        assert!(
+            !directory_path.exists(),
+            "作用域走完目录 {} 连同里面的不在了",
+            directory_path.display()
+        );
+    }
+
+    /// 场景：守卫认领的镜像建好之后作用域里 panic。预期：panic 接住之后镜像不在了。
+    /// 判别力（`crates/mutations.tsv`）：守卫的 Drop 不删，镜像还在，这条红。
+    #[test]
+    fn a_temporary_image_is_gone_after_a_panic_inside_the_scope() {
+        let image = temporary_image_path("guard-panic");
+        let image_path = image.to_path_buf();
+        let panicked = std::panic::catch_unwind(move || {
+            FileBackedBlockDevice::create_image_file_exclusively(
+                &image,
+                4096,
+                PhysicalBlockSizeInBytes(512),
+            )
+            .expect("建镜像");
+            assert!(image.exists(), "panic 之前镜像在");
+            panic!("守卫作用域里造的 panic");
+        });
+        assert!(panicked.is_err(), "作用域里真 panic 了");
+        assert!(
+            !image_path.exists(),
+            "panic 之后镜像 {} 不在了",
+            image_path.display()
+        );
     }
 
     #[test]
@@ -1073,7 +1159,6 @@ mod tests {
             untouched.iter().all(|byte| *byte == 0),
             "稀疏镜像没写过的地方读回全 0"
         );
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     /// 写零把整段变成 0、段外一个字节不动；长度大于一个块时底下拆成几次写，拆的边界上不许留下没清的洞。
@@ -1136,7 +1221,6 @@ mod tests {
                 "偏移 {offset} 在清零段外，不该被动"
             );
         }
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     /// 本线程经 write 一族系统调用交出去的字节数（`/proc/thread-self/io` 的 `wchar`）。
@@ -1218,7 +1302,6 @@ mod tests {
             IMAGE_BYTES,
             "打洞带 KEEP_SIZE，文件长度不变"
         );
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     /// 打洞报不支持的退路（测试开关当作 `fallocate` 报了 `EOPNOTSUPP`，与真失败走同一段按 errno 分路的判定）：
@@ -1300,7 +1383,6 @@ mod tests {
             image_bytes,
             "退路写的全在文件里面，文件长度不变"
         );
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     /// 打洞报别的错（测试开关当作 `fallocate` 报了 `EIO`）：照常交回 `InputOutput`、原 errno 带着，
@@ -1359,7 +1441,6 @@ mod tests {
             "打洞报错之后镜像该原样不动，第一个被改的偏移是 {:?}",
             whole_image.iter().position(|byte| *byte != DIRT)
         );
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     /// 按 errno 分路：只有 `EOPNOTSUPP`（与 `ENOTSUP` 同值）与 `ENOSYS` 退回逐块写 0，`EINTR` 原样重打，
@@ -1409,7 +1490,6 @@ mod tests {
         const ZERO_START: u64 = 4096;
         const ZERO_LENGTH: u64 = 16384;
         let path = temporary_image_path("interrupted-punch");
-        let _image_removed_on_drop = ImageRemovedOnDrop(path.clone());
         let mut device = FileBackedBlockDevice::create_image_file_exclusively(
             &path,
             IMAGE_BYTES,
@@ -1566,7 +1646,6 @@ mod tests {
         ];
 
         let file_path = temporary_image_path("zero-length-file");
-        let _file_image_removed_on_drop = ImageRemovedOnDrop(file_path.clone());
         let mut file_device = FileBackedBlockDevice::create_image_file_exclusively(
             &file_path,
             IMAGE_BYTES,
@@ -1596,7 +1675,6 @@ mod tests {
             PageCachePolicy::GoThroughPageCache,
         ] {
             let direct_path = temporary_image_path("zero-length-direct");
-            let _direct_image_removed_on_drop = ImageRemovedOnDrop(direct_path.clone());
             std::fs::write(&direct_path, vec![DIRT; image_length]).expect("建填脏的镜像");
             let mut direct_device = DirectInputOutputBlockDevice::open_existing(
                 &direct_path,
@@ -1646,7 +1724,6 @@ mod tests {
             .read_at(DeviceOffsetInBytes(0), &mut read_back)
             .expect("读");
         assert_eq!(read_back, vec![0x7Eu8; 512], "被拒的写零一个字节都没落盘");
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     /// 撞上同名文件一律报错、盘上那一份字节一个都不动（进程号会被系统复用、上一轮被杀留下的镜像不会被清：
@@ -1695,6 +1772,7 @@ mod tests {
             "被拒之后旧镜像逐字节不变"
         );
         drop(reopened);
+        // 守卫丢掉时也会删；这里先删，是要看重开一份不在的镜像报什么
         std::fs::remove_file(&path).expect("清理镜像");
         let missing = FileBackedBlockDevice::open_existing_image_file(
             &path,
@@ -1745,7 +1823,6 @@ mod tests {
             PhysicalBlockSizeInBytes(512)
         );
         assert_eq!(device.size_in_bytes(), 8192);
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     #[test]
@@ -1808,13 +1885,13 @@ mod tests {
             ),
             "普通文件在 sysfs 里没有 queue 属性：探不到就报错，不拿写死的值顶上"
         );
-        std::fs::remove_file(&path).expect("清理镜像");
     }
 
     #[test]
     fn queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none() {
-        let root =
-            std::env::temp_dir().join(format!("singlefs-core-fake-sysfs-{}", std::process::id()));
+        let root = TemporaryPathRemovedOnDrop(
+            std::env::temp_dir().join(format!("singlefs-core-fake-sysfs-{}", std::process::id())),
+        );
         let queue = root.join("vdz").join("queue");
         std::fs::create_dir_all(&queue).expect("建假 sysfs");
         std::fs::write(queue.join("physical_block_size"), "4096\n").expect("写属性");
@@ -1843,7 +1920,6 @@ mod tests {
             probe_queue_number_under(&root, Path::new("/dev/vdy"), "physical_block_size"),
             None
         );
-        std::fs::remove_dir_all(&root).expect("清理假 sysfs");
     }
 
     #[test]
@@ -1867,7 +1943,7 @@ mod tests {
     fn dirty_image_for_discards(
         tag: &str,
         landing: DiscardLanding,
-    ) -> (FileBackedBlockDevice, ImageRemovedOnDrop) {
+    ) -> (FileBackedBlockDevice, TemporaryPathRemovedOnDrop) {
         let path = temporary_image_path(tag);
         let mut device = FileBackedBlockDevice::create_image_file_exclusively(
             &path,
@@ -1879,10 +1955,7 @@ mod tests {
         device
             .write_at(DeviceOffsetInBytes(0), &dirt, WriteDurability::Plain)
             .expect("填脏");
-        (
-            device.with_test_only_discard_landing(landing),
-            ImageRemovedOnDrop(path),
-        )
+        (device.with_test_only_discard_landing(landing), path)
     }
 
     fn sector_at(device: &FileBackedBlockDevice, offset: u64) -> Vec<u8> {
@@ -2051,7 +2124,6 @@ mod tests {
             PageCachePolicy::GoThroughPageCache,
         ] {
             let path = temporary_image_path("direct-discard-zero-length");
-            let _removed = ImageRemovedOnDrop(path.clone());
             let mut file = std::fs::File::create(&path).expect("建文件");
             std::io::Write::write_all(&mut file, &[DISCARD_DIRT_BYTE; 65536]).expect("填脏");
             drop(file);
@@ -2084,7 +2156,6 @@ mod tests {
             PageCachePolicy::GoThroughPageCache,
         ] {
             let path = temporary_image_path("direct-discard");
-            let _removed = ImageRemovedOnDrop(path.clone());
             let mut file = std::fs::File::create(&path).expect("建文件");
             std::io::Write::write_all(&mut file, &[DISCARD_DIRT_BYTE; 65536]).expect("填脏");
             drop(file);

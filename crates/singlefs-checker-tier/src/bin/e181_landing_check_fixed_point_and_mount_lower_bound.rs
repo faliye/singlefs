@@ -7,7 +7,7 @@
 //!
 //! 入库装置：只读、只驱动、只观测 `singlefs-core` 的公开入口，不改核心层。每个会读 `crates/` 常量的量在这里是本地常量，
 //! 值抄自 kb 的登记位，注明出处，[`check_local_constants_against_the_crates`] 逐个回比。
-//! 产物按 `E7RESULT` 行打印，复跑登记在 `scripts/experiments/replay.sh`。
+//! 产物按 `E7RESULT` 行打印，复跑登记在 `scripts/experiment-apparatus/replay.sh`。
 //!
 //! 准入写 `always` 而不写 `inputs-changed`：复跑登记（`replay.sh` 的 `E181` 一行）与长跑脚本（`--full` 重做全部片、出错后原样重起同一片）
 //! 都要在输入不变时再跑同一段、拿同一份输入核产物逐字节相同；写 `inputs-changed` 的话，第二次跑会被判「输入没变」拒绝（退出码 78），

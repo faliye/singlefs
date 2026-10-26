@@ -3,9 +3,16 @@ name = "singlefs-unit-graph"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹，从入口按名字与编译目标收闭包、算复用键；只用 std，不依赖工作区任何 crate（测试基础设施库，归 checker 档依赖的一侧）"
+description = "函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹，从入口按名字与编译目标收闭包、算复用键；产品行为判定的视图剥 Verus 规格与证明块用 verus_syn，其余只用 std，不依赖工作区任何 crate（测试基础设施库，归 checker 档依赖的一侧）"
 
 [dependencies]
+# 产品行为判定的视图（verus_ghost_code）剥 `verus!` 里的规格与证明块：用 Verus 自己的语法树，不用词法（m4-exit5-relocation-proof-r3 判决第二节 Z4）。
+# 版本写精确，与 Cargo.lock 里 verus_builtin_macros 擦 ghost 代码用的是同一份（.claude/gate.d/verus-pins.tsv 登记的 verus_syn），不许 cargo 自己升。
+verus_syn = { version = "=0.0.0-2026-09-06-0133", features = ["visit"] }
+# 语法树节点在源码里占哪几个字节（`Span::byte_range`）：span-locations 那一项，verus_syn 自己依赖它时也开着。
+proc-macro2 = { version = "1.0.101", features = ["span-locations"] }
+# 节点交回词法单元串（`ToTokens`），再取各词法单元的字节区间。
+quote = "1.0.35"
 
 [[bin]]
 name = "unit-graph"

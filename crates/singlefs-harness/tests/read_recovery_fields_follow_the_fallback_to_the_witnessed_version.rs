@@ -102,7 +102,7 @@ fn assert_the_version_before_the_recovered_one_is_older_than_the_witnessed_versi
     );
 }
 
-/// 判别力：读字段不照 F2 退（变异「读字段再算一遍时不照 F2 退」）时它的断言 panic、这一条红。
+/// 判别力：读字段拿来比的那一版不取恢复报告的那一版、换成环里最新那一条根时（变异「读字段拿环里最新那一条根当恢复落到的那一版」）这一条红。
 #[test]
 fn reading_the_recovered_version_of_a_confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero_compares_the_witnessed_version(
 ) {

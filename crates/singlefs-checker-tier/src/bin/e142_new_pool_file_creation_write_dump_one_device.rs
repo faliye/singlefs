@@ -6,7 +6,7 @@
 //!
 //! 只驱动、只观测：不改 `singlefs-core`、`singlefs-checker`、`singlefs-format`。
 //! 决定几何与负载的参数写成本地常量，值抄自模型 `PoolParameters::control_one_device_no_barriers()`
-//! （`scripts/experiments/e142_new_pool_file_creation_dry_run.rs`）与跑前登记同一条；
+//! （`scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs`）与跑前登记同一条；
 //! 每个另加一条断言与 `crate::scenario` 的公开常量、`singlefs_format::TEST_IMAGE_DEFAULT_BYTES` 回比。
 //!
 //!   e142_new_pool_file_creation_write_dump_one_device
@@ -19,7 +19,7 @@
 //! 这条断言上）。这正是跑前登记第八节 G4 那一格允许的结局
 //! 「`crates/` 侧造不出这个几何」——按只驱动、只观测的写范围，这个装置不改 `singlefs-core` 去放开那条断言，
 //! 如实记「G4 只在一个几何上量过」，不停机、不作废（模型一侧的数已经由
-//! `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 里
+//! `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` 里
 //! `positive_control_without_barriers_has_4092_violations_out_of_8192`（13 次写、10 个单元）与
 //! `allocation_record_tree_shape_matches_the_five_geometry_points` 的 `one_device` 那一档（分配记录树 3 个节点）
 //! 钉住，与跑前登记第八节 G4「该看到」一致）。这个文件留着，是为了让这条断言与它的行号可以被重新跑一次核实，

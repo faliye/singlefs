@@ -8,6 +8,8 @@
 //! 本文件给了模式名但这一段不跑。
 //! 第 2 次重跑登记：`research/prompts/e161-r2-prereg.md`（C577 那道屏障之后的段形：新池新建文件流 11 段、覆盖写固定脚本流 78 段取段 11–26，
 //! 取样域照它 5.5 的读法甲重定，装置的改动照它 5.6 的 I-1 到 I-12）。
+//! 第 3 次重跑登记：`research/prompts/e161-r3-prereg.md`（取号写两轮之后的段形：新池新建文件流 12 段、覆盖写固定脚本流 80 段取段 12–28，
+//! 段长、锚点与 PC3 的段照它第七节重钉，装置的改动照它 5.6 的 J-1 到 J-7）。
 //!
 //! 只读、只驱动、只观测：不改 `crates/singlefs-core`、`crates/singlefs-checker`、harness 已有的文件。
 //! 新池新建文件流经 `#[path]` 引 `tests/common/mod.rs` 的 `build_pool`；覆盖写固定脚本流的脚本照抄
@@ -88,7 +90,7 @@ const SHARE_MARGIN_FOR_ENOUGH: f64 = 0.1;
 const STRIDE_STEP: u64 = 2_311;
 /// 对照样本里大段各取序号最小的这么多个（5.5）。
 const CONTROL_SAMPLE_PER_LARGE_SEGMENT: usize = 4_096;
-/// PC3：覆盖写固定脚本流段 16（第 1 次登记的段 14，同一批写）里序号最小的 1000 个状态、每个计时区各加 2 ms 忙等（5.3；重跑登记 I-6）。
+/// PC3：覆盖写固定脚本流段 18（第 1 次登记的段 14、第 2 次重跑登记的段 16，同一批写）里序号最小的 1000 个状态、每个计时区各加 2 ms 忙等（5.3；重跑登记 I-6）。
 const TIMING_CONTROL_STATES: usize = 1_000;
 const TIMING_CONTROL_BUSY_WAIT: Duration = Duration::from_millis(2);
 /// PC3 的判据：加忙等的那个区多出 ≥ 1.8 s，其余每个区变化 < 1 s。
@@ -100,9 +102,9 @@ const LARGEST_CARD_MEBIBYTES: u128 = 32_607;
 const SMALLEST_SIXTEEN_GIGABYTE_CARD_MEBIBYTES: u128 = 16_303;
 const FIVE_CARDS_MEBIBYTES: u128 = 97_843;
 const CARD_COUNT: u128 = 5;
-/// 外推点：问题单的 10¹⁰，另报覆盖写固定脚本流整条流的全量状态数（第四节 4.2；重跑登记 A7：C577 之后 78 段）。
+/// 外推点：问题单的 10¹⁰，另报覆盖写固定脚本流整条流的全量状态数（第四节 4.2；第 3 次重跑登记 A7：取号写两轮之后 80 段）。
 const EXTRAPOLATED_STATES: u128 = 10_000_000_000;
-const SECOND_STREAM_FULL_STATES: u128 = 1_678_377_204;
+const SECOND_STREAM_FULL_STATES: u128 = 1_678_377_220;
 /// A7：覆盖写固定脚本流整条流最大一段 2²⁸ − 1（重跑登记 A7：28 个单元写的段，C577 之前是 3² · 2²⁸ − 1 的 30 写段）。
 const SECOND_STREAM_LARGEST_SEGMENT_STATES: u128 = 268_435_455;
 /// 容量的 95% 到 100% 之间记「临界」（第六节 G5 表下）。
@@ -294,7 +296,7 @@ fn fingerprint_of_debug_text(value: &dyn std::fmt::Debug) -> Digest128 {
 enum StreamName {
     /// 崩溃点重放的新池新建文件流：mkfs → 取号 → 暖机两次 → 新池新建文件。
     First,
-    /// 崩溃点重放的覆盖写固定脚本流：固定脚本到 E 再正常卸载，取段 11–26。
+    /// 崩溃点重放的覆盖写固定脚本流：固定脚本到 E 再正常卸载，取段 12–28。
     Second,
 }
 
@@ -569,25 +571,27 @@ fn prepare_second_stream() -> PreparedStream {
     }
 }
 
-/// S2 的锚点（重跑登记 A8，C577 那道屏障之后的段形）：新池新建文件流 11 段的段长、41 次写
+/// S2 的锚点（第 3 次重跑登记 A8，取号写两轮之后的段形：每次取号两轮、轮后各一道池屏障，各成一个 2 写段）：
+/// 新池新建文件流 12 段的段长、43 次写
 /// （`crash_enumeration_new_pool_file_creation_stream.rs` 的 `prepare` 里段长与写数那两条 `assert_eq!`）；
-/// 覆盖写固定脚本流 78 段的段长表、481 次写、19 条根（`crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言、紧跟的写数断言与
+/// 覆盖写固定脚本流 80 段的段长表、485 次写、19 条根（`crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言、紧跟的写数断言与
 /// `expected_roots`，到 E 再正常卸载那一支）。
-const FIRST_STREAM_SEGMENT_LENGTHS: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
-const FIRST_STREAM_WRITES: usize = 41;
+const FIRST_STREAM_SEGMENT_LENGTHS: [usize; 12] = [2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
+const FIRST_STREAM_WRITES: usize = 43;
 /// 新池新建文件流的根槽写：暖机两次各一条、新池新建文件一条（段表里三个 1 写段，收严：登记 S2 没列这一格）。
 const FIRST_STREAM_ROOTS: usize = 3;
-const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
-    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2,
-    1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2,
-    1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2,
+const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 80] = [
+    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2,
+    24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 2,
+    16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2,
 ];
-const SECOND_STREAM_WRITES: usize = 481;
+const SECOND_STREAM_WRITES: usize = 485;
 const SECOND_STREAM_ROOTS: usize = 19;
-/// 覆盖写固定脚本流取段 11–26（重跑登记 1.3「覆盖写固定脚本流的取样段」）；段 0–10 与新池新建文件流段 0–10 逐字节相同（S2），不枚举。
-const SECOND_STREAM_FIRST_SAMPLED_SEGMENT: usize = 11;
-const SECOND_STREAM_LAST_SAMPLED_SEGMENT: usize = 26;
-const SHARED_PREFIX_SEGMENTS: usize = 11;
+/// 覆盖写固定脚本流取段 12–28（第 3 次重跑登记 1.3「第二条流的取样段」：第一条流整条之后，到 txg 7 的根槽为止）；
+/// 段 0–11 与新池新建文件流段 0–11 逐字节相同（S2），不枚举。
+const SECOND_STREAM_FIRST_SAMPLED_SEGMENT: usize = 12;
+const SECOND_STREAM_LAST_SAMPLED_SEGMENT: usize = 28;
+const SHARED_PREFIX_SEGMENTS: usize = 12;
 
 /// S2 的一行：每条判据各自一个布尔。
 struct StreamCheck {
@@ -612,7 +616,7 @@ fn check_stream_shape(stream: &PreparedStream) -> StreamCheck {
     }
 }
 
-/// S2：两条流的基镜像逐字节相同；覆盖写固定脚本流段 0–10 的写与新池新建文件流段 0–10 逐字节相同。
+/// S2：两条流的基镜像逐字节相同；覆盖写固定脚本流段 0–11 的写与新池新建文件流段 0–11 逐字节相同。
 fn shared_prefix_is_identical(first: &PreparedStream, second: &PreparedStream) -> (bool, bool) {
     let bases_identical = first.base == second.base;
     let prefix_of = |stream: &PreparedStream| -> Vec<RetainedWrite> {
@@ -705,9 +709,26 @@ impl ResultLines {
         println!("E7RESULT {text}");
     }
 
+    /// 收尾行：`name=done emitted=<行数，含这一行> loadavg1=<1 分钟负载> cpus=<在线 CPU 数>`
+    /// （复跑脚本 `scripts/experiment-apparatus/replay.sh` 文件头「计时行的负载关」读这两个字段；它们不进 emitted）。
     fn finish(&mut self) {
         self.emitted += 1;
-        println!("E7RESULT name=done emitted={}", self.emitted);
+        let loadavg_text = std::fs::read_to_string("/proc/loadavg")
+            .expect("Linux 上读得到 /proc/loadavg：复跑的负载关要这一项");
+        let loadavg_one_minute = loadavg_text
+            .split_whitespace()
+            .next()
+            .expect("/proc/loadavg 第一列是 1 分钟负载");
+        let cpuinfo_text = std::fs::read_to_string("/proc/cpuinfo")
+            .expect("Linux 上读得到 /proc/cpuinfo：复跑的负载关要在线 CPU 数");
+        let cpus = cpuinfo_text
+            .lines()
+            .filter(|line| line.starts_with("processor"))
+            .count();
+        println!(
+            "E7RESULT name=done emitted={} loadavg1={loadavg_one_minute} cpus={cpus}",
+            self.emitted
+        );
     }
 }
 
@@ -2376,12 +2397,13 @@ impl ArmRecordStore {
             SPILL_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         let file = std::fs::File::create_new(&path).expect("建溢出文件");
+        // 建成就记进 runs：写到一半 panic（盘满）时 Drop 照 runs 删掉这一份
+        self.runs.push(path);
         let mut writer = std::io::BufWriter::new(file);
         for record in self.memory.drain(..) {
             writer.write_all(&record.to_bytes()).expect("写溢出文件");
         }
         writer.flush().expect("写溢出文件");
-        self.runs.push(path);
     }
 
     fn absorb(&mut self, mut other: ArmRecordStore) {
@@ -2753,7 +2775,7 @@ fn evaluate_stream_domain(run: &StreamDomainRun<'_>) -> StreamDomainTotals {
 
 // ───────────────────────────── 取样域（5.5） ─────────────────────────────
 
-/// 这条流的取样段（新池新建文件流全部；覆盖写固定脚本流段 11–26）。
+/// 这条流的取样段（新池新建文件流全部；覆盖写固定脚本流段 12–28）。
 fn is_sampled_segment(stream: StreamName, segment_index: usize) -> bool {
     match stream {
         StreamName::First => true,
@@ -2763,7 +2785,7 @@ fn is_sampled_segment(stream: StreamName, segment_index: usize) -> bool {
     }
 }
 
-/// 全部持久那一个在不在域里：新池新建文件流在（新池新建文件流全量 16777260 含它），覆盖写固定脚本流不在（段 27 起不取）。
+/// 全部持久那一个在不在域里：新池新建文件流在（新池新建文件流全量 16777268 含它），覆盖写固定脚本流不在（段 29 起不取）。
 fn includes_every_write_persisted(stream: StreamName) -> bool {
     match stream {
         StreamName::First => true,
@@ -2783,7 +2805,7 @@ fn domain_expansions(stream: &PreparedStream, expansion: LocalExpansion) -> Vec<
         .collect()
 }
 
-/// 大段的写数：24 写段（D1-stride 取步长、可行性档取段头的那两段：新池新建文件流段 7、覆盖写固定脚本流段 11）。
+/// 大段的写数：24 写段（D1-stride 取步长、可行性档取段头的那两段：新池新建文件流段 8、覆盖写固定脚本流段 12）。
 /// 重跑登记读法甲：第 1 次的 26 写段（3² · 2²⁴ − 1 个状态）在 C577 之后拆成轮换 2 写与单元 24 写，阈值照改成 24。
 const STRIDED_SEGMENT_WRITES: usize = 24;
 /// 对照样本里「大段」的写数下限（18 写段与 24 写段，5.5）。
@@ -2872,7 +2894,7 @@ struct SegmentCountCheck {
 }
 
 /// 逐个数：只展开 `segment_index` 那一段的计划里，每个序号的持久集合真生成出来，数不同的有几个。取样段里一律逐个数（段内这一段的写、
-/// 它们的撕裂镜像与重放至多 32 个位置时用位图，否则用集合）；取样段之外（覆盖写固定脚本流段 0–10 与段 27 起，一段至多 2²⁸ − 1 个）按计划的组合数报。
+/// 它们的撕裂镜像与重放至多 32 个位置时用位图，否则用集合）；取样段之外（覆盖写固定脚本流段 0–11 与段 29 起，一段至多 2²⁸ − 1 个）按计划的组合数报。
 /// 交回（数出来的个数，是不是逐个数的）。
 fn count_distinct_persisted_sets(
     stream: &PreparedStream,
@@ -4046,29 +4068,29 @@ fn discriminating_positions(
 
 // ───────────────────────────── 锚点 A2–A7 的值（第七节 7.2，登记第十三节 anchors.py / anchors2.py 的原样输出） ─────────────────────────────
 
-// 重跑登记（`research/prompts/e161-r2-prereg.md`）第七节 A2、A3、A4 与第十三节 `anchors_r2.py` 的原样输出（C577 之后的段形）。
-const ANCHOR_FIRST_STREAM_SEGMENT_STATES: [u64; 11] = [8, 3, 1, 8, 3, 1, 8, 16_777_215, 3, 1, 8];
-const ANCHOR_FIRST_STREAM_STATES: u64 = 16_777_260;
+// 第 3 次重跑登记（`research/prompts/e161-r3-prereg.md`）第七节 A2、A3、A4 与第十三节 `anchors_e161_r3.py` 的原样输出（取号写两轮之后的段形）。
+const ANCHOR_FIRST_STREAM_SEGMENT_STATES: [u64; 12] = [8, 8, 3, 1, 8, 3, 1, 8, 16_777_215, 3, 1, 8];
+const ANCHOR_FIRST_STREAM_STATES: u64 = 16_777_268;
 /// txg1、txg2、txg3、最后一条根之后。
-const ANCHOR_FIRST_STREAM_BY_PUBLISH: [u64; 4] = [12, 12, 16_777_227, 8];
-/// 覆盖写固定脚本流取样段 11–26 逐段。
-const ANCHOR_SECOND_STREAM_SEGMENT_STATES: [u64; 16] = [
-    16_777_215, 3, 1, 8, 8, 262_143, 3, 1, 8, 65_535, 3, 1, 8, 65_535, 3, 1,
+const ANCHOR_FIRST_STREAM_BY_PUBLISH: [u64; 4] = [20, 12, 16_777_227, 8];
+/// 覆盖写固定脚本流取样段 12–28 逐段。
+const ANCHOR_SECOND_STREAM_SEGMENT_STATES: [u64; 17] = [
+    16_777_215, 3, 1, 8, 8, 8, 262_143, 3, 1, 8, 65_535, 3, 1, 8, 65_535, 3, 1,
 ];
-const ANCHOR_SECOND_STREAM_STATES: u64 = 17_170_476;
-/// txg4（不含不取的段 10）、txg5、txg6、txg7。
-const ANCHOR_SECOND_STREAM_BY_PUBLISH: [u64; 4] = [16_777_219, 262_163, 65_547, 65_547];
-const ANCHOR_FIRST_STREAM_SMALL: u64 = 45;
-const ANCHOR_SECOND_STREAM_SMALL: u64 = 393_261;
+const ANCHOR_SECOND_STREAM_STATES: u64 = 17_170_484;
+/// txg4（不含不取的段 11）、txg5、txg6、txg7。
+const ANCHOR_SECOND_STREAM_BY_PUBLISH: [u64; 4] = [16_777_219, 262_171, 65_547, 65_547];
+const ANCHOR_FIRST_STREAM_SMALL: u64 = 53;
+const ANCHOR_SECOND_STREAM_SMALL: u64 = 393_269;
 /// 每个 24 写段 ⌈(2²⁴ − 1) / 2311⌉；两条流取样段里各只有一个 24 写段。
 const ANCHOR_STRIDE_PER_SEGMENT: u64 = 7_260;
-const ANCHOR_FIRST_STREAM_QUICK: u64 = 46;
-const ANCHOR_SECOND_STREAM_QUICK: u64 = 52;
+const ANCHOR_FIRST_STREAM_QUICK: u64 = 54;
+const ANCHOR_SECOND_STREAM_QUICK: u64 = 60;
 /// 段头：每条流的大段（24 写段）各取段内序号 0–4095（重跑登记 I-4 新加的一格）。
 const ANCHOR_SEGMENT_HEADS_PER_STREAM: u64 = 4_096;
-/// A5：取三态的写数（新池新建文件流 8 次系统配置槽写，覆盖写固定脚本流 46 次）。
-const ANCHOR_FIRST_STREAM_IN_PLACE_OVERWRITES: usize = 8;
-const ANCHOR_SECOND_STREAM_IN_PLACE_OVERWRITES: usize = 46;
+/// A5：取三态的写数（新池新建文件流 10 次系统配置槽写，覆盖写固定脚本流 50 次；第 3 次重跑登记 A5，取号写两轮各多 2 次）。
+const ANCHOR_FIRST_STREAM_IN_PLACE_OVERWRITES: usize = 10;
+const ANCHOR_SECOND_STREAM_IN_PLACE_OVERWRITES: usize = 50;
 /// A6：容量的字节数。
 const ANCHOR_LARGEST_CARD_BYTES: u128 = 34_190_917_632;
 const ANCHOR_SIXTEEN_GIGABYTE_CARD_BYTES: u128 = 17_094_934_528;
@@ -5094,7 +5116,7 @@ impl TimingControlSegmentShape {
     }
 }
 
-/// PC3：覆盖写固定脚本流段 16 序号最小的 1000 个状态，先照常跑一遍，再六遍各在一个计时区里加 2 ms 忙等。交回全部六个区都过没过。
+/// PC3：覆盖写固定脚本流段 18 序号最小的 1000 个状态，先照常跑一遍，再六遍各在一个计时区里加 2 ms 忙等。交回全部六个区都过没过。
 /// 那一段不是写行那 18 个单元写、或不够 1000 个状态时，六个区一律判不过、一个状态都不评（`pc3_segment_holds=false`）。
 fn report_timing_control(
     output: &mut ResultLines,
@@ -5175,8 +5197,9 @@ fn report_timing_control(
     every_zone_holds
 }
 
-/// PC3 取的段（5.3：第 1 次覆盖写固定脚本流段 14「写行发布 18 个单元写」那一段；C577 之后同一批写是段 16，重跑登记 I-6、A9）。
-const TIMING_CONTROL_SEGMENT: usize = 16;
+/// PC3 取的段（5.3：第 1 次覆盖写固定脚本流段 14「写行发布 18 个单元写」那一段；C577 之后同一批写是段 16，重跑登记 I-6、A9；
+/// 取号写两轮之后是段 18，第 3 次重跑登记 J-4、A9）。
+const TIMING_CONTROL_SEGMENT: usize = 18;
 /// PC3 那一段的写数：写行发布的 18 个单元写（重跑登记 A9）。
 const TIMING_CONTROL_SEGMENT_WRITES: usize = 18;
 
@@ -5574,7 +5597,7 @@ fn report_per_state_crates_comparison(
 fn run_feasibility(output: &mut ResultLines) -> i32 {
     let threads = threads_from_environment();
     output.line(format!(
-        "name=config experiment=E161 mode=feasibility threads={threads} registration=research/prompts/e161-preregistration.md rerun_registration=research/prompts/e161-r2-prereg.md domain=first_small_45+quick_46_52+largest_segment_heads_4096"
+        "name=config experiment=E161 mode=feasibility threads={threads} registration=research/prompts/e161-preregistration.md rerun_registration=research/prompts/e161-r3-prereg.md domain=first_small_53+quick_54_60+largest_segment_heads_4096"
     ));
     let constants = local_constants_against_the_crates();
     let constants_clause_holds = constants
@@ -5861,7 +5884,7 @@ mod tests {
         );
     }
 
-    /// 新池新建文件流的 D1-small（45 个状态）跑一遍 5.1 的四件事；各测试共用这一份搭建的写法。
+    /// 新池新建文件流的 D1-small（53 个状态）跑一遍 5.1 的四件事；各测试共用这一份搭建的写法。
     /// 评之前先核 D1-small 的个数（重跑登记 I-7 的域守卫）：段形或阈值一变，D1-small 会把 1677 万个状态的段整段收进来，
     /// 不先核就一路评到撞内存上限。
     fn evaluate_the_first_stream_small_domain(
@@ -5880,8 +5903,8 @@ mod tests {
             let small = small_domain_ordinals(&stream, &plan);
             assert_eq!(
                 small.len(),
-                45,
-                "域守卫：新池新建文件流 D1-small 是 45 个状态（重跑登记 A4），对不上就不评"
+                53,
+                "域守卫：新池新建文件流 D1-small 是 53 个状态（第 3 次重跑登记 A4），对不上就不评"
             );
             let control: BTreeSet<u64> = small.iter().copied().collect();
             let totals = evaluate_stream_domain(&StreamDomainRun {
@@ -5941,8 +5964,8 @@ mod tests {
         );
         assert_eq!(
             table.mask_width(),
-            49,
-            "A5：41 次写 + 8 份撕裂镜像 + 0 次重放"
+            53,
+            "A5：43 次写 + 10 份撕裂镜像 + 0 次重放"
         );
         assert_eq!(
             formula_segment_state_count(26, 2),
@@ -5952,7 +5975,7 @@ mod tests {
         assert_eq!(
             formula_segment_state_count(24, 0),
             16_777_215,
-            "2²⁴ − 1：C577 之后新池新建文件流段 7 的 24 个单元写"
+            "2²⁴ − 1：取号写两轮之后新池新建文件流段 8 的 24 个单元写"
         );
     }
 
@@ -5975,23 +5998,23 @@ mod tests {
         );
         assert_eq!(
             small_domain_ordinals(&stream, &full).len(),
-            45,
+            53,
             "A4：D1-small 新池新建文件流"
         );
         assert_eq!(
             stride_domain_ordinals(&stream, &full).len(),
             7_260,
-            "A4：D1-stride 新池新建文件流唯一的 24 写段（段 7）"
+            "A4：D1-stride 新池新建文件流唯一的 24 写段（段 8）"
         );
         assert_eq!(
             every_ordinal(&stream, &quick).len(),
-            46,
+            54,
             "A4：D1-quick 新池新建文件流"
         );
         assert_eq!(
             strided_segment_heads(&stream, &full).len(),
             4_096,
-            "A4：段头，新池新建文件流段 7 序号最小的 4096 个"
+            "A4：段头，新池新建文件流段 8 序号最小的 4096 个"
         );
     }
 
@@ -6000,8 +6023,8 @@ mod tests {
     fn second_stream_shape_and_sampled_domains_have_the_registered_sizes() {
         let first = prepare_first_stream();
         let stream = prepare_second_stream();
-        assert_eq!(stream.segments.len(), 78, "A8：覆盖写固定脚本流 78 段");
-        assert_eq!(stream.writes.len(), 481, "A8：覆盖写固定脚本流 481 次写");
+        assert_eq!(stream.segments.len(), 80, "A8：覆盖写固定脚本流 80 段");
+        assert_eq!(stream.writes.len(), 485, "A8：覆盖写固定脚本流 485 次写");
         assert_eq!(stream.root_write_count, 19, "A8：覆盖写固定脚本流 19 条根");
         let shape = check_stream_shape(&stream);
         assert!(shape.segment_lengths_match, "S2：段长表与本地常量逐段相同");
@@ -6011,7 +6034,7 @@ mod tests {
         assert!(bases_identical, "S2：两条流的基镜像逐字节相同");
         assert!(
             prefix_identical,
-            "S2：覆盖写固定脚本流前 11 段的写与新池新建文件流 11 段逐字节相同"
+            "S2：覆盖写固定脚本流前 12 段的写与新池新建文件流 12 段逐字节相同"
         );
         let table = TornWriteTable::of(&stream);
         let full = LocalPlan::new(
@@ -6036,27 +6059,27 @@ mod tests {
             .collect();
         assert_eq!(
             sampled_counts, ANCHOR_SECOND_STREAM_SEGMENT_STATES,
-            "A3：取样段 11–26 逐段状态数"
+            "A3：取样段 12–28 逐段状态数"
         );
         assert_eq!(
             small_domain_ordinals(&stream, &full).len(),
-            393_261,
+            393_269,
             "A4：D1-small 覆盖写固定脚本流"
         );
         assert_eq!(
             stride_domain_ordinals(&stream, &full).len(),
             7_260,
-            "A4：D1-stride 覆盖写固定脚本流唯一的 24 写段（段 11）"
+            "A4：D1-stride 覆盖写固定脚本流唯一的 24 写段（段 12）"
         );
         assert_eq!(
             every_ordinal(&stream, &quick).len(),
-            52,
+            60,
             "A4：D1-quick 覆盖写固定脚本流"
         );
         assert_eq!(
             strided_segment_heads(&stream, &full).len(),
             4_096,
-            "A4：段头，覆盖写固定脚本流段 11 序号最小的 4096 个"
+            "A4：段头，覆盖写固定脚本流段 12 序号最小的 4096 个"
         );
         let timing_control = TimingControlSegmentShape::of(&stream, &full);
         assert_eq!(
@@ -6074,7 +6097,7 @@ mod tests {
         let (whole_stream_states, whole_stream_largest) =
             whole_stream_states_by_the_formula(&stream, &table);
         assert_eq!(
-            whole_stream_states, 1_678_377_204,
+            whole_stream_states, 1_678_377_220,
             "A7：覆盖写固定脚本流整条流全量（公式，1 + Σ 各段）"
         );
         assert_eq!(
@@ -6086,7 +6109,7 @@ mod tests {
     #[test]
     fn recorded_recovery_answers_exactly_like_the_baseline_on_the_first_stream() {
         let (_stream, totals, _small) = evaluate_the_first_stream_small_domain(2, None);
-        assert_eq!(totals.states(), 45, "D1-small 新池新建文件流 45 个状态");
+        assert_eq!(totals.states(), 53, "D1-small 新池新建文件流 53 个状态");
         assert_eq!(
             totals.consult_report_differs, 0,
             "S5：记录跑看 journal 那一遍与照跑逐项相同"
@@ -6131,7 +6154,7 @@ mod tests {
         assert_eq!(
             summary.arm_inconsistent[Arm::RecoveryConsult.slot()],
             0,
-            "按读集复用在这 45 个状态上没有不一致"
+            "按读集复用在这 53 个状态上没有不一致"
         );
     }
 
@@ -6173,8 +6196,8 @@ mod tests {
         };
         let added = zone_total(&busy, 0).saturating_sub(zone_total(&quiet, 0));
         assert!(
-            added >= 45 * TIMING_CONTROL_BUSY_WAIT.as_nanos() * 9 / 10,
-            "PC3 的缩小版：看 journal 那一区多出 45 × 2 ms 的九成以上，实际 {added} ns"
+            added >= 53 * TIMING_CONTROL_BUSY_WAIT.as_nanos() * 9 / 10,
+            "PC3 的缩小版：看 journal 那一区多出 53 × 2 ms 的九成以上，实际 {added} ns"
         );
     }
 
@@ -6208,7 +6231,7 @@ mod tests {
             ),
             "PC5：P1 加 32768、P3 加 7 × 21、P2 加 ⌈W/8⌉、P4 加 48"
         );
-        assert_eq!(mask_bytes_per_state(49), 7, "⌈49 / 8⌉");
+        assert_eq!(mask_bytes_per_state(53), 7, "⌈53 / 8⌉");
     }
 
     #[test]

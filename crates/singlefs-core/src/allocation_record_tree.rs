@@ -25,7 +25,9 @@ use singlefs_format::{
 use crate::address::{
     CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber, TreeIdentifier,
 };
-use crate::allocator::{absolute_slot_count_of_device, AllocationRecord, PoolAllocator};
+use crate::allocator::{
+    absolute_slot_count_of_device, AllocationRecord, AllocationRecordEntryRefusal, PoolAllocator,
+};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::pointer::{
     BirthSequence, NodePointer, PointerHeadFieldGroup, PointerHeadFieldsJudgement,
@@ -725,13 +727,21 @@ impl AllocationRecordTreeReading<'_> {
         if header.level == 0 {
             let first_new_record = records.len();
             for entry in &header.entries {
-                let record = AllocationRecord::parse(entry).ok_or(
-                    RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                // 跨度段的隔离记号读成记号、跨度取低位（D19（块指针的结构与宽度预算） 已定项 5），下面的落叶判按去掉记号的跨度判。
+                let record = AllocationRecord::parse(entry).map_err(|refusal| match refusal {
+                    AllocationRecordEntryRefusal::EntryWidthDiffersFromTheFieldTable {
+                        entry_bytes,
+                    } => RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                         what: "分配记录",
-                        entry_bytes: entry.len(),
+                        entry_bytes,
                         field_table_bytes: usize::try_from(ALLOCATION_RECORD_BYTES).expect("20"),
                     },
-                )?;
+                    AllocationRecordEntryRefusal::QuarantineMarkOnAReleasedRecord => {
+                        RecoveryFailure::UnitMalformed {
+                            what: ALLOCATION_RECORD_WITH_THE_QUARANTINE_MARK_ON_A_RELEASED_RECORD,
+                        }
+                    }
+                })?;
                 if self.geometry.leaf_of_slot(record.device, record.slot) != node
                     || !self.geometry.record_fits_in_its_leaf(&record)
                 {
@@ -752,8 +762,10 @@ impl AllocationRecordTreeReading<'_> {
         }
         let internal_width =
             usize::try_from(ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES).expect("96");
-        if header.entry_width < internal_width {
-            return Err(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+        // 宽于 key 宽 + 86 的同样拒（C867，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
+        // `EntryWidthDiffersFromItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
+        if header.entry_width != internal_width {
+            return Err(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: "分配记录树内部条目",
                 entry_bytes: header.entry_width,
                 field_table_bytes: internal_width,
@@ -808,7 +820,7 @@ impl AllocationRecordTreeReading<'_> {
 /// 记录还要对这个池的几何判一遍（设备在池里、槽号在单元区里、跨度不越过单元区末尾、同盘不相交），由调用方做（`recovery`）。
 ///
 /// # Errors
-/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；条目窄于字段表 ⇒ `EntryNarrowerThanItsFieldTable`；
+/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；条目宽不等于字段表（窄于、宽于都算）⇒ `EntryWidthDiffersFromItsFieldTable`；
 /// 记录不在它所在叶里 ⇒ `AllocationRecordOutsideThePoolGeometry`；别的核不过 ⇒ `InvariantViolated`（I-1.1 / I-1.2 / I-1.3 / I-1.4）。
 #[allow(
     clippy::too_many_arguments,
@@ -845,6 +857,10 @@ pub fn read_allocation_record_tree(
     Ok(AllocationRecordTreeReadFromDisk { nodes, records })
 }
 
+/// 分配记录树叶里一条记录的跨度段隔离记号与已释放标志同时置（0x4000 与 0x8000，D19（块指针的结构与宽度预算） 已定项 5
+/// 「带记号的记录必须未释放」）时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句：判那片叶损坏，整棵树读不回。
+pub const ALLOCATION_RECORD_WITH_THE_QUARANTINE_MARK_ON_A_RELEASED_RECORD: &str =
+    "分配记录树叶里一条记录的跨度段隔离记号与已释放标志同时置";
 /// 分配记录树内部条目里的子指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句
 /// （C581（extent 偏移非 0 没有判据）：判该指针所在的结构损坏）。
 pub const ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
@@ -915,6 +931,7 @@ mod tests {
             span_slots,
             generation: CheckpointTxg(1),
             is_released: false,
+            quarantine_mark: crate::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         }
     }
 
@@ -989,6 +1006,28 @@ mod tests {
                 allocation_record_key_bytes(DeviceIdentity(1), SlotNumber(62 * 812 - 1))
             )
         );
+    }
+
+    /// 读回时的落叶判按去掉隔离记号的跨度判（D19（块指针的结构与宽度预算） 已定项 5）：叶罩槽 [49532, 50344)，跨度段 0x4002 起在 50342、
+    /// 0x4001 起在 50343 的两条记录解出跨度 2、1 且带记号，末槽 50343 都不越过叶的末槽；记号当成跨度读的话末槽越到一万六千多槽之外。
+    #[test]
+    fn records_with_the_quarantine_mark_fit_in_their_leaf_by_the_span_in_the_low_bits() {
+        let geometry = geometry_of_two_four_gibibyte_devices();
+        for (slot, span_field, span_slots) in [(50342u64, 0x4002u16, 2u16), (50343, 0x4001, 1)] {
+            let mut bytes = record(0, slot, span_slots).to_bytes();
+            bytes[10..12].copy_from_slice(&span_field.to_le_bytes());
+            let parsed = AllocationRecord::parse(&bytes).expect("带隔离记号、未释放的记录解得开");
+            assert_eq!(parsed.span_slots, span_slots, "跨度取低位");
+            assert_eq!(
+                parsed.quarantine_mark,
+                crate::allocator::AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+                "跨度段次高位读成隔离记号"
+            );
+            assert!(
+                geometry.record_fits_in_its_leaf(&parsed),
+                "带记号的记录（槽 {slot}、跨度段 {span_field:#06x}）落在它所在的叶里"
+            );
+        }
     }
 
     /// 一个叶的记录变了：那片叶、它的父节点与根变，同一块盘上另一片叶与另一块盘上的整条路径不变。

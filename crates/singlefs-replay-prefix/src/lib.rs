@@ -1,6 +1,6 @@
 //! 取 journal 前缀并施加的纯函数核：`singlefs-core` 的 `recovery::replay_journal` 取前缀那一截全部判定都在这里，
 //! Verus 验的就是编进产品、被恢复路径调用的这一份（用户 2026-10-01 定「Verus 跑真实代码」；里程碑三七·3）。
-//! 单独成一个 crate、只依赖 `vstd`：Verus 只编这一个文件，不编整个 `singlefs-core`（用户 2026-10-01 定拆）。
+//! 单独成一个 crate、只依赖 `vstd`：Verus 验证这个 crate 及其模块，不编整个 `singlefs-core`（用户 2026-10-01 定拆）。
 //!
 //! 判定与判的次序照提交 fcc4d340 的 `crates/singlefs-core/src/recovery.rs` 里 `replay_journal` 搬过来：每一判断在哪、
 //! 两个读盘回调在哪一判之前调，都与原文相同。
@@ -20,8 +20,8 @@
 //! 另两个纯函数核也在这里：择根（`choose_root_slot`，`recovery::choose_root` 取 `(checkpoint_txg, 实例代号)` 最大的那一截）与
 //! 扫环建表（`first_copy_of_each_record_key`，`recovery::scan_journal` 同一 (实例代号, 计数器) 先到先得的那一截）；
 //! 择根与取前缀的合判（C650 的 Verus 一半）写成推论 `corollary_recovery_replays_from_the_newest_self_verified_root`。
-//! 整理的选段核与计划核及其四条性质（里程碑四二·4）在模块 [`compaction_plan_proofs`]：`singlefs-core` 不调它们，它的
-//! `compaction_plan` 单测与它们逐项对拍。
+//! 整理的选段核与计划核及其四条性质（里程碑四二·4）在模块 [`compaction_plan_proofs`]：`singlefs-core` 直接调用它们，
+//! `compaction_plan` 单测以独立参考实现核对转换；GC 协议与旧读者证明在 [`gc_crash_proofs`]。
 //! Verus 的必红世界登记在同目录的 `verus-must-red-worlds.tsv`。
 #![forbid(unsafe_code)]
 
@@ -30,6 +30,8 @@ use std::collections::BTreeMap;
 use vstd::prelude::*;
 
 pub mod compaction_plan_proofs;
+pub mod gc_crash_proofs;
+pub mod gc_ring_interval_proofs;
 
 verus! {
 
@@ -681,7 +683,7 @@ pub open spec fn replay_follows_the_prefix_rules<
 // ===== M3 幂等与单调（spec，可信：照判决文字写）=====
 // D13（验证路线）已定项 1 的 M3 一行；题面照第二轮判决 research/prompts/m3-formal-r2-main-verification.md 第二节第 5、6、7 行
 // 与第三轮判决 research/prompts/m3-formal-r3-main-verification.md 第三节（用户 2026-10-01 定 S5 版本序、S6 txg 顶格）。
-// 主语是 replay_core：singlefs-core 里以 verify_named_units = true 调 replay_journal 的三处走到的就是它（第二轮判决第 7 行）。
+// 主语是 replay_core：singlefs-core 里以 `NamedUnitVerification::Verify` 调 replay_journal 的三处走到的就是它（第二轮判决第 7 行）。
 // 下面四条都写成 replay_core 的 ensures（证在 M3 的引理那一节），说的是编进产品的这一份交回的结果；单调本身是推论 corollary_the_landed_version_does_not_go_back。
 
 // I-8.12（K10，判决 research/prompts/m3-inv-b-r1-main-verification.md 第二节第 9 行）：同一实例里 journal 记录的 txg 随计数器不减。
@@ -4055,6 +4057,58 @@ pub fn first_copy_of_each_record_key(scanned_keys: &[(u32, u64)]) -> (first_copi
         position += 1;
     }
     first_copies
+}
+
+// 构造见证：无 requires；确实施加一条完整发布，再从落点恢复保持不动。
+// 联合证明 M3 蕴涵式的三个前件，避免空输入见证掩盖实际重放路径。
+#[allow(clippy::vec_init_then_push, reason = "逐步构造非空记录序列，让见证直接使用 Vec::push 的规格")]
+pub fn witness_nonempty_replay_and_its_fixed_point() {
+    let back_chain = |_position: usize| -> (answer: bool)
+        ensures answer == false,
+    { false };
+    let named_units = |_position: usize| -> (answer: bool)
+        ensures answer == true,
+    { true };
+    let mut records = Vec::new();
+    records.push(CoreRecord {
+        instance: PrefixKernelInstanceGeneration(0),
+        counter: JournalCounter(1),
+        checkpoint_txg: PrefixKernelCheckpointTxg(1),
+        transaction: TransactionNumber(1),
+        is_commit: true,
+        ordinal_within_publish: PrefixKernelJournalRecordOrdinalWithinPublish(1),
+        place_in_publish: PrefixKernelJournalRecordPlaceInPublish::LastRecordOfThePublish,
+        new_root_source: 1u64,
+    });
+    proof {
+        reveal_with_fuel(candidates_before, 2);
+        reveal_with_fuel(last_record_flag_counters_of_the_chosen_roots_publish, 2);
+        assert(journal_txg_does_not_decrease_with_the_counter_within_an_instance(records@));
+        assert(the_reader_answers_each_position_one_way(back_chain));
+        assert(the_reader_answers_each_position_one_way(named_units));
+        assert(records_above_the_chosen_root_fit_the_in_flight_limit(
+            records@, PrefixKernelInstanceGeneration(0), PrefixKernelCheckpointTxg(0), 1));
+    }
+    let _first = replay_core(PrefixKernelInstanceGeneration(0), PrefixKernelCheckpointTxg(0),
+        0u64, &records, 1, NamedUnitVerification::Verify, back_chain, named_units);
+    proof {
+        reveal_with_fuel(candidates_before, 2);
+        reveal_with_fuel(last_record_flag_counters_of_the_chosen_roots_publish, 2);
+        reveal(fails_a_check_before_the_named_units);
+        reveal(passes_every_check_before_the_named_units);
+        assert(_first is Ok);
+        assert(_first->Ok_0.applied@.len() == 1);
+        assert(_first->Ok_0.root_source_after_replay == 1);
+    }
+    let _again = replay_core(PrefixKernelInstanceGeneration(0), PrefixKernelCheckpointTxg(1),
+        1u64, &records, 1, NamedUnitVerification::Verify, back_chain, named_units);
+    proof {
+        reveal_with_fuel(candidates_before, 2);
+        reveal_with_fuel(last_record_flag_counters_of_the_chosen_roots_publish, 2);
+        assert(_again is Ok);
+        assert(_again->Ok_0.applied@.len() == 0);
+        assert(_again->Ok_0.root_source_after_replay == 1);
+    }
 }
 
 // ===== spec 自己的冒烟（防 spec 恒真或恒假）=====

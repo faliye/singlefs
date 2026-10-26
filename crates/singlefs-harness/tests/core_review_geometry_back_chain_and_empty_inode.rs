@@ -594,7 +594,7 @@ fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_sixteen
     assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(16);
 }
 
-/// physical_block_size 256：根槽装不下 457 字节的根记录。在 mkfs 开头拒，不走到 `RootRecord::to_slot` 的断言
+/// physical_block_size 256：根槽装不下 466 字节的根记录。在 mkfs 开头拒，不走到 `RootRecord::to_slot` 的断言
 /// （那时根环、journal 环已经清过、两个单元已经写了）。
 #[test]
 fn a_root_slot_narrower_than_the_root_record_is_refused_before_any_write() {

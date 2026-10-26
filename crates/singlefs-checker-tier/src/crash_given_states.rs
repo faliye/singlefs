@@ -232,7 +232,7 @@ pub trait GivenStatesJudge: Sync {
 
     /// 判一张带两栏的表的每个状态（[`GivenStatesOfATableWithItsColumns`]；崩溃注入第二截那张表写了恢复自称的那一版）。
     /// 产品引擎重写它：两栏跟着表录进库、进块键，判段照读回的两栏判。没重写的判器（只数表的替身）走这一份：照
-    /// [`Self::judge_the_given_states`] 判，再逐状态核那一栏——写了的那一版与结论里看 journal 那一遍落到的根（实例代号与 checkpoint_txg 低 32 位）
+    /// [`Self::judge_the_given_states`] 判，再逐状态核那一栏——写了的那一版与结论里看 journal 那一遍落到的根（实例代号与完整的 checkpoint_txg）
     /// 相同，第二条判据照哪一版判都一样，结论照交；不同就报错（这个判器没照那一栏判第二条判据，不交一份照错的那一版判的结论）。
     ///
     /// # Errors
@@ -262,14 +262,7 @@ pub trait GivenStatesJudge: Sync {
                 ClaimedVersionOfAGivenState::NewestRootWrittenByTheMountAndItsPublish(Some((
                     instance,
                     checkpoint_txg,
-                ))) => {
-                    landed_on
-                        != LandedRootWords {
-                            instance: instance.0,
-                            checkpoint_txg_low: u32::try_from(checkpoint_txg.0 & 0xFFFF_FFFF)
-                                .expect("低 32 位"),
-                        }
-                }
+                ))) => landed_on != LandedRootWords::of_the_landed_root(instance, checkpoint_txg),
             };
             if claimed_differs {
                 return Err(format!(

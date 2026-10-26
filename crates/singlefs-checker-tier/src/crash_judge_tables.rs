@@ -50,7 +50,9 @@ use crate::crash_facts::{
 
 /// 一个落点最多被几次写盖住：GPU 内核里组合掩码是 [`COMBINATION_WORDS_OF_A_VERSION`] 个 u32（[`CombinationOfTheWritesOnALocation`]，
 /// 版本表里的布局见 [`version_word_of_the_combination_word`]）。随机历史越过原分配记录墙那一族把系统配置 0 号槽录制写了 88 到 111 次
-/// （2026-10-18 调查员量的，全量那一趟建不出判表），64 位装不下；256 留出余量。
+/// （2026-10-18 调查员量的，全量那一趟建不出判表），64 位装不下；256 留出余量。清零写进落点模型之后用过的盘上重做 mkfs 那条流
+/// 每个落点至多 4 次（系统配置槽：[0, 根环基址) 清零、系统配置槽写与两者的撕裂镜像；根槽：区域清零、它的撕裂镜像、根槽写；
+/// journal 记录槽：环清零与它的撕裂镜像。推的，读 mkfs 写序与撕裂镜像的建法），不动这个上限。
 pub const MAXIMUM_WRITES_PER_LOCATION: usize = 256;
 /// 组合掩码按 u64 几个字（[`CombinationOfTheWritesOnALocation`] 的存法）。
 const COMBINATION_U64_WORDS: usize = MAXIMUM_WRITES_PER_LOCATION / 64;
@@ -98,8 +100,8 @@ pub fn step_kind_code(kind: StepKind) -> u32 {
         StepKind::RootRecordFua => 3,
         StepKind::SystemConfigurationSlot => 4,
         StepKind::Barrier => 5,
-        // 新码接在最后，旧的几个码不动。discard 不落在任何一个落点上（[`JudgeWrite::location`] 是 `None`）：它罩住的每个单元槽各是一个落点、
-        // 它算进那几个落点的写里，落点的每个版本按 `CrashImage::read` 同一条叠法叠出来（持久那一态读回 0、撕裂那一态是撕裂镜像的字节、
+        // 新码接在最后，旧的几个码不动。discard 与清零写都不落在任何一个落点上（[`JudgeWrite::location`] 是 `None`）：它罩住的每个落点
+        // 把它算进自己的写里，落点的每个版本按 `CrashImage::read` 同一条叠法叠出来（持久那一态读回 0、撕裂那一态是撕裂镜像的字节、
         // 没持久那一态是旧字节，取几态照 D13（验证路线） 已定项 4），内核只按组合查版本，不按这个码分支。
         StepKind::Discard => 6,
     }
@@ -209,8 +211,8 @@ pub struct JudgeWrite {
     pub offset: u64,
     pub length: u32,
     pub kind: StepKind,
-    /// 这次写落在哪个落点（落点表下标）；清零写与 discard（连同它的撕裂镜像）不落在任何落点：一次按 64 槽整段发、罩住几十个落点，
-    /// 它只进它罩住的那几个落点的写（[`JudgeLocation::writes`]）。
+    /// 这次写落在哪个落点（落点表下标）；清零写与 discard（连同它们的撕裂镜像）不落在任何落点：discard 一次按 64 槽整段发、
+    /// 清零写一次清一整段固定结构，都罩住几个到几十个落点，只进它罩住的那几个落点的写（[`JudgeLocation::writes`]）。
     pub location: Option<u32>,
     /// 根槽写写下的根身份（实例代号，checkpoint_txg）。
     pub root_identity: Option<(u32, u64)>,
@@ -315,8 +317,6 @@ pub struct JudgeFlow<'flow> {
 pub enum JudgeTablesRefusal {
     /// 基线里每块盘的两个系统配置槽都解不开（[`system_configuration_the_locations_are_laid_out_by`] 一份都找不到）：落点几何无从取。
     BaseSystemConfigurationUnreadable,
-    /// 枚举写表里有清零写：清零的范围可以横跨几千个槽，落点模型不接它。
-    ZeroFillInTheEnumeratedWrites { write_index: usize },
     /// 一次写的起点不是任何一个落点的起点，或长过那个落点。
     WriteNotAlignedToALocation { write_index: usize },
     /// 一个落点被多于 [`MAXIMUM_WRITES_PER_LOCATION`] 次写盖住。
@@ -627,19 +627,6 @@ fn build_judge_tables_from_the_state_source(
             });
         }
     }
-    for (write_index, write) in enumerated.iter().enumerate() {
-        match write.kind {
-            StepKind::ZeroFill => {
-                return Err(JudgeTablesRefusal::ZeroFillInTheEnumeratedWrites { write_index });
-            }
-            StepKind::Discard
-            | StepKind::UnitWrite
-            | StepKind::JournalRecord
-            | StepKind::RootRecordFua
-            | StepKind::SystemConfigurationSlot
-            | StepKind::Barrier => {}
-        }
-    }
     let devices: Vec<u32> = flow
         .base
         .device_identities()
@@ -921,7 +908,8 @@ fn base_geometry(base: &MemoryPool) -> Result<BaseGeometry, JudgeTablesRefusal> 
     })
 }
 
-/// 全部落点（还没填写与版本）：系统配置每盘两槽、根环全部槽、journal 环里基线或枚举写碰过的记录槽、单元区里基线或枚举写碰过的 16 KiB 槽。
+/// 全部落点（还没填写与版本）：系统配置每盘两槽、根环全部槽、journal 环里基线或枚举写碰过的记录槽、单元区里基线或枚举写碰过的 16 KiB 槽；
+/// 「碰过」不算清零写（[`StepKind::ZeroFill`]，连同它的撕裂镜像），理由在碰过的范围那一段。
 /// 只在池里的盘（`devices`）上建落点：系统配置记的区域盘可以不在池里（卸载掉电之后只剩一块盘的镜像，丢掉的那块住着根环的两个区域），
 /// CPU 的读者读那块盘交 None（`MemoryPool::read`，恢复与池级 checker 都当这一槽读不出），GPU 在那块盘上找不到落点、`read_at` 交没有版本的切片，
 /// 同一个结局；给那块盘建落点就要从基线读它的字节，读不出。
@@ -975,7 +963,13 @@ fn enumerate_locations(
             );
         }
     }
-    // 碰过的字节范围：基线写过的扇区，加枚举写表里每次写的范围
+    // 碰过的字节范围：基线写过的扇区，加枚举写表里每次不是清零写的写的范围。清零写不算碰过：mkfs 一次清整个 journal 环（第一版 768 MiB，
+    // 每块盘 196 608 个记录槽），照算就给每一槽建一个落点，GPU 每个状态逐个落点扫环（`crash_judge_common.wgsl` 的 `scan_journal`）。
+    // 不算它不少判一个字节：清零写写的全是 0，它的撕裂镜像每个字节不是 0 就是「这次写之前的写全落了」时的旧字节（`crash::torn_image_of_in_place_overwrite`），
+    // 旧字节非零的扇区是基线写过的、或录制流里更早一次带字节的写写的，都已算碰过；只被清零写碰过的槽在每个崩溃状态里都读出全 0。
+    // GPU 读没有落点的槽，结局与读全 0 相同：单元区里交全零单元（`zero_unit_version_over_a_slot_nothing_wrote`），journal 环里那一槽不进扫环、
+    // 全 0 的记录本来也自证不过，逐档读槽 1 读成不自证、全 0 的槽本来也自证不过；系统配置每盘两槽与根环全部槽照建落点，不看碰没碰过。
+    // 清零写照样记进它罩住的每个落点的写（下面「每次写盖住哪几个落点」按字节范围记），落点的版本照叠法叠出来。
     let mut touched_ranges: BTreeMap<u32, Vec<Range<u64>>> = BTreeMap::new();
     for (device, sparse) in &base.devices {
         let ranges = touched_ranges.entry(device.0).or_default();
@@ -983,7 +977,10 @@ fn enumerate_locations(
             ranges.push(sector * SECTOR_BYTES..(sector + 1) * SECTOR_BYTES);
         }
     }
-    for write in enumerated {
+    for write in enumerated
+        .iter()
+        .filter(|write| write_puts_bytes_of_its_own(write.kind))
+    {
         touched_ranges
             .entry(write.device.0)
             .or_default()
@@ -1052,6 +1049,21 @@ fn enumerate_locations(
         }
     }
     locations
+}
+
+/// 一次写会不会写下自己的非零字节（[`enumerate_locations`] 按它算碰过的范围）：清零写（连同它的撕裂镜像，种类照抄被撕的那次写）不会，
+/// 别的种类会。discard 写的也是 0，照旧算碰过：它罩住的每个单元槽各建一个落点（discard 进判表那一批的写法，
+/// `tests::a_discard_over_a_data_unit_lands_in_every_unit_slot_location_it_covers_in_its_three_states` 钉着），这里不动它。
+fn write_puts_bytes_of_its_own(kind: StepKind) -> bool {
+    match kind {
+        StepKind::ZeroFill => false,
+        StepKind::Discard
+        | StepKind::UnitWrite
+        | StepKind::JournalRecord
+        | StepKind::RootRecordFua
+        | StepKind::SystemConfigurationSlot
+        | StepKind::Barrier => true,
+    }
 }
 
 /// 建完版本之后这个落点留不留在判表里：系统配置落点在偏移 0 与几何槽距上的照留（每块盘两槽，判器按它们读槽 0 与槽 1）；
@@ -1336,7 +1348,7 @@ const SYSTEM_CONFIGURATION_SLOT_CHECKSUM_HOLDS_CHECK: usize = 0;
 ///
 /// - 系统配置：`[整槽校验和字段对得上, 0, 0, 0]`。
 /// - 根槽：`[整槽校验和字段对得上（罩整个槽宽）, 0, 0, 0]`。
-/// - journal 记录：`[整条校验和字段对得上, 载荷 CRC 对得上（点名项区在 4096 之内）, 反向链值 = CRC-32C(头 487 字节、校验和字段按 0), 0]`。
+/// - journal 记录：`[整条校验和字段对得上, 载荷 CRC 对得上（点名项区在 4096 之内）, 反向链值 = CRC-32C(头 496 字节、校验和字段按 0), 0]`。
 /// - 单元槽：`[前 16 KiB 的 CRC-32C, 前 32 KiB 的 CRC-32C（落点只有 16 KiB 时 0）, 标志位, 0]`；标志位：位 0 头校验和按自述的类过、
 ///   位 1 载荷 CRC 按自述的类过、位 2 落点有 32 KiB、位 3 类身份段之后的 29 字节预留位全 0。类从偏移 6 读，码 2 的 key 宽从偏移 51 读。
 #[must_use]
@@ -1353,14 +1365,14 @@ pub fn version_checks(kind: JudgeLocationKind, bytes: &[u8]) -> [u32; 4] {
             0,
         ],
         JudgeLocationKind::RootSlot => {
-            let holds = bytes.len() >= usize::try_from(ROOT_RECORD_BYTES).expect("457")
+            let holds = bytes.len() >= usize::try_from(ROOT_RECORD_BYTES).expect("466")
                 && wide_checksum_field_holds(bytes, bytes.len(), 138);
             [u32::from(holds), 0, 0, 0]
         }
         JudgeLocationKind::JournalRecord => {
             let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
             let header_bytes =
-                usize::try_from(JOURNAL_HEADER_BYTES).expect("记录头 487 字节装得进 usize");
+                usize::try_from(JOURNAL_HEADER_BYTES).expect("记录头 496 字节装得进 usize");
             let header_holds = wide_checksum_field_holds(bytes, record_bytes, 46);
             let named_count = usize::try_from(u32::from_le_bytes(
                 bytes[12..16].try_into().expect("4 字节"),
@@ -1525,11 +1537,11 @@ fn judge_writes(
     let mut writes = Vec::with_capacity(enumerated.len());
     for (write_index, write) in enumerated.iter().enumerate() {
         let location = match write.kind {
-            // discard 按段整段发、罩住几十个单元槽，不落在哪一个落点上：它罩住的每个落点各把它记进自己的写（建落点那一步按字节范围记），
-            // 版本的字节按叠法叠出来。写表里它这一行只给持久掩码与「之后与一份副本重叠的写」用。
-            StepKind::Discard => None,
-            StepKind::ZeroFill
-            | StepKind::UnitWrite
+            // discard 按段整段发、罩住几十个单元槽，清零写一次清 [0, 根环基址)、一个根环区域或整个 journal 环，都不落在哪一个落点上：
+            // 它罩住的每个落点各把它记进自己的写（建落点那一步按字节范围记），版本的字节按叠法叠出来。写表里它这一行只给持久掩码与
+            // 「之后与一份副本重叠的写」用。
+            StepKind::Discard | StepKind::ZeroFill => None,
+            StepKind::UnitWrite
             | StepKind::JournalRecord
             | StepKind::RootRecordFua
             | StepKind::SystemConfigurationSlot
@@ -2513,9 +2525,11 @@ mod tests {
         SYSTEM_CONFIGURATION_SLOT_BYTES,
     };
     use singlefs_harness::memory_pool::{
-        MemoryPool, RecordStreamSeam, RetainedWrite, SparseBlockDevice, WrittenContents,
+        writes_and_segments, CrashImage, MemoryPool, RecordStreamSeam, RetainedWrite,
+        SparseBlockDevice, WrittenContents, SECTOR_BYTES,
     };
-    use singlefs_harness::segments::StepKind;
+    use singlefs_harness::segments::{FixedGeometry, StepKind};
+    use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
     /// journal 环起点字段写成第一版常量 1024 之外的一个槽号：自证得过、读者不收（与 harness 场景
     /// `system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs` 的同名常量同一个值）。
@@ -3013,6 +3027,12 @@ mod tests {
 
     /// 两块盘 mkfs 一次的池（io_min 512、槽距 4096；根环区域 0 / 1 / 2 在盘 0 / 1 / 0 上），没有文件。
     fn formatted_pool_of_two_devices() -> MemoryPool {
+        formatted_pool_of_two_devices_with_io_min(512)
+    }
+
+    /// 两块盘 mkfs 一次的池，mkfs 探测到的 io_min 是 `minimum_input_output_bytes`（槽距 = 4096 向上取整到它的整数倍；
+    /// 物理块 512；根环区域 0 / 1 / 2 在盘 0 / 1 / 0 上），没有文件。
+    fn formatted_pool_of_two_devices_with_io_min(minimum_input_output_bytes: u32) -> MemoryPool {
         let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> =
             [DeviceIdentity(0), DeviceIdentity(1)]
                 .into_iter()
@@ -3032,8 +3052,10 @@ mod tests {
                 region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
                 geometry: SystemImmutableSizes {
                     physical_block_size: 512,
-                    minimum_input_output_bytes: 512,
-                    fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
+                    minimum_input_output_bytes,
+                    fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(
+                        minimum_input_output_bytes,
+                    ),
                     journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
                     root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
                 },
@@ -3374,6 +3396,306 @@ mod tests {
                 (1, refused_offset)
             ],
             "两块盘各有偏移 0、槽距 {spacing} 与逐档读到的 {refused_offset} 三个系统配置槽的落点，别的几档不留"
+        );
+    }
+
+    /// io_min 8192（槽距 8192）的池，盘 1 槽 1 那 4096 字节整段清掉（稀疏盘上删掉那几个扇区：基线没写过、读出全 0），别处照 mkfs：
+    /// 判表的几何取恢复择的那一份（槽距 8192），每块盘偏移 0 与几何槽距两处系统配置落点照建（[`super::location_is_read_by_the_judge`]：
+    /// 这两处照留，判器按它们读槽 0 与槽 1），盘 1 的 8192 那一处没写过、不由逐档那一圈补出，只由几何槽距那一处建。
+    /// 判别力（`crates/mutations.tsv`「E 崩溃点重放 J14 判表的系统配置槽 1 照旧摆在 4096」那一行）：槽 1 照旧摆在 4096，盘 1 的 8192 没有落点、
+    /// 4096 那一处一版都不自证被去掉，这条红。盘上两槽都写过的池上逐档那一圈补出 8192，那一处改法看不出来。
+    #[test]
+    fn an_io_min_8192_pool_whose_slot_one_on_one_device_was_never_written_keeps_a_system_configuration_location_at_the_slot_spacing(
+    ) {
+        let mut image = formatted_pool_of_two_devices_with_io_min(8192);
+        let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(8192));
+        assert_eq!(spacing, 8192, "io_min 8192 的池槽距 8192");
+        let device_one = image
+            .devices
+            .get_mut(&DeviceIdentity(1))
+            .expect("池里有盘 1");
+        device_one.zero_fill(
+            DeviceOffsetInBytes(spacing),
+            SYSTEM_CONFIGURATION_SLOT_BYTES,
+        );
+        assert!(
+            device_one
+                .written_sectors_in(
+                    DeviceOffsetInBytes(spacing),
+                    SYSTEM_CONFIGURATION_SLOT_BYTES
+                )
+                .is_empty(),
+            "盘 1 槽 1 那 4096 字节没有写过的扇区"
+        );
+        let tables = judge_tables_of_one_image(&image)
+            .expect("两块盘的槽 0 与盘 0 的槽 1 自证得过：判表建得出");
+        assert_eq!(
+            system_configuration_locations_of(&tables),
+            vec![(0, 0), (0, spacing), (1, 0), (1, spacing)],
+            "两块盘各有偏移 0 与几何槽距 {spacing} 两个系统配置槽的落点，盘 1 那一槽没写过也建"
+        );
+    }
+
+    /// 用过的盘上重做 mkfs 那条流的 journal 环长：16 MiB（每块盘 4096 个记录槽），第一版默认的 768 MiB 照样建得出表，只是撕裂镜像大。
+    const SMALL_JOURNAL_RING_BYTES: u64 = 16 << 20;
+
+    /// journal 环 16 MiB、io_min 512（槽距 4096、物理块 512；根环区域 0 / 1 / 2 在盘 0 / 1 / 0 上）的 mkfs 参数。
+    fn make_filesystem_parameters_with_a_small_journal_ring(
+        filesystem_identifier: [u8; 16],
+    ) -> MakeFilesystemParameters {
+        MakeFilesystemParameters {
+            filesystem_identifier,
+            region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
+            geometry: SystemImmutableSizes {
+                physical_block_size: 512,
+                minimum_input_output_bytes: 512,
+                fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
+                journal_ring_bytes: SMALL_JOURNAL_RING_BYTES,
+                root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+            },
+        }
+    }
+
+    /// 旧池：两块空盘按 [`make_filesystem_parameters_with_a_small_journal_ring`] mkfs 一次（fsid `singlefs-tables!`），再在两块盘
+    /// journal 环的头一个记录槽里各写一扇区非零字节（旧池写过的 journal 记录：只要非零，不要求自证）。
+    fn used_pool_with_a_small_journal_ring() -> MemoryPool {
+        let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> =
+            [DeviceIdentity(0), DeviceIdentity(1)]
+                .into_iter()
+                .map(|identity| {
+                    (
+                        identity,
+                        SparseBlockDevice::new(
+                            FORMATTED_DEVICE_BYTES,
+                            PhysicalBlockSizeInBytes(512),
+                        ),
+                    )
+                })
+                .collect();
+        make_filesystem(
+            &make_filesystem_parameters_with_a_small_journal_ring(*b"singlefs-tables!"),
+            &mut devices,
+        )
+        .expect("两块空盘上 mkfs 做得成");
+        let mut base = MemoryPool {
+            devices: devices
+                .iter()
+                .map(|(identity, device)| (*identity, device.image.clone()))
+                .collect(),
+            device_size_in_bytes: FORMATTED_DEVICE_BYTES,
+        };
+        let old_journal_record_sector: Vec<u8> = (0..512_u32)
+            .map(|index| u8::try_from(index % 251 + 1).expect("小于 256"))
+            .collect();
+        for device in base.devices.values_mut() {
+            device.write(
+                DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES),
+                &old_journal_record_sector,
+            );
+        }
+        base
+    }
+
+    /// 在 `base` 上经内层入口拿另一个 fsid（`remade-tables!!!`，前 8 字节与旧池不同）重做 mkfs，交回录下的写与段。
+    fn make_filesystem_over_the_used_pool(
+        base: &MemoryPool,
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+        let stream = SharedStream::retaining_contents();
+        let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = base
+            .devices
+            .iter()
+            .map(|(identity, sparse)| {
+                let mut device =
+                    SparseBlockDevice::new(FORMATTED_DEVICE_BYTES, PhysicalBlockSizeInBytes(512));
+                device.image = sparse.clone();
+                (
+                    *identity,
+                    RecordingBlockDevice::with_shared_stream(*identity, device, stream.clone()),
+                )
+            })
+            .collect();
+        let parameters = make_filesystem_parameters_with_a_small_journal_ring(*b"remade-tables!!!");
+        make_filesystem(&parameters, &mut devices).expect("用过的盘上重做 mkfs 做得成");
+        writes_and_segments(
+            &stream.retained_operations(),
+            &FixedGeometry {
+                fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+                journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+                root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+            },
+        )
+    }
+
+    /// 用过的盘上重做 mkfs（两趟写序：两块盘的 [0, 根环基址) 清零自成一段，其余八次清零与四个单元写一段，三条第 0 代根各一段，四个系统配置槽一段）
+    /// 按甲二展开建判表：清零写不落在哪一个落点上；它罩住的每个落点各把它记进自己的写；它不给自己建落点（journal 环里只有旧池写过的那一槽是落点）；
+    /// 任一个状态里读得出非零字节的扇区（基线写过的、或枚举写表里哪一次写写下了非零字节的）都在某个落点里；每个状态、每个落点按持久掩码查到的版本
+    /// 与崩溃镜像在那里读出的字节逐字节相同。
+    /// 判别力（`crates/mutations.tsv`「C656 GPU 判表收清零写」那两行）：建落点那一步漏记清零写罩住的落点，作废之后系统配置槽那一版照旧是旧池的字节，
+    /// 逐字节比那一句红；清零写照旧算碰过，journal 环里每一槽都建落点，落点那一句红。照旧在建表时拒清零写，建表那一步就红。
+    #[test]
+    fn zero_fills_of_a_make_filesystem_over_a_used_pool_land_in_every_location_they_cover_and_add_no_location_of_their_own(
+    ) {
+        let base = used_pool_with_a_small_journal_ring();
+        let (writes, segments) = make_filesystem_over_the_used_pool(&base);
+        assert_eq!(
+            segments.iter().map(Vec::len).collect::<Vec<usize>>(),
+            vec![2, 12, 1, 1, 1, 4],
+            "两趟写序的段序列"
+        );
+        let zero_fills: Vec<usize> = writes
+            .iter()
+            .enumerate()
+            .filter(|(_, write)| write.kind == StepKind::ZeroFill)
+            .map(|(write_index, _)| write_index)
+            .collect();
+        assert_eq!(zero_fills.len(), 10, "每块盘五次清零，两块盘十次");
+        let judged_root_index = writes
+            .iter()
+            .rposition(|write| write.kind == StepKind::RootRecordFua)
+            .expect("mkfs 写第 0 代根");
+        let tables = build_judge_tables(&JudgeFlow {
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            judged_root_index,
+            versions: &[],
+            expansion: &crate::crash::quick_tier_expansion,
+        })
+        .expect("用过的盘上重做 mkfs 那条流建得出判表");
+        let enumerated = crate::crash::crash_state_enumeration_tables(
+            &base,
+            &writes,
+            &segments,
+            &crate::crash::quick_tier_expansion,
+        )
+        .enumerated_writes;
+        let zero_fill_entries: Vec<usize> = enumerated
+            .iter()
+            .enumerate()
+            .filter(|(_, write)| write.kind == StepKind::ZeroFill)
+            .map(|(entry, _)| entry)
+            .collect();
+        assert!(
+            zero_fill_entries.len() > zero_fills.len(),
+            "罩住旧内容的清零写取第三态，枚举写表里接着它们的撕裂镜像"
+        );
+        for entry in &zero_fill_entries {
+            assert_eq!(
+                tables.writes[*entry].location, None,
+                "清零写（或它的撕裂镜像）{entry} 不落在任何一个落点上"
+            );
+        }
+        for location in &tables.locations {
+            let location_end = location.offset + u64::from(location.length);
+            for entry in &zero_fill_entries {
+                let write = &enumerated[*entry];
+                let covers = write.device.0 == location.device
+                    && write.offset.0 < location_end
+                    && location.offset < write.offset.0 + write.length_in_bytes();
+                assert_eq!(
+                    location
+                        .writes
+                        .contains(&u32::try_from(*entry).expect("装得进 u32")),
+                    covers,
+                    "落点 (盘 {}, 偏移 {}, {:?}) 的写里有没有清零写 {entry}",
+                    location.device,
+                    location.offset,
+                    location.kind
+                );
+            }
+        }
+        let ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
+        let journal_record_locations: Vec<(u32, u64)> = tables
+            .locations
+            .iter()
+            .filter(|location| location.kind == JudgeLocationKind::JournalRecord)
+            .map(|location| (location.device, location.offset))
+            .collect();
+        assert_eq!(
+            journal_record_locations,
+            vec![(0, ring_start), (1, ring_start)],
+            "清零写不给自己建落点：journal 环 {} 个记录槽里只有旧池写过的那一槽是落点",
+            SMALL_JOURNAL_RING_BYTES / JOURNAL_RECORD_BYTES
+        );
+        let sector_bytes = usize::try_from(SECTOR_BYTES).expect("512");
+        let is_inside_some_location = |device: u32, sector_start: u64| {
+            tables.locations.iter().any(|location| {
+                location.device == device
+                    && location.offset <= sector_start
+                    && sector_start + SECTOR_BYTES <= location.offset + u64::from(location.length)
+            })
+        };
+        for (device, sparse) in &base.devices {
+            for (sector, bytes) in sparse.written_sectors() {
+                if bytes.iter().any(|byte| *byte != 0) {
+                    assert!(
+                        is_inside_some_location(device.0, sector * SECTOR_BYTES),
+                        "基线在盘 {} 第 {sector} 扇区有非零字节，它在某个落点里",
+                        device.0
+                    );
+                }
+            }
+        }
+        for (entry, write) in enumerated.iter().enumerate() {
+            let WrittenContents::Bytes(bytes) = &write.contents else {
+                continue;
+            };
+            for (sector_in_the_write, sector) in bytes.chunks(sector_bytes).enumerate() {
+                if sector.iter().any(|byte| *byte != 0) {
+                    let sector_start = write.offset.0
+                        + u64::try_from(sector_in_the_write).expect("扇区号") * SECTOR_BYTES;
+                    assert!(
+                        is_inside_some_location(write.device.0, sector_start),
+                        "枚举写 {entry}（{:?}）在盘 {} 偏移 {sector_start} 写下非零字节，那一扇区在某个落点里",
+                        write.kind,
+                        write.device.0
+                    );
+                }
+            }
+        }
+        let mut versions_checked = 0u64;
+        for ordinal in 0..tables.state_count {
+            let persisted = tables.persisted_writes_of_state(ordinal);
+            let image = CrashImage {
+                base: &base,
+                writes: &enumerated,
+                persisted: persisted.clone(),
+            };
+            for location in &tables.locations {
+                let version = tables.version_of(location, &persisted).unwrap_or_else(|| {
+                    panic!(
+                        "状态 {ordinal} 在落点 (盘 {}, 偏移 {}) 上的组合没有版本",
+                        location.device, location.offset
+                    )
+                });
+                let on_disk = PoolReader::read(
+                    &image,
+                    DeviceIdentity(location.device),
+                    DeviceOffsetInBytes(location.offset),
+                    usize::try_from(location.length).expect("长度"),
+                )
+                .expect("落点在盘内");
+                assert!(
+                    version.bytes == on_disk,
+                    "状态 {ordinal} 落点 (盘 {}, 偏移 {}, {:?}) 的版本字节与崩溃镜像不同",
+                    location.device,
+                    location.offset,
+                    location.kind
+                );
+                versions_checked += 1;
+            }
+        }
+        assert!(versions_checked > 0, "真比过版本");
+        println!(
+            "CRASH_JUDGE_TABLES_ZERO_FILLS states={} locations={} versions_checked={versions_checked} most_writes_on_one_location={}",
+            tables.state_count,
+            tables.locations.len(),
+            tables
+                .locations
+                .iter()
+                .map(|location| location.writes.len())
+                .max()
+                .unwrap_or(0)
         );
     }
 }

@@ -36,6 +36,9 @@ use singlefs_checker_tier::crash::{
     crash_state_count_with_torn_in_place_overwrites, full_expansion,
     CrashPointReplayObserverCounts, CrashPointReplayTally,
 };
+use singlefs_checker_tier::crash_point_replay_provenance::{
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow, RunOfTheFlow,
+};
 use singlefs_checker_tier::crash_state_enumeration::{
     enumerate_crash_states_with_expansion, CrashPointReplayItem,
 };
@@ -137,6 +140,11 @@ fn every_crash_state_of_a_truncation_into_a_unit_then_an_extension_reads_the_siz
         "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_every_state_was_observed(&prepared, &tally);
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        "truncate_into_a_unit_then_extend",
+        &tally,
+    );
 }
 
 /// 复用不改判定：同一趟快档跑两遍，第二遍的块与观察者结论全照库里的，两份计数逐项相同。
@@ -211,6 +219,11 @@ fn full_enumeration_of_the_truncate_into_a_unit_then_extend_stream_is_exhaustive
     assert_eq!(tally.states, closed_form);
     assert_the_shape_of_the_flow(&prepared);
     assert_every_state_was_observed(&prepared, &tally);
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        "truncate_into_a_unit_then_extend",
+        &tally,
+    );
 }
 
 /// 两份造法写表相同：崩溃点重放那一份（[`prepare`]，不录崩溃点）与录制器那一份（C 之后每一步设一个点）录下的起点镜像、整张写表、段、

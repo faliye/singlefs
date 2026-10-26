@@ -131,7 +131,7 @@ const FILESYSTEM_IDENTIFIER: [u8; 16] = [
 ];
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_800_000_000;
 
-/// 产物完整性闸口径（`scripts/experiments/replay.sh` 文件头）：每条结果行以 `E7RESULT` 起头，收尾 `E7RESULT name=done emitted=N`，
+/// 产物完整性闸口径（`scripts/experiment-apparatus/replay.sh` 文件头）：每条结果行以 `E7RESULT` 起头，收尾 `E7RESULT name=done emitted=N`，
 /// N = 本进程打过的 `E7RESULT` 行数（含收尾这一条）。
 static EMITTED_RESULT_LINES: AtomicU64 = AtomicU64::new(0);
 
@@ -1985,17 +1985,35 @@ fn worker_threads() -> usize {
 
 /// 本文件两个判法入口的函数单元闭包指纹（去注释）与这一趟的工具链行。闭包里有拒算时交 `Err`（调用方这一趟不复用、不入库）。
 fn closure_fingerprint() -> Result<ClosureFingerprint, String> {
+    closure_fingerprint_of_the_tree(&repository_root())
+}
+
+/// 在 `root` 那棵树上算闭包指纹，依赖包的特性照这一次编译（编进库的判器键表里 `build-feature` 那几行：checker 档构建脚本读依赖包经
+/// `links` 交出的那一份）。与 harness 档测试一起编时，harness 档的 dev 依赖替核心层并上 `lookup-work-counters`，这个二进制链进来的
+/// 核心层编的是带计数的那一份；只照本包特性算，键就是没并上时那一把，与编出来的代码对不上（D13（验证路线） 已定项 17）。
+fn closure_fingerprint_of_the_tree(root: &std::path::Path) -> Result<ClosureFingerprint, String> {
+    closure_fingerprint_with_the_features_of_the_build(
+        root,
+        &singlefs_checker_tier::crash_identity::compiled_judging_units_keys()
+            .features_enabled_by_the_build,
+    )
+}
+
+/// 在 `root` 那棵树上、照给定的依赖包特性算闭包指纹（[`closure_fingerprint_of_the_tree`] 交编进来的那一份）。
+fn closure_fingerprint_with_the_features_of_the_build(
+    root: &std::path::Path,
+    features_enabled_by_the_build: &singlefs_unit_graph::FeaturesEnabledByTheBuild,
+) -> Result<ClosureFingerprint, String> {
     use singlefs_unit_graph::build_toolchain::{
         effective_profile_lines, toolchain_lines_of_the_build, BuildToolchainInputs,
     };
     use singlefs_unit_graph::entry_groups::{
-        entry_group_key, EntryGroupRequest, EntryGroupVerdict,
+        entry_group_key_with_the_features_of_the_build, EntryGroupRequest, EntryGroupVerdict,
     };
     use singlefs_unit_graph::{load_workspace, parse_lock_file, RuleSwitches, TargetSelector};
-    let root = repository_root();
     let switches = RuleSwitches::every_rule_intact();
     let threads = std::num::NonZeroUsize::new(worker_threads()).expect("线程数是正数");
-    let workspace = load_workspace(&root, threads, &switches)
+    let workspace = load_workspace(root, threads, &switches)
         .map_err(|error| format!("装不起工作区：{error}"))?;
     let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
@@ -2035,9 +2053,10 @@ fn closure_fingerprint() -> Result<ClosureFingerprint, String> {
             .collect(),
         features: vec!["verdict-store".to_string()],
     };
-    let group = entry_group_key(
+    let group = entry_group_key_with_the_features_of_the_build(
         &workspace,
         &request,
+        features_enabled_by_the_build,
         &toolchain_lines,
         &locked_packages,
         &switches,
@@ -4451,9 +4470,11 @@ mod tests {
 
     #[test]
     fn a_stored_shard_is_read_back_only_under_the_same_key() {
-        let directory =
-            std::env::temp_dir().join(format!("e182-library-test-{}", std::process::id()));
-        std::fs::create_dir_all(&directory).expect("建得起临时目录");
+        // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e182-library-test-{}", std::process::id())),
+        );
+        std::fs::create_dir_all(&*directory).expect("建得起临时目录");
         let fingerprint = ClosureFingerprint {
             key_hex: "ab".repeat(32),
             toolchain_lines: vec!["rustc 1".to_string()],
@@ -4474,7 +4495,6 @@ mod tests {
                 "键里任何一段不同都取不到"
             );
         }
-        std::fs::remove_dir_all(&directory).expect("删得掉临时目录");
     }
 
     fn is_a_write(operation: &RetainedOperation) -> bool {
@@ -5023,6 +5043,70 @@ mod tests {
         assert!(
             after_main.starts_with("    let forced_summary = preflight();\n"),
             "入口的第一句是 preflight"
+        );
+    }
+
+    /// 编这个测试二进制的那棵树的根（本 crate 在 `crates/` 下，往上两层）。
+    fn repository_root_of_this_build() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("本 crate 在仓根的 crates/ 下")
+            .to_path_buf()
+    }
+
+    /// 核心层被并上 `lookup-work-counters` 与没并上，判法入口的闭包指纹是两把（闭包经核心层的发布引到计数那个 cfg 原子）：
+    /// 闭包指纹照给定的依赖包特性算，不只看本包特性。
+    /// 判别力（`crates/mutations.tsv`）：算指纹改回只照本包特性（给定的依赖包特性不交给单元图），这条红。
+    #[test]
+    fn the_closure_key_follows_the_features_unified_onto_the_core_layer() {
+        let root = repository_root_of_this_build();
+        let without_counters = closure_fingerprint_with_the_features_of_the_build(
+            &root,
+            &singlefs_unit_graph::FeaturesEnabledByTheBuild::default(),
+        )
+        .expect("核心层没并上特性时判法入口的闭包算得出指纹");
+        let with_counters = closure_fingerprint_with_the_features_of_the_build(
+            &root,
+            &singlefs_unit_graph::FeaturesEnabledByTheBuild {
+                features_of_each_package: BTreeMap::from([(
+                    singlefs_checker_tier::crash_identity::CORE_LAYER_PACKAGE_NAME.to_string(),
+                    BTreeSet::from([
+                        singlefs_checker_tier::crash_identity::LOOKUP_WORK_COUNTERS_FEATURE
+                            .to_string(),
+                    ]),
+                )]),
+            },
+        )
+        .expect("核心层并上计数时判法入口的闭包算得出指纹");
+        assert_ne!(
+            without_counters.key_hex, with_counters.key_hex,
+            "核心层并上计数与没并上，闭包指纹两把"
+        );
+        assert_eq!(
+            without_counters.toolchain_lines, with_counters.toolchain_lines,
+            "两把只差在依赖包特性上，工具链行相同"
+        );
+    }
+
+    /// 装置跑时取的闭包指纹（[`closure_fingerprint_of_the_tree`]，依赖包特性取编进库的那份判器键表）等于照这个二进制链进来的
+    /// 核心层实际开着的特性（`features_the_core_layer_was_compiled_with`，从核心层编出来的代码里认）算的那一把：只编 checker 档时
+    /// 两边都不带计数，与 harness 档测试一起编时两边都带。
+    /// 判别力（`crates/mutations.tsv`，一起编的那一行）：跑时取指纹改回不带依赖包特性，一起编时这条红。
+    #[test]
+    fn the_closure_key_is_computed_with_the_features_this_build_unified_onto_the_core_layer() {
+        let root = repository_root_of_this_build();
+        let taken_at_run_time =
+            closure_fingerprint_of_the_tree(&root).expect("跑时取的闭包指纹算得出");
+        let with_the_features_the_core_layer_was_built_with =
+            closure_fingerprint_with_the_features_of_the_build(
+                &root,
+                &singlefs_checker_tier::crash_identity::features_the_core_layer_was_compiled_with(),
+            )
+            .expect("照链进来的核心层开着的特性算得出闭包指纹");
+        assert_eq!(
+            taken_at_run_time, with_the_features_the_core_layer_was_built_with,
+            "跑时取的闭包指纹照的是这一次编译链进来的核心层实际开着的特性"
         );
     }
 }

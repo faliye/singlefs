@@ -5,7 +5,7 @@
 //! 原来的树、树表与 journal 记录一个字不动（记录里那条根的树表指针因此与根槽不同）。
 //!
 //! 给 GPU 扫描内核 I-3.10 去重表（`C_MAX_EXAMINED`）满了之后照判那一判造输入：合法的流上各版未释放记录去重累计不多于最新那一版的
-//! 分配记录条数（回收要求释放代不高于回退下界，候选集里的版本都不低于它），一版多于 4096 条时分配记录那张表先满；
+//! 分配记录条数（回收要求释放代不高于回退下界，候选集里的版本都不低于它），一版多于 8192 条时分配记录那张表先满；
 //! 老根改了代之后，同一批还在用的单元在每条改过的根里各算一份，累计越过那张表、单版的记录条数不变。
 //! 只依赖 `singlefs-core`、`singlefs-format` 与 `singlefs-harness` 的内存池，不依赖 checker 档。
 
@@ -157,6 +157,7 @@ fn copy_the_subtree_under_another_generation(
                     span_slots: record.span_slots,
                     generation: CheckpointTxg(record.generation.0 + generation_offset),
                     is_released: record.is_released,
+                    quarantine_mark: record.quarantine_mark,
                 };
                 if !regenerated.is_released {
                     unreleased_record_keys.insert((

@@ -252,33 +252,38 @@ fn a_size_change_of_an_inode_being_deleted_is_refused_before_any_write() {
     );
 }
 
-/// 第一版只有第一个文件在 extent 树里有条目：别的 inode 改成别的 size 条款没写，拒成类型化错误；改成原来的 size（只改记录）照做。
+/// 任意活 inode 都能缩短与变长（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S6 删了「第一个文件之外改 size」那一拒）：
+/// inode 2（建出来 size 0、上段没有条目）改成原来的 size 0 只改记录、上段不写它那一条；变长到 10 做成，记录 size 10、上段这次起有它那一条
+/// （粘住的标签 0，第二节 S2；四个读者读出 10 个 0 由 `size_changes_of_inodes_other_than_the_first.rs` 钉），两次都不签截断条目。
 #[test]
-fn a_size_change_of_an_inode_other_than_the_first_file_is_refused_unless_the_size_stays() {
+fn a_size_change_of_an_inode_other_than_the_first_file_is_published_and_only_the_same_size_leaves_its_entry_out(
+) {
     let mut pool = build_pool("size-change-of-a-second-inode");
     publish_new_inodes_and_advance_the_pool(&mut pool, 1);
-    let operations_before = pool.retained_operations().len();
-    let refused = publish_size_change_of_and_advance(&mut pool, InodeNumber(2), 10)
-        .expect_err("inode 2 变长条款没写");
-    assert!(
-        matches!(
-            refused,
-            PublishError::TruncationRefused(
-                TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
-                    inode: 2
-                }
-            )
-        ),
-        "{refused:?}"
-    );
-    assert_eq!(
-        pool.retained_operations().len(),
-        operations_before,
-        "一个写都不发"
-    );
     let unchanged = publish_size_change_of_and_advance(&mut pool, InodeNumber(2), 0)
         .expect("size 不变只改记录");
     assert!(truncation_entry_of(&unchanged).is_none());
+    assert!(
+        unchanged
+            .file_other_than_the_first(InodeNumber(2))
+            .is_none(),
+        "size 0 不变：上段里照旧没有它那一条"
+    );
+    let extended =
+        publish_size_change_of_and_advance(&mut pool, InodeNumber(2), 10).expect("inode 2 变长");
+    assert!(truncation_entry_of(&extended).is_none());
+    assert_eq!(
+        extended
+            .inode_record_of(InodeNumber(2))
+            .map(|record| record.size),
+        Some(10)
+    );
+    assert!(
+        extended
+            .file_other_than_the_first(InodeNumber(2))
+            .is_some_and(|file| file.data_pointers.is_empty()),
+        "变长到 10：上段这次起有它那一条、一个单元都没有"
+    );
 }
 
 /// K12：N = S 发一次只改记录的发布：记录的改动计数 = 这次的 txg、时间是给的，size、数据单元、extent 树都不动，不签截断条目；
@@ -363,14 +368,16 @@ fn the_truncation_publishes_are_deletion_class_and_the_size_change_without_an_in
         tail_data_unit_rewrite,
     }
     .is_a_deletion_class_publish());
-    assert!(
-        DeletionStepOfThePublish::TruncationBatch { data_units_kept: 2 }
-            .is_a_deletion_class_publish()
-    );
-    assert!(
-        DeletionStepOfThePublish::TruncationFinalBatch { data_units_kept: 1 }
-            .is_a_deletion_class_publish()
-    );
+    assert!(DeletionStepOfThePublish::TruncationBatch {
+        inode: FIRST_FILE,
+        data_units_kept: 2
+    }
+    .is_a_deletion_class_publish());
+    assert!(DeletionStepOfThePublish::TruncationFinalBatch {
+        inode: FIRST_FILE,
+        data_units_kept: 1
+    }
+    .is_a_deletion_class_publish());
     assert!(!DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
         record_after_the_change: record,
         tail_data_unit_rewrite,

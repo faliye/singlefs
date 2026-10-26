@@ -10,7 +10,7 @@
 //! `--only <域>`（可写几个，逗号分隔）、`--max-n <N>`、`--family legal|adversarial|all` 只跑一部分。
 //! 多盘域 M、M6、MC（登记 `research/prompts/e165-r2-prereg.md` 5.3，第三段）只在 `--profile r2 --family multi_disk` 时跑：每条记录在 0、1 号盘
 //! 同一落点各一份、各自落或没落，「完整在盘上」取任一份，直接建表先 0 号盘再 1 号盘；`--family all` 仍只含合法历史与对抗两族。
-//! 择根与重放合判一族 K、K9、KW、KA（登记 `research/prompts/e165-r3-prereg.md` 5.3 至 5.5）只在 `--profile r3 --family root_choice` 时跑：真 `choose_root`、`scan_journal`、`replay_journal` 三步串起来，判据 KJ0 至 KJ3 各报各的；`--family all` 不含它。带读故障的择根合判一族 KF、KF3、KF9、KFW、KG、KA（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6）只在 `--profile r4 --family root_choice_faults` 时跑：同样调真三步，多出每块盘两个系统配置槽、挂载开头的读故障、可写挂载读到的更新状态读不出那道闸（实现的取甲）与被判时的读故障，判据加 KJ1T，`--profile r4` 的其余族与 r3 档相同。
+//! 择根与重放合判一族 K、K9、KW、KL（登记 `research/prompts/e165-r3-prereg.md` 5.3 至 5.5；对抗根环 KL 照第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 1.3 照落点公式摆根，替掉 r3 的 KA）只在 `--profile r3 --family root_choice` 时跑：真 `choose_root`、`scan_journal`、`replay_journal` 三步串起来，判据 KJ0 至 KJ3 各报各的；`--family all` 不含它。带读故障的择根合判一族 KF、KF3、KF9、KFW、KG、KL（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6；KL 同上）只在 `--profile r4 --family root_choice_faults` 时跑：同样调真三步，多出每块盘两个系统配置槽、挂载开头的读故障、可写挂载读到的更新状态读不出那道闸（实现的取甲）与被判时的读故障，判据加 KJ1T，`--profile r4` 的其余族与 r3 档相同。
 //! 线程数取环境变量 `E165_THREADS`，没设取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值）；
 //! 内联单测用同一个取法；计数与线程数无关。
 //! 产物是 `E7RESULT` 行，收尾 `name=done emitted=N`；耗时另打 `E7TIMING` 行，不进逐字比对。
@@ -31,7 +31,7 @@
 //! 按数据行的次序每行判一个状态、打一行 `name=state`（与 `--replay-state` 打的那一行是同一段代码）；按 ②③④ 找到状态之后
 //! 拿它重算 ①（`sha256(<域>|<N>|<state= 的值，截到 ;first= 之前>)`），与表里不同、或有行找不到状态、或行本身不对
 //! （不是二十一段、⑨ 起抄来的红例账那一行与 ②③④⑦⑧ 对不上），退 1。
-//! 逐态行与 ⑦ 比不比得上由读这张表的一方（`scripts/experiments/e165-pin-red-examples.py --replay`）判，装置不判。
+//! 逐态行与 ⑦ 比不比得上由读这张表的一方（`scripts/experiment-apparatus/e165-pin-red-examples.py --replay`）判，装置不判。
 
 use std::cell::Cell;
 use std::collections::{btree_map, BTreeMap};
@@ -55,8 +55,8 @@ use singlefs_core::journal::{
 use singlefs_core::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
 use singlefs_core::recovery::{
     choose_root, every_root_ring_slot, read_root_ring_slot, replay_journal, scan_journal,
-    BadRootRingSlotReading, PoolReader, RecoveryFailure, RootRingSlotReading,
-    CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR,
+    BadRootRingSlotReading, NamedUnitVerification, PoolReader, RecoveryFailure,
+    RootRingSlotReading, CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR,
 };
 use singlefs_core::root_record::{RootRecord, UnmountMarker};
 use singlefs_core::root_ring::RootRingSlotsPerRegion;
@@ -755,6 +755,8 @@ impl VersionFields {
             instance_table: beyond.instance_table,
             mapping_root: self.segment.mapping_root,
             allocation_record_tree_root: beyond.allocation_record_tree_root,
+            reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+            pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
         }
     }
 
@@ -797,7 +799,7 @@ enum ParseExpectation {
     OrdinalZeroMustBeRejected,
 }
 
-/// 内存盘上一个记录槽里的一条记录：字节、`parse` 的结果、它的 487 字节头算出的链值（下一条记录的反向链真值）。
+/// 内存盘上一个记录槽里的一条记录：字节、`parse` 的结果、它的 496 字节头算出的链值（下一条记录的反向链真值）。
 #[derive(Clone, Debug)]
 struct GeneratedSlot {
     device: u32,
@@ -1156,6 +1158,9 @@ fn generate_history(plan: &HistoryPlan) -> History {
                         .as_ref()
                         .map(|generated_unit| vec![generated_unit.named])
                         .unwrap_or_default(),
+                    new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+                    new_pinned_ring_slot:
+                        singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
                 };
                 record_truth.note_the_record(&record);
                 slots.push(generate_slot(
@@ -1818,7 +1823,11 @@ fn call_replay_journal(
             chosen_root,
             disk.ring.ring_bytes(),
             records,
-            verify_named_units,
+            if verify_named_units {
+                NamedUnitVerification::Verify
+            } else {
+                NamedUnitVerification::Skip
+            },
         )
     }));
     IS_INSIDE_THE_REPLAY_CALL.with(|is_inside| is_inside.set(false));
@@ -2796,7 +2805,7 @@ fn parse_a_pinned_red_example(
     let columns: Vec<&str> = line.split('\t').collect();
     if columns.len() == PINNED_TABLE_OWN_COLUMN_COUNT {
         return Err(format!(
-            "这一行没整行抄红例账，用 scripts/experiments/e165-pin-red-examples.py 补（这一行是 {PINNED_TABLE_OWN_COLUMN_COUNT} 段的旧格式，要 {PINNED_TABLE_COLUMN_COUNT} 段）"
+            "这一行没整行抄红例账，用 scripts/experiment-apparatus/e165-pin-red-examples.py 补（这一行是 {PINNED_TABLE_OWN_COLUMN_COUNT} 段的旧格式，要 {PINNED_TABLE_COLUMN_COUNT} 段）"
         ));
     }
     if columns.len() != PINNED_TABLE_COLUMN_COUNT {
@@ -2822,7 +2831,7 @@ fn parse_a_pinned_red_example(
 }
 
 /// 输入指纹：`sha256(<域>|<N>|<逐态行里 state= 的值，截到 ;first= 之前>)` 的十六进制，与
-/// `scripts/experiments/e165-pin-red-examples.py` 的 `input_fingerprint` 同一个算法。逐态行里认不出 ` state=<不带空白的值>` 收尾交 `None`。
+/// `scripts/experiment-apparatus/e165-pin-red-examples.py` 的 `input_fingerprint` 同一个算法。逐态行里认不出 ` state=<不带空白的值>` 收尾交 `None`。
 fn input_fingerprint_of(domain_text: &str, size_text: &str, state_row: &str) -> Option<String> {
     let (_row_before_the_state, state_text) = state_row.rsplit_once(" state=")?;
     if state_text.is_empty() || state_text.chars().any(char::is_whitespace) {
@@ -3004,7 +3013,7 @@ fn replay_every_pinned_red_example(table_path: &str, run_profile: RunProfile) {
             eprintln!("  ✗ {problem}");
         }
         eprintln!(
-            "  → 怎么办：指纹漂了先查装置的枚举次序与状态编码变没变；行不对的照表头的二十一段格式（自己的八段后面接红例账出红的那一行原样）找回原行，八段的旧行用 scripts/experiments/e165-pin-red-examples.py 补整行（表只由它写）"
+            "  → 怎么办：指纹漂了先查装置的枚举次序与状态编码变没变；行不对的照表头的二十一段格式（自己的八段后面接红例账出红的那一行原样）找回原行，八段的旧行用 scripts/experiment-apparatus/e165-pin-red-examples.py 补整行（表只由它写）"
         );
         std::process::exit(1);
     }
@@ -5295,6 +5304,8 @@ impl AdversarialEnumeration<'_> {
             new_allocation_record_tree_root: anchor_record_fields.allocation_record_tree_root,
             new_unmount_marker: anchor_record_fields.unmount_marker,
             named: Vec::new(),
+            new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+            new_pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
         };
         generate_slot(
             0,
@@ -5354,6 +5365,8 @@ impl AdversarialEnumeration<'_> {
             new_allocation_record_tree_root: record_fields.allocation_record_tree_root,
             new_unmount_marker: record_fields.unmount_marker,
             named: Vec::new(),
+            new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+            new_pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
         };
         generate_slot(
             0,
@@ -8409,6 +8422,8 @@ fn hand_made_record(
         new_unmount_marker: fields_beyond_the_projection_carried_by_every_generated_record()
             .unmount_marker,
         named: Vec::new(),
+        new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+        new_pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
     }
 }
 
@@ -9611,7 +9626,7 @@ const RECORD_TABLE_SELF_CHECKS: &[(&str, fn())] = &[
     ),
 ];
 
-// ── 择根与重放合判一族（登记 `research/prompts/e165-r3-prereg.md` 5.3 至 5.5：K、K9、KW、KA；只在 `--profile r3 --family root_choice` 时跑）
+// ── 择根与重放合判一族（登记 `research/prompts/e165-r3-prereg.md` 5.3 至 5.5：K、K9、KW，与第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 1.3 的 KL；只在 `--profile r3 --family root_choice` 时跑）
 //
 // 被测对象是 `recover` 的 `Consult` 支里串起来的三步：`choose_root`、`scan_journal`、`replay_journal(…, true)`。
 // 一个状态 = 内存盘上同时摆好根环（三个区域、每区 S 个槽）与 journal 环（两盘镜像）的一份盘；根与记录由合法历史生成，按持久顺序取崩溃点。
@@ -9630,7 +9645,7 @@ const ROOT_CHOICE_MKFS_INSTANCE: u32 = 0;
 const ROOT_CHOICE_MKFS_CHECKPOINT_TXG: u64 = 0;
 /// 暖机至多推几次空发布（D16 已定项 8「至多 R = 3 次」）；第一版实付 2 次是几何的结果，不是这里的常量。
 const ROOT_CHOICE_WARM_UP_EMPTY_PUBLISHES_AT_MOST: usize = 3;
-/// 每区槽数：K、K9、KA 取 8，KW 取 4（登记 5.3、第三节回比表）。
+/// 每区槽数：K、K9、KL 取 8，KW 取 4（登记 5.3、第三节回比表）。
 const ROOT_CHOICE_SLOTS_PER_REGION_WIDE: u64 = 8;
 const ROOT_CHOICE_SLOTS_PER_REGION_NARROW: u64 = 4;
 /// 内存盘根槽数组的长度：三个区域 × 每区至多 8 个槽。
@@ -9649,12 +9664,12 @@ labelled_enumeration! {
 }
 
 labelled_enumeration! {
-    /// 登记 5.4 的四个域：K、K9、KW 是合法历史，KA 是不合法的对抗根环。
+    /// 登记 5.4 的四个域：K、K9、KW 是合法历史；KL 是照落点公式摆根的对抗根环（第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 1.3，替掉 r3 的 KA）。
     enum RootChoiceDomain {
         BigRing => "K",
         SmallRingNine => "K9",
         WrappingRootRing => "KW",
-        AdversarialRootRing => "KA",
+        AdversarialRootRing => "KL",
     }
 }
 
@@ -9675,7 +9690,7 @@ impl RootChoiceDomain {
         }
     }
 
-    /// 用户发布每次的记录条数（登记 5.3：k ∈ {1, 2}，KW 只取 1）。KA 没有历史。
+    /// 用户发布每次的记录条数（登记 5.3：k ∈ {1, 2}，KW 只取 1）。KL 没有历史。
     const fn user_publish_record_counts(self) -> &'static [usize] {
         match self {
             Self::BigRing | Self::SmallRingNine => &[1, 2],
@@ -9684,7 +9699,7 @@ impl RootChoiceDomain {
         }
     }
 
-    /// 合法历史一族判 KJ1、KJ3；KA 不是合法历史，只判 KJ0、KJ2（登记 5.5 最后一列、第一节读法）。
+    /// 合法历史一族判 KJ1、KJ3；KL 不是合法历史，只判 KJ0、KJ2（登记 5.5 最后一列、第一节读法）。
     const fn is_a_legal_history(self) -> bool {
         match self {
             Self::BigRing | Self::SmallRingNine | Self::WrappingRootRing => true,
@@ -9722,7 +9737,7 @@ impl RootChoiceDomain {
     }
 }
 
-/// 一个 (M, U) 格：M 次挂载、U 次用户发布（跨挂载的总数）。KA 没有挂载与发布，取 (0, 0)。
+/// 一个 (M, U) 格：M 次挂载、U 次用户发布（跨挂载的总数）。KL 没有挂载与发布，取 (0, 0)。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct RootChoiceCell {
     mounts: usize,
@@ -9862,7 +9877,7 @@ fn root_choice_fields_beyond_the_projection() -> FieldsBeyondTheProjection {
     RunProfile::R1.fields_beyond_the_projection_of_version(0)
 }
 
-/// 一次发布（含 mkfs 的第 0 代根与 KA 的根）的材料：生成一次、之后只借用。
+/// 一次发布（含 mkfs 的第 0 代根与 KL 的根）的材料：生成一次、之后只借用。
 #[derive(Debug)]
 struct RootChoicePublishMaterial {
     version: RootVersion,
@@ -9920,7 +9935,7 @@ struct RootChoicePublishPlan {
     new_pool_file_creation: u64,
     record_count: usize,
     commit_marker_bits: u32,
-    /// 本实例写的上一条记录的 487 字节头算出的链值；本实例第一条记录没有，取 0（I-8.6）。
+    /// 本实例写的上一条记录的 496 字节头算出的链值；本实例第一条记录没有，取 0（I-8.6）。
     previous_chain_value: Option<u32>,
     is_user_publish: bool,
 }
@@ -9975,6 +9990,8 @@ fn root_choice_publish_material(plan: &RootChoicePublishPlan) -> RootChoicePubli
             new_unmount_marker: fields_beyond_the_projection_carried_by_every_generated_record()
                 .unmount_marker,
             named: Vec::new(),
+            new_reclaim_threshold: singlefs_core::address::CheckpointTxg(0),
+            new_pinned_ring_slot: singlefs_core::root_record::PinnedRingSlot::NO_SLOT_PINNED,
         };
         let slot = generate_slot(
             0,
@@ -10643,7 +10660,7 @@ fn root_choice_tally_of_work_units<Unit: Sync>(
 
 // ── 被判的一方：今天的三步，或阳性对照的假结局（登记 5.7）
 
-/// KA 上本地写的几种择根序（登记 5.7 第四行、9.1 四行替换文的比较式各写一份；落点 = 择到的根，journal 环空）。
+/// KL 上本地写的几种择根序（登记 5.7 第四行、9.1 四行替换文的比较式各写一份；落点 = 择到的根，journal 环空）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LocalRootChoiceRule {
     /// 今天的序：txg 大者赢，txg 相等实例代号大者赢，键完全相同取读根环次序里前面的。
@@ -10721,7 +10738,7 @@ enum RootChoiceImplementation {
     ChoosesTheOldestRoot,
     /// KF2：有已确认发布的态，落点取最后一次已确认那一版的前一版（同实例、txg 减一）；没有已确认的态照理想恢复。
     LandsOneVersionBeforeTheLastConfirmed,
-    /// KA 上本地写的一种择根序，不调实现。
+    /// KL 上本地写的一种择根序，不调实现。
     LocalChoice(LocalRootChoiceRule),
 }
 
@@ -11049,7 +11066,7 @@ impl RootChoiceJudgement {
                 &chosen_root,
                 self.system_configuration.immutable.sizes.journal_ring_bytes,
                 &records,
-                true,
+                NamedUnitVerification::Verify,
             )
         }));
         match replay {
@@ -11564,84 +11581,109 @@ impl RootChoiceVisitor for RootChoiceStateJudge<'_> {
     }
 }
 
-/// KA（登记 5.4）：根环读根环次序的前三个槽（区域 0 的槽 0、1、2）各取空或四条根之一，其余根槽全 0，journal 环全 0。
-const ROOT_CHOICE_ADVERSARIAL_ROOT_VERSIONS: [RootVersion; 4] = [
-    RootVersion {
-        checkpoint_txg: 100,
-        instance: 1,
-    },
-    RootVersion {
-        checkpoint_txg: 100,
-        instance: 2,
-    },
-    RootVersion {
-        checkpoint_txg: 101,
-        instance: 1,
-    },
-    RootVersion {
-        checkpoint_txg: 101,
-        instance: 2,
-    },
-];
-const ROOT_CHOICE_ADVERSARIAL_FILLED_SLOTS: usize = 3;
+/// KL（第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 1.3）：txg 100、101、102 各自只在它的落点槽里摆根（D22 已定项 16 的落点公式：
+/// txg 102 → 区域 0 槽 2，txg 100 → 区域 1 槽 1，txg 101 → 区域 2 槽 1），每个落点槽取空、或那个 txg 的实例 1、实例 2 两条根之一，3³ = 27 态；
+/// 其余根槽全 0（不摆第 0 代根），journal 环全 0。同 txg 两条根不同在，C743 的落点核不挡任何一条。
+const ROOT_CHOICE_LANDING_SLOT_ADVERSARIAL_TXGS: &[u64] = &[100, 101, 102];
+const ROOT_CHOICE_LANDING_SLOT_ADVERSARIAL_INSTANCES: [u32; 2] = [1, 2];
+
+/// KL 的一态：根槽数组（区域号主序，与 `RootChoiceWorld::root_slots` 同一个次序）与见证串。
+struct LandingSlotAdversarialRootRing {
+    root_slots: Vec<Option<Arc<RootChoicePublishMaterial>>>,
+    witness: String,
+}
+
+/// KL 的全部状态。r3 档（三步与本地择根序）与 r4 档（本地择根序）都从这里取，两档的 KL 出自同一段代码（登记 5.6 H2）。
+/// 落点槽按读根环次序排；状态号是三位三进制，读根环次序最前的落点槽是最高位，每位 0 空、1 实例 1、2 实例 2。
+/// 每摆一条根都过 TH2 回比（本地 (区域, 槽) 与 `root_ring::target_for_publish` 相等，不符当场停）。
+fn landing_slot_adversarial_root_rings() -> Vec<LandingSlotAdversarialRootRing> {
+    let domain = RootChoiceDomain::AdversarialRootRing;
+    let mut txgs_in_ring_order: Vec<u64> = ROOT_CHOICE_LANDING_SLOT_ADVERSARIAL_TXGS.to_vec();
+    txgs_in_ring_order
+        .sort_by_key(|checkpoint_txg| root_choice_slot_index_of_publish(domain, *checkpoint_txg));
+    let landing_slot_indices: Vec<usize> = txgs_in_ring_order
+        .iter()
+        .map(|checkpoint_txg| root_choice_slot_index_of_publish(domain, *checkpoint_txg))
+        .collect();
+    // 每个落点槽的候选根是那个 txg 的两个实例；新根段六条各不相同（同 r3 KA），按 txg 升序、实例升序编号。
+    let mut candidates_per_landing_slot: Vec<Vec<Arc<RootChoicePublishMaterial>>> =
+        vec![Vec::new(); txgs_in_ring_order.len()];
+    let mut segment_number: u64 = 0;
+    for checkpoint_txg in ROOT_CHOICE_LANDING_SLOT_ADVERSARIAL_TXGS {
+        let landing_position = txgs_in_ring_order
+            .iter()
+            .position(|ordered_txg| ordered_txg == checkpoint_txg)
+            .expect("每个 txg 都排进了读根环次序");
+        for instance in ROOT_CHOICE_LANDING_SLOT_ADVERSARIAL_INSTANCES {
+            segment_number += 1;
+            candidates_per_landing_slot[landing_position].push(Arc::new(
+                root_material_without_records(
+                    instance,
+                    *checkpoint_txg,
+                    NewRootSegment::off_timeline(segment_number, *checkpoint_txg),
+                ),
+            ));
+        }
+    }
+    let choices_per_landing_slot = ROOT_CHOICE_LANDING_SLOT_ADVERSARIAL_INSTANCES.len() + 1;
+    let state_count = choices_per_landing_slot
+        .pow(u32::try_from(txgs_in_ring_order.len()).expect("落点槽不超过三个"));
+    let root_slot_count = usize::try_from(ROOT_CHOICE_REGION_COUNT * domain.slots_per_region())
+        .expect("根槽数不超过 24");
+    let mut rings = Vec::with_capacity(state_count);
+    for state_number in 0..state_count {
+        let mut root_slots = vec![None; root_slot_count];
+        let mut choice_texts = vec![String::new(); txgs_in_ring_order.len()];
+        let mut remaining_choices = state_number;
+        for landing_position in (0..txgs_in_ring_order.len()).rev() {
+            let choice = remaining_choices % choices_per_landing_slot;
+            remaining_choices /= choices_per_landing_slot;
+            choice_texts[landing_position] = if choice == 0 {
+                "empty".to_string()
+            } else {
+                let material = &candidates_per_landing_slot[landing_position][choice - 1];
+                assert_the_local_root_slot_arithmetic_against_the_implementation(
+                    domain,
+                    material.version.checkpoint_txg,
+                );
+                root_slots[landing_slot_indices[landing_position]] = Some(Arc::clone(material));
+                format!(
+                    "({},{})",
+                    material.version.checkpoint_txg, material.version.instance
+                )
+            };
+        }
+        rings.push(LandingSlotAdversarialRootRing {
+            root_slots,
+            witness: format!("kl_landing_slots=[{}]", choice_texts.join(",")),
+        });
+    }
+    rings
+}
 
 fn root_choice_tally_of_the_adversarial_root_rings(
     implementation: RootChoiceImplementation,
 ) -> RootChoiceTally {
     let domain = RootChoiceDomain::AdversarialRootRing;
     let judgement = RootChoiceJudgement::new(domain, implementation);
-    let root_materials: Vec<Arc<RootChoicePublishMaterial>> = ROOT_CHOICE_ADVERSARIAL_ROOT_VERSIONS
-        .iter()
-        .enumerate()
-        .map(|(version_index, version)| {
-            Arc::new(root_material_without_records(
-                version.instance,
-                version.checkpoint_txg,
-                NewRootSegment::off_timeline(
-                    1 + u64::try_from(version_index).expect("四条根"),
-                    version.checkpoint_txg,
-                ),
-            ))
-        })
-        .collect();
-    let choices_per_slot = root_materials.len() + 1;
     let mut tally = RootChoiceTally::new();
-    let state_count =
-        choices_per_slot.pow(u32::try_from(ROOT_CHOICE_ADVERSARIAL_FILLED_SLOTS).expect("三个槽"));
-    for state_number in 0..state_count {
-        let mut world = RootChoiceWorld {
+    for ring in landing_slot_adversarial_root_rings() {
+        let world = RootChoiceWorld {
             domain,
-            root_slots: vec![
-                None;
-                usize::try_from(ROOT_CHOICE_REGION_COUNT * domain.slots_per_region())
-                    .expect("根槽数不超过 24")
-            ],
+            root_slots: ring.root_slots,
             landed_records: Vec::new(),
             confirmed_user_publishes: Vec::new(),
             publishes_started: 0,
             history: Vec::new(),
         };
-        let mut remaining_choices = state_number;
-        let mut choice_texts = Vec::new();
-        for slot_index in (0..ROOT_CHOICE_ADVERSARIAL_FILLED_SLOTS).rev() {
-            let choice = remaining_choices % choices_per_slot;
-            remaining_choices /= choices_per_slot;
-            if choice > 0 {
-                world.root_slots[slot_index] = Some(Arc::clone(&root_materials[choice - 1]));
-                choice_texts.push(root_materials[choice - 1].version.describe());
-            } else {
-                choice_texts.push("empty".to_string());
-            }
-        }
-        choice_texts.reverse();
         let landing = root_choice_landing_of(&world, None);
-        let describe_state = || format!("ka_region0_slots012=[{}]", choice_texts.join(","));
+        let describe_state = || ring.witness.clone();
         judgement.judge(&landing, &[], false, &mut tally, &describe_state);
     }
     tally
 }
 
-/// 一个 (域, M, U) 格上、一种实现下全部状态的计数。KA 单线程走 125 个状态；合法历史的三个域按工作单元分给几条线程。
+/// 一个 (域, M, U) 格上、一种实现下全部状态的计数。KL 单线程走 27 个状态；合法历史的三个域按工作单元分给几条线程。
 fn root_choice_tally_of_a_cell(
     domain: RootChoiceDomain,
     cell: RootChoiceCell,
@@ -11718,20 +11760,69 @@ fn pinned_root_choice_cell(
     })
 }
 
-/// KA 上各种本地择根序的 KJ2 违例数（登记第七节乙类 KA：今天的序 0、平局取低 36、实例代号为主 18、比较不看实例 18、取第一个有效者 52），
-/// 出自 `anchors_r3_ka.py`。
+/// KL 上各种本地择根序的 KJ2 违例数（第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 第七节乙类 B2：今天的序 0、平局取低 0、
+/// 实例代号为主 6、比较不看实例 0、取第一个有效者 4），出自那份登记第十三节的 `anchors_e165_r7_ka.py`（`new_ka_three_txgs` 那两行）。
 const fn pinned_root_choice_adversarial_kj2_violations(rule: LocalRootChoiceRule) -> u64 {
     match rule {
         LocalRootChoiceRule::NewestWins => 0,
-        LocalRootChoiceRule::TieTakesTheLowerInstance => 36,
-        LocalRootChoiceRule::InstanceFirstThenTxg => 18,
-        LocalRootChoiceRule::IgnoresTheInstance => 18,
-        LocalRootChoiceRule::FirstSelfVerifiedWins => 52,
+        LocalRootChoiceRule::TieTakesTheLowerInstance => 0,
+        LocalRootChoiceRule::InstanceFirstThenTxg => 6,
+        LocalRootChoiceRule::IgnoresTheInstance => 0,
+        LocalRootChoiceRule::FirstSelfVerifiedWins => 4,
     }
 }
 
-/// KA 的状态数 125 与其中没有一条自证过的根的 1 态（登记第七节乙类 KA：`choose_root` 交回空，KJ0 在这一态记一条）。
-const PINNED_ROOT_CHOICE_ADVERSARIAL_STATES: u64 = 125;
+/// KL 的形状（第 7 次重跑登记第七节乙类 B1，出自那份登记第十三节的 `anchors_e165_r7_ka.py` 与 `anchors_e165_r7_kl_counts.py`）：
+/// 27 态，其中根环全空 1（`choose_root` 交回空，KJ0 在这一态记一条）、同 txg 不同实例同在 0、实例代号更高而 txg 更低同在 7、
+/// 两个以上实例 12、读根环次序里第一个自证过的根不是版本最大那条 4。
+const PINNED_ROOT_CHOICE_ADVERSARIAL_STATES: u64 = 27;
+const PINNED_ROOT_CHOICE_ADVERSARIAL_RING_EMPTY_STATES: u64 = 1;
+const PINNED_ROOT_CHOICE_ADVERSARIAL_SAME_TXG_DIFFERENT_INSTANCE_STATES: u64 = 0;
+const PINNED_ROOT_CHOICE_ADVERSARIAL_HIGHER_INSTANCE_LOWER_TXG_STATES: u64 = 7;
+const PINNED_ROOT_CHOICE_ADVERSARIAL_TWO_OR_MORE_INSTANCES_STATES: u64 = 12;
+const PINNED_ROOT_CHOICE_ADVERSARIAL_FIRST_ROOT_NOT_THE_NEWEST_STATES: u64 = 4;
+
+/// KL 的形状逐格等于登记第七节乙类 B1（这些量只看生成器与真相，与被测实现无关）；r3、r4 两档跑 KL 都过这里，不符走作废条款 TV4（第 7 次重跑登记 LV1）。
+fn assert_the_pinned_landing_slot_adversarial_shape(tally: &RootChoiceTally) {
+    for (counter, pinned, what) in [
+        (
+            RootChoiceCounter::States,
+            PINNED_ROOT_CHOICE_ADVERSARIAL_STATES,
+            "状态数",
+        ),
+        (
+            RootChoiceCounter::StatesWithoutASelfVerifiedRoot,
+            PINNED_ROOT_CHOICE_ADVERSARIAL_RING_EMPTY_STATES,
+            "根环全空的态数",
+        ),
+        (
+            RootChoiceCounter::SameTxgDifferentInstanceRoots,
+            PINNED_ROOT_CHOICE_ADVERSARIAL_SAME_TXG_DIFFERENT_INSTANCE_STATES,
+            "同 txg 不同实例同在的态数",
+        ),
+        (
+            RootChoiceCounter::HigherInstanceLowerTxgRoots,
+            PINNED_ROOT_CHOICE_ADVERSARIAL_HIGHER_INSTANCE_LOWER_TXG_STATES,
+            "实例代号更高而 txg 更低同在的态数",
+        ),
+        (
+            RootChoiceCounter::TwoOrMoreInstancesInTheRing,
+            PINNED_ROOT_CHOICE_ADVERSARIAL_TWO_OR_MORE_INSTANCES_STATES,
+            "根环里有两个以上实例的态数",
+        ),
+        (
+            RootChoiceCounter::FirstSelfVerifiedRootIsNotTheNewest,
+            PINNED_ROOT_CHOICE_ADVERSARIAL_FIRST_ROOT_NOT_THE_NEWEST_STATES,
+            "读根环次序里第一个自证过的根不是版本最大那条的态数",
+        ),
+    ] {
+        assert_eq!(
+            tally.count_of(counter),
+            pinned,
+            "TV4：KL {what}（登记 research/prompts/e165-r7-prereg.md 第七节乙类 B1）"
+        );
+    }
+}
 
 /// 每个跑到的合法历史格，装置数出的状态数与几样计数等于独立生成器的数；不符走作废条款 TV4（这些量只看生成器与真相，与被测实现无关）。
 fn assert_the_pinned_root_choice_cell(
@@ -12504,7 +12595,7 @@ fn root_choice_place_of(domain: RootChoiceDomain, cell: RootChoiceCell) -> Strin
 }
 
 /// 每条判据在每个 (域, M, U) 格上的对照读数：KJ0 在 K 域 M = 1、U = 0 的指定一态上 panic（违例数 1）；KJ1、KJ2 在 KF1 下等于第七节乙类 KF1 那两列；
-/// KJ1、KJ2、KJ3 在 KF2 下各等于「有已确认发布的态数」；KJ2 在 KA 上本地写的几种择根序下等于 36、18、18、52（今天的序 0）。
+/// KJ1、KJ2、KJ3 在 KF2 下各等于「有已确认发布的态数」；KJ2 在 KL 上本地写的几种择根序下等于 0、6、0、4（今天的序 0；第 7 次重跑登记第七节乙类 B2）。
 fn root_choice_control_readings(
     selected_cells: &[(RootChoiceDomain, Vec<RootChoiceCell>)],
     thread_count: usize,
@@ -12628,7 +12719,7 @@ const ROOT_CHOICE_COUNTERS_OF_THE_STATES_ROW: [RootChoiceCounter; 18] = [
     RootChoiceCounter::SlotReadingsDifferingFromTheTruth,
 ];
 
-/// 一个 (域, M, U) 格的全部行：状态数与几样计数、每条判据一行违例数（KA 只判 KJ0、KJ2，另两条不出行）。
+/// 一个 (域, M, U) 格的全部行：状态数与几样计数、每条判据一行违例数（KL 只判 KJ0、KJ2，另两条不出行）。
 fn emit_the_rows_of_a_root_choice_cell(
     emitter: &mut Emitter,
     domain: RootChoiceDomain,
@@ -12699,16 +12790,17 @@ fn emit_the_verdict_of_a_root_choice_domain(
         .map(|cell| cell.user_publishes)
         .max()
         .unwrap_or(0);
-    // 登记作废条款 TV10：域是空的（合法历史三个域合起来没有一个已确认的态，KJ1 一态都没判；KA 上同 txg 不同实例同在为 0）。
+    // 登记作废条款 TV10：域是空的（合法历史三个域合起来没有一个已确认的态，KJ1 一态都没判）；KL 上（第 7 次重跑登记 5.6 H3）
+    // 实例代号更高而 txg 更低同在为 0，或同 txg 不同实例同在不为 0（摆根没照落点）。
     let domain_is_nonempty = if domain.is_a_legal_history() {
         total.count_of(RootChoiceCounter::ConfirmedStates) > 0
     } else {
-        total.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots) > 0
-            && total.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0
+        total.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0
+            && total.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots) == 0
     };
     if !domain_is_nonempty {
         findings.void_conditions.push(format!(
-            "TV10 {} 域是空的（合法历史域没有一个已确认发布的态；KA 上同 txg 不同实例同在与实例代号更高而 txg 更低同在有一样为 0），这个域的 0 违例不算数",
+            "TV10 {} 域是空的（合法历史域没有一个已确认发布的态；KL 上实例代号更高而 txg 更低同在为 0，或同 txg 不同实例同在不为 0），这个域的 0 违例不算数",
             domain.label()
         ));
     }
@@ -12772,7 +12864,7 @@ fn arguments_name_the_root_choice_family(arguments: &[String]) -> bool {
 }
 
 /// `--bounds segment1|segment2|light`（这一族 segment1 与 segment2 同界、`light` 是调试用的小界）、`--family root_choice`、
-/// `--only K,K9,KW,KA`、`--max-u <U>`（每个格的 U 封顶，只给调试用）。
+/// `--only K,K9,KW,KL`、`--max-u <U>`（每个格的 U 封顶，只给调试用）。
 fn parse_the_root_choice_command_line(arguments: &[String]) -> Result<RootChoiceSelection, String> {
     let mut bounds: Option<BoundsTier> = None;
     let mut only: Option<Vec<String>> = None;
@@ -12805,7 +12897,7 @@ fn parse_the_root_choice_command_line(arguments: &[String]) -> Result<RootChoice
                         .iter()
                         .any(|domain| domain.label() == name)
                     {
-                        return Err(format!("不认识的域：{name}（这一族的域是 K、K9、KW、KA）"));
+                        return Err(format!("不认识的域：{name}（这一族的域是 K、K9、KW、KL）"));
                     }
                 }
                 only = Some(names);
@@ -12932,16 +13024,7 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
             if domain.is_a_legal_history() {
                 assert_the_pinned_root_choice_cell(*domain, *cell, &tally);
             } else {
-                assert_eq!(
-                    tally.count_of(RootChoiceCounter::States),
-                    PINNED_ROOT_CHOICE_ADVERSARIAL_STATES,
-                    "TV4：KA 状态数"
-                );
-                assert_eq!(
-                    tally.count_of(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
-                    1,
-                    "TV4：KA 里根环全空的态数（登记第七节乙类 KA：没有一条自证过的根的 1 态）"
-                );
+                assert_the_pinned_landing_slot_adversarial_shape(&tally);
             }
             emit_the_rows_of_a_root_choice_cell(&mut emitter, *domain, *cell, &tally);
             println!(
@@ -12998,7 +13081,7 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
     }
 }
 
-// ── 带读故障的择根合判一族（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6、第七节：KF、KF3、KF9、KFW、KG、KA；只在 `--profile r4 --family root_choice_faults` 时跑）
+// ── 带读故障的择根合判一族（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6、第七节：KF、KF3、KF9、KFW、KG，与第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 1.3 的 KL；只在 `--profile r4 --family root_choice_faults` 时跑）
 //
 // 被测对象与 r3 的择根合判一族相同：`recover` 的 `Consult` 支里串起来的三步（`choose_root`、`scan_journal`、`replay_journal(…, true)`）。
 // 这一族多出来的东西全在生成器一侧（可信件，按登记 5.3 与 D16 已定项 7、8，D22 已定项 7、8、16，D23 已定项 14、18 的字面写，不调 `mount.rs`、`transaction.rs`）：
@@ -13026,14 +13109,14 @@ const MOUNT_FAULT_MENU_LABELS: [&str; MOUNT_FAULT_MENU_LENGTH] = [
 ];
 
 labelled_enumeration! {
-    /// 登记 5.4 的六个域：KF、KF3、KF9、KFW 是带读故障的合法历史，KG 是把条款的两道保护拿掉的对照，KA 是 r3 原样的对抗根环。
+    /// 登记 5.4 的六个域：KF、KF3、KF9、KFW 是带读故障的合法历史，KG 是把条款的两道保护拿掉的对照，KL 是与 r3 档同一个生成函数的对抗根环（第 7 次重跑登记 1.3、5.6 H2）。
     enum FaultDomain {
         GateOn => "KF",
         GateOnThreeMounts => "KF3",
         GateOnSmallRing => "KF9",
         GateOnWrappingRootRing => "KFW",
         GateOff => "KG",
-        AdversarialRootRing => "KA",
+        AdversarialRootRing => "KL",
     }
 }
 
@@ -13068,7 +13151,7 @@ impl FaultDomain {
         }
     }
 
-    /// 合法历史：Q1、Q2 的域。KG 与 KA 不是。
+    /// 合法历史：Q1、Q2 的域。KG 与 KL 不是。
     const fn is_a_legal_history(self) -> bool {
         self.gate_is_on()
     }
@@ -14893,7 +14976,7 @@ fn outcome_of_the_three_steps_with_the_panic_hook_quiet(
             &chosen_root,
             system_configuration.immutable.sizes.journal_ring_bytes,
             &records,
-            true,
+            NamedUnitVerification::Verify,
         )
     }));
     match replay {
@@ -15664,7 +15747,7 @@ fn fault_tally_of_a_cell(
     )
 }
 
-/// 一个 (域, M, U) 格上全部历史的计数，闸取 `witness_gate_rule`。合法历史与 KG 按工作单元分给几条线程；KA 不走这里。
+/// 一个 (域, M, U) 格上全部历史的计数，闸取 `witness_gate_rule`。合法历史与 KG 按工作单元分给几条线程；KL 不走这里。
 fn fault_tally_of_a_cell_under_the_gate(
     domain: FaultDomain,
     cell: RootChoiceCell,
@@ -16459,48 +16542,23 @@ fn fault_control_readings_of_a_cell_under_the_gate(
     readings
 }
 
-/// KA 上本地写的六种择根序（五种加平局取后者赢）的 KJ2 违例数必须等于 36、18、18、52、0 与 0（登记第七节 KA；今天的序 0）。
-/// 次序：今天的序、平局取低、实例代号为主、比较不看实例、取第一个有效者、平局取后者赢。
-const PINNED_KA_KJ2_OF_THE_LOCAL_RULES: [(FaultLocalRule, u64); 6] = [
+/// KL 上本地写的六种择根序（五种加平局取后者赢）的 KJ2 违例数必须等于第 7 次重跑登记 `research/prompts/e165-r7-prereg.md` 第七节乙类 B2：
+/// 今天的序 0、平局取低 0、实例代号为主 6、比较不看实例 0、取第一个有效者 4、平局取后者赢 0。
+const PINNED_KL_KJ2_OF_THE_LOCAL_RULES: [(FaultLocalRule, u64); 6] = [
     (FaultLocalRule::Today, 0),
-    (FaultLocalRule::TieTakesTheLowerInstance, 36),
-    (FaultLocalRule::InstanceFirstThenTxg, 18),
-    (FaultLocalRule::IgnoresTheInstance, 18),
-    (FaultLocalRule::FirstSelfVerifiedWins, 52),
+    (FaultLocalRule::TieTakesTheLowerInstance, 0),
+    (FaultLocalRule::InstanceFirstThenTxg, 6),
+    (FaultLocalRule::IgnoresTheInstance, 0),
+    (FaultLocalRule::FirstSelfVerifiedWins, 4),
     (FaultLocalRule::TieTakesTheLater, 0),
 ];
 
-/// KA（登记 5.4，同 r3）：根环读根环次序的前三个槽各取空或四条根之一，别的槽全 0，journal 环全 0。本地写的一种择根序在这 125 个态上 KJ2 违例几次。
-fn ka_kj2_violations_of_a_local_rule(rule: FaultLocalRule) -> u64 {
-    let materials: Vec<Arc<RootChoicePublishMaterial>> = ROOT_CHOICE_ADVERSARIAL_ROOT_VERSIONS
-        .iter()
-        .enumerate()
-        .map(|(version_index, version)| {
-            Arc::new(root_material_without_records(
-                version.instance,
-                version.checkpoint_txg,
-                NewRootSegment::off_timeline(
-                    1 + u64::try_from(version_index).expect("四条根"),
-                    version.checkpoint_txg,
-                ),
-            ))
-        })
-        .collect();
-    let choices_per_slot = materials.len() + 1;
+/// KL：取 r3 档同一个生成函数（[`landing_slot_adversarial_root_rings`]）交出的 27 个根环，本地写的一种择根序在上面 KJ2 违例几次。
+fn kl_kj2_violations_of_a_local_rule(rule: FaultLocalRule) -> u64 {
     let mut violations = 0;
-    for state_number in 0..choices_per_slot
-        .pow(u32::try_from(ROOT_CHOICE_ADVERSARIAL_FILLED_SLOTS).expect("三个槽"))
-    {
-        let mut remaining_choices = state_number;
-        let mut roots_in_ring_order: Vec<Option<&RootChoicePublishMaterial>> =
-            vec![None; ROOT_CHOICE_ADVERSARIAL_FILLED_SLOTS];
-        for slot_index in (0..ROOT_CHOICE_ADVERSARIAL_FILLED_SLOTS).rev() {
-            let choice = remaining_choices % choices_per_slot;
-            remaining_choices /= choices_per_slot;
-            if choice > 0 {
-                roots_in_ring_order[slot_index] = Some(materials[choice - 1].as_ref());
-            }
-        }
+    for ring in landing_slot_adversarial_root_rings() {
+        let roots_in_ring_order: Vec<Option<&RootChoicePublishMaterial>> =
+            ring.root_slots.iter().map(|slot| slot.as_deref()).collect();
         let newest_version = roots_in_ring_order
             .iter()
             .copied()
@@ -16516,8 +16574,8 @@ fn ka_kj2_violations_of_a_local_rule(rule: FaultLocalRule) -> u64 {
     violations
 }
 
-/// KA 上每种本地择根序的对照读数（KJ2）：必须等于 [`PINNED_KA_KJ2_OF_THE_LOCAL_RULES`]。
-fn fault_ka_control_readings() -> Vec<FaultControlReading> {
+/// KL 上每种本地择根序的对照读数（KJ2）：必须等于 [`PINNED_KL_KJ2_OF_THE_LOCAL_RULES`]。
+fn fault_kl_control_readings() -> Vec<FaultControlReading> {
     let place = fault_place_of(
         FaultDomain::AdversarialRootRing,
         RootChoiceCell {
@@ -16525,13 +16583,13 @@ fn fault_ka_control_readings() -> Vec<FaultControlReading> {
             user_publishes: 0,
         },
     );
-    PINNED_KA_KJ2_OF_THE_LOCAL_RULES
+    PINNED_KL_KJ2_OF_THE_LOCAL_RULES
         .iter()
         .map(|(rule, expected)| {
             fault_reading_that_must_equal(
                 FaultCriterion::Kj2NotEarlierThanAnyReadableRoot,
                 format!("{place} local_choice={}", rule.label()),
-                ka_kj2_violations_of_a_local_rule(*rule),
+                kl_kj2_violations_of_a_local_rule(*rule),
                 *expected,
             )
         })
@@ -16809,7 +16867,7 @@ fn arguments_name_the_root_choice_faults_family(arguments: &[String]) -> bool {
 }
 
 /// `--bounds segment1|segment2|light`（这一族 segment1 与 segment2 同界、`light` 是调试用的小界）、`--family root_choice_faults`、
-/// `--only KF,KF3,KF9,KFW,KG,KA`、`--max-u <U>`（每个格的 U 封顶，只给调试用）。
+/// `--only KF,KF3,KF9,KFW,KG,KL`、`--max-u <U>`（每个格的 U 封顶，只给调试用）。
 fn parse_the_root_choice_faults_command_line(
     arguments: &[String],
 ) -> Result<FaultSelection, String> {
@@ -16855,7 +16913,7 @@ fn parse_the_root_choice_faults_command_line(
                 for name in &names {
                     if !FaultDomain::ALL.iter().any(|domain| domain.label() == name) {
                         return Err(format!(
-                            "不认识的域：{name}（这一族的域是 KF、KF3、KF9、KFW、KG、KA）"
+                            "不认识的域：{name}（这一族的域是 KF、KF3、KF9、KFW、KG、KL）"
                         ));
                     }
                 }
@@ -17143,7 +17201,7 @@ fn emit_the_self_proofs(
     }
 }
 
-/// KA（同 r3）：三步在 125 个对抗根环上，行与判决用 r3 的写法；对照是本地写的六种择根序。
+/// KL（与 r3 档同一个生成函数）：三步在 27 个照落点摆根的对抗根环上，行与判决用 r3 的写法；对照是本地写的六种择根序。
 fn run_the_adversarial_domain_of_the_faults_family(
     emitter: &mut Emitter,
     findings: &mut RunFindings,
@@ -17156,18 +17214,9 @@ fn run_the_adversarial_domain_of_the_faults_family(
     };
     let tally =
         root_choice_tally_of_the_adversarial_root_rings(RootChoiceImplementation::TodayThreeSteps);
-    assert_eq!(
-        tally.count_of(RootChoiceCounter::States),
-        PINNED_ROOT_CHOICE_ADVERSARIAL_STATES,
-        "TV4：KA 状态数"
-    );
-    assert_eq!(
-        tally.count_of(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
-        1,
-        "TV4：KA 里根环全空的态数（登记第七节乙类 KA：没有一条自证过的根的 1 态）"
-    );
+    assert_the_pinned_landing_slot_adversarial_shape(&tally);
     emit_the_rows_of_a_root_choice_cell(emitter, geometry, cell, &tally);
-    let readings = fault_ka_control_readings();
+    let readings = fault_kl_control_readings();
     emit_the_control_rows(emitter, findings, &readings);
     control_readings.extend(readings);
     emit_the_verdict_of_a_root_choice_domain(emitter, findings, geometry, &[cell], &tally);
@@ -17412,7 +17461,7 @@ struct RunSelection {
     family_label: &'static str,
 }
 
-const USAGE: &str = "用法：e165_replay_bounded_enumeration --bounds segment1|segment2|light [--family legal|adversarial|all|multi_disk|root_choice|root_choice_faults] [--only <域>[,<域>…]] [--max-n <N>] [--profile r1|r2|r3|r4|r5] [--marker-parity even|odd] [--table direct|scan|both] [--disk-order normal|reversed]（档不给取 r1；奇偶、建表法、盘次序只在 r2、r3、r5 档有，不给分别取 even、direct、normal；这几个参数写在哪都行，单状态重放、逐态判定行、钉住的红例逐行重放同样认）；域名：L L6 L9 U C C6 A A6 AC X E1 E2 R M M6 MC（多盘三个域只在 --family multi_disk 时跑、要 --profile r2；all 只含合法历史与对抗两族；--family root_choice 只在 --profile r3 时跑，域 K K9 KW KA，认 --bounds、--only、--max-u；--family root_choice_faults 只在 --profile r4 时跑，域 KF KF3 KF9 KFW KG KA，认 --bounds、--only、--max-u、--gate r2（不给是取甲，r5 登记修订 1）；--profile r4 其余族与 r3 档相同；--profile r5 认 legal、adversarial、all、multi_disk，不认 root_choice、root_choice_faults，其余同 r3 档、只把 J7 换成 J8）。单状态重放：--replay-state <域>:<N>:<序号>；逐态判定行：--list-states <域>:<N>（这两种的域名用产物里 domain= 的写法，U 域是 U_verify_on、U_verify_off）；钉住的红例逐行重放：--pinned-cases <表>（格式见 .claude/gate.d/e165-pinned-red-examples.tsv 文件头）";
+const USAGE: &str = "用法：e165_replay_bounded_enumeration --bounds segment1|segment2|light [--family legal|adversarial|all|multi_disk|root_choice|root_choice_faults] [--only <域>[,<域>…]] [--max-n <N>] [--profile r1|r2|r3|r4|r5] [--marker-parity even|odd] [--table direct|scan|both] [--disk-order normal|reversed]（档不给取 r1；奇偶、建表法、盘次序只在 r2、r3、r5 档有，不给分别取 even、direct、normal；这几个参数写在哪都行，单状态重放、逐态判定行、钉住的红例逐行重放同样认）；域名：L L6 L9 U C C6 A A6 AC X E1 E2 R M M6 MC（多盘三个域只在 --family multi_disk 时跑、要 --profile r2；all 只含合法历史与对抗两族；--family root_choice 只在 --profile r3 时跑，域 K K9 KW KL，认 --bounds、--only、--max-u；--family root_choice_faults 只在 --profile r4 时跑，域 KF KF3 KF9 KFW KG KL，认 --bounds、--only、--max-u、--gate r2（不给是取甲，r5 登记修订 1）；--profile r4 其余族与 r3 档相同；--profile r5 认 legal、adversarial、all、multi_disk，不认 root_choice、root_choice_faults，其余同 r3 档、只把 J7 换成 J8）。单状态重放：--replay-state <域>:<N>:<序号>；逐态判定行：--list-states <域>:<N>（这两种的域名用产物里 domain= 的写法，U 域是 U_verify_on、U_verify_off）；钉住的红例逐行重放：--pinned-cases <表>（格式见 .claude/gate.d/e165-pinned-red-examples.tsv 文件头）";
 
 fn parse_the_command_line(arguments: &[String]) -> Result<RunSelection, String> {
     let mut bounds: Option<BoundsTier> = None;
@@ -18331,7 +18380,7 @@ mod tests {
     }
 
     /// 判据表每一行都有一条对照且都红（登记 5.4、作废条款 V2；r2 档加的 J6Qn、J7 五行同样，登记 r2 5.5；r5 档加的 J8 五行，登记 r5 5.4；
-    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`scripts/experiments/replay.sh` 起这个装置的那几条驱动，加上第 5 次重跑登记
+    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`scripts/experiment-apparatus/replay.sh` 起这个装置的那几条驱动，加上第 5 次重跑登记
     /// 比对对象表里没有复跑行的四条（r2 直接建表，两族、两种标记奇偶），每条一族、一档、
     /// 一种建表法、一种盘次序、一种标记奇偶；每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份（写死成字面，
     /// 不从 `is_judged_under`、`Criterion::family` 现算，那是被核的东西），且读数全红；全部单元并起来罩全表。不把几档、几族并起来判：
@@ -18348,7 +18397,7 @@ mod tests {
             .collect();
         assert_eq!(labels.len(), Criterion::ALL.len(), "判据的标签互不相同");
         let formal_run_units: [(&str, Family, RunProfile, &[Criterion]); 19] = [
-            // `scripts/experiments/replay.sh` 的 `driver_e165`、`driver_e165_light`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165`、`driver_e165_light`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
             (
                 "r1 合法",
                 Family::LegalHistory,
@@ -18367,7 +18416,7 @@ mod tests {
                     Criterion::Ia2NoVerificationCounted,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
             (
                 "r1 对抗",
                 Family::Adversarial,
@@ -18382,7 +18431,7 @@ mod tests {
                     Criterion::ALimit,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r2_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
             (
                 "r2 多盘",
                 Family::MultiDisk,
@@ -18474,7 +18523,7 @@ mod tests {
                     Criterion::ALimit,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_table_both_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r2_segment4_table_both_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
             (
                 "两份表都取的 r2 合法",
                 Family::LegalHistory,
@@ -18501,7 +18550,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_table_both_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r2_segment4_table_both_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
             (
                 "两份表都取的 r2 对抗",
                 Family::Adversarial,
@@ -18518,7 +18567,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_table_both_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r2_segment4_table_both_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
             (
                 "两份表都取的 r2 多盘",
                 Family::MultiDisk,
@@ -18532,7 +18581,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
             (
                 "两份表都取、盘次序反报的 r2 合法",
                 Family::LegalHistory,
@@ -18561,7 +18610,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
             (
                 "两份表都取、盘次序反报的 r2 多盘",
                 Family::MultiDisk,
@@ -18577,7 +18626,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r3_segment1_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r3_segment1_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
             (
                 "r3 对抗",
                 Family::Adversarial,
@@ -18593,7 +18642,7 @@ mod tests {
                     Criterion::J6QnSplitByI812,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r6_r3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out`，17 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r6_r3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out`，17 条
             (
                 "r3 合法",
                 Family::LegalHistory,
@@ -18618,7 +18667,7 @@ mod tests {
                     Criterion::J7cUnmountMarkerWhenNothingIsApplied,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r5_segment3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
             (
                 "r5 合法",
                 Family::LegalHistory,
@@ -18642,7 +18691,7 @@ mod tests {
                     Criterion::J8cNothingAppliedReturnsTheChosenRoot,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r5_segment3_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
             (
                 "r5 对抗",
                 Family::Adversarial,
@@ -18658,7 +18707,7 @@ mod tests {
                     Criterion::J6QnSplitByI812,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r5_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
             (
                 "r5 多盘",
                 Family::MultiDisk,
@@ -18670,7 +18719,7 @@ mod tests {
                     Criterion::MultiDiskAppliedSetAndLandedVersion,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
             (
                 "奇数版本的 r5 合法",
                 Family::LegalHistory,
@@ -18694,7 +18743,7 @@ mod tests {
                     Criterion::J8cNothingAppliedReturnsTheChosenRoot,
                 ],
             ),
-            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
+            // `scripts/experiment-apparatus/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
             (
                 "奇数版本的 r5 对抗",
                 Family::Adversarial,
@@ -18891,7 +18940,7 @@ mod tests {
         assert_eq!(parse.problems_of_the_rows_that_do_not_parse.len(), 1);
         assert!(
             parse.problems_of_the_rows_that_do_not_parse[0].starts_with(
-                "第 3 行：这一行没整行抄红例账，用 scripts/experiments/e165-pin-red-examples.py 补"
+                "第 3 行：这一行没整行抄红例账，用 scripts/experiment-apparatus/e165-pin-red-examples.py 补"
             ),
             "要点名行号、说没整行抄、给补的脚本：{:?}",
             parse.problems_of_the_rows_that_do_not_parse
@@ -19179,7 +19228,7 @@ mod tests {
     }
 
     #[test]
-    fn the_adversarial_root_rings_have_125_states_one_of_them_without_a_self_verified_root_and_zero_kj2_violations_today(
+    fn the_landing_slot_adversarial_root_rings_have_27_states_one_of_them_without_a_self_verified_root_and_zero_kj2_violations_today(
     ) {
         let today = root_choice_tally_of_a_cell(
             RootChoiceDomain::AdversarialRootRing,
@@ -19190,20 +19239,113 @@ mod tests {
             RootChoiceImplementation::TodayThreeSteps,
             1,
         );
-        assert_eq!(
-            today.count_of(RootChoiceCounter::States),
-            PINNED_ROOT_CHOICE_ADVERSARIAL_STATES
-        );
+        assert_eq!(today.count_of(RootChoiceCounter::States), 27);
         assert_eq!(today.count_of(RootChoiceCounter::ChoseNothingStates), 1);
         assert_eq!(today.count_of(RootChoiceCounter::Kj0Violations), 1);
-        assert_eq!(today.count_of(RootChoiceCounter::Kj2Judged), 124);
+        assert_eq!(today.count_of(RootChoiceCounter::Kj2Judged), 26);
         assert_eq!(today.count_of(RootChoiceCounter::Kj2Violations), 0);
         assert_eq!(
             today.count_of(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
             0
         );
-        assert!(today.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots) > 0);
-        assert!(today.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0);
+        assert_eq!(
+            today.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots),
+            0
+        );
+        assert_eq!(
+            today.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots),
+            7
+        );
+    }
+
+    /// KL 的 27 态照登记 1.3 与 5.6 H1 摆：落点槽按读根环次序是根槽 2、9、17（txg 102、100、101），状态号三位三进制、最前的落点槽是最高位，
+    /// 六条根的新根段各不相同，见证串写 `empty` 或 `(txg,实例)`。
+    #[test]
+    fn the_landing_slot_adversarial_root_rings_put_each_root_in_its_landing_slot_with_six_distinct_segments(
+    ) {
+        let rings = landing_slot_adversarial_root_rings();
+        assert_eq!(rings.len(), 27);
+        let occupied_slots_of =
+            |ring: &LandingSlotAdversarialRootRing| -> Vec<(usize, RootVersion)> {
+                ring.root_slots
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(slot_index, slot)| {
+                        slot.as_ref().map(|material| (slot_index, material.version))
+                    })
+                    .collect()
+            };
+        assert_eq!(rings[0].witness, "kl_landing_slots=[empty,empty,empty]");
+        assert!(occupied_slots_of(&rings[0]).is_empty());
+        assert_eq!(rings[5].witness, "kl_landing_slots=[empty,(100,1),(101,2)]");
+        assert_eq!(
+            rings[26].witness,
+            "kl_landing_slots=[(102,2),(100,2),(101,2)]"
+        );
+        let version = |checkpoint_txg, instance| RootVersion {
+            checkpoint_txg,
+            instance,
+        };
+        assert_eq!(
+            occupied_slots_of(&rings[26]),
+            vec![
+                (2, version(102, 2)),
+                (9, version(100, 2)),
+                (17, version(101, 2))
+            ]
+        );
+        let mut segments: Vec<NewRootSegment> = Vec::new();
+        for ring in &rings {
+            for material in ring.root_slots.iter().flatten() {
+                if !segments.contains(&material.fields.segment) {
+                    segments.push(material.fields.segment);
+                }
+            }
+        }
+        assert_eq!(segments.len(), 6, "六条根的新根段各不相同");
+    }
+
+    /// KL 的形状过登记第七节乙类 B1 的六条钉值（TV4），TV10 只在「实例代号更高而 txg 更低同在」为 0 或「同 txg 不同实例同在」不为 0 时作废
+    /// （第 7 次重跑登记 5.6 H3、H4）。
+    #[test]
+    fn the_landing_slot_adversarial_domain_passes_its_pinned_shape_and_is_void_only_without_its_two_shapes(
+    ) {
+        let cell = RootChoiceCell {
+            mounts: 0,
+            user_publishes: 0,
+        };
+        let today = root_choice_tally_of_a_cell(
+            RootChoiceDomain::AdversarialRootRing,
+            cell,
+            RootChoiceImplementation::TodayThreeSteps,
+            1,
+        );
+        assert_the_pinned_landing_slot_adversarial_shape(&today);
+        let void_conditions_of = |tally: &RootChoiceTally| {
+            let mut emitter = Emitter { emitted: 0 };
+            let mut findings = RunFindings::default();
+            emit_the_verdict_of_a_root_choice_domain(
+                &mut emitter,
+                &mut findings,
+                RootChoiceDomain::AdversarialRootRing,
+                &[cell],
+                tally,
+            );
+            findings.void_conditions.len()
+        };
+        assert_eq!(void_conditions_of(&today), 0, "照落点摆根的 KL 不作废");
+        let mut with_two_instances_of_one_txg = today.clone();
+        with_two_instances_of_one_txg.add(RootChoiceCounter::SameTxgDifferentInstanceRoots);
+        assert_eq!(
+            void_conditions_of(&with_two_instances_of_one_txg),
+            1,
+            "同 txg 不同实例同在不为 0：摆根没照落点，作废"
+        );
+        assert_eq!(
+            void_conditions_of(&RootChoiceTally::new()),
+            1,
+            "实例代号更高而 txg 更低同在为 0：作废"
+        );
     }
 
     /// 每条判据在每个被判的格上各有对照读数、都红；读数条数照格数逐条判据数（删掉某条判据的某一行对照，条数对不上）。
@@ -19248,7 +19390,7 @@ mod tests {
         assert_eq!(
             readings_of(RootChoiceCriterion::Kj2NotEarlierThanAnySelfVerifiedRoot),
             2 * cell_count + local_rule_count,
-            "KJ2 在每个格上 KF1、KF2 各一条，在 KA 上每种本地择根序一条"
+            "KJ2 在每个格上 KF1、KF2 各一条，在 KL 上每种本地择根序一条"
         );
         assert_eq!(
             readings_of(RootChoiceCriterion::Kj3LandsOnTheIdealRecovery),
@@ -19277,17 +19419,22 @@ mod tests {
             "--bounds segment1 --family legal"
         )));
         let selection = parse_the_root_choice_command_line(&arguments(
-            "--bounds light --family root_choice --only K9,KA --max-u 1",
+            "--bounds light --family root_choice --only K9,KL --max-u 1",
         ))
         .expect("认得的参数");
         assert_eq!(selection.bounds, BoundsTier::Light);
         assert_eq!(
             selection.only,
-            Some(vec!["K9".to_string(), "KA".to_string()])
+            Some(vec!["K9".to_string(), "KL".to_string()])
         );
         assert_eq!(selection.largest_user_publishes_cap, Some(1));
         assert!(parse_the_root_choice_command_line(&arguments(
             "--bounds segment1 --family root_choice --only L"
+        ))
+        .is_err());
+        // KA 这个名字留给 r3 的旧定义：第 7 次重跑登记 1.3 之后 `--only` 不再认它（5.6 H5）。
+        assert!(parse_the_root_choice_command_line(&arguments(
+            "--bounds segment1 --family root_choice --only KA"
         ))
         .is_err());
         assert!(parse_the_root_choice_command_line(&arguments(
@@ -19411,9 +19558,9 @@ mod root_choice_fault_tests {
 
     #[test]
     fn the_local_choice_rules_pick_as_the_registered_comparisons_on_the_adversarial_rings() {
-        for (rule, expected) in PINNED_KA_KJ2_OF_THE_LOCAL_RULES {
+        for (rule, expected) in PINNED_KL_KJ2_OF_THE_LOCAL_RULES {
             assert_eq!(
-                ka_kj2_violations_of_a_local_rule(rule),
+                kl_kj2_violations_of_a_local_rule(rule),
                 expected,
                 "{}",
                 rule.label()
@@ -19498,13 +19645,22 @@ mod root_choice_fault_tests {
             "--family".to_string(),
             "root_choice_faults".to_string(),
             "--only".to_string(),
-            "KF,KA".to_string(),
+            "KF,KL".to_string(),
         ])
         .expect("登记的命令行");
         assert_eq!(
             selection.only,
-            Some(vec!["KF".to_string(), "KA".to_string()])
+            Some(vec!["KF".to_string(), "KL".to_string()])
         );
+        assert!(parse_the_root_choice_faults_command_line(&[
+            "--bounds".to_string(),
+            "segment1".to_string(),
+            "--family".to_string(),
+            "root_choice_faults".to_string(),
+            "--only".to_string(),
+            "KA".to_string(),
+        ])
+        .is_err());
         let as_given = |profile: &str| {
             split_off_the_profile_options(&[
                 "--profile".to_string(),
@@ -19598,7 +19754,7 @@ mod root_choice_fault_tests {
             let tally = fault_tally_of_a_cell(domain, cell, true, 1);
             readings.extend(fault_control_readings_of_a_cell(domain, cell, &tally));
         }
-        readings.extend(fault_ka_control_readings());
+        readings.extend(fault_kl_control_readings());
         for reading in &readings {
             assert!(reading.is_red_as_required, "对照没红：{reading:?}");
         }
@@ -19621,8 +19777,8 @@ mod root_choice_fault_tests {
         );
         assert_eq!(
             readings_of(FaultCriterion::Kj2NotEarlierThanAnyReadableRoot),
-            2 * cells.len() + PINNED_KA_KJ2_OF_THE_LOCAL_RULES.len(),
-            "KJ2 在每个格上 KF1、KF2 各一条，在 KA 上每种本地择根序一条"
+            2 * cells.len() + PINNED_KL_KJ2_OF_THE_LOCAL_RULES.len(),
+            "KJ2 在每个格上 KF1、KF2 各一条，在 KL 上每种本地择根序一条"
         );
         assert_eq!(
             readings_of(FaultCriterion::Kj3LandsOnTheIdealRecovery),

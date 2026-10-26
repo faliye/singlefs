@@ -404,6 +404,26 @@ impl ExtentUpperLeafTarget {
         }
     }
 
+    /// 第一个文件一个数据单元都没有时它在上段叶里那一条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 与第六节 S1：
+    /// 标签 0 是这个文件一个单元都没有，size > 0 时整个文件都是洞；`research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」；
+    /// `research/prompts/m4-validate-code-r2-main-verification.md` 第二节 T1，用户 2026-10-24 定「甲」）：`size_of_its_inode_record_in_bytes` 是这一版
+    /// 第一个文件那条 inode 记录的 size，记录在就写标签 0、不看 size（size 0 与 size > 0 同一形），记录没了（unlink 最后一批之后）不写这一条。
+    /// size 0 也写：冷读那一路（`recovery` 读上段里第一个文件那一条）只给「第一个文件删完」留了没有条目的口子，有记录而没有条目的第一个文件
+    /// 冷走读、可写重挂、冷恢复都按标签 1、2 要至少一个单元、拒收。号 ≥ 2 的空 inode（`transaction::publish_new_inodes` 建出来、没改过 size 的）
+    /// 不经这里，照旧没有条目、读者按「没有条目」收（`write_request_split::DataUnitsOfTheInode::NoneWritten`，size 0 才收）；它改 size 到 size > 0
+    /// 而一个单元都没有时写者照写标签 0、之后一直留着（粘住的标签 0，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S2，
+    /// `transaction::FileOfAnInodeOtherThanTheFirst`），不经这里。
+    /// 写者装上段叶、算上段形状（有条目的号集合）都经这里。
+    #[must_use]
+    pub const fn of_a_file_without_data_units(
+        size_of_its_inode_record_in_bytes: Option<u64>,
+    ) -> Option<Self> {
+        match size_of_its_inode_record_in_bytes {
+            Some(_) => Some(ExtentUpperLeafTarget::NoDataUnit),
+            None => None,
+        }
+    }
+
     /// 这个标签声明的尾部：3、4、0 有洞，1、2 没有。
     #[must_use]
     pub const fn tail(self) -> TailOfAFile {
@@ -429,7 +449,8 @@ pub struct ExtentUpperLeafEntry {
 /// 一条上段叶条目解不开：盘上读来的字节可以是任何值。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExtentUpperLeafEntryMalformed {
-    NarrowerThanItsFieldTable,
+    /// 条目宽不是 113（窄于、宽于都算：I-1.10（码 2 条目宽等于字段表宽） 写「等于」）。
+    WidthDiffersFromItsFieldTable,
     /// 标签不是 0 到 4。
     UnrecognizedTag(u8),
     /// key 的 locality 段或 offset 段不是 0，或载荷里该是零的字节不是零。
@@ -510,10 +531,10 @@ impl ExtentUpperLeafEntry {
     /// 上段叶条目的读者：这里是盘上字节进字段表的边界。
     ///
     /// # Errors
-    /// 窄于 113、标签不认识、该是零的字节不是零、载荷里那条指针头部有一段不是第一版的取值。
+    /// 宽度不是 113（窄于、宽于都算）、标签不认识、该是零的字节不是零、载荷里那条指针头部有一段不是第一版的取值。
     pub fn parse(bytes: &[u8]) -> Result<Self, ExtentUpperLeafEntryMalformed> {
-        if bytes.len() < usize::try_from(EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES).expect("113") {
-            return Err(ExtentUpperLeafEntryMalformed::NarrowerThanItsFieldTable);
+        if bytes.len() != usize::try_from(EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES).expect("113") {
+            return Err(ExtentUpperLeafEntryMalformed::WidthDiffersFromItsFieldTable);
         }
         let (locality, inode, offset) = extent_key_fields(&bytes[..key_width()]);
         if locality != 0 || offset != 0 {
@@ -903,8 +924,10 @@ impl ExtentTreeReading<'_> {
         header: &IndexNodeHeader,
     ) -> Result<Vec<(Vec<u8>, NodePointer)>, RecoveryFailure> {
         let internal_width = usize::try_from(EXTENT_TREE_INTERNAL_ENTRY_BYTES).expect("110");
-        if header.entry_width < internal_width {
-            return Err(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+        // 宽于 key 宽 + 86 的同样拒（C867，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
+        // `EntryWidthDiffersFromItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
+        if header.entry_width != internal_width {
+            return Err(RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                 what: "extent 树内部条目",
                 entry_bytes: header.entry_width,
                 field_table_bytes: internal_width,
@@ -943,7 +966,8 @@ pub struct ExtentLowerSegmentReadFromDisk {
 /// 落在叶罩的那一段里、按 key 严格递增；同一个单元不被两条父条目引用。
 ///
 /// # Errors
-/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；条目窄于字段表 ⇒ `EntryNarrowerThanItsFieldTable`；别的核不过 ⇒ `InvariantViolated`。
+/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；内部条目与叶记录的条目宽不等于字段表（窄于、宽于都算）⇒
+/// `EntryWidthDiffersFromItsFieldTable`；别的核不过 ⇒ `InvariantViolated`。
 pub fn read_lower_segment(
     reading: &ExtentTreeReading<'_>,
     inode: u64,
@@ -1008,8 +1032,8 @@ fn read_lower_node_and_its_subtree(
         for entry in &header.entries {
             let (key, data_pointer) =
                 parse_extent_record(entry).map_err(|refusal| match refusal {
-                    PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
-                        RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                    PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable => {
+                        RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                             what: "extent 叶记录",
                             entry_bytes: entry.len(),
                             field_table_bytes: usize::try_from(EXTENT_LEAF_RECORD_BYTES)
@@ -1113,8 +1137,8 @@ fn upper_leaf_entries(
     for entry_bytes in &header.entries {
         let entry =
             ExtentUpperLeafEntry::parse(entry_bytes).map_err(|malformed| match malformed {
-                ExtentUpperLeafEntryMalformed::NarrowerThanItsFieldTable => {
-                    RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                ExtentUpperLeafEntryMalformed::WidthDiffersFromItsFieldTable => {
+                    RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                         what: "extent 上段叶条目",
                         entry_bytes: entry_bytes.len(),
                         field_table_bytes: usize::try_from(EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES)

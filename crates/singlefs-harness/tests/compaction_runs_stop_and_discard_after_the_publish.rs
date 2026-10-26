@@ -1,6 +1,7 @@
 //! 整理运行（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G2、G4、G5、G8；判决 `research/prompts/m4-batch2-code-r1-main-verification.md`
 //! 第二节 S6）：会话的显式入口 `MountedSession::run_compaction` 先发一次签发意图的发布、再一批一批推，最后一批同一次发布删意图，停在判据上
-//! （签发前判、停机谓词、隔离槽丢意图、预算、开关）；用户改动发成之后强制起跑时只跑至多一批（只数搬了单元的发布：丢意图、签发不算，
+//! （签发前判、停机谓词、隔离槽丢意图、预算、开关）；用户改动发成之后强制起跑时记下「该跑了」，后台入口
+//! `MountedSession::run_compaction_in_the_background` 取走它只跑至多一批（只数搬了单元的发布：丢意图、签发不算，
 //! 判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J3）；合取 7 只拦前台写入类发布、拒成它自己的成员；
 //! 发布返回之后整段可再分配的段发 discard，扣住、隔离、段里还有占着的槽、装着还没清扫的孤儿头都不发；这次挂载里被区域扫描拒过的段只记在
 //! 这一次挂载的会话上；文件删光之后快照照样删得掉。
@@ -18,15 +19,17 @@ use singlefs_core::admission::EmptyClusterSegmentsBelowTheFloorOnSomeDevices;
 use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::compaction_plan::{
-    region_is_empty_by_the_records, CompactionBatchSize, CompactionBatchUnits,
-    CompactionRegionExclusion, CompactionRunForcing, CompactionRunStop, CompactionSwitches,
-    EmptyClusterSegmentsFloor, ForcedReleaseChecksumMismatchAfterIssue,
-    RelocationDestinationPolicy, RelocationPublishOrder,
+    region_is_empty_by_the_records, CallerMonotonicClockReading, CallerOfTheBackgroundCompaction,
+    CompactionBatchSize, CompactionBatchUnits, CompactionPacing, CompactionRegionExclusion,
+    CompactionRunForcing, CompactionRunStop, CompactionSwitches, EmptyClusterSegmentsFloor,
+    ForcedReleaseChecksumMismatchAfterIssue, ForegroundFsync, RelocationDestinationPolicy,
+    RelocationPublishOrder,
 };
 use singlefs_core::logged_operations::{live_compaction_intent_of_the_entries, CompactionRegion};
 use singlefs_core::mount::mount_writable;
 use singlefs_core::mounted_session::{
-    CompactionRunOutcome, MountedSession, UserChange, UserChangeRefused,
+    BackgroundCompactionCall, BackgroundCompactionTrigger, CompactionRun, CompactionRunOutcome,
+    MountedSession, UserChange, UserChangeRefused,
 };
 use singlefs_core::records::TREE_KIND_SNAPSHOT_INODE_ROOT;
 use singlefs_core::recovery::walk_to_file;
@@ -92,6 +95,43 @@ fn mounted_session(
         .allocator
         .set_compaction_switches(compaction_switches);
     (session, devices)
+}
+
+/// 后台入口的调用方：钟停在起点，前台没有 fsync 在等。
+struct CallerWithoutAForegroundFsync;
+
+impl CallerOfTheBackgroundCompaction for CallerWithoutAForegroundFsync {
+    fn clock_reading(&self) -> CallerMonotonicClockReading {
+        CallerMonotonicClockReading(std::time::Duration::ZERO)
+    }
+
+    fn foreground_fsync(&self) -> ForegroundFsync {
+        ForegroundFsync::NoneWaiting
+    }
+}
+
+/// 用户改动之后调一次后台入口（节奏参数取默认）：起跑判据记下的「该跑了」被取走，跑的那一趟交回来。
+fn background_run_after_the_user_change(
+    session: &mut MountedSession,
+    devices: &mut Vec<(DeviceIdentity, common::Recorded)>,
+) -> CompactionRun {
+    match session
+        .run_compaction_in_the_background(
+            devices,
+            CompactionPacing::BY_DEFAULT,
+            &CallerWithoutAForegroundFsync,
+        )
+        .expect("盘表是挂载的那一份、现行那一版有树")
+    {
+        BackgroundCompactionCall::Ran {
+            trigger: BackgroundCompactionTrigger::DueAfterAUserChange,
+            run,
+        } => *run,
+        other
+        @ (BackgroundCompactionCall::NotStarted(_) | BackgroundCompactionCall::Ran { .. }) => {
+            panic!("强制起跑：用户改动之后后台入口取走「该跑了」起跑，实际是 {other:?}")
+        }
+    }
 }
 
 fn current_of(session: &MountedSession) -> &TransactionOutput {
@@ -294,7 +334,8 @@ fn a_quarantine_after_the_issue_drops_the_intent_and_its_region_exclusion() {
     );
 }
 
-/// 强制起跑（判决 G8 丁，开关强制）：用户改动发成之后只跑至多一批，停在「用户改动之后那一批跑完了」；那一批在改动之后、会话的 current 就是它。
+/// 强制起跑（判决 G8 丁，开关强制）：用户改动发成之后起跑判据记下「该跑了」，后台入口取走它只跑至多一批，停在「用户改动之后那一批跑完了」；
+/// 那一批在改动之后、会话的 current 就是它（整理挪出了用户改动的调用线程，用户 2026-10-26 定）。
 #[test]
 fn a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_it() {
     let mut pool = build_pool("compaction-run-after-a-user-change");
@@ -317,8 +358,8 @@ fn a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_i
             },
         )
         .expect("建一个 inode");
+    let run = background_run_after_the_user_change(&mut session, &mut devices);
     pool.devices = Some(devices);
-    let run = published.compaction_after_the_change.expect("强制起跑");
     assert_eq!(run.batches_published, 1, "至多一批");
     assert!(
         matches!(
@@ -346,7 +387,7 @@ fn a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_i
 /// 它就不是那时挂载开的段。
 const CLUSTER_SEGMENT_OF_THE_MOUNT_AFTER_THE_BUILD: u64 = 50304;
 
-/// 用户改动之后那一趟发几次（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J3；G8 丁「至多一批」）：一批 = 搬了单元的
+/// 用户改动之后后台入口起跑的那一趟发几次（判决 `research/prompts/m4-segment-code-r3-main-verification.md` 第三节 J3；G8 丁「至多一批」）：一批 = 搬了单元的
 /// 那一次发布（判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F2），上一条意图的收尾与签发不算批，一趟可以发三次。
 /// 池建好之后挂一次、建一个 inode（它的提交内生块落在段 50304），关掉重开；重开之后那次挂载强制起跑、强制选段 50304、签发之后强制一次
 /// 「释放前核出对不上」：建快照之后那一趟签发、搬一批（源落点隔离），停在「那一批跑完了」，意图留着、R 里有隔离槽。改成强制选段 50240、
@@ -392,11 +433,10 @@ fn a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue
             EmptyClusterSegmentsFloor::OfTheFirstVersion,
         ),
     );
-    let quarantining = session
+    session
         .publish_user_change(&mut devices, UserChange::CreateSnapshot)
-        .expect("建快照")
-        .compaction_after_the_change
-        .expect("强制起跑");
+        .expect("建快照");
+    let quarantining = background_run_after_the_user_change(&mut session, &mut devices);
     assert!(
         matches!(
             quarantining.outcome,
@@ -432,11 +472,10 @@ fn a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue
         ForcedReleaseChecksumMismatchAfterIssue::NotForced,
         EmptyClusterSegmentsFloor::OfTheFirstVersion,
     ));
-    let run = session
+    session
         .publish_user_change(&mut devices, UserChange::CreateSnapshot)
-        .expect("再建一个快照")
-        .compaction_after_the_change
-        .expect("强制起跑");
+        .expect("再建一个快照");
+    let run = background_run_after_the_user_change(&mut session, &mut devices);
     pool.devices = Some(devices);
     let relocated_by_each_publish: Vec<usize> = run
         .versions_published

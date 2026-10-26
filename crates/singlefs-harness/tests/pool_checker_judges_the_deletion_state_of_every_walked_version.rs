@@ -41,10 +41,10 @@ use common_deletion_in_progress::{
     set_the_head_identifier_of_the_tree_table_entry_of_kind_at,
     set_the_nlink_of_an_inode_record_in_the_leaf_at_to_zero,
     set_the_nlink_of_an_inode_record_to_zero, set_the_nlink_of_the_queued_first_file_back_to_one,
-    set_the_pending_deletion_occupancy_row_to_one, set_tombstone_field, tombstone_field,
-    tree_table_slot_of_the_newest_root, unlink_to_the_end, zero_both_copies_of_the_unit_at,
-    TOMBSTONE_RECORD_DEATH_TXG_OFFSET, TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET,
-    TOMBSTONE_RECORD_RANGE_END_OFFSET,
+    set_the_pending_deletion_occupancy_row_to_one, set_the_smallest_key_of_the_inode_root_at,
+    set_tombstone_field, tombstone_field, tree_table_slot_of_the_newest_root, unlink_to_the_end,
+    zero_both_copies_of_the_unit_at, TOMBSTONE_RECORD_DEATH_TXG_OFFSET,
+    TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET, TOMBSTONE_RECORD_RANGE_END_OFFSET,
 };
 use common_pointer_head_corruption::{data_unit_bytes, node_bytes, unit_bytes_at};
 use singlefs_checker::image::{
@@ -60,7 +60,7 @@ use singlefs_checker::image::{
 };
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::records::{TREE_KIND_DELETED_INODES, TREE_KIND_EXTENT};
-use singlefs_core::transaction::TransactionUnit;
+use singlefs_core::transaction::{TransactionUnit, FIRST_INODE_NUMBER};
 use singlefs_harness::memory_pool::MemoryPool;
 
 /// 判违例的不变量，按 checker 报的次序（池级 checker 自己的单测，手造的镜像就地判：这份文件登记在 `cpu-judging-sites.tsv` 的 excluded 里；
@@ -966,6 +966,12 @@ fn an_intermediate_version_with_data_units_of_an_inode_without_a_record_reddens_
     drop_the_record_of_the_first_file_in_the_leaf_at_and_keep_its_data_units(
         &mut image,
         intermediate_leaf_slot,
+    );
+    // 中间那一版的 inode 树根头里的最小 key 跟着改成 2（子树覆盖区间，C478）：只红 I-4.7，不连带 I-1.1。
+    set_the_smallest_key_of_the_inode_root_at(
+        &mut image,
+        intermediate.unit(TransactionUnit::InodeRoot).slot,
+        FIRST_INODE_NUMBER + 1,
     );
     assert_eq!(
         violated_invariants(&image),

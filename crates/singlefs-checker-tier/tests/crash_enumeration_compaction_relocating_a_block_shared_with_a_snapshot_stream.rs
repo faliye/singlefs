@@ -44,6 +44,9 @@ use singlefs_checker_tier::crash::{
     CrashPointReplayObserverCounts, CrashPointReplaySegmentExpansion, CrashPointReplayTally,
     CrashPointReplayVersionTable,
 };
+use singlefs_checker_tier::crash_point_replay_provenance::{
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow, RunOfTheFlow,
+};
 use singlefs_checker_tier::crash_state_enumeration::{
     enumerate_crash_states_with_every_kind_of_observer, CrashPointReplayItem,
 };
@@ -289,6 +292,11 @@ fn every_crash_state_of_relocating_a_block_shared_with_a_snapshot_keeps_the_snap
         "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_every_state_was_observed(&prepared, &tally, &landed_counters(&prepared));
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        "compaction_relocating_a_block_shared_with_a_snapshot",
+        &tally,
+    );
     assert!(
         tally
             .observer_counts
@@ -385,6 +393,11 @@ fn full_enumeration_of_the_compaction_relocating_a_block_shared_with_a_snapshot_
     assert_eq!(tally.states, closed_form);
     assert_the_shape_of_the_flow(&prepared);
     assert_every_state_was_observed(&prepared, &tally, &landed_counters(&prepared));
+    assert_every_state_was_seen_by_the_observers_attached_to_the_flow(
+        RunOfTheFlow::CrashPointReplayEnumeration,
+        "compaction_relocating_a_block_shared_with_a_snapshot",
+        &tally,
+    );
 }
 
 /// 崩溃放量的形态：按环境跑一趟，健康的流零红；展开上限默认 6。崩溃点照公共模块 `common_crash_points` 设：建快照、快照下覆盖写与快照流共享，

@@ -31,7 +31,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
-use singlefs_checker::image::SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION;
+use singlefs_checker::image::{
+    ViolationSite, SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
+    UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+};
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, DiscardOutcome, PhysicalBlockSizeInBytes, WriteDurability,
@@ -42,7 +45,7 @@ use singlefs_core::recovery::{
     RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
-use singlefs_format::{ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM};
+use singlefs_format::{ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM, SLOT_BYTES};
 
 use crate::heavy_threads::{
     default_heavy_threads_of_the_cap_value, THREAD_CAP_ENVIRONMENT_VARIABLE,
@@ -51,10 +54,10 @@ use crate::history::{
     classify_failure, execute_history_stopping_at_the_given_pool_checker_violations,
     execute_history_with_faults, generate_history_with_weights, newest_ring_root_and_slot_count,
     raised_floor_lands_only_on_abandoned_roots, AppliedEffect, ColdStartReadBack,
-    FailureObservation, FailureSignature, GeneratedHistory, GenerationWeights, HarnessJudgement,
-    HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
-    HistoryRun, HistorySeed, PerStepChecker, SeededRandomSource, StartingPointStep, StepOutcome,
-    StepPosition,
+    CopyQuarantinedByTheImplementation, FailureObservation, FailureSignature, GeneratedHistory,
+    GenerationWeights, HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
+    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, PerStepChecker,
+    SeededRandomSource, StartingPointStep, StepOutcome, StepPosition,
 };
 use crate::memory_pool::{
     newest_persisted_root, root_identity_written_by, writes_and_segments_with_stream_indexes,
@@ -734,6 +737,10 @@ struct FaultPlanState {
     /// （可写挂载里那是取号写之后那一道；取号写之前那一道前面没有写，不算，代码审阅第 19 条加了它）。
     counts_when_the_first_barrier_after_a_write_arrived:
         BTreeMap<DeviceIdentity, FaultDeviceCounts>,
+    /// 每块盘每一道「前面比上一次快照多了写」的屏障进来那一刻的计数（屏障本身不算进去），按到达次序：写数逐个严格递增，
+    /// 头一项就是 `counts_when_the_first_barrier_after_a_write_arrived` 那一刻。可写挂载取号写两轮（D22（单元原子性怎么合成） 已定项 8），
+    /// 真设备那一路的挂载窗口从第二轮取号写之后那一道屏障起，按写数在这里找。
+    counts_at_each_barrier_after_new_writes: BTreeMap<DeviceIdentity, Vec<FaultDeviceCounts>>,
     fired: Vec<FiredFault>,
     /// 整个池上交给里面那块盘的写（含写零）一共几次：被吞的写在录制流里本该排在第几次写之后，按它数。
     writes_forwarded_across_the_pool: usize,
@@ -757,6 +764,7 @@ impl SharedFaultPlan {
             matching_calls_per_device: BTreeMap::new(),
             per_device_counts: BTreeMap::new(),
             counts_when_the_first_barrier_after_a_write_arrived: BTreeMap::new(),
+            counts_at_each_barrier_after_new_writes: BTreeMap::new(),
             fired: Vec::new(),
             writes_forwarded_across_the_pool: 0,
             swallowed_writes: Vec::new(),
@@ -767,6 +775,12 @@ impl SharedFaultPlan {
     #[must_use]
     pub fn swallowed_writes(&self) -> Vec<SwallowedWrite> {
         self.0.borrow().swallowed_writes.clone()
+    }
+
+    /// 到此为止吞掉了几次写（[`Self::swallowed_writes`] 的头这么多次）。
+    #[must_use]
+    pub fn swallowed_write_count(&self) -> usize {
+        self.0.borrow().swallowed_writes.len()
     }
 
     fn note_swallowed_write(
@@ -833,6 +847,30 @@ impl SharedFaultPlan {
             .borrow()
             .counts_when_the_first_barrier_after_a_write_arrived
             .get(&device)
+            .copied()
+    }
+
+    /// 这块盘收到的写数到了 `writes_before_the_barrier` 之后进来的第一道屏障，那一刻的计数（屏障本身不算进去）；
+    /// 取 1 与 [`Self::counts_when_the_first_barrier_after_a_write_arrived_at`] 是同一刻。写数到了之后一道屏障都没收到过时 None。
+    ///
+    /// # Panics
+    /// `writes_before_the_barrier` 是 0（「零次写之后」的屏障不拍快照，问它是调用方写错了）。
+    #[must_use]
+    pub fn counts_when_the_first_barrier_after_this_many_writes_arrived_at(
+        &self,
+        device: DeviceIdentity,
+        writes_before_the_barrier: u64,
+    ) -> Option<FaultDeviceCounts> {
+        assert!(
+            writes_before_the_barrier > 0,
+            "问的是至少一次写之后的屏障：写之前的屏障不拍快照"
+        );
+        self.0
+            .borrow()
+            .counts_at_each_barrier_after_new_writes
+            .get(&device)?
+            .iter()
+            .find(|snapshot| snapshot.writes >= writes_before_the_barrier)
             .copied()
     }
 
@@ -933,6 +971,14 @@ impl SharedFaultPlan {
                 .entry(device)
                 .or_insert(counts);
         }
+        let snapshots = state
+            .counts_at_each_barrier_after_new_writes
+            .entry(device)
+            .or_default();
+        let writes_at_the_latest_snapshot = snapshots.last().map_or(0, |snapshot| snapshot.writes);
+        if counts.writes > writes_at_the_latest_snapshot {
+            snapshots.push(counts);
+        }
     }
 
     /// 一次 discard 交给了里面那块盘、它交回了 `outcome`。「交给了底层」的在整池写数里算一次（录制器在注入层里面时它在录制流里记一步，
@@ -1018,13 +1064,19 @@ impl<Inner: BlockDevice> FaultInjectingBlockDevice<Inner> {
     pub fn plan(&self) -> &SharedFaultPlan {
         &self.plan
     }
-}
 
-impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
-    fn read_at(
+    /// 普通读与两种专用读（读坏之后的重读、这一刻读盘）共用的注入判定与记账：同一次 `decide(FaultCallKind::Read, …)`，
+    /// 读失败与读出坏位一样生效，交下去的读一样记进这块盘的读数。交下去的那一读由 `read_from_the_inner_device` 发：
+    /// 普通读发里面那块盘的 `read_at`，专用读发它的同名方法（里面那块盘可能是记着这次挂载读过什么的那一层，它在专用读上绕过记下的那一份）。
+    fn read_through_the_fault_plan(
         &self,
         offset: DeviceOffsetInBytes,
         buffer: &mut [u8],
+        read_from_the_inner_device: impl FnOnce(
+            &Inner,
+            DeviceOffsetInBytes,
+            &mut [u8],
+        ) -> Result<(), BlockDeviceError>,
     ) -> Result<(), BlockDeviceError> {
         let length = u64::try_from(buffer.len()).expect("读的长度装得进 u64");
         match self
@@ -1033,7 +1085,7 @@ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
         {
             Some(InjectedFault::ReadFails) => return Err(injected_block_device_error("读")),
             Some(InjectedFault::ReadReturnsCorruptedBytes { flipped_bit }) => {
-                self.inner.read_at(offset, buffer)?;
+                read_from_the_inner_device(&self.inner, offset, buffer)?;
                 self.plan.note_forwarded_read(self.device);
                 if let Some((index, mask)) = flipped_bit.within(buffer.len()) {
                     buffer[index] ^= mask;
@@ -1049,9 +1101,52 @@ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
             )
             | None => {}
         }
-        self.inner.read_at(offset, buffer)?;
+        read_from_the_inner_device(&self.inner, offset, buffer)?;
         self.plan.note_forwarded_read(self.device);
         Ok(())
+    }
+}
+
+impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.read_through_the_fault_plan(offset, buffer, Inner::read_at)
+    }
+
+    /// 与普通读同一条注入判定与记账，交下去的是里面那块盘的重读。
+    fn reread_at_after_a_bad_read(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.read_through_the_fault_plan(offset, buffer, Inner::reread_at_after_a_bad_read)
+    }
+
+    /// 与普通读同一条注入判定与记账，交下去的是里面那块盘的这一刻读盘。
+    fn read_at_straight_from_the_disk(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.read_through_the_fault_plan(offset, buffer, Inner::read_at_straight_from_the_disk)
+    }
+
+    /// 通知不是读、不碰盘：不走注入判定、不占调用序号、不记读，原样转给里面那块盘。
+    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
+        self.inner.keep_the_self_verified_reread(offset, bytes);
+    }
+
+    /// 通知不是读、不碰盘：不走注入判定、不占调用序号、不记读，原样转给里面那块盘。
+    fn note_the_read_failing_self_verification_and_forget_its_bytes(
+        &self,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: u64,
+    ) {
+        self.inner
+            .note_the_read_failing_self_verification_and_forget_its_bytes(offset, length_in_bytes);
     }
 
     fn write_at(
@@ -1946,7 +2041,9 @@ fn system_configuration_instance_before_a_mount_step(
             | HistoryOperationKind::Truncate
             // 建 inode、按 inode 号写同样经挂着的会话发。
             | HistoryOperationKind::CreateInodes
-            | HistoryOperationKind::WriteOfAnInode => None,
+            | HistoryOperationKind::WriteOfAnInode
+            // 按偏移写同样经挂着的会话发。
+            | HistoryOperationKind::WriteAtOffset => None,
         },
     }
 }
@@ -2512,6 +2609,25 @@ pub struct WhatTheSwallowedWritesExplain {
     pub byte_ranges_of_the_swallowed_writes: BTreeSet<SwallowedWriteByteRange>,
 }
 
+impl WhatTheSwallowedWritesExplain {
+    /// 同一份，池级 checker 那一项（插回去之后仍红的不变量）换成 `invariants_still_violated`：交出去的那一份里那一项是空的，归类那一刻填。
+    #[must_use]
+    pub fn with_the_invariants_still_violated(
+        self,
+        invariants_still_violated: BTreeSet<&'static str>,
+    ) -> Self {
+        Self {
+            invariants_still_violated_if_the_swallowed_writes_had_landed: invariants_still_violated,
+            ceiling_without_the_swallowed_roots: self.ceiling_without_the_swallowed_roots,
+            root_ring_slots_of_the_swallowed_root_slot_writes: self
+                .root_ring_slots_of_the_swallowed_root_slot_writes,
+            instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: self
+                .instance_rows_with_the_swallowed_roots_rebuilt_from_their_records,
+            byte_ranges_of_the_swallowed_writes: self.byte_ranges_of_the_swallowed_writes,
+        }
+    }
+}
+
 /// 一次被吞的写落在哪块盘的哪一段字节：[起, 止)。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SwallowedWriteByteRange {
@@ -2634,6 +2750,7 @@ pub fn left_by_the_lying_device(
             | ModelDisagreementAspect::LoggedCompactionIntent
             | ModelDisagreementAspect::FirstFileRecordTruncationField
             | ModelDisagreementAspect::InodesOtherThanTheFirst
+            | ModelDisagreementAspect::EffectKindOfTheOperation
             | ModelDisagreementAspect::NotModeled => false,
         },
     };
@@ -2666,6 +2783,12 @@ pub struct ImagesAfterAFault {
     pub step_images_of_the_run_with_the_fault: Vec<StepImageInTheRecordedStream>,
     /// 说谎的设备吞掉了写时：被吞的写按原位插回去之后的那张盘（实现以为自己写下的那一份；判「这条失败是不是它留下的」）。
     pub image_with_the_swallowed_writes_landed: Option<RecordedStreamOfAnImage>,
+    /// 说谎的设备吞掉的每一次写，按发生的先后（每步镜像各记着它那一刻之前吞了几次，按步对照那张盘照它插：
+    /// [`ImagesAfterAFault::image_at_the_step_image_with_the_swallowed_writes_before_it_landed`]）。
+    pub swallowed_writes: Vec<SwallowedWrite>,
+    /// 实现交回的每一份隔离，跨重挂累积（[`crate::history::HistoryRun::copies_quarantined_by_the_implementation`]；每步镜像各记着它那一刻之前交回了几份）：
+    /// 归类器认「插回去那张盘上仍红的那一份是说谎的设备逼出来的隔离」（[`unit_start_slots_quarantined_over_a_swallowed_write`]）。
+    pub copies_quarantined_by_the_implementation: Vec<CopyQuarantinedByTheImplementation>,
     /// 这个注入点上池级 checker 判红时那一条失败除违例之外的样子（位置、根环、抬 F 落没落在空档里），违例一栏是空的。
     pub observation_without_the_pool_checker_violations: FailureObservation,
     pub facts_after_the_fault: FactsAfterTheFault,
@@ -2685,6 +2808,60 @@ pub struct StepImageInTheRecordedStream {
     pub operations_recorded: usize,
     pub newest_ring_root_txg: Option<u64>,
     pub root_ring_slot_count: Option<u64>,
+    /// 这一刻之前说谎的设备吞了几次写（[`ImagesAfterAFault::swallowed_writes`] 的头这么多次）。
+    pub swallowed_writes_before_it: usize,
+    /// 这一刻之前实现交回了几份隔离（[`ImagesAfterAFault::copies_quarantined_by_the_implementation`] 的头这么多份）。
+    pub copies_quarantined_by_the_implementation_before_it: usize,
+}
+
+impl ImagesAfterAFault {
+    /// 按步对照的那张盘（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3 与「用户定案」：归类器对照第一张红的那一步镜像那一刻
+    /// 插回去的盘）：带着注入跑的那一遍第 `step_image_index` 张每步镜像那一刻的录制流前缀，把那一刻之前被吞的写按原位插回去。
+    /// 那一刻之前一次写都没吞时交 `None`（插回去的盘就是那张每步镜像本身，那一张上判红的没有一条是被吞的写留下的）。
+    /// 掉电接缝只留落在前缀里的那几道。
+    ///
+    /// # Panics
+    /// `step_image_index` 不是一张交出去的每步镜像。
+    #[must_use]
+    pub fn image_at_the_step_image_with_the_swallowed_writes_before_it_landed(
+        &self,
+        step_image_index: usize,
+    ) -> Option<RecordedStreamOfAnImage> {
+        let step_image = self
+            .step_images_of_the_run_with_the_fault
+            .get(step_image_index)
+            .unwrap_or_else(|| {
+                panic!(
+                    "交出去的每步镜像只有 {} 张，没有第 {step_image_index} 张",
+                    self.step_images_of_the_run_with_the_fault.len()
+                )
+            });
+        let swallowed_before_it = &self.swallowed_writes[..step_image.swallowed_writes_before_it];
+        if swallowed_before_it.is_empty() {
+            return None;
+        }
+        let prefix = RecordedStreamOfAnImage {
+            operations: self.image_after_the_fault.operations[..step_image.operations_recorded]
+                .to_vec(),
+            operations_written_by_make_filesystem: self
+                .image_after_the_fault
+                .operations_written_by_make_filesystem
+                .min(step_image.operations_recorded),
+            earliest_stream_index_after_each_power_loss: self
+                .image_after_the_fault
+                .earliest_stream_index_after_each_power_loss
+                .iter()
+                .copied()
+                .filter(|earliest_stream_index| {
+                    *earliest_stream_index < step_image.operations_recorded
+                })
+                .collect(),
+        };
+        Some(stream_with_the_swallowed_writes_landed(
+            &prefix,
+            swallowed_before_it,
+        ))
+    }
 }
 
 /// 一条注入之后的失败归到哪一格（[`classify_a_failure_after_a_fault`]）。
@@ -2746,48 +2923,194 @@ pub fn classify_a_failure_after_a_fault(
     }
 }
 
+/// 一张盘上池级 checker 判红的，连同违例点名的（不变量, 盘, 槽）（`singlefs_checker::walk::check_pool_image_naming_the_violation_sites` 交回的那两样；
+/// 点名槽的只有 I-3.1、I-3.11、I-3.10 与 I-3.15，别的不变量判红时这里没有它的行）。违例细节可以是占位的一句：归类只看判红的是哪几条、点名了哪几处。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ViolationsNamingTheSites {
+    pub violations: Vec<(&'static str, String)>,
+    pub violation_sites: BTreeSet<ViolationSite>,
+}
+
+/// checker 档两段判回的、一个注入点交出去的那几张盘上池级 checker 判红的（[`classify_the_pool_checker_verdicts_of_the_images_after_a_fault`] 收它）。
+/// 违例点名的（不变量, 盘, 槽）只在拿来比的那几张上要：第一张判红的每步镜像与它的按步对照盘、重开那张盘与被吞的写都插回去那张盘。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoolCheckerVerdictsOfTheImagesAfterAFault {
+    /// 与 [`ImagesAfterAFault::step_images_of_the_run_with_the_fault`] 逐张对应。
+    pub violations_of_the_step_images: Vec<Vec<(&'static str, String)>>,
+    /// 第一张判红的每步镜像上违例点名的（不变量, 盘, 槽）；一张都不红时空。
+    pub violation_sites_of_the_first_red_step_image: BTreeSet<ViolationSite>,
+    /// 重开那张盘（[`ImagesAfterAFault::image_after_the_fault`]）上判红的。
+    pub after_the_fault: ViolationsNamingTheSites,
+    /// 第一张判红的每步镜像的按步对照盘（[`ImagesAfterAFault::image_at_the_step_image_with_the_swallowed_writes_before_it_landed`]）上判红的：
+    /// 那个方法交回 `Some` 时给，交回 `None`（一张都不红、或那一刻之前一次写都没吞）时是 `None`。
+    pub at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed:
+        Option<ViolationsNamingTheSites>,
+    /// 被吞的写都插回去之后那张盘（[`ImagesAfterAFault::image_with_the_swallowed_writes_landed`]）上判红的：那张盘在时给，不在时是 `None`。
+    pub with_the_swallowed_writes_landed: Option<ViolationsNamingTheSites>,
+}
+
+/// 隔离判据判的那三条（I-3.1、I-3.11 与随 I-3.1 那一份的 I-3.15，`crates/singlefs-checker/invariants/05-空间记账.md`）：
+/// 对照盘上落在 [`unit_start_slots_quarantined_over_a_swallowed_write`] 那几个起点槽上的点名，归类器先减掉再比。
+const INVARIANTS_JUDGED_BY_THE_QUARANTINE_CRITERION: [&str; 3] = [
+    "I-3.1",
+    "I-3.11",
+    UNRELEASED_ALLOCATION_RECORD_COVERS_A_UNIT_THE_CENTRAL_MAPPING_PLACES_THERE,
+];
+
+/// 实现交回的隔离里，那一份与一次被吞的写有重叠字节的那几个单元的起点槽（两盘同槽，按槽认、不分盘）。被吞的写插回去之后这几个单元每一份都对得上、
+/// 记录却留在已分配：那是实现在说谎的设备上读盘核出对不上才隔离的，不是实现的缺口（判决 `research/prompts/m4-i315-r2-main-verification.md`
+/// 甲二「把实现交出、与被吞的写有重叠的单元当隔离单元」，第三轮判决第三节 C3 收齐四条路的清单）。
+#[must_use]
+pub fn unit_start_slots_quarantined_over_a_swallowed_write(
+    copies_quarantined_by_the_implementation: &[CopyQuarantinedByTheImplementation],
+    swallowed_writes: &[SwallowedWrite],
+) -> BTreeSet<u64> {
+    let swallowed_ranges: Vec<SwallowedWriteByteRange> = swallowed_writes
+        .iter()
+        .map(SwallowedWriteByteRange::of)
+        .collect();
+    copies_quarantined_by_the_implementation
+        .iter()
+        .filter(|quarantined| {
+            let copy = quarantined.copy;
+            let start_in_bytes = copy.placement.slot.to_device_offset().0;
+            let end_in_bytes = copy
+                .placement
+                .span
+                .checked_mul(SLOT_BYTES)
+                .and_then(|length_in_bytes| start_in_bytes.checked_add(length_in_bytes))
+                .expect("一个落点的末端装得进 u64：分配器只在盘内取落点");
+            swallowed_ranges.iter().any(|swallowed| {
+                swallowed.device.0 == copy.device.0
+                    && swallowed.start_in_bytes < end_in_bytes
+                    && start_in_bytes < swallowed.end_in_bytes
+            })
+        })
+        .map(|quarantined| quarantined.copy.placement.slot.0)
+        .collect()
+}
+
+/// 被比的那一张上判红的每一条里，拿对照盘比之后仍红的那几条（判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3：按（不变量, 盘, 槽）比）：
+/// - 被比那一张上这一条点了槽、对照盘上这一条也点了槽：被比那一张点名的（盘, 槽）里有一处在对照盘上这一条下仍被点名，才算仍红；
+///   隔离判据那三条（[`INVARIANTS_JUDGED_BY_THE_QUARANTINE_CRITERION`]），对照盘上落在 `quarantined_over_a_swallowed_write` 那几个起点槽上的点名不算；
+/// - 被比那一张上这一条没点槽（I-3.x 之外的不变量，或判红的不是哪一个单元），或对照盘上这一条一个槽都没点：按名比，对照盘上这一条红就算仍红。
+///
+/// `comparison` 是 `None`（这一刻之前一次写都没吞，插回去就是被比那一张本身）时每一条都算仍红。
+#[must_use]
+pub fn invariants_still_violated_on_the_comparison_image(
+    observed: &ViolationsNamingTheSites,
+    comparison: Option<&ViolationsNamingTheSites>,
+    quarantined_over_a_swallowed_write: &BTreeSet<u64>,
+) -> BTreeSet<&'static str> {
+    let observed_invariants = observed.violations.iter().map(|(invariant, _)| *invariant);
+    let Some(comparison) = comparison else {
+        return observed_invariants.collect();
+    };
+    let violated_on_the_comparison: BTreeSet<&'static str> = comparison
+        .violations
+        .iter()
+        .map(|(invariant, _)| *invariant)
+        .collect();
+    observed_invariants
+        .filter(|invariant| {
+            let sites_named_for = |sites: &BTreeSet<ViolationSite>| -> Vec<ViolationSite> {
+                sites
+                    .iter()
+                    .filter(|site| site.invariant == *invariant)
+                    .copied()
+                    .collect()
+            };
+            let observed_sites = sites_named_for(&observed.violation_sites);
+            let comparison_sites = sites_named_for(&comparison.violation_sites);
+            if observed_sites.is_empty() || comparison_sites.is_empty() {
+                return violated_on_the_comparison.contains(invariant);
+            }
+            let judged_by_the_quarantine_criterion =
+                INVARIANTS_JUDGED_BY_THE_QUARANTINE_CRITERION.contains(invariant);
+            observed_sites.iter().any(|site| {
+                comparison_sites.contains(site)
+                    && !(judged_by_the_quarantine_criterion
+                        && quarantined_over_a_swallowed_write.contains(&site.slot))
+            })
+        })
+        .collect()
+}
+
 /// checker 档两段判出的池级 checker 结论归类（harness 不判，那一遍的结论交回这里；要判红就停那一档口径的调用方改走
-/// [`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`]）：
-/// `violations_of_the_step_images` 与 [`ImagesAfterAFault::step_images_of_the_run_with_the_fault`] 逐张对应，
-/// `violations_after_the_fault` 是重开那张盘上判红的，`invariants_still_violated_if_the_swallowed_writes_had_landed` 是被吞的写插回去之后
-/// 那张盘上判红的不变量（没吞写时空）。交回归好类的失败：每步镜像里第一张判红的（harness 就地判时历史停在那一步，之后的步不跑），
-/// 重开那张判红的，各一条；都不红交回空。
+/// [`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`]）。交回归好类的失败：每步镜像里第一张判红的
+/// （harness 就地判时历史停在那一步，之后的步不跑）、重开那张判红的，各一条；都不红交回空。
+///
+/// 「这条失败是不是说谎的设备留下的」（[`left_by_the_lying_device`]）要的「插回去仍红的不变量」按步取对照盘、按（不变量, 盘, 槽）比
+/// （判决 `research/prompts/m4-i315-r3-main-verification.md` 第三节 C3 与「用户定案」，[`invariants_still_violated_on_the_comparison_image`]）：
+/// 第一张判红的每步镜像拿它那一刻的按步对照盘比（那一刻之前被吞的写插回去），减掉那一刻之前实现交回的、压在那一刻之前被吞的写上的隔离；
+/// 重开那张拿被吞的写都插回去那张比，减掉整段交回的、压在被吞的写上的隔离。
 ///
 /// # Panics
-/// `violations_of_the_step_images` 与每步镜像张数不同。
+/// `violations_of_the_step_images` 与每步镜像张数不同；按步对照盘该给没给、不该给给了；被吞的写都插回去那张盘在而没给结论、不在而给了。
 #[must_use]
 pub fn classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
     images: &ImagesAfterAFault,
-    violations_of_the_step_images: Vec<Vec<(&'static str, String)>>,
-    violations_after_the_fault: Vec<(&'static str, String)>,
-    invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet<&'static str>,
+    verdicts: PoolCheckerVerdictsOfTheImagesAfterAFault,
 ) -> Vec<FailureAfterAFault> {
+    let PoolCheckerVerdictsOfTheImagesAfterAFault {
+        mut violations_of_the_step_images,
+        violation_sites_of_the_first_red_step_image,
+        after_the_fault,
+        at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed,
+        with_the_swallowed_writes_landed,
+    } = verdicts;
     assert_eq!(
         violations_of_the_step_images.len(),
         images.step_images_of_the_run_with_the_fault.len(),
         "每步镜像的结论与交出去的每步镜像逐张对应"
     );
-    let explained = images
-        .what_the_swallowed_writes_explain_without_the_pool_checker
-        .clone()
-        .map(|explained| WhatTheSwallowedWritesExplain {
-            invariants_still_violated_if_the_swallowed_writes_had_landed,
-            ceiling_without_the_swallowed_roots: explained.ceiling_without_the_swallowed_roots,
-            root_ring_slots_of_the_swallowed_root_slot_writes: explained
-                .root_ring_slots_of_the_swallowed_root_slot_writes,
-            instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: explained
-                .instance_rows_with_the_swallowed_roots_rebuilt_from_their_records,
-            byte_ranges_of_the_swallowed_writes: explained.byte_ranges_of_the_swallowed_writes,
-        });
-    let first_red_step_image = images
-        .step_images_of_the_run_with_the_fault
+    let first_red_step_image = violations_of_the_step_images
         .iter()
-        .zip(violations_of_the_step_images)
-        .find(|(_, violations)| !violations.is_empty())
-        .map(|(step_image, violations)| FailureObservation {
+        .position(|violations| !violations.is_empty());
+    let a_write_was_swallowed_before_the_first_red_step_image =
+        first_red_step_image.is_some_and(|index| {
+            images.step_images_of_the_run_with_the_fault[index].swallowed_writes_before_it > 0
+        });
+    assert_eq!(
+        at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed.is_some(),
+        a_write_was_swallowed_before_the_first_red_step_image,
+        "第一张判红的每步镜像那一刻之前吞过写，就要给它的按步对照盘的结论；没吞过就不给"
+    );
+    assert_eq!(
+        with_the_swallowed_writes_landed.is_some(),
+        images.image_with_the_swallowed_writes_landed.is_some(),
+        "被吞的写都插回去那张盘在就要给它的结论；不在就不给"
+    );
+    let explained_with = |invariants_still_violated: BTreeSet<&'static str>| {
+        images
+            .what_the_swallowed_writes_explain_without_the_pool_checker
+            .clone()
+            .map(|explained| {
+                explained.with_the_invariants_still_violated(invariants_still_violated)
+            })
+    };
+    let mut failures = Vec::new();
+    if let Some(index) = first_red_step_image {
+        let step_image = &images.step_images_of_the_run_with_the_fault[index];
+        let observed = ViolationsNamingTheSites {
+            violations: std::mem::take(&mut violations_of_the_step_images[index]),
+            violation_sites: violation_sites_of_the_first_red_step_image,
+        };
+        let quarantined_over_a_swallowed_write =
+            unit_start_slots_quarantined_over_a_swallowed_write(
+                &images.copies_quarantined_by_the_implementation
+                    [..step_image.copies_quarantined_by_the_implementation_before_it],
+                &images.swallowed_writes[..step_image.swallowed_writes_before_it],
+            );
+        let invariants_still_violated = invariants_still_violated_on_the_comparison_image(
+            &observed,
+            at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed.as_ref(),
+            &quarantined_over_a_swallowed_write,
+        );
+        let observation = FailureObservation {
             position: step_image.position,
             operation_kind: step_image.operation_kind,
-            violations,
+            violations: observed.violations,
             panic: None,
             newest_ring_root_txg: step_image.newest_ring_root_txg,
             root_ring_slot_count: step_image.root_ring_slot_count,
@@ -2795,13 +3118,30 @@ pub fn classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
             model_disagreement: None,
             raised_floor_lands_only_on_abandoned_roots: None,
             record_check: RecordCheck::default(),
-        });
-    let template = &images.observation_without_the_pool_checker_violations;
-    let red_after_the_fault =
-        (!violations_after_the_fault.is_empty()).then(|| FailureObservation {
+        };
+        failures.push(classify_a_failure_after_a_fault(
+            observation,
+            &images.facts_after_the_fault,
+            images.drawn.fault,
+            explained_with(invariants_still_violated).as_ref(),
+        ));
+    }
+    if !after_the_fault.violations.is_empty() {
+        let quarantined_over_a_swallowed_write =
+            unit_start_slots_quarantined_over_a_swallowed_write(
+                &images.copies_quarantined_by_the_implementation,
+                &images.swallowed_writes,
+            );
+        let invariants_still_violated = invariants_still_violated_on_the_comparison_image(
+            &after_the_fault,
+            with_the_swallowed_writes_landed.as_ref(),
+            &quarantined_over_a_swallowed_write,
+        );
+        let template = &images.observation_without_the_pool_checker_violations;
+        let observation = FailureObservation {
             position: template.position,
             operation_kind: template.operation_kind,
-            violations: violations_after_the_fault,
+            violations: after_the_fault.violations,
             panic: None,
             newest_ring_root_txg: template.newest_ring_root_txg,
             root_ring_slot_count: template.root_ring_slot_count,
@@ -2810,19 +3150,15 @@ pub fn classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
             raised_floor_lands_only_on_abandoned_roots: template
                 .raised_floor_lands_only_on_abandoned_roots,
             record_check: RecordCheck::default(),
-        });
-    first_red_step_image
-        .into_iter()
-        .chain(red_after_the_fault)
-        .map(|observation| {
-            classify_a_failure_after_a_fault(
-                observation,
-                &images.facts_after_the_fault,
-                images.drawn.fault,
-                explained.as_ref(),
-            )
-        })
-        .collect()
+        };
+        failures.push(classify_a_failure_after_a_fault(
+            observation,
+            &images.facts_after_the_fault,
+            images.drawn.fault,
+            explained_with(invariants_still_violated).as_ref(),
+        ));
+    }
+    failures
 }
 
 /// 被吞的那一次写要是落了盘，录制流里它排在第几步之前（插进去的下标）：录制流里第 `writes_recorded_before` 次写之后（屏障不改镜像，
@@ -2866,7 +3202,12 @@ fn operations_with_the_swallowed_writes_landed(
 
 /// 被吞的写插回去之后的那张盘（[`RecordedStreamOfAnImage`]）：mkfs 的步数与掉电之后第一步的下标跟着插进去的写往后挪。
 /// 插在 mkfs 那几步之后第一处（恰好插在边界上）的算 mkfs 之后写的；插在掉电之后第一步之前（恰好插在接缝上）的算掉电之前写的。
-fn stream_with_the_swallowed_writes_landed(
+/// 写死一段历史、照入口的样子拼 [`ImagesAfterAFault`] 的用例也经它插（同一份插法）。
+///
+/// # Panics
+/// `swallowed` 里有一次写之前记着的写数比 `stream` 里的写多（注入层与录制器数的写对不上）。
+#[must_use]
+pub fn stream_with_the_swallowed_writes_landed(
     stream: &RecordedStreamOfAnImage,
     swallowed: &[SwallowedWrite],
 ) -> RecordedStreamOfAnImage {
@@ -3140,6 +3481,9 @@ fn run_one_fault_up_to_the_pool_checker(
                 operations_recorded: step_image.operations_recorded,
                 newest_ring_root_txg,
                 root_ring_slot_count,
+                swallowed_writes_before_it: plan.swallowed_write_count(),
+                copies_quarantined_by_the_implementation_before_it: step_image
+                    .copies_quarantined_by_the_implementation_up_to_this_step,
             });
         },
         &mut |step_image_index| {
@@ -3295,7 +3639,10 @@ fn run_one_fault_up_to_the_pool_checker(
             // 那几版与测量跑记的那几版（截断那一步不注入时写出的截后内容在后一份里）。
             | HistoryOperation::Truncate(_)
             // 建 inode 不改第一个文件的内容。
-            | HistoryOperation::CreateInodes(_) => None,
+            | HistoryOperation::CreateInodes(_)
+            // 按偏移写的号、偏移与长度执行时才取（`history::PartialWriteChoice`），这里取不到写之后的内容：照截断那样只放行模型认过的那几版与
+            // 测量跑记的那几版。
+            | HistoryOperation::WriteAtOffset(_) => None,
         });
     let (read_back_root, read_back_content): (Option<ModelRootKey>, Option<&[u8]>) =
         match &read_back {
@@ -3499,6 +3846,8 @@ fn run_one_fault_up_to_the_pool_checker(
         image_after_the_fault: stream_after_the_fault,
         step_images_of_the_run_with_the_fault,
         image_with_the_swallowed_writes_landed: stream_with_the_swallowed_writes_landed,
+        swallowed_writes,
+        copies_quarantined_by_the_implementation: run.copies_quarantined_by_the_implementation,
         observation_without_the_pool_checker_violations: FailureObservation {
             position: drawn.segment.position(),
             operation_kind: drawn.segment.operation_kind(),
@@ -4098,6 +4447,68 @@ mod tests {
             "写之前那一道算进去，这一道本身不算进去"
         );
         assert_eq!(plan.counts_of_device(DeviceIdentity(0)).writes, 2);
+    }
+
+    /// 按写数找屏障那一刻的计数：写数到了之后进来的第一道屏障，屏障本身不算进去；两道屏障之间没有新写的那一道不拍快照，
+    /// 问的写数还没到、或到了之后还没收到屏障时没有。可写挂载取号写两轮，挂载窗口从第二轮写之后那一道屏障起，问的就是写数 2。
+    #[test]
+    fn the_counts_when_the_first_barrier_after_this_many_writes_arrived_are_frozen_at_that_moment()
+    {
+        let plan = SharedFaultPlan::unarmed(TEST_GEOMETRY);
+        let mut devices = two_devices(&plan);
+        devices[0].1.barrier().expect("写之前的一道屏障");
+        write(&mut devices[0].1, UNIT_AREA_OFFSET.0, 1).expect("取号第一轮那一写");
+        devices[0].1.barrier().expect("第一轮之后的屏障");
+        devices[0].1.barrier().expect("中间没有新写的一道屏障");
+        assert_eq!(
+            plan.counts_when_the_first_barrier_after_this_many_writes_arrived_at(
+                DeviceIdentity(0),
+                2
+            ),
+            None,
+            "第二次写还没来"
+        );
+        write(&mut devices[0].1, UNIT_AREA_OFFSET.0 + 512, 2).expect("取号第二轮那一写");
+        devices[0].1.barrier().expect("第二轮之后的屏障");
+        write(&mut devices[0].1, UNIT_AREA_OFFSET.0 + 1024, 3).expect("之后的写");
+        devices[0].1.barrier().expect("之后的屏障");
+        let after_one_write = plan
+            .counts_when_the_first_barrier_after_this_many_writes_arrived_at(DeviceIdentity(0), 1)
+            .expect("一次写之后收到过屏障");
+        assert_eq!(
+            Some(after_one_write),
+            plan.counts_when_the_first_barrier_after_a_write_arrived_at(DeviceIdentity(0)),
+            "写数取 1 与写之后第一道屏障同一刻"
+        );
+        assert_eq!(
+            (after_one_write.writes, after_one_write.barriers_forwarded),
+            (1, 1),
+            "第一轮之后那一刻：一次写，写之前那一道屏障"
+        );
+        let after_two_writes = plan
+            .counts_when_the_first_barrier_after_this_many_writes_arrived_at(DeviceIdentity(0), 2)
+            .expect("两次写之后收到过屏障");
+        assert_eq!(
+            (after_two_writes.writes, after_two_writes.barriers_forwarded),
+            (2, 3),
+            "第二轮之后那一刻：两次写，之前三道屏障（中间没有新写那一道也发了），这一道本身不算进去"
+        );
+        assert_eq!(
+            plan.counts_when_the_first_barrier_after_this_many_writes_arrived_at(
+                DeviceIdentity(0),
+                4
+            ),
+            None,
+            "第四次写还没来"
+        );
+        assert_eq!(
+            plan.counts_when_the_first_barrier_after_this_many_writes_arrived_at(
+                DeviceIdentity(1),
+                1
+            ),
+            None,
+            "另一块盘一次写都没收到"
+        );
     }
 
     /// 屏障报错：交回块设备错，里面那块盘没收到。

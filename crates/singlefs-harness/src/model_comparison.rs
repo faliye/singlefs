@@ -2,7 +2,7 @@
 //! 把实现的错误成员映射到模型的拒绝理由。D13（验证路线） 已定项 5 管的是模型本身（`model.rs` 只 `use singlefs_format`）；
 //! 拿实现结局与模型比的这一层可以用 core 的类型。
 //!
-//! 映射只做「这个成员说的是哪条理由」，不做判断，按成员与它的判别字段映射、不看给人看的文字：成员说得出条款理由的映射过去，
+//! 拒因映射只读成员与它的判别字段、不看给人看的文字；盘上字节的观测由验证侧独立解析，不调 core 的编解码器：成员说得出条款理由的映射过去，
 //! I/O、盘坏、走读失败、第一版不支持的池形状（小盘写满、各盘落点不一致）这类模型里没有的一律 `Unexplained`（不建崩溃与设备错、
 //! 两块等大盘的历史里它们都不该出现）。
 
@@ -12,19 +12,17 @@ use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
 };
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal};
-use singlefs_core::instance_table::{
-    InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex,
-};
-use singlefs_core::logged_operations::{live_compaction_intent_of_the_entries, CompactionRegion};
+use singlefs_core::extent_tree::TailOfAFile;
+use singlefs_core::instance_table::InstanceTablePageIndex;
+use singlefs_core::logged_operations::{CompactionRegion, LoggedOperation};
 use singlefs_core::mount::{
     InstanceRow, MountError, Mounted, RollbackCandidateExclusion, RollbackError,
     StillUnreadableAfterOneReread, Unmounted,
 };
 use singlefs_core::pointer::{LocationEntry, NodePointer};
 use singlefs_core::records::{
-    mapping_key_for_node, mapping_key_sort_key, DeadlistEntry, InodeRecord,
-    INODE_RECORD_TRUNCATION_FIELD_OFFSET, NLINK_OF_AN_INODE_BEING_DELETED, TREE_KIND_EXTENT,
-    TREE_KIND_INODE, TREE_KIND_SNAPSHOT_EXTENT_ROOT, TREE_KIND_SNAPSHOT_INODE_ROOT,
+    DeadlistEntry, NLINK_OF_AN_INODE_BEING_DELETED, TREE_KIND_EXTENT, TREE_KIND_INODE,
+    TREE_KIND_SNAPSHOT_EXTENT_ROOT, TREE_KIND_SNAPSHOT_INODE_ROOT,
 };
 use singlefs_core::recovery::{
     RecoveryFailure, RecoveryOutcome, RecoveryReport, SnapshotFileReading,
@@ -38,9 +36,7 @@ use singlefs_core::transaction::{
     SnapshotCreationRefusal, TransactionOutput, TransactionUnit, TruncationRefusal,
     VersionWithoutFilePublishOutput, FIRST_INODE_NUMBER,
 };
-use singlefs_core::unit::{
-    data_unit_payload, data_unit_payload_capacity, parse_data_unit, UNIT_CLASS_INDEX_NODE,
-};
+use singlefs_core::unit::UNIT_CLASS_INDEX_NODE;
 
 use crate::model::{
     ModelCheckpointTxg, ModelCompactionIntent, ModelCompactionRegion, ModelDeadlistEntry,
@@ -198,17 +194,19 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
         ),
         snapshot_state: observed_snapshot_state_of_file_version(output),
         logged_compaction_intent: observed_logged_compaction_intent(output),
-        first_file_record_truncation_field: output
-            .inode_record
-            .as_ref()
-            .map(observed_truncation_field_of_the_record),
+        first_file_record_truncation_field: observed_truncation_field_of_file_version(output),
         inodes_other_than_the_first: observed_inodes_other_than_the_first_of_file_version(output),
+        truncation_fields_of_the_inodes_other_than_the_first:
+            observed_truncation_fields_of_the_inodes_other_than_the_first_of_file_version(output),
     }
 }
 
 /// 这一版第一个文件之外的每个活着的 inode（nlink 不是 0）读回的内容（里程碑「删除与多次 COW」一·1）：那个文件的数据单元
-/// （`TransactionUnit::DataOfAFileOtherThanTheFirst`）按单元号接起来，各按单元头里的声明长度取载荷，接到它那条记录的 size；单元号要从 0 起连着、
-/// 每个号恰好一个，接出来的长度要恰好是 size（这个文件只经按 inode 号写数据从偏移 0 整份写，没有洞）。没有数据单元的要 size 0（读回空）。
+/// （`TransactionUnit::DataOfAFileOtherThanTheFirst`）按单元号接起来，各按单元头里的声明长度取载荷，按上段叶条目的标签与 logged_ops 里的
+/// 截断条目读（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5「胶水按标签与截断条目读别的文件」）：
+/// 单元号要从 0 起连着、每个号恰好一个；标签 1、2（尾部没有洞）的头 ⌈size ÷ 净荷⌉.max(1) 个接起来恰好 size 字节，多出来的只许是一条对得上的
+/// 截断条目（号、对象出生代、目标 = size）点名的截断中间态、读者不读；标签 3、4 的单元都在 size 之内、个个满净荷，之后到 size 读 0；
+/// 标签 0（上段有条目、一个单元都没有）整个文件读 0。上段里没有它的条目的要 size 0（读回空）。
 #[must_use]
 pub fn observed_inodes_other_than_the_first_of_file_version(
     output: &TransactionOutput,
@@ -223,6 +221,16 @@ pub fn observed_inodes_other_than_the_first_of_file_version(
                 .push((index.0, unit.bytes.as_slice()));
         }
     }
+    let tail_of_the_entry: BTreeMap<u64, TailOfAFile> = output
+        .files_other_than_the_first
+        .iter()
+        .map(|file| (file.inode.0, file.tail))
+        .collect();
+    let truncation_intent =
+        singlefs_core::logged_operations::live_truncation_intent_of_the_entries(
+            &output.logged_operations,
+        )
+        .map(|(_, intent)| intent);
     output
         .inode_leaf_containers
         .iter()
@@ -235,21 +243,38 @@ pub fn observed_inodes_other_than_the_first_of_file_version(
                 .remove(&record.inode)
                 .unwrap_or_default();
             data_units.sort_by_key(|(index, _)| *index);
+            let names_a_truncation_intent = truncation_intent.is_some_and(|intent| {
+                intent.inode.0 == record.inode
+                    && intent.object_birth == record.object_birth
+                    && intent.target_size_in_bytes == record.size
+            });
             (
                 record.inode,
-                content_of_a_file_other_than_the_first(record.size, &data_units),
+                content_of_a_file_other_than_the_first(
+                    record.size,
+                    tail_of_the_entry.get(&record.inode).copied(),
+                    names_a_truncation_intent,
+                    &data_units,
+                ),
             )
         })
         .collect()
 }
 
-/// 第一个文件之外一个文件读回的内容（[`observed_inodes_other_than_the_first_of_file_version`]）：`data_units` 按单元号升序。
+/// 第一个文件之外一个文件读回的内容（[`observed_inodes_other_than_the_first_of_file_version`]）：`data_units` 按单元号升序，
+/// `tail_of_the_entry` 是它上段叶条目标签声明的尾部（没有条目为 `None`），`names_a_truncation_intent` 说 logged_ops 里有没有一条截断条目对得上它。
 fn content_of_a_file_other_than_the_first(
     size_in_bytes: u64,
+    tail_of_the_entry: Option<TailOfAFile>,
+    names_a_truncation_intent: bool,
     data_units: &[(u64, &[u8])],
 ) -> ObservedFile {
-    let mut content_read_back = Vec::new();
-    // 迭代上界：这个文件的数据单元数；跨轮只往内容末尾追加；提前出口两个：单元号断了或重了、一个单元解不开。
+    let payload_capacity =
+        u64::try_from(crate::verification_read::data_payload_capacity()).expect("净荷容量");
+    let data_units_the_size_asks_for = size_in_bytes.div_ceil(payload_capacity).max(1);
+    let data_units_existing = u64::try_from(data_units.len()).expect("单元数装得进 u64");
+    let mut payloads: Vec<&[u8]> = Vec::with_capacity(data_units.len());
+    // 迭代上界：这个文件的数据单元数；跨轮只往末尾追加；提前出口两个：单元号断了或重了、一个单元解不开。
     for (expected_index, (index, bytes)) in (0_u64..).zip(data_units) {
         if *index != expected_index {
             return ObservedFile::Undecodable {
@@ -258,10 +283,8 @@ fn content_of_a_file_other_than_the_first(
                 ),
             };
         }
-        match parse_data_unit(bytes)
-            .and_then(|header| data_unit_payload(bytes, header.declared_length))
-        {
-            Ok(payload) => content_read_back.extend_from_slice(payload),
+        match crate::verification_read::data_payload(bytes) {
+            Ok(payload) => payloads.push(payload),
             Err(error) => {
                 return ObservedFile::Undecodable {
                     what: format!("第 {index} 个数据单元解不开：{error:?}"),
@@ -269,6 +292,51 @@ fn content_of_a_file_other_than_the_first(
             }
         }
     }
+    let content_of = |within: &[&[u8]]| -> Vec<u8> { within.concat() };
+    let content_read_back = match (tail_of_the_entry, data_units_existing) {
+        (None, 0) if size_in_bytes == 0 => Vec::new(),
+        (None, _) => {
+            return ObservedFile::Undecodable {
+                what: format!(
+                    "上段里没有它的条目、有 {data_units_existing} 个数据单元，记录的 size 是 {size_in_bytes}（要 size 0、没有单元）"
+                ),
+            };
+        }
+        // 标签 0：整个文件是洞。
+        (Some(_), 0) => vec![0; usize::try_from(size_in_bytes).expect("size 装得进 usize")],
+        (Some(TailOfAFile::NoHoleAfterTheLastDataUnit), _) => {
+            if data_units_existing < data_units_the_size_asks_for
+                || (data_units_existing > data_units_the_size_asks_for
+                    && !names_a_truncation_intent)
+            {
+                return ObservedFile::Undecodable {
+                    what: format!(
+                        "标签 1、2：{data_units_existing} 个数据单元，记录的 size {size_in_bytes} 要 {data_units_the_size_asks_for} 个（多出来的只许是截断条目点名的中间态）"
+                    ),
+                };
+            }
+            content_of(&payloads[..usize::try_from(data_units_the_size_asks_for).expect("单元数")])
+        }
+        (Some(TailOfAFile::HoleAfterTheLastDataUnit), _) => {
+            if data_units_existing >= data_units_the_size_asks_for
+                || payloads.iter().any(|payload| {
+                    u64::try_from(payload.len()).expect("载荷长度") != payload_capacity
+                })
+            {
+                return ObservedFile::Undecodable {
+                    what: format!(
+                        "标签 3、4：{data_units_existing} 个数据单元要都满净荷、少于 size {size_in_bytes} 要的 {data_units_the_size_asks_for} 个"
+                    ),
+                };
+            }
+            let mut content = content_of(&payloads);
+            content.resize(
+                usize::try_from(size_in_bytes).expect("size 装得进 usize"),
+                0,
+            );
+            content
+        }
+    };
     if u64::try_from(content_read_back.len()).expect("内容长度装得进 u64") != size_in_bytes {
         return ObservedFile::Undecodable {
             what: format!(
@@ -281,27 +349,100 @@ fn content_of_a_file_other_than_the_first(
     ObservedFile::Decoded(content_read_back)
 }
 
-/// 第一个文件那条 inode 记录里截断字段那两段的原样值：取记录写成盘上字节（`InodeRecord::to_bytes`）之后从核心层的截断字段起点
-/// （`singlefs_core::records::INODE_RECORD_TRUNCATION_FIELD_OFFSET`，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R1：
-/// 起点是 T、紧接着是 N_w，各 8 字节小端）起的两个小端 u64，不判合法性（模型比）。偏移只认核心层那一处定义，胶水不另写一份数；
-/// 仍从记录写成的字节里取、不读记录的字段：`to_bytes` 把字段写错位置时模型这一侧照样比得出来。
-fn observed_truncation_field_of_the_record(record: &InodeRecord) -> ObservedTruncationField {
-    let bytes = record.to_bytes();
-    let truncation_txg_offset_in_bytes = usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET)
-        .expect("截断字段的起点在 140 字节的 inode 记录里，装得进 usize");
-    let truncated_size_offset_in_bytes =
-        truncation_txg_offset_in_bytes + std::mem::size_of::<u64>();
-    let little_endian_u64_at = |offset_in_bytes: usize| {
-        u64::from_le_bytes(
-            bytes[offset_in_bytes..offset_in_bytes + std::mem::size_of::<u64>()]
-                .try_into()
-                .expect("截断字段两段各 8 字节都在 140 字节的 inode 记录里"),
-        )
-    };
-    ObservedTruncationField {
-        truncation_txg: ModelCheckpointTxg(little_endian_u64_at(truncation_txg_offset_in_bytes)),
-        size_in_bytes: little_endian_u64_at(truncated_size_offset_in_bytes),
+/// 截断观测优先从发布输出的 inode 容器原字节读取，偏移按字段表独立定义。
+/// 输出不带任何 inode 容器时只观察内存结果的字段，不调用实现的序列化器制造参照字节。
+fn observed_truncation_field_of_file_version(
+    output: &TransactionOutput,
+) -> Option<ObservedTruncationField> {
+    let record = output.inode_record.as_ref()?;
+    let containers: Vec<_> = output
+        .units
+        .iter()
+        .filter(|unit| matches!(unit.identity, TransactionUnit::InodeLeafContainer(_)))
+        .collect();
+    if containers.is_empty() {
+        return Some(ObservedTruncationField {
+            truncation_txg: model_txg(record.truncation_field.truncation_txg()),
+            size_in_bytes: record.truncation_field.truncated_size_in_bytes(),
+        });
     }
+    for container in containers {
+        let page = singlefs_checker::packed_unit_view(&container.bytes).ok()?;
+        if page.record_type != 2 || page.record_width < 136 {
+            return None;
+        }
+        for bytes in page.records {
+            if u64::from_le_bytes(bytes[..8].try_into().ok()?) == record.inode {
+                return Some(ObservedTruncationField {
+                    truncation_txg: ModelCheckpointTxg(u64::from_le_bytes(
+                        bytes[120..128].try_into().ok()?,
+                    )),
+                    size_in_bytes: u64::from_le_bytes(bytes[128..136].try_into().ok()?),
+                });
+            }
+        }
+    }
+    None
+}
+
+/// 这一版第一个文件之外每条 inode 记录（活着的与删除中的）里截断字段那两段（判决
+/// `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S5「截断字段按 inode 比」）：同第一个文件那一份
+/// （[`observed_truncation_field_of_file_version`]）优先从发布输出的 inode 容器原字节读，偏移按字段表独立定义（偏移 0 是号、120 是 T、128 是 N_w，
+/// 各 8 字节小端）；输出不带任何 inode 容器时只观察内存结果的字段。解不开的容器、记录宽不够的那一页不交（模型那一侧有它就判对不上）。
+fn observed_truncation_fields_of_the_inodes_other_than_the_first_of_file_version(
+    output: &TransactionOutput,
+) -> BTreeMap<u64, ObservedTruncationField> {
+    let containers: Vec<_> = output
+        .units
+        .iter()
+        .filter(|unit| matches!(unit.identity, TransactionUnit::InodeLeafContainer(_)))
+        .collect();
+    if containers.is_empty() {
+        return output
+            .inode_leaf_containers
+            .iter()
+            .flat_map(|container| container.contents.records.iter())
+            .filter(|record| record.inode != FIRST_INODE_NUMBER)
+            .map(|record| {
+                (
+                    record.inode,
+                    ObservedTruncationField {
+                        truncation_txg: model_txg(record.truncation_field.truncation_txg()),
+                        size_in_bytes: record.truncation_field.truncated_size_in_bytes(),
+                    },
+                )
+            })
+            .collect();
+    }
+    let little_endian_word_at = |bytes: &[u8], offset: usize| {
+        let mut word = [0u8; 8];
+        word.copy_from_slice(&bytes[offset..offset + 8]);
+        u64::from_le_bytes(word)
+    };
+    let mut fields = BTreeMap::new();
+    // 迭代上界：这一版交回的 inode 叶容器数乘每页的记录数；跨轮只往表里加；解不开的那一页跳过（见文档）。
+    for container in containers {
+        let Ok(page) = singlefs_checker::packed_unit_view(&container.bytes) else {
+            continue;
+        };
+        if page.record_type != 2 || page.record_width < 136 {
+            continue;
+        }
+        for bytes in page.records {
+            let inode = little_endian_word_at(&bytes, 0);
+            if inode == FIRST_INODE_NUMBER {
+                continue;
+            }
+            fields.insert(
+                inode,
+                ObservedTruncationField {
+                    truncation_txg: ModelCheckpointTxg(little_endian_word_at(&bytes, 120)),
+                    size_in_bytes: little_endian_word_at(&bytes, 128),
+                },
+            );
+        }
+    }
+    fields
 }
 
 /// 整理区域换成模型那一份（一个聚簇段：盘、起始槽、槽数）。
@@ -331,12 +472,19 @@ pub fn compaction_region_of_the_model(region: ModelCompactionRegion) -> Option<C
 pub fn observed_logged_compaction_intent(
     output: &TransactionOutput,
 ) -> Option<ModelCompactionIntent> {
-    live_compaction_intent_of_the_entries(&output.logged_operations).map(|(issued_txg, intent)| {
-        ModelCompactionIntent {
-            issued_txg: model_txg(issued_txg),
-            region: model_compaction_region(intent.region),
-            allocation_generation_at_issue: model_txg(intent.allocation_generation_at_issue),
-        }
+    let mut intents = output
+        .logged_operations
+        .iter()
+        .filter_map(|entry| match entry.operation {
+            LoggedOperation::Compaction(intent) => Some((entry.issued_txg, intent)),
+            LoggedOperation::Truncation(_) => None,
+        });
+    let live = intents.next();
+    assert!(intents.next().is_none(), "模型观测里活整理意图至多一条");
+    live.map(|(issued_txg, intent)| ModelCompactionIntent {
+        issued_txg: model_txg(issued_txg),
+        region: model_compaction_region(intent.region),
+        allocation_generation_at_issue: model_txg(intent.allocation_generation_at_issue),
     })
 }
 
@@ -365,7 +513,7 @@ pub fn user_visible_root_units_relocated_by_this_publish(
                 _ => return None,
             };
             relocated_keys
-                .contains(mapping_key_for_node(UNIT_CLASS_INDEX_NODE, entry.root).as_slice())
+                .contains(observed_node_mapping_key(UNIT_CLASS_INDEX_NODE, entry.root).as_slice())
                 .then_some(ModelUserVisibleRootUnit {
                     tree,
                     birth_txg: model_txg(entry.root.head.birth_txg),
@@ -429,11 +577,23 @@ pub fn observed_snapshot_state_of_file_version(
     }
 }
 
-/// 一条 deadlist 条目换成模型那一份：纪元与映射 key 的打头三段（类标签、出生树、出生 txg，`records::mapping_key_sort_key` 的前三段）。
-/// 映射 key 末段模型不比（[`ModelDeadlistEntry`] 的文档）。
+/// 模型观测用的节点身份：按映射 key 字段表编码，不调用实现的编码器。
+fn observed_node_mapping_key(class: u8, pointer: NodePointer) -> Vec<u8> {
+    let mut key = vec![class];
+    key.extend_from_slice(&pointer.head.birth_tree.0.to_le_bytes());
+    key.extend_from_slice(&pointer.head.birth_txg.0.to_le_bytes());
+    key.extend_from_slice(&pointer.instance.0.to_le_bytes());
+    key.extend_from_slice(&pointer.birth_sequence.0.to_le_bytes());
+    key.extend_from_slice(&[0, 0]);
+    key
+}
+
+/// 一条 deadlist 条目换成模型观测；直接读取 key 的类标签、出生树与出生 txg，末段模型不比。
 fn observed_deadlist_entry(entry: &DeadlistEntry) -> ModelDeadlistEntry {
-    let (unit_class, birth_tree, birth_txg, _instance, _tail) =
-        mapping_key_sort_key(&entry.mapping_key);
+    let key = &entry.mapping_key;
+    let unit_class = key[0];
+    let birth_tree = u64::from_le_bytes(key[1..9].try_into().expect("映射 key 出生树"));
+    let birth_txg = u64::from_le_bytes(key[9..17].try_into().expect("映射 key 出生代"));
     ModelDeadlistEntry {
         epoch: model_txg(entry.epoch),
         mapping_key_unit_class: unit_class,
@@ -474,7 +634,8 @@ pub fn observed_file_of_file_version(output: &TransactionOutput) -> ObservedFile
         }
         Some(record) => record.size,
     };
-    let payload_capacity = u64::try_from(data_unit_payload_capacity()).expect("净荷容量装得进 u64");
+    let payload_capacity = u64::try_from(crate::verification_read::data_payload_capacity())
+        .expect("净荷容量装得进 u64");
     let data_units_within_the_size = size_in_bytes.div_ceil(payload_capacity).max(1);
     let mut data_units: Vec<(u64, &[u8])> = output
         .units
@@ -503,9 +664,7 @@ pub fn observed_file_of_file_version(output: &TransactionOutput) -> ObservedFile
                 ),
             };
         }
-        match parse_data_unit(bytes)
-            .and_then(|header| data_unit_payload(bytes, header.declared_length))
-        {
+        match crate::verification_read::data_payload(bytes) {
             Ok(payload) => content.extend_from_slice(payload),
             Err(error) => {
                 return ObservedFile::Undecodable {
@@ -595,15 +754,22 @@ fn instance_table_rows_of_units(
         let Some(bytes) = pages.get(&page_index) else {
             return Err(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits);
         };
-        let Some(page) = InstanceTablePage::parse(bytes, page_index) else {
+        let Some(page) = crate::verification_read::instance_table_page(bytes, page_index.0) else {
             return Err(InstanceTableNotDecodedFromTheUnits::PageUndecodable(
                 page_index,
             ));
         };
         rows.extend(page.rows.iter().map(model_instance_row));
-        match page.chain {
-            InstanceTableChainRecord::LastPage => return Ok(rows),
-            InstanceTableChainRecord::NextPage(_) => page_index = page_index.next(),
+        match page.next {
+            None => return Ok(rows),
+            Some(_) => {
+                page_index = InstanceTablePageIndex(
+                    page_index
+                        .0
+                        .checked_add(1)
+                        .ok_or(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits)?,
+                )
+            }
         }
     }
     Err(InstanceTableNotDecodedFromTheUnits::ChainedPageNotInTheUnits)
@@ -819,6 +985,7 @@ pub fn observed_root_of_version_without_file(
         logged_compaction_intent: None,
         first_file_record_truncation_field: None,
         inodes_other_than_the_first: BTreeMap::new(),
+        truncation_fields_of_the_inodes_other_than_the_first: BTreeMap::new(),
     }
 }
 
@@ -928,6 +1095,7 @@ fn observed_zero_unit_publish_carried_from_the_version_before(
         logged_compaction_intent: None,
         first_file_record_truncation_field: None,
         inodes_other_than_the_first: BTreeMap::new(),
+        truncation_fields_of_the_inodes_other_than_the_first: BTreeMap::new(),
     };
     let carried_on =
         (instance_table_pointer_carried && allocation_record_tree_root_carried).then(|| {
@@ -1117,21 +1285,22 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
     }
 }
 
-/// 改 size 被拒说的是哪条理由（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K12）。
+/// 改 size 与按偏移写被拒说的是哪条理由（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K12；
+/// `research/prompts/m4-partial-write-r1-main-verification.md` 第二节 R3）。
 #[must_use]
 pub fn refusal_reason_of_truncation_refusal(refusal: TruncationRefusal) -> ObservedRefusalReason {
     match refusal {
         TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows { .. } => {
             explained(ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow)
         }
-        // 第一版只有第一个文件写数据，别的 inode 改成别的 size 在任何写之前拒（调度记录「截甲交回」那一行第 ① 处，主 agent 定）。
-        TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
-            ..
-        } => explained(ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile),
-        // 执行器只点名树里活着的记录（第一个文件，或删完之后建的 inode）；尾单元的字节在内存池里都读得出；截断条目只经会话的走空续做，
-        // 走空只在有一条对得上的条目时调：健康的内存盘上这几种都不该出现，模型里没有它们的理由。
+        // 读—改—写读不回旧单元（D4（校验和位置） 已定项 4）：模型有这条理由、健康的内存盘上从不要求它（每个单元都读得回），
+        // 实现在健康的历史里拒在这一格，对拍报「模型说该成、实现拒了」，不归「说不出理由」。
+        TruncationRefusal::OldDataUnitToRewriteNotReadBack { .. } => {
+            explained(ModelRefusalReason::OldDataUnitToRewriteNotReadBack)
+        }
+        // 执行器只点名树里活着的记录（任意活 inode 都能缩短与变长，判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md`
+        // 第二节 S6）；截断条目只经会话的走空续做，走空只在有一条对得上的条目时调：健康的内存盘上这几种都不该出现，模型里没有它们的理由。
         TruncationRefusal::InodeIsNotALiveRecord { .. }
-        | TruncationRefusal::TailDataUnitBytesNotInTheVersion { .. }
         | TruncationRefusal::TruncationIntentDoesNotNameTheLiveRecord { .. }
         | TruncationRefusal::NoTruncationIntentToContinue => ObservedRefusalReason::Unexplained,
     }
@@ -1280,6 +1449,7 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
+        | MountError::InstanceTableUnreadable
         | MountError::Acquisition(_)
         | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
@@ -1333,6 +1503,7 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
+        | MountError::InstanceTableUnreadable
         | MountError::Acquisition(_)
         | MountError::Publish(_)
         | MountError::RaiseFloorSequencePublishFailed(_)
@@ -1450,6 +1621,7 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
+        | MountError::InstanceTableUnreadable
         | MountError::Acquisition(_)
         | MountError::Publish(_)
         | MountError::RaiseFloorSequencePublishFailed(_)
@@ -1519,6 +1691,58 @@ pub fn observed_read_back_after_a_crash(report: &RecoveryReport) -> ObservedRead
     }
 }
 
+/// 攒批的会话报的一次排空待发的发布与模型比（判决 `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「返回即落盘」那一格：
+/// 模型对拍的点只放在会话报告的发布之后，待发期间模型里「盘上读得到」的仍是上一次发布的那一份）：`version` 是这次发布发成的那一版
+/// （会话的现行那一版），`first_file_read_back` 是这一刻盘上恢复读出的第一个文件。比三样：模型里每个 inode 号在这一版的 inode 树里、size 是它的内容长、
+/// 不在删除中；inode 号水位相同；读出的第一个文件与模型里那一份逐字节相同。
+///
+/// # Errors
+/// 对不上的那一样，写明模型里是什么、实现那一版是什么。
+pub fn compare_a_publish_of_the_pending_changes_with_the_model(
+    version: &TransactionOutput,
+    first_file_read_back: Option<&[u8]>,
+    model: &crate::model::ModelOfThePendingChanges,
+) -> Result<(), String> {
+    let published = model.published();
+    for (inode, content) in &published.contents_by_inode {
+        let Some(record) = version.inode_record_of(singlefs_core::address::InodeNumber(*inode))
+        else {
+            return Err(format!(
+                "模型里发布之后有 inode {inode}（{} 字节），实现那一版（txg {}）的 inode 树里没有它",
+                content.len(),
+                version.root.checkpoint_txg.0
+            ));
+        };
+        let size_in_the_model = u64::try_from(content.len()).expect("内容长度装得进 u64");
+        if record.size != size_in_the_model || record.nlink == NLINK_OF_AN_INODE_BEING_DELETED {
+            return Err(format!(
+                "inode {inode}：模型里 size {size_in_the_model}、活着，实现那一版（txg {}）记 size {}、nlink {}",
+                version.root.checkpoint_txg.0, record.size, record.nlink
+            ));
+        }
+    }
+    if version.inode_number_watermark() != published.inode_number_watermark {
+        return Err(format!(
+            "inode 号水位：模型 {}，实现那一版（txg {}）{}",
+            published.inode_number_watermark,
+            version.root.checkpoint_txg.0,
+            version.inode_number_watermark()
+        ));
+    }
+    let first_file_in_the_model = published
+        .contents_by_inode
+        .get(&FIRST_INODE_NUMBER)
+        .map(Vec::as_slice);
+    if first_file_read_back != first_file_in_the_model {
+        return Err(format!(
+            "恢复读出的第一个文件 {:?} 字节，模型里发布之后是 {:?} 字节（内容不同或一边没有）",
+            first_file_read_back.map(<[u8]>::len),
+            first_file_in_the_model.map(<[u8]>::len)
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1526,10 +1750,10 @@ mod tests {
         IdealModel, ModelDeviceIdentity, ModelDisagreementAspect, ModelPoolGeometry,
         ObservedOutcome,
     };
-    use singlefs_core::address::{DeviceIdentity, SlotNumber};
+    use singlefs_core::address::{DataUnitIndexInFile, DeviceIdentity, InodeNumber, SlotNumber};
     use singlefs_core::allocator::CommitGeneratedDeviceAnswer;
     use singlefs_core::mount::RollbackTarget;
-    use singlefs_core::transaction::TransactionUnit;
+    use singlefs_core::transaction::{OldDataUnitReadBackFailure, TransactionUnit};
     use singlefs_format::{SLOT_BYTES, UNIT_AREA_START_SLOT};
 
     fn every_placement_refusal() -> [PlacementRefusal; 4] {
@@ -1898,16 +2122,50 @@ mod tests {
         );
     }
 
-    /// 改 size 被拒（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K12，调度记录「截甲交回」第 ① 处）：N 按整单元取整溢出与
-    /// 第一个文件之外的 inode 改成别的 size 各映射到模型自己那一条理由、互不相同；别的几种（健康的内存盘上走不到）是说不清的理由。
+    /// 改 size 被拒（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1、K12）：N 按整单元取整溢出映射到模型自己那一条理由；
+    /// 别的几种（健康的内存盘上走不到）是说不清的理由。第一个文件之外的 inode 改 size 不再有拒（判决
+    /// `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S6 删了那个成员）。
+    /// 读—改—写读不回要重写的旧单元（部分写与截断、变长重写尾单元同一个成员，判决 `research/prompts/m4-partial-write-r1-main-verification.md`
+    /// 第二节 R3）：两样读回失败都映射到模型「读不回旧单元」那一条理由，不归「说不出理由」。判别力：映射改回「说不出理由」时这一条红
+    /// （`crates/mutations.tsv` 一行）。
+    #[test]
+    fn an_old_data_unit_not_read_back_maps_to_the_models_reason_for_it_and_not_to_an_unexplained_one(
+    ) {
+        let mapped: Vec<ObservedRefusalReason> = [
+            OldDataUnitReadBackFailure::UnreadableAtTheHintsAndAtTheMappedLocations,
+            OldDataUnitReadBackFailure::UnreadableAtTheHintsAndMissingFromTheMapping,
+            OldDataUnitReadBackFailure::DisagreesWithTheLookupPath {
+                detail: "单元头解不开",
+            },
+        ]
+        .into_iter()
+        .map(|read_back| {
+            refusal_reason_of_publish_error(&PublishError::TruncationRefused(
+                TruncationRefusal::OldDataUnitToRewriteNotReadBack {
+                    inode: InodeNumber(7),
+                    unit: DataUnitIndexInFile(2),
+                    read_back,
+                },
+            ))
+        })
+        .collect();
+        assert_eq!(
+            mapped,
+            vec![
+                ObservedRefusalReason::Explained(
+                    ModelRefusalReason::OldDataUnitToRewriteNotReadBack
+                );
+                3
+            ],
+            "三种读回失败都是「读不回旧单元」那一条理由"
+        );
+    }
+
     #[test]
     fn each_truncation_refusal_the_model_has_a_reason_for_maps_to_its_own_reason() {
         let mapped: Vec<ObservedRefusalReason> = [
             TruncationRefusal::TargetSizeRoundedUpToAWholeDataUnitOverflows {
                 target_size_in_bytes: u64::MAX,
-            },
-            TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
-                inode: 2,
             },
             TruncationRefusal::InodeIsNotALiveRecord { inode: 1 },
             TruncationRefusal::NoTruncationIntentToContinue,
@@ -1920,9 +2178,6 @@ mod tests {
             vec![
                 ObservedRefusalReason::Explained(
                     ModelRefusalReason::TruncationSizeWhoseWholeDataUnitsOverflow
-                ),
-                ObservedRefusalReason::Explained(
-                    ModelRefusalReason::SizeChangeOfAnInodeOtherThanTheFirstFile
                 ),
                 ObservedRefusalReason::Unexplained,
                 ObservedRefusalReason::Unexplained,

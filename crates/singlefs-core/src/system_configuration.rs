@@ -16,7 +16,7 @@ use singlefs_format::{
 use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::checksum::{wide_checksum_field_holds, wide_checksum_with_field_zeroed};
-use crate::journal::slot_after_the_journal_ring;
+use crate::journal::{slot_after_the_journal_ring, JournalBytesToWrite};
 use crate::root_ring::{RootRingSlotsPerRegion, RootRingSlotsPerRegionOutOfRange};
 
 pub const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
@@ -56,6 +56,10 @@ const ROOT_RING_REGION_COUNT_OFFSET: u64 = 361;
 /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切，
 /// 一个偏移只有这一处定义。
 const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
+/// 几何段里「根环区域步长 P」那 4 字节与紧随其后的「根环 chunk」那 4 字节（字段表 `layout/01-first-txn.md` 一：S 362 之后是 P 363、
+/// chunk 367）。写侧 [`SystemConfiguration::to_slot`] 写它们之前断言位置、读侧 [`root_ring_region_stride_fields_recorded_in_the_slot`] 按它们切。
+const ROOT_RING_PRIME_STEP_OFFSET: u64 = 363;
+const ROOT_RING_CHUNK_BYTES_OFFSET: u64 = 367;
 /// 几何段里「journal 环起点」那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。写侧写它之前断言位置、读侧按它切。
 const JOURNAL_RING_START_SLOT_OFFSET: u64 = 325;
 /// 几何段里「journal 在飞记录数上限」那 4 字节、「journal 最坏占用」那 8 字节、「安全系数 F」那 4 字节
@@ -133,6 +137,30 @@ pub fn journal_in_flight_record_limit_fits_its_four_byte_field(journal_ring_byte
 #[must_use]
 pub fn root_ring_region_count_recorded_in_the_slot(slot: &[u8]) -> u8 {
     slot[usize::try_from(ROOT_RING_REGION_COUNT_OFFSET).expect("字段表里的偏移装得进 usize")]
+}
+
+/// 一槽系统配置里记着的根环区域步长 P 与 chunk（偏移 363、367 各 4 字节，小端）。只切字节、不判值：core 读写根环按格式常量走
+/// （`root_ring::region_start`），读者择系统配置时拿这两个字段与第一版常量比，不等整池拒（`recovery` 的
+/// `system_configuration_values_this_reader_accepts`；D22（单元原子性怎么合成） 已定项 16 第 1 句、I-7.13）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RootRingRegionStrideFieldsRecordedInTheSlot {
+    pub prime_step: u32,
+    pub chunk_bytes: u32,
+}
+
+/// 见 [`RootRingRegionStrideFieldsRecordedInTheSlot`]。
+///
+/// # Panics
+/// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
+#[must_use]
+pub fn root_ring_region_stride_fields_recorded_in_the_slot(
+    slot: &[u8],
+) -> RootRingRegionStrideFieldsRecordedInTheSlot {
+    let field_offset = |offset: u64| usize::try_from(offset).expect("字段表里的偏移装得进 usize");
+    RootRingRegionStrideFieldsRecordedInTheSlot {
+        prime_step: ByteReader::at(slot, field_offset(ROOT_RING_PRIME_STEP_OFFSET)).get_u32(),
+        chunk_bytes: ByteReader::at(slot, field_offset(ROOT_RING_CHUNK_BYTES_OFFSET)).get_u32(),
+    }
 }
 
 /// magic 与整槽校验和两关都过的槽自述的 fsid（偏移 102 起 16 字节）；两关有一关不过交回 `None`。不看 incompat 位与别的字段：
@@ -231,8 +259,9 @@ pub struct SystemImmutableSizes {
     pub fixed_structure_slot_spacing: u32,
     /// journal 环长（mkfs 参数，默认 768 MiB，环 ≤ 容量 / 4，D23（journal 的角色与格式） 已定项 19）。
     pub journal_ring_bytes: u64,
-    /// 每区槽数 S（mkfs 参数，第一版写 [`RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM`] = 8，
-    /// 挂载时判 4..16 区间，D22（单元原子性怎么合成） 已定项 1 的字段表）。环几何的每一处都读它，
+    /// 每区槽数 S（mkfs 参数：第一版 mkfs 的默认值按槽距算，[`RootRingSlotsPerRegion::first_version_make_filesystem_default_for_the_slot_spacing`]；
+    /// 显式给 S 的建池入口常取 [`RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM`] = 8）。挂载时判 4..16 区间
+    /// （D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格）与 S × 槽距 ≤ P × chunk（已定项 16 第 1 句）。环几何的每一处都读它，
     /// 不读编译期常量（C506（每区槽数 S 写成编译期常量，条文说它住系统配置））。
     pub root_ring_slots_per_region: RootRingSlotsPerRegion,
 }
@@ -385,6 +414,92 @@ impl SystemRuntimeConfiguration {
     #[must_use]
     pub fn compaction_watermarks(self) -> [u64; COMPACTION_WATERMARK_COUNT] {
         [COMPACTION_WATERMARK_BUILT_IN_DEFAULT; COMPACTION_WATERMARK_COUNT]
+    }
+}
+
+/// 发布触发的两个阈值在这次挂载里的有效值（D16（发布语义） 已定项 2、已定项 5）：挂载时求值一次、会话期间不变
+/// （`.claude/rules/fs-design.md` 五条硬要求第 5 条：分支变量是这两个阈值，`now` 与待发的 journal 字节是被比较的量）。
+///
+/// 时间那一支取系统运行配置里的 `T_time`（毫秒）；脏量那一支照已定项 5 夹一次：有效 `T_dirty` = min(系统运行配置里的 `T_dirty`, 环长 ÷ F)，
+/// 两边都是 journal 字节（脏量按待发改动要写的 journal 字节算，用户 2026-10-26 定）。挂载选项通道还没有（C422），产品路径只有
+/// [`PublishTriggerThresholds::of_the_mount`] 这一个来源；只供测试的那个来源（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支能被测试强制进入）
+/// 在默认关的 cargo 特性 `test-only-publish-thresholds` 后面，发布构建里调不到（判决 `research/prompts/m4-publish-trigger-r1-main-verification.md`
+/// 第二节「只供测试的开关」那一格）。只供测试的那个来源给的是夹之前的那个值，夹照常做（攻方 P6-乙：给有效值就跳过夹的那条分支）。
+///
+/// 发布构建里够不着那个来源，按编译期判：不开特性编本包时下面这一段必须编不过；开着特性编时它照常编得过、跑得对（两种编法各判一半，
+/// `cargo test -p singlefs-core --doc` 单编本包时特性关着，跑的是前一半）。
+///
+#[cfg_attr(not(feature = "test-only-publish-thresholds"), doc = "```compile_fail")]
+#[cfg_attr(feature = "test-only-publish-thresholds", doc = "```")]
+/// use singlefs_core::system_configuration::PublishTriggerThresholds;
+/// let thresholds = PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring(
+///     std::time::Duration::from_millis(3),
+///     8192,
+///     6 << 20,
+/// );
+/// assert_eq!(thresholds.time_threshold(), std::time::Duration::from_millis(3));
+/// assert_eq!(thresholds.dirty_threshold().0, 8192);
+/// ```
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PublishTriggerThresholds {
+    time_threshold: std::time::Duration,
+    dirty_threshold: JournalBytesToWrite,
+}
+
+impl PublishTriggerThresholds {
+    /// 产品路径的有效值：系统运行配置里的两个值（`T_time` 5000 ms、`T_dirty` 2 GiB），`T_dirty` 按这个池的环长夹。
+    #[must_use]
+    pub fn of_the_mount(journal_ring_bytes: u64) -> Self {
+        let runtime = SystemRuntimeConfiguration;
+        Self::clamped_by_the_journal_ring(
+            std::time::Duration::from_millis(u64::from(runtime.time_threshold_milliseconds())),
+            runtime.dirty_threshold_bytes(),
+            journal_ring_bytes,
+        )
+    }
+
+    /// 只供测试的来源：把两个阈值压到测试的尺度（几毫秒、几条记录），无视 5 s 与 256 MiB 的判据强制进入时间那一支或脏量那一支。
+    /// `dirty_threshold_before_the_clamp` 是夹之前的值（与系统运行配置里那个字段同一个位置），有效值照样 min(它, 环长 ÷ F)。
+    /// 只在默认关的 cargo 特性 `test-only-publish-thresholds` 打开时编进来（harness 档的 dev 依赖打开它）：不开特性编的库里没有这个名字
+    /// （[`PublishTriggerThresholds`] 文档里那一段在那时编不过）。
+    #[cfg(feature = "test-only-publish-thresholds")]
+    #[must_use]
+    pub fn of_test_only_values_clamped_by_the_journal_ring(
+        time_threshold: std::time::Duration,
+        dirty_threshold_before_the_clamp: u64,
+        journal_ring_bytes: u64,
+    ) -> Self {
+        Self::clamped_by_the_journal_ring(
+            time_threshold,
+            dirty_threshold_before_the_clamp,
+            journal_ring_bytes,
+        )
+    }
+
+    /// 已定项 5 的夹：有效 `T_dirty` = min(夹之前的值, 环长 ÷ F)。
+    fn clamped_by_the_journal_ring(
+        time_threshold: std::time::Duration,
+        dirty_threshold_before_the_clamp: u64,
+        journal_ring_bytes: u64,
+    ) -> Self {
+        Self {
+            time_threshold,
+            dirty_threshold: JournalBytesToWrite(
+                dirty_threshold_before_the_clamp.min(journal_ring_bytes / JOURNAL_SAFETY_FACTOR),
+            ),
+        }
+    }
+
+    /// 时间那一支的阈值（`T_time`）。
+    #[must_use]
+    pub fn time_threshold(self) -> std::time::Duration {
+        self.time_threshold
+    }
+
+    /// 脏量那一支的有效阈值（夹过的 `T_dirty`，journal 字节）。
+    #[must_use]
+    pub fn dirty_threshold(self) -> JournalBytesToWrite {
+        self.dirty_threshold
     }
 }
 
@@ -590,7 +705,9 @@ impl SystemConfiguration {
                     .root_ring_slots_per_region
                     .to_system_configuration_field(),
             );
+            writer.assert_position(ROOT_RING_PRIME_STEP_OFFSET, "根环区域步长 P");
             writer.put_u32(u32::try_from(ROOT_RING_PRIME_STEP).expect("P"));
+            writer.assert_position(ROOT_RING_CHUNK_BYTES_OFFSET, "根环 chunk");
             writer.put_u32(u32::try_from(ROOT_RING_CHUNK_BYTES).expect("chunk"));
             writer.assert_position(ROOT_RING_BASE_SLOT_OFFSET, "根环起点");
             writer.put_u64(self.immutable.root_ring_base_slot.0);
@@ -638,7 +755,7 @@ impl SystemConfiguration {
     /// [`SystemConfigurationSlotRefusal::IncompatBitsNotRecognized`]（这一槽同样不可择，但它是一份完整的系统配置，布局不认识）；
     /// 布局认得、节点大小那 4 字节不等于格式常量 `NODE_BYTES` 是
     /// [`SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant`]（当这一槽自证不过，与整槽校验和不过同一个处置）；
-    /// 解开之后按 D22 已定项 1 的字段表判每区槽数 S 的区间，越界是
+    /// 解开之后按 D22 已定项 2 参数表「每区槽数 S」那一格判 S 的区间，越界是
     /// [`SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange`]（整池拒绝挂载）。
     ///
     /// # Errors

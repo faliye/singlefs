@@ -30,6 +30,8 @@ pub mod reference_filesystem_translation;
 pub mod scenario;
 pub mod segments;
 pub mod sha256;
+pub mod temporary_files;
+mod verification_read;
 
 /// 一条录制流里能出现的操作种类，封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -383,6 +385,15 @@ impl<Inner: BlockDevice> RecordingBlockDevice<Inner> {
     pub fn render_stream(&self) -> String {
         self.stream.render()
     }
+
+    /// 普通读与两种专用读共用的一份记账：开了记读的流记下这一段读。
+    fn record_a_read_of(&self, offset: DeviceOffsetInBytes, buffer: &[u8]) {
+        self.stream.push_read_range(RecordedReadRange {
+            device: self.device,
+            offset,
+            length: u64::try_from(buffer.len()).expect("读长度装得进 u64"),
+        });
+    }
 }
 
 /// 把一批操作渲染成流文本，末行 `count=N`。
@@ -431,12 +442,43 @@ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
         offset: DeviceOffsetInBytes,
         buffer: &mut [u8],
     ) -> Result<(), BlockDeviceError> {
-        self.stream.push_read_range(RecordedReadRange {
-            device: self.device,
-            offset,
-            length: u64::try_from(buffer.len()).expect("读长度装得进 u64"),
-        });
+        self.record_a_read_of(offset, buffer);
         self.inner.read_at(offset, buffer)
+    }
+
+    /// 照普通读记这一段，交给里面那块盘的重读（里面那块盘可能是记着这次挂载读过什么的那一层，它在这里绕过记下的那一份）。
+    fn reread_at_after_a_bad_read(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.record_a_read_of(offset, buffer);
+        self.inner.reread_at_after_a_bad_read(offset, buffer)
+    }
+
+    /// 照普通读记这一段，交给里面那块盘的这一刻读盘。
+    fn read_at_straight_from_the_disk(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.record_a_read_of(offset, buffer);
+        self.inner.read_at_straight_from_the_disk(offset, buffer)
+    }
+
+    /// 通知不是读、不改盘：不进流、不记读，原样转给里面那块盘。
+    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
+        self.inner.keep_the_self_verified_reread(offset, bytes);
+    }
+
+    /// 通知不是读、不改盘：不进流、不记读，原样转给里面那块盘。
+    fn note_the_read_failing_self_verification_and_forget_its_bytes(
+        &self,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: u64,
+    ) {
+        self.inner
+            .note_the_read_failing_self_verification_and_forget_its_bytes(offset, length_in_bytes);
     }
 
     fn write_at(

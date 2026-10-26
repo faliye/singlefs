@@ -35,7 +35,8 @@ impl DecisionWidth {
     }
 }
 
-/// 按位的 CRC-32C（Castagnoli，反射，初值与输出异或全 1）——故意不用查表：与实现那份 slicing-by-8 独立。
+/// 按位的 CRC-32C（Castagnoli，反射，初值与输出异或全 1）——故意不用查表：与实现那份独立（实现在 x86_64 上查到 SSE4.2 走硬件
+/// `crc32` 指令，别处走 slicing-by-8；这里两样都不用）。
 #[must_use]
 pub fn crc32_castagnoli_bitwise(bytes: &[u8]) -> u32 {
     const POLYNOMIAL_REFLECTED: u32 = 0x82F6_3B78;
@@ -55,7 +56,8 @@ pub fn crc32_castagnoli_bitwise(bytes: &[u8]) -> u32 {
 
 /// 查表的 CRC-32C（反射多项式 0x82F63B78，一次一个字节、一张 256 项的表）：与按位那一份逐字节同值
 /// （单测 `table_crc32c_agrees_with_the_bitwise_crc32c_on_every_prefix_length` 对拍），
-/// 与实现那份 slicing-by-8 仍是两种写法；池级 checker 在崩溃点重放的每个崩溃状态上要算几十个单元，按位算太慢。
+/// 与实现那份仍是不同写法（实现在 x86_64 上查到 SSE4.2 走硬件 `crc32` 指令，别处走 slicing-by-8）；池级 checker 在崩溃点重放的
+/// 每个崩溃状态上要算几十个单元，按位算太慢。
 #[must_use]
 pub fn crc32_castagnoli_table(bytes: &[u8]) -> u32 {
     static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
@@ -122,7 +124,7 @@ pub enum Verdict {
     /// （用户 2026-10-20 定 C663「R 读并整池拒」）：[`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
     RegionCountPastTheRegionDeviceFields,
     /// 系统配置自述的每区槽数 S（偏移 362 那一字节）落在格式承诺的区间之外
-    /// （`singlefs_format::ROOT_RING_SLOTS_PER_REGION_MINIMUM`..`_MAXIMUM`，D22（单元原子性怎么合成） 已定项 1 的字段表）：
+    /// （`singlefs_format::ROOT_RING_SLOTS_PER_REGION_MINIMUM`..`_MAXIMUM`，D22（单元原子性怎么合成） 已定项 2 参数表「每区槽数 S」那一格）：
     /// S 是**盘上读来的一字节**，可以是 0..255 里的任何一个，而根环的每一处走读都按它算
     /// （`image::root_slot_positions` 枚举 R × S 个槽、`walk` 按 R × S 算环长）。
     /// 不夹到区间里往下走（那是按一个池里根本不存在的几何走读，少读或多读几个槽而没人说），
@@ -139,9 +141,15 @@ pub enum Verdict {
     /// R 与 3 不等归这一版读者不收的值；0 与大于 3 的两头各报自己的成员（[`Self::RegionCountZero`]、
     /// [`Self::RegionCountPastTheRegionDeviceFields`]），同一个处置。
     RegionCountBelowTheFirstVersionConstant,
-    /// 系统配置自述的根环几何（基槽、区域步长 × 区块字节、槽距）算出的根槽偏移装不进 u64：几样都是盘上读来的数，
-    /// 坏盘上任意大，`image::root_slot_positions` 的乘加会溢出；这一槽不可择，不往下按它枚举槽。
-    RootRingSlotOffsetOverflowsTheOffsetSpace,
+    /// 系统配置偏移 363 自述的根环区域步长 P 不是第一版的格式常量 `ROOT_RING_PRIME_STEP`（3，D22（单元原子性怎么合成） 已定项 16
+    /// 第 1 句、I-7.13，用户 2026-10-22 定）：实现按常量放区域，checker 也按常量放（`image::root_slot_positions`），字段与常量不等时
+    /// 写这一槽的写者放的是另一个环。这一版读者不收的值：[`crate::image::value_refused_by_this_reader`] 认它，整池不作保。
+    RootRingPrimeStepNotTheFirstVersionConstant,
+    /// 系统配置偏移 367 自述的根环 chunk 不是第一版的格式常量 `ROOT_RING_CHUNK_BYTES`（1 MiB），同一句条款、同一个处置。
+    RootRingChunkBytesNotTheFirstVersionConstant,
+    /// P 与 chunk 都是第一版常量，而 S × 固定结构槽距大于区域间距 P × chunk（3 MiB）：一个区域的最后几槽落进下一个区域
+    /// （D22（单元原子性怎么合成） 已定项 16 第 1 句「写 ≤ 收」、I-7.13）。同一个处置。
+    RootRingRegionLongerThanTheRegionStride,
     /// 单元头或系统配置槽偏移 4 那 2 字节格式版本不是这一版 checker 读得了的那一版
     /// （`UNIT_FORMAT_VERSION_THIS_CHECKER_READS`、`SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS`）：
     /// 版本号定的是后面每个字段按哪张表读，不认得就不按今天的表往下解。
@@ -210,7 +218,26 @@ pub struct SystemConfigurationView {
     /// （[`image::judge_system_configuration_slot_bytes_past_the_field_table_are_zero`]）。
     pub first_non_zero_byte_past_the_field_table:
         Option<FirstNonZeroByteInTheSystemConfigurationSlot>,
+    /// 自举头「写入者身份 20」里实现标识那 16 字节（fsid 之后，D22（单元原子性怎么合成） 已定项 9）是不是全零：I-1.5（系统配置记管道身份）
+    /// 判它。只记全零与否、不带那 16 字节原样：[`image::SystemConfigurationSlotReading::Usable`] 带着整份视图，宽字段会让那个成员
+    /// 越过 clippy 的 `large_enum_variant` 线（同 [`FirstNonZeroByteInTheSystemConfigurationSlot`] 取 u16 偏移的理由）。
+    pub writer_implementation_identifier: WriterImplementationIdentifier,
 }
+
+/// 系统配置自举头里实现标识那 16 字节读出来的样子（D22（单元原子性怎么合成） 已定项 9：16 字节 ASCII 零补齐，第一版写 `singlefs-rs`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WriterImplementationIdentifier {
+    /// 16 字节全零：没记下是哪条管道写的，I-1.5 判红。
+    AllZero,
+    /// 至少一个字节非零。
+    Written,
+}
+
+/// 实现标识那 16 字节在系统配置槽里的偏移：紧跟 fsid 16（D22（单元原子性怎么合成） 已定项 9 的字段表）。
+const SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_OFFSET: usize =
+    SYSTEM_CONFIGURATION_FSID_OFFSET + 16;
+/// 实现标识的字节数（写入者身份 20 = 实现标识 16 + 版本 4）。
+const SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_BYTES: usize = 16;
 
 /// 系统配置槽字段表之后那一段里第一个非 0 的字节：在槽里的偏移与它的值。偏移取 u16（槽 4096 字节装得下）：
 /// [`image::SystemConfigurationSlotReading::Usable`] 带着整份视图，宽一点的偏移会让那个成员比别的成员大出 clippy 的
@@ -283,6 +310,11 @@ const ROOT_CHECKSUM_OFFSET: usize = 138;
 const ROOT_FLAGS_OFFSET: usize = 20;
 /// 根记录 flags 位 0 = 卸载记号（D22（单元原子性怎么合成） 已定项 7）；其余位第一版恒 0、非 0 拒收（已定项 17）。
 const ROOT_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
+/// 根记录里回收门槛 t 8 字节与钉槽 p 1 字节的偏移（C773（读坏与全零根槽的回收门槛钉只在内存里），根环三方第二轮正推 Y4.2 的摆法）：
+/// 自证校验和 32 在 138 之后是实例表指针、中央映射树根指针、分配记录树根指针三条 86，到 428 为止，t 接在那里、p 接在 t 后面。
+/// checker 自己走字段表推，不借实现那边的写者。
+const ROOT_RECLAIM_THRESHOLD_OFFSET: usize = ROOT_CHECKSUM_OFFSET + 32 + 3 * 86;
+const ROOT_PINNED_RING_SLOT_OFFSET: usize = ROOT_RECLAIM_THRESHOLD_OFFSET + 8;
 const UNIT_HEADER_CHECKSUM_OFFSET: usize = 10;
 /// 格式版本那 2 字节的偏移：单元头共同前缀与系统配置自举头都是紧跟 magic 4（D18（块里携带什么信息） 已定项 7 的共同前缀表；
 /// D22（单元原子性怎么合成） 已定项 9 的字段表）。
@@ -311,6 +343,11 @@ pub(crate) fn read_u32(bytes: &[u8], offset: usize) -> u32 {
 }
 pub(crate) fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+}
+/// 码 1 数据单元的整单元宽（格式常量 `DATA_UNIT_BYTES` 换成切片下标用的 usize）。住在 crate 根、不住在 `walk`：遍历式与扫描式两个方向
+/// 都读整单元，共享的只许是格式解析与常量（D13（验证路线） 已定项 12；C410（checker 两个方向共享什么没有检查） 用户 2026-10-26 定的「搬进 lib.rs」）。
+pub(crate) fn data_unit_bytes() -> usize {
+    usize::try_from(DATA_UNIT_BYTES).expect("格式常量 DATA_UNIT_BYTES 是 32768，装得进 usize")
 }
 
 /// 判一个系统配置槽（4096 字节）：magic、整槽校验和、格式版本、incompat 位、节点大小、加密类型。
@@ -386,6 +423,17 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
                 value,
             },
         ),
+        writer_implementation_identifier: if slot
+            [SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_OFFSET
+                ..SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_OFFSET
+                    + SYSTEM_CONFIGURATION_WRITER_IMPLEMENTATION_IDENTIFIER_BYTES]
+            .iter()
+            .all(|byte| *byte == 0)
+        {
+            WriterImplementationIdentifier::AllZero
+        } else {
+            WriterImplementationIdentifier::Written
+        },
     })
 }
 
@@ -411,9 +459,13 @@ pub struct RootView {
     pub tree_identifier_watermark: u64,
     pub rollback_floor: u64,
     pub unmount_marker: UnmountMarkerView,
-    /// 457 字节记录本身（含校验和字段），三个区域比对用。
+    /// 回收门槛 t（C773（读坏与全零根槽的回收门槛钉只在内存里），用户 2026-10-20 定）：写者写的那一份，I-7.18（根记录的回收门槛等于现算的门槛） 拿它求等。
+    pub reclaim_threshold: u64,
+    /// 钉槽 p 那 1 字节原样（255 = 没有钉着的槽，别的值是钉值 `3·槽 + 区域`）：I-7.18 并进现算、I-7.19（钉着的槽不住本实例写的根） 还原成槽。
+    pub pinned_ring_slot: u8,
+    /// 466 字节记录本身（含校验和字段），三个区域比对用。
     pub record_bytes: Vec<u8>,
-    /// 根记录之后到槽宽那一段（[`ROOT_RECORD_BYTES`]（457）起到读进来的槽宽）里第一个非 0 的字节；整段全 0 时是 None。
+    /// 根记录之后到槽宽那一段（[`ROOT_RECORD_BYTES`]（466）起到读进来的槽宽）里第一个非 0 的字节；整段全 0 时是 None。
     /// 第一版写 0（用户 2026-10-20 定 C728「恒 0，由 checker 判」），池级 checker 按 I-2.4 判
     /// （[`image::judge_root_slot_bytes_past_the_record_are_zero`]）。
     pub first_non_zero_byte_past_the_record: Option<FirstNonZeroByteInTheRootSlot>,
@@ -424,7 +476,7 @@ pub fn check_root_slot(
     slot: &[u8],
     expected_filesystem_identifier: &[u8; 16],
 ) -> Result<RootView, Verdict> {
-    let record_bytes = usize::try_from(ROOT_RECORD_BYTES).expect("457");
+    let record_bytes = usize::try_from(ROOT_RECORD_BYTES).expect("466");
     if slot.len() < record_bytes {
         return Err(Verdict::TooShort);
     }
@@ -452,6 +504,8 @@ pub fn check_root_slot(
         tree_identifier_watermark: read_u64(slot, 36 + 86),
         rollback_floor: read_u64(slot, 36 + 86 + 8),
         unmount_marker,
+        reclaim_threshold: read_u64(slot, ROOT_RECLAIM_THRESHOLD_OFFSET),
+        pinned_ring_slot: slot[ROOT_PINNED_RING_SLOT_OFFSET],
         record_bytes: slot[..record_bytes].to_vec(),
         first_non_zero_byte_past_the_record: first_non_zero_byte_from(slot, record_bytes).map(
             |(offset_in_the_slot, value)| FirstNonZeroByteInTheRootSlot {
@@ -772,6 +826,26 @@ pub fn check_internal_node_separators(
     Ok(())
 }
 
+/// 判孩子是码 3 容器的那几棵树（inode 树，墓碑树、谱系树、退役树）里一个码 2 内部节点的 key：自述 key 宽等于形态宽、条目按分隔 key 严格递增。
+/// 头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2：inode 树根是 [最左那片的最小记录号, 最右那片的最大记录号]），
+/// 要等孩子读回来才判得了，由走读的一方判，这里不判。零条目的节点（inode 树删空之后的零条目根）只判 key 宽，与
+/// [`check_index_node_keys`] 对空节点同一读法（根之下有没有空节点不归这一判）。
+pub fn check_separators_of_a_node_whose_subtree_coverage_the_walk_judges(
+    view: &IndexNodeView,
+    schema: KeySchema,
+) -> Result<(), Verdict> {
+    if schema.width() != view.key_width {
+        return Err(Verdict::KeyWidthMismatch);
+    }
+    let key_of = |entry: &Vec<u8>| schema.fields(&entry[..view.key_width]);
+    for pair in view.entries.windows(2) {
+        if key_of(&pair[0]) >= key_of(&pair[1]) {
+            return Err(Verdict::KeysNotStrictlyAscending);
+        }
+    }
+    Ok(())
+}
+
 /// 码 3 打包记录单元解出来的头与记录（D18（块里携带什么信息） 已定项 11 / 已定项 16：记录区从 136 起）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackedUnitView {
@@ -956,7 +1030,7 @@ impl ContentUnitClass {
 }
 
 /// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）：magic 4 + 类型 2 + 算法类型 1 之后是记录标志 1；
-/// 事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，再是反向链 4、载荷校验和 4、新根段 364、fsid 8、MAC 16，头到 487 为止。
+/// 事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，再是反向链 4、载荷校验和 4、新根段 373、fsid 8、MAC 16，头到 496 为止。
 const JOURNAL_MAGIC: &[u8; 4] = b"SFSJ";
 const JOURNAL_RECORD_FLAGS_OFFSET: usize = 7;
 const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 46;
@@ -966,7 +1040,7 @@ const JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET: usize = 87;
 const JOURNAL_BACK_CHAIN_OFFSET: usize = 91;
 const JOURNAL_PAYLOAD_CHECKSUM_OFFSET: usize = 95;
 const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: usize = 99;
-const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: usize = 463;
+const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: usize = 472;
 /// 新根段里卸载记号那 4 字节：新根段 99 起，前六段 86 + 86 + 8 + 8 + 86 + 86 = 360 之后（D23（journal 的角色与格式） 已定项 15）。
 const JOURNAL_UNMOUNT_MARKER_OFFSET: usize = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 360;
 /// 卸载记号只许位 0（正常卸载那一串写 1），编码与根记录 flags 位 0 相同（D22（单元原子性怎么合成） 已定项 7）。
@@ -1014,7 +1088,7 @@ pub struct JournalRecordView {
     /// 不在这里拒其余位非 0 的记录，I-8.9（一次发布的记录序号连续且只有末条带标志） 判红——拒了它就看不见。
     pub record_flags_byte: u8,
     pub back_chain: u32,
-    /// 新根段 364 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4，
+    /// 新根段 373 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4 + 回收门槛 t 8 + 钉槽 p 1，
     /// D23（journal 的角色与格式） 已定项 15）。
     pub new_root_segment: Vec<u8>,
     pub new_tree_identifier_watermark: u64,
@@ -1022,10 +1096,10 @@ pub struct JournalRecordView {
     pub named: Vec<NamedEntryView>,
 }
 
-/// 反向链的口径（D23（journal 的角色与格式） 已定项 19 ②）：前一条记录 487 字节头的 CRC-32C，`header_csum` 那 32 字节按 0 参与。
+/// 反向链的口径（D23（journal 的角色与格式） 已定项 19 ②）：前一条记录 496 字节头的 CRC-32C，`header_csum` 那 32 字节按 0 参与。
 #[must_use]
 pub fn back_chain_of_record_header(record: &[u8]) -> u32 {
-    let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("487")].to_vec();
+    let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("496")].to_vec();
     header[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].fill(0);
     crc32_castagnoli_table(&header)
 }
@@ -1059,7 +1133,7 @@ pub fn check_journal_record(
         return Err(Verdict::UnmountMarkerBitsOtherThanBitZero);
     }
     let named_count = usize::try_from(read_u32(record, 12)).expect("点名项数");
-    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("487");
+    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("496");
     let entry_bytes = usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56");
     let payload_end = header_bytes + named_count * entry_bytes;
     if payload_end > record_bytes {

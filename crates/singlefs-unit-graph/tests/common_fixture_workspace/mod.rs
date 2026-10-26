@@ -144,33 +144,39 @@ pub const CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE: [(&str, &str); 11] = [
 
 static NEXT_TREE_NUMBER: AtomicUsize = AtomicUsize::new(0);
 
-/// 一棵写在临时目录里的夹具树，离开作用域时删掉。
+/// 一棵写在临时目录里的夹具树，离开作用域时删掉：用例做完、断言失败、panic 都删，写到一半 panic 留下的半棵也删。
 pub struct FixtureTree {
     root: PathBuf,
 }
 
 impl FixtureTree {
-    /// 把（相对路径，内容）逐份写进一个新的临时目录。
-    pub fn materialize(label: &str, files: &[(&str, &str)]) -> Self {
+    /// 这个进程里下一棵夹具树的根（临时目录下，名字带标签、进程号与进程内序号）。
+    pub fn fresh_root(label: &str) -> PathBuf {
         let tree_number = NEXT_TREE_NUMBER.fetch_add(1, Ordering::SeqCst);
-        let root = std::env::temp_dir().join(format!(
+        std::env::temp_dir().join(format!(
             "singlefs-unit-graph-{label}-{}-{tree_number}",
             std::process::id()
-        ));
-        if root.exists() {
-            std::fs::remove_dir_all(&root).expect("上一趟同名的临时目录删得掉");
-        }
+        ))
+    }
+
+    /// 把（相对路径，内容）逐份写进一个新的临时目录。先认领根、再写：写到一半 panic 时守卫删掉写了的那一半。
+    pub fn materialize(label: &str, files: &[(&str, &str)]) -> Self {
+        let tree = Self::adopt(Self::fresh_root(label));
         for (relative, content) in files {
-            let path = root.join(relative);
+            let path = tree.root.join(relative);
             std::fs::create_dir_all(path.parent().expect("夹具文件都在某个目录里"))
                 .expect("临时目录建得起来");
             std::fs::write(path, content).expect("夹具文件写得进临时目录");
         }
-        Self { root }
+        tree
     }
 
-    /// 包住一个已经建好的目录（测试自己拷进去的仓），离开作用域时同样删掉。
+    /// 认领一个临时目录（测试自己往里拷仓的那一份）：先认领、再往里写，离开作用域时同样删掉。
+    /// 同名的目录已经在（同进程号的旧进程被杀时留下的）就先删掉。
     pub fn adopt(root: PathBuf) -> Self {
+        if root.exists() {
+            std::fs::remove_dir_all(&root).expect("上一趟同名的临时目录删得掉");
+        }
         Self { root }
     }
 
@@ -195,7 +201,11 @@ impl FixtureTree {
 
 impl Drop for FixtureTree {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.root).ok();
+        if let Err(error) = std::fs::remove_dir_all(&self.root) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                eprintln!("删不掉夹具树 {}：{error}", self.root.display());
+            }
+        }
     }
 }
 

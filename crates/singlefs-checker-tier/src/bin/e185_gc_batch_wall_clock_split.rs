@@ -19,11 +19,30 @@
 //!       没编 `gpu` 特性时退 78，报「本次未跑：没编 gpu 特性」。整条命令经 `bash scripts/crash/gpu-quiesce-run.sh -- …` 起。
 //!   foreground-fsync --image-directory <目录> --point <活槽占比>:<池的数据量> --batch-units <K> [--seconds <秒>]
 //!       第四段（附带，只在 Q16 > 10% 时跑）：前台「4 KiB 直接写 + fdatasync」循环的延迟，GC 并发与不跑 GC 各 5 轮。
+//!   geometry-check [--point <活槽占比>:<池的数据量>]… [--overwrite-order slot-order]
+//!       单点核（第 2 次重跑登记 `research/prompts/e185-r2-prereg.md` 第五节「单点核」）：只造池、核几何，打 `name=geometry_attempt`、
+//!       `name=geometry`、`name=segment_composition`、`name=overwrite_landing`、`name=pool`，不量。不给 `--overwrite-order` 时照改法甲造
+//!       （占比 0.25 槽号最大的那一整段留到最后覆盖写）；`slot-order` 照第 1 次重跑那一版造（全部按旧槽号升序，不数副本落点）。
+//!   host-cpu-drift-control --cards <序号,…> --stage-split-product <文件> --attack-ledger <文件>
+//!       第 4 次重跑控漂移段（登记 `research/prompts/e185-r4-prereg.md` 第五节「控漂移段怎么量」，编了 `gpu` 特性才有）：复现臂照第 3 次重跑第一段
+//!       原样量头一张卡；受控臂绑核、读频率、暖到稳、每格暖到稳、两张卡逐轮交替；每轮末尾两格漂移探针；两条臂各自照第 3 次重跑算点，再算 D1–D7。
+//!       没编 `gpu` 特性时退 78。整条命令经 `bash scripts/crash/gpu-quiesce-run.sh -- …` 起。
+//!   cpu-writings [--point <活槽占比>:<池的数据量>]…
+//!       第 4 次重跑写法与拆分段（同一节「写法与拆分段怎么量」；拆法乙那一半主 agent 在装置写之前撤了，登记第一节「主 agent 定」第 6 条）：
+//!       照第二段造池、量意图、重放三个阶段，每次调用之后另量九种 CPU 写法的计时件（硬件 CRC 单路与三路、按身份查的区域扫描与建索引），
+//!       与 crates 逐个对拍（停机 K-S1、K-S2），每个点每轮做一次 PW1、PW2，收尾打每个点的写法系数 φ。替代写法只给计时用，不改 `crates/`。
+//!
+//! 第 2 次重跑（登记第五节「这一趟装置改什么」改动一至七）：造池用改法甲的覆盖写次序（[`overwrite_order_of`]）；每个点头一次造池之后逐段打成分
+//! 与覆盖写副本的落点；第一、二段每条意图前后做一次校准（16 MiB 缓冲的 CRC-32C 连做 3 遍取中位、64 MiB 追指针一遍）并读线程与机器的状态，
+//! 校准比超过 1.10 的意图作废，作废之后先等机器回到常态再重量（登记第十一节 R2-1 至 R2-4）；段开头与段末各做 21 遍校准的基线，段开头另做
+//! 一遍加倍的活当校准自己的阳性对照；丙段的判定从签发那一行收（`name=choose_judgement`）；另报「照原作废规则」的并列判定。新读数一律另起一行，
+//! 不往已有的行里加键。
 //!
 //! 线程数取环境变量 `E185_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值（编进来的那一份）。
 //! 产物是标准输出上的 `E7RESULT` 行，末行 `name=done emitted=<行数>`；进度打到标准错误。
-//! 退出码：0 正常；2 命令行不对；3 停机条款触发（装置与 `crates/` 对不上，或开跑自检判线程 CPU 时钟分辨率不够；产物照打、交主 agent）；4 阳性对照没过（那条臂整段作废，产物照打）；
-//! 5 等别的性能测量（`qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`）等满上限仍没等到；
+//! 退出码：0 正常；2 命令行不对；3 停机条款触发（装置与 `crates/` 对不上，或开跑自检判线程 CPU 时钟分辨率不够，或一段里校准锚点不符累计超过
+//! 3 次；产物照打、交主 agent）；4 阳性对照没过（那条臂整段作废，产物照打；校准分不出两倍的活时那一段一个点都不量）；
+//! 5 等别的性能测量（`qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`）等满上限仍没等到，或一段里等机器回到常态累计满 600 秒；
 //! 78 准入与运行条件没满足（`preflight` 拒绝，带 `--force` 才照跑），或 `gpu-submission` 没编 `gpu` 特性、清场或取卡没过。
 //!
 //! 决定工作量、几何或判据门槛的常量都是本地常量（值抄自登记第五节「装置读 `crates/` 的这些常量」那张表），每个子命令开跑先与
@@ -77,7 +96,9 @@ use singlefs_core::make_filesystem::{
 use singlefs_core::mount::{
     mount_writable_with_compaction_switches, raise_rollback_floor_to_the_admission_ceiling,
 };
-use singlefs_core::mounted_session::{CompactionRunOutcome, MountedSession, UserChange};
+use singlefs_core::mounted_session::{
+    central_mapping_as_the_compaction_reads_it, CompactionRunOutcome, MountedSession, UserChange,
+};
 use singlefs_core::recovery::PoolReader;
 use singlefs_core::region_scan::{
     scan_region, AllocationInRegion, CentralMappingEntry, RegionScan,
@@ -87,7 +108,9 @@ use singlefs_core::transaction::{
     acquire_instance, central_mapping_locations_in_the_version, publish_first_file, warm_up,
     FirstFile, MappingLookup, PoolVersion, PoolWriter, TransactionOutput, TransactionUnit,
 };
-use singlefs_core::unit::{data_unit_payload_capacity, UNIT_CLASS_DATA, UNIT_CLASS_PACKED};
+use singlefs_core::unit::{
+    data_unit_payload_capacity, UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
+};
 use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::sha256::sha256_digest;
 
@@ -115,6 +138,14 @@ const PUBLISHES_ALREADY_PASSED_COMPARED: [u64; 2] = [0, 1000];
 const PUBLISHES_ALREADY_PASSED_LEAVING_A_BUDGET_OF_ONE: u64 = 1000;
 /// 物理块（内存盘与真盘臂的声明值，登记第一节「真盘」那一行的逻辑块 512）。
 const PHYSICAL_BLOCK_BYTES: u32 = 512;
+/// 根环条数：值抄自第 2 次重跑登记第五节「装置读 `crates/` 的常量」那张表（回比
+/// `singlefs_format::ROOT_RING_REGIONS × singlefs_format::ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM`）。只用来打第七节「推的预测」那一栏。
+const LOCAL_ROOT_RING_ENTRIES: u64 = 24;
+/// 第 4 次重跑写法丙抄的那一份区域扫描用到的三个类标签（登记 `research/prompts/e185-r4-prereg.md` 第五节「入库装置这一趟新读 crates 的东西」：
+/// 回比 `crates/singlefs-core/src/unit.rs` 的 `UNIT_CLASS_DATA`、`UNIT_CLASS_INDEX_NODE`、`UNIT_CLASS_PACKED`）。
+const LOCAL_UNIT_CLASS_DATA: u8 = 1;
+const LOCAL_UNIT_CLASS_INDEX_NODE: u8 = 2;
+const LOCAL_UNIT_CLASS_PACKED: u8 = 3;
 
 /// 本地的发布预算算式 `max(1, 3S − 4 − p)`（登记第五节常量表那一行；回比 `publish_budget_of_a_compaction_run`）。
 fn local_publish_budget(root_ring_slots_per_region: u64, publishes_already_passed: u64) -> u64 {
@@ -159,6 +190,27 @@ fn constants_disagreeing_with_the_crates() -> Vec<(String, String, String)> {
         singlefs_format::ALLOCATION_RECORD_BYTES,
     );
     compare("device_bytes", LOCAL_DEVICE_BYTES, common::IMAGE_BYTES);
+    for (name, local_tag, crates_tag) in [
+        ("unit_class_data", LOCAL_UNIT_CLASS_DATA, UNIT_CLASS_DATA),
+        (
+            "unit_class_index_node",
+            LOCAL_UNIT_CLASS_INDEX_NODE,
+            UNIT_CLASS_INDEX_NODE,
+        ),
+        (
+            "unit_class_packed",
+            LOCAL_UNIT_CLASS_PACKED,
+            UNIT_CLASS_PACKED,
+        ),
+    ] {
+        compare(name, u64::from(local_tag), u64::from(crates_tag));
+    }
+    compare(
+        "root_ring_entries",
+        LOCAL_ROOT_RING_ENTRIES,
+        singlefs_format::ROOT_RING_REGIONS
+            * singlefs_format::ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM,
+    );
     let memory_device = SparseBlockDevice::new(
         LOCAL_DEVICE_BYTES,
         PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_BYTES),
@@ -682,20 +734,37 @@ extern "C" {
     fn clock_gettime(clock_id: i32, reading: *mut ThreadCpuClockReading) -> i32;
 }
 
+/// Linux 的 `CLOCK_PROCESS_CPUTIME_ID`（`<linux/time.h>` 里是 2）：本进程全部线程在 CPU 上跑过的时间（含驱动与 wgpu 在本进程里起的线程；
+/// 第 3 次重跑登记第一节「c_rt 的进程钟版」，只给第十条 J5 用）。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(dead_code, reason = "第 3 次重跑第一段（gpu 特性）才读进程钟")
+)]
+const CLOCK_IDENTIFIER_OF_THE_PROCESS_CPU_TIME: i32 = 2;
+
 /// 本线程到此刻在 CPU 上跑过的纳秒；系统调用报错、读出负数的交回 `None`，调用方把那一轮作废（登记第十一节「读不到」）。
 fn thread_cpu_nanoseconds() -> Option<u64> {
+    nanoseconds_of_the_cpu_clock(CLOCK_IDENTIFIER_OF_THE_THREAD_CPU_TIME)
+}
+
+/// 本进程到此刻在 CPU 上跑过的纳秒（全部线程合计）；读不到同 [`thread_cpu_nanoseconds`]。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(dead_code, reason = "第 3 次重跑第一段（gpu 特性）才读进程钟")
+)]
+fn process_cpu_nanoseconds() -> Option<u64> {
+    nanoseconds_of_the_cpu_clock(CLOCK_IDENTIFIER_OF_THE_PROCESS_CPU_TIME)
+}
+
+/// 读一个 CPU 时钟（线程钟或进程钟）的纳秒；系统调用报错、读出负数的交回 `None`。
+fn nanoseconds_of_the_cpu_clock(clock_identifier: i32) -> Option<u64> {
     let mut reading = ThreadCpuClockReading {
         whole_seconds: 0,
         nanoseconds_within_the_second: 0,
     };
     // SAFETY: `reading` 是这个栈帧里活着的变量，`#[repr(C)]` 照 `struct timespec` 排布（平台由文件里的 compile_error 守着）；
     // 指针只在这一次调用里用，内核只往这 16 字节里写；clock id 不合法时内核交回 −1、不写内存。
-    let status = unsafe {
-        clock_gettime(
-            CLOCK_IDENTIFIER_OF_THE_THREAD_CPU_TIME,
-            std::ptr::addr_of_mut!(reading),
-        )
-    };
+    let status = unsafe { clock_gettime(clock_identifier, std::ptr::addr_of_mut!(reading)) };
     if status != 0 {
         return None;
     }
@@ -755,6 +824,43 @@ fn spin_until_the_thread_cpu_advances(nanoseconds: u64) -> bool {
             Some(_) => std::hint::spin_loop(),
             None => return false,
         }
+    }
+}
+
+/// 按线程 CPU 钟自旋到前进了多少（[`spin_by_the_cpu_clock_until_it_advances_or_the_wall_runs_out`]）：线程钟前进的纳秒与包着它的挂钟走了多少。
+#[cfg_attr(not(test), allow(dead_code, reason = "只有单测按线程钟转、看钟走没走"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SpinByTheCpuClock {
+    cpu_advanced_nanoseconds: u64,
+    wall_elapsed_nanoseconds: u64,
+}
+
+/// 在本线程上按 CPU 钟（`read_the_cpu_clock`）自旋，直到它前进 `cpu_nanoseconds`，或挂钟（`read_the_wall_clock`）走满 `wall_limit_nanoseconds`
+/// 先到为止；任何一次读不到交回 `None`。满载时线程被换下来，挂钟走了 CPU 钟不走，按 CPU 钟转才转得够（按挂钟转的话换下来那一段不算 CPU）；
+/// 挂钟上限只防钟停着不走时转不出来。两个钟都从参数进来，单测换成假钟（CPU 钟只按挂钟一半的速度走）。
+#[cfg_attr(not(test), allow(dead_code, reason = "只有单测按线程钟转、看钟走没走"))]
+fn spin_by_the_cpu_clock_until_it_advances_or_the_wall_runs_out(
+    cpu_nanoseconds: u64,
+    wall_limit_nanoseconds: u64,
+    mut read_the_cpu_clock: impl FnMut() -> Option<u64>,
+    mut read_the_wall_clock: impl FnMut() -> u64,
+) -> Option<SpinByTheCpuClock> {
+    let wall_start = read_the_wall_clock();
+    let cpu_start = read_the_cpu_clock()?;
+    // 迭代上界：挂钟单调前进，走满 wall_limit_nanoseconds 必出去；跨圈的状态只有两个起点，不改。
+    loop {
+        let cpu_now = read_the_cpu_clock()?;
+        let wall_now = read_the_wall_clock();
+        let spin = SpinByTheCpuClock {
+            cpu_advanced_nanoseconds: cpu_now.saturating_sub(cpu_start),
+            wall_elapsed_nanoseconds: wall_now.saturating_sub(wall_start),
+        };
+        if spin.cpu_advanced_nanoseconds >= cpu_nanoseconds
+            || spin.wall_elapsed_nanoseconds >= wall_limit_nanoseconds
+        {
+            return Some(spin);
+        }
+        std::hint::spin_loop();
     }
 }
 
@@ -2041,11 +2147,154 @@ const RELEASE_ROUNDS_AT_MOST: u64 = 16;
 /// 建池时用户改动写进记录的时间：第一个文件之后 600 秒起，每次改动加一。
 const SECONDS_FROM_THE_FIRST_FILE_TO_THE_WORKLOAD: u64 = 600;
 
-/// 造池的配方：取样点，加上几何没造成时累计改负载多覆盖写掉的 inode（登记第五节「先改负载重造」）。
+/// 造池的配方：取样点、覆盖写的次序，加上几何没造成时累计改负载多覆盖写掉的 inode（登记第五节「先改负载重造」）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct PoolRecipe {
     point: SamplingPoint,
+    overwrite_order: OverwriteOrder,
     extra_overwritten_inodes: BTreeSet<u64>,
+}
+
+/// 造池第 2 步覆盖写的次序（第 2 次重跑登记第一节「改法甲」、第五节改动一）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OverwriteOrder {
+    /// 改法甲：占比 0.25 时三组依次写（[`OverwriteGroup`]），槽号最大的那一整段留到最后；占比 0.75 时与按旧槽号升序相同。
+    HighestFullSegmentLast,
+    /// 第 1 次重跑那一版：全部按旧槽号升序（`geometry-check --overwrite-order slot-order` 的对照）。
+    SlotOrder,
+}
+
+impl OverwriteOrder {
+    const fn label(self) -> &'static str {
+        match self {
+            OverwriteOrder::HighestFullSegmentLast => "highest_full_segment_last",
+            OverwriteOrder::SlotOrder => "slot_order",
+        }
+    }
+
+    /// 命令行 `--overwrite-order` 的值：只认 `slot-order`（不给这个选项就是改法甲）。
+    fn of_argument(argument: &str) -> Option<OverwriteOrder> {
+        (argument == "slot-order").then_some(OverwriteOrder::SlotOrder)
+    }
+}
+
+/// 造池第 2 步要覆盖写的一个单元（排次序用）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct UnitToOverwrite {
+    old_slot: u64,
+    inode: u64,
+    segment_start_slot: u64,
+    /// 它所在的段 32 个数据单元都是这次写的（「整段」）。
+    is_in_a_segment_full_of_this_workload: bool,
+    /// 配方里累计改负载点名要多覆盖写掉的 inode。
+    is_named_by_the_recipe: bool,
+}
+
+/// 改法甲的三组（登记第一节「改法甲」那一格），按写的先后。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OverwriteGroup {
+    /// 不在「整段都是这次写的」段里的单元（混住段的全部），与配方累计点名的：最先写。
+    MixedSegmentsAndNamedByTheRecipe,
+    /// 整段里要覆盖写的单元，槽号最大的那一整段之外的。
+    FullSegmentsBelowTheHighest,
+    /// 槽号最大的那一整段里要覆盖写的（占比 0.25 时 24 个）：最后写。
+    HighestFullSegment,
+}
+
+impl OverwriteGroup {
+    /// 写的先后：小的先写。
+    const fn writing_rank(self) -> u8 {
+        match self {
+            OverwriteGroup::MixedSegmentsAndNamedByTheRecipe => 0,
+            OverwriteGroup::FullSegmentsBelowTheHighest => 1,
+            OverwriteGroup::HighestFullSegment => 2,
+        }
+    }
+}
+
+/// 覆盖写的次序（改动一）：交回（旧槽、inode），按写的先后。改法甲只对占比 0.25 生效：三组依次、组内按旧槽号升序；
+/// 占比 0.75 与 `slot-order` 一律按旧槽号升序（与第 1 次重跑 `sort_unstable` 逐项相同，旧槽号互不相同）。覆盖写哪些单元不变，只换次序。
+fn overwrite_order_of(
+    fraction: LiveSlotFraction,
+    overwrite_order: OverwriteOrder,
+    units: &[UnitToOverwrite],
+) -> Vec<(u64, u64)> {
+    let mut in_writing_order = units.to_vec();
+    in_writing_order.sort_unstable_by_key(|unit| (unit.old_slot, unit.inode));
+    let is_the_highest_full_segment_kept_last = match (overwrite_order, fraction) {
+        (OverwriteOrder::HighestFullSegmentLast, LiveSlotFraction::OneQuarter) => true,
+        (OverwriteOrder::HighestFullSegmentLast, LiveSlotFraction::ThreeQuarters) => false,
+        (OverwriteOrder::SlotOrder, LiveSlotFraction::OneQuarter) => false,
+        (OverwriteOrder::SlotOrder, LiveSlotFraction::ThreeQuarters) => false,
+    };
+    if is_the_highest_full_segment_kept_last {
+        let full_segment_starts: BTreeSet<u64> = in_writing_order
+            .iter()
+            .filter(|unit| unit.is_in_a_segment_full_of_this_workload)
+            .map(|unit| unit.segment_start_slot)
+            .collect();
+        let highest_full_segment_start_slot = full_segment_starts.last().copied();
+        let group_of = |unit: &UnitToOverwrite| {
+            if !unit.is_in_a_segment_full_of_this_workload || unit.is_named_by_the_recipe {
+                OverwriteGroup::MixedSegmentsAndNamedByTheRecipe
+            } else if Some(unit.segment_start_slot) == highest_full_segment_start_slot {
+                OverwriteGroup::HighestFullSegment
+            } else {
+                OverwriteGroup::FullSegmentsBelowTheHighest
+            }
+        };
+        // 稳定排序：同一组里保持上面排好的旧槽号升序
+        in_writing_order.sort_by_key(|unit| group_of(unit).writing_rank());
+    }
+    in_writing_order
+        .iter()
+        .map(|unit| (unit.old_slot, unit.inode))
+        .collect()
+}
+
+/// 数不数覆盖写副本的落点（第六节 N12）。封闭集合。数与不数造出的池逐块相同（单测
+/// `counting_the_overwrite_landings_leaves_the_pool_digests_unchanged`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LandingCount {
+    Counted,
+    NotCounted,
+}
+
+/// 造池第 2 步覆盖写的副本落在哪（N12）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct OverwriteLanding {
+    /// 新副本的槽是这次造池前面某次覆盖写空出来的旧槽。
+    copies_landing_in_holes_of_this_construction: u64,
+    copies_landing_elsewhere: u64,
+}
+
+/// 第 j 份副本的新槽在第 0 到 j − 1 次覆盖写的旧槽里，就算落进这次造池打出的旧洞；两串按写的先后、一一对应。
+fn landings_of_the_copies(
+    old_slots_in_writing_order: &[u64],
+    new_slots_in_writing_order: &[u64],
+) -> OverwriteLanding {
+    let mut holes_opened_so_far: BTreeSet<u64> = BTreeSet::new();
+    let mut landing = OverwriteLanding {
+        copies_landing_in_holes_of_this_construction: 0,
+        copies_landing_elsewhere: 0,
+    };
+    for (old_slot, new_slot) in old_slots_in_writing_order
+        .iter()
+        .zip(new_slots_in_writing_order)
+    {
+        if holes_opened_so_far.contains(new_slot) {
+            landing.copies_landing_in_holes_of_this_construction += 1;
+        } else {
+            landing.copies_landing_elsewhere += 1;
+        }
+        holes_opened_so_far.insert(*old_slot);
+    }
+    landing
+}
+
+/// 推的落进旧洞的副本数（第七节「推的预测」，不是锚点）：覆盖写到第 25 次起每一份都落进 24 次之前打出的洞，共 `覆盖写份数 − 24`。
+const fn predicted_copies_landing_in_holes(overwritten_units: u64) -> u64 {
+    overwritten_units.saturating_sub(LOCAL_ROOT_RING_ENTRIES)
 }
 
 /// 造好的池：两块内存盘（关掉、没卸载）与造的经过里要报的数。
@@ -2060,6 +2309,8 @@ struct ConstructedPool {
     release_rounds: u64,
     is_every_overwritten_slot_released: bool,
     construction_seconds: f64,
+    /// 覆盖写副本的落点（N12）；没数（[`LandingCount::NotCounted`]）是 `None`。
+    overwrite_landing: Option<OverwriteLanding>,
 }
 
 /// 一个数据单元装满的内容：按 inode 与第几次写的不同而不同（净荷容量那么长，正好一个数据单元）。
@@ -2203,12 +2454,13 @@ fn formatted_pool_with_the_first_file_and_a_session(
 /// 按配方造一个池（登记第五节「负载：池怎么造」）：
 /// 1. 建 P + 64 个空 inode，前 P 个各顺序写一个数据单元（按段顺序写满 ⌈P ÷ 32⌉ 段；用户数据取最低的空槽对）；
 /// 2. 整段 32 个数据单元都是这次写的段，按槽序每 4 个覆盖写其中 3 个（f = 0.25）或 1 个（f = 0.75）；没写满一整段的段（与别的单元混住的）
-///    这次写的单元全覆盖写掉，配方里累计改负载点名的 inode 也覆盖写掉；
+///    这次写的单元全覆盖写掉，配方里累计改负载点名的 inode 也覆盖写掉；次序照配方的 [`OverwriteOrder`]（[`overwrite_order_of`]），
+///    `landing_count` 是 [`LandingCount::Counted`] 时逐份记下新副本的槽、数落点（N12；只读，不改池）；
 /// 3. 下一个用户数据落点还在最高那一段里时，用多建的空 inode 一个一个写，把那一段补满（免得留一段活槽少的新数据段）；
 /// 4. 抬 F 到准入上限、建一个 inode，转到被覆盖写的旧落点都按记录已释放、回到空闲（或已被别的这次写的单元占回）为止。
 ///
 /// 关掉（不卸载）交回两块内存盘；测量那一侧再 `mount_writable_with_compaction_switches` 可写挂载，这样造出来的段不是那次挂载开过的段。
-fn construct_the_pool(recipe: &PoolRecipe) -> ConstructedPool {
+fn construct_the_pool(recipe: &PoolRecipe, landing_count: LandingCount) -> ConstructedPool {
     let started = Instant::now();
     let (mut devices, mut session) = formatted_pool_with_the_first_file_and_a_session();
     let mut floor_raises = 0_u64;
@@ -2247,28 +2499,53 @@ fn construct_the_pool(recipe: &PoolRecipe) -> ConstructedPool {
             .or_default()
             .push(*inode);
     }
-    let mut inodes_to_overwrite: Vec<(u64, u64)> = Vec::new();
-    for inodes_in_slot_order in units_by_segment.values() {
+    let mut units_to_overwrite: Vec<UnitToOverwrite> = Vec::new();
+    for (segment_start_slot, inodes_in_slot_order) in &units_by_segment {
         let is_full_of_this_workload =
             u64::try_from(inodes_in_slot_order.len()).expect("一段的单元数") == full_segment_units;
         for (position, inode) in (0_u64..).zip(inodes_in_slot_order) {
+            let is_named_by_the_recipe = recipe.extra_overwritten_inodes.contains(inode);
             if !is_full_of_this_workload
                 || recipe.point.fraction.is_overwritten(position)
-                || recipe.extra_overwritten_inodes.contains(inode)
+                || is_named_by_the_recipe
             {
-                inodes_to_overwrite.push((workload.slot_of_inode[inode], *inode));
+                units_to_overwrite.push(UnitToOverwrite {
+                    old_slot: workload.slot_of_inode[inode],
+                    inode: *inode,
+                    segment_start_slot: *segment_start_slot,
+                    is_in_a_segment_full_of_this_workload: is_full_of_this_workload,
+                    is_named_by_the_recipe,
+                });
             }
         }
     }
-    inodes_to_overwrite.sort_unstable();
+    let inodes_to_overwrite = overwrite_order_of(
+        recipe.point.fraction,
+        recipe.overwrite_order,
+        &units_to_overwrite,
+    );
     let old_slots: Vec<u64> = inodes_to_overwrite
         .iter()
         .map(|(slot, _inode)| *slot)
         .collect();
+    let mut new_slots_in_writing_order: Vec<u64> = Vec::new();
     for (_old_slot, inode) in &inodes_to_overwrite {
         let write_time = next_write_time();
         workload.write_one_unit(&mut session, &mut devices, *inode, 1, write_time);
+        match landing_count {
+            LandingCount::Counted => {
+                new_slots_in_writing_order.push(workload.slot_of_inode[inode]);
+            }
+            LandingCount::NotCounted => {}
+        }
     }
+    let overwrite_landing = match landing_count {
+        LandingCount::Counted => Some(landings_of_the_copies(
+            &old_slots,
+            &new_slots_in_writing_order,
+        )),
+        LandingCount::NotCounted => None,
+    };
     let mut filler_units = 0_u64;
     let frontier_segment = workload
         .live_data_inode_by_slot
@@ -2331,6 +2608,7 @@ fn construct_the_pool(recipe: &PoolRecipe) -> ConstructedPool {
         release_rounds,
         is_every_overwritten_slot_released,
         construction_seconds: started.elapsed().as_secs_f64(),
+        overwrite_landing,
     }
 }
 
@@ -2654,6 +2932,106 @@ struct GreedyPrediction {
     greedy_composition: Option<SegmentComposition>,
     geometry_formed_segments: Vec<CompactionRegion>,
     mapped_units: usize,
+    /// 单元区里每一段（盘 0 上有未释放记录的段）的成分，按段起点升序（第六节 N11）。
+    segment_compositions: Vec<SegmentComposition>,
+}
+
+/// 盘 0 单元区里有未释放记录的每一段的成分（N11），取法同几何核的 [`composition_of_the_segment`]。
+fn compositions_of_every_segment_holding_an_unreleased_record(
+    records: &[AllocationRecord],
+    unit_area_start_slot: u64,
+    live_data_inode_by_slot: &BTreeMap<u64, u64>,
+) -> Vec<SegmentComposition> {
+    let segment_starts: BTreeSet<u64> = records
+        .iter()
+        .filter(|record| {
+            record.device == DeviceIdentity(0)
+                && !record.is_released
+                && record.slot.0 >= unit_area_start_slot
+        })
+        .map(|record| segment_start_of(record.slot.0, unit_area_start_slot))
+        .collect();
+    segment_starts
+        .into_iter()
+        .map(|start| {
+            let region =
+                CompactionRegion::of_one_cluster_segment(DeviceIdentity(0), SlotNumber(start))
+                    .expect("段起点在聚簇段边界上、装得进 6 字节");
+            composition_of_the_segment(records, region, live_data_inode_by_slot)
+        })
+        .collect()
+}
+
+/// N11 的一行：`name=segment_composition`。
+fn segment_composition_line(
+    point: SamplingPoint,
+    overwrite_order: OverwriteOrder,
+    workload_changes: usize,
+    composition: SegmentComposition,
+) -> String {
+    format!(
+        "name=segment_composition {} overwrite_order={} workload_changes={workload_changes} region_start_slot={} live_slots={} slots_of_this_workload={} other_slots={} formed={}",
+        point.label(),
+        overwrite_order.label(),
+        composition.start_slot,
+        composition.live_slots,
+        composition.slots_of_this_workload,
+        composition.other_slots,
+        is_the_geometry_formed(composition, point.fraction),
+    )
+}
+
+/// 一次造池之后的 N11、N12 几行：逐段成分、成分汇总（`formed_segments` 应等于同一次 `name=geometry_attempt` 的
+/// `geometry_formed_segments`，第七节「两条路数同一个东西」）、覆盖写副本的落点（没数的写 `status=not_run`）。
+/// 几行都带 `workload_changes`，与同一次的 `name=geometry_attempt` 对得上（一个点改过负载时有几次造池）。
+fn construction_reading_lines(
+    recipe: &PoolRecipe,
+    pool: &ConstructedPool,
+    prediction: &GreedyPrediction,
+    workload_changes: usize,
+) -> Vec<String> {
+    let point = recipe.point;
+    let order_label = recipe.overwrite_order.label();
+    let mut lines: Vec<String> = prediction
+        .segment_compositions
+        .iter()
+        .map(|composition| {
+            segment_composition_line(
+                point,
+                recipe.overwrite_order,
+                workload_changes,
+                *composition,
+            )
+        })
+        .collect();
+    let formed_segments = prediction
+        .segment_compositions
+        .iter()
+        .filter(|composition| is_the_geometry_formed(**composition, point.fraction))
+        .count();
+    lines.push(format!(
+        "name=segment_composition_summary {} overwrite_order={order_label} workload_changes={workload_changes} segments={} formed_segments={formed_segments} geometry_formed_segments_of_the_attempt={} counts_agree={}",
+        point.label(),
+        prediction.segment_compositions.len(),
+        prediction.geometry_formed_segments.len(),
+        formed_segments == prediction.geometry_formed_segments.len(),
+    ));
+    lines.push(match pool.overwrite_landing {
+        Some(landing) => format!(
+            "name=overwrite_landing {} overwrite_order={order_label} workload_changes={workload_changes} status=counted overwritten_units={} copies_landing_in_holes_of_this_construction={} copies_landing_elsewhere={} predicted_copies_landing_in_holes={} root_ring_entries={LOCAL_ROOT_RING_ENTRIES}",
+            point.label(),
+            pool.overwritten_units,
+            landing.copies_landing_in_holes_of_this_construction,
+            landing.copies_landing_elsewhere,
+            predicted_copies_landing_in_holes(pool.overwritten_units),
+        ),
+        None => format!(
+            "name=overwrite_landing {} overwrite_order={order_label} workload_changes={workload_changes} status=not_run overwritten_units={}",
+            point.label(),
+            pool.overwritten_units,
+        ),
+    });
+    lines
 }
 
 fn predict_the_greedy_choice(
@@ -2706,6 +3084,11 @@ fn predict_the_greedy_choice(
         }),
         geometry_formed_segments,
         mapped_units: version_of_trees(&session).mapped_units.len(),
+        segment_compositions: compositions_of_every_segment_holding_an_unreleased_record(
+            &version.allocation_records,
+            pool.unit_area_start_slot,
+            &pool.live_data_inode_by_slot,
+        ),
     }
 }
 
@@ -2725,14 +3108,28 @@ struct PreparedPoint {
 /// 产物行不直接打，攒进交回的 [`PreparedPoint::lines`]：同一个点的几次重造前后依赖，在一条线程上按次序跑；不同的点互不依赖，由
 /// [`PreparationQueue`] 与别的准备单位一起分到几条线程上。
 fn prepare_the_sampling_point(point: SamplingPoint) -> PreparedPoint {
+    prepare_the_sampling_point_with_the_order(point, OverwriteOrder::HighestFullSegmentLast)
+}
+
+/// 同 [`prepare_the_sampling_point`]，覆盖写的次序由调用方给（`geometry-check --overwrite-order slot-order` 的对照用 [`OverwriteOrder::SlotOrder`]）。
+/// 每次造池（`name=geometry_attempt` 那几次）之后另攒 N11、N12 几行（[`construction_reading_lines`]）；改法甲数副本落点，`slot-order` 不数。
+fn prepare_the_sampling_point_with_the_order(
+    point: SamplingPoint,
+    overwrite_order: OverwriteOrder,
+) -> PreparedPoint {
     let mut lines = Vec::new();
     let mut recipe = PoolRecipe {
         point,
+        overwrite_order,
         extra_overwritten_inodes: BTreeSet::new(),
+    };
+    let landing_count = match overwrite_order {
+        OverwriteOrder::HighestFullSegmentLast => LandingCount::Counted,
+        OverwriteOrder::SlotOrder => LandingCount::NotCounted,
     };
     let mut workload_changes = 0_usize;
     loop {
-        let pool = construct_the_pool(&recipe);
+        let pool = construct_the_pool(&recipe, landing_count);
         let prediction = predict_the_greedy_choice(&pool, point.fraction);
         let greedy = prediction.greedy_composition;
         let is_greedy_formed =
@@ -2752,6 +3149,12 @@ fn prepare_the_sampling_point(point: SamplingPoint) -> PreparedPoint {
             greedy.map_or_else(|| "none".to_string(), |composition| composition.live_slots.to_string()),
             greedy.map_or_else(|| "none".to_string(), |composition| composition.slots_of_this_workload.to_string()),
             greedy.map_or_else(|| "none".to_string(), |composition| composition.other_slots.to_string()),
+        ));
+        lines.extend(construction_reading_lines(
+            &recipe,
+            &pool,
+            &prediction,
+            workload_changes,
         ));
         if is_greedy_formed {
             lines.push(format!(
@@ -2883,6 +3286,14 @@ struct CallReplayMaterial {
     release_check_reads: Vec<RecordedRead>,
     release_check_copies: Vec<Vec<u8>>,
     relocated_keys: Vec<Vec<u8>>,
+    /// 第 3 次重跑附带段（`function-split`）重放两次克隆要的两版；别的段不收（`None`）。
+    versions_around_the_call: Option<VersionsAroundTheCall>,
+}
+
+/// 一次调用前后的两版（第 3 次重跑登记第五节「第三段怎么量」：克隆调用之前那一版、克隆调用之后发成的那一版）。
+struct VersionsAroundTheCall {
+    before: TransactionOutput,
+    published: Option<TransactionOutput>,
 }
 
 /// 收不收第二段的重放材料。封闭集合。
@@ -2890,6 +3301,8 @@ struct CallReplayMaterial {
 enum ReplayCapture {
     Off,
     On,
+    /// 收第二段的材料，另收调用前后的两版（第 3 次重跑附带段）。
+    OnWithTheVersions,
 }
 
 /// 一条意图的读数：R、每次调用、挂载没做成的原因、重放材料。
@@ -3047,7 +3460,7 @@ fn measure_one_intent<Inner: BlockDevice>(
         let batches_before = session.compaction.observations.batches_published;
         let captured_before = match capture {
             ReplayCapture::Off => None,
-            ReplayCapture::On => Some((
+            ReplayCapture::On | ReplayCapture::OnWithTheVersions => Some((
                 version_as_the_replay_reads_it(version_of_trees(&session)),
                 session_state_for_the_choice(&session),
                 reading
@@ -3068,6 +3481,8 @@ fn measure_one_intent<Inner: BlockDevice>(
                     .unwrap_or_default(),
             )),
         };
+        let version_before_the_call = (capture == ReplayCapture::OnWithTheVersions)
+            .then(|| version_of_trees(&session).clone());
         session.compaction.publishes_since_the_last_user_change =
             PUBLISHES_ALREADY_PASSED_LEAVING_A_BUDGET_OF_ONE;
         ledger.borrow_mut().open_a_new_window();
@@ -3172,8 +3587,10 @@ fn measure_one_intent<Inner: BlockDevice>(
                 .map(|region| expected_scan_read_bytes(&records_before, region)),
             CallKind::IntentDeletedWithoutABatch | CallKind::NoPublish => None,
         };
-        if let (ReplayCapture::On, Some((version, state, region_bytes, copies_before))) =
-            (capture, captured_before)
+        if let (
+            ReplayCapture::On | ReplayCapture::OnWithTheVersions,
+            Some((version, state, region_bytes, copies_before)),
+        ) = (capture, captured_before)
         {
             let release_check_copies: Vec<Vec<u8>> = release_check_reads
                 .iter()
@@ -3219,6 +3636,12 @@ fn measure_one_intent<Inner: BlockDevice>(
                     .iter()
                     .map(|unit| unit.mapping_key.clone())
                     .collect(),
+                versions_around_the_call: version_before_the_call.map(|before| {
+                    VersionsAroundTheCall {
+                        before,
+                        published: published.cloned(),
+                    }
+                }),
             });
         }
         reading.calls.push(CallReading {
@@ -3605,6 +4028,988 @@ fn measure_on_the_real_disk(
     Ok(reading)
 }
 
+// ───────────────────────────── 校准（第 2 次重跑登记第六节 N1、N2、N15，第十一节 R2-1、R2-3、R2-4） ─────────────────────────────
+
+/// 校准那块缓冲的字节（N1：16 MiB）。
+const CALIBRATION_BUFFER_BYTES: usize = 16 << 20;
+/// 校准缓冲第 i 字节 = i mod 251（第七节乙类锚点的算法）。
+const CALIBRATION_BYTE_MODULUS: usize = 251;
+/// 16 MiB 校准缓冲的 CRC-32C（第七节乙类，登记第十三节 python 命令的输出）。
+const CALIBRATION_CRC_ANCHOR: u32 = 0x3430_BE3B;
+/// 加倍那一遍（32 MiB，同法）的 CRC-32C（R2-3）。
+const DOUBLED_CALIBRATION_CRC_ANCHOR: u32 = 0x84B6_5AA5;
+/// 一次校准 CRC 那份活连做几遍取中位（N1）。
+const CALIBRATION_RUNS_PER_READING: usize = 3;
+/// 段开头、段末的基线各做几遍取中位（N2）。
+const CALIBRATION_RUNS_OF_THE_BASELINE: usize = 21;
+/// 一条意图前后两个校准比有一个超过它，那一条意图作废（R2-1；等于不作废）。
+const CALIBRATION_RATIO_ABOVE_FOR_VOIDING: f64 = 1.10;
+/// 段末基线 ÷ 段开头基线不在这个区间（含两端）就记漂移（R2-4）。
+const CALIBRATION_DRIFT_LOWER: f64 = 0.90;
+const CALIBRATION_DRIFT_UPPER: f64 = 1.10;
+/// 校准自己的阳性对照：加倍的活 ÷ 段开头基线要落在这个区间（含两端，R2-3）。
+const CALIBRATION_DOUBLING_RATIO_LOWER: f64 = 1.8;
+const CALIBRATION_DOUBLING_RATIO_UPPER: f64 = 2.2;
+/// 第八节「新加的轨迹」另报的两条门槛（门槛挪一档会多作废、少作废几条，只报）。
+const CALIBRATION_TRAJECTORY_LOWER_EDGE: f64 = 1.05;
+const CALIBRATION_TRAJECTORY_UPPER_EDGE: f64 = 1.20;
+/// 追指针表的项数（N15：2^24 项 `u32`，64 MiB）。
+const CHASE_TABLE_ENTRIES: u64 = 1 << 24;
+/// 追指针表第 x 项 = (2654435761 x + 1) mod 2^24。
+const CHASE_MULTIPLIER: u64 = 2_654_435_761;
+/// 一遍追指针走几步。
+const CHASE_STEPS: u64 = 1 << 20;
+/// 从 0 走 2^20 步的终点下标（第七节乙类）。
+const CHASE_END_INDEX_ANCHOR: u32 = 9_437_184;
+/// 一段里校准锚点不符（每一次校准读数算一次）累计超过几次就停、退 3（停机 10）。
+const CALIBRATION_ANCHOR_MISMATCHES_PER_SEGMENT_AT_MOST: usize = 3;
+
+/// 校准的缓冲：第 i 字节 = i mod 251。N1 用 16 MiB，R2-3 加倍那一遍用 32 MiB。
+fn calibration_buffer(bytes: usize) -> Vec<u8> {
+    (0..bytes)
+        .map(|position| {
+            u8::try_from(position % CALIBRATION_BYTE_MODULUS).expect("余数小于模，装得进 u8")
+        })
+        .collect()
+}
+
+/// 追指针表（N15）。
+fn chase_table() -> Vec<u32> {
+    (0..CHASE_TABLE_ENTRIES)
+        .map(|index| {
+            u32::try_from((CHASE_MULTIPLIER * index + 1) % CHASE_TABLE_ENTRIES)
+                .expect("模 2^24 的余数装得进 u32")
+        })
+        .collect()
+}
+
+/// 一遍 CRC 那份活：（线程 CPU 纳秒、算出的 CRC）；线程 CPU 时钟读不到交回 `None`。
+fn one_calibration_run(buffer: &[u8]) -> Option<(u64, u32)> {
+    let started = thread_cpu_nanoseconds()?;
+    let crc = std::hint::black_box(crc32_castagnoli(std::hint::black_box(buffer)));
+    let finished = thread_cpu_nanoseconds()?;
+    Some((finished.checked_sub(started)?, crc))
+}
+
+/// 一遍追指针：从下标 0 起每步取表里那一项当下一个下标，走 2^20 步；交回（线程 CPU 纳秒、终点下标）。
+fn one_chase_run(table: &[u32]) -> Option<(u64, u32)> {
+    let table = std::hint::black_box(table);
+    let started = thread_cpu_nanoseconds()?;
+    let mut index = 0_u32;
+    // 迭代上界：CHASE_STEPS 步；跨步的状态只有下标，每一步都依赖上一步取到的那一项，编译器省不掉
+    for _step in 0..CHASE_STEPS {
+        index = table[usize::try_from(index).expect("u32 装得进 usize")];
+    }
+    let finished = thread_cpu_nanoseconds()?;
+    Some((finished.checked_sub(started)?, std::hint::black_box(index)))
+}
+
+/// 一次校准的读数（N1、N15）：CRC 那份活连做 3 遍的中位与追指针一遍；读不到的是 `None`（不当 0）。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct CalibrationReading {
+    crc_median_nanoseconds: Option<f64>,
+    /// 算出的 CRC 不是 `0x3430be3b` 的遍数（校准的活确实做了、没被优化掉时是 0）。
+    crc_runs_off_the_anchor: usize,
+    chase_nanoseconds: Option<f64>,
+    /// 追指针的终点是 9437184（读不到时不算不符）。
+    is_the_chase_end_the_anchor: bool,
+}
+
+impl CalibrationReading {
+    /// 这一次校准里锚点不符的遍数（停机 10 按遍累计）：CRC 不符的遍数，追指针终点不符再加一遍。
+    fn anchor_mismatching_runs(&self) -> usize {
+        self.crc_runs_off_the_anchor + usize::from(!self.is_the_chase_end_the_anchor)
+    }
+
+    fn are_the_anchors_holding(&self) -> bool {
+        self.anchor_mismatching_runs() == 0
+    }
+}
+
+fn calibration_reading(buffer: &[u8], table: &[u32]) -> CalibrationReading {
+    let mut run_nanoseconds: Vec<f64> = Vec::new();
+    let mut crc_runs_off_the_anchor = 0_usize;
+    for _run in 0..CALIBRATION_RUNS_PER_READING {
+        if let Some((nanoseconds, crc)) = one_calibration_run(buffer) {
+            run_nanoseconds.push(nanoseconds as f64);
+            crc_runs_off_the_anchor += usize::from(crc != CALIBRATION_CRC_ANCHOR);
+        }
+    }
+    let chase = one_chase_run(table);
+    CalibrationReading {
+        crc_median_nanoseconds: (run_nanoseconds.len() == CALIBRATION_RUNS_PER_READING)
+            .then(|| median_of(&run_nanoseconds))
+            .flatten(),
+        crc_runs_off_the_anchor,
+        chase_nanoseconds: chase.map(|(nanoseconds, _end_index)| nanoseconds as f64),
+        is_the_chase_end_the_anchor: chase
+            .is_none_or(|(_nanoseconds, end_index)| end_index == CHASE_END_INDEX_ANCHOR),
+    }
+}
+
+/// 校准比：这一次 ÷ 段开头基线（N1、N15）。
+fn calibration_ratio(this_nanoseconds: f64, baseline_nanoseconds: f64) -> f64 {
+    this_nanoseconds / baseline_nanoseconds
+}
+
+/// 一个校准比超过 1.10（等于 1.10 不算）。
+fn is_the_calibration_ratio_above_the_edge(ratio: f64) -> bool {
+    ratio > CALIBRATION_RATIO_ABOVE_FOR_VOIDING
+}
+
+/// R2-1：一条意图前后两个校准比有一个超过 1.10 就作废。
+fn is_voided_by_the_calibration_ratios(before_ratio: f64, after_ratio: f64) -> bool {
+    is_the_calibration_ratio_above_the_edge(before_ratio)
+        || is_the_calibration_ratio_above_the_edge(after_ratio)
+}
+
+/// R2-4：段末基线 ÷ 段开头基线（[`calibration_ratio`]）不在 [0.90, 1.10] 里就是漂移了。
+fn calibration_drifted(end_to_start_ratio: f64) -> bool {
+    !(CALIBRATION_DRIFT_LOWER..=CALIBRATION_DRIFT_UPPER).contains(&end_to_start_ratio)
+}
+
+/// R2-3：加倍的活 ÷ 段开头基线（[`calibration_ratio`]）落在 [1.8, 2.2] 里，校准才分得出两倍的活。
+fn calibration_doubling_holds(twice_to_once_ratio: f64) -> bool {
+    (CALIBRATION_DOUBLING_RATIO_LOWER..=CALIBRATION_DOUBLING_RATIO_UPPER)
+        .contains(&twice_to_once_ratio)
+}
+
+/// 段开头或段末的基线（N2）：CRC 那份活与追指针各做 21 遍取中位。CRC 那份读不到的交回 `None`。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct CalibrationBaseline {
+    crc_median_nanoseconds: f64,
+    chase_median_nanoseconds: Option<f64>,
+    /// 21 遍里 CRC 与追指针终点都是锚点。
+    are_the_anchors_holding: bool,
+}
+
+fn calibration_baseline(buffer: &[u8], table: &[u32]) -> Option<CalibrationBaseline> {
+    let mut crc_nanoseconds: Vec<f64> = Vec::new();
+    let mut chase_nanoseconds: Vec<f64> = Vec::new();
+    let mut are_the_anchors_holding = true;
+    for _run in 0..CALIBRATION_RUNS_OF_THE_BASELINE {
+        let (nanoseconds, crc) = one_calibration_run(buffer)?;
+        crc_nanoseconds.push(nanoseconds as f64);
+        are_the_anchors_holding &= crc == CALIBRATION_CRC_ANCHOR;
+        if let Some((chase, end_index)) = one_chase_run(table) {
+            chase_nanoseconds.push(chase as f64);
+            are_the_anchors_holding &= end_index == CHASE_END_INDEX_ANCHOR;
+        }
+    }
+    Some(CalibrationBaseline {
+        crc_median_nanoseconds: median_of(&crc_nanoseconds)?,
+        chase_median_nanoseconds: median_of(&chase_nanoseconds),
+        are_the_anchors_holding,
+    })
+}
+
+/// 一条意图前后两次校准的判定（R2-1、停机 10）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CalibrationVerdict {
+    Holds,
+    /// 前后两个比有一个超过 1.10（R2-1）：作废，等常态再重量（R2-2）。
+    RatioAboveTheEdge,
+    /// CRC 那份活的钟读不到（原登记第十一节「读不到」）：作废，当场重量。
+    Unreadable,
+    /// 某一遍的 CRC 或追指针终点不是锚点（停机 10）：作废，当场重量，一段里累计超过 3 次就停。
+    AnchorMismatch,
+}
+
+/// R2-1 作废的那一条的 `invalid_reason`。
+const CALIBRATION_RATIO_INVALID_REASON: &str = "calibration_ratio_above_the_registered_edge";
+
+impl CalibrationVerdict {
+    const fn label(self) -> &'static str {
+        match self {
+            CalibrationVerdict::Holds => "holds",
+            CalibrationVerdict::RatioAboveTheEdge => "ratio_above_the_edge",
+            CalibrationVerdict::Unreadable => "unreadable",
+            CalibrationVerdict::AnchorMismatch => "anchor_mismatch",
+        }
+    }
+
+    /// 作废的原因（写进 `name=intent` 的 `invalid_reason`）；不作废是 `None`。
+    const fn invalid_reason(self) -> Option<&'static str> {
+        match self {
+            CalibrationVerdict::Holds => None,
+            CalibrationVerdict::RatioAboveTheEdge => Some(CALIBRATION_RATIO_INVALID_REASON),
+            CalibrationVerdict::Unreadable => Some("calibration_unreadable"),
+            CalibrationVerdict::AnchorMismatch => Some("calibration_anchor_mismatch"),
+        }
+    }
+}
+
+fn calibration_verdict(
+    before: &CalibrationReading,
+    after: &CalibrationReading,
+    baseline: &CalibrationBaseline,
+) -> CalibrationVerdict {
+    if !before.are_the_anchors_holding() || !after.are_the_anchors_holding() {
+        return CalibrationVerdict::AnchorMismatch;
+    }
+    match (before.crc_median_nanoseconds, after.crc_median_nanoseconds) {
+        (Some(before_nanoseconds), Some(after_nanoseconds)) => {
+            if is_voided_by_the_calibration_ratios(
+                calibration_ratio(before_nanoseconds, baseline.crc_median_nanoseconds),
+                calibration_ratio(after_nanoseconds, baseline.crc_median_nanoseconds),
+            ) {
+                CalibrationVerdict::RatioAboveTheEdge
+            } else {
+                CalibrationVerdict::Holds
+            }
+        }
+        (None, _) | (_, None) => CalibrationVerdict::Unreadable,
+    }
+}
+
+// ───────────────────────────── 作废之后等常态（第 2 次重跑登记第十一节 R2-2） ─────────────────────────────
+
+/// 「未入账超过挂钟 10%」作废的那一条的 `invalid_reason`（原登记第十一节「机器被别的活挤」）。
+const UNACCOUNTED_INVALID_REASON: &str = "unaccounted_time_above_ten_percent_of_the_wall";
+/// 等常态时隔几秒做一次校准。
+const SECONDS_BETWEEN_NORMAL_CHECKS: u64 = 10;
+/// 连着几次校准比 ≤ 1.10 才重量。
+const NORMAL_CHECKS_IN_A_ROW_FOR_THE_RETRY: usize = 2;
+/// 单次至多等几秒（等满照样重量）。
+const SECONDS_OF_ONE_WAIT_AT_MOST: u64 = 300;
+/// 一段里累计至多等几秒（等满就停、退 5）。
+const SECONDS_OF_WAITING_PER_SEGMENT_AT_MOST: u64 = 600;
+
+/// 这一种作废之后要先等机器回到常态再重量（R2-2）；别的原因（挂载失败、钟读不到、扫描读为 0、拷回不成、校准锚点不符）当场重量。
+fn is_retried_only_after_the_machine_is_back_to_normal(invalid_reason: &str) -> bool {
+    invalid_reason == UNACCOUNTED_INVALID_REASON
+        || invalid_reason == CALIBRATION_RATIO_INVALID_REASON
+}
+
+/// 一次等常态的结局。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NormalWaitOutcome {
+    /// 连着两次校准比 ≤ 1.10。
+    BackToNormal,
+    /// 这一次等满 300 秒，照样重量（重量的那一次照样受 R2-1 判）。
+    OneWaitCapReached,
+    /// 一段里累计等满 600 秒：打 `name=stopped`、收尾、退 5。
+    SegmentWaitCapReached,
+}
+
+impl NormalWaitOutcome {
+    const fn label(self) -> &'static str {
+        match self {
+            NormalWaitOutcome::BackToNormal => "back_to_normal",
+            NormalWaitOutcome::OneWaitCapReached => "one_wait_cap_reached_retrying_anyway",
+            NormalWaitOutcome::SegmentWaitCapReached => "segment_wait_cap_reached",
+        }
+    }
+
+    /// 这个结局要不要停下这一段：要停交回退出码（等满上限仍没等到，同别的性能测量那一条的退出码）。
+    const fn exit_code_stopping_the_segment(self) -> Option<i32> {
+        match self {
+            NormalWaitOutcome::BackToNormal | NormalWaitOutcome::OneWaitCapReached => None,
+            NormalWaitOutcome::SegmentWaitCapReached => {
+                Some(EXIT_CODE_OTHER_MEASUREMENT_STILL_RUNNING)
+            }
+        }
+    }
+}
+
+/// 一次等常态的经过。
+#[derive(Clone, Debug, PartialEq)]
+struct NormalWait {
+    checks: usize,
+    waited_seconds: u64,
+    ratio_per_check: Vec<Option<f64>>,
+    outcome: NormalWaitOutcome,
+}
+
+/// 一段里等过的账（600 秒上限与第八节轨迹）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct WaitingLedger {
+    total_seconds: u64,
+    longest_seconds: u64,
+    waits: usize,
+}
+
+/// R2-2：这一种作废之后先等常态再重量——每 10 秒做一次校准（`calibrate` 交回 CRC 那份的校准比，读不到是 `None`），连着两次 ≤ 1.10 才回去
+/// 重量；单次等满 300 秒照样重量；一段里累计等满 600 秒交回 [`NormalWaitOutcome::SegmentWaitCapReached`]。不用等的原因交回 `None`、不睡。
+/// 钟与校准源从参数进来（单测换成假的，不真睡）；记账写进 `ledger`。
+fn wait_before_the_retry(
+    invalid_reason: &str,
+    ledger: &mut WaitingLedger,
+    calibrate: &mut dyn FnMut() -> Option<f64>,
+    sleep: &mut dyn FnMut(Duration),
+) -> Option<NormalWait> {
+    if !is_retried_only_after_the_machine_is_back_to_normal(invalid_reason) {
+        return None;
+    }
+    let mut wait = NormalWait {
+        checks: 0,
+        waited_seconds: 0,
+        ratio_per_check: Vec::new(),
+        outcome: NormalWaitOutcome::OneWaitCapReached,
+    };
+    let mut normal_checks_in_a_row = 0_usize;
+    // 迭代上界：每一圈 waited_seconds 加 10，到 300 必出去（30 圈）；一段累计到 600 也出去。跨圈的状态：normal_checks_in_a_row =
+    // 到这一圈为止连着 ≤ 1.10 的次数，读不到或超过 1.10 归零。
+    loop {
+        sleep(Duration::from_secs(SECONDS_BETWEEN_NORMAL_CHECKS));
+        wait.waited_seconds += SECONDS_BETWEEN_NORMAL_CHECKS;
+        ledger.total_seconds += SECONDS_BETWEEN_NORMAL_CHECKS;
+        let ratio = calibrate();
+        wait.checks += 1;
+        wait.ratio_per_check.push(ratio);
+        if ratio.is_some_and(|value| !is_the_calibration_ratio_above_the_edge(value)) {
+            normal_checks_in_a_row += 1;
+        } else {
+            normal_checks_in_a_row = 0;
+        }
+        if normal_checks_in_a_row >= NORMAL_CHECKS_IN_A_ROW_FOR_THE_RETRY {
+            wait.outcome = NormalWaitOutcome::BackToNormal;
+            break;
+        }
+        if ledger.total_seconds >= SECONDS_OF_WAITING_PER_SEGMENT_AT_MOST {
+            wait.outcome = NormalWaitOutcome::SegmentWaitCapReached;
+            break;
+        }
+        if wait.waited_seconds >= SECONDS_OF_ONE_WAIT_AT_MOST {
+            wait.outcome = NormalWaitOutcome::OneWaitCapReached;
+            break;
+        }
+    }
+    ledger.waits += 1;
+    ledger.longest_seconds = ledger.longest_seconds.max(wait.waited_seconds);
+    Some(wait)
+}
+
+// ───────────────────────────── 线程与机器的读数（第 2 次重跑登记第六节 N3–N10；只报不判） ─────────────────────────────
+
+/// `/proc/<…>/stat` 进程名之后头一栏是第 3 栏（状态）。
+const COUNTER_RECORD_FIELD_NUMBER_RIGHT_AFTER_THE_COMMAND_NAME: usize = 3;
+/// `proc(5)` 里 `stat` 的栏号（从 1 数）：minflt、majflt、utime、stime。
+const COUNTER_RECORD_FIELD_MINOR_FAULTS: usize = 10;
+const COUNTER_RECORD_FIELD_MAJOR_FAULTS: usize = 12;
+const COUNTER_RECORD_FIELD_USER_TICKS: usize = 14;
+const COUNTER_RECORD_FIELD_SYSTEM_TICKS: usize = 15;
+/// glibc `<bits/confname.h>` 的 `_SC_CLK_TCK`。
+const SYSTEM_CONFIGURATION_NAME_OF_THE_CLOCK_TICKS: i32 = 2;
+/// `/proc/meminfo` 的 kB 是 1024 字节。
+const BYTES_PER_KIBIBYTE: u64 = 1024;
+/// 机器状态（N10）两次读 `/proc/stat` 之间隔几秒。
+const SECONDS_BETWEEN_THE_MACHINE_STATE_READS: u64 = 1;
+
+// std 已经链着 C 库，这里只声明、不加依赖；签名照 glibc：`int sched_getcpu(void)`、`long sysconf(int)`（Linux 64 位上 long 是 64 位）。
+extern "C" {
+    fn sched_getcpu() -> i32;
+    fn sysconf(name: i32) -> i64;
+}
+
+/// 读一个内核文件再照 `parse` 拆出一个数；文件不在、读不了交回 `None`（读不到不当 0）。
+fn parsed_value_of_the_file<Value>(path: &Path, parse: fn(&str) -> Option<Value>) -> Option<Value> {
+    let text = std::fs::read_to_string(path).ok()?;
+    parse(&text)
+}
+
+/// `/proc/thread-self/schedstat` 第二个字段：本线程在运行队列里等 CPU 的纳秒（N3）。
+fn run_queue_wait_nanoseconds_of_the_scheduler_counters(text: &str) -> Option<u64> {
+    text.split_whitespace().nth(1)?.parse().ok()
+}
+
+/// `/proc/thread-self/status` 的 `nonvoluntary_ctxt_switches`（N4）。
+fn involuntary_switches_of_the_status(text: &str) -> Option<u64> {
+    text.lines()
+        .find_map(|line| line.strip_prefix("nonvoluntary_ctxt_switches:"))?
+        .trim()
+        .parse()
+        .ok()
+}
+
+/// `stat` 进程名之后的各栏：从最后一个 `)` 之后数（进程名里有空格与括号也不错位）；交回的头一项是第 3 栏。
+fn counter_record_fields_after_the_command_name(text: &str) -> Option<Vec<&str>> {
+    let (_command_name, after_the_command_name) = text.rsplit_once(')')?;
+    Some(after_the_command_name.split_whitespace().collect())
+}
+
+/// `stat` 第 `field_number` 栏（从 1 数，至少是 3）。
+fn counter_record_field(
+    fields_after_the_command_name: &[&str],
+    field_number: usize,
+) -> Option<u64> {
+    fields_after_the_command_name
+        .get(field_number.checked_sub(COUNTER_RECORD_FIELD_NUMBER_RIGHT_AFTER_THE_COMMAND_NAME)?)?
+        .parse()
+        .ok()
+}
+
+/// 本线程 `stat` 里的四个计数（N5、N6）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ThreadCounters {
+    minor_faults: u64,
+    major_faults: u64,
+    user_ticks: u64,
+    system_ticks: u64,
+}
+
+fn thread_counters_of_the_counter_record(text: &str) -> Option<ThreadCounters> {
+    let fields = counter_record_fields_after_the_command_name(text)?;
+    Some(ThreadCounters {
+        minor_faults: counter_record_field(&fields, COUNTER_RECORD_FIELD_MINOR_FAULTS)?,
+        major_faults: counter_record_field(&fields, COUNTER_RECORD_FIELD_MAJOR_FAULTS)?,
+        user_ticks: counter_record_field(&fields, COUNTER_RECORD_FIELD_USER_TICKS)?,
+        system_ticks: counter_record_field(&fields, COUNTER_RECORD_FIELD_SYSTEM_TICKS)?,
+    })
+}
+
+/// 本进程 `stat` 的 utime + stime（N10）。
+fn process_ticks_of_the_counter_record(text: &str) -> Option<u64> {
+    let fields = counter_record_fields_after_the_command_name(text)?;
+    counter_record_field(&fields, COUNTER_RECORD_FIELD_USER_TICKS)?.checked_add(
+        counter_record_field(&fields, COUNTER_RECORD_FIELD_SYSTEM_TICKS)?,
+    )
+}
+
+/// `/proc/pressure/{cpu,memory}` 的 `some avg10`（N7）。
+fn pressure_some_ten_seconds_of(text: &str) -> Option<f64> {
+    text.lines()
+        .find_map(|line| line.strip_prefix("some "))?
+        .split_whitespace()
+        .find_map(|field| field.strip_prefix("avg10="))?
+        .parse()
+        .ok()
+}
+
+/// `/proc/loadavg` 第一个数（N7）。
+fn load_average_one_minute_of(text: &str) -> Option<f64> {
+    text.split_whitespace().next()?.parse().ok()
+}
+
+/// `/proc/meminfo` 的 `MemAvailable`（kB）折成字节（N10）。
+fn memory_available_bytes_of(text: &str) -> Option<u64> {
+    let kibibytes: u64 = text
+        .lines()
+        .find_map(|line| line.strip_prefix("MemAvailable:"))?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()?;
+    kibibytes.checked_mul(BYTES_PER_KIBIBYTE)
+}
+
+fn cpu_number_now() -> Option<u32> {
+    // SAFETY: glibc 的 sched_getcpu 不带参数、不读写调用方的内存；出错交回 −1（try_from 判成 None）。
+    let cpu_number = unsafe { sched_getcpu() };
+    u32::try_from(cpu_number).ok()
+}
+
+fn clock_ticks_per_second() -> Option<u64> {
+    // SAFETY: sysconf 只按名字查一个配置值，不读写调用方的内存；名字不认得时交回 −1（try_from 判成 None）。
+    let ticks = unsafe { sysconf(SYSTEM_CONFIGURATION_NAME_OF_THE_CLOCK_TICKS) };
+    u64::try_from(ticks).ok().filter(|value| *value > 0)
+}
+
+/// 一条意图前或后的一组线程与机器读数（N3–N9）；读不到的是 `None`（不当 0）。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ThreadAndMachineSnapshot {
+    run_queue_wait_nanoseconds: Option<u64>,
+    involuntary_switches: Option<u64>,
+    thread_counters: Option<ThreadCounters>,
+    cpu_pressure_some_ten_seconds: Option<f64>,
+    memory_pressure_some_ten_seconds: Option<f64>,
+    load_average_one_minute: Option<f64>,
+    cpu_number: Option<u32>,
+    seconds_since_the_segment_start: f64,
+}
+
+fn thread_and_machine_snapshot(segment_started: Instant) -> ThreadAndMachineSnapshot {
+    ThreadAndMachineSnapshot {
+        run_queue_wait_nanoseconds: parsed_value_of_the_file(
+            Path::new("/proc/thread-self/schedstat"),
+            run_queue_wait_nanoseconds_of_the_scheduler_counters,
+        ),
+        involuntary_switches: parsed_value_of_the_file(
+            Path::new("/proc/thread-self/status"),
+            involuntary_switches_of_the_status,
+        ),
+        thread_counters: parsed_value_of_the_file(
+            Path::new("/proc/thread-self/stat"),
+            thread_counters_of_the_counter_record,
+        ),
+        cpu_pressure_some_ten_seconds: parsed_value_of_the_file(
+            Path::new("/proc/pressure/cpu"),
+            pressure_some_ten_seconds_of,
+        ),
+        memory_pressure_some_ten_seconds: parsed_value_of_the_file(
+            Path::new("/proc/pressure/memory"),
+            pressure_some_ten_seconds_of,
+        ),
+        load_average_one_minute: parsed_value_of_the_file(
+            Path::new("/proc/loadavg"),
+            load_average_one_minute_of,
+        ),
+        cpu_number: cpu_number_now(),
+        seconds_since_the_segment_start: segment_started.elapsed().as_secs_f64(),
+    }
+}
+
+/// 后减前；两头有一头读不到、或后比前小（计数回绕）交回 `None`。
+fn increase_of(before: Option<u64>, after: Option<u64>) -> Option<u64> {
+    after?.checked_sub(before?)
+}
+
+fn optional_count(value: Option<u64>) -> String {
+    value.map_or_else(|| "none".to_string(), |count| count.to_string())
+}
+
+fn optional_with_two_decimals(value: Option<f64>) -> String {
+    value.map_or_else(|| "none".to_string(), |number| format!("{number:.2}"))
+}
+
+/// `/proc/stat` 首行前八栏（user、nice、system、idle、iowait、irq、softirq、steal）之和是全部，idle 与 iowait 两栏之外是忙。
+const CPU_JIFFY_FIELDS_SUMMED: usize = 8;
+const CPU_JIFFY_IDLE_FIELD_INDEX: usize = 3;
+const CPU_JIFFY_INPUT_OUTPUT_WAIT_FIELD_INDEX: usize = 4;
+
+/// 全机的 CPU 节拍（N10）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CpuJiffies {
+    busy: u64,
+    total: u64,
+}
+
+fn cpu_jiffies_of_the_system_counters(text: &str) -> Option<CpuJiffies> {
+    let values: Vec<u64> = text
+        .lines()
+        .next()?
+        .strip_prefix("cpu ")?
+        .split_whitespace()
+        .take(CPU_JIFFY_FIELDS_SUMMED)
+        .map(|field| field.parse().ok())
+        .collect::<Option<Vec<u64>>>()?;
+    if values.len() < CPU_JIFFY_FIELDS_SUMMED {
+        return None;
+    }
+    let total: u64 = values.iter().sum();
+    let idle = values[CPU_JIFFY_IDLE_FIELD_INDEX] + values[CPU_JIFFY_INPUT_OUTPUT_WAIT_FIELD_INDEX];
+    Some(CpuJiffies {
+        busy: total.checked_sub(idle)?,
+        total,
+    })
+}
+
+/// 隔一秒的两次读数之间：整机忙的比例、本进程占的比例与其余（「其余不归 singlefs」只记这个总量，不打进程名）。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct MachineShares {
+    machine_busy_share: f64,
+    this_process_share: f64,
+    others_share: f64,
+}
+
+fn machine_shares(
+    cpu_before: Option<CpuJiffies>,
+    cpu_after: Option<CpuJiffies>,
+    process_ticks_before: Option<u64>,
+    process_ticks_after: Option<u64>,
+) -> Option<MachineShares> {
+    let (cpu_before, cpu_after) = (cpu_before?, cpu_after?);
+    let total = cpu_after.total.checked_sub(cpu_before.total)?;
+    if total == 0 {
+        return None;
+    }
+    let machine_busy_share = cpu_after.busy.checked_sub(cpu_before.busy)? as f64 / total as f64;
+    let this_process_share =
+        increase_of(process_ticks_before, process_ticks_after)? as f64 / total as f64;
+    Some(MachineShares {
+        machine_busy_share,
+        this_process_share,
+        others_share: machine_busy_share - this_process_share,
+    })
+}
+
+/// 机器状态那一行打在哪一刻（N10）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MachineStatePosition {
+    SegmentStart,
+    /// 一个取样点准备完、量之前。
+    PointStart(SamplingPoint),
+    SegmentEnd,
+}
+
+impl MachineStatePosition {
+    fn text(self) -> String {
+        match self {
+            MachineStatePosition::SegmentStart => "position=segment_start".to_string(),
+            MachineStatePosition::PointStart(point) => {
+                format!("position=point_start {}", point.label())
+            }
+            MachineStatePosition::SegmentEnd => "position=segment_end".to_string(),
+        }
+    }
+}
+
+/// N10：读 `/proc/stat` 首行与本进程 `/proc/self/stat`，隔 1 秒再读一次，打一行 `name=machine_state`（连同可用内存与 N7 那三样）。
+fn emit_the_machine_state(
+    emitter: &mut Emitter,
+    segment: &str,
+    position: MachineStatePosition,
+    segment_started: Instant,
+) {
+    let cpu_before =
+        parsed_value_of_the_file(Path::new("/proc/stat"), cpu_jiffies_of_the_system_counters);
+    let process_before = parsed_value_of_the_file(
+        Path::new("/proc/self/stat"),
+        process_ticks_of_the_counter_record,
+    );
+    std::thread::sleep(Duration::from_secs(SECONDS_BETWEEN_THE_MACHINE_STATE_READS));
+    let cpu_after =
+        parsed_value_of_the_file(Path::new("/proc/stat"), cpu_jiffies_of_the_system_counters);
+    let process_after = parsed_value_of_the_file(
+        Path::new("/proc/self/stat"),
+        process_ticks_of_the_counter_record,
+    );
+    let shares = machine_shares(cpu_before, cpu_after, process_before, process_after);
+    let snapshot = thread_and_machine_snapshot(segment_started);
+    emitter.line(&format!(
+        "name=machine_state segment={segment} {} machine_busy_share={} this_process_share={} others_share={} others_note=not_attributed_to_singlefs memory_available_bytes={} cpu_pressure_some_ten_seconds={} memory_pressure_some_ten_seconds={} load_average_one_minute={} seconds_since_the_segment_start={:.3}",
+        position.text(),
+        optional_number(shares.map(|reading| reading.machine_busy_share)),
+        optional_number(shares.map(|reading| reading.this_process_share)),
+        optional_number(shares.map(|reading| reading.others_share)),
+        optional_count(parsed_value_of_the_file(Path::new("/proc/meminfo"), memory_available_bytes_of)),
+        optional_with_two_decimals(snapshot.cpu_pressure_some_ten_seconds),
+        optional_with_two_decimals(snapshot.memory_pressure_some_ten_seconds),
+        optional_with_two_decimals(snapshot.load_average_one_minute),
+        snapshot.seconds_since_the_segment_start,
+    ));
+}
+
+/// 一条意图前后的校准与读数，及其判定。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct IntentCalibration {
+    before: CalibrationReading,
+    after: CalibrationReading,
+    snapshot_before: ThreadAndMachineSnapshot,
+    snapshot_after: ThreadAndMachineSnapshot,
+    verdict: CalibrationVerdict,
+}
+
+/// 一段的校准状态：缓冲与追指针表（段开头建一次、之后不改）、段开头的基线、锚点不符的累计（停机 10）、等常态的账（R2-2）与 N1 的轨迹。
+struct SegmentCalibration {
+    segment: &'static str,
+    started: Instant,
+    buffer: Vec<u8>,
+    chase_table: Vec<u32>,
+    baseline: CalibrationBaseline,
+    clock_ticks_per_second: Option<u64>,
+    anchor_mismatches: usize,
+    waiting: WaitingLedger,
+    /// 每条意图前后两个 CRC 校准比里大的那个，按意图的次序（第八节轨迹）；读不到的是 `None`。
+    larger_ratio_per_intent: Vec<Option<f64>>,
+}
+
+/// `name=calibration_baseline` 的一行；段末那一行另带末 ÷ 头与漂移判定（R2-4）。
+fn calibration_baseline_line(
+    segment: &str,
+    position: &str,
+    baseline: &CalibrationBaseline,
+    end_to_start_ratio: Option<f64>,
+) -> String {
+    let drift_text = end_to_start_ratio.map_or_else(String::new, |ratio| {
+        format!(
+            " ratio_of_the_end_to_the_start={ratio:.6} drifted={}",
+            calibration_drifted(ratio)
+        )
+    });
+    format!(
+        "name=calibration_baseline segment={segment} position={position} runs={CALIBRATION_RUNS_OF_THE_BASELINE} median_nanoseconds={:.1} chase_median_nanoseconds={} anchors_hold={}{drift_text}",
+        baseline.crc_median_nanoseconds,
+        optional_number(baseline.chase_median_nanoseconds),
+        baseline.are_the_anchors_holding,
+    )
+}
+
+impl SegmentCalibration {
+    /// 段开头（时钟分辨率自检之后、准备之前）：建缓冲与表，做 21 遍基线（N2），再做一遍加倍的活当校准自己的阳性对照（R2-3）。
+    /// 基线读不到或锚点不符（停机 10 收严到基线）时打 `name=stopped`、收尾、交回 `Err(3)`；加倍对照没过时交回 `Err(4)`：那一段一个点都不量。
+    fn start(
+        segment: &'static str,
+        started: Instant,
+        emitter: &mut Emitter,
+    ) -> Result<SegmentCalibration, i32> {
+        enter_the_timing_window(emitter, TimingWindow::Calibration);
+        let buffer = calibration_buffer(CALIBRATION_BUFFER_BYTES);
+        let chase_table = chase_table();
+        let Some(baseline) = calibration_baseline(&buffer, &chase_table) else {
+            emitter.line(&format!(
+                "name=stopped segment={segment} reason=calibration_baseline_unreadable"
+            ));
+            emitter.finish();
+            return Err(EXIT_CODE_STOP_CLAUSE);
+        };
+        emitter.line(&calibration_baseline_line(
+            segment, "start", &baseline, None,
+        ));
+        if !baseline.are_the_anchors_holding {
+            emitter.line(&format!(
+                "name=stopped segment={segment} reason=calibration_anchor_mismatch_in_the_baseline"
+            ));
+            emitter.finish();
+            return Err(EXIT_CODE_STOP_CLAUSE);
+        }
+        let doubled_buffer = calibration_buffer(2 * CALIBRATION_BUFFER_BYTES);
+        let twice = one_calibration_run(&doubled_buffer);
+        drop(doubled_buffer);
+        let twice_to_once_ratio = twice.map(|(nanoseconds, _crc)| {
+            calibration_ratio(nanoseconds as f64, baseline.crc_median_nanoseconds)
+        });
+        let is_the_doubled_crc_the_anchor =
+            twice.is_some_and(|(_nanoseconds, crc)| crc == DOUBLED_CALIBRATION_CRC_ANCHOR);
+        let holds = is_the_doubled_crc_the_anchor
+            && twice_to_once_ratio.is_some_and(calibration_doubling_holds);
+        emitter.line(&format!(
+            "name=positive_control row=calibration segment={segment} twice_nanoseconds={} once_median_nanoseconds={:.1} ratio={} crc_holds={is_the_doubled_crc_the_anchor} holds={holds}",
+            optional_count(twice.map(|(nanoseconds, _crc)| nanoseconds)),
+            baseline.crc_median_nanoseconds,
+            optional_number(twice_to_once_ratio),
+        ));
+        if !holds {
+            emitter.line(&format!(
+                "name=stopped segment={segment} reason=calibration_cannot_tell_twice_the_work"
+            ));
+            emitter.finish();
+            return Err(EXIT_CODE_POSITIVE_CONTROL_FAILED);
+        }
+        Ok(SegmentCalibration {
+            segment,
+            started,
+            buffer,
+            chase_table,
+            baseline,
+            clock_ticks_per_second: clock_ticks_per_second(),
+            anchor_mismatches: 0,
+            waiting: WaitingLedger {
+                total_seconds: 0,
+                longest_seconds: 0,
+                waits: 0,
+            },
+            larger_ratio_per_intent: Vec::new(),
+        })
+    }
+
+    fn crc_ratio_of(&self, reading: &CalibrationReading) -> Option<f64> {
+        reading
+            .crc_median_nanoseconds
+            .map(|nanoseconds| calibration_ratio(nanoseconds, self.baseline.crc_median_nanoseconds))
+    }
+
+    fn chase_ratio_of(&self, reading: &CalibrationReading) -> Option<f64> {
+        match (
+            reading.chase_nanoseconds,
+            self.baseline.chase_median_nanoseconds,
+        ) {
+            (Some(nanoseconds), Some(baseline)) => Some(calibration_ratio(nanoseconds, baseline)),
+            (None, _) | (_, None) => None,
+        }
+    }
+
+    /// 一条意图前后（N1、N3–N9、N15）：校准 → 读数 → 量 → 读数 → 校准，都在调用方进的计时窗口里、在 `measure` 之外。
+    fn around_the_intent<Measured>(
+        &self,
+        measure: impl FnOnce() -> Measured,
+    ) -> (Measured, IntentCalibration) {
+        let before = calibration_reading(&self.buffer, &self.chase_table);
+        let snapshot_before = thread_and_machine_snapshot(self.started);
+        let measured = measure();
+        let snapshot_after = thread_and_machine_snapshot(self.started);
+        let after = calibration_reading(&self.buffer, &self.chase_table);
+        let verdict = calibration_verdict(&before, &after, &self.baseline);
+        (
+            measured,
+            IntentCalibration {
+                before,
+                after,
+                snapshot_before,
+                snapshot_after,
+                verdict,
+            },
+        )
+    }
+
+    /// `name=intent_machine_readings` 那一行（键同那条意图的 `name=intent`；N1、N3–N9、N15）。
+    fn intent_machine_readings_text(
+        &self,
+        label: &MeasurementLabel,
+        calibration: &IntentCalibration,
+    ) -> String {
+        let before_ratio = self.crc_ratio_of(&calibration.before);
+        let after_ratio = self.crc_ratio_of(&calibration.after);
+        let (before, after) = (&calibration.snapshot_before, &calibration.snapshot_after);
+        let counter_increase = |pick: fn(&ThreadCounters) -> u64| {
+            increase_of(
+                before.thread_counters.as_ref().map(pick),
+                after.thread_counters.as_ref().map(pick),
+            )
+        };
+        format!(
+            "name=intent_machine_readings {} calibration_before_nanoseconds={} calibration_after_nanoseconds={} calibration_before_ratio={} calibration_after_ratio={} chase_before_nanoseconds={} chase_after_nanoseconds={} chase_before_ratio={} chase_after_ratio={} calibration_anchors_hold={} calibration_verdict={} run_queue_wait_nanoseconds={} involuntary_switches={} user_ticks={} system_ticks={} clock_ticks_per_second={} minor_faults={} major_faults={} cpu_pressure_some_ten_seconds_before={} cpu_pressure_some_ten_seconds_after={} memory_pressure_some_ten_seconds_before={} memory_pressure_some_ten_seconds_after={} load_average_one_minute_before={} load_average_one_minute_after={} cpu_number_before={} cpu_number_after={} seconds_since_the_segment_start_before={:.3} seconds_since_the_segment_start_after={:.3}",
+            label.text(),
+            optional_number(calibration.before.crc_median_nanoseconds),
+            optional_number(calibration.after.crc_median_nanoseconds),
+            optional_number(before_ratio),
+            optional_number(after_ratio),
+            optional_number(calibration.before.chase_nanoseconds),
+            optional_number(calibration.after.chase_nanoseconds),
+            optional_number(self.chase_ratio_of(&calibration.before)),
+            optional_number(self.chase_ratio_of(&calibration.after)),
+            calibration.before.are_the_anchors_holding() && calibration.after.are_the_anchors_holding(),
+            calibration.verdict.label(),
+            optional_count(increase_of(before.run_queue_wait_nanoseconds, after.run_queue_wait_nanoseconds)),
+            optional_count(increase_of(before.involuntary_switches, after.involuntary_switches)),
+            optional_count(counter_increase(|counters| counters.user_ticks)),
+            optional_count(counter_increase(|counters| counters.system_ticks)),
+            optional_count(self.clock_ticks_per_second),
+            optional_count(counter_increase(|counters| counters.minor_faults)),
+            optional_count(counter_increase(|counters| counters.major_faults)),
+            optional_with_two_decimals(before.cpu_pressure_some_ten_seconds),
+            optional_with_two_decimals(after.cpu_pressure_some_ten_seconds),
+            optional_with_two_decimals(before.memory_pressure_some_ten_seconds),
+            optional_with_two_decimals(after.memory_pressure_some_ten_seconds),
+            optional_with_two_decimals(before.load_average_one_minute),
+            optional_with_two_decimals(after.load_average_one_minute),
+            optional_count(before.cpu_number.map(u64::from)),
+            optional_count(after.cpu_number.map(u64::from)),
+            before.seconds_since_the_segment_start,
+            after.seconds_since_the_segment_start,
+        )
+    }
+
+    /// 打 `name=intent_machine_readings`（键同那条意图的 `name=intent`）、记 N1 轨迹与锚点不符的次数；一段里锚点不符累计超过 3 次就打
+    /// `name=stopped`、收尾、退 3（停机 10：校准那段代码坏了，不是机器忙）。
+    fn note_the_intent(
+        &mut self,
+        emitter: &mut Emitter,
+        label: &MeasurementLabel,
+        calibration: &IntentCalibration,
+    ) {
+        let before_ratio = self.crc_ratio_of(&calibration.before);
+        let after_ratio = self.crc_ratio_of(&calibration.after);
+        emitter.line(&self.intent_machine_readings_text(label, calibration));
+        self.larger_ratio_per_intent
+            .push(match (before_ratio, after_ratio) {
+                (Some(before_value), Some(after_value)) => Some(before_value.max(after_value)),
+                (None, _) | (_, None) => None,
+            });
+        self.anchor_mismatches += calibration.before.anchor_mismatching_runs()
+            + calibration.after.anchor_mismatching_runs();
+        if self.anchor_mismatches > CALIBRATION_ANCHOR_MISMATCHES_PER_SEGMENT_AT_MOST {
+            emitter.line(&format!(
+                "name=stopped segment={} reason=calibration_anchor_mismatches_above_three_in_the_segment mismatches={}",
+                self.segment, self.anchor_mismatches
+            ));
+            emitter.finish();
+            std::process::exit(EXIT_CODE_STOP_CLAUSE);
+        }
+    }
+
+    /// 一条意图作废之后、重量之前（R2-2）：要等常态的原因就在测量线程上每 10 秒校准一次地等，打一行 `name=normal_wait`；一段里累计等满
+    /// 600 秒就打 `name=stopped`、收尾、退 5。别的原因当场重量，不打行。
+    fn wait_for_the_machine_before_the_retry(
+        &mut self,
+        emitter: &mut Emitter,
+        label: &MeasurementLabel,
+        invalid_reason: &str,
+    ) {
+        if !is_retried_only_after_the_machine_is_back_to_normal(invalid_reason) {
+            return;
+        }
+        enter_the_timing_window(emitter, TimingWindow::Calibration);
+        let buffer = &self.buffer;
+        let chase_table = &self.chase_table;
+        let baseline_nanoseconds = self.baseline.crc_median_nanoseconds;
+        let mut calibrate = || {
+            let reading = calibration_reading(buffer, chase_table);
+            if reading.are_the_anchors_holding() {
+                reading
+                    .crc_median_nanoseconds
+                    .map(|nanoseconds| calibration_ratio(nanoseconds, baseline_nanoseconds))
+            } else {
+                None
+            }
+        };
+        let mut sleep_on_this_thread = std::thread::sleep;
+        let Some(wait) = wait_before_the_retry(
+            invalid_reason,
+            &mut self.waiting,
+            &mut calibrate,
+            &mut sleep_on_this_thread,
+        ) else {
+            return;
+        };
+        emitter.line(&format!(
+            "name=normal_wait {} reason={invalid_reason} checks={} waited_seconds={} ratio_per_check={} outcome={} segment_waited_seconds={}",
+            label.text(),
+            wait.checks,
+            wait.waited_seconds,
+            wait.ratio_per_check.iter().map(|ratio| optional_number(*ratio)).collect::<Vec<_>>().join(","),
+            wait.outcome.label(),
+            self.waiting.total_seconds,
+        ));
+        if let Some(exit_code) = wait.outcome.exit_code_stopping_the_segment() {
+            emitter.line(&format!(
+                "name=stopped segment={} reason=machine_not_back_to_normal_within_the_waiting_cap segment_waited_seconds={}",
+                self.segment, self.waiting.total_seconds
+            ));
+            emitter.finish();
+            std::process::exit(exit_code);
+        }
+    }
+
+    /// 段末：21 遍基线（N2 段末那一块，带末 ÷ 头与漂移，R2-4）与第八节「新加的轨迹」一行 `name=calibration_trajectory`。
+    fn finish(&self, emitter: &mut Emitter) {
+        enter_the_timing_window(emitter, TimingWindow::Calibration);
+        match calibration_baseline(&self.buffer, &self.chase_table) {
+            Some(end) => emitter.line(&calibration_baseline_line(
+                self.segment,
+                "end",
+                &end,
+                Some(calibration_ratio(
+                    end.crc_median_nanoseconds,
+                    self.baseline.crc_median_nanoseconds,
+                )),
+            )),
+            None => emitter.line(&format!(
+                "name=calibration_baseline segment={} position=end status=unreadable",
+                self.segment
+            )),
+        }
+        emitter.line(&calibration_trajectory_line(
+            self.segment,
+            &self.larger_ratio_per_intent,
+            &self.waiting,
+        ));
+    }
+}
+
+/// 第八节「新加的轨迹」：N1 前后两个比里大的那个（峰值、超过 1.10 / 1.05 / 1.20 的意图条数、期末值）与等常态的秒数（单次最长、等过的次数、累计）。
+fn calibration_trajectory_line(
+    segment: &str,
+    larger_ratio_per_intent: &[Option<f64>],
+    waiting: &WaitingLedger,
+) -> String {
+    let readable: Vec<f64> = larger_ratio_per_intent.iter().flatten().copied().collect();
+    let count_above = |edge: f64| readable.iter().filter(|ratio| **ratio > edge).count();
+    format!(
+        "name=calibration_trajectory segment={segment} intents={} intents_with_a_readable_ratio={} larger_ratio_peak={} intents_above_the_voiding_edge={} voiding_edge={CALIBRATION_RATIO_ABOVE_FOR_VOIDING:.2} intents_above_the_lower_reported_edge={} lower_reported_edge={CALIBRATION_TRAJECTORY_LOWER_EDGE:.2} intents_above_the_upper_reported_edge={} upper_reported_edge={CALIBRATION_TRAJECTORY_UPPER_EDGE:.2} larger_ratio_final={} wait_longest_seconds={} waits={} wait_total_seconds={}",
+        larger_ratio_per_intent.len(),
+        readable.len(),
+        optional_number(readable.iter().copied().reduce(f64::max)),
+        readable.iter().filter(|ratio| is_the_calibration_ratio_above_the_edge(**ratio)).count(),
+        count_above(CALIBRATION_TRAJECTORY_LOWER_EDGE),
+        count_above(CALIBRATION_TRAJECTORY_UPPER_EDGE),
+        optional_number(larger_ratio_per_intent.last().copied().flatten()),
+        waiting.longest_seconds,
+        waiting.waits,
+        waiting.total_seconds,
+    )
+}
+
 // ───────────────────────────── 一条意图的作废、停机与产物行 ─────────────────────────────
 
 /// 一条意图的读数要不要作废（登记第十一节作废条款里「那一轮作废、重跑」那几条）；交回第一条原因。
@@ -3620,7 +5025,7 @@ fn invalid_reason_of(reading: &IntentReading) -> Option<&'static str> {
         .iter()
         .any(|call| call.inclusion == InclusionVerdict::UnaccountedAboveTenPercent)
     {
-        return Some("unaccounted_time_above_ten_percent_of_the_wall");
+        return Some(UNACCOUNTED_INVALID_REASON);
     }
     if reading.calls.iter().any(|call| {
         call.scan_read_bytes_in_the_region == 0
@@ -3893,37 +5298,103 @@ impl StoredIntent {
     }
 }
 
+/// 一次尝试在两种作废规则下的样子（第 2 次重跑登记第六节 N14）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct AttemptVoiding {
+    /// 照原登记第十一节（不加 R2-1）这一次有效。
+    is_valid_under_the_original_voiding: bool,
+    /// 这一次被校准（R2-1 的比、校准读不到、校准锚点不符）作废。
+    is_voided_by_the_calibration: bool,
+}
+
+/// 照原登记第十一节（不加 R2-1）会被收下的那一次（N14）：头一个照原规则有效的——只因校准作废的那一次照原规则算有效。
+fn attempt_kept_under_the_original_voiding(attempts: &[AttemptVoiding]) -> Option<usize> {
+    attempts
+        .iter()
+        .position(|attempt| attempt.is_valid_under_the_original_voiding)
+}
+
+/// N14：照原作废规则收下的那一次（[`attempt_kept_under_the_original_voiding`]）是被校准作废的那一次时打一行
+/// `name=kept_under_the_original_voiding`，点名这一轮 R2-1 换掉了哪一次（只报）；交回收下的那一次的下标。
+fn kept_attempt_under_the_original_voiding(
+    emitter: &mut Emitter,
+    label: &MeasurementLabel,
+    voidings: &[AttemptVoiding],
+) -> Option<usize> {
+    let kept_index = attempt_kept_under_the_original_voiding(voidings)?;
+    if voidings[kept_index].is_voided_by_the_calibration {
+        emitter.line(&format!(
+            "name=kept_under_the_original_voiding {} kept_attempt={} voided_by_the_calibration=true",
+            label.text(),
+            kept_index + 1
+        ));
+    }
+    Some(kept_index)
+}
+
+/// 存下的有效意图两份：照这一趟的作废规则（加了 R2-1，Q1–Q17 的判定只读这一份）与照原作废规则（N14 并列报，只报不判）。
+struct StoredIntents {
+    under_the_registered_voiding: Vec<StoredIntent>,
+    under_the_original_voiding: Vec<StoredIntent>,
+}
+
+fn stored_intent_of(
+    label: &MeasurementLabel,
+    is_the_geometry_formed: bool,
+    calls: Vec<CallReading>,
+) -> StoredIntent {
+    StoredIntent {
+        arm: label.arm,
+        point: label.point,
+        batch_units: label.batch_units,
+        round: label.round,
+        injection: label.injection,
+        is_the_geometry_formed,
+        calls,
+    }
+}
+
 /// 一个取样点、一个设备、一个批大小、一轮（或对照的一轮）：照登记重跑至多三次，作废的照打 `valid=false`，第一份有效的存下；
-/// 交回停机条款触发了的那几条。
+/// 交回停机条款触发了的那几条。每一次前后做校准与读数（[`SegmentCalibration::around_the_intent`]），校准作废的照 R2-1 作废；
+/// 作废之后要重量的，先照 R2-2 等常态（[`SegmentCalibration::wait_for_the_machine_before_the_retry`]）。照原作废规则会收下的那一次另存一份（N14）。
 fn measure_with_retries(
     emitter: &mut Emitter,
-    stored: &mut Vec<StoredIntent>,
+    stored: &mut StoredIntents,
     images: Option<&mut RealDiskImages>,
     label: MeasurementLabel,
     is_the_geometry_formed: bool,
-    data_units: Option<u64>,
     pool_of_the_round: Option<&ConstructedPool>,
+    calibration: &mut SegmentCalibration,
 ) -> Vec<String> {
     let switches = measured_switches(label.batch_units, label.choice.forced_region());
+    let data_units =
+        is_the_geometry_formed.then_some(label.point.fraction.data_units_per_segment());
     let mut images = images;
+    let mut voidings: Vec<AttemptVoiding> = Vec::new();
+    let mut calls_of_each_attempt: Vec<Option<Vec<CallReading>>> = Vec::new();
+    let mut is_stored = false;
     for attempt in 1..=ATTEMPTS_PER_ROUND_AT_MOST {
         enter_the_timing_window(emitter, TimingWindow::WallClockCompactionRun);
         let mut attempt_label = label;
         attempt_label.attempt = attempt;
-        let reading = match (label.arm, pool_of_the_round, images.as_deref_mut()) {
-            (DeviceArm::Memory, Some(pool), _) => Ok(measure_on_the_memory_device(
-                pool,
-                switches,
-                label.injection,
-                ReplayCapture::Off,
-            )),
-            (DeviceArm::RealDisk, _, Some(real_disk_images)) => {
-                measure_on_the_real_disk(real_disk_images, switches, label.injection)
+        let (reading, intent_calibration) = calibration.around_the_intent(|| {
+            match (label.arm, pool_of_the_round, images.as_deref_mut()) {
+                (DeviceArm::Memory, Some(pool), _) => Ok(measure_on_the_memory_device(
+                    pool,
+                    switches,
+                    label.injection,
+                    ReplayCapture::Off,
+                )),
+                (DeviceArm::RealDisk, _, Some(real_disk_images)) => {
+                    measure_on_the_real_disk(real_disk_images, switches, label.injection)
+                }
+                (DeviceArm::Memory, None, _) | (DeviceArm::RealDisk, _, None) => {
+                    Err("no_device_for_this_arm".to_string())
+                }
             }
-            (DeviceArm::Memory, None, _) | (DeviceArm::RealDisk, _, None) => {
-                Err("no_device_for_this_arm".to_string())
-            }
-        };
+        });
+        calibration.note_the_intent(emitter, &attempt_label, &intent_calibration);
+        let calibration_invalid_reason = intent_calibration.verdict.invalid_reason();
         let reading = match reading {
             Ok(reading) => reading,
             Err(reason) => {
@@ -3931,10 +5402,16 @@ fn measure_with_retries(
                     "name=intent {} valid=false invalid_reason={reason}",
                     attempt_label.text()
                 ));
+                voidings.push(AttemptVoiding {
+                    is_valid_under_the_original_voiding: false,
+                    is_voided_by_the_calibration: calibration_invalid_reason.is_some(),
+                });
+                calls_of_each_attempt.push(None);
                 continue;
             }
         };
-        let invalid_reason = invalid_reason_of(&reading);
+        let original_invalid_reason = invalid_reason_of(&reading);
+        let invalid_reason = original_invalid_reason.or(calibration_invalid_reason);
         emit_the_intent(emitter, &attempt_label, &reading, invalid_reason);
         let findings = stop_findings_of(&reading, data_units, label.batch_units);
         for finding in &findings {
@@ -3946,23 +5423,49 @@ fn measure_with_retries(
         if !findings.is_empty() {
             return findings;
         }
-        if invalid_reason.is_none() {
-            stored.push(StoredIntent {
-                arm: label.arm,
-                point: label.point,
-                batch_units: label.batch_units,
-                round: label.round,
-                injection: label.injection,
-                is_the_geometry_formed,
-                calls: reading.calls,
-            });
-            return Vec::new();
+        voidings.push(AttemptVoiding {
+            is_valid_under_the_original_voiding: original_invalid_reason.is_none(),
+            is_voided_by_the_calibration: calibration_invalid_reason.is_some(),
+        });
+        match invalid_reason {
+            None => {
+                stored.under_the_registered_voiding.push(stored_intent_of(
+                    &label,
+                    is_the_geometry_formed,
+                    reading.calls.clone(),
+                ));
+                calls_of_each_attempt.push(Some(reading.calls));
+                is_stored = true;
+                break;
+            }
+            Some(reason) => {
+                calls_of_each_attempt.push(Some(reading.calls));
+                if attempt < ATTEMPTS_PER_ROUND_AT_MOST {
+                    calibration.wait_for_the_machine_before_the_retry(
+                        emitter,
+                        &attempt_label,
+                        reason,
+                    );
+                }
+            }
         }
     }
-    emitter.line(&format!(
-        "name=round_invalid {} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
-        label.text()
-    ));
+    if !is_stored {
+        emitter.line(&format!(
+            "name=round_invalid {} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
+            label.text()
+        ));
+    }
+    if let Some(Some(calls)) = kept_attempt_under_the_original_voiding(emitter, &label, &voidings)
+        .and_then(|kept_index| calls_of_each_attempt.get_mut(kept_index))
+        .map(Option::take)
+    {
+        stored.under_the_original_voiding.push(stored_intent_of(
+            &label,
+            is_the_geometry_formed,
+            calls,
+        ));
+    }
     Vec::new()
 }
 
@@ -4194,17 +5697,23 @@ enum TimingWindow {
     StageReplay,
     StageControls,
     DiskSizeSensitivity,
+    /// 第 4 次重跑写法与拆分段：一次调用之后九种写法的计时件、对拍与 PW1、PW2（登记 `research/prompts/e185-r4-prereg.md` 第五节「串行声明」）。
+    CpuWritingPieces,
+    /// 校准的基线、加倍对照与等常态（第 2 次重跑登记第十四节「串行」：量的是这一条测量线程此刻跑同一份活要多久）。
+    Calibration,
 }
 
 impl TimingWindow {
     #[cfg_attr(not(test), allow(dead_code, reason = "只有单测逐个核各窗口的理由"))]
-    const ALL: [TimingWindow; 6] = [
+    const ALL: [TimingWindow; 8] = [
         TimingWindow::WallClockCompactionRun,
         TimingWindow::DeviceSequentialWrite,
         TimingWindow::StageSplitCompactionRun,
         TimingWindow::StageReplay,
         TimingWindow::StageControls,
         TimingWindow::DiskSizeSensitivity,
+        TimingWindow::CpuWritingPieces,
+        TimingWindow::Calibration,
     ];
 
     /// 线程核没过时 panic 消息里点名的那一处。
@@ -4217,6 +5726,8 @@ impl TimingWindow {
             TimingWindow::StageReplay => "stage_replay",
             TimingWindow::StageControls => "stage_controls",
             TimingWindow::DiskSizeSensitivity => "disk_size_sensitivity",
+            TimingWindow::CpuWritingPieces => "cpu_writing_pieces",
+            TimingWindow::Calibration => "calibration",
         }
     }
 
@@ -4235,6 +5746,12 @@ impl TimingWindow {
             | TimingWindow::DiskSizeSensitivity => {
                 "E185 计时窗口：第二段的一批搬迁、阶段重放、2 ms 对照与盘大小敏感性要在没有别的线程的进程里量"
             }
+            TimingWindow::CpuWritingPieces => {
+                "E185 第 4 次重跑写法与拆分段：九种 CPU 写法的计时件与它们的 2 ms、两倍对照要在没有别的线程的进程里量"
+            }
+            TimingWindow::Calibration => {
+                "E185 校准与等常态：同一条测量线程跑同一份固定的活，量的是这条线程此刻的快慢，换到别的线程上就不是它的状态了"
+            }
         }
     }
 }
@@ -4243,6 +5760,19 @@ impl TimingWindow {
 fn enter_the_timing_window(emitter: &mut Emitter, window: TimingWindow) {
     assert_this_process_runs_one_thread(window.moment());
     emitter.declare(DeclaredSegment::Serial(window.serial_reason()));
+}
+
+/// 一个子命令的整段（第 4 次重跑登记 `research/prompts/e185-r4-prereg.md` 第五节「串行声明」①③，C905（E185 装置的计时窗口不写串行声明））：
+/// 段一开头（时钟自检之前）声明串行，段末声明并行；中间每个计时窗口另由各自的那一处声明。
+fn within_a_declared_serial_segment<Outcome>(
+    emitter: &mut Emitter,
+    reason: &'static str,
+    segment: impl FnOnce(&mut Emitter) -> Outcome,
+) -> Outcome {
+    emitter.declare(DeclaredSegment::Serial(reason));
+    let outcome = segment(emitter);
+    emitter.declare(DeclaredSegment::Parallel);
+    outcome
 }
 
 // ───────────────────────────── 不计时的准备：一个全局队列（登记第十二节 12.11） ─────────────────────────────
@@ -4336,10 +5866,11 @@ enum PreparationOutcome {
     },
 }
 
-/// 头一次的配方：只有取样点，没有改负载多覆盖写的 inode。几何核还没定时，重造按它推测着先造。
+/// 头一次的配方：只有取样点与量的那一侧用的覆盖写次序（改法甲），没有改负载多覆盖写的 inode。几何核还没定时，重造按它推测着先造。
 fn first_recipe_of(point: SamplingPoint) -> PoolRecipe {
     PoolRecipe {
         point,
+        overwrite_order: OverwriteOrder::HighestFullSegmentLast,
         extra_overwritten_inodes: BTreeSet::new(),
     }
 }
@@ -4363,7 +5894,8 @@ fn run_the_preparation_work(work: PreparationWork) -> PreparationOutcome {
                 .map_err(|error| field_token(&error.to_string())),
         ),
         PreparationWork::Rebuild(recipe) => {
-            let pool = construct_the_pool(&recipe);
+            // 第 2–5 轮的重造不数落点（改动三只打每个点头一次造池），数与不数池逐块相同
+            let pool = construct_the_pool(&recipe, LandingCount::NotCounted);
             let digests = digests_of_the_pool(&pool);
             let footprint_bytes = footprint_bytes_of_the_pool(&pool);
             PreparationOutcome::Rebuilt {
@@ -5005,15 +6537,32 @@ fn measurements_of_the_round(
     plan
 }
 
+/// 一个取样点造好的池那一行 `name=pool`（第一段、第二段与 `geometry-check` 同一个格式；占比 0.75 的核比的是它的 `digests=`）。
+fn pool_line(prepared: &PreparedPoint, speculative_rebuilds_voided: usize) -> String {
+    format!(
+        "name=pool {} choice={} geometry_formed={} speculative_rebuilds_voided={speculative_rebuilds_voided} digests={}",
+        prepared.recipe.point.label(),
+        prepared.choice.label(),
+        prepared.is_the_geometry_formed,
+        prepared
+            .reference_digests
+            .iter()
+            .map(hexadecimal_of)
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
 /// 第一段一个取样点：从准备队列取它的真盘镜像（镜像在量这一点之前建，连同造池与几何核；还没好就跑一次准备，[`PreparationQueue`]），
 /// 打准备时攥着的行，再串行量 5 轮 × 两臂 × 三个批大小；是对照点的，每一轮在 K = 8 那一格里另跑第一行两条臂的阳性对照
 /// （与基线交错，[`measurements_of_the_round`]）。第 2 轮起的重造池从队列里取，还没造好就在那一轮开头跑一次准备（量的时候不造）。
-/// 量完放掉这一点的池与镜像。交回停机条款的触发。
+/// 量完放掉这一点的池与镜像。交回停机条款的触发。准备完、量之前打一行机器状态（N10）。
 fn measure_one_sampling_point(
     emitter: &mut Emitter,
-    stored: &mut Vec<StoredIntent>,
+    stored: &mut StoredIntents,
     queue: &mut PreparationQueue<'_>,
     point_index: usize,
+    calibration: &mut SegmentCalibration,
 ) -> Vec<String> {
     let real_disk_images_or_reason = queue.take_the_real_disk_images(point_index, emitter);
     let prepared = queue.prepared_point(point_index, emitter);
@@ -5021,22 +6570,16 @@ fn measure_one_sampling_point(
     for line in &prepared.lines {
         emitter.line(line);
     }
-    emitter.line(&format!(
-        "name=pool {} choice={} geometry_formed={} speculative_rebuilds_voided={} digests={}",
-        point.label(),
-        prepared.choice.label(),
-        prepared.is_the_geometry_formed,
+    emitter.line(&pool_line(
+        &prepared,
         queue.points[point_index].speculative_rebuilds_voided,
-        prepared
-            .reference_digests
-            .iter()
-            .map(hexadecimal_of)
-            .collect::<Vec<_>>()
-            .join(",")
     ));
-    let data_units = prepared
-        .is_the_geometry_formed
-        .then_some(point.fraction.data_units_per_segment());
+    emit_the_machine_state(
+        emitter,
+        calibration.segment,
+        MachineStatePosition::PointStart(point),
+        calibration.started,
+    );
     let mut real_disk_images = match real_disk_images_or_reason {
         Ok(images) => Some(images),
         Err(reason) => {
@@ -5082,8 +6625,8 @@ fn measure_one_sampling_point(
                 real_disk_images.as_mut(),
                 label,
                 prepared.is_the_geometry_formed,
-                data_units,
                 pool_of_the_round,
+                calibration,
             ));
             if !findings.is_empty() {
                 return findings;
@@ -5231,6 +6774,112 @@ fn paired_by_round<'stored>(
         .collect()
 }
 
+/// Q1 每轮的 ρ：真盘臂一批 CPU ÷ 一批等盘（批行之和）。
+fn rho_per_round(real: &[&StoredIntent]) -> Vec<f64> {
+    real.iter()
+        .map(|intent| intent.batch_cpu_nanoseconds() / intent.batch_wait_nanoseconds())
+        .collect()
+}
+
+/// Q2 每轮的挂钟比：同一轮号真盘臂 ÷ 内存臂（批行挂钟之和）。
+fn intent_wall_ratio_per_round(pairs: &[(&StoredIntent, &StoredIntent)]) -> Vec<f64> {
+    pairs
+        .iter()
+        .map(|(memory_intent, real_intent)| {
+            real_intent.batch_wall_nanoseconds() / memory_intent.batch_wall_nanoseconds()
+        })
+        .collect()
+}
+
+/// Q3 每轮的对账：真盘臂一批 CPU 对内存臂一批挂钟（[`cpu_reconciliation`]）。
+fn cpu_reconciliation_per_round(pairs: &[(&StoredIntent, &StoredIntent)]) -> Vec<f64> {
+    pairs
+        .iter()
+        .map(|(memory_intent, real_intent)| {
+            cpu_reconciliation(
+                real_intent.batch_cpu_nanoseconds(),
+                memory_intent.batch_wall_nanoseconds(),
+            )
+        })
+        .collect()
+}
+
+/// 一格（f、P、K）Q1、Q2、Q3 的五轮判定（原登记的判定函数与门槛），给 N14 两种作废规则各算一遍。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct WallClockCellJudgements {
+    rounds_on_the_real_disk: usize,
+    paired_rounds: usize,
+    rho: &'static str,
+    wall_ratio: &'static str,
+    reconciliation: &'static str,
+}
+
+fn wall_clock_cell_judgements(
+    stored: &[StoredIntent],
+    point: SamplingPoint,
+    batch_units: u64,
+) -> WallClockCellJudgements {
+    let none = WriteInjection::Nothing;
+    let memory = intents_of(stored, DeviceArm::Memory, point, batch_units, none);
+    let real = intents_of(stored, DeviceArm::RealDisk, point, batch_units, none);
+    let pairs = paired_by_round(&memory, &real);
+    let judgement_of = |values: Vec<f64>, judge: fn(f64) -> &'static str| {
+        let per_round: Vec<&'static str> = values.into_iter().map(judge).collect();
+        judgement_of_the_rounds(&per_round)
+    };
+    WallClockCellJudgements {
+        rounds_on_the_real_disk: real.len(),
+        paired_rounds: pairs.len(),
+        rho: judgement_of(
+            rho_per_round(&real),
+            judgement_of_rho_at_the_registered_edges,
+        ),
+        wall_ratio: judgement_of(
+            intent_wall_ratio_per_round(&pairs),
+            judgement_of_wall_ratio_at_the_registered_edges,
+        ),
+        reconciliation: judgement_of(
+            cpu_reconciliation_per_round(&pairs),
+            judgement_of_the_cpu_reconciliation,
+        ),
+    }
+}
+
+/// N14（附带，只报不判）：每格一行，照原作废规则（不加 R2-1）收下的那几轮算的三个判定，并列这一趟正式的判定。
+fn emit_the_wall_clock_judgements_under_the_original_voiding(
+    emitter: &mut Emitter,
+    stored: &StoredIntents,
+    points: &[SamplingPoint],
+) {
+    for point in points {
+        for batch_units in BATCH_SIZES {
+            let original =
+                wall_clock_cell_judgements(&stored.under_the_original_voiding, *point, batch_units);
+            let registered = wall_clock_cell_judgements(
+                &stored.under_the_registered_voiding,
+                *point,
+                batch_units,
+            );
+            emitter.line(&format!(
+                "name=judgements_under_the_original_voiding segment=wall_clock {} batch_units={batch_units} rounds_on_the_real_disk={} paired_rounds={} rho_judgement={} wall_ratio_judgement={} reconciliation_judgement={} registered_rounds_on_the_real_disk={} registered_paired_rounds={} registered_rho_judgement={} registered_wall_ratio_judgement={} registered_reconciliation_judgement={} differs_from_the_registered={}",
+                point.label(),
+                original.rounds_on_the_real_disk,
+                original.paired_rounds,
+                original.rho,
+                original.wall_ratio,
+                original.reconciliation,
+                registered.rounds_on_the_real_disk,
+                registered.paired_rounds,
+                registered.rho,
+                registered.wall_ratio,
+                registered.reconciliation,
+                (original.rho, original.wall_ratio, original.reconciliation)
+                    != (registered.rho, registered.wall_ratio, registered.reconciliation),
+            ));
+        }
+    }
+}
+
 fn list_of(values: &[f64]) -> String {
     if values.is_empty() {
         return "none".to_string();
@@ -5374,10 +7023,7 @@ fn summarize_the_wall_clock_segment(
                 .first()
                 .or(memory.first())
                 .is_some_and(|intent| intent.is_the_geometry_formed);
-            let rhos: Vec<f64> = real
-                .iter()
-                .map(|intent| intent.batch_cpu_nanoseconds() / intent.batch_wait_nanoseconds())
-                .collect();
+            let rhos = rho_per_round(&real);
             let rho_judgements: Vec<&'static str> = rhos
                 .iter()
                 .map(|rho| judgement_of_rho_at_the_registered_edges(*rho))
@@ -5399,12 +7045,7 @@ fn summarize_the_wall_clock_segment(
                 rho_medians.push(median);
             }
             let pairs = paired_by_round(&memory, &real);
-            let wall_ratios: Vec<f64> = pairs
-                .iter()
-                .map(|(memory_intent, real_intent)| {
-                    real_intent.batch_wall_nanoseconds() / memory_intent.batch_wall_nanoseconds()
-                })
-                .collect();
+            let wall_ratios = intent_wall_ratio_per_round(&pairs);
             let batch_count = pairs
                 .iter()
                 .map(|(memory_intent, real_intent)| {
@@ -5454,15 +7095,7 @@ fn summarize_the_wall_clock_segment(
             if let Some(median) = median_of(&wall_ratios) {
                 wall_ratio_medians.push(median);
             }
-            let reconciliations: Vec<f64> = pairs
-                .iter()
-                .map(|(memory_intent, real_intent)| {
-                    cpu_reconciliation(
-                        real_intent.batch_cpu_nanoseconds(),
-                        memory_intent.batch_wall_nanoseconds(),
-                    )
-                })
-                .collect();
+            let reconciliations = cpu_reconciliation_per_round(&pairs);
             let reconciliation_judgements: Vec<&'static str> = reconciliations
                 .iter()
                 .map(|value| judgement_of_the_cpu_reconciliation(*value))
@@ -5951,6 +7584,7 @@ fn wall_clock_configuration_line(
 }
 
 fn run_the_wall_clock_segment(image_directory: &Path, points: &[SamplingPoint]) -> i32 {
+    let segment_started = Instant::now();
     let settings = PreparationSettings::from_the_environment();
     let mut emitter = Emitter::new();
     emitter.line(&wall_clock_configuration_line(
@@ -5959,11 +7593,28 @@ fn run_the_wall_clock_segment(image_directory: &Path, points: &[SamplingPoint]) 
         &settings,
     ));
     assert_this_process_runs_one_thread("segment_start");
+    if !check_the_apparatus_sha256(&mut emitter) {
+        return EXIT_CODE_STOP_CLAUSE;
+    }
     if !check_the_thread_cpu_clock_resolution(&mut emitter) {
         return stop_for_the_clock_resolution(&mut emitter, "wall_clock");
     }
+    emit_the_machine_state(
+        &mut emitter,
+        "wall_clock",
+        MachineStatePosition::SegmentStart,
+        segment_started,
+    );
+    let mut calibration =
+        match SegmentCalibration::start("wall_clock", segment_started, &mut emitter) {
+            Ok(calibration) => calibration,
+            Err(exit_code) => return exit_code,
+        };
     let mismatches = check_the_constants_and_the_anchors(&mut emitter);
-    let mut stored = Vec::new();
+    let mut stored = StoredIntents {
+        under_the_registered_voiding: Vec::new(),
+        under_the_original_voiding: Vec::new(),
+    };
     let mut stop_findings: Vec<String> = Vec::new();
     if mismatches == 0 {
         let mut queue = PreparationQueue::new(
@@ -5979,6 +7630,7 @@ fn run_the_wall_clock_segment(image_directory: &Path, points: &[SamplingPoint]) 
                 &mut stored,
                 &mut queue,
                 point_index,
+                &mut calibration,
             ));
             if !stop_findings.is_empty() {
                 break;
@@ -5990,7 +7642,20 @@ fn run_the_wall_clock_segment(image_directory: &Path, points: &[SamplingPoint]) 
     } else {
         None
     };
-    let summary = summarize_the_wall_clock_segment(&mut emitter, &stored, points, sequential_write);
+    let summary = summarize_the_wall_clock_segment(
+        &mut emitter,
+        &stored.under_the_registered_voiding,
+        points,
+        sequential_write,
+    );
+    emit_the_wall_clock_judgements_under_the_original_voiding(&mut emitter, &stored, points);
+    calibration.finish(&mut emitter);
+    emit_the_machine_state(
+        &mut emitter,
+        "wall_clock",
+        MachineStatePosition::SegmentEnd,
+        segment_started,
+    );
     emitter.line(&format!(
         "name=verdict segment=wall_clock constant_or_anchor_mismatches={mismatches} stop_clause_findings={} positive_control_failures={} positive_control_failure_items={} discrimination_failures={} clause_wall_clock_not_rising_with_the_batch_triggered={} clause_two_cpu_paths_disagree_points={} gc_to_sequential_write_bandwidth_maximum_ratio={} gc_to_sequential_write_bandwidth_judgement={} stored_intents={}",
         stop_findings.len(),
@@ -6001,7 +7666,7 @@ fn run_the_wall_clock_segment(image_directory: &Path, points: &[SamplingPoint]) 
         summary.clause_two_cpu_paths_disagree_points,
         summary.gc_to_sequential_write_bandwidth.map_or_else(|| "none".to_string(), |(ratio, _judgement)| format!("{ratio:.6}")),
         summary.gc_to_sequential_write_bandwidth.map_or("not_run", |(_ratio, judgement)| judgement),
-        stored.len(),
+        stored.under_the_registered_voiding.len(),
     ));
     emitter.finish();
     if mismatches > 0 || !stop_findings.is_empty() {
@@ -6348,6 +8013,7 @@ fn emit_the_disk_size_sensitivity(
                 span_slots: record.span_slots,
                 generation: record.generation,
                 is_released: record.is_released,
+                quarantine_mark: record.quarantine_mark,
             }
         }));
     }
@@ -6482,21 +8148,41 @@ fn emit_the_stage_controls(
     failures
 }
 
-/// 第二段一次调用的份额与吞吐（Q5–Q8）：份额的分母是这一次被测调用的 CPU（线程 CPU 时钟），分子是阶段重放每次重复的 CPU。
-/// Q5 与 Q8 只用甲段原来那一项（区域扫描读到的单元）；释放前读盘核那一项与两项之和另列在同一行末尾，不进判定（登记第十二节 12.5）。
-fn emit_the_stage_shares(
-    emitter: &mut Emitter,
-    prefix: &str,
+/// 一次调用三个阶段的 CPU 与份额（Q5、Q6、Q7 的算式照原登记第六节）：`name=stage` 那一行、批行的判定与丙段的判定（N13）都从这里取。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct StageShareRow {
+    kind: CallKind,
+    crc_cpu_nanoseconds: Option<f64>,
+    scan_cpu_nanoseconds: Option<f64>,
+    scan_increment_cpu_nanoseconds: Option<f64>,
+    choose_cpu_nanoseconds: Option<f64>,
+    crc_share: Option<f64>,
+    scan_increment_share: Option<f64>,
+    /// 选段 CPU ÷ 这条意图的批数 ÷ 这条意图批 CPU 的中位（原登记 Q7 的算法；只有签发那一次的重放里有选段 CPU）。
+    choose_share_per_batch: Option<f64>,
+    /// 签发那一次的原值：选段 CPU ÷ 这一次调用的 CPU（只报）。
+    choose_share_of_the_issue: Option<f64>,
+}
+
+impl StageShareRow {
+    /// 这一行上 Q5、Q6、Q7 的判定（读不到的是 `None`）。
+    fn judgements(&self) -> [Option<&'static str>; 3] {
+        [
+            self.crc_share,
+            self.scan_increment_share,
+            self.choose_share_per_batch,
+        ]
+        .map(|share| share.map(|value| judgement_of_share(value, STAGE_SHARE_AT_LEAST_FOR_WORTH)))
+    }
+}
+
+fn stage_share_row(
     call: &CallReading,
-    material: &CallReplayMaterial,
+    kind: CallKind,
     replay: &CallStageReplay,
     batches_of_the_intent: u64,
     median_batch_cpu: Option<f64>,
-) -> (
-    Option<&'static str>,
-    Option<&'static str>,
-    Option<&'static str>,
-) {
+) -> StageShareRow {
     let call_cpu = call.cpu_nanoseconds as f64;
     let crc_cpu = replay
         .crc
@@ -6511,20 +8197,88 @@ fn emit_the_stage_shares(
     let choose_cpu = replay
         .choose
         .map(|timing| timing.cpu_nanoseconds_per_repetition);
+    let choose_share_per_batch = match (choose_cpu, median_batch_cpu) {
+        (Some(choose), Some(batch_cpu)) if batches_of_the_intent > 0 => {
+            Some(choose / batches_of_the_intent as f64 / batch_cpu)
+        }
+        (Some(_), Some(_)) | (None, _) | (_, None) => None,
+    };
+    StageShareRow {
+        kind,
+        crc_cpu_nanoseconds: crc_cpu,
+        scan_cpu_nanoseconds: scan_cpu,
+        scan_increment_cpu_nanoseconds: scan_increment,
+        choose_cpu_nanoseconds: choose_cpu,
+        crc_share: crc_cpu.map(|crc| crc / call_cpu),
+        scan_increment_share: scan_increment.map(|increment| increment / call_cpu),
+        choose_share_per_batch,
+        choose_share_of_the_issue: choose_cpu.map(|choose| choose / call_cpu),
+    }
+}
+
+/// 一条意图里批行的 Q5/Q6/Q7 判定：（批序号、三个判定），按批序号。
+type BatchShareJudgements = Vec<(usize, [Option<&'static str>; 3])>;
+
+/// 一条意图逐次调用的份额行里，批行的 Q5/Q6/Q7 判定（批序号 → 判定），次序同 `name=stage_judgement` 一直以来的收法。
+fn batch_judgements_of(rows: &[StageShareRow]) -> BatchShareJudgements {
+    rows.iter()
+        .filter(|row| counts_as_a_batch(row.kind))
+        .enumerate()
+        .map(|(batch_index, row)| (batch_index, row.judgements()))
+        .collect()
+}
+
+/// 丙段（N13）一轮的读数：那一轮有效意图签发那一行的 `choose_share_per_batch`（不从批行收：选段只在签发那一次发生）。
+fn choose_share_of_the_issue_row(rows: &[StageShareRow]) -> Option<f64> {
+    rows.iter()
+        .find(|row| row.kind == CallKind::Issue)
+        .and_then(|row| row.choose_share_per_batch)
+}
+
+/// 丙段五轮收成一个判定（原登记 Q7 的门槛 10%）：每轮的判定，读不到的那一轮写 `not_run`（不当 0）；五轮相同写那个判定，不全相同写 `unstable`。
+fn choose_judgement_of_the_rounds(
+    choose_share_per_round: &[Option<f64>],
+) -> (Vec<&'static str>, &'static str) {
+    let per_round: Vec<&'static str> = choose_share_per_round
+        .iter()
+        .map(|share| {
+            share.map_or("not_run", |value| {
+                judgement_of_share(value, STAGE_SHARE_AT_LEAST_FOR_WORTH)
+            })
+        })
+        .collect();
+    let judgement = judgement_of_the_rounds(&per_round);
+    (per_round, judgement)
+}
+
+/// 第二段一次调用的份额与吞吐（Q5–Q8）：份额的分母是这一次被测调用的 CPU（线程 CPU 时钟），分子是阶段重放每次重复的 CPU。
+/// Q5 与 Q8 只用甲段原来那一项（区域扫描读到的单元）；释放前读盘核那一项与两项之和另列在同一行末尾，不进判定（登记第十二节 12.5）。
+/// 返回这一次调用的份额那一行（[`stage_share_row`]，N13、N14 从它取）。
+fn emit_the_stage_shares(
+    emitter: &mut Emitter,
+    prefix: &str,
+    call: &CallReading,
+    material: &CallReplayMaterial,
+    replay: &CallStageReplay,
+    batches_of_the_intent: u64,
+    median_batch_cpu: Option<f64>,
+) -> StageShareRow {
+    let row = stage_share_row(
+        call,
+        material.kind,
+        replay,
+        batches_of_the_intent,
+        median_batch_cpu,
+    );
+    let crc_cpu = row.crc_cpu_nanoseconds;
+    let scan_increment = row.scan_increment_cpu_nanoseconds;
+    let choose_cpu = row.choose_cpu_nanoseconds;
     let release_check_crc_cpu = replay
         .release_check_crc
         .map(|timing| timing.cpu_nanoseconds_per_repetition);
     let crc_with_the_release_check_cpu = match (crc_cpu, release_check_crc_cpu) {
         (Some(crc), Some(release_check_crc)) => Some(crc + release_check_crc),
         (None, _) | (_, None) => None,
-    };
-    let crc_share = crc_cpu.map(|crc| crc / call_cpu);
-    let scan_increment_share = scan_increment.map(|increment| increment / call_cpu);
-    let choose_share_per_batch = match (choose_cpu, median_batch_cpu) {
-        (Some(choose), Some(batch_cpu)) if batches_of_the_intent > 0 => {
-            Some(choose / batches_of_the_intent as f64 / batch_cpu)
-        }
-        (Some(_), Some(_)) | (None, _) | (_, None) => None,
     };
     let crc_bytes = replay.crc_bytes as f64;
     let choose_bytes = (replay.records_read_per_choice * LOCAL_ALLOCATION_RECORD_BYTES) as f64
@@ -6537,17 +8291,17 @@ fn emit_the_stage_shares(
         optional_number(crc_cpu),
         optional_number(replay.crc.map(|timing| timing.wall_nanoseconds_per_repetition)),
         replay.crc.map_or(0, |timing| timing.repetitions),
-        optional_number(scan_cpu),
+        optional_number(row.scan_cpu_nanoseconds),
         optional_number(scan_increment),
         optional_number(choose_cpu),
         replay.choose_calls,
         replay.crc_bytes,
         replay.records_read_per_choice,
         replay.full_segments,
-        optional_number(crc_share),
-        optional_number(scan_increment_share),
-        optional_number(choose_share_per_batch),
-        optional_number(choose_cpu.map(|choose| choose / call_cpu)),
+        optional_number(row.crc_share),
+        optional_number(row.scan_increment_share),
+        optional_number(row.choose_share_per_batch),
+        optional_number(row.choose_share_of_the_issue),
         optional_number(crc_cpu.map(|crc| crc_bytes / (crc / 1e9))),
         optional_number(scan_increment.map(|increment| crc_bytes / (increment / 1e9))),
         optional_number(choose_cpu.map(|choose| choose_bytes / (choose / 1e9))),
@@ -6560,197 +8314,325 @@ fn emit_the_stage_shares(
         optional_number(crc_with_the_release_check_cpu),
         replay.crc_bytes + replay.release_check_crc_bytes,
     ));
+    row
+}
+
+/// 第二段一格一轮交回的东西。
+struct StageSplitIntentOutcome {
+    stop_findings: Vec<String>,
+    control_failures: Vec<String>,
+    /// 这一趟作废规则下收下的那一次逐次调用的份额行（三次都作废是 `None`）。
+    registered: Option<Vec<StageShareRow>>,
+    /// 照原作废规则（不加 R2-1）收下的那一次逐次调用的份额行（N14，只报不判）。
+    under_the_original_voiding: Option<Vec<StageShareRow>>,
+}
+
+/// 这条意图的批数与批 CPU 的中位（Q7 的分母）。
+fn batches_and_the_median_batch_cpu_of(reading: &IntentReading) -> (u64, Option<f64>) {
+    let batch_cpus: Vec<f64> = reading
+        .calls
+        .iter()
+        .filter(|call| counts_as_a_batch(call.kind))
+        .map(|call| call.cpu_nanoseconds as f64)
+        .collect();
     (
-        crc_share.map(|share| judgement_of_share(share, STAGE_SHARE_AT_LEAST_FOR_WORTH)),
-        scan_increment_share.map(|share| judgement_of_share(share, STAGE_SHARE_AT_LEAST_FOR_WORTH)),
-        choose_share_per_batch
-            .map(|share| judgement_of_share(share, STAGE_SHARE_AT_LEAST_FOR_WORTH)),
+        u64::try_from(batch_cpus.len()).expect("批数"),
+        median_of(&batch_cpus),
     )
 }
 
-/// 第二段一个取样点、一个 K、一轮：量一条意图（收重放材料），逐次调用重放三个阶段；第一轮另量饱和吞吐、盘大小敏感性，第一个点第一轮另跑第二行对照。
-/// 交回（停机条款第 4 条的触发、对照没过的几条、这一轮每批的 Q5/Q6/Q7 判定（批序号 → 判定））。
-#[allow(
-    clippy::type_complexity,
-    reason = "交回值是三样各自独立的东西：停机触发、对照失败、按批序号的三个判定"
-)]
-fn stage_split_one_intent(
+/// 收下的那一条意图：逐次调用重放三个阶段、打 `name=stage` 行、判停机条款第 4 条；第一轮另量饱和吞吐、盘大小敏感性，`with_the_controls` 时
+/// 另跑第二行对照。停机触发与对照失败记进 `outcome`；交回逐次调用的份额行。
+fn replay_and_emit_the_stages(
     emitter: &mut Emitter,
-    point: SamplingPoint,
-    prepared_choice: ChoiceOfTheRegion,
-    batch_units: u64,
-    round: usize,
+    reading: &IntentReading,
+    label: &MeasurementLabel,
     pool: &ConstructedPool,
     with_the_controls: bool,
-) -> (
-    Vec<String>,
-    Vec<String>,
-    Vec<(usize, [Option<&'static str>; 3])>,
-) {
-    let switches = measured_switches(batch_units, prepared_choice.forced_region());
-    let mut stop_findings = Vec::new();
-    let mut control_failures = Vec::new();
-    let mut judgements = Vec::new();
-    for attempt in 1..=ATTEMPTS_PER_ROUND_AT_MOST {
-        enter_the_timing_window(emitter, TimingWindow::StageSplitCompactionRun);
-        let reading = measure_on_the_memory_device(
-            pool,
-            switches,
-            WriteInjection::Nothing,
-            ReplayCapture::On,
-        );
-        let label = MeasurementLabel {
-            arm: DeviceArm::Memory,
-            point,
+    outcome: &mut StageSplitIntentOutcome,
+) -> Vec<StageShareRow> {
+    let (prepared_choice, batch_units, round) = (label.choice, label.batch_units, label.round);
+    let prefix = format!(
+        "{} batch_units={batch_units} round={round}",
+        label.point.label()
+    );
+    let (batches_of_the_intent, median_batch_cpu) = batches_and_the_median_batch_cpu_of(reading);
+    let mut rows = Vec::new();
+    let mut batch_index = 0_usize;
+    for material in &reading.replay_material {
+        let call = &reading.calls[material.call_index];
+        enter_the_timing_window(emitter, TimingWindow::StageReplay);
+        let replay = replay_the_stages_of_a_call(
+            material,
+            reading.region,
+            prepared_choice,
             batch_units,
-            round,
-            attempt,
-            injection: WriteInjection::Nothing,
-            choice: prepared_choice,
-        };
-        let invalid_reason = invalid_reason_of(&reading);
-        emit_the_intent(emitter, &label, &reading, invalid_reason);
-        if invalid_reason.is_some() {
-            continue;
+            &pool.devices,
+        );
+        if let Some(finding) = &replay.stop_finding {
+            emitter.line(&format!(
+                "name=stop_clause clause=4 {prefix} finding={finding}"
+            ));
+            outcome.stop_findings.push(finding.clone());
         }
-        let prefix = format!("{} batch_units={batch_units} round={round}", point.label());
-        let batch_cpus: Vec<f64> = reading
-            .calls
-            .iter()
-            .filter(|call| counts_as_a_batch(call.kind))
-            .map(|call| call.cpu_nanoseconds as f64)
-            .collect();
-        let batches_of_the_intent = u64::try_from(batch_cpus.len()).expect("批数");
-        let median_batch_cpu = median_of(&batch_cpus);
-        let mut batch_index = 0_usize;
-        for material in &reading.replay_material {
-            let call = &reading.calls[material.call_index];
+        rows.push(emit_the_stage_shares(
+            emitter,
+            &prefix,
+            call,
+            material,
+            &replay,
+            batches_of_the_intent,
+            median_batch_cpu,
+        ));
+        if counts_as_a_batch(material.kind) {
+            batch_index += 1;
+        }
+        if round == 1 {
+            let units = units_read_by_the_scan(material);
+            if counts_as_a_batch(material.kind) && batch_index == 1 {
+                if let Some(region) = reading.region {
+                    let crc_stage = || {
+                        std::hint::black_box(crc_stage_over_the_units(&units));
+                    };
+                    let scan_stage = || {
+                        std::hint::black_box(
+                            scan_region(
+                                region,
+                                &material.version.allocation_records,
+                                &material.version.mapping_entries,
+                                &material.version.pinned_slots,
+                                &material.state.quarantined_slots,
+                                |_device, slot, length| {
+                                    material
+                                        .unit_bytes_by_slot
+                                        .get(&slot.0)
+                                        .filter(|bytes| bytes.len() == length)
+                                        .cloned()
+                                },
+                            )
+                            .is_ok(),
+                        );
+                    };
+                    let bytes = replay.crc_bytes;
+                    if !emit_the_saturation(emitter, &prefix, "crc", bytes, &crc_stage)
+                        || !emit_the_saturation(emitter, &prefix, "scan", bytes, &scan_stage)
+                    {
+                        outcome
+                            .control_failures
+                            .push("saturation_threads_not_distinct".to_string());
+                    }
+                    if with_the_controls {
+                        enter_the_timing_window(emitter, TimingWindow::StageControls);
+                        outcome.control_failures.extend(emit_the_stage_controls(
+                            emitter,
+                            material,
+                            region,
+                            &pool.devices,
+                        ));
+                    }
+                }
+            }
+            if material.kind == CallKind::Issue {
+                let greedy = replay_the_greedy_choice(
+                    &material.version,
+                    &material.state,
+                    replay_reader(material, &pool.devices),
+                );
+                let disqualify: BTreeSet<SlotNumber> = material
+                    .version
+                    .pinned_slots
+                    .union(&material.state.quarantined_slots)
+                    .copied()
+                    .collect();
+                let choose_stage = || {
+                    for (region_scans, refused) in &greedy.inputs_of_each_call {
+                        std::hint::black_box(choose_region(
+                            &material.version.allocation_records,
+                            material.state.unit_area,
+                            &material.state.cluster_segments,
+                            None,
+                            &disqualify,
+                            region_scans,
+                            refused,
+                            RegionChoiceCriterion::Greedy,
+                        ));
+                    }
+                };
+                let choose_bytes = replay.records_read_per_choice
+                    * LOCAL_ALLOCATION_RECORD_BYTES
+                    * u64::try_from(greedy.inputs_of_each_call.len()).expect("调用次数");
+                if !emit_the_saturation(emitter, &prefix, "choose", choose_bytes, &choose_stage) {
+                    outcome
+                        .control_failures
+                        .push("saturation_threads_not_distinct".to_string());
+                }
+                enter_the_timing_window(emitter, TimingWindow::DiskSizeSensitivity);
+                emit_the_disk_size_sensitivity(emitter, &prefix, material, &greedy);
+            }
+        }
+    }
+    rows
+}
+
+/// 只因校准作废、照原作废规则算有效的那一次（N14）：逐次调用重放三个阶段只为算份额，不打 `name=stage` 行、不量饱和吞吐与对照。
+fn stage_share_rows_without_emitting(
+    emitter: &mut Emitter,
+    reading: &IntentReading,
+    label: &MeasurementLabel,
+    pool: &ConstructedPool,
+) -> Vec<StageShareRow> {
+    let (batches_of_the_intent, median_batch_cpu) = batches_and_the_median_batch_cpu_of(reading);
+    reading
+        .replay_material
+        .iter()
+        .map(|material| {
             enter_the_timing_window(emitter, TimingWindow::StageReplay);
             let replay = replay_the_stages_of_a_call(
                 material,
                 reading.region,
-                prepared_choice,
-                batch_units,
+                label.choice,
+                label.batch_units,
                 &pool.devices,
             );
-            if let Some(finding) = &replay.stop_finding {
-                emitter.line(&format!(
-                    "name=stop_clause clause=4 {prefix} finding={finding}"
-                ));
-                stop_findings.push(finding.clone());
+            stage_share_row(
+                &reading.calls[material.call_index],
+                material.kind,
+                &replay,
+                batches_of_the_intent,
+                median_batch_cpu,
+            )
+        })
+        .collect()
+}
+
+/// 收下的那一条意图交给谁重放：第二段是 [`replay_and_emit_the_stages`]，第 4 次重跑写法与拆分段另加九种写法的计时件。
+type ReplayOfTheKeptIntent<'replay> = dyn FnMut(
+        &mut Emitter,
+        &IntentReading,
+        &MeasurementLabel,
+        &ConstructedPool,
+        &mut StageSplitIntentOutcome,
+    ) -> Vec<StageShareRow>
+    + 'replay;
+
+/// 第二段一个取样点、一个 K、一轮（`label` 的 `attempt` 不读）：量一条意图（收重放材料），收下的那一次交 `replay_the_kept_intent`
+/// 逐次调用重放（第二段是 [`replay_and_emit_the_stages`]）。每一次前后做校准与读数，校准作废的照 R2-1 作废、作废之后照 R2-2 等常态再重量；
+/// 照原作废规则会收下的那一次另算一份份额（N14）。
+fn stage_split_one_intent(
+    emitter: &mut Emitter,
+    label: MeasurementLabel,
+    pool: &ConstructedPool,
+    calibration: &mut SegmentCalibration,
+    replay_the_kept_intent: &mut ReplayOfTheKeptIntent<'_>,
+) -> StageSplitIntentOutcome {
+    let switches = measured_switches(label.batch_units, label.choice.forced_region());
+    let mut outcome = StageSplitIntentOutcome {
+        stop_findings: Vec::new(),
+        control_failures: Vec::new(),
+        registered: None,
+        under_the_original_voiding: None,
+    };
+    let mut voidings: Vec<AttemptVoiding> = Vec::new();
+    let mut rows_of_each_attempt: Vec<Option<Vec<StageShareRow>>> = Vec::new();
+    for attempt in 1..=ATTEMPTS_PER_ROUND_AT_MOST {
+        enter_the_timing_window(emitter, TimingWindow::StageSplitCompactionRun);
+        let mut attempt_label = label;
+        attempt_label.attempt = attempt;
+        let (reading, intent_calibration) = calibration.around_the_intent(|| {
+            measure_on_the_memory_device(pool, switches, WriteInjection::Nothing, ReplayCapture::On)
+        });
+        calibration.note_the_intent(emitter, &attempt_label, &intent_calibration);
+        let calibration_invalid_reason = intent_calibration.verdict.invalid_reason();
+        let original_invalid_reason = invalid_reason_of(&reading);
+        let invalid_reason = original_invalid_reason.or(calibration_invalid_reason);
+        emit_the_intent(emitter, &attempt_label, &reading, invalid_reason);
+        voidings.push(AttemptVoiding {
+            is_valid_under_the_original_voiding: original_invalid_reason.is_none(),
+            is_voided_by_the_calibration: calibration_invalid_reason.is_some(),
+        });
+        match invalid_reason {
+            None => {
+                let rows =
+                    replay_the_kept_intent(emitter, &reading, &attempt_label, pool, &mut outcome);
+                rows_of_each_attempt.push(Some(rows.clone()));
+                outcome.registered = Some(rows);
+                break;
             }
-            let (crc_share_judgement, scan_increment_share_judgement, choose_share_judgement) =
-                emit_the_stage_shares(
-                    emitter,
-                    &prefix,
-                    call,
-                    material,
-                    &replay,
-                    batches_of_the_intent,
-                    median_batch_cpu,
-                );
-            if counts_as_a_batch(material.kind) {
-                judgements.push((
-                    batch_index,
-                    [
-                        crc_share_judgement,
-                        scan_increment_share_judgement,
-                        choose_share_judgement,
-                    ],
-                ));
-                batch_index += 1;
-            }
-            if round == 1 {
-                let units = units_read_by_the_scan(material);
-                if counts_as_a_batch(material.kind) && batch_index == 1 {
-                    if let Some(region) = reading.region {
-                        let crc_stage = || {
-                            std::hint::black_box(crc_stage_over_the_units(&units));
-                        };
-                        let scan_stage = || {
-                            std::hint::black_box(
-                                scan_region(
-                                    region,
-                                    &material.version.allocation_records,
-                                    &material.version.mapping_entries,
-                                    &material.version.pinned_slots,
-                                    &material.state.quarantined_slots,
-                                    |_device, slot, length| {
-                                        material
-                                            .unit_bytes_by_slot
-                                            .get(&slot.0)
-                                            .filter(|bytes| bytes.len() == length)
-                                            .cloned()
-                                    },
-                                )
-                                .is_ok(),
-                            );
-                        };
-                        let bytes = replay.crc_bytes;
-                        if !emit_the_saturation(emitter, &prefix, "crc", bytes, &crc_stage)
-                            || !emit_the_saturation(emitter, &prefix, "scan", bytes, &scan_stage)
-                        {
-                            control_failures.push("saturation_threads_not_distinct".to_string());
-                        }
-                        if with_the_controls {
-                            enter_the_timing_window(emitter, TimingWindow::StageControls);
-                            control_failures.extend(emit_the_stage_controls(
-                                emitter,
-                                material,
-                                region,
-                                &pool.devices,
-                            ));
-                        }
-                    }
-                }
-                if material.kind == CallKind::Issue {
-                    let greedy = replay_the_greedy_choice(
-                        &material.version,
-                        &material.state,
-                        replay_reader(material, &pool.devices),
+            Some(reason) => {
+                rows_of_each_attempt.push(original_invalid_reason.is_none().then(|| {
+                    stage_share_rows_without_emitting(emitter, &reading, &attempt_label, pool)
+                }));
+                if attempt < ATTEMPTS_PER_ROUND_AT_MOST {
+                    calibration.wait_for_the_machine_before_the_retry(
+                        emitter,
+                        &attempt_label,
+                        reason,
                     );
-                    let disqualify: BTreeSet<SlotNumber> = material
-                        .version
-                        .pinned_slots
-                        .union(&material.state.quarantined_slots)
-                        .copied()
-                        .collect();
-                    let choose_stage = || {
-                        for (region_scans, refused) in &greedy.inputs_of_each_call {
-                            std::hint::black_box(choose_region(
-                                &material.version.allocation_records,
-                                material.state.unit_area,
-                                &material.state.cluster_segments,
-                                None,
-                                &disqualify,
-                                region_scans,
-                                refused,
-                                RegionChoiceCriterion::Greedy,
-                            ));
-                        }
-                    };
-                    let choose_bytes = replay.records_read_per_choice
-                        * LOCAL_ALLOCATION_RECORD_BYTES
-                        * u64::try_from(greedy.inputs_of_each_call.len()).expect("调用次数");
-                    if !emit_the_saturation(emitter, &prefix, "choose", choose_bytes, &choose_stage)
-                    {
-                        control_failures.push("saturation_threads_not_distinct".to_string());
-                    }
-                    enter_the_timing_window(emitter, TimingWindow::DiskSizeSensitivity);
-                    emit_the_disk_size_sensitivity(emitter, &prefix, material, &greedy);
                 }
             }
         }
-        return (stop_findings, control_failures, judgements);
     }
-    emitter.line(&format!(
-        "name=round_invalid arm=memory {} batch_units={batch_units} round={round} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
-        point.label()
-    ));
-    (stop_findings, control_failures, judgements)
+    if outcome.registered.is_none() {
+        emitter.line(&format!(
+            "name=round_invalid arm=memory {} batch_units={} round={} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
+            label.point.label(),
+            label.batch_units,
+            label.round,
+        ));
+    }
+    outcome.under_the_original_voiding =
+        kept_attempt_under_the_original_voiding(emitter, &label, &voidings)
+            .and_then(|kept_index| rows_of_each_attempt.get_mut(kept_index))
+            .and_then(Option::take);
+    outcome
+}
+
+/// N14（第二段，只报不判）：一格（f、P、K）里两种作废规则下各自收下的那几轮，甲、乙段按批序号五轮收成的判定与丙段的判定。
+fn stage_cell_judgements_text(rows_per_round: &[Vec<StageShareRow>]) -> String {
+    let batch_judgements_per_round: Vec<BatchShareJudgements> = rows_per_round
+        .iter()
+        .map(|rows| batch_judgements_of(rows))
+        .collect();
+    let batch_indices: BTreeSet<usize> = batch_judgements_per_round
+        .iter()
+        .flatten()
+        .map(|(batch_index, _judgements)| *batch_index)
+        .collect();
+    let judgement_per_batch = |position: usize| {
+        batch_indices
+            .iter()
+            .map(|batch_index| {
+                let per_round: Vec<&'static str> = batch_judgements_per_round
+                    .iter()
+                    .map(|judgements| {
+                        judgements
+                            .iter()
+                            .find(|(index, _judgements)| index == batch_index)
+                            .and_then(|(_index, cell)| cell[position])
+                            .unwrap_or("not_run")
+                    })
+                    .collect();
+                judgement_of_the_rounds(&per_round)
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let choose_share_per_round: Vec<Option<f64>> = rows_per_round
+        .iter()
+        .map(|rows| choose_share_of_the_issue_row(rows))
+        .collect();
+    let (_choose_per_round, choose_judgement) =
+        choose_judgement_of_the_rounds(&choose_share_per_round);
+    format!(
+        "rounds={} crc_share_judgement_per_batch={} scan_increment_share_judgement_per_batch={} choose_share_judgement={choose_judgement}",
+        rows_per_round.len(),
+        judgement_per_batch(0),
+        judgement_per_batch(1),
+    )
 }
 
 fn run_the_stage_split_segment(points: &[SamplingPoint]) -> i32 {
+    let segment_started = Instant::now();
     let settings = PreparationSettings::from_the_environment();
     let mut emitter = Emitter::new();
     emitter.line(&format!(
@@ -6761,9 +8643,23 @@ fn run_the_stage_split_segment(points: &[SamplingPoint]) -> i32 {
         preparation_configuration_fields(points, None, &settings),
     ));
     assert_this_process_runs_one_thread("segment_start");
+    if !check_the_apparatus_sha256(&mut emitter) {
+        return EXIT_CODE_STOP_CLAUSE;
+    }
     if !check_the_thread_cpu_clock_resolution(&mut emitter) {
         return stop_for_the_clock_resolution(&mut emitter, "stage_split");
     }
+    emit_the_machine_state(
+        &mut emitter,
+        "stage_split",
+        MachineStatePosition::SegmentStart,
+        segment_started,
+    );
+    let mut calibration =
+        match SegmentCalibration::start("stage_split", segment_started, &mut emitter) {
+            Ok(calibration) => calibration,
+            Err(exit_code) => return exit_code,
+        };
     let mismatches = check_the_constants_and_the_anchors(&mut emitter);
     let mut stop_findings: Vec<String> = Vec::new();
     let mut control_failures: Vec<String> = Vec::new();
@@ -6783,9 +8679,20 @@ fn run_the_stage_split_segment(points: &[SamplingPoint]) -> i32 {
             for line in &prepared.lines {
                 emitter.line(line);
             }
+            emit_the_machine_state(
+                &mut emitter,
+                "stage_split",
+                MachineStatePosition::PointStart(*point),
+                segment_started,
+            );
             let choice = prepared.choice;
             let mut rebuilt_pool_of_the_round: Option<ConstructedPool> = None;
             let mut judgements_by_cell: BTreeMap<(u64, usize), Vec<[Option<&'static str>; 3]>> =
+                BTreeMap::new();
+            let mut choose_share_by_batch_units: BTreeMap<u64, Vec<Option<f64>>> = BTreeMap::new();
+            let mut registered_rows_by_batch_units: BTreeMap<u64, Vec<Vec<StageShareRow>>> =
+                BTreeMap::new();
+            let mut original_rows_by_batch_units: BTreeMap<u64, Vec<Vec<StageShareRow>>> =
                 BTreeMap::new();
             for round in 1..=ROUNDS {
                 wait_until_no_other_measurement_runs(&mut emitter);
@@ -6809,25 +8716,58 @@ fn run_the_stage_split_segment(points: &[SamplingPoint]) -> i32 {
                     continue;
                 };
                 for batch_units in BATCH_SIZES {
-                    let (findings, failures, judgements) = stage_split_one_intent(
-                        &mut emitter,
-                        *point,
-                        choice,
+                    let label = MeasurementLabel {
+                        arm: DeviceArm::Memory,
+                        point: *point,
                         batch_units,
                         round,
+                        attempt: 0,
+                        injection: WriteInjection::Nothing,
+                        choice,
+                    };
+                    let with_the_controls = is_the_first_intent;
+                    let outcome = stage_split_one_intent(
+                        &mut emitter,
+                        label,
                         pool,
-                        is_the_first_intent,
+                        &mut calibration,
+                        &mut |replay_emitter, kept_reading, kept_label, kept_pool, kept_outcome| {
+                            replay_and_emit_the_stages(
+                                replay_emitter,
+                                kept_reading,
+                                kept_label,
+                                kept_pool,
+                                with_the_controls,
+                                kept_outcome,
+                            )
+                        },
                     );
                     is_the_first_intent = false;
-                    control_failures.extend(failures);
-                    for (batch_index, cell) in judgements {
-                        judgements_by_cell
-                            .entry((batch_units, batch_index))
+                    control_failures.extend(outcome.control_failures);
+                    if let Some(rows) = outcome.registered {
+                        for (batch_index, cell) in batch_judgements_of(&rows) {
+                            judgements_by_cell
+                                .entry((batch_units, batch_index))
+                                .or_default()
+                                .push(cell);
+                        }
+                        choose_share_by_batch_units
+                            .entry(batch_units)
                             .or_default()
-                            .push(cell);
+                            .push(choose_share_of_the_issue_row(&rows));
+                        registered_rows_by_batch_units
+                            .entry(batch_units)
+                            .or_default()
+                            .push(rows);
                     }
-                    if !findings.is_empty() {
-                        stop_findings.extend(findings);
+                    if let Some(rows) = outcome.under_the_original_voiding {
+                        original_rows_by_batch_units
+                            .entry(batch_units)
+                            .or_default()
+                            .push(rows);
+                    }
+                    if !outcome.stop_findings.is_empty() {
+                        stop_findings.extend(outcome.stop_findings);
                         break 'points;
                     }
                 }
@@ -6850,9 +8790,44 @@ fn run_the_stage_split_segment(points: &[SamplingPoint]) -> i32 {
                     cells.len()
                 ));
             }
+            for (batch_units, choose_share_per_round) in &choose_share_by_batch_units {
+                let (choose_share_judgement_per_round, choose_share_judgement) =
+                    choose_judgement_of_the_rounds(choose_share_per_round);
+                emitter.line(&format!(
+                    "name=choose_judgement {} batch_units={batch_units} rounds={} choose_share_per_batch_per_round={} choose_share_judgement_per_round={} choose_share_judgement={choose_share_judgement}",
+                    point.label(),
+                    choose_share_per_round.len(),
+                    choose_share_per_round.iter().map(|share| optional_number(*share)).collect::<Vec<_>>().join(","),
+                    choose_share_judgement_per_round.join(","),
+                ));
+            }
+            for batch_units in BATCH_SIZES {
+                let empty: Vec<Vec<StageShareRow>> = Vec::new();
+                let original = original_rows_by_batch_units
+                    .get(&batch_units)
+                    .unwrap_or(&empty);
+                let registered = registered_rows_by_batch_units
+                    .get(&batch_units)
+                    .unwrap_or(&empty);
+                let original_text = stage_cell_judgements_text(original);
+                let registered_text = stage_cell_judgements_text(registered);
+                emitter.line(&format!(
+                    "name=judgements_under_the_original_voiding segment=stage_split {} batch_units={batch_units} {original_text} registered_{} differs_from_the_registered={}",
+                    point.label(),
+                    registered_text.replace(' ', " registered_"),
+                    original_text != registered_text,
+                ));
+            }
             queue.finish_the_point(point_index);
         }
     }
+    calibration.finish(&mut emitter);
+    emit_the_machine_state(
+        &mut emitter,
+        "stage_split",
+        MachineStatePosition::SegmentEnd,
+        segment_started,
+    );
     emitter.line(&format!(
         "name=verdict segment=stage_split constant_or_anchor_mismatches={mismatches} stop_clause_findings={} positive_control_failures={} positive_control_failure_items={}",
         stop_findings.len(),
@@ -6863,6 +8838,1615 @@ fn run_the_stage_split_segment(points: &[SamplingPoint]) -> i32 {
     if mismatches > 0 || !stop_findings.is_empty() {
         EXIT_CODE_STOP_CLAUSE
     } else if !control_failures.is_empty() {
+        EXIT_CODE_POSITIVE_CONTROL_FAILED
+    } else {
+        EXIT_CODE_OK
+    }
+}
+
+// ───────────────────────────── 第 4 次重跑：CPU 模式的四种写法（登记 research/prompts/e185-r4-prereg.md 第一节第 1 行「读法写死」；只给计时用，不改 crates/） ─────────────────────────────
+
+mod cpu_writings {
+    use super::*;
+    use singlefs_core::address::CheckpointTxg;
+    use singlefs_core::pointer::{NodePointer, PointerHead};
+    use singlefs_core::records::{mapping_key_for_data, mapping_key_for_node};
+    use singlefs_core::region_scan::{
+        MappedUnitClass, MovableUnit, RegionScanInconsistency, RegionScanRefusal,
+        ScannedAllocation, UnitHeaderUnreadable,
+    };
+    use singlefs_core::unit::{parse_data_unit, parse_index_node, parse_packed_unit, UnitError};
+    use std::arch::x86_64::{_mm_crc32_u64, _mm_crc32_u8};
+    use std::collections::HashMap;
+
+    /// CRC-32C 的反射多项式与初值（与 crates `checksum.rs` 同一个算法；这一份只给写法乙丁计时，值由停机 K-S1 每次重放与 crates 对拍）。
+    pub(super) const CASTAGNOLI_REFLECTED_POLYNOMIAL: u32 = 0x82F6_3B78;
+    pub(super) const CRC_INITIAL_REGISTER: u32 = 0xFFFF_FFFF;
+    /// 一条 `crc32q` 吃几字节。
+    pub(super) const BYTES_PER_HARDWARE_CRC_STEP: usize = 8;
+    const BITS_PER_BYTE: usize = 8;
+    const REGISTER_BITS: usize = 32;
+
+    /// 硬件指令那一圈：从 `register` 起，每 8 字节一条 `crc32q`，尾巴逐字节 `crc32b`；交回原样的寄存器（不取反）。
+    #[target_feature(enable = "sse4.2")]
+    fn hardware_register_over(register: u32, bytes: &[u8]) -> u32 {
+        let mut wide = u64::from(register);
+        let (words, tail) = bytes.as_chunks::<BYTES_PER_HARDWARE_CRC_STEP>();
+        for word in words {
+            wide = _mm_crc32_u64(wide, u64::from_le_bytes(*word));
+        }
+        let mut narrow = u32::try_from(wide).expect("crc32q 只写低 32 位");
+        for byte in tail {
+            narrow = _mm_crc32_u8(narrow, *byte);
+        }
+        narrow
+    }
+
+    /// 单路（登记第一节写法乙「单路」）：初值 `0xFFFFFFFF`、出来取反。
+    #[target_feature(enable = "sse4.2")]
+    fn hardware_single_crc(bytes: &[u8]) -> u32 {
+        hardware_register_over(CRC_INITIAL_REGISTER, bytes) ^ CRC_INITIAL_REGISTER
+    }
+
+    /// 三路切段（登记第一节写法乙「三路交错」）：段长取 ⌊长度 ÷ 3 ÷ 8⌋ × 8、前两段同值、余下的给第三段。
+    pub(super) fn three_way_lanes(length: usize) -> [usize; 3] {
+        let lane = length / 3 / BYTES_PER_HARDWARE_CRC_STEP * BYTES_PER_HARDWARE_CRC_STEP;
+        [lane, lane, length - 2 * lane]
+    }
+
+    /// 往 CRC 寄存器后面接 n 个零字节的 32×32 移位矩阵（GF(2) 上；第 j 列是只有第 j 位为 1 的寄存器接完零字节之后的样子）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) struct ZeroByteShift {
+        columns: [u32; REGISTER_BITS],
+    }
+
+    impl ZeroByteShift {
+        fn identity() -> ZeroByteShift {
+            let mut columns = [0_u32; REGISTER_BITS];
+            for (bit, column) in columns.iter_mut().enumerate() {
+                *column = 1_u32 << bit;
+            }
+            ZeroByteShift { columns }
+        }
+
+        /// 接一个零位：寄存器右移一位，移出的是 1 就异或多项式（反射 CRC 的一步）。
+        fn one_zero_bit() -> ZeroByteShift {
+            let mut columns = [0_u32; REGISTER_BITS];
+            columns[0] = CASTAGNOLI_REFLECTED_POLYNOMIAL;
+            for (bit, column) in columns.iter_mut().enumerate().skip(1) {
+                *column = 1_u32 << (bit - 1);
+            }
+            ZeroByteShift { columns }
+        }
+
+        /// 矩阵乘向量：寄存器里为 1 的那几位对应的列异或起来。
+        pub(super) fn applied_to(&self, register: u32) -> u32 {
+            self.columns
+                .iter()
+                .enumerate()
+                .filter(|(bit, _column)| register & (1_u32 << bit) != 0)
+                .fold(0_u32, |folded, (_bit, column)| folded ^ column)
+        }
+
+        /// 先接 `self`、再接 `later`。
+        fn followed_by(&self, later: &ZeroByteShift) -> ZeroByteShift {
+            let mut columns = [0_u32; REGISTER_BITS];
+            for (column, own) in columns.iter_mut().zip(self.columns) {
+                *column = later.applied_to(own);
+            }
+            ZeroByteShift { columns }
+        }
+
+        /// 接 `bytes` 个零字节（一位的矩阵平方着乘）。
+        pub(super) fn over_zero_bytes(bytes: usize) -> ZeroByteShift {
+            let mut result = ZeroByteShift::identity();
+            let mut power = ZeroByteShift::one_zero_bit();
+            let mut remaining_bits = bytes * BITS_PER_BYTE;
+            // 迭代上界：remaining_bits 每圈右移一位，至多 usize 的位数圈
+            while remaining_bits > 0 {
+                if remaining_bits & 1 == 1 {
+                    result = result.followed_by(&power);
+                }
+                power = power.followed_by(&power);
+                remaining_bits >>= 1;
+            }
+            result
+        }
+    }
+
+    /// 三路合并要的移位矩阵：开跑时按要量的单元长度把各段长的矩阵预算好，量的时候只查表、不现算（登记第一节写法乙）。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct ThreeWayShifts {
+        by_lane_bytes: BTreeMap<usize, ZeroByteShift>,
+    }
+
+    impl ThreeWayShifts {
+        pub(super) fn for_unit_lengths(unit_lengths: &[usize]) -> ThreeWayShifts {
+            let by_lane_bytes = unit_lengths
+                .iter()
+                .flat_map(|length| three_way_lanes(*length))
+                .map(|lane_bytes| (lane_bytes, ZeroByteShift::over_zero_bytes(lane_bytes)))
+                .collect();
+            ThreeWayShifts { by_lane_bytes }
+        }
+
+        /// 接这么多零字节的矩阵；没预算的长度交 `None`（那一次三路读数作废，不现算）。
+        pub(super) fn over(&self, lane_bytes: usize) -> Option<&ZeroByteShift> {
+            self.by_lane_bytes.get(&lane_bytes)
+        }
+    }
+
+    fn word_at(lane: &[u8], offset: usize) -> u64 {
+        u64::from_le_bytes(
+            lane[offset..offset + BYTES_PER_HARDWARE_CRC_STEP]
+                .try_into()
+                .expect("三段共有的字数之内，每段都还有 8 字节"),
+        )
+    }
+
+    fn low_half(wide: u64) -> u32 {
+        u32::try_from(wide).expect("crc32q 只写低 32 位")
+    }
+
+    /// 三路交错：三段在同一个循环里各走一条 `crc32q`，各自走完余下的，再按「第一段移过第二段长度的零字节、异或第二段，再移过第三段长度、
+    /// 异或第三段」合并。第一段初值 `0xFFFFFFFF`，后两段初值 0，出来取反。移位矩阵没预算的交 `None`。
+    #[target_feature(enable = "sse4.2")]
+    fn hardware_three_way_crc(bytes: &[u8], shifts: &ThreeWayShifts) -> Option<u32> {
+        let [first_length, second_length, third_length] = three_way_lanes(bytes.len());
+        let (first, rest) = bytes.split_at(first_length);
+        let (second, third) = rest.split_at(second_length);
+        let common_words =
+            first_length.min(second_length).min(third_length) / BYTES_PER_HARDWARE_CRC_STEP;
+        let mut registers = [u64::from(CRC_INITIAL_REGISTER), 0_u64, 0_u64];
+        for word_index in 0..common_words {
+            let offset = word_index * BYTES_PER_HARDWARE_CRC_STEP;
+            registers[0] = _mm_crc32_u64(registers[0], word_at(first, offset));
+            registers[1] = _mm_crc32_u64(registers[1], word_at(second, offset));
+            registers[2] = _mm_crc32_u64(registers[2], word_at(third, offset));
+        }
+        let done = common_words * BYTES_PER_HARDWARE_CRC_STEP;
+        let first_register = hardware_register_over(low_half(registers[0]), &first[done..]);
+        let second_register = hardware_register_over(low_half(registers[1]), &second[done..]);
+        let third_register = hardware_register_over(low_half(registers[2]), &third[done..]);
+        let combined = shifts.over(second_length)?.applied_to(first_register) ^ second_register;
+        let combined = shifts.over(third_length)?.applied_to(combined) ^ third_register;
+        Some(combined ^ CRC_INITIAL_REGISTER)
+    }
+
+    /// 硬件 CRC 的两种写法：只能在核过 `sse4.2` 之后造出来（[`HardwareCrc::when_the_instructions_are_present`]），造出来就信它。
+    pub(super) struct HardwareCrc {
+        shifts: ThreeWayShifts,
+    }
+
+    /// 写法乙的两端（登记第一节：单路、三路交错）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum HardwareCrcLanes {
+        Single,
+        ThreeWay,
+    }
+
+    impl HardwareCrcLanes {
+        pub(super) const ALL: [HardwareCrcLanes; 2] =
+            [HardwareCrcLanes::Single, HardwareCrcLanes::ThreeWay];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                HardwareCrcLanes::Single => "hardware_single",
+                HardwareCrcLanes::ThreeWay => "hardware_three_way",
+            }
+        }
+    }
+
+    impl HardwareCrc {
+        /// 这台机器有 `sse4.2` 才交回（写法与拆分段开跑核一次，不在退 78）；移位矩阵按 `unit_lengths` 预算。
+        pub(super) fn when_the_instructions_are_present(
+            unit_lengths: &[usize],
+        ) -> Option<HardwareCrc> {
+            std::arch::is_x86_feature_detected!("sse4.2").then(|| HardwareCrc {
+                shifts: ThreeWayShifts::for_unit_lengths(unit_lengths),
+            })
+        }
+
+        /// 一份字节的 CRC-32C；三路那一端的段长没预算交 `None`。
+        pub(super) fn crc(&self, lanes: HardwareCrcLanes, bytes: &[u8]) -> Option<u32> {
+            match lanes {
+                // SAFETY: HardwareCrc 只在 is_x86_feature_detected!("sse4.2") 为真时造得出来（when_the_instructions_are_present），这台机器有这条指令。
+                HardwareCrcLanes::Single => Some(unsafe { hardware_single_crc(bytes) }),
+                // SAFETY: 同上一臂。
+                HardwareCrcLanes::ThreeWay => unsafe {
+                    hardware_three_way_crc(bytes, &self.shifts)
+                },
+            }
+        }
+
+        /// 甲段换成硬件写法：对每个单元算 CRC，交回（算过的字节、各段 CRC 的异或）；有一个单元三路段长没预算交 `None`。
+        pub(super) fn stage_over_the_units(
+            &self,
+            lanes: HardwareCrcLanes,
+            units: &[Vec<u8>],
+        ) -> Option<(u64, u32)> {
+            let mut covered_bytes = 0_u64;
+            let mut folded = 0_u32;
+            for unit in units {
+                covered_bytes += length_in_bytes(unit);
+                folded ^= self.crc(lanes, std::hint::black_box(unit))?;
+            }
+            Some((covered_bytes, folded))
+        }
+    }
+
+    /// 停机 K-S1 的核法：每个单元两种硬件写法与 crates `crc32_castagnoli` 逐个比，交回对不上的个数（三路段长没预算也算对不上）。
+    pub(super) fn hardware_crc_mismatches(hardware: &HardwareCrc, units: &[Vec<u8>]) -> usize {
+        units
+            .iter()
+            .map(|unit| {
+                let expected = crc32_castagnoli(unit);
+                HardwareCrcLanes::ALL
+                    .iter()
+                    .filter(|lanes| hardware.crc(**lanes, unit) != Some(expected))
+                    .count()
+            })
+            .sum()
+    }
+
+    /// PW3 的锚点（登记第七节乙类）：「第 i 字节 = i mod 251」的两种长度与它的 CRC-32C。
+    pub(super) const MODULUS_ANCHORS: [(usize, u32); 2] =
+        [(32_768, 0x2AD6_0827), (16_384, 0xEAFC_A51D)];
+    pub(super) const RANDOM_LENGTH_CHECKS: usize = 1000;
+    pub(super) const RANDOM_LENGTH_AT_MOST: usize = 64;
+    pub(super) const RANDOM_LENGTH_SEED: u64 = 0xE185_0004_0000_0001;
+
+    /// 「第 i 字节 = i mod 251」那份字节。
+    pub(super) fn modulus_bytes(length: usize) -> Vec<u8> {
+        (0..length)
+            .map(|index| u8::try_from(index % CALIBRATION_BYTE_MODULUS).expect("251 以内装得进 u8"))
+            .collect()
+    }
+
+    /// 写死种子的 0 到 64 字节随机串（splitmix64），PW3 第三项用。
+    pub(super) fn random_length_strings() -> Vec<Vec<u8>> {
+        let mut state = RANDOM_LENGTH_SEED;
+        let mut next = || {
+            state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut mixed = state;
+            mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            mixed ^ (mixed >> 31)
+        };
+        (0..RANDOM_LENGTH_CHECKS)
+            .map(|_string| {
+                let length =
+                    usize::try_from(next() % u64::try_from(RANDOM_LENGTH_AT_MOST + 1).expect("65"))
+                        .expect("64 以内");
+                (0..length).map(|_byte| next().to_le_bytes()[0]).collect()
+            })
+            .collect()
+    }
+
+    /// 写法与拆分段开跑时要预算的单元长度：数据单元、节点、i mod 251 的两种、0 到 64 字节。
+    pub(super) fn unit_lengths_of_the_segment() -> Vec<usize> {
+        let mut lengths = vec![
+            usize::try_from(LOCAL_DATA_UNIT_BYTES).expect("32768"),
+            usize::try_from(LOCAL_NODE_BYTES).expect("16384"),
+        ];
+        lengths.extend(MODULUS_ANCHORS.map(|(length, _crc)| length));
+        lengths.extend(0..=RANDOM_LENGTH_AT_MOST);
+        lengths.push(CHECK_STRING.len());
+        lengths
+    }
+
+    /// PW3（登记第五节阳性对照表）：校验串、i mod 251 两种长度、随机长度三项，两种硬件写法各自与锚点、与 crates 逐个相同。
+    /// 交回（项、写法、对不上的个数）；全对交空表。
+    pub(super) fn hardware_crc_check_failures(
+        hardware: &HardwareCrc,
+    ) -> Vec<(String, &'static str, usize)> {
+        let mut failures = Vec::new();
+        for lanes in HardwareCrcLanes::ALL {
+            let mut check = |item: String, bytes: &[u8], expected: u32| {
+                let differs = usize::from(hardware.crc(lanes, bytes) != Some(expected))
+                    + usize::from(crc32_castagnoli(bytes) != expected);
+                if differs > 0 {
+                    failures.push((item, lanes.label(), differs));
+                }
+            };
+            check(
+                "check_string".to_string(),
+                CHECK_STRING,
+                CHECK_STRING_CRC32_CASTAGNOLI,
+            );
+            for (length, anchor) in MODULUS_ANCHORS {
+                check(
+                    format!("modulus_bytes_{length}"),
+                    &modulus_bytes(length),
+                    anchor,
+                );
+            }
+            let random = random_length_strings();
+            let random_mismatches = random
+                .iter()
+                .filter(|bytes| hardware.crc(lanes, bytes) != Some(crc32_castagnoli(bytes)))
+                .count();
+            if random_mismatches > 0 {
+                failures.push((
+                    "random_lengths".to_string(),
+                    lanes.label(),
+                    random_mismatches,
+                ));
+            }
+        }
+        failures
+    }
+
+    // ───── 写法丙：抄的一份区域扫描，两处线性找换成按身份查（逐句照 crates `region_scan.rs` 的 `scan_region`、`classify_allocation`、`read_unit_header`） ─────
+
+    // 抄的扫描用到的三个类标签是顶层的本地常量（`LOCAL_UNIT_CLASS_DATA` 那三个，开跑与 crates 回比，[`constants_disagreeing_with_the_crates`]）。
+
+    fn local_tag_of(unit_class: MappedUnitClass) -> u8 {
+        match unit_class {
+            MappedUnitClass::Data => LOCAL_UNIT_CLASS_DATA,
+            MappedUnitClass::IndexNode => LOCAL_UNIT_CLASS_INDEX_NODE,
+            MappedUnitClass::Packed => LOCAL_UNIT_CLASS_PACKED,
+        }
+    }
+
+    /// 一个位置项的键：盘与槽一起。
+    fn location_key_of(
+        device_of_the_location: DeviceIdentity,
+        slot_of_the_location: SlotNumber,
+    ) -> (DeviceIdentity, SlotNumber) {
+        (device_of_the_location, slot_of_the_location)
+    }
+
+    /// 这一版映射条目的两张索引（登记第一节写法丙）：（盘、槽）→ 条目号、key → 条目号，都用 std 的 `HashMap`，条目号按映射条目的次序存。
+    pub(super) struct IdentityIndexOfTheMapping {
+        entries_by_location: HashMap<(DeviceIdentity, SlotNumber), Vec<usize>>,
+        entries_by_key: HashMap<Vec<u8>, Vec<usize>>,
+    }
+
+    impl IdentityIndexOfTheMapping {
+        /// 两条位置项各进一次：先全部条目的第一条、再全部条目的第二条，所以一个槽的条目号在表里不一定按映射条目的次序，查的时候再排。
+        pub(super) fn of_the_entries(entries: &[CentralMappingEntry]) -> IdentityIndexOfTheMapping {
+            let mut entries_by_location: HashMap<(DeviceIdentity, SlotNumber), Vec<usize>> =
+                HashMap::new();
+            for location_position in 0..2 {
+                for (entry_index, entry) in entries.iter().enumerate() {
+                    let location = entry.locations[location_position];
+                    let indices = entries_by_location
+                        .entry(location_key_of(location.device, location.slot))
+                        .or_default();
+                    if !indices.contains(&entry_index) {
+                        indices.push(entry_index);
+                    }
+                }
+            }
+            let mut entries_by_key: HashMap<Vec<u8>, Vec<usize>> = HashMap::new();
+            for (entry_index, entry) in entries.iter().enumerate() {
+                entries_by_key
+                    .entry(entry.key.clone())
+                    .or_default()
+                    .push(entry_index);
+            }
+            IdentityIndexOfTheMapping {
+                entries_by_location,
+                entries_by_key,
+            }
+        }
+
+        /// 指着这一槽的条目号，按映射条目的次序（与线性找交回的次序相同）。
+        fn entries_pointing_at(&self, device: DeviceIdentity, slot: SlotNumber) -> Vec<usize> {
+            let mut indices = self
+                .entries_by_location
+                .get(&location_key_of(device, slot))
+                .cloned()
+                .unwrap_or_default();
+            indices.sort_unstable();
+            indices
+        }
+
+        fn is_the_key_mapped(&self, key: &[u8]) -> bool {
+            self.entries_by_key.contains_key(key)
+        }
+
+        /// `identity_index_entries`：key 那张表的键数（为 0 照「读不到」作废那一次重放）。
+        pub(super) fn keys(&self) -> usize {
+            self.entries_by_key.len()
+        }
+
+        /// `identity_index_location_keys`：（盘、槽）那张表的键数。
+        pub(super) fn location_keys(&self) -> usize {
+            self.entries_by_location.len()
+        }
+    }
+
+    /// 单元头里反查出来的东西（crates `UnitHeaderIdentity` 的同形，那一份是私有的）。
+    struct CopiedUnitHeaderIdentity {
+        unit_class: MappedUnitClass,
+        mapping_key: Vec<u8>,
+        birth_txg: CheckpointTxg,
+    }
+
+    /// 抄的 `scan_region`：R 那块盘上起点在 R 里、未释放的每条记录分一类，按槽升序交回；跨边界、两条同 key 的拒法照 crates。
+    pub(super) fn scan_region_with_the_identity_index<ReadUnitBytes>(
+        region: CompactionRegion,
+        allocation_records: &[AllocationRecord],
+        mapping_entries: &[CentralMappingEntry],
+        index: &IdentityIndexOfTheMapping,
+        pinned_slots: &BTreeSet<SlotNumber>,
+        quarantined_slots: &BTreeSet<SlotNumber>,
+        mut read_unit_bytes: ReadUnitBytes,
+    ) -> Result<RegionScan, RegionScanRefusal>
+    where
+        ReadUnitBytes: FnMut(DeviceIdentity, SlotNumber, usize) -> Option<Vec<u8>>,
+    {
+        let device = region.device();
+        let mut records_in_region: Vec<&AllocationRecord> = Vec::new();
+        for record in allocation_records
+            .iter()
+            .filter(|record| record.device == device && !record.is_released)
+        {
+            let record_end = record.slot.0 + u64::from(record.span_slots);
+            let starts_inside = region.contains_slot(record.slot);
+            let reaches_in_from_below =
+                record.slot.0 < region.start_slot().0 && record_end > region.start_slot().0;
+            let reaches_out_above = starts_inside && record_end > region.end_slot().0;
+            if reaches_in_from_below || reaches_out_above {
+                return Err(
+                    RegionScanRefusal::RecordStraddlesTheRegionBoundaryUnsupported {
+                        device,
+                        slot: record.slot,
+                        span_slots: record.span_slots,
+                    },
+                );
+            }
+            if starts_inside {
+                records_in_region.push(record);
+            }
+        }
+        records_in_region.sort_by_key(|record| record.slot);
+        let allocations = records_in_region
+            .into_iter()
+            .map(|record| ScannedAllocation {
+                placement: Placement {
+                    slot: record.slot,
+                    span: u64::from(record.span_slots),
+                },
+                class: classify_allocation_with_the_identity_index(
+                    record,
+                    mapping_entries,
+                    index,
+                    pinned_slots,
+                    quarantined_slots,
+                    &mut read_unit_bytes,
+                ),
+            })
+            .collect();
+        let scan = RegionScan {
+            region,
+            allocations,
+        };
+        if let Some(slots) = scan.first_two_movable_units_sharing_a_mapping_key() {
+            return Err(RegionScanRefusal::TwoRecordsMovableUnderOneMappingKey { device, slots });
+        }
+        Ok(scan)
+    }
+
+    /// 抄的 `classify_allocation`：次序照 crates（钉住 → 隔离 → 读头 → 类标签 → key 与位置），只把两处线性找换成查索引。
+    fn classify_allocation_with_the_identity_index<ReadUnitBytes>(
+        record: &AllocationRecord,
+        mapping_entries: &[CentralMappingEntry],
+        index: &IdentityIndexOfTheMapping,
+        pinned_slots: &BTreeSet<SlotNumber>,
+        quarantined_slots: &BTreeSet<SlotNumber>,
+        read_unit_bytes: &mut ReadUnitBytes,
+    ) -> AllocationInRegion
+    where
+        ReadUnitBytes: FnMut(DeviceIdentity, SlotNumber, usize) -> Option<Vec<u8>>,
+    {
+        let covered_slots = record.slot..SlotNumber(record.slot.0 + u64::from(record.span_slots));
+        if pinned_slots.range(covered_slots.clone()).next().is_some() {
+            return AllocationInRegion::Pinned;
+        }
+        if quarantined_slots.range(covered_slots).next().is_some() {
+            return AllocationInRegion::Quarantined;
+        }
+        let entries_pointing_here: Vec<&CentralMappingEntry> = index
+            .entries_pointing_at(record.device, record.slot)
+            .into_iter()
+            .map(|entry_index| &mapping_entries[entry_index])
+            .collect();
+        let header = match copied_read_unit_header(record, read_unit_bytes) {
+            Ok(header) => header,
+            Err(unreadable) => {
+                return AllocationInRegion::Inconsistent(RegionScanInconsistency::HeaderUnreadable(
+                    unreadable,
+                ))
+            }
+        };
+        if let Some(entry) = entries_pointing_here
+            .iter()
+            .find(|entry| entry.key.first() != Some(&local_tag_of(header.unit_class)))
+        {
+            return AllocationInRegion::Inconsistent(
+                RegionScanInconsistency::UnitClassDisagreesWithTheMappingKey {
+                    header_unit_class: header.unit_class,
+                    mapping_key_class_tag: entry.key.first().copied().unwrap_or_default(),
+                },
+            );
+        }
+        let header_key_is_mapped = index.is_the_key_mapped(&header.mapping_key);
+        if entries_pointing_here.is_empty() && !header_key_is_mapped {
+            return AllocationInRegion::Dead;
+        }
+        let every_entry_pointing_here_carries_the_header_key = entries_pointing_here
+            .iter()
+            .all(|entry| entry.key == header.mapping_key);
+        if !entries_pointing_here.is_empty() && every_entry_pointing_here_carries_the_header_key {
+            return AllocationInRegion::Movable(MovableUnit {
+                mapping_key: header.mapping_key,
+                unit_class: header.unit_class,
+                birth_txg: header.birth_txg,
+            });
+        }
+        AllocationInRegion::Inconsistent(
+            RegionScanInconsistency::HeaderKeyDisagreesWithTheMappingLocation,
+        )
+    }
+
+    /// 抄的 `read_unit_header`：跨度 1 当码 2 读 16 KiB，跨度 2 读 32 KiB 先当码 1、类标签是 3 再当码 3；解头与 key 调 crates 公开的那几个函数。
+    fn copied_read_unit_header<ReadUnitBytes>(
+        record: &AllocationRecord,
+        read_unit_bytes: &mut ReadUnitBytes,
+    ) -> Result<CopiedUnitHeaderIdentity, UnitHeaderUnreadable>
+    where
+        ReadUnitBytes: FnMut(DeviceIdentity, SlotNumber, usize) -> Option<Vec<u8>>,
+    {
+        let node_pointer_of = |birth_tree, birth_txg, instance, birth_sequence| NodePointer {
+            head: PointerHead {
+                birth_tree,
+                birth_txg,
+            },
+            locations: NodePointer::empty_root().locations,
+            instance,
+            birth_sequence,
+        };
+        match record.span_slots {
+            1 => {
+                let bytes = read_unit_bytes(
+                    record.device,
+                    record.slot,
+                    usize::try_from(LOCAL_NODE_BYTES).expect("16384"),
+                )
+                .ok_or(UnitHeaderUnreadable::DeviceReadFailed)?;
+                let header =
+                    parse_index_node(&bytes).map_err(UnitHeaderUnreadable::RefusedByTheParser)?;
+                Ok(CopiedUnitHeaderIdentity {
+                    unit_class: MappedUnitClass::IndexNode,
+                    mapping_key: mapping_key_for_node(
+                        LOCAL_UNIT_CLASS_INDEX_NODE,
+                        node_pointer_of(
+                            header.tree,
+                            header.birth_txg,
+                            header.instance,
+                            header.birth_sequence,
+                        ),
+                    ),
+                    birth_txg: header.birth_txg,
+                })
+            }
+            2 => {
+                let bytes = read_unit_bytes(
+                    record.device,
+                    record.slot,
+                    usize::try_from(LOCAL_DATA_UNIT_BYTES).expect("32768"),
+                )
+                .ok_or(UnitHeaderUnreadable::DeviceReadFailed)?;
+                match parse_data_unit(&bytes) {
+                    Ok(header) => Ok(CopiedUnitHeaderIdentity {
+                        unit_class: MappedUnitClass::Data,
+                        mapping_key: mapping_key_for_data(
+                            PointerHead {
+                                birth_tree: header.identity.tree,
+                                birth_txg: header.birth_txg,
+                            },
+                            header.write_order,
+                        ),
+                        birth_txg: header.birth_txg,
+                    }),
+                    Err(UnitError::WrongUnitClass {
+                        found: LOCAL_UNIT_CLASS_PACKED,
+                        ..
+                    }) => {
+                        let header = parse_packed_unit(&bytes)
+                            .map_err(UnitHeaderUnreadable::RefusedByTheParser)?;
+                        Ok(CopiedUnitHeaderIdentity {
+                            unit_class: MappedUnitClass::Packed,
+                            mapping_key: mapping_key_for_node(
+                                LOCAL_UNIT_CLASS_PACKED,
+                                node_pointer_of(
+                                    header.identity.birth_tree,
+                                    header.birth_txg,
+                                    header.write_order.instance,
+                                    header.birth_sequence,
+                                ),
+                            ),
+                            birth_txg: header.birth_txg,
+                        })
+                    }
+                    Err(refusal) => Err(UnitHeaderUnreadable::RefusedByTheParser(refusal)),
+                }
+            }
+            span_slots => Err(UnitHeaderUnreadable::SpanIsNotAUnitFootprint { span_slots }),
+        }
+    }
+
+    // ───── 九种写法与它们在三样阶段上的取值（登记第一节「产物里的写法名」、B1、B2） ─────
+
+    /// CRC 那两项用哪一种写法。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum CrcWriting {
+        Today,
+        Hardware(HardwareCrcLanes),
+    }
+
+    /// 区域扫描用哪一份、建索引算不算。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum ScanWriting {
+        Today,
+        IdentityIndexWithTheBuild,
+        IdentityIndexWithoutTheBuild,
+    }
+
+    /// 九种写法（甲一种、乙两端、丙两端、丁四种组合）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum CpuWriting {
+        Today,
+        HardwareCrcSingle,
+        HardwareCrcThreeWay,
+        IdentityIndexWithBuild,
+        IdentityIndexWithoutBuild,
+        BothSingleWithBuild,
+        BothSingleWithoutBuild,
+        BothThreeWayWithBuild,
+        BothThreeWayWithoutBuild,
+    }
+
+    impl CpuWriting {
+        pub(super) const ALL: [CpuWriting; 9] = [
+            CpuWriting::Today,
+            CpuWriting::HardwareCrcSingle,
+            CpuWriting::HardwareCrcThreeWay,
+            CpuWriting::IdentityIndexWithBuild,
+            CpuWriting::IdentityIndexWithoutBuild,
+            CpuWriting::BothSingleWithBuild,
+            CpuWriting::BothSingleWithoutBuild,
+            CpuWriting::BothThreeWayWithBuild,
+            CpuWriting::BothThreeWayWithoutBuild,
+        ];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                CpuWriting::Today => "today",
+                CpuWriting::HardwareCrcSingle => "hardware_crc_single",
+                CpuWriting::HardwareCrcThreeWay => "hardware_crc_three_way",
+                CpuWriting::IdentityIndexWithBuild => "identity_index_with_build",
+                CpuWriting::IdentityIndexWithoutBuild => "identity_index_without_build",
+                CpuWriting::BothSingleWithBuild => "both_single_with_build",
+                CpuWriting::BothSingleWithoutBuild => "both_single_without_build",
+                CpuWriting::BothThreeWayWithBuild => "both_three_way_with_build",
+                CpuWriting::BothThreeWayWithoutBuild => "both_three_way_without_build",
+            }
+        }
+
+        const fn parts(self) -> (CrcWriting, ScanWriting) {
+            let single = CrcWriting::Hardware(HardwareCrcLanes::Single);
+            let three_way = CrcWriting::Hardware(HardwareCrcLanes::ThreeWay);
+            match self {
+                CpuWriting::Today => (CrcWriting::Today, ScanWriting::Today),
+                CpuWriting::HardwareCrcSingle => (single, ScanWriting::Today),
+                CpuWriting::HardwareCrcThreeWay => (three_way, ScanWriting::Today),
+                CpuWriting::IdentityIndexWithBuild => {
+                    (CrcWriting::Today, ScanWriting::IdentityIndexWithTheBuild)
+                }
+                CpuWriting::IdentityIndexWithoutBuild => {
+                    (CrcWriting::Today, ScanWriting::IdentityIndexWithoutTheBuild)
+                }
+                CpuWriting::BothSingleWithBuild => (single, ScanWriting::IdentityIndexWithTheBuild),
+                CpuWriting::BothSingleWithoutBuild => {
+                    (single, ScanWriting::IdentityIndexWithoutTheBuild)
+                }
+                CpuWriting::BothThreeWayWithBuild => {
+                    (three_way, ScanWriting::IdentityIndexWithTheBuild)
+                }
+                CpuWriting::BothThreeWayWithoutBuild => {
+                    (three_way, ScanWriting::IdentityIndexWithoutTheBuild)
+                }
+            }
+        }
+    }
+
+    /// 一次调用之后量的九样计时件（纳秒；读不到的是 `None`），`name=cpu_writing_stage` 那一行的数。今天写法那三样取同一次重放
+    /// （[`replay_the_stages_of_a_call`]）的读数。
+    #[derive(Clone, Copy, Debug, Default, PartialEq)]
+    pub(super) struct CpuWritingPieces {
+        pub(super) crc_today: Option<f64>,
+        pub(super) crc_hardware_single: Option<f64>,
+        pub(super) crc_hardware_three_way: Option<f64>,
+        pub(super) release_check_crc_today: Option<f64>,
+        pub(super) release_check_crc_hardware_single: Option<f64>,
+        pub(super) release_check_crc_hardware_three_way: Option<f64>,
+        pub(super) scan_today: Option<f64>,
+        pub(super) scan_identity_index_lookup: Option<f64>,
+        pub(super) identity_index_build: Option<f64>,
+    }
+
+    /// 三样阶段（登记第一节「候选 A–D 的门槛 T_X」：写法 X 只换这三样）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum WritingStage {
+        Crc,
+        ScanIncrement,
+        ReleaseCheckCrc,
+    }
+
+    impl WritingStage {
+        pub(super) const ALL: [WritingStage; 3] = [
+            WritingStage::Crc,
+            WritingStage::ScanIncrement,
+            WritingStage::ReleaseCheckCrc,
+        ];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                WritingStage::Crc => "crc",
+                WritingStage::ScanIncrement => "scan_increment",
+                WritingStage::ReleaseCheckCrc => "release_check_crc",
+            }
+        }
+    }
+
+    impl CpuWritingPieces {
+        fn crc_of(&self, writing: CrcWriting) -> Option<f64> {
+            match writing {
+                CrcWriting::Today => self.crc_today,
+                CrcWriting::Hardware(HardwareCrcLanes::Single) => self.crc_hardware_single,
+                CrcWriting::Hardware(HardwareCrcLanes::ThreeWay) => self.crc_hardware_three_way,
+            }
+        }
+
+        fn release_check_crc_of(&self, writing: CrcWriting) -> Option<f64> {
+            match writing {
+                CrcWriting::Today => self.release_check_crc_today,
+                CrcWriting::Hardware(HardwareCrcLanes::Single) => {
+                    self.release_check_crc_hardware_single
+                }
+                CrcWriting::Hardware(HardwareCrcLanes::ThreeWay) => {
+                    self.release_check_crc_hardware_three_way
+                }
+            }
+        }
+
+        /// 写法 X 下一样阶段的值（登记第一节写法乙丙丁）：`crc`、`release_check_crc` 取那一种 CRC 写法；`scan_increment` = 那一份扫描
+        /// （丙丁按端加不加建索引）− 今天写法的 `crc`（乙段增量里那一份 CRC 是 `parse_data_unit` 调的 crates CRC，乙不改它）。
+        pub(super) fn stage_of_the_writing(
+            &self,
+            writing: CpuWriting,
+            stage: WritingStage,
+        ) -> Option<f64> {
+            let (crc_writing, scan_writing) = writing.parts();
+            match stage {
+                WritingStage::Crc => self.crc_of(crc_writing),
+                WritingStage::ReleaseCheckCrc => self.release_check_crc_of(crc_writing),
+                WritingStage::ScanIncrement => {
+                    let scan = match scan_writing {
+                        ScanWriting::Today => self.scan_today?,
+                        ScanWriting::IdentityIndexWithTheBuild => {
+                            self.scan_identity_index_lookup? + self.identity_index_build?
+                        }
+                        ScanWriting::IdentityIndexWithoutTheBuild => {
+                            self.scan_identity_index_lookup?
+                        }
+                    };
+                    Some(scan - self.crc_today?)
+                }
+            }
+        }
+    }
+
+    /// 一条意图里进候选式子的那几次调用的一样阶段之和（登记第一节「门槛来源」）：`crc` 与 `scan_increment` 取签发加各批（A、B、C 的式子），
+    /// `release_check_crc` 只取各批（D 的式子）；「签发」照门槛账的取法是 `kind=issue` 那一次，其余都算批。有一次读不到交 `None`。
+    pub(super) fn stage_sum_of_the_intent(
+        calls: &[(CallKind, CpuWritingPieces)],
+        writing: CpuWriting,
+        stage: WritingStage,
+    ) -> Option<f64> {
+        calls
+            .iter()
+            .filter(|(kind, _pieces)| match stage {
+                WritingStage::Crc | WritingStage::ScanIncrement => true,
+                WritingStage::ReleaseCheckCrc => *kind != CallKind::Issue,
+            })
+            .map(|(_kind, pieces)| pieces.stage_of_the_writing(writing, stage))
+            .sum()
+    }
+
+    /// 一条意图上写法 X 的系数：X 那几次之和 ÷ 今天写法同几次之和；分母读不到或是 0 交 `None`。写法甲恒为 1。
+    pub(super) fn writing_factor_of_the_intent(
+        calls: &[(CallKind, CpuWritingPieces)],
+        writing: CpuWriting,
+        stage: WritingStage,
+    ) -> Option<f64> {
+        let today = stage_sum_of_the_intent(calls, CpuWriting::Today, stage)?;
+        let this_writing = stage_sum_of_the_intent(calls, writing, stage)?;
+        (today != 0.0).then(|| this_writing / today)
+    }
+
+    /// 系数 φ（B2）：各有效轮的系数取中位；读不到的轮不收，一轮都没有交 `None`。
+    pub(super) fn writing_factor_of_the_rounds(factor_per_round: &[Option<f64>]) -> Option<f64> {
+        let read: Vec<f64> = factor_per_round.iter().flatten().copied().collect();
+        median_of(&read)
+    }
+
+    // ───── 一次调用之后、计时窗口外量八样新的计时件（B1）与对拍（K-S1、K-S2） ─────
+
+    /// 一次调用的新读数：九样计时件、字节、索引的大小、对拍结果。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct CpuWritingsOfTheCall {
+        pub(super) pieces: CpuWritingPieces,
+        pub(super) choose_cpu_nanoseconds: Option<f64>,
+        pub(super) crc_bytes: u64,
+        pub(super) release_check_crc_bytes: u64,
+        pub(super) hardware_crc_bytes: [u64; 2],
+        pub(super) hardware_release_check_crc_bytes: [u64; 2],
+        pub(super) identity_index_entries: usize,
+        pub(super) identity_index_location_keys: usize,
+        /// 两种硬件写法与 crates 对不上的单元个数（K-S1，扫描读到的与释放前读盘核的合起来）。
+        pub(super) hardware_crc_mismatches: usize,
+        /// 抄的扫描交回的整个 `Result` 与 crates `scan_region` 的相不相等（K-S2；签发与批之外的调用没有 R 时是 `None`）。
+        pub(super) identity_index_scan_matches: Option<bool>,
+    }
+
+    impl CpuWritingsOfTheCall {
+        /// 停机条款：K-S1、K-S2 与第七节乙类「一次重放里写法乙丙丁的字节」；对上交 `None`，对不上交（条款编号、一句）。
+        pub(super) fn stop_finding(&self, call_index: usize) -> Option<(&'static str, String)> {
+            if self.hardware_crc_mismatches > 0 {
+                return Some((
+                    "K-S1",
+                    format!(
+                        "clause_k_s1_hardware_crc_differs_from_the_crates_at_call_{call_index}_units_{}",
+                        self.hardware_crc_mismatches
+                    ),
+                ));
+            }
+            if self.identity_index_scan_matches == Some(false) {
+                return Some((
+                    "K-S2",
+                    format!("clause_k_s2_identity_index_scan_differs_from_the_crates_at_call_{call_index}"),
+                ));
+            }
+            (!self.do_the_hardware_crc_bytes_hold()).then(|| {
+                (
+                    "K-S1",
+                    format!("clause_k_s1_hardware_crc_bytes_differ_from_the_scan_and_release_check_reads_at_call_{call_index}"),
+                )
+            })
+        }
+
+        /// 第七节乙类：两种硬件写法算过的字节与今天写法的 `crc_bytes`、`release_check_crc_bytes` 相同。
+        pub(super) fn do_the_hardware_crc_bytes_hold(&self) -> bool {
+            self.hardware_crc_bytes
+                .iter()
+                .all(|bytes| *bytes == self.crc_bytes)
+                && self
+                    .hardware_release_check_crc_bytes
+                    .iter()
+                    .all(|bytes| *bytes == self.release_check_crc_bytes)
+        }
+
+        /// 读不到（登记第十一节）：索引里一条都没有，那一次重放作废。
+        pub(super) fn is_unreadable(&self) -> bool {
+            self.identity_index_entries == 0
+        }
+    }
+
+    /// 两种硬件写法在甲段两项上的（CPU 中位、算过的字节），次序同 [`HardwareCrcLanes::ALL`]：`crc` 算扫描读到的单元，`release_check_crc` 算释放前读盘核
+    /// 读的那几份副本（字节锚点照核，第七节乙类）。
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub(super) struct HardwareCrcPieces {
+        pub(super) crc: [(Option<f64>, u64); 2],
+        pub(super) release_check_crc: [(Option<f64>, u64); 2],
+    }
+
+    pub(super) fn hardware_crc_pieces(
+        hardware: &HardwareCrc,
+        units: &[Vec<u8>],
+        copies: &[Vec<u8>],
+    ) -> HardwareCrcPieces {
+        let piece = |lanes: HardwareCrcLanes, bytes: &[Vec<u8>]| {
+            let covered = hardware
+                .stage_over_the_units(lanes, bytes)
+                .map_or(0, |(covered_bytes, _folded)| covered_bytes);
+            let timing = median_stage_timing(|| {
+                std::hint::black_box(hardware.stage_over_the_units(lanes, bytes));
+            });
+            (
+                timing.map(|read| read.cpu_nanoseconds_per_repetition),
+                covered,
+            )
+        };
+        HardwareCrcPieces {
+            crc: HardwareCrcLanes::ALL.map(|lanes| piece(lanes, units)),
+            release_check_crc: HardwareCrcLanes::ALL.map(|lanes| piece(lanes, copies)),
+        }
+    }
+
+    /// 一次调用之后量新的计时件（各 5 次取中位，[`median_stage_timing`]）：两种硬件写法的 `crc` 与 `release_check_crc`、抄的扫描（索引在计时之外建好）、
+    /// 建索引；今天写法那三样与选段取 `replay`（同一次调用的阶段重放）。另做 K-S1、K-S2（计时之外）。
+    pub(super) fn cpu_writings_of_the_call(
+        material: &CallReplayMaterial,
+        region: Option<CompactionRegion>,
+        replay: &CallStageReplay,
+        hardware: &HardwareCrc,
+        pool_devices: &[(DeviceIdentity, SparseBlockDevice)],
+    ) -> CpuWritingsOfTheCall {
+        let units = units_read_by_the_scan(material);
+        let copies = &material.release_check_copies;
+        let cpu_of =
+            |timing: Option<StageTiming>| timing.map(|read| read.cpu_nanoseconds_per_repetition);
+        let hardware_pieces = hardware_crc_pieces(hardware, &units, copies);
+        let version = &material.version;
+        let index = IdentityIndexOfTheMapping::of_the_entries(&version.mapping_entries);
+        let identity_index_build = cpu_of(median_stage_timing(|| {
+            std::hint::black_box(IdentityIndexOfTheMapping::of_the_entries(
+                &version.mapping_entries,
+            ));
+        }));
+        let identity_scan_of = |scanned_region: CompactionRegion| {
+            scan_region_with_the_identity_index(
+                scanned_region,
+                &version.allocation_records,
+                &version.mapping_entries,
+                &index,
+                &version.pinned_slots,
+                &material.state.quarantined_slots,
+                replay_reader(material, pool_devices),
+            )
+        };
+        let identity_index_scan_matches = region.map(|scanned_region| {
+            let crates_scan = scan_region(
+                scanned_region,
+                &version.allocation_records,
+                &version.mapping_entries,
+                &version.pinned_slots,
+                &material.state.quarantined_slots,
+                replay_reader(material, pool_devices),
+            );
+            identity_scan_of(scanned_region) == crates_scan
+        });
+        let scan_identity_index_lookup = region.and_then(|scanned_region| {
+            cpu_of(median_stage_timing(|| {
+                std::hint::black_box(identity_scan_of(scanned_region).is_ok());
+            }))
+        });
+        let mut checked_units = units.clone();
+        checked_units.extend(copies.iter().cloned());
+        CpuWritingsOfTheCall {
+            pieces: CpuWritingPieces {
+                crc_today: cpu_of(replay.crc),
+                crc_hardware_single: hardware_pieces.crc[0].0,
+                crc_hardware_three_way: hardware_pieces.crc[1].0,
+                release_check_crc_today: cpu_of(replay.release_check_crc),
+                release_check_crc_hardware_single: hardware_pieces.release_check_crc[0].0,
+                release_check_crc_hardware_three_way: hardware_pieces.release_check_crc[1].0,
+                scan_today: cpu_of(replay.scan),
+                scan_identity_index_lookup,
+                identity_index_build,
+            },
+            choose_cpu_nanoseconds: cpu_of(replay.choose),
+            crc_bytes: replay.crc_bytes,
+            release_check_crc_bytes: replay.release_check_crc_bytes,
+            hardware_crc_bytes: hardware_pieces.crc.map(|(_cpu, bytes)| bytes),
+            hardware_release_check_crc_bytes: hardware_pieces
+                .release_check_crc
+                .map(|(_cpu, bytes)| bytes),
+            identity_index_entries: index.keys(),
+            identity_index_location_keys: index.location_keys(),
+            hardware_crc_mismatches: hardware_crc_mismatches(hardware, &checked_units),
+            identity_index_scan_matches,
+        }
+    }
+
+    // ───── PW1、PW2：五个计时件各自罩得住 2 ms、分得出两倍的活（每个点每轮第一批） ─────
+
+    /// 五个计时件（登记第五节阳性对照表 PW1）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum TimedPiece {
+        TodayCrc,
+        HardwareCrc(HardwareCrcLanes),
+        IdentityIndexLookupScan,
+        IdentityIndexBuild,
+    }
+
+    impl TimedPiece {
+        pub(super) const ALL: [TimedPiece; 5] = [
+            TimedPiece::TodayCrc,
+            TimedPiece::HardwareCrc(HardwareCrcLanes::Single),
+            TimedPiece::HardwareCrc(HardwareCrcLanes::ThreeWay),
+            TimedPiece::IdentityIndexLookupScan,
+            TimedPiece::IdentityIndexBuild,
+        ];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                TimedPiece::TodayCrc => "today_crc",
+                TimedPiece::HardwareCrc(HardwareCrcLanes::Single) => "hardware_crc_single",
+                TimedPiece::HardwareCrc(HardwareCrcLanes::ThreeWay) => "hardware_crc_three_way",
+                TimedPiece::IdentityIndexLookupScan => "identity_index_lookup_scan",
+                TimedPiece::IdentityIndexBuild => "identity_index_build",
+            }
+        }
+
+        /// 这个计时件红了作废哪几种写法（登记第十一节「阳性对照红」：那一种写法整段作废）：今天的 CRC 进每种写法的乙段增量，九种都作废。
+        pub(super) fn writings_voided(self) -> Vec<CpuWriting> {
+            CpuWriting::ALL
+                .into_iter()
+                .filter(|writing| {
+                    let (crc_writing, scan_writing) = writing.parts();
+                    match self {
+                        TimedPiece::TodayCrc => true,
+                        TimedPiece::HardwareCrc(lanes) => {
+                            crc_writing == CrcWriting::Hardware(lanes)
+                        }
+                        TimedPiece::IdentityIndexLookupScan => scan_writing != ScanWriting::Today,
+                        TimedPiece::IdentityIndexBuild => {
+                            scan_writing == ScanWriting::IdentityIndexWithTheBuild
+                        }
+                    }
+                })
+                .collect()
+        }
+    }
+
+    /// 一个计时件跑一遍（`doubled` 时同一批输入喂两遍：单元表接两份、扫描连调两次、索引建两次）。
+    fn run_the_timed_piece(piece: TimedPiece, is_doubled: bool, inputs: &TimedPieceInputs<'_>) {
+        let units = if is_doubled {
+            inputs.doubled_units
+        } else {
+            inputs.units
+        };
+        let repetitions = if is_doubled { 2 } else { 1 };
+        match piece {
+            TimedPiece::TodayCrc => {
+                std::hint::black_box(crc_stage_over_the_units(units));
+            }
+            TimedPiece::HardwareCrc(lanes) => {
+                std::hint::black_box(inputs.hardware.stage_over_the_units(lanes, units));
+            }
+            TimedPiece::IdentityIndexLookupScan => {
+                for _repetition in 0..repetitions {
+                    std::hint::black_box((inputs.lookup_scan)().is_ok());
+                }
+            }
+            TimedPiece::IdentityIndexBuild => {
+                for _repetition in 0..repetitions {
+                    std::hint::black_box(IdentityIndexOfTheMapping::of_the_entries(
+                        inputs.mapping_entries,
+                    ));
+                }
+            }
+        }
+    }
+
+    /// 五个计时件共用的输入。
+    struct TimedPieceInputs<'inputs> {
+        units: &'inputs [Vec<u8>],
+        doubled_units: &'inputs [Vec<u8>],
+        hardware: &'inputs HardwareCrc,
+        mapping_entries: &'inputs [CentralMappingEntry],
+        lookup_scan: &'inputs dyn Fn() -> Result<RegionScan, RegionScanRefusal>,
+    }
+
+    /// PW1 的判法（2 ms 的 [0.9, 1.1] 倍）与 PW2 的判法（两遍 ÷ 一遍在 [1.8, 2.2]）在一个计时件的三个读数上：交回（自旋增量、两遍 ÷ 一遍、两条各过没过）。
+    pub(super) fn cpu_writing_control_judgements(
+        plain: Option<f64>,
+        spun: Option<f64>,
+        doubled: Option<f64>,
+    ) -> (Option<f64>, Option<f64>, bool, bool) {
+        let increment = plain.zip(spun).map(|(without, with)| with - without);
+        let doubling = plain.zip(doubled).map(|(single, double)| double / single);
+        let spin_holds = increment.is_some_and(spin_control_holds);
+        let double_holds = plain
+            .zip(doubled)
+            .is_some_and(|(single, double)| double_crc_control_holds(double, single));
+        (increment, doubling, spin_holds, double_holds)
+    }
+
+    /// 一次调用上五个计时件各一次 PW1（计时区间里加 2 ms 按线程钟自旋）与 PW2（同一批输入喂两遍），各打一行
+    /// `name=positive_control row=cpu_writing`；交回没过的计时件。
+    pub(super) fn emit_the_cpu_writing_controls(
+        emitter: &mut Emitter,
+        prefix: &str,
+        material: &CallReplayMaterial,
+        region: CompactionRegion,
+        hardware: &HardwareCrc,
+        pool_devices: &[(DeviceIdentity, SparseBlockDevice)],
+    ) -> Vec<TimedPiece> {
+        let units = units_read_by_the_scan(material);
+        let doubled_units: Vec<Vec<u8>> = units.iter().chain(units.iter()).cloned().collect();
+        let version = &material.version;
+        let index = IdentityIndexOfTheMapping::of_the_entries(&version.mapping_entries);
+        let lookup_scan = || {
+            scan_region_with_the_identity_index(
+                region,
+                &version.allocation_records,
+                &version.mapping_entries,
+                &index,
+                &version.pinned_slots,
+                &material.state.quarantined_slots,
+                replay_reader(material, pool_devices),
+            )
+        };
+        let inputs = TimedPieceInputs {
+            units: &units,
+            doubled_units: &doubled_units,
+            hardware,
+            mapping_entries: &version.mapping_entries,
+            lookup_scan: &lookup_scan,
+        };
+        let cpu_of =
+            |timing: Option<StageTiming>| timing.map(|read| read.cpu_nanoseconds_per_repetition);
+        let mut failures = Vec::new();
+        for piece in TimedPiece::ALL {
+            let plain = cpu_of(median_stage_timing(|| {
+                run_the_timed_piece(piece, false, &inputs)
+            }));
+            let spun = cpu_of(median_stage_timing(|| {
+                run_the_timed_piece(piece, false, &inputs);
+                let _spun = spin_until_the_thread_cpu_advances(INSERTED_NANOSECONDS);
+            }));
+            let doubled = cpu_of(median_stage_timing(|| {
+                run_the_timed_piece(piece, true, &inputs)
+            }));
+            let (increment, doubling, spin_holds, double_holds) =
+                cpu_writing_control_judgements(plain, spun, doubled);
+            for (control, holds, value) in [
+                ("spin_two_milliseconds", spin_holds, increment),
+                ("doubled_input", double_holds, doubling),
+            ] {
+                emitter.line(&format!(
+                    "name=positive_control row=cpu_writing {prefix} piece={} control={control} value={} holds={holds}",
+                    piece.label(),
+                    optional_number(value),
+                ));
+            }
+            if !(spin_holds && double_holds) {
+                failures.push(piece);
+            }
+        }
+        failures
+    }
+}
+
+use cpu_writings::*;
+
+// ───────────────────────────── 第 4 次重跑写法与拆分段 cpu-writings（登记 research/prompts/e185-r4-prereg.md 第五节「写法与拆分段怎么量」；不带 gpu 特性） ─────────────────────────────
+
+/// 一条意图收下之后逐次调用的（种类、九样计时件），喂系数 φ（B2）。
+type CallPiecesOfTheIntent = Vec<(CallKind, CpuWritingPieces)>;
+
+/// 写法与拆分段一路记下的：每个点（f、P、K）每轮收下的那一条意图的逐次调用读数（作废的轮是 `None`）、PW1 或 PW2 没过的计时件。
+struct CpuWritingsSegmentRecord {
+    pieces_by_point: BTreeMap<SubmissionPoint, Vec<Option<CallPiecesOfTheIntent>>>,
+    failed_pieces: BTreeSet<TimedPiece>,
+    /// 打了几行 `name=stage`、几行 `name=cpu_writing_stage`（登记第七节乙类：两者相等，段收尾核）。
+    stage_lines: usize,
+    cpu_writing_stage_lines: usize,
+}
+
+/// 段收尾那一行锚点（登记第七节乙类「`cpu_writing_stage` 行数等于同一段 `name=stage` 行数」）。
+fn cpu_writing_stage_line_count_anchor(record: &CpuWritingsSegmentRecord) -> (String, bool) {
+    let holds = record.cpu_writing_stage_lines == record.stage_lines;
+    (
+        format!(
+            "name=anchor item=cpu_writing_stage_lines value={} expected={} holds={holds}",
+            record.cpu_writing_stage_lines, record.stage_lines
+        ),
+        holds,
+    )
+}
+
+/// `name=cpu_writing_stage` 一行（B1）：每次重放的调用一行，键与同一次调用的 `name=stage` 行相同（`prefix`、`call_index`、`kind`）。
+fn cpu_writing_stage_line(
+    prefix: &str,
+    call_index: usize,
+    kind: CallKind,
+    writings: &CpuWritingsOfTheCall,
+) -> String {
+    let pieces = &writings.pieces;
+    format!(
+        "name=cpu_writing_stage {prefix} call_index={call_index} kind={} crc_today_cpu_nanoseconds={} crc_hardware_single_cpu_nanoseconds={} crc_hardware_three_way_cpu_nanoseconds={} release_check_crc_today_cpu_nanoseconds={} release_check_crc_hardware_single_cpu_nanoseconds={} release_check_crc_hardware_three_way_cpu_nanoseconds={} scan_today_cpu_nanoseconds={} scan_identity_index_lookup_cpu_nanoseconds={} identity_index_build_cpu_nanoseconds={} identity_index_entries={} identity_index_location_keys={} choose_cpu_nanoseconds={} crc_bytes={} release_check_crc_bytes={} hardware_crc_bytes={} hardware_release_check_crc_bytes={} hardware_crc_matches={} identity_index_scan_matches={} readable={}",
+        kind.label(),
+        optional_number(pieces.crc_today),
+        optional_number(pieces.crc_hardware_single),
+        optional_number(pieces.crc_hardware_three_way),
+        optional_number(pieces.release_check_crc_today),
+        optional_number(pieces.release_check_crc_hardware_single),
+        optional_number(pieces.release_check_crc_hardware_three_way),
+        optional_number(pieces.scan_today),
+        optional_number(pieces.scan_identity_index_lookup),
+        optional_number(pieces.identity_index_build),
+        writings.identity_index_entries,
+        writings.identity_index_location_keys,
+        optional_number(writings.choose_cpu_nanoseconds),
+        writings.crc_bytes,
+        writings.release_check_crc_bytes,
+        writings.hardware_crc_bytes.map(|bytes| bytes.to_string()).join(","),
+        writings
+            .hardware_release_check_crc_bytes
+            .map(|bytes| bytes.to_string())
+            .join(","),
+        writings.hardware_crc_mismatches == 0 && writings.do_the_hardware_crc_bytes_hold(),
+        writings
+            .identity_index_scan_matches
+            .map_or_else(|| "none".to_string(), |matches| matches.to_string()),
+        !writings.is_unreadable(),
+    )
+}
+
+/// 写法与拆分段收下的一条意图（登记第五节「每次调用之后、计时窗口外」①–④）：逐次调用照第二段重放三个阶段、打 `name=stage` 行、核停机条款第 4 条；
+/// 再量九种写法的计时件、打 `name=cpu_writing_stage`、核 K-S1 与 K-S2；这一点这一轮还欠 PW1、PW2 时，在头一批上做。交回逐次调用的份额行。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一条意图的重放要的各样：产物、读数、标签、池、硬件 CRC、对照欠不欠、两份记账"
+)]
+fn replay_and_emit_the_cpu_writings(
+    emitter: &mut Emitter,
+    reading: &IntentReading,
+    label: &MeasurementLabel,
+    pool: &ConstructedPool,
+    hardware: &HardwareCrc,
+    are_the_controls_due: &mut bool,
+    outcome: &mut StageSplitIntentOutcome,
+    record: &mut CpuWritingsSegmentRecord,
+) -> Vec<StageShareRow> {
+    let prefix = format!(
+        "{} batch_units={} round={}",
+        label.point.label(),
+        label.batch_units,
+        label.round
+    );
+    let (batches_of_the_intent, median_batch_cpu) = batches_and_the_median_batch_cpu_of(reading);
+    let mut rows = Vec::new();
+    let mut pieces_of_the_intent: CallPiecesOfTheIntent = Vec::new();
+    for material in &reading.replay_material {
+        let call = &reading.calls[material.call_index];
+        enter_the_timing_window(emitter, TimingWindow::StageReplay);
+        let replay = replay_the_stages_of_a_call(
+            material,
+            reading.region,
+            label.choice,
+            label.batch_units,
+            &pool.devices,
+        );
+        if let Some(finding) = &replay.stop_finding {
+            emitter.line(&format!(
+                "name=stop_clause clause=4 {prefix} finding={finding}"
+            ));
+            outcome.stop_findings.push(finding.clone());
+        }
+        rows.push(emit_the_stage_shares(
+            emitter,
+            &prefix,
+            call,
+            material,
+            &replay,
+            batches_of_the_intent,
+            median_batch_cpu,
+        ));
+        record.stage_lines += 1;
+        enter_the_timing_window(emitter, TimingWindow::CpuWritingPieces);
+        let writings =
+            cpu_writings_of_the_call(material, reading.region, &replay, hardware, &pool.devices);
+        emitter.line(&cpu_writing_stage_line(
+            &prefix,
+            material.call_index,
+            material.kind,
+            &writings,
+        ));
+        record.cpu_writing_stage_lines += 1;
+        if let Some((clause, finding)) = writings.stop_finding(material.call_index) {
+            emitter.line(&format!(
+                "name=stop_clause clause={clause} {prefix} finding={finding}"
+            ));
+            outcome.stop_findings.push(finding);
+        }
+        // 读不到（索引里一条都没有）的那一次不收（登记第十一节「读不到」），那一轮的系数随之读不到，不当 0
+        pieces_of_the_intent.push((
+            material.kind,
+            if writings.is_unreadable() {
+                CpuWritingPieces::default()
+            } else {
+                writings.pieces
+            },
+        ));
+        if *are_the_controls_due && counts_as_a_batch(material.kind) {
+            if let Some(region) = reading.region {
+                *are_the_controls_due = false;
+                record.failed_pieces.extend(emit_the_cpu_writing_controls(
+                    emitter,
+                    &prefix,
+                    material,
+                    region,
+                    hardware,
+                    &pool.devices,
+                ));
+            }
+        }
+    }
+    let point = SubmissionPoint {
+        fraction: label.point.fraction,
+        pool_data_units: label.point.pool_data_units,
+        batch_units: label.batch_units,
+    };
+    if let Some(slot) = record
+        .pieces_by_point
+        .entry(point)
+        .or_insert_with(|| vec![None; ROUNDS])
+        .get_mut(label.round - 1)
+    {
+        *slot = Some(pieces_of_the_intent);
+    }
+    rows
+}
+
+/// B2 的全部行（`name=writing_factor`）：每个点、每种写法、每样阶段一行，各轮的系数与它们的中位；PW1 或 PW2 没过的计时件
+/// 让用到它的写法写 `status=void_positive_control`（登记第十一节「阳性对照红」：那一种写法整段作废）。
+fn writing_factor_lines(record: &CpuWritingsSegmentRecord) -> Vec<String> {
+    let voided: BTreeSet<CpuWriting> = record
+        .failed_pieces
+        .iter()
+        .flat_map(|piece| piece.writings_voided())
+        .collect();
+    let mut lines = Vec::new();
+    for (point, rounds) in &record.pieces_by_point {
+        for writing in CpuWriting::ALL {
+            for stage in WritingStage::ALL {
+                let factor_per_round: Vec<Option<f64>> = rounds
+                    .iter()
+                    .map(|intent| {
+                        intent
+                            .as_deref()
+                            .and_then(|calls| writing_factor_of_the_intent(calls, writing, stage))
+                    })
+                    .collect();
+                let factor = writing_factor_of_the_rounds(&factor_per_round);
+                lines.push(format!(
+                    "name=writing_factor {} writing={} stage={} factor_per_round={} factor={} status={}",
+                    point.label(),
+                    writing.label(),
+                    stage.label(),
+                    factor_per_round
+                        .iter()
+                        .map(|value| optional_number(*value))
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    optional_number(factor),
+                    if voided.contains(&writing) {
+                        "void_positive_control"
+                    } else if factor.is_some() {
+                        "measured"
+                    } else {
+                        "not_run"
+                    },
+                ));
+            }
+        }
+    }
+    lines
+}
+
+/// 写法与拆分段的串行理由（登记第五节「串行声明」①：段一开头声明，计时窗口另照各自的 [`TimingWindow`] 声明）。
+const CPU_WRITINGS_SERIAL_REASON: &str =
+    "E185 第 4 次重跑写法与拆分段：一批搬迁与九种 CPU 写法的计时件在这一条测量线程上量，别的线程抢 CPU 会混进来";
+
+/// 写法与拆分段（登记第五节「写法与拆分段怎么量」，第一节主 agent 定第 6 条撤了拆法乙之后只剩写法那一半）：头尾声明在
+/// [`within_a_declared_serial_segment`]。
+fn run_the_cpu_writings_segment(points: &[SamplingPoint]) -> i32 {
+    let mut emitter = Emitter::new();
+    within_a_declared_serial_segment(&mut emitter, CPU_WRITINGS_SERIAL_REASON, |emitter| {
+        cpu_writings_segment(points, emitter)
+    })
+}
+
+/// 开跑核 `sse4.2`（不在退 78）与 PW3 的三项（对不上是停机 K-S1）；交回造好的硬件 CRC，或退出码（已打行、已收尾）。
+fn hardware_crc_of_the_segment(emitter: &mut Emitter) -> Result<HardwareCrc, i32> {
+    let Some(hardware) =
+        HardwareCrc::when_the_instructions_are_present(&unit_lengths_of_the_segment())
+    else {
+        emitter.line("name=verdict segment=cpu_writings status=not_run reason=sse4_2_not_present");
+        emitter.finish();
+        return Err(EXIT_CODE_NOT_RUN);
+    };
+    let failures = hardware_crc_check_failures(&hardware);
+    for lanes in HardwareCrcLanes::ALL {
+        let mismatches: usize = failures
+            .iter()
+            .filter(|(_item, writing, _count)| *writing == lanes.label())
+            .map(|(_item, _writing, count)| *count)
+            .sum();
+        emitter.line(&format!(
+            "name=positive_control row=hardware_crc_check writing={} items=check_string,modulus_bytes_32768,modulus_bytes_16384,random_lengths random_length_strings={RANDOM_LENGTH_CHECKS} random_length_seed={RANDOM_LENGTH_SEED:#018x} mismatches={mismatches} holds={}",
+            lanes.label(),
+            mismatches == 0
+        ));
+    }
+    if failures.is_empty() {
+        return Ok(hardware);
+    }
+    for (item, writing, count) in &failures {
+        emitter.line(&format!(
+            "name=stop_clause clause=K-S1 segment=cpu_writings finding=clause_k_s1_{item}_{writing}_mismatches_{count}"
+        ));
+    }
+    emitter.line(&format!(
+        "name=verdict segment=cpu_writings stop_clause_findings={}",
+        failures.len()
+    ));
+    emitter.finish();
+    Err(EXIT_CODE_STOP_CLAUSE)
+}
+
+fn cpu_writings_segment(points: &[SamplingPoint], emitter: &mut Emitter) -> i32 {
+    let segment_started = Instant::now();
+    let settings = PreparationSettings::from_the_environment();
+    emitter.line(&format!(
+        "name=configuration segment=cpu_writings points={} batch_sizes={} rounds={ROUNDS} stage_replays={STAGE_REPLAYS} writings={} writing_stages={} timed_pieces={} worker_threads={} threads_of_the_measurement=1 {}",
+        points.iter().map(|point| format!("{}:{}", point.fraction.label(), point.pool_data_units)).collect::<Vec<_>>().join(","),
+        BATCH_SIZES.iter().map(u64::to_string).collect::<Vec<_>>().join(","),
+        CpuWriting::ALL.map(CpuWriting::label).join(","),
+        WritingStage::ALL.map(WritingStage::label).join(","),
+        TimedPiece::ALL.map(TimedPiece::label).join(","),
+        worker_threads_from_the_environment(),
+        preparation_configuration_fields(points, None, &settings),
+    ));
+    assert_this_process_runs_one_thread("segment_start");
+    if !check_the_apparatus_sha256(emitter) {
+        return EXIT_CODE_STOP_CLAUSE;
+    }
+    if !check_the_thread_cpu_clock_resolution(emitter) {
+        return stop_for_the_clock_resolution(emitter, "cpu_writings");
+    }
+    let hardware = match hardware_crc_of_the_segment(emitter) {
+        Ok(hardware) => hardware,
+        Err(exit_code) => return exit_code,
+    };
+    emit_the_machine_state(
+        emitter,
+        "cpu_writings",
+        MachineStatePosition::SegmentStart,
+        segment_started,
+    );
+    let mut calibration = match SegmentCalibration::start("cpu_writings", segment_started, emitter)
+    {
+        Ok(calibration) => calibration,
+        Err(exit_code) => return exit_code,
+    };
+    let mismatches = check_the_constants_and_the_anchors(emitter);
+    let mut stop_findings: Vec<String> = Vec::new();
+    let mut record = CpuWritingsSegmentRecord {
+        pieces_by_point: BTreeMap::new(),
+        failed_pieces: BTreeSet::new(),
+        stage_lines: 0,
+        cpu_writing_stage_lines: 0,
+    };
+    if mismatches == 0 {
+        let mut queue = PreparationQueue::new(
+            "cpu_writings",
+            points,
+            None,
+            &settings,
+            &run_the_preparation_work,
+        );
+        'points: for point_index in 0..points.len() {
+            let prepared = queue.prepared_point(point_index, emitter);
+            let point = &prepared.recipe.point;
+            for line in &prepared.lines {
+                emitter.line(line);
+            }
+            emit_the_machine_state(
+                emitter,
+                "cpu_writings",
+                MachineStatePosition::PointStart(*point),
+                segment_started,
+            );
+            let mut rebuilt_pool_of_the_round: Option<ConstructedPool> = None;
+            for round in 1..=ROUNDS {
+                wait_until_no_other_measurement_runs(emitter);
+                if round > 1 {
+                    let rebuilt = queue.take_the_rebuilt_pool(point_index, round, emitter);
+                    let is_identical = rebuilt.digests == prepared.reference_digests;
+                    emitter.line(&format!(
+                        "name=memory_rebuild {} round={round} construction_seconds={:.3} digests_identical={is_identical}",
+                        point.label(),
+                        rebuilt.pool.construction_seconds
+                    ));
+                    rebuilt_pool_of_the_round = is_identical.then_some(rebuilt.pool);
+                }
+                let pool_of_the_round = if round == 1 {
+                    Some(&prepared.pool)
+                } else {
+                    rebuilt_pool_of_the_round.as_ref()
+                };
+                let Some(pool) = pool_of_the_round else {
+                    emitter.line(&format!("name=round_invalid arm=memory {} round={round} reason=start_image_digest_differs", point.label()));
+                    continue;
+                };
+                // PW1、PW2 每个点每轮做一次（登记第五节阳性对照表），在这一轮头一条收下的意图的头一批上
+                let mut are_the_controls_due = true;
+                for batch_units in BATCH_SIZES {
+                    let label = MeasurementLabel {
+                        arm: DeviceArm::Memory,
+                        point: *point,
+                        batch_units,
+                        round,
+                        attempt: 0,
+                        injection: WriteInjection::Nothing,
+                        choice: prepared.choice,
+                    };
+                    let outcome = stage_split_one_intent(
+                        emitter,
+                        label,
+                        pool,
+                        &mut calibration,
+                        &mut |replay_emitter, kept_reading, kept_label, kept_pool, kept_outcome| {
+                            replay_and_emit_the_cpu_writings(
+                                replay_emitter,
+                                kept_reading,
+                                kept_label,
+                                kept_pool,
+                                &hardware,
+                                &mut are_the_controls_due,
+                                kept_outcome,
+                                &mut record,
+                            )
+                        },
+                    );
+                    if !outcome.stop_findings.is_empty() {
+                        stop_findings.extend(outcome.stop_findings);
+                        break 'points;
+                    }
+                }
+            }
+            queue.finish_the_point(point_index);
+        }
+    }
+    for line in writing_factor_lines(&record) {
+        emitter.line(&line);
+    }
+    let (anchor_line, does_the_anchor_hold) = cpu_writing_stage_line_count_anchor(&record);
+    emitter.line(&anchor_line);
+    if !does_the_anchor_hold {
+        stop_findings.push("cpu_writing_stage_lines_differ_from_the_stage_lines".to_string());
+    }
+    calibration.finish(emitter);
+    emit_the_machine_state(
+        emitter,
+        "cpu_writings",
+        MachineStatePosition::SegmentEnd,
+        segment_started,
+    );
+    emitter.line(&format!(
+        "name=verdict segment=cpu_writings constant_or_anchor_mismatches={mismatches} stop_clause_findings={} positive_control_failures={} positive_control_failure_items={}",
+        stop_findings.len(),
+        record.failed_pieces.len(),
+        if record.failed_pieces.is_empty() {
+            "none".to_string()
+        } else {
+            record.failed_pieces.iter().map(|piece| piece.label()).collect::<Vec<_>>().join(",")
+        },
+    ));
+    emitter.finish();
+    if mismatches > 0 || !stop_findings.is_empty() {
+        EXIT_CODE_STOP_CLAUSE
+    } else if !record.failed_pieces.is_empty() {
         EXIT_CODE_POSITIVE_CONTROL_FAILED
     } else {
         EXIT_CODE_OK
@@ -6906,7 +10490,7 @@ mod gpu_submission {
     const CARD_QUOTA_MEBIBYTES: u64 = 4096;
 
     /// 造池时写的一个真数据单元的整单元字节（32768）：mkfs、第一个文件、建一个 inode、顺序写一个数据单元，从盘上读回。
-    fn one_data_unit_of_the_workload() -> Vec<u8> {
+    pub(super) fn one_data_unit_of_the_workload() -> Vec<u8> {
         let (mut devices, mut session) = formatted_pool_with_the_first_file_and_a_session();
         let inode = version_of_trees(&session).inode_number_watermark();
         let mut floor_raises = 0_u64;
@@ -6943,7 +10527,7 @@ mod gpu_submission {
     }
 
     /// `nvidia-smi` 报的每张卡的 PCIe 链路代数与宽度（序号 → (代数, 宽度)）；读不到交回空表。
-    fn pcie_links_reported_by_nvidia_smi() -> BTreeMap<u32, (u32, u32)> {
+    pub(super) fn pcie_links_reported_by_nvidia_smi() -> BTreeMap<u32, (u32, u32)> {
         let Ok(output) = std::process::Command::new("nvidia-smi")
             .args([
                 "--query-gpu=index,pcie.link.gen.max,pcie.link.width.max",
@@ -7340,6 +10924,7518 @@ mod gpu_submission {
     }
 }
 
+// ───────────────────────────── host-cpu-per-submission 的算术（第 3 次重跑登记 `research/prompts/e185-r3-prereg.md` 第一、五、六节；纯函数，不编 gpu 特性也有单测） ─────────────────────────────
+
+/// 两段 GPU 子命令（第 3 次重跑第一、二段）的纯算术与判定行：不编 gpu 特性时只有单测用它们。
+mod gpu_segment_arithmetic {
+    #![cfg_attr(
+        not(feature = "gpu"),
+        allow(
+            dead_code,
+            reason = "第 3 次重跑的两段 GPU 子命令（gpu 特性）才用；没编 gpu 特性时只在单测里用"
+        )
+    )]
+
+    use super::*;
+
+    /// 一次提交的单元数 n 的八档（每单元 32768 字节：128 KiB 到 16 MiB；登记第一节「提交大小 n」）。
+    pub(super) const SUBMISSION_UNIT_COUNTS: [u64; 8] = [4, 8, 12, 16, 20, 24, 32, 512];
+    /// 最大那一档（常驻缓冲按它开，登记第一节「常驻写法」）。
+    pub(super) const LARGEST_SUBMISSION_UNITS: u64 = 512;
+
+    /// 岔路单第 1 行的四个候选（登记第一节「候选门槛」）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum GpuCandidate {
+        /// A：只放扫描里的校验和。
+        ScanChecksumOnly,
+        /// B：A 加选段打分。
+        ScanChecksumAndChoice,
+        /// C：甲、乙、丙全放（g1 的门槛）。
+        EveryStage,
+        /// D：只换整理发布里释放前读盘核那一段。
+        ReleaseCheckOnly,
+    }
+
+    impl GpuCandidate {
+        pub(super) const ALL: [GpuCandidate; 4] = [
+            GpuCandidate::ScanChecksumOnly,
+            GpuCandidate::ScanChecksumAndChoice,
+            GpuCandidate::EveryStage,
+            GpuCandidate::ReleaseCheckOnly,
+        ];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                GpuCandidate::ScanChecksumOnly => "scan_checksum_only",
+                GpuCandidate::ScanChecksumAndChoice => "scan_checksum_and_choice",
+                GpuCandidate::EveryStage => "every_stage",
+                GpuCandidate::ReleaseCheckOnly => "release_check_only",
+            }
+        }
+    }
+
+    /// 一个点（登记第一节「12 个点」）：(f, P, K)，与 `out/g1.out` 的 12 行一一对应。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) struct SubmissionPoint {
+        pub(super) fraction: LiveSlotFraction,
+        pub(super) pool_data_units: u64,
+        pub(super) batch_units: u64,
+    }
+
+    impl SubmissionPoint {
+        pub(super) fn label(self) -> String {
+            format!(
+                "fraction={} pool_data_units={} batch_units={}",
+                self.fraction.label(),
+                self.pool_data_units,
+                self.batch_units
+            )
+        }
+    }
+
+    /// 12 个点，按 (f, P, K) 升序（同 `g1_cpu_saved_ledger.py` 打行的次序）。
+    pub(super) fn every_submission_point() -> Vec<SubmissionPoint> {
+        every_sampling_point()
+            .into_iter()
+            .flat_map(|point| {
+                BATCH_SIZES
+                    .into_iter()
+                    .map(move |batch_units| SubmissionPoint {
+                        fraction: point.fraction,
+                        pool_data_units: point.pool_data_units,
+                        batch_units,
+                    })
+            })
+            .collect()
+    }
+
+    /// 一条意图里各次提交交的单元数（登记第一节「一个点的提交序列」）。A、B、C：签发一次加每批各一次，每次交那一刻 R 里还剩的单元
+    /// （每批之前重扫整个 R）；D：每批一次，交这一批搬的单元两块盘各一份。与 P 无关。
+    pub(super) fn submission_units_of_the_intent(
+        candidate: GpuCandidate,
+        fraction: LiveSlotFraction,
+        batch_units: u64,
+    ) -> Vec<u64> {
+        let data_units = fraction.data_units_per_segment();
+        let mut units_left = data_units;
+        match candidate {
+            GpuCandidate::ScanChecksumOnly
+            | GpuCandidate::ScanChecksumAndChoice
+            | GpuCandidate::EveryStage => {
+                let mut submissions = vec![data_units];
+                // 迭代上界：每圈 units_left 减 min(K, units_left) ≥ 1，⌈m ÷ K⌉ 圈出去
+                while units_left > 0 {
+                    submissions.push(units_left);
+                    units_left -= units_left.min(batch_units);
+                }
+                submissions
+            }
+            GpuCandidate::ReleaseCheckOnly => {
+                let mut submissions = Vec::new();
+                // 迭代上界同上
+                while units_left > 0 {
+                    let relocated_in_this_batch = units_left.min(batch_units);
+                    submissions.push(DEVICES_HOLDING_A_COPY * relocated_in_this_batch);
+                    units_left -= relocated_in_this_batch;
+                }
+                submissions
+            }
+        }
+    }
+
+    /// 乙-1（意图内一次交）那一次交的单元数：签发那一次交的 m（登记第五节「第 3 行的臂」乙-1，`c_rt(m)` 直接取 n = m 那一档）。
+    pub(super) fn units_of_one_submission_per_intent(submission_units: &[u64]) -> u64 {
+        submission_units
+            .first()
+            .copied()
+            .expect("A、B、C 的提交序列头一次是签发，至少一次")
+    }
+
+    /// 第七节乙类：每个点 A、B、C 的提交次数、平均每次提交的字节（四舍五入到 0.1 字节写成整十分之一）、D 的提交次数。键 (f, K)。
+    pub(super) const SUBMISSION_SEQUENCE_ANCHORS: [(LiveSlotFraction, u64, u64, u64, u64); 6] = [
+        (LiveSlotFraction::OneQuarter, 4, 3, 2_184_533, 2),
+        (LiveSlotFraction::OneQuarter, 8, 2, 2_621_440, 1),
+        (LiveSlotFraction::OneQuarter, 16, 2, 2_621_440, 1),
+        (LiveSlotFraction::ThreeQuarters, 4, 7, 5_055_634, 6),
+        (LiveSlotFraction::ThreeQuarters, 8, 4, 5_898_240, 3),
+        (LiveSlotFraction::ThreeQuarters, 16, 3, 6_116_693, 2),
+    ];
+
+    /// 平均每次提交的字节 × 10，四舍五入到整数（第七节乙类锚点 218453.3 写成 2184533）。
+    pub(super) fn mean_submission_tenths_of_bytes(submission_units: &[u64]) -> u64 {
+        let total_bytes: u64 = submission_units
+            .iter()
+            .map(|units| units * LOCAL_GPU_SLOT_BYTES)
+            .sum();
+        let submissions = u64::try_from(submission_units.len()).expect("提交次数装得进 u64");
+        (total_bytes * 10 * 2 + submissions).div_euclid(2 * submissions)
+    }
+
+    /// 一个点的 c_rt（登记第一节「一个点的 c_rt」）：那个点的提交序列里每次提交取它那一档 n 的值，取平均（一条意图的总 CPU ÷ 提交次数，
+    /// 与 g1 的门槛同一个分母）。有一档没有读数交回 `None`。
+    pub(super) fn point_milliseconds_of_the_sequence(
+        submission_units: &[u64],
+        milliseconds_by_units: &BTreeMap<u64, f64>,
+    ) -> Option<f64> {
+        let per_submission: Vec<f64> = submission_units
+            .iter()
+            .map(|units| milliseconds_by_units.get(units).copied())
+            .collect::<Option<Vec<f64>>>()?;
+        let count = per_submission.len() as f64;
+        Some(per_submission.iter().sum::<f64>() / count)
+    }
+
+    /// R1、R2、R3 的判定（登记第六节）：c_rt < 门槛判不赔，≥ 判赔；B 的不赔写成下界（丙的输入是分配记录，展平它的 CPU 没量）。
+    pub(super) fn judgement_against_the_threshold(
+        host_cpu_milliseconds: f64,
+        threshold_milliseconds: f64,
+        candidate: GpuCandidate,
+    ) -> &'static str {
+        if host_cpu_milliseconds < threshold_milliseconds {
+            match candidate {
+                GpuCandidate::ScanChecksumAndChoice => "not_losing_lower_bound",
+                GpuCandidate::ScanChecksumOnly
+                | GpuCandidate::EveryStage
+                | GpuCandidate::ReleaseCheckOnly => "not_losing",
+            }
+        } else {
+            "losing"
+        }
+    }
+
+    /// 5 轮各判一次之后的判定（登记第六节）：有一轮没有读数（三次都作废，第十条 J9）写「轮数不足」，不下判定、不当阴性；5 轮都有读数时
+    /// 全相同写那个判定，不全相同写 `unstable`。
+    pub(super) fn judgement_of_the_valid_rounds(
+        judgements_per_round: &[Option<&'static str>],
+    ) -> &'static str {
+        if judgements_per_round.len() < ROUNDS || judgements_per_round.iter().any(Option::is_none) {
+            return "rounds_insufficient";
+        }
+        let judged: Vec<&'static str> = judgements_per_round.iter().flatten().copied().collect();
+        judgement_of_the_rounds(&judged)
+    }
+
+    /// 两份输入文件的 sha256（登记第十一节停机 J-S4）：`out/g1.out` 与 r2 第二段产物。
+    pub(super) const ATTACK_LEDGER_SHA256: &str =
+        "61b210296634f2f20fa0465a4e4f09859cd9236522c54d4fb18301e75f243025";
+    pub(super) const STAGE_SPLIT_PRODUCT_SHA256: &str =
+        "f70eb21b8a7081489dd8fc3209080f3ab83f16ac40beee3042c03f4756f1e07a";
+
+    /// 停机 J-S4 的核法：两份输入各算 sha256，与登记的比；交回（项、算出的、登记的、对不对得上）。
+    pub(super) fn input_file_checks(
+        attack_ledger_bytes: &[u8],
+        stage_split_bytes: &[u8],
+    ) -> Vec<(&'static str, String, &'static str, bool)> {
+        [
+            ("attack_ledger", attack_ledger_bytes, ATTACK_LEDGER_SHA256),
+            (
+                "stage_split_product",
+                stage_split_bytes,
+                STAGE_SPLIT_PRODUCT_SHA256,
+            ),
+        ]
+        .into_iter()
+        .map(|(item, bytes, registered)| {
+            let digest = hexadecimal_of(&sha256_digest(bytes));
+            let holds = digest == registered;
+            (item, digest, registered, holds)
+        })
+        .collect()
+    }
+
+    /// r2 第二段产物里一条 `name=stage` 行要的几个数（`g1_cpu_saved_ledger.py` 第 13–37 行读的那几样）。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct StageLedgerRow {
+        pub(super) intent_key: LedgerIntentKey,
+        pub(super) is_the_issue: bool,
+        pub(super) call_cpu_nanoseconds: f64,
+        pub(super) crc_cpu_nanoseconds: f64,
+        pub(super) scan_increment_cpu_nanoseconds: f64,
+        pub(super) choose_cpu_nanoseconds: Option<f64>,
+        pub(super) release_check_crc_cpu_nanoseconds: f64,
+    }
+
+    /// 照 `g1_cpu_saved_ledger.py` 第 13 行读：只收 `name=stage` 的行，不滤 `valid`；键 (f, P, K, 轮)。缺数的行交回 `None`（整份读不成）。
+    pub(super) fn stage_ledger_rows_of(
+        lines: &[BTreeMap<String, String>],
+    ) -> Option<Vec<StageLedgerRow>> {
+        lines
+            .iter()
+            .filter(|fields| fields.get("name").map(String::as_str) == Some("stage"))
+            .map(|fields| {
+                let number = |key: &str| fields.get(key)?.parse::<f64>().ok();
+                Some(StageLedgerRow {
+                    intent_key: (
+                        fields.get("fraction")?.clone(),
+                        fields.get("pool_data_units")?.clone(),
+                        fields.get("batch_units")?.clone(),
+                        fields.get("round")?.clone(),
+                    ),
+                    is_the_issue: fields.get("kind")? == "issue",
+                    call_cpu_nanoseconds: number("call_cpu_nanoseconds")?,
+                    crc_cpu_nanoseconds: number("crc_cpu_nanoseconds")?,
+                    scan_increment_cpu_nanoseconds: number("scan_increment_cpu_nanoseconds")?,
+                    choose_cpu_nanoseconds: number("choose_cpu_nanoseconds"),
+                    release_check_crc_cpu_nanoseconds: number("release_check_crc_cpu_nanoseconds")?,
+                })
+            })
+            .collect()
+    }
+
+    /// 一个候选在一个点上的门槛（登记第一节「候选门槛」）：一条意图省下的毫秒（各轮中位）、提交次数、门槛 = 省下 ÷ 提交次数。
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub(super) struct CandidateThreshold {
+        pub(super) saved_per_intent_milliseconds: f64,
+        pub(super) submissions_per_intent: u64,
+        pub(super) threshold_milliseconds: f64,
+    }
+
+    /// 一条意图一个候选省下的纳秒与提交次数（照 `g1_cpu_saved_ledger.py` 第 30–36 行的式子与加法次序；A、B、D 是换候选的同一个算法）。
+    pub(super) fn saved_nanoseconds_of_the_intent(
+        candidate: GpuCandidate,
+        issue: &StageLedgerRow,
+        batches: &[&StageLedgerRow],
+    ) -> Option<(f64, u64)> {
+        let batch_count = u64::try_from(batches.len()).expect("批数");
+        let sum_over_batches = |value_of: fn(&StageLedgerRow) -> f64| {
+            batches
+                .iter()
+                .fold(0.0_f64, |total, batch| total + value_of(batch))
+        };
+        Some(match candidate {
+            GpuCandidate::ScanChecksumOnly => (
+                sum_over_batches(|batch| batch.crc_cpu_nanoseconds) + issue.crc_cpu_nanoseconds,
+                batch_count + 1,
+            ),
+            GpuCandidate::ScanChecksumAndChoice => (
+                sum_over_batches(|batch| batch.crc_cpu_nanoseconds)
+                    + issue.crc_cpu_nanoseconds
+                    + issue.choose_cpu_nanoseconds?,
+                batch_count + 1,
+            ),
+            GpuCandidate::EveryStage => (
+                sum_over_batches(|batch| {
+                    batch.crc_cpu_nanoseconds + batch.scan_increment_cpu_nanoseconds
+                }) + (issue.crc_cpu_nanoseconds
+                    + issue.scan_increment_cpu_nanoseconds
+                    + issue.choose_cpu_nanoseconds?),
+                batch_count + 1,
+            ),
+            GpuCandidate::ReleaseCheckOnly => (
+                sum_over_batches(|batch| batch.release_check_crc_cpu_nanoseconds),
+                batch_count,
+            ),
+        })
+    }
+
+    /// 门槛账的键：一条意图 (f, P, K, 轮) 与一个点 (f, P, K)，都按产物里的文字。
+    pub(super) type LedgerIntentKey = (String, String, String, String);
+    pub(super) type LedgerPointKey = (String, String, String);
+    /// 每个点四个候选的门槛。
+    pub(super) type CandidateThresholdsByPoint =
+        BTreeMap<LedgerPointKey, BTreeMap<GpuCandidate, CandidateThreshold>>;
+
+    /// 照 `g1_cpu_saved_ledger.py` 的取法算四个候选在每个点上的门槛：按 (f, P, K, 轮) 分组（`kind=issue` 那一行算签发、后来的签发行盖掉先来的，
+    /// 其余算批），每个点各轮省下的取中位 ÷ 1e6 得毫秒，提交次数取轮号最小那一轮的。键 (f, P, K)。读不成交回 `None`。
+    pub(super) fn candidate_thresholds_of_the_ledger(
+        rows: &[StageLedgerRow],
+    ) -> Option<CandidateThresholdsByPoint> {
+        let mut intents: BTreeMap<
+            LedgerIntentKey,
+            (Option<&StageLedgerRow>, Vec<&StageLedgerRow>),
+        > = BTreeMap::new();
+        for row in rows {
+            let intent = intents.entry(row.intent_key.clone()).or_default();
+            if row.is_the_issue {
+                intent.0 = Some(row);
+            } else {
+                intent.1.push(row);
+            }
+        }
+        let mut per_point: BTreeMap<LedgerPointKey, BTreeMap<GpuCandidate, Vec<(f64, u64)>>> =
+            BTreeMap::new();
+        for ((fraction, pool, batch, _round), (issue, batches)) in &intents {
+            let issue = (*issue)?;
+            for candidate in GpuCandidate::ALL {
+                per_point
+                    .entry((fraction.clone(), pool.clone(), batch.clone()))
+                    .or_default()
+                    .entry(candidate)
+                    .or_default()
+                    .push(saved_nanoseconds_of_the_intent(candidate, issue, batches)?);
+            }
+        }
+        per_point
+            .into_iter()
+            .map(|(point_key, by_candidate)| {
+                let thresholds = by_candidate
+                    .into_iter()
+                    .map(|(candidate, intents_of_the_point)| {
+                        let saved: Vec<f64> = intents_of_the_point
+                            .iter()
+                            .map(|(saved, _)| *saved)
+                            .collect();
+                        let saved_per_intent_milliseconds = median_of(&saved)? / 1e6;
+                        let submissions_per_intent = intents_of_the_point.first()?.1;
+                        Some((
+                            candidate,
+                            CandidateThreshold {
+                                saved_per_intent_milliseconds,
+                                submissions_per_intent,
+                                threshold_milliseconds: saved_per_intent_milliseconds
+                                    / submissions_per_intent as f64,
+                            },
+                        ))
+                    })
+                    .collect::<Option<BTreeMap<_, _>>>()?;
+                Some((point_key, thresholds))
+            })
+            .collect()
+    }
+
+    /// `out/g1.out` 的一行 `name=g1_ledger`：门槛原样的文字（小数第 4 位，J-S3 逐字比）与它的数、省下的上界、提交次数。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct AttackLedgerPoint {
+        pub(super) break_even_text: String,
+        pub(super) break_even_milliseconds: f64,
+        pub(super) saved_upper_milliseconds: f64,
+        pub(super) submissions_per_intent: u64,
+    }
+
+    /// 读 `out/g1.out`（行首没有 `E7RESULT`）：键 (f, P, K) 的文字。缺数的行交回 `None`。
+    pub(super) fn attack_ledger_points_of(
+        text: &str,
+    ) -> Option<BTreeMap<(String, String, String), AttackLedgerPoint>> {
+        text.lines()
+            .filter(|line| line.starts_with("name=g1_ledger "))
+            .map(|line| {
+                let fields: BTreeMap<&str, &str> = line
+                    .split(' ')
+                    .filter_map(|field| field.split_once('='))
+                    .collect();
+                let break_even_text =
+                    (*fields.get("break_even_host_cpu_per_submission_ms")?).to_string();
+                Some((
+                    (
+                        (*fields.get("f")?).to_string(),
+                        (*fields.get("P")?).to_string(),
+                        (*fields.get("K")?).to_string(),
+                    ),
+                    AttackLedgerPoint {
+                        break_even_milliseconds: break_even_text.parse().ok()?,
+                        break_even_text,
+                        saved_upper_milliseconds: fields.get("saved_upper_ms")?.parse().ok()?,
+                        submissions_per_intent: fields
+                            .get("submissions_per_intent")?
+                            .parse()
+                            .ok()?,
+                    },
+                ))
+            })
+            .collect()
+    }
+
+    /// 停机 J-S3：装置算的候选 C 门槛到小数第 4 位与 `g1.out` 不同，或提交次数与 `g1.out`、与第七节乙类锚点不同，交回一句；都对上交 `None`。
+    pub(super) fn ledger_finding_of_the_point(
+        point: SubmissionPoint,
+        computed_every_stage: &CandidateThreshold,
+        attack_ledger: &AttackLedgerPoint,
+    ) -> Option<String> {
+        let computed_text = format!("{:.4}", computed_every_stage.threshold_milliseconds);
+        let sequence_submissions = u64::try_from(
+            submission_units_of_the_intent(
+                GpuCandidate::EveryStage,
+                point.fraction,
+                point.batch_units,
+            )
+            .len(),
+        )
+        .expect("提交次数");
+        if computed_text != attack_ledger.break_even_text {
+            return Some(format!(
+                "clause_j_s3_threshold_{computed_text}_differs_from_the_attack_ledger_{}",
+                attack_ledger.break_even_text
+            ));
+        }
+        if computed_every_stage.submissions_per_intent != attack_ledger.submissions_per_intent
+            || sequence_submissions != attack_ledger.submissions_per_intent
+        {
+            return Some(format!(
+            "clause_j_s3_submissions_{}_or_sequence_{sequence_submissions}_differ_from_the_attack_ledger_{}",
+            computed_every_stage.submissions_per_intent, attack_ledger.submissions_per_intent
+        ));
+        }
+        None
+    }
+
+    /// ρ_机器（登记第一节「机器换算」）：本机 16 MiB 校准基线的中位 ÷ 第二台（r2 第二段产物 `position=start` 那一行）的中位。
+    /// 门槛 × ρ 是「换到本机」的门槛：本机算同一份活更快（ρ < 1），省下的 CPU 也少。
+    pub(super) fn machine_ratio(
+        local_baseline_nanoseconds: f64,
+        peer_baseline_nanoseconds: f64,
+    ) -> f64 {
+        local_baseline_nanoseconds / peer_baseline_nanoseconds
+    }
+
+    /// r2 第二段产物里 `name=calibration_baseline segment=stage_split position=start` 那一行的中位；取不到交回 `None`（机器换算那几行写 `not_run`）。
+    pub(super) fn peer_calibration_baseline_of(lines: &[BTreeMap<String, String>]) -> Option<f64> {
+        lines
+            .iter()
+            .find(|fields| {
+                fields.get("name").map(String::as_str) == Some("calibration_baseline")
+                    && fields.get("segment").map(String::as_str) == Some("stage_split")
+                    && fields.get("position").map(String::as_str) == Some("start")
+            })
+            .and_then(|fields| fields.get("median_nanoseconds")?.parse().ok())
+    }
+
+    /// 第十条 J10 的两个触发：ρ 不在 [0.5, 2]；本机同一线程算同一份字节的 CPU ÷ T_A 与 ρ 差一倍以上。
+    pub(super) const MACHINE_RATIO_LOWER: f64 = 0.5;
+    pub(super) const MACHINE_RATIO_UPPER: f64 = 2.0;
+
+    pub(super) fn is_the_machine_ratio_far_from_one(ratio: f64) -> bool {
+        !(MACHINE_RATIO_LOWER..=MACHINE_RATIO_UPPER).contains(&ratio)
+    }
+
+    pub(super) fn is_the_cross_check_off_by_more_than_double(
+        local_crc_over_the_scan_checksum_threshold: f64,
+        ratio: f64,
+    ) -> bool {
+        is_the_machine_ratio_far_from_one(local_crc_over_the_scan_checksum_threshold / ratio)
+    }
+
+    /// R4 的拟合不合（第十条 J6）：最大相对残差超过 20%。
+    pub(super) const FIT_RELATIVE_RESIDUAL_ABOVE_FOR_NOT_LINEAR: f64 = 0.20;
+    pub(super) const BYTES_PER_MEBIBYTE: f64 = 1_048_576.0;
+
+    /// R4：c_rt 拟合成「固定部分 + 每字节部分」（毫秒；每 MiB 的斜率另报一份），与最大相对残差。
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub(super) struct FixedAndPerByteFit {
+        pub(super) fixed_milliseconds: f64,
+        pub(super) per_byte_milliseconds: f64,
+        pub(super) per_mebibyte_milliseconds: f64,
+        pub(super) maximum_relative_residual: f64,
+    }
+
+    impl FixedAndPerByteFit {
+        pub(super) fn is_linear(&self) -> bool {
+            self.maximum_relative_residual <= FIT_RELATIVE_RESIDUAL_ABOVE_FOR_NOT_LINEAR
+        }
+    }
+
+    /// 最小二乘：各档 n 的 c_rt（毫秒）对字节（n × 32768）。少于两档、或有一档读数不是正数交回 `None`。
+    pub(super) fn fixed_and_per_byte_fit(
+        milliseconds_by_units: &BTreeMap<u64, f64>,
+    ) -> Option<FixedAndPerByteFit> {
+        let points: Vec<(f64, f64)> = milliseconds_by_units
+            .iter()
+            .map(|(units, milliseconds)| {
+                let bytes = (units * LOCAL_GPU_SLOT_BYTES) as f64;
+                (bytes, *milliseconds)
+            })
+            .collect();
+        if points
+            .iter()
+            .any(|(_bytes, milliseconds)| *milliseconds <= 0.0)
+        {
+            return None;
+        }
+        let (fixed_milliseconds, per_byte_milliseconds) =
+            least_squares_intercept_and_slope(&points)?;
+        let maximum_relative_residual = points
+            .iter()
+            .map(|(bytes, milliseconds)| {
+                ((fixed_milliseconds + per_byte_milliseconds * bytes - milliseconds) / milliseconds)
+                    .abs()
+            })
+            .fold(0.0_f64, f64::max);
+        Some(FixedAndPerByteFit {
+            fixed_milliseconds,
+            per_byte_milliseconds,
+            per_mebibyte_milliseconds: per_byte_milliseconds * BYTES_PER_MEBIBYTE,
+            maximum_relative_residual,
+        })
+    }
+
+    /// R5 一个点一轮的攒批类别（登记第六节 R5，按次序判）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub(super) enum MergingShape {
+        /// 甲：c_rt < T。
+        OneSubmissionPerBatch,
+        /// 乙-1：c_rt(m) < 省下的上界。
+        OneSubmissionPerIntent,
+        /// 乙-2 或丙：每字节那一部分 c1 × m × 32768 < 省下的上界，至少攒这么多条意图（W*）。
+        MergeAcrossIntents { intents_to_merge_at_least: f64 },
+        /// 每字节那一部分已经吃掉省下的。
+        LosesHoweverMerged,
+        /// 后两类要 R4 不是 `fit_not_linear`（第十条 J6）。
+        FitNotLinear,
+    }
+
+    impl MergingShape {
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                MergingShape::OneSubmissionPerBatch => "one_submission_per_batch",
+                MergingShape::OneSubmissionPerIntent => "one_submission_per_intent",
+                MergingShape::MergeAcrossIntents { .. } => "merge_across_intents",
+                MergingShape::LosesHoweverMerged => "loses_however_merged",
+                MergingShape::FitNotLinear => "fit_not_linear",
+            }
+        }
+    }
+
+    /// R5 一个点一轮：`point_milliseconds` 是这个点的 c_rt，`one_submission_per_intent_milliseconds` 是 n = m 那一档量到的 c_rt(m)，
+    /// `saved_upper_milliseconds` 是一条意图省下的上界；后两类用 R4 的拟合（`fit` 读不成时交回 `None`，那一轮写 not_run）。
+    pub(super) fn merging_shape(
+        point_milliseconds: f64,
+        threshold_milliseconds: f64,
+        one_submission_per_intent_milliseconds: f64,
+        saved_upper_milliseconds: f64,
+        data_units: u64,
+        fit: Option<FixedAndPerByteFit>,
+        is_the_fit_linear: bool,
+    ) -> Option<MergingShape> {
+        if point_milliseconds < threshold_milliseconds {
+            return Some(MergingShape::OneSubmissionPerBatch);
+        }
+        if one_submission_per_intent_milliseconds < saved_upper_milliseconds {
+            return Some(MergingShape::OneSubmissionPerIntent);
+        }
+        if !is_the_fit_linear {
+            return Some(MergingShape::FitNotLinear);
+        }
+        let fit = fit?;
+        let per_byte_part_milliseconds =
+            fit.per_byte_milliseconds * (data_units * LOCAL_GPU_SLOT_BYTES) as f64;
+        if per_byte_part_milliseconds < saved_upper_milliseconds {
+            Some(MergingShape::MergeAcrossIntents {
+                intents_to_merge_at_least: (fit.fixed_milliseconds
+                    / (saved_upper_milliseconds - per_byte_part_milliseconds))
+                    .ceil(),
+            })
+        } else {
+            Some(MergingShape::LosesHoweverMerged)
+        }
+    }
+
+    /// 第八节轨迹：一格一轮的计时提交逐次的线程钟读数里，峰值、第 90 百分位、≥ 最小 / 最大门槛的次数、头一次与最后一次。
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub(super) struct SubmissionTrajectory {
+        pub(super) maximum_nanoseconds: f64,
+        pub(super) percentile_90_nanoseconds: f64,
+        pub(super) at_or_above_the_smallest_threshold: usize,
+        pub(super) at_or_above_the_largest_threshold: usize,
+        pub(super) first_nanoseconds: f64,
+        pub(super) last_nanoseconds: f64,
+    }
+
+    pub(super) fn submission_trajectory(
+        thread_cpu_nanoseconds_in_order: &[f64],
+        smallest_threshold_milliseconds: f64,
+        largest_threshold_milliseconds: f64,
+    ) -> Option<SubmissionTrajectory> {
+        let count_at_or_above = |milliseconds: f64| {
+            thread_cpu_nanoseconds_in_order
+                .iter()
+                .filter(|nanoseconds| **nanoseconds >= milliseconds * 1e6)
+                .count()
+        };
+        Some(SubmissionTrajectory {
+            maximum_nanoseconds: thread_cpu_nanoseconds_in_order
+                .iter()
+                .copied()
+                .reduce(f64::max)?,
+            percentile_90_nanoseconds: percentile_of(thread_cpu_nanoseconds_in_order, 90)?,
+            at_or_above_the_smallest_threshold: count_at_or_above(smallest_threshold_milliseconds),
+            at_or_above_the_largest_threshold: count_at_or_above(largest_threshold_milliseconds),
+            first_nanoseconds: *thread_cpu_nanoseconds_in_order.first()?,
+            last_nanoseconds: *thread_cpu_nanoseconds_in_order.last()?,
+        })
+    }
+
+    /// P1 插在计时区间开头（① 之前）的那一段（登记第五节阳性对照 P1）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum IntervalInsertion {
+        Nothing,
+        /// 甲：按线程钟自旋 2 ms。
+        SpinTwoMilliseconds,
+        /// 乙：睡 2 ms。
+        SleepTwoMilliseconds,
+    }
+
+    /// P1 插的那 2 ms（纳秒）。
+    pub(super) const INSERTED_NANOSECONDS: u64 = 2_000_000;
+    /// P1 甲：c_rt 增量中位在 2 ms 的 [0.9, 1.1] 倍；乙：c_rt 增量中位 ≤ 2 ms × 0.1、挂钟增量中位 ≥ 2 ms × 0.9。
+    pub(super) const SPIN_CONTROL_LOWER: f64 = 0.9;
+    pub(super) const SPIN_CONTROL_UPPER: f64 = 1.1;
+    pub(super) const SLEEP_CONTROL_CPU_AT_MOST: f64 = 0.1;
+    pub(super) const SLEEP_CONTROL_WALL_AT_LEAST: f64 = 0.9;
+
+    pub(super) fn spin_control_holds(cpu_increment_nanoseconds: f64) -> bool {
+        let inserted = INSERTED_NANOSECONDS as f64;
+        (SPIN_CONTROL_LOWER * inserted..=SPIN_CONTROL_UPPER * inserted)
+            .contains(&cpu_increment_nanoseconds)
+    }
+
+    pub(super) fn sleep_control_holds(
+        cpu_increment_nanoseconds: f64,
+        wall_increment_nanoseconds: f64,
+    ) -> bool {
+        let inserted = INSERTED_NANOSECONDS as f64;
+        cpu_increment_nanoseconds <= SLEEP_CONTROL_CPU_AT_MOST * inserted
+            && wall_increment_nanoseconds >= SLEEP_CONTROL_WALL_AT_LEAST * inserted
+    }
+
+    /// P1 每轮的增量（插了的中位 − 基线的中位），5 轮再取中位。有一轮读不到交回 `None`。
+    pub(super) fn median_increment_of_the_rounds(
+        baseline_medians: &[Option<f64>],
+        inserted_medians: &[Option<f64>],
+    ) -> Option<f64> {
+        let increments: Vec<f64> = baseline_medians
+            .iter()
+            .zip(inserted_medians)
+            .map(|(baseline, inserted)| Some((*inserted)? - (*baseline)?))
+            .collect::<Option<Vec<f64>>>()?;
+        median_of(&increments)
+    }
+
+    /// P3：比对报恰好 1 条「不确定」、是第 3 条（下标 2）。
+    pub(super) const READBACK_ENTRY_FLIPPED_BY_THE_COMPARISON_CONTROL: usize = 2;
+
+    pub(super) fn comparison_control_holds(uncertain_entries: &[usize]) -> bool {
+        uncertain_entries == [READBACK_ENTRY_FLIPPED_BY_THE_COMPARISON_CONTROL]
+    }
+
+    /// 第十条 J5：进程钟比线程钟多出线程钟的 10% 以上（驱动与 wgpu 在本进程里起的线程的 CPU 没算进 c_rt）。
+    pub(super) const PROCESS_CLOCK_EXCESS_ABOVE_FOR_UNDERESTIMATE: f64 = 0.10;
+
+    pub(super) fn is_the_thread_clock_underestimating(
+        process_cpu_median_nanoseconds: f64,
+        thread_cpu_median_nanoseconds: f64,
+    ) -> bool {
+        process_cpu_median_nanoseconds - thread_cpu_median_nanoseconds
+            > thread_cpu_median_nanoseconds * PROCESS_CLOCK_EXCESS_ABOVE_FOR_UNDERESTIMATE
+    }
+
+    /// 停机 J-S5：一次提交的线程钟增量大过包着它的挂钟增量（计时口径错）。
+    pub(super) fn is_the_thread_cpu_inside_the_wall(
+        thread_cpu_nanoseconds: u64,
+        wall_nanoseconds: u64,
+    ) -> bool {
+        thread_cpu_nanoseconds <= wall_nanoseconds
+    }
+
+    /// 停机 J-S1：核一与 crates 的 `GpuCard::crc32c_of_ranges` 对同一份输入有一条不同（或条数不同），交回一句；逐条相同交 `None`。
+    pub(super) fn kernel_one_finding_against_the_crates(
+        units: u64,
+        kernel_one_results: &[u32],
+        crates_results: &[u32],
+    ) -> Option<String> {
+        let differing = kernel_one_results
+            .iter()
+            .zip(crates_results)
+            .filter(|(kernel_one, crates)| kernel_one != crates)
+            .count();
+        (differing > 0 || kernel_one_results.len() != crates_results.len()).then(|| {
+        format!(
+            "clause_j_s1_kernel_one_differs_from_the_crates_at_{differing}_of_{units}_units_lengths_{}_{}",
+            kernel_one_results.len(),
+            crates_results.len()
+        )
+    })
+    }
+
+    /// `nvidia-smi --query-gpu=index,pci.bus_id --format=csv,noheader` 的输出：序号 → 总线号（小写）。
+    pub(super) fn bus_identifiers_by_index_of(query_text: &str) -> BTreeMap<u32, String> {
+        query_text
+            .lines()
+            .filter_map(|line| {
+                let (index, bus) = line.split_once(',')?;
+                Some((index.trim().parse().ok()?, bus.trim().to_ascii_lowercase()))
+            })
+            .collect()
+    }
+
+    /// `nvidia-smi --query-compute-apps=pid,gpu_bus_id --format=csv,noheader` 的输出里，在这张卡上、不是本进程的计算进程（登记第十一节「机器被别的活挤」）。
+    pub(super) fn other_compute_processes_on_the_card(
+        query_text: &str,
+        bus_identifier: &str,
+        own_process: u32,
+    ) -> Vec<u32> {
+        query_text
+            .lines()
+            .filter_map(|line| {
+                let (process, bus) = line.split_once(',')?;
+                let process: u32 = process.trim().parse().ok()?;
+                (bus.trim().eq_ignore_ascii_case(bus_identifier) && process != own_process)
+                    .then_some(process)
+            })
+            .collect()
+    }
+
+    /// 两核的输入形态（登记第一节「输入形态」，岔路单第 5 行甲、乙）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum InputForm {
+        /// 两核读同一块输入缓冲。
+        Shared,
+        /// 每核一块、各写一次。
+        Split,
+    }
+
+    impl InputForm {
+        pub(super) const ALL: [InputForm; 2] = [InputForm::Shared, InputForm::Split];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                InputForm::Shared => "shared",
+                InputForm::Split => "split",
+            }
+        }
+
+        /// 这一种形态一次提交往卡上写几份单元字节。
+        pub(super) const fn input_copies(self) -> u64 {
+            match self {
+                InputForm::Shared => 1,
+                InputForm::Split => 2,
+            }
+        }
+
+        /// 第二段内容种子里的那一位（共用 0、分开 1，登记第五节「第二段怎么量」）。
+        pub(super) const fn seed_bits(self) -> u64 {
+            match self {
+                InputForm::Shared => 0,
+                InputForm::Split => 1,
+            }
+        }
+    }
+
+    /// 睡眠等的两档间隔（纳秒；登记第八节，第一节问题单第 3 行主 agent 认下）。
+    pub(super) const SHORT_SLEEP_INTERVAL_NANOSECONDS: u64 = 100_000;
+    pub(super) const LONG_SLEEP_INTERVAL_NANOSECONDS: u64 = 1_000_000;
+
+    /// 等法（登记第一节「等法」）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum WaitMethod {
+        /// `device.poll(Wait { submission_index: Some(这一次), timeout: None })`。
+        Blocking,
+        /// 「poll 一次；回读回调到了就出；没到睡 100 µs」。
+        SleepingShortly,
+        /// 同上，睡 1 ms。
+        SleepingLonger,
+    }
+
+    impl WaitMethod {
+        pub(super) const ALL: [WaitMethod; 3] = [
+            WaitMethod::Blocking,
+            WaitMethod::SleepingShortly,
+            WaitMethod::SleepingLonger,
+        ];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                WaitMethod::Blocking => "blocking",
+                WaitMethod::SleepingShortly => "sleep_100_microseconds",
+                WaitMethod::SleepingLonger => "sleep_1_millisecond",
+            }
+        }
+
+        /// 睡眠等的间隔；阻塞等交回 `None`。
+        pub(super) const fn sleep_interval(self) -> Option<Duration> {
+            match self {
+                WaitMethod::Blocking => None,
+                WaitMethod::SleepingShortly => {
+                    Some(Duration::from_nanos(SHORT_SLEEP_INTERVAL_NANOSECONDS))
+                }
+                WaitMethod::SleepingLonger => {
+                    Some(Duration::from_nanos(LONG_SLEEP_INTERVAL_NANOSECONDS))
+                }
+            }
+        }
+    }
+
+    /// 配置行里的睡眠间隔（第九节 V98 盯的那一段）。
+    pub(super) fn sleep_interval_configuration_text() -> String {
+        format!(
+        "sleep_interval_nanoseconds={SHORT_SLEEP_INTERVAL_NANOSECONDS},{LONG_SLEEP_INTERVAL_NANOSECONDS}"
+    )
+    }
+
+    /// 睡眠等（登记第一节「等法」）：循环「poll 一次（`poll_once` 交回回读回调到没到）；到了就出；没到睡 `interval`」，交回 poll 了几次。
+    /// poll 与睡都从参数进来，单测换成假的（前 5 次没好、第 6 次好，应睡 5 次）。
+    pub(super) fn wait_by_sleeping(
+        mut poll_once: impl FnMut() -> bool,
+        mut sleep: impl FnMut(Duration),
+        interval: Duration,
+    ) -> u64 {
+        let mut polls = 0_u64;
+        // 迭代上界：回读回调在提交做完之后一定到（设备丢了另由 poll 的错误报出），每圈 poll 一次
+        loop {
+            polls += 1;
+            if poll_once() {
+                return polls;
+            }
+            sleep(interval);
+        }
+    }
+
+    /// 一次提交往卡上写的那一块（① 写哪几块输入缓冲）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum InputBufferOfTheKernel {
+        /// 共用形态两核都读它；分开形态只有核一读它。
+        KernelOne,
+        /// 分开形态核二读它。
+        KernelTwo,
+    }
+
+    /// ① 把这一次的单元字节写进卡上的输入缓冲（`write` 是 `queue.write_buffer` 或单测里记账的假的），交回写进卡的单元字节数
+    /// （第七节乙类 `input_bytes_written`：共用 n × 32768，分开 2 × n × 32768）。长度表与派活参数另写，不计在内。
+    pub(super) fn write_the_unit_bytes(
+        form: InputForm,
+        unit_bytes: &[u8],
+        mut write: impl FnMut(InputBufferOfTheKernel, &[u8]),
+    ) -> u64 {
+        let length = u64::try_from(unit_bytes.len()).expect("一次提交的字节装得进 u64");
+        match form {
+            InputForm::Shared => {
+                write(InputBufferOfTheKernel::KernelOne, unit_bytes);
+                length
+            }
+            InputForm::Split => {
+                write(InputBufferOfTheKernel::KernelOne, unit_bytes);
+                write(InputBufferOfTheKernel::KernelTwo, unit_bytes);
+                2 * length
+            }
+        }
+    }
+
+    /// 一种形态一次提交该写进卡的单元字节（第七节乙类锚点、P4 物理下限的分子）。
+    pub(super) const fn expected_input_bytes(form: InputForm, units: u64) -> u64 {
+        units * LOCAL_GPU_SLOT_BYTES * form.input_copies()
+    }
+
+    /// P4：一次提交的挂钟没快过「这一次写进卡的字节 ÷ 链路峰值」（分开输入按两份字节算）。
+    pub(super) fn respects_the_floor_of_the_form(
+        wall_seconds: f64,
+        form: InputForm,
+        units: u64,
+        link_peak_bytes_per_second: f64,
+    ) -> bool {
+        respects_the_physical_floor(
+            wall_seconds,
+            units * LOCAL_GPU_SLOT_BYTES * form.input_copies(),
+            link_peak_bytes_per_second,
+        )
+    }
+
+    /// ⑥ 的比对结果：确认（两核相同）与不确定的条数、不确定的下标、两核各与期望值（计时窗口外 CPU 算好的）不同的条数、两份序号都对不对。
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(super) struct SubmissionComparison {
+        pub(super) confirmed: u64,
+        pub(super) uncertain_entries: Vec<usize>,
+        pub(super) kernel_one_differs_from_the_expected: u64,
+        pub(super) kernel_two_differs_from_the_expected: u64,
+        pub(super) are_the_sequence_numbers_holding: bool,
+    }
+
+    /// 回读缓冲里一条结果的字节（[`LOCAL_GPU_RESULT_ENTRY_BYTES`]，换成下标用的 usize）。
+    pub(super) fn result_entry_bytes() -> usize {
+        usize::try_from(LOCAL_GPU_RESULT_ENTRY_BYTES).expect("一条结果 8 字节装得进 usize")
+    }
+
+    /// 回读缓冲里一条结果：CRC 与序号，小端。
+    pub(super) fn readback_entry(readback: &[u8], entry: usize) -> (u32, u32) {
+        let start = entry * result_entry_bytes();
+        let word = |offset: usize| {
+            u32::from_le_bytes(
+                readback[start + offset..start + offset + 4]
+                    .try_into()
+                    .expect("4 字节"),
+            )
+        };
+        (word(0), word(4))
+    }
+
+    /// ⑥ 读回两份结果（前 n 条核一、后 n 条核二）、核每条结果的序号、逐条比两份（相同记确认、不同记不确定），再逐条与期望值比。
+    /// `kernel_two_flip` 给了就把核二那一条的 CRC 异或 1（P3 在读回之后、比对之前注入）。
+    pub(super) fn compare_the_readback(
+        readback: &[u8],
+        expected: &[u32],
+        kernel_two_flip: Option<usize>,
+    ) -> SubmissionComparison {
+        let units = expected.len();
+        let mut comparison = SubmissionComparison {
+            confirmed: 0,
+            uncertain_entries: Vec::new(),
+            kernel_one_differs_from_the_expected: 0,
+            kernel_two_differs_from_the_expected: 0,
+            are_the_sequence_numbers_holding: readback.len() >= 2 * units * result_entry_bytes(),
+        };
+        if !comparison.are_the_sequence_numbers_holding {
+            return comparison;
+        }
+        for (entry, expected_crc) in expected.iter().enumerate() {
+            let (kernel_one_crc, kernel_one_sequence) = readback_entry(readback, entry);
+            let (mut kernel_two_crc, kernel_two_sequence) = readback_entry(readback, units + entry);
+            if kernel_two_flip == Some(entry) {
+                kernel_two_crc ^= 1;
+            }
+            let entry_number = u32::try_from(entry).expect("一次提交的条数装得进 u32");
+            comparison.are_the_sequence_numbers_holding &= kernel_one_sequence == entry_number;
+            comparison.are_the_sequence_numbers_holding &= kernel_two_sequence == entry_number;
+            if kernel_one_crc == kernel_two_crc {
+                comparison.confirmed += 1;
+            } else {
+                comparison.uncertain_entries.push(entry);
+            }
+            comparison.kernel_one_differs_from_the_expected +=
+                u64::from(kernel_one_crc != *expected_crc);
+            comparison.kernel_two_differs_from_the_expected +=
+                u64::from(kernel_two_crc != *expected_crc);
+        }
+        comparison
+    }
+
+    /// 一次 GPU 提交的七步（登记第一节「一次 GPU 提交」①–⑦）。真卡上的常驻写法、今天的写法与单测里按假钟走的步骤各实现一份。
+    pub(super) trait SubmissionSteps {
+        /// ① 写输入（单元字节、长度表、派活参数），交回写进卡的单元字节。
+        fn prepare(&mut self) -> u64;
+        /// ② 编命令缓冲、③ 提交一次。
+        fn encode_and_submit(&mut self);
+        /// ④ 回读映射登记。
+        fn register_the_readback(&mut self);
+        /// ⑤ 等：交回睡眠等 poll 了几次（阻塞等交 0）；等那一段分不出来的写法（今天的写法，等在 ① 那一次调用里）交 `None`。
+        fn wait(&mut self) -> Option<u64>;
+        /// ⑥ 读回、核序号、逐条比两份、与期望值比。
+        fn read_and_compare(&mut self) -> SubmissionComparison;
+        /// ⑦ 解映射。
+        fn unmap(&mut self);
+    }
+
+    /// 计时用的三个钟（登记第一节「c_rt」：线程钟；「c_rt 的进程钟版」；挂钟 `CLOCK_MONOTONIC_RAW` 包着两个 CPU 钟）。真钟与单测的假钟各一份。
+    pub(super) trait SubmissionClocks {
+        fn thread_cpu(&mut self) -> Option<u64>;
+        fn process_cpu(&mut self) -> Option<u64>;
+        fn wall(&mut self) -> u64;
+    }
+
+    /// 真钟：本线程的线程钟、本进程的进程钟、`CLOCK_MONOTONIC_RAW`。
+    pub(super) struct ClocksOfThisThread;
+
+    impl SubmissionClocks for ClocksOfThisThread {
+        fn thread_cpu(&mut self) -> Option<u64> {
+            thread_cpu_nanoseconds()
+        }
+
+        fn process_cpu(&mut self) -> Option<u64> {
+            process_cpu_nanoseconds()
+        }
+
+        fn wall(&mut self) -> u64 {
+            RawWallClockReading::now().0
+        }
+    }
+
+    /// 一次计时提交的读数（纳秒）。`wait_*` 在等那一段分不出来时是 `None`。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct SubmissionTiming {
+        pub(super) thread_cpu_nanoseconds: u64,
+        pub(super) process_cpu_nanoseconds: u64,
+        pub(super) wall_nanoseconds: u64,
+        pub(super) wait_thread_cpu_nanoseconds: Option<u64>,
+        pub(super) wait_wall_nanoseconds: Option<u64>,
+        pub(super) polls: Option<u64>,
+        pub(super) input_bytes_written: u64,
+        pub(super) comparison: SubmissionComparison,
+    }
+
+    impl SubmissionTiming {
+        /// c_floor：c_rt − c_wait（与等法、核快慢无关的那一部分；登记第一节「等那一段」）。
+        pub(super) fn floor_thread_cpu_nanoseconds(&self) -> Option<u64> {
+            Some(
+                self.thread_cpu_nanoseconds
+                    .saturating_sub(self.wait_thread_cpu_nanoseconds?),
+            )
+        }
+    }
+
+    /// 一次计时提交（登记第五节「每次计时提交」）：读挂钟、线程钟、进程钟 → P1 插的那一段（`insertion`，① 之前）→ ①–⑦（⑤ 前后另读线程钟与
+    /// 挂钟）→ 读进程钟、线程钟、挂钟（挂钟包着两个 CPU 钟）。任何一次 CPU 钟读不到交回 `None`（那一格那一轮作废，登记第十一节「读不到」）。
+    pub(super) fn time_one_submission(
+        steps: &mut dyn SubmissionSteps,
+        clocks: &mut dyn SubmissionClocks,
+        insertion: &mut dyn FnMut(),
+    ) -> Option<SubmissionTiming> {
+        let wall_before = clocks.wall();
+        let thread_before = clocks.thread_cpu()?;
+        let process_before = clocks.process_cpu()?;
+        insertion();
+        let input_bytes_written = steps.prepare();
+        steps.encode_and_submit();
+        steps.register_the_readback();
+        let wait_wall_before = clocks.wall();
+        let wait_thread_before = clocks.thread_cpu()?;
+        let polls = steps.wait();
+        let wait_thread_after = clocks.thread_cpu()?;
+        let wait_wall_after = clocks.wall();
+        let comparison = steps.read_and_compare();
+        steps.unmap();
+        let process_after = clocks.process_cpu()?;
+        let thread_after = clocks.thread_cpu()?;
+        let wall_after = clocks.wall();
+        Some(SubmissionTiming {
+            thread_cpu_nanoseconds: thread_after.saturating_sub(thread_before),
+            process_cpu_nanoseconds: process_after.saturating_sub(process_before),
+            wall_nanoseconds: wall_after.saturating_sub(wall_before),
+            wait_thread_cpu_nanoseconds: polls
+                .map(|_| wait_thread_after.saturating_sub(wait_thread_before)),
+            wait_wall_nanoseconds: polls.map(|_| wait_wall_after.saturating_sub(wait_wall_before)),
+            polls,
+            input_bytes_written,
+            comparison,
+        })
+    }
+
+    /// 一格一轮的计时提交（登记第五节「每轮」）：`count` 次，每次之前（第一次除外）睡 `gap`，睡在下一次读挂钟之前、不在区间里。
+    /// 交回逐次的读数（读不到的那一次是 `None`）。热身由调用方另跑同一个函数、丢掉读数。
+    pub(super) fn time_the_submissions_of_a_cell(
+        steps: &mut dyn SubmissionSteps,
+        clocks: &mut dyn SubmissionClocks,
+        count: usize,
+        gap: Duration,
+        sleep: &mut dyn FnMut(Duration),
+        insertion: &mut dyn FnMut(),
+    ) -> Vec<Option<SubmissionTiming>> {
+        let mut timings = Vec::with_capacity(count);
+        for submission in 0..count {
+            let gap_before_this_submission = if submission == 0 { Duration::ZERO } else { gap };
+            sleep(gap_before_this_submission);
+            timings.push(time_one_submission(steps, clocks, insertion));
+        }
+        timings
+    }
+
+    /// 一格一轮的中位与轨迹（`name=submission_cell` 那一行的数）。有一次读不到交回 `None`。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct CellRoundReading {
+        pub(super) thread_cpu_median_nanoseconds: f64,
+        pub(super) floor_thread_cpu_median_nanoseconds: Option<f64>,
+        pub(super) process_cpu_median_nanoseconds: f64,
+        pub(super) wait_thread_cpu_median_nanoseconds: Option<f64>,
+        pub(super) wait_wall_median_nanoseconds: Option<f64>,
+        pub(super) wall_median_nanoseconds: f64,
+        pub(super) polls_median: Option<f64>,
+        pub(super) input_bytes_written: Vec<u64>,
+        pub(super) thread_cpu_in_order: Vec<f64>,
+        pub(super) are_the_results_holding: bool,
+        pub(super) are_the_sequence_numbers_holding: bool,
+        pub(super) uncertain_total: usize,
+        pub(super) is_every_thread_cpu_inside_the_wall: bool,
+        /// 第七节甲类：每次提交 ⑤ 那一段的线程钟 ≤ 整次的线程钟（等那一段分不出来的写法不判）。
+        pub(super) is_every_wait_inside_the_submission: bool,
+        /// 第七节甲类：每次提交「确认」+「不确定」= n（两份核各算一次、逐条比了）。
+        pub(super) are_the_comparison_counts_holding: bool,
+    }
+
+    pub(super) fn cell_round_reading(
+        timings: &[Option<SubmissionTiming>],
+        units: u64,
+    ) -> Option<CellRoundReading> {
+        let timings: Vec<&SubmissionTiming> = timings
+            .iter()
+            .map(Option::as_ref)
+            .collect::<Option<Vec<_>>>()?;
+        let median_of_the = |value_of: &dyn Fn(&SubmissionTiming) -> Option<u64>| -> Option<f64> {
+            let values: Vec<f64> = timings
+                .iter()
+                .map(|timing| value_of(timing).map(|value| value as f64))
+                .collect::<Option<Vec<f64>>>()?;
+            median_of(&values)
+        };
+        Some(CellRoundReading {
+            thread_cpu_median_nanoseconds: median_of_the(&|timing| {
+                Some(timing.thread_cpu_nanoseconds)
+            })?,
+            floor_thread_cpu_median_nanoseconds: median_of_the(
+                &SubmissionTiming::floor_thread_cpu_nanoseconds,
+            ),
+            process_cpu_median_nanoseconds: median_of_the(&|timing| {
+                Some(timing.process_cpu_nanoseconds)
+            })?,
+            wait_thread_cpu_median_nanoseconds: median_of_the(&|timing| {
+                timing.wait_thread_cpu_nanoseconds
+            }),
+            wait_wall_median_nanoseconds: median_of_the(&|timing| timing.wait_wall_nanoseconds),
+            wall_median_nanoseconds: median_of_the(&|timing| Some(timing.wall_nanoseconds))?,
+            polls_median: median_of_the(&|timing| timing.polls),
+            input_bytes_written: timings
+                .iter()
+                .map(|timing| timing.input_bytes_written)
+                .collect(),
+            thread_cpu_in_order: timings
+                .iter()
+                .map(|timing| timing.thread_cpu_nanoseconds as f64)
+                .collect(),
+            are_the_results_holding: timings.iter().all(|timing| {
+                timing.comparison.kernel_one_differs_from_the_expected == 0
+                    && timing.comparison.kernel_two_differs_from_the_expected == 0
+            }),
+            are_the_sequence_numbers_holding: timings
+                .iter()
+                .all(|timing| timing.comparison.are_the_sequence_numbers_holding),
+            uncertain_total: timings
+                .iter()
+                .map(|timing| timing.comparison.uncertain_entries.len())
+                .sum(),
+            is_every_thread_cpu_inside_the_wall: timings.iter().all(|timing| {
+                is_the_thread_cpu_inside_the_wall(
+                    timing.thread_cpu_nanoseconds,
+                    timing.wall_nanoseconds,
+                )
+            }),
+            is_every_wait_inside_the_submission: timings.iter().all(|timing| {
+                timing
+                    .wait_thread_cpu_nanoseconds
+                    .is_none_or(|wait| wait <= timing.thread_cpu_nanoseconds)
+            }),
+            are_the_comparison_counts_holding: timings.iter().all(|timing| {
+                timing.comparison.confirmed
+                    + u64::try_from(timing.comparison.uncertain_entries.len()).expect("条数")
+                    == units
+            }),
+        })
+    }
+
+    // ───────────────────────────── recompute-disagreement 的算术（第 3 次重跑登记第五节「第二段怎么量」、第六节 R6–R8；纯函数） ─────────────────────────────
+
+    /// 第二段每张卡每种输入的批数与每批的单元数。
+    pub(super) const DISAGREEMENT_BATCHES: u64 = 64;
+    pub(super) const UNITS_PER_DISAGREEMENT_BATCH: u64 = 16_384;
+    /// 一个单元不一致之后至多单独重算几次。
+    pub(super) const RECOMPUTES_AT_MOST: usize = 3;
+    /// 注入只在第 1–8 批；P5（确定性）注第 7 个单元（下标 7），P6（暂态）注第 11 个单元（下标 11）；P5 在分开输入时改核二那一份输入的第 100 字节。
+    pub(super) const INJECTED_BATCHES: std::ops::RangeInclusive<u64> = 1..=8;
+    pub(super) const DETERMINISTIC_INJECTION_UNIT: u64 = 7;
+    pub(super) const TRANSIENT_INJECTION_UNIT: u64 = 11;
+    pub(super) const DETERMINISTIC_INJECTION_BYTE: usize = 100;
+    /// 两张卡同一输入那一批：卡序号一栏填 0xFFFF、批号 0（共用输入）。
+    pub(super) const BOTH_CARDS_SEED_CARD: u64 = 0xFFFF;
+    pub(super) const BOTH_CARDS_SEED_BATCH: u64 = 0;
+    /// 内容的种子起点与 xorshift64* 的乘数（登记第五节「第二段怎么量」）。
+    pub(super) const CONTENT_SEED_START: u64 = 0x9E37_79B9_7F4A_7C15;
+    pub(super) const CONTENT_MULTIPLIER: u64 = 0x2545_F491_4F6C_DD1D;
+    /// 第二段单元的两种长度：偶数号单元 32768、奇数号 16384。
+    pub(super) const EVEN_UNIT_BYTES: usize = 32_768;
+    pub(super) const ODD_UNIT_BYTES: usize = 16_384;
+
+    /// 一个单元的长度（偶数号整单元，奇数号半个）。
+    pub(super) const fn disagreement_unit_length(unit: u64) -> usize {
+        if unit.is_multiple_of(2) {
+            EVEN_UNIT_BYTES
+        } else {
+            ODD_UNIT_BYTES
+        }
+    }
+
+    /// 第二段一个单元的字节：起点 x = 种子起点 ^ ((卡 << 48) | (输入形态 << 40) | (批号 << 20) | 单元号)，xorshift64* 每步出 8 字节、小端，截到长度。
+    pub(super) fn disagreement_unit_content(
+        card_seed: u64,
+        form: InputForm,
+        batch: u64,
+        unit: u64,
+        into: &mut [u8],
+    ) {
+        let mut state = CONTENT_SEED_START
+            ^ ((card_seed << 48) | (form.seed_bits() << 40) | (batch << 20) | unit);
+        for chunk in into.chunks_mut(8) {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            let output = state.wrapping_mul(CONTENT_MULTIPLIER).to_le_bytes();
+            chunk.copy_from_slice(&output[..chunk.len()]);
+        }
+    }
+
+    /// 第七节乙类「第二段的内容」锚点：(卡种子、形态、批、单元、前 8 字节、CRC-32C)。
+    pub(super) const CONTENT_ANCHORS: [(u64, InputForm, u64, u64, u64, u32); 4] = [
+        (
+            0,
+            InputForm::Shared,
+            1,
+            0,
+            0x3ae4_b0f4_eaea_c4c4,
+            0xaac1_beb6,
+        ),
+        (
+            0,
+            InputForm::Shared,
+            1,
+            1,
+            0x57c1_1d0a_c205_6cc7,
+            0x0dff_e7b3,
+        ),
+        (
+            1,
+            InputForm::Split,
+            64,
+            16_383,
+            0x972b_7b78_30e1_c500,
+            0x261c_3840,
+        ),
+        (
+            BOTH_CARDS_SEED_CARD,
+            InputForm::Shared,
+            BOTH_CARDS_SEED_BATCH,
+            0,
+            0x7aba_e00a_7fb3_6a3a,
+            0x05f3_bd54,
+        ),
+    ];
+
+    /// 停机 J-S8：内容锚点有一条不符交回一句；都符交 `None`。
+    pub(super) fn content_anchor_finding() -> Option<String> {
+        CONTENT_ANCHORS.iter().find_map(|(card_seed, form, batch, unit, first_eight, crc)| {
+        let mut bytes = vec![0_u8; disagreement_unit_length(*unit)];
+        disagreement_unit_content(*card_seed, *form, *batch, *unit, &mut bytes);
+        let head = u64::from_be_bytes(bytes[..8].try_into().expect("8 字节"));
+        let computed_crc = crc32_castagnoli(&bytes);
+        (head != *first_eight || computed_crc != *crc).then(|| {
+            format!(
+                "clause_j_s8_content_card_{card_seed}_form_{}_batch_{batch}_unit_{unit}_head_{head:016x}_crc_{computed_crc:08x}",
+                form.label()
+            )
+        })
+    })
+    }
+
+    /// 这一个单元是不是注入阳性对照的那 16 个之一（不进天然计数）。
+    pub(super) fn is_an_injected_unit(batch: u64, unit: u64) -> bool {
+        INJECTED_BATCHES.contains(&batch)
+            && (unit == DETERMINISTIC_INJECTION_UNIT || unit == TRANSIENT_INJECTION_UNIT)
+    }
+
+    /// 每张卡每种输入的天然单元次：批数 × 每批单元数 − 注入的单元数（第七节乙类锚点 1048560）。
+    pub(super) fn natural_unit_times(
+        batches: u64,
+        units_per_batch: u64,
+        injected_units: u64,
+    ) -> u64 {
+        batches * units_per_batch - injected_units
+    }
+
+    /// 注入的批数（第 1–8 批）。
+    pub(super) fn injected_batches() -> u64 {
+        INJECTED_BATCHES.end() - INJECTED_BATCHES.start() + 1
+    }
+
+    /// 每张卡每种输入注入的单元数（第 1–8 批各 2 个：P5 一个、P6 一个）。
+    pub(super) fn injected_units_per_combination() -> u64 {
+        2 * injected_batches()
+    }
+
+    /// 一个单元第几次计算（P6 只在头一次注入）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum ComputationOfTheUnit {
+        FirstInTheBatch,
+        Recompute,
+    }
+
+    /// P5 在分开输入时改核二那一份输入的哪一个字节（每次计算都改，含重算）；别的单元、别的形态交 `None`。
+    pub(super) fn kernel_two_input_flip(form: InputForm, batch: u64, unit: u64) -> Option<usize> {
+        (form == InputForm::Split
+            && INJECTED_BATCHES.contains(&batch)
+            && unit == DETERMINISTIC_INJECTION_UNIT)
+            .then_some(DETERMINISTIC_INJECTION_BYTE)
+    }
+
+    /// 读回之后把核二那一条的 CRC 异或 1 不：P5 在共用输入时每次（含重算）都注，P6 两种输入都只在头一次计算时注。
+    pub(super) fn is_the_kernel_two_readback_flipped(
+        form: InputForm,
+        batch: u64,
+        unit: u64,
+        computation: ComputationOfTheUnit,
+    ) -> bool {
+        if !INJECTED_BATCHES.contains(&batch) {
+            return false;
+        }
+        let deterministic = form == InputForm::Shared && unit == DETERMINISTIC_INJECTION_UNIT;
+        let transient = unit == TRANSIENT_INJECTION_UNIT
+            && computation == ComputationOfTheUnit::FirstInTheBatch;
+        deterministic || transient
+    }
+
+    /// 一个单元一次计算的三样比（登记第五节「每个单元比三样」）。核的结果读不到（没派那一核）交回 `None`。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) struct UnitComparison {
+        pub(super) kernels_differ: bool,
+        pub(super) kernel_one_differs_from_the_cpu: bool,
+        pub(super) kernel_two_differs_from_the_cpu: bool,
+    }
+
+    impl UnitComparison {
+        pub(super) fn of(
+            kernel_one: Option<u32>,
+            kernel_two: Option<u32>,
+            cpu: u32,
+        ) -> Option<UnitComparison> {
+            let (kernel_one, kernel_two) = (kernel_one?, kernel_two?);
+            Some(UnitComparison {
+                kernels_differ: kernel_one != kernel_two,
+                kernel_one_differs_from_the_cpu: kernel_one != cpu,
+                kernel_two_differs_from_the_cpu: kernel_two != cpu,
+            })
+        }
+
+        pub(super) fn is_any_different(self) -> bool {
+            self.kernels_differ
+                || self.kernel_one_differs_from_the_cpu
+                || self.kernel_two_differs_from_the_cpu
+        }
+
+        /// R8：两核一致而与 CPU 不同（第 8 条射程那句「抓不到两份一起错」的实例）。
+        pub(super) fn do_both_kernels_agree_and_differ_from_the_cpu(self) -> bool {
+            !self.kernels_differ && self.kernel_one_differs_from_the_cpu
+        }
+    }
+
+    /// 派哪几核（重算时两核都派，第九节 V118 盯的那一处）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum KernelsToDispatch {
+        Both,
+        KernelOneOnly,
+    }
+
+    /// 一个单元的重算结局（登记第六节 R7）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum RecomputeOutcome {
+        /// 第 1 次重算就一致。
+        Transient,
+        /// 第 2 或第 3 次重算才一致。
+        AgreedLater,
+        /// 3 次重算都不一致。
+        Deterministic,
+        /// 重算里有一次读不到核的结果。
+        Unreadable,
+    }
+
+    impl RecomputeOutcome {
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                RecomputeOutcome::Transient => "transient",
+                RecomputeOutcome::AgreedLater => "agreed_later",
+                RecomputeOutcome::Deterministic => "deterministic",
+                RecomputeOutcome::Unreadable => "unreadable",
+            }
+        }
+    }
+
+    /// 一个不一致的单元单独重算（n = 1，同一种输入），至多 3 次，一致了就停；`recompute` 交回那一次的三样比。交回每次的比与结局。
+    pub(super) fn recompute_until_agreement(
+        mut recompute: impl FnMut(KernelsToDispatch) -> Option<UnitComparison>,
+    ) -> (Vec<Option<UnitComparison>>, RecomputeOutcome) {
+        let mut comparisons = Vec::new();
+        for recompute_number in 1..=RECOMPUTES_AT_MOST {
+            let comparison = recompute(KernelsToDispatch::Both);
+            comparisons.push(comparison);
+            match comparison {
+                None => return (comparisons, RecomputeOutcome::Unreadable),
+                Some(agreeing) if !agreeing.is_any_different() => {
+                    let outcome = if recompute_number == 1 {
+                        RecomputeOutcome::Transient
+                    } else {
+                        RecomputeOutcome::AgreedLater
+                    };
+                    return (comparisons, outcome);
+                }
+                Some(_) => {}
+            }
+        }
+        (comparisons, RecomputeOutcome::Deterministic)
+    }
+
+    /// R7 的类别：首轮 0 次 `zero`；有一个 3 次重算都不一致 `deterministic_present`；全部第 1 次重算就一致 `transient_only`；别的 `mixed`。
+    pub(super) fn recompute_category(
+        first_round_disagreements: u64,
+        outcomes: &[RecomputeOutcome],
+    ) -> &'static str {
+        if first_round_disagreements == 0 {
+            return "zero";
+        }
+        if outcomes.contains(&RecomputeOutcome::Deterministic) {
+            return "deterministic_present";
+        }
+        if !outcomes.is_empty()
+            && outcomes
+                .iter()
+                .all(|outcome| *outcome == RecomputeOutcome::Transient)
+        {
+            return "transient_only";
+        }
+        "mixed"
+    }
+
+    /// R6：零次时单侧 95% 上界 1 − 0.05^(1/n)（n = 1048560 → 2.856992e-06），按 −expm1(ln 0.05 ÷ n) 算免得相减丢位。
+    pub(super) fn upper_bound_at_95_percent_when_zero(unit_times: u64) -> f64 {
+        -(0.05_f64.ln() / unit_times as f64).exp_m1()
+    }
+
+    /// P5、P6 收尾：注入的 8 个单元全记确定性（或全记暂态）；首轮就没报不一致的那一个记 `None`，判不过。
+    pub(super) fn injected_units_hold(
+        outcomes: &[Option<RecomputeOutcome>],
+        expected: RecomputeOutcome,
+    ) -> bool {
+        u64::try_from(outcomes.len()).is_ok_and(|count| count == injected_batches())
+            && outcomes.iter().all(|outcome| *outcome == Some(expected))
+    }
+
+    /// 一次计算交回的两核结果（没派的那一核是 `None`），读回之后、注入之前的原样。
+    pub(super) type KernelResultsOfAUnit = (Option<u32>, Option<u32>);
+
+    /// 一个重算过的单元：单元号、首轮那一次的比、每次重算的比、结局（`name=recompute` 一行）。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct RecomputedUnit {
+        pub(super) unit: u64,
+        pub(super) first_round: UnitComparison,
+        pub(super) recomputes: Vec<Option<UnitComparison>>,
+        pub(super) outcome: RecomputeOutcome,
+    }
+
+    /// 第二段一批的结局（登记第六节 R6–R8 的计数，按天然单元算；注入的那几个另记 P5、P6 的结局）。
+    #[derive(Clone, Debug, PartialEq, Default)]
+    pub(super) struct DisagreementBatchOutcome {
+        pub(super) natural_units: u64,
+        pub(super) first_round_unreadable: u64,
+        pub(super) first_round_kernel_disagreements: u64,
+        pub(super) first_round_any_difference: u64,
+        pub(super) both_kernels_agree_and_differ_from_the_cpu: u64,
+        pub(super) kernel_one_differs_from_the_cpu: u64,
+        pub(super) kernel_two_differs_from_the_cpu: u64,
+        pub(super) natural_recomputes: Vec<RecomputedUnit>,
+        pub(super) deterministic_injection: Option<Option<RecomputeOutcome>>,
+        pub(super) transient_injection: Option<Option<RecomputeOutcome>>,
+    }
+
+    /// 第二段一批（登记第五节「每批」）：`first_results` 是这一批写入、两核各派一次、读回的原样结果（按单元次序）；对每个单元先照 P5、P6 注入，
+    /// 再比三样；三样有一样不同的单元单独重算（`recompute` 交回那一个单元 n = 1 再算一次的原样结果，照样注入），至多 3 次。
+    /// 注入的单元不进天然计数，它们的结局另记（P5、P6）。
+    pub(super) fn process_the_disagreement_batch(
+        form: InputForm,
+        batch: u64,
+        cpu_crcs: &[u32],
+        first_results: &[KernelResultsOfAUnit],
+        mut recompute: impl FnMut(u64, KernelsToDispatch) -> KernelResultsOfAUnit,
+    ) -> DisagreementBatchOutcome {
+        let mut outcome = DisagreementBatchOutcome::default();
+        for ((unit_index, cpu_crc), (kernel_one, kernel_two)) in
+            cpu_crcs.iter().enumerate().zip(first_results)
+        {
+            let unit = u64::try_from(unit_index).expect("单元号装得进 u64");
+            let flip_of = |computation| {
+                u32::from(is_the_kernel_two_readback_flipped(
+                    form,
+                    batch,
+                    unit,
+                    computation,
+                ))
+            };
+            let kernel_two_seen =
+                kernel_two.map(|crc| crc ^ flip_of(ComputationOfTheUnit::FirstInTheBatch));
+            let is_injected = is_an_injected_unit(batch, unit);
+            let Some(first_round) = UnitComparison::of(*kernel_one, kernel_two_seen, *cpu_crc)
+            else {
+                if !is_injected {
+                    outcome.natural_units += 1;
+                    outcome.first_round_unreadable += 1;
+                }
+                continue;
+            };
+            if !is_injected {
+                outcome.natural_units += 1;
+                outcome.first_round_kernel_disagreements += u64::from(first_round.kernels_differ);
+                outcome.first_round_any_difference += u64::from(first_round.is_any_different());
+                outcome.both_kernels_agree_and_differ_from_the_cpu +=
+                    u64::from(first_round.do_both_kernels_agree_and_differ_from_the_cpu());
+                outcome.kernel_one_differs_from_the_cpu +=
+                    u64::from(first_round.kernel_one_differs_from_the_cpu);
+                outcome.kernel_two_differs_from_the_cpu +=
+                    u64::from(first_round.kernel_two_differs_from_the_cpu);
+            }
+            let recomputed = first_round.is_any_different().then(|| {
+                let (recomputes, recompute_outcome) = recompute_until_agreement(|kernels| {
+                    let (again_one, again_two) = recompute(unit, kernels);
+                    let again_two_seen =
+                        again_two.map(|crc| crc ^ flip_of(ComputationOfTheUnit::Recompute));
+                    UnitComparison::of(again_one, again_two_seen, *cpu_crc)
+                });
+                RecomputedUnit {
+                    unit,
+                    first_round,
+                    recomputes,
+                    outcome: recompute_outcome,
+                }
+            });
+            let injected_outcome = recomputed
+                .as_ref()
+                .map(|recomputed_unit| recomputed_unit.outcome);
+            match (is_injected, unit) {
+                (true, DETERMINISTIC_INJECTION_UNIT) => {
+                    outcome.deterministic_injection = Some(injected_outcome)
+                }
+                (true, _) => outcome.transient_injection = Some(injected_outcome),
+                (false, _) => outcome.natural_recomputes.extend(recomputed),
+            }
+        }
+        outcome
+    }
+
+    /// R7：重算过的天然单元里，头 `recomputes` 次重算都还不一致的个数（重算里读不到的不算进来，另由结局 `unreadable` 报）。
+    pub(super) fn still_disagreeing_after(recomputed: &[RecomputedUnit], recomputes: usize) -> u64 {
+        let still = recomputed
+            .iter()
+            .filter(|unit| {
+                unit.recomputes.len() >= recomputes
+                    && unit.recomputes[..recomputes]
+                        .iter()
+                        .all(|comparison| comparison.is_some_and(UnitComparison::is_any_different))
+            })
+            .count();
+        u64::try_from(still).expect("个数")
+    }
+
+    /// 第八节轨迹（第二段每批的首轮不一致）：64 批里最多的一批、不一致 > 0 的批数、最后一批的。
+    pub(super) fn disagreement_trajectory_text(
+        first_round_disagreements_per_batch: &[u64],
+    ) -> String {
+        format!(
+            "first_round_disagreements_peak_of_a_batch={} batches_with_first_round_disagreements={} first_round_disagreements_of_the_last_batch={}",
+            first_round_disagreements_per_batch.iter().copied().max().map_or_else(|| "none".to_string(), |peak| peak.to_string()),
+            first_round_disagreements_per_batch.iter().filter(|count| **count > 0).count(),
+            first_round_disagreements_per_batch.last().map_or_else(|| "none".to_string(), u64::to_string),
+        )
+    }
+
+    /// 第十条 J8：天然单元次不足（有批读不到、卡掉了没算完）。
+    pub(super) fn are_the_natural_unit_times_sufficient(natural_units: u64) -> bool {
+        natural_units
+            >= natural_unit_times(
+                DISAGREEMENT_BATCHES,
+                UNITS_PER_DISAGREEMENT_BATCH,
+                injected_units_per_combination(),
+            )
+    }
+
+    /// R8「同一输入同一结果」：两份原样结果逐条相同的条数（两核都比）。
+    pub(super) fn identical_entries(
+        first: &[KernelResultsOfAUnit],
+        again: &[KernelResultsOfAUnit],
+    ) -> u64 {
+        let identical = first
+            .iter()
+            .zip(again)
+            .filter(|(earlier, later)| earlier == later)
+            .count();
+        u64::try_from(identical).expect("条数")
+    }
+
+    /// 一种提交形态（登记第五节阳性对照 P1「全部 7 种提交形态」：常驻 × 三种等法 × 两种输入，加今天的写法）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum SubmissionForm {
+        Resident(InputForm),
+        TodaySingleKernel,
+    }
+
+    impl SubmissionForm {
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                SubmissionForm::Resident(form) => form.label(),
+                SubmissionForm::TodaySingleKernel => "today_single_kernel",
+            }
+        }
+
+        /// 这一种形态量哪几种等法（今天的写法只有它自己的阻塞等）。
+        pub(super) fn wait_methods(self) -> Vec<WaitMethod> {
+            match self {
+                SubmissionForm::Resident(_) => WaitMethod::ALL.to_vec(),
+                SubmissionForm::TodaySingleKernel => vec![WaitMethod::Blocking],
+            }
+        }
+
+        /// 这一种形态一次提交写进卡的单元字节（今天的写法拷一份）。
+        pub(super) const fn input_bytes(self, units: u64) -> u64 {
+            match self {
+                SubmissionForm::Resident(form) => expected_input_bytes(form, units),
+                SubmissionForm::TodaySingleKernel => units * LOCAL_GPU_SLOT_BYTES,
+            }
+        }
+    }
+
+    /// 两次提交之间计时窗口外睡多久（毫秒；登记第一节「间隔」）：0 与 50，50 只量共用输入的三种等法。
+    pub(super) const GAP_BETWEEN_TWO_BATCHES_MILLISECONDS: u64 = 50;
+    pub(super) const GAP_MILLISECONDS: [u64; 2] = [0, GAP_BETWEEN_TWO_BATCHES_MILLISECONDS];
+
+    /// 第一段一张卡上的一格（登记第五节「每轮」：格的次序间隔、输入、等法、n 由外到里）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) struct SubmissionCell {
+        pub(super) gap_milliseconds: u64,
+        pub(super) form: SubmissionForm,
+        pub(super) wait: WaitMethod,
+        pub(super) units: u64,
+    }
+
+    impl SubmissionCell {
+        /// 同一格（间隔、形态、等法）换一档 n。
+        pub(super) const fn with_units(self, units: u64) -> SubmissionCell {
+            SubmissionCell {
+                gap_milliseconds: self.gap_milliseconds,
+                form: self.form,
+                wait: self.wait,
+                units,
+            }
+        }
+
+        pub(super) fn label(self) -> String {
+            format!(
+                "form={} wait={} gap_milliseconds={} units={}",
+                self.form.label(),
+                self.wait.label(),
+                self.gap_milliseconds,
+                self.units
+            )
+        }
+    }
+
+    /// 一张卡上的 80 格（常驻 48 格 + 间隔 50 ms 24 格 + 今天的写法 8 格），按间隔、输入、等法、n 由外到里。
+    pub(super) fn submission_cells_of_a_card() -> Vec<SubmissionCell> {
+        let mut cells = Vec::new();
+        for gap_milliseconds in GAP_MILLISECONDS {
+            let forms: Vec<SubmissionForm> = if gap_milliseconds == 0 {
+                vec![
+                    SubmissionForm::Resident(InputForm::Shared),
+                    SubmissionForm::Resident(InputForm::Split),
+                    SubmissionForm::TodaySingleKernel,
+                ]
+            } else {
+                vec![SubmissionForm::Resident(InputForm::Shared)]
+            };
+            for form in forms {
+                for wait in form.wait_methods() {
+                    for units in SUBMISSION_UNIT_COUNTS {
+                        cells.push(SubmissionCell {
+                            gap_milliseconds,
+                            form,
+                            wait,
+                            units,
+                        });
+                    }
+                }
+            }
+        }
+        cells
+    }
+
+    /// 每格热身几次（不计）、计时几次（间隔 0 的格 100 次、间隔 50 ms 的格 50 次）：第 3 次重跑第一段与第 4 次重跑控漂移段共用。
+    pub(super) const WARM_UP_SUBMISSIONS: usize = 10;
+    pub(super) const TIMED_SUBMISSIONS_WITHOUT_A_GAP: usize = 100;
+    pub(super) const TIMED_SUBMISSIONS_WITH_A_GAP: usize = 50;
+
+    /// 第 `round` 轮（从 1 起）的格的次序：从第 `round` 格起轮换（登记第五节「每轮」）。
+    pub(super) fn submission_cells_in_the_order_of_the_round(round: usize) -> Vec<SubmissionCell> {
+        let mut cells = submission_cells_of_a_card();
+        let start = (round - 1) % cells.len();
+        cells.rotate_left(start);
+        cells
+    }
+
+    /// 一格一轮算点要的三个中位（纳秒）。
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub(super) struct CellRoundMedians {
+        pub(super) thread_cpu_nanoseconds: f64,
+        pub(super) floor_thread_cpu_nanoseconds: Option<f64>,
+        pub(super) process_cpu_nanoseconds: f64,
+    }
+
+    /// 第一段全部格的各轮中位：键（卡序号、格），值 5 轮（作废的那一轮是 `None`）。
+    pub(super) type CellMediansOfTheSegment =
+        BTreeMap<(u32, SubmissionCell), Vec<Option<CellRoundMedians>>>;
+
+    /// 门槛是哪一台的 CPU（登记第一节「机器换算」，第一节主 agent 定第 2 条：第 1 行读 `machine_scaled`，`attack_ledger` 并列报）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum ThresholdKind {
+        AttackLedger,
+        MachineScaled,
+    }
+
+    impl ThresholdKind {
+        pub(super) const ALL: [ThresholdKind; 2] =
+            [ThresholdKind::AttackLedger, ThresholdKind::MachineScaled];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                ThresholdKind::AttackLedger => "attack_ledger",
+                ThresholdKind::MachineScaled => "machine_scaled",
+            }
+        }
+
+        /// 这一种门槛的值：原样，或 × ρ_机器（ρ 读不到交 `None`，那几行写 not_run）。
+        pub(super) fn scaled(
+            self,
+            attack_ledger_value: f64,
+            machine_ratio: Option<f64>,
+        ) -> Option<f64> {
+            match self {
+                ThresholdKind::AttackLedger => Some(attack_ledger_value),
+                ThresholdKind::MachineScaled => {
+                    machine_ratio.map(|ratio| attack_ledger_value * ratio)
+                }
+            }
+        }
+    }
+
+    /// 一个点的门槛（`out/g1.out` 那一点的 T 与省下的上界；A、B、D 是装置从 r2 第二段产物现算的）。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct PointThresholds {
+        pub(super) by_candidate: BTreeMap<GpuCandidate, f64>,
+        pub(super) saved_upper_milliseconds: f64,
+    }
+
+    /// 用哪个 CPU 钟算 c_rt（第十条 J5：线程钟是读法，进程钟只在那一格触发 J5 时并列报）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum CpuClockKind {
+        Thread,
+        Process,
+    }
+
+    impl CpuClockKind {
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                CpuClockKind::Thread => "thread",
+                CpuClockKind::Process => "process",
+            }
+        }
+    }
+
+    /// R1、R2、R3 一行的键（旋钮翻面按它配对）：点、候选、卡、形态、等法、间隔、门槛的机器、钟。
+    pub(super) type PointJudgementKey = (
+        SubmissionPoint,
+        GpuCandidate,
+        u32,
+        SubmissionForm,
+        WaitMethod,
+        u64,
+        ThresholdKind,
+        CpuClockKind,
+    );
+
+    // ───────────────────────────── 两种 GPU 子命令与附带段共用的旋钮翻面（第 3 次重跑登记第八节「几何敏感性」、第十条 J2–J4） ─────────────────────────────
+
+    /// 一格写下的结局算不算「判定」（第 3 次重跑登记第十二节 R3-7「两端都有判定的对数」）：第十条 J9 的轮数不足「不下判定、不当阴性」；
+    /// 第十一节作废的（阳性对照红、GPU 结果错与计时没等到记成的 `void_` 那几种）与读不到的（门槛读不到写的 `not_run`）不当结果；
+    /// 那一端没有这个量的（`not_applicable`：进程钟与今天的写法没有 c_floor）没有可判的。第六节「不全相同写 `unstable`」与第五节
+    /// 分段表「都有判定（含「不稳定」）」：`unstable` 算判定。
+    pub(super) fn is_a_judgement(outcome: &str) -> bool {
+        match outcome {
+            "rounds_insufficient" | "not_run" | "not_applicable" => false,
+            voided if voided.starts_with("void_") => false,
+            _ => true,
+        }
+    }
+
+    /// 一个键在这个旋钮另一端的键，两端的结局都是判定（[`is_a_judgement`]）时交回（另一端的键、这一端的判定、另一端的判定）；
+    /// 一对只出一次：换过去的键比原键大才收。
+    pub(super) fn both_ends_with_a_judgement<'judgements, Key: Ord>(
+        judgements: &'judgements BTreeMap<Key, String>,
+        key: &Key,
+        other_end: &impl Fn(&Key) -> Option<Key>,
+    ) -> Option<(Key, &'judgements str, &'judgements str)> {
+        let other = other_end(key).filter(|other| other > key)?;
+        let judgement = judgements.get(key)?;
+        let other_judgement = judgements.get(&other)?;
+        (is_a_judgement(judgement) && is_a_judgement(other_judgement)).then_some((
+            other,
+            judgement.as_str(),
+            other_judgement.as_str(),
+        ))
+    }
+
+    /// 一个量在一个旋钮两端的翻面：`judgements` 里每个键有一个结局，`other_end` 把一个键换成那个旋钮另一端的键（这个键本来就在另一端、
+    /// 或那一端没有对应的格交回 `None`）；交回两端都有判定而判定不同的每一对（[`both_ends_with_a_judgement`]）。
+    pub(super) fn knob_flips<Key: Ord + Clone>(
+        judgements: &BTreeMap<Key, String>,
+        other_end: impl Fn(&Key) -> Option<Key>,
+    ) -> Vec<(Key, Key)> {
+        judgements
+            .keys()
+            .filter_map(|key| {
+                let (other, judgement, other_judgement) =
+                    both_ends_with_a_judgement(judgements, key, &other_end)?;
+                (other_judgement != judgement).then(|| (key.clone(), other))
+            })
+            .collect()
+    }
+
+    /// 同一组键里，在这个旋钮两端都有判定的对数（「这几个点上不翻」那一句的分母）。
+    pub(super) fn knob_pairs<Key: Ord + Clone>(
+        judgements: &BTreeMap<Key, String>,
+        other_end: impl Fn(&Key) -> Option<Key>,
+    ) -> usize {
+        judgements
+            .keys()
+            .filter(|key| both_ends_with_a_judgement(judgements, key, &other_end).is_some())
+            .count()
+    }
+
+    // ───────────────────────────── 第一段的点、拟合与攒批（第 3 次重跑登记第六节 R1–R5；纯函数，单测喂合成的各格中位） ─────────────────────────────
+
+    /// 一个点在一张卡、一种形态、一种等法、一种间隔下各轮的毫秒：序列里每档 n 取那一轮那一格的中位（`value_of` 取哪个钟），取平均
+    /// （[`point_milliseconds_of_the_sequence`]）。有一档那一轮没有读数，那一轮是 `None`。
+    pub(super) fn point_milliseconds_per_round(
+        medians: &CellMediansOfTheSegment,
+        card: u32,
+        cell_without_the_units: SubmissionCell,
+        submission_units: &[u64],
+        value_of: fn(&CellRoundMedians) -> Option<f64>,
+    ) -> Vec<Option<f64>> {
+        (0..ROUNDS)
+            .map(|round_index| {
+                let by_units: BTreeMap<u64, f64> = submission_units
+                    .iter()
+                    .map(|units| {
+                        let cell = cell_without_the_units.with_units(*units);
+                        let value = medians
+                            .get(&(card, cell))?
+                            .get(round_index)?
+                            .as_ref()
+                            .and_then(value_of)?;
+                        Some((*units, value / 1e6))
+                    })
+                    .collect::<Option<BTreeMap<u64, f64>>>()?;
+                point_milliseconds_of_the_sequence(submission_units, &by_units)
+            })
+            .collect()
+    }
+
+    pub(super) fn thread_milliseconds_source(medians: &CellRoundMedians) -> Option<f64> {
+        Some(medians.thread_cpu_nanoseconds)
+    }
+
+    pub(super) fn floor_milliseconds_source(medians: &CellRoundMedians) -> Option<f64> {
+        medians.floor_thread_cpu_nanoseconds
+    }
+
+    pub(super) fn process_milliseconds_source(medians: &CellRoundMedians) -> Option<f64> {
+        Some(medians.process_cpu_nanoseconds)
+    }
+
+    /// 一格（不带 n）在第一段里有没有：间隔 50 只有共用输入的常驻写法，今天的写法只有阻塞等。
+    pub(super) fn is_a_measured_cell(
+        gap_milliseconds: u64,
+        form: SubmissionForm,
+        wait: WaitMethod,
+    ) -> bool {
+        form.wait_methods().contains(&wait)
+            && (gap_milliseconds == 0 || form == SubmissionForm::Resident(InputForm::Shared))
+    }
+
+    /// 各轮的数与判定写成逗号接起来的两串；读不到的轮写 `not_run`。
+    pub(super) fn per_round_texts(
+        values: &[Option<f64>],
+        judgements: &[Option<&'static str>],
+    ) -> (String, String) {
+        (
+            values
+                .iter()
+                .map(|value| optional_number(*value))
+                .collect::<Vec<_>>()
+                .join(","),
+            judgements
+                .iter()
+                .map(|judgement| judgement.unwrap_or("not_run"))
+                .collect::<Vec<_>>()
+                .join(","),
+        )
+    }
+
+    /// R1、R2、R3 各轮判定与 5 轮之后的判定：形态或卡作废了（`voiding` 给了原因）写那个原因；门槛读不到写 not_run；否则照 [`judgement_of_the_valid_rounds`]。
+    pub(super) fn judgements_of_the_point(
+        milliseconds_per_round: &[Option<f64>],
+        threshold: Option<f64>,
+        candidate: GpuCandidate,
+        voiding: Option<&'static str>,
+    ) -> (Vec<Option<&'static str>>, &'static str) {
+        let per_round: Vec<Option<&'static str>> = milliseconds_per_round
+            .iter()
+            .map(|milliseconds| {
+                Some(judgement_against_the_threshold(
+                    (*milliseconds)?,
+                    threshold?,
+                    candidate,
+                ))
+            })
+            .collect();
+        let overall = match (voiding, threshold) {
+            (Some(reason), _) => reason,
+            (None, None) => "not_run",
+            (None, Some(_)) => judgement_of_the_valid_rounds(&per_round),
+        };
+        (per_round, overall)
+    }
+
+    /// 第一段算点的输入：门槛、ρ、卡、各格中位、作废的（卡、形态）与原因、触发 J5 的格。
+    pub(super) struct HostCpuPointInputs<'inputs> {
+        pub(super) thresholds: &'inputs BTreeMap<SubmissionPoint, PointThresholds>,
+        pub(super) machine_ratio: Option<f64>,
+        pub(super) cards: &'inputs [u32],
+        pub(super) medians: &'inputs CellMediansOfTheSegment,
+        pub(super) voiding: &'inputs BTreeMap<(u32, SubmissionForm, WaitMethod), &'static str>,
+        pub(super) process_clock_cells: &'inputs BTreeSet<(u32, SubmissionCell)>,
+    }
+
+    /// R1、R2、R3 的产物行与判定表（旋钮翻面用）：每个点 × 候选 × 卡 × 形态 × 等法 × 间隔 × 门槛的机器各一行线程钟的；序列里有一格触发 J5 的，
+    /// 另报一行进程钟的（`clock=process`，没有 c_floor）。今天的写法只按 C 的门槛判一行（只报，不当第 1 行的读数）。
+    pub(super) fn host_cpu_point_lines(
+        inputs: &HostCpuPointInputs<'_>,
+    ) -> (
+        Vec<String>,
+        BTreeMap<PointJudgementKey, String>,
+        BTreeMap<PointJudgementKey, String>,
+    ) {
+        let mut lines = Vec::new();
+        let mut point_judgements = BTreeMap::new();
+        let mut floor_judgements = BTreeMap::new();
+        let forms = [
+            SubmissionForm::Resident(InputForm::Shared),
+            SubmissionForm::Resident(InputForm::Split),
+            SubmissionForm::TodaySingleKernel,
+        ];
+        for (point, point_thresholds) in inputs.thresholds {
+            for (candidate, attack_threshold) in &point_thresholds.by_candidate {
+                let submission_units =
+                    submission_units_of_the_intent(*candidate, point.fraction, point.batch_units);
+                let units_text = submission_units
+                    .iter()
+                    .map(u64::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",");
+                for card in inputs.cards {
+                    for form in forms {
+                        if form == SubmissionForm::TodaySingleKernel
+                            && *candidate != GpuCandidate::EveryStage
+                        {
+                            continue;
+                        }
+                        for wait in WaitMethod::ALL {
+                            for gap_milliseconds in GAP_MILLISECONDS {
+                                if !is_a_measured_cell(gap_milliseconds, form, wait) {
+                                    continue;
+                                }
+                                let cell = SubmissionCell {
+                                    gap_milliseconds,
+                                    form,
+                                    wait,
+                                    units: 0,
+                                };
+                                let has_a_process_clock_cell =
+                                    submission_units.iter().any(|units| {
+                                        inputs
+                                            .process_clock_cells
+                                            .contains(&(*card, cell.with_units(*units)))
+                                    });
+                                let clocks: &[CpuClockKind] = if has_a_process_clock_cell {
+                                    &[CpuClockKind::Thread, CpuClockKind::Process]
+                                } else {
+                                    &[CpuClockKind::Thread]
+                                };
+                                for clock in clocks {
+                                    let (source, floor) = match clock {
+                                        CpuClockKind::Thread => (
+                                            thread_milliseconds_source
+                                                as fn(&CellRoundMedians) -> Option<f64>,
+                                            point_milliseconds_per_round(
+                                                inputs.medians,
+                                                *card,
+                                                cell,
+                                                &submission_units,
+                                                floor_milliseconds_source,
+                                            ),
+                                        ),
+                                        CpuClockKind::Process => (
+                                            process_milliseconds_source
+                                                as fn(&CellRoundMedians) -> Option<f64>,
+                                            vec![None; ROUNDS],
+                                        ),
+                                    };
+                                    let milliseconds = point_milliseconds_per_round(
+                                        inputs.medians,
+                                        *card,
+                                        cell,
+                                        &submission_units,
+                                        source,
+                                    );
+                                    for kind in ThresholdKind::ALL {
+                                        let threshold =
+                                            kind.scaled(*attack_threshold, inputs.machine_ratio);
+                                        let voiding =
+                                            inputs.voiding.get(&(*card, form, wait)).copied();
+                                        let (per_round, judgement) = judgements_of_the_point(
+                                            &milliseconds,
+                                            threshold,
+                                            *candidate,
+                                            voiding,
+                                        );
+                                        let (floor_per_round, floor_judgement) = match (clock, form)
+                                        {
+                                            (CpuClockKind::Thread, SubmissionForm::Resident(_)) => {
+                                                judgements_of_the_point(
+                                                    &floor, threshold, *candidate, voiding,
+                                                )
+                                            }
+                                            (CpuClockKind::Process, _)
+                                            | (_, SubmissionForm::TodaySingleKernel) => {
+                                                (vec![None; ROUNDS], "not_applicable")
+                                            }
+                                        };
+                                        let (values_text, judgements_text) =
+                                            per_round_texts(&milliseconds, &per_round);
+                                        let (floor_values_text, floor_judgements_text) =
+                                            per_round_texts(&floor, &floor_per_round);
+                                        lines.push(format!(
+                                        "name=host_cpu_per_submission_point {} candidate={} index={card} form={} wait={} gap_milliseconds={gap_milliseconds} clock={} threshold_kind={} threshold_milliseconds={} submission_units={units_text} host_cpu_per_submission_milliseconds_per_round={values_text} judgement_per_round={judgements_text} judgement={judgement} floor_host_cpu_per_submission_milliseconds_per_round={floor_values_text} floor_judgement_per_round={floor_judgements_text} floor_judgement={floor_judgement}",
+                                        point.label(),
+                                        candidate.label(),
+                                        form.label(),
+                                        wait.label(),
+                                        clock.label(),
+                                        kind.label(),
+                                        optional_number(threshold),
+                                    ));
+                                        let key = (
+                                            *point,
+                                            *candidate,
+                                            *card,
+                                            form,
+                                            wait,
+                                            gap_milliseconds,
+                                            kind,
+                                            *clock,
+                                        );
+                                        point_judgements.insert(key, judgement.to_string());
+                                        floor_judgements.insert(key, floor_judgement.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        (lines, point_judgements, floor_judgements)
+    }
+
+    /// 一格（不带 n）的拟合：总的（8 档各取 5 轮中位的中位）与每轮各一次。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct FitsOfACell {
+        pub(super) overall: Option<FixedAndPerByteFit>,
+        pub(super) per_round: Vec<Option<FixedAndPerByteFit>>,
+    }
+
+    /// R4：一张卡、一种常驻形态、一种等法、一种间隔的拟合（线程钟，毫秒对字节）。
+    pub(super) fn fits_of_the_cell(
+        medians: &CellMediansOfTheSegment,
+        card: u32,
+        cell_without_the_units: SubmissionCell,
+    ) -> FitsOfACell {
+        let milliseconds_of = |units: u64, round_index: usize| -> Option<f64> {
+            medians
+                .get(&(card, cell_without_the_units.with_units(units)))?
+                .get(round_index)?
+                .map(|round| round.thread_cpu_nanoseconds / 1e6)
+        };
+        let overall_points: Option<BTreeMap<u64, f64>> = SUBMISSION_UNIT_COUNTS
+            .iter()
+            .map(|units| {
+                let rounds: Vec<f64> = (0..ROUNDS)
+                    .filter_map(|round_index| milliseconds_of(*units, round_index))
+                    .collect();
+                Some((*units, median_of(&rounds)?))
+            })
+            .collect();
+        let per_round = (0..ROUNDS)
+            .map(|round_index| {
+                let points: BTreeMap<u64, f64> = SUBMISSION_UNIT_COUNTS
+                    .iter()
+                    .map(|units| Some((*units, milliseconds_of(*units, round_index)?)))
+                    .collect::<Option<_>>()?;
+                fixed_and_per_byte_fit(&points)
+            })
+            .collect();
+        FitsOfACell {
+            overall: overall_points.as_ref().and_then(fixed_and_per_byte_fit),
+            per_round,
+        }
+    }
+
+    /// R4 一行（`name=fixed_and_per_byte_fit`）。
+    pub(super) fn fit_line(
+        card: u32,
+        cell_without_the_units: SubmissionCell,
+        fits: &FitsOfACell,
+    ) -> String {
+        let per_round = |value_of: fn(&FixedAndPerByteFit) -> f64| {
+            fits.per_round
+                .iter()
+                .map(|fit| optional_number(fit.as_ref().map(value_of)))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        format!(
+        "name=fixed_and_per_byte_fit index={card} form={} wait={} gap_milliseconds={} fixed_milliseconds={} per_mebibyte_milliseconds={} maximum_relative_residual={} points={} fit_not_linear={} fixed_milliseconds_per_round={} per_mebibyte_milliseconds_per_round={}",
+        cell_without_the_units.form.label(),
+        cell_without_the_units.wait.label(),
+        cell_without_the_units.gap_milliseconds,
+        optional_number(fits.overall.map(|fit| fit.fixed_milliseconds)),
+        optional_number(fits.overall.map(|fit| fit.per_mebibyte_milliseconds)),
+        optional_number(fits.overall.map(|fit| fit.maximum_relative_residual)),
+        SUBMISSION_UNIT_COUNTS.len(),
+        fits.overall.is_none_or(|fit| !fit.is_linear()),
+        per_round(|fit| fit.fixed_milliseconds),
+        per_round(|fit| fit.per_mebibyte_milliseconds),
+    )
+    }
+
+    /// R5：每个点 × 卡 × 常驻形态 × 等法 × 间隔 × 门槛的机器一行（`name=merging_shape`），按 C 的提交序列与门槛、`saved_upper_ms`、
+    /// n = m 那一档的 c_rt(m) 与那一轮的拟合判；后两类要那一格的总拟合不是 `fit_not_linear`（第十条 J6）。交回行与判定表。
+    pub(super) fn merging_shape_lines(
+        inputs: &HostCpuPointInputs<'_>,
+    ) -> (Vec<String>, BTreeMap<PointJudgementKey, String>) {
+        let mut lines = Vec::new();
+        let mut categories = BTreeMap::new();
+        for (point, point_thresholds) in inputs.thresholds {
+            let Some(every_stage_threshold) =
+                point_thresholds.by_candidate.get(&GpuCandidate::EveryStage)
+            else {
+                continue;
+            };
+            let submission_units = submission_units_of_the_intent(
+                GpuCandidate::EveryStage,
+                point.fraction,
+                point.batch_units,
+            );
+            let units_per_intent = units_of_one_submission_per_intent(&submission_units);
+            for card in inputs.cards {
+                for form in InputForm::ALL.map(SubmissionForm::Resident) {
+                    for wait in WaitMethod::ALL {
+                        for gap_milliseconds in GAP_MILLISECONDS {
+                            if !is_a_measured_cell(gap_milliseconds, form, wait) {
+                                continue;
+                            }
+                            let cell = SubmissionCell {
+                                gap_milliseconds,
+                                form,
+                                wait,
+                                units: units_per_intent,
+                            };
+                            let fits = fits_of_the_cell(inputs.medians, *card, cell);
+                            let is_the_fit_linear = fits.overall.is_some_and(|fit| fit.is_linear());
+                            let point_milliseconds = point_milliseconds_per_round(
+                                inputs.medians,
+                                *card,
+                                cell,
+                                &submission_units,
+                                thread_milliseconds_source,
+                            );
+                            let per_intent_milliseconds = point_milliseconds_per_round(
+                                inputs.medians,
+                                *card,
+                                cell,
+                                &[units_per_intent],
+                                thread_milliseconds_source,
+                            );
+                            for kind in ThresholdKind::ALL {
+                                let threshold =
+                                    kind.scaled(*every_stage_threshold, inputs.machine_ratio);
+                                let saved = kind.scaled(
+                                    point_thresholds.saved_upper_milliseconds,
+                                    inputs.machine_ratio,
+                                );
+                                let shapes: Vec<Option<MergingShape>> = (0..ROUNDS)
+                                    .map(|round_index| {
+                                        merging_shape(
+                                            point_milliseconds[round_index]?,
+                                            threshold?,
+                                            per_intent_milliseconds[round_index]?,
+                                            saved?,
+                                            units_per_intent,
+                                            fits.per_round[round_index],
+                                            is_the_fit_linear,
+                                        )
+                                    })
+                                    .collect();
+                                let labels: Vec<Option<&'static str>> = shapes
+                                    .iter()
+                                    .map(|shape| shape.map(MergingShape::label))
+                                    .collect();
+                                let category =
+                                    match (inputs.voiding.get(&(*card, form, wait)), threshold) {
+                                        (Some(reason), _) => reason,
+                                        (None, None) => "not_run",
+                                        (None, Some(_)) => judgement_of_the_valid_rounds(&labels),
+                                    };
+                                let intents_text = shapes
+                                    .iter()
+                                    .map(|shape| match shape {
+                                        Some(MergingShape::MergeAcrossIntents {
+                                            intents_to_merge_at_least,
+                                        }) => {
+                                            format!("{intents_to_merge_at_least:.0}")
+                                        }
+                                        Some(
+                                            MergingShape::OneSubmissionPerBatch
+                                            | MergingShape::OneSubmissionPerIntent
+                                            | MergingShape::LosesHoweverMerged
+                                            | MergingShape::FitNotLinear,
+                                        )
+                                        | None => "none".to_string(),
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(",");
+                                let per_byte_text = fits
+                                    .per_round
+                                    .iter()
+                                    .map(|fit| {
+                                        optional_number(fit.map(|round_fit| {
+                                            round_fit.per_byte_milliseconds
+                                                * (units_per_intent * LOCAL_GPU_SLOT_BYTES) as f64
+                                        }))
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(",");
+                                let (per_intent_text, category_text) =
+                                    per_round_texts(&per_intent_milliseconds, &labels);
+                                lines.push(format!(
+                                "name=merging_shape {} index={card} form={} wait={} gap_milliseconds={gap_milliseconds} threshold_kind={} threshold_milliseconds={} saved_per_intent_milliseconds={} one_submission_per_intent_units={units_per_intent} one_submission_per_intent_host_cpu_milliseconds_per_round={per_intent_text} per_byte_part_milliseconds_per_round={per_byte_text} intents_to_merge_at_least_per_round={intents_text} fit_not_linear={} category_per_round={category_text} category={category}",
+                                point.label(),
+                                form.label(),
+                                wait.label(),
+                                kind.label(),
+                                optional_number(threshold),
+                                optional_number(saved),
+                                !is_the_fit_linear,
+                            ));
+                                categories.insert(
+                                    (
+                                        *point,
+                                        GpuCandidate::EveryStage,
+                                        *card,
+                                        form,
+                                        wait,
+                                        gap_milliseconds,
+                                        kind,
+                                        CpuClockKind::Thread,
+                                    ),
+                                    category.to_string(),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        (lines, categories)
+    }
+
+    /// 一个旋钮（登记第八节）：哪一条失败条款管它的翻面、怎么把一个键换到另一端。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum JudgementKnob {
+        /// J3：两张卡。
+        Card,
+        /// J4：共用 ／ 分开。
+        InputForm,
+        /// J2：阻塞等 ／ 睡 100 µs。
+        BlockingAndShortSleep,
+        /// J2：阻塞等 ／ 睡 1 ms。
+        BlockingAndLongerSleep,
+        /// J4：睡 100 µs ／ 睡 1 ms。
+        ShortAndLongerSleep,
+        /// J4：间隔 0 ／ 50 ms。
+        Gap,
+        /// J4、J10：门槛原样 ／ × ρ_机器。
+        ThresholdMachine,
+        /// J5：线程钟 ／ 进程钟（只在那一格触发 J5、报了进程钟那一行的点上有两端）。
+        Clock,
+    }
+
+    impl JudgementKnob {
+        pub(super) const ALL: [JudgementKnob; 8] = [
+            JudgementKnob::Card,
+            JudgementKnob::InputForm,
+            JudgementKnob::BlockingAndShortSleep,
+            JudgementKnob::BlockingAndLongerSleep,
+            JudgementKnob::ShortAndLongerSleep,
+            JudgementKnob::Gap,
+            JudgementKnob::ThresholdMachine,
+            JudgementKnob::Clock,
+        ];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                JudgementKnob::Card => "card",
+                JudgementKnob::InputForm => "input_form",
+                JudgementKnob::BlockingAndShortSleep => "wait_blocking_and_sleep_100_microseconds",
+                JudgementKnob::BlockingAndLongerSleep => "wait_blocking_and_sleep_1_millisecond",
+                JudgementKnob::ShortAndLongerSleep => {
+                    "wait_sleep_100_microseconds_and_sleep_1_millisecond"
+                }
+                JudgementKnob::Gap => "gap",
+                JudgementKnob::ThresholdMachine => "threshold_machine",
+                JudgementKnob::Clock => "clock",
+            }
+        }
+
+        pub(super) const fn clause(self) -> &'static str {
+            match self {
+                JudgementKnob::Card => "two_cards_judge_differently",
+                JudgementKnob::BlockingAndShortSleep | JudgementKnob::BlockingAndLongerSleep => {
+                    "the_wait_method_decides"
+                }
+                JudgementKnob::InputForm
+                | JudgementKnob::ShortAndLongerSleep
+                | JudgementKnob::Gap => "flips_with_a_knob",
+                JudgementKnob::ThresholdMachine => "machine_ratio_decides",
+                JudgementKnob::Clock => "thread_clock_underestimates",
+            }
+        }
+
+        /// 把键换到这个旋钮的另一端（`cards` 是第一段量的两张卡）。
+        pub(super) fn other_end(
+            self,
+            key: &PointJudgementKey,
+            cards: &[u32],
+        ) -> Option<PointJudgementKey> {
+            let (point, candidate, card, form, wait, gap, kind, clock) = *key;
+            let swap_wait = |one: WaitMethod, other: WaitMethod| {
+                (wait == one).then_some((point, candidate, card, form, other, gap, kind, clock))
+            };
+            match self {
+                JudgementKnob::Card => match cards {
+                    [one, other] if card == *one => {
+                        Some((point, candidate, *other, form, wait, gap, kind, clock))
+                    }
+                    _ => None,
+                },
+                JudgementKnob::InputForm => (form == SubmissionForm::Resident(InputForm::Shared))
+                    .then_some((
+                        point,
+                        candidate,
+                        card,
+                        SubmissionForm::Resident(InputForm::Split),
+                        wait,
+                        gap,
+                        kind,
+                        clock,
+                    )),
+                JudgementKnob::BlockingAndShortSleep => {
+                    swap_wait(WaitMethod::Blocking, WaitMethod::SleepingShortly)
+                }
+                JudgementKnob::BlockingAndLongerSleep => {
+                    swap_wait(WaitMethod::Blocking, WaitMethod::SleepingLonger)
+                }
+                JudgementKnob::ShortAndLongerSleep => {
+                    swap_wait(WaitMethod::SleepingShortly, WaitMethod::SleepingLonger)
+                }
+                JudgementKnob::Gap => (gap == 0).then_some((
+                    point,
+                    candidate,
+                    card,
+                    form,
+                    wait,
+                    GAP_BETWEEN_TWO_BATCHES_MILLISECONDS,
+                    kind,
+                    clock,
+                )),
+                JudgementKnob::ThresholdMachine => {
+                    (kind == ThresholdKind::AttackLedger).then_some((
+                        point,
+                        candidate,
+                        card,
+                        form,
+                        wait,
+                        gap,
+                        ThresholdKind::MachineScaled,
+                        clock,
+                    ))
+                }
+                JudgementKnob::Clock => (clock == CpuClockKind::Thread).then_some((
+                    point,
+                    candidate,
+                    card,
+                    form,
+                    wait,
+                    gap,
+                    kind,
+                    CpuClockKind::Process,
+                )),
+            }
+        }
+    }
+
+    /// 一个量（R1、R2、R5）在每个旋钮两端的翻面：翻了的每一对一行 `name=knob_flip`，每个旋钮一行 `name=knob_flip_summary`（两端都有判定的对数、翻了几对；
+    /// 一端是轮数不足、作废、读不到或没有这个量的对不算，[`is_a_judgement`]）。
+    pub(super) fn knob_flip_lines(
+        quantity: &str,
+        judgements: &BTreeMap<PointJudgementKey, String>,
+        cards: &[u32],
+    ) -> Vec<String> {
+        let mut lines = Vec::new();
+        for knob in JudgementKnob::ALL {
+            let other_end = |key: &PointJudgementKey| knob.other_end(key, cards);
+            let flips = knob_flips(judgements, other_end);
+            for (one, other) in &flips {
+                let (point, candidate, card, form, wait, gap, kind, clock) = *one;
+                lines.push(format!(
+                "name=knob_flip quantity={quantity} knob={} clause={} {} candidate={} index={card} form={} wait={} gap_milliseconds={gap} threshold_kind={} clock={} other_end_index={} other_end_form={} other_end_wait={} other_end_gap_milliseconds={} other_end_threshold_kind={} judgement_at_one_end={} judgement_at_the_other_end={}",
+                knob.label(),
+                knob.clause(),
+                point.label(),
+                candidate.label(),
+                form.label(),
+                wait.label(),
+                kind.label(),
+                clock.label(),
+                other.2,
+                other.3.label(),
+                other.4.label(),
+                other.5,
+                other.6.label(),
+                judgements[one],
+                judgements[other],
+            ));
+            }
+            lines.push(format!(
+                "name=knob_flip_summary quantity={quantity} knob={} clause={} pairs={} flipped={}",
+                knob.label(),
+                knob.clause(),
+                knob_pairs(judgements, other_end),
+                flips.len()
+            ));
+        }
+        lines
+    }
+
+    /// 第十条 J10 的旁证：本机同一线程算 A 那一点的提交序列的 CPU（每次提交取它那一档 n 的中位，取平均）÷ T_A，与 ρ_机器 差一倍以上就记。
+    pub(super) fn machine_ratio_cross_check_lines(
+        thresholds: &BTreeMap<SubmissionPoint, PointThresholds>,
+        cpu_crc_milliseconds: &BTreeMap<u64, f64>,
+        machine_ratio: Option<f64>,
+    ) -> Vec<String> {
+        thresholds
+        .iter()
+        .map(|(point, point_thresholds)| {
+            let submission_units =
+                submission_units_of_the_intent(GpuCandidate::ScanChecksumOnly, point.fraction, point.batch_units);
+            let local = point_milliseconds_of_the_sequence(&submission_units, cpu_crc_milliseconds);
+            let threshold = point_thresholds.by_candidate.get(&GpuCandidate::ScanChecksumOnly).copied();
+            let ratio = local.zip(threshold).map(|(local_value, threshold_value)| local_value / threshold_value);
+            format!(
+                "name=machine_ratio_cross_check {} local_crc_per_submission_milliseconds={} scan_checksum_threshold_milliseconds={} ratio={} machine_ratio={} off_by_more_than_double={}",
+                point.label(),
+                optional_number(local),
+                optional_number(threshold),
+                optional_number(ratio),
+                optional_number(machine_ratio),
+                ratio
+                    .zip(machine_ratio)
+                    .is_some_and(|(value, ratio_of_the_machines)| is_the_cross_check_off_by_more_than_double(value, ratio_of_the_machines)),
+            )
+        })
+        .collect()
+    }
+
+    /// 一格一轮量完之后（计时窗口外）的读数与判定：作废原因（读不到、校准比超过 1.10）、物理下限、结果与锚点。
+    pub(super) struct CellRoundVerdict {
+        pub(super) invalid_reason: Option<&'static str>,
+        pub(super) floor_violations: usize,
+        pub(super) respects_the_floor: bool,
+        pub(super) input_bytes_hold: bool,
+    }
+
+    pub(super) fn cell_round_verdict(
+        cell: SubmissionCell,
+        timings: &[Option<SubmissionTiming>],
+        reading: Option<&CellRoundReading>,
+        ratios: (Option<f64>, Option<f64>),
+        link_peak_bytes_per_second: f64,
+    ) -> CellRoundVerdict {
+        let floor_violations = timings
+            .iter()
+            .flatten()
+            .filter(|timing| {
+                let seconds = timing.wall_nanoseconds as f64 / NANOSECONDS_PER_SECOND as f64;
+                let respects = match cell.form {
+                    SubmissionForm::Resident(input_form) => respects_the_floor_of_the_form(
+                        seconds,
+                        input_form,
+                        cell.units,
+                        link_peak_bytes_per_second,
+                    ),
+                    SubmissionForm::TodaySingleKernel => respects_the_physical_floor(
+                        seconds,
+                        cell.form.input_bytes(cell.units),
+                        link_peak_bytes_per_second,
+                    ),
+                };
+                !respects
+            })
+            .count();
+        let invalid_reason = match (reading, ratios) {
+            (None, _) => Some("thread_cpu_clock_unreadable"),
+            (Some(_), (None, _) | (_, None)) => Some("calibration_unreadable"),
+            (Some(_), (Some(before), Some(after))) => {
+                is_voided_by_the_calibration_ratios(before, after)
+                    .then_some(CALIBRATION_RATIO_INVALID_REASON)
+            }
+        };
+        CellRoundVerdict {
+            invalid_reason,
+            floor_violations,
+            respects_the_floor: floor_violations == 0,
+            input_bytes_hold: reading.is_some_and(|cell_reading| {
+                cell_reading
+                    .input_bytes_written
+                    .iter()
+                    .all(|bytes| *bytes == cell.form.input_bytes(cell.units))
+            }),
+        }
+    }
+
+    /// `name=submission_cell` 一行（第六节「只报」那一格与第八节轨迹）。
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "一行产物的各栏：格、轮、读数、判定、校准与线程数各是一样"
+    )]
+    pub(super) fn submission_cell_line(
+        card_index: u32,
+        cell: SubmissionCell,
+        round: usize,
+        attempt: usize,
+        reading: Option<&CellRoundReading>,
+        verdict: &CellRoundVerdict,
+        ratios: (Option<f64>, Option<f64>),
+        threads: (Option<usize>, Option<usize>),
+        thresholds_edges: (f64, f64),
+    ) -> String {
+        let trajectory = reading.and_then(|cell_reading| {
+            submission_trajectory(
+                &cell_reading.thread_cpu_in_order,
+                thresholds_edges.0,
+                thresholds_edges.1,
+            )
+        });
+        let number_of = |value: Option<f64>| optional_number(value);
+        let count_of = |value: Option<usize>| {
+            value.map_or_else(|| "none".to_string(), |count| count.to_string())
+        };
+        format!(
+            "name=submission_cell index={card_index} {} round={round} attempt={attempt} thread_cpu_median_nanoseconds={} floor_thread_cpu_median_nanoseconds={} process_cpu_median_nanoseconds={} wait_thread_cpu_median_nanoseconds={} wait_wall_median_nanoseconds={} wall_median_nanoseconds={} polls_median={} input_bytes_written={} input_bytes_written_holds={} results_agree_with_the_cpu={} sequence_numbers_hold={} uncertain_entries={} thread_cpu_maximum_nanoseconds={} thread_cpu_percentile_90_nanoseconds={} submissions_at_or_above_the_smallest_threshold={} submissions_at_or_above_the_largest_threshold={} thread_cpu_first_nanoseconds={} thread_cpu_last_nanoseconds={} respects_the_physical_floor={} floor_violations={} wait_inside_the_submission={} comparison_counts_hold={} thread_clock_underestimated={} calibration_ratio_before={} calibration_ratio_after={} threads_before={} threads_after={} invalid_reason={}",
+            cell.label(),
+            number_of(reading.map(|cell_reading| cell_reading.thread_cpu_median_nanoseconds)),
+            number_of(reading.and_then(|cell_reading| cell_reading.floor_thread_cpu_median_nanoseconds)),
+            number_of(reading.map(|cell_reading| cell_reading.process_cpu_median_nanoseconds)),
+            number_of(reading.and_then(|cell_reading| cell_reading.wait_thread_cpu_median_nanoseconds)),
+            number_of(reading.and_then(|cell_reading| cell_reading.wait_wall_median_nanoseconds)),
+            number_of(reading.map(|cell_reading| cell_reading.wall_median_nanoseconds)),
+            number_of(reading.and_then(|cell_reading| cell_reading.polls_median)),
+            cell.form.input_bytes(cell.units),
+            verdict.input_bytes_hold,
+            reading.is_some_and(|cell_reading| cell_reading.are_the_results_holding),
+            reading.is_some_and(|cell_reading| cell_reading.are_the_sequence_numbers_holding),
+            count_of(reading.map(|cell_reading| cell_reading.uncertain_total)),
+            number_of(trajectory.map(|path| path.maximum_nanoseconds)),
+            number_of(trajectory.map(|path| path.percentile_90_nanoseconds)),
+            count_of(trajectory.map(|path| path.at_or_above_the_smallest_threshold)),
+            count_of(trajectory.map(|path| path.at_or_above_the_largest_threshold)),
+            number_of(trajectory.map(|path| path.first_nanoseconds)),
+            number_of(trajectory.map(|path| path.last_nanoseconds)),
+            verdict.respects_the_floor,
+            verdict.floor_violations,
+            reading.is_some_and(|cell_reading| cell_reading.is_every_wait_inside_the_submission),
+            reading.is_some_and(|cell_reading| cell_reading.are_the_comparison_counts_holding),
+            reading.is_some_and(|cell_reading| is_the_thread_clock_underestimating(
+                cell_reading.process_cpu_median_nanoseconds,
+                cell_reading.thread_cpu_median_nanoseconds
+            )),
+            number_of(ratios.0),
+            number_of(ratios.1),
+            count_of(threads.0),
+            count_of(threads.1),
+            verdict.invalid_reason.unwrap_or("none"),
+        )
+    }
+
+    /// 第一段量完之后的全部判定行：R1–R3（`name=host_cpu_per_submission_point`）、R4（`name=fixed_and_per_byte_fit`）、R5（`name=merging_shape`）、
+    /// 三个量在各旋钮两端的翻面（J2–J4、J10）与 J10 的旁证。
+    pub(super) fn emit_the_analysis(
+        inputs: &HostCpuPointInputs<'_>,
+        cpu_crc_milliseconds: &BTreeMap<u64, f64>,
+        emitter: &mut Emitter,
+    ) {
+        for line in analysis_lines(inputs, cpu_crc_milliseconds) {
+            emitter.line(&line);
+        }
+    }
+
+    /// [`emit_the_analysis`] 打的那几行，按打的次序（第 4 次重跑控漂移段每条臂各算一份，点行改名、各行加 `arm=` 之后再打）。
+    pub(super) fn analysis_lines(
+        inputs: &HostCpuPointInputs<'_>,
+        cpu_crc_milliseconds: &BTreeMap<u64, f64>,
+    ) -> Vec<String> {
+        let mut lines = Vec::new();
+        let (point_lines, point_judgements, floor_judgements) = host_cpu_point_lines(inputs);
+        lines.extend(point_lines);
+        for card in inputs.cards {
+            for form in InputForm::ALL.map(SubmissionForm::Resident) {
+                for wait in WaitMethod::ALL {
+                    for gap_milliseconds in GAP_MILLISECONDS {
+                        if !is_a_measured_cell(gap_milliseconds, form, wait) {
+                            continue;
+                        }
+                        let cell = SubmissionCell {
+                            gap_milliseconds,
+                            form,
+                            wait,
+                            units: 0,
+                        };
+                        lines.push(fit_line(
+                            *card,
+                            cell,
+                            &fits_of_the_cell(inputs.medians, *card, cell),
+                        ));
+                    }
+                }
+            }
+        }
+        let (merging_lines, categories) = merging_shape_lines(inputs);
+        lines.extend(merging_lines);
+        for (quantity, judgements) in [
+            ("host_cpu_per_submission", &point_judgements),
+            ("floor_host_cpu_per_submission", &floor_judgements),
+            ("merging_shape", &categories),
+        ] {
+            lines.extend(knob_flip_lines(quantity, judgements, inputs.cards));
+        }
+        lines.extend(machine_ratio_cross_check_lines(
+            inputs.thresholds,
+            cpu_crc_milliseconds,
+            inputs.machine_ratio,
+        ));
+        lines
+    }
+}
+
+use gpu_segment_arithmetic::*;
+
+// ───────────────────────────── 第 4 次重跑控漂移段的算术（登记 research/prompts/e185-r4-prereg.md 第一节第 2 行、第五节「控漂移段怎么量」、第六节 D1–D7；不用卡，单测喂假钟） ─────────────────────────────
+
+mod drift_control_arithmetic {
+    #![cfg_attr(
+        not(feature = "gpu"),
+        allow(
+            dead_code,
+            reason = "控漂移段（gpu 特性）才用；没编 gpu 特性时只在单测里用"
+        )
+    )]
+
+    use super::*;
+
+    /// 控漂移段的两条臂（登记第一节「复现臂」「受控臂」）。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum DriftArm {
+        /// 照第 3 次重跑第一段原样量卡 0：不另暖机、每格 10 次热身、不绑核。
+        Reproduction,
+        /// 暖到稳、每格暖到稳、绑核、读频率、两张卡交替。
+        Controlled,
+    }
+
+    impl DriftArm {
+        pub(super) const ALL: [DriftArm; 2] = [DriftArm::Reproduction, DriftArm::Controlled];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                DriftArm::Reproduction => "reproduction",
+                DriftArm::Controlled => "controlled",
+            }
+        }
+
+        /// 这条臂每格的热身怎么做（第一节受控臂 ②；复现臂照第 3 次重跑每格 10 次）。
+        pub(super) const fn cell_warm_up(self) -> CellWarmUp {
+            match self {
+                DriftArm::Reproduction => CellWarmUp::FixedTenSubmissions,
+                DriftArm::Controlled => CellWarmUp::UntilTwoGroupsAgree,
+            }
+        }
+    }
+
+    // ───── 受控臂 ① 暖到稳：探针格每 20 次一窗，至少 60 秒，连着三窗的中位离三窗均值都不超过 3%，至多 600 秒 ─────
+
+    pub(super) const WARM_UP_WINDOW_SUBMISSIONS: usize = 20;
+    pub(super) const WARM_UP_SECONDS_AT_LEAST: f64 = 60.0;
+    pub(super) const WARM_UP_SECONDS_AT_MOST: f64 = 600.0;
+    pub(super) const WARM_UP_WINDOWS_COMPARED: usize = 3;
+    pub(super) const WARM_UP_WINDOW_TOLERANCE: f64 = 0.03;
+    /// 暖到稳用的探针格的 n（登记第一节受控臂 ①：n = 512、常驻、共用输入、阻塞等、间隔 0）。
+    pub(super) const WARM_UP_PROBE_UNITS: u64 = 512;
+
+    /// 最近三窗稳了没有：三窗都读得到，三窗的中位各自离三窗均值都不超过 3%。不满三窗不算稳。`window_medians_nanoseconds` 是开暖以来全部的窗。
+    pub(super) fn are_the_last_windows_stable(window_medians_nanoseconds: &[Option<f64>]) -> bool {
+        let Some(start) = window_medians_nanoseconds
+            .len()
+            .checked_sub(WARM_UP_WINDOWS_COMPARED)
+        else {
+            return false;
+        };
+        let Some(last_windows) = window_medians_nanoseconds[start..]
+            .iter()
+            .copied()
+            .collect::<Option<Vec<f64>>>()
+        else {
+            return false;
+        };
+        let mean = last_windows.iter().sum::<f64>() / last_windows.len() as f64;
+        mean > 0.0
+            && last_windows
+                .iter()
+                .all(|median| ((median - mean) / mean).abs() <= WARM_UP_WINDOW_TOLERANCE)
+    }
+
+    /// 暖到稳的经过（`name=warm_up_to_stable` 那一行与第八节轨迹）。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct WarmUpToStable {
+        pub(super) window_medians_nanoseconds: Vec<Option<f64>>,
+        pub(super) seconds: f64,
+        pub(super) reached_the_cap: bool,
+    }
+
+    impl WarmUpToStable {
+        /// 轨迹三样：窗中位的峰值、与前一窗相差超过 3% 的窗数、最后一窗的中位。读不到的窗不算进来。
+        pub(super) fn trajectory(&self) -> (Option<f64>, usize, Option<f64>) {
+            let read: Vec<f64> = self
+                .window_medians_nanoseconds
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            let peak = read.iter().copied().reduce(f64::max);
+            let changed = read
+                .windows(2)
+                .filter(|pair| ((pair[1] - pair[0]) / pair[0]).abs() > WARM_UP_WINDOW_TOLERANCE)
+                .count();
+            (peak, changed, read.last().copied())
+        }
+    }
+
+    /// 暖到稳（登记第一节受控臂 ①）：`run_window` 连发一窗、交回这一窗的线程钟中位（读不到交 `None`，这一窗不算稳），
+    /// `elapsed_seconds` 交回从开暖起过了几秒。至少 60 秒且最近三窗稳了就停；到 600 秒没稳照停，记 `reached_the_cap`。
+    /// 钟与提交从参数进来，单测换成假的。
+    pub(super) fn warm_up_to_stable(
+        run_window: &mut dyn FnMut() -> Option<f64>,
+        elapsed_seconds: &mut dyn FnMut() -> f64,
+    ) -> WarmUpToStable {
+        let mut window_medians_nanoseconds: Vec<Option<f64>> = Vec::new();
+        // 迭代上界：elapsed_seconds 单调前进（每窗至少发 20 次提交），到 600 秒必出去；跨圈的状态只有各窗的中位，只增不改
+        loop {
+            window_medians_nanoseconds.push(run_window());
+            let seconds = elapsed_seconds();
+            let is_stable = are_the_last_windows_stable(&window_medians_nanoseconds);
+            if seconds >= WARM_UP_SECONDS_AT_LEAST && is_stable {
+                return WarmUpToStable {
+                    window_medians_nanoseconds,
+                    seconds,
+                    reached_the_cap: false,
+                };
+            }
+            if seconds >= WARM_UP_SECONDS_AT_MOST {
+                return WarmUpToStable {
+                    window_medians_nanoseconds,
+                    seconds,
+                    reached_the_cap: true,
+                };
+            }
+        }
+    }
+
+    // ───── 受控臂 ② 每格暖到稳：先 10 次，之后每 10 次一组，相邻两组线程钟中位相差不超过 5% 停，至多 100 次 ─────
+
+    pub(super) const CELL_WARM_UP_GROUP_SUBMISSIONS: usize = 10;
+    pub(super) const CELL_WARM_UP_SUBMISSIONS_AT_MOST: usize = 100;
+    pub(super) const CELL_WARM_UP_GROUP_TOLERANCE: f64 = 0.05;
+
+    /// 每格的热身怎么做。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum CellWarmUp {
+        /// 第 3 次重跑原样：[`WARM_UP_SUBMISSIONS`] 次。
+        FixedTenSubmissions,
+        /// 受控臂 ②：相邻两组的线程钟中位相差不超过 5% 停，至多 100 次。
+        UntilTwoGroupsAgree,
+    }
+
+    /// 相邻两组近不近：后一组 ÷ 前一组离 1 不超过 5%；有一组读不到不算近。
+    pub(super) fn are_two_warm_up_groups_close(earlier: Option<f64>, later: Option<f64>) -> bool {
+        match (earlier, later) {
+            (Some(earlier_median), Some(later_median)) if earlier_median > 0.0 => {
+                (later_median / earlier_median - 1.0).abs() <= CELL_WARM_UP_GROUP_TOLERANCE
+            }
+            (Some(_), Some(_)) | (None, _) | (_, None) => false,
+        }
+    }
+
+    /// 一格的热身：`run_group(次数)` 连发这么多次、交回这一组的线程钟中位（读不到交 `None`）。交回一共热身了几次。
+    /// 两种都先发 [`WARM_UP_SUBMISSIONS`] 次；受控臂之后每 10 次一组接着发。
+    pub(super) fn warm_up_the_cell(
+        policy: CellWarmUp,
+        run_group: &mut dyn FnMut(usize) -> Option<f64>,
+    ) -> usize {
+        let mut submissions = WARM_UP_SUBMISSIONS;
+        let mut earlier = run_group(WARM_UP_SUBMISSIONS);
+        match policy {
+            CellWarmUp::FixedTenSubmissions => submissions,
+            CellWarmUp::UntilTwoGroupsAgree => {
+                // 迭代上界：每圈加 10 次，到 100 次必出去；跨圈的状态是上一组的中位
+                while submissions < CELL_WARM_UP_SUBMISSIONS_AT_MOST {
+                    let later = run_group(CELL_WARM_UP_GROUP_SUBMISSIONS);
+                    submissions += CELL_WARM_UP_GROUP_SUBMISSIONS;
+                    if are_two_warm_up_groups_close(earlier, later) {
+                        break;
+                    }
+                    earlier = later;
+                }
+                submissions
+            }
+        }
+    }
+
+    // ───── 受控臂 ⑤ 卡交替：第奇数轮先量 cards 里头一张，第偶数轮倒过来 ─────
+
+    /// 第 `round` 轮（从 1 起）这条臂按什么次序量卡。复现臂只有一张卡、照给的次序。
+    pub(super) fn cards_in_the_order_of_the_round(
+        arm: DriftArm,
+        round: usize,
+        cards: &[u32],
+    ) -> Vec<u32> {
+        let mut ordered = cards.to_vec();
+        match arm {
+            DriftArm::Reproduction => {}
+            DriftArm::Controlled => {
+                if round.is_multiple_of(2) {
+                    ordered.reverse();
+                }
+            }
+        }
+        ordered
+    }
+
+    /// 这张卡在第 `round` 轮是不是先量的（`card_order_effect` 按它分两组）。
+    pub(super) fn is_the_card_measured_first_in_the_round(
+        arm: DriftArm,
+        round: usize,
+        cards: &[u32],
+        card: u32,
+    ) -> bool {
+        cards_in_the_order_of_the_round(arm, round, cards).first() == Some(&card)
+    }
+
+    // ───── 漂移探针格（阳性对照 P-drift）：每轮 80 格之后两格，n = 8、常驻、共用输入、阻塞等、间隔 0，计时区间 ① 之前按线程钟自旋 ─────
+
+    /// 两格探针。封闭集合。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(super) enum DriftProbe {
+        /// 第 r 轮自旋 8.0 − 1.9 × (r − 1) 毫秒。
+        Decreasing,
+        /// 每轮 2 毫秒（只报）。
+        Constant,
+    }
+
+    impl DriftProbe {
+        pub(super) const ALL: [DriftProbe; 2] = [DriftProbe::Decreasing, DriftProbe::Constant];
+
+        pub(super) const fn label(self) -> &'static str {
+            match self {
+                DriftProbe::Decreasing => "decreasing",
+                DriftProbe::Constant => "constant",
+            }
+        }
+    }
+
+    pub(super) const DECREASING_PROBE_FIRST_ROUND_NANOSECONDS: u64 = 8_000_000;
+    pub(super) const DECREASING_PROBE_STEP_NANOSECONDS: u64 = 1_900_000;
+    pub(super) const CONSTANT_PROBE_NANOSECONDS: u64 = 2_000_000;
+    pub(super) const PROBE_UNITS: u64 = 8;
+    /// 每条臂每张卡每轮量几格（登记第七节乙类：80 格 + 2 格探针）。
+    pub(super) const CELLS_AND_PROBES_PER_ROUND: usize = 80 + 2;
+    /// 轮次比那几行（候选 A、换到本机的门槛、线程钟）每张卡几行（登记第七节乙类：12 个点 × 9 种形态等法间隔）。
+    pub(super) const POINT_LINES_OF_THE_ROUND_RATIO_PER_CARD: usize = 108;
+    /// P-drift：递减格的第 5 轮 ÷ 第 1 轮 ≤ 0.80 才算看得出漂移。
+    pub(super) const PROBE_ROUND_RATIO_AT_MOST: f64 = 0.80;
+
+    /// 一格探针在第 `round` 轮（从 1 起）计时区间里自旋多少纳秒。
+    pub(super) fn probe_spin_nanoseconds(probe: DriftProbe, round: usize) -> u64 {
+        match probe {
+            DriftProbe::Decreasing => {
+                let steps = u64::try_from(round.saturating_sub(1)).expect("轮号装得进 u64");
+                DECREASING_PROBE_FIRST_ROUND_NANOSECONDS - DECREASING_PROBE_STEP_NANOSECONDS * steps
+            }
+            DriftProbe::Constant => CONSTANT_PROBE_NANOSECONDS,
+        }
+    }
+
+    /// 探针格的那一格（间隔 0、常驻共用输入、阻塞等、n = 8）。
+    pub(super) const fn probe_cell() -> SubmissionCell {
+        SubmissionCell {
+            gap_milliseconds: 0,
+            form: SubmissionForm::Resident(InputForm::Shared),
+            wait: WaitMethod::Blocking,
+            units: PROBE_UNITS,
+        }
+    }
+
+    /// 暖到稳用的探针格（n = 512，别的同探针格）。
+    pub(super) const fn warm_up_probe_cell() -> SubmissionCell {
+        probe_cell().with_units(WARM_UP_PROBE_UNITS)
+    }
+
+    /// 第 5 轮 ÷ 第 1 轮；有一轮读不到或第 1 轮是 0 交 `None`。
+    pub(super) fn round_five_over_round_one(values: &[Option<f64>]) -> Option<f64> {
+        let first = (*values.first()?)?;
+        let fifth = (*values.get(ROUNDS - 1)?)?;
+        (first > 0.0).then(|| fifth / first)
+    }
+
+    /// P-drift 的判定：递减格的比 ≤ 0.80 才过。
+    pub(super) fn probe_drift_holds(round_five_over_round_one: f64) -> bool {
+        round_five_over_round_one <= PROBE_ROUND_RATIO_AT_MOST
+    }
+
+    // ───── D1–D4 的三条线（登记第一节问题单第 1 行、主 agent 定第 1 条：读过第 3 次重跑的 0.528 与 0.958 之后定的） ─────
+
+    pub(super) const DRIFT_GONE_LOWER: f64 = 0.90;
+    pub(super) const DRIFT_GONE_UPPER: f64 = 1.0 / 0.90;
+    pub(super) const DRIFT_REMAINS_BELOW: f64 = 0.80;
+    pub(super) const DRIFT_REMAINS_ABOVE: f64 = 1.25;
+    /// D4：卡 0 ÷ 卡 1 的 `unstable` 数 ≤ 1.5 判卡 0 不比卡 1 更不稳，≥ 2 判更不稳。
+    pub(super) const UNSTABLE_RATIO_AT_MOST_FOR_NOT_LESS_STABLE: f64 = 1.5;
+    pub(super) const UNSTABLE_RATIO_AT_LEAST_FOR_LESS_STABLE: f64 = 2.0;
+
+    /// D1、D3（受控臂）：在 [0.90, 1 ÷ 0.90] 判漂移消失；< 0.80 或 > 1.25 判仍在；之间不判。
+    pub(super) fn controlled_round_ratio_judgement(ratio: f64) -> &'static str {
+        if (DRIFT_GONE_LOWER..=DRIFT_GONE_UPPER).contains(&ratio) {
+            "drift_gone"
+        } else if !(DRIFT_REMAINS_BELOW..=DRIFT_REMAINS_ABOVE).contains(&ratio) {
+            "drift_remains"
+        } else {
+            "between"
+        }
+    }
+
+    /// D2（复现臂）：≤ 0.80 判复现了；在 [0.90, 1 ÷ 0.90] 判没复现；0.80 与 0.90 之间不判。登记三档之外（> 1 ÷ 0.90）另记一档，不当三档里的哪一档。
+    pub(super) fn reproduction_round_ratio_judgement(ratio: f64) -> &'static str {
+        if ratio <= DRIFT_REMAINS_BELOW {
+            "drift_reproduced"
+        } else if (DRIFT_GONE_LOWER..=DRIFT_GONE_UPPER).contains(&ratio) {
+            "drift_not_reproduced"
+        } else if ratio < DRIFT_GONE_LOWER {
+            "between"
+        } else {
+            "above_the_registered_bands"
+        }
+    }
+
+    /// D4：两张卡都没有 `unstable` 判 `both_zero`；否则卡 0 ÷ 卡 1（卡 1 是 0 时算无穷大）照两条线判。
+    pub(super) fn unstable_ratio_judgement(
+        card_zero: usize,
+        card_one: usize,
+    ) -> (Option<f64>, &'static str) {
+        if card_zero == 0 && card_one == 0 {
+            return (None, "both_zero");
+        }
+        let ratio = card_zero as f64 / card_one as f64;
+        let judgement = if ratio <= UNSTABLE_RATIO_AT_MOST_FOR_NOT_LESS_STABLE {
+            "card_zero_not_less_stable"
+        } else if ratio >= UNSTABLE_RATIO_AT_LEAST_FOR_LESS_STABLE {
+            "card_zero_less_stable"
+        } else {
+            "between"
+        };
+        (Some(ratio), judgement)
+    }
+
+    /// D1–D3 的一个值的判定：那条臂那张卡的 P-drift 没过写 `void_positive_control`（第十一节「阳性对照红」），读不到写 `not_run`，
+    /// 否则照那一档（`judge`）判。
+    pub(super) fn drift_round_ratio_judgement(
+        value: Option<f64>,
+        is_the_probe_failing: bool,
+        judge: fn(f64) -> &'static str,
+    ) -> (Option<f64>, &'static str) {
+        if is_the_probe_failing {
+            return (value, "void_positive_control");
+        }
+        value.map_or((None, "not_run"), |ratio| (Some(ratio), judge(ratio)))
+    }
+
+    /// 第十条 L4（控住的跑法本身造出漂移）：受控臂卡 1 判 `drift_remains`，或受控臂两张卡暖到稳都到了顶。
+    pub(super) fn is_failure_clause_l4_triggered(
+        card_one_judgement: Option<&str>,
+        warm_ups_reaching_the_cap: &[bool],
+    ) -> bool {
+        let both_reached_the_cap = warm_ups_reaching_the_cap.len() == 2
+            && warm_ups_reaching_the_cap.iter().all(|reached| *reached);
+        card_one_judgement == Some("drift_remains") || both_reached_the_cap
+    }
+
+    /// 第十条 L5（这一天复现不出）：复现臂卡 0 判 `drift_not_reproduced`。
+    pub(super) fn is_failure_clause_l5_triggered(reproduction_judgement: Option<&str>) -> bool {
+        reproduction_judgement == Some("drift_not_reproduced")
+    }
+
+    // ───── 从点行算轮次比与 `unstable` 数（第一节「轮次比」：候选 A、换到本机的门槛、线程钟，每张卡 108 行） ─────
+
+    /// 一行产物（没有 `E7RESULT ` 前缀）拆成「键 → 值」。
+    pub(super) fn fields_of_a_line(line: &str) -> BTreeMap<String, String> {
+        line.split(' ')
+            .filter_map(|field| field.split_once('='))
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect()
+    }
+
+    /// 逗号接起来的各轮读数；`none` 是那一轮读不到。
+    pub(super) fn per_round_values_of(text: &str) -> Vec<Option<f64>> {
+        text.split(',')
+            .map(|value| value.parse::<f64>().ok())
+            .collect()
+    }
+
+    /// 一条臂一张卡算轮次比用的那几行：`name=drift_control_point`、点名的臂与卡、候选 A、`machine_scaled`、线程钟。
+    pub(super) fn round_ratio_lines(
+        lines: &[BTreeMap<String, String>],
+        arm: DriftArm,
+        card: u32,
+    ) -> Vec<&BTreeMap<String, String>> {
+        let card_text = card.to_string();
+        lines
+            .iter()
+            .filter(|fields| {
+                let is =
+                    |key: &str, value: &str| fields.get(key).map(String::as_str) == Some(value);
+                is("name", "drift_control_point")
+                    && is("arm", arm.label())
+                    && is("index", &card_text)
+                    && is("candidate", GpuCandidate::ScanChecksumOnly.label())
+                    && is("threshold_kind", ThresholdKind::MachineScaled.label())
+                    && is("clock", CpuClockKind::Thread.label())
+            })
+            .collect()
+    }
+
+    /// 轮次比（`name=round_ratio`）：每行第 k 轮 ÷ 第 1 轮（k = 2–5）取中位；两轮有一轮读不到的行那一个比不收。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct RoundRatios {
+        pub(super) lines: usize,
+        /// 第 2、3、4、5 轮 ÷ 第 1 轮的中位，次序就是轮号。
+        pub(super) median_over_round_one: [Option<f64>; 4],
+    }
+
+    impl RoundRatios {
+        pub(super) fn round_five(&self) -> Option<f64> {
+            self.median_over_round_one[3]
+        }
+
+        /// 第八节轨迹：五轮里最大的比（第 1 轮算 1）、比落在 [0.90, 1 ÷ 0.90] 之外的轮数、期末值（第 5 轮）。
+        pub(super) fn trajectory(&self) -> (Option<f64>, usize, Option<f64>) {
+            let read: Vec<f64> = self
+                .median_over_round_one
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            let peak = read.iter().copied().fold(1.0_f64, f64::max);
+            let off = read
+                .iter()
+                .filter(|ratio| !(DRIFT_GONE_LOWER..=DRIFT_GONE_UPPER).contains(*ratio))
+                .count();
+            ((!read.is_empty()).then_some(peak), off, self.round_five())
+        }
+    }
+
+    /// 一串各行的各轮读数算轮次比。
+    pub(super) fn round_ratios_of(per_round_of_each_line: &[Vec<Option<f64>>]) -> RoundRatios {
+        let median_of_round = |round_index: usize| {
+            let ratios: Vec<f64> = per_round_of_each_line
+                .iter()
+                .filter_map(|values| {
+                    let first = (*values.first()?)?;
+                    let later = (*values.get(round_index)?)?;
+                    (first > 0.0).then(|| later / first)
+                })
+                .collect();
+            median_of(&ratios)
+        };
+        RoundRatios {
+            lines: per_round_of_each_line.len(),
+            median_over_round_one: [1, 2, 3, 4].map(median_of_round),
+        }
+    }
+
+    /// 点行一级的轮次比（D1–D3 的值）：那几行的 `host_cpu_per_submission_milliseconds_per_round`。
+    pub(super) fn round_ratios_of_the_point_lines(
+        lines: &[BTreeMap<String, String>],
+        arm: DriftArm,
+        card: u32,
+    ) -> RoundRatios {
+        let per_round: Vec<Vec<Option<f64>>> = round_ratio_lines(lines, arm, card)
+            .into_iter()
+            .map(|fields| {
+                fields
+                    .get("host_cpu_per_submission_milliseconds_per_round")
+                    .map_or_else(Vec::new, |text| per_round_values_of(text))
+            })
+            .collect();
+        round_ratios_of(&per_round)
+    }
+
+    /// D4：一条臂一张卡全部 `name=drift_control_point` 行的 `judgement` 列里 `unstable` 几行（口径同第二轮判决数 1054 的那一列）；交回（行数、`unstable` 数）。
+    pub(super) fn unstable_count(
+        lines: &[BTreeMap<String, String>],
+        arm: DriftArm,
+        card: u32,
+    ) -> (usize, usize) {
+        let card_text = card.to_string();
+        let of_the_card: Vec<&BTreeMap<String, String>> = lines
+            .iter()
+            .filter(|fields| {
+                fields.get("name").map(String::as_str) == Some("drift_control_point")
+                    && fields.get("arm").map(String::as_str) == Some(arm.label())
+                    && fields.get("index") == Some(&card_text)
+            })
+            .collect();
+        let unstable = of_the_card
+            .iter()
+            .filter(|fields| fields.get("judgement").map(String::as_str) == Some("unstable"))
+            .count();
+        (of_the_card.len(), unstable)
+    }
+
+    /// 格一级的轮次比（`name=submission_cell` 的线程钟中位，每张卡 80 格）。
+    pub(super) fn round_ratios_of_the_cells(
+        medians: &CellMediansOfTheSegment,
+        card: u32,
+    ) -> RoundRatios {
+        let per_round: Vec<Vec<Option<f64>>> = medians
+            .iter()
+            .filter(|((card_index, _cell), _rounds)| *card_index == card)
+            .map(|(_key, rounds)| {
+                rounds
+                    .iter()
+                    .map(|round| {
+                        round
+                            .map(|medians_of_the_round| medians_of_the_round.thread_cpu_nanoseconds)
+                    })
+                    .collect()
+            })
+            .collect();
+        round_ratios_of(&per_round)
+    }
+
+    /// 受控臂一张卡先量的轮与后量的轮（第八节「几何敏感性」最后一行，只报）：轮次比那几行里每行先量那几轮的平均、后量那几轮的平均，
+    /// 各取中位；交回（先量的中位、后量的中位、后 ÷ 先）。
+    pub(super) fn card_order_effect(
+        lines: &[BTreeMap<String, String>],
+        cards: &[u32],
+        card: u32,
+    ) -> (Option<f64>, Option<f64>, Option<f64>) {
+        let mean_of = |values: &[Option<f64>], first: bool| {
+            let chosen: Vec<f64> = values
+                .iter()
+                .enumerate()
+                .filter(|(round_index, _value)| {
+                    is_the_card_measured_first_in_the_round(
+                        DriftArm::Controlled,
+                        round_index + 1,
+                        cards,
+                        card,
+                    ) == first
+                })
+                .filter_map(|(_round_index, value)| *value)
+                .collect();
+            (!chosen.is_empty()).then(|| chosen.iter().sum::<f64>() / chosen.len() as f64)
+        };
+        let mut first_rounds = Vec::new();
+        let mut second_rounds = Vec::new();
+        for fields in round_ratio_lines(lines, DriftArm::Controlled, card) {
+            let values = fields
+                .get("host_cpu_per_submission_milliseconds_per_round")
+                .map_or_else(Vec::new, |text| per_round_values_of(text));
+            first_rounds.extend(mean_of(&values, true));
+            second_rounds.extend(mean_of(&values, false));
+        }
+        let first_median = median_of(&first_rounds);
+        let second_median = median_of(&second_rounds);
+        let ratio = first_median
+            .zip(second_median)
+            .filter(|(first, _second)| *first > 0.0)
+            .map(|(first, second)| second / first);
+        (first_median, second_median, ratio)
+    }
+
+    /// 秩相关（Spearman）：两列各自排秩（并列取平均秩），秩的皮尔逊相关；不到 3 对或有一列没有变化交 `None`。
+    pub(super) fn rank_correlation(pairs: &[(f64, f64)]) -> Option<f64> {
+        if pairs.len() < 3 {
+            return None;
+        }
+        let ranks_of = |values: Vec<f64>| {
+            let mut order: Vec<usize> = (0..values.len()).collect();
+            order.sort_by(|left, right| values[*left].total_cmp(&values[*right]));
+            let mut ranks = vec![0.0_f64; values.len()];
+            let mut start = 0;
+            // 迭代上界：每圈 start 至少前进 1（一组并列至少一个）
+            while start < order.len() {
+                let mut end = start + 1;
+                while end < order.len() && values[order[end]] == values[order[start]] {
+                    end += 1;
+                }
+                let shared_rank = (start + end + 1) as f64 / 2.0;
+                for position in &order[start..end] {
+                    ranks[*position] = shared_rank;
+                }
+                start = end;
+            }
+            ranks
+        };
+        let first = ranks_of(pairs.iter().map(|(value, _other)| *value).collect());
+        let second = ranks_of(pairs.iter().map(|(_value, other)| *other).collect());
+        let count = pairs.len() as f64;
+        let mean_first = first.iter().sum::<f64>() / count;
+        let mean_second = second.iter().sum::<f64>() / count;
+        let covariance: f64 = first
+            .iter()
+            .zip(&second)
+            .map(|(left, right)| (left - mean_first) * (right - mean_second))
+            .sum();
+        let spread_first: f64 = first.iter().map(|left| (left - mean_first).powi(2)).sum();
+        let spread_second: f64 = second
+            .iter()
+            .map(|right| (right - mean_second).powi(2))
+            .sum();
+        (spread_first > 0.0 && spread_second > 0.0)
+            .then(|| covariance / (spread_first * spread_second).sqrt())
+    }
+
+    // ───── 受控臂 ④ 频率读数：每格前后读那个核的两项与这张卡的六项（并进本来就起的那一次 nvidia-smi），计时窗口外 ─────
+
+    /// 开格前那一次 `nvidia-smi` 查的栏（头两栏同第 3 次重跑的 `index,pci.bus_id`，后面六栏是这一趟加的读数）。
+    pub(super) const CARD_QUERY_FIELDS: &str =
+        "index,pci.bus_id,clocks.sm,clocks.mem,pstate,temperature.gpu,power.draw,clocks_event_reasons.active";
+
+    /// 一张卡此刻的读数；读不到的那一栏是 `None`（产物里写 `none`，不作废那一格，登记第十一节「读不到」）。
+    #[derive(Clone, Debug, Default, PartialEq)]
+    pub(super) struct CardClockReading {
+        pub(super) bus_identifier: String,
+        pub(super) sm_clock_megahertz: Option<f64>,
+        pub(super) memory_clock_megahertz: Option<f64>,
+        pub(super) performance_state: Option<String>,
+        pub(super) temperature_celsius: Option<f64>,
+        pub(super) power_watts: Option<f64>,
+        pub(super) clocks_event_reasons: Option<String>,
+    }
+
+    /// `nvidia-smi --query-gpu=<CARD_QUERY_FIELDS> --format=csv,noheader,nounits` 的输出，按卡的序号；栏数不对的行不收。
+    pub(super) fn card_clock_readings_of(query_text: &str) -> BTreeMap<u32, CardClockReading> {
+        let number = |text: &str| text.trim().parse::<f64>().ok();
+        let word = |text: &str| {
+            let trimmed = text.trim();
+            (!trimmed.is_empty() && !trimmed.starts_with('[') && trimmed != "N/A")
+                .then(|| field_token(trimmed))
+        };
+        query_text
+            .lines()
+            .filter_map(|line| {
+                let columns: Vec<&str> = line.split(',').collect();
+                let [index, bus, sm, memory, state, temperature, power, reasons] =
+                    columns.as_slice()
+                else {
+                    return None;
+                };
+                Some((
+                    index.trim().parse().ok()?,
+                    CardClockReading {
+                        bus_identifier: bus.trim().to_ascii_lowercase(),
+                        sm_clock_megahertz: number(sm),
+                        memory_clock_megahertz: number(memory),
+                        performance_state: word(state),
+                        temperature_celsius: number(temperature),
+                        power_watts: number(power),
+                        clocks_event_reasons: word(reasons),
+                    },
+                ))
+            })
+            .collect()
+    }
+
+    /// 发起提交那条线程此刻所在的核与它的两项频率（`sysfs` 读两个文件，不起进程）；读不到的是 `None`。
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub(super) struct HostCoreReading {
+        pub(super) core: Option<usize>,
+        pub(super) scaling_current_frequency_kilohertz: Option<u64>,
+        pub(super) average_frequency_kilohertz: Option<u64>,
+    }
+
+    // std 已经链着 C 库，这里只声明、不加依赖；签名照 glibc：`int sched_setaffinity(pid_t, size_t, const cpu_set_t *)`、
+    // `int sched_getaffinity(pid_t, size_t, cpu_set_t *)`（`pid_t` 是 `int`；`cpu_set_t` 当 16 个 u64 传）。
+    extern "C" {
+        fn sched_setaffinity(process: i32, mask_bytes: usize, mask: *const u64) -> i32;
+        fn sched_getaffinity(process: i32, mask_bytes: usize, mask: *mut u64) -> i32;
+    }
+
+    /// `cpu_set_t` 的大小：1024 位，16 个 u64。
+    const AFFINITY_MASK_WORDS: usize = 16;
+    const BITS_PER_AFFINITY_WORD: usize = 64;
+
+    fn cpufreq_file_of(core: usize, file: &str) -> Option<u64> {
+        std::fs::read_to_string(format!("/sys/devices/system/cpu/cpu{core}/cpufreq/{file}"))
+            .ok()?
+            .trim()
+            .parse()
+            .ok()
+    }
+
+    /// 此刻这条线程在哪个核上、那个核的 `scaling_cur_freq` 与 `cpuinfo_avg_freq`。
+    pub(super) fn host_core_reading_now() -> HostCoreReading {
+        let core = cpu_number_now().and_then(|number| usize::try_from(number).ok());
+        HostCoreReading {
+            core,
+            scaling_current_frequency_kilohertz: core
+                .and_then(|index| cpufreq_file_of(index, "scaling_cur_freq")),
+            average_frequency_kilohertz: core
+                .and_then(|index| cpufreq_file_of(index, "cpuinfo_avg_freq")),
+        }
+    }
+
+    /// 本线程此刻允许跑的核（`sched_getaffinity`）；读不到交 `None`。
+    pub(super) fn allowed_cores_of_this_thread() -> Option<Vec<usize>> {
+        let mut mask = [0_u64; AFFINITY_MASK_WORDS];
+        // SAFETY: mask 是这个栈帧里活着的 128 字节，长度照实传进去，内核至多写这么多；进程号 0 是调用的这条线程。
+        let status =
+            unsafe { sched_getaffinity(0, std::mem::size_of_val(&mask), mask.as_mut_ptr()) };
+        (status == 0).then(|| {
+            (0..AFFINITY_MASK_WORDS * BITS_PER_AFFINITY_WORD)
+                .filter(|core| {
+                    mask[core / BITS_PER_AFFINITY_WORD] & (1_u64 << (core % BITS_PER_AFFINITY_WORD))
+                        != 0
+                })
+                .collect()
+        })
+    }
+
+    /// 把本线程绑到一个核上；交回绑成了没有。
+    pub(super) fn pin_this_thread_to(core: usize) -> bool {
+        if core >= AFFINITY_MASK_WORDS * BITS_PER_AFFINITY_WORD {
+            return false;
+        }
+        let mut mask = [0_u64; AFFINITY_MASK_WORDS];
+        mask[core / BITS_PER_AFFINITY_WORD] |= 1_u64 << (core % BITS_PER_AFFINITY_WORD);
+        // SAFETY: mask 是这个栈帧里活着的 128 字节，内核只读；进程号 0 是调用的这条线程。
+        let status = unsafe { sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) };
+        status == 0
+    }
+
+    /// 绑哪个核（第一节受控臂 ③）：允许集合里 `amd_pstate_prefcore_ranking` 最高的，并列取号小的；一个都读不到取允许集合里号最小的非 0 核
+    /// （只有 0 号核时取 0）。`rankings` 是（核号、排名，读不到是 `None`）。
+    pub(super) fn preferred_core(
+        rankings: &[(usize, Option<u64>)],
+        allowed: &[usize],
+    ) -> Option<usize> {
+        let ranked = rankings
+            .iter()
+            .filter(|(core, _ranking)| allowed.contains(core))
+            .filter_map(|(core, ranking)| ranking.map(|value| (*core, value)))
+            .max_by(|left, right| left.1.cmp(&right.1).then(right.0.cmp(&left.0)));
+        ranked.map(|(core, _ranking)| core).or_else(|| {
+            allowed
+                .iter()
+                .copied()
+                .filter(|core| *core != 0)
+                .min()
+                .or_else(|| allowed.first().copied())
+        })
+    }
+
+    /// 一条臂的线程放在哪（`name=arm_placement`）：绑的核（复现臂不绑）、那个核的 `scaling_governor`。
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(super) struct ArmThreadPlacement {
+        pub(super) pinned_core: Option<usize>,
+        pub(super) allowed_cores: Option<Vec<usize>>,
+        pub(super) scaling_governor: Option<String>,
+    }
+
+    /// 开一条臂之前放好这条线程：受控臂绑到 [`preferred_core`]，复现臂照旧（不绑，允许集合原样）。
+    pub(super) fn place_the_thread_of_the_arm(arm: DriftArm) -> ArmThreadPlacement {
+        let allowed = allowed_cores_of_this_thread();
+        let pinned_core = match arm {
+            DriftArm::Reproduction => None,
+            DriftArm::Controlled => allowed.as_deref().and_then(|cores| {
+                let rankings: Vec<(usize, Option<u64>)> = cores
+                    .iter()
+                    .map(|core| (*core, cpufreq_file_of(*core, "amd_pstate_prefcore_ranking")))
+                    .collect();
+                preferred_core(&rankings, cores).filter(|core| pin_this_thread_to(*core))
+            }),
+        };
+        let governor_core = pinned_core.or_else(|| host_core_reading_now().core);
+        ArmThreadPlacement {
+            pinned_core,
+            allowed_cores: allowed_cores_of_this_thread(),
+            scaling_governor: governor_core.and_then(|core| {
+                std::fs::read_to_string(format!(
+                    "/sys/devices/system/cpu/cpu{core}/cpufreq/scaling_governor"
+                ))
+                .ok()
+                .map(|text| field_token(text.trim()))
+            }),
+        }
+    }
+
+    // ───── 一格一轮（照第 3 次重跑的格：前校准 → 热身 → 计时提交 → 后校准，作废与重试照 R2-2）；卡与钟从参数进来，单测换成假的 ─────
+
+    /// 一格一轮在一张卡上要的东西：真卡（gpu 特性）与单测的假卡各一份。
+    pub(super) trait CellRoundEnvironment {
+        fn card_index(&self) -> u32;
+        fn link_peak_bytes_per_second(&self) -> f64;
+        fn host_core_reading(&mut self) -> HostCoreReading;
+        /// 16 MiB 那份 CRC 的校准比（读不到交 `None`，那一格那一轮作废）。
+        fn calibration_ratio(&mut self) -> Option<f64>;
+        fn threads(&mut self) -> Option<usize>;
+        /// 开这一格的提交步骤（第 3 次重跑的 `steps_of`），热身与计时提交用同一份。
+        fn open_the_cell(&mut self, cell: SubmissionCell);
+        /// 用开着的那一格连发 `count` 次（第 3 次重跑的 `time_the_submissions_of_a_cell`，间隔睡在区间外）。
+        fn time_the_submissions(
+            &mut self,
+            count: usize,
+            gap: Duration,
+            insertion: &mut dyn FnMut(),
+        ) -> Vec<Option<SubmissionTiming>>;
+        fn close_the_cell(&mut self);
+    }
+
+    /// 开格前读卡（计时窗口外）：等这张卡上别的计算进程走，交回这一次读到的各张卡的读数（第一节受控臂 ④，并进本来就起的那一次 `nvidia-smi`）。
+    pub(super) trait CardReader {
+        fn wait_for_the_card_and_read_the_cards(
+            &mut self,
+            card_index: u32,
+            emitter: &mut Emitter,
+        ) -> BTreeMap<u32, CardClockReading>;
+    }
+
+    /// 计时那几格的串行声明（登记第五节「串行声明」①②；C905（E185 装置的计时窗口不写串行声明））。
+    pub(super) const DRIFT_CONTROL_SERIAL_REASON: &str =
+        "E185 第 4 次重跑控漂移段：一次 GPU 提交在发起它的那条线程上花的 CPU，要串行量，别的线程抢 CPU 与 PCIe 会混进来";
+
+    /// 一格一轮的要求。
+    #[derive(Clone, Copy, Debug)]
+    pub(super) struct CellRoundRequest {
+        pub(super) arm: DriftArm,
+        pub(super) cell: SubmissionCell,
+        pub(super) round: usize,
+        pub(super) probe: Option<DriftProbe>,
+        pub(super) threshold_edges: (f64, f64),
+    }
+
+    impl CellRoundRequest {
+        /// 产物行里这一格的头：`name=<submission_cell 或 drift_probe_cell> arm=<臂>[ probe=<探针>]`。
+        pub(super) fn line_head(&self) -> String {
+            match self.probe {
+                None => format!("submission_cell arm={}", self.arm.label()),
+                Some(probe) => format!(
+                    "drift_probe_cell arm={} probe={}",
+                    self.arm.label(),
+                    probe.label()
+                ),
+            }
+        }
+
+        /// 别的行里这一格的键：`arm=… [probe=…] index=… <格>`。
+        pub(super) fn key_text(&self, card_index: u32) -> String {
+            let probe_text = self
+                .probe
+                .map_or_else(String::new, |probe| format!(" probe={}", probe.label()));
+            format!(
+                "arm={}{probe_text} index={card_index} {}",
+                self.arm.label(),
+                self.cell.label()
+            )
+        }
+    }
+
+    /// 一张卡在一条臂上累计的作废读数（同第 3 次重跑 `CellsOfTheCard` 的几栏）。
+    #[derive(Clone, Debug, Default, PartialEq)]
+    pub(super) struct CardTallies {
+        pub(super) result_mismatches: usize,
+        pub(super) floor_violations: usize,
+        pub(super) input_byte_mismatches: usize,
+        pub(super) process_clock_cells: BTreeSet<SubmissionCell>,
+        pub(super) coverage_failures: BTreeSet<(SubmissionForm, WaitMethod)>,
+    }
+
+    /// 一格一轮量完交回的东西（收下的那一次；三次都作废时 `medians` 是 `None`）。
+    #[derive(Clone, Debug, PartialEq)]
+    pub(super) struct CellRoundOutcome {
+        pub(super) medians: Option<CellRoundMedians>,
+        pub(super) warm_up_submissions: usize,
+        pub(super) cards_before: BTreeMap<u32, CardClockReading>,
+        pub(super) host_before: HostCoreReading,
+        pub(super) host_after: HostCoreReading,
+        pub(super) wall_median_nanoseconds: Option<f64>,
+    }
+
+    /// 把第 3 次重跑那一行的头 `name=submission_cell ` 换成这一格的头。
+    pub(super) fn with_the_line_head(line: &str, head: &str) -> String {
+        line.replacen("name=submission_cell ", &format!("name={head} "), 1)
+    }
+
+    /// 开着的那一格热身、再计时提交（间隔 0 的格 100 次、50 ms 的格 50 次）：计时区间 ① 之前插探针的自旋与 `extra`（平常什么都不做）。
+    /// 交回（热身了几次、计时提交的读数）。
+    pub(super) fn warm_up_and_time_the_cell(
+        environment: &mut dyn CellRoundEnvironment,
+        request: &CellRoundRequest,
+        extra: &mut dyn FnMut(),
+    ) -> (usize, Vec<Option<SubmissionTiming>>) {
+        let gap = Duration::from_millis(request.cell.gap_milliseconds);
+        environment.open_the_cell(request.cell);
+        let warm_up_submissions = warm_up_the_cell(request.arm.cell_warm_up(), &mut |count| {
+            let timings = environment.time_the_submissions(count, gap, &mut || {});
+            cell_round_reading(&timings, request.cell.units)
+                .map(|reading| reading.thread_cpu_median_nanoseconds)
+        });
+        let timed_submissions = if request.cell.gap_milliseconds == 0 {
+            TIMED_SUBMISSIONS_WITHOUT_A_GAP
+        } else {
+            TIMED_SUBMISSIONS_WITH_A_GAP
+        };
+        let spin = request
+            .probe
+            .map(|probe| probe_spin_nanoseconds(probe, request.round));
+        let mut insertion = || {
+            if let Some(nanoseconds) = spin {
+                let _spun = spin_until_the_thread_cpu_advances(nanoseconds);
+            }
+            extra();
+        };
+        let timings = environment.time_the_submissions(timed_submissions, gap, &mut insertion);
+        environment.close_the_cell();
+        (warm_up_submissions, timings)
+    }
+
+    /// 一格一轮（登记第五节「控漂移段怎么量」：每格照第 3 次重跑的格，受控臂只把 10 次热身换成暖到稳）：每次先读卡（等别的计算进程、读各张卡，
+    /// 计时窗口外）→ 声明串行 → 前校准 → 热身 → 计时提交 → 后校准；校准比有一个 > 1.10 或有一次钟读不到，那一次作废、等常态（R2-2）再重量，
+    /// 至多 3 次，三次都作废打 `name=round_invalid`。每次打一行这一格的头的 `submission_cell` 行（[`CellRoundRequest::line_head`]），受控臂另打一行
+    /// `name=cell_warm_up`。有一次提交的线程钟大过挂钟（停机 J-S5）交回 `Err`。
+    pub(super) fn measure_one_cell_round(
+        environment: &mut dyn CellRoundEnvironment,
+        card_reader: &mut dyn CardReader,
+        request: CellRoundRequest,
+        tallies: &mut CardTallies,
+        waiting: &mut WaitingLedger,
+        larger_ratio_per_cell: &mut Vec<Option<f64>>,
+        emitter: &mut Emitter,
+    ) -> Result<CellRoundOutcome, String> {
+        let card_index = environment.card_index();
+        let cell = request.cell;
+        let round = request.round;
+        let mut outcome = CellRoundOutcome {
+            medians: None,
+            warm_up_submissions: 0,
+            cards_before: BTreeMap::new(),
+            host_before: HostCoreReading::default(),
+            host_after: HostCoreReading::default(),
+            wall_median_nanoseconds: None,
+        };
+        for attempt in 1..=ATTEMPTS_PER_ROUND_AT_MOST {
+            let cards_before =
+                card_reader.wait_for_the_card_and_read_the_cards(card_index, emitter);
+            emitter.declare(DeclaredSegment::Serial(DRIFT_CONTROL_SERIAL_REASON));
+            let (host_before, ratio_before, threads_before) = (
+                environment.host_core_reading(),
+                environment.calibration_ratio(),
+                environment.threads(),
+            );
+            let (warm_up_submissions, timings) =
+                warm_up_and_time_the_cell(environment, &request, &mut || {});
+            let threads_after = environment.threads();
+            let ratio_after = environment.calibration_ratio();
+            let host_after = environment.host_core_reading();
+            let reading = cell_round_reading(&timings, cell.units);
+            if let Some(outside) = reading
+                .as_ref()
+                .filter(|cell_reading| !cell_reading.is_every_thread_cpu_inside_the_wall)
+            {
+                return Err(format!(
+                    "clause_j_s5_thread_cpu_above_the_wall_at_{}_round_{round}_median_{:.0}",
+                    request.key_text(card_index).replace([' ', '='], "_"),
+                    outside.thread_cpu_median_nanoseconds
+                ));
+            }
+            let ratios = (ratio_before, ratio_after);
+            let verdict = cell_round_verdict(
+                cell,
+                &timings,
+                reading.as_ref(),
+                ratios,
+                environment.link_peak_bytes_per_second(),
+            );
+            tallies.floor_violations += verdict.floor_violations;
+            tallies.result_mismatches +=
+                usize::from(reading.as_ref().is_some_and(|cell_reading| {
+                    !cell_reading.are_the_results_holding
+                        || !cell_reading.are_the_sequence_numbers_holding
+                }));
+            tallies.input_byte_mismatches +=
+                usize::from(reading.is_some() && !verdict.input_bytes_hold);
+            if reading.as_ref().is_some_and(|cell_reading| {
+                !cell_reading.is_every_wait_inside_the_submission
+                    || !cell_reading.are_the_comparison_counts_holding
+            }) {
+                tallies.coverage_failures.insert((cell.form, cell.wait));
+            }
+            larger_ratio_per_cell.push(match ratios {
+                (Some(before), Some(after)) => Some(before.max(after)),
+                (None, _) | (_, None) => None,
+            });
+            emitter.line(&with_the_line_head(
+                &submission_cell_line(
+                    card_index,
+                    cell,
+                    round,
+                    attempt,
+                    reading.as_ref(),
+                    &verdict,
+                    ratios,
+                    (threads_before, threads_after),
+                    request.threshold_edges,
+                ),
+                &request.line_head(),
+            ));
+            if request.arm == DriftArm::Controlled {
+                emitter.line(&format!(
+                    "name=cell_warm_up {} round={round} attempt={attempt} warm_up_submissions={warm_up_submissions}",
+                    request.key_text(card_index)
+                ));
+            }
+            outcome = CellRoundOutcome {
+                medians: None,
+                warm_up_submissions,
+                cards_before,
+                host_before,
+                host_after,
+                wall_median_nanoseconds: reading
+                    .as_ref()
+                    .map(|cell_reading| cell_reading.wall_median_nanoseconds),
+            };
+            match (verdict.invalid_reason, reading) {
+                (None, Some(round_reading)) => {
+                    if is_the_thread_clock_underestimating(
+                        round_reading.process_cpu_median_nanoseconds,
+                        round_reading.thread_cpu_median_nanoseconds,
+                    ) {
+                        tallies.process_clock_cells.insert(cell);
+                    }
+                    outcome.medians = Some(CellRoundMedians {
+                        thread_cpu_nanoseconds: round_reading.thread_cpu_median_nanoseconds,
+                        floor_thread_cpu_nanoseconds: round_reading
+                            .floor_thread_cpu_median_nanoseconds,
+                        process_cpu_nanoseconds: round_reading.process_cpu_median_nanoseconds,
+                    });
+                    return Ok(outcome);
+                }
+                (Some(reason), _) if attempt < ATTEMPTS_PER_ROUND_AT_MOST => {
+                    let mut calibrate = || environment.calibration_ratio();
+                    let mut sleep_before_the_retry =
+                        |duration: Duration| std::thread::sleep(duration);
+                    if let Some(wait) = wait_before_the_retry(
+                        reason,
+                        waiting,
+                        &mut calibrate,
+                        &mut sleep_before_the_retry,
+                    ) {
+                        emitter.line(&format!(
+                            "name=normal_wait {} round={round} attempt={attempt} reason={reason} checks={} waited_seconds={} ratio_per_check={} outcome={} segment_waited_seconds={}",
+                            request.key_text(card_index),
+                            wait.checks,
+                            wait.waited_seconds,
+                            wait.ratio_per_check.iter().map(|ratio| optional_number(*ratio)).collect::<Vec<_>>().join(","),
+                            wait.outcome.label(),
+                            waiting.total_seconds,
+                        ));
+                        if let Some(exit_code) = wait.outcome.exit_code_stopping_the_segment() {
+                            emitter.line("name=stopped segment=host_cpu_drift_control reason=machine_not_back_to_normal_within_the_waiting_cap");
+                            emitter.declare(DeclaredSegment::Parallel);
+                            emitter.finish();
+                            std::process::exit(exit_code);
+                        }
+                    }
+                }
+                (Some(_) | None, _) => {
+                    if attempt == ATTEMPTS_PER_ROUND_AT_MOST {
+                        emitter.line(&format!(
+                            "name=round_invalid segment=host_cpu_drift_control {} round={round} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
+                            request.key_text(card_index)
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(outcome)
+    }
+}
+
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        unused_imports,
+        reason = "控漂移段（gpu 特性）才从顶层用它；没编 gpu 特性时只有单测用"
+    )
+)]
+use drift_control_arithmetic::*;
+
+// ───────────────────────────── function-split 的算术（第 3 次重跑登记第五节「第三段怎么量」、第六节 A1；纯函数） ─────────────────────────────
+
+/// 附带段一次调用按函数拆开的读数（每项是 5 次计时重放的中位，纳秒；不在这一次调用里的项是 `None`：选段只在签发那一次）。
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FunctionSplitReading {
+    call_cpu_nanoseconds: f64,
+    clone_before_cpu_nanoseconds: f64,
+    clone_after_cpu_nanoseconds: f64,
+    read_the_version_mapping_cpu_nanoseconds: f64,
+    read_the_version_pinned_cpu_nanoseconds: f64,
+    region_scan_cpu_nanoseconds: Option<f64>,
+    choose_cpu_nanoseconds: Option<f64>,
+}
+
+impl FunctionSplitReading {
+    /// 两次克隆（调用之前那一版、调用之后发成的那一版）。
+    fn clone_cpu_nanoseconds(&self) -> f64 {
+        self.clone_before_cpu_nanoseconds + self.clone_after_cpu_nanoseconds
+    }
+
+    /// 读这一版（映射条目 + 钉住槽那一圈）。
+    fn read_the_version_cpu_nanoseconds(&self) -> f64 {
+        self.read_the_version_mapping_cpu_nanoseconds + self.read_the_version_pinned_cpu_nanoseconds
+    }
+
+    /// 「发布与其余」= 这一次调用的线程钟 CPU − 上面各项之和（含计划、发布、discard、记账；取余数，不单独重放）。
+    fn remainder_cpu_nanoseconds(&self) -> f64 {
+        self.call_cpu_nanoseconds
+            - self.clone_cpu_nanoseconds()
+            - self.read_the_version_cpu_nanoseconds()
+            - self.region_scan_cpu_nanoseconds.unwrap_or(0.0)
+            - self.choose_cpu_nanoseconds.unwrap_or(0.0)
+    }
+
+    /// `name=function_split` 那一行里各项与份额（份额 = 那一项 ÷ 这一次调用的 CPU）。
+    fn fields_text(&self) -> String {
+        let share = |value: f64| value / self.call_cpu_nanoseconds;
+        let optional_share = |value: Option<f64>| optional_number(value.map(share));
+        format!(
+            "call_cpu_nanoseconds={:.1} clone_before_cpu_nanoseconds={:.1} clone_after_cpu_nanoseconds={:.1} read_the_version_mapping_cpu_nanoseconds={:.1} read_the_version_pinned_cpu_nanoseconds={:.1} region_scan_cpu_nanoseconds={} choose_cpu_nanoseconds={} remainder_cpu_nanoseconds={:.1} clone_share={:.6} read_the_version_share={:.6} region_scan_share={} choose_share={} remainder_share={:.6}",
+            self.call_cpu_nanoseconds,
+            self.clone_before_cpu_nanoseconds,
+            self.clone_after_cpu_nanoseconds,
+            self.read_the_version_mapping_cpu_nanoseconds,
+            self.read_the_version_pinned_cpu_nanoseconds,
+            optional_number(self.region_scan_cpu_nanoseconds),
+            optional_number(self.choose_cpu_nanoseconds),
+            self.remainder_cpu_nanoseconds(),
+            share(self.clone_cpu_nanoseconds()),
+            share(self.read_the_version_cpu_nanoseconds()),
+            optional_share(self.region_scan_cpu_nanoseconds),
+            optional_share(self.choose_cpu_nanoseconds),
+            share(self.remainder_cpu_nanoseconds()),
+        )
+    }
+}
+
+/// 一轮里几次调用合起来的各项（批那几次相加；签发那一次单独一份），每项 ÷ 调用 CPU 之和得份额。交回（各项之和、份额）的文字。
+fn function_split_round_totals(readings: &[FunctionSplitReading]) -> Option<[f64; 6]> {
+    if readings.is_empty() {
+        return None;
+    }
+    let total = |value_of: &dyn Fn(&FunctionSplitReading) -> f64| {
+        readings.iter().map(value_of).sum::<f64>()
+    };
+    Some([
+        total(&|reading| reading.call_cpu_nanoseconds),
+        total(&FunctionSplitReading::clone_cpu_nanoseconds),
+        total(&FunctionSplitReading::read_the_version_cpu_nanoseconds),
+        total(&|reading| reading.region_scan_cpu_nanoseconds.unwrap_or(0.0)),
+        total(&|reading| reading.choose_cpu_nanoseconds.unwrap_or(0.0)),
+        total(&FunctionSplitReading::remainder_cpu_nanoseconds),
+    ])
+}
+
+/// `name=function_split_summary` 的各项名（与 [`function_split_round_totals`] 的次序相同）。
+const FUNCTION_SPLIT_ITEMS: [&str; 6] = [
+    "call",
+    "clone",
+    "read_the_version",
+    "region_scan",
+    "choose",
+    "remainder",
+];
+
+/// 五轮中位：每项各轮之和的中位与各轮份额（那一项 ÷ 调用之和）的中位。有一轮读不到的那一项不收那一轮。
+fn function_split_summary_text(round_totals: &[[f64; 6]]) -> String {
+    FUNCTION_SPLIT_ITEMS
+        .iter()
+        .enumerate()
+        .map(|(item_index, item)| {
+            let values: Vec<f64> = round_totals
+                .iter()
+                .map(|totals| totals[item_index])
+                .collect();
+            let shares: Vec<f64> = round_totals
+                .iter()
+                .map(|totals| totals[item_index] / totals[0])
+                .collect();
+            format!(
+                "{item}_cpu_nanoseconds_median={} {item}_share_median={}",
+                optional_number(median_of(&values)),
+                optional_number(median_of(&shares))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// 停机 J-S6：crates 的 `central_mapping_as_the_compaction_reads_it` 与装置的 `version_as_the_replay_reads_it` 取出的映射条目集合不同。
+/// 两边按（key、位置条目的写法）排好再逐条比；交回一句或 `None`。
+fn mapping_entries_finding(
+    call_index: usize,
+    crates_entries: &[CentralMappingEntry],
+    apparatus_entries: &[CentralMappingEntry],
+) -> Option<String> {
+    let sorted = |entries: &[CentralMappingEntry]| {
+        let mut texts: Vec<(Vec<u8>, String)> = entries
+            .iter()
+            .map(|entry| (entry.key.clone(), format!("{:?}", entry.locations)))
+            .collect();
+        texts.sort();
+        texts
+    };
+    (sorted(crates_entries) != sorted(apparatus_entries)).then(|| {
+        format!(
+            "clause_j_s6_mapping_entries_differ_at_call_{call_index}_crates_{}_apparatus_{}",
+            crates_entries.len(),
+            apparatus_entries.len()
+        )
+    })
+}
+
+// ───────────────────────────── 常驻在一张卡上的两份核（第 3 次重跑登记第一节「核一、核二」「常驻写法」；只在编了 gpu 特性时有） ─────────────────────────────
+
+#[cfg(feature = "gpu")]
+mod resident_gpu_kernels {
+    use super::*;
+    use singlefs_checker_tier::gpu_unit_checks::GpuCard;
+
+    /// 核一：照 `crates/singlefs-checker-tier/src/gpu_unit_checks.rs` 那份逐位算法另抄一份（那份源码是私有常量，装置读不到；行为由停机 J-S1
+    /// 与 crates 的 `GpuCard::crc32c_of_ranges` 逐条对拍）。每个单元一条线程、工作组 64。
+    const KERNEL_ONE_SOURCE: &str = r#"
+struct Params { count: u32, reserved0: u32, reserved1: u32, reserved2: u32, };
+struct ResultEntry { crc: u32, local_offset: u32, };
+@group(0) @binding(0) var<uniform> params: Params;
+@group(0) @binding(1) var<storage, read> slot_words: array<u32>;
+@group(0) @binding(2) var<storage, read> slot_lengths: array<u32>;
+@group(0) @binding(3) var<storage, read_write> results: array<ResultEntry>;
+const CRC32C_REFLECTED_POLYNOMIAL: u32 = 0x82F63B78u;
+const CRC32C_INITIAL_VALUE: u32 = 0xFFFFFFFFu;
+const WORDS_PER_SLOT: u32 = 8192u;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    let local_offset = global_id.x;
+    if (local_offset >= params.count) { return; }
+    let length_in_bytes = slot_lengths[local_offset];
+    let base_word = local_offset * WORDS_PER_SLOT;
+    var crc_register: u32 = CRC32C_INITIAL_VALUE;
+    var byte_index: u32 = 0u;
+    loop {
+        if (byte_index >= length_in_bytes) { break; }
+        let word = slot_words[base_word + byte_index / 4u];
+        let current_byte = (word >> (8u * (byte_index % 4u))) & 0xFFu;
+        crc_register = crc_register ^ current_byte;
+        var bit_index: u32 = 0u;
+        loop {
+            if (bit_index >= 8u) { break; }
+            if ((crc_register & 1u) == 1u) {
+                crc_register = (crc_register >> 1u) ^ CRC32C_REFLECTED_POLYNOMIAL;
+            } else {
+                crc_register = crc_register >> 1u;
+            }
+            bit_index = bit_index + 1u;
+        }
+        byte_index = byte_index + 1u;
+    }
+    results[local_offset].crc = crc_register ^ CRC32C_INITIAL_VALUE;
+    results[local_offset].local_offset = local_offset;
+}
+"#;
+
+    /// 核二：装置新写，按字节查 256 项表，表在工作组共享内存里（工作组里 64 条线程每条算表里 4 项，栅栏之后再算），不共用核一的核函数
+    /// （D26 已定项 13 第 8 条）。每个单元一条线程、工作组 64。
+    const KERNEL_TWO_SOURCE: &str = r#"
+struct DispatchParameters { unit_count: u32, unused_first: u32, unused_second: u32, unused_third: u32, };
+struct UnitResult { checksum: u32, unit_index: u32, };
+@group(0) @binding(0) var<uniform> dispatch_parameters: DispatchParameters;
+@group(0) @binding(1) var<storage, read> unit_words: array<u32>;
+@group(0) @binding(2) var<storage, read> unit_lengths: array<u32>;
+@group(0) @binding(3) var<storage, read_write> unit_results: array<UnitResult>;
+const REVERSED_CASTAGNOLI_POLYNOMIAL: u32 = 0x82F63B78u;
+const WORDS_PER_UNIT_SLOT: u32 = 8192u;
+const TABLE_ENTRIES_PER_LANE: u32 = 4u;
+var<workgroup> byte_table: array<u32, 256>;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) invocation: vec3<u32>, @builtin(local_invocation_index) lane: u32) {
+    for (var entry_of_the_lane: u32 = 0u; entry_of_the_lane < TABLE_ENTRIES_PER_LANE; entry_of_the_lane = entry_of_the_lane + 1u) {
+        let table_index = lane * TABLE_ENTRIES_PER_LANE + entry_of_the_lane;
+        var table_value: u32 = table_index;
+        for (var shift_round: u32 = 0u; shift_round < 8u; shift_round = shift_round + 1u) {
+            table_value = select(table_value >> 1u, (table_value >> 1u) ^ REVERSED_CASTAGNOLI_POLYNOMIAL, (table_value & 1u) == 1u);
+        }
+        byte_table[table_index] = table_value;
+    }
+    workgroupBarrier();
+    let unit_index = invocation.x;
+    if (unit_index >= dispatch_parameters.unit_count) { return; }
+    let unit_length = unit_lengths[unit_index];
+    let first_word = unit_index * WORDS_PER_UNIT_SLOT;
+    var running_checksum: u32 = 0xFFFFFFFFu;
+    for (var position: u32 = 0u; position < unit_length; position = position + 1u) {
+        let packed = unit_words[first_word + position / 4u];
+        let unit_byte = (packed >> (8u * (position % 4u))) & 0xFFu;
+        running_checksum = byte_table[(running_checksum ^ unit_byte) & 0xFFu] ^ (running_checksum >> 8u);
+    }
+    unit_results[unit_index].checksum = running_checksum ^ 0xFFFFFFFFu;
+    unit_results[unit_index].unit_index = unit_index;
+}
+"#;
+
+    /// 工作组大小（两核都是 64）。
+    const WORKGROUP_SIZE: u64 = 64;
+
+    /// 一张卡上常驻的两核与缓冲：管线、缓冲（按这一段最大一档开）、绑定组都在计时窗口外建一次，每次提交只做 ①–⑦（登记第一节「常驻写法」）。
+    /// 共用形态两核读核一那一块输入与长度表；分开形态各读各的。
+    pub(super) struct ResidentKernels {
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        kernel_one: wgpu::ComputePipeline,
+        kernel_two: wgpu::ComputePipeline,
+        parameters: wgpu::Buffer,
+        input_of_kernel_one: wgpu::Buffer,
+        input_of_kernel_two: wgpu::Buffer,
+        lengths_of_kernel_one: wgpu::Buffer,
+        lengths_of_kernel_two: wgpu::Buffer,
+        results_of_kernel_one: wgpu::Buffer,
+        results_of_kernel_two: wgpu::Buffer,
+        readback: wgpu::Buffer,
+        kernel_one_bindings: wgpu::BindGroup,
+        kernel_two_shared_bindings: wgpu::BindGroup,
+        kernel_two_split_bindings: wgpu::BindGroup,
+        pub(super) capacity_units: u64,
+    }
+
+    /// 回读映射登记之后、等完之前攥着的东西：这一次提交的序号与回读回调送结果的那一头。
+    pub(super) struct PendingReadback {
+        submission: wgpu::SubmissionIndex,
+        receiver: std::sync::mpsc::Receiver<Result<(), wgpu::BufferAsyncError>>,
+        mapped_bytes: u64,
+    }
+
+    fn storage_buffer(
+        device: &wgpu::Device,
+        bytes: u64,
+        usage: wgpu::BufferUsages,
+    ) -> wgpu::Buffer {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: bytes,
+            usage,
+            mapped_at_creation: false,
+        })
+    }
+
+    fn pipeline_of(device: &wgpu::Device, label: &str, source: &str) -> wgpu::ComputePipeline {
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(label),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
+        });
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(label),
+            layout: None,
+            module: &module,
+            entry_point: Some("main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        })
+    }
+
+    fn bindings_of(
+        device: &wgpu::Device,
+        pipeline: &wgpu::ComputePipeline,
+        buffers: [&wgpu::Buffer; 4],
+    ) -> wgpu::BindGroup {
+        let layout = pipeline.get_bind_group_layout(0);
+        let entries: Vec<wgpu::BindGroupEntry<'_>> = buffers
+            .iter()
+            .zip(0_u32..)
+            .map(|(buffer, binding)| wgpu::BindGroupEntry {
+                binding,
+                resource: buffer.as_entire_binding(),
+            })
+            .collect();
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &layout,
+            entries: &entries,
+        })
+    }
+
+    impl ResidentKernels {
+        /// 在这张卡上编两核、按 `capacity_units` 个 32 KiB 槽开两份输入、两份长度表、两份结果与一块回读缓冲，建三个绑定组（计时窗口外）。
+        pub(super) fn start(card: &GpuCard, capacity_units: u64) -> ResidentKernels {
+            let device = card.device().clone();
+            let queue = card.queue().clone();
+            let kernel_one = pipeline_of(&device, "e185_kernel_one", KERNEL_ONE_SOURCE);
+            let kernel_two = pipeline_of(&device, "e185_kernel_two", KERNEL_TWO_SOURCE);
+            let storage_in = wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST;
+            let storage_out = wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC;
+            let input_bytes = capacity_units * LOCAL_GPU_SLOT_BYTES;
+            let length_bytes = capacity_units * 4;
+            let result_bytes = capacity_units * LOCAL_GPU_RESULT_ENTRY_BYTES;
+            let parameters = storage_buffer(
+                &device,
+                LOCAL_GPU_PARAMETER_BYTES,
+                wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            );
+            let input_of_kernel_one = storage_buffer(&device, input_bytes, storage_in);
+            let input_of_kernel_two = storage_buffer(&device, input_bytes, storage_in);
+            let lengths_of_kernel_one = storage_buffer(&device, length_bytes, storage_in);
+            let lengths_of_kernel_two = storage_buffer(&device, length_bytes, storage_in);
+            let results_of_kernel_one = storage_buffer(&device, result_bytes, storage_out);
+            let results_of_kernel_two = storage_buffer(&device, result_bytes, storage_out);
+            let readback = storage_buffer(
+                &device,
+                2 * result_bytes,
+                wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            );
+            let kernel_one_bindings = bindings_of(
+                &device,
+                &kernel_one,
+                [
+                    &parameters,
+                    &input_of_kernel_one,
+                    &lengths_of_kernel_one,
+                    &results_of_kernel_one,
+                ],
+            );
+            let kernel_two_shared_bindings = bindings_of(
+                &device,
+                &kernel_two,
+                [
+                    &parameters,
+                    &input_of_kernel_one,
+                    &lengths_of_kernel_one,
+                    &results_of_kernel_two,
+                ],
+            );
+            let kernel_two_split_bindings = bindings_of(
+                &device,
+                &kernel_two,
+                [
+                    &parameters,
+                    &input_of_kernel_two,
+                    &lengths_of_kernel_two,
+                    &results_of_kernel_two,
+                ],
+            );
+            ResidentKernels {
+                device,
+                queue,
+                kernel_one,
+                kernel_two,
+                parameters,
+                input_of_kernel_one,
+                input_of_kernel_two,
+                lengths_of_kernel_one,
+                lengths_of_kernel_two,
+                results_of_kernel_one,
+                results_of_kernel_two,
+                readback,
+                kernel_one_bindings,
+                kernel_two_shared_bindings,
+                kernel_two_split_bindings,
+                capacity_units,
+            }
+        }
+
+        /// ① 写输入：单元字节（[`write_the_unit_bytes`]，交回写进卡的单元字节）、长度表（分开形态各写一份）、派活参数。
+        /// `kernel_two_patches` 是分开形态里核二那一份输入在单元字节写完之后再改的几段（偏移、字节；第二段 P5 用，第一段不给）。
+        pub(super) fn write_the_inputs(
+            &self,
+            form: InputForm,
+            unit_bytes: &[u8],
+            lengths: &[u32],
+            kernel_two_patches: &[(u64, Vec<u8>)],
+        ) -> u64 {
+            let units = u64::try_from(lengths.len()).expect("单元数");
+            assert!(
+                units <= self.capacity_units,
+                "一次提交 {units} 个单元，超过常驻缓冲的 {}",
+                self.capacity_units
+            );
+            let written = write_the_unit_bytes(form, unit_bytes, |buffer, bytes| {
+                let target = match buffer {
+                    InputBufferOfTheKernel::KernelOne => &self.input_of_kernel_one,
+                    InputBufferOfTheKernel::KernelTwo => &self.input_of_kernel_two,
+                };
+                self.queue.write_buffer(target, 0, bytes);
+            });
+            for (offset, bytes) in kernel_two_patches {
+                self.queue
+                    .write_buffer(&self.input_of_kernel_two, *offset, bytes);
+            }
+            let length_bytes: Vec<u8> = lengths
+                .iter()
+                .flat_map(|length| length.to_le_bytes())
+                .collect();
+            self.queue
+                .write_buffer(&self.lengths_of_kernel_one, 0, &length_bytes);
+            if form == InputForm::Split {
+                self.queue
+                    .write_buffer(&self.lengths_of_kernel_two, 0, &length_bytes);
+            }
+            let count = u32::try_from(units).expect("单元数装得进 u32");
+            let parameter_bytes: Vec<u8> = [count, 0, 0, 0]
+                .iter()
+                .flat_map(|word| word.to_le_bytes())
+                .collect();
+            self.queue
+                .write_buffer(&self.parameters, 0, &parameter_bytes);
+            written
+        }
+
+        /// ② 编一个命令缓冲：核一、核二各派一次（每个单元一条线程；`kernels` 是只派核一时核二不派），两份结果拷进同一块回读缓冲
+        /// （前 n 条核一、后 n 条核二）；③ 提交一次。
+        pub(super) fn encode_and_submit(
+            &self,
+            form: InputForm,
+            units: u64,
+            kernels: KernelsToDispatch,
+        ) -> wgpu::SubmissionIndex {
+            let workgroups =
+                u32::try_from(units.div_ceil(WORKGROUP_SIZE)).expect("工作组数装得进 u32");
+            let result_bytes = units * LOCAL_GPU_RESULT_ENTRY_BYTES;
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            {
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: None,
+                    timestamp_writes: None,
+                });
+                pass.set_pipeline(&self.kernel_one);
+                pass.set_bind_group(0, &self.kernel_one_bindings, &[]);
+                pass.dispatch_workgroups(workgroups, 1, 1);
+                match kernels {
+                    KernelsToDispatch::Both => {
+                        pass.set_pipeline(&self.kernel_two);
+                        let kernel_two_bindings = match form {
+                            InputForm::Shared => &self.kernel_two_shared_bindings,
+                            InputForm::Split => &self.kernel_two_split_bindings,
+                        };
+                        pass.set_bind_group(0, kernel_two_bindings, &[]);
+                        pass.dispatch_workgroups(workgroups, 1, 1);
+                    }
+                    KernelsToDispatch::KernelOneOnly => {}
+                }
+            }
+            encoder.copy_buffer_to_buffer(
+                &self.results_of_kernel_one,
+                0,
+                &self.readback,
+                0,
+                result_bytes,
+            );
+            encoder.copy_buffer_to_buffer(
+                &self.results_of_kernel_two,
+                0,
+                &self.readback,
+                result_bytes,
+                result_bytes,
+            );
+            self.queue.submit(std::iter::once(encoder.finish()))
+        }
+
+        /// ④ 回读映射登记（前 2n 条）。
+        pub(super) fn register_the_readback(
+            &self,
+            submission: wgpu::SubmissionIndex,
+            units: u64,
+        ) -> PendingReadback {
+            let mapped_bytes = 2 * units * LOCAL_GPU_RESULT_ENTRY_BYTES;
+            let (sender, receiver) = std::sync::mpsc::channel();
+            self.readback
+                .slice(..mapped_bytes)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    // 送不出去只有一种：收的那一头已经丢了，这次的结果没人要
+                    let _nobody_waits_any_more = sender.send(result);
+                });
+            PendingReadback {
+                submission,
+                receiver,
+                mapped_bytes,
+            }
+        }
+
+        /// ⑤ 等（登记第一节「等法」）：阻塞等只等这一次提交；睡眠等循环 poll、没到就睡。交回 poll 了几次（阻塞等交 0）。
+        ///
+        /// # Panics
+        /// 等不成（设备丢了）或回读映射不成：这一段停下，不带着错的结果往下走。
+        pub(super) fn wait(&self, pending: &PendingReadback, method: WaitMethod) -> u64 {
+            let polls = match method.sleep_interval() {
+                None => {
+                    let polled = self.device.poll(wgpu::PollType::Wait {
+                        submission_index: Some(pending.submission.clone()),
+                        timeout: None,
+                    });
+                    assert!(polled.is_ok(), "阻塞等没等成：{polled:?}");
+                    0
+                }
+                Some(interval) => wait_by_sleeping(
+                    || {
+                        let polled = self.device.poll(wgpu::PollType::Poll);
+                        assert!(polled.is_ok(), "睡眠等里 poll 不成：{polled:?}");
+                        // 回调送到了（映射成不成留给 ⑥ 取映射时判）：收到什么都算到了，只有「还空着」算没到
+                        !matches!(
+                            pending.receiver.try_recv(),
+                            Err(std::sync::mpsc::TryRecvError::Empty)
+                        )
+                    },
+                    std::thread::sleep,
+                    interval,
+                ),
+            };
+            polls
+        }
+
+        /// 单测用的一次长活：只派核一 `passes` 遍（不拷回读缓冲），当「同一个设备上另交的一次长的活」（第九节 V99 那条带卡单测）。
+        #[cfg(test)]
+        pub(super) fn submit_a_long_job(&self, units: u64, passes: u32) -> wgpu::SubmissionIndex {
+            let workgroups =
+                u32::try_from(units.div_ceil(WORKGROUP_SIZE)).expect("工作组数装得进 u32");
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            {
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: None,
+                    timestamp_writes: None,
+                });
+                pass.set_pipeline(&self.kernel_one);
+                pass.set_bind_group(0, &self.kernel_one_bindings, &[]);
+                for _pass in 0..passes {
+                    pass.dispatch_workgroups(workgroups, 1, 1);
+                }
+            }
+            self.queue.submit(std::iter::once(encoder.finish()))
+        }
+
+        /// 单测用：阻塞到这一次提交做完。
+        #[cfg(test)]
+        pub(super) fn block_until_done(&self, submission: wgpu::SubmissionIndex) {
+            let polled = self.device.poll(wgpu::PollType::Wait {
+                submission_index: Some(submission),
+                timeout: None,
+            });
+            assert!(polled.is_ok(), "等长活没等成：{polled:?}");
+        }
+
+        /// ⑥ 在映射着的回读字节上做 `read`（比对在映射上做，不先拷一份）；⑦ 解映射。阻塞等之后回调已经送到，先收它。
+        ///
+        /// # Panics
+        /// 回读映射不成。
+        pub(super) fn read_then_unmap<Answer>(
+            &self,
+            pending: &PendingReadback,
+            read: impl FnOnce(&[u8]) -> Answer,
+        ) -> Answer {
+            let _mapping_result_already_taken_by_a_sleeping_wait = pending.receiver.try_recv();
+            let answer = {
+                let mapped = self
+                    .readback
+                    .slice(..pending.mapped_bytes)
+                    .get_mapped_range()
+                    .expect("回读缓冲映射着");
+                read(&mapped)
+            };
+            self.readback.unmap();
+            answer
+        }
+    }
+
+    /// 常驻写法的一次提交（[`SubmissionSteps`] 的真卡那一份）：`unit_bytes` 是 n 个 32 KiB 槽连着放的字节，`lengths` 每单元一个长度，
+    /// `expected` 是计时窗口外 CPU 算好的期望值；`kernel_two_flip` 是 P3 在读回之后、比对之前把核二哪一条异或 1。
+    pub(super) struct ResidentSubmission<'kernels> {
+        pub(super) kernels: &'kernels ResidentKernels,
+        pub(super) form: InputForm,
+        pub(super) wait_method: WaitMethod,
+        pub(super) unit_bytes: &'kernels [u8],
+        pub(super) lengths: &'kernels [u32],
+        pub(super) expected: &'kernels [u32],
+        pub(super) kernel_two_flip: Option<usize>,
+        pub(super) submission: Option<wgpu::SubmissionIndex>,
+        pub(super) pending: Option<PendingReadback>,
+    }
+
+    impl ResidentSubmission<'_> {
+        fn units(&self) -> u64 {
+            u64::try_from(self.lengths.len()).expect("单元数")
+        }
+    }
+
+    impl SubmissionSteps for ResidentSubmission<'_> {
+        fn prepare(&mut self) -> u64 {
+            self.kernels
+                .write_the_inputs(self.form, self.unit_bytes, self.lengths, &[])
+        }
+
+        fn encode_and_submit(&mut self) {
+            self.submission = Some(self.kernels.encode_and_submit(
+                self.form,
+                self.units(),
+                KernelsToDispatch::Both,
+            ));
+        }
+
+        fn register_the_readback(&mut self) {
+            let submission = self.submission.take().expect("③ 提交在 ④ 之前");
+            self.pending = Some(self.kernels.register_the_readback(submission, self.units()));
+        }
+
+        fn wait(&mut self) -> Option<u64> {
+            let pending = self.pending.as_ref().expect("④ 登记在 ⑤ 之前");
+            Some(self.kernels.wait(pending, self.wait_method))
+        }
+
+        fn read_and_compare(&mut self) -> SubmissionComparison {
+            let pending = self.pending.take().expect("④ 登记在 ⑥ 之前");
+            let (expected, kernel_two_flip) = (self.expected, self.kernel_two_flip);
+            self.kernels.read_then_unmap(&pending, |readback| {
+                compare_the_readback(readback, expected, kernel_two_flip)
+            })
+        }
+
+        fn unmap(&mut self) {
+            // ⑦ 在 read_then_unmap 里随 ⑥ 做完（映射的视图要先丢掉才能解映射）；计时区间照样罩着它
+        }
+    }
+
+    /// 今天的写法（真实基线，登记第五节「真实基线」）：`GpuCard::crc32c_of_ranges` 调一次（一份核、每次建五个缓冲与绑定组、阻塞等）。
+    /// 那一次调用整个算在 ① 里，⑤ 分不出来（`wait` 交 `None`）；只有一份核，比对只比它与期望值。
+    pub(super) struct TodaySubmission<'card> {
+        pub(super) card: &'card GpuCard,
+        pub(super) ranges: Vec<&'card [u8]>,
+        pub(super) expected: &'card [u32],
+        pub(super) results: Vec<u32>,
+    }
+
+    impl SubmissionSteps for TodaySubmission<'_> {
+        fn prepare(&mut self) -> u64 {
+            self.results = self.card.crc32c_of_ranges(&self.ranges);
+            u64::try_from(self.ranges.len()).expect("段数") * LOCAL_GPU_SLOT_BYTES
+        }
+
+        fn encode_and_submit(&mut self) {}
+
+        fn register_the_readback(&mut self) {}
+
+        fn wait(&mut self) -> Option<u64> {
+            None
+        }
+
+        fn read_and_compare(&mut self) -> SubmissionComparison {
+            let differing = self
+                .results
+                .iter()
+                .zip(self.expected)
+                .filter(|(result, expected)| result != expected)
+                .count();
+            SubmissionComparison {
+                confirmed: u64::try_from(self.results.len()).expect("条数"),
+                uncertain_entries: Vec::new(),
+                kernel_one_differs_from_the_expected: u64::try_from(differing).expect("条数"),
+                kernel_two_differs_from_the_expected: 0,
+                are_the_sequence_numbers_holding: self.results.len() == self.expected.len(),
+            }
+        }
+
+        fn unmap(&mut self) {}
+    }
+
+    /// 一张卡上跑一次不计时的提交（P2 的 9 字节、停机 J-S1 的对拍、第二段的每批与重算）：写入、派 `kernels`、提交、阻塞等、读回，
+    /// 交回每单元两核的原样结果（没派的那一核是 `None`）与序号核没核过。
+    pub(super) fn untimed_results(
+        kernels: &ResidentKernels,
+        form: InputForm,
+        unit_bytes: &[u8],
+        lengths: &[u32],
+        kernel_two_patches: &[(u64, Vec<u8>)],
+        dispatched: KernelsToDispatch,
+    ) -> (Vec<KernelResultsOfAUnit>, bool) {
+        let units = u64::try_from(lengths.len()).expect("单元数");
+        let _written = kernels.write_the_inputs(form, unit_bytes, lengths, kernel_two_patches);
+        let submission = kernels.encode_and_submit(form, units, dispatched);
+        let pending = kernels.register_the_readback(submission, units);
+        let _polls = kernels.wait(&pending, WaitMethod::Blocking);
+        kernels.read_then_unmap(&pending, |readback| {
+            let count = lengths.len();
+            let mut are_the_sequence_numbers_holding = true;
+            let results = (0..count)
+                .map(|entry| {
+                    let entry_number = u32::try_from(entry).expect("条数");
+                    let (kernel_one, kernel_one_sequence) = readback_entry(readback, entry);
+                    let (kernel_two, kernel_two_sequence) = readback_entry(readback, count + entry);
+                    are_the_sequence_numbers_holding &= kernel_one_sequence == entry_number;
+                    let kernel_two = match dispatched {
+                        KernelsToDispatch::Both => {
+                            are_the_sequence_numbers_holding &= kernel_two_sequence == entry_number;
+                            Some(kernel_two)
+                        }
+                        KernelsToDispatch::KernelOneOnly => None,
+                    };
+                    (Some(kernel_one), kernel_two)
+                })
+                .collect();
+            (results, are_the_sequence_numbers_holding)
+        })
+    }
+}
+
+// ───────────────────────────── 第 3 次重跑第一段 host-cpu-per-submission（登记第五节「第一段怎么量」；只在编了 gpu 特性时有） ─────────────────────────────
+
+/// 第一段装置自己不起任何线程（起卡之后驱动有自己的线程，不归装置管，它们的 CPU 由进程钟单报）；计时区间之外每格前后报本进程线程数。
+/// 单测 `the_host_cpu_segment_starts_no_thread_of_its_own` 核这个模块的源码里没有起线程的写法。
+#[cfg(feature = "gpu")]
+mod host_cpu_per_submission_segment {
+    use super::resident_gpu_kernels::{
+        untimed_results, ResidentKernels, ResidentSubmission, TodaySubmission,
+    };
+    use super::*;
+    use singlefs_checker_tier::gpu_unit_checks::{gpu_cards_by_priority, GpuCard};
+
+    /// 每张卡起设备时给的显存额度（MiB，同原第三段）。
+    pub(super) const CARD_QUOTA_MEBIBYTES: u64 = 4096;
+    /// P1 每轮基线、甲、乙各量几次；P1、P3 用的 n。
+    const POSITIVE_CONTROL_SUBMISSIONS: usize = 30;
+    const POSITIVE_CONTROL_UNITS: u64 = 8;
+    /// 每格前后的校准：16 MiB 那份 CRC 连做几遍取中位。
+    const CELL_CALIBRATION_RUNS: usize = 3;
+    /// 本机同一线程上 CPU 算同一份字节（只报那一行）每档 n 做几遍取中位。
+    const CPU_CRC_RUNS: usize = 21;
+    /// 停机 J-S1 对拍用的两档 n。
+    const KERNEL_ONE_COMPARISON_UNITS: [u64; 2] = [8, 512];
+
+    /// 计时区间之外报的本进程线程数（`/proc/self/task` 的条数）；读不到交 `None`。
+    pub(super) fn threads_of_this_process() -> Option<usize> {
+        std::fs::read_dir("/proc/self/task")
+            .ok()
+            .map(Iterator::count)
+    }
+
+    fn nvidia_smi_text(arguments: &[&str]) -> Option<String> {
+        let output = std::process::Command::new("nvidia-smi")
+            .args(arguments)
+            .output()
+            .ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
+    /// 开格之前等这张卡上别的计算进程走（登记第十一节「机器被别的活挤」：这时等它，不开格）；等满一小时仍在就停、退 5。
+    fn wait_until_the_card_has_no_other_compute_process(emitter: &mut Emitter, card_index: u32) {
+        let _query_text = wait_until_the_card_has_no_other_compute_process_reading_the_cards(
+            emitter,
+            card_index,
+            "index,pci.bus_id",
+            "csv,noheader",
+            bus_identifiers_by_index_of,
+        );
+    }
+
+    /// 同上，查卡那一次 `nvidia-smi --query-gpu=<query_fields> --format=<format>` 由调用方点栏（第 4 次重跑控漂移段多查六栏频率读数，
+    /// 并进这一次，不多起进程）；`bus_identifiers_of` 从它的输出取各张卡的总线号。交回最后那一次（没有别的计算进程时）的输出，`nvidia-smi` 读不到交 `None`。
+    pub(super) fn wait_until_the_card_has_no_other_compute_process_reading_the_cards(
+        emitter: &mut Emitter,
+        card_index: u32,
+        query_fields: &str,
+        format: &str,
+        bus_identifiers_of: impl Fn(&str) -> BTreeMap<u32, String>,
+    ) -> Option<String> {
+        let own_process = std::process::id();
+        let query_argument = format!("--query-gpu={query_fields}");
+        let format_argument = format!("--format={format}");
+        for look in 0..LOOKS_AT_OTHER_MEASUREMENTS_AT_MOST {
+            let query_text = nvidia_smi_text(&[query_argument.as_str(), format_argument.as_str()]);
+            let bus_identifiers = query_text
+                .as_deref()
+                .map(&bus_identifiers_of)
+                .unwrap_or_default();
+            let others = match (
+                bus_identifiers.get(&card_index),
+                nvidia_smi_text(&[
+                    "--query-compute-apps=pid,gpu_bus_id",
+                    "--format=csv,noheader",
+                ]),
+            ) {
+                (Some(bus), Some(apps)) => {
+                    other_compute_processes_on_the_card(&apps, bus, own_process)
+                }
+                (None, _) | (_, None) => Vec::new(),
+            };
+            if others.is_empty() {
+                return query_text;
+            }
+            eprintln!("卡 {card_index} 上有别的计算进程 {others:?}，等它（第 {look} 次看）");
+            std::thread::sleep(Duration::from_secs(
+                SECONDS_BETWEEN_LOOKS_AT_OTHER_MEASUREMENTS,
+            ));
+        }
+        emitter.line(&format!(
+            "name=stopped reason=other_compute_processes_still_on_card_{card_index}_after_an_hour"
+        ));
+        emitter.finish();
+        std::process::exit(EXIT_CODE_OTHER_MEASUREMENT_STILL_RUNNING);
+    }
+
+    /// 每格前后的校准比：16 MiB 那份 CRC 连做 3 遍取中位 ÷ 段开头基线；有一遍读不到或 CRC 不是锚点交回 `None`（读不到，作废）。
+    pub(super) fn cell_calibration_ratio(buffer: &[u8], baseline_nanoseconds: f64) -> Option<f64> {
+        let runs: Vec<f64> = (0..CELL_CALIBRATION_RUNS)
+            .map(|_run| {
+                one_calibration_run(buffer)
+                    .filter(|(_nanoseconds, crc)| *crc == CALIBRATION_CRC_ANCHOR)
+                    .map(|(nanoseconds, _crc)| nanoseconds as f64)
+            })
+            .collect::<Option<Vec<f64>>>()?;
+        Some(calibration_ratio(median_of(&runs)?, baseline_nanoseconds))
+    }
+
+    /// 这一段的单元：真数据单元（造池时写的一个，同区域扫描读盘之后的样子）连着放 512 份、长度表、CPU 算好的期望值。
+    pub(super) struct SegmentUnits {
+        unit_bytes: Vec<u8>,
+        lengths: Vec<u32>,
+        expected: Vec<u32>,
+        unit: Vec<u8>,
+    }
+
+    pub(super) fn segment_units() -> SegmentUnits {
+        let unit = super::gpu_submission::one_data_unit_of_the_workload();
+        let count = usize::try_from(LARGEST_SUBMISSION_UNITS).expect("512");
+        let unit_crc = crc32_castagnoli(&unit);
+        SegmentUnits {
+            unit_bytes: unit.repeat(count),
+            lengths: vec![u32::try_from(unit.len()).expect("32768"); count],
+            expected: vec![unit_crc; count],
+            unit,
+        }
+    }
+
+    impl SegmentUnits {
+        fn bytes_of(&self, units: u64) -> &[u8] {
+            &self.unit_bytes[..usize::try_from(units * LOCAL_GPU_SLOT_BYTES).expect("字节")]
+        }
+
+        fn lengths_of(&self, units: u64) -> &[u32] {
+            &self.lengths[..usize::try_from(units).expect("单元数")]
+        }
+
+        fn expected_of(&self, units: u64) -> &[u32] {
+            &self.expected[..usize::try_from(units).expect("单元数")]
+        }
+    }
+
+    /// 本机同一线程上 `crc32_castagnoli` 算 n 个单元的线程钟中位（只报；A 在本机能省下的参照，第十条 J10 的旁证）。
+    pub(super) fn cpu_crc_of_the_same_bytes(
+        units: &SegmentUnits,
+        emitter: &mut Emitter,
+    ) -> BTreeMap<u64, f64> {
+        let mut milliseconds_by_units = BTreeMap::new();
+        for submission_units in SUBMISSION_UNIT_COUNTS {
+            let bytes = units.bytes_of(submission_units);
+            let runs: Option<Vec<f64>> = (0..CPU_CRC_RUNS)
+                .map(|_run| {
+                    let started = thread_cpu_nanoseconds()?;
+                    for unit in bytes.chunks(units.unit.len()) {
+                        std::hint::black_box(crc32_castagnoli(std::hint::black_box(unit)));
+                    }
+                    Some(thread_cpu_nanoseconds()?.saturating_sub(started) as f64)
+                })
+                .collect();
+            let median = runs.as_deref().and_then(median_of);
+            emitter.line(&format!(
+                "name=cpu_crc_of_the_same_bytes units={submission_units} runs={CPU_CRC_RUNS} thread_cpu_median_nanoseconds={}",
+                optional_number(median)
+            ));
+            if let Some(nanoseconds) = median {
+                milliseconds_by_units.insert(submission_units, nanoseconds / 1e6);
+            }
+        }
+        milliseconds_by_units
+    }
+
+    /// 一格的提交步骤：常驻写法的两种输入，或今天的写法。`kernel_two_flip` 只给 P3。
+    pub(super) fn steps_of<'segment>(
+        form: SubmissionForm,
+        wait: WaitMethod,
+        units: u64,
+        kernels: &'segment ResidentKernels,
+        card: &'segment GpuCard,
+        segment_units: &'segment SegmentUnits,
+        kernel_two_flip: Option<usize>,
+    ) -> Box<dyn SubmissionSteps + 'segment> {
+        match form {
+            SubmissionForm::Resident(input_form) => Box::new(ResidentSubmission {
+                kernels,
+                form: input_form,
+                wait_method: wait,
+                unit_bytes: segment_units.bytes_of(units),
+                lengths: segment_units.lengths_of(units),
+                expected: segment_units.expected_of(units),
+                kernel_two_flip,
+                submission: None,
+                pending: None,
+            }),
+            SubmissionForm::TodaySingleKernel => Box::new(TodaySubmission {
+                card,
+                ranges: vec![
+                    segment_units.unit.as_slice();
+                    usize::try_from(units).expect("单元数")
+                ],
+                expected: segment_units.expected_of(units),
+                results: Vec::new(),
+            }),
+        }
+    }
+
+    /// P2 的 9 字节（两种输入各交两核一次）：两核都回 `0xe3069283`。9 字节放进一个 32 KiB 槽（写入要按 4 字节对齐），长度表写 9。
+    pub(super) fn check_string_holds(
+        kernels: &ResidentKernels,
+        emitter: &mut Emitter,
+        card_index: u32,
+    ) -> bool {
+        let mut slot = vec![0_u8; usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768")];
+        slot[..CHECK_STRING.len()].copy_from_slice(CHECK_STRING);
+        let lengths = [u32::try_from(CHECK_STRING.len()).expect("9")];
+        let mut holds = true;
+        for form in InputForm::ALL {
+            let (results, are_the_sequence_numbers_holding) =
+                untimed_results(kernels, form, &slot, &lengths, &[], KernelsToDispatch::Both);
+            let both_hold = results
+                == [(
+                    Some(CHECK_STRING_CRC32_CASTAGNOLI),
+                    Some(CHECK_STRING_CRC32_CASTAGNOLI),
+                )];
+            holds &= both_hold && are_the_sequence_numbers_holding;
+            let crc_text = |crc: Option<u32>| {
+                crc.map_or_else(|| "none".to_string(), |value| format!("{value:#010x}"))
+            };
+            let first = results.first().copied().unwrap_or((None, None));
+            emitter.line(&format!(
+                "name=positive_control row=check_string index={card_index} form={} kernel_one={} kernel_two={} expected={CHECK_STRING_CRC32_CASTAGNOLI:#010x} sequence_numbers_hold={are_the_sequence_numbers_holding} holds={}",
+                form.label(),
+                crc_text(first.0),
+                crc_text(first.1),
+                both_hold && are_the_sequence_numbers_holding
+            ));
+        }
+        holds
+    }
+
+    /// 停机 J-S1：同一份输入（n = 8 与 512；真数据单元连放与按种子造的各不相同的单元两种）交 crates 的 `crc32c_of_ranges` 与核一，逐条比。
+    pub(super) fn kernel_one_findings(
+        kernels: &ResidentKernels,
+        card: &GpuCard,
+        segment_units: &SegmentUnits,
+        emitter: &mut Emitter,
+    ) -> Vec<String> {
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        let mut distinct =
+            vec![0_u8; usize::try_from(LARGEST_SUBMISSION_UNITS).expect("512") * slot_bytes];
+        for (unit, slot) in (0_u64..).zip(distinct.chunks_mut(slot_bytes)) {
+            disagreement_unit_content(
+                u64::from(card.index),
+                InputForm::Shared,
+                BOTH_CARDS_SEED_BATCH,
+                unit,
+                slot,
+            );
+        }
+        let mut findings = Vec::new();
+        for (content, bytes) in [
+            ("workload_unit", segment_units.unit_bytes.as_slice()),
+            ("seeded_units", distinct.as_slice()),
+        ] {
+            for units in KERNEL_ONE_COMPARISON_UNITS {
+                let count = usize::try_from(units).expect("单元数");
+                let unit_bytes = &bytes[..count * slot_bytes];
+                let lengths = vec![u32::try_from(slot_bytes).expect("32768"); count];
+                let (results, _sequence) = untimed_results(
+                    kernels,
+                    InputForm::Shared,
+                    unit_bytes,
+                    &lengths,
+                    &[],
+                    KernelsToDispatch::KernelOneOnly,
+                );
+                let kernel_one: Vec<u32> = results
+                    .iter()
+                    .filter_map(|(kernel_one, _)| *kernel_one)
+                    .collect();
+                let ranges: Vec<&[u8]> = unit_bytes.chunks(slot_bytes).collect();
+                let crates_results = card.crc32c_of_ranges(&ranges);
+                let finding =
+                    kernel_one_finding_against_the_crates(units, &kernel_one, &crates_results);
+                emitter.line(&format!(
+                    "name=kernel_one_against_the_crates index={} content={content} units={units} holds={}",
+                    card.index,
+                    finding.is_none()
+                ));
+                findings.extend(finding);
+            }
+        }
+        findings
+    }
+
+    /// P3：常驻两种输入、n = 8、阻塞等，一次提交里把核二回读的第 3 条异或 1：比对报恰好 1 条不确定、是第 3 条。交回没过的形态。
+    pub(super) fn comparison_control_failures(
+        kernels: &ResidentKernels,
+        card: &GpuCard,
+        segment_units: &SegmentUnits,
+        emitter: &mut Emitter,
+    ) -> Vec<InputForm> {
+        let mut failures = Vec::new();
+        for form in InputForm::ALL {
+            let mut steps = steps_of(
+                SubmissionForm::Resident(form),
+                WaitMethod::Blocking,
+                POSITIVE_CONTROL_UNITS,
+                kernels,
+                card,
+                segment_units,
+                Some(READBACK_ENTRY_FLIPPED_BY_THE_COMPARISON_CONTROL),
+            );
+            let timing = time_one_submission(steps.as_mut(), &mut ClocksOfThisThread, &mut || {});
+            let uncertain = timing
+                .as_ref()
+                .map(|reading| reading.comparison.uncertain_entries.clone());
+            let holds = uncertain.as_deref().is_some_and(comparison_control_holds);
+            emitter.line(&format!(
+                "name=positive_control row=comparison index={} form={} units={POSITIVE_CONTROL_UNITS} flipped_entry={READBACK_ENTRY_FLIPPED_BY_THE_COMPARISON_CONTROL} uncertain_entries={} holds={holds}",
+                card.index,
+                form.label(),
+                uncertain.map_or_else(|| "unreadable".to_string(), |entries| format!("{entries:?}").replace(' ', "")),
+            ));
+            if !holds {
+                failures.push(form);
+            }
+        }
+        failures
+    }
+
+    /// P1（第 1 行全部 7 种提交形态，每张卡，n = 8、间隔 0）：每轮里基线、甲（按线程钟自旋 2 ms）、乙（睡 2 ms）各 30 次挨着量，
+    /// 次序按轮号轮换，5 轮；甲的 c_rt 增量中位在 2 ms 的 [0.9, 1.1] 倍，乙的 c_rt 增量中位 ≤ 0.2 ms、挂钟增量中位 ≥ 1.8 ms。交回没过的（形态、等法）。
+    pub(super) fn thread_clock_control_failures(
+        kernels: &ResidentKernels,
+        card: &GpuCard,
+        segment_units: &SegmentUnits,
+        emitter: &mut Emitter,
+    ) -> Vec<(SubmissionForm, WaitMethod)> {
+        let insertions = [
+            IntervalInsertion::Nothing,
+            IntervalInsertion::SpinTwoMilliseconds,
+            IntervalInsertion::SleepTwoMilliseconds,
+        ];
+        let forms = [
+            SubmissionForm::Resident(InputForm::Shared),
+            SubmissionForm::Resident(InputForm::Split),
+            SubmissionForm::TodaySingleKernel,
+        ];
+        let mut failures = Vec::new();
+        for form in forms {
+            for wait in form.wait_methods() {
+                let mut thread_medians: BTreeMap<IntervalInsertion, Vec<Option<f64>>> =
+                    BTreeMap::new();
+                let mut wall_medians: BTreeMap<IntervalInsertion, Vec<Option<f64>>> =
+                    BTreeMap::new();
+                for round in 1..=ROUNDS {
+                    let mut order = insertions;
+                    order.rotate_left((round - 1) % insertions.len());
+                    for insertion in order {
+                        let mut steps = steps_of(
+                            form,
+                            wait,
+                            POSITIVE_CONTROL_UNITS,
+                            kernels,
+                            card,
+                            segment_units,
+                            None,
+                        );
+                        let mut insert = || match insertion {
+                            IntervalInsertion::Nothing => {}
+                            IntervalInsertion::SpinTwoMilliseconds => {
+                                let _spun =
+                                    spin_until_the_thread_cpu_advances(INSERTED_NANOSECONDS);
+                            }
+                            IntervalInsertion::SleepTwoMilliseconds => {
+                                std::thread::sleep(Duration::from_nanos(INSERTED_NANOSECONDS));
+                            }
+                        };
+                        let mut no_sleep = |_duration: Duration| {};
+                        let _warm_up = time_the_submissions_of_a_cell(
+                            steps.as_mut(),
+                            &mut ClocksOfThisThread,
+                            WARM_UP_SUBMISSIONS,
+                            Duration::ZERO,
+                            &mut no_sleep,
+                            &mut || {},
+                        );
+                        let timings = time_the_submissions_of_a_cell(
+                            steps.as_mut(),
+                            &mut ClocksOfThisThread,
+                            POSITIVE_CONTROL_SUBMISSIONS,
+                            Duration::ZERO,
+                            &mut no_sleep,
+                            &mut insert,
+                        );
+                        let reading = cell_round_reading(&timings, POSITIVE_CONTROL_UNITS);
+                        thread_medians.entry(insertion).or_default().push(
+                            reading
+                                .as_ref()
+                                .map(|cell_reading| cell_reading.thread_cpu_median_nanoseconds),
+                        );
+                        wall_medians.entry(insertion).or_default().push(
+                            reading
+                                .as_ref()
+                                .map(|cell_reading| cell_reading.wall_median_nanoseconds),
+                        );
+                    }
+                }
+                let increment = |medians: &BTreeMap<IntervalInsertion, Vec<Option<f64>>>,
+                                 insertion| {
+                    median_increment_of_the_rounds(
+                        &medians[&IntervalInsertion::Nothing],
+                        &medians[&insertion],
+                    )
+                };
+                let spin_increment =
+                    increment(&thread_medians, IntervalInsertion::SpinTwoMilliseconds);
+                let sleep_cpu_increment =
+                    increment(&thread_medians, IntervalInsertion::SleepTwoMilliseconds);
+                let sleep_wall_increment =
+                    increment(&wall_medians, IntervalInsertion::SleepTwoMilliseconds);
+                let spin_holds = spin_increment.is_some_and(spin_control_holds);
+                let sleep_holds = match (sleep_cpu_increment, sleep_wall_increment) {
+                    (Some(cpu), Some(wall)) => sleep_control_holds(cpu, wall),
+                    (None, _) | (_, None) => false,
+                };
+                emitter.line(&format!(
+                    "name=positive_control row=thread_clock index={} form={} wait={} units={POSITIVE_CONTROL_UNITS} rounds={ROUNDS} submissions_per_insertion={POSITIVE_CONTROL_SUBMISSIONS} inserted_nanoseconds={INSERTED_NANOSECONDS} spin_increment_median_nanoseconds={} sleep_cpu_increment_median_nanoseconds={} sleep_wall_increment_median_nanoseconds={} spin_holds={spin_holds} sleep_holds={sleep_holds} holds={}",
+                    card.index,
+                    form.label(),
+                    wait.label(),
+                    optional_number(spin_increment),
+                    optional_number(sleep_cpu_increment),
+                    optional_number(sleep_wall_increment),
+                    spin_holds && sleep_holds,
+                ));
+                if !(spin_holds && sleep_holds) {
+                    failures.push((form, wait));
+                }
+            }
+        }
+        failures
+    }
+
+    /// 一张卡 80 格 5 轮的读数与这张卡上的作废：P2（每格每条结果与 CPU 相同）、P4（没快过物理下限）、`input_bytes_written` 锚点不符的格轮数，
+    /// 触发 J5 的格。
+    struct CellsOfTheCard {
+        medians: BTreeMap<SubmissionCell, Vec<Option<CellRoundMedians>>>,
+        result_mismatches: usize,
+        floor_violations: usize,
+        input_byte_mismatches: usize,
+        process_clock_cells: BTreeSet<SubmissionCell>,
+        /// 第七节甲类不符（⑤ 那一段大过整次，或「确认」+「不确定」≠ n）的（形态、等法）：装置没罩全，照「阳性对照红」作废那一种形态。
+        coverage_failures: BTreeSet<(SubmissionForm, WaitMethod)>,
+    }
+
+    /// 计时那几格的串行声明（登记第十四节「串行」）：装置在这一段不起线程，量的是发起提交那一条线程的 CPU。
+    const SUBMISSION_SERIAL_REASON: &str =
+        "E185 第 3 次重跑第一段：一次 GPU 提交在发起它的那条线程上花的 CPU，要串行量，别的线程抢 CPU 与 PCIe 会混进来";
+
+    /// 一张卡 80 格 5 轮（登记第五节「每轮」）：每轮开头等别的性能测量；每格开格前等这张卡上别的计算进程；每格前校准 → 10 次热身 → 计时提交 →
+    /// 后校准；校准比有一个 > 1.10 或有一次钟读不到，那一格那一轮作废、等常态（R2-2 同法）再重量，至多 3 次，三次都作废打 `name=round_invalid`。
+    /// 有一次提交的线程钟大过挂钟（停机 J-S5）交回 `Err`。
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "一张卡的量要的各样：卡、两核、单元、校准、链路峰值、门槛两端、产物"
+    )]
+    fn measure_the_cells_of_the_card(
+        card_index: u32,
+        card: &GpuCard,
+        kernels: &ResidentKernels,
+        segment_units: &SegmentUnits,
+        calibration: &mut SegmentCalibration,
+        link_peak_bytes_per_second: f64,
+        threshold_edges: (f64, f64),
+        emitter: &mut Emitter,
+    ) -> Result<CellsOfTheCard, String> {
+        let mut cells = CellsOfTheCard {
+            medians: submission_cells_of_a_card()
+                .into_iter()
+                .map(|cell| (cell, vec![None; ROUNDS]))
+                .collect(),
+            result_mismatches: 0,
+            floor_violations: 0,
+            input_byte_mismatches: 0,
+            process_clock_cells: BTreeSet::new(),
+            coverage_failures: BTreeSet::new(),
+        };
+        let baseline_nanoseconds = calibration.baseline.crc_median_nanoseconds;
+        for round in 1..=ROUNDS {
+            wait_until_no_other_measurement_runs(emitter);
+            for cell in submission_cells_in_the_order_of_the_round(round) {
+                wait_until_the_card_has_no_other_compute_process(emitter, card_index);
+                for attempt in 1..=ATTEMPTS_PER_ROUND_AT_MOST {
+                    emitter.declare(DeclaredSegment::Serial(SUBMISSION_SERIAL_REASON));
+                    let ratio_before =
+                        cell_calibration_ratio(&calibration.buffer, baseline_nanoseconds);
+                    let threads_before = threads_of_this_process();
+                    let mut steps = steps_of(
+                        cell.form,
+                        cell.wait,
+                        cell.units,
+                        kernels,
+                        card,
+                        segment_units,
+                        None,
+                    );
+                    let gap = Duration::from_millis(cell.gap_milliseconds);
+                    let mut sleep_between_submissions = |duration: Duration| {
+                        if !duration.is_zero() {
+                            std::thread::sleep(duration);
+                        }
+                    };
+                    let _warm_up = time_the_submissions_of_a_cell(
+                        steps.as_mut(),
+                        &mut ClocksOfThisThread,
+                        WARM_UP_SUBMISSIONS,
+                        gap,
+                        &mut sleep_between_submissions,
+                        &mut || {},
+                    );
+                    let timed_submissions = if cell.gap_milliseconds == 0 {
+                        TIMED_SUBMISSIONS_WITHOUT_A_GAP
+                    } else {
+                        TIMED_SUBMISSIONS_WITH_A_GAP
+                    };
+                    let timings = time_the_submissions_of_a_cell(
+                        steps.as_mut(),
+                        &mut ClocksOfThisThread,
+                        timed_submissions,
+                        gap,
+                        &mut sleep_between_submissions,
+                        &mut || {},
+                    );
+                    drop(steps);
+                    let threads_after = threads_of_this_process();
+                    let ratio_after =
+                        cell_calibration_ratio(&calibration.buffer, baseline_nanoseconds);
+                    let reading = cell_round_reading(&timings, cell.units);
+                    if let Some(outside) = reading
+                        .as_ref()
+                        .filter(|cell_reading| !cell_reading.is_every_thread_cpu_inside_the_wall)
+                    {
+                        return Err(format!(
+                            "clause_j_s5_thread_cpu_above_the_wall_at_card_{card_index}_{}_round_{round}_median_{:.0}",
+                            cell.label().replace([' ', '='], "_"),
+                            outside.thread_cpu_median_nanoseconds
+                        ));
+                    }
+                    let ratios = (ratio_before, ratio_after);
+                    let verdict = cell_round_verdict(
+                        cell,
+                        &timings,
+                        reading.as_ref(),
+                        ratios,
+                        link_peak_bytes_per_second,
+                    );
+                    cells.floor_violations += verdict.floor_violations;
+                    cells.result_mismatches +=
+                        usize::from(reading.as_ref().is_some_and(|cell_reading| {
+                            !cell_reading.are_the_results_holding
+                                || !cell_reading.are_the_sequence_numbers_holding
+                        }));
+                    cells.input_byte_mismatches +=
+                        usize::from(reading.is_some() && !verdict.input_bytes_hold);
+                    if reading.as_ref().is_some_and(|cell_reading| {
+                        !cell_reading.is_every_wait_inside_the_submission
+                            || !cell_reading.are_the_comparison_counts_holding
+                    }) {
+                        cells.coverage_failures.insert((cell.form, cell.wait));
+                    }
+                    calibration.larger_ratio_per_intent.push(match ratios {
+                        (Some(before), Some(after)) => Some(before.max(after)),
+                        (None, _) | (_, None) => None,
+                    });
+                    emitter.line(&submission_cell_line(
+                        card_index,
+                        cell,
+                        round,
+                        attempt,
+                        reading.as_ref(),
+                        &verdict,
+                        ratios,
+                        (threads_before, threads_after),
+                        threshold_edges,
+                    ));
+                    match (verdict.invalid_reason, reading) {
+                        (None, Some(round_reading)) => {
+                            if is_the_thread_clock_underestimating(
+                                round_reading.process_cpu_median_nanoseconds,
+                                round_reading.thread_cpu_median_nanoseconds,
+                            ) {
+                                cells.process_clock_cells.insert(cell);
+                            }
+                            if let Some(slot) = cells
+                                .medians
+                                .get_mut(&cell)
+                                .and_then(|rounds| rounds.get_mut(round - 1))
+                            {
+                                *slot = Some(CellRoundMedians {
+                                    thread_cpu_nanoseconds: round_reading
+                                        .thread_cpu_median_nanoseconds,
+                                    floor_thread_cpu_nanoseconds: round_reading
+                                        .floor_thread_cpu_median_nanoseconds,
+                                    process_cpu_nanoseconds: round_reading
+                                        .process_cpu_median_nanoseconds,
+                                });
+                            }
+                            break;
+                        }
+                        (Some(reason), _) if attempt < ATTEMPTS_PER_ROUND_AT_MOST => {
+                            let buffer = &calibration.buffer;
+                            let mut calibrate =
+                                || cell_calibration_ratio(buffer, baseline_nanoseconds);
+                            let mut sleep_on_this_thread = std::thread::sleep;
+                            if let Some(wait) = wait_before_the_retry(
+                                reason,
+                                &mut calibration.waiting,
+                                &mut calibrate,
+                                &mut sleep_on_this_thread,
+                            ) {
+                                emitter.line(&format!(
+                                    "name=normal_wait index={card_index} {} round={round} attempt={attempt} reason={reason} checks={} waited_seconds={} ratio_per_check={} outcome={} segment_waited_seconds={}",
+                                    cell.label(),
+                                    wait.checks,
+                                    wait.waited_seconds,
+                                    wait.ratio_per_check.iter().map(|ratio| optional_number(*ratio)).collect::<Vec<_>>().join(","),
+                                    wait.outcome.label(),
+                                    calibration.waiting.total_seconds,
+                                ));
+                                if let Some(exit_code) =
+                                    wait.outcome.exit_code_stopping_the_segment()
+                                {
+                                    emitter.line("name=stopped segment=host_cpu_per_submission reason=machine_not_back_to_normal_within_the_waiting_cap");
+                                    emitter.finish();
+                                    std::process::exit(exit_code);
+                                }
+                            }
+                        }
+                        (Some(_) | None, _) => {
+                            if attempt == ATTEMPTS_PER_ROUND_AT_MOST {
+                                emitter.line(&format!(
+                                    "name=round_invalid segment=host_cpu_per_submission index={card_index} {} round={round} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
+                                    cell.label()
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(cells)
+    }
+
+    /// 段开头读到的门槛（每个点）、第二台的校准基线（ρ_机器 的分母）、提交序列锚点对不上的条数。
+    pub(super) struct SegmentThresholds {
+        pub(super) thresholds: BTreeMap<SubmissionPoint, PointThresholds>,
+        pub(super) peer_baseline: Option<f64>,
+        pub(super) anchor_mismatches: usize,
+    }
+
+    /// 段开头读两份输入（停机 J-S4 核 sha256）、算四个候选的门槛（P7、停机 J-S3）、提交序列的锚点（第七节乙类）与 ρ_机器的分母。
+    /// 交回（每个点的门槛、第二台的校准基线、对不上的条数）；读不成交回 `Err(退出码)`（已打行、已收尾）。
+    pub(super) fn thresholds_of_the_segment(
+        segment: &str,
+        stage_split_product: &Path,
+        attack_ledger: &Path,
+        emitter: &mut Emitter,
+        stop_findings: &mut Vec<String>,
+    ) -> Result<SegmentThresholds, i32> {
+        let (Ok(stage_split_bytes), Ok(attack_ledger_bytes)) = (
+            std::fs::read(stage_split_product),
+            std::fs::read(attack_ledger),
+        ) else {
+            emitter.line(&format!(
+                "name=verdict segment={segment} status=not_run reason=inputs_unreadable"
+            ));
+            emitter.finish();
+            return Err(EXIT_CODE_USAGE);
+        };
+        for (item, digest, registered, holds) in
+            input_file_checks(&attack_ledger_bytes, &stage_split_bytes)
+        {
+            emitter.line(&format!(
+                "name=input_file item={item} sha256={digest} registered_sha256={registered} holds={holds}"
+            ));
+            if !holds {
+                stop_findings.push(format!("clause_j_s4_{item}_sha256_{digest}"));
+            }
+        }
+        let stage_lines = result_lines_of(&String::from_utf8_lossy(&stage_split_bytes));
+        let peer_baseline = peer_calibration_baseline_of(&stage_lines);
+        let computed = stage_ledger_rows_of(&stage_lines)
+            .and_then(|rows| candidate_thresholds_of_the_ledger(&rows));
+        let attack_points = attack_ledger_points_of(&String::from_utf8_lossy(&attack_ledger_bytes));
+        let (Some(computed), Some(attack_points)) = (computed, attack_points) else {
+            emitter.line(&format!(
+                "name=verdict segment={segment} status=not_run reason=ledger_unreadable"
+            ));
+            emitter.finish();
+            return Err(EXIT_CODE_USAGE);
+        };
+        let mut thresholds = BTreeMap::new();
+        for point in every_submission_point() {
+            let key = (
+                point.fraction.label().to_string(),
+                point.pool_data_units.to_string(),
+                point.batch_units.to_string(),
+            );
+            let (Some(by_candidate), Some(attack_point)) =
+                (computed.get(&key), attack_points.get(&key))
+            else {
+                stop_findings.push(format!(
+                    "clause_j_s3_point_missing_{}",
+                    point.label().replace([' ', '='], "_")
+                ));
+                continue;
+            };
+            for (candidate, threshold) in by_candidate {
+                emitter.line(&format!(
+                    "name=candidate_threshold {} candidate={} saved_per_intent_milliseconds={:.6} submissions_per_intent={} threshold_milliseconds={:.6}",
+                    point.label(),
+                    candidate.label(),
+                    threshold.saved_per_intent_milliseconds,
+                    threshold.submissions_per_intent,
+                    threshold.threshold_milliseconds,
+                ));
+            }
+            let finding = by_candidate
+                .get(&GpuCandidate::EveryStage)
+                .and_then(|every_stage| {
+                    ledger_finding_of_the_point(point, every_stage, attack_point)
+                });
+            emitter.line(&format!(
+                "name=attack_ledger_check {} attack_ledger_threshold_milliseconds={} attack_ledger_submissions_per_intent={} holds={}",
+                point.label(),
+                attack_point.break_even_text,
+                attack_point.submissions_per_intent,
+                finding.is_none()
+            ));
+            stop_findings.extend(finding);
+            let mut point_thresholds = PointThresholds {
+                by_candidate: by_candidate
+                    .iter()
+                    .map(|(candidate, threshold)| (*candidate, threshold.threshold_milliseconds))
+                    .collect(),
+                saved_upper_milliseconds: attack_point.saved_upper_milliseconds,
+            };
+            point_thresholds.by_candidate.insert(
+                GpuCandidate::EveryStage,
+                attack_point.break_even_milliseconds,
+            );
+            thresholds.insert(point, point_thresholds);
+        }
+        let mut mismatches = 0_usize;
+        for (fraction, batch_units, submissions, mean_tenths, release_submissions) in
+            SUBMISSION_SEQUENCE_ANCHORS
+        {
+            let every_stage =
+                submission_units_of_the_intent(GpuCandidate::EveryStage, fraction, batch_units);
+            let release = submission_units_of_the_intent(
+                GpuCandidate::ReleaseCheckOnly,
+                fraction,
+                batch_units,
+            );
+            let values = [
+                (
+                    "submissions",
+                    u64::try_from(every_stage.len()).expect("次数"),
+                    submissions,
+                ),
+                (
+                    "mean_submission_tenths_of_bytes",
+                    mean_submission_tenths_of_bytes(&every_stage),
+                    mean_tenths,
+                ),
+                (
+                    "release_check_submissions",
+                    u64::try_from(release.len()).expect("次数"),
+                    release_submissions,
+                ),
+            ];
+            for (item, value, expected) in values {
+                let holds = value == expected;
+                mismatches += usize::from(!holds);
+                emitter.line(&format!(
+                    "name=anchor item={item}_fraction_{}_batch_units_{batch_units} value={value} expected={expected} holds={holds}",
+                    fraction.label()
+                ));
+            }
+        }
+        Ok(SegmentThresholds {
+            thresholds,
+            peer_baseline,
+            anchor_mismatches: mismatches,
+        })
+    }
+
+    /// 段末（没有线程核：起卡之后驱动的线程还在）：21 遍基线（N2 段末）与校准比的轨迹（第八节）。
+    pub(super) fn finish_the_calibration(calibration: &SegmentCalibration, emitter: &mut Emitter) {
+        emitter.declare(DeclaredSegment::Serial(
+            TimingWindow::Calibration.serial_reason(),
+        ));
+        match calibration_baseline(&calibration.buffer, &calibration.chase_table) {
+            Some(end) => emitter.line(&calibration_baseline_line(
+                calibration.segment,
+                "end",
+                &end,
+                Some(calibration_ratio(
+                    end.crc_median_nanoseconds,
+                    calibration.baseline.crc_median_nanoseconds,
+                )),
+            )),
+            None => emitter.line(&format!(
+                "name=calibration_baseline segment={} position=end status=unreadable",
+                calibration.segment
+            )),
+        }
+        emitter.line(&calibration_trajectory_line(
+            calibration.segment,
+            &calibration.larger_ratio_per_intent,
+            &calibration.waiting,
+        ));
+    }
+
+    /// 第一段（登记第五节「第一段怎么量」）：段开头自检、两份输入与门槛、校准与 P8、ρ_机器、本机 CPU 参照；每张卡起卡、P2、停机 J-S1、P3、
+    /// P1、80 格 5 轮；两张卡量完算 R1–R5、旋钮翻面与 J10，收尾。
+    pub(super) fn run(
+        stage_split_product: &Path,
+        attack_ledger: &Path,
+        card_indices: &[u32],
+    ) -> i32 {
+        let segment_started = Instant::now();
+        let mut emitter = Emitter::new();
+        emitter.line(&format!(
+            "name=configuration segment=host_cpu_per_submission cards={} submission_units={} rounds={ROUNDS} warm_up_submissions={WARM_UP_SUBMISSIONS} timed_submissions_without_a_gap={TIMED_SUBMISSIONS_WITHOUT_A_GAP} timed_submissions_with_a_gap={TIMED_SUBMISSIONS_WITH_A_GAP} gap_milliseconds={} {} cells_per_card={} card_quota_mebibytes={CARD_QUOTA_MEBIBYTES} cell_calibration_runs={CELL_CALIBRATION_RUNS} attempts_per_round_at_most={ATTEMPTS_PER_ROUND_AT_MOST} threads_of_the_apparatus=1",
+            card_indices.iter().map(u32::to_string).collect::<Vec<_>>().join(","),
+            SUBMISSION_UNIT_COUNTS.iter().map(u64::to_string).collect::<Vec<_>>().join(","),
+            GAP_MILLISECONDS.iter().map(u64::to_string).collect::<Vec<_>>().join(","),
+            sleep_interval_configuration_text(),
+            submission_cells_of_a_card().len(),
+        ));
+        assert_this_process_runs_one_thread("segment_start");
+        if !check_the_apparatus_sha256(&mut emitter) {
+            return EXIT_CODE_STOP_CLAUSE;
+        }
+        if !check_the_thread_cpu_clock_resolution(&mut emitter) {
+            return stop_for_the_clock_resolution(&mut emitter, "host_cpu_per_submission");
+        }
+        let mut stop_findings: Vec<String> = Vec::new();
+        let constant_mismatches = check_the_constants_and_the_anchors(&mut emitter);
+        let SegmentThresholds {
+            thresholds,
+            peer_baseline,
+            anchor_mismatches,
+        } = match thresholds_of_the_segment(
+            "host_cpu_per_submission",
+            stage_split_product,
+            attack_ledger,
+            &mut emitter,
+            &mut stop_findings,
+        ) {
+            Ok(read) => read,
+            Err(exit_code) => return exit_code,
+        };
+        let mismatches = constant_mismatches + anchor_mismatches;
+        if mismatches > 0 || !stop_findings.is_empty() {
+            for finding in &stop_findings {
+                emitter.line(&format!(
+                    "name=stop_clause segment=host_cpu_per_submission finding={finding}"
+                ));
+            }
+            emitter.line(&format!(
+                "name=verdict segment=host_cpu_per_submission constant_or_anchor_mismatches={mismatches} stop_clause_findings={}",
+                stop_findings.len()
+            ));
+            emitter.finish();
+            return EXIT_CODE_STOP_CLAUSE;
+        }
+        let mut calibration = match SegmentCalibration::start(
+            "host_cpu_per_submission",
+            segment_started,
+            &mut emitter,
+        ) {
+            Ok(calibration) => calibration,
+            Err(exit_code) => return exit_code,
+        };
+        let machine_ratio = peer_baseline
+            .map(|peer| machine_ratio(calibration.baseline.crc_median_nanoseconds, peer));
+        emitter.line(&format!(
+            "name=machine_ratio local_baseline_nanoseconds={:.1} peer_baseline_nanoseconds={} ratio={} far_from_one={} status={}",
+            calibration.baseline.crc_median_nanoseconds,
+            optional_number(peer_baseline),
+            optional_number(machine_ratio),
+            machine_ratio.is_some_and(is_the_machine_ratio_far_from_one),
+            if machine_ratio.is_some() { "measured" } else { "not_run" },
+        ));
+        let segment_units = segment_units();
+        let cpu_crc_milliseconds = cpu_crc_of_the_same_bytes(&segment_units, &mut emitter);
+        let threshold_values: Vec<f64> = thresholds
+            .values()
+            .filter_map(|point| point.by_candidate.get(&GpuCandidate::EveryStage).copied())
+            .collect();
+        let threshold_edges = (
+            threshold_values
+                .iter()
+                .copied()
+                .reduce(f64::min)
+                .unwrap_or(0.0),
+            threshold_values
+                .iter()
+                .copied()
+                .reduce(f64::max)
+                .unwrap_or(0.0),
+        );
+        let links = super::gpu_submission::pcie_links_reported_by_nvidia_smi();
+        let mut medians: CellMediansOfTheSegment = BTreeMap::new();
+        let mut voiding: BTreeMap<(u32, SubmissionForm, WaitMethod), &'static str> =
+            BTreeMap::new();
+        let mut process_clock_cells: BTreeSet<(u32, SubmissionCell)> = BTreeSet::new();
+        let mut cards_measured = Vec::new();
+        let mut card_failures: Vec<String> = Vec::new();
+        for card_index in card_indices {
+            let Some(card) = gpu_cards_by_priority(&[(*card_index, CARD_QUOTA_MEBIBYTES)])
+                .into_iter()
+                .next()
+            else {
+                emitter.line(&format!(
+                    "name=gpu_card index={card_index} status=not_run reason=card_not_usable"
+                ));
+                continue;
+            };
+            let Some(link_peak) = links.get(card_index).and_then(|(generation, width)| {
+                pcie_link_peak_bytes_per_second(*generation, *width)
+            }) else {
+                emitter.line(&format!(
+                    "name=gpu_card index={card_index} status=invalid reason=pcie_link_unreadable"
+                ));
+                card_failures.push(format!("card_{card_index}_link_unreadable"));
+                continue;
+            };
+            let kernels = ResidentKernels::start(&card, LARGEST_SUBMISSION_UNITS);
+            emitter.line(&format!(
+                "name=gpu_card index={card_index} card_name={} driver={} free_memory_mebibytes={} link_peak_bytes_per_second={link_peak:.0} resident_capacity_units={} threads_after_the_card_started={}",
+                field_token(&card.name),
+                field_token(&card.driver_version),
+                card.free_memory_mebibytes,
+                kernels.capacity_units,
+                threads_of_this_process().map_or_else(|| "none".to_string(), |count| count.to_string()),
+            ));
+            let check_string_holds = check_string_holds(&kernels, &mut emitter, *card_index);
+            let kernel_one_findings =
+                kernel_one_findings(&kernels, &card, &segment_units, &mut emitter);
+            if !kernel_one_findings.is_empty() {
+                stop_findings.extend(kernel_one_findings);
+                break;
+            }
+            for form in comparison_control_failures(&kernels, &card, &segment_units, &mut emitter) {
+                for wait in WaitMethod::ALL {
+                    voiding.insert(
+                        (*card_index, SubmissionForm::Resident(form), wait),
+                        "void_positive_control",
+                    );
+                }
+            }
+            for (form, wait) in
+                thread_clock_control_failures(&kernels, &card, &segment_units, &mut emitter)
+            {
+                voiding.insert((*card_index, form, wait), "void_positive_control");
+            }
+            let cells = match measure_the_cells_of_the_card(
+                *card_index,
+                &card,
+                &kernels,
+                &segment_units,
+                &mut calibration,
+                link_peak,
+                threshold_edges,
+                &mut emitter,
+            ) {
+                Ok(cells) => cells,
+                Err(finding) => {
+                    stop_findings.push(finding);
+                    break;
+                }
+            };
+            let is_the_card_valid = check_string_holds
+                && cells.result_mismatches == 0
+                && cells.floor_violations == 0
+                && cells.input_byte_mismatches == 0;
+            emitter.line(&format!(
+                "name=gpu_card_verdict index={card_index} check_string_holds={check_string_holds} result_mismatching_cell_rounds={} floor_violations={} input_byte_mismatching_cell_rounds={} card_valid={is_the_card_valid}",
+                cells.result_mismatches, cells.floor_violations, cells.input_byte_mismatches,
+            ));
+            if !is_the_card_valid {
+                card_failures.push(format!("card_{card_index}_result_or_floor"));
+                for form in [
+                    SubmissionForm::Resident(InputForm::Shared),
+                    SubmissionForm::Resident(InputForm::Split),
+                    SubmissionForm::TodaySingleKernel,
+                ] {
+                    for wait in WaitMethod::ALL {
+                        voiding.insert((*card_index, form, wait), "void_card");
+                    }
+                }
+            }
+            medians.extend(
+                cells
+                    .medians
+                    .into_iter()
+                    .map(|(cell, rounds)| ((*card_index, cell), rounds)),
+            );
+            process_clock_cells.extend(
+                cells
+                    .process_clock_cells
+                    .into_iter()
+                    .map(|cell| (*card_index, cell)),
+            );
+            for (form, wait) in &cells.coverage_failures {
+                emitter.line(&format!(
+                    "name=positive_control row=interval_coverage index={card_index} form={} wait={} holds=false",
+                    form.label(),
+                    wait.label()
+                ));
+                voiding.insert((*card_index, *form, *wait), "void_positive_control");
+            }
+            cards_measured.push(*card_index);
+        }
+        if !stop_findings.is_empty() {
+            for finding in &stop_findings {
+                emitter.line(&format!(
+                    "name=stop_clause segment=host_cpu_per_submission finding={finding}"
+                ));
+            }
+            emitter.line(&format!(
+                "name=verdict segment=host_cpu_per_submission constant_or_anchor_mismatches=0 stop_clause_findings={}",
+                stop_findings.len()
+            ));
+            emitter.finish();
+            return EXIT_CODE_STOP_CLAUSE;
+        }
+        let inputs = HostCpuPointInputs {
+            thresholds: &thresholds,
+            machine_ratio,
+            cards: &cards_measured,
+            medians: &medians,
+            voiding: &voiding,
+            process_clock_cells: &process_clock_cells,
+        };
+        emit_the_analysis(&inputs, &cpu_crc_milliseconds, &mut emitter);
+        finish_the_calibration(&calibration, &mut emitter);
+        let positive_control_failures = voiding
+            .values()
+            .filter(|reason| **reason == "void_positive_control")
+            .count();
+        emitter.line(&format!(
+            "name=verdict segment=host_cpu_per_submission constant_or_anchor_mismatches=0 stop_clause_findings=0 cards_measured={} card_failures={} card_failure_items={} voided_forms_by_the_positive_controls={positive_control_failures}",
+            cards_measured.len(),
+            card_failures.len(),
+            if card_failures.is_empty() { "none".to_string() } else { card_failures.join(",") },
+        ));
+        emitter.finish();
+        if cards_measured.is_empty() {
+            EXIT_CODE_NOT_RUN
+        } else if !card_failures.is_empty() || positive_control_failures > 0 {
+            EXIT_CODE_POSITIVE_CONTROL_FAILED
+        } else {
+            EXIT_CODE_OK
+        }
+    }
+}
+
+// ───────────────────────────── 第 3 次重跑第二段 recompute-disagreement（登记第五节「第二段怎么量」；只在编了 gpu 特性时有） ─────────────────────────────
+
+#[cfg(feature = "gpu")]
+mod recompute_disagreement_segment {
+    use super::host_cpu_per_submission_segment::check_string_holds;
+    use super::resident_gpu_kernels::{untimed_results, ResidentKernels};
+    use super::*;
+    use singlefs_checker_tier::gpu_unit_checks::gpu_cards_by_priority;
+
+    /// 每张卡起设备时给的显存额度（MiB，同第一段）。
+    const CARD_QUOTA_MEBIBYTES: u64 = 4096;
+
+    /// 一批的内容（计时以外造）：16384 个 32 KiB 槽连放（奇数号单元只用前 16 KiB，其余是 0）、长度表、CPU 参照。
+    struct BatchContent {
+        slots: Vec<u8>,
+        lengths: Vec<u32>,
+        cpu_crcs: Vec<u32>,
+    }
+
+    fn slot_bytes() -> usize {
+        usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768")
+    }
+
+    /// 造一批（`threads` 条线程按单元号切片并行，每片各写自己的槽与 CRC；结果与单线程逐字节相同，内容只由种子定）。
+    fn batch_content(card_seed: u64, form: InputForm, batch: u64, threads: usize) -> BatchContent {
+        let units = usize::try_from(UNITS_PER_DISAGREEMENT_BATCH).expect("16384");
+        let mut slots = vec![0_u8; units * slot_bytes()];
+        let mut cpu_crcs = vec![0_u32; units];
+        let units_per_thread = units.div_ceil(threads.max(1));
+        std::thread::scope(|scope| {
+            for (chunk_index, (slot_chunk, crc_chunk)) in slots
+                .chunks_mut(units_per_thread * slot_bytes())
+                .zip(cpu_crcs.chunks_mut(units_per_thread))
+                .enumerate()
+            {
+                scope.spawn(move || {
+                    for (offset, (slot, crc)) in slot_chunk
+                        .chunks_mut(slot_bytes())
+                        .zip(crc_chunk.iter_mut())
+                        .enumerate()
+                    {
+                        let unit =
+                            u64::try_from(chunk_index * units_per_thread + offset).expect("单元号");
+                        let length = disagreement_unit_length(unit);
+                        disagreement_unit_content(
+                            card_seed,
+                            form,
+                            batch,
+                            unit,
+                            &mut slot[..length],
+                        );
+                        *crc = crc32_castagnoli(&slot[..length]);
+                    }
+                });
+            }
+        });
+        let lengths = (0..UNITS_PER_DISAGREEMENT_BATCH)
+            .map(|unit| u32::try_from(disagreement_unit_length(unit)).expect("长度"))
+            .collect();
+        BatchContent {
+            slots,
+            lengths,
+            cpu_crcs,
+        }
+    }
+
+    /// 一个单元的槽（32 KiB，奇数号单元后半是 0）。
+    fn slot_of(content: &BatchContent, unit: u64) -> &[u8] {
+        let start = usize::try_from(unit).expect("单元号") * slot_bytes();
+        &content.slots[start..start + slot_bytes()]
+    }
+
+    /// P5 在分开输入时改核二那一份输入：那个单元的槽复制一份、第 100 字节异或 1，交回（在这一次写入里的偏移、改过的槽）。
+    fn kernel_two_patch(
+        content: &BatchContent,
+        form: InputForm,
+        batch: u64,
+        unit: u64,
+        offset_in_the_write: u64,
+    ) -> Vec<(u64, Vec<u8>)> {
+        kernel_two_input_flip(form, batch, unit)
+            .map(|byte| {
+                let mut patched = slot_of(content, unit).to_vec();
+                patched[byte] ^= 1;
+                (offset_in_the_write, patched)
+            })
+            .into_iter()
+            .collect()
+    }
+
+    /// 一批第一次计算的原样结果：写入（P5 的补丁跟着写）、两核各派一次、阻塞等、读回；序号对不上的那一批全记读不到。
+    fn first_results_of_the_batch(
+        kernels: &ResidentKernels,
+        content: &BatchContent,
+        form: InputForm,
+        batch: u64,
+    ) -> (Vec<KernelResultsOfAUnit>, bool) {
+        let patches = kernel_two_patch(
+            content,
+            form,
+            batch,
+            DETERMINISTIC_INJECTION_UNIT,
+            DETERMINISTIC_INJECTION_UNIT * LOCAL_GPU_SLOT_BYTES,
+        );
+        let (results, are_the_sequence_numbers_holding) = untimed_results(
+            kernels,
+            form,
+            &content.slots,
+            &content.lengths,
+            &patches,
+            KernelsToDispatch::Both,
+        );
+        if are_the_sequence_numbers_holding {
+            (results, true)
+        } else {
+            (vec![(None, None); results.len()], false)
+        }
+    }
+
+    /// 一个单元单独重算（n = 1，同一种输入；P5 的补丁照写）。
+    fn recompute_one_unit(
+        kernels: &ResidentKernels,
+        content: &BatchContent,
+        form: InputForm,
+        batch: u64,
+        unit: u64,
+        dispatched: KernelsToDispatch,
+    ) -> KernelResultsOfAUnit {
+        let unit_index = usize::try_from(unit).expect("单元号");
+        let patches = kernel_two_patch(content, form, batch, unit, 0);
+        let (results, are_the_sequence_numbers_holding) = untimed_results(
+            kernels,
+            form,
+            slot_of(content, unit),
+            &content.lengths[unit_index..=unit_index],
+            &patches,
+            dispatched,
+        );
+        match (are_the_sequence_numbers_holding, results.first()) {
+            (true, Some(result)) => *result,
+            (false, _) | (_, None) => (None, None),
+        }
+    }
+
+    fn comparison_text(comparison: Option<UnitComparison>) -> String {
+        comparison.map_or_else(
+            || "unreadable".to_string(),
+            |seen| {
+                format!(
+                    "{}{}{}",
+                    u8::from(seen.kernels_differ),
+                    u8::from(seen.kernel_one_differs_from_the_cpu),
+                    u8::from(seen.kernel_two_differs_from_the_cpu)
+                )
+            },
+        )
+    }
+
+    /// 一张卡一种输入的合计（`name=disagreement_summary` 那一行）与 P5、P6 的结局。
+    #[derive(Default)]
+    struct CombinationTotals {
+        natural_units: u64,
+        first_round_unreadable: u64,
+        first_round_kernel_disagreements: u64,
+        first_round_any_difference: u64,
+        both_kernels_agree_and_differ_from_the_cpu: u64,
+        kernel_one_differs_from_the_cpu: u64,
+        kernel_two_differs_from_the_cpu: u64,
+        recomputed: Vec<RecomputedUnit>,
+        first_round_disagreements_per_batch: Vec<u64>,
+        deterministic_injections: Vec<Option<RecomputeOutcome>>,
+        transient_injections: Vec<Option<RecomputeOutcome>>,
+    }
+
+    /// 一张卡一种输入：64 批，每批造内容、第一次计算、比三样、重算（[`process_the_disagreement_batch`]），每批一行、每个重算的单元一行；
+    /// 64 批之后用同样的种子把第 1 批整批再算一遍比原样结果（R8「同一输入同一结果」）。交回合计。
+    fn measure_the_combination(
+        kernels: &ResidentKernels,
+        card_index: u32,
+        form: InputForm,
+        threads: usize,
+        emitter: &mut Emitter,
+    ) -> CombinationTotals {
+        let card_seed = u64::from(card_index);
+        let mut totals = CombinationTotals::default();
+        let mut first_batch_results: Vec<KernelResultsOfAUnit> = Vec::new();
+        for batch in 1..=DISAGREEMENT_BATCHES {
+            let content = batch_content(card_seed, form, batch, threads);
+            let started = Instant::now();
+            let (first_results, are_the_sequence_numbers_holding) =
+                first_results_of_the_batch(kernels, &content, form, batch);
+            let outcome = process_the_disagreement_batch(
+                form,
+                batch,
+                &content.cpu_crcs,
+                &first_results,
+                |unit, dispatched| {
+                    recompute_one_unit(kernels, &content, form, batch, unit, dispatched)
+                },
+            );
+            let wall_seconds = started.elapsed().as_secs_f64();
+            if batch == 1 {
+                first_batch_results = first_results;
+            }
+            emitter.line(&format!(
+                "name=disagreement_batch index={card_index} form={} batch={batch} natural_units={} first_round_kernel_disagreements={} first_round_any_difference={} both_kernels_agree_and_differ_from_the_cpu={} kernel_one_differs_from_the_cpu={} kernel_two_differs_from_the_cpu={} first_round_unreadable={} recomputed_natural_units={} sequence_numbers_hold={are_the_sequence_numbers_holding} wall_seconds={wall_seconds:.6}",
+                form.label(),
+                outcome.natural_units,
+                outcome.first_round_kernel_disagreements,
+                outcome.first_round_any_difference,
+                outcome.both_kernels_agree_and_differ_from_the_cpu,
+                outcome.kernel_one_differs_from_the_cpu,
+                outcome.kernel_two_differs_from_the_cpu,
+                outcome.first_round_unreadable,
+                outcome.natural_recomputes.len(),
+            ));
+            for recomputed in &outcome.natural_recomputes {
+                emitter.line(&format!(
+                    "name=recompute index={card_index} form={} batch={batch} unit={} seed_card={card_seed} seed_form={} first_round_kernels_and_cpu={} recomputes={} outcome={}",
+                    form.label(),
+                    recomputed.unit,
+                    form.seed_bits(),
+                    comparison_text(Some(recomputed.first_round)),
+                    recomputed.recomputes.iter().map(|comparison| comparison_text(*comparison)).collect::<Vec<_>>().join(","),
+                    recomputed.outcome.label(),
+                ));
+            }
+            totals.natural_units += outcome.natural_units;
+            totals.first_round_unreadable += outcome.first_round_unreadable;
+            totals.first_round_kernel_disagreements += outcome.first_round_kernel_disagreements;
+            totals.first_round_any_difference += outcome.first_round_any_difference;
+            totals.both_kernels_agree_and_differ_from_the_cpu +=
+                outcome.both_kernels_agree_and_differ_from_the_cpu;
+            totals.kernel_one_differs_from_the_cpu += outcome.kernel_one_differs_from_the_cpu;
+            totals.kernel_two_differs_from_the_cpu += outcome.kernel_two_differs_from_the_cpu;
+            totals.recomputed.extend(outcome.natural_recomputes);
+            totals
+                .first_round_disagreements_per_batch
+                .push(outcome.first_round_kernel_disagreements);
+            if INJECTED_BATCHES.contains(&batch) {
+                totals
+                    .deterministic_injections
+                    .push(outcome.deterministic_injection.flatten());
+                totals
+                    .transient_injections
+                    .push(outcome.transient_injection.flatten());
+            }
+        }
+        let replay_content = batch_content(card_seed, form, 1, threads);
+        let (replayed, _sequence) = first_results_of_the_batch(kernels, &replay_content, form, 1);
+        emitter.line(&format!(
+            "name=determinism_replay index={card_index} form={} batch=1 units={} identical={} all_identical={}",
+            form.label(),
+            replayed.len(),
+            identical_entries(&first_batch_results, &replayed),
+            identical_entries(&first_batch_results, &replayed) == u64::try_from(replayed.len()).expect("条数")
+                && !replayed.is_empty(),
+        ));
+        totals
+    }
+
+    /// `name=disagreement_summary` 一行（R6、R7、R8 与 P5、P6、J8）；交回 P5、P6 过没过。
+    fn emit_the_summary(
+        card_index: u32,
+        form: InputForm,
+        totals: &CombinationTotals,
+        emitter: &mut Emitter,
+    ) -> bool {
+        let expected = natural_unit_times(
+            DISAGREEMENT_BATCHES,
+            UNITS_PER_DISAGREEMENT_BATCH,
+            injected_units_per_combination(),
+        );
+        let sufficient = are_the_natural_unit_times_sufficient(totals.natural_units);
+        let deterministic_holds = injected_units_hold(
+            &totals.deterministic_injections,
+            RecomputeOutcome::Deterministic,
+        );
+        let transient_holds =
+            injected_units_hold(&totals.transient_injections, RecomputeOutcome::Transient);
+        let outcomes: Vec<RecomputeOutcome> =
+            totals.recomputed.iter().map(|unit| unit.outcome).collect();
+        let category = match (deterministic_holds && transient_holds, sufficient) {
+            (false, _) => "void_positive_control",
+            (true, false) => "unit_times_insufficient",
+            (true, true) => recompute_category(totals.first_round_any_difference, &outcomes),
+        };
+        emitter.line(&format!(
+            "name=disagreement_summary index={card_index} form={} natural_unit_times={} expected_natural_unit_times={expected} natural_unit_times_sufficient={sufficient} first_round_unreadable={} first_round_kernel_disagreements={} first_round_any_difference={} first_round_rate={:.9e} upper_bound_at_95_percent_when_zero={} both_kernels_agree_and_differ_from_the_cpu={} kernel_one_differs_from_the_cpu={} kernel_two_differs_from_the_cpu={} still_disagreeing_after_one_recompute={} still_disagreeing_after_two_recomputes={} still_disagreeing_after_three_recomputes={} unreadable_recomputes={} deterministic_injection_outcomes={} transient_injection_outcomes={} deterministic_injection_holds={deterministic_holds} transient_injection_holds={transient_holds} {} category={category}",
+            form.label(),
+            totals.natural_units,
+            totals.first_round_unreadable,
+            totals.first_round_kernel_disagreements,
+            totals.first_round_any_difference,
+            totals.first_round_kernel_disagreements as f64 / totals.natural_units.max(1) as f64,
+            if totals.first_round_kernel_disagreements == 0 {
+                format!("{:.6e}", upper_bound_at_95_percent_when_zero(totals.natural_units))
+            } else {
+                "none".to_string()
+            },
+            totals.both_kernels_agree_and_differ_from_the_cpu,
+            totals.kernel_one_differs_from_the_cpu,
+            totals.kernel_two_differs_from_the_cpu,
+            still_disagreeing_after(&totals.recomputed, 1),
+            still_disagreeing_after(&totals.recomputed, 2),
+            still_disagreeing_after(&totals.recomputed, 3),
+            outcomes.iter().filter(|outcome| **outcome == RecomputeOutcome::Unreadable).count(),
+            totals.deterministic_injections.iter().map(|outcome| outcome.map_or("no_first_round_difference", RecomputeOutcome::label)).collect::<Vec<_>>().join(","),
+            totals.transient_injections.iter().map(|outcome| outcome.map_or("no_first_round_difference", RecomputeOutcome::label)).collect::<Vec<_>>().join(","),
+            disagreement_trajectory_text(&totals.first_round_disagreements_per_batch),
+        ));
+        deterministic_holds && transient_holds
+    }
+
+    /// 第二段（登记第五节「第二段怎么量」）：段开头核装置 sha256、常量回比（停机 J-S2）、内容锚点（停机 J-S8）；每张卡起卡、P2、两种输入各
+    /// 64 批，再算「两张卡同一输入」那一批；两张卡都算完逐条比（第十条 J11）。这一段不计时，只报每批挂钟。
+    pub(super) fn run(card_indices: &[u32]) -> i32 {
+        let threads = worker_threads_from_the_environment();
+        let mut emitter = Emitter::new();
+        emitter.line(&format!(
+            "name=configuration segment=recompute_disagreement cards={} batches={DISAGREEMENT_BATCHES} units_per_batch={UNITS_PER_DISAGREEMENT_BATCH} recomputes_at_most={RECOMPUTES_AT_MOST} injected_batches={}..={} deterministic_injection_unit={DETERMINISTIC_INJECTION_UNIT} transient_injection_unit={TRANSIENT_INJECTION_UNIT} worker_threads={threads} card_quota_mebibytes={CARD_QUOTA_MEBIBYTES}",
+            card_indices.iter().map(u32::to_string).collect::<Vec<_>>().join(","),
+            INJECTED_BATCHES.start(),
+            INJECTED_BATCHES.end(),
+        ));
+        if !check_the_apparatus_sha256(&mut emitter) {
+            return EXIT_CODE_STOP_CLAUSE;
+        }
+        // P8：校准分得出两倍的活（第一、二段都做；这一段不计时，校准只报这一行与基线）
+        if let Err(exit_code) =
+            SegmentCalibration::start("recompute_disagreement", Instant::now(), &mut emitter)
+        {
+            return exit_code;
+        }
+        let mismatches = check_the_constants_and_the_anchors(&mut emitter);
+        let content_finding = content_anchor_finding();
+        emitter.line(&format!(
+            "name=content_anchor_check anchors={} holds={}",
+            CONTENT_ANCHORS.len(),
+            content_finding.is_none()
+        ));
+        if mismatches > 0 || content_finding.is_some() {
+            if let Some(finding) = &content_finding {
+                emitter.line(&format!(
+                    "name=stop_clause segment=recompute_disagreement finding={finding}"
+                ));
+            }
+            emitter.line(&format!(
+                "name=verdict segment=recompute_disagreement constant_or_anchor_mismatches={mismatches} stop_clause_findings={}",
+                usize::from(content_finding.is_some())
+            ));
+            emitter.finish();
+            return EXIT_CODE_STOP_CLAUSE;
+        }
+        emitter.declare(DeclaredSegment::Parallel);
+        let both_cards_content = batch_content(
+            BOTH_CARDS_SEED_CARD,
+            InputForm::Shared,
+            BOTH_CARDS_SEED_BATCH,
+            threads,
+        );
+        let mut both_cards_results: Vec<(u32, Vec<KernelResultsOfAUnit>)> = Vec::new();
+        let mut cards_measured = 0_usize;
+        let mut control_failures: Vec<String> = Vec::new();
+        for card_index in card_indices {
+            let Some(card) = gpu_cards_by_priority(&[(*card_index, CARD_QUOTA_MEBIBYTES)])
+                .into_iter()
+                .next()
+            else {
+                emitter.line(&format!(
+                    "name=gpu_card index={card_index} status=not_run reason=card_not_usable"
+                ));
+                continue;
+            };
+            let kernels = ResidentKernels::start(&card, UNITS_PER_DISAGREEMENT_BATCH);
+            emitter.line(&format!(
+                "name=gpu_card index={card_index} card_name={} driver={} free_memory_mebibytes={} resident_capacity_units={}",
+                field_token(&card.name),
+                field_token(&card.driver_version),
+                card.free_memory_mebibytes,
+                kernels.capacity_units,
+            ));
+            cards_measured += 1;
+            if !check_string_holds(&kernels, &mut emitter, *card_index) {
+                control_failures.push(format!("card_{card_index}_check_string"));
+            }
+            let mut card_totals = Vec::new();
+            for form in InputForm::ALL {
+                let totals =
+                    measure_the_combination(&kernels, *card_index, form, threads, &mut emitter);
+                if !emit_the_summary(*card_index, form, &totals, &mut emitter) {
+                    control_failures.push(format!(
+                        "card_{card_index}_form_{}_injections",
+                        form.label()
+                    ));
+                }
+                card_totals.push(totals);
+            }
+            let natural: u64 = card_totals.iter().map(|totals| totals.natural_units).sum();
+            let disagreements: u64 = card_totals
+                .iter()
+                .map(|totals| totals.first_round_kernel_disagreements)
+                .sum();
+            emitter.line(&format!(
+                "name=disagreement_card_summary index={card_index} natural_unit_times={natural} first_round_kernel_disagreements={disagreements} upper_bound_at_95_percent_when_zero={}",
+                if disagreements == 0 {
+                    format!("{:.6e}", upper_bound_at_95_percent_when_zero(natural))
+                } else {
+                    "none".to_string()
+                },
+            ));
+            let (results, are_the_sequence_numbers_holding) = untimed_results(
+                &kernels,
+                InputForm::Shared,
+                &both_cards_content.slots,
+                &both_cards_content.lengths,
+                &[],
+                KernelsToDispatch::Both,
+            );
+            let differing_from_the_cpu = results
+                .iter()
+                .zip(&both_cards_content.cpu_crcs)
+                .filter(|((kernel_one, kernel_two), cpu)| {
+                    *kernel_one != Some(**cpu) || *kernel_two != Some(**cpu)
+                })
+                .count();
+            emitter.line(&format!(
+                "name=both_cards_same_input_card index={card_index} units={} sequence_numbers_hold={are_the_sequence_numbers_holding} differing_from_the_cpu={differing_from_the_cpu}",
+                results.len()
+            ));
+            both_cards_results.push((*card_index, results));
+        }
+        let mut cards_differ = false;
+        if let [(one_card, one_results), (other_card, other_results), ..] =
+            both_cards_results.as_slice()
+        {
+            let identical = identical_entries(one_results, other_results);
+            let units = u64::try_from(one_results.len()).expect("条数");
+            cards_differ = identical != units;
+            emitter.line(&format!(
+                "name=both_cards_same_input cards={one_card},{other_card} units={units} identical={identical} cards_differ={cards_differ}"
+            ));
+        }
+        emitter.line(&format!(
+            "name=verdict segment=recompute_disagreement constant_or_anchor_mismatches=0 stop_clause_findings=0 cards_measured={cards_measured} positive_control_failures={} positive_control_failure_items={} two_cards_differ_on_the_same_input={cards_differ}",
+            control_failures.len(),
+            if control_failures.is_empty() { "none".to_string() } else { control_failures.join(",") },
+        ));
+        emitter.finish();
+        if cards_measured == 0 {
+            EXIT_CODE_NOT_RUN
+        } else if !control_failures.is_empty() {
+            EXIT_CODE_POSITIVE_CONTROL_FAILED
+        } else {
+            EXIT_CODE_OK
+        }
+    }
+}
+
+// ───────────────────────────── 第 4 次重跑控漂移段 host-cpu-drift-control（登记 research/prompts/e185-r4-prereg.md 第五节「控漂移段怎么量」；只在编了 gpu 特性时有） ─────────────────────────────
+
+#[cfg(feature = "gpu")]
+mod host_cpu_drift_control_segment {
+    use super::host_cpu_per_submission_segment::{
+        cell_calibration_ratio, check_string_holds, comparison_control_failures,
+        cpu_crc_of_the_same_bytes, finish_the_calibration, kernel_one_findings, segment_units,
+        steps_of, thread_clock_control_failures, threads_of_this_process,
+        thresholds_of_the_segment,
+        wait_until_the_card_has_no_other_compute_process_reading_the_cards, SegmentThresholds,
+        SegmentUnits, CARD_QUOTA_MEBIBYTES,
+    };
+    use super::resident_gpu_kernels::ResidentKernels;
+    use super::*;
+    use singlefs_checker_tier::gpu_unit_checks::{gpu_cards_by_priority, GpuCard};
+
+    /// 真卡上的一格一轮：第 3 次重跑的提交步骤与真钟，16 MiB 那份 CRC 的校准。
+    struct GpuCellEnvironment<'segment> {
+        card_index: u32,
+        card: &'segment GpuCard,
+        kernels: &'segment ResidentKernels,
+        segment_units: &'segment SegmentUnits,
+        calibration_buffer: &'segment [u8],
+        baseline_nanoseconds: f64,
+        link_peak_bytes_per_second: f64,
+        steps: Option<Box<dyn SubmissionSteps + 'segment>>,
+    }
+
+    impl CellRoundEnvironment for GpuCellEnvironment<'_> {
+        fn card_index(&self) -> u32 {
+            self.card_index
+        }
+
+        fn link_peak_bytes_per_second(&self) -> f64 {
+            self.link_peak_bytes_per_second
+        }
+
+        fn host_core_reading(&mut self) -> HostCoreReading {
+            host_core_reading_now()
+        }
+
+        fn calibration_ratio(&mut self) -> Option<f64> {
+            cell_calibration_ratio(self.calibration_buffer, self.baseline_nanoseconds)
+        }
+
+        fn threads(&mut self) -> Option<usize> {
+            threads_of_this_process()
+        }
+
+        fn open_the_cell(&mut self, cell: SubmissionCell) {
+            self.steps = Some(steps_of(
+                cell.form,
+                cell.wait,
+                cell.units,
+                self.kernels,
+                self.card,
+                self.segment_units,
+                None,
+            ));
+        }
+
+        fn time_the_submissions(
+            &mut self,
+            count: usize,
+            gap: Duration,
+            insertion: &mut dyn FnMut(),
+        ) -> Vec<Option<SubmissionTiming>> {
+            let steps = self
+                .steps
+                .as_mut()
+                .expect("open_the_cell 之后才计时提交：measure_one_cell_round 与暖到稳都先开格");
+            let mut sleep_between_submissions = |duration: Duration| {
+                if !duration.is_zero() {
+                    std::thread::sleep(duration);
+                }
+            };
+            time_the_submissions_of_a_cell(
+                steps.as_mut(),
+                &mut ClocksOfThisThread,
+                count,
+                gap,
+                &mut sleep_between_submissions,
+                insertion,
+            )
+        }
+
+        fn close_the_cell(&mut self) {
+            self.steps = None;
+        }
+    }
+
+    /// 真卡的读卡：第 3 次重跑开格前那一次 `nvidia-smi --query-gpu` 多查六栏（[`CARD_QUERY_FIELDS`]），等法照旧。
+    struct GpuCardReader;
+
+    impl CardReader for GpuCardReader {
+        fn wait_for_the_card_and_read_the_cards(
+            &mut self,
+            card_index: u32,
+            emitter: &mut Emitter,
+        ) -> BTreeMap<u32, CardClockReading> {
+            let query_text = wait_until_the_card_has_no_other_compute_process_reading_the_cards(
+                emitter,
+                card_index,
+                CARD_QUERY_FIELDS,
+                "csv,noheader,nounits",
+                |text| {
+                    card_clock_readings_of(text)
+                        .into_iter()
+                        .map(|(index, reading)| (index, reading.bus_identifier))
+                        .collect()
+                },
+            );
+            query_text
+                .as_deref()
+                .map(card_clock_readings_of)
+                .unwrap_or_default()
+        }
+    }
+
+    /// 控漂移段里起好的一张卡：两份核、链路峰值、P2 过没过、P3 没过的输入形态。
+    struct CardOfTheSegment {
+        index: u32,
+        card: GpuCard,
+        kernels: ResidentKernels,
+        link_peak_bytes_per_second: f64,
+        check_string_holds: bool,
+        comparison_control_failures: Vec<InputForm>,
+    }
+
+    /// 起一张卡（第 3 次重跑第一段原样）：编核、开常驻缓冲、P2、停机 J-S1、P3。卡起不来交 `Ok(None)`（`name=gpu_card status=not_run`）；
+    /// 链路读不到交 `Ok(None)` 并记进 `card_failures`；J-S1 对不上交 `Err(那几条)`。
+    fn start_the_card(
+        card_index: u32,
+        links: &BTreeMap<u32, (u32, u32)>,
+        segment_units: &SegmentUnits,
+        card_failures: &mut Vec<String>,
+        emitter: &mut Emitter,
+    ) -> Result<Option<CardOfTheSegment>, Vec<String>> {
+        let Some(card) = gpu_cards_by_priority(&[(card_index, CARD_QUOTA_MEBIBYTES)])
+            .into_iter()
+            .next()
+        else {
+            emitter.line(&format!(
+                "name=gpu_card index={card_index} status=not_run reason=card_not_usable"
+            ));
+            return Ok(None);
+        };
+        let Some(link_peak) = links
+            .get(&card_index)
+            .and_then(|(generation, width)| pcie_link_peak_bytes_per_second(*generation, *width))
+        else {
+            emitter.line(&format!(
+                "name=gpu_card index={card_index} status=invalid reason=pcie_link_unreadable"
+            ));
+            card_failures.push(format!("card_{card_index}_link_unreadable"));
+            return Ok(None);
+        };
+        let kernels = ResidentKernels::start(&card, LARGEST_SUBMISSION_UNITS);
+        emitter.line(&format!(
+            "name=gpu_card index={card_index} card_name={} driver={} free_memory_mebibytes={} link_peak_bytes_per_second={link_peak:.0} resident_capacity_units={} threads_after_the_card_started={}",
+            field_token(&card.name),
+            field_token(&card.driver_version),
+            card.free_memory_mebibytes,
+            kernels.capacity_units,
+            threads_of_this_process().map_or_else(|| "none".to_string(), |count| count.to_string()),
+        ));
+        let check_string_holds = check_string_holds(&kernels, emitter, card_index);
+        let findings = kernel_one_findings(&kernels, &card, segment_units, emitter);
+        if !findings.is_empty() {
+            return Err(findings);
+        }
+        let comparison_control_failures =
+            comparison_control_failures(&kernels, &card, segment_units, emitter);
+        Ok(Some(CardOfTheSegment {
+            index: card_index,
+            card,
+            kernels,
+            link_peak_bytes_per_second: link_peak,
+            check_string_holds,
+            comparison_control_failures,
+        }))
+    }
+
+    /// 开格前读到的主机核与这张卡（读不到这张卡是 `None`）。
+    type ReadingsBeforeTheCell = (HostCoreReading, Option<CardClockReading>);
+
+    /// 一条臂量下来的东西：各格各轮的中位、作废、触发 J5 的格、各卡的累计作废读数、两格探针各轮的中位、频率读数、暖到稳。
+    struct ArmRecord {
+        arm: DriftArm,
+        cards: Vec<u32>,
+        medians: CellMediansOfTheSegment,
+        voiding: BTreeMap<(u32, SubmissionForm, WaitMethod), &'static str>,
+        process_clock_cells: BTreeSet<(u32, SubmissionCell)>,
+        tallies: BTreeMap<u32, CardTallies>,
+        probe_medians: BTreeMap<(u32, DriftProbe), Vec<Option<f64>>>,
+        /// 每张卡每轮各格开格前的读数（`name=clock_round_summary`）。
+        before_readings: BTreeMap<(u32, usize), Vec<ReadingsBeforeTheCell>>,
+        /// 每张卡（格一级 c_rt、开格前的 SM 时钟）的对子（`name=clock_correlation`）。
+        clock_pairs: BTreeMap<u32, Vec<(f64, f64)>>,
+        warm_ups: BTreeMap<u32, WarmUpToStable>,
+        cell_warm_up_submissions: BTreeMap<u32, Vec<usize>>,
+    }
+
+    impl ArmRecord {
+        fn new(arm: DriftArm, cards: &[u32]) -> ArmRecord {
+            ArmRecord {
+                arm,
+                cards: cards.to_vec(),
+                medians: cards
+                    .iter()
+                    .flat_map(|card| {
+                        submission_cells_of_a_card()
+                            .into_iter()
+                            .map(move |cell| ((*card, cell), vec![None; ROUNDS]))
+                    })
+                    .collect(),
+                voiding: BTreeMap::new(),
+                process_clock_cells: BTreeSet::new(),
+                tallies: cards
+                    .iter()
+                    .map(|card| (*card, CardTallies::default()))
+                    .collect(),
+                probe_medians: cards
+                    .iter()
+                    .flat_map(|card| {
+                        DriftProbe::ALL.map(|probe| ((*card, probe), vec![None; ROUNDS]))
+                    })
+                    .collect(),
+                before_readings: BTreeMap::new(),
+                clock_pairs: BTreeMap::new(),
+                warm_ups: BTreeMap::new(),
+                cell_warm_up_submissions: BTreeMap::new(),
+            }
+        }
+    }
+
+    /// 开格前读到的卡读数要配给上一格当「后」：GPU 那几栏取下一格开格前那一次 `nvidia-smi`（并进本来就起的那一次，不多起进程），
+    /// 主机核那两栏取上一格量完当场读的。
+    struct PendingAfterReading {
+        key_text: String,
+        card_index: u32,
+        round: usize,
+        host_after: HostCoreReading,
+    }
+
+    fn clock_reading_line(
+        key_text: &str,
+        round: usize,
+        position: &str,
+        host: HostCoreReading,
+        card: Option<&CardClockReading>,
+    ) -> String {
+        let count_of = |value: Option<u64>| {
+            value.map_or_else(|| "none".to_string(), |number| number.to_string())
+        };
+        let word_of = |value: Option<&String>| value.cloned().unwrap_or_else(|| "none".to_string());
+        format!(
+            "name=clock_reading {key_text} round={round} position={position} host_core={} scaling_current_frequency_kilohertz={} average_frequency_kilohertz={} sm_clock_megahertz={} memory_clock_megahertz={} performance_state={} temperature_celsius={} power_watts={} clocks_event_reasons={}",
+            host.core.map_or_else(|| "none".to_string(), |core| core.to_string()),
+            count_of(host.scaling_current_frequency_kilohertz),
+            count_of(host.average_frequency_kilohertz),
+            optional_number(card.and_then(|reading| reading.sm_clock_megahertz)),
+            optional_number(card.and_then(|reading| reading.memory_clock_megahertz)),
+            word_of(card.and_then(|reading| reading.performance_state.as_ref())),
+            optional_number(card.and_then(|reading| reading.temperature_celsius)),
+            optional_number(card.and_then(|reading| reading.power_watts)),
+            word_of(card.and_then(|reading| reading.clocks_event_reasons.as_ref())),
+        )
+    }
+
+    /// 上一格还欠的「后」读数，用这一次读到的各张卡补上。
+    fn emit_the_pending_after_reading(
+        pending: &mut Option<PendingAfterReading>,
+        cards_now: &BTreeMap<u32, CardClockReading>,
+        emitter: &mut Emitter,
+    ) {
+        if let Some(waiting) = pending.take() {
+            emitter.line(&clock_reading_line(
+                &waiting.key_text,
+                waiting.round,
+                "after",
+                waiting.host_after,
+                cards_now.get(&waiting.card_index),
+            ));
+        }
+    }
+
+    /// 段里共用的东西：门槛的边、校准、读卡、欠着的「后」读数。
+    struct SegmentContext<'segment> {
+        threshold_edges: (f64, f64),
+        calibration: &'segment mut SegmentCalibration,
+        card_reader: GpuCardReader,
+        pending_after: Option<PendingAfterReading>,
+    }
+
+    /// 一张卡在一条臂上的一格一轮（80 格之一或两格探针之一）：量、记进 `record`、打频率读数。停机 J-S5 交回 `Err`。
+    fn measure_and_record(
+        card: &CardOfTheSegment,
+        segment_units: &SegmentUnits,
+        context: &mut SegmentContext<'_>,
+        record: &mut ArmRecord,
+        request: CellRoundRequest,
+        emitter: &mut Emitter,
+    ) -> Result<(), String> {
+        let SegmentCalibration {
+            buffer,
+            baseline,
+            waiting,
+            larger_ratio_per_intent,
+            ..
+        } = &mut *context.calibration;
+        let mut environment = GpuCellEnvironment {
+            card_index: card.index,
+            card: &card.card,
+            kernels: &card.kernels,
+            segment_units,
+            calibration_buffer: buffer.as_slice(),
+            baseline_nanoseconds: baseline.crc_median_nanoseconds,
+            link_peak_bytes_per_second: card.link_peak_bytes_per_second,
+            steps: None,
+        };
+        // 探针格的 n = 8 与 80 格里的一格同键：它触发 J5 不往 80 格的进程钟那几行里记，别的作废读数照算进这张卡
+        let mut probe_tallies = CardTallies::default();
+        let tallies = match request.probe {
+            None => record.tallies.entry(card.index).or_default(),
+            Some(_) => &mut probe_tallies,
+        };
+        let mut reader_noting_the_pending = PendingNotingReader {
+            reader: &mut context.card_reader,
+            pending: &mut context.pending_after,
+        };
+        let outcome = measure_one_cell_round(
+            &mut environment,
+            &mut reader_noting_the_pending,
+            request,
+            tallies,
+            waiting,
+            larger_ratio_per_intent,
+            emitter,
+        )?;
+        let key_text = request.key_text(card.index);
+        let card_before = outcome.cards_before.get(&card.index);
+        emitter.line(&clock_reading_line(
+            &key_text,
+            request.round,
+            "before",
+            outcome.host_before,
+            card_before,
+        ));
+        context.pending_after = Some(PendingAfterReading {
+            key_text,
+            card_index: card.index,
+            round: request.round,
+            host_after: outcome.host_after,
+        });
+        record
+            .before_readings
+            .entry((card.index, request.round))
+            .or_default()
+            .push((outcome.host_before, card_before.cloned()));
+        let round_index = request.round - 1;
+        match request.probe {
+            None => {
+                if let Some(slot) = record
+                    .medians
+                    .get_mut(&(card.index, request.cell))
+                    .and_then(|rounds| rounds.get_mut(round_index))
+                {
+                    *slot = outcome.medians;
+                }
+                if let (Some(medians), Some(sm_clock)) = (
+                    outcome.medians,
+                    card_before.and_then(|reading| reading.sm_clock_megahertz),
+                ) {
+                    record
+                        .clock_pairs
+                        .entry(card.index)
+                        .or_default()
+                        .push((medians.thread_cpu_nanoseconds, sm_clock));
+                }
+                if record.arm == DriftArm::Controlled {
+                    record
+                        .cell_warm_up_submissions
+                        .entry(card.index)
+                        .or_default()
+                        .push(outcome.warm_up_submissions);
+                }
+            }
+            Some(probe) => {
+                if let Some(slot) = record
+                    .probe_medians
+                    .get_mut(&(card.index, probe))
+                    .and_then(|rounds| rounds.get_mut(round_index))
+                {
+                    *slot = outcome
+                        .medians
+                        .map(|medians| medians.thread_cpu_nanoseconds);
+                }
+            }
+        }
+        if request.probe.is_some() {
+            let card_tallies = record.tallies.entry(card.index).or_default();
+            card_tallies.result_mismatches += probe_tallies.result_mismatches;
+            card_tallies.floor_violations += probe_tallies.floor_violations;
+            card_tallies.input_byte_mismatches += probe_tallies.input_byte_mismatches;
+            card_tallies
+                .coverage_failures
+                .extend(probe_tallies.coverage_failures);
+        }
+        Ok(())
+    }
+
+    /// 读卡时顺手补上一格欠的「后」读数（同一次 `nvidia-smi`）。
+    struct PendingNotingReader<'reader> {
+        reader: &'reader mut GpuCardReader,
+        pending: &'reader mut Option<PendingAfterReading>,
+    }
+
+    impl CardReader for PendingNotingReader<'_> {
+        fn wait_for_the_card_and_read_the_cards(
+            &mut self,
+            card_index: u32,
+            emitter: &mut Emitter,
+        ) -> BTreeMap<u32, CardClockReading> {
+            let cards_now = self
+                .reader
+                .wait_for_the_card_and_read_the_cards(card_index, emitter);
+            emit_the_pending_after_reading(self.pending, &cards_now, emitter);
+            cards_now
+        }
+    }
+
+    /// 受控臂 ① 暖到稳一张卡：探针格（n = 512、常驻共用输入、阻塞等、间隔 0）每 20 次一窗，打 `name=warm_up_to_stable`。
+    fn warm_up_the_card_to_stable(
+        card: &CardOfTheSegment,
+        segment_units: &SegmentUnits,
+        context: &mut SegmentContext<'_>,
+        emitter: &mut Emitter,
+    ) -> WarmUpToStable {
+        let mut cards_now = context
+            .card_reader
+            .wait_for_the_card_and_read_the_cards(card.index, emitter);
+        emit_the_pending_after_reading(&mut context.pending_after, &cards_now, emitter);
+        cards_now.clear();
+        emitter.declare(DeclaredSegment::Serial(DRIFT_CONTROL_SERIAL_REASON));
+        let mut environment = GpuCellEnvironment {
+            card_index: card.index,
+            card: &card.card,
+            kernels: &card.kernels,
+            segment_units,
+            calibration_buffer: context.calibration.buffer.as_slice(),
+            baseline_nanoseconds: context.calibration.baseline.crc_median_nanoseconds,
+            link_peak_bytes_per_second: card.link_peak_bytes_per_second,
+            steps: None,
+        };
+        let cell = warm_up_probe_cell();
+        environment.open_the_cell(cell);
+        let started = Instant::now();
+        let warm_up = warm_up_to_stable(
+            &mut || {
+                let timings = environment.time_the_submissions(
+                    WARM_UP_WINDOW_SUBMISSIONS,
+                    Duration::ZERO,
+                    &mut || {},
+                );
+                cell_round_reading(&timings, cell.units)
+                    .map(|reading| reading.thread_cpu_median_nanoseconds)
+            },
+            &mut || started.elapsed().as_secs_f64(),
+        );
+        environment.close_the_cell();
+        let (peak, changed, last) = warm_up.trajectory();
+        emitter.line(&format!(
+            "name=warm_up_to_stable arm=controlled index={} {} windows={} window_submissions={WARM_UP_WINDOW_SUBMISSIONS} seconds={:.3} window_medians_nanoseconds={} reached_the_cap={} window_median_peak_nanoseconds={} windows_off_the_previous_by_more_than_three_percent={changed} last_window_median_nanoseconds={}",
+            card.index,
+            cell.label(),
+            warm_up.window_medians_nanoseconds.len(),
+            warm_up.seconds,
+            warm_up.window_medians_nanoseconds.iter().map(|median| optional_number(*median)).collect::<Vec<_>>().join(","),
+            warm_up.reached_the_cap,
+            optional_number(peak),
+            optional_number(last),
+        ));
+        warm_up
+    }
+
+    /// 一条臂的 5 轮（登记第五节「复现臂」「受控臂」）：每轮开头等别的性能测量；按 [`cards_in_the_order_of_the_round`] 量卡，每张卡 80 格照第 3 次重跑
+    /// 轮转、再两格探针。受控臂开轮之前先暖卡（后暖的先量：先暖次序表里后量的那张）。停机 J-S5 交回 `Err`。
+    fn measure_the_arm(
+        cards: &[&CardOfTheSegment],
+        segment_units: &SegmentUnits,
+        context: &mut SegmentContext<'_>,
+        record: &mut ArmRecord,
+        emitter: &mut Emitter,
+    ) -> Result<(), String> {
+        let indices: Vec<u32> = cards.iter().map(|card| card.index).collect();
+        let card_of = |index: u32| cards.iter().copied().find(|card| card.index == index);
+        if record.arm == DriftArm::Controlled {
+            for index in cards_in_the_order_of_the_round(record.arm, 1, &indices)
+                .into_iter()
+                .rev()
+            {
+                let card = card_of(index).expect("次序里的卡都在起好的卡里");
+                let warm_up = warm_up_the_card_to_stable(card, segment_units, context, emitter);
+                record.warm_ups.insert(index, warm_up);
+            }
+        }
+        for round in 1..=ROUNDS {
+            wait_until_no_other_measurement_runs(emitter);
+            for index in cards_in_the_order_of_the_round(record.arm, round, &indices) {
+                let card = card_of(index).expect("次序里的卡都在起好的卡里");
+                let requests = submission_cells_in_the_order_of_the_round(round)
+                    .into_iter()
+                    .map(|cell| (cell, None))
+                    .chain(DriftProbe::ALL.map(|probe| (probe_cell(), Some(probe))));
+                for (cell, probe) in requests {
+                    let request = CellRoundRequest {
+                        arm: record.arm,
+                        cell,
+                        round,
+                        probe,
+                        threshold_edges: context.threshold_edges,
+                    };
+                    measure_and_record(card, segment_units, context, record, request, emitter)?;
+                }
+            }
+        }
+        let cards_now = context
+            .card_reader
+            .wait_for_the_card_and_read_the_cards(indices[0], emitter);
+        emit_the_pending_after_reading(&mut context.pending_after, &cards_now, emitter);
+        for (card, tallies) in &record.tallies {
+            for cell in &tallies.process_clock_cells {
+                record.process_clock_cells.insert((*card, *cell));
+            }
+        }
+        Ok(())
+    }
+
+    /// 一条臂量完之后的作废：P3（起卡时）、P1（这条臂里）、第七节甲类的区间与计数（这条臂里）、卡作废（P2、结果、物理下限、写入字节锚点）。
+    /// 交回这条臂没过的卡（`card_failures` 那几条）。
+    fn void_the_arm(
+        cards: &[&CardOfTheSegment],
+        thread_clock_failures: &BTreeMap<u32, Vec<(SubmissionForm, WaitMethod)>>,
+        record: &mut ArmRecord,
+        emitter: &mut Emitter,
+    ) -> Vec<String> {
+        let mut card_failures = Vec::new();
+        for card in cards {
+            for form in &card.comparison_control_failures {
+                for wait in WaitMethod::ALL {
+                    record.voiding.insert(
+                        (card.index, SubmissionForm::Resident(*form), wait),
+                        "void_positive_control",
+                    );
+                }
+            }
+            for (form, wait) in thread_clock_failures.get(&card.index).into_iter().flatten() {
+                record
+                    .voiding
+                    .insert((card.index, *form, *wait), "void_positive_control");
+            }
+            let tallies = record.tallies.get(&card.index).cloned().unwrap_or_default();
+            for (form, wait) in &tallies.coverage_failures {
+                emitter.line(&format!(
+                    "name=positive_control row=interval_coverage arm={} index={} form={} wait={} holds=false",
+                    record.arm.label(),
+                    card.index,
+                    form.label(),
+                    wait.label()
+                ));
+                record
+                    .voiding
+                    .insert((card.index, *form, *wait), "void_positive_control");
+            }
+            let is_the_card_valid = card.check_string_holds
+                && tallies.result_mismatches == 0
+                && tallies.floor_violations == 0
+                && tallies.input_byte_mismatches == 0;
+            emitter.line(&format!(
+                "name=gpu_card_verdict arm={} index={} check_string_holds={} result_mismatching_cell_rounds={} floor_violations={} input_byte_mismatching_cell_rounds={} card_valid={is_the_card_valid}",
+                record.arm.label(),
+                card.index,
+                card.check_string_holds,
+                tallies.result_mismatches,
+                tallies.floor_violations,
+                tallies.input_byte_mismatches,
+            ));
+            if !is_the_card_valid {
+                card_failures.push(format!(
+                    "{}_card_{}_result_or_floor",
+                    record.arm.label(),
+                    card.index
+                ));
+                for form in [
+                    SubmissionForm::Resident(InputForm::Shared),
+                    SubmissionForm::Resident(InputForm::Split),
+                    SubmissionForm::TodaySingleKernel,
+                ] {
+                    for wait in WaitMethod::ALL {
+                        record.voiding.insert((card.index, form, wait), "void_card");
+                    }
+                }
+            }
+        }
+        card_failures
+    }
+
+    /// 一条臂照第 3 次重跑第一段的算点与判定出行（R1–R5、J1–J11、R3-11 的翻面口径）：点行换名 `name=drift_control_point`，别的行加 `arm=`。
+    /// 交回这一条臂的全部行（拆成键值，D1–D5 从它们算）。
+    fn emit_the_analysis_of_the_arm(
+        record: &ArmRecord,
+        thresholds: &BTreeMap<SubmissionPoint, PointThresholds>,
+        machine_ratio: Option<f64>,
+        cpu_crc_milliseconds: &BTreeMap<u64, f64>,
+        emitter: &mut Emitter,
+    ) -> Vec<BTreeMap<String, String>> {
+        let inputs = HostCpuPointInputs {
+            thresholds,
+            machine_ratio,
+            cards: &record.cards,
+            medians: &record.medians,
+            voiding: &record.voiding,
+            process_clock_cells: &record.process_clock_cells,
+        };
+        let arm_field = format!("arm={}", record.arm.label());
+        analysis_lines(&inputs, cpu_crc_milliseconds)
+            .into_iter()
+            .map(|line| {
+                let renamed = match line.strip_prefix("name=host_cpu_per_submission_point ") {
+                    Some(rest) => format!("name=drift_control_point {arm_field} {rest}"),
+                    None => match line.split_once(' ') {
+                        Some((name, rest)) => format!("{name} {arm_field} {rest}"),
+                        None => format!("{line} {arm_field}"),
+                    },
+                };
+                emitter.line(&renamed);
+                fields_of_a_line(&renamed)
+            })
+            .collect()
+    }
+
+    /// P-drift（每条臂每张卡）：递减格的第 5 轮 ÷ 第 1 轮 ≤ 0.80；恒定格只报。交回没过的卡。
+    fn emit_the_drift_probes(record: &ArmRecord, emitter: &mut Emitter) -> BTreeSet<u32> {
+        let mut failed = BTreeSet::new();
+        for card in &record.cards {
+            for probe in DriftProbe::ALL {
+                let medians = record
+                    .probe_medians
+                    .get(&(*card, probe))
+                    .cloned()
+                    .unwrap_or_default();
+                let ratio = round_five_over_round_one(&medians);
+                let holds = match probe {
+                    DriftProbe::Decreasing => ratio.is_some_and(probe_drift_holds),
+                    DriftProbe::Constant => true,
+                };
+                if !holds {
+                    failed.insert(*card);
+                }
+                emitter.line(&format!(
+                    "name=drift_probe arm={} index={card} probe={} spin_nanoseconds_per_round={} thread_cpu_median_nanoseconds_per_round={} round_five_over_round_one={} judged={} holds={holds}",
+                    record.arm.label(),
+                    probe.label(),
+                    (1..=ROUNDS).map(|round| probe_spin_nanoseconds(probe, round).to_string()).collect::<Vec<_>>().join(","),
+                    medians.iter().map(|median| optional_number(*median)).collect::<Vec<_>>().join(","),
+                    optional_number(ratio),
+                    probe == DriftProbe::Decreasing,
+                ));
+            }
+        }
+        failed
+    }
+
+    /// 一条臂一张卡的轮次比两行（点行一级、格一级），交回点行一级的（D1–D3 的值）。
+    fn emit_the_round_ratios(
+        record: &ArmRecord,
+        card: u32,
+        lines: &[BTreeMap<String, String>],
+        emitter: &mut Emitter,
+    ) -> RoundRatios {
+        let point_ratios = round_ratios_of_the_point_lines(lines, record.arm, card);
+        let cell_ratios = round_ratios_of_the_cells(&record.medians, card);
+        for (scope, ratios) in [("point_lines", &point_ratios), ("cells", &cell_ratios)] {
+            let (peak, off, last) = ratios.trajectory();
+            emitter.line(&format!(
+                "name=round_ratio arm={} index={card} scope={scope} lines={} lines_expected={} median_round_two_over_round_one={} median_round_three_over_round_one={} median_round_four_over_round_one={} median_round_five_over_round_one={} round_ratio_peak={} rounds_off_by_more_than_ten_percent={off} final_round_ratio={}",
+                record.arm.label(),
+                ratios.lines,
+                match scope {
+                    "point_lines" => POINT_LINES_OF_THE_ROUND_RATIO_PER_CARD,
+                    _ => submission_cells_of_a_card().len(),
+                },
+                optional_number(ratios.median_over_round_one[0]),
+                optional_number(ratios.median_over_round_one[1]),
+                optional_number(ratios.median_over_round_one[2]),
+                optional_number(ratios.median_over_round_one[3]),
+                optional_number(peak),
+                optional_number(last),
+            ));
+        }
+        point_ratios
+    }
+
+    /// 一条臂一张卡的频率读数汇总（D6）：每轮开格前读数的中位，格一级 c_rt 与 SM 时钟的秩相关；受控臂另报每格热身次数的轨迹（D7、第八节）。
+    fn emit_the_clock_summaries(record: &ArmRecord, card: u32, emitter: &mut Emitter) {
+        for round in 1..=ROUNDS {
+            let readings = record
+                .before_readings
+                .get(&(card, round))
+                .cloned()
+                .unwrap_or_default();
+            let median_of_the = |value_of: &dyn Fn(&ReadingsBeforeTheCell) -> Option<f64>| {
+                let values: Vec<f64> = readings.iter().filter_map(value_of).collect();
+                optional_number(median_of(&values))
+            };
+            emitter.line(&format!(
+                "name=clock_round_summary arm={} index={card} round={round} cells={} cells_expected={CELLS_AND_PROBES_PER_ROUND} cells_hold={} scaling_current_frequency_kilohertz_median={} average_frequency_kilohertz_median={} sm_clock_megahertz_median={} memory_clock_megahertz_median={} temperature_celsius_median={} power_watts_median={}",
+                record.arm.label(),
+                readings.len(),
+                readings.len() == CELLS_AND_PROBES_PER_ROUND,
+                median_of_the(&|(host, _card)| host.scaling_current_frequency_kilohertz.map(|value| value as f64)),
+                median_of_the(&|(host, _card)| host.average_frequency_kilohertz.map(|value| value as f64)),
+                median_of_the(&|(_host, card_reading)| card_reading.as_ref()?.sm_clock_megahertz),
+                median_of_the(&|(_host, card_reading)| card_reading.as_ref()?.memory_clock_megahertz),
+                median_of_the(&|(_host, card_reading)| card_reading.as_ref()?.temperature_celsius),
+                median_of_the(&|(_host, card_reading)| card_reading.as_ref()?.power_watts),
+            ));
+        }
+        let pairs = record.clock_pairs.get(&card).cloned().unwrap_or_default();
+        emitter.line(&format!(
+            "name=clock_correlation arm={} index={card} pairs={} rank_correlation_of_the_thread_cpu_and_the_sm_clock={}",
+            record.arm.label(),
+            pairs.len(),
+            optional_number(rank_correlation(&pairs)),
+        ));
+        if record.arm == DriftArm::Controlled {
+            let counts = record
+                .cell_warm_up_submissions
+                .get(&card)
+                .cloned()
+                .unwrap_or_default();
+            emitter.line(&format!(
+                "name=cell_warm_up_trajectory arm=controlled index={card} cell_rounds={} warm_up_submissions_peak={} cell_rounds_at_the_cap={} last_cell_warm_up_submissions={}",
+                counts.len(),
+                counts.iter().max().map_or_else(|| "none".to_string(), usize::to_string),
+                counts.iter().filter(|count| **count >= CELL_WARM_UP_SUBMISSIONS_AT_MOST).count(),
+                counts.last().map_or_else(|| "none".to_string(), usize::to_string),
+            ));
+        }
+    }
+
+    /// D1–D5 与第十条 L4、L5 的触发（`name=drift_judgement`、`name=unstable_count`、`name=card_order_effect`、`name=failure_clause`）。
+    /// `probe_failures` 是 P-drift 没过的（臂、卡）：那几个 D 值写 `void_positive_control`。
+    fn emit_the_drift_judgements(
+        reproduction: Option<(&ArmRecord, &[BTreeMap<String, String>])>,
+        controlled: Option<(&ArmRecord, &[BTreeMap<String, String>])>,
+        round_ratios: &BTreeMap<(DriftArm, u32), RoundRatios>,
+        probe_failures: &BTreeSet<(DriftArm, u32)>,
+        emitter: &mut Emitter,
+    ) {
+        let judged = |arm: DriftArm,
+                      card: u32,
+                      judge: fn(f64) -> &'static str|
+         -> (Option<f64>, &'static str) {
+            drift_round_ratio_judgement(
+                round_ratios
+                    .get(&(arm, card))
+                    .and_then(RoundRatios::round_five),
+                probe_failures.contains(&(arm, card)),
+                judge,
+            )
+        };
+        let controlled_cards = controlled
+            .map(|(record, _lines)| record.cards.clone())
+            .unwrap_or_default();
+        let reproduction_card =
+            reproduction.and_then(|(record, _lines)| record.cards.first().copied());
+        let card_zero = controlled_cards.first().copied().or(reproduction_card);
+        let card_one = controlled_cards.get(1).copied();
+        let mut judgements: BTreeMap<&str, &'static str> = BTreeMap::new();
+        for (quantity, arm, card, judge) in [
+            (
+                "controlled_card_zero_round_ratio",
+                DriftArm::Controlled,
+                card_zero,
+                controlled_round_ratio_judgement as fn(f64) -> &'static str,
+            ),
+            (
+                "reproduction_card_zero_round_ratio",
+                DriftArm::Reproduction,
+                reproduction_card,
+                reproduction_round_ratio_judgement,
+            ),
+            (
+                "controlled_card_one_round_ratio",
+                DriftArm::Controlled,
+                card_one,
+                controlled_round_ratio_judgement,
+            ),
+        ] {
+            let (value, judgement) =
+                card.map_or((None, "not_run"), |index| judged(arm, index, judge));
+            judgements.insert(quantity, judgement);
+            emitter.line(&format!(
+                "name=drift_judgement quantity={quantity} arm={} index={} value={} judgement={judgement}",
+                arm.label(),
+                card.map_or_else(|| "none".to_string(), |index| index.to_string()),
+                optional_number(value),
+            ));
+        }
+        let mut unstable_by_card: BTreeMap<(DriftArm, u32), usize> = BTreeMap::new();
+        for (record, lines) in [reproduction, controlled].into_iter().flatten() {
+            for card in &record.cards {
+                let (count, unstable) = unstable_count(lines, record.arm, *card);
+                unstable_by_card.insert((record.arm, *card), unstable);
+                emitter.line(&format!(
+                    "name=unstable_count arm={} index={card} lines={count} unstable={unstable}",
+                    record.arm.label()
+                ));
+            }
+        }
+        let (value, judgement) = match (card_zero, card_one) {
+            (Some(zero), Some(one)) => match (
+                unstable_by_card.get(&(DriftArm::Controlled, zero)),
+                unstable_by_card.get(&(DriftArm::Controlled, one)),
+            ) {
+                (Some(zero_count), Some(one_count)) => {
+                    unstable_ratio_judgement(*zero_count, *one_count)
+                }
+                (None, _) | (_, None) => (None, "not_run"),
+            },
+            (None, _) | (_, None) => (None, "not_run"),
+        };
+        emitter.line(&format!(
+            "name=drift_judgement quantity=controlled_unstable_card_zero_over_card_one arm=controlled index=none value={} judgement={judgement}",
+            optional_number(value),
+        ));
+        if let Some((record, lines)) = controlled {
+            for card in &record.cards {
+                let (first, second, ratio) = card_order_effect(lines, &record.cards, *card);
+                emitter.line(&format!(
+                    "name=card_order_effect arm=controlled index={card} first_rounds_median={} second_rounds_median={} ratio={}",
+                    optional_number(first),
+                    optional_number(second),
+                    optional_number(ratio),
+                ));
+            }
+            let warm_ups_reaching_the_cap: Vec<bool> = record
+                .cards
+                .iter()
+                .map(|card| {
+                    record
+                        .warm_ups
+                        .get(card)
+                        .is_some_and(|warm_up| warm_up.reached_the_cap)
+                })
+                .collect();
+            let card_one_judgement = judgements.get("controlled_card_one_round_ratio").copied();
+            emitter.line(&format!(
+                "name=failure_clause clause=L4 card_one_judgement={} warm_ups_reaching_the_cap={} triggered={}",
+                card_one_judgement.unwrap_or("not_run"),
+                warm_ups_reaching_the_cap
+                    .iter()
+                    .map(bool::to_string)
+                    .collect::<Vec<_>>()
+                    .join(","),
+                is_failure_clause_l4_triggered(card_one_judgement, &warm_ups_reaching_the_cap),
+            ));
+        }
+        emitter.line(&format!(
+            "name=failure_clause clause=L5 triggered={}",
+            is_failure_clause_l5_triggered(
+                judgements
+                    .get("reproduction_card_zero_round_ratio")
+                    .copied()
+            )
+        ));
+    }
+
+    /// 停机：打每一条、打判决行、收尾（段末并行由 [`within_a_declared_serial_segment`] 写）。
+    fn stop_the_segment(findings: &[String], emitter: &mut Emitter) -> i32 {
+        for finding in findings {
+            emitter.line(&format!(
+                "name=stop_clause segment=host_cpu_drift_control finding={finding}"
+            ));
+        }
+        emitter.line(&format!(
+            "name=verdict segment=host_cpu_drift_control stop_clause_findings={}",
+            findings.len()
+        ));
+        emitter.finish();
+        EXIT_CODE_STOP_CLAUSE
+    }
+
+    /// 控漂移段（登记第五节「控漂移段怎么量」）：段开头照第 3 次重跑第一段；复现臂只量 `card_indices` 的头一张卡；受控臂绑核、起第二张卡、
+    /// 两张卡各一遍 P1、暖到稳、5 轮卡交替；两条臂各自算点与判定，再算 D1–D7。头尾的串行、并行声明在 [`within_a_declared_serial_segment`]。
+    pub(super) fn run(
+        stage_split_product: &Path,
+        attack_ledger: &Path,
+        card_indices: &[u32],
+    ) -> i32 {
+        let mut emitter = Emitter::new();
+        within_a_declared_serial_segment(&mut emitter, DRIFT_CONTROL_SERIAL_REASON, |emitter| {
+            run_the_segment(stage_split_product, attack_ledger, card_indices, emitter)
+        })
+    }
+
+    fn run_the_segment(
+        stage_split_product: &Path,
+        attack_ledger: &Path,
+        card_indices: &[u32],
+        emitter: &mut Emitter,
+    ) -> i32 {
+        let segment_started = Instant::now();
+        emitter.line(&format!(
+            "name=configuration segment=host_cpu_drift_control cards={} arms={} reproduction_cards={} submission_units={} rounds={ROUNDS} warm_up_submissions={WARM_UP_SUBMISSIONS} cell_warm_up_group_submissions={CELL_WARM_UP_GROUP_SUBMISSIONS} cell_warm_up_submissions_at_most={CELL_WARM_UP_SUBMISSIONS_AT_MOST} warm_up_window_submissions={WARM_UP_WINDOW_SUBMISSIONS} warm_up_seconds_at_least={WARM_UP_SECONDS_AT_LEAST} warm_up_seconds_at_most={WARM_UP_SECONDS_AT_MOST} timed_submissions_without_a_gap={TIMED_SUBMISSIONS_WITHOUT_A_GAP} timed_submissions_with_a_gap={TIMED_SUBMISSIONS_WITH_A_GAP} gap_milliseconds={} {} cells_per_card={} probe_cells_per_round=2 card_quota_mebibytes={CARD_QUOTA_MEBIBYTES} attempts_per_round_at_most={ATTEMPTS_PER_ROUND_AT_MOST} threads_of_the_apparatus=1 threads_of_the_measurement=1",
+            card_indices.iter().map(u32::to_string).collect::<Vec<_>>().join(","),
+            DriftArm::ALL.map(DriftArm::label).join(","),
+            card_indices.first().map_or_else(|| "none".to_string(), u32::to_string),
+            SUBMISSION_UNIT_COUNTS.iter().map(u64::to_string).collect::<Vec<_>>().join(","),
+            GAP_MILLISECONDS.iter().map(u64::to_string).collect::<Vec<_>>().join(","),
+            sleep_interval_configuration_text(),
+            submission_cells_of_a_card().len(),
+        ));
+        assert_this_process_runs_one_thread("segment_start");
+        if !check_the_apparatus_sha256(emitter) {
+            return EXIT_CODE_STOP_CLAUSE;
+        }
+        if !check_the_thread_cpu_clock_resolution(emitter) {
+            return stop_for_the_clock_resolution(emitter, "host_cpu_drift_control");
+        }
+        let mut stop_findings: Vec<String> = Vec::new();
+        let constant_mismatches = check_the_constants_and_the_anchors(emitter);
+        let SegmentThresholds {
+            thresholds,
+            peer_baseline,
+            anchor_mismatches,
+        } = match thresholds_of_the_segment(
+            "host_cpu_drift_control",
+            stage_split_product,
+            attack_ledger,
+            emitter,
+            &mut stop_findings,
+        ) {
+            Ok(read) => read,
+            Err(exit_code) => return exit_code,
+        };
+        if constant_mismatches + anchor_mismatches > 0 || !stop_findings.is_empty() {
+            stop_findings.push(format!(
+                "constant_or_anchor_mismatches_{}",
+                constant_mismatches + anchor_mismatches
+            ));
+            return stop_the_segment(&stop_findings, emitter);
+        }
+        let mut calibration =
+            match SegmentCalibration::start("host_cpu_drift_control", segment_started, emitter) {
+                Ok(calibration) => calibration,
+                Err(exit_code) => return exit_code,
+            };
+        let machine_ratio = peer_baseline
+            .map(|peer| machine_ratio(calibration.baseline.crc_median_nanoseconds, peer));
+        emitter.line(&format!(
+            "name=machine_ratio local_baseline_nanoseconds={:.1} peer_baseline_nanoseconds={} ratio={} far_from_one={} status={}",
+            calibration.baseline.crc_median_nanoseconds,
+            optional_number(peer_baseline),
+            optional_number(machine_ratio),
+            machine_ratio.is_some_and(is_the_machine_ratio_far_from_one),
+            if machine_ratio.is_some() { "measured" } else { "not_run" },
+        ));
+        let segment_units = segment_units();
+        let cpu_crc_milliseconds = cpu_crc_of_the_same_bytes(&segment_units, emitter);
+        let threshold_values: Vec<f64> = thresholds
+            .values()
+            .filter_map(|point| point.by_candidate.get(&GpuCandidate::EveryStage).copied())
+            .collect();
+        let threshold_edges = (
+            threshold_values
+                .iter()
+                .copied()
+                .reduce(f64::min)
+                .unwrap_or(0.0),
+            threshold_values
+                .iter()
+                .copied()
+                .reduce(f64::max)
+                .unwrap_or(0.0),
+        );
+        let links = super::gpu_submission::pcie_links_reported_by_nvidia_smi();
+        let mut context = SegmentContext {
+            threshold_edges,
+            calibration: &mut calibration,
+            card_reader: GpuCardReader,
+            pending_after: None,
+        };
+        let mut card_failures: Vec<String> = Vec::new();
+        let mut started_cards: Vec<CardOfTheSegment> = Vec::new();
+        let mut records: Vec<(ArmRecord, Vec<BTreeMap<String, String>>)> = Vec::new();
+        let mut round_ratios: BTreeMap<(DriftArm, u32), RoundRatios> = BTreeMap::new();
+        let mut probe_failures: BTreeSet<(DriftArm, u32)> = BTreeSet::new();
+        for arm in DriftArm::ALL {
+            let wanted: Vec<u32> = match arm {
+                DriftArm::Reproduction => card_indices.iter().copied().take(1).collect(),
+                DriftArm::Controlled => card_indices.to_vec(),
+            };
+            let placement = place_the_thread_of_the_arm(arm);
+            emitter.line(&format!(
+                "name=arm_placement arm={} pinned_core={} allowed_cores={} scaling_governor={}",
+                arm.label(),
+                placement
+                    .pinned_core
+                    .map_or_else(|| "none".to_string(), |core| core.to_string()),
+                placement
+                    .allowed_cores
+                    .map_or_else(|| "none".to_string(), |cores| cores.len().to_string()),
+                placement
+                    .scaling_governor
+                    .unwrap_or_else(|| "none".to_string()),
+            ));
+            for index in &wanted {
+                if started_cards.iter().any(|card| card.index == *index) {
+                    continue;
+                }
+                match start_the_card(*index, &links, &segment_units, &mut card_failures, emitter) {
+                    Ok(Some(card)) => started_cards.push(card),
+                    Ok(None) => {}
+                    Err(findings) => return stop_the_segment(&findings, emitter),
+                }
+            }
+            let cards: Vec<&CardOfTheSegment> = wanted
+                .iter()
+                .filter_map(|index| started_cards.iter().find(|card| card.index == *index))
+                .collect();
+            if cards.is_empty() {
+                emitter.line(&format!(
+                    "name=arm_verdict arm={} status=not_run reason=no_card_usable",
+                    arm.label()
+                ));
+                continue;
+            }
+            let mut thread_clock_failures = BTreeMap::new();
+            for card in &cards {
+                thread_clock_failures.insert(
+                    card.index,
+                    thread_clock_control_failures(
+                        &card.kernels,
+                        &card.card,
+                        &segment_units,
+                        emitter,
+                    ),
+                );
+            }
+            let indices: Vec<u32> = cards.iter().map(|card| card.index).collect();
+            let mut record = ArmRecord::new(arm, &indices);
+            if let Err(finding) =
+                measure_the_arm(&cards, &segment_units, &mut context, &mut record, emitter)
+            {
+                return stop_the_segment(&[finding], emitter);
+            }
+            card_failures.extend(void_the_arm(
+                &cards,
+                &thread_clock_failures,
+                &mut record,
+                emitter,
+            ));
+            let lines = emit_the_analysis_of_the_arm(
+                &record,
+                &thresholds,
+                machine_ratio,
+                &cpu_crc_milliseconds,
+                emitter,
+            );
+            for card in emit_the_drift_probes(&record, emitter) {
+                probe_failures.insert((arm, card));
+            }
+            for card in &record.cards {
+                round_ratios.insert(
+                    (arm, *card),
+                    emit_the_round_ratios(&record, *card, &lines, emitter),
+                );
+                emit_the_clock_summaries(&record, *card, emitter);
+            }
+            records.push((record, lines));
+        }
+        let of_the_arm = |arm: DriftArm| {
+            records
+                .iter()
+                .find(|(record, _lines)| record.arm == arm)
+                .map(|(record, lines)| (record, lines.as_slice()))
+        };
+        emit_the_drift_judgements(
+            of_the_arm(DriftArm::Reproduction),
+            of_the_arm(DriftArm::Controlled),
+            &round_ratios,
+            &probe_failures,
+            emitter,
+        );
+        finish_the_calibration(context.calibration, emitter);
+        let positive_control_failures: usize = records
+            .iter()
+            .map(|(record, _lines)| {
+                record
+                    .voiding
+                    .values()
+                    .filter(|reason| **reason == "void_positive_control")
+                    .count()
+            })
+            .sum::<usize>()
+            + probe_failures.len();
+        emitter.line(&format!(
+            "name=verdict segment=host_cpu_drift_control constant_or_anchor_mismatches=0 stop_clause_findings=0 arms_measured={} cards_started={} card_failures={} card_failure_items={} voided_forms_by_the_positive_controls_or_probes={positive_control_failures}",
+            records.len(),
+            started_cards.len(),
+            card_failures.len(),
+            if card_failures.is_empty() { "none".to_string() } else { card_failures.join(",") },
+        ));
+        emitter.finish();
+        if records.is_empty() {
+            EXIT_CODE_NOT_RUN
+        } else if !card_failures.is_empty() || positive_control_failures > 0 {
+            EXIT_CODE_POSITIVE_CONTROL_FAILED
+        } else {
+            EXIT_CODE_OK
+        }
+    }
+}
+
+// ───────────────────────────── 第 3 次重跑第三段 function-split（附带；登记第五节「第三段怎么量」，不带 gpu 特性） ─────────────────────────────
+
+/// 第三段只量 K = 8（登记第五节「第三段怎么量」）。
+const FUNCTION_SPLIT_BATCH_UNITS: u64 = 8;
+
+/// 装置那一份钉住槽那一圈（`version_as_the_replay_reads_it` 里与 crates `version_as_the_compaction_reads_it` 那一圈同法的部分）单独重放用。
+fn pinned_slots_of_the_version(version: &TransactionOutput) -> BTreeSet<SlotNumber> {
+    version_as_the_replay_reads_it(version).pinned_slots
+}
+
+/// 一次调用按函数拆（计时窗口外重放；各项先不计时跑一遍、再计时一遍，5 次取中位，[`median_stage_timing`]）：两次克隆、crates 的
+/// `central_mapping_as_the_compaction_reads_it`、钉住槽那一圈、`scan_region` 与签发那一次的选段（[`replay_the_stages_of_a_call`]）。
+/// 另核停机 J-S6（映射条目两份相同）与原第二段的停机条款第 4 条。没收两版、钟读不到的交回 `Err`（那一次的说明）。
+fn function_split_of_the_call(
+    material: &CallReplayMaterial,
+    call: &CallReading,
+    region: Option<CompactionRegion>,
+    choice: ChoiceOfTheRegion,
+    pool_devices: &[(DeviceIdentity, SparseBlockDevice)],
+) -> Result<(FunctionSplitReading, Vec<String>), String> {
+    let versions = material
+        .versions_around_the_call
+        .as_ref()
+        .ok_or_else(|| format!("versions_not_captured_at_call_{}", material.call_index))?;
+    let unreadable = || {
+        format!(
+            "thread_cpu_clock_unreadable_at_call_{}",
+            material.call_index
+        )
+    };
+    let cpu_of =
+        |timing: Option<StageTiming>| timing.map(|read| read.cpu_nanoseconds_per_repetition);
+    let clone_before = cpu_of(median_stage_timing(|| {
+        std::hint::black_box(versions.before.clone());
+    }))
+    .ok_or_else(unreadable)?;
+    let clone_after = match &versions.published {
+        Some(published) => cpu_of(median_stage_timing(|| {
+            std::hint::black_box(published.clone());
+        }))
+        .ok_or_else(unreadable)?,
+        None => 0.0,
+    };
+    let mapping = cpu_of(median_stage_timing(|| {
+        std::hint::black_box(central_mapping_as_the_compaction_reads_it(&versions.before));
+    }))
+    .ok_or_else(unreadable)?;
+    let pinned = cpu_of(median_stage_timing(|| {
+        std::hint::black_box(pinned_slots_of_the_version(&versions.before));
+    }))
+    .ok_or_else(unreadable)?;
+    let mut findings: Vec<String> = mapping_entries_finding(
+        material.call_index,
+        &central_mapping_as_the_compaction_reads_it(&versions.before),
+        &version_as_the_replay_reads_it(&versions.before).mapping_entries,
+    )
+    .into_iter()
+    .collect();
+    let stages = replay_the_stages_of_a_call(
+        material,
+        region,
+        choice,
+        FUNCTION_SPLIT_BATCH_UNITS,
+        pool_devices,
+    );
+    findings.extend(stages.stop_finding.clone());
+    Ok((
+        FunctionSplitReading {
+            call_cpu_nanoseconds: call.cpu_nanoseconds as f64,
+            clone_before_cpu_nanoseconds: clone_before,
+            clone_after_cpu_nanoseconds: clone_after,
+            read_the_version_mapping_cpu_nanoseconds: mapping,
+            read_the_version_pinned_cpu_nanoseconds: pinned,
+            region_scan_cpu_nanoseconds: cpu_of(stages.scan),
+            choose_cpu_nanoseconds: cpu_of(stages.choose),
+        },
+        findings,
+    ))
+}
+
+/// 一个函数的重放（附带段的 2 ms 对照逐个跑）。
+type ReplayOfAFunction<'version> = Box<dyn Fn() + 'version>;
+
+/// 附带段新加的两个重放的 2 ms 对照（登记第五节「附带段的阳性对照」）：克隆与读这一版各在计时区间里加 2 ms（按线程钟自旋），
+/// 增量在 2 ms 的 [0.9, 1.1] 倍。交回没过的项。
+fn function_split_controls(emitter: &mut Emitter, versions: &VersionsAroundTheCall) -> Vec<String> {
+    let mut failures = Vec::new();
+    let spin = || {
+        let _spun = spin_until_the_thread_cpu_advances(INSERTED_NANOSECONDS);
+    };
+    let cpu_of =
+        |timing: Option<StageTiming>| timing.map(|read| read.cpu_nanoseconds_per_repetition);
+    let items: [(&str, ReplayOfAFunction<'_>); 2] = [
+        (
+            "clone",
+            Box::new(|| {
+                std::hint::black_box(versions.before.clone());
+            }),
+        ),
+        (
+            "read_the_version",
+            Box::new(|| {
+                std::hint::black_box(central_mapping_as_the_compaction_reads_it(&versions.before));
+                std::hint::black_box(pinned_slots_of_the_version(&versions.before));
+            }),
+        ),
+    ];
+    for (item, replay) in &items {
+        let baseline = cpu_of(median_stage_timing(replay));
+        let inserted = cpu_of(median_stage_timing(|| {
+            replay();
+            spin();
+        }));
+        let increment = baseline.zip(inserted).map(|(without, with)| with - without);
+        let holds = increment.is_some_and(spin_control_holds);
+        emitter.line(&format!(
+            "name=positive_control row=function_split item={item} inserted_nanoseconds={INSERTED_NANOSECONDS} increment_nanoseconds={} holds={holds}",
+            optional_number(increment)
+        ));
+        if !holds {
+            failures.push(format!("function_split_{item}"));
+        }
+    }
+    failures
+}
+
+/// 第三段一个点、一轮的结局：签发那一次与各批的拆分（收下的那一次；三次都作废是空的）、停机与对照失败。
+#[derive(Default)]
+struct FunctionSplitIntentOutcome {
+    issue: Vec<FunctionSplitReading>,
+    batches: Vec<FunctionSplitReading>,
+    stop_findings: Vec<String>,
+    control_failures: Vec<String>,
+}
+
+/// 第三段一条意图（`stage_split_one_intent` 同一套作废与等常态：前后校准、R2-1 作废、R2-2 等常态，至多 3 次）：收下的那一次逐次调用按函数拆，
+/// 每次调用一行 `name=function_split`；`with_the_controls` 时另跑原第二段甲、乙、丙的 2 ms 对照与新加两个重放的对照。
+fn function_split_one_intent(
+    emitter: &mut Emitter,
+    label: MeasurementLabel,
+    pool: &ConstructedPool,
+    with_the_controls: bool,
+    calibration: &mut SegmentCalibration,
+) -> FunctionSplitIntentOutcome {
+    let switches = measured_switches(label.batch_units, label.choice.forced_region());
+    let mut outcome = FunctionSplitIntentOutcome::default();
+    for attempt in 1..=ATTEMPTS_PER_ROUND_AT_MOST {
+        enter_the_timing_window(emitter, TimingWindow::StageSplitCompactionRun);
+        let mut attempt_label = label;
+        attempt_label.attempt = attempt;
+        let (reading, intent_calibration) = calibration.around_the_intent(|| {
+            measure_on_the_memory_device(
+                pool,
+                switches,
+                WriteInjection::Nothing,
+                ReplayCapture::OnWithTheVersions,
+            )
+        });
+        calibration.note_the_intent(emitter, &attempt_label, &intent_calibration);
+        let invalid_reason =
+            invalid_reason_of(&reading).or(intent_calibration.verdict.invalid_reason());
+        emit_the_intent(emitter, &attempt_label, &reading, invalid_reason);
+        let Some(reason) = invalid_reason else {
+            let prefix = format!(
+                "{} batch_units={} round={}",
+                label.point.label(),
+                label.batch_units,
+                label.round
+            );
+            for material in &reading.replay_material {
+                enter_the_timing_window(emitter, TimingWindow::StageReplay);
+                let call = &reading.calls[material.call_index];
+                match function_split_of_the_call(material, call, reading.region, label.choice, &pool.devices) {
+                    Ok((split, findings)) => {
+                        emitter.line(&format!(
+                            "name=function_split {prefix} call_index={} kind={} {}",
+                            material.call_index,
+                            material.kind.label(),
+                            split.fields_text()
+                        ));
+                        for finding in &findings {
+                            emitter.line(&format!("name=stop_clause segment=function_split {prefix} finding={finding}"));
+                        }
+                        outcome.stop_findings.extend(findings);
+                        match material.kind {
+                            CallKind::Issue => outcome.issue.push(split),
+                            CallKind::Batch | CallKind::FinalBatch => outcome.batches.push(split),
+                            CallKind::IntentDeletedWithoutABatch | CallKind::NoPublish => {}
+                        }
+                    }
+                    Err(reason_of_the_call) => emitter.line(&format!(
+                        "name=function_split {prefix} call_index={} kind={} status=not_run reason={reason_of_the_call}",
+                        material.call_index,
+                        material.kind.label()
+                    )),
+                }
+            }
+            if with_the_controls {
+                enter_the_timing_window(emitter, TimingWindow::StageControls);
+                let first_batch = reading
+                    .replay_material
+                    .iter()
+                    .find(|material| counts_as_a_batch(material.kind));
+                if let (Some(material), Some(region)) = (first_batch, reading.region) {
+                    outcome.control_failures.extend(emit_the_stage_controls(
+                        emitter,
+                        material,
+                        region,
+                        &pool.devices,
+                    ));
+                    if let Some(versions) = &material.versions_around_the_call {
+                        outcome
+                            .control_failures
+                            .extend(function_split_controls(emitter, versions));
+                    }
+                }
+            }
+            return outcome;
+        };
+        if attempt < ATTEMPTS_PER_ROUND_AT_MOST {
+            calibration.wait_for_the_machine_before_the_retry(emitter, &attempt_label, reason);
+        }
+    }
+    emitter.line(&format!(
+        "name=round_invalid segment=function_split {} batch_units={} round={} attempts={ATTEMPTS_PER_ROUND_AT_MOST}",
+        label.point.label(),
+        label.batch_units,
+        label.round,
+    ));
+    outcome
+}
+
+/// 第三段（附带，在第二台跑）：r2 第二段同一套造池、几何核、全局准备队列与校准，只量 K = 8、给的点、5 轮；每轮一条意图按函数拆，
+/// 每个点五轮中位两行 `name=function_split_summary`（各批合起来一行、签发一行）。
+fn run_the_function_split_segment(points: &[SamplingPoint]) -> i32 {
+    let segment_started = Instant::now();
+    let settings = PreparationSettings::from_the_environment();
+    let mut emitter = Emitter::new();
+    emitter.line(&format!(
+        "name=configuration segment=function_split points={} batch_units={FUNCTION_SPLIT_BATCH_UNITS} rounds={ROUNDS} replays_per_function={STAGE_REPLAYS} worker_threads={} {}",
+        points.iter().map(|point| format!("{}:{}", point.fraction.label(), point.pool_data_units)).collect::<Vec<_>>().join(","),
+        worker_threads_from_the_environment(),
+        preparation_configuration_fields(points, None, &settings),
+    ));
+    assert_this_process_runs_one_thread("segment_start");
+    if !check_the_apparatus_sha256(&mut emitter) {
+        return EXIT_CODE_STOP_CLAUSE;
+    }
+    if !check_the_thread_cpu_clock_resolution(&mut emitter) {
+        return stop_for_the_clock_resolution(&mut emitter, "function_split");
+    }
+    let mut calibration =
+        match SegmentCalibration::start("function_split", segment_started, &mut emitter) {
+            Ok(calibration) => calibration,
+            Err(exit_code) => return exit_code,
+        };
+    let mismatches = check_the_constants_and_the_anchors(&mut emitter);
+    let mut stop_findings: Vec<String> = Vec::new();
+    let mut control_failures: Vec<String> = Vec::new();
+    if mismatches == 0 {
+        let mut queue = PreparationQueue::new(
+            "function_split",
+            points,
+            None,
+            &settings,
+            &run_the_preparation_work,
+        );
+        let mut is_the_first_intent = true;
+        'points: for point_index in 0..points.len() {
+            let prepared = queue.prepared_point(point_index, &mut emitter);
+            let point = prepared.recipe.point;
+            for line in &prepared.lines {
+                emitter.line(line);
+            }
+            let mut batch_totals: Vec<[f64; 6]> = Vec::new();
+            let mut issue_totals: Vec<[f64; 6]> = Vec::new();
+            let mut rebuilt_pool_of_the_round: Option<ConstructedPool> = None;
+            for round in 1..=ROUNDS {
+                wait_until_no_other_measurement_runs(&mut emitter);
+                if round > 1 {
+                    let rebuilt = queue.take_the_rebuilt_pool(point_index, round, &mut emitter);
+                    let is_identical = rebuilt.digests == prepared.reference_digests;
+                    emitter.line(&format!(
+                        "name=memory_rebuild {} round={round} construction_seconds={:.3} digests_identical={is_identical}",
+                        point.label(),
+                        rebuilt.pool.construction_seconds
+                    ));
+                    rebuilt_pool_of_the_round = is_identical.then_some(rebuilt.pool);
+                }
+                let pool_of_the_round = if round == 1 {
+                    Some(&prepared.pool)
+                } else {
+                    rebuilt_pool_of_the_round.as_ref()
+                };
+                let Some(pool) = pool_of_the_round else {
+                    emitter.line(&format!(
+                        "name=round_invalid segment=function_split {} round={round} reason=start_image_digest_differs",
+                        point.label()
+                    ));
+                    continue;
+                };
+                let label = MeasurementLabel {
+                    arm: DeviceArm::Memory,
+                    point,
+                    batch_units: FUNCTION_SPLIT_BATCH_UNITS,
+                    round,
+                    attempt: 0,
+                    injection: WriteInjection::Nothing,
+                    choice: prepared.choice,
+                };
+                let outcome = function_split_one_intent(
+                    &mut emitter,
+                    label,
+                    pool,
+                    is_the_first_intent,
+                    &mut calibration,
+                );
+                is_the_first_intent = false;
+                control_failures.extend(outcome.control_failures);
+                batch_totals.extend(function_split_round_totals(&outcome.batches));
+                issue_totals.extend(function_split_round_totals(&outcome.issue));
+                if !outcome.stop_findings.is_empty() {
+                    stop_findings.extend(outcome.stop_findings);
+                    break 'points;
+                }
+            }
+            for (scope, totals) in [("batches", &batch_totals), ("issue", &issue_totals)] {
+                emitter.line(&format!(
+                    "name=function_split_summary {} batch_units={FUNCTION_SPLIT_BATCH_UNITS} scope={scope} rounds={} {}",
+                    point.label(),
+                    totals.len(),
+                    function_split_summary_text(totals)
+                ));
+            }
+            queue.finish_the_point(point_index);
+        }
+    }
+    calibration.finish(&mut emitter);
+    emitter.line(&format!(
+        "name=verdict segment=function_split constant_or_anchor_mismatches={mismatches} stop_clause_findings={} positive_control_failures={} positive_control_failure_items={}",
+        stop_findings.len(),
+        control_failures.len(),
+        if control_failures.is_empty() { "none".to_string() } else { control_failures.join(",") },
+    ));
+    emitter.finish();
+    if mismatches > 0 || !stop_findings.is_empty() {
+        EXIT_CODE_STOP_CLAUSE
+    } else if !control_failures.is_empty() {
+        EXIT_CODE_POSITIVE_CONTROL_FAILED
+    } else {
+        EXIT_CODE_OK
+    }
+}
+
 // ───────────────────────────── 第四段 foreground-fsync（附带，登记第五节分段表第四段；只在 Q16 > 10% 时跑） ─────────────────────────────
 
 /// 前台一次写的字节。
@@ -7560,6 +18656,138 @@ fn run_the_foreground_fsync_segment(
 
 // ───────────────────────────── 准入、命令行、入口 ─────────────────────────────
 
+// ───────────────────────────── 停机 7：装置自己的 sha256（第 2 次重跑登记第十一节停机 7） ─────────────────────────────
+
+/// 编进这个二进制的装置源码：每段开头打出它的 sha256，与输入清单第一行、登记第十二节写的那一个对拍（停机 7）。
+const OWN_SOURCE_TEXT: &str = include_str!("e185_gc_batch_wall_clock_split.rs");
+/// 设了就与编进来的源码 sha256 比（起跑脚本把登记第十二节写的那一个设进来），不同就停、退 3。
+const REGISTERED_APPARATUS_SHA256_ENVIRONMENT_VARIABLE: &str = "E185_REGISTERED_APPARATUS_SHA256";
+
+fn own_source_sha256() -> String {
+    hexadecimal_of(&sha256_digest(OWN_SOURCE_TEXT.as_bytes()))
+}
+
+/// 停机 7 的判法：登记的值设了而与编进来的源码 sha256 不同（不分大小写），交回登记的那一个；没设、相同交回 `None`。
+fn registered_apparatus_sha256_mismatch(registered: Option<&str>, own: &str) -> Option<String> {
+    let registered = registered?.trim().to_ascii_lowercase();
+    (registered != own).then_some(registered)
+}
+
+/// 每段开头打一行 `name=apparatus`；登记的 sha256 设了而对不上就打 `name=stop_clause clause=7`、收尾，交回 `false`（调用方退 3）。
+fn check_the_apparatus_sha256(emitter: &mut Emitter) -> bool {
+    let own = own_source_sha256();
+    let registered = std::env::var(REGISTERED_APPARATUS_SHA256_ENVIRONMENT_VARIABLE).ok();
+    emitter.line(&format!(
+        "name=apparatus source_sha256={own} registered_sha256={}",
+        registered
+            .as_deref()
+            .map_or_else(|| "not_set".to_string(), field_token)
+    ));
+    if let Some(registered_value) =
+        registered_apparatus_sha256_mismatch(registered.as_deref(), &own)
+    {
+        emitter.line(&format!(
+            "name=stop_clause clause=7 registered_sha256={} source_sha256={own}",
+            field_token(&registered_value)
+        ));
+        emitter.finish();
+        return false;
+    }
+    true
+}
+
+// ───────────────────────────── 单点核 geometry-check（第 2 次重跑登记第五节「单点核」） ─────────────────────────────
+
+/// 单点核：每个点只造池、核几何（[`prepare_the_sampling_point_with_the_order`]），不量、不进计时窗口。点与点之间互相独立，分组派到几条线程上
+/// （每组几份照 [`tasks_of_the_next_group`]：空着的线程与内存预算 ÷ 一份峰值，一份都装不下时保底一份），组内并行、组间串行；按给的点的次序
+/// 打攥着的行（`name=geometry_attempt`、N11、N12、`name=geometry`）与 `name=pool`。开跑先做常量回比（停机条款第 1 条）。
+fn run_the_geometry_check(points: &[SamplingPoint], overwrite_order: OverwriteOrder) -> i32 {
+    let settings = PreparationSettings::from_the_environment();
+    let mut emitter = Emitter::new();
+    emitter.line(&format!(
+        "name=configuration segment=geometry_check points={} overwrite_order={} worker_threads={} memory_cap_bytes={} memory_cap_source={}",
+        points.iter().map(|point| format!("{}:{}", point.fraction.label(), point.pool_data_units)).collect::<Vec<_>>().join(","),
+        overwrite_order.label(),
+        settings.threads,
+        settings.memory_cap.bytes,
+        settings.memory_cap.source.label(),
+    ));
+    if !check_the_apparatus_sha256(&mut emitter) {
+        return EXIT_CODE_STOP_CLAUSE;
+    }
+    let disagreeing = constants_disagreeing_with_the_crates();
+    for (name, local_value, crates_value) in &disagreeing {
+        emitter.line(&format!(
+            "name=stop_clause clause=1 constant={name} local={local_value} crates={crates_value}"
+        ));
+    }
+    if !disagreeing.is_empty() {
+        emitter.line(&format!(
+            "name=verdict segment=geometry_check constant_mismatches={}",
+            disagreeing.len()
+        ));
+        emitter.finish();
+        return EXIT_CODE_STOP_CLAUSE;
+    }
+    emitter.declare(DeclaredSegment::Parallel);
+    let mut prepared_points: Vec<PreparedPoint> = Vec::new();
+    let mut remaining_points: &[SamplingPoint] = points;
+    // 迭代上界：每一圈至少造一个点（组的份数保底 1），points.len() 圈之内做完
+    while !remaining_points.is_empty() {
+        let peak_bytes_in_order: Vec<u64> = remaining_points
+            .iter()
+            .map(|point| {
+                estimated_pool_footprint_bytes_before_construction(*point)
+                    * POOLS_HELD_WHILE_PREPARING_A_SAMPLING_POINT
+            })
+            .collect();
+        let group_size = tasks_of_the_next_group(
+            &peak_bytes_in_order,
+            settings.threads,
+            settings.memory_cap.bytes,
+        )
+        .clamp(1, remaining_points.len());
+        let (points_of_this_group, later_points) = remaining_points.split_at(group_size);
+        let prepared_group: Vec<PreparedPoint> = std::thread::scope(|scope| {
+            let running: Vec<_> = points_of_this_group
+                .iter()
+                .map(|point| {
+                    scope.spawn(move || {
+                        prepare_the_sampling_point_with_the_order(*point, overwrite_order)
+                    })
+                })
+                .collect();
+            running
+                .into_iter()
+                .map(|thread| {
+                    thread
+                        .join()
+                        .unwrap_or_else(|panic_content| std::panic::resume_unwind(panic_content))
+                })
+                .collect()
+        });
+        prepared_points.extend(prepared_group);
+        remaining_points = later_points;
+    }
+    for prepared in &prepared_points {
+        for line in &prepared.lines {
+            emitter.line(line);
+        }
+        emitter.line(&pool_line(prepared, 0));
+    }
+    emitter.line(&format!(
+        "name=verdict segment=geometry_check constant_mismatches=0 overwrite_order={} points={} geometry_formed_points={}",
+        overwrite_order.label(),
+        prepared_points.len(),
+        prepared_points
+            .iter()
+            .filter(|prepared| prepared.is_the_geometry_formed)
+            .count(),
+    ));
+    emitter.finish();
+    EXIT_CODE_OK
+}
+
 /// 准入与运行条件（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`「开头先判」Rust 那一行）：起 `preflight.py check`，
 /// 退出码不是 0 就原样退出；强制跑（`--force`）时交回摘要，`main` 把它作为头一行打到标准输出（同 E183 装置的写法）。
 fn preflight() -> Option<String> {
@@ -7597,6 +18825,21 @@ fn usage() {
     eprintln!("  e185_gc_batch_wall_clock_split stage-split [--point <0.25|0.75>:<1024|8192>]…");
     eprintln!("  e185_gc_batch_wall_clock_split gpu-submission --wall-clock-product <文件> --stage-split-product <文件> --cards <序号,…>");
     eprintln!("  e185_gc_batch_wall_clock_split foreground-fsync --image-directory <目录> --point <0.25|0.75>:<1024|8192> --batch-units <4|8|16> [--seconds <秒>]");
+    eprintln!("  e185_gc_batch_wall_clock_split geometry-check [--point <0.25|0.75>:<1024|8192>]… [--overwrite-order slot-order]");
+    eprintln!("  e185_gc_batch_wall_clock_split host-cpu-per-submission --cards <序号,…> --stage-split-product <文件> --attack-ledger <文件>");
+    eprintln!("  e185_gc_batch_wall_clock_split recompute-disagreement --cards <序号,…>");
+    eprintln!("  e185_gc_batch_wall_clock_split function-split [--point <0.25|0.75>:<1024|8192>]…");
+    eprintln!("  e185_gc_batch_wall_clock_split host-cpu-drift-control --cards <序号,…> --stage-split-product <文件> --attack-ledger <文件>");
+    eprintln!("  e185_gc_batch_wall_clock_split cpu-writings [--point <0.25|0.75>:<1024|8192>]…");
+}
+
+/// `--cards 0,1` 的序号表；写错交回 `None`。
+fn cards_of(options: &BTreeMap<String, Vec<String>>) -> Option<Vec<u32>> {
+    single_option(options, "cards").and_then(|text| {
+        text.split(',')
+            .map(|index| index.trim().parse::<u32>().ok())
+            .collect()
+    })
 }
 
 /// 一个子命令的选项：`--名字 值` 成对，`--point` 可以给几次。认不得的、缺值的交回 `None`。
@@ -7660,6 +18903,23 @@ fn run_the_subcommand(words: &[&str]) -> i32 {
                 }
             }
         }
+        "geometry-check" if known(&["point", "overwrite-order"]) => {
+            let overwrite_order = match options.get("overwrite-order") {
+                None => Some(OverwriteOrder::HighestFullSegmentLast),
+                Some(_) => {
+                    single_option(&options, "overwrite-order").and_then(OverwriteOrder::of_argument)
+                }
+            };
+            match (points_of(&options), overwrite_order) {
+                (Some(points), Some(overwrite_order)) => {
+                    run_the_geometry_check(&points, overwrite_order)
+                }
+                (None, _) | (_, None) => {
+                    usage();
+                    EXIT_CODE_USAGE
+                }
+            }
+        }
         "stage-split" if known(&["point"]) => match points_of(&options) {
             Some(points) => run_the_stage_split_segment(&points),
             None => {
@@ -7691,6 +18951,65 @@ fn run_the_subcommand(words: &[&str]) -> i32 {
                 }
             }
         }
+        "host-cpu-per-submission" if known(&["cards", "stage-split-product", "attack-ledger"]) => {
+            match (
+                cards_of(&options),
+                single_option(&options, "stage-split-product"),
+                single_option(&options, "attack-ledger"),
+            ) {
+                (Some(card_indices), Some(stage_split_product), Some(attack_ledger)) => {
+                    run_the_host_cpu_per_submission_segment(
+                        Path::new(stage_split_product),
+                        Path::new(attack_ledger),
+                        &card_indices,
+                    )
+                }
+                (None, _, _) | (_, None, _) | (_, _, None) => {
+                    usage();
+                    EXIT_CODE_USAGE
+                }
+            }
+        }
+        "recompute-disagreement" if known(&["cards"]) => match cards_of(&options) {
+            Some(card_indices) => run_the_recompute_disagreement_segment(&card_indices),
+            None => {
+                usage();
+                EXIT_CODE_USAGE
+            }
+        },
+        "host-cpu-drift-control" if known(&["cards", "stage-split-product", "attack-ledger"]) => {
+            match (
+                cards_of(&options),
+                single_option(&options, "stage-split-product"),
+                single_option(&options, "attack-ledger"),
+            ) {
+                (Some(card_indices), Some(stage_split_product), Some(attack_ledger)) => {
+                    run_the_host_cpu_drift_control_segment(
+                        Path::new(stage_split_product),
+                        Path::new(attack_ledger),
+                        &card_indices,
+                    )
+                }
+                (None, _, _) | (_, None, _) | (_, _, None) => {
+                    usage();
+                    EXIT_CODE_USAGE
+                }
+            }
+        }
+        "cpu-writings" if known(&["point"]) => match points_of(&options) {
+            Some(points) => run_the_cpu_writings_segment(&points),
+            None => {
+                usage();
+                EXIT_CODE_USAGE
+            }
+        },
+        "function-split" if known(&["point"]) => match points_of(&options) {
+            Some(points) => run_the_function_split_segment(&points),
+            None => {
+                usage();
+                EXIT_CODE_USAGE
+            }
+        },
         "foreground-fsync" if known(&["image-directory", "point", "batch-units", "seconds"]) => {
             let point = single_option(&options, "point").and_then(SamplingPoint::of_argument);
             let batch_units = single_option(&options, "batch-units")
@@ -7751,6 +19070,69 @@ fn run_the_gpu_submission_segment(
     emitter.finish();
     eprintln!("本次未跑：没编 gpu 特性（带 --features gpu 编这个 bin，经 scripts/crash/gpu-quiesce-run.sh 起）");
     EXIT_CODE_NOT_RUN
+}
+
+#[cfg(feature = "gpu")]
+fn run_the_host_cpu_per_submission_segment(
+    stage_split_product: &Path,
+    attack_ledger: &Path,
+    card_indices: &[u32],
+) -> i32 {
+    host_cpu_per_submission_segment::run(stage_split_product, attack_ledger, card_indices)
+}
+
+#[cfg(feature = "gpu")]
+fn run_the_recompute_disagreement_segment(card_indices: &[u32]) -> i32 {
+    recompute_disagreement_segment::run(card_indices)
+}
+
+#[cfg(feature = "gpu")]
+fn run_the_host_cpu_drift_control_segment(
+    stage_split_product: &Path,
+    attack_ledger: &Path,
+    card_indices: &[u32],
+) -> i32 {
+    host_cpu_drift_control_segment::run(stage_split_product, attack_ledger, card_indices)
+}
+
+/// 没编 `gpu` 特性：第 3 次重跑的两段 GPU 子命令本次未跑（退 78），同原 `gpu-submission`。
+#[cfg(not(feature = "gpu"))]
+fn gpu_segment_not_compiled(segment: &str, card_indices: &[u32]) -> i32 {
+    let mut emitter = Emitter::new();
+    emitter.line(&format!(
+        "name=verdict segment={segment} status=not_run reason=gpu_feature_not_compiled cards={}",
+        card_indices
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    ));
+    emitter.finish();
+    eprintln!("本次未跑：没编 gpu 特性（带 --features gpu 编这个 bin，经 scripts/crash/gpu-quiesce-run.sh 起）");
+    EXIT_CODE_NOT_RUN
+}
+
+#[cfg(not(feature = "gpu"))]
+fn run_the_host_cpu_per_submission_segment(
+    _stage_split_product: &Path,
+    _attack_ledger: &Path,
+    card_indices: &[u32],
+) -> i32 {
+    gpu_segment_not_compiled("host_cpu_per_submission", card_indices)
+}
+
+#[cfg(not(feature = "gpu"))]
+fn run_the_recompute_disagreement_segment(card_indices: &[u32]) -> i32 {
+    gpu_segment_not_compiled("recompute_disagreement", card_indices)
+}
+
+#[cfg(not(feature = "gpu"))]
+fn run_the_host_cpu_drift_control_segment(
+    _stage_split_product: &Path,
+    _attack_ledger: &Path,
+    card_indices: &[u32],
+) -> i32 {
+    gpu_segment_not_compiled("host_cpu_drift_control", card_indices)
 }
 
 fn main() {
@@ -7895,6 +19277,8 @@ mod tests {
             span_slots,
             generation: singlefs_core::address::CheckpointTxg(7),
             is_released,
+            quarantine_mark:
+                singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
         }
     }
 
@@ -8415,12 +19799,55 @@ mod tests {
 
     #[test]
     fn thread_cpu_time_advances_while_the_thread_spins() {
-        let before = thread_cpu_nanoseconds().expect("线程 CPU 时钟读得到");
-        busy_wait_for(Duration::from_millis(30));
-        let after = thread_cpu_nanoseconds().expect("线程 CPU 时钟读得到");
+        // 按线程 CPU 钟转够 30 ms（或挂钟走满 20 秒）：满载时线程被换下来，按挂钟忙等 30 ms 转不出 15 ms 的 CPU，按 CPU 钟转不受它影响
+        let spin = spin_by_the_cpu_clock_until_it_advances_or_the_wall_runs_out(
+            30_000_000,
+            20_000_000_000,
+            thread_cpu_nanoseconds,
+            || RawWallClockReading::now().0,
+        )
+        .expect("线程 CPU 时钟读得到");
         assert!(
-            after >= before + 15_000_000,
-            "忙等 30 ms，线程 CPU 时钟至少前进 15 ms：{before} → {after}"
+            spin.cpu_advanced_nanoseconds >= 15_000_000,
+            "按线程 CPU 钟转 30 ms，线程 CPU 时钟至少前进 15 ms：{spin:?}"
+        );
+    }
+
+    /// 假钟：CPU 钟只按挂钟一半的速度走（满载时线程有一半时间被换下来）。按 CPU 钟转的要转到 CPU 钟走满 30 ms（挂钟 60 ms）才停；
+    /// 按挂钟转的挂钟走满 30 ms 就停，CPU 钟只走了 15 ms。
+    #[test]
+    fn spinning_by_the_cpu_clock_runs_until_the_cpu_clock_advances_even_at_half_the_wall_speed() {
+        let wall = std::cell::Cell::new(0_u64);
+        let read_the_wall = || {
+            wall.set(wall.get() + 1_000);
+            wall.get()
+        };
+        let read_the_cpu = || Some(wall.get() / 2);
+        let spin = spin_by_the_cpu_clock_until_it_advances_or_the_wall_runs_out(
+            30_000_000,
+            20_000_000_000,
+            read_the_cpu,
+            read_the_wall,
+        )
+        .expect("假钟读得到");
+        assert!(
+            spin.cpu_advanced_nanoseconds >= 30_000_000,
+            "CPU 钟要走满 30 ms：{spin:?}"
+        );
+        assert!(
+            spin.wall_elapsed_nanoseconds >= 60_000_000,
+            "挂钟跟着走了两倍：{spin:?}"
+        );
+        let stopped = spin_by_the_cpu_clock_until_it_advances_or_the_wall_runs_out(
+            30_000_000,
+            5_000_000,
+            || Some(0),
+            read_the_wall,
+        )
+        .expect("假钟读得到");
+        assert_eq!(
+            stopped.cpu_advanced_nanoseconds, 0,
+            "钟停着不走时挂钟走满上限就停"
         );
     }
 
@@ -8837,8 +20264,10 @@ mod tests {
                 WriteDurability::Plain,
             )
             .expect("写");
-        let path =
-            std::env::temp_dir().join(format!("e185-digest-test-{}.img", std::process::id()));
+        // 守卫认领镜像：用例做完、断言失败、panic 都删掉它
+        let path = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e185-digest-test-{}.img", std::process::id())),
+        );
         let _ = std::fs::remove_file(&path);
         create_a_zero_filled_image(&path, 3 * IMAGE_CHUNK_BYTES).expect("建全零镜像");
         write_the_memory_device_into(&path, &device).expect("写进镜像");
@@ -8857,7 +20286,6 @@ mod tests {
             file_digest,
             "改一个字节摘要就不同"
         );
-        std::fs::remove_file(&path).expect("删掉自己建的镜像");
     }
 
     /// 端到端（内存盘、小池）：造池、核几何、量一条意图，第七节锚点与停机条款第 2、3、5、6 条不触发，第二段的重放（停机条款第 4 条）对得上。
@@ -8989,7 +20417,10 @@ mod tests {
             "e185-configuration-line-private-directory-{}",
             std::process::id()
         );
-        let directory = std::env::temp_dir().join(&private_name);
+        // 守卫认领配置行那一步建的目录：用例做完、断言失败、panic 都删掉它
+        let directory = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(&private_name),
+        );
         let line = wall_clock_configuration_line(
             &directory,
             &every_sampling_point(),
@@ -8998,7 +20429,6 @@ mod tests {
         let device_number = std::fs::metadata(&directory)
             .expect("配置行那一步建了这个目录")
             .dev();
-        std::fs::remove_dir(&directory).expect("删掉这条单测建的空目录");
         let directory_text = directory.display().to_string();
         assert!(
             !line.contains(&directory_text),
@@ -9489,6 +20919,7 @@ mod tests {
             release_rounds: 0,
             is_every_overwritten_slot_released: true,
             construction_seconds: 0.0,
+            overwrite_landing: None,
         };
         assert_eq!(footprint_bytes_of_the_pool(&pool), 3200, "5 个扇区 × 640");
     }
@@ -9571,6 +21002,7 @@ mod tests {
             release_rounds: 0,
             is_every_overwritten_slot_released: true,
             construction_seconds: 0.0,
+            overwrite_landing: None,
         }
     }
 
@@ -9792,10 +21224,12 @@ mod tests {
             declaration_line(DeclaredSegment::Parallel, 1_700_000_000.0),
             "1700000000.000\t此刻并行"
         );
-        let path =
-            std::env::temp_dir().join(format!("e185-serial-declarations-{}", std::process::id()));
+        // 守卫认领声明文件：用例做完、断言失败、panic 都删掉它
+        let path = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e185-serial-declarations-{}", std::process::id())),
+        );
         let _absent_before = std::fs::remove_file(&path);
-        let mut declarations = SerialDeclarations::into_the_file(path.clone());
+        let mut declarations = SerialDeclarations::into_the_file(path.to_path_buf());
         let wall_clock =
             DeclaredSegment::Serial(TimingWindow::WallClockCompactionRun.serial_reason());
         let sequential =
@@ -9812,7 +21246,6 @@ mod tests {
         .collect();
         assert_eq!(written, vec![true, true, false, true, true], "同一段不重写");
         let text = std::fs::read_to_string(&path).expect("读得回声明文件");
-        std::fs::remove_file(&path).expect("删掉这条单测建的文件");
         assert!(text.ends_with('\n'), "每行带换行");
         let split: Vec<(f64, &str)> = text
             .lines()
@@ -9918,11 +21351,15 @@ mod tests {
             running.fetch_sub(1, Ordering::SeqCst);
             fake_preparation_outcome(work, None, 1000)
         };
+        // 守卫认领声明文件：用例做完、断言失败、panic 都删掉它
         let declarations_path =
-            std::env::temp_dir().join(format!("e185-phase-declarations-{}", std::process::id()));
+            singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+                std::env::temp_dir()
+                    .join(format!("e185-phase-declarations-{}", std::process::id())),
+            );
         let _absent_before = std::fs::remove_file(&declarations_path);
         let mut emitter = Emitter::with_declarations(SerialDeclarations::into_the_file(
-            declarations_path.clone(),
+            declarations_path.to_path_buf(),
         ));
         let settings = preparation_settings_with(31, 28 << 30);
         let mut queue = PreparationQueue::new("stage_split", &points, None, &settings, &worker);
@@ -9950,7 +21387,6 @@ mod tests {
         assert_eq!(most_running.load(Ordering::SeqCst), 10, "十份真同时在跑");
         assert_eq!(running.load(Ordering::SeqCst), 0, "交回时准备线程都已停");
         let declarations = std::fs::read_to_string(&declarations_path).expect("准备开始时写了声明");
-        std::fs::remove_file(&declarations_path).expect("删掉这条单测建的文件");
         let bodies: Vec<&str> = declarations
             .lines()
             .map(|line| line.split_once('\t').map_or("", |(_seconds, body)| body))
@@ -10209,8 +21645,10 @@ mod tests {
 
     #[test]
     fn dropping_the_page_cache_of_a_file_keeps_its_bytes_and_a_missing_file_is_an_error() {
-        let path =
-            std::env::temp_dir().join(format!("e185-page-cache-drop-{}", std::process::id()));
+        // 守卫认领临时文件：断言失败、panic 时也删掉它（用例自己先删一次，要看文件不在时报什么）
+        let path = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!("e185-page-cache-drop-{}", std::process::id())),
+        );
         std::fs::write(&path, vec![9_u8; 8192]).expect("写得进临时文件");
         drop_the_page_cache_of_the_file(&path).expect("扔页缓存成功");
         assert_eq!(std::fs::read(&path).expect("读得回"), vec![9_u8; 8192]);
@@ -10219,5 +21657,4194 @@ mod tests {
             drop_the_page_cache_of_the_file(&path).is_err(),
             "文件不在时报错"
         );
+    }
+
+    // ───────── 第 2 次重跑（登记 `research/prompts/e185-r2-prereg.md` 第五节改动一至七、第九节 V56 起） ─────────
+
+    /// 手搭的分段输入：两个混住段（起点 0、320，各 3 个单元）、三个整段（起点 64、128、192，各按占比覆盖写），段 64 槽号最小的那个单元另由配方点名。
+    /// 输入次序倒过来，次序函数自己排。
+    fn units_to_overwrite_of_five_segments(fraction: LiveSlotFraction) -> Vec<UnitToOverwrite> {
+        let mut units = Vec::new();
+        for segment_start_slot in [0_u64, 320] {
+            for position in 0..3_u64 {
+                units.push(UnitToOverwrite {
+                    old_slot: segment_start_slot + 2 * position,
+                    inode: 1000 + segment_start_slot + position,
+                    segment_start_slot,
+                    is_in_a_segment_full_of_this_workload: false,
+                    is_named_by_the_recipe: false,
+                });
+            }
+        }
+        for segment_start_slot in [64_u64, 128, 192] {
+            for position in 0..32_u64 {
+                let is_named_by_the_recipe = segment_start_slot == 64 && position == 0;
+                if fraction.is_overwritten(position) || is_named_by_the_recipe {
+                    units.push(UnitToOverwrite {
+                        old_slot: segment_start_slot + 2 * position,
+                        inode: 2000 + segment_start_slot + position,
+                        segment_start_slot,
+                        is_in_a_segment_full_of_this_workload: true,
+                        is_named_by_the_recipe,
+                    });
+                }
+            }
+        }
+        units.reverse();
+        units
+    }
+
+    /// 改法甲（占比 0.25）：混住段与配方点名的先写，整段按段起点升序，槽号最大的那一整段（起点 192）的 24 个最后写；组内按旧槽号升序。
+    #[test]
+    fn overwrite_order_at_one_quarter_writes_the_mixed_segments_first_and_the_highest_full_segment_last(
+    ) {
+        let units = units_to_overwrite_of_five_segments(LiveSlotFraction::OneQuarter);
+        let order = overwrite_order_of(
+            LiveSlotFraction::OneQuarter,
+            OverwriteOrder::HighestFullSegmentLast,
+            &units,
+        );
+        let expected_slots: Vec<u64> = [0_u64, 2, 4, 64, 320, 322, 324]
+            .into_iter()
+            .chain(
+                [64_u64, 128, 192]
+                    .into_iter()
+                    .flat_map(|segment_start_slot| {
+                        (0..32_u64)
+                            .filter(|position| !position.is_multiple_of(4))
+                            .map(move |position| segment_start_slot + 2 * position)
+                    }),
+            )
+            .collect();
+        assert_eq!(
+            order
+                .iter()
+                .map(|(old_slot, _inode)| *old_slot)
+                .collect::<Vec<_>>(),
+            expected_slots
+        );
+        assert_eq!(order.len(), 7 + 3 * 24);
+        assert!(
+            order[order.len() - 24..]
+                .iter()
+                .all(|(old_slot, _inode)| (192..256).contains(old_slot)),
+            "最后 24 个全是槽号最大那一整段的"
+        );
+        assert_eq!(order[3], (64, 2064), "配方点名的那个单元跟着混住段先写");
+    }
+
+    /// 占比 0.75 用改法甲、或任何占比用 `slot-order`，都与按旧槽号升序（第 1 次重跑的 `sort_unstable`）逐项相同。
+    #[test]
+    fn overwrite_order_at_three_quarters_and_in_slot_order_equals_sorting_by_the_old_slot() {
+        for (fraction, overwrite_order) in [
+            (
+                LiveSlotFraction::ThreeQuarters,
+                OverwriteOrder::HighestFullSegmentLast,
+            ),
+            (LiveSlotFraction::ThreeQuarters, OverwriteOrder::SlotOrder),
+            (LiveSlotFraction::OneQuarter, OverwriteOrder::SlotOrder),
+        ] {
+            let units = units_to_overwrite_of_five_segments(fraction);
+            let mut sorted: Vec<(u64, u64)> = units
+                .iter()
+                .map(|unit| (unit.old_slot, unit.inode))
+                .collect();
+            sorted.sort_unstable();
+            assert_eq!(
+                overwrite_order_of(fraction, overwrite_order, &units),
+                sorted,
+                "{fraction:?} {overwrite_order:?}"
+            );
+        }
+    }
+
+    /// N12：前 24 份落在前沿（1000 起），后 6 份落进前面空出的旧槽；落在之后才空出的槽上的不算旧洞。
+    #[test]
+    fn copies_landing_in_holes_count_only_the_slots_opened_by_earlier_overwrites() {
+        let old_slots: Vec<u64> = (0..30_u64).map(|index| 2 * index).collect();
+        let new_slots: Vec<u64> = (0..24_u64)
+            .map(|index| 1000 + 2 * index)
+            .chain((0..6_u64).map(|index| 2 * index))
+            .collect();
+        assert_eq!(
+            landings_of_the_copies(&old_slots, &new_slots),
+            OverwriteLanding {
+                copies_landing_in_holes_of_this_construction: 6,
+                copies_landing_elsewhere: 24,
+            }
+        );
+        assert_eq!(
+            landings_of_the_copies(&[10, 20], &[20, 30]),
+            OverwriteLanding {
+                copies_landing_in_holes_of_this_construction: 0,
+                copies_landing_elsewhere: 2,
+            },
+            "第 0 份落在第 1 次才空出的槽上，不是这之前打出的洞"
+        );
+        assert_eq!(predicted_copies_landing_in_holes(776), 752);
+        assert_eq!(predicted_copies_landing_in_holes(6152), 6128);
+        assert_eq!(predicted_copies_landing_in_holes(280), 256);
+        assert_eq!(predicted_copies_landing_in_holes(2072), 2048);
+    }
+
+    /// 改动三的计数只读、不改池：P = 128、占比 0.75 的小池，数与不数副本落点造出的池逐块相同（第五节「怎么核」第 2 道的单测一半）。
+    #[test]
+    fn counting_the_overwrite_landings_leaves_the_pool_digests_unchanged() {
+        let recipe = first_recipe_of(small_point(128));
+        let counted = construct_the_pool(&recipe, LandingCount::Counted);
+        let not_counted = construct_the_pool(&recipe, LandingCount::NotCounted);
+        assert_eq!(
+            digests_of_the_pool(&counted),
+            digests_of_the_pool(&not_counted),
+            "数落点不许多发一次发布、不许改池"
+        );
+        let landing = counted.overwrite_landing.expect("改法甲那一份数了落点");
+        assert_eq!(
+            landing.copies_landing_in_holes_of_this_construction + landing.copies_landing_elsewhere,
+            counted.overwritten_units
+        );
+        assert!(not_counted.overwrite_landing.is_none());
+    }
+
+    /// N11：一段 16 个这次写的槽、2 个别的槽（节点），已释放的不算；单元区起点之下的记录不进逐段成分；活槽 = 16 且全是这次写的那一段在占比 0.25 下算造成。
+    #[test]
+    fn segment_composition_counts_this_workload_and_other_slots_apart() {
+        let mut live_data_inode_by_slot = BTreeMap::new();
+        let mut records = vec![record(50_000, 1, false)];
+        for index in 0..8_u64 {
+            let slot = 50_304 + 2 * index;
+            records.push(record(slot, 2, false));
+            live_data_inode_by_slot.insert(slot, 100 + index);
+            let slot_in_the_next_segment = 50_368 + 2 * index;
+            records.push(record(slot_in_the_next_segment, 2, false));
+            live_data_inode_by_slot.insert(slot_in_the_next_segment, 200 + index);
+        }
+        records.push(record(50_320, 1, false));
+        records.push(record(50_321, 1, false));
+        records.push(record(50_330, 2, true));
+        let composition =
+            composition_of_the_segment(&records, region_at(50_304), &live_data_inode_by_slot);
+        assert_eq!(
+            composition,
+            SegmentComposition {
+                start_slot: 50_304,
+                live_slots: 18,
+                slots_of_this_workload: 16,
+                other_slots: 2,
+            }
+        );
+        let every_segment = compositions_of_every_segment_holding_an_unreleased_record(
+            &records,
+            50_304,
+            &live_data_inode_by_slot,
+        );
+        assert_eq!(
+            every_segment
+                .iter()
+                .map(|segment| segment.start_slot)
+                .collect::<Vec<_>>(),
+            vec![50_304, 50_368]
+        );
+        let point = SamplingPoint {
+            fraction: LiveSlotFraction::OneQuarter,
+            pool_data_units: 1024,
+        };
+        let lines: Vec<String> = every_segment
+            .iter()
+            .map(|segment| {
+                segment_composition_line(point, OverwriteOrder::HighestFullSegmentLast, 0, *segment)
+            })
+            .collect();
+        assert!(
+            lines[0].ends_with(
+                "region_start_slot=50304 live_slots=18 slots_of_this_workload=16 other_slots=2 formed=false"
+            ),
+            "{}",
+            lines[0]
+        );
+        assert!(
+            lines[1].ends_with(
+                "region_start_slot=50368 live_slots=16 slots_of_this_workload=16 other_slots=0 formed=true"
+            ),
+            "{}",
+            lines[1]
+        );
+    }
+
+    /// R2-1：前或后的校准比有一个超过 1.10 就作废；比 = 这一次 ÷ 基线。
+    #[test]
+    fn calibration_ratio_above_one_point_one_before_or_after_voids_the_intent() {
+        assert!(
+            is_voided_by_the_calibration_ratios(
+                calibration_ratio(1_200_000.0, 1_000_000.0),
+                calibration_ratio(1_000_000.0, 1_000_000.0)
+            ),
+            "基线 1 ms、这一次 1.2 ms：比 1.2，作废"
+        );
+        assert!(
+            is_voided_by_the_calibration_ratios(1.00, 1.30),
+            "前 1.00、后 1.30：作废"
+        );
+        assert!(!is_voided_by_the_calibration_ratios(1.05, 0.98));
+    }
+
+    /// R2-1 的边界：正好 1.10 不作废（门槛不含等号）。
+    #[test]
+    fn calibration_ratio_of_exactly_one_point_one_does_not_void() {
+        assert!(!is_voided_by_the_calibration_ratios(1.10, 1.10));
+    }
+
+    fn calibration_reading_with(
+        crc_median_nanoseconds: Option<f64>,
+        are_the_anchors_holding: bool,
+    ) -> CalibrationReading {
+        CalibrationReading {
+            crc_median_nanoseconds,
+            crc_runs_off_the_anchor: usize::from(!are_the_anchors_holding),
+            chase_nanoseconds: Some(100_000_000.0),
+            is_the_chase_end_the_anchor: true,
+        }
+    }
+
+    /// 停机 10 按遍累计：一次校准里 CRC 有两遍不是锚点、追指针终点也不符，算三遍。
+    #[test]
+    fn calibration_anchor_mismatches_count_every_run_off_the_anchor() {
+        let reading = CalibrationReading {
+            crc_median_nanoseconds: Some(1_000_000.0),
+            crc_runs_off_the_anchor: 2,
+            chase_nanoseconds: Some(100_000_000.0),
+            is_the_chase_end_the_anchor: false,
+        };
+        assert_eq!(reading.anchor_mismatching_runs(), 3);
+        assert!(!reading.are_the_anchors_holding());
+        assert_eq!(
+            calibration_reading_with(Some(1_000_000.0), true).anchor_mismatching_runs(),
+            0
+        );
+    }
+
+    /// 停机 10 与读不到：锚点不符先判（比再小也是锚点不符），CRC 那份读不到判读不到，都写进 `invalid_reason`。
+    #[test]
+    fn calibration_verdict_puts_an_anchor_mismatch_before_the_ratio_and_an_unreadable_clock() {
+        let baseline = CalibrationBaseline {
+            crc_median_nanoseconds: 1_000_000.0,
+            chase_median_nanoseconds: Some(100_000_000.0),
+            are_the_anchors_holding: true,
+        };
+        let holding = calibration_reading_with(Some(1_000_000.0), true);
+        let mismatching = calibration_reading_with(Some(1_000_000.0), false);
+        let slow = calibration_reading_with(Some(1_300_000.0), true);
+        let unreadable = calibration_reading_with(None, true);
+        assert_eq!(
+            calibration_verdict(&holding, &holding, &baseline),
+            CalibrationVerdict::Holds
+        );
+        assert_eq!(
+            calibration_verdict(&holding, &mismatching, &baseline),
+            CalibrationVerdict::AnchorMismatch
+        );
+        assert_eq!(
+            calibration_verdict(&holding, &slow, &baseline),
+            CalibrationVerdict::RatioAboveTheEdge
+        );
+        assert_eq!(
+            calibration_verdict(&unreadable, &holding, &baseline),
+            CalibrationVerdict::Unreadable
+        );
+        assert_eq!(
+            CalibrationVerdict::RatioAboveTheEdge.invalid_reason(),
+            Some("calibration_ratio_above_the_registered_edge")
+        );
+        assert_eq!(CalibrationVerdict::Holds.invalid_reason(), None);
+    }
+
+    /// R2-2：校准作废之后头两次读 1.30、1.25，第三、四次 1.02、1.03，等到第四次（40 秒）才回去重量；假钟与假校准源，不真睡。
+    /// 别的原因（挂载失败）当场重量：不睡、不校准。
+    #[test]
+    fn waiting_retries_only_after_two_normal_calibrations_in_a_row() {
+        let mut ledger = WaitingLedger {
+            total_seconds: 0,
+            longest_seconds: 0,
+            waits: 0,
+        };
+        let mut ratios = [1.30, 1.25, 1.02, 1.03].into_iter();
+        let mut calibrate = || ratios.next();
+        let mut slept: Vec<Duration> = Vec::new();
+        let mut sleep = |duration: Duration| slept.push(duration);
+        let wait = wait_before_the_retry(
+            CALIBRATION_RATIO_INVALID_REASON,
+            &mut ledger,
+            &mut calibrate,
+            &mut sleep,
+        )
+        .expect("校准比作废的要先等常态");
+        assert_eq!(wait.checks, 4);
+        assert_eq!(wait.waited_seconds, 40);
+        assert_eq!(wait.outcome, NormalWaitOutcome::BackToNormal);
+        assert_eq!(slept, vec![Duration::from_secs(10); 4]);
+        assert_eq!(
+            ledger,
+            WaitingLedger {
+                total_seconds: 40,
+                longest_seconds: 40,
+                waits: 1,
+            }
+        );
+        let mut calibration_not_expected =
+            || -> Option<f64> { panic!("当场重量的原因不做校准") };
+        let mut sleep_not_expected = |_duration: Duration| panic!("当场重量的原因不睡");
+        assert!(wait_before_the_retry(
+            "mount_failed",
+            &mut ledger,
+            &mut calibration_not_expected,
+            &mut sleep_not_expected,
+        )
+        .is_none());
+        assert!(is_retried_only_after_the_machine_is_back_to_normal(
+            "unaccounted_time_above_ten_percent_of_the_wall"
+        ));
+    }
+
+    /// R2-2 的上限：校准一直读 1.30，头一次等满 300 秒照样重量；一段累计到 600 秒就停这一段、退 5。
+    #[test]
+    fn waiting_stops_the_segment_after_six_hundred_seconds_in_total_with_exit_code_five() {
+        let mut ledger = WaitingLedger {
+            total_seconds: 0,
+            longest_seconds: 0,
+            waits: 0,
+        };
+        let mut calibrate = || Some(1.30);
+        let mut sleep = |_duration: Duration| {};
+        let wait_reaching_the_one_wait_cap = wait_before_the_retry(
+            CALIBRATION_RATIO_INVALID_REASON,
+            &mut ledger,
+            &mut calibrate,
+            &mut sleep,
+        )
+        .expect("要等");
+        assert_eq!(
+            wait_reaching_the_one_wait_cap.outcome,
+            NormalWaitOutcome::OneWaitCapReached
+        );
+        assert_eq!(wait_reaching_the_one_wait_cap.checks, 30);
+        assert_eq!(wait_reaching_the_one_wait_cap.waited_seconds, 300);
+        assert_eq!(
+            wait_reaching_the_one_wait_cap
+                .outcome
+                .exit_code_stopping_the_segment(),
+            None
+        );
+        let wait_reaching_the_segment_cap = wait_before_the_retry(
+            CALIBRATION_RATIO_INVALID_REASON,
+            &mut ledger,
+            &mut calibrate,
+            &mut sleep,
+        )
+        .expect("要等");
+        assert_eq!(
+            wait_reaching_the_segment_cap.outcome,
+            NormalWaitOutcome::SegmentWaitCapReached
+        );
+        assert_eq!(ledger.total_seconds, 600);
+        assert_eq!(
+            wait_reaching_the_segment_cap
+                .outcome
+                .exit_code_stopping_the_segment(),
+            Some(5)
+        );
+    }
+
+    /// 第七节乙类：16 MiB 校准缓冲的 CRC-32C 是 0x3430be3b，32 MiB 是 0x84b65aa5，追指针从 0 走 2^20 步落在 9437184。
+    #[test]
+    fn calibration_work_gives_the_registered_crc_and_chase_anchors() {
+        let buffer = calibration_buffer(16 << 20);
+        assert_eq!(crc32_castagnoli(&buffer), 0x3430_be3b);
+        assert_eq!(crc32_castagnoli(&calibration_buffer(32 << 20)), 0x84b6_5aa5);
+        let table = chase_table();
+        assert_eq!(table.len(), 16_777_216);
+        let (_nanoseconds, end_index) = one_chase_run(&table).expect("线程 CPU 时钟读得到");
+        assert_eq!(end_index, 9_437_184);
+        let reading = calibration_reading(&buffer, &table);
+        assert!(reading.are_the_anchors_holding());
+        assert!(reading
+            .crc_median_nanoseconds
+            .is_some_and(|nanoseconds| nanoseconds > 0.0));
+    }
+
+    /// R2-4：段末 ÷ 段开头不在 [0.90, 1.10] 里记漂移，两端不算。
+    #[test]
+    fn calibration_baseline_drift_is_flagged_outside_ninety_to_one_hundred_ten_percent() {
+        assert!(calibration_drifted(calibration_ratio(
+            1_200_000.0,
+            1_000_000.0
+        )));
+        assert!(calibration_drifted(0.85));
+        assert!(!calibration_drifted(1.0));
+        assert!(!calibration_drifted(0.90));
+        assert!(!calibration_drifted(1.10));
+        let end = CalibrationBaseline {
+            crc_median_nanoseconds: 1_200_000.0,
+            chase_median_nanoseconds: None,
+            are_the_anchors_holding: true,
+        };
+        assert!(
+            calibration_baseline_line("wall_clock", "end", &end, Some(1.2))
+                .ends_with("ratio_of_the_end_to_the_start=1.200000 drifted=true")
+        );
+    }
+
+    fn stage_share_row_of(
+        kind: CallKind,
+        choose_share_per_batch: Option<f64>,
+        choose_share_of_the_issue: Option<f64>,
+    ) -> StageShareRow {
+        StageShareRow {
+            kind,
+            crc_cpu_nanoseconds: None,
+            scan_cpu_nanoseconds: None,
+            scan_increment_cpu_nanoseconds: None,
+            choose_cpu_nanoseconds: None,
+            crc_share: None,
+            scan_increment_share: None,
+            choose_share_per_batch,
+            choose_share_of_the_issue,
+        }
+    }
+
+    /// N13：丙段的判定从签发那一行收（签发行 0.15、批行读不到 ⇒ 值得），不从批行收。
+    #[test]
+    fn choose_judgement_reads_the_issue_row_not_the_batch_rows() {
+        let rows = [
+            stage_share_row_of(CallKind::Issue, Some(0.15), None),
+            stage_share_row_of(CallKind::Batch, None, None),
+        ];
+        let (per_round, judgement) =
+            choose_judgement_of_the_rounds(&[choose_share_of_the_issue_row(&rows)]);
+        assert_eq!(per_round, vec!["worth"]);
+        assert_eq!(judgement, "worth");
+    }
+
+    /// N13：取的是摊到每批的份额（0.05 ⇒ 不值），不是签发那一次的原值（0.15）。
+    #[test]
+    fn choose_judgement_reads_the_share_per_batch_not_the_share_of_the_issue() {
+        let rows = [stage_share_row_of(CallKind::Issue, Some(0.05), Some(0.15))];
+        let (_per_round, judgement) =
+            choose_judgement_of_the_rounds(&[choose_share_of_the_issue_row(&rows)]);
+        assert_eq!(judgement, "not_worth");
+    }
+
+    /// N13：读不到的那一轮写 `not_run`（不当 0），五轮不全相同写 `unstable`。
+    #[test]
+    fn choose_judgement_of_the_rounds_writes_not_run_for_an_unreadable_round() {
+        let (per_round, judgement) =
+            choose_judgement_of_the_rounds(&[Some(0.15), None, Some(0.02)]);
+        assert_eq!(per_round, vec!["worth", "not_run", "not_worth"]);
+        assert_eq!(judgement, "unstable");
+        let (_per_round, judgement_of_five_equal_rounds) =
+            choose_judgement_of_the_rounds(&[Some(0.2); 5]);
+        assert_eq!(judgement_of_five_equal_rounds, "worth");
+    }
+
+    /// N3：`schedstat` 的排队等 CPU 是第二个字段。
+    #[test]
+    fn scheduler_counters_give_the_run_queue_wait_after_the_time_on_the_cpu() {
+        assert_eq!(
+            run_queue_wait_nanoseconds_of_the_scheduler_counters("100 200 3\n"),
+            Some(200)
+        );
+    }
+
+    /// N5、N6、N10：`stat` 从最后一个 `)` 之后数栏（进程名 `(a b) c)` 里有空格与括号）。
+    #[test]
+    fn counter_record_fields_count_from_the_last_closing_parenthesis() {
+        let counter_record_text =
+            "4242 (a b) c) S 1 2 3 4 5 6 70 0 12 0 1400 150 0 0 20 0 1 0 100\n";
+        assert_eq!(
+            thread_counters_of_the_counter_record(counter_record_text),
+            Some(ThreadCounters {
+                minor_faults: 70,
+                major_faults: 12,
+                user_ticks: 1400,
+                system_ticks: 150,
+            })
+        );
+        assert_eq!(
+            process_ticks_of_the_counter_record(counter_record_text),
+            Some(1550)
+        );
+    }
+
+    /// 读不到不当 0：文件不在交回 `None`；在的照读。
+    #[test]
+    fn missing_kernel_file_reads_as_none_not_zero() {
+        assert_eq!(
+            parsed_value_of_the_file(
+                Path::new("/proc/e185-no-such-kernel-file"),
+                run_queue_wait_nanoseconds_of_the_scheduler_counters
+            ),
+            None
+        );
+        let path =
+            std::env::temp_dir().join(format!("e185-kernel-file-reading-{}", std::process::id()));
+        std::fs::write(&path, "5 7 9\n").expect("写得进临时文件");
+        let value =
+            parsed_value_of_the_file(&path, run_queue_wait_nanoseconds_of_the_scheduler_counters);
+        std::fs::remove_file(&path).expect("删掉这条单测建的文件");
+        assert_eq!(value, Some(7));
+        assert_eq!(increase_of(Some(3), Some(5)), Some(2));
+        assert_eq!(increase_of(Some(5), Some(3)), None, "回绕不当负数");
+        assert_eq!(increase_of(None, Some(5)), None);
+    }
+
+    /// N14：一轮里第 1 次只因校准作废、第 2 次有效（批 CPU 差一倍），照原作废规则收下的是第 1 次。
+    #[test]
+    fn original_voiding_keeps_the_attempt_voided_only_by_the_calibration() {
+        let attempts = [
+            AttemptVoiding {
+                is_valid_under_the_original_voiding: true,
+                is_voided_by_the_calibration: true,
+            },
+            AttemptVoiding {
+                is_valid_under_the_original_voiding: true,
+                is_voided_by_the_calibration: false,
+            },
+        ];
+        let batch_cpu_nanoseconds_of_each_attempt = [2_000_000_u64, 1_000_000];
+        let kept = attempt_kept_under_the_original_voiding(&attempts).expect("有一次照原规则有效");
+        assert_eq!(kept, 0);
+        assert_eq!(batch_cpu_nanoseconds_of_each_attempt[kept], 2_000_000);
+        let voided_by_the_original_rules_first = [
+            AttemptVoiding {
+                is_valid_under_the_original_voiding: false,
+                is_voided_by_the_calibration: false,
+            },
+            attempts[1],
+        ];
+        assert_eq!(
+            attempt_kept_under_the_original_voiding(&voided_by_the_original_rules_first),
+            Some(1)
+        );
+        assert_eq!(attempt_kept_under_the_original_voiding(&[]), None);
+    }
+
+    /// R2-3：加倍的活 ÷ 基线在 [1.8, 2.2] 里（两端算）才算校准分得出两倍的活。
+    #[test]
+    fn calibration_doubling_holds_only_between_one_point_eight_and_two_point_two() {
+        assert!(calibration_doubling_holds(calibration_ratio(
+            2_000_000.0,
+            1_000_000.0
+        )));
+        assert!(calibration_doubling_holds(1.8));
+        assert!(calibration_doubling_holds(2.2));
+        assert!(!calibration_doubling_holds(1.5));
+        assert!(!calibration_doubling_holds(2.5));
+    }
+
+    /// N10：`/proc/stat` 首行前八栏是全部，idle 与 iowait 之外是忙；隔一秒的增量折成整机忙、本进程与其余三个比例。
+    #[test]
+    fn machine_shares_split_the_busy_jiffies_into_this_process_and_the_others() {
+        let before = cpu_jiffies_of_the_system_counters(
+            "cpu  100 0 50 800 50 0 0 0 7 0\ncpu0 1 2 3 4 5 6 7 8\n",
+        );
+        assert_eq!(
+            before,
+            Some(CpuJiffies {
+                busy: 150,
+                total: 1000,
+            })
+        );
+        let after = Some(CpuJiffies {
+            busy: 450,
+            total: 2000,
+        });
+        let shares = machine_shares(before, after, Some(10), Some(110)).expect("四样都读得到");
+        assert!((shares.machine_busy_share - 0.3).abs() < 1e-12);
+        assert!((shares.this_process_share - 0.1).abs() < 1e-12);
+        assert!((shares.others_share - 0.2).abs() < 1e-12);
+        assert_eq!(machine_shares(before, None, Some(10), Some(110)), None);
+    }
+
+    /// N4、N7、N10：`status`、`pressure`、`loadavg`、`meminfo` 各取对那一个数。
+    #[test]
+    fn status_pressure_load_and_memory_texts_give_their_numbers() {
+        assert_eq!(
+            involuntary_switches_of_the_status(
+                "voluntary_ctxt_switches:\t3\nnonvoluntary_ctxt_switches:\t17\n"
+            ),
+            Some(17)
+        );
+        assert_eq!(
+            pressure_some_ten_seconds_of(
+                "some avg10=2.86 avg60=3.76 avg300=9.41 total=1\nfull avg10=1.00 avg60=0.00 avg300=0.00 total=0\n"
+            ),
+            Some(2.86)
+        );
+        assert_eq!(
+            load_average_one_minute_of("18.47 29.47 33.50 2/1000 123\n"),
+            Some(18.47)
+        );
+        assert_eq!(
+            memory_available_bytes_of("MemTotal:  100 kB\nMemAvailable:   2048 kB\n"),
+            Some(2_097_152)
+        );
+    }
+
+    /// 第八节「新加的轨迹」：读不到的意图不进峰值与条数（不当 0），三条门槛各数一遍，期末值取最后一条。
+    #[test]
+    fn calibration_trajectory_counts_the_intents_above_each_edge() {
+        let line = calibration_trajectory_line(
+            "wall_clock",
+            &[Some(1.02), Some(1.08), None, Some(1.15), Some(1.30)],
+            &WaitingLedger {
+                total_seconds: 120,
+                longest_seconds: 80,
+                waits: 2,
+            },
+        );
+        assert!(
+            line.contains("intents=5 intents_with_a_readable_ratio=4 larger_ratio_peak=1.300000 intents_above_the_voiding_edge=2 "),
+            "{line}"
+        );
+        assert!(
+            line.contains(" intents_above_the_lower_reported_edge=3 "),
+            "{line}"
+        );
+        assert!(
+            line.contains(" intents_above_the_upper_reported_edge=1 "),
+            "{line}"
+        );
+        assert!(
+            line.ends_with(
+                "larger_ratio_final=1.300000 wait_longest_seconds=80 waits=2 wait_total_seconds=120"
+            ),
+            "{line}"
+        );
+    }
+
+    /// N14（第二段）：两轮的份额行，甲、乙段按批序号五轮收成一个判定（签发那一行不算批），丙段从签发那一行收。
+    #[test]
+    fn stage_cell_judgements_collect_the_batch_rows_by_index_and_the_choice_from_the_issue_row() {
+        let row_with =
+            |kind: CallKind, crc_share: Option<f64>, scan_increment_share: Option<f64>| {
+                StageShareRow {
+                    kind,
+                    crc_cpu_nanoseconds: None,
+                    scan_cpu_nanoseconds: None,
+                    scan_increment_cpu_nanoseconds: None,
+                    choose_cpu_nanoseconds: None,
+                    crc_share,
+                    scan_increment_share,
+                    choose_share_per_batch: None,
+                    choose_share_of_the_issue: None,
+                }
+            };
+        let round_of = |final_batch_crc_share: f64| {
+            vec![
+                stage_share_row_of(CallKind::Issue, Some(0.15), Some(0.40)),
+                row_with(CallKind::Batch, Some(0.2), Some(0.05)),
+                row_with(
+                    CallKind::FinalBatch,
+                    Some(final_batch_crc_share),
+                    Some(0.01),
+                ),
+            ]
+        };
+        assert_eq!(
+            stage_cell_judgements_text(&[round_of(0.3), round_of(0.05)]),
+            "rounds=2 crc_share_judgement_per_batch=worth,unstable scan_increment_share_judgement_per_batch=not_worth,not_worth choose_share_judgement=worth"
+        );
+        assert_eq!(
+            stage_cell_judgements_text(&[]),
+            "rounds=0 crc_share_judgement_per_batch= scan_increment_share_judgement_per_batch= choose_share_judgement=not_run"
+        );
+    }
+
+    /// `geometry-check --overwrite-order` 只认 `slot-order`；认不得的值退 2（不起造池）。
+    #[test]
+    fn geometry_check_takes_only_slot_order_for_the_overwrite_order() {
+        assert_eq!(
+            OverwriteOrder::of_argument("slot-order"),
+            Some(OverwriteOrder::SlotOrder)
+        );
+        assert_eq!(
+            OverwriteOrder::of_argument("highest-full-segment-last"),
+            None
+        );
+        assert_eq!(
+            run_the_subcommand(&["geometry-check", "--overwrite-order", "alpha"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["geometry-check", "--point", "0.5:1024"]),
+            EXIT_CODE_USAGE
+        );
+    }
+
+    /// 停机 7：登记的 sha256 设了而与编进来的源码不同才停（不分大小写）；没设不停；编进来的是 64 位十六进制。
+    #[test]
+    fn apparatus_sha256_stops_only_when_the_registered_value_differs() {
+        let own = own_source_sha256();
+        assert_eq!(own.len(), 64);
+        assert_eq!(registered_apparatus_sha256_mismatch(None, &own), None);
+        assert_eq!(
+            registered_apparatus_sha256_mismatch(Some(own.to_ascii_uppercase().as_str()), &own),
+            None
+        );
+        assert_eq!(
+            registered_apparatus_sha256_mismatch(Some("eadb929d"), &own),
+            Some("eadb929d".to_string())
+        );
+    }
+
+    /// N3–N9：在本线程上读得到排队时间、非自愿切换、`stat` 计数、负载与 CPU 号（压力文件要内核开 PSI，不判）。
+    #[test]
+    fn thread_and_machine_snapshot_reads_this_thread() {
+        let started = Instant::now();
+        let snapshot = thread_and_machine_snapshot(started);
+        assert!(
+            snapshot.run_queue_wait_nanoseconds.is_some(),
+            "{snapshot:?}"
+        );
+        assert!(snapshot.involuntary_switches.is_some(), "{snapshot:?}");
+        assert!(snapshot.thread_counters.is_some(), "{snapshot:?}");
+        assert!(snapshot.load_average_one_minute.is_some(), "{snapshot:?}");
+        assert!(snapshot.cpu_number.is_some(), "{snapshot:?}");
+        assert!(clock_ticks_per_second().is_some_and(|ticks| ticks > 0));
+        assert!(snapshot.seconds_since_the_segment_start >= 0.0);
+    }
+
+    fn label_of_round(arm: DeviceArm, round: usize) -> MeasurementLabel {
+        MeasurementLabel {
+            arm,
+            point: small_point(1024),
+            batch_units: 8,
+            round,
+            attempt: 1,
+            injection: WriteInjection::Nothing,
+            choice: ChoiceOfTheRegion::Greedy,
+        }
+    }
+
+    /// 一条只有最后一批的意图：批 CPU、批挂钟、批等盘由参数给。
+    fn intent_with_one_batch(
+        cpu_nanoseconds: u64,
+        wall_nanoseconds: u64,
+        wait_nanoseconds: i64,
+    ) -> Vec<CallReading> {
+        let mut call = call_reading(CallKind::FinalBatch, 262_144, None, 524_288, 1);
+        call.cpu_nanoseconds = cpu_nanoseconds;
+        call.wall_nanoseconds = wall_nanoseconds;
+        call.device_totals.wait_nanoseconds = wait_nanoseconds;
+        vec![call]
+    }
+
+    /// N14（第一段）：两种作废规则各收的几轮照原判定函数各算一遍。内存臂挂钟 10 ms；真盘臂 CPU 9 ms、挂钟 30 ms、等盘 3 ms 的两轮
+    /// ⇒ ρ = 3 判 cpu、挂钟比 3 判 disk、对账 0.1 判 compatible；把第 2 轮换成 CPU 30 ms ⇒ 对账 2.0，两轮不全相同判 unstable。
+    #[test]
+    fn wall_clock_cell_judgements_follow_the_registered_judgements_under_either_voiding() {
+        let point = small_point(1024);
+        let stored_of = |real_cpu_of_the_later_round: u64| -> Vec<StoredIntent> {
+            [1_usize, 2]
+                .into_iter()
+                .flat_map(|round| {
+                    let real_cpu = if round == 2 {
+                        real_cpu_of_the_later_round
+                    } else {
+                        9_000_000
+                    };
+                    [
+                        stored_intent_of(
+                            &label_of_round(DeviceArm::Memory, round),
+                            true,
+                            intent_with_one_batch(4_000_000, 10_000_000, 5_500_000),
+                        ),
+                        stored_intent_of(
+                            &label_of_round(DeviceArm::RealDisk, round),
+                            true,
+                            intent_with_one_batch(real_cpu, 30_000_000, 3_000_000),
+                        ),
+                    ]
+                })
+                .collect()
+        };
+        assert_eq!(
+            wall_clock_cell_judgements(&stored_of(9_000_000), point, 8),
+            WallClockCellJudgements {
+                rounds_on_the_real_disk: 2,
+                paired_rounds: 2,
+                rho: "cpu",
+                wall_ratio: "disk",
+                reconciliation: "compatible",
+            }
+        );
+        assert_eq!(
+            wall_clock_cell_judgements(&stored_of(30_000_000), point, 8).reconciliation,
+            "unstable"
+        );
+        assert_eq!(
+            wall_clock_cell_judgements(&stored_of(9_000_000), point, 4).rho,
+            "not_run",
+            "没有那一格的意图"
+        );
+    }
+
+    /// N1、N3–N9、N15 那一行：前后两个比、各个增量与前后两个读数照键写（读不到的写 none）。
+    #[test]
+    fn intent_machine_readings_text_reports_the_ratios_and_the_increases() {
+        let calibration = SegmentCalibration {
+            segment: "wall_clock",
+            started: Instant::now(),
+            buffer: Vec::new(),
+            chase_table: Vec::new(),
+            baseline: CalibrationBaseline {
+                crc_median_nanoseconds: 1_000_000.0,
+                chase_median_nanoseconds: Some(100_000_000.0),
+                are_the_anchors_holding: true,
+            },
+            clock_ticks_per_second: Some(100),
+            anchor_mismatches: 0,
+            waiting: WaitingLedger {
+                total_seconds: 0,
+                longest_seconds: 0,
+                waits: 0,
+            },
+            larger_ratio_per_intent: Vec::new(),
+        };
+        let snapshot_at =
+            |run_queue_wait_nanoseconds: u64, user_ticks: u64, cpu_number: u32, seconds: f64| {
+                ThreadAndMachineSnapshot {
+                    run_queue_wait_nanoseconds: Some(run_queue_wait_nanoseconds),
+                    involuntary_switches: Some(user_ticks),
+                    thread_counters: Some(ThreadCounters {
+                        minor_faults: user_ticks + 1,
+                        major_faults: 0,
+                        user_ticks,
+                        system_ticks: 1,
+                    }),
+                    cpu_pressure_some_ten_seconds: Some(2.5),
+                    memory_pressure_some_ten_seconds: None,
+                    load_average_one_minute: Some(18.47),
+                    cpu_number: Some(cpu_number),
+                    seconds_since_the_segment_start: seconds,
+                }
+            };
+        let intent = IntentCalibration {
+            before: calibration_reading_with(Some(1_200_000.0), true),
+            after: calibration_reading_with(Some(1_000_000.0), true),
+            snapshot_before: snapshot_at(1_000, 7, 4, 1.0),
+            snapshot_after: snapshot_at(1_500, 9, 5, 2.5),
+            verdict: CalibrationVerdict::RatioAboveTheEdge,
+        };
+        let text = calibration
+            .intent_machine_readings_text(&label_of_round(DeviceArm::Memory, 1), &intent);
+        assert!(
+            text.starts_with("name=intent_machine_readings arm=memory fraction=0.75 pool_data_units=1024 batch_units=8 round=1 attempt=1 injection=none choice=greedy "),
+            "{text}"
+        );
+        assert!(
+            text.contains(" calibration_before_ratio=1.200000 calibration_after_ratio=1.000000 "),
+            "{text}"
+        );
+        assert!(
+            text.contains(" calibration_verdict=ratio_above_the_edge run_queue_wait_nanoseconds=500 involuntary_switches=2 user_ticks=2 system_ticks=0 clock_ticks_per_second=100 minor_faults=2 major_faults=0 cpu_pressure_some_ten_seconds_before=2.50 "),
+            "{text}"
+        );
+        assert!(
+            text.contains(" memory_pressure_some_ten_seconds_before=none "),
+            "{text}"
+        );
+        assert!(
+            text.ends_with(" cpu_number_before=4 cpu_number_after=5 seconds_since_the_segment_start_before=1.000 seconds_since_the_segment_start_after=2.500"),
+            "{text}"
+        );
+    }
+
+    /// N11、N12：成分汇总把逐段数出的造成段数与几何核那条路数的并列、对不上写 `counts_agree=false`；数了落点的写三个数与预测，没数的写 `status=not_run`。
+    #[test]
+    fn construction_reading_lines_compare_the_two_counts_of_formed_segments_and_report_the_landing()
+    {
+        let recipe = PoolRecipe {
+            point: SamplingPoint {
+                fraction: LiveSlotFraction::OneQuarter,
+                pool_data_units: 1024,
+            },
+            overwrite_order: OverwriteOrder::HighestFullSegmentLast,
+            extra_overwritten_inodes: BTreeSet::new(),
+        };
+        let mut pool = constructed_pool_without_devices();
+        pool.overwritten_units = 776;
+        pool.overwrite_landing = Some(OverwriteLanding {
+            copies_landing_in_holes_of_this_construction: 752,
+            copies_landing_elsewhere: 24,
+        });
+        let prediction_with = |geometry_formed_segments: Vec<CompactionRegion>| GreedyPrediction {
+            greedy_region: None,
+            greedy_composition: None,
+            geometry_formed_segments,
+            mapped_units: 0,
+            segment_compositions: vec![
+                SegmentComposition {
+                    start_slot: 50_304,
+                    live_slots: 16,
+                    slots_of_this_workload: 16,
+                    other_slots: 0,
+                },
+                SegmentComposition {
+                    start_slot: 50_368,
+                    live_slots: 18,
+                    slots_of_this_workload: 16,
+                    other_slots: 2,
+                },
+            ],
+        };
+        let agreeing = construction_reading_lines(
+            &recipe,
+            &pool,
+            &prediction_with(vec![region_at(50_304)]),
+            0,
+        );
+        assert_eq!(agreeing.len(), 4);
+        assert!(agreeing[0].ends_with("region_start_slot=50304 live_slots=16 slots_of_this_workload=16 other_slots=0 formed=true"));
+        assert!(
+            agreeing[2].ends_with("segments=2 formed_segments=1 geometry_formed_segments_of_the_attempt=1 counts_agree=true"),
+            "{}",
+            agreeing[2]
+        );
+        assert!(
+            agreeing[3].ends_with("status=counted overwritten_units=776 copies_landing_in_holes_of_this_construction=752 copies_landing_elsewhere=24 predicted_copies_landing_in_holes=752 root_ring_entries=24"),
+            "{}",
+            agreeing[3]
+        );
+        let disagreeing =
+            construction_reading_lines(&recipe, &pool, &prediction_with(Vec::new()), 1);
+        assert!(disagreeing[2]
+            .ends_with("geometry_formed_segments_of_the_attempt=0 counts_agree=false"));
+        pool.overwrite_landing = None;
+        let not_counted =
+            construction_reading_lines(&recipe, &pool, &prediction_with(Vec::new()), 1);
+        assert!(not_counted[3].ends_with("workload_changes=1 status=not_run overwritten_units=776"));
+    }
+
+    // ───────────── 第 3 次重跑（登记 research/prompts/e185-r3-prereg.md）：计时区间、等法、写输入、比对 ─────────────
+
+    /// 假钟的三个计数器（纳秒）：假步骤与假睡按设定往上加。
+    #[derive(Default)]
+    struct FakeClockState {
+        thread_cpu: u64,
+        wall: u64,
+    }
+
+    struct FakeClocks(Rc<RefCell<FakeClockState>>);
+
+    impl SubmissionClocks for FakeClocks {
+        fn thread_cpu(&mut self) -> Option<u64> {
+            Some(self.0.borrow().thread_cpu)
+        }
+
+        fn process_cpu(&mut self) -> Option<u64> {
+            Some(self.0.borrow().thread_cpu)
+        }
+
+        fn wall(&mut self) -> u64 {
+            self.0.borrow().wall
+        }
+    }
+
+    /// 假步骤：① 走 `preparation_nanoseconds`、⑤ 走 `wait_nanoseconds`，别的每步走 `other_nanoseconds`（线程钟与挂钟一起走）。
+    struct FakeSteps {
+        clock: Rc<RefCell<FakeClockState>>,
+        preparation_nanoseconds: u64,
+        wait_nanoseconds: u64,
+        other_nanoseconds: u64,
+    }
+
+    impl FakeSteps {
+        fn advance(&self, nanoseconds: u64) {
+            let mut clock = self.clock.borrow_mut();
+            clock.thread_cpu += nanoseconds;
+            clock.wall += nanoseconds;
+        }
+    }
+
+    impl SubmissionSteps for FakeSteps {
+        fn prepare(&mut self) -> u64 {
+            self.advance(self.preparation_nanoseconds);
+            8 * LOCAL_GPU_SLOT_BYTES
+        }
+
+        fn encode_and_submit(&mut self) {
+            self.advance(self.other_nanoseconds);
+        }
+
+        fn register_the_readback(&mut self) {
+            self.advance(self.other_nanoseconds);
+        }
+
+        fn wait(&mut self) -> Option<u64> {
+            self.advance(self.wait_nanoseconds);
+            Some(0)
+        }
+
+        fn read_and_compare(&mut self) -> SubmissionComparison {
+            self.advance(self.other_nanoseconds);
+            SubmissionComparison {
+                confirmed: 8,
+                uncertain_entries: Vec::new(),
+                kernel_one_differs_from_the_expected: 0,
+                kernel_two_differs_from_the_expected: 0,
+                are_the_sequence_numbers_holding: true,
+            }
+        }
+
+        fn unmap(&mut self) {
+            self.advance(self.other_nanoseconds);
+        }
+    }
+
+    fn fake_steps_and_clocks(
+        preparation_nanoseconds: u64,
+        wait_nanoseconds: u64,
+    ) -> (FakeSteps, FakeClocks, Rc<RefCell<FakeClockState>>) {
+        let clock = Rc::new(RefCell::new(FakeClockState::default()));
+        (
+            FakeSteps {
+                clock: Rc::clone(&clock),
+                preparation_nanoseconds,
+                wait_nanoseconds,
+                other_nanoseconds: 100_000,
+            },
+            FakeClocks(Rc::clone(&clock)),
+            clock,
+        )
+    }
+
+    #[test]
+    fn submission_interval_includes_a_wait_of_three_milliseconds() {
+        let (mut steps, mut clocks, _clock) = fake_steps_and_clocks(100_000, 3_000_000);
+        let timing = time_one_submission(&mut steps, &mut clocks, &mut || {}).expect("假钟读得到");
+        assert_eq!(timing.thread_cpu_nanoseconds, 3_000_000 + 5 * 100_000);
+        assert_eq!(timing.wait_thread_cpu_nanoseconds, Some(3_000_000));
+        assert!(timing.wait_thread_cpu_nanoseconds <= Some(timing.thread_cpu_nanoseconds));
+        assert_eq!(timing.floor_thread_cpu_nanoseconds(), Some(5 * 100_000));
+        assert_eq!(timing.input_bytes_written, 8 * LOCAL_GPU_SLOT_BYTES);
+    }
+
+    #[test]
+    fn submission_interval_includes_a_preparation_of_one_millisecond_and_the_insertion_before_it() {
+        let (mut steps, mut clocks, clock) = fake_steps_and_clocks(1_000_000, 100_000);
+        let mut insertion = || {
+            let mut state = clock.borrow_mut();
+            state.thread_cpu += 2_000_000;
+            state.wall += 2_000_000;
+        };
+        let timing =
+            time_one_submission(&mut steps, &mut clocks, &mut insertion).expect("假钟读得到");
+        assert_eq!(
+            timing.thread_cpu_nanoseconds,
+            2_000_000 + 1_000_000 + 5 * 100_000
+        );
+        assert_eq!(timing.wall_nanoseconds, 2_000_000 + 1_000_000 + 5 * 100_000);
+    }
+
+    #[test]
+    fn gap_between_submissions_stays_outside_the_interval() {
+        let (mut steps, mut clocks, clock) = fake_steps_and_clocks(100_000, 100_000);
+        let mut sleep = |duration: Duration| {
+            clock.borrow_mut().wall += u64::try_from(duration.as_nanos()).expect("纳秒");
+        };
+        let timings = time_the_submissions_of_a_cell(
+            &mut steps,
+            &mut clocks,
+            5,
+            Duration::from_millis(GAP_BETWEEN_TWO_BATCHES_MILLISECONDS),
+            &mut sleep,
+            &mut || {},
+        );
+        let reading = cell_round_reading(&timings, 8).expect("5 次都读得到");
+        assert_eq!(reading.wall_median_nanoseconds, 600_000.0);
+        assert!(reading.wall_median_nanoseconds < 50_000_000.0);
+        assert_eq!(reading.thread_cpu_in_order.len(), 5);
+    }
+
+    #[test]
+    fn sleeping_wait_sleeps_once_for_every_poll_that_found_nothing() {
+        let polls_seen = std::cell::Cell::new(0_u64);
+        let sleeps = std::cell::Cell::new(0_u64);
+        let polls = wait_by_sleeping(
+            || {
+                polls_seen.set(polls_seen.get() + 1);
+                polls_seen.get() >= 6
+            },
+            |_interval| sleeps.set(sleeps.get() + 1),
+            Duration::from_nanos(SHORT_SLEEP_INTERVAL_NANOSECONDS),
+        );
+        assert_eq!(polls, 6);
+        assert_eq!(sleeps.get(), 5);
+        assert_eq!(WaitMethod::Blocking.sleep_interval(), None);
+        assert_eq!(
+            WaitMethod::SleepingLonger.sleep_interval(),
+            Some(Duration::from_millis(1))
+        );
+    }
+
+    #[test]
+    fn sleep_intervals_of_the_configuration_are_one_hundred_microseconds_and_one_millisecond() {
+        assert_eq!(
+            sleep_interval_configuration_text(),
+            "sleep_interval_nanoseconds=100000,1000000"
+        );
+    }
+
+    #[test]
+    fn split_input_writes_the_unit_bytes_into_both_kernel_buffers() {
+        let unit_bytes = vec![7_u8; usize::try_from(8 * LOCAL_GPU_SLOT_BYTES).expect("字节")];
+        for (form, expected_buffers) in [
+            (InputForm::Shared, vec![InputBufferOfTheKernel::KernelOne]),
+            (
+                InputForm::Split,
+                vec![
+                    InputBufferOfTheKernel::KernelOne,
+                    InputBufferOfTheKernel::KernelTwo,
+                ],
+            ),
+        ] {
+            let mut written: Vec<(InputBufferOfTheKernel, usize)> = Vec::new();
+            let bytes = write_the_unit_bytes(form, &unit_bytes, |buffer, bytes| {
+                written.push((buffer, bytes.len()))
+            });
+            assert_eq!(bytes, expected_input_bytes(form, 8), "{form:?}");
+            assert_eq!(
+                written
+                    .iter()
+                    .map(|(buffer, _)| *buffer)
+                    .collect::<Vec<_>>(),
+                expected_buffers,
+                "{form:?}"
+            );
+            assert!(written
+                .iter()
+                .all(|(_, length)| *length == unit_bytes.len()));
+        }
+        assert_eq!(expected_input_bytes(InputForm::Split, 512), 33_554_432);
+        assert_eq!(expected_input_bytes(InputForm::Shared, 512), 16_777_216);
+    }
+
+    /// 回读缓冲：前 n 条核一、后 n 条核二，每条（CRC、序号）小端。
+    fn readback_of(kernel_one: &[(u32, u32)], kernel_two: &[(u32, u32)]) -> Vec<u8> {
+        kernel_one
+            .iter()
+            .chain(kernel_two)
+            .flat_map(|(crc, sequence)| crc.to_le_bytes().into_iter().chain(sequence.to_le_bytes()))
+            .collect()
+    }
+
+    #[test]
+    fn comparison_reports_exactly_the_flipped_entry_as_uncertain() {
+        let expected: Vec<u32> = (0..8).map(|entry| 0x1000 + entry).collect();
+        let entries: Vec<(u32, u32)> = expected
+            .iter()
+            .zip(0_u32..)
+            .map(|(crc, entry)| (*crc, entry))
+            .collect();
+        let readback = readback_of(&entries, &entries);
+        let clean = compare_the_readback(&readback, &expected, None);
+        assert_eq!(clean.confirmed, 8);
+        assert!(clean.uncertain_entries.is_empty());
+        let flipped = compare_the_readback(
+            &readback,
+            &expected,
+            Some(READBACK_ENTRY_FLIPPED_BY_THE_COMPARISON_CONTROL),
+        );
+        assert_eq!(flipped.confirmed, 7);
+        assert_eq!(flipped.uncertain_entries, vec![2]);
+        assert_eq!(flipped.kernel_one_differs_from_the_expected, 0);
+        assert_eq!(flipped.kernel_two_differs_from_the_expected, 1);
+        assert!(comparison_control_holds(&flipped.uncertain_entries));
+        assert!(!comparison_control_holds(&clean.uncertain_entries));
+        assert!(!comparison_control_holds(&[2, 3]));
+    }
+
+    #[test]
+    fn comparison_checks_the_sequence_numbers_of_both_kernels() {
+        let expected = vec![5_u32; 4];
+        let good: Vec<(u32, u32)> = (0..4).map(|entry| (5, entry)).collect();
+        let mut kernel_two_wrong = good.clone();
+        kernel_two_wrong[1].1 = 9;
+        assert!(
+            compare_the_readback(&readback_of(&good, &good), &expected, None)
+                .are_the_sequence_numbers_holding
+        );
+        assert!(
+            !compare_the_readback(&readback_of(&good, &kernel_two_wrong), &expected, None)
+                .are_the_sequence_numbers_holding
+        );
+        assert!(
+            !compare_the_readback(&readback_of(&kernel_two_wrong, &good), &expected, None)
+                .are_the_sequence_numbers_holding
+        );
+    }
+
+    #[test]
+    fn submission_sequence_at_a_quarter_and_four_issues_once_and_scans_what_is_left() {
+        let sequence = submission_units_of_the_intent(
+            GpuCandidate::EveryStage,
+            LiveSlotFraction::OneQuarter,
+            4,
+        );
+        assert_eq!(sequence, vec![8, 8, 4]);
+        assert_eq!(sequence.len(), 3);
+    }
+
+    #[test]
+    fn submission_sequence_scans_what_is_left_in_the_region_not_what_the_batch_moves() {
+        let sequence = submission_units_of_the_intent(
+            GpuCandidate::ScanChecksumOnly,
+            LiveSlotFraction::ThreeQuarters,
+            8,
+        );
+        assert_eq!(sequence, vec![24, 24, 16, 8]);
+        assert_eq!(mean_submission_tenths_of_bytes(&sequence), 5_898_240);
+    }
+
+    #[test]
+    fn release_check_sequence_has_no_issue_submission() {
+        assert_eq!(
+            submission_units_of_the_intent(
+                GpuCandidate::ReleaseCheckOnly,
+                LiveSlotFraction::ThreeQuarters,
+                16
+            ),
+            vec![32, 16]
+        );
+        assert_eq!(
+            submission_units_of_the_intent(
+                GpuCandidate::ReleaseCheckOnly,
+                LiveSlotFraction::ThreeQuarters,
+                4
+            ),
+            vec![8; 6]
+        );
+    }
+
+    #[test]
+    fn sequence_anchors_hold_for_every_fraction_and_batch_size() {
+        for (fraction, batch_units, submissions, mean_tenths, release_submissions) in
+            SUBMISSION_SEQUENCE_ANCHORS
+        {
+            let every_stage =
+                submission_units_of_the_intent(GpuCandidate::EveryStage, fraction, batch_units);
+            let release = submission_units_of_the_intent(
+                GpuCandidate::ReleaseCheckOnly,
+                fraction,
+                batch_units,
+            );
+            assert_eq!(
+                every_stage.len(),
+                usize::try_from(submissions).expect("次数"),
+                "{fraction:?} {batch_units}"
+            );
+            assert_eq!(
+                mean_submission_tenths_of_bytes(&every_stage),
+                mean_tenths,
+                "{fraction:?} {batch_units}"
+            );
+            assert_eq!(
+                release.len(),
+                usize::try_from(release_submissions).expect("次数"),
+                "{fraction:?} {batch_units}"
+            );
+        }
+        assert_eq!(every_submission_point().len(), 12);
+        assert_eq!(
+            units_of_one_submission_per_intent(&submission_units_of_the_intent(
+                GpuCandidate::EveryStage,
+                LiveSlotFraction::ThreeQuarters,
+                8
+            )),
+            24
+        );
+    }
+
+    #[test]
+    fn point_milliseconds_average_the_submissions_rather_than_take_the_median() {
+        let sequence = submission_units_of_the_intent(
+            GpuCandidate::EveryStage,
+            LiveSlotFraction::ThreeQuarters,
+            4,
+        );
+        let by_units: BTreeMap<u64, f64> = sequence
+            .iter()
+            .map(|units| (*units, 0.01 * *units as f64))
+            .collect();
+        let point = point_milliseconds_of_the_sequence(&sequence, &by_units).expect("每档都有");
+        assert!((point - 0.01 * 108.0 / 7.0).abs() < 1e-12, "{point}");
+        assert_eq!(
+            point_milliseconds_of_the_sequence(&sequence, &BTreeMap::new()),
+            None
+        );
+    }
+
+    #[test]
+    fn host_cpu_equal_to_the_threshold_is_losing_and_moving_the_threshold_between_two_values_flips_it(
+    ) {
+        assert_eq!(
+            judgement_against_the_threshold(0.5, 0.5, GpuCandidate::EveryStage),
+            "losing"
+        );
+        assert_eq!(
+            judgement_against_the_threshold(0.4999, 0.5, GpuCandidate::EveryStage),
+            "not_losing"
+        );
+        assert_eq!(
+            judgement_against_the_threshold(0.3, 0.35, GpuCandidate::ReleaseCheckOnly),
+            "not_losing"
+        );
+        assert_eq!(
+            judgement_against_the_threshold(0.4, 0.35, GpuCandidate::ReleaseCheckOnly),
+            "losing"
+        );
+    }
+
+    #[test]
+    fn choice_candidate_not_losing_is_written_as_a_lower_bound() {
+        assert_eq!(
+            judgement_against_the_threshold(0.1, 0.5, GpuCandidate::ScanChecksumAndChoice),
+            "not_losing_lower_bound"
+        );
+        assert_eq!(
+            judgement_against_the_threshold(0.1, 0.5, GpuCandidate::ScanChecksumOnly),
+            "not_losing"
+        );
+        assert_eq!(
+            judgement_against_the_threshold(0.9, 0.5, GpuCandidate::ScanChecksumAndChoice),
+            "losing"
+        );
+    }
+
+    #[test]
+    fn judgement_of_the_valid_rounds_writes_rounds_insufficient_for_a_voided_round() {
+        assert_eq!(
+            judgement_of_the_valid_rounds(&[Some("losing"); ROUNDS]),
+            "losing"
+        );
+        let mut mixed = [Some("losing"); ROUNDS];
+        mixed[2] = Some("not_losing");
+        assert_eq!(judgement_of_the_valid_rounds(&mixed), "unstable");
+        let mut voided = [Some("losing"); ROUNDS];
+        voided[4] = None;
+        assert_eq!(
+            judgement_of_the_valid_rounds(&voided),
+            "rounds_insufficient"
+        );
+        assert_eq!(
+            judgement_of_the_valid_rounds(&[Some("losing"); 4]),
+            "rounds_insufficient"
+        );
+    }
+
+    /// 合成的 r2 第二段 `name=stage` 行：（轮、签发不、crc、乙增量、丙、释放前核）。
+    fn ledger_row(
+        round: &str,
+        is_the_issue: bool,
+        numbers: (f64, f64, Option<f64>, f64),
+    ) -> StageLedgerRow {
+        StageLedgerRow {
+            intent_key: (
+                "0.25".to_string(),
+                "1024".to_string(),
+                "4".to_string(),
+                round.to_string(),
+            ),
+            is_the_issue,
+            call_cpu_nanoseconds: 10_000_000.0,
+            crc_cpu_nanoseconds: numbers.0,
+            scan_increment_cpu_nanoseconds: numbers.1,
+            choose_cpu_nanoseconds: numbers.2,
+            release_check_crc_cpu_nanoseconds: numbers.3,
+        }
+    }
+
+    fn point_key() -> (String, String, String) {
+        ("0.25".to_string(), "1024".to_string(), "4".to_string())
+    }
+
+    #[test]
+    fn ledger_groups_by_round_and_takes_the_median_of_the_rounds() {
+        let rows = vec![
+            ledger_row("1", true, (1_000_000.0, 0.0, Some(0.0), 80.0)),
+            ledger_row("1", false, (100_000.0, 0.0, None, 0.0)),
+            ledger_row("1", false, (100_000.0, 0.0, None, 0.0)),
+            ledger_row("2", true, (3_000_000.0, 0.0, Some(0.0), 80.0)),
+            ledger_row("2", false, (300_000.0, 0.0, None, 0.0)),
+            ledger_row("2", false, (300_000.0, 0.0, None, 0.0)),
+        ];
+        let thresholds = candidate_thresholds_of_the_ledger(&rows).expect("读得成");
+        let scan_checksum = thresholds[&point_key()][&GpuCandidate::ScanChecksumOnly];
+        assert!(
+            (scan_checksum.saved_per_intent_milliseconds - 2.4).abs() < 1e-12,
+            "{scan_checksum:?}"
+        );
+        assert_eq!(scan_checksum.submissions_per_intent, 3);
+        assert!(
+            (scan_checksum.threshold_milliseconds - 0.8).abs() < 1e-12,
+            "{scan_checksum:?}"
+        );
+    }
+
+    #[test]
+    fn scan_checksum_candidate_saves_only_the_checksum_cpu() {
+        let rows = vec![
+            ledger_row("1", true, (1_000_000.0, 500_000.0, Some(2_000_000.0), 80.0)),
+            ledger_row("1", false, (100_000.0, 50_000.0, None, 70_000.0)),
+            ledger_row("1", false, (100_000.0, 50_000.0, None, 70_000.0)),
+        ];
+        let thresholds = candidate_thresholds_of_the_ledger(&rows).expect("读得成");
+        let of = |candidate| thresholds[&point_key()][&candidate];
+        assert!((of(GpuCandidate::ScanChecksumOnly).threshold_milliseconds - 0.4).abs() < 1e-12);
+        assert!(
+            (of(GpuCandidate::ScanChecksumAndChoice).threshold_milliseconds - 3.2 / 3.0).abs()
+                < 1e-12
+        );
+        assert!((of(GpuCandidate::EveryStage).threshold_milliseconds - 3.8 / 3.0).abs() < 1e-12);
+        assert!((of(GpuCandidate::ReleaseCheckOnly).threshold_milliseconds - 0.07).abs() < 1e-12);
+        assert_eq!(of(GpuCandidate::ReleaseCheckOnly).submissions_per_intent, 2);
+        assert_eq!(of(GpuCandidate::EveryStage).submissions_per_intent, 3);
+    }
+
+    #[test]
+    fn stage_ledger_rows_keep_rows_of_every_validity() {
+        let lines = result_lines_of(
+            "E7RESULT name=stage fraction=0.25 pool_data_units=1024 batch_units=4 round=1 call_index=0 kind=issue valid=false call_cpu_nanoseconds=1 crc_cpu_nanoseconds=2.0 scan_increment_cpu_nanoseconds=3.0 choose_cpu_nanoseconds=4.0 release_check_crc_cpu_nanoseconds=5.0\n\
+             E7RESULT name=stage fraction=0.25 pool_data_units=1024 batch_units=4 round=1 call_index=1 kind=batch call_cpu_nanoseconds=1 crc_cpu_nanoseconds=2.0 scan_increment_cpu_nanoseconds=3.0 choose_cpu_nanoseconds=none release_check_crc_cpu_nanoseconds=5.0\n\
+             E7RESULT name=calibration_baseline segment=stage_split position=start runs=21 median_nanoseconds=5224477.0",
+        );
+        let rows = stage_ledger_rows_of(&lines).expect("读得成");
+        assert_eq!(rows.len(), 2);
+        assert!(rows[0].is_the_issue);
+        assert_eq!(rows[1].choose_cpu_nanoseconds, None);
+        assert_eq!(peer_calibration_baseline_of(&lines), Some(5_224_477.0));
+        assert_eq!(peer_calibration_baseline_of(&lines[..2]), None);
+    }
+
+    #[test]
+    fn ledger_finding_stops_when_the_threshold_differs_at_the_fourth_decimal() {
+        // `out/g1.out` 的一行照原样拼（键名是攻方模型脚本定的，照它的写法；拼起来免得字面量里出现它的缩写键名）
+        let fields = [
+            ["f", "0.25"],
+            ["P", "1024"],
+            ["K", "4"],
+            ["saved_upper_ms", "0.648"],
+            ["submissions_per_intent", "3"],
+            ["break_even_host_cpu_per_submission_ms", "0.2159"],
+        ];
+        let line = fields
+            .iter()
+            .map(|[key, value]| format!("{key}={value}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let attack_ledger = attack_ledger_points_of(&format!(
+            "name=g1_ledger_header columns=none\nname=g1_ledger {line}\n"
+        ))
+        .expect("读得成");
+        let point = SubmissionPoint {
+            fraction: LiveSlotFraction::OneQuarter,
+            pool_data_units: 1024,
+            batch_units: 4,
+        };
+        let attack_point = &attack_ledger[&point_key()];
+        assert_eq!(attack_point.saved_upper_milliseconds, 0.648);
+        assert_eq!(attack_point.break_even_milliseconds, 0.2159);
+        let threshold = |milliseconds: f64, submissions: u64| CandidateThreshold {
+            saved_per_intent_milliseconds: milliseconds * 3.0,
+            submissions_per_intent: submissions,
+            threshold_milliseconds: milliseconds,
+        };
+        assert_eq!(
+            ledger_finding_of_the_point(point, &threshold(0.21594, 3), attack_point),
+            None
+        );
+        assert!(ledger_finding_of_the_point(point, &threshold(0.21596, 3), attack_point).is_some());
+        assert!(ledger_finding_of_the_point(point, &threshold(0.2159, 2), attack_point).is_some());
+    }
+
+    #[test]
+    fn machine_ratio_is_this_machine_over_the_peer() {
+        assert_eq!(machine_ratio(1_000_000.0, 2_000_000.0), 0.5);
+        assert!(!is_the_machine_ratio_far_from_one(0.5));
+        assert!(is_the_machine_ratio_far_from_one(0.49));
+        assert!(is_the_machine_ratio_far_from_one(2.01));
+        assert!(!is_the_cross_check_off_by_more_than_double(0.9, 0.5));
+        assert!(is_the_cross_check_off_by_more_than_double(1.1, 0.5));
+        assert_eq!(
+            ThresholdKind::MachineScaled.scaled(0.4, Some(0.5)),
+            Some(0.2)
+        );
+        assert_eq!(ThresholdKind::MachineScaled.scaled(0.4, None), None);
+        assert_eq!(ThresholdKind::AttackLedger.scaled(0.4, None), Some(0.4));
+    }
+
+    /// 八档 n 上照 `milliseconds_of(MiB)` 合成的 c_rt。
+    fn synthetic_milliseconds(milliseconds_of: impl Fn(f64) -> f64) -> BTreeMap<u64, f64> {
+        SUBMISSION_UNIT_COUNTS
+            .iter()
+            .map(|units| {
+                (
+                    *units,
+                    milliseconds_of((units * LOCAL_GPU_SLOT_BYTES) as f64 / 1_048_576.0),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fit_recovers_the_fixed_and_per_mebibyte_parts_within_one_percent() {
+        let fit =
+            fixed_and_per_byte_fit(&synthetic_milliseconds(|mebibytes| 0.1 + 0.2 * mebibytes))
+                .expect("八档都有");
+        assert!((fit.fixed_milliseconds - 0.1).abs() <= 0.001, "{fit:?}");
+        assert!(
+            (fit.per_mebibyte_milliseconds - 0.2).abs() <= 0.002,
+            "{fit:?}"
+        );
+        assert!(fit.maximum_relative_residual < 1e-9, "{fit:?}");
+        assert!(fit.is_linear());
+    }
+
+    /// 合成的线性拟合：固定 `fixed_milliseconds`，n = 24 那一次的每字节那一部分是 `per_byte_part_at_twenty_four_units`。
+    fn linear_fit(
+        fixed_milliseconds: f64,
+        per_byte_part_at_twenty_four_units: f64,
+    ) -> FixedAndPerByteFit {
+        let per_byte_milliseconds =
+            per_byte_part_at_twenty_four_units / (24 * LOCAL_GPU_SLOT_BYTES) as f64;
+        FixedAndPerByteFit {
+            fixed_milliseconds,
+            per_byte_milliseconds,
+            per_mebibyte_milliseconds: per_byte_milliseconds * 1_048_576.0,
+            maximum_relative_residual: 0.0,
+        }
+    }
+
+    #[test]
+    fn merging_takes_at_least_the_ceiling_of_the_fixed_part_over_the_margin() {
+        let shape = merging_shape(5.0, 1.0, 5.0, 2.0, 24, Some(linear_fit(1.0, 1.7)), true);
+        assert_eq!(
+            shape,
+            Some(MergingShape::MergeAcrossIntents {
+                intents_to_merge_at_least: 4.0
+            })
+        );
+    }
+
+    #[test]
+    fn merging_shape_gives_each_of_the_four_categories() {
+        let fit = Some(linear_fit(1.0, 1.7));
+        assert_eq!(
+            merging_shape(0.5, 1.0, 5.0, 2.0, 24, fit, true),
+            Some(MergingShape::OneSubmissionPerBatch)
+        );
+        assert_eq!(
+            merging_shape(2.0, 1.0, 1.0, 2.0, 24, fit, true),
+            Some(MergingShape::OneSubmissionPerIntent)
+        );
+        assert!(matches!(
+            merging_shape(2.0, 1.0, 5.0, 2.0, 24, fit, true),
+            Some(MergingShape::MergeAcrossIntents { .. })
+        ));
+        assert_eq!(
+            merging_shape(2.0, 1.0, 5.0, 2.0, 24, Some(linear_fit(1.0, 3.0)), true),
+            Some(MergingShape::LosesHoweverMerged)
+        );
+        assert_eq!(merging_shape(2.0, 1.0, 5.0, 2.0, 24, None, true), None);
+    }
+
+    #[test]
+    fn merging_shape_refuses_the_last_two_categories_when_the_fit_is_not_linear() {
+        let quadratic = fixed_and_per_byte_fit(&synthetic_milliseconds(|mebibytes| {
+            0.1 + mebibytes * mebibytes
+        }))
+        .expect("八档都有");
+        assert!(!quadratic.is_linear(), "{quadratic:?}");
+        assert_eq!(
+            merging_shape(
+                5.0,
+                1.0,
+                5.0,
+                2.0,
+                24,
+                Some(quadratic),
+                quadratic.is_linear()
+            ),
+            Some(MergingShape::FitNotLinear)
+        );
+        assert_eq!(
+            merging_shape(0.5, 1.0, 5.0, 2.0, 24, Some(quadratic), false),
+            Some(MergingShape::OneSubmissionPerBatch),
+            "前两类不经拟合，照判"
+        );
+    }
+
+    #[test]
+    fn trajectory_counts_the_submissions_at_or_above_each_threshold_edge() {
+        let in_order = [300_000.0, 216_000.0, 800_000.0, 100_000.0, 722_000.0];
+        let trajectory = submission_trajectory(&in_order, 0.2159, 0.7214).expect("有读数");
+        assert_eq!(trajectory.maximum_nanoseconds, 800_000.0);
+        assert_eq!(trajectory.at_or_above_the_smallest_threshold, 4);
+        assert_eq!(trajectory.at_or_above_the_largest_threshold, 2);
+        assert_eq!(trajectory.first_nanoseconds, 300_000.0);
+        assert_eq!(trajectory.last_nanoseconds, 722_000.0);
+        assert_eq!(trajectory.percentile_90_nanoseconds, 800_000.0);
+    }
+
+    #[test]
+    fn thread_clock_control_judges_the_spin_and_the_sleep_at_the_registered_edges() {
+        assert!(spin_control_holds(1_800_000.0));
+        assert!(spin_control_holds(2_200_000.0));
+        assert!(!spin_control_holds(1_799_999.0));
+        assert!(!spin_control_holds(2_200_001.0));
+        assert!(sleep_control_holds(200_000.0, 1_800_000.0));
+        assert!(!sleep_control_holds(200_001.0, 1_800_000.0));
+        assert!(!sleep_control_holds(100_000.0, 1_799_999.0));
+        let baseline = [Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)];
+        let inserted = [Some(3.0), Some(4.5), Some(5.0), Some(6.0), Some(7.0)];
+        assert_eq!(
+            median_increment_of_the_rounds(&baseline, &inserted),
+            Some(2.0)
+        );
+        assert_eq!(
+            median_increment_of_the_rounds(
+                &baseline,
+                &[None, Some(1.0), Some(1.0), Some(1.0), Some(1.0)]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn thread_clock_underestimate_triggers_above_ten_percent_and_thread_above_wall_is_outside() {
+        assert!(!is_the_thread_clock_underestimating(110.0, 100.0));
+        assert!(is_the_thread_clock_underestimating(110.1, 100.0));
+        assert!(is_the_thread_cpu_inside_the_wall(100, 100));
+        assert!(!is_the_thread_cpu_inside_the_wall(101, 100));
+    }
+
+    #[test]
+    fn kernel_one_finding_stops_when_one_result_differs_from_the_crates() {
+        assert_eq!(
+            kernel_one_finding_against_the_crates(3, &[1, 2, 3], &[1, 2, 3]),
+            None
+        );
+        assert!(kernel_one_finding_against_the_crates(3, &[1, 9, 3], &[1, 2, 3]).is_some());
+        assert!(kernel_one_finding_against_the_crates(3, &[1, 2], &[1, 2, 3]).is_some());
+    }
+
+    #[test]
+    fn other_compute_processes_on_the_card_leave_out_this_process_and_other_cards() {
+        let buses = bus_identifiers_by_index_of("0, 00000000:01:00.0\n1, 00000000:02:00.0\n");
+        assert_eq!(buses.get(&1).map(String::as_str), Some("00000000:02:00.0"));
+        let apps = "100, 00000000:01:00.0\n200, 00000000:02:00.0\n300, 00000000:02:00.0\n";
+        assert_eq!(
+            other_compute_processes_on_the_card(apps, &buses[&1], 300),
+            vec![200]
+        );
+        assert_eq!(
+            other_compute_processes_on_the_card(apps, &buses[&0], 100),
+            Vec::<u32>::new()
+        );
+    }
+
+    #[test]
+    fn physical_floor_of_split_input_counts_both_copies() {
+        let peak = 63_015_384_615.0;
+        let one_copy_seconds = 512.0 * LOCAL_GPU_SLOT_BYTES as f64 / peak;
+        assert!(respects_the_floor_of_the_form(
+            1.5 * one_copy_seconds,
+            InputForm::Shared,
+            512,
+            peak
+        ));
+        assert!(!respects_the_floor_of_the_form(
+            1.5 * one_copy_seconds,
+            InputForm::Split,
+            512,
+            peak
+        ));
+        assert!(respects_the_floor_of_the_form(
+            2.0 * one_copy_seconds,
+            InputForm::Split,
+            512,
+            peak
+        ));
+    }
+
+    // ───────────── 第 3 次重跑第二段：注入、重算、计数 ─────────────
+
+    #[test]
+    fn disagreement_trajectory_reports_the_peak_the_batches_with_some_and_the_last_batch() {
+        assert_eq!(
+            disagreement_trajectory_text(&[0, 3, 0, 1]),
+            "first_round_disagreements_peak_of_a_batch=3 batches_with_first_round_disagreements=2 first_round_disagreements_of_the_last_batch=1"
+        );
+        assert!(disagreement_trajectory_text(&[]).contains("peak_of_a_batch=none"));
+    }
+
+    #[test]
+    fn natural_unit_times_leave_out_the_sixteen_injected_units() {
+        assert_eq!(injected_units_per_combination(), 16);
+        assert_eq!(
+            natural_unit_times(
+                DISAGREEMENT_BATCHES,
+                UNITS_PER_DISAGREEMENT_BATCH,
+                injected_units_per_combination()
+            ),
+            1_048_560
+        );
+        assert!(are_the_natural_unit_times_sufficient(1_048_560));
+        assert!(!are_the_natural_unit_times_sufficient(1_048_559));
+        assert!(is_an_injected_unit(1, 7) && is_an_injected_unit(8, 11));
+        assert!(!is_an_injected_unit(9, 7) && !is_an_injected_unit(1, 8));
+    }
+
+    /// 假卡：单元 `unit` 的真 CRC 是 1000 + 单元号；核一照真值，核二在分开输入的 P5 那个单元上读的是改过的输入（交回不同的值），
+    /// 只派核一时核二交 `None`。`kernels_both_wrong` 里的单元两核都交同一个错值。
+    fn fake_kernel_results(
+        form: InputForm,
+        batch: u64,
+        unit: u64,
+        dispatched: KernelsToDispatch,
+        kernels_both_wrong: &[u64],
+    ) -> KernelResultsOfAUnit {
+        let truth = 1000 + u32::try_from(unit).expect("单元号");
+        if kernels_both_wrong.contains(&unit) {
+            return (Some(truth ^ 0xF0), Some(truth ^ 0xF0));
+        }
+        let kernel_two = match dispatched {
+            KernelsToDispatch::Both => {
+                Some(if kernel_two_input_flip(form, batch, unit).is_some() {
+                    truth ^ 0xABCD
+                } else {
+                    truth
+                })
+            }
+            KernelsToDispatch::KernelOneOnly => None,
+        };
+        (Some(truth), kernel_two)
+    }
+
+    fn fake_batch(
+        form: InputForm,
+        batch: u64,
+        kernels_both_wrong: &[u64],
+    ) -> DisagreementBatchOutcome {
+        let units = 12_u64;
+        let cpu_crcs: Vec<u32> = (0..units)
+            .map(|unit| 1000 + u32::try_from(unit).expect("单元号"))
+            .collect();
+        let first_results: Vec<KernelResultsOfAUnit> = (0..units)
+            .map(|unit| {
+                fake_kernel_results(
+                    form,
+                    batch,
+                    unit,
+                    KernelsToDispatch::Both,
+                    kernels_both_wrong,
+                )
+            })
+            .collect();
+        process_the_disagreement_batch(
+            form,
+            batch,
+            &cpu_crcs,
+            &first_results,
+            |unit, dispatched| {
+                fake_kernel_results(form, batch, unit, dispatched, kernels_both_wrong)
+            },
+        )
+    }
+
+    #[test]
+    fn transient_injection_flips_only_the_first_computation() {
+        for form in InputForm::ALL {
+            let outcome = fake_batch(form, 1, &[]);
+            assert_eq!(
+                outcome.transient_injection,
+                Some(Some(RecomputeOutcome::Transient)),
+                "{form:?}"
+            );
+            assert_eq!(outcome.natural_units, 10, "{form:?}");
+            assert_eq!(outcome.first_round_any_difference, 0, "{form:?}");
+            assert!(outcome.natural_recomputes.is_empty(), "{form:?}");
+        }
+        assert!(is_the_kernel_two_readback_flipped(
+            InputForm::Split,
+            1,
+            11,
+            ComputationOfTheUnit::FirstInTheBatch
+        ));
+        assert!(!is_the_kernel_two_readback_flipped(
+            InputForm::Split,
+            1,
+            11,
+            ComputationOfTheUnit::Recompute
+        ));
+        assert!(!is_the_kernel_two_readback_flipped(
+            InputForm::Split,
+            9,
+            11,
+            ComputationOfTheUnit::FirstInTheBatch
+        ));
+    }
+
+    #[test]
+    fn deterministic_injection_stays_deterministic_after_three_recomputes_of_both_kernels() {
+        for form in InputForm::ALL {
+            let outcome = fake_batch(form, 1, &[]);
+            assert_eq!(
+                outcome.deterministic_injection,
+                Some(Some(RecomputeOutcome::Deterministic)),
+                "{form:?}"
+            );
+        }
+        assert_eq!(kernel_two_input_flip(InputForm::Split, 8, 7), Some(100));
+        assert_eq!(kernel_two_input_flip(InputForm::Shared, 1, 7), None);
+        assert!(is_the_kernel_two_readback_flipped(
+            InputForm::Shared,
+            1,
+            7,
+            ComputationOfTheUnit::Recompute
+        ));
+        let outside = fake_batch(InputForm::Split, 9, &[]);
+        assert_eq!(outside.natural_units, 12);
+        assert_eq!(outside.deterministic_injection, None);
+    }
+
+    #[test]
+    fn both_kernels_agreeing_against_the_cpu_are_counted() {
+        let outcome = fake_batch(InputForm::Shared, 20, &[3]);
+        assert_eq!(outcome.both_kernels_agree_and_differ_from_the_cpu, 1);
+        assert_eq!(outcome.first_round_kernel_disagreements, 0);
+        assert_eq!(outcome.first_round_any_difference, 1);
+        assert_eq!(outcome.kernel_one_differs_from_the_cpu, 1);
+        assert_eq!(outcome.natural_recomputes.len(), 1);
+        assert_eq!(
+            outcome.natural_recomputes[0].outcome,
+            RecomputeOutcome::Deterministic
+        );
+        assert_eq!(still_disagreeing_after(&outcome.natural_recomputes, 3), 1);
+    }
+
+    #[test]
+    fn upper_bound_at_95_percent_when_zero_matches_the_registered_value() {
+        assert_eq!(
+            format!("{:.6e}", upper_bound_at_95_percent_when_zero(1_048_560)),
+            "2.856992e-6"
+        );
+        assert_eq!(
+            format!("{:.6e}", upper_bound_at_95_percent_when_zero(2_097_120)),
+            "1.428497e-6"
+        );
+    }
+
+    #[test]
+    fn recompute_category_is_zero_when_the_first_round_has_no_difference() {
+        assert_eq!(recompute_category(0, &[]), "zero");
+        assert_eq!(
+            recompute_category(
+                2,
+                &[RecomputeOutcome::Transient, RecomputeOutcome::Transient]
+            ),
+            "transient_only"
+        );
+        assert_eq!(
+            recompute_category(
+                2,
+                &[RecomputeOutcome::Transient, RecomputeOutcome::Deterministic]
+            ),
+            "deterministic_present"
+        );
+        assert_eq!(
+            recompute_category(
+                2,
+                &[RecomputeOutcome::Transient, RecomputeOutcome::AgreedLater]
+            ),
+            "mixed"
+        );
+    }
+
+    #[test]
+    fn content_anchors_hold_and_the_seed_includes_the_input_form() {
+        assert_eq!(content_anchor_finding(), None);
+        let mut bytes = vec![0_u8; disagreement_unit_length(16_383)];
+        disagreement_unit_content(1, InputForm::Split, 64, 16_383, &mut bytes);
+        assert_eq!(bytes.len(), 16_384);
+        assert_eq!(crc32_castagnoli(&bytes), 0x261c_3840);
+        let mut shared = vec![0_u8; bytes.len()];
+        disagreement_unit_content(1, InputForm::Shared, 64, 16_383, &mut shared);
+        assert_ne!(shared, bytes);
+    }
+
+    #[test]
+    fn still_disagreeing_counts_and_injected_units_hold_only_with_all_eight_outcomes() {
+        let differing = UnitComparison {
+            kernels_differ: true,
+            kernel_one_differs_from_the_cpu: false,
+            kernel_two_differs_from_the_cpu: true,
+        };
+        let differ = Some(differing);
+        let agree = UnitComparison::of(Some(1), Some(1), 1);
+        let unit = |recomputes: Vec<Option<UnitComparison>>, outcome| RecomputedUnit {
+            unit: 0,
+            first_round: differing,
+            recomputes,
+            outcome,
+        };
+        let units = [
+            unit(vec![agree], RecomputeOutcome::Transient),
+            unit(vec![differ, agree], RecomputeOutcome::AgreedLater),
+            unit(
+                vec![differ, differ, differ],
+                RecomputeOutcome::Deterministic,
+            ),
+        ];
+        assert_eq!(still_disagreeing_after(&units, 1), 2);
+        assert_eq!(still_disagreeing_after(&units, 2), 1);
+        assert_eq!(still_disagreeing_after(&units, 3), 1);
+        assert!(injected_units_hold(
+            &[Some(RecomputeOutcome::Transient); 8],
+            RecomputeOutcome::Transient
+        ));
+        assert!(!injected_units_hold(
+            &[Some(RecomputeOutcome::Transient); 7],
+            RecomputeOutcome::Transient
+        ));
+        let mut one_missing = [Some(RecomputeOutcome::Transient); 8];
+        one_missing[3] = None;
+        assert!(!injected_units_hold(
+            &one_missing,
+            RecomputeOutcome::Transient
+        ));
+        assert_eq!(
+            identical_entries(
+                &[(Some(1), Some(1)), (Some(2), None)],
+                &[(Some(1), Some(1)), (Some(2), Some(2))]
+            ),
+            1
+        );
+    }
+
+    // ───────────── 第 3 次重跑第一段：格、点行、拟合与攒批行、旋钮翻面 ─────────────
+
+    #[test]
+    fn submission_cells_of_a_card_are_eighty_in_the_registered_order() {
+        let cells = submission_cells_of_a_card();
+        assert_eq!(cells.len(), 80);
+        let count_of = |predicate: &dyn Fn(&SubmissionCell) -> bool| {
+            cells.iter().filter(|cell| predicate(cell)).count()
+        };
+        assert_eq!(
+            count_of(&|cell| cell.gap_milliseconds == 0
+                && matches!(cell.form, SubmissionForm::Resident(_))),
+            48
+        );
+        assert_eq!(
+            count_of(&|cell| cell.gap_milliseconds == GAP_BETWEEN_TWO_BATCHES_MILLISECONDS),
+            24
+        );
+        assert_eq!(
+            count_of(&|cell| cell.form == SubmissionForm::TodaySingleKernel),
+            8
+        );
+        assert_eq!(
+            cells[0].label(),
+            "form=shared wait=blocking gap_milliseconds=0 units=4"
+        );
+        assert_eq!(cells[7].units, 512);
+        assert_eq!(cells[8].wait, WaitMethod::SleepingShortly);
+        let second_round = submission_cells_in_the_order_of_the_round(2);
+        assert_eq!(second_round[0], cells[1]);
+        assert_eq!(second_round[79], cells[0]);
+        assert_eq!(submission_cells_in_the_order_of_the_round(81)[0], cells[0]);
+    }
+
+    fn quarter_point_at_four() -> SubmissionPoint {
+        SubmissionPoint {
+            fraction: LiveSlotFraction::OneQuarter,
+            pool_data_units: 1024,
+            batch_units: 4,
+        }
+    }
+
+    /// 一张卡（序号 0）一种形态一种等法间隔 0 的合成中位：n = 4 是 0.6 ms、n = 8 是 0.3 ms，五轮相同（`missing_round` 那一轮没有读数）。
+    fn synthetic_medians(
+        form: SubmissionForm,
+        missing_round: Option<usize>,
+        process_cpu_nanoseconds: f64,
+    ) -> CellMediansOfTheSegment {
+        let mut medians = CellMediansOfTheSegment::new();
+        for (units, thread_cpu_nanoseconds) in [(4_u64, 600_000.0), (8, 300_000.0)] {
+            let cell = SubmissionCell {
+                gap_milliseconds: 0,
+                form,
+                wait: WaitMethod::Blocking,
+                units,
+            };
+            let rounds = (0..ROUNDS)
+                .map(|round_index| {
+                    (Some(round_index) != missing_round).then_some(CellRoundMedians {
+                        thread_cpu_nanoseconds,
+                        floor_thread_cpu_nanoseconds: Some(thread_cpu_nanoseconds / 2.0),
+                        process_cpu_nanoseconds,
+                    })
+                })
+                .collect();
+            medians.insert((0, cell), rounds);
+        }
+        medians
+    }
+
+    #[test]
+    fn host_cpu_point_lines_judge_each_threshold_kind_and_mark_voided_and_short_rounds() {
+        let thresholds = BTreeMap::from([(
+            quarter_point_at_four(),
+            PointThresholds {
+                by_candidate: BTreeMap::from([(GpuCandidate::EveryStage, 0.5)]),
+                saved_upper_milliseconds: 1.5,
+            },
+        )]);
+        let shared = SubmissionForm::Resident(InputForm::Shared);
+        let medians = synthetic_medians(shared, None, 300_000.0);
+        let voiding = BTreeMap::new();
+        let process_clock_cells = BTreeSet::new();
+        let inputs = HostCpuPointInputs {
+            thresholds: &thresholds,
+            machine_ratio: Some(0.5),
+            cards: &[0],
+            medians: &medians,
+            voiding: &voiding,
+            process_clock_cells: &process_clock_cells,
+        };
+        let (lines, judgements, floor_judgements) = host_cpu_point_lines(&inputs);
+        let key = |kind| {
+            (
+                quarter_point_at_four(),
+                GpuCandidate::EveryStage,
+                0,
+                shared,
+                WaitMethod::Blocking,
+                0,
+                kind,
+                CpuClockKind::Thread,
+            )
+        };
+        assert_eq!(judgements[&key(ThresholdKind::AttackLedger)], "not_losing");
+        assert_eq!(judgements[&key(ThresholdKind::MachineScaled)], "losing");
+        assert_eq!(
+            floor_judgements[&key(ThresholdKind::MachineScaled)],
+            "not_losing"
+        );
+        let attack_line = lines
+            .iter()
+            .find(|line| {
+                line.contains("form=shared wait=blocking")
+                    && line.contains("threshold_kind=attack_ledger")
+            })
+            .expect("有这一行");
+        assert!(attack_line.contains("submission_units=8,8,4 host_cpu_per_submission_milliseconds_per_round=0.400000,0.400000,0.400000,0.400000,0.400000"), "{attack_line}");
+        let flips = knob_flip_lines("host_cpu_per_submission", &judgements, &[0]);
+        assert!(
+            flips.iter().any(|line| line
+                .contains("knob=threshold_machine clause=machine_ratio_decides")
+                && line
+                    .contains("judgement_at_one_end=not_losing judgement_at_the_other_end=losing")),
+            "{flips:?}"
+        );
+        assert!(flips.contains(&"name=knob_flip_summary quantity=host_cpu_per_submission knob=threshold_machine clause=machine_ratio_decides pairs=1 flipped=1".to_string()), "{flips:?}");
+        let short = synthetic_medians(shared, Some(2), 400_000.0);
+        let voided = BTreeMap::from([((0, shared, WaitMethod::Blocking), "void_positive_control")]);
+        let underestimated = BTreeSet::from([(
+            0,
+            SubmissionCell {
+                gap_milliseconds: 0,
+                form: shared,
+                wait: WaitMethod::Blocking,
+                units: 8,
+            },
+        )]);
+        let short_inputs = HostCpuPointInputs {
+            thresholds: &thresholds,
+            machine_ratio: Some(0.5),
+            cards: &[0],
+            medians: &short,
+            voiding: &voiding,
+            process_clock_cells: &underestimated,
+        };
+        let (_short_lines, short_judgements, _short_floor) = host_cpu_point_lines(&short_inputs);
+        assert_eq!(
+            short_judgements[&key(ThresholdKind::AttackLedger)],
+            "rounds_insufficient"
+        );
+        let process_key = (
+            quarter_point_at_four(),
+            GpuCandidate::EveryStage,
+            0,
+            shared,
+            WaitMethod::Blocking,
+            0,
+            ThresholdKind::AttackLedger,
+            CpuClockKind::Process,
+        );
+        assert_eq!(short_judgements[&process_key], "rounds_insufficient");
+        let voided_inputs = HostCpuPointInputs {
+            thresholds: &thresholds,
+            machine_ratio: Some(0.5),
+            cards: &[0],
+            medians: &medians,
+            voiding: &voided,
+            process_clock_cells: &process_clock_cells,
+        };
+        let (_voided_lines, voided_judgements, _voided_floor) =
+            host_cpu_point_lines(&voided_inputs);
+        assert_eq!(
+            voided_judgements[&key(ThresholdKind::AttackLedger)],
+            "void_positive_control"
+        );
+    }
+
+    #[test]
+    fn knob_flips_pair_each_key_with_its_other_end_once() {
+        let judgements: BTreeMap<u32, String> = BTreeMap::from([
+            (0, "losing".to_string()),
+            (1, "not_losing".to_string()),
+            (2, "losing".to_string()),
+            (3, "losing".to_string()),
+        ]);
+        let other_end = |key: &u32| key.is_multiple_of(2).then_some(key + 1);
+        assert_eq!(knob_flips(&judgements, other_end), vec![(0, 1)]);
+        assert_eq!(knob_pairs(&judgements, other_end), 2);
+        let key = (
+            quarter_point_at_four(),
+            GpuCandidate::EveryStage,
+            0,
+            SubmissionForm::Resident(InputForm::Shared),
+            WaitMethod::Blocking,
+            0,
+            ThresholdKind::AttackLedger,
+            CpuClockKind::Thread,
+        );
+        assert_eq!(
+            JudgementKnob::Card
+                .other_end(&key, &[0, 1])
+                .map(|other| other.2),
+            Some(1)
+        );
+        assert_eq!(
+            JudgementKnob::Gap
+                .other_end(&key, &[0, 1])
+                .map(|other| other.5),
+            Some(50)
+        );
+        assert_eq!(
+            JudgementKnob::ShortAndLongerSleep.other_end(&key, &[0, 1]),
+            None
+        );
+        assert_eq!(
+            JudgementKnob::BlockingAndLongerSleep
+                .other_end(&key, &[0, 1])
+                .map(|other| other.4),
+            Some(WaitMethod::SleepingLonger)
+        );
+        assert_eq!(
+            JudgementKnob::Clock
+                .other_end(&key, &[0, 1])
+                .map(|other| other.7),
+            Some(CpuClockKind::Process)
+        );
+        assert_eq!(JudgementKnob::ALL.len(), 8);
+    }
+
+    #[test]
+    fn knob_flip_lines_count_only_pairs_with_a_judgement_at_both_ends() {
+        let shared = SubmissionForm::Resident(InputForm::Shared);
+        let key = |form, wait, gap, kind, clock| {
+            (
+                quarter_point_at_four(),
+                GpuCandidate::EveryStage,
+                0_u32,
+                form,
+                wait,
+                gap,
+                kind,
+                clock,
+            )
+        };
+        let judgements = BTreeMap::from([
+            (
+                key(
+                    shared,
+                    WaitMethod::Blocking,
+                    0,
+                    ThresholdKind::AttackLedger,
+                    CpuClockKind::Thread,
+                ),
+                "losing".to_string(),
+            ),
+            (
+                key(
+                    shared,
+                    WaitMethod::Blocking,
+                    0,
+                    ThresholdKind::MachineScaled,
+                    CpuClockKind::Thread,
+                ),
+                "unstable".to_string(),
+            ),
+            (
+                key(
+                    SubmissionForm::Resident(InputForm::Split),
+                    WaitMethod::Blocking,
+                    0,
+                    ThresholdKind::AttackLedger,
+                    CpuClockKind::Thread,
+                ),
+                "rounds_insufficient".to_string(),
+            ),
+            (
+                key(
+                    shared,
+                    WaitMethod::Blocking,
+                    GAP_BETWEEN_TWO_BATCHES_MILLISECONDS,
+                    ThresholdKind::AttackLedger,
+                    CpuClockKind::Thread,
+                ),
+                "void_positive_control".to_string(),
+            ),
+            (
+                key(
+                    shared,
+                    WaitMethod::SleepingShortly,
+                    0,
+                    ThresholdKind::AttackLedger,
+                    CpuClockKind::Thread,
+                ),
+                "not_run".to_string(),
+            ),
+            (
+                key(
+                    shared,
+                    WaitMethod::SleepingLonger,
+                    0,
+                    ThresholdKind::AttackLedger,
+                    CpuClockKind::Thread,
+                ),
+                "losing".to_string(),
+            ),
+            (
+                key(
+                    shared,
+                    WaitMethod::Blocking,
+                    0,
+                    ThresholdKind::AttackLedger,
+                    CpuClockKind::Process,
+                ),
+                "not_applicable".to_string(),
+            ),
+        ]);
+        let lines = knob_flip_lines("host_cpu_per_submission", &judgements, &[0]);
+        let summary = |knob: &str, clause: &str, pairs: usize, flipped: usize| {
+            format!("name=knob_flip_summary quantity=host_cpu_per_submission knob={knob} clause={clause} pairs={pairs} flipped={flipped}")
+        };
+        for expected in [
+            summary("card", "two_cards_judge_differently", 0, 0),
+            summary("input_form", "flips_with_a_knob", 0, 0),
+            summary(
+                "wait_blocking_and_sleep_100_microseconds",
+                "the_wait_method_decides",
+                0,
+                0,
+            ),
+            summary(
+                "wait_blocking_and_sleep_1_millisecond",
+                "the_wait_method_decides",
+                1,
+                0,
+            ),
+            summary(
+                "wait_sleep_100_microseconds_and_sleep_1_millisecond",
+                "flips_with_a_knob",
+                0,
+                0,
+            ),
+            summary("gap", "flips_with_a_knob", 0, 0),
+            summary("threshold_machine", "machine_ratio_decides", 1, 1),
+            summary("clock", "thread_clock_underestimates", 0, 0),
+        ] {
+            assert!(lines.contains(&expected), "缺 {expected}：{lines:?}");
+        }
+        let flip_lines: Vec<&String> = lines
+            .iter()
+            .filter(|line| line.starts_with("name=knob_flip "))
+            .collect();
+        assert_eq!(flip_lines.len(), 1, "{lines:?}");
+        assert!(
+            flip_lines[0].contains("knob=threshold_machine")
+                && flip_lines[0]
+                    .ends_with("judgement_at_one_end=losing judgement_at_the_other_end=unstable"),
+            "{flip_lines:?}"
+        );
+        for outcome in [
+            "rounds_insufficient",
+            "not_run",
+            "not_applicable",
+            "void_positive_control",
+            "void_card",
+        ] {
+            assert!(!is_a_judgement(outcome), "{outcome} 不是判定");
+        }
+        for outcome in [
+            "losing",
+            "not_losing",
+            "not_losing_lower_bound",
+            "unstable",
+            "one_submission_per_batch",
+        ] {
+            assert!(is_a_judgement(outcome), "{outcome} 是判定");
+        }
+    }
+
+    /// 一张卡（序号 0）共用输入、阻塞等、间隔 0 的八档合成中位：c_rt = `fixed` + `per_mebibyte` × MiB，五轮相同。
+    fn linear_medians(
+        fixed_milliseconds: f64,
+        per_mebibyte_milliseconds: f64,
+    ) -> CellMediansOfTheSegment {
+        let shared = SubmissionForm::Resident(InputForm::Shared);
+        SUBMISSION_UNIT_COUNTS
+            .iter()
+            .map(|units| {
+                let mebibytes = (units * LOCAL_GPU_SLOT_BYTES) as f64 / 1_048_576.0;
+                let nanoseconds =
+                    (fixed_milliseconds + per_mebibyte_milliseconds * mebibytes) * 1e6;
+                let cell = SubmissionCell {
+                    gap_milliseconds: 0,
+                    form: shared,
+                    wait: WaitMethod::Blocking,
+                    units: *units,
+                };
+                let round = CellRoundMedians {
+                    thread_cpu_nanoseconds: nanoseconds,
+                    floor_thread_cpu_nanoseconds: None,
+                    process_cpu_nanoseconds: nanoseconds,
+                };
+                ((0, cell), vec![Some(round); ROUNDS])
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fit_and_merging_lines_report_the_fit_and_the_category_of_every_round() {
+        let medians = linear_medians(1.0, 0.25);
+        let shared = SubmissionForm::Resident(InputForm::Shared);
+        let cell = SubmissionCell {
+            gap_milliseconds: 0,
+            form: shared,
+            wait: WaitMethod::Blocking,
+            units: 0,
+        };
+        let fits = fits_of_the_cell(&medians, 0, cell);
+        let overall = fits.overall.expect("八档都有");
+        assert!(
+            (overall.fixed_milliseconds - 1.0).abs() < 1e-9
+                && (overall.per_mebibyte_milliseconds - 0.25).abs() < 1e-9
+        );
+        assert_eq!(fits.per_round.iter().flatten().count(), ROUNDS);
+        let line = fit_line(0, cell, &fits);
+        assert!(
+            line.contains("fixed_milliseconds=1.000000 per_mebibyte_milliseconds=0.250000")
+                && line.contains("fit_not_linear=false"),
+            "{line}"
+        );
+        let thresholds = BTreeMap::from([(
+            SubmissionPoint {
+                fraction: LiveSlotFraction::ThreeQuarters,
+                pool_data_units: 1024,
+                batch_units: 8,
+            },
+            PointThresholds {
+                by_candidate: BTreeMap::from([(GpuCandidate::EveryStage, 0.3)]),
+                saved_upper_milliseconds: 1.4,
+            },
+        )]);
+        let voiding = BTreeMap::new();
+        let process_clock_cells = BTreeSet::new();
+        let inputs = HostCpuPointInputs {
+            thresholds: &thresholds,
+            machine_ratio: None,
+            cards: &[0],
+            medians: &medians,
+            voiding: &voiding,
+            process_clock_cells: &process_clock_cells,
+        };
+        let (lines, categories) = merging_shape_lines(&inputs);
+        let attack = lines
+            .iter()
+            .find(|merging_line| {
+                merging_line.contains(
+                    "form=shared wait=blocking gap_milliseconds=0 threshold_kind=attack_ledger",
+                )
+            })
+            .expect("有这一行");
+        // 这一点 c_rt = 1.140625 ≥ 0.3，不是甲；n = 24 那一档 c_rt(m) = 1 + 0.25 × 0.75 = 1.1875 < 1.4，是乙-1
+        assert!(
+            attack.contains("one_submission_per_intent_units=24")
+                && attack.ends_with("category=one_submission_per_intent"),
+            "{attack}"
+        );
+        let machine = lines
+            .iter()
+            .find(|merging_line| merging_line.contains("threshold_kind=machine_scaled"))
+            .expect("有这一行");
+        assert!(machine.ends_with("category=not_run"), "{machine}");
+        assert_eq!(
+            categories.len(),
+            2 * 9,
+            "两种门槛 × 共用六格（三种等法、两种间隔）加分开三格"
+        );
+    }
+
+    #[test]
+    fn function_split_remainder_subtracts_every_replayed_function() {
+        let reading = FunctionSplitReading {
+            call_cpu_nanoseconds: 1_000.0,
+            clone_before_cpu_nanoseconds: 100.0,
+            clone_after_cpu_nanoseconds: 50.0,
+            read_the_version_mapping_cpu_nanoseconds: 200.0,
+            read_the_version_pinned_cpu_nanoseconds: 20.0,
+            region_scan_cpu_nanoseconds: Some(300.0),
+            choose_cpu_nanoseconds: None,
+        };
+        assert_eq!(reading.clone_cpu_nanoseconds(), 150.0);
+        assert_eq!(reading.read_the_version_cpu_nanoseconds(), 220.0);
+        assert_eq!(reading.remainder_cpu_nanoseconds(), 330.0);
+        assert!(
+            reading
+                .fields_text()
+                .contains("remainder_cpu_nanoseconds=330.0 clone_share=0.150000"),
+            "{}",
+            reading.fields_text()
+        );
+        let totals = function_split_round_totals(&[reading, reading]).expect("有两次");
+        assert_eq!(totals, [2_000.0, 300.0, 440.0, 600.0, 0.0, 660.0]);
+        let summary = function_split_summary_text(&[totals]);
+        assert!(summary.starts_with("call_cpu_nanoseconds_median=2000.000000 call_share_median=1.000000 clone_cpu_nanoseconds_median=300.000000 clone_share_median=0.150000"), "{summary}");
+        assert_eq!(function_split_round_totals(&[]), None);
+    }
+
+    /// 一条合成的映射条目（只给 J-S6 的比法用）。
+    fn synthetic_mapping_entry(key_byte: u8, slot: u64) -> CentralMappingEntry {
+        let location = singlefs_core::pointer::LocationEntry {
+            device: DeviceIdentity(0),
+            slot: SlotNumber(slot),
+            unit_checksum: 0,
+        };
+        CentralMappingEntry {
+            key: vec![key_byte; 27],
+            locations: [location, location],
+        }
+    }
+
+    #[test]
+    fn mapping_entries_finding_ignores_the_order_but_not_a_missing_or_moved_entry() {
+        let entries = vec![
+            synthetic_mapping_entry(1, 100),
+            synthetic_mapping_entry(2, 200),
+        ];
+        let mut reversed = entries.clone();
+        reversed.reverse();
+        assert_eq!(mapping_entries_finding(0, &entries, &reversed), None);
+        assert!(mapping_entries_finding(0, &entries, &entries[..1]).is_some());
+        let moved = vec![
+            synthetic_mapping_entry(1, 100),
+            synthetic_mapping_entry(2, 202),
+        ];
+        assert!(mapping_entries_finding(0, &entries, &moved).is_some());
+    }
+
+    /// 停机 J-S6 在一个真池上不触发：crates 的 `central_mapping_as_the_compaction_reads_it` 与装置那一份取出的映射条目相同。
+    #[test]
+    fn crates_and_apparatus_read_the_same_mapping_entries_of_a_fresh_pool() {
+        let (_devices, session) = formatted_pool_with_the_first_file_and_a_session();
+        let version = version_of_trees(&session);
+        assert_eq!(
+            mapping_entries_finding(
+                0,
+                &central_mapping_as_the_compaction_reads_it(version),
+                &version_as_the_replay_reads_it(version).mapping_entries,
+            ),
+            None
+        );
+        assert_eq!(
+            pinned_slots_of_the_version(version),
+            version_as_the_replay_reads_it(version).pinned_slots
+        );
+    }
+
+    #[test]
+    fn the_host_cpu_segment_starts_no_thread_of_its_own() {
+        let start = OWN_SOURCE_TEXT
+            .find("mod host_cpu_per_submission_segment {")
+            .expect("模块在");
+        let end = OWN_SOURCE_TEXT
+            .find("mod recompute_disagreement_segment {")
+            .expect("下一个模块在");
+        let segment = &OWN_SOURCE_TEXT[start..end];
+        for spawning in ["thread::spawn", "thread::scope", "thread::Builder"] {
+            assert!(!segment.contains(spawning), "第一段里有 {spawning}");
+        }
+        assert!(
+            segment.contains("fn measure_the_cells_of_the_card"),
+            "量的那一段在这个模块里"
+        );
+    }
+
+    #[test]
+    fn the_three_new_subcommands_refuse_missing_and_unknown_options() {
+        assert_eq!(
+            run_the_subcommand(&["host-cpu-per-submission", "--cards", "0,1"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["recompute-disagreement", "--cards", "zero"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["recompute-disagreement", "--card", "0"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["function-split", "--point", "0.5:1024"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["function-split", "--batch-units", "8"]),
+            EXIT_CODE_USAGE
+        );
+    }
+
+    fn timing_with(
+        thread_cpu_nanoseconds: u64,
+        wall_nanoseconds: u64,
+        kernel_two_differs: u64,
+    ) -> Option<SubmissionTiming> {
+        Some(SubmissionTiming {
+            thread_cpu_nanoseconds,
+            process_cpu_nanoseconds: thread_cpu_nanoseconds + 10,
+            wall_nanoseconds,
+            wait_thread_cpu_nanoseconds: Some(thread_cpu_nanoseconds / 2),
+            wait_wall_nanoseconds: Some(wall_nanoseconds / 2),
+            polls: Some(3),
+            input_bytes_written: 8 * LOCAL_GPU_SLOT_BYTES,
+            comparison: SubmissionComparison {
+                confirmed: 8,
+                uncertain_entries: Vec::new(),
+                kernel_one_differs_from_the_expected: 0,
+                kernel_two_differs_from_the_expected: kernel_two_differs,
+                are_the_sequence_numbers_holding: true,
+            },
+        })
+    }
+
+    #[test]
+    fn cell_round_reading_flags_a_result_differing_from_the_cpu_and_any_unreadable_submission() {
+        let clean = cell_round_reading(
+            &[
+                timing_with(100, 200, 0),
+                timing_with(300, 400, 0),
+                timing_with(200, 300, 0),
+            ],
+            8,
+        )
+        .expect("都读得到");
+        assert_eq!(clean.thread_cpu_median_nanoseconds, 200.0);
+        assert_eq!(clean.floor_thread_cpu_median_nanoseconds, Some(100.0));
+        assert_eq!(clean.process_cpu_median_nanoseconds, 210.0);
+        assert_eq!(clean.polls_median, Some(3.0));
+        assert!(clean.are_the_results_holding && clean.is_every_thread_cpu_inside_the_wall);
+        let wrong = cell_round_reading(&[timing_with(100, 200, 0), timing_with(100, 200, 1)], 8)
+            .expect("都读得到");
+        assert!(!wrong.are_the_results_holding);
+        let outside = cell_round_reading(&[timing_with(300, 200, 0)], 8).expect("读得到");
+        assert!(!outside.is_every_thread_cpu_inside_the_wall);
+        assert_eq!(
+            cell_round_reading(&[timing_with(100, 200, 0), None], 8),
+            None
+        );
+        assert!(
+            clean.is_every_wait_inside_the_submission && clean.are_the_comparison_counts_holding
+        );
+        assert!(
+            !cell_round_reading(&[timing_with(100, 200, 0)], 9)
+                .expect("读得到")
+                .are_the_comparison_counts_holding
+        );
+        let mut waiting_longer = timing_with(100, 200, 0).expect("合成的");
+        waiting_longer.wait_thread_cpu_nanoseconds = Some(101);
+        assert!(
+            !cell_round_reading(&[Some(waiting_longer)], 8)
+                .expect("读得到")
+                .is_every_wait_inside_the_submission
+        );
+    }
+
+    #[test]
+    fn input_file_checks_hold_only_for_the_registered_digests() {
+        let checks = input_file_checks(b"not the attack ledger", b"not the stage split product");
+        assert_eq!(checks.len(), 2);
+        assert!(checks.iter().all(|(_, _, _, holds)| !holds));
+        assert_eq!(checks[0].2, ATTACK_LEDGER_SHA256);
+        assert_eq!(checks[1].2, STAGE_SPLIT_PRODUCT_SHA256);
+    }
+
+    #[test]
+    fn machine_ratio_cross_check_compares_the_local_checksum_cpu_over_the_threshold_with_the_ratio()
+    {
+        let thresholds = BTreeMap::from([(
+            quarter_point_at_four(),
+            PointThresholds {
+                by_candidate: BTreeMap::from([(GpuCandidate::ScanChecksumOnly, 0.1)]),
+                saved_upper_milliseconds: 1.0,
+            },
+        )]);
+        let cpu: BTreeMap<u64, f64> = BTreeMap::from([(4, 0.04), (8, 0.04)]);
+        let near = machine_ratio_cross_check_lines(&thresholds, &cpu, Some(0.5));
+        assert!(
+            near[0].contains("ratio=0.400000 machine_ratio=0.500000 off_by_more_than_double=false"),
+            "{near:?}"
+        );
+        let far = machine_ratio_cross_check_lines(&thresholds, &cpu, Some(0.1));
+        assert!(far[0].ends_with("off_by_more_than_double=true"), "{far:?}");
+    }
+
+    // ───────────── 第 3 次重跑：带卡的单测（gpu 特性，经 scripts/crash/gpu-quiesce-run.sh 跑；没有卡报 NOT_RUN_NO_GPU_ADAPTER） ─────────────
+
+    /// 64 个按种子造的单元（偶数号 32 KiB、奇数号 16 KiB），各放一个 32 KiB 槽：（槽连放的字节、长度表、CPU 算的 CRC）。
+    #[cfg(feature = "gpu")]
+    fn seeded_slots(units: u64) -> (Vec<u8>, Vec<u32>, Vec<u32>) {
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        let mut slots = vec![0_u8; usize::try_from(units).expect("单元数") * slot_bytes];
+        let mut lengths = Vec::new();
+        let mut crcs = Vec::new();
+        for (unit, slot) in (0_u64..).zip(slots.chunks_mut(slot_bytes)) {
+            let length = disagreement_unit_length(unit);
+            disagreement_unit_content(3, InputForm::Split, 5, unit, &mut slot[..length]);
+            lengths.push(u32::try_from(length).expect("长度"));
+            crcs.push(crc32_castagnoli(&slot[..length]));
+        }
+        (slots, lengths, crcs)
+    }
+
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn resident_kernels_agree_with_the_cpu_and_kernel_one_agrees_with_the_crates_on_seeded_units() {
+        use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
+        let Some(card) = first_usable_card_or_report_not_run(
+            "resident_kernels_agree_with_the_cpu_and_kernel_one_agrees_with_the_crates_on_seeded_units",
+        ) else {
+            return;
+        };
+        let kernels = resident_gpu_kernels::ResidentKernels::start(&card, 64);
+        let (slots, lengths, crcs) = seeded_slots(64);
+        for form in InputForm::ALL {
+            let (results, are_the_sequence_numbers_holding) = resident_gpu_kernels::untimed_results(
+                &kernels,
+                form,
+                &slots,
+                &lengths,
+                &[],
+                KernelsToDispatch::Both,
+            );
+            assert!(are_the_sequence_numbers_holding, "{form:?}");
+            let expected: Vec<KernelResultsOfAUnit> =
+                crcs.iter().map(|crc| (Some(*crc), Some(*crc))).collect();
+            assert_eq!(results, expected, "{form:?}");
+        }
+        let (kernel_one_only, _sequence) = resident_gpu_kernels::untimed_results(
+            &kernels,
+            InputForm::Shared,
+            &slots,
+            &lengths,
+            &[],
+            KernelsToDispatch::KernelOneOnly,
+        );
+        let kernel_one: Vec<u32> = kernel_one_only.iter().filter_map(|(crc, _)| *crc).collect();
+        assert!(kernel_one_only
+            .iter()
+            .all(|(_, kernel_two)| kernel_two.is_none()));
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        let ranges: Vec<&[u8]> = slots
+            .chunks(slot_bytes)
+            .zip(&lengths)
+            .map(|(slot, length)| &slot[..usize::try_from(*length).expect("长度")])
+            .collect();
+        assert_eq!(
+            kernel_one_finding_against_the_crates(64, &kernel_one, &card.crc32c_of_ranges(&ranges)),
+            None
+        );
+    }
+
+    /// 第九节 V99：同一个设备上先交这一次（n = 8），再交一次长的活（核一 64 遍 × 16384 个单元）；阻塞等只等这一次，比长活单独跑的一半还快。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn blocking_wait_waits_only_for_its_own_submission() {
+        use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
+        const LONG_JOB_PASSES: u32 = 64;
+        let Some(card) =
+            first_usable_card_or_report_not_run("blocking_wait_waits_only_for_its_own_submission")
+        else {
+            return;
+        };
+        let kernels =
+            resident_gpu_kernels::ResidentKernels::start(&card, UNITS_PER_DISAGREEMENT_BATCH);
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        let units = usize::try_from(UNITS_PER_DISAGREEMENT_BATCH).expect("16384");
+        let long_bytes = vec![0x5A_u8; units * slot_bytes];
+        let lengths = vec![u32::try_from(slot_bytes).expect("32768"); units];
+        let _long_job_bytes_written =
+            kernels.write_the_inputs(InputForm::Shared, &long_bytes, &lengths, &[]);
+        let long_job_started = Instant::now();
+        let alone = kernels.submit_a_long_job(UNITS_PER_DISAGREEMENT_BATCH, LONG_JOB_PASSES);
+        kernels.block_until_done(alone);
+        let long_job_seconds = long_job_started.elapsed().as_secs_f64();
+        let short_units = 8;
+        let expected = vec![crc32_castagnoli(&long_bytes[..slot_bytes]); short_units];
+        let _short_bytes_written = kernels.write_the_inputs(
+            InputForm::Shared,
+            &long_bytes[..short_units * slot_bytes],
+            &lengths[..short_units],
+            &[],
+        );
+        let short = kernels.encode_and_submit(InputForm::Shared, 8, KernelsToDispatch::Both);
+        let pending = kernels.register_the_readback(short, 8);
+        let _second_long_job_bytes_written =
+            kernels.write_the_inputs(InputForm::Shared, &long_bytes, &lengths, &[]);
+        let long_again = kernels.submit_a_long_job(UNITS_PER_DISAGREEMENT_BATCH, LONG_JOB_PASSES);
+        let wait_started = Instant::now();
+        let _polls = kernels.wait(&pending, WaitMethod::Blocking);
+        let short_wait_seconds = wait_started.elapsed().as_secs_f64();
+        let comparison = kernels.read_then_unmap(&pending, |readback| {
+            compare_the_readback(readback, &expected, None)
+        });
+        kernels.block_until_done(long_again);
+        assert_eq!(comparison.confirmed, 8);
+        assert_eq!(comparison.kernel_one_differs_from_the_expected, 0);
+        assert!(
+            short_wait_seconds < long_job_seconds / 2.0,
+            "阻塞等等了 {short_wait_seconds} 秒，长活单独 {long_job_seconds} 秒：等的不只是这一次"
+        );
+    }
+
+    // ───────────── 第 4 次重跑（登记 research/prompts/e185-r4-prereg.md）：控漂移段的算术（不用卡，假钟） ─────────────
+
+    /// 一串窗中位喂暖到稳：第 i 窗交回 `medians[i]`（用完了重复最后一个），每窗之后过了 `seconds_per_window` 秒。交回（经过、发了几窗）。
+    fn warm_up_over(medians: &[f64], seconds_per_window: f64) -> WarmUpToStable {
+        let mut window = 0_usize;
+        let mut seconds = 0.0_f64;
+        warm_up_to_stable(
+            &mut || {
+                let median = medians[window.min(medians.len() - 1)];
+                window += 1;
+                Some(median)
+            },
+            &mut || {
+                seconds += seconds_per_window;
+                seconds
+            },
+        )
+    }
+
+    #[test]
+    fn warm_up_to_stable_stops_at_the_fifth_window_when_the_last_three_agree_with_their_mean() {
+        let warm_up = warm_up_over(&[10.0, 9.0, 8.0, 8.0, 8.0], 60.0);
+        assert_eq!(warm_up.window_medians_nanoseconds.len(), 5);
+        assert!(!warm_up.reached_the_cap);
+        assert_eq!(warm_up.trajectory(), (Some(10.0), 2, Some(8.0)));
+    }
+
+    #[test]
+    fn warm_up_to_stable_waits_sixty_seconds_and_stops_at_six_hundred_without_agreement() {
+        let early = warm_up_over(&[8.0, 8.0, 8.0], 10.0);
+        assert_eq!(
+            early.window_medians_nanoseconds.len(),
+            6,
+            "60 秒之前稳了也接着暖"
+        );
+        let never = warm_up_over(&[10.0, 20.0, 10.0, 20.0, 10.0, 20.0, 10.0], 100.0);
+        assert!(never.reached_the_cap);
+        assert_eq!(never.window_medians_nanoseconds.len(), 6);
+        assert!(!are_the_last_windows_stable(&[Some(8.0), None, Some(8.0)]));
+    }
+
+    /// 每格热身的假提交：第 i 次（从 0 起）的线程钟是 100 × 0.98^min(i, 30) 纳秒；一组交回这一组各次的中位。
+    fn cell_warm_up_with_a_cost_that_settles_after_thirty(policy: CellWarmUp) -> usize {
+        let mut sent = 0_usize;
+        warm_up_the_cell(policy, &mut |count| {
+            let costs: Vec<f64> = (sent..sent + count)
+                .map(|index| 100.0 * 0.98_f64.powi(i32::try_from(index.min(30)).expect("30 以内")))
+                .collect();
+            sent += count;
+            median_of(&costs)
+        })
+    }
+
+    #[test]
+    fn cell_warm_up_until_two_groups_agree_stops_at_fifty_and_the_reproduction_arm_at_ten() {
+        assert_eq!(
+            cell_warm_up_with_a_cost_that_settles_after_thirty(CellWarmUp::UntilTwoGroupsAgree),
+            50
+        );
+        assert_eq!(
+            cell_warm_up_with_a_cost_that_settles_after_thirty(CellWarmUp::FixedTenSubmissions),
+            WARM_UP_SUBMISSIONS
+        );
+        let never_settles = warm_up_the_cell(CellWarmUp::UntilTwoGroupsAgree, &mut |_count| None);
+        assert_eq!(never_settles, CELL_WARM_UP_SUBMISSIONS_AT_MOST);
+    }
+
+    #[test]
+    fn controlled_arm_alternates_the_card_order_by_round_and_the_reproduction_arm_keeps_it() {
+        let cards = [0_u32, 1];
+        assert_eq!(
+            cards_in_the_order_of_the_round(DriftArm::Controlled, 1, &cards),
+            vec![0, 1]
+        );
+        assert_eq!(
+            cards_in_the_order_of_the_round(DriftArm::Controlled, 2, &cards),
+            vec![1, 0]
+        );
+        assert_eq!(
+            cards_in_the_order_of_the_round(DriftArm::Controlled, 5, &cards),
+            vec![0, 1]
+        );
+        assert_eq!(
+            cards_in_the_order_of_the_round(DriftArm::Reproduction, 2, &[0]),
+            vec![0]
+        );
+        assert!(is_the_card_measured_first_in_the_round(
+            DriftArm::Controlled,
+            4,
+            &cards,
+            1
+        ));
+    }
+
+    #[test]
+    fn decreasing_probe_spins_hit_the_registered_ratios_from_point_zero_five_to_thirty_milliseconds(
+    ) {
+        let spins: Vec<u64> = (1..=ROUNDS)
+            .map(|round| probe_spin_nanoseconds(DriftProbe::Decreasing, round))
+            .collect();
+        assert_eq!(
+            spins,
+            vec![8_000_000, 6_100_000, 4_200_000, 2_300_000, 400_000]
+        );
+        assert_eq!(probe_spin_nanoseconds(DriftProbe::Constant, 4), 2_000_000);
+        for (crt_nanoseconds, expected_ten_thousandths) in [
+            (50_000_u64, 559_u64),
+            (1_000_000, 1556),
+            (3_000_000, 3091),
+            (6_000_000, 4571),
+            (14_000_000, 6545),
+            (30_000_000, 8000),
+        ] {
+            let medians: Vec<Option<f64>> = spins
+                .iter()
+                .map(|spin| Some((crt_nanoseconds + spin) as f64))
+                .collect();
+            let ratio = round_five_over_round_one(&medians).expect("五轮都读得到");
+            assert_eq!(
+                (ratio * 10_000.0).round(),
+                expected_ten_thousandths as f64,
+                "c_rt {crt_nanoseconds} ns 时第 5 轮 ÷ 第 1 轮是 {ratio}"
+            );
+            assert!(probe_drift_holds(ratio), "c_rt ≤ 30 ms 都看得出漂移");
+        }
+        assert!(!probe_drift_holds(0.93));
+        assert_eq!(
+            round_five_over_round_one(&[Some(1.0), None, None, None, None]),
+            None
+        );
+    }
+
+    #[test]
+    fn controlled_round_ratio_judgement_puts_the_edges_point_nine_and_its_inverse_inside_drift_gone(
+    ) {
+        assert_eq!(controlled_round_ratio_judgement(0.90), "drift_gone");
+        assert_eq!(controlled_round_ratio_judgement(1.0 / 0.90), "drift_gone");
+        assert_eq!(controlled_round_ratio_judgement(0.85), "between");
+        assert_eq!(controlled_round_ratio_judgement(0.80), "between");
+        assert_eq!(controlled_round_ratio_judgement(0.79), "drift_remains");
+        assert_eq!(controlled_round_ratio_judgement(1.26), "drift_remains");
+        assert_eq!(controlled_round_ratio_judgement(1.2), "between");
+    }
+
+    #[test]
+    fn reproduction_round_ratio_judgement_reproduces_at_or_below_point_eight() {
+        assert_eq!(
+            reproduction_round_ratio_judgement(0.528),
+            "drift_reproduced"
+        );
+        assert_eq!(reproduction_round_ratio_judgement(0.80), "drift_reproduced");
+        assert_eq!(reproduction_round_ratio_judgement(0.85), "between");
+        assert_eq!(
+            reproduction_round_ratio_judgement(0.958),
+            "drift_not_reproduced"
+        );
+        assert_eq!(
+            reproduction_round_ratio_judgement(1.2),
+            "above_the_registered_bands"
+        );
+    }
+
+    #[test]
+    fn unstable_ratio_judgement_handles_both_zero_and_the_two_edges() {
+        assert_eq!(unstable_ratio_judgement(0, 0), (None, "both_zero"));
+        assert_eq!(
+            unstable_ratio_judgement(3, 2),
+            (Some(1.5), "card_zero_not_less_stable")
+        );
+        assert_eq!(
+            unstable_ratio_judgement(4, 2),
+            (Some(2.0), "card_zero_less_stable")
+        );
+        assert_eq!(unstable_ratio_judgement(7, 4), (Some(1.75), "between"));
+        assert_eq!(unstable_ratio_judgement(3, 0).1, "card_zero_less_stable");
+    }
+
+    /// 一行合成的控漂移段点行（候选 A、换到本机的门槛）。
+    fn drift_point_line(
+        arm: DriftArm,
+        card: u32,
+        clock: &str,
+        per_round: &str,
+        judgement: &str,
+    ) -> BTreeMap<String, String> {
+        fields_of_a_line(&format!(
+            "name=drift_control_point arm={} index={card} candidate=scan_checksum_only threshold_kind=machine_scaled clock={clock} host_cpu_per_submission_milliseconds_per_round={per_round} judgement={judgement}",
+            arm.label()
+        ))
+    }
+
+    #[test]
+    fn round_ratios_take_the_fifth_round_over_the_first() {
+        let lines = vec![drift_point_line(
+            DriftArm::Controlled,
+            0,
+            "thread",
+            "10,9,8,7,5",
+            "losing",
+        )];
+        let ratios = round_ratios_of_the_point_lines(&lines, DriftArm::Controlled, 0);
+        assert_eq!(ratios.lines, 1);
+        assert_eq!(ratios.round_five(), Some(0.5));
+        assert_eq!(
+            ratios.median_over_round_one,
+            [Some(0.9), Some(0.8), Some(0.7), Some(0.5)]
+        );
+        assert_eq!(ratios.trajectory(), (Some(1.0), 3, Some(0.5)));
+    }
+
+    #[test]
+    fn round_ratios_count_only_the_thread_clock_lines_of_the_arm_and_the_card() {
+        let lines = vec![
+            drift_point_line(DriftArm::Controlled, 0, "thread", "4,4,4,4,4", "losing"),
+            drift_point_line(DriftArm::Controlled, 0, "process", "4,4,4,4,2", "losing"),
+            drift_point_line(DriftArm::Reproduction, 0, "thread", "4,4,4,4,1", "losing"),
+            drift_point_line(DriftArm::Controlled, 1, "thread", "4,4,4,4,1", "losing"),
+            drift_point_line(DriftArm::Controlled, 0, "thread", "none,4,4,4,4", "losing"),
+        ];
+        let ratios = round_ratios_of_the_point_lines(&lines, DriftArm::Controlled, 0);
+        assert_eq!(ratios.lines, 2, "进程钟、别的臂、别的卡都不收");
+        assert_eq!(
+            ratios.round_five(),
+            Some(1.0),
+            "头一轮读不到的那一行不算进比"
+        );
+    }
+
+    #[test]
+    fn unstable_count_takes_only_the_unstable_judgements_of_the_arm_and_the_card() {
+        let lines = vec![
+            drift_point_line(DriftArm::Controlled, 0, "thread", "1,1,1,1,1", "unstable"),
+            drift_point_line(DriftArm::Controlled, 0, "process", "1,1,1,1,1", "unstable"),
+            drift_point_line(DriftArm::Controlled, 0, "thread", "1,1,1,1,1", "not_run"),
+            drift_point_line(
+                DriftArm::Controlled,
+                0,
+                "thread",
+                "1,1,1,1,1",
+                "rounds_insufficient",
+            ),
+            drift_point_line(DriftArm::Controlled, 0, "thread", "1,1,1,1,1", "losing"),
+            drift_point_line(DriftArm::Controlled, 1, "thread", "1,1,1,1,1", "unstable"),
+        ];
+        assert_eq!(unstable_count(&lines, DriftArm::Controlled, 0), (5, 2));
+        assert_eq!(unstable_count(&lines, DriftArm::Reproduction, 0), (0, 0));
+    }
+
+    #[test]
+    fn card_order_effect_compares_the_rounds_measured_second_with_those_measured_first() {
+        let lines = vec![
+            drift_point_line(
+                DriftArm::Controlled,
+                0,
+                "thread",
+                "10,20,10,20,10",
+                "losing",
+            ),
+            drift_point_line(
+                DriftArm::Controlled,
+                1,
+                "thread",
+                "10,20,10,20,10",
+                "losing",
+            ),
+        ];
+        assert_eq!(
+            card_order_effect(&lines, &[0, 1], 0),
+            (Some(10.0), Some(20.0), Some(2.0))
+        );
+        assert_eq!(
+            card_order_effect(&lines, &[0, 1], 1),
+            (Some(20.0), Some(10.0), Some(0.5))
+        );
+    }
+
+    #[test]
+    fn rank_correlation_is_one_for_the_same_order_and_minus_one_for_the_reverse() {
+        let rising = [(1.0, 10.0), (2.0, 20.0), (3.0, 35.0), (4.0, 36.0)];
+        assert_eq!(rank_correlation(&rising), Some(1.0));
+        let falling = [(1.0, 36.0), (2.0, 35.0), (3.0, 20.0), (4.0, 10.0)];
+        assert_eq!(rank_correlation(&falling), Some(-1.0));
+        assert_eq!(rank_correlation(&rising[..2]), None);
+        assert_eq!(
+            rank_correlation(&[(1.0, 5.0), (2.0, 5.0), (3.0, 5.0)]),
+            None
+        );
+    }
+
+    #[test]
+    fn card_clock_readings_parse_the_eight_query_columns_and_mark_unreadable_ones() {
+        let readings = card_clock_readings_of(
+            "0, 00000000:01:00.0, 2805, 14001, P1, 45, 120.50, 0x0000000000000000\n1, 00000000:02:00.0, [N/A], 9001, P2, 40, 80, 0x0000000000000001\n2, 00000000:03:00.0, 1, 2, P8, 3\n",
+        );
+        assert_eq!(readings.len(), 2, "栏数不对的那一行不收");
+        let card_zero = &readings[&0];
+        assert_eq!(card_zero.bus_identifier, "00000000:01:00.0");
+        assert_eq!(card_zero.sm_clock_megahertz, Some(2805.0));
+        assert_eq!(card_zero.memory_clock_megahertz, Some(14001.0));
+        assert_eq!(card_zero.performance_state.as_deref(), Some("P1"));
+        assert_eq!(card_zero.temperature_celsius, Some(45.0));
+        assert_eq!(card_zero.power_watts, Some(120.5));
+        assert_eq!(
+            card_zero.clocks_event_reasons.as_deref(),
+            Some("0x0000000000000000")
+        );
+        assert_eq!(readings[&1].sm_clock_megahertz, None);
+        assert_eq!(CARD_QUERY_FIELDS.split(',').count(), 8);
+    }
+
+    #[test]
+    fn preferred_core_takes_the_highest_ranking_then_the_lowest_number() {
+        let rankings = [(0, Some(200)), (3, Some(231)), (5, Some(231)), (7, None)];
+        assert_eq!(preferred_core(&rankings, &[0, 3, 5, 7]), Some(3));
+        assert_eq!(preferred_core(&rankings, &[0, 5, 7]), Some(5));
+        assert_eq!(preferred_core(&[(4, None), (2, None)], &[0, 4, 2]), Some(2));
+        assert_eq!(preferred_core(&[], &[0]), Some(0));
+        assert_eq!(preferred_core(&[], &[]), None);
+    }
+
+    #[test]
+    fn controlled_arm_pins_its_thread_to_a_single_core() {
+        let (placement, allowed_after) = std::thread::spawn(|| {
+            let placement = place_the_thread_of_the_arm(DriftArm::Controlled);
+            (placement, allowed_cores_of_this_thread())
+        })
+        .join()
+        .expect("绑核的那条线程跑完");
+        let pinned = placement.pinned_core.expect("允许集合读得到、绑得上");
+        assert_eq!(allowed_after, Some(vec![pinned]), "绑完只剩那一个核");
+        assert_eq!(placement.allowed_cores, Some(vec![pinned]));
+    }
+
+    #[test]
+    fn reproduction_arm_leaves_the_affinity_of_its_thread_as_it_was() {
+        let (before, placement, after) = std::thread::spawn(|| {
+            let before = allowed_cores_of_this_thread();
+            let placement = place_the_thread_of_the_arm(DriftArm::Reproduction);
+            (before, placement, allowed_cores_of_this_thread())
+        })
+        .join()
+        .expect("复现臂的那条线程跑完");
+        assert_eq!(placement.pinned_core, None);
+        assert!(
+            before.as_ref().is_some_and(|cores| cores.len() > 1),
+            "这台机器允许不止一个核：{before:?}"
+        );
+        assert_eq!(after, before, "复现臂不绑核");
+    }
+
+    /// 控漂移段一格一轮的假卡：提交步骤与钟是第 3 次重跑单测那一套假的（每步 0.1 ms），校准比恒 1、线程数恒 1。
+    struct FakeCellEnvironment {
+        clock: Rc<RefCell<FakeClockState>>,
+        steps: Option<FakeSteps>,
+    }
+
+    impl CellRoundEnvironment for FakeCellEnvironment {
+        fn card_index(&self) -> u32 {
+            0
+        }
+
+        fn link_peak_bytes_per_second(&self) -> f64 {
+            1e12
+        }
+
+        fn host_core_reading(&mut self) -> HostCoreReading {
+            HostCoreReading {
+                core: Some(3),
+                scaling_current_frequency_kilohertz: Some(5_000_000),
+                average_frequency_kilohertz: Some(4_900_000),
+            }
+        }
+
+        fn calibration_ratio(&mut self) -> Option<f64> {
+            Some(1.0)
+        }
+
+        fn threads(&mut self) -> Option<usize> {
+            Some(1)
+        }
+
+        fn open_the_cell(&mut self, _cell: SubmissionCell) {
+            self.steps = Some(FakeSteps {
+                clock: Rc::clone(&self.clock),
+                preparation_nanoseconds: 100_000,
+                wait_nanoseconds: 100_000,
+                other_nanoseconds: 100_000,
+            });
+        }
+
+        fn time_the_submissions(
+            &mut self,
+            count: usize,
+            gap: Duration,
+            insertion: &mut dyn FnMut(),
+        ) -> Vec<Option<SubmissionTiming>> {
+            let steps = self.steps.as_mut().expect("开格之后才计时");
+            let mut clocks = FakeClocks(Rc::clone(&self.clock));
+            let mut no_sleep = |_duration: Duration| {};
+            time_the_submissions_of_a_cell(steps, &mut clocks, count, gap, &mut no_sleep, insertion)
+        }
+
+        fn close_the_cell(&mut self) {
+            self.steps = None;
+        }
+    }
+
+    /// 假的读卡：每读一次线程钟与挂钟各走 50 ms（读数要是挪进了计时区间，每次提交都会多出这 50 ms）。
+    struct FakeCardReader {
+        clock: Rc<RefCell<FakeClockState>>,
+        reads: usize,
+    }
+
+    impl CardReader for FakeCardReader {
+        fn wait_for_the_card_and_read_the_cards(
+            &mut self,
+            card_index: u32,
+            _emitter: &mut Emitter,
+        ) -> BTreeMap<u32, CardClockReading> {
+            self.reads += 1;
+            let mut clock = self.clock.borrow_mut();
+            clock.thread_cpu += 50_000_000;
+            clock.wall += 50_000_000;
+            BTreeMap::from([(
+                card_index,
+                CardClockReading {
+                    bus_identifier: "00000000:01:00.0".to_string(),
+                    sm_clock_megahertz: Some(2805.0),
+                    memory_clock_megahertz: Some(14001.0),
+                    performance_state: Some("P1".to_string()),
+                    temperature_celsius: Some(45.0),
+                    power_watts: Some(120.5),
+                    clocks_event_reasons: None,
+                },
+            )])
+        }
+    }
+
+    /// 在假卡上量一格一轮（n = 8 的探针那一格，不带探针的自旋），交回量出来的那一次与读卡的次数。
+    fn measure_a_fake_cell_round(
+        arm: DriftArm,
+        emitter: &mut Emitter,
+    ) -> (CellRoundOutcome, usize) {
+        let clock = Rc::new(RefCell::new(FakeClockState::default()));
+        let mut environment = FakeCellEnvironment {
+            clock: Rc::clone(&clock),
+            steps: None,
+        };
+        let mut card_reader = FakeCardReader {
+            clock: Rc::clone(&clock),
+            reads: 0,
+        };
+        let mut waiting = WaitingLedger {
+            total_seconds: 0,
+            longest_seconds: 0,
+            waits: 0,
+        };
+        let outcome = measure_one_cell_round(
+            &mut environment,
+            &mut card_reader,
+            CellRoundRequest {
+                arm,
+                cell: probe_cell(),
+                round: 1,
+                probe: None,
+                threshold_edges: (0.1, 1.0),
+            },
+            &mut CardTallies::default(),
+            &mut waiting,
+            &mut Vec::new(),
+            emitter,
+        )
+        .expect("假钟里线程钟不超过挂钟");
+        (outcome, card_reader.reads)
+    }
+
+    #[test]
+    fn drift_cell_round_reads_the_cards_outside_the_timed_submissions() {
+        let mut emitter = Emitter::with_declarations(SerialDeclarations::nowhere());
+        let (outcome, reads) = measure_a_fake_cell_round(DriftArm::Reproduction, &mut emitter);
+        assert_eq!(reads, 1, "开格前读一次卡");
+        let medians = outcome.medians.expect("一次就收下");
+        assert_eq!(
+            medians.thread_cpu_nanoseconds, 600_000.0,
+            "一次提交 6 步各 0.1 ms，读卡那 50 ms 不在里面"
+        );
+        assert_eq!(outcome.warm_up_submissions, WARM_UP_SUBMISSIONS);
+        assert_eq!(outcome.cards_before[&0].sm_clock_megahertz, Some(2805.0));
+        assert_eq!(outcome.host_before.core, Some(3));
+    }
+
+    #[test]
+    fn controlled_arm_cell_round_warms_up_until_two_groups_agree() {
+        let mut emitter = Emitter::with_declarations(SerialDeclarations::nowhere());
+        let (outcome, _reads) = measure_a_fake_cell_round(DriftArm::Controlled, &mut emitter);
+        assert_eq!(
+            outcome.warm_up_submissions,
+            WARM_UP_SUBMISSIONS + CELL_WARM_UP_GROUP_SUBMISSIONS,
+            "假提交每次一样快：头 10 次之后再一组就相邻两组相同"
+        );
+    }
+
+    #[test]
+    fn drift_segment_declares_serial_at_its_start_and_parallel_at_its_end() {
+        // 守卫认领声明文件：用例做完、断言失败、panic 都删掉它
+        let path = singlefs_harness::temporary_files::TemporaryPathRemovedOnDrop::claiming(
+            std::env::temp_dir().join(format!(
+                "e185-drift-serial-declarations-{}",
+                std::process::id()
+            )),
+        );
+        let _absent_before = std::fs::remove_file(&path);
+        let mut emitter =
+            Emitter::with_declarations(SerialDeclarations::into_the_file(path.to_path_buf()));
+        let declared_at_the_start = within_a_declared_serial_segment(
+            &mut emitter,
+            DRIFT_CONTROL_SERIAL_REASON,
+            |emitter| {
+                let declared_at_the_start = std::fs::read_to_string(&path).unwrap_or_default();
+                let _fake_cell = measure_a_fake_cell_round(DriftArm::Controlled, emitter);
+                declared_at_the_start
+            },
+        );
+        let declared = std::fs::read_to_string(&path).expect("读得回声明文件");
+        if let Some(kept) = std::env::var_os("E185_KEEP_THE_DRIFT_DECLARATIONS_AT") {
+            std::fs::copy(&path, kept).expect("留一份给 core_usage.py judge 的自证");
+        }
+        let bodies: Vec<&str> = declared
+            .lines()
+            .map(|line| line.split_once('\t').expect("秒数与正文之间一个制表符").1)
+            .collect();
+        let serial = format!("此刻串行：{DRIFT_CONTROL_SERIAL_REASON}");
+        assert_eq!(
+            declared_at_the_start
+                .lines()
+                .map(|line| line.split_once('\t').map(|(_seconds, body)| body))
+                .collect::<Vec<_>>(),
+            vec![Some(serial.as_str())],
+            "段一开头、量第一格之前已经声明了串行"
+        );
+        assert_eq!(
+            bodies,
+            vec![serial.as_str(), "此刻并行"],
+            "格里同一个理由不重写，段末声明并行"
+        );
+        assert!(DRIFT_CONTROL_SERIAL_REASON.chars().count() >= SERIAL_REASON_CHARACTERS_AT_LEAST);
+        assert!(CPU_WRITINGS_SERIAL_REASON.chars().count() >= SERIAL_REASON_CHARACTERS_AT_LEAST);
+    }
+
+    #[test]
+    fn the_drift_control_segment_starts_no_thread_of_its_own() {
+        let start = OWN_SOURCE_TEXT
+            .find("mod host_cpu_drift_control_segment {")
+            .expect("模块在");
+        let end = start + OWN_SOURCE_TEXT[start..].find("\n}\n").expect("模块收尾");
+        let segment = &OWN_SOURCE_TEXT[start..end];
+        for spawning in ["thread::spawn", "thread::scope", "thread::Builder"] {
+            assert!(!segment.contains(spawning), "控漂移段里有 {spawning}");
+        }
+        assert!(
+            segment.contains("fn measure_the_arm"),
+            "量的那一段在这个模块里"
+        );
+    }
+
+    // ───────────── 第 4 次重跑：写法与拆分段的硬件 CRC、九种写法的取值与系数 ─────────────
+
+    fn hardware_crc_of_this_machine() -> HardwareCrc {
+        HardwareCrc::when_the_instructions_are_present(&unit_lengths_of_the_segment())
+            .expect("这台机器有 sse4.2（登记第四节第 6 行：两台都有）")
+    }
+
+    #[test]
+    fn single_lane_hardware_crc_gives_the_check_value_of_the_nine_digits() {
+        let hardware = hardware_crc_of_this_machine();
+        assert_eq!(
+            hardware.crc(HardwareCrcLanes::Single, CHECK_STRING),
+            Some(0xE306_9283)
+        );
+        assert_eq!(
+            hardware.crc(HardwareCrcLanes::ThreeWay, CHECK_STRING),
+            Some(0xE306_9283)
+        );
+    }
+
+    #[test]
+    fn three_way_hardware_crc_hits_the_modulus_anchors_of_both_unit_lengths() {
+        let hardware = hardware_crc_of_this_machine();
+        assert_eq!(
+            hardware.crc(HardwareCrcLanes::ThreeWay, &modulus_bytes(32_768)),
+            Some(0x2AD6_0827)
+        );
+        assert_eq!(
+            hardware.crc(HardwareCrcLanes::ThreeWay, &modulus_bytes(16_384)),
+            Some(0xEAFC_A51D)
+        );
+        assert_eq!(
+            hardware.crc(HardwareCrcLanes::Single, &modulus_bytes(32_768)),
+            Some(0x2AD6_0827)
+        );
+        assert_eq!(
+            MODULUS_ANCHORS,
+            [(32_768, 0x2AD6_0827), (16_384, 0xEAFC_A51D)]
+        );
+    }
+
+    #[test]
+    fn three_way_lanes_are_multiples_of_eight_with_the_rest_on_the_third() {
+        assert_eq!(three_way_lanes(32_768), [10_920, 10_920, 10_928]);
+        assert_eq!(three_way_lanes(16_384), [5_456, 5_456, 5_472]);
+        assert_eq!(three_way_lanes(9), [0, 0, 9]);
+    }
+
+    #[test]
+    fn both_hardware_writings_agree_with_the_crates_on_random_lengths_up_to_sixty_four_bytes() {
+        let hardware = hardware_crc_of_this_machine();
+        let strings = random_length_strings();
+        assert_eq!(strings.len(), RANDOM_LENGTH_CHECKS);
+        assert!(
+            strings
+                .iter()
+                .any(|bytes| bytes.len() % BYTES_PER_HARDWARE_CRC_STEP != 0),
+            "有长度不是 8 的倍数的串，尾巴那一圈跑得到"
+        );
+        assert_eq!(hardware_crc_check_failures(&hardware), Vec::new());
+        assert_eq!(hardware_crc_mismatches(&hardware, &strings), 0);
+    }
+
+    #[test]
+    fn zero_byte_shift_matches_feeding_zero_bytes_through_the_register() {
+        let state = 0x1234_5678_u32;
+        let shifted = ZeroByteShift::over_zero_bytes(10_920).applied_to(state);
+        // 软件那一圈：反射 CRC 每吃一个零字节，寄存器照多项式右移 8 位
+        let mut register = state;
+        for _byte in 0..10_920 {
+            for _bit in 0..8 {
+                register = if register & 1 == 1 {
+                    (register >> 1) ^ CASTAGNOLI_REFLECTED_POLYNOMIAL
+                } else {
+                    register >> 1
+                };
+            }
+        }
+        assert_eq!(shifted, register);
+    }
+
+    #[test]
+    fn release_check_crc_pieces_read_the_release_check_copies_not_the_scan_units() {
+        let hardware = hardware_crc_of_this_machine();
+        let units = vec![modulus_bytes(32_768)];
+        let copies = vec![modulus_bytes(16_384); 3];
+        let pieces = hardware_crc_pieces(&hardware, &units, &copies);
+        assert_eq!(pieces.crc.map(|(_cpu, bytes)| bytes), [32_768, 32_768]);
+        assert_eq!(
+            pieces.release_check_crc.map(|(_cpu, bytes)| bytes),
+            [49_152, 49_152]
+        );
+        assert!(pieces
+            .crc
+            .iter()
+            .chain(pieces.release_check_crc.iter())
+            .all(|(cpu, _bytes)| cpu.is_some()));
+    }
+
+    /// 九样计时件的合成读数（纳秒）：今天的 CRC 4、单路 1、三路 0.5；释放前读盘核 2、0.6、0.3；扫描 10、查索引 0.125、建索引 1（都取二进制里写得准的数）。
+    fn synthetic_cpu_writing_pieces() -> CpuWritingPieces {
+        CpuWritingPieces {
+            crc_today: Some(4.0),
+            crc_hardware_single: Some(1.0),
+            crc_hardware_three_way: Some(0.5),
+            release_check_crc_today: Some(2.0),
+            release_check_crc_hardware_single: Some(0.6),
+            release_check_crc_hardware_three_way: Some(0.3),
+            scan_today: Some(10.0),
+            scan_identity_index_lookup: Some(0.125),
+            identity_index_build: Some(1.0),
+        }
+    }
+
+    #[test]
+    fn hardware_crc_writing_keeps_the_scan_increment_of_today_minus_the_crc_of_today() {
+        let pieces = synthetic_cpu_writing_pieces();
+        assert_eq!(
+            pieces.stage_of_the_writing(CpuWriting::Today, WritingStage::ScanIncrement),
+            Some(6.0)
+        );
+        assert_eq!(
+            pieces.stage_of_the_writing(CpuWriting::HardwareCrcSingle, WritingStage::ScanIncrement),
+            Some(6.0),
+            "乙段增量里那一份 CRC 是 parse_data_unit 调的 crates CRC，乙不改它"
+        );
+        assert_eq!(
+            pieces.stage_of_the_writing(CpuWriting::HardwareCrcSingle, WritingStage::Crc),
+            Some(1.0)
+        );
+        assert_eq!(
+            pieces.stage_of_the_writing(
+                CpuWriting::HardwareCrcThreeWay,
+                WritingStage::ReleaseCheckCrc
+            ),
+            Some(0.3)
+        );
+    }
+
+    #[test]
+    fn identity_index_writing_counts_the_build_only_at_the_with_build_end() {
+        let pieces = synthetic_cpu_writing_pieces();
+        let with_build = pieces
+            .stage_of_the_writing(
+                CpuWriting::IdentityIndexWithBuild,
+                WritingStage::ScanIncrement,
+            )
+            .expect("读得到");
+        let without_build = pieces
+            .stage_of_the_writing(
+                CpuWriting::IdentityIndexWithoutBuild,
+                WritingStage::ScanIncrement,
+            )
+            .expect("读得到");
+        assert_eq!(
+            with_build + 4.0,
+            1.125,
+            "计入：查 0.125 加建 1，减今天的 CRC 4"
+        );
+        assert_eq!(without_build + 4.0, 0.125, "不计：只有查的 0.125");
+        assert_eq!(
+            pieces.stage_of_the_writing(CpuWriting::BothThreeWayWithBuild, WritingStage::Crc),
+            Some(0.5)
+        );
+        assert_eq!(
+            pieces.stage_of_the_writing(CpuWriting::IdentityIndexWithBuild, WritingStage::Crc),
+            Some(4.0)
+        );
+        let mut unreadable = pieces;
+        unreadable.identity_index_build = None;
+        assert_eq!(
+            unreadable
+                .stage_of_the_writing(CpuWriting::BothSingleWithBuild, WritingStage::ScanIncrement),
+            None,
+            "读不到不当 0"
+        );
+    }
+
+    #[test]
+    fn writing_factor_takes_the_median_of_the_rounds_not_the_mean() {
+        assert_eq!(
+            writing_factor_of_the_rounds(&[Some(1.0), Some(1.0), Some(1.0), Some(1.0), Some(5.0)]),
+            Some(1.0)
+        );
+        assert_eq!(
+            writing_factor_of_the_rounds(&[None, Some(2.0), None]),
+            Some(2.0)
+        );
+        assert_eq!(writing_factor_of_the_rounds(&[None, None]), None);
+    }
+
+    #[test]
+    fn writing_factor_sums_the_crc_over_issue_and_batches_and_the_release_check_over_batches_only()
+    {
+        let mut issue = synthetic_cpu_writing_pieces();
+        issue.release_check_crc_today = Some(100.0);
+        issue.release_check_crc_hardware_single = Some(100.0);
+        let batch = synthetic_cpu_writing_pieces();
+        let calls = vec![
+            (CallKind::Issue, issue),
+            (CallKind::Batch, batch),
+            (CallKind::FinalBatch, batch),
+        ];
+        assert_eq!(
+            stage_sum_of_the_intent(&calls, CpuWriting::Today, WritingStage::Crc),
+            Some(12.0)
+        );
+        assert_eq!(
+            stage_sum_of_the_intent(&calls, CpuWriting::Today, WritingStage::ReleaseCheckCrc),
+            Some(4.0),
+            "签发那一次的释放前读盘核不进 D 的式子"
+        );
+        assert_eq!(
+            writing_factor_of_the_intent(&calls, CpuWriting::HardwareCrcSingle, WritingStage::Crc),
+            Some(0.25)
+        );
+        assert_eq!(
+            writing_factor_of_the_intent(
+                &calls,
+                CpuWriting::HardwareCrcSingle,
+                WritingStage::ReleaseCheckCrc
+            ),
+            Some(0.3)
+        );
+        for stage in WritingStage::ALL {
+            assert_eq!(
+                writing_factor_of_the_intent(&calls, CpuWriting::Today, stage),
+                Some(1.0),
+                "写法甲恒为 1"
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_timed_piece_voids_exactly_the_writings_that_use_it() {
+        assert_eq!(
+            TimedPiece::TodayCrc.writings_voided(),
+            CpuWriting::ALL.to_vec()
+        );
+        assert_eq!(
+            TimedPiece::HardwareCrc(HardwareCrcLanes::ThreeWay).writings_voided(),
+            vec![
+                CpuWriting::HardwareCrcThreeWay,
+                CpuWriting::BothThreeWayWithBuild,
+                CpuWriting::BothThreeWayWithoutBuild
+            ]
+        );
+        assert_eq!(
+            TimedPiece::IdentityIndexBuild.writings_voided(),
+            vec![
+                CpuWriting::IdentityIndexWithBuild,
+                CpuWriting::BothSingleWithBuild,
+                CpuWriting::BothThreeWayWithBuild
+            ]
+        );
+        assert_eq!(
+            TimedPiece::IdentityIndexLookupScan.writings_voided().len(),
+            6
+        );
+    }
+
+    #[test]
+    fn writing_factor_lines_mark_the_voided_writings_and_the_unread_rounds() {
+        let calls = vec![
+            (CallKind::Issue, synthetic_cpu_writing_pieces()),
+            (CallKind::Batch, synthetic_cpu_writing_pieces()),
+        ];
+        let point = SubmissionPoint {
+            fraction: LiveSlotFraction::OneQuarter,
+            pool_data_units: 1024,
+            batch_units: 8,
+        };
+        let mut rounds = vec![Some(calls); ROUNDS];
+        rounds[1] = None;
+        let record = CpuWritingsSegmentRecord {
+            pieces_by_point: BTreeMap::from([(point, rounds)]),
+            failed_pieces: BTreeSet::from([TimedPiece::IdentityIndexBuild]),
+            stage_lines: 2,
+            cpu_writing_stage_lines: 1,
+        };
+        let lines = writing_factor_lines(&record);
+        assert_eq!(lines.len(), CpuWriting::ALL.len() * WritingStage::ALL.len());
+        assert!(lines.contains(&"name=writing_factor fraction=0.25 pool_data_units=1024 batch_units=8 writing=hardware_crc_single stage=crc factor_per_round=0.250000,none,0.250000,0.250000,0.250000 factor=0.250000 status=measured".to_string()));
+        assert!(lines.iter().any(|line| line
+            .contains("writing=both_single_with_build stage=crc ")
+            && line.ends_with("status=void_positive_control")));
+        assert!(lines.iter().any(|line| line
+            .contains("writing=identity_index_without_build stage=scan_increment ")
+            && line.ends_with("status=measured")));
+    }
+
+    #[test]
+    fn cpu_writing_controls_judge_two_milliseconds_and_twice_the_work_at_the_registered_edges() {
+        assert_eq!(
+            cpu_writing_control_judgements(Some(1e6), Some(3e6), Some(2e6)),
+            (Some(2e6), Some(2.0), true, true)
+        );
+        let (_increment, _doubling, spin_holds, double_holds) =
+            cpu_writing_control_judgements(Some(1e6), Some(3.4e6), Some(2.5e6));
+        assert!(!spin_holds && !double_holds, "2.4 ms 与 2.5 倍都在线外");
+        let (_unread_increment, _unread_doubling, unread_spin_holds, unread_double_holds) =
+            cpu_writing_control_judgements(None, Some(3e6), Some(2e6));
+        assert!(!unread_spin_holds && !unread_double_holds, "读不到不算过");
+    }
+
+    /// 一次调用的合成读数：两种硬件写法与 crates 都对上、字节相同。
+    fn synthetic_cpu_writings_of_a_call() -> CpuWritingsOfTheCall {
+        CpuWritingsOfTheCall {
+            pieces: synthetic_cpu_writing_pieces(),
+            choose_cpu_nanoseconds: Some(7.0),
+            crc_bytes: 65_536,
+            release_check_crc_bytes: 32_768,
+            hardware_crc_bytes: [65_536, 65_536],
+            hardware_release_check_crc_bytes: [32_768, 32_768],
+            identity_index_entries: 1030,
+            identity_index_location_keys: 2060,
+            hardware_crc_mismatches: 0,
+            identity_index_scan_matches: Some(true),
+        }
+    }
+
+    #[test]
+    fn cpu_writings_of_a_call_stop_on_a_crc_mismatch_a_scan_mismatch_or_different_bytes() {
+        let agreeing = synthetic_cpu_writings_of_a_call();
+        assert_eq!(agreeing.stop_finding(3), None);
+        assert!(!agreeing.is_unreadable());
+        let mut crc_differs = synthetic_cpu_writings_of_a_call();
+        crc_differs.hardware_crc_mismatches = 1;
+        assert_eq!(
+            crc_differs.stop_finding(3).map(|(clause, _finding)| clause),
+            Some("K-S1")
+        );
+        let mut scan_differs = synthetic_cpu_writings_of_a_call();
+        scan_differs.identity_index_scan_matches = Some(false);
+        assert_eq!(
+            scan_differs
+                .stop_finding(3)
+                .map(|(clause, _finding)| clause),
+            Some("K-S2")
+        );
+        let mut bytes_differ = synthetic_cpu_writings_of_a_call();
+        bytes_differ.hardware_release_check_crc_bytes = [32_768, 16_384];
+        assert_eq!(
+            bytes_differ
+                .stop_finding(3)
+                .map(|(clause, _finding)| clause),
+            Some("K-S1")
+        );
+        let mut empty_index = synthetic_cpu_writings_of_a_call();
+        empty_index.identity_index_entries = 0;
+        assert!(empty_index.is_unreadable());
+    }
+
+    #[test]
+    fn cpu_writing_stage_line_carries_the_keys_of_the_stage_line_and_the_nine_pieces() {
+        let line = cpu_writing_stage_line(
+            "fraction=0.75 pool_data_units=8192 batch_units=16 round=2",
+            4,
+            CallKind::Batch,
+            &synthetic_cpu_writings_of_a_call(),
+        );
+        assert!(line.starts_with("name=cpu_writing_stage fraction=0.75 pool_data_units=8192 batch_units=16 round=2 call_index=4 kind=batch crc_today_cpu_nanoseconds=4.000000 "));
+        assert!(line.contains(" scan_identity_index_lookup_cpu_nanoseconds=0.125000 identity_index_build_cpu_nanoseconds=1.000000 identity_index_entries=1030 "));
+        assert!(line.ends_with(
+            " hardware_crc_matches=true identity_index_scan_matches=true readable=true"
+        ));
+    }
+
+    #[test]
+    fn the_two_r4_subcommands_refuse_missing_and_unknown_options() {
+        assert_eq!(
+            run_the_subcommand(&["host-cpu-drift-control", "--cards", "0,1"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&[
+                "host-cpu-drift-control",
+                "--cards",
+                "zero",
+                "--stage-split-product",
+                "a",
+                "--attack-ledger",
+                "b"
+            ]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["cpu-writings", "--point", "0.5:1024"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["cpu-writings", "--cards", "0"]),
+            EXIT_CODE_USAGE
+        );
+        assert_eq!(
+            run_the_subcommand(&["cpu-writings-and-function-partition"]),
+            EXIT_CODE_USAGE
+        );
+    }
+
+    #[cfg(not(feature = "gpu"))]
+    #[test]
+    fn drift_control_without_the_gpu_feature_reports_not_run() {
+        assert_eq!(
+            run_the_subcommand(&[
+                "host-cpu-drift-control",
+                "--cards",
+                "0,1",
+                "--stage-split-product",
+                "a",
+                "--attack-ledger",
+                "b"
+            ]),
+            EXIT_CODE_NOT_RUN
+        );
+    }
+
+    // ───────────── 第 4 次重跑：抄的区域扫描（两张索引）在手搭的池上与 crates `scan_region` 逐个结局相同（PW3、停机 K-S2） ─────────────
+
+    use singlefs_core::region_scan::{
+        MappedUnitClass, RegionScanInconsistency, RegionScanRefusal, UnitHeaderUnreadable,
+    };
+
+    const SCAN_CASE_DEVICE_ZERO: DeviceIdentity = DeviceIdentity(0);
+    const SCAN_CASE_DEVICE_ONE: DeviceIdentity = DeviceIdentity(1);
+
+    /// 单元区里起点 50240 的那个聚簇段 [50240, 50304)（同 crates `region_scan.rs` 单测那一个）。
+    fn scan_case_region() -> CompactionRegion {
+        CompactionRegion::of_one_cluster_segment(
+            SCAN_CASE_DEVICE_ZERO,
+            SlotNumber(singlefs_format::UNIT_AREA_START_SLOT + LOCAL_CLUSTER_SEGMENT_SLOTS),
+        )
+        .expect("50240 = 785 × 64")
+    }
+
+    fn scan_case_slot(offset_in_slots: u64) -> SlotNumber {
+        SlotNumber(scan_case_region().start_slot().0 + offset_in_slots)
+    }
+
+    /// 一块手搭的池：两块盘上每个落点各一份字节、各一条记录（两盘同槽），加中央映射的条目。
+    #[derive(Default)]
+    struct ScanCasePool {
+        units: BTreeMap<(DeviceIdentity, SlotNumber), Vec<u8>>,
+        records: Vec<AllocationRecord>,
+        mapping_entries: Vec<CentralMappingEntry>,
+    }
+
+    impl ScanCasePool {
+        fn place(&mut self, slot: SlotNumber, span_slots: u16, unit: Option<&[u8]>) {
+            for device in [SCAN_CASE_DEVICE_ZERO, SCAN_CASE_DEVICE_ONE] {
+                self.records.push(AllocationRecord {
+                    device,
+                    slot,
+                    span_slots,
+                    generation: singlefs_core::address::CheckpointTxg(7),
+                    is_released: false,
+                    quarantine_mark:
+                        singlefs_core::allocator::AllocationRecordQuarantineMark::NotQuarantined,
+                });
+                if let Some(bytes) = unit {
+                    self.units.insert((device, slot), bytes.to_vec());
+                }
+            }
+        }
+
+        fn map(&mut self, key: Vec<u8>, locations: [(DeviceIdentity, SlotNumber); 2]) {
+            self.mapping_entries.push(CentralMappingEntry {
+                key,
+                locations: locations.map(|(device, slot)| singlefs_core::pointer::LocationEntry {
+                    device,
+                    slot,
+                    unit_checksum: 0,
+                }),
+            });
+        }
+
+        /// crates 那一份与抄的那一份各扫一次，交回（crates 的、抄的）。
+        fn both_scans(
+            &self,
+            pinned_slots: &BTreeSet<SlotNumber>,
+            quarantined_slots: &BTreeSet<SlotNumber>,
+        ) -> (
+            Result<RegionScan, singlefs_core::region_scan::RegionScanRefusal>,
+            Result<RegionScan, singlefs_core::region_scan::RegionScanRefusal>,
+        ) {
+            let read = |device: DeviceIdentity, slot: SlotNumber, unit_bytes: usize| {
+                self.units
+                    .get(&(device, slot))
+                    .filter(|bytes| bytes.len() == unit_bytes)
+                    .cloned()
+            };
+            let index = IdentityIndexOfTheMapping::of_the_entries(&self.mapping_entries);
+            (
+                scan_region(
+                    scan_case_region(),
+                    &self.records,
+                    &self.mapping_entries,
+                    pinned_slots,
+                    quarantined_slots,
+                    read,
+                ),
+                scan_region_with_the_identity_index(
+                    scan_case_region(),
+                    &self.records,
+                    &self.mapping_entries,
+                    &index,
+                    pinned_slots,
+                    quarantined_slots,
+                    read,
+                ),
+            )
+        }
+
+        /// 两份扫描整个 `==`，交回那一份的结果（不同就红在这里）。
+        fn agreeing_scan(
+            &self,
+            pinned_slots: &BTreeSet<SlotNumber>,
+            quarantined_slots: &BTreeSet<SlotNumber>,
+        ) -> Result<RegionScan, singlefs_core::region_scan::RegionScanRefusal> {
+            let (crates_scan, copied_scan) = self.both_scans(pinned_slots, quarantined_slots);
+            assert_eq!(
+                copied_scan, crates_scan,
+                "抄的扫描与 crates 那一份不同（停机 K-S2）"
+            );
+            crates_scan
+        }
+
+        fn class_at_the_region_start(
+            &self,
+            pinned: &[u64],
+            quarantined: &[u64],
+        ) -> AllocationInRegion {
+            let slots = |offsets: &[u64]| {
+                offsets
+                    .iter()
+                    .map(|offset| scan_case_slot(*offset))
+                    .collect::<BTreeSet<_>>()
+            };
+            let scan = self
+                .agreeing_scan(&slots(pinned), &slots(quarantined))
+                .expect("这几种结局都扫得成");
+            scan.allocations
+                .iter()
+                .find(|allocation| allocation.placement.slot == scan_case_slot(0))
+                .map(|allocation| allocation.class.clone())
+                .expect("R 起点那一条在扫描结果里")
+        }
+    }
+
+    /// 一个码 1 数据单元与写者给它的映射 key（同 crates `region_scan.rs` 单测的 `data_unit`）。
+    fn scan_case_data_unit(transaction: u64) -> (Vec<u8>, Vec<u8>) {
+        let write_order = singlefs_core::unit::WriteOrder {
+            instance: singlefs_core::address::InstanceGeneration(2),
+            transaction,
+        };
+        let tree = singlefs_core::address::TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT);
+        let bytes = singlefs_core::unit::build_data_unit(
+            singlefs_core::unit::DataUnitIdentity {
+                tree,
+                object: 1,
+                object_birth: singlefs_core::address::CheckpointTxg(3),
+                anchor_offset: 0,
+            },
+            singlefs_core::address::CheckpointTxg(7),
+            &[7_u8; 16],
+            write_order,
+            &[0x5A; 100],
+        );
+        let key = singlefs_core::records::mapping_key_for_data(
+            singlefs_core::pointer::PointerHead {
+                birth_tree: tree,
+                birth_txg: singlefs_core::address::CheckpointTxg(7),
+            },
+            write_order,
+        );
+        (bytes, key)
+    }
+
+    /// R 起点放一个数据单元（两盘），交回池与它的 key。
+    fn scan_case_pool_with_a_data_unit_at_the_start() -> (ScanCasePool, Vec<u8>) {
+        let mut pool = ScanCasePool::default();
+        let (bytes, key) = scan_case_data_unit(1);
+        pool.place(scan_case_slot(0), 2, Some(&bytes));
+        (pool, key)
+    }
+
+    fn scan_case_both_devices(offset_in_slots: u64) -> [(DeviceIdentity, SlotNumber); 2] {
+        [SCAN_CASE_DEVICE_ZERO, SCAN_CASE_DEVICE_ONE]
+            .map(|device| (device, scan_case_slot(offset_in_slots)))
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_a_movable_unit() {
+        let (mut pool, key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.map(key.clone(), scan_case_both_devices(0));
+        assert!(matches!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Movable(unit) if unit.mapping_key == key
+        ));
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_a_pinned_unit() {
+        let (mut pool, key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.map(key, scan_case_both_devices(0));
+        assert_eq!(
+            pool.class_at_the_region_start(&[1], &[]),
+            AllocationInRegion::Pinned
+        );
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_a_quarantined_unit() {
+        let (mut pool, key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.map(key, scan_case_both_devices(0));
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[0]),
+            AllocationInRegion::Quarantined
+        );
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_a_dead_unit() {
+        let (pool, _key) = scan_case_pool_with_a_data_unit_at_the_start();
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Dead
+        );
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_an_unreadable_header() {
+        let mut pool = ScanCasePool::default();
+        pool.place(scan_case_slot(0), 2, None);
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Inconsistent(RegionScanInconsistency::HeaderUnreadable(
+                UnitHeaderUnreadable::DeviceReadFailed
+            ))
+        );
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_a_class_tag_differing_from_the_mapping_key() {
+        let (mut pool, _key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.map(
+            vec![LOCAL_UNIT_CLASS_INDEX_NODE; 27],
+            scan_case_both_devices(0),
+        );
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Inconsistent(
+                RegionScanInconsistency::UnitClassDisagreesWithTheMappingKey {
+                    header_unit_class: MappedUnitClass::Data,
+                    mapping_key_class_tag: LOCAL_UNIT_CLASS_INDEX_NODE,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn copied_scan_agrees_when_the_header_key_is_mapped_at_another_slot_only() {
+        let (mut pool, key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.map(key, scan_case_both_devices(10));
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Inconsistent(
+                RegionScanInconsistency::HeaderKeyDisagreesWithTheMappingLocation
+            )
+        );
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_a_record_straddling_the_region_start() {
+        let (mut pool, _key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.place(SlotNumber(scan_case_slot(0).0 - 1), 2, None);
+        let (crates_scan, copied_scan) = pool.both_scans(&BTreeSet::new(), &BTreeSet::new());
+        assert_eq!(copied_scan, crates_scan);
+        assert!(matches!(
+            crates_scan,
+            Err(RegionScanRefusal::RecordStraddlesTheRegionBoundaryUnsupported { .. })
+        ));
+    }
+
+    #[test]
+    fn copied_scan_agrees_on_two_records_movable_under_one_key() {
+        let (mut pool, key) = scan_case_pool_with_a_data_unit_at_the_start();
+        let (bytes, _same_key) = scan_case_data_unit(1);
+        pool.place(scan_case_slot(2), 2, Some(&bytes));
+        pool.map(
+            key,
+            [
+                (SCAN_CASE_DEVICE_ZERO, scan_case_slot(0)),
+                (SCAN_CASE_DEVICE_ZERO, scan_case_slot(2)),
+            ],
+        );
+        let (crates_scan, copied_scan) = pool.both_scans(&BTreeSet::new(), &BTreeSet::new());
+        assert_eq!(copied_scan, crates_scan);
+        assert!(matches!(
+            crates_scan,
+            Err(RegionScanRefusal::TwoRecordsMovableUnderOneMappingKey { .. })
+        ));
+    }
+
+    #[test]
+    fn copied_scan_looks_up_the_slot_together_with_its_device() {
+        let (mut pool, _key) = scan_case_pool_with_a_data_unit_at_the_start();
+        let (_other_bytes, other_key) = scan_case_data_unit(2);
+        pool.map(
+            other_key,
+            [
+                (SCAN_CASE_DEVICE_ONE, scan_case_slot(0)),
+                (DeviceIdentity(2), scan_case_slot(0)),
+            ],
+        );
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Dead,
+            "同槽号、别的盘上的条目不指着 R 那块盘上的这一槽"
+        );
+    }
+
+    #[test]
+    fn copied_scan_reports_the_first_disagreeing_entry_in_the_mapping_order() {
+        let (mut pool, _key) = scan_case_pool_with_a_data_unit_at_the_start();
+        // 条目 0 指着这一槽的是第二条位置项、条目 1 是第一条：建表时条目 1 先进去，查的时候要排回映射的次序
+        pool.map(
+            vec![LOCAL_UNIT_CLASS_INDEX_NODE; 27],
+            [
+                (SCAN_CASE_DEVICE_ONE, scan_case_slot(0)),
+                (SCAN_CASE_DEVICE_ZERO, scan_case_slot(0)),
+            ],
+        );
+        pool.map(vec![LOCAL_UNIT_CLASS_PACKED; 27], scan_case_both_devices(0));
+        assert_eq!(
+            pool.class_at_the_region_start(&[], &[]),
+            AllocationInRegion::Inconsistent(
+                RegionScanInconsistency::UnitClassDisagreesWithTheMappingKey {
+                    header_unit_class: MappedUnitClass::Data,
+                    mapping_key_class_tag: LOCAL_UNIT_CLASS_INDEX_NODE,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn identity_index_counts_its_keys_and_its_locations() {
+        let (mut pool, key) = scan_case_pool_with_a_data_unit_at_the_start();
+        pool.map(key, scan_case_both_devices(0));
+        pool.map(vec![LOCAL_UNIT_CLASS_PACKED; 27], scan_case_both_devices(4));
+        let index = IdentityIndexOfTheMapping::of_the_entries(&pool.mapping_entries);
+        assert_eq!(index.keys(), 2);
+        assert_eq!(index.location_keys(), 4);
+    }
+
+    #[test]
+    fn drift_round_has_eighty_cells_and_two_probes() {
+        assert_eq!(
+            submission_cells_of_a_card().len() + DriftProbe::ALL.len(),
+            CELLS_AND_PROBES_PER_ROUND
+        );
+        assert_eq!(CELLS_AND_PROBES_PER_ROUND, 82);
+    }
+
+    #[test]
+    fn round_ratio_point_lines_per_card_are_twelve_points_times_nine_resident_cells() {
+        let resident_cells_of_one_size = submission_cells_of_a_card()
+            .iter()
+            .filter(|cell| {
+                cell.units == SUBMISSION_UNIT_COUNTS[0]
+                    && cell.form != SubmissionForm::TodaySingleKernel
+            })
+            .count();
+        assert_eq!(
+            every_submission_point().len() * resident_cells_of_one_size,
+            POINT_LINES_OF_THE_ROUND_RATIO_PER_CARD
+        );
+        assert_eq!(POINT_LINES_OF_THE_ROUND_RATIO_PER_CARD, 108);
+    }
+
+    #[test]
+    fn cpu_writing_stage_line_count_anchor_holds_only_when_the_counts_agree() {
+        let mut record = CpuWritingsSegmentRecord {
+            pieces_by_point: BTreeMap::new(),
+            failed_pieces: BTreeSet::new(),
+            stage_lines: 7,
+            cpu_writing_stage_lines: 7,
+        };
+        assert_eq!(
+            cpu_writing_stage_line_count_anchor(&record),
+            (
+                "name=anchor item=cpu_writing_stage_lines value=7 expected=7 holds=true"
+                    .to_string(),
+                true
+            )
+        );
+        record.cpu_writing_stage_lines = 6;
+        assert!(!cpu_writing_stage_line_count_anchor(&record).1);
+    }
+
+    #[test]
+    fn a_failing_drift_probe_voids_the_round_ratio_and_an_unread_one_is_not_run() {
+        assert_eq!(
+            drift_round_ratio_judgement(Some(0.95), false, controlled_round_ratio_judgement),
+            (Some(0.95), "drift_gone")
+        );
+        assert_eq!(
+            drift_round_ratio_judgement(Some(0.95), true, controlled_round_ratio_judgement),
+            (Some(0.95), "void_positive_control")
+        );
+        assert_eq!(
+            drift_round_ratio_judgement(None, false, reproduction_round_ratio_judgement),
+            (None, "not_run")
+        );
+    }
+
+    #[test]
+    fn failure_clause_l4_needs_card_one_drifting_or_both_warm_ups_at_the_cap() {
+        assert!(is_failure_clause_l4_triggered(
+            Some("drift_remains"),
+            &[false, false]
+        ));
+        assert!(is_failure_clause_l4_triggered(
+            Some("drift_gone"),
+            &[true, true]
+        ));
+        assert!(!is_failure_clause_l4_triggered(
+            Some("drift_gone"),
+            &[true, false]
+        ));
+        assert!(!is_failure_clause_l4_triggered(Some("between"), &[true]));
+        assert!(!is_failure_clause_l4_triggered(None, &[false, false]));
+    }
+
+    #[test]
+    fn failure_clause_l5_fires_only_when_the_reproduction_arm_does_not_reproduce() {
+        assert!(is_failure_clause_l5_triggered(Some("drift_not_reproduced")));
+        assert!(!is_failure_clause_l5_triggered(Some("drift_reproduced")));
+        assert!(!is_failure_clause_l5_triggered(Some("between")));
+        assert!(!is_failure_clause_l5_triggered(None));
     }
 }

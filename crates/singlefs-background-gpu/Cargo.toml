@@ -1,0 +1,38 @@
+[package]
+name = "singlefs-background-gpu"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "产品的后台 GPU 路径（D26（后台整理与放置回收） 已定项 13）：卡清单、挂载那一刻的校验、按量出的代价分活、显存上限与切批、两份独立 GPU 核的比对与连续不确定计数，扫描里的校验和核对、区域扫描里的单元头解析与映射反查、选段打分的每段活槽数三段各两份 WGSL 核，等 GPU 的上限，以及核心层要的那一份实现（BackgroundGpuCompute）与挂载那一刻开卡交回把手的入口。依赖核心层，核心层不依赖它；与 checker 档的 GPU 判器不共用代码（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条）"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+# 版本与特性照 checker 档那一份写死（crates/singlefs-checker-tier/Cargo.toml 的 wgpu 一行）：两个包在同一个工作区里解析成同一份 wgpu。
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"] }
+# 显存总量：wgpu 的适配器信息不报显存，经 wgpu 的 hal 层拿到 Vulkan 实例，读物理设备的内存堆（src/background_gpu.rs 的 largest_device_local_memory_heap）。
+# 版本与 Cargo.lock 里 wgpu-hal 带进来的那一份相同，不多引一份；特性由 wgpu-hal 那边定。
+ash = { version = "=0.38.0", default-features = false }
+# 量一次提交的主机 CPU 时间用这条线程的 CPU 钟（clock_gettime 的 CLOCK_THREAD_CPUTIME_ID）；std 没有线程 CPU 钟。与核心层用的是同一份 libc。
+libc = "0.2"
+
+[features]
+# 要真显卡的对拍（tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs、tests/region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs、
+# tests/live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs）与真卡上的端到端整理（tests/compaction_on_a_real_gpu_through_the_background_gpu_compute_ends_as_on_the_cpu.rs）只在开了这个特性时编：
+# 不开时 `cargo test` 整包与整工作区都不碰 GPU（.claude/rules/verification.md「凡用 GPU 先清场，跑完不复原」：用 GPU 的跑法要经清场脚本起）。
+tests-on-a-real-gpu = []
+
+[[test]]
+name = "checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "compaction_on_a_real_gpu_through_the_background_gpu_compute_ends_as_on_the_cpu"
+required-features = ["tests-on-a-real-gpu"]

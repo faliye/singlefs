@@ -2,11 +2,15 @@
 //! 多线程与单线程逐字相同），按 `mod` 声明（连 `#[path]`）连出每个编译目标的模块树，再建闭包要查的索引。
 //!
 //! 根目录可以是仓根（底下有 `crates/`），也可以就是 `crates/` 本身；输出里的文件路径都从仓根算（`crates/…`）。
+//!
+//! 装出来的那一份是源码原样（形式化判定用）；产品行为判定用 [`Workspace::view_for_judgment`] 交的视图：同一批文件的原文剥掉 Verus 的
+//! 规格与证明块（`verus_ghost_code`）之后再切一遍、再连模块树与索引，第一次要时才切。
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fmt;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use crate::conditional_compilation::Predicate;
 use crate::lexer::Token;
@@ -18,6 +22,7 @@ use crate::rust_items::{normalized_path, parse_rust_file, RustFileInput};
 use crate::units::{
     DocumentationTestAttachment, FileIndex, Refusal, RefusalForm, Unit, UnitIndex, UnitKind,
 };
+use crate::verus_ghost_code::{source_with_verus_ghost_code_blanked, JudgmentKind, VerusGhostCode};
 use crate::wgsl::{parse_wgsl_file, WgslUnit};
 
 /// 工作区里一个 crate 的下标。
@@ -217,6 +222,13 @@ pub struct Workspace {
     pub memberships: Vec<Vec<FileMembership>>,
     pub files_of_target: Vec<Vec<FileIndex>>,
     pub indexes: WorkspaceIndexes,
+    /// 这一份里 Verus 的规格与证明块在不在：`load_workspace` 装出来的是原样，产品行为视图里剥掉了。
+    pub verus_ghost_code: VerusGhostCode,
+    /// 装这一份用的线程数与弄坏开关：产品行为视图照同样的切法再切一遍。
+    loading_threads: NonZeroUsize,
+    loading_switches: RuleSwitches,
+    /// 产品行为视图（只在原样的那一份上有），第一次要时才切。
+    product_behavior_view: OnceLock<Box<Workspace>>,
 }
 
 /// 工作区装不起来。
@@ -256,6 +268,15 @@ struct FileEntry {
     relative_path: String,
     crate_index: CrateIndex,
     language: SourceLanguage,
+}
+
+/// 切分时每份文件的源码从哪来。
+#[derive(Clone, Copy)]
+enum SourceOrigin<'loaded> {
+    /// 从盘上读（`load_workspace`）。
+    ReadFromDisk,
+    /// 已装好的原样那一份里的原文（按文件下标一一对应），剥掉 Verus 的规格与证明块（产品行为视图）。
+    VerusGhostCodeBlankedFrom(&'loaded [SourceFile]),
 }
 
 struct ParsedSource {
@@ -299,15 +320,48 @@ fn collect_source_files(directory: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
+/// 这份文件拿去切的源码，连同剥不了 Verus 规格与证明块时记的那一条拒算（那时原文原样拿去切）。
+fn source_to_split(
+    file: FileIndex,
+    entry: &FileEntry,
+    origin: SourceOrigin<'_>,
+) -> (String, Option<Refusal>) {
+    match origin {
+        SourceOrigin::ReadFromDisk => (
+            std::fs::read(&entry.absolute_path)
+                .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+                .unwrap_or_default(),
+            None,
+        ),
+        SourceOrigin::VerusGhostCodeBlankedFrom(loaded_files) => {
+            let original = &loaded_files[file.0].source;
+            match entry.language {
+                SourceLanguage::Wgsl => (original.clone(), None),
+                SourceLanguage::Rust => match source_with_verus_ghost_code_blanked(original) {
+                    Ok(blanked) => (blanked, None),
+                    Err(unparsed) => (
+                        original.clone(),
+                        Some(Refusal {
+                            file,
+                            line: unparsed.line,
+                            form: RefusalForm::VerusGhostCodeUnparsed,
+                            fragment: unparsed.reason,
+                        }),
+                    ),
+                },
+            }
+        }
+    }
+}
+
 fn parse_one_file(
     file: FileIndex,
     entry: &FileEntry,
     crates: &[WorkspaceCrate],
     switches: &RuleSwitches,
+    origin: SourceOrigin<'_>,
 ) -> ParsedSource {
-    let source = std::fs::read(&entry.absolute_path)
-        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
-        .unwrap_or_default();
+    let (source, unparsed_verus_block) = source_to_split(file, entry, origin);
     match entry.language {
         SourceLanguage::Rust => {
             let file_directory = entry
@@ -321,11 +375,13 @@ fn parse_one_file(
                 manifest_directory: Some(&crates[entry.crate_index.0].directory),
                 switches,
             });
+            let mut file_level_refusals = parsed.file_level_refusals;
+            file_level_refusals.extend(unparsed_verus_block);
             ParsedSource {
                 tokens: parsed.tokens,
                 units: parsed.units,
                 wgsl_units: Vec::new(),
-                file_level_refusals: parsed.file_level_refusals,
+                file_level_refusals,
                 source,
             }
         }
@@ -348,6 +404,7 @@ fn parse_files_in_parallel(
     crates: &[WorkspaceCrate],
     threads: NonZeroUsize,
     switches: &RuleSwitches,
+    origin: SourceOrigin<'_>,
 ) -> Vec<ParsedSource> {
     if entries.is_empty() {
         return Vec::new();
@@ -366,7 +423,7 @@ fn parse_files_in_parallel(
                         .enumerate()
                         .map(|(offset, entry)| {
                             let file = FileIndex(chunk_index * chunk_length + offset);
-                            (file, parse_one_file(file, entry, crates, switches))
+                            (file, parse_one_file(file, entry, crates, switches, origin))
                         })
                         .collect::<Vec<(FileIndex, ParsedSource)>>()
                 })
@@ -977,7 +1034,41 @@ pub fn load_workspace(
         }
     }
     entries.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
-    let parsed = parse_files_in_parallel(&entries, &crates, threads, switches);
+    Ok(assemble_workspace(
+        repository_root,
+        crates,
+        entries,
+        WorkspaceLoading {
+            threads,
+            switches,
+            origin: SourceOrigin::ReadFromDisk,
+            verus_ghost_code: VerusGhostCode::Kept,
+        },
+    ))
+}
+
+/// 一次切分怎么切：线程数、弄坏开关、源码从哪来、这一份里 Verus 的规格与证明块在不在。
+struct WorkspaceLoading<'loaded> {
+    threads: NonZeroUsize,
+    switches: &'loaded RuleSwitches,
+    origin: SourceOrigin<'loaded>,
+    verus_ghost_code: VerusGhostCode,
+}
+
+/// 切全部文件，连模块树、限定名与索引（`load_workspace` 与产品行为视图共用这一段）。
+fn assemble_workspace(
+    repository_root: PathBuf,
+    crates: Vec<WorkspaceCrate>,
+    entries: Vec<FileEntry>,
+    loading: WorkspaceLoading<'_>,
+) -> Workspace {
+    let parsed = parse_files_in_parallel(
+        &entries,
+        &crates,
+        loading.threads,
+        loading.switches,
+        loading.origin,
+    );
     let mut files = Vec::with_capacity(entries.len());
     let mut units = Vec::new();
     let mut wgsl_units = Vec::new();
@@ -1048,7 +1139,7 @@ pub fn load_workspace(
     }
     assign_qualified_names(&mut units, &files, &memberships, &targets, &crates);
     let indexes = build_indexes(&units, &memberships, files_by_path);
-    Ok(Workspace {
+    Workspace {
         repository_root,
         crates,
         files,
@@ -1058,10 +1149,58 @@ pub fn load_workspace(
         memberships,
         files_of_target,
         indexes,
-    })
+        verus_ghost_code: loading.verus_ghost_code,
+        loading_threads: loading.threads,
+        loading_switches: loading.switches.clone(),
+        product_behavior_view: OnceLock::new(),
+    }
 }
 
 impl Workspace {
+    /// 一类判定取键用的那一份：形式化判定用装出来的这一份本身（规格与证明都在指纹里）；产品行为判定用剥掉 Verus 规格与证明块的视图
+    /// （第一次要时照装这一份的线程数与弄坏开关，从这一份的原文再切一遍，之后复用）。在视图上要产品行为的那一份，交视图自己。
+    ///
+    /// # Panics
+    /// 在产品行为视图上要形式化判定的那一份：视图里规格与证明已经剥掉，交出去就是拿剥过的键判证明（假绿），是调用方的 bug。
+    #[must_use]
+    pub fn view_for_judgment(&self, kind: JudgmentKind) -> &Workspace {
+        match (kind, self.verus_ghost_code) {
+            (JudgmentKind::FormalVerification, VerusGhostCode::Kept)
+            | (JudgmentKind::ProductBehavior, VerusGhostCode::Blanked) => self,
+            (JudgmentKind::ProductBehavior, VerusGhostCode::Kept) => self
+                .product_behavior_view
+                .get_or_init(|| Box::new(self.product_behavior_view_cut_afresh())),
+            (JudgmentKind::FormalVerification, VerusGhostCode::Blanked) => panic!(
+                "产品行为视图里 Verus 的规格与证明已经剥掉，形式化判定要用 load_workspace 装出来的那一份"
+            ),
+        }
+    }
+
+    /// 同一批文件的原文剥掉 Verus 的规格与证明块之后再切一遍（不再读盘上的源码；数据文件的摘要照切分的做法现读）。
+    fn product_behavior_view_cut_afresh(&self) -> Workspace {
+        let entries = self
+            .files
+            .iter()
+            .map(|file| FileEntry {
+                absolute_path: file.absolute_path.clone(),
+                relative_path: file.relative_path.clone(),
+                crate_index: file.crate_index,
+                language: file.language,
+            })
+            .collect();
+        assemble_workspace(
+            self.repository_root.clone(),
+            self.crates.clone(),
+            entries,
+            WorkspaceLoading {
+                threads: self.loading_threads,
+                switches: &self.loading_switches,
+                origin: SourceOrigin::VerusGhostCodeBlankedFrom(&self.files),
+                verus_ghost_code: VerusGhostCode::Blanked,
+            },
+        )
+    }
+
     /// 一份文件在一个目标里的那条归属。
     #[must_use]
     pub fn membership(&self, file: FileIndex, target: TargetIndex) -> Option<&FileMembership> {

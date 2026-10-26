@@ -180,7 +180,10 @@ fn crc32_of_the_images(devices: &[(DeviceIdentity, SparseBlockDevice)], device_b
 /// 取号写两轮（甲'，判决 `research/prompts/m3-close-sysconf-r3-main-verification.md` 第四节「落地」）：取号多写一轮，之后每次系统配置写的世代号
 /// 都大 1、落的槽换一边（新池新建文件之后两槽是世代 5、6，原来 4、5，最新一槽从槽 1 换到槽 0），两块盘四个系统配置槽的内容跟着变；
 /// 根环、journal 环与单元区不带系统配置的世代号，推的是不变（这一回没逐扇区比过）。钉值随之换成 1715986665（批 8 实现员副本上这条断言红出来的 left 值）。
-const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 1_715_986_665;
+/// 根记录与 journal 新根段末尾加回收门槛 t 与钉槽 p（C773（读坏与全零根槽的回收门槛钉只在内存里），根记录 457 → 466、记录头 487 → 496）：
+/// 每条根与每条记录多 9 字节（第 0 代与暖机 t = 0、p = 255，第一个文件那条按记根时的门槛写），算法类型、nonce、MAC、fsid 跟着后挪，
+/// 连带根槽与记录的校验和、反向链；单元区与系统配置槽不变（推的，没逐扇区比）。钉值随之换成 3413977980（C773 实现员副本上这条断言红出来的 left 值）。
+const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 3_413_977_980;
 
 /// 默认环 768 MiB：mkfs 按环长现算的单元区起点就是 50176（`INSTANCE_TABLE_SLOT`），树表第 0 版在 50178（`TREE_TABLE_GENESIS_SLOT`），
 /// 系统配置偏移 417 的 8 字节写 50176；mkfs 到第一个文件写出的两块盘与钉值那一版（钉值说明里最后一次换钉的那一版）逐字节相同（整盘 CRC-32C 钉值）。

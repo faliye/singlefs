@@ -541,7 +541,7 @@ pub fn the_pool_checker_reddens_each_broken_rule_of_a_multi_level_tree_root(
                 matches!(
                     recovered,
                     RecoveryOutcome::Failed {
-                        failure: RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                        failure: RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
                             what: "记账树内部条目",
                             entry_bytes: 109,
                             field_table_bytes: 108,

@@ -96,7 +96,8 @@ pub fn mkfs_pool_with_two_empty_slots_after_its_root(
     }
 }
 
-/// 同一份造法（择新键完全相同的两条根：前面是 mkfs 那条，后面那条只把实例表指针两条位置条目的校验和改掉），问池级 checker：
+/// 同一份造法（择新键完全相同的两条根：前面是 mkfs 那条，后面那条只把实例表指针两条位置条目的校验和改掉、写进区域 2 的槽 0——
+/// 第 0 代根照 mkfs 种根的槽另认，C743），问池级 checker：
 /// 它择最新根走读（I-7.2「最新的根走得完」），键相同取读根环次序里前面那条，与 `choose_root` 同（代码轮第二轮判决辩方 D3）。
 /// 前面那条的实例表读得出，I-7.2 成立；取了后面那条，实例表读不出，I-7.2 判违例。
 pub fn of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does(
@@ -107,8 +108,11 @@ pub fn of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_
         system_configuration,
         mkfs_root,
         earlier_empty_slot: _,
-        later_empty_slot,
+        later_empty_slot: _,
     } = mkfs_pool_with_two_empty_slots_after_its_root("tied-choice-key-pool-checker");
+    let later_genesis_slot = singlefs_core::make_filesystem::genesis_root_ring_slots()
+        .last()
+        .expect("mkfs 种根的槽有三个");
     let mut same_key_root_with_an_unreadable_instance_table = mkfs_root;
     for location in &mut same_key_root_with_an_unreadable_instance_table
         .instance_table
@@ -119,7 +123,7 @@ pub fn of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_
     write_root_into_ring_slot(
         &mut image,
         &system_configuration,
-        later_empty_slot,
+        later_genesis_slot,
         &same_key_root_with_an_unreadable_instance_table,
     );
     assert_eq!(

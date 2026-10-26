@@ -11,7 +11,8 @@
 //! - 发布路径：`transaction::prepare_the_version_publish` 在算定这次发布的样子之后、读盘核与动分配器之前，按
 //!   [`admission_reading_before_a_publish`] 取读数（实例切换的预留按下一次可写挂载的 rows0，D28（挂载期承诺量） 已定项 3
 //!   「发布路径用 rows0 + 1」）、按 [`demand_of_the_roles_on_each_device`] 取这次的需求，逐设备合取；判不判按
-//!   [`publish_has_an_ordinary_allocation`]；
+//!   [`publish_has_an_ordinary_allocation`]，整理的一批（搬了单元的发布）另外照判、批次最坏占用加进这一次读数的已承诺预留
+//!   （[`worst_case_occupancy_of_a_compaction_batch`]，D26（后台整理与放置回收） 已定项 3 第 2 句）；
 //! - 可写挂载：`mount::establish_instance` 在取号之前按 [`admission_reading_of_a_writable_mount`]（这次挂载的 rows0）判
 //!   「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13），需求逐盘 0。
 //!
@@ -101,6 +102,19 @@ impl BytesSummedOverAllReplicas {
                 .0
                 .checked_mul(replicas.replicas())
                 .expect("一份副本的字节乘副本数装得进 u64"),
+        )
+    }
+
+    /// 两份承诺量加在一起。
+    ///
+    /// # Panics
+    /// 和装不进 u64：两份都是一个池上的字节，加起来大过 u64 说明调用方给的不是一个池上的量。
+    #[must_use]
+    pub fn plus(self, other: BytesSummedOverAllReplicas) -> Self {
+        Self(
+            self.0
+                .checked_add(other.0)
+                .expect("一个池上的两份承诺量加起来装得进 u64"),
         )
     }
 
@@ -757,12 +771,24 @@ pub struct DemandOnDevice {
     pub bytes: BytesOnOneDevice,
 }
 
-/// 一块不够的盘：它的可用与需求。式子那一判（[`admit_on_every_device`]）里是可用(d) 与需求(d)；「这次的单元落得下」那一判
-/// （[`admit_the_units_landing_on_every_device`]）里是这块盘上短的那一种单元落得下的字节与这次那一种单元要的字节，
-/// 两种怎么取见那个函数的文档。
+/// 一块盘是被哪一判判成不够的，也就是 [`DeviceShortOfDemand`] 的 `available` 与 `demand` 装的是哪一对量。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JudgementThatFoundTheDeviceShort {
+    /// 式子那一判（[`admit_on_every_device`]）：`available` 是可用(d)，`demand` 是需求(d)。
+    FormulaAvailableAgainstDemand,
+    /// 「这次的单元落得下」那一判的数据单元那一样（[`admit_the_units_landing_on_every_device`] ①）：
+    /// `available` 是段外没挡的槽对 × 2 槽的字节，`demand` 是这次数据单元 × 2 槽的字节。
+    SlotPairsOutsideTheClusterSegmentsForDataUnits,
+    /// 「这次的单元落得下」那一判的提交内生块那一样（[`admit_the_units_landing_on_every_device`] ②）：
+    /// `available` 是数据单元取走之后剩下没挡的槽的字节，`demand` 是提交内生块至多要的槽的字节。
+    SlotsLeftForCommitGeneratedUnits,
+}
+
+/// 一块不够的盘：它的可用与需求，连同判它不够的是哪一判（`judged_short_by`；两个量各是什么由它定）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DeviceShortOfDemand {
     pub device: DeviceIdentity,
+    pub judged_short_by: JudgementThatFoundTheDeviceShort,
     pub available: AvailableBytesOnOneDevice,
     pub demand: BytesOnOneDevice,
 }
@@ -810,6 +836,7 @@ pub fn admit_on_every_device(
                 .bytes;
             (available.0 < i128::from(demand.0)).then_some(DeviceShortOfDemand {
                 device,
+                judged_short_by: JudgementThatFoundTheDeviceShort::FormulaAvailableAgainstDemand,
                 available,
                 demand,
             })
@@ -964,8 +991,9 @@ pub fn units_of_a_publish_to_land(
 /// 条款没写这一判要不要判它们，放行之后落点照样可能被拒（`PlacementRefused`），在任何写之前。
 ///
 /// # Errors
-/// `AdmissionRefusedOnSomeDevices`：至少一块盘落不下，按 `room` 的次序交回每一块；那一块的 `available` 与 `demand` 说的是短的那一种：
-/// ① 短时是段外槽对 × 2 槽的字节与这次数据单元 × 2 槽的字节；① 够而 ② 短时是数据单元取走之后剩下没挡的槽的字节与提交内生块要的槽的字节。
+/// `AdmissionRefusedOnSomeDevices`：至少一块盘落不下，按 `room` 的次序交回每一块；那一块的 `judged_short_by` 说短的是哪一种
+/// （① 短时是 [`JudgementThatFoundTheDeviceShort::SlotPairsOutsideTheClusterSegmentsForDataUnits`]，① 够而 ② 短时是
+/// [`JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits`]），`available` 与 `demand` 各是什么见那两个成员的文档。
 pub fn admit_the_units_landing_on_every_device(
     room: &[PlacementRoomOnOneDevice],
     units: UnitsOfAPublishToLand,
@@ -989,6 +1017,8 @@ pub fn admit_the_units_landing_on_every_device(
                     .expect("槽对的槽数装得进 u64");
                 return Some(DeviceShortOfDemand {
                     device: room_on_the_device.device,
+                    judged_short_by:
+                        JudgementThatFoundTheDeviceShort::SlotPairsOutsideTheClusterSegmentsForDataUnits,
                     available: bytes_of_slots(slots_of_the_pairs).0,
                     demand: bytes_of_slots(slots_of_the_data_units).1,
                 });
@@ -1000,6 +1030,8 @@ pub fn admit_the_units_landing_on_every_device(
             (slots_left_after_the_data_units < units.commit_generated_slots).then(|| {
                 DeviceShortOfDemand {
                     device: room_on_the_device.device,
+                    judged_short_by:
+                        JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
                     available: bytes_of_slots(slots_left_after_the_data_units).0,
                     demand: bytes_of_slots(units.commit_generated_slots).1,
                 }
@@ -1525,6 +1557,25 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
     }
 }
 
+/// 整理一批的最坏占用（D26（后台整理与放置回收） 已定项 3 第 2 句「整理不是释放路径，它走常规准入，批次最坏占用计入『已承诺预留』」；
+/// 用户 2026-10-26 定 C906「照条款：整理批走常规准入」）：这一批计划搬的单元在目的地各新占它的跨度，每个单元落每一份副本
+/// （第一版每块盘一份，[`ReplicaCount::of_every_device_in_the_pool`]），按全部副本之和记——与「已承诺预留」同一口径，发布路径把它加进
+/// 这一次准入读数的已承诺预留（只进这一次的读数，不写进记账行：一批在同一个调用里准入、分配、落盘，落盘之后它就在「已分配」里）。
+/// 「最坏」是计划里每一项都真搬：其中这次发布本来就重写、不另搬的那几个也照搬算。`slots_of_the_planned_units` 是计划里每一项源落点的跨度之和。
+///
+/// # Panics
+/// 字节数装不进 u64：一批的单元数至多批大小，装不下说明调用方给的不是一批的跨度。
+#[must_use]
+pub fn worst_case_occupancy_of_a_compaction_batch(
+    slots_of_the_planned_units: u64,
+    replicas: ReplicaCount,
+) -> BytesSummedOverAllReplicas {
+    BytesSummedOverAllReplicas::of_one_copy_on_every_replica(
+        BytesOnOneDevice::of_slots(slots_of_the_planned_units),
+        replicas,
+    )
+}
+
 /// 这次发布判不判空间准入（D28（挂载期承诺量） 已定项 1 接线「判不判照旧」）：重写的角色里至少一个是普通分配
 /// （[`space_budget_of_role`] 是 [`SpaceBudgetOfARole::OrdinaryAllocation`]）才判；没有普通分配的发布（空发布、写行、暖机、抬 F）不判。
 #[must_use]
@@ -1832,11 +1883,15 @@ mod tests {
                 short_devices: vec![
                     DeviceShortOfDemand {
                         device: DeviceIdentity(0),
+                        judged_short_by:
+                            JudgementThatFoundTheDeviceShort::FormulaAvailableAgainstDemand,
                         available: available_slots(1),
                         demand: slots(2),
                     },
                     DeviceShortOfDemand {
                         device: DeviceIdentity(1),
+                        judged_short_by:
+                            JudgementThatFoundTheDeviceShort::FormulaAvailableAgainstDemand,
                         available: available_slots(1),
                         demand: slots(2),
                     },
@@ -1866,6 +1921,8 @@ mod tests {
             Err(AdmissionRefusedOnSomeDevices {
                 short_devices: vec![DeviceShortOfDemand {
                     device: DeviceIdentity(0),
+                    judged_short_by:
+                        JudgementThatFoundTheDeviceShort::FormulaAvailableAgainstDemand,
                     available: available_slots(1),
                     demand: slots(2),
                 }],
@@ -2402,6 +2459,7 @@ mod tests {
             Err(AdmissionRefusedOnSomeDevices {
                 short_devices: vec![DeviceShortOfDemand {
                     device: DeviceIdentity(1),
+                    judged_short_by: JudgementThatFoundTheDeviceShort::SlotPairsOutsideTheClusterSegmentsForDataUnits,
                     available: available_slots(4),
                     demand: slots(6),
                 }],
@@ -2420,6 +2478,8 @@ mod tests {
                 short_devices: [0, 1]
                     .map(|device| DeviceShortOfDemand {
                         device: DeviceIdentity(device),
+                        judged_short_by:
+                            JudgementThatFoundTheDeviceShort::SlotsLeftForCommitGeneratedUnits,
                         available: available_slots(13),
                         demand: slots(15),
                     })

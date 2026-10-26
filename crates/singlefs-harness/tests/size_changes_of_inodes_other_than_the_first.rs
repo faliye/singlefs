@@ -1,0 +1,76 @@
+//! 第一个文件之外的 inode 缩短与变长（判决 `research/prompts/m4-multi-inode-size-r1-main-verification.md` 第二节 S2、S3、S4、S6、S7；
+//! 用户 2026-10-26 定射程「任意活 inode 都能缩短与变长」）的验收：攻方腿 H1–H5 那五段历史在实现之后都是合法镜像、四个读者都收，
+//! 正推腿 7.1 节行为层的几条（K9 叶边界、批间停下再重挂续做、快照下缩短、带洞时被 unlink、两个 inode 的回退），与「有记录、没有条目、
+//! size > 0」读者拒那一形。场景与期望写在 `tests/common_images_for_the_checker_tier/size_changes_of_inodes_other_than_the_first.rs`。
+
+//! 本档只核实现行为；同名场景交出的镜像由 checker 档给定状态引擎两段判。
+
+mod common;
+mod common_deletion_in_progress;
+mod common_images_for_the_checker_tier;
+mod common_pointer_head_corruption;
+mod common_truncation;
+#[path = "common_images_for_the_checker_tier/size_changes_of_inodes_other_than_the_first.rs"]
+mod scenarios;
+
+#[test]
+fn extending_an_inode_without_an_entry_writes_a_sticky_tag_zero_entry_read_as_zeros_by_every_reader(
+) {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::extending_an_inode_without_an_entry_writes_a_sticky_tag_zero_entry_read_as_zeros_by_every_reader);
+}
+
+#[test]
+fn extending_an_inode_inside_its_one_data_unit_rewrites_that_unit_and_every_reader_reads_the_zeros()
+{
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::extending_an_inode_inside_its_one_data_unit_rewrites_that_unit_and_every_reader_reads_the_zeros);
+}
+
+#[test]
+fn extending_an_inode_across_data_units_declares_the_hole_and_every_reader_reads_zeros_up_to_the_size(
+) {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::extending_an_inode_across_data_units_declares_the_hole_and_every_reader_reads_zeros_up_to_the_size);
+}
+
+#[test]
+fn truncating_an_inode_inside_its_one_data_unit_rewrites_it_through_an_intent_and_a_final_batch() {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::truncating_an_inode_inside_its_one_data_unit_rewrites_it_through_an_intent_and_a_final_batch);
+}
+
+#[test]
+fn truncating_a_three_unit_inode_into_unit_zero_writes_its_truncation_field_and_releases_the_units_beyond(
+) {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::truncating_a_three_unit_inode_into_unit_zero_writes_its_truncation_field_and_releases_the_units_beyond);
+}
+
+#[test]
+fn truncating_another_inode_onto_the_lower_leaf_boundary_rewrites_the_leaf_holding_the_cut_unit() {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::truncating_another_inode_onto_the_lower_leaf_boundary_rewrites_the_leaf_holding_the_cut_unit);
+}
+
+#[test]
+fn a_truncation_of_another_inode_stopped_between_batches_continues_by_its_number_at_the_writable_remount(
+) {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::a_truncation_of_another_inode_stopped_between_batches_continues_by_its_number_at_the_writable_remount);
+}
+
+#[test]
+fn truncating_another_inode_under_a_live_snapshot_keeps_its_replaced_data_units_on_the_deadlist() {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::truncating_another_inode_under_a_live_snapshot_keeps_its_replaced_data_units_on_the_deadlist);
+}
+
+#[test]
+fn unlinking_another_inode_with_a_hole_switches_its_tag_back_and_deletes_it() {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::unlinking_another_inode_with_a_hole_switches_its_tag_back_and_deletes_it);
+}
+
+#[test]
+fn a_rollback_between_two_truncations_of_different_inodes_keeps_one_entry_naming_the_target_inode()
+{
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::a_rollback_between_two_truncations_of_different_inodes_keeps_one_entry_naming_the_target_inode);
+}
+
+#[test]
+fn a_record_with_a_size_but_no_upper_leaf_entry_is_refused_by_the_readers_and_reddens_only_the_unit_count(
+) {
+    common_images_for_the_checker_tier::PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(scenarios::a_record_with_a_size_but_no_upper_leaf_entry_is_refused_by_the_readers_and_reddens_only_the_unit_count);
+}

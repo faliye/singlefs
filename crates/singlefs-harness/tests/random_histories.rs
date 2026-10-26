@@ -250,6 +250,15 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
                     "快档那一组比重不抽 {kind:?}"
                 );
             }
+            // 按偏移写只进它自己那一组比重（`GenerationWeights::PARTIAL_WRITES`），快档那一组不抽；跑到了没有在那一组的
+            // 取样点那条用例里核（`partial_write_against_the_model.rs`）。
+            HistoryOperationKind::WriteAtOffset => {
+                assert_eq!(
+                    (operation.applied, operation.refused, operation.not_applicable),
+                    (0, 0, 0),
+                    "快档那一组比重不抽 {kind:?}"
+                );
+            }
             HistoryOperationKind::PublishFirstFile
             | HistoryOperationKind::PublishOverwrite
             | HistoryOperationKind::PublishWithoutUnits

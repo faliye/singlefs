@@ -5,8 +5,10 @@
 //! 单元两道校验和上 GPU 与 CPU 对拍（`gpu_unit_checks`，特性 `gpu`）、崩溃放量取卡与 GPU 用例的卡池共用的显卡配置读法（`gpu_card_configuration`，`gpu` 与 `verdict-store` 开一个就编）、GPU 判器的判法（`crash_judge_gpu`）与它的派活（`crash_judge_dispatch`，回读归位那一段在 GPU 判器的入口集合里）、
 //! 崩溃判定库（`crash_library`：几类测试各一份长期存放、按键复用的库，录入段与判段只经它交接；verdict-store 因此是默认特性）、
 //! 崩溃点重放枚举用例的两段入口（`crash_state_enumeration`：录入段写流进库，判段读回、按块上卡或 CPU 判、存结论、复用，崩溃点重放计数从库里重建）、
+//! 崩溃点重放各条流的来历表与按来历统一挂的观察者（`crash_point_replay_provenance`：两槽全废盘面观察者、并集对走读观察者，跑流的两处按表挂）、
 //! 两个判器共用、不挂特性的结论写法（`crash_judge_conclusions`：红项编码、恢复字与失败点码表、计数向量）；
 //! 判法单元的入口登记表（`judging_units_entries`：构建脚本按它逐组算判器键写进 `OUT_DIR`，`crash_identity` 读回）。
+//! 崩溃全量的积压登记表（`crash_full_run_backlog`：里程碑四出口 10，本包根上那一份表的读、写、核与取件；读写表的小程序在 `src/bin/crash_full_run_backlog.rs`）。
 //! 随机历史两项的给定状态表、它的判器 trait 与 CPU 判法（`crash_given_states`，不引随机历史：流水线引它，崩溃枚举用例的判法闭包里因此没有崩溃注入；崩溃注入照旧转出）。
 //! 脚手架（内存池、录制器、理想模型、随机历史）在 `singlefs_harness`；池级 checker 判决器在 `singlefs_checker`。
 #![forbid(unsafe_code)]
@@ -20,6 +22,7 @@ pub mod crash;
 #[cfg(feature = "verdict-store")]
 pub mod crash_amplification;
 pub mod crash_facts;
+pub mod crash_full_run_backlog;
 pub mod crash_given_states;
 pub mod crash_identity;
 pub mod crash_injection;
@@ -31,6 +34,8 @@ pub mod crash_judge_gpu;
 pub mod crash_judge_tables;
 pub mod crash_library;
 pub mod crash_point_replay_progress;
+#[cfg(feature = "verdict-store")]
+pub mod crash_point_replay_provenance;
 pub mod crash_state_enumeration;
 #[cfg(feature = "gpu")]
 pub mod crash_verify_gpu;

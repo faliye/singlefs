@@ -167,6 +167,9 @@ pub enum RefusalForm {
     TargetTripleUnrecognized,
     /// 闭包点名的外部 crate 在 `Cargo.lock` 里找不到它解析到的那一个包。
     LockDependencyUnresolved,
+    /// 产品行为判定的视图里，这份文件有一块 `verus!` 交给 `verus_syn` 解不开：规格与证明块剥不了，那份文件原样留着、链接到它的闭包拒算
+    /// （`verus_ghost_code`）。形式化判定的视图不剥，不记这一条。
+    VerusGhostCodeUnparsed,
 }
 
 impl RefusalForm {
@@ -194,6 +197,7 @@ impl RefusalForm {
             RefusalForm::WgslUnrecognizedItemStart => "wgsl-unrecognized-item-start",
             RefusalForm::TargetTripleUnrecognized => "target-triple-unrecognized",
             RefusalForm::LockDependencyUnresolved => "lock-dependency-unresolved",
+            RefusalForm::VerusGhostCodeUnparsed => "verus-ghost-code-unparsed",
         }
     }
 }

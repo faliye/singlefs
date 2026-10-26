@@ -113,12 +113,12 @@ const UNIT_CLASS_INDEX_NODE: u8 = 2;
 const UNIT_CLASS_PACKED: u8 = 3;
 
 /// journal 记录（D23（journal 的角色与格式） 已定项 4 / 已定项 17）：点名项数 4 在 12、计数器 6 在 20、
-/// 自证校验和 32 在 46（罩整条 4096）、载荷校验和 4 在 95（罩头之后的点名项）、头 487、点名项 56（两条位置条目在前）。
+/// 自证校验和 32 在 46（罩整条 4096）、载荷校验和 4 在 95（罩头之后的点名项）、头 496、点名项 56（两条位置条目在前）。
 const JOURNAL_RECORD_NAMED_COUNT_OFFSET: usize = 12;
 const JOURNAL_RECORD_COUNTER_OFFSET: usize = 20;
 const JOURNAL_RECORD_HEADER_CHECKSUM_OFFSET: usize = 46;
 const JOURNAL_RECORD_PAYLOAD_CHECKSUM_OFFSET: usize = 95;
-const JOURNAL_RECORD_HEADER_BYTES: usize = 487;
+const JOURNAL_RECORD_HEADER_BYTES: usize = 496;
 const JOURNAL_NAMED_ENTRY_BYTES: usize = 56;
 const JOURNAL_RECORD_BYTES: usize = 4096;
 
@@ -704,17 +704,22 @@ fn an_older_version_naming_again_a_placement_inside_a_subtree_it_shares_with_a_n
     write_bytes(&mut image, root_device, root_offset, &root_slot);
     let red = violations(&image);
     // 另红两条，都是改了 F 那条根的实例表指针连带的：F 那条记录新根段里的实例表指针没跟着改（I-8.10 从第 8 批起比七段，有它）；
-    // F 不再引用实例表单元而 N 照旧引用，那个单元在 N 里像是新出现、诞生代号 0 不大于 F 的 txg（I-3.5 的出现规则）。
+    // F 不再引用实例表单元而 N 照旧引用，那个单元在 N 里像是新出现、诞生代号 0 不大于 F 的 txg（I-3.5 的出现规则）；
+    // 实例表指针要码 3，D 头里是码 1（I-1.6 的类那一半）。
     assert_eq!(
         violated_names(&red),
-        ["I-5.1", "I-8.10", "I-3.5"],
-        "F 这一版里 D 被引用两次，红 I-5.1（另加改实例表指针连带的 I-8.10 与 I-3.5）：{red:?}"
+        ["I-1.6", "I-5.1", "I-8.10", "I-3.5"],
+        "F 这一版里 D 被引用两次，红 I-5.1（另加改实例表指针连带的 I-1.6、I-8.10 与 I-3.5）：{red:?}"
     );
+    let disjoint_ranges_detail = &red
+        .iter()
+        .find(|(name, _)| *name == "I-5.1")
+        .expect("上一条断言钉了 I-5.1 判红")
+        .1;
     assert!(
-        red[0].1.contains("被同一版引用了两次")
-            && red[0].1.contains(&format!("槽 {}", data_unit.slot.0)),
-        "说明要点出 D 那一槽被同一版引用了两次：{}",
-        red[0].1
+        disjoint_ranges_detail.contains("被同一版引用了两次")
+            && disjoint_ranges_detail.contains(&format!("槽 {}", data_unit.slot.0)),
+        "说明要点出 D 那一槽被同一版引用了两次：{disjoint_ranges_detail}"
     );
 }
 
@@ -940,11 +945,13 @@ fn image_with_two_leaf_containers(pool: &TreeSplitPool, second_container: u64) -
     entry_to_the_second[pointer_birth_sequence..pointer_birth_sequence + 4]
         .copy_from_slice(&SECOND_LEAF_CONTAINER_BIRTH_SEQUENCE.to_le_bytes());
     let entries = vec![root_header.entries[0].clone(), entry_to_the_second];
+    // 根头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2，C478）：[C1 的最小记录号 1, C2 的最大记录号 30]，
+    // 不是首末两条条目的分隔 key [1, 15]。
     let grown_root = rebuilt_index_node(
         &root_header,
         root_header.level,
-        &entries[0][..8],
-        &entries[1][..8],
+        &1u64.to_le_bytes(),
+        &30u64.to_le_bytes(),
         root_header.birth_sequence,
         &entries,
     );
@@ -1194,7 +1201,9 @@ fn a_released_record_in_the_allocation_record_tree_the_root_record_holds_is_judg
 }
 
 /// 同一份写行之后的镜像：根记录直接持有的那棵分配记录树里，盘 0 那片叶上 mkfs 树表那条记录（槽 50178、跨 1）的跨度改宽到罩住下一条记录的起点槽
-/// ⇒ 只红 I-5.4（分配记录罩住的槽互不相交）。改之前 checker 只读树表里种类 3 那一棵，这一版上报不适用。
+/// ⇒ 红 I-5.4（分配记录罩住的槽互不相交）。改之前 checker 只读树表里种类 3 那一棵，这一版上报不适用。
+/// 那条记录未释放、罩住的 mkfs 树表是码 2 一槽，改宽之后同时是 I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数，
+/// C411（分配记录的跨度段与单元类别不符没检查）） 的违例：红的恰是这两条。
 #[test]
 fn overlapping_records_in_the_allocation_record_tree_the_root_record_holds_redden_only_the_disjointness_invariant(
 ) {
@@ -1229,8 +1238,11 @@ fn overlapping_records_in_the_allocation_record_tree_the_root_record_holds_redde
     let red = violations(&image);
     assert_eq!(
         violated_names(&red),
-        ["I-5.4"],
-        "两条记录罩住同一个槽，只该红 I-5.4：{red:?}"
+        [
+            "I-5.4",
+            singlefs_checker::image::ALLOCATION_RECORD_SPAN_EQUALS_THE_SLOTS_OF_THE_CLASS_OF_THE_UNIT_IT_COVERS
+        ],
+        "两条记录罩住同一个槽，红 I-5.4 与改宽那条记录自己的 I-3.18：{red:?}"
     );
 }
 

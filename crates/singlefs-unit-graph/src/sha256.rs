@@ -1,5 +1,5 @@
 //! SHA-256（FIPS 180-4）流式实现：单元指纹与复用键要能在仓外用 `sha256sum` 独立复算，所以必须是标准 SHA-256。
-//! 本 crate 只用 std、不依赖工作区任何 crate，算法照 `crates/singlefs-harness/src/sha256.rs` 另写一份流式的：
+//! 本 crate 不依赖工作区任何 crate（外部包只有剥 Verus 规格与证明块用的 `verus_syn` 那一套），算法照 `crates/singlefs-harness/src/sha256.rs` 另写一份流式的：
 //! 指纹按词法单元一段一段喂进来，不先拼出整串。
 //!
 //! 名字里的 `sha256` 是 FIPS 180-4 给这个算法起的名字，不是我们的缩写。

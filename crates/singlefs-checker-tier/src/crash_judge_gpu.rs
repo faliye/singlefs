@@ -1,5 +1,6 @@
 //! GPU 判器（用户 2026-09-28 定「GPU 判器现在实现、整套做完」）：把 `crate::crash_judge_tables` 摊出来的表整份上卡，
-//! 每个调用判一个崩溃状态——恢复（看 journal 与不看 journal 各一遍：择系统配置、择根、扫环重放、走到第一个文件）、
+//! 每个调用判一个崩溃状态——恢复（看 journal 与不看 journal 各一遍：择系统配置、择根、扫环重放、走到第一个文件；看 journal 那一遍判退看冷走读、
+//! 只读挂载的打开、可写挂载的建上一版连同实例表三样读者的并集，C755）、
 //! 七类 oracle、记录核对器两条判据，判法与 CPU 判器（`crate::crash::judge_crash_image`）逐条相同；GPU 与 CPU 逐状态比是它的判别力自证。
 //! 内核分六份源码：`crash_judge_common.wgsl`（各内核共用的解析与查表）、`crash_judge_recovery.wgsl`（恢复、oracle、记录核对器）、
 //! `crash_judge_checker_common.wgsl`（池级 checker 两个内核共用的读法与交接段）、`crash_judge_checker.wgsl`（走读内核：第一、二批不变量，
@@ -14,13 +15,16 @@
 //! 一个状态的结论 [`VERDICT_WORDS`] 个 u32：第 0 字是红位（位 0..6 看 journal 那一遍 oracle 的七类、位 8..14 不看那一遍、
 //! 位 16 根在而记录都不在、位 17 恢复自称的状态少单元、位 31 判不了）；第 1 字判不了的原因（判得了时低 16 位是看 journal 那一遍
 //! 重放停在哪一道、高 16 位是记录数，诊断用）；第 2 / 3 字看 journal 那一遍落到的
-//! 实例代号与 checkpoint_txg 低 32 位；第 4 / 5 字它的走读结局与失败点（失败点码是 [`gpu_failure_point_code`] 那一张表）；第 6 / 7 字不看那一遍的结局与失败点；
+//! 实例代号与 checkpoint_txg 低 32 位（高 32 位与落没落到根的标记在第 26 字起那几个字）；第 4 / 5 字它的走读结局与失败点（失败点码是 [`gpu_failure_point_code`] 那一张表）；第 6 / 7 字不看那一遍的结局与失败点；
 //! 第 8..12 字池级 checker 的违例位（[`POOL_CHECKER_VIOLATED_WORDS`] 个字，128 位）；第 12 字池级 checker 走到第几步；第 13 字它判不了的原因；
 //! 第 14 / 15 字不看 journal 那一遍落到的实例代号与 checkpoint_txg 低 32 位（判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md`
 //! 第二节 L1-6）；第 16..20 字池级 checker 逐条不变量的「判到」位（成立或违例，与 CPU 计数里「评估过」同一口径；同一判决 L1-4）；
 //! 第 20..24 字池级 checker 判 I-7.4 时违例细节里点名的那一条被抛弃的根（点没点名、实例代号、checkpoint_txg 低 / 高 32 位，
 //! [`ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD`]）；第 24 字扫描重建那一截判 I-1.13 的结局（[`SCAN_REBUILD_OUTCOME_WORD`]：成立、违例、
-//! 报不适用的哪一种理由，[`SCAN_REBUILD_OUTCOMES`]）。
+//! 报不适用的哪一种理由，[`SCAN_REBUILD_OUTCOMES`]）；第 25 字逐盘自证过的系统配置槽数（[`SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD`]，
+//! 两槽全废盘面观察者在判段对基镜像比的那一样）；第 26..30 字两遍落到的根另两个字：看 journal 那一遍落没落到根的标记与 checkpoint_txg 高 32 位、
+//! 不看那一遍的同两字（[`CONSULTED_PASS_LANDED_MARKER_WORD`]；用户 2026-10-24 定 checkpoint_txg「存完整 u64」，`records/2026-10-24-singlefs-checker-tier-审计复核.md`
+//! 的 T01；第 2 / 3、14 / 15 字没落到根时照旧是 `u32::MAX`，落没落到看标记那一字）。
 //! 这几个字号、打包表的表号与段表宽、段的展开方式码、失败点码、扫描重建的结局码在内核里的常量由 [`kernel_prelude_wgsl_constants`] 从 Rust 生成、
 //! 接在每个内核源码前面，不在 WGSL 里另写一份。对拍比的是 [`CrossCheckWords`]：GPU 与 CPU 两侧各由一个构造函数换出来，
 //! 经 [`cross_check_words_agree_in_the_cross_check`] 逐字段比（内核不置位、对拍不比的表 [`POOL_CHECKER_INVARIANT_INDEXES_LEFT_UNSET_BY_THE_GPU_KERNELS`]
@@ -67,7 +71,7 @@ pub use crate::crash_judge_conclusions::{
     pool_checker_violated_and_judged_bits, verdict_bits, CrossCheckWords, LandedRootWords,
     GPU_FAILURE_POINTS, GPU_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY,
     GPU_FAILURE_POINT_DEVICE_ENDS_BEFORE_THE_UNIT_AREA_START,
-    GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE,
+    GPU_FAILURE_POINT_ENTRY_WIDTH_DIFFERS_FROM_ITS_FIELD_TABLE,
     GPU_FAILURE_POINT_INODE_NUMBER_WATERMARK_ROW_MISSING_FROM_THE_ACCOUNTING_TREE,
     GPU_FAILURE_POINT_INVARIANT_VIOLATED, GPU_FAILURE_POINT_MAPPING_MISS,
     GPU_FAILURE_POINT_MAPPING_STILL_UNREADABLE, GPU_FAILURE_POINT_NONE,
@@ -131,7 +135,8 @@ pub const POOL_CHECKER_REACHED_WORD: usize =
     POOL_CHECKER_VIOLATED_FIRST_WORD + POOL_CHECKER_VIOLATED_WORDS;
 /// 池级 checker 内核判不了的原因。
 pub const POOL_CHECKER_UNDECIDABLE_WORD: usize = POOL_CHECKER_REACHED_WORD + 1;
-/// 看 journal 那一遍落到的根（实例代号、checkpoint_txg 低 32 位；没落到根时两个都是 `u32::MAX`），走读结局与失败点。
+/// 看 journal 那一遍落到的根（实例代号、checkpoint_txg 低 32 位；没落到根时两个都是 `u32::MAX`；落没落到根的标记与高 32 位在
+/// [`CONSULTED_PASS_LANDED_MARKER_WORD`] 那两个字），走读结局与失败点。
 pub const CONSULTED_PASS_LANDED_INSTANCE_WORD: usize = 2;
 pub const CONSULTED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD: usize = 3;
 pub const CONSULTED_PASS_OUTCOME_WORD: usize = 4;
@@ -139,7 +144,8 @@ pub const CONSULTED_PASS_FAILURE_POINT_WORD: usize = 5;
 /// 不看 journal 那一遍的走读结局与失败点。
 pub const IGNORED_PASS_OUTCOME_WORD: usize = 6;
 pub const IGNORED_PASS_FAILURE_POINT_WORD: usize = 7;
-/// 不看 journal 那一遍落到的根（同看 journal 那一遍的两个字）：恢复内核写，接在池级 checker 那几个字之后。
+/// 不看 journal 那一遍落到的根（同看 journal 那一遍的两个字；标记与高 32 位在 [`IGNORED_PASS_LANDED_MARKER_WORD`] 那两个字）：
+/// 恢复内核写，接在池级 checker 那几个字之后。
 pub const IGNORED_PASS_LANDED_INSTANCE_WORD: usize = POOL_CHECKER_UNDECIDABLE_WORD + 1;
 pub const IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD: usize =
     IGNORED_PASS_LANDED_INSTANCE_WORD + 1;
@@ -169,9 +175,29 @@ pub const ABANDONED_ROOT_NAMED: u32 = 1;
 /// 别的状态写没走到；交接段有效时扫描重建那一截再写它判成的那一种（池级 checker 那几处早退之后不走扫描重建，交接段那时无效）。
 pub const SCAN_REBUILD_OUTCOME_WORD: usize =
     ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD + 1;
+/// 逐盘自证过的系统配置槽数（两槽全废盘面观察者挪进判段要的那一样，用户 2026-10-22 定「你做你的 GPU版让GPU去做」）：走读内核读完每盘两槽之后写，
+/// 盘按判表里池里的盘的次序（`crate::crash_judge_tables::JudgeTables` 的 `devices`），第 d 块盘占 [`SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE`] × d 起
+/// 那几位，值是 0、1、2：magic 与整槽校验和都对的槽数，不分 fsid，自证过而不可择的槽、带这一版读者不收之值的槽也算——同池级 checker 的逐盘数
+/// （`singlefs_checker::image::system_configuration_redundancy_report`，CPU 参照 `crate::crash_judge_conclusions::self_verified_system_configuration_slots_of_each_device`）。
+/// 盘数越过内核上限（判不了）时写 0。
+pub const SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD: usize =
+    SCAN_REBUILD_OUTCOME_WORD + 1;
+/// 那一字里一块盘占几位（0、1、2 三个值）。
+pub const SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE: u32 = 2;
+/// 两遍恢复落到的根的另两个字（`crate::crash_judge_conclusions::LandedRootWords`；用户 2026-10-24 定 checkpoint_txg「存完整 u64」，审计复核 T01）：
+/// 落没落到根的标记（[`LandedRootWords::LANDED_ON_A_ROOT`] 或 [`LandedRootWords::LANDED_ON_NO_ROOT`]，内核里是 `PASS_LANDED_ON_A_ROOT`、
+/// `PASS_LANDED_ON_NO_ROOT`）与 checkpoint_txg 高 32 位（没落到根时是 `u32::MAX`）。恢复内核写，接在结论末尾：池级 checker 那几个内核
+/// 写的字号一个都不挪。
+pub const CONSULTED_PASS_LANDED_MARKER_WORD: usize =
+    SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD + 1;
+pub const CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD: usize =
+    CONSULTED_PASS_LANDED_MARKER_WORD + 1;
+pub const IGNORED_PASS_LANDED_MARKER_WORD: usize =
+    CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD + 1;
+pub const IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD: usize = IGNORED_PASS_LANDED_MARKER_WORD + 1;
 /// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因，不看 journal 那一遍落到的根，判到位，
-/// I-7.4 点名的被抛弃根，I-1.13 的结局。
-pub const VERDICT_WORDS: usize = SCAN_REBUILD_OUTCOME_WORD + 1;
+/// I-7.4 点名的被抛弃根，I-1.13 的结局，逐盘自证过的系统配置槽数，两遍落到的根的标记与 checkpoint_txg 高 32 位。
+pub const VERDICT_WORDS: usize = IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD + 1;
 
 // 违例位装得下池级 checker 的每一条不变量；读出来的是一个 u128，字数再多就装不进。
 const _: () = assert!(
@@ -183,7 +209,7 @@ const _: () = assert!(
     "违例位读成一个 u128"
 );
 
-/// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：全部 103 条——三批 49 条，加里程碑三二·1 那一批 16 条
+/// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：全部 109 条——三批 49 条，加里程碑三二·1 那一批 16 条
 /// （判决 `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 11 行），下标 65 的 I-3.5（引用区间的精确性，
 /// 走读内核在回退候选集的版本都走完之后逐对判），再加 C673（三 oracle 合谋测试的补 oracle 改法没做）⑤ ⑥ 那两条
 /// （下标 66 是 I-9.27，走读内核挨着 I-9.16 按表判；下标 67 是 I-5.5，扫描内核每一版重读树表与 extent 树判），
@@ -235,7 +261,7 @@ const _: () = assert!(
 /// 数进映射条目数；扫描内核主入口在记账那一判之后判下标 97 的 I-3.16（占着的槽取 I-3.1 那一份并集：全部走过的版本的引用、第一遍隔离豁免的组、
 /// F 之下仍在 defer 的槽，排一次序逐盘按序走一遍，`judge_fragmentation_and_empty_segment_statistics`）；引用与快照那一截之后在版本清单每一版上
 /// 判 73 的 I-4.4 与 96 的 I-5.6（`judge_compaction_intents_of_the_versions`）、95 的 I-3.15（`judge_unreleased_allocation_records_against_the_central_mapping`，
-/// 隔离判据接着 I-3.1 那两遍的位置项校验和）、98 的 I-1.14（`judge_unit_bytes_of_each_mapping_key_across_the_versions`）。表越过上限的判不了
+/// 隔离的单元只认记号，同 I-3.1 那两遍）、98 的 I-1.14（`judge_unit_bytes_of_each_mapping_key_across_the_versions`）。表越过上限的判不了
 /// （扫描内核站点 100–104）。
 /// 下标 99 的 I-4.10（截断中间态有账）与 100 的 I-9.38（数据单元声明长度对 size）是截断那一批新立的两条（判决
 /// `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K7 T-2、T-4，T-2 只判一个方向见第六节 S2），连同下标 72 的 I-4.6 改成每条记录都判
@@ -253,13 +279,30 @@ const _: () = assert!(
 /// 每一版的每一棵 extent 树判（深度优先走上段、按后序记子树里有没有落在自己那片叶区间里的条目，不把节点位置与号抄进表；只有改过字节的镜像才
 /// 逐个再走上段找罩着那个节点的号、找那个号的那片叶），置位、对拍逐位比——两路逐位相同照用户 2026-10-19 定的双机导入冲突岔路的同一口径，
 /// 不进内核不置位的表。
+/// 下标 103 的 I-3.17（隔离记号与引用相符，D19（块指针的结构与宽度预算） 已定项 5「新加判据『记号与引用相符』」，用户 2026-10-22 定）：
+/// 扫描内核记账那一判两遍隔离豁免之后照 `singlefs_checker::walk` 的 `judge_quarantine_marks_against_the_references` 在最新根的分配记录树上判三句
+/// （树表里种类 3 的每一棵合成一张表，第三句按单元归组时分落几棵树的记录也归进一组）、置位，对拍逐位比；同一批 I-3.1、I-3.11、I-3.15 的隔离豁免改成只认记号（分配记录那一行第八个字的最高位记跨度段 0x4000）。
+/// 下标 104、105 的 I-7.18（根记录的回收门槛等于现算的门槛）与 I-7.19（钉着的槽不住本实例写的根）是钉也落盘那一批新立的两条（C773（读坏与全零根槽的
+/// 回收门槛钉只在内存里），用户 2026-10-20 定）：走读内核走完最新根之后照 `singlefs_checker::walk` 的
+/// `judge_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_newest_root` 判（建账的发布由走最新根那一遍记下的记账树根指针出生 txg 认），
+/// 置位、对拍逐位比；同一批 I-3.1 并「钉带出来的那一截」由扫描内核的 `c_deferred_below_the_floor` 收（`released_slots_the_pin_kept_in_defer`），
+/// 要排除的被抛弃根引用着的槽由走读内核在被抛弃根那一阶段记进草稿区末尾那一张（站点 117），扫描内核那两张表满了判不了（站点 115、116）。
+/// 下标 106 的 I-1.5（系统配置记管道身份，C868）与 107 的 I-3.18（分配记录的跨度等于它罩住的单元那一类的槽数，C411）是里程碑三收尾补的两条：
+/// 走读内核择系统配置时逐盘照 `singlefs_checker::walk` 择系统配置那一段判 I-1.5（择到的那一槽实现标识 16 字节不全零，槽的字节就在判表里、
+/// 不另带字段）；引用与快照那一截在 I-3.15 那一份版本清单上照 `judge_allocation_record_spans_against_the_classes_of_the_units_they_cover`
+/// 判 I-3.18（只要那一版的分配记录读全、不要映射读全）。同一批 I-8.10 往非末条扩（C738）由走读内核在同一次发布那一组里逐条比新根段，不加下标。
+/// 都置位、对拍逐位比。
+/// 下标 108 的 I-8.13（自证过的 journal 记录落在它计数器该落的环槽：D23（journal 的角色与格式） 已定项 18「记录 n 落在环内偏移
+/// (计数器 − 1) mod 槽数 × 4096」的可执行形式，欠账 C897）：走读内核逐盘扫环（`crash_judge_checker.wgsl` 的 `checker_scan_journal_of_device`）
+/// 时每条自证过的记录判一次，判在同键先到先留之前（同一块盘上撞键时被挤掉的那一条也判），计数器 0 没有该落的槽、判红；置位、对拍逐位比。
+/// 同一批逐盘记录表的先到先留只在恢复读者读得出的记录之间比（`checker_insert_record`），不加下标。
 /// 用户 2026-10-04 定「改回要求全覆盖」：没有「内核还没判」那一张表。
 pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &[
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
     26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
     50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
     74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97,
-    98, 99, 100, 101, 102,
+    98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108,
 ];
 
 /// 内核源码里写死下标的那几条（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_4_4`、`INVARIANT_I_3_15`、`INVARIANT_I_5_6`、`INVARIANT_I_3_16`、
@@ -354,9 +397,59 @@ pub const KERNEL_INVARIANT_INDEX_OF_THE_UPPER_SHAPE_JUDGE: [(&str, usize); 1] = 
     102,
 )];
 
-// 里程碑四自建 GC 那几条、截断那一批那几条、扫描重建那一条与上段规范形那一条。
+/// 隔离记号那一条在内核里写死下标（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_3_17`）：同
+/// [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了、或它登记进内核不置位的表，这里编译不过。
+pub const KERNEL_INVARIANT_INDEX_OF_THE_QUARANTINE_MARK_JUDGE: [(&str, usize); 1] = [(
+    singlefs_checker::image::QUARANTINE_MARK_AGREES_WITH_THE_REFERENCES,
+    103,
+)];
+
+/// 钉也落盘那一批在内核里写死下标的两条（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_7_18`、`INVARIANT_I_7_19`，C773）：同
+/// [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了、或它们登记进内核不置位的表，这里编译不过。
+pub const KERNEL_INVARIANT_INDEXES_OF_THE_RECLAIM_THRESHOLD_AND_PINNED_RING_SLOT_JUDGES: [(
+    &str,
+    usize,
+); 2] = [
+    (
+        singlefs_checker::image::ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
+        104,
+    ),
+    (
+        singlefs_checker::image::PINNED_RING_SLOT_HOLDS_NO_ROOT_OF_THE_SAME_INSTANCE,
+        105,
+    ),
+];
+
+/// 里程碑三收尾补的那两条在内核里写死下标（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_1_5`、`INVARIANT_I_3_18`，C868、C411）：同
+/// [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了、或它们登记进内核不置位的表，这里编译不过。
+pub const KERNEL_INVARIANT_INDEXES_OF_THE_WRITER_IDENTITY_AND_ALLOCATION_RECORD_SPAN_JUDGES: [(
+    &str,
+    usize,
+); 2] = [
+    (
+        singlefs_checker::image::SYSTEM_CONFIGURATION_RECORDS_THE_WRITER_IDENTITY,
+        106,
+    ),
+    (
+        singlefs_checker::image::ALLOCATION_RECORD_SPAN_EQUALS_THE_SLOTS_OF_THE_CLASS_OF_THE_UNIT_IT_COVERS,
+        107,
+    ),
+];
+
+/// journal 记录落槽那一条在内核里写死下标（`crash_judge_checker_common.wgsl` 的 `INVARIANT_I_8_13`，C897）：同
+/// [`KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES`]，清单里下标挪了、或它登记进内核不置位的表，这里编译不过。
+pub const KERNEL_INVARIANT_INDEX_OF_THE_JOURNAL_RECORD_RING_SLOT_JUDGE: [(&str, usize); 1] =
+    [("I-8.13", 108)];
+
+// 里程碑四自建 GC 那几条、截断那一批那几条、扫描重建那一条、上段规范形那一条、隔离记号那一条、钉也落盘那两条、里程碑三收尾那两条与 journal 记录落槽那一条。
 const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
     &KERNEL_INVARIANT_INDEXES_OF_THE_COMPACTION_AND_RELOCATION_JUDGES,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEX_OF_THE_QUARANTINE_MARK_JUDGE,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEXES_OF_THE_RECLAIM_THRESHOLD_AND_PINNED_RING_SLOT_JUDGES,
 );
 const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
     &KERNEL_INVARIANT_INDEX_OF_THE_UPPER_SHAPE_JUDGE,
@@ -366,6 +459,12 @@ const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_b
 );
 const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
     &KERNEL_INVARIANT_INDEXES_OF_THE_TRUNCATION_JUDGES,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEXES_OF_THE_WRITER_IDENTITY_AND_ALLOCATION_RECORD_SPAN_JUDGES,
+);
+const _: () = assert_kernel_invariant_indexes_name_covered_invariants_compared_bit_by_bit(
+    &KERNEL_INVARIANT_INDEX_OF_THE_JOURNAL_RECORD_RING_SLOT_JUDGE,
 );
 
 // 覆盖表就是池级 checker 的每一条，按下标升序：第 k 项是 k。新立一条不变量而内核没跟上时这里编译不过，不悄悄让 GPU 那一位恒 0。
@@ -455,12 +554,22 @@ pub fn verdict_layout_wgsl_constants() -> String {
          const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD}u;\n\
          const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD}u;\n\
          const SCAN_REBUILD_OUTCOME_WORD: u32 = {SCAN_REBUILD_OUTCOME_WORD}u;\n\
+         const SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD: u32 = {SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD}u;\n\
+         const SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE: u32 = {SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE}u;\n\
+         const CONSULTED_PASS_LANDED_MARKER_WORD: u32 = {CONSULTED_PASS_LANDED_MARKER_WORD}u;\n\
+         const CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD: u32 = {CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD}u;\n\
+         const IGNORED_PASS_LANDED_MARKER_WORD: u32 = {IGNORED_PASS_LANDED_MARKER_WORD}u;\n\
+         const IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD: u32 = {IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD}u;\n\
+         const PASS_LANDED_ON_A_ROOT: u32 = {}u;\n\
+         const PASS_LANDED_ON_NO_ROOT: u32 = {}u;\n\
          const NO_ABANDONED_ROOT_NAMED: u32 = {NO_ABANDONED_ROOT_NAMED}u;\n\
          const ABANDONED_ROOT_NAMED: u32 = {ABANDONED_ROOT_NAMED}u;\n\
          const OUTCOME_NO_FILE: u32 = {RECOVERY_OUTCOME_CODE_NO_FILE}u;\n\
          const OUTCOME_FILE_READ: u32 = {RECOVERY_OUTCOME_CODE_FILE_READ}u;\n\
          const OUTCOME_FAILED: u32 = {RECOVERY_OUTCOME_CODE_FAILED}u;\n\
          const BIT_CLAIMED_VERSION_NOT_LANDED_ON_BY_THE_RECOVERY: u32 = {}u;\n",
+        LandedRootWords::LANDED_ON_A_ROOT,
+        LandedRootWords::LANDED_ON_NO_ROOT,
         verdict_bits::CLAIMED_VERSION_NOT_LANDED_ON_BY_THE_RECOVERY
     )
 }
@@ -555,12 +664,16 @@ pub fn cross_check_words_of_gpu_verdict(words: &[u32]) -> CrossCheckWords {
         red_bits: words[0] & !undecidable_bit,
         pool_checker_violated_bits: pool_checker_violated_bits(words),
         consulted_pass_landed_root: LandedRootWords {
+            landed_marker: words[CONSULTED_PASS_LANDED_MARKER_WORD],
             instance: words[CONSULTED_PASS_LANDED_INSTANCE_WORD],
             checkpoint_txg_low: words[CONSULTED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD],
+            checkpoint_txg_high: words[CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD],
         },
         ignored_pass_landed_root: LandedRootWords {
+            landed_marker: words[IGNORED_PASS_LANDED_MARKER_WORD],
             instance: words[IGNORED_PASS_LANDED_INSTANCE_WORD],
             checkpoint_txg_low: words[IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD],
+            checkpoint_txg_high: words[IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD],
         },
         consulted_pass_outcome: words[CONSULTED_PASS_OUTCOME_WORD],
         ignored_pass_outcome: words[IGNORED_PASS_OUTCOME_WORD],
@@ -685,6 +798,39 @@ pub fn gpu_verdict_items(words: &[u32; VERDICT_WORDS]) -> Option<Vec<String>> {
     Some(items)
 }
 
+/// GPU 一个状态的结论里逐盘自证过的系统配置槽数（[`SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD`]），按 `devices`
+/// （这个状态那张判表的 `devices`，池里的盘的次序）交回 (盘, 槽数)：与 CPU 参照
+/// `crate::crash_judge_conclusions::self_verified_system_configuration_slots_of_each_device` 同一种写法，对拍逐盘比，判段拿它对基镜像比。
+///
+/// # Panics
+/// 盘数多于那一字装得下的（内核里的盘数上限 8 块，每块两位）。
+#[must_use]
+pub fn self_verified_system_configuration_slots_of_each_device_of_the_gpu_verdict(
+    words: &[u32; VERDICT_WORDS],
+    devices: &[u32],
+) -> Vec<(u32, u32)> {
+    let device_mask = (1u32 << SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE) - 1;
+    assert!(
+        devices.len() * usize::try_from(SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE).expect("2")
+            <= 32,
+        "逐盘槽数那一字装 16 块盘：判表里 {} 块",
+        devices.len()
+    );
+    devices
+        .iter()
+        .enumerate()
+        .map(|(device_position, device)| {
+            let shift = SELF_VERIFIED_SLOT_COUNT_BITS_OF_A_DEVICE
+                * u32::try_from(device_position).expect("盘的位置装得进 u32");
+            (
+                *device,
+                (words[SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD] >> shift)
+                    & device_mask,
+            )
+        })
+        .collect()
+}
+
 /// GPU 一个状态的恢复字（与 CPU 那一份 `CrashStateJudgement::recovery_words` 同一种八个字，对照逐字比）：结论字先换成对拍比的那几个字
 /// （[`cross_check_words_of_gpu_verdict`]），再取那八个。
 ///
@@ -695,10 +841,26 @@ pub fn recovery_words_of_the_gpu_verdict(words: &[u32]) -> RecoveryWordsOfState 
     recovery_words_of_the_cross_check_words(&cross_check_words_of_gpu_verdict(words))
 }
 
-/// GPU 一个状态的结论字里与 `crate::crash_amplification::recovery_words_of`（CPU 两遍恢复的四个数）同口径的四个字（第 2、3、4、6 字）。
+/// GPU 一个状态的结论字换成恢复摘要（`crate::crash_amplification::RecoveryRootAndOutcomesOfState`，与 CPU 一侧
+/// `crate::crash_amplification::recovery_words_of` 同一个类型）：看 journal 那一遍落到的根取标记、实例代号、checkpoint_txg 低 32 位与高 32 位那四个字
+/// （高 32 位与标记是接在结论末尾的那两个字），两遍的走读结局码各取各的字。
 #[must_use]
-pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
-    [words[2], words[3], words[4], words[6]]
+pub fn gpu_recovery_words(
+    words: &[u32; VERDICT_WORDS],
+) -> crate::crash_amplification::RecoveryRootAndOutcomesOfState {
+    let consulted_pass_landed_root = LandedRootWords {
+        landed_marker: words[CONSULTED_PASS_LANDED_MARKER_WORD],
+        instance: words[CONSULTED_PASS_LANDED_INSTANCE_WORD],
+        checkpoint_txg_low: words[CONSULTED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD],
+        checkpoint_txg_high: words[CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD],
+    };
+    let consulted_pass_outcome = words[CONSULTED_PASS_OUTCOME_WORD];
+    let ignored_pass_outcome = words[IGNORED_PASS_OUTCOME_WORD];
+    crate::crash_amplification::RecoveryRootAndOutcomesOfState {
+        consulted_pass_landed_root,
+        consulted_pass_outcome,
+        ignored_pass_outcome,
+    }
 }
 
 /// 每个状态的草稿区几个 u32（checker 共用那一半里 `SCRATCH_END`：共用的 `SCRATCH_WORDS_REQUIRED`、走读与扫描的集合、两个内核的交接段、
@@ -749,8 +911,11 @@ pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
 /// 里程碑四自建 GC 新判的那几条（I-3.16、I-4.4、I-5.6、I-3.15、I-1.14，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1、G3）
 /// 不另加：扫描内核主入口 I-3.16 的占着的槽区间表，与引用与快照那一截之后 I-3.15 的落点表、logged_ops 叶条目、读树的栈、I-1.14 跨版本那张 key 表，
 /// 都借引用与快照那一截的单元表起到草稿区末尾那一段（117 312 字；两处各自从头写、用完不再读，`crash_judge_checker_scan.wgsl` 的 `C_OCCUPIED` 与
-/// `G_PLACEMENTS` 那几处的 `const_assert` 守着装得下）；I-3.15 接着 I-3.1 那两遍隔离豁免用的「补没补过根环里没走过的根」那一个字记在原处空着的
-/// 185 056（`C_HARVESTED_BY_THE_ACCOUNTING_QUARANTINE`）。
+/// `G_PLACEMENTS` 那几处的 `const_assert` 守着装得下）。
+///
+/// 再之后池级 checker 只认隔离记号、不读副本（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-10-22 定）：走读内核不再收位置项校验和，
+/// 主走读与候选集之外的根那两张表（152 160 起 32 768 字）、它们的桶表与交接段里的两个条数都删了，那一段空着、其后各表的偏移不挪；
+/// 原来记在 185 056 的「补没补过根环里没走过的根」那一个字同样不记了。草稿区总字数不变。
 ///
 /// 再之后截断第二轮的 I-9.39（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R6）要每条记录的截断字段：扫描内核一版的 inode 记录
 /// `D_INODE_RECORDS` 一行从 7 字加到 11 字（多 T、N_w 两段各 2 字），16 384 条多 4 × 16 384 = 65 536 字，其后各表照偏移链往后挪：
@@ -765,7 +930,29 @@ pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
 /// 长文件旁边那条流一次派活撞驱动的上下文切换时限；`crash_judge_checker_common.wgsl` 定义 `W_MERGE_EXPANDED_BUCKETS` 那一处）：
 /// 展开过的单元的桶表 16 384 字，挂父单元那张表两套上下文各一份桶表 8192 字、下一行 4096 字、最后一行 4096 字，
 /// 1 612 286 + 16 384 + 2 × 16 384 = 1 661 438（每个状态 6 645 752 字节）。
-pub const SCRATCH_WORDS: usize = 1_661_438;
+///
+/// 再之后钉也落盘那一批（C773）：走读内核在被抛弃根那一阶段记下的「被抛弃根引用着、候选版本没走到的槽」（扫描内核 I-3.1 钉带出来的那一截按它排除），
+/// 条数 1 字加 3 字一条 × 4096 = 12 289 字，1 661 438 + 12 289 = 1 673 727（每个状态 6 694 908 字节）。
+///
+/// 再之后走读内核 I-3.5 每一版引用的落点那张表（`C_APPEARANCE_MAX_VERSION_PLACEMENTS`，站点 44）从 8192 个字抬到结构上界：版本上限 64 乘
+/// 每版落点上限 2048 = 131 072 个字（整理夹着回退那一组比重交判的 17 张镜像里两张各版合计 19 916、18 664 个，在站点 44 判不了）：挪到末尾
+/// （原处 8192 个字空着），1 673 727 + 131 072 = 1 804 799（每个状态 7 219 196 字节）。同一批扫描内核 I-1.8 的扫描项 `C_MAX_SCANNED`
+/// 从 2048 抬到 4096（那两张 2148、3030 项，在站点 36 判不了）：挪进 `C_PICKED` 之后原来空着的那一段，草稿区不涨。
+///
+/// 再之后恢复内核一版的分配记录 `MAX_ALLOCATION_RECORDS` 与扫描内核一条根的分配记录 `C_MAX_ALLOC_RECORDS` 从 4096 抬到 8192（C894：
+/// 整理夹着回退那一组比重交判的 17 张镜像每版至多 4018 条，拉长到 160 步至多 4728 条）。偏移链上跟着长的：恢复内核那张 6 字一条多 24 576 字，
+/// 扫描内核那张 8 字一条多 32 768 字，与它同宽的已释放记录与「哪条候选根引用它」（5 字、2 字一条）多 20 480 + 8192 字、释放代高于 F 的已释放记录
+/// （4 字一条）多 16 384 字、I-3.10 的去重表（5 字一条）多 20 480 字，合 122 880 字；原来借的段装不下的两样另开两段接在末尾
+/// （`crash_judge_checker_common.wgsl` 的 ⑮）：I-5.4 与 I-3.16 排分配记录的次序表 8192 字（原来借 `C_ROW_ORDER` 那 4096 字），
+/// I-3.9、I-3.10 先后借的桶表 16 384 字（原来借 `C_JOURNAL_GROUP_KEYS` 那 8192 字）。
+/// 1 804 799 + 122 880 + 8192 + 16 384 = 1 952 255（每个状态 7 809 020 字节，比上一版多 8.17%；一条草稿缓冲 275 个状态）。
+///
+/// 再之后 journal 记录表 `MAX_RECORDS` 从 2048 抬到 4096（一版分配记录过 8192 的那条流盘 0 上 3749 条记录写，2048 条时每个状态在扫环那一步就判不了）：
+/// 跟着它长的三张挪到末尾（`crash_judge_checker_common.wgsl` 的 ⑯；原处 12 288、8192、8192 个字空着，其后的偏移不挪）：共用那一半的记录表
+/// 6 字一条 × 4096 = 24 576 字、走读内核 I-4.1 重放读的那一份环 `C_REPLAY_RECORDS` 4 字一条 × 4096 = 16 384 字、journal 组键 `C_JOURNAL_GROUP_KEYS`
+/// 4 字一条 × 4096 = 16 384 字。行号次序 `C_ROW_ORDER`（4096 字）装得下 4096 条记录的组，不挪。
+/// 1 952 255 + 24 576 + 16 384 + 16 384 = 2 009 599（每个状态 8 038 396 字节，比上一版多 2.94%；一条草稿缓冲 267 个状态）。
+pub const SCRATCH_WORDS: usize = 2_009_599;
 /// 内核的工作组大小（四个入口都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
 pub const WORKGROUP_SIZE: usize = 64;
 /// 内核的四个绑定（`crash_judge_common.wgsl` 开头）：派活参数、打包的表、结论、草稿区。
@@ -1047,6 +1234,8 @@ mod tests {
                 .chain(super::KERNEL_INVARIANT_INDEXES_OF_THE_TRUNCATION_JUDGES)
                 .chain(super::KERNEL_INVARIANT_INDEX_OF_THE_SCAN_REBUILD_JUDGE)
                 .chain(super::KERNEL_INVARIANT_INDEX_OF_THE_UPPER_SHAPE_JUDGE)
+                .chain(super::KERNEL_INVARIANT_INDEXES_OF_THE_WRITER_IDENTITY_AND_ALLOCATION_RECORD_SPAN_JUDGES)
+                .chain(super::KERNEL_INVARIANT_INDEX_OF_THE_JOURNAL_RECORD_RING_SLOT_JUDGE)
         {
             assert!(
                 constants_checked.iter().any(|checked| checked == invariant),
@@ -1056,7 +1245,7 @@ mod tests {
     }
 
     /// 结论的每个字号互不相同、都在 VERDICT_WORDS 之内；不看 journal 那一遍的根与判到位接在池级 checker 那几个字之后，不挪老字号
-    /// （放量流水线的 gpu_recovery_words 按第 2、3、4、6 字取）。
+    /// （放量流水线的 gpu_recovery_words 按具名字号取；两遍落到的根的标记与 txg 高 32 位接在末尾）。
     #[test]
     fn every_verdict_word_index_is_distinct_and_the_old_ones_stay_put() {
         let mut indexes = vec![
@@ -1077,6 +1266,11 @@ mod tests {
             super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD,
             super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD,
             super::SCAN_REBUILD_OUTCOME_WORD,
+            super::SELF_VERIFIED_SYSTEM_CONFIGURATION_SLOTS_OF_EACH_DEVICE_WORD,
+            super::CONSULTED_PASS_LANDED_MARKER_WORD,
+            super::CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD,
+            super::IGNORED_PASS_LANDED_MARKER_WORD,
+            super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD,
         ];
         indexes.extend(
             POOL_CHECKER_VIOLATED_FIRST_WORD
@@ -1103,7 +1297,7 @@ mod tests {
                 super::IGNORED_PASS_OUTCOME_WORD
             ],
             [2, 3, 4, 6],
-            "放量流水线按第 2、3、4、6 字取恢复字"
+            "老字号不挪：看 journal 那一遍的实例代号、txg 低 32 位与两遍的结局仍在第 2、3、4、6 字"
         );
     }
 
@@ -1337,12 +1531,12 @@ mod tests {
     );
     failure_point_of_a_member!(
         entry_narrower_than_its_field_table_has_its_failure_point,
-        RecoveryFailure::EntryNarrowerThanItsFieldTable {
+        RecoveryFailure::EntryWidthDiffersFromItsFieldTable {
             what: "记账条目",
             entry_bytes: 20,
             field_table_bytes: 34
         },
-        GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE
+        GPU_FAILURE_POINT_ENTRY_WIDTH_DIFFERS_FROM_ITS_FIELD_TABLE
     );
     failure_point_of_a_member!(
         inode_number_watermark_row_missing_has_its_failure_point,
@@ -1380,7 +1574,8 @@ mod tests {
         GPU_FAILURE_POINT_ROOT_PUBLISH_CARRIES_MORE_THAN_ONE_LAST_RECORD_FLAG_WHOSE_ANCHOR_IS_UNDECIDED
     );
 
-    /// GPU 结论字换成对拍字：红位去掉判不了那一位、两遍的根与结局与失败点各取各的字、违例位与判到位各读四个字、I-1.13 的结局码取第 24 字；
+    /// GPU 结论字换成对拍字：红位去掉判不了那一位、两遍的根（标记、实例代号、checkpoint_txg 低 32 位与高 32 位，高 32 位取接在末尾的那两个字）
+    /// 与结局与失败点各取各的字、违例位与判到位各读四个字、I-1.13 的结局码取第 24 字；
     /// 判不了两种来路都认。
     #[test]
     fn the_cross_check_words_of_a_gpu_verdict_take_each_field_from_its_word() {
@@ -1393,6 +1588,10 @@ mod tests {
         words[super::IGNORED_PASS_OUTCOME_WORD] = super::RECOVERY_OUTCOME_CODE_FILE_READ;
         words[super::IGNORED_PASS_LANDED_INSTANCE_WORD] = 6;
         words[super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD] = 8;
+        words[super::CONSULTED_PASS_LANDED_MARKER_WORD] = super::LandedRootWords::LANDED_ON_A_ROOT;
+        words[super::CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD] = 5;
+        words[super::IGNORED_PASS_LANDED_MARKER_WORD] = super::LandedRootWords::LANDED_ON_A_ROOT;
+        words[super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD] = 0xFFFF_FFFF;
         words[POOL_CHECKER_VIOLATED_FIRST_WORD + 3] = 1 << 31;
         words[super::POOL_CHECKER_JUDGED_FIRST_WORD + 2] = 1;
         words[super::SCAN_REBUILD_OUTCOME_WORD] = 25;
@@ -1402,14 +1601,14 @@ mod tests {
             super::CrossCheckWords {
                 red_bits: 1,
                 pool_checker_violated_bits: 1u128 << 127,
-                consulted_pass_landed_root: super::LandedRootWords {
-                    instance: 7,
-                    checkpoint_txg_low: 9
-                },
-                ignored_pass_landed_root: super::LandedRootWords {
-                    instance: 6,
-                    checkpoint_txg_low: 8
-                },
+                consulted_pass_landed_root: super::LandedRootWords::of_the_landed_root(
+                    InstanceGeneration(7),
+                    CheckpointTxg((5 << 32) | 9)
+                ),
+                ignored_pass_landed_root: super::LandedRootWords::of_the_landed_root(
+                    InstanceGeneration(6),
+                    CheckpointTxg((0xFFFF_FFFF << 32) | 8)
+                ),
                 consulted_pass_outcome: super::RECOVERY_OUTCOME_CODE_FAILED,
                 ignored_pass_outcome: super::RECOVERY_OUTCOME_CODE_FILE_READ,
                 consulted_pass_failure_point: super::GPU_FAILURE_POINT_MAPPING_MISS,
@@ -1424,6 +1623,79 @@ mod tests {
         assert!(super::cross_check_words_of_gpu_verdict(&checker_gave_up).gpu_could_not_judge);
         assert!(
             !super::cross_check_words_of_gpu_verdict(&[0u32; VERDICT_WORDS]).gpu_could_not_judge
+        );
+    }
+
+    /// 审计复核 T01（用户 2026-10-24 定 checkpoint_txg「存完整 u64」）：一份手造的结论字，看 journal 那一遍落到实例 7、checkpoint_txg
+    /// `(5 << 32) | 9` 那条根（高 32 位那一字非 0）、读到文件，不看 journal 那一遍没落到根、失败；GPU 一侧换出的恢复摘要与 CPU 一侧
+    /// （`crate::crash_amplification::recovery_words_of`）对同一个根、同两种结局换出的那一份逐字段相同、摊出的字逐字相同。
+    /// 高 32 位那一字改成 0 之后两份不同：GPU 一侧真读了高 32 位那一字。
+    #[test]
+    fn the_gpu_recovery_summary_of_a_verdict_whose_checkpoint_txg_high_word_is_not_zero_equals_the_cpu_summary_of_the_same_root(
+    ) {
+        let landed_root = (InstanceGeneration(7), CheckpointTxg((5 << 32) | 9));
+        let mut words = [0u32; VERDICT_WORDS];
+        words[super::CONSULTED_PASS_LANDED_MARKER_WORD] = super::LandedRootWords::LANDED_ON_A_ROOT;
+        words[super::CONSULTED_PASS_LANDED_INSTANCE_WORD] = 7;
+        words[super::CONSULTED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD] = 9;
+        words[super::CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD] = 5;
+        words[super::CONSULTED_PASS_OUTCOME_WORD] = super::RECOVERY_OUTCOME_CODE_FILE_READ;
+        words[super::IGNORED_PASS_LANDED_MARKER_WORD] = super::LandedRootWords::LANDED_ON_NO_ROOT;
+        words[super::IGNORED_PASS_LANDED_INSTANCE_WORD] = u32::MAX;
+        words[super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD] = u32::MAX;
+        words[super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD] = u32::MAX;
+        words[super::IGNORED_PASS_OUTCOME_WORD] = super::RECOVERY_OUTCOME_CODE_FAILED;
+        words[super::IGNORED_PASS_FAILURE_POINT_WORD] = super::GPU_FAILURE_POINT_NO_VALID_ROOT;
+        let recovery_report = |outcome, effective_root| singlefs_core::recovery::RecoveryReport {
+            outcome,
+            effective_root,
+            journal: singlefs_core::recovery::JournalScanReport::default(),
+            mapping_fallbacks: 0,
+            devices_without_a_mountable_system_configuration_slot: Vec::new(),
+        };
+        let judgement = crate::crash::CrashStateJudgement {
+            consulted: recovery_report(
+                singlefs_core::recovery::RecoveryOutcome::FileRead {
+                    root: landed_root,
+                    content: Vec::new(),
+                },
+                Some(landed_root),
+            ),
+            ignored: recovery_report(
+                singlefs_core::recovery::RecoveryOutcome::Failed {
+                    root: None,
+                    failure: RecoveryFailure::NoValidRoot,
+                },
+                None,
+            ),
+            root_persisted: false,
+            consulted_oracle: None,
+            ignored_oracle: None,
+            pool_checker: Vec::new(),
+            records: singlefs_harness::memory_pool::RecordCheck::default(),
+        };
+        let summary_on_the_cpu = crate::crash_amplification::recovery_words_of(&judgement);
+        let summary_on_the_gpu = super::gpu_recovery_words(&words);
+        assert_eq!(
+            summary_on_the_gpu, summary_on_the_cpu,
+            "同一个根（实例 7、checkpoint_txg 高 32 位 5、低 32 位 9）、同两种结局：GPU 与 CPU 换出的恢复摘要逐字段相同"
+        );
+        assert_eq!(
+            summary_on_the_gpu.words(),
+            summary_on_the_cpu.words(),
+            "摊出的字逐字相同"
+        );
+        assert_eq!(
+            summary_on_the_gpu.consulted_pass_landed_root.landed_root(),
+            Some(landed_root),
+            "GPU 一侧的摘要换得回完整的 checkpoint_txg"
+        );
+        let mut words_without_the_high_word = words;
+        words_without_the_high_word[super::CONSULTED_PASS_LANDED_CHECKPOINT_TXG_HIGH_WORD] = 0;
+        assert_ne!(
+            super::gpu_recovery_words(&words_without_the_high_word),
+            summary_on_the_cpu,
+            "高 32 位那一字是 0 的结论落到的是 checkpoint_txg 9 那条根，与 CPU 那一份不同"
         );
     }
 
@@ -1698,5 +1970,479 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// 走读内核 I-3.5 每一版引用的落点那张表（`C_APPEARANCE_MAX_VERSION_PLACEMENTS`）取结构上界：版本上限（`C_APPEARANCE_MAX_VERSIONS`，
+    /// 满了站点 43）乘每版落点上限（`C_MAX_IN_VERSION`，满了站点 4）。那两处先判不了，这张表满了（站点 44 的容量那一半）在每个输入上都走不到。
+    /// 判别力：这张表改回 8192 个字（整理夹着回退那一组比重交判的 17 张镜像里两张各版合计 19 916、18 664 个，在站点 44 判不了的那个界）这条红。
+    #[test]
+    fn the_appearance_version_placements_hold_the_most_versions_times_the_most_placements_of_a_version(
+    ) {
+        let module = parsed_module("池级 checker 走读内核", &checker_walk_kernel_source());
+        let most_versions = value_of_the_u32_constant(&module, "C_APPEARANCE_MAX_VERSIONS");
+        let most_placements_of_a_version = value_of_the_u32_constant(&module, "C_MAX_IN_VERSION");
+        assert_eq!(
+            value_of_the_u32_constant(&module, "C_APPEARANCE_MAX_VERSION_PLACEMENTS"),
+            most_versions
+                .checked_mul(most_placements_of_a_version)
+                .expect("64 版乘每版 2048 个装得进 u32"),
+            "每一版引用的落点那张表的条数是版本上限 {most_versions} 乘每版落点上限 {most_placements_of_a_version}"
+        );
+    }
+
+    /// 扫描内核 I-1.8 收的扫描项（`C_MAX_SCANNED`，站点 36）与扫描重建那一遍（`SCAN_REBUILD_MAX_UNITS`，站点 110）至少要装下这么多项：
+    /// 整理夹着回退那一组比重偏移 0–3、40 步交判的 17 张镜像里两张 2148、3030 项（CPU 一侧数的，在 2048 的界上判不了），
+    /// 同比重 259 张（加种子到偏移 19、拉长到 160 步）至多 3030 项；4096 是 I-1.8 借的次序表（`C_ROW_ORDER`，`C_MAX_REFERENCES` 个字）的宽。
+    const SCANNED_UNITS_THE_SCAN_KERNEL_HOLDS_AT_LEAST: u32 = 4096;
+
+    /// 扫描项那张表至少 [`SCANNED_UNITS_THE_SCAN_KERNEL_HOLDS_AT_LEAST`] 项，扫描重建那一遍与它同宽（收法相同，一边装得下另一边也装得下）。
+    /// 判别力：`C_MAX_SCANNED` 改回 2048 这条红。
+    #[test]
+    fn the_scan_and_the_scan_rebuild_hold_the_scanned_units_of_the_compaction_and_rollback_histories(
+    ) {
+        let module = parsed_module("池级 checker 扫描内核", &checker_scan_kernel_source());
+        let scanned_units = value_of_the_u32_constant(&module, "C_MAX_SCANNED");
+        assert!(
+            scanned_units >= SCANNED_UNITS_THE_SCAN_KERNEL_HOLDS_AT_LEAST,
+            "扫描项那张表 {scanned_units} 项，至少要 {SCANNED_UNITS_THE_SCAN_KERNEL_HOLDS_AT_LEAST} 项"
+        );
+        assert_eq!(
+            value_of_the_u32_constant(&module, "SCAN_REBUILD_MAX_UNITS"),
+            scanned_units,
+            "扫描重建收扫描项那张表与 I-1.8 那一张同宽"
+        );
+    }
+
+    /// 恢复内核一版的分配记录（`MAX_ALLOCATION_RECORDS`，满了记条目过多）与扫描内核一条根的分配记录（`C_MAX_ALLOC_RECORDS`，满了记站点 20）
+    /// 至少要装下这么多条：整理夹着回退那一组比重 40 步交判的 17 张镜像每版至多 4018 条，离 4096 只差 78；同比重拉到 80 步那一组 45 张里 11 张、
+    /// 160 步那一组 105 张里 27 张多于 4096 条，至多 4728 条（CPU 一侧数的，C894）。
+    const ALLOCATION_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST: u32 = 8192;
+
+    /// 两张分配记录表各至少 [`ALLOCATION_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST`] 条。恢复内核先解析、先判：
+    /// 判别力：恢复内核那张改回 4096 这条红在恢复内核那一句（恢复内核里没有草稿区末端那条 `const_assert`，照样解析得过；
+    /// 它挪了 `R_ROWS` 之后的偏移链，扫描内核随后解析也不过）；扫描内核那张改回 4096 时草稿区末端那条 `const_assert` 先不成立，红在解析扫描内核。
+    #[test]
+    fn both_allocation_record_tables_hold_the_records_of_a_version_of_the_longer_compaction_and_rollback_histories(
+    ) {
+        for (kernel, source, table_constant) in [
+            (
+                "恢复内核",
+                recovery_kernel_source(),
+                "MAX_ALLOCATION_RECORDS",
+            ),
+            (
+                "池级 checker 扫描内核",
+                checker_scan_kernel_source(),
+                "C_MAX_ALLOC_RECORDS",
+            ),
+        ] {
+            let module = parsed_module(kernel, &source);
+            let records = value_of_the_u32_constant(&module, table_constant);
+            assert!(
+                records >= ALLOCATION_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST,
+                "{kernel} 的分配记录表 {table_constant} {records} 条，至少要 {ALLOCATION_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST} 条"
+            );
+        }
+    }
+
+    /// 两个内核收环里 journal 记录的那张表（`crash_judge_common.wgsl` 的 `MAX_RECORDS`，恢复内核、走读内核满了记判不了、原因 2）至少要装下这么多条：
+    /// 一版分配记录过 8192 条的那条流（新池新建文件之后顺序写 17 次各 200 个单元、再 201 个、再 144 个，被判那次缩回 1 个，被判那一版 8194 条）
+    /// 盘 0 上 3749 条记录写（CPU 一侧量的，`crash_judge_gpu_tables_at_their_capacity.rs` 里 8194 条那条用例照这条流现数、断言不多于 4096）。
+    const JOURNAL_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST: u32 = 3749;
+
+    /// 三个判器内核的 journal 记录表各至少 [`JOURNAL_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST`] 条（三份都由共用那一半定义，恢复内核先解析、先判）。
+    /// 判别力：`MAX_RECORDS` 改回 2048 这条红在恢复内核那一句（恢复内核照样解析得过；走读与扫描两个内核里草稿区末端那条 `const_assert` 不成立）。
+    #[test]
+    fn every_judge_kernel_holds_the_journal_records_of_the_flow_past_eight_thousand_one_hundred_and_ninety_two_allocation_records(
+    ) {
+        for (kernel, source) in [
+            ("恢复内核", recovery_kernel_source()),
+            ("池级 checker 走读内核", checker_walk_kernel_source()),
+            ("池级 checker 扫描内核", checker_scan_kernel_source()),
+        ] {
+            let module = parsed_module(kernel, &source);
+            let records = value_of_the_u32_constant(&module, "MAX_RECORDS");
+            assert!(
+                records >= JOURNAL_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST,
+                "{kernel} 的 journal 记录表 MAX_RECORDS {records} 条，至少要 {JOURNAL_RECORDS_THE_GPU_TABLES_HOLD_AT_LEAST} 条"
+            );
+        }
+    }
+
+    /// 借草稿区一段的一处：说给人看的名字、它起在哪、至多占几个字（都是扫描内核里的常量名；每个字一条）。
+    struct ScratchSegmentBorrower {
+        name: &'static str,
+        start_constant: &'static str,
+        word_count_constant: &'static str,
+    }
+
+    /// 草稿区里几处先后借的一段：名字、起点与末端（段之后第一个字）的常量名、借它的那几处。
+    struct BorrowedScratchSegment {
+        name: &'static str,
+        start_constant: &'static str,
+        end_constant: &'static str,
+        borrowers: &'static [ScratchSegmentBorrower],
+    }
+
+    /// 扫描内核里轮着借的四段（`crash_judge_checker_common.wgsl` 的 ⑨、⑮ 与 ⑯）与借它们的每一处。
+    const BORROWED_SCRATCH_SEGMENTS_OF_THE_SCAN_KERNEL: [BorrowedScratchSegment; 4] = [
+        BorrowedScratchSegment {
+            name: "⑨ 行号次序",
+            start_constant: "C_ROW_ORDER",
+            end_constant: "C_ROW_ORDER_END",
+            borrowers: &[
+                ScratchSegmentBorrower {
+                    name: "走读内核逐盘 journal 那几条的组",
+                    start_constant: "C_ROW_ORDER",
+                    word_count_constant: "MAX_RECORDS",
+                },
+                ScratchSegmentBorrower {
+                    name: "I-3.5 一版引用的落点",
+                    start_constant: "C_ROW_ORDER",
+                    word_count_constant: "C_MAX_IN_VERSION",
+                },
+                ScratchSegmentBorrower {
+                    name: "I-5.1 主走读引用集合",
+                    start_constant: "C_ROW_ORDER",
+                    word_count_constant: "C_MAX_REFERENCES",
+                },
+                ScratchSegmentBorrower {
+                    name: "I-1.8 扫描项",
+                    start_constant: "C_ROW_ORDER",
+                    word_count_constant: "C_MAX_SCANNED",
+                },
+                ScratchSegmentBorrower {
+                    name: "I-9.20 墓碑两两比的 key",
+                    start_constant: "C_ROW_ORDER",
+                    word_count_constant: "DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE",
+                },
+            ],
+        },
+        BorrowedScratchSegment {
+            name: "⑯ journal 组键",
+            start_constant: "C_JOURNAL_GROUP_KEYS",
+            end_constant: "C_JOURNAL_GROUP_KEYS_END",
+            borrowers: &[ScratchSegmentBorrower {
+                name: "I-1.8 扫描项的检查字",
+                start_constant: "C_SCANNED_CHECK_WORDS",
+                word_count_constant: "C_MAX_SCANNED",
+            }],
+        },
+        BorrowedScratchSegment {
+            name: "⑮ 分配记录的行号次序",
+            start_constant: "C_ALLOCATION_RECORD_ROW_ORDER",
+            end_constant: "C_ALLOCATION_RECORD_BUCKETS",
+            borrowers: &[ScratchSegmentBorrower {
+                name: "I-5.4 与 I-3.16 排一棵分配记录树的记录",
+                start_constant: "C_ALLOCATION_RECORD_ROW_ORDER",
+                word_count_constant: "C_MAX_ALLOC_RECORDS",
+            }],
+        },
+        BorrowedScratchSegment {
+            name: "⑮ 分配记录的桶表",
+            start_constant: "C_ALLOCATION_RECORD_BUCKETS",
+            end_constant: "SCRATCH_END",
+            borrowers: &[
+                ScratchSegmentBorrower {
+                    name: "I-3.9 已释放记录的桶表",
+                    start_constant: "C_RELEASED_BUCKETS",
+                    word_count_constant: "C_RELEASED_BUCKET_COUNT",
+                },
+                ScratchSegmentBorrower {
+                    name: "I-3.10 去重表的桶表",
+                    start_constant: "C_EXAMINED_BUCKETS",
+                    word_count_constant: "C_EXAMINED_BUCKET_COUNT",
+                },
+            ],
+        },
+    ];
+
+    /// 每一处借用者起在它借的那一段里、占的字不越过段的末端；⑮ 的两段接在 I-3.5 每一版引用的落点那张表之后、彼此不重叠。
+    /// 判别力：I-3.9 已释放记录的桶表改回借 `C_JOURNAL_GROUP_KEYS` 这条红（起点不在 ⑮ 的桶表那一段里；桶数照旧不过那一段的宽，内核照样解析得过）。
+    #[test]
+    fn every_borrower_of_the_row_order_and_bucket_segments_fits_inside_the_segment_it_borrows() {
+        let module = parsed_module("池级 checker 扫描内核", &checker_scan_kernel_source());
+        let value = |name: &str| value_of_the_u32_constant(&module, name);
+        let end_of_the_version_placements = value("C_APPEARANCE_VERSION_PLACEMENTS")
+            .checked_add(value("C_APPEARANCE_MAX_VERSION_PLACEMENTS"))
+            .expect("草稿区的字下标装得进 u32");
+        assert!(
+            value("C_ALLOCATION_RECORD_ROW_ORDER") >= end_of_the_version_placements,
+            "⑮ 的次序表起在 {}，压到 I-3.5 每一版引用的落点那张表（到 {end_of_the_version_placements} 为止）上",
+            value("C_ALLOCATION_RECORD_ROW_ORDER")
+        );
+        for segment in &BORROWED_SCRATCH_SEGMENTS_OF_THE_SCAN_KERNEL {
+            let segment_start = value(segment.start_constant);
+            let segment_end = value(segment.end_constant);
+            assert!(
+                segment_start <= segment_end,
+                "{}：起点 {segment_start} 在末端 {segment_end} 之后",
+                segment.name
+            );
+            for borrower in segment.borrowers {
+                let borrower_start = value(borrower.start_constant);
+                let borrower_end = borrower_start
+                    .checked_add(value(borrower.word_count_constant))
+                    .expect("草稿区的字下标装得进 u32");
+                assert!(
+                    segment_start <= borrower_start && borrower_end <= segment_end,
+                    "{} 借 {}：占 [{borrower_start}, {borrower_end})，那一段是 [{segment_start}, {segment_end})",
+                    borrower.name,
+                    segment.name
+                );
+            }
+        }
+    }
+
+    /// 原因码 3（条目太多）的站点号里几处共用一个的：同一张表在几处判满（站点号、几处）。
+    /// 站点 41：一版用户可见树的根那张表满了，与之后给落点打标签时找不到那一版的根（那张表满了才找不到）；
+    /// 站点 115：扫描内核释放代高于 F 的已释放记录那张表两头往中间长、碰上了（收钉带出来那一截与收 F 之上那一截各判一次）。
+    const TOO_MANY_ENTRIES_SITES_JUDGED_IN_SEVERAL_PLACES_OF_ONE_TABLE: [(u32, usize); 2] =
+        [(41, 2), (115, 2)];
+
+    /// 六份手写的内核源码：文件名与原文。
+    fn handwritten_kernel_sources() -> [(&'static str, &'static str); 6] {
+        [
+            ("crash_judge_common.wgsl", super::GPU_JUDGE_COMMON_SOURCE),
+            (
+                "crash_judge_recovery.wgsl",
+                super::GPU_JUDGE_RECOVERY_SOURCE,
+            ),
+            (
+                "crash_judge_checker_common.wgsl",
+                GPU_JUDGE_CHECKER_COMMON_SOURCE,
+            ),
+            ("crash_judge_checker.wgsl", super::GPU_JUDGE_CHECKER_SOURCE),
+            (
+                "crash_judge_checker_scan.wgsl",
+                super::GPU_JUDGE_CHECKER_SCAN_SOURCE,
+            ),
+            (
+                "crash_judge_checker_scan_rebuild.wgsl",
+                super::GPU_JUDGE_CHECKER_SCAN_REBUILD_SOURCE,
+            ),
+        ]
+    }
+
+    /// 一行 WGSL 里 `//` 之前的那一段（WGSL 没有字符串字面量，`//` 起头的都是注释）。
+    fn code_before_the_comment(line: &str) -> &str {
+        line.split("//").next().expect("split 至少交回一段")
+    }
+
+    /// 六份源码里 `const <名字>: u32 = <十进制>u;` 的每个常量：名字与它在各份源码里的值（几份源码可以各定义一个同名常量）。
+    fn decimal_u32_constants_of(
+        sources: &[(&str, &str)],
+    ) -> std::collections::BTreeMap<String, std::collections::BTreeSet<u32>> {
+        let mut constants: std::collections::BTreeMap<String, std::collections::BTreeSet<u32>> =
+            std::collections::BTreeMap::new();
+        for (_file_name, source) in sources {
+            for line in source.lines() {
+                let Some(definition) = code_before_the_comment(line).trim().strip_prefix("const ")
+                else {
+                    continue;
+                };
+                let Some((name, after_the_name)) = definition.split_once(':') else {
+                    continue;
+                };
+                let Some((_type, initializer)) = after_the_name.split_once('=') else {
+                    continue;
+                };
+                let initializer = initializer.trim().trim_end_matches(';').trim();
+                let Some(digits) = initializer.strip_suffix('u') else {
+                    continue;
+                };
+                if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+                    continue;
+                }
+                constants
+                    .entry(name.trim().to_string())
+                    .or_default()
+                    .insert(
+                        digits
+                            .parse::<u32>()
+                            .expect("u32 常量的十进制初值装得进 u32"),
+                    );
+            }
+        }
+        constants
+    }
+
+    /// 拼进原因字的那个站点（`<十进制>u`，或一个十进制常量的名字）换成站点号与「在哪写下这个号」：字面的写文件名与行号，
+    /// 具名常量写它的名字（几处用同一个常量算一处）。
+    fn site_and_where_it_is_written(
+        site_text: &str,
+        file_name: &str,
+        line_number: usize,
+        constants: &std::collections::BTreeMap<String, std::collections::BTreeSet<u32>>,
+    ) -> (u32, String) {
+        if let Some(digits) = site_text
+            .strip_suffix('u')
+            .filter(|digits| !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit()))
+        {
+            return (
+                digits.parse::<u32>().expect("站点号装得进 u32"),
+                format!("{file_name} 第 {line_number} 行"),
+            );
+        }
+        let values = constants.get(site_text).unwrap_or_else(|| {
+            panic!(
+                "{file_name} 第 {line_number} 行的站点「{site_text}」既不是 `<十进制>u`，也不是哪一份源码里的十进制 u32 常量"
+            )
+        });
+        let mut distinct_values = values.iter().copied();
+        let (Some(site), None) = (distinct_values.next(), distinct_values.next()) else {
+            panic!(
+                "{file_name} 第 {line_number} 行的站点常量 {site_text} 在几份源码里定义成不同的值 {values:?}"
+            );
+        };
+        (site, format!("具名常量 {site_text}"))
+    }
+
+    /// 一次调用 `(` 之后那一段里，到与它配对的 `)` 为止的实参原文。
+    fn arguments_up_to_the_closing_parenthesis(after_the_opening_parenthesis: &str) -> &str {
+        let mut depth_of_nested_parentheses = 0_usize;
+        for (byte_index, character) in after_the_opening_parenthesis.char_indices() {
+            match character {
+                '(' => depth_of_nested_parentheses += 1,
+                ')' if depth_of_nested_parentheses == 0 => {
+                    return &after_the_opening_parenthesis[..byte_index];
+                }
+                ')' => depth_of_nested_parentheses -= 1,
+                _ => {}
+            }
+        }
+        panic!(
+            "调用的实参到行尾都没配上 `)`（这一判只认写在一行里的调用）：{after_the_opening_parenthesis}"
+        );
+    }
+
+    /// 原因码 3（条目太多）的原因字是 `UNDECIDABLE_TOO_MANY_ENTRIES | (<站点> << 8u)`：看站点号就知道是哪一张表满了
+    /// （[`super::undecidable_reasons_of_the_gpu_verdict`] 照它打判不了那一句）。读全部六份 `.wgsl`，把每一处写下站点号的地方都收上：
+    /// 字面的 `<十进制>u`、十进制常量的名字（几处用同一个常量算一处）、拼好整个原因字的具名常量（`const X: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (…)`），
+    /// 与按参数 `site` 传进去的那几个函数在每个调用点传的实参；不带站点（恢复内核那几处 `= UNDECIDABLE_TOO_MANY_ENTRIES;`）的不收。
+    /// 每个站点号只在一处写下，登记的几张表（[`TOO_MANY_ENTRIES_SITES_JUDGED_IN_SEVERAL_PLACES_OF_ONE_TABLE`]）除外、处数恰好是登记的数。
+    /// 认不出写法的那一行直接红，不悄悄漏掉。
+    /// 判别力：扫描重建读 inode 树的栈满了那一处（`SCAN_REBUILD_SITE_INODE_TREE_PENDING_PAST_THE_STACK`）改回 115，与扫描内核
+    /// 释放代高于 F 那张表的站点拼出同一个原因字 0x7303，这条红。
+    #[test]
+    fn every_too_many_entries_site_is_written_in_one_place_except_the_tables_judged_full_in_several_places(
+    ) {
+        const SITE_SHIFTED_INTO_THE_REASON: &str = "UNDECIDABLE_TOO_MANY_ENTRIES | (";
+        const END_OF_THE_SITE_SHIFT: &str = " << 8u)";
+        const SITE_PASSED_AS_A_PARAMETER: &str = "site";
+        let sources = handwritten_kernel_sources();
+        let constants = decimal_u32_constants_of(&sources);
+        let mut places_of_each_site: std::collections::BTreeMap<
+            u32,
+            std::collections::BTreeSet<String>,
+        > = std::collections::BTreeMap::new();
+        let mut functions_taking_the_site_as_a_parameter: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
+        for (file_name, source) in sources {
+            let code_lines: Vec<&str> = source.lines().map(code_before_the_comment).collect();
+            for (line_index, code) in code_lines.iter().enumerate() {
+                if !code.contains("UNDECIDABLE_TOO_MANY_ENTRIES") {
+                    continue;
+                }
+                let line_number = line_index + 1;
+                let trimmed = code.trim();
+                let Some((_, after_the_reason)) = code.split_once(SITE_SHIFTED_INTO_THE_REASON)
+                else {
+                    assert!(
+                        trimmed.starts_with("const UNDECIDABLE_TOO_MANY_ENTRIES:")
+                            || trimmed.ends_with("= UNDECIDABLE_TOO_MANY_ENTRIES;"),
+                        "{file_name} 第 {line_number} 行认不出原因码 3 的写法（定义、不带站点的 `= UNDECIDABLE_TOO_MANY_ENTRIES;`、\
+                         `UNDECIDABLE_TOO_MANY_ENTRIES | (<站点> << 8u)` 三种）：{trimmed}"
+                    );
+                    continue;
+                };
+                let (site_text, _) = after_the_reason
+                    .split_once(END_OF_THE_SITE_SHIFT)
+                    .unwrap_or_else(|| {
+                        panic!("{file_name} 第 {line_number} 行站点之后不是 `{END_OF_THE_SITE_SHIFT}`：{trimmed}")
+                    });
+                let site_text = site_text.trim();
+                if site_text == SITE_PASSED_AS_A_PARAMETER {
+                    let function_line = code_lines[..=line_index]
+                        .iter()
+                        .rev()
+                        .find(|candidate| candidate.starts_with("fn "))
+                        .unwrap_or_else(|| {
+                            panic!("{file_name} 第 {line_number} 行按参数传站点，往上找不到它所在的 `fn`")
+                        });
+                    let function_name = function_line
+                        .strip_prefix("fn ")
+                        .expect("上面按 `fn ` 起头找的")
+                        .split('(')
+                        .next()
+                        .expect("split 至少交回一段")
+                        .trim();
+                    functions_taking_the_site_as_a_parameter.insert(function_name.to_string());
+                    continue;
+                }
+                let (site, mut written_at) =
+                    site_and_where_it_is_written(site_text, file_name, line_number, &constants);
+                if let Some(definition) = trimmed.strip_prefix("const ") {
+                    let reason_word_constant = definition
+                        .split(':')
+                        .next()
+                        .expect("split 至少交回一段")
+                        .trim();
+                    written_at = format!("具名常量 {reason_word_constant}");
+                }
+                places_of_each_site
+                    .entry(site)
+                    .or_default()
+                    .insert(written_at);
+            }
+        }
+        for function_name in &functions_taking_the_site_as_a_parameter {
+            let call = format!("{function_name}(");
+            let definition = format!("fn {call}");
+            for (file_name, source) in sources {
+                for (line_index, line) in source.lines().enumerate() {
+                    let code = code_before_the_comment(line);
+                    if code.contains(&definition) {
+                        continue;
+                    }
+                    let Some((_, after_the_call)) = code.split_once(&call) else {
+                        continue;
+                    };
+                    let last_argument = arguments_up_to_the_closing_parenthesis(after_the_call)
+                        .rsplit(',')
+                        .next()
+                        .expect("rsplit 至少交回一段")
+                        .trim();
+                    let (site, written_at) = site_and_where_it_is_written(
+                        last_argument,
+                        file_name,
+                        line_index + 1,
+                        &constants,
+                    );
+                    places_of_each_site
+                        .entry(site)
+                        .or_default()
+                        .insert(written_at);
+                }
+            }
+        }
+        let sites_written_in_several_places: std::collections::BTreeMap<u32, Vec<String>> =
+            places_of_each_site
+                .iter()
+                .filter(|(_site, places)| places.len() > 1)
+                .map(|(site, places)| (*site, places.iter().cloned().collect()))
+                .collect();
+        let place_counts_of_those_sites: std::collections::BTreeMap<u32, usize> =
+            sites_written_in_several_places
+                .iter()
+                .map(|(site, places)| (*site, places.len()))
+                .collect();
+        assert_eq!(
+            place_counts_of_those_sites,
+            TOO_MANY_ENTRIES_SITES_JUDGED_IN_SEVERAL_PLACES_OF_ONE_TABLE
+                .into_iter()
+                .collect::<std::collections::BTreeMap<u32, usize>>(),
+            "原因码 3 的站点号除登记的几张表之外各只在一处写下（不然看原因字分不出是哪一张表满了）；写在几处的：{sites_written_in_several_places:?}"
+        );
     }
 }

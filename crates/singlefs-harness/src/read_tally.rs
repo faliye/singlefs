@@ -9,7 +9,7 @@ use std::cell::RefCell;
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::block_device::{
-    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
+    BlockDevice, BlockDeviceError, DiscardOutcome, PhysicalBlockSizeInBytes, WriteDurability,
 };
 use singlefs_core::recovery::PoolReader;
 use singlefs_format::{
@@ -162,7 +162,10 @@ pub struct BlockDeviceReadLog {
 }
 
 /// 包在一块 [`BlockDevice`] 外面记读：可写挂载只收块设备（不收 [`PoolReader`]），挂载里恢复扫环读了哪些记录槽要在这一层看。
-/// journal 提示怎么答由 [`JournalHintAnswer`] 定；写、清零与屏障原样转交、不记。读是 `&self`，所以记录走 [`RefCell`]（单线程用）。
+/// journal 提示怎么答由 [`JournalHintAnswer`] 定；写、清零、discard 与屏障原样转交、不记，discard 交回里面那块盘的结局与错误
+/// （`BlockDevice::discard_at` 的文档：包装不转就把里面那块盘认得的 discard 吞成「不支持」）。
+/// 读坏之后的重读与这一刻读盘那两种专用读照普通读记一次，再交给里面那块盘的同名方法（里面那块盘可能是记着这次挂载读过什么的那一层，
+/// 它在这两种读上绕过记下的那一份）；换上自证过的重读、记读坏丢块那两个通知原样转交、不记。读是 `&self`，所以记录走 [`RefCell`]（单线程用）。
 pub struct ReadLoggingBlockDevice<Inner: BlockDevice> {
     inner: Inner,
     journal_ring: JournalRingRegion,
@@ -189,6 +192,15 @@ impl<Inner: BlockDevice> ReadLoggingBlockDevice<Inner> {
     pub fn read_log(&self) -> BlockDeviceReadLog {
         self.read_log.borrow().clone()
     }
+
+    /// 普通读与两种专用读共用的一份记账：读数加一，起点落在 journal 环里的记下起点。
+    fn log_a_read_starting_at(&self, offset: DeviceOffsetInBytes) {
+        let mut read_log = self.read_log.borrow_mut();
+        read_log.reads += 1;
+        if self.journal_ring.contains(offset) {
+            read_log.journal_ring_read_offsets.push(offset);
+        }
+    }
 }
 
 impl<Inner: BlockDevice> BlockDevice for ReadLoggingBlockDevice<Inner> {
@@ -197,14 +209,43 @@ impl<Inner: BlockDevice> BlockDevice for ReadLoggingBlockDevice<Inner> {
         offset: DeviceOffsetInBytes,
         buffer: &mut [u8],
     ) -> Result<(), BlockDeviceError> {
-        {
-            let mut read_log = self.read_log.borrow_mut();
-            read_log.reads += 1;
-            if self.journal_ring.contains(offset) {
-                read_log.journal_ring_read_offsets.push(offset);
-            }
-        }
+        self.log_a_read_starting_at(offset);
         self.inner.read_at(offset, buffer)
+    }
+
+    /// 照普通读记一次，交给里面那块盘的重读。
+    fn reread_at_after_a_bad_read(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.log_a_read_starting_at(offset);
+        self.inner.reread_at_after_a_bad_read(offset, buffer)
+    }
+
+    /// 照普通读记一次，交给里面那块盘的这一刻读盘。
+    fn read_at_straight_from_the_disk(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.log_a_read_starting_at(offset);
+        self.inner.read_at_straight_from_the_disk(offset, buffer)
+    }
+
+    /// 通知不是读：不记，原样转给里面那块盘。
+    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
+        self.inner.keep_the_self_verified_reread(offset, bytes);
+    }
+
+    /// 通知不是读：不记，原样转给里面那块盘。
+    fn note_the_read_failing_self_verification_and_forget_its_bytes(
+        &self,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: u64,
+    ) {
+        self.inner
+            .note_the_read_failing_self_verification_and_forget_its_bytes(offset, length_in_bytes);
     }
 
     fn write_at(
@@ -222,6 +263,15 @@ impl<Inner: BlockDevice> BlockDevice for ReadLoggingBlockDevice<Inner> {
         length: u64,
     ) -> Result<(), BlockDeviceError> {
         self.inner.write_zeroes_at(offset, length)
+    }
+
+    /// 原样转给里面那块盘，交回它的结局与错误（长度 0、没对齐、越界都由它核）；读日志只记读，discard 不记。
+    fn discard_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<DiscardOutcome, BlockDeviceError> {
+        self.inner.discard_at(offset, length)
     }
 
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {

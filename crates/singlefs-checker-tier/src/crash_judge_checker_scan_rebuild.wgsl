@@ -88,7 +88,9 @@ const SCAN_REBUILD_SITE_INODE_RECORDS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY
 const SCAN_REBUILD_SITE_WALKED_INODE_RECORDS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (112u << 8u);
 const SCAN_REBUILD_SITE_TOMBSTONED_OBJECTS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (113u << 8u);
 const SCAN_REBUILD_SITE_LINEAGE_CONTAINERS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (114u << 8u);
-const SCAN_REBUILD_SITE_INODE_TREE_PENDING_PAST_THE_STACK: u32 = 115u;
+// 经 d_push_container_tree_entries_in_reverse 的 site 参数拼成原因字。原来取 115，与扫描内核释放代高于 F 那张表两头碰上的那一处
+// （crash_judge_checker_scan.wgsl 的 c_deferred_below_the_floor）拼出同一个原因字 0x7303，看原因字分不出是哪一张满了
+const SCAN_REBUILD_SITE_INODE_TREE_PENDING_PAST_THE_STACK: u32 = 118u;
 
 // 码 1 与码 3 的头里几段的偏移（singlefs_checker 的 ContentUnitClass::header_offsets）：明文头末尾、对象身份末尾、诞生代号、写序、载荷校验和
 const SCAN_REBUILD_OBJECT_IDENTITY_START: u32 = 42u;
@@ -473,7 +475,8 @@ fn scan_rebuild_object_identity_bytes(unit_class: u32) -> u32 {
     return select(27u, 33u, unit_class == 1u);
 }
 
-// C113 定案 P3 的择新键（rebuild.rs CurrentVersionOrderKey）：码 1 是写序 (实例代号, 事务号)，码 3 是 (诞生代号, 实例代号, 事务号)；码 1 的诞生代号那一段记 0
+// C113 定案 P3 的择新键（rebuild.rs CurrentVersionOrderKey）：码 1 与码 3 同形，(诞生代号, 实例代号, 事务号)，诞生代号打头
+// （码 1 那一半是 C464 用户 2026-10-26 定的「① 加诞生代号打头」：一个事务跨两个 checkpoint 时两版写序逐字节相同，只有诞生代号分得开）
 struct ScanRebuildOrderKey {
     birth_txg: vec2<u32>,
     instance: u32,
@@ -483,7 +486,7 @@ struct ScanRebuildOrderKey {
 fn scan_rebuild_order_key_of(base: u32) -> ScanRebuildOrderKey {
     var key: ScanRebuildOrderKey;
     if (rd8(base, 6u) == 1u) {
-        key.birth_txg = vec2<u32>(0u, 0u);
+        key.birth_txg = rd64(base, 75u);
         key.instance = rd32(base, 91u);
         key.transaction = rd48(base, 95u);
     } else {
@@ -999,7 +1002,7 @@ fn scan_rebuild_outcome_of_the_versions_left_for_the_lineage() -> u32 {
         if (next_older_start != NONE
             && scan_rebuild_order_keys_are_equal(scan_rebuild_order_key_of(scan_rebuild_base_at(next_older_start)), scan_rebuild_order_key_of(current_base))) {
             return select(SCAN_REBUILD_OUTCOME_PACKED_RECORD_VERSIONS_TIED_ON_THE_TOTAL_ORDER_KEY,
-                SCAN_REBUILD_OUTCOME_DATA_UNIT_VERSIONS_TIED_ON_THE_WRITE_ORDER, unit_class == 1u);
+                SCAN_REBUILD_OUTCOME_DATA_UNIT_VERSIONS_TIED_ON_THE_TOTAL_ORDER_KEY, unit_class == 1u);
         }
         if (unit_class == 1u) {
             let inode = rd64(current_base, 51u);
