@@ -1,0 +1,21 @@
+name=shapes pbs=512 spacings=2033 shapes=26429 rule_accepts=9411 mkfs_today_accepts=9411 rule_minus_mkfs=0 mkfs_minus_rule=0 extent_clean_full=17463 extent_clean_byte_exact=18733 root_slot_clean=23195 rule_refuses_and_extent_clean_full=8052 rule_refuses_and_root_slot_clean=13784 rule_accepts_and_root_slot_collides=0
+name=min_formula pbs=512 written_S=3 spacings=504 from=786944 to=1044480
+name=min_formula pbs=512 written_S=4 spacings=308 from=629248 to=786432
+name=min_formula pbs=512 written_S=5 spacings=204 from=524800 to=628736
+name=min_formula pbs=512 written_S=6 spacings=147 from=449536 to=524288
+name=min_formula pbs=512 written_S=7 spacings=109 from=393728 to=449024
+name=min_formula pbs=512 written_S=8 spacings=761 from=4096 to=393216
+name=shapes pbs=4096 spacings=255 shapes=3315 rule_accepts=1184 mkfs_today_accepts=1184 rule_minus_mkfs=0 mkfs_minus_rule=0 extent_clean_full=2191 extent_clean_byte_exact=2348 root_slot_clean=2901 rule_refuses_and_extent_clean_full=1007 rule_refuses_and_root_slot_clean=1717 rule_accepts_and_root_slot_collides=0
+name=min_formula pbs=4096 written_S=3 spacings=63 from=790528 to=1044480
+name=min_formula pbs=4096 written_S=4 spacings=39 from=630784 to=786432
+name=min_formula pbs=4096 written_S=5 spacings=25 from=528384 to=626688
+name=min_formula pbs=4096 written_S=6 spacings=19 from=450560 to=524288
+name=min_formula pbs=4096 written_S=7 spacings=13 from=397312 to=446464
+name=min_formula pbs=4096 written_S=8 spacings=96 from=4096 to=393216
+name=shapes_total grand_total=29744
+name=effective_spacing_upper_bound bytes=786432 kib=768
+name=pinned_slot_byte largest_S=85 value_at_85=254 value_at_86=257
+name=d2_item19_io_min outcome=refused_by_alignment io_min_count=4084 io_min=[1536, 2560, 3072, 3584, 4608, 5120, '...', 2096128, 2096640, 2097152]
+name=d2_item19_io_min outcome=refused_by_spacing_range io_min_count=1 io_min=[1048576]
+name=d2_item19_io_min outcome=writes_S=6 io_min_count=1 io_min=[524288]
+name=d2_item19_io_min outcome=writes_S=8 io_min_count=10 io_min=[512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]

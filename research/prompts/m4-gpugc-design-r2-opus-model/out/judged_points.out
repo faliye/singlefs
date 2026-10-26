@@ -1,0 +1,32 @@
+name=judged_points selection=all_knobs candidate=scan_checksum_only card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=all_knobs candidate=scan_checksum_only card=1 points=12 losing=12
+name=judged_points selection=all_knobs candidate=scan_checksum_and_choice card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=all_knobs candidate=scan_checksum_and_choice card=1 points=12 flips_with_a_knob=10 losing=2
+name=judged_points selection=all_knobs candidate=release_check_only card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=all_knobs candidate=release_check_only card=1 points=12 losing=12
+name=judged_points selection=all_knobs candidate=every_stage card=0 points=12 flips_with_a_knob=9 not_losing=3
+name=judged_points selection=all_knobs candidate=every_stage card=1 points=12 flips_with_a_knob=12
+name=judged_points selection=gap_50_only candidate=scan_checksum_only card=0 points=12 flips_with_a_knob=4 losing=8
+name=judged_points selection=gap_50_only candidate=scan_checksum_only card=1 points=12 losing=12
+name=judged_points selection=gap_50_only candidate=scan_checksum_and_choice card=0 points=12 flips_with_a_knob=10 unstable=2
+name=judged_points selection=gap_50_only candidate=scan_checksum_and_choice card=1 points=12 losing=12
+name=judged_points selection=gap_50_only candidate=release_check_only card=0 points=12 flips_with_a_knob=8 losing=4
+name=judged_points selection=gap_50_only candidate=release_check_only card=1 points=12 losing=12
+name=judged_points selection=gap_50_only candidate=every_stage card=0 points=12 flips_with_a_knob=5 not_losing=5 unstable=2
+name=judged_points selection=gap_50_only candidate=every_stage card=1 points=12 flips_with_a_knob=5 losing=7
+name=judged_points selection=gap_0_only candidate=scan_checksum_only card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=gap_0_only candidate=scan_checksum_only card=1 points=12 losing=12
+name=judged_points selection=gap_0_only candidate=scan_checksum_and_choice card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=gap_0_only candidate=scan_checksum_and_choice card=1 points=12 flips_with_a_knob=10 losing=2
+name=judged_points selection=gap_0_only candidate=release_check_only card=0 points=12 flips_with_a_knob=4 unstable=8
+name=judged_points selection=gap_0_only candidate=release_check_only card=1 points=12 losing=12
+name=judged_points selection=gap_0_only candidate=every_stage card=0 points=12 flips_with_a_knob=9 not_losing=3
+name=judged_points selection=gap_0_only candidate=every_stage card=1 points=12 flips_with_a_knob=12
+name=judged_points selection=shared_gap_0_machine_scaled candidate=scan_checksum_only card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=shared_gap_0_machine_scaled candidate=scan_checksum_only card=1 points=12 losing=12
+name=judged_points selection=shared_gap_0_machine_scaled candidate=scan_checksum_and_choice card=0 points=12 flips_with_a_knob=12
+name=judged_points selection=shared_gap_0_machine_scaled candidate=scan_checksum_and_choice card=1 points=12 flips_with_a_knob=6 losing=2 unstable=4
+name=judged_points selection=shared_gap_0_machine_scaled candidate=release_check_only card=0 points=12 flips_with_a_knob=4 unstable=8
+name=judged_points selection=shared_gap_0_machine_scaled candidate=release_check_only card=1 points=12 losing=12
+name=judged_points selection=shared_gap_0_machine_scaled candidate=every_stage card=0 points=12 flips_with_a_knob=6 not_losing=6
+name=judged_points selection=shared_gap_0_machine_scaled candidate=every_stage card=1 points=12 flips_with_a_knob=2 not_losing=9 unstable=1

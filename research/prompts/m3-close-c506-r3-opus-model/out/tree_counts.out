@@ -1,0 +1,63 @@
+name=at_make_filesystem_associated lines=77 doc_comment_lines=5 code_lines=72 files=44
+name=at_make_filesystem_format_constant lines=26 files=9
+name=local_copy_of_eight at=crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:74 text=const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
+name=local_copy_of_eight at=crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs:67 text=const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
+name=local_copy_of_eight at=crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs:90 text=const SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
+name=local_copy_of_eight at=crates/singlefs-format/src/lib.rs:309 text=pub const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
+name=local_copy_of_eight at=crates/singlefs-harness/src/model.rs:1815 text=const MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 =
+name=cites_d22_item_one at=crates/singlefs-checker/src/lib.rs:125
+name=cites_d22_item_one at=crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:93
+name=cites_d22_item_one at=crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1174
+name=cites_d22_item_one at=crates/singlefs-core/src/recovery.rs:500
+name=cites_d22_item_one at=crates/singlefs-core/src/root_ring.rs:18
+name=cites_d22_item_one at=crates/singlefs-core/src/system_configuration.rs:235
+name=cites_d22_item_one at=crates/singlefs-format/src/lib.rs:293
+name=cites_d22_item_one at=crates/singlefs-format/src/lib.rs:307
+name=cites_d22_item_one at=crates/singlefs-harness/tests/system_configuration_slots_per_region.rs:1
+name=format_const_marker_in_lib constant=ROOT_RING_CHUNK_BYTES markers=1
+name=format_const_marker_in_lib constant=ROOT_RING_PRIME_STEP markers=0
+name=format_const_marker_in_lib constant=ROOT_RING_SLOTS_PER_REGION_MINIMUM markers=1
+name=format_const_marker_in_lib constant=ROOT_RING_SLOTS_PER_REGION_MAXIMUM markers=0
+name=layout_row at=.claude/kb/layout/01-first-txn.md:140 has_format_const_marker=False text=| 几何 | 每区槽数 S | 1 | 8 | D22（单元原子性怎么合成） 已定项 2 |
+name=layout_row at=.claude/kb/layout/01-first-txn.md:141 has_format_const_marker=False text=| 几何 | 素数步长 P | 4 | 3 | D22（单元原子性怎么合成） 已定项 2 |
+name=layout_row at=.claude/kb/layout/01-first-txn.md:142 has_format_const_marker=True text=| 几何 | 根环 chunk | 4 | 1 048 576 <!-- format-const: ROOT_RING_CHUNK_BYTES = 1048576 --> | D22（单元原子性怎么合成） 已定项 2 |
+name=edge_pool_constant at=crates/singlefs-harness/tests/common_root_ring_holes/mod.rs:30 text=pub const SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS: u64 = 4;
+name=edge_pool_constant at=crates/singlefs-harness/tests/pool_checker_scan_of_tree_identifiers_claims_whole_units.rs:32 text=const SLOTS_PER_REGION_OF_THE_CLAIM_POOLS: u64 = 4;
+name=edge_pool_constant at=crates/singlefs-harness/tests/pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root.rs:42 text=const SLOTS_PER_REGION_OF_THE_BIRTH_POOLS: u64 = 4;
+name=edge_pool_users files=21 checker_tier_files=['crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs', 'crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs']
+name=crash_replay_item at=.claude/gate.d/crash-point-replay-items.tsv:40 text=instance-table-sweep
+name=c568_mkfs_cases_passing_S count=13
+name=mkfs_builds_edge_S at=crates/singlefs-harness/tests/system_configuration_slots_per_region.rs:239 text=for declared in [4u64, 8, 16] {
+name=mkfs_builds_edge_S at=crates/singlefs-harness/tests/system_configuration_slots_per_region.rs:305 text=for (declared, cleared_bytes) in [(4u64, 16_384u64), (8, 32_768), (16, 65_536)] {
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs:114 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:178 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:195 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1039 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:3688 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:319 expect=S 在 [4,16] 区间内
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:331 expect=S 在 [4,16] 区间内
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:1478 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:10415 expect=每区槽数 4 或 8 在格式承诺的区间里
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:1051 expect=每区槽数只取 4、8、16，都在挂载判的区间里
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs:555 expect=每区槽数只取 4、8、16，都在挂载判的区间里
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:371 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs:351 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs:365 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs:607 expect=每区槽数落在 4..16 闭区间
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/e197_scan_journal_glue_memory_by_device_count.rs:461 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:1447 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:1548 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:1984 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:2022 expect=None
+name=experiment_mkfs_parameter_S at=crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs:2412 expect=None
+name=gpu_literal at=crates/singlefs-checker-tier/src/crash_judge_common.wgsl:113 text=const ROOT_RING_REGION_STRIDE: u32 = 3145728u;     // P × chunk = 3 × 1 MiB
+name=gpu_literal at=crates/singlefs-checker-tier/src/crash_judge_common.wgsl:114 text=const ROOT_RING_BASE_BYTES: u32 = 1048576u;        // 64 × 16384
+name=prior_art_line at=.claude/kb/prior-art.md:657
+name=prior_art_line at=.claude/kb/prior-art.md:658
+name=prior_art_line at=.claude/kb/prior-art.md:660
+name=e50_first_crossing load=coarse blocks_per_fsync=13 scanned=[2, 4, 8, 16, 32, 64, 256, 1024] first_in_scan=256 first_over_all_n=77 largest_S_below_line_R3=25 smallest_S_on_line_R3=26
+name=e50_first_crossing load=scattered blocks_per_fsync=34 scanned=[2, 4, 8, 16, 32, 64, 256, 1024] first_in_scan=32 first_over_all_n=30 largest_S_below_line_R3=9 smallest_S_on_line_R3=10
+name=e50_page_line at=.claude/kb/experiments/50-根环槽数的上下界.md:91
+name=e50_page_line at=.claude/kb/experiments/50-根环槽数的上下界.md:118
+name=d22_s_cell at=.claude/kb/decisions/22-单元原子性怎么合成.md:60 replaced_span_found=1 kept_after_span_has_not_a_format_decision=True kept_after_span_has_load_shape=True
+name=i713_row at=crates/singlefs-checker/invariants/02-根环.md:20 says_eight_members=True names_prime_step_363=False names_chunk_367=False pbs_lower_457=True

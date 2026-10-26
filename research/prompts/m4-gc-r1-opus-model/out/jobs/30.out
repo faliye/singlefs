@@ -1,5 +1,0 @@
-E name=cur_recheck nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=56943 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=13636 frozen=0 unmet_del=0 false_enospc=2884 release_bad=0 rb_refused=0 del_pred_true=1386 del_pred_false=1482 n0_refused=0 gc_done=17481 gc_declined=4782 gc_stuck=0 gc_paused=21044 gc_cycle=12816 gc_cap=820 gc_wasted=0
-W name=cur_recheck flag=livelock path=W0.M
-W name=cur_recheck flag=false_enospc path=W0.O0.GI.O0
-W name=cur_recheck flag=del_pred_true path=W0.GI.GB
-W name=cur_recheck flag=del_pred_false path=W0.GI.O0.GB

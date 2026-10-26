@@ -1,0 +1,50 @@
+name=chain_through_registered_row.base launch='走的是 A' base_rows=['old-b\ttools/real-b\t2026-10-23\trecords/move.md']
+name=chain_through_registered_row.control_direct.path_move_report rows=3 problems=['第 2 行的新前缀 tools/real-b 下有基准 HEAD 里本来就在的文件（tools/real-b/run.sh，共 1 份）：这一行不是一次搬迁'] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）实据不够，见上'
+name=chain_through_registered_row.control_after_old_row.path_move_report rows=3 problems=['第 3 行的新前缀 old-b 不在磁盘上', '第 3 行：基准 HEAD 里旧前缀 tools/real-a 下的 1 份，照登记换到的落点上有 1 份此刻不在（old-b/run.sh）'] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）实据不够，见上'
+name=chain_through_registered_row.attack.path_move_report rows=3 problems=[] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 0 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=chain_through_registered_row.attack.final_landing_arm problems=['第 2 行的新前缀 old-b 最终落在 tools/real-b，那里有基准里本来就在的文件（tools/real-b/run.sh）']
+name=chain_through_registered_row.attack.gate_changed_paths rc=0 changed=['.claude/gate.d/path-moves.tsv', '.claude/long-run-live-hosts-exempt', 'tools/real-a/run.sh'] stderr=''
+name=chain_through_registered_row.attack.gate_added_lines rc=0 added=['.claude/gate.d/path-moves.tsv\ttools/real-a\told-b\t2026-10-23\trecords/move.md', '.claude/gate.d/path-moves.tsv\tbin/live.sh\tbin/live-host.sh\t2026-10-23\trecords/move.md', '.claude/long-run-live-hosts-exempt\tbin/live-host.sh  29d1d8c273c570a6b8865f521ac959628c1ce4f4160e1f5f7e7a3bb28f06d6ee  # 样本：文件头按现算写、不能改，只缩不涨'] stderr=''
+name=chain_through_registered_row.attack.real_change launch_now='走的是 B' diff=['-bash tools/real-a/run.sh', '+bash tools/real-b/run.sh', '']
+name=chain_through_registered_row.attack.exempt_check result=(0, '✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨（其中 1 行照 .claude/gate.d/path-moves.tsv 登记的搬迁换算之后与基准那一版逐字节相同：bin/live-host.sh）')
+name=chain_through_registered_row.attack.pins frozen_o3_same=True reuse_library_pin_accepted=True
+name=round_trip_pair.control_one_row.path_move_report rows=1 problems=['第 2 行的新前缀 tools/live 下有基准 HEAD 里本来就在的文件（tools/live/run.sh，共 1 份）：这一行不是一次搬迁', '第 2 行的旧前缀 build/out 在基准 HEAD 里没有文件：这一行不是一次搬迁'] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）实据不够，见上'
+name=round_trip_pair.attack.path_move_report rows=2 problems=[] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=round_trip_pair.attack.final_landing_arm problems=['第 2 行照全部登记换完，旧前缀下的文件落回原处：没有东西搬家', '第 3 行照全部登记换完，旧前缀下的文件落回原处：没有东西搬家']
+name=round_trip_pair.attack.status porcelain=[' M ops/launch.sh', '?? .claude/']
+name=round_trip_pair.attack.gate_changed_paths rc=0 changed=['.claude/gate.d/path-moves.tsv'] stderr=''
+name=round_trip_pair.attack.pins frozen_o3_same=True reuse_library_pin_accepted=True
+name=ignored_landing.path_move_report rows=1 problems=[] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 0 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=ignored_landing.final_landing_arm problems=[] untracked_landings=['第 2 行：tools/real-a/run.sh 的落点 build/run.sh 不在索引里']
+name=ignored_landing.gate_changed_paths rc=0 changed=['.claude/gate.d/path-moves.tsv', 'tools/real-a/run.sh'] stderr='' launch_now='走的是没进 git 的另一份'
+name=stale_row_moved_back.before_commit.path_move_report rows=2 problems=[] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=stale_row_moved_back.before_commit.exempt_check result=(0, '✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨')
+name=stale_row_moved_back.after_commit.status porcelain=[]
+name=stale_row_moved_back.after_commit.path_move_report rows=2 problems=[] note='没有新加的行（都在基准 HEAD 那一版的登记表里），实据不再核'
+name=stale_row_moved_back.after_commit.exempt_check result=(1, '✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）：\n     第 2 行 scripts/experiments/live.sh 是基准那一版里没有的（豁免表涨了）\n     → 怎么办：豁免只缩不涨：新脚本的文件头按登记值写；确实要加的，交主 agent 问用户再加')
+name=stale_row_moved_back.after_commit.baseline_text rows=['scripts/experiment-apparatus/live.sh  0b872096c65a3316ee37e87fa3ac72138c541d1f07145b68294c47ff643e76c8  # 样本：文件头按现算写、不能改，只缩不涨'] problem=None
+name=stale_row_moved_back.kept_line_rewritten gate_changed_paths=[] rc=0 gate_added_lines=[] rc_lines=0 command_now=['搬迁那次（登记表连同第 5 步留旧路径的那一行一起提交）'] command_then=['搬迁那次（登记表连同第 5 步留旧路径的那一行一起提交）', '更早']
+name=stale_row_edits.date_and_source_rewritten rows=1 problems=[] note='没有新加的行（都在基准 HEAD 那一版的登记表里），实据不再核'
+name=stale_row_edits.deleted_then_added rows=2 problems=[] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=stale_row_edits.new_prefix_rewritten rows=1 problems=['第 2 行的新前缀 tools/real-c 下有基准 HEAD 里本来就在的文件（tools/real-c/run.sh，共 1 份）：这一行不是一次搬迁', '第 2 行的旧前缀 old-b 在基准 HEAD 里没有文件：这一行不是一次搬迁'] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）实据不够，见上'
+name=stale_row_edits.reordered_with_fresh_row rows=2 problems=[] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=governed_same_class.base_commit_selected agent_definitions=[] crates_sources=['crates/core/src/lib.rs']
+name=governed_same_class.control_unregistered changed=['.claude/agents/cross.md', '.claude/agents/helper.md', '.claude/agents/reviewer.md', 'crates/core/src/fast_path.rs', 'crates/core/src/lib.rs'] agent_definitions=['.claude/agents/cross.md', '.claude/agents/helper.md', '.claude/agents/reviewer.md'] crates_sources=['crates/core/src/fast_path.rs', 'crates/core/src/lib.rs']
+name=governed_same_class.registered.path_move_report rows=4 problems=[] note='新加的 4 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；第 4 行 1 份里 1 份换算之后相同；第 5 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=governed_same_class.registered rc=0 changed=['.claude/agents/cross.md', '.claude/gate.d/path-moves.tsv', 'crates/core/src/lib.rs'] agent_definitions=['.claude/agents/cross.md'] crates_sources=['crates/core/src/lib.rs'] stderr=''
+name=governed_same_class.registered_in_process kept=['.claude/agents/cross.md', '.claude/gate.d/path-moves.tsv', 'crates/core/src/lib.rs'] agent_definitions=['.claude/agents/cross.md'] crates_sources=['crates/core/src/lib.rs'] problem=None
+name=hunk_internal_relocation.path_move_report rows=1 problems=[] note='新加的 1 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=hunk_internal_relocation.diff lines=['@@ -2,3 +2,3 @@', '-结论甲', '-- 结论甲的复跑见 scripts/old-rig/x.sh', '-## 历史', '+结论甲（改）', '+## 历史（2026-10-23 起）', '+- 结论甲的复跑见 scripts/new-rig/x.sh', '']
+name=hunk_internal_relocation.drop_moved_lines kept=[('kb/page.md', '结论甲（改）', 2), ('kb/page.md', '## 历史（2026-10-23 起）', 3)] problem=None
+name=hunk_internal_relocation.gate_added_lines rc=0 added=['kb/page.md\t结论甲（改）', 'kb/page.md\t## 历史（2026-10-23 起）'] stderr=''
+name=selftest_distinguish.judged red=[] green=4
+name=selftest_distinguish.final_landing red=[] green=4
+name=selftest_distinguish.final_landing.chain_through_registered_row.attack.path_move_report rows=3 problems=['第 2 行的新前缀 old-b 最终落在 tools/real-b，那里有基准里本来就在的文件（tools/real-b/run.sh）'] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 0 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=selftest_distinguish.final_landing.round_trip_pair.attack.path_move_report rows=2 problems=['第 2 行照全部登记换完，旧前缀下的文件落回原处：没有东西搬家', '第 3 行照全部登记换完，旧前缀下的文件落回原处：没有东西搬家'] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=selftest_distinguish.final_landing.governed_same_class.registered_in_process kept=['.claude/agents/cross.md', '.claude/gate.d/path-moves.tsv', 'crates/core/src/lib.rs'] agent_definitions=['.claude/agents/cross.md'] crates_sources=['crates/core/src/lib.rs'] problem=None
+name=selftest_distinguish.half_threshold red=['搬迁登记：登记行要有搬迁实据'] green=3
+name=selftest_distinguish.no_occupied_check red=['搬迁登记：登记行要有搬迁实据'] green=3
+name=selftest_distinguish.class_by_reader red=[] green=4
+name=selftest_distinguish.class_by_reader.chain_through_registered_row.attack.path_move_report rows=3 problems=[] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 0 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=selftest_distinguish.class_by_reader.round_trip_pair.attack.path_move_report rows=2 problems=[] note='新加的 2 行（基准 HEAD 那一版的登记表里没有）有搬迁实据（第 2 行 1 份里 1 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=selftest_distinguish.class_by_reader.governed_same_class.registered_in_process kept=['.claude/agents/cross.md', '.claude/agents/helper.md', '.claude/agents/reviewer.md', '.claude/gate.d/path-moves.tsv', 'crates/core/src/fast_path.rs', 'crates/core/src/lib.rs'] agent_definitions=['.claude/agents/cross.md', '.claude/agents/helper.md', '.claude/agents/reviewer.md'] crates_sources=['crates/core/src/fast_path.rs', 'crates/core/src/lib.rs'] problem=None

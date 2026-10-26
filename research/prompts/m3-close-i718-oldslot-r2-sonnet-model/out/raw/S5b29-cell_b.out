@@ -1,0 +1,36 @@
+
+running 1 test
+test cell_b_hole_in_the_next_slot ... ROW cell=B hist=hole_base29_repeat0 S=5 image=healthy_n kind=legit newest=44 inst=3 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat0 S=5 image=before_record kind=legit newest=44 inst=3 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat0 S=5 image=before_root kind=legit newest=44 inst=3 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat0 S=5 image=zero kind=legit newest=44 inst=3 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat0 S=5 image=torn_enum kind=legit newest=44 inst=3 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat0 S=5 image=torn_half kind=legit newest=44 inst=3 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat1 S=5 image=healthy_n kind=legit newest=59 inst=5 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat1 S=5 image=before_record kind=legit newest=59 inst=5 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat1 S=5 image=before_root kind=legit newest=59 inst=5 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat1 S=5 image=zero kind=legit newest=59 inst=5 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat1 S=5 image=torn_enum kind=legit newest=59 inst=5 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat1 S=5 image=torn_half kind=legit newest=59 inst=5 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat2 S=5 image=healthy_n kind=legit newest=74 inst=7 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat2 S=5 image=before_record kind=legit newest=74 inst=7 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat2 S=5 image=before_root kind=legit newest=74 inst=7 t=15 F=0 p=255 next_slot_root=Some(15) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base29_repeat2 S=5 image=zero kind=legit newest=74 inst=7 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat2 S=5 image=torn_enum kind=legit newest=74 inst=7 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base29_repeat2 S=5 image=torn_half kind=legit newest=74 inst=7 t=15 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+SCAN cell=B hist=hole_base29_repeat2 label=hole_base29_repeat2_zero S=5 N=74 true_t=15 true_F=0 true_p=255 combos=225 floors=[0, 5, 60] pins=[255]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=today legit_accepted=0 legit_red=3 legit_na=0 wrong_accepted=3 wrong_red=219 wrong_na=0 wrong_accepted_sample=[(61, 0, 255), (61, 5, 255), (61, 60, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=jia_gt legit_accepted=1 legit_red=2 legit_na=0 wrong_accepted=5 wrong_red=217 wrong_na=0 wrong_accepted_sample=[(60, 0, 255), (60, 5, 255), (61, 0, 255), (61, 5, 255), (61, 60, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=jia_seed legit_accepted=1 legit_red=2 legit_na=0 wrong_accepted=5 wrong_red=217 wrong_na=0 wrong_accepted_sample=[(60, 0, 255), (60, 5, 255), (61, 0, 255), (61, 5, 255), (61, 60, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=yi_literal legit_accepted=0 legit_red=0 legit_na=3 wrong_accepted=0 wrong_red=0 wrong_na=222 wrong_accepted_sample=[]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=yi_gate legit_accepted=0 legit_red=0 legit_na=3 wrong_accepted=0 wrong_red=0 wrong_na=222 wrong_accepted_sample=[]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=any_lap legit_accepted=3 legit_red=0 legit_na=0 wrong_accepted=11 wrong_red=211 wrong_na=0 wrong_accepted_sample=[(0, 0, 255), (5, 5, 255), (30, 0, 255), (30, 5, 255), (45, 0, 255), (45, 5, 255), (60, 0, 255), (60, 5, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=ding_jia legit_accepted=3 legit_red=0 legit_na=0 wrong_accepted=11 wrong_red=211 wrong_na=0 wrong_accepted_sample=[(0, 0, 255), (5, 5, 255), (30, 0, 255), (30, 5, 255), (45, 0, 255), (45, 5, 255), (60, 0, 255), (60, 5, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=ding_jia_same legit_accepted=3 legit_red=0 legit_na=0 wrong_accepted=11 wrong_red=211 wrong_na=0 wrong_accepted_sample=[(0, 0, 255), (5, 5, 255), (30, 0, 255), (30, 5, 255), (45, 0, 255), (45, 5, 255), (60, 0, 255), (60, 5, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=ding_jia_single legit_accepted=1 legit_red=2 legit_na=0 wrong_accepted=5 wrong_red=217 wrong_na=0 wrong_accepted_sample=[(60, 0, 255), (60, 5, 255), (61, 0, 255), (61, 5, 255), (61, 60, 255)]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=ding_yi legit_accepted=0 legit_red=0 legit_na=3 wrong_accepted=0 wrong_red=0 wrong_na=222 wrong_accepted_sample=[]
+  SCANCAND label=hole_base29_repeat2_zero S=5 N=74 cand=ding_yi_same legit_accepted=0 legit_red=0 legit_na=3 wrong_accepted=0 wrong_red=0 wrong_na=222 wrong_accepted_sample=[]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 125.94s
+

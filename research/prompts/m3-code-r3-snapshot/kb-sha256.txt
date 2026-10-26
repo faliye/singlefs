@@ -1,2 +1,0 @@
-1a47bdc3c83956395b45841bee1a585829b448458bb9f51fd8d266d1d95e58a0  .claude/kb/experiments/01-节点大小vs可恢复性.md
-a83e6430a842fcbd19e17f454a3d3a8edbd8f33b832098ba582261a5ad5d8279  .claude/kb/decisions/18-块里携带什么信息.md

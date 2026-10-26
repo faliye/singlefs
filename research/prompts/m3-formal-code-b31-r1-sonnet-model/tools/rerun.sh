@@ -30,7 +30,7 @@ static)
   rsync -a --exclude target/ "$FROZEN/" "$draft/tree/"
   { echo "== N5 静态核"; python3 "$here/check_rows.py" "$FROZEN"; } 2>&1 | tee -a "$OUT/n5-static.txt"
   mkdir -p "$draft/n4"
-  q5="$REPO/scripts/experiments/target/e171-r1-frozen-tree-revision-5-q5/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
+  q5="$REPO/scripts/experiment-apparatus/target/e171-r1-frozen-tree-revision-5-q5/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
   repo_file="$FROZEN/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
   old="${OLD945:-/tmp/claude-1000/m3-formal-31-2/device-945e41c8.rs}"
   patches="${P6_DIR:-/tmp/claude-1000/m3-formal-31-2/patch}"

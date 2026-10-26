@@ -1,0 +1,4 @@
+crates/singlefs-core/src/relocation_judgement.rs	s1：目的地与受保护落点比重叠时漏判	        if placements_overlap(candidate, &others[k]) {	        if false && placements_overlap(candidate, &others[k]) {
+crates/singlefs-core/src/relocation_judgement.rs	s1：两两不重叠只比相邻一项之外的	        let mut j: usize = i + 1;\n        while j < runs.len()	        let mut j: usize = i + 2;\n        while j < runs.len()
+crates/singlefs-core/src/relocation_judgement.rs	s1：源槽判定漏掉第二份副本	        sits == (first_copy_slot == planned_source_slot && second_copy_slot == planned_source_slot	        sits == (first_copy_slot == planned_source_slot
+crates/singlefs-core/src/relocation_judgement.rs	s1：字节可用判成长度大于等于 0	    length > 0\n}	    length >= 0\n}

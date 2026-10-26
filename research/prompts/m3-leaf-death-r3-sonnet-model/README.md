@@ -1,6 +1,6 @@
 # m3-leaf-death-r3 正推腿（Sonnet）模型
 
-第二轮攻方腿模型（`research/prompts/m3-leaf-death-r2-opus-model/`）的另写版本，加了候选二 / 三、同一段历史的做法、三个名字空间、按事件记账。不依赖 `crates/`、不依赖 `scripts/experiments/Cargo.toml`。
+第二轮攻方腿模型（`research/prompts/m3-leaf-death-r2-opus-model/`）的另写版本，加了候选二 / 三、同一段历史的做法、三个名字空间、按事件记账。不依赖 `crates/`、不依赖 `scripts/experiment-apparatus/Cargo.toml`。
 
 - `src/model.rs`：主模型。候选 Today / RetA / RetB / Persist / PersistX / Tsz / Fsz，借法 NoBorrow / N1New / N2 / N1Raise；崩溃（在飞单元写逐子集枚举）、丢根、管理员回退、实例表清扫、unlink 分批；每次发布之后扫盘重建，按 inode、data、units 三个名字空间与真值比。
 - `src/clone.rs`：克隆头共享叶的有界穷举（叶容量 2，长度 ≤ 6 的全部序列）。

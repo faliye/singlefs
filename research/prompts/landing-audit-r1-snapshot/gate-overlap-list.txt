@@ -1,0 +1,58 @@
+门禁	.claude/singlefs-ai-sop/scripts/changelog-lint.sh		CHANGELOG 连续性：每一版都有自己的一节，最新一节就是 VERSION。
+门禁	.claude/singlefs-ai-sop/scripts/check.sh		快速本地检查：格式 / lint / 构建 / 单测。
+门禁	.claude/singlefs-ai-sop/scripts/doc-lint.sh		文档铁律的自动检查。rules/writing-discipline.md 和它分出去的 design-doc、kb 两篇靠这个脚本强制，不
+门禁	.claude/singlefs-ai-sop/scripts/gate-lint.sh		门禁自身的门禁：每一条拒绝，都必须同时给出下一步。
+门禁	.claude/singlefs-ai-sop/scripts/gate-overlap.py		新加的门禁与钩子要先对过已有的：能追加就追加，能合并就合并，不另起一份，更不整段抄一份。
+门禁	.claude/singlefs-ai-sop/scripts/gate.sh		准入门禁。rules/show-me-test.md的可执行形式。
+门禁	.claude/singlefs-ai-sop/scripts/history-ordinal.sh		本次新增的历史条目有没有撞号。
+门禁	.claude/singlefs-ai-sop/scripts/hooks-registered.sh		工具层的闸注册着、而且会拒绝。
+门禁	.claude/singlefs-ai-sop/scripts/i18n-sync.sh		各语言文本必须同步：改了任何一份，声明的每种语言都要跟上。
+门禁	.claude/singlefs-ai-sop/scripts/link-targets.py		文档里的相对链接与「第 <数字> 节」指向，指不指得到。
+门禁	.claude/singlefs-ai-sop/scripts/manifest.sh		规则清单：给译文仓对账用的唯一接口。
+门禁	.claude/singlefs-ai-sop/scripts/naming-lint.sh		命名纪律里机器判得了的那一半（rules/code-discipline.md 的「名字」一节）。
+门禁	.claude/singlefs-ai-sop/scripts/number-name-sync.sh		编号与简称在 doc-lint 够不到的地方也要一致。
+门禁	.claude/singlefs-ai-sop/scripts/preflight-lint.py		准入与运行条件（rules/preflight-discipline.md）：每个脚本在开头写明什么时候该调、什么时候不能调，而且开跑之前先
+门禁	.claude/singlefs-ai-sop/scripts/preflight.py		准入与运行条件（rules/preflight-discipline.md）：读脚本文件头的声明，在它开跑之前现判；不满足就拒绝，带 --f
+门禁	.claude/singlefs-ai-sop/scripts/relay-timing-lint.py		读子进程输出的循环里，不许一边给行打时间戳、一边把行转打出去。
+门禁	.claude/singlefs-ai-sop/scripts/rules-lint.sh		规则文件只写怎么做，不写历史与原因（rules/rules-discipline.md）。
+门禁	.claude/singlefs-ai-sop/scripts/script-modes.sh		脚本的执行位在暂存区里没有丢，射程里也没有 git 存不下的空目录。
+门禁	.claude/singlefs-ai-sop/scripts/selftest.sh		门禁自己的测试：拿一组「本该红」和「本该绿」的样本喂给各个门禁脚本，看它判得对不对。
+门禁	.claude/singlefs-ai-sop/scripts/shell-lint.sh		shell 脚本的已知坑，做成会红的检查（rules/command-safety.md）。
+门禁	.claude/singlefs-ai-sop/scripts/show-me-test.sh		Show me test 阶段：改了 crates 代码就必须带测试（rules/show-me-test.md）。
+门禁	.claude/singlefs-ai-sop/scripts/stage-selftest.sh		项目本地门禁阶段自己会不会红。
+门禁	.claude/singlefs-ai-sop/scripts/version-discipline.sh		版本纪律：改了规范本体就必须同时抬 VERSION。
+门禁	.claude/gate.d/checker-independence-and-sync.sh		checker 类：checker 与实现只共享常量模块、记账语义不许同源，harness 档不依赖 checker 档；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟；判器调用点要么在判定段里、要么带了豁免或 CPU 参照的标记
+门禁	.claude/gate.d/checker-tier-broad-mutation.sh		广谱变异（提交门禁：此刻源码上每一条变异都有单元键相同的结论、没有一条没红）
+门禁	.claude/gate.d/checker-tier-crash-point-replay.sh		崩溃点重放与登记的崩溃枚举用例（快档跑 checker 档包不标 ignored 的用例、按条复用，核每条用例的崩溃状态块；--full 逐条按块的单元键跑全量）
+门禁	.claude/gate.d/checker-tier-crates-mutation-replay.sh		crates 变异表复跑（每条改坏一处、点名的测试必须红）
+门禁	.claude/gate.d/checker-tier-formal-verification.sh		形式化验证（Verus 证明恢复重放取前缀的核，版本钉住、空真与必红世界按落点判；E165 全量的红例钉进快档；两条本该独立的腿的同源性计数器）
+门禁	.claude/gate.d/checker-tier-lkmm.sh		内存序（herd7 + litmus/，本工程自己的阶段）
+门禁	.claude/gate.d/checker-tier-qemu-device-streams.sh		QEMU 真设备上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
+门禁	.claude/gate.d/checker-tier-research-build-and-replay.sh		research 工作区的构建与单测；入库的实验数今天还复现得出来吗
+门禁	.claude/gate.d/code-source-discipline.sh		代码类的源码纪律：名字不只由空泛词拼成、测试文件与 #[test] 函数不按里程碑、欠账号起名；kb 登记的格式常量、条文集合与 feature bit 位号与代码逐个对得上；实验二进制有成形的变异表且锚点唯一、有钉绝对值的断言、种子不折叠与读数不恒为字面量 0；crates/ 里放开 unsafe 的地方与登记表逐处对上；crates 变异表的轻型登记在改坏对象在 crates/singlefs-core/src/ 下的行里每个测试目标一行；不走 GPU 的计算与豁免表逐项对上；崩溃点重放的按段登记成形；代码里我们自己的名字不带序号与位置词
+门禁	.claude/gate.d/code-tooling.sh		工具层自检（二十七格：研究脚本的自证都过、有阶段在跑；带判定库的脚本自证里复用三问都过；项目规则清单；阶段归属表按格登记；钩子注册与写范围表与定义头；改动范围只许一份取法；研究脚本与钩子的拒绝出路与 shell 纪律；阶段声称的样本与编造的日期；带编号登记位的样本都排在 doc-lint 之外；kb 登记表；门禁结构；环境检查排在跑测试的阶段之后；目录形态；提交里没有超过单文件上限的文件；阶段在 cd 之前取好自己的位置；并行度默认值只经每台默认重活线程数的登记位取；长活声明按现算读的脚本豁免表指得到、真要靠现算才齐、只缩不涨；函数单元两份实现对拍；heavy 与 heavy-if-set 的自证登记成偏离；变异门禁的 --list-items 在被判的仓上跑得通；门禁阶段的弄坏开关只在样本根上认；入口脚本带列项、自证与每项一行；弄坏开关文件头三样写全；门禁阶段的弄坏开关逐条复跑、判错的样本与头注点名的相等；研究脚本与钩子平常跑时设了弄坏开关要被拒；登记的脚本与钩子的弄坏开关逐条复跑、点名的项都在失败行里）
+门禁	.claude/gate.d/doc-decisions.sh		决策文档与变更史（二十格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、候选代号复用、依据块里的推论判决与三方腿况、变更史条目与形状）
+门禁	.claude/gate.d/doc-experiments.sh		实验页与产物（十三格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记、点名的路径找得到、跑前登记的并行与挂钟、重跑登记的比对对象在单元表与复跑表里找得到）
+门禁	.claude/gate.d/doc-process-records.sh		三方论证与阶段同步有没有留下该留的记录：批次范围、判决点名、正文前提、轮次收尾、同步记录、里程碑收口时的欠账
+门禁	.claude/gate.d/doc-registries.sh		登记表与引用（二十七格：字段与布局登记表之间的账；欠账表与收口表的形状与去向；实验号、决策号、门禁名、路径、小节与外部引用指得到；不变量条数与字段落点；kb 正文里的内联算式左右相等；未实现的不变量写了编号前置；字段频率「每 X 一份」的 X 指得到已定条款给出的大小；字段行的宽度写在被指的分项里；删除写出的字节三处挂钩；挂载透明字段表与 kb 对账）
+门禁	.claude/gate.d/doc-text.sh		文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改一份就三份同进同出、译文照翻译术语表用词；这次改动新加到记录、kb 页与三方判决正文的行里不写账号切换与用量限额；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8
+门禁	.claude/gate.d/harness-model-differential-and-scenarios.sh		harness 类：harness 档与 checker 档一条用例一个场景；模型对拍（随机历史快档与五个取样点，每一步拿实现的结局与只住内存的理想模型比，每段一格、各点名一条用例）
+门禁	.claude/gate.d/harness-test-environment.sh		跑完测试之后机器还干不干净（残留测试设备、临时目录残留、宿主盘）
+钩子	.claude/singlefs-ai-sop/scripts/claude-hooks/gate-reuse-check.sh	没注册	Claude Code 的 Stop / SubagentStop 钩子（收工的尾门禁）：agent 这一轮新建了门禁或钩子，收工前先自检它
+钩子	.claude/singlefs-ai-sop/scripts/claude-hooks/handback-scratch-check.sh	PreToolUse[SubagentHandback]、SubagentStop[*]	Claude Code 钩子（交回的尾门禁）：子 agent 交回之前，它自己建的编译目录与仓副本要删掉
+钩子	.claude/singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh	PreToolUse[Bash]	Claude Code 的 PreToolUse 钩子（Bash 工具）：命令里有按模式找进程的写法（pgrep 或 pkill 带 -f 
+钩子	.claude/hooks/ask-user-claim-guard.sh	PreToolUse[AskUserQuestion]	PreToolUse hook（AskUserQuestion）：弹窗问句里把推出来的话写成事实的，执行前拒绝（退出 2，stderr 写是
+钩子	.claude/hooks/bash-command-detector.sh	PreToolUse[Bash]	PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、
+钩子	.claude/hooks/continuation-guard.sh	PreToolUse[SendMessage]	PreToolUse hook（SendMessage）：给一个已经交回过、或被中断过（撞限额、被停、报错）的子 agent 发消息之前拦一
+钩子	.claude/hooks/handback-guard.sh	PreToolUse[SubagentHandback]	PreToolUse hook（SubagentHandback）：子 agent 交回之前拦四样——自己起的后台任务还在跑（全部子 age
+钩子	.claude/hooks/heavy-test-guard.sh	PreToolUse[Bash]	PreToolUse hook（Bash）：重型测试只在提交代码时、或用户要求时跑，子 agent 只跑自己那一份；不合的当场拒绝（退出 2
+钩子	.claude/hooks/host-resources-reminder.sh	PreToolUse[Bash]	PreToolUse hook（Bash）：认出要起重活或起 GPU 的命令时，先跑 scripts/hosts/host-resource
+钩子	.claude/hooks/remind-rearm-stop-guard.sh	Stop[*]	Stop hook：主 agent 要结束这一轮时，看这个会话登记着的循环提醒（scripts/agents/remind.sh start
+钩子	.claude/hooks/run-scope-guard.sh	PreToolUse[Bash]	PreToolUse hook（Bash）：起验证脚本的命令要在开头带一份范围声明（跑什么、范围多大、为什么这么跑），种类与范围要与命令的形
+钩子	.claude/hooks/runner-dispatch-guard.sh	PreToolUse[Agent|Task]	PreToolUse hook（Agent）：派发那一刻查派发提示齐不齐、写得对不对，缺一样当场拒（退出 2，stderr 写原因与出路）。
+钩子	.claude/hooks/session-start.sh	SessionStart[startup|resume|compact]	SessionStart hook：会话开始时往上下文里补两样东西，按 hook 输入的 source 分，只报、不改任何东西。
+钩子	.claude/hooks/shared-index-stale-reminder.sh	PostToolUse[Bash]	PostToolUse hook（Bash）：命令文本里命令位置上有 git commit（经 -C、cd、bash -c 起的也认）时，提
+钩子	.claude/hooks/timer-only-remind-guard.sh	PreToolUse[CronCreate|ScheduleWakeup|RemoteTrigger|Skill|Monitor|Bash]	PreToolUse hook（CronCreate、ScheduleWakeup、RemoteTrigger、Skill、Monitor、
+钩子	.claude/hooks/two-logs-guard.sh	PreToolUse[Bash]	PreToolUse hook（Bash）：门禁（.claude/gate.d/*.sh、gate.sh）、cargo test、四个入口脚
+钩子	.claude/hooks/write-guard.sh	PreToolUse[Write|Edit|MultiEdit]	PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matche
+共 57 份：门禁 40、钩子 17

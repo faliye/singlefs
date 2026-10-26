@@ -1,0 +1,4 @@
+name=time_first poll_at_T_minus_1=None poll_at_T=time dirty_bytes_at_cross=0
+name=dirty_first accepts=4 cause=dirty clock_ms=5
+name=both_at_once cause=both
+name=clock_backwards poll_at_100=None

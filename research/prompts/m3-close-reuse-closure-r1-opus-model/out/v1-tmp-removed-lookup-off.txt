@@ -1,0 +1,4 @@
+name=tmp-removed-lookup-off remove_after=3 status=252 seconds=6 ran=no
+run-with-memory-cap: 没查到别的机器：RUN_WITH_MEMORY_CAP_HOST_LOOKUP=off，这一条不查
+  ✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 MiB（回收不掉的用量 0 MiB + 账上还没涨到量的 250 MiB）
+run-with-memory-cap: 没查到别的机器：RUN_WITH_MEMORY_CAP_HOST_LOOKUP=off，这一条不查

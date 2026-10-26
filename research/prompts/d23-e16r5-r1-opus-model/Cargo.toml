@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-# 独立工作区：不进仓根工作区，不依赖 scripts/experiments（Emitter 换成本文件里的行计数）。
+# 独立工作区：不进仓根工作区，不依赖 scripts/experiment-apparatus（Emitter 换成本文件里的行计数）。
 [workspace]
 
 [[bin]]

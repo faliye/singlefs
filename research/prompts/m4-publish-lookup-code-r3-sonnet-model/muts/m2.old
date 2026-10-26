@@ -1,0 +1,1 @@
+                let locations = match previous_version_read_by_role.locations_of_role(*identity) {

@@ -1,0 +1,35 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.56s
+     Running tests/compaction_intent_is_logged_and_resumed_after_a_crash.rs (target/debug/deps/compaction_intent_is_logged_and_resumed_after_a_crash-0edd70d9b8f12af9)
+
+running 5 tests
+test a_logged_compaction_intent_whose_region_is_not_aligned_is_refused_by_the_writable_mount ... ok
+test a_crash_between_two_batches_is_continued_by_the_writable_mount_to_the_end ... ok
+test a_crash_right_before_the_last_batch_is_continued_by_the_writable_mount_to_the_end ... ok
+test a_crash_right_after_the_issue_publish_is_continued_by_the_writable_mount_to_the_end ... ok
+test the_issue_publish_logs_the_compaction_intent_and_a_writable_mount_reads_it_back_with_its_region_excluded ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.01s
+
+     Running tests/compaction_relocation_batches_publish_through_the_mapping.rs (target/debug/deps/compaction_relocation_batches_publish_through_the_mapping-d79fae701ced4fbe)
+
+running 8 tests
+test a_planned_source_off_the_mapping_position_is_refused_before_any_write ... ok
+test a_batch_moves_the_mapping_entry_to_the_destination_and_releases_the_source ... ok
+test the_tree_table_rewritten_by_the_batch_names_the_relocated_root_at_its_mapping_position ... ok
+test after_a_batch_the_cold_walk_and_the_rebuild_read_the_content_at_the_mapping_position ... ok
+test a_unit_kept_only_for_a_snapshot_is_relocated_and_the_snapshot_still_reads_it ... ok
+test a_batch_that_releases_the_source_while_the_mapping_still_names_it_is_judged_red ... ok
+test a_writable_mount_after_a_batch_keeps_the_mapping_entry_at_the_destination ... ok
+test consecutive_batches_rewrite_the_mapping_leaf_holding_each_moved_entry_and_a_writable_mount_keeps_both ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.46s
+
+     Running tests/snapshot_and_compaction_over_a_file_other_than_the_first.rs (target/debug/deps/snapshot_and_compaction_over_a_file_other_than_the_first-49de8d06b41467c1)
+
+running 2 tests
+test a_relocation_batch_moving_the_data_unit_of_another_file_takes_its_mapping_position_over_the_hint ... ok
+test overwriting_another_file_under_a_live_snapshot_puts_its_replaced_units_on_the_deadlist ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+

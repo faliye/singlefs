@@ -1,0 +1,4 @@
+# 登记式 assume_specification（演示）：每一条规格登记 std 函数、差分测试名、必红世界名。
+# 门禁要判的三件事：源码里的 assume_specification 集合 == 本表集合；差分测试在真实 std 上过；必红世界（把规格谓词改成错的）里 Verus 仍接受而差分测试红。
+std函数	差分测试	必红世界
+Option::copied	differential::the_registered_spec_agrees_with_std_on_the_bounded_domain	copied-returns-none-for-some

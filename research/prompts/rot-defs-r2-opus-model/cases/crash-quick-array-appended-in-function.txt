@@ -1,1 +1,0 @@
-items=(--item core); f() { items+=(--full); }; f; SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=崩溃点重放入口的轻型（--quick）; 范围=轻型核心部分加点名的 1 项; 为什么=改了恢复路径要核崩溃点重放轻型核心部分' bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick "${items[@]}"

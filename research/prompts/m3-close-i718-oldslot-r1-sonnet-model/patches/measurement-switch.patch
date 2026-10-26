@@ -1,0 +1,90 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -8520,16 +8520,78 @@
+         newest_root.rollback_floor,
+     );
+     let (newest_instance, newest_txg) = (newest_root.instance, newest_root.checkpoint_txg);
+-    judgements.judge(
+-        ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
+-        newest_root.reclaim_threshold == recomputed_threshold,
+-        || {
+-            format!(
+-                "最新根（实例 {newest_instance}、txg {newest_txg}）带的回收门槛 t {}，按这条根自己带的 F {}、环里按它的实例表仍有效的根与钉槽 p {} 现算是 {recomputed_threshold}",
+-                newest_root.reclaim_threshold, newest_root.rollback_floor, newest_root.pinned_ring_slot
+-            )
+-        },
++    // 量法开关（草稿副本，只给 I718_VARIANT 量具用，不是候选的改法）：同一份编译里按环境变量切 基线 / 甲 / 甲含种子边 / 乙 / 乙按大于。
++    let variant = std::env::var("I718_VARIANT").unwrap_or_default();
++    let ring_length_in_txgs = geometry.regions * geometry.slots_per_region;
++    let next_txg = newest_txg + 1;
++    let next_slot = (
++        next_txg % geometry.regions,
++        (next_txg / geometry.regions) % geometry.slots_per_region,
+     );
++    let next_slot_holds_a_self_verified_root = roots
++        .iter()
++        .any(|(region, slot, _)| (*region, *slot) == next_slot);
++    let next_slot_lacks_a_root_strictly_past_one_revolution =
++        !next_slot_holds_a_self_verified_root && next_txg > ring_length_in_txgs;
++    let next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed =
++        !next_slot_holds_a_self_verified_root && next_txg >= ring_length_in_txgs;
++    let recomputed_with_the_next_slot_by_its_old_content = next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed
++        .then(|| {
++            deferred_slots_reclaim_threshold(
++                roots
++                    .iter()
++                    .map(|(_, _, root)| {
++                        (
++                            standing_in_the_newest_roots_table(root),
++                            root.checkpoint_txg,
++                        )
++                    })
++                    .chain(
++                        pinned_txg_counted_as_a_valid_root
++                            .map(|pinned_txg| (RootStandingInTheNewestRootsTable::Valid, pinned_txg)),
++                    )
++                    .chain(std::iter::once((
++                        RootStandingInTheNewestRootsTable::Valid,
++                        next_txg - ring_length_in_txgs,
++                    ))),
++                newest_root.rollback_floor,
++            )
++        });
++    let equals_the_recomputed = newest_root.reclaim_threshold == recomputed_threshold;
++    let equals_the_one_with_the_old_content =
++        Some(newest_root.reclaim_threshold) == recomputed_with_the_next_slot_by_its_old_content;
++    let reclaim_threshold_message = || {
++        format!(
++            "最新根（实例 {newest_instance}、txg {newest_txg}）带的回收门槛 t {}，按这条根自己带的 F {}、环里按它的实例表仍有效的根与钉槽 p {} 现算是 {recomputed_threshold}",
++            newest_root.reclaim_threshold, newest_root.rollback_floor, newest_root.pinned_ring_slot
++        )
++    };
++    match variant.as_str() {
++        "b" if next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed => judgements.not_applicable(
++            ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
++            "乙：最新根之后那一槽读不出自证过的根",
++        ),
++        "b_strict" if next_slot_lacks_a_root_strictly_past_one_revolution => judgements.not_applicable(
++            ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
++            "乙（按大于）：最新根之后那一槽读不出自证过的根",
++        ),
++        _ => {
++            let accepted = match variant.as_str() {
++                "a" => {
++                    equals_the_recomputed
++                        || (next_slot_lacks_a_root_strictly_past_one_revolution
++                            && equals_the_one_with_the_old_content)
++                }
++                "a_seed" => equals_the_recomputed || equals_the_one_with_the_old_content,
++                _ => equals_the_recomputed,
++            };
++            judgements.judge(
++                ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
++                accepted,
++                reclaim_threshold_message,
++            );
++        }
++    }
+     match pinned {
+         PinnedRingSlotOfTheRoot::NoSlotPinned => {
+             judgements.judge(

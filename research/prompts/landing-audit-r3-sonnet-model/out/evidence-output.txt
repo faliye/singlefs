@@ -1,0 +1,61 @@
+== C1 九十节(第1466行起)与调度记录里这些词的命中行数
+admission: 九十节 0, 调度记录 0
+decision-evidence-lag: 九十节 0, 调度记录 1
+子目录: 九十节 0, 调度记录 1
+long-run-lines-dropped: 九十节 0, 调度记录 0
+live-words-narrowed: 九十节 0, 调度记录 0
+起点: 九十节 0, 调度记录 0
+three-way-materials: 九十节 0, 调度记录 2
+summary: 九十节 0, 调度记录 3
+findings: 九十节 0, 调度记录 2
+--until: 九十节 0, 调度记录 2
+修红: 九十节 0, 调度记录 1
+用量撞顶: 九十节 0, 调度记录 2
+subagent_transcript: 九十节 0, 调度记录 2
+常设: 九十节 1, 调度记录 6
+== C2 九十节 19 行里写了红样本(自证…应当 或 样本)的
+行数 19
+写了红样本的 ['⑩', '⑬', '⑭', '⑰', '⑱']
+去向列是「下一批工具改动」的 17
+== C3 ⑪ 点名的两处是否已改调库
+1084:    previous_rows, baseline_problem = lag_baseline.baseline_rows(base, pending_rel, cwd=root)
+3376:    text, problem = lag_baseline.baseline_text(diff_base, ledger_path)
+== C4 ⑪ 写的 gate-overlap 路径在不在；⑯ 要靠它报的最短相同段
+ls: cannot access 'scripts/gate-overlap.py': No such file or directory
+75:CLONE_MINIMUM_LINES = 8
+== C5 三方类型表现有几处(不含自证样本)
+.claude/hooks/runner-dispatch-guard.sh:1318:THREE_WAY_REPORT_TYPES = ("three-way-forward", "three-way-attack", "three-way-defense")   # 报告就是 research/prompts/<轮
+scripts/agents/dispatch-prompt.py:116:THREE_WAY_REPORT_TYPES = ("three-way-forward", "three-way-attack", "three-way-defense")
+.claude/hooks/handback-guard.sh:73:CITATION_CHECKED_AGENTS = {"three-way-forward", "three-way-attack", "three-way-defense", "three-way-verifier"}
+1017:        if agent["type"].startswith("three-way"):
+1083:    legs = [agent for agent in agents if agent["handed_back"] and agent["type"].startswith("three-way")]
+== C6 共用约束 108 行三前缀与派发闸
+以 REPORT、SUMMARY、FINDINGS、ANALYSIS 开头（不分大小写）
+3
+== C7 复跑表里有没有 subagent_transcript / dispatch-prompt / quote-kb / runner-dispatch-guard
+0
+== C8 rework.md 记下的缺口在定义里的痕迹(0=没有)
+K12 static-check 在 implementation-writer.md: 0
+K5 自证 在 experiment-runner.md: 0
+K2 clippy 在 experiment-runner.md: 0
+K10 观测不到|跑整格|重登记 在 main-agent.md: 0
+K13 连带红 在 implementation-writer.md: 0
+结局账 agent-cost.py outcome 在 main-agent.md/agent-common.md/hooks 里的调用点: 0
+== C9 判决 r2 K1 K3-4 引的「主 agent 建的工作树」在定义里
+0
+== C10 decision-evidence-lag.tsv 第9行
+# 只缩不涨：相对基准那一版（changed-paths.sh 的 gate_diff_base gate）新增的行判红；基准那一版
+== C11 ⑥ 与 agent-common 命名检查
+没跑就拒交回
+在 rsync 拷的副本里改的，不在副本上跑
+== C12 门禁格头注自陈管不到
+# 管不到：登记散文里的比对对象表有没有照实抄进机读表（散文没有固定形态，漏登记的行这一格看不见）、留存产物名指到的文件在不在、单元表里
+== C13 admission.py 里复跑表的第五份读法
+5438:REPLAY_TABLE_START = "TABLE=$(cat <<'TSV'\n"
+== C14 看门狗检出前两条：调度记录里的原话
+- 定义与共用约束那一位：想跑 `rules-lint.sh` 与 `stage-selftest.sh --item doc-experiments.sh`，钩子以
+- 门禁与脚本那一位：`stage-selftest.sh` 被拒，原因是 doc-experiments.sh 的样本与 HEAD 加暂存区不
+== C15 ⑰ 写的出处「调度记录第七批、一个工具员 20 分钟里报了五次以上」在调度记录里找得到吗
+含「20 分钟」的行数: 0；第七批一节(第183行起)含 mktemp 的行数: 0；含「五次」的行数: 0
+== C16 ③ 的词在调度记录里的命中(粗算)
+命中延后|下轮开|下一批的行: 10；其中同行带 C 号、拆分提案、九十节或 checks-owed 的行: 3

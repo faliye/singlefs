@@ -1,0 +1,14 @@
+  · ③ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · ④ 树拷到第二台 runs/m4-r2-sonnet-trip6（git 列得出的 4096 个文件，没跟踪的临时文件排掉 0 个，规范副本另拷），在那里 git init 并提交一次
+  · ⑤ 第二台开跑（脱离 ssh 会话起，经副本里的 run-with-memory-cap.sh 16G），每 5 秒看一次
+  … 第二台那一份：running
+    Finished `release` profile [optimized + debuginfo] target(s) in 29.13s
+  Executable tests/diff_history_remount.rs (target/release/deps/diff_history_remount-6b287aaba72eee00)
+name=differential_red seeds=1-32 steps=64 lines=2112 lines_before=2112 faulty_vs_before=different
+name=differential_red_first_difference 130,131c130,131
+name=differential_red_first_difference < seed=2 step=62 compaction ok:batches=3:kept_relocated=0:Discriminant(0) f6f54759d916bc6543937e23 kept=0 dupkept=0 files=13 dupfiles=0 units=98 snapshots=0 slots=99684be27fa9
+name=differential_red_first_difference < seed=2 step=63 create_snapshot ok 0b8478ac5e65ca461a64bd6b kept=0 dupkept=0 files=13 dupfiles=0 units=98 snapshots=1 slots=31c0b8ec1b00
+name=differential_red_first_difference ---
+name=differential_red differing_lines=379
+  · 第二台那条命令退 0
+  · ⑦ 删了第二台 runs/m4-r2-sonnet-trip6 这一趟的树与进程号、退出码、输出、串行声明四个文件（回读不在了）

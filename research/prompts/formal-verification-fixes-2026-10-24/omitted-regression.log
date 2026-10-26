@@ -1,0 +1,2 @@
+  ✗ 未登记的 Verus 核：crates/core/src/omitted.rs
+     → 怎么办：把该文件加入 .claude/gate.d/verus-pins.tsv 的 kernel 行；所有被使用的证明契约都必须验证

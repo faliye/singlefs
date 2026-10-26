@@ -1,4 +1,0 @@
-candidate=today binaries=13 passed=142 failed=0 ignored=1 failed_tests=
-candidate=k6 binaries=13 passed=142 failed=0 ignored=1 failed_tests=
-candidate=pointer_per_kind binaries=13 passed=142 failed=0 ignored=1 failed_tests=
-candidate=pointer_r1 binaries=13 passed=141 failed=1 ignored=1 failed_tests=a_root_whose_units_and_record_read_back_zero_at_the_mount_falls_back_to_the_witnessed_version_in_recovery_and_both_mounts

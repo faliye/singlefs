@@ -308,7 +308,7 @@
 
 `crates/` 里没有旧写者处置不认识的树的路径：`grep -rn -E '旧写者|不认识的树|unknown_tree|carry_unknown' crates --include=*.rs | grep -v '/tests/' | wc -l` 输出 `0`。因此三条记账臂、五条 flags 臂都没有实现可比，装置是独立模型；与实现逐项对拍只做第十一节停机条款列的三项（行数、台阶行照抄规则、I-3.13 语法认法）。
 
-**装置写在哪（写死）**：`scripts/experiments/e186_unknown_tree_accounting_rederive.rs`，独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）。这条岔路问的是格式政策，不是「`crates/` 这份代码的性质」，不写成入库装置。
+**装置写在哪（写死）**：`scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs`，独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）。这条岔路问的是格式政策，不是「`crates/` 这份代码的性质」，不写成入库装置。
 
 ## 四、跑之前已经存在的数
 
@@ -318,7 +318,7 @@
 |---|---|---|
 | 摸底报告 `~/.local/share/singlefs/work/m3-close-w8-c693-survey/report.md` 第 261–346 行（第 3 项），其中整段抄的 D8 已定项 8「依据」 | E112：`Skip + Carry` 在挂得上的格子里零静默、搬运每代多写 2 行，`Carry` 丢 0 行对 `NoCarry` 丢 2 行；E113：`RejectEntry` 在 120 个扫描点里没输过、`Skip` 输在第 1 关、`Ignore` 输在第 2 关、`PerBit` 输；E113 末关 `Exempt` 每代写 17 行对 `Carry` 19 行；两块盘的池常态 15 行、80 块盘起才分裂；「省 2 行不一定变成少写节点（推的，没量）」 | 不改判据。17、19、15 三个数与第七节独立算出的锚点重合，那几条锚点照样由命令另算，不引这里 |
 | `.claude/kb/experiments/112-旧写者遇到不认识的树.md` 第 1 行标题、`113-不认识的树-补齐臂集.md` 第 1 行标题（读装置与臂定义时随第 1–74 / 1–73 行读进来） | 同上（E112「零静默结局，代价每代多写 2 行」；E113「`RejectEntry` 在 120 个扫描点里一次都没输过；基准点唯一赢家是 `RejectEntry_Exempt`」） | 同上；两页的「实测」「结论」「口径」「影响的决策」小节没读 |
-| `scripts/experiments/e113_unknown_tree_full_arms.rs` 第 1–284 行（模型、选法、扫描循环；第 285 行起的测试模块没读） | 几何常数（`t_known=12`、`h_known=6`、`t_new=4`、`h_new=2`、只读位 1 棵、半删位 1 棵、`r_pool=11`、`G=10`、每代出生 64 块）与基准点 `k_keep=4`、`w_gens=3` | 这些是 E113 几何的定义，本实验原样沿用 |
+| `scripts/experiment-apparatus/e113_unknown_tree_full_arms.rs` 第 1–284 行（模型、选法、扫描循环；第 285 行起的测试模块没读） | 几何常数（`t_known=12`、`h_known=6`、`t_new=4`、`h_new=2`、只读位 1 棵、半删位 1 棵、`r_pool=11`、`G=10`、每代出生 64 块）与基准点 `k_keep=4`、`w_gens=3` | 这些是 E113 几何的定义，本实验原样沿用 |
 | D8 已定项 8 原文自己的「依据」与「射程」（第二节整段抄） | 同第一行；另有「不搬的代价……下一次发布就消失」 | 不改判据 |
 
 **判问法时自己推出来的（推的，没跑；建模之前写下，不删）**：
@@ -596,7 +596,7 @@ B2 增项：U12 在 `NoCarry`、随根留着两条、`h_new > 0` 时各 +1（`Ca
 
 - 规则：`.claude/agent-common.md` 1–106；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122；`.claude/rules/three-way-inference.md` 1–166；`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–179；`.claude/rules/mutation-sampling.md` 1–93；`.claude/rules/implementation-first.md` 1–19；`.claude/rules/test-script-discipline.md` 1–106。
 - 输入：`research/prompts/c693-forks.md` 1–9；`~/.local/share/singlefs/work/m3-close-w8-c693-survey/report.md` 标题行全部、261–347。
-- 实验页与装置（只读装置、臂定义、取样点）：`.claude/kb/experiments/112-旧写者遇到不认识的树.md` 标题行全部、1–74；`.claude/kb/experiments/113-不认识的树-补齐臂集.md` 标题行全部、1–73；`scripts/experiments/e113_unknown_tree_full_arms.rs` 1–284，另 grep 命中 291、296、301、303、311、321、331、332、343、348、355、362、365、366、376、387、408、420（测试名与三行断言）；`scripts/experiments/e112_old_writer_unknown_tree.rs` 1–46，grep 命中 179、180、277、289、308–310、374、375；`scripts/experiments/Cargo.toml` 471–472。
+- 实验页与装置（只读装置、臂定义、取样点）：`.claude/kb/experiments/112-旧写者遇到不认识的树.md` 标题行全部、1–74；`.claude/kb/experiments/113-不认识的树-补齐臂集.md` 标题行全部、1–73；`scripts/experiment-apparatus/e113_unknown_tree_full_arms.rs` 1–284，另 grep 命中 291、296、301、303、311、321、331、332、343、348、355、362、365、366、376、387、408、420（测试名与三行断言）；`scripts/experiment-apparatus/e112_old_writer_unknown_tree.rs` 1–46，grep 命中 179、180、277、289、308–310、374、375；`scripts/experiment-apparatus/Cargo.toml` 471–472。
 - 决策：`.claude/kb/decisions/05-快照-空间记账机制.md` 标题行全部、1–66、89–152、204–228；`.claude/kb/decisions/08-核心索引结构.md` 标题行全部、1–42、253–297、177、383；`.claude/kb/decisions/15-格式冻结政策.md` 标题行全部、41–53、181–205；`.claude/kb/decisions/16-发布语义.md` 242 与它之前最近的 `####` 标题（240）；`.claude/kb/decisions/23-journal的角色与格式.md` 373 与 357；`.claude/kb/decisions/18-块里携带什么信息.md` 582、597 与 574。
 - 欠账：`.claude/kb/checks-owed.md` 67、131、132、452、789（每行截前 3000 字）。
 - 不变量：`crates/singlefs-checker/invariants/05-空间记账.md` 1–30（每行截前 2500 字）；`crates/singlefs-checker/invariants/09-inode树结构.md` 23、42；`crates/singlefs-checker/invariants/README.md` 29、33。
@@ -733,7 +733,7 @@ for geo in ('e113','impl'):
 
 `crates/` 里仍没有旧写者处置不认识的树的路径：`grep -rn -E '旧写者|不认识的树|unknown_tree|carry_unknown' crates --include=*.rs | grep -v '/tests/' | wc -l` 输出 `0`。U5 管的是 D8 已定项 12 的前端，`crates/` 第一版没有前端（D8 已定项 12 定案「第一版两级都不开」），新 U5 没有实现可比；停机条款照第一次跑第十一节那四项，另加第十一节的两项。
 
-**装置写在哪（写死）**：仍是 `scripts/experiments/e186_unknown_tree_accounting_rederive.rs`，独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）；不写成入库装置，理由同第一次跑（问的是格式政策，不是「`crates/` 这份代码的性质」）。同一个 bin 加一个参数 `--judgement <vacuous-u5|dangling-u5>`：不带参数等于 `vacuous-u5`，逐行照第一次跑的判据算，产物必须逐字节等于第一次跑的产物（`scripts/experiments/replay.sh:1297` 那一行照旧 `exact`）；`dangling-u5` 是这一次的判据（新 U5 与第十节新的反向接受条款）。第二次跑的产物另存新文件名（例 `research/results/e186-unknown-tree-accounting-rederive-dangling-u5-2026-10-20.out`），`replay.sh` 另加一行带 `--judgement dangling-u5` 的。第一次跑的产物、复跑行与单测原样留着。
+**装置写在哪（写死）**：仍是 `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs`，独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）；不写成入库装置，理由同第一次跑（问的是格式政策，不是「`crates/` 这份代码的性质」）。同一个 bin 加一个参数 `--judgement <vacuous-u5|dangling-u5>`：不带参数等于 `vacuous-u5`，逐行照第一次跑的判据算，产物必须逐字节等于第一次跑的产物（`scripts/experiment-apparatus/replay.sh:1297` 那一行照旧 `exact`）；`dangling-u5` 是这一次的判据（新 U5 与第十节新的反向接受条款）。第二次跑的产物另存新文件名（例 `research/results/e186-unknown-tree-accounting-rederive-dangling-u5-2026-10-20.out`），`replay.sh` 另加一行带 `--judgement dangling-u5` 的。第一次跑的产物、复跑行与单测原样留着。
 
 ### 四、跑之前已经存在的数
 
@@ -772,7 +772,7 @@ for geo in ('e113','impl'):
 
 **实现量与分段**：只有一段，补 Q1 那一行；跑完够不够判见第十一节。执行员要改的地方（只列，设计员不改）在本节末尾「装置要改的地方」。
 
-装置要改的地方（`scripts/experiments/e186_unknown_tree_accounting_rederive.rs`，行号是 2026-10-20 的）：
+装置要改的地方（`scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs`，行号是 2026-10-20 的）：
 
 1. `fn main`（第 1829 行）：认参数 `--judgement <vacuous-u5|dangling-u5>`，不带等于 `vacuous-u5`；判据随它传进去。
 2. `fn clause_holds_on_version`（第 626 行）里 `ClauseUnit::DecisionEightItemTwelveCarriedRows` 那一支（第 646 行）：`dangling-u5` 下换成第六节新 U5 的谓词（`initial` 已是参数，N 从它数）。
@@ -782,7 +782,7 @@ for geo in ('e113','impl'):
 6. `fn main` 里判 Q1 那一段（第 2033–2044 行，`let judgement = if sets.len() == 1` 在第 2041 行）：第一次跑那几行照旧打；`dangling-u5` 下另打第十节新表的判定行（被判点集、形态、后果，格式见第六节）。
 7. 第八节新自证：照 `fn q1_position_six_self_proof_turns_red`（第 1343 行）的样子另写一个。
 8. 测试模块（第 2104 行起）：第一次跑的单测照旧（它们钉的是 `vacuous-u5`）；补第七节的单测期望、第十节新表的形态函数单测、第十一节两种判据逐格相同的单测。
-9. 变异表 `scripts/mutation/tables/e186_unknown_tree_accounting_rederive.tsv`：补第九节新加的几条；`scripts/experiments/replay.sh` 第 1297 行之后加 `dangling-u5` 那一行。
+9. 变异表 `scripts/mutation/tables/e186_unknown_tree_accounting_rederive.tsv`：补第九节新加的几条；`scripts/experiment-apparatus/replay.sh` 第 1297 行之后加 `dangling-u5` 那一行。
 
 ### 六、报哪些量与各自的判据
 
@@ -952,7 +952,7 @@ for geo in ('e113','impl'):
 - 定义与规则：`.claude/agent-common.md` 1–106；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122；`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–179；`.claude/rules/three-way-inference.md` 1–166；`.claude/rules/mutation-sampling.md` 1–93；`.claude/rules/implementation-first.md` 1–19；`.claude/rules/test-script-discipline.md` 1–106。
 - 输入：`research/prompts/e186-preregistration.md` 1–658；`research/prompts/c693-forks.md` 1–9；`research/prompts/m3-close-c693-r1-main-verification.md` 1–44；`research/prompts/m3-close-c693-r1-opus-output.md` 标题行全部、64–133，grep 命中 49、51、103、104、114、120、121、285、286、287。
 - 决策与不变量：`.claude/kb/decisions/08-核心索引结构.md` 标题行（grep 命中 253、298、335、347、381、395）、381–394，grep 命中 260、261、262、282、286、287、288、296、383（每行截前 220 字）；第六节那条 grep 的 24 处命中行（每行截前 160 字，文件:行列在第六节末）；第二节重抽的 14 段（与第一次跑第二节逐字相同）。
-- 装置与表：`scripts/experiments/e186_unknown_tree_accounting_rederive.rs` 函数头一览（grep，第 27–2382 行之间的命中）、385–487、526–706、1322–1360、1494–1552、1775–1830、2020–2050、2104–2121、2224–2300，grep 命中 646、2033、2041、2044；`scripts/experiments/Cargo.toml` grep 命中 752、754、755；`scripts/experiments/replay.sh` grep 命中 1163、1164、1182、1231–1247、1297、1502、1512、1526、1547、1555、1566、1588、1595、1599、1604；`scripts/mutation/tables/e186_unknown_tree_accounting_rederive.tsv` 1–17（只第一列）。
+- 装置与表：`scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs` 函数头一览（grep，第 27–2382 行之间的命中）、385–487、526–706、1322–1360、1494–1552、1775–1830、2020–2050、2104–2121、2224–2300，grep 命中 646、2033、2041、2044；`scripts/experiment-apparatus/Cargo.toml` grep 命中 752、754、755；`scripts/experiment-apparatus/replay.sh` grep 命中 1163、1164、1182、1231–1247、1297、1502、1512、1526、1547、1555、1566、1588、1595、1599、1604；`scripts/mutation/tables/e186_unknown_tree_accounting_rederive.tsv` 1–17（只第一列）。
 - 实现：`crates/singlefs-core/src/transaction.rs` 3678–3705、6931–6985，grep 命中 3685、6859、6931；`crates/singlefs-core/src/recovery.rs` grep 命中 5711；`crates/singlefs-checker/src/walk.rs` grep 命中 2649、2654、13039。
 - 工具、门禁与登记：`scripts/kb/quote-kb.py` 1–60；`scripts/agents/cite-check.py` 1–40；`.claude/gate.d/doc-experiments.sh` 2166–2245，grep 命中 26、46、47、65、89、90；`.claude/hooks/runner-dispatch-guard.sh` grep 命中 57、568、1384、1646、1647、1714、1727、1884、1885、1886、1889；`.claude/agents/experiment-runner.md` grep 命中 20、51；`research/prompts/e179-preregistration.md` grep 命中 422、426；`research/prompts/e178-preregistration.md` grep 命中 1465；`.claude/heavy-thread-default` 1–6。
 - 只 `ls` 过、没读内容：`research/results/e186-unknown-tree-accounting-rederive.out.gz`（文件名与大小）。没读：第一次跑的产物内容、实验页 `.claude/kb/experiments/186-不认识的树-记账维重推.md`、攻方模型目录 `research/prompts/m3-close-c693-r1-opus-model/`。

@@ -1,4 +1,0 @@
-1c08b7c8094b4b5bc17467ed552f0b27c7290d8e48bce820e68c69a3b628895d  .claude/kb/invariants.md
-49721f00336c56212d2c92df1e9136797325f897cd5f96c3a027ac3c243ad557  .claude/kb/decisions/03-空间分配.md
-a8ac7fdd61389af0da4c720445c134ac03de32be0562c0875598a7a5f4e4415b  .claude/kb/decisions/08-核心索引结构.md
-53665ad54cf9789e1637c8bdd819910b8f1faf8b1425ebf8377686bd323853c7  .claude/kb/checks-owed.md

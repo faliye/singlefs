@@ -24,12 +24,12 @@ r2、r3 默认取 `--frozen` 同级的 `m3-defs-b6-r2/repo`、`m3-defs-b6-r3/rep
 ```
 0c92936ba1d7ee909877e746c68d29d4d0d8b1fbfdd2f53de630ced246d92af7  ./feeds/z2/sample/.claude/heavy-thread-default
 3de0665968539362a4dd306f360ecbdd91767992dd0e58d322883c063170764c  ./feeds/z2/sample/.claude/heavy-thread-exempt
-6811c6b8bdc11e994806c3dc0c3c1c2cc2254548bcebf0cb19600e07c6ff870f  ./feeds/z2/sample/scripts/experiments/assign_default.sh
-f303fced68981a6ba88bf934fb4214d67a06648c5ba05d57d274550eaaf3a77f  ./feeds/z2/sample/scripts/experiments/capped_assign_default.sh
-1833495fdbe3afb14e77a65c4329cd57a6ad01ea0308e3e0cbec2b0041b3935d  ./feeds/z2/sample/scripts/experiments/capped_dash_default.sh
-17aecfd3cb8a99c9c7c956486dcd7658f45f1d7adad33e5db5cda02b78627e3b  ./feeds/z2/sample/scripts/experiments/if_one_line.sh
-6b9862d76d1ff66fb138d588a9a4bd352b1e7dc7fa69717f1cfb1324defcc2c8  ./feeds/z2/sample/scripts/experiments/printenv_fallback.sh
-65655dfd1b6bd1f0e7423d8f0a371c29926a92651565ee9aae7b187931f5e2d3  ./feeds/z2/sample/scripts/experiments/var_from_registry.sh
+6811c6b8bdc11e994806c3dc0c3c1c2cc2254548bcebf0cb19600e07c6ff870f  ./feeds/z2/sample/scripts/experiment-apparatus/assign_default.sh
+f303fced68981a6ba88bf934fb4214d67a06648c5ba05d57d274550eaaf3a77f  ./feeds/z2/sample/scripts/experiment-apparatus/capped_assign_default.sh
+1833495fdbe3afb14e77a65c4329cd57a6ad01ea0308e3e0cbec2b0041b3935d  ./feeds/z2/sample/scripts/experiment-apparatus/capped_dash_default.sh
+17aecfd3cb8a99c9c7c956486dcd7658f45f1d7adad33e5db5cda02b78627e3b  ./feeds/z2/sample/scripts/experiment-apparatus/if_one_line.sh
+6b9862d76d1ff66fb138d588a9a4bd352b1e7dc7fa69717f1cfb1324defcc2c8  ./feeds/z2/sample/scripts/experiment-apparatus/printenv_fallback.sh
+65655dfd1b6bd1f0e7423d8f0a371c29926a92651565ee9aae7b187931f5e2d3  ./feeds/z2/sample/scripts/experiment-apparatus/var_from_registry.sh
 77314fde542c805dcdad14d16707944fdde4e8bfe8bc90e863a498b0d8004b73  ./feeds/z2/sample/scripts/hosts/capped.sh
 daff66fe20eb64f1c0b46df188343237f5d1b7873f392680fa513615e0b8c2d9  ./feeds/z2/sample/scripts/hosts/heavy_threads.py
 480b2179539b4c23137f7463660bb6b4543022f9705085f9cf357b8eb028fdb1  ./feeds/z2/sample/scripts/hosts/heavy-threads.sh
@@ -191,7 +191,7 @@ r2 两段历史同绿（`out/z2-real.txt` 第 7、9 行）。
 
 ### Z2-乙　照格的出路从登记位取进变量再赋，被点名成钉数（量过）
 
-样本 `feeds/z2/sample/scripts/experiments/var_from_registry.sh`：`source …/heavy-threads.sh`、`default_threads="$(heavy_thread_default)"`、`[[ -n "${SAMPLE_SWEEP_THREADS:-}" ]] || SAMPLE_SWEEP_THREADS=$default_threads`。格的出路（`/home/fy5090/.local/share/singlefs/work/m3-defs-b9-r1/repo/.claude/gate.d/code-tooling.sh:2389`）：「shell 先 source scripts/hosts/heavy-threads.sh 再 heavy_thread_default 取」，这份脚本就是这么取的；M2 把 `$变量` 一律认成钉数（`/home/fy5090/.local/share/singlefs/work/m3-defs-b9-r1/repo/.claude/gate.d/code-tooling.sh:1877`：「即默认值先放进变量、先算好再赋」），不看变量是不是从登记位来的。b9、r3 点名「写死的线程数默认（|| / && 赋值）」（`out/z2-shell-b9.txt` 第 6 行），r2 不点名。
+样本 `feeds/z2/sample/scripts/experiment-apparatus/var_from_registry.sh`：`source …/heavy-threads.sh`、`default_threads="$(heavy_thread_default)"`、`[[ -n "${SAMPLE_SWEEP_THREADS:-}" ]] || SAMPLE_SWEEP_THREADS=$default_threads`。格的出路（`/home/fy5090/.local/share/singlefs/work/m3-defs-b9-r1/repo/.claude/gate.d/code-tooling.sh:2389`）：「shell 先 source scripts/hosts/heavy-threads.sh 再 heavy_thread_default 取」，这份脚本就是这么取的；M2 把 `$变量` 一律认成钉数（`/home/fy5090/.local/share/singlefs/work/m3-defs-b9-r1/repo/.claude/gate.d/code-tooling.sh:1877`：「即默认值先放进变量、先算好再赋」），不看变量是不是从登记位来的。b9、r3 点名「写死的线程数默认（|| / && 赋值）」（`out/z2-shell-b9.txt` 第 6 行），r2 不点名。
 
 四句：分辨（r2 绿、b9 红，M2 带进来）；看得到（同一份文件上一行就是 `$(heavy_thread_default)`）；分句：文件头写到了 `$变量` 算钉数，不是「钩子拒而定义没写」，是「照出路做仍红」——出路剩下的只有把命令替换内联、或进排除表（排除表的理由要「确实不是重活」，这一处是重活）；改法：M2 自己是来源，F-Z2b（推的）：`$变量` 只在同一份文件里那个变量不是由 `heavy_thread_default`、`default_heavy_threads`、`$SINGLEFS_THREAD_CAP` 赋值时才算钉数。
 
@@ -297,7 +297,7 @@ $ for p in .claude/long-run-live-hosts-exempt .claude/heavy-thread-exempt; do pr
 
 ### Z7-乙　被钉的入口不干活：改没被钉的编排脚本、换配置，同一个入口照起（量过）
 
-被钉的入口一共 20 行，配置从参数给、正文只 exec 编排脚本：`/home/fy5090/.local/share/singlefs/work/m3-defs-b9-r1/repo/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh:15`：「CONFIG=${1:-$RESEARCH/revision_11_placeholders.json}」，同一份第 20 行：「exec nice -n 19 python3 -B "$RESEARCH/segment_one_units_revision_11.py" run --config "$CONFIG" --repo "$REPO"」。历史：E171 下一次修订不写新入口（主 agent 定义第 55 行「新脚本不往表里加」），改 `segment_one_units_revision_11.py`、放一份 `revision_13_placeholders.json`，照旧 `run_segment_one_revision_11_multi_host.sh revision_13_placeholders.json`：
+被钉的入口一共 20 行，配置从参数给、正文只 exec 编排脚本：`/home/fy5090/.local/share/singlefs/work/m3-defs-b9-r1/repo/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh:15`：「CONFIG=${1:-$RESEARCH/revision_11_placeholders.json}」，同一份第 20 行：「exec nice -n 19 python3 -B "$RESEARCH/segment_one_units_revision_11.py" run --config "$CONFIG" --repo "$REPO"」。历史：E171 下一次修订不写新入口（主 agent 定义第 55 行「新脚本不往表里加」），改 `segment_one_units_revision_11.py`、放一份 `revision_13_placeholders.json`，照旧 `run_segment_one_revision_11_multi_host.sh revision_13_placeholders.json`：
 
 `research/prompts/m3-defs-b9-r1-opus-model/out/z7.txt:4`：「b9	reuse-entry-基准有表	exempt-check 退出=0」
 `research/prompts/m3-defs-b9-r1-opus-model/out/z7.txt:5`：「b9	reuse-entry-被起脚本	script 退出=0」

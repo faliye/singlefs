@@ -1,0 +1,16 @@
+格	镜像	段数	today_or_bing	jia	yi_literal	yi_after_first_lap	jia_any_lap_of_next_slot	jia_any_unreadable_slot	ding_jia_with_next_record	ding_yi_with_next_record
+A	root_slot_torn_after_the_first_half	12	violated:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+A	root_slot_torn_like_the_crash_point_replay_enumeration	12	violated:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+A	root_slot_written_zero	12	violated:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+B	root_slot_torn_after_the_first_half	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+B	root_slot_torn_like_the_crash_point_replay_enumeration	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+B	root_slot_written_zero	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+F	bad_p_255	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	violated:12	violated:12
+F	bad_t_as_floor	12	holds:1 violated:11	holds:1 violated:11	not_applicable:12	not_applicable:12	holds:1 violated:11	holds:1 violated:11	holds:1 violated:11	holds:1 violated:11
+F	legit	12	holds:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	holds:12
+F-next-in-flight	crash_before_the_root_slot_write	12	holds:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+F-next-in-flight	root_slot_torn_like_the_crash_point_replay_enumeration	12	holds:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+F-next-in-flight	root_slot_written_zero	12	holds:12	holds:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+F-next-in-flight-bad-p-255	crash_before_the_root_slot_write	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+F-next-in-flight-bad-p-255	root_slot_torn_like_the_crash_point_replay_enumeration	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12
+F-next-in-flight-bad-p-255	root_slot_written_zero	12	violated:12	violated:12	not_applicable:12	not_applicable:12	holds:12	holds:12	holds:12	not_applicable:12

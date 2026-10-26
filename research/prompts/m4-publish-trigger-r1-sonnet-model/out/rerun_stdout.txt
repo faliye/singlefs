@@ -1,0 +1,10 @@
+name=constants data_unit_bytes=32768 payload_offset=134 record_bytes=4096 factor=3 default_ring_bytes=805306368
+name=refs_selftest broken_python_differs_from_real=4745 of 32152
+name=refs_real_vs_python lines=32152 identical=1
+name=same_as_stored file=count_assumptions.txt
+name=same_as_stored file=model_window.txt
+name=same_as_stored file=model_dirty.txt
+name=same_as_stored file=model_firstcross.txt
+name=same_as_stored file=refs_cases_summary.txt
+name=same_as_stored file=cases.sha256
+name=rerun_summary mismatches=0

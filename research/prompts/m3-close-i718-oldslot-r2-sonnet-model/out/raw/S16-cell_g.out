@@ -1,0 +1,18 @@
+
+running 1 test
+test cell_g_the_next_publish_is_the_row_of_a_new_instance ... ROW cell=G hist=new_instance_row_after_n50 S=16 image=healthy_n kind=legit newest=50 inst=1 t=3 F=0 p=255 next_slot_root=Some(3) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=G hist=new_instance_row_after_n50 S=16 image=before_record kind=legit newest=50 inst=1 t=3 F=0 p=255 next_slot_root=Some(3) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=G hist=new_instance_row_after_n50 S=16 image=before_root kind=legit newest=50 inst=1 t=3 F=0 p=255 next_slot_root=Some(3) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=G hist=new_instance_row_after_n50 S=16 image=zero kind=legit newest=50 inst=1 t=3 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,0,1,-1,0 red=["I-7.18"]
+ROW cell=G hist=new_instance_row_after_n50 S=16 image=torn_enum kind=legit newest=50 inst=1 t=3 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,0,1,-1,0 red=["I-7.18"]
+ROW cell=G hist=new_instance_row_after_n50 S=16 image=torn_half kind=legit newest=50 inst=1 t=3 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,0,1,-1,0 red=["I-7.18"]
+ROW cell=G hist=new_instance_row_after_n97 S=16 image=healthy_n kind=legit newest=97 inst=1 t=50 F=0 p=255 next_slot_root=Some(50) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=G hist=new_instance_row_after_n97 S=16 image=before_record kind=legit newest=97 inst=1 t=50 F=0 p=255 next_slot_root=Some(50) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=G hist=new_instance_row_after_n97 S=16 image=before_root kind=legit newest=97 inst=1 t=50 F=0 p=255 next_slot_root=Some(50) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=G hist=new_instance_row_after_n97 S=16 image=zero kind=legit newest=97 inst=1 t=50 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,0,1,-1,0 red=["I-7.18"]
+ROW cell=G hist=new_instance_row_after_n97 S=16 image=torn_enum kind=legit newest=97 inst=1 t=50 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,0,1,-1,0 red=["I-7.18"]
+ROW cell=G hist=new_instance_row_after_n97 S=16 image=torn_half kind=legit newest=97 inst=1 t=50 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,0,1,-1,0 red=["I-7.18"]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 6.24s
+

@@ -28,7 +28,7 @@ bash .claude/gate.d/95-fixture-claims.sh            # 现在是绿
 造的实验都在仓的一份副本上跑，副本连 `.git` 一起拷，所以 `project_start_date` 与真仓同为 2026-08-26：
 
 ```
-rsync -a --exclude target --exclude scripts/experiments/target \
+rsync -a --exclude target --exclude scripts/experiment-apparatus/target \
   <仓根>/ /tmp/claude-1000/c510-attack/repo/
 cd /tmp/claude-1000/c510-attack/repo && bash .claude/gate.d/95-fixture-claims.sh
 ```

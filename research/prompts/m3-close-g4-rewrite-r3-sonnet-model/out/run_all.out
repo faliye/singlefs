@@ -1,0 +1,30 @@
+# 第二轮攻方的数（我的模型照切段规则 + 原地覆写第三态判据 + 写协议独立推出）
+name=remount_correct segments=[2, 2, 14, 2, 1, 2, 12, 2, 1, 2] states=20519 whole=20499 torn=20 single_dead(whole/torn)=0/0 all_dead(whole/torn)=0/0
+name=MUT_B1_base_built_with_the_mutation_like_the_prototype segments=[3, 3, 14, 2, 1, 3, 12, 2, 1, 3] states=20582 whole=20515 torn=67 single_dead(whole/torn)=8/34 all_dead(whole/torn)=0/0
+name=MUT_B1_base_built_clean segments=[3, 3, 14, 2, 1, 3, 12, 2, 1, 3] states=20591 whole=20515 torn=76 single_dead(whole/torn)=6/36 all_dead(whole/torn)=0/0
+name=MUT_B2 segments=[4, 14, 2, 1, 2, 12, 2, 1, 2] states=20583 whole=20508 torn=75 single_dead(whole/torn)=0/16 all_dead(whole/torn)=0/1
+name=remount_plus_one_more_12_unit_publish_the_segment_list_the_attacker_printed_for_its_bases_at_segment_5 segments=[2, 2, 14, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] states=24626 whole=24601 torn=25 single_dead(whole/torn)=0/0 all_dead(whole/torn)=0/0
+name=MUT_B2_dead_states_by_domain_and_device [(('torn', (0,)), 8), (('torn', (0, 1)), 1), (('torn', (1,)), 8)]
+second_crash_group_arithmetic 6*20519+2*24626 = 172366  (also = 6*(20499+20)+2*(24601+25))
+four_groups_total 3*20519+172366 = 233923
+# mkfs 末段（四个系统配置槽写同一段、没有屏障）
+name=mkfs_used_pool segments=[2, 12, 1, 1, 1, 4] states=4187 whole=4117 torn=70 single_dead(whole/torn)=8/36 all_dead(whole/torn)=4099/18
+name=mkfs_used_pool_single_dead_by_segment(index,domain)=[((0, 'torn'), 2), ((0, 'whole'), 2), ((5, 'torn'), 34), ((5, 'whole'), 6)]
+name=mkfs_fresh_pool segments=[2, 12, 1, 1, 1, 4] states=4117 whole=4117 torn=0 single_dead(whole/torn)=6/0 all_dead(whole/torn)=4102/0
+name=mkfs_fresh_pool_single_dead_by_segment(index,domain)=[((5, 'whole'), 6)]
+# 同一张盘面能不能分出「mkfs 中途」与「mkfs 之后」
+name=post_mkfs_pool_with_one_device_lost images=8 of_them_equal_to_a_state_inside_the_mkfs_tail_segment=8 (by_domain=['torn', 'whole'])
+# 丙-I 若用「盘面上有 mkfs 已返回的证据」分中途与之后：证据 = 某个自证过的槽世代号 ≥ 1
+name=first_mount_after_mkfs_correct single_dead_states=0 without_evidence_of_mkfs_return=0
+name=first_mount_after_mkfs_MUT_B2 single_dead_states=16 without_evidence_of_mkfs_return=6
+# 现行 I-8.5（只判全池皆废）漏掉哪一类：只让一块盘的两槽落进同一段的坏实现
+name=B3_only_device_zero_skips_its_barrier_after_round_one segments=[4, 14, 2, 1, 2, 12, 2, 1, 2] states=20583 whole=20508 torn=75 single_dead(whole/torn)=0/16 all_dead(whole/torn)=0/1
+name=B4_device_zero_writes_both_slots_in_one_segment_device_one_once segments=[3] states=27 whole=8 torn=19 single_dead(whole/torn)=0/3 all_dead(whole/torn)=0/0
+# 单盘全废态可达 ⟺ 某一段里有一块盘的系统配置槽写不止一个（健康起点、写协议照 transaction.rs、基镜像两槽非零）
+name=double_write_equivalence flows=729 (3_segments_each_device_0_1_or_2_slot_writes) dead_state_reachable_without_a_double_write=0 dead_state_reachable_with_a_double_write=665 double_write_without_any_dead_state=0
+# 补写流：起点就有一块盘两槽全废（手造），正确实现的取号两轮 + 两次发布
+name=rewrite_flow_from_a_dead_device segments=[2, 2, 14, 2, 1, 2, 12, 2, 1, 2] states=20513 whole=20499 torn=14 single_dead(whole/torn)=2/1 all_dead(whole/torn)=0/0
+name=rewrite_flow_states_still_dead_before_the_second_round_persisted dead_states=3
+# 可达盘面闭包（正确实现）：mkfs 返回后反复在任意崩溃状态上再挂载 / 抬 F / 发布
+name=closure_correct fixpoint_rounds=3 reachable_images=25 images_with_a_dead_device=0 dead_states_met=0
+name=second_crash_bases whole_domain_images_of_the_four_system_configuration_segments=4 all_inside_the_closure=True

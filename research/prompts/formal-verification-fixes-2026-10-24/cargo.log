@@ -1,0 +1,64 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+warning: unused variable: `position`
+    --> crates/singlefs-replay-prefix/src/lib.rs:4066:24
+     |
+4066 |     let named_units = |position: usize| -> (answer: bool)
+     |                        ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_position`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `position`
+    --> crates/singlefs-replay-prefix/src/lib.rs:4063:23
+     |
+4063 |     let back_chain = |position: usize| -> (answer: bool)
+     |                       ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_position`
+
+warning: unused variable: `first`
+    --> crates/singlefs-replay-prefix/src/lib.rs:4089:9
+     |
+4089 |     let first = replay_core(PrefixKernelInstanceGeneration(0), PrefixKernelCheckpointTxg(0),
+     |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_first`
+
+warning: unused variable: `again`
+    --> crates/singlefs-replay-prefix/src/lib.rs:4100:9
+     |
+4100 |     let again = replay_core(PrefixKernelInstanceGeneration(0), PrefixKernelCheckpointTxg(1),
+     |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_again`
+
+warning: `singlefs-replay-prefix` (lib test) generated 4 warnings (run `cargo fix --lib -p singlefs-replay-prefix --tests` to apply 4 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.67s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_replay_prefix-fa3368575e7c33f6)
+
+running 12 tests
+test compaction_plan_proofs::tests::a_batch_takes_the_first_movable_units_up_to_the_batch_size ... ok
+test compaction_plan_proofs::tests::an_empty_region_is_emptied_and_a_region_without_a_movable_unit_is_not ... ok
+test compaction_plan_proofs::tests::excluded_segments_are_skipped_and_an_unscanned_candidate_is_scanned_first ... ok
+test compaction_plan_proofs::tests::no_segment_is_eligible_when_each_one_is_excluded ... ok
+test compaction_plan_proofs::tests::the_fewest_live_slots_win_and_a_tie_goes_to_the_earlier_segment ... ok
+test tests::a_later_checkpoint_txg_is_chosen_over_a_higher_instance_with_an_earlier_checkpoint_txg ... ok
+test tests::a_newer_root_after_the_first_self_verified_slot_is_chosen_over_it ... ok
+test tests::a_publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays ... ok
+test tests::a_two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record ... ok
+test tests::of_two_scanned_copies_of_one_record_key_the_first_position_is_kept ... ok
+test tests::of_two_slots_with_the_same_checkpoint_txg_the_higher_instance_in_the_later_slot_is_chosen ... ok
+test tests::of_two_slots_with_the_same_choice_key_the_earlier_slot_is_chosen ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+run-with-memory-cap: 这一次峰值 738 MiB，是记账 84 MiB 的 8.8 倍：工作量可能变了（键「cargo test -p singlefs-replay-prefix --lib」，记账取峰值表里近几次实测最大的那个；退出码照命令自己的）
+run-with-memory-cap: → 查这条命令最近的改动是不是让它要的内存变多了；变多了就照这一次的峰值给上限（峰值表已记下这一次，下一次按它记账），同时在跑的几条按新的量分；没变多是这一次偶然涨了，不用处置

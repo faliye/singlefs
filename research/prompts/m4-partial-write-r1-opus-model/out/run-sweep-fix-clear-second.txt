@@ -1,0 +1,14 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.7 GiB，这一条要 923 MiB（按峰值表里近 4 次实测里最大的峰值 923 MiB（最近一次 2026-10-26 量的）算），总上限 40.1 GiB；账上在跑 4 条
+  → 第二台此刻放得下（可用 36.7 GiB、要 923 MiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 2G --label moved-from-queue-1314438-519217952 -- cargo test --offline -p singlefs-harness --test partial_write_attack -- --nocapture --test-threads 1 sweep_with_the_candidate_fix
+run-with-memory-cap: 排了 2 秒，起跑（singlefs-memory-cap-1314438-519217952）
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-partial-write-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.24s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 1 test
+test sweep_with_the_candidate_fix ... 观测 扫（改法开着 = true）：历史 [OverwriteShorterToOneUnit, OverwriteShorterToOneUnit, ExtendByOnePayload] 出生 txg [7] 违例 ["I-1.13"] 读者读回相同 = true
+观测 扫汇总（改法开着 = true）：历史 199 段（含部分写 117 段），I-1.13 违例 1 段（含部分写的 0、不含部分写的 1），I-1.13 之外有违例 0 段，读者读回不同 0 段，挂钟 68.596087243s
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 68.63s
+

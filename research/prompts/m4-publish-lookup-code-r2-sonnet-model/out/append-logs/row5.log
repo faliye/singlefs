@@ -1,0 +1,23 @@
+
+running 1 test
+test an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata ... FAILED
+
+failures:
+
+---- an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata stdout ----
+
+thread 'an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata' (2474159) panicked at crates/singlefs-core/src/transaction.rs:5838:9:
+一个单元只被杀一次：这次进 deadlist 的条目在上一版的 deadlist 里没有（它的映射 key 上一版还被这一版的树引用）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 4.91s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 38s
+     Running tests/snapshot_release_and_destroy_through_the_deadlist.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/snapshot_release_and_destroy_through_the_deadlist-ed36be39ea00ad83)
+error: test failed, to rerun pass `-p singlefs-harness --test snapshot_release_and_destroy_through_the_deadlist`

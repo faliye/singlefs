@@ -1,0 +1,44 @@
+✓ 自证 rp1-two-passes：45 个单元；第二遍现跑的 9（要 9 个）；读数不同的 无；判法不同的 无；账本 E7RESULT name=verdict units=45 judged_fresh=9 reused=36 fresh_check=0 fresh_always=7 sample_size=0 check_mismatches=0 cl
+✓ 自证 rp1-layers-e2e：segment_one_units_revision_11.py 自证 1 项，红 0；rows_orchestrator_revision_11.py 自证 1 项，红 0；rows_orchestrator_segment_two_revision_11.py 自证 1 项，红 0
+✓ 自证 rp3-kind：键 1f60c614cf20 → 4f25e6afff83，第二份 fresh（no-entry）
+✓ 自证 rp3-build：键 06fbea1d308e → 5402d95a6eba，第二份 fresh（no-entry）
+✓ 自证 rp3-closure：键 ec53fd03c3f2 → 2935d4128334，第二份 fresh（no-entry）
+✓ 自证 rp3-closure-mutated-content：键 ee604fbd07f8 → ee604fbd07f8，第二份 reused（hit）
+✓ 自证 rp3-env：键 1f60c614cf20 → 42ebeb37f1fa，第二份 fresh（env-set）；设了变量的那一份 env-set
+✓ 自证 rp3-mutation：键 ec53fd03c3f2 → d17d3401b607，第二份 fresh（no-entry）
+✓ 自证 rp3-args：键 c236ee04213a → f1b634b6a2d5，第二份 fresh（no-entry）
+✓ 自证 rp3-limit：键 ec53fd03c3f2 → 86660e97cf9e，第二份 fresh（no-entry）
+✓ 自证 rp3-upstream：键 16f904b335af → 452fb5a8083e，第二份 fresh（no-entry）
+✓ 自证 rp3-research：键 ec53fd03c3f2 → cde0b0084d08，第二份 fresh（no-entry）
+✓ 自证 rp3-python：键 96a49455122b → fa41f3b17cc2，第二份 fresh（no-entry）
+✓ 自证 rp4-resume-fetch：子进程 -9；断在中间的 row-4 是半份；续跑重取 ['seg2-row-4']；别的行没再动 True；库里 3 条；账本 E7RESULT name=verdict units=5 judged_fresh=2 reused=3 fresh_check=0 fresh_always=1 sample_
+✓ 自证 rp5-atomic-insert：子进程退出码 [-9, -9]；被杀之后 entries/ 里半条条目 无；staging/ 残留 2、清掉 2；再入库 inserted
+✓ 自证 rp6-closure-extra-file：相符 false；账本末行 E7RESULT name=verdict units=1 judged_fresh=1 reused=0 fresh_check=0 fresh_always=0 sample_size=0 check_mismatches=0 clos；S18 1 行
+✓ 自证 rp6-closure-outside-the-tree：相符 false；账本末行 E7RESULT name=verdict units=1 judged_fresh=1 reused=0 fresh_check=0 fresh_always=0 sample_size=0 check_mismatches=0 clos；S18 1 行
+✓ 自证 rp7-check-mismatch：第二次入库 present-differs；产物相同 True；账本末行 E7RESULT name=verdict units=2 judged_fresh=2 reused=0 fresh_check=0 fresh_always=1 sample_size=0 check_mismatc
+✓ 自证 rp8-corrupted-entry：第二次 fresh（corrupted-entry）；隔离目录 1 条；现跑完 inserted；账本末行 E7RESULT name=verdict units=1 judged_fresh=1 reused=0 fresh_check=0 fresh_always=0 sample_size=0 che
+✓ 自证 pin-moves：9 项都对
+✓ 自证 pin-moves-real-files：6 处钉值、6 份被钉文件照 scripts/experiment-apparatus → scripts/experiment-apparatus-moved-in-selftest 换过（5 份里真有这个前缀），真仓登记 1 行
+✓ 自证 frozen-o3-moves：test_frozen_o3 退 0：Ran 16 tests in 0.019s；OK
+✓ 自证 no-leftover-processes：收之前看到 1 个（含故意留下的 590307），收之后遗留 0 个
+✓ 自证 temporary-directory-removed：临时目录 已删
+✓ 弄坏开关 drop-kind → 红在 rp3-kind：红了
+✓ 弄坏开关 drop-build → 红在 rp3-build：红了
+✓ 弄坏开关 drop-closure → 红在 rp3-closure：红了
+✓ 弄坏开关 drop-env → 红在 rp3-env：红了
+✓ 弄坏开关 drop-mutation → 红在 rp3-mutation：红了
+✓ 弄坏开关 drop-args → 红在 rp3-args：红了
+✓ 弄坏开关 drop-limit → 红在 rp3-limit：红了
+✓ 弄坏开关 drop-upstream → 红在 rp3-upstream：红了
+✓ 弄坏开关 drop-research → 红在 rp3-research：红了
+✓ 弄坏开关 drop-python → 红在 rp3-python：红了
+✓ 弄坏开关 check-skipped → 红在 rp7-check-mismatch：红了
+✓ 弄坏开关 closure-check-skipped → 红在 rp6-closure-extra-file：红了
+✓ 弄坏开关 manifest-unchecked → 红在 rp8-corrupted-entry：红了
+✓ 弄坏开关 insert-in-place → 红在 rp5-atomic-insert：红了
+✓ 弄坏开关 fresh-always-ignored → 红在 rp1-two-passes：红了
+✓ 弄坏开关 pin-moves-ignored → 红在 pin-moves：红了
+✓ 弄坏开关 frozen-o3-moves-ignored → 红在 frozen-o3-moves：红了
+✓ 弄坏开关 sweep-skipped → 红在 no-leftover-processes：红了
+✓ 弄坏开关 temporary-kept → 红在 temporary-directory-removed：红了
+自证 43 项，红 0

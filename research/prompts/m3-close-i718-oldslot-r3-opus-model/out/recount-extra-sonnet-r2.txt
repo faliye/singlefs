@@ -1,0 +1,10 @@
+keys_not_at_all_four_S [(('F', 'healthy_n', 'legit'), [4, 5]), (('W', 'before_record', 'legit'), [4]), (('W', 'before_root', 'legit'), [4]), (('W', 'healthy_n', 'legit'), [4]), (('W', 'torn_enum', 'legit'), [4]), (('W', 'torn_half', 'legit'), [4]), (('W', 'zero', 'legit'), [4])]
+written_bad_images 1890 {'[]': 717, '["I-7.18"]': 1173}
+G S=4 {('torn_enum', 'ding_jia_same_instance', 0): 3, ('torn_half', 'ding_jia_same_instance', 0): 3, ('zero', 'ding_jia_same_instance', 0): 3}
+G S=5 {('torn_enum', 'ding_jia_same_instance', 0): 3, ('torn_half', 'ding_jia_same_instance', 0): 3, ('zero', 'ding_jia_same_instance', 0): 3}
+G S=8 {('torn_enum', 'ding_jia_same_instance', 0): 2, ('torn_half', 'ding_jia_same_instance', 0): 2, ('zero', 'ding_jia_same_instance', 0): 2}
+G S=16 {('torn_enum', 'ding_jia_same_instance', 0): 2, ('torn_half', 'ding_jia_same_instance', 0): 2, ('zero', 'ding_jia_same_instance', 0): 2}
+BR-oldest S=4 {('any_lap', 1): 14, ('ding_jia', 0): 14, ('jia_seed', 1): 14, ('today', 0): 14}
+BR-oldest S=5 {('any_lap', 1): 17, ('ding_jia', 0): 17, ('jia_seed', 1): 17, ('today', 0): 17}
+BR-oldest S=8 {('any_lap', 1): 26, ('ding_jia', 0): 26, ('jia_seed', 1): 26, ('today', 0): 26}
+BR-oldest S=16 {('any_lap', 1): 50, ('ding_jia', 0): 50, ('jia_seed', 1): 50, ('today', 0): 50}

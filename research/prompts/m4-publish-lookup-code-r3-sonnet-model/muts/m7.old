@@ -1,0 +1,3 @@
+                previous_read_by_key.get_or_insert_with(|| {
+                    MappedUnitsOfAVersionReadByKey::of_the_version(previous)
+                }),

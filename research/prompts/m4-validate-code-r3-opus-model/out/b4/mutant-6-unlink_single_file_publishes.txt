@@ -1,0 +1,17 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+     Running tests/unlink_single_file_publishes.rs (target/release/deps/unlink_single_file_publishes-fcc62c0e6443564a)
+
+running 9 tests
+test intent_rewrites_the_inode_leaf_and_root_the_deleted_inodes_root_and_the_tombstone_container_and_root ... ok
+test a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit ... ok
+test the_pool_checker_finds_no_violation_after_the_intent_and_after_every_batch ... ok
+test continuing_after_the_queue_is_empty_publishes_nothing ... ok
+test from_the_intent_on_the_read_only_mount_and_the_cold_walk_answer_no_file ... ok
+test unlink_of_an_inode_that_is_not_a_live_record_is_refused_before_any_write ... ok
+test every_deletion_version_rebuilt_from_disk_equals_the_published_one ... ok
+test the_final_batch_removes_the_record_the_queue_key_and_every_remaining_unit_in_the_same_publish ... ok
+test overwriting_the_first_file_after_it_is_deleted_is_refused_as_not_in_the_tree ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+mutant_rc=0

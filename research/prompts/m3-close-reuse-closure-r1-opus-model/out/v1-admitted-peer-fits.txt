@@ -1,0 +1,6 @@
+name=admitted-peer-fits wrapper_status=0
+host_lookup_lines_in_diagnostics=1
+  host_lookup_line=  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-2495671-2281723696 -- bash -c 'pri
+problems=[]
+summary=落点 无；证明错 1 条
+proof_error_messages=["assertion failed"]

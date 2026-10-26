@@ -1,0 +1,1 @@
+        let locations = mapping_locations_of_a_released_unit(&mut previous_read_by_role, identity);

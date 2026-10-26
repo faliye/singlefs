@@ -4,11 +4,11 @@
 
 <!-- doc-lint:not-numbers Q1 Q2 H1 H2 H3 H4 H5 P1 P2 T1 T2 PC1 PC2 PC3 PC4 PC5 PC6 PC7 A1 A2 A3 A6 A7 A8 A9 B1 B5 B8 B9 B10 B11 K1 K7 M1 M15 MR1 MR2 MR3 MR4 MR5 MR6 MR7 MR8 MR9 F1 F2 F3 F4 F5 F6 F7 F8 V1 V2 V3 V4 V5 V6 V7 S1 S2 S3 S4 S5 S6 X1 X2 X3 X4 X5 X6 Y1 Z1 Z2 Q1-1 Q1-1b Q1-2 Q1-2b Q1-3 Q1-4 Q1-5 Q1-6 Q2-1 Q2-2 Q2-3 G-min G-1 G-4 -->
 
-要主 agent 认的项：①「按 ckpt_cost 现算」取第一节写死的读法（保留池 = 现算的 ckpt_cost，一次空发布实际新占的块数另量，两者分开）；②装置分两处（第五节「装置写在哪」），派发提示说「装置在 checker 档包里」只对第一段成立，第二段沿用原装置 `scripts/experiments/` 那一份、加一个模式；③问题单是设计员照派发提示与 C723 一行写的（第一节），没有现成的岔路单文件。
+要主 agent 认的项：①「按 ckpt_cost 现算」取第一节写死的读法（保留池 = 现算的 ckpt_cost，一次空发布实际新占的块数另量，两者分开）；②装置分两处（第五节「装置写在哪」），派发提示说「装置在 checker 档包里」只对第一段成立，第二段沿用原装置 `scripts/experiment-apparatus/` 那一份、加一个模式；③问题单是设计员照派发提示与 C723 一行写的（第一节），没有现成的岔路单文件。
 
 ## 一、问题
 
-英文名：checkpoint_cost_against_empty_publish_cost（第一段新起的入库装置用它：`crates/singlefs-checker-tier/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs`）。第二段不另起装置：改原装置 `scripts/experiments/e173_admission_ceiling_bad_ring_slot_dispositions.rs`（原英文名 admission_ceiling_bad_ring_slot_dispositions，`[[bin]]` 名 `e173-admission-ceiling-bad-ring-slot-dispositions` 不变），只加一个模式 `checkpoint-cost-reserve`；原有 `checks`、`first`、`second` 三个模式与它们在 `scripts/experiments/replay.sh` 里的三行复跑登记留着不动，输出逐字节不变（第十一节停机条款 S1）。
+英文名：checkpoint_cost_against_empty_publish_cost（第一段新起的入库装置用它：`crates/singlefs-checker-tier/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs`）。第二段不另起装置：改原装置 `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs`（原英文名 admission_ceiling_bad_ring_slot_dispositions，`[[bin]]` 名 `e173-admission-ceiling-bad-ring-slot-dispositions` 不变），只加一个模式 `checkpoint-cost-reserve`；原有 `checks`、`first`、`second` 三个模式与它们在 `scripts/experiment-apparatus/replay.sh` 里的三行复跑登记留着不动，输出逐字节不变（第十一节停机条款 S1）。
 
 主 agent 给的问题（派发提示逐字）：
 
@@ -217,7 +217,7 @@
 
 ## 三、实现今天的样子
 
-行号与哈希取自 2026-10-20 此刻的主工作区。主工作区 `crates/` 有暂存未提交的改动（`git status --short` 列 `admission.rs`、`allocator.rs` 等为 `M`）；下面引的四份文件此刻的 `sha256sum`：`crates/singlefs-core/src/admission.rs` `e239a81f5f05d69d0e6e83cb7383ea58398eed33de3e0832011b7e29563f8daf`、`mount.rs` `655aaad1d3804753fbd145445f8fec35b4b594ad435a77f89c8197f508e99cfb`、`allocator.rs` `c376167f3edbf38b0e70ab03fa364b62f8dd98dcd6b45d05a3b2e21d78452623`、`mounted_session.rs` `83cbe82640095fb1e2e2398d9d708fecb800e4d1a978b8385f06666342e8eb2b`。原装置 `scripts/experiments/e173_admission_ceiling_bad_ring_slot_dispositions.rs` `650ed8ef3f94bb5456c6fb1eaea96f987355314ca28fab67f33f2356dcca3e71`（3685 行），变异表 `scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv` `8dad39aa0cada6714533975634de6e0db29f3690a1fea2363d0aa0fa8761a32c`（23 行）。执行员开工先重算这六个哈希，对不上的照第十一节 S6 办。
+行号与哈希取自 2026-10-20 此刻的主工作区。主工作区 `crates/` 有暂存未提交的改动（`git status --short` 列 `admission.rs`、`allocator.rs` 等为 `M`）；下面引的四份文件此刻的 `sha256sum`：`crates/singlefs-core/src/admission.rs` `e239a81f5f05d69d0e6e83cb7383ea58398eed33de3e0832011b7e29563f8daf`、`mount.rs` `655aaad1d3804753fbd145445f8fec35b4b594ad435a77f89c8197f508e99cfb`、`allocator.rs` `c376167f3edbf38b0e70ab03fa364b62f8dd98dcd6b45d05a3b2e21d78452623`、`mounted_session.rs` `83cbe82640095fb1e2e2398d9d708fecb800e4d1a978b8385f06666342e8eb2b`。原装置 `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs` `650ed8ef3f94bb5456c6fb1eaea96f987355314ca28fab67f33f2356dcca3e71`（3685 行），变异表 `scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv` `8dad39aa0cada6714533975634de6e0db29f3690a1fea2363d0aa0fa8761a32c`（23 行）。执行员开工先重算这六个哈希，对不上的照第十一节 S6 办。
 
 「照今天」那一半（原登记第五节的四条 Q1 臂与两条 Q2 臂）不改；这一节只列③要用的代码事实与①②的复核。
 
@@ -266,7 +266,7 @@
 **装置写在哪（写死）**：
 
 - **第一段：入库装置** `crates/singlefs-checker-tier/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs`（不写 `[[bin]]`，bin 名就是文件名）。理由：③乙问的就是「`crates/` 这份代码在真盘面上算出的 ckpt_cost 与一次空发布真写出的固定点各多大」，κ 依赖这一版各棵树的真形状（中央映射树、记账树、分配记录树根层级），另写一份独立模型答不了。它只读、只驱动与观测 `singlefs-core` 的公开入口，不改 `crates/singlefs-core`、`crates/singlefs-checker`。下面这些量要读 `crates/` 的常量，执行员逐个写成本地常量（值抄自注明的 kb 或格式定义位）、另加一条断言与实现侧同名常量回比，不直接引：`SLOT_BYTES` = 16384、`DATA_UNIT_BYTES` = 32768（`crates/singlefs-format/src/lib.rs:14`、`:20`）；`ALLOCATION_RECORD_TREE_LEAF_SLOTS` = 812、`ALLOCATION_RECORD_TREE_INTERNAL_FANOUT` = 169（同文件 163、169 行；D28 已定项 4「S_L = 812 × 169^L」）；`ROOT_RING_REGIONS` = 3（同文件 286 行）；`ROOT_RING_SLOTS_PER_REGION_MINIMUM` = 4、`ROOT_RING_SLOTS_PER_REGION_MAXIMUM` = 16（同文件 295、300 行）；`PUBLISHES_PER_ADMISSION_AT_MOST` = 8（`mount.rs:4164`；D16 已定项 1「B = 4 + 2 k_tol」）；`LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW`、`RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW` = 2，`LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COW`、`RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COW` = 1（`admission.rs` 160、161、199、200 行；D28 已定项 4「容器 2 块 + ……根 1 块」）。树表那一项 1（`admission.rs:1117` 是函数里的局部常量，回比不了）照 D28 已定项 4「树表单列一项，每次发布 1 个单元」写本地常量，由停机条款 S2（本地重算的 κ 与核心层的 κ 逐次相同）间接盯着。
-- **第二段：`scripts/experiments/` 那一支**，改原装置 `scripts/experiments/e173_admission_ceiling_bad_ring_slot_dispositions.rs`，加模式 `checkpoint-cost-reserve`，不依赖 `crates/`、不与实现共用代码（`.claude/rules/implementation-first.md` 第 4 条）。9 个几何的 (S, c实, κ) 写成本地常量表，每一行注明抄自第一段产物的文件名与行号；第二段开跑先读那份产物逐行比这张表，对不上停（第十一节 S5）。
+- **第二段：`scripts/experiment-apparatus/` 那一支**，改原装置 `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs`，加模式 `checkpoint-cost-reserve`，不依赖 `crates/`、不与实现共用代码（`.claude/rules/implementation-first.md` 第 4 条）。9 个几何的 (S, c实, κ) 写成本地常量表，每一行注明抄自第一段产物的文件名与行号；第二段开跑先读那份产物逐行比这张表，对不上停（第十一节 S5）。
 
 ### 第一段要做的（入库装置，没有臂）
 
@@ -522,7 +522,7 @@ for name, P in (("code", k), ("clause", 10 + 7 * k), ("old_code_c", c), ("old_cl
 
 ## 九、变异
 
-两处装置各有自己的变异：第一段（入库装置）的变异行照 `crates/mutations.tsv` 第 1 行表头的六段格式追加到它末尾，归门禁 checker-tier-crates-mutation-replay 在提交时跑；第二段的变异行只追加到原变异表 `scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv` 末尾（原 23 行不动），执行员在 `scripts/experiments/` 下跑完整张表。每条写明在哪个取样点上改变输出，执行员先在单测里核「这一格在原式与变异上确实不同」再进表。
+两处装置各有自己的变异：第一段（入库装置）的变异行照 `crates/mutations.tsv` 第 1 行表头的六段格式追加到它末尾，归门禁 checker-tier-crates-mutation-replay 在提交时跑；第二段的变异行只追加到原变异表 `scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv` 末尾（原 23 行不动），执行员在 `scripts/experiment-apparatus/` 下跑完整张表。每条写明在哪个取样点上改变输出，执行员先在单测里核「这一格在原式与变异上确实不同」再进表。
 
 | 变异 | 在哪一处 | 在哪一格改变输出 |
 |---|---|---|
@@ -572,7 +572,7 @@ for name, P in (("code", k), ("clause", 10 + 7 * k), ("old_code_c", c), ("old_cl
 
 | 编号 | 对不上什么 | 停下之后报什么 |
 |---|---|---|
-| S1 | 第二段加了模式之后，原有 `checks`、`first`、`second` 三个模式的输出与 `scripts/experiments/replay.sh` 里 E173 三行登记的产物不是逐字节相同 | 哪个模式、第一处不同的行；改动碰到了原模型，不往下跑 |
+| S1 | 第二段加了模式之后，原有 `checks`、`first`、`second` 三个模式的输出与 `scripts/experiment-apparatus/replay.sh` 里 E173 三行登记的产物不是逐字节相同 | 哪个模式、第一处不同的行；改动碰到了原模型，不往下跑 |
 | S2 | 第一段本地照 D28 已定项 4 Σ 名单重算的 κ 与核心层 `checkpoint_cost_of_the_version_to_build_on` 在某一次发布上不同 | 哪个几何、哪一次发布、六项各自的本地值与差在哪一项；那一项条款怎么写、代码怎么算（同时看 F3） |
 | S3 | 两条路数出的新占固定点在某一次发布、某块盘上不同 | 哪一次、哪块盘、两条路各多少、差的是哪些角色或哪些记录 |
 | S4 | 第五节列的本地常量与 `crates/` 同名常量回比不等 | 哪个常量、两边各多少 |
@@ -610,7 +610,7 @@ for name, P in (("code", k), ("clause", 10 + 7 * k), ("old_code_c", c), ("old_cl
 |---|---|
 | `.claude/agent-common.md` | 整份 |
 | `.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/rules/three-way-inference.md`、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`、`.claude/rules/mutation-sampling.md`、`.claude/rules/implementation-first.md`、`.claude/rules/test-script-discipline.md` | 整份 |
-| `.claude/rules/verification.md` | 标题行；`scripts/experiments` 的 grep 命中（126、136 行） |
+| `.claude/rules/verification.md` | 标题行；`scripts/experiment-apparatus` 的 grep 命中（126、136 行） |
 | `.claude/kb/checks-owed.md` | 475 行（C723，整行） |
 | `.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md` | 标题行；25–55 行、243 行到文件尾（「历史版本」）；1–24、56–242 行没读 |
 | `.claude/kb/experiments.md` | `grep -n 'E173'` 命中 197 行 |
@@ -627,13 +627,13 @@ for name, P in (("code", k), ("clause", 10 + 7 * k), ("old_code_c", c), ("old_cl
 | `crates/singlefs-checker-tier/Cargo.toml` | 1–60 行里的非注释行 |
 | `crates/singlefs-checker-tier/src/bin/` | `ls`；`e180_admission_reading_versus_writable_bytes.rs` 1–40、1425–1460；`e181_landing_check_fixed_point_and_mount_lower_bound.rs` 1–40、695–730、900–925、960–1000，grep 命中 3、705、910、917、968、1783；`e183_capacity_read_cache_reserve_and_sweep_costs.rs` 1–40；`e168_delete_ring_window_borrow.rs` 1–40。都只看了口径与写法，没读它们的产物与实验页 |
 | `crates/` 全体 | `grep -rn '10 + 7\|7 c_max\|7 \* c_max\|(B − 1) × c_max'` 命中 5 处（第三节）；`grep -rln 'checkpoint_cost_of_the_version_to_build_on'` 的文件名 |
-| `scripts/experiments/e173_admission_ceiling_bad_ring_slot_dispositions.rs` | 675–760、1960–2010；grep 命中 33、35、37、204、682、687、696、735–744、853、870、913、1053、1054、1128、1171、1176、1177、1181、1430、1470、1474、1480、1499、1535、1601、1781、1897、1919、1972–1995、2095、2101、2160、2187、2224、2229、2348、2459、3110、3234–3241 |
-| `scripts/experiments/replay.sh` | grep 命中 71、72、1217–1219、1491 |
-| `scripts/experiments/Cargo.toml`、仓根 `Cargo.toml` | grep `e7-index-bench\|scripts/experiments` 的命中行 |
+| `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs` | 675–760、1960–2010；grep 命中 33、35、37、204、682、687、696、735–744、853、870、913、1053、1054、1128、1171、1176、1177、1181、1430、1470、1474、1480、1499、1535、1601、1781、1897、1919、1972–1995、2095、2101、2160、2187、2224、2229、2348、2459、3110、3234–3241 |
+| `scripts/experiment-apparatus/replay.sh` | grep 命中 71、72、1217–1219、1491 |
+| `scripts/experiment-apparatus/Cargo.toml`、仓根 `Cargo.toml` | grep `e7-index-bench\|scripts/experiment-apparatus` 的命中行 |
 | `scripts/hosts/compile-then-swap.py` | 1–40；grep 命中 7、211、358、656、659、685 |
 | `~/.local/share/singlefs/memory-peaks.tsv` | 头 3 行；grep `e173\|e181\|e180` 与 checker 档包编译的命中行 |
 | `.claude/heavy-thread-default` | 整份 |
-| `.claude/agents/experiment-runner.md` | grep `research\|入库装置\|scripts/experiments` 命中 20、31、32、35、38、40、43、44、51 |
+| `.claude/agents/experiment-runner.md` | grep `research\|入库装置\|scripts/experiment-apparatus` 命中 20、31、32、35、38、40、43、44、51 |
 | `.claude/gate.d/doc-experiments.sh` | grep 命中 26、46、47、65、89、2166、2178、2179、2187 |
 | `research/results/`、`.claude/kb/experiments/` | 只 `ls | grep` 了 E173 的文件名，没读内容 |
 
@@ -648,7 +648,7 @@ git show 04ceaa904^:research/prompts/e173-preregistration.md > <草稿目录>/or
 git log --all --name-only --format='%h' -- 'research/prompts/e173-r*'      （无输出：没有过重跑登记）
 grep -rn '不抬 F 的空发布\|写掉那一槽\|PushEmptyUntil\|empty_publishes_until_the_slot' crates/singlefs-core/src/ | wc -l      （输出 10）
 grep -rn '10 + 7\|7 c_max\|7 \* c_max\|(B − 1) × c_max' crates/ | wc -l      （输出 5）
-sha256sum crates/singlefs-core/src/admission.rs crates/singlefs-core/src/mount.rs crates/singlefs-core/src/allocator.rs crates/singlefs-core/src/mounted_session.rs scripts/experiments/e173_admission_ceiling_bad_ring_slot_dispositions.rs scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv
+sha256sum crates/singlefs-core/src/admission.rs crates/singlefs-core/src/mount.rs crates/singlefs-core/src/allocator.rs crates/singlefs-core/src/mounted_session.rs scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv
 python3 scripts/kb/quote-kb.py <草稿目录>/quote-c723.md '.claude/kb/checks-owed.md~^\| C723 '
 python3 scripts/kb/quote-kb.py <草稿目录>/quote-d16-item1.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读'
 python3 scripts/kb/quote-kb.py <草稿目录>/quote-d28-items-1-4.md '.claude/kb/decisions/28-挂载期承诺量.md@#### 已定项 1：准入不等式的权威形式' '.claude/kb/decisions/28-挂载期承诺量.md@#### 已定项 4：checkpoint 保留池进准入'
@@ -694,4 +694,4 @@ free -g
 
    上限同上一条（测试构建与 bin 构建同一批依赖）。
 3. 第一段产物（执行员跑，用 compile-then-swap 编好的那一份）：`SINGLEFS_THREAD_CAP=31 bash scripts/hosts/run-with-memory-cap.sh 20G <执行员的草稿目录>/compile-then-swap/target/release/e173_checkpoint_cost_against_empty_publish_cost <模式>`。上限 20G 的推法（推的）：E181 入库装置在两块 4 GiB 盘的几何上 31 线程峰值 12254707712 字节（`memory-peaks.tsv`，20G 上限下没撞）；这一段同时至多 3 个 G-4 几何在跑、每个几何只写几 MiB，设备只存写过的块，量级不超过 E181。
-4. 第二段（执行员跑，`scripts/experiments` 那一支）：编译 `cd scripts/experiments && bash ../hosts/capped.sh 31 cargo build --release -p e7-index-bench --bin e173-admission-ceiling-bad-ring-slot-dispositions`；产物 `SINGLEFS_THREAD_CAP=31 bash scripts/hosts/run-with-memory-cap.sh 8G scripts/experiments/target/release/e173-admission-ceiling-bad-ring-slot-dispositions checkpoint-cost-reserve`。上限 8G 的推法：原装置第一段峰值 57671680 字节、第二段 38797312 字节（`memory-peaks.tsv`，4G 上限、15 线程），新模式格数 1.5 倍、线程 31，取 `scripts/experiments/replay.sh` 的默认 `REPLAY_MEMORY_CAP` = 8G 足够。
+4. 第二段（执行员跑，`scripts/experiment-apparatus` 那一支）：编译 `cd scripts/experiment-apparatus && bash ../hosts/capped.sh 31 cargo build --release -p e7-index-bench --bin e173-admission-ceiling-bad-ring-slot-dispositions`；产物 `SINGLEFS_THREAD_CAP=31 bash scripts/hosts/run-with-memory-cap.sh 8G scripts/experiment-apparatus/target/release/e173-admission-ceiling-bad-ring-slot-dispositions checkpoint-cost-reserve`。上限 8G 的推法：原装置第一段峰值 57671680 字节、第二段 38797312 字节（`memory-peaks.tsv`，4G 上限、15 线程），新模式格数 1.5 倍、线程 31，取 `scripts/experiment-apparatus/replay.sh` 的默认 `REPLAY_MEMORY_CAP` = 8G 足够。

@@ -1,0 +1,24 @@
+name=counts old 2144 new 2125 only_old 45 only_new 26 both 2099
+name=only_old_in_top_edge 45 of 45
+name=only_new_in_bottom_edge 26 of 26
+name=cost old 7076.36 new 7004.91 only_old 117.13 (1.66% of old) only_new 45.68 (0.65% of new)
+name=bucket_table  bucket old new | minus_only_old plus_only_new | changed_in_both_net
+  cut-by-api-error                           2     5 | -  0 +  3 |   +0 ok
+  cut-by-usage-limit                        36    36 | -  0 +  0 |   +0 ok
+  report-unreferenced                        9     9 | -  0 +  0 |   +0 ok
+  report-used-by-later-sub                   5     5 | -  0 +  0 |   +0 ok
+  report-used-by-main                      609   591 | - 23 +  5 |   +0 ok
+  stopped-abandoned                         14    15 | -  0 +  1 |   +0 ok
+  stopped-salvaged                          51    51 | -  0 +  0 |   +0 ok
+  verdict-archived                         461   463 | -  2 +  4 |   +0 ok
+  written-landed                           847   842 | - 17 + 12 |   +0 ok
+  written-overwritten                       23    22 | -  2 +  1 |   +0 ok
+  written-partial                           87    86 | -  1 +  0 |   +0 ok
+name=changed_in_both {}
+name=rework old 327 new 313 only_old 10 only_new 2 flip_in_both {'True->False': 6}
+    flip a09da330abc7d33ac True -> False 'C487 segments-step red fixture'
+    flip a16997f77d82b1f3f True -> False 'C441 sweep excludes own fixtures'
+    flip a18609bb47225b456 True -> False 'C531 fixture registrations excluded'
+    flip a7909700bb0517c92 True -> False 'C450 old sync record green fixture'
+    flip a8f1d32a9bf8406dc True -> False '9-8b repin amplification fixed-script tests'
+    flip ab4895e4eafb29811 True -> False 'C530 C455 fixture-claims marker'

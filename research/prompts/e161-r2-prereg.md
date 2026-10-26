@@ -149,7 +149,7 @@
 | 装置：可行性档 | `:5321` `run_feasibility`；`:5324` config 行写 `domain=first_small_37+quick_54_84+strided_segment_heads_4096`；`:5359` 字段 `first_nine_segments_identical`；`:5543` 判决行 | 锚点对不上时它照样往下评每个域（`anchors_hold` 只进判决行与退出码），域变大时没有先停的一步 |
 | 装置：内联测试（13 条，`grep -c '#\[test\]'` 现数） | `:5573-5609` 共用的 `evaluate_the_first_stream_small_domain`（先评、不先核域大小）；`:5626` A2（`:5634` 比 `:3918`）；`:5663` A4（`:5679-5683` 钉 37、`:5684` 钉 65 338、`:5689` 钉 54）；`:5697` `:5699` 钉 37、`:5707` 钉 file_read 12；`:5744` 注释 37；`:5773` PC3 缩小版（`:5786` `37 * 2 ms`）；`:5825` S3/S4 对拍 | 调查报告第一节：今天主工作区两条 `FAILED`（A2、A4），其余用 D1-small 的 6 条在 32G 撞顶（`.../checker-tier-quick-early-tests.log` 第 1017、1018、1025 行，这一次没现查日志） |
 | 变异表 | `crates/mutations.tsv` 第 1202–1213 行，12 条 `E161 crash_state_dedup …（M1–M12）`（行号随别的会话的改动会移，跑时按名字现查） | 这份文件工作区有别的会话暂存与未暂存的改动（`git diff --cached --stat` 210 行增删、`git diff --stat` +14），改它要与那些会话协商 |
-| 复跑驱动 | `scripts/experiments/replay.sh:216` 登记 `E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing`；`:561-562` 驱动（`E161_THREADS=10`、`$REPLAY_MEMORY_CAP`，默认 `:26` 8G） | 新产物落盘之后，第 216 行的产物名要换成新产物 |
+| 复跑驱动 | `scripts/experiment-apparatus/replay.sh:216` 登记 `E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing`；`:561-562` 驱动（`E161_THREADS=10`、`$REPLAY_MEMORY_CAP`，默认 `:26` 8G） | 新产物落盘之后，第 216 行的产物名要换成新产物 |
 | 工作区里未提交、与这次有关的 crates 改动 | e161 装置 `:2091-2092`（暂存）：`NotApplicable(_) \| PartiallyJudged(_)` 计进不适用；`crates/singlefs-checker/src/image.rs:39` 新增 `InvariantVerdict::PartiallyJudged(String)`（`git diff HEAD --stat` 该文件 +29/−3）、`crates/singlefs-checker-tier/src/crash.rs`（+9/−3） | 第 1 次产物之后 checker 多了一种判定。行 3 若有格翻面，分不开是域变了、这处改动，还是别的改动（第十节 F3 写明怎么记） |
 
 ## 四、跑之前已经存在的数
@@ -242,7 +242,7 @@ G1–G5 的臂同第 1 次 5.2（第 193–207 行），这一次不判 G 行（
 |---|---|---|---|---|
 | 第一段 | 实现员 | 5.6 的 I-1 到 I-12；文件头那一句删掉之前不开工 | 都不直接补；是第二、三段的前提 | — |
 | 第二段 | 主 agent | 5.8 的 C1、C2（内联测试） | 行 4 的内联测试那一半；行 2 的「内联测试跑得完」与 A4 域大小；行 1 的「crates = 公式 = 锚点」11 段（A2 那条测试里段 7 不逐个数，`segment_count_checks_up_to` 的上限 2²⁰） | 行 4 内联那一半够判；行 1、行 2 不够（段 7 没逐个数、可行性档没跑） |
-| 第三段 | 主 agent 跑 C3，执行员落产物与比对 | 5.8 的 C3；执行员把产物落进 `research/results/`、照第六节 Q1–Q3 判、照 PCr3 先证比对脚本会红、写实验页、把 `scripts/experiments/replay.sh:216` 的产物名换成新产物（执行员写范围之外的由主 agent 定谁改） | 行 1 全部（段 7 在可行性档里逐个数）、行 2 全部、行 3 全部 | 三行都够判 |
+| 第三段 | 主 agent 跑 C3，执行员落产物与比对 | 5.8 的 C3；执行员把产物落进 `research/results/`、照第六节 Q1–Q3 判、照 PCr3 先证比对脚本会红、写实验页、把 `scripts/experiment-apparatus/replay.sh:216` 的产物名换成新产物（执行员写范围之外的由主 agent 定谁改） | 行 1 全部（段 7 在可行性档里逐个数）、行 2 全部、行 3 全部 | 三行都够判 |
 | 第四段 | 主 agent 提交时 | 5.8 的 C4 | 行 4 的变异那一半 | 够判 |
 | 附带 | 主 agent | 5.8 的 C3b（线程数 1） | 行 3：只在 Q3 有翻面格时跑，用来排除线程数造成的翻面 | 够判后不跑 |
 
@@ -474,12 +474,12 @@ F3 用的已知差别表（设计时按第五节 5.5 与第四节 4.7 写，跑�
 | `.claude/hooks/heavy-test-guard.sh` | 1–80 里 `run`、`bin`、`checker-tier` 的命中行 |
 | `scripts/hosts/run-with-memory-cap.sh` | 1–40 里退出码、上限的命中行；71–80；grep 25、84、85、93、119、145、187、188、191、249、645、653 |
 | `~/.local/share/singlefs/memory-peaks.tsv` | 1–8；`e161` grep 6211、6246、6252–6256、6894、7623、7673 |
-| `scripts/experiments/replay.sh` | grep 25、26、216、468、513、514、558、561、562 |
+| `scripts/experiment-apparatus/replay.sh` | grep 25、26、216、468、513、514、558、561、562 |
 | `scripts/kb/quote-kb.py` | `--help` 前 20 行 |
 | `scripts/kb/replace-once.py` | 1–30 |
 | `research/results/` | 只 `ls \| grep -i e161`（文件名），没读内容 |
 
-没读：第 1 次产物与 `research/results/` 下任何内容、实验页的结果与结论各节、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`records/`、`.claude/kb/decisions-history.md`、`scripts/experiments/perf-by-milestone.md`、调查报告点名的那几份 `/tmp` 日志原件。
+没读：第 1 次产物与 `research/results/` 下任何内容、实验页的结果与结论各节、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`records/`、`.claude/kb/decisions-history.md`、`scripts/experiment-apparatus/perf-by-milestone.md`、调查报告点名的那几份 `/tmp` 日志原件。
 
 ### 13.2 跑过的命令（原样）与算术的原样输出
 
@@ -491,8 +491,8 @@ grep -n '^#' ".claude/kb/experiments/161-崩溃放量的去重与分段耗时.md
 grep -n '^const\|^static\|^pub const\|^    const\|^fn \|^pub fn\|^mod \|^struct\|^enum\|^impl\|#\[test\]\|^    fn \|#\[path\|^use ' $F
 ls crates/singlefs-checker-tier/tests/; grep -n '2, 2, 1, 2, 2, 1' crates/singlefs-checker-tier/tests/*.rs crates/singlefs-harness/tests/*.rs
 grep -rn '14_960_689_284\|14960689284\|16_777_260\|16_777_215\|268_435_455\|file_read_states\|no_file_states' crates/ --include=*.rs | grep -v 'e161_'
-grep -n 'e161' crates/mutations.tsv; grep -n 'e161\|E161' scripts/experiments/replay.sh; grep -n 'e161' ~/.local/share/singlefs/memory-peaks.tsv
-git diff --cached --stat -- $F crates/mutations.tsv scripts/experiments/replay.sh; git diff --stat -- $F crates/mutations.tsv; git diff --cached -- $F | head -20
+grep -n 'e161' crates/mutations.tsv; grep -n 'e161\|E161' scripts/experiment-apparatus/replay.sh; grep -n 'e161' ~/.local/share/singlefs/memory-peaks.tsv
+git diff --cached --stat -- $F crates/mutations.tsv scripts/experiment-apparatus/replay.sh; git diff --stat -- $F crates/mutations.tsv; git diff --cached -- $F | head -20
 git diff HEAD --numstat -- crates/singlefs-checker/src/image.rs crates/singlefs-checker-tier/src/crash.rs; git log --oneline -1 c3540c02; git log -1 --format='%h %ad' --date=short b970d824
 git rev-parse --short HEAD          # 31e47115
 sha256sum research/prompts/e161-preregistration.md research/prompts/e161-r2-questions.md /tmp/claude-1000/m3-5-7-e161/report.md

@@ -1,0 +1,3 @@
+name=七·6 按身份查：快照判定那一圈的映射 key 一律取 inode 根那一把 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 1.28s
+  first_panic_line=thread 'an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata' (2513346) panicked at crates/singlefs-harness/tests/snapshot_release_and_destroy_through_the_deadlist.rs:221:5:
+  left: {[1, 0, 1, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 1, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0]}

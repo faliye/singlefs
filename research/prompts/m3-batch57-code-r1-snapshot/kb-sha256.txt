@@ -1,2 +1,0 @@
-1730ad450d2cd4b2db27e24e59ed9c1a533d104c59603de0164f0205de50e7a0  .claude/kb/decisions/18-块里携带什么信息.md
-c708e5933178577310cf329f2670e93e927908a4c7d7c3bcc12a501e2a050362  .claude/kb/invariants.md

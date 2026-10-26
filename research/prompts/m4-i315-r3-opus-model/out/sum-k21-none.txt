@@ -1,0 +1,22 @@
+6395 0 sw=1 reused=true flag noleak selfcheck after:I-3.1=违例,I-3.11=违例,I-3.15=违例 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+N[I-3.1,I-3.10,I-3.11,I-3.15] jia2n=L[I-3.10]+L[I-3.1,I-3.10,I-3.11,I-3.15] jia2s=L[I-3.10]+L[I-3.1,I-3.10,I-3.11,I-3.15] jia2k=L[I-3.10]+L[I-3.1,I-3.10,I-3.11,I-3.15]
+6395 0 sw=1 reused=true flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+6395 0 sw=1 reused=true flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+6395 0 sw=1 reused=true flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+TALLY both jia2k {'L': 2}
+TALLY both jia2n {'L': 2}
+TALLY both jia2s {'L': 2}
+TALLY both today {'L': 2}
+TALLY cmp jia2k {'L': 2}
+TALLY cmp jia2n {'L': 2}
+TALLY cmp jia2s {'L': 2}
+TALLY cmp today {'L': 2}
+TALLY gen jia2k {'L': 2}
+TALLY gen jia2n {'L': 2}
+TALLY gen jia2s {'L': 2}
+TALLY gen today {'L': 2}
+TALLY selfcheck jia2k {'L': 2}
+TALLY selfcheck jia2n {'L': 2}
+TALLY selfcheck jia2s {'L': 2}
+TALLY selfcheck today {'L': 1, 'N': 1}
+BLIND {'loc_self_pass_points': 1}
+DONE 1

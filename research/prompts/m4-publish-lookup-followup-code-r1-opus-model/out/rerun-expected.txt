@@ -1,0 +1,54 @@
+name=mutant mutant=baseline build_rc=0 rc=0 test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=witness mutant=baseline witness files=8 destruction site=KeptMappingEntriesReleasedByTheSnapshotDestruction LookupWork { index_builds: 2, index_lookups: 16, index_entries_examined: 42, largest_index_looked_up: 8, mapping_leaf_decodes: 0 }
+name=witness mutant=baseline witness files=48 rewrite site=FilesOfTheReplacedRolesInThePreviousVersion LookupWork { index_builds: 8, index_lookups: 72, index_entries_examined: 432, largest_index_looked_up: 48, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 5, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=witness mutant=baseline witness files=48 rewrite site=CarriedExtentTreeNodes LookupWork { index_builds: 0, index_lookups: 47, index_entries_examined: 373, largest_index_looked_up: 452, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 5, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=witness mutant=baseline witness files=48 rewrite site=CarriedNodesOfTheMultiLevelTrees LookupWork { index_builds: 0, index_lookups: 1, index_entries_examined: 9, largest_index_looked_up: 452, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 5, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=mutant mutant=MA1 build_rc=0 rc=0 test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=mutant mutant=MA2 build_rc=0 rc=0 test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=mutant mutant=MA3 build_rc=0 rc=0 test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=mutant mutant=MA4 build_rc=0 rc=0 test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=mutant mutant=MA5 build_rc=0 rc=0 test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=witness mutant=MA1 witness files=8 destruction site=KeptMappingEntriesReleasedByTheSnapshotDestruction LookupWork { index_builds: 16, index_lookups: 16, index_entries_examined: 42, largest_index_looked_up: 8, mapping_leaf_decodes: 0 }
+name=witness mutant=MA2 witness files=48 rewrite site=FilesOfTheReplacedRolesInThePreviousVersion LookupWork { index_builds: 24, index_lookups: 72, index_entries_examined: 432, largest_index_looked_up: 48, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 5, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=witness mutant=MA3 witness files=48 rewrite site=FilesOfTheReplacedRolesInThePreviousVersion LookupWork { index_builds: 40, index_lookups: 72, index_entries_examined: 432, largest_index_looked_up: 48, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 5, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=witness mutant=MA4 witness files=48 rewrite site=CarriedNodesOfTheMultiLevelTrees LookupWork { index_builds: 0, index_lookups: 1, index_entries_examined: 9, largest_index_looked_up: 452, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 5, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=witness mutant=MA5 witness files=48 rewrite site=CarriedExtentTreeNodes LookupWork { index_builds: 0, index_lookups: 47, index_entries_examined: 373, largest_index_looked_up: 452, mapping_leaf_decodes: 0 } none_site=Some(LookupWork { index_builds: 52, index_lookups: 1282, index_entries_examined: 9948, largest_index_looked_up: 452, mapping_leaf_decodes: 0 })
+name=slow_mutant mutant=MA5 build_rc=0 rc=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out failed=[compaction_batches_decode_each_routed_mapping_leaf_once_and_examine_index_entries_sublinearly_from_512_to_2048_data_units ]
+name=slow_mutant mutant=MA1+MA2+MA3+MA4 build_rc=0 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out failed=[]
+name=differential seeds=512 steps=64 lines=33792 before_vs_after=identical
+name=differential_coverage op=new_inodes steps=3431 ok=3431 err=0
+name=differential_coverage op=write steps=10167 ok=10167 err=0
+name=differential_coverage op=overwrite steps=1925 ok=1925 err=0
+name=differential_coverage op=create_snapshot steps=2460 ok=2460 err=0
+name=differential_coverage op=destroy_snapshot steps=1533 ok=1533 err=0
+name=differential_coverage op=unlink steps=1001 ok=1001 err=0
+name=differential_coverage op=compaction steps=4783 ok=4783 err=0
+name=differential_coverage op=relocate steps=3802 ok=3802 err=0
+name=differential_coverage op=raise_floor steps=3666 ok=3666 err=0
+name=differential_coverage panics=0 kept_relocated_total=4000 histories_with_kept_relocation=432 max_dupkept=0 max_dupfiles=0
+name=probe files=16 units=159 mapped=156 op=relocation_batch_of_8_from_the_second_file mapping_positions_find=108 mount_placements_find=0 kept_contains=0 allocation_node_find=28 first_file_rewritten_contains=10 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=16 units=159 mapped=156 op=relocation_batch_of_8_from_the_last_file mapping_positions_find=1004 mount_placements_find=0 kept_contains=0 allocation_node_find=25 first_file_rewritten_contains=8 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=16 units=159 mapped=156 op=whole_rewrite_of_8 mapping_positions_find=0 mount_placements_find=0 kept_contains=0 allocation_node_find=28 first_file_rewritten_contains=22 mapping_positions_calls=0 record_roles_contains=399
+name=probe files=16 units=159 mapped=156 op=raise_floor raised=true mapping_positions_find=0 mount_placements_find=4940 kept_contains=0 allocation_node_find=100 first_file_rewritten_contains=32 mapping_positions_calls=0 record_roles_contains=0
+name=probe files=16 units=159 mapped=156 op=remount mapping_positions_find=12246 mount_placements_find=8328 kept_contains=0 allocation_node_find=156 first_file_rewritten_contains=54 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=64 units=599 mapped=592 op=relocation_batch_of_8_from_the_second_file mapping_positions_find=108 mount_placements_find=0 kept_contains=0 allocation_node_find=66 first_file_rewritten_contains=16 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=64 units=599 mapped=592 op=relocation_batch_of_8_from_the_last_file mapping_positions_find=4076 mount_placements_find=0 kept_contains=0 allocation_node_find=45 first_file_rewritten_contains=9 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=64 units=599 mapped=592 op=whole_rewrite_of_8 mapping_positions_find=0 mount_placements_find=0 kept_contains=0 allocation_node_find=63 first_file_rewritten_contains=26 mapping_positions_calls=0 record_roles_contains=483
+name=probe files=64 units=599 mapped=592 op=raise_floor raised=true mapping_positions_find=0 mount_placements_find=21368 kept_contains=0 allocation_node_find=220 first_file_rewritten_contains=36 mapping_positions_calls=0 record_roles_contains=0
+name=probe files=64 units=599 mapped=592 op=remount mapping_positions_find=176715 mount_placements_find=40248 kept_contains=0 allocation_node_find=396 first_file_rewritten_contains=68 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=256 units=2354 mapped=2337 op=relocation_batch_of_8_from_the_second_file mapping_positions_find=108 mount_placements_find=0 kept_contains=0 allocation_node_find=220 first_file_rewritten_contains=16 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=256 units=2354 mapped=2337 op=relocation_batch_of_8_from_the_last_file mapping_positions_find=16364 mount_placements_find=0 kept_contains=0 allocation_node_find=115 first_file_rewritten_contains=10 mapping_positions_calls=1 record_roles_contains=0
+name=probe files=256 units=2354 mapped=2337 op=whole_rewrite_of_8 mapping_positions_find=0 mount_placements_find=0 kept_contains=0 allocation_node_find=247 first_file_rewritten_contains=33 mapping_positions_calls=0 record_roles_contains=630
+name=probe files=256 units=2354 mapped=2337 op=raise_floor raised=true mapping_positions_find=0 mount_placements_find=84292 kept_contains=0 allocation_node_find=540 first_file_rewritten_contains=36 mapping_positions_calls=0 record_roles_contains=0
+name=probe files=256 units=2354 mapped=2337 op=remount mapping_positions_find=2741311 mount_placements_find=159032 kept_contains=0 allocation_node_find=1068 first_file_rewritten_contains=68 mapping_positions_calls=1 record_roles_contains=0
+name=probe rewrite_units=8 op=whole_rewrite_under_a_snapshot mapping_positions_find=0 mount_placements_find=0 kept_contains=882 allocation_node_find=28 first_file_rewritten_contains=23 mapping_positions_calls=0 record_roles_contains=420
+name=probe rewrite_units=32 op=whole_rewrite_under_a_snapshot mapping_positions_find=0 mount_placements_find=0 kept_contains=3636 allocation_node_find=25 first_file_rewritten_contains=45 mapping_positions_calls=0 record_roles_contains=2790
+name=probe rewrite_units=128 op=whole_rewrite_under_a_snapshot mapping_positions_find=0 mount_placements_find=0 kept_contains=49962 allocation_node_find=42 first_file_rewritten_contains=145 mapping_positions_calls=0 record_roles_contains=31242
+name=t4 cell=plain build_script_ran=yes rustc_cfg_lookup_work_counters=off build_script_output=[cargo::metadata=enabled_features=]
+name=t4 cell=feature build_script_ran=yes rustc_cfg_lookup_work_counters=on build_script_output=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS]
+name=t4 cell=environment build_script_ran=yes rustc_cfg_lookup_work_counters=off build_script_output=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS]
+name=t4 cell=config_env build_script_ran=yes rustc_cfg_lookup_work_counters=off build_script_output=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS]
+name=t4 cell=stale build_script_ran=no rustc_cfg_lookup_work_counters=not-recompiled build_script_output=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS]
+name=t4 cell=checker_tier_keys_plain table=found groups=64 build_feature_lines=[]
+name=t4 cell=checker_tier_keys_environment table=found groups=64 build_feature_lines=[build-feature singlefs-core lookup-work-counters]
+name=t4 cell=checker_tier_keys_compare groups_with_a_different_line=56 of 64

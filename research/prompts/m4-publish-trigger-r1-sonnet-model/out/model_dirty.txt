@@ -1,0 +1,10 @@
+name=effective_t_dirty field_bytes=2147483648 ring_bytes=805306368 factor=3 ring_div_factor=268435456 effective_bytes=268435456
+name=effective_in_data_units data_unit_bytes=32768 units=8192 journal_bytes_of_those_units=33554432 in_flight_record_limit=65536
+name=field_2gib_in_data_units units=65536 journal_bytes=268435456
+name=dirty_reading load=same_file_1KiB_x1000 content=1024000 folded_content=1024 units=32768
+name=dirty_reading load=1000_files_1KiB content=1024000 folded_content=1024000 units=32768000
+name=dirty_reading load=one_file_70000B_x3 content=210000 folded_content=70000 units=98304
+name=dirty_reading load=100000_empty_inodes content=0 folded_content=0 units=0
+name=dirty_branch_reachable reading=content threshold_bytes=65536 accepts_until_cross=64 cause=dirty
+name=dirty_branch_reachable reading=folded_content threshold_bytes=65536 accepts_until_cross=never(10000) cause=None
+name=dirty_branch_reachable reading=units threshold_bytes=65536 accepts_until_cross=never(10000) cause=None

@@ -1,1 +1,0 @@
-COUNT flow=rollback-publish writes=25 segments=[20, 2, 1, 2] root_index=22 states=1048588

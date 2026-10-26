@@ -1,0 +1,65 @@
+implementation-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	heavy-test-guard	rc=0
+implementation-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	run-scope-guard	rc=0
+implementation-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	two-logs-guard	rc=0
+implementation-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	bash-command-detector	rc=0
+implementation-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	heavy-test-guard	rc=0
+implementation-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	run-scope-guard	rc=0
+implementation-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	two-logs-guard	rc=0
+implementation-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	bash-command-detector	rc=0
+implementation-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	heavy-test-guard	rc=0
+implementation-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	run-scope-guard	rc=0
+implementation-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	two-logs-guard	rc=0
+implementation-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	bash-command-detector	rc=0
+implementation-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	heavy-test-guard	rc=0
+implementation-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	run-scope-guard	rc=0
+implementation-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	two-logs-guard	rc=0
+implementation-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	bash-command-detector	rc=0
+experiment-runner	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	heavy-test-guard	rc=0
+experiment-runner	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	run-scope-guard	rc=0
+experiment-runner	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	two-logs-guard	rc=0
+experiment-runner	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	bash-command-detector	rc=0
+experiment-runner	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	heavy-test-guard	rc=0
+experiment-runner	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	run-scope-guard	rc=0
+experiment-runner	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	two-logs-guard	rc=0
+experiment-runner	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	bash-command-detector	rc=0
+experiment-runner	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	heavy-test-guard	rc=0
+experiment-runner	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	run-scope-guard	rc=0
+experiment-runner	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	two-logs-guard	rc=0
+experiment-runner	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	bash-command-detector	rc=0
+experiment-runner	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	heavy-test-guard	rc=0
+experiment-runner	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	run-scope-guard	rc=0
+experiment-runner	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	two-logs-guard	rc=0
+experiment-runner	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	bash-command-detector	rc=0
+tooling-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	heavy-test-guard	rc=0
+tooling-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	run-scope-guard	rc=0
+tooling-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	two-logs-guard	rc=0
+tooling-writer	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	bash-command-detector	rc=0
+tooling-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	heavy-test-guard	rc=0
+tooling-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	run-scope-guard	rc=0
+tooling-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	two-logs-guard	rc=0
+tooling-writer	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	bash-command-detector	rc=0
+tooling-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	heavy-test-guard	rc=0
+tooling-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	run-scope-guard	rc=0
+tooling-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	two-logs-guard	rc=0
+tooling-writer	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	bash-command-detector	rc=0
+tooling-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	heavy-test-guard	rc=0
+tooling-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	run-scope-guard	rc=0
+tooling-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	two-logs-guard	rc=0
+tooling-writer	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	bash-command-detector	rc=0
+three-way-attack	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	heavy-test-guard	rc=0
+three-way-attack	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	run-scope-guard	rc=0
+three-way-attack	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	two-logs-guard	rc=0
+three-way-attack	SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.	bash-command-detector	rc=0
+three-way-attack	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	heavy-test-guard	rc=0
+three-way-attack	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	run-scope-guard	rc=0
+three-way-attack	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	two-logs-guard	rc=0
+three-way-attack	bash .claude/singlefs-ai-sop/scripts/naming-lint.sh /home/fy	bash-command-detector	rc=0
+three-way-attack	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	heavy-test-guard	rc=0
+three-way-attack	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	run-scope-guard	rc=0
+three-way-attack	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	two-logs-guard	rc=0
+three-way-attack	nice -n 19 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-	bash-command-detector	rc=0
+three-way-attack	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	heavy-test-guard	rc=0
+three-way-attack	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	run-scope-guard	rc=0
+three-way-attack	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	two-logs-guard	rc=0
+three-way-attack	nice -n 19 bash .claude/singlefs-ai-sop/scripts/naming-lint.	bash-command-detector	rc=0
+对照（夹着 format-constants）heavy-test-guard rc=2

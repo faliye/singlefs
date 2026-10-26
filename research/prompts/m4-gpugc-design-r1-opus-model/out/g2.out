@@ -1,0 +1,22 @@
+name=g2_merge card=0 a_ms=4.492 b_ns_per_byte=0.4117 phi_target=0.5 bytes_needed=10910092 intents_needed_at_full_R=10.4 intents_needed_at_786432=13.9 intents_needed_at_262144=41.6
+name=g2_merge card=0 a_ms=4.492 b_ns_per_byte=0.4117 phi_target=0.1 bytes_needed=98190824 intents_needed_at_full_R=93.6 intents_needed_at_786432=124.9 intents_needed_at_262144=374.6
+name=g2_one_intent card=0 phi_when_a_whole_R_is_one_submission=0.9123
+name=g2_pool card=0 P=1024 pool_data_bytes=33554432 phi_if_the_whole_pool_is_one_submission=0.2454 mapping_table_bytes_one_copy=61440 two_copies=122880
+name=g2_pool card=0 P=8192 pool_data_bytes=268435456 phi_if_the_whole_pool_is_one_submission=0.0391 mapping_table_bytes_one_copy=491520 two_copies=983040
+name=g2_merge card=1 a_ms=10.300 b_ns_per_byte=1.2660 phi_target=0.5 bytes_needed=8135835 intents_needed_at_full_R=7.8 intents_needed_at_786432=10.3 intents_needed_at_262144=31.0
+name=g2_merge card=1 a_ms=10.300 b_ns_per_byte=1.2660 phi_target=0.1 bytes_needed=73222517 intents_needed_at_full_R=69.8 intents_needed_at_786432=93.1 intents_needed_at_262144=279.3
+name=g2_one_intent card=1 phi_when_a_whole_R_is_one_submission=0.8858
+name=g2_pool card=1 P=1024 pool_data_bytes=33554432 phi_if_the_whole_pool_is_one_submission=0.1951 mapping_table_bytes_one_copy=61440 two_copies=122880
+name=g2_pool card=1 P=8192 pool_data_bytes=268435456 phi_if_the_whole_pool_is_one_submission=0.0294 mapping_table_bytes_one_copy=491520 two_copies=983040
+name=g2_publishes f=0.25 K=4 batches_per_intent=2 merged_batches=125 intents_spanned=63 publishes_to_consume=189 b_gc_after_a_user_change=20 runs_needed_at_least=10
+name=g2_publishes f=0.25 K=4 batches_per_intent=2 merged_batches=374 intents_spanned=187 publishes_to_consume=561 b_gc_after_a_user_change=20 runs_needed_at_least=29
+name=g2_publishes f=0.25 K=8 batches_per_intent=1 merged_batches=125 intents_spanned=125 publishes_to_consume=250 b_gc_after_a_user_change=20 runs_needed_at_least=13
+name=g2_publishes f=0.25 K=8 batches_per_intent=1 merged_batches=374 intents_spanned=374 publishes_to_consume=748 b_gc_after_a_user_change=20 runs_needed_at_least=38
+name=g2_publishes f=0.25 K=16 batches_per_intent=1 merged_batches=125 intents_spanned=125 publishes_to_consume=250 b_gc_after_a_user_change=20 runs_needed_at_least=13
+name=g2_publishes f=0.25 K=16 batches_per_intent=1 merged_batches=374 intents_spanned=374 publishes_to_consume=748 b_gc_after_a_user_change=20 runs_needed_at_least=38
+name=g2_publishes f=0.75 K=4 batches_per_intent=6 merged_batches=125 intents_spanned=21 publishes_to_consume=147 b_gc_after_a_user_change=20 runs_needed_at_least=8
+name=g2_publishes f=0.75 K=4 batches_per_intent=6 merged_batches=374 intents_spanned=63 publishes_to_consume=441 b_gc_after_a_user_change=20 runs_needed_at_least=23
+name=g2_publishes f=0.75 K=8 batches_per_intent=3 merged_batches=125 intents_spanned=42 publishes_to_consume=168 b_gc_after_a_user_change=20 runs_needed_at_least=9
+name=g2_publishes f=0.75 K=8 batches_per_intent=3 merged_batches=374 intents_spanned=125 publishes_to_consume=500 b_gc_after_a_user_change=20 runs_needed_at_least=25
+name=g2_publishes f=0.75 K=16 batches_per_intent=2 merged_batches=125 intents_spanned=63 publishes_to_consume=189 b_gc_after_a_user_change=20 runs_needed_at_least=10
+name=g2_publishes f=0.75 K=16 batches_per_intent=2 merged_batches=374 intents_spanned=187 publishes_to_consume=561 b_gc_after_a_user_change=20 runs_needed_at_least=29

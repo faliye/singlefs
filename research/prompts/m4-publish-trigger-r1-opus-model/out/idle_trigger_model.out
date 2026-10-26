@@ -1,0 +1,228 @@
+# 一、丢窗口（T_time = 5 s；None = 空闲期间发布不了，窗口等于空闲时长、无界）
+name=loss_window arm=entry idle=10 tick_period=0.1 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=10 tick_period=0.1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=10 tick_period=1 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=10 tick_period=1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=10 tick_period=5 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=10 tick_period=5 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=60 tick_period=0.1 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=60 tick_period=0.1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=60 tick_period=1 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=60 tick_period=1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=60 tick_period=5 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=60 tick_period=5 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=3600 tick_period=0.1 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=3600 tick_period=0.1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=3600 tick_period=1 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=3600 tick_period=1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=entry idle=3600 tick_period=5 blocking_call=0 backwards=0 published_at=None
+name=loss_window arm=entry idle=3600 tick_period=5 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick idle=10 tick_period=0.1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=10 tick_period=0.1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick idle=10 tick_period=1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=10 tick_period=1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick idle=10 tick_period=5 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=10 tick_period=5 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick idle=60 tick_period=0.1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=60 tick_period=0.1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick idle=60 tick_period=1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=60 tick_period=1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick idle=60 tick_period=5 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=60 tick_period=5 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick idle=3600 tick_period=0.1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=3600 tick_period=0.1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick idle=3600 tick_period=1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=3600 tick_period=1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick idle=3600 tick_period=5 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick idle=3600 tick_period=5 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=0.1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=0.1 blocking_call=0 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=0.1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=0.1 blocking_call=30 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=1 blocking_call=0 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=1 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=1 blocking_call=30 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=5 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=5 blocking_call=0 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=5 blocking_call=30 backwards=0 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=10 tick_period=5 blocking_call=30 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=0.1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=0.1 blocking_call=0 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=0.1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=0.1 blocking_call=30 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=1 blocking_call=0 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=1 blocking_call=30 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=5 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=5 blocking_call=0 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=5 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=60 tick_period=5 blocking_call=30 backwards=120 published_at=None
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=0.1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=0.1 blocking_call=0 backwards=120 published_at=125.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=0.1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=0.1 blocking_call=30 backwards=120 published_at=125.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=1 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=1 blocking_call=0 backwards=120 published_at=125.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=1 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=1 blocking_call=30 backwards=120 published_at=125.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=5 blocking_call=0 backwards=0 published_at=5.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=5 blocking_call=0 backwards=120 published_at=125.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=5 blocking_call=30 backwards=0 published_at=30.0
+name=loss_window arm=tick_monotonic_backwards idle=3600 tick_period=5 blocking_call=30 backwards=120 published_at=125.0
+name=loss_window_summary arm=entry worst_window_seconds=3600 formula_t_time=5
+name=loss_window_summary arm=tick worst_window_seconds=30 formula_t_time=5
+name=loss_window_summary arm=tick_monotonic_backwards worst_window_seconds=125 formula_t_time=5
+name=loss_window_rows rows=72
+# 二、空闲时照字面推空发布：环里还剩几个不同状态（回退候选集至多 4）
+name=ring_churn S=4 T_time=0.2 idle=10 writes_before_idle=1 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=0.2 idle=10 writes_before_idle=4 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=10 writes_before_idle=6 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=60 writes_before_idle=1 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=0.2 idle=60 writes_before_idle=4 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=60 writes_before_idle=6 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=120 writes_before_idle=1 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=0.2 idle=120 writes_before_idle=4 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=120 writes_before_idle=6 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=600 writes_before_idle=1 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=0.2 idle=600 writes_before_idle=4 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=600 writes_before_idle=6 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=3600 writes_before_idle=1 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=0.2 idle=3600 writes_before_idle=4 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=0.2 idle=3600 writes_before_idle=6 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=10 writes_before_idle=1 empty_publishes_literal=10 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=1 idle=10 writes_before_idle=4 empty_publishes_literal=10 candidates_literal=2 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=10 writes_before_idle=6 empty_publishes_literal=10 candidates_literal=2 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=60 writes_before_idle=1 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=1 idle=60 writes_before_idle=4 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=60 writes_before_idle=6 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=120 writes_before_idle=1 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=1 idle=120 writes_before_idle=4 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=120 writes_before_idle=6 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=600 writes_before_idle=1 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=1 idle=600 writes_before_idle=4 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=600 writes_before_idle=6 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=3600 writes_before_idle=1 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=1 idle=3600 writes_before_idle=4 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=1 idle=3600 writes_before_idle=6 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=10 writes_before_idle=1 empty_publishes_literal=2 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=5 idle=10 writes_before_idle=4 empty_publishes_literal=2 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=10 writes_before_idle=6 empty_publishes_literal=2 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=60 writes_before_idle=1 empty_publishes_literal=12 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=5 idle=60 writes_before_idle=4 empty_publishes_literal=12 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=60 writes_before_idle=6 empty_publishes_literal=12 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=120 writes_before_idle=1 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=5 idle=120 writes_before_idle=4 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=120 writes_before_idle=6 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=600 writes_before_idle=1 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=5 idle=600 writes_before_idle=4 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=600 writes_before_idle=6 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=3600 writes_before_idle=1 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=4 T_time=5 idle=3600 writes_before_idle=4 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=4 T_time=5 idle=3600 writes_before_idle=6 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=10 writes_before_idle=1 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=0.2 idle=10 writes_before_idle=4 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=10 writes_before_idle=6 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=60 writes_before_idle=1 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=0.2 idle=60 writes_before_idle=4 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=60 writes_before_idle=6 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=120 writes_before_idle=1 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=0.2 idle=120 writes_before_idle=4 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=120 writes_before_idle=6 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=600 writes_before_idle=1 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=0.2 idle=600 writes_before_idle=4 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=600 writes_before_idle=6 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=3600 writes_before_idle=1 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=0.2 idle=3600 writes_before_idle=4 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=0.2 idle=3600 writes_before_idle=6 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=10 writes_before_idle=1 empty_publishes_literal=10 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=1 idle=10 writes_before_idle=4 empty_publishes_literal=10 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=10 writes_before_idle=6 empty_publishes_literal=10 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=60 writes_before_idle=1 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=1 idle=60 writes_before_idle=4 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=60 writes_before_idle=6 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=120 writes_before_idle=1 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=1 idle=120 writes_before_idle=4 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=120 writes_before_idle=6 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=600 writes_before_idle=1 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=1 idle=600 writes_before_idle=4 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=600 writes_before_idle=6 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=3600 writes_before_idle=1 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=1 idle=3600 writes_before_idle=4 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=1 idle=3600 writes_before_idle=6 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=10 writes_before_idle=1 empty_publishes_literal=2 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=5 idle=10 writes_before_idle=4 empty_publishes_literal=2 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=10 writes_before_idle=6 empty_publishes_literal=2 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=60 writes_before_idle=1 empty_publishes_literal=12 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=5 idle=60 writes_before_idle=4 empty_publishes_literal=12 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=60 writes_before_idle=6 empty_publishes_literal=12 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=120 writes_before_idle=1 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=5 idle=120 writes_before_idle=4 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=120 writes_before_idle=6 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=600 writes_before_idle=1 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=5 idle=600 writes_before_idle=4 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=600 writes_before_idle=6 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=3600 writes_before_idle=1 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=8 T_time=5 idle=3600 writes_before_idle=4 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=8 T_time=5 idle=3600 writes_before_idle=6 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=10 writes_before_idle=1 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=0.2 idle=10 writes_before_idle=4 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=10 writes_before_idle=6 empty_publishes_literal=49 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=60 writes_before_idle=1 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=0.2 idle=60 writes_before_idle=4 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=60 writes_before_idle=6 empty_publishes_literal=299 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=120 writes_before_idle=1 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=0.2 idle=120 writes_before_idle=4 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=120 writes_before_idle=6 empty_publishes_literal=599 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=600 writes_before_idle=1 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=0.2 idle=600 writes_before_idle=4 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=600 writes_before_idle=6 empty_publishes_literal=2999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=3600 writes_before_idle=1 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=0.2 idle=3600 writes_before_idle=4 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=0.2 idle=3600 writes_before_idle=6 empty_publishes_literal=17999 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=10 writes_before_idle=1 empty_publishes_literal=10 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=1 idle=10 writes_before_idle=4 empty_publishes_literal=10 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=10 writes_before_idle=6 empty_publishes_literal=10 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=60 writes_before_idle=1 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=1 idle=60 writes_before_idle=4 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=60 writes_before_idle=6 empty_publishes_literal=60 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=120 writes_before_idle=1 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=1 idle=120 writes_before_idle=4 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=120 writes_before_idle=6 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=600 writes_before_idle=1 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=1 idle=600 writes_before_idle=4 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=600 writes_before_idle=6 empty_publishes_literal=600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=3600 writes_before_idle=1 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=1 idle=3600 writes_before_idle=4 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=1 idle=3600 writes_before_idle=6 empty_publishes_literal=3600 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=10 writes_before_idle=1 empty_publishes_literal=2 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=5 idle=10 writes_before_idle=4 empty_publishes_literal=2 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=10 writes_before_idle=6 empty_publishes_literal=2 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=60 writes_before_idle=1 empty_publishes_literal=12 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=5 idle=60 writes_before_idle=4 empty_publishes_literal=12 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=60 writes_before_idle=6 empty_publishes_literal=12 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=120 writes_before_idle=1 empty_publishes_literal=24 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=5 idle=120 writes_before_idle=4 empty_publishes_literal=24 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=120 writes_before_idle=6 empty_publishes_literal=24 candidates_literal=4 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=600 writes_before_idle=1 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=5 idle=600 writes_before_idle=4 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=600 writes_before_idle=6 empty_publishes_literal=120 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=3600 writes_before_idle=1 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=1
+name=ring_churn S=16 T_time=5 idle=3600 writes_before_idle=4 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn S=16 T_time=5 idle=3600 writes_before_idle=6 empty_publishes_literal=720 candidates_literal=1 candidates_dirty_guarded=4
+name=ring_churn_summary rows=135 rows_collapsed_to_one_state_only_under_the_literal_formula=72 idle_seconds_to_collapse_at_T_time_5={4: 60.0, 8: 120.0, 16: 240.0}
+# 三、串行、T_time < 发布耗时 D：空闲一小时的发布次数，与持续写下一次改动收下到发布的最长时间
+name=serial_short_t_time T_time=0.2 D=0.5 tick_period=0.05 idle_hour_publishes_literal=7200 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=1.2
+name=serial_short_t_time T_time=0.2 D=0.5 tick_period=1 idle_hour_publishes_literal=3600 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=2
+name=serial_short_t_time T_time=0.2 D=2 tick_period=0.05 idle_hour_publishes_literal=1800 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=4.2
+name=serial_short_t_time T_time=0.2 D=2 tick_period=1 idle_hour_publishes_literal=1800 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=5
+name=serial_short_t_time T_time=0.2 D=10 tick_period=0.05 idle_hour_publishes_literal=360 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=20.2
+name=serial_short_t_time T_time=0.2 D=10 tick_period=1 idle_hour_publishes_literal=360 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=21
+name=serial_short_t_time T_time=1 D=0.5 tick_period=0.05 idle_hour_publishes_literal=3600 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=2
+name=serial_short_t_time T_time=1 D=0.5 tick_period=1 idle_hour_publishes_literal=3600 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=2
+name=serial_short_t_time T_time=1 D=2 tick_period=0.05 idle_hour_publishes_literal=1800 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=5
+name=serial_short_t_time T_time=1 D=2 tick_period=1 idle_hour_publishes_literal=1800 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=5
+name=serial_short_t_time T_time=1 D=10 tick_period=0.05 idle_hour_publishes_literal=360 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=21
+name=serial_short_t_time T_time=1 D=10 tick_period=1 idle_hour_publishes_literal=360 idle_hour_publishes_dirty_guarded=0 busy_worst_accept_to_durable_seconds=21
+name=serial_short_t_time_rows rows=12

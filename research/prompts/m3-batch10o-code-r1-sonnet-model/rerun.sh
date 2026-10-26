@@ -17,7 +17,7 @@ case ${1:-} in
     W=${2:?草稿目录}; FROZEN=${3:-$HOME/.local/share/singlefs/work/m3-batch10o-code-r1/tree-r2}
     mkdir -p "$W/tree/crates/t2-arm-probe/src" "$W/out"
     cp -a "$FROZEN/Cargo.toml" "$FROZEN/Cargo.lock" "$FROZEN/crates" "$W/tree/"
-    mkdir -p "$W/tree/research"; cp "$FROZEN/scripts/experiments/Cargo.toml" "$W/tree/research/"
+    mkdir -p "$W/tree/research"; cp "$FROZEN/scripts/experiment-apparatus/Cargo.toml" "$W/tree/research/"
     (cd "$W/tree" && patch -p1 -s < "$HERE/t2-arm-core.patch")
     sed -i 's#    "crates/singlefs-reference-filesystem",#    "crates/singlefs-reference-filesystem",\n    "crates/t2-arm-probe",#' "$W/tree/Cargo.toml"
     cp "$HERE/Cargo.toml" "$W/tree/crates/t2-arm-probe/Cargo.toml"; cp "$HERE/main.rs" "$W/tree/crates/t2-arm-probe/src/main.rs"

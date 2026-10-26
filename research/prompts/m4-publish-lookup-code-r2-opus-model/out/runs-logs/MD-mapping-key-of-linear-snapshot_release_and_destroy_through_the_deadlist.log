@@ -1,0 +1,23 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 38.9 GiB，这一条要 3.1 GiB（按峰值表里近 5 次实测里最大的峰值 3.1 GiB（最近一次 2026-10-21T10:25:54Z 量的）算），总上限 40.1 GiB；账上在跑 20 条
+run-with-memory-cap: 没查到别的机器：17 秒前包装 1812385 刚查过（几条一起排队时每 60 秒只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）
+run-with-memory-cap: 排了 43 秒，起跑（singlefs-memory-cap-1818252-3176031160）
+
+running 15 tests
+test destroying_a_snapshot_that_is_not_in_the_tree_table_is_refused_before_any_write ... ok
+test an_overwrite_without_any_snapshot_releases_every_replaced_unit_and_leaves_the_deadlist_at_a_zero_root ... ok
+test a_rollback_from_a_version_carrying_a_snapshot_is_refused_before_any_write ... ok
+test the_snapshot_reads_the_content_at_its_creation_after_an_overwrite ... ok
+test an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata ... ok
+test creating_a_snapshot_while_another_is_being_destroyed_is_refused_before_any_write ... ok
+test the_snapshot_reads_the_content_at_its_creation_after_the_file_is_unlinked ... ok
+test a_unit_born_after_the_snapshot_is_released_when_it_is_replaced ... ok
+test destroying_the_only_snapshot_releases_every_entry_and_deletes_its_pair_of_entries ... ok
+test a_rollback_to_a_version_carrying_a_snapshot_is_refused_before_any_write ... ok
+test destroying_the_older_snapshot_releases_its_own_range_and_passes_its_predecessor_to_the_newer_one ... ok
+test a_destruction_batch_capped_at_one_entry_releases_one_entry_per_publish_until_the_final_batch ... ok
+test destroying_the_newer_snapshot_keeps_what_the_older_one_references_and_destroying_the_older_one_releases_it ... ok
+test destroying_a_snapshot_through_the_mounted_session_publishes_the_intent_and_every_batch_in_one_call ... ok
+test a_writable_mount_after_the_destruction_intent_continues_the_batches_to_the_end ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.79s
+

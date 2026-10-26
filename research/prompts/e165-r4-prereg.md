@@ -8,7 +8,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；变体驱动仍是 `scripts/experiments/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；变体驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 主 agent 给的问题（逐字，派发提示里的几行）：
 
@@ -437,7 +437,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-主 agent 以外的观测，行号是 2026-10-03 在主工作区现读的。整份 sha256：`crates/singlefs-core/src/recovery.rs` `264664af7a694fbda1295ac450c3d9c2198336d002b3c288b0f797731350e625`（r3 第二段冻结根里那份是 `9337dc1b…`，差 89 行 `diff`，三步之外：`newest_root_among` 平局取法、inode 树内部条目判 extent 偏移、`recover` 报跳过的盘），`crates/singlefs-replay-prefix/src/lib.rs` `40cd99b58242a5e522a9e302fa83ceaed17cdd5c2ea8e8811e0e223a4649f08c`（与 r3 相同），`crates/singlefs-core/src/journal.rs` `d12f9a9327aec3a60b2fc6e3a3f31752faad05a16ded1894be708aeb21c80b87`（与 r3 冻结根不同：`JournalRecord::parse` 另判新根段指针头部 extent 偏移非 0 即拒），`crates/singlefs-core/src/mount.rs` `444610b45490a11c1f5dcafaaaceff9decbc100168423d07e2179390bd779213` 与 `transaction.rs` `67d6470f4c3b860bdb0c3d2e87f45c17e0c00db0d4b3414f4c56fcd4c9f6f61d`（两份都与 r3 冻结根相同），`crates/mutations.tsv` `37d30a0ec8109e6cd0d48795be2ebc35a86251b0663f4ab54c481a0545a7059b`；装置 `acd76c379479d5e9e23bc8a1fd6552c1af4f0108655c2a69c37a4ee3c2304a58`（13 577 行，等于 r3 第二段那一份），驱动 `scripts/experiments/e165-replay-mutation-kill-bounds.sh` `1a3dafb007079a31e0609c53f541d05e0bc88f591955e6be709787b2e267e042`。r3 登记第三节那 20 个函数的区间文本 sha256 今天逐个相同（`function_ranges.py` 的输出 `function-ranges-today.txt` sha256 `21f86221e38a73cdd5df9ce7ac000d55748214122424af1a57fcdcda22f923db`），只有 `recovery.rs` 里六个函数整体下移（例：`choose_root` 1250–1287 → 1255–1292）。
+主 agent 以外的观测，行号是 2026-10-03 在主工作区现读的。整份 sha256：`crates/singlefs-core/src/recovery.rs` `264664af7a694fbda1295ac450c3d9c2198336d002b3c288b0f797731350e625`（r3 第二段冻结根里那份是 `9337dc1b…`，差 89 行 `diff`，三步之外：`newest_root_among` 平局取法、inode 树内部条目判 extent 偏移、`recover` 报跳过的盘），`crates/singlefs-replay-prefix/src/lib.rs` `40cd99b58242a5e522a9e302fa83ceaed17cdd5c2ea8e8811e0e223a4649f08c`（与 r3 相同），`crates/singlefs-core/src/journal.rs` `d12f9a9327aec3a60b2fc6e3a3f31752faad05a16ded1894be708aeb21c80b87`（与 r3 冻结根不同：`JournalRecord::parse` 另判新根段指针头部 extent 偏移非 0 即拒），`crates/singlefs-core/src/mount.rs` `444610b45490a11c1f5dcafaaaceff9decbc100168423d07e2179390bd779213` 与 `transaction.rs` `67d6470f4c3b860bdb0c3d2e87f45c17e0c00db0d4b3414f4c56fcd4c9f6f61d`（两份都与 r3 冻结根相同），`crates/mutations.tsv` `37d30a0ec8109e6cd0d48795be2ebc35a86251b0663f4ab54c481a0545a7059b`；装置 `acd76c379479d5e9e23bc8a1fd6552c1af4f0108655c2a69c37a4ee3c2304a58`（13 577 行，等于 r3 第二段那一份），驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` `1a3dafb007079a31e0609c53f541d05e0bc88f591955e6be709787b2e267e042`。r3 登记第三节那 20 个函数的区间文本 sha256 今天逐个相同（`function_ranges.py` 的输出 `function-ranges-today.txt` sha256 `21f86221e38a73cdd5df9ce7ac000d55748214122424af1a57fcdcda22f923db`），只有 `recovery.rs` 里六个函数整体下移（例：`choose_root` 1250–1287 → 1255–1292）。
 
 | 事实 | 文件:行 |
 |---|---|
@@ -602,9 +602,9 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | 段 | 补哪一行、补完够不够判 | 要改的文件 | 产物（`research/results/` 下，前缀 `e165-replay-bounded-enumeration-<日期>-r4-`） | 并行 |
 |---|---|---|---|---|
 | 第一段（装置） | Q1；补完够判。Q2 的基线与两个计数（TQ11）也在这一段出 | 装置（`--profile r4`、5.3 的生成器与闸、被判时故障的读者、5.5 的判据与标签、计数、读槽对拍、本地常量回比、5.6 的对照、KG 上的本地择根序、单测）；`crates/mutations.tsv` 这个 bin 的行（9.2） | `segment1-root-choice-faults.out`、`segment1-root-choice-faults-threads-second.out`（各配 `-timing.out`）；`segment1-profile-check.out`（TV1、TV2 的比对与两遍线程比） | 根在开工时拷（第三节） |
-| 第二段（驱动） | Q2；补完够判 | `scripts/experiments/e165-replay-mutation-kill-bounds.sh`（加 r4 模式，9.3） | `segment2-root-choice-faults-kill-bounds.out`（配 `-timing.out`） | 驱动可与第一段同时写（不共用文件）；跑要等第一段的根 |
+| 第二段（驱动） | Q2；补完够判 | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`（加 r4 模式，9.3） | `segment2-root-choice-faults-kill-bounds.out`（配 `-timing.out`） | 驱动可与第一段同时写（不共用文件）；跑要等第一段的根 |
 
-- `scripts/experiments/replay.sh` 两段都不改：每段交回附自己产物要加的复跑行（参数原样），主 agent 收齐一次加。
+- `scripts/experiment-apparatus/replay.sh` 两段都不改：每段交回附自己产物要加的复跑行（参数原样），主 agent 收齐一次加。
 - 钉红例表 `.claude/gate.d/e165-pinned-red-examples.tsv` 这一次不动（同 r3 5.8）。
 
 ### 5.8 实现量与状态数估计（推的，没量）
@@ -1050,7 +1050,7 @@ KA（`anchors_r3_ka.py`，同 r3）：125 态，没有一条自证过的根的 1
 
 - 装置终版：`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 今天（现查）sha256 `4ecfa61fda6e2c0764e748533bba37abcfbed86c4c7129dac67d7f80539ac031`，17 623 行。修订 2 写的 `0608bda0…` 与 17 622 行是第一遍的；第二遍（最后一次源码改动之后）与第二段在根上编的二进制用的都是终版。
 - `crates/mutations.tsv` 里 9.2 的 18 行：今天（现查）在第 1994 至 2011 行，名字都以「E165 r4 第一段」起头（`grep -c 'E165 r4 第一段' crates/mutations.tsv` 得 18）；修订 2 写的第 1995 至 2012 行是第一段根里那份的行号，主工作区的表后来被别的会话改过，今天 2025 行、sha256 `de0c12fdb20263e84f597fda777ddfe65f08ad9af72136f6fd44fcc6245eb79c`。第二段的驱动与变体选行用的是根里那份（2012 行、sha256 `db2981d0d6fccb1a65bdf701897d4475302ec1ba8cd87501fa1374d191bd9349`，第二段产物 `config` 行的 `table_sha256`），v1822 至 v1827 在根里与今天的主工作区里都是第 1821 至 1826 行。
-- 驱动：`scripts/experiments/e165-replay-mutation-kill-bounds.sh` 的 r4 模式由主 agent 装进仓（sha256 `3428a78ee8d41be830905e6595e3212cfa36acc49805adb45deab9f16cd06c56`，3 365 行；修订 2 写的是镜像，没装）。`--selftest` 84 项全过、五个 r4 弄坏开关（`r4itemsmissing`、`r4firstredswap`、`r4kgcountsasred`、`r4kgpinunchecked`、`r4noprofile`）各红，是主 agent 在派发提示里写的读数，没有入库的输出文件，执行员没重跑。
+- 驱动：`scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` 的 r4 模式由主 agent 装进仓（sha256 `3428a78ee8d41be830905e6595e3212cfa36acc49805adb45deab9f16cd06c56`，3 365 行；修订 2 写的是镜像，没装）。`--selftest` 84 项全过、五个 r4 弄坏开关（`r4itemsmissing`、`r4firstredswap`、`r4kgcountsasred`、`r4kgpinunchecked`、`r4noprofile`）各红，是主 agent 在派发提示里写的读数，没有入库的输出文件，执行员没重跑。
 - 第二段的跑法与那一次内存撞顶：第一趟 `--jobs 2 --threads 3`、内存上限 4G，tsv-1823 的变体二进制被内存包装拒（退出码 250，驱动记「没得出结果」，那一次输出不算结果，TV8），别的五个变体与开头收尾基线得出结果，第一趟因此没有写收尾三行；第二趟（补跑）内存上限换 8G、`--jobs 1 --threads 6`，只补 tsv-1823，tsv-1824、tsv-1825、tsv-1826 取第一趟存在草稿目录里的单项结果（驱动的 `stored_record`，不重跑），开头与收尾基线两趟各编各跑一遍，两趟日志里都写了「已还原，基线与开头逐字相同」、没有报基线与第一段产物不同（驱动不同退 6）。所以产物里 v1824（tsv-1823）这一行是 6 线程跑的，别的五行是 3 线程跑的；计数与线程数无关由第一段两遍（6 与 3 线程整份逐字节相同）与产物 `baseline` 行的 `rows_identical_to_segment1_product=true`（基线 3309 行逐行等于第一段产物）这两条保住，不是这一段新量的。两趟的驱动日志原样入库：`research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-driver-log.out`。「线程与内存」写的第二段默认内存上限 1G 不够用：驱动 r4 模式的默认是 4G（驱动文件头），第一趟用它撞了顶（撞的是 tsv-1823 那一个二进制；第一段整遍峰值约 1.66 GB，tsv-1823 为什么超 4G 没查），补跑与复跑行取 8G。
 - TH10 在第二段产物之后现查：`crates/singlefs-core/src/mount.rs` `444610b4…`、`transaction.rs` `67d6470f…`、`recovery.rs` `264664af…`、`journal.rs` `d12f9a93…` 与登记第三节、修订 1 记的相同；`crates/singlefs-replay-prefix/src/lib.rs` 在主工作区今天是 `9966f42f…`，与根里那份（`40cd99b5…`，第二段产物 `config` 行的 `lib_sha256`）不同——别的会话改了它；两段产物都是根上编的二进制跑的，不受影响，只是主工作区上 `replay.sh` 第一段那一行（`cargo run` 编主工作区）以后复出的数可能与产物不同，先对根清单。
 
@@ -1082,8 +1082,8 @@ KA（`anchors_r3_ka.py`，同 r3）：125 态，没有一条自证过的根的 1
 | `crates/singlefs-core/src/journal.rs` | 与 r3 第二段冻结根那份的 `diff` 前 20 行；grep `pub fn parse` |
 | `crates/singlefs-core/src/system_configuration.rs`、`make_filesystem.rs`、`crates/singlefs-format/src/lib.rs` | 705–720；grep 命中的 46、644 行；grep 命中的 235 行 |
 | `crates/mutations.tsv` | 1820–1829（`awk` 取第一列）；六个名字的 grep 与原文核对 |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`scripts/experiments/e165-replay-mutation-kill-bounds.sh` | 只算了 sha256、数了行数，内容没读（它们今天的结构以 r3 登记修订 1–3 的描述为准） |
-| `scripts/experiments/replay.sh` | grep `e165` 的命中行（222–234、537–547） |
+| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 只算了 sha256、数了行数，内容没读（它们今天的结构以 r3 登记修订 1–3 的描述为准） |
+| `scripts/experiment-apparatus/replay.sh` | grep `e165` 的命中行（222–234、537–547） |
 | `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py` | `--help` 的用法段 |
 | `/tmp/claude-1000/e165-r3-designer/` | 目录清单；`anchors_r3_k.py` 全文与 `anchors_r3_k.out` 前 5 行；`anchors_r3_ka.py` 全文 |
 | `/tmp/claude-1000/e165-r3-segment2/` | 目录清单；冻结根里 `recovery.rs`、`journal.rs` 与主工作区的 `diff`，`mount.rs`、`transaction.rs` 等六份的 `cmp` |
@@ -1103,7 +1103,7 @@ KA（`anchors_r3_ka.py`，同 r3）：125 态，没有一条自证过的根的 1
 | `.claude/kb/checks-owed.md` | `5c3ab5d8a8a530cea45cda71b6595e2375a9edc987cc5b334345ad6a9dcfe7f5`（2026-10-03 第一段开工重取；写登记时是 `600053db…`） |
 | `.claude/kb/invariants.md` | `158a740762a98646c1fb5202acc3203e790abd23c117c26b5f7d686031c0459b`（2026-10-03 第一段开工重取；写登记时是 `3cfc6a0d…`） |
 | `research/prompts/e165-r4-questions.md` | `8377cd613a56faf4398cd1accd5e52d574fef11b2e0ae6d55a8f74e4e6508f42` |
-| `scripts/experiments/replay.sh` | `79f8648d04098675453d9b029c01ba3ef135296dc524093c99e0a7871a45540c`（2026-10-03 第一段开工重取；写登记时是 `e4ce6f7d…`，别人加了行；本登记的复跑行还没加） |
+| `scripts/experiment-apparatus/replay.sh` | `79f8648d04098675453d9b029c01ba3ef135296dc524093c99e0a7871a45540c`（2026-10-03 第一段开工重取；写登记时是 `e4ce6f7d…`，别人加了行；本登记的复跑行还没加） |
 | 草稿 `clauses.md`、`clauses-defs.md`（设计员写登记时抄的，第二节已换成下一行那一份） | `9460063130e359e8f9f0b7bd31c23c59db77ac4ba51051d15d6f96f0b5939cd4`、`bb0b8e9587848133e09a199ac6e1b5c697b90bd7372774ab5b3cfaf70d69f5a2` |
 | 草稿 `/tmp/claude-1000/e165-r4-segment1b/clauses.md`、`clauses-defs.md`（2026-10-03 第一段开工时照第二节命令重抄，回读逐字节一致） | `1d0caed6cc3daeda51683bb65aef575004b5c31a8540a53591843d1066406d70`、`4aa5aaefb9639f1f95c5bd7e025db38a3ca0646e9c32ee47fd2fe2a6586fd03c` |
 | 草稿 `anchors_r4.py`、`merge_anchors.py`、`table_r4.py`、`table_m2fault.py`、`anchors_r3_ka.py` | `00fb4236c17a110fe643b8918583c1451d5583203686109d33050d68fb2f0c71`、`2d626a7b252f5693de2d6c6595a5d70ae9a372c86e54a85cd283c6cc0fd5a863`、`124a866fd8d45454642b67fedb3c442c3b8e226a1a7c77d8a971170f835fb40e`、`e31452858d7b50594ce128ae7b0af5e8bf3be56c1b3299ba2a1ae7864563da88`、`305126e959079ae5b70f82769a63e9d6b602a4d3769f79b5961f412d9019e258` |

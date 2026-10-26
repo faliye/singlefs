@@ -1,0 +1,11 @@
+name=y1_build variant=base rc=0 warnings=0
+name=y1_build variant=verusbang rc=0 warnings=0
+name=y1_verify variant=verusbang rc=0 verification results:: 1 verified, 0 errors|
+name=y1_build variant=attribute rc=0 warnings=0
+name=y1_verify variant=attribute rc=0 verification results:: 1 verified, 0 errors|
+name=y1_build variant=inplace rc=0 warnings=0
+name=y1_verify variant=inplace rc=0 verification results:: 13 verified, 0 errors|
+name=y1_build variant=kernelmodule rc=0 warnings=0
+name=y1_verify variant=kernelmodule rc=0 verification results:: 13 verified, 0 errors|
+name=y1_mir_fn_count base=5557 verusbang=5557 attribute=5557
+name=y1_mir_diff_lines verusbang=0 attribute=0

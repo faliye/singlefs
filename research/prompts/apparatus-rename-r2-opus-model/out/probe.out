@@ -1,0 +1,10 @@
+name=probe.base base=e1b1ceb95
+name=probe.lib_evidence rows=1 problems=[] note='新加的 1 行（基准 e1b1ceb95 那一版的登记表里没有）有搬迁实据（第 6 行 395 份里 360 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=probe.independent_evidence subjects=395 present=395 same_after_plain_replace=362
+name=probe.change_range listed=5552 lib_moved_only=725 independent_moved_only=730 problem=None
+name=probe.only_lib count=0 first=[]
+name=probe.only_independent count=5 first=['.claude/gate.d/fixtures/code-source-discipline.sh/data-names-red/setup.sh', '.claude/gate.d/fixtures/doc-experiments.sh/evidence-in-repo-red/setup.sh', 'scripts/experiment-apparatus/e10-aging-compaction-run.sh', 'scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh', 'scripts/gate/data-name-lint.py']
+name=probe.lib_moved_only_governed count=11 paths=['.claude/agents/mutation-triage.md', '.claude/hooks/host-resources-reminder.sh', '.claude/rules/format-evolution.md', '.claude/rules/implementation-first.md', 'crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs', 'crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs', 'crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs', 'crates/singlefs-checker-tier/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs', 'crates/singlefs-core/src/inode_tree.rs', 'crates/singlefs-harness/src/new_pool_file_creation_regions.rs', 'crates/singlefs-unit-graph/src/heavy_threads.rs']
+name=probe.real_row_control.judged problems=0 note='新加的 1 行（基准 e1b1ceb95 那一版的登记表里没有）有搬迁实据（第 6 行 395 份里 360 份换算之后'
+name=probe.real_row_control.no_occupied_check problems=0 note='新加的 1 行（基准 e1b1ceb95 那一版的登记表里没有）有搬迁实据（第 6 行 395 份里 360 份换算之后'
+name=probe.real_row_control.evidence_unchecked problems=0 note='实据不核'

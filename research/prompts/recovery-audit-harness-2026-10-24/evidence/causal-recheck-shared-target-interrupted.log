@@ -1,0 +1,32 @@
+ROUND original-first
+     Locking 22 packages to latest compatible versions
+   Compiling singlefs-harness v0.1.0 (/tmp/singlefs-harness-causal-recheck-u6ki0auh/crates/harness)
+   Compiling singlefs-harness-causal-recheck v0.0.0 (/tmp/singlefs-harness-causal-recheck-u6ki0auh)
+    Finished `release` profile [optimized] target(s) in 38.90s
+     Running unittests src/lib.rs (target/release/deps/singlefs_harness_causal_recheck-83cdce4e26cd32b6)
+
+running 3 tests
+test audit_all_three_wrappers_lose_four_read_route_hooks ... H02 logging control=false reread=0x11 straight=0x11
+H02 recording control=false reread=0x11 straight=0x11
+H02 fault-unarmed control=false reread=0x11 straight=0x11
+ok
+test audit_cold_start_accepts_publishes_without_any_readback ... H03 control=false actual_failed_readback=Err wrong_effect_empty_publishes=Ok
+ok
+test audit_logger_changes_supported_discard_to_unsupported ... H01 control=false direct=Applied logged=Unsupported inner_discard_calls=1
+H01 sparse_direct_after_discard=0x00 sparse_logged_after_discard=0x5a
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+ROUND temporary-controls
+    Blocking waiting for file lock on build directory
+Traceback (most recent call last):
+  File "/home/fy5090/code/singlefs/crates/singlefs-harness/audits/recovery-verification/verify_recheck.py", line 91, in <module>
+    for path, digest in hashes.items():
+    ^^^^^^
+  File "/home/fy5090/code/singlefs/crates/singlefs-harness/audits/recovery-verification/verify_recheck.py", line 85, in main
+    (harness / 'src' / name).write_text(source)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['cargo', 'test', '--release', '--offline', '-j', '2', '--manifest-path', '/tmp/singlefs-harness-causal-recheck-u6ki0auh/Cargo.toml', '--lib', '--', '--nocapture', '--test-threads=1']' died with <Signals.SIGTERM: 15>.

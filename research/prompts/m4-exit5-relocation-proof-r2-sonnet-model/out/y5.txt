@@ -1,0 +1,16 @@
+name=y5_crate label=冻结副本原样 rc=0 verified=88 errors=0
+name=y5_crate label=加两份新证明 rc=0 verified=110 errors=0
+name=y5_single_file file=relocation_interval_proofs rc=0 verification results:: 9 verified, 0 errors
+name=y5_single_file file=gc_ring_proofs rc=0 verification results:: 13 verified, 0 errors
+区间：目的区间不与映射区间重叠的前提去掉	rc=1	errors=3	verified=6	落点=relocation_interval_proofs.rs:175:20
+区间：目的区间两两不重叠的前提去掉	rc=1	errors=1	verified=8	落点=relocation_interval_proofs.rs:182:16
+区间：目的跨度等于源跨度的前提去掉	rc=1	errors=2	verified=7	落点=relocation_interval_proofs.rs:168:16
+区间：映射区间跨度至少 1 的前提去掉	rc=1	errors=1	verified=8	落点=relocation_interval_proofs.rs:275:13
+环：回收只避开现行与读者、不避开回退候选	rc=1	errors=2	verified=11	落点=gc_ring_proofs.rs:157:17
+环：回退可以退到 floor 之下	rc=1	errors=2	verified=11	落点=gc_ring_proofs.rs:193:20
+环：Checkpoint 从不挤窗口	rc=1	errors=3	verified=10	落点=gc_ring_proofs.rs:149:9
+环：搬迁不核目的字节等于源字节	rc=1	errors=1	verified=12	落点=gc_ring_proofs.rs:179:17
+环：Crash 之后现行版本取最旧的根	rc=1	errors=1	verified=12	落点=gc_ring_proofs.rs:149:9
+环：用户发布不核新版本读得对	rc=1	errors=1	verified=12	落点=gc_ring_proofs.rs:149:9
+环：F 可以往下抬	rc=1	errors=1	verified=12	落点=gc_ring_proofs.rs:149:9
+环：留存读者拿到的是最旧的根	rc=1	errors=1	verified=12	落点=gc_ring_proofs.rs:200:31

@@ -4,6 +4,8 @@
 
 正文 `research/prompts/_m3-multi-file-unlink-r1-body.md`，背景材料 `_m3-multi-file-unlink-r1-background.md`（sha256 b64a225e…），开工快照 `m3-multi-file-unlink-r1-snapshot/`（`kb-sha256.txt` 与 `tree-sha256.txt`，后者是打上按 inode 号写数据补丁的树 `~/.local/share/singlefs/work/m3-multi-file-unlink-r1-tree` 里 core 与池级 checker 的 43 份源文件）。正推腿（Sonnet）报告 `research/prompts/m3-multi-file-unlink-r1-sonnet-output.md`（363 行，sha256 `58471a81a1396ba6f20782a5669b62a96617b68e35eedd8cdc6dc06040e83ac3`），模型 `m3-multi-file-unlink-r1-sonnet-model/`；攻方腿（Opus）报告 `research/prompts/m3-multi-file-unlink-r1-opus-output.md`（237 行，sha256 `56559f449f8e614b7bda147f58dc892d0e38f862c7b316d72273dc30ff964817`），模型 `m3-multi-file-unlink-r1-opus-model/`。
 
+开工快照：`research/prompts/m3-multi-file-unlink-r1-snapshot/`
+
 ## 一、核查
 
 - 快照：`sha256sum -c m3-multi-file-unlink-r1-snapshot/kb-sha256.txt`（仓根）与 `tree-sha256.txt`（那棵树的根）全部 OK；腿跑着的时候主 agent 没改快照里的文件。那棵树之外，同一份补丁 2026-10-19 打进了主工作区（`apply-writer-patch.py` 带「快照冲突已判」），主工作区 `crates/` 由此与那棵树的 core 一致，腿只读那棵树。

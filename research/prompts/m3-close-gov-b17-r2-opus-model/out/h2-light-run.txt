@@ -1,0 +1,13 @@
+name=same_bytes file=scripts/experiment-apparatus/replay.sh repo=ab8007103c090ba8 copy=ab8007103c090ba8
+name=same_bytes file=scripts/crash/crash-point-replay.sh repo=18437ced3fcbaf02 copy=18437ced3fcbaf02
+name=same_bytes file=scripts/crash/crash-amplification.sh repo=948064e3e96efd3f copy=948064e3e96efd3f
+role=main-agent	case=copy-replay-list-items	judged_by_name=False	guard_exit=2	stderr=→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户；合入后验证里 `scripts/gate/merge-and-verify.sh` 带 `SINGLEFS_HEAVY_TESTS=user-request` 起的 checker 档快档那一步与它给出的只重跑那几格的命令（那一步
+role=main-agent	case=copy-crash-point-replay-list-items	judged_by_name=False	guard_exit=0	stderr=
+role=main-agent	case=copy-crash-point-replay-quick	judged_by_name=False	guard_exit=0	stderr=
+role=main-agent	case=copy-crash-amplification-list-items	judged_by_name=False	guard_exit=0	stderr=
+role=main-agent	case=repo-crash-point-replay-quick	judged_by_name=True	guard_exit=0	stderr=
+role=implementation-writer	case=copy-replay-list-items	judged_by_name=False	guard_exit=2	stderr=✗ 重型测试被拒：脚本 <copy>/scripts/experiment-apparatus/replay.sh:760 里的 scripts/experiment-apparatus/replay.sh ${@:2} E1（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与
+role=implementation-writer	case=copy-crash-point-replay-list-items	judged_by_name=False	guard_exit=2	stderr=✗ 不经内存包装跑编译出来的代码被拒：脚本 <copy>/scripts/crash/crash-point-replay.sh:1678 里的 cargo run（implementation-writer 不经 run-with-memory-cap.sh）
+role=implementation-writer	case=copy-crash-point-replay-quick	judged_by_name=False	guard_exit=0	stderr=
+role=implementation-writer	case=copy-crash-amplification-list-items	judged_by_name=False	guard_exit=0	stderr=
+role=implementation-writer	case=repo-crash-point-replay-quick	judged_by_name=True	guard_exit=0	stderr=

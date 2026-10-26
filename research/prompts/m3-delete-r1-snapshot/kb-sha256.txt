@@ -1,9 +1,0 @@
-054b9ebee80f05837a000ed704eb552dd4d2527281f03ee52b77bb1576523097  .claude/kb/milestone/03-third-txn.md
-d5fa01db58dbcc1a704c17b8e9a8b2c36d86ea58334e292558174f129aa1843f  .claude/kb/freeze-layer-membership.md
-9c516a472cca21797fc4313718807bf225a7834f4e3228415a6f2650cae888b7  .claude/kb/invariants.md
-c362defb795339408bc5fe149146d1afe88c0023f215c6a2401fe1224dde6f06  .claude/kb/decisions/08-核心索引结构.md
-f2738f6bd4c0db88de024447ed83be057dff8b72c92d76ef787c13097202cde5  .claude/kb/checks-owed.md
-181bb2ddfbf2fc79b48e20de354289da4aa7a6789a3686681d2672a13f87a81c  .claude/kb/decisions/18-块里携带什么信息.md
-536d35af183f06741175601b489e45797dd70ba2b5d82628d5e136213a2ef31d  .claude/kb/decisions/15-格式冻结政策.md
-1ad89a78b58317aba30a502beb0c06f44d8cb78e405d678011e667a8741abd47  .claude/kb/decisions/05-快照-空间记账机制.md
-59e413a9dc0d40c04b8056a4f3593f419115524d529a4fed77cbe6e64736b75e  .claude/kb/decisions/26-后台整理与放置回收.md

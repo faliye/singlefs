@@ -1,0 +1,53 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -647,6 +647,15 @@
+         )?;
+         self.writes_by_structure_kind
+             .count_write_call(WrittenStructureKind::SystemConfigurationSlot, &slot_bytes);
++        // 攻方原型开关（只在草稿副本里）：MUT-B1，盘表下标 0 那块盘写完新槽之后同一段里把另一槽清成全 0。
++        if index == 0 && std::env::var_os("SINGLEFS_PROTO_MUT_B1").is_some() {
++            let other_slot = (slot_generation + 1) % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
++            self.devices[index].1.write_at(
++                DeviceOffsetInBytes(other_slot * spacing),
++                &vec![0u8; slot_bytes.len()],
++                WriteDurability::Plain,
++            )?;
++        }
+         Ok(())
+     }
+ 
+@@ -1232,7 +1241,7 @@
+         witnessed_journal_tail,
+     } = witnessed;
+     let mut devices_written: Vec<usize> = Vec::new();
+-    for _round in ACQUISITION_WRITE_ROUNDS {
++    for round in ACQUISITION_WRITE_ROUNDS {
+         for index in 0..pool.devices.len() {
+             if let Err(cause) = pool.write_system_configuration_slot(
+                 index,
+@@ -1251,6 +1260,12 @@
+                 devices_written.push(index);
+             }
+         }
++        // 攻方原型开关（只在草稿副本里）：MUT-B2，取号两轮之间少一道屏障（每块盘两槽在同一段里各写一次、内容都自证得过）。
++        if round == AcquisitionWriteRound::OverTheOlderSlotOfEachDevice
++            && std::env::var_os("SINGLEFS_PROTO_MUT_B2").is_some()
++        {
++            continue;
++        }
+         if let Err(cause) = pool.perform_commit_step(CommitStep::Barrier) {
+             return Err(pool.roll_back_acquisition(
+                 &devices_written,
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -5857,6 +5857,10 @@
+     device: DeviceIdentity,
+     selected_version: SelectedVersionCheckedOnEachDevice<'_>,
+ ) -> Option<RewriteGateNotMet> {
++    // 攻方原型开关（只在草稿副本里）：补写闸恒不过（退回丙' 之前的拒）。
++    if std::env::var_os("SINGLEFS_PROTO_GATE_NEVER_PASSES").is_some() {
++        return Some(RewriteGateNotMet::UnitsOfTheSelectedVersionNotAllOnTheDevice);
++    }
+     let every_unit_of_the_version_is_on_the_device = !selected_version.units.is_empty()
+         && selected_version.units.iter().all(|unit| {
+             !unit.bytes.is_empty()

@@ -1,0 +1,5 @@
+excluded_program_edges=3
+  scripts/hosts/run-with-memory-cap.sh :: HostLookup.query -> scripts/hosts/host-resources.py
+  scripts/hosts/run-with-memory-cap.sh :: HostLookup.watch_events -> scripts/hosts/resource_release_broadcast.py
+  scripts/hosts/run-with-memory-cap.sh :: broadcast_memory_released -> scripts/hosts/resource_release_broadcast.py
+crates_judging_units total=465 from_not_judging_files=0

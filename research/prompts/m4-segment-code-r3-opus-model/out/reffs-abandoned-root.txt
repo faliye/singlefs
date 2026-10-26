@@ -1,6 +1,0 @@
-CASE mount-roots allowed_snapshot_sets=[{}]
-CASE mount-roots allowed_reads_of_7=[None]
-CASE mount-roots read_7_as_A=Err(SnapshotReadOutsideTheAllowedReads { name: SnapshotName(7), read_out: OneFile(FileContent([65])), allowed_reads: [None] })
-CASE destroy-batches allowed_snapshot_sets=[{SnapshotName(7): OneFile(FileContent([65]))}]
-CASE destroy-batches allowed_reads_of_7=[Some(OneFile(FileContent([65])))]
-CASE destroy-batches recreate_7_after_the_walk=Err(SnapshotNameAlreadyTaken { name: SnapshotName(7) })

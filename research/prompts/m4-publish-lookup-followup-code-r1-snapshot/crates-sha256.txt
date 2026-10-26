@@ -1,0 +1,3 @@
+3b81509b74d72a6f0e4b764aa9027d7d301033186b5a7f96f51472821dffeac2  crates/singlefs-core/src/transaction.rs
+feb8160eba2758b7a244e515aeb73e7548584564a2886f6a38670b74b2a71cd5  crates/singlefs-core/Cargo.toml
+f3618015f1ecb5aee308b60543dc6b1dcd287b6be0bb71421e1dd0475e91dc07  crates/singlefs-core/build.rs

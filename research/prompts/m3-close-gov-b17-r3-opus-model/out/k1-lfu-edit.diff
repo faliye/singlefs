@@ -1,0 +1,11 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-close-gov-b17-r3-opus/copy-lfu0/scripts/gate/lib_function_units.py	2026-10-23 13:20:19.885761309 +0000
++++ /home/fy5090/.local/share/singlefs/work/m3-close-gov-b17-r3-opus/copy-lfu1/scripts/gate/lib_function_units.py	2026-10-23 23:06:21.612979097 +0000
+@@ -1082,7 +1082,7 @@
+         pieces = self.texts[start:end]
+         if "rust-doc-comments-kept" in self.breaks:
+             pieces = pieces + ["\n".join(rows) for _line, _style, rows, next_index, _raw in self.documents if start <= next_index < end]
+-        unit = Unit("rust", kind, "::".join(context + [name]), self.path, self.lines[start], self.lines[min(end, self.count) - 1],
++        unit = Unit("rust", kind, "::".join(context + [name]), self.path, self.lines[start], self.lines[min(end, self.count) - 1] + 1,
+                     sha256_text("\x1f".join(pieces)))
+         unit.short = name
+         unit.first_token, unit.last_token = start, min(end, self.count)

@@ -1,0 +1,4 @@
+scenario=fresh-peer attempt=first-import rows_read=2 fresh=2 rejected=0 reasons=- conflicts=0 import_exit_would_be=0
+scenario=fresh-peer attempt=same-file-again rows_read=2 fresh=2 rejected=0 reasons=- conflicts=0 import_exit_would_be=0
+scenario=peer-with-history attempt=first-import rows_read=4 fresh=2 rejected=2 reasons=gpu-pass-changed,key-not-in-list conflicts=0 import_exit_would_be=1
+scenario=peer-with-history attempt=same-file-again rows_read=4 fresh=2 rejected=2 reasons=gpu-pass-changed,key-not-in-list conflicts=0 import_exit_would_be=1

@@ -1,0 +1,8 @@
+name=guard_compare 提示=1397（2026-10-09 起） 退出码（旧,新）分布={(0, 0): 368, (2, 0): 10, (2, 2): 1019}
+name=report_name_reason 旧拒新放=61 旧放新拒=0 按日={'2026-10-09': 12, '2026-10-11': 18, '2026-10-12': 1, '2026-10-13': 16, '2026-10-14': 14}
+name=report_name_reason_since_2026-10-15 旧拒新放=0
+name=only_reason 旧只因这一条拒、新放行=10
+name=named_in_90_section_20 a0a2dfee322e26786 experiment-designer 旧=拒 新=拒
+name=named_in_90_section_20 a789e7091d91430aa experiment-designer 旧=拒 新=拒
+name=named_in_90_section_20 a8afb2185cfa840cc experiment-designer 旧=拒 新=拒
+name=named_in_90_section_20 a9717cf07fb6e7c21 tooling-writer 旧=拒 新=放

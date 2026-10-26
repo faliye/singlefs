@@ -28,7 +28,7 @@
 ## 三、两条腿之外主 agent 记的
 
 - 正推自报用 python3 `open('w')` 就地改过一次自己模型目录里的 `zz_diff.rs`，执行前拒绝的写法那道闸没拦：并进共用库盲区那一批（与第一轮攻方 `sed -i` 那一笔同族）。
-- 正推读过之后 `scripts/experiments/e165-pin-red-examples.py` 被改过（3-12、3-13 在改它），它引的行号指入库拷贝 `model/e165-pin-red-examples.py.read`。
+- 正推读过之后 `scripts/experiment-apparatus/e165-pin-red-examples.py` 被改过（3-12、3-13 在改它），它引的行号指入库拷贝 `model/e165-pin-red-examples.py.read`。
 
 ## 四、下一步
 

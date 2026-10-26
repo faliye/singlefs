@@ -1,0 +1,108 @@
+name=rerun_roots repo=/home/fy5090/code/singlefs frozen=/home/fy5090/code/singlefs model=/home/fy5090/code/singlefs/research/prompts/landing-audit-r2-opus-model work=/home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus/rerun2
+== lib-lag-baseline 并前并后切表行
+name=content_rows rows=[1, 4]
+name=multipath-registry before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=replay-comparison-units before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=mutation-tables before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=reading-discipline before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=doc-process-records before_rows=[1, 4] after_rows=[1, 4] same=True
+== replay-comparison-units 借键
+name=基准原样
+  ✓ 比对对象 2 行（E165）：登记出处都在，单元名在单元表出处里都恰好出现一次；复跑写驱动名的 1 行在 replay.sh 里都有且产物名相符；复跑写 none 的 1 行只缩不涨，与基准 HEAD 比没涨
+exit=0
+name=删掉E165的none行换成E200的新比对对象借用同一对键
+  ✓ 比对对象 2 行（E165、E200）：登记出处都在，单元名在单元表出处里都恰好出现一次；复跑写驱动名的 1 行在 replay.sh 里都有且产物名相符；复跑写 none 的 1 行只缩不涨，与基准 HEAD 比没涨
+exit=0
+name=对照登记出处写成新实验自己的登记
+  ✗ none 行比基准多：replay-comparison-units.tsv 里这几行复跑写 none:，基准 HEAD 那一版里没有这样的行：
+     第 3 行 segment3-r5-legal.out（research/prompts/e200-r1-prereg.md）
+     → 怎么办：复跑写 none: 的行只缩不涨。新登记的比对对象要在 replay.sh 复跑表里加一行驱动行、复跑列写驱动名，不许写 none: 把它按下去。
+exit=1
+== 派发闸改前改后
+name=tooling-writer-hooks-fix type=tooling-writer before_exit=0 after_exit=2
+    改后拒：✗ 派 tooling-writer 的提示有 2 处不成立，各条都判完了，下面一次列全，逐处照各自的「→ 怎么办」改；改完可以先跑 pyt
+    改后拒：✗ 派 tooling-writer 的提示报告行点名的文件名里带 report：「…/report.md」。
+    改后拒：✗ 提示要 tooling-writer 写进它写范围之外的路径：research/prompts（.claude/hooks/agent-write-scope.tsv）。
+name=landing-audit-r1-attack type=three-way-attack before_exit=0 after_exit=2
+    改后拒：✗ 派 three-way-attack 的提示有 2 处不成立，各条都判完了，下面一次列全，逐处照各自的「→ 怎么办」改；改完可以先跑 p
+    改后拒：✗ 派 three-way-attack 的提示报告行点名的文件名里带 report：「report.md」。
+    改后拒：✗ 派 three-way-attack 的提示报告行点名的文件不是这一形态：「<草稿目录>/result.md」；三方腿的报告要形如 research/prompts/<轮>
+name=probe-clerk-prose type=clerk before_exit=0 after_exit=2
+    改后拒：✗ 派 clerk 的提示报告行点名的文件名里带 report：「…/report.md」。
+name=probe-attack-prose type=three-way-attack before_exit=0 after_exit=2
+    改后拒：✗ 派 three-way-attack 的提示报告行点名的文件不是这一形态：「<草稿目录>/result.md」；三方腿的报告要形如 research/prompts/<轮>
+name=probe-tooling-writer-prose type=tooling-writer before_exit=0 after_exit=2
+    改后拒：✗ 提示要 tooling-writer 写进它写范围之外的路径：research/prompts（.claude/hooks/agent-write-scope.tsv）。
+== 各类型骨架填好 --check
+== clerk rc=0
+== experiment-designer rc=0
+== experiment-runner rc=0
+== implementation-writer rc=0
+== investigator rc=0
+== kb-scribe rc=0
+== mutation-triage rc=3
+    ✗ 派 mutation-triage 的提示里没有变异表（scripts/mutation/tables/<名>.tsv 或 crates/mutations.tsv 的条目名）。
+== prior-art rc=0
+== sweep rc=0
+== three-way-attack rc=0
+== three-way-defense rc=0
+== three-way-forward rc=0
+== three-way-materials rc=0
+== tooling-writer rc=0
+== kb-directories 写法
+name=form:crates/x/invariants quote_kb_roots=['.claude/kb', 'crates/x/invariants'] stale_candidates_carrier=True
+name=form:./crates/x/invariants quote_kb_roots=['./crates/x/invariants', '.claude/kb'] stale_candidates_carrier=False
+name=form:<探针根>/crates/x/invariants quote_kb_roots=['.claude/kb', '<探针根>/crates/x/invariants'] stale_candidates_carrier=False
+name=form:crates/x/invariants// quote_kb_roots=['.claude/kb', 'crates/x/invariants'] stale_candidates_carrier=True
+== doc-decisions 挂账表取基准
+name=对象库完整 base_ledger_text_HEAD=有表 base_ledger_text_no_such_base=None（不比） lib_baseline_text_HEAD=没有问题
+name=基准那一版的对象缺了 base_ledger_text_HEAD=None（不比） base_ledger_text_no_such_base=None（不比） lib_baseline_text_HEAD=问题：读不出基准 HEAD 里的 .claude/gate.d/decision-evidence-lag.tsv（git show 退 128）
+== 交回结果的形状
+files 3286
+3071 json success=True message='Report delivered to your caller.' | agent-aa939103fa58bc8ef.jsonl
+193 is_error | agent-a55c08b4c49a3067d.jsonl
+2 json success=False message='Nothing was sent: your report was already delivere' | agent-a48f2f806614c1a41.jsonl
+== 闭窗口结局账复跑与门槛换值
+agents 2144 now 2026-10-22T15:33:14.893014+00:00
+name=closed_window_diff exit=0
+原门槛重算与账里桶不同的个数 0
+LANDED_AT PARTIAL_AT WRITTEN_MINIMUM | 落地个数 落地花费 | 部分个数 部分花费 | 没效果几桶个数 没效果花费
+0.7       0.3        10              |    847   50.0% |     87    4.2% |       87    2.0%
+0.9       0.3        10              |    618   35.0% |    316   19.2% |       87    2.0%
+0.5       0.3        10              |    903   52.8% |     31    1.4% |       87    2.0%
+0.7       0.5        10              |    847   50.0% |     56    2.9% |      118    3.4%
+0.7       0.1        10              |    847   50.0% |    100    4.8% |       74    1.5%
+0.9       0.7        10              |    618   35.0% |    229   14.9% |      174    6.2%
+0.95      0.9        10              |    418   21.8% |    200   13.2% |      403   21.2%
+0.7       0.3        1               |    971   53.3% |    106    4.5% |      140    3.1%
+0.7       0.3        30              |    742   47.2% |     71    3.7% |       76    1.7%
+0.9       0.7        1               |    734   38.1% |    237   15.1% |      246    7.6%
+写了≥10 行的交回个数 957 落地率 <0.3: 23  [0.3,0.7): 87  [0.7,0.9): 229  ≥0.9: 618
+返工字样 327 13.7%
+命中词（每个派发取第一个命中）: [('fix', 91), ('修', 68), ('重跑', 30), ('改名', 27), ('rerun', 26), ('接手', 14), ('重派', 12), ('第 2 次', 8), ('接续', 8), ('续做', 6), ('renumber', 4), ('重做', 4), ('第 25 次', 4), ('第 4 次', 3), ('第 22 次', 3), ('（续）', 3), ('补做', 3), ('第 7 次', 3), ('补写', 3), ('改钉值', 2), ('接着做', 2), ('redispatch', 2), ('re-run', 1)]
+只因单字「修」命中: 65 2.5% 后接的字: [(' ', 16), ('补', 13), ('红', 7), ('（行尾）', 5), ('复', 2), ('正', 2), ('三', 1), ('广', 1), ('编', 1), ('装', 1), ('停', 1), ('驱', 1), ('：', 1), ('多', 1), ('甲', 1)]
+没命中而带接续类字样: 48 2.0% [('收尾', 21), ('第二段', 12), ('二次', 11), ('续', 3), ('接着', 1)]
+   漏? tooling-writer 3-9 rlimit 判法收窄与门禁收尾
+   漏? tooling-writer 6-2 门禁期望约定与 E165 收尾
+   漏? experiment-runner E165 r2 第二段：驱动
+   漏? experiment-runner E170 第二段：Python 执行器
+   漏? experiment-runner E165 r2 第二段：甲表真跑
+   漏? tooling-writer H9 收尾：退出码表与开跑前判
+   漏? implementation-writer 第三轮前收尾：依赖红与 C610
+   漏? implementation-writer 数值环境变量解析收尾
+   漏? implementation-writer B0 断言非 mkfs 基镜像与两处收尾
+   漏? experiment-runner E165 r2 第二段补跑与第四段
+   漏? experiment-runner E165 r2 第二段补跑 2c
+   漏? experiment-runner E165 r3 第二段 Q1
+   误? implementation-writer 4-2 测试簇与锚点修复
+   误? tooling-writer 崩溃放量入口对齐与对抗审修补
+   误? tooling-writer 崩溃放量入口判法修补
+   误? tooling-writer 修 doc-experiments worktree 样本
+   误? tooling-writer 修三份研究脚本自证的早有毛病
+   误? implementation-writer checker 档：违例位改宽、R-换、测试修
+   误? tooling-writer 修广谱驱动换树后产物过时
+   误? implementation-writer 合入后修编译与四样收尾
+   误? experiment-runner E171 第三段修装置
+   误? experiment-runner E171 第五段修停机出结论
+   误? experiment-runner E171 第六段修驱动交命令
+   误? implementation-writer 修 I-4.1 慢档用例豁免

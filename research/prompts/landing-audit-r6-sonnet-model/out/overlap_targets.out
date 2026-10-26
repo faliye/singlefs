@@ -1,0 +1,3 @@
+'cp /tmp/x/a.sh .claude/hooks/a.sh.new && mv .claude/hooks/a.sh.new .claude/hooks' -> ['/home/fy5090/code/singlefs/.claude/hooks/a.sh', '/home/fy5090/code/singlefs/.claude/hooks/a.sh.new']
+'python3 scripts/gate/hook-swap.py spec.json --hook .claude/hooks/a.sh --scratch ' -> []
+'mv .claude/hooks/a.sh.new .claude/hooks/a.sh' -> ['/home/fy5090/code/singlefs/.claude/hooks/a.sh']

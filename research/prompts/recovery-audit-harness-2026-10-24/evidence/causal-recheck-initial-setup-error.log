@@ -1,0 +1,23 @@
+ROUND original-first
+     Locking 22 packages to latest compatible versions
+   Compiling singlefs-harness v0.1.0 (/tmp/singlefs-harness-causal-recheck-5fneue10/harness)
+error: couldn't read `/tmp/singlefs-harness-causal-recheck-5fneue10/harness/../../.claude/heavy-thread-default`: No such file or directory (os error 2)
+  --> harness/src/heavy_threads.rs:22:42
+   |
+22 |   pub const REGISTRATION_FILE_TEXT: &str = include_str!(concat!(
+   |  __________________________________________^
+23 | |     env!("CARGO_MANIFEST_DIR"),
+24 | |     "/",
+25 | |     "../../.claude/heavy-thread-default"
+26 | | ));
+   | |__^
+
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+Traceback (most recent call last):
+  File "/home/fy5090/code/singlefs/crates/singlefs-harness/audits/recovery-verification/verify_recheck.py", line 89, in <module>
+    main()
+  File "/home/fy5090/code/singlefs/crates/singlefs-harness/audits/recovery-verification/verify_recheck.py", line 83, in main
+    subprocess.run(['cargo', 'test', '--release', '--offline', '-j', '2', '--manifest-path', str(work / 'Cargo.toml'), '--lib', '--', '--nocapture', '--test-threads=1'], cwd=ROOT, env=current, check=True)
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['cargo', 'test', '--release', '--offline', '-j', '2', '--manifest-path', '/tmp/singlefs-harness-causal-recheck-5fneue10/Cargo.toml', '--lib', '--', '--nocapture', '--test-threads=1']' returned non-zero exit status 101.

@@ -1,0 +1,11 @@
+# m4-gpugc-measure-r4 问题单（2026-10-24）
+
+七·2 设计轮第二轮判决 `research/prompts/m4-gpugc-design-r2-main-verification.md`「三、下一步」第 1 条要在入库装置上量的三样，一行一条：候选、翻面观测、够判条件、状态。是 E185（GC一批搬迁的挂钟拆分） 的第 4 次重跑；第 3 次重跑登记 `research/prompts/e185-r3-prereg.md`，产物在 `research/results/` 下 `*-r3-2026-10-24*`。格式照 `.claude/rules/three-way-inference.md`「交岔路时写岔路单，派实验时带上它」。
+
+被测的仍是 `crates/` 今天的 GC 路径：`crates/singlefs-core/src/mounted_session.rs` 的 `run_compaction` → 区域扫描 `region_scan.rs` 第 204 行 `scan_region` → 选段与计划 `compaction_plan.rs` → 发布 `transaction.rs` 第 9676 行 `publish_relocation_batch`。CPU 侧 CRC-32C 在 `crates/singlefs-core/src/checksum.rs`（第 3 行写「实现用 slicing-by-8」）；区域扫描在 `region_scan.rs` 第 286–289、309–312 行对每条记录在全部映射条目上线性找。
+
+| # | 候选 | 翻面观测 | 够判条件 | 状态 |
+|---|---|---|---|---|
+| 1 | CPU 模式一批的主机 CPU 取哪一种 CPU 写法当基线：甲 今天的写法（软件 slicing-by-8、线性找）／ 乙 CRC 换硬件指令、线性找不变 ／ 丙 CRC 不变、区域扫描换按身份查 ／ 丁 两处都换 | 四种基线下候选 A–D（`research/prompts/m4-gpugc-design-r1-forks.md` 第 1 行）各自的门槛与第 3 次重跑第一段的每次提交主机 CPU 相比，判定（不赔 / 赔 / 不稳定）变没变 | 四种基线在第 3 次重跑的 12 个点上各量到一批的主机 CPU（按阶段拆开），候选 A–D 的门槛照第 3 次重跑登记的算法逐点现算 | 够判：写法段 `research/results/e185-gc-batch-wall-clock-split-cpu-writings-r4-2026-10-24.out`（`name=verdict segment=cpu_writings … positive_control_failures=0`）与重判 `research/results/e185-r4-baseline-rejudge-2026-10-24.out.gz`（`name=verdict segment=baseline_rejudge stop_clause_findings=0 rejudged_lines=96696 voided_writings=none drift_control_end=measured`）；`baseline_rejudge_summary` 1152 行 |
+| 2 | 第 3 次重跑第一段卡 0 的轮次漂移是装置造的还是卡的性质：甲 暖机或频率造的（控住之后消失）／ 乙 卡 0 的真实性质（控住之后仍在） | 控住暖机与频率之后，卡 0 每格第 5 轮 ÷ 第 1 轮的中位（第 3 次重跑是 0.528，卡 1 0.958）；`unstable` 格数变化 | 卡 0 在第 3 次重跑第一段的全部格上重量，报每格的轮次比与判定，与卡 1 同样的跑法对照 | 复现不了（登记失败条款 L5）：`research/results/e185-gc-batch-wall-clock-split-host-cpu-drift-control-r4-2026-10-24.out` 复现臂 `reproduction_card_zero_round_ratio … value=1.056747 judgement=drift_not_reproduced`，受控臂卡 0 `value=1.079304`、卡 1 `value=1.000256` 都 `drift_gone`，`controlled_unstable_card_zero_over_card_one … value=8.629032`；第 3 次重跑卡 0 读数照旧可疑，后续用受控臂的读数 |
+| 3 | 按函数拆开一批 CPU 的拆法：甲 第 3 次重跑第三段的重放法 ／ 乙 一种份额相加等于整次调用的拆法 | 第 3 次重跑第三段八行 `function_split_summary` 里七行各项份额之和 1.167–2.517、余项为负；新拆法下各项之和与整次调用之比 | 新拆法在第 3 次重跑第三段的四个 (f, P) 点上量到、各项之和与整次调用相差不超过登记写死的容差 | 不量：主 agent 2026-10-24 在装置写之前撤掉（登记 `research/prompts/e185-r4-prereg.md` 第一节「主 agent 定」第 6 条）：第 1 行写法丙、丁直接量出按身份查之后一批的主机 CPU，按函数拆的份额不再是任何岔路的输入 |

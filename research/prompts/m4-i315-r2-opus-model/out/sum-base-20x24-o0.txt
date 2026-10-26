@@ -1,0 +1,42 @@
+115 1 write_is_swallowed reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+115 1 write_is_swallowed reused=true noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+120 0 write_is_swallowed reused=false noflag noleak selfcheck after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+120 0 write_is_swallowed reused=false noflag noleak exempt after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+120 1 write_is_swallowed reused=true noflag noleak selfcheck after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+120 1 write_is_swallowed reused=true noflag noleak exempt after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+120 2 write_is_swallowed reused=true noflag noleak selfcheck after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+120 2 write_is_swallowed reused=true noflag noleak exempt after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+121 0 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+121 0 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+122 0 write_is_swallowed reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+122 0 write_is_swallowed reused=false noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+124 1 write_is_swallowed reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+124 1 write_is_swallowed reused=false noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+124 2 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+124 2 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+126 0 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+126 0 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+127 0 write_is_swallowed reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+127 0 write_is_swallowed reused=false noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+128 0 write_is_swallowed reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+128 0 write_is_swallowed reused=false noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+128 1 write_is_swallowed reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+128 1 write_is_swallowed reused=true noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+130 0 write_is_swallowed reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+130 0 write_is_swallowed reused=true noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+130 1 write_is_swallowed reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+130 1 write_is_swallowed reused=false noflag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+131 0 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+131 0 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+132 1 write_is_swallowed reused=true noflag noleak selfcheck after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+132 1 write_is_swallowed reused=true noflag noleak exempt after:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 replug:I-3.1=不适用,I-3.11=不适用,I-3.15=成立 noloc_after=0/0 noloc_replug=0/0 today=- jia_two=-
+134 0 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+134 0 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+136 0 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+136 0 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+136 1 write_is_swallowed reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+136 1 write_is_swallowed reused=false flag noleak exempt after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 noloc_after=0/0 noloc_replug=0/0 today=L+L jia_two=L+L
+TALLY exempt jia_two {'-': 7, 'L': 24}
+TALLY exempt today {'-': 7, 'L': 24}
+TALLY selfcheck jia_two {'-': 7, 'L': 24}
+TALLY selfcheck today {'-': 7, 'L': 24}

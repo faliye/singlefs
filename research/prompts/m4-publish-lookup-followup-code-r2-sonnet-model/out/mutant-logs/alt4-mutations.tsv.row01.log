@@ -1,0 +1,42 @@
+
+running 13 tests
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_examine_index_entries_sublinearly_from_512_to_2048_data_units ... ignored, harness 慢档用例：造 2048 个数据单元的池要发约 460 次发布，debug 下单条超过 60 秒
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+test first_entry_of_each_identity_examines_less_than_twice_as_many_entries_per_lookup_on_a_table_four_times_as_long ... ok
+test lookup_work_counts_one_entry_per_step_of_a_walk_from_either_end_and_one_lookup_per_search ... ok
+test the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside ... ok
+test first_entry_of_each_identity_keeps_the_first_entry_of_identities_repeated_across_a_long_shuffled_table ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+test a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once ... ok
+test relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice ... ok
+test a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site ... ok
+test rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 41.60s
+
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-format v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-reference-filesystem v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-checker v0.1.0 (〔第二台的目录〕)
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling indexmap v2.14.2
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 29s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)

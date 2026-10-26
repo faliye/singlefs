@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 1 test
+test r4_user_steps_opened_over_short_histories ... 观测 R4 扫：历史 [PartialWrite(0)] 出生 txg [5, 4, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1)] 出生 txg [4, 5, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2)] 出生 txg [4, 4, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole] 出生 txg [5, 5, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload] 出生 txg [4, 4, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0)] 出生 txg [6, 4, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1)] 出生 txg [5, 6, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2)] 出生 txg [5, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole] 出生 txg [6, 6, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload] 出生 txg [5, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫汇总：历史 10 段，I-1.13 违例 6 段，判定与照字面预测一致 10 段，挂钟 1.853606451s
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 2.03s
+

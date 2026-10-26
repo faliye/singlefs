@@ -1,0 +1,96 @@
+q01_question_mark	0	verification results:: 1 verified, 0 errors
+q02_vec_index	0	verification results:: 1 verified, 0 errors
+q03_for_over_slice_iter	0	verification results:: 2 verified, 0 errors
+q04_for_range	0	verification results:: 2 verified, 0 errors
+q05_vec_push	0	verification results:: 1 verified, 0 errors
+q06_option_copied	1	error: `core::option::impl&%3::copied` is not supported (note: you may be able to add a Verus specif
+q06_option_expect	0	verification results:: 1 verified, 0 errors
+q06_option_is_some_and	1	error: `core::option::impl&%0::is_some_and` is not supported (note: you may be able to add a Verus s
+q06_option_map	1	error: postcondition not satisfied
+q06_option_map_or	1	error: `core::option::impl&%0::map_or` is not supported (note: you may be able to add a Verus specif
+q06_option_ok_or	0	verification results:: 1 verified, 0 errors
+q07_map_collect	0	verification results:: 1 verified, 0 errors
+q08_any	0	verification results:: 1 verified, 0 errors
+q09_checked_add	0	verification results:: 1 verified, 0 errors
+q09_div_ceil	1	error: `core::num::impl&%9::div_ceil` is not supported (note: you may be able to add a Verus specifi
+q09_from	0	verification results:: 1 verified, 0 errors
+q09_try_from	0	verification results:: 1 verified, 0 errors
+q10_btree_get	0	verification results:: 1 verified, 0 errors
+q11_assert_msg	0	verification results:: 1 verified, 0 errors
+q12_vec_clone_eq	0	verification results:: 1 verified, 0 errors
+q13_from_le_bytes	1	error: `core::num::impl&%9::from_le_bytes` is not supported (note: you may be able to add a Verus sp
+q13_le_bytes	1	error: `core::num::impl&%9::to_le_bytes` is not supported (note: you may be able to add a Verus spec
+q14_extend	0	verification results:: 1 verified, 0 errors
+q14_to_vec	1	error: `alloc::slice::impl&%0::to_vec` is not supported (note: you may be able to add a Verus specif
+r01_map_collect_len	0	verification results:: 1 verified, 0 errors
+r02_any_spec	1	error: postcondition not satisfied
+r03_filter_count	1	error: `core::iter::adapters::filter::impl&%3::count` is not supported (note: you may be able to add
+r04_find_map	1	error: `core::slice::iter::impl&%171::find_map` is not supported (note: you may be able to add a Ver
+r05_question_with_from	0	verification results:: 1 verified, 0 errors
+r06_for_over_vec_by_value	0	verification results:: 2 verified, 0 errors
+r07_match_enum	1	error[E0425]: cannot find type `Verdict` in this scope
+r08_let_else	0	verification results:: 1 verified, 0 errors
+r09_slice_len_and_split	0	verification results:: 1 verified, 0 errors
+r10_closure_param	1	error: postcondition not satisfied
+r11_generic_device	1	error[E0405]: cannot find trait `Device` in this scope
+r12_dyn_trait	1	error[E0405]: cannot find trait `Device` in this scope
+r13_slice_copy	0	verification results:: 1 verified, 0 errors
+r14_sort	1	error: `alloc::slice::impl&%0::sort` is not supported (note: you may be able to add a Verus specific
+r15_btree_insert_iter	0	verification results:: 2 verified, 0 errors
+r16_string_format	0	verification results:: 1 verified, 0 errors
+r17_u8_array_index	0	verification results:: 1 verified, 0 errors
+r18_wrapping_ops	0	verification results:: 1 verified, 0 errors
+r19_overflow_arith	1	error: possible arithmetic underflow/overflow
+r20_cast	0	verification results:: 1 verified, 0 errors
+s07_match_enum	0	verification results:: 1 verified, 0 errors
+s11_generic_device	0	verification results:: 1 verified, 0 errors
+s12_dyn_trait	0	verification results:: 1 verified, 0 errors
+s13_impl_for_real_device	1	error: possible arithmetic underflow/overflow
+d01_extend	1	error: `alloc::vec::impl&%20::extend` is not supported (note: you may be able to add a Verus specifi
+d02_enumerate	1	error: `core::iter::adapters::enumerate::Enumerate` is not supported (note: you may be able to add a
+d03_iter_copied	1	error: `core::iter::adapters::copied::Copied` is not supported (note: you may be able to add a Verus
+d04_contains	1	error: `core::slice::impl&%0::contains` is not supported (note: you may be able to add a Verus speci
+d05_chain	1	error: `core::iter::adapters::copied::Copied` is not supported (note: you may be able to add a Verus
+d06_filter_map	1	error: `core::iter::adapters::filter_map::FilterMap` is not supported (note: you may be able to add 
+d07_map_or_else	1	error: `core::option::impl&%0::map_or_else` is not supported (note: you may be able to add a Verus s
+d08_then_some	1	error: `core::bool::impl&%0::then_some` is not supported (note: you may be able to add a Verus speci
+d09_option_filter	1	error: `core::option::impl&%0::filter` is not supported (note: you may be able to add a Verus specif
+d10_iter_max	1	error: `core::iter::adapters::copied::impl&%1%default%max` is not supported (note: you may be able t
+d11_sum	1	error: `core::iter::adapters::copied::impl&%1%default%sum` is not supported (note: you may be able t
+d12_windows	1	error: `core::slice::iter::impl&%62::count` is not supported (note: you may be able to add a Verus s
+d13_chunks	1	error: `core::slice::iter::Chunks` is not supported (note: you may be able to add a Verus specificat
+d14_retain	1	error: `alloc::vec::impl&%1::retain` is not supported (note: you may be able to add a Verus specific
+d15_is_none_or	1	error: `core::option::impl&%0::is_none_or` is not supported (note: you may be able to add a Verus sp
+d16_btree_entry	1	error: `alloc::collections::btree::map::entry::impl&%4::or_insert` is not supported (note: you may b
+d17_btree_remove	0	verification results:: 1 verified, 0 errors
+d18_btreeset	0	verification results:: 1 verified, 0 errors
+d19_vec_truncate	0	verification results:: 1 verified, 0 errors
+d20_vec_resize	0	verification results:: 1 verified, 0 errors
+d21_vec_from_iter_range	0	verification results:: 1 verified, 0 errors
+d22_vec_concat_clone	0	verification results:: 1 verified, 0 errors
+d23_slice_eq	1	error: postcondition not satisfied
+d24_u64_pow_shift	0	verification results:: 1 verified, 0 errors
+d25_usize_as	0	verification results:: 1 verified, 0 errors
+d26_box_dyn_fn	1	error: The verifier does not yet support the following Rust feature: dyn with more that one trait
+d27_swap_mem	0	verification results:: 1 verified, 0 errors
+d28_mem_take	1	error: `core::mem::take` is not supported (note: you may be able to add a Verus specification to thi
+e01_panic_reachable	1	error: precondition not satisfied
+e02_panic_unreachable	0	verification results:: 1 verified, 0 errors
+e03_unreachable_macro	0	verification results:: 1 verified, 0 errors
+e04_result_expect	0	verification results:: 1 verified, 0 errors
+e05_shift_mask	0	verification results:: 1 verified, 0 errors
+e06_u32_u64_cast	0	verification results:: 1 verified, 0 errors
+e07_wrapping_sub	0	verification results:: 1 verified, 0 errors
+e08_vec_index_mut	0	verification results:: 1 verified, 0 errors
+e09_vec_of_vec	1	error: loop must have a decreases clause
+e10_tuple_return	0	verification results:: 1 verified, 0 errors
+e11_struct_update	0	verification results:: 1 verified, 0 errors
+e12_array_literal	0	verification results:: 1 verified, 0 errors
+e13_array_loop	1	error: loop must have a decreases clause
+e14_option_take	0	verification results:: 1 verified, 0 errors
+e15_string_literal	0	verification results:: 1 verified, 0 errors
+e16_debug_assert	0	verification results:: 1 verified, 0 errors
+e17_char_ops	0	verification results:: 1 verified, 0 errors
+e18_const_in_expr	0	verification results:: 2 verified, 0 errors
+e19_loop_labeled	1	error: loop must have a decreases clause
+e20_slice_pattern	1	error: The verifier does not yet support the following Rust feature: slice patterns

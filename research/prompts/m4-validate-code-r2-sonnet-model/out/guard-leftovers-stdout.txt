@@ -1,0 +1,2 @@
+name=leftovers tree=intact rc=0 test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 320 filtered out; finished in 4.77s files_left_in_TMPDIR=0
+name=leftovers tree=mutant rc=101 test result: FAILED. 23 passed; 2 failed; 0 ignored; 0 measured; 320 filtered out; finished in 2.02s files_left_in_TMPDIR=25

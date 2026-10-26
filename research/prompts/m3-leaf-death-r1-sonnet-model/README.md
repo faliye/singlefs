@@ -1,6 +1,6 @@
 # m3-leaf-death-r1 正推腿的副本装置
 
-这是 E177 装置（`scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs`，sha256 `9061c07b…2848f5`，与冻结树里那份相同）的**副本**加五层补丁，用来量四个候选在 E177 主取样点上的结局。副本上的数不进 kb；要引，先在入库装置上重做。
+这是 E177 装置（`scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs`，sha256 `9061c07b…2848f5`，与冻结树里那份相同）的**副本**加五层补丁，用来量四个候选在 E177 主取样点上的结局。副本上的数不进 kb；要引，先在入库装置上重做。
 
 - `apply_patch.py`：候选 `retire`（容器身份消失写退役记录）、`zero`（删空的容器照样落零条目版本）、`all_suppressed`（只改读侧）；合并政策 `E177_MERGE=absorb | absorb_borrow`（E176 的 M2 / M3 均分借）。
 - `apply_patch2.py`：候选 `shrink_range`（文件变短那次发布写区间墓碑，模型里不占槽）。

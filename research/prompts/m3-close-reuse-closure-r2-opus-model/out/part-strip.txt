@@ -1,0 +1,27 @@
+name=broad_escalation_evidence kind=time arm=raw problems=0 first=[]
+name=broad_escalation_evidence kind=time arm=stripped problems=2 first=["原来那趟的日志里没有包装打的「超过限时 1 秒」"]
+name=broad_escalation_evidence kind=memory arm=raw problems=0 first=[]
+name=broad_escalation_evidence kind=memory arm=stripped problems=2 first=["原来那趟的日志里没有包装打的「撞了内存上限 64M」"]
+name=strip_leftovers world=world-peer43-refused lines_after_strip=5 host_lookup_lines_left=2
+  left=  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-1404400-1005027382 -- ba
+  left=  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-1404400-1005027382 -- ba
+name=verus_wrapper_outcome world=world-peer43-refused exit=252 own_lines=4 first_own_line=→ 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run
+  queue_refusal_where=proof 格「proof:attack」那一处退了 252，包装说：→ 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-1
+  problem_has_peer_numbers=True problem=没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 200M），这一次的输出不算判定；包装自己打的：「→ 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved
+name=strip_leftovers world=world-peer41-refused lines_after_strip=5 host_lookup_lines_left=2
+  left=  → 第二台此刻放得下（可用 41.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-1404413-802626327 -- bas
+  left=  → 第二台此刻放得下（可用 41.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-1404413-802626327 -- bas
+name=verus_wrapper_outcome world=world-peer41-refused exit=252 own_lines=4 first_own_line=→ 第二台此刻放得下（可用 41.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run
+  queue_refusal_where=proof 格「proof:attack」那一处退了 252，包装说：→ 第二台此刻放得下（可用 41.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-1
+  problem_has_peer_numbers=True problem=没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 200M），这一次的输出不算判定；包装自己打的：「→ 第二台此刻放得下（可用 41.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved
+name=strip_leftovers world=world-lookup-off-refused lines_after_strip=3 host_lookup_lines_left=0
+name=verus_wrapper_outcome world=world-lookup-off-refused exit=252 own_lines=2 first_own_line=✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 M
+  queue_refusal_where=proof 格「proof:attack」那一处退了 252，包装说：✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 MiB（回收不掉的用量 0 MiB + 账上还没涨到量的 250 MiB），这一条要 200 MiB（峰值表里没
+  problem_has_peer_numbers=False problem=没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 200M），这一次的输出不算判定；包装自己打的：「✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 MiB（回收不掉的用量 0 MiB + 账上还没涨到量的 250 MiB），这一条要 
+name=strip_leftovers world=world-hr-int-cap-admitted lines_after_strip=12 host_lookup_lines_left=10
+  left=Exception in thread Thread-1 (run):
+  left=Traceback (most recent call last):
+  left=  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+name=verus_wrapper_outcome world=world-hr-int-cap-admitted exit=0 own_lines=0 first_own_line=
+  queue_refusal_where=
+  problem_has_peer_numbers=False problem=Verus 没出判定（退 0，编不过或起不来）：  File "/dev/fd/3", line 298, in run |   File "/home/fy5090/.local/share/singlefs/work/m3-close-reuse-closure-r2-opus/run1/variants/hr-int-cap/scripts/hosts/memory_peaks_lib.py

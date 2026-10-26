@@ -1,0 +1,10 @@
+--- a/crates/singlefs-replay-prefix/src/lib.rs
++++ b/crates/singlefs-replay-prefix/src/lib.rs
+@@ -31,6 +31,7 @@
+ 
+ pub mod compaction_plan_proofs;
+ pub mod gc_crash_proofs;
++pub mod relocation_execution_proofs;
+ 
+ verus! {
+ 

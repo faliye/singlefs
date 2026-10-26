@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 1 test
+test sweep_with_the_candidate_fix ... 观测 扫汇总（改法开着 = true）：历史 199 段（含部分写 117 段），I-1.13 违例 0 段（含部分写的 0、不含部分写的 0），I-1.13 之外有违例 0 段，读者读回不同 0 段，挂钟 72.7645844s
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 72.78s
+

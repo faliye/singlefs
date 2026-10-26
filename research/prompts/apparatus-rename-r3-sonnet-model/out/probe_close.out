@@ -1,0 +1,9 @@
+name=h1_1_no_landing effective=[rigs/y->legacy] table_problems=1 dropped=[] exempt_table_grown=[] caller_line_kept=True
+    problem: 第 2 行：基准 HEAD 里旧前缀 rigs/y 下的 1 份，照这一行换前缀的落点上有 1 份此刻不在（legacy/run.sh）
+name=h1_1_landing_at_legacy_caller_to_app effective=[rigs/y->legacy] table_problems=0 dropped=[legacy/run.sh] exempt_table_grown=['rigs/y/run.sh\t豁免'] caller_line_kept=True
+name=h1_1_control_real_move effective=[rigs/y->legacy] table_problems=0 dropped=[.claude/hooks/live.sh, exempt.tsv, legacy/run.sh] exempt_table_grown=[] caller_line_kept=False
+name=h1_4_untouched_after_commit effective=[] table_problems=0 dropped=[] exempt_table_grown=[] caller_line_kept=True
+name=h1_4_new_row_in_table effective=[] table_problems=0 dropped=[] exempt_table_grown=['legacy/new.sh\t新写的一行'] caller_line_kept=True
+name=unordered_key_reordered_plus_middle effective=[app->legacy] table_problems=2 dropped=[] exempt_table_grown=['mid/run.sh\t豁免'] caller_line_kept=True
+    problem: 第 2 行的旧前缀 app 还在磁盘上（搬完以后旧路径不该还在）
+    problem: 第 2 行：基准 HEAD 里旧前缀 app 下的 1 份，照这一行换前缀的落点上有 1 份此刻不在（legacy/run.sh）

@@ -21,7 +21,7 @@
 ### pin-script-replay（investigator）
 [bash-command-detector.sh] exit=0
 [heavy-test-guard.sh] exit=2
-    ✗ 重型测试被拒：scripts/experiments/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration（门禁 checker-tier-formal-verification 的判法：起 Verus 或编 checker 档装置重放；只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--check-table、--backfill、--list-items 不算；红例钉
+    ✗ 重型测试被拒：scripts/experiment-apparatus/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration（门禁 checker-tier-formal-verification 的判法：起 Verus 或编 checker 档装置重放；只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--check-table、--backfill、--list-items 不算；红例钉
 [run-scope-guard.sh] exit=0
 ### rerun-wrapped-declaration-outside（implementation-writer）
 [bash-command-detector.sh] exit=0

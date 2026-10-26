@@ -1,7 +1,0 @@
-4fde92df9e69ef7644e3e67382a5739b9526e58172f52b5a465b3d61330abbd1  .claude/kb/milestone/03-third-txn.md
-e201956f3abef3c963f88ec1281fba80873a4b8ca8901d05ff32b6b4b556dde7  .claude/kb/checks-owed.md
-99b4dbe6cd4cdc755f056d2e90e67029b7db153f754d5ea9731953ff02085925  .claude/kb/decisions/28-挂载期承诺量.md
-b2965c90cf7704cd1120bd45f61e415b7a3bc8222be7ca61438434075900b314  .claude/kb/decisions/16-发布语义.md
-34911f9515cc2b1d14f477730e9fe9eed1f5131650e33d7c71e64f4afe11015a  .claude/kb/decisions/03-空间分配.md
-135c8b6efa94126379ce8b179a0d6044225fc76cad6a16208a8f7e1dd087e2cb  .claude/kb/decisions/02-RAID条带策略.md
-980963dd2e92ef1bcda535aa7427a78396c697cc249bf4248d9e609c3fa17805  .claude/kb/decisions/05-快照-空间记账机制.md

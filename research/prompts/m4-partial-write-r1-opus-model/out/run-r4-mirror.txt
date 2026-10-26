@@ -1,0 +1,20 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 现查别的机器：第二台此刻也放不下（内存：预测 8.0 GiB + 余量 2.0 GiB、包装要记 12.0 GiB，此刻空闲 18.1 GiB、slice 放得下 2.9 GiB）
+run-with-memory-cap: 没查到别的机器：第 10327 号资源释放广播包装 264913 已经查过（几条一起排队时一个事件只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）（被资源释放广播叫醒：第 10327 号，peer-run-finished）
+run-with-memory-cap: 排队（已等 61 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 没查到别的机器：第 10329 号资源释放广播包装 316894 已经查过（几条一起排队时一个事件只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）（被资源释放广播叫醒：第 10329 号，peer-run-finished）
+run-with-memory-cap: 排队（已等 122 秒，至多 3600 秒）：slice 已占 32.2 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排了 182 秒，起跑（singlefs-memory-cap-262031-2417413053）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 1 test
+test r4_mirror_a_partial_write_on_one_unit_then_the_scan_rebuild ... 观测 R4 起点：三个单元的出生 txg [4, 4, 4]，I-1.13 Holds
+观测 R4 部分写单元 0：出生 txg [5, 4, 4]；挂载态读者读回整文件与期望相同 = true；写序一条照字面判死某个活单元 = true；I-1.13 Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50184、盘 1 槽 50184}；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）")；违例的不变量 ["I-1.13"]
+观测 R4 部分写单元 1：出生 txg [4, 5, 4]；挂载态读者读回整文件与期望相同 = true；写序一条照字面判死某个活单元 = true；I-1.13 Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 1 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 4）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50186、盘 1 槽 50186}；「每个 inode 的数据单元集合」差 1 处，第一处 key （inode 1、偏移 65268）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 4）")；违例的不变量 ["I-1.13"]
+观测 R4 部分写单元 2：出生 txg [4, 4, 5]；挂载态读者读回整文件与期望相同 = true；写序一条照字面判死某个活单元 = false；I-1.13 Holds；违例的不变量 []
+观测 R4 汇总：三个单元各部分写一次，I-1.13 违例 2 次
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.78s
+

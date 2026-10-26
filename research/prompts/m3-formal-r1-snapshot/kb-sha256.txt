@@ -1,7 +1,0 @@
-054b9ebee80f05837a000ed704eb552dd4d2527281f03ee52b77bb1576523097  .claude/kb/milestone/03-third-txn.md
-9c516a472cca21797fc4313718807bf225a7834f4e3228415a6f2650cae888b7  .claude/kb/invariants.md
-576c061884220aa76560cd5cf4b409576fe074fab11d7bf49204897e27bff491  .claude/kb/decisions/13-验证路线.md
-2f035423ea148c9e926c1ba0d9bf8e2e27b2b65b444b1a06b881854b71109b96  .claude/kb/decisions/09-加密.md
-f2738f6bd4c0db88de024447ed83be057dff8b72c92d76ef787c13097202cde5  .claude/kb/checks-owed.md
-ce97e481e3d044017acacf5ce12ed20dc99b0e2f56911630fa7d8ecd5636b945  .claude/kb/decisions/16-发布语义.md
-042e559ad774fbc6b11e184846b090171f13ce690e8074742f7a2c9d9a2be6e4  .claude/kb/decisions/23-journal的角色与格式.md

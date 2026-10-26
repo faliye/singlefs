@@ -1,0 +1,6 @@
+列表项里的围栏块（前一条腿的提示原样贴在列表里）：新库认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；照 CommonMark 遮过之后认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；⑯ 建锁 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']
+缩进 4 格的代码块（空行之后）：新库认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine', '/home/fy5090/.local/share/singlefs/work/r5-fence-previous-leg']；照 CommonMark 遮过之后认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine', '/home/fy5090/.local/share/singlefs/work/r5-fence-previous-leg']；⑯ 建锁 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine', '/home/fy5090/.local/share/singlefs/work/r5-fence-previous-leg']
+语言名里带反引号的那一行（CommonMark 不当围栏开头）：新库认 []；照 CommonMark 遮过之后认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；⑯ 建锁 []
+引用块里的围栏块：新库认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；照 CommonMark 遮过之后认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；⑯ 建锁 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']
+对照：顶格的闭合围栏块：新库认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；照 CommonMark 遮过之后认 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']；⑯ 建锁 ['/home/fy5090/.local/share/singlefs/work/r5-fence-mine']
+真派发提示里两种认法认出的「草稿目录：」值不同的：0 份

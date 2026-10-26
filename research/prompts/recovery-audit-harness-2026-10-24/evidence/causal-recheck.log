@@ -1,0 +1,80 @@
+ROUND original-first
+     Locking 22 packages to latest compatible versions
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.190
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker)
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-reference-filesystem)
+   Compiling singlefs-harness v0.1.0 (/tmp/singlefs-harness-causal-recheck-6swl3agg/crates/harness)
+   Compiling singlefs-harness-causal-recheck v0.0.0 (/tmp/singlefs-harness-causal-recheck-6swl3agg)
+    Finished `release` profile [optimized] target(s) in 2m 56s
+     Running unittests src/lib.rs (target/harness-causal-recheck/release/deps/singlefs_harness_causal_recheck-83cdce4e26cd32b6)
+
+running 3 tests
+test audit_all_three_wrappers_lose_four_read_route_hooks ... H02 logging control=false reread=0x11 straight=0x11
+H02 recording control=false reread=0x11 straight=0x11
+H02 fault-unarmed control=false reread=0x11 straight=0x11
+ok
+test audit_cold_start_accepts_publishes_without_any_readback ... H03 control=false actual_failed_readback=Err wrong_effect_empty_publishes=Ok
+ok
+test audit_logger_changes_supported_discard_to_unsupported ... H01 control=false direct=Applied logged=Unsupported inner_discard_calls=1
+H01 sparse_direct_after_discard=0x00 sparse_logged_after_discard=0x5a
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+ROUND temporary-controls
+   Compiling singlefs-harness v0.1.0 (/tmp/singlefs-harness-causal-recheck-6swl3agg/crates/harness)
+   Compiling singlefs-harness-causal-recheck v0.0.0 (/tmp/singlefs-harness-causal-recheck-6swl3agg)
+    Finished `release` profile [optimized] target(s) in 1m 26s
+     Running unittests src/lib.rs (target/harness-causal-recheck/release/deps/singlefs_harness_causal_recheck-83cdce4e26cd32b6)
+
+running 3 tests
+test audit_all_three_wrappers_lose_four_read_route_hooks ... H02 logging control=true reread=0x22 straight=0x33
+H02 recording control=true reread=0x22 straight=0x33
+H02 fault-unarmed control=true reread=0x22 straight=0x33
+ok
+test audit_cold_start_accepts_publishes_without_any_readback ... H03 control=true actual_failed_readback=Err wrong_effect_empty_publishes=Err
+ok
+test audit_logger_changes_supported_discard_to_unsupported ... H01 control=true direct=Applied logged=Applied inner_discard_calls=2
+H01 sparse_direct_after_discard=0x00 sparse_logged_after_discard=0x00
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+ROUND original-again
+   Compiling singlefs-harness v0.1.0 (/tmp/singlefs-harness-causal-recheck-6swl3agg/crates/harness)
+   Compiling singlefs-harness-causal-recheck v0.0.0 (/tmp/singlefs-harness-causal-recheck-6swl3agg)
+    Finished `release` profile [optimized] target(s) in 1m 23s
+     Running unittests src/lib.rs (target/harness-causal-recheck/release/deps/singlefs_harness_causal_recheck-83cdce4e26cd32b6)
+
+running 3 tests
+test audit_all_three_wrappers_lose_four_read_route_hooks ... H02 logging control=false reread=0x11 straight=0x11
+H02 recording control=false reread=0x11 straight=0x11
+H02 fault-unarmed control=false reread=0x11 straight=0x11
+ok
+test audit_cold_start_accepts_publishes_without_any_readback ... H03 control=false actual_failed_readback=Err wrong_effect_empty_publishes=Ok
+ok
+test audit_logger_changes_supported_discard_to_unsupported ... H01 control=false direct=Applied logged=Unsupported inner_discard_calls=1
+H01 sparse_direct_after_discard=0x00 sparse_logged_after_discard=0x5a
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+HARNESS_CAUSAL_RECHECK_COMPLETE original/control/original passed; product sources unchanged.

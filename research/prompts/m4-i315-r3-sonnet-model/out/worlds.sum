@@ -1,0 +1,121 @@
+世界 N | today exempt gen genplus cmp both bothplus jrn jrngen
+ForeignUnitOnBothDevices N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnBothDevices N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnBothDevices N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnBothDevices N=24 | XXX ooo ooo ooo XXX ooo ooo ooo ooo
+ForeignUnitOnBothDevices N=30 | XXX ooo ooo ooo XXX ooo ooo ooo ooo
+ForeignUnitOnDeviceZero N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnDeviceZero N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnDeviceZero N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnDeviceZero N=24 | XXX ooo ooo ooo ooo ooo ooo ooo ooo
+ForeignUnitOnDeviceZero N=30 | XXX ooo ooo ooo ooo ooo ooo ooo ooo
+ZeroedHeaderOnDeviceZero N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ZeroedHeaderOnDeviceZero N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ZeroedHeaderOnDeviceZero N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ZeroedHeaderOnDeviceZero N=24 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+ZeroedHeaderOnDeviceZero N=30 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+LeakWithBothCopiesIntact N=0 | oXX oXX oXX oXX oXX oXX oXX oXX oXX
+LeakWithBothCopiesIntact N=8 | oXX oXX oXX oXX oXX oXX oXX oXX oXX
+LeakWithBothCopiesIntact N=20 | oXX oXX oXX oXX oXX oXX oXX oXX oXX
+LeakWithBothCopiesIntact N=24 | XXX ooo XXX XXX XXX XXX XXX XXX XXX
+LeakWithBothCopiesIntact N=30 | XXX ooo XXX XXX XXX XXX XXX XXX XXX
+LeakThenForeignUnit N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+LeakThenForeignUnit N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+LeakThenForeignUnit N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+LeakThenForeignUnit N=24 | XXX ooo ooo ooo XXX ooo ooo ooo ooo
+LeakThenForeignUnit N=30 | XXX ooo ooo ooo XXX ooo ooo ooo ooo
+DifferentForeignUnitsOnTheTwoDevices N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+DifferentForeignUnitsOnTheTwoDevices N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+DifferentForeignUnitsOnTheTwoDevices N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+DifferentForeignUnitsOnTheTwoDevices N=24 | XXX ooo ooo ooo ooo ooo ooo ooo ooo
+DifferentForeignUnitsOnTheTwoDevices N=30 | XXX ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnBothDevices N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnBothDevices N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnBothDevices N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnBothDevices N=24 | XXX ooo XXX XXX XXX XXX XXX ooo ooo
+SameIdentityOnBothDevices N=30 | XXX ooo XXX XXX XXX XXX XXX ooo ooo
+SameIdentityOnDeviceZero N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnDeviceZero N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnDeviceZero N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+SameIdentityOnDeviceZero N=24 | XXX ooo XXX XXX ooo ooo ooo ooo ooo
+SameIdentityOnDeviceZero N=30 | XXX ooo XXX XXX ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnBothDevices N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnBothDevices N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnBothDevices N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnBothDevices N=24 | XXX ooo XXX ooo XXX XXX ooo ooo ooo
+RemadePoolSameBirthOnBothDevices N=30 | XXX ooo XXX ooo XXX XXX ooo ooo ooo
+RemadePoolSameBirthOnDeviceZero N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnDeviceZero N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnDeviceZero N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnDeviceZero N=24 | XXX ooo XXX ooo ooo ooo ooo ooo ooo
+RemadePoolSameBirthOnDeviceZero N=30 | XXX ooo XXX ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnBothDevices N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnBothDevices N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnBothDevices N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnBothDevices N=24 | XXX ooo XXX XXX XXX XXX XXX ooo ooo
+EarlierInstanceLeftoverOnBothDevices N=30 | XXX ooo XXX XXX XXX XXX XXX ooo ooo
+EarlierInstanceLeftoverOnDeviceZero N=0 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnDeviceZero N=8 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnDeviceZero N=20 | ooo ooo ooo ooo ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnDeviceZero N=24 | XXX ooo XXX XXX ooo ooo ooo ooo ooo
+EarlierInstanceLeftoverOnDeviceZero N=30 | XXX ooo XXX XXX ooo ooo ooo ooo ooo
+FACTS ForeignUnitOnBothDevices 0 []
+FACTS ForeignUnitOnBothDevices 8 []
+FACTS ForeignUnitOnBothDevices 20 []
+FACTS ForeignUnitOnBothDevices 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)"]
+FACTS ForeignUnitOnBothDevices 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)"]
+FACTS ForeignUnitOnDeviceZero 0 []
+FACTS ForeignUnitOnDeviceZero 8 []
+FACTS ForeignUnitOnDeviceZero 20 []
+FACTS ForeignUnitOnDeviceZero 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS ForeignUnitOnDeviceZero 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS ZeroedHeaderOnDeviceZero 0 []
+FACTS ZeroedHeaderOnDeviceZero 8 []
+FACTS ZeroedHeaderOnDeviceZero 20 []
+FACTS ZeroedHeaderOnDeviceZero 24 ["dev=0|slot=50180|self_check=false|header_birth=None|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS ZeroedHeaderOnDeviceZero 30 ["dev=0|slot=50180|self_check=false|header_birth=None|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS LeakWithBothCopiesIntact 0 []
+FACTS LeakWithBothCopiesIntact 8 []
+FACTS LeakWithBothCopiesIntact 20 []
+FACTS LeakWithBothCopiesIntact 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(true)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(true)"]
+FACTS LeakWithBothCopiesIntact 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(true)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(true)"]
+FACTS LeakThenForeignUnit 0 []
+FACTS LeakThenForeignUnit 8 []
+FACTS LeakThenForeignUnit 20 []
+FACTS LeakThenForeignUnit 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)"]
+FACTS LeakThenForeignUnit 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=true|journal=Some(false)"]
+FACTS DifferentForeignUnitsOnTheTwoDevices 0 []
+FACTS DifferentForeignUnitsOnTheTwoDevices 8 []
+FACTS DifferentForeignUnitsOnTheTwoDevices 20 []
+FACTS DifferentForeignUnitsOnTheTwoDevices 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)"]
+FACTS DifferentForeignUnitsOnTheTwoDevices 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(4)|record_generation=Some(3)|gen=false|fits=false|cmp=false|journal=Some(false)"]
+FACTS SameIdentityOnBothDevices 0 []
+FACTS SameIdentityOnBothDevices 8 []
+FACTS SameIdentityOnBothDevices 20 []
+FACTS SameIdentityOnBothDevices 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)"]
+FACTS SameIdentityOnBothDevices 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)"]
+FACTS SameIdentityOnDeviceZero 0 []
+FACTS SameIdentityOnDeviceZero 8 []
+FACTS SameIdentityOnDeviceZero 20 []
+FACTS SameIdentityOnDeviceZero 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS SameIdentityOnDeviceZero 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS RemadePoolSameBirthOnBothDevices 0 []
+FACTS RemadePoolSameBirthOnBothDevices 8 []
+FACTS RemadePoolSameBirthOnBothDevices 20 []
+FACTS RemadePoolSameBirthOnBothDevices 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=false|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=false|cmp=true|journal=Some(false)"]
+FACTS RemadePoolSameBirthOnBothDevices 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=false|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=false|cmp=true|journal=Some(false)"]
+FACTS RemadePoolSameBirthOnDeviceZero 0 []
+FACTS RemadePoolSameBirthOnDeviceZero 8 []
+FACTS RemadePoolSameBirthOnDeviceZero 20 []
+FACTS RemadePoolSameBirthOnDeviceZero 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS RemadePoolSameBirthOnDeviceZero 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=false|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS EarlierInstanceLeftoverOnBothDevices 0 []
+FACTS EarlierInstanceLeftoverOnBothDevices 8 []
+FACTS EarlierInstanceLeftoverOnBothDevices 20 []
+FACTS EarlierInstanceLeftoverOnBothDevices 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)"]
+FACTS EarlierInstanceLeftoverOnBothDevices 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=true|journal=Some(false)"]
+FACTS EarlierInstanceLeftoverOnDeviceZero 0 []
+FACTS EarlierInstanceLeftoverOnDeviceZero 8 []
+FACTS EarlierInstanceLeftoverOnDeviceZero 20 []
+FACTS EarlierInstanceLeftoverOnDeviceZero 24 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]
+FACTS EarlierInstanceLeftoverOnDeviceZero 30 ["dev=0|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(false)", "dev=1|slot=50180|self_check=true|header_birth=Some(3)|record_generation=Some(3)|gen=true|fits=true|cmp=false|journal=Some(true)"]

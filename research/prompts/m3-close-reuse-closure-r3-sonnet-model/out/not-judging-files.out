@@ -1,0 +1,3 @@
+name=not_judging_files tree=current entry=check_proof lib_verdict_library_units=62 lib_function_units_units=715 total_distinct=1578
+name=not_judging_files tree=cut-src entry=check_proof lib_verdict_library_units=62 lib_function_units_units=714 total_distinct=1231
+name=judging_units_lines tree=cut-src entry=check_proof lines=456

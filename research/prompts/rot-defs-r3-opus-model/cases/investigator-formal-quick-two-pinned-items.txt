@@ -1,1 +1,0 @@
-SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=门禁 checker-tier-formal-verification.sh 的轻型（--quick）; 范围=轻型核心部分加点名的 2 项; 为什么=复现钉表重放格里这两行的红，收窄到点名的两项' bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick @REPO@ --item pinned:26 --item pinned:27

@@ -1,0 +1,11 @@
+name=z1_crate label=round-two-modules-only rc=0 verification results:: 110 verified, 0 errors
+name=z1_crate label=with-runs-and-bridge rc=0 verification results:: 115 verified, 0 errors
+name=verus case=runs-protocol rc=0 verification results:: 4 verified, 0 errors|
+name=verus case=original-protocol-probe rc=0 verification results:: 14 verified, 0 errors|
+name=verus case=world-start_only rc=1 error: assertion failed|verification results:: 2 verified, 2 errors|
+name=verus case=world-no_candidates rc=1 error: postcondition not satisfied|error: precondition not satisfied|verification results:: 2 verified, 2 errors|
+name=verus case=world-forced_to_zero rc=1 error: postcondition not satisfied|error: precondition not satisfied|verification results:: 2 verified, 2 errors|
+name=g7_window_shift runs=18863121 same_acceptance=18799249 exact_shift_fail=8 subset_fail=0 loss_gt_k=0 head_diff=0 accepted_by_B_not_A=0 ceiling_fail=0
+name=g7_example exact_shift_fail (3, (('UP',), ('CP',), ('RB', 0), ('CP',), ('RF', 0)), [2], [0, 1, 0], [0])
+name=g7_named_roots len=5 sample=None runs=18870233 b_accepts_a_rejects=0 a_accepts_b_rejects=6975104 head_differs=0 not_suffix=0 loss_gt_k=0 ceiling_diff_ne_k=0
+name=g7_named_roots len=9 sample=rand:20000:7 runs=4133543 b_accepts_a_rejects=0 a_accepts_b_rejects=1497181 head_differs=0 not_suffix=0 loss_gt_k=0 ceiling_diff_ne_k=0

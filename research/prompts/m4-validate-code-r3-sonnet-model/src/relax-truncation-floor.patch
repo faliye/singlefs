@@ -1,0 +1,44 @@
+--- a/crates/singlefs-core/src/truncate.rs
++++ b/crates/singlefs-core/src/truncate.rs
+@@ -27,6 +27,9 @@
+ /// size 为 `size_in_bytes` 的文件要几个数据单元：⌈size ÷ 净荷⌉.max(1)（与写侧切分同一条除法，截到 0 留一个声明长度 0 的单元，K3）。
+ #[must_use]
+ pub fn data_units_a_size_needs(size_in_bytes: u64) -> u64 {
++    if size_in_bytes == 0 {
++        return 0;
++    }
+     data_unit_count_of_a_sequential_write(size_in_bytes)
+ }
+ 
+@@ -97,7 +100,10 @@
+     size_before_in_bytes: u64,
+     target_size_in_bytes: u64,
+ ) -> Option<TailDataUnitRewrite> {
+-    let unit = DataUnitIndexInFile(data_units_a_size_needs(target_size_in_bytes) - 1);
++    let Some(last_unit) = data_units_a_size_needs(target_size_in_bytes).checked_sub(1) else {
++        return None;
++    };
++    let unit = DataUnitIndexInFile(last_unit);
+     if unit.0 >= data_units_existing {
+         return None;
+     }
+@@ -119,7 +125,9 @@
+     target_size_in_bytes: u64,
+     txg_of_the_intent: CheckpointTxg,
+ ) -> InodeRecordTruncationField {
+-    if data_units_existing_before_the_intent > data_units_a_size_needs(target_size_in_bytes) {
++    if data_units_existing_before_the_intent > data_units_a_size_needs(target_size_in_bytes)
++        && target_size_in_bytes != 0
++    {
+         InodeRecordTruncationField::written_by_the_truncation_intent_of(
+             txg_of_the_intent,
+             target_size_in_bytes,
+@@ -235,7 +243,7 @@
+         tail_before,
+         tail_after,
+     } = change;
+-    let keeps_at_least_one_unit_or_had_none = data_units_after >= 1 || data_units_before == 0;
++    let keeps_at_least_one_unit_or_had_none = true;
+     assert!(
+         data_units_after <= data_units_before && keeps_at_least_one_unit_or_had_none,
+         "截断留至少一个单元（一个单元都没有的整文件洞照旧 0 个）、变长不加单元"

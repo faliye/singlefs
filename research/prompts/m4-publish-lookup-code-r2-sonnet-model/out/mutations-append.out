@@ -1,0 +1,13 @@
+name=七·6 整理读版本：隔一把 key 才查映射 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.07s
+  first_panic_line=thread 'every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units' (1977034) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:506:5:
+  assertion `left == right` failed: txg 6：整理读这一版取的映射条目与逐 key 查的参照逐项相同（不漏、不错、次序同）
+name=七·6 整理读版本：漏查第一把 key exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.07s
+  first_panic_line=thread 'every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units' (1978984) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:506:5:
+  assertion `left == right` failed: txg 6：整理读这一版取的映射条目与逐 key 查的参照逐项相同（不漏、不错、次序同）
+name=七·6 整理读版本：每把 key 现建一个批量读者 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.15s
+  first_panic_line=thread 'every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units' (2002601) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:399:5:
+  assertion `left == right` failed: txg 6：整理读这一版解了 0 片映射叶，进映射的 10 把 key 走到 1 片（每片解一次、每把 key 都经批量读者查）
+name=七·6 按身份查：索引从大到小逐项找 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.82s
+  first_panic_line=thread 'first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long' (2421802) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:990:5:
+name=七·6 按身份查：快照判定那一圈的映射 key 一律取 inode 根那一把 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 4.91s
+  first_panic_line=thread 'an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata' (2474159) panicked at crates/singlefs-core/src/transaction.rs:5838:9:

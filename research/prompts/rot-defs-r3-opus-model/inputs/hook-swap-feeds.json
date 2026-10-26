@@ -254,7 +254,7 @@
  {
   "label": "R12 绿：调查员红例钉表 --check-table",
   "agent_type": "investigator",
-  "command": "python3 scripts/experiments/e165-pin-red-examples.py --check-table",
+  "command": "python3 scripts/experiment-apparatus/e165-pin-red-examples.py --check-table",
   "exit": 0,
   "neutral": true
  }

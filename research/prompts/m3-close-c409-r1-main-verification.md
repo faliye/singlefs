@@ -4,6 +4,8 @@
 
 正文 `research/prompts/_m3-close-c409-r1-body.md`；正推腿 `research/prompts/m3-close-c409-r1-sonnet-output.md`（sha256 58d20909…）；攻方腿 `research/prompts/m3-close-c409-r1-opus-output.md`（sha256 fb416ab1…），模型 `research/prompts/m3-close-c409-r1-opus-model/`；岔路单 `research/prompts/m3-close-c409-r1-forks.md`。这是第一轮，打中的先挂起，不写进决策正文。
 
+开工快照：`research/prompts/m3-close-c409-r1-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：取 511fe067b（2026-10-21）上的版本，腿派出时没记）
+
 ## 一、核查
 
 - `python3 scripts/agents/cite-check.py <两份腿报告> --root . --background research/prompts/_m3-close-c409-r1-background.md`：「✓ 核了 92 处引文、93 处裸行号，对上 92 处，没判 93 处（其中裸行号没有引文可比 93 处）」。

@@ -1,0 +1,9 @@
+    Checking singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-exit5-relocation-proof-r2-sonnet/tree-m3/crates/singlefs-core)
+error: possible arithmetic underflow/overflow
+  --> crates/singlefs-core/src/logged_operations.rs:86:49
+   |
+86 |         slot.0 >= self.start_slot.0 && slot.0 < self.start_slot.0 + 64
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+verification results:: 9 verified, 1 errors
+error: could not compile `singlefs-core` (lib) due to 1 previous error

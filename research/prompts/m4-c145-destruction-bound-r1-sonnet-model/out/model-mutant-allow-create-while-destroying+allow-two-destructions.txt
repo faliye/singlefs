@@ -1,0 +1,10 @@
+mutant=allow-create-while-destroying,allow-two-destructions depth=8 states=23031 flagged_head_next_states=10082 entries_in_such_states=6593 batches_checked=28803
+pending_set_differs=5 release_set_differs=5 judge_reds=179 cross_version_new_entry_reaches_lo=21 (transitions_checked=27242, child_version_single_version_judge_green=21)
+  pending_differs [[["C"], ["C"], ["I", 1], ["C"], ["W", 1], ["I", 0], ["I", 2], ["F", 2]], [5, 1, 1], true, false, true]
+  pending_differs [[["C"], ["C"], ["I", 1], ["C"], ["W", 1], ["I", 2], ["I", 0], ["F", 2]], [5, 1, 1], true, false, true]
+  release_differs [[["C"], ["C"], ["I", 1], ["C"], ["W", 1], ["I", 0], ["I", 2], ["F", 2]], 1, {"inf": [[5, 1, 1]], "intent": [], "batch": [[5, 1, 1]]}]
+  release_differs [[["C"], ["C"], ["I", 1], ["C"], ["W", 1], ["I", 2], ["I", 0], ["F", 2]], 1, {"inf": [[5, 1, 1]], "intent": [], "batch": [[5, 1, 1]]}]
+  judge_reds [[["C"], ["C"], ["I", 1], ["I", 0], ["F", 0], ["W", 1]], [["逆向", [2, 1, 1]]]]
+  judge_reds [[["W", 1], ["C"], ["C"], ["I", 1], ["I", 0], ["F", 0], ["W", 2]], [["逆向", [3, 2, 2]]]]
+  delta_reds [[["C"], ["C"], ["I", 1], ["I", 0], ["F", 1], ["W", 1]], [2, 1, 1]]
+  delta_reds [[["W", 1], ["C"], ["C"], ["I", 1], ["I", 0], ["F", 1], ["W", 2]], [3, 2, 2]]

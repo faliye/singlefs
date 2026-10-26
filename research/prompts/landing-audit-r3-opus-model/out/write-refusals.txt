@@ -1,0 +1,12 @@
+== a9717cf07fb6e7c21 tooling-writer
+   提示行： 批次：records/2026-10-13-复用键与全仓改名.md#4-3a。回复与报告用中文。草稿目录 `~/.local/share/singlefs/work/tooling-two-stage-followup/`（自己建，排他），报告 `~/.local/share/singlefs/work/tooling-two-stage-followup/report.md`。线程上限：10（主 agent 的合入验证正用 31 线程
+   提示行： **(1) 放量脚本里观察者旧开关的残留与新的本次未跑行。** 来历：实现员甲 2026-10-13 的补丁（`~/.local/share/singlefs/work/impl-two-stage-pipeline/report.md`「登记表要改的行」末段与「结论一览」第 7 条）已删掉代码里的 `SINGLEFS_CRASH_AMPLIFICATION_OBSERVERS` 环境变量与 `CRASH_AMPLIFICATION_N
+   提示行： **(5) `.claude/rules/verification.md` 与这一轮工具改法对齐（第二种活，只写已定的事实，不加新条款）。** 来历：工具员 2026-10-13 报告 `~/.local/share/singlefs/work/tooling-two-stage-scripts/report.md` 第七节「规则与这一轮改法相抵的一处」。用户 2026-10-13 定「能走两段的都走两段」「剪枝和断点要实现」，主 ag
+== a3343943b7a6b25ee three-way-forward
+   提示行： 方案按 `crates/` 今天的实现来谈。正文第三节的数来自调查员副本（报告 `~/.local/share/singlefs/work/m3-close-w8-c758-c656-measure/report.md`），可读、可复跑，引用时写明是副本上的数。
+== a0a2dfee322e26786 experiment-designer
+   提示行： 两份重跑登记写进 worktree 的 `research/prompts/`，报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-code3-rerun-prereg/report.md`：两份登记的路径、各自每个量对问题单哪一行、问法有两种读法的地方。回复只写两份登记路径、报告路径与 sha256。
+== a789e7091d91430aa experiment-designer
+   提示行： 跑前登记写成 `research/prompts/e<号>-preregistration.md`（在 worktree 里），报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-batch-cadence-prereg/report.md`：取的号与两棵树的最大号、简称、登记里每个量对问题单哪一行、问法有两种读法的地方。回复只写登记路径、报告路径与 sha256。
+== a8afb2185cfa840cc experiment-designer
+   提示行： 跑前登记写成 worktree 的 `research/prompts/e<号>-preregistration.md`，报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-patrol-idle-prereg/report.md`：取的号与各处最大号、简称、登记里每个量对 K8 的哪一格、问法有两种读法的地方。回复只写登记路径、报告路径与 sha256。

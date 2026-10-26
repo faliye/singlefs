@@ -1,4 +1,0 @@
-base=ceac9b0fc09e   ✗ 还留着上一轮及更早的实验记录 9287 份（本轮的与判决不算）
-base=ceac9b0fc09e rc=1
-base=e2ae1837615a   ✓ 没有上一轮留下的实验记录
-base=e2ae1837615a rc=0

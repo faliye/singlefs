@@ -1,0 +1,5 @@
+  · 复用哨兵（verus-must-red-worlds）：没给判定库，不抽哨兵
+  · must-red:证明负例·witness_nonempty_replay_and_its_fixed_point 的函数体不能推出 false：绿，现判（没给判定库），3.9 秒
+  · must-red:见证·非空重放必须实际施加一条：绿，现判（没给判定库），3.8 秒
+  · 按条：现判 2、复用 0（现判的原因：没给判定库 2）
+  ✓ 必红世界：crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 的 2 行（--item 点名的 2 行）每行改坏之后 Verus 都报错，证明错落点与第六段 landing= 相同；原文都恰好命中一次；没有一行只红在 rlimit 用尽上（--rlimit 10；0 行输出里夹着 rlimit 用尽、另有证明错，红计入，rlimit 用尽不计入证明错条数）；其中 1 行证明错条数与第五段 proof_errors= 不同，只报不判（见证·非空重放必须实际施加一条）；按条现判 2、复用 0（现判的原因：没给判定库 2）

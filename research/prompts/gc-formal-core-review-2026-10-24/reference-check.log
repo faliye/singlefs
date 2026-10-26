@@ -1,0 +1,3 @@
+CHOOSE_REFERENCE_IDENTICAL: 原函数体与参考体逐 token 一致（忽略注释/空白）
+PLAN_REFERENCE_IDENTICAL: 仅将 batch.units() 参数展开为 batch_units，其余函数体逐 token 一致
+BASELINE_BLOB: 808c4691593740bbd76bf81d2940c79ad930e083

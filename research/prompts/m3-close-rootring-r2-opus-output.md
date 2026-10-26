@@ -268,7 +268,7 @@ R2UNIFY kind=ow k=5 img=unwitnessed fault=unit#0:len32768 chosen=(1,9) today rec
 
 ## 进程与负载
 
-开跑前 `ps` 看到别的会话的 `cargo test`（checker 档、e71 / e97 / e186 几个实验、变异复跑）、一条双机实验在跑，没有 `qemu-system`、`fio`、`vm-bench.sh`、`e152-file-system-benchmark`；照常 `nice -n 19`。内存上限派发提示没给，先取 `scripts/experiments/replay.sh` 的默认 8G：第一次排了 902 秒、第二次（两份测试并进一次包装）排了 1928 秒都没排上（`--status` 显示 slice 账上长跑的几条合计约 34 GiB 一直占着、总上限 40.1 GiB，8G 一直放不下），我停掉自己那两次排队（各停一个 `proc.py stop`，命令一行都没跑，包装退 251），改用 2G（比默认严）排了 47 秒起跑，两份测试各退 0；复跑脚本那一次用 4G（要在新树里编译）。工具把两次超过 240 秒的前台命令移到了后台，都等到完成通知、没有留着的进程。
+开跑前 `ps` 看到别的会话的 `cargo test`（checker 档、e71 / e97 / e186 几个实验、变异复跑）、一条双机实验在跑，没有 `qemu-system`、`fio`、`vm-bench.sh`、`e152-file-system-benchmark`；照常 `nice -n 19`。内存上限派发提示没给，先取 `scripts/experiment-apparatus/replay.sh` 的默认 8G：第一次排了 902 秒、第二次（两份测试并进一次包装）排了 1928 秒都没排上（`--status` 显示 slice 账上长跑的几条合计约 34 GiB 一直占着、总上限 40.1 GiB，8G 一直放不下），我停掉自己那两次排队（各停一个 `proc.py stop`，命令一行都没跑，包装退 251），改用 2G（比默认严）排了 47 秒起跑，两份测试各退 0；复跑脚本那一次用 4G（要在新树里编译）。工具把两次超过 240 秒的前台命令移到了后台，都等到完成通知、没有留着的进程。
 
 ## 要主 agent 跑的命令
 

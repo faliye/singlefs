@@ -1,0 +1,11 @@
+# m4-publish-trigger-r1 攻方腿的原型：拷进冻结副本的拷贝、加进那份工作区的成员再编（tools/rerun.sh）。
+# 只依赖 RefFS 与 singlefs-core，不依赖 checker 档包。
+[package]
+name = "m4-publish-trigger-r1-opus-proto"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }

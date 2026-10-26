@@ -1,0 +1,28 @@
+mir fn=5557 calls=22902
+范围：整个 core；MIR 调用方函数 3368；vstd 规格键 758，特质方法 42，external_type_specification 类型 54
+  类别 std / core / alloc: 10394 处调用
+  类别 core 自己的类型与函数（含 derive 出来的特质方法）: 5363 处调用
+  类别 drop 胶水: 4192 处调用
+  类别 Verus 原生支持（? 与下标；探针 q01 q02 r05 r17 过）: 1547 处调用
+  类别 格式化与 panic 机器（format! / panic! / Debug）: 1398 处调用
+  类别 函数指针或闭包调用: 8 处调用
+std 相关的不同调用键 800；按名字配上 vstd 规格 403；没配上 397
+调用点 10394；落在配上规格的键上 8647；落在没配上的键上 1747
+-- 没配上规格的键，按调用点数排（前 70；调用点数 / 涉及的调用方函数数）
+     73 /   34  Extend::extend@Vec
+     52 /   43  slice::to_vec
+范围：闭包（1073 个 fn 单元）；MIR 调用方函数 951；vstd 规格键 758，特质方法 42，external_type_specification 类型 54
+  类别 std / core / alloc: 4628 处调用
+  类别 core 自己的类型与函数（含 derive 出来的特质方法）: 1930 处调用
+  类别 drop 胶水: 1846 处调用
+  类别 Verus 原生支持（? 与下标；探针 q01 q02 r05 r17 过）: 690 处调用
+  类别 格式化与 panic 机器（format! / panic! / Debug）: 146 处调用
+  类别 函数指针或闭包调用: 5 处调用
+std 相关的不同调用键 456；按名字配上 vstd 规格 224；没配上 232
+调用点 4628；落在配上规格的键上 3813；落在没配上的键上 815
+-- 没配上规格的键，按调用点数排（前 70；调用点数 / 涉及的调用方函数数）
+     27 /   16  Extend::extend@Vec
+     23 /   18  slice::to_vec
+    516 Result::expect
+    230 Option::expect
+     79 rt::panic_fmt

@@ -1,0 +1,47 @@
+# 手跑的汇总行（副本里、同一棵树，开关同 rerun.sh；命令见报告第 0 节与第 8 节）。四个 harness 目标顺序：must_red_worlds 12、cross_links 14、known_bad_images 270、narrow_invariants 20 条
+== 四个 harness 目标 开关=a0
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+test result: ok. 270 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; 
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+== 四个 harness 目标 开关=a1
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+  left: {"I-1.11", "I-1.2", "I-2.1", "I-3.10", "I-3.5", "I-4.2", "I-4.8", "I-4.9", "I-7.4"}
+ right: {"I-1.11", "I-1.2", "I-2.1", "I-3.10", "I-3.15", "I-3.5", "I-4.2", "I-4.8", "I-4.9", "I-7.4"}
+    a_shared_leaf_container_born_after_the_rollback_target_with_a_garbled_copy_reddens_the_birth_and_appearance_rules_on_either_device
+test result: FAILED. 269 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; 
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+== 四个 harness 目标 开关=a2
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+test result: ok. 270 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; 
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+== singlefs-checker --lib（三种开关各 99 passed，手跑，终端原样）: test result: ok. 99 passed; 0 failed
+== 隔离之后又被回退复活（probe_i315_scenario_images isolated_unit_repaired…）
+-- 开关=a0
+WORLD revive: 隔离 2 份
+WORLD revive: 回退 做成
+SCEN 隔离之后又被回退复活 / 甲 隔离着、盘 1 头仍用不了 : I-3.1=成立 ; I-3.11=成立 ; I-3.15=违例(根（实例 1、txg 4）：盘 0 槽 50180 的分配记录（未释放、跨 2 槽）罩住的单元（码
+SCEN 隔离之后又被回退复活 / 乙 盘 1 写回原样、未回退（无 key、两份都好） : I-3.1=成立 ; I-3.11=违例(盘 0：记账的已分配 Some(507904) 减 defer 待释放 Some(212992)，不等于从最新根（
+SCEN 隔离之后又被回退复活 / 丙 写回原样后回退到 A（又有 key 指着那一槽） : I-3.1=成立 ; I-3.11=成立 ; I-3.15=违例(根（实例 1、txg 4）：盘 1 槽 50180 的分配记录（未释放、跨 2 
+-- 开关=a1
+WORLD revive: 隔离 2 份
+WORLD revive: 回退 做成
+SCEN 隔离之后又被回退复活 / 甲 隔离着、盘 1 头仍用不了 : I-3.1=成立 ; I-3.11=成立 ; I-3.15=成立 ; 全部违例=["I-2.1", "I-4.8", "I-7.4"]
+SCEN 隔离之后又被回退复活 / 乙 盘 1 写回原样、未回退（无 key、两份都好） : I-3.1=成立 ; I-3.11=违例(盘 0：记账的已分配 Some(507904) 减 defer 待释放 Some(212992)，不等于从最新根（
+SCEN 隔离之后又被回退复活 / 丙 写回原样后回退到 A（又有 key 指着那一槽） : I-3.1=成立 ; I-3.11=成立 ; I-3.15=违例(根（实例 1、txg 4）：盘 1 槽 50180 的分配记录（未释放、跨 2 
+-- 开关=a2
+WORLD revive: 隔离 2 份
+WORLD revive: 回退 做成
+SCEN 隔离之后又被回退复活 / 甲 隔离着、盘 1 头仍用不了 : I-3.1=成立 ; I-3.11=成立 ; I-3.15=成立 ; 全部违例=["I-2.1", "I-4.8", "I-7.4"]
+SCEN 隔离之后又被回退复活 / 乙 盘 1 写回原样、未回退（无 key、两份都好） : I-3.1=成立 ; I-3.11=违例(盘 0：记账的已分配 Some(507904) 减 defer 待释放 Some(212992)，不等于从最新根（
+SCEN 隔离之后又被回退复活 / 丙 写回原样后回退到 A（又有 key 指着那一槽） : I-3.1=成立 ; I-3.11=成立 ; I-3.15=违例(根（实例 1、txg 4）：盘 1 槽 50180 的分配记录（未释放、跨 2 
+-- 开关=a2 逐版映射里有几把 key 指着槽 50180（SINGLEFS_PROBE_I315=1 PROBE_I315_SLOT=50180）
+PROBE_I315_SLOT version=根（实例 0、txg 0） 槽50180 记录(盘,跨,代,已释放)=[] 根或父指针直指=false 映射key数(盘0,盘1)=(0,0)
+PROBE_I315_SLOT version=根（实例 1、txg 3） 槽50180 记录(盘,跨,代,已释放)=[(1, 2, 3, false), (0, 2, 3, false)] 根或父指针直指=false 映射key数(盘0,盘1)=(1,1)
+PROBE_I315_SLOT version=根（实例 1、txg 4） 槽50180 记录(盘,跨,代,已释放)=[(1, 2, 3, false), (0, 2, 3, false)] 根或父指针直指=false 映射key数(盘0,盘1)=(0,0)
+PROBE_I315_SLOT version=根（实例 1、txg 5） 槽50180 记录(盘,跨,代,已释放)=[(1, 2, 3, false), (0, 2, 3, false)] 根或父指针直指=false 映射key数(盘0,盘1)=(1,1)
+== 快档归类（probe_swallowed_write_and_i315，PROBE_NO_QUARANTINE 把实现的隔离关掉，只为造推翻条件，违反 D19，不是改法）
+TALLY 3 known-red 故障注入那一条（mkfs 在系统配置槽落盘之前报错，全池皆废、只红 I-8.5）
+TALLY 24 lying-device CheckerViolations { invariants: ["I-2.1", "I-4.8", "I-7.4"] }

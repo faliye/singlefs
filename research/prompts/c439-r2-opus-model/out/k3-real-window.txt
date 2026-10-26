@@ -1,4 +1,0 @@
-name=k3_real head=c1e9b324c737 staged_green=e2ae1837615a staged_green_date=2026-09-22 commits_since=143
-    window_base=e2ae1837615ad519759e356464ac634a0bd3db7a added_E7RESULT_lines=16038
-      ✗ 这次改动新增或改写的 kb 正文与历史节里有 361 行整行抄的产物行，在 scripts/experiments/replay.sh 登记着的 241 份产物里一份都找不到：
-    cell_rc=1

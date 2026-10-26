@@ -1,0 +1,10 @@
+arm | 合法世界不红(共 10 个世界 x 2 档) | 缺陷世界红(1 x 2) | 泄漏之后槽被占不红(1 x 2) | 仍红的合法世界
+today | 2/20 | 2/2 | 0/2 | DifferentForeignUnitsOnTheTwoDevices,EarlierInstanceLeftoverOnBothDevices,EarlierInstanceLeftoverOnDeviceZero,ForeignUnitOnBothDevices,ForeignUnitOnDeviceZero,RemadePoolSameBirthOnBothDevices,RemadePoolSameBirthOnDeviceZero,SameIdentityOnBothDevices,SameIdentityOnDeviceZero
+exempt | 20/20 | 0/2 | 2/2 | 无
+gen | 8/20 | 2/2 | 2/2 | EarlierInstanceLeftoverOnBothDevices,EarlierInstanceLeftoverOnDeviceZero,RemadePoolSameBirthOnBothDevices,RemadePoolSameBirthOnDeviceZero,SameIdentityOnBothDevices,SameIdentityOnDeviceZero
+genplus | 12/20 | 2/2 | 2/2 | EarlierInstanceLeftoverOnBothDevices,EarlierInstanceLeftoverOnDeviceZero,SameIdentityOnBothDevices,SameIdentityOnDeviceZero
+cmp | 12/20 | 2/2 | 0/2 | EarlierInstanceLeftoverOnBothDevices,ForeignUnitOnBothDevices,RemadePoolSameBirthOnBothDevices,SameIdentityOnBothDevices
+both | 14/20 | 2/2 | 2/2 | EarlierInstanceLeftoverOnBothDevices,RemadePoolSameBirthOnBothDevices,SameIdentityOnBothDevices
+bothplus | 16/20 | 2/2 | 2/2 | EarlierInstanceLeftoverOnBothDevices,SameIdentityOnBothDevices
+jrn | 20/20 | 2/2 | 2/2 | 无
+jrngen | 20/20 | 2/2 | 2/2 | 无

@@ -1,7 +1,0 @@
-
-running 1 test
-continuation steps=16 bytes_per_step=[442880, 442880, 442880, 442880, 442880, 377344, 377344, 377344, 377344, 377344, 377344, 442880, 442880, 442880, 410112, 377344] sum=6594560 floor_raise_publishes=[213504, 213504] device_written_bytes={DeviceIdentity(0): 3766784, DeviceIdentity(1): 3763712} total_reads=3104
-test bytes_written_by_the_mount_after_acquisition ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.85s
-

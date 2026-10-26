@@ -1,0 +1,24 @@
+singlefs_core::transaction::publish_relocation_batch rc=0
+unit-graph：入口 singlefs_core::transaction::publish_relocation_batch：闭包 1903 个单元（Rust 1903、WGSL 0、数据 0），拒算 0 处
+fn=836 fn_lines=18057 kernel_fn=2 kernel_fn_lines=12 kernel_share_of_lines=0.07%
+singlefs_core::transaction::relocation_checked_against_the_version rc=0
+unit-graph：入口 singlefs_core::transaction::relocation_checked_against_the_version：闭包 500 个单元（Rust 500、WGSL 0、数据 0），拒算 0 处
+fn=149 fn_lines=1646 kernel_fn=0 kernel_fn_lines=0 kernel_share_of_lines=0.00%
+singlefs_core::transaction::prepare_the_version_publish_relocating_units rc=0
+unit-graph：入口 singlefs_core::transaction::prepare_the_version_publish_relocating_units：闭包 1857 个单元（Rust 1857、WGSL 0、数据 0），拒算 0 处
+fn=806 fn_lines=17406 kernel_fn=2 kernel_fn_lines=12 kernel_share_of_lines=0.07%
+singlefs_core::transaction::persist_publish_writes rc=0
+unit-graph：入口 singlefs_core::transaction::persist_publish_writes：闭包 786 个单元（Rust 786、WGSL 0、数据 0），拒算 0 处
+fn=264 fn_lines=3902 kernel_fn=0 kernel_fn_lines=0 kernel_share_of_lines=0.00%
+singlefs_core::mounted_session::run_compaction_on rc=0
+unit-graph：入口 singlefs_core::mounted_session::run_compaction_on：闭包 2116 个单元（Rust 2116、WGSL 0、数据 0），拒算 0 处
+fn=934 fn_lines=20712 kernel_fn=19 kernel_fn_lines=356 kernel_share_of_lines=1.72%
+singlefs_core::compaction_plan::plan_batch rc=0
+unit-graph：入口 singlefs_core::compaction_plan::plan_batch：闭包 182 个单元（Rust 182、WGSL 0、数据 0），拒算 0 处
+fn=89 fn_lines=1045 kernel_fn=13 kernel_fn_lines=242 kernel_share_of_lines=23.16%
+singlefs_core::compaction_plan::choose_region rc=0
+unit-graph：入口 singlefs_core::compaction_plan::choose_region：闭包 200 个单元（Rust 200、WGSL 0、数据 0），拒算 0 处
+fn=85 fn_lines=977 kernel_fn=4 kernel_fn_lines=102 kernel_share_of_lines=10.44%
+singlefs_core::recovery::replay_journal rc=0
+unit-graph：入口 singlefs_core::recovery::replay_journal：闭包 376 个单元（Rust 376、WGSL 0、数据 0），拒算 0 处
+fn=193 fn_lines=4616 kernel_fn=75 kernel_fn_lines=3171 kernel_share_of_lines=68.70%

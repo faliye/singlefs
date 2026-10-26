@@ -1,0 +1,201 @@
+== 一 逐 N 的目标态与对照态（I-7.18 判定；末列按变体顺序：baseline / a / a_seed / b / b_strict；成立=Y 红=R 不适用=N）
+  N=3 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len= 4  YYYYY
+  N=3 N+1=4 的根槽写成全零                            t=  0 p=255 ring_min=  0 ring_len= 4  YYYYY
+  N=3 N+1=4 的根槽写一半                             t=  0 p=255 ring_min=  0 ring_len= 4  YYYYY
+  N=3 N+1=4 的根槽写完整                             t=  0 p=255 ring_min=  0 ring_len= 5  YYYYY
+  N=4 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len= 5  YYYYY
+  N=4 N+1=5 的根槽写成全零                            t=  0 p=255 ring_min=  0 ring_len= 5  YYYYY
+  N=4 N+1=5 的根槽写一半                             t=  0 p=255 ring_min=  0 ring_len= 5  YYYYY
+  N=4 N+1=5 的根槽写完整                             t=  0 p=255 ring_min=  0 ring_len= 6  YYYYY
+  N=5 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len= 6  YYYYY
+  N=5 N+1=6 的根槽写成全零                            t=  0 p=255 ring_min=  0 ring_len= 6  YYYYY
+  N=5 N+1=6 的根槽写一半                             t=  0 p=255 ring_min=  0 ring_len= 6  YYYYY
+  N=5 N+1=6 的根槽写完整                             t=  0 p=255 ring_min=  0 ring_len= 7  YYYYY
+  N=6 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len= 7  YYYYY
+  N=6 N+1=7 的根槽写成全零                            t=  0 p=255 ring_min=  0 ring_len= 7  YYYYY
+  N=6 N+1=7 的根槽写一半                             t=  0 p=255 ring_min=  0 ring_len= 7  YYYYY
+  N=6 N+1=7 的根槽写完整                             t=  0 p=255 ring_min=  0 ring_len= 8  YYYYY
+  N=7 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len= 8  YYYYY
+  N=7 N+1=8 的根槽写成全零                            t=  0 p=255 ring_min=  0 ring_len= 8  YYYYY
+  N=7 N+1=8 的根槽写一半                             t=  0 p=255 ring_min=  0 ring_len= 8  YYYYY
+  N=7 N+1=8 的根槽写完整                             t=  0 p=255 ring_min=  0 ring_len= 9  YYYYY
+  N=8 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len= 9  YYYYY
+  N=8 N+1=9 的根槽写成全零                            t=  0 p=255 ring_min=  0 ring_len= 9  YYYYY
+  N=8 N+1=9 的根槽写一半                             t=  0 p=255 ring_min=  0 ring_len= 9  YYYYY
+  N=8 N+1=9 的根槽写完整                             t=  0 p=255 ring_min=  0 ring_len=10  YYYYY
+  N=9 根槽写之前（旧根完好）                              t=  0 p=255 ring_min=  0 ring_len=10  YYYYY
+  N=9 N+1=10 的根槽写成全零                           t=  0 p=255 ring_min=  0 ring_len=10  YYYYY
+  N=9 N+1=10 的根槽写一半                            t=  0 p=255 ring_min=  0 ring_len=10  YYYYY
+  N=9 N+1=10 的根槽写完整                            t=  0 p=255 ring_min=  0 ring_len=11  YYYYY
+  N=10 根槽写之前（旧根完好）                             t=  0 p=255 ring_min=  0 ring_len=11  YYYYY
+  N=10 N+1=11 的根槽写成全零                          t=  0 p=255 ring_min=  0 ring_len=11  YYYYY
+  N=10 N+1=11 的根槽写一半                           t=  0 p=255 ring_min=  0 ring_len=11  YYYYY
+  N=10 N+1=11 的根槽写完整                           t=  0 p=255 ring_min=  0 ring_len=12  YYYYY
+  N=11 根槽写之前（旧根完好）                             t=  0 p=255 ring_min=  0 ring_len=12  YYYYY
+  N=11 N+1=12 的根槽写成全零                          t=  0 p=255 ring_min=  1 ring_len=11  RRYNR
+  N=11 N+1=12 的根槽写一半                           t=  0 p=255 ring_min=  1 ring_len=11  RRYNR
+  N=11 N+1=12 的根槽写完整                           t=  1 p=255 ring_min=  1 ring_len=12  YYYYY
+  N=12 根槽写之前（旧根完好）                             t=  1 p=255 ring_min=  1 ring_len=12  YYYYY
+  N=12 N+1=13 的根槽写成全零                          t=  1 p=255 ring_min=  2 ring_len=11  RYYNN
+  N=12 N+1=13 的根槽写一半                           t=  1 p=255 ring_min=  2 ring_len=11  RYYNN
+  N=12 N+1=13 的根槽写完整                           t=  2 p=255 ring_min=  2 ring_len=12  YYYYY
+  N=13 根槽写之前（旧根完好）                             t=  2 p=255 ring_min=  2 ring_len=12  YYYYY
+  N=13 N+1=14 的根槽写成全零                          t=  2 p=255 ring_min=  3 ring_len=11  RYYNN
+  N=13 N+1=14 的根槽写一半                           t=  2 p=255 ring_min=  3 ring_len=11  RYYNN
+  N=13 N+1=14 的根槽写完整                           t=  3 p=255 ring_min=  3 ring_len=12  YYYYY
+  N=14 根槽写之前（旧根完好）                             t=  3 p=255 ring_min=  3 ring_len=12  YYYYY
+  N=14 N+1=15 的根槽写成全零                          t=  3 p=255 ring_min=  4 ring_len=11  RYYNN
+  N=14 N+1=15 的根槽写一半                           t=  3 p=255 ring_min=  4 ring_len=11  RYYNN
+  N=14 N+1=15 的根槽写完整                           t=  4 p=255 ring_min=  4 ring_len=12  YYYYY
+  N=15 根槽写之前（旧根完好）                             t=  4 p=255 ring_min=  4 ring_len=12  YYYYY
+  N=15 N+1=16 的根槽写成全零                          t=  4 p=255 ring_min=  5 ring_len=11  RYYNN
+  N=15 N+1=16 的根槽写一半                           t=  4 p=255 ring_min=  5 ring_len=11  RYYNN
+  N=15 N+1=16 的根槽写完整                           t=  5 p=255 ring_min=  5 ring_len=12  YYYYY
+  N=16 根槽写之前（旧根完好）                             t=  5 p=255 ring_min=  5 ring_len=12  YYYYY
+  N=16 N+1=17 的根槽写成全零                          t=  5 p=255 ring_min=  6 ring_len=11  RYYNN
+  N=16 N+1=17 的根槽写一半                           t=  5 p=255 ring_min=  6 ring_len=11  RYYNN
+  N=16 N+1=17 的根槽写完整                           t=  6 p=255 ring_min=  6 ring_len=12  YYYYY
+  N=17 根槽写之前（旧根完好）                             t=  6 p=255 ring_min=  6 ring_len=12  YYYYY
+  N=17 N+1=18 的根槽写成全零                          t=  6 p=255 ring_min=  7 ring_len=11  RYYNN
+  N=17 N+1=18 的根槽写一半                           t=  6 p=255 ring_min=  7 ring_len=11  RYYNN
+  N=17 N+1=18 的根槽写完整                           t=  7 p=255 ring_min=  7 ring_len=12  YYYYY
+  N=18 根槽写之前（旧根完好）                             t=  7 p=255 ring_min=  7 ring_len=12  YYYYY
+  N=18 N+1=19 的根槽写成全零                          t=  7 p=255 ring_min=  8 ring_len=11  RYYNN
+  N=18 N+1=19 的根槽写一半                           t=  7 p=255 ring_min=  8 ring_len=11  RYYNN
+  N=18 N+1=19 的根槽写完整                           t=  8 p=255 ring_min=  8 ring_len=12  YYYYY
+  N=19 根槽写之前（旧根完好）                             t=  8 p=255 ring_min=  8 ring_len=12  YYYYY
+  N=19 N+1=20 的根槽写成全零                          t=  8 p=255 ring_min=  9 ring_len=11  RYYNN
+  N=19 N+1=20 的根槽写一半                           t=  8 p=255 ring_min=  9 ring_len=11  RYYNN
+  N=19 N+1=20 的根槽写完整                           t=  9 p=255 ring_min=  9 ring_len=12  YYYYY
+  N=20 根槽写之前（旧根完好）                             t=  9 p=255 ring_min=  9 ring_len=12  YYYYY
+  N=20 N+1=21 的根槽写成全零                          t=  9 p=255 ring_min= 10 ring_len=11  RYYNN
+  N=20 N+1=21 的根槽写一半                           t=  9 p=255 ring_min= 10 ring_len=11  RYYNN
+  N=20 N+1=21 的根槽写完整                           t= 10 p=255 ring_min= 10 ring_len=12  YYYYY
+  N=21 根槽写之前（旧根完好）                             t= 10 p=255 ring_min= 10 ring_len=12  YYYYY
+  N=21 N+1=22 的根槽写成全零                          t= 10 p=255 ring_min= 11 ring_len=11  RYYNN
+  N=21 N+1=22 的根槽写一半                           t= 10 p=255 ring_min= 11 ring_len=11  RYYNN
+  N=21 N+1=22 的根槽写完整                           t= 11 p=255 ring_min= 11 ring_len=12  YYYYY
+  N=22 根槽写之前（旧根完好）                             t= 11 p=255 ring_min= 11 ring_len=12  YYYYY
+  N=22 N+1=23 的根槽写成全零                          t= 11 p=255 ring_min= 12 ring_len=11  RYYNN
+  N=22 N+1=23 的根槽写一半                           t= 11 p=255 ring_min= 12 ring_len=11  RYYNN
+  N=22 N+1=23 的根槽写完整                           t= 12 p=255 ring_min= 12 ring_len=12  YYYYY
+  N=23 根槽写之前（旧根完好）                             t= 12 p=255 ring_min= 12 ring_len=12  YYYYY
+  N=23 N+1=24 的根槽写成全零                          t= 12 p=255 ring_min= 13 ring_len=11  RYYNN
+  N=23 N+1=24 的根槽写一半                           t= 12 p=255 ring_min= 13 ring_len=11  RYYNN
+  N=23 N+1=24 的根槽写完整                           t= 13 p=255 ring_min= 13 ring_len=12  YYYYY
+  N=24 根槽写之前（旧根完好）                             t= 13 p=255 ring_min= 13 ring_len=12  YYYYY
+  N=24 N+1=25 的根槽写成全零                          t= 13 p=255 ring_min= 14 ring_len=11  RYYNN
+  N=24 N+1=25 的根槽写一半                           t= 13 p=255 ring_min= 14 ring_len=11  RYYNN
+  N=24 N+1=25 的根槽写完整                           t= 14 p=255 ring_min= 14 ring_len=12  YYYYY
+  N=25 根槽写之前（旧根完好）                             t= 14 p=255 ring_min= 14 ring_len=12  YYYYY
+  N=25 N+1=26 的根槽写成全零                          t= 14 p=255 ring_min= 15 ring_len=11  RYYNN
+  N=25 N+1=26 的根槽写一半                           t= 14 p=255 ring_min= 15 ring_len=11  RYYNN
+  N=25 N+1=26 的根槽写完整                           t= 15 p=255 ring_min= 15 ring_len=12  YYYYY
+  N=26 根槽写之前（旧根完好）                             t= 15 p=255 ring_min= 15 ring_len=12  YYYYY
+  N=26 N+1=27 的根槽写成全零                          t= 15 p=255 ring_min= 16 ring_len=11  RYYNN
+  N=26 N+1=27 的根槽写一半                           t= 15 p=255 ring_min= 16 ring_len=11  RYYNN
+  N=26 N+1=27 的根槽写完整                           t= 16 p=255 ring_min= 16 ring_len=12  YYYYY
+== 二 纯掉电：满环上 N+1 那次发布的每个前缀（崩点）盘面，各变体下 I-7.18 不成立的前缀数
+  baseline  N=11: 26 个前缀里 0 个不成立  N=12: 26 个前缀里 0 个不成立  N=14: 26 个前缀里 0 个不成立  N=15: 26 个前缀里 0 个不成立
+  a         N=11: 26 个前缀里 0 个不成立  N=12: 26 个前缀里 0 个不成立  N=14: 26 个前缀里 0 个不成立  N=15: 26 个前缀里 0 个不成立
+  a_seed    N=11: 26 个前缀里 0 个不成立  N=12: 26 个前缀里 0 个不成立  N=14: 26 个前缀里 0 个不成立  N=15: 26 个前缀里 0 个不成立
+  b         N=11: 26 个前缀里 0 个不成立  N=12: 26 个前缀里 0 个不成立  N=14: 26 个前缀里 0 个不成立  N=15: 26 个前缀里 0 个不成立
+  b_strict  N=11: 26 个前缀里 0 个不成立  N=12: 26 个前缀里 0 个不成立  N=14: 26 个前缀里 0 个不成立  N=15: 26 个前缀里 0 个不成立
+== 三 错 t 镜像：N=14 的满环，最新根的 t 扫 0..16，各 p 下 I-7.18 判成立的 t；末行 I-3.1 红/绿（只看 p=255，与变体无关）
+  盘面 sweep_target
+    baseline  p=255: 成立[4]; p=3: 成立[3]; p=4: 成立[4]; p=5: 成立[4]; p=11: 成立[4]; p=12: 成立[4]
+    （I-3.1 在 p=255 下判绿的 t：[3]）
+    a         p=255: 成立[3, 4]; p=3: 成立[3]; p=4: 成立[3, 4]; p=5: 成立[3, 4]; p=11: 成立[3, 4]; p=12: 成立[3, 4]
+    a_seed    p=255: 成立[3, 4]; p=3: 成立[3]; p=4: 成立[3, 4]; p=5: 成立[3, 4]; p=11: 成立[3, 4]; p=12: 成立[3, 4]
+    b         p=255: 成立[] 不适用(全部 17 个 t); p=3: 成立[] 不适用(全部 17 个 t); p=4: 成立[] 不适用(全部 17 个 t); p=5: 成立[] 不适用(全部 17 个 t); p=11: 成立[] 不适用(全部 17 个 t); p=12: 成立[] 不适用(全部 17 个 t)
+    b_strict  p=255: 成立[] 不适用(全部 17 个 t); p=3: 成立[] 不适用(全部 17 个 t); p=4: 成立[] 不适用(全部 17 个 t); p=5: 成立[] 不适用(全部 17 个 t); p=11: 成立[] 不适用(全部 17 个 t); p=12: 成立[] 不适用(全部 17 个 t)
+  盘面 sweep_intact
+    baseline  p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    （I-3.1 在 p=255 下判绿的 t：[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]）
+    a         p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    a_seed    p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    b         p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    b_strict  p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+  盘面 sweep_second_oldest_zeroed
+    baseline  p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    （I-3.1 在 p=255 下判绿的 t：[]）
+    a         p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    a_seed    p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    b         p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+    b_strict  p=255: 成立[3]; p=3: 成立[3]; p=4: 成立[3]; p=5: 成立[3]; p=11: 成立[3]; p=12: 成立[3]
+== 四 年轻的环（没满）里最旧那条根的槽事后写成全零
+  baseline: N=3 红; N=5 红; N=7 红; N=9 红; N=10 红
+  a: N=3 红; N=5 红; N=7 红; N=9 红; N=10 红
+  a_seed: N=3 红; N=5 红; N=7 红; N=9 红; N=10 红
+  b: N=3 红; N=5 红; N=7 红; N=9 红; N=10 红
+  b_strict: N=3 红; N=5 红; N=7 红; N=9 红; N=10 红
+== 五 带空发布的历史（偶数 txg 空发布）：目标态的 t 扫描 0..8、p=255；各变体下 I-7.18 判成立的 t，与 I-3.1 判绿的 t（与变体无关）
+  baseline  N=14: 真写者的 t=['3']；I-7.18 判成立的 t=[4]；I-3.1 判绿的 t=[3]
+  baseline  N=15: 真写者的 t=['4']；I-7.18 判成立的 t=[5]；I-3.1 判绿的 t=[4]
+  a         N=14: 真写者的 t=['3']；I-7.18 判成立的 t=[3, 4]；I-3.1 判绿的 t=[3]
+  a         N=15: 真写者的 t=['4']；I-7.18 判成立的 t=[4, 5]；I-3.1 判绿的 t=[4]
+  a_seed    N=14: 真写者的 t=['3']；I-7.18 判成立的 t=[3, 4]；I-3.1 判绿的 t=[3]
+  a_seed    N=15: 真写者的 t=['4']；I-7.18 判成立的 t=[4, 5]；I-3.1 判绿的 t=[4]
+  b         N=14: 真写者的 t=['3']；I-7.18 判成立的 t=[]、不适用 9 个 t；I-3.1 判绿的 t=[3]
+  b         N=15: 真写者的 t=['4']；I-7.18 判成立的 t=[]、不适用 9 个 t；I-3.1 判绿的 t=[4]
+  b_strict  N=14: 真写者的 t=['3']；I-7.18 判成立的 t=[]、不适用 9 个 t；I-3.1 判绿的 t=[3]
+  b_strict  N=15: 真写者的 t=['4']；I-7.18 判成立的 t=[]、不适用 9 个 t；I-3.1 判绿的 t=[4]
+== 六 掉一块盘的降级镜像（I-7.18 / I-3.1 / I-7.19）
+  baseline  ROWDEGRADED N=14 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+  baseline  ROWDEGRADED N=14 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  baseline  ROWDEGRADED N=15 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+  baseline  ROWDEGRADED N=15 掉盘 1: I-3.1=红 I-7.18=红 I-7.19=成立
+  baseline  ROWDEGRADED N=16 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+  baseline  ROWDEGRADED N=16 掉盘 1: I-3.1=红 I-7.18=红 I-7.19=成立
+  baseline  ROWDEGRADED N=17 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+  baseline  ROWDEGRADED N=17 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=14 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=14 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=15 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=15 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=16 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=16 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=17 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a         ROWDEGRADED N=17 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=14 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=14 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=15 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=15 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=16 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=16 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=17 掉盘 0: I-3.1=红 I-7.18=成立 I-7.19=成立
+  a_seed    ROWDEGRADED N=17 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  b         ROWDEGRADED N=14 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b         ROWDEGRADED N=14 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  b         ROWDEGRADED N=15 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b         ROWDEGRADED N=15 掉盘 1: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b         ROWDEGRADED N=16 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b         ROWDEGRADED N=16 掉盘 1: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b         ROWDEGRADED N=17 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b         ROWDEGRADED N=17 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  b_strict  ROWDEGRADED N=14 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b_strict  ROWDEGRADED N=14 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+  b_strict  ROWDEGRADED N=15 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b_strict  ROWDEGRADED N=15 掉盘 1: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b_strict  ROWDEGRADED N=16 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b_strict  ROWDEGRADED N=16 掉盘 1: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b_strict  ROWDEGRADED N=17 掉盘 0: I-3.1=红 I-7.18=不适用 I-7.19=成立
+  b_strict  ROWDEGRADED N=17 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+== 六之二 第二圈以后（N=26，N+1=27 的落点位置 3，那一槽住着 txg 15）目标态的错 t 镜像：各 p 下 I-7.18 判成立的 t；真写者的 t；I-3.1 在 p=255 下判绿的 t
+  baseline  真写者 t=['15']; p=255: 成立[16]; p=3: 成立[3]; p=4: 成立[4]; I-3.1 判绿的 t(p=255)=[15]
+  a         真写者 t=['15']; p=255: 成立[15, 16]; p=3: 成立[3]; p=4: 成立[4]; I-3.1 判绿的 t(p=255)=[15]
+  a_seed    真写者 t=['15']; p=255: 成立[15, 16]; p=3: 成立[3]; p=4: 成立[4]; I-3.1 判绿的 t(p=255)=[15]
+  b         真写者 t=['15']; p=255: 成立[] 不适用19个t; p=3: 成立[] 不适用19个t; p=4: 成立[] 不适用19个t; I-3.1 判绿的 t(p=255)=[15]
+  b_strict  真写者 t=['15']; p=255: 成立[] 不适用19个t; p=3: 成立[] 不适用19个t; p=4: 成立[] 不适用19个t; I-3.1 判绿的 t(p=255)=[15]
+== 七 三个场景交出的镜像（investigator 的探针）：每个变体下判红的镜像数 / 总数
+  baseline  probe_plain: 1/23 ['I-7.18']; probe_torn: 1/24 ['I-7.18']; probe_zeroed: 1/24 ['I-7.18']
+  a         probe_plain: 0/23 []; probe_torn: 0/24 []; probe_zeroed: 0/24 []
+  a_seed    probe_plain: 0/23 []; probe_torn: 0/24 []; probe_zeroed: 0/24 []
+  b         probe_plain: 0/23 []; probe_torn: 0/24 []; probe_zeroed: 0/24 []
+  b_strict  probe_plain: 0/23 []; probe_torn: 0/24 []; probe_zeroed: 0/24 []
+== 八 既有回归（测试结果行）
+  baseline  rootrecord: test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured;  | knownbad: test result: ok. 276 passed; 0 failed; 2 ignored; 0 measured | checkerlib: test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured
+  a         rootrecord: test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured;  | knownbad: test result: ok. 276 passed; 0 failed; 2 ignored; 0 measured | checkerlib: test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured
+  a_seed    rootrecord: test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured;  | knownbad: test result: ok. 276 passed; 0 failed; 2 ignored; 0 measured | checkerlib: test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured
+  b         rootrecord: test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured;  | knownbad: test result: ok. 276 passed; 0 failed; 2 ignored; 0 measured | checkerlib: test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured
+  b_strict  rootrecord: test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured;  | knownbad: test result: ok. 276 passed; 0 failed; 2 ignored; 0 measured | checkerlib: test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured

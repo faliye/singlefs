@@ -108,7 +108,7 @@ seg_m3_greps() {
   cd "$REPO"
   echo "== crates 里 T_time 的全部引用（不含变异表）"; grep -rniE 'time_threshold|TIME_THRESHOLD' crates --include='*.rs' --include='*.wgsl' | grep -v 'crates/mutations.tsv' | cut -c1-170
   echo "== crates 里偏移 433 字面"; grep -rnE '\b433\b' crates --include='*.rs' --include='*.wgsl' | grep -v 'b30_m' | cut -c1-170
-  echo "== research 装置里写 / 解 T_time 盘上字段的地方"; grep -rnIE 'put_u32\(5\)|put_u32\(5000\)|T_time (秒|毫秒)|"checkpoint_time_threshold"' scripts/experiments --include='*.rs' --include='*.py' | cut -c1-200
+  echo "== research 装置里写 / 解 T_time 盘上字段的地方"; grep -rnIE 'put_u32\(5\)|put_u32\(5000\)|T_time (秒|毫秒)|"checkpoint_time_threshold"' scripts/experiment-apparatus --include='*.rs' --include='*.py' | cut -c1-200
   echo "== 字段表与 D16"; grep -n '| T_time |' .claude/kb/layout/01-first-txn.md; sed -n 140p .claude/kb/decisions/16-发布语义.md | cut -c1-120
 }
 seg_m4_keys() {

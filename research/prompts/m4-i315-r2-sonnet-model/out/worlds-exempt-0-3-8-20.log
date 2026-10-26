@@ -1,0 +1,52 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.11s
+     Running tests/defense_worlds.rs (target/release/deps/defense_worlds-2767f3191cb0f6d9)
+
+running 1 test
+WORLD w-ForeignUnitOnBothDevices-0: mode=ForeignUnitOnBothDevices 隔离 2 份
+SCEN arm=exempt ForeignUnitOnBothDevices 之后再覆盖写0次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnBothDevices-3: mode=ForeignUnitOnBothDevices 隔离 2 份
+SCEN arm=exempt ForeignUnitOnBothDevices 之后再覆盖写3次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnBothDevices-8: mode=ForeignUnitOnBothDevices 隔离 2 份
+SCEN arm=exempt ForeignUnitOnBothDevices 之后再覆盖写8次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnBothDevices-20: mode=ForeignUnitOnBothDevices 隔离 2 份
+SCEN arm=exempt ForeignUnitOnBothDevices 之后再覆盖写20次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnDeviceZero-0: mode=ForeignUnitOnDeviceZero 隔离 2 份
+SCEN arm=exempt ForeignUnitOnDeviceZero 之后再覆盖写0次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnDeviceZero-3: mode=ForeignUnitOnDeviceZero 隔离 2 份
+SCEN arm=exempt ForeignUnitOnDeviceZero 之后再覆盖写3次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnDeviceZero-8: mode=ForeignUnitOnDeviceZero 隔离 2 份
+SCEN arm=exempt ForeignUnitOnDeviceZero 之后再覆盖写8次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ForeignUnitOnDeviceZero-20: mode=ForeignUnitOnDeviceZero 隔离 2 份
+SCEN arm=exempt ForeignUnitOnDeviceZero 之后再覆盖写20次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ZeroedHeaderOnDeviceZero-0: mode=ZeroedHeaderOnDeviceZero 隔离 2 份
+SCEN arm=exempt ZeroedHeaderOnDeviceZero 之后再覆盖写0次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-2.1", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ZeroedHeaderOnDeviceZero-3: mode=ZeroedHeaderOnDeviceZero 隔离 2 份
+SCEN arm=exempt ZeroedHeaderOnDeviceZero 之后再覆盖写3次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-2.1", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ZeroedHeaderOnDeviceZero-8: mode=ZeroedHeaderOnDeviceZero 隔离 2 份
+SCEN arm=exempt ZeroedHeaderOnDeviceZero 之后再覆盖写8次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-2.1", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-ZeroedHeaderOnDeviceZero-20: mode=ZeroedHeaderOnDeviceZero 隔离 2 份
+SCEN arm=exempt ZeroedHeaderOnDeviceZero 之后再覆盖写20次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-2.1", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-LeakWithBothCopiesIntact-0: mode=LeakWithBothCopiesIntact 隔离 2 份
+SCEN arm=exempt LeakWithBothCopiesIntact 之后再覆盖写0次 : I-3.1=成立 I-3.11=违例 I-3.15=违例 全部违例=["I-3.11", "I-3.15"] noentry=[]
+WORLD w-LeakWithBothCopiesIntact-3: mode=LeakWithBothCopiesIntact 隔离 2 份
+SCEN arm=exempt LeakWithBothCopiesIntact 之后再覆盖写3次 : I-3.1=成立 I-3.11=违例 I-3.15=违例 全部违例=["I-3.11", "I-3.15"] noentry=[]
+WORLD w-LeakWithBothCopiesIntact-8: mode=LeakWithBothCopiesIntact 隔离 2 份
+test quarantine_worlds_with_the_location_entry_rotated_out_of_the_root_ring has been running for over 60 seconds
+SCEN arm=exempt LeakWithBothCopiesIntact 之后再覆盖写8次 : I-3.1=成立 I-3.11=违例 I-3.15=违例 全部违例=["I-3.11", "I-3.15"] noentry=[]
+WORLD w-LeakWithBothCopiesIntact-20: mode=LeakWithBothCopiesIntact 隔离 2 份
+SCEN arm=exempt LeakWithBothCopiesIntact 之后再覆盖写20次 : I-3.1=成立 I-3.11=违例 I-3.15=违例 全部违例=["I-3.11", "I-3.15"] noentry=[]
+WORLD w-LeakThenForeignUnit-0: mode=LeakThenForeignUnit 隔离 2 份
+SCEN arm=exempt LeakThenForeignUnit 之后再覆盖写0次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-LeakThenForeignUnit-3: mode=LeakThenForeignUnit 隔离 2 份
+SCEN arm=exempt LeakThenForeignUnit 之后再覆盖写3次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-LeakThenForeignUnit-8: mode=LeakThenForeignUnit 隔离 2 份
+SCEN arm=exempt LeakThenForeignUnit 之后再覆盖写8次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+WORLD w-LeakThenForeignUnit-20: mode=LeakThenForeignUnit 隔离 2 份
+SCEN arm=exempt LeakThenForeignUnit 之后再覆盖写20次 : I-3.1=成立 I-3.11=成立 I-3.15=成立 全部违例=["I-1.8", "I-2.1", "I-3.10", "I-4.8", "I-7.4"] noentry=[]
+test quarantine_worlds_with_the_location_entry_rotated_out_of_the_root_ring ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 286.48s
+

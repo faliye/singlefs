@@ -1,0 +1,1 @@
+name=hand_made_image_both_slots_and_a_unit gate_never_passes=true g4_c_dead=Some([0]) remount=refused reason=SystemConfigurationUnreadableAfterTheReadStage/CheckingEachDeviceBeforeTheAcquisition verdict=illegal g4_arm=fires other_conditions=0 records_on_this_image=2 assertion_mount_succeeds=fails

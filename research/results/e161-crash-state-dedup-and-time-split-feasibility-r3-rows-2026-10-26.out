@@ -1,0 +1,79 @@
+== 完整性：V9 比对对象（git show HEAD:research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-2026-10-05.out）
+文件行数 186 E7RESULT 行数 186 收尾行 emitted 186 相等
+    89 name=anchor_segment
+     2 name=anchor_stream
+     1 name=config
+     5 name=determinism
+     1 name=done
+     5 name=g1
+     5 name=g3
+     5 name=g5_contents
+     2 name=positive_control_device_memory
+     1 name=positive_control_refeed
+    10 name=positive_control_remove_one_position
+     2 name=positive_control_same_state_twice
+     6 name=positive_control_timing
+    30 name=reuse_arm
+     1 name=stop_clause_constants
+     3 name=stop_clause_crates
+     2 name=stop_clause_crates_per_state
+     2 name=stop_clause_determinism
+     1 name=stop_clause_shared_prefix
+     2 name=stop_clause_stream
+    10 name=stop_clause_tally
+     1 name=verdict
+== 完整性：V10 这一次（research/results/e161-crash-state-dedup-and-time-split-feasibility-r3-2026-10-23.out）
+文件行数 189 E7RESULT 行数 189 收尾行 emitted 189 相等
+    92 name=anchor_segment
+     2 name=anchor_stream
+     1 name=config
+     5 name=determinism
+     1 name=done
+     5 name=g1
+     5 name=g3
+     5 name=g5_contents
+     2 name=positive_control_device_memory
+     1 name=positive_control_refeed
+    10 name=positive_control_remove_one_position
+     2 name=positive_control_same_state_twice
+     6 name=positive_control_timing
+    30 name=reuse_arm
+     1 name=stop_clause_constants
+     3 name=stop_clause_crates
+     2 name=stop_clause_crates_per_state
+     2 name=stop_clause_determinism
+     1 name=stop_clause_shared_prefix
+     2 name=stop_clause_stream
+    10 name=stop_clause_tally
+     1 name=verdict
+== 行 1：Q1a、Q1b、Q1c
+Q1a first writes 43 segments 12 roots 3 segment_lengths_match true
+Q1a second writes 485 segments 80 roots 19 segment_lengths_match true
+first 段数 12 四个数不全相等的段数 0 逐个数 true 的段数 12 F1 段数 0 缺行段数 0
+second 段数 17 四个数不全相等的段数 0 逐个数 true 的段数 17 F1 段数 0 缺行段数 0
+second 的 anchor_segment 行数 80 three_agree 非 true 的段 []
+== 行 2：Q2a、Q2c
+Q2a first d1_small 量到 53 登记 53 d1_small_match=true
+Q2a first d1_stride 量到 7260 登记 7260 d1_stride_match=true
+Q2a first d1_quick 量到 54 登记 54 d1_quick_match=true
+Q2a first d1_heads 量到 4096 登记 4096 d1_heads_match=true
+Q2a second d1_small 量到 393269 登记 393269 d1_small_match=true
+Q2a second d1_stride 量到 7260 登记 7260 d1_stride_match=true
+Q2a second d1_quick 量到 60 登记 60 d1_quick_match=true
+Q2a second d1_heads 量到 4096 登记 4096 d1_heads_match=true
+Q2a 对不上的格数 0
+1 first_small states ['53'] 期望 53 有对象
+1 first_quick states ['54'] 期望 54 有对象
+1 first_segment_head states ['4096'] 期望 4096 有对象
+1 second_quick states ['60'] 期望 60 有对象
+1 second_segment_head states ['4096'] 期望 4096 有对象
+2 refed_state_unit_positions 34
+3 first_small k2_consult distinct_outcomes 7
+4 k4_full distinct_outcomes {'first_small': 8, 'first_segment_head': 1, 'first_quick': 8, 'second_segment_head': 1, 'second_quick': 5}
+5 timing 行数 6 states ['1000'] pc3_segment_holds ['true'] 判决行有 second_segment_18_pc3 True
+6a crates compared_states [('first_small', '53'), ('first_quick', '54'), ('second_quick', '60')]
+6b per_state states [('first_segment_head', '4096'), ('second_segment_head', '4096')]
+7 control_states [('first_small_and_head', '4149'), ('second_small_and_head', '4096')]
+8 positions [('first_small_and_head', 'k2_consult', '4129'), ('first_small_and_head', 'k2_ignore', '4109'), ('first_small_and_head', 'k4_walk', '56'), ('first_small_and_head', 'k4_units', '68'), ('first_small_and_head', 'k4_full', '4173'), ('second_small_and_head', 'k2_consult', '52'), ('second_small_and_head', 'k2_ignore', '44'), ('second_small_and_head', 'k4_walk', '56'), ('second_small_and_head', 'k4_units', '96'), ('second_small_and_head', 'k4_full', '137')]
+9 device_memory 行 ['first_segment_head', 'second_segment_head']
+没有对象的格数 0 []

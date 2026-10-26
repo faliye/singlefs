@@ -1,0 +1,4 @@
+name=declaration_fingerprint file=caller.py units_without=3 units_with=3 identical=yes
+name=declaration_fingerprint file=function-body.sh units_without=3 units_with=3 identical=no
+name=declaration_fingerprint file=top-level.sh units_without=2 units_with=2 identical=no
+name=declaration_fingerprint file=heredoc.sh units_without=3 units_with=3 identical=no

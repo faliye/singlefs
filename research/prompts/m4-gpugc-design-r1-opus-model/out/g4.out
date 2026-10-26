@@ -1,0 +1,12 @@
+name=g4_model seed=185 units_in_region=24 kept_only=0
+name=g4_runtime_two_kernels differing_entries=0 confirmed=24
+name=g4_test_same_input_cpu_vs_gpu differing_entries=0
+name=g4_end_to_end_modes differing_entries=0 gpu_dead_cpu_movable=0
+name=g4_model seed=185 units_in_region=24 kept_only=3
+name=g4_runtime_two_kernels differing_entries=0 confirmed=24
+name=g4_test_same_input_cpu_vs_gpu differing_entries=0
+name=g4_end_to_end_modes differing_entries=3 gpu_dead_cpu_movable=3
+name=g4_model seed=185 units_in_region=24 kept_only=0
+name=g4_runtime_two_kernels differing_entries=1 confirmed=23
+name=g4_test_same_input_cpu_vs_gpu differing_entries=0
+name=g4_end_to_end_modes differing_entries=0 gpu_dead_cpu_movable=0

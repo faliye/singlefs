@@ -1,0 +1,4 @@
+name=real_tree scripts=copy-lfu0 fn_units=19946 units=38189 placed_elsewhere=0
+name=real_tree scripts=copy-lfu1 fn_units=19946 units=38189 placed_elsewhere=878
+name=real_tree_fingerprints identical=1
+name=real_tree_placement_diff lines=878

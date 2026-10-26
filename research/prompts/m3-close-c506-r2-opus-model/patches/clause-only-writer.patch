@@ -1,0 +1,17 @@
+--- a/crates/singlefs-core/src/make_filesystem.rs	2026-10-22 08:28:04.628517371 +0000
++++ b/crates/singlefs-core/src/make_filesystem.rs	2026-10-22 14:51:02.450984533 +0000
+@@ -525,7 +525,13 @@
+             },
+         );
+     }
+-    let extents = fixed_structure_extents(geometry);
++    // c506-r2 攻方原型的补丁：设了这个变量时 mkfs 不判固定结构两两不重叠，只留条款写的盘长判（D22 已定项 16 第 3 句），
++    // 当「只照条款判盘长的合法写者」用；不设时与冻结副本逐行为相同。
++    let extents = if std::env::var_os("C506_R2_CLAUSE_ONLY_WRITER").is_some() {
++        Vec::new()
++    } else {
++        fixed_structure_extents(geometry)
++    };
+     // 六段两两比，路径数只有「第一对重叠的在哪」一种出口；迭代次数的上界是 6 × 5 ÷ 2。
+     for (index, first_in_layout_order) in extents.iter().enumerate() {
+         for second_in_layout_order in &extents[index + 1..] {

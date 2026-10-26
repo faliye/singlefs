@@ -1,5 +1,0 @@
-Q2 keeps_bit=true 回退之后 槽 50180: 盘0(已释放=false,隔离位=true,代=3) 盘1(已释放=false,隔离位=true,代=3)
-Q2 回退之后 checker: violated=["I-3.11"] I-1.1=Holds I-3.1=Holds I-3.11=违例[C794-Q3-newest 隔离位置在最新根引用的记录上：[(1, 50180), (0, 50180)]]
-Q2 D 照常释放之后 槽 50180: 盘0(已释放=true,隔离位=false,代=7) 盘1(已释放=true,隔离位=false,代=7)
-Q2 漏释放之后 槽 50180: 盘0(已释放=false,隔离位=true,代=3) 盘1(已释放=false,隔离位=true,代=3)
-Q2 漏释放之后 checker: violated=[] I-1.1=Holds I-3.1=Holds I-3.11=Holds

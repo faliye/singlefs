@@ -6,6 +6,8 @@
 - 正推（Sonnet）：`research/prompts/m3-close-c693-r1-sonnet-output.md`，sha256 34314851eb345a0fe3d11b7598aff64a983ab58722f1932971227e83a1beb20f。没写模型目录；自算的两个数（第 1.2 节 `diff_rows.py`、`max rows_written_w2 = 47`）只在它的草稿目录。
 - 攻方（Opus）：`research/prompts/m3-close-c693-r1-opus-output.md`，sha256 7b3d2eac256296f7ab38f920df2bf03f79d655e57abc0a937c5fee9b5c5abc1e。模型 `research/prompts/m3-close-c693-r1-opus-model/`（三份纯算术脚本，只读入库产物）。
 
+开工快照：`research/prompts/m3-close-c693-r1-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：取 511fe067b（2026-10-21）上的版本，腿派出时没记）
+
 ## 一、核查
 
 1. 引文：`cite-check.py <两份报告> --root . --background <背景材料>` 末行「✓ 核了 122 处引文、42 处裸行号，对上 122 处，没判 42 处（其中裸行号没有引文可比 42 处；逐处列在上面）」。判决要用的裸行号主 agent 现查：`crates/singlefs-core/src/code_two_tree.rs:655`（`for deleted in previous_keys.difference(keys_after_this_publish) {`）、`crates/singlefs-core/src/transaction.rs:2561`（记账树叶 477、内部 150）、`.claude/kb/decisions/08-核心索引结构.md:383`（定案含「含已定项 8 ㊀ 那类旧写者搬运的记账行」）、`research/prompts/e186-preregistration.md:414`、`:433`、`:554`，都对得上。

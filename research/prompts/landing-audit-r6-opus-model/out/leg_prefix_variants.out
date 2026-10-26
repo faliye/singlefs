@@ -1,0 +1,15 @@
+工作树：['/home/fy5090/code/singlefs', '/home/fy5090/.local/share/singlefs/work/m5-dev']；取列表的错误：None
+m5-dev 绝对路径（对照）：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+m5-dev 路径里带 /./：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+m5-dev 路径末尾多一个 /：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+经符号链接写的 m5-dev：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+$SINGLEFS_WORK_ROOT/m5-dev（lib_work_root 认这种写法）：没认出
+~/.local/share/singlefs/work/m5-dev：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+仓根路径里带 /./：认出 /home/fy5090/code/singlefs
+工作区相对路径写法：认出 /home/fy5090/code/singlefs
+<副本>/ 占位起头：没认出
+草稿目录名起头的相对写法 m5-dev/：没认出
+Markdown 链接 [报告](…/m5-dev/…)：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+file:// 写法：认出 /home/fy5090/.local/share/singlefs/work/m5-dev
+仓根绝对路径（对照）：认出 /home/fy5090/code/singlefs
+没有前缀（对照）：认出 /home/fy5090/code/singlefs

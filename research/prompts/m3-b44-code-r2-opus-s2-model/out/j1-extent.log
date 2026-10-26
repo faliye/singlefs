@@ -1,7 +1,0 @@
-
-running 1 test
-J1 extent leaf: mount=refused Recovery(InvariantViolated { invariant: "I-1.1", detail: "同一个 extent 树节点被两条父条目引用" })
-test attack_s2_descending_pointer_in_an_extent_upper_leaf_entry_of_another_inode ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 7.72s
-

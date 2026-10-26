@@ -1,7 +1,0 @@
-name=guardcheck h=distinct on_the_old_pool_for_fsid=old unit_area_start_slot=1408 g_sysconf=refuse g_units_fixed=refuse g_units_all=refuse
-name=guardcheck h=distinct on_the_old_pool_for_fsid=new unit_area_start_slot=1408 g_sysconf=allow g_units_fixed=allow g_units_all=allow
-name=guardcheck_raw slot=1408 first64=Some([83, 70, 83, 85, 1, 0, 3, 0, 88, 0, 113, 92, 142, 219, 0, 0])
-name=guardcheck_raw slot=1409 first64=Some([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-name=guardcheck_raw slot=1410 first64=Some([83, 70, 83, 85, 1, 0, 2, 0, 0, 0, 217, 216, 246, 255, 0, 0])
-name=guardcheck_raw slot=1411 first64=Some([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-name=guardcheck_units h=distinct slots_with_unit_magic=84 first=["d0s1408:class3:Some(\"OLDPOOL!\")", "d0s1410:class2:Some(\"OLDPOOL!\")", "d0s1412:class1:Some(\"OLDPOOL!\")", "d0s1414:class1:Some(\"OLDPOOL!\")", "d0s1416:class1:Some(\"OLDPOOL!\")", "d0s1418:class1:Some(\"OLDPOOL!\")"]

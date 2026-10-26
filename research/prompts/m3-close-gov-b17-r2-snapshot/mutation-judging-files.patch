@@ -1,0 +1,106 @@
+diff --git a/scripts/mutation/crates-mutation-rows.py b/scripts/mutation/crates-mutation-rows.py
+index 458ec10..4a63a61 100644
+--- a/scripts/mutation/crates-mutation-rows.py
++++ b/scripts/mutation/crates-mutation-rows.py
+@@ -71,7 +71,8 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里
+ 判法单元（judging_units，JUDGING_ENTRIES）：判「抓没抓到」的那几个函数——结局分类 verdict_of_run（连同它调到的 libtest 结果行解析，
+   scripts/gate/lib_libtest_result_lines.py 一份）、基线分类 baseline_problem、覆盖复用判据 baseline_reuse_problem、切 fn 规则
+   （lib_mutation_units.py 的 UnitKeys.mutated_units、resolve_test、executed_units，连同它们调到的 lib_function_units.py）——从它们收 python 闭包合起来，
+-  指纹 = 闭包里单元（种类，去注释指纹）的多重集。只改注释、文档串、别的函数（阶段脚本的调度、内存包装、判定库的存放、派活与报数）指纹不变；
++  指纹 = 闭包里单元（种类，去注释指纹）的多重集；scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES 那两份（算键的库自己与 lib_function_units.py，
++  D13 已定项 17 的文件级排除）的单元不进，lib_mutation_units.py 的 judging_units 排掉（名单从那份库导入）。只改注释、文档串、别的函数（阶段脚本的调度、内存包装、判定库的存放、派活与报数）指纹不变；
+   改了闭包里任何一个函数，整张表的行键都变。闭包里有拒算（getattr 变量名、折不出的 import 路径这一类）就算不出，这一道判红、一条都不跑。
+ 
+ 行键（KeyContext.components，文件头「复用」那一句的逐样）：
+@@ -168,6 +169,9 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里
+   baseline-by-tree-snapshot  基线 ok 只按整树快照复用（改前的判法）（自证「加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用」
+                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错）
+   judge-units-whole-file  判法单元指纹取闭包碰到的那几份文件的整份原文（改前的取法）（自证「只改判法脚本的注释：判法单元指纹不变」那一格必须判错）
++  judging-files-included  scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：判法单元指纹里留着
++                       NOT_JUDGING_FILES 那两份（lib_verdict_library.py、lib_function_units.py）的单元（改前的样子）
++                       （本模块自证「改 NOT_JUDGING_FILES 那两份里任一份的一个函数：判法单元指纹不变，闭包里也没有那两份的单元」那一格必须判错）
+   coveragenotrecorded  抓到之后不记覆盖（自证「头一趟每条点名测试记一份覆盖、同一条测试的几行共用一份」
+                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错；另有记覆盖次数的四格跟着判错：
+                        「头一趟起 1 批基线 + 4 条变异，另记 4 份覆盖」「下一趟只跑剩下的 2 条」「插桩编译那一步写出的剖析文件」「会话里平常跑……4 个工作进程」）
+@@ -6477,7 +6481,8 @@ def judging_copy(work, name):
+         _key, references = judging_units({}, source)
+     except (JudgingUnitsRefused, OSError):
+         return copy, False
+-    for path in sorted({reference.file for reference in references} | {".claude/scripts/project_preflight.py"}):
++    # NOT_JUDGING_FILES 那两份的单元不在 references 里（不进指纹），但闭包要读它们的原文才收得到别的单元，拷贝里要有
++    for path in sorted({reference.file for reference in references} | {".claude/scripts/project_preflight.py"} | set(mutation_units.not_judging_files())):
+         if os.path.isfile(os.path.join(source, path)):
+             os.makedirs(os.path.dirname(os.path.join(copy, path)), exist_ok=True)
+             shutil.copyfile(os.path.join(source, path), os.path.join(copy, path))
+@@ -6512,6 +6517,21 @@ def selftest_judging_unit_cells(selftest, work):
+                     "        if expected == parsed.full_name or parsed.full_name.endswith(\"::\" + expected):\n")
+     parsing_key, _references = judging_units(environment, copy)
+     selftest.check("改 libtest 结果行解析函数的一处：判法单元指纹变", parsing_key != scheduling_key, f"{scheduling_key[:16]}… → {parsing_key[:16]}…")
++    # NOT_JUDGING_FILES 那两份（D13 已定项 17 的文件级排除）：lib_function_units.py 的 RustFile.row（闭包里有它）与 lib_verdict_library.py 的 digest_text 各改一处函数体，指纹不变；
++    # 弄坏开关 judging-files-included（lib_mutation_units.py 里的，同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）下前一处改动进指纹、这一格判错
++    units_file = os.path.join(copy, "scripts", "gate", "lib_function_units.py")
++    with open(units_file, encoding="utf-8") as handle:
++        units_text = handle.read()
++    row_line = '        return snippet_of(self.source_rows[line - 1]) if 0 < line <= len(self.source_rows) else ""\n'
++    assert units_text.count(row_line) >= 1, units_file
++    selftest_write(units_file, units_text.replace(row_line, row_line.replace("0 < line", "1 <= line"), 1))
++    replace_in_file(os.path.join(copy, "scripts", "crash", "lib_verdict_library.py"),
++                    '    return hashlib.sha256(text.encode("utf-8", "surrogateescape") if isinstance(text, str) else text).hexdigest()\n',
++                    '    return hashlib.sha256(text.encode("utf-8", "replace") if isinstance(text, str) else text).hexdigest()\n')
++    excluded_key, excluded_references = judging_units(environment, copy)
++    selftest.check("改 NOT_JUDGING_FILES 那两份里任一份的一个函数：判法单元指纹不变，闭包里也没有那两份的单元",
++                   excluded_key == parsing_key and not any(reference.file in mutation_units.not_judging_files() for reference in excluded_references),
++                   f"{parsing_key[:16]}… → {excluded_key[:16]}…；那两份的单元 {sum(reference.file in mutation_units.not_judging_files() for reference in excluded_references)} 个")
+     shown = run_command_capturing(command_judging_units, [copy])
+     selftest.check("judging-units 子命令打「<指纹> <单元数>」", shown[0] == 0 and re.fullmatch(r"[0-9a-f]{64} \d+\n", shown[1]) is not None, shown[1])
+ 
+diff --git a/scripts/mutation/lib_mutation_units.py b/scripts/mutation/lib_mutation_units.py
+index fbd593d..1f7a0f4 100644
+--- a/scripts/mutation/lib_mutation_units.py
++++ b/scripts/mutation/lib_mutation_units.py
+@@ -29,6 +29,12 @@
+   弄坏开关 closure-error-masked（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：模块不登记进 sys.modules、工作进程把异常原样抛（改前的样子）；
+   crates-mutation-rows.py --selftest 的「点名的测试在这一组特性下不编」一格必须判错。
+ 
++判法单元指纹（judging_units）：crates 变异表判「抓没抓到」的那几个 python 函数的闭包键（入口在 crates-mutation-rows.py 的 JUDGING_ENTRIES）；
++  scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES 那两份（算键的库自己与单元算法 lib_function_units.py）的单元不进它，那两份里的拒算也不算
++  （D13 已定项 17 的文件级排除，与崩溃判定库的 judging_unit_key 同一条，名单从那份库导入、这里不抄）。
++  弄坏开关 judging-files-included（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：那两份的单元照旧进指纹；
++  crates-mutation-rows.py --selftest 的「改 NOT_JUDGING_FILES 那两份里任一份的一个函数：判法单元指纹不变，闭包里也没有那两份的单元」一格必须判错。
++
+ 工具链行（toolchain_lines）：rustc -vV 与 cargo -V 原样各行；环境里影响编出什么的变量（RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、RUSTDOCFLAGS、
+   CARGO_BUILD_RUSTFLAGS、CARGO_BUILD_TARGET、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、CARGO_PROFILE_*、CARGO_TARGET_<三元组>_{RUSTFLAGS,RUNNER,LINKER}）；
+   从根往上每一层与 CARGO_HOME 的 .cargo/config.toml（或 config）解析之后的 build（除 jobs、target-dir、incremental）、target、profile、env 各键；
+@@ -750,16 +756,29 @@ def dependency_lines(workspace, units, packages, by_whole_crate=False):
+ 
+ # ── 判法单元（python 写的判法：从几个入口函数收的闭包） ────────────────────────
+ 
++def not_judging_files():
++    """NOT_JUDGING_FILES（scripts/crash/lib_verdict_library.py 一处定义，D13 已定项 17 的文件级排除）：算键的库自己与单元算法，按角色排，它们的单元不进判法单元指纹。
++    每次按路径载入那份库、不在本模块留一份缓存：本模块的模块级语句进判法单元指纹，这里不加。"""
++    specification = importlib.util.spec_from_file_location("lib_verdict_library_for_mutation_units", os.path.join(LIBRARY_DIRECTORY, "..", "crash", "lib_verdict_library.py"))
++    module = importlib.util.module_from_spec(specification)
++    specification.loader.exec_module(module)
++    return tuple(module.NOT_JUDGING_FILES)
++
++
+ def judging_units(repository, entries, whole_file=False):
+     """(键或 None, UnitReference 列表, 拒算列表)：从 entries（lib_function_units.py 的入口写法 <文件>::<限定名>）各收一个闭包、合起来，
+-    键 = 合起来的单元（种类、指纹）多重集。whole_file（弄坏开关用）：键换成闭包碰到的那几份文件的整份原文。"""
++    键 = 合起来的单元（种类、指纹）多重集。NOT_JUDGING_FILES 那两份文件的单元不进（它们管怎么存、怎么算键，不管判对错；那两份里的拒算也不算），
++    弄坏开关 judging-files-included（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）下照进。
++    whole_file（弄坏开关用）：键换成闭包碰到的那几份文件的整份原文，排掉的那两份不在其中。"""
+     lfu = function_units()
++    excluded = () if break_is("judging-files-included") else not_judging_files()
+     members, refusals = {}, set()
+     for entry in entries:
+         closure = lfu.closure_of(repository, entry)
+         for unit in closure.order:
+-            members[(unit.file, unit.kind, unit.name, unit.first_line)] = unit
+-        refusals |= {f"{refusal.form} {refusal.file}:{refusal.line}" for refusal in closure.refusals}
++            if unit.file not in excluded:
++                members[(unit.file, unit.kind, unit.name, unit.first_line)] = unit
++        refusals |= {f"{refusal.form} {refusal.file}:{refusal.line}" for refusal in closure.refusals if refusal.file not in excluded}
+     references = sorted((reference_of(unit) for unit in members.values()), key=lambda reference: (reference.file, reference.lines, reference.kind, reference.name))
+     if refusals:
+         return None, references, sorted(refusals)

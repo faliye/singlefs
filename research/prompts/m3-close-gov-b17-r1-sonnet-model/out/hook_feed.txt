@@ -1,0 +1,20 @@
+h01	exit=0	want=0	same	agent=implementation-writer	bash scripts/experiment-apparatus/replay.sh --list-items	
+h02	exit=2	want=2	same	agent=implementation-writer	bash scripts/experiment-apparatus/replay.sh E142	✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh E142（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --s
+h03	exit=2	want=2	same	agent=implementation-writer	bash scripts/experiment-apparatus/replay.sh	✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh （实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selft
+h04	exit=0	want=0	same	agent=implementation-writer	bash <scratch>/fake/scripts/experiment-apparatus/replay.sh --list-items	
+h05	exit=2	want=2	same	agent=implementation-writer	bash <scratch>/fake2/replay.sh --list-items	✗ 重型测试被拒：脚本 <scratch>/fake2/replay.sh:2 里的 cargo test 带 --workspace / --all（全量测试）：implementation-writer 不跑「全量测试」
+h06	exit=2	want=2	same	agent=implementation-writer	cp scripts/experiment-apparatus/replay.sh <scratch>/r.sh; bash <scratch>/r.sh E142	✗ 重型测试被拒：脚本 <scratch>/r.sh:745 里的 scripts/experiment-apparatus/replay.sh ${@:2} E1（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰
+h07	exit=0	want=2	DIFF	agent=implementation-writer	echo E142 | xargs bash scripts/experiment-apparatus/replay.sh	
+h08	exit=0	want=0	same	agent=implementation-writer	bash scripts/hosts/capped.sh 31 bash scripts/experiment-apparatus/replay.sh --list-items	
+h09	exit=0	want=0	same	agent=implementation-writer	bash -c 'bash scripts/experiment-apparatus/replay.sh --list-items'	
+h10	exit=2	want=2	same	agent=implementation-writer	bash scripts/experiment-apparatus/replay.sh --list-items; bash scripts/experiment-apparatus/replay.sh E142	✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh E142（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --s
+h11	exit=0	want=0	same	agent=implementation-writer	bash scripts/experiments/replay.sh --list-items	! heavy-test-guard.sh：bash / sh 起的脚本 /home/fy5090/code/singlefs/scripts/experiments/replay.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检
+h12	exit=0	want=0	same	agent=implementation-writer	REPLAY_BREAK=x bash scripts/experiment-apparatus/replay.sh --list-items	
+h13	exit=0	want=0	same	agent=implementation-writer	bash scripts/experiment-apparatus/replay.sh --force --list-items	
+h14	exit=2	want=2	same	agent=implementation-writer	bash scripts/experiment-apparatus/replay.sh --list-items E142	✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh --list-items E142（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 
+h15	exit=0	want=0	same	agent=implementation-writer	bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/experiment-apparatus/replay.sh --list-items	
+h16	exit=0	want=0	same	agent=main	bash scripts/experiment-apparatus/replay.sh --list-items	
+h17	exit=2	want=2	same	agent=main	bash scripts/experiment-apparatus/replay.sh E142	→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户；合入后验证里 `scripts/gate/merge-and-verify.sh` 带 `SINGLEFS_HEAVY_TESTS
+h18	exit=0	want=0	same	agent=main	SINGLEFS_HEAVY_TESTS=commit bash scripts/experiment-apparatus/replay.sh E142	
+h19	exit=2	want=2	same	agent=main	bash scripts/experiment-apparatus/replay.sh	→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户；合入后验证里 `scripts/gate/merge-and-verify.sh` 带 `SINGLEFS_HEAVY_TESTS
+cases=19 diff=1

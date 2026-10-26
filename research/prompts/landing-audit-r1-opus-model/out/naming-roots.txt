@@ -1,0 +1,29 @@
+== 根：copy-root
+code-source-discipline 四格 rc=1
+  ✗ 读不到空泛词表 .claude/naming-vague-words
+  ✓ 查了 366 份测试文件的名字（harness 档与 checker 档的 tests/*.rs），没有按里程碑、步号、增补号、并行线号或欠账号起
+  ✓ crash-case-check 判了 1 样（file-names），0 样无对象可判
+  ✗ 读不到序号与位置词表 .claude/naming-ordinal-tokens
+  ✗ 数据形态的名字不合命名纪律：735 处违规、排除表 0 处不合规（扫了 131 份文件、10080 个串）
+  ✗ code-source-discipline.sh：4 格里 3 格红（vague-names ordinal-names data-names）
+naming-lint rc=1
+  ✗ 2823 处名字不合命名纪律（查了 599 个 .rs 文件、154142 个声明的名字）
+== 根：copy-root-wordlists
+code-source-discipline 四格 rc=1
+  ! 本次无对象可判：crates/ 与 scripts/experiment-apparatus/ 下一份 .rs 都没列出来
+  ✓ 查了 366 份测试文件的名字（harness 档与 checker 档的 tests/*.rs），没有按里程碑、步号、增补号、并行线号或欠账号起
+  ✓ crash-case-check 判了 1 样（file-names），0 样无对象可判
+  ✗ git ls-files 退 128：fatal: not a git repository (or any of the parent directories): .git
+  ✗ 数据形态的名字不合命名纪律：29 处违规、排除表 2257 处不合规（扫了 131 份文件、10080 个串）
+  ✗ code-source-discipline.sh：4 格里 2 格红（ordinal-names data-names）
+naming-lint rc=1
+== 根：/home/fy5090/code/singlefs
+code-source-discipline 四格 rc=1
+  ✗ 11 个函数名或类型名只由空泛词拼成（每个词都在 .claude/naming-vague-words 里）
+  ✓ 查了 366 份测试文件的名字（harness 档与 checker 档的 tests/*.rs），没有按里程碑、步号、增补号、并行线号或欠账号起
+  ✓ crash-case-check 判了 1 样（file-names），0 样无对象可判
+  ✗ 2 处名字带序号或位置词（词表 .claude/naming-ordinal-tokens，按词边界认，复合名也算）
+  ✗ 数据形态的名字不合命名纪律：742 处违规、排除表 0 处不合规（扫了 1046 份文件、33990 个串）
+  ✗ code-source-discipline.sh：4 格里 3 格红（vague-names ordinal-names data-names）
+naming-lint rc=1
+  ✗ 3448 处名字不合命名纪律（查了 765 个 .rs 文件、224191 个声明的名字）

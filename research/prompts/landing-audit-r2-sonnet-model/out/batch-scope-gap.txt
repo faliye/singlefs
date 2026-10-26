@@ -1,0 +1,20 @@
+被判文件里对 HEAD 有改动的 60 份；命中触发清单 25 份；其中已在 batch-scope 6 份、不在 19 份
+  不在: .claude/agents/experiment-runner.md
+  不在: .claude/agents/experiment-designer.md
+  不在: .claude/agents/sweep.md
+  不在: .claude/agents/tooling-writer.md
+  不在: .claude/agents/three-way-attack.md
+  不在: .claude/agents/three-way-defense.md
+  不在: .claude/hooks/runner-dispatch-guard.sh
+  不在: .claude/hooks/continuation-guard.sh
+  不在: .claude/hooks/lib_long_run.py
+  不在: .claude/hooks/agent-write-scope.tsv
+  不在: scripts/agents/agent-cost.py
+  不在: scripts/agents/dispatch-prompt.py
+  不在: scripts/agents/README.md
+  不在: scripts/kb/stale-candidates.py
+  不在: .claude/gate.d/doc-process-records.sh
+  不在: .claude/gate.d/code-source-discipline.sh
+  不在: .claude/gate.d/replay-comparison-units.tsv
+  不在: scripts/agents/subagent_transcript.py
+  不在: .claude/gate.d/lib-lag-baseline.py

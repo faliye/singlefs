@@ -1,0 +1,7 @@
+name=rerun_compare file=closure-base.txt result=identical
+name=rerun_compare file=crates-entries.txt result=identical
+name=rerun_compare file=h3-refusal.txt result=identical
+name=rerun_compare file=h4-run.txt result=identical
+name=rerun_compare file=h2-run.txt result=identical
+name=rerun_compare file=h2-light-run.txt result=identical
+name=rerun_summary identical=6 differs=0

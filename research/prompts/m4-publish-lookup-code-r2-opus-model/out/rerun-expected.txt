@@ -1,0 +1,24 @@
+name=build mutant=baseline rc=0
+name=run mutant=baseline test=publish_lookup_by_identity rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=118 growth_in_percent=110 
+name=run mutant=baseline test=snapshot_release_and_destroy_through_the_deadlist rc=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] 
+name=build mutant=MA-index-unit-linear rc=0
+name=run mutant=MA-index-unit-linear test=publish_lookup_by_identity rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=118 growth_in_percent=110 
+name=run mutant=MA-index-unit-linear test=snapshot_release_and_destroy_through_the_deadlist rc=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] 
+name=build mutant=MC-leaf-redecoded-per-key rc=0
+name=run mutant=MC-leaf-redecoded-per-key test=publish_lookup_by_identity rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=118 growth_in_percent=110 
+name=build mutant=MD-mapping-key-of-linear rc=0
+name=run mutant=MD-mapping-key-of-linear test=publish_lookup_by_identity rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=118 growth_in_percent=110 
+name=run mutant=MD-mapping-key-of-linear test=snapshot_release_and_destroy_through_the_deadlist rc=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] 
+name=build mutant=ME-registered-reader-per-key rc=0
+name=run mutant=ME-registered-reader-per-key test=publish_lookup_by_identity rc=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out failed=[every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ] 
+name=build mutant=MF-fresh-reader-per-key-keeping-the-count rc=0
+name=run mutant=MF-fresh-reader-per-key-keeping-the-count test=publish_lookup_by_identity rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=118 growth_in_percent=110 
+name=build mutant=MG-deadlist-loop-reverted-to-linear rc=0
+name=run mutant=MG-deadlist-loop-reverted-to-linear test=snapshot_release_and_destroy_through_the_deadlist rc=0 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] 
+name=build mutant=MH-deadlist-key-of-the-next-replaced-role rc=0
+name=run mutant=MH-deadlist-key-of-the-next-replaced-role test=snapshot_release_and_destroy_through_the_deadlist rc=101 test result: FAILED. 6 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out failed=[a_destruction_batch_capped_at_one_entry_releases_one_entry_per_publish_until_the_final_batch a_rollback_to_a_version_carrying_a_snapshot_is_refused_before_any_write a_writable_mount_after_the_destruction_intent_continues_the_batches_to_the_end an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata destroying_a_snapshot_through_the_mounted_session_publishes_the_intent_and_every_batch_in_one_call destroying_the_newer_snapshot_keeps_what_the_older_one_references_and_destroying_the_older_one_releases_it destroying_the_older_snapshot_releases_its_own_range_and_passes_its_predecessor_to_the_newer_one destroying_the_only_snapshot_releases_every_entry_and_deletes_its_pair_of_entries the_snapshot_reads_the_content_at_its_creation_after_the_file_is_unlinked ] 
+name=build mutant=MI-first-entry-of-walks-every-entry-without-comparing rc=0
+name=run mutant=MI-first-entry-of-walks-every-entry-without-comparing test=publish_lookup_by_identity rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=118 growth_in_percent=110 
+name=build mutant=P1-probe-relocation-reads-the-mapping-key-by-key rc=0
+name=run mutant=P1-probe-relocation-reads-the-mapping-key-by-key test=publish_lookup_by_identity rc=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out failed=[every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ] 
+name=differential before_vs_after=identical lines=15

@@ -7,11 +7,11 @@
 | 项 | 结果 |
 |---|---|
 | kb 快照 | 写判决前 `sha256sum -c research/prompts/m3-leaf-death-r1-snapshot/kb-sha256.txt` 无一行不是 OK |
-| `scripts/experiments` | 冻结清单里 382 行，`sha256sum -c --quiet` 退 0（主仓与冻结树逐个相同） |
+| `scripts/experiment-apparatus` | 冻结清单里 382 行，`sha256sum -c --quiet` 退 0（主仓与冻结树逐个相同） |
 | 攻方报告 `m3-leaf-death-r1-opus-output.md`（sha256 f93cc64d…，349 行） | `cite-check.py --root .`：「✓ 核了 22 处引文，对上 22 处，没判 0 处」；以冻结树为根时 10 处代码引文对上、12 处 kb 引文因冻结树无 kb 没判，换仓根补核全对上 |
 | 正推报告 `m3-leaf-death-r1-sonnet-output.md`（sha256 9268db92…，373 行） | `cite-check.py --root .`：「✓ 核了 55 处引文，对上 55 处，没判 0 处」 |
 | 攻方模型复跑 | 模型拷到 `~/.local/share/singlefs/work/m3-leaf-death-r1-verify/model`，`SINGLEFS_REPO` 指冻结树，逐阶段经内存包装从头跑；`compare.sh` 11 份全 `same`（agg-e177、agg-merges、agg-rename、counts-e177、counts-merges、counts-rename、indistinguishable、k3、rc、rollback、sorted-output-sha256） |
-| 正推模型复跑 | 模型拷到 `…/m3-leaf-death-r1-verify/smodel`；它的 `rerun.sh` 要 `scripts/experiments/Cargo.toml`，冻结树没带，改用仓根（`scripts/experiments` 与冻结树逐个相同，见第二行）；build 一次、run 七次（每次经内存包装）之后 `rerun.sh compare`：「摘要与期望逐行相同（207 行）」 |
+| 正推模型复跑 | 模型拷到 `…/m3-leaf-death-r1-verify/smodel`；它的 `rerun.sh` 要 `scripts/experiment-apparatus/Cargo.toml`，冻结树没带，改用仓根（`scripts/experiment-apparatus` 与冻结树逐个相同，见第二行）；build 一次、run 七次（每次经内存包装）之后 `rerun.sh compare`：「摘要与期望逐行相同（207 行）」 |
 
 两腿的数全是各自副本装置上量的，照 `.claude/rules/three-way-inference.md`「一条腿在副本装置上量出来的数，要在入库的装置上重做一次才能引」，进 kb 之前要在入库装置上重做（第五节）。
 

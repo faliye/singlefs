@@ -1,0 +1,79 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 36.5 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 4 条
+  → 第二台此刻放得下（可用 55.4 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 16G --label moved-from-queue-3466290-323639424 -- cargo test --offline -p singlefs-harness --test publish_lookup_by_identity --target-dir /home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/target-mut -- --skip forward_leg --skip compaction_batches
+run-with-memory-cap: 排队（已等 61 秒，至多 3600 秒）：slice 已占 35.7 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 113 秒，起跑（singlefs-memory-cap-3466290-323639424）
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-core)
+warning: unused variable: `previous_read_by_key`
+    --> crates/singlefs-core/src/transaction.rs:9891:5
+     |
+9891 |     previous_read_by_key: &mut MappedUnitsOfAVersionReadByKey<'_>,
+     |     ^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_previous_read_by_key`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `mapped_units_by_key` and `central_mapping` are never read
+    --> crates/singlefs-core/src/transaction.rs:9868:5
+     |
+9867 | struct MappedUnitsOfAVersionReadByKey<'version> {
+     |        ------------------------------ fields in this struct
+9868 |     mapped_units_by_key:
+     |     ^^^^^^^^^^^^^^^^^^^
+9869 |         FirstEntryOfEachIdentity<'version, &'version [u8], (TransactionUnit, Vec<u8>)>,
+9870 |     central_mapping: CentralMappingOfAVersionReadLeafByLeaf<'version>,
+     |     ^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 47.76s
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/target-mut/debug/deps/publish_lookup_by_identity-d53243f4d7a69b6f)
+
+running 5 tests
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+test first_entry_of_each_identity_examines_less_than_twice_as_many_entries_per_lookup_on_a_table_four_times_as_long ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... FAILED
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... FAILED
+
+failures:
+
+---- every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units stdout ----
+
+thread 'every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units' (3480737) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:246:5:
+整理这一趟搬了 11 个单元，核源落点那一处只经索引查了 0 次（计划里每一项按映射 key 查一次）：LookupWork { index_builds: 12, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 11 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units stdout ----
+
+thread 'every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units' (3480736) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:246:5:
+整理这一趟搬了 8 个单元，核源落点那一处只经索引查了 0 次（计划里每一项按映射 key 查一次）：LookupWork { index_builds: 10, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 8 }
+
+
+failures:
+    every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units
+    every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 3 filtered out; finished in 19.24s
+
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

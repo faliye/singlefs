@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/fy5090/code/singlefs/research/prompts/gc-formal-core-review-2026-10-24/check-reference.py", line 36, in <module>
+    assert data['choose_region'] == body(current, 'reference_choose_region')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

@@ -1,0 +1,70 @@
+    Checking singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-exit5-relocation-proof-r2-sonnet/tree-m3/crates/singlefs-core)
+error: cannot use type `singlefs_core::allocator::AllocationRecord` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> crates/singlefs-core/src/compaction_plan.rs:955:5
+    |
+955 |          allocation_records: &[AllocationRecord],
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+958 |          !allocation_records.iter().any(|record| {
+    |     ______-------------------------_____-
+    |  __|______|
+    | |  |
+959 | |  |         record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+    | |  |         -------------                        ------------------                         -----------
+960 | |  |     })
+    | |__|_____--
+    |    |_____|
+    |
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExAllocationRecord(crate::allocator::AllocationRecord);
+
+error: cannot use type `singlefs_core::logged_operations::CompactionRegion` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> crates/singlefs-core/src/compaction_plan.rs:956:5
+    |
+956 |     region: CompactionRegion,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+959 |         record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+    |                          ------                                    ------
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExCompactionRegion(crate::logged_operations::CompactionRegion);
+
+error: cannot use type `singlefs_core::address::DeviceIdentity` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> crates/singlefs-core/src/compaction_plan.rs:959:9
+    |
+959 |         record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+    |         -------------^^^^---------------
+    |
+    = help: The following declaration may resolve this error:
+            #[verifier::external_type_specification]
+            pub struct ExDeviceIdentity(crate::address::DeviceIdentity);
+
+error: cannot use function `singlefs_core::logged_operations::CompactionRegion::device` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> crates/singlefs-core/src/compaction_plan.rs:959:26
+    |
+959 |         record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+    |                          ^^^^^^^^^^^^^^^
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification [crate::logged_operations::CompactionRegion::device] (_0: crate::logged_operations::CompactionRegion) -> crate::address::DeviceIdentity;
+
+error: cannot use function `singlefs_core::logged_operations::CompactionRegion::contains_slot` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> crates/singlefs-core/src/compaction_plan.rs:959:68
+    |
+959 |         record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+    |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: The following declaration may resolve this error:
+            pub assume_specification [crate::logged_operations::CompactionRegion::contains_slot] (_0: crate::logged_operations::CompactionRegion, _1: crate::address::SlotNumber) -> bool;
+
+error: cannot use type `singlefs_core::address::SlotNumber` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+   --> crates/singlefs-core/src/compaction_plan.rs:959:89
+    |
+959 |         record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+    |                                                                                         ^^^^^^^^^^^
+
+error: could not compile `singlefs-core` (lib) due to 6 previous errors

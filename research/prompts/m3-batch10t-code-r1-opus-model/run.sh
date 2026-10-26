@@ -6,7 +6,7 @@ frozen="$1"
 work="$2"
 model="$(cd "$(dirname "$0")" && pwd)"
 repo=/home/fy5090/code/singlefs
-rsync -a --exclude /target --exclude /.git --exclude /scripts/experiments/target "$frozen/" "$work/tree/"
+rsync -a --exclude /target --exclude /.git --exclude /scripts/experiment-apparatus/target "$frozen/" "$work/tree/"
 tests="$work/tree/crates/singlefs-harness/tests"
 mkdir -p "$tests/opus_model"
 { echo '#![allow(dead_code, clippy::all)]'; head -n 1489 "$frozen/crates/singlefs-harness/src/gpu_memory_ledger.rs" | sed 's#//!#//#g'; } > "$work/base_ledger_copy.rs"

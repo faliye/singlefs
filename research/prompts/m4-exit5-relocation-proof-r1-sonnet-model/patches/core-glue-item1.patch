@@ -1,0 +1,89 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -10182,17 +10182,13 @@
+     let Some((holder, role_for_the_checks, mapping_locations)) = holder_and_locations else {
+         return Err(RelocationBatchRefused::PlannedUnitNotInTheVersion { mapping_key });
+     };
+-    match role_for_the_checks {
++    // 判定部分在 Verus 核 `relocation_execution_proofs::judge_relocation_item`（原型）：读树取到的事实交给核，核只判。
++    let role_is_pinned = match role_for_the_checks {
+         TransactionUnit::MappingTreeNodeBelowTheRoot(_)
+         | TransactionUnit::MappingTree
+         | TransactionUnit::TreeTable
+         | TransactionUnit::InstanceTable
+-        | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
+-            return Err(RelocationBatchRefused::PinnedUnitInThePlan {
+-                mapping_key,
+-                unit: role_for_the_checks,
+-            })
+-        }
++        | TransactionUnit::InstanceTablePageAfterTheFirst(_) => true,
+         TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+         | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+         | TransactionUnit::Data(_)
+@@ -10217,22 +10213,37 @@
+         | TransactionUnit::LineageNodeBelowTheRoot(_)
+         | TransactionUnit::RetirementLeafContainer(_)
+         | TransactionUnit::RetirementRoot
+-        | TransactionUnit::RetirementNodeBelowTheRoot(_) => {}
+-    }
+-    let Some(source_locations) = mapping_locations.filter(|locations| {
+-        locations
+-            .iter()
+-            .all(|location| location.slot == planned.source.slot)
+-            && planned.source.span == role_for_the_checks.span_slots()
+-    }) else {
+-        return Err(
+-            RelocationBatchRefused::PlannedSourceIsNotTheMappingPosition {
+-                mapping_key,
+-                planned_source: planned.source,
+-                mapping_locations,
+-            },
+-        );
++        | TransactionUnit::RetirementNodeBelowTheRoot(_) => false,
++    };
++    let mut facts = singlefs_replay_prefix::relocation_execution_proofs::RelocationItemFacts {
++        role_is_pinned,
++        mapping_copy_slots: mapping_locations.map(|locations| (locations[0].slot.0, locations[1].slot.0)),
++        planned_source_slot: planned.source.slot.0,
++        planned_source_span: planned.source.span,
++        role_span_slots: role_for_the_checks.span_slots(),
++        // 字节还没取：先判到「源就是映射位置」为止，取字节在这一判之后（任何读之前交回的计划错不读盘）。
++        bytes_available: true,
+     };
++    match singlefs_replay_prefix::relocation_execution_proofs::judge_relocation_item(&facts) {
++        singlefs_replay_prefix::relocation_execution_proofs::RelocationItemVerdict::PinnedUnit => {
++            return Err(RelocationBatchRefused::PinnedUnitInThePlan {
++                mapping_key,
++                unit: role_for_the_checks,
++            })
++        }
++        singlefs_replay_prefix::relocation_execution_proofs::RelocationItemVerdict::SourceIsNotTheMappingPosition => {
++            return Err(
++                RelocationBatchRefused::PlannedSourceIsNotTheMappingPosition {
++                    mapping_key,
++                    planned_source: planned.source,
++                    mapping_locations,
++                },
++            )
++        }
++        singlefs_replay_prefix::relocation_execution_proofs::RelocationItemVerdict::Accepted
++        | singlefs_replay_prefix::relocation_execution_proofs::RelocationItemVerdict::BytesNotAvailable => {}
++    }
++    let source_locations = mapping_locations.expect("核判过映射位置在");
+     let bytes = match holder {
+         RelocatedUnitHolder::RoleOfThisVersion(role) => previous_read_by_key
+             .central_mapping
+@@ -10256,7 +10267,11 @@
+                 .unwrap_or_default()
+         }
+     };
+-    if bytes.is_empty() {
++    facts.bytes_available = !bytes.is_empty();
++    if !matches!(
++        singlefs_replay_prefix::relocation_execution_proofs::judge_relocation_item(&facts),
++        singlefs_replay_prefix::relocation_execution_proofs::RelocationItemVerdict::Accepted
++    ) {
+         return Err(RelocationBatchRefused::UnitBytesNotAvailable { mapping_key });
+     }
+     let Some(birth_txg) = birth_txg_of_a_mapping_key(&mapping_key) else {

@@ -1,0 +1,6 @@
+1	GREEN	正推 删快照：每条放掉的条目现建留存条目索引	test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 41.69s	
+2	GREEN	正推 mapped_roles_released_by_this_publish：每问一个角色现建按 inode 号的文件索引	test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 50.50s	
+3	GREEN	正推 快照判定那一圈：每问一个角色现建按 inode 号的文件索引	test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 40.36s	
+4	GREEN	正推 核源落点：留存条目索引不等第一次要找，建按 key 的索引时一并建	test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 40.09s	
+5	GREEN	正推 照抄 extent 树节点：按角色查两遍（常数倍）	test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 40.18s	
+6	GREEN	正推 照抄 extent 树节点：索引照查，另在 units 上线性找一遍丢掉结果	test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 40.90s	

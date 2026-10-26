@@ -1,0 +1,18 @@
+
+running 1 test
+test cell_f2_pinned_slot_whose_failure_was_in_the_first_revolution ... ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=healthy_n kind=legit newest=92 inst=2 t=45 F=0 p=45 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,1,1 red=[]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=before_record kind=legit newest=92 inst=2 t=45 F=0 p=45 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,1,1 red=[]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=before_root kind=legit newest=92 inst=2 t=45 F=0 p=45 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=zero kind=legit newest=92 inst=2 t=45 F=0 p=45 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=torn_enum kind=legit newest=92 inst=2 t=45 F=0 p=45 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=torn_half kind=legit newest=92 inst=2 t=45 F=0 p=45 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=healthy_n_bad_t_as_floor kind=bad newest=92 inst=2 t=0 F=0 p=45 next_slot_root=None all=0,0,0,-1,-1,0,0,0,0,0,0 red=["I-3.1", "I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=healthy_n_bad_p_255 kind=bad newest=92 inst=2 t=45 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,0,0,0,0,0 red=["I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=before_root_bad_p_255 kind=bad newest=92 inst=2 t=45 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,1,1,-1,-1 red=["I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=before_root_bad_t_as_floor kind=bad newest=92 inst=2 t=0 F=0 p=45 next_slot_root=None all=0,0,0,-1,-1,0,0,0,0,-1,-1 red=["I-3.1", "I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=zero_bad_p_255 kind=bad newest=92 inst=2 t=45 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,1,1,-1,-1 red=["I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base44_first_lap_failure S=16 image=zero_bad_t_as_floor kind=bad newest=92 inst=2 t=0 F=0 p=45 next_slot_root=None all=0,0,0,-1,-1,0,0,0,0,-1,-1 red=["I-3.1", "I-8.10", "I-7.18"]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 6.34s
+

@@ -4,6 +4,8 @@
 
 正文 `research/prompts/_m4-trunc-r2-body.md`，背景材料 `_m4-trunc-r2-background.md`（sha256 `b39dfacb…45477`），开工快照 `m4-trunc-r2-snapshot/kb-sha256.txt`。正推腿（Sonnet）报告 `research/prompts/m4-trunc-r2-sonnet-output.md`（233 行，sha256 `594f146d…52fc5`），模型 `m4-trunc-r2-sonnet-model/`；攻方腿（Opus）报告 `research/prompts/m4-trunc-r2-opus-output.md`（284 行，sha256 `0fa780fe…f054a`），模型 `m4-trunc-r2-opus-model/`。这一轮另一会话在跑崩溃点重放全量，两条腿与主 agent 都没起 cargo、编译与测试，量的只有 python3 纯算术小模型（经内存包装 2G）。
 
+开工快照：`research/prompts/m4-trunc-r2-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：取 511fe067b（2026-10-21）上的版本，腿派出时没记）
+
 ## 一、核查
 
 - 快照：`sha256sum -c m4-trunc-r2-snapshot/kb-sha256.txt` 全部 OK；腿跑着的时候主 agent 没改快照里的文件。

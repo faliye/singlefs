@@ -1,9 +1,0 @@
-PROBE-Q5 asym-bit-only-on-d1: after the writer defect records[d0(released=false,bit=false,gen=3) d1(released=false,bit=true,gen=3)]
-PROBE-Q5 asym-bit-only-on-d1 newest txg 8 (A still in the ring): per_record_violated=["I-3.11"] per_unit_violated=[] recover=Failed:InvariantViolated { invariant: "E142 走读同款", detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于这套几何下新池新建文件之后每盘的落点数" }
-PROBE-Q5 asym-bit-only-on-d1 after raising F to 5: per_record_violated=["I-3.1", "I-3.11"] per_unit_violated=[] recover=Failed:InvariantViolated { invariant: "E142 走读同款", detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于这套几何下新池新建文件之后每盘的落点数" }
-PROBE-Q5 asym-bit-only-on-d0: after the writer defect records[d0(released=false,bit=true,gen=3) d1(released=false,bit=false,gen=3)]
-PROBE-Q5 asym-bit-only-on-d0 newest txg 8 (A still in the ring): per_record_violated=["I-3.11"] per_unit_violated=[] recover=Failed:InvariantViolated { invariant: "E142 走读同款", detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于这套几何下新池新建文件之后每盘的落点数" }
-PROBE-Q5 asym-bit-only-on-d0 after raising F to 5: per_record_violated=["I-3.1", "I-3.11"] per_unit_violated=[] recover=Failed:InvariantViolated { invariant: "E142 走读同款", detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于这套几何下新池新建文件之后每盘的落点数" }
-PROBE-Q5 sym-control: records[d0(released=false,bit=true,gen=3) d1(released=false,bit=true,gen=3)]
-PROBE-Q5 sym-control after raising F to 5: per_record_violated=[] per_unit_violated=[] recover=FileRead
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out;

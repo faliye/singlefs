@@ -1,0 +1,21 @@
+# 变异套在改后树上（muts/<名>.old 换成 .new），跑 publish_lookup_by_identity 快档（跳过慢档与 forward_leg），原样输出的结局行
+## m8
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... FAILED
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... FAILED
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 3 filtered out; finished in 19.24s
+## m1
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 44.69s
+## m2
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 47.90s
+## m3
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 43.71s
+## m4
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 40.36s
+## m7
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 40.11s
+## m8 红的理由（panicked 行）
+整理这一趟搬了 11 个单元，核源落点那一处只经索引查了 0 次（计划里每一项按映射 key 查一次）：LookupWork { index_builds: 12, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 11
+整理这一趟搬了 8 个单元，核源落点那一处只经索引查了 0 次（计划里每一项按映射 key 查一次）：LookupWork { index_builds: 10, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 8 }
+## m7 慢档（-- --include-ignored --exact 增长慢档那一条）
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 117.51s
+publish_lookup_by_identity growth smaller=LookupWork { index_builds: 148, index_lookups: 15064, index_entries_examined: 123533, largest_index_looked_up: 606, mapping_leaf_decodes: 85 } larger=LookupWork { index_builds: 148, index_lookups: 59033, index_entries_examined: 599570, largest_index_looked_up: 2379, mapping_leaf_decodes: 245 } growth_in_percent=123 index_builds_growth_in_percent=100

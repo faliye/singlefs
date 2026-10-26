@@ -1,0 +1,5 @@
+name=inject point=起线程失败 where=begin() escaped=True exception=RuntimeError
+name=inject point=建临时文件失败 where=finish()（退 252 之前，主线程） escaped=True exception=FileNotFoundError
+name=inject point=格式化抛 TypeError where=finish()（退 252 之前，主线程） escaped=True exception=TypeError
+name=inject point=排队锁不放 where=finish() escaped=True exception=卡住（3 秒后调用还没返回）
+name=inject point=等线程的 join 无时限 where=finish() escaped=True exception=卡住（3 秒后调用还没返回）

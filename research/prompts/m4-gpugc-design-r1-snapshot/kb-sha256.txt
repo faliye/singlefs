@@ -1,0 +1,17 @@
+fbbd0e2c03edd83b1ab1f22d01a5b042b9a156c760409021dabee48f9b6b1f91  .claude/kb/milestone/04-fourth-txn.md
+25fab857849323d57eefc71d40cfaf8ef00b3662326c6f796068bb0c59b82916  .claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md
+d4f16ed7d9e5ef83e3529dec3762dc8f21e017ddddf6d11b18771e17c9c8849e  .claude/kb/experiments/185-GC-一バッチ分の移動の壁時計分解.ja.md
+5ec750a151c23c9e7859de61a6ce05d75ca10e8deb64d0b3a9adec06e247d0af  .claude/kb/experiments/185-wall-clock-breakdown-of-a-batch-of-gc-migrations.en.md
+dfcf289ea2c4075bc6acfca65cb4141f594542c4624933f992e6236275f1a101  .claude/kb/decisions/26-background-compaction-and-placement-reclamation.en.md
+0f1cb3b497b4988ce90007be0fc1cb4b374accffb8fafa5d1fe9a323b94cfab7  .claude/kb/decisions/26-バックグラウンド整理と配置回収.ja.md
+a6fea364933154a9f04299c3b51c6e7fe02b59bcd15819e11236b71cf78859aa  .claude/kb/decisions/26-后台整理与放置回收.md
+ae59565b8bb152b081c235900e72973cabe8adb391b498fa58c590186632bf7d  .claude/kb/decisions/24-offloading-heavy-background-work-to-gpu.en.md
+524b09fe2d2748919a523f71846f20653ad67b3d161db675ec1bb55354d8bf3c  .claude/kb/decisions/24-バックグラウンド重処理の-GPU-オフロード要否.ja.md
+73a491a2afba2282ebb4dc20ceeb9817523a077659f2e64d8a7d7bf0f3be7ca3  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
+b60a3022657beb6fb0c950ad7d63c366a0711fb01de7780a14d06d7b876d1fd3  .claude/kb/experiments/10-aging-structural-resistance-vs-post-hoc-compaction.en.md
+4df1b2f13cb2a540601fdd3d556758356eb8232fa0abfcbe3072b9f0f563e3cf  .claude/kb/experiments/10-老化-構造的抗老化-vs-事後デフラグ.ja.md
+c4dd3cb66445ed32e6e4e384dbbc312cd4b05515589a4af6101c2aba9a9a9948  .claude/kb/experiments/10-老化结构抗老化vs事后整理.md
+a109e9f0ea79b5a4d15aa1270667116775b61c6fb0e73056ec2529057004147d  .claude/kb/checks-owed.md
+2b1df9a742df584026f81bfeb9a9da5006ee8332451d705c8dcbc4449598684a  .claude/kb/decisions/13-verification-route.en.md
+4314b11f4255ea630b836dd8c87089ae5a46472109cc31bd8d2e501aabc7bcb7  .claude/kb/decisions/13-検証ルート.ja.md
+41a3c08630cdbe78344495b475c84d47c26526fe49a03a125b0dba4c6eed2235  .claude/kb/decisions/13-验证路线.md

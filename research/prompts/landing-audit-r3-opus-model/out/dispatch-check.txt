@@ -1,0 +1,17 @@
+== a3652270eb80e4fd0
+  ✓ 派发闸照这份提示放行（three-way-attack，查了 37 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话
+== a303d33b0ccd5e68f
+  ✓ 派发闸照这份提示放行（tooling-writer，查了 30 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话
+  ✗ 认领行：有「草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r1fix-hooks」却没有「认领：bash scripts/hosts/work-director
+== a3652270eb80e4fd0-delivery-colon
+✗ 派 three-way-attack 的提示一行报告行都没有（或报告行里没有点名文件）；三方腿的报告要形如 research/prompts/<轮>-<模型>-
+→ 派发闸照这份提示会拒 1 处（三方腿报告路径），照上面逐处改完再核；派的那一刻另判：⑦ 并发与限额窗口（派的
+== a3652270eb80e4fd0-section-colon
+✗ 派 three-way-attack 的提示一行报告行都没有（或报告行里没有点名文件）；三方腿的报告要形如 research/prompts/<轮>-<模型>-
+→ 派发闸照这份提示会拒 1 处（三方腿报告路径），照上面逐处改完再核；派的那一刻另判：⑦ 并发与限额窗口（派的
+== aa9ec3423c1f54bba-own-result
+✗ 派 implementation-writer 的提示报告行点名的文件名里带 report：「~/.local/share/singlefs/work/m4-trunc-core-writer/patch/report.md」。
+→ 派发闸照这份提示会拒 1 处（报告文件名），照上面逐处改完再核；派的那一刻另判：⑦ 并发与限额窗口（派的那一
+== a4737c6f3660f4f7e-own-result
+✗ 派 experiment-runner 的提示报告行点名的文件名里带 report：「/home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-7/report.md」。
+→ 派发闸照这份提示会拒 1 处（报告文件名），照上面逐处改完再核；派的那一刻另判：⑦ 并发与限额窗口（派的那一

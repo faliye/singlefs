@@ -1,0 +1,5 @@
+0b8d9d03275bb71a5096981387e22733f244036978d6ae7e3ec8d1503f45b7d6  .claude/kb/milestone/04-fourth-txn.md
+89e2ac533621fc4c8adb95ce222a415de022be839d82e7500d11abca6448223b  .claude/kb/decisions/04-校验和位置.md
+aabed61599c8ecdb33508cc9ff10e767b39f2b13b82ef4f5924d20d97dc31464  .claude/kb/decisions/14-双轨大小文件-持久临时.md
+8d49f8c33f05fdaa680e942185c848cfa22003cf32395f535d10e52ba6579d70  .claude/kb/checks-owed.md
+7c57b59c1f78e063191e3b17585e6883260ee7329434bc7a5964bd7c8f257efe  crates/singlefs-checker/invariants/01-块自描述.md

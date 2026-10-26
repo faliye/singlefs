@@ -88,7 +88,7 @@ rerun_steps() {
   { echo "--- 冻结副本自己的登记表 ⑥ 读法"; python3 -I "$fr/.claude/hooks/lib_abandoned_rounds.py" "$fr"
     echo "--- 冻结副本自己的登记表 门禁读法（--legacy-ok）"; python3 -I "$fr/.claude/hooks/lib_abandoned_rounds.py" "$fr" --legacy-ok; } > "$out/lib-table.out" 2>&1 || true
   # V8：被起脚本文件头的读法（detached-run.sh long-run-check 与 host-dispatch.py 的 header_hosts），豁免表里的与不在表里的同一份内容
-  local exempt="scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh"
+  local exempt="scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh"
   cp "$fr/$exempt" "$WORK/lr/copy_of_exempt.sh"
   { echo "--- long-run-check 豁免表里的脚本"; (cd "$fr" && bash scripts/hosts/detached-run.sh long-run-check -- bash "$exempt" x; echo "退出=$?")
     echo "--- long-run-check 同一份内容拷到表外"; (cd "$fr" && bash scripts/hosts/detached-run.sh long-run-check -- bash "$WORK/lr/copy_of_exempt.sh" x; echo "退出=$?")

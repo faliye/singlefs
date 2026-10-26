@@ -1,0 +1,13 @@
+shell_words 不同 x{100..00..2}y ['x100y', 'x098y', 'x096y', 'x094y'] ['x100y', 'x98y', 'x96y', 'x94y']
+heavy_tests 不同 x{100..00..2}y ['x100y', 'x098y', 'x096y', 'x094y'] ['x100y', 'x98y', 'x96y', 'x94y']
+shell_words 不同 x{01..100..3}y ['x001y', 'x004y', 'x007y', 'x010y'] ['x01y', 'x04y', 'x07y', 'x10y']
+heavy_tests 不同 x{01..100..3}y ['x001y', 'x004y', 'x007y', 'x010y'] ['x01y', 'x04y', 'x07y', 'x10y']
+shell_words 不同 x{00..100..-2}y ['x000y', 'x002y', 'x004y', 'x006y'] ['x00y', 'x02y', 'x04y', 'x06y']
+heavy_tests 不同 x{00..100..-2}y ['x000y', 'x002y', 'x004y', 'x006y'] ['x00y', 'x02y', 'x04y', 'x06y']
+heavy_tests 不同 x{03..100..-2}y ['x003y', 'x005y', 'x007y', 'x009y'] ['x03y', 'x05y', 'x07y', 'x09y']
+heavy_tests 不同 x{00..100..02}y ['x000y', 'x002y', 'x004y', 'x006y'] ['x00y', 'x02y', 'x04y', 'x06y']
+heavy_tests 不同 x{100..01..2}y ['x100y', 'x098y', 'x096y', 'x094y'] ['x100y', 'x98y', 'x96y', 'x94y']
+heavy_tests 不同 x{01..100..02}y ['x001y', 'x003y', 'x005y', 'x007y'] ['x01y', 'x03y', 'x05y', 'x07y']
+heavy_tests 不同 x{01..100..2}y ['x001y', 'x003y', 'x005y', 'x007y'] ['x01y', 'x03y', 'x05y', 'x07y']
+heavy_tests 不同 x{100..03..02}y ['x100y', 'x098y', 'x096y', 'x094y'] ['x100y', 'x98y', 'x96y', 'x94y']
+tree 共 1500 条，不同： {'shell_words': 10, 'heavy_tests': 10}

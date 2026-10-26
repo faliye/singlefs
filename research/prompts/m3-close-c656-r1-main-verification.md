@@ -7,6 +7,8 @@
 - 攻方（Opus）第一次抽样：`research/prompts/m3-close-c656-r1-opus-output.md`，sha256 2afed3b296e5b60692c7274e955ddf826aecde7cbe155d17e3d49c3149620635。模型 `research/prompts/m3-close-c656-r1-opus-model/`。
 - 攻方第二次抽样（V2 第一次没打中，照规则再抽）：`research/prompts/m3-close-c656-r1-opus-s2-output.md`，sha256 4972a04b2e08cd730bc52c5cddc6f6e11a75fb4f481af43aad9c1c2b54da60c3。模型 `research/prompts/m3-close-c656-r1-opus-s2-model/`。
 
+开工快照：`research/prompts/m3-close-c656-r1-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：取 511fe067b（2026-10-21）上的版本，腿派出时没记）
+
 ## 一、核查
 
 1. 引文：`cite-check.py <三份报告> --root . --background <背景材料>` 末行「✓ 核了 51 处引文、40 处裸行号，对上 51 处，没判 40 处（其中裸行号没有引文可比 40 处；逐处列在上面）」。

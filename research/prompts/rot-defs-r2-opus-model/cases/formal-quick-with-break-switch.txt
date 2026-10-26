@@ -1,1 +1,0 @@
-FORMAL_VERIFICATION_BREAK=quick-core-unselected SINGLEFS_RUN_SCOPE='种类=quick; 跑什么=门禁 checker-tier-formal-verification.sh 的轻型（--quick）; 范围=轻型核心部分; 为什么=改了 singlefs-replay-prefix 的取前缀那一处要核证明与钉表' bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick $PWD

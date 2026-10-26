@@ -77,7 +77,7 @@
 | （欠的检查清单 标题之下、第一个下级标题之前的正文：第 2-587 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
 | ### 已还清 | 抄 | 默认全抄（脚本生成） |
 
-### 小节清单：`.claude/kb/decisions/05-快照-空间记账机制.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/05-snapshot-space-accounting-mechanism.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -107,7 +107,7 @@
 | #### Settled Item 21: Whether Snapshot List Needs an Enumerable Persistent Structure | 抄 | 随父节带到 |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/05-快照-空间记账机制.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/05-スナップショット-空間会計メカニズム.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -167,7 +167,7 @@
 | #### 已定项 21：快照列表要不要一个可枚举的持久结构 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/experiments/97-记账与分配记录的条目编码.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/97-entry-encoding-of-accounting-and-allocation-records.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -192,7 +192,7 @@
 | #### (Part 3): Two More Criteria Added, One Metric Corrected, Two Arms Added After Second Adversarial Round, Rerun | 抄 | 随父节带到 |
 | #### (Part 4): Third Adversarial Round Removed Artifact — "Half Unit Unrepresentable" is Arm Tag, Not Encoding Property | 抄 | 随父节带到 |
 
-### 小节清单：`.claude/kb/experiments/97-记账与分配记录的条目编码.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/97-記帳および割り当て記録のエントリ符号化.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -217,7 +217,7 @@
 | #### （その 3）：第 2 ラウンド三方論証後にさらに判定基準 2 条を追加、計測条件 1 箇所修正、アーム 2 つを追加し再実行 | 抄 | 随父节带到 |
 | #### （その 4）：第 3 ラウンド三方論証で偽像を排除——「半ユニット表現不可」はアームのタグであり符号化の性質ではない | 抄 | 随父节带到 |
 
-### 小节清单：`.claude/kb/decisions/08-核心索引结构.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/08-core-index-structure.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -242,7 +242,7 @@
 | #### Settled Item 16: First-Version Unlink: Creates deleted_inodes Only, Batched from Tail, Resumes to Empty During Mount | 抄 | 随父节带到 |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/08-核心索引结构.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/08-コアインデックス構造.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

@@ -1,0 +1,6 @@
+base: rows=5513 resolve_refused=24 mutated_refused=0
+v-E1: resolve_changed=0 (其中新拒算 0) mutated_changed=0
+v-E2: resolve_changed=2127 (其中新拒算 2125) mutated_changed=1522
+v-E3: resolve_changed=0 (其中新拒算 0) mutated_changed=0
+v-E4: resolve_changed=5489 (其中新拒算 0) mutated_changed=1371
+v-E5: resolve_changed=0 (其中新拒算 0) mutated_changed=0

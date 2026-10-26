@@ -1,0 +1,25 @@
+
+running 1 test
+test a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once ... FAILED
+
+failures:
+
+---- a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once stdout ----
+publish_lookup_by_identity rewrite_under_a_snapshot killed=8 routed_leaves=1 replaced_user_visible_roles=8 snapshot_judgement=LookupWork { index_builds: 9, index_lookups: 51, index_entries_examined: 231, largest_index_looked_up: 55, mapping_leaf_decodes: 3, times_entered: 3 }
+publish_lookup_by_identity snapshot_destruction released=8 kept_entries_released=LookupWork { index_builds: 16, index_lookups: 16, index_entries_examined: 42, largest_index_looked_up: 8, mapping_leaf_decodes: 0, times_entered: 2 } files_of_the_snapshot_judgement=LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 4 }
+
+thread 'a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once' (118353) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1477:5:
+删快照：放条目的每一遍建一份留存条目按 key 的索引：进了 2 次（走了几遍），建索引 16 次，每走一遍恰好建一份：LookupWork { index_builds: 16, index_lookups: 16, index_entries_examined: 42, largest_index_looked_up: 8, mapping_leaf_decodes: 0, times_entered: 2 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.28s
+
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.30s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

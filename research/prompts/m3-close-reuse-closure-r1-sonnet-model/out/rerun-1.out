@@ -1,0 +1,15 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 36.4 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 没查到别的机器：36 秒前包装 3978428 刚查过（几条一起排队时每 60 秒只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 36.4 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排了 89 秒，起跑（singlefs-memory-cap-3983081-324856748）
+RESULT tree=current entry=scripts/gate/verus-proof-check.py::check_proof units=1579 refused=[inline-script-not-literal scripts/hosts/peer-host-lib.sh:76;]
+RESULT tree=current entry=scripts/gate/verus-proof-check.py::check_vacuity units=1567 refused=[inline-script-not-literal scripts/hosts/peer-host-lib.sh:76;]
+RESULT tree=current entry=scripts/gate/verus-proof-check.py::check_must_red_worlds units=1575 refused=[inline-script-not-literal scripts/hosts/peer-host-lib.sh:76;]
+RESULT tree=current entry=scripts/mutation/broad-mutation.py::Runner.escalate_step units=792 refused=[inline-script-not-literal scripts/hosts/peer-host-lib.sh:76;]
+RESULT tree=cut-lookup entry=scripts/gate/verus-proof-check.py::check_proof units=1232 refused=[]
+RESULT tree=cut-lookup entry=scripts/gate/verus-proof-check.py::check_vacuity units=1220 refused=[]
+RESULT tree=cut-lookup entry=scripts/gate/verus-proof-check.py::check_must_red_worlds units=1228 refused=[]
+RESULT tree=cut-lookup entry=scripts/mutation/broad-mutation.py::Runner.escalate_step units=436 refused=[]
+begin（起线程失败，主线程里）: 异常冒出来 RuntimeError: can't start new thread
+finish（临时文件建不了，退 252 之前前台查，主线程里）: 异常冒出来 OSError: [Errno 28] No space left on device
+begin（临时文件建不了，后台线程里查）: 没有异常冒出来

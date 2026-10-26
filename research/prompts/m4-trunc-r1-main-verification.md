@@ -4,6 +4,8 @@
 
 正文 `research/prompts/_m4-trunc-r1-body.md`，背景材料 `_m4-trunc-r1-background.md`（5512 行），开工快照 `m4-trunc-r1-snapshot/kb-sha256.txt`。正推腿（Sonnet）报告 `research/prompts/m4-trunc-r1-sonnet-output.md`（503 行，sha256 `d197eba0…69d3`），模型 `m4-trunc-r1-sonnet-model/`；攻方腿（Opus）报告 `research/prompts/m4-trunc-r1-opus-output.md`（387 行，sha256 `4adde0e4…99ba`），模型 `m4-trunc-r1-opus-model/`。
 
+开工快照：`research/prompts/m4-trunc-r1-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：取 511fe067b（2026-10-21）上的版本，腿派出时没记）
+
 ## 一、核查
 
 - 快照：`sha256sum -c m4-trunc-r1-snapshot/kb-sha256.txt` 全部 OK；腿跑着的时候主 agent 没改快照里的文件。

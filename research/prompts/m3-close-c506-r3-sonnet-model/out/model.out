@@ -1,0 +1,54 @@
+name=source_check result=ok S_min=4 S_max=16 S_mkfs=8 P=3 chunk=1048576 R=3 base=1048576 journal=16777216 syscfg=4096 sentinel=255 sp_min=4096 stride=3145728
+name=alias arm=rewritten_S16_512KiB S=16 spacing=524288 aliased_pairs=4 red_states=73_of_73 subset24_red=24_of_24
+name=alias arm=S16_4KiB S=16 spacing=4096 aliased_pairs=0 red_states=0_of_73 subset24_red=0_of_24
+name=alias arm=S4_512KiB S=4 spacing=524288 aliased_pairs=0 red_states=0_of_73 subset24_red=0_of_24
+name=alias arm=S16_256KiB S=16 spacing=262144 aliased_pairs=0 red_states=0_of_73 subset24_red=0_of_24
+name=alias arm=S8_512KiB S=8 spacing=524288 aliased_pairs=0 red_states=0_of_73 subset24_red=0_of_24
+name=alias_control_clean_states_per_24x4 clean=96 expected_if_96_of_96=96
+name=pin_bound max_pin_value_formula=3S-1 largest_S_with_pin_below_255=85 pin_at_85=254 pin_at_86=257
+name=e50_constants coarse_blocks=13 scattered_blocks=34 pinned_matters=1000
+name=e50_crossing coarse_first_S_reaching_line=26 (S_le_25_does_not) scattered_first_S_reaching_line=10 coarse_exact_N=77 scattered_exact_N=30
+name=e50_values S25_coarse=975 S26_coarse=1014 S9_scattered=918 S10_scattered=1020 S16_scattered=1632 S16_coarse=624
+name=e50_page_row first_sampled_N_coarse=256 first_sampled_N_scattered=32 N8_coarse=104 N8_scattered=272 N64_coarse=832 N64_scattered=2176
+name=shapes pbs=512 spacings=2033 shapes=26429 rule_accepts=9411 mkfs_accepts=9411 rule_xor_mkfs=0 false_rejects_vs_mkfs=0 rule_accepts_but_extent_overlap=0 rule_accepts_but_slot_overlap=0
+name=shapes_physical pbs=512 extent_overlap_shapes=8966 slot_overlap_shapes=3234 rule_refuses=17018 rule_refuses_and_no_slot_overlap=13784 trimmed_overlap_shapes=7696 rule_accepts_but_trimmed_overlap=0
+name=shapes_over_rejection pbs=512 rule_refuses_but_extent_clean=8052 rule_refuses_but_trimmed_clean=9322 rule_accepts_exactly_touching=5
+name=shapes pbs=4096 spacings=255 shapes=3315 rule_accepts=1184 mkfs_accepts=1184 rule_xor_mkfs=0 false_rejects_vs_mkfs=0 rule_accepts_but_extent_overlap=0 rule_accepts_but_slot_overlap=0
+name=shapes_physical pbs=4096 extent_overlap_shapes=1124 slot_overlap_shapes=414 rule_refuses=2131 rule_refuses_and_no_slot_overlap=1717 trimmed_overlap_shapes=967 rule_accepts_but_trimmed_overlap=0
+name=shapes_over_rejection pbs=4096 rule_refuses_but_extent_clean=1007 rule_refuses_but_trimmed_clean=1164 rule_accepts_exactly_touching=5
+name=shapes_total total=29744
+name=min_formula pbs=512 histogram=[(3, 504), (4, 308), (5, 204), (6, 147), (7, 109), (8, 761)] spacing_giving_4=629248..786432 spacing_giving_below_4=786944..1044480 any_16=False
+name=min_formula pbs=4096 histogram=[(3, 63), (4, 39), (5, 25), (6, 19), (7, 13), (8, 96)] spacing_giving_4=630784..786432 spacing_giving_below_4=790528..1044480 any_16=False
+name=bound_arithmetic S4_largest_spacing=786432=768KiB real_4_interval_bytes=629146..786432 KiB_of_upper=768.0 reader_range_top=1044480
+name=threshold refuse_below=4 written_values_over_free_spacing=[(4, 308), (5, 204), (6, 147), (7, 109), (8, 761)] touches_edge_4=True touches_edge_16=False
+name=threshold refuse_below=5 written_values_over_free_spacing=[(5, 204), (6, 147), (7, 109), (8, 761)] touches_edge_4=False touches_edge_16=False
+name=d2_19_conforming pbs=512 io_min_range=0..2097152 accepted_io_min_count=12 accepted_all_power_of_two_or_zero=True largest_accepted_io_min=524288 written_S_values=[6, 8] io_min_giving_6=[524288] written_S_equals_4_or_below_among_accepted=False
+name=d2_19_conforming pbs=4096 io_min_range=0..2097152 accepted_io_min_count=12 accepted_all_power_of_two_or_zero=True largest_accepted_io_min=524288 written_S_values=[6, 8] io_min_giving_6=[524288] written_S_equals_4_or_below_among_accepted=False
+name=io_min_1MiB spacing=1048576 formula_gives=3 refused_by_threshold_4=True refused_by_threshold_5=True mkfs_extent_overlap_at_S4=True reader_range_top=1044480 spacing_over_range=True
+name=grep_at_make_filesystem direct_calls=77 files=44
+name=grep_reader_of_P_chunk file=crates/singlefs-core/src/recovery.rs hits=[]
+name=grep_reader_of_P_chunk file=crates/singlefs-core/src/system_configuration.rs hits=[(12, 'ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS, SLOT_BYTES,'), (593, 'writer.put_u32(u32::try_from(ROOT_RING_PRIME_STEP).expect("P"));'), (594, 'writer.put_u32(u32::try_from(ROOT_RING_CHUNK_BYTES).expect("chunk"));')]
+name=grep_reader_of_P_chunk file=crates/singlefs-checker/src/image.rs hits=[(773, 'let prime_step = u64::from(read_u32(slot, 363));'), (774, 'let chunk_bytes = u64::from(read_u32(slot, 367));')]
+name=grep_wgsl_s_interval_and_48 sites=[('crash_judge_checker.wgsl', 111), ('crash_judge_checker_common.wgsl', 567, '48u'), ('crash_judge_common.wgsl', 241, '48u'), ('crash_judge_common.wgsl', 960), ('crash_judge_recovery.wgsl', 906)]
+name=claim r1_alias_24_of_24_red reported=24/24 computed=24/24 match=true
+name=claim r1_controls_96_of_96_clean reported=96/96 computed=96/96 match=true
+name=claim r1_S_le_85 reported=85 computed=85 match=true
+name=claim r1_coarse_S_le_25_not_over_line reported=25 computed=25 match=true
+name=claim r1_scattered_S_ge_10_over_line reported=10 computed=10 match=true
+name=claim r2_shapes_pbs512 reported=26429 computed=26429 match=true
+name=claim r2_shapes_total reported=29744 computed=29744 match=true
+name=claim r2_rule_accepts_pbs512 reported=9411 computed=9411 match=true
+name=claim r2_rule_accepts_pbs4096 reported=1184 computed=1184 match=true
+name=claim r2_rule_xor_mkfs_total reported=0 computed=0 match=true
+name=claim r2_false_rejects_total reported=0 computed=0 match=true
+name=claim r2_uncovered_overlap_total reported=0 computed=0 match=true
+name=claim r2_extent_overlap_pbs512 reported=8966 computed=8966 match=true
+name=claim r2_refused_no_slot_overlap_pbs512_pbs4096 reported=13784+1717 computed=13784+1717 match=true
+name=claim r2_over_rejection_extent_pbs512 reported=8052 computed=8052 match=true
+name=claim r2_trimmed_overlap_pbs512_is_26429_minus_18733 reported=7696 computed=7696 match=true
+name=claim r2_spacing_giving_4_from reported=629248 computed=629248 match=true
+name=claim r2_spacing_giving_4_to reported=786432 computed=786432 match=true
+name=claim r2_effective_spacing_upper_KiB reported=768 computed=768 match=true
+name=claim r2_at_make_filesystem_direct_calls reported=77 computed=77 match=true
+name=claim r2_at_make_filesystem_files reported=44 computed=44 match=true
+name=claims_summary claims=21 mismatched=0

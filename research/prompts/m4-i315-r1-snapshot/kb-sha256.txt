@@ -1,0 +1,16 @@
+1fe61a6d7bdd9160af32db226e3903ebe1887bb8dc4db3563f88de50d691c26d  .claude/kb/experiments/112-legacy-writer-encountering-unknown-trees.en.md
+c456eba63cdcac765921db861b398256c0e023604c708802b76d0234d2091bfe  .claude/kb/experiments/112-旧ライターが未知のツリーに遭遇した場合.ja.md
+d894544951a4040d6b41bc33534e453e3e2e73f9a729859eb786a0f5b7b9bc2f  crates/singlefs-checker/invariants/05-空间记账.md
+4b41828508b5c27e72a14d1dd2b19850821a563558664de76a0c60ca9bc0ce08  crates/singlefs-checker/invariants/04-校验和.md
+66c8cd663a24ca84f47ec9a3e4e4cb5ff8f1602ee91fd36e73c9e70757115a2d  crates/singlefs-checker/invariants/06-事务与崩溃一致性.md
+4fcc7f3dab627e6b514c6d9c5b7db61dbe020f444a5cc6c17ecddacab5dcc97c  crates/singlefs-checker/invariants/02-根环.md
+ff6aa88a1e5dc2f8b8d9d6de544c20f4234e42f0c778fc5036ad49fafddbade1  .claude/kb/decisions/19-block-pointer-structure-width-budget.en.md
+226b36b6f3383383b55454ed25b1a9d00e0bf50e4f260cc8ab6a7e5e7869cc4d  .claude/kb/decisions/19-ブロックポインタ構造と幅予算.ja.md
+85c20b626ca6c7a2953b64a6de2ff97f759327374b233d656f82f53039c73625  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+c0c6b5ba4790381e205aa7a71901da3b4aae1bb67a227a6254ce6959099f02ff  .claude/kb/decisions/13-verification-route.en.md
+a89c0b9cceb459a1dce4828f443f13f42bdec150e6db1b350175c80730764bf3  .claude/kb/decisions/13-検証ルート.ja.md
+c33fac2be12fb000adc861e2b83818003ddc5b8c3211276a44cde4cb59103dd9  .claude/kb/decisions/13-验证路线.md
+1e3202a42847dc655086c05539171b186485f03919ca66da3c503b9060f3afc6  .claude/kb/decisions/18-information-carried-in-a-block.en.md
+0e50ebe1eaec8f6cc38c3a61285548814b5769bd19ff3f94042089883c14d173  .claude/kb/decisions/18-ブロックに含める情報.ja.md
+4d503c1ffde24422d118bfb76ba4c0e6740d3eb4efe7db4af9c3b1ffca40cf75  .claude/kb/decisions/27-小データパッキングコンテナ.ja.md
+7d92c59adfb0b3cc2c472c9ac033074f8acdbabafd796e62fbacf647aa594b6a  crates/singlefs-checker/invariants/01-块自描述.md

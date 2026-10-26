@@ -1,0 +1,2 @@
+续做闸（hook 模式）不设开关：退 0
+续做闸（hook 模式）环境里有 SUBAGENT_TRANSCRIPT_BREAK=refused-counts-delivered：退 2；✗ 子 agent abreakprobe0000001 已经交回过（它的会话记录里有一次送达的 SubagentHandback），交回之后不续做，新活一律新

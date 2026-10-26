@@ -1,0 +1,51 @@
+name=selftest result=ok
+name=w1_cell S=16 spacing=524288 region_bytes=8388608 physical_full=overlap:d0:R0/R2 physical_byte_exact=overlap mkfs_today=refuse rule=reject
+name=w1_cell S=8 spacing=524288 region_bytes=4194304 physical_full=clean physical_byte_exact=clean mkfs_today=refuse rule=reject
+name=w1_cell S=16 spacing=262144 region_bytes=4194304 physical_full=clean physical_byte_exact=clean mkfs_today=refuse rule=reject
+name=w1_cell S=12 spacing=262144 region_bytes=3145728 physical_full=clean physical_byte_exact=clean mkfs_today=accept rule=accept
+name=w1_cell S=6 spacing=524288 region_bytes=3145728 physical_full=clean physical_byte_exact=clean mkfs_today=accept rule=accept
+name=w1_cell S=4 spacing=524288 region_bytes=2097152 physical_full=clean physical_byte_exact=clean mkfs_today=accept rule=accept
+name=w1_cell S=8 spacing=393216 region_bytes=3145728 physical_full=clean physical_byte_exact=clean mkfs_today=accept rule=accept
+name=w1_cell S=8 spacing=393728 region_bytes=3149824 physical_full=clean physical_byte_exact=clean mkfs_today=refuse rule=reject
+name=w1_counts shapes=26429 rule_accept=9411 mkfs_today_accept=9411 physical_clean_full=17463 physical_clean_byte_exact=18733
+name=w1_cover rule_accepts_but_physically_overlaps=0 rule_accepts_but_byte_exact_overlaps=0
+name=w1_equals_mkfs_today rule_minus_mkfs=0 mkfs_minus_rule=0
+name=w1_over_rejection_full count=8052 min_region_bytes=3146240 max_region_bytes=6291456
+name=w1_over_rejection_byte_exact count=9322
+name=w1_touching_shapes_rule_accepts count=5 first=(4, 786432) last=(16, 196608)
+name=w1_largest_S spacing=131072 uniform_rule=24 same_disk_0_and_2=48 region2_before_journal=72
+name=w1_largest_S spacing=196608 uniform_rule=16 same_disk_0_and_2=32 region2_before_journal=48
+name=w1_largest_S spacing=262144 uniform_rule=12 same_disk_0_and_2=24 region2_before_journal=36
+name=w1_largest_S spacing=393216 uniform_rule=8 same_disk_0_and_2=16 region2_before_journal=24
+name=w1_largest_S spacing=524288 uniform_rule=6 same_disk_0_and_2=12 region2_before_journal=18
+name=w1_largest_S spacing=1044480 uniform_rule=3 same_disk_0_and_2=6 region2_before_journal=9
+name=w1_control_no_rule accepted=26429 physically_overlapping=8966 includes_16_512KiB=True
+name=w1_control_same_disk_rule_on_0_1_0 accepted=17463 physically_overlapping=0
+name=w1_control_same_disk_rule_on_0_0_1 accepted=17463 physically_overlapping=8052
+name=w1_control_disk_stride p_times_chunk=3145728 rule_accepts=9411 overlapping_with_that_stride=0 overlapping_journal=0
+name=w1_control_disk_stride p_times_chunk=5242880 rule_accepts=15221 overlapping_with_that_stride=0 overlapping_journal=0
+name=w1_control_disk_stride p_times_chunk=6291456 rule_accepts=17463 overlapping_with_that_stride=8052 overlapping_journal=8052
+name=w1_control_disk_stride p_times_chunk=9437184 rule_accepts=22316 overlapping_with_that_stride=22316 overlapping_journal=22316
+name=w1_control_strict_less_than wrongly_rejects_mkfs_accepted=5
+name=w2_min_over_free_spacing written_S_histogram=[(3, 504), (4, 308), (5, 204), (6, 147), (7, 109), (8, 761)] spacing_giving_exactly_4=629248..786432 spacing_giving_below_4=786944..1044480 spacing_giving_16=none
+name=w2_conforming_io_min_passing_alignment count=11 io_min_values=[524288] written_S_not_8=[(524288, 6)] any_written_S_is_4_or_below=False
+name=w2_conforming_io_min_all_powers_of_two value=True
+name=w2_non_power_of_two_io_min io_min=3072 spacing=6144 reader_range=True alignment_pass=False written_S=8
+name=w2_non_power_of_two_io_min io_min=6144 spacing=6144 reader_range=True alignment_pass=False written_S=8
+name=w2_non_power_of_two_io_min io_min=12288 spacing=12288 reader_range=True alignment_pass=False written_S=8
+name=w2_non_power_of_two_io_min io_min=786432 spacing=786432 reader_range=True alignment_pass=False written_S=4
+name=w2_non_power_of_two_io_min io_min=655360 spacing=655360 reader_range=True alignment_pass=False written_S=4
+name=w2_free_spacing_reaching_4 count=39 examples=[630784, 634880, 638976]
+name=w2_ring_depth S=4 ring_slots=12 ring_window_factor=13 max_pin_value=11 pin_fits_a_byte_below_sentinel=True
+name=w2_ring_depth S=6 ring_slots=18 ring_window_factor=19 max_pin_value=17 pin_fits_a_byte_below_sentinel=True
+name=w2_ring_depth S=8 ring_slots=24 ring_window_factor=25 max_pin_value=23 pin_fits_a_byte_below_sentinel=True
+name=w2_ring_depth S=12 ring_slots=36 ring_window_factor=37 max_pin_value=35 pin_fits_a_byte_below_sentinel=True
+name=w2_ring_depth S=16 ring_slots=48 ring_window_factor=49 max_pin_value=47 pin_fits_a_byte_below_sentinel=True
+name=w2_pin_bound max_S_with_pin_below_255=85
+name=w2_gpu_root_table format_upper_bound_times_R=48 gpu_MAX_ROOTS_literal=48
+name=w3_slot_alias_vs_rule pbs=512 shapes_with_a_root_slot_aliased=12 of_them_accepted_by_rule=0 extent_overlap_shapes=8966 extent_overlap_without_slot_alias=8954 alias_spacings_not_power_of_two=[786432]
+name=w3_slot_alias_vs_rule pbs=4096 shapes_with_a_root_slot_aliased=61 of_them_accepted_by_rule=0 extent_overlap_shapes=8966 extent_overlap_without_slot_alias=8905 alias_spacings_not_power_of_two=[419328, 449536, 483840, 571904, 629248, 698880]
+name=w3_cell_16_512KiB_aliases pairs=d0:r0s12=r2s0;d0:r0s13=r2s1;d0:r0s14=r2s2;d0:r0s15=r2s3
+name=w3_genesis_seed_scanned_elsewhere S=16 spacing=524288 hits=['seed_r2s0_is_scanned_as_r0s12']
+name=w3_genesis_seed_scanned_elsewhere S=13 spacing=524288 hits=['seed_r2s0_is_scanned_as_r0s12']
+name=w3_genesis_seed_scanned_elsewhere S=8 spacing=524288 hits=none

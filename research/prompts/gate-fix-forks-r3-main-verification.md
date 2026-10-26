@@ -4,7 +4,7 @@
 
 材料：正文 `research/prompts/_gate-fix-forks-r3-body.md`，清单 `_gate-fix-forks-r3-checklist.md`、附录 `_gate-fix-forks-r3-appendix.md`（含第一、二轮判决全文），拼成 `_gate-fix-forks-r3-background.md`；代码 diff `_gate-fix-forks-r3-diff.md`。**这是第三轮，判完就停，不开第四轮。**
 
-**开工快照漂移**（`gate-fix-forks-r3-snapshot/sha256sums.txt`，105 份；快照时的原样树 `/tmp/claude-1000/gate-fix-forks-r3-snapshot-tree/`）：腿跑着的时候变了 3 份。`.claude/rules/implementation-workflow.md`（主 agent，正推交回之后改了第 18 行那句「门禁 71 号」）与 `.claude/scripts/gen-decision-items.py`（主 agent，not-numbers 标记的读法改成跳过代码围栏）的经过在 `gate-fix-forks-r3-snapshot/changed-during-legs.md`；`scripts/experiments/replay.sh` 是别的会话改的。三条腿读的都是快照树，攻方收工时自己核过这三份它没读主树。
+**开工快照漂移**（`gate-fix-forks-r3-snapshot/sha256sums.txt`，105 份；快照时的原样树 `/tmp/claude-1000/gate-fix-forks-r3-snapshot-tree/`）：腿跑着的时候变了 3 份。`.claude/rules/implementation-workflow.md`（主 agent，正推交回之后改了第 18 行那句「门禁 71 号」）与 `.claude/scripts/gen-decision-items.py`（主 agent，not-numbers 标记的读法改成跳过代码围栏）的经过在 `gate-fix-forks-r3-snapshot/changed-during-legs.md`；`scripts/experiment-apparatus/replay.sh` 是别的会话改的。三条腿读的都是快照树，攻方收工时自己核过这三份它没读主树。
 
 ## 一、三条腿与核查员
 

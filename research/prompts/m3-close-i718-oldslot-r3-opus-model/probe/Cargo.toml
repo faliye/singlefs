@@ -1,0 +1,12 @@
+# m3-close-i718-oldslot-r3 攻方腿原型（第二轮那一份拷来改名）：只放进三方腿的仓副本（crates/i718-round-three-probe），不进入库的工作区。
+[package]
+name = "i718-round-three-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-harness = { path = "../singlefs-harness" }

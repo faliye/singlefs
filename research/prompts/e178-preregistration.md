@@ -6,7 +6,7 @@
 
 问法已定（主 agent 2026-10-08，用户定「留 O2，删 O1」）：第六节只留 Q-X3-O2 一行（「意图到最后一批之间崩溃后重建视图多出的对象数」读法 O2）；Q-X3-O1 那一行已删。
 
-装置写在哪（写死）：`scripts/experiments/e178_leaf_and_record_death_counts.rs`，走 `research/` 那一支，独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）；不是入库装置，不改 `crates/singlefs-checker-tier/src/bin/`。不改 E177（逐树不写墓碑的复活数） 的装置 `e177_per_tree_resurrection_without_tombstones.rs`，理由见第五节 5.0。
+装置写在哪（写死）：`scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs`，走 `research/` 那一支，独立手写模型，不与 `crates/` 共用代码（`.claude/rules/implementation-first.md` 第 4 条）；不是入库装置，不改 `crates/singlefs-checker-tier/src/bin/`。不改 E177（逐树不写墓碑的复活数） 的装置 `e177_per_tree_resurrection_without_tombstones.rs`，理由见第五节 5.0。
 
 ## 一、问题
 
@@ -14,7 +14,7 @@
 
 ### 主 agent 给的问题（逐字）
 
-> 任务：为这三行写一份计数实验的跑前登记，装置是入库的 E177（逐树不写墓碑的复活数）装置 `scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs` 加臂（或你判断另立新装置更好，写理由）。要量的：
+> 任务：为这三行写一份计数实验的跑前登记，装置是入库的 E177（逐树不写墓碑的复活数）装置 `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs` 加臂（或你判断另立新装置更好，写理由）。要量的：
 > - X2：读法 Z 与区间墓碑两个候选各自的复活数、误判死亡数，区间墓碑每次发布多写的单元数与多写发布占比；历史要含记录被借走或被左吸收的对象（不只 1 号有数据）。
 > - X3：两种墓碑生效时刻下 unlink 途中漏活峰值（inode、extent），以及意图到最后一批之间崩溃后重建视图多出的对象数。
 > - X4：N1、N2 各自每次借多写的单元数与退役记录数；N1 在 I-9.4 现有坏镜像与新补坏镜像上判得出、判不出的逐条列。
@@ -691,7 +691,7 @@
 
 ### 修订 1（执行员，2026-10-08，装置单测跑完、产物一次没跑之前）
 
-**依据的单测读数**：装置 `scripts/experiments/e178_leaf_and_record_death_counts.rs` 第一次跑单测（草稿目录 `~/.local/share/singlefs/work/e178-runner/test1.log`），31 个里 30 个过；红的那一个是 `after_a_rollback_retirements_and_tombstones_from_the_gap_do_not_apply` 的最后一句——F11 吸收缺口（容量 16、θ = 8、N2）上，B-off-lin × Z × E-I × W = ∞ 在「回退之后、不在 unlink 途中」的扫描里容器 m 峰值不是 > 0（`assertion failed: trajectories[ignoring_lineage].by_scope[SCOPE_AFTER_ROLLBACK_OUTSIDE_UNLINK][QUANTITY_CONTAINER_M].peak > 0`）。同一段 B-on 的容器 m、inode m 都是 0，那两句过了。
+**依据的单测读数**：装置 `scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs` 第一次跑单测（草稿目录 `~/.local/share/singlefs/work/e178-runner/test1.log`），31 个里 30 个过；红的那一个是 `after_a_rollback_retirements_and_tombstones_from_the_gap_do_not_apply` 的最后一句——F11 吸收缺口（容量 16、θ = 8、N2）上，B-off-lin × Z × E-I × W = ∞ 在「回退之后、不在 unlink 途中」的扫描里容器 m 峰值不是 > 0（`assertion failed: trajectories[ignoring_lineage].by_scope[SCOPE_AFTER_ROLLBACK_OUTSIDE_UNLINK][QUANTITY_CONTAINER_M].peak > 0`）。同一段 B-on 的容器 m、inode m 都是 0，那两句过了。
 
 **模型里为什么是这样**（照条款字面写出来的模型的推论，没改模型）：① 回退那次发布不重写退役树的开放容器（D18 已定项 24 第 3 条「有新记录的那次发布才重写」，5.3 底座「随现行那一版」），缺口里写的那一版退役容器诞生 txg 不在新父链上，读者在 5.4 第 1 条「候选」就把它滤掉；② 回退之后第一次往退役树追加，就是重跑缺口里第一次身份消失（R_old 是事件那次发布之前那一版，也就是那个对象的意图那一版，续删按升序重放同一串合并）；③ 删空与吸收让右边各片左移、这次全部重写（`inode_tree.rs:286-318` 的位置规则），缺口里退役、回退后又活着的那几个身份，在退役容器重新读得到的那一刻已经换成了诞生 txg 在回退之后的新版本，「诞生 txg ≤ 死亡 txg」不成立。三条合起来，5.5 PC-B2 写的「B-off-lin 的容器 m = 缺口里退役、而在 R_old 里有的身份个数」在 F11 这种回退之后重放缺口的历史上量不出来；第九节 M3 登记的取样点（F11、回退之后又追加过退役记录）同理不敏感。
 
@@ -907,7 +907,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 
 用户定案（原话，2026-10-15，派发提示转述）：「剪枝就是单元的 做不到就重做」「做完 对账 不用问我 怎么改 不符合要求的统统改掉 从零开始跑也再所不惜」。
 
-**装置写在哪（写死，同原登记）**：`scripts/experiments/e178_leaf_and_record_death_counts.rs`，走 `research/` 那一支，独立手写模型，不与 `crates/` 共用代码；不是入库装置。新加的取键脚本 `scripts/experiments/device-code-key.py` 也在 `scripts/experiments/`。键的单元那一半由 `crates/singlefs-unit-graph` 编出的 `unit-graph` 程序算：它只用 std、只读源码文本，装置不链它、不 import 它、不读 `crates/` 的任何常量，`.claude/rules/implementation-first.md` 第 4 条「不与实现共用代码」不受影响。
+**装置写在哪（写死，同原登记）**：`scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs`，走 `research/` 那一支，独立手写模型，不与 `crates/` 共用代码；不是入库装置。新加的取键脚本 `scripts/experiment-apparatus/device-code-key.py` 也在 `scripts/experiment-apparatus/`。键的单元那一半由 `crates/singlefs-unit-graph` 编出的 `unit-graph` 程序算：它只用 std、只读源码文本，装置不链它、不 import 它、不读 `crates/` 的任何常量，`.claude/rules/implementation-first.md` 第 4 条「不与实现共用代码」不受影响。
 
 #### 修订 4 之一：问题与问题单
 
@@ -958,9 +958,9 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 
 #### 修订 4 之三：实现今天的样子（这一次现查的行号）
 
-- 装置续跑那几处：`scripts/experiments/e178_leaf_and_record_death_counts.rs:6191`（`DEVICE_SOURCE = include_str!` 整份源文件）、`:6202`（`segment_four_item_name`：`{position:04}-{label}`）、`:6208`（`segment_four_item_key`：`key item=… device_source_sha256=… geometry=…`）、`:6213`（`read_back_the_item`：首行键相同、末行 `done lines=` 对得上才读回）、`:6243`（`compute_or_reuse_the_items`：按项名找项文件）、`:6828`–`:6848`（`segment_four_options_from`，库目录 `E178_SEGMENT_FOUR_ITEMS`，默认在工作根）；文件头 `:12`–`:18`；单测 `:7458`–`:7481`（`resuming_from_the_item_files_assembles_the_same_product`）与 `:7519`（`--no-reuse` 的解析）。
+- 装置续跑那几处：`scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs:6191`（`DEVICE_SOURCE = include_str!` 整份源文件）、`:6202`（`segment_four_item_name`：`{position:04}-{label}`）、`:6208`（`segment_four_item_key`：`key item=… device_source_sha256=… geometry=…`）、`:6213`（`read_back_the_item`：首行键相同、末行 `done lines=` 对得上才读回）、`:6243`（`compute_or_reuse_the_items`：按项名找项文件）、`:6828`–`:6848`（`segment_four_options_from`，库目录 `E178_SEGMENT_FOUR_ITEMS`，默认在工作根）；文件头 `:12`–`:18`；单测 `:7458`–`:7481`（`resuming_from_the_item_files_assembles_the_same_product`）与 `:7519`（`--no-reuse` 的解析）。
 - 闭包里拉进整个 bin 的两处：`:5705`–`:5709` 一个局部变量叫 `main`，`unit-graph` 按裸名把 `fn main`（`:6866`）收进来，接着收进第一至三段、`preflight`（`:7530`）、`repository_root`（`:7526`）与 `DEVICE_SOURCE`；`:6855` 条目级 `include!("heavy_threads_default/threads.rs")`。
-- `unit-graph`：用法 `crates/singlefs-unit-graph/src/bin/unit_graph.rs:1`–`:15`（`key <根> <入口 fn 路径> [--target] [--cfg]… [--toolchain-line]… [--lock-line]…`，退 3 = 拒算、不打键行）；根不含 `crates/` 时把根当 crate 目录、根的上一级当仓根（`workspace.rs:893`），所以根给 `scripts` 时 `scripts/experiments` 是一个 crate（包 `e7-index-bench`，crate 名 `e7_index_bench`）；条目级 `include!` 记成文件级拒算（`rust_items.rs:1637`），链接到的每份文件的文件级拒算都进闭包（`closure.rs:1161`–`:1168`），所以 `:6855` 那一处不管在不在闭包里都让键算不出；键的组成在 `closure.rs:1478` 起的 `reuse_key`：入口目标种类与生效 cfg、闭包里每个单元（种类、去注释指纹）的多重集、数据单元摘要、调用方给的工具链行与依赖行，不带路径、名字、行号。
+- `unit-graph`：用法 `crates/singlefs-unit-graph/src/bin/unit_graph.rs:1`–`:15`（`key <根> <入口 fn 路径> [--target] [--cfg]… [--toolchain-line]… [--lock-line]…`，退 3 = 拒算、不打键行）；根不含 `crates/` 时把根当 crate 目录、根的上一级当仓根（`workspace.rs:893`），所以根给 `scripts` 时 `scripts/experiment-apparatus` 是一个 crate（包 `e7-index-bench`，crate 名 `e7_index_bench`）；条目级 `include!` 记成文件级拒算（`rust_items.rs:1637`），链接到的每份文件的文件级拒算都进闭包（`closure.rs:1161`–`:1168`），所以 `:6855` 那一处不管在不在闭包里都让键算不出；键的组成在 `closure.rs:1478` 起的 `reuse_key`：入口目标种类与生效 cfg、闭包里每个单元（种类、去注释指纹）的多重集、数据单元摘要、调用方给的工具链行与依赖行，不带路径、名字、行号。
 - 仓里已有的两样取法（取键脚本照用，不另写一份）：工具链行 `scripts/gate/admission.py:700` 的 `KeyContext.rust_toolchain_lines`（`rustc -vV` 每行、`cargo -V`、`build_environment_setting_lines` 摊开的构建环境，`:2367`）；依赖行 `scripts/crash/lib_verdict_library.py:227` 的 `locked_dependency_lines`（从包出发顺 `Cargo.lock` 收传递依赖，一包一行「名 版本 来源 checksum」）。
 
 #### 修订 4 之四：跑之前已经存在的数
@@ -976,8 +976,8 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 | 组成 | 取法 | 进键 |
 |---|---|---|
 | 单元 | `unit-graph key <仓根>/scripts e7_index_bench::segment_four_item_lines --target bin:e178-leaf-and-record-death-counts --threads <N>`：入口 `segment_four_item_lines`、目标 bin `e178-leaf-and-record-death-counts`、不加 `--cfg`（这个 bin 不挂特性） | 进（闭包里每个单元的种类与去注释指纹） |
-| 工具链行 | `scripts/gate/admission.py` 的 `KeyContext(<仓根>).rust_toolchain_lines(<仓根>/scripts/experiments)` 的每一行；另加 `profile release` 一行与清单 `[profile.release]` 照 tomllib 解析后逐键摊开的 `profile.release.<键>=<值>`（排好序）；另加 `features none` 一行 | 进（每行一个 `--toolchain-line`） |
-| 依赖版本行 | `scripts/crash/lib_verdict_library.py` 的 `locked_dependency_lines(<仓根>/scripts/experiments, "e7-index-bench")` 的每一行 | 进（每行一个 `--lock-line`） |
+| 工具链行 | `scripts/gate/admission.py` 的 `KeyContext(<仓根>).rust_toolchain_lines(<仓根>/scripts/experiment-apparatus)` 的每一行；另加 `profile release` 一行与清单 `[profile.release]` 照 tomllib 解析后逐键摊开的 `profile.release.<键>=<值>`（排好序）；另加 `features none` 一行 | 进（每行一个 `--toolchain-line`） |
+| 依赖版本行 | `scripts/crash/lib_verdict_library.py` 的 `locked_dependency_lines(<仓根>/scripts/experiment-apparatus, "e7-index-bench")` 的每一行 | 进（每行一个 `--lock-line`） |
 | 参数 | 这一项的 `format!("{item:?}")` | 进 |
 | 序号、项名、`label()`、项文件名、库路径、线程数、分片、机器、日期、跑法 | — | 不进 |
 
@@ -998,16 +998,16 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 
 #### 修订 4 之六：执行员要做的改动（落点；行号是这一次现查的）
 
-装置 `scripts/experiments/e178_leaf_and_record_death_counts.rs`：
+装置 `scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs`：
 
 1. `:5705`–`:5709` 局部变量 `main` 改名（例 `group_index_readings`），行为不变；不改，`fn main` 连带第一至三段被收进入口闭包（修订 4 之三）。
 2. `:6855` 条目级 `include!("heavy_threads_default/threads.rs")` 改成 `#[path = "heavy_threads_default/threads.rs"] mod heavy_threads_default;` 加 `use`；`threads.rs` 里 `default_heavy_threads` 标 `pub(crate)`（照旧 `include!` 它的别的装置里，bin 根上 `pub(crate)` 与私有同义）。不改，键算不出（文件级拒算）。
 3. `:6191` 删 `DEVICE_SOURCE`；`:6130` 的 `sha256_hex` 留着算项键。
 4. `:6202` 项名只给 `index.tsv` 用；`:6208` 改成由（代码键，项）算项键；`:6213` 读回改成按项键找文件、比首行两个键与 `done` 行数，跳过 `parameters`、`meta` 两行；`:6243` 写项文件照修订 4 之五的格式、记这一趟写了哪些项键、拼完重写 `index.tsv`、数键对不上的项；`:6816` 成功句照修订 4 之五。
 5. `:6828`–`:6848` 参数：加 `--code-key-file <组成清单>`、`--written-list <文件>`；库取 `E178_SEGMENT_FOUR_LIBRARY`，默认 `~/.local/share/singlefs/experiments/e178/segment-four`；设了 `E178_SEGMENT_FOUR_ITEMS` 退 2。不带 `--code-key-file` 时只认 `--no-reuse`（现判全部，不读不写库，产物照打）；不带 `--no-reuse` 又没给代码键退 2，出路写「经 `device-code-key.py run` 起」。
-6. 文件头 `:12`–`:18` 改写成新的续跑说法；`scripts/experiments/replay.sh:956` 那一行（`segment-four --no-reuse`）照第 5 条的语义不用改，执行员核一遍它不带 `--code-key-file` 也跑得通。
+6. 文件头 `:12`–`:18` 改写成新的续跑说法；`scripts/experiment-apparatus/replay.sh:956` 那一行（`segment-four --no-reuse`）照第 5 条的语义不用改，执行员核一遍它不带 `--code-key-file` 也跑得通。
 
-取键脚本 `scripts/experiments/device-code-key.py`（新建，E174 修订 2 同用）：`key <仓根> --binary <bin> --entry <fn 路径>… [--feature <特性>]… [--unit-graph <程序>]` 打组成清单与每个入口一行 `code_key <入口> <hex>`（入口名只当索引）；`run <仓根> <同上选项> -- <装置参数…>` 照修订 4 之五「编译与取键的先后」那一段做。文件头写 `admission:` 与 `run-condition:` 两行（`unit-graph` 程序是运行条件）。`--selftest` 用假的 `unit-graph`、`rustc`、`cargo`，不编译。
+取键脚本 `scripts/experiment-apparatus/device-code-key.py`（新建，E174 修订 2 同用）：`key <仓根> --binary <bin> --entry <fn 路径>… [--feature <特性>]… [--unit-graph <程序>]` 打组成清单与每个入口一行 `code_key <入口> <hex>`（入口名只当索引）；`run <仓根> <同上选项> -- <装置参数…>` 照修订 4 之五「编译与取键的先后」那一段做。文件头写 `admission:` 与 `run-condition:` 两行（`unit-graph` 程序是运行条件）。`--selftest` 用假的 `unit-graph`、`rustc`、`cargo`，不编译。
 
 **单元测试**（装置内，快档；每条单独能跑）：
 
@@ -1036,7 +1036,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 
 取键脚本的弄坏开关（文件头逐个列明，自证逐个打开看红在点名那一格）：`DEVICE_CODE_KEY_BREAK=raw-source-digest`（代码键改取整份源文件 sha256 → 「只加注释」格红）、`=toolchain-lines-dropped`（→ 工具链格红）、`=dependency-lines-dropped`（→ 依赖格红）、`=bracket-skipped`（跑完不再取第二次 → 「编译与跑之间改源码」格红）。
 
-**真树样本**（不进快档，执行员跑一次、产物进 `research/results/e178-leaf-and-record-death-counts-resume-key-samples-<日期>.out`）：在草稿目录拷一份 `scripts/experiments`，逐个施加下表的改动（原文在副本里恰好命中一次），每个样本各打一次代码键与受影响项的项键，与基线比。
+**真树样本**（不进快档，执行员跑一次、产物进 `research/results/e178-leaf-and-record-death-counts-resume-key-samples-<日期>.out`）：在草稿目录拷一份 `scripts/experiment-apparatus`，逐个施加下表的改动（原文在副本里恰好命中一次），每个样本各打一次代码键与受影响项的项键，与基线比。
 
 | 类 | 样本 | 为什么 | 作废面 | 设计员在副本上量的（修订 4 之八） |
 |---|---|---|---|---|
@@ -1110,7 +1110,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 
 ### 修订 5（执行员，2026-10-15，装置改完、单元测试跑完，真树样本与第四段产物一次没跑之前；只触及续跑键的依赖行与它牵到的一行样本）
 
-- **改了什么**：修订 4 之五「键的组成」一表「依赖版本行」那一格的取法收窄。原取法 `locked_dependency_lines(<仓根>/scripts/experiments, "e7-index-bench")`（整个包的传递依赖）不再用；改取入口闭包里的 Rust 单元点到的外部包与它们的传递依赖：每个闭包单元的原文（`unit-graph closure` 交的「文件:起-止」那几行）经 `scripts/gate/lib_function_units.py` 的 `rust_lex`、`token_references` 取出点到的名字（裸名与路径的头一段），交 `scripts/gate/admission.py` 的 `KeyContext.dependency_lines` 那一份收窄法（清单写的外部依赖里代码名被点到的才收，再顺 `Cargo.lock` 收传递依赖）。写法在 `scripts/experiments/device-code-key.py` 文件头「键的组成」依赖行那一条。修订 4 之五第二条「收窄到闭包点名的依赖要另立修订」说的就是这一条。
+- **改了什么**：修订 4 之五「键的组成」一表「依赖版本行」那一格的取法收窄。原取法 `locked_dependency_lines(<仓根>/scripts/experiment-apparatus, "e7-index-bench")`（整个包的传递依赖）不再用；改取入口闭包里的 Rust 单元点到的外部包与它们的传递依赖：每个闭包单元的原文（`unit-graph closure` 交的「文件:起-止」那几行）经 `scripts/gate/lib_function_units.py` 的 `rust_lex`、`token_references` 取出点到的名字（裸名与路径的头一段），交 `scripts/gate/admission.py` 的 `KeyContext.dependency_lines` 那一份收窄法（清单写的外部依赖里代码名被点到的才收，再顺 `Cargo.lock` 收传递依赖）。写法在 `scripts/experiment-apparatus/device-code-key.py` 文件头「键的组成」依赖行那一条。修订 4 之五第二条「收窄到闭包点名的依赖要另立修订」说的就是这一条。
 - **这一条不是收严**：它少作废了闭包没点到的依赖变动（例：抬 wgpu 不再让第四段的项作废）。依据是主 agent 在派发提示（`~/.local/share/singlefs/work/runner-e178-e174-resume-keys/prompt.md`）「主 agent 对设计员交的几点的定」里定的，原句：「② 依赖行不取整个包的传递依赖，收窄到闭包真引到的外部包及其传递依赖（`unit-graph key --lock-line` 只喂闭包引到的那几行，怎么从闭包成员取「引到哪些外部包」照设计 3.1）」。设计 3.1 指第二轮复查 design 路报告（入库副本 `research/prompts/pruning-survey-2026-10-15/r2-design-report.md`「3.1 键」）那一句「外部依赖解析结果（`Cargo.lock` 里入口链接集真引到的包：名、版本、来源、checksum，及传递依赖；随底稿 L4）」。
 - **单元测试读数**（时点在产物之前）：改完的装置在草稿副本上 `cargo test --release --bin e178-leaf-and-record-death-counts` 54 条绿；`device-code-key.py key` 对入口 `e7_index_bench::segment_four_item_lines` 打的组成清单里 unit 行 338、dependency 行 0（清单写的外部依赖代码名 `aes_gcm`、`chacha20poly1305`、`pollster`、`redb`、`rocksdb`、`wgpu`，闭包 338 个单元一个都没点到），toolchain 行 14；草稿 `logs/e178-key-final.out`。
 - **牵到的那一行样本**：修订 4 之六真树样本表「作废」类「`Cargo.lock` 里 aes-gcm 抬一版」。收窄之后入口闭包不点 aes_gcm，这一行的代码键不换，按收窄后的取法它的期望改记「不作废」。行与施加的改动原样保留、照跑、照报 `changed=`，产物里那一行写 `expected=unchanged` 并注明依据是这一条修订；判据（F-K1 / F-K2 的写法）不改。E178 的入口闭包没有点到任何外部包，「闭包点到的依赖抬一版就作废」这一格在 E178 上造不出样本，由 E174 修订 3 的 wgpu 那一行与取键脚本自证「闭包点到的包在 Cargo.lock 里抬一版键变」那一格担。
@@ -1134,7 +1134,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 | `.claude/kb/decisions/18-块里携带什么信息.md` | 全部标题行；202-251；252-255、300-302（经草稿 `d18-11.txt` 第 1-4、49-51 行）；568-599；252-351 里 grep「退役\|类型 3」命中的 256、300、303 |
 | `.claude/kb/invariants.md` | 标题行与 I-9 各行的 grep：1、9、12、21、48、83、125、136、172、191、214、264、279、290、292、293、300、301、306、308、309、310、311 |
 | `.claude/kb/checks-owed.md` | 100、104、106、474（C109、C113、C116、C614 那几行） |
-| `scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs` | 1-120；132-446；1462-1700；1700-2070；2140-2220；2540-2575；2738-3150；3318-3345；3385-3405；3900-3980；4560-4835；`^fn\|^struct\|^enum\|^impl` 的 grep 全部命中行；33、35、39、1728-1729、1966-1970、2205-2217、3331、3336、3400、3950-3956、4585-4588、4694-4699 |
+| `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs` | 1-120；132-446；1462-1700；1700-2070；2140-2220；2540-2575；2738-3150；3318-3345；3385-3405；3900-3980；4560-4835；`^fn\|^struct\|^enum\|^impl` 的 grep 全部命中行；33、35、39、1728-1729、1966-1970、2205-2217、3331、3336、3400、3950-3956、4585-4588、4694-4699 |
 | `research/prompts/e177-preregistration.md` | `^## \|^### ` 的标题行；330-403（第五节，设计；第四节与修订、产物没读） |
 | `crates/singlefs-core/src/inode_tree.rs` | 1-100；181-320；`fn \|合并\|借` 的 grep 命中行 |
 | `crates/singlefs-core/src/unlink.rs` | 95-165；grep 命中 3、15、21、22、29、37、42、46、61、118、135、166、243 |
@@ -1154,7 +1154,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 | `.claude/scripts/gen-decision-items.py`、`scripts/kb/kb-spec-check.py` | `not-numbers` 的 grep 命中行（51、69、83；62） |
 | `research/results/` | 只有 `ls \| grep -i e177` 列出的三个文件名，内容没读 |
 
-全仓按用词搜（排除实验、产物、提示目录与实验索引两份文件）只搜过一次：「发布占比\|多写的发布\|每次借多写\|退役记录数」，零命中。`records/`、`.claude/kb/decisions-history.md`、`scripts/experiments/perf-by-milestone.md` 没读到任何结果行。
+全仓按用词搜（排除实验、产物、提示目录与实验索引两份文件）只搜过一次：「发布占比\|多写的发布\|每次借多写\|退役记录数」，零命中。`records/`、`.claude/kb/decisions-history.md`、`scripts/experiment-apparatus/perf-by-milestone.md` 没读到任何结果行。
 
 ### 13.2 跑过的命令（原样；工作目录仓根，草稿目录 `~/.local/share/singlefs/work/leaf-death-designer/`）
 
@@ -1313,7 +1313,7 @@ A7 n_u=300 b=144 in_window_scans=3 extent_m_peak=300 first=[300, 156, 12] last=1
 | `.claude/singlefs-ai-sop/rules/test-script-discipline.md` | 1-96 |
 | `research/prompts/m3-leaf-death-forks.md` | 1-11（只读问题） |
 | `research/prompts/e178-preregistration.md` | 修订 2 之前的 1-886 全部 |
-| `scripts/experiments/e178_leaf_and_record_death_counts.rs` | `^//!` 的 grep（1-28）；顶层 `fn / struct / enum / impl / const` 的 grep 命中行（39-4324 之间）；170-401；630-1289；2040-2339 |
+| `scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs` | `^//!` 的 grep（1-28）；顶层 `fn / struct / enum / impl / const` 的 grep 命中行（39-4324 之间）；170-401；630-1289；2040-2339 |
 | `.claude/kb/invariants.md` | 301、307（grep 命中） |
 | `crates/singlefs-checker/src/walk.rs` | grep `I-9\.13` 命中 3017、3056；grep `I-9\.19` 命中 10000、10028、10304；3054-3058 |
 | `crates/singlefs-core/src/inode_tree.rs` | grep `is_empty()` 命中 132、301、762、801、802；296-310 |
@@ -1325,7 +1325,7 @@ A7 n_u=300 b=144 in_window_scans=3 extent_m_peak=300 first=[300, 156, 12] last=1
 ps -o pid,etime,args -u "$(id -u)" | grep -i 'e178\|leaf-and-record' | grep -v grep
 bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts | tail -5
 python3 scripts/hosts/host-resources.py --json | head -c 1500
-sha256sum research/prompts/m3-leaf-death-forks.md research/prompts/e178-preregistration.md scripts/experiments/e178_leaf_and_record_death_counts.rs
+sha256sum research/prompts/m3-leaf-death-forks.md research/prompts/e178-preregistration.md scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs
 python3 scripts/kb/quote-kb.py $D/quote-i919.md ".claude/kb/invariants.md~^\| I-9\.19 \|"     # ✓ 1 段整抄，回读逐字节一致，退出 0
 python3 anchors3.py > anchors3.out      # 退出 0
 python3 anchors4.py > anchors4.out      # 退出 0
@@ -1450,8 +1450,8 @@ M20 F1 n=900 cap=233 ascending publishes=1819 versions_with_an_empty_leaf=869 ve
 - 规则整份：`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–126、`.claude/rules/three-way-inference.md` 1–166、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–179、`.claude/rules/mutation-sampling.md` 1–90、`.claude/rules/implementation-first.md` 1–19、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–103、`.claude/rules/changelog-format.md` 1–46；`.claude/singlefs-ai-sop/rules/command-safety.md` 第 153 行（grep `跨轮`）。
 - 仓外底稿（只读）：`~/.local/share/singlefs/work/survey-pruning-ledger/ledger-r1.md` 1–12、25、29–30、32、41–46、79–103；`~/.local/share/singlefs/work/survey-pruning-r2-gaps/report.md` 1–15、55–66、217–218、224–226、245 与标题；`~/.local/share/singlefs/work/survey-pruning-r2-controls/report.md` 1–15、324–346、677–692、730–750 与标题。
 - `crates/singlefs-unit-graph/`：`Cargo.toml` 整份；`src/lib.rs` 1–29；`src/bin/unit_graph.rs` 1–232；`src/workspace.rs` 1–60、720–790、879–960；`src/closure.rs` 1–70、795–812、1155–1170、1255–1425、1430–1547；`src/rust_items.rs` 1060–1110、1620–1650；`src/units.rs` 152–206（grep 拒算形态）。
-- 装置：`scripts/experiments/e178_leaf_and_record_death_counts.rs` 1–40、140–215、2840–2925、5700–5712、6085–6290、6815–6870、7455–7500、7510–7552，grep 命中第 12、16、18、2861、3919、5705–5709、6130、6191、6202、6208、6243、6254–6263、6653、6816–6876、7303–7305、7470–7474、7519 行；`scripts/experiments/e174_lease_drop_wait_memory_return.rs`（E174 修订 2 用，行区间列在那一份登记）。
-- `scripts/experiments/Cargo.toml` 1–40、250–253、623–660、715–750；`scripts/experiments/heavy_threads_default/threads.rs` 1–40；`scripts/experiments/replay.sh` 第 66–67、946–956、2255–2290 行（grep）；`scripts/mutation/tables/e178_leaf_and_record_death_counts.tsv` 前 3 行与末 3 行的变异名（`grep -vc` 数行数）。
+- 装置：`scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs` 1–40、140–215、2840–2925、5700–5712、6085–6290、6815–6870、7455–7500、7510–7552，grep 命中第 12、16、18、2861、3919、5705–5709、6130、6191、6202、6208、6243、6254–6263、6653、6816–6876、7303–7305、7470–7474、7519 行；`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs`（E174 修订 2 用，行区间列在那一份登记）。
+- `scripts/experiment-apparatus/Cargo.toml` 1–40、250–253、623–660、715–750；`scripts/experiment-apparatus/heavy_threads_default/threads.rs` 1–40；`scripts/experiment-apparatus/replay.sh` 第 66–67、946–956、2255–2290 行（grep）；`scripts/mutation/tables/e178_leaf_and_record_death_counts.tsv` 前 3 行与末 3 行的变异名（`grep -vc` 数行数）。
 - `scripts/gate/admission.py` 12–40、590–602、690–770、2367–2380、2919–2938、3092–3122、4950–4970；`scripts/gate/lib_function_units.py` 1–75；`scripts/gate/README.md` 第 11 行；`scripts/crash/lib_verdict_library.py` 15–30、227–300；`scripts/kb/replace-once.py` 1–30；`scripts/mutation/crates-mutation-rows.py` 第 181、280、1213、3357 行与 `scripts/hosts/test-environment-check.py` 第 96、1969 行（grep `cross-run-cache`）。
 - `.claude/hooks/agent-write-scope.tsv`（grep `experiment`）、`.claude/hooks/lib_long_run.py` 10–20、88–91、`.claude/heavy-thread-default` 第一条非注释行、`.claude/history-carriers` 整份、`.cargo/config.toml` 整份、`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 798–837、`.claude/doc-lint-exclude` 1–8。
 - `records/2026-10-13-复用键与全仓改名.md` 标题与第 503、507、514、522、528 行。
@@ -1466,7 +1466,7 @@ bash scripts/hosts/work-directory-ownership.sh claim ~/.local/share/singlefs/wor
 TZ=Asia/Tokyo date +%F
 diff -rq crates/singlefs-unit-graph ~/.local/share/singlefs/work/impl-unit-graph-crate/repository/crates/singlefs-unit-graph
 nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G $UG closure scripts e7_index_bench::segment_four_item_lines --target bin:e178-leaf-and-record-death-counts --threads 1
-rsync -r --exclude=target scripts/experiments $D/probe/tree/scripts/ && cp .claude/heavy-thread-default $D/probe/tree/.claude/
+rsync -r --exclude=target scripts/experiment-apparatus $D/probe/tree/scripts/ && cp .claude/heavy-thread-default $D/probe/tree/.claude/
 nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G python3 -I $D/probe/tools/e178_probe.py $D/probe $UG
 nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G python3 -I $D/probe/tools/crosscheck.py $D/probe $UG scripts/gate/lib_function_units.py
 python3 scripts/kb/quote-kb.py $D/rule-quote.md '.claude/singlefs-ai-sop/rules/test-script-discipline.md@## 判定可复用：按输入存，按前缀剪'
@@ -1478,8 +1478,8 @@ ls -d ~/.local/share/singlefs/work/e178-segment-four
 
 ```
 sample=raw-device-today exit=3 key=none units=494 refused=2 main_in_closure=True run_segment_one_in_closure=True data_units=2
-  refused	item-level-include	scripts/experiments/e178_leaf_and_record_death_counts.rs:6855	include ! ( "heavy_threads_default/threads.rs" ) ;
-  refused	runtime-read-path-not-literal	scripts/experiments/e178_leaf_and_record_death_counts.rs:7527	: : from ( env ! ( "CARGO_MANIFEST_DIR" ) ) . join
+  refused	item-level-include	scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs:6855	include ! ( "heavy_threads_default/threads.rs" ) ;
+  refused	runtime-read-path-not-literal	scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs:7527	: : from ( env ! ( "CARGO_MANIFEST_DIR" ) ) . join
 sample=prepared-baseline exit=0 key=60a62695b290a29c units=338 refused=0 main_in_closure=False run_segment_one_in_closure=False data_units=0
 sample=prepared-comment-only exit=0 key=60a62695b290a29c units=338 refused=0 main_in_closure=False run_segment_one_in_closure=False data_units=0
 sample=prepared-unrelated-function exit=0 key=60a62695b290a29c units=338 refused=0 main_in_closure=False run_segment_one_in_closure=False data_units=0
@@ -1510,4 +1510,4 @@ case=e174 sample=lease-step-changed rust=[exit=0 key	004a05038837cd64bc26156c7a8
 补记两样也跑过的：
 
 - `e178_probe.py` 改样本之前先跑过一趟：那一趟拿 `merge_thresholds_of` 当「闭包里的函数」样本，代码键没换（它只造清单、在入口闭包外，修订 4 之六样本表把它改记成几何参数那一格），另换 `deletion_order_of` 当闭包里的函数重跑，就是上面那份输出。
-- `python3 scripts/gate/admission.py unit-key . 'e178_leaf_and_record_death_counts.rs::segment_four_item_lines' root:scripts/experiments [target:…] profile:release` 三种写法：给 `target:experiments:bin:…` 或 `target:.:bin:…` 报 `key-uncomputable`（目标号认不得）；不给目标报拒算 2 处（`include-missing` 第 6863 行、`runtime-path` 第 7527 行），与 `unit-graph` 在今天装置上的结论同向（入口闭包收进了 `main` 那一路）。取键不走它，只记下。
+- `python3 scripts/gate/admission.py unit-key . 'e178_leaf_and_record_death_counts.rs::segment_four_item_lines' root:scripts/experiment-apparatus [target:…] profile:release` 三种写法：给 `target:experiments:bin:…` 或 `target:.:bin:…` 报 `key-uncomputable`（目标号认不得）；不给目标报拒算 2 处（`include-missing` 第 6863 行、`runtime-path` 第 7527 行），与 `unit-graph` 在今天装置上的结论同向（入口闭包收进了 `main` 那一路）。取键不走它，只记下。

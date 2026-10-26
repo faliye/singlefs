@@ -15,7 +15,7 @@ work="${1:?用法：rerun.sh <工作目录> build|run|compare|all}"
 stage="${2:?用法：rerun.sh <工作目录> build|run|compare|all}"
 original_sha="9061c07b72a3c74693ddcacb885b0b4a9ebc4e4dc2c7082cfee320b3112848f5"
 bin_name="e177-per-tree-resurrection-without-tombstones"
-bin_file="scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs"
+bin_file="scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs"
 runs=(
   "baseline none" "baseline absorb" "baseline absorb_borrow"
   "retire none" "retire absorb" "retire absorb_borrow"
@@ -32,8 +32,8 @@ do_build() {
   need_repo
   mkdir -p "$work/build" "$work/runs"
   if [[ ! -d "$work/build/e7-index-bench" ]]; then
-    cp -r "$SINGLEFS_REPO/scripts/experiments" "$work/build/e7-index-bench"
-    cp "$SINGLEFS_REPO/scripts/experiments/Cargo.toml" "$SINGLEFS_REPO/scripts/experiments/Cargo.lock" "$work/build/"
+    cp -r "$SINGLEFS_REPO/scripts/experiment-apparatus" "$work/build/e7-index-bench"
+    cp "$SINGLEFS_REPO/scripts/experiment-apparatus/Cargo.toml" "$SINGLEFS_REPO/scripts/experiment-apparatus/Cargo.lock" "$work/build/"
   fi
   actual_sha="$(sha256sum "$SINGLEFS_REPO/research/$bin_file" | cut -d' ' -f1)"
   if [[ "$actual_sha" != "$original_sha" ]]; then

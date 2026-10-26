@@ -1,0 +1,17 @@
+# 攻方原型：m3-close-g4-rewrite-r3（从 r2 那一份原型改出）。拷进仓副本的 crates/g4-attack-prototype-r3 当工作区成员编（只 cargo build，直接执行编出来的二进制）。
+[package]
+name = "g4-attack-prototype-r3"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "g4-attack-prototype-r3"
+path = "src/main.rs"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-checker = { path = "../singlefs-checker" }

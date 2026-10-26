@@ -1,0 +1,170 @@
+6365 0 sw=1 reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6365 0 sw=1 reused=true noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6365 0 sw=1 reused=true noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6365 0 sw=1 reused=true noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6365 1 sw=1 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6365 1 sw=1 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6365 1 sw=1 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6365 1 sw=1 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6371 0 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6371 0 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6371 0 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6371 0 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6372 0 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6372 0 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6372 0 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6372 0 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6372 1 sw=2 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6372 1 sw=2 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6372 1 sw=2 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6372 1 sw=2 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6375 0 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6375 0 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6375 0 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6375 0 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6375 1 sw=2 reused=true noflag noleak selfcheck after:I-3.1=违例,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-3.1] jia2n=L[I-7.2]+L[I-3.1] jia2s=L[I-7.2]+L[I-3.1] jia2k=L[I-7.2]+L[I-3.1]
+6375 1 sw=2 reused=true noflag noleak gen after:I-3.1=违例,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-3.1] jia2n=L[I-7.2]+L[I-3.1] jia2s=L[I-7.2]+L[I-3.1] jia2k=L[I-7.2]+L[I-3.1]
+6375 1 sw=2 reused=true noflag noleak cmp after:I-3.1=违例,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-3.1] jia2n=L[I-7.2]+L[I-3.1] jia2s=L[I-7.2]+L[I-3.1] jia2k=L[I-7.2]+L[I-3.1]
+6375 1 sw=2 reused=true noflag noleak both after:I-3.1=违例,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-3.1] jia2n=L[I-7.2]+L[I-3.1] jia2s=L[I-7.2]+L[I-3.1] jia2k=L[I-7.2]+L[I-3.1]
+6378 2 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6378 2 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6378 2 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6378 2 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6379 0 sw=1 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6379 0 sw=1 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6379 0 sw=1 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6379 0 sw=1 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6381 0 sw=1 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6381 0 sw=1 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6381 0 sw=1 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6381 0 sw=1 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6382 0 sw=1 reused=true flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6382 0 sw=1 reused=true flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6382 0 sw=1 reused=true flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6382 0 sw=1 reused=true flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6382 1 sw=2 reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6382 1 sw=2 reused=true noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6382 1 sw=2 reused=true noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6382 1 sw=2 reused=true noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6383 1 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6383 1 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6383 1 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6383 1 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6384 0 sw=2 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6384 0 sw=2 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6384 0 sw=2 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6384 0 sw=2 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6385 0 sw=1 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6385 0 sw=1 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6385 0 sw=1 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6385 0 sw=1 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6385 1 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6385 1 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6385 1 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6385 1 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6387 1 sw=1 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6387 1 sw=1 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6387 1 sw=1 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6387 1 sw=1 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6388 0 sw=1 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6388 0 sw=1 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6388 0 sw=1 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6388 0 sw=1 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6392 0 sw=2 reused=false noflag noleak selfcheck after:I-3.1=不适用,I-3.11=不适用,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6392 0 sw=2 reused=false noflag noleak gen after:I-3.1=不适用,I-3.11=不适用,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6392 0 sw=2 reused=false noflag noleak cmp after:I-3.1=不适用,I-3.11=不适用,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6392 0 sw=2 reused=false noflag noleak both after:I-3.1=不适用,I-3.11=不适用,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6393 0 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 0 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 0 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 0 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 1 sw=1 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 1 sw=1 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 1 sw=1 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6393 1 sw=1 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6394 0 sw=1 reused=true flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6394 0 sw=1 reused=true flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6394 0 sw=1 reused=true flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6394 0 sw=1 reused=true flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6395 0 sw=2 reused=true flag noleak selfcheck after:I-3.1=违例,I-3.11=违例,I-3.15=违例 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2]+N[I-3.1,I-3.10,I-3.11,I-3.15] jia2n=L[I-7.2]+L[I-3.1,I-3.10,I-3.11,I-3.15] jia2s=L[I-7.2]+L[I-3.1,I-3.10,I-3.11,I-3.15] jia2k=L[I-7.2]+L[I-3.1,I-3.10,I-3.11,I-3.15]
+6395 0 sw=2 reused=true flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2]+L[I-3.10] jia2n=L[I-7.2]+L[I-3.10] jia2s=L[I-7.2]+L[I-3.10] jia2k=L[I-7.2]+L[I-3.10]
+6395 0 sw=2 reused=true flag noleak cmp after:I-3.1=违例,I-3.11=违例,I-3.15=违例 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2]+N[I-3.1,I-3.10,I-3.11,I-3.15] jia2n=L[I-7.2]+L[I-3.1,I-3.10,I-3.11,I-3.15] jia2s=L[I-7.2]+L[I-3.1,I-3.10,I-3.11,I-3.15] jia2k=L[I-7.2]+L[I-3.1,I-3.10,I-3.11,I-3.15]
+6395 0 sw=2 reused=true flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2]+L[I-3.10] jia2n=L[I-7.2]+L[I-3.10] jia2s=L[I-7.2]+L[I-3.10] jia2k=L[I-7.2]+L[I-3.10]
+6396 1 sw=2 reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6396 1 sw=2 reused=true noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6396 1 sw=2 reused=true noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6396 1 sw=2 reused=true noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=不适用 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-7.2]+L[I-7.2] jia2n=L[I-7.2]+L[I-7.2] jia2s=L[I-7.2]+L[I-7.2] jia2k=L[I-7.2]+L[I-7.2]
+6398 2 sw=2 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6398 2 sw=2 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6398 2 sw=2 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6398 2 sw=2 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6399 0 sw=1 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6399 0 sw=1 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6399 0 sw=1 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6399 0 sw=1 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6399 1 sw=1 reused=true flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+6399 1 sw=1 reused=true flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+6399 1 sw=1 reused=true flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+6399 1 sw=1 reused=true flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L[I-3.10]+L[I-3.10] jia2n=L[I-3.10]+L[I-3.10] jia2s=L[I-3.10]+L[I-3.10] jia2k=L[I-3.10]+L[I-3.10]
+6400 1 sw=2 reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6400 1 sw=2 reused=true noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6400 1 sw=2 reused=true noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6400 1 sw=2 reused=true noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=- jia2n=- jia2s=- jia2k=-
+6401 0 sw=1 reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6401 0 sw=1 reused=true noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6401 0 sw=1 reused=true noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6401 0 sw=1 reused=true noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6403 1 sw=1 reused=true noflag noleak selfcheck after:I-3.1=违例,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-3.1]+L[I-3.1] jia2n=L[I-3.1]+L[I-3.1] jia2s=L[I-3.1]+L[I-3.1] jia2k=L[I-3.1]+L[I-3.1]
+6403 1 sw=1 reused=true noflag noleak gen after:I-3.1=违例,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-3.1]+L[I-3.1] jia2n=L[I-3.1]+L[I-3.1] jia2s=L[I-3.1]+L[I-3.1] jia2k=L[I-3.1]+L[I-3.1]
+6403 1 sw=1 reused=true noflag noleak cmp after:I-3.1=违例,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-3.1]+L[I-3.1] jia2n=L[I-3.1]+L[I-3.1] jia2s=L[I-3.1]+L[I-3.1] jia2k=L[I-3.1]+L[I-3.1]
+6403 1 sw=1 reused=true noflag noleak both after:I-3.1=违例,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-3.1]+L[I-3.1] jia2n=L[I-3.1]+L[I-3.1] jia2s=L[I-3.1]+L[I-3.1] jia2k=L[I-3.1]+L[I-3.1]
+6404 0 sw=1 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6404 0 sw=1 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6404 0 sw=1 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6404 0 sw=1 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6406 1 sw=1 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6406 1 sw=1 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6406 1 sw=1 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6406 1 sw=1 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6407 1 sw=1 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6407 1 sw=1 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6407 1 sw=1 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6407 1 sw=1 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L jia2n=L jia2s=L jia2k=L
+6407 2 sw=2 reused=true noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6407 2 sw=2 reused=true noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6407 2 sw=2 reused=true noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6407 2 sw=2 reused=true noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L jia2n=L jia2s=L jia2k=L
+6409 0 sw=2 reused=false flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6409 0 sw=2 reused=false flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6409 0 sw=2 reused=false flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6409 0 sw=2 reused=false flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=违例,I-3.11=违例,I-3.15=违例 today=L[I-7.2] jia2n=L[I-7.2] jia2s=L[I-7.2] jia2k=L[I-7.2]
+6411 0 sw=2 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2n=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2s=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2k=L[I-1.13,I-7.2]+L[I-1.13,I-7.2]
+6411 0 sw=2 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2n=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2s=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2k=L[I-1.13,I-7.2]+L[I-1.13,I-7.2]
+6411 0 sw=2 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2n=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2s=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2k=L[I-1.13,I-7.2]+L[I-1.13,I-7.2]
+6411 0 sw=2 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2n=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2s=L[I-1.13,I-7.2]+L[I-1.13,I-7.2] jia2k=L[I-1.13,I-7.2]+L[I-1.13,I-7.2]
+6411 1 sw=1 reused=true flag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6411 1 sw=1 reused=true flag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6411 1 sw=1 reused=true flag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6411 1 sw=1 reused=true flag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=违例,I-3.15=违例 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6412 1 sw=1 reused=false noflag noleak selfcheck after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6412 1 sw=1 reused=false noflag noleak gen after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6412 1 sw=1 reused=false noflag noleak cmp after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+6412 1 sw=1 reused=false noflag noleak both after:I-3.1=成立,I-3.11=成立,I-3.15=成立 replug:I-3.1=成立,I-3.11=成立,I-3.15=成立 today=L+L jia2n=L+L jia2s=L+L jia2k=L+L
+TALLY both jia2k {'-': 2, 'L': 56}
+TALLY both jia2n {'-': 2, 'L': 56}
+TALLY both jia2s {'-': 2, 'L': 56}
+TALLY both today {'-': 2, 'L': 56}
+TALLY cmp jia2k {'-': 2, 'L': 56}
+TALLY cmp jia2n {'-': 2, 'L': 56}
+TALLY cmp jia2s {'-': 2, 'L': 56}
+TALLY cmp today {'-': 2, 'L': 55, 'N': 1}
+TALLY gen jia2k {'-': 2, 'L': 56}
+TALLY gen jia2n {'-': 2, 'L': 56}
+TALLY gen jia2s {'-': 2, 'L': 56}
+TALLY gen today {'-': 2, 'L': 56}
+TALLY selfcheck jia2k {'-': 2, 'L': 56}
+TALLY selfcheck jia2n {'-': 2, 'L': 56}
+TALLY selfcheck jia2s {'-': 2, 'L': 56}
+TALLY selfcheck today {'-': 2, 'L': 55, 'N': 1}
+BLIND {'genNe_otherSame': 1, 'loc_self_pass_points': 2}
+DONE 50

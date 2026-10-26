@@ -1,6 +1,0 @@
-ba2c136f35545c08269de167ef535d47550b8a446735574f7d83fe13628dc468  .claude/kb/decisions/26-后台整理与放置回收.md
-25f5e2ba938a0af1929bc301fe445c1e1f5ed256794f2d5eb32594e3e1ac8470  .claude/kb/decisions/23-journal的角色与格式.md
-0689f876afbb9fef657c2b1bf0f516a1b50ab7b9e328bfa5b4bb454d47cad30d  .claude/kb/decisions/05-快照-空间记账机制.md
-d91e4a01952f0668ff26ad4ea823c62ee333bd93d4bccbedb226173cdacc12a9  .claude/kb/decisions/16-发布语义.md
-2a567e439dff0a19d8f810dbe835e857196c24719e347789777054ab9bda4016  crates/singlefs-checker/invariants/05-空间记账.md
-a0b4a2067e2518cb141b9a0c38c85aed278c3a911266592e76fe8f78c2b5c55a  crates/singlefs-checker/invariants/07-分配器.md

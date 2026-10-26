@@ -2,7 +2,7 @@
 # e171-conclusion-r2 攻方腿（Opus）报告里引的数，在副本里从头复跑。只读仓、E171 导出目录与两棵冻住的树，只写 <工作目录>。
 # 用法：bash tools/rerun.sh <工作目录（不存在）> [线程数，默认 15]
 # 要的东西：E171 跑的那棵树 /tmp/claude-1000/e171-s4/frozen-tree/（这一轮叫「s4 树」）、这一轮的冻结副本 /tmp/claude-1000/e171-conclusion-r1/tree/
-# （「今天的树」，它没有 Cargo.toml / Cargo.lock，取 e171-conclusion-r1 攻方模型目录里那两份）、scripts/experiments/target/e171-dumps/。
+# （「今天的树」，它没有 Cargo.toml / Cargo.lock，取 e171-conclusion-r1 攻方模型目录里那两份）、scripts/experiment-apparatus/target/e171-dumps/。
 # 跑的都是 harness 档的自写探针（测试目标名不带 layer0）与 Python；不跑 checker 档测试、不起 E171 装置。每一步编译与跑都经内存包装。
 # 跑完逐个与 <模型目录>/out/ 下同名文件比（比法在末尾），judge-*.tsv 原始逐态文件不比（这一版探针多一列第二截判定），比它们的汇总 judge-summary.out。
 set -euo pipefail
@@ -13,7 +13,7 @@ REPO=/home/fy5090/code/singlefs
 S4=/tmp/claude-1000/e171-s4/frozen-tree
 TODAY=/tmp/claude-1000/e171-conclusion-r1/tree
 R1MODEL=$REPO/research/prompts/e171-conclusion-r1-opus-model
-D=$REPO/scripts/experiments/target/e171-dumps
+D=$REPO/scripts/experiment-apparatus/target/e171-dumps
 CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh"
 CAPPED="bash $REPO/scripts/hosts/capped.sh $THREADS"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='e171-conclusion-r2 攻方复跑：自写探针换输入或换二进制'
@@ -21,7 +21,7 @@ export PYTHONDONTWRITEBYTECODE=1
 mkdir "$WORK"
 cd "$WORK"
 mkdir out bin jb
-cp -r "$TODAY/scripts/experiments/e170_second_run_o3_spec_executor" o3copy
+cp -r "$TODAY/scripts/experiment-apparatus/e170_second_run_o3_spec_executor" o3copy
 
 echo "== 1 两棵树的副本"
 mkdir ws ws_s4

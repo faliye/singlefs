@@ -1,3 +1,0 @@
-E name=holes_pre_bounded nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=37078 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=228 del_pred_false=110 n0_refused=0 gc_done=5561 gc_declined=29173 gc_stuck=0 gc_paused=658 gc_cycle=0 gc_cap=0 gc_wasted=1686
-W name=holes_pre_bounded flag=del_pred_true path=W0.M.W1.GI.GB
-W name=holes_pre_bounded flag=del_pred_false path=W0.M.M.W1.GI.GB

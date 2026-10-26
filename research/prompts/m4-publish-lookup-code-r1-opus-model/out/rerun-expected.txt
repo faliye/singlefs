@@ -1,5 +1,0 @@
-name=differential kind=random lines=<随行数而定> before_vs_after=identical
-name=differential kind=scripted lines=<随行数而定> before_vs_after=identical
-name=t2 M4T2 total keys_compared=14352 both_panicked=942 found=9808
-name=half_mapping_mutant 4 tests_ok; batches_published=13 images_sha256=763f4477ce2f2d78947048a8f8d37327601b302c81bd8eb0fdaa6596427d89e4 batches_published=39 images_sha256=f065921a3fc7507c1d89d4fba41acc5fe7ef5f6c9a302f48b4244a86e9998a5c
-name=growth_row_nine growth_in_percent=<354–362 之间，CPU 时间随负载浮动> test result: ok. 1 passed; ...

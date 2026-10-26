@@ -1,0 +1,24 @@
+
+running 1 test
+test first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long ... FAILED
+
+failures:
+
+---- first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long stdout ----
+publish_lookup_by_identity synthetic_table smaller=ComparisonsOfLookups { lookups: 513, comparisons: 131840 } larger=ComparisonsOfLookups { lookups: 2049, comparisons: 2100224 } growth_in_percent=398
+
+thread 'first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long' (2421802) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:990:5:
+表长四倍，每次查平均比较次数涨了 398%，门槛 200%（小表 ComparisonsOfLookups { lookups: 513, comparisons: 131840 }，大表 ComparisonsOfLookups { lookups: 2049, comparisons: 2100224 }）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.82s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 23s
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

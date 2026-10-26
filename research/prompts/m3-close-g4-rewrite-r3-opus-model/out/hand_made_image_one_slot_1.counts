@@ -1,0 +1,1 @@
+name=hand_made_image_one_slot_1 slots_per_device=[1, 2] o2_report=SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [0] } writable_mount=mounted slots_per_device_after_the_mount=[2, 2]

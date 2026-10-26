@@ -1,0 +1,17 @@
+b1ecb7af3f4fbf163838c3379db55eff4367d1564d71bb603dc44c8f857c795b  .claude/kb/decisions/22-synthesizing-unit-atomicity.en.md
+c3b4c93838f6494fcad6dc1a1195c380102abb9ee5b1c199f52d6f29f04afc9d  .claude/kb/decisions/22-ユニット原子性の合成手法.ja.md
+d4926ce2e92063675aeb2ccd597c6a3987deb9b1dcf2df05bb3decd493c8a151  .claude/kb/decisions/22-单元原子性怎么合成.md
+399edb86cedb84ef4391698a21e1044e1472ad425c4b98806c8350fb8eb2ae38  crates/singlefs-checker/invariants/02-根环.md
+7f47994fadb34f9ad24a0fcd581ea154a88b0c7a3ab44d2a3d0bc3e8d3023ca7  .claude/kb/experiments/50-upper-and-lower-bounds-on-root-ring-slot-count.en.md
+7262ad242e365776b006e3cec5da77d49f8cf4d71d61e40df8f955512e8177b0  .claude/kb/experiments/50-ルートリングスロット数の上下限.ja.md
+3610a80eaa22a23fd7d712bb37d84885ff8d8a7da0856d90ab2256bca3be9a39  .claude/kb/experiments/50-根环槽数的上下界.md
+1994b83d6228bad1cb244204f6b68ab18e8f474a1d382f74765356b9727887e3  .claude/kb/checks-owed.md
+6fd163aa776b862cb1263f28aabb80913c596597e5ba5663b7da2f7ee944bfc5  .claude/kb/decisions/15-format-freeze-policy.en.md
+cabd35d8cb5cd1848d78b5ae28f29e7eade8fafd29c6f6d521618c26f8629a96  .claude/kb/decisions/15-フォーマット凍結ポリシー.ja.md
+8064d49f9b2bd0cefbef67dc88df8e078b7e89cb3c44d51a26b0810a1cae6788  .claude/kb/decisions/15-格式冻结政策.md
+feaca6a65ef86444158061d62092793b2e74e3e0288ea0ccc94c8f1012b385f5  .claude/kb/decisions/16-publish-semantics.en.md
+e781d9e990bcc750c9a9f548187d1add6ca06551bb0cbcc4e07eb3a69db252f5  .claude/kb/decisions/16-パブリッシュセマンティクス.ja.md
+3e626bdffeb5d1a6f5603db393f623d80679fd5cbe40a7b6a6ac7dc0489f533d  .claude/kb/decisions/16-发布语义.md
+a4ea80f2a6c50a6d0aeff1901f1d417405c840494971cea6ea65e93c6e8cb716  .claude/kb/decisions/28-mount-time-commitments.en.md
+e5850241705e435ca29323f1d51e93fc2ed54030630aa16df3a056f49083495f  .claude/kb/decisions/28-マウント時コミットメント量.ja.md
+0f6fc9d1127d3ee89ef20f83bd2c7d7a6629195ac2aa537ebc55017059d081c3  .claude/kb/decisions/28-挂载期承诺量.md

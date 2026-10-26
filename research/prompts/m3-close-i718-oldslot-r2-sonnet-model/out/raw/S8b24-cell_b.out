@@ -1,0 +1,24 @@
+
+running 1 test
+test cell_b_hole_in_the_next_slot ... ROW cell=B hist=hole_base24_repeat0 S=8 image=healthy_n kind=legit newest=48 inst=3 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat0 S=8 image=before_record kind=legit newest=48 inst=3 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat0 S=8 image=before_root kind=legit newest=48 inst=3 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat0 S=8 image=zero kind=legit newest=48 inst=3 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat0 S=8 image=torn_enum kind=legit newest=48 inst=3 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat0 S=8 image=torn_half kind=legit newest=48 inst=3 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat1 S=8 image=healthy_n kind=legit newest=72 inst=5 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat1 S=8 image=before_record kind=legit newest=72 inst=5 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat1 S=8 image=before_root kind=legit newest=72 inst=5 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat1 S=8 image=zero kind=legit newest=72 inst=5 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat1 S=8 image=torn_enum kind=legit newest=72 inst=5 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat1 S=8 image=torn_half kind=legit newest=72 inst=5 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat2 S=8 image=healthy_n kind=legit newest=96 inst=7 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat2 S=8 image=before_record kind=legit newest=96 inst=7 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat2 S=8 image=before_root kind=legit newest=96 inst=7 t=1 F=0 p=255 next_slot_root=Some(1) all=1,1,1,1,1,1,1,1,1,1,1 red=[]
+ROW cell=B hist=hole_base24_repeat2 S=8 image=zero kind=legit newest=96 inst=7 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat2 S=8 image=torn_enum kind=legit newest=96 inst=7 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ROW cell=B hist=hole_base24_repeat2 S=8 image=torn_half kind=legit newest=96 inst=7 t=1 F=0 p=255 next_slot_root=None all=0,0,0,-1,-1,1,1,1,0,-1,-1 red=["I-7.18"]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 9.47s
+

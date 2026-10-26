@@ -1,2 +1,0 @@
-cf32ad9a58e143768cc833d7f95a0f95b7e75c908e47f617d7cbbeea3defcf00  .claude/kb/invariants.md
-b3280a004a8ed29e8048fe20eabdefbfb92dc2098b6d6a2754d0ea65ee462279  .claude/kb/checks-owed.md

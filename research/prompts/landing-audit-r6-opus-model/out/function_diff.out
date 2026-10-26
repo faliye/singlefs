@@ -1,0 +1,29 @@
+== 交回闸 v10→now
+scribe_spec_entries：逐字相同（改前 20 行、改后 20 行）
+missing_targets_sections：逐字相同（改前 14 行、改后 14 行）
+missing_targets_listed：逐字相同（改前 9 行、改后 9 行）
+scribe_target_problems：逐字相同（改前 36 行、改后 36 行）
+prompt_scratch_directories：逐字相同（改前 11 行、改后 11 行）
+first_prompt：逐字相同（改前 12 行、改后 12 行）
+prompt_label_paths：逐字相同（改前 8 行、改后 8 行）
+citation_checked_agents：逐字相同（改前 9 行、改后 9 行）
+is_project_agent：逐字相同（改前 4 行、改后 4 行）
+green_count_problems：逐字相同（改前 19 行、改后 19 行）
+background_problems：逐字相同（改前 19 行、改后 19 行）
+decide：逐字相同（改前 38 行、改后 38 行）
+naming_source_tree：逐字相同（改前 18 行、改后 18 行）
+== 派发闸 v10→now
+report_file_name_verdict：逐字相同（改前 32 行、改后 32 行）
+three_way_report_verdict：不同（改前 42 行、改后 44 行）
+prompt_scratch_directories：逐字相同（改前 12 行、改后 12 行）
+report_scratch_directories：逐字相同（改前 3 行、改后 3 行）
+three_way_report_types：逐字相同（改前 12 行、改后 12 行）
+own_report_token：逐字相同（改前 7 行、改后 7 行）
+== 库 v10→now
+frontmatter_fields：逐字相同（改前 17 行、改后 17 行）
+three_way_leg_types：逐字相同（改前 8 行、改后 8 行）
+three_way_leg_types_scanned：逐字相同（改前 13 行、改后 13 行）
+is_leg_report_path：逐字相同（改前 3 行、改后 3 行）
+leg_report_mentions：不同（改前 3 行、改后 3 行）
+== 草稿目录库 v10→now 逐行差几行
+3

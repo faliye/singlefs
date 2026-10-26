@@ -1,0 +1,4 @@
+name=tmp-kept remove_after=none status=252 seconds=7 ran=no
+  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-2318583-620622371 
+  ✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 MiB（回收不掉的用量 0 MiB + 账上还没涨到量的 250 MiB）
+  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-2318583-620622371 

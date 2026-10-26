@@ -1,0 +1,17 @@
+name=verus case=h1_proof_calls_exec rc=1 error: cannot call function `z4_h1_proof_calls_exec::bump` with mode exec|
+name=verus case=h2_ghost_in_exec_branch rc=1 error: cannot access spec-mode place in executable context|
+name=verus case=h3_ghost_param_selects_exec rc=1 error: cannot perform operation with mode spec, Unary(CoerceMode { op_mode: Spec, from_mode: Spec, to_mode: Spec, kind: Field }, SpannedType|
+name=verus case=h4_proof_block_assign_exec_var rc=1 error: cannot mutate exec-mode place in proof-code|
+name=judge-key variant=frozen raw=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a stripped=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=comment-only raw=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a stripped=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=wrapped-in-verus-without-ghost raw=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a stripped=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=wrapped-with-an-ensures raw=070444cae357beefb8aaf8667e20de83084a1de14ee7af30c5daebddaf82378d stripped=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=wrapped-with-an-ensures-and-a-proof-block raw=2efa80a4899459c24451b5d1c05353d418c1258c163cd60528268806bb3fb314 stripped=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=wrapped-with-spec-fn-proof-fn-ghost-let-and-assert raw=4b80affbf10b7d969189c25d0f7eaad2d8dc650093b2815504c9624036621da0 stripped=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=must-red-exec-string-changed raw=1872d8f173816490b4451d28baf683ba5f29771ee150fd9e8e39900ba12bdf47 stripped=9a0201172e5e259cd417a89639ff586b2164df05e42dd77bff215d8a748377f3
+name=judge-key variant=must-red-exec-expression-changed raw=11c344b1da7afced9ef6fe3581eb152fbb419e45f8a19a0df8c75cfb67169b53 stripped=9a346171f4a2338aea7bc0553c27b12f774c100499e458ca919d833e963a0fc3
+name=judge-key variant=must-red-exec-attribute-added raw=214b513868c65e943fa5de44ea8092b6bf0b07c1208a6bbb8cd81e2b6c38a794 stripped=3827ac033b5d217cafb674fc41bfcb26a22ec720c3ada776c59bcebd83345218
+name=judge-closure-replay-prefix-units fn=83 lines=3322 proof_fn=23 proof_lines=1536
+name=judge-closure-units-in-the-two-proof-only-files count=0
+name=judge-key-lib-lemma-edit variant=frozen key=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key-lib-lemma-edit variant=one-assert-true-added-in-lemma_applying_a_record_twice_in_a_row_is_applying_it_once key=9383df24031f04c68a91bf61299761eb57760c6973fe96c1f3a16289d9eb78c3

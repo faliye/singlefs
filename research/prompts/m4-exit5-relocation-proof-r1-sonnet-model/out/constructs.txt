@@ -1,0 +1,10 @@
+fn 总数=836
+   48  BTreeMap/BTreeSet/HashMap/HashSet
+    9  dyn trait
+   34  泛型设备/读者 trait 约束
+  242  闭包 |..|
+  212  迭代器链 .iter()/.map(/.filter(/.collect
+  287  format!/panic!/assert!/unreachable!/expect(
+    0  String / format 文字
+  194  Vec<
+  225  u64/usize 算术（+ - * 的粗数不计，只数 checked_/saturating_/try_from）

@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 3 tests
+test r4_hole_history_and_partial_write_history_look_alike_to_the_scan ... 观测 R4 判别子 变长留洞：记录 size 97895 对象出生代 3 截断字段 InodeRecordTruncationField { truncation_txg: CheckpointTxg(0), truncated_size_in_bytes: 0 }；遍历方向的单元数 1；I-1.13 Holds
+观测 R4 判别子 变长留洞 单元 0（这一版指着的 SlotNumber(50190)）：对象 1 对象出生代 3 锚点偏移 0 出生 txg 6 声明长度 32634 写序 WriteOrder { instance: InstanceGeneration(1), transaction: 6 }
+观测 R4 判别子 变长留洞 单元 1（起点那一版的落点（遍历方向已不指） SlotNumber(50184)）：对象 1 对象出生代 3 锚点偏移 32634 出生 txg 4 声明长度 32634 写序 WriteOrder { instance: InstanceGeneration(1), transaction: 3 }
+观测 R4 判别子 变长留洞 单元 2（起点那一版的落点（遍历方向已不指） SlotNumber(50186)）：对象 1 对象出生代 3 锚点偏移 65268 出生 txg 4 声明长度 32627 写序 WriteOrder { instance: InstanceGeneration(1), transaction: 4 }
+观测 R4 判别子 中间部分写：记录 size 97895 对象出生代 3 截断字段 InodeRecordTruncationField { truncation_txg: CheckpointTxg(0), truncated_size_in_bytes: 0 }；遍历方向的单元数 3；I-1.13 Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50184、盘 1 槽 50184}；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）")
+观测 R4 判别子 中间部分写 单元 0（这一版指着的 SlotNumber(50190)）：对象 1 对象出生代 3 锚点偏移 0 出生 txg 6 声明长度 32634 写序 WriteOrder { instance: InstanceGeneration(1), transaction: 6 }
+观测 R4 判别子 中间部分写 单元 1（这一版指着的 SlotNumber(50184)）：对象 1 对象出生代 3 锚点偏移 32634 出生 txg 4 声明长度 32634 写序 WriteOrder { instance: InstanceGeneration(1), transaction: 3 }
+观测 R4 判别子 中间部分写 单元 2（这一版指着的 SlotNumber(50186)）：对象 1 对象出生代 3 锚点偏移 65268 出生 txg 4 声明长度 32627 写序 WriteOrder { instance: InstanceGeneration(1), transaction: 4 }
+ok
+test sweep_today_rules ... 观测 扫汇总（改法开着 = false）：历史 20 段（含部分写 20 段），I-1.13 违例 12 段（含部分写的 12、不含部分写的 0），I-1.13 之外有违例 0 段，读者读回不同 0 段，挂钟 6.57272507s
+ok
+test sweep_with_the_candidate_fix ... 观测 扫汇总（改法开着 = true）：历史 20 段（含部分写 20 段），I-1.13 违例 0 段（含部分写的 0、不含部分写的 0），I-1.13 之外有违例 0 段，读者读回不同 0 段，挂钟 6.611629617s
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 13.49s
+

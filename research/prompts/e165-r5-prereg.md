@@ -10,13 +10,13 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；驱动仍是 `scripts/experiments/e165-replay-mutation-kill-bounds.sh`，自造表仍是 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`，自造表仍是 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`）
 
 主 agent 给的问题（派发提示原句，逐字；只抄与问题相关的四条，「前几次登记」「被测条款」「交付」几条与草稿目录不抄，前两样的落点在本登记开头与第二节）：
 
 > 任务：写 E165（恢复重放有界穷举与变异杀伤界） 第 5 次重跑的重跑登记 `research/prompts/e165-r5-prereg.md`（重跑，不占号；节名照你定义里「登记的固定节名」）。
 > - 问题单：`research/prompts/m3-r1-batch9-reruns-questions.md` 第 3 行（sha256 d6b328eb…）。要回答的问题照那一行：记录格式按今天的新根段（后三项实例表指针、分配记录树根指针、卸载记号，364 字节）与施加七项全取记录改过之后，有界穷举的判定与变异杀伤界是否仍与第 4 次重跑相同；翻面观测、够判条件照那一行。
-> - 事实表：`research/prompts/m3-r1-batch9-reruns-evidence/e165-format-change-facts.md`（sha256 6892de6f…，根环那条线事务员现查）。要点：改动全出自根环那条线第 7 批 7-2；装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 直接调 core 编解码，但 r2 / r3 档投影之外的字段（第 597–604 行一带）与 J7a/b/c 判据（第 3284 行一带）还照旧的「抄所选根」规则登记，源码第 380–387 行自己写明要重新登记；驱动 `scripts/experiments/e165-replay-mutation-kill-bounds.sh` r4 档钉的三个 sha256 今天全对不上；7-2 同时让系统配置读错取 R2（`crates/singlefs-core/src/recovery.rs` 第 3322 行一带），实验页第 616 行一带「闸取的是实现今天的取甲」那句的前提变了。登记里要逐条写这几处怎么处置（重新登记的判据跑前写死）。
+> - 事实表：`research/prompts/m3-r1-batch9-reruns-evidence/e165-format-change-facts.md`（sha256 6892de6f…，根环那条线事务员现查）。要点：改动全出自根环那条线第 7 批 7-2；装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 直接调 core 编解码，但 r2 / r3 档投影之外的字段（第 597–604 行一带）与 J7a/b/c 判据（第 3284 行一带）还照旧的「抄所选根」规则登记，源码第 380–387 行自己写明要重新登记；驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` r4 档钉的三个 sha256 今天全对不上；7-2 同时让系统配置读错取 R2（`crates/singlefs-core/src/recovery.rs` 第 3322 行一带），实验页第 616 行一带「闸取的是实现今天的取甲」那句的前提变了。登记里要逐条写这几处怎么处置（重新登记的判据跑前写死）。
 > - 执行的时机：执行员要等固定脚本那条流写次数终值与删除与并发那条线第 14 批合入之后才派；登记里写一条「开跑前把装置里引用的记录格式与 `crates/singlefs-core/src/recovery.rs` 当时的样子逐处对一遍，对不上先回登记」。
 > - 段：照你判断切，段与段不共用装置改动的写明，主 agent 照它并行派执行员。
 
@@ -388,7 +388,7 @@ M1–M4 的前提与域：语义层只挂「同一 (实例代号, 计数器) 在
 - r4 登记全文（读了第一至十二节，判据怎么定的要读）：第四节里第 3 次的读数（K、K9、KW 合计 2 937 126 态、KJ0–KJ3 每格 0，KA KJ2 0、KJ0 1；Q2 只有 v1824 红；两个根环计数在合法历史 36 格都是 0、KA 125 态里 48 与 24）、r4 设计员的锚点（KF 129 321 等「不罩」那一类的丢失数、KG M = 2、U = 3 一格 309 609 / 346 005 / 49 680 对 265 923 / 284 607 / 0、648 等），修订 2–4 的读数（第一段 6 线程约 70 秒、整遍峰值约 1.66 GB，第二段 tsv-1823 在 4G 撞顶、补跑 8G；T1 读法的修订与 `k4t1.log` 第 2–11 行的结局）。驱动文件头与 `R4_KG_RULE_READINGS`（第 `344` 行一带）里同一批 KA、KG 钉值；装置源码 `14698`、`14700` 行（grep 「311」时命中的 r4 锚点表两行）。
 - r2 登记（读了第一节、第三至八节、第十至十二节）：第四节判决 S1、S6 的数（328 / 0、398 / 70、1 867 682 态、464 / 2 904 等），第七节乙类锚点（L 大环对照界 N ≤ 5 的 3 110、762、2 348、2 989，M、M6、MC 的状态数与类数，E1 的 70，第二段计数 27 / 29 / 28 / 23），修订 4（segment2b 五个变体在启动自检上 panic、挪三条自检后基线 1 373 行）。r3 登记读了第五节 5.1、5.2、5.8。原登记、r1 登记只读了节标题。
 - 事实表全文（结论第 4 点：「第 4 次的 root_choice_faults 一族 KJ3 只比六个投影字段」；第 4 节：「推的：J7a 的实例表指针与分配记录树根两行、J7b 的卸载记号一行会在『施加了记录』的态上因规则变而有读数变化，没量过」）。
-- `scripts/experiments/replay.sh` E165 那几行与注释（`224–238`、`555–658`）：各产物的跑法、「计数与线程数无关」、用时与峰值。
+- `scripts/experiment-apparatus/replay.sh` E165 那几行与注释（`224–238`、`555–658`）：各产物的跑法、「计数与线程数无关」、用时与峰值。
 - 调度记录 `records/2026-10-01-里程碑三形式化接入.md` grep `e165\|E165` 命中的末 5 行（`795`、`833`、`842–844`）：只有派活与交回的说明，没有 E165 的读数。
 - 没读的：实验页 `.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md` 一行没读（派发提示与事实表转述的第 616 行那一句除外）；`research/results/` 下 E165 产物只算了 sha256、数了行数（第十一节末尾那张表），内容没读。
 
@@ -482,11 +482,11 @@ C8a、C8c 在 C 域 Nc ≤ 3 上只要求 > 0（C 域所选根随落盘变，钉
 | 段 | 补哪一格、补完够不够判 | 要改的文件 | 产物（前缀之后） | 与别段共不共用改动、能不能并行 |
 |---|---|---|---|---|
 | 第一段（旧档重跑） | 3-甲；补完够判（PQ1–PQ4） | **不改任何文件**：开工按第三节拷根、建清单、跑第十一节 PH1 对拍清单；在根上编装置，照第十一节末尾比对对象表每一行的跑法各跑一遍 | 每份比对对象一份 `segment1-<比对对象的段名与族名>.out`（各配 `-timing.out`，名字照那张表的「重跑产物名」一列）；`segment1-root-choice-faults-threads-second.out`（PV5）；`segment1-comparison.out`（逐份 sha256 是否相同、行数，3-甲 的逐身份判定比对，只有数变的行数，按「只在 J7 字段 / 别处」分类） | 不改文件，与谁都不共用改动。第二、三段要等它的根建好（拷根与清单几分钟）；第二段的**跑**还要等它的产物（当 TV7 / V7 的比对对象） |
-| 第二段（驱动钉值） | 3-乙；补完够判（PQ5–PQ7） | `scripts/experiments/e165-replay-mutation-kill-bounds.sh`（加一套 r5 钉值与选它的参数，9.3）；`scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`（Z5 原地换锚点，9.1） | `segment2-r2-mode-kill-bounds.out`、`segment2-r2-mode-red-examples.tsv`、`segment2-r3-mode-kill-bounds.out`、`segment2-r4-mode-kill-bounds.out`（各配 `-timing.out`）；`segment2-comparison.out`（3-乙 逐变体比对） | 只改驱动与自造表，与第一、三段**不共用改动**；写可以在第一段跑的同时做（钉值要等第一段的根建好才填得出）；跑在第一段的根上（`--root`），要等第一段的产物 |
+| 第二段（驱动钉值） | 3-乙；补完够判（PQ5–PQ7） | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`（加一套 r5 钉值与选它的参数，9.3）；`scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`（Z5 原地换锚点，9.1） | `segment2-r2-mode-kill-bounds.out`、`segment2-r2-mode-red-examples.tsv`、`segment2-r3-mode-kill-bounds.out`、`segment2-r4-mode-kill-bounds.out`（各配 `-timing.out`）；`segment2-comparison.out`（3-乙 逐变体比对） | 只改驱动与自造表，与第一、三段**不共用改动**；写可以在第一段跑的同时做（钉值要等第一段的根建好才填得出）；跑在第一段的根上（`--root`），要等第一段的产物 |
 | 第三段（r5 档） | 3-丙；补完够判（PQ8–PQ12） | 装置（`--profile r5`、5.3 生成器与 J8、5.4 对照、单测、第三节第 6、7 行的注释与档参数单测）；`crates/mutations.tsv` 这个 bin 的行（9.2） | `segment3-r5-legal-family.out`、`segment3-r5-adversarial-family.out`、`segment3-r5-multi-disk.out`、两族的 `-threads-second.out`、`segment3-r5-odd-marker-legal-family.out`、`segment3-r5-odd-marker-adversarial-family.out`（各配 `-timing.out`）；`segment3-profile-check.out`（PV2、PV3 的比对）；`segment3-cell-correspondence.out`（3-丙 新格对旧格） | 只改装置与变异表，与第一、二段**不共用改动**；在第一段的根的拷贝上盖自己的两个文件（第十一节「根」），可与第一段的跑、第二段同时进行；PV3 的比对对象是第一段的产物，比对那一步等第一段跑完 |
 | 第四段（附带，够判后不跑） | 不补哪一格：J8 在真代码上的阳性对照（PQ13） | 驱动再加一个模式（9.4） | `segment4-r5-mode-kill-bounds.out` | 要等第二段的驱动与第三段的根；主 agent 判三格都够判就不派 |
 
-- `scripts/experiments/replay.sh` 各段都不改：每段交回附自己产物要加的复跑行（参数原样），主 agent 收齐一次加。旧的复跑行在今天的主工作区上会怎样，写在待主 agent 认第 4 条。
+- `scripts/experiment-apparatus/replay.sh` 各段都不改：每段交回附自己产物要加的复跑行（参数原样），主 agent 收齐一次加。旧的复跑行在今天的主工作区上会怎样，写在待主 agent 认第 4 条。
 - 钉红例表 `.claude/gate.d/e165-pinned-red-examples.tsv` 这一次不动（同 r2 登记 5.6）。
 
 ### 5.7 实现量与状态数估计（推的，没量）
@@ -715,9 +715,9 @@ C8a、C8c 在 C 域 Nc ≤ 3 上只要求 > 0（C 域所选根随落盘变，钉
 | `crates/singlefs-format/src/lib.rs` | grep 命中的 220、223、229 行 |
 | `crates/mutations.tsv` | 1810–1815 第一列；第 1857、2156、2157、2158、2236 行（awk 取列）；`journal.rs` 那几行的第一列 |
 | `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 70–90；296–400；540–672；860–930；2770–2835；2895–2945；3284–3330；4740–4866；grep 命中行（`name=` 行名统计、`name=violations` / `name=verdict` / `name=self_check` / `name=control` 的格式行、几个函数名与常量、「311」「188」） |
-| `scripts/experiments/e165-replay-mutation-kill-bounds.sh` | 1–120；186–370；1042–1100；grep 命中行 |
+| `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 1–120；186–370；1042–1100；grep 命中行 |
 | `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` | 全文 |
-| `scripts/experiments/replay.sh` | grep `e165` 命中的 224–238 与 555–658；548–670 里 E165 那几段注释 |
+| `scripts/experiment-apparatus/replay.sh` | grep `e165` 命中的 224–238 与 555–658；548–670 里 E165 那几段注释 |
 | `records/2026-10-01-里程碑三形式化接入.md` | grep `e165\|E165` 命中的末 5 行（795、833、842–844） |
 | `/tmp/claude-1000/e165-r4-designer/function_ranges.py`、`function-ranges-today.txt` | 全文 |
 | `/tmp/claude-1000/e165-r2-designer/anchors_r2c.py` | 1–80 |
@@ -801,7 +801,7 @@ cd research/results && sha256sum、wc -l 十九份比对对象
 
 ### 修1.一、问题
 
-英文名：replay_bounded_enumeration（照抄；装置、驱动、自造表都不另起，装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，驱动仍是 `scripts/experiments/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄；装置、驱动、自造表都不另起，装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 主 agent 给的问题（派发提示原句，逐字；只抄任务那一句）：
 
@@ -972,7 +972,7 @@ cd research/results && sha256sum、wc -l 十九份比对对象
 | 5-甲（装置） | Q1（R2）；补完 Q1 那一半够判（PQ15、PQ16、PQ23 的 Q1 部分）。Q2 的基线与两个计数（PQ24）也在这一步出 | 装置（`--gate r2`、R2 闸与取号那一刻、拒因分计、R2 钉值表、R2 判别力自证、单测）；`crates/mutations.tsv` 这个 bin 的行（修1.九甲表） | `segment5-r2-gate-root-choice-faults.out`、`segment5-r2-gate-root-choice-faults-threads-second.out`（各配 `-timing.out`）；`segment5-profile-check.out`（PQ20、PV13 的比对）；`segment5-comparison-with-r4-q1.out`（PQ23 的 Q1 部分） | **共用**：装置文件与 `crates/mutations.tsv` 第三段也改——5-甲 在第三段的装置改动进了主工作区之后改，或由第三段的执行员一次改两段；不与第三段同时改。与第一段不共用改动，要它的根和第 16 行重跑产物 |
 | 5-乙（驱动） | Q2（R2）；补完够判（PQ21、PQ22、PQ23 的 Q2 部分） | 驱动（r4 模式加 `--gate r2`，修1.九乙） | `segment5-r2-gate-kill-bounds.out`（配 `-timing.out` 与驱动日志 `segment5-r2-gate-driver-log.out`）；`segment5-comparison-with-r4-q2.out` | **共用**：驱动文件第二段（`--pins r5`）、第四段（若派）也改——5-乙 在第二段的驱动改动进了主工作区之后改，不与第二、四段同时改。跑要等 5-甲 的根与产物 |
 
-两步可以是一个执行员，也可以分两次派；5-甲 交回之后主 agent 对着问题单第 1 行判续不续（Q1 够判而 Q2 开着才派 5-乙）。`scripts/experiments/replay.sh` 不改，每步交回附复跑行，主 agent 收齐一次加。钉红例表不动。
+两步可以是一个执行员，也可以分两次派；5-甲 交回之后主 agent 对着问题单第 1 行判续不续（Q1 够判而 Q2 开着才派 5-乙）。`scripts/experiment-apparatus/replay.sh` 不改，每步交回附复跑行，主 agent 收齐一次加。钉红例表不动。
 
 **实现量与用时**（推的，没量）：5-甲 写 `--gate` 参数与档检查、R2 判不出与取号那一刻两道拒（新函数，不改取甲那几行）、拒因三栏与一行新输出、R2 钉值表（`anchors_s5.out` 摊成两张文本常量，同 r4 修订 2 第 6 条的形）、R2 判别力自证五条、`config` 行的闸字段、单测 8 条上下、变异行 9 条（修1.九甲表）；跑：R2 整遍 34 814 150 个被判态（KF 1 903 615、KF3 29 792 525、KF9 488 935、KFW 400、KG 2 628 550、KA 125），两个线程数各一遍，加修1.十一 PV13 那几份复跑。5-乙 写一个参数、一套比对对象、一格自证与一个弄坏开关；跑：基线 2 次 + 变体 6 个，每个一次冷编加一遍 R2 整遍。用时照推 s13：5-甲 半小时上下，5-乙 一小时上下。
 
@@ -1238,7 +1238,7 @@ KA（`anchors_r3_ka.py`，同 r4）：125 态，没有一条自证过的根的 1
 | `crates/singlefs-core/src/transaction.rs` | 395–412；640–760；grep 命中的 108、405、407、443、453、677、705、720；`write_acquired_instance` 与第 4 次的根那一份的 `diff`（两句注释） |
 | 第 4 次的根 `/tmp/claude-1000/e165-r4-segment1b/root` 的 `mount.rs`、`transaction.rs` | grep 命中的 405、433、3234、3289、4463、4531；`self_verified_system_configurations_of_every_device` 的 grep 片段 |
 | `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 12471–12501；12985–13075；13150–13200；15575–15600；grep 命中的 2093、2105、2332、2652、4060、7072、8199、9736、9748、11961、12031、12173、12181、12225、12420、12612、12640、12675、12704、12925、12926、12990、12997、13152、13166–13198、13466、13484、13532、13565、13586、13626、13646、13964、14058、14156、14180、14200、14798、14839、14904、14989、15219–15280、15421、15441、15485、15587–15591、15608、15624、15725、15881、15905、15967、15968、16028、16191、16520、17469、17514、17515、17533、17543、17563、17570 |
-| `scripts/experiments/e165-replay-mutation-kill-bounds.sh` | 336–372；grep 命中的 28–54、252、316、327、339、365、367、1139、1164、1312、1469–1474、1509–1521、1559 |
+| `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 336–372；grep 命中的 28–54、252、316、327、339、365、367、1139、1164、1312、1469–1474、1509–1521、1559 |
 | `crates/mutations.tsv` | grep `system_configuration_witness_is_undecidable` 命中的 2164–2168；grep `E165 r4 第一段` 命中的 1979、1980、1996 与计数 18 |
 | `crates/singlefs-harness/tests/system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both.rs`、`a_writable_mount_with_system_configuration_slot_zero_unreadable.rs`、`crates/singlefs-harness/src/mount_transparency.rs` | grep 命中的第 2、6、1359 行 |
 | kb（经 `quote-kb.py` 抄出后读出口） | D22 已定项 8、24，D23 已定项 4、14、15、22，D22 已定项 7，D13 已定项 1，C331、C657 两行；r4 第二节那 15 段今天的样子（只读与 r4 第一段那两份的逐字差） |
@@ -1808,7 +1808,7 @@ if __name__ == "__main__":
 
 ## 主 agent 认定第一段交回（2026-10-04）
 
-第一段报告 `/tmp/claude-1000/e165-r5-segment1/report.md` 交的 PH6 类一处：多盘一族（第 8、11、13 份）按 `lagging_class` 分出的判据行，身份字段与判定字段的取法——取 `name=extended_pq1` 那一种（身份带 `lagging_class`、判定字段罩 `J7a_…=` 这类字段名），比 `name=pq1` 严；两种读法 3-甲 判决相同。`scripts/experiments/replay.sh` 第 586、611 行说旧产物的注释由第二段执行员改。
+第一段报告 `/tmp/claude-1000/e165-r5-segment1/report.md` 交的 PH6 类一处：多盘一族（第 8、11、13 份）按 `lagging_class` 分出的判据行，身份字段与判定字段的取法——取 `name=extended_pq1` 那一种（身份带 `lagging_class`、判定字段罩 `J7a_…=` 这类字段名），比 `name=pq1` 严；两种读法 3-甲 判决相同。`scripts/experiment-apparatus/replay.sh` 第 586、611 行说旧产物的注释由第二段执行员改。
 
 ## 主 agent 认定第三段与 5-甲 交回（2026-10-04）
 

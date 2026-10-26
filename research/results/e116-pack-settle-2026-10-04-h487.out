@@ -1,3 +1,4 @@
+E7INPUT name=input_fingerprint key=E116 sha256=8d2fe5b7f5d9dc483dc8e14220841ecbe37a9107d3e596de946a1ca7d89699a2 units=54
 E7RESULT name=config unit=32768 node=16384 pack_hdr=107 node_hdr=86 w=2 map_entry=61 map_leaf_cap=267 alloc_entry=18 alloc_leaf_cap=905 journal_hdr=487 slot_extra=47 n=100000 sizes=[512, 1024, 4096, 8192, 16384] batches=[1, 8, 64, 512, 4096, 100000]
 E7RESULT name=positive_cap1 size=512 arm=bg_key pad_occ=3276800000 pack_occ=3276800000 same=true
 E7RESULT name=positive_cap1 size=512 arm=bg_fill pad_occ=3276800000 pack_occ=3276800000 same=true

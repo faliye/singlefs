@@ -1,0 +1,3 @@
+Prior opaque-false diagnostic judged by CURRENT gate: ([], '/tmp/singlefs-formal-writing-audit-58eqtqxk/injected.rs:11 报 assertion failed')
+Inline requires CURRENT parser: []
+CURRENT table rejection: crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 写坏了：第 19 行「ensures·record_ends_its_publish 函数体与 ensures 一起改成恒真（接回量测报告的 red_r2）」、第 20 行「ensures·record_ends_its_publish 的 ensures 取反」、第 21 行「ensures·counter_of_the_last_record_the_root_covers 交回的锚点计数器小于 u64 最大值减一」、第 22 行「ensures·counter_of_the_last_record_the_root_covers 交回的锚点改成不等于 spec 的锚点」、第 23 行「ensures·replay_core 整个结论取反」 等 165 行只有五段、没写第六段落点 landing=（按条数判会随求解环境漂，这一格改按落点判）

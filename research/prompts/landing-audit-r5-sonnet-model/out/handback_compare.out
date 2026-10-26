@@ -1,0 +1,9 @@
+name=handback_compare 子agent=1464 命名检查那条拒：旧=148 新=152 只认退0=152
+name=only0_vs_new 新与只认退0判得不同的=0
+name=newly_refused 新拒而旧放=4 其中调用过 naming-lint.sh 的=4 ['a7aa1608c74c3e21e', 'aa68d151c2fa72bb7', 'aa87dd9fe761d727f', 'ab6dd5f35228122b7']
+name=ran_naming_lint 调用过 naming-lint.sh 的子agent=148 其中旧拒=40 新拒=44
+name=newly_refused_command a7aa1608c74c3e21e D=/home/fy5090/.local/share/singlefs/work/m4-temporary-files-and-bare-cargo; cat >> $D/result.md <<'EOF' ## 要主 agent 跑的命令 / 定的事 1. 门禁 code-tooling 的 r
+name=newly_refused_command aa68d151c2fa72bb7 cd /home/fy5090/.local/share/singlefs/work/m3-close-b16-c777-admission; set -o noclobber; cat >> result.md <<'EOF' ## 编译（副本，已删） 副本 `…/c777-admission/t
+name=newly_refused_command aa87dd9fe761d727f D=/home/fy5090/.local/share/singlefs/work/m4-per-run-build-dirs-three; cat >> $D/result.md <<'EOF' ## 命名检查（改了 .rs，交回前在主工作区跑） - `SINGLEFS_RUN_SCOPE='种类
+name=newly_refused_command ab6dd5f35228122b7 cat >> /home/fy5090/.local/share/singlefs/work/m3-close-b16-tools-ji9/result.md <<'EOF' ## lib_function_units.py：被谁调用、键会不会整批变 **调用方**（`grep -rln lib_f
+name=edit_classes 子agent=1464 {'只改了别处的 .rs': 563, '改了主工作区 crates/ 或 scripts/ 下的 .rs': 125, '没改 .rs': 776}

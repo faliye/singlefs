@@ -1,0 +1,18 @@
+name=threshold_split fraction=0.25 pool_data_units=1024 batch_units=4 T_A=0.068814 T_B=0.192802 T_C=0.215934 T_D=0.082975 checksum_part=0.068814 choice_part=0.123988 scan_increment_part=0.023132 scan_increment_share_of_T_C=0.1071 submissions=3
+name=threshold_split fraction=0.25 pool_data_units=1024 batch_units=8 T_A=0.082310 T_B=0.268607 T_C=0.297882 T_D=0.165240 checksum_part=0.082310 choice_part=0.186297 scan_increment_part=0.029275 scan_increment_share_of_T_C=0.0983 submissions=2
+name=threshold_split fraction=0.25 pool_data_units=1024 batch_units=16 T_A=0.082370 T_B=0.268551 T_C=0.295256 T_D=0.165491 checksum_part=0.082370 choice_part=0.186181 scan_increment_part=0.026705 scan_increment_share_of_T_C=0.0904 submissions=2
+name=threshold_split fraction=0.25 pool_data_units=8192 batch_units=4 T_A=0.068767 T_B=0.197514 T_C=0.354802 T_D=0.082765 checksum_part=0.068767 choice_part=0.128747 scan_increment_part=0.157288 scan_increment_share_of_T_C=0.4433 submissions=3
+name=threshold_split fraction=0.25 pool_data_units=8192 batch_units=8 T_A=0.082446 T_B=0.275757 T_C=0.468612 T_D=0.164871 checksum_part=0.082446 choice_part=0.193311 scan_increment_part=0.192855 scan_increment_share_of_T_C=0.4115 submissions=2
+name=threshold_split fraction=0.25 pool_data_units=8192 batch_units=16 T_A=0.082470 T_B=0.275326 T_C=0.469108 T_D=0.165301 checksum_part=0.082470 choice_part=0.192856 scan_increment_part=0.193782 scan_increment_share_of_T_C=0.4131 submissions=2
+name=threshold_split fraction=0.75 pool_data_units=1024 batch_units=4 T_A=0.159201 T_B=0.212104 T_C=0.263739 T_D=0.082572 checksum_part=0.159201 choice_part=0.052903 scan_increment_part=0.051635 scan_increment_share_of_T_C=0.1958 submissions=7
+name=threshold_split fraction=0.75 pool_data_units=1024 batch_units=8 T_A=0.185948 T_B=0.278487 T_C=0.338034 T_D=0.164921 checksum_part=0.185948 choice_part=0.092539 scan_increment_part=0.059547 scan_increment_share_of_T_C=0.1762 submissions=4
+name=threshold_split fraction=0.75 pool_data_units=1024 batch_units=16 T_A=0.192774 T_B=0.315202 T_C=0.376482 T_D=0.247601 checksum_part=0.192774 choice_part=0.122428 scan_increment_part=0.061280 scan_increment_share_of_T_C=0.1628 submissions=3
+name=threshold_split fraction=0.75 pool_data_units=8192 batch_units=4 T_A=0.159751 T_B=0.214600 T_C=0.565853 T_D=0.082699 checksum_part=0.159751 choice_part=0.054849 scan_increment_part=0.351253 scan_increment_share_of_T_C=0.6207 submissions=7
+name=threshold_split fraction=0.75 pool_data_units=8192 batch_units=8 T_A=0.185739 T_B=0.280979 T_C=0.688038 T_D=0.164948 checksum_part=0.185739 choice_part=0.095240 scan_increment_part=0.407059 scan_increment_share_of_T_C=0.5916 submissions=4
+name=threshold_split fraction=0.75 pool_data_units=8192 batch_units=16 T_A=0.192428 T_B=0.320865 T_C=0.721447 T_D=0.247267 checksum_part=0.192428 choice_part=0.128437 scan_increment_part=0.400582 scan_increment_share_of_T_C=0.5552 submissions=3
+name=same_c_rt_for_a_b_c groups=432 identical=432 different=0
+name=c_not_losing_cells_by_zone card=0 zone=below_T_A cells=10
+name=c_not_losing_cells_by_zone card=0 zone=below_T_B cells=83
+name=c_not_losing_cells_by_zone card=0 zone=only_below_T_C cells=39
+name=c_not_losing_cells_by_zone card=1 zone=below_T_B cells=49
+name=c_not_losing_cells_by_zone card=1 zone=only_below_T_C cells=36

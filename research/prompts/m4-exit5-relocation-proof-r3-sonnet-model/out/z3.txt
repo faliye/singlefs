@@ -1,0 +1,55 @@
+name=z3_closure entry=publish rc=0 fn=836 units=1903 refused=0
+name=z3_closure entry=roll_back_by_a_forward_publish rc=0 fn=1057 units=2292 refused=0
+name=z3_closure entry=recover rc=0 fn=654 units=1558 refused=0
+name=z3_closure entry=run_compaction rc=0 fn=952 units=2169 refused=0
+name=z3_closure entry=run_compaction_in_the_background rc=0 fn=952 units=2175 refused=0
+name=z3_closure entry=discard_segments rc=0 fn=198 units=651 refused=0
+name=z3_closure entry=raise_rollback_floor rc=0 fn=1061 units=2267 refused=0
+name=z3_closure entry=raise_floor_to_ceiling rc=0 fn=1063 units=2270 refused=0
+name=z3_closure entry=sweep_end_of_mount rc=0 fn=895 units=2063 refused=0
+name=z3_closure entry=sweep_while_mounted rc=0 fn=894 units=2058 refused=0
+name=z3_closure entry=mount_writable rc=0 fn=1469 units=3046 refused=0
+name=z3_closure entry=scan_region rc=0 fn=137 units=309 refused=0
+name=z3_union U2_fn=1073 U3_fn=1185 recover_only_fn=112 recover_only_lines=4837
+name=z3_entry entry=run_compaction closure_fn=952 outside_U3_fn=115 outside_U3_lines=2984
+name=z3_entry entry=run_compaction_in_the_background closure_fn=952 outside_U3_fn=115 outside_U3_lines=3058
+name=z3_entry entry=discard_segments closure_fn=198 outside_U3_fn=13 outside_U3_lines=259
+name=z3_entry entry=raise_rollback_floor closure_fn=1061 outside_U3_fn=69 outside_U3_lines=2142
+name=z3_entry entry=raise_floor_to_ceiling closure_fn=1063 outside_U3_fn=71 outside_U3_lines=2192
+name=z3_entry entry=sweep_end_of_mount closure_fn=895 outside_U3_fn=22 outside_U3_lines=728
+name=z3_entry entry=sweep_while_mounted closure_fn=894 outside_U3_fn=21 outside_U3_lines=691
+name=z3_entry entry=scan_region closure_fn=137 outside_U3_fn=13 outside_U3_lines=321
+name=z3_entry entry=mount_writable closure_fn=1469 outside_U3_fn=315 outside_U3_lines=10289
+name=z3_gate_caller where=U2 fn=allocator::<impl PoolAllocator>::release_leaving_the_record_allocated_on file=allocator.rs:2206-2248
+name=z3_gate_caller where=U2 fn=allocator::<impl PoolAllocator>::reclaim_released_up_to file=allocator.rs:2504-2518
+name=z3_gate_caller where=outside fn=allocator::<impl PoolAllocator>::reclaim_released_up_to_isolating_what_the_isolation_still_protects file=allocator.rs:2524-2548
+name=z3_gate_caller where=U2 fn=allocator::<impl PoolAllocator>::reclaim_released_records_up_to file=allocator.rs:2551-2590
+name=z3_gate_caller where=U2 fn=allocator::<impl PoolAllocator>::record_root_written_by_this_process file=allocator.rs:2731-2810
+name=z3_gate_caller where=outside fn=mount::reclaim_the_released_slots_of_the_rebuilt_allocator file=mount.rs:3385-3432
+name=z3_gate_caller where=outside fn=mount::reclaim_released_in_the_sequence_raising_the_floor_up_to file=mount.rs:5174-5185
+name=z3_membership fn=mount::raise_rollback_floor in_U2=0 in_U3=0
+name=z3_membership fn=mount::reclaim_released_in_the_sequence_raising_the_floor_up_to in_U2=0 in_U3=0
+name=z3_membership fn=mount::rebuilt_allocator in_U2=0 in_U3=0
+name=z3_membership fn=mount::reclaim_the_released_slots_of_the_rebuilt_allocator in_U2=0 in_U3=0
+name=z3_membership fn=mounted_session::discard_the_segments_reusable_as_a_whole in_U2=0 in_U3=0
+name=z3_membership fn=instance_table_sweep::erase_the_heads_and_publish_the_sweep in_U2=0 in_U3=0
+name=z3_membership fn=transaction::write_the_raised_floor_into_every_system_configuration in_U2=0 in_U3=0
+name=z3_writer where=U2 fn=block_device::<trait BlockDevice>::write_at file=block_device.rs:166-171 prims=write_at
+name=z3_writer where=U2 fn=block_device::<trait BlockDevice>::write_zeroes_at file=block_device.rs:181-185 prims=write_zeroes_at
+name=z3_writer where=outside fn=block_device::<trait BlockDevice>::discard_at file=block_device.rs:201-217 prims=discard_at
+name=z3_writer where=U2 fn=block_device::<impl BlockDevice for FileBackedBlockDevice>::write_at file=block_device.rs:609-625 prims=write_at
+name=z3_writer where=U2 fn=block_device::<impl BlockDevice for FileBackedBlockDevice>::write_zeroes_at file=block_device.rs:627-692 prims=write_zeroes_at
+name=z3_writer where=U2 fn=block_device::<impl BlockDevice for FileBackedBlockDevice>::discard_at file=block_device.rs:697-754 prims=discard_at
+name=z3_writer where=U2 fn=block_device::<impl BlockDevice for DirectInputOutputBlockDevice>::write_at file=block_device.rs:934-966 prims=write_at
+name=z3_writer where=U2 fn=block_device::<impl BlockDevice for DirectInputOutputBlockDevice>::write_zeroes_at file=block_device.rs:968-982 prims=write_zeroes_at
+name=z3_writer where=U2 fn=block_device::<impl BlockDevice for DirectInputOutputBlockDevice>::discard_at file=block_device.rs:988-1001 prims=discard_at
+name=z3_writer where=outside fn=instance_table_sweep::erase_the_heads_and_publish_the_sweep file=instance_table_sweep.rs:532-693 prims=write_at
+name=z3_writer where=U2 fn=make_filesystem::make_filesystem file=make_filesystem.rs:606-820 prims=write_at+write_zeroes_at
+name=z3_writer where=U2 fn=mounted_session::<impl BlockDevice for DeviceKeepingWritesInMemory < '_ >>::write_at file=mounted_session.rs:766-775 prims=write_at
+name=z3_writer where=U2 fn=mounted_session::<impl BlockDevice for DeviceKeepingWritesInMemory < '_ >>::write_zeroes_at file=mounted_session.rs:777-786 prims=write_zeroes_at
+name=z3_writer where=U2 fn=mounted_session::<impl BlockDevice for DeviceReadOnceInThisMount < '_ , '_ , Device >>::write_at file=mounted_session.rs:1155-1173 prims=write_at
+name=z3_writer where=U2 fn=mounted_session::<impl BlockDevice for DeviceReadOnceInThisMount < '_ , '_ , Device >>::write_zeroes_at file=mounted_session.rs:1175-1193 prims=write_zeroes_at
+name=z3_writer where=outside fn=mounted_session::discard_the_segments_reusable_as_a_whole file=mounted_session.rs:2679-2753 prims=discard_at
+name=z3_writer where=U2 fn=transaction::<impl PoolWriter < '_ , Device >>::perform_commit_step file=transaction.rs:481-554 prims=write_at
+name=z3_writer where=U2 fn=transaction::<impl PoolWriter < '_ , Device >>::write_system_configuration_slot file=transaction.rs:578-652 prims=write_at
+name=z3_writer_total fn=18 U2=15 U3_only=0 outside=3

@@ -1,0 +1,6 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 30 秒）：slice 已占 250 MiB，这一条要 200 MiB（峰值表里没有这条，按它的上限 200M 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 256 MiB；账上在跑 1 条
+run-with-memory-cap: 没查到别的机器：第二台没读到，判不了（退 1：Resource limit (rlimit) exceeded）
+run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-2522665-539312203）
+error: assertion failed
+  --> src/kernel.rs:12:9
+error: aborting due to 1 previous error

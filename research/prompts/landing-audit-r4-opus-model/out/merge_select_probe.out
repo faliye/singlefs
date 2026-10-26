@@ -1,0 +1,5 @@
+unit-graph → CHECKER	affected	补丁改到 checker 档包或它依赖的包：singlefs-unit-graph
+experiments → CHECKER	unaffected	补丁只改到 e7-index-bench，都不是 checker 档包 singlefs-checker-tier、也不在它的依赖闭包里，快档测试函数的单元键不会因这一批变
+empty → CHECKER	unaffected	这一批补丁目录里没有改到文件的 crates.patch
+harness-tests → CHECKER	affected	补丁改到 checker 档包或它依赖的包：singlefs-harness
+工作区成员 8 ；checker 档包依赖闭包 8 ；闭包外的成员 []

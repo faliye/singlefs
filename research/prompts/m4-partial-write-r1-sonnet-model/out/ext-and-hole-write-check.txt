@@ -1,0 +1,2 @@
+name=today_rule_with_ext_and_hole_writes_only depth=10 states=17979 mismatches=0
+name=today_rule_without_any_partial_write depth=10 states=10482 mismatches=0

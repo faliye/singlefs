@@ -148,7 +148,7 @@ rerun_steps() {
     nice -n 19 bash "$tools/x6_rev12.sh" "$after" "$before" "$WORK/x6rev12" "$MODEL" 2>&1 | cut -c1-200 > "$out/x6-rev12.txt" || true
     nice -n 19 bash "$tools/x7_sha.sh" "$after" "$WORK/x7" 2>&1 | cut -c1-220 > "$out/x7-sha.txt" || true
     { for v in after before; do dir=$after; [[ $v == before ]] && dir=$before; echo "=== $v"; bash "$tools/x6_sweep.sh" "$dir" 2>&1 | sed "s#$dir#<ROOT>#g"; done; } > "$out/x6-sweep.txt" 2>&1 || true
-    local E=scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes
+    local E=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes
     { for v in after before; do dir=$after; [[ $v == before ]] && dir=$before; mkdir -p "$WORK/hd-$v"
         cp "$dir/$E/run_segment_one_revision_11_multi_host.sh" "$WORK/hd-$v/copy_of_rev11.sh"; cp "$WORK/x6rev12/$v/$E/rev12_c_canonical_head.sh" "$WORK/hd-$v/canon_head.sh"
         echo "=== $v"; python3 -B -I "$tools/hd_header.py" "$dir" "$dir/$E/run_segment_one_revision_11_multi_host.sh" "$WORK/hd-$v/copy_of_rev11.sh" "$WORK/hd-$v/canon_head.sh" 2>&1 | sed "s#$WORK#<WORK>#g" | cut -c1-260; done; } > "$out/hd-header.txt" 2>&1 || true

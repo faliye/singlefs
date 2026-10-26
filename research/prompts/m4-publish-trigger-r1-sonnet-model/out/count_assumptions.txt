@@ -1,0 +1,132 @@
+== A1 会话入口 publish_user_change 的方法调用点（含测试、装置、history）
+sites=100 files=28
+-- 按 crate/目录分
+singlefs-checker-tier/src files=7 sites=13
+singlefs-checker-tier/tests files=2 sites=7
+singlefs-harness/src files=1 sites=8
+singlefs-harness/tests files=18 sites=72
+== A2 harness 历史的操作种类：HistoryOperation 一共几种、几种经 publish_user_change
+enum 行区间 503-586
+variants=19
+-- 含 .publish_user_change( 的 fn
+apply_create_inode
+apply_create_inodes
+apply_overwrite_losing_power_before_its_journal_record_then_mount_writable
+apply_publish_overwrite
+apply_truncate
+apply_unlink
+apply_write_of_an_inode
+publish_a_snapshot_change_through_the_session
+-- apply_operation 分派里 变体 => 处理函数
+HistoryOperation::PublishFirstFile => apply_publish_first_file
+HistoryOperation::PublishOverwrite => apply_publish_overwrite
+HistoryOperation::PublishWithoutUnits => apply_publish_without_units
+HistoryOperation::CloseAndMountWritable => apply_mount_writable
+HistoryOperation::RollBackWhileMounted => apply_rollback_while_mounted
+HistoryOperation::RaiseRollbackFloor => apply_raise_rollback_floor
+HistoryOperation::ColdStartRecover => apply_cold_start_recover
+HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => apply_crash_recovery_abandoning_the_newest_root
+HistoryOperation::Unlink => apply_unlink
+HistoryOperation::CreateInode => apply_create_inode
+HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable => apply_overwrite_losing_power_before_its_journal_record_then_mount_writable
+HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device_reading_zeros
+HistoryOperation::CreateSnapshot => apply_create_snapshot
+HistoryOperation::ReadSnapshot => apply_read_snapshot
+HistoryOperation::DestroySnapshot => apply_destroy_snapshot
+HistoryOperation::CompactWhileMounted => apply_compact_while_mounted
+HistoryOperation::Truncate => apply_truncate
+HistoryOperation::CreateInodes => apply_create_inodes
+HistoryOperation::WriteOfAnInode => apply_write_of_an_inode
+== A3 RefFS 翻译：内容改动后紧跟显式发布点
+publish_with_content 出现次数=6
+364:                operation: Operation::ExplicitPublish,
+1589:                    operation: Operation::ExplicitPublish,
+1641:                    operation: Operation::ExplicitPublish,
+-- RefFS 里算发布末尾的种类
+227:            EnteredKind::ExplicitPublish | EnteredKind::Fsync => true,
+232:            EnteredKind::ContentChange => false,
+== A4 崩溃流里经会话的
+crash_enumeration 文件数=34
+-- checker-tier/tests 里含 publish_user_change 的文件
+crates/singlefs-checker-tier/tests/common_crash_points/mod.rs
+crates/singlefs-checker-tier/tests/crash_judge_gpu_secondary_reads_after_the_source_segment_is_discarded.rs
+-- checker-tier/src 里含 publish_user_change 的文件
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs
+crates/singlefs-checker-tier/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs
+crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs
+crates/singlefs-checker-tier/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs
+crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs
+crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+== A5 随机历史入口
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+crates/singlefs-checker-tier/tests/crash_given_states_of_a_rollback_to_the_root_at_the_effective_floor.rs
+crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs
+crates/singlefs-checker-tier/tests/crash_judge_gpu_tables_at_their_capacity.rs
+crates/singlefs-harness/src/history.rs
+crates/singlefs-harness/tests/random_histories.rs
+== B1 发布计划一次装几个改动（P3）
+5780:    pub file: Option<FileVersionPlan<'content>>,
+5784:    pub new_inode_records: &'content [InodeRecord],
+7247:pub enum ChangeOfAFileOtherThanTheFirst {
+7251:    WholeWrite { inode: InodeNumber, data_units: u64 },
+== B2 一次发布至多几条 journal 记录；每次准入至多几次发布；格式常量
+11913:pub fn journal_record_limit_of_one_publish(journal_ring_bytes: u64) -> u64 {
+4388:pub const PUBLISHES_PER_ADMISSION_AT_MOST: usize = 8;
+20:pub const DATA_UNIT_BYTES: u64 = 32768;
+35:pub const DATA_UNIT_HEADER_BYTES: u64 = 105;
+38:pub const DATA_UNIT_PAYLOAD_OFFSET: u64 = 134;
+241:pub const JOURNAL_RECORD_BYTES: u64 = 4096;
+273:pub const JOURNAL_SAFETY_FACTOR: u64 = 3;
+== C1 核心层没有的东西（零命中）
+grep -rn -- 'Instant::now' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'SystemTime' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'thread::spawn' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'fn fsync' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'MountOption' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'mount_options' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'T_redo' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'retry_budget' crates/singlefs-core/src | wc -l = 0
+grep -rn -- 'InFlightDepth' crates/singlefs-core/src | wc -l = 0
+会话里的实例切换入口个数=0
+== C2 调用方给钟的先例（P1）
+991:pub struct CallerMonotonicClockReading(pub Duration);
+1073:pub trait CallerOfTheBackgroundCompaction {
+2160:    pub fn run_compaction_in_the_background<Device: BlockDevice>(
+395:pub struct SystemRuntimeConfiguration;
+403:    pub fn time_threshold_milliseconds(self) -> u32 {
+409:    pub fn dirty_threshold_bytes(self) -> u64 {
+== C3 只供测试的开关先例（P6）
+436:pub struct CompactionSwitches {
+588:pub struct CompactionSwitchesAndTheExcludedRegion {
+32:pub struct DeletionSwitches {
+8693:fn mount_writable_with_every_test_only_switch<Device: BlockDevice>(
+== A6 调用方读返回值假设「每次改动都有已落盘的版本」的位置（Y 方案才受影响）
+versions_published 在 core/src 之外的出现处=185 文件数=25
+roots_carrying_the_change 出现处=14 文件=crates/singlefs-harness/src/history.rs crates/singlefs-harness/src/reference_filesystem_translation.rs 
+== D1 会话字段公开、卸载与回退是收字段的自由函数（待发队列要放在哪）
+90:pub struct MountedSession {
+91-    pub allocator: PoolAllocator,
+92-    pub current: PoolVersion,
+93-    pub instance: InstanceGeneration,
+4240:pub fn unmount<Device: BlockDevice>(
+4241-    parameters: &MakeFilesystemParameters,
+4242-    devices: &mut Vec<(DeviceIdentity, Device)>,
+4243-    allocator: &mut PoolAllocator,
+4244-    current: &mut PoolVersion,
+4245-    shadow_ledger: ShadowLedger,
+== D2 测试开关装在哪、产品入口固定什么（P6）
+1871:    deletion_switches: DeletionSwitches,
+8087:pub fn mount_writable<Device: BlockDevice>(
+8088-    parameters: &MakeFilesystemParameters,
+8089-    devices: &mut Vec<(DeviceIdentity, Device)>,
+8090-) -> Result<Mounted, MountError> {
+8091-    mount_writable_with_space_admission(parameters, devices, SpaceAdmission::JudgedByTheFormula)
+1120:    /// 只供测试的开关关掉准入（`SpaceAdmission::SkippedByTheTestOnlySwitch`）：没判，一次都没推。
+6974:    // 只供测试的开关（`SpaceAdmission::SkippedByTheTestOnlySwitch`）关掉准入时不判，这次挂载之后的发布也不判（开关装在分配器上）。
+-- 非 tests 目录里引用 mount_writable_with_test_only 的文件
+crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs
+crates/singlefs-core/src/allocator.rs
+crates/singlefs-core/src/mount.rs
+crates/singlefs-core/src/unlink.rs
+crates/singlefs-harness/src/scenario.rs

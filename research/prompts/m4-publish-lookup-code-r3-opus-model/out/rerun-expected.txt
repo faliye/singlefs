@@ -1,0 +1,37 @@
+name=trees after_transaction=2d69b817bed2bdfe before_transaction=0a6a104eb416d059
+name=differential_compare histories=192 before_vs_after=identical endings=ending=completed:192
+name=coverage_sum site=CompactionReadsTheCentralMapping histories_reaching_it=24 lookups=181 builds=180 leaf_decodes=181
+name=coverage_sum site=MappingEntriesOfReleasedUnits histories_reaching_it=46 lookups=102352 builds=20066 leaf_decodes=10070
+name=coverage_sum site=RelocationSources histories_reaching_it=6 lookups=128 builds=86 leaf_decodes=32
+name=coverage_sum site=SnapshotJudgement histories_reaching_it=46 lookups=33906 builds=6340 leaf_decodes=245
+name=images tree=before shape=PoolOfFiles { files: 16, data_units_per_file: 4 } batches_published=24 images_sha256=66357a801c8269e8af3fb3be5e76928281729a11e63f8529069cfcfa2f56fa49
+name=images tree=before shape=PoolOfFiles { files: 48, data_units_per_file: 8 } batches_published=44 images_sha256=7b3bb85d08a2822115a91a554d2ecd4fcbbf8f29a6291f621f9081decf90708e
+name=mutant mutant=baseline rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=images tree=after shape=PoolOfFiles { files: 16, data_units_per_file: 4 } batches_published=24 images_sha256=66357a801c8269e8af3fb3be5e76928281729a11e63f8529069cfcfa2f56fa49
+name=images tree=after shape=PoolOfFiles { files: 48, data_units_per_file: 8 } batches_published=44 images_sha256=7b3bb85d08a2822115a91a554d2ecd4fcbbf8f29a6291f621f9081decf90708e
+name=mutant mutant=RA rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RB rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RC rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RD rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RE rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RF rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RG rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=RG+MA rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=124 index_builds_growth_in_percent=100
+name=mutant mutant=PR rc=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out failed=[] growth_in_percent=124 growth_in_percent=123 index_builds_growth_in_percent=100
+name=mutant mutant=MA rc=101 test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out failed=[compaction_batches_decode_each_routed_ma,every_lookup_by_identity_agrees_with_a_l,every_lookup_by_identity_agrees_with_a_l] growth_in_percent=124
+     36 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=2 relocation_lookups=3 relocation_builds=2 batches=1 versions=1
+     30 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=0 relocation_lookups=0 relocation_builds=0 batches=0 versions=1
+      8 probe_relocation thread=growth-pool-thread units_relocated=1 relocation_lookups=2 relocation_builds=2 batches=1 versions=1
+      8 probe_relocation thread=growth-pool-thread units_relocated=0 relocation_lookups=0 relocation_builds=0 batches=0 versions=1
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=8 relocation_lookups=13 relocation_builds=10 batches=5 versions=7
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=8 relocation_lookups=12 relocation_builds=8 batches=4 versions=5
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=7 relocation_lookups=11 relocation_builds=8 batches=4 versions=5
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=2 relocation_lookups=3 relocation_builds=2 batches=1 versions=2
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=21 relocation_lookups=32 relocation_builds=22 batches=11 versions=13
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=1 relocation_lookups=2 relocation_builds=2 batches=1 versions=1
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=11 relocation_lookups=17 relocation_builds=12 batches=6 versions=7
+      1 probe_relocation thread=every_lookup_by_identity_agrees_with_a_l units_relocated=0 relocation_lookups=0 relocation_builds=0 batches=0 versions=0
+name=cargo_tree checker_tier_alone_lookup_work_counters=0 checker_tier_with_harness_lookup_work_counters=1 workspace_lookup_work_counters=1
+name=unit_key group=judgement_of_the_crash_images tree=before key=3a64ff49abed2a74e898656817df1b5ab796a76df74ab4f33e5af6c51b2dd959 units=2488 lookup_work_units=0
+name=unit_key group=judgement_of_the_crash_images tree=after key=128ef400926b03638da82545bee8e288744ff4e366d11473e6aff34b0d440d0f units=2500 lookup_work_units=3
+name=unit_key group=judgement_of_the_crash_images tree=featured key=e7b303e7ccd1833e04763be39736105b8a3897330afa6514b1fce34e29e9f0cc units=2506 lookup_work_units=9

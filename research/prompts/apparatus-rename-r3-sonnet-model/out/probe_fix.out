@@ -1,0 +1,14 @@
+name=occupied_row（新前缀早就有文件）
+    tools/check_a->tools/check_b: window_open=False row_in_base_table=False 收严X判红=True 收严Y后仍生效=False
+name=token_row（旧前缀根本不存在）
+    3->4: window_open=False row_in_base_table=False 收严X判红=True 收严Y后仍生效=False
+name=landed_looking_forged_row（新前缀有、旧前缀无、从没搬过）
+    tools/check_a->tools/check_b: window_open=False row_in_base_table=False 收严X判红=True 收严Y后仍生效=False
+name=real_move_uncommitted（真搬迁，基准是搬迁之前）
+    tools/check_a->tools/check_c: window_open=True row_in_base_table=False 收严X判红=False 收严Y后仍生效=True
+name=real_move_after_commit（老行已在基准表里，窗口已关）
+    tools/check_a->tools/check_c: window_open=False row_in_base_table=True 收严X判红=False 收严Y后仍生效=False
+name=stale_row_wakes_up（老行睡着后醒来）
+    rig->rig2: window_open=True row_in_base_table=True 收严X判红=False 收严Y后仍生效=False
+name=real_move_committed_unpushed（gate 基准是 S0）
+    tools/old->tools/new: window_open=True row_in_base_table=False 收严X判红=False 收严Y后仍生效=True

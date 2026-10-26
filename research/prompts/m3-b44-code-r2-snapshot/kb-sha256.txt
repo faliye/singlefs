@@ -1,3 +1,0 @@
-2835a3dbe40cc59a927eedc726c71b4f911218f96eeb4cc461477c632daeb488  .claude/kb/term-renames.md
-a7d3c07761095e4745c9004ccf044b3a8be5e413126e67c1ccb8ed0e5f66f6bd  crates/singlefs-checker/invariants/04-校验和.md
-143f82785ffa318ba0ee2906d368646262e74568c8e85fa61c2ea949bd80fcc2  .claude/kb/checks-owed.md

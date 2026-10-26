@@ -1,0 +1,15 @@
+== clerk rc=0
+== experiment-designer rc=0
+== experiment-runner rc=0
+== implementation-writer rc=0
+== investigator rc=0
+== kb-scribe rc=0
+== mutation-triage rc=3
+    ✗ 派 mutation-triage 的提示里没有变异表（scripts/mutation/tables/<名>.tsv 或 crates/mutations.tsv 的条目名）。
+== prior-art rc=0
+== sweep rc=0
+== three-way-attack rc=0
+== three-way-defense rc=0
+== three-way-forward rc=0
+== three-way-materials rc=0
+== tooling-writer rc=0

@@ -1,0 +1,20 @@
+label	resolve	mutated	row_key	baseline_key	coverage_id	test_closure	executed_functions_now	executed_functions_same_as_recorded	set_current	reuse_problem	reuse_problem_realistic
+base-base	0	0	0	0	0	0	0	0	0	0	0
+E1-base	0	0	0	0	0	0	0	49	0	0	0
+E2-base	23	0	22	22	22	22	22	49	43	21	0
+E3-base	0	0	0	0	0	0	0	0	0	0	0
+E4-base	50	14	49	49	49	49	49	49	49	6	0
+E5-base	0	0	0	0	0	0	0	0	0	0	0
+base-t1	0	0	33	0	0	33	49	49	27	27	33
+E5-t1	0	0	0	0	0	0	49	49	0	0	0
+E4-t1	50	14	49	49	49	49	49	49	49	6	0
+name=k1_compare rows=50 set_current_true_in_base=43
+label=base-base set_current_true=43 baseline_reused_by_coverage_only=44 baseline_reused_given_record=50 baseline_reused_real_flow=49 set_current_flipped_rows=0
+label=E1-base set_current_true=43 baseline_reused_by_coverage_only=44 baseline_reused_given_record=50 baseline_reused_real_flow=49 set_current_flipped_rows=0
+label=E2-base set_current_true=0 baseline_reused_by_coverage_only=23 baseline_reused_given_record=50 baseline_reused_real_flow=27 set_current_flipped_rows=43
+label=E3-base set_current_true=43 baseline_reused_by_coverage_only=44 baseline_reused_given_record=50 baseline_reused_real_flow=49 set_current_flipped_rows=0
+label=E4-base set_current_true=0 baseline_reused_by_coverage_only=50 baseline_reused_given_record=50 baseline_reused_real_flow=0 set_current_flipped_rows=49
+label=E5-base set_current_true=43 baseline_reused_by_coverage_only=44 baseline_reused_given_record=50 baseline_reused_real_flow=49 set_current_flipped_rows=0
+label=base-t1 set_current_true=16 baseline_reused_by_coverage_only=17 baseline_reused_given_record=17 baseline_reused_real_flow=16 set_current_flipped_rows=27
+label=E5-t1 set_current_true=43 baseline_reused_by_coverage_only=44 baseline_reused_given_record=50 baseline_reused_real_flow=49 set_current_flipped_rows=0
+label=E4-t1 set_current_true=0 baseline_reused_by_coverage_only=50 baseline_reused_given_record=50 baseline_reused_real_flow=0 set_current_flipped_rows=49

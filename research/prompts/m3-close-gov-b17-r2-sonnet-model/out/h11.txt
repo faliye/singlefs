@@ -1,0 +1,2 @@
+old-path-present	exit=2	✗ 重型测试被拒：脚本 <scratch>/with-old-path/scripts/experiments/replay.sh:760 里的 scripts/experiment-apparatus/replay.sh ${@:2} E1（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --
+old-path-absent	exit=0	! heavy-test-guard.sh：bash / sh 起的脚本 <scratch>/without-old-path/scripts/experiments/replay.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出

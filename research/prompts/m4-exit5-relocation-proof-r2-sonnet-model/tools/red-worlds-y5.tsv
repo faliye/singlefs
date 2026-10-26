@@ -1,0 +1,12 @@
+relocation_interval_proofs.rs	区间：目的区间不与映射区间重叠的前提去掉	0 <= index < count && #[trigger] mapping.contains_key(key) ==> !runs_overlap(	0 <= index < count && #[trigger] mapping.contains_key(key) && false ==> !runs_overlap(
+relocation_interval_proofs.rs	区间：目的区间两两不重叠的前提去掉	0 <= earlier < later < count ==> !runs_overlap(destinations[earlier], destinations[later])	0 <= earlier < later < count && false ==> !runs_overlap(destinations[earlier], destinations[later])
+relocation_interval_proofs.rs	区间：目的跨度等于源跨度的前提去掉	            == sources[index].span	            == destinations[index].span
+relocation_interval_proofs.rs	区间：映射区间跨度至少 1 的前提去掉	    &&& forall|key: u64| #[trigger] mapping.contains_key(key) ==> mapping[key].span >= 1	    &&& true
+gc_ring_proofs.rs	环：回收只避开现行与读者、不避开回退候选	    &&& forall|i: int| s.floor <= i < s.roots.len() ==> ring_map_avoids(#[trigger] s.roots[i].mapping, slot)	    &&& true
+gc_ring_proofs.rs	环：回退可以退到 floor 之下	RingStep::Rollback { target } => s.floor <= target < s.roots.len(),	RingStep::Rollback { target } => 0 <= target < s.roots.len(),
+gc_ring_proofs.rs	环：Checkpoint 从不挤窗口	if s.roots.len() + 1 - s.floor > s.window { (s.floor + 1) as nat } else { s.floor }	s.floor
+gc_ring_proofs.rs	环：搬迁不核目的字节等于源字节	            &&& s.disk[destination] == s.disk[s.head.mapping[key]]	            &&& true
+gc_ring_proofs.rs	环：Crash 之后现行版本取最旧的根	RingStep::Crash => GcRingState { head: s.roots[s.roots.len() - 1], readers: Seq::empty(), ..s },	RingStep::Crash => GcRingState { head: s.roots[0], readers: Seq::empty(), ..s },
+gc_ring_proofs.rs	环：用户发布不核新版本读得对	RingStep::UserPublish { new_view } => view_reads_right(new_view, s.disk),	RingStep::UserPublish { new_view } => true,
+gc_ring_proofs.rs	环：F 可以往下抬	RingStep::RaiseFloor { new_floor } => s.floor <= new_floor < s.roots.len(),	RingStep::RaiseFloor { new_floor } => new_floor < s.roots.len(),
+gc_ring_proofs.rs	环：留存读者拿到的是最旧的根	RingStep::AcquireReader => GcRingState { readers: s.readers.push(s.head), ..s },	RingStep::AcquireReader => GcRingState { readers: s.readers.push(s.roots[0]), ..s },

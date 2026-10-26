@@ -1,0 +1,15 @@
+1fe61a6d7bdd9160af32db226e3903ebe1887bb8dc4db3563f88de50d691c26d  .claude/kb/experiments/112-legacy-writer-encountering-unknown-trees.en.md
+c456eba63cdcac765921db861b398256c0e023604c708802b76d0234d2091bfe  .claude/kb/experiments/112-旧ライターが未知のツリーに遭遇した場合.ja.md
+e69b4dd0d69cc11bc0dbdaca4f54a3803baf8ed74a545ab761723dc0ed29f2f1  crates/singlefs-checker/invariants/05-空间记账.md
+ff6aa88a1e5dc2f8b8d9d6de544c20f4234e42f0c778fc5036ad49fafddbade1  .claude/kb/decisions/19-block-pointer-structure-width-budget.en.md
+226b36b6f3383383b55454ed25b1a9d00e0bf50e4f260cc8ab6a7e5e7869cc4d  .claude/kb/decisions/19-ブロックポインタ構造と幅予算.ja.md
+85c20b626ca6c7a2953b64a6de2ff97f759327374b233d656f82f53039c73625  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+16357609f10b25b2451821801ed51555824693c35eb7f0024a05d55f3f9bd48e  .claude/kb/decisions/23-journal-role-format.en.md
+897b1d98af420e4f062211d393962d4017251ed007967c1afdd2de34c4de8a2f  .claude/kb/decisions/23-ジャーナルの役割と形式.ja.md
+07bdef40d8cf3bb39cb629d48835dbf2c719ad56f98886d469f662872f5f0ad2  .claude/kb/decisions/23-journal的角色与格式.md
+c0c6b5ba4790381e205aa7a71901da3b4aae1bb67a227a6254ce6959099f02ff  .claude/kb/decisions/13-verification-route.en.md
+a89c0b9cceb459a1dce4828f443f13f42bdec150e6db1b350175c80730764bf3  .claude/kb/decisions/13-検証ルート.ja.md
+c33fac2be12fb000adc861e2b83818003ddc5b8c3211276a44cde4cb59103dd9  .claude/kb/decisions/13-验证路线.md
+756328f4cf10924cad76a46aed181737202b2de0fa3380828992d5df17ac5c15  .claude/kb/decisions/15-format-freeze-policy.en.md
+acb16f12dd930ebb6ee48274aa9cfae16f183a39149b88a0b5b3ac9b23a196fa  .claude/kb/decisions/15-フォーマット凍結ポリシー.ja.md
+d4408990f2e9e0ccadac3ce024bb9d60222c10790acf4963fb466e35fffe822e  .claude/kb/decisions/15-格式冻结政策.md

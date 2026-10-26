@@ -1,8 +1,0 @@
-FAIL h1a_original / 丙只改带暂存：期望 yes，实测 no
-FAIL h1a_original / 丙两条路：期望 yes，实测 no
-PASS h1a_original / 今天：Lbad_A 进过窗口=no
-FAIL h1b_bypass / 丙只改带暂存：期望 yes，实测 no
-FAIL h1b_bypass / 丙两条路：期望 yes，实测 no
-PASS h1b_bypass / 今天：Lbad_A 进过窗口=no
-h5 自证查了 6 项，红 4 项
-退出码 1

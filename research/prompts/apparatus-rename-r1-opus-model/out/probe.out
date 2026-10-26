@@ -1,0 +1,3 @@
+name=real_repo base=e1b1ceb95a8b8c38bcd59e2e3ae9cc921575f865 changed=5423 moved_only=726 problem=None
+name=real_repo.history_bound_lines_in_moved_only_files count=1
+name=real_repo.history_bound_line path=research/prompts/e161-r2-prereg.md line=495 snippet='git diff --cached --stat -- $F crates/mutations.tsv scripts/experiment-apparatus'

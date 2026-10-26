@@ -1,7 +1,0 @@
-name=ding_merge way=listed alphabet=3 runs=600 runs_with_witnesses_whose_image_is_missing=15 runs_where_the_judge_stage_errors=15 most_erroring_blocks_of_twenty=4
-name=ding_merge way=listed alphabet=8 runs=600 runs_with_witnesses_whose_image_is_missing=600 runs_where_the_judge_stage_errors=600 most_erroring_blocks_of_twenty=10
-name=ding_merge way=planned alphabet=3 runs=600 runs_with_witnesses_whose_image_is_missing=0 runs_where_the_judge_stage_errors=0 most_erroring_blocks_of_twenty=0
-name=ding_merge way=planned alphabet=8 runs=600 runs_with_witnesses_whose_image_is_missing=557 runs_where_the_judge_stage_errors=557 most_erroring_blocks_of_twenty=3
-name=ding_merge way=union alphabet=3 runs=600 runs_with_witnesses_whose_image_is_missing=0 runs_where_the_judge_stage_errors=0 most_erroring_blocks_of_twenty=0
-name=ding_merge way=union alphabet=8 runs=600 runs_with_witnesses_whose_image_is_missing=0 runs_where_the_judge_stage_errors=0 most_erroring_blocks_of_twenty=0
-name=ding_double_record samples=40 block_bytes_differ=0 observations_differ=0

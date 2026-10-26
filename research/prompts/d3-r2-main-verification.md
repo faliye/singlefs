@@ -51,4 +51,4 @@ R2 的口径要带一句：入库装置里提交内生块寿命一轮（上一�
 
 ## 六、装置的收口（写在判决之后，按实跑的结果）
 
-`cargo test --release --bin e151-arrival-and-container-arms`：18 passed；`bash scripts/mutation/mutate.sh e151-arrival-and-container-arms scripts/experiments/e151_arrival_and_container_arms.rs mutations/e151_arrival_and_container_arms.tsv`：14 条全部被抓（M13「按请求到达序不洗请求」第一次跑没被抓，把种子 7 下洗牌后的顺序钉成绝对值之后被抓）；`bash scripts/experiments/replay.sh E151`：字节一致 1。
+`cargo test --release --bin e151-arrival-and-container-arms`：18 passed；`bash scripts/mutation/mutate.sh e151-arrival-and-container-arms scripts/experiment-apparatus/e151_arrival_and_container_arms.rs mutations/e151_arrival_and_container_arms.tsv`：14 条全部被抓（M13「按请求到达序不洗请求」第一次跑没被抓，把种子 7 下洗牌后的顺序钉成绝对值之后被抓）；`bash scripts/experiment-apparatus/replay.sh E151`：字节一致 1。

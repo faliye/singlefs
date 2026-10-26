@@ -1,0 +1,33 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-core)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/transaction.rs:4305:9
+     |
+4305 |     let mut previous_read_by_role = MappedUnitsOfAVersionReadByRole::of_the_version(previous);
+     |         ----^^^^^^^^^^^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `previous_read_by_role`
+    --> crates/singlefs-core/src/transaction.rs:4305:9
+     |
+4305 |     let mut previous_read_by_role = MappedUnitsOfAVersionReadByRole::of_the_version(previous);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_previous_read_by_role`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/mut/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.85s
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r3-sonnet/target-mut/debug/deps/publish_lookup_by_identity-d53243f4d7a69b6f)
+
+running 5 tests
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+test first_entry_of_each_identity_examines_less_than_twice_as_many_entries_per_lookup_on_a_table_four_times_as_long ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 43.71s
+

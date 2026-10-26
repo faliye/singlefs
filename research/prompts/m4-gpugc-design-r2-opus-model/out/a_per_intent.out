@@ -1,0 +1,11 @@
+name=scan_checksum_only_one_submission_per_intent card=0 gap_milliseconds=0 judgement=not_losing cells=74
+name=scan_checksum_only_one_submission_per_intent card=0 gap_milliseconds=0 judgement=unstable cells=70
+name=scan_checksum_only_one_submission_per_intent card=0 gap_milliseconds=50 judgement=losing cells=26
+name=scan_checksum_only_one_submission_per_intent card=0 gap_milliseconds=50 judgement=not_losing cells=34
+name=scan_checksum_only_one_submission_per_intent card=0 gap_milliseconds=50 judgement=unstable cells=12
+name=scan_checksum_only_one_submission_per_intent card=1 gap_milliseconds=0 judgement=losing cells=58
+name=scan_checksum_only_one_submission_per_intent card=1 gap_milliseconds=0 judgement=not_losing cells=54
+name=scan_checksum_only_one_submission_per_intent card=1 gap_milliseconds=0 judgement=unstable cells=32
+name=scan_checksum_only_one_submission_per_intent card=1 gap_milliseconds=50 judgement=losing cells=64
+name=scan_checksum_only_one_submission_per_intent card=1 gap_milliseconds=50 judgement=not_losing cells=1
+name=scan_checksum_only_one_submission_per_intent card=1 gap_milliseconds=50 judgement=unstable cells=7

@@ -1,4 +1,0 @@
-name=rebuilt_hook version=snapshot file=.claude/hooks/lib_heavy_tests.py sha256=08efe8b7a1fb0a1d6245c25c6ce384235b462edd3644f81f45178cb28a4152e1 matches_frozen=yes
-name=rebuilt_hook version=snapshot file=.claude/hooks/heavy-test-guard.sh sha256=3bf1e8a21da2c4dd9abbf3eebacd83ad51f18f830d084c015d1d43bcd78264e2 matches_frozen=yes
-name=rebuilt_hook version=pre-swap file=.claude/hooks/lib_heavy_tests.py sha256=30f7e2321734a971883a9ea735b70c6666c247e4125f94fdba20d7cde1482778
-name=rebuilt_hook version=pre-swap file=.claude/hooks/heavy-test-guard.sh sha256=37426dc29884ea3a6b3809b3f1dd8ce56b71b80b594a9b22f8e628ca35ae6c50

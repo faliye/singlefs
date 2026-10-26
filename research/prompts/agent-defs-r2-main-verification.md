@@ -56,7 +56,7 @@
 
 ## 四、方法改动（K9）
 
-**写范围探针走真仓路径**：三个有 Write / Edit 的定义，把「写范围」一节的每一类路径按真仓路径各喂闸一次，再各配出界的几条，共 25 条，全部判对。另发现一处副本试跑测不到的缺口：138 个实验 bin 有 100 个在 `scripts/experiments/Cargo.toml` 显式登记 `[[bin]]`（E150–E152 都是），执行员照惯例追加会被闸拒；第一轮试跑它靠 cargo 按文件名自动发现、没碰 `Cargo.toml`，所以没撞上。已加进执行员写范围与 `.claude/hooks/agent-write-scope.tsv`（只许末尾追加），探针复核退出码 0，63 号绿。
+**写范围探针走真仓路径**：三个有 Write / Edit 的定义，把「写范围」一节的每一类路径按真仓路径各喂闸一次，再各配出界的几条，共 25 条，全部判对。另发现一处副本试跑测不到的缺口：138 个实验 bin 有 100 个在 `scripts/experiment-apparatus/Cargo.toml` 显式登记 `[[bin]]`（E150–E152 都是），执行员照惯例追加会被闸拒；第一轮试跑它靠 cargo 按文件名自动发现、没碰 `Cargo.toml`，所以没撞上。已加进执行员写范围与 `.claude/hooks/agent-write-scope.tsv`（只许末尾追加），探针复核退出码 0，63 号绿。
 
 **还没做的两样**：每个定义一次故意缺输入的派发；三条没走到的路径（干到一半收到主 agent 的消息、交回之后再收到消息或被打回、两个 agent 同时改同一个文件）。
 
@@ -68,5 +68,5 @@
 
 - 第二轮，仍是单轮判；上表所有改法被攻过零轮，没有再试跑。
 - a 的改法把书记员的写回挪回 Bash，写范围闸对它只剩自愿的预检。
-- B1 残留：55 号读 `scripts/experiments/replay.sh` 与 E142 产物、59 号拷仓根 `Cargo.toml`、`Cargo.lock` 与 `research/results`，都不在指纹的 `-- crates litmus` 里。
+- B1 残留：55 号读 `scripts/experiment-apparatus/replay.sh` 与 E142 产物、59 号拷仓根 `Cargo.toml`、`Cargo.lock` 与 `research/results`，都不在指纹的 `-- crates litmus` 里。
 - G1 仍挂起。

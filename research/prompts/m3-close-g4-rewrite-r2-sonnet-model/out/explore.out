@@ -1,0 +1,42 @@
+name=post_mkfs_publishes0_depth1 states=5 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes0_depth2 states=30 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes0_depth3 states=75 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes1_depth1 states=7 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes1_depth2 states=56 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes1_depth3 states=147 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes2_depth1 states=9 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes2_depth2 states=90 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes2_depth3 states=243 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes3_depth1 states=11 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes3_depth2 states=132 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_publishes3_depth3 states=363 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_fault_in_the_first_run_only_depth1 states=9 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_fault_in_the_first_run_only_depth2 states=90 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=post_mkfs_fault_in_the_first_run_only_depth3 states=243 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=stress_fault_in_every_run_depth3 states=234 states_without_a_verified_slot=6 segments_where_it_first_appears=[0]
+name=stress_fault_in_every_run_depth3 first_counterexample=seg0:T->(None, 1) | seg0:T->(None, None)
+# 崩溃注入第二、三截的抽样域：整写子集，撕裂并进没持久（outcomes=PN）。正确协议与坏协议在这一域里怎样
+name=injection_domain_post_mkfs_depth1 states=5 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=injection_domain_post_mkfs_depth2 states=30 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=injection_domain_post_mkfs_depth3 states=75 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=injection_domain_control_no_barrier_between_the_two_acquisition_rounds_depth3 states=90 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=injection_domain_control_mkfs_last_segment_only_slot_zero_landed_depth3 states=48 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=injection_domain_control_mut_b1_depth1 states=10 states_without_a_verified_slot=2 segments_where_it_first_appears=[1, 2]
+name=injection_domain_control_mut_b1_depth1 first_counterexample=seg1:NP->(None, None)
+name=injection_domain_control_mut_b1_depth2 states=90 states_without_a_verified_slot=21 segments_where_it_first_appears=[0, 1, 2]
+name=injection_domain_control_mut_b1_depth2 first_counterexample=seg1:NP->(None, None)
+name=injection_domain_control_mut_b1_depth3 states=240 states_without_a_verified_slot=58 segments_where_it_first_appears=[0, 1, 2]
+name=injection_domain_control_mut_b1_depth3 first_counterexample=seg1:NP->(None, None)
+# 对照臂（枚举域 PNT）：下面每一行都应当有无槽状态
+name=control_mkfs_last_segment_only_slot_zero_landed_depth1 states=5 states_without_a_verified_slot=1 segments_where_it_first_appears=[0]
+name=control_mkfs_last_segment_only_slot_zero_landed_depth1 first_counterexample=seg0:T->(None, None)
+name=control_mkfs_last_segment_only_slot_one_landed_depth1 states=5 states_without_a_verified_slot=0 segments_where_it_first_appears=[]
+name=control_mut_b1_zero_the_other_slot_in_the_same_segment_depth1 states=25 states_without_a_verified_slot=10 segments_where_it_first_appears=[0, 1, 2]
+name=control_mut_b1_zero_the_other_slot_in_the_same_segment_depth1 first_counterexample=seg0:TP->(None, None)
+name=control_no_barrier_between_the_two_acquisition_rounds_depth1 states=9 states_without_a_verified_slot=1 segments_where_it_first_appears=[0]
+name=control_no_barrier_between_the_two_acquisition_rounds_depth1 first_counterexample=seg0:TT->(None, None)
+# 补写本身：从两槽全废起的一次挂载（取号两轮：世代号 1 落槽 1，世代号 2 落槽 0），无槽状态只许出现在第 0 段
+name=rewrite_of_a_device_without_slots_depth1 states=5 states_without_a_verified_slot=2 segments_where_it_first_appears=[0]
+name=rewrite_of_a_device_without_slots_depth1 first_counterexample=seg0:N->(None, None)
+name=rewrite_of_a_device_without_slots_then_a_second_crash_depth2 states=15 states_without_a_verified_slot=2 segments_where_it_first_appears=[0]
+name=rewrite_of_a_device_without_slots_then_a_second_crash_depth2 first_counterexample=seg0:N->(None, None)

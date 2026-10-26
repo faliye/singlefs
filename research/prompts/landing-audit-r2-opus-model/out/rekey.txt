@@ -1,0 +1,11 @@
+name=基准原样
+  ✓ 比对对象 2 行（E165）：登记出处都在，单元名在单元表出处里都恰好出现一次；复跑写驱动名的 1 行在 replay.sh 里都有且产物名相符；复跑写 none 的 1 行只缩不涨，与基准 HEAD 比没涨
+exit=0
+name=删掉E165的none行换成E200的新比对对象借用同一对键
+  ✓ 比对对象 2 行（E165、E200）：登记出处都在，单元名在单元表出处里都恰好出现一次；复跑写驱动名的 1 行在 replay.sh 里都有且产物名相符；复跑写 none 的 1 行只缩不涨，与基准 HEAD 比没涨
+exit=0
+name=对照登记出处写成新实验自己的登记
+  ✗ none 行比基准多：replay-comparison-units.tsv 里这几行复跑写 none:，基准 HEAD 那一版里没有这样的行：
+     第 3 行 segment3-r5-legal.out（research/prompts/e200-r1-prereg.md）
+     → 怎么办：复跑写 none: 的行只缩不涨。新登记的比对对象要在 replay.sh 复跑表里加一行驱动行、复跑列写驱动名，不许写 none: 把它按下去。
+exit=1

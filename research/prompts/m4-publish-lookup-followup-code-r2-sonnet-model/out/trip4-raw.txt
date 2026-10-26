@@ -1,0 +1,14 @@
+  · ③ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · ④ 树拷到第二台 runs/m4-r2-sonnet-trip4（git 列得出的 3439 个文件，没跟踪的临时文件排掉 0 个，规范副本另拷），在那里 git init 并提交一次
+  · ⑤ 第二台开跑（脱离 ssh 会话起，经副本里的 run-with-memory-cap.sh 16G），每 5 秒看一次
+  … 第二台那一份：running
+name=t3_drop copy=after ll=singlefs_core-29f332cfc1888881.ll ll_bytes=233703254 define=1797 landingpad=2649 drop_in_place_InsideALookupSite_refs=4 resume=547
+name=t3_drop_line copy=after 1216970:!130888 = !DICompositeType(tag: DW_TAG_structure_type, name: "InsideALookupSite", scope: !2340, file: !2, align: 8, flags: DIFlagProtected, elements: !130889, templateParams: !30, identifier: "776622b9a745cef839c53aa84c49e
+name=t3_drop_line copy=after 1792142:!706060 = distinct !DISubprogram(name: "drop_glue<singlefs_core::transaction::lookup_work::InsideALookupSite>", linkageName: "_RINvNtCsc36rpYXAlPq_4core3ptr9drop_glueNtNtNtCslcHRcs2uvzy_13singlefs_core11transaction11lookup
+name=t3_drop_line copy=after 1792145:!706063 = !DIDerivedType(tag: DW_TAG_pointer_type, name: "&mut singlefs_core::transaction::lookup_work::InsideALookupSite", baseType: !130888, size: 64, align: 64, dwarfAddressSpace: 0)
+name=t3_drop_line copy=after 1835966:!749884 = !DICompositeType(tag: DW_TAG_structure_type, name: "Option<singlefs_core::transaction::lookup_work::InsideALookupSite>", scope: !23, file: !2, size: 8, align: 8, flags: DIFlagPublic, elements: !749885, templatePa
+name=t3_drop copy=dropless ll=singlefs_core-29f332cfc1888881.ll ll_bytes=233704764 define=1797 landingpad=2647 drop_in_place_InsideALookupSite_refs=2 resume=547
+name=t3_drop_line copy=dropless 1216932:!130888 = !DICompositeType(tag: DW_TAG_structure_type, name: "InsideALookupSite", scope: !2340, file: !2, align: 8, flags: DIFlagProtected, elements: !130889, templateParams: !30, identifier: "776622b9a745cef839c53aa84c49e
+name=t3_drop_line copy=dropless 1835906:!749862 = !DICompositeType(tag: DW_TAG_structure_type, name: "Option<singlefs_core::transaction::lookup_work::InsideALookupSite>", scope: !23, file: !2, size: 8, align: 8, flags: DIFlagPublic, elements: !749863, templatePa
+  · 第二台那条命令退 0
+  · ⑦ 删了第二台 runs/m4-r2-sonnet-trip4 这一趟的树与进程号、退出码、输出、串行声明四个文件（回读不在了）

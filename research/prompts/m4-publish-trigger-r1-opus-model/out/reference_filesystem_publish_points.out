@@ -1,0 +1,22 @@
+name=auto_publish_between_changes overwrites=1 auto_publish_after=0 translated_today=red(allowed_states=1) content_only=green any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=1 auto_publish_after=1 translated_today=green content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=2 auto_publish_after=0 translated_today=red(allowed_states=1) content_only=green any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=2 auto_publish_after=1 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=2 auto_publish_after=2 translated_today=green content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=3 auto_publish_after=0 translated_today=red(allowed_states=1) content_only=green any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=3 auto_publish_after=1 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=3 auto_publish_after=2 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=3 auto_publish_after=3 translated_today=green content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=4 auto_publish_after=0 translated_today=red(allowed_states=1) content_only=green any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=4 auto_publish_after=1 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=4 auto_publish_after=2 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=4 auto_publish_after=3 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes overwrites=4 auto_publish_after=4 translated_today=green content_only=red(allowed_states=1) any_state_between_lo_and_hi=green
+name=auto_publish_between_changes_summary cases=14 red_translated_today=10 red_content_only=10 red_any_state_between_lo_and_hi=0
+name=one_request_split_by_the_trigger units_published=0 translated_today=red(allowed_states=1) content_only=green any_state_between_lo_and_hi=green unit_key_prefix=green
+name=one_request_split_by_the_trigger units_published=1 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=red unit_key_prefix=green
+name=one_request_split_by_the_trigger units_published=2 translated_today=red(allowed_states=1) content_only=red(allowed_states=1) any_state_between_lo_and_hi=red unit_key_prefix=green
+name=one_request_split_by_the_trigger units_published=3 translated_today=green content_only=red(allowed_states=1) any_state_between_lo_and_hi=green unit_key_prefix=green
+name=one_request_split_by_the_trigger_summary cases=4 red_translated_today=3 red_content_only=3 red_any_state_between_lo_and_hi=2 red_unit_key_prefix=0
+name=accept_after_a_failed_auto_publish recovered=first failure_on_a_publish_point=not_accepted(operation_after_a_failure_after_writing) failure_not_submitted=green
+name=accept_after_a_failed_auto_publish recovered=failed_publish_landed failure_on_a_publish_point=not_accepted(operation_after_a_failure_after_writing) failure_not_submitted=red(allowed_states=1)

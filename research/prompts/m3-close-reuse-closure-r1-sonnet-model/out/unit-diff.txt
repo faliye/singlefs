@@ -1,0 +1,16 @@
+单元合计 现状 1579、切边之后 1232
+.claude/hooks/lib_heavy_tests.py: 现状 18、切边之后 0、少 18
+.claude/hooks/lib_long_run.py: 现状 40、切边之后 0、少 40
+.claude/hooks/lib_shell_words.py: 现状 5、切边之后 0、少 5
+.claude/hooks/lib_work_root.py: 现状 11、切边之后 10、少 1
+.claude/scripts/project_preflight.py: 现状 8、切边之后 7、少 1
+.claude/singlefs-ai-sop/scripts/preflight.py: 现状 69、切边之后 66、少 3
+.claude/singlefs-ai-sop/scripts/proc.py: 现状 13、切边之后 12、少 1
+scripts/crash/crash-amplification-lib.sh: 现状 26、切边之后 0、少 26
+scripts/crash/crash-point-replay-shard-configuration-check.sh: 现状 20、切边之后 0、少 20
+scripts/gate/lib_function_units.py: 现状 715、切边之后 714、少 1
+scripts/hosts/host-dispatch.py: 现状 67、切边之后 26、少 41
+scripts/hosts/host-resources.py: 现状 75、切边之后 0、少 75
+scripts/hosts/memory_peaks_lib.py: 现状 40、切边之后 31、少 9
+scripts/hosts/peer-host-lib.sh: 现状 5、切边之后 0、少 5
+scripts/hosts/rocksdb-prebuilt.py: 现状 101、切边之后 0、少 101

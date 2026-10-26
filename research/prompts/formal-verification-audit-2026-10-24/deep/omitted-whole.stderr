@@ -1,0 +1,10 @@
+error: postcondition not satisfied
+ --> /tmp/singlefs-formal-deep-audit-wgxnn8_h/omitted/omitted_proof.rs:2:50
+  |
+2 | verus! { pub proof fn impossible_claim() ensures false, {} }
+  |          -------------------------------         ^^^^^ failed this postcondition
+  |          |
+  |          at the end of the function body
+
+error: aborting due to 1 previous error
+

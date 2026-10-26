@@ -6,7 +6,7 @@ ROOT="${1:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 cd "$ROOT" || { echo "找不到仓根 $ROOT"; exit 2; }
 
 echo "== 1. G2/G5/G7 改后字面：grep -nF 逐句核（命中即证明这句确实在文件里、行号现取） =="
-grep -nF "这一次的新文件也不删：重跑已有实验时，第 5 步把 \`scripts/experiments/replay.sh\` 里这个实验的登记行改指新文件，旧的留着" .claude/agents/experiment-runner.md
+grep -nF "这一次的新文件也不删：重跑已有实验时，第 5 步把 \`scripts/experiment-apparatus/replay.sh\` 里这个实验的登记行改指新文件，旧的留着" .claude/agents/experiment-runner.md
 grep -nF "取值是布尔 \`true\` 的、取值是 \`zero\` 的（例 \`control_violations_ok=true\`、\`layer0_violations=zero\`）与名字不表示「没过」的计数（例 \`journal_differing_states\`）不点名" .claude/agents/experiment-runner.md
 grep -nF "读实验页或实验索引的那几道除外（27、34、40、69、75、84、85、86、88、99 号）" .claude/agents/experiment-runner.md
 grep -nF "产物照第 4 步一个不删（86 号出路里「把 research 下那些文件删掉」那一句不照做，写进报告交主 agent）" .claude/agents/experiment-runner.md

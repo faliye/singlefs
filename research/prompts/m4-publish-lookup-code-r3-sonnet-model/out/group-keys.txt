@@ -1,0 +1,21 @@
+# unit-graph key：与构建脚本同样的特性（default、verdict-store；第二段另加 gpu）、--toolchain-of-the-build dev、--lock-file；改前树 old = 冻结副本反向打回第三批补丁，改后树 new = 冻结副本；键只写前 16 位；ERR = 这组入口在这组特性下不编进来（两边一样）
+## 不带 gpu
+group=gpu_judge target=lib old=ERR:unit-graph：入口「singlefs_checker_tier::crash_judge_gpu::JudgeKernelSources::of_
+group=judgement_of_the_crash_images target=lib old=44ac2f762d6f7b1a new=bebc0c50c4da2e1a changed=True
+group=judgement_of_the_given_states target=lib old=67fa0b7e7467146d new=d6e44a85eba1866a changed=True
+group=cpu_facts_verifier target=lib old=add06eb39352061e new=541b62c58bf00fea changed=True
+group=gpu_facts_verifier target=lib old=ERR:unit-graph：入口「singlefs_checker_tier::crash_verify_gpu::GpuFactsVerif
+group=recording target=lib old=ERR:unit-graph：入口「singlefs_checker_tier::crash_judge_dispatch::PackedJudgeTables:
+group=gpu_and_cpu_judge_pairing_comparison target=test:crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state old=ERR:
+group=gpu_and_cpu_facts_verifier_pairing_comparison target=test:crash_facts_gpu_verifier_agrees_with_the_cpu_reference o
+group=observer_conclusion_composition target=lib old=ERR:unit-graph：入口「singlefs_checker_tier::crash_amplificatio
+## 带 gpu
+group=gpu_judge target=lib old=7399b06859a2abfd new=7399b06859a2abfd changed=False
+group=judgement_of_the_crash_images target=lib old=44ac2f762d6f7b1a new=bebc0c50c4da2e1a changed=True
+group=judgement_of_the_given_states target=lib old=e4dda94055b4d7fd new=c3ef78cd6c8feda8 changed=True
+group=cpu_facts_verifier target=lib old=add06eb39352061e new=541b62c58bf00fea changed=True
+group=gpu_facts_verifier target=lib old=45115fffc41e5a90 new=45115fffc41e5a90 changed=False
+group=recording target=lib old=6397f65be176953b new=7e549a145dd759e2 changed=True
+group=gpu_and_cpu_judge_pairing_comparison target=test:crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state old=6b137aa641c2cdb1 new=6b137aa641c2cdb1 changed=False
+group=gpu_and_cpu_facts_verifier_pairing_comparison target=test:crash_facts_gpu_verifier_agrees_with_the_cpu_reference old=926448a6a24eb530 new=926448a6a24eb530 changed=False
+group=observer_conclusion_composition target=lib old=3138c0c674c963eb new=8eb4e81a890977c0 changed=True

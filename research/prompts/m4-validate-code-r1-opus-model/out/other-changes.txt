@@ -1,0 +1,4 @@
+ATTACK-OUTCOME 标签 0 size 3000 unlink: 做成：2 版
+ATTACK-OUTCOME 标签 0 size 3000 建一个 inode: 做成：1 版
+ATTACK-OUTCOME 标签 0 size 3000 建快照: 做成：1 版
+exit=0

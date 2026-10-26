@@ -1,0 +1,14 @@
+name=verus file=baseline rc_is_zero=yes verification results:: 32 verified, 0 errors
+name=verus file=attack_gc_protocol_and_p4 rc_is_zero=yes verification results:: 36 verified, 0 errors
+name=verus file=must_red_rollback rc_is_zero=no verification results:: 35 verified, 1 errors
+name=verus file=must_red_overlap rc_is_zero=no verification results:: 35 verified, 1 errors
+name=reachable-summary cases=12 differing=10
+name=twin-summary cases=112 with_batches=56 differing=48
+name=twin-differing-by-kind rollback=32 raise_floor=16 in_cases_without_a_batch=0
+name=closure entry=transaction::publish_relocation_batch fn=836 fn_lines=18057 kernel_fn=2 kernel_lines=12
+name=closure entry=mount::roll_back_by_a_forward_publish fn=1057 fn_lines=24494 kernel_fn=2 kernel_lines=12
+name=membership fn=mount::mapping_keys_whose_target_locations_differ_from_the_current_mapping in_relocation_publish=0 in_rollback=1
+name=membership fn=mount::version_to_publish_the_rollback_after in_relocation_publish=0 in_rollback=1
+name=membership fn=transaction::relocation_checked_against_the_version in_relocation_publish=1 in_rollback=0
+name=membership fn=gc_crash_proofs::released_record_can_be_reclaimed in_relocation_publish=1 in_rollback=1
+name=lifted-upper-bound fns=5 body_lines=583

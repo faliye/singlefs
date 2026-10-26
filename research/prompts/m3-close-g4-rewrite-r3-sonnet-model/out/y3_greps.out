@@ -1,0 +1,82 @@
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '可写挂载会拒' <区域>
+  .claude/kb lines=1 files=1
+  crates lines=5 files=4
+  scripts lines=0 files=0
+  records lines=1 files=1
+  research/prompts lines=85 files=64
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '单盘全废' <区域>
+  .claude/kb lines=3 files=3
+  crates lines=8 files=4
+  scripts lines=5 files=5
+  records lines=1 files=1
+  research/prompts lines=100 files=65
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '两槽全废' <区域>
+  .claude/kb lines=2 files=2
+  crates lines=20 files=10
+  scripts lines=0 files=0
+  records lines=5 files=3
+  research/prompts lines=117 files=44
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '两槽都自证不过' <区域>
+  .claude/kb lines=0 files=0
+  crates lines=9 files=7
+  scripts lines=0 files=0
+  records lines=1 files=1
+  research/prompts lines=32 files=27
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '两槽都废' <区域>
+  .claude/kb lines=0 files=0
+  crates lines=2 files=2
+  scripts lines=0 files=0
+  records lines=0 files=0
+  research/prompts lines=1 files=1
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '少于两槽自证' <区域>
+  .claude/kb lines=1 files=1
+  crates lines=2 files=2
+  scripts lines=0 files=0
+  records lines=0 files=0
+  research/prompts lines=77 files=61
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '一份自证过的系统配置都没有' <区域>
+  .claude/kb lines=7 files=4
+  crates lines=19 files=10
+  scripts lines=0 files=0
+  records lines=1 files=1
+  research/prompts lines=106 files=51
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '一份本池自证过的系统配置都没有' <区域>
+  .claude/kb lines=1 files=1
+  crates lines=9 files=4
+  scripts lines=0 files=0
+  records lines=0 files=0
+  research/prompts lines=25 files=15
+== 命令：grep -rnI --exclude-dir=target --exclude-dir=.git -- '没有自证过的槽' <区域>
+  .claude/kb lines=0 files=0
+  crates lines=2 files=2
+  scripts lines=1 files=1
+  records lines=0 files=0
+  research/prompts lines=4 files=4
+== kb 与 crates 里非测试、非变异表文件的命中行（文件:行，前 110 字）
+  [可写挂载会拒] .claude/kb/checks-owed.md:732:| C461 | checker 判「挂不上的镜像」整片报不适用 | 早退那一半
+  [可写挂载会拒] crates/singlefs-checker/invariants/03-journal.md:12:| I-8.5 | tail 槽有效集非空 | 池里至少有一块盘
+  [可写挂载会拒] crates/singlefs-checker/src/image.rs:350:/// I-8.5（V-池）：全池至少一块盘有一个自证过的系
+  [单盘全废] .claude/kb/checks-owed.en.md:729:| C367 | I-8.5 的字面后半句在合法镜像上不成立 | I-8.5 (tail 
+  [单盘全废] .claude/kb/checks-owed.md:734:| C367 | I-8.5 的字面后半句在合法镜像上不成立 | I-8.5（tail 槽
+  [单盘全废] .claude/kb/checks-owed.ja.md:729:| C367 | I-8.5 的字面后半句在合法镜像上不成立 | I-8.5（tail 
+  [单盘全废] crates/singlefs-checker/invariants/03-journal.md:12:| I-8.5 | tail 槽有效集非空 | 池里至少有一块盘
+  [单盘全废] crates/singlefs-checker/src/image.rs:350:/// I-8.5（V-池）：全池至少一块盘有一个自证过的系
+  [单盘全废] crates/singlefs-checker/src/image.rs:1458:/// 对着只读恢复判（`research/prompts/m3-inv-a-r1-main-verif
+  [单盘全废] crates/singlefs-checker/src/image.rs:1482:    /// 两个槽都没自证过的盘（单盘全废）。
+  [单盘全废] crates/singlefs-checker/src/image.rs:1485:    /// （D23（journal 的角色与格式） 已定项 14「可写
+  [单盘全废] crates/singlefs-checker/src/walk.rs:17323:    // I-8.5（V-池）：全池皆废判红；一块盘交得出可
+  [两槽全废] .claude/kb/decisions-history.md:11725:- 已定项 8 写进系统配置三轮的落地：承诺罩住取号之
+  [两槽全废] .claude/kb/decisions/22-单元原子性怎么合成.md:181:**射程**：系统配置自己的更新协议（
+  [两槽全废] crates/singlefs-checker-tier/src/crash_judge_tables.rs:858:/// 取第一份自证得过的；一份都没有
+  [两槽全废] crates/singlefs-checker-tier/src/crash_injection.rs:8961:    /// （`once` 有内容）。盘 0 两槽全废
+  [两槽全废] crates/singlefs-core/src/mount.rs:5727:/// 两槽全废的盘过不了丙' 补写闸的是哪一件（[`rewrit
+  [两槽全废] crates/singlefs-core/src/mount.rs:5745:/// 交回不带的那几块与各自缺的（[`SelectedVersionLackingO
+  [两槽全废] crates/singlefs-core/src/mount.rs:5754:/// 外层的提前出口两个：两槽全废又过不了补写闸（
+  [两槽全废] crates/singlefs-core/src/mount.rs:5849:/// 这块盘是谁只由调用方的盘表说了算（两槽全废，
+  [两槽全废] crates/singlefs-core/src/mount.rs:6914:    // 丙'：过了补写闸的两槽全废的盘交给取号，取号
+  [两槽全废] crates/singlefs-core/src/system_configuration_repair.rs:43:/// 可写挂载取号补写两槽全废的盘之
+  [两槽全废] crates/singlefs-core/src/transaction.rs:879:/// `devices_rewritten_by_the_acquisition` 里的盘是可写挂
+  [两槽全废] crates/singlefs-core/src/transaction.rs:1085:/// `devices_rewritten_by_the_acquisition` 是可写挂载核过
+  [少于两槽自证] .claude/kb/checks-owed.md:732:| C461 | checker 判「挂不上的镜像」整片报不适用 | 早退那一半
+  [少于两槽自证] crates/singlefs-checker/invariants/03-journal.md:12:| I-8.5 | tail 槽有效集非空 | 池里至少有一块盘
+  [少于两槽自证] crates/singlefs-checker/src/image.rs:350:/// I-8.5（V-池）：全池至少一块盘有一个自证过的系

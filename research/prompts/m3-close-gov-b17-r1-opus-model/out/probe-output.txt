@@ -1,0 +1,27 @@
+name=judged_by_name copy=True elsewhere=False main=True
+case=main-list-items	lib=none	guard_exit=0	stderr=
+case=main-list-items-then-experiment	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh --list-items E142（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：impleme
+case=main-list-items-force-after	lib=none	guard_exit=0	stderr=
+case=main-no-arguments	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh （实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：implementation-writer 不跑
+case=wrapped-memory-cap	lib=none	guard_exit=0	stderr=
+case=wrapped-env-nice-capped	lib=none	guard_exit=0	stderr=
+case=joined-and-experiment	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh E142（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：implementation-write
+case=joined-semicolon-cargo	lib=checker-tier-cargo	guard_exit=2	stderr=✗ 主工作区合入锁被别的进程占着，这条命令要在主工作区 <repo> 里起 cargo：cargo test
+case=copy-absolute-path	lib=none	guard_exit=0	stderr=
+case=copy-cd-relative	lib=none	guard_exit=0	stderr=
+case=copy-cwd-relative	lib=none	guard_exit=0	stderr=
+case=copy-no-arguments-control	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh （实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：implementation-writer 不跑
+case=elsewhere-same-body-control	lib=none	guard_exit=2	stderr=✗ 重型测试被拒：脚本 <work>/elsewhere/replay.sh:5 里的 cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：implementation-writer 不跑「checker 档」
+case=copy-crash-point-replay-list-items	lib=none	guard_exit=0	stderr=
+case=bash-env-replay-list-items	lib=none	guard_exit=0	stderr=
+case=bash-env-env-replay-list-items	lib=none	guard_exit=0	stderr=
+case=bash-env-export-replay-list-items	lib=none	guard_exit=0	stderr=
+case=bash-env-bash-c-true-control	lib=none	guard_exit=0	stderr=
+case=prefix-assignment-variable	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh $A（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：implementation-writer 
+case=variable-known-list-items	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh $A（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：implementation-writer 
+case=xargs-appends-experiment	lib=none	guard_exit=0	stderr=
+case=xargs-bare-entry	lib=none	guard_exit=0	stderr=
+case=source-list-items	lib=none	guard_exit=0	stderr=
+case=sh-list-items	lib=none	guard_exit=0	stderr=
+case=bash-x-list-items	lib=none	guard_exit=0	stderr=
+case=glob-argument	lib=replay-all-stage	guard_exit=2	stderr=✗ 重型测试被拒：scripts/experiment-apparatus/replay.sh --list-item?（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）（全部实验复跑）：implementati

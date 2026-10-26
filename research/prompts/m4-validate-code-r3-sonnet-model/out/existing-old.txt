@@ -1,0 +1,55 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 1.3 GiB（按峰值表里近 5 次实测里最大的峰值 1.3 GiB（最近一次 2026-10-26 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 没查到别的机器：2 秒前包装 160410 刚查过（几条一起排队时每 60 秒只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）
+run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 1.3 GiB（按峰值表里近 5 次实测里最大的峰值 1.3 GiB（最近一次 2026-10-26 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 121 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 1.3 GiB（按峰值表里近 5 次实测里最大的峰值 1.3 GiB（最近一次 2026-10-26 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排队（已等 182 秒，至多 3600 秒）：slice 已占 40.1 GiB，这一条要 1.3 GiB（按峰值表里近 5 次实测里最大的峰值 1.3 GiB（最近一次 2026-10-26 量的）算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排了 237 秒，起跑（singlefs-memory-cap-160701-698725781）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target-old/debug/deps/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session-109d910fcfbabcd5)
+
+running 9 tests
+test a_whole_file_hole_of_tag_zero_shrunk_by_the_session_reads_back_its_new_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two ... FAILED
+test a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_then_unlinked_leaves_no_entry_in_the_upper_leaf ... FAILED
+test a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf ... FAILED
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_then_extended_after_its_upper_leaf_is_rewritten_reads_back_zeros ... FAILED
+test a_whole_file_hole_of_tag_zero_extended_by_the_session_reads_back_its_new_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_kept_at_its_size_by_the_session_reads_back_its_size_as_zeros ... ok
+
+failures:
+
+---- a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two stdout ----
+
+thread 'a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two' (270938) panicked at crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs:222:35:
+冷走读收下第一个文件，实际拒 InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_whole_file_hole_of_tag_zero_truncated_to_zero_then_unlinked_leaves_no_entry_in_the_upper_leaf stdout ----
+
+thread 'a_whole_file_hole_of_tag_zero_truncated_to_zero_then_unlinked_leaves_no_entry_in_the_upper_leaf' (270946) panicked at crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs:587:5:
+assertion `left == right` failed: 删完的那一版上段叶不留第一个文件那一条
+  left: Some(NoDataUnit)
+ right: None
+
+---- a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf stdout ----
+
+thread 'a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf' (270939) panicked at crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs:222:35:
+冷走读收下第一个文件，实际拒 InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }
+
+---- a_whole_file_hole_of_tag_zero_truncated_to_zero_then_extended_after_its_upper_leaf_is_rewritten_reads_back_zeros stdout ----
+
+thread 'a_whole_file_hole_of_tag_zero_truncated_to_zero_then_extended_after_its_upper_leaf_is_rewritten_reads_back_zeros' (270944) panicked at crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs:222:35:
+冷走读收下第一个文件，实际拒 InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }
+
+
+failures:
+    a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two
+    a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf
+    a_whole_file_hole_of_tag_zero_truncated_to_zero_then_extended_after_its_upper_leaf_is_rewritten_reads_back_zeros
+    a_whole_file_hole_of_tag_zero_truncated_to_zero_then_unlinked_leaves_no_entry_in_the_upper_leaf
+
+test result: FAILED. 5 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+
+error: test failed, to rerun pass `-p singlefs-harness --test whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session`

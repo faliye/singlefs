@@ -1,2 +1,0 @@
-e71e6f87bbfb7784b9dec9a32dc84fd99038a639bd2faec7de152950124bbee7  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
-38721b4d73362e309821d9db8ee61751424364234b6d0c7ab108e0853b756822  .claude/kb/experiments/174-借据丢掉时等待与显存回还.md

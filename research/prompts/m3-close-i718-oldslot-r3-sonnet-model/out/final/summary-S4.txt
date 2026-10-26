@@ -1,0 +1,33 @@
+== S=4 rows=2423 scans=462
+A 写坏镜像（N+1>=3S）81 张：today=Counter({'R': 81}), yi_gate=Counter({'N': 81}), ding_yi=Counter({'N': 81}), ding_yi_same=Counter({'N': 81}), jia=Counter({'G': 81}), ding_jia=Counter({'G': 81})
+E 第一圈健康镜像（N+1<3S）8 张：yi_lit=Counter({'N': 8}) yi_gate=Counter({'G': 8}) today=Counter({'G': 8})
+B 写坏镜像 348 张，其中落在洞上（今天判红）36 张，按种类 {'zero': 12, 'torn_half': 12, 'torn_enum': 12}
+  落在洞上：today=Counter({'R': 36}), yi_gate=Counter({'N': 36}), ding_yi=Counter({'N': 36}), ding_yi_same=Counter({'N': 36}), jia=Counter({'R': 36}), ding_jia=Counter({'G': 36})
+  没落在洞上的写坏镜像：today=Counter({'G': 312}), ding_yi=Counter({'N': 312}), jia=Counter({'G': 312}), ding_jia=Counter({'G': 312})
+  B 历史数（L 取值个数）12
+F honest          健康/记录前: 24 张：today={'G': 24}, yi_lit={'N': 24}, ding_yi={'G': 24}, jia={'G': 24}, ding_jia={'G': 24}
+F honest          在飞/写坏: 48 张：today={'G': 48}, yi_lit={'N': 48}, ding_yi={'N': 48}, jia={'G': 48}, ding_jia={'G': 48}
+F bad_t_as_floor  健康/记录前: 24 张：today={'G': 2, 'R': 22}, yi_lit={'N': 24}, ding_yi={'G': 2, 'R': 22}, jia={'G': 2, 'R': 22}, ding_jia={'G': 2, 'R': 22}
+F bad_t_as_floor  在飞/写坏: 48 张：today={'G': 4, 'R': 44}, yi_lit={'N': 48}, ding_yi={'N': 48}, jia={'G': 4, 'R': 44}, ding_jia={'G': 4, 'R': 44}
+F bad_p_255       健康/记录前: 24 张：today={'R': 24}, yi_lit={'N': 24}, ding_yi={'R': 24}, jia={'R': 24}, ding_jia={'R': 24}
+F bad_p_255       在飞/写坏: 48 张：today={'R': 48}, yi_lit={'N': 48}, ding_yi={'N': 48}, jia={'R': 48}, ding_jia={'G': 48}
+G 写行写坏镜像 42 张：today={'R': 42}, ding_yi={'N': 42}, ding_yi_same={'R': 42}, jia={'G': 42}, ding_jia={'G': 42}
+BR 27 张：today={'R': 27}, yi_lit={'N': 27}, yi_gate={'N': 27}, ding_yi={'R': 27}, ding_yi_same={'R': 27}, jia={'G': 27}, ding_jia={'R': 27}
+Y 8 张：today={'R': 8}, yi_lit={'N': 8}, yi_gate={'R': 8}, ding_yi={'R': 8}, ding_yi_same={'R': 8}, jia={'R': 8}, ding_jia={'R': 8}
+Z2-two-holes 写坏镜像 264 张（全是合法写者）判红：today=54, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=54, ding_jia=0
+   该格全部 528 张里判红：today=54, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=54, ding_jia=0
+Z2-hole-raised-floor 写坏镜像 45 张（全是合法写者）判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+   该格全部 90 张里判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+Z2-alt-row 写坏镜像 90 张（全是合法写者）判红：today=69, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=69, jia=0, ding_jia=0
+   该格全部 180 张里判红：today=69, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=69, jia=0, ding_jia=0
+Z2-alt-overwrite 写坏镜像 192 张（全是合法写者）判红：today=165, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+   该格全部 384 张里判红：today=165, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+SCAN A                      zero        次数=4 组合=77 诚实=4 | today:错收4/误拒4 yi_lit:错收73/误拒0 yi_gate:错收73/误拒0 ding_yi:错收73/误拒0 ding_yi_same:错收73/误拒0 jia:错收4/误拒0 ding_jia:错收6/误拒0
+SCAN B                      zero        次数=12 组合=366 诚实=12 | today:错收12/误拒12 yi_lit:错收354/误拒0 yi_gate:错收354/误拒0 ding_yi:错收354/误拒0 ding_yi_same:错收354/误拒0 jia:错收24/误拒12 ding_jia:错收25/误拒0
+SCAN F                      before_root 次数=12 组合=708 诚实=24 | today:错收0/误拒0 yi_lit:错收684/误拒0 yi_gate:错收684/误拒0 ding_yi:错收684/误拒0 ding_yi_same:错收684/误拒0 jia:错收12/误拒0 ding_jia:错收24/误拒0
+SCAN F                      zero        次数=12 组合=708 诚实=24 | today:错收0/误拒0 yi_lit:错收684/误拒0 yi_gate:错收684/误拒0 ding_yi:错收684/误拒0 ding_yi_same:错收684/误拒0 jia:错收12/误拒0 ding_jia:错收24/误拒0
+SCAN G                      zero        次数=1 组合=14 诚实=1 | today:错收1/误拒1 yi_lit:错收13/误拒0 yi_gate:错收13/误拒0 ding_yi:错收13/误拒0 ding_yi_same:错收1/误拒1 jia:错收1/误拒0 ding_jia:错收1/误拒0
+SCAN Z2-hole-raised-floor   zero        次数=5 组合=140 诚实=5 | today:错收0/误拒0 yi_lit:错收135/误拒0 yi_gate:错收135/误拒0 ding_yi:错收135/误拒0 ding_yi_same:错收135/误拒0 jia:错收0/误拒0 ding_jia:错收0/误拒0
+SCAN Z2-pins                before_root 次数=1 组合=338 诚实=13 | today:错收0/误拒0 yi_lit:错收325/误拒0 yi_gate:错收325/误拒0 ding_yi:错收325/误拒0 ding_yi_same:错收325/误拒0 jia:错收1/误拒0 ding_jia:错收11/误拒0
+SCAN Z2-pins                zero        次数=1 组合=338 诚实=13 | today:错收0/误拒0 yi_lit:错收325/误拒0 yi_gate:错收325/误拒0 ding_yi:错收325/误拒0 ding_yi_same:错收325/误拒0 jia:错收1/误拒0 ding_jia:错收11/误拒0
+SCAN Z2-two-holes           zero        次数=18 组合=609 诚实=18 | today:错收18/误拒18 yi_lit:错收591/误拒0 yi_gate:错收591/误拒0 ding_yi:错收591/误拒0 ding_yi_same:错收591/误拒0 jia:错收27/误拒18 ding_jia:错收35/误拒0

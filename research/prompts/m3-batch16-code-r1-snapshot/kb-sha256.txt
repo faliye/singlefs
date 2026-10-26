@@ -1,3 +1,0 @@
-f9aabb900e8d77111f2d136cf78359c9277438d5aedb66e7dc54e30cf350f68a  .claude/kb/decisions/16-发布语义.md
-a8ac7fdd61389af0da4c720445c134ac03de32be0562c0875598a7a5f4e4415b  .claude/kb/decisions/08-核心索引结构.md
-a0bc97070fc080056ccb383c9b7a4f74f32404f0d59c7d48d4ef02a06090f535  .claude/kb/checks-owed.md

@@ -1,0 +1,83 @@
+E7RESULT name=cell family=stop_check key=T6_no_crashflow_in_crates before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=local_states_per_block_matches_crates before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=local_seed_base_matches_crates before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=local_longest_closed_form_segment_matches_crates before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=copied_text_verbatim_fixed_script_head before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=copied_text_verbatim_fixed_script_body before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=copied_text_verbatim_multi_record_publish before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=copied_text_verbatim_new_pool_prepare_body before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=copied_segments_found before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=recorded_values_match_the_test_pins_smoke-new_pool_file_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=pins_still_in_the_test_file_smoke-new_pool_file_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_counting_routes_agree_smoke-new_pool_file_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_state_not_above_full_smoke-new_pool_file_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=blocks_per_point_follow_the_local_block_length_smoke-new_pool_file_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=recorded_values_match_the_test_pins_smoke-overwrite_fixed_script_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=pins_still_in_the_test_file_smoke-overwrite_fixed_script_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_counting_routes_agree_smoke-overwrite_fixed_script_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_state_not_above_full_smoke-overwrite_fixed_script_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=blocks_per_point_follow_the_local_block_length_smoke-overwrite_fixed_script_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=recorded_values_match_the_test_pins_smoke-multi_record_publish_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=pins_still_in_the_test_file_smoke-multi_record_publish_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_counting_routes_agree_smoke-multi_record_publish_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_state_not_above_full_smoke-multi_record_publish_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=blocks_per_point_follow_the_local_block_length_smoke-multi_record_publish_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=recorded_values_match_the_test_pins_smoke-snapshot_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=pins_still_in_the_test_file_smoke-snapshot_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_counting_routes_agree_smoke-snapshot_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=two_state_not_above_full_smoke-snapshot_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=stop_check key=blocks_per_point_follow_the_local_block_length_smoke-snapshot_creation_stream before=pass after=pass same=true
+E7RESULT name=cell family=anchor key=snapshot_creation_two_state before=true after=true same=true
+E7RESULT name=cell family=anchor key=new_pool_two_state before=true after=true same=true
+E7RESULT name=cell family=anchor key=new_pool_writes before=true after=true same=true
+E7RESULT name=cell family=anchor key=blocks_needed_at_and_one_state_beyond_the_states_per_block before=true after=true same=true
+E7RESULT name=cell family=anchor key=first_history_seed before=true after=true same=true
+E7RESULT name=cell family=anchor key=full_states_smoke-new_pool_file_creation_stream before=true after=true same=true
+E7RESULT name=cell family=anchor key=full_states_smoke-overwrite_fixed_script_stream before=true after=true same=true
+E7RESULT name=cell family=anchor key=full_states_smoke-multi_record_publish_stream before=true after=true same=true
+E7RESULT name=cell family=anchor key=full_states_smoke-snapshot_creation_stream before=true after=true same=true
+E7RESULT name=cell family=anchor key=multi_record_full_named_by_the_clause before=false after=false same=true
+E7RESULT name=cell family=selfcheck_done key=selfcheck_done before=false after=false same=true
+E7RESULT name=cell family=overlap key=family:overwrite_chain_main before=separate after=separate same=true
+E7RESULT name=cell family=overlap key=family:random_history_main before=partial after=partial same=true
+E7RESULT name=cell family=overlap key=group:overwrite_chain-01_units_per_overwrite before=separate after=separate same=true
+E7RESULT name=cell family=overlap key=group:overwrite_chain-04_units_per_overwrite before=separate after=separate same=true
+E7RESULT name=cell family=overlap key=group:overwrite_chain-16_units_per_overwrite before=separate after=separate same=true
+E7RESULT name=cell family=overlap key=group:random_history-broad-FourGibibytes-steps0050 before=overlap after=overlap same=true
+E7RESULT name=cell family=overlap key=group:random_history-broad-FourGibibytes-steps0100 before=overlap after=overlap same=true
+E7RESULT name=cell family=overlap key=group:random_history-broad-FourGibibytes-steps0200 before=partial after=partial same=true
+E7RESULT name=cell family=overlap key=group:random_history-broad-FourGibibytes-steps0400 before=separate after=separate same=true
+E7RESULT name=cell family=overlap key=group:random_history-broad-UnitAreaOf240Slots-steps0100 before=overlap after=overlap same=true
+E7RESULT name=cell family=overlap key=group:random_history-broad_with_compaction_while_mounted-FourGibibytes-steps0100 before=overlap after=overlap same=true
+E7RESULT name=cell family=share_group key=family:overwrite_chain_main before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=family:random_history_main before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:overwrite_chain-01_units_per_overwrite before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:overwrite_chain-04_units_per_overwrite before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:overwrite_chain-16_units_per_overwrite before=not_planned after=not_planned same=true
+E7RESULT name=cell family=share_group key=group:random_history-broad-FourGibibytes-steps0050 before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:random_history-broad-FourGibibytes-steps0100 before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:random_history-broad-FourGibibytes-steps0200 before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:random_history-broad-FourGibibytes-steps0400 before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:random_history-broad-UnitAreaOf240Slots-steps0100 before=independent after=independent same=true
+E7RESULT name=cell family=share_group key=group:random_history-broad_with_compaction_while_mounted-FourGibibytes-steps0100 before=independent after=independent same=true
+E7RESULT name=derived clause=F1 before=false after=false same=true
+E7RESULT name=derived clause=F2 before=false after=false same=true
+E7RESULT name=derived clause=F3 before=false after=false same=true
+E7RESULT name=derived clause=F6_second before=false after=false same=true
+E7RESULT name=anchor_recompute identifier=snapshot_creation_two_state recomputed=16842785 expected=16842785 actual=16842785 same=true
+E7RESULT name=anchor_recompute identifier=new_pool_two_state recomputed=16777243 expected=16777243 actual=16777243 same=true
+E7RESULT name=anchor_recompute identifier=new_pool_writes recomputed=43 expected=43 actual=43 same=true
+E7RESULT name=anchor_recompute identifier=blocks_needed_at_and_one_state_beyond_the_states_per_block recomputed=1,2 expected=1,2 actual=1,2 same=true
+E7RESULT name=anchor_recompute identifier=first_history_seed recomputed=7463871032432355113 expected=7463871032432355113 actual=7463871032432355113 same=true
+E7RESULT name=anchor_recompute identifier=full_states_smoke-new_pool_file_creation_stream recomputed=16777268 expected=16777268 actual=16777268 same=true
+E7RESULT name=anchor_recompute identifier=full_states_smoke-overwrite_fixed_script_stream recomputed=1678377220 expected=1678377220 actual=1678377220 same=true
+E7RESULT name=anchor_recompute identifier=full_states_smoke-multi_record_publish_stream recomputed=1358954642 expected=1358954642 actual=1358954642 same=true
+E7RESULT name=anchor_recompute identifier=full_states_smoke-snapshot_creation_stream recomputed=16842815 expected=16842815 actual=16842815 same=true
+E7RESULT name=anchor_recompute identifier=multi_record_full_named_by_the_clause recomputed=1358954642 expected=12230590578 actual=1358954642 same=true
+E7RESULT name=void_check family=control cells=174 failing=0
+E7RESULT name=void_check family=determinism cells=12 failing=0
+E7RESULT name=void_check family=dump_done cells=6 failing=0
+E7RESULT name=void_check family=pinned_smoke cells=12 failing=0
+E7RESULT name=verdict_comparison reading=narrow cells=40 differing=0 verdict=not_flipped
+E7RESULT name=verdict_comparison reading=wide cells=62 differing=0 verdict=not_flipped
+E7RESULT name=done emitted=83

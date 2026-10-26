@@ -1,0 +1,35 @@
+== afe056221fc5576eb implementation-writer 2026-10-03
+   报告路径：`/tmp/claude-1000/m3-formal-18-2/report.md`；草稿目录：`/tmp/claude-1000/m3-formal-18-2/`。在副本里改，交补丁（`crates.patch`，变异改动写进 `mutations-append.tsv` 与报告里的整
+== a44db5e51b18954f4 experiment-runner 2026-09-27
+   - 报告写到 `/tmp/claude-1000/e162-runner/report.md`，草稿目录 `/tmp/claude-1000/e162-runner/`。
+== ac4e13659f2bc7bd6 implementation-writer 2026-10-09
+   这是主 agent 聚成的一簇，在副本里改、交合起来的补丁（`crates.patch`、`mutations-append.tsv`、`mutations-replacements.tsv`，要删的变异行另列 `mutations-deletions.tsv`）。从主工作区现在这一版拷副本，先用 
+   - `crates/mutations.tsv` 别的会话的行不动。形式化线第 3383、3407、3496–3499 行与末行锚 E165、nff 装置与 `write_accounting.rs` 的 `IN_REPORT_ORDER`；你动到这几处锚的源码就报告里写明。
+   要动的 crates 文件：W3 补丁里的 33 份（清单在 `~/.local/share/singlefs/work/m3-batch49/w3c/report.md` 与它前两份报告的第三节），加 crates/singlefs-core/src/inode_tree.rs、crates/si
+   报告：~/.local/share/singlefs/work/m3-batch50/m3/report.md；草稿目录：~/.local/share/singlefs/work/m3-batch50/m3/。报告要有「主 agent 要跑的命令」与「kb 要跟着改的」两节。
+== ab4c1753443232981 experiment-runner 2026-10-01
+   - 报告：`/tmp/claude-1000/e170-segment2/report.md`；草稿目录 `/tmp/claude-1000/e170-segment2/`。
+== a00e2463db4c8443a implementation-writer 2026-09-27
+   步号与压着的条款：代码审阅第 29、38 条（用户定：38 条分批全在里程碑二修，`records/2026-09-27-代码审阅38条去向.md`）的 checker 那一半；压着 `.claude/kb/invariants.md` I-2.4（现查整行），D19（块指针的结构与宽度预算） 已定
+   报告 `/tmp/claude-1000/impl-rev-a3-checker/report.md`；草稿目录 `/tmp/claude-1000/impl-rev-a3-checker/`；进度逐条追加进同目录的 `progress.md`。
+== a6f2d2b0f7a1334d2 tooling-writer 2026-10-01
+   第三轮两条腿的报告：`research/prompts/tooling-detached-run-r3-sonnet-output.md`、`research/prompts/tooling-detached-run-r3-opus-output.md`（攻方模型目录里 `model-g3-env-
+   只改 `research/scripts/detached-run.sh`，定点 Edit，不整份重写，不 `git add`；开工先把它备份进草稿目录的 `orig/`。不碰钩子与 `lib_*`（共用库那一半归另一批）、`.claude/agent-common.md`、`.claude/mai
+   线程上限：8；内存上限：2G。草稿目录 `/tmp/claude-1000/m3-r1/detached-run-4/`，报告 `/tmp/claude-1000/m3-r1/detached-run-4/report.md`（分段写，每段不超过 150 行），写每条改了哪里、新格与开关名、主 ag
+== ae172d27de20e3fe2 implementation-writer 2026-10-03
+   报告路径：`/tmp/claude-1000/m3-formal-17-4/report.md`；草稿目录：`/tmp/claude-1000/m3-formal-17-4/`。直接改主仓这一份文件（第 17 批已合入，这是合入验证红了之后的改钉值）。别的文件不碰，变异表只读。读过的路径：合入验证日
+== a2f415f9f7430a65b investigator 2026-09-27
+   报告写到 `/tmp/claude-1000/investigate-peer-resume/report.md`，草稿目录 `/tmp/claude-1000/investigate-peer-resume/`。报告里点名主机与路径一律写「第二台」「第二台上的仓副本目录」。
+== a79d5faed5f978ea8 tooling-writer 2026-10-01
+   判决 `research/prompts/tooling-detached-run-r1-main-verification.md` 第三节的改法 F1–F7（逐条原文在那一节，第二节是每条的现查证据）。背景：`records/2026-09-16-subagent拆分提案.md` 第四十二节；前一
+   线程上限：8；内存上限：2G。草稿目录 `/tmp/claude-1000/m3-r1/detached-run-2/`，报告 `/tmp/claude-1000/m3-r1/detached-run-2/report.md`（分段写，每段不超过 150 行）。报告写：每条改法改了哪里、样本与开关、
+== a08fa53c77793d617 implementation-writer 2026-10-02
+   要动的 crates 文件：crates/singlefs-harness/src/history.rs crates/singlefs-harness/src/lib.rs crates/singlefs-harness/src/environment_number.rs crates/singl
+   压着的条款：判决 `research/prompts/test-script-align-code-r2-main-verification.md`；`.claude/kb/checks-owed.md` 的 C610 那一行（「测试文件头还写着来历」，只读）；上游 `.claude/singlef
+   报告：/tmp/claude-1000/impl-pre-r3/report.md；草稿目录 /tmp/claude-1000/impl-pre-r3/。
+== aae38d58c8b9fd873 implementation-writer 2026-10-13
+   背景：批次 4-2 乙（报告 `~/.local/share/singlefs/work/impl-two-stage-harness-and-references/report.md`，读「结论」「验收逐条」1、2）已把随机历史每步与故障注入每个注入点的池级 checker 搬进了 checker
+   报告：`~/.local/share/singlefs/work/impl-harness-images-to-checker-tier-a/report.md`；草稿目录：`~/.local/share/singlefs/work/impl-harness-images-to-checker-ti
+== ab3e49548f09335bd tooling-writer 2026-10-01
+   报告：/tmp/claude-1000/tooling-writer-f2-gates/report.md；草稿目录 /tmp/claude-1000/tooling-writer-f2-gates/。
+402

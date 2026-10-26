@@ -1,0 +1,30 @@
+0bd2274383f12e88beab3f96f354148698cfcd2043263b5d5709e32e1946784d  crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+a891136e2c273dbd15a616dd68105f83b9394c9c1612f6c84a5e3de84fecee72  crates/singlefs-core/src/transaction.rs
+381511a2f1d1c854e4b4ab364a31b0c37762f81dec5456bf93601fb6ec275e51  crates/singlefs-core/src/mounted_session.rs
+d0f9316a4dcdc1c254e7fb8fabfd78c5b01822f92f5ee97f8f05ebe273ed8f3e  crates/singlefs-core/src/region_scan.rs
+826d7d3de270993b81a726fbe6cd2e3d26b3b091c7fcba1511579b9f15c7c4c1  crates/singlefs-core/src/compaction_plan.rs
+7249312c68efa2a46627172d510c6c5d754fbf9cdb254ac46783264cadb1b77e  crates/singlefs-core/src/unit.rs
+6f6e6dc5374d98aa45c7e3d904c1e429320b6d1635fe44fd26f4e7adbff24c2d  crates/singlefs-core/src/checksum.rs
+28a6ee4b67305f4430d9116587b5434795ddfcacc50e0bad996897f134350153  crates/singlefs-core/src/block_device.rs
+3d5a0296f97192ae064bd09f0996dc1b05c1663fdfeabcb2b095d95ba473d79a  crates/singlefs-core/src/allocator.rs
+f0a126bc88d3424e74ed5465565fa218e8bf56c852061ec3fd0c0241c7364da2  crates/singlefs-format/src/lib.rs
+eef17aca5c9b0d4b36b400c75b8eb66bdd8a5023ed1e1f8a48651d556f0b2d70  Cargo.lock
+HEAD 8a10858485fc0c257b6b7e16d781a765c19f19b4（scripts/hosts/multi-host-run.sh --peer 拷树之后 git init 提交的那一次；树拷自主工作区）
+singlefs-core v0.1.0 (〔第二台的目录〕/runs/e185-r2-geometry-check-2026-10-23/crates/singlefs-core)
+└── singlefs-core feature "default"
+    ├── singlefs-checker-tier v0.1.0 (〔第二台的目录〕/runs/e185-r2-geometry-check-2026-10-23/crates/singlefs-checker-tier)
+    │   ├── singlefs-checker-tier feature "default" (command-line)
+    │   └── singlefs-checker-tier feature "verdict-store"
+    │       └── singlefs-checker-tier feature "default" (command-line)
+    └── singlefs-harness v0.1.0 (〔第二台的目录〕/runs/e185-r2-geometry-check-2026-10-23/crates/singlefs-harness)
+        └── singlefs-harness feature "default"
+            └── singlefs-checker-tier v0.1.0 (〔第二台的目录〕/runs/e185-r2-geometry-check-2026-10-23/crates/singlefs-checker-tier) (*)
+镜像目录所在盘（lsblk -s，NAME MODEL LOG-SEC）：
+ubuntu--vg-ubuntu--lv                    512
+└─nvme0n1p3                              512
+  └─nvme0n1           CT2000T500SSD8     512
+镜像目录所在文件系统：ext4
+nproc 32
+getconf CLK_TCK 100
+上限：外层 multi-host-run.sh --memory-cap 46G；E185_MEMORY_CAP=40G
+E185_REGISTERED_APPARATUS_SHA256=0bd2274383f12e88beab3f96f354148698cfcd2043263b5d5709e32e1946784d

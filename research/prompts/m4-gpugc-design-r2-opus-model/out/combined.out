@@ -1,0 +1,9 @@
+name=every_stage_after_both_cpu_improvements card=0 gap_milliseconds=0 judgement=losing cells=15
+name=every_stage_after_both_cpu_improvements card=0 gap_milliseconds=0 judgement=not_losing cells=18
+name=every_stage_after_both_cpu_improvements card=0 gap_milliseconds=0 judgement=unstable cells=111
+name=every_stage_after_both_cpu_improvements card=0 gap_milliseconds=50 judgement=losing cells=41
+name=every_stage_after_both_cpu_improvements card=0 gap_milliseconds=50 judgement=unstable cells=31
+name=every_stage_after_both_cpu_improvements card=1 gap_milliseconds=0 judgement=losing cells=100
+name=every_stage_after_both_cpu_improvements card=1 gap_milliseconds=0 judgement=not_losing cells=6
+name=every_stage_after_both_cpu_improvements card=1 gap_milliseconds=0 judgement=unstable cells=38
+name=every_stage_after_both_cpu_improvements card=1 gap_milliseconds=50 judgement=losing cells=72

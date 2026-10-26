@@ -1,0 +1,147 @@
+name=judged_sha256 status=ok
+name=wrapper_hit case=time-first status=253
+name=wrapper_hit case=time-escalated status=253
+name=wrapper_hit case=memory-first status=250
+name=wrapper_hit case=memory-escalated status=250
+name=peer43-refused status=252 ran=no traceback=0 typeerror=0 peer_fits_lines=2 stderr_lines_not_starting_with_prefix=5
+name=peer41-refused status=252 ran=no traceback=0 typeerror=0 peer_fits_lines=2 stderr_lines_not_starting_with_prefix=5
+name=lookup-off-refused status=252 ran=no traceback=0 typeerror=0 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=3
+name=hr-int-cap-refused status=251 ran=no traceback=2 typeerror=2 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=25
+name=hr-int-cap-refused-lookup-off status=252 ran=no traceback=0 typeerror=0 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=3
+name=item1-literal-refused status=251 ran=no traceback=2 typeerror=2 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=25
+name=item1-catchall-refused status=252 ran=no traceback=0 typeerror=0 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=3
+name=hr-int-cap-admitted status=0 ran=yes traceback=1 typeerror=1 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=12
+name=item1-literal-admitted status=0 ran=yes traceback=1 typeerror=1 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=12
+name=item1-catchall-admitted status=0 ran=yes traceback=0 typeerror=0 peer_fits_lines=0 stderr_lines_not_starting_with_prefix=1
+name=broad_escalation_evidence kind=time arm=raw problems=0 first=[]
+name=broad_escalation_evidence kind=time arm=stripped problems=2 first=["原来那趟的日志里没有包装打的「超过限时 1 秒」"]
+name=broad_escalation_evidence kind=memory arm=raw problems=0 first=[]
+name=broad_escalation_evidence kind=memory arm=stripped problems=2 first=["原来那趟的日志里没有包装打的「撞了内存上限 64M
+name=strip_leftovers world=world-peer43-refused lines_after_strip=5 host_lookup_lines_left=2
+name=verus_wrapper_outcome world=world-peer43-refused exit=252 own_lines=4 first_own_line=→ 第二台此刻放得下
+  queue_refusal_where=proof 格「proof:attack」那一处退了 252，包装说：→ 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash s
+  problem_has_peer_numbers=True problem=没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，
+name=strip_leftovers world=world-peer41-refused lines_after_strip=5 host_lookup_lines_left=2
+name=verus_wrapper_outcome world=world-peer41-refused exit=252 own_lines=4 first_own_line=→ 第二台此刻放得下
+  queue_refusal_where=proof 格「proof:attack」那一处退了 252，包装说：→ 第二台此刻放得下（可用 41.0 GiB、要 8.0 GiB）：改用 bash s
+  problem_has_peer_numbers=True problem=没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，
+name=strip_leftovers world=world-lookup-off-refused lines_after_strip=3 host_lookup_lines_left=0
+name=verus_wrapper_outcome world=world-lookup-off-refused exit=252 own_lines=2 first_own_line=✗ 内存不够
+  queue_refusal_where=proof 格「proof:attack」那一处退了 252，包装说：✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAI
+  problem_has_peer_numbers=False problem=没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上
+name=strip_leftovers world=world-hr-int-cap-admitted lines_after_strip=12 host_lookup_lines_left=10
+name=verus_wrapper_outcome world=world-hr-int-cap-admitted exit=0 own_lines=0 first_own_line=
+  queue_refusal_where=
+  problem_has_peer_numbers=False problem=Verus 没出判定（退 0，编不过或起不来）：  File "/dev/fd/3", line 298, in ru
+name=closure tree=full entry=scripts/gate/verus-proof-check.py::check_proof rc=4 units=1579 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=9d97d469cf8d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure tree=full entry=scripts/gate/verus-proof-check.py::check_vacuity rc=4 units=1567 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=9d97d469cf8d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure tree=full entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=4 units=1575 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=9d97d469cf8d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure tree=full entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=4 units=792 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=9d97d469cf8d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=import_census tree=full file=.claude/hooks/lib_heavy_tests.py module_level=170 not_in_closure=158 examples=assign:ALIAS_CONFIGURATION,assign:ALIAS_ENVIRONMENT_PREFIX,assign:ARRAY_REFERENCE,assign:BASH_BRACKET_PATTERN,assign:BASH_FOR_PATTERNS,assign:BASH_PATTERN_TIMEOUT
+name=import_census tree=full file=.claude/hooks/lib_long_run.py module_level=40 not_in_closure=12 examples=assign:LAG_BASELINE_LIBRARY,assign:LINE_START,assign:LIVE_HOSTS_EXEMPT_BASE_ROW,assign:PROMPT_LABELS,assign:PROMPT_SPELLING,assign:WALL_CLOCK_LABEL
+name=import_census tree=full file=.claude/hooks/lib_shell_words.py module_level=42 not_in_closure=39 examples=assign:APPEND_ASSIGNMENT,assign:ARRAY_ASSIGNMENT_START,assign:ASSIGNMENT,assign:COMMAND_KEYWORDS,assign:COMMAND_SEPARATORS,assign:DECLARATION_COMMANDS
+name=import_census tree=full file=scripts/hosts/memory_peaks_lib.py module_level=19 not_in_closure=2 examples=assign:DURATION_TABLE_HEADER,import:fcntl
+name=import_census tree=full file=.claude/scripts/project_preflight.py module_level=4 not_in_closure=0 examples=
+name=import_census tree=full file=scripts/hosts/host-dispatch.py module_level=63 not_in_closure=25 examples=assign:EXIT_NEVER_FITS,assign:EXIT_PROBE_FAILED,assign:EXIT_USAGE,assign:EXIT_WAITED_OUT,assign:GPU_MEMORY_HIT_EXIT,assign:GPU_PEAK_TABLE_HEADER
+name=import_census_total tree=full executed_files=6 not_in_closure=236
+name=closure tree=cut entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1232 key=274ceff933716fc2 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut entry=scripts/gate/verus-proof-check.py::check_vacuity rc=0 units=1220 key=8af063b88d2a3cc0 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=0 units=1228 key=d28e55104fb1ee91 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=436 key=d2b4aec981ecca8a load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=import_census tree=cut file=.claude/hooks/lib_heavy_tests.py module_level=170 not_in_closure=170 examples=assign:ALIAS_CONFIGURATION,assign:ALIAS_ENVIRONMENT_PREFIX,assign:ARRAY_REFERENCE,assign:BASH_BRACKET_PATTERN,assign:BASH_FOR_PATTERNS,assign:BASH_PATTERN_TIMEOUT
+name=import_census tree=cut file=.claude/hooks/lib_long_run.py module_level=40 not_in_closure=40 examples=assign:BREAK_VARIABLE,assign:CANONICAL_HOSTS_SENTENCE,assign:EXEMPT_REASON_MINIMUM_CHARACTERS,assign:HARD_CODED_QUOTA,assign:HEADER_KEYS,assign:HEADER_READ_BYTES
+name=import_census tree=cut file=.claude/hooks/lib_shell_words.py module_level=42 not_in_closure=42 examples=assign:APPEND_ASSIGNMENT,assign:ARRAY_ASSIGNMENT_START,assign:ASSIGNMENT,assign:COMMAND_KEYWORDS,assign:COMMAND_SEPARATORS,assign:DECLARATION_COMMANDS
+name=import_census tree=cut file=scripts/hosts/memory_peaks_lib.py module_level=19 not_in_closure=6 examples=assign:DEFAULT_RESERVE_TEXT,assign:DEFAULT_SLICE,assign:DURATION_TABLE_HEADER,assign:LONG_RUN_SECONDS,import:fcntl,import:subprocess
+name=import_census tree=cut file=.claude/scripts/project_preflight.py module_level=4 not_in_closure=0 examples=
+name=import_census tree=cut file=scripts/hosts/host-dispatch.py module_level=63 not_in_closure=42 examples=assign:EXIT_LONG_SINGLE_HOST,assign:EXIT_NEVER_FITS,assign:EXIT_PROBE_FAILED,assign:EXIT_USAGE,assign:EXIT_WAITED_OUT,assign:FAKE_LAUNCHER
+name=import_census_total tree=cut executed_files=6 not_in_closure=300
+name=closure tree=cut-mpl-import entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1232 key=274ceff933716fc2 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut-mpl-import entry=scripts/gate/verus-proof-check.py::check_vacuity rc=0 units=1220 key=8af063b88d2a3cc0 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut-mpl-import entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=0 units=1228 key=d28e55104fb1ee91 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut-mpl-import entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=436 key=d2b4aec981ecca8a load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=import_census tree=cut-mpl-import import_failed=1 rc=1 last_line=ModuleNotFoundError: No module named 'attack_w2_missing_module'
+name=closure tree=cut-long-run-unit entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1232 key=274ceff933716fc2 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut-long-run-unit entry=scripts/gate/verus-proof-check.py::check_vacuity rc=0 units=1220 key=8af063b88d2a3cc0 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut-long-run-unit entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=0 units=1228 key=d28e55104fb1ee91 load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=closure tree=cut-long-run-unit entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=436 key=d2b4aec981ecca8a load_edge_to_host_dispatch=1 import_long_run_lib=0 import_preflight=0 memory_peaks_lib_import_subprocess=absent refusals=none
+name=import_census tree=cut-long-run-unit file=.claude/hooks/lib_heavy_tests.py module_level=170 not_in_closure=170 examples=assign:ALIAS_CONFIGURATION,assign:ALIAS_ENVIRONMENT_PREFIX,assign:ARRAY_REFERENCE,assign:BASH_BRACKET_PATTERN,assign:BASH_FOR_PATTERNS,assign:BASH_PATTERN_TIMEOUT
+name=import_census tree=cut-long-run-unit file=.claude/hooks/lib_long_run.py module_level=40 not_in_closure=40 examples=assign:BREAK_VARIABLE,assign:CANONICAL_HOSTS_SENTENCE,assign:EXEMPT_REASON_MINIMUM_CHARACTERS,assign:HARD_CODED_QUOTA,assign:HEADER_KEYS,assign:HEADER_READ_BYTES
+name=import_census tree=cut-long-run-unit file=.claude/hooks/lib_shell_words.py module_level=42 not_in_closure=42 examples=assign:APPEND_ASSIGNMENT,assign:ARRAY_ASSIGNMENT_START,assign:ASSIGNMENT,assign:COMMAND_KEYWORDS,assign:COMMAND_SEPARATORS,assign:DECLARATION_COMMANDS
+name=import_census tree=cut-long-run-unit file=scripts/hosts/memory_peaks_lib.py module_level=19 not_in_closure=6 examples=assign:DEFAULT_RESERVE_TEXT,assign:DEFAULT_SLICE,assign:DURATION_TABLE_HEADER,assign:LONG_RUN_SECONDS,import:fcntl,import:subprocess
+name=import_census tree=cut-long-run-unit file=.claude/scripts/project_preflight.py module_level=4 not_in_closure=0 examples=
+name=import_census tree=cut-long-run-unit file=scripts/hosts/host-dispatch.py module_level=63 not_in_closure=42 examples=assign:EXIT_LONG_SINGLE_HOST,assign:EXIT_NEVER_FITS,assign:EXIT_PROBE_FAILED,assign:EXIT_USAGE,assign:EXIT_WAITED_OUT,assign:FAKE_LAUNCHER
+name=import_census_total tree=cut-long-run-unit executed_files=6 not_in_closure=300
+name=closure tree=full-mpl-import entry=scripts/gate/verus-proof-check.py::check_proof rc=4 units=1579 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=c45f293fd20d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure tree=full-mpl-import entry=scripts/gate/verus-proof-check.py::check_vacuity rc=4 units=1567 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=c45f293fd20d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure tree=full-mpl-import entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=4 units=1575 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=c45f293fd20d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure tree=full-mpl-import entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=4 units=792 key=none load_edge_to_host_dispatch=1 import_long_run_lib=1 import_preflight=1 memory_peaks_lib_import_subprocess=c45f293fd20d refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=import_census tree=full-mpl-import import_failed=1 rc=1 last_line=ModuleNotFoundError: No module named 'attack_w2_missing_module'
+name=wrapper_start tree=cut status=0 ran=yes last_error=
+name=wrapper_start tree=cut-mpl-import status=251 ran=no last_error=ModuleNotFoundError: No module named 'attack_w2_missing_module'
+name=wrapper_start tree=cut-long-run-unit status=0 ran=yes last_error=
+name=module_census entry=scripts_gate_verus-proof-check_py__check_proof python_files_in_closure=12 module_level_units_not_in_closure=164 by_how_file_entered={'load': 52, 'module-body': 106, 'program': 6}
+name=module_census entry=scripts_mutation_broad-mutation_py__Runner_escalate_step python_files_in_closure=10 module_level_units_not_in_closure=290 by_how_file_entered={'load': 115, 'module-body': 169, 'program': 6}
+name=module_level_fix tree=cut entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1232 lib_long_run_units=0 memory_peaks_lib_import_subprocess=0 key=274ceff933716fc2 refusals=
+name=module_level_fix tree=cut entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=436 lib_long_run_units=0 memory_peaks_lib_import_subprocess=0 key=d2b4aec981ecca8a refusals=
+name=module_level_fix tree=cut-ml entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1655 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=990b2be37195adb5 refusals=
+name=module_level_fix tree=cut-ml entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=959 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=5e94673c710d60e4 refusals=
+name=module_level_fix tree=cut-mlc entry=scripts/gate/verus-proof-check.py::check_proof rc=4 units=1697 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=none refusals=shell-path-unfolded scripts/hosts/host-dispatch.py:301,shell-path-unfolded scripts/hosts/host-dispatch.py:318,
+name=module_level_fix tree=cut-mlc entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=4 units=2120 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=none refusals=shell-path-unfolded scripts/hosts/host-dispatch.py:301,shell-path-unfolded scripts/hosts/host-dispatch.py:318,subprocess-command-unfolded scripts/mutation/broad-mutation.py:5064,
+name=module_level_fix tree=cut-ml-long-run entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1655 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=79d2f285ac7e44ed refusals=
+name=module_level_fix tree=cut-ml-long-run entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=959 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=5b7b656fe59c9d94 refusals=
+name=module_level_fix tree=cut-ml-mpl entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1656 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=2c9e1af64471fd39 refusals=
+name=module_level_fix tree=cut-ml-mpl entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=960 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=be782486690e7a21 refusals=
+name=module_level_fix tree=cut-ml-hr entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1655 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=990b2be37195adb5 refusals=
+name=module_level_fix tree=cut-ml-hr entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=959 lib_long_run_units=41 memory_peaks_lib_import_subprocess=1 key=5e94673c710d60e4 refusals=
+name=entry entry=scripts/mutation/broad-mutation.py::select_items units_full=44 units_cut=44 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::verdict_state units_full=33 units_cut=33 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::Judgement.state units_full=963 units_cut=963 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::Judgement.row_holds units_full=948 units_cut=948 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::Judgement.selection units_full=943 units_cut=943 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::process_item units_full=93 units_cut=93 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::Runner.escalate_step units_full=790 units_cut=434 dropped=356 added=0 refused_full=[inline-script-not-literal:1;] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::escalation_evidence_problems units_full=21 units_cut=21 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::carry_decision units_full=9 units_cut=9 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::mutation_key units_full=14 units_cut=14 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::UnitTree.closure_key units_full=863 units_cut=863 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::catching_test_key units_full=15 units_cut=15 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::coverers_key units_full=12 units_cut=12 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::global_lines units_full=8 units_cut=8 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/mutation-prune.py::build_environment_lines units_full=20 units_cut=20 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::gpu_pass_command units_full=27 units_cut=27 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::gpu_classify_build units_full=33 units_cut=33 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::gpu_classify_test units_full=64 units_cut=64 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::gpu_combined_state units_full=31 units_cut=31 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::GpuJudging.need units_full=50 units_cut=50 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::GpuJudging.row_holds units_full=888 units_cut=888 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/broad-mutation.py::GpuJudging.test_key_of units_full=46 units_cut=46 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run units_full=51 units_cut=51 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/crates-mutation-rows.py::baseline_problem units_full=46 units_cut=46 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem units_full=30 units_cut=30 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units units_full=322 units_cut=322 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test units_full=316 units_cut=316 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units units_full=307 units_cut=307 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product units_full=16 units_cut=16 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/experiment-apparatus/replay.sh::strip_admission_header units_full=2 units_cut=2 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/experiment-apparatus/replay.sh::timing_load_decide units_full=7 units_cut=7 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/experiment-apparatus/e165-pin-red-examples.py::replay units_full=939 units_cut=939 dropped=0 added=0 refused_full=[] refused_cut=[]
+name=entry entry=scripts/gate/verus-proof-check.py::check_proof units_full=1577 units_cut=1230 dropped=347 added=0 refused_full=[inline-script-not-literal:1;] refused_cut=[]
+name=entry entry=scripts/gate/verus-proof-check.py::check_vacuity units_full=1565 units_cut=1218 dropped=347 added=0 refused_full=[inline-script-not-literal:1;] refused_cut=[]
+name=entry entry=scripts/gate/verus-proof-check.py::check_must_red_worlds units_full=1573 units_cut=1226 dropped=347 added=0 refused_full=[inline-script-not-literal:1;] refused_cut=[]
+name=needed_files full_tree_rc=0 repo_files=10 outside_scripts_hosts=7
+  outside=.claude/hooks/lib_heavy_tests.py
+  outside=.claude/hooks/lib_long_run.py
+  outside=.claude/hooks/lib_shell_words.py
+  outside=.claude/scripts/project_preflight.py
+  outside=.claude/singlefs-ai-sop/scripts/preflight.py
+  outside=scripts/crash/crash-amplification-lib.sh
+  outside=scripts/crash/crash-point-replay-shard-configuration-check.sh
+name=only_scripts_hosts rc=1 stdout_is_json=False last_stderr_line=ModuleNotFoundError: No module named 'project_preflight'
+name=sync_without_delete first_rc=0 second_rc=0 deleted_in_source_still_in_copy=yes python_files_only_in_copy=1
+name=declaration_fingerprint file=caller.py units_without=3 units_with=3 identical=yes
+name=declaration_fingerprint file=function-body.sh units_without=3 units_with=3 identical=no
+name=declaration_fingerprint file=top-level.sh units_without=2 units_with=2 identical=no
+name=declaration_fingerprint file=heredoc.sh units_without=3 units_with=3 identical=no
+name=judging_key tree=cut entry=check_proof key=274ceff933716fc2
+name=judging_key tree=cut-hr-int-cap entry=check_proof key=274ceff933716fc2
+name=not_judging_files_units_in_cut_closure entry=check_proof scripts/crash/lib_verdict_library.py=62 scripts/gate/lib_function_units.py=714 

@@ -1,0 +1,2 @@
+2b7cd2c4a4c7cc6298948dd8a748b09b80001f36b54fe2b54e9003fa7cdd48eb  .claude/kb/checks-owed.md
+4afaabbb27825e7c15ce6e01916d1628ce546bd0d166b46e9812f9982d46d721  .claude/kb/milestone/03-third-txn.md

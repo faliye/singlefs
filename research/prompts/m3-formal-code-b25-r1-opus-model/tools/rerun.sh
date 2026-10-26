@@ -9,7 +9,7 @@ set -euo pipefail
 work=$1; shift
 repo=$(cd "$(dirname "$0")/../../../.." && pwd)
 model="$repo/research/prompts/m3-formal-code-b25-r1-opus-model"
-frozen="$repo/scripts/experiments/target/e171-r1-frozen-tree"
+frozen="$repo/scripts/experiment-apparatus/target/e171-r1-frozen-tree"
 tree="$work/tree"; target="$work/target"; out="$work/out"
 mkdir -p "$work" "$out"
 fresh_tree() {

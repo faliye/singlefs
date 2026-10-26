@@ -1,0 +1,13 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.1 GiB，这一条要 2.0 GiB（峰值表里没有这条，按它的上限 2G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 5 条
+run-with-memory-cap: 没查到别的机器：31 秒前包装 891866 刚查过（几条一起排队时每 60 秒只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）
+run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-914214-165822683）
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-partial-write-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.24s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 1 test
+test sweep_with_the_candidate_fix ... 观测 扫汇总（改法开着 = true）：历史 200 段（含部分写 198 段），I-1.13 违例 0 段（含部分写的 0、不含部分写的 0），I-1.13 之外有违例 0 段，读者读回不同 0 段，挂钟 118.712242021s
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 118.78s
+

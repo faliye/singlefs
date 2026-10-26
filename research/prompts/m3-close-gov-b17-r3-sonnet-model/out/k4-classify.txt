@@ -1,0 +1,16 @@
+name=k4_classify repo=/home/fy5090/code/singlefs
+case=不带参数 words=scripts/experiment-apparatus/replay.sh classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=点名实验号 E142 words=scripts/experiment-apparatus/replay.sh E142 classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=点名两个实验号 words=scripts/experiment-apparatus/replay.sh E142 E143 classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--admission-only words=scripts/experiment-apparatus/replay.sh --admission-only classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--admission-only 加实验号 words=scripts/experiment-apparatus/replay.sh --admission-only E142 classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--full words=scripts/experiment-apparatus/replay.sh --full classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--list-items words=scripts/experiment-apparatus/replay.sh --list-items classify=None（放行） classify_process=None（放行）
+case=--force --list-items words=scripts/experiment-apparatus/replay.sh --force --list-items classify=None（放行） classify_process=None（放行）
+case=--list-items 后面带实验号 words=scripts/experiment-apparatus/replay.sh --list-items E142 classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--list-items 后面带 --full words=scripts/experiment-apparatus/replay.sh --list-items --full classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--list-items 两次 words=scripts/experiment-apparatus/replay.sh --list-items --list-items classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--selftest words=scripts/experiment-apparatus/replay.sh --selftest classify=None（放行） classify_process=None（放行）
+case=--selftest 后面带实验号 words=scripts/experiment-apparatus/replay.sh --selftest E142 classify=commit-check-selftest-unregistered（提交时才跑的检查） classify_process=commit-check-selftest-unregistered（提交时才跑的检查）
+case=--list-items 前面带实验号 words=scripts/experiment-apparatus/replay.sh E142 --list-items classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）
+case=--help words=scripts/experiment-apparatus/replay.sh --help classify=replay-all-stage（全部实验复跑） classify_process=replay-all-stage（全部实验复跑）

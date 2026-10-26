@@ -1,7 +1,0 @@
-E name=n0_all nseg=3 segsz=6 ring=3 maxobj=2 b=2 depth=7 states=66806 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=4066 frozen=3434 unmet_del=0 false_enospc=1128 release_bad=0 rb_refused=0 del_pred_true=923 del_pred_false=2902 n0_refused=6320 gc_done=34126 gc_declined=7268 gc_stuck=0 gc_paused=21346 gc_cycle=4066 gc_cap=0 gc_wasted=0
-W name=n0_all flag=livelock path=W0
-W name=n0_all flag=frozen path=W0.GI.W1
-W name=n0_all flag=false_enospc path=W0.O0.O0.O0.O0.GI.O0
-W name=n0_all flag=del_pred_true path=W0.GI.D0.GB
-W name=n0_all flag=del_pred_false path=W0.GI.GB
-W name=n0_all flag=n0_refused path=W0.GI.W1.O0

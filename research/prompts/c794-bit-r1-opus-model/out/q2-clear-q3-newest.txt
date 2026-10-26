@@ -1,5 +1,0 @@
-Q2 keeps_bit=false 回退之后 槽 50180: 盘0(已释放=false,隔离位=false,代=3) 盘1(已释放=false,隔离位=false,代=3)
-Q2 回退之后 checker: violated=[] I-1.1=Holds I-3.1=Holds I-3.11=Holds
-Q2 D 照常释放之后 槽 50180: 盘0(已释放=true,隔离位=false,代=7) 盘1(已释放=true,隔离位=false,代=7)
-Q2 漏释放之后 槽 50180: 盘0(已释放=false,隔离位=false,代=3) 盘1(已释放=false,隔离位=false,代=3)
-Q2 漏释放之后 checker: violated=["I-3.11"] I-1.1=Holds I-3.1=Holds I-3.11=违例[盘 0：记账的已分配 Some(1376256) 减 defer 待释放 Some(1032192)，不等于从最新根（txg 8）走读到的 311296（其中隔离豁免 0）]

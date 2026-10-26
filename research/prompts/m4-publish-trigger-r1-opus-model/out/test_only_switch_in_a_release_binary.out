@@ -1,0 +1,1 @@
+name=test_only_switch_in_a_release_binary cfg_test=false debug_assertions=true session_entry_compiles=true mount_entry_is_public=true switch_branch_name=space_admission=skipped

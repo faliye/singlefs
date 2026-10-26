@@ -1,0 +1,159 @@
+
+running 2 tests
+test a_batch_whose_planned_units_this_publish_rewrites_anyway_deletes_the_intent_once_it_empties_the_region ... FAILED
+test the_intent_deletion_refused_after_a_batch_emptying_the_region_publishes_the_batch_carrying_the_intent_and_the_next_publish_deletes_it ... FAILED
+
+failures:
+
+---- a_batch_whose_planned_units_this_publish_rewrites_anyway_deletes_the_intent_once_it_empties_the_region stdout ----
+
+thread 'a_batch_whose_planned_units_this_publish_rewrites_anyway_deletes_the_intent_once_it_empties_the_region' (1867500) panicked at crates/singlefs-harness/tests/compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish.rs:128:5:
+最后那一趟搬过单元、停下时意图已删（与腾空 R 的那一批同一次发布）：[(0, 0, false), (0, 0, false), (0, 0, false)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- the_intent_deletion_refused_after_a_batch_emptying_the_region_publishes_the_batch_carrying_the_intent_and_the_next_publish_deletes_it stdout ----
+
+thread 'the_intent_deletion_refused_after_a_batch_emptying_the_region_publishes_the_batch_carrying_the_intent_and_the_next_publish_deletes_it' (1867501) panicked at crates/singlefs-harness/tests/compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish.rs:249:10:
+这一趟头一次发布签发意图
+
+
+failures:
+    a_batch_whose_planned_units_this_publish_rewrites_anyway_deletes_the_intent_once_it_empties_the_region
+    the_intent_deletion_refused_after_a_batch_emptying_the_region_publishes_the_batch_carrying_the_intent_and_the_next_publish_deletes_it
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+
+running 1 test
+test a_compaction_batch_relocating_a_user_visible_root_is_non_empty_and_the_other_compaction_publishes_are_not ... FAILED
+
+failures:
+
+---- a_compaction_batch_relocating_a_user_visible_root_is_non_empty_and_the_other_compaction_publishes_are_not stdout ----
+
+thread 'a_compaction_batch_relocating_a_user_visible_root_is_non_empty_and_the_other_compaction_publishes_are_not' (1867537) panicked at crates/singlefs-harness/tests/compaction_batch_relocating_a_user_visible_root_is_non_empty.rs:120:5:
+assertion `left == right` failed: inode 根与 extent 根都在段 50240 里，一批一个：两批各搬一个根（这一趟发了 0 次）
+  left: 0
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_compaction_batch_relocating_a_user_visible_root_is_non_empty_and_the_other_compaction_publishes_are_not
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.94s
+
+
+running 18 tests
+test a_segment_holding_an_isolated_slot_is_not_discarded ... ok
+test a_segment_held_until_the_floor_takes_effect_is_discarded_only_after_the_hold_is_released ... ok
+test a_segment_reclaimed_as_a_whole_is_handed_out_for_discard_once ... ok
+test a_segment_with_a_slot_still_allocated_is_not_discarded ... ok
+test a_foreground_write_is_refused_by_the_empty_cluster_segments_floor ... ok
+test an_unlink_intent_is_exempt_from_the_empty_cluster_segments_floor ... ok
+test a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_it ... FAILED
+test a_quarantine_after_the_issue_drops_the_intent_and_its_region_exclusion ... FAILED
+test a_run_on_the_product_path_stops_before_issuing_because_the_batch_size_is_not_decided ... ok
+test a_run_on_a_forced_region_relocates_it_batch_by_batch_until_it_is_empty_by_the_records ... FAILED
+test a_run_stopped_by_the_test_only_switch_writes_nothing ... ok
+test a_run_stops_before_issuing_when_the_holes_outside_the_region_are_too_few ... FAILED
+test the_segments_refused_by_the_region_scan_are_forgotten_by_the_next_mount ... ok
+test a_foreground_write_refused_by_the_empty_cluster_segments_floor_in_a_session_pushes_no_floor_raise has been running for over 60 seconds
+test a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue_and_one_batch has been running for over 60 seconds
+test a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slots_are_reclaimed has been running for over 60 seconds
+test a_segment_holding_an_unswept_orphan_head_is_withheld_from_the_discard has been running for over 60 seconds
+test a_snapshot_is_destroyed_on_a_version_whose_files_are_all_deleted has been running for over 60 seconds
+test a_snapshot_is_destroyed_on_a_version_whose_files_are_all_deleted ... ok
+test a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue_and_one_batch ... FAILED
+test a_foreground_write_refused_by_the_empty_cluster_segments_floor_in_a_session_pushes_no_floor_raise ... ok
+test a_segment_holding_an_unswept_orphan_head_is_withheld_from_the_discard ... FAILED
+test a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slots_are_reclaimed ... FAILED
+
+failures:
+
+---- a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_it stdout ----
+
+thread 'a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_it' (1875151) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:322:5:
+assertion `left == right` failed: 至多一批
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_quarantine_after_the_issue_drops_the_intent_and_its_region_exclusion stdout ----
+
+thread 'a_quarantine_after_the_issue_drops_the_intent_and_its_region_exclusion' (1875138) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:252:5:
+assertion `left == right` failed: 隔离之后不再发
+  left: 0
+ right: 1
+
+---- a_run_on_a_forced_region_relocates_it_batch_by_batch_until_it_is_empty_by_the_records stdout ----
+
+thread 'a_run_on_a_forced_region_relocates_it_batch_by_batch_until_it_is_empty_by_the_records' (1875140) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:128:5:
+R 搬空之后下一条签不出：Stopped(HolesOutsideTheRegionFewerThanItsUnitsToMove { holes: 0, units_to_move: 3 })
+
+---- a_run_stops_before_issuing_when_the_holes_outside_the_region_are_too_few stdout ----
+
+thread 'a_run_stops_before_issuing_when_the_holes_outside_the_region_are_too_few' (1875143) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:211:5:
+签发前判不过：Stopped(HolesOutsideTheRegionFewerThanItsUnitsToMove { holes: 0, units_to_move: 3 })
+
+---- a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue_and_one_batch stdout ----
+
+thread 'a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue_and_one_batch' (1875139) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:400:5:
+签发、搬一批，停在那一批跑完了：Stopped(HolesOutsideTheRegionFewerThanItsUnitsToMove { holes: 0, units_to_move: 2 })，发了 0 次、记 0 批（这次挂载开的聚簇段 {SlotNumber(50368)}）
+
+---- a_segment_holding_an_unswept_orphan_head_is_withheld_from_the_discard stdout ----
+
+thread 'a_segment_holding_an_unswept_orphan_head_is_withheld_from_the_discard' (1875147) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:940:5:
+assertion `left == right` failed: 那一段整段可再分配的那一次，两块盘上都记成装着还没清扫的孤儿头
+  left: []
+ right: [DeviceIdentity(0), DeviceIdentity(1)]
+
+---- a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slots_are_reclaimed stdout ----
+
+thread 'a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slots_are_reclaimed' (1875144) panicked at crates/singlefs-harness/tests/compaction_runs_stop_and_discard_after_the_publish.rs:840:9:
+assertion `left == right` failed: DeviceIdentity(0)：搬空的那一段发了一次 discard
+  left: 0
+ right: 1
+
+
+failures:
+    a_quarantine_after_the_issue_drops_the_intent_and_its_region_exclusion
+    a_run_after_a_user_change_publishes_the_drop_of_a_quarantined_intent_an_issue_and_one_batch
+    a_run_on_a_forced_region_relocates_it_batch_by_batch_until_it_is_empty_by_the_records
+    a_run_stops_before_issuing_when_the_holes_outside_the_region_are_too_few
+    a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slots_are_reclaimed
+    a_segment_holding_an_unswept_orphan_head_is_withheld_from_the_discard
+    a_user_change_with_the_forced_start_runs_at_most_one_compaction_batch_after_it
+
+test result: FAILED. 11 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 99.60s
+
+
+running 6 tests
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units ... ignored, harness 慢档用例：造 2048 个数据单元的池要发约 460 次发布，debug 下单条超过 60 秒
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+test first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 36.50s
+
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.7 GiB，这一条要 8.0 GiB（峰值表里没有这条，按 host-resources.py 对它的预测 8.0 GiB 算（比它的上限 16G 小；scope 的上限照旧是 16G）），总上限 40.1 GiB；账上在跑 18 条
+run-with-memory-cap: 没查到别的机器：13 秒前包装 1838108 刚查过（几条一起排队时每 60 秒只查一次，看那一条打的；要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）
+run-with-memory-cap: 排了 15 秒，起跑（singlefs-memory-cap-1843902-477223032）
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.39s
+     Running tests/compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish-811980ca9509b86c)
+error: test failed, to rerun pass `-p singlefs-harness --test compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish`
+     Running tests/compaction_batch_relocating_a_user_visible_root_is_non_empty.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/compaction_batch_relocating_a_user_visible_root_is_non_empty-bf02ce47aadcad49)
+error: test failed, to rerun pass `-p singlefs-harness --test compaction_batch_relocating_a_user_visible_root_is_non_empty`
+     Running tests/compaction_runs_stop_and_discard_after_the_publish.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/compaction_runs_stop_and_discard_after_the_publish-b06e1f2dd4d8eabd)
+error: test failed, to rerun pass `-p singlefs-harness --test compaction_runs_stop_and_discard_after_the_publish`
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+error: 3 targets failed:
+    `-p singlefs-harness --test compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish`
+    `-p singlefs-harness --test compaction_batch_relocating_a_user_visible_root_is_non_empty`
+    `-p singlefs-harness --test compaction_runs_stop_and_discard_after_the_publish`

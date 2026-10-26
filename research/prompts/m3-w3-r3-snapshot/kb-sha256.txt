@@ -1,4 +1,0 @@
-cfa6966a50c3b3e32dd48ed559cf747e80730eb8e404fa06ae3c50789532b6e0  .claude/kb/checks-owed.md
-b378f7c079d5d0b30c7fa6ba042b745d02ec11a2b16d1b247c0d84093a108e93  .claude/kb/decisions/23-journal的角色与格式.md
-2448958a486fb1e5254cde675a4a7800137b41a0646198857fe2c7b5854bd22b  .claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md
-7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md

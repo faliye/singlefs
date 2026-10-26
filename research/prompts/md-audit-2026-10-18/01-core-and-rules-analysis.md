@@ -287,12 +287,12 @@
 - **判定结论**：✅ **一致/无显著过时**
 - **核查说明**：路径引用有效，术语、常量与当前 codebase 严格对齐。
 
-## [scripts/experiments/README.md](file:///home/fy5090/code/singlefs/scripts/experiments/README.md)
+## [scripts/experiment-apparatus/README.md](file:///home/fy5090/code/singlefs/scripts/experiment-apparatus/README.md)
 - **文件规模**：10 行，1826 字节
 - **判定结论**：✅ **一致/无显著过时**
 - **核查说明**：路径引用有效，术语、常量与当前 codebase 严格对齐。
 
-## [scripts/experiments/perf-by-milestone.md](file:///home/fy5090/code/singlefs/scripts/experiments/perf-by-milestone.md)
+## [scripts/experiment-apparatus/perf-by-milestone.md](file:///home/fy5090/code/singlefs/scripts/experiment-apparatus/perf-by-milestone.md)
 - **文件规模**：768 行，67166 字节
 - **判定结论**：⚠️ **存在过时或对不上的内容**
 - **具体过时/不一致点**：

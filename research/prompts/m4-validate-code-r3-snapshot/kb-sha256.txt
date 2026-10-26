@@ -1,0 +1,4 @@
+701aeb9fce2b504e3cfd6ef98b556262bf9deec6db80bc22ea0c862177515f49  .claude/kb/decisions/08-核心索引结构.md
+1804eb06d5f17b596311da9ac8fefdbad10b59249de27761e69a71f7c6ca3872  .claude/kb/checks-owed.md
+5a4cbdd2c050ba6022d1944a8abd7ffa68356a5e936160ca62f4dfd74417e79c  crates/singlefs-checker/invariants/05-空间记账.md
+7c57b59c1f78e063191e3b17585e6883260ee7329434bc7a5964bd7c8f257efe  crates/singlefs-checker/invariants/01-块自描述.md

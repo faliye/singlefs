@@ -1,0 +1,28 @@
+返工字样 327 13.7%
+命中词（每个派发取第一个命中）: [('fix', 91), ('修', 68), ('重跑', 30), ('改名', 27), ('rerun', 26), ('接手', 14), ('重派', 12), ('第 2 次', 8), ('接续', 8), ('续做', 6), ('renumber', 4), ('重做', 4), ('第 25 次', 4), ('第 4 次', 3), ('第 22 次', 3), ('（续）', 3), ('补做', 3), ('第 7 次', 3), ('补写', 3), ('改钉值', 2), ('接着做', 2), ('redispatch', 2), ('re-run', 1)]
+只因单字「修」命中: 65 2.5% 后接的字: [(' ', 16), ('补', 13), ('红', 7), ('（行尾）', 5), ('复', 2), ('正', 2), ('三', 1), ('广', 1), ('编', 1), ('装', 1), ('停', 1), ('驱', 1), ('：', 1), ('多', 1), ('甲', 1)]
+没命中而带接续类字样: 48 2.0% [('收尾', 21), ('第二段', 12), ('二次', 11), ('续', 3), ('接着', 1)]
+   漏? tooling-writer 3-9 rlimit 判法收窄与门禁收尾
+   漏? tooling-writer 6-2 门禁期望约定与 E165 收尾
+   漏? experiment-runner E165 r2 第二段：驱动
+   漏? experiment-runner E170 第二段：Python 执行器
+   漏? experiment-runner E165 r2 第二段：甲表真跑
+   漏? tooling-writer H9 收尾：退出码表与开跑前判
+   漏? implementation-writer 第三轮前收尾：依赖红与 C610
+   漏? implementation-writer 数值环境变量解析收尾
+   漏? implementation-writer B0 断言非 mkfs 基镜像与两处收尾
+   漏? experiment-runner E165 r2 第二段补跑与第四段
+   漏? experiment-runner E165 r2 第二段补跑 2c
+   漏? experiment-runner E165 r3 第二段 Q1
+   误? implementation-writer 4-2 测试簇与锚点修复
+   误? tooling-writer 崩溃放量入口对齐与对抗审修补
+   误? tooling-writer 崩溃放量入口判法修补
+   误? tooling-writer 修 doc-experiments worktree 样本
+   误? tooling-writer 修三份研究脚本自证的早有毛病
+   误? implementation-writer checker 档：违例位改宽、R-换、测试修
+   误? tooling-writer 修广谱驱动换树后产物过时
+   误? implementation-writer 合入后修编译与四样收尾
+   误? experiment-runner E171 第三段修装置
+   误? experiment-runner E171 第五段修停机出结论
+   误? experiment-runner E171 第六段修驱动交命令
+   误? implementation-writer 修 I-4.1 慢档用例豁免

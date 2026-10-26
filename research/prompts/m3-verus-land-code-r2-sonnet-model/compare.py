@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H6：同一批行（表里 151 个 ⑦ 加 17 条构造的怪行）上，scripts/experiments/e165-pin-red-examples.py 的 input_fingerprint（取原文第 99–110 行逐字执行）
+"""H6：同一批行（表里 151 个 ⑦ 加 17 条构造的怪行）上，scripts/experiment-apparatus/e165-pin-red-examples.py 的 input_fingerprint（取原文第 99–110 行逐字执行）
 与装置 input_fingerprint_of（zz_h6_fingerprint.rs 里取原文 1724–1737 行逐字编的）各算一遍，逐行比。用法：compare.py"""
 import re, hashlib, sys
 src = open("/home/fy5090/code/singlefs/research/prompts/m3-verus-land-code-r2-sonnet-model/e165-pin-red-examples.py.read", encoding="utf-8").read().split("\n")

@@ -11,7 +11,7 @@
 | 攻方第二次抽样 `research/prompts/m3-batch50-code-r1-opus-s2-output.md`（309 行，sha256 a41d71fe7086…） | 同上 | 「✓ 核了 19 处引文，对上 19 处，没判 0 处」 |
 | 攻方模型 | 拷到 `~/.local/share/singlefs/work/m3-batch50-code-r1-verify/`，`rerun.sh … all`，rc=0 | compare 九份「一致」（churn-totals、closed-early、edge-mut、edge-orig、m3-core-lib、m4-absorb、m4-core-lib、m5-random、m5-rollback-all） |
 | 第二次抽样模型 | 拷到 `~/.local/share/singlefs/work/m3-batch50-code-r1-verify-s2/`，逐阶段从头复跑 | 见第六节 |
-| 主 agent 现查 | 读冻结副本 | `crates/singlefs-core/src/inode_tree.rs` 第 462–468 行先 `right_pair_fits` 后 `left_pair_fits`；`crates/singlefs-checker/src/walk.rs` 第 202–212 行登记退役记录宽 34、第 3523 行按登记宽比；`crates/singlefs-harness/tests/checker_known_bad_images.rs` 没有改退役容器记录宽的坏镜像；`.claude/kb/invariants.md` 第 32 行 I-1.7 写「类型 5（谱系）是 16」、没有类型 3；`scripts/experiments/e176_crates_oracle/oracle.rs` 第 124、125、183 行读已删的 `containers_dropped`（独立 Cargo，`scripts/experiments/replay.sh` 第 324、325 行只登记 E176 主装置） |
+| 主 agent 现查 | 读冻结副本 | `crates/singlefs-core/src/inode_tree.rs` 第 462–468 行先 `right_pair_fits` 后 `left_pair_fits`；`crates/singlefs-checker/src/walk.rs` 第 202–212 行登记退役记录宽 34、第 3523 行按登记宽比；`crates/singlefs-harness/tests/checker_known_bad_images.rs` 没有改退役容器记录宽的坏镜像；`.claude/kb/invariants.md` 第 32 行 I-1.7 写「类型 5（谱系）是 16」、没有类型 3；`scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` 第 124、125、183 行读已删的 `containers_dropped`（独立 Cargo，`scripts/experiment-apparatus/replay.sh` 第 324、325 行只登记 E176 主装置） |
 | 合后 checker 档（主 agent 在副本 `merge-copy/repo` 上跑，不是腿的数） | `checker-quick.log`、`feature-gated-nff.log`；打第 52 批之后 `checker-quick-b52.log`、`feature-gated-b52.log` | 打第 52 批前 CPU 8 红、GPU 6 红；打之后 CPU 61 个目标 658 过、1 红（根环线那份 nff 装置钉值，归它的第二十六块），GPU 20 个目标 491 过、0 红、NOT_RUN 0 |
 
 ## 二、逐格判（三份样本合看）

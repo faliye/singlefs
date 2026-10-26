@@ -1,0 +1,112 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target-mut/debug/deps/unlink_idempotence_criteria_and_rollback_to_the_emptied_version-aecfec74b1abe437)
+
+running 5 tests
+test tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_its_image ... ok
+test rolling_back_to_the_version_before_the_intent_recomputes_tag_six_from_the_rollback_targets_inode_tree ... ok
+test the_publishes_continued_by_a_remount_between_two_batches_equal_the_rest_of_the_uninterrupted_run ... ok
+test rolling_back_to_the_emptied_version_is_accepted_and_publishes_a_version_with_trees_and_no_file ... ok
+test a_crash_halfway_through_the_writes_of_the_first_batch_continues_on_remount_to_the_uninterrupted_end_state ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.63s
+
+     Running tests/unlink_mount_continuation_and_the_emptied_version.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target-mut/debug/deps/unlink_mount_continuation_and_the_emptied_version-f36f7838cd7b155a)
+
+running 23 tests
+test the_intent_and_a_middle_batch_each_set_the_change_count_to_the_txg_of_their_own_publish ... ok
+test the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... ok
+test the_tombstone_prepay_of_an_overwrite_reads_the_tombstone_tree_height_from_the_root_node_header ... ok
+test only_the_version_after_the_final_batch_rebuilds_as_with_trees_and_no_file ... ok
+test the_intent_given_a_time_earlier_than_the_previous_version_writes_that_earlier_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... ok
+test two_copies_of_the_image_between_two_batches_continue_to_byte_identical_disks ... ok
+test a_mount_whose_continuation_step_fails_on_a_device_error_hands_back_the_writes_of_every_publish_it_landed ... ok
+test a_session_mounted_with_batches_of_one_unlinks_a_three_unit_file_in_an_intent_and_three_steps ... ok
+test after_the_unlink_the_session_holds_the_emptied_version_and_refuses_an_overwrite_before_any_write ... ok
+test the_session_hands_in_the_intent_and_every_step_of_an_unlink_in_publish_order ... ok
+test the_mount_hands_in_every_continuation_step_after_its_warm_up_in_publish_order ... ok
+test the_batches_of_a_mount_continuation_after_an_intent_given_a_time_earlier_than_the_previous_version_copy_that_earlier_time_on_disk ... ok
+test the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk ... ok
+test a_session_unlink_given_a_time_that_is_not_a_whole_minute_writes_it_to_the_second_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test two_session_unlinks_in_the_same_mount_the_second_given_an_earlier_time_write_the_second_given_time_into_the_three_time_fields_of_its_intent_on_disk ... ok
+test rolling_back_to_the_intent_takes_its_deleted_inodes_root_and_the_next_mount_continues_it_to_empty ... ok
+test a_session_unlink_after_a_new_inode_with_a_later_time_in_the_same_mount_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published ... ok
+test a_session_unlink_given_a_time_earlier_than_the_previous_version_writes_that_earlier_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_session_unlink_given_a_time_past_thirty_two_bits_writes_it_whole_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_writable_mount_after_the_intent_continues_the_queue_to_empty_after_its_warm_up ... ok
+test new_inodes_on_the_emptied_version_are_published_and_the_version_holds_files_again ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.88s
+
+     Running tests/unlink_of_files_other_than_the_first.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target-mut/debug/deps/unlink_of_files_other_than_the_first-639d0e2ed3f5e346)
+
+running 10 tests
+test a_root_left_one_level_above_the_only_leaf_with_an_entry_reddens_the_upper_shape_invariant ... ok
+test deleting_inode_five_hundred_beside_the_first_file_lowers_the_upper_segment_to_the_first_leaf ... ok
+test a_file_created_before_the_first_file_was_deleted_is_still_written_after_it ... ok
+test deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root ... FAILED
+test deleting_the_first_file_beside_inode_five_hundred_leaves_its_leaf_under_a_level_one_root ... ok
+test one_set_of_files_with_data_reaches_one_upper_segment_through_two_histories ... ok
+test each_deletion_batch_of_another_file_cuts_only_that_file_and_the_first_file_reads_back_unchanged ... ok
+test a_writable_remount_after_the_intent_of_another_file_continues_its_deletion_to_the_end ... ok
+test unlinking_the_first_file_after_the_upper_segment_grew_to_level_one_keeps_the_leaf_of_the_other_file ... ok
+test unlinking_another_file_holding_three_data_units_releases_them_and_drops_its_upper_entry ... ok
+
+failures:
+
+---- deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root stdout ----
+
+thread 'deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root' (1057646) panicked at crates/singlefs-harness/tests/common_images_for_the_checker_tier/unlink_of_files_other_than_the_first.rs:522:9:
+删序 [1, 500]：有条目的号集合空
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.45s
+
+error: test failed, to rerun pass `-p singlefs-harness --test unlink_of_files_other_than_the_first`
+     Running tests/unlink_single_file_publishes.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target-mut/debug/deps/unlink_single_file_publishes-8395a9f880c301a5)
+
+running 9 tests
+test intent_rewrites_the_inode_leaf_and_root_the_deleted_inodes_root_and_the_tombstone_container_and_root ... ok
+test overwriting_the_first_file_after_it_is_deleted_is_refused_as_not_in_the_tree ... ok
+test a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit ... ok
+test every_deletion_version_rebuilt_from_disk_equals_the_published_one ... ok
+test continuing_after_the_queue_is_empty_publishes_nothing ... ok
+test the_pool_checker_finds_no_violation_after_the_intent_and_after_every_batch ... ok
+test unlink_of_an_inode_that_is_not_a_live_record_is_refused_before_any_write ... ok
+test the_final_batch_removes_the_record_the_queue_key_and_every_remaining_unit_in_the_same_publish ... ok
+test from_the_intent_on_the_read_only_mount_and_the_cold_walk_answer_no_file ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/writes_and_unlinks_after_the_first_file_was_deleted_in_histories_judged_by_the_model.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target-mut/debug/deps/writes_and_unlinks_after_the_first_file_was_deleted_in_histories_judged_by_the_model-1ef135990084e0b7)
+
+running 3 tests
+test the_directed_history_of_the_attack_refuses_the_write_after_two_rollbacks_as_the_model_requires ... ok
+test the_interleaved_shape_of_the_attack_seed_two_hundred_refuses_the_write_after_three_rollbacks_as_the_model_requires ... ok
+test the_fast_inode_write_histories_delete_another_inode_after_the_first_file_was_deleted ... FAILED
+
+failures:
+
+---- the_fast_inode_write_histories_delete_another_inode_after_the_first_file_was_deleted stdout ----
+
+thread 'the_fast_inode_write_histories_delete_another_inode_after_the_first_file_was_deleted' (1072356) panicked at crates/singlefs-harness/tests/writes_and_unlinks_after_the_first_file_was_deleted_in_histories_judged_by_the_model.rs:210:9:
+assertion `left == right` failed: 种子 7463871032432435115（偏移 2）：[PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 10206125613668599942 }, fill_seed: 9856909691684859200 }), RollBackWhileMounted(RingRoot { index_from_newest: 10196375400285082386 }), CreateInodes(InodeCountChoice { count_drawn: 159 }), Unlink, WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 5047535586052932623, content: ContentChoice { length: ExactlyDataUnitPayloadCapacity, fill_seed: 13719484536220301199 } }), RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 9037387683086917804 }), CloseAndMountWritable, Unlink, WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 16713359032341670354, content: ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 14, selector: 8219961027124582902 }, fill_seed: 4739824263787385509 } }), CreateInodes(InodeCountChoice { count_drawn: 153 }), RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 16463608520534182318 }), CloseAndMountWritable, Unlink, CreateInodes(InodeCountChoice { count_drawn: 89 }), CloseAndMountWritable, Unlink, WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 11666441251286299738, content: ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 3, selector: 5963744240820916531 }, fill_seed: 3583767769803382090 } }), WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 10903052997651577628, content: ContentChoice { length: InsideOneDataUnit { selector: 17105106477791015340 }, fill_seed: 11472798222567185498 } }), WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 18174363490717594392, content: ContentChoice { length: Empty, fill_seed: 17592457789689056625 } }), WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 7973673776762581356, content: ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 10, selector: 13455401126452559423 }, fill_seed: 14003736993433735177 } }), CreateInodes(InodeCountChoice { count_drawn: 1 }), CloseAndMountWritable, CloseAndMountWritable, WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 7727402966284464020, content: ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 14, selector: 18056196994536365067 }, fill_seed: 16759211262962585295 } }), Unlink, Unlink, WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 8052235295814431670, content: ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 3, selector: 9648045199186017616 }, fill_seed: 8856016961256569462 } }), RollBackWhileMounted(RingRoot { index_from_newest: 0 }), Unlink, RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 1316449072696324976 }), WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 8264646888091944652, content: ContentChoice { length: SpanningDataUnitsThroughTheSequentialWrite { data_units: 4, selector: 5124157533670543442 }, fill_seed: 2334655762516398726 } }), Unlink, WriteOfAnInode(WriteOfAnInodeChoice { inode_selector: 14122908093194717819, content: ContentChoice { length: Empty, fill_seed: 7546091822650122600 } }), Unlink, Unlink, CreateInodes(InodeCountChoice { count_drawn: 2 }), Unlink, CreateInodes(InodeCountChoice { count_drawn: 37 }), Unlink, RollBackWhileMounted(BeyondNewestRoot { txg_beyond_newest: 0 })]
+  left: NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(4), operation_kind: Some(WriteOfAnInode), violations: [], panic: None, newest_ring_root_txg: Some(9), root_ring_slot_count: Some(24), harness_judgement: None, model_disagreement: Some(ModelDisagreement { aspect: AllocationGeneration, model_answer: "ModelRootKey { checkpoint_txg: ModelCheckpointTxg(9), instance: ModelInstanceGeneration(1) } 这一版没有 ExtentUpperNodeBelowTheRoot(ModelExtentUpperNodePosition { level: 0, index_in_level: 0 }) 这个角色", implementation_answer: "实现交回了 ExtentUpperNodeBelowTheRoot(ModelExtentUpperNodePosition { level: 0, index_in_level: 0 }) 的单元", implementation_reported_ceiling: None, implementation_reported_unreadable_place: None, implementation_rows_written: None }), raised_floor_lands_only_on_abandoned_roots: None, record_check: RecordCheck { root_without_record: false, claimed_state_missing_unit: false } } }
+ right: Completed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_fast_inode_write_histories_delete_another_inode_after_the_first_file_was_deleted
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.60s
+
+error: test failed, to rerun pass `-p singlefs-harness --test writes_and_unlinks_after_the_first_file_was_deleted_in_histories_judged_by_the_model`
+error: 2 targets failed:
+    `-p singlefs-harness --test unlink_of_files_other_than_the_first`
+    `-p singlefs-harness --test writes_and_unlinks_after_the_first_file_was_deleted_in_histories_judged_by_the_model`

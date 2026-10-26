@@ -1,0 +1,30 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.34s
+     Running tests/compaction_plan_chooses_regions_and_batches_by_the_clauses.rs (target/debug/deps/compaction_plan_chooses_regions_and_batches_by_the_clauses-3301c1ae3ff5cf59)
+
+running 21 tests
+test a_slot_both_pinned_and_quarantined_is_scanned_as_pinned_and_still_drops_the_intent ... ok
+test a_new_cluster_segment_is_not_opened_in_the_live_intent_region ... ok
+test no_next_intent_is_issued_after_one_that_did_not_add_an_empty_segment ... ok
+test planning_after_the_last_movable_unit_left_reports_the_region_emptied ... ok
+test planning_over_a_region_holding_only_a_dead_unit_reports_nothing_movable_not_emptied ... ok
+test a_batch_of_three_over_three_movable_data_units_carries_exactly_their_keys ... ok
+test a_segment_whose_live_slots_are_all_dead_or_inconsistent_units_is_not_chosen ... ok
+test a_tie_goes_to_the_segment_with_the_lowest_start_slot ... ok
+test empty_cluster_segments_are_counted_by_the_records ... ok
+test the_issue_counts_holes_only_outside_the_region_in_segments_holding_user_data ... ok
+test user_data_lands_in_the_live_intent_region_when_the_exclusion_is_switched_off_for_tests ... ok
+test the_publish_budget_of_a_run_is_three_s_minus_four_minus_the_publishes_passed_and_at_least_one ... ok
+test the_stop_predicate_holds_only_when_no_unreleased_record_starts_in_the_region ... ok
+test user_data_does_not_land_in_the_live_intent_region_while_it_is_excluded ... ok
+test batches_never_overlap_and_their_union_is_every_movable_key_of_the_region ... ok
+test segments_the_region_scan_refuses_leave_no_eligible_segment_instead_of_being_chosen_again ... ok
+test a_segment_the_region_scan_refuses_over_a_record_crossing_segments_is_not_chosen_and_another_is ... ok
+test greedy_chooses_the_segment_with_the_fewest_live_slots_but_not_an_empty_one ... ok
+test a_segment_holding_a_pinned_slot_is_not_chosen ... ok
+test a_segment_opened_in_this_mount_is_not_chosen_and_none_is_left_when_every_segment_is_excluded ... ok
+test the_live_intent_region_is_not_chosen_again ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

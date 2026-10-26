@@ -1,6 +1,0 @@
-E name=fault_safe nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=111443 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=3693 livelock=15804 frozen=0 unmet_del=0 false_enospc=5636 release_bad=0 rb_refused=0 del_pred_true=1906 del_pred_false=1786 n0_refused=0 gc_done=23655 gc_declined=31547 gc_stuck=4179 gc_paused=36258 gc_cycle=14012 gc_cap=1792 gc_wasted=0
-W name=fault_safe flag=gc_stuck path=W0.GI.Q0
-W name=fault_safe flag=livelock path=W0.M
-W name=fault_safe flag=false_enospc path=W0.O0.GI.O0
-W name=fault_safe flag=del_pred_true path=W0.GI.GB
-W name=fault_safe flag=del_pred_false path=W0.GI.O0.GB

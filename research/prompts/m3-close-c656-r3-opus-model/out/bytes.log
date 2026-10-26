@@ -1,2 +1,0 @@
-name=bytes compare=same_parameters differing_sectors_by_area={} total=0
-name=bytes compare=other_fsid differing_sectors_by_area={"root_ring_area": 3, "system_configuration_area": 4, "unit_area": 4} total=11

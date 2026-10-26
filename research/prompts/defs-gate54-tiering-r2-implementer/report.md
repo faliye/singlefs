@@ -9,7 +9,7 @@
 | `.claude/gate.d/checker-tier-layer0-replay.sh` | 232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7（与攻方 `inputs/54-post.sh` 相同） | f845fcd011526c9790450078245b769141867a8cfc8990f613e7fe5ad0520a5b | 438（原 397） |
 | `.claude/agents/gate-triage.md` | e631bc7adf9345e3f9e74559c137cb97b07c9ce5f313811ab10b83358e3c6bb7 | 3663395ae0e6170c13f70eb0f81741dea3c958f01c3881e3afa6677b5353f564 | 39（原 39，改的是第 26 行那一整行） |
 
-副本：`rsync -a --exclude /target` 主工作区（含 `.git`）到 `/tmp/claude-1000/defs54-r2-impl/repo`，删掉副本里被 `.gitignore` 挡着的 `scripts/experiments/target/`（7.7G，只删副本）。原样两份另存 `orig/`，补丁用 `diff -u --label a/… --label b/…` 从 `orig/` 对 `repo/` 生成；把补丁套回 `orig/` 的拷贝，两份 sha256 与上表改后一栏相同。收尾时主工作区两份 sha256 仍是起点那两个。
+副本：`rsync -a --exclude /target` 主工作区（含 `.git`）到 `/tmp/claude-1000/defs54-r2-impl/repo`，删掉副本里被 `.gitignore` 挡着的 `scripts/experiment-apparatus/target/`（7.7G，只删副本）。原样两份另存 `orig/`，补丁用 `diff -u --label a/… --label b/…` 从 `orig/` 对 `repo/` 生成；把补丁套回 `orig/` 的拷贝，两份 sha256 与上表改后一栏相同。收尾时主工作区两份 sha256 仍是起点那两个。
 
 真仓 git common-dir（`.git`）里 `singlefs-layer0*`：开工 0 个，收尾 0 个（`find … -maxdepth 1 -name 'singlefs-layer0*' | wc -l`）。
 

@@ -1,0 +1,7 @@
+{
+  "crates/singlefs-replay-prefix/src/lib.rs": "d4273abf3ad2400640805d0ec078e60b97fb049591bebc1001d917f088dffaa9",
+  "crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs": "408f80368de4f5cd6bc24e55b2bb145764f0df6b6e22cc5921148a11f68cf537",
+  "crates/singlefs-replay-prefix/verus-must-red-worlds.tsv": "1364107a0f33a163f936cdfaf5009b3e446e268c0742a9753121e25406a888f3",
+  "scripts/gate/verus-proof-check.py": "1ea686d8aece0c7dcd57a4ccd6cb03b79617ef021edfc31cbe449a603aae03b7",
+  ".claude/gate.d/verus-pins.tsv": "2cc596f00a587b7996b253d50f18a3360ae5057c47304e593daf573e0ad7c390"
+}

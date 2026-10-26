@@ -1,7 +1,7 @@
 # 正推腿的模型与脚本（m3-reclaim-window-r1）
 
 纯 Python，无第三方包，不与 `crates/` 共用代码。核心 `e139_port.py` 是 E139 装置
-`scripts/experiments/e139_tightened_floor.rs` 里活化一族世界、近满盘两个世界（drain_failure、broken_slot）的端口，
+`scripts/experiment-apparatus/e139_tightened_floor.rs` 里活化一族世界、近满盘两个世界（drain_failure、broken_slot）的端口，
 逐行复现产物 `research/results/e139-tightened-floor-2026-10-04.out`（`run_all.sh` 第一、四节的 `cmp_*` 输出是对账）。
 对账过了才改一处开关再跑：开关在 `Cfg`（`gate`、`failure`、`recover`、`p2`、`p3`、`p3c`、`p3s`、`p4`）。
 

@@ -30,7 +30,7 @@
 | （欠的检查清单 标题之下、第一个下级标题之前的正文：第 2-587 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
 | ### 已还清 | 抄 | 默认全抄（脚本生成） |
 
-### 小节清单：`.claude/kb/decisions/08-核心索引结构.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/08-core-index-structure.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -55,7 +55,7 @@
 | #### Settled Item 16: First-Version Unlink: Creates deleted_inodes Only, Batched from Tail, Resumes to Empty During Mount | 抄 | 随父节带到 |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/08-核心索引结构.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/08-コアインデックス構造.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -105,7 +105,7 @@
 | #### 已定项 16：第一版 unlink：只立 deleted_inodes、从尾部分批、挂载里续做到空 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/decisions/05-快照-空间记账机制.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/05-snapshot-space-accounting-mechanism.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -135,7 +135,7 @@
 | #### Settled Item 21: Whether Snapshot List Needs an Enumerable Persistent Structure | 抄 | 随父节带到 |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/05-快照-空间记账机制.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/05-スナップショット-空間会計メカニズム.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -195,7 +195,7 @@
 | #### 已定项 21：快照列表要不要一个可枚举的持久结构 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/decisions/23-journal的角色与格式.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/23-journal-role-format.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -230,7 +230,7 @@
 | #### Settled Item 26: Two Parsing Disciplines for Record Header | 抄 | 随父节带到 |
 | ## History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/23-journal的角色与格式.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/23-ジャーナルの役割と形式.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -300,7 +300,7 @@
 | #### 已定项 26：记录头的两条解析纪律 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/decisions/18-块里携带什么信息.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/18-information-carried-in-a-block.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -333,7 +333,7 @@
 | #### Settled Item 24: V1 Tombstones: Tombstone Tree, 40-Byte Records, Lineage Records | 抄 | 随父节带到 |
 | ## Historical Versions | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/18-块里携带什么信息.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/18-ブロックに含める情報.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -399,7 +399,7 @@
 | #### 已定项 24：第一版墓碑：墓碑树、40 字节记录、谱系记录 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/experiments/71-记账key的条目数与宽度.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/71-entry-count-and-width-of-accounting-keys.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -423,7 +423,7 @@
 | ### Impacted Decisions | 抄 | 默认全抄（脚本生成） |
 | ## Historical Versions | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/experiments/71-记账key的条目数与宽度.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/71-記帳キーのエントリ数と幅.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -471,7 +471,7 @@
 | ### 影响的决策 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/experiments/97-记账与分配记录的条目编码.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/97-entry-encoding-of-accounting-and-allocation-records.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -496,7 +496,7 @@
 | #### (Part 3): Two More Criteria Added, One Metric Corrected, Two Arms Added After Second Adversarial Round, Rerun | 抄 | 随父节带到 |
 | #### (Part 4): Third Adversarial Round Removed Artifact — "Half Unit Unrepresentable" is Arm Tag, Not Encoding Property | 抄 | 随父节带到 |
 
-### 小节清单：`.claude/kb/experiments/97-记账与分配记录的条目编码.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/97-記帳および割り当て記録のエントリ符号化.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

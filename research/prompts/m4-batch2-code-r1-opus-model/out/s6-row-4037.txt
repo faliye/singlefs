@@ -1,4 +1,0 @@
-  left: DiscardOutcomeCounts { applied_calls: 0, unsupported_calls: 0 }
- right: DiscardOutcomeCounts { applied_calls: 0, unsupported_calls: 1 }
-cargo_rc=101
-test a_backend_keeping_the_default_answers_unsupported_and_the_recorder_counts_it_without_a_step ... FAILED

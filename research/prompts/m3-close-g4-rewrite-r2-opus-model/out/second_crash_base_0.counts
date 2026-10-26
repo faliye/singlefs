@@ -1,0 +1,5 @@
+name=second_crash_base candidates=8
+name=second_crash_base_0 base=[segment=0 landed_device=0 slots_per_device=[2, 2]] first_mount=mounted
+name=second_crash_base_0 state_count=20519 segments=2:system_configuration_slot,2:system_configuration_slot,14:unit_write,2:journal_record,1:root_record_fua,2:system_configuration_slot,12:unit_write,2:journal_record,1:root_record_fua,2:system_configuration_slot
+name=second_crash_base_0 domain=torn states count=20
+name=second_crash_base_0 domain=whole states count=20499

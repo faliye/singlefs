@@ -1,0 +1,5 @@
+name=tmp-removed remove_after=3 status=251 seconds=6 ran=no
+  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 200M --label moved-from-queue-2367720-275795234 
+  ✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 MiB（回收不掉的用量 0 MiB + 账上还没涨到量的 250 MiB）
+FileNotFoundError: [Errno 2] No such file or directory: '/home/fy5090/.local/share/singlefs/work/m3-close-reuse-closure-r1-opus/model/out/worlds/world-tmp-removed/tmp/tmpwfp9ikyk'
+  ✗ 带内存上限的 scope 起不来：排队那一步退 1（上面是它的报错），命令一行都没跑

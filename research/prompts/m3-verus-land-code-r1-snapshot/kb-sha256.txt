@@ -1,6 +1,0 @@
-2ea8b99d3f805992c68f434ee9a6f64c88367ebc2a646eeb0b89a7acd6b18d5e  .claude/kb/checks-owed.md
-203f86d71dfc2d4cdfb534ed30517f8549ed865c9ddc01aa87fc298245479b0b  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
-576c061884220aa76560cd5cf4b409576fe074fab11d7bf49204897e27bff491  .claude/kb/decisions/13-验证路线.md
-cf3b3d3ce92bf7c1ee2d44ada7a0ba926af39b1980f097df477d8f7d4ed4ea30  .claude/kb/decisions/23-journal的角色与格式.md
-f3a5d8e0a084adc150e8fa60247b0d1dc35710534905317a8fbf9e2d8ed4df5d  .claude/kb/milestone/03-third-txn.md
-1041eea7df34a5e9ffafeccde4a1f928a46d24e39335ca624a8b96cf143b802c  .claude/kb/invariants.md

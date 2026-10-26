@@ -1,0 +1,21 @@
+# m3-close-c506-r2 攻方腿的原型：被判形态里「同一槽另判 S × 槽距 ≤ P × chunk」「mkfs 写 min(8, ⌊P × chunk ÷ 槽距⌋)」两句，
+# 与第一轮「改字节造盘」那一法，在 crates/ 今天的实现上量。依赖按「模型目录与冻结副本并排」的布局取：<草稿>/model 与 <草稿>/tree，
+# tree 是冻结副本打上 patches/clause-only-writer.patch 之后的那一份（tools/rerun.sh 就这样摆）。只编不跑测试；不调崩溃枚举。
+[package]
+name = "c506_r2_opus_probe"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+singlefs-core = { path = "../tree/crates/singlefs-core" }
+singlefs-checker = { path = "../tree/crates/singlefs-checker" }
+singlefs-harness = { path = "../tree/crates/singlefs-harness" }
+singlefs-format = { path = "../tree/crates/singlefs-format" }
+
+[profile.release]
+opt-level = 3
+overflow-checks = true
+debug-assertions = true

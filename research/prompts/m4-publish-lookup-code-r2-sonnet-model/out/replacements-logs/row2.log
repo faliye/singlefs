@@ -1,0 +1,37 @@
+
+running 1 test
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units has been running for over 60 seconds
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units ... FAILED
+
+failures:
+
+---- compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units stdout ----
+
+thread 'compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units' (801630) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:399:5:
+assertion `left == right` failed: txg 133：整理读这一版解了 0 片映射叶，进映射的 596 把 key 走到 6 片（每片解一次、每把 key 都经批量读者查）
+  left: 0
+ right: 6
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 204.35s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-core)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/mounted_session.rs:2799:9
+     |
+2799 |     let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
+     |         ----^^^^^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 12s
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

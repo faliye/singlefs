@@ -1,0 +1,21 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.7 GiB，这一条要 2.3 GiB（按峰值表里近 5 次实测里最大的峰值 2.3 GiB（最近一次 2026-10-21T10:30:39Z 量的）算），总上限 40.1 GiB；账上在跑 14 条
+  → 第二台此刻放得下（可用 55.4 GiB、要 2.3 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 12G --label moved-from-queue-1864029-1091623317 -- bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 31 cargo test --offline -p singlefs-harness --test publish_lookup_by_identity --test snapshot_release_and_destroy_through_the_deadlist --no-run
+run-with-memory-cap: 排了 21 秒，起跑（singlefs-memory-cap-1864029-1091623317）
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-core)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/mounted_session.rs:2799:9
+     |
+2799 |     let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
+     |         ----^^^^^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.86s
+  Executable tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+  Executable tests/snapshot_release_and_destroy_through_the_deadlist.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/snapshot_release_and_destroy_through_the_deadlist-ed36be39ea00ad83)

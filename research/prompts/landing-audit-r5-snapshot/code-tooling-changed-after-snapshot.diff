@@ -1,0 +1,204 @@
+--- code-tooling.sh（landing-audit-r5 开工快照那一版，sha256 99dd70c4…）
++++ code-tooling.sh（写判决时的主工作区）
+@@ -25,7 +25,7 @@
+ # gate-cell: rules-manifest 项目规则文件与 CLAUDE.md 的 @ 引用逐项相等
+ # gate-cell: stage-owners 阶段归属表与各道门禁的格逐格一致、派给的 agent 有定义，每道阶段认第一个参数当项目根
+ # gate-cell: agent-write-scope 项目钩子注册在要的 matcher 上，写范围表与定义双向一致，定义头齐全，共用模块不另写一份
+-# gate-cell: change-range-single-source 门禁阶段不自己算 diff 基准，列路径带 quotepath，调共用取法判退出码
++# gate-cell: change-range-single-source 门禁阶段不自己算 diff 基准，列路径带 quotepath，调共用取法判退出码；基准那一版照登记的搬迁换算，搬迁登记表写对、指得到
+ # gate-cell: research-gate-lint 研究脚本、钩子与 .claude/scripts 的拒绝出路、shell 纪律、执行位，终止进程只许点名一个
+ # gate-cell: fixture-claims 阶段头部的显式标记声称的样本真的在（yes 要目录在，none 要目录不在且登记在豁免表）；文件名与样本正文里的日期不许是编的
+ # gate-cell: fixture-registrations-excluded 样本目录里有编号登记位（## D<n> / ## E<n> 标题、doc-lint:registry 标记）的阶段，都在 .claude/doc-lint-exclude 里有一行；排除表里指向 fixtures 下不存在的阶段的行判红
+@@ -59,7 +59,7 @@
+ #   stage-owners                       stage-owners-red、stage-owners-green
+ #   agent-write-scope                  agent-write-scope-red、agent-write-scope-multiedit-red、agent-write-scope-timer-red、agent-write-scope-run-scope-red、agent-write-scope-two-logs-red、
+ #                                      agent-write-scope-green
+-#   change-range-single-source         change-range-single-source-red、change-range-single-source-green
++#   change-range-single-source         change-range-single-source-red、change-range-single-source-green、change-range-single-source-path-moves-red、change-range-single-source-path-moves-green
+ #   research-gate-lint                 research-gate-lint-red、research-gate-lint-green、research-gate-lint-arithmetic-shift-red
+ #   fixture-claims                     fixture-claims-red、fixture-claims-unnumbered-red、fixture-claims-cells-red、fixture-claims-unmarked-red、
+ #                                      fixture-claims-marker-malformed-red、fixture-claims-none-with-directory-red、fixture-claims-exempt-red、fixture-claims-green
+@@ -70,8 +70,8 @@
+ #   directory-layout                   directory-layout-red、directory-layout-green
+ #   committed-file-size                committed-file-size-red、committed-file-size-unpushed-red、committed-file-size-detached-red、committed-file-size-green、committed-file-size-no-upstream-green
+ #   stage-location-before-cd           stage-location-before-cd-red、stage-location-before-cd-green
+-#   heavy-thread-defaults              heavy-thread-defaults-red、heavy-thread-defaults-cfg-test-red、heavy-thread-defaults-capped-elsewhere-red、heavy-thread-defaults-quoted-name-red、heavy-thread-defaults-per-line-red、heavy-thread-defaults-wide-cost-red、heavy-thread-defaults-var-source-red、heavy-thread-defaults-var-source-forms-red、heavy-thread-defaults-per-line-green、heavy-thread-defaults-var-source-green、heavy-thread-defaults-green
+-#   long-run-header-exempt             long-run-header-exempt-red、long-run-header-exempt-green、long-run-header-exempt-sha256-red、long-run-header-exempt-repin-red、long-run-header-exempt-base-green
++#   heavy-thread-defaults              heavy-thread-defaults-red、heavy-thread-defaults-cfg-test-red、heavy-thread-defaults-capped-elsewhere-red、heavy-thread-defaults-quoted-name-red、heavy-thread-defaults-per-line-red、heavy-thread-defaults-wide-cost-red、heavy-thread-defaults-var-source-red、heavy-thread-defaults-var-source-forms-red、heavy-thread-defaults-per-line-green、heavy-thread-defaults-var-source-green、heavy-thread-defaults-green、heavy-thread-defaults-moved-red、heavy-thread-defaults-moved-green
++#   long-run-header-exempt             long-run-header-exempt-red、long-run-header-exempt-green、long-run-header-exempt-sha256-red、long-run-header-exempt-repin-red、long-run-header-exempt-base-green、long-run-header-exempt-moved-green、long-run-header-exempt-moved-red、long-run-header-exempt-moved-edited-red
+ #   function-units-two-implementations-agree  function-units-two-implementations-agree-green、-dump-red、-closure-red、-key-red（Rust 那一侧是录好的输出，不编、不起 unit-graph）
+ #   selftest-registry-deviations       selftest-registry-deviations-red、selftest-registry-deviations-green
+ #   mutation-list-items                mutation-list-items-red、mutation-list-items-green（setup.sh 现写小工作区，--list-items 只起 git 与 rustc -vV）
+@@ -99,7 +99,7 @@
+ #   reuse-selftest-line-unchecked  reuse-selftests 不看规范输出那一行、自证退 0 就算过：reuse-selftests-red 里「输出里没有 REUSE_SELFTEST」那条 want 找不到
+ #   claims-any-file          research-script-selftest-coverage 退回「全文出现 --selftest 就算声称有」：coverage-claims-green 判红
+ #   selftest-coverage-top-level-only  research-script-selftest-coverage 只扫 scripts/<类>/ 那一层、不进装置目录：coverage-nested-red 里「没有任何门禁阶段在跑它」与 drive.py 那两条 want 找不到
+-#                            （它照样退 1：NOT_RUN_HERE 别的几行在这份样本里不在，报过期豁免）；green、coverage-claims-green 判红（NOT_RUN_HERE 里装置目录那一层的三行扫不到，被当成过期豁免）
++#                            （它照样退 1：NOT_RUN_HERE 别的几行在这份样本里不在，报过期豁免）；green、coverage-claims-green 判红（NOT_RUN_HERE 里装置目录那一层的七行扫不到，被当成过期豁免）
+ #   selftest-coverage-name-substring  research-script-selftest-coverage 按文件名当子串认、左边不设边界：crash-point-replay.sh 的自证被当成跑了 replay.sh，
+ #                            coverage-suffix-red 里「没有任何门禁阶段在跑它」与 replay.sh 那两条 want 找不到（照样退 1，原因同 coverage-nested-red）
+ #   numbered-stages-only     research-script-selftest-coverage 与 fixture-claims 只认两位数开头的阶段：coverage-claims-green 判红、fixture-claims-unnumbered-red 退 77，
+@@ -131,8 +131,13 @@
+ #   thread-default-conditional-assignment-literal-only、thread-default-printenv-unseen、thread-default-conditional-variable-source-ignored、
+ #   thread-default-registry-substring-accepted、thread-default-defaulted-variable-accepted、thread-default-other-assignment-forms-unseen、thread-default-sourcing-ignored
+ #                            heavy-thread-defaults 格的二十五个开关，各弄坏哪一处、哪份样本判错写在那一格的注释里
+-#   long-run-exempt-path-unchecked、long-run-exempt-needless-unchecked、long-run-exempt-growth-unchecked、long-run-exempt-repin-unchecked、long-run-exempt-sha256-unchecked
+-#                            long-run-header-exempt 格的五个开关（折成 lib_long_run.py 的 LIB_LONG_RUN_BREAK 同名去掉前缀 long-run- 的项），各弄坏哪一处、哪份样本判错写在那一格的注释里
++#   long-run-exempt-path-unchecked、long-run-exempt-needless-unchecked、long-run-exempt-growth-unchecked、long-run-exempt-repin-unchecked、long-run-exempt-sha256-unchecked、
++#   long-run-exempt-path-moves-ignored
++#                            long-run-header-exempt 格的六个开关（折成 lib_long_run.py 的 LIB_LONG_RUN_BREAK 同名去掉前缀 long-run- 的项），各弄坏哪一处、哪份样本判错写在那一格的注释里
++#   path-moves-unchecked     change-range-single-source 不判搬迁登记表（写法、新前缀在不在、旧前缀还在不在、出处在不在）：change-range-single-source-path-moves-red 判绿（期望退出 1，实测 0）
++#   共用库 lib-lag-baseline.py 的开关 LAG_BASELINE_BREAK=path-moves-ignored（不读搬迁登记表，基准那一版不换前缀、不按搬迁之前的路径取）：
++#                            heavy-thread-defaults-moved-green 期望退出 0、实测 1（排除表涨了），long-run-header-exempt-moved-green 期望退出 0、实测 1（豁免表涨了），
++#                            long-run-header-exempt-moved-edited-red 里重钉与「仍不逐字节相同」两条 want 找不到（照样退 1，红在豁免表涨了）
+ #   deviation-prefix-unchecked  selftest-registry-deviations 不看「偏离上游：」起头：selftest-registry-deviations-red 判绿（期望退出 1，实测 0）
+ #   list-items-exit-only     mutation-list-items 只看 --list-items 的退出码：mutation-list-items-red 判绿（期望退出 1，实测 0）
+ #   break-switch-guard-unchecked  break-switches-sample-only 不判：break-switches-sample-only-red 判绿（期望退出 1，实测 0）
+@@ -180,8 +185,8 @@
+   "照各道门禁的 --list 在 .claude/gate.d/stage-owners.tsv 逐格补行、改名、删行（四列：门禁文件名、格名、判红时派给谁修、为什么）；列不出格的先修 gate-structure 格报的结构；不认项目根的阶段加 ROOT=\"\${1:-…}\" 与 cd \"\$ROOT\""
+ stage_cell agent-write-scope cell_agent_write_scope "项目钩子注册在要的 matcher 上，写范围表与定义双向一致，定义头齐全，共用模块不另写一份" \
+   "照上面逐条的出路改 .claude/settings.json 的 hooks、.claude/hooks/agent-write-scope.tsv 或定义的 frontmatter；共用模块的函数从模块导入，不另写一份"
+-stage_cell change-range-single-source cell_change_range_single_source "门禁阶段不自己算 diff 基准，列路径带 quotepath，调共用取法判退出码" \
+-  "基准与改动范围只经 scripts/gate/changed-paths.sh 的 gate_diff_base / gate_changed_paths / gate_added_lines 取，列路径的 git 带 -c core.quotepath=false，调共用取法判退出码"
++stage_cell change-range-single-source cell_change_range_single_source "门禁阶段不自己算 diff 基准，列路径带 quotepath，调共用取法判退出码；基准那一版照登记的搬迁换算，搬迁登记表写对、指得到" \
++  "基准与改动范围只经 scripts/gate/changed-paths.sh 的 gate_diff_base / gate_changed_paths / gate_added_lines 取，列路径的 git 带 -c core.quotepath=false，调共用取法判退出码；搬迁登记表 .claude/gate.d/path-moves.tsv 一行「旧前缀<TAB>新前缀<TAB>YYYY-MM-DD<TAB>records/<文件>.md」，新前缀写搬到的路径、旧路径搬干净、出处写记这次搬迁的那份记录（判法 lib-lag-baseline.py 的 path_move_problems）"
+ stage_cell research-gate-lint cell_research_gate_lint "研究脚本、钩子与 .claude/scripts 的拒绝出路、shell 纪律、执行位，终止进程只许点名一个" \
+   "拒绝补出路（sop-first.md「每一条拒绝都必须给出下一步」），shell 纪律照 command-safety.md，终止进程照 .claude/hooks/bash-command-detector.sh 文件头 ⑥ 只点名一个自己起的"
+ stage_cell fixture-claims cell_fixture_claims "阶段头部的显式标记声称的样本真的在（yes 要目录在，none 要目录不在且登记在豁免表）；文件名与样本正文里的日期不许是编的" \
+@@ -434,7 +439,7 @@
+   "bash scripts/gate/gate-staged.sh --selftest" "python3 scripts/gate/admission.py --selftest"
+   "bash scripts/hosts/capped.sh --selftest"
+   "bash scripts/crash/crash-point-replay-shard-run.sh --selftest" "bash scripts/mutation/mutation-shard-run.sh --selftest"
+-  "bash scripts/hosts/multi-host-run.sh --selftest" "bash scripts/hosts/run-with-memory-cap.sh --selftest" "bash scripts/hosts/run-build-directory.sh --selftest"
++  "bash scripts/hosts/multi-host-run.sh --selftest" "bash scripts/hosts/run-with-memory-cap.sh --selftest" "bash scripts/hosts/run-build-directory.sh --selftest" "python3 scripts/agents/copy-originals.py --selftest"
+   "bash scripts/hosts/detached-run.sh --selftest" "bash scripts/experiment-apparatus/replay.sh --selftest"
+   "bash scripts/mutation/mutate.sh --selftest" "python3 scripts/agents/cite-check.py --selftest"
+   "python3 scripts/kb/kb-spec-check.py --selftest" "python3 scripts/crash/crash-case-check.py --selftest"
+@@ -806,7 +811,7 @@
+ # 样本：red 放一份只在某个阶段的 echo 出路里被提到的 --selftest 脚本，必须报它没人跑；green 放一份真被阶段调用的与 NOT_RUN_HERE 每一行的那份脚本，判绿并报对数。
+ #   NOT_RUN_HERE 是这一道自己的表，绿样本里缺了哪一行的脚本，那一行就判过期：往表里加一行，同时往 green、coverage-claims-green 里各放一份那个路径的脚本、改两份 expect 的份数。
+ #   coverage-claims-green 放一份只在注释与出路里提 --selftest 的 .py、一份提到它的 .tsv（都不算实现了）与一份由不带编号的阶段 tooling-runs.sh 在跑的 .sh，
+-#   判绿并报 8 份中 1 份（另七份是 NOT_RUN_HERE 那七行）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
++#   判绿并报 12 份中 1 份（另十一份是 NOT_RUN_HERE 那十一行）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
+ #   coverage-nested-red 放一份装置目录那一层的 scripts/experiment-apparatus/sample_rig/drive.py（实现了 --selftest、没人跑），必须报它没人跑；
+ #   coverage-suffix-red 放 scripts/experiment-apparatus/replay.sh 与 scripts/crash/crash-point-replay.sh 两份，阶段只跑后一份的自证，必须报前一份没人跑。
+ NOT_RUN_HERE=(
+@@ -817,6 +822,10 @@
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.py	它自己没有自证：rows_orchestrator.py --selftest 起它当假的 multi-host-run.sh --peer"
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py	它自己没有自证：rows_orchestrator.py --selftest 起它当假的逐行驱动"
+   "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_selftest_harness.py	它自己没有自证：只被修订 8 那几份 import，没有命令行入口，起的是它们各自的 --selftest"
++  "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_8.py	冻结层、一个字节不改：钉的是第一段编排器搬迁前的 sha256，单跑自证按设计退 3；rows_orchestrator_revision_11.py 载入它时换钉，那一层的自证在 SELFTEST_RUNNERS 里"
++  "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py	冻结层、一个字节不改：钉的是第一段编排器搬迁前的 sha256，单跑自证按设计退 3；rows_orchestrator_revision_11.py 载入它时换钉，那一层的自证在 SELFTEST_RUNNERS 里"
++  "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py	冻结层、一个字节不改：钉的是第一段编排器搬迁前的 sha256，单跑自证按设计退 3；rows_orchestrator_segment_two_revision_11.py 载入它时换钉，那一层的自证在 SELFTEST_RUNNERS 里"
++  "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py	冻结层、一个字节不改：经 rows_orchestrator_segment_two.py 间接钉第一段编排器搬迁前的 sha256，单跑自证按设计退 3；rows_orchestrator_segment_two_revision_11.py 载入它时换钉，那一层的自证在 SELFTEST_RUNNERS 里"
+ )
+ cell_research_script_selftest_coverage() {
+ coverage="$(python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "${CODE_TOOLING_BREAK:-}" "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
+@@ -1443,17 +1452,24 @@
+ #      包装函数调，或 git 带 -z；参数列表换了行、这一行以引号开头的，往上看三行找调用前缀。不带时中文路径被转成带引号的八进制串，git 不报错。
+ #   ③ 调共用取法（gate_changed_paths、gate_added_lines）要判退出码：同一行带 ||，或放在 if / while 里。
+ #   「代码行」的认法在 is_text：出路文字与注释里提到这些词不算。
++#   ④ 搬迁登记表 .claude/gate.d/path-moves.tsv（被判的根里那一份；只缩不涨的表与基准那一版比时照它换算，读法在 lib-lag-baseline.py 文件头「搬迁登记」）：
++#      一行「<旧前缀><TAB><新前缀><TAB><YYYY-MM-DD><TAB>records/<文件>.md」写对；新前缀照它后面的登记换算之后在磁盘上；旧前缀不在磁盘上（后面的登记又搬进它的除外）；
++#      出处文件在。判法是 lib-lag-baseline.py 的 path_move_problems（用这一道所在仓里那一份）；表不在算 0 行。
+ # 为什么：取法收成共用脚本之前有六份以上拷贝，已经分叉过（一半漏了 quotepath），收完之后要有东西拦下一份拷贝。
+ #
+ # 样本：change-range-single-source-red 把三条判据该抓的写法各放几种（自己取 merge-base、@{u}...、HEAD~1、HEAD^、换了行的参数列表续行里的 "merge-base"、
+ #   不带或带 =true 的 quotepath、包装函数名叫 git 而这一行没调它、test 的 -z、printf "$(git …)"、换行的参数列表、不判退出码的共用取法），逐条点名判红；
+ #   change-range-single-source-green 放五种合法写法与 unset GATE_BASE、merge-base --is-ancestor、HEAD^{tree}、判了退出码的调用，判绿。
++#   change-range-single-source-path-moves-red 的搬迁登记表五行各错一样（旧前缀还在磁盘上、新前缀不在磁盘上、日期不是 YYYY-MM-DD、只有三列、出处不在），逐行点名判红；
++#   change-range-single-source-path-moves-green 的表两行串起来（scripts/older-rig → scripts/old-rig → scripts/new-rig），第一行的新前缀照第二行换算之后在、旧前缀都不在、出处在，判绿报 2 行。
++# 弄坏开关 CODE_TOOLING_BREAK=path-moves-unchecked：不判 ④，change-range-single-source-path-moves-red 判绿（期望退出 1，实测 0）。
+ cell_change_range_single_source() {
+ [[ -d .claude/gate.d ]] || { echo "  ! 没有 .claude/gate.d，这一格无对象可判"; exit 77; }
+-python3 - "$STAGE_NAME" <<'PY'
+-import glob, os, re, sys
++python3 - "$STAGE_NAME" "$STAGE_DIRECTORY/lib-lag-baseline.py" "${CODE_TOOLING_BREAK:-}" <<'PY'
++import glob, importlib.util, os, re, sys
+ 
+ own_name = sys.argv[1]
++lag_baseline_library, broken = sys.argv[2], sys.argv[3]
+ # 这一道文件里这一格自己的那一段（正则与出路里全是它要抓的写法）：从这一格的标题行到下一格的标题行，按空行判，行号不变
+ OWN_CELL_START = re.compile(r'^# ── 格 change-range-single-source：')
+ NEXT_CELL_START = re.compile(r'^# ── (格 |汇总)')
+@@ -1577,6 +1593,23 @@
+         print(f'      {path}:{number}  {line[:120]}')   # gate-lint:detail
+     print('     → 怎么办：写成 x="$(gate_changed_paths …)" || { echo 取不到改动范围…; echo 出路…; exit 1; }，或放进 if；')
+     print('               git 失败时共用脚本退非 0、什么都不交，不判退出码就会把「没取到」读成「这次什么都没改」。')
++# ④ 搬迁登记表（判法 lib-lag-baseline.py 的 path_move_problems，用这一道所在仓里那一份；表取被判的根里那一份）
++move_count, move_problems = 0, []
++if broken != 'path-moves-unchecked':
++    try:
++        lag_baseline_spec = importlib.util.spec_from_file_location('lag_baseline', lag_baseline_library)
++        lag_baseline = importlib.util.module_from_spec(lag_baseline_spec)
++        lag_baseline_spec.loader.exec_module(lag_baseline)
++        move_count, move_problems = lag_baseline.path_move_problems('.')
++    except (OSError, ImportError, AttributeError, SyntaxError) as error:
++        move_problems = [(f'载不进 {lag_baseline_library}：{type(error).__name__}: {error}',
++                          '它随仓走（.claude/gate.d/lib-lag-baseline.py），被删了就从 git 找回来；搬迁登记表的判法只在那一份里写')]
++if move_problems:
++    failed = True
++    print(f'  ✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 {len(move_problems)} 处不对（共 {move_count} 行）：')
++    for what, _howto in move_problems:
++        print(f'      {what}')   # gate-lint:detail
++    print('     → 怎么办：' + '；'.join(dict.fromkeys(howto for _what, howto in move_problems)))
+ if failed:
+     sys.exit(1)
+ 
+@@ -1588,6 +1621,10 @@
+             if base_hits or list_hits or status_hits:
+                 outside.append(f'{path}（算基准 {len(base_hits)} 行、不带 quotepath 的列路径 {len(list_hits)} 行、不判退出码 {len(status_hits)} 处）')
+ print(f'  ✓ 查了 .claude/gate.d/ 下 {len(scanned)} 份：没有阶段自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false，调共用取法都判了退出码')
++if broken == 'path-moves-unchecked':
++    print('  ! 弄坏开关 path-moves-unchecked 生效：搬迁登记表 .claude/gate.d/path-moves.tsv 没判')
++else:
++    print(f'  ✓ 搬迁登记表 .claude/gate.d/path-moves.tsv {move_count} 行：写法对、新前缀在磁盘上、旧前缀不在了、出处都在')
+ if outside:
+     print(f'     没扫的 {len(outside)} 份（不是门禁阶段，射程之外）：' + '；'.join(outside))
+ else:
+@@ -2738,10 +2775,14 @@
+ #   文件末尾另有 #[cfg(test)]、#[allow(dead_code)]、mod tests 的测试模块，里面点名的 SAMPLE_TEST_ONLY_THREADS 不算。
+ #   heavy-thread-defaults-capped-elsewhere-red：scripts/experiment-apparatus/mentions_capped.py 读 SAMPLE_OWN_JOBS 没设就 KeyError，同文件另一条语句里有字符串 "scripts/hosts/capped.sh"；
+ #   scripts/hosts/mentions_capped.sh 读 SAMPLE_SHELL_WORKERS（${…:?}），下一行 bash scripts/hosts/capped.sh default；两份都必须点名（共 2 处）。
++#   heavy-thread-defaults-moved-green：setup.sh 提交 scripts/old-rig/report_cores.sh（$(nproc) 只打核数）与登记它的排除表，再 git mv 到 scripts/new-rig、表里那一行改成新路径，
++#   .claude/gate.d/path-moves.tsv 登记 scripts/old-rig → scripts/new-rig：基准那一版的表经 lib-lag-baseline.py show 照登记换成新前缀，判绿并写「那一版比没涨」；
++#   heavy-thread-defaults-moved-red：同一个搬迁，不放搬迁登记表，表里换了路径的那一行是基准里没有的，判红点名「排除表涨了」。
+ # 弄坏开关（CODE_TOOLING_BREAK）：thread-default-strings-scanned（python 与 rust 的字面量与文档串照代码扫）：heavy-thread-defaults-green 判红；
+ #   thread-default-half-unchecked（不认核数的一半）：heavy-thread-defaults-red 里 scripts/gate/half.py 第 4 行那条 want 找不到；
+ #   thread-default-exempt-unchecked（排除表不核文件在不在、锚串命不命中）：heavy-thread-defaults-red 里「指向不存在的文件」「锚串一处都不命中」两条 want 找不到；
+-#   thread-default-exempt-growth-unchecked（不比基准）：heavy-thread-defaults-red 里「排除表涨了」那条 want 找不到；
++#   thread-default-exempt-growth-unchecked（不比基准）：heavy-thread-defaults-red 里「排除表涨了」那条 want 找不到；heavy-thread-defaults-moved-red 期望退出 1、实测 0；
++#     heavy-thread-defaults-moved-green 里「那一版比没涨」那条 want 找不到；
+ #   thread-default-timeout-unchecked（超时回退值也按线程数判）：heavy-thread-defaults-green 判红（uses-registry.py 的超时那一行被点名）；
+ #   thread-default-own-variable-unchecked（不判装置读自己的线程变量）：heavy-thread-defaults-red 里「13 处」那一条与五条「读自己的线程变量」want 找不到；
+ #   thread-default-capped-list-ignored（capped.sh 的清单读了不认，每个线程变量都算清单外）：heavy-thread-defaults-green 判红（crates/demo/src/device.rs 里 E161_THREADS 被点名）；
+@@ -3320,11 +3361,20 @@
+ #   long-run-header-exempt-repin-red 的表一行：setup.sh 建 git 仓提交改正文之前的 live.sh（slots=7）与登记它的 sha256 的表，工作区改了 live.sh 的正文（slots=8）、把表里的 sha256 换成新文件的（重钉，路径与行数不变），
+ #   sha256 都对得上，判红点名「登记的 sha256 … 与基准那一版里的 … 不同（豁免表重钉了…）」；
+ #   long-run-header-exempt-base-green 的表一行：setup.sh 把表与脚本原样提交为基准，工作区没动（路径与 sha256 都没变），判绿并写「与基准那一版比没涨」。
++#   long-run-header-exempt-moved-green 的表一行：setup.sh 把 scripts/old-rig/live.sh（正文里写着 scripts/old-rig）与登记它的表提交成基准，再 git mv 到 scripts/new-rig，
++#   正文里的路径一起换成 scripts/new-rig、表里改成新路径与新文件的 sha256，.claude/gate.d/path-moves.tsv 登记 scripts/old-rig → scripts/new-rig：
++#   基准那一版的表照登记换成新前缀（路径没涨），基准那一版的脚本照登记换算之后与此刻逐字节相同（不算重钉），判绿并写「其中 1 行照 … 登记的搬迁换算之后与基准那一版逐字节相同」；
++#   long-run-header-exempt-moved-red：同一个搬迁，不放搬迁登记表，判红点名「豁免表涨了」；
++#   long-run-header-exempt-moved-edited-red：登记了同一个搬迁，脚本除了路径还把 slots=8 改成了 slots=9，判红点名重钉，后面接「仍不逐字节相同（除了登记的路径还改了别处，不算搬迁）」。
+ # 弄坏开关（CODE_TOOLING_BREAK，折成 LIB_LONG_RUN_BREAK 去掉 long-run- 前缀的同名项）：
+ #   long-run-exempt-path-unchecked（不核路径在不在）：long-run-header-exempt-red 里「指向不存在的路径」与「有 5 处不对（共 6 行）」两条 want 找不到；
+ #   long-run-exempt-needless-unchecked（不核脚本是不是已按登记值写齐、按现算读是不是齐）：long-run-header-exempt-red 里「已经按登记值读法写齐了」「按现算读法也不齐」与「有 5 处不对（共 6 行）」三条 want 找不到；
+ #   long-run-exempt-growth-unchecked（不比基准）：long-run-header-exempt-red 里「豁免表涨了」与「有 5 处不对（共 6 行）」两条 want 找不到；long-run-header-exempt-repin-red 期望退出 1、实测 0；
+-#   long-run-exempt-repin-unchecked（比基准时只比路径、不比 sha256）：long-run-header-exempt-repin-red 期望退出 1、实测 0（别的样本不变）；
++#     long-run-header-exempt-moved-red、long-run-header-exempt-moved-edited-red 期望退出 1、实测 0；long-run-header-exempt-moved-green 里那条 want 找不到（成功句没有「其中 1 行照 …」）；
++#   long-run-exempt-repin-unchecked（比基准时只比路径、不比 sha256）：long-run-header-exempt-repin-red、long-run-header-exempt-moved-edited-red 期望退出 1、实测 0；
++#     long-run-header-exempt-moved-green 里那条 want 找不到（不比 sha256 就不去核搬迁，成功句没有「其中 1 行照 …」）；
++#   long-run-exempt-path-moves-ignored（比 sha256 时不认登记的搬迁）：long-run-header-exempt-moved-green 期望退出 0、实测 1（重钉）；
++#     long-run-header-exempt-moved-edited-red 里「仍不逐字节相同」那条 want 找不到；
+ #   long-run-exempt-sha256-unchecked（不比登记的 sha256）：long-run-header-exempt-sha256-red 里「现在的 sha256 是 …，表里登记的是 …」与「有 2 处不对（共 3 行）」两条 want 找不到。
+ cell_long_run_header_exempt() {
+ library="$STAGE_REPOSITORY/.claude/hooks/lib_long_run.py"
+@@ -3347,6 +3397,7 @@
+   long-run-exempt-growth-unchecked) library_break="exempt-growth-unchecked" ;;
+   long-run-exempt-repin-unchecked) library_break="exempt-repin-unchecked" ;;
+   long-run-exempt-sha256-unchecked) library_break="exempt-sha256-unchecked" ;;
++  long-run-exempt-path-moves-ignored) library_break="exempt-path-moves-ignored" ;;
+   *) library_break="" ;;
+ esac
+ # 判法的出口：0 好，1 有问题，77 没有这张表；✓ 打 stdout、✗ 与出路打 stderr，这里并成一路给阶段汇总看

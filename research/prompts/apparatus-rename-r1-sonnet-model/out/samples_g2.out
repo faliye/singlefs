@@ -1,0 +1,62 @@
+name=b1-forward case=plain text=bash scripts/experiments/a.sh result=bash scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=plain text=bash scripts/experiment-apparatus/a.sh result=bash scripts/experiments/a.sh reverted=True
+name=b1-forward case=dot-slash text=bash ./scripts/experiments/a.sh result=bash ./scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=dot-slash text=bash ./scripts/experiment-apparatus/a.sh result=bash ./scripts/experiments/a.sh reverted=True
+name=b1-forward case=root-var text=bash $ROOT/scripts/experiments/a.sh result=bash $ROOT/scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=root-var text=bash $ROOT/scripts/experiment-apparatus/a.sh result=bash $ROOT/scripts/experiments/a.sh reverted=True
+name=b1-forward case=absolute text=bash /home/u/code/singlefs/scripts/experiments/a.sh result=bash /home/u/code/singlefs/scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=absolute text=bash /home/u/code/singlefs/scripts/experiment-apparatus/a.sh result=bash /home/u/code/singlefs/scripts/experiments/a.sh reverted=True
+name=b1-forward case=nested-other-dir text=bash tests/fixtures/scripts/experiments/a.sh result=bash tests/fixtures/scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=nested-other-dir text=bash tests/fixtures/scripts/experiment-apparatus/a.sh result=bash tests/fixtures/scripts/experiments/a.sh reverted=True
+name=b1-forward case=sibling-name text=scripts/experiments2/a.sh result=scripts/experiments2/a.sh replaced=False
+name=b1-backward-of-mirrored case=sibling-name text=scripts/experiment-apparatus2/a.sh result=scripts/experiment-apparatus2/a.sh reverted=False
+name=b1-forward case=dash-suffix text=scripts/experiments-old/a.sh result=scripts/experiments-old/a.sh replaced=False
+name=b1-backward-of-mirrored case=dash-suffix text=scripts/experiment-apparatus-old/a.sh result=scripts/experiment-apparatus-old/a.sh reverted=False
+name=b1-forward case=dot-md text=scripts/experiments.md result=scripts/experiments.md replaced=False
+name=b1-backward-of-mirrored case=dot-md text=scripts/experiment-apparatus.md result=scripts/experiment-apparatus.md reverted=False
+name=b1-forward case=sentence-end text=见 scripts/experiments。 result=见 scripts/experiment-apparatus。 replaced=True
+name=b1-backward-of-mirrored case=sentence-end text=见 scripts/experiment-apparatus。 result=见 scripts/experiments。 reverted=True
+name=b1-forward case=trailing-dot-space text=放在 scripts/experiments. 下 result=放在 scripts/experiment-apparatus. 下 replaced=True
+name=b1-backward-of-mirrored case=trailing-dot-space text=放在 scripts/experiment-apparatus. 下 result=放在 scripts/experiments. 下 reverted=True
+name=b1-forward case=quote text='scripts/experiments' result='scripts/experiment-apparatus' replaced=True
+name=b1-backward-of-mirrored case=quote text='scripts/experiment-apparatus' result='scripts/experiments' reverted=True
+name=b1-forward case=diff-minus text=-scripts/experiments/a.sh result=-scripts/experiments/a.sh replaced=False
+name=b1-backward-of-mirrored case=diff-minus text=-scripts/experiment-apparatus/a.sh result=-scripts/experiment-apparatus/a.sh reverted=False
+name=b1-forward case=diff-plus text=+scripts/experiments/a.sh result=+scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=diff-plus text=+scripts/experiment-apparatus/a.sh result=+scripts/experiments/a.sh reverted=True
+name=b1-forward case=default-expansion text=${X:-scripts/experiments} result=${X:-scripts/experiments} replaced=False
+name=b1-backward-of-mirrored case=default-expansion text=${X:-scripts/experiment-apparatus} result=${X:-scripts/experiment-apparatus} reverted=False
+name=b1-forward case=after-newline-escape text=echo \nscripts/experiments/a result=echo \nscripts/experiments/a replaced=False
+name=b1-backward-of-mirrored case=after-newline-escape text=echo \nscripts/experiment-apparatus/a result=echo \nscripts/experiment-apparatus/a reverted=False
+name=b1-forward case=after-tab-escape text=echo \tscripts/experiments/a result=echo \tscripts/experiments/a replaced=False
+name=b1-backward-of-mirrored case=after-tab-escape text=echo \tscripts/experiment-apparatus/a result=echo \tscripts/experiment-apparatus/a reverted=False
+name=b1-forward case=split-literal text="scripts", "experiments" result="scripts", "experiments" replaced=False
+name=b1-backward-of-mirrored case=split-literal text="scripts", "experiments" result="scripts", "experiments" reverted=False
+name=b1-forward case=commit-ref text=git show 31e47115:scripts/experiments/a.sh result=git show 31e47115:scripts/experiments/a.sh replaced=False
+name=b1-backward-of-mirrored case=commit-ref text=git show 31e47115:scripts/experiment-apparatus/a.sh result=git show 31e47115:scripts/experiment-apparatus/a.sh reverted=False
+name=b1-forward case=commit-ref-dot-slash text=git show 31e47115:./scripts/experiments/a.sh result=git show 31e47115:./scripts/experiments/a.sh replaced=False
+name=b1-backward-of-mirrored case=commit-ref-dot-slash text=git show 31e47115:./scripts/experiment-apparatus/a.sh result=git show 31e47115:./scripts/experiment-apparatus/a.sh reverted=False
+name=b1-forward case=short-hex-is-not-ref text=git show 31e471:scripts/experiments/a.sh result=git show 31e471:scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=short-hex-is-not-ref text=git show 31e471:scripts/experiment-apparatus/a.sh result=git show 31e471:scripts/experiments/a.sh reverted=True
+name=b1-forward case=hex-word-defaced text=defaced:scripts/experiments/a.sh result=defaced:scripts/experiments/a.sh replaced=False
+name=b1-backward-of-mirrored case=hex-word-defaced text=defaced:scripts/experiment-apparatus/a.sh result=defaced:scripts/experiment-apparatus/a.sh reverted=False
+name=b1-forward case=hex-41-before-colon text=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:scripts/experiments/a.sh result=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=hex-41-before-colon text=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:scripts/experiment-apparatus result=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:scripts/experiments/a.sh reverted=True
+name=b1-forward case=sha256-before-colon text=2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881:scrip result=2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881:scripts/experiment-appara replaced=True
+name=b1-backward-of-mirrored case=sha256-before-colon text=2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881:scrip result=2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881:scripts/experiments/a.sh reverted=True
+name=b1-forward case=hex-glued-letter text=g31e47115:scripts/experiments/a.sh result=g31e47115:scripts/experiment-apparatus/a.sh replaced=True
+name=b1-backward-of-mirrored case=hex-glued-letter text=g31e47115:scripts/experiment-apparatus/a.sh result=g31e47115:scripts/experiments/a.sh reverted=True
+name=b1-forward case=two-on-one-line text=cp scripts/experiments/a scripts/experiments/b result=cp scripts/experiment-apparatus/a scripts/experiment-apparatus/b replaced=True
+name=b1-backward-of-mirrored case=two-on-one-line text=cp scripts/experiment-apparatus/a scripts/experiment-apparatus/b result=cp scripts/experiments/a scripts/experiments/b reverted=True
+name=b1-forward case=old-and-new-both text=mv scripts/experiments scripts/experiment-apparatus result=mv scripts/experiment-apparatus scripts/experiment-apparatus replaced=True
+name=b1-backward-of-mirrored case=old-and-new-both text=mv scripts/experiment-apparatus scripts/experiment-apparatus result=mv scripts/experiments scripts/experiments reverted=True
+name=b2-backward-not-injective pinned=aaad639a1e4aefa7 fully_moved_back=aaad639a1e4aefa7 mixed_back=aaad639a1e4aefa7 fully_moved_differs_from_mixed=True
+name=b3-nested-prefix kept_as_changed=['fixtures/g/scripts/experiment-apparatus/replay.sh'] meaning=docs/a.md 是文本一级换算后相同被剔；夹具目录里被改名的 replay.sh 路径一级认不出被留下
+name=b4-chain-moves moves=[('scripts/b', 'scripts/c'), ('scripts/a', 'scripts/b')] problems=[]
+name=b4-paths-before-moves path=scripts/b/x.sh candidates=['scripts/b/x.sh', 'scripts/a/x.sh'] path_c=scripts/c/y.sh candidates_c=['scripts/c/y.sh', 'scripts/b/y.sh']
+name=b4-rewrite-order text=scripts/a/x scripts/b/y result=scripts/b/x scripts/c/y
+name=b5-broken-registry baseline_text_problem=PathMovesProblem filter_exit=0 filter_kept=['a.txt'] filter_stderr=! 搬迁登记表 .claude/gate.d/path-moves.tsv 写得不对，基准 HEAD 里的 （改动范围） 没照登记的搬迁换算：第 1 行有 3 列，要 4 列（<旧前缀><TAB><新前缀><TAB><YYYY-MM-DD> shell_sees_content_row=True
+name=b6-pinned-sha256-now-accepts occurrences_of_old_prefix=2 fully-moved=True half-moved=True not-moved=True
+name=b6-exempt-check variant=fully-moved exit=0 stderr_tail=
+name=b6-exempt-check variant=half-moved exit=1 stderr_tail=（豁免表重钉了：改了脚本正文再换表里的 sha256 也算涨）；基准里的 scripts/old-rig/live.sh 照 .claude/gate.d/path-moves.tsv 把旧前缀换成新前缀之后，与此刻的 scripts/new-rig/live.sh 仍不逐字节相同（除了登记的路径还改了别处，不算搬迁）
+name=b7-retained-old-line baseline_after_rewrite=- 记改名：scripts/experiment-apparatus 改名为 scripts/experiment-apparatus⏎ current_unchanged=- 记改名：scripts/experiments 改名为 scripts/experiment-apparatus⏎ equal=False problem=None

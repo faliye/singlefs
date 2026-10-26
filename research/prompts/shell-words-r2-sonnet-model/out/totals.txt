@@ -1,0 +1,33 @@
+brace_diff2 tree-orig seed1 Counter({'别的': 547, '只差空串': 16}) 共 3000 条（去重、bash 能跑的）
+seq_diff tree-orig 共 1500 条，不同： {'shell_words': 1158, 'heavy_tests': 10}
+brace_diff2 tree seed1 Counter() 共 3000 条（去重、bash 能跑的）
+seq_diff tree 共 1500 条，不同： {'shell_words': 10, 'heavy_tests': 10}
+brace_diff2 tree seed2 Counter() 共 3000 条（去重、bash 能跑的）
+key 合计 {'对->对': 7, '漏拒->对': 10, '误拒->对': 4} 语法错 0 共 21
+cpforms 合计 {'对->对': 49, '误拒->误拒': 1} 语法错 0 共 50
+brace 合计 {'对->对': 181, '对->误拒': 2, '漏拒->对': 33, '误拒->对': 1, '误拒->误拒': 10} 语法错 0 共 227
+heredoc 合计 {'对->对': 270, '对->误拒': 5, '漏拒->对': 148, '漏拒->漏拒': 5} 语法错 7 共 435
+redirect 合计 {'对->对': 196, '对->漏拒': 15, '对->误拒': 7, '漏拒->对': 34, '漏拒->漏拒': 73, '误拒->对': 79, '误拒->误拒': 16} 语法错 0 共 420
+ln 合计 {'对->对': 276, '对->误拒': 13, '漏拒->对': 80, '漏拒->漏拒': 21, '误拒->对': 56, '误拒->误拒': 84} 语法错 0 共 530
+env 合计 {'对->对': 155, '对->误拒': 9, '漏拒->对': 316, '漏拒->漏拒': 2, '误拒->误拒': 12} 语法错 0 共 494
+shell 合计 {'对->对': 390, '对->误拒': 188, '漏拒->对': 266, '漏拒->漏拒': 11, '误拒->对': 17, '误拒->误拒': 74} 语法错 0 共 946
+builtin 合计 {'对->对': 361, '漏拒->漏拒': 2, '误拒->对': 76, '误拒->误拒': 12} 语法错 0 共 451
+function 合计 {'对->对': 965, '对->误拒': 174, '漏拒->对': 296, '误拒->对': 196, '误拒->误拒': 729} 语法错 18 共 2378
+fncall 合计 {'对->对': 358, '对->漏拒': 110, '误拒->误拒': 120} 语法错 0 共 588
+empties 合计 {'对->对': 256, '误拒->误拒': 4} 语法错 0 共 260
+hwrite 合计 {'对->对': 12, '漏拒->漏拒': 2, '误拒->误拒': 8} 语法错 0 共 22
+ansic 合计 {'对->对': 12, '漏拒->对': 4, '漏拒->漏拒': 19} 语法错 0 共 35
+r1-575 合计 {'对->对': 440, '对->误拒': 3, '漏拒->对': 41, '漏拒->漏拒': 21, '误拒->对': 6, '误拒->误拒': 61} 语法错 3 共 575
+fuzz2 合计 {'对->对': 1912, '对->漏拒': 3, '对->误拒': 26, '漏拒->对': 315, '漏拒->漏拒': 189, '误拒->对': 144, '误拒->误拒': 111} 语法错 300 共 3000
+head1 合计 {'对->对': 2187, '对->漏拒': 1, '漏拒->对': 654, '漏拒->漏拒': 124, '误拒->误拒': 30} 语法错 4 共 3000
+r1_575_pre_vs_fixed matrix_rows 575
+r1_575_pre_vs_fixed     166 0->0
+r1_575_pre_vs_fixed     168 0->2
+r1_575_pre_vs_fixed      12 2->0
+r1_575_pre_vs_fixed     229 2->2
+r1-2to0 合计 {'对->对': 12} 语法错 0 共 12
+small_checks name=builtin_table table=61 compgen_b=61 only_in_table=[] only_in_bash=[]
+small_checks name=redirect_operator_copy_copy TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+small_checks name=redirect_operator_copy_deepcopy TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+small_checks name=redirect_operator_pickle TypeError: RedirectOperator.__new__() missing 1 required positional argument: 'fd'
+small_checks name=versions GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu) | env (GNU coreutils) 9.4

@@ -1,9 +1,0 @@
-name=lag step=start slots: d0=[g8/inst1,g9/inst1] d1=[g8/inst1,g9/inst1] pick=g9/inst1 recover=FileRead(i1t6) read_only=Ok(i1t6) raw_red=[] old_last_root=(1, 6)
-name=lag step=mount1 writable_mount=Ok(i1t6)
-name=lag step=after_crash1 slots: d0=[g12/inst2,g13/inst2] d1=[g8/inst1,g9/inst1] pick=g13/inst2 recover=FileRead(i2t8) read_only=Ok(i2t8) raw_red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-7.7"] old_last_root=(1, 6)
-name=lag step=mount2 writable_mount=Err:WritableMountRefusedByDevicesWithoutTheSelectedVersion
-name=lag step=after_crash2 slots: d0=[g12/inst2,g13/inst2] d1=[g8/inst1,g9/inst1] pick=g13/inst2 recover=FileRead(i2t8) read_only=Ok(i2t8) raw_red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-7.7"] old_last_root=(1, 6)
-name=lag step=mount3 writable_mount=Err:WritableMountRefusedByDevicesWithoutTheSelectedVersion
-name=lag step=after_crash3 slots: d0=[g12/inst2,g13/inst2] d1=[g8/inst1,g9/inst1] pick=g13/inst2 recover=FileRead(i2t8) read_only=Ok(i2t8) raw_red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-7.7"] old_last_root=(1, 6)
-name=lag step=mount4 writable_mount=Err:WritableMountRefusedByDevicesWithoutTheSelectedVersion
-name=lag step=after_crash4 slots: d0=[g12/inst2,g13/inst2] d1=[g8/inst1,g9/inst1] pick=g13/inst2 recover=FileRead(i2t8) read_only=Ok(i2t8) raw_red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-7.7"] old_last_root=(1, 6)

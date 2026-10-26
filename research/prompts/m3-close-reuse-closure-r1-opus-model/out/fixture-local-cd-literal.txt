@@ -1,0 +1,3 @@
+kept-comments	<kept-comments>	scripts/hosts/local-cd-literal.sh:1-3	e2b37d0fbeebd5358ba88a5ef5469cfab940c91f397b72b95107b9b6515a9ece
+script-body	<script-body>	scripts/hosts/local-cd-literal.sh:1-3	28bdc875f42127f402a0935e854a2665d24234d7579249704bd4fde47395d74a
+refused	shell-path-unfolded	scripts/hosts/local-cd-literal.sh:2	(cd "$PEER_REPOSITORY_DIRECTORY" && bash -c 'python3 scripts/hosts/probe.py 0.2')

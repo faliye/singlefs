@@ -1,0 +1,4 @@
+hook_feed cells old=19 new=19
+hook_feed h04: exit 0 -> 2（want=0）
+hook_feed exit_changed_cells=1
+feed lines old=49 new=49 identical=True

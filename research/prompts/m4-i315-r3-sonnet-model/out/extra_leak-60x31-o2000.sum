@@ -1,0 +1,33 @@
+points 24
+TALLY today     name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS today    name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY exempt    name={'-': 3, 'L': 24, 'N': 5} j2n={'-': 3, 'L': 24, 'N': 5} j2s={'-': 3, 'L': 24, 'N': 5} j2t={'-': 3, 'L': 23, 'N': 6}
+POINTS exempt   name={'-': 3, 'L': 16, 'LN': 5} j2n={'-': 3, 'L': 16, 'LN': 5} j2s={'-': 3, 'L': 16, 'LN': 5} j2t={'-': 3, 'L': 15, 'LN': 5, 'N': 1}
+TALLY gen       name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS gen      name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY genplus   name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS genplus  name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY cmp       name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS cmp      name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY both      name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS both     name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY bothplus  name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS bothplus name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY jrn       name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS jrn      name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+TALLY jrngen    name={'-': 3, 'L': 23, 'N': 15} j2n={'-': 3, 'L': 23, 'N': 15} j2s={'-': 3, 'L': 23, 'N': 15} j2t={'-': 3, 'L': 23, 'N': 15}
+POINTS jrngen   name={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2n={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2s={'-': 3, 'L': 7, 'LN': 13, 'N': 1} j2t={'-': 3, 'L': 7, 'LN': 13, 'N': 1}
+DIFF 7115 1 dev1:slot50758:len32768 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7119 0 dev0:slot50266:len32768 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7120 1 dev1:slot50635:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7121 1 dev0:slot50556:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7122 0 dev0:slot50744:len32768 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7123 0 dev0:slot50325:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7125 1 dev0:slot50680:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7130 0 dev0:slot50277:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7134 0 dev0:slot50562:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7136 0 dev1:slot50264:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7137 1 dev0:slot50606:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7138 1 dev1:slot50482:len16384 reused=false today:LN/LN/LN/LN exempt:L/L/L/L gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7139 0 dev0:slot50434:len16384 reused=true today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7141 0 dev0:slot50257:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN

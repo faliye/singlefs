@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units' (1876803) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:399:5:
+assertion `left == right` failed: txg 6：整理读这一版解了 0 片映射叶，进映射的 10 把 key 走到 1 片（每片解一次、每把 key 都经批量读者查）
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... FAILED
+
+failures:
+
+failures:
+    every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.07s
+

@@ -1,0 +1,28 @@
+
+running 1 test
+test relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice ... FAILED
+
+failures:
+
+---- relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice stdout ----
+publish_lookup_by_identity relocation_batch items=2 kept_items=1 routed_leaves=1 relocation_sources=LookupWork { index_builds: 3, index_lookups: 5, index_entries_examined: 21, largest_index_looked_up: 56, mapping_leaf_decodes: 1, times_entered: 1 }
+publish_lookup_by_identity relocation_batch items=8 kept_items=4 routed_leaves=1 relocation_sources=LookupWork { index_builds: 3, index_lookups: 17, index_entries_examined: 81, largest_index_looked_up: 56, mapping_leaf_decodes: 1, times_entered: 1 }
+publish_lookup_by_identity relocation_batch items=3 kept_items=0 routed_leaves=1 relocation_sources=LookupWork { index_builds: 3, index_lookups: 7, index_entries_examined: 35, largest_index_looked_up: 56, mapping_leaf_decodes: 1, times_entered: 1 }
+
+thread 'relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice' (121007) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:2045:5:
+assertion `left == right` failed: 搬 3 项（其中留存的 0 项）的一批：建 2 份索引、进映射那几项的 key 走到的 1 片叶各解一次、查项数两倍加解叶次数那么多次（建索引次数、解叶次数、查的次数）：LookupWork { index_builds: 3, index_lookups: 7, index_entries_examined: 35, largest_index_looked_up: 56, mapping_leaf_decodes: 1, times_entered: 1 }
+  left: (3, 1, 7)
+ right: (2, 1, 7)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.34s
+
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.09s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

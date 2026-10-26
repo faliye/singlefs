@@ -1,0 +1,35 @@
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::select_items
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::verdict_state
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::Judgement.state
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::Judgement.row_holds
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::Judgement.selection
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::process_item
+rc=4 wrapper_units=88 host_resources_units=75 refused=[      1 inline-script-not-literal;] scripts/mutation/broad-mutation.py::Runner.escalate_step
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::escalation_evidence_problems
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::carry_decision
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::mutation_key
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::UnitTree.closure_key
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::catching_test_key
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::coverers_key
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::global_lines
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/mutation-prune.py::build_environment_lines
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::gpu_pass_command
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::gpu_classify_build
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::gpu_classify_test
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::gpu_combined_state
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::GpuJudging.need
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::GpuJudging.row_holds
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/broad-mutation.py::GpuJudging.test_key_of
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/crates-mutation-rows.py::verdict_of_run
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/crates-mutation-rows.py::baseline_problem
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/experiment-apparatus/replay.sh::strip_admission_header
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/experiment-apparatus/replay.sh::timing_load_decide
+rc=0 wrapper_units=0 host_resources_units=0 refused=[] scripts/experiment-apparatus/e165-pin-red-examples.py::replay
+rc=4 wrapper_units=88 host_resources_units=75 refused=[      1 inline-script-not-literal;] scripts/gate/verus-proof-check.py::check_proof
+rc=4 wrapper_units=88 host_resources_units=75 refused=[      1 inline-script-not-literal;] scripts/gate/verus-proof-check.py::check_vacuity
+rc=4 wrapper_units=88 host_resources_units=75 refused=[      1 inline-script-not-literal;] scripts/gate/verus-proof-check.py::check_must_red_worlds

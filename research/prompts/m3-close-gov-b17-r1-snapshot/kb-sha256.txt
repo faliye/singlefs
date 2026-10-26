@@ -1,0 +1,3 @@
+2b1df9a742df584026f81bfeb9a9da5006ee8332451d705c8dcbc4449598684a  .claude/kb/decisions/13-verification-route.en.md
+4314b11f4255ea630b836dd8c87089ae5a46472109cc31bd8d2e501aabc7bcb7  .claude/kb/decisions/13-検証ルート.ja.md
+41a3c08630cdbe78344495b475c84d47c26526fe49a03a125b0dba4c6eed2235  .claude/kb/decisions/13-验证路线.md

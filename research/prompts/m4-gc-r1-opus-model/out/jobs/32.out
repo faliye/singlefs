@@ -1,5 +1,0 @@
-E name=naive nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=81231 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=10781 frozen=0 unmet_del=0 false_enospc=3452 release_bad=0 rb_refused=0 del_pred_true=2057 del_pred_false=4141 n0_refused=0 gc_done=48078 gc_declined=848 gc_stuck=0 gc_paused=21524 gc_cycle=10781 gc_cap=0 gc_wasted=0
-W name=naive flag=livelock path=(mkfs)
-W name=naive flag=false_enospc path=W0.O0.GI.O0
-W name=naive flag=del_pred_true path=W0.GI.GB
-W name=naive flag=del_pred_false path=GI.GB

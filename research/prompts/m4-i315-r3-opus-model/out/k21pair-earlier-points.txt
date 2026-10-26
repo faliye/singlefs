@@ -1,0 +1,7 @@
+POINT seed=7463871032432356395 point=0 fault=write_is_swallowed swallowed=["dev0:slot50317:len16384:reused=true", "dev1:slot50317:len16384:reused=true"] flagged=[(0, 50317, 1, "ChecksumMismatch"), (1, 50317, 1, "ChecksumMismatch")] leaks=[] external={(50317, 1)}
+HITS seed=7463871032432356395 point=0 after=4/4 genEq_otherDiff=0 genNe_otherSame=2 genEq_otherSame=0
+LOCS seed=7463871032432356395 point=0 loc_self_pass=1 equal_birth=0
+HIT seed=7463871032432356395 point=0 I315|dev=0|slot=50317|span=1|self=true|birth=Some(5)|gen=Some(37)|other_same=true
+HIT seed=7463871032432356395 point=0 I315|dev=1|slot=50317|span=1|self=true|birth=Some(5)|gen=Some(37)|other_same=true
+HIT seed=7463871032432356395 point=0 Q31|dev=0|slot=50317|span=1|self=true|birth=Some(5)|gen=Some(37)|other_same=true
+HIT seed=7463871032432356395 point=0 Q31|dev=1|slot=50317|span=1|self=true|birth=Some(5)|gen=Some(37)|other_same=true

@@ -1,0 +1,57 @@
+    Checking singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-exit5-relocation-proof-r2-sonnet/tree-m3/crates/singlefs-core)
+warning: unused doc comment
+  --> crates/singlefs-core/src/allocator.rs:44:1
+   |
+44 | /// 一条分配记录跨度段次高位的读法（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」）。
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+   = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused doc comment
+  --> crates/singlefs-core/src/allocator.rs:64:1
+   |
+64 | / /// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志与隔离记号, 分配代或释放...
+65 | | /// 释放时条目不删、不点删：改写成已释放 + 释放代，留到该落点被重新分配时覆盖（覆盖是步 5 回收接上时的事：
+66 | | /// 回收过的落点被再分配时那条记录改写、不追加，槽号在每盘仍唯一；新落点罩住的别的已回收记录随这次分配删掉，同一块盘上的记录
+67 | | /// 罩住的槽互不相交（I-5.4（分配记录罩住的槽互不相交））；回收要 F_生效 抬到释放代之上，见 `reclaim_released_up_to`）。
+   | |_-----------------------------------------------------------------------------------------------------------------------^
+   |   |
+   |   rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+  --> crates/singlefs-core/src/logged_operations.rs:69:1
+   |
+69 | / /// 整理意图的区域 R：一块盘上一个 64 槽对齐的聚簇段（判决 G1：起始槽 64 对齐、槽数 = 64；第一版两盘同槽时 R 罩住每块盘上的同号槽，
+70 | | /// 攻方 K-n）。只从 [`CompactionRegion::of_one_cluster_segment`] 进来，所以槽数不存：恒是 [`CLUSTER_SEGMENT_SLOTS`]。
+   | |_---------------------------------------------------------------------------------------------------------------------^
+   |   |
+   |   rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+error: cannot use type `singlefs_core::address::CheckpointTxg` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.
+  --> crates/singlefs-core/src/allocator.rs:76:5
+   |
+69 |   #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+   |            ----- in this derive macro expansion
+70 | / pub struct AllocationRecord {
+71 | |     pub device: DeviceIdentity,
+72 | |     pub slot: SlotNumber,
+73 | |     /// 纯跨度，不含已释放标志与隔离记号。
+...  |
+76 | |     pub generation: CheckpointTxg,
+   | |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...  |
+79 | |     pub quarantine_mark: AllocationRecordQuarantineMark,
+80 | | }
+   | |_-
+   |
+   = help: The following declaration may resolve this error:
+           #[verifier::external_type_specification]
+           pub struct ExCheckpointTxg(crate::address::CheckpointTxg);
+
+warning: `singlefs-core` (lib) generated 3 warnings
+error: could not compile `singlefs-core` (lib) due to 1 previous error; 3 warnings emitted

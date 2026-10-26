@@ -1,0 +1,30 @@
+第三段 gpu-submission 的输入清单（第一、二段的在 research/results/e185-r1-inputs-2026-10-22.txt；第三段在本机主工作区跑，树与第一、二段那棵不同：之后又打进了别的会话的标签 0 补丁与隔离记号补丁，七·6 第 11 批没打）
+eadb929d6d8be037530f2ce94ee4a564202939f9c2d25e275023aa7ce091ae76  crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+25fb4392864c286f7c50e7ea28c52e06856d577d8c8bd1e4045f2381e37d36f9  crates/singlefs-core/src/transaction.rs
+d31503616b7c6fec47b189b4c424ebc039621078510af299c3d4cf121fa177c8  crates/singlefs-core/src/mounted_session.rs
+d0f9316a4dcdc1c254e7fb8fabfd78c5b01822f92f5ee97f8f05ebe273ed8f3e  crates/singlefs-core/src/region_scan.rs
+826d7d3de270993b81a726fbe6cd2e3d26b3b091c7fcba1511579b9f15c7c4c1  crates/singlefs-core/src/compaction_plan.rs
+66e7551ae17cc2b17f20c73fa0ca9f2093f67d6dd1a78fd6b0cfe60012f37c0a  crates/singlefs-core/src/unit.rs
+6f6e6dc5374d98aa45c7e3d904c1e429320b6d1635fe44fd26f4e7adbff24c2d  crates/singlefs-core/src/checksum.rs
+cd89c987ebf85f73b5583408cfac683b9d9d32a6ec3015d57b2805eb1dfdf43a  crates/singlefs-core/src/block_device.rs
+93cf2ffd8ed31fec57c6a3049050db7c8714a9a10b888223d727a4a584fd4b83  crates/singlefs-checker-tier/src/gpu_unit_checks.rs
+d35631c788137d7b5adc4463e636de2a9724d02e190599333462c02d1a1a5018  Cargo.lock
+HEAD 841b3beabb9812ceaafcd636888b1201dd6e5adf
+git diff --cached --stat -- crates/singlefs-core/src | tail -1： 13 files changed, 1610 insertions(+), 438 deletions(-)
+git diff --stat -- crates/singlefs-core/src | tail -1： 7 files changed, 378 insertions(+), 33 deletions(-)
+singlefs-core v0.1.0 (〔主工作区〕/crates/singlefs-core)
+└── singlefs-core feature "default"
+    ├── singlefs-checker-tier v0.1.0 (〔主工作区〕/crates/singlefs-checker-tier)
+    │   ├── singlefs-checker-tier feature "default" (command-line)
+    │   ├── singlefs-checker-tier feature "gpu" (command-line)
+    │   └── singlefs-checker-tier feature "verdict-store"
+    │       └── singlefs-checker-tier feature "default" (command-line)
+    └── singlefs-harness v0.1.0 (〔主工作区〕/crates/singlefs-harness)
+        └── singlefs-harness feature "default"
+            └── singlefs-checker-tier v0.1.0 (〔主工作区〕/crates/singlefs-checker-tier) (*)
+第一段产物 sha256：978ae7b5fe60ab8f5a87338b982e8989c4c0d0ba8f19994bfc8e1c39b3d437fd  research/results/e185-gc-batch-wall-clock-split-wall-clock-r1-2026-10-22.out
+第二段产物 sha256：4a073e80fdbea6237ab9f39326f676d6b8ff0dd95e2932b0b188997c3ef71743  research/results/e185-gc-batch-wall-clock-split-stage-split-r1-2026-10-22.out
+0, NVIDIA GeForce RTX 5090, 32607 MiB, 595.99.02
+1, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.99.02
+nproc 32
+上限：外层 run-with-memory-cap.sh 46G；E185_MEMORY_CAP=40G；卡 0,1

@@ -13,7 +13,7 @@
   ✗ rot-defs-r2-opus-output.md:90 引 .claude/agents/experiment-runner.md:34「中文简称只用在 kb 页」：那一行不含这句；原文在这份文件第 35 行
   ✗ rot-defs-r2-opus-output.md:109 引 .claude/hooks/lib_heavy_tests.py:2899「return None   # 装置的本体（cargo build 编出）」：那一行不含这句；这份文件里找不到这句
   ✗ rot-defs-r2-opus-output.md:109 引 .claude/hooks/lib_heavy_tests.py:71「攻方原型 `cargo build` 之后经内存包装直接执行编出来的二进制是许可的用法」：那一行不含这句；原文在这份文件第 77 行
-  ✗ rot-defs-r2-opus-output.md:131 引 .claude/agents/experiment-runner.md:31「`cargo run` 与装置二进制（例 `scripts/experiments/target/release/e<号」：那一行不含这句；这份文件里找不到这句
+  ✗ rot-defs-r2-opus-output.md:131 引 .claude/agents/experiment-runner.md:31「`cargo run` 与装置二进制（例 `scripts/experiment-apparatus/target/release/e<号」：那一行不含这句；这份文件里找不到这句
   ✗ rot-defs-r2-opus-output.md:223 引 .claude/main-agent.md:51「写段打过的补丁目录带 `--skip-apply`（只编、只验，脚本先逐份核补丁已打在树上，核不过退 1），没打过的不带」：那一行不含这句；这份文件里找不到这句
   ✗ rot-defs-r2-opus-output.md:270 引 .claude/main-agent.md:91「有实验登记钉死了常量、还没拍树的（今天是 E171（三oracle合谋测试） 修订 8）」：那一行不含这句；这份文件里找不到这句
   ✗ rot-defs-r2-opus-output.md:276 引 .claude/agents/experiment-runner.md:34「中文简称只用在 kb 页」：那一行不含这句；原文在这份文件第 35 行

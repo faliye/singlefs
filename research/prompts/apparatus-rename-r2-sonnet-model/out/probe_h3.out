@@ -1,0 +1,4 @@
+name=c1-从rules搬进records 登记表问题=[] 改动范围剔掉=[] 新增行共3条留下0条 问题=None/None
+name=c2-同一类里改名 登记表问题=[] 改动范围剔掉=['.claude/rules/draft.md', '.claude/rules/renamed.md'] 新增行共3条留下0条 问题=None/None
+name=c3-搬进kb 登记表问题=[] 改动范围剔掉=[] 新增行共3条留下0条 问题=None/None
+name=c0-没登记的对照 新增行共3条留下3条

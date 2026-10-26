@@ -1,5 +1,0 @@
-196b7fff002a50d2e01ec0634c14d896e3f19d0b0ddc24c7cf6d332841f50752  .claude/kb/invariants.md
-5c23d3dcc082005c4a5e9ea538b7bdb68e4da52f9305967a5c5a077a81ead0bb  .claude/kb/milestone/03-third-txn.md
-a1ba83004d8532317a63cc4951d79313347921a7ed13c92931810fcb6136ae7a  .claude/kb/checks-owed.md
-a8ac7fdd61389af0da4c720445c134ac03de32be0562c0875598a7a5f4e4415b  .claude/kb/decisions/08-核心索引结构.md
-da1ceca334bdebd7a8526d545f6a063bdd522982853a1a6d7ba0d1bd509d91a8  .claude/kb/decisions/18-块里携带什么信息.md

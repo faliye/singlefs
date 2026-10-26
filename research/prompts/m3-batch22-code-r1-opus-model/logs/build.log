@@ -1,3 +1,0 @@
-run-with-memory-cap: 上限 6G 超过实测峰值 1898M 的 2 倍，照理由放行：派发提示写死编译 6G、跑 4G
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿模型复跑，在自己的工作目录里各跑各的
-    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s

@@ -1,0 +1,10 @@
+    Blocking waiting for file lock on package cache
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-trigger-r1-sonnet/rr1/refs-copy)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.89s
+     Running tests/cross.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-trigger-r1-sonnet/rr1/refs-target/debug/deps/cross-032e0867f301feff)
+
+running 1 test
+test judge_every_case_with_the_real_reference_filesystem ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+

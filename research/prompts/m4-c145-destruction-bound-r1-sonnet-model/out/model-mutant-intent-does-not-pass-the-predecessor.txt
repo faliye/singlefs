@@ -1,0 +1,6 @@
+mutant=intent-does-not-pass-the-predecessor depth=8 states=6180 flagged_head_next_states=2083 entries_in_such_states=1638 batches_checked=3451
+pending_set_differs=0 release_set_differs=0 judge_reds=471 cross_version_new_entry_reaches_lo=198 (transitions_checked=6256, child_version_single_version_judge_green=170)
+  judge_reds [[["C"], ["I", 0], ["F", 0], ["W", 1]], [["逆向", [2, 1, 1]]]]
+  judge_reds [[["W", 1], ["C"], ["I", 0], ["F", 0], ["W", 2]], [["逆向", [3, 2, 2]]]]
+  delta_reds [[["C"], ["I", 0], ["W", 1]], [2, 1, 1]]
+  delta_reds [[["W", 1], ["C"], ["I", 0], ["W", 2]], [3, 2, 2]]

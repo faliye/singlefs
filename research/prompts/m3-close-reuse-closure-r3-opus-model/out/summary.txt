@@ -1,0 +1,246 @@
+name=closure_runs_refused count=4
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::select_items tree=full units=44 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::select_items tree=cut units=44 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::select_items tree=ml units=349 refusals=none vs_full=+305/-0 digest_same_as_full=no
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::select_items tree=mlh units=371 refusals=none vs_full=+327/-0 digest_same_as_full=no
+name=closure_summary index=1 entry=scripts/mutation/broad-mutation.py::verdict_state tree=full units=33 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=1 entry=scripts/mutation/broad-mutation.py::verdict_state tree=cut units=33 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=1 entry=scripts/mutation/broad-mutation.py::verdict_state tree=ml units=344 refusals=none vs_full=+311/-0 digest_same_as_full=no
+name=closure_summary index=1 entry=scripts/mutation/broad-mutation.py::verdict_state tree=mlh units=367 refusals=none vs_full=+334/-0 digest_same_as_full=no
+name=closure_summary index=2 entry=scripts/mutation/broad-mutation.py::Judgement.state tree=full units=963 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=2 entry=scripts/mutation/broad-mutation.py::Judgement.state tree=cut units=963 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=2 entry=scripts/mutation/broad-mutation.py::Judgement.state tree=ml units=1288 refusals=none vs_full=+325/-0 digest_same_as_full=no
+name=closure_summary index=2 entry=scripts/mutation/broad-mutation.py::Judgement.state tree=mlh units=1311 refusals=none vs_full=+348/-0 digest_same_as_full=no
+name=closure_summary index=3 entry=scripts/mutation/broad-mutation.py::Judgement.row_holds tree=full units=948 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=3 entry=scripts/mutation/broad-mutation.py::Judgement.row_holds tree=cut units=948 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=3 entry=scripts/mutation/broad-mutation.py::Judgement.row_holds tree=ml units=1280 refusals=none vs_full=+332/-0 digest_same_as_full=no
+name=closure_summary index=3 entry=scripts/mutation/broad-mutation.py::Judgement.row_holds tree=mlh units=1304 refusals=none vs_full=+356/-0 digest_same_as_full=no
+name=closure_summary index=4 entry=scripts/mutation/broad-mutation.py::Judgement.selection tree=full units=943 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=4 entry=scripts/mutation/broad-mutation.py::Judgement.selection tree=cut units=943 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=4 entry=scripts/mutation/broad-mutation.py::Judgement.selection tree=ml units=1279 refusals=none vs_full=+336/-0 digest_same_as_full=no
+name=closure_summary index=4 entry=scripts/mutation/broad-mutation.py::Judgement.selection tree=mlh units=1303 refusals=none vs_full=+360/-0 digest_same_as_full=no
+name=closure_summary index=5 entry=scripts/mutation/broad-mutation.py::process_item tree=full units=93 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=5 entry=scripts/mutation/broad-mutation.py::process_item tree=cut units=93 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=5 entry=scripts/mutation/broad-mutation.py::process_item tree=ml units=366 refusals=none vs_full=+273/-0 digest_same_as_full=no
+name=closure_summary index=5 entry=scripts/mutation/broad-mutation.py::process_item tree=mlh units=388 refusals=none vs_full=+295/-0 digest_same_as_full=no
+name=closure_summary index=6 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=full units=790 refusals=inline-script-not-literal:1 vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=6 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=cut units=434 refusals=none vs_full=+0/-356 digest_same_as_full=no
+name=closure_summary index=6 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=ml units=957 refusals=none vs_full=+443/-276 digest_same_as_full=no
+name=closure_summary index=6 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=mlh units=991 refusals=none vs_full=+474/-273 digest_same_as_full=no
+name=closure_summary index=7 entry=scripts/mutation/broad-mutation.py::escalation_evidence_problems tree=full units=21 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=7 entry=scripts/mutation/broad-mutation.py::escalation_evidence_problems tree=cut units=21 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=7 entry=scripts/mutation/broad-mutation.py::escalation_evidence_problems tree=ml units=338 refusals=none vs_full=+317/-0 digest_same_as_full=no
+name=closure_summary index=7 entry=scripts/mutation/broad-mutation.py::escalation_evidence_problems tree=mlh units=362 refusals=none vs_full=+341/-0 digest_same_as_full=no
+name=closure_summary index=8 entry=scripts/mutation/mutation-prune.py::carry_decision tree=full units=9 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=8 entry=scripts/mutation/mutation-prune.py::carry_decision tree=cut units=9 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=8 entry=scripts/mutation/mutation-prune.py::carry_decision tree=ml units=102 refusals=none vs_full=+93/-0 digest_same_as_full=no
+name=closure_summary index=8 entry=scripts/mutation/mutation-prune.py::carry_decision tree=mlh units=110 refusals=none vs_full=+101/-0 digest_same_as_full=no
+name=closure_summary index=9 entry=scripts/mutation/mutation-prune.py::mutation_key tree=full units=14 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=9 entry=scripts/mutation/mutation-prune.py::mutation_key tree=cut units=14 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=9 entry=scripts/mutation/mutation-prune.py::mutation_key tree=ml units=104 refusals=none vs_full=+90/-0 digest_same_as_full=no
+name=closure_summary index=9 entry=scripts/mutation/mutation-prune.py::mutation_key tree=mlh units=112 refusals=none vs_full=+98/-0 digest_same_as_full=no
+name=closure_summary index=10 entry=scripts/mutation/mutation-prune.py::UnitTree.closure_key tree=full units=863 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=10 entry=scripts/mutation/mutation-prune.py::UnitTree.closure_key tree=cut units=863 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=10 entry=scripts/mutation/mutation-prune.py::UnitTree.closure_key tree=ml units=951 refusals=none vs_full=+88/-0 digest_same_as_full=no
+name=closure_summary index=10 entry=scripts/mutation/mutation-prune.py::UnitTree.closure_key tree=mlh units=957 refusals=none vs_full=+94/-0 digest_same_as_full=no
+name=closure_summary index=11 entry=scripts/mutation/mutation-prune.py::catching_test_key tree=full units=15 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=11 entry=scripts/mutation/mutation-prune.py::catching_test_key tree=cut units=15 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=11 entry=scripts/mutation/mutation-prune.py::catching_test_key tree=ml units=106 refusals=none vs_full=+91/-0 digest_same_as_full=no
+name=closure_summary index=11 entry=scripts/mutation/mutation-prune.py::catching_test_key tree=mlh units=114 refusals=none vs_full=+99/-0 digest_same_as_full=no
+name=closure_summary index=12 entry=scripts/mutation/mutation-prune.py::coverers_key tree=full units=12 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=12 entry=scripts/mutation/mutation-prune.py::coverers_key tree=cut units=12 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=12 entry=scripts/mutation/mutation-prune.py::coverers_key tree=ml units=105 refusals=none vs_full=+93/-0 digest_same_as_full=no
+name=closure_summary index=12 entry=scripts/mutation/mutation-prune.py::coverers_key tree=mlh units=113 refusals=none vs_full=+101/-0 digest_same_as_full=no
+name=closure_summary index=13 entry=scripts/mutation/mutation-prune.py::global_lines tree=full units=8 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=13 entry=scripts/mutation/mutation-prune.py::global_lines tree=cut units=8 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=13 entry=scripts/mutation/mutation-prune.py::global_lines tree=ml units=102 refusals=none vs_full=+94/-0 digest_same_as_full=no
+name=closure_summary index=13 entry=scripts/mutation/mutation-prune.py::global_lines tree=mlh units=110 refusals=none vs_full=+102/-0 digest_same_as_full=no
+name=closure_summary index=14 entry=scripts/mutation/mutation-prune.py::build_environment_lines tree=full units=20 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=14 entry=scripts/mutation/mutation-prune.py::build_environment_lines tree=cut units=20 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=14 entry=scripts/mutation/mutation-prune.py::build_environment_lines tree=ml units=106 refusals=none vs_full=+86/-0 digest_same_as_full=no
+name=closure_summary index=14 entry=scripts/mutation/mutation-prune.py::build_environment_lines tree=mlh units=114 refusals=none vs_full=+94/-0 digest_same_as_full=no
+name=closure_summary index=15 entry=scripts/mutation/broad-mutation.py::gpu_pass_command tree=full units=27 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=15 entry=scripts/mutation/broad-mutation.py::gpu_pass_command tree=cut units=27 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=15 entry=scripts/mutation/broad-mutation.py::gpu_pass_command tree=ml units=342 refusals=none vs_full=+315/-0 digest_same_as_full=no
+name=closure_summary index=15 entry=scripts/mutation/broad-mutation.py::gpu_pass_command tree=mlh units=366 refusals=none vs_full=+339/-0 digest_same_as_full=no
+name=closure_summary index=16 entry=scripts/mutation/broad-mutation.py::gpu_classify_build tree=full units=33 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=16 entry=scripts/mutation/broad-mutation.py::gpu_classify_build tree=cut units=33 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=16 entry=scripts/mutation/broad-mutation.py::gpu_classify_build tree=ml units=338 refusals=none vs_full=+305/-0 digest_same_as_full=no
+name=closure_summary index=16 entry=scripts/mutation/broad-mutation.py::gpu_classify_build tree=mlh units=362 refusals=none vs_full=+329/-0 digest_same_as_full=no
+name=closure_summary index=17 entry=scripts/mutation/broad-mutation.py::gpu_classify_test tree=full units=64 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=17 entry=scripts/mutation/broad-mutation.py::gpu_classify_test tree=cut units=64 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=17 entry=scripts/mutation/broad-mutation.py::gpu_classify_test tree=ml units=351 refusals=none vs_full=+287/-0 digest_same_as_full=no
+name=closure_summary index=17 entry=scripts/mutation/broad-mutation.py::gpu_classify_test tree=mlh units=374 refusals=none vs_full=+310/-0 digest_same_as_full=no
+name=closure_summary index=18 entry=scripts/mutation/broad-mutation.py::gpu_combined_state tree=full units=31 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=18 entry=scripts/mutation/broad-mutation.py::gpu_combined_state tree=cut units=31 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=18 entry=scripts/mutation/broad-mutation.py::gpu_combined_state tree=ml units=343 refusals=none vs_full=+312/-0 digest_same_as_full=no
+name=closure_summary index=18 entry=scripts/mutation/broad-mutation.py::gpu_combined_state tree=mlh units=366 refusals=none vs_full=+335/-0 digest_same_as_full=no
+name=closure_summary index=19 entry=scripts/mutation/broad-mutation.py::GpuJudging.need tree=full units=50 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=19 entry=scripts/mutation/broad-mutation.py::GpuJudging.need tree=cut units=50 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=19 entry=scripts/mutation/broad-mutation.py::GpuJudging.need tree=ml units=355 refusals=none vs_full=+305/-0 digest_same_as_full=no
+name=closure_summary index=19 entry=scripts/mutation/broad-mutation.py::GpuJudging.need tree=mlh units=377 refusals=none vs_full=+327/-0 digest_same_as_full=no
+name=closure_summary index=20 entry=scripts/mutation/broad-mutation.py::GpuJudging.row_holds tree=full units=888 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=20 entry=scripts/mutation/broad-mutation.py::GpuJudging.row_holds tree=cut units=888 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=20 entry=scripts/mutation/broad-mutation.py::GpuJudging.row_holds tree=ml units=1199 refusals=none vs_full=+311/-0 digest_same_as_full=no
+name=closure_summary index=20 entry=scripts/mutation/broad-mutation.py::GpuJudging.row_holds tree=mlh units=1220 refusals=none vs_full=+332/-0 digest_same_as_full=no
+name=closure_summary index=21 entry=scripts/mutation/broad-mutation.py::GpuJudging.test_key_of tree=full units=46 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=21 entry=scripts/mutation/broad-mutation.py::GpuJudging.test_key_of tree=cut units=46 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=21 entry=scripts/mutation/broad-mutation.py::GpuJudging.test_key_of tree=ml units=351 refusals=none vs_full=+305/-0 digest_same_as_full=no
+name=closure_summary index=21 entry=scripts/mutation/broad-mutation.py::GpuJudging.test_key_of tree=mlh units=373 refusals=none vs_full=+327/-0 digest_same_as_full=no
+name=closure_summary index=22 entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run tree=full units=51 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=22 entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run tree=cut units=51 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=22 entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run tree=ml units=365 refusals=none vs_full=+314/-0 digest_same_as_full=no
+name=closure_summary index=22 entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run tree=mlh units=381 refusals=none vs_full=+330/-0 digest_same_as_full=no
+name=closure_summary index=23 entry=scripts/mutation/crates-mutation-rows.py::baseline_problem tree=full units=46 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=23 entry=scripts/mutation/crates-mutation-rows.py::baseline_problem tree=cut units=46 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=23 entry=scripts/mutation/crates-mutation-rows.py::baseline_problem tree=ml units=362 refusals=none vs_full=+316/-0 digest_same_as_full=no
+name=closure_summary index=23 entry=scripts/mutation/crates-mutation-rows.py::baseline_problem tree=mlh units=378 refusals=none vs_full=+332/-0 digest_same_as_full=no
+name=closure_summary index=24 entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem tree=full units=30 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=24 entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem tree=cut units=30 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=24 entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem tree=ml units=357 refusals=none vs_full=+327/-0 digest_same_as_full=no
+name=closure_summary index=24 entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem tree=mlh units=373 refusals=none vs_full=+343/-0 digest_same_as_full=no
+name=closure_summary index=25 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units tree=full units=322 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=25 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units tree=cut units=322 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=25 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units tree=ml units=500 refusals=none vs_full=+178/-0 digest_same_as_full=no
+name=closure_summary index=25 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units tree=mlh units=522 refusals=none vs_full=+200/-0 digest_same_as_full=no
+name=closure_summary index=26 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test tree=full units=316 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=26 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test tree=cut units=316 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=26 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test tree=ml units=493 refusals=none vs_full=+177/-0 digest_same_as_full=no
+name=closure_summary index=26 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test tree=mlh units=515 refusals=none vs_full=+199/-0 digest_same_as_full=no
+name=closure_summary index=27 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units tree=full units=307 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=27 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units tree=cut units=307 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=27 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units tree=ml units=488 refusals=none vs_full=+181/-0 digest_same_as_full=no
+name=closure_summary index=27 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units tree=mlh units=511 refusals=none vs_full=+204/-0 digest_same_as_full=no
+name=closure_summary index=28 entry=scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product tree=full units=16 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=28 entry=scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product tree=cut units=16 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=28 entry=scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product tree=ml units=16 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=28 entry=scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product tree=mlh units=16 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=29 entry=scripts/experiment-apparatus/replay.sh::strip_admission_header tree=full units=2 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=29 entry=scripts/experiment-apparatus/replay.sh::strip_admission_header tree=cut units=2 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=29 entry=scripts/experiment-apparatus/replay.sh::strip_admission_header tree=ml units=2 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=29 entry=scripts/experiment-apparatus/replay.sh::strip_admission_header tree=mlh units=2 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=30 entry=scripts/experiment-apparatus/replay.sh::timing_load_decide tree=full units=7 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=30 entry=scripts/experiment-apparatus/replay.sh::timing_load_decide tree=cut units=7 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=30 entry=scripts/experiment-apparatus/replay.sh::timing_load_decide tree=ml units=7 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=30 entry=scripts/experiment-apparatus/replay.sh::timing_load_decide tree=mlh units=7 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=31 entry=scripts/experiment-apparatus/e165-pin-red-examples.py::replay tree=full units=939 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=31 entry=scripts/experiment-apparatus/e165-pin-red-examples.py::replay tree=cut units=939 refusals=none vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=31 entry=scripts/experiment-apparatus/e165-pin-red-examples.py::replay tree=ml units=1036 refusals=none vs_full=+97/-0 digest_same_as_full=no
+name=closure_summary index=31 entry=scripts/experiment-apparatus/e165-pin-red-examples.py::replay tree=mlh units=1039 refusals=none vs_full=+100/-0 digest_same_as_full=no
+name=closure_summary index=32 entry=scripts/gate/verus-proof-check.py::check_proof tree=full units=1577 refusals=inline-script-not-literal:1 vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=32 entry=scripts/gate/verus-proof-check.py::check_proof tree=cut units=1230 refusals=none vs_full=+0/-347 digest_same_as_full=no
+name=closure_summary index=32 entry=scripts/gate/verus-proof-check.py::check_proof tree=ml units=1653 refusals=none vs_full=+351/-275 digest_same_as_full=no
+name=closure_summary index=32 entry=scripts/gate/verus-proof-check.py::check_proof tree=mlh units=1673 refusals=none vs_full=+368/-272 digest_same_as_full=no
+name=closure_summary index=33 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=full units=1565 refusals=inline-script-not-literal:1 vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=33 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=cut units=1218 refusals=none vs_full=+0/-347 digest_same_as_full=no
+name=closure_summary index=33 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=ml units=1653 refusals=none vs_full=+363/-275 digest_same_as_full=no
+name=closure_summary index=33 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=mlh units=1673 refusals=none vs_full=+380/-272 digest_same_as_full=no
+name=closure_summary index=34 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=full units=1573 refusals=inline-script-not-literal:1 vs_full=+0/-0 digest_same_as_full=yes
+name=closure_summary index=34 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=cut units=1226 refusals=none vs_full=+0/-347 digest_same_as_full=no
+name=closure_summary index=34 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=ml units=1653 refusals=none vs_full=+355/-275 digest_same_as_full=no
+name=closure_summary index=34 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=mlh units=1673 refusals=none vs_full=+372/-272 digest_same_as_full=no
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::select_items tree=ml units=349 refusals=none vs_cut=+305/-0 digest_same_as_cut=no
+name=closure_summary index=1 entry=scripts/mutation/broad-mutation.py::verdict_state tree=ml units=344 refusals=none vs_cut=+311/-0 digest_same_as_cut=no
+name=closure_summary index=2 entry=scripts/mutation/broad-mutation.py::Judgement.state tree=ml units=1288 refusals=none vs_cut=+325/-0 digest_same_as_cut=no
+name=closure_summary index=3 entry=scripts/mutation/broad-mutation.py::Judgement.row_holds tree=ml units=1280 refusals=none vs_cut=+332/-0 digest_same_as_cut=no
+name=closure_summary index=4 entry=scripts/mutation/broad-mutation.py::Judgement.selection tree=ml units=1279 refusals=none vs_cut=+336/-0 digest_same_as_cut=no
+name=closure_summary index=5 entry=scripts/mutation/broad-mutation.py::process_item tree=ml units=366 refusals=none vs_cut=+273/-0 digest_same_as_cut=no
+name=closure_summary index=6 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=ml units=957 refusals=none vs_cut=+523/-0 digest_same_as_cut=no
+name=closure_summary index=7 entry=scripts/mutation/broad-mutation.py::escalation_evidence_problems tree=ml units=338 refusals=none vs_cut=+317/-0 digest_same_as_cut=no
+name=closure_summary index=8 entry=scripts/mutation/mutation-prune.py::carry_decision tree=ml units=102 refusals=none vs_cut=+93/-0 digest_same_as_cut=no
+name=closure_summary index=9 entry=scripts/mutation/mutation-prune.py::mutation_key tree=ml units=104 refusals=none vs_cut=+90/-0 digest_same_as_cut=no
+name=closure_summary index=10 entry=scripts/mutation/mutation-prune.py::UnitTree.closure_key tree=ml units=951 refusals=none vs_cut=+88/-0 digest_same_as_cut=no
+name=closure_summary index=11 entry=scripts/mutation/mutation-prune.py::catching_test_key tree=ml units=106 refusals=none vs_cut=+91/-0 digest_same_as_cut=no
+name=closure_summary index=12 entry=scripts/mutation/mutation-prune.py::coverers_key tree=ml units=105 refusals=none vs_cut=+93/-0 digest_same_as_cut=no
+name=closure_summary index=13 entry=scripts/mutation/mutation-prune.py::global_lines tree=ml units=102 refusals=none vs_cut=+94/-0 digest_same_as_cut=no
+name=closure_summary index=14 entry=scripts/mutation/mutation-prune.py::build_environment_lines tree=ml units=106 refusals=none vs_cut=+86/-0 digest_same_as_cut=no
+name=closure_summary index=15 entry=scripts/mutation/broad-mutation.py::gpu_pass_command tree=ml units=342 refusals=none vs_cut=+315/-0 digest_same_as_cut=no
+name=closure_summary index=16 entry=scripts/mutation/broad-mutation.py::gpu_classify_build tree=ml units=338 refusals=none vs_cut=+305/-0 digest_same_as_cut=no
+name=closure_summary index=17 entry=scripts/mutation/broad-mutation.py::gpu_classify_test tree=ml units=351 refusals=none vs_cut=+287/-0 digest_same_as_cut=no
+name=closure_summary index=18 entry=scripts/mutation/broad-mutation.py::gpu_combined_state tree=ml units=343 refusals=none vs_cut=+312/-0 digest_same_as_cut=no
+name=closure_summary index=19 entry=scripts/mutation/broad-mutation.py::GpuJudging.need tree=ml units=355 refusals=none vs_cut=+305/-0 digest_same_as_cut=no
+name=closure_summary index=20 entry=scripts/mutation/broad-mutation.py::GpuJudging.row_holds tree=ml units=1199 refusals=none vs_cut=+311/-0 digest_same_as_cut=no
+name=closure_summary index=21 entry=scripts/mutation/broad-mutation.py::GpuJudging.test_key_of tree=ml units=351 refusals=none vs_cut=+305/-0 digest_same_as_cut=no
+name=closure_summary index=22 entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run tree=ml units=365 refusals=none vs_cut=+314/-0 digest_same_as_cut=no
+name=closure_summary index=23 entry=scripts/mutation/crates-mutation-rows.py::baseline_problem tree=ml units=362 refusals=none vs_cut=+316/-0 digest_same_as_cut=no
+name=closure_summary index=24 entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem tree=ml units=357 refusals=none vs_cut=+327/-0 digest_same_as_cut=no
+name=closure_summary index=25 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units tree=ml units=500 refusals=none vs_cut=+178/-0 digest_same_as_cut=no
+name=closure_summary index=26 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test tree=ml units=493 refusals=none vs_cut=+177/-0 digest_same_as_cut=no
+name=closure_summary index=27 entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units tree=ml units=488 refusals=none vs_cut=+181/-0 digest_same_as_cut=no
+name=closure_summary index=28 entry=scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product tree=ml units=16 refusals=none vs_cut=+0/-0 digest_same_as_cut=yes
+name=closure_summary index=29 entry=scripts/experiment-apparatus/replay.sh::strip_admission_header tree=ml units=2 refusals=none vs_cut=+0/-0 digest_same_as_cut=yes
+name=closure_summary index=30 entry=scripts/experiment-apparatus/replay.sh::timing_load_decide tree=ml units=7 refusals=none vs_cut=+0/-0 digest_same_as_cut=yes
+name=closure_summary index=31 entry=scripts/experiment-apparatus/e165-pin-red-examples.py::replay tree=ml units=1036 refusals=none vs_cut=+97/-0 digest_same_as_cut=no
+name=closure_summary index=32 entry=scripts/gate/verus-proof-check.py::check_proof tree=ml units=1653 refusals=none vs_cut=+423/-0 digest_same_as_cut=no
+name=closure_summary index=33 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=ml units=1653 refusals=none vs_cut=+435/-0 digest_same_as_cut=no
+name=closure_summary index=34 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=ml units=1653 refusals=none vs_cut=+427/-0 digest_same_as_cut=no
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=ml-classbreak units=957 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=ml-defbreak units=957 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=ml-assignbreak units=958 refusals=none vs_ml=+1/-0 digest_same_as_ml=no
+name=closure_summary index=1 entry=scripts/gate/verus-proof-check.py::check_proof tree=ml-classbreak units=1653 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=1 entry=scripts/gate/verus-proof-check.py::check_proof tree=ml-defbreak units=1653 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=1 entry=scripts/gate/verus-proof-check.py::check_proof tree=ml-assignbreak units=1654 refusals=none vs_ml=+1/-0 digest_same_as_ml=no
+name=closure_summary index=2 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=ml-classbreak units=1653 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=2 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=ml-defbreak units=1653 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=2 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=ml-assignbreak units=1654 refusals=none vs_ml=+1/-0 digest_same_as_ml=no
+name=closure_summary index=3 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=ml-classbreak units=1653 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=3 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=ml-defbreak units=1653 refusals=none vs_ml=+0/-0 digest_same_as_ml=yes
+name=closure_summary index=3 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=ml-assignbreak units=1654 refusals=none vs_ml=+1/-0 digest_same_as_ml=no
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=mlh-classbreak units=991 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=no
+name=closure_summary index=0 entry=scripts/mutation/broad-mutation.py::Runner.escalate_step tree=mlh-defbreak units=991 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=yes
+name=closure_summary index=1 entry=scripts/gate/verus-proof-check.py::check_proof tree=mlh-classbreak units=1673 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=no
+name=closure_summary index=1 entry=scripts/gate/verus-proof-check.py::check_proof tree=mlh-defbreak units=1673 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=yes
+name=closure_summary index=2 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=mlh-classbreak units=1673 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=no
+name=closure_summary index=2 entry=scripts/gate/verus-proof-check.py::check_vacuity tree=mlh-defbreak units=1673 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=yes
+name=closure_summary index=3 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=mlh-classbreak units=1673 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=no
+name=closure_summary index=3 entry=scripts/gate/verus-proof-check.py::check_must_red_worlds tree=mlh-defbreak units=1673 refusals=none vs_mlh=+0/-0 digest_same_as_mlh=yes
+name=raw_unit_lines tree=full index=32 lines=1579
+name=module_census_ast label=full:32 python_files_in_closure=17 not_in_closure_total=348 by_kind={'assign': 271, 'class': 17, 'import': 60} executed_def_heads_not_in_closure=10
+name=raw_unit_lines tree=full index=6 lines=792
+name=module_census_ast label=full:6 python_files_in_closure=16 not_in_closure_total=473 by_kind={'assign': 378, 'class': 31, 'import': 64} executed_def_heads_not_in_closure=11
+name=raw_unit_lines tree=cut index=32 lines=1232
+name=module_census_ast label=cut:32 python_files_in_closure=12 not_in_closure_total=164 by_kind={'assign': 106, 'class': 8, 'import': 50} executed_def_heads_not_in_closure=7
+name=raw_unit_lines tree=cut index=6 lines=436
+name=module_census_ast label=cut:6 python_files_in_closure=10 not_in_closure_total=290 by_kind={'assign': 213, 'class': 22, 'import': 55} executed_def_heads_not_in_closure=8
+name=raw_unit_lines tree=ml index=32 lines=1655
+name=module_census_ast label=ml:32 python_files_in_closure=15 not_in_closure_total=20 by_kind={'class': 20} executed_def_heads_not_in_closure=17
+name=raw_unit_lines tree=ml index=6 lines=959
+name=module_census_ast label=ml:6 python_files_in_closure=14 not_in_closure_total=34 by_kind={'class': 34} executed_def_heads_not_in_closure=18
+name=raw_unit_lines tree=mlh index=32 lines=1675
+name=module_census_ast label=mlh:32 python_files_in_closure=15 not_in_closure_total=0 by_kind={} executed_def_heads_not_in_closure=17
+name=raw_unit_lines tree=mlh index=6 lines=993
+name=module_census_ast label=mlh:6 python_files_in_closure=14 not_in_closure_total=0 by_kind={} executed_def_heads_not_in_closure=18
+name=not_judging_units_in_cut_check_proof lib_verdict_library=62 lib_function_units=714
+name=host_resources_units_in_check_proof tree=full units=75
+name=host_resources_units_in_check_proof tree=cut units=0
+name=host_resources_units_in_check_proof tree=ml units=0
+name=host_resources_units_in_check_proof tree=mlh units=0
+name=empty_callee entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1233 host_resources_units=1 refusals=
+name=empty_callee entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=437 host_resources_units=1 refusals=
+name=needed_files repo_files=13 python=8 shell=5 other=0 outside_scripts_hosts=9
+  file=.claude/hooks/lib_heavy_tests.py
+  file=.claude/hooks/lib_long_run.py
+  file=.claude/hooks/lib_shell_words.py
+  file=.claude/scripts/preflight.sh
+  file=.claude/scripts/project_preflight.py
+  file=.claude/singlefs-ai-sop/scripts/preflight.py
+  file=.claude/singlefs-ai-sop/scripts/preflight.sh
+  file=scripts/crash/crash-amplification-lib.sh
+  file=scripts/crash/crash-point-replay-shard-configuration-check.sh
+  file=scripts/hosts/heavy-threads.sh
+  file=scripts/hosts/host-dispatch.py
+  file=scripts/hosts/host-resources.py
+  file=scripts/hosts/memory_peaks_lib.py
+name=packed_run arm=same-python rc=1 stdout_is_json=yes last_stderr_line=
+name=packed_run arm=old-python rc=1 stdout_is_json=no last_stderr_line=ModuleNotFoundError: No module named 'tomllib'（模拟第二台的 python 低于 3.11）
+name=today_remote_program arm=same-python rc=0 probe_line=1 last_stderr_line=
+name=today_remote_program arm=old-python rc=0 probe_line=1 last_stderr_line=
+name=packed_same_python_view config_read=no memory_history=default predicted_memory=8589934592
+name=wrapper_world world=start tree=ml status=0 ran=yes first_error=
+name=wrapper_world world=predict tree=ml status=0 ran=yes first_error=
+name=wrapper_world world=start tree=ml-classbreak status=0 ran=yes first_error=
+name=wrapper_world world=predict tree=ml-classbreak status=252 ran=no first_error=ValueError: invalid literal for int() with base 10: '第三轮攻方：类头在载入时就抛'
+name=wrapper_world world=start tree=ml-defbreak status=251 ran=no first_error=ValueError: invalid literal for int() with base 10: '第三轮攻方：缺省值在载入时就抛'
+name=wrapper_world world=predict tree=ml-defbreak status=251 ran=no first_error=ValueError: invalid literal for int() with base 10: '第三轮攻方：缺省值在载入时就抛'
+name=wrapper_world world=start tree=ml-assignbreak status=251 ran=no first_error=ValueError: invalid literal for int() with base 10: '第三轮攻方：模块级赋值在载入时就抛'
+name=wrapper_world world=predict tree=ml-assignbreak status=251 ran=no first_error=ValueError: invalid literal for int() with base 10: '第三轮攻方：模块级赋值在载入时就抛'

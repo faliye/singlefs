@@ -1,0 +1,44 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.6 GiB，这一条要 6.0 GiB（峰值表里没有这条，按它的上限 6G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 3 条
+  → 第二台此刻放得下（可用 55.7 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 6G --label moved-from-queue-724611-804916607 -- bash /home/fy5090/code/singlefs/research/prompts/m3-close-reuse-closure-r3-sonnet-model/tools/rerun.sh --repo /home/fy5090/code/singlefs --frozen /home/fy5090/.local/share/singlefs/work/m3-close-reuse-closure-r3-sonnet/repo --work /home/fy5090/.local/share/singlefs/work/m3-close-reuse-closure-r3-sonnet/rerun-1
+run-with-memory-cap: 排了 52 秒，起跑（singlefs-memory-cap-724611-804916607）
+name=variants built=cut-algo,cut-modlevel,cut-modlevel-class,cut-narrow,cut-src,modlevel,mut-a,mut-b,narrow,stub-hr
+name=job_exit_codes      11 0
+DIFF cut-src: 入口 41 个，集合或退出码变了 4 个，不计算法文件自己之后真变的 4 个，拒算与基准不同的 0 个
+DIFF cut-algo: 入口 41 个，集合或退出码变了 10 个，不计算法文件自己之后真变的 4 个，拒算与基准不同的 0 个
+DIFF stub-hr: 入口 41 个，集合或退出码变了 4 个，不计算法文件自己之后真变的 4 个，拒算与基准不同的 0 个
+DIFF modlevel: 入口 41 个，集合或退出码变了 34 个，不计算法文件自己之后真变的 34 个，拒算与基准不同的 0 个
+DIFF narrow: 入口 41 个，集合或退出码变了 26 个，不计算法文件自己之后真变的 26 个，拒算与基准不同的 0 个
+DIFF cut-modlevel: 入口 41 个，集合或退出码变了 34 个，不计算法文件自己之后真变的 34 个，拒算与基准不同的 0 个
+DIFF cut-modlevel-class: 入口 41 个，集合或退出码变了 34 个，不计算法文件自己之后真变的 34 个，拒算与基准不同的 21 个
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→0 原始行 792→436 去重 791→435 文件 24→15 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[] 掉357 多1（不计算法文件：掉357 多1）
+  scripts/gate/verus-proof-check.py::check_proof rc 4→0 原始行 1579→1232 去重 1578→1231 文件 25→17 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[] 掉348 多1（不计算法文件：掉347 多1）
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→0 原始行 792→436 去重 791→435 文件 24→15 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[] 掉356 多0（不计算法文件：掉356 多0）
+  scripts/gate/verus-proof-check.py::check_proof rc 4→0 原始行 1579→1232 去重 1578→1231 文件 25→17 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[] 掉348 多1（不计算法文件：掉346 多0）
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→0 原始行 792→437 去重 791→436 文件 24→16 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[] 掉356 多1（不计算法文件：掉356 多1）
+  scripts/gate/verus-proof-check.py::check_proof rc 4→0 原始行 1579→1233 去重 1578→1232 文件 25→18 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[] 掉347 多1（不计算法文件：掉346 多1）
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→4 原始行 792→1235 去重 791→1234 文件 24→24 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76] 掉0 处
+  scripts/gate/verus-proof-check.py::check_proof rc 4→4 原始行 1579→1931 去重 1578→1930 文件 25→25 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76] 掉1 多353（
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→4 原始行 792→837 去重 791→836 文件 24→24 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76] 掉0 多
+  scripts/gate/verus-proof-check.py::check_proof rc 4→4 原始行 1579→1611 去重 1578→1610 文件 25→25 拒算[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76]→[inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76] 掉2 多34（
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 0→0 原始行 436→959 去重 435→958 文件 15→19 拒算[]→[] 掉0 多523（不计算法文件：掉0 多523）
+  scripts/gate/verus-proof-check.py::check_proof rc 0→0 原始行 1232→1656 去重 1231→1655 文件 17→20 拒算[]→[] 掉1 多425（不计算法文件：掉0 多421）
+check_proof py文件=12 单元缺口(按 dump) assign=106 class=8 import=50 main-guard=9 合计(import+assign+class)=164 合计(import+assign)=156
+Runner.escalate_step py文件=10 单元缺口(按 dump) assign=213 class=22 import=55 main-guard=8 合计(import+assign+class)=290 合计(import+assign)=268
+  495943 .claude/hooks/lib_heavy_tests.py
+   37012 .claude/hooks/lib_long_run.py
+   75616 .claude/hooks/lib_shell_words.py
+    2629 .claude/scripts/preflight.sh
+    3251 .claude/scripts/project_preflight.py
+   40132 .claude/singlefs-ai-sop/scripts/preflight.py
+    5035 .claude/singlefs-ai-sop/scripts/preflight.sh
+   72296 scripts/crash/crash-amplification-lib.sh
+   22712 scripts/crash/crash-point-replay-shard-configuration-check.sh
+   11680 scripts/hosts/heavy-threads.sh
+   97176 scripts/hosts/host-dispatch.py
+   68745 scripts/hosts/host-resources.py
+   19220 scripts/hosts/memory_peaks_lib.py
+name=needed_files_strace files=13 outside_scripts_hosts=9 bytes=951447 base64_bytes=1268596 single_argument_limit=131071
+name=remote_program_today bytes=23800 base64_bytes=31736 single_argument_limit=131071 fits=True
+name=python_version file=.claude/hooks/lib_heavy_tests.py syntax_min=3.7 newer_stdlib={'tomllib': '3.11'}
+name=python_version file=.claude/hooks/lib_long_run.py syntax_min=3.7 newer_stdlib={}
+exit=0

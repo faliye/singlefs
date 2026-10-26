@@ -1,0 +1,12 @@
+{
+  "crates/singlefs-core/src/compaction_plan.rs": "a740a952d30feb2a80f7a09ebd0fa3b083dc39d38e487bacaa61a322dc83adaa",
+  "crates/singlefs-core/src/allocator.rs": "97e8417ddf341d890b670d91e0ff035e5ad368d8c76c5c47e67ca4bad90a975d",
+  "crates/singlefs-core/Cargo.toml": "e7ecd5690646bb283dd3798f60a3e1d660e491fd36297855fcc8cc3fd95fbc4a",
+  "crates/singlefs-replay-prefix/src/lib.rs": "5ef2cd50822e199a6f21145f24df78419b0b2c91c96f9ac4ddecb462815a7645",
+  "crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs": "274e57685cfe504d53daee9be83c66f081de1a9b40c075d233fcec723d4acdfd",
+  "crates/singlefs-replay-prefix/src/gc_crash_proofs.rs": "afff10af0af1594ca62b9798680ada3b85d46f46dc48801d44e3ea7660f4e0b3",
+  "crates/singlefs-replay-prefix/verus-must-red-worlds.tsv": "d8124145c232dd60b4e93699124eec410203a2cfd90e9b87ff4b7a1b0f2c00b1",
+  ".claude/gate.d/verus-pins.tsv": "09ffa0e9759407adf9bd8c80d518bc0f33b23d3a29e717e28a4f4c5b8ca98a4c",
+  "crates/mutations.tsv": "b9287c3e699997df295151e149b63df23ebef6b511d5486ab470b8148dccabb0",
+  "scripts/gate/verus-proof-check.py": "9d990a065733266b385667424c79d42a336389a93bbe20398022fe2041f2dbad"
+}

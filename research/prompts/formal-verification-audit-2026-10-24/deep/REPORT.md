@@ -1,0 +1,55 @@
+# 形式化严格复核（2026-10-24）
+
+审核对象：当前工作区的 singlefs-replay-prefix 两份核、证明门禁与必红世界表，及 recovery / compaction_plan 的连接处。只审计，不改产品或门禁。源码指纹在 source-sha256.json；工作区已有大量他人改动，本报告不以 HEAD 代表当前代码。
+
+## 实测
+
+- 当前整 crate：Verus 0.2026.09.20.aef82ed，--no-cheating --rlimit 10 --num-threads 2，78 verified / 0 errors。baseline.json、baseline.stderr。
+- 当前核副本新增未登记的错误证明模块：只验 choose_root_slot 为 2 verified / 0 errors；整 crate 为 78 verified / 1 error。omitted-selected.json、omitted-whole.json。
+- 最小两模块工程调用真实 check_proof：只登记根模块，另一个已被 mod 接入的模块含 `pub proof fn omitted_bad_proof() ensures false, {}`。根模块含 `pub proof fn registered_proof() ensures false, { omitted::omitted_bad_proof(); }`。正式证明格返回 0，1 verified / 0 errors，未用 BREAK、assume、admit、external_body 或判定缓存。复现脚本 gate_probe_false.py；另有不调用错误引理的较弱对照 gate_probe.py。
+- 当前核副本将选段比较 `< best_live_slots` 改为 `> best_live_slots`：choose_compaction_segment 仍 2 verified / 0 errors。greedy-reversed.json。
+- 上轮三个问题用当前判定代码复核，仍存在：prior-findings-recheck.txt。
+- 必红表 165 个锚点均唯一命中当前源码，但 165 行全部缺 landing 第六列。未运行这 165 个变异；解析阶段已拒绝，不能报告它们通过。
+
+## 必须修复的判定缺陷
+
+### 高：遗漏模块可污染已登记证明
+
+scripts/gate/verus-proof-check.py:610 的 kernel_files 只确认登记路径存在；1137 的 verus_functions 只收这些文件；1439 的 check_proof 仅逐项验证，1530 附近把所选函数的计数与手写登记数比较。新增可达模块却不新增登记时，原来的计数不变，没有新义务进入检查。
+
+Verus 的模块化验证会使用未选中函数的契约。错误引理漏验后，已选中函数可以利用其假契约证明 false，正式 proof 格仍绿，已实测。这是门禁健全性问题；当前完整 crate 的 78/0 不说明门禁具备防止未来漏验的能力，也不意味着当前核已存在这类错误引理。
+
+处置：在入口的真实模块闭包与实际证明义务之间做完整性核对，未支持的模块/条目形态应拒绝；增加“漏登记但被调用的错误引理”负例。整 crate 无过滤验证可作为最终完整性检查，函数级复用继续用于日常增量检查。固定 verified 总数不能替代义务集合覆盖。
+
+### 高：空真筛查不能证明可满足性
+
+上轮 opaque 恒假前提的实际 Verus 输出，送入当前 vacuity_item_problems 仍返回无问题。无法在入口证明 false，不等于前提存在模型。对于关键结论应构造见证并证明前提；入口插断言可以保留为筛查，成功文字不能写成可满足性已证。
+
+### 中：requires 词法识别可被合法排版绕过
+
+1550 起的 requires_insertion_points 对单行 `proof fn f() requires false, ensures false, {}` 返回空列表，Verus 接受该语法。使用词法/语法结构枚举并交叉核对全部契约，不能仅看行首。
+
+### 中：必红世界格式迁移未完成
+
+表全部还是五列，当前解析要求六列 landing。应运行真实变异收集失败落点再迁移，不能从旧错误条数猜落点。此处是显式拒绝，和上述假绿漏洞性质不同。
+
+## 当前遗漏与证明边界
+
+1. **M3 非空见证尚未补齐。** lib.rs:848、917 的结论含 reader 唯一回答、txg 单调、候选不超上限等蕴涵式前件；入口 requires 检查覆盖不到。现存两个 spec 冒烟函数只检查整次发布结构。C830（checks-owed.md:519）已记录此欠账，不能算本轮首次发现。补充至少一条实际施加非零记录、第二次恢复不再施加的可执行证明包装器，使用带确定 ensures 的回调，并证明前件联合成立。空记录、零搬迁见证不能独自代表这些场景。
+2. **负例覆盖没有机器闭合。** C831 已登记此问题。按每行唯一锚点的所属函数核对，恢复核三个 broadcast 引理没有直接行（旧账记有代罩）；新增整理模块另有七个带 ensures 的函数没有直接行：lemma_movable_positions_are_the_movable_allocations_in_order、lemma_every_position_is_movable_when_every_allocation_is、lemma_relocating_in_order_keeps_every_read、lemma_a_planned_batch_keeps_every_read、lemma_under_the_premise_a_plan_takes_the_leading_allocations、one_movable_allocation_is_planned_and_not_reported_emptied、a_segment_holding_a_pinned_slot_is_not_a_sound_choice。这不表示它们没被 Verus 验证，也不表示现有其他变异绝不间接覆盖；缺的是明确、可核验的直接或代罩登记。建议按性质登记，分别跟踪 spec 反例、实现变异和前提见证，避免把改坏证明文本的失败当成产品实现杀伤证据。
+3. **整理核未连接产品执行。** compaction_plan_proofs.rs:13 明确产品不调用它，core 单测在小域对拍。把共同纯决策逻辑收敛为产品调用的已验证核，比继续增加另一份实现的引理更有价值；适配数据的代码仍需独立检查。既有变异锚点应随重构迁移。
+4. **P4 是抽象映射恒等，不是空间安全与崩溃安全证明。** storage: slot -> Seq<u8> 把一个起点抽象为整份内容；destinations_are_distinct_and_free（536）只判断起点不等与不等于已有映射值，模型没有 span、区域 R 的边界，也没有旧读者或旧根集合。目的地 10、11 对应两个跨度为 2 的单元时，起点互异不能推出物理区间不重叠；目的地在 R 内的空闲处也不被这个谓词排除。文件头明确把分配器与执行层排除，故这不是现有抽象定理的反例，但不能用该定理宣称安全搬空真实区域。接下来应证明分配器给出的区间不相交、目的地在 R 外、跨度一致、旧读者保护以及发布后才可释放/复用；再建立具体块状态到抽象 storage 的对应。
+5. **M2 语义层、M4 最远完整发布与写侧单调前提仍未形式化闭合。** D13 明确 M2 语义层与 M4 主要由 E165 界内检查。单调推论 lib.rs:2843 输入不是崩溃写集合包含关系；它把较大状态根版本不落后、覆盖较小状态已施加版本或输入相同等关键桥梁写成 requires。现有证明是条件推论。若要提升为 publish/crash/recover refinement，应从持久写集合和屏障规则导出这些前提，并证明已确认发布不丢，而不是再把这些结论当作新定理的输入。
+6. **胶水与读回调尚在可信边界外。** recovery.rs:5142 起只在运行时断言排序/计数器前提，再映射字段、包装读回调、重建根。Verus 证明任意 RootSource 的来源关系，不证明实际根所有字段映射正确，也不证明读回调反映真实磁盘。优先补字段投影的等价检查、新字段加入时的穷尽性检查，并验证回调模型与产品读语义的关系。不要把动态断言当作调用点的形式化证明。
+
+## 有价值的优化
+
+- **第一优先级：**修复 proof 义务完整性、防空真表述与见证、requires 枚举和必红表格式。先让“通过”结论可信。
+- **第二优先级：**完成 C830 / C831；整理决策核接入产品；为 GC 搬迁建立空间与旧读者保护的具体到抽象关系。
+- **低成本契约增强：**选段保证 live_slots 最小且平局取最小下标。现有文件明确“先不证最优”，反转贪心比较仍通过就是可复现的契约边界；属于增强任务，不应报成现有 P1 定理错误。
+- **减少独立假设：**在扫描保证源位置互异时，从 scan_agrees_with_the_mapping 和源位置互异推导 movable_mapping_keys_are_distinct，避免多处独立假定同一事实；为前提标明生产者与证明/动态检查/测试来源。
+- **性能：**保留函数级增量复用；增加完整义务集合检查与整 crate 最终验证。不要通过减少必验函数、放宽 rlimit 或删减后置条件提速。本次未量化性能瓶颈，不给加速比例。触发器和 opaque 的调整应建立在具体慢查询剖析及见证/负例回归上。
+
+## 限制
+
+本轮验证当前整 crate、定向最小反例、两类源码变异，以及静态覆盖映射。没有跑完整仓库门禁、全部必红世界、全部 Cargo 测试或 E165 大域；不把这些未跑项目列为通过。涉及真实产品错误的风险均与已经实测的门禁漏洞区分。

@@ -1,8 +1,0 @@
-e71e6f87bbfb7784b9dec9a32dc84fd99038a639bd2faec7de152950124bbee7  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
-bbd80c07b834953c61a8530fd0cd9bc6b10902399c9927bff0dd0f49dfbe4b30  .claude/kb/decisions/16-发布语义.md
-b378f7c079d5d0b30c7fa6ba042b745d02ec11a2b16d1b247c0d84093a108e93  .claude/kb/decisions/23-journal的角色与格式.md
-b94e1806e8c2329062f81fbdcd95e319d55b43cfec289329cdd885cfdb236a7a  .claude/kb/decisions/28-挂载期承诺量.md
-7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md
-5d9c579db1b3858e693e4b79f0f73c25b67d39faf92b31e109d6ef116888cc16  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
-b6b9be1e3d3d35500c97939cb6de042708f48cea24f2b355f92a64504814bea3  .claude/kb/experiments/168-删除借保留量的环窗口.md
-bdbe7c46ef4504ea604eda496570b2f9b0112e59bf7f0a88e431b771c74b32b6  .claude/kb/experiments/171-三oracle合谋测试.md

@@ -796,7 +796,7 @@
 - **`.claude/gate.d/fixtures/doc-registries.sh/references-green/crates/sample/invariants/01-绿样类.md`**：门禁夹具。✅ [正向测试期望通过]
 - **`.claude/gate.d/fixtures/doc-registries.sh/references-green/crates/sample/invariants/02-绿样二类.md`**：门禁夹具。✅ [正向测试期望通过]
 - **`.claude/gate.d/fixtures/doc-registries.sh/references-green/crates/sample/invariants/README.md`**：门禁夹具。✅ [正向测试期望通过]
-- **`.claude/gate.d/fixtures/doc-registries.sh/references-green/scripts/experiments/notes/sample.md`**：门禁夹具。✅ [正向测试期望通过]
+- **`.claude/gate.d/fixtures/doc-registries.sh/references-green/scripts/experiment-apparatus/notes/sample.md`**：门禁夹具。✅ [正向测试期望通过]
 - **`.claude/gate.d/fixtures/doc-registries.sh/references-red/.claude/agents/sample.md`**：门禁夹具。⚠️ [负向故意构造违规]
 - **`.claude/gate.d/fixtures/doc-registries.sh/references-red/.claude/kb/checks-owed.md`**：门禁夹具。⚠️ [负向故意构造违规]
 - **`.claude/gate.d/fixtures/doc-registries.sh/references-red/.claude/kb/decisions.md`**：门禁夹具。⚠️ [负向故意构造违规]

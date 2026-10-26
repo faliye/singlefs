@@ -1,0 +1,14 @@
+   Compiling checker-audit v0.0.0 (/tmp/singlefs-checker-audit-20261023)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.36s
+     Running unittests src/lib.rs (/tmp/singlefs-checker-audit-20261023/target/debug/deps/checker_audit-da70cae27ddf2ddf)
+
+running 3 tests
+CONFIRMED checker keeps txg=20, recovery first-copy rule keeps txg=10
+test walk::audit_journal_scan::audit_scanner_keeps_last_copy_where_recovery_keeps_first ... ok
+CONFIRMED cached=0 fresh=1 I-1.3 violations
+test walk::audit_repro::audit_cached_node_skips_expected_tree ... ok
+CONFIRMED cached=0 fresh=1 I-1.2 violations
+test walk::audit_repro::audit_cached_node_skips_new_pointer_birth_identity ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.01s
+

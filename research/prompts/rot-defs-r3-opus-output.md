@@ -198,7 +198,7 @@ name=e184_regular_layer_cost_counts binary=absent
 
 ### 循环变量当钉表（R1 与 R2 放在一起）
 
-K2 第二条问的那一撞：执行员照 R1 跑编好的本体时撞不撞 R2 的拒。装置不是 e165 的不撞（`runner-run-device-main` 退 0）。是 e165 的：E165 已有六次重跑（`.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:1`：「第 6 次重跑已跑（2026-10-09：r3 档合法一族）」，复跑登记 `scripts/experiments/replay.sh:1240` 起的是 `--bounds segment1 --family legal --profile r3`），第七次重跑由执行员照 R1 直接起本体，按族写一个循环是常见写法：
+K2 第二条问的那一撞：执行员照 R1 跑编好的本体时撞不撞 R2 的拒。装置不是 e165 的不撞（`runner-run-device-main` 退 0）。是 e165 的：E165 已有六次重跑（`.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:1`：「第 6 次重跑已跑（2026-10-09：r3 档合法一族）」，复跑登记 `scripts/experiment-apparatus/replay.sh:1240` 起的是 `--bounds segment1 --family legal --profile r3`），第七次重跑由执行员照 R1 直接起本体，按族写一个循环是常见写法：
 
 ```
 == runner-e165-loop-variable（experiment-runner）
@@ -359,7 +359,7 @@ R3 的前提是「环境变量能让 `--quick` 跑出轻型以外的量」；判
 - `experiment-designer.md`：第 31 行占号之后定英文名，与 R1 的「bin 名、产物名一律用英文名」一致；它不写装置的跑法，R1 那几步不经过它。`04ceaa904` 改的 `test-script-discipline.md` 路径今天在 `.claude/rules/` 下、两节标题在（第 62、87 行）。
 - `three-way-defense.md`（除 R8）：第 1 步 `grep -nF`、R8 补的第 4 步与写范围的冻结副本只读，照走没有撞闸的步；三份三方定义里 `tools/rerun.sh` 各出现一次、写法相同。
 - `investigator.md` 第 16 行引的小节：`evidence-discipline.md` 第 73 行标题逐字在。
-- 第二轮判决第二节 K1 前两行（第一轮 A1、A3、A9 那几条命令）：第二轮模型今天复跑，锁不被占时这几格的退出码与第二轮一样（`kb-scribe-write`、`runner-research-unit-test`、`implementer-combined` 都退 0），差的只有 R2、R3 有意翻的三格。锁被占时 `runner-research-unit-test`、`implementer-combined` 被锁拒——这是锁，不是定义；实现员在自己的副本里跑，碰不到主工作区的锁，执行员 research 那一支在主工作区 `scripts/experiments` 下起 cargo，会碰到（定义没提锁，出路在锁的拒绝说明里，等或换副本）。
+- 第二轮判决第二节 K1 前两行（第一轮 A1、A3、A9 那几条命令）：第二轮模型今天复跑，锁不被占时这几格的退出码与第二轮一样（`kb-scribe-write`、`runner-research-unit-test`、`implementer-combined` 都退 0），差的只有 R2、R3 有意翻的三格。锁被占时 `runner-research-unit-test`、`implementer-combined` 被锁拒——这是锁，不是定义；实现员在自己的副本里跑，碰不到主工作区的锁，执行员 research 那一支在主工作区 `scripts/experiment-apparatus` 下起 cargo，会碰到（定义没提锁，出路在锁的拒绝说明里，等或换副本）。
 
 ## 没打中的形状
 

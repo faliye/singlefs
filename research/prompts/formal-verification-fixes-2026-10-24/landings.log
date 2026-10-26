@@ -1,0 +1,351 @@
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-2973194-2372214821）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 385 MiB（按峰值表里近 1 次实测里最大的峰值 385 MiB（最近一次 2026-10-24 量的）算），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 6 秒，起跑（singlefs-memory-cap-2973185-2740112398）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 385 MiB（按峰值表里近 2 次实测里最大的峰值 385 MiB（最近一次 2026-10-24 量的）算），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 6 秒，起跑（singlefs-memory-cap-2973532-320096256）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-2973689-3200625217）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 61 秒，至多 3600 秒）：slice 已占 36.8 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 3 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 122 秒，至多 3600 秒）：slice 已占 38.0 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 7 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 182 秒，至多 3600 秒）：slice 已占 36.9 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 3 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 409 MiB（按峰值表里近 5 次实测里最大的峰值 409 MiB（最近一次 2026-10-24 量的）算），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 409 MiB（按峰值表里近 5 次实测里最大的峰值 409 MiB（最近一次 2026-10-24 量的）算），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 40.0 GiB，这一条要 409 MiB（按峰值表里近 5 次实测里最大的峰值 409 MiB（最近一次 2026-10-24 量的）算），总上限 40.1 GiB；账上在跑 2 条
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 221 秒，起跑（singlefs-memory-cap-2973186-3080019514）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 4 秒，起跑（singlefs-memory-cap-3053247-27613169）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 4 秒，起跑（singlefs-memory-cap-3053179-2375919160）
+  … verus-proof-check must-red-landings：run-with-memory-cap: 排了 4 秒，起跑（singlefs-memory-cap-3053380-1134422988）
+  · must-red:ensures·record_ends_its_publish 函数体与 ensures 一起改成恒真（接回量测报告的 red_r2）：落点 counter_of_the_last_record_the_root_covers、judge_the_candidate、replay_core；证明错 5 条
+  · must-red:ensures·record_ends_its_publish 的 ensures 取反：落点 counter_of_the_last_record_the_root_covers、judge_the_candidate、record_ends_its_publish、replay_core；证明错 7 条
+  · must-red:ensures·counter_of_the_last_record_the_root_covers 交回的锚点计数器小于 u64 最大值减一：落点 counter_of_the_last_record_the_root_covers；证明错 1 条
+  · must-red:ensures·counter_of_the_last_record_the_root_covers 交回的锚点改成不等于 spec 的锚点：落点 counter_of_the_last_record_the_root_covers、replay_core；证明错 3 条
+  · must-red:ensures·replay_core 整个结论取反：落点 replay_core、witness_nonempty_replay_and_its_fixed_point；证明错 4 条（条数与登记的 proof_errors=2 不同，条数只报）
+  · must-red:ensures·replay_core 报「所选根 txg 没有后继」那一臂改成恒假：落点 replay_core；证明错 2 条
+  · must-red:ensures·replay_core 施加了的每一条都改成要求在所选根之下：落点 lemma_replay_core_result_lands_no_earlier_than_the_chosen_root、lemma_replay_core_result_replays_an_applied_record_twice_as_once、replay_core；证明错 4 条
+  · must-red:ensures·冒烟：两条记录的整次发布改成断言不是拼接：落点 a_publish_of_two_records_is_whole；证明错 1 条
+  · must-red:ensures·冒烟：一条不带末条标志的记录改成断言是拼接：落点 a_record_without_the_last_flag_alone_is_not_a_concatenation；证明错 1 条
+  · must-red:ensures·is_above_the_chosen_root 交回的判定取反：落点 is_above_the_chosen_root、replay_core；证明错 4 条
+  · must-red:ensures·readable_record_of_the_same_publish_follows 交回的判定取反：落点 judge_the_candidate、readable_record_of_the_same_publish_follows；证明错 6 条（条数与登记的 proof_errors=5 不同，条数只报）
+  · must-red:ensures·maximum_transaction_of 交回的改成严格大于起点：落点 maximum_transaction_of；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:ensures·maximum_transaction_of 攒着的每条事务号改成严格小于交回的：落点 maximum_transaction_of；证明错 1 条
+  · must-red:ensures·maximum_transaction_of 交回的改成「不等于起点、或是攒着的某一条的」：落点 maximum_transaction_of、replay_core；证明错 2 条
+  · must-red:ensures·judge_the_candidate 接受时读者规则改成不成立：落点 judge_the_candidate、replay_core；证明错 2 条
+  · must-red:ensures·judge_the_candidate 点名单元之前断时改成「没有一判不过」：落点 judge_the_candidate、replay_core；证明错 3 条
+  · must-red:ensures·judge_the_candidate 断在点名单元时改成点名单元之前就有一判不过：落点 judge_the_candidate、replay_core；证明错 2 条
+  · must-red:ensures·引理：候选个数改成严格小于终点：落点 lemma_candidates_lie_below_their_end_and_above_the_chosen_root；证明错 1 条
+  · must-red:ensures·引理：短终点的候选个数改成严格少于长终点的：落点 lemma_candidates_before_a_shorter_end_are_a_prefix；证明错 1 条
+  · must-red:ensures·引理：同一实例里切片次序改成与计数器次序相反：落点 lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg、lemma_replay_core_result_replays_an_applied_record_twice_as_once、lemma_slice_order_within_an_instance_follows_the_counter、lemma_the_landed_record_closes_its_txg、readable_record_of_the_same_publish_follows；证明错 7 条
+  · must-red:ensures·引理：接受下一个候选之后过了逐条判定的多算一条：落点 lemma_admitting_the_candidate_keeps_every_link；证明错 1 条
+  · must-red:ensures·引理：接受下一个候选之后攒着的改成不是这一串的尾巴：落点 lemma_admitting_the_candidate_extends_the_open_publish、replay_core；证明错 3 条
+  · must-red:ensures·引理：接受了带末条标志的候选之后攒着的改成不是一次整的发布：落点 lemma_admitting_the_candidate_extends_the_open_publish；证明错 1 条
+  · must-red:ensures·引理：已施加的与攒着的接起来改成不是整串：落点 lemma_the_applied_head_and_the_open_tail_make_up_the_chain；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:ensures·引理：接上一次整的发布之后改成不是整次发布的拼接：落点 lemma_appending_a_whole_publish_keeps_a_concatenation、replay_core；证明错 2 条，rlimit 用尽夹证明错
+  · must-red:ensures·引理：接上一次发布之后最大事务号改成不是施加的里最大的：落点 lemma_the_maximum_over_the_appended_publish、replay_core；证明错 2 条
+  · must-red:循环不变式·readable_record_of_the_same_publish_follows 下标到不了末尾：落点 readable_record_of_the_same_publish_follows；证明错 2 条，rlimit 用尽夹证明错
+  · must-red:循环不变式·readable_record_of_the_same_publish_follows 这一条改成往后扫到的那一条：落点 readable_record_of_the_same_publish_follows；证明错 3 条，rlimit 用尽夹证明错
+  · must-red:循环不变式·readable_record_of_the_same_publish_follows 入参次序改成不升序：落点 readable_record_of_the_same_publish_follows；证明错 3 条
+  · must-red:循环不变式·readable_record_of_the_same_publish_follows 扫过的同实例后继改成 txg 都更大：落点 readable_record_of_the_same_publish_follows；证明错 2 条
+  · must-red:循环不变式·counter_of_the_last_record_the_root_covers 下标到不了末尾：落点 counter_of_the_last_record_the_root_covers；证明错 2 条
+  · must-red:循环不变式·counter_of_the_last_record_the_root_covers 计数器改成有到顶的：落点 counter_of_the_last_record_the_root_covers；证明错 2 条
+  · must-red:循环不变式·counter_of_the_last_record_the_root_covers 收下的计数器改成多看一条：落点 counter_of_the_last_record_the_root_covers；证明错 3 条
+  · must-red:循环不变式·counter_of_the_last_record_the_root_covers 收下的计数器上界收紧一格：落点 counter_of_the_last_record_the_root_covers；证明错 1 条
+  · must-red:循环不变式·counter_of_the_last_record_the_root_covers 收下的计数器改成要求小于 1：落点 counter_of_the_last_record_the_root_covers；证明错 1 条
+  · must-red:循环不变式·maximum_transaction_of 位置到不了末尾：落点 maximum_transaction_of；证明错 2 条，rlimit 用尽夹证明错
+  · must-red:循环不变式·maximum_transaction_of 攒着的下标上界收紧一格：落点 maximum_transaction_of；证明错 1 条
+  · must-red:循环不变式·maximum_transaction_of 当前最大改成严格大于起点：落点 maximum_transaction_of；证明错 1 条
+  · must-red:循环不变式·maximum_transaction_of 看过的每条事务号改成严格小于当前最大：落点 maximum_transaction_of；证明错 1 条
+  · must-red:循环不变式·maximum_transaction_of 当前最大改成「不等于起点、或是看过的某一条的」：落点 maximum_transaction_of；证明错 2 条
+  · must-red:循环不变式·数水位之上那一遍下标到不了末尾：落点 replay_core；证明错 2 条
+  · must-red:循环不变式·数水位之上那一遍条数改成严格小于下标：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·数水位之上那一遍条数改成多看一条的候选数：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环已取条数改成比已接受的多一：落点 replay_core；证明错 2 条
+  · must-red:循环不变式·主循环校验不过条数改成 1：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环下一个该接的 jsn 改成不是这一串定下的：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环下标到不了末尾：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环所选根 txg 上界收紧一格：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环无锚点链首 txg 改成根加二：落点 replay_core；证明错 2 条，rlimit 用尽夹证明错
+  · must-red:循环不变式·主循环入参次序改成不升序：落点 replay_core；证明错 2 条
+  · must-red:循环不变式·主循环计数器改成有到顶的：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环反向链回调的前置条件多要一格下标：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环点名校验回调的前置条件多要一格下标：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环锚点改成不是 spec 的锚点：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环锚点计数器上界收紧一格：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环水位之上条数改成多一：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环过了逐条判定的改成多看一条的候选：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环过了逐条判定的条数改成严格小于在飞上限：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环过了逐条判定的每一条改成多要一条：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环验过条数改成比过了逐条判定的多一：落点 replay_core；证明错 3 条，rlimit 用尽夹证明错
+  · must-red:循环不变式·主循环已施加的改成不是这一串到最后一个末条为止的那一截：落点 replay_core；证明错 4 条
+  · must-red:循环不变式·主循环攒着的改成不是这一串在已施加之后的尾巴：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环最大事务号改成不是施加的里最大的：落点 replay_core；证明错 4 条
+  · must-red:循环不变式·主循环已施加的下标上界收紧一格：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环已施加的下标改成严格递减：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环已施加的每一条改成要求在所选根之下：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环已施加的改成不是整次发布的拼接：落点 replay_core；证明错 4 条
+  · must-red:循环不变式·主循环施加条数多算一条：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环交回的根从哪来两臂对调：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环攒着的下标上界收紧一格：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环攒着的下标改成严格递减：落点 replay_core；证明错 2 条
+  · must-red:循环不变式·主循环已施加的改成都在攒着的之后：落点 replay_core；证明错 2 条
+  · must-red:循环不变式·主循环攒着的每一条改成要求在所选根之下：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环攒着的改成不是未完的一次发布：落点 replay_core；证明错 3 条
+  · must-red:循环不变式·主循环已施加加攒着的条数改成严格小于下标：落点 replay_core；证明错 1 条
+  · must-red:循环不变式·主循环没接上链首时攒着为空改成接上之后攒着为空（「锚点读不出时链首序号为 1」那一判冗余的证明跟着断）：落点 replay_core；证明错 1 条
+  · must-red:循环出口·主循环出口改成下标没到末尾：落点 replay_core；证明错 1 条
+  · must-red:循环出口·主循环走完时校验不过条数改成 1：落点 replay_core；证明错 3 条，rlimit 用尽夹证明错
+  · must-red:循环出口·主循环停下时那一条改成不在所选根之上：落点 replay_core；证明错 3 条
+  · must-red:循环出口·主循环停下的理由改成落在下一个下标上：落点 replay_core；证明错 4 条
+  · must-red:改判定·反向链回调交回「断」也不断链（I-8.6、已定项 8；攻方 V01）：落点 judge_the_candidate；证明错 2 条
+  · must-red:改判定·上一条没带提交标记而这一条换了事务号照接（已定项 7；攻方 V02）：落点 judge_the_candidate；证明错 2 条
+  · must-red:改判定·末条不带提交标记照施加（已定项 14 五条口径第三条；攻方 V03）：落点 judge_the_candidate；证明错 2 条
+  · must-red:改判定·末条之后同一次发布还有记录照施加（已定项 4 读者规则第四格、C540；攻方 V04）：落点 judge_the_candidate；证明错 2 条
+  · must-red:改判定·点名单元不验（已定项 14 五条口径第四条；攻方 V05）：落点 judge_the_candidate；证明错 1 条
+  · must-red:改判定·在飞上限不看（已定项 18；攻方 V06）：落点 replay_core；证明错 2 条（条数与登记的 proof_errors=3 不同，条数只报）
+  · must-red:改判定·第一条水位之上的记录就停、一条都不施加（攻方 V07）：落点 replay_core；证明错 1 条
+  · must-red:改判定·锚点读不出时链首不看 txg（已定项 14 注 1；三方第一轮 K4-a；攻方 V08）：落点 judge_the_candidate；证明错 1 条
+  · must-red:改判定·每次都报所选根 txg 没有后继（攻方 V09）：落点 replay_core；证明错 2 条
+  · must-red:改判定·最大事务号取最小（已定项 14 注 4 的 W 的输入；攻方 V10）：落点 maximum_transaction_of；证明错 2 条
+  · must-red:改判定·水位之上条数不数（报告字段；攻方 V11）：落点 replay_core；证明错 1 条
+  · must-red:改判定·锚点筛选不看 txg（同实例任一带末条标志的都算；已定项 14 注 1；攻方 V12、K19）：落点 counter_of_the_last_record_the_root_covers；证明错 1 条
+  · must-red:改判定·删掉 I-8.3 那一判（jsn 严格连续不判；已定项 22；第二轮判决第二节第 2 条）：落点 judge_the_candidate；证明错 2 条
+  · must-red:改判定·末条之后同一次发布的记录往后找时跳过紧挨着的下一条（已定项 4 读者规则第四格、C540；代码轮第三轮攻方 A02）：落点 readable_record_of_the_same_publish_follows；证明错 2 条
+  · must-red:M3·ensures·replay_core 记录级幂等那一条取反：落点 replay_core；证明错 2 条
+  · must-red:M3·ensures·replay_core 不动点那一条取反：落点 replay_core；证明错 2 条
+  · must-red:M3·ensures·replay_core 落点不早于所选根那一条取反：落点 replay_core；证明错 2 条
+  · must-red:M3·ensures·replay_core 规则只容得下一个结果那一条取反：落点 replay_core；证明错 2 条
+  · must-red:M3·broadcast·replay_core 不用记录级那一个 broadcast 引理：落点 replay_core；证明错 2 条
+  · must-red:M3·broadcast·replay_core 不用不动点那一个 broadcast 引理：落点 replay_core；证明错 2 条
+  · must-red:M3·broadcast·replay_core 不用规则只容得下一个结果那一个 broadcast 引理：落点 replay_core；证明错 2 条
+  · must-red:M3·spec·记录级：交回的根改成少施加最后一条的结果：落点 lemma_replay_core_result_replays_an_applied_record_twice_as_once；证明错 1 条
+  · must-red:M3·spec·记录级：紧接着再施加一次之后的根改成所选根：落点 lemma_replay_core_result_replays_an_applied_record_twice_as_once；证明错 1 条
+  · must-red:M3·前提·记录级第二半去掉 I-8.12：落点 lemma_replay_core_result_replays_an_applied_record_twice_as_once；证明错 1 条
+  · must-red:M3·前提·不动点去掉 I-8.12：落点 lemma_replay_core_result_is_a_fixed_point；证明错 1 条
+  · must-red:M3·前提·不动点去掉同一个读者（反向链回调）：落点 lemma_replay_core_result_is_a_fixed_point；证明错 1 条
+  · must-red:M3·前提·不动点去掉同一个读者（点名单元回调）：落点 lemma_replay_core_result_is_a_fixed_point；证明错 1 条
+  · must-red:M3·前提·不动点去掉所选根之上的记录不超在飞上限：落点 lemma_replay_core_result_is_a_fixed_point；证明错 1 条
+  · must-red:M3·spec·不动点 S6：txg 顶格报错不算相等（Qn 改成前提读法 P 漏判的那一侧）：落点 lemma_replaying_from_the_landed_root_stays_put；证明错 1 条
+  · must-red:M3·spec·不动点：第二次改成要施加一条：落点 lemma_replaying_from_the_landed_root_stays_put；证明错 1 条
+  · must-red:M3·spec·S5 版本序：实例代号破平局改成严格小于：落点 choose_root_slot、lemma_replay_core_result_lands_no_earlier_than_the_chosen_root、replay_core；证明错 3 条
+  · must-red:M3·spec·落点不早于所选根改成所选根不早于落点：落点 lemma_replay_core_result_lands_no_earlier_than_the_chosen_root、replay_core；证明错 2 条
+  · must-red:M3·前提·规则只容得下一个结果去掉同一个读者（反向链回调）：落点 lemma_replay_core_result_is_the_only_one_the_rules_allow；证明错 1 条
+  · must-red:M3·前提·推论去掉择根（所选根取最新的有效根）：落点 corollary_the_landed_version_does_not_go_back；证明错 1 条
+  · must-red:M3·前提·推论去掉串行提交与持久顺序：落点 corollary_the_landed_version_does_not_go_back；证明错 2 条
+  · must-red:M3·前提·推论去掉同一个读者：落点 corollary_the_landed_version_does_not_go_back；证明错 1 条
+  · must-red:M3·ensures·推论的结论改成 s 落点晚于 u 的：落点 corollary_the_landed_version_does_not_go_back；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:M3·ensures·引理：候选按切片次序改成递减：落点 lemma_candidates_ascend_in_slice_order、lemma_the_landed_record_closes_its_txg；证明错 2 条
+  · must-red:M3·ensures·引理：所选根之上的记录在候选里的位置改成错一位：落点 lemma_a_record_above_the_chosen_root_is_a_candidate、lemma_the_landed_record_closes_its_txg；证明错 2 条，rlimit 用尽夹证明错
+  · must-red:M3·ensures·引理：没有记录在所选根之上时候选改成有一个：落点 lemma_candidates_above_the_landed_root_are_the_tail、lemma_no_record_above_the_chosen_root_means_no_candidate；证明错 2 条
+  · must-red:M3·ensures·引理：落点之下的候选个数改成严格少于全部候选：落点 lemma_candidates_above_the_landed_root_are_the_tail；证明错 1 条
+  · must-red:M3·ensures·引理：过了第四格的末条之后同实例记录的 txg 改成更小：落点 lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg、lemma_the_landed_record_closes_its_txg；证明错 2 条
+  · must-red:M3·ensures·引理：落到的那一版的发布里带末条标志的改成一条都没有：落点 lemma_the_flagged_counters_of_the_landed_publish、lemma_the_landed_record_closes_its_txg；证明错 2 条，rlimit 用尽夹证明错
+  · must-red:M3·前提·引理：同一个读者不会既让一串停下又让另一串接受，去掉反向链回调那一个读者前提：落点 lemma_the_same_reader_does_not_both_stop_and_admit_a_candidate；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:M3·ensures·引理：同样的入参过了逐条判定的那一串改成严格更长：落点 lemma_the_same_inputs_admit_no_longer_chain；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:M3·ensures·引理：规则容得下的两个结果施加的改成不同：落点 lemma_the_rules_allow_one_outcome；证明错 1 条
+  · must-red:M3·ensures·引理：施加了时落点改成早于所选根（推论调的那一个）：落点 lemma_replay_core_result_lands_no_earlier_than_the_chosen_root；证明错 1 条
+  · must-red:M3·ensures·引理：落点的 txg 改成小于所选根的：落点 lemma_the_landed_record_closes_its_txg；证明错 1 条
+  · must-red:M3·ensures·引理：落到的那一版之上的候选改成原候选整张：落点 lemma_replaying_from_the_landed_root_stays_put、lemma_the_landed_record_closes_its_txg；证明错 3 条
+  · must-red:M3·ensures·引理：不动点的第二次改成交回第一次的所选根段：落点 lemma_replaying_from_the_landed_root_stays_put；证明错 1 条
+  · must-red:M3·ensures·引理：同一条记录紧接着施加两次改成与少施加最后一条相同：落点 lemma_applying_a_record_twice_in_a_row_is_applying_it_once；证明错 1 条
+  · must-red:M3·改判定·去掉所选根 txg 顶格那一判（第三轮 S6 那一格的实现侧）：落点 replay_core；证明错 1 条
+  · must-red:M3·改判定·末条没到也施加攒着的（多施加半次发布，不动点那一侧再取一次会接着施加）：落点 replay_core；证明错 2 条
+  · must-red:择根·改判定·平局取后者赢（实例代号比较的严格大于改成大于等于；原型 m1_tie_last_wins）：落点 choose_root_slot；证明错 1 条
+  · must-red:择根·改判定·比较不看实例代号（只比 checkpoint_txg；原型 m2_ignore_instance）：落点 choose_root_slot；证明错 1 条
+  · must-red:择根·改判定·取第一个有效者（择了一个就不再换；原型 m3_first_valid_wins）：落点 choose_root_slot；证明错 1 条
+  · must-red:C650·改判定·择根 txg 平局时实例代号低者赢（改坏择根序：平局取低）：落点 choose_root_slot；证明错 1 条
+  · must-red:C650·改判定·择根以实例代号为主、txg 破平局（改坏择根序：实例代号为主）：落点 choose_root_slot；证明错 1 条
+  · must-red:择根·ensures·choose_root_slot 的结论取反：落点 choose_root_slot；证明错 1 条
+  · must-red:择根·循环不变式·记着的择新键改成不等于所选槽的键：落点 choose_root_slot；证明错 2 条
+  · must-red:择根·循环不变式·看过的槽改成多算一个：落点 choose_root_slot；证明错 3 条
+  · must-red:择根·spec·键相同改成取槽序最后的（所选槽之后的自证过的槽都严格更旧）：落点 choose_root_slot；证明错 1 条
+  · must-red:C650·spec·择根结论只要求所选槽自证过、不要求择新序最大（取第一个有效者也合这一句；合判那一条红）：落点 choose_root_slot、corollary_recovery_replays_from_the_newest_self_verified_root；证明错 2 条
+  · must-red:C650·spec·择根的择新序改成实例代号为主（与重放的版本序不再同序）：落点 choose_root_slot、corollary_recovery_replays_from_the_newest_self_verified_root；证明错 2 条
+  · must-red:C650·前提·合判去掉择根那一条（choose_root_slot 的 ensures）：落点 corollary_recovery_replays_from_the_newest_self_verified_root；证明错 2 条
+  · must-red:C650·前提·合判去掉 replay_core 的 M2 那一条（replay_follows_the_prefix_rules）：落点 corollary_recovery_replays_from_the_newest_self_verified_root；证明错 1 条
+  · must-red:C650·ensures·合判结论改成落点早于每一条自证过的根：落点 corollary_recovery_replays_from_the_newest_self_verified_root；证明错 1 条
+  · must-red:R3-10·改判定·扫环建表先到先得改成后到者赢（先查后插改成直接插）：落点 first_copy_of_each_record_key；证明错 1 条
+  · must-red:扫环·改判定·只收第一份读到的记录（之后读到的键不进表）：落点 first_copy_of_each_record_key；证明错 1 条
+  · must-red:扫环·ensures·first_copy_of_each_record_key 先到先得那一条取反：落点 first_copy_of_each_record_key；证明错 1 条
+  · must-red:扫环·spec·(实例代号, 计数器) 唯一改成不同的键留同一份：落点 first_copy_of_each_record_key；证明错 1 条
+  · must-red:扫环·spec·先到先得改成后到者赢（之前都不是这个键改成之后都不是）：落点 first_copy_of_each_record_key；证明错 1 条
+  · must-red:扫环·循环不变式·读过的位置改成多算一个：落点 first_copy_of_each_record_key；证明错 3 条
+  · must-red:改判定·P1 选段核不看钉住的槽：落点 choose_compaction_segment；证明错 1 条
+  · must-red:改判定·P1 选段核把扫过而一个能搬的都没有的段也当候选：落点 choose_compaction_segment；证明错 1 条
+  · must-red:改判定·P2 计划核一批多取一个（K 差一）：落点 plan_compaction_batch；证明错 1 条
+  · must-red:改判定·P2 计划核不判能不能搬（钉住、隔离、已死、不一致的也进计划）：落点 plan_compaction_batch；证明错 2 条（条数与登记的 proof_errors=1 不同，条数只报）
+  · must-red:改判定·P3 计划核取不到时一律报搬空（搬不动的 R 也报搬空）：落点 plan_compaction_batch；证明错 1 条
+  · must-red:改模型·P4 搬迁写目的地时多写一个零字节（GC 改掉内容）：落点 lemma_relocating_in_order_keeps_every_read；证明错 1 条
+  · must-red:改前提·P4 搬到 R 空去掉「R 内每条未释放记录都有映射 key 且不在隔离集里」（攻方 H-G7-1）：落点 corollary_compacting_the_region_until_it_is_empty_keeps_every_read；证明错 2 条
+  · must-red:改前提·P4 目的地去掉「不被映射里任何 key 占着」（分配器那一半）：落点 corollary_compacting_the_region_until_it_is_empty_keeps_every_read、lemma_relocating_in_order_keeps_every_read；证明错 3 条
+  · must-red:改前提·P4 目的地去掉「两两不重叠」（分配器那一半）：落点 corollary_compacting_the_region_until_it_is_empty_keeps_every_read、lemma_relocating_in_order_keeps_every_read；证明错 3 条
+  · must-red:ensures·P1 选中的段改成要求没扫过：落点 choose_compaction_segment；证明错 1 条
+  · must-red:ensures·P2 一批里的 key 改成要求相同：落点 plan_compaction_batch；证明错 1 条
+  · must-red:ensures·P3 「搬」改成至少两项：落点 plan_compaction_batch；证明错 1 条
+  ── 变异名	落点	条数
+  ensures·record_ends_its_publish 函数体与 ensures 一起改成恒真（接回量测报告的 red_r2）	landing=counter_of_the_last_record_the_root_covers,judge_the_candidate,replay_core	5
+  ensures·record_ends_its_publish 的 ensures 取反	landing=counter_of_the_last_record_the_root_covers,judge_the_candidate,record_ends_its_publish,replay_core	7
+  ensures·counter_of_the_last_record_the_root_covers 交回的锚点计数器小于 u64 最大值减一	landing=counter_of_the_last_record_the_root_covers	1
+  ensures·counter_of_the_last_record_the_root_covers 交回的锚点改成不等于 spec 的锚点	landing=counter_of_the_last_record_the_root_covers,replay_core	3
+  ensures·replay_core 整个结论取反	landing=replay_core,witness_nonempty_replay_and_its_fixed_point	4
+  ensures·replay_core 报「所选根 txg 没有后继」那一臂改成恒假	landing=replay_core	2
+  ensures·replay_core 施加了的每一条都改成要求在所选根之下	landing=lemma_replay_core_result_lands_no_earlier_than_the_chosen_root,lemma_replay_core_result_replays_an_applied_record_twice_as_once,replay_core	4
+  ensures·冒烟：两条记录的整次发布改成断言不是拼接	landing=a_publish_of_two_records_is_whole	1
+  ensures·冒烟：一条不带末条标志的记录改成断言是拼接	landing=a_record_without_the_last_flag_alone_is_not_a_concatenation	1
+  ensures·is_above_the_chosen_root 交回的判定取反	landing=is_above_the_chosen_root,replay_core	4
+  ensures·readable_record_of_the_same_publish_follows 交回的判定取反	landing=judge_the_candidate,readable_record_of_the_same_publish_follows	6
+  ensures·maximum_transaction_of 交回的改成严格大于起点	landing=maximum_transaction_of	1
+  ensures·maximum_transaction_of 攒着的每条事务号改成严格小于交回的	landing=maximum_transaction_of	1
+  ensures·maximum_transaction_of 交回的改成「不等于起点、或是攒着的某一条的」	landing=maximum_transaction_of,replay_core	2
+  ensures·judge_the_candidate 接受时读者规则改成不成立	landing=judge_the_candidate,replay_core	2
+  ensures·judge_the_candidate 点名单元之前断时改成「没有一判不过」	landing=judge_the_candidate,replay_core	3
+  ensures·judge_the_candidate 断在点名单元时改成点名单元之前就有一判不过	landing=judge_the_candidate,replay_core	2
+  ensures·引理：候选个数改成严格小于终点	landing=lemma_candidates_lie_below_their_end_and_above_the_chosen_root	1
+  ensures·引理：短终点的候选个数改成严格少于长终点的	landing=lemma_candidates_before_a_shorter_end_are_a_prefix	1
+  ensures·引理：同一实例里切片次序改成与计数器次序相反	landing=lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg,lemma_replay_core_result_replays_an_applied_record_twice_as_once,lemma_slice_order_within_an_instance_follows_the_counter,lemma_the_landed_record_closes_its_txg,readable_record_of_the_same_publish_follows	7
+  ensures·引理：接受下一个候选之后过了逐条判定的多算一条	landing=lemma_admitting_the_candidate_keeps_every_link	1
+  ensures·引理：接受下一个候选之后攒着的改成不是这一串的尾巴	landing=lemma_admitting_the_candidate_extends_the_open_publish,replay_core	3
+  ensures·引理：接受了带末条标志的候选之后攒着的改成不是一次整的发布	landing=lemma_admitting_the_candidate_extends_the_open_publish	1
+  ensures·引理：已施加的与攒着的接起来改成不是整串	landing=lemma_the_applied_head_and_the_open_tail_make_up_the_chain	1
+  ensures·引理：接上一次整的发布之后改成不是整次发布的拼接	landing=lemma_appending_a_whole_publish_keeps_a_concatenation,replay_core	2
+  ensures·引理：接上一次发布之后最大事务号改成不是施加的里最大的	landing=lemma_the_maximum_over_the_appended_publish,replay_core	2
+  循环不变式·readable_record_of_the_same_publish_follows 下标到不了末尾	landing=readable_record_of_the_same_publish_follows	2
+  循环不变式·readable_record_of_the_same_publish_follows 这一条改成往后扫到的那一条	landing=readable_record_of_the_same_publish_follows	3
+  循环不变式·readable_record_of_the_same_publish_follows 入参次序改成不升序	landing=readable_record_of_the_same_publish_follows	3
+  循环不变式·readable_record_of_the_same_publish_follows 扫过的同实例后继改成 txg 都更大	landing=readable_record_of_the_same_publish_follows	2
+  循环不变式·counter_of_the_last_record_the_root_covers 下标到不了末尾	landing=counter_of_the_last_record_the_root_covers	2
+  循环不变式·counter_of_the_last_record_the_root_covers 计数器改成有到顶的	landing=counter_of_the_last_record_the_root_covers	2
+  循环不变式·counter_of_the_last_record_the_root_covers 收下的计数器改成多看一条	landing=counter_of_the_last_record_the_root_covers	3
+  循环不变式·counter_of_the_last_record_the_root_covers 收下的计数器上界收紧一格	landing=counter_of_the_last_record_the_root_covers	1
+  循环不变式·counter_of_the_last_record_the_root_covers 收下的计数器改成要求小于 1	landing=counter_of_the_last_record_the_root_covers	1
+  循环不变式·maximum_transaction_of 位置到不了末尾	landing=maximum_transaction_of	2
+  循环不变式·maximum_transaction_of 攒着的下标上界收紧一格	landing=maximum_transaction_of	1
+  循环不变式·maximum_transaction_of 当前最大改成严格大于起点	landing=maximum_transaction_of	1
+  循环不变式·maximum_transaction_of 看过的每条事务号改成严格小于当前最大	landing=maximum_transaction_of	1
+  循环不变式·maximum_transaction_of 当前最大改成「不等于起点、或是看过的某一条的」	landing=maximum_transaction_of	2
+  循环不变式·数水位之上那一遍下标到不了末尾	landing=replay_core	2
+  循环不变式·数水位之上那一遍条数改成严格小于下标	landing=replay_core	1
+  循环不变式·数水位之上那一遍条数改成多看一条的候选数	landing=replay_core	3
+  循环不变式·主循环已取条数改成比已接受的多一	landing=replay_core	2
+  循环不变式·主循环校验不过条数改成 1	landing=replay_core	3
+  循环不变式·主循环下一个该接的 jsn 改成不是这一串定下的	landing=replay_core	3
+  循环不变式·主循环下标到不了末尾	landing=replay_core	3
+  循环不变式·主循环所选根 txg 上界收紧一格	landing=replay_core	1
+  循环不变式·主循环无锚点链首 txg 改成根加二	landing=replay_core	2
+  循环不变式·主循环入参次序改成不升序	landing=replay_core	2
+  循环不变式·主循环计数器改成有到顶的	landing=replay_core	3
+  循环不变式·主循环反向链回调的前置条件多要一格下标	landing=replay_core	1
+  循环不变式·主循环点名校验回调的前置条件多要一格下标	landing=replay_core	1
+  循环不变式·主循环锚点改成不是 spec 的锚点	landing=replay_core	1
+  循环不变式·主循环锚点计数器上界收紧一格	landing=replay_core	1
+  循环不变式·主循环水位之上条数改成多一	landing=replay_core	1
+  循环不变式·主循环过了逐条判定的改成多看一条的候选	landing=replay_core	3
+  循环不变式·主循环过了逐条判定的条数改成严格小于在飞上限	landing=replay_core	3
+  循环不变式·主循环过了逐条判定的每一条改成多要一条	landing=replay_core	3
+  循环不变式·主循环验过条数改成比过了逐条判定的多一	landing=replay_core	3
+  循环不变式·主循环已施加的改成不是这一串到最后一个末条为止的那一截	landing=replay_core	4
+  循环不变式·主循环攒着的改成不是这一串在已施加之后的尾巴	landing=replay_core	3
+  循环不变式·主循环最大事务号改成不是施加的里最大的	landing=replay_core	4
+  循环不变式·主循环已施加的下标上界收紧一格	landing=replay_core	1
+  循环不变式·主循环已施加的下标改成严格递减	landing=replay_core	3
+  循环不变式·主循环已施加的每一条改成要求在所选根之下	landing=replay_core	1
+  循环不变式·主循环已施加的改成不是整次发布的拼接	landing=replay_core	4
+  循环不变式·主循环施加条数多算一条	landing=replay_core	3
+  循环不变式·主循环交回的根从哪来两臂对调	landing=replay_core	3
+  循环不变式·主循环攒着的下标上界收紧一格	landing=replay_core	1
+  循环不变式·主循环攒着的下标改成严格递减	landing=replay_core	2
+  循环不变式·主循环已施加的改成都在攒着的之后	landing=replay_core	2
+  循环不变式·主循环攒着的每一条改成要求在所选根之下	landing=replay_core	1
+  循环不变式·主循环攒着的改成不是未完的一次发布	landing=replay_core	3
+  循环不变式·主循环已施加加攒着的条数改成严格小于下标	landing=replay_core	1
+  循环不变式·主循环没接上链首时攒着为空改成接上之后攒着为空（「锚点读不出时链首序号为 1」那一判冗余的证明跟着断）	landing=replay_core	1
+  循环出口·主循环出口改成下标没到末尾	landing=replay_core	1
+  循环出口·主循环走完时校验不过条数改成 1	landing=replay_core	3
+  循环出口·主循环停下时那一条改成不在所选根之上	landing=replay_core	3
+  循环出口·主循环停下的理由改成落在下一个下标上	landing=replay_core	4
+  改判定·反向链回调交回「断」也不断链（I-8.6、已定项 8；攻方 V01）	landing=judge_the_candidate	2
+  改判定·上一条没带提交标记而这一条换了事务号照接（已定项 7；攻方 V02）	landing=judge_the_candidate	2
+  改判定·末条不带提交标记照施加（已定项 14 五条口径第三条；攻方 V03）	landing=judge_the_candidate	2
+  改判定·末条之后同一次发布还有记录照施加（已定项 4 读者规则第四格、C540；攻方 V04）	landing=judge_the_candidate	2
+  改判定·点名单元不验（已定项 14 五条口径第四条；攻方 V05）	landing=judge_the_candidate	1
+  改判定·在飞上限不看（已定项 18；攻方 V06）	landing=replay_core	2
+  改判定·第一条水位之上的记录就停、一条都不施加（攻方 V07）	landing=replay_core	1
+  改判定·锚点读不出时链首不看 txg（已定项 14 注 1；三方第一轮 K4-a；攻方 V08）	landing=judge_the_candidate	1
+  改判定·每次都报所选根 txg 没有后继（攻方 V09）	landing=replay_core	2
+  改判定·最大事务号取最小（已定项 14 注 4 的 W 的输入；攻方 V10）	landing=maximum_transaction_of	2
+  改判定·水位之上条数不数（报告字段；攻方 V11）	landing=replay_core	1
+  改判定·锚点筛选不看 txg（同实例任一带末条标志的都算；已定项 14 注 1；攻方 V12、K19）	landing=counter_of_the_last_record_the_root_covers	1
+  改判定·删掉 I-8.3 那一判（jsn 严格连续不判；已定项 22；第二轮判决第二节第 2 条）	landing=judge_the_candidate	2
+  改判定·末条之后同一次发布的记录往后找时跳过紧挨着的下一条（已定项 4 读者规则第四格、C540；代码轮第三轮攻方 A02）	landing=readable_record_of_the_same_publish_follows	2
+  M3·ensures·replay_core 记录级幂等那一条取反	landing=replay_core	2
+  M3·ensures·replay_core 不动点那一条取反	landing=replay_core	2
+  M3·ensures·replay_core 落点不早于所选根那一条取反	landing=replay_core	2
+  M3·ensures·replay_core 规则只容得下一个结果那一条取反	landing=replay_core	2
+  M3·broadcast·replay_core 不用记录级那一个 broadcast 引理	landing=replay_core	2
+  M3·broadcast·replay_core 不用不动点那一个 broadcast 引理	landing=replay_core	2
+  M3·broadcast·replay_core 不用规则只容得下一个结果那一个 broadcast 引理	landing=replay_core	2
+  M3·spec·记录级：交回的根改成少施加最后一条的结果	landing=lemma_replay_core_result_replays_an_applied_record_twice_as_once	1
+  M3·spec·记录级：紧接着再施加一次之后的根改成所选根	landing=lemma_replay_core_result_replays_an_applied_record_twice_as_once	1
+  M3·前提·记录级第二半去掉 I-8.12	landing=lemma_replay_core_result_replays_an_applied_record_twice_as_once	1
+  M3·前提·不动点去掉 I-8.12	landing=lemma_replay_core_result_is_a_fixed_point	1
+  M3·前提·不动点去掉同一个读者（反向链回调）	landing=lemma_replay_core_result_is_a_fixed_point	1
+  M3·前提·不动点去掉同一个读者（点名单元回调）	landing=lemma_replay_core_result_is_a_fixed_point	1
+  M3·前提·不动点去掉所选根之上的记录不超在飞上限	landing=lemma_replay_core_result_is_a_fixed_point	1
+  M3·spec·不动点 S6：txg 顶格报错不算相等（Qn 改成前提读法 P 漏判的那一侧）	landing=lemma_replaying_from_the_landed_root_stays_put	1
+  M3·spec·不动点：第二次改成要施加一条	landing=lemma_replaying_from_the_landed_root_stays_put	1
+  M3·spec·S5 版本序：实例代号破平局改成严格小于	landing=choose_root_slot,lemma_replay_core_result_lands_no_earlier_than_the_chosen_root,replay_core	3
+  M3·spec·落点不早于所选根改成所选根不早于落点	landing=lemma_replay_core_result_lands_no_earlier_than_the_chosen_root,replay_core	2
+  M3·前提·规则只容得下一个结果去掉同一个读者（反向链回调）	landing=lemma_replay_core_result_is_the_only_one_the_rules_allow	1
+  M3·前提·推论去掉择根（所选根取最新的有效根）	landing=corollary_the_landed_version_does_not_go_back	1
+  M3·前提·推论去掉串行提交与持久顺序	landing=corollary_the_landed_version_does_not_go_back	2
+  M3·前提·推论去掉同一个读者	landing=corollary_the_landed_version_does_not_go_back	1
+  M3·ensures·推论的结论改成 s 落点晚于 u 的	landing=corollary_the_landed_version_does_not_go_back	1
+  M3·ensures·引理：候选按切片次序改成递减	landing=lemma_candidates_ascend_in_slice_order,lemma_the_landed_record_closes_its_txg	2
+  M3·ensures·引理：所选根之上的记录在候选里的位置改成错一位	landing=lemma_a_record_above_the_chosen_root_is_a_candidate,lemma_the_landed_record_closes_its_txg	2
+  M3·ensures·引理：没有记录在所选根之上时候选改成有一个	landing=lemma_candidates_above_the_landed_root_are_the_tail,lemma_no_record_above_the_chosen_root_means_no_candidate	2
+  M3·ensures·引理：落点之下的候选个数改成严格少于全部候选	landing=lemma_candidates_above_the_landed_root_are_the_tail	1
+  M3·ensures·引理：过了第四格的末条之后同实例记录的 txg 改成更小	landing=lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg,lemma_the_landed_record_closes_its_txg	2
+  M3·ensures·引理：落到的那一版的发布里带末条标志的改成一条都没有	landing=lemma_the_flagged_counters_of_the_landed_publish,lemma_the_landed_record_closes_its_txg	2
+  M3·前提·引理：同一个读者不会既让一串停下又让另一串接受，去掉反向链回调那一个读者前提	landing=lemma_the_same_reader_does_not_both_stop_and_admit_a_candidate	1
+  M3·ensures·引理：同样的入参过了逐条判定的那一串改成严格更长	landing=lemma_the_same_inputs_admit_no_longer_chain	1
+  M3·ensures·引理：规则容得下的两个结果施加的改成不同	landing=lemma_the_rules_allow_one_outcome	1
+  M3·ensures·引理：施加了时落点改成早于所选根（推论调的那一个）	landing=lemma_replay_core_result_lands_no_earlier_than_the_chosen_root	1
+  M3·ensures·引理：落点的 txg 改成小于所选根的	landing=lemma_the_landed_record_closes_its_txg	1
+  M3·ensures·引理：落到的那一版之上的候选改成原候选整张	landing=lemma_replaying_from_the_landed_root_stays_put,lemma_the_landed_record_closes_its_txg	3
+  M3·ensures·引理：不动点的第二次改成交回第一次的所选根段	landing=lemma_replaying_from_the_landed_root_stays_put	1
+  M3·ensures·引理：同一条记录紧接着施加两次改成与少施加最后一条相同	landing=lemma_applying_a_record_twice_in_a_row_is_applying_it_once	1
+  M3·改判定·去掉所选根 txg 顶格那一判（第三轮 S6 那一格的实现侧）	landing=replay_core	1
+  M3·改判定·末条没到也施加攒着的（多施加半次发布，不动点那一侧再取一次会接着施加）	landing=replay_core	2
+  择根·改判定·平局取后者赢（实例代号比较的严格大于改成大于等于；原型 m1_tie_last_wins）	landing=choose_root_slot	1
+  择根·改判定·比较不看实例代号（只比 checkpoint_txg；原型 m2_ignore_instance）	landing=choose_root_slot	1
+  择根·改判定·取第一个有效者（择了一个就不再换；原型 m3_first_valid_wins）	landing=choose_root_slot	1
+  C650·改判定·择根 txg 平局时实例代号低者赢（改坏择根序：平局取低）	landing=choose_root_slot	1
+  C650·改判定·择根以实例代号为主、txg 破平局（改坏择根序：实例代号为主）	landing=choose_root_slot	1
+  择根·ensures·choose_root_slot 的结论取反	landing=choose_root_slot	1
+  择根·循环不变式·记着的择新键改成不等于所选槽的键	landing=choose_root_slot	2
+  择根·循环不变式·看过的槽改成多算一个	landing=choose_root_slot	3
+  择根·spec·键相同改成取槽序最后的（所选槽之后的自证过的槽都严格更旧）	landing=choose_root_slot	1
+  C650·spec·择根结论只要求所选槽自证过、不要求择新序最大（取第一个有效者也合这一句；合判那一条红）	landing=choose_root_slot,corollary_recovery_replays_from_the_newest_self_verified_root	2
+  C650·spec·择根的择新序改成实例代号为主（与重放的版本序不再同序）	landing=choose_root_slot,corollary_recovery_replays_from_the_newest_self_verified_root	2
+  C650·前提·合判去掉择根那一条（choose_root_slot 的 ensures）	landing=corollary_recovery_replays_from_the_newest_self_verified_root	2
+  C650·前提·合判去掉 replay_core 的 M2 那一条（replay_follows_the_prefix_rules）	landing=corollary_recovery_replays_from_the_newest_self_verified_root	1
+  C650·ensures·合判结论改成落点早于每一条自证过的根	landing=corollary_recovery_replays_from_the_newest_self_verified_root	1
+  R3-10·改判定·扫环建表先到先得改成后到者赢（先查后插改成直接插）	landing=first_copy_of_each_record_key	1
+  扫环·改判定·只收第一份读到的记录（之后读到的键不进表）	landing=first_copy_of_each_record_key	1
+  扫环·ensures·first_copy_of_each_record_key 先到先得那一条取反	landing=first_copy_of_each_record_key	1
+  扫环·spec·(实例代号, 计数器) 唯一改成不同的键留同一份	landing=first_copy_of_each_record_key	1
+  扫环·spec·先到先得改成后到者赢（之前都不是这个键改成之后都不是）	landing=first_copy_of_each_record_key	1
+  扫环·循环不变式·读过的位置改成多算一个	landing=first_copy_of_each_record_key	3
+  改判定·P1 选段核不看钉住的槽	landing=choose_compaction_segment	1
+  改判定·P1 选段核把扫过而一个能搬的都没有的段也当候选	landing=choose_compaction_segment	1
+  改判定·P2 计划核一批多取一个（K 差一）	landing=plan_compaction_batch	1
+  改判定·P2 计划核不判能不能搬（钉住、隔离、已死、不一致的也进计划）	landing=plan_compaction_batch	2
+  改判定·P3 计划核取不到时一律报搬空（搬不动的 R 也报搬空）	landing=plan_compaction_batch	1
+  改模型·P4 搬迁写目的地时多写一个零字节（GC 改掉内容）	landing=lemma_relocating_in_order_keeps_every_read	1
+  改前提·P4 搬到 R 空去掉「R 内每条未释放记录都有映射 key 且不在隔离集里」（攻方 H-G7-1）	landing=corollary_compacting_the_region_until_it_is_empty_keeps_every_read	2
+  改前提·P4 目的地去掉「不被映射里任何 key 占着」（分配器那一半）	landing=corollary_compacting_the_region_until_it_is_empty_keeps_every_read,lemma_relocating_in_order_keeps_every_read	3
+  改前提·P4 目的地去掉「两两不重叠」（分配器那一半）	landing=corollary_compacting_the_region_until_it_is_empty_keeps_every_read,lemma_relocating_in_order_keeps_every_read	3
+  ensures·P1 选中的段改成要求没扫过	landing=choose_compaction_segment	1
+  ensures·P2 一批里的 key 改成要求相同	landing=plan_compaction_batch	1
+  ensures·P3 「搬」改成至少两项	landing=plan_compaction_batch	1
+  ✓ 补落点：crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 补了 165 行的第六段（共取到 165 行的落点，已有第六段的 0 行没改）；对着 git diff 过一眼再提交

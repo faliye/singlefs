@@ -8,7 +8,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；第三段驱动仍是 `scripts/experiments/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；第三段驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 主 agent 给的问题（逐字，派发提示里的几行）：
 
@@ -317,7 +317,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-主 agent 以外的观测，行号是 2026-10-02 在主工作区现读的。今天主工作区这两份文件逐字节等于第 10 批 10-3 的补丁打在它的快照上的结果（`patch -p1` 打在 `/tmp/claude-1000/m3-formal-10-3/base/` 的拷贝上，`cmp` 两份都相同）：`crates/singlefs-core/src/recovery.rs` sha256 `9337dc1b50eb13afdb346ee0a58360709e3a9f2bba6e5da8948fdda5685edd18`，`crates/singlefs-replay-prefix/src/lib.rs` `40cd99b58242a5e522a9e302fa83ceaed17cdd5c2ea8e8811e0e223a4649f08c`；`crates/mutations.tsv` `5877d9c024bc2080744fca17b8c20cc5ccaaaab51824be8bfff90daf81f41172`（暂存区之外还有改动，`git status` 是 `MM`）；装置 `a0fdc9e297ff347a4e6bd492ddb55480eaa92dad390ad9ededaebb52eb86f179`（等于 r2 第四段冻结根里那一份，r2 修订 4）；驱动 `scripts/experiments/e165-replay-mutation-kill-bounds.sh` `ea7213ddfdda05d1fc108cdc93f712a70727a4e32e47fa0e26a7578ccbe7d7d2`；自造表 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` `990319174135ce78c0cf2d8f5d59a382d25ed951b40b0cf05e1f4dfd0c877fae`。
+主 agent 以外的观测，行号是 2026-10-02 在主工作区现读的。今天主工作区这两份文件逐字节等于第 10 批 10-3 的补丁打在它的快照上的结果（`patch -p1` 打在 `/tmp/claude-1000/m3-formal-10-3/base/` 的拷贝上，`cmp` 两份都相同）：`crates/singlefs-core/src/recovery.rs` sha256 `9337dc1b50eb13afdb346ee0a58360709e3a9f2bba6e5da8948fdda5685edd18`，`crates/singlefs-replay-prefix/src/lib.rs` `40cd99b58242a5e522a9e302fa83ceaed17cdd5c2ea8e8811e0e223a4649f08c`；`crates/mutations.tsv` `5877d9c024bc2080744fca17b8c20cc5ccaaaab51824be8bfff90daf81f41172`（暂存区之外还有改动，`git status` 是 `MM`）；装置 `a0fdc9e297ff347a4e6bd492ddb55480eaa92dad390ad9ededaebb52eb86f179`（等于 r2 第四段冻结根里那一份，r2 修订 4）；驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` `ea7213ddfdda05d1fc108cdc93f712a70727a4e32e47fa0e26a7578ccbe7d7d2`；自造表 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` `990319174135ce78c0cf2d8f5d59a382d25ed951b40b0cf05e1f4dfd0c877fae`。
 
 | 事实 | 文件:行 |
 |---|---|
@@ -504,9 +504,9 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 |---|---|---|---|---|
 | 第一段（装置甲） | Q3；补完够判 | 装置（`--profile r3`、5.6 的几行、KF3、单测）；`crates/mutations.tsv` 这个 bin 的行（9.2 甲） | `segment1-adversarial-family.out`、`segment1-adversarial-family-threads-second.out`（各配 `-timing.out`）；`segment1-profile-check.out`（TV1、TV2 的比对） | 与第二、三段的写不并行（同一份装置）；根在开工时拷（第三节） |
 | 第二段（装置乙） | Q1；补完够判。Q2 的基线也在这一段出 | 装置（K 族生成器与四个域、5.5 的判据与计数、读槽对拍、本地常量回比、KF1、KF2、KA 的本地择根、单测）；`crates/mutations.tsv` 这个 bin 的行（9.2 乙） | `segment2-root-choice.out`、`segment2-root-choice-threads-second.out`（各配 `-timing.out`）；`segment2-profile-check.out` | 要等第一段合入；根照第三节「后几段的根」 |
-| 第三段（驱动） | Q2；补完够判 | `scripts/experiments/e165-replay-mutation-kill-bounds.sh`（加 r3 模式，9.3） | `segment3-root-choice-kill-bounds.out`、`segment3-root-choice-kill-bounds-timing.out` | 驱动可与第二段同时写（不共用文件）；跑要等第二段的根 |
+| 第三段（驱动） | Q2；补完够判 | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`（加 r3 模式，9.3） | `segment3-root-choice-kill-bounds.out`、`segment3-root-choice-kill-bounds-timing.out` | 驱动可与第二段同时写（不共用文件）；跑要等第二段的根 |
 
-- `scripts/experiments/replay.sh` 三段都不改：每段交回附自己产物要加的复跑行（参数原样），主 agent 收齐一次加。
+- `scripts/experiment-apparatus/replay.sh` 三段都不改：每段交回附自己产物要加的复跑行（参数原样），主 agent 收齐一次加。
 - 钉红例表 `.claude/gate.d/e165-pinned-red-examples.tsv` 这一次不动（同 r2 登记 5.6）。
 
 ### 5.9 实现量与状态数估计（推的，没量）
@@ -820,7 +820,7 @@ KF3 必须读到的四格（`anchors_r3_i812_premise.py`；对照界内第一次
 
 ### 修订 3（2026-10-03，第三段，驱动 r3 模式写完、第三段产物一份没跑之前）
 
-时点：驱动 `scripts/experiments/e165-replay-mutation-kill-bounds.sh` 的 r3 模式写完，写在草稿目录里的镜像（`/tmp/claude-1000/e165-r3-segment3/mirror/scripts/experiments/e165-replay-mutation-kill-bounds.sh`，sha256 `1a3dafb007079a31e0609c53f541d05e0bc88f591955e6be709787b2e267e042`，2 538 行；改前仓里那份 `ea7213dd…`，1 826 行），`bash -n` 与 `python3 -m py_compile` 过；**驱动的 `--selftest` 在镜像上一格没跑**（重型测试闸只按本仓字面路径放行），所以下面各处的依据不是自证读数，是三样没起驱动整轮的核对：① `--profile r3 --root <第二段冻结根> --list-items` 在冻结根上列 7 行（基线 1、`tsv-1822` 至 `tsv-1827`）；② 把第二段产物的 379 行与手改的行喂给驱动里新写的纯函数（首红、违例数不同的格数、计数行比对、KA 钉值、TV7 比对），读数合预期；③ 假 cargo 与假装置（自证用的那一份）单独起了几趟，输出行形状对得上驱动的读法。驱动整轮、自证、第三段产物都还没有；这一节写在它们之前。原判据一个字不动，下面只收严或补一条臂与判据：
+时点：驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` 的 r3 模式写完，写在草稿目录里的镜像（`/tmp/claude-1000/e165-r3-segment3/mirror/scripts/experiments/e165-replay-mutation-kill-bounds.sh`，sha256 `1a3dafb007079a31e0609c53f541d05e0bc88f591955e6be709787b2e267e042`，2 538 行；改前仓里那份 `ea7213dd…`，1 826 行），`bash -n` 与 `python3 -m py_compile` 过；**驱动的 `--selftest` 在镜像上一格没跑**（重型测试闸只按本仓字面路径放行），所以下面各处的依据不是自证读数，是三样没起驱动整轮的核对：① `--profile r3 --root <第二段冻结根> --list-items` 在冻结根上列 7 行（基线 1、`tsv-1822` 至 `tsv-1827`）；② 把第二段产物的 379 行与手改的行喂给驱动里新写的纯函数（首红、违例数不同的格数、计数行比对、KA 钉值、TV7 比对），读数合预期；③ 假 cargo 与假装置（自证用的那一份）单独起了几趟，输出行形状对得上驱动的读法。驱动整轮、自证、第三段产物都还没有；这一节写在它们之前。原判据一个字不动，下面只收严或补一条臂与判据：
 
 1. **第二段根上的钉值（9.3 第 2 条要求写进修订）**：`crates/singlefs-core/src/recovery.rs` sha256 `9337dc1b50eb13afdb346ee0a58360709e3a9f2bba6e5da8948fdda5685edd18`，`crates/singlefs-replay-prefix/src/lib.rs` `40cd99b58242a5e522a9e302fa83ceaed17cdd5c2ea8e8811e0e223a4649f08c`，`crates/mutations.tsv` `0a52bf84cd1d811619d24ae55f4f5da2866d80ce7e99d0db255501b6e5c96977`（根里 1 850 行）；两个函数的区间用第三节的取法在根上现算：`choose_root_slot`（`lib.rs`）3977–4016，`choose_root`（`recovery.rs`）1250–1287，与第三节主工作区那一张相同。9.1 六个名字在根里各恰 1 行、文件列与登记相同（1822–1826 改 `lib.rs`，1827 改 `recovery.rs`）、原文各命中 1 次、命中处都落在这两个函数里（`load_items_r3` 在根上选行，没有一行 `failure`）。驱动开工核对（RH1）钉这三个哈希与两个区间，不等退 4。
 2. **首红格的写法**：登记 9.3 第 3 条写 `KJ1:<域>=<M,U 或 none>,…`；驱动里 (M, U) 写成 M 后接挂载数、U 后接用户发布数连写（避免与域之间的逗号相混），到上沿都相同写 `none`，基线在那个域上一行那条判据都没有写 `no_rows`。判据没动：首红 = 按 (M 升序, U 升序) 第一个违例数与基线不同的格（变体缺那一格或缺那一行也算不同），全跑不早停。
@@ -833,11 +833,11 @@ KF3 必须读到的四格（`anchors_r3_i812_premise.py`；对照界内第一次
 9. **r3 模式的用法**：`--profile r3 --root <冻结根> --scratch <草稿目录> --output <产物> [--item <变体>]… [--jobs N] [--threads N]`；不认 `--select-rows`、`--measure`、`--recheck` 与 `--ledger`（退 2：红例账不落、选行在整轮开头做、复跑靠 replay.sh 那一行整份比）；不给 `--profile` 仍是 r2 那一套，`--list-items` 在今天主工作区上仍列 27 行。
 10. **根与内存包装的位置**：`--root` 指第二段冻结根（只有 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`），内存包装 `run-with-memory-cap.sh` 与第二段产物取脚本所在的仓、不取 `--root`。内存上限默认 1G（`E165_KILL_BOUNDS_MEMORY_CAP` 可换）：第二段 `--family root_choice` 整遍包装记下的实测峰值 446 MiB，1G 超过它的两倍，驱动已设 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON`。基线的线程数 = `--jobs` × `--threads`，变体各 `--threads`；`--jobs` × `--threads` 不超过线程上限 6。
 11. **自证的 r3 格**：登记 9.3 第 6 条那四格（`--list-items` 7 行；假变体 KJ1 在 (1, 2)、KJ2 在 (1, 0) 与基线不同；假变体 KA 读数不等于钉值整轮退 1；基线缺 `criteria=root_choice` 判决行退 7 且变体一个不编）外另加：基线与第二段产物不同退 6、变体一个不编；选行不满足记 `not_compared`、别的行照做；变体跑到装置自己退 1 仍落行；r3 不认的用法退 2；r3 写死的数一格（六个名字、钉值、两个函数、档参数与界参数、首红的判据次序）。四个弄坏开关与登记表一一对应：`r3itemsmissing`、`r3firstredswap`、`r3kapinunchecked`、`r3noprofile`。r3 的假仓、假 cargo、假装置都另起（`root3`、`FAKE_CARGO_R3`），r2 那几趟与它们的假仓一个字不动。自证一格没跑，红绿不知道。
-12. **复跑行**：`scripts/experiments/replay.sh` 加三行（`@driver_e165_r3_segment1_adversarial`、`@driver_e165_r3_segment2_root_choice`、`@driver_e165_r3_segment3_root_choice_kill_bounds`）与三个驱动函数；第三段那一行指的产物名 `e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out` 是写这一节时定的，产物要用这个名字（`--output` 里写它），不是这个名字就连同那一行改。
+12. **复跑行**：`scripts/experiment-apparatus/replay.sh` 加三行（`@driver_e165_r3_segment1_adversarial`、`@driver_e165_r3_segment2_root_choice`、`@driver_e165_r3_segment3_root_choice_kill_bounds`）与三个驱动函数；第三段那一行指的产物名 `e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out` 是写这一节时定的，产物要用这个名字（`--output` 里写它），不是这个名字就连同那一行改。
 
 ### 修订之外没动的
 
-第四节推 t1–推 t6、第五至第十一节判据与门槛、第七节钉值、第十节失败条款一个字没动；`scripts/experiments/replay.sh` 与第三段驱动没动。
+第四节推 t1–推 t6、第五至第十一节判据与门槛、第七节钉值、第十节失败条款一个字没动；`scripts/experiment-apparatus/replay.sh` 与第三段驱动没动。
 
 ## 十三、读过的文件与跑过的命令
 
@@ -866,8 +866,8 @@ KF3 必须读到的四格（`anchors_r3_i812_premise.py`；对照界内第一次
 | `crates/singlefs-core/src/pointer.rs` | 与 r2 冻结根那一份的 `diff` 前 60 行 |
 | `crates/mutations.tsv` | 1822–1829（grep `择根核\|择根胶水\|扫环…`、`awk` 取 1822–1827 的四列） |
 | `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 定义行的 grep（`草稿 device-defs.txt`）；400–600；1160–1200；3014–3175；4594–4700；5060–5180；J6Qn 计数器的 grep 命中行 |
-| `scripts/experiments/e165-replay-mutation-kill-bounds.sh` | 1–30；`REGISTERED\|--profile\|--list-items\|…` 的 grep 命中行 |
-| `scripts/experiments/replay.sh` | grep `e165` 的命中行（222–231、533–585） |
+| `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 1–30；`REGISTERED\|--profile\|--list-items\|…` 的 grep 命中行 |
+| `scripts/experiment-apparatus/replay.sh` | grep `e165` 的命中行（222–231、533–585） |
 | r2 冻结根 `/tmp/claude-1000/e165-r2-segment4/root/` | 清单 `sha256sum -c`；`recovery.rs` 与 10-3 快照之差的前 9 000 字节；`root_record.rs`、`pointer.rs`、`replay_core` 三处 `diff` |
 | `research/results/` | 五份 E165 产物只算 sha256、数行数（第七节那五份），内容没读 |
 
@@ -884,7 +884,7 @@ KF3 必须读到的四格（`anchors_r3_i812_premise.py`；对照界内第一次
 | `.claude/kb/checks-owed.md` | `59eb4c5c505e13934869f0e74c7c4b9cb8c64e8446e89b19a586e28ae274cc78` |
 | `research/prompts/m3-inv-b-r1-main-verification.md` | `bc431fd46aa767e96a09133d6b159b9e1eef9de975905ed49e38a2ad1ae1c6a2` |
 | `research/prompts/e165-r3-questions.md` | `dd76c3a56f1539a7884bd1cb4467ebe4e44235748bfad974bb41234c669b921b` |
-| `scripts/experiments/replay.sh` | `084448e76ff6240ec2d628e85a10a6ddc5ed9fcad2e034f2fc55fcc9a3ed2b05` |
+| `scripts/experiment-apparatus/replay.sh` | `084448e76ff6240ec2d628e85a10a6ddc5ed9fcad2e034f2fc55fcc9a3ed2b05` |
 | `/tmp/claude-1000/m3-formal-10-5/report.md`、`/tmp/claude-1000/m3-formal-10-3/report.md` | `d7d289229ea306ec4593db6a2df659e2c2cbcc9fe2501807205a2300adb9694b`、`bc5731fa761c164f01929796c018bf9ab385215b411b30b74b29c7d2d481f1be` |
 | 草稿 `clauses.md`、`clauses-defs.md` | `65d003f20e374af2f9468b15fd02e70746d23e8aad57c14edddab21c732175b8`、`deedd74a1b973ba3b8bf83e0cb3f8b3b897554d3924588b611044f9dd1fda0c5` |
 | 草稿 `function_ranges.py`、它今天的输出 `function-ranges-today.txt` | `5c5234e1627354751b679d41650a362d159424b9445a243ab3a5fb03eec4afaa`、`2c21d9104e6c84280a2c12daf013917df0a39f1b619d510bf24e1f711c8b3293` |

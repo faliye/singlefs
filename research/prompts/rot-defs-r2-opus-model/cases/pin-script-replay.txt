@@ -1,1 +1,1 @@
-python3 scripts/experiments/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration --memory-cap 8G
+python3 scripts/experiment-apparatus/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration --memory-cap 8G

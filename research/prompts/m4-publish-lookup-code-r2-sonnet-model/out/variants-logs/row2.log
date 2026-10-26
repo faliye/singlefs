@@ -1,0 +1,36 @@
+
+running 6 tests
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units ... ignored, harness 慢档用例：造 2048 个数据单元的池要发约 460 次发布，debug 下单条超过 60 秒
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+test first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... ok
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 54.93s
+
+
+running 15 tests
+test destroying_a_snapshot_that_is_not_in_the_tree_table_is_refused_before_any_write ... ok
+test an_overwrite_without_any_snapshot_releases_every_replaced_unit_and_leaves_the_deadlist_at_a_zero_root ... ok
+test an_overwrite_under_a_snapshot_keeps_every_replaced_user_visible_unit_on_the_deadlist_and_releases_the_pool_metadata ... ok
+test creating_a_snapshot_while_another_is_being_destroyed_is_refused_before_any_write ... ok
+test a_unit_born_after_the_snapshot_is_released_when_it_is_replaced ... ok
+test a_rollback_from_a_version_carrying_a_snapshot_is_refused_before_any_write ... ok
+test the_snapshot_reads_the_content_at_its_creation_after_an_overwrite ... ok
+test the_snapshot_reads_the_content_at_its_creation_after_the_file_is_unlinked ... ok
+test destroying_the_only_snapshot_releases_every_entry_and_deletes_its_pair_of_entries ... ok
+test a_rollback_to_a_version_carrying_a_snapshot_is_refused_before_any_write ... ok
+test a_destruction_batch_capped_at_one_entry_releases_one_entry_per_publish_until_the_final_batch ... ok
+test destroying_the_older_snapshot_releases_its_own_range_and_passes_its_predecessor_to_the_newer_one ... ok
+test destroying_the_newer_snapshot_keeps_what_the_older_one_references_and_destroying_the_older_one_releases_it ... ok
+test destroying_a_snapshot_through_the_mounted_session_publishes_the_intent_and_every_batch_in_one_call ... ok
+test a_writable_mount_after_the_destruction_intent_continues_the_batches_to_the_end ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.74s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 20.01s
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+     Running tests/snapshot_release_and_destroy_through_the_deadlist.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/snapshot_release_and_destroy_through_the_deadlist-ed36be39ea00ad83)

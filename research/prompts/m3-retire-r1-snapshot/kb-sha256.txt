@@ -1,9 +1,0 @@
-c9e48c69a6f7fa3b9ce991307db866bc5a3c80a85b29216e74fd04217e0a673c  .claude/kb/checks-owed.md
-3c7dfb20ecb5ddd3701e74e6c70df19ac95c8f9f35f3595373fe43b6a3b174e3  .claude/kb/decisions/23-journal的角色与格式.md
-773f06748275d5f6d6499629eaaa09d0157ea73855a106a1078b759000091abb  .claude/kb/decisions/08-核心索引结构.md
-33933dc5ebade4b982f90b6eeb7099778b4c4671ef2fb6071f1aee3d4ed3fc0a  .claude/kb/decisions/18-块里携带什么信息.md
-93716f451110e731d53b23f73a1f8e96007444bba1e84785322c1e05f4b9537c  .claude/kb/experiments/178-叶容器与记录死亡的计数.md
-b94e1806e8c2329062f81fbdcd95e319d55b43cfec289329cdd885cfdb236a7a  .claude/kb/decisions/28-挂载期承诺量.md
-7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md
-a7230d029c40ecf422f2a9970f77c6aa942f765ed73167159ab14d19c668059d  .claude/kb/decisions/15-格式冻结政策.md
-49721f00336c56212d2c92df1e9136797325f897cd5f96c3a027ac3c243ad557  .claude/kb/decisions/03-空间分配.md

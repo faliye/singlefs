@@ -1,0 +1,17 @@
+name=check item=r3_point_lines lines=2684 losing=1137 not_losing=398 not_losing_lower_bound=95 unstable=1054
+name=check item=c_and_a_same_c_rt groups=672 identical=672
+name=check item=r3_round_five_over_round_one index=0 lines=108 median=0.528
+name=check item=r3_round_five_over_round_one index=1 lines=108 median=0.958
+name=check item=function_split_share_sum fraction=0.25 pool=1024 scope=batches sum=0.888 remainder=0.110173
+name=check item=function_split_share_sum fraction=0.25 pool=1024 scope=issue sum=1.628 remainder=-0.630513
+name=check item=function_split_share_sum fraction=0.25 pool=8192 scope=batches sum=1.309 remainder=-0.309107
+name=check item=function_split_share_sum fraction=0.25 pool=8192 scope=issue sum=2.517 remainder=-1.516256
+name=check item=function_split_share_sum fraction=0.75 pool=1024 scope=batches sum=1.167 remainder=-0.169035
+name=check item=function_split_share_sum fraction=0.75 pool=1024 scope=issue sum=1.578 remainder=-0.578534
+name=check item=function_split_share_sum fraction=0.75 pool=8192 scope=batches sum=1.675 remainder=-0.675966
+name=check item=function_split_share_sum fraction=0.75 pool=8192 scope=issue sum=2.183 remainder=-1.182773
+name=check item=r3_merging_shape lines=432 merge_across_intents=1
+name=check item=g8_foreground_increment card0_one_submission_of_8_units_min=5.50 max=6.54 card1_two_submissions_of_24_units_min=12.03 max=14.76
+name=check item=r3_one_submission_wall_median_range min=5.32 max=32.04 cells=720
+name=check item=r1_verdict_stage_share line=989 share=0.049067
+name=check item=r1_verdict_intercepts line54=0.004492 line136=0.010300

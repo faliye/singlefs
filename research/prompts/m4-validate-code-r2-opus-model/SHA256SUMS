@@ -1,0 +1,7 @@
+412d971edd7600c5325c4b0a1210890ef3792026862050d02112abf1bac6cda2  ./out/fix-candidate.txt
+c838822be7b1ea7dbbe4826a78267500bce700b926e7688e7181ada356c10aef  ./out/main.txt
+fc019dd5b130224f91f161d2f2f4a33e52ca65873dafd347c572cfe65a07be06  ./out/old-readers.txt
+c0d16ad222fc661b6a4474451abb125385ed2457f7be740e700ac5cfbb0b8993  ./prototype/old_readers_on_quarantine_marks.rs
+cd52a87561e1627f9538afd8a83b928e95ff211365b3e40e9500f3eeef460844  ./prototype/validate_code_round_two_attack_cases.rs
+5efd12b9ab451eacf3312d67d24060368be96c9cb24cb091ed80ff696ae34dd1  ./tools/apply_fix_candidate_a.py
+7f51f630037021a63cf291109f81fdde6fef95a71eb12f81bf73a77f8e460cc6  ./tools/rerun.sh

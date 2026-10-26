@@ -1,0 +1,45 @@
+
+running 1 test
+test a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site ... FAILED
+
+failures:
+
+---- a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site stdout ----
+publish_lookup_by_identity release_sites replaced_roles=9 routed_leaves=2 release_judgement=LookupWorkOfEachSite { work_of_each_site: {Some(MappingEntriesOfTheReleaseJudgement): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheReplacedRolesInThePreviousVersion): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 54, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 9 }, Some(RolesKeptForTheSnapshotsInTheReleaseJudgement): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }} } two_pool_devices_check=LookupWorkOfEachSite { work_of_each_site: {Some(MappingEntriesCheckedForTwoPoolDevices): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheMappedRolesReleasedByThisPublish): LookupWork { index_builds: 9, index_lookups: 9, index_entries_examined: 54, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 1 }, Some(RolesKeptForTheSnapshotsAmongTheMappedRolesReleased): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }} } release_checksum_check=LookupWorkOfEachSite { work_of_each_site: {Some(MappingEntriesCheckedForTwoPoolDevices): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(MappingEntriesCheckedAgainstTheReleaseChecksums): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheMappedRolesReleasedByThisPublish): LookupWork { index_builds: 18, index_lookups: 18, index_entries_examined: 108, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 2 }, Some(RolesKeptForTheSnapshotsAmongTheMappedRolesReleased): LookupWork { index_builds: 2, index_lookups: 18, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 2 }} }
+
+thread 'a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site' (117055) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1477:5:
+核两条位置项：FilesOfTheMappedRolesReleasedByThisPublish：进了 1 次（走了几遍），建索引 9 次，每走一遍恰好建一份：LookupWork { index_builds: 9, index_lookups: 9, index_entries_examined: 54, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 1 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.36s
+
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/transaction.rs:4931:9
+     |
+4931 |     let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+     |         ----^^^^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `previous_files`
+    --> crates/singlefs-core/src/transaction.rs:4931:9
+     |
+4931 |     let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+     |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_previous_files`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.77s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

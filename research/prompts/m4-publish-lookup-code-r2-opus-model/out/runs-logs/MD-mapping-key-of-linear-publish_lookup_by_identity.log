@@ -1,0 +1,17 @@
+
+running 6 tests
+test first_entry_of_each_identity_keeps_the_first_of_repeated_identities_and_misses_absent_ones ... ok
+publish_lookup_by_identity synthetic_table smaller=ComparisonsOfLookups { lookups: 513, comparisons: 6503 } larger=ComparisonsOfLookups { lookups: 2049, comparisons: 30683 } growth_in_percent=118
+test first_entry_of_each_identity_compares_less_than_twice_as_often_per_lookup_on_a_table_four_times_as_long ... ok
+test leaf_by_leaf_mapping_read_agrees_with_the_per_key_lookup_on_a_malformed_leaf_a_narrow_leaf_and_repeated_keys ... ok
+publish_lookup_by_identity shape=PoolOfFiles { files: 16, data_units_per_file: 4 } batches_published=24 images_sha256=66357a801c8269e8af3fb3be5e76928281729a11e63f8529069cfcfa2f56fa49
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... ok
+publish_lookup_by_identity shape=PoolOfFiles { files: 48, data_units_per_file: 8 } batches_published=44 images_sha256=7b3bb85d08a2822115a91a554d2ecd4fcbbf8f29a6291f621f9081decf90708e
+test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_forty_eight_files_of_eight_data_units ... ok
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units has been running for over 60 seconds
+publish_lookup_by_identity growth smaller_comparisons=[ComparisonsOfLookups { lookups: 606, comparisons: 8121 }, ComparisonsOfLookups { lookups: 607, comparisons: 8138 }, ComparisonsOfLookups { lookups: 606, comparisons: 8121 }, ComparisonsOfLookups { lookups: 607, comparisons: 8138 }, ComparisonsOfLookups { lookups: 606, comparisons: 8121 }, ComparisonsOfLookups { lookups: 607, comparisons: 8138 }, ComparisonsOfLookups { lookups: 606, comparisons: 8121 }, ComparisonsOfLookups { lookups: 607, comparisons: 8138 }] larger_comparisons=[ComparisonsOfLookups { lookups: 2379, comparisons: 35306 }, ComparisonsOfLookups { lookups: 2380, comparisons: 35322 }, ComparisonsOfLookups { lookups: 2379, comparisons: 35306 }, ComparisonsOfLookups { lookups: 2380, comparisons: 35322 }, ComparisonsOfLookups { lookups: 2379, comparisons: 35306 }, ComparisonsOfLookups { lookups: 2380, comparisons: 35322 }, ComparisonsOfLookups { lookups: 2379, comparisons: 35306 }, ComparisonsOfLookups { lookups: 2380, comparisons: 35322 }]
+publish_lookup_by_identity growth smaller=ComparisonsOfLookups { lookups: 4852, comparisons: 65036 } larger=ComparisonsOfLookups { lookups: 19036, comparisons: 282512 } growth_in_percent=110
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 215.20s
+

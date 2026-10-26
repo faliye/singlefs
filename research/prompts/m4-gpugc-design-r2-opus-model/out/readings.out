@@ -1,0 +1,22 @@
+name=rounds_not_losing candidate=scan_checksum_only card=0 k0=108 k1=56 k2=40 k3=4 k4=8 k5=0
+name=rounds_not_losing candidate=scan_checksum_only card=1 k0=216 k1=0 k2=0 k3=0 k4=0 k5=0
+name=rounds_not_losing candidate=scan_checksum_and_choice card=0 k0=29 k1=33 k2=24 k3=48 k4=45 k5=37
+name=rounds_not_losing candidate=scan_checksum_and_choice card=1 k0=140 k1=5 k2=12 k3=29 k4=16 k5=14
+name=rounds_not_losing candidate=release_check_only card=0 k0=64 k1=82 k2=46 k3=18 k4=6 k5=0
+name=rounds_not_losing candidate=release_check_only card=1 k0=216 k1=0 k2=0 k3=0 k4=0 k5=0
+name=rounds_not_losing candidate=every_stage card=0 k0=6 k1=20 k2=4 k3=26 k4=28 k5=132
+name=rounds_not_losing candidate=every_stage card=1 k0=85 k1=2 k2=6 k3=20 k4=18 k5=85
+name=reading candidate=scan_checksum_only card=0 cells=216 majority_not_losing=12 median_not_losing=12 any_round_not_losing=108 last_round_not_losing=88
+name=reading candidate=scan_checksum_only card=1 cells=216 majority_not_losing=0 median_not_losing=0 any_round_not_losing=0 last_round_not_losing=0
+name=reading candidate=scan_checksum_and_choice card=0 cells=216 majority_not_losing=130 median_not_losing=130 any_round_not_losing=187 last_round_not_losing=162
+name=reading candidate=scan_checksum_and_choice card=1 cells=216 majority_not_losing=59 median_not_losing=59 any_round_not_losing=76 last_round_not_losing=64
+name=reading candidate=release_check_only card=0 cells=216 majority_not_losing=24 median_not_losing=24 any_round_not_losing=152 last_round_not_losing=108
+name=reading candidate=release_check_only card=1 cells=216 majority_not_losing=0 median_not_losing=0 any_round_not_losing=0 last_round_not_losing=0
+name=reading candidate=every_stage card=0 cells=216 majority_not_losing=186 median_not_losing=186 any_round_not_losing=210 last_round_not_losing=195
+name=reading candidate=every_stage card=1 cells=216 majority_not_losing=123 median_not_losing=123 any_round_not_losing=131 last_round_not_losing=123
+name=round_trend card=0 wait=blocking points=36 median_c_rt_by_round_ms=0.2880,0.2197,0.3236,0.1642,0.1404
+name=round_trend card=0 wait=sleep_100_microseconds points=36 median_c_rt_by_round_ms=0.2918,0.3018,0.4671,0.3440,0.2102
+name=round_trend card=0 wait=sleep_1_millisecond points=36 median_c_rt_by_round_ms=0.2432,0.2215,0.3419,0.2033,0.1501
+name=round_trend card=1 wait=blocking points=36 median_c_rt_by_round_ms=0.3479,0.4117,0.3692,0.4008,0.3200
+name=round_trend card=1 wait=sleep_100_microseconds points=36 median_c_rt_by_round_ms=0.4414,0.4434,0.4330,0.5134,0.4704
+name=round_trend card=1 wait=sleep_1_millisecond points=36 median_c_rt_by_round_ms=0.4108,0.4044,0.3561,0.4789,0.4095

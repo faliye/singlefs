@@ -1,0 +1,26 @@
+name=z5_union publish_fn=836 rollback_fn=1057 union_fn=1073 shared=820 only_publish=16 only_rollback=237
+name=z5_union_by_crate singlefs_core=1071 singlefs_replay_prefix=2
+name=z5_union_lines span_lines=24970 code_lines=24346 core_span_lines=24958
+name=z5_union_noncore fn=singlefs_replay_prefix::gc_crash_proofs::released_record_can_be_reclaimed at=crates/singlefs-replay-prefix/src/gc_crash_proofs.rs:246-251
+name=z5_union_noncore fn=singlefs_replay_prefix::records_at at=crates/singlefs-replay-prefix/src/lib.rs:506-511
+mir fn=5557 calls=22902
+闭包 fn 单元（去重后）1073 个；MIR 里没配上的单元 185 个（归 A：空函数、trait 方法的默认体、或名字没配上）
+  类 A: fn 单元 472，行数 5238
+  类 B: fn 单元 190，行数 3340
+  类 C: fn 单元 291，行数 10160
+  类 D: fn 单元 120，行数 6232
+  合计 fn 单元 1073，行数 24970
+std 相关的不同调用键 456；按名字配上 vstd 规格 224；没配上 232
+调用点 4628；落在配上规格的键上 3813；落在没配上的键上 815
+name=z5_proof_ratio file=compaction_plan_proofs.rs code_lines=944 exec=148 spec=301 proof=454 other=41 ratio_all_over_exec=6.38 ratio_nonexec_over_exec=5.38
+name=z5_proof_ratio file=gc_crash_proofs.rs code_lines=224 exec=6 spec=48 proof=153 other=17 ratio_all_over_exec=37.33 ratio_nonexec_over_exec=36.33
+name=z5_proof_ratio file=gc_ring_proofs.rs code_lines=413 exec=0 spec=76 proof=311 other=26 ratio_all_over_exec=413.00 ratio_nonexec_over_exec=413.00
+name=z5_proof_ratio file=lib.rs code_lines=3826 exec=2362 spec=761 proof=644 other=59 ratio_all_over_exec=1.62 ratio_nonexec_over_exec=0.62
+name=z5_proof_ratio file=relocation_interval_proofs.rs code_lines=339 exec=0 spec=92 proof=241 other=6 ratio_all_over_exec=339.00 ratio_nonexec_over_exec=339.00
+name=z5_proof_ratio file=relocation_judgement.rs code_lines=146 exec=115 spec=20 proof=9 other=2 ratio_all_over_exec=1.27 ratio_nonexec_over_exec=0.27
+name=z5_proof_ratio total code_lines=5892 exec=2631 spec=1298 proof=1812 other=151 ratio_all_over_exec=2.24
+name=z5_erased file=compaction_plan_proofs.rs verus_block_code_lines=942 erased_rust_lines_rustfmt=110 ratio=8.56 rustfmt_rc=0
+name=z5_erased file=relocation_judgement.rs verus_block_code_lines=144 erased_rust_lines_rustfmt=57 ratio=2.53 rustfmt_rc=0
+name=z5_erased file=gc_crash_proofs.rs verus_block_code_lines=222 erased_rust_lines_rustfmt=18 ratio=12.33 rustfmt_rc=0
+name=z5_erased file=lib.rs verus_block_code_lines=3824 erased_rust_lines_rustfmt=-1 ratio=3824.00 rustfmt_rc=1
+name=z5_erased total verus_block_code_lines=1308 erased=185 ratio=7.07

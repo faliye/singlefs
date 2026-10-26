@@ -1,0 +1,19 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.24s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_core-fa24058cfebce2e3)
+
+running 11 tests
+test compaction_plan::tests::plan_batch_skipping_a_unit_rewritten_anyway_fills_the_batch_with_the_next_movable_units ... ok
+test compaction_plan::tests::plan_batch_skipping_every_unit_plans_them_all_when_only_units_rewritten_anyway_are_left ... ok
+test compaction_plan::tests::verified_choice_adapter_preserves_scan_precedence_and_segment_boundaries ... ok
+test compaction_plan::tests::plan_batch_skipping_every_movable_unit_with_a_pinned_record_left_has_nothing_movable ... ok
+test compaction_plan::tests::plan_batch_refuses_a_region_scan_holding_two_movable_units_under_one_mapping_key - should panic ... ok
+test compaction_plan::tests::verified_plan_conversion_preserves_key_equality_in_the_proof_input ... ok
+test compaction_plan::tests::verified_plan_adapter_preserves_byte_keys_input_order_and_full_placements ... ok
+test compaction_plan::tests::verified_plan_adapter_rejects_a_duplicate_key_beyond_the_batch - should panic ... ok
+test compaction_plan::tests::plan_batch_agrees_with_the_verified_batch_plan_on_every_small_region_scan ... ok
+test compaction_plan::tests::plan_batch_skipping_no_unit_agrees_with_plan_batch_on_every_small_region_scan ... ok
+test compaction_plan::tests::choose_region_agrees_with_the_verified_segment_choice_on_every_small_unit_area ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 339 filtered out; finished in 3.84s
+

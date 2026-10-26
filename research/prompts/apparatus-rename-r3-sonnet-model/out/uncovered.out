@@ -1,0 +1,186 @@
+name=uncovered_lines count=185 first_code_line=166
+258: return "是空的"
+260: return "含空白"
+264: return "不带结尾的 /"
+266: return "不许有空段、. 段与 .. 段"
+278: except (OSError, UnicodeDecodeError) as error:
+279: return [], [f"读不了 {PATH_MOVES_TABLE}：{error}"]
+289: row_problems.append(f"旧前缀与新前缀都是「{old}」")
+308: return [], []
+317: return [], BaselineProblem(base, "（搬迁登记的前缀）", "ls-tree", listed.returncode, listed.stderr.decode("utf-8", "rep
+335: return list(moves), None
+341: return [], problem
+350: return [], PathMovesProblem(base, "（生效的登记行）", "path-moves", 1, "；".join(problems))
+413: return False
+445: print(f"  ! 弄坏开关 {BREAK_VARIABLE}=path-moves-ignored 生效：不读 {PATH_MOVES_TABLE}，{path} 不按登记的搬迁换算", file=sys.stde
+448: return None, problem._replace(path=path)
+463: return None, None, PathMovesProblem(base, path, "path-moves", 1, "；".join(problems))
+466: return None, None, problem._replace(path=path)
+471: return None, None, BaselineProblem(base, relative, "ls-tree", listed.returncode, listed.stderr)
+476: return None, None, BaselineProblem(base, relative, "show", shown.returncode, shown.stderr.decode("utf-8", "rep
+478: return None, None, None
+500: return False, BaselineProblem("仓", "（rev-parse --show-prefix）", "rev-parse", shown.returncode, shown.stderr.de
+508: return None, BaselineProblem(revision, "（整棵树）", "ls-tree", listed.returncode, listed.stderr.decode("utf-8", "r
+522: return None, BaselineProblem("索引", "（全部条目）", "ls-files", listed.returncode, listed.stderr.decode("utf-8", "rep
+539: return None, BaselineProblem("对象库", "（cat-file --batch）", "cat-file", shown.returncode, shown.stderr.decode("u
+545: return None, BaselineProblem("对象库", oid, "cat-file", 1, " ".join(header) or "输出截断了")
+556: return "120000", os.fsencode(os.readlink(full))
+562: return OtherKind("不是普通文件")
+570: return path
+584: return [], None, PathMovesProblem(base, "（改动范围）", "path-moves", 1, "；".join(problems))
+588: print(f"  ! 弄坏开关 {BREAK_VARIABLE}=moved-only-kept 生效：与基准只差登记搬迁的文件与行照旧算改动", file=sys.stderr)
+589: return [], None, None
+592: return [], None, problem
+595: return [], None, problem
+604: return {}, None
+607: return None, BaselineProblem("对象库", "（cat-file --batch-check）", "cat-file", shown.returncode, shown.stderr.dec
+612: return None, BaselineProblem("对象库", oid, "cat-file", 1, line or "输出截断了")
+637: return set(), None
+644: head_tree, problem = {}, None
+647: return set(), problem or index_problem
+659: return OtherKind("没合并完的索引条目")
+673: return set(), problem
+681: target = os.fsencode(os.readlink(full))
+682: return "120000", len(target), lambda: target
+691: return OtherKind("子模块")
+697: return False
+710: return False
+714: return False
+728: return set(), problem
+743: return entries, None
+759: return entries, problem
+766: before_lines, after_lines = text_lines(before), text_lines(rewrite_moved_paths(before, moves))
+767: droppable[path] = (set(), collections.Counter(new for old, new in zip(before_lines, after_lines) if relocated 
+768: continue
+771: return entries, problem
+804: except OSError:
+805: return set(), [], None
+811: return (set(range(1, len(current_lines) + 1)) if relocated else set()), current_lines, None
+818: return set(), current_lines, BaselineProblem("工作区", current_path, "diff --no-index", shown.returncode, shown.s
+832: used = [False] * len(deleted)
+833: for offset, text in enumerate(added):
+834: for index in range(len(deleted)):
+835: old_number = old_start + index
+836: if used[index] or not 0 < old_number <= len(after_lines):
+837: continue
+838: if after_lines[old_number - 1] == text and before_lines[old_number - 1] != text:
+839: used[index] = True
+840: numbers.add(new_start + offset)
+841: break
+862: count, problems, _note = path_move_report(root, base)
+863: return count, problems
+873: inside = git_run(["rev-parse", "--is-inside-work-tree"], root)
+874: if inside.returncode != 0 or inside.stdout.strip() != b"true":
+875: return None, None
+876: top_level, problem = at_top_level(root)
+877: if problem is not None:
+878: return None, problem.sentence()
+879: if not top_level:
+880: return None, None
+881: if not os.path.isfile(CHANGED_PATHS_LIBRARY):
+882: return None, f"找不到取 gate 基准的共用取法 {CHANGED_PATHS_LIBRARY}"
+883: shown = subprocess.run(["bash", "-c", 'source "$1" && gate_diff_base gate', "_", CHANGED_PATHS_LIBRARY], cwd=r
+884: base = shown.stdout.strip()
+885: if shown.returncode != 0 or not base:
+886: return None, f"取不到 gate 基准（{CHANGED_PATHS_LIBRARY} 的 gate_diff_base gate 退 {shown.returncode}：{shown.stderr.st
+887: return base, None
+893: return set(), None
+896: return set(), BaselineProblem("工作区", "（没跟踪的文件）", "ls-files", listed.returncode, listed.stderr.decode("utf-8", 
+923: return 0, [(f"搬迁登记表哪几行生效判不了：{problem.sentence()}", "照括号里 git 的报错修仓库状态（基准名不在、对象库缺了那一份）再跑")], ""
+926: return 0, [(f"搬迁登记表哪几行生效判不了：{problem.sentence()}", "照括号里 git 的报错修仓库状态再跑")], ""
+940: return len(effective), [(f"搬迁登记表的实据判不了：{(problem or untracked_problem).sentence()}", "照括号里 git 的报错修仓库状态再跑")], 
+947: problems.append((f"第 {move.line} 行的新前缀 {move.new} 下有基准 {shown_base} 里本来就在的文件（{'、'.join(occupied[:3])}{'…' if l
+948: f"共 {len(occupied)} 份）：这一行不是一次搬迁", howto))
+950: problems.append((f"第 {move.line} 行的旧前缀 {move.old} 在基准 {shown_base} 里没有文件：这一行不是一次搬迁", howto))
+955: continue
+958: return len(effective), [(f"搬迁登记表的实据判不了：{problem.sentence()}", "照括号里 git 的报错修仓库状态再跑")], ""
+997: except (OSError, UnicodeDecodeError):
+998: table_text = ""
+1006: return count, problems, "没有内容行，实据不用核"
+1008: return count, problems, f"弄坏开关 {BREAK_VARIABLE}=move-evidence-unchecked 生效：此刻生效的登记行串没串、有没有搬迁实据没核"
+1010: base, base_problem = gate_base_of(root)
+1011: if base_problem is not None:
+1012: return count, problems + [(f"搬迁登记表的实据判不了：{base_problem}", "照括号里的报错修好再跑；取不到基准不是「没有生效的行」")], ""
+1014: return count, problems, "被判的根不在 git 仓里（或不是仓根、没给基准），判不了哪几行此刻生效：门禁一行都不按它换算，串与实据没核"
+1035: print(f"  ! 弄坏开关 {BREAK_VARIABLE}=unreadable-as-absent 生效：{problem.sentence()}，当成基准里没有这张表", file=sys.stderr)
+1036: return None, None
+1066: try:
+1067: text, problem = baseline_text(base, path)
+1068: except ValueError as error:
+1069: print(f"  ✗ {error}", file=sys.stderr)
+1070: print(f"     → 怎么办：去掉 {BREAK_VARIABLE}，或只写认得的项", file=sys.stderr)
+1071: return 2
+1072: if problem is not None:
+1073: print(problem.sentence(), file=sys.stderr)
+1074: return 1
+1075: if text is None:
+1076: return EXIT_ABSENT
+1077: sys.stdout.write(text)
+1078: return 0
+1082: count, problems, note = path_move_report(root, base)
+1083: if problems:
+1084: print(f"  ✗ 搬迁登记表 {PATH_MOVES_TABLE} 有 {len(problems)} 处不对（共 {count} 行）：")  # gate-lint:summary
+1085: for what, _howto in problems:
+1086: print(f"     {what}")  # gate-lint:detail
+1087: print(f"     → 怎么办：{'；'.join(dict.fromkeys(howto for _what, howto in problems))}")
+1088: return 1
+1089: print(f"  ✓ 搬迁登记表 {PATH_MOVES_TABLE} {count} 行：写法对、出处都在；{note}")
+1090: return 0
+1094: rows = replay_rows(path)
+1095: if rows is None:
+1096: print(f"  ✗ 读不了复跑表 {path}（不在，或没有读权限）", file=sys.stderr)
+1097: print("     → 怎么办：核对路径；replay.sh 搬了家就把调用方点名的路径一起改（.claude/rules/path-moves.md）", file=sys.stderr)
+1098: return 1
+1099: for row in rows:
+1100: print("\t".join(row))
+1101: return 0
+1106: if isinstance(problem, PathMovesProblem):
+1107: print(f"  ! {problem.sentence()}；{what}没剔除只差搬迁的，照没有登记时交回", file=sys.stderr)
+1108: return 0
+1109: print(f"  ✗ {problem.sentence()}，{what}里哪些只差登记的搬迁判不了", file=sys.stderr)
+1110: print("     → 怎么办：照括号里 git 的报错修仓库状态（基准名不在、对象库缺了那一份）再跑；判不了时不交半截结果", file=sys.stderr)
+1111: return 1
+1116: paths = [line for line in sys.stdin.buffer.read().decode("utf-8", "surrogateescape").split("\n") if line]
+1117: moved, problem = moved_only_paths(base, paths)
+1118: if problem is not None:
+1119: status = report_moved_only_problem(problem, "改动范围")
+1120: if status:
+1121: return status
+1122: kept = [path for path in paths if (path[2:] if path.startswith("./") else path) not in moved]
+1123: sys.stdout.buffer.write("".join(path + "\n" for path in kept).encode("utf-8", "surrogateescape"))
+1124: return 0
+1129: entries = []
+1130: for line in sys.stdin.buffer.read().decode("utf-8", "surrogateescape").split("\n"):
+1131: if line:
+1132: path, _tab, text = line.partition("\t")
+1133: entries.append((path, text, line))
+1134: kept, problem = drop_moved_lines(base, entries)
+1135: if problem is not None:
+1136: status = report_moved_only_problem(problem, "新增行")
+1137: if status:
+1138: return status
+1139: sys.stdout.buffer.write("".join(entry[2] + "\n" for entry in kept).encode("utf-8", "surrogateescape"))
+1140: return 0
+1800: refused = False
+1807: os.environ[BREAK_VARIABLE] = saved
+1827: print(f"  ✗ 自证失败：{name}：{detail}")  # gate-lint:detail
+1829: print(f"  ✗ lib-lag-baseline.py 自证：{len(results)} 项里 {len(failed)} 项没过")  # gate-lint:summary
+1830: print("     → 怎么办：照上面点名的那一项修 baseline_text / content_rows / replay_rows；设了 LAG_BASELINE_BREAK 时这几项该红")
+1831: return 1
+1839: if len(argv) == 3 and argv[0] == "show":
+1840: return show_main(argv[1], argv[2])
+1841: if len(argv) == 2 and argv[0] == "replay-rows":
+1842: return replay_rows_main(argv[1])
+1843: checking = argv[:1] == ["path-moves-check"] and (len(argv) in (1, 2) or (len(argv) == 4 and argv[2] == "--base
+1844: if checking or (len(argv) == 2 and argv[0] in ("moved-only-filter", "moved-lines-filter")):
+1845: try:
+1846: if checking:
+1847: return path_moves_check_main(argv[1] if len(argv) >= 2 else ".", argv[3] if len(argv) == 4 else None)
+1848: return (moved_only_filter_main if argv[0] == "moved-only-filter" else moved_lines_filter_main)(argv[1])
+1849: except ValueError as error:
+1850: print(f"  ✗ {error}", file=sys.stderr)
+1851: print(f"     → 怎么办：去掉 {BREAK_VARIABLE}，或只写认得的项", file=sys.stderr)
+1852: return 2
+1853: print("  ✗ 用法：lib-lag-baseline.py show <基准> <路径> | replay-rows <复跑表路径> | path-moves-check [根 [--base <基准>]] | 
+1854: print("     → 怎么办：照文件头「命令行」一段写；python 里调用见文件头「函数」一段", file=sys.stderr)
+1855: return 2

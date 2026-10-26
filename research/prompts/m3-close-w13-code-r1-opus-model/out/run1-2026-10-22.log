@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/attack_w13_wider_entries_checker_versus_readers.rs (<草稿目录>/target/debug/deps/attack_w13_wider_entries_checker_versus_readers-78b9cc4437421a95)
+
+running 1 test
+name=case-extent-internal-110 checker_new_not_holding=1 lines=["I-1.10:违例:extent 树（树 65536）inode 1 下段的根：头里自述的条目宽 111 不等于这一层的条目字段表宽度 110"]
+name=case-extent-internal-110 implementation_before cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(4)) writable=可写挂载挂上:实例InstanceGeneration(2)
+name=case-extent-internal-110 implementation_after cold=恢复拒:EntryNarrowerThanItsFieldTable { what: "extent 树内部条目", entry_bytes: 111, field_table_bytes: 110 } writable=可写挂载拒:Recovery(EntryNarrowerThanItsFieldTable { what: "extent 树内部条目", entry_bytes: 111, field_table_bytes: 110 })
+name=case-extent-leaf-112 checker_new_not_holding=1 lines=["I-1.10:违例:extent 树（树 65536）inode 1 下段的根：头里自述的条目宽 113 不等于这一层的条目字段表宽度 112"]
+name=case-extent-leaf-112 implementation_before cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(4)) writable=可写挂载挂上:实例InstanceGeneration(2)
+name=case-extent-leaf-112 implementation_after cold=恢复拒:EntryNarrowerThanItsFieldTable { what: "extent 叶记录", entry_bytes: 113, field_table_bytes: 112 } writable=可写挂载拒:Recovery(EntryNarrowerThanItsFieldTable { what: "extent 叶记录", entry_bytes: 113, field_table_bytes: 112 })
+name=case-inode-internal-120 checker_new_not_holding=10 lines=["I-1.10:违例:树 65537（种类 2）的根：头里自述的条目宽 121 不等于这棵树的条目字段表宽度 120", "I-9.2:不适用:这个镜像上没有它判的对象", "I-9.4:不适用:这个镜像上没有它判的对象", "I-9.6:不适用:最新的根下面走不到 inode 树里的任何一条记录", "I-9.7:不适用:这个镜像上没有它判的对象", "I-9.10:不适用:这个镜像上没有它判的对象", "I-9.12:不适用:最新的根下面走不到 inode 树的内部节点（树表 0 条或根读不出）", "I-9.13:不适用:这个镜像上没有它判的对象", "I-9.15:不适用:这个镜像上没有它判的对象", "I-9.26:不适用:这个镜像上没有它判的对象"]
+name=case-inode-internal-120 implementation_before cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(3)) writable=可写挂载挂上:实例InstanceGeneration(2)
+name=case-inode-internal-120 implementation_after cold=恢复拒:EntryNarrowerThanItsFieldTable { what: "inode 树内部条目", entry_bytes: 121, field_table_bytes: 120 } writable=可写挂载拒:Recovery(EntryNarrowerThanItsFieldTable { what: "inode 树内部条目", entry_bytes: 121, field_table_bytes: 120 })
+name=case-allocation-record-20 checker_new_not_holding=1 lines=["I-1.10:违例:分配记录树（树 65538）层级 0 盘 0 第 61 格的节点：头里自述的条目宽 21 不等于这一层的条目字段表宽度 20"]
+name=case-allocation-record-20 implementation_before cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(3)) writable=可写挂载挂上:实例InstanceGeneration(2)
+name=case-allocation-record-20 implementation_after cold=恢复拒:EntryNarrowerThanItsFieldTable { what: "分配记录", entry_bytes: 21, field_table_bytes: 20 } writable=可写挂载拒:Recovery(EntryNarrowerThanItsFieldTable { what: "分配记录", entry_bytes: 21, field_table_bytes: 20 })
+name=case-allocation-internal-96 checker_new_not_holding=1 lines=["I-1.10:违例:分配记录树（树 65538）的根：头里自述的条目宽 97 不等于这一层的条目字段表宽度 96"]
+name=case-allocation-internal-96 implementation_before cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(3)) writable=可写挂载挂上:实例InstanceGeneration(2)
+name=case-allocation-internal-96 implementation_after cold=恢复拒:EntryNarrowerThanItsFieldTable { what: "分配记录树内部条目", entry_bytes: 97, field_table_bytes: 96 } writable=可写挂载拒:Recovery(EntryNarrowerThanItsFieldTable { what: "分配记录树内部条目", entry_bytes: 97, field_table_bytes: 96 })
+name=case-deadlist-43 checker_new_not_holding=0 lines=[]
+name=case-deadlist-43 implementation_before cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(5)) writable=可写挂载挂上:实例InstanceGeneration(2)
+name=case-deadlist-43 implementation_after cold=恢复读出文件:(InstanceGeneration(1), CheckpointTxg(5)) writable=可写挂载拒:Recovery(EntryNarrowerThanItsFieldTable { what: "deadlist 条目", entry_bytes: 44, field_table_bytes: 43 })
+name=summary I-1.10-red extent-internal=true extent-leaf=true inode-internal=true allocation-record=true allocation-internal=true deadlist=false
+name=summary deadlist-checker-new-not-holding=0
+test checker_and_the_six_readers_on_entries_wider_than_the_field_table ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.98s
+

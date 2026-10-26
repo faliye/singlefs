@@ -1,6 +1,0 @@
-    Blocking waiting for file lock on package cache
-   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-code-r2-opus/work/crates/singlefs-core)
-   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-code-r2-opus/work/crates/singlefs-harness)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.89s
-  Executable tests/entries_after_mount_refuse_swapped_or_behind_devices.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/entries_after_mount_refuse_swapped_or_behind_devices-7e14242ee9c4c3ad)
-  Executable tests/r2opus_entries_proto.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/r2opus_entries_proto-c4b9d13e22442de4)

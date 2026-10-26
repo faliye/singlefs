@@ -1,0 +1,21 @@
+# unit-graph closure 摘要（命令见报告「复跑」；二进制 target/debug/unit-graph，文件日期 10-18 编的；入口之外的闭包行落在草稿目录，不入库）
+--- judge_crash_image
+unit-graph：入口 singlefs_checker_tier::crash::judge_crash_image：闭包 2487 个单元（Rust 2487、WGSL 0、数据 0），拒算 0 处，31 线程，1.01 秒
+--- judge_the_given_states_on_the_cpu
+unit-graph：入口 singlefs_checker_tier::crash_given_states::judge_the_given_states_on_the_cpu：闭包 2567 个单元（Rust 2567、WGSL 0、数据 0），拒算 0 处，31 线程，0.84 秒
+--- verify_states_from_facts
+unit-graph：入口 singlefs_checker_tier::crash_facts::verify_states_from_facts：闭包 90 个单元（Rust 90、WGSL 0、数据 0），拒算 0 处，31 线程，0.71 秒
+--- gpu_of_the_judge
+unit-graph：入口 singlefs_checker_tier::crash_judge_gpu::JudgeKernelSources::of_the_judge：闭包 1722 个单元（Rust 122、WGSL 1600、数据 0），拒算 0 处，31 线程，0.77 秒
+--- 成员 judge_crash_image
+judge_some_device_carries_a_self_verified_system_configuration hits=1
+system_configuration_slot_readings hits=1
+slot_verifies_itself hits=1
+system_configuration_redundancy_report hits=0
+fn	singlefs_checker::image::judge_some_device_carries_a_self_verified_system_configuration	crates/singlefs-checker/src/image.rs:1460-1477	54385d8e05cd71edb0b0d1ea1ff7e053333554d186c329b2d3d4a493f30e78
+--- 成员 judge_the_given_states_on_the_cpu
+judge_some_device_carries_a_self_verified_system_configuration hits=1
+--- 成员 verify_states_from_facts
+judge_some_device_carries_a_self_verified_system_configuration hits=0
+--- 成员 gpu of_the_judge (--cfg feature=gpu)
+wgsl_fn	singlefs_checker_tier::crash_judge_checker.wgsl::judge_the_pool_from_its_system_configuration_slots	crates/singlefs-checker-tier/src/crash_judge_checker.wgsl:5179

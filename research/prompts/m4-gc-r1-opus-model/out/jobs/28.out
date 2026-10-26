@@ -1,9 +1,0 @@
-E name=cached nseg=3 segsz=3 ring=3 maxobj=2 b=1 depth=7 states=68691 live_released=1366 unreadable=602 dup_map=338 leak=0 hint_bad=0 gc_stuck=0 livelock=0 frozen=0 unmet_del=0 false_enospc=3214 release_bad=660 rb_refused=308 del_pred_true=2060 del_pred_false=1696 n0_refused=0 gc_done=40325 gc_declined=11516 gc_stuck=0 gc_paused=16850 gc_cycle=0 gc_cap=0 gc_wasted=0
-W name=cached flag=live_released path=W0.O0.GI.GB
-W name=cached flag=unreadable path=W0.GI.W1.GB
-W name=cached flag=dup_map path=W0.GI.W1.GB
-W name=cached flag=false_enospc path=W0.O0.GI.O0
-W name=cached flag=release_bad path=W0.O0.GI.GB.O0
-W name=cached flag=rb_refused path=W0.GI.W1.GB.R1
-W name=cached flag=del_pred_true path=W0.GI.GB
-W name=cached flag=del_pred_false path=W0.GI.O0.GB

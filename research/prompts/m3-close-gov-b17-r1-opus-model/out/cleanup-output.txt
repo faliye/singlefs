@@ -1,0 +1,5 @@
+kind repo-copy = 仓副本
+kind its-target = 编译目录
+kind model-copy-only = None
+found judgement-rerun/repo 仓副本
+visited=4 truncated=False

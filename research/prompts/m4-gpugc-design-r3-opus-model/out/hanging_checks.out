@@ -1,0 +1,29 @@
+name=n_count arm=controlled index=0 kernels=one_kernel_today valid_cells=40 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=314000 invalid_cells=0
+name=n_count arm=controlled index=0 kernels=two_kernels valid_cells=360 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=2355000 invalid_cells=4
+name=n_count arm=controlled index=1 kernels=one_kernel_today valid_cells=40 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=314000 invalid_cells=0
+name=n_count arm=controlled index=1 kernels=two_kernels valid_cells=360 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=2355000 invalid_cells=0
+name=n_count arm=reproduction index=0 kernels=one_kernel_today valid_cells=40 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=314000 invalid_cells=1
+name=n_count arm=reproduction index=0 kernels=two_kernels valid_cells=360 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=2355000 invalid_cells=7
+name=n_count arm=all index=all kernels=two_kernels valid_cells=1080 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=7065000 invalid_cells=11
+name=n_count arm=all index=all kernels=one_kernel_today valid_cells=120 uncertain_entries=0 cells_disagreeing_with_the_cpu=0 unit_comparisons_in_timed_submissions=942000 invalid_cells=1
+name=n_units units_4=151 units_8=153 units_12=151 units_16=150 units_20=152 units_24=153 units_32=150 units_512=152
+name=batch_cpu fraction=0.25 pool_data_units=1024 calls=20 today_ms_min=12.3 today_ms_max=13.3 both_three_way_without_build_ms_min=12.1 both_three_way_without_build_ms_max=13.1 largest_share_saved=0.0195
+name=batch_cpu fraction=0.25 pool_data_units=8192 calls=20 today_ms_min=100.0 today_ms_max=110.4 both_three_way_without_build_ms_min=99.8 both_three_way_without_build_ms_max=110.0 largest_share_saved=0.0038
+name=batch_cpu fraction=0.75 pool_data_units=1024 calls=55 today_ms_min=12.2 today_ms_max=13.9 both_three_way_without_build_ms_min=12.0 both_three_way_without_build_ms_max=13.3 largest_share_saved=0.0436
+name=batch_cpu fraction=0.75 pool_data_units=8192 calls=55 today_ms_min=96.4 today_ms_max=112.7 both_three_way_without_build_ms_min=95.7 both_three_way_without_build_ms_max=111.6 largest_share_saved=0.0095
+name=snapshot_note the_pools_have_no_snapshot=210
+name=r2_check item=one_submission_wall cells=84 min=5.46 max=8.05
+name=r2_check item=calibration_end_over_start ratio=0.876478 faster_by=0.124
+name=r2_check item=r3_fit index=0 gap_milliseconds=0 fit_not_linear=true lines=6
+name=r2_check item=r3_fit index=0 gap_milliseconds=50 fit_not_linear=false lines=2
+name=r2_check item=r3_fit index=0 gap_milliseconds=50 fit_not_linear=true lines=1
+name=r2_check item=r3_fit index=1 gap_milliseconds=0 fit_not_linear=false lines=5
+name=r2_check item=r3_fit index=1 gap_milliseconds=0 fit_not_linear=true lines=1
+name=r2_check item=r3_fit index=1 gap_milliseconds=50 fit_not_linear=false lines=2
+name=r2_check item=r3_fit index=1 gap_milliseconds=50 fit_not_linear=true lines=1
+name=r1_check item=g6_batch_wall arm=memory lines=12 wall_ms_median_min=12.508 max=111.090
+name=r1_check item=g6_batch_wall arm=real_disk lines=12 wall_ms_median_min=21.671 max=123.369
+name=r2_check item=g8_share low=0.0447 high=1.1768 from_increment_ms=5.50,14.76 over_batch_ms=123.135,12.542
+name=clock_pair arm=controlled index=0 keys=108 keys_with_a_process_line=100 process_over_thread_median=1.112 min=1.040 max=1.227
+name=clock_pair arm=controlled index=1 keys=108 keys_with_a_process_line=12 process_over_thread_median=1.051 min=1.036 max=1.072
+name=clock_pair arm=reproduction index=0 keys=108 keys_with_a_process_line=84 process_over_thread_median=1.124 min=1.030 max=1.281

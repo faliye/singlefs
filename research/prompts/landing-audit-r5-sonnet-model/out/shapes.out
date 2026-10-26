@@ -1,0 +1,5 @@
+两条各一次，lint 判红退 1：old=退0  new=退0  only0=退2
+timeout 包着、重定向到文件、echo rc 收尾（整条退 0，lint 其实红）：old=退0  new=退2  only0=退2
+重定向到文件、echo rc 收尾，没有 timeout（整条退 0）：old=退0  new=退0  only0=退0
+timeout 包着、就是整条的最后一条（退 0）：old=退0  new=退0  only0=退0
+两条用 ; 连在一条里，后一条判红退 1：old=退0  new=退0  only0=退2

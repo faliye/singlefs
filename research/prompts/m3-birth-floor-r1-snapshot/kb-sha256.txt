@@ -1,3 +1,0 @@
-b9bc9072c625744e5c6e1827f6e9d1aaa2faa224ad895e637f8ebcbd7a3f453f  .claude/kb/invariants.md
-36d7575441eecd9ef2af620c5474215258acd8c02be9a079164b49855c8e4e70  .claude/kb/decisions/23-journal的角色与格式.md
-75f821fa766d99445a9b52b3f27ac206d7b6d79992b974a7fbf7e38d8501d5e0  .claude/kb/decisions/16-发布语义.md

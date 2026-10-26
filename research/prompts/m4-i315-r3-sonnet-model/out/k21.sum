@@ -1,0 +1,20 @@
+points 1
+TALLY today     name={'L': 1, 'N': 1} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS today    name={'LN': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY exempt    name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS exempt   name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY gen       name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS gen      name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY genplus   name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS genplus  name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY cmp       name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS cmp      name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY both      name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS both     name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY bothplus  name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS bothplus name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY jrn       name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS jrn      name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+TALLY jrngen    name={'L': 2} j2n={'L': 2} j2s={'L': 2} j2t={'L': 2}
+POINTS jrngen   name={'L': 1} j2n={'L': 1} j2s={'L': 1} j2t={'L': 1}
+DIFF 6395 0 dev1:slot50317:len16384 reused=true today:LN/L/L/L exempt:L/L/L/L gen:L/L/L/L genplus:L/L/L/L cmp:L/L/L/L both:L/L/L/L bothplus:L/L/L/L jrn:L/L/L/L jrngen:L/L/L/L

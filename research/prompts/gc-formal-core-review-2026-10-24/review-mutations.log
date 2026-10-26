@@ -1,0 +1,88 @@
+── crates-mutation-rows：crates/mutations.tsv 每条改坏一处、点名的测试都红，基线在没改坏的副本上绿
+  … 逐行上限（.claude/gate.d/crates-mutation-light-rows.tsv 的「# 逐行上限：」）：64 行另给了上限或限时，别的行照每条 4G、限时 1800 秒
+  … 判定库记录：复用抓到 0 条、复用基线 ok 0 行；现跑基线 1 批 9 行、现跑变异至多 9 条（其中拒算 0 条）、锚点失效不跑 0 行、补记覆盖 0 份；前移 0 条（上一次用时 ≥ 300 秒或上一次超时的先派，按用时从长到短）；判法单元 c7bc2303eee3e0dd…（961 个单元），库在 /home/fy5090/code/singlefs/.git/singlefs-crates-mutation-library
+  · 复用哨兵（crates 变异表）：种子 2078501343（SINGLEFS_REUSE_SENTINEL_SEED=2078501343 复现）；键相同、有判定的 0 条里抽哨兵 0 条：一条都没有；强制现判 1 条：没有可抽的（键相同的都当了哨兵或一条都没有）
+  · 复用哨兵（crates 变异表）：哨兵不足 3 条（键相同、有判定的只有 0 条），这一趟不因此判红
+  · 现判：crates/mutations.tsv:5577 GC接核审核：key身份错误地只看首字节：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5578 GC接核审核：重复key分配新的身份：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5579 GC接核审核：源槽号转换错一槽：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5580 GC接核审核：重复扫描改取最后一份：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5581 GC接核审核：尾部不足整段也参与选择：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5582 GC接核审核：段末pin错归前段：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5583 GC接核审核：返回Placement丢失原跨度：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5584 GC接核审核：撤掉全输入重复key拒绝：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  · 现判：crates/mutations.tsv:5585 GC接核审核：回收比较误改严格小于：行新加——判定库里没有这一行的记录（新加的行，或改了变异名、文件）
+  … 记覆盖用的 llvm 工具：/home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin（llvm-profdata 22.1.8-rust-1.98.0-stable、llvm-cov 22.1.8-rust-1.98.0-stable；rustc 的 LLVM 22.1.8）
+  … 这一轮开 9 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；这一趟要现跑 9 条（没有作数的抓到记录的）；磁盘余量 2021.8 GiB（编译目录所在的盘此刻可用），留备用 30.0 GiB，每个工作进程最多占两份编译目录（普通、插桩）、各涨到 64G，开 2 个以上时先编一份依赖的两份也各涨到 64G（已有的目录只算还能涨的）：10 个共还要 1408.0 GiB，前几项的天花板 9 个（连同再多 1 个）都放得下，这一项不卡。卡在「这一趟要现跑的条数」这一项；内存不按进程数收：每条经 run-with-memory-cap.sh 排队，放不下的等（slice 的总上限兜底）；外层内存上限没读到（RUN_WITH_MEMORY_CAP_OUTER_CAP 没设，按没套在外层包装里算）
+  … 起 cargo 时的构建档：CARGO_PROFILE_BENCH_DEBUG=false、CARGO_PROFILE_DEV_DEBUG=false、CARGO_PROFILE_RELEASE_DEBUG=false、CARGO_PROFILE_TEST_DEBUG=false（关调试信息，取值进行键）
+  … 起 cargo 时的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay，清掉调用方点名的 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY；每个工作进程再用底下自己片号的 shard-<片号> 子目录，不共用一份库
+  … 编译目录：/tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target（第 1 片；其余片加 -w<片号>，记覆盖的再加 -coverage；这一趟自己建的，跑完连同 build 整个删）；片号大于这一趟 9 个工作进程、要回收的 0 份
+  … 先编一份依赖：串行段声明写进 /tmp/singlefs-mutation-replay-dez862t8/serial-declarations（先编一份依赖：2 组共用一份编译目录、cargo 锁着它逐组编，组与组不能同时编；每组的并行度 20 已按内存上限 36864M ÷ 1.75 GiB 与核数取小）；编完写「此刻并行」
+  … 先编一份依赖：源码副本 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-seed-source 同步了 698 个文件（摸了整包的 8 个：crates/singlefs-checker、crates/singlefs-checker-tier、crates/singlefs-core、crates/singlefs-format、crates/singlefs-harness、crates/singlefs-reference-filesystem、crates/singlefs-replay-prefix、crates/singlefs-unit-graph）；内存上限 36864M、并行度 20
+  … 先编一份依赖（普通）：/tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-seed 编了 1 组，工作进程起来时拷其中外部依赖的产物
+  … 先编一份依赖（插桩）：/tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-seed-coverage 编了 1 组，工作进程起来时拷其中外部依赖的产物
+  … 工作进程 2412737 领到片号 1（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target.slot）
+  … 工作进程 2412737 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-1（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412758 领到片号 2（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w2；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w2.slot）
+  … 工作进程 2412758 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-2（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412759 领到片号 3（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w3；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w3.slot）
+  … 工作进程 2412759 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-3（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412760 领到片号 4（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w4；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w4.slot）
+  … 工作进程 2412760 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-4（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412762 领到片号 5（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w5；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w5.slot）
+  … 工作进程 2412762 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-5（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412763 领到片号 6（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w6；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w6.slot）
+  … 工作进程 2412763 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-6（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412737 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412770 领到片号 7（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w7；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w7.slot）
+  … 工作进程 2412770 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-7（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412758 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412774 领到片号 8（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w8；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w8.slot）
+  … 工作进程 2412774 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-8（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412760 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412759 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412778 领到片号 9（编译目录 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w9；片号锁 /tmp/singlefs-mutation-replay-dez862t8/build/singlefs-crates-mutation-target-w9.slot）
+  … 工作进程 2412778 起 cargo 用的崩溃判定库家目录：/home/fy5090/.local/share/singlefs/crash-amplification/mutation-replay/shard-9（每片各一份，不与别的工作进程共用）
+  … 工作进程 2412762 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412763 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412770 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412774 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 工作进程 2412778 从先编那一份拷来外部依赖的产物：普通 175 个文件 93.5 MiB；插桩 175 个文件 114.9 MiB（3 条线程同时拷；大小与修改时刻对得上的不拷）
+  … 已判 1 格、派出 1 格、还排着 9 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 2 格、派出 10 格、还排着 1 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 3 格、派出 11 格、还排着 1 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 4 格、派出 12 格、还排着 1 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 5 格、派出 13 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 6 格、派出 13 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 7 格、派出 13 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 8 格、派出 13 格、还排着 1 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 9 格、派出 14 格、还排着 1 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 10 格、派出 15 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 11 格、派出 15 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 12 格、派出 15 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 13 格、派出 15 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 14 格、派出 15 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  … 已判 15 格、派出 15 格、还排着 0 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）
+  删了这一趟的编译目录 /tmp/singlefs-mutation-replay-dez862t8/build（共 4.9 GiB）
+  … 覆盖：这一趟记了 5 份、已有沿用 0 份、没记成 0 份；收尾删了 30 天里没被任何一趟引用的 0 份（一份都没有）
+  · 复用哨兵（crates 变异表）：哨兵 0 条都复用（种子 2078501343）
+  ✓ GC接核审核：key身份错误地只看首字节：compaction_plan::tests::verified_plan_conversion_preserves_key_equality_in_the_proof_input 红了（现判：行新加）
+  ✓ GC接核审核：重复key分配新的身份：compaction_plan::tests::verified_plan_conversion_preserves_key_equality_in_the_proof_input 红了（现判：行新加）
+  ✓ GC接核审核：源槽号转换错一槽：compaction_plan::tests::verified_plan_conversion_preserves_key_equality_in_the_proof_input 红了（现判：行新加）
+  ✓ GC接核审核：重复扫描改取最后一份：compaction_plan::tests::verified_choice_adapter_preserves_scan_precedence_and_segment_boundaries 红了（现判：行新加）
+  ✓ GC接核审核：尾部不足整段也参与选择：compaction_plan::tests::verified_choice_adapter_preserves_scan_precedence_and_segment_boundaries 红了（现判：行新加）
+  ✓ GC接核审核：段末pin错归前段：compaction_plan::tests::verified_choice_adapter_preserves_scan_precedence_and_segment_boundaries 红了（现判：行新加）
+  ✓ GC接核审核：返回Placement丢失原跨度：compaction_plan::tests::verified_plan_adapter_preserves_byte_keys_input_order_and_full_placements 红了（现判：行新加）
+  ✓ GC接核审核：撤掉全输入重复key拒绝：compaction_plan::tests::verified_plan_adapter_rejects_a_duplicate_key_beyond_the_batch 红了（现判：行新加）
+  ✓ GC接核审核：回收比较误改严格小于：allocator::tests::verified_reclaim_predicate_preserves_txg_order_at_unsigned_boundaries 红了（现判：行新加）
+  计数：抓到 9 条、没红 0 条、无效 0 条、内存撞顶 0 条、超时 0 条、被总上限挤掉 0 条、排不上没跑 0 条、scope 起不来没跑 0 条、锚点失效 0 行（共 9 条）
+  基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 9 行，基线不绿 0 行（按 cargo 参数分 1 批；共 9 行）
+  复用：现判 9 条、复用 0 条、拒算 0 条、本次未跑 0 条（现判的按栏：一律现判 0、行新加 9、判法单元变了 0、被改坏的单元变了 0、点名测试的闭包变了 0、原文或替换文变了 0、工具链或依赖变了 0、上次没判成抓到 0、键对不上 0）
+  覆盖：这一趟记了 5 份（点名测试执行过的单元，基线按它复用），已有、沿用 0 份，没记成 0 份
+  临时目录：9 条变异各一个自己的 TMPDIR，每条结束时不论退出码都整个删掉了；删前合计 0 个文件、占盘 0 字节（表观 0 字节），其中被包装停掉或杀掉的 0 条（超时、内存撞顶、被总上限挤掉）留下 0 个文件、占盘 0 字节
+  … 这一轮 9 个工作进程，每个 cargo 编译并行度 3（编译那一趟再按每条的内存上限收：每条 4G 时 2），每条变异内存上限 4G、限时 1800 秒；复用抓到 0 条、复用基线 ok 0 行，现跑变异 9 条、现跑基线 1 批
+  … 只判了选中的 9 行，不是整道结论（GATE_MUTATION_ROW_SELECTION=/tmp/tmp.ori7SB5cfD；选中的都红在点名的测试上；判定库记录写进了 /home/fy5090/code/singlefs/.git/singlefs-crates-mutation-library）；这一趟现判 9 条、复用 0 条、拒算 0 条、本次未跑 0 条（现判的按栏：一律现判 0、行新加 9、判法单元变了 0、被改坏的单元变了 0、点名测试的闭包变了 0、原文或替换文变了 0、工具链或依赖变了 0、上次没判成抓到 0、键对不上 0）
+  ✓ 点名的 9 条变异都抓到了（只判了这几行，不是整道结论；现判、复用、拒算各几条见上面「复用：」那一行）
+── 汇总：checker-tier-crates-mutation-replay.sh 跑了 1 格（全部登记的格）
+  crates-mutation-rows：绿
+  ✓ checker-tier-crates-mutation-replay.sh：1 格里 1 格绿（crates-mutation-rows），0 格本次未跑（无）

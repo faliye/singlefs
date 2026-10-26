@@ -1,0 +1,1 @@
+name=k1_wgsl_probe coverage_records=49 with_wgsl_members=6 (executed_set_is_current 真 0) without_wgsl_members=43 (executed_set_is_current 真 43) missing_by_kind_in_wgsl_records={'wgsl_compute': 30, 'wgsl_const': 4476, 'wgsl_const_assert': 270, 'wgsl_fn': 3810, 'wgsl_struct': 390, 'wgsl_var': 1206}

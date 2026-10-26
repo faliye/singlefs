@@ -1,0 +1,419 @@
+diff --git a/crates/singlefs-core/src/allocation_record_tree.rs b/crates/singlefs-core/src/allocation_record_tree.rs
+index b972fa2c0..d37a73ab0 100644
+--- a/crates/singlefs-core/src/allocation_record_tree.rs
++++ b/crates/singlefs-core/src/allocation_record_tree.rs
+@@ -752,7 +752,9 @@ impl AllocationRecordTreeReading<'_> {
+         }
+         let internal_width =
+             usize::try_from(ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES).expect("96");
+-        if header.entry_width < internal_width {
++        // 宽于 key 宽 + 86 的同样拒（C867，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
++        // `EntryNarrowerThanItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
++        if header.entry_width != internal_width {
+             return Err(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                 what: "分配记录树内部条目",
+                 entry_bytes: header.entry_width,
+@@ -808,7 +810,7 @@ impl AllocationRecordTreeReading<'_> {
+ /// 记录还要对这个池的几何判一遍（设备在池里、槽号在单元区里、跨度不越过单元区末尾、同盘不相交），由调用方做（`recovery`）。
+ ///
+ /// # Errors
+-/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；条目窄于字段表 ⇒ `EntryNarrowerThanItsFieldTable`；
++/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；条目宽不等于字段表（窄于、宽于都算）⇒ `EntryNarrowerThanItsFieldTable`；
+ /// 记录不在它所在叶里 ⇒ `AllocationRecordOutsideThePoolGeometry`；别的核不过 ⇒ `InvariantViolated`（I-1.1 / I-1.2 / I-1.3 / I-1.4）。
+ #[allow(
+     clippy::too_many_arguments,
+diff --git a/crates/singlefs-core/src/allocator.rs b/crates/singlefs-core/src/allocator.rs
+index 661130aaa..c4372ea0a 100644
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -74,10 +74,11 @@ impl AllocationRecord {
+         (self.device.0, self.slot.0)
+     }
+     /// 分配记录 20 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 10），
+-    /// 窄于 20 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 20 信它。
++    /// 不等于 20 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 20 信它。窄于 20 的切不出整条记录；
++    /// 宽于 20 的同样不收（I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C867）。
+     #[must_use]
+     pub fn parse(bytes: &[u8]) -> Option<Self> {
+-        if bytes.len() < usize::try_from(ALLOCATION_RECORD_BYTES).expect("20") {
++        if bytes.len() != usize::try_from(ALLOCATION_RECORD_BYTES).expect("20") {
+             return None;
+         }
+         let mut reader = crate::bytes::ByteReader::at(bytes, 0);
+diff --git a/crates/singlefs-core/src/extent_tree.rs b/crates/singlefs-core/src/extent_tree.rs
+index 246aebef7..f32880ac2 100644
+--- a/crates/singlefs-core/src/extent_tree.rs
++++ b/crates/singlefs-core/src/extent_tree.rs
+@@ -903,7 +903,9 @@ impl ExtentTreeReading<'_> {
+         header: &IndexNodeHeader,
+     ) -> Result<Vec<(Vec<u8>, NodePointer)>, RecoveryFailure> {
+         let internal_width = usize::try_from(EXTENT_TREE_INTERNAL_ENTRY_BYTES).expect("110");
+-        if header.entry_width < internal_width {
++        // 宽于 key 宽 + 86 的同样拒（C867，用户 2026-10-18 定「宽于字段表也拒」）。报的成员沿用
++        // `EntryNarrowerThanItsFieldTable`：`entry_bytes` 大于 `field_table_bytes` 就是宽了的那一种。
++        if header.entry_width != internal_width {
+             return Err(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                 what: "extent 树内部条目",
+                 entry_bytes: header.entry_width,
+@@ -943,7 +945,8 @@ pub struct ExtentLowerSegmentReadFromDisk {
+ /// 落在叶罩的那一段里、按 key 严格递增；同一个单元不被两条父条目引用。
+ ///
+ /// # Errors
+-/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；条目窄于字段表 ⇒ `EntryNarrowerThanItsFieldTable`；别的核不过 ⇒ `InvariantViolated`。
++/// 节点读不到、解不开 ⇒ 读者交回的错或 `UnitMalformed`；内部条目与叶记录的条目宽不等于字段表（窄于、宽于都算）⇒
++/// `EntryNarrowerThanItsFieldTable`；别的核不过 ⇒ `InvariantViolated`。
+ pub fn read_lower_segment(
+     reading: &ExtentTreeReading<'_>,
+     inode: u64,
+@@ -1008,7 +1011,7 @@ fn read_lower_node_and_its_subtree(
+         for entry in &header.entries {
+             let (key, data_pointer) =
+                 parse_extent_record(entry).map_err(|refusal| match refusal {
+-                    PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
++                    PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable => {
+                         RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                             what: "extent 叶记录",
+                             entry_bytes: entry.len(),
+diff --git a/crates/singlefs-core/src/make_filesystem.rs b/crates/singlefs-core/src/make_filesystem.rs
+index 42a946009..20792d996 100644
+--- a/crates/singlefs-core/src/make_filesystem.rs
++++ b/crates/singlefs-core/src/make_filesystem.rs
+@@ -1,9 +1,14 @@
+ //! mkfs（里程碑「新池新建文件」步 1）：吃 N 块设备，写出一个能被挂载、但一个文件都没有的池。
+ //!
+-//! 写序（字节表零 m1..m4；段序列 `12+1+1+1+4`）：根环三个区域与 journal 环整环清零（每块盘 4 次写零调用）→
+-//! 实例表单元第 0 片与树表单元第 0 版（两盘各一份）→ 屏障 →
++//! 写序（字节表零 m1..m4；段序列 `2+12+1+1+1+4`，D22（单元原子性怎么合成） 已定项 8 第 3 条的两趟写序）：
++//! 每块盘 [0, 根环基址) 整段清零（两块盘各一次写零调用）→ 两块盘各一道屏障（作废：旧池的系统配置槽从此读不出）→
++//! 根环三个区域与 journal 环整环清零（每块盘 4 次写零调用）→ 实例表单元第 0 片与树表单元第 0 版（两盘各一份）→ 屏障 →
+ //! 第 0 代根记录种进三个区域各自槽 0（各一道 FUA 写）→ 每盘两个系统配置槽都写世代号 1 → 屏障。
+ //!
++//! 两个入口（用户 2026-10-20 定「对外生成，留内层入口」）：对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
++//! 从随机源取 fsid（前 8 字节就是随机源给的，单元头只带这 8 字节）；内层入口 [`make_filesystem`] 的 fsid 由调用方给，
++//! 给测试、装置、崩溃点重放与 C484、C651 的回归用例用：同参数同 fsid 两次逐字节相同。
++//!
+ //! 清零 2026-09-22 起由 mkfs 自己做（用户 2026-09-19 定案「块设备抽象加写零」，
+ //! `records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行；里程碑「覆盖写、释放、回退与复用」并行线四）：
+ //! 此前它是「镜像准备」、不进录制流，等于要求设备是新建的全零镜像——真设备上没有这个前提。
+@@ -63,7 +68,9 @@ pub const TREE_TABLE_KEY_WIDTH: usize = 8;
+ pub const FIRST_VERSION_REGION_DEVICES: [DeviceIdentity; 3] =
+     [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)];
+ 
+-/// mkfs 的参数：fsid 与时间戳都是参数，同参数两次 mkfs 逐字节相同（里程碑步 1 验收）。
++/// mkfs 的参数。内层入口 [`make_filesystem`] 照 `filesystem_identifier` 写，同参数（连同同一个 fsid）两次逐字节相同
++/// （里程碑步 1 验收，用户 2026-10-20 改成「同参数同 fsid」）；对外入口 [`make_filesystem_drawing_the_filesystem_identifier`]
++/// 不收 fsid，从随机源取、填进交回的这一份参数里。
+ ///
+ /// 三样都进系统不可变配置那一档（D22（单元原子性怎么合成） 已定项 26 第一档：改了要重建文件系统）；
+ /// 那一档里剩下的本盘设备号与设备数不是参数——mkfs 逐盘现填、按池里的盘数现数。
+@@ -201,6 +208,9 @@ pub enum MakeFilesystemError {
+     RegionDevicesNotTheFirstVersionLayout {
+         region_devices: [DeviceIdentity; 3],
+     },
++    /// 对外入口取 fsid 的随机源（[`RANDOM_SOURCE_PATH`]）打不开或读不满 16 字节：在任何写之前交回，盘上一个字节都没动。
++    /// 只有对外入口 [`make_filesystem_drawing_the_filesystem_identifier`] 出这一个。
++    RandomSourceUnreadable(std::io::Error),
+     BlockDevice(BlockDeviceError),
+ }
+ 
+@@ -210,6 +220,52 @@ impl From<BlockDeviceError> for MakeFilesystemError {
+     }
+ }
+ 
++/// 对外入口取 fsid 的随机源：内核的随机数设备，只用 std 读（不加第三方依赖）。
++pub const RANDOM_SOURCE_PATH: &str = "/dev/urandom";
++
++/// 从随机源读一个 16 字节的 fsid。前 8 字节进每个单元头（`unit::unit_filesystem_identifier`），
++/// 两次 mkfs 撞上同一个前 8 字节的概率按 2⁻⁶⁴ 算（推的）；撞上的那一形是 C659（fsid 前 8 字节相同时重做 mkfs 实例代号不变式红）
++/// 认下的已知形态。
++///
++/// # Errors
++/// 随机源打不开或读不满 16 字节：[`MakeFilesystemError::RandomSourceUnreadable`]。
++pub fn filesystem_identifier_from_the_random_source() -> Result<[u8; 16], MakeFilesystemError> {
++    use std::io::Read;
++    let mut filesystem_identifier = [0u8; 16];
++    std::fs::File::open(RANDOM_SOURCE_PATH)
++        .and_then(|mut random_source| random_source.read_exact(&mut filesystem_identifier))
++        .map_err(MakeFilesystemError::RandomSourceUnreadable)?;
++    Ok(filesystem_identifier)
++}
++
++/// 对外入口做成的池：带着随机源取的 fsid 的那一份参数（挂载、接着写都要它），与 mkfs 写出的东西。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct FilesystemMadeWithADrawnIdentifier {
++    pub parameters: MakeFilesystemParameters,
++    pub output: MakeFilesystemOutput,
++}
++
++/// 对外入口：fsid 从随机源取（[`filesystem_identifier_from_the_random_source`]），再照内层入口 [`make_filesystem`] 写
++/// （D22（单元原子性怎么合成） 已定项 8 第 3 条「fsid 由 mkfs 的对外入口生成，前 8 字节取自随机源」）。
++/// 取 fsid 在任何写之前：随机源读不出就一个字节都不写。
++///
++/// # Errors
++/// 随机源读不出（[`MakeFilesystemError::RandomSourceUnreadable`]），或内层入口的错。
++pub fn make_filesystem_drawing_the_filesystem_identifier<Device: BlockDevice>(
++    region_devices: [DeviceIdentity; 3],
++    geometry: SystemImmutableSizes,
++    devices: &mut [(DeviceIdentity, Device)],
++) -> Result<FilesystemMadeWithADrawnIdentifier, MakeFilesystemError> {
++    let drawn_filesystem_identifier = filesystem_identifier_from_the_random_source()?;
++    let parameters = MakeFilesystemParameters {
++        filesystem_identifier: drawn_filesystem_identifier,
++        region_devices,
++        geometry,
++    };
++    let output = make_filesystem(&parameters, devices)?;
++    Ok(FilesystemMadeWithADrawnIdentifier { parameters, output })
++}
++
+ /// mkfs 写出的三样东西与它按环长现算的单元区起点，给验收与步 5 用。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub struct MakeFilesystemOutput {
+@@ -468,7 +524,12 @@ fn check_geometry(
+     Ok(unit_area_start)
+ }
+ 
+-/// 对两块设备做 mkfs。`devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
++/// 内层入口：对两块设备做 mkfs，fsid 照调用方给的 `parameters.filesystem_identifier` 写，不另取。给测试、装置、崩溃点重放
++/// 与 C484、C651 的回归用例用（同参数同 fsid 两次逐字节相同）；对外的入口是 [`make_filesystem_drawing_the_filesystem_identifier`]。
++/// `devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
++///
++/// # Errors
++/// 几何判定不过（都在任何写之前），或底层块设备错。
+ pub fn make_filesystem<Device: BlockDevice>(
+     parameters: &MakeFilesystemParameters,
+     devices: &mut [(DeviceIdentity, Device)],
+@@ -478,6 +539,8 @@ pub fn make_filesystem<Device: BlockDevice>(
+         2,
+         "第一版跑 2 块盘（D2（RAID 条带策略） 已定项 9）"
+     );
++    // 单元、根、系统配置三处写的 fsid 都取这一个：内层入口照调用方给的写。
++    let filesystem_identifier = parameters.filesystem_identifier;
+     let sizes: Vec<(DeviceIdentity, u64)> = devices
+         .iter()
+         .map(|(identity, device)| (*identity, device.size_in_bytes()))
+@@ -507,7 +570,7 @@ pub fn make_filesystem<Device: BlockDevice>(
+         u16::try_from(INSTANCE_ROW_BYTES).expect("88"),
+         &[instance_table_chain_record()],
+         genesis,
+-        &parameters.filesystem_identifier,
++        &filesystem_identifier,
+         genesis_write_order,
+         instance_table_sequence,
+     );
+@@ -518,7 +581,7 @@ pub fn make_filesystem<Device: BlockDevice>(
+         &[0u8; 8],
+         &[0u8; 8],
+         genesis,
+-        &parameters.filesystem_identifier,
++        &filesystem_identifier,
+         instance,
+         tree_table_sequence,
+         u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"),
+@@ -529,19 +592,22 @@ pub fn make_filesystem<Device: BlockDevice>(
+     // 凑出一条合法记录的概率不是 0（上一次 mkfs 留下的就是真合法的记录），而「这块盘是新建的全零镜像」
+     // 是装置的假设、真设备上不成立。
+     // 根环非清不可（C484（mkfs 不清根环，同 fsid 重来旧根还择得中））：挡住旧池那几条根的只有 fsid，
+-    // 而 fsid 是调用方给的（`MakeFilesystemParameters::filesystem_identifier`，mkfs 自己不生成）⇒
+-    // 拿同一个 fsid 在用过的盘上重做 mkfs，旧池留在槽 1..7 里的根照样自证得过、解得开，
++    // 而内层入口的 fsid 是调用方给的（`MakeFilesystemParameters::filesystem_identifier`；对外入口才从随机源取）⇒
++    // 经内层入口拿同一个 fsid 在用过的盘上重做 mkfs，旧池留在槽 1..7 里的根照样自证得过、解得开，
+     // `choose_root` 按 (checkpoint_txg, 实例代号) 取最大还会择中它——而它指着的树表、实例表、分配记录都是旧池的账。
+     // 三个区域在每块盘上都清，不按 `region_devices` 只清本盘要读的那几段：区域归属是参数、设备身份是调用方给的，
+     // 按参数清要多查一次表，还会在别的盘上留下「本池 fsid、自证得过、这一版读不到」的根记录，
+     // 它今天读不到全靠择根与 checker 两处各自按归属读（`recovery::visit_valid_roots`、
+     // `singlefs-checker` 的 `image.rs`），任一处以后改成扫全部盘，漏就回来了。
+     // 按几何清之后 mkfs 的后置条件只有一句：根环三段在每块盘上只剩这次写下的三条第 0 代根，别处全 0。
+-    // 次序与屏障：清零按设备内偏移升序发（[0, 1 MiB)，根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
++    // 次序与屏障（D22（单元原子性怎么合成） 已定项 8 第 3 条的两趟写序，三方判决 `research/prompts/m3-close-c656-r3-main-verification.md`
++    // 第二节 S3，用户 2026-10-20 定）：每块盘先清 [0, 根环基址)，两块盘各过一道屏障（作废），之后才写别的。
++    // 作废那道屏障把 mkfs 中途崩溃的结局分成两截：作废持久之前，两块盘是同一个池时旧池读回最后确认的一版；作废持久之后，
++    // 下一次挂载只有整池拒（`NoValidSystemConfiguration`）或恢复读回第 0 代空池两种结局，不读回旧池的任何一版，也不让新系统配置与旧池的根并存
++    // （少了它，清根环、清 journal 环与清 [0, 根环基址) 同在一段，旧池的系统配置还在而它的根已被清掉的状态摆得出来）。
++    // 其余清零按设备内偏移升序发（根环 1 / 4 / 7 MiB，journal 环 16 MiB），与单元写同段、之间不另加屏障——
+     // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过固定结构两两不重叠；单元区起点是环末尾的下一个槽）；真正重叠的是清根环与根槽 FUA 写
+-    //（区域 r 的槽 0）、清 [0, 1 MiB) 与系统配置两槽的写，这两对都由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
+-    // mkfs 中途崩溃第一版没有条款（崩溃点重放从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
+-    // mkfs 那一行的「崩溃点重放枚举」格写「不在」），不为一个没有条款的语义加屏障。
++    //（区域 r 的槽 0）、清 [0, 1 MiB) 与系统配置两槽的写，前一对由单元写之后、根 FUA 之前那道屏障隔开，后一对由作废那道屏障隔开，不靠发出次序。
+     // 清的是 S 个槽那么长的一段，S 取 mkfs 参数里的那个——这一次写进系统配置的也是它，
+     // 于是「mkfs 清了多长」与「挂载时按多长读」出自同一个数。
+     let root_ring_region_bytes = region_length_in_bytes(
+@@ -549,7 +615,7 @@ pub fn make_filesystem<Device: BlockDevice>(
+         parameters.geometry.root_ring_slots_per_region,
+     );
+     let journal_ring_start = DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES);
+-    // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前（按偏移升序）：系统配置两槽住在这一段里，
++    // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前、自成一段：系统配置两槽住在这一段里，
+     // 槽 1 的偏移随槽距走。在用过的盘上换一个 io_min 重做 mkfs，旧池写在别的槽距上的槽 1 自证得过、记的槽距也等于它所在的偏移，
+     // 全池没有可用的槽 0 时逐档读槽 1 的读者（恢复与池级 checker）分不出它与本池的槽 1、按世代号会择中它
+     // （C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同） 第一轮判决岔路 W，用户 2026-10-02 定 W1 mkfs 清零，
+@@ -557,6 +623,12 @@ pub fn make_filesystem<Device: BlockDevice>(
+     let root_ring_base = region_start(0);
+     for (_, device) in devices.iter_mut() {
+         device.write_zeroes_at(DeviceOffsetInBytes(0), root_ring_base.0)?;
++    }
++    // 作废那道屏障：两块盘的 [0, 根环基址) 清零都持久之后，旧池的系统配置槽一槽都读不出，才写别的。
++    for (_, device_whose_system_configuration_area_was_zeroed) in devices.iter_mut() {
++        device_whose_system_configuration_area_was_zeroed.barrier()?;
++    }
++    for (_, device) in devices.iter_mut() {
+         for region_to_clear in 0..ROOT_RING_REGIONS {
+             device.write_zeroes_at(region_start(region_to_clear), root_ring_region_bytes)?;
+         }
+@@ -579,7 +651,7 @@ pub fn make_filesystem<Device: BlockDevice>(
+     }
+ 
+     let root = RootRecord {
+-        filesystem_identifier: parameters.filesystem_identifier,
++        filesystem_identifier,
+         unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
+         instance,
+         checkpoint_txg: genesis,
+@@ -632,7 +704,7 @@ pub fn make_filesystem<Device: BlockDevice>(
+     for (identity, device) in devices.iter_mut() {
+         let system_configuration = SystemConfiguration {
+             immutable: SystemImmutableConfiguration {
+-                filesystem_identifier: parameters.filesystem_identifier,
++                filesystem_identifier,
+                 this_device: *identity,
+                 device_count: u32::try_from(identities.len()).expect("设备数"),
+                 region_devices: parameters.region_devices,
+diff --git a/crates/singlefs-core/src/mounted_read.rs b/crates/singlefs-core/src/mounted_read.rs
+index 4f5ae7ae8..aca927a98 100644
+--- a/crates/singlefs-core/src/mounted_read.rs
++++ b/crates/singlefs-core/src/mounted_read.rs
+@@ -499,7 +499,7 @@ pub fn open_pool_for_read_judging_the_truncation_fields_as(
+             entry_bytes,
+         )
+         .map_err(|refusal| match refusal {
+-            PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
++            PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable => {
+                 OpenPoolForReadFailure::RecordMalformed {
+                     what: "inode 树内部条目",
+                 }
+diff --git a/crates/singlefs-core/src/records.rs b/crates/singlefs-core/src/records.rs
+index 25c6d14b8..5d402df78 100644
+--- a/crates/singlefs-core/src/records.rs
++++ b/crates/singlefs-core/src/records.rs
+@@ -633,10 +633,11 @@ impl DeadlistEntry {
+         writer.into_bytes()
+     }
+ 
+-    /// 读者：条目宽窄于 43 交回 `None`（`parse_index_node` 只判了条目宽 ≥ key 宽）。
++    /// 读者：条目宽不等于 43 交回 `None`（`parse_index_node` 只判了条目宽 ≥ key 宽）。宽于 43 的同样不收
++    /// （I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，用户 2026-10-18 定「宽于字段表也拒」，欠账 C780、C867）。
+     #[must_use]
+     pub fn parse(bytes: &[u8]) -> Option<Self> {
+-        if bytes.len() < DEADLIST_ENTRY_KEY_BYTES {
++        if bytes.len() != DEADLIST_ENTRY_KEY_BYTES {
+             return None;
+         }
+         let mut reader = ByteReader::at(bytes, 0);
+@@ -779,15 +780,16 @@ impl TreeTableEntry {
+ /// 两种都是盘上读来的字节、不是我们的不变量：调用方把这条条目当损坏处置，不拿里面的指针去解引用。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub enum PointerCarryingEntryRefusal {
+-    /// 条目宽（索引节点头里的盘上字段）窄于字段表：调用方报「条目窄于字段表」。
+-    NarrowerThanItsFieldTable,
++    /// 条目宽（索引节点头里的盘上字段）不等于字段表（窄于、宽于都算：I-1.10（码 2 条目宽等于字段表宽） 写的是「等于」，
++    /// 用户 2026-10-18 定「宽于字段表也拒」，欠账 C867）：调用方报「条目宽与字段表不符」。
++    WidthOtherThanItsFieldTable,
+     /// 条目里那条指针的头部有一段不是第一版的取值（MAC / nonce、算法类型、压缩算法码与压后长度、extent 偏移）：判该指针所在的结构
+     /// （这条条目）损坏（D19（块指针的结构与宽度预算） 已定项 3、D9（加密） 已定项 14、C581（extent 偏移非 0 没有判据））。
+     PointerHeadFieldOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
+ }
+ 
+ /// inode 内部条目 120 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 8），
+-/// 窄于字段表、或子指针头部有一段不是第一版的取值时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
++/// 不等于字段表宽（窄于、宽于都算）、或子指针头部有一段不是第一版的取值时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
+ /// 要分清是哪一种的调用方（冷启动走读、只读挂载打开池）用 [`parse_inode_internal_entry_or_refusal`]；只要知道解不解得开的（用例）用这一个。
+ #[must_use]
+ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, NodePointer)> {
+@@ -797,12 +799,12 @@ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity,
+ /// 同 [`parse_inode_internal_entry`]，解不开时交回是哪一种。
+ ///
+ /// # Errors
+-/// 窄于 120 ⇒ `NarrowerThanItsFieldTable`；子指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
++/// 不等于 120（窄于、宽于都算，欠账 C867）⇒ `WidthOtherThanItsFieldTable`；子指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
+ pub fn parse_inode_internal_entry_or_refusal(
+     bytes: &[u8],
+ ) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
+-    if bytes.len() < usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
+-        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
++    if bytes.len() != usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
++        return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
+     }
+     let mut reader = ByteReader::at(bytes, 0);
+     let separator_key = reader.get_u64();
+@@ -823,12 +825,12 @@ pub fn parse_inode_internal_entry_or_refusal(
+ /// 切到偏移 112 之前要在这里判一次；数据指针头部第一版之外的取值也在这里判）。
+ ///
+ /// # Errors
+-/// 窄于 112 ⇒ `NarrowerThanItsFieldTable`；数据指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
++/// 不等于 112（窄于、宽于都算，欠账 C867）⇒ `WidthOtherThanItsFieldTable`；数据指针头部有一段不是第一版的取值 ⇒ `PointerHeadFieldOutsideTheFirstVersion`。
+ pub fn parse_extent_record(
+     bytes: &[u8],
+ ) -> Result<([u8; 24], DataPointer), PointerCarryingEntryRefusal> {
+-    if bytes.len() < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
+-        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
++    if bytes.len() != usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
++        return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
+     }
+     let key: [u8; 24] = bytes[..24].try_into().expect("24");
+     let pointer =
+@@ -1447,12 +1449,12 @@ mod tests {
+         let entry_narrowed_to_the_key_width = |key_width: usize| vec![0u8; key_width];
+         assert_eq!(
+             parse_extent_record(&entry_narrowed_to_the_key_width(24)),
+-            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
++            Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable),
+             "extent 叶记录该有 112 字节，条目宽缩到 key 宽 24 时不解"
+         );
+         assert_eq!(
+             parse_extent_record(&[0u8; 111]),
+-            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
++            Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable),
+             "差一个字节也不解"
+         );
+         assert!(
+diff --git a/crates/singlefs-core/src/recovery.rs b/crates/singlefs-core/src/recovery.rs
+index 9b0494326..e93e67346 100644
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -5048,7 +5048,7 @@ fn read_container_tree_index_nodes(
+                 let (separator_key, identity_in_the_entry, child_pointer) =
+                     parse_inode_internal_entry_or_refusal(entry).map_err(
+                         |refusal| match refusal {
+-                            PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
++                            PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable => {
+                                 RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                                     what: what_entry,
+                                     entry_bytes: entry.len(),
+@@ -5871,7 +5871,7 @@ fn mapping_entry_count_is_one_per_mapped_unit(
+ /// deadlist 树叶里的条目逐条解开（43 字节，`records::DeadlistEntry`），次序照叶里的（key 升序）。
+ ///
+ /// # Errors
+-/// 有一条窄于 43 ⇒ `EntryNarrowerThanItsFieldTable`。
++/// 有一条不是 43（窄于、宽于都算，欠账 C867）⇒ `EntryNarrowerThanItsFieldTable`。
+ fn deadlist_entries_parsed(
+     leaf_entries_in_key_order: &[Vec<u8>],
+ ) -> Result<Vec<DeadlistEntry>, RecoveryFailure> {
+@@ -5956,7 +5956,7 @@ pub const INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
+ pub const INODE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION:
+     &str = "inode 树内部条目的子指针头部的加密、压缩那几段不是第一版的取值";
+ 
+-/// 解一条 inode 树内部条目（条目宽是盘上的值，窄于 120 报 `EntryNarrowerThanItsFieldTable`；子指针头部 extent 偏移非 0 报
++/// 解一条 inode 树内部条目（条目宽是盘上的值，不是 120（窄于、宽于都算）报 `EntryNarrowerThanItsFieldTable`；子指针头部 extent 偏移非 0 报
+ /// `UnitMalformed`，`what` 取 [`INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO`]，加密、压缩那几段不是第一版的取值取
+ /// [`INODE_INTERNAL_ENTRY_CHILD_POINTER_ENCRYPTION_OR_COMPRESSION_FIELD_OUTSIDE_THE_FIRST_VERSION`]），判类型段是 2（I-9.2（条目身份与子头相符）
+ /// 的第一句；第一版 inode 树根下面只有叶容器）。
+@@ -5965,7 +5965,7 @@ fn inode_internal_entry_parsed_and_judged(
+ ) -> Result<(u64, PackedIdentity, NodePointer), RecoveryFailure> {
+     let (separator_key, identity, child) =
+         parse_inode_internal_entry_or_refusal(entry).map_err(|refusal| match refusal {
+-            PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
++            PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable => {
+                 RecoveryFailure::EntryNarrowerThanItsFieldTable {
+                     what: "inode 树内部条目",
+                     entry_bytes: entry.len(),

@@ -1,0 +1,17 @@
+  - 快照目录里没有 judged-vs-head.diff 与 judged-vs-index.diff：每份都取此刻 HEAD
+  ✗ .claude/rules/implementation-workflow.md  倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 3ae3d752739c 不是快照的 55525e09512a（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✗ .claude/rules/verification.md  倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 e2dd0fa628b5 不是快照的 e59b30f67237（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ .claude/rules/three-way-inference.md  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 e39784933131；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 4b5a0c3690fd 不是快照的 e39784933131（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ .claude/skills/crash-test/commit-stages.md  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 b828f76ca90f；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 2e8a715280ac 不是快照的 b828f76ca90f（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ .claude/agent-common.md  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 67f0fc7f815b；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 d0bdffc5f4db 不是快照的 67f0fc7f815b（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ .claude/main-agent.md  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 3d8133b26169；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 f8f299026927 不是快照的 3d8133b26169（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✗ .claude/hooks/heavy-test-guard.sh  倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 ffcd90afa4ef 不是快照的 d196737f0670（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ .claude/hooks/lib_heavy_tests.py  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 df5acf9615bb；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 b85bb92c4830 不是快照的 df5acf9615bb（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ .claude/hooks/completion-cleanup-guard.sh  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 f363326498d3；照原样：倒推不出：diff 里没有它，此刻 HEAD 里也没有
+  ✗ scripts/mutation/lib_mutation_units.py  倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 a5404f9ee1d0 不是快照的 8da38607b35b（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✗ scripts/mutation/crates-mutation-rows.py  倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 b7f6a3ecf7b9 不是快照的 69e1bce7ed7b（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ scripts/mutation/broad-mutation.py  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 7d530d22aa7b；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 9d03e1639a1e 不是快照的 7d530d22aa7b（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ scripts/crash/lib_verdict_library.py  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 2d59435f228d；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 9bb4fc5912d9 不是快照的 2d59435f228d（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✓ scripts/gate/lib_function_units.py  来源：工作区此刻那一份（照 diff 与 HEAD 都倒推不出或对不上；此刻工作区那一份 sha256 与快照相同）  sha256 5fc1e2f4ecd4；照原样：倒推不出：diff 里没有它，此刻 HEAD 那一份 sha256 b06d1a90cad3 不是快照的 5fc1e2f4ecd4（快照之后有提交改过它，diff 里没有它的基底；照搬迁登记换回旧路径也对不上）
+  ✗ 快照 m3-close-gov-b17-r2：清单点名 14 份，倒推出 9 份、sha256 对上 9 份；倒推不出 5 份、对不上 0 份（逐份列在上面；没对上的不铺进树；diff 用的是 没有 diff；对上的里有 0 份取 diff 头记的结果 blob、9 份取工作区此刻那一份）
+  → 怎么办：倒推不出的照判决规则写明哪一份、为什么，cite-check 里它被引的那几处逐处人工核；对不上的先看 diff 与清单是不是同一刻取的、diff 有没有被改过

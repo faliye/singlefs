@@ -1,0 +1,28 @@
+4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea  crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+93cf2ffd8ed31fec57c6a3049050db7c8714a9a10b888223d727a4a584fd4b83  crates/singlefs-checker-tier/src/gpu_unit_checks.rs
+381511a2f1d1c854e4b4ab364a31b0c37762f81dec5456bf93601fb6ec275e51  crates/singlefs-core/src/mounted_session.rs
+d0f9316a4dcdc1c254e7fb8fabfd78c5b01822f92f5ee97f8f05ebe273ed8f3e  crates/singlefs-core/src/region_scan.rs
+c4819e2fff92bfade658e078baeb9a65645fcca085a72732464c5cd85a04edfe  crates/singlefs-core/src/transaction.rs
+6f6e6dc5374d98aa45c7e3d904c1e429320b6d1635fe44fd26f4e7adbff24c2d  crates/singlefs-core/src/checksum.rs
+eef17aca5c9b0d4b36b400c75b8eb66bdd8a5023ed1e1f8a48651d556f0b2d70  Cargo.lock
+Cargo.lock 里 wgpu 的版本：30.0.1
+HEAD 841b3beabb9812ceaafcd636888b1201dd6e5adf
+index, name, driver_version, pcie.link.gen.max, pcie.link.width.max, memory.total [MiB]
+0, NVIDIA GeForce RTX 5090, 595.99.02, 5, 16, 32607 MiB
+1, NVIDIA GeForce RTX 5060 Ti, 595.99.02, 4, 8, 16311 MiB
+61b210296634f2f20fa0465a4e4f09859cd9236522c54d4fb18301e75f243025  research/prompts/m4-gpugc-design-r1-opus-model/out/g1.out
+f70eb21b8a7081489dd8fc3209080f3ab83f16ac40beee3042c03f4756f1e07a  research/results/e185-gc-batch-wall-clock-split-stage-split-r2-2026-10-23.out
+singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+└── singlefs-core feature "default"
+    ├── singlefs-checker-tier v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker-tier)
+    │   ├── singlefs-checker-tier feature "default" (command-line)
+    │   ├── singlefs-checker-tier feature "gpu" (command-line)
+    │   └── singlefs-checker-tier feature "verdict-store"
+    │       └── singlefs-checker-tier feature "default" (command-line)
+    └── singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+        └── singlefs-harness feature "default"
+            └── singlefs-checker-tier v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker-tier) (*)
+nproc 32
+getconf CLK_TCK 100
+上限：第一、二段外层 run-with-memory-cap.sh 16G；第三段外层 multi-host-run.sh --memory-cap 46G、E185_MEMORY_CAP=40G；编译线程 31，装置线程取登记值
+E185_REGISTERED_APPARATUS_SHA256=4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea

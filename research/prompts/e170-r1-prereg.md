@@ -8,13 +8,13 @@
 
 <!-- doc-lint:not-numbers O1 O2 O3 Q1 Q2 Q3 Q4 G01 G02 G03 G04 G19 G20 G21 G1 G2 G5 G6 P1 P2 P3 P4 P5 P8 P9 P10 N1 N2 N3 N4 N5 M2 V1 V2 V2b V3 V4 V5 V7 V8 V9 V10 S1 S2 S3 S4 S5 S6 F1 F2 F4 F5 F6 F7 F9 F10 F11 A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 X1 X2 X3 X4 X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X15 X16 X17 X18 X19 X20 XC1 XC2 XE1 XE2 XE3 XE4 C1 C2 C3 C4 C5 F8 G14 S5b V6 V11 U1 U2 U3 U4 U5 U6 U7 U8 Y3 -->
 
-英文名的来历：原登记的英文名是 `o3_spec_executor`。这次的执行器从第一次冻结的那一份拷出来另放一个目录再改（5.2），照 E155（每次持久化的写量：三种 fsync 形态与反事实上界）第二次跑 `e155_second_run_fsync_write_volume` 的先例另起新英文名；原执行器目录 `scripts/experiments/e170_o3_spec_executor/`、原变异表 `scripts/mutation/tables/e170_o3_spec_executor.tsv` 与 `scripts/experiments/replay.sh` 里 E170 的五行复跑（第 240–244 行）留着不动。导出装置不另起：仍是 `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs`，只加一个新模式，原有 `dump`、`bad-states` 两个模式的输出不许变（第十一节 S5）。
+英文名的来历：原登记的英文名是 `o3_spec_executor`。这次的执行器从第一次冻结的那一份拷出来另放一个目录再改（5.2），照 E155（每次持久化的写量：三种 fsync 形态与反事实上界）第二次跑 `e155_second_run_fsync_write_volume` 的先例另起新英文名；原执行器目录 `scripts/experiment-apparatus/e170_o3_spec_executor/`、原变异表 `scripts/mutation/tables/e170_o3_spec_executor.tsv` 与 `scripts/experiment-apparatus/replay.sh` 里 E170 的五行复跑（第 240–244 行）留着不动。导出装置不另起：仍是 `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs`，只加一个新模式，原有 `dump`、`bad-states` 两个模式的输出不许变（第十一节 S5）。
 
 主 agent 给的问题（派发提示原文逐字）：
 
 > 要回答的问题：照问题单三行的候选定义，一种读法。
 > 重跑已有实验：E170（O3规约执行器第一版），第 1 次重跑，写 research/prompts/e170-r1-prereg.md。第一次的登记 research/prompts/e170-preregistration.md 与实验页 .claude/kb/experiments/170-O3规约执行器第一版.md 当定义读（它们记着冻结的执行器版本、批 1–3、坏状态表 P1–P9 与盲测族、导出装置与导出文件）。
-> 要写死的：执行器解冻一次——只照今天的 kb 改（.claude/kb/layout/01-first-txn.md 的 magic 取值与「行序即盘上顺序」、.claude/kb/decisions/22-单元原子性怎么合成.md 已定项 16 全池没有可用槽 0 时逐档那一句与两个出口），改完再冻结、记新的 sha256；写执行器的执行员照第一次登记 5.7 的禁读清单（不读 crates/）；P8 的期望怎么改正、依据哪一句登记读法（第一次登记读法 3：F 与 Mk 上末次调用的返回点在 m(c) 之后、ack = n − 1、v_{n−1} 在 A(c) 里）写清，并写明这是登记修订、在产物之前；导出文件（scripts/experiments/target/e170-dumps/，不进 git）还能不能直接用、要不要用今天的导出装置重导（第 11 批改了 mkfs，每盘多一步写零，导出的录制流会变）。
+> 要写死的：执行器解冻一次——只照今天的 kb 改（.claude/kb/layout/01-first-txn.md 的 magic 取值与「行序即盘上顺序」、.claude/kb/decisions/22-单元原子性怎么合成.md 已定项 16 全池没有可用槽 0 时逐档那一句与两个出口），改完再冻结、记新的 sha256；写执行器的执行员照第一次登记 5.7 的禁读清单（不读 crates/）；P8 的期望怎么改正、依据哪一句登记读法（第一次登记读法 3：F 与 Mk 上末次调用的返回点在 m(c) 之后、ack = n − 1、v_{n−1} 在 A(c) 里）写清，并写明这是登记修订、在产物之前；导出文件（scripts/experiment-apparatus/target/e170-dumps/，不进 git）还能不能直接用、要不要用今天的导出装置重导（第 11 批改了 mkfs，每盘多一步写零，导出的录制流会变）。
 > 被测条款：.claude/kb/decisions/13-验证路线.md「已定项 6」；.claude/kb/decisions/22-单元原子性怎么合成.md「已定项 16」；.claude/kb/layout/01-first-txn.md「系统配置槽 0 与槽 1 的位置」那一段。
 
 问题单 `research/prompts/e170-r1-questions.md` 第 7–11 行（`scripts/kb/quote-kb.py` 整段抄）：
@@ -31,8 +31,8 @@
 
 ### 读法写死
 
-1. **Q1 的「第一次跑的批 1」**：`scripts/experiments/target/e170-dumps/<流名>/states.tsv` 里批号为 1 的态（两条流）。这份导出 20 个文件的 sha256 与实验页「导出文件的 sha256」一节的表逐个相同（2026-10-03 现核，第十三节命令，20 个 OK）；执行器只读这份中性格式，不依赖今天的 `crates/`，所以 Q1 直接用它，不等重导。
-2. **Q2、Q3 用今天的导出**：今天的导出装置把两条流重导到 `scripts/experiments/target/e170-second-run-dumps/`（不进 git，`dump` 模式拒绝写进已存在的目录，不会盖掉第一次的导出），取样规则照原登记 5.4 原样。「批 1」在 Q2 里指这份重导的批 1。重导的八个不带耗时的文件（`base-sectors.bin`、`ops.tsv`、`ops-payload.bin`、`calls.tsv`、`torn.tsv`、`torn-payload.bin`、`states.tsv`、`quick-tier.tsv`）与第一次的逐字节相同时，两份批 1 是同一批态，Q1 与 Q2 说的是同一批；不同时两份各报，Q1 照第 1 条取第一次的，重导那一份的严格跑法计数当几何点（第八节 G6）。
+1. **Q1 的「第一次跑的批 1」**：`scripts/experiment-apparatus/target/e170-dumps/<流名>/states.tsv` 里批号为 1 的态（两条流）。这份导出 20 个文件的 sha256 与实验页「导出文件的 sha256」一节的表逐个相同（2026-10-03 现核，第十三节命令，20 个 OK）；执行器只读这份中性格式，不依赖今天的 `crates/`，所以 Q1 直接用它，不等重导。
+2. **Q2、Q3 用今天的导出**：今天的导出装置把两条流重导到 `scripts/experiment-apparatus/target/e170-second-run-dumps/`（不进 git，`dump` 模式拒绝写进已存在的目录，不会盖掉第一次的导出），取样规则照原登记 5.4 原样。「批 1」在 Q2 里指这份重导的批 1。重导的八个不带耗时的文件（`base-sectors.bin`、`ops.tsv`、`ops-payload.bin`、`calls.tsv`、`torn.tsv`、`torn-payload.bin`、`states.tsv`、`quick-tier.tsv`）与第一次的逐字节相同时，两份批 1 是同一批态，Q1 与 Q2 说的是同一批；不同时两份各报，Q1 照第 1 条取第一次的，重导那一份的严格跑法计数当几何点（第八节 G6）。
 3. **「实现」= 重导那一刻工作区里的 `crates/`**。为什么要重导：第一次导出（目录日期 2026-10-01）早于第 11 批合入（2026-10-02，C651 的逐档进了恢复与池级 checker），`impl-verdicts.tsv` 是那时的实现给的判定；Q2 问的是与今天的实现一不一致。重导时在产物里记 `git rev-parse HEAD`、`git diff --cached -- crates/ | sha256sum`、`git diff -- crates/ | sha256sum` 三行，认得出是哪一份实现。
 4. **版本、A(c)、L(c)、在 / 不在**：照原登记第一节读法 2、3、4、5 原样（读法 3 在第二节整段抄了），不改。
 5. **严格跑法与暂代跑法**：照原登记 5.6。欠一句表 `spec-gaps.tsv` 沿用第一次的 G04–G20 行原样（行文、类别、暂代读法、触发条件都不改）；G01、G02、G03 三行按 5.2 改成「已由 kb 补」、不再触发；写执行器时新发现的欠一句从 G21 起编。Q1、Q2、Q3 的判定一律取严格跑法；暂代跑法照跑，只当附带。
@@ -64,7 +64,7 @@
 （例如 nonce 永远为 0）去过三关，若三者全部放行，说明存在共同盲区，回头补 oracle。
 本工程功能正确性的全部故事就是这三个 oracle。
 
-**射程**：三个 oracle 各自验不到什么写在表的最后一列；O2（独立解析器 + checker） 的定义域归已定项 7，需要第二个输入的核对归记录核对器。**实现今天的样子**：O2（独立解析器 + checker） 在 `crates/singlefs-checker`（只依赖格式常量 crate）；O1（内存模型对拍（HashMap 理想文件系统）） 今天的形态是 `crates/singlefs-harness/src/model.rs` 的理想模型（只住内存、只用 `singlefs_format` 的常量、不建崩溃），门禁 harness-model-differential-and-scenarios 拿随机历史逐步对拍；O3（独立规约执行器） 的第一版是只照 kb 文字写的 Python 执行器 `scripts/experiments/e170_o3_spec_executor/`（E170（O3规约执行器第一版））：严格跑法撞「规约欠一句」判不出，暂代跑法与实现在 972 个取样态上一致（两边全放行，不当它判得对的证据），阳性对照照字面没有判别力（26 行判「在」4 行，原因在跑前登记的读法与那一行的期望之间），盲测 40 行全判「不在」，还没接进崩溃点重放；RefFS（已定项 3）的第一版在 `crates/singlefs-reference-filesystem`，调用点没接；「三 oracle 合谋测试」没有（`grep -rn 合谋 crates` 零命中）。
+**射程**：三个 oracle 各自验不到什么写在表的最后一列；O2（独立解析器 + checker） 的定义域归已定项 7，需要第二个输入的核对归记录核对器。**实现今天的样子**：O2（独立解析器 + checker） 在 `crates/singlefs-checker`（只依赖格式常量 crate）；O1（内存模型对拍（HashMap 理想文件系统）） 今天的形态是 `crates/singlefs-harness/src/model.rs` 的理想模型（只住内存、只用 `singlefs_format` 的常量、不建崩溃），门禁 harness-model-differential-and-scenarios 拿随机历史逐步对拍；O3（独立规约执行器） 的第一版是只照 kb 文字写的 Python 执行器 `scripts/experiment-apparatus/e170_o3_spec_executor/`（E170（O3规约执行器第一版））：严格跑法撞「规约欠一句」判不出，暂代跑法与实现在 972 个取样态上一致（两边全放行，不当它判得对的证据），阳性对照照字面没有判别力（26 行判「在」4 行，原因在跑前登记的读法与那一行的期望之间），盲测 40 行全判「不在」，还没接进崩溃点重放；RefFS（已定项 3）的第一版在 `crates/singlefs-reference-filesystem`，调用点没接；「三 oracle 合谋测试」没有（`grep -rn 合谋 crates` 零命中）。
 
 **依据**：
 - E170（O3规约执行器第一版）：O3（独立规约执行器） 照「另一种语言、只照 kb 文字重新推导、配阳性对照」写得出第一版，判得动单个崩溃状态、一态够进快档；严格跑法因规约欠一句判不出、阳性对照照字面判别力不足，这两样它撑不住。
@@ -187,7 +187,7 @@
 - 层 0 判定：`crates/singlefs-checker-tier/src/crash.rs` 第 51 行 `check_records`、第 1222 行 `judge_crash_image`、第 1267 行 `judge_layer0_state_range`、第 1307 行 `layer0_state_ranges_by_segment`。
 - mkfs 的写零：`crates/singlefs-core/src/make_filesystem.rs` 第 557 行 `device.write_zeroes_at(DeviceOffsetInBytes(0), root_ring_base.0)?;`。导出装置的录制流从 mkfs 之后起（`crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 第 543 行 `let operations = all_operations[mkfs_operation_count..].to_vec();`），基镜像是 mkfs 之后的池（第 549 行 `let base = pool.memory_pool_after_mkfs();`，`crates/singlefs-harness/tests/common/mod.rs` 第 204–205 行按 mkfs 那一截操作建池），层 0 也从 `mkfs_operation_count` 之后起枚举（`crates/singlefs-harness/src/history.rs` 第 2228 行注释）。
 - 导出装置的模式：第 1852 行 `main`，第 1854 行认 `bad-states`，第 1689 行认 `dump`。P8 那一行在第 2688 行 `BadShape::NewestRootAndRecordUnreadable =>` 起，期望判定写 `"not_in"`、落点写第 2704 行 `ExpectedLanding::Version(facts.previous_version_text(newest.publish_index))`；Mk⁺ 底态第 2772 行 `let middle_plus = facts.mk_plus();`（是 `Option`），P9 在第 2805 行 `if let Some(plus) = &middle_plus {` 之下、第 2811 行 `"P9-Mk+"`；盲测每条流 20 行（第 1953 行 `BLIND_ROWS_PER_STREAM`）。
-- 第一次冻结的执行器：`scripts/experiments/e170_o3_spec_executor/` 20 个文件（不含 `__pycache__`），`git status --short` 全是 `A `（已暂存、工作区与暂存一致）；2026-10-03 的 sha256 存在草稿 `/tmp/claude-1000/e170-r1-designer/first-run-executor-sha256-2026-10-03.txt`（只当设计时的记录，执行员按第一次第二段产物的冻结行核，第十一节 V9）。
+- 第一次冻结的执行器：`scripts/experiment-apparatus/e170_o3_spec_executor/` 20 个文件（不含 `__pycache__`），`git status --short` 全是 `A `（已暂存、工作区与暂存一致）；2026-10-03 的 sha256 存在草稿 `/tmp/claude-1000/e170-r1-designer/first-run-executor-sha256-2026-10-03.txt`（只当设计时的记录，执行员按第一次第二段产物的冻结行核，第十一节 V9）。
 - `crates/singlefs-core`、`crates/singlefs-format`、`crates/singlefs-harness/src`、`crates/singlefs-checker/src`、`crash.rs` 与导出装置这几条路径里，自 HEAD 以来暂存了 33 个文件的改动（`git diff --cached --stat -- <这几条路径>` 末行 `33 files changed, 9782 insertions(+), 659 deletions(-)`，含新建的导出装置本身；命令见第十三节），其中有 `crates/singlefs-core/src/recovery.rs`、`transaction.rs`、`records.rs`、`mount.rs`、`make_filesystem.rs`、`crates/singlefs-format/src/lib.rs`。哪些在第一次导出之前、哪些在之后，从 git 里分不出（都没提交）。
 
 ## 四、跑之前已经存在的数
@@ -198,7 +198,7 @@
 2. 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 449–456、473、501、538–539 行（读到的数）：c651 正推腿说「E170 批 1 有 14 态是这一形」（全池没有可用槽 0）；「E170 Q3-f 的 28 / 66 是上界」；layout 那一段第 160 行写 O3 执行器的暂代读法是「收到第一个就停、不比世代号」。**影响**：Q2-e 的路径计数里「③ 逐档」那一项设计时预期大于 0，门槛照写「> 0」，不从 14 定；Q3-f 是附带，不判。
 3. 判问法时自己推的：mkfs 新加的写零在录制流开始之前（第三节），新盘上写零不改任何不全为零的扇区，所以单凭这一处，`base-sectors.bin` 与录制流不会变（推的，没量）；与派发提示「导出的录制流会变」那一句不同。会不会变由重导的逐字节比对定（读法 2），这一句不进任何判据。暂存的 33 个文件里恢复与 checker 的改动会让 `impl-verdicts.tsv` 可以不同，这是要重导的理由（读法 3）。
 4. 判问法时自己推的：在 F、Mk 底态上，读法 3 让 P8 落在 A(c) 里（推导在 5.5）；同一个补丁打在 Mk⁺ 底态上，读法 3 让它落在 A(c) 下界之下（P10，5.5）。P10 的期望是设计员照读法 3 推的，被攻过零轮。
-5. 在派发之外读到的工作区事实：`scripts/experiments/target/e170-dumps/` 两条流目录里除第一段的十个文件外还有第三段的五个 `bad-*` 文件；`scripts/experiments/target/e170-dumps-v2-first-run/` 在。不影响判据。
+5. 在派发之外读到的工作区事实：`scripts/experiment-apparatus/target/e170-dumps/` 两条流目录里除第一段的十个文件外还有第三段的五个 `bad-*` 文件；`scripts/experiment-apparatus/target/e170-dumps-v2-first-run/` 在。不影响判据。
 6. CRC-32C 三个参考值（第七节 A8–A10）沿用原登记，2026-10-03 用本机 `google_crc32c` 复算一遍，相同（第十三节）。`printf 'SFSB SFSU SFSJ SFSR' | xxd -p` 的输出与 layout 写的十六进制逐字节相同（第七节 A12 的交叉核）。
 
 ## 五、臂、阳性对照、真实基线
@@ -221,7 +221,7 @@
 
 ### 5.2 执行器解冻一次：改哪几步、依据哪几句
 
-**起点**：把第一次冻结的那一份执行器目录 `scripts/experiments/e170_o3_spec_executor/` 里进过冻结的文件（第一次第二段产物 `research/results/e170-o3-spec-executor-2026-10-02-s2-executor.out` 的冻结行逐个点名的那些）拷进新目录 `scripts/experiments/e170_second_run_o3_spec_executor/`，拷完逐个算 sha256 与那几行比，全同才往下改（不同走 V9）；原目录一个字节不动。比对器与变异驱动不拷，由读 `crates/` 的执行员在第二、三段照第一次那几份重写或拷过来改（它们不进冻结）。
+**起点**：把第一次冻结的那一份执行器目录 `scripts/experiment-apparatus/e170_o3_spec_executor/` 里进过冻结的文件（第一次第二段产物 `research/results/e170-o3-spec-executor-2026-10-02-s2-executor.out` 的冻结行逐个点名的那些）拷进新目录 `scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`，拷完逐个算 sha256 与那几行比，全同才往下改（不同走 V9）；原目录一个字节不动。比对器与变异驱动不拷，由读 `crates/` 的执行员在第二、三段照第一次那几份重写或拷过来改（它们不进冻结）。
 
 **只改下面五处**；每一处在代码旁写依据（`文件@小节标题`，layout 的行写文件加行号），并在交回里逐条列「改了哪个文件哪个函数、依据哪一句」（Q1-d）：
 
@@ -251,9 +251,9 @@ U7 不设（① 由批里每一态都走，锚点 A13 钉住）。合成池的�
 
 ### 5.3 崩溃状态从哪来：两份导出
 
-- **第一次的导出**（Q1）：`scripts/experiments/target/e170-dumps/` 原样，格式照原登记 5.3。执行器开跑前按实验页「导出文件的 sha256」一节的表核 20 个文件（V8）。
-- **今天的重导**（Q2、Q3）：导出装置 `dump` 模式不改代码，连跑两趟：`dump --output-directory scripts/experiments/target/e170-second-run-dumps-v2-first-run/`，再 `dump --output-directory scripts/experiments/target/e170-second-run-dumps/ --compare-with scripts/experiments/target/e170-second-run-dumps-v2-first-run/`；确定性照原登记 V2 与修订 1 的 V2b 判。产物另记三行 git 标识（读法 3），并逐文件报重导与第一次导出的比对：八个不带耗时的文件 `identical=true/false`，`impl-verdicts.tsv` 去掉耗时列后逐行比、报不同的态数与态号（附带 Q2-i）。导出装置今天编不过或跑不起来时，只许改到编得过、不改任何输出（改了什么记第十二节）；要改输出才跑得起来的，走停机 S6。
-- **坏状态的新模式**：导出装置加一个模式 `bad-states-second-run --dump-directory <目录> --seed-hex <种子>`，造出的行与原 `bad-states` 模式在同一份导出、同一个种子上逐行相同，只差两处：P8 四行的期望判定写 `in`（期望落点不变，仍是 v_{n−1}）；每条流多一行 P10（5.5）。原 `bad-states` 与 `dump` 两个模式的代码路径不改（S5 核）。写出的文件名与原模式相同（`bad-states.tsv`、`bad-patches.bin`、`bad-expected.tsv`、`bad-impl-verdicts.tsv`、`bad-seed.tsv`），进 `scripts/experiments/target/e170-second-run-dumps/<流名>/`。
+- **第一次的导出**（Q1）：`scripts/experiment-apparatus/target/e170-dumps/` 原样，格式照原登记 5.3。执行器开跑前按实验页「导出文件的 sha256」一节的表核 20 个文件（V8）。
+- **今天的重导**（Q2、Q3）：导出装置 `dump` 模式不改代码，连跑两趟：`dump --output-directory scripts/experiment-apparatus/target/e170-second-run-dumps-v2-first-run/`，再 `dump --output-directory scripts/experiment-apparatus/target/e170-second-run-dumps/ --compare-with scripts/experiment-apparatus/target/e170-second-run-dumps-v2-first-run/`；确定性照原登记 V2 与修订 1 的 V2b 判。产物另记三行 git 标识（读法 3），并逐文件报重导与第一次导出的比对：八个不带耗时的文件 `identical=true/false`，`impl-verdicts.tsv` 去掉耗时列后逐行比、报不同的态数与态号（附带 Q2-i）。导出装置今天编不过或跑不起来时，只许改到编得过、不改任何输出（改了什么记第十二节）；要改输出才跑得起来的，走停机 S6。
+- **坏状态的新模式**：导出装置加一个模式 `bad-states-second-run --dump-directory <目录> --seed-hex <种子>`，造出的行与原 `bad-states` 模式在同一份导出、同一个种子上逐行相同，只差两处：P8 四行的期望判定写 `in`（期望落点不变，仍是 v_{n−1}）；每条流多一行 P10（5.5）。原 `bad-states` 与 `dump` 两个模式的代码路径不改（S5 核）。写出的文件名与原模式相同（`bad-states.tsv`、`bad-patches.bin`、`bad-expected.tsv`、`bad-impl-verdicts.tsv`、`bad-seed.tsv`），进 `scripts/experiment-apparatus/target/e170-second-run-dumps/<流名>/`。
 
 ### 5.4 取样规则
 
@@ -289,9 +289,9 @@ U7 不设（① 由批里每一态都走，锚点 A13 钉住）。合成池的�
 
 ### 5.7 装置写在哪；禁读清单；资源上限
 
-- **执行器走 `research/` 那一支**：`scripts/experiments/e170_second_run_o3_spec_executor/`（Python，目录里不放 `main.rs`）；执行员先跑 `cargo metadata --format-version 1 --no-deps --manifest-path scripts/experiments/Cargo.toml`，确认 bin 目标里没有多出 e170 那一项。执行器、单测、`spec-gaps.tsv` 放这里；比对器与变异驱动也放这里，不进冻结。
+- **执行器走 `research/` 那一支**：`scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`（Python，目录里不放 `main.rs`）；执行员先跑 `cargo metadata --format-version 1 --no-deps --manifest-path scripts/experiment-apparatus/Cargo.toml`，确认 bin 目标里没有多出 e170 那一项。执行器、单测、`spec-gaps.tsv` 放这里；比对器与变异驱动也放这里，不进冻结。
 - **导出装置是入库装置**（这条岔路的 Q2 问的就是「`crates/` 今天这份代码在同一批状态上判得与执行器一不一致」，另写一份独立模型答不了）：仍是 `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs`，只读、只驱动、只观测，不改 core、checker、harness、format。**要读 `crates/` 常量的量**：照原登记 5.7 那张清单（盘数、盘字节数、物理块与 io_min、固定 fsid 与写时刻、两份文件内容的生成式、流二的段长表与写数与根数），装置里已经是本地常量加 `main` 开头回比（S1）；新模式不新读任何 `crates/` 常量，补丁与重封照第一次 `bad-states` 模式调 core 的写者。
-- **写执行器的执行员的禁读清单**（换掉原登记 5.7 那一份）：`crates/` 全部（含 `git log -p` / `git show` / `git diff` 里落在 `crates/` 的部分）；`scripts/experiments/` 下除新目录与原目录里进过冻结的那 15 个文件以外的全部（原目录的 `comparator*`、`mutation_driver.py` 也不读）；`scripts/` 下的源文件（照用法跑 `run-with-memory-cap.sh`、`capped.sh` 不算读）；`research/results/` 全部，只有 `grep '^name=freeze' research/results/e170-o3-spec-executor-2026-10-02-s2-executor.out` 那几行例外；`research/prompts/` 下除本登记（第一、二、五至十一节）、原登记（第一、二、五至十一节）与问题单 `research/prompts/e170-r1-questions.md` 以外的全部；`records/` 全部；`.claude/kb/` 下除 `decisions/`、`invariants.md`、`layout/` 以外的全部（`.claude/kb/experiments/` 在内）；本登记与原登记的第三、四、十二、十三节；`scripts/experiments/target/` 下任何一份 `impl-verdicts.tsv` 与 `bad-*` 文件（冻结之前）。kb 正文里点名的 crates 函数名、文件名、行号只当文字读，不顺着去读代码。执行员交回时附自己读过的文件清单（从自己的工具调用里列）；主 agent 可用 `scripts/agents/agent-handover.py` 抽它的会话记录核对。写执行器的执行员不是这一批读过 `crates/` 的任何一位。
+- **写执行器的执行员的禁读清单**（换掉原登记 5.7 那一份）：`crates/` 全部（含 `git log -p` / `git show` / `git diff` 里落在 `crates/` 的部分）；`scripts/experiment-apparatus/` 下除新目录与原目录里进过冻结的那 15 个文件以外的全部（原目录的 `comparator*`、`mutation_driver.py` 也不读）；`scripts/` 下的源文件（照用法跑 `run-with-memory-cap.sh`、`capped.sh` 不算读）；`research/results/` 全部，只有 `grep '^name=freeze' research/results/e170-o3-spec-executor-2026-10-02-s2-executor.out` 那几行例外；`research/prompts/` 下除本登记（第一、二、五至十一节）、原登记（第一、二、五至十一节）与问题单 `research/prompts/e170-r1-questions.md` 以外的全部；`records/` 全部；`.claude/kb/` 下除 `decisions/`、`invariants.md`、`layout/` 以外的全部（`.claude/kb/experiments/` 在内）；本登记与原登记的第三、四、十二、十三节；`scripts/experiment-apparatus/target/` 下任何一份 `impl-verdicts.tsv` 与 `bad-*` 文件（冻结之前）。kb 正文里点名的 crates 函数名、文件名、行号只当文字读，不顺着去读代码。执行员交回时附自己读过的文件清单（从自己的工具调用里列）；主 agent 可用 `scripts/agents/agent-handover.py` 抽它的会话记录核对。写执行器的执行员不是这一批读过 `crates/` 的任何一位。
 - **线程与内存上限从派发提示取**（「线程上限：N」与内存上限）：导出装置与执行器的工作线程 / 进程数都不超过 N；编译、跑装置、跑执行器、跑变异一律经 `bash scripts/hosts/capped.sh N` 与 `bash scripts/hosts/run-with-memory-cap.sh <上限>`。导出装置在 checker 档包里，跑它照 `.claude/agent-common.md` 的重型测试那一条由主 agent 判归谁跑（第一次是执行员经 `cargo run` 跑的）。
 
 ### 5.8 实现量与分段
@@ -302,9 +302,9 @@ U7 不设（① 由批里每一态都走，锚点 A13 钉住）。合成池的�
 
 | 段 | 谁做 | 做什么 | 要改的装置与产物 | 补问题单哪一行 | 补完够不够判 |
 |---|---|---|---|---|---|
-| 第一段 | 只读 kb 的执行员（禁读清单见 5.7） | 拷执行器（V9）；照 5.2 改 C1–C5；单测 U1–U6、U8；在**第一次的导出**上严格与暂代两种跑法判批 1、批 2；冻结；锚点 A1–A13、S2、S3 | `scripts/experiments/e170_second_run_o3_spec_executor/`；`research/results/e170-r1-o3-spec-executor-<日期>-s1-executor.out` | Q1 | Q1 够判 |
-| 第二段 | 读 `crates/` 的执行员 | 重导两趟（V2、V2b、S1、S4、与第一次逐文件比）；冻结的执行器在重导的批 1、批 2 上严格与暂代两种跑法判；Q2 比对器与 Q2-pc | 导出目录 `scripts/experiments/target/e170-second-run-dumps*/`；`research/results/e170-r1-o3-spec-executor-<日期>-s2-export.out`、`-s2-q2-comparator.out` | Q2 | Q2 够判（严格跑法撞欠一句的态单报，那几态不够判） |
-| 第三段 | 读 `crates/` 的执行员（可与第二段同一位） | 导出装置加 `bad-states-second-run` 模式（S5、S5b）；种子取第一段冻结行；冻结的执行器判坏状态；Q3 比对器与 Q3-pc；执行器变异 X1–X20、XC1–XC2 在草稿目录的副本上跑；XE4 | 导出装置同一个文件；`scripts/experiments/target/e170-second-run-dumps/*/bad-*`；`research/results/e170-r1-o3-spec-executor-<日期>-s3-bad-states.out`、`-s3-mutations.out`；变异表 `scripts/mutation/tables/e170_second_run_o3_spec_executor.tsv`；`crates/mutations.tsv` 末尾一行 XE4 | Q3 | Q3 够判（严格跑法撞欠一句的行单报，那几行不够判） |
+| 第一段 | 只读 kb 的执行员（禁读清单见 5.7） | 拷执行器（V9）；照 5.2 改 C1–C5；单测 U1–U6、U8；在**第一次的导出**上严格与暂代两种跑法判批 1、批 2；冻结；锚点 A1–A13、S2、S3 | `scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`；`research/results/e170-r1-o3-spec-executor-<日期>-s1-executor.out` | Q1 | Q1 够判 |
+| 第二段 | 读 `crates/` 的执行员 | 重导两趟（V2、V2b、S1、S4、与第一次逐文件比）；冻结的执行器在重导的批 1、批 2 上严格与暂代两种跑法判；Q2 比对器与 Q2-pc | 导出目录 `scripts/experiment-apparatus/target/e170-second-run-dumps*/`；`research/results/e170-r1-o3-spec-executor-<日期>-s2-export.out`、`-s2-q2-comparator.out` | Q2 | Q2 够判（严格跑法撞欠一句的态单报，那几态不够判） |
+| 第三段 | 读 `crates/` 的执行员（可与第二段同一位） | 导出装置加 `bad-states-second-run` 模式（S5、S5b）；种子取第一段冻结行；冻结的执行器判坏状态；Q3 比对器与 Q3-pc；执行器变异 X1–X20、XC1–XC2 在草稿目录的副本上跑；XE4 | 导出装置同一个文件；`scripts/experiment-apparatus/target/e170-second-run-dumps/*/bad-*`；`research/results/e170-r1-o3-spec-executor-<日期>-s3-bad-states.out`、`-s3-mutations.out`；变异表 `scripts/mutation/tables/e170_second_run_o3_spec_executor.tsv`；`crates/mutations.tsv` 末尾一行 XE4 | Q3 | Q3 够判（严格跑法撞欠一句的行单报，那几行不够判） |
 
 第二段的重导不依赖第一段，可以与第一段同时开工；它判批与比对要等第一段的冻结行落盘。第三段的新模式代码可以与第一、二段同时写，跑要等种子（第一段）与重导目录（第二段）。
 
@@ -462,11 +462,11 @@ XE1–XE3 照原登记，不另跑（导出装置的 `dump` 模式代码不改�
 - `.claude/kb/experiments.md`：只用 `grep -o '^| E155（[^）]*）'` 与 `grep -o '^| E170（[^）]*）'` 取了两个简称。
 - `records/2026-10-01-里程碑三形式化接入.md` 标题行；grep 命中 440、445、449、450、451、456、469、473、491、498、499、501、529、531、536、538、539 行；第 485–537 行的 grep 命中 492、495、499、501、502、505、510、515、517、519、528、529、531、533、534、536 行。
 - `.claude/kb/decisions/13-验证路线.md` 标题行、130–155；`.claude/kb/decisions/22-单元原子性怎么合成.md` 标题行、330–354；`.claude/kb/layout/01-first-txn.md` 标题行，grep 命中 109、158、160、175、198、216、338、359、365、369 行。
-- `scripts/experiments/e170_o3_spec_executor/`：文件清单与行数；`spec-gaps.tsv` 全部 21 行（每行前 400 字符，G01–G03 的缺什么、类别、暂代读法、触发条件四列，G04–G20 的触发条件列）；`comparator_q3_bad_states.py` grep 命中 1、7、32、136、144、158、167、177、179、182、184、202、204、207、212、213、214、216、221、225、226、227、231、232、271 行；`executor_main.py` grep 命中 45、48、54、102、103、105、106、107、109、110、111、112、119 行。
-- `scripts/experiments/target/e170-dumps/`：目录清单、20 个文件的 sha256；两条流 `bad-expected.tsv` 的前 3 行与 P8 四行（读到的期望列在第四节）。
+- `scripts/experiment-apparatus/e170_o3_spec_executor/`：文件清单与行数；`spec-gaps.tsv` 全部 21 行（每行前 400 字符，G01–G03 的缺什么、类别、暂代读法、触发条件四列，G04–G20 的触发条件列）；`comparator_q3_bad_states.py` grep 命中 1、7、32、136、144、158、167、177、179、182、184、202、204、207、212、213、214、216、221、225、226、227、231、232、271 行；`executor_main.py` grep 命中 45、48、54、102、103、105、106、107、109、110、111、112、119 行。
+- `scripts/experiment-apparatus/target/e170-dumps/`：目录清单、20 个文件的 sha256；两条流 `bad-expected.tsv` 的前 3 行与 P8 四行（读到的期望列在第四节）。
 - `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 2636–2760、2785–2845，grep 命中 9、10、78–140 的常量行、158、166、175、200、251、252、266、286、291、296、320、393、394、406、423、429、448、455、476、486、504、531、539、540、543、549、619、620、622、627、628、629、632、854–865、881、928、946、997、1411、1689、1852、1854、1942、1953、2002–2027、2462、2553、2626、2638–2759 内的 `"in"` / `"not_in"` 行、2688、2704、2754、2772、2792、2798、2805、2811、2812、2827、2839、2879、2974、3157、3191、3194、3199、3200、3209、3252、3272、3273、3278、3280、3284、3285、3290、3292、3311、3693 行。
 - `crates/singlefs-core/src/make_filesystem.rs` grep 命中 557、559、561 行；`crates/singlefs-core/src/recovery.rs` grep 命中 741、967、1039、1064、1255、4330 行；`crates/singlefs-checker/src/image.rs` grep 命中 583、631 行；`crates/singlefs-checker-tier/src/crash.rs` grep 命中 51、108、1222、1267、1307 行；`crates/singlefs-core/src/system_configuration.rs` 第 22 行、`root_record.rs` 第 11 行、`journal.rs` 第 20 行、`unit.rs` 第 14 行；`crates/singlefs-harness/src/scenario.rs` grep 命中 58、145、189 行；`crates/singlefs-harness/src/history.rs` 第 2228 行；`crates/singlefs-harness/tests/common/mod.rs` grep 命中 93、190、191、204、205、227 行。
-- `scripts/kb/quote-kb.py` 1–60；`scripts/kb/claim-experiment.sh` 1–70；`scripts/kb/replace-once.py` 1–25；`scripts/experiments/replay.sh` grep 命中 240–244、617、619、620、621、623 行；`scripts/mutation/tables/` 文件清单里 e170 那一项。
+- `scripts/kb/quote-kb.py` 1–60；`scripts/kb/claim-experiment.sh` 1–70；`scripts/kb/replace-once.py` 1–25；`scripts/experiment-apparatus/replay.sh` grep 命中 240–244、617、619、620、621、623 行；`scripts/mutation/tables/` 文件清单里 e170 那一项。
 - 没读：`research/results/` 下任何文件；`.claude/kb/experiments/` 下别的实验页；别的实验的跑前登记与产物。
 
 **跑过的命令**（原样；只读命令的输出没进登记的不贴，进了登记的数在对应小节）：
@@ -475,18 +475,18 @@ XE1–XE3 照原登记，不另跑（导出装置的 `dump` 模式代码不改�
 TZ=Asia/Tokyo date +%F                                         # 2026-10-03
 D=/tmp/claude-1000/e170-r1-designer
 grep -E '^\| (new_pool_file_creation|fixed_script_through_e_then_unmount) \|' ".claude/kb/experiments/170-O3规约执行器第一版.md" | awk -F'|' '{gsub(/[ `]/,"",$2);gsub(/[ `]/,"",$3);gsub(/[ `]/,"",$4); print $4"  "$2"/"$3}' > $D/first-run-dump-sha256.txt
-(cd scripts/experiments/target/e170-dumps && sha256sum -c $D/first-run-dump-sha256.txt) | awk '{print $NF}' | sort | uniq -c
+(cd scripts/experiment-apparatus/target/e170-dumps && sha256sum -c $D/first-run-dump-sha256.txt) | awk '{print $NF}' | sort | uniq -c
 #        20 OK
 nice -n 19 python3 -c "import google_crc32c as g; print('crc32c_123456789=0x%08X zero4096=0x%08X zero512=0x%08X' % (g.value(b'123456789'), g.value(bytes(4096)), g.value(bytes(512))))"
 #   crc32c_123456789=0xE3069283 zero4096=0x98F94189 zero512=0x30FCEDC0
 printf 'SFSB SFSU SFSJ SFSR' | xxd -p
 #   534653422053465355205346534a2053465352
-cd scripts/experiments/e170_o3_spec_executor && git status --short . | cut -c1-2 | sort | uniq -c     # 20 个 「A 」
+cd scripts/experiment-apparatus/e170_o3_spec_executor && git status --short . | cut -c1-2 | sort | uniq -c     # 20 个 「A 」
 sha256sum $(ls | grep -v __pycache__) > /tmp/claude-1000/e170-r1-designer/first-run-executor-sha256-2026-10-03.txt
 git diff --cached --stat -- crates/singlefs-core crates/singlefs-format crates/singlefs-harness/src crates/singlefs-checker-tier/src/crash.rs crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs crates/singlefs-checker/src | tail -20
 #   末行 33 files changed, 9782 insertions(+), 659 deletions(-)
 git log --since='2026-09-30' --format='%h %ad %s' --date=iso -- crates/ | head     # 无输出
-ls -ld --time-style=+%F scripts/experiments/target/e170-dumps                                 # 日期 2026-10-01
+ls -ld --time-style=+%F scripts/experiment-apparatus/target/e170-dumps                                 # 日期 2026-10-01
 nice -n 19 python3 scripts/kb/quote-kb.py $D/questions-quote.md 'research/prompts/e170-r1-questions.md:7-11'
 #   ✓ 1 段整抄进 /tmp/claude-1000/e170-r1-designer/questions-quote.md，回读逐字节一致
 L=.claude/kb/layout/01-first-txn.md; nice -n 19 python3 scripts/kb/quote-kb.py $D/quotes.md \

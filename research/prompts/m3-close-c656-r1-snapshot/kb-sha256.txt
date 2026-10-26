@@ -1,5 +1,5 @@
 02ef80ff196e4263ff648490159c6ad13329e545cffc93d1fcdc7eeaf1062ecf  .claude/kb/layout/01-first-txn.md
 1cdbf25c59532bdebd79319376008388f2ed5ae07b2ad588fa48066e9d063432  .claude/kb/checks-owed.md
-e44490b4d05fa4abd9edb3b52bd8d9964e9cc92604218d4105ecf69632a0bc1f  .claude/kb/decisions/22-单元原子性怎么合成.en.md
-a232ed86b5dd98c986d5d81473cdfb05c1f47f8118846e9d46bef60e35896301  .claude/kb/decisions/22-单元原子性怎么合成.ja.md
+e44490b4d05fa4abd9edb3b52bd8d9964e9cc92604218d4105ecf69632a0bc1f  .claude/kb/decisions/22-synthesizing-unit-atomicity.en.md
+a232ed86b5dd98c986d5d81473cdfb05c1f47f8118846e9d46bef60e35896301  .claude/kb/decisions/22-ユニット原子性の合成手法.ja.md
 097fba1ccfc805568df4041bf3a426d35aab858cb26af56366702ffbac9fcd03  .claude/kb/decisions/22-单元原子性怎么合成.md

@@ -1,0 +1,10 @@
+{
+  "scripts/gate/verus-proof-check.py": "9d990a065733266b385667424c79d42a336389a93bbe20398022fe2041f2dbad",
+  "scripts/gate/lib_function_units.py": "5fc1e2f4ecd42598f4a54326a0e311be7564d85d2d70766430c4b9ca7c4b8ebe",
+  ".claude/gate.d/checker-tier-formal-verification.sh": "97e82d65037436aff9f645229c7946d223533ef157a82b44a1b615cd7ce509bc",
+  ".claude/gate.d/verus-pins.tsv": "8f34532f2af351c0fcee8366110d044da18d5338ea83cfe5df04fc0acc2e7152",
+  "crates/singlefs-replay-prefix/src/lib.rs": "6abe44fc935f8f56a0ccd1ec1b5f16af5ece0f5bacad6da9033681fdc68d86ed",
+  "crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs": "415634c481ba7dc7d02edb6629cba855a59aa0e33ffeccc11b3460bbb5aebf4e",
+  "crates/singlefs-replay-prefix/verus-must-red-worlds.tsv": "3b34cd436431efea10051b577708792e24443cce69be2d1a5b9712cf659893f7",
+  "scripts/gate/README.md": "ab305a3504674bd40f1fbfa9c3116e7c60bc237310b7f08977ec20a0f9aa9b98"
+}

@@ -1,0 +1,12 @@
+name=membership entry=check_proof tree=current memory_peaks_lib_import_subprocess=1 lib_long_run_units=40 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=75
+name=membership entry=check_proof tree=cut-src memory_peaks_lib_import_subprocess=0 lib_long_run_units=0 lib_long_run_imports=0 host_dispatch_module_body=1 host_resources_units=0
+name=membership entry=check_proof tree=cut-algo memory_peaks_lib_import_subprocess=0 lib_long_run_units=0 lib_long_run_imports=0 host_dispatch_module_body=1 host_resources_units=0
+name=membership entry=check_proof tree=narrow memory_peaks_lib_import_subprocess=1 lib_long_run_units=40 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=75
+name=membership entry=check_proof tree=modlevel memory_peaks_lib_import_subprocess=1 lib_long_run_units=52 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=75
+name=membership entry=check_proof tree=cut-modlevel memory_peaks_lib_import_subprocess=1 lib_long_run_units=41 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=0
+name=membership entry=Runner.escalate_step tree=current memory_peaks_lib_import_subprocess=1 lib_long_run_units=40 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=75
+name=membership entry=Runner.escalate_step tree=cut-src memory_peaks_lib_import_subprocess=0 lib_long_run_units=0 lib_long_run_imports=0 host_dispatch_module_body=1 host_resources_units=0
+name=membership entry=Runner.escalate_step tree=cut-algo memory_peaks_lib_import_subprocess=0 lib_long_run_units=0 lib_long_run_imports=0 host_dispatch_module_body=1 host_resources_units=0
+name=membership entry=Runner.escalate_step tree=narrow memory_peaks_lib_import_subprocess=1 lib_long_run_units=40 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=75
+name=membership entry=Runner.escalate_step tree=modlevel memory_peaks_lib_import_subprocess=1 lib_long_run_units=52 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=75
+name=membership entry=Runner.escalate_step tree=cut-modlevel memory_peaks_lib_import_subprocess=1 lib_long_run_units=41 lib_long_run_imports=5 host_dispatch_module_body=1 host_resources_units=0

@@ -1,0 +1,55 @@
+== shell
+.claude/gate.d/doc-decisions.sh:1495	review_out="$(python3 -c "$OPEN_ITEM_REVIEW_SOURCE" "$f" "$ln" "${deps[@]}")" || {
+.claude/gate.d/doc-experiments.sh:567	python3 - "$base" "$SHARED_CHANGED_PATHS" "$SHARED_ADDED_PATHS" "$(dirname "$LIB_CHANGED_PATHS")" \
+.claude/gate.d/doc-process-records.sh:489	python3 - <(printf '%s\n' "$changed_since_head") "$TRIGGER_TABLE" <<'PY'
+.claude/gate.d/doc-process-records.sh:1413	python3 - "$gate_base" <(printf '%s\n' "$changed_since_gate") <(printf '%s\n' "$added_record_lines") "$TRIGGER_TABLE" "$STAGE_N
+scripts/agents/remind.sh:199	state=1; if [[ $cell_rc == 0 && "$cell_out" == *"「loop-case」第 1 次：$tricky"* && -f "$conf" ]] && grep -q '^once=0$' "$conf" && grep 
+scripts/crash/gpu-quiesce-run.sh:397	bash "$0" -- bash "$work/command.sh" ok >"$work/default-log.calls.out" 2>&1
+scripts/devices/build-patched-qemu.sh:232	got="$(env -u SINGLEFS_THREAD_CAP bash -c 'source "$1"; build_break="$2"; '"$(declare -f default_build_threads)"'; default_build
+scripts/devices/e125-zoned-wp-probe.sh:203	Q=$(python3 -c "print(f'{$PC/$ZS:.6f}')")
+scripts/devices/e129-tear-injector.sh:103	post_ok=$(python3 -c "
+scripts/devices/e129-tear-injector.sh:126	nothing_ok=$(python3 -c "
+scripts/devices/e129-thin-neighbour.sh:53	mkpattern() { python3 -c "
+scripts/devices/e129-thin-neighbour.sh:110	first_diff="$(python3 -c "
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh:26	(cd "$2" && python3 -c "
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh:31	(cd "$2" && python3 -c "
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh:130	step v1-against-stored bash -c "cd '$V2' && python3 comparator_v1_against_stored.
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh:137	step v2-i1-against-segment-one bash -c "cd '$V2' && python3 comparator_v1_against
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh:140	step comparator-q1 bash -c "cd '$V2' && python3 comparator_two_versions.py \
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh:146	step comparator-q2-q3 bash -c "cd '$V2' && python3 comparator_witness_classes.py 
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh:39	(cd "$2" && python3 -c "
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh:125	step record-paths bash -c "cd '$V487' && python3 run_q5_rec
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh:127	step format-constants bash -c "cd '$V487' && python3 compar
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_6_tree_multi_host.sh:75	digest=$(python3 -B -c "import sys; sys.pat
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_6_tree_multi_host.sh:80	differences=$(python3 -B -c "import sys; sy
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh:69	digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARC
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh:77	differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RE
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh:320	logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh:47	digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh:55	differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RES
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh:267	logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'
+scripts/experiment-apparatus/replay.sh:1220	echo " → 怎么办：单独写 bash scripts/experiment-apparatus/replay.sh --list-items；要跑哪几个照它列的实验号写：bash scrip
+scripts/experiment-apparatus/replay.sh:1717	bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" bash -c '
+scripts/hosts/detached-run.sh:1365	bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}b" -- bash -c 'echo last-line-b; exit 7' > "$work/b.out" 2>&
+scripts/hosts/multi-host-run.sh:719	bash "$template/scripts/hosts/run-with-memory-cap.sh" 16M bash -c 'echo "$$" > "$0"; exec sleep 300' "$scene/holder.pid" > "$scene/hol
+scripts/hosts/multi-host-run.sh:1112	echo " → 怎么办：去掉它再跑（env -u MULTI_HOST_RUN_BREAK bash scripts/hosts/multi-host-run.sh …）；要证红就跑 MU
+scripts/hosts/peer-host-lib.sh:76	peer_host_run() { # <目录> <命令文本>：在第二台的这个目录里 bash -c 跑（PATH 前面加 PEER_CARGO_BIN_DIRECTORY），
+scripts/hosts/peer-host-lib.sh:135	bash -c "$QUIESCE_STOP_COMMAND" >/dev/null 2>&1
+scripts/hosts/peer-host-lib.sh:136	if bash -c "$QUIESCE_STOPPED_CHECK_COMMAND" >/dev/null 2>&1; then
+== python
+.claude/hooks/lib_heavy_tests.py:4765	answer = subprocess.run(["bash"], input=script, capture_output=True, text=True).stdout.split("\0")
+.claude/singlefs-ai-sop/scripts/proc.py:143	stop_ancestor_run = subprocess.run(["bash", "-c", f'"{sys.executable}" "{os.path.abspath(__file__)}" stop $$ --grace 1; echo "
+scripts/agents/agent-watch.py:4869	silent = subprocess.Popen(["bash", "-c", f"exec 3>>'{silent_file}'; touch -d '1 hour ago' '{silent_file}'; exec sleep 120"])
+scripts/agents/agent-watch.py:5285	holder = subprocess.Popen(["bash", "-c", f"exec 3>>'{held_output}'; exec sleep 60"])
+scripts/agents/agent-watch.py:5381	sleeper = subprocess.Popen(["bash", "-c", f"exec 3>>'{stale_file}'; touch -d '1 hour ago' '{stale_file}'; exec sleep 30"])
+scripts/agents/agent-watch.py:5386	busy = subprocess.Popen([sys.executable, "-c", "import os, time\n"
+scripts/agents/agent-watch.py:5498	writer = subprocess.Popen([sys.executable, "-c", "import time\n"
+scripts/agents/agent-watch.py:5504	silent = subprocess.Popen(["bash", "-c", f"exec 3>>'{silent_file}'; touch -d '1 hour ago' '{silent_file}'; exec sleep 60"])
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py:290	completed = subprocess.run(["bash", "-c", command] if command e
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_selftest_harness.py:111	subprocess.Popen(["bash", "-c", f"sleep 300 </dev/null >/dev/nul
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:1107	completed = subprocess.run(["bash", "-c", context.hosts_command], cwd=con
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:1112	completed = subprocess.run(["bash", "-c", context.resources_command], cwd
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py:1094	subprocess.run([sys.executable, "-c", code], check=True, time
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py:331	completed = subprocess.run(["bash", "-c", command], cwd=setting
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py:341	completed = subprocess.run(["bash", "-c", command], cwd=setting
+scripts/gate/lib_reuse_checks.py:558	completed = subprocess.run(["bash", "-c", command], cwd=root, capture_output=True, text=True, timeout=timeout,

@@ -1,0 +1,28 @@
+name=judged_sha256 status=ok
+name=closure arm=full entry=scripts/gate/verus-proof-check.py::check_proof rc=4 units=1577 lib_long_run_units=40 host_dispatch_predict=1 refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure arm=edge-cut entry=scripts/gate/verus-proof-check.py::check_proof rc=0 units=1230 lib_long_run_units=0 host_dispatch_predict=1 refusals=none
+name=dropped_by_edge_cut entry=scripts/gate/verus-proof-check.py::check_proof total=347 by_file=.claude/hooks/lib_heavy_tests.py:18,.claude/hooks/lib_long_run.py:40,.claude/hooks/lib_shell_words.py:5,.claude/hooks/lib_work_root.py:1,.claude/scripts/project_preflight.py:1,.claude/singlefs-ai-sop/scripts/preflight.py:3,.claude/singlefs-ai-sop/scripts/proc.py:1,scripts/crash/crash-amplification-lib.sh:26,scripts/crash/crash-point-replay-shard-configuration-check.sh:20,scripts/gate/lib_function_units.py:1,scripts/hosts/host-dispatch.py:41,scripts/hosts/host-resources.py:75,scripts/hosts/memory_peaks_lib.py:9,scripts/hosts/peer-host-lib.sh:5,scripts/hosts/rocksdb-prebuilt.py:101,
+name=closure arm=full entry=scripts/gate/verus-proof-check.py::check_vacuity rc=4 units=1565 lib_long_run_units=40 host_dispatch_predict=1 refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure arm=edge-cut entry=scripts/gate/verus-proof-check.py::check_vacuity rc=0 units=1218 lib_long_run_units=0 host_dispatch_predict=1 refusals=none
+name=dropped_by_edge_cut entry=scripts/gate/verus-proof-check.py::check_vacuity total=347 by_file=.claude/hooks/lib_heavy_tests.py:18,.claude/hooks/lib_long_run.py:40,.claude/hooks/lib_shell_words.py:5,.claude/hooks/lib_work_root.py:1,.claude/scripts/project_preflight.py:1,.claude/singlefs-ai-sop/scripts/preflight.py:3,.claude/singlefs-ai-sop/scripts/proc.py:1,scripts/crash/crash-amplification-lib.sh:26,scripts/crash/crash-point-replay-shard-configuration-check.sh:20,scripts/gate/lib_function_units.py:1,scripts/hosts/host-dispatch.py:41,scripts/hosts/host-resources.py:75,scripts/hosts/memory_peaks_lib.py:9,scripts/hosts/peer-host-lib.sh:5,scripts/hosts/rocksdb-prebuilt.py:101,
+name=closure arm=full entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=4 units=1573 lib_long_run_units=40 host_dispatch_predict=1 refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure arm=edge-cut entry=scripts/gate/verus-proof-check.py::check_must_red_worlds rc=0 units=1226 lib_long_run_units=0 host_dispatch_predict=1 refusals=none
+name=dropped_by_edge_cut entry=scripts/gate/verus-proof-check.py::check_must_red_worlds total=347 by_file=.claude/hooks/lib_heavy_tests.py:18,.claude/hooks/lib_long_run.py:40,.claude/hooks/lib_shell_words.py:5,.claude/hooks/lib_work_root.py:1,.claude/scripts/project_preflight.py:1,.claude/singlefs-ai-sop/scripts/preflight.py:3,.claude/singlefs-ai-sop/scripts/proc.py:1,scripts/crash/crash-amplification-lib.sh:26,scripts/crash/crash-point-replay-shard-configuration-check.sh:20,scripts/gate/lib_function_units.py:1,scripts/hosts/host-dispatch.py:41,scripts/hosts/host-resources.py:75,scripts/hosts/memory_peaks_lib.py:9,scripts/hosts/peer-host-lib.sh:5,scripts/hosts/rocksdb-prebuilt.py:101,
+name=closure arm=full entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=4 units=790 lib_long_run_units=40 host_dispatch_predict=1 refusals=inline-script-not-literal scripts/hosts/peer-host-lib.sh:76,
+name=closure arm=edge-cut entry=scripts/mutation/broad-mutation.py::Runner.escalate_step rc=0 units=434 lib_long_run_units=0 host_dispatch_predict=1 refusals=none
+name=dropped_by_edge_cut entry=scripts/mutation/broad-mutation.py::Runner.escalate_step total=356 by_file=.claude/hooks/lib_heavy_tests.py:18,.claude/hooks/lib_long_run.py:40,.claude/hooks/lib_shell_words.py:5,.claude/hooks/lib_work_root.py:1,.claude/scripts/project_preflight.py:8,.claude/singlefs-ai-sop/scripts/preflight.py:3,.claude/singlefs-ai-sop/scripts/proc.py:1,scripts/crash/crash-amplification-lib.sh:26,scripts/crash/crash-point-replay-shard-configuration-check.sh:20,scripts/gate/lib_libtest_result_lines.py:1,scripts/gate/lib_reuse_checks.py:1,scripts/hosts/core_usage.py:2,scripts/hosts/host-dispatch.py:40,scripts/hosts/host-resources.py:75,scripts/hosts/memory_peaks_lib.py:9,scripts/hosts/peer-host-lib.sh:5,scripts/hosts/rocksdb-prebuilt.py:101,
+name=wrapper_shell_units arm=full admission=9c0d1ca99464b9a1c4eb0f76908f91a7c2bd5a2394ddc4d195305a827c6530c5 hostlookup_units=0
+name=wrapper_shell_units arm=hostlookup-text admission=4e4b872a9c9c0903f79cc4017b7e35b0d11fc1fa5437201c48bfb650e2a81093 hostlookup_units=0
+name=fixture case=through-function rc=4 probe_units=0 refusals=inline-script-not-literal scripts/hosts/lib.sh:4,
+name=fixture case=ssh-only rc=0 probe_units=0 refusals=
+name=fixture case=local-cd-literal rc=4 probe_units=1 refusals=shell-path-unfolded scripts/hosts/local-cd-literal.sh:2,
+name=fixture case=local-dir-prefix rc=0 probe_units=4 refusals=
+name=tmp-kept status=252 ran=no
+name=tmp-removed-lookup-off status=252 ran=no
+name=tmp-removed-nohostlookup status=252 ran=no
+name=tmp-removed status=251 ran=no
+name=tmp-removed traceback=FileNotFoundError
+name=import-broken status=252 ran=no
+name=import-intact status=0 ran=yes
+name=admitted-peer-fits host_lookup_lines_in_diagnostics=1 problems=[] summary=落点 无；证明错 1 条 wrapper_status=0
+name=admitted-peer-tail-rlimit host_lookup_lines_in_diagnostics=1 problems=[] summary=落点 无；证明错 1 条，rlimit 用尽夹证明错 wrapper_status=0

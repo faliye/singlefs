@@ -1,0 +1,13 @@
+name=scan_slash_context base=e1b1ceb95 occurrences=11889 preceded_by_slash=256 files_with_slash_preceded=81 not_after_dot_slash_var_root=73 in_files=36
+       40  '/home/fy5090/code/singlefs/'
+       24  '../../../'
+       17  '$tree/'
+       16  '/'
+       15  '$ROOT/'
+       15  '$root/'
+       13  './'
+       10  '<仓根>/'
+       10  '$cell/tree/'
+        6  '$REPO/'
+        6  './feeds/z2/sample/'
+        6  '$repository_root/'

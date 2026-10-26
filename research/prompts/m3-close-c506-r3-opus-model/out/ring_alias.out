@@ -1,0 +1,5 @@
+name=i717_arm arm=aliased_S16_spacing512KiB S=16 spacing=524288 states=201 red_states=201 first_red_txg=0 aliased_slot_pairs=['d0@7340032:r0s12=r2s0', 'd0@7864320:r0s13=r2s1', 'd0@8388608:r0s14=r2s2', 'd0@8912896:r0s15=r2s3']
+name=i717_arm arm=control_S8_spacing512KiB S=8 spacing=524288 states=201 red_states=0 first_red_txg=None aliased_slot_pairs=[]
+name=i717_arm arm=control_S16_spacing256KiB S=16 spacing=262144 states=201 red_states=0 first_red_txg=None aliased_slot_pairs=[]
+name=i717_arm arm=control_S8_spacing4KiB S=8 spacing=4096 states=201 red_states=0 first_red_txg=None aliased_slot_pairs=[]
+name=i717_arm arm=control_S16_spacing4KiB S=16 spacing=4096 states=201 red_states=0 first_red_txg=None aliased_slot_pairs=[]

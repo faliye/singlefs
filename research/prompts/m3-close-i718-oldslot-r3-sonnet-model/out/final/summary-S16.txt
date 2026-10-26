@@ -1,0 +1,26 @@
+== S=16 rows=1833 scans=49
+A 写坏镜像（N+1>=3S）147 张：today=Counter({'R': 147}), yi_gate=Counter({'N': 147}), ding_yi=Counter({'N': 147}), ding_yi_same=Counter({'N': 147}), jia=Counter({'G': 147}), ding_jia=Counter({'G': 147})
+E 第一圈健康镜像（N+1<3S）44 张：yi_lit=Counter({'N': 44}) yi_gate=Counter({'G': 44}) today=Counter({'G': 44})
+B 写坏镜像 540 张，其中落在洞上（今天判红）12 张，按种类 {'zero': 4, 'torn_half': 4, 'torn_enum': 4}
+  落在洞上：today=Counter({'R': 12}), yi_gate=Counter({'N': 12}), ding_yi=Counter({'N': 12}), ding_yi_same=Counter({'N': 12}), jia=Counter({'R': 12}), ding_jia=Counter({'G': 12})
+  没落在洞上的写坏镜像：today=Counter({'G': 528}), ding_yi=Counter({'N': 528}), jia=Counter({'G': 528}), ding_jia=Counter({'G': 528})
+  B 历史数（L 取值个数）4
+F honest          健康/记录前: 8 张：today={'G': 8}, yi_lit={'N': 8}, ding_yi={'G': 8}, jia={'G': 8}, ding_jia={'G': 8}
+F honest          在飞/写坏: 16 张：today={'G': 16}, yi_lit={'N': 16}, ding_yi={'N': 16}, jia={'G': 16}, ding_jia={'G': 16}
+F bad_t_as_floor  健康/记录前: 8 张：today={'G': 2, 'R': 6}, yi_lit={'N': 8}, ding_yi={'G': 2, 'R': 6}, jia={'G': 2, 'R': 6}, ding_jia={'G': 2, 'R': 6}
+F bad_t_as_floor  在飞/写坏: 16 张：today={'G': 4, 'R': 12}, yi_lit={'N': 16}, ding_yi={'N': 16}, jia={'G': 4, 'R': 12}, ding_jia={'G': 4, 'R': 12}
+F bad_p_255       健康/记录前: 8 张：today={'R': 8}, yi_lit={'N': 8}, ding_yi={'R': 8}, jia={'R': 8}, ding_jia={'R': 8}
+F bad_p_255       在飞/写坏: 16 张：today={'R': 16}, yi_lit={'N': 16}, ding_yi={'N': 16}, jia={'R': 16}, ding_jia={'G': 16}
+G 写行写坏镜像 15 张：today={'R': 15}, ding_yi={'N': 15}, ding_yi_same={'R': 15}, jia={'G': 15}, ding_jia={'G': 15}
+BR 49 张：today={'R': 49}, yi_lit={'N': 49}, yi_gate={'N': 49}, ding_yi={'R': 49}, ding_yi_same={'R': 49}, jia={'G': 49}, ding_jia={'R': 49}
+Y 44 张：today={'R': 44}, yi_lit={'N': 44}, yi_gate={'R': 44}, ding_yi={'R': 44}, ding_yi_same={'R': 44}, jia={'R': 44}, ding_jia={'R': 44}
+Z2-two-holes 写坏镜像 0 张（全是合法写者）判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+   该格全部 0 张里判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+Z2-hole-raised-floor 写坏镜像 0 张（全是合法写者）判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+   该格全部 0 张里判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+Z2-alt-row 写坏镜像 0 张（全是合法写者）判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+   该格全部 0 张里判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+Z2-alt-overwrite 写坏镜像 0 张（全是合法写者）判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+   该格全部 0 张里判红：today=0, yi_lit=0, yi_gate=0, ding_yi=0, ding_yi_same=0, jia=0, ding_jia=0
+SCAN B                      zero        次数=3 组合=327 诚实=3 | today:错收3/误拒3 yi_lit:错收324/误拒0 yi_gate:错收324/误拒0 ding_yi:错收324/误拒0 ding_yi_same:错收324/误拒0 jia:错收6/误拒3 ding_jia:错收6/误拒0
+SCAN F                      zero        次数=4 组合=912 诚实=8 | today:错收0/误拒0 yi_lit:错收904/误拒0 yi_gate:错收904/误拒0 ding_yi:错收904/误拒0 ding_yi_same:错收904/误拒0 jia:错收4/误拒0 ding_jia:错收8/误拒0

@@ -1,0 +1,34 @@
+points 19
+TALLY today     name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS today    name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY exempt    name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'L': 1, 'N': 29} j2t={'-': 4, 'N': 30}
+POINTS exempt   name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'LN': 1, 'N': 14} j2t={'-': 4, 'N': 15}
+TALLY gen       name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS gen      name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY genplus   name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS genplus  name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY cmp       name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS cmp      name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY both      name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS both     name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY bothplus  name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS bothplus name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY jrn       name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS jrn      name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+TALLY jrngen    name={'-': 4, 'N': 30} j2n={'-': 4, 'N': 30} j2s={'-': 4, 'N': 30} j2t={'-': 4, 'N': 30}
+POINTS jrngen   name={'-': 4, 'N': 15} j2n={'-': 4, 'N': 15} j2s={'-': 4, 'N': 15} j2t={'-': 4, 'N': 15}
+DIFF 5115 1 dev1:slot0:len4096 reused=true today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5121 0 dev1:slot50444:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5122 0 dev0:slot50462:len32768 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5124 1 dev0:slot50313:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5124 2 dev0:slot50372:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5126 0 dev0:slot50414:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5127 0 dev1:slot50375:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5128 0 dev0:slot50275:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5128 1 dev1:slot0:len4096 reused=true today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5130 0 dev1:slot1025:len4096 reused=true today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5130 1 dev0:slot50435:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5131 0 dev0:slot50248:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5134 0 dev0:slot50303:len16384 reused=false today:N/N/N/N exempt:N/N/LN/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5136 0 dev0:slot50338:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 5136 1 dev0:slot50442:len16384 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N

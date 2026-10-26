@@ -1,0 +1,70 @@
+   Compiling singlefs-checker v0.1.0 (〔第二台的仓目录〕/runs/m4-c145-destruction-bound-r1-opus-rounds-fixed/peer-frozen-copy/crates/singlefs-checker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_checker-68797fa85c855dfd)
+
+running 62 tests
+test walk::tests::a_cached_unreadable_placement_is_read_again_by_a_pointer_that_tries_its_hint ... ok
+test walk::tests::a_full_first_lineage_container_and_one_more_hold_on_the_product_branch ... ok
+test walk::tests::a_full_first_retirement_container_and_one_more_hold_on_the_product_branch ... ok
+test walk::tests::a_deadlist_entry_born_after_the_previous_snapshot_of_its_side_violates_the_tight_bound ... ok
+test walk::tests::a_deadlist_entry_pinning_a_unit_the_head_still_references_violates_the_reference_intervals ... ok
+test walk::tests::a_full_first_tombstone_container_and_one_more_hold_on_the_product_branch ... ok
+test walk::tests::a_deadlist_entry_pinning_a_unit_no_live_snapshot_references_violates_the_reverse_direction ... ok
+test walk::tests::a_live_snapshot_appearing_with_another_txg_violates_the_enumerable_invariant ... ok
+test walk::tests::a_legal_deadlist_under_two_live_snapshots_holds_the_reference_intervals_and_the_tight_bound ... ok
+test walk::tests::a_live_snapshot_vanishing_between_consecutive_versions_violates_the_enumerable_invariant ... ok
+test walk::tests::a_missing_ancestor_departs_from_the_canonical_upper_shape ... ok
+test walk::tests::a_released_allocation_record_keeps_its_slots_out_of_the_first_data_unit_slot ... ok
+test walk::tests::a_live_snapshot_whose_txg_is_after_its_version_violates_the_enumerable_invariant ... ok
+test walk::tests::a_root_one_level_higher_than_needed_departs_from_the_canonical_upper_shape ... ok
+test walk::tests::a_root_that_only_created_a_snapshot_counts_as_one_more_distinct_state ... ok
+test walk::tests::a_unit_only_a_live_snapshot_references_pinned_under_an_epoch_of_another_side_violates_the_reference_intervals ... ok
+test walk::tests::a_unit_only_a_live_snapshot_references_without_a_deadlist_entry_violates_the_reference_intervals ... ok
+test walk::tests::an_empty_deadlist_without_snapshots_holds_the_tight_bound_and_leaves_the_reference_intervals_unjudged ... ok
+test walk::tests::an_extent_entry_naming_neither_of_two_inode_tree_entries_violates_the_head_identifier_relation ... ok
+test walk::tests::an_extent_entry_naming_the_second_of_two_inode_tree_entries_holds_the_head_identifier_relation ... ok
+test walk::tests::an_extra_spine_node_above_the_canonical_root_departs_from_the_canonical_upper_shape ... ok
+test walk::tests::an_unreadable_result_of_a_read_that_tried_its_hint_is_not_cached ... ok
+test walk::tests::every_tree_kind_code_the_checker_reads_is_below_every_tree_identifier ... ok
+test walk::tests::product_lineage_containers_numbered_one_and_three_violate_only_the_adjacent_number_sentence ... ok
+test walk::tests::product_lineage_containers_numbered_two_and_three_violate_only_the_first_number_sentence ... ok
+test walk::tests::product_lineage_containers_with_an_empty_rightmost_one_violate_only_the_non_empty_sentence ... ok
+test walk::tests::pending_entries_between_the_destroy_intent_and_the_last_batch_hold_the_tight_bound_and_the_reverse_direction ... ok
+test walk::tests::product_retirement_containers_numbered_one_and_three_violate_only_the_adjacent_number_sentence ... ok
+test walk::tests::product_retirement_containers_numbered_two_and_three_violate_only_the_first_number_sentence ... ok
+test walk::tests::product_lineage_containers_numbered_zero_and_one_violate_only_the_first_number_sentence ... ok
+test walk::tests::product_retirement_containers_numbered_zero_and_one_violate_only_the_first_number_sentence ... ok
+test walk::tests::product_tombstone_containers_numbered_zero_and_one_violate_only_the_first_number_sentence ... ok
+test walk::tests::product_tombstone_containers_with_an_empty_rightmost_one_violate_only_the_non_empty_sentence ... ok
+test walk::tests::product_retirement_containers_with_an_empty_rightmost_one_violate_only_the_non_empty_sentence ... ok
+test walk::tests::the_back_chain_takes_the_predecessor_of_its_own_instance_when_two_instances_share_the_previous_counter ... ok
+test walk::tests::the_band_the_pin_kept_takes_released_slots_above_the_root_threshold_up_to_the_threshold_without_the_pin_except_abandoned_references ... ok
+test walk::tests::the_counter_after_the_cursor_is_none_at_the_top_of_u64 ... ok
+test walk::tests::the_canonical_upper_shape_of_the_inodes_with_an_entry_holds ... ok
+test walk::tests::the_one_revolution_window_keeps_the_txgs_above_the_newest_minus_the_ring_length ... ok
+test walk::tests::the_first_data_unit_slot_skips_the_open_cluster_segment_of_the_version ... ok
+test walk::tests::the_pinned_ring_slot_byte_reads_as_no_pin_a_ring_slot_or_outside_the_ring ... ok
+test walk::tests::two_lineage_containers_of_one_record_judged_with_the_knob_two_violate_only_the_full_sentence ... ok
+test walk::tests::the_recovery_reader_refuses_each_of_the_four_kinds_the_pool_checker_reader_accepts ... ok
+test walk::tests::the_back_chain_gate_looks_up_the_predecessor_of_the_same_instance_past_another_instance_at_that_counter ... ok
+test walk::tests::the_ring_as_the_recovery_reads_it_keeps_both_records_of_two_instances_at_the_same_counter ... ok
+test walk::tests::the_trees_of_a_snapshot_being_destroyed_are_left_out_of_the_references_of_its_root ... ok
+test walk::tests::a_container_tree_internal_node_an_earlier_version_walked_reddens_the_logical_address_invariant_under_a_parent_of_another_level ... ok
+test walk::tests::two_retirement_containers_of_one_record_judged_with_the_knob_two_violate_only_the_full_sentence ... ok
+test walk::tests::two_tombstone_containers_of_one_record_judged_with_the_knob_two_violate_only_the_full_sentence ... ok
+test walk::tests::versions_whose_txgs_are_not_consecutive_are_not_compared ... ok
+test walk::tests::product_tombstone_containers_numbered_two_and_three_violate_only_the_first_number_sentence ... ok
+test walk::tests::snapshot_sets_changing_by_creation_destroy_intent_and_last_batch_hold_the_enumerable_invariant ... ok
+test walk::tests::product_tombstone_containers_numbered_one_and_three_violate_only_the_adjacent_number_sentence ... ok
+test walk::tests::an_inode_internal_node_an_earlier_version_walked_reddens_the_logical_address_invariant_under_a_parent_of_another_level ... ok
+test walk::tests::a_node_an_earlier_version_walked_reddens_the_birth_identity_invariant_when_this_pointer_names_another_birth_txg ... ok
+test walk::tests::a_node_an_earlier_version_walked_reddens_the_tree_identifier_invariant_when_referenced_from_another_tree ... ok
+test walk::tests::a_node_an_earlier_version_walked_reddens_the_class_label_invariant_when_an_extent_record_points_at_it ... ok
+test walk::tests::an_extent_lower_root_an_earlier_version_walked_reddens_the_logical_address_invariant_when_this_upper_entry_names_another_inode ... ok
+test walk::tests::an_allocation_record_leaf_an_earlier_version_walked_reddens_the_logical_address_invariant_when_this_parent_entry_places_it_in_another_cell ... ok
+test walk::tests::an_extent_upper_leaf_an_earlier_version_walked_reddens_the_logical_address_invariant_when_this_parent_entry_places_it_in_another_cell ... ok
+test walk::tests::the_deferral_threshold_is_the_effective_floor_whenever_a_root_below_the_floor_can_merge_its_slots ... ok
+test walk::tests::deferred_selection_merging_the_abandoned_roots_too_selects_the_same_slots_on_every_small_world_but_the_double_fault_form ... ok
+
+test result: ok. 62 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 11.91s
+

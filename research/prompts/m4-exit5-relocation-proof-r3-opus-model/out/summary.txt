@@ -1,0 +1,8 @@
+name=attack 55 verified, 0 errors
+name=mustred-a1 13 verified, 1 errors
+name=mustred-a2 9 verified, 1 errors
+name=closure entry=publish fn=836
+name=closure entry=rollback fn=1057
+name=closure entry=recover fn=654
+name=union-two fn=1073 core=1071 lines=24970
+name=union-three fn=1185 core=1101 lines=29807

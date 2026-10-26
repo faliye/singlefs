@@ -300,7 +300,7 @@ $ grep -nF '(25, "14+1+1+1+4".to_string(), 16402)' crates/singlefs-harness/tests
 
 ```
 $ grep -rl -e 'zero_fill×10' -e '14+1+1+1+4' scripts .claude
-scripts/experiments/e142_new_pool_file_creation_dry_run.rs
+scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs
 scripts/crash/check-segment-registry-product-sample.txt
 .claude/gate.d/checker-tier-qemu-device-streams.sh
 .claude/gate.d/fixtures/checker-tier-qemu-device-streams.sh/mkfs-segments-red/.claude/kb/layout/01-first-txn.md
@@ -319,7 +319,7 @@ scripts/crash/check-segment-registry-product-sample.txt
 .claude/kb/milestone/02-second-txn.ja.md
 ```
 
-其中有登记表本身（`.claude/kb/layout/01-first-txn.md` 八，三种语言各一份）、E142 的独立手写装置（`scripts/experiments/e142_new_pool_file_creation_dry_run.rs`，写死这组数的行有 2280、5662、8712、8730、8731、8851、8868 等处）、门禁 doc-registries 的产物样本与门禁 checker-tier-qemu-device-streams 的样本。装置是独立模型，按「装置的数与实现对不上时两边都查」处理（`.claude/rules/implementation-first.md`），改完要重出产物；门禁 checker-tier-qemu-device-streams 拿虚机录到的 mkfs 那一行与登记表比，虚机要重录（重型，归主 agent）。
+其中有登记表本身（`.claude/kb/layout/01-first-txn.md` 八，三种语言各一份）、E142 的独立手写装置（`scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs`，写死这组数的行有 2280、5662、8712、8730、8731、8851、8868 等处）、门禁 doc-registries 的产物样本与门禁 checker-tier-qemu-device-streams 的样本。装置是独立模型，按「装置的数与实现对不上时两边都查」处理（`.claude/rules/implementation-first.md`），改完要重出产物；门禁 checker-tier-qemu-device-streams 拿虚机录到的 mkfs 那一行与登记表比，虚机要重录（重型，归主 agent）。
 
 ### 3.4 D22 已定项 8 第 3 条要改的句子
 

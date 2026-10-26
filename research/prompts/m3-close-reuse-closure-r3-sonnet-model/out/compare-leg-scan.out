@@ -1,0 +1,4 @@
+name=compare_leg_scan 现在这棵树上变的入口=26 腿报的=25
+  仅现在有： ['scripts/experiment-apparatus/e165-pin-red-examples.py::replay']
+  仅腿有： []
+  两边都有的 25 个：增量范围 18~45；单元数不同的：check_must_red_worlds 现在(1575, 1607) 腿(1575, 1606)；check_proof 现在(1579, 1611) 腿(1579, 1610)；check_vacuity 现在(1567, 1599) 腿(1567, 1598)；GpuJudging.row_holds 现在(888, 921) 腿(888, 920)；Judgement.row_holds 现在(948, 990) 腿(948, 989)；Judgement.selection 现在(943, 985) 腿(943, 984)；Judgement.state 现在(963, 1005) 腿(963, 1004)；UnitTree.closure_key 现在(863, 885) 腿(863, 884)

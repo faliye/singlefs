@@ -1,0 +1,4 @@
+35c52517440f213af55df760fd1d8123f30a337e4a365eb2d0f845af390965d9  .claude/kb/decisions/26-后台整理与放置回收.md
+8a24f584c67624d8711a9a4c480b30677de41ea4fae352aeaf07cb64736455b3  .claude/kb/checks-owed.md
+25fab857849323d57eefc71d40cfaf8ef00b3662326c6f796068bb0c59b82916  .claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md
+d78185fa265c4f61203f94620f471a7636364661a9260beab432248c8c9edbea  .claude/kb/experiments/07-离线索引harness.md

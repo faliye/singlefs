@@ -1,0 +1,4 @@
+name=form:crates/x/invariants quote_kb_roots=['.claude/kb', 'crates/x/invariants'] stale_candidates_carrier=True
+name=form:./crates/x/invariants quote_kb_roots=['./crates/x/invariants', '.claude/kb'] stale_candidates_carrier=False
+name=form:<探针根>/crates/x/invariants quote_kb_roots=['.claude/kb', '<探针根>/crates/x/invariants'] stale_candidates_carrier=False
+name=form:crates/x/invariants// quote_kb_roots=['.claude/kb', 'crates/x/invariants'] stale_candidates_carrier=True

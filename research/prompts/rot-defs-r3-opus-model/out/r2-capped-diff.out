@@ -1,4 +1,0 @@
-1c1
-< @REPO@/scripts/hosts/capped.sh: line 214: exec: SINGLEFS_RUN_SCOPE=种类=target; 跑什么=x: not found
----
-> @WORK@/pre-swap-tree/scripts/hosts/capped.sh: line 214: exec: SINGLEFS_RUN_SCOPE=种类=target; 跑什么=x: not found

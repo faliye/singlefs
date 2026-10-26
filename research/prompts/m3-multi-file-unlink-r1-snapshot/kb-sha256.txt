@@ -1,9 +1,0 @@
-aaa6f6fcd1eb0f46531c1e643ed36bf3a35428ba80c55f8ee78018321a71cb5f  .claude/kb/decisions/08-核心索引结构.md
-73daf542bc8c2fdfedc04b16096a8eb15d5775a4a4c21c18923ae6beb3687ab1  .claude/kb/checks-owed.md
-6890462dd579762aa632f6d6cba4d8595ee390f13762a68e917b66670ef62128  .claude/kb/decisions/18-块里携带什么信息.md
-d7b0d811fa00d4330d9daab9e8140eff8918fa2ab8f28e78e658941267756015  .claude/kb/decisions/16-发布语义.md
-66f077c88d14071d292ebfa3abc1bf740df09fd61ad6a88245842cf7c52b30d8  .claude/kb/decisions/05-快照-空间记账机制.md
-be539721f8bbcde507c8a838434bbf05cb6caa891d08c5fc814e8fed5c809e54  crates/singlefs-checker/invariants/06-事务与崩溃一致性.md
-2a567e439dff0a19d8f810dbe835e857196c24719e347789777054ab9bda4016  crates/singlefs-checker/invariants/05-空间记账.md
-81b50247647964b842afe8a2abc0e5290bee9b216f373d89d117df0d788310bd  crates/singlefs-checker/invariants/09-inode树结构.md
-44226cbfcf44c8e486fa37bceaa3c96a8230cb46003db9a71cee965d5e20c12e  crates/singlefs-checker/invariants/01-块自描述.md

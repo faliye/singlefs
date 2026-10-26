@@ -1,0 +1,5 @@
+keys_per_S {4: 57, 5: 51, 8: 50, 16: 50} keys_total 57
+keys_matching_the_summary_filter 33
+keys_present_at_S_4_5_8_16 50 of_which_matching_summary_filter 29
+key_candidate_pairs_changing_class_across_S 0
+total_ROW_lines 4095

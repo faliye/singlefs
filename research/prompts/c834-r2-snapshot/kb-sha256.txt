@@ -1,4 +1,0 @@
-565620bcead49240809b3788d09345f1e339007874b22207006c45f8b4cc77ef  .claude/kb/decisions/23-journal的角色与格式.md
-18b9cb3a3767f1d65cd6ebf822e18bf5b12379f0b34ce624ff2c9c1bf036ec46  .claude/kb/term-renames.md
-f14babb5b9e671ef843a7873f3a07f3949f38ed7f48771fcf453da7df18c806b  .claude/kb/checks-owed.md
-04195d90a11cfca7f1c693e4d8c7d4613a2f4045acf3ff9526f3915aba225568  crates/singlefs-checker/invariants/02-根环.md

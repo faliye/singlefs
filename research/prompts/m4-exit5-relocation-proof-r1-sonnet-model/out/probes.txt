@@ -1,0 +1,17 @@
+== p1_array_iter_all_closure.rs rc=1
+error: postcondition not satisfied
+ --> p1_array_iter_all_closure.rs:6:13
+== p2_btreemap_get.rs rc=1
+error: `core::option::impl&%3::copied` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specific
+ --> p2_btreemap_get.rs:6:5
+== p3_dyn_trait.rs rc=0
+verification results:: 1 verified, 0 errors
+== p4_try_from_expect.rs rc=1
+error: precondition not satisfied
+ --> p4_try_from_expect.rs:5:5
+== p5_question_mark_result.rs rc=0
+verification results:: 3 verified, 0 errors
+== p6_for_loop_over_slice_iter_with_generic_device.rs rc=0
+verification results:: 2 verified, 0 errors
+== p7_btreeset_collect_closure.rs rc=0
+verification results:: 1 verified, 0 errors

@@ -1,0 +1,5 @@
+cbb7a5f5369e969135bb26b6ee743d372677bef43e356fc52e7c68dbe02dcdd7  crates/singlefs-checker/invariants/02-根环.md
+0232decaeb6d9a2d7d7cb5b2ec41f5b3c9c5c9d3d520ff167381811f8f33f101  .claude/kb/decisions/16-publish-semantics.en.md
+cb5fd020544f110978d1bb3dd19511645281028aa89f9cf1cc631d646560ea52  .claude/kb/decisions/16-パブリッシュセマンティクス.ja.md
+26fa611af45f76732dda3fd2138ae95003b77453258341c6f70293f604397770  .claude/kb/decisions/16-发布语义.md
+e32bf7040f7da8a0b88bb2bdde99a55dded89159b0c4eef70051670149e6ff95  .claude/kb/checks-owed.md

@@ -1,5 +1,5 @@
 d3c41c3e48ff08dd168b47977f17cf6eb1c33d6d25998b51a35be483a3e1334e  .claude/kb/milestone/04-fourth-txn.md
-4d503c1ffde24422d118bfb76ba4c0e6740d3eb4efe7db4af9c3b1ffca40cf75  .claude/kb/decisions/27-小数据打包容器.ja.md
+4d503c1ffde24422d118bfb76ba4c0e6740d3eb4efe7db4af9c3b1ffca40cf75  .claude/kb/decisions/27-小データパッキングコンテナ.ja.md
 31126ee3a9827d6333f362fea28b68e39c704718dc1aad50fca02c33ead93018  crates/singlefs-checker/invariants/01-块自描述.md
 1cdbf25c59532bdebd79319376008388f2ed5ae07b2ad588fa48066e9d063432  .claude/kb/checks-owed.md
 207cffed1f37652adeb9e4cba12066612b17ceb68c5e74dd6c96ce5f96f3281a  crates/singlefs-checker/invariants/09-inode树结构.md

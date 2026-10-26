@@ -1,0 +1,13 @@
+name=a1-exempt-growth-without-registry grown=['scripts/gate/runner.py:os.cpu_count()']
+name=a1-registry-check exit=0 out=✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、新前缀在磁盘上、旧前缀不在了、出处都在
+name=a1-exempt-growth-with-fiction-row grown=[] base_after_rewrite=['scripts/gate/runner.py:os.cpu_count()']
+name=a2-without-registry moved_only_filter_kept=['crates/x/src/lib.rs']
+name=a2-with-fiction-row moved_only_filter_kept=[]
+name=a2-added-line-with-fiction-row moved_lines_filter_kept=[]
+name=a3-registry-check exit=0 out=✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、新前缀在磁盘上、旧前缀不在了、出处都在
+name=a3-moved-only-filter-kept kept=[]
+name=a6-duplicate-line-dropped added_line_kept=[] baseline_old_line_still_in_file=True
+name=a7-registry-check exit=0 out=✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 2 行：写法对、新前缀在磁盘上、旧前缀不在了、出处都在 old_prefix_exists=True
+name=a7-moved-only-filter-kept kept=[]
+name=a4-exempt-check exit=1 stderr=✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）：⏎     第 1 行 scripts/other/live.sh 登记的 sha256 51882d0bf752dca5d4ae6fde3205b7dae84eccf2839b51d769b9a9e3b2e52572 与基准那一版里的 ca5a2638c9cc665d5894e34df8ad8269bb64663f06db033e36512ef15f160b55 不同（豁免表重钉了：改了脚本正文再换表里的 sha256 也算涨）；基准里的 scripts/other/live.sh 的 sha256 51882d0bf752dca5d4ae6fde3205b7dae84eccf2839b51d769b9a9e3b2e52572 不是基准那一版表里登记的，没法当成被钉住的那一版去比⏎     → 怎么办：豁免只缩不涨，表里的 sha256 不能换：把脚本的改动撤回去（sha256 对回基准那一版）；文件头已能按登记值读法写的，改写文件头并删掉这一行；确要保留改动并重钉的，交主 agent 问用户 stdout=
+name=a5-exempt-check-identical-copy exit=0 stderr= stdout=✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨

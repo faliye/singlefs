@@ -1,0 +1,14 @@
+9e5747d852b802e5976068318ab46039d4e88c60656fa619a23416e03c893f20  .claude/kb/decisions/22-synthesizing-unit-atomicity.en.md
+13708d3f3b7e7e5cf78c6b4859479cfb662a58ea38e3495a24241272403e139b  .claude/kb/decisions/22-ユニット原子性の合成手法.ja.md
+d22a7ca22c7cc0958b97ee48ffe7724703de6f05e1a156d41fc085fe10a83d94  .claude/kb/decisions/22-单元原子性怎么合成.md
+5ad3dab671bfb57fea4e9f4b3d903df63fe81bcbda5655154dfa741440ec2b62  .claude/kb/experiments/115-completeness-and-byte-budget-of-system-configuration-field-table.en.md
+8739c6493c2389ebba2d174ae1dd136862e0e9153d0535c79e2b510842378864  .claude/kb/experiments/45-ring-space-occupancy-for-multi-record-transactions.en.md
+2581b82d41470185e7aad2fd281ff17a896be96bb6ec83475a5527c81c123c9b  .claude/kb/experiments/45-トランザクションの複数レコード跨ぎによるリング占有.ja.md
+129d91eae2acac47236c1de21c0fbe02d9eb81de70292547e27dee48745ef8db  crates/singlefs-checker/invariants/03-journal.md
+16357609f10b25b2451821801ed51555824693c35eb7f0024a05d55f3f9bd48e  .claude/kb/decisions/23-journal-role-format.en.md
+897b1d98af420e4f062211d393962d4017251ed007967c1afdd2de34c4de8a2f  .claude/kb/decisions/23-ジャーナルの役割と形式.ja.md
+07bdef40d8cf3bb39cb629d48835dbf2c719ad56f98886d469f662872f5f0ad2  .claude/kb/decisions/23-journal的角色与格式.md
+353386d44bb7778558105e4bbd9b24eef4e7c234392875b77409e95d9af38b8f  .claude/kb/decisions/13-verification-route.en.md
+6e2bbb710ab361ce093e37f787ac5e954ebf80606061c355f98b7b5a671a6c3c  .claude/kb/decisions/13-検証ルート.ja.md
+ba57f7135f5fa9f03d268b2fc021f1eb4b1c1c8f1eab2e001b4c0610dd9ed158  .claude/kb/decisions/13-验证路线.md
+772388ccf32201cb96eade3e4188b06f3e1f51a2d25b91a1b3894192b40c6e11  .claude/kb/checks-owed.md

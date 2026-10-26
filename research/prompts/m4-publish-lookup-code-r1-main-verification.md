@@ -4,6 +4,8 @@
 
 被判的产品代码：`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/mounted_session.rs`（七·6 补丁，`research/prompts/_m4-publish-lookup-code-r1-diff.md`）。测试代码 `crates/singlefs-harness/tests/publish_lookup_by_identity.rs` 与 `crates/mutations.tsv` 末尾九行一并判 T4。
 
+开工快照：`research/prompts/m4-publish-lookup-code-r1-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：两行原样抄自同目录 sha256sums.txt，那份是腿派出时记的）
+
 ## 一、核查
 
 | 核了什么 | 怎么核 | 结果 |

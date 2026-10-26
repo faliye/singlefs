@@ -1,9 +1,0 @@
-name=deadlist_model variant=paper histories=20000 steps=40 violated=0 kinds={} first=None
-name=deadlist_model variant=paper_serial histories=20000 steps=40 violated=0 kinds={} first=None
-name=deadlist_model variant=noprev histories=20000 steps=40 violated=11585 kinds={'T-leak': 2642, 'T-loose': 8943} first=(1, ('T-leak', 0))
-name=deadlist_model variant=noprev_serial histories=20000 steps=40 violated=11614 kinds={'T-leak': 3650, 'T-loose': 7964} first=(2, ('T-loose', 6))
-name=deadlist_model variant=hiinf histories=20000 steps=40 violated=17090 kinds={'L-lost': 17090} first=(0, ('L-lost', 4))
-name=deadlist_model variant=hiinf_serial histories=20000 steps=40 violated=13349 kinds={'L-lost': 13349} first=(3, ('L-lost', 4))
-name=deadlist_model variant=hihead histories=20000 steps=40 violated=5505 kinds={'L-lost': 5505} first=(3, ('L-lost', 10))
-name=deadlist_model variant=hihead_serial histories=20000 steps=40 violated=0 kinds={} first=None
-name=deadlist_model variant=lt histories=20000 steps=40 violated=12135 kinds={'L-lost': 12135} first=(0, ('L-lost', 2))

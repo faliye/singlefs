@@ -1,0 +1,5 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+    Checking libc v0.2.189
+    Checking singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+    Checking singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.19s

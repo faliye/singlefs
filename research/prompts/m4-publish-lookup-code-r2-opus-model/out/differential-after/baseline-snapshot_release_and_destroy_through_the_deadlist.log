@@ -1,0 +1,19 @@
+
+running 1 test
+attack_probe step=create S1 txg=4 deadlist_entries=0 kept_mapping_entries=0 version_digest=7b8313ace6bf1bba version_debug_bytes=745054
+attack_probe step=overwrite 31 txg=5 deadlist_entries=4 kept_mapping_entries=4 version_digest=2f43baa4d56922d6 version_debug_bytes=804359
+attack_probe step=create S2 txg=6 deadlist_entries=4 kept_mapping_entries=4 version_digest=d0cedbc2926bbe08 version_debug_bytes=805411
+attack_probe step=overwrite 37 txg=7 deadlist_entries=8 kept_mapping_entries=8 version_digest=25e350bbe31be99c version_debug_bytes=815267
+attack_probe step=overwrite 41 txg=8 deadlist_entries=8 kept_mapping_entries=8 version_digest=bbc455e7fefa2d3c version_debug_bytes=818369
+attack_probe step=destroy S1 intent txg=9 deadlist_entries=8 kept_mapping_entries=8 version_digest=9d793be25fa9617f version_debug_bytes=818649
+attack_probe step=destroy S1 batch 0 txg=10 deadlist_entries=4 kept_mapping_entries=4 version_digest=7643b90848b2fefe version_debug_bytes=817356
+attack_probe step=overwrite 43 txg=11 deadlist_entries=4 kept_mapping_entries=4 version_digest=b6f216cdd9860c23 version_debug_bytes=822216
+attack_probe step=destroy S2 intent txg=12 deadlist_entries=4 kept_mapping_entries=4 version_digest=e5e91e3405fa28e3 version_debug_bytes=924762
+attack_probe step=destroy S2 batch 0 txg=13 deadlist_entries=0 kept_mapping_entries=0 version_digest=3d8779fbd166942f version_debug_bytes=873109
+attack_probe step=overwrite 47 txg=14 deadlist_entries=0 kept_mapping_entries=0 version_digest=1d1516b2713e54fe version_debug_bytes=879025
+attack_probe write_stream operations=441 digest=658175b19d1f276d debug_bytes=64614
+attack_probe retained_stream digest=05c7d97d622c45ea debug_bytes=15160665
+test attack_probe_snapshot_history_digests ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.37s
+

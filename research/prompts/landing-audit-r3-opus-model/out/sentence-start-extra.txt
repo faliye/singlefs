@@ -1,0 +1,13 @@
+句首多认、点名带 report 的文件：12 处（东京 2026-10-14 起开工的提示）
+  2026-10-16 aa9ec3423c1f54bba implementation-writer 与草稿目录同棵=False | 、logged_ops 种类码 2、上段叶标签 3 与 4；报告 `~/.local/share/singlefs/work/m4-trunc-core-writer/patch/report.md` 第十节列了格式常量的派生形态）：合法世界用真写路径造（可以读用 `crates/singlefs-
+  2026-10-20 a28fe10b58d88beec kb-scribe 与草稿目录同棵=False | 04 → 1678377220，到 D 36 → 38 段。报告 `~/.local/share/singlefs/work/m3-close-w9-landing-pins/report.md`，数去补丁现查。
+  2026-10-18 a3c7dd9bb65917659 experiment-designer 与草稿目录同棵=True | -preregistration.md`，重跑写重跑登记）；报告 `/home/fy5090/.local/share/singlefs/work/m3-close-w4-c409-cost-design/report.md` 列登记路径与 sha256、实验号、分段与每段挂钟、要主 agent 先
+  2026-10-22 a49692aed6ccf5f06 clerk 与草稿目录同棵=True | 、已关几项；⏎- 写清哪几项要用户定。⏎⏎不改仓里任何文件。报告写到 `/home/fy5090/.local/share/singlefs/work/m3-close-b16-remaining-inventory/report.md`。
+  2026-10-21 a86c5c8fb8ec28789 implementation-writer 与草稿目录同棵=False | 段形算出的数和旧钉值逐个对上，确认算法没错；再按新段形重算。报告 `~/.local/share/singlefs/work/m3-close-w9-stale-shape-pins/report.md`。
+  2026-10-20 a84362c9d98d56c33 tooling-writer 与草稿目录同棵=True | 跑到绿，新开关逐个打开红在点名那一格；那两批的改动核过还在。报告写进 /home/fy5090/.local/share/singlefs/work/memory-alert-scope-tooling/report.md：改过的文件、`git diff --stat`、每条的自证格与开关、没做什么
+  2026-10-20 a93a3ed60c33f7ae3 tooling-writer 与草稿目录同棵=True | ，新开关打开红在点名那一格；别的会话那一份暂存改动核过还在。报告写进 /home/fy5090/.local/share/singlefs/work/broad-mutation-baseline-alerts-tooling/report.md：改过的文件、`git diff --stat`、自证
+  2026-10-20 aac390c9b0b568fd1 tooling-writer 与草稿目录同棵=True | 开关逐个打开红在点名那一格；第七十五节那一批的改动核过还在。报告写进 /home/fy5090/.local/share/singlefs/work/memory-peak-hysteresis-tooling/report.md：改过的文件、`git diff --stat`、每条的自证格与开关、
+  2026-10-15 a10ea31b4e72cb0bf experiment-designer 与草稿目录同棵=False | ules/changelog-format.md` 加一条；报告写到草稿目录 `report.md`，列修订落在哪几行、要 runner 做的事。
+  2026-10-20 a4737c6f3660f4f7e experiment-runner 与草稿目录同棵=False | 1c27958e8d，64 条单测，编过、clippy 0；报告 /home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-7/report.md）。
+  2026-10-22 afba6a8f35e34a446 experiment-designer 与草稿目录同棵=False | -prereg.md` 排他新建，跑你定义里的登记检查到绿；报告写进草稿目录 report.md，回复只写短句。不写装置、不跑实验、不改实验页与 kb。
+  2026-10-20 a5efbaac4603da1fd experiment-runner 与草稿目录同棵=False | 190 的文件为 0 处。⏎⏎## 出口⏎⏎上面三条都达成；报告写到 `report.md`，交回时报产物路径、sha256、行数、末行，单测与变异数，岔路表。

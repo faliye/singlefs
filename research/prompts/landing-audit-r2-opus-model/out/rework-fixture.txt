@@ -1,0 +1,7 @@
+name=fixture_only type=implementation-writer description=9-8b repin amplification fixed-script tests
+name=fixture_only type=tooling-writer description=C441 sweep excludes own fixtures
+name=fixture_only type=tooling-writer description=C530 C455 fixture-claims marker
+name=fixture_only type=tooling-writer description=C531 fixture registrations excluded
+name=fixture_only type=tooling-writer description=C487 segments-step red fixture
+name=fixture_only type=tooling-writer description=C450 old sync record green fixture
+name=fixture_only_total count=6 cost_share=0.04%

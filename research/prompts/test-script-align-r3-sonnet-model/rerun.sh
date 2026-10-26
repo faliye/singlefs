@@ -37,7 +37,7 @@ awk -F'\t' '$2 ~ /^heavy/{print $1" | "$2}' .claude/hooks/selftest-registry.tsv
 echo -n "checks-owed 里「假驱动」: "; grep -c '假驱动' .claude/kb/checks-owed.md
 
 echo "== L5 replay.sh 与 broad-mutation.py"
-for p in '--list-items' '--item' '--selftest'; do echo -n "replay.sh 里 $p: "; grep -c -- "$p" scripts/experiments/replay.sh; done
+for p in '--list-items' '--item' '--selftest'; do echo -n "replay.sh 里 $p: "; grep -c -- "$p" scripts/experiment-apparatus/replay.sh; done
 awk 'NR==82' scripts/mutation/broad-mutation.py | cut -c1-160
 
 echo "== L6 记录里的尾巴在 checks-owed 里的命中数"

@@ -1,2 +1,0 @@
-7a10fc6db0b5b5a3f7d5d7bb3b351b66facab6c2a6c409f98155643ad466a4f1  .claude/kb/checks-owed.md
-95d90622c4bf46ec5428722135efd64477a9fdc91a4e451385d181fcce127a56  .claude/kb/tooling.md

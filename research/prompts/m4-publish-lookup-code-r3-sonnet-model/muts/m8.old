@@ -1,0 +1,9 @@
+    let holder_and_locations = match previous_read_by_key
+        .mapped_units_by_key
+        .first_entry_of(&mapping_key.as_slice())
+    {
+        Some((role, _)) => {
+            let locations = match previous_read_by_key
+                .central_mapping
+                .locations_of_key(&mapping_key)
+            {

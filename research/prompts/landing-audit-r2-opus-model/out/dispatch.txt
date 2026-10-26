@@ -1,0 +1,14 @@
+name=tooling-writer-hooks-fix type=tooling-writer before_exit=0 after_exit=2
+    改后拒：✗ 派 tooling-writer 的提示有 2 处不成立，各条都判完了，下面一次列全，逐处照各自的「→ 怎么办」改；改完可以先跑 pyt
+    改后拒：✗ 派 tooling-writer 的提示报告行点名的文件名里带 report：「…/report.md」。
+    改后拒：✗ 提示要 tooling-writer 写进它写范围之外的路径：research/prompts（.claude/hooks/agent-write-scope.tsv）。
+name=landing-audit-r1-attack type=three-way-attack before_exit=0 after_exit=2
+    改后拒：✗ 派 three-way-attack 的提示有 2 处不成立，各条都判完了，下面一次列全，逐处照各自的「→ 怎么办」改；改完可以先跑 p
+    改后拒：✗ 派 three-way-attack 的提示报告行点名的文件名里带 report：「report.md」。
+    改后拒：✗ 派 three-way-attack 的提示报告行点名的文件不是这一形态：「<草稿目录>/result.md」；三方腿的报告要形如 research/prompts/<轮>
+name=probe-clerk-prose type=clerk before_exit=0 after_exit=2
+    改后拒：✗ 派 clerk 的提示报告行点名的文件名里带 report：「…/report.md」。
+name=probe-attack-prose type=three-way-attack before_exit=0 after_exit=2
+    改后拒：✗ 派 three-way-attack 的提示报告行点名的文件不是这一形态：「<草稿目录>/result.md」；三方腿的报告要形如 research/prompts/<轮>
+name=probe-tooling-writer-prose type=tooling-writer before_exit=0 after_exit=2
+    改后拒：✗ 提示要 tooling-writer 写进它写范围之外的路径：research/prompts（.claude/hooks/agent-write-scope.tsv）。

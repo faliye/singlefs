@@ -1,0 +1,25 @@
+
+running 1 test
+test rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart ... FAILED
+
+failures:
+
+---- rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart stdout ----
+publish_lookup_by_identity deadlist_pool deadlist_entries=795 deadlist_tree_nodes=5
+publish_lookup_by_identity deadlist_pool_rewrite data_units=8 carried_accounting_nodes=0 carried_deadlist_nodes=2 carried_mapping_nodes=10 lookup_work=LookupWorkOfEachSite { work_of_each_site: {None: LookupWork { index_builds: 5, index_lookups: 2613, index_entries_examined: 23053, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 0 }, Some(SnapshotJudgement): LookupWork { index_builds: 6, index_lookups: 46, index_entries_examined: 388, largest_index_looked_up: 906, mapping_leaf_decodes: 4, times_entered: 2 }, Some(MappingEntriesOfTheReleaseJudgement): LookupWork { index_builds: 4, index_lookups: 23, index_entries_examined: 202, largest_index_looked_up: 906, mapping_leaf_decodes: 2, times_entered: 2 }, Some(MappingEntriesCheckedForTwoPoolDevices): LookupWork { index_builds: 2, index_lookups: 15, index_entries_examined: 134, largest_index_looked_up: 906, mapping_leaf_decodes: 1, times_entered: 1 }, Some(MappingEntriesCheckedAgainstTheReleaseChecksums): LookupWork { index_builds: 2, index_lookups: 15, index_entries_examined: 134, largest_index_looked_up: 906, mapping_leaf_decodes: 1, times_entered: 1 }, Some(FilesOfTheReplacedRolesInThePreviousVersion): LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 21 }, Some(FilesOfTheMappedRolesReleasedByThisPublish): LookupWork { index_builds: 2, index_lookups: 18, index_entries_examined: 90, largest_index_looked_up: 27, mapping_leaf_decodes: 0, times_entered: 4 }, Some(FilesOfTheUserVisibleRolesOfTheSnapshotJudgement): LookupWork { index_builds: 2, index_lookups: 18, index_entries_examined: 90, largest_index_looked_up: 27, mapping_leaf_decodes: 0, times_entered: 2 }, Some(RolesKeptForTheSnapshotsAmongTheMappedRolesReleased): LookupWork { index_builds: 4, index_lookups: 97, index_entries_examined: 186, largest_index_looked_up: 9, mapping_leaf_decodes: 0, times_entered: 4 }, Some(DataRolesNamedBeforeTheLastRecord): LookupWork { index_builds: 3, index_lookups: 78, index_entries_examined: 222, largest_index_looked_up: 7, mapping_leaf_decodes: 0, times_entered: 3 }, Some(UnitsOfTheRolesWrittenByThisPublish): LookupWork { index_builds: 1, index_lookups: 26, index_entries_examined: 233, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 1 }, Some(UnitsOfTheRolesNamedByTheRecords): LookupWork { index_builds: 0, index_lookups: 26, index_entries_examined: 233, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 26 }, Some(CarriedExtentTreeNodes): LookupWork { index_builds: 0, index_lookups: 26, index_entries_examined: 234, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 27 }, Some(FilesOfTheCarriedExtentLowerNodes): LookupWork { index_builds: 0, index_lookups: 26, index_entries_examined: 104, largest_index_looked_up: 27, mapping_leaf_decodes: 0, times_entered: 26 }, Some(CarriedNodesOfTheAccountingTree): LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }, Some(CarriedNodesOfTheDeadlistTree): LookupWork { index_builds: 0, index_lookups: 2, index_entries_examined: 17, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 3 }, Some(CarriedNodesOfTheCentralMappingTree): LookupWork { index_builds: 0, index_lookups: 10, index_entries_examined: 88, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 11 }} }
+
+thread 'rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart' (77592) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1477:5:
+快照下整份重写一个 8 单元的文件（deadlist 树几片叶）：RolesKeptForTheSnapshotsInTheReleaseJudgement：进了 0 次（走了几遍），建索引 0 次，每走一遍恰好建一份：LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 0 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 43.02s
+
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 17s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

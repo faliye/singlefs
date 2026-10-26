@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 照 scripts/experiments/replay.sh 的 driver_e142 两条命令原样跑，按它的次序拼：模型 stdout 在前、导出在后。
+# 照 scripts/experiment-apparatus/replay.sh 的 driver_e142 两条命令原样跑，按它的次序拼：模型 stdout 在前、导出在后。
 # 用法：driver.sh <标签> <产物路径>；模型 stderr（准入）存 <草稿>/run/<标签>.model-stderr.txt
 set -u
 label="$1"; product="$2"

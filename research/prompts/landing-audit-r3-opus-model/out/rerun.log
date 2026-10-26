@@ -1,0 +1,24 @@
+== 结局账闭窗口：今天的 agent-cost.py 按东京日期切 / 第七批开工前那一份按 UTC 切
+agents 2125 cut tokyo since 2026-10-01T00:00:00+09:00 until 2026-10-22T00:00:00+09:00
+agents 2144 cut utc since 2026-10-01T00:00:00+00:00 until 2026-10-22T00:00:00+00:00
+== 派发闸报告行三种认法在真派发提示上
+== 三方腿自己的报告与认到的判决；Write 名字与工具层拒写；交回形状
+/home/fy5090/code/singlefs/research/prompts/landing-audit-r3-opus-model/probes/fix_word_end.py:1: SyntaxWarning: invalid escape sequence '\w'
+  """全部子 agent 的派发描述：改前 \bfix 认、改后 \bfix(?:es|ed)?(?![\w-]) 不认、别的返工词也不中的，按命中的词分组。用法：fix_word_end.py <会话目录根>"""
+== 第二轮快照重建与 cite-check
+== 与 /home/fy5090/code/singlefs/research/prompts/landing-audit-r3-opus-model/out/ 逐份比（会话记录与工作树会长，差在哪一行就是往后长出来的）
+  same before-r2fix-utc-summary.txt
+  same decompose.txt
+  diff fix-word-end.txt（12 行不同）
+  same handback-shapes-today.txt
+  same leg-own-report.txt
+  same negation-corpus.txt
+  same r2-cite-check-rebuilt.txt
+  same report-line-corpus.txt
+  same report-line-examples.txt
+  same sentence-start-extra.txt
+  same threshold-sweep-before-r2fix.txt
+  same threshold-sweep-today.txt
+  same today-tokyo-summary.txt
+  same write-name-refusals.txt
+  same write-refusals.txt

@@ -1,3 +1,0 @@
-017b96a36bf94374f8dc6a9776cf8bd22186f5f03ba7cf2377ced9d6c9ad2cb3  .claude/kb/decisions/13-验证路线.md
-d80a71631b8c6e0cdbe33d064dfd92cff9700dd94a584d635d69779e90de166b  .claude/kb/invariants.md
-12d909782d74fac4fb97efa2efddce4e1086a5c71b6ed54b742770265e95daf5  .claude/kb/checks-owed.md

@@ -1,0 +1,2 @@
+45669816f8dd08251aa5b94b76d82bb8c5808f87106efe1b06d419eef3f15397  .claude/kb/milestone/04-fourth-txn.md
+8de494de92933222e788e7f4e8a327cb57467973cd3094d969085bd27a2873e2  .claude/kb/checks-owed.md

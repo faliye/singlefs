@@ -1,3 +1,0 @@
-1bde226343730f704bdc952ae2e4135b6f5b3edd1d3c34aa5fd96469d13763a3  .claude/kb/invariants.md
-7974746af520d75f9d4ed47b23d6ad03d4494703e402e057889751d55909d42d  .claude/kb/decisions/23-journal的角色与格式.md
-6b05fcc181a8071c1e9e11e0d8a337d224571db992e951d9d2d04038636db489  .claude/kb/checks-owed.md

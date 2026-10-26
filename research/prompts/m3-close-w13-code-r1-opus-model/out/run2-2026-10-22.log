@@ -1,0 +1,13 @@
+   Compiling singlefs-harness v0.1.0 (<草稿目录>/repo-copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.48s
+     Running tests/attack_w13_mount_after_a_remade_pool_named_by_the_old_identifier.rs (<草稿目录>/target/debug/deps/attack_w13_mount_after_a_remade_pool_named_by_the_old_identifier-96707505f9728117)
+
+running 1 test
+name=remade cold=恢复无文件:(InstanceGeneration(0), CheckpointTxg(0))
+name=remade writable caller-holds=old-pool-identifier outcome=拒:CallerParametersDisagreeWithTheSelectedSystemConfiguration { disagreeing_fields: [FilesystemIdentifier], disagreeing_device_table: [] }
+name=remade writable caller-holds=remade-pool-identifier outcome=挂上:实例InstanceGeneration(1)
+name=remade writable caller-holds=third-identifier outcome=拒:CallerParametersDisagreeWithTheSelectedSystemConfiguration { disagreeing_fields: [FilesystemIdentifier], disagreeing_device_table: [] }
+test writable_mount_of_a_remade_pool_for_each_identifier_the_caller_may_hold ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.98s
+

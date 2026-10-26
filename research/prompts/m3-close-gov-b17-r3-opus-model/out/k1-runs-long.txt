@@ -1,0 +1,77 @@
+name=timeline id=E copies=lfu1,lfu0 break=judging-files-included
+E.1 name=run state=S0 break=judging-files-included exit=0
+E.1 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+E.1 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+E.1 name=cargo_calls total=6 coverage=2 plain=2
+E.1 name=keys judging=c3e826fde2665a8b row_key=6b2ad909b7d9d044 baseline_key=e52b122ff9856b04 coverage_id=b962b2fa0b6f9993 test_closure=319bb7ecd1ce5f36 mutated=fn:helper
+E.1 name=coverage_record id=b962b2fa0b6f9993 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+E.2 name=run state=S1 break=judging-files-included exit=1
+E.2 name=verdict_line   计数：抓到 0 条、没红 0 条、无效 0 条（共 1 条）
+E.2 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 0 行，基线不绿 1 行（按 cargo 参数分 1 批；共 1 行）
+E.2 name=cargo_calls total=2 coverage=0 plain=1
+E.2 name=keys judging=c7bc2303eee3e0dd row_key=f764e8a0501391e3 baseline_key=b4be201abe1260c5 coverage_id=b962b2fa0b6f9993 test_closure=7a775197c34742c5 mutated=fn:helper
+E.2 name=coverage_record id=b962b2fa0b6f9993 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+E.3 name=run state=S2 break=judging-files-included exit=0
+E.3 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+E.3 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+E.3 name=cargo_calls total=4 coverage=0 plain=2
+E.3 name=keys judging=c7bc2303eee3e0dd row_key=f89f5bf3f5cb92c3 baseline_key=b4be201abe1260c5 coverage_id=b962b2fa0b6f9993 test_closure=319bb7ecd1ce5f36 mutated=fn:helper
+E.3 name=coverage_record id=b962b2fa0b6f9993 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+E.4 name=run state=S3 break=judging-files-included exit=0
+E.4 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+E.4 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+E.4 name=cargo_calls total=2 coverage=0 plain=1
+E.4 name=keys judging=c7bc2303eee3e0dd row_key=f764e8a0501391e3 baseline_key=b4be201abe1260c5 coverage_id=b962b2fa0b6f9993 test_closure=7a775197c34742c5 mutated=fn:helper
+E.4 name=coverage_record id=b962b2fa0b6f9993 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+name=timeline id=F copies=lfu1-fix,lfu0-fix break=judging-files-included
+F.1 name=run state=S0 break=judging-files-included exit=0
+F.1 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+F.1 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+F.1 name=cargo_calls total=6 coverage=2 plain=2
+F.1 name=keys judging=c3e826fde2665a8b row_key=6b2ad909b7d9d044 baseline_key=e52b122ff9856b04 coverage_id=3efe11bee29b1294 test_closure=319bb7ecd1ce5f36 mutated=fn:helper
+F.1 name=coverage_record id=3efe11bee29b1294 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+F.2 name=run state=S1 break=judging-files-included exit=1
+F.2 name=verdict_line   计数：抓到 0 条、没红 0 条、无效 0 条（共 1 条）
+F.2 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 0 行，基线不绿 1 行（按 cargo 参数分 1 批；共 1 行）
+F.2 name=cargo_calls total=2 coverage=0 plain=1
+F.2 name=keys judging=c7bc2303eee3e0dd row_key=f764e8a0501391e3 baseline_key=b4be201abe1260c5 coverage_id=b5d98ea585322e26 test_closure=7a775197c34742c5 mutated=fn:helper
+F.2 name=coverage_record id=3efe11bee29b1294 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+F.3 name=run state=S2 break=judging-files-included exit=0
+F.3 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+F.3 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+F.3 name=cargo_calls total=6 coverage=2 plain=2
+F.3 name=keys judging=c7bc2303eee3e0dd row_key=f89f5bf3f5cb92c3 baseline_key=b4be201abe1260c5 coverage_id=b5d98ea585322e26 test_closure=319bb7ecd1ce5f36 mutated=fn:helper
+F.3 name=coverage_record id=3efe11bee29b1294 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+F.3 name=coverage_record id=b5d98ea585322e26 complete=True executed=fn:add,fn:helper,fn:tests::helps,mod_head:tests
+F.4 name=run state=S3 break=judging-files-included exit=1
+F.4 name=verdict_line   计数：抓到 0 条、没红 0 条、无效 0 条（共 1 条）
+F.4 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 0 行，基线不绿 1 行（按 cargo 参数分 1 批；共 1 行）
+F.4 name=cargo_calls total=2 coverage=0 plain=1
+F.4 name=keys judging=c7bc2303eee3e0dd row_key=f764e8a0501391e3 baseline_key=b4be201abe1260c5 coverage_id=b5d98ea585322e26 test_closure=7a775197c34742c5 mutated=fn:helper
+F.4 name=coverage_record id=3efe11bee29b1294 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+F.4 name=coverage_record id=b5d98ea585322e26 complete=True executed=fn:add,fn:helper,fn:tests::helps,mod_head:tests
+name=timeline id=G copies=lfu1-fix,lfu0-fix break=-
+G.1 name=run state=S0 break=- exit=0
+G.1 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+G.1 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+G.1 name=cargo_calls total=6 coverage=2 plain=2
+G.1 name=keys judging=c63379ff285eba00 row_key=72b3b534e43ad9e1 baseline_key=7c09233338be8f3b coverage_id=d1e6a95932af3165 test_closure=319bb7ecd1ce5f36 mutated=fn:helper
+G.1 name=coverage_record id=d1e6a95932af3165 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+G.2 name=run state=S1 break=- exit=0
+G.2 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+G.2 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+G.2 name=cargo_calls total=2 coverage=0 plain=1
+G.2 name=keys judging=c63379ff285eba00 row_key=2866562c9f23fcfe baseline_key=7c09233338be8f3b coverage_id=d1e6a95932af3165 test_closure=7a775197c34742c5 mutated=fn:helper
+G.2 name=coverage_record id=d1e6a95932af3165 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+G.3 name=run state=S2 break=- exit=0
+G.3 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+G.3 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+G.3 name=cargo_calls total=0 coverage=0 plain=0
+G.3 name=keys judging=c63379ff285eba00 row_key=72b3b534e43ad9e1 baseline_key=7c09233338be8f3b coverage_id=d1e6a95932af3165 test_closure=319bb7ecd1ce5f36 mutated=fn:helper
+G.3 name=coverage_record id=d1e6a95932af3165 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests
+G.4 name=run state=S3 break=- exit=0
+G.4 name=verdict_line   计数：抓到 1 条、没红 0 条、无效 0 条（共 1 条）
+G.4 name=verdict_line   基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 1 行，基线不绿 0 行（按 cargo 参数分 1 批；共 1 行）
+G.4 name=cargo_calls total=0 coverage=0 plain=0
+G.4 name=keys judging=c63379ff285eba00 row_key=2866562c9f23fcfe baseline_key=7c09233338be8f3b coverage_id=d1e6a95932af3165 test_closure=7a775197c34742c5 mutated=fn:helper
+G.4 name=coverage_record id=d1e6a95932af3165 complete=True executed=const:OFFSET,fn:helper,fn:tests::helps,mod_head:tests

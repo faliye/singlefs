@@ -1,0 +1,3 @@
+name=七·6 增长：整理读版本退回逐 key 查映射 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 204.35s
+  first_panic_line=thread 'compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units' (801630) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:399:5:
+  assertion `left == right` failed: txg 133：整理读这一版解了 0 片映射叶，进映射的 596 把 key 走到 6 片（每片解一次、每把 key 都经批量读者查）

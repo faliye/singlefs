@@ -1,0 +1,2 @@
+FWD_EDGE compared=2033
+test forward_leg_edge_cases_of_the_sorted_index ... ok

@@ -1,0 +1,41 @@
+0	scripts/mutation/broad-mutation.py::select_items	0	73	73	5		0	0	b4f0a43603c8
+1	scripts/mutation/broad-mutation.py::verdict_state	0	62	62	5		0	0	18bfa6d6a475
+2	scripts/mutation/broad-mutation.py::Judgement.state	0	1005	1005	11		0	0	2ed87960bcee
+3	scripts/mutation/broad-mutation.py::Judgement.row_holds	0	990	990	11		0	0	241167f3fdf5
+4	scripts/mutation/broad-mutation.py::Judgement.selection	0	985	985	11		0	0	45b8e26ec62d
+5	scripts/mutation/broad-mutation.py::process_item	0	119	119	5		0	0	914447cd44d3
+6	scripts/mutation/broad-mutation.py::Runner.escalate_step	4	837	836	24	inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76	87	75	062641753a62
+7	scripts/mutation/broad-mutation.py::escalation_evidence_problems	0	50	50	5		0	0	52892f10e1b8
+8	scripts/mutation/mutation-prune.py::carry_decision	0	9	9	1		0	0	bfdf11afe331
+9	scripts/mutation/mutation-prune.py::mutation_key	0	14	14	1		0	0	1bd2beea9f5f
+10	scripts/mutation/mutation-prune.py::UnitTree.closure_key	0	885	885	8		0	0	1a00864c6b90
+11	scripts/mutation/mutation-prune.py::catching_test_key	0	15	15	1		0	0	7fd073bf21be
+12	scripts/mutation/mutation-prune.py::coverers_key	0	12	12	1		0	0	7ece587f68b2
+13	scripts/mutation/mutation-prune.py::global_lines	0	8	8	1		0	0	5c3cbe20a8f5
+14	scripts/mutation/mutation-prune.py::build_environment_lines	0	20	20	1		0	0	4d53dfb60f0d
+15	scripts/mutation/broad-mutation.py::gpu_pass_command	0	56	56	5		0	0	796e771d55c3
+16	scripts/mutation/broad-mutation.py::gpu_classify_build	0	62	62	5		0	0	976172da746d
+17	scripts/mutation/broad-mutation.py::gpu_classify_test	0	90	90	5		0	0	83c7a78cf7d9
+18	scripts/mutation/broad-mutation.py::gpu_combined_state	0	60	60	5		0	0	8a04256a79be
+19	scripts/mutation/broad-mutation.py::GpuJudging.need	0	79	79	5		0	0	09ff8ab52a4c
+20	scripts/mutation/broad-mutation.py::GpuJudging.row_holds	0	921	921	10		0	0	47b7255e1bce
+21	scripts/mutation/broad-mutation.py::GpuJudging.test_key_of	0	75	75	5		0	0	fbe9fc1db696
+22	scripts/mutation/crates-mutation-rows.py::verdict_of_run	0	91	91	6		0	0	4a20ae38540c
+23	scripts/mutation/crates-mutation-rows.py::baseline_problem	0	86	86	6		0	0	770b6cd45093
+24	scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem	0	72	72	6		0	0	08bf01e38f02
+25	scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units	0	340	340	4		0	0	da8adc04a57f
+26	scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test	0	334	334	4		0	0	7cc5335e8080
+27	scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units	0	325	325	4		0	0	7336802c7abd
+28	scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product	0	16	16	1		0	0	eec33f6c6937
+29	scripts/experiment-apparatus/replay.sh::strip_admission_header	0	2	2	1		0	0	99d059a9e773
+30	scripts/experiment-apparatus/replay.sh::strip_timing	0	2	2	1		0	0	a8f33722066d
+31	scripts/experiment-apparatus/replay.sh::strip_load_fields	0	2	2	1		0	0	6194bd1d2954
+32	scripts/experiment-apparatus/replay.sh::timing_load_reading_raw	0	3	3	1		0	0	f4b6dd3a96f4
+33	scripts/experiment-apparatus/replay.sh::timing_load_decide	0	7	7	1		0	0	18aed80ee637
+34	scripts/experiment-apparatus/e165-pin-red-examples.py::replay	0	950	950	8		0	0	97ee73851f6e
+35	scripts/gate/verus-proof-check.py::check_proof	4	1611	1610	25	inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76	87	75	cdf6c904677c
+36	scripts/gate/verus-proof-check.py::check_vacuity	4	1599	1598	25	inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76	87	75	c020d5314000
+37	scripts/gate/verus-proof-check.py::check_must_red_worlds	4	1607	1606	25	inline-script-not-literal@scripts/hosts/peer-host-lib.sh:76	87	75	dd63d11ee8bd
+38	scripts/gate/lib_libtest_result_lines.py::result_line	0	12	12	1		0	0	96fdf1ee9d45
+39	scripts/gate/lib_libtest_result_lines.py::recordable_results	0	27	27	1		0	0	a2bdc6776e6b
+40	.claude/gate.d/harness-model-differential-and-scenarios.sh::model_section_verdict	0	3	3	1		0	0	7241630186f8

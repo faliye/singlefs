@@ -1,0 +1,14 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-core)
+warning: unused variable: `mapped_units_of_the_previous_version`
+    --> crates/singlefs-core/src/transaction.rs:7955:13
+     |
+7955 |         let mapped_units_of_the_previous_version =
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mapped_units_of_the_previous_version`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.67s
+  Executable tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+  Executable tests/snapshot_release_and_destroy_through_the_deadlist.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/snapshot_release_and_destroy_through_the_deadlist-ed36be39ea00ad83)

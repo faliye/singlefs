@@ -1,0 +1,39 @@
+9e813cbd36900f1b0c7001e6de0f98de01080bbf7ac6aab39d8e7c9854bd97f8  crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+93cf2ffd8ed31fec57c6a3049050db7c8714a9a10b888223d727a4a584fd4b83  crates/singlefs-checker-tier/src/gpu_unit_checks.rs
+381511a2f1d1c854e4b4ab364a31b0c37762f81dec5456bf93601fb6ec275e51  crates/singlefs-core/src/mounted_session.rs
+d0f9316a4dcdc1c254e7fb8fabfd78c5b01822f92f5ee97f8f05ebe273ed8f3e  crates/singlefs-core/src/region_scan.rs
+c4819e2fff92bfade658e078baeb9a65645fcca085a72732464c5cd85a04edfe  crates/singlefs-core/src/transaction.rs
+6f6e6dc5374d98aa45c7e3d904c1e429320b6d1635fe44fd26f4e7adbff24c2d  crates/singlefs-core/src/checksum.rs
+7249312c68efa2a46627172d510c6c5d754fbf9cdb254ac46783264cadb1b77e  crates/singlefs-core/src/unit.rs
+826d7d3de270993b81a726fbe6cd2e3d26b3b091c7fcba1511579b9f15c7c4c1  crates/singlefs-core/src/compaction_plan.rs
+7852ff4a738970c2f98485728659edf0b6c63b82fc2d077358642a3308d006ed  crates/singlefs-core/src/records.rs
+eef17aca5c9b0d4b36b400c75b8eb66bdd8a5023ed1e1f8a48651d556f0b2d70  Cargo.lock
+Cargo.lock 里 wgpu 的版本：30.0.1
+HEAD f6990348b2a838bc5da6b1579163f5ea834c0625
+写法与拆分段不起卡，不查 nvidia-smi
+61b210296634f2f20fa0465a4e4f09859cd9236522c54d4fb18301e75f243025  research/prompts/m4-gpugc-design-r1-opus-model/out/g1.out
+f70eb21b8a7081489dd8fc3209080f3ab83f16ac40beee3042c03f4756f1e07a  research/results/e185-gc-batch-wall-clock-split-stage-split-r2-2026-10-23.out
+840b68352e6d849e9a397dd71c3fb9d7a1f30c0a5b7f7f362e620b2a7ef69993  research/results/e185-gc-batch-wall-clock-split-host-cpu-per-submission-r3-2026-10-24-2.out
+31fd33a3a7672b9db7e13b54990ef4533db137a1c0f93bd521b66a07b8596851  research/results/e185-gc-batch-wall-clock-split-function-split-r3-2026-10-24.out
+singlefs-core v0.1.0 (〔第二台的目录〕/crates/singlefs-core)
+└── singlefs-core feature "default"
+    ├── singlefs-checker-tier v0.1.0 (〔第二台的目录〕/crates/singlefs-checker-tier)
+    │   ├── singlefs-checker-tier feature "default" (command-line)
+    │   └── singlefs-checker-tier feature "verdict-store"
+    │       └── singlefs-checker-tier feature "default" (command-line)
+    └── singlefs-harness v0.1.0 (〔第二台的目录〕/crates/singlefs-harness)
+        └── singlefs-harness feature "default"
+            └── singlefs-checker-tier v0.1.0 (〔第二台的目录〕/crates/singlefs-checker-tier) (*)
+nproc 32
+getconf CLK_TCK 100
+RUSTFLAGS=（拆法乙撤了，这一趟两段都不带 -C force-frame-pointers=yes）
+CPU 型号：AMD Ryzen 9 9950X 16-Core Processor
+CPU 标志 sse4_2 在
+CPU 标志 pclmulqdq 在
+scaling_governor（cpu0）：performance
+perf_event_paranoid：4
+多机配置里的台数（--emit-hosts 的 MULTI_HOST_COUNT，不抄主机名）：1
+上限：控漂移段外层 run-with-memory-cap.sh 16G；写法与拆分段外层 multi-host-run.sh --memory-cap 46G、E185_MEMORY_CAP=40G；
+  编译与装置准备队列的线程经 scripts/hosts/capped.sh default 取登记值 31
+SINGLEFS_SERIAL_DECLARATIONS 由外层包装设
+E185_REGISTERED_APPARATUS_SHA256=9e813cbd36900f1b0c7001e6de0f98de01080bbf7ac6aab39d8e7c9854bd97f8

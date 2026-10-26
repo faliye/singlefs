@@ -12,7 +12,7 @@
 
 方案按 `crates/` 与 `scripts/` 今天的实现来谈（主工作区现状）。这一轮被判的定义句子引的钩子与脚本：
 
-- `.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`：R2、R3 经 `hook-swap.py` 换上（工具员报告第二节）：直接执行 `e165_replay_bounded_enumeration` 带 `--pinned-cases` 照重型判（装置名与选项现读 `scripts/experiments/e165-pin-red-examples.py` 的 `DEVICE_BINARY`、`DEVICE_FLAG`）；带 `--quick` 的轻型三条在环境里设了各自文件头列的 `*_BREAK` 开关时照重型判。注意：另一位工具员此刻正在改这两份里的 `cargo run --bin` 漏网一形与 `.claude/gate.d/doc-decisions.sh` 另 9 处出路句、`.claude/rules/verification.md` 一句（不在这一轮被判之列），腿读到的若与快照不同，以今天的为准、在报告里写明。
+- `.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`：R2、R3 经 `hook-swap.py` 换上（工具员报告第二节）：直接执行 `e165_replay_bounded_enumeration` 带 `--pinned-cases` 照重型判（装置名与选项现读 `scripts/experiment-apparatus/e165-pin-red-examples.py` 的 `DEVICE_BINARY`、`DEVICE_FLAG`）；带 `--quick` 的轻型三条在环境里设了各自文件头列的 `*_BREAK` 开关时照重型判。注意：另一位工具员此刻正在改这两份里的 `cargo run --bin` 漏网一形与 `.claude/gate.d/doc-decisions.sh` 另 9 处出路句、`.claude/rules/verification.md` 一句（不在这一轮被判之列），腿读到的若与快照不同，以今天的为准、在报告里写明。
 - `scripts/hosts/compile-then-swap.py`：草稿编过（`cargo build` 与 `cargo test --no-run`）才整份换进主工作区，回读 sha256（R1 改后的 `experiment-runner.md` 指到它）。
 - `scripts/gate/rerun-failed-tests.py`：打出的命令次序是「范围声明在前、内存包装在后」（工具员报告第一节 R6）。
 - `.claude/skills/crash-test/commit-stages.md`：监控行的抄法（R4 改后的第 14 条指到它）。

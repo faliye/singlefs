@@ -1,0 +1,6 @@
+kept-comments	<kept-comments>	scripts/hosts/lib.sh:1-9	e2b37d0fbeebd5358ba88a5ef5469cfab940c91f397b72b95107b9b6515a9ece
+script-body	<script-body>	scripts/hosts/lib.sh:1-9	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+function	run_there	scripts/hosts/lib.sh:2-8	21625c78b5543d24a3019a8d8a0aa8f5f1a09a71aa4e70b2dab5e8a7574a9bf4
+kept-comments	<kept-comments>	scripts/hosts/through-function.sh:1-4	e2b37d0fbeebd5358ba88a5ef5469cfab940c91f397b72b95107b9b6515a9ece
+script-body	<script-body>	scripts/hosts/through-function.sh:1-4	ac380a055b9071810ec1d52dc8c12d2cc4bf47bb7b47cb5e28829594c220da9e
+refused	inline-script-not-literal	scripts/hosts/lib.sh:4	(cd "$1" && bash -c "$2")

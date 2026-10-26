@@ -4,7 +4,7 @@
 #   hidden：返回值探针只跑 untouched-subset.tsv 的 13 行（7 行交回值不同的、6 行对照），约 4 分钟；
 #   all：跑 untouched-s4.tsv 里除 make_filesystem.rs 之外的 232 行，约 45 分钟（一行一次重编，每行约 11–12 秒），主 agent 放后台跑。
 # 要的东西：E171 跑的树 /tmp/claude-1000/e171-s4/frozen-tree/（s4 树）、这一轮的冻结副本 /tmp/claude-1000/e171-conclusion-r3/tree/、
-#   scripts/experiments/target/e171-dumps/、仓里的 E170 冻结执行器与 E171 研究一侧目录。
+#   scripts/experiment-apparatus/target/e171-dumps/、仓里的 E170 冻结执行器与 E171 研究一侧目录。
 # 跑的是 harness 档的自写探针（测试目标名不带 layer0）与 Python；不跑 checker 档测试、不起 E171 装置。编译与跑探针都经内存包装。
 # 末尾逐个与 <模型目录>/out/ 下同名文件 cmp，没有输出就是逐字节相同。
 set -euo pipefail
@@ -15,7 +15,7 @@ MODE=${3:-hidden}
 REPO=/home/fy5090/code/singlefs
 S4=/tmp/claude-1000/e171-s4/frozen-tree
 TODAY=/tmp/claude-1000/e171-conclusion-r3/tree
-E=$REPO/scripts/experiments/target/e171-dumps
+E=$REPO/scripts/experiment-apparatus/target/e171-dumps
 P=$REPO/research/results/e171-three-oracle-collusion-2026-10-03
 CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh"
 CAPPED="bash $REPO/scripts/hosts/capped.sh $THREADS"
@@ -34,24 +34,24 @@ python3 "$MODEL/row15_offsets.py" "$E" > out/row15-offsets.out
 echo "== 3 C407 改写的判官：四个 O3（冻结 / 三个变坏的）在 Q2 坏镜像与两种「已确认的丢了」写流上；判官在入库产物与造出来的产物上"
 mkdir k3
 for v in v0 v1 v2 v3; do
-  mkdir -p k3/$v/scripts/experiments k3/$v/research/results
-  cp -r "$REPO/scripts/experiments/e170_second_run_o3_spec_executor" "$REPO/scripts/experiments/e171_three_oracle_collusion" k3/$v/scripts/experiments/
-  rm -rf k3/$v/scripts/experiments/*/__pycache__
+  mkdir -p k3/$v/scripts/experiment-apparatus k3/$v/research/results
+  cp -r "$REPO/scripts/experiment-apparatus/e170_second_run_o3_spec_executor" "$REPO/scripts/experiment-apparatus/e171_three_oracle_collusion" k3/$v/scripts/experiment-apparatus/
+  rm -rf k3/$v/scripts/experiment-apparatus/*/__pycache__
   cp "$REPO/research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out" k3/$v/research/results/
 done
 python3 "$MODEL/make_o3_variants.py" "$PWD/k3/v1" "$PWD/k3/v2" "$PWD/k3/v3" > /dev/null
 for v in v0 v1 v2 v3; do
-  nice -n 19 python3 k3/$v/scripts/experiments/e171_three_oracle_collusion/o3_bad_image_judge.py judge --repo-root "$PWD/k3/$v" \
+  nice -n 19 python3 k3/$v/scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py judge --repo-root "$PWD/k3/$v" \
     --e170-dumps "$E/e170-bad-states-copy-s2" --known-bad-dir "$E/known-bad-s2" --output "$PWD/k3/images-$v.out" > /dev/null
 done
 diff <(grep 'name=image_judgement' k3/images-v0.out) <(grep 'name=image_judgement' "$P-s2-images-o3.out") > out/images-v0-vs-product.diff || true
-(cd k3 && python3 "$MODEL/q2_o3_only.py" v0/scripts/experiments/e171_three_oracle_collusion "$E/known-bad-s2" "$E/e170-bad-states-copy-s2" \
+(cd k3 && python3 "$MODEL/q2_o3_only.py" v0/scripts/experiment-apparatus/e171_three_oracle_collusion "$E/known-bad-s2" "$E/e170-bad-states-copy-s2" \
    v0=images-v0.out v1=images-v1.out v2=images-v2.out v3=images-v3.out) > out/q2-o3-only.out
 for v in v0 v1 v2 v3; do
   echo "name=o3_controls variant=$v p1_f_new_pool_strict=$(grep 'source=e170 stream=new_pool_file_creation row=0 ' k3/images-$v.out | grep -o 'strict=[a-z_]*' | cut -d= -f2) base_images_strict_not_in=$(grep -c 'source=base .*strict=not_in' k3/images-$v.out) freeze_check_differences=$(grep 'name=freeze_check before=true' k3/images-$v.out | grep -o 'differences=[0-9]*' | cut -d= -f2)"
 done > out/o3-controls.out
 for v in v0 v1 v2 v3; do
-  X=k3/$v/scripts/experiments/e170_second_run_o3_spec_executor
+  X=k3/$v/scripts/experiment-apparatus/e170_second_run_o3_spec_executor
   nice -n 19 python3 "$MODEL/o3_ack_shapes.py" $X warmup "$E/baseline-run1/new_pool_file_creation" k3/shape-warmup-$v | sed "s/^/variant=$v /"
   nice -n 19 python3 "$MODEL/o3_ack_shapes.py" $X content "$E/baseline-run1/fixed_script_through_e_then_unmount" k3/shape-content-$v | sed "s/^/variant=$v /"
 done > out/shapes-variants.out

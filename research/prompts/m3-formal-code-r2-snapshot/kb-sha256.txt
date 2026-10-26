@@ -1,8 +1,0 @@
-bb3c492e1d86ba0556152cdc4f911d805ce46ab91b2690e019a3d540c016ea24  .claude/kb/decisions/13-验证路线.md
-75f821fa766d99445a9b52b3f27ac206d7b6d79992b974a7fbf7e38d8501d5e0  .claude/kb/decisions/16-发布语义.md
-f0d58c15d2a84aa307959ee6230c1210e69b33d871c8e902bd509b17011269d9  .claude/kb/decisions/23-journal的角色与格式.md
-1112a4c9d6c2b23be6da2dda296715fb1d39cbfdc5da668dd26fa03fe3427baa  .claude/kb/decisions/18-块里携带什么信息.md
-44b2c381d7a6cbd64c5397d7aae4e2b41355b417285eca6ea79462bbf8e3db9c  .claude/kb/checks-owed.md
-08194433c2cb3bb15336b99bdfbc127d7e60417aefb8273b99d5d1c00c3622c9  .claude/kb/decisions/22-单元原子性怎么合成.md
-d7203573e4f75f9483685735e05d67c296157e1a941bb110c76274f548adb158  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
-4f8b8643f9c24c0332605162b6f1c4e98089f91f8993ef758ce5d0f8912a2149  .claude/kb/invariants.md

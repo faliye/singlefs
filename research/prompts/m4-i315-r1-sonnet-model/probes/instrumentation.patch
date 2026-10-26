@@ -1,0 +1,146 @@
+--- crates/singlefs-checker/src/walk.rs	2026-10-20 11:42:12.822614151 +0000
++++ /home/fy5090/.local/share/singlefs/work/m4-validate-investigate-i315-swallowed/tree/crates/singlefs-checker/src/walk.rs	2026-10-21 06:11:25.572614699 +0000
+@@ -16357,6 +16357,21 @@
+             (u64, u64),
+             Vec<AllocationRecordOffTheCentralMapping>,
+         > = BTreeMap::new();
++        if let Some(watched) = std::env::var("PROBE_I315_SLOT").ok().and_then(|v| v.parse::<u64>().ok()) {
++            let here: Vec<(u32, u64, u64, bool)> = account
++                .records
++                .iter()
++                .filter(|r| r.slot == watched)
++                .map(|r| (r.device, r.span_slots, r.generation, r.is_released))
++                .collect();
++            eprintln!(
++                "PROBE_I315_SLOT version={} 槽{watched} 记录(盘,跨,代,已释放)={here:?} 根或父指针直指={} 映射key数(盘0,盘1)=({},{})",
++                version.name,
++                pointed_directly_by_the_root_or_a_parent.contains(&(0, watched)) || pointed_directly_by_the_root_or_a_parent.contains(&(1, watched)),
++                keys_at_each_placement.get(&(0, watched)).map_or(0, Vec::len),
++                keys_at_each_placement.get(&(1, watched)).map_or(0, Vec::len),
++            );
++        }
+         for record in account.records.iter().filter(|record| !record.is_released) {
+             let placement = (record.device, record.slot);
+             if pointed_directly_by_the_root_or_a_parent.contains(&placement) {
+@@ -16381,6 +16396,16 @@
+                 })
+                 .clone()
+             else {
++                if std::env::var("SINGLEFS_PROBE_I315").is_ok() {
++                    eprintln!(
++                        "PROBE_I315_HEADER_UNUSABLE version={} 盘{} 槽{} 跨{} 前16字节={:?}",
++                        version.name,
++                        record.device,
++                        record.slot,
++                        record.span_slots,
++                        reader.read(record.device, record.slot * SLOT_BYTES, 16)
++                    );
++                }
+                 continue;
+             };
+             let keys_here = keys_at_each_placement
+@@ -16463,17 +16488,60 @@
+                 });
+         }
+         for ((slot, span_slots), records_of_the_unit) in records_off_the_mapping_by_unit {
+-            let devices_of_the_unit: Vec<u32> = records_of_the_unit
++            let no_key_names_the_slot_on_any_device = account
++                .records
+                 .iter()
+-                .map(|record| record.device)
+-                .collect();
+-            if some_copy_of_the_unit_fails_its_location_entries(
++                .filter(|record| record.slot == slot)
++                .all(|record| !keys_at_each_placement.contains_key(&(record.device, slot)));
++            let devices_of_the_unit: Vec<u32> = if std::env::var("PROBE_FIX_GROUPING").is_ok()
++                || (std::env::var("PROBE_FIX_GROUPING_WHEN_NO_KEY").is_ok() && no_key_names_the_slot_on_any_device)
++            {
++                account
++                    .records
++                    .iter()
++                    .filter(|record| {
++                        !record.is_released && record.slot == slot && record.span_slots == span_slots
++                    })
++                    .map(|record| record.device)
++                    .collect()
++            } else {
++                records_of_the_unit
++                    .iter()
++                    .map(|record| record.device)
++                    .collect()
++            };
++            let quarantined_probe = some_copy_of_the_unit_fails_its_location_entries(
+                 reader,
+                 &devices_of_the_unit,
+                 slot,
+                 span_slots,
+                 location_entry_checksums,
+-            ) {
++            );
++            if std::env::var("SINGLEFS_PROBE_I315").is_ok() {
++                let all_records_here: Vec<(u32, u64, u64, bool)> = account
++                    .records
++                    .iter()
++                    .filter(|r| r.slot == slot)
++                    .map(|r| (r.device, r.span_slots, r.generation, r.is_released))
++                    .collect();
++                let mut copies = Vec::new();
++                for device in [0u32, 1u32] {
++                    let crc = usize::try_from(span_slots * SLOT_BYTES)
++                        .ok()
++                        .and_then(|b| reader.read(device, slot * SLOT_BYTES, b))
++                        .map(|u| crc32_castagnoli_table(&u));
++                    let entries = location_entry_checksums.at(device, slot).cloned();
++                    copies.push(format!("盘{device}: crc={crc:?} 位置项校验和={entries:?}"));
++                }
++                eprintln!(
++                    "PROBE_I315 version={} unit=(slot {slot}, span {span_slots}) group_devices={devices_of_the_unit:?} quarantined={quarantined_probe} records_at_this_slot(device,span,generation,released)={all_records_here:?} copies=[{}] keys_at(0,slot)={} keys_at(1,slot)={}",
++                    version.name,
++                    copies.join("; "),
++                    keys_at_each_placement.get(&(0, slot)).map_or(0, Vec::len),
++                    keys_at_each_placement.get(&(1, slot)).map_or(0, Vec::len),
++                );
++            }
++            if quarantined_probe {
+                 continue;
+             }
+             for record in records_of_the_unit {
+--- crates/singlefs-core/src/transaction.rs	2026-10-21 05:17:44.423287862 +0000
++++ /home/fy5090/.local/share/singlefs/work/m4-validate-investigate-i315-swallowed/tree/crates/singlefs-core/src/transaction.rs	2026-10-21 05:56:57.419347244 +0000
+@@ -4632,6 +4632,15 @@
+             | QuarantinedCopyReading::UnreadableAfterOneReread => true,
+             QuarantinedCopyReading::IntactButAnotherCopyFailed => false,
+         });
++    if some_copy_failed && std::env::var("SINGLEFS_PROBE_I315").is_ok() {
++        eprintln!(
++            "PROBE_CORE release-checksum-check unit={identity:?} readings={:?} some_copy_failed={some_copy_failed}",
++            reading_of_each_copy
++                .iter()
++                .map(|(location, reading)| (location.device, location.slot, *reading))
++                .collect::<Vec<_>>()
++        );
++    }
+     if !some_copy_failed {
+         return Vec::new();
+     }
+@@ -12577,11 +12586,15 @@
+     // 释放之前读盘核校验和核出对不上（读不出也算）的那几份：逻辑上照样释放（映射条目这次不再写它），那一份在它那块盘上的分配记录
+     // 留在已分配、不改成已释放（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-09-24 定案），核得上的那一份照常释放。
+     for placement in release {
+-        let devices_whose_copy_failed_the_checksum: Vec<DeviceIdentity> = quarantine
+-            .iter()
+-            .filter(|copy| copy.placement == *placement)
+-            .map(|copy| copy.device)
+-            .collect();
++        let devices_whose_copy_failed_the_checksum: Vec<DeviceIdentity> = if std::env::var("PROBE_NO_QUARANTINE").is_ok() {
++            Vec::new()
++        } else {
++            quarantine
++                .iter()
++                .filter(|copy| copy.placement == *placement)
++                .map(|copy| copy.device)
++                .collect()
++        };
+         allocator.release_leaving_the_record_allocated_on(
+             *placement,
+             txg,

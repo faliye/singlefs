@@ -12,4 +12,4 @@ checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩�
 55-qemu-first-transaction.sh	crates/ Cargo.toml Cargo.lock scripts/ research/results/	# 起虚机跑 crates 的装置，虚机与复跑脚本都在 scripts/
 59-crates-mutation-replay.sh	crates/ Cargo.toml Cargo.lock	# 按 crates/mutations.tsv 逐条改坏 crates/ 里的源码再跑点名的测试
 74-model-differential.sh	crates/ Cargo.toml Cargo.lock	# 拿 crates 里的实现与只住内存的理想模型对拍
-87-replay.sh	crates/ Cargo.toml Cargo.lock scripts/experiments/ scripts/ research/results/	# 复跑入库的实验产物，装置在 scripts/experiments/，登记表与脚本在 scripts/
+87-replay.sh	crates/ Cargo.toml Cargo.lock scripts/experiment-apparatus/ scripts/ research/results/	# 复跑入库的实验产物，装置在 scripts/experiment-apparatus/，登记表与脚本在 scripts/

@@ -1,6 +1,0 @@
-PROBE group=f5 name=f5-control-snapshot-with-a-file-then-unlink ending=Completed steps=7 rollbacks=[] reds=0
-PROBE group=f5 name=f5-crash-abandoning-the-snapshot-creation-root ending=Completed steps=7 rollbacks=[] reds=0
-PROBE group=f5 name=f5-destroy-the-snapshot-of-the-emptied-set-in-a-fresh-mount ending=Completed steps=7 rollbacks=[] reds=0
-PROBE group=f5 name=f5-rollback-refused-with-a-snapshot-of-the-emptied-set-then-destroy ending=Completed steps=7 rollbacks=["n/a", "n/a", "n/a"] reds=0
-PROBE group=f5 name=f5-snapshot-of-the-emptied-file-set-then-read-remount-cold-start ending=Completed steps=9 rollbacks=[] reds=0
-PROBE group=f5 name=f5-twelve-snapshots-of-the-emptied-set-the-cap-of-ten ending=Completed steps=14 rollbacks=[] reds=0

@@ -1,0 +1,4 @@
+a7aa1608c74c3e21e（tooling-writer，记录 sha256 3e90a0855150a648…）：改前退 0；改后退 2：✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）
+aa87dd9fe761d727f（tooling-writer，记录 sha256 1d25a002905f1740…）：改前退 0；改后退 2：✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）
+aa68d151c2fa72bb7（tooling-writer，记录 sha256 372e60e5f98ff551…）：改前退 0；改后退 2：✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）
+ab6dd5f35228122b7（tooling-writer，记录 sha256 18a52406f8ccb57e…）：改前退 0；改后退 2：✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）

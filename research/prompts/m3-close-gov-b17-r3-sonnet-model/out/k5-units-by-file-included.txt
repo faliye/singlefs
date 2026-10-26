@@ -1,0 +1,8 @@
+    496 scripts/gate/lib_function_units.py
+    222 scripts/mutation/crates-mutation-rows.py
+     70 scripts/mutation/lib_mutation_units.py
+     64 scripts/gate/lib_reuse_checks.py
+     43 .claude/singlefs-ai-sop/scripts/preflight.py
+     38 scripts/gate/lib_libtest_result_lines.py
+     19 scripts/hosts/heavy_threads.py
+      9 .claude/scripts/project_preflight.py

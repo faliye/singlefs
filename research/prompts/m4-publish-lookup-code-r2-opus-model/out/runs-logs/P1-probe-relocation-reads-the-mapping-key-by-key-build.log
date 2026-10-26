@@ -1,0 +1,26 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-core)
+warning: unused variable: `role`
+    --> crates/singlefs-core/src/transaction.rs:9550:15
+     |
+9550 |         Some((role, _)) => {
+     |               ^^^^ help: if this is intentional, prefix it with an underscore: `_role`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `locations`
+    --> crates/singlefs-core/src/transaction.rs:9551:17
+     |
+9551 |             let locations = match {
+     |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_locations`
+
+warning: unused variable: `probe`
+    --> crates/singlefs-core/src/transaction.rs:9552:21
+     |
+9552 | ...   let probe: MappingLookup = panic!("探针：搬单元那一步（relocation_checked_against_the_version）不经 central_mapping_as_the_c...
+     |           ^^^^^ help: if this is intentional, prefix it with an underscore: `_probe`
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 3 warnings (run `cargo fix --lib -p singlefs-core` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 28.24s
+  Executable tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+  Executable tests/snapshot_release_and_destroy_through_the_deadlist.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/snapshot_release_and_destroy_through_the_deadlist-ed36be39ea00ad83)

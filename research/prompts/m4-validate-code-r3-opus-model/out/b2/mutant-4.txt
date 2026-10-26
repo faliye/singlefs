@@ -1,0 +1,40 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs (target/release/deps/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session-5b0776583c618e44)
+
+running 9 tests
+test a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two ... FAILED
+test a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf ... FAILED
+test a_whole_file_hole_of_tag_zero_extended_by_the_session_reads_back_its_new_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two ... ok
+test a_whole_file_hole_of_tag_zero_kept_at_its_size_by_the_session_reads_back_its_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_then_unlinked_leaves_no_entry_in_the_upper_leaf ... ok
+test a_whole_file_hole_of_tag_zero_shrunk_by_the_session_reads_back_its_new_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_then_extended_after_its_upper_leaf_is_rewritten_reads_back_zeros ... ok
+
+failures:
+
+---- a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two stdout ----
+
+thread 'a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two' (1870362) panicked at crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs:389:5:
+assertion `left == right` failed: 重写的那片上段叶里第一个文件那一条照写标签 0
+  left: None
+ right: Some(NoDataUnit)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf stdout ----
+
+thread 'a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf' (1870363) panicked at crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs:430:5:
+assertion `left == right` failed: 第一片上段叶连同标签 0 那一条留在新形状里
+  left: None
+ right: Some(NoDataUnit)
+
+
+failures:
+    a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two
+    a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf
+
+test result: FAILED. 7 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+error: test failed, to rerun pass `-p singlefs-harness --test whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session`
+mutant_rc=101

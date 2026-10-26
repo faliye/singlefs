@@ -1,0 +1,48 @@
+此刻（unix 秒）1792677601
+== 此刻全部：2287 个子 agent，折算合计 7723.82 百万
+   写了东西、不低于 70% 的行进了提交或工作树	899	50.4%
+   写了东西、30% 到 70%	91	4.1%
+   三方腿	475	27.2%
+   只交报告、交回后主 agent 有动作点到	667	15.2%
+   看起来没效果的几桶	92	2.0%
+   其余	63	1.1%
+   桶：written-landed 899、written-partial 91、verdict-archived 475、report-used-by-main 667、report-used-by-later-sub 7、report-unreferenced 7、written-overwritten 27、cut-by-usage-limit 36、cut-by-api-error 2、stopped-salvaged 58、stopped-abandoned 15、in-flight 3
+   返工字样（agent-cost 现词表）354 个，占个数 15.5%，占花费 14.1%
+   返工字样（调度记录第一批写的五个词）157 个，占个数 6.9%，占花费 5.5%
+   没交回 114 个：API 错 2、停掉 73、用量撞顶 36、还在跑 3
+   outcome 当成交回、交回一次都没送达的 0 个，按桶：；按类型：
+   返工字样只靠一个词命中的：fix 94、修 77、重跑 28、rerun 25、改名 22、接手 17、重派 12、接续 8、续做 6、renumber 4、重做 4、第 2 次 4、（续） 3、补做 3、第 25 次 3、补写 3、改钉值 2、第 22 次 2、接着做 2、redispatch 2、返工 2、re-run 1、第 7 次 1、第 3 次 1
+   只靠「修」命中的里「修」后一字：修 16、修补 13、修订 11、修红 8、修复 2、修正 2、修三 1、修广 1
+== 首条记录不晚于 unix 秒 1792668941：2269 个子 agent，折算合计 7654.44 百万
+   写了东西、不低于 70% 的行进了提交或工作树	894	50.5%
+   写了东西、30% 到 70%	90	4.1%
+   三方腿	473	27.3%
+   只交报告、交回后主 agent 有动作点到	661	15.2%
+   看起来没效果的几桶	91	2.0%
+   其余	60	0.9%
+   桶：written-landed 894、written-partial 90、verdict-archived 473、report-used-by-main 661、report-used-by-later-sub 7、report-unreferenced 7、written-overwritten 26、cut-by-usage-limit 36、cut-by-api-error 2、stopped-salvaged 58、stopped-abandoned 15
+   返工字样（agent-cost 现词表）353 个，占个数 15.6%，占花费 14.1%
+   返工字样（调度记录第一批写的五个词）156 个，占个数 6.9%，占花费 5.4%
+   没交回 111 个：API 错 2、停掉 73、用量撞顶 36
+== 首条记录不晚于 unix 秒 1792672000：2273 个子 agent，折算合计 7677.16 百万
+   写了东西、不低于 70% 的行进了提交或工作树	897	50.6%
+   写了东西、30% 到 70%	90	4.0%
+   三方腿	473	27.3%
+   只交报告、交回后主 agent 有动作点到	662	15.2%
+   看起来没效果的几桶	91	2.0%
+   其余	60	0.9%
+   桶：written-landed 897、written-partial 90、verdict-archived 473、report-used-by-main 662、report-used-by-later-sub 7、report-unreferenced 7、written-overwritten 26、cut-by-usage-limit 36、cut-by-api-error 2、stopped-salvaged 58、stopped-abandoned 15
+   返工字样（agent-cost 现词表）353 个，占个数 15.5%，占花费 14.1%
+   返工字样（调度记录第一批写的五个词）156 个，占个数 6.9%，占花费 5.4%
+   没交回 111 个：API 错 2、停掉 73、用量撞顶 36
+== 首条记录不晚于 unix 秒 1792675882：2285 个子 agent，折算合计 7717.60 百万
+   写了东西、不低于 70% 的行进了提交或工作树	899	50.4%
+   写了东西、30% 到 70%	91	4.1%
+   三方腿	474	27.2%
+   只交报告、交回后主 agent 有动作点到	667	15.2%
+   看起来没效果的几桶	92	2.0%
+   其余	62	1.1%
+   桶：written-landed 899、written-partial 91、verdict-archived 474、report-used-by-main 667、report-used-by-later-sub 7、report-unreferenced 7、written-overwritten 27、cut-by-usage-limit 36、cut-by-api-error 2、stopped-salvaged 58、stopped-abandoned 15、in-flight 2
+   返工字样（agent-cost 现词表）354 个，占个数 15.5%，占花费 14.1%
+   返工字样（调度记录第一批写的五个词）157 个，占个数 6.9%，占花费 5.5%
+   没交回 113 个：API 错 2、停掉 73、用量撞顶 36、还在跑 2

@@ -1,0 +1,5 @@
+running 1 test
+name=truncation_intent_into_unit_zero units=3 rewritten=14 records=1 released=13 roles=datax1,extent_lowerx1,t*x11,tlo*x1
+name=unlink_intent_appends_a_tombstone units=3 rewritten=13 records=1 released=10 roles=t*x10,td*x1,tt*x2
+test print_the_cost_of_the_truncation_intent_against_the_unlink_intent_which_appends_a_tombstone ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 25.41s

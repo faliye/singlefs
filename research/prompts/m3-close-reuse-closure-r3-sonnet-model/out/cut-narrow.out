@@ -1,0 +1,4 @@
+name=cut_narrow kinds=import entry=check_proof units=1290 memory_peaks_lib_import_subprocess=0 lib_long_run_units=6 lib_long_run_imports=5
+name=cut_narrow kinds=import entry=Runner.escalate_step units=514 memory_peaks_lib_import_subprocess=0 lib_long_run_units=6 lib_long_run_imports=5
+name=cut_narrow kinds=import-assign entry=check_proof units=1332 memory_peaks_lib_import_subprocess=0 lib_long_run_units=41 lib_long_run_imports=5
+name=cut_narrow kinds=import-assign entry=Runner.escalate_step units=604 memory_peaks_lib_import_subprocess=0 lib_long_run_units=41 lib_long_run_imports=5

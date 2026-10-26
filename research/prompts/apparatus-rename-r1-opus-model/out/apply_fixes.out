@@ -1,0 +1,4 @@
+name=apply_fix file=.claude/gate.d/lib-lag-baseline.py
+name=apply_fix file=.claude/hooks/lib_long_run.py
+name=apply_fix file=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_o3.py
+name=apply_fix file=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py

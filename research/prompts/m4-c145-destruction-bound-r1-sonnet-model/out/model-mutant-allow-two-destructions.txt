@@ -1,0 +1,6 @@
+mutant=allow-two-destructions depth=8 states=10638 flagged_head_next_states=5952 entries_in_such_states=4157 batches_checked=11791
+pending_set_differs=0 release_set_differs=0 judge_reds=105 cross_version_new_entry_reaches_lo=19 (transitions_checked=12288, child_version_single_version_judge_green=19)
+  judge_reds [[["C"], ["C"], ["I", 1], ["I", 0], ["F", 0], ["W", 1]], [["逆向", [2, 1, 1]]]]
+  judge_reds [[["W", 1], ["C"], ["C"], ["I", 1], ["I", 0], ["F", 0], ["W", 2]], [["逆向", [3, 2, 2]]]]
+  delta_reds [[["C"], ["C"], ["I", 1], ["I", 0], ["F", 1], ["W", 1]], [2, 1, 1]]
+  delta_reds [[["W", 1], ["C"], ["C"], ["I", 1], ["I", 0], ["F", 1], ["W", 2]], [3, 2, 2]]

@@ -1,9 +1,0 @@
-# baseline	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=0 failed=0 changed=false	reads=1070	walk=764
-337	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=0 failed=0 changed=false	fired=2	all_inside_walk=true	read=Some((337, true, 1, 0, 4096))
-338	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=0 failed=0 changed=false	fired=2	all_inside_walk=true	read=Some((338, true, 1, 4096, 4096))
-339	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=19 failed=0 changed=true	fired=2	all_inside_walk=true	read=Some((339, true, 0, 0, 4096))
-340	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=19 failed=0 changed=true	fired=2	all_inside_walk=true	read=Some((340, true, 0, 4096, 4096))
-341	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=19 failed=0 changed=true	fired=2	all_inside_walk=true	read=Some((341, true, 1, 0, 4096))
-342	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=0 failed=0 changed=false	fired=2	all_inside_walk=true	read=Some((342, true, 1, 4096, 4096))
-343	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=19 failed=0 changed=true	fired=2	all_inside_walk=true	read=Some((343, true, 0, 0, 4096))
-344	Publish cause=NextContainerNumberPastTheTopOfItsRange c841=true persisted=19 failed=0 changed=true	fired=2	all_inside_walk=true	read=Some((344, true, 0, 4096, 4096))

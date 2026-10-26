@@ -1,0 +1,69 @@
+name=fit index=0 form=shared wait=blocking gap=0 fixed_ms=0.193968 per_mebibyte_ms=0.061909 maximum_relative_residual=0.217393 fit_not_linear=true
+name=fit index=0 form=shared wait=blocking gap=50 fixed_ms=0.369545 per_mebibyte_ms=0.061993 maximum_relative_residual=0.489041 fit_not_linear=true
+name=fit index=0 form=shared wait=sleep_100_microseconds gap=0 fixed_ms=0.226304 per_mebibyte_ms=0.056607 maximum_relative_residual=0.570083 fit_not_linear=true
+name=fit index=0 form=shared wait=sleep_100_microseconds gap=50 fixed_ms=0.395357 per_mebibyte_ms=0.059690 maximum_relative_residual=0.141281 fit_not_linear=false
+name=fit index=0 form=shared wait=sleep_1_millisecond gap=0 fixed_ms=0.179838 per_mebibyte_ms=0.064026 maximum_relative_residual=0.689029 fit_not_linear=true
+name=fit index=0 form=shared wait=sleep_1_millisecond gap=50 fixed_ms=0.307083 per_mebibyte_ms=0.076497 maximum_relative_residual=0.118389 fit_not_linear=false
+name=fit index=0 form=split wait=blocking gap=0 fixed_ms=0.157242 per_mebibyte_ms=0.118703 maximum_relative_residual=0.380355 fit_not_linear=true
+name=fit index=0 form=split wait=sleep_100_microseconds gap=0 fixed_ms=0.182489 per_mebibyte_ms=0.114715 maximum_relative_residual=0.252071 fit_not_linear=true
+name=fit index=0 form=split wait=sleep_1_millisecond gap=0 fixed_ms=0.099305 per_mebibyte_ms=0.120569 maximum_relative_residual=0.990022 fit_not_linear=true
+name=fit index=1 form=shared wait=blocking gap=0 fixed_ms=0.056578 per_mebibyte_ms=0.487637 maximum_relative_residual=0.218780 fit_not_linear=true
+name=fit index=1 form=shared wait=blocking gap=50 fixed_ms=0.106233 per_mebibyte_ms=1.463544 maximum_relative_residual=0.449607 fit_not_linear=true
+name=fit index=1 form=shared wait=sleep_100_microseconds gap=0 fixed_ms=0.066975 per_mebibyte_ms=0.487991 maximum_relative_residual=0.095107 fit_not_linear=false
+name=fit index=1 form=shared wait=sleep_100_microseconds gap=50 fixed_ms=0.218017 per_mebibyte_ms=1.461432 maximum_relative_residual=0.055185 fit_not_linear=false
+name=fit index=1 form=shared wait=sleep_1_millisecond gap=0 fixed_ms=0.046974 per_mebibyte_ms=0.490537 maximum_relative_residual=0.066904 fit_not_linear=false
+name=fit index=1 form=shared wait=sleep_1_millisecond gap=50 fixed_ms=0.164840 per_mebibyte_ms=1.459890 maximum_relative_residual=0.070459 fit_not_linear=false
+name=fit index=1 form=split wait=blocking gap=0 fixed_ms=0.039440 per_mebibyte_ms=0.975133 maximum_relative_residual=0.044922 fit_not_linear=false
+name=fit index=1 form=split wait=sleep_100_microseconds gap=0 fixed_ms=0.094627 per_mebibyte_ms=0.974610 maximum_relative_residual=0.180543 fit_not_linear=false
+name=fit index=1 form=split wait=sleep_1_millisecond gap=0 fixed_ms=0.037045 per_mebibyte_ms=0.976690 maximum_relative_residual=0.047351 fit_not_linear=false
+name=c_with_the_inputs_of_scan_and_choice key=0,1024,losing,losing cells=6
+name=c_with_the_inputs_of_scan_and_choice key=0,1024,not_losing,not_losing cells=31
+name=c_with_the_inputs_of_scan_and_choice key=0,1024,not_losing,unstable cells=2
+name=c_with_the_inputs_of_scan_and_choice key=0,1024,unstable,unstable cells=69
+name=c_with_the_inputs_of_scan_and_choice key=0,8192,not_losing,not_losing cells=94
+name=c_with_the_inputs_of_scan_and_choice key=0,8192,not_losing,unstable cells=5
+name=c_with_the_inputs_of_scan_and_choice key=0,8192,unstable,unstable cells=9
+name=c_with_the_inputs_of_scan_and_choice key=1,1024,losing,losing cells=60
+name=c_with_the_inputs_of_scan_and_choice key=1,1024,not_losing,not_losing cells=9
+name=c_with_the_inputs_of_scan_and_choice key=1,1024,not_losing,unstable cells=9
+name=c_with_the_inputs_of_scan_and_choice key=1,1024,unstable,losing cells=14
+name=c_with_the_inputs_of_scan_and_choice key=1,1024,unstable,unstable cells=16
+name=c_with_the_inputs_of_scan_and_choice key=1,8192,losing,losing cells=25
+name=c_with_the_inputs_of_scan_and_choice key=1,8192,not_losing,losing cells=34
+name=c_with_the_inputs_of_scan_and_choice key=1,8192,not_losing,not_losing cells=19
+name=c_with_the_inputs_of_scan_and_choice key=1,8192,not_losing,unstable cells=14
+name=c_with_the_inputs_of_scan_and_choice key=1,8192,unstable,losing cells=16
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,0,1024,0.005 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,0,1024,0.0077 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,0,8192,0.0323 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,0,8192,0.0326 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,0,8192,0.0339 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,1024,0.0311 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,1024,0.0318 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,1024,0.0319 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,1024,0.0333 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,1024,0.0334 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,1024,0.0668 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2395 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2396 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2409 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.254 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2542 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2555 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2667 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2669 cells=4
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.2683 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.4786 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.4789 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.4796 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.4949 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.4952 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.496 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.5076 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.5079 cells=4
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.5087 cells=4
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.533 cells=2
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.5333 cells=4
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.5341 cells=4
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.7623 cells=1
+name=c_with_the_inputs_of_scan_and_choice key=flipped_extra_ms,1,8192,0.8004 cells=2

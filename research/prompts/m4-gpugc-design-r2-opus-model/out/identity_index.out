@@ -1,0 +1,14 @@
+name=c_not_losing_at_every_knob fraction=0.75 pool_data_units=8192 batch_units=16 card=0
+name=c_not_losing_at_every_knob fraction=0.75 pool_data_units=8192 batch_units=4 card=0
+name=c_not_losing_at_every_knob fraction=0.75 pool_data_units=8192 batch_units=8 card=0
+name=identity_index_pushed card=0 pool_data_units=8192 judgement_as_measured=not_losing judgement_with_the_scan_increment_of_1024=losing cells=3
+name=identity_index_pushed card=0 pool_data_units=8192 judgement_as_measured=not_losing judgement_with_the_scan_increment_of_1024=not_losing cells=37
+name=identity_index_pushed card=0 pool_data_units=8192 judgement_as_measured=not_losing judgement_with_the_scan_increment_of_1024=unstable cells=59
+name=identity_index_pushed card=0 pool_data_units=8192 judgement_as_measured=unstable judgement_with_the_scan_increment_of_1024=losing cells=3
+name=identity_index_pushed card=0 pool_data_units=8192 judgement_as_measured=unstable judgement_with_the_scan_increment_of_1024=unstable cells=6
+name=identity_index_pushed card=1 pool_data_units=8192 judgement_as_measured=losing judgement_with_the_scan_increment_of_1024=losing cells=25
+name=identity_index_pushed card=1 pool_data_units=8192 judgement_as_measured=not_losing judgement_with_the_scan_increment_of_1024=losing cells=18
+name=identity_index_pushed card=1 pool_data_units=8192 judgement_as_measured=not_losing judgement_with_the_scan_increment_of_1024=not_losing cells=18
+name=identity_index_pushed card=1 pool_data_units=8192 judgement_as_measured=not_losing judgement_with_the_scan_increment_of_1024=unstable cells=31
+name=identity_index_pushed card=1 pool_data_units=8192 judgement_as_measured=unstable judgement_with_the_scan_increment_of_1024=losing cells=14
+name=identity_index_pushed card=1 pool_data_units=8192 judgement_as_measured=unstable judgement_with_the_scan_increment_of_1024=unstable cells=2

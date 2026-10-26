@@ -1,0 +1,8 @@
+shares=64 first=(0, 384) last=(24241, 24626) contiguous=True states_counted=24626
+count=16400 newest=(25, 1) t=14 p=255 F=0 next_slot=Some((14, 1)) record_same_instance=false record_any_instance=false today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]
+count=4104 newest=(26, 2) t=15 p=255 F=0 next_slot=Some((15, 1)) record_same_instance=false record_any_instance=false today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]
+count=4104 newest=(27, 2) t=16 p=255 F=0 next_slot=Some((16, 1)) record_same_instance=false record_any_instance=false today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]
+count=9 newest=(28, 2) t=17 p=255 F=0 next_slot=Some((17, 1)) record_same_instance=false record_any_instance=false today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]
+count=3 newest=(25, 1) t=14 p=255 F=0 next_slot=Some((14, 1)) record_same_instance=false record_any_instance=true today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]
+count=3 newest=(26, 2) t=15 p=255 F=0 next_slot=Some((15, 1)) record_same_instance=true record_any_instance=true today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]
+count=3 newest=(27, 2) t=16 p=255 F=0 next_slot=Some((16, 1)) record_same_instance=true record_any_instance=true today=holds ding_r2_same_instance=holds ding_r2_any_instance=holds today_red=[]

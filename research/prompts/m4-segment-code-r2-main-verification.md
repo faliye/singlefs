@@ -4,6 +4,8 @@
 
 被判的产品代码与第一轮同一组 20 份（冻结副本 `~/.local/share/singlefs/work/m4-segment-code-r2/repo/`，sha256 在 `m4-segment-code-r2-snapshot/crates-sha256.txt` 21 行），这一轮改过的是 `crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/mounted_session.rs`、`crates/singlefs-core/src/compaction_plan.rs`、`crates/singlefs-reference-filesystem/src/lib.rs`。正文 `research/prompts/_m4-segment-code-r2-body.md`，背景材料 `_m4-segment-code-r2-background.md`，复核的判决 `research/prompts/m4-segment-code-r1-main-verification.md`。
 
+开工快照：`research/prompts/m4-segment-code-r2-snapshot/`
+
 ## 一、核查
 
 - 快照：两条腿各自在冻结副本根上 `sha256sum -c` 21 行全 OK（两份报告开头原样）。腿跑着的时候主 agent 只往工作树打了测试代码与 checker 档的补丁（修复批二丁、丙二），被判的 20 份产品代码文件没动。

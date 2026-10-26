@@ -1,0 +1,4 @@
+copy_identical_to_repo_file=True
+本仓那一份 --list-items	exit=0	
+没改过的拷贝（路径尾部相同）--list-items	exit=2	✗ 重型测试被拒：脚本 <scratch>/copy/scripts/experiment-apparatus/replay.sh:760 里的 scripts/experiment-apparatus/replay.sh ${@:2} E1（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-
+没改过的拷贝 cd 进去相对路径 --list-items	exit=2	✗ 重型测试被拒：脚本 <scratch>/copy/scripts/experiment-apparatus/replay.sh:760 里的 scripts/experiment-apparatus/replay.sh ${@:2} E1（实验复跑：每个实验起装置或驱动；只有仓内那一份摘掉 --force 之后恰好一个 --list-

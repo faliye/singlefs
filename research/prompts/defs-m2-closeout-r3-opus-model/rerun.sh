@@ -12,7 +12,7 @@ scratch="${1:-${TMPDIR:-/tmp}}"
 export TMPDIR="$scratch"
 status=0
 copy="$(mktemp -d "$scratch/probe-copy.XXXXXX")"
-( cd "$root" && rsync -a --exclude target scripts/experiments/Cargo.toml scripts/experiments/Cargo.lock scripts/experiments "$copy/" )
+( cd "$root" && rsync -a --exclude target scripts/experiment-apparatus/Cargo.toml scripts/experiment-apparatus/Cargo.lock scripts/experiment-apparatus "$copy/" )
 cd "$root" || exit 2
 echo "== probe cases-k1.json"
 PROBE_COPY_ROOT="$copy" nice -n 19 python3 "$here/probe.py" "$here/cases-k1.json" | sed "s#$copy#@COPY@#g" || status=1
@@ -29,7 +29,7 @@ echo "== cap-syntax-fix.py（改法，只在副本上）"
 fix="$(mktemp -d "$scratch/fixdemo.XXXXXX")"
 mkdir -p "$fix/.claude/gate.d" "$fix/research" "$fix/crates/singlefs-harness"
 ln -s "$root/scripts" "$fix/scripts"
-printf '[workspace]\nmembers = []\n' > "$fix/scripts/experiments/Cargo.toml"
+printf '[workspace]\nmembers = []\n' > "$fix/scripts/experiment-apparatus/Cargo.toml"
 printf '[workspace]\nmembers = []\n' > "$fix/Cargo.toml"
 python3 "$here/cap-syntax-fix.py" "$root/.claude/gate.d/15-research-build.sh" "$fix/.claude/gate.d/15-research-build.sh" || status=1
 python3 "$here/cap-syntax-fix.py" "$root/.claude/gate.d/74-model-differential.sh" "$fix/.claude/gate.d/74-model-differential.sh" || status=1

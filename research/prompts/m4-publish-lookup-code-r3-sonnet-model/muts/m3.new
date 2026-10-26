@@ -1,0 +1,4 @@
+                match {
+                    let (_, linear_key) = previous.mapped_units.iter().find(|(mapped, _)| *mapped == identity).expect("x");
+                    central_mapping_locations_in_the_version(previous, linear_key)
+                } {

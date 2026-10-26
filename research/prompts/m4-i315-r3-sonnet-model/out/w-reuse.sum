@@ -1,0 +1,20 @@
+points 17
+TALLY today     name={'-': 5, 'L': 16, 'N': 1} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS today    name={'-': 5, 'L': 11, 'LN': 1} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY exempt    name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS exempt   name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY gen       name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS gen      name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY genplus   name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS genplus  name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY cmp       name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS cmp      name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY both      name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS both     name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY bothplus  name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS bothplus name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY jrn       name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS jrn      name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+TALLY jrngen    name={'-': 5, 'L': 17} j2n={'-': 5, 'L': 17} j2s={'-': 5, 'L': 17} j2t={'-': 5, 'L': 17}
+POINTS jrngen   name={'-': 5, 'L': 12} j2n={'-': 5, 'L': 12} j2s={'-': 5, 'L': 12} j2t={'-': 5, 'L': 12}
+DIFF 8128 0 dev0:slot50184:len32768 reused=true today:LN/L/L/L exempt:L/L/L/L gen:L/L/L/L genplus:L/L/L/L cmp:L/L/L/L both:L/L/L/L bothplus:L/L/L/L jrn:L/L/L/L jrngen:L/L/L/L

@@ -1,1 +1,0 @@
-bash scripts/hosts/capped.sh 31 bash scripts/hosts/run-with-memory-cap.sh 8G SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-harness --test model_differential 里上一趟红的用例; 范围=2 个测试; 为什么=只重跑 fake_run_1.log 里红的这 2 条用例，修完看它们转绿，不整份重跑' cargo test -p singlefs-harness --test model_differential -- --include-ignored --exact beta_case gamma::delta_case

@@ -1,0 +1,26 @@
+b3a50d50441f9f2e74bec6c941b74e632529688a78563995387708230b60c470  crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+3b81509b74d72a6f0e4b764aa9027d7d301033186b5a7f96f51472821dffeac2  crates/singlefs-core/src/transaction.rs
+d31503616b7c6fec47b189b4c424ebc039621078510af299c3d4cf121fa177c8  crates/singlefs-core/src/mounted_session.rs
+dc08c9651ca685146d7ff1ba283688b213df80e48536896e487415acb776e095  crates/singlefs-core/src/region_scan.rs
+deebf3402feb78bcbe7b66a5888b9bc668ff9cbed9900a2372bcbfbab29f5624  crates/singlefs-core/src/compaction_plan.rs
+66e7551ae17cc2b17f20c73fa0ca9f2093f67d6dd1a78fd6b0cfe60012f37c0a  crates/singlefs-core/src/unit.rs
+6f6e6dc5374d98aa45c7e3d904c1e429320b6d1635fe44fd26f4e7adbff24c2d  crates/singlefs-core/src/checksum.rs
+cd89c987ebf85f73b5583408cfac683b9d9d32a6ec3015d57b2805eb1dfdf43a  crates/singlefs-core/src/block_device.rs
+d35631c788137d7b5adc4463e636de2a9724d02e190599333462c02d1a1a5018  Cargo.lock
+HEAD 36e471cd5de9e926e67d0b2a123fcbf1f34e8f48（scripts/hosts/multi-host-run.sh --peer 拷树之后 git init 提交的那一次；树拷自主工作区）
+git diff --cached --stat -- crates/singlefs-core/src | tail -1：
+singlefs-core v0.1.0 (〔第二台的目录〕/runs/e185-r1-2026-10-22/crates/singlefs-core)
+└── singlefs-core feature "default"
+    ├── singlefs-checker-tier v0.1.0 (〔第二台的目录〕/runs/e185-r1-2026-10-22/crates/singlefs-checker-tier)
+    │   ├── singlefs-checker-tier feature "default" (command-line)
+    │   └── singlefs-checker-tier feature "verdict-store"
+    │       └── singlefs-checker-tier feature "default" (command-line)
+    └── singlefs-harness v0.1.0 (〔第二台的目录〕/runs/e185-r1-2026-10-22/crates/singlefs-harness)
+        └── singlefs-harness feature "default"
+            └── singlefs-checker-tier v0.1.0 (〔第二台的目录〕/runs/e185-r1-2026-10-22/crates/singlefs-checker-tier) (*)
+镜像目录所在盘（lsblk -s，NAME MODEL LOG-SEC）：
+ubuntu--vg-ubuntu--lv                    512
+└─nvme0n1p3                              512
+  └─nvme0n1           CT2000T500SSD8     512
+nproc 32
+上限：外层 multi-host-run.sh --memory-cap 46G；E185_MEMORY_CAP=40G

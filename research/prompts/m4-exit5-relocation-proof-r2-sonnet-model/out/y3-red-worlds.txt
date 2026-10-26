@@ -1,0 +1,7 @@
+s1：目的地与受保护落点比重叠时漏判	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/relocation_judgement.rs:63:13
+s1：两两不重叠只比相邻一项之外的	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/relocation_judgement.rs:88:28
+s1：源槽判定漏掉第二份副本	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/relocation_judgement.rs:149:9
+s1：字节可用判成长度大于等于 0	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/relocation_judgement.rs:159:9
+m4：contains_slot 不引类型不变量	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/logged_operations.rs:142:57
+m4：region_is_empty 把已释放的也算占着	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/compaction_plan.rs:959:9
+m4：构造函数漏掉 6 字节上限	rc=101	verification results:: 12 verified, 1 errors	落点=crates/singlefs-core/src/logged_operations.rs:117:12

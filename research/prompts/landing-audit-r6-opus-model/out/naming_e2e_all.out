@@ -1,0 +1,808 @@
+a7c5ca4c189a545a5 experiment-runner 2026-09-20 v10=0 now=0 ｜ 
+aef3dbd8f2e2ca023 experiment-runner 2026-09-21 v10=0 now=0 ｜ 
+a2dbea8b4164589e9 implementation-writer 2026-09-21 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ac492768dd41f302e implementation-writer 2026-09-21 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+aff90ef7cb7dec519 implementation-writer 2026-09-21 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a35fba9ed80b7acbf implementation-writer 2026-09-21 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+aedfc2fa082a7668c implementation-writer 2026-09-21 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a29ce3f94faf84104 experiment-runner 2026-09-22 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ab17bb34fbcf52fbf implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+afca1ea8ebb90726f experiment-runner 2026-09-22 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a107cbecd9ab7c3bd implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ab4fd0f450ab0938c implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+aa7f3bc62a9ec0e49 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a0e826689657f0259 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a26f49df6547b4e24 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a27e6086f52091c32 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ae3b311ad2772cc56 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a839428158e3d410e implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a25a55d38c8b73216 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ae5c406135db42152 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a445acd57f7181a28 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a69e96e693f70b731 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a6c40828577f9ae82 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a91a7bbb77fca5cdb implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a9ec28f0188209300 experiment-runner 2026-09-22 v10=0 now=0 ｜ 
+a3a7b4d4038f3eab3 implementation-writer 2026-09-22 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a90048f64be930b03 implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a4eb029ac4a687677 implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ae331440bf7c83a98 implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a86789aa5a547939b implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ad3da3c6728c7611a implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+adc7ceca482b55e2f implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ae2789303a9e76747 implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+afdd5fac2ea6d46c0 implementation-writer 2026-09-23 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+abb91233a39bfb538 experiment-runner 2026-09-23 v10=0 now=0 ｜ 
+a2871990a1fd54c60 experiment-runner 2026-09-23 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a656f030a4a2fabb2 experiment-runner 2026-09-23 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a843e0051ad85541d implementation-writer 2026-09-23 v10=0 now=0 ｜ 
+a1599fb8cfeab4130 implementation-writer 2026-09-23 v10=0 now=0 ｜ 
+a6660031b4890a181 implementation-writer 2026-09-23 v10=0 now=0 ｜ 
+a08a70b08f4658ef3 implementation-writer 2026-09-23 v10=0 now=0 ｜ 
+a958ca3edc57e1db3 implementation-writer 2026-09-23 v10=0 now=0 ｜ 
+add4988ea74815aeb implementation-writer 2026-09-23 v10=0 now=0 ｜ 
+ad67bef3ddf10ded6 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a2346578aff8a874c implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+ad8f30e7660714e3d implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a5d9e95789054aa43 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+adc20bcca8074e007 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+ab19434984a3ab054 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+ae24d1c30c82db5ab implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+ad96b0bec8c0f7e4d implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+abaa2548753bdfa58 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a5b0f95f52ba3e3e8 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a2dcad8f62dd2f23d implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a23189a2cd6a853cf implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+aa60725ee24e38e38 experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+a5ca6b782242d2592 experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+a462a87f9164e8e15 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+ab85369a718bfa7f4 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+af5fa9da80f85640b implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+aba2dbc6a415a0a3f implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+ac2e2fd6c5ec669d5 experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+a930954f6f38fd80c experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+acafe21a11c13f37b experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ad50f170e05560bed implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+aa118372e4578f23f implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a7e9452a02b490de4 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a981ddfa381112716 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+aa5f8a536cc664e40 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a14a47b7c57f63355 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a094dfbddfd25e9b6 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aa8e057a2df121d5d implementation-writer 2026-09-24 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ae4a363385b549748 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+abf0472d7eb5ba804 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a3296b5411b75212a experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+a52c8517ad13b10e6 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+aa4e717ba6d338a9e implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a6a2f0b8f04842509 experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+a5581b714555508b4 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a9ff42bfb2d6aa028 experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ac075a6843314ec2d experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+abd3a891f9ab30443 experiment-runner 2026-09-24 v10=0 now=0 ｜ 
+a0197eed96128d40f experiment-runner 2026-09-24 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+af58ad384d32fef7c implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+aad0c6faacbcc0308 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+accff537782f07239 implementation-writer 2026-09-24 v10=0 now=0 ｜ 
+a8e0abaed98417b75 implementation-writer 2026-09-24 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a210cbecf8992a4a4 implementation-writer 2026-09-24 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a9bd83b0f38d5591e experiment-runner 2026-09-25 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ae7cd35af76d46790 experiment-runner 2026-09-25 v10=0 now=0 ｜ 
+a4b42524e3544d233 experiment-runner 2026-09-25 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a577363d87c02d00c implementation-writer 2026-09-25 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a0300f4bd524ccf5d experiment-runner 2026-09-25 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aef629c7fc0bfd9a4 experiment-runner 2026-09-25 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a6346263f57cf31f9 experiment-runner 2026-09-25 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+abdefc530e3391da1 implementation-writer 2026-09-25 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ac3a68b737fd2bf64 experiment-runner 2026-09-25 v10=0 now=0 ｜ 
+a1af88b45918c5a4b implementation-writer 2026-09-25 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a4bd4054d8a39ab08 experiment-runner 2026-09-25 v10=0 now=0 ｜ 
+a7894374052f571d8 experiment-runner 2026-09-25 v10=0 now=0 ｜ 
+aca2d86743a58f0b2 experiment-runner 2026-09-25 v10=0 now=0 ｜ 
+a7470199175d1c8fa implementation-writer 2026-09-25 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+af96ae5683902ec27 implementation-writer 2026-09-25 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ab7a9784c3cca2bdd experiment-runner 2026-09-25 v10=0 now=0 ｜ 
+af0bde0d96d46ccea implementation-writer 2026-09-25 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a979a78ea3c9f962b implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+abcf1812681e62e9f implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a1c50362864dacfce implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a725f23ef212d9eee implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a83829eaeeb62ed74 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a710b10cf8d3e4f74 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a2d372380208adf92 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+afc516b06fcb4e911 experiment-runner 2026-09-26 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aba6e70e0d1092764 experiment-runner 2026-09-26 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a46fe49ed1aff9610 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a314d0dde97be0079 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a27d008e9a73e8097 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a5abc879265e9bc2a implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a3eeef7a299c8def9 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a98a21ff4fc458f62 experiment-runner 2026-09-26 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a7a573e910df2edb7 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+add5214c6009b12dc implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ac471b9c64e3fea6e implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a58f49321a00ee652 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a40b90366e5146c17 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ab61aa6e27df6c689 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ab2d6b24dc4ea7e31 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a3fa8c8d987e10516 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+af4a02de8e51e77d4 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ac18d80b64a0cfdc8 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a629604300b4d4b7c implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a36aef9c951119845 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a86b839e2f4d04949 implementation-writer 2026-09-26 v10=0 now=0 ｜ 
+ad01f8f7765692ca1 implementation-writer 2026-09-26 v10=0 now=0 ｜ 
+a215f6dc2b9208e4c implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a6392f7fae2c5ea64 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a6f5bf00944853ba7 implementation-writer 2026-09-26 v10=0 now=0 ｜ 
+ab37fa8b1a0713841 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a1d8e230997498f22 implementation-writer 2026-09-26 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a5ba4e5f874825019 experiment-runner 2026-09-26 v10=0 now=0 ｜ 
+aeebbbe697ecd1d67 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a7d9ce77912780007 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a3ba4061d2495fa33 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+aa7a1c726e959ad2e implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a94cdc5acc957f167 experiment-runner 2026-09-27 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a4a624e63c8178d86 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+af7bdf77d13b4b7c9 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+ac54db07581f82394 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+aecb5173327fdfd28 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+af0147c3fa322811b implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+aa207259ffad74062 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+af805ce86caa9a735 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a2c64d0cc98d5eca1 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+af781d5588c485ea7 experiment-runner 2026-09-27 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a44db5e51b18954f4 experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+a22c4427b30f12db8 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a00e2463db4c8443a implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a3835b5d8ad8470be experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+a6a15907211773656 experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+aeeb7366bac16b911 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+aa2aa805b29c0d2bc implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a3a3cf51e77900c95 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a576d60351497d0a7 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a7e27b699f0984900 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a729f8f0f4a412d88 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a20abcb2070cb470c implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a5c27011470230753 implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a0377481cb4ea1def implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a2e9023bad52c02e8 experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+a5554c241c40b2ffc implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a31f1d8f8a24d04ca implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+aaec56bf03a66a641 experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+aad8f3fcaa7101149 experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+a042fc2aac79f8ff3 experiment-runner 2026-09-27 v10=0 now=0 ｜ 
+a760a9a2b22494b2d implementation-writer 2026-09-27 v10=0 now=0 ｜ 
+a9e766feed04a0753 implementation-writer 2026-09-27 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a170866e2ed08f5e7 tooling-writer 2026-09-27 v10=0 now=0 ｜ 
+af60ebeb74e52fd9a tooling-writer 2026-09-28 v10=0 now=0 ｜ 
+aebce25cfba13d27b tooling-writer 2026-09-28 v10=0 now=0 ｜ 
+a340f52c038dac352 tooling-writer 2026-09-28 v10=0 now=0 ｜ 
+aed39770c1a1e94c4 tooling-writer 2026-09-28 v10=0 now=0 ｜ 
+a81590cf997452bbb experiment-runner 2026-09-28 v10=0 now=0 ｜ 
+a8519aab2a61cba49 implementation-writer 2026-09-28 v10=0 now=0 ｜ 
+af26cfe9872a8e042 experiment-runner 2026-09-28 v10=0 now=0 ｜ 
+a5513b9515f938646 implementation-writer 2026-09-28 v10=0 now=0 ｜ 
+a5466812de4f2b1c3 experiment-runner 2026-09-28 v10=0 now=0 ｜ 
+a34ff58e8000d79e4 experiment-runner 2026-09-28 v10=0 now=0 ｜ 
+af495943b7889e37d implementation-writer 2026-09-28 v10=0 now=0 ｜ 
+a0d57879b53ce06da tooling-writer 2026-09-28 v10=0 now=0 ｜ 
+a660d6ee8266f0253 experiment-runner 2026-09-28 v10=0 now=0 ｜ 
+a5c6102d673f2f3aa experiment-runner 2026-09-28 v10=0 now=0 ｜ 
+ac3bf7a6a790481bc implementation-writer 2026-09-28 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a87da3bcbc41e1fd4 implementation-writer 2026-09-30 v10=0 now=0 ｜ 
+ad8cfed22d40dd878 experiment-runner 2026-09-30 v10=0 now=0 ｜ 
+a7beef9748fd6fa41 implementation-writer 2026-09-30 v10=0 now=0 ｜ 
+a53e4f3b58245648f implementation-writer 2026-09-30 v10=0 now=0 ｜ 
+abde8c16c33a5fb9f tooling-writer 2026-09-30 v10=0 now=0 ｜ 
+ab32c8dab786bab51 implementation-writer 2026-09-30 v10=0 now=0 ｜ 
+a8d66b37a19b705fc implementation-writer 2026-09-30 v10=0 now=0 ｜ 
+ae7979a1240460150 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a28ad02ef1bfdedfa tooling-writer 2026-10-01 v10=0 now=0 ｜ 
+ab64789dbbf4160d3 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a21188fcd512ca703 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a4079013d25c28f49 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+ae980288702478081 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a8ab5219d455cbcdb experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+acd63b31aefa274d6 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a91d6c9200e1b1a1e experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a38227d8a268f8615 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a7872f9724c796d92 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a72bd4b6f4788b12a tooling-writer 2026-10-01 v10=0 now=0 ｜ 
+a45e56f738f273838 tooling-writer 2026-10-01 v10=0 now=0 ｜ 
+a34fa75ac1dba4c6f implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a1060da4c8df87a3c implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+aaccaa18703c3e4da implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a8fb0fbfa0393f0e8 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a7b31e4faa0ef5ad2 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a05174cc50e6886c3 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a1ded4eb8f47e0707 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+aca0f3516a6c4e4df implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+afca530b3e5a08c44 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a192a44cb46096acd tooling-writer 2026-10-01 v10=0 now=0 ｜ 
+a2c3f892cb14e53dd tooling-writer 2026-10-01 v10=0 now=0 ｜ 
+ac9b1df1ecc230e84 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+ac68273daf5fafdcb implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a625fd74e640b6739 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+aa6e8bd2ab3f0dd36 implementation-writer 2026-10-01 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a8b8d01fe0617d511 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+ad93b75efb83709be tooling-writer 2026-10-01 v10=0 now=0 ｜ 
+a3e48eff3432e10d3 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a7e6221907576a818 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a193efc2c02e1be13 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a9b245962a082a61f implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a69266ac48721d787 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a3d0f243bb5af3050 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+aab3cfb1989f01d33 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a46a37f4f1644e892 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+aaaa2f0ab89d7ab1f implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a65af6b802260c28d implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+aac7c2e7f8bb98dca implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+aed086da67b5c603f implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a3679b7f1739e22ab implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+adceb60795c78ca39 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a6c53cd89d5c74501 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a307597ba14614fb7 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a8e2e445c9695a1f7 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a7c96c58d5e1fd456 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a1b3a3c835cb8f262 experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a67acebd96b594799 implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+aae1aea526d4e6d3e implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+a7b26efc13cbbd95a implementation-writer 2026-10-01 v10=0 now=0 ｜ 
+acaad41d67c9cf88b implementation-writer 2026-10-01 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a5865ebacde9f04cc experiment-runner 2026-10-01 v10=0 now=0 ｜ 
+a227ddbc573169a6d implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a286863f70d88aa23 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a08fa53c77793d617 implementation-writer 2026-10-02 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ad109bcadf8a653ff implementation-writer 2026-10-02 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a21d1afe347bba78b implementation-writer 2026-10-02 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a298f99ef714e40ea implementation-writer 2026-10-02 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a3bd85b5a75468f2e implementation-writer 2026-10-02 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a6e3f31bfdd07871c implementation-writer 2026-10-02 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a5165856446a5effa experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+a598bd9e7a1d707e8 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+aee3d3aaa96c9d66d implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a98261b7844277881 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+ad5d45e7bb98dfb1a implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a0c513a39e6cfc903 experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+ac8efa20510d40b9e implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+aa771d298bceed019 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+ade045cf06b9210d9 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a790bb220191f68e3 experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+a5a31241c51de5457 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+abef2dedb5bffae15 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a74ef1e95195cbf12 tooling-writer 2026-10-02 v10=0 now=0 ｜ 
+ae29991860c72d01c implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a1da032edaf33a873 experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+afe9e65ae8860db6e experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+a36c9bee9a4f4c5f5 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+ab64e060795a18127 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a0f4bcfb72e3d97b0 experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+adbeb61a2375961d3 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+aced1e0e32624631a implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a5c908ec2ef973ce8 experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+ac19d983645d0fcd1 experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+ae93f190af8ca4a16 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+abeb9d0205883eff8 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+a6d14d1f82ae108e7 implementation-writer 2026-10-02 v10=0 now=0 ｜ 
+ac5a5f01136595ccb experiment-runner 2026-10-02 v10=0 now=0 ｜ 
+ae7b245dddf471985 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+ad8e67430daac6f83 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a8aa3a658ebe4200b implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a25f25c35843ae624 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ab2a1265790e381e4 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a585360253bc7b9da implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+adf5a5efff8072fde implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ab0fd521adc1201be implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a7e64c886d46dc19c implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+abb8876d5118fec82 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+abdeac99c415af4e6 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a0625209c252ef131 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a4f19276eab54ab74 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a78ce54dcc379fc86 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+afecc3db5458eab49 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a58c3f544bfb2beb6 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+abf83b7467fc3745e implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a197cb0850d4235a9 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a0bc642b1a40d5294 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a4486895be9577c08 implementation-writer 2026-10-03 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+aba3c3f5f5992c3c4 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ae8e6d4f6d741c7d4 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ae172d27de20e3fe2 implementation-writer 2026-10-03 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a6ff8c2cde15e7b02 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a07d369bad232a53b implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a5635150e0537db12 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+abbdab061d4bfc5d6 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+a13da859a513c2328 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a10315447b3a61b17 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a6dea38c8895ae507 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+aaca7dd0c1de77a3b implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a0c60c2e234a36753 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+adba0add91d78678f implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a6c03d786eb85b0ee implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ac4ca5ee1357437c5 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ad3128eb72ab3e33f implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ab6bbc25c46ae4407 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+abd1c703f4b361f41 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a33dbe7e56511bc54 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+aa5cef3f4ceed9a4f experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+ad283b01afd420b33 implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ae5fb8fc22b69b4e6 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+a8f1d32a9bf8406dc implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+a0f996b4b36e022c5 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+a7954321d4a7ed629 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+ac0b6f30d16125a44 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+ac1f11f9b8834825c implementation-writer 2026-10-03 v10=0 now=0 ｜ 
+ab4e649d995ff9556 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+a1a33aab6d4a4a807 experiment-runner 2026-10-03 v10=0 now=0 ｜ 
+a472e85c02850d6e1 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a5ba2e6d6a258358b implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a788e5c484e173075 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a9b0510cf8553c67b implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a128b544ab44fdc26 experiment-runner 2026-10-04 v10=0 now=0 ｜ 
+a725177780ea70995 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+ae7dd91d7de16f986 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a4807444e3ed76e09 experiment-runner 2026-10-04 v10=0 now=0 ｜ 
+a75cc9762bfebd747 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+af95f890fc61387f9 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+ac70a7e03ebeae6ca experiment-runner 2026-10-04 v10=0 now=0 ｜ 
+a19e8330b6af2affe implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a5cc119b3a3d644c7 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+abcad6d3a849adf28 implementation-writer 2026-10-04 v10=0 now=0 ｜ 
+a8c879db387ee1271 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+ab2e1f6e09c0fa73b implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a7aafc88204a0589d implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a6974da118f4ec1cc implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a058a19e002ebf539 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a885e51395e76d660 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a6ff1cf40dba646de implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a4a2809e8ff6c97f1 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a78e798dbfa493ea9 experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+ac74b65de0bea27ab experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+a1f3e1abe4755c125 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a7e75bece21ea4260 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a66412bbef54a81a8 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+ae784a60c08eb3ab6 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a0411171e877c8ee9 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a5b402317c9d616eb implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a718de587232182c7 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a6ceb6702d5a6044b implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a4733e9b5c83beb44 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a3eb19bdd6c1b7eae implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a94f7680edf66b970 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+aeeb57b5ae9a403df implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a55b384064ec4f65f experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+adc8aac243da33dbd implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a5ad08673569504e8 experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+aa28de7d8621013d7 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a5457966feabdcf7f implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a8389213801c37101 experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+a79dc0eba9d2a92f7 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a246ab2e088b986db implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+afb87dec55fe73379 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+afb510f2b2e2f6056 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+acf1b0e2665e26ce2 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+acb765da28f5ec7b6 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a309025bc6287cb10 experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+a88672cccdbd3429c experiment-runner 2026-10-05 v10=0 now=0 ｜ 
+a0835f4dbf7abc0dd implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a45557d23388738e3 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a13629be43dc58e4c implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a9a54c52ce39737a6 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a4d2de36b9b3ea23e implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a17a3f31b7684831b implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a2e0f6cfa8630f2d1 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a9e6ddf948566683f implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a1f886f4ee07cf7e1 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+aac1ed4b8a27e5450 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+aca4f248cd0de2ec4 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+a25ef7bd9a37dfdea implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+afd31789e1ac42de8 implementation-writer 2026-10-05 v10=0 now=0 ｜ 
+af9121d26f905dbf7 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+ae422392deddf8622 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a44153f1b1a2cc62c implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a606128ec6fe63a6a implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a7b87bbe5e34da4db implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+aa3efd3533117c888 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a4181627be1dccb6e implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a0ca347cd4c3a0436 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a57b2c847598b7c80 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+ab38ba2fca74ee130 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a29150ed4ed09ad54 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a2e289e69bdf5e3a5 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a394048817a99aff5 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a67ca812aa87f80c0 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a066b4017af8a9193 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+aad9c8fbc50aa7a31 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a662d575c02f78b76 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+ac950c8502e762221 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+af006c49937ea46bc implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a5e905a32a6acda3b implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a4b286a9c1a0dd484 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a36c8a59663da7b6a implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+ae0d7fb6d5623a7f9 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a914bd823aebccf35 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a42ab874fc2c669c6 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+a2c9005d824eff0b7 implementation-writer 2026-10-06 v10=0 now=0 ｜ 
+ae966ba53424b4a74 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a608b3592713fab5e implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a6ffb06451e7af92a implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a2947665df1443ef1 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a67204f6c429dfe32 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a3a6c60e12da2feba implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a42401fa4893c8568 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a8fcd33f0601a4010 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a760eb8faefdfc0e8 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a7cc53689ae094bde implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+ad0cc1c1e6f9caf6b implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a23e259cb6ebdd66a implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a9cb8dd41a1fb1fe4 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+aec1a120e7daa15e5 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a02185063d413cfc3 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+ab518c6c9143e8ecc implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a6010af8a0e7ac24c experiment-runner 2026-10-07 v10=0 now=0 ｜ 
+a719db15b405f1a18 implementation-writer 2026-10-07 v10=0 now=0 ｜ 
+a8b23d1b25665c7d1 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a89023cce2e6d4d04 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a8cc2603b9f44d8dc implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a0290c043b4303698 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a56c28b312df8026c implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a93ab8181f24e4006 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a1fb689272fd1e835 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+add5ceed665b2a027 experiment-runner 2026-10-08 v10=0 now=0 ｜ 
+a567559584b97c1f0 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+ab691c2744541fa36 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a9d4eaa35bc6295d6 experiment-runner 2026-10-08 v10=0 now=0 ｜ 
+a6a319e5aca7b665e experiment-runner 2026-10-08 v10=0 now=0 ｜ 
+a6bbe1ba76460b67f implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+aaf4b10d070375986 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a0d181763708580af experiment-runner 2026-10-08 v10=0 now=0 ｜ 
+abf98f94dbbebec80 experiment-runner 2026-10-08 v10=0 now=0 ｜ 
+ad8ad8a71786bcfd1 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+ab4660be04e89bbe9 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a61f73482d8f9923f implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a75f0b2d97c0d675e implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+a53fa10e1f6d4d093 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+ad4849d4eebc0fe69 implementation-writer 2026-10-08 v10=0 now=0 ｜ 
+abde6ad224cf389b8 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+afe439b8cf945000a implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+af7e1a16723e2eefb implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+aae870a43056eb2c7 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a03c82fc0b11d8930 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+ac4e13659f2bc7bd6 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a053289c889b86c00 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+aa7655e52cddfa305 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+acca663ea965c7a27 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a728efbba98fce1d2 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a069d4dc6155c4472 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+ae3ab60839be0e7ee implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a5febcd4f7471e722 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+add7b4010401d6c8f implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+ac047c602eea8d98f tooling-writer 2026-10-09 v10=0 now=0 ｜ 
+a87fe3ec278c31932 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a1a02effcc69f1d3f implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+ae1e4a21f0de5ced4 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a2e8539e934da4e44 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a5d6179fc5f0429f0 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+ad6f65b0fbd962dc0 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+aef0983f8c4e22f25 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a5f29435fed3422d4 implementation-writer 2026-10-09 v10=0 now=0 ｜ 
+a419de0c770b6930f implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+ad6ea00bde381c447 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a17693edf1b2c48ab tooling-writer 2026-10-10 v10=0 now=0 ｜ 
+a98a2d32a1b12a934 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a6c0e4034cc038e7e implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+ab3adb9777b9315b8 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+add2626f2d650bd20 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+ab603f3737b522ad8 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a593d230eb184d077 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+af8246804519720ba implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a32b4b94031eceeca implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+ac46de00dc1d4a621 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a61184c8b20cea6f2 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a4d1f5c32ac436fb3 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a1f66cb59fa348686 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a503343fce9661c88 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a947dcff24f4ed36f implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a5644651dfe1a6178 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a37e617ff18136f2a implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+adf76ee1a85ca6863 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+acbb6627ddc2a9312 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a92c9d78355441f54 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+aac5e496b1260951d implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a9e3f6375909431ce implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a13277d136d9794a7 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a85a9c9ff78df4e30 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+a80aad301bcb014f8 implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+ae8fce762e243665e implementation-writer 2026-10-10 v10=0 now=0 ｜ 
+afc1fdbe76b6665ca implementation-writer 2026-10-11 v10=0 now=0 ｜ 
+a786402b592ae08d6 implementation-writer 2026-10-11 v10=0 now=0 ｜ 
+af330696a6434663c implementation-writer 2026-10-11 v10=0 now=0 ｜ 
+acce860f09a31bcef implementation-writer 2026-10-11 v10=0 now=0 ｜ 
+a773c4c293bc59b9a implementation-writer 2026-10-11 v10=0 now=0 ｜ 
+abc2d8251b7e0a883 implementation-writer 2026-10-11 v10=0 now=0 ｜ 
+ad798ece025820903 experiment-runner 2026-10-12 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aaa0c79758d2e1744 tooling-writer 2026-10-12 v10=0 now=0 ｜ 
+a8434bc678c2e822c experiment-runner 2026-10-12 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a1b7ff44d16b0bcba implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+a7ac32e19115e04ed implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+af8f5b46b56798315 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+a8ac124a752c81877 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+a630e0cd37607c1ee tooling-writer 2026-10-13 v10=0 now=0 ｜ 
+a6162eb11e6947e65 tooling-writer 2026-10-13 v10=0 now=0 ｜ 
+ab7f1cd37cb27ec8f implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+a92bd0edd7a9a3993 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+ae9940c701f3a7668 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+af1e73cff151a37c7 tooling-writer 2026-10-13 v10=0 now=0 ｜ 
+a6bf97abb39181c2d implementation-writer 2026-10-13 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+ad56535d024188d8b tooling-writer 2026-10-13 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+aac883ea4e51021f3 tooling-writer 2026-10-13 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+a3a469333876a9b14 tooling-writer 2026-10-13 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+abc6d4897ee7fa113 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+ab05f1cf865595f0e implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+a2a266f41c553dbce implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+a89e0796ec94a96f6 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+ad70d118d0130f3a4 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+aae38d58c8b9fd873 implementation-writer 2026-10-13 v10=0 now=0 ｜ 
+aff0ad0ae613657d4 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a9e1b3b8480afebda implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a0a7455a41c3ecf07 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+ad49fa84502a2cc02 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+ac51b9057cfa78871 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a0fdb76ed54a021e1 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a98357774c4c42040 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+ac39f00a71f0c3e0d implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a7c31dd918efb9d2e implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+ac8fdb802ef70e3eb implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a7de9cd0a0514372b implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a2d334198157214d9 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+ae4802e8ffb3e8733 experiment-runner 2026-10-14 v10=0 now=0 ｜ 
+acc1d398a075d8433 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+aa36a9879953e1e03 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a5b15dd4342249ff3 implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a74470d57633dbaeb implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+aee297c2817afd59b implementation-writer 2026-10-14 v10=0 now=0 ｜ 
+a2edfc721a2f26056 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ad382e73e38f29533 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a7c947481bebb703a implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ae00a364b4cbf115b implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a5b80904ef9d2903f implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ae2cf6cb79dce006f implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a0926cfad16433545 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ac444c41efaba339b implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+abd28133ddf221a97 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a54803f4aaef430d0 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a03e547801f697e93 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+aef9d9c646543f7ce implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ab36a00a605cd9f95 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+adf67955eaefa441e tooling-writer 2026-10-15 v10=0 now=0 ｜ 
+a5e5d9ce99b57fb08 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a20ae1b5740d8078e implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a5cba7c8fd3732ace implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a2e3ca14b1d636b3d implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a71befa194ca9b9c4 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a028b96f139ab0bc1 tooling-writer 2026-10-15 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+a899dbce43a023d1b implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ab20ee3bf53977caa implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a517cdac4b55c5820 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a3d1834688f7b024f tooling-writer 2026-10-15 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+a042e59255037214d implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+afe8bb0dc562e1cc1 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ad5b589e11f82aa53 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a9ccf834a7c2a5935 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a29ca7df0f9aa56bc implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+af9125a06669fe21d implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a7cbf6a75997dbe8c implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+adfab145ae912ddd8 tooling-writer 2026-10-15 v10=0 now=0 ｜ 
+a8f5ec8ba6204e83a implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ad93dadb1a865eefd implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a90f6707add66c19f tooling-writer 2026-10-15 v10=0 now=0 ｜ 
+a91c9fba272524969 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ae87107c0f7c58a1c implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+ab75e8fde50976dad implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+acfba9bf973a7e11b implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+aabace8b2821bd079 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a59c470de597bcbc8 implementation-writer 2026-10-15 v10=0 now=0 ｜ 
+a6f49b5fc5e41a990 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a80455e6e0f04afa0 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+abe00fc421eb7751e implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a0ea839d90c7b4c17 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a8dcdbcb953359856 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a3de0889c25e22d6d implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+abaefb793c51e4080 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a39c59abdb0704987 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+af0cae0865128db8d implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a1416b10f8b360594 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a5d6572a4b9bba040 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a1b734e0d4e6b8e95 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+aebc91013261c10be implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a677819d8b3763877 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a7b472ae1b1515c81 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+ad6c1d4f48d08f63f implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+aa9ec3423c1f54bba implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+ae7ff5ead0f0c92a9 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a2adbe251b3465c9f implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+aeb9518516750b46a implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+aaac77433aeb3f3d5 implementation-writer 2026-10-16 v10=0 now=0 ｜ 
+a70ad565379360ef4 implementation-writer 2026-10-17 v10=0 now=0 ｜ 
+a5793100f108eb07a experiment-runner 2026-10-17 v10=0 now=0 ｜ 
+aa04fb84f9e5d2678 tooling-writer 2026-10-17 v10=0 now=0 ｜ 
+a49f25a94384622e1 implementation-writer 2026-10-17 v10=0 now=0 ｜ 
+a5d1133e913fc0c45 implementation-writer 2026-10-17 v10=0 now=0 ｜ 
+aec7ca6eae9f2f7e6 implementation-writer 2026-10-17 v10=0 now=0 ｜ 
+a0078cadaed2c3259 implementation-writer 2026-10-17 v10=0 now=0 ｜ 
+ab910133d4fa98d07 implementation-writer 2026-10-17 v10=0 now=0 ｜ 
+a788f431db074f846 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+aef9f3f1debc30836 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a809855cefac06f50 tooling-writer 2026-10-18 v10=0 now=0 ｜ 
+a542546a7883a91db implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+acee1da41c1f57526 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a67a1a5100eb0e27c implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a074ce6f0c762730e experiment-runner 2026-10-18 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a8490f51798802e11 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a994655289e0240b6 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+acce8551af75a1cb6 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+ad783f8e5d420dffa implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a6a10f10531290795 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a513d1edc7f389f20 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a1fa2eaffb7f7f3e8 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a6690992b4cd1946d experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+aa014bdf68bad54cb tooling-writer 2026-10-18 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+ad95dc2d10c83e9b9 experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a0049f785af24c97e experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a84ed6185fbddb2d3 experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a2ecb2367e5bc1f02 experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+ae568e9a93d6bee3d experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a6b123c951891791c experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a88edaab715ae9b5b experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+ac9b9ef5e6dc060de experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a5c0f8cd69ef445c5 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a0abde2011913ce16 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a05ace7eea0bea092 experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a6da56a06ddf3a2af experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a5cccb72252995ff1 experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a309e90458e0a66e8 implementation-writer 2026-10-18 v10=0 now=0 ｜ 
+a2e02673ce66d2612 tooling-writer 2026-10-18 v10=0 now=0 ｜ 
+ae3a5ce36e3d1dd43 experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+ab3bb371e0df7f52b experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+ad05d62f0bf335d3d experiment-runner 2026-10-18 v10=0 now=0 ｜ 
+a9d844bcb46c8d77f experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+abe2009674f569f55 experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+a998b529b27e1ae4f experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+ac715e31c8fd5bf24 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+addae744baac83dd0 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a8f2ffa888371e579 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a3679821a8edca0f8 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a5a3dfb8d2da99b36 experiment-runner 2026-10-19 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a50f981712c1998c4 experiment-runner 2026-10-19 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aefa1667cc7e6f7e5 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a47a6e6f9b0e25950 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a19e0cad68cb836bd experiment-runner 2026-10-19 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a2c29a35f9f9567ea implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a8ebedfe8fa675f59 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a9373a1bdd336e9c6 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a4337757c0a0e2189 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+adb9f91089368172f implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a49e778a8f041c0b8 experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+a319676002ef8a7f4 experiment-runner 2026-10-19 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aacf5334684d7e101 experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+afa34c9b55ae7bd3f implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+adc9e519e858a7f24 experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+a90f8f616cd1fbc45 experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+ac7d0112c65211b10 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+ae4e0b09ac1ecb772 implementation-writer 2026-10-19 v10=0 now=0 ｜ 
+a8fa0f6ba17be99b7 experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+a947aff4ab732ad82 experiment-runner 2026-10-19 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a8aabd7850ab8776f experiment-runner 2026-10-19 v10=0 now=0 ｜ 
+a4737c6f3660f4f7e experiment-runner 2026-10-20 v10=0 now=0 ｜ 
+a44b80a56169ea025 tooling-writer 2026-10-20 v10=0 now=0 ｜ 
+ad156bede96eb6ea8 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+ab55d1370976a3e2d implementation-writer 2026-10-20 v10=2 now=2 ｜ v10:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只 ／ now:✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只
+a4e779e8910cb162d implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+a8e98bf678c4647f5 experiment-runner 2026-10-20 v10=0 now=0 ｜ 
+abe2af8e9d80c26c2 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a1be3b984be233f61 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a7cdbcdb67ab22840 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a4c899939492e9a59 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+add957b16fabd0d77 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+a18f3ec83c799a9eb implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+ae1740da25688e534 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a321ccec05379b299 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+afd99b5414c4af184 experiment-runner 2026-10-20 v10=0 now=0 ｜ 
+a03a4362380848587 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+afa2da51879e84af5 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aec80e9fe3ebd357a experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a2cd12112e671bb57 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+af22a244ed633a835 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a40548067c4793b83 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ad696faa1b5e8c349 experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a5efbaac4603da1fd experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a36dfae9acd48e3d2 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+ac8ce9669158bc42f implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+a9b2e0bd518be9d06 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+a40b05884b81f1a81 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+ab2c0ba0ff34e4fb3 implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+a813277dc8833c6dd experiment-runner 2026-10-20 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a1a32c2d4e350efaf implementation-writer 2026-10-20 v10=0 now=0 ｜ 
+a86c5c8fb8ec28789 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+af50d62429598394c implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a085bf6cbed5fbe45 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+adaff2b14f2d4757c implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+ac4a6182e47bc95c4 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a77511a9daad3f2c1 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a5fd5efdaa4829ee7 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a797b7bff4559a712 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ab2f7ed97c2a46fb1 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+ae3e53f5c35f0d660 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a9efcb9b6d74d871e implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a3c97769f515bac2c implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+aaf4612adeb9870d0 tooling-writer 2026-10-21 v10=0 now=0 ｜ 
+a09d2bd77e868ff10 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a168181d9b4d811e0 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+aca13e342b471b0d8 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a0e305d2f662f45b9 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a453fead26bf791fb experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a4387823b0f2640f2 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+adb64c2bd0ad0365d implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a74fa7b07eb6ec1dc implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a0605883560376878 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a7dc47601a7cc0f2a experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a86caa6b931fba980 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a4c6b63ea14a8095f experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aa34b25a2bc5ecb0b implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+ad8816bc6a2454dd6 experiment-runner 2026-10-21 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a8e2495196b24df28 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a55c08b4c49a3067d implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a0ba4466defcb0a7e implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a1582afafcd80aea4 implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a0c2df320382c14bd implementation-writer 2026-10-21 v10=0 now=0 ｜ 
+a84c85b58b9f07337 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a3fb10ce83955f774 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+ac59343e8f41db069 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+ab85b77d63e4ab98e experiment-runner 2026-10-22 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aba956c91a6755e90 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+aba8ee95f9f1480db experiment-runner 2026-10-22 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a120daf854fcada68 experiment-runner 2026-10-22 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+aa7c16d30ce29c555 experiment-runner 2026-10-22 v10=2 now=2 ｜ v10:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过 ／ now:✗ experiment-runner 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过
+a21d15f91b9bc333c implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a51a99f7e448b8c83 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a9b89b5e8f6f14cff implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a4c15da80d700df15 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a567b63eeaaeb38cb implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a8bac87681bca82f2 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+ac39106511365e719 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a564e644c8df1540b implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a1da34b66db32161b implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+ab223d4e3014ce887 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a8eacf46d70af59dd implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+ad7cb2f0d28aae7ce implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+aa6c0cead2f03f08e implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+acf04b49293b12bba implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a20e4a06f89266469 tooling-writer 2026-10-22 v10=0 now=0 ｜ 
+a8934b5c5ce6db590 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a84e51c003c8c60bd implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a427eccd6824832fb experiment-runner 2026-10-22 v10=0 now=0 ｜ 
+aa68d151c2fa72bb7 tooling-writer 2026-10-22 v10=2 now=2 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令 ／ now:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+a8a66a81f09d886b1 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a21722bc9e821a995 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+ab6dd5f35228122b7 tooling-writer 2026-10-22 v10=2 now=0 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+ad78da731d96813af implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a9b2fb6ef7de91659 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+aef6feaf4ade3d754 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a97b2e7970da7f5c0 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a011035aff62edc42 implementation-writer 2026-10-22 v10=0 now=0 ｜ 
+a4dcb307d1deb60a2 experiment-runner 2026-10-22 v10=0 now=0 ｜ 
+a7aa1608c74c3e21e tooling-writer 2026-10-22 v10=2 now=0 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+aa87dd9fe761d727f tooling-writer 2026-10-23 v10=2 now=0 ｜ v10:✗ tooling-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令
+a391f3778dde9e885 implementation-writer 2026-10-23 v10=0 now=0 ｜ 
+a728603eab8c67792 implementation-writer 2026-10-23 v10=0 now=0 ｜ 
+ac532acba01448647 experiment-runner 2026-10-23 v10=0 now=0 ｜ 
+a46ded3ada277fb3c implementation-writer 2026-10-23 v10=0 now=0 ｜ 
+ad81f57ff2589c987 experiment-runner 2026-10-23 v10=0 now=0 ｜ 
+汇总（按首条记录的 UTC 日期；退出码依次是 v10、now）：
+  2026-10-22 之前：0/0：614 份
+  2026-10-22 之前：2/2：144 份
+  2026-10-22 起：0/0：35 份
+  2026-10-22 起：2/0：3 份
+  2026-10-22 起：2/2：5 份
+共 801 份改过 .rs 的

@@ -1,0 +1,117 @@
+diff -ruN after/crates/singlefs-core/src/attack_probe.rs probe/crates/singlefs-core/src/attack_probe.rs
+--- after/crates/singlefs-core/src/attack_probe.rs	1970-01-01 00:00:00.000000000 +0000
++++ probe/crates/singlefs-core/src/attack_probe.rs	2026-10-22 05:21:36.536382590 +0000
+@@ -0,0 +1,25 @@
++//! 攻方腿探针（只在攻方的副本里）：几处没改的线性查找各比较了几次。
++
++/// 探针的处数。0：`take_the_mapping_positions_over_the_location_hints` 末尾按角色在 `units` 上找；1：`mount.rs` 的
++/// `placements_taken_by_a_file_version` 按角色取单元；2：释放两处 `kept_for_the_snapshots.contains`；3：照抄分配记录树节点时在
++/// 这次重写的分配记录树单元里找；4：照抄第一个文件的数据单元时 `rewritten.contains`；5：`take_the_mapping_positions…` 被调的次数；
++/// 6：`roles_named_by_each_record_of_the_publish` 里 `data_roles_named_before_the_last_record.contains`。
++pub const SITES: usize = 7;
++
++thread_local! {
++    /// 每条线程各记各的：探针用例按场景分线程并行跑，各场景的数互不串。
++    static COUNTS: std::cell::Cell<[u64; SITES]> = const { std::cell::Cell::new([0; SITES]) };
++}
++
++pub fn add(site: usize) {
++    COUNTS.with(|counts| {
++        let mut now = counts.get();
++        now[site] += 1;
++        counts.set(now);
++    });
++}
++
++#[must_use]
++pub fn take() -> [u64; SITES] {
++    COUNTS.with(|counts| counts.replace([0; SITES]))
++}
+diff -ruN after/crates/singlefs-core/src/lib.rs probe/crates/singlefs-core/src/lib.rs
+--- after/crates/singlefs-core/src/lib.rs	2026-10-22 04:03:29.494627898 +0000
++++ probe/crates/singlefs-core/src/lib.rs	2026-10-22 04:26:23.007887313 +0000
+@@ -10,6 +10,7 @@
+ #![deny(unsafe_code)]
+ 
+ pub mod address;
++pub mod attack_probe;
+ pub mod admission;
+ pub mod allocation_record_tree;
+ pub mod allocator;
+diff -ruN after/crates/singlefs-core/src/mount.rs probe/crates/singlefs-core/src/mount.rs
+--- after/crates/singlefs-core/src/mount.rs	2026-10-22 04:03:29.494627898 +0000
++++ probe/crates/singlefs-core/src/mount.rs	2026-10-22 04:26:24.198212676 +0000
+@@ -5526,7 +5526,7 @@
+     output
+         .rewritten
+         .iter()
+-        .map(|role| (*role, output.unit(*role).slot))
++        .map(|role| (*role, output.units.iter().find(|unit| { crate::attack_probe::add(1); unit.identity == *role }).expect("探针").slot))
+         .collect()
+ }
+ 
+diff -ruN after/crates/singlefs-core/src/transaction.rs probe/crates/singlefs-core/src/transaction.rs
+--- after/crates/singlefs-core/src/transaction.rs	2026-10-22 04:50:25.509096733 +0000
++++ probe/crates/singlefs-core/src/transaction.rs	2026-10-22 04:48:22.270602466 +0000
+@@ -3679,6 +3679,7 @@
+ ) where
+     PositionOfKey: Fn(&[u8]) -> Option<[LocationEntry; 2]>,
+ {
++    crate::attack_probe::add(5);
+     let refresh_node_pointer = |pointer: &mut NodePointer, unit_class: u8| {
+         if *pointer == NodePointer::empty_root() {
+             return;
+@@ -3764,7 +3765,7 @@
+             if let Some(unit) = version
+                 .units
+                 .iter_mut()
+-                .find(|unit| unit.identity == *identity)
++                .find(|unit| { crate::attack_probe::add(0); unit.identity == *identity })
+             {
+                 unit.slot = locations[0].slot;
+             }
+@@ -4335,7 +4336,7 @@
+     let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+     for identity in roles_replaced_via_mapping(previous, roles, file_content)
+         .into_iter()
+-        .filter(|identity| !kept_for_the_snapshots.contains(identity))
++        .filter(|identity| !kept_for_the_snapshots.iter().any(|kept| { crate::attack_probe::add(2); kept == identity }))
+     {
+         let locations = match identity {
+             TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+@@ -4817,7 +4818,7 @@
+     let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+     roles_replaced_via_mapping(previous, roles, file_content)
+         .into_iter()
+-        .filter(|identity| !kept_for_the_snapshots.contains(identity))
++        .filter(|identity| !kept_for_the_snapshots.iter().any(|kept| { crate::attack_probe::add(2); kept == identity }))
+         .filter(|identity| match identity {
+             TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+             | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+@@ -11710,7 +11711,7 @@
+         rewritten
+             .iter()
+             .copied()
+-            .filter(|identity| !data_roles_named_before_the_last_record.contains(identity))
++            .filter(|identity| !data_roles_named_before_the_last_record.iter().any(|named| { crate::attack_probe::add(6); named == identity }))
+             .collect(),
+     );
+     // 末条再跨记录（已定项 17）：最后一个事务那一项装不下一条记录时切成几条，装满一条再开下一条。
+@@ -14183,7 +14184,7 @@
+             u64::try_from(position).expect("单元序号"),
+         ));
+         units.push(match carried_file {
+-            Some(_) if !rewritten.contains(&identity) => carried_unit(
++            Some(_) if !rewritten.iter().any(|role| { crate::attack_probe::add(4); *role == identity }) => carried_unit(
+                 units_of_the_previous_version
+                     .as_ref()
+                     .expect("照抄第一个文件的发布接在上一版之后：carried_file 就是上一版"),
+@@ -14259,7 +14260,7 @@
+             match allocation_built
+                 .rewritten_units
+                 .iter()
+-                .find(|unit| unit.identity == identity)
++                .find(|unit| { crate::attack_probe::add(3); unit.identity == identity })
+             {
+                 Some(allocation_record_tree_node_unit) => allocation_record_tree_node_unit.clone(),
+                 None => carried_unit(

@@ -1,3 +1,4 @@
+E7INPUT name=input_fingerprint key=E49 sha256=8dea146767b72b15b68d2d65906d31b4deff13a1a7eaa8b6eeaa55b0f585b914 units=53
 E7RESULT name=config item_bytes=56 max_items=2000 incident_chances=36500
 E7RESULT name=cost base=78 unit=512 div_2v4=31 first_2v4=26 div_4v8=0 first_4v8=NA cap_items=7
 E7RESULT name=cost base=78 unit=4096 div_2v4=4 first_2v4=218 div_4v8=0 first_4v8=NA cap_items=71

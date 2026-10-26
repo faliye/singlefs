@@ -1,0 +1,10 @@
+== probe-writer：报告：research/prompts/probe-impl-result.md
+  ✓ 派发闸照这份提示放行（implementation-writer，查了 21 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主
+check-rc=0
+== probe-writer-control：报告写进 research/prompts/probe-impl-result.md
+✗ 提示要 implementation-writer 写进它写范围之外的路径：research/prompts/probe-impl-result.md（.claude/hooks/agent-write-scope.tsv）。
+→ 怎么办：改成它写范围里的路径（报告与草稿放工作根 ~/.local/share/singlefs/work/ 下）；范围外的改动交该写的 agent 或主 
+check-rc=3
+== probe-clerk：报告路径：/home/fy5090/.local/share/singlefs/work/landing-audit-r1-opus/rerun2/probe-clerk/report.md
+  ✓ 派发闸照这份提示放行（clerk，查了 18 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判
+check-rc=0

@@ -1,0 +1,6 @@
+entry=scripts/mutation/crates-mutation-rows.py::verdict_of_run units=448 lib_function_units=0 lib_verdict_library=0 refusals=0
+entry=scripts/mutation/crates-mutation-rows.py::baseline_problem units=444 lib_function_units=0 lib_verdict_library=0 refusals=0
+entry=scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem units=439 lib_function_units=0 lib_verdict_library=0 refusals=0
+entry=scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units units=610 lib_function_units=495 lib_verdict_library=0 refusals=0
+entry=scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test units=603 lib_function_units=486 lib_verdict_library=0 refusals=0
+entry=scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units units=599 lib_function_units=485 lib_verdict_library=0 refusals=0

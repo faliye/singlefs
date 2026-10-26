@@ -1,0 +1,9 @@
+name=control_unregistered gate_problems=0 gate_note='没有内容行，实据不用核' gate_changed_after_filter=[frozen/judge.py] pin_side_accepts=False reuse_library_pinned_accepts=False
+name=occupied_row gate_problems=0 gate_note='此刻生效的 0 行；不生效 1 行（第 2 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）' gate_changed_after_filter=[.claude/gate.d/path-moves.tsv, frozen/judge.py, records/2026-10-23-搬迁.md] pin_side_accepts=True reuse_library_pinned_accepts=True
+name=occupied_row_window_ignored gate_problems=2 gate_note='此刻生效 1 行（第 2 行），实据不够或串了，见上' gate_changed_after_filter=[.claude/gate.d/path-moves.tsv, records/2026-10-23-搬迁.md] pin_side_accepts=True
+    gate_problem: 第 2 行的新前缀 tools/check_b 下有基准 HEAD 里本来就在的文件（tools/check_b/run.sh，共 1 份）：这一行不是一次搬迁
+    gate_problem: 第 2 行的旧前缀 tools/check_a 还在磁盘上（搬完以后旧路径不该还在）
+name=token_row gate_problems=0 gate_note='此刻生效的 0 行；不生效 1 行（第 2 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）' gate_changed_after_filter=[.claude/gate.d/path-moves.tsv, frozen/judge.py, records/2026-10-23-搬迁.md] pin_side_accepts=True reuse_library_pinned_accepts=True
+name=real_move gate_problems=0 gate_note='此刻生效 1 行（第 2 行），不串、有搬迁实据（第 2 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）' gate_changed_after_filter=[.claude/gate.d/path-moves.tsv, records/2026-10-23-搬迁.md] pin_side_accepts=True reuse_library_pinned_accepts=True
+name=chain_old_row gate_problems=0 gate_note='此刻生效 1 行（第 2 行），不串、有搬迁实据（第 2 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）；不生效 1 行（第 3 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）' gate_changed_after_filter=[.claude/gate.d/path-moves.tsv, frozen/judge.py] pin_side_accepts=True reuse_library_pinned_accepts=True
+name=real_move_after_commit gate_problems=0 gate_note='此刻生效的 0 行；不生效 1 行（第 2 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）' gate_changed_after_filter=[] pin_side_accepts=True reuse_library_pinned_accepts=True

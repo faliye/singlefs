@@ -1,0 +1,4 @@
+files 3286
+3071 json success=True message='Report delivered to your caller.' | agent-aa939103fa58bc8ef.jsonl
+193 is_error | agent-a55c08b4c49a3067d.jsonl
+2 json success=False message='Nothing was sent: your report was already delivere' | agent-a48f2f806614c1a41.jsonl

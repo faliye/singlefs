@@ -1,0 +1,2 @@
+name=对象库完整 base_ledger_text_HEAD=有表 base_ledger_text_no_such_base=None（不比） lib_baseline_text_HEAD=没有问题
+name=基准那一版的对象缺了 base_ledger_text_HEAD=None（不比） base_ledger_text_no_such_base=None（不比） lib_baseline_text_HEAD=问题：读不出基准 HEAD 里的 .claude/gate.d/decision-evidence-lag.tsv（git show 退 128）

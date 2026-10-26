@@ -18,7 +18,7 @@
 ## 怎么重跑（都在草稿副本里，不在仓里）
 
 ```
-rsync -a --exclude=/target --exclude=/.git --exclude=/scripts/experiments/target ~/.local/share/singlefs/work/m3-batch10y-code-r1/tree/ <草稿>/repo/
+rsync -a --exclude=/target --exclude=/.git --exclude=/scripts/experiment-apparatus/target ~/.local/share/singlefs/work/m3-batch10y-code-r1/tree/ <草稿>/repo/
 cp src/sonnet_probe_*.rs <草稿>/repo/crates/singlefs-harness/tests/
 cd <草稿>/repo && CARGO_TARGET_DIR=<草稿>/target bash scripts/hosts/capped.sh 4 bash scripts/hosts/run-with-memory-cap.sh 6G \
   cargo test -p singlefs-harness --test sonnet_probe_k4_units2 -- --nocapture --test-threads=1

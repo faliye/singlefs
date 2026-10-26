@@ -1,5 +1,0 @@
-TALLY weights=orphans first_seed=5000 seeds=124 ops=40 arm bing none_deleting holds = 4995
-TALLY weights=orphans first_seed=5000 seeds=124 ops=40 arm ding none_deleting holds = 4995
-TALLY weights=orphans first_seed=5000 seeds=124 ops=40 arm jia none_deleting holds = 4995
-TALLY weights=orphans first_seed=5000 seeds=124 ops=40 arm yi none_deleting holds = 4995
-TALLY weights=orphans first_seed=5000 seeds=124 ops=40 states none_deleting = 4995

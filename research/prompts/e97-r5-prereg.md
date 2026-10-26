@@ -5,16 +5,16 @@
 写于 2026-10-20，装置写之前、这一次任何产物之前。不占号，实验号仍是 E97（记账与分配记录的条目编码）。批次：`records/2026-10-18-里程碑三收尾与近期欠账.md#8`（C693 ④）。同批的另一半是 `research/prompts/e71-r1-prereg.md`。
 
 - **第几次（待主 agent 认）**：实验页首行写「三轮对抗后重跑三次」，历史版本 2026-09-03 下（其二）（其三）（其四）各是一次重跑；页上 `:281` 另写「2026-09-07 按当天成立的头宽重跑过一遍」。已有 4 次重跑，这是第 5 次，取 r5。
-- **原登记**：E97 早于独立的跑前登记文件，`research/prompts/` 下没有 `e97-preregistration.md`，git 历史里也没有（第十三节命令输出 0）。原判据与失败条款以实验页「被引用条款」「判据（跑前写死，跑完不许改）」「失败条款（跑前写死）」三节（`.claude/kb/experiments/97-记账与分配记录的条目编码.md:15-75`）与装置文件头（`scripts/experiments/e97_entry_encoding.rs:42-94`）为准。读了页首 `:1-14`、上面三节、「口径与复跑」`:76-89` 与历史版本的几行（`:311-316`、`:350-352`）；实测各节（`:90-270`）与「它答不了的」「影响的决策」没读，读到的数照第四节列。
+- **原登记**：E97 早于独立的跑前登记文件，`research/prompts/` 下没有 `e97-preregistration.md`，git 历史里也没有（第十三节命令输出 0）。原判据与失败条款以实验页「被引用条款」「判据（跑前写死，跑完不许改）」「失败条款（跑前写死）」三节（`.claude/kb/experiments/97-记账与分配记录的条目编码.md:15-75`）与装置文件头（`scripts/experiment-apparatus/e97_entry_encoding.rs:42-94`）为准。读了页首 `:1-14`、上面三节、「口径与复跑」`:76-89` 与历史版本的几行（`:311-316`、`:350-352`）；实测各节（`:90-270`）与「它答不了的」「影响的决策」没读，读到的数照第四节列。
 - **不是差分重跑**：装置的判据 10 要改一处口径（每叶装几组），第一到第十四节照写。
-- **装置写在哪（写死）**：`scripts/experiments/`（独立手写模型，不与 `crates/` 共用代码，`.claude/rules/implementation-first.md` 第 4 条）。另起新装置，原装置 `scripts/experiments/e97_entry_encoding.rs`、它的变异表 `scripts/mutation/tables/e97_entry_encoding.tsv` 与复跑行 `scripts/experiments/replay.sh:1104`（`E97|e97-entry-encoding||e97-entry-encoding-2026-09-07.out|exact`）一个字不动。新装置：源文件 `scripts/experiments/e97_entry_encoding_single_generation.rs`，bin `e97-entry-encoding-single-generation`（`scripts/experiments/Cargo.toml` 加一段 `[[bin]]`），变异表 `scripts/mutation/tables/e97_entry_encoding_single_generation.tsv`，产物 `research/results/e97-entry-encoding-single-generation-<日期>.out`，`scripts/experiments/replay.sh` 加一行 exact 档。
+- **装置写在哪（写死）**：`scripts/experiment-apparatus/`（独立手写模型，不与 `crates/` 共用代码，`.claude/rules/implementation-first.md` 第 4 条）。另起新装置，原装置 `scripts/experiment-apparatus/e97_entry_encoding.rs`、它的变异表 `scripts/mutation/tables/e97_entry_encoding.tsv` 与复跑行 `scripts/experiment-apparatus/replay.sh:1104`（`E97|e97-entry-encoding||e97-entry-encoding-2026-09-07.out|exact`）一个字不动。新装置：源文件 `scripts/experiment-apparatus/e97_entry_encoding_single_generation.rs`，bin `e97-entry-encoding-single-generation`（`scripts/experiment-apparatus/Cargo.toml` 加一段 `[[bin]]`），变异表 `scripts/mutation/tables/e97_entry_encoding_single_generation.tsv`，产物 `research/results/e97-entry-encoding-single-generation-<日期>.out`，`scripts/experiment-apparatus/replay.sh` 加一行 exact 档。
 - **输入 sha256（写登记时现取）**：问题单 `research/prompts/c693-forks.md` `6c3390804248814946c2015cb1c0344b0b70a93310c0bf563e03225c722c798f`；D5 `.claude/kb/decisions/05-快照-空间记账机制.md` `c3dc29d43d884ddea29a177116071a444fddc5ca0b661753c8c270580393f7d1`；D16 `.claude/kb/decisions/16-发布语义.md` `94700acc006f03ddec74212ad552a1b3c56760292d3289e1ff9e6443fca107ff`；实验页 `.claude/kb/experiments/97-记账与分配记录的条目编码.md` `349c51777c10eb93cb3038d7113a0f2f1bc89dcbc5839d449a88c5fafaf177af`；原装置 `56b83aeb676bd26587071d3a32b14327b55f8ffdd6030829dde2aa87d50b0e03`；原变异表 `c4b781eeb8ba494b3073181f563d772762b683e2f87d402c2ff168777153b7e8`；摸底报告 `~/.local/share/singlefs/work/m3-close-w8-c693-survey/report.md` `3685025a69544f06692dd7659a54f194a49a9db6e2f4755425228199054137c7`；`crates/singlefs-core/src/transaction.rs` `d3bfee24083784ffc475f4abbf9ff12e3475d1d4e3b91c1b74d8ff8c4df76245`；`crates/singlefs-core/src/code_two_tree.rs` `6587eb221d67423cc74ccc365dee8dd1d12a3d35be4e8b416ca76cdcf6bd0dda`；`crates/singlefs-format/src/lib.rs` `b4b6a6e54b6a43d9c4f3d0abeaa49965eb8b3ffe7de852b8921bd9e185ac5ddb`。HEAD `1bb3a24dc`。
 
 ### 为什么重跑
 
-1. D5（快照 / 空间记账机制） 已定项 2 已改成「每条根的记账树只装这条根那一代的行，不留多代」，射程第二条逐字「每次发布把这一代的行全写一遍，写的行数是实付值，不是上界」。E97 判据 10 的脏叶数按「同组的 K 代在 key 空间里连续 ⇒ 每叶装 `leaf_fanout / K` 组」算（`scripts/experiments/e97_entry_encoding.rs:361-372`），调用处把 K 写死成 25（`:473`），这个前提不再成立；判据 4 的条目字节与它的反解按「一写一删 × 2」算（`:462`、`:471`、`:490`），同样不再成立。
+1. D5（快照 / 空间记账机制） 已定项 2 已改成「每条根的记账树只装这条根那一代的行，不留多代」，射程第二条逐字「每次发布把这一代的行全写一遍，写的行数是实付值，不是上界」。E97 判据 10 的脏叶数按「同组的 K 代在 key 空间里连续 ⇒ 每叶装 `leaf_fanout / K` 组」算（`scripts/experiment-apparatus/e97_entry_encoding.rs:361-372`），调用处把 K 写死成 25（`:473`），这个前提不再成立；判据 4 的条目字节与它的反解按「一写一删 × 2」算（`:462`、`:471`、`:490`），同样不再成立。
 2. D5 已定项 4 的依据第二条（D5:146）引的是 E97 这张表：「宽读法下最紧的一格占预算 53%，这是『哪几项按树分』那一列的代价侧依据」。
-3. **出处出入（如实写，不改 kb）**：D5:146 写「宽读法下」，而 E97 源码把 53% 钉在窄读上（`e97_entry_encoding.rs:986-990`：`narrow_dirty_node_bytes` 那一格断言「占预算 53%」）。D5:145 把「`1024 × 64` 时宽读那条臂过 `T_dirty` 的 1%，窄读四格全过」记在 E71（记账 key 的条目数与宽度） 名下，而 E71 判据 2 没有宽读臂（`scripts/experiments/e71_accounting_keys.rs:205`），对得上「四格」的是 E97 判据 10 的四格（`e97_entry_encoding.rs:467`）。两处出入最早见摸底报告「摸底时顺带看到的出入」第 2 条；E97:156 在实测节里，我没读，只按源码核了「53% 钉在窄读」「四格在 E97」两点。这次不改 kb：两种读法都报，第六节分别给 D5:146 的字面（宽读）与 E97 源码（窄读）各一行。
+3. **出处出入（如实写，不改 kb）**：D5:146 写「宽读法下」，而 E97 源码把 53% 钉在窄读上（`e97_entry_encoding.rs:986-990`：`narrow_dirty_node_bytes` 那一格断言「占预算 53%」）。D5:145 把「`1024 × 64` 时宽读那条臂过 `T_dirty` 的 1%，窄读四格全过」记在 E71（记账 key 的条目数与宽度） 名下，而 E71 判据 2 没有宽读臂（`scripts/experiment-apparatus/e71_accounting_keys.rs:205`），对得上「四格」的是 E97 判据 10 的四格（`e97_entry_encoding.rs:467`）。两处出入最早见摸底报告「摸底时顺带看到的出入」第 2 条；E97:156 在实测节里，我没读，只按源码核了「53% 钉在窄读」「四格在 E97」两点。这次不改 kb：两种读法都报，第六节分别给 D5:146 的字面（宽读）与 E97 源码（窄读）各一行。
 4. C162（seq 进 value 之后四个实验的数要重算）点名的条目宽不是这一次改的口径：主 agent 定只改行数口径，34 字节的实现几何只当几何敏感性取样点（第八节）。
 
 ## 一、问题
@@ -319,7 +319,7 @@
 
 ### 乙：独立算出、用命令核过（不符才作废，第十一节 V2）
 
-命令 `nice -n 19 python3 -I /home/fy5090/.local/share/singlefs/work/m3-close-w8-c693-reruns/anchors.py`（只按读法第 1–3 条写下的式子现算，不读 `scripts/experiments/` 与 `crates/` 的代码；sha256 见第四节第 5 条）。下面每行是 `anchors.out` 的原样行（`k19_h58` 是 19B 臂、头 58；`k19_h96` 是第八节 S1；`impl_k22_h115_e34` 是 S2）：
+命令 `nice -n 19 python3 -I /home/fy5090/.local/share/singlefs/work/m3-close-w8-c693-reruns/anchors.py`（只按读法第 1–3 条写下的式子现算，不读 `scripts/experiment-apparatus/` 与 `crates/` 的代码；sha256 见第四节第 5 条）。下面每行是 `anchors.out` 的原样行（`k19_h58` 是 19B 臂、头 58；`k19_h96` 是第八节 S1；`impl_k22_h115_e34` 是 S2）：
 
 ```
 budget=21474836
@@ -426,7 +426,7 @@ Q3 的 E97 那一半够判 = Q-E97-1 到 Q-E97-6 在原登记全部 32 格上新
 
 （留空；装置写之后、产物之前由执行员写，只许收严或补臂，写明改了什么、依据哪个单元测试读数、时点在产物之前。）
 
-**执行员修订（2026-10-20，单元测试跑完、产物一次没跑之前）**。依据的单元测试读数：`scripts/experiments/e97_entry_encoding_single_generation.rs` 经 `cargo test --release --bin e97-entry-encoding-single-generation`（内存上限 3G）一次跑完，`test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`，其中 `old_caliber_reproduces_the_archived_budget_lines`、`old_caliber_reproduces_the_archived_key_ceiling_lines`、`old_caliber_reproduces_the_archived_tree_height_line_of_the_22_byte_arm` 与 48 条 `anchor_*` 用例都绿。原判据、门槛、臂一个字不改，下面五条都是比原登记多要求的，各自判：
+**执行员修订（2026-10-20，单元测试跑完、产物一次没跑之前）**。依据的单元测试读数：`scripts/experiment-apparatus/e97_entry_encoding_single_generation.rs` 经 `cargo test --release --bin e97-entry-encoding-single-generation`（内存上限 3G）一次跑完，`test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`，其中 `old_caliber_reproduces_the_archived_budget_lines`、`old_caliber_reproduces_the_archived_key_ceiling_lines`、`old_caliber_reproduces_the_archived_tree_height_line_of_the_22_byte_arm` 与 48 条 `anchor_*` 用例都绿。原判据、门槛、臂一个字不改，下面五条都是比原登记多要求的，各自判：
 
 | # | 改了什么 | 收严在哪 | 依据 |
 |---|---|---|---|
@@ -450,9 +450,9 @@ Q3 的 E97 那一半够判 = Q-E97-1 到 Q-E97-6 在原登记全部 32 格上新
 - `.claude/kb/experiments/97-记账与分配记录的条目编码.md:1-89`、`:311-316`、`:350-352`；grep 命中 `:78`、`:82`、`:86`、`:131`、`:248`、`:281`、`:282`、`:287`、`:288`、`:317`、`:329`；标题行 grep
 - `.claude/kb/experiments/71-记账key的条目数与宽度.md:1-48`、`:134-146`；grep 命中 `:9`、`:10`、`:126`、`:138`；标题行 grep
 - `~/.local/share/singlefs/work/m3-close-w8-c693-survey/report.md:138-260`；grep 命中行同 `e71-r1-prereg.md` 第十三节
-- `scripts/experiments/e97_entry_encoding.rs:1-160`、`:300-519`；grep 命中（`fn`、`const`、`kept`、`603`、`dirty`、`criterion`、`name=` 那一组，含 `:592`、`:669`、`:730`、`:797-821`、`:841-870`、`:918-993` 的测试名与断言行）
-- `scripts/experiments/e71_accounting_keys.rs:1-395`；`scripts/mutation/tables/e71_accounting_keys.tsv:1-8`
-- `scripts/experiments/replay.sh:1060-1070`、`:1104`；`scripts/experiments/Cargo.toml` grep 命中 `:2`、`:16`、`:77-78`、`:407-408`、`:622`、`:645`、`:667`、`:716`
+- `scripts/experiment-apparatus/e97_entry_encoding.rs:1-160`、`:300-519`；grep 命中（`fn`、`const`、`kept`、`603`、`dirty`、`criterion`、`name=` 那一组，含 `:592`、`:669`、`:730`、`:797-821`、`:841-870`、`:918-993` 的测试名与断言行）
+- `scripts/experiment-apparatus/e71_accounting_keys.rs:1-395`；`scripts/mutation/tables/e71_accounting_keys.tsv:1-8`
+- `scripts/experiment-apparatus/replay.sh:1060-1070`、`:1104`；`scripts/experiment-apparatus/Cargo.toml` grep 命中 `:2`、`:16`、`:77-78`、`:407-408`、`:622`、`:645`、`:667`、`:716`
 - 先例：`research/prompts/e10-r1-prereg.md:1-40` 与标题行；`e161-r2-prereg.md:1-6`、`e165-r1-prereg.md:1-6`、`e156-r7-prereg.md:1-6`、`e171-r1-prereg.md:1-6`
 - `crates/singlefs-core/src/transaction.rs:2515-2540`、`:2555-2615`、`:6683-6713`、`:6740-6860`；grep 命中 `:15`、`:2526`、`:2561`、`:6720`、`:6730`、`:6755` 等
 - `crates/singlefs-core/src/code_two_tree.rs:600-700`；grep 命中 `:636`、`:655`、`:658`、`:703` 等
@@ -483,7 +483,7 @@ print('impl rows', [3+6*d for d in (1,8,64)])
 "
 python3 scripts/kb/replace-once.py research/prompts/e97-r5-prereg.md '<第七节乙类最后一行里手误的表达式>' '<anchors.out 原文>'    # 两次定点替换，修本登记第七节自己写错的一行与随它的一句说明
 （逐行核两份登记里抄的 anchors.out 行：grep -qxF 每一行，e71 11 行、e97 16 行，缺 0 行）
-sha256sum research/prompts/c693-forks.md .claude/kb/decisions/05-快照-空间记账机制.md .claude/kb/decisions/16-发布语义.md .claude/kb/experiments/71-记账key的条目数与宽度.md .claude/kb/experiments/97-记账与分配记录的条目编码.md scripts/experiments/e71_accounting_keys.rs scripts/experiments/e97_entry_encoding.rs scripts/mutation/tables/e71_accounting_keys.tsv scripts/mutation/tables/e97_entry_encoding.tsv ~/.local/share/singlefs/work/m3-close-w8-c693-survey/report.md crates/singlefs-core/src/transaction.rs crates/singlefs-core/src/code_two_tree.rs crates/singlefs-format/src/lib.rs
+sha256sum research/prompts/c693-forks.md .claude/kb/decisions/05-快照-空间记账机制.md .claude/kb/decisions/16-发布语义.md .claude/kb/experiments/71-记账key的条目数与宽度.md .claude/kb/experiments/97-记账与分配记录的条目编码.md scripts/experiment-apparatus/e71_accounting_keys.rs scripts/experiment-apparatus/e97_entry_encoding.rs scripts/mutation/tables/e71_accounting_keys.tsv scripts/mutation/tables/e97_entry_encoding.tsv ~/.local/share/singlefs/work/m3-close-w8-c693-survey/report.md crates/singlefs-core/src/transaction.rs crates/singlefs-core/src/code_two_tree.rs crates/singlefs-format/src/lib.rs
 git rev-parse --short HEAD
 ```
 

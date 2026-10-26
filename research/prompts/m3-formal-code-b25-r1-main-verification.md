@@ -9,7 +9,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 改动全文 / 背景材料 | `research/prompts/_m3-formal-code-b25-r1-body.md`、`_m3-formal-code-b25-r1-diff.md`、`_m3-formal-code-b25-r1-background.md` | — |
-| 冻结副本与快照 | E171 第一段冻结树 `scripts/experiments/target/e171-r1-frozen-tree/`（摘要 4d071c12…）；crates 清单 `/tmp/claude-1000/m3-formal-code-b25-r1/crates-sha256.txt`（291 行）；kb 快照 `research/prompts/m3-formal-code-b25-r1-snapshot/kb-sha256.txt`（2 份） | 写判决前 `sha256sum -c`：冻结树对清单 0 处不符，kb 两份 OK |
+| 冻结副本与快照 | E171 第一段冻结树 `scripts/experiment-apparatus/target/e171-r1-frozen-tree/`（摘要 4d071c12…）；crates 清单 `/tmp/claude-1000/m3-formal-code-b25-r1/crates-sha256.txt`（291 行）；kb 快照 `research/prompts/m3-formal-code-b25-r1-snapshot/kb-sha256.txt`（2 份） | 写判决前 `sha256sum -c`：冻结树对清单 0 处不符，kb 两份 OK |
 | 云端正推（Sonnet） | `research/prompts/m3-formal-code-b25-r1-sonnet-output.md`（sha256 e74815ed…），模型 `…-sonnet-model/` | 主 agent 照它的 `tools/rerun.sh setup k1 k2` 在会话草稿复跑，见第四节 |
 | 云端攻方（Opus） | `research/prompts/m3-formal-code-b25-r1-opus-output.md`（sha256 3b71b123…），模型 `…-opus-model/` | 主 agent 照它的 `tools/rerun.sh` 七段全跑，见第四节 |
 | 引文 | 两份腿报告 | `cite-check.py <两份报告> --root <冻结树> --root . --background <背景材料>`：122 处引文对上 122 处，没判 0 处 |

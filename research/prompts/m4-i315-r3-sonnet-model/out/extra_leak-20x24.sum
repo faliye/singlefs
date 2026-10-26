@@ -1,0 +1,26 @@
+points 19
+TALLY today     name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS today    name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY exempt    name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS exempt   name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY gen       name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS gen      name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY genplus   name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS genplus  name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY cmp       name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS cmp      name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY both      name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS both     name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY bothplus  name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS bothplus name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY jrn       name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS jrn      name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+TALLY jrngen    name={'-': 7, 'L': 17, 'N': 7} j2n={'-': 7, 'L': 17, 'N': 7} j2s={'-': 7, 'L': 17, 'N': 7} j2t={'-': 7, 'L': 17, 'N': 7}
+POINTS jrngen   name={'-': 7, 'L': 5, 'LN': 7} j2n={'-': 7, 'L': 5, 'LN': 7} j2s={'-': 7, 'L': 5, 'LN': 7} j2t={'-': 7, 'L': 5, 'LN': 7}
+DIFF 5121 0 dev1:slot50444:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 5124 2 dev0:slot50372:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 5126 0 dev0:slot50414:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 5131 0 dev0:slot50248:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 5134 0 dev0:slot50303:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 5136 0 dev0:slot50338:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 5136 1 dev0:slot50442:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN

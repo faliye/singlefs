@@ -1,1 +1,0 @@
-for family in legal adversarial; do bash scripts/hosts/run-with-memory-cap.sh 8G target/release/e165_replay_bounded_enumeration --bounds segment1 --family "$family" --profile r3 > research/results/e165-replay-bounded-enumeration-r7-$family.out; done

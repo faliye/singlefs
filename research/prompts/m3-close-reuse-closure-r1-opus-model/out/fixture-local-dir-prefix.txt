@@ -1,0 +1,6 @@
+kept-comments	<kept-comments>	scripts/hosts/local-dir-prefix.sh:1-3	e2b37d0fbeebd5358ba88a5ef5469cfab940c91f397b72b95107b9b6515a9ece
+script-body	<script-body>	scripts/hosts/local-dir-prefix.sh:1-3	1fc5e67e5fb1984cdd20863bc09c336a8d544d4fdd4f817b5c993f78efa76fbf
+import	sys	scripts/hosts/probe.py:1-1	f7252e3c1dbe1d5edf1f34c020a58a05b55f706b2c1d9479eae91f9a9d4be275
+module-body	<module-body>	scripts/hosts/probe.py:1-1	3543b4693a36a1098850b8bc928887694ed59a6deb7d3dfd0339de01f55a77b6
+def	probe	scripts/hosts/probe.py:4-5	ad32ae424a6d50dafb302151af8855d23c60d119a6db70f4e7c0344744963b28
+main-guard	<main-guard>	scripts/hosts/probe.py:8-9	083f8f2f78fc8d08095b57b528e7359a6338fbd339535903d1957e9c518cb34e

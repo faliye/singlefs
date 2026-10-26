@@ -1,0 +1,609 @@
+--- a/crates/singlefs-core/src/extent_tree.rs
++++ b/crates/singlefs-core/src/extent_tree.rs
+@@ -404,6 +404,19 @@
+         }
+     }
+ 
++    /// 一个数据单元都没有的文件在上段叶里那一条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 与第六节 S1：
++    /// 标签 0 配 size > 0 是整个文件都是洞；`research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」）：
++    /// size > 0 写标签 0，size 0 不写条目——与 `transaction::publish_new_inodes` 建出来、一次都没写过内容的 inode 同一形，
++    /// 读者按「没有条目」收（`write_request_split::DataUnitsOfTheInode::NoneWritten`）。写者装上段叶、算上段形状（有条目的号集合）都经这里。
++    #[must_use]
++    pub const fn of_a_file_without_data_units(size_in_bytes: u64) -> Option<Self> {
++        if size_in_bytes > 0 {
++            Some(ExtentUpperLeafTarget::NoDataUnit)
++        } else {
++            None
++        }
++    }
++
+     /// 这个标签声明的尾部：3、4、0 有洞，1、2 没有。
+     #[must_use]
+     pub const fn tail(self) -> TailOfAFile {
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3906,11 +3906,16 @@
+     }
+ 
+     /// 这一版 extent 树上段里有条目的 inode 号（上段规范形的 S，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md`
+-    /// 第三节 M2）：第一个文件有数据单元时连 inode 1，加第一个文件之外每个有数据单元的文件。写者不写标签 0（D8（核心索引结构） 已定项 14），
+-    /// 有条目的号就是有数据单元的号。
++    /// 第三节 M2）：第一个文件有数据单元、或一个单元都没有而 size > 0（上段叶标签 0，整个文件都是洞：
++    /// [`ExtentUpperLeafTarget::of_a_file_without_data_units`]）时连 inode 1，加第一个文件之外每个有数据单元的文件。
++    /// 与装上段叶写不写第一个文件那一条（`build_extent_tree`）同一条判法，形状与条目才对得上。
+     #[must_use]
+     pub fn inodes_with_an_extent_upper_leaf_entry(&self) -> BTreeSet<u64> {
+-        let first_file = (!self.data_pointers.is_empty()).then_some(FIRST_INODE_NUMBER);
++        let first_file_has_an_entry = !self.data_pointers.is_empty()
++            || self.inode_record.is_some_and(|record| {
++                ExtentUpperLeafTarget::of_a_file_without_data_units(record.size).is_some()
++            });
++        let first_file = first_file_has_an_entry.then_some(FIRST_INODE_NUMBER);
+         first_file
+             .into_iter()
+             .chain(
+@@ -11905,8 +11910,10 @@
+ /// 按计划装 extent 树这一版的全部节点（D8（核心索引结构） 已定项 14 的两段）：重写的节点按 bump 次序逐个装、发出生序号、取这次的落点——
+ /// 下段先叶后根（叶装它罩的那几个单元的 extent 叶记录，内部节点装「孩子那一段的起点 key + 孩子这一版的指针」；第一个文件的下段在前，
+ /// 第一个文件之外各文件的下段按 inode 号接着），再上段先叶后根（重写的一片叶装它罩的那几个 inode 号上每个有数据单元的文件那一条叶条目：
+-/// 一个数据单元就内联它的数据指针（标签 2），多个就放下段根这一版的指针（标签 1）；第一个文件尾部有洞的写标签 3、4。条目都取这一版内存里的指针）。
++/// 一个数据单元就内联它的数据指针（标签 2），多个就放下段根这一版的指针（标签 1）；第一个文件尾部有洞的写标签 3、4，一个单元都没有而
++/// size > 0 的写标签 0。条目都取这一版内存里的指针）。
+ /// 照抄的节点字节、落点、指针全取上一版同一个位置上的。`data_pointers` 是第一个文件这一版每个数据单元的指针（第 i 项是单元 i），
++/// `size_of_the_first_file_after_this_publish` 是这一版第一个文件那条记录的 size（这一版没有那条记录时为 `None`：不写它那一条），
+ /// `data_pointers_of_the_files_other_than_the_first` 是第一个文件之外各文件这一版的数据指针（与 `files_other_than_the_first.files` 同序）。
+ ///
+ /// # Panics
+@@ -11914,7 +11921,7 @@
+ /// （角色清单按同一份计划排、上一版的字节是这个进程装的或重建时核过的、两份清单由 `publish_admitted` 按同一份计划拼）。
+ #[allow(
+     clippy::too_many_arguments,
+-    reason = "参数各是一样东西：计划、第一个文件之外各文件的计划、上一版、上一版按身份的两份索引、第一个文件的数据指针、它尾部有没有洞、别的文件的数据指针、树号、身份、落点、出生序号"
++    reason = "参数各是一样东西：计划、第一个文件之外各文件的计划、上一版、上一版按身份的两份索引、第一个文件的数据指针、它这一版的 size、别的文件的数据指针、树号、身份、落点、出生序号"
+ )]
+ fn build_extent_tree(
+     plan: &ExtentTreePlan,
+@@ -11927,7 +11934,7 @@
+         &FirstEntryOfEachIdentity<'_, InodeNumber, FileOfAnInodeOtherThanTheFirst>,
+     >,
+     data_pointers: &[DataPointer],
+-    tail_of_the_first_file: TailOfAFile,
++    size_of_the_first_file_after_this_publish: Option<u64>,
+     data_pointers_of_the_files_other_than_the_first: &[(InodeNumber, Vec<DataPointer>)],
+     tree: TreeIdentifier,
+     context: &MultiLevelTreeBuildContext<'_>,
+@@ -11941,6 +11948,10 @@
+         instance: context.instance,
+     };
+     let data_units = u64::try_from(data_pointers.len()).expect("单元数");
++    let tail_of_the_first_file = size_of_the_first_file_after_this_publish
++        .map_or(TailOfAFile::NoHoleAfterTheLastDataUnit, |size_in_bytes| {
++            TailOfAFile::of_data_units_and_size(data_units, size_in_bytes)
++        });
+     let mut units: Vec<PublishedUnit> = Vec::new();
+     let mut birth_sequences_of_rewritten_nodes = BTreeMap::new();
+     let mut rewritten_node = |role: TransactionUnit,
+@@ -12157,7 +12168,9 @@
+             .map(|previous_root_level| role_of_extent_upper_node(*position, previous_root_level));
+         let pointer = match origin {
+             ExtentTreeNodeOrigin::RewrittenThisPublish if position.level == 0 => {
+-                // 第一个文件这一版的那条叶条目：下段有根就指下段根，只有一个单元就内联它；一个单元都不剩（unlink 最后一批）就不写这一条，
++                // 第一个文件这一版的那条叶条目：下段有根就指下段根，只有一个单元就内联它；一个单元都没有时按记录的 size 取
++                // （`ExtentUpperLeafTarget::of_a_file_without_data_units`）：size > 0 是整个文件都是洞，照写标签 0（判决 m4-trunc-r1 K5、S1，
++                // m4-validate-code-r1 用户定案「丑」：重写这片叶的发布不丢这一条）；记录没了（unlink 最后一批）或 size 0 就不写这一条，
+                 // 只剩它一条时这片叶成了零条目根（D8（核心索引结构） 已定项 16 第 5 条）。
+                 // 最后一个单元之后到 size 是洞的换成标签 3、4（判决 m4-trunc-r1 K5，`ExtentUpperLeafTarget::with_the_tail`）。
+                 let target = match (lower_nodes.last(), data_pointers.first()) {
+@@ -12167,7 +12180,8 @@
+                     (None, Some(only_data_pointer)) => {
+                         Some(ExtentUpperLeafTarget::InlineDataUnit(*only_data_pointer))
+                     }
+-                    (None, None) => None,
++                    (None, None) => size_of_the_first_file_after_this_publish
++                        .and_then(ExtentUpperLeafTarget::of_a_file_without_data_units),
+                 }
+                 .map(|target| target.with_the_tail(tail_of_the_first_file));
+                 // 这片叶罩的 inode 号上第一个文件之外的文件，条目照这一版内存里的指针装（照抄的文件的指针整理之后已换成映射位置，
+@@ -13335,15 +13349,7 @@
+         units_of_the_previous_version.as_ref(),
+         files_of_the_previous_version.as_ref(),
+         &data_pointers,
+-        record_of_the_first_file_after_this_publish.map_or(
+-            TailOfAFile::NoHoleAfterTheLastDataUnit,
+-            |record| {
+-                TailOfAFile::of_data_units_and_size(
+-                    u64::try_from(data_pointers.len()).expect("单元数"),
+-                    record.size,
+-                )
+-            },
+-        ),
++        record_of_the_first_file_after_this_publish.map(|record| record.size),
+         &data_pointers_of_the_files_other_than_the_first,
+         trees.extent,
+         &multi_level_tree_context,
+@@ -15214,7 +15220,7 @@
+                     None,
+                     None,
+                     &units.data_pointers,
+-                    TailOfAFile::NoHoleAfterTheLastDataUnit,
++                    Some(u64::try_from(content.len()).expect("内容长度")),
+                     &[],
+                     checkpoint.trees.extent,
+                     &context,
+--- a/crates/singlefs-core/src/truncate.rs
++++ b/crates/singlefs-core/src/truncate.rs
+@@ -130,20 +130,15 @@
+ }
+ 
+ /// 变长那次要不要重写尾单元（K5）：最后一个存在的单元声明长度小于 min(N − 起点, 净荷) 时补零重写到那个长度；之后到 N 是洞、不写单元。
+-///
+-/// # Panics
+-/// 一个单元都不存在：第一个文件至少一个数据单元（长度 0 的内容也写一个声明长度 0 的单元）。
++/// 一个单元都不存在（上段叶标签 0：整个文件都是洞，K5、S1）时没有单元可补：不重写、不加单元，变长只改记录、标签留 0
++/// （判决 `research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」）。
+ #[must_use]
+ pub fn tail_data_unit_rewrite_of_an_extension(
+     data_units_existing: u64,
+     size_before_in_bytes: u64,
+     target_size_in_bytes: u64,
+ ) -> Option<TailDataUnitRewrite> {
+-    let unit = DataUnitIndexInFile(
+-        data_units_existing
+-            .checked_sub(1)
+-            .expect("第一个文件至少一个数据单元"),
+-    );
++    let unit = DataUnitIndexInFile(data_units_existing.checked_sub(1)?);
+     let declared_length_in_bytes = declared_length_within_a_size(unit, target_size_in_bytes);
+     (declared_length_within_a_size(unit, size_before_in_bytes) < declared_length_in_bytes)
+         .then_some(TailDataUnitRewrite {
+@@ -222,8 +217,11 @@
+ /// 留下的单元数正在叶边界上（144 的倍数）时也一样；被截掉那一段里的节点换下。只剩一个单元时不建下段（内联）。上段这个文件那一串
+ /// 在单元数变了、有单元重写、或上段叶条目的标签变了（尾部有没有洞）时重写，否则整棵照抄、什么都不换下。
+ ///
++/// 之前一个单元都没有（上段叶标签 0：整个文件都是洞，K5、S1）的，之后也是 0 个：截短、N = S、变长都不加单元、不重写单元，
++/// 标签留 0、整棵照抄（判决 `research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑」）。
++///
+ /// # Panics
+-/// 这次之后的单元数是 0 或多于之前的：截断留至少一个单元、变长不加单元。
++/// 这次之后的单元数多于之前的，或之前有单元而之后是 0 个：截断留至少一个单元、变长不加单元。
+ #[must_use]
+ pub fn plan_the_extent_tree_after_a_size_change(
+     previous: &ExtentTreeVersion,
+@@ -237,9 +235,10 @@
+         tail_before,
+         tail_after,
+     } = change;
++    let keeps_at_least_one_unit_or_had_none = data_units_after >= 1 || data_units_before == 0;
+     assert!(
+-        (1..=data_units_before).contains(&data_units_after),
+-        "截断留至少一个单元、变长不加单元"
++        data_units_after <= data_units_before && keeps_at_least_one_unit_or_had_none,
++        "截断留至少一个单元（一个单元都没有的整文件洞照旧 0 个）、变长不加单元"
+     );
+     let covers_the_rewritten_unit = |position: &ExtentLowerNodePosition| {
+         let (first_data_unit, last_data_unit) = position.data_unit_range();
+--- /dev/null
++++ b/crates/singlefs-harness/tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs
+@@ -0,0 +1,422 @@
++//! 上段叶标签 0 配 size > 0（一个数据单元都没有，整个文件都是洞：判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5、
++//! 第六节 S1）的第一个文件，可写挂载之后会话里接着发布：写者接得住这一形（判决 `research/prompts/m4-validate-code-r1-main-verification.md`
++//! 用户定案「丑」）。
++//! - 改 size（截短、N = S、变长）只改 inode 记录，不加单元、标签留 0；改之前三条都 panic 在 `truncate.rs` 那两处断言。
++//! - 重写第一个文件所在那片上段叶的发布（按号写 inode 2）、与长高之后照抄那片叶的发布（按号写第一片上段叶之外的号）都留着标签 0 那一条；
++//!   改之前前一条丢掉那一条，后一条把那片叶整片换下，写出的那一版三处读者都拒。
++//!
++//! 每条之后三处读者各读一遍第一个文件：冷走读、可写重挂（重建出的那一版）、挂载态读者（只读挂载、打开、从 0 读到 size）。
++//! 镜像手造，办法同 `whole_file_hole_of_upper_leaf_tag_zero_with_a_positive_size_read_by_every_reader.rs`：新池新建文件（3000 字节、标签 2
++//! 内联一个单元）那一版，第一个文件那一条上段叶条目改成标签 0、载荷清零，中央映射树里那个数据单元的映射条目拿掉，新的整单元校验和沿引用链
++//! 补到根槽。今天的写路径写不出这一形（调查员报告：约 5800 次发布里 0 次）。
++mod common;
++mod common_deletion_in_progress;
++mod common_pointer_head_corruption;
++
++use common::{build_pool, parameters};
++use common_deletion_in_progress::change_the_unit_and_propagate_its_checksum;
++use common_pointer_head_corruption::{
++    first_upper_leaf_entry, newest_root, node_bytes, the_slot_of, tree_table_entry_of_kind,
++    unit_bytes_at,
++};
++use singlefs_core::address::{DeviceIdentity, FileOffsetInBytes, InodeNumber, SlotNumber};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::bytes::ByteReader;
++use singlefs_core::extent_tree::{ExtentUpperLeafEntry, ExtentUpperLeafTarget};
++use singlefs_core::mount::mount_writable;
++use singlefs_core::mounted_read::mount_read_only;
++use singlefs_core::mounted_session::{MountedSession, UserChange};
++use singlefs_core::pointer::NodePointer;
++use singlefs_core::records::{parse_mapping_entry, TREE_KIND_EXTENT};
++use singlefs_core::recovery::walk_to_file;
++use singlefs_core::transaction::{PoolVersion, FIRST_INODE_NUMBER};
++use singlefs_core::unit::{data_unit_payload_capacity, parse_index_node};
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
++
++/// 新池新建文件那一版第一个文件的长度。
++const SIZE_OF_THE_FIRST_FILE: u64 = 3000;
++const FIRST_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
++const WRITE_TIME_SECONDS: u64 = 1_788_000_300;
++/// extent 上段叶条目 113：key 24（locality 8、inode 8、offset 8）之后一字节标签、载荷 88。
++const EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET: usize = 8;
++const EXTENT_UPPER_LEAF_ENTRY_TAG_OFFSET: usize = 24;
++/// 上段叶条目标签 0：没有数据单元。
++const UPPER_LEAF_TAG_NO_DATA_UNIT: u8 = 0;
++/// 一片上段叶罩的 inode 号个数（D8（核心索引结构） 已定项 14：`EXTENT_TREE_UPPER_LEAF_INODES`）：号 0 到 142 在第一片叶里，143 起在下一片。
++const INODES_PER_UPPER_LEAF: u64 = 143;
++/// 码 2 节点（key 宽 k）：声明长度在偏移 8、层级在 50、key 区间从 52 起两个 key、条目数在 82 + 2k、条目从 115 + 2k 起（D18（块里携带什么信息）
++/// 已定项 18 的偏移表）。
++const INDEX_NODE_DECLARED_LENGTH_OFFSET: usize = 8;
++const INDEX_NODE_LEVEL_OFFSET: usize = 50;
++const INDEX_NODE_KEY_RANGE_OFFSET: usize = 52;
++
++fn payload_capacity_in_bytes() -> u64 {
++    u64::try_from(data_unit_payload_capacity()).expect("32634")
++}
++
++fn read_u64_at(bytes: &[u8], offset: usize) -> u64 {
++    u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
++}
++
++/// 节点头里的 key 区间跟不跟着条目改：按 key 寻址的树（中央映射树）跟着改；按位置寻址的 extent 上段由位置定，不动。
++#[derive(Clone, Copy)]
++enum KeyRangeOfTheNode {
++    FollowsTheEntries,
++    FixedByThePosition,
++}
++
++/// `slot` 那个码 2 节点的条目整份交给 `change` 改，条目数、声明长度跟着改（key 区间照 `key_range`），重封、校验和补到根槽。
++fn rewrite_the_entries_of_the_index_node_at(
++    image: &mut MemoryPool,
++    slot: SlotNumber,
++    key_range: KeyRangeOfTheNode,
++    change: impl FnOnce(&mut Vec<Vec<u8>>),
++) {
++    let parsed = parse_index_node(&unit_bytes_at(image, slot, node_bytes())).expect("节点解得开");
++    let key_width = parsed.key_width;
++    let entry_width = parsed.entry_width;
++    let mut entries = parsed.entries;
++    change(&mut entries);
++    change_the_unit_and_propagate_its_checksum(image, slot, node_bytes(), |node| {
++        let entries_start = 115 + 2 * key_width;
++        node[entries_start..].fill(0);
++        for (position, entry) in entries.iter().enumerate() {
++            assert_eq!(entry.len(), entry_width, "条目宽不变");
++            let start = entries_start + position * entry_width;
++            node[start..start + entry_width].copy_from_slice(entry);
++        }
++        let count_offset = 82 + 2 * key_width;
++        node[count_offset..count_offset + 2].copy_from_slice(
++            &u16::try_from(entries.len())
++                .expect("条目数装得进 2 字节")
++                .to_le_bytes(),
++        );
++        node[INDEX_NODE_DECLARED_LENGTH_OFFSET..INDEX_NODE_DECLARED_LENGTH_OFFSET + 2]
++            .copy_from_slice(
++                &u16::try_from(entries.len() * entry_width)
++                    .expect("声明长度装得进 2 字节")
++                    .to_le_bytes(),
++            );
++        if let (KeyRangeOfTheNode::FollowsTheEntries, Some(first), Some(last)) =
++            (key_range, entries.first(), entries.last())
++        {
++            let smallest = INDEX_NODE_KEY_RANGE_OFFSET;
++            let largest = INDEX_NODE_KEY_RANGE_OFFSET + key_width;
++            node[smallest..smallest + key_width].copy_from_slice(&first[..key_width]);
++            node[largest..largest + key_width].copy_from_slice(&last[..key_width]);
++        }
++    });
++}
++
++/// 新池新建文件那一版手造成「标签 0 配 size 3000」：第一个文件那一条上段叶条目改成标签 0、载荷清零，那个数据单元的映射条目拿掉。
++fn image_whose_first_file_is_a_whole_file_hole(tag: &str) -> MemoryPool {
++    let pool = build_pool(tag);
++    let mut image = pool.memory_pool();
++    let ExtentUpperLeafTarget::InlineDataUnit(data_unit) = first_upper_leaf_entry(&image).target
++    else {
++        panic!("前提：新池新建文件那一版第一个文件是标签 2、内联一个单元")
++    };
++    let mapping_root_slot = the_slot_of(&newest_root(&image).mapping_root);
++    assert_eq!(
++        unit_bytes_at(&image, mapping_root_slot, node_bytes())[INDEX_NODE_LEVEL_OFFSET],
++        0,
++        "前提：中央映射树只有根兼叶"
++    );
++    rewrite_the_entries_of_the_index_node_at(
++        &mut image,
++        mapping_root_slot,
++        KeyRangeOfTheNode::FollowsTheEntries,
++        |entries| {
++            let before = entries.len();
++            entries.retain(|entry| {
++                let (_key, locations) = parse_mapping_entry(entry).expect("映射条目解得开");
++                locations[0].slot != data_unit.locations[0].slot
++            });
++            assert_eq!(
++                entries.len() + 1,
++                before,
++                "恰好一条映射条目落在那个数据单元上"
++            );
++        },
++    );
++    let extent_root_slot = the_slot_of(&tree_table_entry_of_kind(&image, TREE_KIND_EXTENT).root);
++    rewrite_the_entries_of_the_index_node_at(
++        &mut image,
++        extent_root_slot,
++        KeyRangeOfTheNode::FixedByThePosition,
++        |entries| {
++            let first_file_entry = entries
++                .iter_mut()
++                .find(|entry| {
++                    read_u64_at(entry, EXTENT_UPPER_LEAF_ENTRY_INODE_OFFSET) == FIRST_INODE_NUMBER
++                })
++                .expect("上段叶里有第一个文件那一条");
++            first_file_entry[EXTENT_UPPER_LEAF_ENTRY_TAG_OFFSET] = UPPER_LEAF_TAG_NO_DATA_UNIT;
++            first_file_entry[EXTENT_UPPER_LEAF_ENTRY_TAG_OFFSET + 1..].fill(0);
++        },
++    );
++    assert_eq!(
++        first_upper_leaf_entry(&image).target,
++        ExtentUpperLeafTarget::NoDataUnit,
++        "前提：手造之后第一个文件那一条是标签 0"
++    );
++    image
++}
++
++type WritableDevices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++fn writable_devices_of(image: &MemoryPool) -> WritableDevices {
++    image
++        .devices
++        .iter()
++        .map(|(identity, sparse)| {
++            let mut device =
++                SparseBlockDevice::new(image.device_size_in_bytes, PhysicalBlockSizeInBytes(512));
++            device.image = sparse.clone();
++            (*identity, device)
++        })
++        .collect()
++}
++
++fn image_of_the_devices(devices: &WritableDevices, device_size_in_bytes: u64) -> MemoryPool {
++    MemoryPool {
++        devices: devices
++            .iter()
++            .map(|(identity, device)| (*identity, device.image.clone()))
++            .collect(),
++        device_size_in_bytes,
++    }
++}
++
++/// 标签 0 镜像可写挂载、会话里按次序发 `changes`（每一条都要做成），交回之后的镜像。
++fn image_after_the_session_publishes(
++    image: &MemoryPool,
++    changes: Vec<UserChange<'_>>,
++) -> MemoryPool {
++    let mut devices = writable_devices_of(image);
++    let mounted = mount_writable(&parameters(), &mut devices).expect("标签 0 镜像可写挂载");
++    let (_, mut session) = MountedSession::of_the_mount(mounted);
++    for change in changes {
++        let what = format!("{change:?}").chars().take(120).collect::<String>();
++        session
++            .publish_user_change(&mut devices, change)
++            .unwrap_or_else(|refusal| panic!("会话里这一条做成：{what}，实际拒 {refusal:?}"));
++    }
++    image_of_the_devices(&devices, image.device_size_in_bytes)
++}
++
++/// 三处读者读第一个文件都做成、size 是 `expected_size_in_bytes`、内容全 0、一个数据单元都没有。
++fn every_reader_reads_the_first_file_as_a_whole_file_hole_of(
++    image: &MemoryPool,
++    expected_size_in_bytes: u64,
++) {
++    let expected_content =
++        vec![0u8; usize::try_from(expected_size_in_bytes).expect("size 装得进 usize")];
++    let root = newest_root(image);
++    let mut mapping_fallbacks = 0;
++    let cold_walk = walk_to_file(image, &root, &mut mapping_fallbacks)
++        .unwrap_or_else(|failure| panic!("冷走读收下第一个文件，实际拒 {failure:?}"));
++    assert!(
++        cold_walk.as_ref() == Some(&expected_content),
++        "冷走读读出 {expected_size_in_bytes} 个 0（读出 {:?} 字节）",
++        cold_walk.as_ref().map(Vec::len)
++    );
++    let mut devices = writable_devices_of(image);
++    let remounted = mount_writable(&parameters(), &mut devices)
++        .unwrap_or_else(|refusal| panic!("可写重挂收下这一版，实际拒 {refusal:?}"));
++    let PoolVersion::WithFile(rebuilt) = remounted.current else {
++        panic!("可写重挂重建出带文件的一版")
++    };
++    assert_eq!(
++        (
++            rebuilt.inode_record.map(|record| record.size),
++            rebuilt.data_pointers.len()
++        ),
++        (Some(expected_size_in_bytes), 0),
++        "可写重挂重建出 size {expected_size_in_bytes}、一个数据单元都没有（整个文件都是洞，读出全 0）的第一个文件"
++    );
++    let read_only = mount_read_only(image)
++        .unwrap_or_else(|refusal| panic!("只读挂载收下这一版，实际拒 {refusal:?}"));
++    let file = read_only
++        .mounted
++        .open_file(image, FIRST_FILE)
++        .unwrap_or_else(|failure| panic!("挂载态读者打开第一个文件，实际拒 {failure:?}"));
++    assert_eq!(
++        (file.inode_record().size, file.data_unit_count()),
++        (expected_size_in_bytes, 0),
++        "挂载态读者打开的第一个文件 size {expected_size_in_bytes}、一个数据单元都没有"
++    );
++    let read = file
++        .read_at(image, FileOffsetInBytes(0), expected_size_in_bytes)
++        .expect("挂载态读者从 0 读到 size");
++    assert!(
++        read.bytes == expected_content,
++        "挂载态读者读出 {expected_size_in_bytes} 个 0（读出 {} 字节）",
++        read.bytes.len()
++    );
++}
++
++/// 最新那一版 extent 树上段里第一个文件那一条（逐片叶找；上段可能长高过一层）。
++fn first_file_entry_of_the_extent_upper_segment(
++    image: &MemoryPool,
++) -> Option<ExtentUpperLeafTarget> {
++    let extent_root = tree_table_entry_of_kind(image, TREE_KIND_EXTENT).root;
++    let root_bytes = unit_bytes_at(image, the_slot_of(&extent_root), node_bytes());
++    let root = parse_index_node(&root_bytes).expect("extent 上段根解得开");
++    let leaves: Vec<Vec<Vec<u8>>> = if root_bytes[INDEX_NODE_LEVEL_OFFSET] == 0 {
++        vec![root.entries]
++    } else {
++        root.entries
++            .iter()
++            .map(|internal_entry| {
++                // 上段内部条目 110：孩子那一段的起点 key 之后是子指针 86。
++                let child =
++                    NodePointer::read_from(&mut ByteReader::at(internal_entry, root.key_width));
++                parse_index_node(&unit_bytes_at(image, the_slot_of(&child), node_bytes()))
++                    .expect("extent 上段叶解得开")
++                    .entries
++            })
++            .collect()
++    };
++    leaves
++        .iter()
++        .flatten()
++        .map(|entry| ExtentUpperLeafEntry::parse(entry).expect("上段叶条目解得开"))
++        .find(|entry| entry.inode == FIRST_INODE_NUMBER)
++        .map(|entry| entry.target)
++}
++
++/// 截短（3000 → 100）：意图、最后一批都只改记录与截断条目，不放单元（一个都没有）；三处读者读出 100 个 0。改之前 panic 在
++/// `plan_the_extent_tree_after_a_size_change` 的「截断留至少一个单元」那一断言（之前 0、之后 0）。
++#[test]
++fn a_whole_file_hole_of_tag_zero_shrunk_by_the_session_reads_back_its_new_size_as_zeros() {
++    let image = image_whose_first_file_is_a_whole_file_hole("tag-zero-shrunk-by-the-session");
++    let after = image_after_the_session_publishes(
++        &image,
++        vec![UserChange::Truncate {
++            inode: FIRST_FILE,
++            new_size: 100,
++            write_time_seconds: WRITE_TIME_SECONDS,
++        }],
++    );
++    assert_eq!(
++        first_file_entry_of_the_extent_upper_segment(&after),
++        Some(ExtentUpperLeafTarget::NoDataUnit),
++        "标签留 0"
++    );
++    every_reader_reads_the_first_file_as_a_whole_file_hole_of(&after, 100);
++}
++
++/// N = S（3000 → 3000）：一次只改记录的发布；三处读者读出 3000 个 0。改之前 panic 在同一断言。
++#[test]
++fn a_whole_file_hole_of_tag_zero_kept_at_its_size_by_the_session_reads_back_its_size_as_zeros() {
++    let image =
++        image_whose_first_file_is_a_whole_file_hole("tag-zero-kept-at-its-size-by-the-session");
++    let after = image_after_the_session_publishes(
++        &image,
++        vec![UserChange::Truncate {
++            inode: FIRST_FILE,
++            new_size: SIZE_OF_THE_FIRST_FILE,
++            write_time_seconds: WRITE_TIME_SECONDS,
++        }],
++    );
++    assert_eq!(
++        first_file_entry_of_the_extent_upper_segment(&after),
++        Some(ExtentUpperLeafTarget::NoDataUnit),
++        "标签留 0"
++    );
++    every_reader_reads_the_first_file_as_a_whole_file_hole_of(&after, SIZE_OF_THE_FIRST_FILE);
++}
++
++/// 变长（3000 → 三个净荷）：没有单元可补，一次只改记录的发布；三处读者读出三个净荷那么多个 0。改之前 panic 在
++/// `tail_data_unit_rewrite_of_an_extension` 的「第一个文件至少一个数据单元」。
++#[test]
++fn a_whole_file_hole_of_tag_zero_extended_by_the_session_reads_back_its_new_size_as_zeros() {
++    let image = image_whose_first_file_is_a_whole_file_hole("tag-zero-extended-by-the-session");
++    let extended_size = 3 * payload_capacity_in_bytes();
++    let after = image_after_the_session_publishes(
++        &image,
++        vec![UserChange::Truncate {
++            inode: FIRST_FILE,
++            new_size: extended_size,
++            write_time_seconds: WRITE_TIME_SECONDS,
++        }],
++    );
++    assert_eq!(
++        first_file_entry_of_the_extent_upper_segment(&after),
++        Some(ExtentUpperLeafTarget::NoDataUnit),
++        "标签留 0"
++    );
++    every_reader_reads_the_first_file_as_a_whole_file_hole_of(&after, extended_size);
++}
++
++/// 建一个 inode、再按号写 inode 2：inode 2 与第一个文件在同一片上段叶（根兼叶）里，这片叶重写，第一个文件那一条照写标签 0；
++/// 三处读者读第一个文件读出 3000 个 0。改之前（第一个文件零单元那一臂不写条目）这一条丢掉，三处读者都拒。
++#[test]
++fn a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two(
++) {
++    let image =
++        image_whose_first_file_is_a_whole_file_hole("tag-zero-upper-leaf-rewritten-for-inode-two");
++    let content_of_inode_two = vec![9u8; 100];
++    let after = image_after_the_session_publishes(
++        &image,
++        vec![
++            UserChange::NewInodes {
++                count: 1,
++                write_time_seconds: WRITE_TIME_SECONDS,
++            },
++            UserChange::OverwriteOfAnInode {
++                inode: InodeNumber(2),
++                content: &content_of_inode_two,
++                write_time_seconds: WRITE_TIME_SECONDS,
++            },
++        ],
++    );
++    assert_eq!(
++        first_file_entry_of_the_extent_upper_segment(&after),
++        Some(ExtentUpperLeafTarget::NoDataUnit),
++        "重写的那片上段叶里第一个文件那一条照写标签 0"
++    );
++    every_reader_reads_the_first_file_as_a_whole_file_hole_of(&after, SIZE_OF_THE_FIRST_FILE);
++}
++
++/// 建到第一片上段叶之外的号（143）、再按号写它：上段长高一层，第一个文件那片叶不罩变了的号、照抄成根之下的叶，标签 0 那一条留着；
++/// 三处读者读第一个文件读出 3000 个 0。改之前（有条目的号集合里第一个文件只在有数据单元时才算）那片叶不在新形状里、整片换下，三处读者都拒。
++#[test]
++fn a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf(
++) {
++    let image =
++        image_whose_first_file_is_a_whole_file_hole("tag-zero-upper-leaf-kept-past-that-leaf");
++    let inode_past_the_first_upper_leaf = InodeNumber(INODES_PER_UPPER_LEAF);
++    let content = vec![5u8; 100];
++    let after = image_after_the_session_publishes(
++        &image,
++        vec![
++            UserChange::NewInodes {
++                count: inode_past_the_first_upper_leaf.0 - 1,
++                write_time_seconds: WRITE_TIME_SECONDS,
++            },
++            UserChange::OverwriteOfAnInode {
++                inode: inode_past_the_first_upper_leaf,
++                content: &content,
++                write_time_seconds: WRITE_TIME_SECONDS,
++            },
++        ],
++    );
++    assert_ne!(
++        unit_bytes_at(
++            &after,
++            the_slot_of(&tree_table_entry_of_kind(&after, TREE_KIND_EXTENT).root),
++            node_bytes()
++        )[INDEX_NODE_LEVEL_OFFSET],
++        0,
++        "前提：上段长高了一层（号 {} 在第一片叶之外）",
++        inode_past_the_first_upper_leaf.0
++    );
++    assert_eq!(
++        first_file_entry_of_the_extent_upper_segment(&after),
++        Some(ExtentUpperLeafTarget::NoDataUnit),
++        "第一片上段叶连同标签 0 那一条留在新形状里"
++    );
++    every_reader_reads_the_first_file_as_a_whole_file_hole_of(&after, SIZE_OF_THE_FIRST_FILE);
++}

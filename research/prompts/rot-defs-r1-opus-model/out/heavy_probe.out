@@ -1,8 +1,0 @@
-[2] three-way-attack 在调 enumerate_crash_states 的原型包里 cargo run（照 3b 与写范围）
-      ✗ 重型测试被拒：cargo run 起的包 <输出目录>/proto-crate 依赖 singlefs-checker-tier（探针包链接 checker 档，里面能起崩溃枚举，默认只在提交时跑；按包判，不看它挑哪个目标）（checker 档）：three-way-attack 不跑「checker 档」
-      → 规矩：重型测试就是 checker 档那一批（.claude/rules/verification.md）：checker 档包 singlefs-checker-tier 的测试（按包判，挑哪个目标都算）与 checker-tier-crash-point-replay、QEMU、herd7、crates 变异整表、Verus 那一道门禁（checker-tier-formal-verification.sh，连同直接起它的判法脚本 scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py
-[2] three-way-attack 同一原型包 cargo test --test，带 target 声明
-      ✗ 重型测试被拒：cargo test 起的包 <输出目录>/proto-crate 依赖 singlefs-checker-tier（探针包链接 checker 档，里面能起崩溃枚举，默认只在提交时跑；按包判，不看它挑哪个目标）（checker 档）：three-way-attack 不跑「checker 档」
-      → 规矩：重型测试就是 checker 档那一批（.claude/rules/verification.md）：checker 档包 singlefs-checker-tier 的测试（按包判，挑哪个目标都算）与 checker-tier-crash-point-replay、QEMU、herd7、crates 变异整表、Verus 那一道门禁（checker-tier-formal-verification.sh，连同直接起它的判法脚本 scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py
-[0] three-way-attack 同一原型包只 cargo build
-[0] three-way-attack 直接执行原型包编出来的二进制

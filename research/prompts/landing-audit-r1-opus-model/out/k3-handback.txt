@@ -1,0 +1,5 @@
+! handback-guard：找不到这个子 agent 自己的会话记录（输入里没有主会话记录），后台任务这一条没判（放行）
+✗ 报告里的引文对不上（scripts/agents/cite-check.py）：
+  交回里没点名报告文件（research/prompts/<轮>-…-output.md）
+→ 怎么办：按每处的提示改报告里的行号或引文——行号去被引文件里现查（grep -nF），不从背景材料里数；改完再跑一次 python3 scripts/agents/cite-check.py <报告> 看它转绿，再交回。
+handback-rc=2

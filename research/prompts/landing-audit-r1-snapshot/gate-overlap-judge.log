@@ -1,0 +1,12 @@
+  ✗ 加进来的行里有 8 段与别的门禁、钩子或共享脚本整段相同：
+       .claude/hooks/lib_two_logs_guard.py:21-29 与 .claude/hooks/lib_run_scope.py:8 起（连续 9 行相同）
+       .claude/hooks/lib_two_logs_guard.py:75-90 与 .claude/hooks/lib_run_scope.py:86 起（连续 14 行相同）
+       .claude/hooks/lib_two_logs_guard.py:242-251 与 .claude/hooks/lib_run_scope.py:647 起（连续 9 行相同）
+       .claude/hooks/lib_two_logs_guard.py:271-279 与 .claude/hooks/lib_run_scope.py:688 起（连续 8 行相同）
+       .claude/hooks/lib_two_logs_guard.py:363-371 与 .claude/hooks/lib_run_scope.py:923 起（连续 9 行相同）
+       .claude/hooks/lib_two_logs_guard.py:410-417 与 .claude/hooks/lib_run_scope.py:961 起（连续 8 行相同）
+       .claude/hooks/lib_two_logs_guard.py:428-438 与 .claude/hooks/lib_run_scope.py:978 起（连续 11 行相同）
+       .claude/hooks/lib_two_logs_guard.py:443-459 与 .claude/hooks/lib_run_scope.py:994 起（连续 12 行相同）
+     → 怎么办：两份要做的是同一件事，就把新判据并进已有的那一份；
+               只是共用一段逻辑，抽成共用的库（本包的 lib.sh、项目 .claude/gate.d/ 下的 lib-*.py 这类），两边都调它。
+               确实要留两份，在其中一份里写 # gate-overlap:copy-kept <另一份的文件名> <为什么不抽成共用>。

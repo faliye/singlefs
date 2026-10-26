@@ -1,0 +1,2 @@
+REUSE_SELFTEST script=scripts/gate/verus-proof-check.py same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=7 affected=5
+  ✓ verus-proof-check 自证 128 格都判对；弄坏开关 64 个，每个都让至少一格判错

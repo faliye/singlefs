@@ -51,7 +51,7 @@
 
 ### 4. 路径搬移、归档依赖与测试夹具特性
 - **E175 装置重构搬移**：
-  - 原路径 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs` 已被重构移至 `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs`，相关实验文档中的路径未及时同步。
+  - 原路径 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs` 已被重构移至 `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`，相关实验文档中的路径未及时同步。
 - **测试夹具 (Fixtures) 特殊性**：
   - 分册五中列出的 366 篇门禁夹具（如 `doc-decisions.sh` 等的负向测试样本），**故意包含了格式错误、失效决策号、旧格名或不存在的路径**，此为测试其「能否准确判红」的必要设计，**切不可按常规文档盲目“修补”**。
 

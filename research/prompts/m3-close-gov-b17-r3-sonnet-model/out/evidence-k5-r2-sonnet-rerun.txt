@@ -1,0 +1,2 @@
+name=rerun_roots repo=~/code/singlefs frozen=~/code/singlefs/research/prompts/m3-close-gov-b17-r2-snapshot model=<草稿目录>/r2-rerun/sonnet-model
+.claude/rules/verification.md 里找不到「两种排除理由不同」

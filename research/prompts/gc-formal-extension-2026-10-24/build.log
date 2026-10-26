@@ -1,0 +1,20 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 36.4 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 4 条
+  → 第二台此刻放得下（可用 54.6 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 4G --label moved-from-queue-1016876-1674518886 -- cargo test -p singlefs-core --lib compaction_plan::tests --no-run
+run-with-memory-cap: 排了 13 秒，起跑（singlefs-memory-cap-1016876-1674518886）
+   Compiling singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-replay-prefix)
+warning: unused imports: `CompactionKernelAllocationClass`, `CompactionKernelPlannedBatch`, `CompactionKernelScannedAllocation`, and `plan_compaction_batch`
+   --> crates/singlefs-core/src/compaction_plan.rs:969:36
+    |
+969 |         choose_compaction_segment, plan_compaction_batch, CompactionKernelAllocationClass,
+    |                                    ^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+970 |         CompactionKernelPlannedBatch, CompactionKernelRegionChoice,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+971 |         CompactionKernelScannedAllocation, CompactionKernelSegment, CompactionKernelSegmentScan,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib test) generated 1 warning (run `cargo fix --lib -p singlefs-core --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.90s
+  Executable unittests src/lib.rs (target/debug/deps/singlefs_core-fa24058cfebce2e3)

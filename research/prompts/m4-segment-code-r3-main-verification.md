@@ -4,6 +4,8 @@
 
 被判的产品代码与前两轮同一组 20 份（冻结副本 `~/.local/share/singlefs/work/m4-segment-code-r3/repo/`，sha256 在 `m4-segment-code-r3-snapshot/crates-sha256.txt` 21 行），修复批三改过的是 `crates/singlefs-core/src/compaction_plan.rs`、`crates/singlefs-core/src/mounted_session.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-reference-filesystem/src/lib.rs`。正文 `research/prompts/_m4-segment-code-r3-body.md`，背景材料 `_m4-segment-code-r3-background.md`。这是最终轮，之后不再开轮。
 
+开工快照：`research/prompts/m4-segment-code-r3-snapshot/`
+
 ## 一、核查
 
 - 快照：两条腿各自在冻结副本根上 `sha256sum -c` 21 行全 OK（两份报告开头原样）；腿跑着的时候主 agent 没改工作树。

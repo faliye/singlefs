@@ -209,7 +209,7 @@
   新：名、三个数写「待提交时 checker-tier-crates-mutation-replay」。`research/
 - 旧：源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_
   新：源码改动编出来；生成产物时不设 `CARGO_T
-- 旧：sh 会静默盖掉前一个），跑一次 `bash scripts/experiments/replay.sh E<号>` 确认逐字节一致。登记行改指第 4 步的
+- 旧：sh 会静默盖掉前一个），跑一次 `bash scripts/experiment-apparatus/replay.sh E<号>` 确认逐字节一致。登记行改指第 4 步的
   新：sh 会静默盖掉前一个）。登记行改指第 4 步的
 - 旧：字节一致也点一行；门禁 40 号按文件名查）；这一次
   新：字节一致也点一行；门禁 doc-experiments 的 results-c

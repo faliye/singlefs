@@ -1,0 +1,8 @@
+error: assertion failed
+  --> /tmp/singlefs-formal-writing-audit-58eqtqxk/injected.rs:11:12
+   |
+11 |     assert(false);
+   |            ^^^^^ assertion failed
+
+error: aborting due to 1 previous error
+

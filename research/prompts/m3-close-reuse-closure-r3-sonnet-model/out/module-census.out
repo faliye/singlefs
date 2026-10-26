@@ -1,0 +1,26 @@
+check_proof py文件=12 单元缺口(按 dump) assign=106 class=8 import=50 main-guard=9 合计(import+assign+class)=164 合计(import+assign)=156
+  .claude/hooks/lib_work_root.py: ast 顶层 import 名 3 assign 名 7 class 0 | dump 缺口 {'import': 2, 'assign': 3, 'main-guard': 1}
+  .claude/scripts/project_preflight.py: ast 顶层 import 名 3 assign 名 1 class 0 | dump 缺口 {}
+  .claude/singlefs-ai-sop/scripts/preflight.py: ast 顶层 import 名 10 assign 名 25 class 4 | dump 缺口 {'assign': 6}
+  .claude/singlefs-ai-sop/scripts/proc.py: ast 顶层 import 名 7 assign 名 1 class 0 | dump 缺口 {'import': 3, 'main-guard': 1}
+  scripts/crash/lib_verdict_library.py: ast 顶层 import 名 10 assign 名 22 class 4 | dump 缺口 {'import': 2, 'assign': 9, 'main-guard': 1}
+  scripts/gate/lib_function_units.py: ast 顶层 import 名 19 assign 名 120 class 23 | dump 缺口 {'import': 1, 'assign': 1, 'main-guard': 1}
+  scripts/gate/lib_reuse_checks.py: ast 顶层 import 名 16 assign 名 33 class 1 | dump 缺口 {'import': 9, 'assign': 22, 'main-guard': 1}
+  scripts/gate/verus-proof-check.py: ast 顶层 import 名 32 assign 名 56 class 7 | dump 缺口 {'import': 5, 'assign': 22, 'class': 1, 'main-guard': 1}
+  scripts/hosts/core_usage.py: ast 顶层 import 名 13 assign 名 21 class 0 | dump 缺口 {'import': 11, 'assign': 17, 'main-guard': 1}
+  scripts/hosts/heavy_threads.py: ast 顶层 import 名 3 assign 名 9 class 1 | dump 缺口 {'import': 1, 'assign': 1, 'main-guard': 1}
+  scripts/hosts/host-dispatch.py: ast 顶层 import 名 24 assign 名 30 class 9 | dump 缺口 {'import': 14, 'assign': 21, 'class': 7, 'main-guard': 1}
+  scripts/hosts/memory_peaks_lib.py: ast 顶层 import 名 6 assign 名 13 class 0 | dump 缺口 {'import': 2, 'assign': 4}
+check_proof ast 顶层合计 import=146 assign=338 class=49（含已在闭包里的）
+Runner.escalate_step py文件=10 单元缺口(按 dump) assign=213 class=22 import=55 main-guard=8 合计(import+assign+class)=290 合计(import+assign)=268
+  .claude/hooks/lib_work_root.py: ast 顶层 import 名 3 assign 名 7 class 0 | dump 缺口 {'import': 2, 'assign': 3, 'main-guard': 1}
+  .claude/singlefs-ai-sop/scripts/preflight.py: ast 顶层 import 名 10 assign 名 25 class 4 | dump 缺口 {'assign': 6}
+  .claude/singlefs-ai-sop/scripts/proc.py: ast 顶层 import 名 7 assign 名 1 class 0 | dump 缺口 {'import': 3, 'main-guard': 1}
+  scripts/gate/lib_libtest_result_lines.py: ast 顶层 import 名 8 assign 名 20 class 0 | dump 缺口 {'import': 3, 'assign': 16, 'main-guard': 1}
+  scripts/gate/lib_reuse_checks.py: ast 顶层 import 名 16 assign 名 33 class 1 | dump 缺口 {'import': 13, 'assign': 33, 'class': 1, 'main-guard': 1}
+  scripts/hosts/core_usage.py: ast 顶层 import 名 13 assign 名 21 class 0 | dump 缺口 {'import': 8, 'assign': 17, 'main-guard': 1}
+  scripts/hosts/heavy_threads.py: ast 顶层 import 名 3 assign 名 9 class 1 | dump 缺口 {'import': 1, 'assign': 1, 'main-guard': 1}
+  scripts/hosts/host-dispatch.py: ast 顶层 import 名 24 assign 名 30 class 9 | dump 缺口 {'import': 13, 'assign': 21, 'class': 7, 'main-guard': 1}
+  scripts/hosts/memory_peaks_lib.py: ast 顶层 import 名 6 assign 名 13 class 0 | dump 缺口 {'import': 2, 'assign': 4}
+  scripts/mutation/broad-mutation.py: ast 顶层 import 名 24 assign 名 170 class 19 | dump 缺口 {'import': 10, 'assign': 112, 'class': 14, 'main-guard': 1}
+Runner.escalate_step ast 顶层合计 import=114 assign=329 class=34（含已在闭包里的）

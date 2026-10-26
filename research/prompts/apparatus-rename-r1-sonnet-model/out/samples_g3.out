@@ -1,0 +1,16 @@
+name=c1-gate-changed-paths exit=0 kept=['.claude/gate.d/path-moves.tsv', 'scripts/experiment-apparatus/brand-new.sh', 'scripts/experiment-apparatus/edited.sh', 'scripts/experiment-apparatus/mode.sh', 'scripts/experiment-apparatus/run.sh', 'scripts/experiment-apparatus/untracked-copy.sh', 'scripts/experiments/deleted.sh', 'scripts/experiments/edited.sh', 'scripts/experiments/mode.sh', 'scripts/experiments/run.sh'] error=
+name=c1-verdict path=.claude/agents/triage.md seen_as_changed=False
+name=c1-verdict path=crates/x/src/lib.rs seen_as_changed=False
+name=c1-verdict path=.claude/hooks/guard.sh seen_as_changed=False
+name=c1-verdict path=docs/note.md seen_as_changed=False
+name=c1-verdict path=scripts/experiment-apparatus/copied.sh seen_as_changed=False
+name=c1-verdict path=scripts/experiment-apparatus/mode.sh seen_as_changed=True
+name=c1-verdict path=scripts/experiment-apparatus/edited.sh seen_as_changed=True
+name=c1-verdict path=scripts/experiment-apparatus/deleted.sh seen_as_changed=False
+name=c1-verdict path=scripts/experiment-apparatus/brand-new.sh seen_as_changed=True
+name=c1-verdict path=scripts/experiment-apparatus/run.sh seen_as_changed=True
+name=c1-verdict path=scripts/experiment-apparatus/untracked-copy.sh seen_as_changed=True
+name=c1-verdict path=.claude/gate.d/path-moves.tsv seen_as_changed=True
+name=c1-gate-changed-paths-added-only exit=0 kept=['.claude/gate.d/path-moves.tsv', 'scripts/experiment-apparatus/brand-new.sh', 'scripts/experiment-apparatus/edited.sh', 'scripts/experiment-apparatus/mode.sh', 'scripts/experiment-apparatus/run.sh', 'scripts/experiment-apparatus/untracked-copy.sh']
+name=c1-gate-added-lines exit=0 lines=['.claude/gate.d/path-moves.tsv\tscripts/experiments\tscripts/experiment-apparatus\t2026-10-23\t', 'scripts/experiment-apparatus/brand-new.sh\techo scripts/experiment-apparatus/brand-new.sh', 'scripts/experiment-apparatus/edited.sh\tline two changed', 'scripts/experiment-apparatus/run.sh\textra unstaged line', 'scripts/experiment-apparatus/untracked-copy.sh\tbash scripts/experiment-apparatus/run.sh']
+name=c2-copy-old-still-there change_range=['.claude/gate.d/path-moves.tsv'] registry_cell_exit=1 registry_cell_says=✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 1 行）：

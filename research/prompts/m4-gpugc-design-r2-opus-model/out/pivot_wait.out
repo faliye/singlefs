@@ -1,0 +1,48 @@
+name=pivot_wait include_today=False candidate=every_stage card=0 wait=blocking threshold_kind=attack_ledger losing=3 not_losing=23 unstable=10
+name=pivot_wait include_today=False candidate=every_stage card=0 wait=blocking threshold_kind=machine_scaled losing=1 not_losing=29 unstable=6
+name=pivot_wait include_today=False candidate=every_stage card=0 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=1 not_losing=14 unstable=21
+name=pivot_wait include_today=False candidate=every_stage card=0 wait=sleep_100_microseconds threshold_kind=machine_scaled not_losing=16 unstable=20
+name=pivot_wait include_today=False candidate=every_stage card=0 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=1 not_losing=22 unstable=13
+name=pivot_wait include_today=False candidate=every_stage card=0 wait=sleep_1_millisecond threshold_kind=machine_scaled not_losing=28 unstable=8
+name=pivot_wait include_today=False candidate=every_stage card=1 wait=blocking threshold_kind=attack_ledger losing=14 not_losing=13 unstable=9
+name=pivot_wait include_today=False candidate=every_stage card=1 wait=blocking threshold_kind=machine_scaled losing=10 not_losing=18 unstable=8
+name=pivot_wait include_today=False candidate=every_stage card=1 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=19 not_losing=6 unstable=11
+name=pivot_wait include_today=False candidate=every_stage card=1 wait=sleep_100_microseconds threshold_kind=machine_scaled losing=13 not_losing=15 unstable=8
+name=pivot_wait include_today=False candidate=every_stage card=1 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=17 not_losing=14 unstable=5
+name=pivot_wait include_today=False candidate=every_stage card=1 wait=sleep_1_millisecond threshold_kind=machine_scaled losing=12 not_losing=19 unstable=5
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=0 wait=blocking threshold_kind=attack_ledger losing=10 not_losing_lower_bound=6 unstable=20
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=0 wait=blocking threshold_kind=machine_scaled losing=6 not_losing_lower_bound=14 unstable=16
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=0 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=7 unstable=29
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=0 wait=sleep_100_microseconds threshold_kind=machine_scaled unstable=36
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=0 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=4 not_losing_lower_bound=4 unstable=28
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=0 wait=sleep_1_millisecond threshold_kind=machine_scaled losing=2 not_losing_lower_bound=13 unstable=21
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=1 wait=blocking threshold_kind=attack_ledger losing=24 unstable=12
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=1 wait=blocking threshold_kind=machine_scaled losing=20 not_losing_lower_bound=4 unstable=12
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=1 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=30 unstable=6
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=1 wait=sleep_100_microseconds threshold_kind=machine_scaled losing=22 unstable=14
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=1 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=24 not_losing_lower_bound=4 unstable=8
+name=pivot_wait include_today=False candidate=scan_checksum_and_choice card=1 wait=sleep_1_millisecond threshold_kind=machine_scaled losing=20 not_losing_lower_bound=6 unstable=10
+name=pivot_wait include_today=True candidate=every_stage card=0 wait=blocking threshold_kind=attack_ledger losing=3 not_losing=29 unstable=16
+name=pivot_wait include_today=True candidate=every_stage card=0 wait=blocking threshold_kind=machine_scaled losing=1 not_losing=38 unstable=9
+name=pivot_wait include_today=True candidate=every_stage card=0 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=1 not_losing=14 unstable=21
+name=pivot_wait include_today=True candidate=every_stage card=0 wait=sleep_100_microseconds threshold_kind=machine_scaled not_losing=16 unstable=20
+name=pivot_wait include_today=True candidate=every_stage card=0 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=1 not_losing=22 unstable=13
+name=pivot_wait include_today=True candidate=every_stage card=0 wait=sleep_1_millisecond threshold_kind=machine_scaled not_losing=28 unstable=8
+name=pivot_wait include_today=True candidate=every_stage card=1 wait=blocking threshold_kind=attack_ledger losing=18 not_losing=15 unstable=15
+name=pivot_wait include_today=True candidate=every_stage card=1 wait=blocking threshold_kind=machine_scaled losing=13 not_losing=24 unstable=11
+name=pivot_wait include_today=True candidate=every_stage card=1 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=19 not_losing=6 unstable=11
+name=pivot_wait include_today=True candidate=every_stage card=1 wait=sleep_100_microseconds threshold_kind=machine_scaled losing=13 not_losing=15 unstable=8
+name=pivot_wait include_today=True candidate=every_stage card=1 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=17 not_losing=14 unstable=5
+name=pivot_wait include_today=True candidate=every_stage card=1 wait=sleep_1_millisecond threshold_kind=machine_scaled losing=12 not_losing=19 unstable=5
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=0 wait=blocking threshold_kind=attack_ledger losing=10 not_losing_lower_bound=6 unstable=20
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=0 wait=blocking threshold_kind=machine_scaled losing=6 not_losing_lower_bound=14 unstable=16
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=0 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=7 unstable=29
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=0 wait=sleep_100_microseconds threshold_kind=machine_scaled unstable=36
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=0 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=4 not_losing_lower_bound=4 unstable=28
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=0 wait=sleep_1_millisecond threshold_kind=machine_scaled losing=2 not_losing_lower_bound=13 unstable=21
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=1 wait=blocking threshold_kind=attack_ledger losing=24 unstable=12
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=1 wait=blocking threshold_kind=machine_scaled losing=20 not_losing_lower_bound=4 unstable=12
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=1 wait=sleep_100_microseconds threshold_kind=attack_ledger losing=30 unstable=6
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=1 wait=sleep_100_microseconds threshold_kind=machine_scaled losing=22 unstable=14
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=1 wait=sleep_1_millisecond threshold_kind=attack_ledger losing=24 not_losing_lower_bound=4 unstable=8
+name=pivot_wait include_today=True candidate=scan_checksum_and_choice card=1 wait=sleep_1_millisecond threshold_kind=machine_scaled losing=20 not_losing_lower_bound=6 unstable=10

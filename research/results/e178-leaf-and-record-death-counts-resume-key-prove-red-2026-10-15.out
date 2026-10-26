@@ -1,8 +1,0 @@
-baseline exit=0 passed=54 failed=0
-[M23_项键漏参数] exit=101 failed=[tests::item_key_changes_with_every_parameter_field tests::item_key_changes_with_the_code_key tests::inserting_an_item_in_front_reuses_every_item_already_judged tests::resuming_from_the_item_files_assembles_the_same_product tests::items_written_under_another_code_key_are_not_read_back ] compile_error=[error: test failed, to rerun pass `--bin e178-leaf-and-record-death-counts`]
-[M24_项键带序号] exit=101 failed=[tests::inserting_an_item_in_front_reuses_every_item_already_judged ] compile_error=[error: test failed, to rerun pass `--bin e178-leaf-and-record-death-counts`]
-[M25_按项名找项文件] exit=101 failed=[tests::items_written_under_another_code_key_are_not_read_back ] compile_error=[error: test failed, to rerun pass `--bin e178-leaf-and-record-death-counts`]
-[M26_键对不上恒报零] exit=101 failed=[tests::a_second_code_key_reports_every_item_as_mismatched ] compile_error=[error: test failed, to rerun pass `--bin e178-leaf-and-record-death-counts`]
-[M27_项键漏代码键] exit=101 failed=[tests::item_key_changes_with_the_code_key tests::a_second_code_key_reports_every_item_as_mismatched tests::items_written_under_another_code_key_are_not_read_back ] compile_error=[error: test failed, to rerun pass `--bin e178-leaf-and-record-death-counts`]
-已还原
-restored exit=0 passed=54 failed=0

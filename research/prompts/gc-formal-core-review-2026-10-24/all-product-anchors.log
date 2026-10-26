@@ -1,0 +1,2 @@
+COPIED	crates Cargo.toml Cargo.lock litmus .cargo scripts/hosts/run-with-memory-cap.sh scripts/mutation/crates-mutation-rows.py scripts/mutation/mutation-prune.py scripts/gate/lib_libtest_result_lines.py scripts/crash/lib_verdict_library.py .claude/heavy-thread-default .claude/gate.d/crash-point-replay-items.tsv .claude/gate.d/stage-inputs.tsv scripts/crash/crash-amplification.sh
+CHECKED	23	613	7

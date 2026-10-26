@@ -1,0 +1,250 @@
+diff -ruN tree-b/crates/singlefs-core/Cargo.toml tree-m4/crates/singlefs-core/Cargo.toml
+--- tree-b/crates/singlefs-core/Cargo.toml
++++ tree-m4/crates/singlefs-core/Cargo.toml
+@@ -15,6 +15,13 @@
+ singlefs-format = { path = "../singlefs-format" }
+ # 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它；compaction_plan 直接调用整理选段核、计划核，allocator 调用释放代比较核。
+ singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
++vstd = "=0.0.0-2026-09-20-0158"
++
++[lints.rust]
++unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
++
++[package.metadata.verus]
++verify = true
+ 
+ [features]
+ # 七·6 各处按身份查的计数（`transaction::lookup_work`：查了几次、每次看过索引几项、建了几次索引、解了几次中央映射叶）：只给测试读，默认关；
+diff -ruN tree-b/crates/singlefs-core/src/address.rs tree-m4/crates/singlefs-core/src/address.rs
+--- tree-b/crates/singlefs-core/src/address.rs
++++ tree-m4/crates/singlefs-core/src/address.rs
+@@ -8,7 +8,9 @@
+ //! ```
+ 
+ use singlefs_format::SLOT_BYTES;
++use vstd::prelude::*;
+ 
++verus! {
+ /// 池内一块设备的身份，与位置条目里那 4 字节同宽（D19（块指针的结构与宽度预算） 已定项 4）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+ pub struct DeviceIdentity(pub u32);
+@@ -17,13 +19,14 @@
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+ pub struct SlotNumber(pub u64);
+ 
+-/// 设备内字节偏移。只由 [`SlotNumber::to_device_offset`] 或固定结构的落点表产生。
+-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+-pub struct DeviceOffsetInBytes(pub u64);
+-
+ /// checkpoint 号：发布计数、轮转键、记账代、重放水位是同一个数（D16（发布语义） 已定项 6）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+ pub struct CheckpointTxg(pub u64);
++}
++
++/// 设备内字节偏移。只由 [`SlotNumber::to_device_offset`] 或固定结构的落点表产生。
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
++pub struct DeviceOffsetInBytes(pub u64);
+ 
+ /// journal 实例代号：mkfs 写 0，第一次可写挂载取 1（D23（journal 的角色与格式） 已定项 16）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+diff -ruN tree-b/crates/singlefs-core/src/allocator.rs tree-m4/crates/singlefs-core/src/allocator.rs
+--- tree-b/crates/singlefs-core/src/allocator.rs
++++ tree-m4/crates/singlefs-core/src/allocator.rs
+@@ -16,6 +16,7 @@
+ };
+ 
+ use std::collections::{BTreeMap, BTreeSet};
++use vstd::prelude::*;
+ 
+ use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+ use crate::admission::SpaceAdmission;
+@@ -40,6 +41,7 @@
+ const ALLOCATION_RECORD_SPAN_VALUE_BITS: u16 =
+     !(ALLOCATION_RECORD_RELEASED_FLAG | ALLOCATION_RECORD_QUARANTINE_MARK);
+ 
++verus! {
+ /// 一条分配记录跨度段次高位的读法（D19（块指针的结构与宽度预算） 已定项 5「隔离的盘上记号」）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+ pub enum AllocationRecordQuarantineMark {
+@@ -48,6 +50,7 @@
+     /// 次高位 1：释放之前读盘核出这个单元有一份对不上，隔离那次发布在每块盘上那条记录里置上；记录仍分配、分配代不变。
+     QuarantinedAfterTheReleaseChecksumCheck,
+ }
++}
+ 
+ /// 盘上 20 字节解不成一条分配记录的样子。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -58,6 +61,7 @@
+     QuarantineMarkOnAReleasedRecord,
+ }
+ 
++verus! {
+ /// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志与隔离记号, 分配代或释放代 8)。
+ /// 释放时条目不删、不点删：改写成已释放 + 释放代，留到该落点被重新分配时覆盖（覆盖是步 5 回收接上时的事：
+ /// 回收过的落点被再分配时那条记录改写、不追加，槽号在每盘仍唯一；新落点罩住的别的已回收记录随这次分配删掉，同一块盘上的记录
+@@ -74,6 +78,7 @@
+     /// 已释放的记录恒是 [`AllocationRecordQuarantineMark::NotQuarantined`]（[`Self::to_bytes`] 断言）。
+     pub quarantine_mark: AllocationRecordQuarantineMark,
+ }
++}
+ 
+ impl AllocationRecord {
+     /// # Panics
+diff -ruN tree-b/crates/singlefs-core/src/compaction_plan.rs tree-m4/crates/singlefs-core/src/compaction_plan.rs
+--- tree-b/crates/singlefs-core/src/compaction_plan.rs
++++ tree-m4/crates/singlefs-core/src/compaction_plan.rs
+@@ -7,6 +7,7 @@
+ //! 打分是 [`greedy_score`]；cost-benefit 与轮转留给 E10（老化：结构抗老化 vs 事后整理） 的臂。
+ 
+ use std::collections::{BTreeMap, BTreeSet};
++use vstd::prelude::*;
+ use std::num::{NonZeroU64, NonZeroUsize};
+ use std::time::Duration;
+ 
+@@ -943,15 +944,37 @@
+     holes >= units_to_move
+ }
+ 
++verus! {
++pub open spec fn record_keeps_the_region_non_empty(record: AllocationRecord, region: CompactionRegion) -> bool {
++    record.device == region.spec_device() && !record.is_released && region.spec_contains_slot(record.slot)
++}
++
+ /// 停机谓词（D26（后台整理与放置回收） 已定项 1 第 2 条，判决 G4）：删意图那一刻 R 按记录全空——R 那块盘上起点在 R 里的未释放记录一条都没有。
+ #[must_use]
+ pub fn region_is_empty_by_the_records(
+     allocation_records: &[AllocationRecord],
+     region: CompactionRegion,
+-) -> bool {
+-    !allocation_records.iter().any(|record| {
+-        record.device == region.device() && !record.is_released && region.contains_slot(record.slot)
+-    })
++) -> (empty: bool)
++    ensures
++        empty == forall|i: int| 0 <= i < allocation_records@.len() ==> !record_keeps_the_region_non_empty(
++            #[trigger] allocation_records@[i], region),
++{
++    let mut index: usize = 0;
++    while index < allocation_records.len()
++        invariant
++            0 <= index <= allocation_records.len(),
++            forall|i: int| 0 <= i < index ==> !record_keeps_the_region_non_empty(
++                #[trigger] allocation_records@[i], region),
++        decreases allocation_records.len() - index,
++    {
++        let record = &allocation_records[index];
++        if record.device.0 == region.device().0 && !record.is_released && region.contains_slot(record.slot) {
++            return false;
++        }
++        index += 1;
++    }
++    true
++}
+ }
+ 
+ /// 一条意图完成之后签不签下一条（攻方 K-h）：全局差值 `全空聚簇段数(现在) − segs0 ≥ 1` 为真才签。
+diff -ruN tree-b/crates/singlefs-core/src/logged_operations.rs tree-m4/crates/singlefs-core/src/logged_operations.rs
+--- tree-b/crates/singlefs-core/src/logged_operations.rs
++++ tree-m4/crates/singlefs-core/src/logged_operations.rs
+@@ -14,6 +14,7 @@
+ };
+ 
+ use crate::address::{CheckpointTxg, DeviceIdentity, InodeNumber, SlotNumber};
++use vstd::prelude::*;
+ use crate::bytes::{ByteReader, ByteWriter};
+ use crate::unit::index_node_entry_capacity;
+ 
+@@ -65,6 +66,7 @@
+     }
+ }
+ 
++verus! {
+ /// 整理意图的区域 R：一块盘上一个 64 槽对齐的聚簇段（判决 G1：起始槽 64 对齐、槽数 = 64；第一版两盘同槽时 R 罩住每块盘上的同号槽，
+ /// 攻方 K-n）。只从 [`CompactionRegion::of_one_cluster_segment`] 进来，所以槽数不存：恒是 [`CLUSTER_SEGMENT_SLOTS`]。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+@@ -83,6 +85,20 @@
+ }
+ 
+ impl CompactionRegion {
++    // 类型不变量：起始槽装得进 6 字节、是 64 的倍数。私有字段只在 of_one_cluster_segment 里构造。
++    #[verifier::type_invariant]
++    spec fn well_formed(self) -> bool {
++        self.start_slot.0 < 0x1_0000_0000_0000u64 && self.start_slot.0 % 64 == 0
++    }
++
++    pub closed spec fn spec_device(self) -> DeviceIdentity { self.device }
++
++    pub closed spec fn spec_start_slot(self) -> SlotNumber { self.start_slot }
++
++    pub open spec fn spec_contains_slot(self, slot: SlotNumber) -> bool {
++        self.spec_start_slot().0 <= slot.0 && slot.0 < self.spec_start_slot().0 + 64
++    }
++
+     /// `device` 上从 `start_slot` 起的那一个聚簇段。
+     ///
+     /// # Errors
+@@ -90,26 +106,46 @@
+     pub fn of_one_cluster_segment(
+         device: DeviceIdentity,
+         start_slot: SlotNumber,
+-    ) -> Result<Self, CompactionRegionRefusal> {
+-        if !start_slot.0.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
++    ) -> (result: Result<Self, CompactionRegionRefusal>)
++        ensures
++            result is Ok ==> result->Ok_0.spec_device() == device && result->Ok_0.spec_start_slot() == start_slot,
++            result is Ok <==> (start_slot.0 % 64 == 0 && start_slot.0 < 0x1_0000_0000_0000u64),
++    {
++        if start_slot.0 % 64 != 0 {
+             return Err(CompactionRegionRefusal::StartOffAClusterSegmentBoundary { start_slot });
+         }
+-        if start_slot.0 >= SIX_BYTE_SLOT_NUMBER_LIMIT {
++        if start_slot.0 >= 0x1_0000_0000_0000u64 {
+             return Err(CompactionRegionRefusal::StartBeyondTheSixByteSlotNumber { start_slot });
+         }
+         Ok(Self { device, start_slot })
+     }
+ 
+     #[must_use]
+-    pub const fn device(self) -> DeviceIdentity {
++    pub fn device(self) -> (d: DeviceIdentity)
++        ensures d == self.spec_device(),
++    {
+         self.device
+     }
+ 
+     #[must_use]
+-    pub const fn start_slot(self) -> SlotNumber {
++    pub fn start_slot(self) -> (s: SlotNumber)
++        ensures s == self.spec_start_slot(),
++    {
+         self.start_slot
+     }
+ 
++    /// 这个槽号在不在 R 里（只看槽号：两盘同槽时 R 罩住每块盘上的同号槽）。
++    #[must_use]
++    pub fn contains_slot(self, slot: SlotNumber) -> (inside: bool)
++        ensures inside == self.spec_contains_slot(slot),
++    {
++        proof { use_type_invariant(&self); }
++        slot.0 >= self.start_slot.0 && slot.0 < self.start_slot.0 + 64
++    }
++}
++}
++
++impl CompactionRegion {
+     /// 槽数：恒是一个聚簇段。
+     #[must_use]
+     pub const fn slot_count(self) -> u64 {
+@@ -121,12 +157,6 @@
+     pub const fn end_slot(self) -> SlotNumber {
+         SlotNumber(self.start_slot.0 + CLUSTER_SEGMENT_SLOTS)
+     }
+-
+-    /// 这个槽号在不在 R 里（只看槽号：两盘同槽时 R 罩住每块盘上的同号槽）。
+-    #[must_use]
+-    pub const fn contains_slot(self, slot: SlotNumber) -> bool {
+-        slot.0 >= self.start_slot.0 && slot.0 < self.start_slot.0 + CLUSTER_SEGMENT_SLOTS
+-    }
+ }
+ 
+ /// 一条整理意图（D26（后台整理与放置回收） 已定项 1 / 已定项 2；字段表判决 G1）。三个字段都是值，不是增量

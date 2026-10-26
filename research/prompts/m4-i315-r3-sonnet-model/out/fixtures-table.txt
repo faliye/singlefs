@@ -1,0 +1,15 @@
+盘 | today exempt gen genplus cmp both bothplus jrn jrngen | 臂间一致
+隔离之后又被回退复活 / 甲 隔离着、盘 1 头仍用不了 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+隔离之后又被回退复活 / 乙 盘 1 写回原样、未回退（无 key、两份都好） | oXX oXX oXX oXX oXX oXX oXX oXX oXX | 同
+隔离之后又被回退复活 / 丙 写回原样后回退到 A（又有 key 指着那一槽） | ooX ooX ooX ooX ooX ooX ooX ooX ooX | 同
+两盘改坏/改回 / 两盘那一份都改坏 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+两盘改坏/改回 / 那两份改回对得上 | XXX XXX XXX XXX XXX XXX XXX XXX XXX | 同
+只盘0改坏/改回 / 只盘 0 那一份改坏 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+只盘0改坏/改回 / 单元两份都好 | XXX XXX XXX XXX XXX XXX XXX XXX XXX | 同
+完整的别的单元 / 隔离的那两份是一个完整的别的单元 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+头用不了的世界 / W1 盘0头写零、盘1好、B 一次、A 仍是候选 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+头用不了的世界 / W1b 盘1头写零、盘0好、B 一次、A 仍是候选 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+头用不了的世界 / W2 两盘头写零、B 一次、A 仍是候选 | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+头用不了的世界 / W3 盘0整单元0xa5、盘1好、再三次覆盖写并抬 F 到 4（A 出候选集） | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+头用不了的世界 / W3b 同 W3 但只再覆盖写一次、不抬 F | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同
+头用不了的世界 / W0 无损坏（对照：隔离不发生） | ooo ooo ooo ooo ooo ooo ooo ooo ooo | 同

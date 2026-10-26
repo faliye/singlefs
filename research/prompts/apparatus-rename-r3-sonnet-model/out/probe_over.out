@@ -1,0 +1,21 @@
+name=o0_control_plain_directory_move effective=[rig->rig2] table_problems=0 kept_for_review=[]
+name=o1_move_and_delete_one_file effective=[rig->rig2] table_problems=1 kept_for_review=[rig/b.sh, rig2/b.sh]
+    problem: 第 2 行：基准 HEAD 里旧前缀 rig 下的 2 份，照这一行换前缀的落点上有 1 份此刻不在（rig2/b.sh）
+name=o2_ignored_leftover_in_old_dir effective=[rig->rig2] table_problems=1 kept_for_review=[]
+    problem: 第 2 行的旧前缀 rig 还在磁盘上（搬完以后旧路径不该还在）
+name=o3_wrap_directory_into_its_own_subdirectory effective=[rig->rig/legacy] table_problems=1 kept_for_review=[]
+    problem: 第 2 行的旧前缀 rig 还在磁盘上（搬完以后旧路径不该还在）
+name=o4_merge_two_directories_into_one effective=[rig->merged, rig_b->merged] table_problems=2 kept_for_review=[merged/c.sh]
+    problem: 第 2 行与第 3 行串了（merged 与 merged 相同或一个在另一个下面）：此刻生效的几行，旧前缀、新前缀互相不许相同、包含或落在下面
+    problem: 第 3 行的旧前缀 rig_b 还在磁盘上（搬完以后旧路径不该还在）
+name=o5_two_independent_moves_in_one_change effective=[rig->rig2, other->other2] table_problems=0 kept_for_review=[]
+name=o6_single_file_rename_callers_only effective=[rig/a.sh->rig/alpha.sh] table_problems=0 kept_for_review=[rig/a.sh, rig/alpha.sh]
+name=o7a_after_commit_row_idle effective=[] table_problems=0 kept_for_review=[]
+name=o7b_row_unchanged_since_but_wakes_up_nothing_changed effective=[rig->rig2] table_problems=2 kept_for_review=[]
+    problem: 第 2 行的旧前缀 rig 还在磁盘上（搬完以后旧路径不该还在）
+    problem: 第 2 行：基准 HEAD 里旧前缀 rig 下的 1 份，照这一行换前缀的落点上有 1 份此刻不在（rig2/new.sh）
+name=o7c_untouched_exempt_table baseline_line='rig2/new.sh\t豁免' current_line='rig/new.sh\t豁免' reads_as_growth=True
+name=o9_two_of_three_files_replaced_after_move effective=[rig->rig2] table_problems=0 kept_for_review=[rig/b.sh, rig/c.sh, rig2/b.sh, rig2/c.sh]
+name=o9_cell_note table_problems=0 note='此刻生效 1 行（第 2 行），不串、有搬迁实据（第 2 行 3 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）'
+name=o8_placeholder_file_already_under_new_prefix effective=[] table_problems=0 kept_for_review=[.claude/hooks/caller.sh, rig/a.sh, rig2/a.sh, rig2/b.sh]
+name=o8_cell_message cell_problems=0 note='此刻生效的 0 行；不生效 1 行（第 2 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）'

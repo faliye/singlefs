@@ -66,7 +66,7 @@ case "$PART" in
     [ ! -e "$W/repo" ] || { echo "工作目录里已有 repo：$W/repo" >&2; exit 2; }
     rsync -a --exclude target --exclude .git "$FROZEN/" "$W/repo/"
     (cd "$W/repo" && sha256sum -c --quiet "$R/research/prompts/m3-w3-r1-snapshot/tree-sha256.txt")
-    python3 "$M/make_device.py" "$R/scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs" "$W/repo/crates/singlefs-harness/tests/w3_attack_candidates.rs"
+    python3 "$M/make_device.py" "$R/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs" "$W/repo/crates/singlefs-harness/tests/w3_attack_candidates.rs"
     exe=$(build_device); cp "$exe" "$W/bin/w3-P"
     cp "$W/repo/crates/singlefs-core/src/mount.rs" "$W/mount.rs.pristine"
     sha256sum "$W/bin/w3-P" ;;

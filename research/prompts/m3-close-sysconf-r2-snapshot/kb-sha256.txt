@@ -1,8 +1,0 @@
-693eefacd37edf0ce6869e753015975df3fbbd14dcd7a627c28219019ec21fbd  .claude/kb/decisions/22-单元原子性怎么合成.md
-6890462dd579762aa632f6d6cba4d8595ee390f13762a68e917b66670ef62128  .claude/kb/decisions/18-块里携带什么信息.md
-b5f08fb2c3a54332d565a0951976f492568e75bb6857d76aeb5e9b788b50675d  .claude/kb/decisions/23-journal的角色与格式.md
-2a280dd4f823f042e766899d49746e91d223fafa9dbf36cae2d1a4bfb9d468f0  crates/singlefs-checker/invariants/03-journal.md
-91df9832877bc1950071ecf0e8f7f4053a815c9be7d4ab4bef79aa2c24b96d55  crates/singlefs-checker/invariants/02-根环.md
-9ceac9cb3aa5ad5be91724be4839b254eec874678c13d72bed642d5ffdbf80bc  .claude/kb/checks-owed.md
-6aca8d61a7788b560801c84006e6bb0b2522cf9ccf8c28692bafd402de854a1a  crates/singlefs-checker/invariants/04-校验和.md
-be539721f8bbcde507c8a838434bbf05cb6caa891d08c5fc814e8fed5c809e54  crates/singlefs-checker/invariants/06-事务与崩溃一致性.md

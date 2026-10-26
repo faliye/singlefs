@@ -31,7 +31,7 @@
 - **「投影之外的根字段随版本变」（Q2 的生成器）**：时间线第 j 版 R_j 的实例表指针取 `node_pointer_at_slot(69_000 + j, 1)`、分配记录树根取 `node_pointer_at_slot(68_000 + j, 1)`、16 字节 fsid 的末字节取 j（低 8 字节不动，仍等于记录头里那 8 字节与系统配置的 fsid 低 8 字节）、卸载记号 j 为偶数取 `WrittenByTheUnmountSequence`、奇数取 `NotWrittenByTheUnmountSequence`；对抗一族的所选根取 R_0 那一份。这些取值不是任何合法池写得出来的（fsid 全池不变，D22 已定项 7 的分配记录树根只在树表 0 条写过行的一版非零），它们只是让「施加出的根抄错了来源」这一类在界内看得见的取样点；投影与记录的字节一个不动。
 - **多盘（Q3）**：「两块盘各一份记录」= D22（单元原子性怎么合成） 已定项 8 第 2 条「journal 环在两块盘上互为镜像」：每条记录在 0、1 号盘同一落点各写一份，崩溃状态里每份各自落或没落（每条记录四态）；「盘之间有一份落后」= 一块盘的落盘集合真包含于另一块的（「落后」），与「相等」「互不包含」并列各报一行。「两块盘各一份根」只经所选根进 `replay_journal`：根槽不镜像（D16（发布语义） 已定项 7 射程第一条），所选根照 C 域的写法由「落了的根里最新那条」给（MC 域）；根落在哪块盘只影响择根，择根不在被测范围。记录「在」= 任一份读得出（D23 已定项 14「两份镜像何时算「记录在」：任一份自证校验和过即在」），J2、J4 的「完整在盘上」照这一句改成任一份。
 - **由 `scan_journal` 建表（Q4）**：同一个状态、同一份内存盘，「直接给表」= 今天装置的建法（原登记 5.1 与修订第 8 条：按盘号升序、逐槽取那一条的 `parse` 结果、`(实例, 计数器)` 先到先得）；「扫盘建表」= 装置照状态的环长与 fsid 造一份 `SystemConfiguration`，调 `scan_journal(&内存盘, &系统配置)`。「逐态行相同」= 同一个状态上两张表逐键逐值相等，且拿两张表各判一遍，这个状态让哪几个计数器加一（`--replay-state` 打的那一行里的计数器标签集合与实现的结局）逐项相同。
-- **线程上限与内存上限**：一律取派发提示给的（编译、装置、驱动的 `--jobs` × `--threads` 不超过线程上限；装置与驱动经 `scripts/hosts/run-with-memory-cap.sh`，上限取派发提示的，没给时第一、三、四段取 `scripts/experiments/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值、第二段取驱动文件头 `E165_KILL_BOUNDS_MEMORY_CAP` 的默认值）。登记里不写死数。
+- **线程上限与内存上限**：一律取派发提示给的（编译、装置、驱动的 `--jobs` × `--threads` 不超过线程上限；装置与驱动经 `scripts/hosts/run-with-memory-cap.sh`，上限取派发提示的，没给时第一、三、四段取 `scripts/experiment-apparatus/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值、第二段取驱动文件头 `E165_KILL_BOUNDS_MEMORY_CAP` 的默认值）。登记里不写死数。
 
 问题单 `research/prompts/e165-r2-questions.md`（sha256 `15fa858b87aeccda620486a1317a8bd88078d3b090e898b53992742e6bf6ce98`）四行逐行抄（表头在内）：
 
@@ -340,7 +340,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-主 agent 以外的观测，行号是 2026-10-02 现读的。sha256：`crates/singlefs-core/src/recovery.rs` `3d79b99ece9bb7a308c8c503f31f445539d0f8020a12f1c6d7ab05f21f5b6acd`；`crates/singlefs-replay-prefix/src/lib.rs` `e53aeb448cf2b6b63fae4bbc1c225656d5aed9094a2db94992faae5284a6b397`；`crates/mutations.tsv` `9165740f2e8e60995d8958fc3f8b6245f645f73bbf8db71080986e5798910cd6`；`crates/singlefs-core/src/journal.rs` `ba9c12bfba3c473de009fe5ff926864664015901f6078f61f8d452ad9e389db7`；`crates/singlefs-core/src/root_record.rs` `37513d6e7168b831b76a8305f59743b0e46f6585f5fda7ffb15a72c12c718042`；`crates/singlefs-core/src/transaction.rs` `67d6470f4c3b860bdb0c3d2e87f45c17e0c00db0d4b3414f4c56fcd4c9f6f61d`；`crates/singlefs-core/src/system_configuration.rs` `ca06b14acc1e762e0cd44c58ff91fcfe427e873a85426295d3468821cada0a0d`；`crates/singlefs-core/src/unit.rs` `265027f504df6466bacd09fa6810496a3641d0bd940c70faf9fe92427e01966b`；装置 `f9dfee913dab6acd6edabf56f9068f54da0af5da09e853d0b8ecae9ad0b5e518`；驱动 `scripts/experiments/e165-replay-mutation-kill-bounds.sh` `7c2824bda347e9080eac42611949c6d58acc4e657ba743eecc1c882b5b9b9cb2`；自造表 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` `4cbfe17c932b4fd21fcad4080e28a0632fa60919684e12f22f323437bf1d8a25`。工作区 `crates/` 有大量没提交的改动（`git status --porcelain crates/` 几十行），r1 的冻结清单 `research/prompts/m3-verus-land-code-r3-snapshot/crates-sha256.txt` 今天 `sha256sum -c` 有 51 行不是 OK。
+主 agent 以外的观测，行号是 2026-10-02 现读的。sha256：`crates/singlefs-core/src/recovery.rs` `3d79b99ece9bb7a308c8c503f31f445539d0f8020a12f1c6d7ab05f21f5b6acd`；`crates/singlefs-replay-prefix/src/lib.rs` `e53aeb448cf2b6b63fae4bbc1c225656d5aed9094a2db94992faae5284a6b397`；`crates/mutations.tsv` `9165740f2e8e60995d8958fc3f8b6245f645f73bbf8db71080986e5798910cd6`；`crates/singlefs-core/src/journal.rs` `ba9c12bfba3c473de009fe5ff926864664015901f6078f61f8d452ad9e389db7`；`crates/singlefs-core/src/root_record.rs` `37513d6e7168b831b76a8305f59743b0e46f6585f5fda7ffb15a72c12c718042`；`crates/singlefs-core/src/transaction.rs` `67d6470f4c3b860bdb0c3d2e87f45c17e0c00db0d4b3414f4c56fcd4c9f6f61d`；`crates/singlefs-core/src/system_configuration.rs` `ca06b14acc1e762e0cd44c58ff91fcfe427e873a85426295d3468821cada0a0d`；`crates/singlefs-core/src/unit.rs` `265027f504df6466bacd09fa6810496a3641d0bd940c70faf9fe92427e01966b`；装置 `f9dfee913dab6acd6edabf56f9068f54da0af5da09e853d0b8ecae9ad0b5e518`；驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` `7c2824bda347e9080eac42611949c6d58acc4e657ba743eecc1c882b5b9b9cb2`；自造表 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` `4cbfe17c932b4fd21fcad4080e28a0632fa60919684e12f22f323437bf1d8a25`。工作区 `crates/` 有大量没提交的改动（`git status --porcelain crates/` 几十行），r1 的冻结清单 `research/prompts/m3-verus-land-code-r3-snapshot/crates-sha256.txt` 今天 `sha256sum -c` 有 51 行不是 OK。
 
 | 事实 | 文件:行 |
 |---|---|
@@ -358,7 +358,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | 装置今天：建表照原登记 5.1，逐条取生成时那一次 `parse` 的结果 | 装置 `729–810` |
 | 装置今天：J6 只认「返回根且全字段相等」；报错结局只记种类（`FailureKind`） | 装置 `2263–2319`、`862–892` |
 | 驱动今天钉的是 r1 时的 `recovery.rs` `40067ae3…`、`lib.rs` `5f294973…`、`crates/mutations.tsv` `8c24d2c6…`：在今天的树上开工核对就停（r1 登记 RH1） | 驱动 `118–123`、`456–463` |
-| `replay.sh` 复跑 E165 的四行：第一段两族、`light` 档、r1 第二段 | `scripts/experiments/replay.sh:222–225`、`525–545` |
+| `replay.sh` 复跑 E165 的四行：第一段两族、`light` 档、r1 第二段 | `scripts/experiment-apparatus/replay.sh:222–225`、`525–545` |
 | r1 那 23 个变异名今天各恰 1 行，原文在第二列那份文件里各恰命中 1 次；18 行在 `lib.rs`、5 行在 `recovery.rs`（行号比 r1 登记 9.1 的「今天位置」整体后移，`lib.rs` 约 +9、`recovery.rs` +13） | 草稿脚本 `/tmp/claude-1000/e165-r2-designer/names_today.py` 的输出（第十三节） |
 | Z1、Z2、Z4 的原文命中 `lib.rs:1726` 一次，Z3 命中 `lib.rs:1484` 一次；Z5 拟用的原文 `unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,` 在 `recovery.rs` 命中 3163 一次 | `grep -n -F`（第十三节） |
 
@@ -473,11 +473,11 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | 段 | 补哪一行、补完够不够判 | 要改的文件 | 产物（`research/results/` 下） | 能不能与别段并行 |
 |---|---|---|---|---|
 | 第一段（装置甲） | Q1 前半（今天的实现 J6Qn 两族各域）、Q2；补完 Q2 够判，Q1 还差第二段 | 装置（`--profile`、r2 生成器、J6Qn、J7、5.5 的对照、单测）；`crates/mutations.tsv` 里这个 bin 的行（9.2） | `e165-replay-bounded-enumeration-<日期>-r2-segment1-legal-family.out`、`…-r2-segment1-adversarial-family.out`（线程上限那一遍），`…-threads-second.out` 两份（第八节另一个线程数），四份各配 `-timing.out`；`…-r2-segment1-r1-profile-check.out`（三份 sha256 比对与 5.5 那条对照） | 与第二段的**写**并行（不共用文件）；与第三、四段不并行（同一份装置） |
-| 第二段（驱动） | Q1 后半（甲表逐行 J6 与 J6Qn 首红）；补完 Q1 够判 | `scripts/experiments/e165-replay-mutation-kill-bounds.sh`（9.1）；`scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`（加 Z5，Z1–Z4 不动） | `…-r2-segment2-row-selection.out`、`…-r2-segment2-kill-bounds.out`、`-timing.out`、`…-r2-segment2-red-examples.tsv` | 写：可与第一段同时；跑：要等第一段的装置落盘，在**冻结的根**上跑（第一段收尾时把 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/` 拷进草稿目录、记清单 sha256，`--root` 指它，同 r1 登记修订 2 的做法），所以跑的时候可以与第三、四段的写并行 |
+| 第二段（驱动） | Q1 后半（甲表逐行 J6 与 J6Qn 首红）；补完 Q1 够判 | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`（9.1）；`scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`（加 Z5，Z1–Z4 不动） | `…-r2-segment2-row-selection.out`、`…-r2-segment2-kill-bounds.out`、`-timing.out`、`…-r2-segment2-red-examples.tsv` | 写：可与第一段同时；跑：要等第一段的装置落盘，在**冻结的根**上跑（第一段收尾时把 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/` 拷进草稿目录、记清单 sha256，`--root` 指它，同 r1 登记修订 2 的做法），所以跑的时候可以与第三、四段的写并行 |
 | 第三段（装置乙，多盘） | Q3；补完够判 | 装置（M、M6、MC，落后类别，5.5 的多盘对照）；`crates/mutations.tsv` 这个 bin 的行 | `…-r2-segment3-multi-disk.out`、`-timing.out`、`-threads-second.out` | 要等第一段合入；与第四段不并行（同一份装置） |
 | 第四段（装置丙，建表） | Q4；补完够判 | 装置（`--table`、T-表、T-行、5.5 的两条对照）；`crates/mutations.tsv` 这个 bin 的行 | `…-r2-segment4-table-both-legal-family.out`、`…-adversarial-family.out`、`…-multi-disk.out`，各配 `-timing.out` | 要等第三段合入（它也比多盘域） |
 
-- `scripts/experiments/replay.sh` 四段都不改：每段把它的产物要加的复跑行（参数原样）写进交回，主 agent 收齐后一次加。`replay.sh:225`（r1 第二段）那一行在今天的树上已经复不出（第三节：驱动钉的 r1 源码哈希对不上今天的树），留不留由主 agent 定。
+- `scripts/experiment-apparatus/replay.sh` 四段都不改：每段把它的产物要加的复跑行（参数原样）写进交回，主 agent 收齐后一次加。`replay.sh:225`（r1 第二段）那一行在今天的树上已经复不出（第三节：驱动钉的 r1 源码哈希对不上今天的树），留不留由主 agent 定。
 - 第二段驱动收尾的「把红例钉进 `.claude/gate.d/e165-pinned-red-examples.tsv`」这一次**不做**：r2 的红例只落 r2 的红例账；钉表的行要带 `--profile r2` 才重放得出，接不接、表格式怎么扩由主 agent 定。
 - 只有第一段改动 `--profile` 的默认值与 `r1` 档；第三、四段只许往 r2 档里加，r1 档的输出每段收尾都照 5.5 那条对照再核一次（SV1）。
 
@@ -562,7 +562,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | T-表，L 域 N ≤ 5 | `tables_differ` = 2 989 |
 | T-行，L 域 N ≤ 5 | `rows_differ` = 3 110，`tables_differ` = 0 |
 
-**r1 档复跑的比对对象**（SQ13；不符走 SV1）：`scripts/experiments/replay.sh:222–224` 三行点名的三份产物，整份 sha256（这三份全文都是 `E7RESULT ` 行，`grep '^E7RESULT '` 之后的 sha256 与整份相同）：
+**r1 档复跑的比对对象**（SQ13；不符走 SV1）：`scripts/experiment-apparatus/replay.sh:222–224` 三行点名的三份产物，整份 sha256（这三份全文都是 `E7RESULT ` 行，`grep '^E7RESULT '` 之后的 sha256 与整份相同）：
 
 | 产物 | sha256 | `E7RESULT ` 行数 |
 |---|---|---|
@@ -849,8 +849,8 @@ Z1–Z4 照 r1 登记 9.4 今天的四行，名字、原文、替换文一个字
 | `crates/singlefs-core/src/journal.rs`、`system_configuration.rs`、`unit.rs`、`transaction.rs`、`root_record.rs` | grep 命中行（`to_bytes`、`parse`、`SystemConfiguration` 各结构、`unit_filesystem_identifier`）；`transaction.rs` 280–300 | 前任 |
 | `crates/mutations.tsv` | 经 `names_today.py` 整份解析（23 个名字的行、文件列、原文命中）；这个 bin 的行数 | 两个 |
 | `crates/` 下 `scan_journal`、`replay_journal(` 的 grep 命中行；`fn device_size_in_bytes\|fn journal_record_offsets_hint\|fn device_identities` 命中行 | — | 两个 |
-| `scripts/experiments/e165-replay-mutation-kill-bounds.sh` | 1–60、116–200、1500–1515，`REGISTERED`、`CLAUSE_CRITERIA`、`J6` 的 grep 命中行 | 两个 |
-| `scripts/experiments/replay.sh` | grep `e165` 命中的 222–225、522–545 | 两个 |
+| `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 1–60、116–200、1500–1515，`REGISTERED`、`CLAUSE_CRITERIA`、`J6` 的 grep 命中行 | 两个 |
+| `scripts/experiment-apparatus/replay.sh` | grep `e165` 命中的 222–225、522–545 | 两个 |
 | `.claude/hooks/heavy-test-guard.sh` | 1–60；grep `experiment-runner\|e165` 命中行 | 接手的 |
 | `.claude/hooks/lib_heavy_tests.py` | grep `cargo run\|src/bin` 命中行 | 接手的 |
 | `research/prompts/m3-verus-land-code-r3-snapshot/crates-sha256.txt` | 经 `sha256sum -c` | 前任 |
@@ -869,9 +869,9 @@ Z1–Z4 照 r1 登记 9.4 今天的四行，名字、原文、替换文一个字
 | `research/prompts/e165-r2-questions.md` | `15fa858b87aeccda620486a1317a8bd88078d3b090e898b53992742e6bf6ce98` |
 | `crates/singlefs-core/src/recovery.rs`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/mutations.tsv` 与第三节列的另几份 `crates/` 源文件 | 与第三节的值逐个相同（重算过） |
 | `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | `f9dfee913dab6acd6edabf56f9068f54da0af5da09e853d0b8ecae9ad0b5e518`（同第三节） |
-| `scripts/experiments/e165-replay-mutation-kill-bounds.sh` | `cd6d479218cd3dc00f48cb73418a288da9376ff3c72d4440067a3d76979fca0f`（第三节记的 `7c2824bd…` 是 r1 修订 2 的值，见第二节补段） |
+| `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | `cd6d479218cd3dc00f48cb73418a288da9376ff3c72d4440067a3d76979fca0f`（第三节记的 `7c2824bd…` 是 r1 修订 2 的值，见第二节补段） |
 | `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` | `4cbfe17c932b4fd21fcad4080e28a0632fa60919684e12f22f323437bf1d8a25` |
-| `scripts/experiments/replay.sh` | `c0b5b7afcae92d0f08a0fe7591355e138c9dea536ab34415e77de4eea6b5de4b` |
+| `scripts/experiment-apparatus/replay.sh` | `c0b5b7afcae92d0f08a0fe7591355e138c9dea536ab34415e77de4eea6b5de4b` |
 | 草稿 `clauses-now.md`（附录甲的出口） | 见下面命令的输出 |
 
 草稿出口的 sha256：`clauses-now.md` `5de9be8c9bd37330962b7c8dfb0778edd7778e872bd2fb73a43de142ed55fd97`（194 行，附录甲）；`clauses-defs-now.md` 与第二节的 `clauses-defs.md` 同为 `71a4e9ba6845b10b52f5cdc3f0eb71a919b9be30ef496a9604f175833e63eb62`；第二节旧抄本 `clauses.md` `c1b4e23d8f7a954bf84ee87e574b4f857e08cc081074deec0ac5f35bc21ce6a3`。
@@ -907,13 +907,13 @@ grep -n '^## \|^### ' research/prompts/e165-preregistration.md research/prompts/
 cat / python3 草稿目录的三份脚本（anchors_r2.py、anchors_r2b.py、names_today.py）；sha256sum *.py           # 与前任记的哈希相同、输出相同
 TZ=Asia/Tokyo date +%F                                                                                       # 2026-10-02
 sha256sum（第三节那几份、三份决策、判决、问题单、两份旧登记、驱动、自造表、replay.sh）
-sed -n '222,225p' scripts/experiments/replay.sh ；ls research/results/ | grep -i e165
+sed -n '222,225p' scripts/experiment-apparatus/replay.sh ；ls research/results/ | grep -i e165
 grep -n '^#### 已定项 …' 三份决策
 python3 scripts/kb/quote-kb.py /tmp/claude-1000/e165-r2-designer/clauses-now.md '<13@已定项 1>' '<23@已定项 4>' '<23@已定项 14>' '<23@已定项 15>' '<23@已定项 22>'   # 5 段，回读逐字节一致
 python3 scripts/kb/quote-kb.py /tmp/claude-1000/e165-r2-designer/clauses-defs-now.md '<22@已定项 7>' '<22@已定项 8>'                            # 2 段，回读逐字节一致
 diff clauses.md clauses-now.md       # 60 行不同（D13 已定项 1 重写；D23 4、14、15 各补一两句、行号后移）
 diff clauses-defs.md clauses-defs-now.md   # 0 行
-git status --porcelain / git diff HEAD --stat / stat -c '%y %n'（驱动）；grep -n 'REGISTERED\|…' scripts/experiments/e165-replay-mutation-kill-bounds.sh
+git status --porcelain / git diff HEAD --stat / stat -c '%y %n'（驱动）；grep -n 'REGISTERED\|…' scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh
 sed -n '3138,3178p;2908,2948p' crates/singlefs-core/src/recovery.rs；sed -n '1560,1590p' crates/singlefs-replay-prefix/src/lib.rs
 awk 求 9.2 那九个函数与 scan_journal 的行区间                                                             # 见 9.2
 python3 /tmp/claude-1000/e165-r2-designer/names_today.py                                                    # 23 个名字的今天位置，见 9.1
@@ -1332,7 +1332,7 @@ print("E1 jstar1", sum(patterns(s) * 2 ** s[0] for N in range(1, 5) for s in com
 
 ```python
 import re,sys
-src=open('scripts/experiments/e165-replay-mutation-kill-bounds.sh').read()
+src=open('scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh').read()
 names=re.findall(r'\(\d+, "([^"]+)", \[', src)
 rows=[l.rstrip('\n').split('\t') for l in open('crates/mutations.tsv') if not l.startswith('#')]
 print('names',len(names))

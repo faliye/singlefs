@@ -1,5 +1,0 @@
-b889ab330afeef7f1bc68f7f0c6884b0597b533bbd7fcdc1ff7d1912ad5c9151  .claude/kb/milestone/03-third-txn.md
-46a30a5b99195dbe2661a2ed56e9ce1c099dd5f9137137c3b10f8797bb77c121  .claude/kb/invariants.md
-12d909782d74fac4fb97efa2efddce4e1086a5c71b6ed54b742770265e95daf5  .claude/kb/checks-owed.md
-a8ac7fdd61389af0da4c720445c134ac03de32be0562c0875598a7a5f4e4415b  .claude/kb/decisions/08-核心索引结构.md
-c0896d1a14a8fc2f9dfcc002965dffedb0b5cba9cefa35750991f00fae476da5  .claude/kb/decisions/05-快照-空间记账机制.md

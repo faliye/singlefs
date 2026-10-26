@@ -1,0 +1,40 @@
+E7RESULT name=stop_check item=local_states_per_block_matches_crates result=pass detail=local=65536_crates=65536
+E7RESULT name=stop_check item=local_seed_base_matches_crates result=pass detail=local=7463871032432355113_crates=7463871032432355113
+E7RESULT name=stop_check item=local_longest_closed_form_segment_matches_crates result=pass detail=limit=63_crates_at_the_limit_panics=false_crates_one_beyond_panics=true
+E7RESULT name=stop_check item=copied_text_verbatim_fixed_script_head result=pass detail=origin=crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs:53-90_lines=38
+E7RESULT name=stop_check item=copied_text_verbatim_fixed_script_body result=pass detail=origin=crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs:137-572_lines=436
+E7RESULT name=stop_check item=copied_text_verbatim_multi_record_publish result=pass detail=origin=crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs:74-218_lines=145
+E7RESULT name=stop_check item=copied_text_verbatim_new_pool_prepare_body result=pass detail=origin=crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs:792-810_lines=19
+E7RESULT name=stop_check item=copied_segments_found result=pass detail=segments=4_expected=4
+E7RESULT name=stop_check item=recorded_values_match_the_test_pins_smoke-new_pool_file_creation_stream result=pass detail=mismatches=[]
+E7RESULT name=stop_check item=pins_still_in_the_test_file_smoke-new_pool_file_creation_stream result=pass detail=two_state_full_quick_tier
+E7RESULT name=stop_check item=two_counting_routes_agree_smoke-new_pool_file_creation_stream result=pass detail=disagreements=[]
+E7RESULT name=stop_check item=two_state_not_above_full_smoke-new_pool_file_creation_stream result=pass detail=two_state=Some(16777243)_full=Some(16777268)
+E7RESULT name=stop_check item=blocks_per_point_follow_the_local_block_length_smoke-new_pool_file_creation_stream result=pass detail=blocks_full=Some(268)
+E7RESULT name=stop_check item=recorded_values_match_the_test_pins_smoke-overwrite_fixed_script_stream result=pass detail=mismatches=[]
+E7RESULT name=stop_check item=pins_still_in_the_test_file_smoke-overwrite_fixed_script_stream result=pass detail=two_state_full_quick_tier
+E7RESULT name=stop_check item=two_counting_routes_agree_smoke-overwrite_fixed_script_stream result=pass detail=disagreements=[]
+E7RESULT name=stop_check item=two_state_not_above_full_smoke-overwrite_fixed_script_stream result=pass detail=two_state=Some(1678377095)_full=Some(1678377220)
+E7RESULT name=stop_check item=blocks_per_point_follow_the_local_block_length_smoke-overwrite_fixed_script_stream result=pass detail=blocks_full=Some(25674)
+E7RESULT name=stop_check item=recorded_values_match_the_test_pins_smoke-multi_record_publish_stream result=pass detail=mismatches=[]
+E7RESULT name=stop_check item=pins_still_in_the_test_file_smoke-multi_record_publish_stream result=pass detail=two_state_full_quick_tier
+E7RESULT name=stop_check item=two_counting_routes_agree_smoke-multi_record_publish_stream result=pass detail=disagreements=[]
+E7RESULT name=stop_check item=two_state_not_above_full_smoke-multi_record_publish_stream result=pass detail=two_state=Some(1358954607)_full=Some(1358954642)
+E7RESULT name=stop_check item=blocks_per_point_follow_the_local_block_length_smoke-multi_record_publish_stream result=pass detail=blocks_full=Some(20754)
+E7RESULT name=stop_check item=recorded_values_match_the_test_pins_smoke-snapshot_creation_stream result=pass detail=mismatches=[]
+E7RESULT name=stop_check item=pins_still_in_the_test_file_smoke-snapshot_creation_stream result=pass detail=two_state_full_quick_tier
+E7RESULT name=stop_check item=two_counting_routes_agree_smoke-snapshot_creation_stream result=pass detail=disagreements=[]
+E7RESULT name=stop_check item=two_state_not_above_full_smoke-snapshot_creation_stream result=pass detail=two_state=Some(16842785)_full=Some(16842815)
+E7RESULT name=stop_check item=blocks_per_point_follow_the_local_block_length_smoke-snapshot_creation_stream result=pass detail=blocks_full=Some(272)
+E7RESULT name=anchor identifier=snapshot_creation_two_state expected=16842785 actual=16842785 match=true
+E7RESULT name=anchor identifier=new_pool_two_state expected=16777243 actual=16777243 match=true
+E7RESULT name=anchor identifier=new_pool_writes expected=43 actual=43 match=true
+E7RESULT name=anchor identifier=blocks_needed_at_and_one_state_beyond_the_states_per_block expected=1,2 actual=1,2 match=true
+E7RESULT name=anchor identifier=first_history_seed expected=7463871032432355113 actual=7463871032432355113 match=true
+E7RESULT name=anchor identifier=full_states_smoke-new_pool_file_creation_stream expected=16777268 actual=16777268 match=true
+E7RESULT name=anchor identifier=full_states_smoke-overwrite_fixed_script_stream expected=1678377220 actual=1678377220 match=true
+E7RESULT name=anchor identifier=full_states_smoke-multi_record_publish_stream expected=1358954642 actual=1358954642 match=true
+E7RESULT name=anchor identifier=full_states_smoke-snapshot_creation_stream expected=16842815 actual=16842815 match=true
+E7RESULT name=anchor identifier=multi_record_full_named_by_the_clause expected=12230590578 actual=1358954642 match=false
+E7RESULT name=selfcheck_done stop_checks=28 failed=0 anchors=10 anchors_mismatching=0 clause_anchor_matches=false emitted=39
+E7RESULT name=done emitted=40

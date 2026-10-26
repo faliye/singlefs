@@ -1,0 +1,1 @@
+name=hand_made_image_both_slots gate_never_passes=false g4_c_dead=Some([0]) remount=mounted dead_after_the_mount=0 records_on_this_image=1 assertion_mount_succeeds=holds

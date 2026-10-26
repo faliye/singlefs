@@ -1,0 +1,105 @@
+diff --git a/.claude/hooks/heavy-test-guard.sh b/.claude/hooks/heavy-test-guard.sh
+--- a/.claude/hooks/heavy-test-guard.sh
++++ b/.claude/hooks/heavy-test-guard.sh
+@@ -1668,6 +1668,11 @@
+             ("主 agent 带前缀起崩溃放量全量：放行", None, commit + f"bash {repo}/scripts/crash/crash-amplification.sh", 0),
+             ("实现员列崩溃放量的分项：放行、不读正文", writer, f"bash {repo}/scripts/crash/crash-amplification.sh --list-items", 0, 0, 0),
+             ("实现员单独跑分项驱动的自证（登记成不起重活）：放行、不读正文", writer, f"bash {repo}/scripts/crash/crash-amplification-item.sh --selftest", 0, 0, 0),
++            # 实验复跑入口 scripts/experiments/replay.sh 按名字判、不读正文（lib_heavy_tests.py 的 EXPERIMENT_REPLAY_SCRIPT；
++            # LIB_HEAVY_TESTS_BREAK=experiment-replay-unnamed 下头一格两项红：应当是 0，实际 2、读进去几份脚本应当是 0，实际 1；后两格的读进去几份脚本也红）
++            ("实现员列实验复跑入口的项（--list-items）：放行、不读正文", writer, f"bash {repo}/scripts/experiments/replay.sh --list-items", 0, 0, 0),
++            ("实现员起实验复跑入口点名实验：照拒", writer, f"bash {repo}/scripts/experiments/replay.sh E142", 2),
++            ("主 agent 不带前缀起实验复跑入口：照拒", None, f"bash {repo}/scripts/experiments/replay.sh", 2),
+             # 两档里的轻型（lib_heavy_tests.py 文件头「两档里的轻型」）：三条带 --quick 的子 agent 带不带前缀都放行、要经内存包装；重型的剪枝、逐条、全量照拒
+             # （LIB_HEAVY_TESTS_BREAK=light-tier-unrecognized 下前四格与「主 agent 不带前缀起崩溃点重放 --quick」红，light-tier-memory-cap-unrequired 下「不经内存包装」一格红，
+             # crash-point-replay-unnamed 下「剪枝」到「主 agent 不带前缀起崩溃点重放入口」五格红，light-tier-any-arguments 下「--quick 又带 --full」一格红，
+diff --git a/.claude/hooks/lib_heavy_tests.py b/.claude/hooks/lib_heavy_tests.py
+--- a/.claude/hooks/lib_heavy_tests.py
++++ b/.claude/hooks/lib_heavy_tests.py
+@@ -345,6 +345,10 @@
+   三格 / 「工具实现员单独跑 crash-amplification.sh --selftest」、它的 stdin 那一格与「实现员单独跑分项驱动的自证」三格（崩溃放量入口的 --selftest 不按登记表判、
+   落到按名字算重型；原先红的「工具实现员单独跑 crash-amplification.sh --selftest：读进去几份脚本」不再红，按名字判不读正文了）。
+   heavy-test-guard.sh --selftest 里对应的几格（文件头写在各格旁边）在上面这几个开关下同样红。
++  LIB_HEAVY_TESTS_BREAK=experiment-replay-unnamed  实验复跑入口 scripts/experiments/replay.sh 不按名字判（退回读正文：只列项也被读进去，正文里命令词没展开的行判成重型）
++      cargo 那张表里「实验复跑入口不带参数：全部实验复跑」「实验复跑入口点名实验」「实验复跑入口 --list-items 后面还带实验号：照拒」三格红（应当是 replay-all-stage，实际 None）；
++      heavy-test-guard.sh --selftest 里「实现员列实验复跑入口的项（--list-items）：放行、不读正文」两项（应当是 0，实际 2：读进去撞上正文里命令词没展开的行；
++      「读进去几份脚本」应当是 0，实际 1）与「实现员起实验复跑入口点名实验：照拒」「主 agent 不带前缀起实验复跑入口：照拒」两格的「读进去几份脚本」红（应当是 0，实际 1：按名字判的不读正文）
+   LIB_HEAVY_TESTS_BREAK=qemu-build-unnamed  scripts/devices/build-patched-qemu.sh 不按名字算真编 QEMU（不带参数、--rebuild 的真编放过去）
+       cargo 那张表里「真编 QEMU（build-patched-qemu.sh 不带参数）」到「capped.sh 与 bash -c 包着真编 QEMU」五格红；
+       heavy-test-guard.sh --selftest 里「实现员真编 QEMU（--rebuild）：照拒」到「主 agent 不带前缀经内存包装真编 QEMU：照拒」三格红；
+@@ -565,6 +569,10 @@
+   名字是这三个就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那几份不读正文）。不算的：crash-amplification.sh 带 --list-items 的（只列分项，不清场、不跑）；
+   仓内那几份单独一个 --selftest 的照自证登记表判（三份都登记成 light，放行）。别处同名拷贝的 --selftest 不在登记表里，
+   按这一类算（接受的误拒）。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
++实验复跑入口 scripts/experiments/replay.sh（类名「全部实验复跑」，kind replay-all-stage）：按名字判、不读正文（EXPERIMENT_REPLAY_SCRIPT：名字是它、又落在
++  scripts/experiments/ 上才算，judged_by_name 认 KNOWN_SCRIPT_LOCATIONS 登记的位置）。不算的只有摘掉 --force 之后恰好一个 --list-items 的（逐行打可点名的实验号，
++  不编、不跑，replay.sh 文件头「--list-items」）与仓内那一份单独一个 --selftest（照自证登记表判，先于这一类）；不带参数、点名实验号、--admission-only、
++  --list-items 后面还带别的词，都照重型算。别处同名的拷贝不按名字判，读正文。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
+ 真编 QEMU（类名「真编 QEMU」，kind qemu-build）：scripts/devices/build-patched-qemu.sh 取源码、在 ${TMPDIR:-/tmp} 下约 1 GiB 的编译目录里按给的线程数编 QEMU、
+   装进私有目录。按名字判（QEMU_BUILD_SCRIPT：名字是它就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那一份不读正文）：不带参数、--rebuild、别的参数都算，
+   包装（bash -c、capped.sh、run-with-memory-cap.sh、nice 这类）里面的同样算。不算的只有仓内那一份单独一个 --selftest（照自证登记表判，登记成 light，放行）；
+@@ -709,7 +717,7 @@
+     "crash-amplification.sh": "scripts/crash/crash-amplification.sh", "crash-amplification-item.sh": "scripts/crash/crash-amplification-item.sh",
+     "crash-amplification-two-hosts.sh": "scripts/crash/crash-amplification-two-hosts.sh",
+     "build-patched-qemu.sh": "scripts/devices/build-patched-qemu.sh",
+-    "crash-point-replay.sh": "scripts/crash/crash-point-replay.sh",
++    "crash-point-replay.sh": "scripts/crash/crash-point-replay.sh", "replay.sh": "scripts/experiments/replay.sh",
+     STAGE_SELFTEST_SCRIPT: ".claude/singlefs-ai-sop/scripts/stage-selftest.sh",
+ }
+ # 广谱变异的逐条驱动（scripts/mutation/broad-mutation.py）：带这几个参数之一的只读（列项、汇总、帮助），不起 cargo、不改库目录
+@@ -970,6 +978,9 @@
+ CRASH_POINT_REPLAY_SCRIPT = "crash-point-replay.sh"
+ CRASH_POINT_REPLAY_DIRECTORY = "scripts/crash"
+ CRASH_POINT_REPLAY_QUERY_ARGUMENTS = ["--list-items"]   # 只列可点名的项（摘掉 --force 之后恰好这一个词）
++# 实验复跑入口（文件头「实验复跑入口」）：名字是它、又落在 scripts/experiments/ 上才按名字判；摘掉 --force 之后恰好一个 --list-items 的只列可点名的实验号，不算
++EXPERIMENT_REPLAY_SCRIPT = "replay.sh"
++EXPERIMENT_REPLAY_QUERY_ARGUMENTS = ["--list-items"]
+ LIGHT_TIER_OPTION = "--quick"
+ LIGHT_TIER_ITEM_OPTION = "--item"
+ LIGHT_TIER_STAGES = frozenset({"checker-tier-formal-verification.sh", "checker-tier-crates-mutation-replay.sh"})
+@@ -3178,6 +3189,11 @@
+             return None   # 只列分项，不清场、不跑
+         return heavy_test("crash-amplification", f"scripts/crash/{name}（崩溃放量：每一项经 crash-amplification-lib.sh 起 checker 档 cargo test；"
+                                                  "只有 crash-amplification.sh --list-items 与登记表里的单独 --selftest 不算）")
++    if name == EXPERIMENT_REPLAY_SCRIPT and not break_is_set("experiment-replay-unnamed") and judged_by_name(words[0], directory):
++        if [argument for argument in arguments if argument != "--force"] == EXPERIMENT_REPLAY_QUERY_ARGUMENTS:
++            return None   # 只列可点名的实验号，不编、不跑（replay.sh 文件头 --list-items）
++        return heavy_test("replay-all-stage", f"scripts/experiments/{name} {' '.join(arguments[:4])}（实验复跑：每个实验起装置或驱动；"
++                                                 "只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）")
+     if name == PROVE_RED_SCRIPT:
+         proving = prove_red_use(arguments, directory, environment)
+         if proving is not None:
+@@ -3251,7 +3267,7 @@
+     if gate_stage_name(word, directory) is not None:
+         return True
+     location = KNOWN_SCRIPT_LOCATIONS.get(os.path.basename(word))
+-    if location is None:
++    if location is None or (os.path.basename(word) == EXPERIMENT_REPLAY_SCRIPT and break_is_set("experiment-replay-unnamed")):
+         return False
+     return any(candidate == location or candidate.endswith("/" + location)
+                for candidate in (os.path.normpath(word), shell_words.resolve_path(directory, word) or ""))
+@@ -4301,6 +4317,12 @@
+             ("POSIX 字符类起崩溃放量全量", ["bash", "scripts/crash/crash-amplification.s[[:alpha:]]"], repository, "crash-amplification"),
+             ("崩溃放量只列分项（--list-items）放行", ["bash", "scripts/crash/crash-amplification.sh", "--list-items"], repository, None),
+             ("崩溃放量分项驱动单独 --selftest 照登记表放行", ["bash", "scripts/crash/crash-amplification-item.sh", "--selftest"], repository, None),
++            # 实验复跑入口按名字判、不读正文（开关 experiment-replay-unnamed 下后三格红：应当是 replay-all-stage，实际 None）
++            ("实验复跑入口只列项（--list-items）放行", ["bash", "scripts/experiments/replay.sh", "--list-items"], repository, None),
++            ("实验复跑入口摘掉 --force 之后只列项：放行", ["bash", "scripts/experiments/replay.sh", "--force", "--list-items"], repository, None),
++            ("实验复跑入口不带参数：全部实验复跑", ["bash", "scripts/experiments/replay.sh"], repository, "replay-all-stage"),
++            ("实验复跑入口点名实验", ["bash", "scripts/experiments/replay.sh", "E142"], repository, "replay-all-stage"),
++            ("实验复跑入口 --list-items 后面还带实验号：照拒", ["bash", "scripts/experiments/replay.sh", "--list-items", "E142"], repository, "replay-all-stage"),
+             # 两档里的轻型（文件头「两档里的轻型」）：三条带 --quick（可加 --item）的不算；重型的剪枝、逐条、全量与夹了别的词的照算
+             # （开关 light-tier-unrecognized 下前九格红，light-tier-any-arguments 下「--quick 又带 --full」起四格红，crash-point-replay-unnamed 下「剪枝」起六格红，
+             # gpu-quiesce-opaque 下 gpu-quiesce-run.sh 那三格红）
+diff --git a/.claude/rules/verification.md b/.claude/rules/verification.md
+--- a/.claude/rules/verification.md
++++ b/.claude/rules/verification.md
+@@ -130,7 +130,7 @@
+ | 函数名与类型名不只由空泛词拼成；测试文件不按里程碑起名 | 门禁 code-source-discipline：vague-names 格读词表 `.claude/naming-vague-words`、还没改完的文件 `.claude/naming-vague-exclude`；test-file-names 格跑 `scripts/crash/crash-case-check.py --only file-names` |
+ | 池级 checker 库不依赖实现；harness 档不依赖 checker 档；RefFS 的依赖闭包只有自己与 `singlefs-format`、源码零处引实现与池级 checker 与两档（真名与改名别名都算）、实现与池级 checker 的依赖闭包里没有它 | 门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格（⑤⑥⑦ 判 RefFS 那三样；RefFS 包不在时 ⑤⑥ 报本次未跑） |
+ | 判器调用点（池级 checker、记录核对器、GPU 判器）落在判定段里，或包住它的函数带 `// gpu-exempt: <截名>` 或 `// cpu-reference-for-gpu-comparison` 标记；两样都不是的调用点判红 | 门禁 checker-independence-and-sync 的 cpu-judging-sites 格：判法 `scripts/crash/cpu-judging-sites-check.py`，判定段与判器本体登记在 `.claude/gate.d/cpu-judging-sites.tsv`。标记写在包住调用点的那个函数前面：属性、文档注释与签名之前紧挨着的 `//` 注释行，或属性与签名之间的注释行；外层函数带了标记，里面嵌套的函数一并算；写在函数体里的不算 |
+-| harness 档一条用例一个场景 | 门禁 harness-model-differential-and-scenarios 的 one-scenario 格（跑 `scripts/crash/crash-case-check.py --only one-scenario`） |
++| harness 档与 checker 档一条用例一个场景 | 门禁 harness-model-differential-and-scenarios 的 one-scenario 格（跑 `scripts/crash/crash-case-check.py --only one-scenario`，读 `crates/singlefs-harness/tests/` 与 `crates/singlefs-checker-tier/tests/` 的用例源码，不跑 checker 档） |
+ | 变异行点名的测试跑得到：标了 `#[ignore]` 的带 `--include-ignored`、`--` 之后的筛选词筛得到点名的测试 | 门禁 code-source-discipline 的 mutation-tables 格 |
+ | 每道阶段认第一个参数当项目根 | 门禁 code-tooling 的 stage-owners 格 |
+ | 谁在什么时候跑得了 checker 档 | `.claude/hooks/heavy-test-guard.sh`，判定在 `lib_heavy_tests.py`：轻型三条（「两档：轻型与重型」）不算重型；崩溃点重放入口 `scripts/crash/crash-point-replay.sh` 的重型跑法（不带参数、`--item`、`--full`）、跑到 checker 档包 `singlefs-checker-tier` 的测试（库单测、集成测试、装置二进制的内联测试）、门禁 checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification（连同直接起它的判法脚本 `scripts/gate/verus-proof-check.py` 证明、空真、必红三种用法与 `scripts/experiments/e165-pin-red-examples.py --replay`）与 checker-tier-research-build-and-replay 的 experiment-replay 格、QEMU、herd7、`crates/mutations.tsv` 整表、全量 `cargo test`、整轮门禁、E152 装置、广谱变异（`scripts/mutation/broad-mutation.py` 起 cargo 或改库目录的每一种用法；`--list-items`、`--summary`、`--check-ignored`、`--help`（`-h`）与登记为 light 的单独 `--selftest` 不算）与门禁 checker-tier-broad-mutation（只点名 gate-verdict 一格的 `--check gate-verdict` 不算）、真编 QEMU（`scripts/devices/build-patched-qemu.sh` 除 `--selftest` 之外的用法）算重型 |

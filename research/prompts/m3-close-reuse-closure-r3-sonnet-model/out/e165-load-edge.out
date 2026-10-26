@@ -1,0 +1,5 @@
+# 原腿 make_trees.py 的 load-edge 补丁在现在这棵树上对 e165 replay 入口的结果（入口,rc,原始行,去重）与现状
+his-load-edge:
+scripts/experiment-apparatus/e165-pin-red-examples.py::replay 0 949 949
+current:
+scripts/experiment-apparatus/e165-pin-red-examples.py::replay 0 939 939

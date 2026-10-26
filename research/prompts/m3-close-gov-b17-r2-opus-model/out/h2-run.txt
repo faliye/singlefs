@@ -1,0 +1,28 @@
+case=linked-replay-list-items	judged_by_name=True	guard_exit=0	stderr=
+case=linked-replay-cd-relative	judged_by_name=-	guard_exit=0	stderr=
+case=linked-crash-point-replay-list-items	judged_by_name=True	guard_exit=0	stderr=
+case=linked-crash-point-replay-quick	judged_by_name=True	guard_exit=0	stderr=
+case=linked-crash-amplification-list-items	judged_by_name=True	guard_exit=0	stderr=
+case=control-source-payload	judged_by_name=-	guard_exit=2	stderr=✗ 重型测试被拒：脚本 <work>/linked/.claude/scripts/preflight.sh:2 里的 cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：implementation-
+case=copied-formal-quick	judged_by_name=True	guard_exit=0	stderr=
+case=copied-crates-mutation-quick	judged_by_name=True	guard_exit=0	stderr=
+case=copied-doc-text-list	judged_by_name=True	guard_exit=0	stderr=
+case=copied-broad-gate-verdict	judged_by_name=True	guard_exit=0	stderr=
+case=copied-lkmm-version	judged_by_name=True	guard_exit=0	stderr=
+case=copied-mutate-research-table	judged_by_name=True	guard_exit=0	stderr=
+case=copied-memory-cap-wrapper	judged_by_name=True	guard_exit=0	stderr=
+case=copied-capped-wrapper	judged_by_name=True	guard_exit=0	stderr=
+case=control-copied-replay-list-items	judged_by_name=False	guard_exit=2	stderr=✗ 重型测试被拒：脚本 <work>/copied/scripts/experiment-apparatus/replay.sh:3 里的 cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：imple
+case=control-elsewhere-formal-quick	judged_by_name=False	guard_exit=2	stderr=✗ 重型测试被拒：脚本 <work>/elsewhere/checker-tier-formal-verification.sh:3 里的 cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：imple
+case=own-crash-point-replay-quick-root-override	judged_by_name=True	guard_exit=0	stderr=
+case=own-crash-point-replay-quick-plain	judged_by_name=True	guard_exit=0	stderr=
+case=own-replay-cd-command-substitution	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-cd-tilde	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-variable-root	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-unassigned-variable-root	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-bash-c-cd	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-subshell-cd	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-pushd	judged_by_name=-	guard_exit=0	stderr=
+case=own-replay-through-directory-link	judged_by_name=True	guard_exit=0	stderr=
+case=own-replay-source	judged_by_name=True	guard_exit=0	stderr=
+case=own-replay-plain	judged_by_name=True	guard_exit=0	stderr=

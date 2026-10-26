@@ -8,6 +8,8 @@
 
 这是最终轮：不再开第四轮。这一轮腿提的改法与主 agent 合成的组合都算被攻过零轮，写进第三节的交用户表。
 
+开工快照：`research/prompts/m3-close-rootring-r3-snapshot/`（crates-sha256.txt 于 2026-10-21 事后补：取 511fe067b（2026-10-21）上的版本，腿派出时没记）
+
 ## 一、核查
 
 1. 引文：`cite-check.py <两份报告> --root . --background <背景材料>` 末行「✓ 核了 54 处引文、23 处裸行号，对上 54 处，没判 23 处（其中裸行号没有引文可比 23 处；逐处列在上面）」。裸行号里判决要用的几处主 agent 逐行现查：`crates/singlefs-core/src/allocator.rs:2611`（`occupancy.effective_floor,`）、`allocator.rs:1266`（「挂载时生效的 F。抬 F 生效之后不跟着抬」）、`crates/singlefs-core/src/recovery.rs:1877`、`crates/singlefs-checker/src/walk.rs:9795`（`fn judge_blocks_referenced_by_abandoned_roots(`）、`walk.rs:18297`（I-3.1 在没有记账树时报不适用）、`crates/singlefs-core/src/mount.rs:8023`、`mount.rs:8029`、`crates/singlefs-core/src/instance_table_sweep.rs:721`、`crates/singlefs-core/src/admission.rs:675`，都对得上。辩方写的 `.claude/kb/decisions/22-单元原子性怎么合成.md:341`（`physical_block_size` 区间）行号错，那一句在同一文件第 74 行（「`physical_block_size`）∈ [根记录宽 457 字节（已定项 7）, 槽距]」），内容对。

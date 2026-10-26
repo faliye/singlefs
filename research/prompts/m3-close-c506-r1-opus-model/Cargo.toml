@@ -1,0 +1,21 @@
+# m3-close-c506-r1 攻方腿的原型：每区槽数 S 的上界 16 与根环几何（区域间距 P × chunk、槽距上界）撞不撞。
+# 依赖按「模型目录与冻结副本并排」的布局取：<草稿>/model（本目录的拷贝）与 <草稿>/tree（冻结副本的拷贝），
+# tools/rerun.sh 就这样摆。只编不跑测试；不调崩溃枚举（这一腿的历史不含崩溃点）。
+[package]
+name = "c506_opus_probe"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+singlefs-core = { path = "../tree/crates/singlefs-core" }
+singlefs-checker = { path = "../tree/crates/singlefs-checker" }
+singlefs-harness = { path = "../tree/crates/singlefs-harness" }
+singlefs-format = { path = "../tree/crates/singlefs-format" }
+
+[profile.release]
+opt-level = 3
+overflow-checks = true
+debug-assertions = true

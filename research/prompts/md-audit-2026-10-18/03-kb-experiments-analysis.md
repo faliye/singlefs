@@ -619,7 +619,7 @@
 - **判定结论**：⚠️ **存在引用断链、归档依赖或回看滞后**
 - **具体过时/不一致点**：
   - 第 11 行：引用的产物或代码路径已不存在：`crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs`
-  - E175 装置源码已由 `crates/singlefs-harness/tests/` 搬移至 `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs`，页面若仍指向原 tests 路径则过时。
+  - E175 装置源码已由 `crates/singlefs-harness/tests/` 搬移至 `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`，页面若仍指向原 tests 路径则过时。
 - **建议处置**：校正实验源码新路径、更新已归档产物指针并补齐回看记录。
 
 ## [.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md](file:///home/fy5090/code/singlefs/.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md)

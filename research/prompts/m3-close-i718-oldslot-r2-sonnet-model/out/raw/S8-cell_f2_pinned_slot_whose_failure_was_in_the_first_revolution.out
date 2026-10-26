@@ -1,0 +1,30 @@
+
+running 1 test
+test cell_f2_pinned_slot_whose_failure_was_in_the_first_revolution ... ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=healthy_n kind=legit newest=44 inst=2 t=21 F=0 p=21 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,1,1 red=[]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=before_record kind=legit newest=44 inst=2 t=21 F=0 p=21 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,1,1 red=[]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=before_root kind=legit newest=44 inst=2 t=21 F=0 p=21 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=zero kind=legit newest=44 inst=2 t=21 F=0 p=21 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=torn_enum kind=legit newest=44 inst=2 t=21 F=0 p=21 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=torn_half kind=legit newest=44 inst=2 t=21 F=0 p=21 next_slot_root=None all=1,1,1,-1,-1,1,1,1,1,-1,-1 red=[]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=healthy_n_bad_t_as_floor kind=bad newest=44 inst=2 t=0 F=0 p=21 next_slot_root=None all=0,0,0,-1,-1,0,0,0,0,0,0 red=["I-3.1", "I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=healthy_n_bad_p_255 kind=bad newest=44 inst=2 t=21 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,0,0,0,0,0 red=["I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=before_root_bad_p_255 kind=bad newest=44 inst=2 t=21 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,1,1,-1,-1 red=["I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=before_root_bad_t_as_floor kind=bad newest=44 inst=2 t=0 F=0 p=21 next_slot_root=None all=0,0,0,-1,-1,0,0,0,0,-1,-1 red=["I-3.1", "I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=zero_bad_p_255 kind=bad newest=44 inst=2 t=21 F=0 p=255 next_slot_root=None all=0,1,1,-1,-1,1,1,1,1,-1,-1 red=["I-8.10", "I-7.18"]
+ROW cell=F hist=pinned_after_base20_first_lap_failure S=8 image=zero_bad_t_as_floor kind=bad newest=44 inst=2 t=0 F=0 p=21 next_slot_root=None all=0,0,0,-1,-1,0,0,0,0,-1,-1 red=["I-3.1", "I-8.10", "I-7.18"]
+SCAN cell=F hist=pinned_after_base20_first_lap_failure label=pinned_after_base20_first_lap_failure_zero S=8 N=44 true_t=21 true_F=0 true_p=21 combos=270 floors=[0, 8, 21] pins=[21, 255]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=today legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=0 wrong_red=264 wrong_na=0 wrong_accepted_sample=[]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=jia_gt legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=3 wrong_red=261 wrong_na=0 wrong_accepted_sample=[(21, 0, 255), (21, 8, 255), (21, 21, 255)]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=jia_seed legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=3 wrong_red=261 wrong_na=0 wrong_accepted_sample=[(21, 0, 255), (21, 8, 255), (21, 21, 255)]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=yi_literal legit_accepted=0 legit_red=0 legit_na=6 wrong_accepted=0 wrong_red=0 wrong_na=264 wrong_accepted_sample=[]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=yi_gate legit_accepted=0 legit_red=0 legit_na=6 wrong_accepted=0 wrong_red=0 wrong_na=264 wrong_accepted_sample=[]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=any_lap legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=3 wrong_red=261 wrong_na=0 wrong_accepted_sample=[(21, 0, 255), (21, 8, 255), (21, 21, 255)]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=ding_jia legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=3 wrong_red=261 wrong_na=0 wrong_accepted_sample=[(21, 0, 255), (21, 8, 255), (21, 21, 255)]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=ding_jia_same legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=3 wrong_red=261 wrong_na=0 wrong_accepted_sample=[(21, 0, 255), (21, 8, 255), (21, 21, 255)]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=ding_jia_single legit_accepted=6 legit_red=0 legit_na=0 wrong_accepted=3 wrong_red=261 wrong_na=0 wrong_accepted_sample=[(21, 0, 255), (21, 8, 255), (21, 21, 255)]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=ding_yi legit_accepted=0 legit_red=0 legit_na=6 wrong_accepted=0 wrong_red=0 wrong_na=264 wrong_accepted_sample=[]
+  SCANCAND label=pinned_after_base20_first_lap_failure_zero S=8 N=44 cand=ding_yi_same legit_accepted=0 legit_red=0 legit_na=6 wrong_accepted=0 wrong_red=0 wrong_na=264 wrong_accepted_sample=[]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 76.88s
+

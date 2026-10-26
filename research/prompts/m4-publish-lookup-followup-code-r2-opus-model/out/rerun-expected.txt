@@ -1,0 +1,23 @@
+name=job job=base mutant=baseline target=publish_lookup_by_identity build_rc=0 rc=0 test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=carried deadlist_pool_rewrite data_units=8 carried_accounting_nodes=0
+name=carried deadlist_pool_rewrite data_units=32 carried_accounting_nodes=0
+name=job job=NA1 mutant=NA1 target=publish_lookup_by_identity build_rc=0 rc=0 test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=job job=NA2 mutant=NA2 target=publish_lookup_by_identity build_rc=0 rc=0 test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=job job=NA3 mutant=NA3 target=publish_lookup_by_identity build_rc=0 rc=0 test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=job job=NA4 mutant=NA4 target=publish_lookup_by_identity build_rc=0 rc=0 test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out failed=[]
+name=none_site job=base None: LookupWork { index_builds: 5
+name=none_site job=NA2 None: LookupWork { index_builds: 29
+name=remount files=16 units=159 mapped=156 mount=ok times_entered=1 index_builds=1 index_lookups=156
+name=remount files=64 units=599 mapped=592 mount=ok times_entered=1 index_builds=1 index_lookups=592
+name=remount files=256 units=2354 mapped=2337 mount=ok times_entered=1 index_builds=1 index_lookups=2337
+name=remount files=16 units=159 mapped=156 mount=ok times_entered=156 index_builds=156 index_lookups=156
+name=remount files=64 units=599 mapped=592 mount=ok times_entered=592 index_builds=592 index_lookups=592
+name=remount files=256 units=2354 mapped=2337 mount=ok times_entered=2337 index_builds=2337 index_lookups=2337
+name=probe first_file_units=64 first_file_data_pointers=64 rewrite_units=32 units_in_the_version=211 rewritten_roles=44 outcome=ok first_file_contains_comparisons=2816
+name=probe first_file_units=256 first_file_data_pointers=256 rewrite_units=32 units_in_the_version=409 rewritten_roles=49 outcome=ok first_file_contains_comparisons=12544
+name=probe first_file_units=1024 first_file_data_pointers=1024 rewrite_units=8 units_in_the_version=1134 rewritten_roles=37 outcome=ok first_file_contains_comparisons=37888
+name=probe first_file_units=1024 first_file_data_pointers=1024 rewrite_units=32 units_in_the_version=1231 rewritten_roles=61 outcome=ok first_file_contains_comparisons=211968
+name=probe first_file_units=1024 first_file_data_pointers=1024 rewrite_units=128 units_in_the_version=1619 rewritten_roles=162 outcome=ok first_file_contains_comparisons=165888
+name=differential seeds=32 steps=48 lines=1600 before_vs_after=identical
+name=t4 cell=rustflags_with_target library_rustc_cfg_lookup_work_counters=on build_script_rustc_cfg_lookup_work_counters=off build_script_output=[cargo::metadata=enabled_features=]
+name=t4 cell=rustflags_without_target library_rustc_cfg_lookup_work_counters=on build_script_rustc_cfg_lookup_work_counters=on build_script_output=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS]

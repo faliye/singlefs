@@ -1,0 +1,88 @@
+临时目录： /tmp/singlefs-checker-recheck-1vmwcvgo
+
+ROUND original-first
++ cargo test --release --offline --manifest-path /tmp/singlefs-checker-recheck-1vmwcvgo/checker/Cargo.toml --lib audit_ -- --nocapture --test-threads=1
+     Locking 22 packages to latest compatible versions
+   Compiling singlefs-checker-audit v0.0.0 (/tmp/singlefs-checker-recheck-1vmwcvgo/checker)
+    Finished `release` profile [optimized + debuginfo] target(s) in 27.62s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_audit-2c66ba3a23de951f)
+
+running 4 tests
+test walk::audit_image_controls::audit_full_image_bad_reference_and_restore_controls ... AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT root_txg=1 original_pointer_birth=0 actual_node_birth=0 mutated_pointer_birth=999
+AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT pointer_birth=999 cache_hit=true
+AUDIT full_image control=false mutated_roots=1 I-1.2=Holds all_red=[]
+AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT restored_image all_red=0
+ok
+test walk::audit_image_controls::audit_journal_same_real_geometry_and_same_image ... AUDIT same_image journal different_instances=false reverse=false checker=[(1, 1, 20)] core=[(1, 1, 10)]
+AUDIT same_image journal different_instances=false reverse=true checker=[(1, 1, 10)] core=[(1, 1, 20)]
+AUDIT same_image journal different_instances=true reverse=false checker=[(2, 1, 20)] core=[(1, 1, 10), (2, 1, 20)]
+AUDIT same_image journal different_instances=true reverse=true checker=[(1, 1, 10)] core=[(1, 1, 10), (2, 1, 20)]
+ok
+test walk::audit_repro::audit_cached_node_skips_expected_tree ... AUDIT I-1.3 cached=0 fresh=1
+ok
+test walk::audit_repro::audit_cached_node_skips_new_pointer_birth_identity ... AUDIT I-1.2 cached=0 fresh=1
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.76s
+
+
+ROUND reference-recheck-control
++ cargo test --release --offline --manifest-path /tmp/singlefs-checker-recheck-1vmwcvgo/checker/Cargo.toml --lib audit_ -- --nocapture --test-threads=1
+    Blocking waiting for file lock on build directory
+   Compiling singlefs-checker-audit v0.0.0 (/tmp/singlefs-checker-recheck-1vmwcvgo/checker)
+    Finished `release` profile [optimized + debuginfo] target(s) in 25.95s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_audit-2c66ba3a23de951f)
+
+running 4 tests
+test walk::audit_image_controls::audit_full_image_bad_reference_and_restore_controls ... AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT root_txg=1 original_pointer_birth=0 actual_node_birth=0 mutated_pointer_birth=999
+AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT pointer_birth=999 cache_hit=true
+AUDIT full_image control=true mutated_roots=1 I-1.2=Violated("树表单元：头里的出生身份（诞生代号 0、写序实例 0、出生序号 1）与引用它的指针记的（诞生代号 999、实例 0、尾段 1）不符") all_red=[("I-1.2", Violated("树表单元：头里的出生身份（诞生代号 0、写序实例 0、出生序号 1）与引用它的指针记的（诞生代号 999、实例 0、尾段 1）不符"))]
+AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT restored_image all_red=0
+ok
+test walk::audit_image_controls::audit_journal_same_real_geometry_and_same_image ... AUDIT same_image journal different_instances=false reverse=false checker=[(1, 1, 20)] core=[(1, 1, 10)]
+AUDIT same_image journal different_instances=false reverse=true checker=[(1, 1, 10)] core=[(1, 1, 20)]
+AUDIT same_image journal different_instances=true reverse=false checker=[(2, 1, 20)] core=[(1, 1, 10), (2, 1, 20)]
+AUDIT same_image journal different_instances=true reverse=true checker=[(1, 1, 10)] core=[(1, 1, 10), (2, 1, 20)]
+ok
+test walk::audit_repro::audit_cached_node_skips_expected_tree ... AUDIT I-1.3 cached=1 fresh=1
+ok
+test walk::audit_repro::audit_cached_node_skips_new_pointer_birth_identity ... AUDIT I-1.2 cached=1 fresh=1
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.72s
+
+
+ROUND original-second
++ cargo test --release --offline --manifest-path /tmp/singlefs-checker-recheck-1vmwcvgo/checker/Cargo.toml --lib audit_ -- --nocapture --test-threads=1
+   Compiling singlefs-checker-audit v0.0.0 (/tmp/singlefs-checker-recheck-1vmwcvgo/checker)
+    Finished `release` profile [optimized + debuginfo] target(s) in 24.62s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_audit-2c66ba3a23de951f)
+
+running 4 tests
+test walk::audit_image_controls::audit_full_image_bad_reference_and_restore_controls ... AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT root_txg=1 original_pointer_birth=0 actual_node_birth=0 mutated_pointer_birth=999
+AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT pointer_birth=999 cache_hit=true
+AUDIT full_image control=false mutated_roots=1 I-1.2=Holds all_red=[]
+AUDIT candidate_roots=[(0, 0), (1, 3), (1, 1), (1, 2)]
+AUDIT restored_image all_red=0
+ok
+test walk::audit_image_controls::audit_journal_same_real_geometry_and_same_image ... AUDIT same_image journal different_instances=false reverse=false checker=[(1, 1, 20)] core=[(1, 1, 10)]
+AUDIT same_image journal different_instances=false reverse=true checker=[(1, 1, 10)] core=[(1, 1, 20)]
+AUDIT same_image journal different_instances=true reverse=false checker=[(2, 1, 20)] core=[(1, 1, 10), (2, 1, 20)]
+AUDIT same_image journal different_instances=true reverse=true checker=[(1, 1, 10)] core=[(1, 1, 10), (2, 1, 20)]
+ok
+test walk::audit_repro::audit_cached_node_skips_expected_tree ... AUDIT I-1.3 cached=0 fresh=1
+ok
+test walk::audit_repro::audit_cached_node_skips_new_pointer_birth_identity ... AUDIT I-1.2 cached=0 fresh=1
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.09s
+
+CHECKER_RECHECK_COMPLETE original/control/original 各轮通过；产品源码未变。

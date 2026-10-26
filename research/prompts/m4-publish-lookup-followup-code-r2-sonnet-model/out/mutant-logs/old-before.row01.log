@@ -1,0 +1,45 @@
+
+running 1 test
+test publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record ... FAILED
+
+failures:
+
+---- publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record stdout ----
+
+thread 'publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record' (229030) panicked at crates/singlefs-harness/tests/sequential_write_split_into_one_unit_transactions.rs:157:5:
+assertion `left == right` failed: 前一条只点名一个单元
+  left: 13
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.50s
+
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-format v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-reference-filesystem v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-checker v0.1.0 (〔第二台的目录〕)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.50s
+     Running tests/sequential_write_split_into_one_unit_transactions.rs (target-mut/debug/deps/sequential_write_split_into_one_unit_transactions-1bcab05f7367b1c2)
+error: test failed, to rerun pass `-p singlefs-harness --test sequential_write_split_into_one_unit_transactions`

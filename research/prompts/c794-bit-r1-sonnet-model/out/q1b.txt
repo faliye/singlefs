@@ -1,5 +1,0 @@
-PROBE-Q1B after-B-no-anomaly checker_violated=[] recover=FileRead(2500 bytes)
-PROBE-Q1B C-both-bits-on-both-devices checker_violated=[] recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录的已释放位与隔离位同时置着：条款没定这一组合，第一版不认" })
-PROBE-Q1B after-B-no-anomaly checker_violated=[] recover=FileRead(2500 bytes)
-PROBE-Q1B C-both-bits-on-device-0-only checker_violated=[] recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录的已释放位与隔离位同时置着：条款没定这一组合，第一版不认" })
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;

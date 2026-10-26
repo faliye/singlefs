@@ -33,7 +33,7 @@
 | （欠的检查清单 标题之下、第一个下级标题之前的正文：第 2-587 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
 | ### 已还清 | 抄 | 默认全抄（脚本生成） |
 
-### 小节清单：`.claude/kb/decisions/08-核心索引结构.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/08-core-index-structure.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -58,7 +58,7 @@
 | #### Settled Item 16: First-Version Unlink: Creates deleted_inodes Only, Batched from Tail, Resumes to Empty During Mount | 抄 | 随父节带到 |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/08-核心索引结构.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/08-コアインデックス構造.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -108,7 +108,7 @@
 | #### 已定项 16：第一版 unlink：只立 deleted_inodes、从尾部分批、挂载里续做到空 | 抄 | 默认全抄（脚本生成） |
 | ## 历史版本 | 不抄 | 历史节，正文只引现状 |
 
-### 小节清单：`.claude/kb/decisions/05-快照-空间记账机制.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/05-snapshot-space-accounting-mechanism.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -138,7 +138,7 @@
 | #### Settled Item 21: Whether Snapshot List Needs an Enumerable Persistent Structure | 抄 | 随父节带到 |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/05-快照-空间记账机制.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/05-スナップショット-空間会計メカニズム.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -212,7 +212,7 @@
 | ## I-9 inode 树结构 —— 类 | 抄 | 顶上标题，与开篇正文合成行区间 |
 | （I-9 标题之下、第一个下级标题之前的正文：第 2-56 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
 
-### 小节清单：`.claude/kb/experiments/71-记账key的条目数与宽度.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/71-entry-count-and-width-of-accounting-keys.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -236,7 +236,7 @@
 | ### Impacted Decisions | 抄 | 默认全抄（脚本生成） |
 | ## Historical Versions | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/experiments/71-记账key的条目数与宽度.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/71-記帳キーのエントリ数と幅.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

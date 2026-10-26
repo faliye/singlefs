@@ -1,3 +1,0 @@
-e71e6f87bbfb7784b9dec9a32dc84fd99038a639bd2faec7de152950124bbee7  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
-703f3b7477cf3421b45933894ea99417d0abb208cefc2f52bdb944722ed565d7  .claude/kb/decisions/16-发布语义.md
-0b97af507e86c13251eb564cf6aece96a6ff237887e90f3fd5a4abc759d76223  .claude/kb/checks-owed.md

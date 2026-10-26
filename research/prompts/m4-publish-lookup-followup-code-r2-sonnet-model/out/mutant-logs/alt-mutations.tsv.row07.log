@@ -1,0 +1,24 @@
+
+running 1 test
+test rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart ... FAILED
+
+failures:
+
+---- rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart stdout ----
+publish_lookup_by_identity deadlist_pool deadlist_entries=795 deadlist_tree_nodes=5
+
+thread 'rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart' (127385) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1600:5:
+CarriedNodesOfTheDeadlistTree：这一版 Deadlist 照抄了 2 个节点，走一遍每个经上一版建一次的索引查一次（这一处不另建索引、不解叶）：（建索引次数、解叶次数、查的次数）是走一遍 (0, 0, 2) 的整数倍（0 遍）：LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 3 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 5.46s
+
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.18s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

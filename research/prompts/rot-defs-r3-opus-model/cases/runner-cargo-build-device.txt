@@ -1,1 +1,0 @@
-bash scripts/hosts/capped.sh 31 cargo build --release -p singlefs-checker-tier --bin e183_capacity_read_cache_reserve_and_sweep_costs

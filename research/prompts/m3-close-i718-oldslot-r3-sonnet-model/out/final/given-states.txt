@@ -1,0 +1,222 @@
+GIVEN scenario=plain_overwrite label="D 的根槽写报错、恢复之前" red=["I-7.18"] I-7.18=R I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="D 的根槽写报错、恢复之前" variant=t_as_floor I-7.18=R newest_txg=27 t=4 F=0 p=255
+GIVEN_BAD scenario=plain_overwrite label="D 的根槽写报错、恢复之前" variant=p_255 same_as_honest=1
+GIVEN scenario=plain_overwrite label="恢复之后重开" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开" variant=t_as_floor I-7.18=R newest_txg=31 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开" variant=p_255 I-7.18=R newest_txg=31 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=32 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=32 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=33 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=33 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=34 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=34 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=35 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=35 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=36 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=36 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=37 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=37 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=38 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=38 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=39 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=39 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=40 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=40 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=41 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=41 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=42 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=42 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=43 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=43 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=44 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=44 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=45 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=45 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=46 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=46 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=47 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=47 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=48 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=48 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=49 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=49 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=50 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=50 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=51 t=4 F=0 p=4
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=51 t=4 F=0 p=4
+GIVEN scenario=plain_overwrite label="恢复之后重开：写掉钉住的那一槽（txg 52）之后" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：写掉钉住的那一槽（txg 52）之后" variant=t_as_floor I-7.18=R newest_txg=52 t=29 F=0 p=255
+GIVEN_BAD scenario=plain_overwrite label="恢复之后重开：写掉钉住的那一槽（txg 52）之后" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_refused label="RefusedBeforeWriting：重发之后" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_refused label="RefusedBeforeWriting：重发之后" variant=t_as_floor I-7.18=R newest_txg=28 t=5 F=0 p=255
+GIVEN_BAD scenario=rollback_refused label="RefusedBeforeWriting：重发之后" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_refused label="RefusedBeforeWriting：崩在重发之前、恢复之前" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_refused label="RefusedBeforeWriting：崩在重发之前、恢复之前" variant=t_as_floor I-7.18=R newest_txg=27 t=4 F=0 p=255
+GIVEN_BAD scenario=rollback_refused label="RefusedBeforeWriting：崩在重发之前、恢复之前" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_refused label="RefusedBeforeWriting：崩溃之后重开" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_refused label="RefusedBeforeWriting：崩溃之后重开" variant=t_as_floor I-7.18=R newest_txg=31 t=4 F=0 p=255
+GIVEN_BAD scenario=rollback_refused label="RefusedBeforeWriting：崩溃之后重开" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：重发之后" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：重发之后" variant=t_as_floor I-7.18=R newest_txg=28 t=5 F=0 p=255
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：重发之后" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩在重发之前、恢复之前" red=["I-7.18"] I-7.18=R I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩在重发之前、恢复之前" variant=t_as_floor I-7.18=R newest_txg=27 t=4 F=0 p=255
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩在重发之前、恢复之前" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开" variant=t_as_floor I-7.18=R newest_txg=31 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开" variant=p_255 I-7.18=R newest_txg=31 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=32 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=32 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=33 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=33 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=34 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=34 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=35 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=35 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=36 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=36 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=37 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=37 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=38 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=38 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=39 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=39 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=40 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=40 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=41 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=41 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=42 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=42 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=43 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=43 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=44 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=44 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=45 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=45 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=46 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=46 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=47 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=47 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=48 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=48 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=49 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=49 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=50 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=50 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=51 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=51 t=4 F=0 p=4
+GIVEN scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：写掉钉住的那一槽（txg 52）之后" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：写掉钉住的那一槽（txg 52）之后" variant=t_as_floor I-7.18=R newest_txg=52 t=29 F=0 p=255
+GIVEN_BAD scenario=rollback_torn label="TornAfterTheFirstHalf：崩溃之后重开：写掉钉住的那一槽（txg 52）之后" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：重发之后" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：重发之后" variant=t_as_floor I-7.18=R newest_txg=28 t=5 F=0 p=255
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：重发之后" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩在重发之前、恢复之前" red=["I-7.18"] I-7.18=R I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩在重发之前、恢复之前" variant=t_as_floor I-7.18=R newest_txg=27 t=4 F=0 p=255
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩在重发之前、恢复之前" variant=p_255 same_as_honest=1
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开" variant=t_as_floor I-7.18=R newest_txg=31 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开" variant=p_255 I-7.18=R newest_txg=31 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=32 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 1 次覆盖写之后（txg 32），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=32 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=33 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 2 次覆盖写之后（txg 33），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=33 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=34 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 3 次覆盖写之后（txg 34），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=34 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=35 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 4 次覆盖写之后（txg 35），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=35 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=36 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 5 次覆盖写之后（txg 36），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=36 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=37 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 6 次覆盖写之后（txg 37），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=37 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=38 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 7 次覆盖写之后（txg 38），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=38 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=39 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 8 次覆盖写之后（txg 39），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=39 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=40 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 9 次覆盖写之后（txg 40），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=40 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=41 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 10 次覆盖写之后（txg 41），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=41 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=42 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 11 次覆盖写之后（txg 42），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=42 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=43 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 12 次覆盖写之后（txg 43），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=43 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=44 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 13 次覆盖写之后（txg 44），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=44 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=45 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 14 次覆盖写之后（txg 45），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=45 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=46 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 15 次覆盖写之后（txg 46），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=46 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=47 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 16 次覆盖写之后（txg 47），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=47 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=48 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 17 次覆盖写之后（txg 48），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=48 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=49 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 18 次覆盖写之后（txg 49），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=49 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=50 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 19 次覆盖写之后（txg 50），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=50 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" variant=t_as_floor I-7.18=R newest_txg=51 t=4 F=0 p=4
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：第 20 次覆盖写之后（txg 51），那一槽还没被写掉" variant=p_255 I-7.18=R newest_txg=51 t=4 F=0 p=4
+GIVEN scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：写掉钉住的那一槽（txg 52）之后" red=[] I-7.18=G I-3.1=G I-7.19=G
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：写掉钉住的那一槽（txg 52）之后" variant=t_as_floor I-7.18=R newest_txg=52 t=29 F=0 p=255
+GIVEN_BAD scenario=rollback_zeroed label="ZeroesWritten：崩溃之后重开：写掉钉住的那一槽（txg 52）之后" variant=p_255 same_as_honest=1

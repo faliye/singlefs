@@ -1,0 +1,23 @@
+# 派发：three-way-attack
+
+重型测试：不跑
+批次：探针内容
+线程上限：31
+禁读清单：探针内容
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-three-way-attack
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-three-way-attack --purpose '探针：现试骨架'
+背景材料：探针内容
+攻击面：探针内容
+报告：research/prompts/probe-r9-opus-output.md
+预计挂钟：2 小时内，读几份文件
+
+## 关的是哪几条
+
+探针内容
+
+## 出口
+
+探针内容
+
+
+另判一处：骨架「报告：」一行默认填 `<草稿目录>/result.md`，这是不是矛盾。

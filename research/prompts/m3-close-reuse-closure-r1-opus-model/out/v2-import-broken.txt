@@ -1,0 +1,2 @@
+name=import-broken status=252 ran=no
+  ✗ 内存不够排不上：这一条要 10.0 GiB（峰值表里没有这条，host-resources.py 对它的预测没算出来（RuntimeError: attack: lib_long_run import-time failure），按它的上限 10G 算），比 slice 的

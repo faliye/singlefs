@@ -1,0 +1,3 @@
+BASELINE_COVERAGE_OK
+REMOVAL_REJECTED 不变式负例·compaction_plan_proofs 第114行 ['crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs:114 invariant 块']
+REMOVAL_REJECTED 证明负例·lemma_under_the_premise_a_plan_takes_the_leading_allocations ['crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs:869 函数 lemma_under_the_premise_a_plan_takes_the_leading_allocations']

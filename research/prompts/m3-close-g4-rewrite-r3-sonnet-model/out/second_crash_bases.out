@@ -1,0 +1,9 @@
+name=second_crash_base segment=0 landed_device=0 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=0 landed_device=1 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=1 landed_device=0 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=1 landed_device=1 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=5 landed_device=0 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=5 landed_device=1 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=9 landed_device=0 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+name=second_crash_base segment=9 landed_device=1 states=20519 whole=20499 torn=20 dead_states(whole+torn)=0
+sum_of_the_eight_in_my_model= 164152

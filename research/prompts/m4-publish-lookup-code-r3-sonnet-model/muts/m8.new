@@ -1,0 +1,7 @@
+    let holder_and_locations = match previous
+        .mapped_units
+        .iter()
+        .find(|(_, key)| *key == mapping_key)
+    {
+        Some((role, _)) => {
+            let locations = match central_mapping_locations_in_the_version(previous, &mapping_key) {

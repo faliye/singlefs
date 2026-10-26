@@ -1,0 +1,22 @@
+== PCr3 ①：比对对象对它自己
+键数 比对对象/这一次: 85 85
+比了的字段数（按类）: {'布尔': 162, '钉零': 88, '读不到': 5, '要正': 70, '结局种数': 30, 'G行判定': 5} 合计 360
+翻面格数: 0 其中判决行（Q3a）: 0 其余（Q3b）: 0
+只在一边的键数: 0
+只在一边的字段数: 2
+  不可比的字段 verdict scope=feasibility second_segment_16_pc3 只在这一次
+  不可比的字段 verdict scope=feasibility second_segment_18_pc3 只在比对对象
+== 改了 reuse_arm 行 行109：inconsistent 0 -> 3
+== 改了判决行 行185：clause_S2_holds true -> false
+== PCr3 ②：比对对象对改了两处的副本
+键数 比对对象/这一次: 85 85
+比了的字段数（按类）: {'布尔': 162, '钉零': 88, '读不到': 5, '要正': 70, '结局种数': 30, 'G行判定': 5} 合计 360
+翻面格数: 2 其中判决行（Q3a）: 1 其余（Q3b）: 1
+  翻面 [钉零] 键=reuse_arm cell=first_small arm=k2_consult 字段=inconsistent 比对对象(行109)=0 这一次(行109)=3
+  翻面 [布尔] 键=verdict scope=feasibility 字段=clause_S2_holds 比对对象(行185)=true 这一次(行185)=false
+只在一边的键数: 0
+只在一边的字段数: 2
+  不可比的字段 verdict scope=feasibility second_segment_16_pc3 只在这一次
+  不可比的字段 verdict scope=feasibility second_segment_18_pc3 只在比对对象
+== PCr3 结果：① 翻面 0 格（要求 0）；② 翻面 2 格（要求 2）
+== PCr3 通过

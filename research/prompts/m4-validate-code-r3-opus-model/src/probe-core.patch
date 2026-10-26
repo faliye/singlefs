@@ -1,0 +1,130 @@
+--- a/crates/singlefs-core/src/extent_tree.rs
++++ b/crates/singlefs-core/src/extent_tree.rs
+@@ -1688,3 +1688,80 @@
+         );
+     }
+ }
++
++/// 攻方腿 m4-validate-code-r3 的探针开关（只在腿的副本里，不进仓）：线程局部的变异号与「截断最后一批一个单元都不留」的生成器开关。
++/// 变异号 0 是冻结副本的行为（改法甲）；环境变量 `R3_PROBE_MUTANT` 设了非 0 值时整个进程照它，线程局部的值不再看。
++pub mod r3_probe {
++    use super::ExtentUpperLeafTarget;
++    use std::cell::Cell;
++    use std::sync::OnceLock;
++
++    thread_local! {
++        static MUTANT: Cell<u8> = const { Cell::new(0) };
++        static TRUNCATION_KEEPS_NO_UNIT: Cell<bool> = const { Cell::new(false) };
++    }
++
++    pub fn set_mutant(mutant: u8) {
++        MUTANT.with(|cell| cell.set(mutant));
++    }
++
++    pub fn set_truncation_keeps_no_unit(on: bool) {
++        TRUNCATION_KEEPS_NO_UNIT.with(|cell| cell.set(on));
++    }
++
++    #[must_use]
++    pub fn truncation_keeps_no_unit() -> bool {
++        TRUNCATION_KEEPS_NO_UNIT.with(Cell::get)
++    }
++
++    #[must_use]
++    pub fn mutant() -> u8 {
++        static FROM_THE_ENVIRONMENT: OnceLock<u8> = OnceLock::new();
++        let from_the_environment = *FROM_THE_ENVIRONMENT.get_or_init(|| {
++            std::env::var("R3_PROBE_MUTANT")
++                .ok()
++                .and_then(|value| value.parse().ok())
++                .unwrap_or(0)
++        });
++        if from_the_environment != 0 {
++            return from_the_environment;
++        }
++        MUTANT.with(Cell::get)
++    }
++
++    #[derive(Clone, Copy)]
++    enum Site {
++        Shape,
++        Build,
++    }
++
++    fn old_rule(size: Option<u64>) -> Option<ExtentUpperLeafTarget> {
++        size.filter(|size| *size > 0)
++            .map(|_| ExtentUpperLeafTarget::NoDataUnit)
++    }
++
++    fn rule(size: Option<u64>, site: Site) -> Option<ExtentUpperLeafTarget> {
++        let frozen = ExtentUpperLeafTarget::of_a_file_without_data_units(size);
++        match (mutant(), site) {
++            (1, _) | (2, Site::Shape) | (3, Site::Build) => old_rule(size),
++            (4, _) => match size {
++                Some(0) => Some(ExtentUpperLeafTarget::NoDataUnit),
++                _ => None,
++            },
++            (5, _) | (6, Site::Shape) | (7, Site::Build) => Some(ExtentUpperLeafTarget::NoDataUnit),
++            _ => frozen,
++        }
++    }
++
++    /// 上段形状（有条目的号集合）那一处。
++    #[must_use]
++    pub fn shape_rule(size: Option<u64>) -> Option<ExtentUpperLeafTarget> {
++        rule(size, Site::Shape)
++    }
++
++    /// 装上段叶那一处。
++    #[must_use]
++    pub fn build_rule(size: Option<u64>) -> Option<ExtentUpperLeafTarget> {
++        rule(size, Site::Build)
++    }
++}
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3999,7 +3999,7 @@
+     #[must_use]
+     pub fn inodes_with_an_extent_upper_leaf_entry(&self) -> BTreeSet<u64> {
+         let first_file_has_an_entry = !self.data_pointers.is_empty()
+-            || ExtentUpperLeafTarget::of_a_file_without_data_units(
++            || crate::extent_tree::r3_probe::shape_rule(
+                 self.inode_record.map(|record| record.size),
+             )
+             .is_some();
+@@ -12337,7 +12337,7 @@
+                     (None, Some(only_data_pointer)) => {
+                         Some(ExtentUpperLeafTarget::InlineDataUnit(*only_data_pointer))
+                     }
+-                    (None, None) => ExtentUpperLeafTarget::of_a_file_without_data_units(
++                    (None, None) => crate::extent_tree::r3_probe::build_rule(
+                         size_of_the_first_file_after_this_publish,
+                     ),
+                 }
+--- a/crates/singlefs-core/src/truncate.rs
++++ b/crates/singlefs-core/src/truncate.rs
+@@ -164,8 +164,11 @@
+     target_size_in_bytes: u64,
+     batch_size: UnlinkBatchSize,
+ ) -> TruncationStep {
+-    let data_units_kept_at_the_end =
+-        data_units_existing.min(data_units_a_size_needs(target_size_in_bytes));
++    let data_units_kept_at_the_end = if crate::extent_tree::r3_probe::truncation_keeps_no_unit() {
++        0
++    } else {
++        data_units_existing.min(data_units_a_size_needs(target_size_in_bytes))
++    };
+     let data_units_beyond_the_size = data_units_existing - data_units_kept_at_the_end;
+     let data_units_per_batch = batch_size.data_units_per_batch();
+     if data_units_beyond_the_size <= data_units_per_batch {
+@@ -235,7 +238,9 @@
+         tail_before,
+         tail_after,
+     } = change;
+-    let keeps_at_least_one_unit_or_had_none = data_units_after >= 1 || data_units_before == 0;
++    let keeps_at_least_one_unit_or_had_none = data_units_after >= 1
++        || data_units_before == 0
++        || crate::extent_tree::r3_probe::truncation_keeps_no_unit();
+     assert!(
+         data_units_after <= data_units_before && keeps_at_least_one_unit_or_had_none,
+         "截断留至少一个单元（一个单元都没有的整文件洞照旧 0 个）、变长不加单元"

@@ -1,0 +1,14 @@
+三方腿类型（此刻 frontmatter）：three-way-attack、three-way-defense、three-way-forward
+② 三方腿交回（一次调用一次；v10→v35→now）：
+  认出/认出/认出：618 次；例：a6545bcc4c8eb512d（2026-10-17）、a6c3a55ff5bc19039（2026-10-17）
+  认出/没认出/认出；前缀 /home/fy5090/.local/share/singlefs/work/m5-dev/：37 次；例：a028ec0c5ee1bd7bb（2026-10-19）、a05f0aae7e6706e18（2026-10-20）
+  认出/没认出/没认出；前缀 /home/fy5090/.local/share/singlefs/work/m4-predev/：9 次；例：a2e0cc6ef56fad5c8（2026-10-16）、a3b0c2a40d1b94bf7（2026-10-16）
+  没认出/没认出/没认出；前缀 （没有 research/prompts/…-output.md）：6 次；例：a4e8e26a56372c72a（2026-09-28）、ae8bcf94bea3860c6（2026-09-28）
+  合计 670 次
+⑰ 三方腿派发提示 three_way_report_verdict（一份记录一份；v10→v35→now）：
+  拒/拒/拒：37 份；例：a4e8e26a56372c72a、ae8bcf94bea3860c6、a5603803187800851
+  放/放/放：658 份；例：a6545bcc4c8eb512d、a6c3a55ff5bc19039、a7ede783bbf522fe6
+  合计 695 份
+⑰ 全部类型派发提示 report_file_name_verdict（v10→v35→now）：
+  拒/拒/拒：1365 份
+  放/放/放：1996 份

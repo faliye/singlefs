@@ -4,6 +4,8 @@
 
 被判的产品代码（这一批四份补丁，冻结副本 `~/.local/share/singlefs/work/m4-batch2-code-r1/repo/`，sha256 在 `m4-batch2-code-r1-snapshot/crates-sha256.txt`）：`crates/singlefs-core/src/block_device.rs`、`crates/singlefs-core/src/lib.rs`、`crates/singlefs-core/src/mounted_read.rs`、`crates/singlefs-core/src/records.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/logged_operations.rs`、`crates/singlefs-core/src/region_scan.rs`、`crates/singlefs-core/src/compaction_plan.rs`、`crates/singlefs-format/src/lib.rs`；连带判的池级 checker 与 checker 档：`crates/singlefs-checker/src/rebuild.rs`、`walk.rs`、`image.rs`、`lib.rs`，`crates/singlefs-checker-tier/src/crash_judge_gpu.rs`、`device_log.rs`。正文 `_m4-batch2-code-r1-body.md`，腿报告 `m4-batch2-code-r1-sonnet-output.md`（正推，275 行）与 `m4-batch2-code-r1-opus-output.md`（攻方，298 行）。
 
+开工快照：`research/prompts/m4-batch2-code-r1-snapshot/`
+
 ## 一、核查
 
 - 快照：两条腿各自 `sha256sum -c` 冻结副本 16 行全 OK（两份报告开头原样）；腿跑着的时候主 agent 没改被判文件（轻型三条在工作树上跑，只读源码）。

@@ -1,0 +1,14 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 30 秒）：slice 已占 250 MiB，这一条要 200 MiB（峰值表里没有这条，按它的上限 200M 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 256 MiB；账上在跑 1 条
+Exception in thread Thread-1 (run):
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/dev/fd/3", line 298, in run
+  File "/home/fy5090/.local/share/singlefs/work/m3-close-reuse-closure-r2-opus/run1/variants/hr-int-cap/scripts/hosts/memory_peaks_lib.py", line 72, in human
+    if byte_count >= 1024 ** 3:
+       ^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: '>=' not supported between instances of 'str' and 'int'
+run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-1404414-570611703）
+命令自己的 stderr

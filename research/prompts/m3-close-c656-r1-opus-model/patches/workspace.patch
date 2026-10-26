@@ -6,9 +6,9 @@
      "crates/singlefs-unit-graph",
 +    "crates/c656-attack-probe",
  ]
- exclude = ["scripts/experiments"]
+ exclude = ["scripts/experiment-apparatus"]
  
- # 与 scripts/experiments/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
+ # 与 scripts/experiment-apparatus/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
  [profile.release]
 -opt-level = 3
 -debug = true

@@ -1,3 +1,0 @@
-a8ac7fdd61389af0da4c720445c134ac03de32be0562c0875598a7a5f4e4415b  .claude/kb/decisions/08-核心索引结构.md
-49721f00336c56212d2c92df1e9136797325f897cd5f96c3a027ac3c243ad557  .claude/kb/decisions/03-空间分配.md
-58294ed5fcd908d9d144e0f19195c37c14c3b4557d503661654f3b2d920fffaa  .claude/kb/checks-owed.md

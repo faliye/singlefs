@@ -1,0 +1,5 @@
+case=base default exit=0 out=c63379ff285eba00ca251e038844715f9057189fb3fca205c2985172c9d0dccc 465
+case=lfu-dynamic default exit=0 out=c63379ff285eba00ca251e038844715f9057189fb3fca205c2985172c9d0dccc 465
+case=lfu-dynamic judging-files-included exit=2 out=
+case=units-dynamic default exit=2 out=
+case=units-dynamic judging-files-included exit=2 out=

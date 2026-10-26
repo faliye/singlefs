@@ -2,7 +2,7 @@
 
 ## 结论
 
-两次都是 E142 第十六次跑给独立比对程序 `scripts/experiments/e142_region_diff_independent.rs` 跑变异表时，第 2 条变异 `M2_diff_segments_equality_flipped` 让单测无限分配内存；变异跑道 `scripts/mutation/mutate.sh` 只有 120 秒超时、没有内存上限，整机 60 GiB 十几秒被吃满，内核全局 OOM 先杀了本机本地模型服务的 ray 进程，Claude Code 会话在内存耗尽时断掉，最后才杀到这个单测进程。
+两次都是 E142 第十六次跑给独立比对程序 `scripts/experiment-apparatus/e142_region_diff_independent.rs` 跑变异表时，第 2 条变异 `M2_diff_segments_equality_flipped` 让单测无限分配内存；变异跑道 `scripts/mutation/mutate.sh` 只有 120 秒超时、没有内存上限，整机 60 GiB 十几秒被吃满，内核全局 OOM 先杀了本机本地模型服务的 ray 进程，Claude Code 会话在内存耗尽时断掉，最后才杀到这个单测进程。
 
 ## 证据
 

@@ -1,0 +1,10 @@
+relay-comma（clerk）：退 2；✗ 派 clerk 的提示报告行点名的文件名里带 report，或是以 SUMMARY、FINDINGS、ANALYSIS 开头的 .md：「/home/fy5090/.local/share/singlefs/work/k3-probe-previous/report.md」。
+relay-control（clerk）：退 0；  ✓ 派发闸照这份提示放行（clerk，查了 18 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）、⑯ 草稿目录写者锁（派的
+relay-list（clerk）：退 2；✗ 派 clerk 的提示报告行点名的文件名里带 report，或是以 SUMMARY、FINDINGS、ANALYSIS 开头的 .md：「/home/fy5090/.local/share/singlefs/work/k3-probe-previous/report.md」。
+own-zai（clerk）：退 0；  ✓ 派发闸照这份提示放行（clerk，查了 17 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）
+own-control（clerk）：退 2；✗ 派 clerk 的提示报告行点名的文件名里带 report，或是以 SUMMARY、FINDINGS、ANALYSIS 开头的 .md：「/home/fy5090/.local/share/singlefs/work/k3-probe-mine/report.md」。
+leg-filled（three-way-attack）：退 0；  ✓ 派发闸照这份提示放行（three-way-attack，查了 21 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）、⑯ 草稿目录写者限
+leg-form-placeholder（three-way-attack）：退 0；  ✓ 派发闸照这份提示放行（three-way-attack，查了 21 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）、⑯ 草稿目录写者限
+leg-subdir（three-way-attack）：退 2；✗ 派 three-way-attack 的提示整份提示里没有一处 research/prompts/<名>-output.md（报告行点名的，或不在「」『』“”与反引号里的）；报告行点名的「research/p
+交回闸 ② 的 LEG_REPORT_MENTION 认出： ['research/prompts/x-r1/x-r1-opus-output.md']
+交回闸 ② 的 LEG_REPORT_MENTION 认出： ['research/prompts/<轮>-opus-output.md']

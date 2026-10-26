@@ -85,9 +85,9 @@ bfbebd2e2120409a04774059a9f238a05a1c6760b635ff9141dec1ef9a92b8e2  ./out/snapshot
 [run-scope-guard.sh] exit=0
 ```
 
-（`out/probe.out` 原样；前两格在仓根起，第二格加了 `-p singlefs-checker-tier`；第三格是 research 那一支，在 `scripts/experiments` 下起。）范围声明闸三格都放（声明的种类对得上），拦下的是重型测试闸。定义没有哪一句说入库装置的单测不跑、交给谁：第 3 步只给变异写了去处（「三个数写「待提交时 checker-tier-crates-mutation-replay」」），单测没有；产出又要它：`.claude/agents/experiment-runner.md:53`：「单测数（一条命令数出来）」。照共用约束「被拒了不换写法绕过去」，执行员只能交回、交不出单测数。
+（`out/probe.out` 原样；前两格在仓根起，第二格加了 `-p singlefs-checker-tier`；第三格是 research 那一支，在 `scripts/experiment-apparatus` 下起。）范围声明闸三格都放（声明的种类对得上），拦下的是重型测试闸。定义没有哪一句说入库装置的单测不跑、交给谁：第 3 步只给变异写了去处（「三个数写「待提交时 checker-tier-crates-mutation-replay」」），单测没有；产出又要它：`.claude/agents/experiment-runner.md:53`：「单测数（一条命令数出来）」。照共用约束「被拒了不换写法绕过去」，执行员只能交回、交不出单测数。
 
-同一句的 bin 名还写成了简称：`.claude/agents/experiment-runner.md:34`：「中文简称只用在 kb 页」；`scripts/experiments/Cargo.toml` 的 166 个 `[[bin]]` 名没有一个带非 ASCII 字符（`grep -A1 '^\[\[bin\]\]' scripts/experiments/Cargo.toml | grep '^name' | grep -cP '[^\x00-\x7f]'` 输出 `0`）。照 1b 抄 `e<号>-<简称>`，research 那一支 cargo 报没有这个 bin（推的，没跑 cargo），入库装置那一支的名字连下划线都不对。
+同一句的 bin 名还写成了简称：`.claude/agents/experiment-runner.md:34`：「中文简称只用在 kb 页」；`scripts/experiment-apparatus/Cargo.toml` 的 166 个 `[[bin]]` 名没有一个带非 ASCII 字符（`grep -A1 '^\[\[bin\]\]' scripts/experiment-apparatus/Cargo.toml | grep '^name' | grep -cP '[^\x00-\x7f]'` 输出 `0`）。照 1b 抄 `e<号>-<简称>`，research 那一支 cargo 报没有这个 bin（推的，没跑 cargo），入库装置那一支的名字连下划线都不对。
 
 四句：
 - 分不分辨臂：这一轮没有臂；它分辨「定义要执行员跑的单测」与「闸放行的单测」，在入库装置那一支上不同、research 那一支上相同。
@@ -97,7 +97,7 @@ bfbebd2e2120409a04774059a9f238a05a1c6760b635ff9141dec1ef9a92b8e2  ./out/snapshot
 
 | 改法 | 修哪一格 | 标 |
 |---|---|---|
-| 1b 分两支写：research 那一支 `cd scripts/experiments && … cargo test --release --bin e<号>-<英文名里的下划线换成连字符>`；入库装置那一支不跑单测，产出的单测数写「待提交时 checker-tier-crash-point-replay 快档」（`.claude/rules/verification.md` 快档那一行写明快档带上装置二进制的内联单测） | 两半 | 推的（research 那一支的写法量过：上面第三格 `exit=0`） |
+| 1b 分两支写：research 那一支 `cd scripts/experiment-apparatus && … cargo test --release --bin e<号>-<英文名里的下划线换成连字符>`；入库装置那一支不跑单测，产出的单测数写「待提交时 checker-tier-crash-point-replay 快档」（`.claude/rules/verification.md` 快档那一行写明快档带上装置二进制的内联单测） | 两半 | 推的（research 那一支的写法量过：上面第三格 `exit=0`） |
 | 入库装置那一支的单测写进「要主 agent 跑的命令」，主 agent 带 `SINGLEFS_HEAVY_TESTS=user-request` 起 | 被拒那一半 | 推的；要不要为一个装置的单测弹窗，归主 agent 定 |
 
 推翻条件：重型测试闸改成放行 checker 档包里 `--bin <装置>` 的内联单测，或定义另有一处给入库装置单测写了去处（我读的是执行员定义全文与它点名的几份规则的点名小节）。
@@ -107,7 +107,7 @@ bfbebd2e2120409a04774059a9f238a05a1c6760b635ff9141dec1ef9a92b8e2  ./out/snapshot
 步骤：
 
 1. 戊-A56 写进闸的文件头：`.claude/hooks/lib_heavy_tests.py:68`：「直接执行装置的本体与它同判、不算」；判法：`.claude/hooks/lib_heavy_tests.py:2899`：「return None   # 装置的本体（cargo build 编出）」。攻方原型那一种也登成了许可：`.claude/hooks/lib_heavy_tests.py:71`：「攻方原型 `cargo build` 之后经内存包装直接执行编出来的二进制是许可的用法」。
-2. 形式化门禁红例钉表重放那一格起的就是这个装置本体：`scripts/experiments/e165-pin-red-examples.py:62`：「再用装置 e165_replay_bounded_enumeration --pinned-cases <表> 在今天的实现上逐行判」。经脚本起是重型：`.claude/agent-common.md:56`：「与 `scripts/experiments/e165-pin-red-examples.py --replay`」（同一句在 `.claude/rules/verification.md:136`）。
+2. 形式化门禁红例钉表重放那一格起的就是这个装置本体：`scripts/experiment-apparatus/e165-pin-red-examples.py:62`：「再用装置 e165_replay_bounded_enumeration --pinned-cases <表> 在今天的实现上逐行判」。经脚本起是重型：`.claude/agent-common.md:56`：「与 `scripts/experiment-apparatus/e165-pin-red-examples.py --replay`」（同一句在 `.claude/rules/verification.md:136`）。
 3. 同一份活换成直接起本体：
 
 ```
@@ -118,7 +118,7 @@ bfbebd2e2120409a04774059a9f238a05a1c6760b635ff9141dec1ef9a92b8e2  ./out/snapshot
 == pin-script-replay（investigator）
 [bash-command-detector.sh] exit=0
 [heavy-test-guard.sh] exit=2
-    ✗ 重型测试被拒：scripts/experiments/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration（门禁 checker-tier-formal-verification 的判法：起 Verus 或编 checker 档装置重放；只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--backfill、--list-items 不算；红例钉表参数里的变量只在可能展开成
+    ✗ 重型测试被拒：scripts/experiment-apparatus/e165-pin-red-examples.py --replay --binary target/release/e165_replay_bounded_enumeration（门禁 checker-tier-formal-verification 的判法：起 Verus 或编 checker 档装置重放；只有字面写明的 toolchain、fingerprint、tool-versions、list-items 与红例钉表的追加、--check、--backfill、--list-items 不算；红例钉表参数里的变量只在可能展开成
 [run-scope-guard.sh] exit=0
 == device-deps-e165-pinned-cases（investigator）
 [bash-command-detector.sh] exit=0
@@ -128,7 +128,7 @@ bfbebd2e2120409a04774059a9f238a05a1c6760b635ff9141dec1ef9a92b8e2  ./out/snapshot
 
 （`out/probe.out` 与 `out/probe-deps.out` 原样。）第一格是 `target/release/<名>`（批 4 之前就不判），第三格是 deps 下与它同一个 inode 的那一份（批 4 新放行的）。调查员、执行员、攻方腿、正推与辩方腿都不在拒绝的名单里，闸对它们一样放。
 
-与定义句是不是同一套说法：不是。共用约束与 `verification.md` 按入口脚本列重型（`e165-pin-red-examples.py --replay`），闸按二进制是不是装置本体放行，两套在「直接起 e165 本体、喂钉表」这一种上给出相反的判定。定义里许可直接执行装置的句子只写了「自己的」装置：`.claude/agents/experiment-runner.md:31`：「`cargo run` 与装置二进制（例 `scripts/experiments/target/release/e<号>-<简称>`）」、`.claude/agents/three-way-attack.md:36`：「调枚举函数的原型只 `cargo build`，经内存包装直接执行编出来的二进制（不 `cargo run`、不 `cargo test`）」，没有一句说别的门禁格起的装置本体归谁。照定义走的子 agent 不会因为这一句去起 e165 本体；会去起它的是要复现「钉表重放红」的调查员（输入给的就是那一格的 ✗ 行，定义第 2 步要它收窄再复现），收窄到「直接起本体、喂钉表」这一步，闸放、共用约束的清单拒。
+与定义句是不是同一套说法：不是。共用约束与 `verification.md` 按入口脚本列重型（`e165-pin-red-examples.py --replay`），闸按二进制是不是装置本体放行，两套在「直接起 e165 本体、喂钉表」这一种上给出相反的判定。定义里许可直接执行装置的句子只写了「自己的」装置：`.claude/agents/experiment-runner.md:31`：「`cargo run` 与装置二进制（例 `scripts/experiment-apparatus/target/release/e<号>-<简称>`）」、`.claude/agents/three-way-attack.md:36`：「调枚举函数的原型只 `cargo build`，经内存包装直接执行编出来的二进制（不 `cargo run`、不 `cargo test`）」，没有一句说别的门禁格起的装置本体归谁。照定义走的子 agent 不会因为这一句去起 e165 本体；会去起它的是要复现「钉表重放红」的调查员（输入给的就是那一格的 ✗ 行，定义第 2 步要它收窄再复现），收窄到「直接起本体、喂钉表」这一步，闸放、共用约束的清单拒。
 
 四句：
 - 分不分辨臂：分辨「按入口判」与「按二进制判」两套说法，在这一条命令上两者相反。

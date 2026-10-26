@@ -1,0 +1,5 @@
+naga baseline: PARSE_OK functions=21 entry_points=0 stubbed_constants=5 VALIDATE_OK 
+naga a: PARSE_OK functions=27 entry_points=0 stubbed_constants=5 VALIDATE_OK 
+naga a_seed: PARSE_OK functions=27 entry_points=0 stubbed_constants=5 VALIDATE_OK 
+naga b: PARSE_OK functions=27 entry_points=0 stubbed_constants=5 VALIDATE_OK 
+naga 阴性对照（故意写错类型，必须红）: PARSE_OK functions=27 entry_points=0 stubbed_constants=5 VALIDATE_INFO error: Function [26] 'judge_the_reclaim_threshold_and_the_pinned_ring_slot_of_the_newest_root' is invalid 

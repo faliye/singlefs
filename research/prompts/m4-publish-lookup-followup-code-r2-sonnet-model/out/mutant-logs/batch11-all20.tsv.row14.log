@@ -1,0 +1,43 @@
+
+running 1 test
+test a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once ... FAILED
+
+failures:
+
+---- a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once stdout ----
+publish_lookup_by_identity rewrite_under_a_snapshot killed=8 routed_leaves=1 replaced_user_visible_roles=8 snapshot_judgement=LookupWork { index_builds: 9, index_lookups: 51, index_entries_examined: 231, largest_index_looked_up: 55, mapping_leaf_decodes: 3, times_entered: 3 }
+
+thread 'a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once' (120221) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1477:5:
+快照下整份重写一个四单元的文件：快照判定那一圈按 inode 号找文件：进了 3 次（走了几遍），建索引 15 次，每走一遍恰好建一份：LookupWork { index_builds: 15, index_lookups: 15, index_entries_examined: 30, largest_index_looked_up: 8, mapping_leaf_decodes: 0, times_entered: 3 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.24s
+
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/transaction.rs:6235:9
+     |
+6235 |     let mut previous_files =
+     |         ----^^^^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `previous_files`
+    --> crates/singlefs-core/src/transaction.rs:6235:9
+     |
+6235 |     let mut previous_files =
+     |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_previous_files`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.62s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

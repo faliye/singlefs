@@ -1,0 +1,28 @@
+== name_passes_today 78; 开工于东京 2026-10-14 及以后的 7; 其中会话里有工具层拒写的 2
+   按日期： {'2026-09-24': 4, '2026-09-25': 1, '2026-09-26': 6, '2026-09-27': 9, '2026-09-28': 22, '2026-10-01': 5, '2026-10-02': 9, '2026-10-03': 3, '2026-10-04': 2, '2026-10-05': 1, '2026-10-06': 1, '2026-10-08': 2, '2026-10-09': 1, '2026-10-11': 4, '2026-10-13': 1, '2026-10-14': 1, '2026-10-20': 1, '2026-10-22': 5}
+   2026-10-11 a37489ee438e19c5c clerk 工具层拒写 0 次 | 任何文件；不跑 cargo、测试、门禁。⏎交付：报告 `~/.local/share/singlefs/work/m3-item5-closure/report.md`
+   2026-10-11 a5a54c13038c099d0 experiment-designer 工具层拒写 0 次 | egistration.md`（或照现行命名），报告 `~/.local/share/singlefs/work/m3-item5-3-designer/report.
+   2026-10-11 aafadc8acff05c139 clerk 工具层拒写 0 次 | 份的，改成指仍在的那份或删掉那个链接。⏎⏎交付：报告写到 `/home/fy5090/.local/share/singlefs/work/memory-audit/a
+   2026-10-11 ac7ec4a7ad35f81f5 clerk 工具层拒写 0 次 | 文件:行号；查不到就写「仓里没找到」。⏎⏎交付：报告写到草稿目录下的 `report.md`。一张表，列：memory 文件、行号、原文（整行抄）、属于第几类、仓里对应
+   2026-10-13 adb6cfb059f7a8863 experiment-designer 工具层拒写 0 次 | 171-s3-repin-designer/`（报告写到这里的 report.md）⏎被测条款：① 退役记录的写出时点——判决 `research/prompts/m3
+   2026-10-14 a9717cf07fb6e7c21 tooling-writer 工具层拒写 0 次 | tage-followup/`（自己建，排他），报告 `~/.local/share/singlefs/work/tooling-two-stage-followup/
+   2026-10-20 a3343943b7a6b25ee three-way-forward 工具层拒写 0 次 |  今天的实现来谈。正文第三节的数来自调查员副本（报告 `~/.local/share/singlefs/work/m3-close-w8-c758-c656-measu
+   2026-10-22 a0a2dfee322e26786 experiment-designer 工具层拒写 0 次 | e 的 `research/prompts/`，报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-code3-re
+   2026-10-22 a303d33b0ccd5e68f tooling-writer 工具层拒写 9 次 | LINE` 并成一个报告行解析，标签认「报告」「报告路径」「报告写进」「报告写到」，取出的路径同时交 ④（写范围）与 ⑰（文件名带 report 就拒）。⑰ 那一格把「
+   2026-10-22 a3652270eb80e4fd0 three-way-attack 工具层拒写 6 次 |  three-way-forward` 的骨架「报告：」一行默认填 `<草稿目录>/result.md`，而三方腿的报告要写进 `research/prompts/<轮
+   2026-10-22 a789e7091d91430aa experiment-designer 工具层拒写 0 次 | ation.md`（在 worktree 里），报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-batch-ca
+   2026-10-22 a8afb2185cfa840cc experiment-designer 工具层拒写 0 次 | <号>-preregistration.md`，报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-patrol-i
+== form_refused_today 27; 开工于东京 2026-10-14 及以后的 0; 其中会话里有工具层拒写的 0
+   按日期： {'2026-09-25': 1, '2026-10-03': 8, '2026-10-05': 10, '2026-10-08': 6, '2026-10-09': 1, '2026-10-11': 1}
+   2026-10-05 acd50325688c22c1c three-way-forward 工具层拒写 0 次 | 坐实或补形。前一轮判决：没有（第一轮）。⏎交付：报告 research/prompts/m3-formal-code-b29-r1-sonnet-output.md（分
+   2026-10-05 ace183bb8b33de7fb three-way-forward 工具层拒写 0 次 | 云端正推」。前一轮判决：没有（第一轮）。⏎交付：报告 research/prompts/m3-formal-code-b26-r1-sonnet-output.md（分
+   2026-10-05 ae49f516c189cdd5d three-way-forward 工具层拒写 0 次 | 云端正推」。前一轮判决：没有（第一轮）。⏎交付：报告 research/prompts/m3-formal-code-b30-r1-sonnet-output.md（分
+   2026-10-05 ae54c34aa34eae787 three-way-attack 工具层拒写 0 次 | 最后一条）。前一轮判决：没有（第一轮）。⏎交付：报告 research/prompts/m3-formal-code-b30-r1-opus-output.md（分段落
+   2026-10-08 a05a58e3338cdd1e7 three-way-attack 工具层拒写 0 次 | 没打中（写清扫了什么）」。照正文第五节「交付」：报告写进 research/prompts/m3-w3-r1-opus-output.md，分段落盘，每次写进文件不超过
+   2026-10-08 a5f080c88127cd786 three-way-attack 工具层拒写 0 次 | 没打中（写清扫了什么）」。照正文第五节「交付」：报告写进 research/prompts/m3-leaf-death-r1-opus-output.md，分段落盘，每
+   2026-10-08 aa6dd97b2bfec8172 three-way-attack 工具层拒写 0 次 | 没打中（写清扫了什么）」。照正文第五节「交付」：报告写进 research/prompts/m3-leaf-death-r3-opus-output.md，分段落盘，每
+   2026-10-08 ad1ea4c012479290a three-way-attack 工具层拒写 0 次 | 没打中（写清扫了什么）」。照正文第五节「交付」：报告写进 research/prompts/m3-w3-r3-opus-output.md，分段落盘，每次写进文件不超过
+   2026-10-08 ad4b0e5ec4fba0e36 three-way-attack 工具层拒写 0 次 | 没打中（写清扫了什么）」。照正文第五节「交付」：报告写进 research/prompts/m3-w3-r2-opus-output.md，分段落盘，每次写进文件不超过
+   2026-10-08 ad910bdd59b4c4153 three-way-attack 工具层拒写 0 次 | 没打中（写清扫了什么）」。照正文第五节「交付」：报告写进 research/prompts/m3-leaf-death-r2-opus-output.md，分段落盘，每
+   2026-10-09 a9bd0a31bbeaa2eb8 three-way-attack 工具层拒写 0 次 | 。照正文第五节「交付」，但文件名用第二次抽样的：报告写进 research/prompts/m3-w3-r3-opus-s2-output.md，分段落盘，每次写进文件
+   2026-10-11 a20eb4ca4d5f970f4 three-way-attack 工具层拒写 0 次 | s-model/`（带 `rerun.sh`），报告 `research/prompts/m3-batch60-61-code-r1-opus-output.md`。⏎

@@ -1,0 +1,20 @@
+rows=19
+ 1 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 核源落点：找留存的映射条目退回在表上线性找
+ 2 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 核源落点：取计划里单元的字节退回在 units 上线性找
+ 3 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 删快照：取放掉条目留存的映射条目退回在表上线性找
+ 4 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 释放：换下的角色按 inode 号找上一版的文件退回线性找
+ 5 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 照抄：extent 树节点按角色取上一版的单元退回线性找
+ 6 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 照抄：第一个文件之外文件的下段节点按 inode 号找文件退回线
+ 7 hits=1 hits_before=0 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 照抄：多层码 2 树节点按角色取上一版的单元退回线性找
+ 8 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 核源落点：落点退回逐 key 查映射、按 key 的索引照用（攻
+ 9 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 释放：按角色读者的落点退回逐 key 查映射、按角色的索引照用（
+10 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 核源落点：计划里每一项现建按 key 的索引与批量读者（攻方 R
+11 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 释放：按角色读者每查一个角色现建两份索引（攻方 RD）
+12 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 快照判定：每个换下的角色现建按角色的索引（攻方 RE）
+13 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 释放：核两条位置项那一处退回线性找 key、逐 key 查映射（
+14 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 快照判定：进 deadlist 那一支退回线性找 key、逐 k
+15 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 释放：释放判定路径那一处退回线性找 key、逐 key 查映射（
+16 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 释放：读盘核校验和那一处退回线性找 key、逐 key 查映射（
+17 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 核源落点：每一项另建一份按 key 的索引与批量读者、外层那份照
+18 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 按身份查：稳定排序换成不稳定排序（正推 M1）
+19 hits=1 hits_before=1 differs=True test_defined=1 args_names_test=True dup=False 七·6 第三轮 计数：从前往后走索引不记看过几项（攻方 RG）

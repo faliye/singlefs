@@ -1,0 +1,20 @@
+# 派发：clerk
+
+重型测试：不跑
+批次：探针内容
+线程上限：31
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-clerk
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-clerk --purpose '探针：现试骨架'
+报告：/home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-clerk/result.md
+预计挂钟：2 小时内，读几份文件
+
+## 关的是哪几条
+
+探针内容
+
+## 出口
+
+探针内容
+
+
+出口：改完之后 `--check` 上「报告路径：…/report.md」退非 0。

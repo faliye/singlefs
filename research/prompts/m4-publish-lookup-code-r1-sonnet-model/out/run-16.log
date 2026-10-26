@@ -1,8 +1,0 @@
-
-running 1 test
-publish_lookup_by_identity shape=PoolOfFiles { files: 16, data_units_per_file: 4 } batches_published=24 images_sha256=87addacdc948bbbc00b1e0f2894f5ffe45f1e93a24f7645bd4092edcb3f2bf75
-test every_lookup_by_identity_agrees_with_a_linear_find_on_every_version_of_sixteen_files_of_four_data_units ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 9.81s
-
-wall=10.46 s

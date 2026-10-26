@@ -1,5 +1,0 @@
-565620bcead49240809b3788d09345f1e339007874b22207006c45f8b4cc77ef  .claude/kb/decisions/23-journal的角色与格式.md
-f1391f13ac39158d50742d0b949b804a3d2776a3737228c96ba33ce874c906a9  .claude/kb/checks-owed.md
-3ad16693d36357477bf62fc8425369362486e14f2e579b14a0f87bc3247c5276  .claude/kb/milestone/03-third-txn.md
-cffc418b03944b0fbd8eea1d4fa333b42f44f55a2b1633948405ba1e0ec15b20  .claude/kb/term-renames.md
-a7d3c07761095e4745c9004ccf044b3a8be5e413126e67c1ccb8ed0e5f66f6bd  crates/singlefs-checker/invariants/04-校验和.md

@@ -1,0 +1,66 @@
+
+running 1 test
+test a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site ... FAILED
+
+failures:
+
+---- a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site stdout ----
+publish_lookup_by_identity release_sites replaced_roles=9 routed_leaves=2 release_judgement=LookupWorkOfEachSite { work_of_each_site: {Some(MappingEntriesOfTheReleaseJudgement): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheReplacedRolesInThePreviousVersion): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 54, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 9 }, Some(RolesKeptForTheSnapshotsInTheReleaseJudgement): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }} } two_pool_devices_check=LookupWorkOfEachSite { work_of_each_site: {Some(MappingEntriesCheckedForTwoPoolDevices): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheMappedRolesReleasedByThisPublish): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 54, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 1 }, Some(RolesKeptForTheSnapshotsAmongTheMappedRolesReleased): LookupWork { index_builds: 1, index_lookups: 9, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }} } release_checksum_check=LookupWorkOfEachSite { work_of_each_site: {Some(MappingEntriesCheckedForTwoPoolDevices): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(MappingEntriesCheckedAgainstTheReleaseChecksums): LookupWork { index_builds: 2, index_lookups: 11, index_entries_examined: 83, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheMappedRolesReleasedByThisPublish): LookupWork { index_builds: 2, index_lookups: 18, index_entries_examined: 108, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 2 }, Some(RolesKeptForTheSnapshotsAmongTheMappedRolesReleased): LookupWork { index_builds: 2, index_lookups: 18, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 2 }} }
+publish_lookup_by_identity whole_rewrite lookup_work=LookupWorkOfEachSite { work_of_each_site: {None: LookupWork { index_builds: 5, index_lookups: 1286, index_entries_examined: 9986, largest_index_looked_up: 452, mapping_leaf_decodes: 0, times_entered: 0 }, Some(SnapshotJudgement): LookupWork { index_builds: 2, index_lookups: 24, index_entries_examined: 188, largest_index_looked_up: 446, mapping_leaf_decodes: 0, times_entered: 2 }, Some(MappingEntriesOfTheReleaseJudgement): LookupWork { index_builds: 4, index_lookups: 37, index_entries_examined: 279, largest_index_looked_up: 452, mapping_leaf_decodes: 4, times_entered: 2 }, Some(MappingEntriesCheckedForTwoPoolDevices): LookupWork { index_builds: 2, index_lookups: 22, index_entries_examined: 167, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(MappingEntriesCheckedAgainstTheReleaseChecksums): LookupWork { index_builds: 2, index_lookups: 22, index_entries_examined: 167, largest_index_looked_up: 452, mapping_leaf_decodes: 2, times_entered: 1 }, Some(FilesOfTheReplacedRolesInThePreviousVersion): LookupWork { index_builds: 2, index_lookups: 18, index_entries_examined: 108, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 33 }, Some(FilesOfTheMappedRolesReleasedByThisPublish): LookupWork { index_builds: 4, index_lookups: 36, index_entries_examined: 216, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 4 }, Some(FilesOfTheUserVisibleRolesOfTheSnapshotJudgement): LookupWork { index_builds: 18, index_lookups: 18, index_entries_examined: 108, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 2 }, Some(RolesKeptForTheSnapshotsInTheReleaseJudgement): LookupWork { index_builds: 2, index_lookups: 41, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 2 }, Some(RolesKeptForTheSnapshotsAmongTheMappedRolesReleased): LookupWork { index_builds: 4, index_lookups: 89, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 4 }, Some(DataRolesNamedBeforeTheLastRecord): LookupWork { index_builds: 3, index_lookups: 72, index_entries_examined: 204, largest_index_looked_up: 7, mapping_leaf_decodes: 0, times_entered: 3 }, Some(UnitsOfTheRolesWrittenByThisPublish): LookupWork { index_builds: 1, index_lookups: 24, index_entries_examined: 194, largest_index_looked_up: 452, mapping_leaf_decodes: 0, times_entered: 1 }, Some(UnitsOfTheRolesNamedByTheRecords): LookupWork { index_builds: 0, index_lookups: 24, index_entries_examined: 194, largest_index_looked_up: 452, mapping_leaf_decodes: 0, times_entered: 24 }, Some(CarriedExtentTreeNodes): LookupWork { index_builds: 0, index_lookups: 47, index_entries_examined: 373, largest_index_looked_up: 452, mapping_leaf_decodes: 0, times_entered: 48 }, Some(FilesOfTheCarriedExtentLowerNodes): LookupWork { index_builds: 0, index_lookups: 47, index_entries_examined: 225, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 47 }, Some(CarriedNodesOfTheAccountingTree): LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }, Some(CarriedNodesOfTheDeadlistTree): LookupWork { index_builds: 0, index_lookups: 0, index_entries_examined: 0, largest_index_looked_up: 0, mapping_leaf_decodes: 0, times_entered: 1 }, Some(CarriedNodesOfTheCentralMappingTree): LookupWork { index_builds: 0, index_lookups: 1, index_entries_examined: 9, largest_index_looked_up: 452, mapping_leaf_decodes: 0, times_entered: 2 }} }
+
+thread 'a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site' (114511) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1477:5:
+整份重写一个八单元的文件（池里没有快照）：快照判定那一圈按 inode 号找文件：进了 2 次（走了几遍），建索引 18 次，每走一遍恰好建一份：LookupWork { index_builds: 18, index_lookups: 18, index_entries_examined: 108, largest_index_looked_up: 48, mapping_leaf_decodes: 0, times_entered: 2 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.77s
+
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-format v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-checker v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-reference-filesystem v0.1.0 (〔第二台的目录〕)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling synstructure v0.13.2
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (〔第二台的目录〕)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/transaction.rs:6235:9
+     |
+6235 |     let mut previous_files =
+     |         ----^^^^^^^^^^^^^^
+     |         |
+     |         help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `previous_files`
+    --> crates/singlefs-core/src/transaction.rs:6235:9
+     |
+6235 |     let mut previous_files =
+     |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_previous_files`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5m 10s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

@@ -1,0 +1,49 @@
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 0：历史结局 Completed
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 0：第 0 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 0：第 1 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 0：第 2 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 0：第 3 步 Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(6) }, released_user_visible_units: 7, resurrected_u
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 0：第 4 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 1：历史结局 Completed
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 1：第 0 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 1：第 1 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 1：第 2 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 1：第 3 步 Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(6) }, released_user_visible_units: 7, resurrected_u
+ATTACK-OUTCOME 回退到第 1 新的根、变长选择子 1：第 4 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 0：历史结局 Completed
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 0：第 0 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 0：第 1 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 0：第 2 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 0：第 3 步 Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(5) }, released_user_visible_units: 7, resurrected_u
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 0：第 4 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 1：历史结局 Completed
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 1：第 0 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 1：第 1 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 1：第 2 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 1：第 3 步 Applied(RolledBack { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(5) }, released_user_visible_units: 7, resurrected_u
+ATTACK-OUTCOME 回退到第 2 新的根、变长选择子 1：第 4 步 Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0, released_records_covered: 0 },
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 0：第 0 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 0：第 1 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 0：第 2 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 0：第 3 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 0：第 4 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 0：起点 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 1：第 0 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 1：第 1 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 1：第 2 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 1：第 3 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 1：第 4 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 1 新的根、变长选择子 1：起点 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 0：第 0 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 0：第 1 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 0：第 2 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 0：第 3 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 0：第 4 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 0：起点 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 1：第 0 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 1：第 1 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 1：第 2 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 1：第 3 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 1：第 4 步 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+ATTACK-VERDICT 回退到第 2 新的根、变长选择子 1：起点 ["I-9.7=Holds", "I-1.13=Holds", "I-9.39=Holds"]
+exit=0

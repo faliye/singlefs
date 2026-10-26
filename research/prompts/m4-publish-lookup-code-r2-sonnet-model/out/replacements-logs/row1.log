@@ -1,0 +1,26 @@
+
+running 1 test
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units has been running for over 60 seconds
+test compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units ... FAILED
+
+failures:
+
+---- compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units stdout ----
+publish_lookup_by_identity growth smaller_comparisons=[ComparisonsOfLookups { lookups: 606, comparisons: 183920 }, ComparisonsOfLookups { lookups: 607, comparisons: 184527 }, ComparisonsOfLookups { lookups: 606, comparisons: 183920 }, ComparisonsOfLookups { lookups: 607, comparisons: 184527 }, ComparisonsOfLookups { lookups: 606, comparisons: 183920 }, ComparisonsOfLookups { lookups: 607, comparisons: 184527 }, ComparisonsOfLookups { lookups: 606, comparisons: 183920 }, ComparisonsOfLookups { lookups: 607, comparisons: 184527 }] larger_comparisons=[ComparisonsOfLookups { lookups: 2379, comparisons: 2831009 }, ComparisonsOfLookups { lookups: 2380, comparisons: 2833389 }, ComparisonsOfLookups { lookups: 2379, comparisons: 2831009 }, ComparisonsOfLookups { lookups: 2380, comparisons: 2833389 }, ComparisonsOfLookups { lookups: 2379, comparisons: 2831009 }, ComparisonsOfLookups { lookups: 2380, comparisons: 2833389 }, ComparisonsOfLookups { lookups: 2379, comparisons: 2831009 }, ComparisonsOfLookups { lookups: 2380, comparisons: 2833389 }]
+publish_lookup_by_identity growth smaller=ComparisonsOfLookups { lookups: 4852, comparisons: 1473788 } larger=ComparisonsOfLookups { lookups: 19036, comparisons: 22657592 } growth_in_percent=391
+
+thread 'compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units' (1935236) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:1107:5:
+数据单元四倍，units 上按角色查一次平均比较次数涨了 391%，门槛 200%（小池 ComparisonsOfLookups { lookups: 4852, comparisons: 1473788 }，大池 ComparisonsOfLookups { lookups: 19036, comparisons: 22657592 }）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    compaction_batches_decode_each_routed_mapping_leaf_once_and_compare_identities_sublinearly_from_512_to_2048_data_units
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 201.66s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/post/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.80s
+     Running tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/target/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

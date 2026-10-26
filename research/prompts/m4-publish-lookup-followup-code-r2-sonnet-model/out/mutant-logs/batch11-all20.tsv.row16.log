@@ -1,0 +1,40 @@
+
+running 1 test
+test the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside ... FAILED
+
+failures:
+
+---- the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside stdout ----
+
+thread 'the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside' (129823) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:2394:5:
+外带 CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1 的子进程里这一条绿、恰好跑了一条（退出 Some(101)）：
+running 1 test
+test the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside ... FAILED
+
+failures:
+
+failures:
+    the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+
+thread 'the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside' (129825) panicked at crates/singlefs-harness/tests/publish_lookup_by_identity.rs:2371:9:
+assertion `left == right` failed: 环境里外带 CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1、特性没开：构建脚本不报开着
+  left: "LOOKUP_WORK_COUNTERS"
+ right: ""
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+   Compiling singlefs-core v0.1.0 (〔第二台的目录〕)
+   Compiling singlefs-harness v0.1.0 (〔第二台的目录〕)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.14s
+     Running tests/publish_lookup_by_identity.rs (target/debug/deps/publish_lookup_by_identity-2c505afa7964b09e)
+error: test failed, to rerun pass `-p singlefs-harness --test publish_lookup_by_identity`

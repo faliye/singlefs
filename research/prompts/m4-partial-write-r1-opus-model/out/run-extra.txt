@@ -1,0 +1,40 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 3 tests
+test r2_residue_at_the_newly_allocated_slot ... 观测 R2 残留：截断放掉的单元 1、2 的落点 [SlotNumber(50184), SlotNumber(50186)]；变长之后存在的单元 1
+观测 R2 残留：第 0 次部分写的新落点 SlotNumber(50192) 写之前是 全零（从没写过）
+观测 R2 残留：第 19 次部分写的新落点 SlotNumber(50178) 写之前是 不是数据单元（WrongUnitClass { expected: 1, found: 2 }）
+观测 R2 残留：第 20 次部分写的新落点 SlotNumber(50180) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 3、声明长度 3000；被截断放掉的落点 = false
+观测 R2 残留：第 21 次部分写的新落点 SlotNumber(50182) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 4、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 22 次部分写的新落点 SlotNumber(50184) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 32634、出生 txg 4、声明长度 32634；被截断放掉的落点 = true
+观测 R2 残留：第 23 次部分写的新落点 SlotNumber(50186) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 65268、出生 txg 4、声明长度 32627；被截断放掉的落点 = true
+观测 R2 残留：第 24 次部分写的新落点 SlotNumber(50188) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 5、声明长度 100；被截断放掉的落点 = false
+观测 R2 残留：第 25 次部分写的新落点 SlotNumber(50190) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 7、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 26 次部分写的新落点 SlotNumber(50192) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 8、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 27 次部分写的新落点 SlotNumber(50194) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 9、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 28 次部分写的新落点 SlotNumber(50196) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 10、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 29 次部分写的新落点 SlotNumber(50198) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 11、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 30 次部分写的新落点 SlotNumber(50200) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 12、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 31 次部分写的新落点 SlotNumber(50202) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 13、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 32 次部分写的新落点 SlotNumber(50204) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 14、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 33 次部分写的新落点 SlotNumber(50206) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 15、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 34 次部分写的新落点 SlotNumber(50208) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 16、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 35 次部分写的新落点 SlotNumber(50210) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 17、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 36 次部分写的新落点 SlotNumber(50212) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 18、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 37 次部分写的新落点 SlotNumber(50214) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 19、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 38 次部分写的新落点 SlotNumber(50216) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 20、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留：第 39 次部分写的新落点 SlotNumber(50218) 写之前是 码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 21、声明长度 32634；被截断放掉的落点 = false
+观测 R2 残留汇总：40 次里各类残留 {"不是数据单元（WrongUnitClass { expected: 1, found: 2 }）": 1, "全零（从没写过）": 19, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 10、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 11、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 12、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 13、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 14、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 15、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 16、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 17、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 18、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 19、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 20、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 21、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 3、声明长度 3000；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 4、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 5、声明长度 100；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 7、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 8、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 0、出生 txg 9、声明长度 32634；被截断放掉的落点 = false": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 32634、出生 txg 4、声明长度 32634；被截断放掉的落点 = true": 1, "码 1 数据单元：对象 1、对象出生代 3、锚点偏移 65268、出生 txg 4、声明长度 32627；被截断放掉的落点 = true": 1}
+ok
+test r3_memory_bytes_come_from_the_mount_and_the_order_of_the_fault_decides ... 观测 R3 改坏在挂载之前（挂载后内存里单元 1 的字节为空 = true）读法 MemoryBytesOfThePreviousVersion：Err("内存里这一版的字节解不开：TooShort")，块层读 0 次
+观测 R3 改坏在挂载之前（挂载后内存里单元 1 的字节为空 = true）读法 DiskWithTheWholeUnitChecksum：Err("读回旧单元：两份都读不回或整单元校验和对不上 ⇒ 部分写失败（D4 已定项 4）")，块层读 2 次
+观测 R3 改坏在挂载之后 读法 MemoryBytesOfThePreviousVersion：Ok(())，块层读 0 次
+观测 R3 改坏在挂载之后 读法 DiskWithTheWholeUnitChecksum：Err("读回旧单元：两份都读不回或整单元校验和对不上 ⇒ 部分写失败（D4 已定项 4）")，块层读 2 次
+ok
+test r4_writes_of_one_partial_write_and_of_a_whole_write ... 观测 R4 写账：部分写单元 0：合计 WriteCallsAndBytes { write_calls: 31, written_bytes: 508416 }；分种类 WritesByStructureKind { counted: {DataUnit: WriteCallsAndBytes { write_calls: 2, written_bytes: 65536 }, ExtentTreeNode: WriteCallsAndBytes { write_calls: 4, written_bytes: 65536 }, InodeTreeLeafContainer: WriteCallsAndBytes { write_calls: 2, written_bytes: 65536 }, InodeTreeRoot: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, AllocationRecordTreeNode: WriteCallsAndBytes { write_calls: 10, written_bytes: 163840 }, AccountingTreeNode: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, CentralMappingTreeNode: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, TreeTableUnit: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, JournalRecord: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }, RootSlot: WriteCallsAndBytes { write_calls: 1, written_bytes: 512 }, SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }
+观测 R4 写账：整份顺序写三个单元：合计 WriteCallsAndBytes { write_calls: 39, written_bytes: 655872 }；分种类 WritesByStructureKind { counted: {DataUnit: WriteCallsAndBytes { write_calls: 6, written_bytes: 196608 }, ExtentTreeNode: WriteCallsAndBytes { write_calls: 4, written_bytes: 65536 }, InodeTreeLeafContainer: WriteCallsAndBytes { write_calls: 2, written_bytes: 65536 }, InodeTreeRoot: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, AllocationRecordTreeNode: WriteCallsAndBytes { write_calls: 10, written_bytes: 163840 }, AccountingTreeNode: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, CentralMappingTreeNode: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, TreeTableUnit: WriteCallsAndBytes { write_calls: 2, written_bytes: 32768 }, JournalRecord: WriteCallsAndBytes { write_calls: 6, written_bytes: 24576 }, RootSlot: WriteCallsAndBytes { write_calls: 1, written_bytes: 512 }, SystemConfigurationSlot: WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }} }
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.59s
+

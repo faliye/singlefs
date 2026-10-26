@@ -43,7 +43,7 @@ bdd46666e1151ce5626048e49b30da25c86a31e5fa5e909837eb2387fc3de40d  ./probe/src/ma
 .claude/kb/decisions/08-核心索引结构.md: FAILED
 ```
 
-`git diff` 看到只是文件头加了一行语言链接（`**中文** · [English](08-核心索引结构.en.md) · [日本語](08-核心索引结构.ja.md)`，2 行新增），已定项 16 的正文没变；下文引 D8 的行号按此刻的文件取。
+`git diff` 看到只是文件头加了一行语言链接（`**中文** · [English](08-core-index-structure.en.md) · [日本語](08-コアインデックス構造.ja.md)`，2 行新增），已定项 16 的正文没变；下文引 D8 的行号按此刻的文件取。
 
 ## 各格判定一览
 

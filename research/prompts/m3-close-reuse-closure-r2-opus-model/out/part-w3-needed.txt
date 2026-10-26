@@ -1,0 +1,9 @@
+name=needed_files full_tree_rc=0 repo_files=10 outside_scripts_hosts=7
+  outside=.claude/hooks/lib_heavy_tests.py
+  outside=.claude/hooks/lib_long_run.py
+  outside=.claude/hooks/lib_shell_words.py
+  outside=.claude/scripts/project_preflight.py
+  outside=.claude/singlefs-ai-sop/scripts/preflight.py
+  outside=scripts/crash/crash-amplification-lib.sh
+  outside=scripts/crash/crash-point-replay-shard-configuration-check.sh
+name=only_scripts_hosts rc=1 stdout_is_json=False last_stderr_line=ModuleNotFoundError: No module named 'project_preflight'

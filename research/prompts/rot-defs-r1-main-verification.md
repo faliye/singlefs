@@ -35,7 +35,7 @@
 | K1 一致的十六处（共用约束六处、实验执行员两处、实现员一处、写回员一处、分诊两处、攻方路径一处、工具实现员一处、主 agent 验证段两处） | 站住 | 正推逐处对脚本、钩子、规则现读，两处实测（轻型带声明、子 agent 跑 whole）与攻方模型同结果 |
 | A1 写回员照 kb-scribe 第 2、3 步与第 35 行跑 `doc-decisions.sh --write` 被范围声明闸按整轮拒，带不带声明都拒；主 agent 不带声明也拒一次 | 打中（重），主 agent 复跑模型坐实 | 能过的只有 `--write --check decision-items-sync` 加 `种类=items` 声明（模型第三格退 0；`doc-decisions.sh:39` 文件头许可这种写法，主 agent 今天跑 `--write` 的输出也是「写完 1 块：decision-items-sync」）。定义三处没写这种写法 |
 | A2 攻方 3b「在自己的原型里这样调枚举函数跑小流不算重型」与 heavy-test-guard 冲突：原型包一链接 `singlefs-checker-tier`，`cargo run` / `cargo test` 就被拒；能过的只有先 `cargo build` 再直接执行二进制，而那正是闸文件头自认「罩不住」的一处 | 打中（重），两条腿各自实测同结果，主 agent 复跑坐实 | 冲突改前就在，这一批只改准了路径。解法要同时改定义与闸（下面第三节） |
-| A3 实验执行员 1b 在 `scripts/experiments/` 下裸跑 `cargo test` 按整轮拒 | 打中，复跑坐实 | `cargo test --release --bin e<号>-<简称>` 加 target 声明放行（模型第六格退 0） |
+| A3 实验执行员 1b 在 `scripts/experiment-apparatus/` 下裸跑 `cargo test` 按整轮拒 | 打中，复跑坐实 | `cargo test --release --bin e<号>-<简称>` 加 target 声明放行（模型第六格退 0） |
 | A4 / 正推第 22 项 分诊第 5 步缺「点名的测试 ok 又打了 `NOT_RUN_NO_GPU_ADAPTER` 记本次未跑」一支与「基线不绿」 | 打中 | `.claude/rules/mutation-sampling.md:79` 与门禁 `checker-tier-crates-mutation-replay.sh` 第 90、103 行都有；分诊会把这几条记成没红 |
 | 正推第 21 项 分诊第 2 步「这张表不跑」与 `mutate.sh` 按条锚点失效（`mutate.sh:47`、规则第 57 行）矛盾，改后第 5 步的 `⚓` 栏走不到 | 打中 | 同一份定义两处自相矛盾 |
 | A5 / 正推第 17 项 main-agent 第 10 行把 D13 已定项 9 的全量弹窗条件摘短了（丢「对不上的键里有判器单元变了」那一半），也没指到数它的入口 | 打中 | `13-验证路线.md:256` 整行主 agent 现读；两条腿都 grep 不到「阶段把作废块数与变了的判器单元清单打出来」的实现（`scripts`、`crates`、`.claude/gate.d`、`.claude/skills`、`.claude/hooks` 零命中）——kb 与实现对不上，另立账 |

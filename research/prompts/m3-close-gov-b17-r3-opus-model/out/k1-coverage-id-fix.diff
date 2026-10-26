@@ -1,0 +1,11 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-close-gov-b17-r3-opus/copy-lfu0/scripts/mutation/crates-mutation-rows.py	2026-10-23 22:52:42.458111081 +0000
++++ /home/fy5090/.local/share/singlefs/work/m3-close-gov-b17-r3-opus/copy-lfu0-fix/scripts/mutation/crates-mutation-rows.py	2026-10-23 23:09:35.939642565 +0000
+@@ -1284,7 +1284,7 @@
+         baseline_key = mutation_units.key_of_lines([("form", [BASELINE_KEY_FORM]), ("judging", [self.judging]), ("test-unit", [test.unit.fingerprint]),
+                                                     ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
+                                                     ("toolchain", [self.toolchain]), ("dependency", [dependency])])
+-        coverage_id = mutation_units.key_of_lines([("form", [COVERAGE_KEY_FORM]), ("test-unit", [test.unit.fingerprint]),
++        coverage_id = mutation_units.key_of_lines([("form", [COVERAGE_KEY_FORM]), ("judging", [self.judging]), ("test-unit", [test.unit.fingerprint]),
+                                                    ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
+                                                    ("toolchain", [self.toolchain])])
+         return Components(row_key, None, mutated, test.unit, test.full_name, closure.key, arguments.switches, self.toolchain, dependency,

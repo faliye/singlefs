@@ -1,0 +1,3 @@
+crates/singlefs-core/src/logged_operations.rs	m4：contains_slot 不引类型不变量	        proof { use_type_invariant(&self); }\n	        
+crates/singlefs-core/src/compaction_plan.rs	m4：region_is_empty 把已释放的也算占着	if record.device.0 == region.device().0 && !record.is_released && region.contains_slot(record.slot) {	if record.device.0 == region.device().0 && record.is_released && region.contains_slot(record.slot) {
+crates/singlefs-core/src/logged_operations.rs	m4：构造函数漏掉 6 字节上限	        if start_slot.0 >= 0x1_0000_0000_0000u64 {\n            return Err(CompactionRegionRefusal::StartBeyondTheSixByteSlotNumber { start_slot });\n        }\n	

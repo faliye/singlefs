@@ -1,0 +1,11 @@
+峰值      0.000 MiB → 阈值     8192.0 MiB（fixed）
+峰值      0.000 MiB → 阈值      512.0 MiB（peakfloor）
+峰值      0.004 MiB → 阈值      512.0 MiB（peakfloor）
+峰值    100.000 MiB → 阈值      512.0 MiB（peakfloor）
+峰值    300.000 MiB → 阈值      512.0 MiB（peakfloor）
+峰值    341.000 MiB → 阈值      512.0 MiB（peakfloor）
+峰值    400.000 MiB → 阈值      600.0 MiB（peak）
+峰值   2048.000 MiB → 阈值     3072.0 MiB（peak）
+峰值   5120.000 MiB → 阈值     7680.0 MiB（peak）
+峰值   6144.000 MiB → 阈值     9216.0 MiB（peak）
+峰值  20480.000 MiB → 阈值    30720.0 MiB（peak）

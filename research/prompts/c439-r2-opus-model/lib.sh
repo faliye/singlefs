@@ -15,9 +15,9 @@ awk 'NR>=1625 && NR<=1796' "$FROZEN/.claude/gate.d/doc-experiments.sh" > "$CELL_
 new_repo() {   # new_repo <目录>：空仓，带 replay 登记表、一份产物（对的行）与 .gitignore
   rm -rf "$1"; mkdir -p "$1"; cd "$1" || exit 2
   git init -q -b master .
-  mkdir -p .claude/kb/experiments research/results scripts/experiments
+  mkdir -p .claude/kb/experiments research/results scripts/experiment-apparatus
   printf '/.claude/singlefs-ai-sop/\n' > .gitignore
-  printf 'E900|e900|--x|e900-x.out|exact\n' > scripts/experiments/replay.sh
+  printf 'E900|e900|--x|e900-x.out|exact\n' > scripts/experiment-apparatus/replay.sh
   printf 'E7RESULT name=alpha value=1\nE7RESULT name=beta value=1\n' > research/results/e900-x.out
   printf '# E900\n\nE7RESULT name=alpha value=1\n' > .claude/kb/experiments/900-x.md
   git add -A && git commit -qm root

@@ -1,0 +1,27 @@
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+@@ -4597,7 +4597,23 @@
+     if (have_oldest && lt64(recomputed_threshold, oldest)) {
+         recomputed_threshold = oldest;
+     }
+-    judge(INVARIANT_I_7_18, eq64(reclaim_threshold, recomputed_threshold));
++    // 最新根之后那一次发布（txg N+1）的落点 (区域 (N+1) mod R, 槽 ((N+1) div R) mod S) 上有没有自证过的根（walk.rs 同名函数同一段）
++    let next_txg = add64(newest_root.txg, u64_of(1u));
++    let next_by_region = divmod64(next_txg, u64_of(g.regions));
++    let next_region = next_by_region.remainder.x;
++    let next_slot = divmod64(next_by_region.quotient, u64_of(g.slots_per_region)).remainder.x;
++    var next_slot_holds_a_root = false;
++    for (var i = 0u; i < root_count; i = i + 1u) {
++        if (checker_root_region(i) == next_region && checker_root_slot_in_its_region(i) == next_slot) {
++            next_slot_holds_a_root = true;
++        }
++    }
++    let next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed =
++        !next_slot_holds_a_root && !lt64(next_txg, u64_of(ring_length_in_txgs));
++    // 乙：那一槽读不出自证过的根（N+1 不小于环长）时 I-7.18 不判（CPU 一侧报不适用）；I-7.19 照判
++    if (!next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed) {
++        judge(INVARIANT_I_7_18, eq64(reclaim_threshold, recomputed_threshold));
++    }
+     if (pinned == ROOT_RECORD_NO_RING_SLOT_PINNED) {
+         judge(INVARIANT_I_7_19, true);
+         return;

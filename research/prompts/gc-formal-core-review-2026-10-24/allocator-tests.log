@@ -1,0 +1,38 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_core-fa24058cfebce2e3)
+
+running 31 tests
+test allocator::tests::isolating_a_whole_span_over_allocated_slots_counts_each_overlapping_slot_both_as_allocated_and_as_isolated ... ok
+test allocator::tests::a_segment_left_with_only_deferred_slots_counts_as_empty_by_the_records_while_its_slots_stay_occupied ... ok
+test allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_lend_an_empty_entry_as_some_empty ... ok
+test allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot ... ok
+test allocator::tests::placements_recorded_for_an_abandoned_root_answer_none_on_slots_recorded_bad_all_zero_or_valid_at_mount ... ok
+test allocator::tests::clearing_the_quarantine_mark_keeps_the_record_allocated_under_its_generation ... ok
+test allocator::tests::commit_generated_bump_skips_a_slot_isolated_after_the_segment_was_opened ... ok
+test allocator::tests::placements_recorded_for_an_abandoned_root_answer_only_for_the_same_root_not_for_another_root_on_its_ring_slot ... ok
+test allocator::tests::accounting_deltas_are_maintained_incrementally ... ok
+test allocator::tests::new_pool_file_creation_placements_follow_the_byte_table ... ok
+test allocator::tests::one_slot_placement_inside_reclaimed_two_slot_record_deletes_that_record ... ok
+test allocator::tests::placement_over_record_that_was_not_reclaimed_is_asserted_on_the_records ... ok
+test allocator::tests::span_field_with_the_quarantine_mark_parses_to_the_span_in_the_low_bits_and_the_mark ... ok
+test allocator::tests::rebuild_from_records_remembers_the_genesis_tree_table_until_it_is_released ... ok
+test allocator::tests::quarantining_a_placement_marks_the_record_on_every_named_device_and_keeps_its_generation ... ok
+test allocator::tests::recording_a_root_on_an_allocator_without_a_root_ring_occupancy_panics_instead_of_never_reclaiming - should panic ... ok
+test allocator::tests::the_slot_bad_at_mount_is_not_reread_while_an_older_valid_root_is_in_the_ring ... ok
+test allocator::tests::the_slot_bad_at_mount_reading_back_all_zero_on_the_reread_stays_pinned_at_the_oldest_txg_it_can_have_held ... ok
+test allocator::tests::the_slot_bad_at_mount_rereading_as_a_root_of_the_previous_revolution_counts_by_the_txg_read ... ok
+test allocator::tests::releasing_a_placement_keeps_the_slots_occupied_and_moves_them_into_the_defer_queue ... ok
+test allocator::tests::releasing_a_quarantined_record_rewrites_it_released_and_clears_the_mark ... ok
+test allocator::tests::the_slot_bad_at_mount_still_unreadable_on_the_reread_stays_pinned_at_the_oldest_txg_it_can_have_held ... ok
+test allocator::tests::resurrecting_a_released_record_moves_it_out_of_the_defer_queue_or_back_onto_the_bitmap ... ok
+test allocator::tests::verified_reclaim_predicate_preserves_txg_order_at_unsigned_boundaries ... ok
+test allocator::tests::root_ring_occupancy_that_missed_the_root_panics_instead_of_reclaiming_by_the_guessed_ring - should panic ... ok
+test allocator::tests::root_ring_occupancy_that_follows_every_root_reclaims_as_the_ring_turns ... ok
+test allocator::tests::root_ring_occupancy_keeps_the_reclaim_floor_at_the_oldest_valid_root_however_far_below_the_newest_it_is ... ok
+test allocator::tests::unit_area_of_a_4_gib_image_has_211968_slots_in_3312_segments ... ok
+test allocator::tests::reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_rewrites_the_first_and_deletes_the_second ... ok
+test allocator::tests::unblocked_slot_and_slot_pair_counts_are_maintained_incrementally_and_match_a_scan ... ok
+test allocator::tests::user_data_does_not_land_in_a_cluster_segment_that_the_fallback_closed ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 318 filtered out; finished in 0.00s
+

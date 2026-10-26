@@ -1,0 +1,1 @@
+name=sync_without_delete first_rc=0 second_rc=0 deleted_in_source_still_in_copy=yes python_files_only_in_copy=1

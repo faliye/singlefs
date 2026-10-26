@@ -1,9 +1,0 @@
-282b8686c39343a287dbbb7fbfcff5583b077f2796940e945332437c82a0c88a  .claude/kb/decisions/13-验证路线.md
-d2fd003ed9d7dbbecdb8a0d5701f2354653da4a9211410083f4ec6979e426617  .claude/kb/experiments/02-key布局对递归遍历的影响.md
-73ca3e2be60a0717170b12c453f0bfcce9fa36bd093afd8466c0a6cb4420d920  .claude/kb/experiments/03-意图日志的断电语义.md
-71335292385bae5f1a0486d6368d8e2c4619b233a62df59bf124bfc6332584cc  .claude/kb/experiments/04-范围重建vs逐项修改的交叉点.md
-7a13b5b288be983cbbc477ebe63d0b70ac11c313b811c1e9ec2949c634c49ef0  .claude/kb/decisions/01-数据可移动性-反向索引.md
-1730ad450d2cd4b2db27e24e59ed9c1a533d104c59603de0164f0205de50e7a0  .claude/kb/decisions/18-块里携带什么信息.md
-ba733394d2c5c1ec0f7d71d549764d360293c74401621f896b2a78e0d3a66545  .claude/kb/experiments/05-nonce唯一性×崩溃点重放.md
-e98e9b4461a1e5cffa2587d86ca5e0c2dc3862eacf5426e49d02bcc5680b44d8  .claude/kb/experiments/06-加密算法选型.md
-c708e5933178577310cf329f2670e93e927908a4c7d7c3bcc12a501e2a050362  .claude/kb/invariants.md

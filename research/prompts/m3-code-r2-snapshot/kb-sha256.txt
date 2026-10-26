@@ -1,1 +1,0 @@
-e09ab08b63a3ec572cd528b39bff1ec1fe0dcf3bb0b3e5bf40f5ca6eb20a4420  .claude/kb/decisions/18-块里携带什么信息.md

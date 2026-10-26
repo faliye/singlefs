@@ -132,7 +132,7 @@ s0 的 8 态里可写挂载：4 态做成 (1, 6)，4 态拒（`rw_err_system_con
 | fsid 相同时混合 | 今天没跑 | 0（量过） | 推的：有 | 6653 / 7874（量过） | — |
 
 要改的处数：
-- crates 里钉 mkfs 段形的用例 2 处：「"14+1+1+1+4",」（`crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs:280`），「(25, "14+1+1+1+4".to_string(), 16402)」（`crates/singlefs-harness/tests/new_pool_file_creation_publish.rs:364`）。另有 E142 装置（`scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 里命中 `14+1+1+1+4`、`16402` 或 `[14, 1, 1, 1, 4]` 的 8 行）、`scripts/crash/check-segment-registry-product-sample.txt` 一行、layout 八「mkfs 种根」那一行（`.claude/kb/layout/01-first-txn.md:410`）。checker 档用例：崩溃点重放从 mkfs 之后的池起枚举，没有钉 mkfs 段形的，`grep -rnF '14+1+1+1+4' crates` 只命中上面两处。
+- crates 里钉 mkfs 段形的用例 2 处：「"14+1+1+1+4",」（`crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs:280`），「(25, "14+1+1+1+4".to_string(), 16402)」（`crates/singlefs-harness/tests/new_pool_file_creation_publish.rs:364`）。另有 E142 装置（`scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` 里命中 `14+1+1+1+4`、`16402` 或 `[14, 1, 1, 1, 4]` 的 8 行）、`scripts/crash/check-segment-registry-product-sample.txt` 一行、layout 八「mkfs 种根」那一行（`.claude/kb/layout/01-first-txn.md:410`）。checker 档用例：崩溃点重放从 mkfs 之后的池起枚举，没有钉 mkfs 段形的，`grep -rnF '14+1+1+1+4' crates` 只命中上面两处。
 - 乙要改 D22 已定项 8 第 3 条那一句「清零几段之间不加屏障」（`.claude/kb/decisions/22-单元原子性怎么合成.md:178`）：改成 [0, 根环基址) 先清、过一道屏障，再清根环与 journal 环。甲要改的是同一条的次序，外加 fsid 相同那一支的处置（见第六节）。
 - 乙在 mkfs 文件头注释的写序（第 3–5 行）与第 540–544 行「不为一个没有条款的语义加屏障」那一段要跟着改（推的）。
 

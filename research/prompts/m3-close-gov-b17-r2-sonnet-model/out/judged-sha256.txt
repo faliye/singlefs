@@ -1,0 +1,15 @@
+.claude/agent-common.md: OK
+.claude/hooks/completion-cleanup-guard.sh: OK
+.claude/hooks/heavy-test-guard.sh: OK
+.claude/hooks/lib_heavy_tests.py: OK
+.claude/main-agent.md: OK
+.claude/rules/implementation-workflow.md: OK
+.claude/rules/three-way-inference.md: OK
+.claude/rules/verification.md: OK
+.claude/skills/crash-test/commit-stages.md: OK
+scripts/crash/lib_verdict_library.py: OK
+scripts/gate/lib_function_units.py: OK
+scripts/mutation/broad-mutation.py: OK
+scripts/mutation/crates-mutation-rows.py: FAILED
+scripts/mutation/lib_mutation_units.py: OK
+sha256sum: WARNING: 1 computed checksum did NOT match

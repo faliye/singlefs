@@ -1,0 +1,18 @@
+selfcheck=today_ops_today_rule(should_be_0) depth=10 states=10482 mismatches=0
+selfcheck=today_ops_without_field_clause(should_be_gt0) depth=10 states=10482 mismatches=924
+  example ops=[('whole', 3), ('trunc', 2), ('ext', 3)] -> h=3 l=1 b=[2, 2, None, None] field(T,h)=(3, 2) tombs=[(3, 1)] scan_claims=[0, 1] live=[0]
+selfcheck=today_ops_without_order_clause(should_be_gt0) depth=10 states=10482 mismatches=1796
+  example ops=[('whole', 3), ('whole', 0), ('ext', 3)] -> h=3 l=1 b=[3, 2, None, None] field(T,h)=(0, 0) tombs=[(3, 1)] scan_claims=[0, 1] live=[0]
+variant=today_rule_pw_only depth=10 states=26109 mismatches=3123
+  example ops=[('whole', 3), ('pw', 0)] -> h=3 l=2 b=[3, 2, None, None] field(T,h)=(0, 0) tombs=[] scan_claims=[0] live=[0, 1]
+  example ops=[('whole', 4), ('pw', 0)] -> h=4 l=2 b=[3, 2, None, None] field(T,h)=(0, 0) tombs=[] scan_claims=[0] live=[0, 1]
+variant=today_rule_pw_tail_rewrite depth=10 states=20244 mismatches=0
+variant=field_only_whole_always depth=10 states=28393 mismatches=0
+variant=field_only_whole_if_rel depth=10 states=25227 mismatches=0
+variant=field_only_whole_clear depth=10 states=26109 mismatches=2722
+  example ops=[('whole', 3), ('whole', 0), ('ext', 3)] -> h=3 l=1 b=[3, 2, None, None] field(T,h)=(0, 0) tombs=[(3, 1)] scan_claims=[0, 1] live=[0]
+  example ops=[('whole', 3), ('whole', 0), ('ext', 4)] -> h=4 l=1 b=[3, 2, None, None] field(T,h)=(0, 0) tombs=[(3, 1)] scan_claims=[0, 1] live=[0]
+variant=field_only_whole_clear_unless_released depth=10 states=25852 mismatches=1400
+  example ops=[('whole', 3), ('whole', 0), ('whole', 0), ('ext', 3)] -> h=3 l=1 b=[4, 2, None, None] field(T,h)=(0, 0) tombs=[(3, 1)] scan_claims=[0, 1] live=[0]
+  example ops=[('whole', 3), ('whole', 0), ('whole', 0), ('ext', 4)] -> h=4 l=1 b=[4, 2, None, None] field(T,h)=(0, 0) tombs=[(3, 1)] scan_claims=[0, 1] live=[0]
+variant=range_tombstone depth=10 states=26109 mismatches=0

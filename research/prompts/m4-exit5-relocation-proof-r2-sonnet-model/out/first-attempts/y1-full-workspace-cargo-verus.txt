@@ -1,0 +1,8 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 33.0 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 1 条
+  → 第二台此刻放得下（可用 38.6 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 8G --label moved-from-queue-2448987-914413223 -- cargo verus focus --manifest-path /home/fy5090/.local/share/singlefs/work/m4-exit5-relocation-proof-r2-sonnet/tree-a/Cargo.toml --offline -p singlefs-replay-prefix
+run-with-memory-cap: 排了 11 秒，起跑（singlefs-memory-cap-2448987-914413223）
+Error: `cargo metadata` exited with an error: error: failed to download `android_system_properties v0.1.6`
+
+Caused by:
+  attempting to make an HTTP request, but --offline was specified
+

@@ -1,0 +1,10 @@
+name=start start=generated_zero baseline_violations={"I-1.13"} readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok
+name=compare start=generated_zero compared_mutant=1
+  baseline_violation I-1.13: 扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 1 处，第一处 key （码 1、出生树 65536、出生 txg 6、实例 2、事务号 1）：扫描重建 落点 {盘 0 槽 50182、盘 1 槽 50182}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 1 处，第一处 key （inode 1、偏移 0）：扫描重建 （码 1、出生树 65536、出生 txg 6、实例 2、事务号 1）、遍历方向 没有这一条
+name=summary start=generated_zero length=0 histories=1 seconds=0.1 threads=31 versions_seen=0 record_zero_units_size_zero=0 record_zero_units_size_positive=0 unverifiable_versions=0 shape_mismatches=0 record_without_entry=0 entry_without_record=0 histories_whose_bytes_differ_from_the_old_rule=0
+  readers cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok examples=["[]"]
+name=start start=generated_3000 baseline_violations={"I-1.13"} readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok
+name=compare start=generated_3000 compared_mutant=1
+  baseline_violation I-1.13: 扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 1 处，第一处 key （码 1、出生树 65536、出生 txg 6、实例 2、事务号 1）：扫描重建 落点 {盘 0 槽 50182、盘 1 槽 50182}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 1 处，第一处 key （inode 1、偏移 0）：扫描重建 （码 1、出生树 65536、出生 txg 6、实例 2、事务号 1）、遍历方向 没有这一条
+name=summary start=generated_3000 length=0 histories=1 seconds=0.1 threads=31 versions_seen=0 record_zero_units_size_zero=0 record_zero_units_size_positive=0 unverifiable_versions=0 shape_mismatches=0 record_without_entry=0 entry_without_record=0 histories_whose_bytes_differ_from_the_old_rule=0
+  readers cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok examples=["[]"]

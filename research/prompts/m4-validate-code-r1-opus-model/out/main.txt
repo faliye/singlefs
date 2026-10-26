@@ -1,0 +1,14 @@
+ATTACK-OUTCOME 1 TiB 文件可写重挂截回 100：做成 2 版
+ATTACK-OUTCOME 可写挂载之后：盘 0 槽 0: incompat0=0x06 世代 12；盘 0 槽 4096: incompat0=0x06 世代 11；盘 1 槽 0: incompat0=0x06 世代 12；盘 1 槽 4096: incompat0=0x06 世代 11
+ATTACK-OUTCOME 截到 100：意图那一版字段 T = 8、N_w = 100
+ATTACK-OUTCOME 截断之后冷走读：Ok(Some(100))
+ATTACK-OUTCOME 截断之后只读挂载：Ok(())
+ATTACK-OUTCOME 截断之后可写重挂：Ok(())
+ATTACK-OUTCOME 截断之后：盘 0 槽 0: incompat0=0x06 世代 14；盘 0 槽 4096: incompat0=0x06 世代 13；盘 1 槽 0: incompat0=0x06 世代 14；盘 1 槽 4096: incompat0=0x06 世代 13
+ATTACK-OUTCOME 挂载态读者读 1 TiB 文件末尾 10 字节：全 0，读盘 0 个单元
+ATTACK-OUTCOME 改成 0x02 之后：盘 0 槽 0: incompat0=0x02 世代 6；盘 0 槽 4096: incompat0=0x02 世代 7；盘 1 槽 0: incompat0=0x02 世代 6；盘 1 槽 4096: incompat0=0x02 世代 7
+ATTACK-OUTCOME 标签 0 size 3000 变长到三个净荷: panic：第一个文件至少一个数据单元
+ATTACK-OUTCOME 标签 0 size 3000 截到 100: panic：截断留至少一个单元、变长不加单元
+ATTACK-OUTCOME 标签 0 size 3000 改成 3000: panic：截断留至少一个单元、变长不加单元
+ATTACK-OUTCOME 标签 0 size 3000 覆盖写 100 字节: 做成：1 版
+exit=101

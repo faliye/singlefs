@@ -1,4 +1,0 @@
-b378f7c079d5d0b30c7fa6ba042b745d02ec11a2b16d1b247c0d84093a108e93  .claude/kb/decisions/23-journal的角色与格式.md
-b94e1806e8c2329062f81fbdcd95e319d55b43cfec289329cdd885cfdb236a7a  .claude/kb/decisions/28-挂载期承诺量.md
-435aa16122b801e44b7b9d0829772380144a8c4f123a8d855fbdce2a10596604  .claude/kb/checks-owed.md
-7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md

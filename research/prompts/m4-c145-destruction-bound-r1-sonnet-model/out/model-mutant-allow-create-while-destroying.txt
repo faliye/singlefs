@@ -1,0 +1,2 @@
+mutant=allow-create-while-destroying depth=8 states=11403 flagged_head_next_states=2667 entries_in_such_states=1658 batches_checked=7424
+pending_set_differs=0 release_set_differs=0 judge_reds=0 cross_version_new_entry_reaches_lo=0 (transitions_checked=11892, child_version_single_version_judge_green=0)

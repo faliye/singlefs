@@ -1,5 +1,0 @@
-E name=cur_skip nseg=5 segsz=4 ring=3 maxobj=3 b=1 depth=6 states=53938 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=42579 frozen=0 unmet_del=6 false_enospc=0 release_bad=0 rb_refused=0 del_pred_true=281 del_pred_false=2004 n0_refused=0 gc_done=8926 gc_declined=2433 gc_stuck=0 gc_paused=0 gc_cycle=41763 gc_cap=816 gc_wasted=0
-W name=cur_skip flag=livelock path=W0
-W name=cur_skip flag=unmet_del path=W0.W1.GI.GB.R1.GB
-W name=cur_skip flag=del_pred_true path=W0.GI.D0.GB
-W name=cur_skip flag=del_pred_false path=W0.GI.GB

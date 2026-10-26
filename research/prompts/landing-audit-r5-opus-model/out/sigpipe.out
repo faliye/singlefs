@@ -1,0 +1,2 @@
+整条跑完：退 1，输出 4007 行
+接 | head -2：PIPESTATUS=141 0（naming-lint 退 141 是被 SIGPIPE 杀掉，整条的退出码是 head 的）

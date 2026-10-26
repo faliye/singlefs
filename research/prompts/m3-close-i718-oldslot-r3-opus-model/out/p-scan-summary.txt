@@ -1,0 +1,48 @@
+p=0 t=0 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=0 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=1 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=1 t=1 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=1 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=2 t=0 healthy_today=R/R bad=True zero:today=R/G,ding_jia=R/G,ding_jia_gen0=G/G,ding_yi=NA/NA torn_enum:today=R/G,ding_jia=R/G,ding_jia_gen0=G/G,ding_yi=NA/NA
+p=2 t=2 healthy_today=G/R bad=True zero:today=G/G,ding_jia=G/G,ding_jia_gen0=G/G,ding_yi=NA/NA torn_enum:today=G/G,ding_jia=G/G,ding_jia_gen0=G/G,ding_yi=NA/NA
+p=2 t=14 healthy_today=R/R bad=True zero:today=R/G,ding_jia=R/G,ding_jia_gen0=R/G,ding_yi=NA/NA torn_enum:today=R/G,ding_jia=R/G,ding_jia_gen0=R/G,ding_yi=NA/NA
+p=3 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=3 t=3 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=3 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=4 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=4 t=4 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=4 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=5 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=5 t=5 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=5 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=6 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=6 t=6 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=6 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=7 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=7 t=7 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=7 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=8 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=8 t=8 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=8 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=9 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=9 t=9 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=9 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=10 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=10 t=10 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=10 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=11 t=0 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=11 t=11 healthy_today=G/R bad=True zero:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA torn_enum:today=G/R,ding_jia=G/R,ding_jia_gen0=G/R,ding_yi=NA/NA
+p=11 t=14 healthy_today=R/R bad=True zero:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA torn_enum:today=R/R,ding_jia=R/R,ding_jia_gen0=R/R,ding_yi=NA/NA
+p=255 t=0 healthy_today=R/G bad=True zero:today=R/G,ding_jia=R/G,ding_jia_gen0=G/G,ding_yi=NA/NA torn_enum:today=R/G,ding_jia=R/G,ding_jia_gen0=G/G,ding_yi=NA/NA
+p=255 t=14 healthy_today=G/G bad=False zero:today=R/G,ding_jia=G/G,ding_jia_gen0=G/G,ding_yi=NA/NA torn_enum:today=R/G,ding_jia=G/G,ding_jia_gen0=G/G,ding_yi=NA/NA
+combinations 37 bad_on_the_healthy_image 36
+bad_writers_passed_on_the_written_bad_image image=torn_enum candidate=ding_jia count=1
+bad_writers_passed_on_the_written_bad_image image=torn_enum candidate=ding_jia_gen0 count=3
+bad_writers_passed_on_the_written_bad_image image=torn_enum candidate=ding_yi count=36
+bad_writers_passed_on_the_written_bad_image image=torn_enum candidate=ding_yi_keeping_i719 count=4
+bad_writers_passed_on_the_written_bad_image image=torn_enum candidate=today count=1
+bad_writers_passed_on_the_written_bad_image image=zero candidate=ding_jia count=1
+bad_writers_passed_on_the_written_bad_image image=zero candidate=ding_jia_gen0 count=3
+bad_writers_passed_on_the_written_bad_image image=zero candidate=ding_yi count=36
+bad_writers_passed_on_the_written_bad_image image=zero candidate=ding_yi_keeping_i719 count=4
+bad_writers_passed_on_the_written_bad_image image=zero candidate=today count=1

@@ -1,0 +1,12 @@
+5ad3dab671bfb57fea4e9f4b3d903df63fe81bcbda5655154dfa741440ec2b62  .claude/kb/experiments/115-completeness-and-byte-budget-of-system-configuration-field-table.en.md
+8739c6493c2389ebba2d174ae1dd136862e0e9153d0535c79e2b510842378864  .claude/kb/experiments/45-ring-space-occupancy-for-multi-record-transactions.en.md
+2581b82d41470185e7aad2fd281ff17a896be96bb6ec83475a5527c81c123c9b  .claude/kb/experiments/45-トランザクションの複数レコード跨ぎによるリング占有.ja.md
+129d91eae2acac47236c1de21c0fbe02d9eb81de70292547e27dee48745ef8db  crates/singlefs-checker/invariants/03-journal.md
+59b68208489649ae09a4e96da2e253bdac49b3d0bbc69fbbbd2f6bf63a6e7d4b  .claude/kb/checks-owed.md
+fb59ef0fcfbbcbbd816fd89aff6be3782ae031daa1de89f03d893f608822e29d  .claude/kb/experiments/171-三oracle合谋测试.md
+88daceb4955d4d18618f77bbfb4f603f3593f0cff0855da5a7d692dcac34fa97  .claude/kb/decisions/13-verification-route.en.md
+0030db2aa30f8e70a4f562239d5a32f20a8d5e46f6b997e52af58dbf3f5ee132  .claude/kb/decisions/13-検証ルート.ja.md
+6de9993f76a38d88263893b92574707f35cf0f5845300501dba7b8a8e0059eb2  .claude/kb/decisions/13-验证路线.md
+16357609f10b25b2451821801ed51555824693c35eb7f0024a05d55f3f9bd48e  .claude/kb/decisions/23-journal-role-format.en.md
+897b1d98af420e4f062211d393962d4017251ed007967c1afdd2de34c4de8a2f  .claude/kb/decisions/23-ジャーナルの役割と形式.ja.md
+07bdef40d8cf3bb39cb629d48835dbf2c719ad56f98886d469f662872f5f0ad2  .claude/kb/decisions/23-journal的角色与格式.md

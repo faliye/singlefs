@@ -1,0 +1,8 @@
+ROWDEGRADED N=14 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+ROWDEGRADED N=14 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立
+ROWDEGRADED N=15 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+ROWDEGRADED N=15 掉盘 1: I-3.1=红 I-7.18=红 I-7.19=成立
+ROWDEGRADED N=16 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+ROWDEGRADED N=16 掉盘 1: I-3.1=红 I-7.18=红 I-7.19=成立
+ROWDEGRADED N=17 掉盘 0: I-3.1=红 I-7.18=红 I-7.19=成立
+ROWDEGRADED N=17 掉盘 1: I-3.1=红 I-7.18=成立 I-7.19=成立

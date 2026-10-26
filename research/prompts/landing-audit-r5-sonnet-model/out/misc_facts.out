@@ -1,0 +1,4 @@
+name=comparison_table 表行=19 登记行=14 表里对不上登记的行号=['15', '16', '17', '18', '19'] 文件头点名不登记的行号=['15', '16', '17', '18', '19']
+name=memory_peaks 最小=1048576（字节） 峰值为0的条数=0（表在长，条数不打，免得复跑对不上）
+name=workspace_closure 工作区成员=8 依赖闭包外的成员=[]
+name=gate_tsv_readers scripts/ 下读 .claude/gate.d/*.tsv 的脚本=29 涉及的表=22

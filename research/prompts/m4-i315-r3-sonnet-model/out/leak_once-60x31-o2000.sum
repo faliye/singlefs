@@ -1,0 +1,41 @@
+points 24
+TALLY today     name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS today    name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY exempt    name={'L': 24, 'N': 9} j2n={'L': 28, 'N': 5} j2s={'L': 28, 'N': 5} j2t={'L': 9, 'N': 24}
+POINTS exempt   name={'L': 17, 'LN': 5, 'N': 2} j2n={'L': 21, 'LN': 1, 'N': 2} j2s={'L': 21, 'LN': 1, 'N': 2} j2t={'L': 2, 'LN': 7, 'N': 15}
+TALLY gen       name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS gen      name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY genplus   name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS genplus  name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY cmp       name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS cmp      name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY both      name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS both     name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY bothplus  name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS bothplus name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY jrn       name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS jrn      name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+TALLY jrngen    name={'L': 4, 'N': 39} j2n={'L': 6, 'N': 37} j2s={'L': 6, 'N': 37} j2t={'L': 3, 'N': 40}
+POINTS jrngen   name={'L': 3, 'LN': 1, 'N': 20} j2n={'L': 5, 'LN': 1, 'N': 18} j2s={'L': 5, 'LN': 1, 'N': 18} j2t={'L': 2, 'LN': 1, 'N': 21}
+DIFF 7115 1 dev1:slot50758:len32768 reused=false today:N/N/N/N exempt:LN/L/L/LN gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7117 0 dev1:slot50356:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7118 0 dev1:slot1035:len4096 reused=true today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7119 0 dev0:slot50266:len32768 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7119 1 dev1:slot50560:len32768 reused=false today:N/N/N/N exempt:L/L/L/LN gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7120 1 dev1:slot50635:len16384 reused=false today:N/L/L/N exempt:L/L/L/N gen:N/L/L/N genplus:N/L/L/N cmp:N/L/L/N both:N/L/L/N bothplus:N/L/L/N jrn:N/L/L/N jrngen:N/L/L/N
+DIFF 7122 0 dev0:slot50744:len32768 reused=false today:N/N/N/N exempt:LN/L/L/LN gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7123 0 dev0:slot50325:len16384 reused=false today:N/L/L/N exempt:L/L/L/N gen:N/L/L/N genplus:N/L/L/N cmp:N/L/L/N both:N/L/L/N bothplus:N/L/L/N jrn:N/L/L/N jrngen:N/L/L/N
+DIFF 7125 0 dev1:slot50447:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7125 1 dev0:slot50680:len16384 reused=false today:N/N/N/N exempt:LN/L/L/LN gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7126 1 dev1:slot50416:len16384 reused=true today:N/N/N/N exempt:L/L/L/LN gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7128 1 dev1:slot50432:len32768 reused=false today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7128 2 dev0:slot0:len4096 reused=true today:N/N/N/N exempt:N/N/N/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7130 0 dev0:slot50277:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7130 1 dev1:slot50641:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7134 0 dev0:slot50562:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7136 0 dev1:slot50264:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7137 1 dev0:slot50606:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7138 1 dev1:slot50482:len16384 reused=false today:N/N/N/N exempt:L/L/L/N gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7139 0 dev1:slot50482:len16384 reused=true today:N/N/N/N exempt:LN/L/L/LN gen:N/N/N/N genplus:N/N/N/N cmp:N/N/N/N both:N/N/N/N bothplus:N/N/N/N jrn:N/N/N/N jrngen:N/N/N/N
+DIFF 7141 0 dev0:slot50257:len16384 reused=false today:LN/LN/LN/LN exempt:LN/LN/LN/LN gen:LN/LN/LN/LN genplus:LN/LN/LN/LN cmp:LN/LN/LN/LN both:LN/LN/LN/LN bothplus:LN/LN/LN/LN jrn:LN/LN/LN/LN jrngen:LN/LN/LN/LN
+DIFF 7143 0 dev0:slot50496:len1048576 reused=true today:L/L/L/N exempt:L/L/L/N gen:L/L/L/N genplus:L/L/L/N cmp:L/L/L/N both:L/L/L/N bothplus:L/L/L/N jrn:L/L/L/N jrngen:L/L/L/N

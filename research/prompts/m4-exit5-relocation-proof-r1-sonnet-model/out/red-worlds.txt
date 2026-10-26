@@ -1,0 +1,8 @@
+条目判定去掉钉住拒	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:47:9;src/relocation_execution_proofs.rs:48:9
+目的地判定漏掉受保护集那一半	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:126:17
+目的地判定漏掉两两不同那一半	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:109:17
+形状要求去掉目的地两两不同	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:274:9
+形状要求去掉key两两不同	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:363:20
+形状要求去掉目的地未被引用	rc=1	errors=2	verified=12	落点=src/relocation_execution_proofs.rs:294:16;src/relocation_execution_proofs.rs:369:20
+单元写写的是空字节	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:298:16
+结论里根没指向目的地	rc=1	errors=1	verified=13	落点=src/relocation_execution_proofs.rs:400:9

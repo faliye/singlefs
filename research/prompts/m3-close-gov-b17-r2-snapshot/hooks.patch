@@ -1,0 +1,233 @@
+--- a/.claude/hooks/lib_heavy_tests.py
++++ b/.claude/hooks/lib_heavy_tests.py
+@@ -52,7 +52,9 @@
+       heavy-test-guard.sh 拿它判子 agent 跑这一类经没经 scripts/hosts/run-with-memory-cap.sh（与重型不重型无关）。
+   judged_by_name(word, directory) -> bool
+       这个命令词是不是按名字判的仓内脚本（.claude/gate.d/ 下的阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在它们的仓内位置上）：
+-      算不算重型、带什么参数才算，都在名字那一格判完了，要读脚本正文的一方不再读进去。
++      算不算重型、带什么参数才算，都在名字那一格判完了，要读脚本正文的一方不再读进去。放行靠参数的三份入口（OWN_COPY_ONLY_SCRIPTS：replay.sh、
++      crash-point-replay.sh、crash-amplification.sh）要命令词解到的真实路径正是本仓那一份才为真（own_repository_script，与 stage-selftest.sh 的 --item / --list-items
++      放行同一种认法），路径尾部相同的别处拷贝为假、照读正文。
+   selftest_judged_light(words, directory, environment=None) -> bool
+       这一条是不是登记表里记成不起重活、又写成单独一个 --selftest 的自证（classify_selftest 判它放行）：要读脚本正文的一方同样不再读进去
+       （正文里平常那条路上起的 cargo 不是自证跑的）。
+@@ -353,8 +355,17 @@
+   heavy-test-guard.sh --selftest 里对应的几格（文件头写在各格旁边）在上面这几个开关下同样红。
+   LIB_HEAVY_TESTS_BREAK=experiment-replay-unnamed  实验复跑入口 scripts/experiment-apparatus/replay.sh 不按名字判（退回读正文：只列项也被读进去，正文里命令词没展开的行判成重型）
+       cargo 那张表里「实验复跑入口不带参数：全部实验复跑」「实验复跑入口点名实验」「实验复跑入口 --list-items 后面还带实验号：照拒」三格红（应当是 replay-all-stage，实际 None）；
++      按名字判那一组里「本仓那一份 replay.sh 按名字判（相对当前目录写）」「本仓那一份 replay.sh 按名字判（从 research 里写 ../）」「本仓那一份 replay.sh 按名字判（写绝对路径）」
++      「指到本仓那一份的符号链接按指到的算（replay.sh）」四格红（应当是 True，实际 False），cargo 那张表里「路径尾部相同的别处 replay.sh 拷贝点名实验：照旧算全部实验复跑」一格红；
+       heavy-test-guard.sh --selftest 里「实现员列实验复跑入口的项（--list-items）：放行、不读正文」两项（应当是 0，实际 2：读进去撞上正文里命令词没展开的行；
+       「读进去几份脚本」应当是 0，实际 1）与「实现员起实验复跑入口点名实验：照拒」「主 agent 不带前缀起实验复跑入口：照拒」两格的「读进去几份脚本」红（应当是 0，实际 1：按名字判的不读正文）
++  LIB_HEAVY_TESTS_BREAK=judged-by-name-path-tail  放行靠参数的三份入口（replay.sh、crash-point-replay.sh、crash-amplification.sh）的 judged_by_name 退回只按路径尾部认（路径尾部相同的别处拷贝也不读正文）
++      本文件 --selftest 里按名字判（judged_by_name）那一组的「路径尾部相同的别处 replay.sh 拷贝不按名字判（读正文）」「当前目录是别处树、相对着写的 replay.sh 拷贝不按名字判（读正文）」
++      「路径尾部相同的别处 crash-point-replay.sh 拷贝不按名字判（读正文）」「路径尾部相同的别处 crash-amplification.sh 拷贝不按名字判（读正文）」四格红（应当是 False，实际 True），
++      「指到本仓那一份的符号链接按指到的算（replay.sh）」一格红（应当是 True，实际 False：路径尾部对不上）；
++      heavy-test-guard.sh --selftest 里「实现员起路径尾部相同的实验复跑入口拷贝 --list-items（正文起 cargo）：读正文照拒」「实现员 cd 进别处树、相对着起实验复跑入口拷贝 --list-items（正文起 cargo）：读正文照拒」
++      「实现员经内存包装起路径尾部相同的崩溃点重放入口拷贝 --quick（正文起 cargo）：读正文照拒」「实现员起路径尾部相同的崩溃放量入口拷贝 --list-items（正文起 cargo）：读正文照拒」四格红
++      （应当是 2，实际 0；读进去几份脚本应当是 1，实际 0）；cargo 那张表里新加的两格（别处 replay.sh 拷贝的 classify）不红：classify 对拷贝的判法没动
+   LIB_HEAVY_TESTS_BREAK=qemu-build-unnamed  scripts/devices/build-patched-qemu.sh 不按名字算真编 QEMU（不带参数、--rebuild 的真编放过去）
+       cargo 那张表里「真编 QEMU（build-patched-qemu.sh 不带参数）」到「capped.sh 与 bash -c 包着真编 QEMU」五格红；
+       heavy-test-guard.sh --selftest 里「实现员真编 QEMU（--rebuild）：照拒」到「主 agent 不带前缀经内存包装真编 QEMU：照拒」三格红；
+@@ -570,8 +581,9 @@
+   LIB_HEAVY_TESTS_BREAK=light-tier-variables-unexpanded 下 cargo 那张表里「轻型：根参数写成前面赋过值的变量」「轻型：根参数写成 $HOME/…」两格红（应当是 None，
+   实际 verus-stage 或 crates-mutation-stage），heavy-test-guard.sh --selftest 里「调查员 cd 到变量目录、经内存包装起形式化那一道 --quick 根写成同一个变量：放行」一格红
+   （应当是 0，实际 2））；展开不了的（没在这段命令里赋值的）照重型算。
+-  入口按名字与位置认：名字叫 crash-point-replay.sh、又落在 scripts 这一层（路径尾部；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，不读正文）；
+-  别处的同名拷贝带 --quick 也照重型算（接受的误拒）。两道门禁按文件名认，与重型那一格同一种认法。
++  入口按名字与位置认：名字叫 crash-point-replay.sh、又落在 scripts 这一层（路径尾部；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置）；
++  别处的同名拷贝带 --quick 也照重型算（接受的误拒）。不读正文的只有解到本仓那一份的（judged_by_name，own_repository_script 比真实路径）：路径尾部相同的别处拷贝
++  classify 照旧交轻型或只列项，heavy-test-guard.sh 却读它的正文逐条判（弄坏开关 judged-by-name-path-tail 下退回只按路径尾部认、不读）。两道门禁按文件名认，与重型那一格同一种认法。
+   重型照旧（kind crash-point-replay，类名「崩溃点重放」，只有主 agent 带前缀能跑）：入口不带参数（剪枝）、带 --item 不带 --quick（逐条）、带 --full（全量），
+   与不是上面那种写法的每一种；只有摘掉 --force 之后恰好一个 --list-items 的（只列可点名的项）与登记表里的单独 --selftest 不算。两道门禁的重型照 STAGE_KIND。
+   轻型三条在 runs_compiled_code 里算跑编译出来的代码（里面起 checker 档的 cargo 与 Verus）：子 agent 要经 scripts/hosts/run-with-memory-cap.sh 起，
+@@ -580,13 +592,14 @@
+ 崩溃放量的三份入口（test-script-align-r3 攻方 A2；类名「崩溃放量」，kind crash-amplification）：scripts/crash/crash-amplification.sh（不带参数是崩溃放量全量，
+   --item 点名分项、--expand-up-to 缩过规模的同算）、crash-amplification-item.sh（分项驱动）、crash-amplification-two-hosts.sh（双机驱动），每一种跑法都经
+   crash-amplification-lib.sh 起 checker 档 cargo test；正文里的 cargo 拼在 bash 数组里、分项驱动经变量起，读正文看不见，所以按名字判（CRASH_AMPLIFICATION_SCRIPTS：
+-  名字是这三个就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那几份不读正文）。不算的：crash-amplification.sh 带 --list-items 的（只列分项，不清场、不跑）；
++  名字是这三个就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，解到本仓那几份的不读正文，crash-amplification.sh 路径尾部相同的别处拷贝读正文）。不算的：crash-amplification.sh 带 --list-items 的（只列分项，不清场、不跑）；
+   仓内那几份单独一个 --selftest 的照自证登记表判（三份都登记成 light，放行）。别处同名拷贝的 --selftest 不在登记表里，
+   按这一类算（接受的误拒）。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
+ 实验复跑入口 scripts/experiment-apparatus/replay.sh（类名「全部实验复跑」，kind replay-all-stage）：按名字判、不读正文（EXPERIMENT_REPLAY_SCRIPT：名字是它、又落在
+   scripts/experiment-apparatus/ 上才算，judged_by_name 认 KNOWN_SCRIPT_LOCATIONS 登记的位置）。不算的只有摘掉 --force 之后恰好一个 --list-items 的（逐行打可点名的实验号，
+   不编、不跑，replay.sh 文件头「--list-items」）与仓内那一份单独一个 --selftest（照自证登记表判，先于这一类）；不带参数、点名实验号、--admission-only、
+-  --list-items 后面还带别的词，都照重型算。别处同名的拷贝不按名字判，读正文。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
++  --list-items 后面还带别的词，都照重型算。不读正文的只有解到本仓那一份的（judged_by_name，真实路径比，符号链接按指到的算）：别处同名的拷贝读正文，路径尾部相同的也一样
++  （classify 对它照旧：带 --list-items 交 None、别的参数仍算全部实验复跑，读不读正文是 judged_by_name 的事）。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
+ 真编 QEMU（类名「真编 QEMU」，kind qemu-build）：scripts/devices/build-patched-qemu.sh 取源码、在 ${TMPDIR:-/tmp} 下约 1 GiB 的编译目录里按给的线程数编 QEMU、
+   装进私有目录。按名字判（QEMU_BUILD_SCRIPT：名字是它就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那一份不读正文）：不带参数、--rebuild、别的参数都算，
+   包装（bash -c、capped.sh、run-with-memory-cap.sh、nice 这类）里面的同样算。不算的只有仓内那一份单独一个 --selftest（照自证登记表判，登记成 light，放行）；
+@@ -738,6 +751,10 @@
+     "crash-point-replay.sh": "scripts/crash/crash-point-replay.sh", "replay.sh": "scripts/experiment-apparatus/replay.sh",
+     STAGE_SELFTEST_SCRIPT: ".claude/singlefs-ai-sop/scripts/stage-selftest.sh",
+ }
++# 放行靠参数的入口（replay.sh 与 crash-point-replay.sh 的 --list-items、crash-point-replay.sh 的 --quick、crash-amplification.sh 的 --list-items：classify 交 None，
++# 要读正文的一方又因为 judged_by_name 为真而不读）：命令词要解到本仓那一份才算按名字判（own_repository_script），路径尾部相同的别处拷贝不算，照读正文
++# （文件头「实验复跑入口」「两档里的轻型」「崩溃放量的三份入口」；弄坏开关 judged-by-name-path-tail 下退回只按路径尾部认）
++OWN_COPY_ONLY_SCRIPTS = frozenset({"replay.sh", "crash-point-replay.sh", "crash-amplification.sh"})
+ # 广谱变异的逐条驱动（scripts/mutation/broad-mutation.py）：带这几个参数之一的只读（列项、汇总、帮助），不起 cargo、不改库目录
+ BROAD_MUTATION_SCRIPT_NAME = "broad-mutation.py"
+ BROAD_MUTATION_SCRIPT_DIRECTORY = "scripts/mutation"
+@@ -3243,9 +3260,9 @@
+             return None   # 只列分项，不清场、不跑
+         return heavy_test("crash-amplification", f"scripts/crash/{name}（崩溃放量：每一项经 crash-amplification-lib.sh 起 checker 档 cargo test；"
+                                                  "只有 crash-amplification.sh --list-items 与登记表里的单独 --selftest 不算）")
+-    if name == EXPERIMENT_REPLAY_SCRIPT and not break_is_set("experiment-replay-unnamed") and judged_by_name(words[0], directory):
++    if name == EXPERIMENT_REPLAY_SCRIPT and not break_is_set("experiment-replay-unnamed") and known_script_at_location(words[0], directory):
+         if [argument for argument in arguments if argument != "--force"] == EXPERIMENT_REPLAY_QUERY_ARGUMENTS:
+-            return None   # 只列可点名的实验号，不编、不跑（replay.sh 文件头 --list-items）
++            return None   # 只列可点名的实验号，不编、不跑（replay.sh 文件头 --list-items）；路径尾部相同的别处拷贝在这里也交 None，读不读它的正文看 judged_by_name
+         return heavy_test("replay-all-stage", f"scripts/experiment-apparatus/{name} {' '.join(arguments[:4])}（实验复跑：每个实验起装置或驱动；"
+                                                  "只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）")
+     if name == PROVE_RED_SCRIPT:
+@@ -3316,17 +3333,39 @@
+     return heavy_tests_in_command_text(shlex.join(argv), cwd)
+ 
+ 
+-def judged_by_name(word, directory):
+-    """按名字判的仓内脚本（门禁阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在仓内位置上）：判定在名字那一格做完，不再读脚本正文。"""
+-    if gate_stage_name(word, directory) is not None:
+-        return True
++def known_script_at_location(word, directory):
++    """命令词（照写的样子，或按当前目录解开之后）是 KNOWN_SCRIPT_LOCATIONS 登记的名字、路径又以它的仓内位置收尾。只看路径尾部，不核是不是本仓那一份。"""
+     location = KNOWN_SCRIPT_LOCATIONS.get(os.path.basename(word))
+-    if location is None or (os.path.basename(word) == EXPERIMENT_REPLAY_SCRIPT and break_is_set("experiment-replay-unnamed")):
++    if location is None:
+         return False
+     return any(candidate == location or candidate.endswith("/" + location)
+                for candidate in (os.path.normpath(word), shell_words.resolve_path(directory, word) or ""))
+ 
+ 
++def own_repository_script(word, directory):
++    """命令词解到的真实路径（符号链接按指到的算）正是本仓（HOOK_REPOSITORY）里 KNOWN_SCRIPT_LOCATIONS 登记的那一份；
++    写在变量、通配里的，和当前目录认不出的相对路径，解不出真实路径，不算。判法与 stage_selftest_is_own_copy 同一种（比真实路径，不比路径尾部）。"""
++    location = KNOWN_SCRIPT_LOCATIONS.get(os.path.basename(word))
++    if location is None:
++        return False
++    resolved = shell_words.resolve_path(directory, os.path.expanduser(word))
++    return resolved is not None and os.path.realpath(resolved) == os.path.realpath(os.path.join(HOOK_REPOSITORY, location))
++
++
++def judged_by_name(word, directory):
++    """按名字判的仓内脚本（门禁阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在仓内位置上）：判定在名字那一格做完，不再读脚本正文。
++    OWN_COPY_ONLY_SCRIPTS 里的几个（放行靠参数的入口）要命令词解到本仓那一份才算，路径尾部相同的别处拷贝不算、照读正文。
++    弄坏开关 judged-by-name-path-tail 下它们也只看路径尾部。"""
++    if gate_stage_name(word, directory) is not None:
++        return True
++    name = os.path.basename(word)
++    if KNOWN_SCRIPT_LOCATIONS.get(name) is None or (name == EXPERIMENT_REPLAY_SCRIPT and break_is_set("experiment-replay-unnamed")):
++        return False
++    if name in OWN_COPY_ONLY_SCRIPTS and not break_is_set("judged-by-name-path-tail"):
++        return own_repository_script(word, directory)
++    return known_script_at_location(word, directory)
++
++
+ def build_sample_workspace(work):
+     """仓根虚工作区四个成员：core、harness 档（singlefs-harness）、池级 checker（singlefs-checker，只有库）、checker 档（singlefs-checker-tier：
+     两个集成测试目标、一个装置二进制、库）；research/ 是另一个虚工作区；mutants-sample/ 是两个成员的虚工作区，带一份 test_workspace = true 的 .cargo/mutants.toml。另有两份给 systemd-run -p EnvironmentFile= 读的环境文件。"""
+@@ -4383,6 +4422,11 @@
+             ("实验复跑入口不带参数：全部实验复跑", ["bash", "scripts/experiment-apparatus/replay.sh"], repository, "replay-all-stage"),
+             ("实验复跑入口点名实验", ["bash", "scripts/experiment-apparatus/replay.sh", "E142"], repository, "replay-all-stage"),
+             ("实验复跑入口 --list-items 后面还带实验号：照拒", ["bash", "scripts/experiment-apparatus/replay.sh", "--list-items", "E142"], repository, "replay-all-stage"),
++            # 路径尾部相同的别处拷贝：classify 照旧（只列项交 None，别的参数仍算全部实验复跑）；读不读它的正文是 judged_by_name 的事（按名字判那一组里的「别处拷贝」几格）
++            ("路径尾部相同的别处 replay.sh 拷贝带 --list-items：classify 交 None（读不读正文看 judged_by_name）",
++             ["bash", os.path.join(work, "copy-tree", "scripts", "experiment-apparatus", "replay.sh"), "--list-items"], work, None),
++            ("路径尾部相同的别处 replay.sh 拷贝点名实验：照旧算全部实验复跑",
++             ["bash", os.path.join(work, "copy-tree", "scripts", "experiment-apparatus", "replay.sh"), "E142"], work, "replay-all-stage"),
+             # 两档里的轻型（文件头「两档里的轻型」）：三条带 --quick（可加 --item）的不算；重型的剪枝、逐条、全量与夹了别的词的照算
+             # （开关 light-tier-unrecognized 下前九格红，light-tier-any-arguments 下「--quick 又带 --full」起四格红，crash-point-replay-unnamed 下「剪枝」起六格红，
+             # gpu-quiesce-opaque 下 gpu-quiesce-run.sh 那三格红）
+@@ -4850,6 +4894,9 @@
+             results.append(("花括号展开与 bash 一致：bash 的输出读得出", True, False))
+         # 自证登记表的读法：换成样本表（写坏的几种行都有）判；仓里那份表另核没有写坏的行、指到的文件都在
+         registry_cases = selftest_registry_cells(work, results)
++        linked_replay = os.path.join(work, "linked-replay", "replay.sh")   # 指到本仓那一份 replay.sh 的符号链接
++        os.makedirs(os.path.dirname(linked_replay))
++        os.symlink(os.path.join(HOOK_REPOSITORY, KNOWN_SCRIPT_LOCATIONS["replay.sh"]), linked_replay)
+         name_cases = [
+             ("门禁阶段按名字判", ".claude/gate.d/doc-text.sh", work, True),
+             ("去了编号的门禁阶段按名字判", ".claude/gate.d/checker-tier-lkmm.sh", work, True),
+@@ -4863,12 +4910,21 @@
+             ("仓外的同名 broad-mutation.py 不按名字判", "/tmp/claude-1000/somewhere/broad-mutation.py", work, False),
+             ("从 research 里相对着写的 mutate.sh", "scripts/mutation/mutate.sh", os.path.join(work, "research"), True),
+             ("仓外的同名 mutate.sh 不按名字判", "/tmp/claude-1000/somewhere/mutate.sh", work, False),
+-            ("仓内位置上的 crash-amplification.sh 按名字判（不读正文）", "scripts/crash/crash-amplification.sh", work, True),
++            ("仓内位置上的 crash-amplification.sh 按名字判（不读正文）", "scripts/crash/crash-amplification.sh", repository, True),
+             ("仓内位置上的 crash-amplification-item.sh 按名字判", "scripts/crash/crash-amplification-item.sh", work, True),
+             ("仓内位置上的 crash-amplification-two-hosts.sh 按名字判", "scripts/crash/crash-amplification-two-hosts.sh", work, True),
+             ("仓内位置上的 build-patched-qemu.sh 按名字判（不读正文）", "scripts/devices/build-patched-qemu.sh", work, True),
+-            ("仓内位置上的 crash-point-replay.sh 按名字判（不读正文）", "scripts/crash/crash-point-replay.sh", work, True),
++            ("仓内位置上的 crash-point-replay.sh 按名字判（不读正文）", "scripts/crash/crash-point-replay.sh", repository, True),
+             ("没登记的脚本", "run-chain.sh", work, False),
++            # 放行靠参数的三份入口只认本仓那一份（OWN_COPY_ONLY_SCRIPTS；开关 judged-by-name-path-tail 下后面四格「别处拷贝」红：应当是 False，实际 True）
++            ("本仓那一份 replay.sh 按名字判（相对当前目录写）", "scripts/experiment-apparatus/replay.sh", repository, True),
++            ("本仓那一份 replay.sh 按名字判（从 research 里写 ../）", "../scripts/experiment-apparatus/replay.sh", os.path.join(repository, "research"), True),
++            ("本仓那一份 replay.sh 按名字判（写绝对路径）", os.path.join(repository, KNOWN_SCRIPT_LOCATIONS["replay.sh"]), work, True),
++            ("指到本仓那一份的符号链接按指到的算（replay.sh）", linked_replay, work, True),
++            ("路径尾部相同的别处 replay.sh 拷贝不按名字判（读正文）", os.path.join(work, "copy-tree", KNOWN_SCRIPT_LOCATIONS["replay.sh"]), work, False),
++            ("当前目录是别处树、相对着写的 replay.sh 拷贝不按名字判（读正文）", KNOWN_SCRIPT_LOCATIONS["replay.sh"], os.path.join(work, "copy-tree"), False),
++            ("路径尾部相同的别处 crash-point-replay.sh 拷贝不按名字判（读正文）", os.path.join(work, "copy-tree", KNOWN_SCRIPT_LOCATIONS["crash-point-replay.sh"]), work, False),
++            ("路径尾部相同的别处 crash-amplification.sh 拷贝不按名字判（读正文）", os.path.join(work, "copy-tree", KNOWN_SCRIPT_LOCATIONS["crash-amplification.sh"]), work, False),
+         ]
+         for label, word, directory, want in name_cases:
+             results.append((label, want, judged_by_name(word, directory)))
+--- a/.claude/hooks/heavy-test-guard.sh
++++ b/.claude/hooks/heavy-test-guard.sh
+@@ -141,7 +141,9 @@
+ #   外层命令带的前缀与 export 往脚本里传，脚本里某一行自己写的前缀同样认；谁能跑什么照上面那张表，不因为写在脚本里而变。
+ #   拒绝说明写出脚本路径与行号（`外层脚本:行 → 里一层的脚本:行`）。
+ #   按名字判的仓内脚本（.claude/gate.d/ 下的阶段，gate.sh、gate-staged.sh、mutate.sh、capped.sh、run-with-memory-cap.sh、崩溃放量的三份入口、build-patched-qemu.sh、上游副本里的 stage-selftest.sh 这几个在各自的仓内位置上）不读正文：
+-#   算不算重型、带什么参数才算，已经在名字那一格判完（lib_heavy_tests.py 的 judged_by_name）。
++#   算不算重型、带什么参数才算，已经在名字那一格判完（lib_heavy_tests.py 的 judged_by_name）。其中放行靠参数的三份入口（实验复跑入口 replay.sh、崩溃点重放入口 crash-point-replay.sh、
++#   崩溃放量入口 crash-amplification.sh）只有命令词解到本仓那一份才不读正文（真实路径比，符号链接按指到的算）；路径尾部与仓内位置相同的别处拷贝，--list-items、--quick 照样放行的判法不变，
++#   但脚本正文照读、逐条判（治理轮 m3-close-gov-b17-r1 G4-a：副本里改过的 replay.sh 的 --list-items 一支起 cargo，原先按路径尾部认、不读正文，放行）。
+ #   直接执行的（`./x`、`路径/x`，经包装的同样）只当两种文件是脚本：`#!` 指到 shell（SHELL_NAMES：bash / sh / dash / zsh / ksh，`#!/usr/bin/env` 转一层也算），
+ #   或没有 `#!`、扩展名是 `.sh`（执行的名字或它指到的文件）；开头是编译产物（ELF 魔数、NUL 字节）的也不算。别的一律不读、不记：
+ #   `.rs`、`.py`、`.md`、`.tsv` 这类、没扩展名又没 `#!` 的文本、`#!` 指到 python 这类别的解释器的。判它只看开头 SCRIPT_HEAD_BYTES（4 KiB），判在大小上限之前；
+@@ -1124,6 +1126,9 @@
+     write("bigprog", b"\x7fELF\x02\x01\x01\x00" + b"\x00" * (MAXIMUM_SCRIPT_BYTES + 64) + b"\ncargo test --all\n", "wb")
+     write("bigtool", "#!/usr/bin/env python3\n" + "# 填充\n" * (MAXIMUM_SCRIPT_BYTES // 8 + 1) + "cargo test --all\n")
+     write("elsewhere/mutate.sh", "#!/usr/bin/env bash\ncargo test --all\n")
++    # 路径尾部与仓内位置相同、却不是本仓那一份的拷贝（放行靠参数的三份入口；lib_heavy_tests.py 的 OWN_COPY_ONLY_SCRIPTS）：正文起 cargo，带放行用的参数也要读正文、判成重型
++    for copied_entry in ("scripts/experiment-apparatus/replay.sh", "scripts/crash/crash-point-replay.sh", "scripts/crash/crash-amplification.sh"):
++        write(f"copy-tree/{copied_entry}", "#!/usr/bin/env bash\ncargo test --all\n")
+     write("scripts/gate/gate-staged.sh", "#!/usr/bin/env bash\nbash .claude/scripts/gate.sh --staged\n")
+     write(".claude/singlefs-ai-sop/scripts/naming-lint.sh", "#!/usr/bin/env bash\ntrue\n")   # 交回前自查命名的那条命令起的上游 lint：脚本在，读得到
+     # 查名字与数组赋值：照 .claude/scripts/fetch-deps.sh 第 44 行、scripts/gate/change-touches-crates.sh（2026-10-15 删掉）第 61 行原样
+@@ -1296,7 +1301,7 @@
+              "items=(--item core-row-1); items+=(--full); bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick . \"${items[@]}\"", 2),
+             # 崩溃点重放入口的轻型另认 --local-only（light-tier-local-only-unrecognized 下头一格红：应当是 0，实际 2）
+             ("实现员经内存包装起崩溃点重放 --quick --local-only 加点名一项：放行", writer,
+-             "bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick --local-only --item fixed-script", 0),
++             f"bash scripts/hosts/run-with-memory-cap.sh 8G bash {repo}/scripts/crash/crash-point-replay.sh --quick --local-only --item fixed-script", 0),
+             ("实现员经内存包装起崩溃点重放 --local-only 不带 --quick：照拒", writer, "bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --local-only", 2),
+             # 登记了红例钉表重放用法的装置本体带 --pinned-cases 照拒（lib_heavy_tests.py 的 device_main_replay_use；device-main-replay-allowed 下前两格红：应当是 2，实际 0）
+             ("实验执行员经内存包装直接执行 e165 装置的本体带 --pinned-cases：照拒", "experiment-runner",
+@@ -1328,7 +1333,7 @@
+             ("主 agent 不带前缀起崩溃点重放 --quick、命令前设了登记的改规模变量：照拒", None,
+              "SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=4294967296 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 2),
+             ("实现员经内存包装起崩溃点重放 --quick、命令前登记的改规模变量值为空：放行", writer,
+-             "SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES= bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick", 0),
++             f"SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES= bash scripts/hosts/run-with-memory-cap.sh 8G bash {repo}/scripts/crash/crash-point-replay.sh --quick", 0),
+             ("实现员经内存包装起 crates 变异那一道 --quick、命令前设的开关变量值为空：放行", writer,
+              "GATE_MUTATION_BREAK= bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .", 0),
+             # 装置的本体与 cargo run --bin 同判（lib_heavy_tests.py 的 device_main_binary；device-main-as-test 下头一格红：应当是 0，实际 2）
+@@ -1750,6 +1755,17 @@
+             ("实现员列实验复跑入口的项（--list-items）：放行、不读正文", writer, f"bash {repo}/scripts/experiment-apparatus/replay.sh --list-items", 0, 0, 0),
+             ("实现员起实验复跑入口点名实验：照拒", writer, f"bash {repo}/scripts/experiment-apparatus/replay.sh E142", 2),
+             ("主 agent 不带前缀起实验复跑入口：照拒", None, f"bash {repo}/scripts/experiment-apparatus/replay.sh", 2),
++            # 放行靠参数的三份入口只认本仓那一份（lib_heavy_tests.py 的 OWN_COPY_ONLY_SCRIPTS、own_repository_script；治理轮 m3-close-gov-b17-r1 G4-a）：路径尾部相同的别处拷贝读正文、
++            # 正文起 cargo 就拒（LIB_HEAVY_TESTS_BREAK=judged-by-name-path-tail 下前四格红：应当是 2，实际 0、读进去几份脚本应当是 1，实际 0；后一格不红）
++            ("实现员起路径尾部相同的实验复跑入口拷贝 --list-items（正文起 cargo）：读正文照拒", writer,
++             f"bash {work}/copy-tree/scripts/experiment-apparatus/replay.sh --list-items", 2, 0, 1),
++            ("实现员 cd 进别处树、相对着起实验复跑入口拷贝 --list-items（正文起 cargo）：读正文照拒", writer,
++             f"cd {work}/copy-tree && bash scripts/experiment-apparatus/replay.sh --list-items", 2, 0, 1),
++            ("实现员经内存包装起路径尾部相同的崩溃点重放入口拷贝 --quick（正文起 cargo）：读正文照拒", writer,
++             f"bash {repo}/scripts/hosts/run-with-memory-cap.sh 8G bash {work}/copy-tree/scripts/crash/crash-point-replay.sh --quick", 2, 0, 1),
++            ("实现员起路径尾部相同的崩溃放量入口拷贝 --list-items（正文起 cargo）：读正文照拒", writer,
++             f"bash {work}/copy-tree/scripts/crash/crash-amplification.sh --list-items", 2, 0, 1),
++            ("实现员列本仓崩溃点重放入口的项（--list-items）：放行、不读正文", writer, f"bash {repo}/scripts/crash/crash-point-replay.sh --list-items", 0, 0, 0),
+             # 两档里的轻型（lib_heavy_tests.py 文件头「两档里的轻型」）：三条带 --quick 的子 agent 带不带前缀都放行、要经内存包装；重型的剪枝、逐条、全量照拒
+             # （LIB_HEAVY_TESTS_BREAK=light-tier-unrecognized 下前四格与「主 agent 不带前缀起崩溃点重放 --quick」红，light-tier-memory-cap-unrequired 下「不经内存包装」一格红，
+             # crash-point-replay-unnamed 下「剪枝」到「主 agent 不带前缀起崩溃点重放入口」五格红，light-tier-any-arguments 下「--quick 又带 --full」一格红，

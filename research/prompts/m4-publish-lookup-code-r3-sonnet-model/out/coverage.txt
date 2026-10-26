@@ -1,0 +1,7 @@
+# forward_coverage_test.rs 在改后树上的原样输出（同一串历史：16 个 4 单元文件、建快照、快照下重写每第 3 个文件、整理推到停）
+FWD_COVERAGE site=None work=LookupWork { index_builds: 98, index_lookups: 5419, index_entries_examined: 30470, largest_index_looked_up: 99, mapping_leaf_decodes: 0 }
+FWD_COVERAGE site=Some(SnapshotJudgement) work=LookupWork { index_builds: 83, index_lookups: 261, index_entries_examined: 1584, largest_index_looked_up: 96, mapping_leaf_decodes: 18 }
+FWD_COVERAGE site=Some(MappingEntriesOfReleasedUnits) work=LookupWork { index_builds: 162, index_lookups: 700, index_entries_examined: 3997, largest_index_looked_up: 99, mapping_leaf_decodes: 81 }
+FWD_COVERAGE site=Some(CompactionReadsTheCentralMapping) work=LookupWork { index_builds: 12, index_lookups: 12, index_entries_examined: 76, largest_index_looked_up: 99, mapping_leaf_decodes: 12 }
+FWD_COVERAGE site=Some(RelocationSources) work=LookupWork { index_builds: 18, index_lookups: 24, index_entries_examined: 148, largest_index_looked_up: 99, mapping_leaf_decodes: 7 }
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.27s

@@ -1,0 +1,55 @@
+name=source_check result=ok checked=18
+name=region_geometry base=1048576 stride=3145728 journal_start=16777216 spacing_max=1044480
+name=largest_spacing_that_keeps_regions_apart S=4 bytes=786432 kib=768 largest_spacing_inside_one_chunk_bytes=262144
+name=largest_spacing_that_keeps_regions_apart S=8 bytes=393216 kib=384 largest_spacing_inside_one_chunk_bytes=131072
+name=largest_spacing_that_keeps_regions_apart S=16 bytes=196608 kib=192 largest_spacing_inside_one_chunk_bytes=65536
+name=cell spacing=4096 S=4 region_bytes=16384 fits_one_chunk=True fits_stride=True last_region_end=7356416 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=4096 S=8 region_bytes=32768 fits_one_chunk=True fits_stride=True last_region_end=7372800 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=4096 S=16 region_bytes=65536 fits_one_chunk=True fits_stride=True last_region_end=7405568 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=8192 S=4 region_bytes=32768 fits_one_chunk=True fits_stride=True last_region_end=7372800 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=8192 S=8 region_bytes=65536 fits_one_chunk=True fits_stride=True last_region_end=7405568 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=8192 S=16 region_bytes=131072 fits_one_chunk=True fits_stride=True last_region_end=7471104 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=65536 S=4 region_bytes=262144 fits_one_chunk=True fits_stride=True last_region_end=7602176 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=65536 S=8 region_bytes=524288 fits_one_chunk=True fits_stride=True last_region_end=7864320 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=65536 S=16 region_bytes=1048576 fits_one_chunk=True fits_stride=True last_region_end=8388608 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=131072 S=4 region_bytes=524288 fits_one_chunk=True fits_stride=True last_region_end=7864320 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=131072 S=8 region_bytes=1048576 fits_one_chunk=True fits_stride=True last_region_end=8388608 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=131072 S=16 region_bytes=2097152 fits_one_chunk=False fits_stride=True last_region_end=9437184 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=196608 S=4 region_bytes=786432 fits_one_chunk=True fits_stride=True last_region_end=8126464 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=196608 S=8 region_bytes=1572864 fits_one_chunk=False fits_stride=True last_region_end=8912896 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=196608 S=16 region_bytes=3145728 fits_one_chunk=False fits_stride=True last_region_end=10485760 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=262144 S=4 region_bytes=1048576 fits_one_chunk=True fits_stride=True last_region_end=8388608 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=262144 S=8 region_bytes=2097152 fits_one_chunk=False fits_stride=True last_region_end=9437184 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=262144 S=16 region_bytes=4194304 fits_one_chunk=False fits_stride=False last_region_end=11534336 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=393216 S=4 region_bytes=1572864 fits_one_chunk=False fits_stride=True last_region_end=8912896 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=393216 S=8 region_bytes=3145728 fits_one_chunk=False fits_stride=True last_region_end=10485760 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=393216 S=16 region_bytes=6291456 fits_one_chunk=False fits_stride=False last_region_end=13631488 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=524288 S=4 region_bytes=2097152 fits_one_chunk=False fits_stride=True last_region_end=9437184 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=524288 S=8 region_bytes=4194304 fits_one_chunk=False fits_stride=False last_region_end=11534336 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=524288 S=16 region_bytes=8388608 fits_one_chunk=False fits_stride=False last_region_end=15728640 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=786432 S=4 region_bytes=3145728 fits_one_chunk=False fits_stride=True last_region_end=10485760 hits_journal=False mkfs_refuses_overlap=False reader_table_accepts=True
+name=cell spacing=786432 S=8 region_bytes=6291456 fits_one_chunk=False fits_stride=False last_region_end=13631488 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=786432 S=16 region_bytes=12582912 fits_one_chunk=False fits_stride=False last_region_end=19922944 hits_journal=True mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=1044480 S=4 region_bytes=4177920 fits_one_chunk=False fits_stride=False last_region_end=11517952 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=1044480 S=8 region_bytes=8355840 fits_one_chunk=False fits_stride=False last_region_end=15695872 hits_journal=False mkfs_refuses_overlap=True reader_table_accepts=True
+name=cell spacing=1044480 S=16 region_bytes=16711680 fits_one_chunk=False fits_stride=False last_region_end=24051712 hits_journal=True mkfs_refuses_overlap=True reader_table_accepts=True
+name=other_limits pin_byte_largest_S=85 gpu_max_roots=48 gpu_max_S=16 system_configuration_byte_domain=0..255
+name=ring_window_note derived_by=arithmetic_copy_of_admission_rs (not the implementation run); K=144, H_retirement=0, two equal devices
+name=ring_window device_gib=1 journal_ring_mib=64 S=4 W=180 root_level=1 window_slots=2340 window_mib=36.6 share_of_one_device_percent=3.57
+name=ring_window device_gib=1 journal_ring_mib=64 S=8 W=180 root_level=1 window_slots=4500 window_mib=70.3 share_of_one_device_percent=6.87
+name=ring_window device_gib=1 journal_ring_mib=64 S=16 W=180 root_level=1 window_slots=8820 window_mib=137.8 share_of_one_device_percent=13.46
+name=ring_window device_gib=2 journal_ring_mib=64 S=4 W=344 root_level=2 window_slots=4472 window_mib=69.9 share_of_one_device_percent=3.41
+name=ring_window device_gib=2 journal_ring_mib=64 S=8 W=344 root_level=2 window_slots=8600 window_mib=134.4 share_of_one_device_percent=6.56
+name=ring_window device_gib=2 journal_ring_mib=64 S=16 W=344 root_level=2 window_slots=16856 window_mib=263.4 share_of_one_device_percent=12.86
+name=ring_window device_gib=4 journal_ring_mib=768 S=4 W=374 root_level=2 window_slots=4862 window_mib=76.0 share_of_one_device_percent=1.85
+name=ring_window device_gib=4 journal_ring_mib=768 S=8 W=374 root_level=2 window_slots=9350 window_mib=146.1 share_of_one_device_percent=3.57
+name=ring_window device_gib=4 journal_ring_mib=768 S=16 W=374 root_level=2 window_slots=18326 window_mib=286.3 share_of_one_device_percent=6.99
+name=ring_window device_gib=16 journal_ring_mib=768 S=4 W=386 root_level=2 window_slots=5018 window_mib=78.4 share_of_one_device_percent=0.48
+name=ring_window device_gib=16 journal_ring_mib=768 S=8 W=386 root_level=2 window_slots=9650 window_mib=150.8 share_of_one_device_percent=0.92
+name=ring_window device_gib=16 journal_ring_mib=768 S=16 W=386 root_level=2 window_slots=18914 window_mib=295.5 share_of_one_device_percent=1.80
+name=ring_window device_gib=100 journal_ring_mib=768 S=4 W=466 root_level=2 window_slots=6058 window_mib=94.7 share_of_one_device_percent=0.09
+name=ring_window device_gib=100 journal_ring_mib=768 S=8 W=466 root_level=2 window_slots=11650 window_mib=182.0 share_of_one_device_percent=0.18
+name=ring_window device_gib=100 journal_ring_mib=768 S=16 W=466 root_level=2 window_slots=22834 window_mib=356.8 share_of_one_device_percent=0.35
+name=ring_window device_gib=1000 journal_ring_mib=768 S=4 W=716 root_level=3 window_slots=9308 window_mib=145.4 share_of_one_device_percent=0.01
+name=ring_window device_gib=1000 journal_ring_mib=768 S=8 W=716 root_level=3 window_slots=17900 window_mib=279.7 share_of_one_device_percent=0.03
+name=ring_window device_gib=1000 journal_ring_mib=768 S=16 W=716 root_level=3 window_slots=35084 window_mib=548.2 share_of_one_device_percent=0.05

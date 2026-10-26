@@ -1,0 +1,23 @@
+# 派发：tooling-writer
+
+重型测试：不跑
+批次：探针内容
+线程上限：31
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-tooling-writer
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-tooling-writer --purpose '探针：现试骨架'
+报告：/home/fy5090/.local/share/singlefs/work/landing-audit-r2-opus-probe-tooling-writer/result.md
+出口：探针内容
+要改的文件：探针内容
+预计挂钟：2 小时内，读几份文件
+自证在哪跑：探针内容
+
+## 关的是哪几条
+
+探针内容
+
+## 出口
+
+探针内容
+
+
+2. 骨架给「报告：」一行的默认：三方腿填形如 `research/prompts/（轮）-（模型）-output.md` 的占位。

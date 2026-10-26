@@ -1,3 +1,0 @@
-PROBE group=t4 name=t4-attack-five-steps ending=Completed steps=5 rollbacks=["applied"] reds=0
-PROBE group=t4 name=t4-five-steps-then-destroy-and-cold-start ending=Completed steps=7 rollbacks=["applied"] reds=0
-PROBE group=t4 name=t4-five-steps-then-second-snapshot ending=Completed steps=9 rollbacks=["applied"] reds=0

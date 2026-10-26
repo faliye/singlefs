@@ -1,0 +1,94 @@
+name=start start=scrubbed_3000 baseline_violations={"I-2.1", "I-4.8", "I-7.4"} readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok
+name=compare start=scrubbed_3000 compared_mutant=1
+  baseline_violation I-2.1: 数据单元 在盘 0 槽 50180 的那一份与位置条目里的校验和对不上
+  baseline_violation I-4.8: 候选根 txg 3 出发的遍历有单元对不上或读不出
+  baseline_violation I-7.4: 候选根 txg 3 引用的单元已被复用或抹头（校验和对不上或头用不了）
+name=summary start=scrubbed_3000 length=3 histories=4369 seconds=29.6 threads=31 versions_seen=10420 record_zero_units_size_zero=1236 record_zero_units_size_positive=6193 unverifiable_versions=0 shape_mismatches=0 record_without_entry=0 entry_without_record=0 histories_whose_bytes_differ_from_the_old_rule=37
+  refused count=29 why=OverwriteFirst(100) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=OverwriteFirst(100) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=OverwriteInode(143) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=1 why=OverwriteInode(143) => Publish { cause: DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 143, object_birth: CheckpointTxg(13), death_txg_of
+  refused count=585 why=OverwriteInode(143) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 143 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=OverwriteInode(2) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=2 why=OverwriteInode(2) => Publish { cause: DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 2, object_birth: CheckpointTxg(13), death_txg_of_t
+  refused count=546 why=OverwriteInode(2) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 2 }, floor_raises: [], versions_published: [] }
+  refused count=38 why=RollBackToTheStart => 回退拒 SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { version: Current, snapshots: 1 }
+  refused count=1 why=RollBackToTheStart => 回退拒 SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { version: Current, snapshots: 2 }
+  refused count=29 why=RollBackToTheStart => 回退：现行那一版不带文件
+  refused count=29 why=SequentialFirst(33134) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=SequentialFirst(33134) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(0) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(0) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(100) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(100) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(3000) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(3000) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(7000) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(7000) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(97902) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(97902) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Unlink(1) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Unlink(1) => Publish { cause: UnlinkOfAnInodeThatIsNotALiveRecord { inode: 1 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=Unlink(2) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=546 why=Unlink(2) => Publish { cause: UnlinkOfAnInodeThatIsNotALiveRecord { inode: 2 }, floor_raises: [], versions_published: [] }
+  readers cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok examples=["[OverwriteInode(143)]", "[Unlink(2)]", "[Truncate(7000)]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=0 entry_without_record=1 examples=["[Truncate(0), Unlink(1)]", "[Truncate(0), Truncate(0), Unlink(1)]", "[Truncate(0), NewInodes(1), Unlink(1)]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=0 entry_without_record=2 examples=["[Truncate(0), Unlink(1), NewInodes(1)]", "[Truncate(0), Unlink(1), Snapshot]", "[Truncate(0), Unlink(1), NewInodes(142)]"]
+  old_rule readers: cold_walk=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) cold_recovery=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) writable_remount=refused(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) mounted_reader=ok new_violations={} record_without_entry=1 entry_without_record=0 examples=["[Truncate(0), NewInodes(1), OverwriteInode(2)]", "[Truncate(0), NewInodes(142), OverwriteInode(2)]", "[Truncate(0), NewInodes(142), OverwriteInode(143)]"]
+  bytes_differ [Truncate(0), Unlink(1)]
+  bytes_differ [Truncate(0), Truncate(0), Unlink(1)]
+  bytes_differ [Truncate(0), NewInodes(1), OverwriteInode(2)]
+  bytes_differ [Truncate(0), NewInodes(1), Unlink(1)]
+  bytes_differ [Truncate(0), NewInodes(142), OverwriteInode(2)]
+  bytes_differ [Truncate(0), NewInodes(142), OverwriteInode(143)]
+name=start start=scrubbed_zero baseline_violations={"I-2.1", "I-4.8", "I-7.4"} readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok
+name=compare start=scrubbed_zero compared_mutant=1
+  baseline_violation I-2.1: 数据单元 在盘 0 槽 50180 的那一份与位置条目里的校验和对不上
+  baseline_violation I-4.8: 候选根 txg 3 出发的遍历有单元对不上或读不出
+  baseline_violation I-7.4: 候选根 txg 3 引用的单元已被复用或抹头（校验和对不上或头用不了）
+name=summary start=scrubbed_zero length=3 histories=4369 seconds=29.5 threads=31 versions_seen=9632 record_zero_units_size_zero=3583 record_zero_units_size_positive=3058 unverifiable_versions=0 shape_mismatches=0 record_without_entry=0 entry_without_record=0 histories_whose_bytes_differ_from_the_old_rule=502
+  refused count=29 why=OverwriteFirst(100) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=OverwriteFirst(100) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=OverwriteInode(143) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=1 why=OverwriteInode(143) => Publish { cause: DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 143, object_birth: CheckpointTxg(13), death_txg_of
+  refused count=585 why=OverwriteInode(143) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 143 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=OverwriteInode(2) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=2 why=OverwriteInode(2) => Publish { cause: DataWriteToAnInodeBornAfterTheFirstFileWasDeletedIsOutsideTheFirstVersion { inode: 2, object_birth: CheckpointTxg(13), death_txg_of_t
+  refused count=546 why=OverwriteInode(2) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 2 }, floor_raises: [], versions_published: [] }
+  refused count=38 why=RollBackToTheStart => 回退拒 SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { version: Current, snapshots: 1 }
+  refused count=1 why=RollBackToTheStart => 回退拒 SnapshotsInAVersionOfTheRollbackWhichTheFirstVersionRefuses { version: Current, snapshots: 2 }
+  refused count=29 why=RollBackToTheStart => 回退：现行那一版不带文件
+  refused count=29 why=SequentialFirst(33134) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=SequentialFirst(33134) => Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(0) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(0) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(100) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(100) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(3000) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(3000) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(7000) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(7000) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Truncate(97902) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Truncate(97902) => Publish { cause: TruncationRefused(InodeIsNotALiveRecord { inode: 1 }), floor_raises: [], versions_published: [] }
+  refused count=29 why=Unlink(1) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=4 why=Unlink(1) => Publish { cause: UnlinkOfAnInodeThatIsNotALiveRecord { inode: 1 }, floor_raises: [], versions_published: [] }
+  refused count=29 why=Unlink(2) => NoFileVersionToChange { floor_raises: [], refusals_that_pushed_the_floor_raises: [], versions_published: [] }
+  refused count=546 why=Unlink(2) => Publish { cause: UnlinkOfAnInodeThatIsNotALiveRecord { inode: 2 }, floor_raises: [], versions_published: [] }
+  readers cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok examples=["[Snapshot]", "[OverwriteFirst(100)]", "[OverwriteInode(2)]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=0 entry_without_record=1 examples=["[Unlink(1)]", "[Truncate(0), Unlink(1)]", "[NewInodes(1), Unlink(1)]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=0 entry_without_record=2 examples=["[Unlink(1), NewInodes(1)]", "[Unlink(1), NewInodes(142)]", "[Unlink(1), Snapshot]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=0 entry_without_record=3 examples=["[NewInodes(1), Unlink(1), Unlink(2)]", "[NewInodes(142), Unlink(1), Unlink(2)]", "[Unlink(1), NewInodes(1), NewInodes(142)]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=0 entry_without_record=4 examples=["[Unlink(1), NewInodes(1), Unlink(2)]", "[Unlink(1), NewInodes(142), Unlink(2)]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=1 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2), OverwriteFirst(100)]", "[NewInodes(1), OverwriteInode(2), SequentialFirst(33134)]", "[NewInodes(1), OverwriteInode(2), RollBackToTheStart]"]
+  old_rule readers: cold_walk=ok cold_recovery=ok writable_remount=ok mounted_reader=ok new_violations={} record_without_entry=2 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2), Unlink(1)]", "[NewInodes(142), OverwriteInode(2), Unlink(1)]", "[NewInodes(142), OverwriteInode(143), Unlink(1)]"]
+  old_rule readers: cold_walk=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) cold_recovery=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) writable_remount=refused(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) mounted_reader=ok new_violations={} record_without_entry=1 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2)]", "[NewInodes(142), OverwriteInode(2)]", "[NewInodes(142), OverwriteInode(143)]"]
+  old_rule readers: cold_walk=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) cold_recovery=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) writable_remount=refused(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) mounted_reader=ok new_violations={} record_without_entry=2 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2), Truncate(0)]", "[NewInodes(1), OverwriteInode(2), OverwriteInode(2)]", "[NewInodes(1), OverwriteInode(2), NewInodes(1)]"]
+  old_rule readers: cold_walk=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) cold_recovery=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) writable_remount=refused(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) mounted_reader=ok new_violations={} record_without_entry=3 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2), Unlink(2)]", "[NewInodes(142), OverwriteInode(2), Unlink(2)]", "[NewInodes(142), OverwriteInode(143), Unlink(2)]"]
+  old_rule readers: cold_walk=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) cold_recovery=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) writable_remount=refused(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) mounted_reader=open_refused(ExtentRecordCountDoesNotMatchTheFileSize { inode: InodeNumber(1), extent_records: 0, data_units_implied_by_the_file_size: 1, fi new_violations={} record_without_entry=2 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2), Truncate(100)]", "[NewInodes(1), OverwriteInode(2), Truncate(3000)]", "[NewInodes(1), OverwriteInode(2), Truncate(7000)]"]
+  old_rule readers: cold_walk=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) cold_recovery=refused(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" }) writable_remount=refused(Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })) mounted_reader=open_refused(ExtentRecordCountDoesNotMatchTheFileSize { inode: InodeNumber(1), extent_records: 0, data_units_implied_by_the_file_size: 3, fi new_violations={} record_without_entry=2 entry_without_record=0 examples=["[NewInodes(1), OverwriteInode(2), Truncate(97902)]", "[NewInodes(142), OverwriteInode(2), Truncate(97902)]", "[NewInodes(142), OverwriteInode(143), Truncate(97902)]"]
+  bytes_differ [Unlink(1)]
+  bytes_differ [Truncate(0), Unlink(1)]
+  bytes_differ [NewInodes(1), OverwriteInode(2)]
+  bytes_differ [NewInodes(1), Unlink(1)]
+  bytes_differ [NewInodes(142), OverwriteInode(2)]
+  bytes_differ [NewInodes(142), OverwriteInode(143)]

@@ -1,1 +1,0 @@
-name=r3_compare sonnet same rows_mine=60 rows_ref=60

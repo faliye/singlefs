@@ -1,0 +1,7 @@
+name=frozen-o3-same-body function=RegisteredMoves identical=True
+name=frozen-o3-same-body function=path_moves_library identical=True
+name=frozen-o3-same-body function=registered_moves identical=True
+name=frozen-o3-same-body function=sha256_before_moves identical=True
+name=frozen-o3-same-body function=matches_the_freeze identical=True
+name=frozen-o3-same-body function=seed_from_directory identical=True
+name=frozen-o3-same-body function=freeze_differences identical=False

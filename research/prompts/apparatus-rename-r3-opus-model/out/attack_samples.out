@@ -1,0 +1,51 @@
+name=nested_same_name.registered.path_moves_check rc=0 base=HEAD out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效 1 行（第 1 行），不串、有搬迁实据（第 1 行 2 份里 2 份换算之后相同；新前缀下没有基准里本来就在的文件）」
+name=nested_same_name.registered.base_table_shown rc=0 rows=['tools/manual/run.sh:$(nproc)  # 只打核数，不是重活']
+name=nested_same_name.registered.exempt_table_grown grown=[]
+name=nested_same_name.registered.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'tools/docs/run.sh', 'tools/manual/run.sh']
+name=nested_same_name.registered.added_lines rc=0 lines=[]
+name=nested_same_name.registered.implementation_swapped base_run_sh=69e03fa44 now_run_sh=921e0e503 tools_manual_registered=False
+name=nested_same_name.control_without_row.path_moves_check rc=0 base=HEAD out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 0 行：写法对、出处都在；没有内容行，实据不用核」
+name=nested_same_name.control_without_row.base_table_shown rc=0 rows=['tools/docs/run.sh:$(nproc)  # 只打核数，不是重活']
+name=nested_same_name.control_without_row.exempt_table_grown grown=['tools/manual/run.sh:$(nproc)']
+name=nested_same_name.control_without_row.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', '.claude/heavy-thread-exempt', 'ci.sh', 'docs/guide.md', 'kb/note.md', 'manual/guide.md', 'manual/howto.md', 'tools/docs/run.sh', 'tools/manual/run.sh']
+name=nested_same_name.control_without_row.added_lines rc=0 lines=['.claude/heavy-thread-exempt\ttools/manual/run.sh:$(nproc)  # 只打核数，不是重活', 'ci.sh\tbash tools/manual/run.sh', 'kb/note.md\t复跑先读 manual 再起']
+name=nested_same_name.control_without_row.implementation_swapped base_run_sh=69e03fa44 now_run_sh=921e0e503 tools_manual_registered=False
+name=window_after_commit.clean_after_move_commit.upstream.path_moves_check rc=0 base=基准_B0 out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效 1 行（第 1 行），不串、有搬迁实据（第 1 行 3 份里 3 份换算之后相同；新前缀下没有基准里本来就在的文件）」
+name=window_after_commit.clean_after_move_commit.upstream.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv']
+name=window_after_commit.clean_after_move_commit.no_upstream.path_moves_check rc=0 base=HEAD out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.clean_after_move_commit.no_upstream.change_range rc=0 paths=[]
+name=window_after_commit.clean_after_move_commit.staged_after_push.path_moves_check rc=0 base=基准_B0 out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效 1 行（第 1 行），不串、有搬迁实据（第 1 行 3 份里 3 份换算之后相同；新前缀下没有基准里本来就在的文件）」
+name=window_after_commit.clean_after_move_commit.staged_after_push.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv']
+name=window_after_commit.clean_after_move_commit.staged_after_push.same_tree_without_staged_base rc=0 base=搬迁_M out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 fcaca822c 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.delete_a_moved_file.upstream.path_moves_check rc=1 base=基准_B0 out=「✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 1 行）： | 第 1 行：基准 8e9cb98e2 里旧前缀 old 下的 3 份，照这一行换前缀的落点上有 1 份此刻不在（new/c.sh） | → 怎么办：登记表只登记真搬了家的目录或文件（git mv 之后再登记，新前缀是搬迁之前没有的路径、搬过去的文件都要跟踪着）；把命令里的目录换成另一个已有的目录、换了实现的，不登记，照真改动交审」
+name=window_after_commit.delete_a_moved_file.upstream.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'new/c.sh', 'old/c.sh']
+name=window_after_commit.delete_a_moved_file.no_upstream.path_moves_check rc=0 base=HEAD out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.delete_a_moved_file.no_upstream.change_range rc=0 paths=['new/c.sh']
+name=window_after_commit.delete_a_moved_file.staged_after_push.path_moves_check rc=1 base=基准_B0 out=「✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 1 行）： | 第 1 行：基准 8e9cb98e2 里旧前缀 old 下的 3 份，照这一行换前缀的落点上有 1 份此刻不在（new/c.sh） | → 怎么办：登记表只登记真搬了家的目录或文件（git mv 之后再登记，新前缀是搬迁之前没有的路径、搬过去的文件都要跟踪着）；把命令里的目录换成另一个已有的目录、换了实现的，不登记，照真改动交审」
+name=window_after_commit.delete_a_moved_file.staged_after_push.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'new/c.sh', 'old/c.sh']
+name=window_after_commit.delete_a_moved_file.staged_after_push.same_tree_without_staged_base rc=0 base=搬迁_M out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 fcaca822c 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.second_step_as_the_rule_says.upstream.path_moves_check rc=1 base=基准_B0 out=「✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 2 行）： | 第 1 行：基准 8e9cb98e2 里旧前缀 old 下的 3 份，照这一行换前缀的落点上有 3 份此刻不在（new/a.sh、new/b.sh、new/c.sh） | → 怎么办：登记表只登记真搬了家的目录或文件（git mv 之后再登记，新前缀是搬迁之前没有的路径、搬过去的文件都要跟踪着）；把命令里的目录换成另一个已有的目录、换了实现的，不登记，照真改动交审」
+name=window_after_commit.second_step_as_the_rule_says.upstream.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'newer/a.sh', 'newer/b.sh', 'newer/c.sh', 'ops/launch.sh']
+name=window_after_commit.second_step_as_the_rule_says.no_upstream.path_moves_check rc=0 base=HEAD out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 2 行：写法对、出处都在；此刻生效 1 行（第 2 行），不串、有搬迁实据（第 2 行 3 份里 3 份换算之后相同；新前缀下没有基准里本来就在的文件）；不生效 1 行（第 1 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.second_step_as_the_rule_says.no_upstream.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv']
+name=window_after_commit.second_step_as_the_rule_says.staged_after_push.path_moves_check rc=1 base=基准_B0 out=「✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 2 行）： | 第 1 行：基准 8e9cb98e2 里旧前缀 old 下的 3 份，照这一行换前缀的落点上有 3 份此刻不在（new/a.sh、new/b.sh、new/c.sh） | → 怎么办：登记表只登记真搬了家的目录或文件（git mv 之后再登记，新前缀是搬迁之前没有的路径、搬过去的文件都要跟踪着）；把命令里的目录换成另一个已有的目录、换了实现的，不登记，照真改动交审」
+name=window_after_commit.second_step_as_the_rule_says.staged_after_push.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'newer/a.sh', 'newer/b.sh', 'newer/c.sh', 'ops/launch.sh']
+name=window_after_commit.second_step_as_the_rule_says.staged_after_push.same_tree_without_staged_base rc=0 base=搬迁_M out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 2 行：写法对、出处都在；此刻生效 1 行（第 2 行），不串、有搬迁实据（第 2 行 3 份里 3 份换算之后相同；新前缀下没有基准里本来就在的文件）；不生效 1 行（第 1 行：基准 fcaca822c 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.reuse_the_old_name.upstream.path_moves_check rc=1 base=基准_B0 out=「✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 1 行）： | 第 1 行的旧前缀 old 还在磁盘上（搬完以后旧路径不该还在） | → 怎么办：把旧路径下剩下的东西搬完（git mv 没搬全的补上）或删掉；没搬就删掉这一行登记」
+name=window_after_commit.reuse_the_old_name.upstream.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'old/fresh.sh']
+name=window_after_commit.reuse_the_old_name.no_upstream.path_moves_check rc=0 base=HEAD out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=window_after_commit.reuse_the_old_name.no_upstream.change_range rc=0 paths=['old/fresh.sh']
+name=window_after_commit.reuse_the_old_name.staged_after_push.path_moves_check rc=1 base=基准_B0 out=「✗ 搬迁登记表 .claude/gate.d/path-moves.tsv 有 1 处不对（共 1 行）： | 第 1 行的旧前缀 old 还在磁盘上（搬完以后旧路径不该还在） | → 怎么办：把旧路径下剩下的东西搬完（git mv 没搬全的补上）或删掉；没搬就删掉这一行登记」
+name=window_after_commit.reuse_the_old_name.staged_after_push.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', 'old/fresh.sh']
+name=window_after_commit.reuse_the_old_name.staged_after_push.same_tree_without_staged_base rc=0 base=搬迁_M out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 fcaca822c 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=pin_never_effective_row.never_effective_row.path_moves_check rc=0 out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 1 行：写法对、出处都在；此刻生效的 0 行；不生效 1 行（第 1 行：基准 HEAD 里旧前缀下没有文件或新前缀下已有文件，门禁不按它们换算，实据不核）」
+name=pin_never_effective_row.never_effective_row.gate_change_range rc=0 orchestrator_counted=True
+name=pin_never_effective_row.never_effective_row.frozen_o3 rows=[('impl/a', 'impl/b')] matches_pin=True runner_now=RUNNER = "impl/b/run.py"
+name=pin_never_effective_row.never_effective_row.reuse_library_pinned_sha256_now accepted=True
+name=pin_never_effective_row.control_without_row.path_moves_check rc=0 out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 0 行：写法对、出处都在；没有内容行，实据不用核」
+name=pin_never_effective_row.control_without_row.gate_change_range rc=0 orchestrator_counted=True
+name=pin_never_effective_row.control_without_row.frozen_o3 rows=[] matches_pin=False runner_now=RUNNER = "impl/b/run.py"
+name=pin_never_effective_row.control_without_row.reuse_library_pinned_sha256_now accepted=False
+name=governed_class_gaps.path_moves_check rc=0 out=「✓ 搬迁登记表 .claude/gate.d/path-moves.tsv 3 行：写法对、出处都在；此刻生效 3 行（第 1、2、3 行），不串、有搬迁实据（第 1 行 1 份里 1 份换算之后相同；第 2 行 1 份里 1 份换算之后相同；第 3 行 1 份里 1 份换算之后相同；新前缀下没有基准里本来就在的文件）」
+name=governed_class_gaps.change_range rc=0 paths=['.claude/gate.d/path-moves.tsv', '.claude/rules/local.md']
+name=done

@@ -38,5 +38,5 @@
   ✓ 退 0（应当 0） R3 绿：实现员 crates 变异 --quick 不设开关 ← bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .
   ✓ 退 0（应当 0） R3 绿：调查员形式化 --quick 不设开关 ← bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick .
   ✓ 退 0（应当 0） R3 绿：实现员崩溃点重放 --quick 不设开关 ← bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/crash/crash-point-replay.sh --quick
-  ✓ 退 0（应当 0） R12 绿：调查员红例钉表 --check-table ← python3 scripts/experiments/e165-pin-red-examples.py --check-table
+  ✓ 退 0（应当 0） R12 绿：调查员红例钉表 --check-table ← python3 scripts/experiment-apparatus/e165-pin-red-examples.py --check-table
 ✓ 只喂不换：.claude/hooks/heavy-test-guard.sh 喂了 41 条，0 条不对

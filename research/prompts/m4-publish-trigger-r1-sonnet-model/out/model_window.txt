@@ -1,0 +1,7 @@
+name=window_entry_only pending_after_idle_forever=2 publishes=0 (无请求进门，条件永远没人判)
+name=window_with_poll period_ms=1000 t_time_ms=5000 worst_pending_age_ms_seen=4997 bound_t_time_plus_period=6000 ok=True
+name=window_worst_layout t_time_ms=4001 period_ms=2000 accepted_at_ms=1 published_at_ms=6000 age_ms=5999 bound_t_time_plus_period=6001
+name=idle_publishes guard_nonempty=True publishes_in_100_t_time=0
+name=idle_publishes guard_nonempty=False publishes_in_100_t_time=99
+name=baseline mount_reading_given=False first_accept_at_ms=15000 triggered_at_accept=None
+name=baseline mount_reading_given=True first_accept_at_ms=15000 triggered_at_accept=time

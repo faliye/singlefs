@@ -1,0 +1,10 @@
+gap	light	echo x | xargs bash scripts/experiment-apparatus/replay.sh
+gap	light	find . -maxdepth 0 -exec bash scripts/experiment-apparatus/replay.sh x ';'
+gap	light	echo x | xargs bash scripts/crash/crash-point-replay.sh
+gap	light	find . -maxdepth 0 -exec bash scripts/crash/crash-point-replay.sh x ';'
+gap	light	echo x | xargs bash scripts/crash/crash-amplification.sh
+gap	light	find . -maxdepth 0 -exec bash scripts/crash/crash-amplification.sh x ';'
+list	exit=0	stdout_lines=164	stderr_bytes=0	--list-items
+list	exit=0	stdout_lines=164	stderr_bytes=0	--force --list-items
+list	exit=0	stdout_lines=164	stderr_bytes=0	--list-items --force
+list	three_outputs_identical=True	new_output_directories=0

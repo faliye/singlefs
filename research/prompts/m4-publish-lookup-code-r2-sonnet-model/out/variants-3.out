@@ -1,0 +1,3 @@
+name=变体V6（不入变异表）：version_as_the_compaction_reads_it 取到映射条目之后丢掉第一条 exit=101 test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+  first_panic_line=thread 'a_batch_whose_planned_units_this_publish_rewrites_anyway_deletes_the_intent_once_it_empties_the_region' (1867500) panicked at crates/singlefs-harness/tests/compaction_batch_emptying_the_region_deletes_the_intent_in_the_same_publish.rs:128:5:
+  left: 0

@@ -1,0 +1,3 @@
+variant=edge-cut file=scripts/hosts/run-with-memory-cap.sh
+variant=hostlookup-text file=scripts/hosts/run-with-memory-cap.sh
+variant=broken-import file=.claude/hooks/lib_long_run.py

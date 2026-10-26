@@ -1,0 +1,27 @@
+kb_line=435 impl_line=31 verif_line=50
+kb_bullet1_line=432 kb_bullet2_line=433
+clause	kb	impl	verif
+理由不同、分开记	Y	Y	Y
+文件级对象 NOT_JUDGING_FILES 那两份	Y	Y	Y
+算键的库自己	Y	Y	-
+单元算法	Y	-	-
+按角色排	Y	Y	-
+管怎么存、怎么算键，不管判对错	Y	Y	Y
+它们的单元不进任何一份判定的键	Y	Y	Y
+边级定义：只打提示、不改判定结局的子进程边	Y	Y	Y
+按实测排	Y	Y	Y
+不沿它收	Y	Y	Y
+现在只有（现状句）	Y	-	-
+第二台那一路只出提示，按这条边排出键	Y	-	-
+登记位 EXCLUDED_PROGRAM_EDGES	-	Y	Y
+三格自证全句	Y	Y	-
+边级排除要配三格自证	Y	Y	-
+另有一格键不变而退出码变必红	Y	Y	-
+模块级语句：一起收进来	Y	-	-
+模块级语句：一起进闭包	-	Y	Y
+模块级四样清单	Y	Y	Y
+key-clause	kb_bullet1_or_2	impl	verif
+键组成：从 Cargo.lock 解析出的闭包真引到的依赖版本	Y	-	-
+键组成：含 cargo 解析后的生效构建环境与外部工具版本	Y	-	-
+不进键清单：种子串	Y	-	-
+不进键清单：路径（仓根也算）	Y	-	-

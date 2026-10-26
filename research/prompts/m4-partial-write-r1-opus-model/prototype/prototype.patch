@@ -1,0 +1,136 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -8961,10 +8961,22 @@
+         write_time_seconds: file.write_time_seconds,
+         // 整份写（顺序写、覆盖写）清零（判决 `research/prompts/m4-trunc-r2-main-verification.md` 第三节 R2、第六节用户定案）：
+         // 这一版从偏移 0 重写了全部单元，没有比它早的单元要靠截断字段判死。
+-        truncation_field: InodeRecordTruncationField::NOT_WRITTEN,
++        truncation_field: TRUNCATION_FIELD_OF_THE_NEXT_WHOLE_WRITE_FOR_THE_ATTACK
++            .with(|cell| *cell.borrow())
++            .unwrap_or(InodeRecordTruncationField::NOT_WRITTEN),
+     }
+ }
+ 
++thread_local! {
++    static TRUNCATION_FIELD_OF_THE_NEXT_WHOLE_WRITE_FOR_THE_ATTACK: std::cell::RefCell<Option<InodeRecordTruncationField>> =
++        const { std::cell::RefCell::new(None) };
++}
++
++/// 攻方原型（m4-partial-write-r1，只在攻方草稿副本里）：整份写那一版的截断字段不清零、写成给的值（改法「放掉单元的整份写照截断写字段」的仿真）。
++pub fn set_the_truncation_field_of_whole_writes_for_the_attack(field: Option<InodeRecordTruncationField>) {
++    TRUNCATION_FIELD_OF_THE_NEXT_WHOLE_WRITE_FOR_THE_ATTACK.with(|cell| *cell.borrow_mut() = field);
++}
++
+ /// 一个池里的第一个文件版本（字节表零 t1..t12 + 六 + 七）：分配十二个落点、装十二个单元、按 D16（发布语义） 已定项 7 的持久顺序落盘。
+ /// 建在树表 0 条的那一版上（`version_to_build_on`）：照抄它的实例表指针、换下它指着的那片 mkfs 树表。
+ ///
+@@ -13181,6 +13193,15 @@
+     previous: &TransactionOutput,
+     rewrite: TailDataUnitRewrite,
+ ) -> Result<Vec<u8>, PublishError> {
++    // 攻方原型（m4-partial-write-r1）：部分写把这个单元的新净荷整份交进来，取它、不取上一版的字节。
++    if let Some(replacement) = PAYLOAD_OF_THE_PARTIAL_WRITE_OF_THE_ATTACK_PROTOTYPE.with(|cell| {
++        cell.borrow()
++            .as_ref()
++            .filter(|(unit, _)| *unit == rewrite.unit.0)
++            .map(|(_, bytes)| bytes.clone())
++    }) {
++        return Ok(replacement);
++    }
+     let not_in_the_version = |_error| {
+         PublishError::TruncationRefused(TruncationRefusal::TailDataUnitBytesNotInTheVersion {
+             unit: rewrite.unit,
+@@ -13198,6 +13219,70 @@
+     Ok(payload)
+ }
+ 
++thread_local! {
++    /// 攻方原型：部分写那次被重写的单元号与它的新净荷（整份，声明长度不变）。
++    static PAYLOAD_OF_THE_PARTIAL_WRITE_OF_THE_ATTACK_PROTOTYPE: std::cell::RefCell<Option<(u64, Vec<u8>)>> =
++        const { std::cell::RefCell::new(None) };
++}
++
++/// 攻方原型（m4-partial-write-r1，只在攻方草稿副本里）：第一个文件的单元 `unit` 换成 `new_payload`（长度等于它现在的声明长度），
++/// size 不变，别的单元照抄。走变长那一条重写一个单元的发布路（`SizeChangeWithoutAnIntent` 带一个重写单元），新净荷由调用方给：
++/// 读旧单元（读盘或取内存）在调用方做，原型只管发布。
++///
++/// # Errors
++/// 同 [`publish_size_change`]。
++///
++/// # Panics
++/// `unit` 不存在，或 `new_payload` 长度不等于它的声明长度。
++pub fn publish_partial_write_of_the_first_file_attack_prototype<Device: BlockDevice>(
++    pool: &mut PoolWriter<'_, Device>,
++    allocator: &mut PoolAllocator,
++    previous: &TransactionOutput,
++    unit: u64,
++    new_payload: Vec<u8>,
++    write_time_seconds: u64,
++    instance: InstanceGeneration,
++) -> Result<TransactionOutput, PublishError> {
++    let record = previous
++        .inode_leaf_containers
++        .iter()
++        .flat_map(|container| container.contents.records.iter())
++        .find(|record| record.inode == FIRST_INODE_NUMBER && record.nlink != NLINK_OF_AN_INODE_BEING_DELETED)
++        .copied()
++        .expect("第一个文件活着");
++    assert!(unit < u64::try_from(previous.data_pointers.len()).expect("单元数"), "单元存在");
++    let declared_length_in_bytes = crate::truncate::declared_length_within_a_size(DataUnitIndexInFile(unit), record.size);
++    assert_eq!(u64::try_from(new_payload.len()).expect("长度"), declared_length_in_bytes, "净荷长度等于声明长度");
++    let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
++    let record_after_the_change = InodeRecord {
++        change_count: txg.0,
++        write_time_seconds,
++        ..record
++    };
++    let step = DeletionStepOfThePublish::SizeChangeWithoutAnIntent {
++        record_after_the_change,
++        tail_data_unit_rewrite: Some(TailDataUnitRewrite {
++            unit: DataUnitIndexInFile(unit),
++            declared_length_in_bytes,
++        }),
++    };
++    PAYLOAD_OF_THE_PARTIAL_WRITE_OF_THE_ATTACK_PROTOTYPE.with(|cell| {
++        *cell.borrow_mut() = Some((unit, new_payload));
++    });
++    let deletion_and_lineage = DeletionAndLineageOfThePublish {
++        step,
++        container_tree_capacities: pool.container_tree_capacities(),
++        lineage: LineageStepOfThePublish::NoLineageRecord,
++        snapshot: SnapshotStepOfThePublish::NoNewSnapshot,
++        logged_operations: LoggedOperationsStepOfThePublish::CarryTheLoggedOperations,
++    };
++    let published = publish_deletion_step(pool, allocator, previous, txg, &deletion_and_lineage, instance);
++    PAYLOAD_OF_THE_PARTIAL_WRITE_OF_THE_ATTACK_PROTOTYPE.with(|cell| {
++        *cell.borrow_mut() = None;
++    });
++    published
++}
++
+ fn carried_file_version_units(
+     carried: &TransactionOutput,
+     carried_data_units: usize,
+--- a/crates/singlefs-checker/src/rebuild.rs
++++ b/crates/singlefs-checker/src/rebuild.rs
+@@ -795,7 +795,8 @@
+             if offset_in_bytes / payload_capacity_in_bytes >= data_units_the_size_covers {
+                 continue;
+             }
+-            if newest_birth_txg_below
++            if !crate::WRITE_ORDER_RULE_OFF_FOR_THE_ATTACK.load(std::sync::atomic::Ordering::SeqCst)
++                && newest_birth_txg_below
+                 .get(&(inode, object_birth, offset_in_bytes))
+                 .is_some_and(|newest_below| *newest_below > birth_txg_of(version))
+             {
+--- a/crates/singlefs-checker/src/lib.rs
++++ b/crates/singlefs-checker/src/lib.rs
+@@ -9,6 +9,8 @@
+ pub mod image;
+ pub mod position_addressed;
+ mod rebuild;
++/// 攻方原型（m4-partial-write-r1，只在攻方草稿副本里）：关掉读法 Z 的写序那一条。
++pub static WRITE_ORDER_RULE_OFF_FOR_THE_ATTACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+ pub mod walk;
+ 
+ use singlefs_format::{

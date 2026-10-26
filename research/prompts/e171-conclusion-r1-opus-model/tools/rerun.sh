@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # e171-conclusion-r1 攻方腿（Opus）报告里引的数，在副本里复跑。只读仓与冻结副本，只写 <工作目录>。
 # 用法：bash tools/rerun.sh <工作目录（不存在）> [线程数，默认 15]
-# 要的东西：冻结副本 /tmp/claude-1000/e171-conclusion-r1/tree/、E171 导出 scripts/experiments/target/e171-dumps/、比对器产物。
+# 要的东西：冻结副本 /tmp/claude-1000/e171-conclusion-r1/tree/、E171 导出 scripts/experiment-apparatus/target/e171-dumps/、比对器产物。
 # 跑的都是 harness 档的自写探针（测试目标名不带 layer0）与 Python；不跑 checker 档测试、不起 E171 装置。
 set -euo pipefail
 MODEL=$(cd "$(dirname "$0")/.." && pwd)
@@ -9,13 +9,13 @@ WORK=$1
 THREADS=${2:-15}
 REPO=/home/fy5090/code/singlefs
 FROZEN=/tmp/claude-1000/e171-conclusion-r1/tree
-DUMPS=$REPO/scripts/experiments/target/e171-dumps
+DUMPS=$REPO/scripts/experiment-apparatus/target/e171-dumps
 CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh"
 CAPPED="bash $REPO/scripts/hosts/capped.sh $THREADS"
 mkdir "$WORK"
 cd "$WORK"
 export PYTHONDONTWRITEBYTECODE=1
-cp -r "$FROZEN/scripts/experiments/e170_second_run_o3_spec_executor" o3copy
+cp -r "$FROZEN/scripts/experiment-apparatus/e170_second_run_o3_spec_executor" o3copy
 
 echo "== 1 第 270 / 242 行：执行员式与 C577 式（见证值）两种数法（G1）"
 nice -n 19 python3 "$MODEL/witness_after_return.py" o3copy \

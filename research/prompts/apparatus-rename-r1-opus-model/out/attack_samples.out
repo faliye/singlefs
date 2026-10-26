@@ -1,0 +1,23 @@
+name=launder_parent_excuse.control_one_row rows=1 problems=['第 2 行的旧前缀 tools/real-a 还在磁盘上（搬完以后旧路径不该还在）']
+name=launder_parent_excuse.path_move_problems rows=2 problems=[]
+name=launder_parent_excuse.real_change diff=['-bash tools/real-a/run.sh', '+bash tools/real-b/run.sh', ''] launch_now='走的是 B'
+name=launder_parent_excuse.moved_only_paths changed=['.claude/gate.d/path-moves.tsv', '.claude/long-run-live-hosts-exempt', 'ops/launch.sh', 'ops/live.sh'] moved_only=['ops/launch.sh', 'ops/live.sh'] problem=None
+name=launder_parent_excuse.drop_moved_lines kept=[('.claude/long-run-live-hosts-exempt', 'ops/live.sh  29d1d8c273c570a6b8865f521ac959628c1ce4f4160e1f5f7e7a3bb28f06d6ee  # 样本：文件头按现算写、不能改，只缩不涨'), ('.claude/gate.d/path-moves.tsv', '# 样本登记表'), ('.claude/gate.d/path-moves.tsv', 'tools/real-a\ttools/real-b\t2026-10-23\trecords/move.md'), ('.claude/gate.d/path-moves.tsv', 'not-on-disk\ttools\t2026-10-23\trecords/move.md')] problem=None
+name=launder_parent_excuse.exempt_check rc=0 out='✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨（其中 1 行照 .claude/gate.d/path-moves.tsv 登记的搬迁换算之后与基准那一版逐字节相同：ops/live.sh）'
+name=launder_deleted_directory.path_move_problems rows=1 problems=[]
+name=launder_deleted_directory.moved_only_paths changed=['.claude/gate.d/path-moves.tsv', 'ops/launch.sh', 'tools/real-a/run.sh'] moved_only=['ops/launch.sh'] problem=None
+name=history_references.moved_only_paths registry_rows=1 registry_problems=[] changed=['.claude/gate.d/path-moves.tsv', 'notes-hex.md', 'notes-log.md', 'notes-tag.md', 'scripts/experiment-apparatus/README.md', 'scripts/experiment-apparatus/run.sh'] moved_only=['notes-log.md', 'notes-tag.md', 'scripts/experiment-apparatus/README.md', 'scripts/experiment-apparatus/run.sh'] problem=None
+name=history_references.after_commit.tag_old command='git show v0:scripts/experiments/run.sh' rc=0 out='echo 第一版'
+name=history_references.after_commit.tag_new command='git show v0:scripts/experiment-apparatus/run.sh' rc=128 out="fatal: path 'scripts/experiment-apparatus/run.sh' exists on disk, but not in 'v0'"
+name=history_references.after_commit.log_old command='git log --format=%s -- scripts/experiments/README.md' rc=0 out='move | first'
+name=history_references.after_commit.log_new command='git log --format=%s -- scripts/experiment-apparatus/README.md' rc=0 out='move'
+name=reverse_partial.full frozen_o3_same=True reuse_library_pin_accepted=True lib_forward_equal=True lib_moved_only=True problem=None
+name=reverse_partial.partial frozen_o3_same=True reuse_library_pin_accepted=True lib_forward_equal=False lib_moved_only=False problem=None
+name=chain_midway registry_rows=2 registry_problems=[] frozen_o3_reverse='x=tools/a/run.sh\n' frozen_o3_same=False reuse_library_pin_accepted=True lib_moved_only=True problem=None
+name=lines_relocated registry_rows=2 registry_problems=[] changed=['.claude/gate.d/path-moves.tsv', 'docs/new/page.md', 'docs/old/page.md', 'kb/page.md', 'scripts/experiment-apparatus/x.sh'] moved_only=['scripts/experiment-apparatus/x.sh'] problem=None
+name=lines_relocated.added_lines added=[('docs/new/page.md', '## 正文'), ('docs/new/page.md', '- 旧说法见 scripts/experiment-apparatus/x.sh'), ('docs/new/page.md', '## 历史'), ('docs/new/page.md', '结论乙'), ('kb/page.md', '- 旧说法见 scripts/experiment-apparatus/x.sh')]
+name=lines_relocated.after_drop kept=[] problem=None
+name=move_into_governed.control registry_rows=0 registry_problems=[] gate_changed_paths_rc=0 changed=['.claude/agents/reviewer.md', 'crates/core/src/fast_path.rs'] agent_definitions=['.claude/agents/reviewer.md'] crates_sources=['crates/core/src/fast_path.rs'] stderr=''
+name=move_into_governed.registered registry_rows=2 registry_problems=[] gate_changed_paths_rc=0 changed=['.claude/gate.d/path-moves.tsv'] agent_definitions=[] crates_sources=[] stderr=''
+name=invariant_file_moved.control added_files_rc=0 added_files=[] own_diff_plus_lines=['| I-1 | 旧行，没点名已定分项 |', '| I-2 | D1（样本） 已定项 1 |']
+name=invariant_file_moved.registered added_files_rc=0 added_files=['.claude/gate.d/path-moves.tsv'] own_diff_plus_lines=['| I-1 | 旧行，没点名已定分项 |', '| I-2 | D1（样本） 已定项 1 |']

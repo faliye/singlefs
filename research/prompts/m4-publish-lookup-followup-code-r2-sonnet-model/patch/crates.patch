@@ -1,0 +1,1336 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3277,14 +3277,44 @@
+         MappingEntriesCheckedAgainstTheReleaseChecksums,
+         /// 删快照的批放掉的 deadlist 条目按映射 key 取它留存的映射条目（`deadlist_changes_of_this_publish`）。
+         KeptMappingEntriesReleasedByTheSnapshotDestruction,
+-        /// 换下的第一个文件之外那一族角色在上一版里有没有落点：按 inode 号找上一版的那个文件（`has_a_placement_in_the_previous_version`）。
++        /// 释放判定路径那一遍，换下的第一个文件之外那一族角色在上一版里有没有落点：按 inode 号找上一版的那个文件
++        /// （`has_a_placement_in_the_previous_version`）。每问一个角色进一次。
+         FilesOfTheReplacedRolesInThePreviousVersion,
++        /// 经映射释放的角色清单（`mapped_roles_released_by_this_publish`：核两条位置项、读盘核校验和、释放那一段与快照判定对账各调它）
++        /// 问换下的角色在上一版里有没有落点时按 inode 号找文件。每调一次进一次（七·6 后续批代码轮第一轮判决第三节第 3 条：建索引次数恰好等于走了几遍）。
++        FilesOfTheMappedRolesReleasedByThisPublish,
++        /// 快照判定那一圈问换下的用户可见角色在上一版里有没有落点时按 inode 号找文件（`deadlist_changes_of_this_publish`）。每走一遍进一次。
++        FilesOfTheUserVisibleRolesOfTheSnapshotJudgement,
++        /// 释放判定路径那一遍，换下的角色在不在留给快照的角色清单里：清单建一次按角色的索引、每个角色查一次
++        /// （`placements_to_release_via_mapping_except_the_units_kept_for_the_snapshots`；七·6 后续批，用户 2026-10-22 定并进）。每走一遍进一次。
++        RolesKeptForTheSnapshotsInTheReleaseJudgement,
++        /// 经映射释放的角色清单那一处，换下的角色在不在留给快照的角色清单里（`mapped_roles_released_by_this_publish`）。每调一次进一次。
++        RolesKeptForTheSnapshotsAmongTheMappedRolesReleased,
++        /// 记录点名的角色清单：这次重写的角色在不在最后一条之前那几条已经点名的数据角色里（`roles_named_by_each_record_of_the_publish`）。
++        /// 每调一次进一次。
++        DataRolesNamedBeforeTheLastRecord,
++        /// 一版里进映射的角色换成映射位置时，按角色找它在 `units` 里的那一项（`take_the_mapping_positions_over_the_location_hints`：
++        /// 整理发批与恢复重建一版都调它；七·6 后续批，用户 2026-10-22 定并进）。每调一次至多进一次（一把有位置的 key 都没有的不进、不建）。
++        UnitsOfTheMappedRolesTakingTheirMappingPositions,
++        /// 装一次发布要写的单元：这次重写的每个角色按角色取它在这一版 `units` 里的单元（`publish_admitted` 的 `written_units`）。
++        /// 这一版 `units` 按角色的索引在这里建，每次装进一次。
++        UnitsOfTheRolesWrittenByThisPublish,
++        /// 装一次发布的记录：点名的每个角色按角色取它在这一版 `units` 里的单元（`publish_admitted` 的 `named_unit_of`），
++        /// 查的是 [`LookupSite::UnitsOfTheRolesWrittenByThisPublish`] 那里建的同一份索引。每点名一个角色进一次。
++        UnitsOfTheRolesNamedByTheRecords,
+         /// 发布照抄 extent 树的节点：按角色取上一版那个节点的单元（`build_extent_tree` 的 `carried_node`）。
++        /// 整棵 extent 树装的时候都在这一处里（七·6 后续批代码轮第一轮判决第三节第 3 条：照抄那一处的作用域包住建），
++        /// 照抄每个节点时再进一次；里面按 inode 号找文件的记在 [`LookupSite::FilesOfTheCarriedExtentLowerNodes`]。
+         CarriedExtentTreeNodes,
+         /// 发布照抄第一个文件之外一个文件的下段节点：按 inode 号找上一版的那个文件、取那个节点的指针（`build_extent_tree`）。
+         FilesOfTheCarriedExtentLowerNodes,
+-        /// 发布照抄记账树、deadlist 树、中央映射树的节点：按角色取上一版那个节点的单元（`build_multi_level_tree`）。
+-        CarriedNodesOfTheMultiLevelTrees,
++        /// 发布照抄记账树的节点：按角色取上一版那个节点的单元（`build_multi_level_tree`）。三棵多层码 2 树按树分开记
++        /// （七·6 后续批代码轮第一轮判决第三节第 3 条）：一棵退回线性找，另两棵补不上它的数。
++        CarriedNodesOfTheAccountingTree,
++        /// 发布照抄 deadlist 树的节点（同 [`LookupSite::CarriedNodesOfTheAccountingTree`]）。
++        CarriedNodesOfTheDeadlistTree,
++        /// 发布照抄中央映射树的节点（同 [`LookupSite::CarriedNodesOfTheAccountingTree`]）。
++        CarriedNodesOfTheCentralMappingTree,
+         /// 整理读一版取全部进映射单元的映射条目（`mounted_session::central_mapping_as_the_compaction_reads_it`）。
+         CompactionReadsTheCentralMapping,
+         /// 整理发批核计划里每一项的源落点：按映射 key 找角色、取映射条目，找不到的按 key 找留存的映射条目，
+@@ -3305,6 +3335,9 @@
+         pub largest_index_looked_up: u64,
+         /// 解了几次中央映射叶：批量读者每解一片算一次，逐 key 查（`central_mapping_locations_in_the_version`）每查到一片叶算一次。
+         pub mapping_leaf_decodes: u64,
++        /// 进了这一处几次（[`entering`] 每调一次算一次）：每一处在哪一层进写在 [`LookupSite`] 那一成员上，
++        /// 按「走一遍进一次」进的那几处，测试拿它判「建索引次数恰好等于走了几遍」。
++        pub times_entered: u64,
+     }
+ 
+     impl LookupWork {
+@@ -3319,6 +3352,7 @@
+                     .largest_index_looked_up
+                     .max(other.largest_index_looked_up),
+                 mapping_leaf_decodes: self.mapping_leaf_decodes + other.mapping_leaf_decodes,
++                times_entered: self.times_entered + other.times_entered,
+             }
+         }
+     }
+@@ -3400,10 +3434,11 @@
+         _constructed_only_by_entering: (),
+     }
+ 
+-    /// 进 `site` 那一处，直到交回的值被丢掉。
++    /// 进 `site` 那一处，直到交回的值被丢掉；那一处进的次数加一（[`LookupWork::times_entered`]）。
+     pub(crate) fn entering(site: LookupSite) -> InsideALookupSite {
+         #[cfg(feature = "lookup-work-counters")]
+         LOOKUP_WORK_ON_THIS_THREAD.with(|state| state.borrow_mut().sites_entered.push(site));
++        count(|work| work.times_entered += 1);
+         #[cfg(not(feature = "lookup-work-counters"))]
+         let _ = site;
+         InsideALookupSite {
+@@ -3411,9 +3446,10 @@
+         }
+     }
+ 
+-    #[cfg(feature = "lookup-work-counters")]
++    // 不开特性时也实现 `Drop`（什么都不做）：调用方在一处的查找做完时 `drop` 它退出，两种编法写法相同。
+     impl Drop for InsideALookupSite {
+         fn drop(&mut self) {
++            #[cfg(feature = "lookup-work-counters")]
+             LOOKUP_WORK_ON_THIS_THREAD.with(|state| {
+                 state.borrow_mut().sites_entered.pop().expect(
+                     "每个 InsideALookupSite 都由 entering 进过一处：退出时栈里至少有它那一处",
+@@ -3759,15 +3795,34 @@
+     for entry in &mut version.tree_table_entries {
+         refresh_node_pointer(&mut entry.root, UNIT_CLASS_INDEX_NODE);
+     }
+-    for (identity, key) in &version.mapped_units {
+-        if let Some(locations) = position_of_key(key) {
+-            if let Some(unit) = version
++    // 进映射的角色按 `mapped_units` 的次序各问一次映射位置；有位置的那几个再按角色找 `units` 里的那一项（同一角色取最先那一项，
++    // 与在 `units` 上 `iter_mut().find` 同一项）。找走建一次的索引（七·6 后续批，用户 2026-10-22 定并进）：整理发批一批搬 K 项、
++    // 恢复重建一版每把 key 都有位置，逐个在 `units` 上找是 K 或 P 乘单元数。`position_of_key` 不读 `units`，先问完再改与边问边改一样。
++    let new_slot_of_each_mapped_role: Vec<(TransactionUnit, SlotNumber)> = version
++        .mapped_units
++        .iter()
++        .filter_map(|(identity, key)| {
++            position_of_key(key).map(|locations| (*identity, locations[0].slot))
++        })
++        .collect();
++    if new_slot_of_each_mapped_role.is_empty() {
++        return;
++    }
++    let _inside_the_units_of_the_mapped_roles =
++        lookup_work::entering(LookupSite::UnitsOfTheMappedRolesTakingTheirMappingPositions);
++    let position_in_the_units_of_each_role =
++        SortedIdentityIndex::keeping_the_first_value_of_each_identity(
++            version
+                 .units
+-                .iter_mut()
+-                .find(|unit| unit.identity == *identity)
+-            {
+-                unit.slot = locations[0].slot;
+-            }
++                .iter()
++                .enumerate()
++                .map(|(position, unit)| (unit.identity, position))
++                .collect(),
++        );
++    // 迭代上界是有位置的进映射角色数。
++    for (identity, slot) in new_slot_of_each_mapped_role {
++        if let Some(position) = position_in_the_units_of_each_role.get(&identity) {
++            version.units[*position].slot = slot;
+         }
+     }
+ }
+@@ -4338,10 +4393,11 @@
+     // 换下的角色逐个取上一版的映射条目：key 与落点都走建一次的索引（七·6），不逐个在 `mapped_units` 上找、逐 key 重解叶。
+     let mut previous_read_by_role = MappedUnitsOfAVersionReadByRole::of_the_version(previous);
+     let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+-    for identity in roles_replaced_via_mapping(previous, roles, file_content)
+-        .into_iter()
+-        .filter(|identity| !kept_for_the_snapshots.contains(identity))
+-    {
++    for identity in roles_other_than_the_ones_kept_for_the_snapshots(
++        roles_replaced_via_mapping(previous, roles, file_content),
++        kept_for_the_snapshots,
++        LookupSite::RolesKeptForTheSnapshotsInTheReleaseJudgement,
++    ) {
+         let locations = match identity {
+             TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+             | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+@@ -4368,8 +4424,13 @@
+             | TransactionUnit::RetirementLeafContainer(_)
+             | TransactionUnit::RetirementRoot
+             | TransactionUnit::RetirementNodeBelowTheRoot(_) => {
+-                if !has_a_placement_in_the_previous_version(previous, &mut previous_files, identity)
+-                {
++                let has_a_placement = {
++                    let _inside_the_file_lookups = lookup_work::entering(
++                        LookupSite::FilesOfTheReplacedRolesInThePreviousVersion,
++                    );
++                    has_a_placement_in_the_previous_version(previous, &mut previous_files, identity)
++                };
++                if !has_a_placement {
+                     continue;
+                 }
+                 match previous_read_by_role.locations_of_role(identity) {
+@@ -4494,6 +4555,28 @@
+         .collect()
+ }
+ 
++/// `roles` 里不在 `kept_for_the_snapshots`（这次进 deadlist、留给快照的用户可见角色）里的那几个，次序不变。
++/// 与 `roles.into_iter().filter(|identity| !kept_for_the_snapshots.contains(identity))` 逐个相同，但留给快照的角色清单先建一次按角色的索引、
++/// 每个角色查一次（七·6 后续批，用户 2026-10-22 定并进）：快照下整份重写一个 N 单元的文件时两份清单各约 N 项，逐个 `contains` 是 N 的平方。
++/// 建与查记在 `site`，进一次。
++fn roles_other_than_the_ones_kept_for_the_snapshots(
++    roles: Vec<TransactionUnit>,
++    kept_for_the_snapshots: &[TransactionUnit],
++    site: LookupSite,
++) -> Vec<TransactionUnit> {
++    let _inside_the_kept_roles = lookup_work::entering(site);
++    let kept_for_the_snapshots_by_role =
++        FirstEntryOfEachIdentity::of_the_table(kept_for_the_snapshots, |identity| *identity);
++    roles
++        .into_iter()
++        .filter(|identity| {
++            kept_for_the_snapshots_by_role
++                .first_entry_of(identity)
++                .is_none()
++        })
++        .collect()
++}
++
+ /// 这个角色在上一版里有没有落点。这次发布新建的叶容器（末尾分裂出来的右半）在上一版里没有落点 ⇒ 没有东西要释放、要核；
+ /// 数据单元同一条：文件变长时新多出来的那几个单元在上一版里没有落点。
+ /// 判据取上一版的容器数、单元数，不取「映射里查不到」：查不到要报 `ReleaseNotInMapping`，那是另一件事。
+@@ -4608,7 +4691,9 @@
+ /// 一版的 `files_other_than_the_first` 按 inode 号找文件的批量形态（七·6 代码轮第三轮判决第三节第 1 条）：每个 inode 号的答案与
+ /// [`TransactionOutput::file_other_than_the_first`]（在表上 `iter().find`，取最先那一项）相同，但走 [`TransactionOutput::files_other_than_the_first_by_inode`]
+ /// 那个索引。释放的三处与快照判定那一圈对换下的每个角色问一次它在上一版里有没有落点，逐个在表上找是角色数乘文件数。
+-/// 索引在第一次查时才建：一个第一个文件之外的角色都不问的不建。查记在 [`LookupSite::FilesOfTheReplacedRolesInThePreviousVersion`] 那一处。
++/// 索引在第一次查时才建：一个第一个文件之外的角色都不问的不建。建与查记在调用方此刻所在的那一处（调用方各进各的：
++/// [`LookupSite::FilesOfTheReplacedRolesInThePreviousVersion`]、[`LookupSite::FilesOfTheMappedRolesReleasedByThisPublish`]、
++/// [`LookupSite::FilesOfTheUserVisibleRolesOfTheSnapshotJudgement`]）：每问一个角色现建一份读者的，建的那几份也记在那一处。
+ pub(crate) struct FilesOtherThanTheFirstOfAVersionReadByInode<'version> {
+     version: &'version TransactionOutput,
+     index_built_at_the_first_lookup:
+@@ -4629,8 +4714,6 @@
+         &mut self,
+         inode: InodeNumber,
+     ) -> Option<&'version FileOfAnInodeOtherThanTheFirst> {
+-        let _inside_the_file_lookups =
+-            lookup_work::entering(LookupSite::FilesOfTheReplacedRolesInThePreviousVersion);
+         let version = self.version;
+         self.index_built_at_the_first_lookup
+             .get_or_insert_with(|| version.files_other_than_the_first_by_inode())
+@@ -4819,10 +4902,17 @@
+     kept_for_the_snapshots: &[TransactionUnit],
+     file_content: FileContentOfThePublish,
+ ) -> Vec<TransactionUnit> {
++    let roles_not_kept_for_the_snapshots = roles_other_than_the_ones_kept_for_the_snapshots(
++        roles_replaced_via_mapping(previous, roles, file_content),
++        kept_for_the_snapshots,
++        LookupSite::RolesKeptForTheSnapshotsAmongTheMappedRolesReleased,
++    );
++    // 按 inode 号找文件的那份读者一调建至多一次：每调一次进一次这一处，建的次数与进的次数相同才是一调一份。
++    let _inside_the_file_lookups =
++        lookup_work::entering(LookupSite::FilesOfTheMappedRolesReleasedByThisPublish);
+     let mut previous_files = FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous);
+-    roles_replaced_via_mapping(previous, roles, file_content)
++    roles_not_kept_for_the_snapshots
+         .into_iter()
+-        .filter(|identity| !kept_for_the_snapshots.contains(identity))
+         .filter(|identity| match identity {
+             TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+             | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+@@ -6121,6 +6211,9 @@
+         return Ok(DeadlistChangesOfThisPublish::default());
+     };
+     let _inside_the_snapshot_judgement = lookup_work::entering(LookupSite::SnapshotJudgement);
++    // 换下的用户可见角色问在上一版里有没有落点：按 inode 号找文件的那份读者每走一遍建至多一次，这一遍进一次这一处。
++    let inside_the_file_lookups =
++        lookup_work::entering(LookupSite::FilesOfTheUserVisibleRolesOfTheSnapshotJudgement);
+     let mut previous_files =
+         FilesOtherThanTheFirstOfAVersionReadByInode::of_the_version(previous_version);
+     let user_visible_roles_replaced: Vec<TransactionUnit> =
+@@ -6135,6 +6228,7 @@
+                 )
+             })
+             .collect();
++    drop(inside_the_file_lookups);
+     let previous_snapshot_txg_of_the_live_head =
+         previous_version.previous_snapshot_txg_of_the_live_head();
+     let mut user_visible_roles_kept_for_the_snapshots = Vec::new();
+@@ -6205,11 +6299,13 @@
+     };
+     let mut entries_released_by_the_destruction = Vec::with_capacity(entries_released.len());
+     // 放掉的每条条目按映射 key 取它留存的映射条目：走建一次的索引（七·6 代码轮第三轮判决第三节第 1 条），同一把 key 取最先那一项，
+-    // 与在 `mapping_entries_kept_for_the_snapshots` 上 `iter().find` 同一项；一条都不放的不建。
++    // 与在 `mapping_entries_kept_for_the_snapshots` 上 `iter().find` 同一项；一条都不放的不建。放条目的每一遍进一次这一处
++    // （七·6 后续批代码轮第一轮判决第三节第 3 条：建索引次数恰好等于走了几遍）。
++    let inside_the_destruction = (!entries_released.is_empty()).then(|| {
++        lookup_work::entering(LookupSite::KeptMappingEntriesReleasedByTheSnapshotDestruction)
++    });
+     let mut kept_mapping_entries_by_key = None;
+     for entry in entries_released {
+-        let _inside_the_destruction =
+-            lookup_work::entering(LookupSite::KeptMappingEntriesReleasedByTheSnapshotDestruction);
+         let locations = kept_mapping_entries_by_key
+             .get_or_insert_with(|| previous_version.mapping_entries_kept_for_the_snapshots_by_key())
+             .first_entry_of(&entry.mapping_key.as_slice())
+@@ -6220,6 +6316,7 @@
+             })?;
+         entries_released_by_the_destruction.push((entry, locations));
+     }
++    drop(inside_the_destruction);
+     let mut entries_after: BTreeMap<CodeTwoTreeKey, DeadlistEntry> = previous_version
+         .deadlist_entries
+         .iter()
+@@ -11712,11 +11809,10 @@
+             .map(|data_role| vec![*data_role])
+             .collect();
+     roles_named_by_each_record.push(
+-        rewritten
+-            .iter()
+-            .copied()
+-            .filter(|identity| !data_roles_named_before_the_last_record.contains(identity))
+-            .collect(),
++        roles_other_than_the_data_roles_named_before_the_last_record(
++            rewritten,
++            data_roles_named_before_the_last_record,
++        ),
+     );
+     // 末条再跨记录（已定项 17）：最后一个事务那一项装不下一条记录时切成几条，装满一条再开下一条。
+     let roles_named_by_the_last_transaction = roles_named_by_each_record
+@@ -11736,6 +11832,31 @@
+     roles_named_by_each_record
+ }
+ 
++/// `rewritten` 里不在 `data_roles_named_before_the_last_record`（最后一个事务之前那几条记录各点名的那一个数据角色）里的那几个，次序不变：
++/// 与 `rewritten.iter().copied().filter(|identity| !data_roles_named_before_the_last_record.contains(identity))` 逐个相同，但那几个数据角色先建一次
++/// 按角色的索引、每个角色查一次（七·6 后续批，用户 2026-10-22 定并进）：整份重写一个 N 单元的文件时两边各约 N 项，逐个 `contains` 是 N 的平方。
++/// 建与查记在 [`LookupSite::DataRolesNamedBeforeTheLastRecord`]，进一次。
++fn roles_other_than_the_data_roles_named_before_the_last_record(
++    rewritten: &[TransactionUnit],
++    data_roles_named_before_the_last_record: &[TransactionUnit],
++) -> Vec<TransactionUnit> {
++    let _inside_the_named_data_roles =
++        lookup_work::entering(LookupSite::DataRolesNamedBeforeTheLastRecord);
++    let data_roles_named_before_the_last_record_by_role = FirstEntryOfEachIdentity::of_the_table(
++        data_roles_named_before_the_last_record,
++        |identity| *identity,
++    );
++    rewritten
++        .iter()
++        .copied()
++        .filter(|identity| {
++            data_roles_named_before_the_last_record_by_role
++                .first_entry_of(identity)
++                .is_none()
++        })
++        .collect()
++}
++
+ /// 一次发布至多切成几条 journal 记录（代码审阅第 26 条）：在飞记录数上限（环槽数 ÷ F，D23（journal 的角色与格式） 已定项 18，
+ /// 语义是「一次恢复重放的前缀最多这么多条」）与本次发布内序号的 32 位（已定项 4）取小。多于在飞上限的那次发布，恢复施加前缀时
+ /// 取不全它的记录、永远施加不了它；多于环槽数的还会在落盘途中盖掉自己前面的记录与所选根的锚点记录。
+@@ -11941,6 +12062,9 @@
+     slots: &BTreeMap<TransactionUnit, SlotNumber>,
+     sequences: &mut BirthSequenceAllocator,
+ ) -> BuiltExtentTree {
++    // 装整棵 extent 树都在照抄那一处里（七·6 后续批代码轮第一轮判决第三节第 3 条）：每照抄一个节点在这里面现建一份上一版的单元索引的，
++    // 建的那几份记在这一处，不漏到没点名的那一格。按 inode 号找文件的那几次在里面另进一处。
++    let _inside_the_extent_tree_build = lookup_work::entering(LookupSite::CarriedExtentTreeNodes);
+     let identity = ExtentTreeNodeIdentity {
+         tree,
+         birth_txg: context.txg,
+@@ -14573,21 +14697,29 @@
+                 ),
+             }
+         };
++    // 这一版 `units` 按角色的索引一次装建一次（七·6 后续批，用户 2026-10-22 定并进）：要写的单元与记录点名的单元都对这次重写的角色
++    // 各取一次，逐个在 `units` 上找是重写的角色数乘单元数。同一角色取最先那一项，与在 `units` 上 `iter().find` 同一项。
++    let inside_the_written_units =
++        lookup_work::entering(LookupSite::UnitsOfTheRolesWrittenByThisPublish);
++    let units_by_role = FirstEntryOfEachIdentity::of_the_table(&units, |unit| unit.identity);
+     let written_units: Vec<&PublishedUnit> = relocated_copies
+         .iter()
+         .map(|(copy, _, _)| copy)
+         .chain(rewritten.iter().map(|identity| {
+-            units
+-                .iter()
+-                .find(|unit| unit.identity == *identity)
++            units_by_role
++                .first_entry_of(identity)
+                 .expect("重写的角色都装了单元")
+         }))
+         .collect();
++    drop(inside_the_written_units);
+     let named_unit_of = |identity: TransactionUnit| -> NamedUnit {
+-        let unit = units
+-            .iter()
+-            .find(|unit| unit.identity == identity)
+-            .expect("点名的角色都是这次重写、装过单元的");
++        let unit = {
++            let _inside_the_named_units =
++                lookup_work::entering(LookupSite::UnitsOfTheRolesNamedByTheRecords);
++            units_by_role
++                .first_entry_of(&identity)
++                .expect("点名的角色都是这次重写、装过单元的")
++        };
+         NamedUnit {
+             locations: pool.location_entries(unit.slot, &unit.bytes),
+             unit_class: identity.unit_class(),
+@@ -14837,6 +14969,15 @@
+     Ok((writes, output))
+ }
+ 
++/// 照抄 `tree` 这棵树的节点那几次查记在哪一处：三棵树各记各的（七·6 后续批代码轮第一轮判决第三节第 3 条）。
++fn lookup_site_of_the_carried_nodes_of(tree: MultiLevelCodeTwoTree) -> LookupSite {
++    match tree {
++        MultiLevelCodeTwoTree::Accounting => LookupSite::CarriedNodesOfTheAccountingTree,
++        MultiLevelCodeTwoTree::CentralMapping => LookupSite::CarriedNodesOfTheCentralMappingTree,
++        MultiLevelCodeTwoTree::Deadlist => LookupSite::CarriedNodesOfTheDeadlistTree,
++    }
++}
++
+ /// 装一棵多层码 2 树时整次发布共用的身份字段。
+ struct MultiLevelTreeBuildContext<'build> {
+     txg: CheckpointTxg,
+@@ -14896,6 +15037,8 @@
+     slots: &BTreeMap<TransactionUnit, SlotNumber>,
+     sequences: &mut BirthSequenceAllocator,
+ ) -> BuiltMultiLevelTree {
++    // 装整棵树都在这棵树照抄节点那一处里（同 `build_extent_tree`）：每照抄一个节点现建一份索引的，建的那几份记在这一处。
++    let _inside_the_tree_build = lookup_work::entering(lookup_site_of_the_carried_nodes_of(tree));
+     let planned_keys: Vec<&CodeTwoTreeKey> = plan.shape.keys_in_order();
+     assert!(
+         planned_keys.len() == leaf_entry_bytes_by_key.len()
+@@ -14922,7 +15065,7 @@
+                 let previous_version = previous.expect("照抄的节点只出现在接着上一版的发布里");
+                 let previous_tree = previous_version.multi_level_tree(tree);
+                 let _inside_the_carried_nodes =
+-                    lookup_work::entering(LookupSite::CarriedNodesOfTheMultiLevelTrees);
++                    lookup_work::entering(lookup_site_of_the_carried_nodes_of(tree));
+                 let carried = units_of_the_previous_version
+                     .expect(
+                         "照抄的节点只出现在接着上一版的发布里：上一版的单元索引与上一版一起交进来",
+--- a/crates/singlefs-core/build.rs
++++ b/crates/singlefs-core/build.rs
+@@ -1,19 +1,40 @@
+ //! 把这一次编译里 cargo 给本包打开的特性交给直接依赖本包的构建脚本：`links` 的元数据，依赖方读 `DEP_SINGLEFS_CORE_ENABLED_FEATURES`
+ //! （`singlefs_unit_graph::build_features::features_enabled_on_the_dependencies`，键名是那里的 `ENABLED_FEATURES_METADATA_KEY`）。
+-//! cargo 给的 `CARGO_FEATURE_*` 是并过之后的：别的包在同一次构建里替本包打开的特性（harness 档的 dev 依赖打开的 `lookup-work-counters`）
+-//! 也在里面，依赖方自己的 `CARGO_FEATURE_*` 看不到它们。checker 档的构建脚本拿这一份算判法单元键。
++//! cargo 解出来的特性是并过之后的：别的包在同一次构建里替本包打开的特性（harness 档的 dev 依赖打开的 `lookup-work-counters`）
++//! 也在里面，依赖方自己的特性看不到它们。checker 档的构建脚本拿这一份算判法单元键。
+ //!
+-//! 只做交出：不读别的输入、不生成代码，值是变量名里 `CARGO_FEATURE_` 之后那一段（大写、`-` 换成 `_`），排好序、逗号隔开。
++//! 取法：cargo 编本包的构建脚本时带着本包这一次开了的特性（每个开着的特性一个 `--cfg feature="<名>"`，与编本包的库同一份），
++//! 所以 `cfg!(feature = "<名>")` 就是 cargo 这一次真开没开；特性一变，构建脚本按另一份 cfg 重编、重跑。不读进程环境里的
++//! `CARGO_FEATURE_*`：那是 cargo 设的，外面带进来的同名变量（`CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1` 而不开特性）它也照收，
++//! 分不出来（七·6 后续批代码轮第一轮判决第二节 T4）。同仓 `Cargo.lock` 里的 `librocksdb-sys` 构建脚本按同一个取法读它的特性
++//! （`if cfg!(feature = "snappy")`）。
++//!
++//! 只做交出：不读别的输入、不生成代码，值是开着的特性名写进 cargo 环境变量名的样子（大写、`-` 换成 `_`），按清单里的名字排好、逗号隔开。
++//! 清单 `[features]` 里的每个特性都要在 [`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`] 里有一行：`singlefs-unit-graph` 的
++//! `build_features` 单测把两边逐个比（`the_core_build_script_lists_every_feature_of_its_manifest`）。
++
++/// 本包清单 `[features]` 里的每个特性（清单里的写法，按名字排好）与 cargo 这一次开没开它。
++/// `pub(crate)`：harness 档的 `publish_lookup_by_identity` 经 `#[path]` 把这份构建脚本编成一个模块，要读它与下面那个函数。
++pub(crate) const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG: [(&str, bool); 1] = [(
++    "lookup-work-counters",
++    cfg!(feature = "lookup-work-counters"),
++)];
++
++/// 交出去的那一行的值：`features_with_their_cfg` 里开着的那几个，写成 cargo 环境变量名的样子（大写、`-` 换成 `_`），逗号隔开。
++/// 只看 `features_with_their_cfg`，不读进程环境：外面带进来的 `CARGO_FEATURE_*` 不算开着。
++pub(crate) fn enabled_features_metadata_value(features_with_their_cfg: &[(&str, bool)]) -> String {
++    features_with_their_cfg
++        .iter()
++        .filter(|(_, is_enabled_by_cargo)| *is_enabled_by_cargo)
++        .map(|(feature, _)| feature.to_ascii_uppercase().replace('-', "_"))
++        .collect::<Vec<String>>()
++        .join(",")
++}
+ 
+ fn main() {
+-    let mut enabled_feature_environment_names: Vec<String> = std::env::vars_os()
+-        .filter_map(|(name, _value)| name.into_string().ok())
+-        .filter_map(|name| name.strip_prefix("CARGO_FEATURE_").map(str::to_string))
+-        .collect();
+-    enabled_feature_environment_names.sort();
+     println!(
+         "cargo::metadata=enabled_features={}",
+-        enabled_feature_environment_names.join(",")
++        enabled_features_metadata_value(&FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG)
+     );
+     println!("cargo::rerun-if-changed=build.rs");
+ }
+--- a/crates/singlefs-unit-graph/src/build_features.rs
++++ b/crates/singlefs-unit-graph/src/build_features.rs
+@@ -4,11 +4,16 @@
+ //! harness 档的 dev 依赖替 `singlefs-core` 打开的特性，checker 档链进来的那一份 `singlefs-core` 同样开着。只看正在编的包自己的
+ //! `CARGO_FEATURE_*` 与清单里的依赖边，看不到别的包并上来的那一部分。
+ //!
+-//! 取法：依赖包带 `links`，它自己的构建脚本把 cargo 给它的 `CARGO_FEATURE_*`（并过之后的）照 [`ENABLED_FEATURES_METADATA_KEY`]
+-//! 交出去（`cargo::metadata=enabled_features=<逗号隔开的变量名后缀>`）；cargo 只把它交给**直接**依赖这个包的构建脚本，变量名
++//! 取法：依赖包带 `links`，它自己的构建脚本把 cargo 这一次给它开的特性（并过之后的）照 [`ENABLED_FEATURES_METADATA_KEY`]
++//! 交出去（`cargo::metadata=enabled_features=<逗号隔开的特性名，写成 cargo 环境变量名后缀的样子>`）；cargo 只把它交给**直接**依赖这个包的构建脚本，变量名
+ //! `DEP_<links>_ENABLED_FEATURES`（[`features_enabled_on_the_dependencies`] 读）。间接依赖的、带特性的包这样取不到，
+ //! [`features_enabled_on_the_dependencies`] 遇到就交错误，不静默当成没开。
+ //!
++//! 「cargo 这一次开没开」一律从构建脚本自己的 `cfg!(feature = "<名>")` 取（cargo 编构建脚本时带着本包这一次开了的特性的 cfg），
++//! 不读进程环境里的 `CARGO_FEATURE_*`：外面带进来的同名变量（不开特性、环境里设 `CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1`）与 cargo 设的分不出，
++//! 键会说开着而编出来的代码没开（七·6 后续批代码轮第一轮判决第二节 T4）。正在编的包自己的那一份同样照这个取法交进来
++//! （[`features_of_the_crate_being_built`]）。
++//!
+ //! 取到的特性交给 `closure::compute_closure_of_entries_with_the_features_of_the_build`：解特性时这些包一被链进来，就照这一次编译的
+ //! 样子再请求这些特性（与把它们写进入口包对那个依赖的 `features` 之后解出来的相同）。
+ 
+@@ -50,6 +55,13 @@
+         dependent_package_name: String,
+         dependency_key: String,
+     },
++    /// 正在编的包的构建脚本交进来的特性表（特性名与它的 `cfg!(feature = …)`）与清单 `[features]` 对不上：
++    /// 清单里有、表里没写的那几个这一次开没开取不到；表里有、清单里没有的是写错的名字。
++    FeatureTableDisagreesWithTheManifest {
++        package_name: String,
++        missing_from_the_table: Vec<String>,
++        missing_from_the_manifest: Vec<String>,
++    },
+ }
+ 
+ impl fmt::Display for BuildFeaturesError {
+@@ -85,6 +97,15 @@
+                 formatter,
+                 "包「{dependent_package_name}」把工作区里的「{dependency_key}」写成可选依赖：判不出这一次编没编它"
+             ),
++            BuildFeaturesError::FeatureTableDisagreesWithTheManifest {
++                package_name,
++                missing_from_the_table,
++                missing_from_the_manifest,
++            } => write!(
++                formatter,
++                "包「{package_name}」构建脚本里的特性表与清单 [features] 对不上：清单里有、表里没写的 {missing_from_the_table:?}，\
++                 表里有、清单里没有的 {missing_from_the_manifest:?}（表里每个特性写一行 (名字, cfg!(feature = \"名字\"))）"
++            ),
+         }
+     }
+ }
+@@ -94,23 +115,51 @@
+     name.to_ascii_uppercase().replace('-', "_")
+ }
+ 
+-/// 正在编的包自己开了哪些特性（清单 `[features]` 里、`CARGO_FEATURE_<名>` 设着的那几个，按名字排好）。
+-/// cargo 给的是并过之后的，别的包并上来的也在里面。
+-#[must_use]
++/// 正在编的包自己开了哪些特性（清单 `[features]` 里、`features_with_their_cfg` 说开着的那几个，按清单里的名字排好）。
++/// `features_with_their_cfg` 是它构建脚本里逐个写的（特性名、`cfg!(feature = "<名>")`）：cargo 编构建脚本时带着本包这一次开了的特性的 cfg，
++/// 并过之后的，别的包并上来的也在里面；不读进程环境里的 `CARGO_FEATURE_*`（外面带进来的同名变量分不出）。
++///
++/// # Errors
++/// 表与清单 `[features]` 不是同一组名字 ⇒ [`BuildFeaturesError::FeatureTableDisagreesWithTheManifest`]。
+ pub fn features_of_the_crate_being_built(
+     workspace: &Workspace,
+     crate_being_built: CrateIndex,
+-    read_environment: &dyn Fn(&str) -> Option<String>,
+-) -> Vec<String> {
+-    workspace.crates[crate_being_built.0]
+-        .manifest
+-        .features
++    features_with_their_cfg: &[(&str, bool)],
++) -> Result<Vec<String>, BuildFeaturesError> {
++    let workspace_crate = &workspace.crates[crate_being_built.0];
++    let features_of_the_manifest = &workspace_crate.manifest.features;
++    let names_in_the_table: BTreeSet<&str> = features_with_their_cfg
++        .iter()
++        .map(|(feature, _)| *feature)
++        .collect();
++    let missing_from_the_table: Vec<String> = features_of_the_manifest
++        .keys()
++        .filter(|feature| !names_in_the_table.contains(feature.as_str()))
++        .cloned()
++        .collect();
++    let missing_from_the_manifest: Vec<String> = names_in_the_table
++        .iter()
++        .filter(|feature| !features_of_the_manifest.contains_key(**feature))
++        .map(|feature| (*feature).to_string())
++        .collect();
++    if !missing_from_the_table.is_empty() || !missing_from_the_manifest.is_empty() {
++        return Err(BuildFeaturesError::FeatureTableDisagreesWithTheManifest {
++            package_name: workspace_crate.package_name.clone(),
++            missing_from_the_table,
++            missing_from_the_manifest,
++        });
++    }
++    Ok(features_of_the_manifest
+         .keys()
+         .filter(|feature| {
+-            read_environment(&format!("CARGO_FEATURE_{}", environment_name_of(feature))).is_some()
++            features_with_their_cfg
++                .iter()
++                .any(|(name, is_enabled_by_cargo)| {
++                    *name == feature.as_str() && *is_enabled_by_cargo
++                })
+         })
+         .cloned()
+-        .collect()
++        .collect())
+ }
+ 
+ /// 正在编的包依赖的工作区包（直接的普通依赖、dev 依赖，与它们传递的普通依赖）里，声明了特性的那几个这一次编译各开了哪些：
+@@ -533,28 +582,48 @@
+         );
+     }
+ 
+-    /// 正在编的包自己的特性照 `CARGO_FEATURE_*` 取：脚手架没有特性，计数的包按变量取到 `counting`。
++    /// 正在编的包自己的特性照它构建脚本交进来的特性表取（名字与 `cfg!(feature = …)`）：表说开着的取到、说没开的不取；
++    /// 没有特性的脚手架交空表取到空。
+     #[test]
+-    fn the_features_of_the_crate_being_built_come_from_its_own_cargo_feature_variables() {
++    fn the_features_of_the_crate_being_built_come_from_the_feature_table_of_its_build_script() {
+         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
+         let workspace = fixture.load();
+         let counting_crate = workspace
+             .crate_named("counting-basis")
+             .expect("夹具里有计数的包");
+         assert_eq!(
+-            features_of_the_crate_being_built(
+-                &workspace,
+-                counting_crate,
+-                &environment_of(&[("CARGO_FEATURE_COUNTING", "1")]),
+-            ),
+-            ["counting"]
++            features_of_the_crate_being_built(&workspace, counting_crate, &[("counting", true)]),
++            Ok(vec!["counting".to_string()])
++        );
++        assert_eq!(
++            features_of_the_crate_being_built(&workspace, counting_crate, &[("counting", false)]),
++            Ok(Vec::new())
++        );
++        let scaffold_crate = workspace
++            .crate_named("scaffold")
++            .expect("夹具里有脚手架的包");
++        assert_eq!(
++            features_of_the_crate_being_built(&workspace, scaffold_crate, &[]),
++            Ok(Vec::new())
++        );
++    }
++
++    /// 特性表与清单 `[features]` 不是同一组名字：清单里有、表里漏写的，表里写了、清单里没有的，都交错误、逐个点名，不按「没开」算。
++    #[test]
++    fn a_feature_table_that_disagrees_with_the_manifest_is_an_error() {
++        let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
++        let workspace = fixture.load();
++        let counting_crate = workspace
++            .crate_named("counting-basis")
++            .expect("夹具里有计数的包");
++        assert_eq!(
++            features_of_the_crate_being_built(&workspace, counting_crate, &[("wide", true)]),
++            Err(BuildFeaturesError::FeatureTableDisagreesWithTheManifest {
++                package_name: "counting-basis".to_string(),
++                missing_from_the_table: vec!["counting".to_string()],
++                missing_from_the_manifest: vec!["wide".to_string()],
++            })
+         );
+-        assert!(features_of_the_crate_being_built(
+-            &workspace,
+-            counting_crate,
+-            &environment_of(&[]),
+-        )
+-        .is_empty());
+     }
+ 
+     /// `singlefs-core` 那一侧的约定与这里读的对得上：清单写了 links、构建脚本照 [`ENABLED_FEATURES_METADATA_KEY`] 打元数据。
+--- a/crates/singlefs-checker-tier/build.rs
++++ b/crates/singlefs-checker-tier/build.rs
+@@ -4,7 +4,8 @@
+ //!
+ //! 只做生成、不藏逻辑：切分、闭包、键、工具链行的拼法、表的写法、特性的取法都在 `singlefs-unit-graph` 里（`entry_groups`、
+ //! `build_toolchain`、`build_features`），命令行 `unit-graph key … --toolchain-of-the-build <profile> --lock-file Cargo.lock` 用的是同一份。
+-//! 这里只取 cargo 给的环境：本包开了哪些特性（`CARGO_FEATURE_*`）、依赖包在这一次编译里开了哪些特性（带 `links` 的依赖包构建脚本交出的
++//! 这里只取 cargo 给的：本包开了哪些特性（cargo 编本构建脚本时带着本包这一次开了的特性的 cfg，[`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`]；
++//! 不读进程环境里的 `CARGO_FEATURE_*`，外面带进来的同名变量分不出，七·6 后续批代码轮第一轮判决第二节 T4）、依赖包在这一次编译里开了哪些特性（带 `links` 的依赖包构建脚本交出的
+ //! `DEP_<links>_ENABLED_FEATURES`：一起编 harness 档测试时它的 dev 依赖替 `singlefs-core` 并上的特性，本包的 `CARGO_FEATURE_*` 看不到）、
+ //! `$RUSTC -vV`、`$CARGO -V`、`TARGET`、`CARGO_ENCODED_RUSTFLAGS`、`PROFILE`（profile 的生效值另从工作区根 `Cargo.toml` 算，
+ //! `CARGO_PROFILE_<名>_<键>` 照盖），连同 `Cargo.lock`。
+@@ -38,6 +39,14 @@
+ /// 写进 `OUT_DIR` 的那份表的文件名（库按同一个名字读回）。
+ const JUDGING_UNITS_KEYS_FILE_NAME: &str = "judging_units_keys.tsv";
+ 
++/// 本包清单 `[features]` 里的每个特性（清单里的写法，按名字排好）与 cargo 这一次开没开它。与清单对不上（漏写、写错名字）的，
++/// `features_of_the_crate_being_built` 交错误、构建脚本停下。
++const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG: [(&str, bool); 3] = [
++    ("default", cfg!(feature = "default")),
++    ("gpu", cfg!(feature = "gpu")),
++    ("verdict-store", cfg!(feature = "verdict-store")),
++];
++
+ fn environment_variable(name: &str) -> String {
+     std::env::var(name).unwrap_or_else(|_| panic!("cargo 起构建脚本时设 {name}"))
+ }
+@@ -77,7 +86,12 @@
+         .crate_named(&environment_variable("CARGO_PKG_NAME"))
+         .expect("工作区里有正在编的这个包");
+     let read_environment = |name: &str| std::env::var(name).ok();
+-    let features = features_of_the_crate_being_built(&workspace, own_crate, &read_environment);
++    let features = features_of_the_crate_being_built(
++        &workspace,
++        own_crate,
++        &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG,
++    )
++    .unwrap_or_else(|error| panic!("本包这一次开了哪些特性取不了：{error}"));
+     let features_enabled_by_the_build =
+         features_enabled_on_the_dependencies(&workspace, own_crate, &read_environment)
+             .unwrap_or_else(|error| panic!("依赖包在这一次编译里开了哪些特性取不全：{error}"));
+--- a/crates/singlefs-harness/tests/publish_lookup_by_identity.rs
++++ b/crates/singlefs-harness/tests/publish_lookup_by_identity.rs
+@@ -17,8 +17,24 @@
+ //!
+ //! 池都在内存里的两块 4 GiB 稀疏盘上造（`SparseBlockDevice`），配方照 E185 装置的 `construct_the_pool`：每个文件整份写进去，
+ //! 再整份重写下标不是 4 的倍数的那几个，抬 F 到换下的落点都回收，留下每段约四分之一还活着的聚簇段。
++//!
++//! 七·6 后续批（`research/prompts/m4-publish-lookup-followup-code-r1-main-verification.md` 第三节第 1–4 条）另钉：整理发批与恢复把映射位置换进
++//! `units`、装一次发布要写与记录点名的单元、留给快照的角色清单两处、记录点名的数据角色那一处都经建一次的索引查；按 inode 号找文件、
++//! 删快照取留存条目那几处在发布路径上建索引的次数恰好等于走了几遍；三棵多层码 2 树照抄的节点按树分开数；`singlefs-core` 构建脚本
++//! 交出的特性只认 cargo 这一次真开的。
+ mod common;
+ 
++/// `singlefs-core` 的构建脚本本身（七·6 后续批代码轮第一轮判决第三节第 4 条）：在这里编进来，判它交出的特性只看
++/// `cfg!(feature = …)`、不读进程环境。这个测试包不开 `lookup-work-counters`，所以那一行的 cfg 在这里恒为假；
++/// 构建脚本的 `main` 在这里用不上。
++#[allow(
++    dead_code,
++    unexpected_cfgs,
++    reason = "构建脚本的 main 在测试里不调；它写的 cfg!(feature = \"lookup-work-counters\") 是 singlefs-core 的特性，这个测试包没有这个特性"
++)]
++#[path = "../../singlefs-core/build.rs"]
++mod singlefs_core_build_script;
++
+ use std::collections::BTreeSet;
+ 
+ use singlefs_checker::image::InvariantVerdict;
+@@ -57,8 +73,8 @@
+     publish_relocation_batch, publish_sequential_write_of_an_inode,
+     refuse_mapping_entries_that_do_not_name_two_pool_devices, warm_up,
+     CentralMappingOfAVersionReadLeafByLeaf, FileContentOfThePublish, FirstEntryOfEachIdentity,
+-    FirstFile, MappedUnitsOfAVersionReadByRole, MappingLookup, PoolVersion, PoolWriter,
+-    RelocatedUnitHolder, TransactionOutput, TransactionUnit,
++    FirstFile, MappedUnitsOfAVersionReadByRole, MappingLookup, MultiLevelCodeTwoTree, PoolVersion,
++    PoolWriter, RelocatedUnitHolder, TransactionOutput, TransactionUnit,
+ };
+ use singlefs_core::unit::{
+     build_index_node, data_unit_payload_capacity, parse_index_node, UNIT_CLASS_DATA,
+@@ -1254,6 +1270,15 @@
+ 
+ /// 第一个文件之外 `files` 个文件，各整份写 `data_units_per_file` 个数据单元（经会话一个个写，不抬 F）：交回盘、会话与文件的号。
+ fn pool_with_files_written_once(files: u64, data_units_per_file: usize) -> PoolBuilt {
++    pool_with_files_of_the_sizes(&vec![
++        data_units_per_file;
++        usize::try_from(files).expect("文件数装得进 usize")
++    ])
++}
++
++/// 第一个文件之外每个文件各整份写一次，第 k 个文件 `data_units_of_each_file[k]` 个数据单元（经会话一个个写，不抬 F）：交回盘、会话与文件的号。
++fn pool_with_files_of_the_sizes(data_units_of_each_file: &[usize]) -> PoolBuilt {
++    let files = u64::try_from(data_units_of_each_file.len()).expect("文件数装得进 u64");
+     let (mut devices, mut session) = formatted_and_mounted(CompactionSwitches::PRODUCT);
+     let first_inode = version_of(&session).inode_number_watermark();
+     let write_time_of_the_new_inodes = common::FIXED_WRITE_TIME_SECONDS + 600;
+@@ -1270,8 +1295,11 @@
+         .map(InodeNumber)
+         .collect();
+     // 每写一个文件写入时间往后推一秒。
+-    for (write_time_seconds, inode) in (write_time_of_the_new_inodes + 1..).zip(&inodes) {
+-        let content = content_of_data_units(data_units_per_file, inode.0);
++    for ((write_time_seconds, inode), data_units) in (write_time_of_the_new_inodes + 1..)
++        .zip(&inodes)
++        .zip(data_units_of_each_file)
++    {
++        let content = content_of_data_units(*data_units, inode.0);
+         session
+             .publish_user_change(
+                 &mut devices,
+@@ -1376,17 +1404,180 @@
+     )
+ }
+ 
+-/// 记账树、deadlist 树、中央映射树的节点（`build_multi_level_tree` 照抄的那几种）。
+-fn is_a_node_of_a_multi_level_tree(identity: TransactionUnit) -> bool {
+-    matches!(
+-        identity,
+-        TransactionUnit::AccountingTree
+-            | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
+-            | TransactionUnit::DeadlistTree
+-            | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
+-            | TransactionUnit::MappingTree
+-            | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
+-    )
++/// `tree` 这棵多层码 2 树的节点（`build_multi_level_tree` 照抄的那几种）。
++fn is_a_node_of_the_multi_level_tree(
++    tree: MultiLevelCodeTwoTree,
++    identity: TransactionUnit,
++) -> bool {
++    match tree {
++        MultiLevelCodeTwoTree::Accounting => matches!(
++            identity,
++            TransactionUnit::AccountingTree | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
++        ),
++        MultiLevelCodeTwoTree::Deadlist => matches!(
++            identity,
++            TransactionUnit::DeadlistTree | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
++        ),
++        MultiLevelCodeTwoTree::CentralMapping => matches!(
++            identity,
++            TransactionUnit::MappingTree | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
++        ),
++    }
++}
++
++/// 照抄三棵多层码 2 树的节点各记在哪一处。
++const CARRIED_NODES_OF_EACH_MULTI_LEVEL_TREE: [(MultiLevelCodeTwoTree, LookupSite); 3] = [
++    (
++        MultiLevelCodeTwoTree::Accounting,
++        LookupSite::CarriedNodesOfTheAccountingTree,
++    ),
++    (
++        MultiLevelCodeTwoTree::Deadlist,
++        LookupSite::CarriedNodesOfTheDeadlistTree,
++    ),
++    (
++        MultiLevelCodeTwoTree::CentralMapping,
++        LookupSite::CarriedNodesOfTheCentralMappingTree,
++    ),
++];
++
++/// 三棵多层码 2 树照抄的节点按树分开数（七·6 后续批代码轮第一轮判决第三节第 3 条）：照抄了节点的那棵树，那一处走一遍每个照抄的节点
++/// 经上一版建一次的索引查一次（不另建索引、不解叶，判整数遍）；一个都没照抄的那棵，那一处不建、不查、不解叶。一棵退回在 `units` 上
++/// 线性找，它那一处查的次数掉到 0，另两棵补不上它的数。交回每棵树这一版照抄了几个节点（按 [`CARRIED_NODES_OF_EACH_MULTI_LEVEL_TREE`] 的次序）。
++fn assert_the_carried_nodes_of_each_multi_level_tree_are_looked_up_through_one_index(
++    published: &TransactionOutput,
++    lookup_work: &LookupWorkOfEachSite,
++) -> [u64; 3] {
++    CARRIED_NODES_OF_EACH_MULTI_LEVEL_TREE.map(|(tree, site)| {
++        let carried =
++            carried_units_of_the_kind(published, |identity| is_a_node_of_the_multi_level_tree(tree, identity));
++        let work = lookup_work.of_the_site(site);
++        if carried == 0 {
++            assert_eq!(
++                (work.index_builds, work.mapping_leaf_decodes, work.index_lookups),
++                (0, 0, 0),
++                "{site:?}：这一版 {tree:?} 一个节点都没照抄，这一处不建索引、不解叶、不查：{work:?}"
++            );
++        } else {
++            assert_the_work_is_whole_passes_of(
++                work,
++                (0, 0, carried),
++                &format!(
++                    "{site:?}：这一版 {tree:?} 照抄了 {carried} 个节点，走一遍每个经上一版建一次的索引查一次（这一处不另建索引、不解叶）"
++                ),
++            );
++        }
++        carried
++    })
++}
++
++/// 一处按「走一遍进一次」进的（[`LookupWork::times_entered`]）：至少进过一次，建索引次数恰好等于进的次数（每走一遍建一份，
++/// 不随这一遍查的项数涨；每查一项现建一份的按查的次数涨）。交回进了几次（走了几遍）。
++fn assert_one_index_built_per_entry(work: LookupWork, what: &str) -> u64 {
++    assert!(
++        work.times_entered >= 1 && work.index_builds == work.times_entered,
++        "{what}：进了 {} 次（走了几遍），建索引 {} 次，每走一遍恰好建一份：{work:?}",
++        work.times_entered,
++        work.index_builds
++    );
++    work.times_entered
++}
++
++/// 一次带文件的发布（不搬迁）在产品里做的、七·6 后续批管的那几处（判决第三节第 1–3 条），`data_units_rewritten` 是这次重写的数据单元数：
++/// - 装要写的单元与记录点名的单元：每装一次建一份这一版 `units` 按角色的索引，重写的每个角色经它取一次要写的单元，记录点名的每个角色经它取一次单元；
++/// - 按 inode 号找文件：释放判定路径每走一遍建一份（建的次数等于释放判定路径进的次数），经映射释放的角色清单与快照判定那一圈各每走一遍建一份；
++/// - 留给快照的角色清单两处、记录点名的数据角色那一处：每走一遍建一份按角色的索引，至少这次重写的每个数据单元查一次。
++fn assert_the_lookups_of_one_publish_build_one_index_per_pass(
++    published: &TransactionOutput,
++    lookup_work: &LookupWorkOfEachSite,
++    data_units_rewritten: u64,
++    what: &str,
++) {
++    assert_the_units_of_the_published_version_are_looked_up_through_one_index(
++        published,
++        lookup_work,
++        what,
++    );
++    let release_judgement_passes = lookup_work
++        .of_the_site(LookupSite::MappingEntriesOfTheReleaseJudgement)
++        .times_entered;
++    let files_of_the_release_judgement =
++        lookup_work.of_the_site(LookupSite::FilesOfTheReplacedRolesInThePreviousVersion);
++    // 快照下换下的数据单元留给快照、不进释放判定路径：一个第一个文件之外的角色都不问的那几遍不建，所以是「至多」。
++    assert!(
++        release_judgement_passes >= 1
++            && files_of_the_release_judgement.index_builds <= release_judgement_passes,
++        "{what}：释放判定路径走了 {release_judgement_passes} 遍，按 inode 号找文件每遍至多建一份：{files_of_the_release_judgement:?}"
++    );
++    let snapshot_judgement_passes = lookup_work
++        .of_the_site(LookupSite::SnapshotJudgement)
++        .times_entered;
++    let files_of_the_snapshot_judgement =
++        lookup_work.of_the_site(LookupSite::FilesOfTheUserVisibleRolesOfTheSnapshotJudgement);
++    assert_eq!(
++        assert_one_index_built_per_entry(
++            files_of_the_snapshot_judgement,
++            &format!("{what}：快照判定那一圈按 inode 号找文件"),
++        ),
++        snapshot_judgement_passes,
++        "{what}：快照判定那一圈走了 {snapshot_judgement_passes} 遍，每遍问一次换下的角色有没有落点：{files_of_the_snapshot_judgement:?}"
++    );
++    // 经映射释放的角色清单同样先去掉留给快照的角色：快照下一个第一个文件之外的角色都不剩的那几遍不建，所以是「至多」；
++    // 每问一个角色现建一份的，建的次数按问的角色数涨、超过走的遍数。
++    let files_of_the_mapped_roles_released =
++        lookup_work.of_the_site(LookupSite::FilesOfTheMappedRolesReleasedByThisPublish);
++    assert!(
++        files_of_the_mapped_roles_released.times_entered >= 1
++            && files_of_the_mapped_roles_released.index_builds
++                <= files_of_the_mapped_roles_released.times_entered,
++        "{what}：经映射释放的角色清单走了 {} 遍，按 inode 号找文件每遍至多建一份：{files_of_the_mapped_roles_released:?}",
++        files_of_the_mapped_roles_released.times_entered
++    );
++    for site in [
++        LookupSite::RolesKeptForTheSnapshotsInTheReleaseJudgement,
++        LookupSite::RolesKeptForTheSnapshotsAmongTheMappedRolesReleased,
++        LookupSite::DataRolesNamedBeforeTheLastRecord,
++    ] {
++        let work = lookup_work.of_the_site(site);
++        let passes = assert_one_index_built_per_entry(work, &format!("{what}：{site:?}"));
++        assert!(
++            work.index_lookups >= passes * data_units_rewritten,
++            "{what}：{site:?} 走了 {passes} 遍，每遍至少这次重写的 {data_units_rewritten} 个数据单元各查一次：{work:?}"
++        );
++    }
++}
++
++/// 装这一版（`publish_admitted`）时取要写的单元与记录点名的单元（七·6 后续批代码轮第一轮判决第三节第 1 条）：每装一次建一份这一版
++/// `units` 按角色的索引（记在要写的那一处），重写的每个角色经它取一次要写的单元，记录点名的每个角色（搬迁副本不按角色取，不算）经同一份取一次单元。
++/// 改回在 `units` 上线性找的那一处查的次数掉到 0；每取一个角色现建索引的建的次数按角色数涨。
++fn assert_the_units_of_the_published_version_are_looked_up_through_one_index(
++    published: &TransactionOutput,
++    lookup_work: &LookupWorkOfEachSite,
++    what: &str,
++) {
++    let written = lookup_work.of_the_site(LookupSite::UnitsOfTheRolesWrittenByThisPublish);
++    let assemblies = assert_one_index_built_per_entry(written, &format!("{what}：装要写的单元"));
++    let rewritten = u64::try_from(published.rewritten.len()).expect("角色数");
++    let named_entries: usize = published
++        .earlier_records_of_this_publish
++        .iter()
++        .map(|earlier| earlier.record.named.len())
++        .sum::<usize>()
++        + published.record.named.len();
++    let named_roles =
++        u64::try_from(named_entries - published.units_relocated_by_this_publish.len())
++            .expect("点名项数");
++    let named = lookup_work.of_the_site(LookupSite::UnitsOfTheRolesNamedByTheRecords);
++    assert_eq!(
++        (
++            written.index_lookups,
++            named.index_builds,
++            named.index_lookups
++        ),
++        (assemblies * rewritten, 0, assemblies * named_roles),
++        "{what}：装了 {assemblies} 次，每次 {rewritten} 个重写的角色各取一次要写的单元、{named_roles} 个点名的角色各取一次单元，\
++         都经装这一次建的那一份索引（要写的查的次数、点名的建索引次数、点名的查的次数）：written={written:?} named={named:?}"
++    );
+ }
+ 
+ /// 一处做的查找（建索引次数、解叶次数、查的次数）恰好是那一处走一遍该做的 `one_pass` 的正整数倍：发布算到定点时同一处可以走几遍
+@@ -1428,7 +1619,11 @@
+ /// 再整份重写它（一次发布）：快照判定那一圈（池里没有快照）每建一份索引至少查换下的数据单元那么多次；照抄的 extent 树节点、第一个文件之外文件的
+ /// 下段节点、多层码 2 树的节点各按角色（按 inode 号）经上一版建一次的索引查一次（发布算到定点时同一处可以走几遍，判整数遍）。
+ /// 改回线性的那一处查的次数掉到 0，每查一个角色现建索引的那一处建的次数按角色数涨，落点改回逐 key 查的那一处解叶次数按 key 数涨。
+-/// 判别力：`crates/mutations.tsv` 里以「七·6 第三轮」起头、点名这一条的几行（攻方 RB、RD、RE、RF，正推 M3、M4，释放与照抄那几处改回线性）。
++/// 七·6 后续批另判：核两条位置项与读盘核校验和经「经映射释放的角色清单」每走一遍各建一份按 inode 号找文件的读者与留给快照的角色清单索引；
++/// 那一次发布里三棵多层码 2 树照抄的节点按树分开数，装要写与点名的单元、按 inode 号找文件、留给快照的角色清单与记录点名的数据角色都每走一遍建一份
++/// （`assert_the_lookups_of_one_publish_build_one_index_per_pass`）；整棵 extent 树装的时候都在照抄那一处里，每个节点现建一份索引的建的次数记在那里。
++/// 判别力：`crates/mutations.tsv` 里以「七·6 第三轮」起头、点名这一条的几行（攻方 RB、RD、RE、RF，正推 M3、M4，释放与照抄那几处改回线性）；
++/// 以「七·6 后续批」起头、点名这一条的几行（装要写与点名的单元改回线性找，攻方 MA2、MA3、MA5，正推自打的经映射释放的角色清单那一行）。
+ #[test]
+ fn a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site(
+ ) {
+@@ -1528,6 +1723,38 @@
+         (1, replaced_roles),
+         "释放判定路径：{replaced_roles} 个角色在上一版里有没有落点，各按 inode 号经一份建一次的索引找一次文件：{files_of_the_replaced_roles:?}"
+     );
++    // 留给快照的角色清单（这里是空的）在释放判定路径与经映射释放的角色清单那一处各建一次按角色的索引，换下的每个角色查一次。
++    let kept_roles_of_the_release_judgement =
++        release_judgement.of_the_site(LookupSite::RolesKeptForTheSnapshotsInTheReleaseJudgement);
++    assert_eq!(
++        (
++            kept_roles_of_the_release_judgement.index_builds,
++            kept_roles_of_the_release_judgement.index_lookups,
++            kept_roles_of_the_release_judgement.times_entered
++        ),
++        (1, replaced_roles, 1),
++        "释放判定路径：留给快照的角色清单建一次按角色的索引，{replaced_roles} 个换下的角色各查一次（建索引次数、查的次数、进的次数）：\
++         {kept_roles_of_the_release_judgement:?}"
++    );
++    // 核两条位置项与读盘核校验和都经「经映射释放的角色清单」（读盘核校验和那一处先调核两条位置项，清单走两遍）：
++    // 每走一遍按 inode 号找文件的读者建一份、留给快照的角色清单建一份，换下的每个角色各查一次。
++    for (which, lookup_work) in [
++        ("核两条位置项", &two_pool_devices_check),
++        ("读盘核校验和", &release_checksum_check),
++    ] {
++        for site in [
++            LookupSite::FilesOfTheMappedRolesReleasedByThisPublish,
++            LookupSite::RolesKeptForTheSnapshotsAmongTheMappedRolesReleased,
++        ] {
++            let work = lookup_work.of_the_site(site);
++            let passes = assert_one_index_built_per_entry(work, &format!("{which}：{site:?}"));
++            assert_eq!(
++                work.index_lookups,
++                passes * replaced_roles,
++                "{which}：{site:?} 走了 {passes} 遍，每遍 {replaced_roles} 个换下的角色各查一次：{work:?}"
++            );
++        }
++    }
+ 
+     let (_, published, lookup_work) = whole_rewrite_published_once(
+         &mut pool,
+@@ -1554,11 +1781,6 @@
+             carried_units_of_the_kind(&published, is_a_lower_node_of_a_file_other_than_the_first),
+             "照抄的第一个文件之外文件的下段节点",
+         ),
+-        (
+-            LookupSite::CarriedNodesOfTheMultiLevelTrees,
+-            carried_units_of_the_kind(&published, is_a_node_of_a_multi_level_tree),
+-            "照抄的记账树、deadlist 树、中央映射树节点",
+-        ),
+     ] {
+         assert_the_work_is_whole_passes_of(
+             lookup_work.of_the_site(site),
+@@ -1568,6 +1790,16 @@
+             ),
+         );
+     }
++    assert_the_carried_nodes_of_each_multi_level_tree_are_looked_up_through_one_index(
++        &published,
++        &lookup_work,
++    );
++    assert_the_lookups_of_one_publish_build_one_index_per_pass(
++        &published,
++        &lookup_work,
++        8,
++        "整份重写一个八单元的文件（池里没有快照）",
++    );
+ }
+ 
+ /// 池里有一个快照的样子：快照之后整份重写过的文件的旧单元进了 deadlist、映射条目留存。
+@@ -1596,7 +1828,10 @@
+ /// 一个快照下整份重写一个文件（一次发布），再删这个快照（经会话）：
+ /// 重写那一次，快照判定那一圈每走一遍换下的用户可见角色各查一次映射 key，进 deadlist 的各经批量读者查一次映射条目（建三份索引：按角色的 key 索引两份、
+ /// 批量读者的单元索引一份；进 deadlist 的 key 走到的叶各解一次）；删快照那几批，放掉的每条条目按 key 经索引取一次它留存的映射条目。
+-/// 判别力：`crates/mutations.tsv` 里正推 M2（进 deadlist 那一支退回线性找 key、逐 key 查）与「七·6 第三轮 删快照：」起头的那一行。
++/// 七·6 后续批另判（判决第三节第 3 条 ①）：删快照放条目的每一遍恰好建一份留存条目按 key 的索引（建索引次数等于进那一处的次数，
++/// 查的次数是遍数乘放掉的条数）；重写那一次按 inode 号找文件等几处每走一遍建一份（`assert_the_lookups_of_one_publish_build_one_index_per_pass`）。
++/// 判别力：`crates/mutations.tsv` 里正推 M2（进 deadlist 那一支退回线性找 key、逐 key 查）与「七·6 第三轮 删快照：」起头的那一行；
++/// 「七·6 后续批」起头、点名这一条的几行（攻方 MA1，正推自打的删快照与快照判定那一圈两行）。
+ #[test]
+ fn a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once(
+ ) {
+@@ -1653,6 +1888,12 @@
+              进 deadlist 的各再查一次 key、每片叶查一次单元"
+         ),
+     );
++    assert_the_lookups_of_one_publish_build_one_index_per_pass(
++        &published,
++        &lookup_work,
++        4,
++        "快照下整份重写一个四单元的文件",
++    );
+ 
+     let kept_before = version_of(&pool.session)
+         .mapping_entries_kept_for_the_snapshots
+@@ -1669,11 +1910,19 @@
+     let released = u64::try_from(kept_before - kept_after).expect("条数");
+     let kept_entries_released = destruction_work
+         .of_the_site(LookupSite::KeptMappingEntriesReleasedByTheSnapshotDestruction);
++    println!(
++        "publish_lookup_by_identity snapshot_destruction released={released} kept_entries_released={kept_entries_released:?} files_of_the_snapshot_judgement={:?}",
++        destruction_work.of_the_site(LookupSite::FilesOfTheUserVisibleRolesOfTheSnapshotJudgement)
++    );
++    // 八个四单元的文件、重写两个：留存的条目一批就放完（最后一批取全部），放条目的每一遍都放这同一批。
++    let passes_that_release = assert_one_index_built_per_entry(
++        kept_entries_released,
++        "删快照：放条目的每一遍建一份留存条目按 key 的索引",
++    );
+     assert!(
+-        released >= 4
+-            && kept_entries_released.index_lookups >= released
+-            && kept_entries_released.index_builds >= 1,
+-        "删快照放掉 {released} 条留存的映射条目（之前 {kept_before} 条、之后 {kept_after} 条）：发布算到定点时每走一遍，放掉的每条按 key 经一份建一次的索引取一次：{kept_entries_released:?}"
++        released >= 4 && kept_entries_released.index_lookups == passes_that_release * released,
++        "删快照放掉 {released} 条留存的映射条目（之前 {kept_before} 条、之后 {kept_after} 条）：发布算到定点时放条目的每一遍（{passes_that_release} 遍），\
++         放掉的每条按 key 经那一遍建一次的索引取一次：{kept_entries_released:?}"
+     );
+ }
+ 
+@@ -1807,12 +2056,34 @@
+         "搬 {items} 项（其中留存的 {kept_items} 项）的一批：建 {index_builds_of_the_batch} 份索引、进映射那几项的 key 走到的 {routed_leaves} 片叶各解一次、\
+          查项数两倍加解叶次数那么多次（建索引次数、解叶次数、查的次数）：{relocation_sources:?}"
+     );
++    // 搬走的、这一版的树引用着的那几项（映射 key 是这一版某个角色的），在上一版的拷贝里换成目的地时按角色找 `units` 里那一项：
++    // 建一份按角色的索引，每一项查一次（七·6 后续批代码轮第一轮判决第三节第 1 条）。
++    let mapping_positions =
++        lookup_work.of_the_site(LookupSite::UnitsOfTheMappedRolesTakingTheirMappingPositions);
++    let roles_relocated = u64::try_from(role_keys.len()).expect("项数");
++    assert_eq!(
++        (
++            mapping_positions.index_builds,
++            mapping_positions.index_lookups,
++            mapping_positions.times_entered
++        ),
++        (1, roles_relocated, 1),
++        "搬 {items} 项的一批，其中 {roles_relocated} 项是这一版的角色：把映射位置换进 `units` 时建一份按角色的索引、每个这样的角色查一次\
++         （建索引次数、查的次数、进的次数）：{mapping_positions:?}"
++    );
++    assert_the_units_of_the_published_version_are_looked_up_through_one_index(
++        version_of(&pool.session),
++        &lookup_work,
++        &format!("搬 {items} 项的一批"),
++    );
+ }
+ 
+-/// 快照下整份重写过两个文件的池上，整理发两批：两项（一项进映射、一项留存）与八项（四项进映射、四项留存）。
+-/// 两批建的索引都是那三份，不随批大小涨（每项现建索引的那一处按项数涨）；查的次数是项数的两倍加解叶次数（找留存条目或取字节改回线性的少了那几次）；
+-/// 解叶恰好是进映射那几项的 key 走到的叶（落点改回逐 key 查的按项数解）。
+-/// 判别力：`crates/mutations.tsv` 里攻方 RA、RC，正推 M7，与「七·6 第三轮 核源落点：」起头的两行。
++/// 快照下整份重写过两个文件的池上，整理发三批：两项（一项进映射、一项留存）、八项（四项进映射、四项留存）与三项（都进映射、没有留存的）。
++/// 有留存项的两批建的索引都是那三份、没有留存项的那批两份，不随批大小涨（每项现建索引的那一处按项数涨，留存条目的索引不等要找就建的多一份）；
++/// 查的次数是项数的两倍加解叶次数（找留存条目或取字节改回线性的少了那几次）；解叶恰好是进映射那几项的 key 走到的叶（落点改回逐 key 查的按项数解）。
++/// 每批把映射位置换进上一版的拷贝时，按角色找 `units` 那一项走建一次的索引；装这一版要写与点名的单元走同一份这一版的索引。
++/// 判别力：`crates/mutations.tsv` 里攻方 RA、RC，正推 M7，与「七·6 第三轮 核源落点：」起头的两行；「七·6 后续批」起头、点名这一条的几行
++/// （映射位置换进 `units`、装要写与点名的单元改回线性找，留存条目索引不等要找就建）。
+ #[test]
+ fn relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice(
+ ) {
+@@ -1842,6 +2113,14 @@
+         4,
+     ));
+     relocate_a_batch_and_check_the_relocation_sources(&mut pool, &planned_batch_of_eight, 4);
++    // 一项留存的都没有的一批（七·6 后续批代码轮第一轮判决第三节第 3 条 ④）：留存条目按 key 的索引不建，只建两份。
++    let planned_batch_without_kept_units =
++        planned_relocations_of_the_data_units(version_of(&pool.session), pool.inodes[5], 3);
++    relocate_a_batch_and_check_the_relocation_sources(
++        &mut pool,
++        &planned_batch_without_kept_units,
++        0,
++    );
+ }
+ 
+ /// 4096 项、64 个身份各出现 64 次（次序按与表长互素的步长打乱）的长表上，索引对每个身份取的是表里它最先那一项（比地址，同 `iter().find`），
+@@ -1931,3 +2210,213 @@
+         binary_digits_of(entries)
+     );
+ }
++
++/// deadlist 树长到几片叶的那个池：第一个文件之外一个小文件，后面跟一串大文件；快照之后整份重写前面那一段大文件，换下的单元进 deadlist。
++/// 每个大文件换下约三十几条 deadlist 条目，二十四个约八百条；一片 deadlist 叶装约三百七十条（16 KiB 节点、43 字节条目，推的），按 key 递增追加时
++/// 叶分裂成各约一半，于是长到四五片叶（用例开头现判至少三片叶）。
++const DATA_UNITS_OF_THE_SMALL_FILE_OF_THE_DEADLIST_POOL: usize = 8;
++const DATA_UNITS_OF_A_LARGE_FILE_OF_THE_DEADLIST_POOL: usize = 32;
++const LARGE_FILES_OF_THE_DEADLIST_POOL: usize = 26;
++const LARGE_FILES_REWRITTEN_UNDER_THE_SNAPSHOT: usize = 24;
++/// 这个池里 deadlist 树至少几个节点（根加至少三片叶）：整份重写一个文件只改一两片叶与根，照抄的就不止一个。
++const DEADLIST_TREE_NODES_AT_LEAST: usize = 4;
++
++/// 快照下 deadlist 树长到几片叶的池上，整份重写那个八单元的小文件、再整份重写一个没重写过的三十二单元的大文件（各一次发布，一次写的单元数在两档之间变）：
++/// - 三棵多层码 2 树照抄的节点按树分开数（七·6 后续批代码轮第一轮判决第三节第 3 条 ③）：deadlist 树照抄了不止一个节点，
++///   每个经上一版建一次的索引查一次；
++/// - 留给快照的角色清单两处、记录点名的数据角色那一处（判决第三节第 2 条）、按 inode 号找文件三处、装要写与点名的单元（第 1 条），
++///   两档都是每走一遍建一份索引、查的次数至少是这次重写的数据单元数（建索引的次数不随一次写的单元数涨；退回逐个比的那一处一次都不查）。
++///
++/// 判别力：`crates/mutations.tsv` 里攻方 MA4（记账树与 deadlist 树照抄的节点退回在 `units` 上线性找）与「七·6 后续批」起头、
++/// 点名这一条的几行（留给快照的角色清单两处、记录点名的数据角色那一处退回 `.contains`）。
++#[test]
++fn rewrites_of_eight_and_of_thirty_two_data_units_under_a_snapshot_with_a_deadlist_of_several_leaves_build_one_index_per_pass_and_count_each_tree_apart(
++) {
++    let data_units_of_each_file: Vec<usize> =
++        std::iter::once(DATA_UNITS_OF_THE_SMALL_FILE_OF_THE_DEADLIST_POOL)
++            .chain(std::iter::repeat_n(
++                DATA_UNITS_OF_A_LARGE_FILE_OF_THE_DEADLIST_POOL,
++                LARGE_FILES_OF_THE_DEADLIST_POOL,
++            ))
++            .collect();
++    let mut pool = pool_with_files_of_the_sizes(&data_units_of_each_file);
++    pool.session
++        .publish_user_change(&mut pool.devices, UserChange::CreateSnapshot)
++        .unwrap_or_else(|refusal| panic!("建快照：{refusal:?}"));
++    let large_files: Vec<InodeNumber> = pool.inodes[1..].to_vec();
++    // 每重写一个大文件写入时间往后推一秒。
++    for (write_time_seconds, inode) in (common::FIXED_WRITE_TIME_SECONDS + 20_000..)
++        .zip(&large_files[..LARGE_FILES_REWRITTEN_UNDER_THE_SNAPSHOT])
++    {
++        let content = content_of_data_units(
++            DATA_UNITS_OF_A_LARGE_FILE_OF_THE_DEADLIST_POOL,
++            inode.0 + 7_000_001,
++        );
++        pool.session
++            .publish_user_change(
++                &mut pool.devices,
++                UserChange::SequentialWriteOfAnInode {
++                    inode: *inode,
++                    content: &content,
++                    write_time_seconds,
++                },
++            )
++            .unwrap_or_else(|refusal| panic!("快照下整份重写 inode {}：{refusal:?}", inode.0));
++    }
++    let deadlist_before = version_of(&pool.session);
++    println!(
++        "publish_lookup_by_identity deadlist_pool deadlist_entries={} deadlist_tree_nodes={}",
++        deadlist_before.deadlist_entries.len(),
++        deadlist_before.deadlist_tree.shape.nodes().len()
++    );
++    assert!(
++        deadlist_before.deadlist_tree.shape.nodes().len() >= DEADLIST_TREE_NODES_AT_LEAST,
++        "deadlist 树长到至少 {DEADLIST_TREE_NODES_AT_LEAST} 个节点：{} 条 deadlist 条目，{} 个节点",
++        deadlist_before.deadlist_entries.len(),
++        deadlist_before.deadlist_tree.shape.nodes().len()
++    );
++    let small_file = pool.inodes[0];
++    let large_file_not_rewritten = large_files[LARGE_FILES_REWRITTEN_UNDER_THE_SNAPSHOT];
++    for (inode, data_units, write_time_seconds) in [
++        (
++            small_file,
++            DATA_UNITS_OF_THE_SMALL_FILE_OF_THE_DEADLIST_POOL,
++            common::FIXED_WRITE_TIME_SECONDS + 30_000,
++        ),
++        (
++            large_file_not_rewritten,
++            DATA_UNITS_OF_A_LARGE_FILE_OF_THE_DEADLIST_POOL,
++            common::FIXED_WRITE_TIME_SECONDS + 30_001,
++        ),
++    ] {
++        let (_, published, lookup_work) = whole_rewrite_published_once(
++            &mut pool,
++            inode,
++            inode.0 + 9_000_011,
++            data_units,
++            write_time_seconds,
++        );
++        let what = format!("快照下整份重写一个 {data_units} 单元的文件（deadlist 树几片叶）");
++        let [carried_accounting_nodes, carried_deadlist_nodes, carried_mapping_nodes] =
++            assert_the_carried_nodes_of_each_multi_level_tree_are_looked_up_through_one_index(
++                &published,
++                &lookup_work,
++            );
++        println!(
++            "publish_lookup_by_identity deadlist_pool_rewrite data_units={data_units} carried_accounting_nodes={carried_accounting_nodes} \
++             carried_deadlist_nodes={carried_deadlist_nodes} carried_mapping_nodes={carried_mapping_nodes} lookup_work={lookup_work:?}"
++        );
++        assert!(
++            carried_deadlist_nodes >= 2,
++            "{what}：deadlist 树照抄了不止一个节点（{carried_deadlist_nodes} 个）"
++        );
++        assert_the_lookups_of_one_publish_build_one_index_per_pass(
++            &published,
++            &lookup_work,
++            u64::try_from(data_units).expect("单元数"),
++            &what,
++        );
++    }
++}
++
++/// 子进程标记：设着时这条用例是父进程起的那一趟（进程环境里带着外面设的那个特性变量）。
++const CHILD_RUN_MARKER_OF_THE_BUILD_SCRIPT_CHECK: &str =
++    "SINGLEFS_HARNESS_CORE_BUILD_SCRIPT_CHECK_CHILD_RUN";
++/// cargo 给构建脚本设的、表示 `lookup-work-counters` 开着的那个环境变量名：这里从外面带进来、冒充开着。
++const VARIABLE_OF_THE_LOOKUP_WORK_COUNTERS_FEATURE: &str = "CARGO_FEATURE_LOOKUP_WORK_COUNTERS";
++/// 下面那条用例的名字（子进程按它 `--exact` 只跑这一条）。
++const NAME_OF_THE_BUILD_SCRIPT_CHECK: &str =
++    "the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside";
++
++/// `singlefs-core` 清单 `[features]` 里的特性名（`name = …` 那几行等号左边，不含注释行），按名字排好。
++fn feature_names_of_the_core_manifest() -> Vec<String> {
++    let manifest_text = std::fs::read_to_string(concat!(
++        env!("CARGO_MANIFEST_DIR"),
++        "/../singlefs-core/Cargo.toml"
++    ))
++    .expect("读得了核心层清单");
++    let mut names: Vec<String> = manifest_text
++        .lines()
++        .skip_while(|line| line.trim() != "[features]")
++        .skip(1)
++        .take_while(|line| !line.trim_start().starts_with('['))
++        .filter(|line| !line.trim_start().starts_with('#'))
++        .filter_map(|line| {
++            line.split_once('=')
++                .map(|(name, _)| name.trim().to_string())
++        })
++        .collect();
++    names.sort();
++    names
++}
++
++/// `singlefs-core` 构建脚本交出的特性只认 cargo 这一次真开的（七·6 后续批代码轮第一轮判决第三节第 4 条）：
++/// - 进程环境里外带 `CARGO_FEATURE_LOOKUP_WORK_COUNTERS=1`、特性不开（这个测试包没有这个特性，编进来的构建脚本里那一行 cfg 为假）：交出空串。
++///   变量要真在进程环境里才判得出「不读环境」：在子进程里跑本测试二进制的这一条（带那个变量与一个标记），父进程判子进程绿、恰好跑了一条；
++/// - cfg 说开着时交出 `LOOKUP_WORK_COUNTERS`（依赖方 `singlefs_unit_graph::build_features` 按这个写法读回清单里的 `lookup-work-counters`）；
++/// - 构建脚本里的特性表与它清单 `[features]` 逐个相同（漏写一个，依赖方就当它没开）。
++///
++/// 判别力：`crates/mutations.tsv` 里「七·6 后续批 构建脚本：」起头的那一行（交出前把进程环境里设着的 `CARGO_FEATURE_*` 也算开着）。
++#[test]
++fn the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside(
++) {
++    let reported_with_the_feature_off = singlefs_core_build_script::enabled_features_metadata_value(
++        &singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG,
++    );
++    if std::env::var_os(CHILD_RUN_MARKER_OF_THE_BUILD_SCRIPT_CHECK).is_some() {
++        assert!(
++            std::env::var_os(VARIABLE_OF_THE_LOOKUP_WORK_COUNTERS_FEATURE).is_some(),
++            "子进程里外带的 {VARIABLE_OF_THE_LOOKUP_WORK_COUNTERS_FEATURE} 设着"
++        );
++        assert_eq!(
++            reported_with_the_feature_off, "",
++            "环境里外带 {VARIABLE_OF_THE_LOOKUP_WORK_COUNTERS_FEATURE}=1、特性没开：构建脚本不报开着"
++        );
++        return;
++    }
++    let child = std::process::Command::new(std::env::current_exe().expect("测试二进制自己的路径"))
++        .args([
++            "--exact",
++            NAME_OF_THE_BUILD_SCRIPT_CHECK,
++            "--test-threads",
++            "1",
++            "--nocapture",
++        ])
++        .env(VARIABLE_OF_THE_LOOKUP_WORK_COUNTERS_FEATURE, "1")
++        .env(CHILD_RUN_MARKER_OF_THE_BUILD_SCRIPT_CHECK, "1")
++        .output()
++        .expect("起得了子进程");
++    let child_output = format!(
++        "{}{}",
++        String::from_utf8_lossy(&child.stdout),
++        String::from_utf8_lossy(&child.stderr)
++    );
++    assert!(
++        child.status.success() && child_output.contains("test result: ok. 1 passed"),
++        "外带 {VARIABLE_OF_THE_LOOKUP_WORK_COUNTERS_FEATURE}=1 的子进程里这一条绿、恰好跑了一条（退出 {:?}）：{child_output}",
++        child.status.code()
++    );
++    assert_eq!(
++        reported_with_the_feature_off, "",
++        "不外带变量、特性没开：构建脚本不报开着"
++    );
++    assert_eq!(
++        singlefs_core_build_script::enabled_features_metadata_value(&[(
++            "lookup-work-counters",
++            true
++        )]),
++        "LOOKUP_WORK_COUNTERS",
++        "cfg 说开着：交出 cargo 环境变量名的写法"
++    );
++    let mut names_in_the_table: Vec<String> =
++        singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG
++            .iter()
++            .map(|(feature, _)| (*feature).to_string())
++            .collect();
++    names_in_the_table.sort();
++    assert_eq!(
++        names_in_the_table,
++        feature_names_of_the_core_manifest(),
++        "构建脚本的特性表与 singlefs-core 清单 [features] 逐个相同"
++    );
++}

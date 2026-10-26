@@ -1,4 +1,0 @@
-565620bcead49240809b3788d09345f1e339007874b22207006c45f8b4cc77ef  .claude/kb/decisions/23-journal的角色与格式.md
-0e9029723d43752aa6d42fdbb271369c3ae3cccbfdbf556bbf4cd53cd15e9a6f  .claude/kb/decisions/19-块指针的结构与宽度预算.md
-cfea72c9bb015cb5dc6b3c8501d258c15c41add96d45cc52aa1142897f04eacd  .claude/kb/checks-owed.md
-cee4cbb7da5bd2eb0f5a3c652448974ccf9e19b18bb497546dd2767ba83864ad  .claude/kb/term-renames.md

@@ -1,0 +1,6 @@
+打出的命令（起 merge-and-verify 时 SINGLEFS_HEAVY_TESTS=没设）：SINGLEFS_HEAVY_TESTS=user-request SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 checker-tier-crash-point-replay.sh 的 crash-case-replay、feature-gated-tests 格; 范围=2 格; 为什么=合入后验证这几格红了，修完只重跑它们：键相同的照复用，只现判红的那几条与改后键变了的' bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 31 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/.claude/gate.d/checker-tier-crash-point-replay.sh --check crash-case-replay\,feature-gated-tests /home/fy5090/code/singlefs
+  主 agent 身份喂 heavy-test-guard.sh：退 0 
+  主 agent 身份喂 run-scope-guard.sh：退 0 
+打出的命令（起 merge-and-verify 时 SINGLEFS_HEAVY_TESTS=user-request）：SINGLEFS_HEAVY_TESTS=user-request SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 checker-tier-crash-point-replay.sh 的 crash-case-replay、feature-gated-tests 格; 范围=2 格; 为什么=合入后验证这几格红了，修完只重跑它们：键相同的照复用，只现判红的那几条与改后键变了的' bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 31 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/.claude/gate.d/checker-tier-crash-point-replay.sh --check crash-case-replay\,feature-gated-tests /home/fy5090/code/singlefs
+  主 agent 身份喂 heavy-test-guard.sh：退 0 
+  主 agent 身份喂 run-scope-guard.sh：退 0 

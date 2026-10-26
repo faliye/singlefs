@@ -1,8 +1,0 @@
-
-/// 草稿探针（m4-trunc-r1 正推腿，只在草稿副本里加，不入库）：把私有的 `roles_replaced_via_mapping` 露出来给探针测试调。
-pub fn probe_roles_replaced_via_mapping(
-    previous: &TransactionOutput,
-    roles: &[TransactionUnit],
-) -> Vec<TransactionUnit> {
-    roles_replaced_via_mapping(previous, roles)
-}

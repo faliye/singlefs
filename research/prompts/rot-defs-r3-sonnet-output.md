@@ -110,7 +110,7 @@ $ ls research/results | wc -l; ls research/results | grep -cP '[^\x00-\x7f]'; ls
 
 （依次：产物 177 份，带非 ASCII 字符 0 份，带下划线 0 份，以 `e<号>` 起头 177 份；定义里 `bin e<号>-<简称>` 还剩 0 处。）
 
-**钩子上量过（用例总表在第八节）。** 执行员 `scripts/experiments` 那一支的单测 A1 放行（0/0/0）；入库装置的单测 A2（带 `-p`）、A3（不带 `-p`）重型闸拒（0/2/0，改前也拒），拒绝说明给出路「在交回报告「要主 agent 跑的命令」一节写明要跑什么」，R1 把这条出路写成了固定一步；执行员执行编好的装置二进制 A4 放行；别的装置的别的用法 B3、B8 放行。主 agent 带 `=commit`、`=user-request` 跑单测都放行（R1-main-unit-test-commit、R1-main-unit-test-user-request 两例都是 0/0/0）。所以 R1 的「执行员只执行编好的二进制」不撞 R2：R2 只拒登记的那一种重放用法。
+**钩子上量过（用例总表在第八节）。** 执行员 `scripts/experiment-apparatus` 那一支的单测 A1 放行（0/0/0）；入库装置的单测 A2（带 `-p`）、A3（不带 `-p`）重型闸拒（0/2/0，改前也拒），拒绝说明给出路「在交回报告「要主 agent 跑的命令」一节写明要跑什么」，R1 把这条出路写成了固定一步；执行员执行编好的装置二进制 A4 放行；别的装置的别的用法 B3、B8 放行。主 agent 带 `=commit`、`=user-request` 跑单测都放行（R1-main-unit-test-commit、R1-main-unit-test-user-request 两例都是 0/0/0）。所以 R1 的「执行员只执行编好的二进制」不撞 R2：R2 只拒登记的那一种重放用法。
 
 **三处落偏。**
 - ① 括号「（checker 档，重型闸拒）」对 `cargo run` 不成立：用例 A5（`cargo run --release -p singlefs-checker-tier --bin e183_…`）、A6（不带 `-p`）在快照版与今天版都是 0/0/0。钩子文件头自己写着 `.claude/hooks/lib_heavy_tests.py:68`「`cargo run` 起 checker 档包自己的装置二进制也照旧不判（只有 e152 那一个按名字算」。括号是工具员加的（判决 R1 没提 `cargo run`），定义本身仍禁止执行员起，所以后果只是理由写错，不是放行。**判决没写到 + 工具员写偏。**
@@ -135,7 +135,7 @@ $ grep -c '入库装置' .claude/rules/verification.md
 
 ### R2　直接执行装置本体放行收严（钩子，快照版 lib 与 guard）
 
-**落了什么。** 装置名与选项读登记，不另抄名单：`.claude/hooks/lib_heavy_tests.py:72`「装置名与选项登记在那份脚本的 DEVICE_BINARY、DEVICE_FLAG 两个常量里，这里读那两行，不另抄名单」；登记处是 `scripts/experiments/e165-pin-red-examples.py:247`「DEVICE_BINARY = "e165_replay_bounded_enumeration"」 与 `scripts/experiments/e165-pin-red-examples.py:248`「DEVICE_FLAG = "--pinned-cases"」。装置那一侧只认「选项 + 表」两个参数：`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17687`「if option == "--pinned-cases" {」。
+**落了什么。** 装置名与选项读登记，不另抄名单：`.claude/hooks/lib_heavy_tests.py:72`「装置名与选项登记在那份脚本的 DEVICE_BINARY、DEVICE_FLAG 两个常量里，这里读那两行，不另抄名单」；登记处是 `scripts/experiment-apparatus/e165-pin-red-examples.py:247`「DEVICE_BINARY = "e165_replay_bounded_enumeration"」 与 `scripts/experiment-apparatus/e165-pin-red-examples.py:248`「DEVICE_FLAG = "--pinned-cases"」。装置那一侧只认「选项 + 表」两个参数：`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17687`「if option == "--pinned-cases" {」。
 
 **改前放行、改后拒（改前版 = 倒回的两份，改后版 = 快照版；三个数依次是检出闸 / 重型闸 / 范围声明闸）：**
 
@@ -217,7 +217,7 @@ light-tier-break-variable-ignored: ✗ 行 5 条
 - `.claude/gate.d/checker-tier-crates-mutation-replay.sh:121`「GATE_MUTATION_BREAK=quickrunsallrows  --quick 不读轻型变异登记表，整张表都判」，代码 `.claude/gate.d/checker-tier-crates-mutation-replay.sh:189`「if ((quick)) && ((list_items == 0)) && [[ ",${GATE_MUTATION_BREAK:-}," != *,quickrunsallrows,* ]]; then」；同一个变量的别的值（例 `.claude/gate.d/checker-tier-crates-mutation-replay.sh:108`「GATE_MUTATION_BREAK=keepmutationtmp  拿掉删临时目录那一步」）不改 `--quick` 挑哪几行。
 - `.claude/gate.d/checker-tier-formal-verification.sh:196`「if [[ ",${FORMAL_VERIFICATION_BREAK:-}," != *,quick-core-unselected,* ]]; then」。开了它就不把核心三项并进要跑的项，核心三项是 `.claude/gate.d/checker-tier-formal-verification.sh:147`「QUICK_CORE_ITEMS=(toolchain proof table)」。
 - 崩溃点重放入口不是这样：`scripts/crash/crash-point-replay.sh:231`「只供自证（自证起的子进程里才认；平常跑时有一个非空就退 2 拒跑」，代码 `scripts/crash/crash-point-replay.sh:272`「[[ -n "$replay_break" ]] && replay_test_variables+=(CRASH_POINT_REPLAY_BREAK)」 加 `scripts/crash/crash-point-replay.sh:305`「elif (( ${#replay_test_variables[@]} )) && (( ! list_items )) && ! replay_break_is honor-test-variables-outside-selftest; then」：设了就退 2，什么都不起，不存在「照整道跑」。
-- 子脚本开关（C3 的 `E165_PIN_RED_EXAMPLES_BREAK`）改的是判法不是挑项：`scripts/experiments/e165-pin-red-examples.py:270`「BREAK = {item for item in os.environ.get("E165_PIN_RED_EXAMPLES_BREAK", "").split(",") if item}」，`--quick` 跑的还是核心三项，只是 table 格的判法被弄坏。
+- 子脚本开关（C3 的 `E165_PIN_RED_EXAMPLES_BREAK`）改的是判法不是挑项：`scripts/experiment-apparatus/e165-pin-red-examples.py:270`「BREAK = {item for item in os.environ.get("E165_PIN_RED_EXAMPLES_BREAK", "").split(",") if item}」，`--quick` 跑的还是核心三项，只是 table 格的判法被弄坏。
 
 钩子把前提写进了拒绝说明和规则：
 
@@ -415,7 +415,7 @@ $ git diff --stat -- .claude/rules/verification.md | tail -n 1
 | 入库装置单测被重型闸拒 | A2、A3（带与不带 `-p`） | 改前改后都 0/2/0 | 对上 |
 | 「这一批 E181、E182 执行员各撞过一次」 | 看门狗检出记录（下面命令） | 各一条 | 对上 |
 | 辩方 H1：`--list-items --with-keys` 是重型 | E1、E3、E2、E4 | 无前缀与子 agent 拒，带 `=commit`、单独 `--list-items` 放 | 对上 |
-| 攻方「装置本体放行重放」：改前放行 | B1、B2 | 改前 0/0/0 | 对上；「同一份活」是推的，现读：`scripts/experiments/e165-pin-red-examples.py:1173`「command = (["bash", binary] if binary.endswith(".sh") else [binary]) + [DEVICE_FLAG, block_table, *profile_arguments]」，门禁格起的就是 B1 那一形 |
+| 攻方「装置本体放行重放」：改前放行 | B1、B2 | 改前 0/0/0 | 对上；「同一份活」是推的，现读：`scripts/experiment-apparatus/e165-pin-red-examples.py:1173`「command = (["bash", binary] if binary.endswith(".sh") else [binary]) + [DEVICE_FLAG, block_table, *profile_arguments]」，门禁格起的就是 B1 那一形 |
 | 攻方「轻型开关」：改前放行 | C1、C2、C3、C5 | 改前 0/0/0 | 钩子一侧对上；**门禁一侧「会照整道跑」说宽**（R3 节：只对两个值成立，崩溃入口退 2） |
 | 攻方「声明夹进包装」：三道钩子放行、跑起来退 127 | D2、D3；`capped.sh` 真跑 | 0/0/0；退 127 | 对上 |
 | 攻方「监控行」：数出 ✓ 0 ✗ 0 | 构造样本喂原 grep | 绿的 0、红的 ≥ 1 | **说宽**（R4 节） |

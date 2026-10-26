@@ -1,0 +1,12 @@
+T3DIFF case=untouched result=Ok digest=990476732496cd8d deadlist_entries=4 kept=4 released=8
+T3DIFF case=duplicate-role-appended-with-another-key result=Ok digest=990476732496cd8d deadlist_entries=4 kept=4 released=8
+T3DIFF case=duplicate-role-prepended-with-another-key result=Err ReleaseNotInMapping { unit: Data(DataUnitIndexInFile(0)) }
+T3DIFF case=duplicate-role-same-key-twice result=Ok digest=990476732496cd8d deadlist_entries=4 kept=4 released=8
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=role-data-0-missing result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=role-inode-root-missing result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=role-extent-root-missing result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=mapped-units-empty result=Panic message=照抄进来的角色在上一版里进映射、有一把 key

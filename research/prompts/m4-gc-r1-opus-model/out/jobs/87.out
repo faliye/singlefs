@@ -1,5 +1,0 @@
-E name=old_skip nseg=4 segsz=4 ring=3 maxobj=2 b=1 depth=8 states=449573 live_released=0 unreadable=0 dup_map=0 leak=0 hint_bad=0 gc_stuck=0 livelock=354788 frozen=0 unmet_del=0 false_enospc=232 release_bad=0 rb_refused=0 del_pred_true=6270 del_pred_false=27800 n0_refused=0 gc_done=67238 gc_declined=24485 gc_stuck=0 gc_paused=3062 gc_cycle=354152 gc_cap=636 gc_wasted=0
-W name=old_skip flag=livelock path=W0
-W name=old_skip flag=false_enospc path=W0.GI.O0.W1.O0.O0.O0
-W name=old_skip flag=del_pred_true path=W0.GI.D0.GB
-W name=old_skip flag=del_pred_false path=W0.GI.GB

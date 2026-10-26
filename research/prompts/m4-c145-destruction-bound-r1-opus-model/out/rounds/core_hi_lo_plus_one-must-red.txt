@@ -1,0 +1,28 @@
+warning: unused variable: `hi_when_the_next_side_is_the_live_head`
+    --> crates/singlefs-core/src/transaction.rs:6172:5
+     |
+6172 |     hi_when_the_next_side_is_the_live_head: CheckpointTxg,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hi_when_the_next_side_is_the_live_head`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+   Compiling singlefs-harness v0.1.0 (〔第二台的仓目录〕/runs/m4-c145-destruction-bound-r1-opus-rounds-fixed/peer-frozen-copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running tests/checker_snapshot_space_accounting_must_red_worlds.rs (target/debug/deps/checker_snapshot_space_accounting_must_red_worlds-7eafecdab17bd5e8)
+
+running 11 tests
+test a_deadlist_missing_the_entry_of_a_unit_only_the_snapshot_references_reddens_the_reference_intervals ... ok
+test a_deadlist_pinning_a_data_unit_the_head_still_references_reddens_the_reference_intervals ... ok
+test removing_the_second_snapshot_from_the_newest_tree_table_reddens_the_enumerable_invariant ... ok
+test adding_a_snapshot_pair_with_an_older_txg_to_the_newest_tree_table_reddens_the_enumerable_invariant ... ok
+test a_node_only_the_snapshot_tree_references_with_a_broken_key_range_reddens_the_self_description_invariant ... ok
+test the_pool_checker_holds_every_invariant_after_an_overwrite_under_a_snapshot ... ok
+test a_unit_born_after_the_snapshot_put_on_the_deadlist_reddens_the_tight_bound ... ok
+test a_deadlist_pinning_a_unit_no_live_snapshot_references_reddens_the_reverse_direction ... ok
+test a_block_released_from_the_deadlist_with_the_txg_of_the_destruction_intent_reddens_the_release_generation_invariant ... ok
+test the_pool_checker_holds_the_snapshot_and_deadlist_invariants_on_a_pool_with_three_snapshots ... ok
+test the_previous_snapshot_txg_holds_after_the_destruction_intent_and_after_the_last_batch ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+

@@ -1,1 +1,0 @@
-bash scripts/hosts/run-with-memory-cap.sh 8G target/release/deps/e181_landing_check_fixed_point_and_mount_lower_bound-9f6a861789a3f5ea

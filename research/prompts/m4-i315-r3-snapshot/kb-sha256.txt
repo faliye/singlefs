@@ -1,0 +1,13 @@
+1fe61a6d7bdd9160af32db226e3903ebe1887bb8dc4db3563f88de50d691c26d  .claude/kb/experiments/112-legacy-writer-encountering-unknown-trees.en.md
+c456eba63cdcac765921db861b398256c0e023604c708802b76d0234d2091bfe  .claude/kb/experiments/112-旧ライターが未知のツリーに遭遇した場合.ja.md
+044f88ffaf93937238b16a59a4a77bcdef22440e40a1327c66644fb8a2579154  crates/singlefs-checker/invariants/05-空间记账.md
+ff6aa88a1e5dc2f8b8d9d6de544c20f4234e42f0c778fc5036ad49fafddbade1  .claude/kb/decisions/19-block-pointer-structure-width-budget.en.md
+226b36b6f3383383b55454ed25b1a9d00e0bf50e4f260cc8ab6a7e5e7869cc4d  .claude/kb/decisions/19-ブロックポインタ構造と幅予算.ja.md
+85c20b626ca6c7a2953b64a6de2ff97f759327374b233d656f82f53039c73625  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+740abf9b0792acebcb59163176caf9806e88d24822d4958a3fe2c4876cb92c6b  .claude/kb/decisions/03-丙.en.md
+08aab6200515ee87d899cb4514e9528d20e65dbebf243aa335635d9c8bb45981  .claude/kb/decisions/03-space-allocation.en.md
+96bd1d62d3eb2ec8f0b8b58ed160284ed4c204f332589145117eb5e24d513155  .claude/kb/decisions/03-領域割り当て.ja.md
+5fa3dd948f6a51a6b5fd12969b28c6df04deb4baf024bf07ca3690f786c5c796  .claude/kb/decisions/03-空间分配.md
+c0c6b5ba4790381e205aa7a71901da3b4aae1bb67a227a6254ce6959099f02ff  .claude/kb/decisions/13-verification-route.en.md
+a89c0b9cceb459a1dce4828f443f13f42bdec150e6db1b350175c80730764bf3  .claude/kb/decisions/13-検証ルート.ja.md
+c33fac2be12fb000adc861e2b83818003ddc5b8c3211276a44cde4cb59103dd9  .claude/kb/decisions/13-验证路线.md

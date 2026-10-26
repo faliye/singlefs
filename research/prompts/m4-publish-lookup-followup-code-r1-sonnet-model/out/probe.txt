@@ -1,0 +1,13 @@
+PROBE scenario=relocation_batch_of_4 n=8 units=87 rewritten=10 written_find=815 named_find=815 roles_named_contains=0 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=relocation_batch_of_4 n=16 units=159 rewritten=10 written_find=1535 named_find=1535 roles_named_contains=0 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=relocation_batch_of_4 n=32 units=307 rewritten=14 written_find=4193 named_find=4193 roles_named_contains=0 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=relocation_batch_of_4 n=64 units=599 rewritten=16 written_find=9422 named_find=9422 roles_named_contains=0 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=whole_rewrite_no_snapshot n=32 units=48 rewritten=46 written_find=1127 named_find=1127 roles_named_contains=2883 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=whole_rewrite_no_snapshot n=64 units=80 rewritten=78 written_find=3159 named_find=3159 roles_named_contains=8883 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=whole_rewrite_no_snapshot n=128 units=144 rewritten=142 written_find=10295 named_find=10295 roles_named_contains=30099 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=whole_rewrite_no_snapshot n=256 units=276 rewritten=274 written_find=37949 named_find=37949 roles_named_contains=112455 kept_contains_release=0 kept_contains_mapped_roles=0
+PROBE scenario=whole_rewrite_under_a_snapshot n=16 units=33 rewritten=31 written_find=527 named_find=527 roles_named_contains=1080 kept_contains_release=1050 kept_contains_mapped_roles=820
+PROBE scenario=whole_rewrite_under_a_snapshot n=32 units=49 rewritten=47 written_find=1175 named_find=1175 roles_named_contains=2976 kept_contains_release=2754 kept_contains_mapped_roles=2052
+PROBE scenario=whole_rewrite_under_a_snapshot n=64 units=81 rewritten=77 written_find=3097 named_find=3097 roles_named_contains=8694 kept_contains_release=5440 kept_contains_mapped_roles=5780
+PROBE scenario=whole_rewrite_under_a_snapshot n=128 units=145 rewritten=141 written_find=10169 named_find=10169 roles_named_contains=29718 kept_contains_release=19008 kept_contains_mapped_roles=19668
+PROBE scenario=whole_rewrite_under_a_snapshot n=256 units=280 rewritten=276 written_find=38528 named_find=38528 roles_named_contains=113985 kept_contains_release=108337 kept_contains_mapped_roles=73098

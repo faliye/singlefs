@@ -1,1 +1,0 @@
-SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=规格翻了 D13 分项状态，要重生成 decisions.md 的分项清单与索引表两列' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync

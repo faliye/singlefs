@@ -1,0 +1,44 @@
+name=verus case=axiom-plain-no-cheating rc=1 error: external_body/assume_specification not allowed with --no-cheating 
+name=verus case=axiom-plain-without-no-cheating rc=0 verification results:: 1 verified, 0 errors 
+name=verus case=axiom-broadcast-no-cheating rc=1 error: external_body/assume_specification not allowed with --no-cheating error: external_body/assume_specification not allowed with --no-cheating 
+name=verus case=assume-specification-no-cheating rc=1 error: external_body/assume_specification not allowed with --no-cheating 
+name=verus case=assume-specification-without-no-cheating rc=0 verification results:: 1 verified, 0 errors 
+name=verus case=divergence-only-no-cheating rc=0 verification results:: 2 verified, 0 errors 
+name=verus case=both-modules-without-no-cheating rc=0 verification results:: 3 verified, 0 errors 
+name=verus case=divergence-must-red-verified-body rc=1 error: postcondition not satisfied error: possible arithmetic underflow/overflow 
+name=verus case=divergence-must-red-cfg-macro rc=1 error: postcondition not satisfied error: possible arithmetic underflow/overflow 
+name=verus case=std-spec-must-red-first-index rc=1 error: postcondition not satisfied verification results:: 2 verified, 1 errors 
+name=verus case=y5-baseline-two-frozen-proofs rc=0 verification results:: 31 verified, 0 errors 
+name=verus case=y5-attack rc=0 verification results:: 33 verified, 0 errors 
+name=verus case=y5-must-red-rollback-read-unchanged rc=1 error: assertion failed verification results:: 32 verified, 1 errors 
+name=verus case=y5-must-red-protocol-allows-the-write rc=1 error: assertion failed verification results:: 32 verified, 1 errors 
+name=verus case=y5-must-red-two-slot-write-refused rc=1 error: assertion failed verification results:: 32 verified, 1 errors 
+name=product-build rc=0
+name=product-run fn=destination_after start=10 span=2 returned=11 ensures_holds=false
+name=product-run fn=destination_after_by_the_cfg_macro start=10 span=2 returned=11 ensures_holds=false
+name=product-run fn=first_index_of slice=[2, 2, 2, 2, 2] returned=Some(4) ensures_holds=false
+name=closure-union entries=publish_relocation_batch+roll_back_by_a_forward_publish fn=1073 fn_lines=24970 core_fn=1071
+name=closure-union-in-impl core_fn_inside_impl_or_trait=598 of=1071
+name=closure-union-name-collisions distinct_names_shared_by_two_or_more_fns=82 fns_carrying_a_shared_name=274 top=[('to_bytes', 12), ('parse', 12), ('from', 11), ('new', 9), ('journal_record_offsets_hint', 8), ('device_size_in_bytes', 7)]
+name=closure-overlap core_fn_in_union_and_in_judge_crash_image=549 of=1071 judge_fn_total=1298 judge_core_fn=589
+name=closure-recover-outside-union core_fn_in_recover_not_in_union=30 recover_core_fn=571
+name=closure-union-test-only-switch-types present=['CompactionBatchSize', 'CompactionRunForcing', 'DeletionSwitches', 'ReuseWindow', 'UnlinkBatchSize']
+name=membership fn=set_reuse_window in_publish=0 in_rollback=0 in_judge=0
+name=membership fn=release_leaving_the_record_allocated_on in_publish=1 in_rollback=1 in_judge=0
+name=membership fn=reclaim_released_records_up_to in_publish=1 in_rollback=1 in_judge=0
+name=closure-recover-outside-union-lines fns=30 fn_lines=1521 includes_mapping_read=1 includes_read_mapped_tree_root=1 includes_replay_journal=1
+name=closure-sizes publish_fn=836 rollback_fn=1057 judge_fn=1298 recover_fn=654
+name=cfg-in-closure-fn-bodies cfg=feature="lookup-work-counters" fns=3 first=['count', 'drop', 'entering']
+name=cfg-in-closure-fn-bodies cfg=not(feature="lookup-work-counters") fns=2 first=['count', 'entering']
+name=cfg-in-closure-fn-bodies total_core_fns=1071
+name=judge-key variant=frozen key=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=comment-only key=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=wrapped-in-verus-without-ghost key=7e76314e8552a53efb6ffba49fdd23179799ac94d07f0eab7f0e05a88be4900a
+name=judge-key variant=wrapped-with-an-ensures key=070444cae357beefb8aaf8667e20de83084a1de14ee7af30c5daebddaf82378d
+name=judge-key variant=wrapped-with-an-ensures-and-a-proof-block key=2efa80a4899459c24451b5d1c05353d418c1258c163cd60528268806bb3fb314
+name=cargo-tree core_already_depends_on_vstd_through_singlefs_replay_prefix=yes
+name=cheating-regex text=pub_axiom_fn_a_lemma_that_proves_false matches=0
+name=cheating-regex text=pub_broadcast_axiom_fn_axiom_every_slot_ matches=0
+name=cheating-regex text=#[cfg matches=0
+name=cheating-regex text=if_cfg! matches=0
+name=cheating-regex text=pub_assume_specification<T:_Ord>[_<[T]>: matches=1

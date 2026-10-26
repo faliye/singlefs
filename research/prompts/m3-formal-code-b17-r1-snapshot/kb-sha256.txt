@@ -1,4 +1,0 @@
-244b83faf6eafeb911b2312b569d62725404f34fb65ee5d999e431da75bd942c  .claude/kb/invariants.md
-d102fa93ac79a1ead84bbec6460d3b5090cb269f13d0728850aac626b2daa447  .claude/kb/decisions/08-核心索引结构.md
-2e7386a0b6240e6c591ba8d1144b427bda2791a6db921ebf406e29e2415d6b49  .claude/kb/decisions/03-空间分配.md
-b18a1253269852d6452fb09159c5ddfdd56686f0e2f674f9a1925ffb682b909b  .claude/kb/experiments/171-三oracle合谋测试.md

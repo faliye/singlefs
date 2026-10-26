@@ -1,6 +1,0 @@
-  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-opus-output.md:169 引 crates/singlefs-harness/src/model.rs:820：行号在文件范围内，没有引文可比
-  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-opus-output.md:275 引 crates/singlefs-core/src/mount.rs:4813：行号在文件范围内，没有引文可比
-  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-opus-output.md:289 引 crates/singlefs-core/src/unlink.rs:112：行号在文件范围内，没有引文可比
-  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-opus-output.md:296 引 crates/singlefs-core/src/region_scan.rs:261：行号在文件范围内，没有引文可比
-  - 没判（裸行号，没有引文可比）：m4-segment-code-r1-opus-output.md:297 引 crates/singlefs-core/src/compaction_plan.rs:808：行号在文件范围内，没有引文可比
-  ✓ 核了 31 处引文、5 处裸行号，对上 31 处，没判 5 处（其中裸行号没有引文可比 5 处；逐处列在上面）

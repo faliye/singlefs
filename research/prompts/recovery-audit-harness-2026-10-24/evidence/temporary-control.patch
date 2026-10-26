@@ -1,0 +1,82 @@
+--- original/src/model.rs
++++ temporary-control/src/model.rs
+@@ -7283,6 +7283,9 @@
+                 roots,
+                 reported_ceiling,
+             } => {
++                if answer.expected_read_back.is_some() {
++                    return Err(ModelDisagreement::new(ModelDisagreementAspect::NotModeled, "audit: cold-start requires readback".into(), "audit: got publishes".into()));
++                }
+                 self.judge_reported_ceiling(answer, *reported_ceiling, counts)?;
+                 if answer.operation == ModelOperationKind::RaiseRollbackFloor
+                     && reported_ceiling.is_none()
+--- original/src/fault_injection.rs
++++ temporary-control/src/fault_injection.rs
+@@ -1067,6 +1067,19 @@
+ }
+ 
+ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
++    fn reread_at_after_a_bad_read(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        self.inner.reread_at_after_a_bad_read(offset, buffer)
++    }
++    fn read_at_straight_from_the_disk(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        self.inner.read_at_straight_from_the_disk(offset, buffer)
++    }
++    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
++        self.inner.keep_the_self_verified_reread(offset, bytes)
++    }
++    fn note_the_read_failing_self_verification_and_forget_its_bytes(&self, offset: DeviceOffsetInBytes, length: u64) {
++        self.inner.note_the_read_failing_self_verification_and_forget_its_bytes(offset, length)
++    }
++
+     fn read_at(
+         &self,
+         offset: DeviceOffsetInBytes,
+--- original/src/read_tally.rs
++++ temporary-control/src/read_tally.rs
+@@ -192,6 +192,23 @@
+ }
+ 
+ impl<Inner: BlockDevice> BlockDevice for ReadLoggingBlockDevice<Inner> {
++    fn reread_at_after_a_bad_read(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        self.inner.reread_at_after_a_bad_read(offset, buffer)
++    }
++    fn read_at_straight_from_the_disk(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        self.inner.read_at_straight_from_the_disk(offset, buffer)
++    }
++    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
++        self.inner.keep_the_self_verified_reread(offset, bytes)
++    }
++    fn note_the_read_failing_self_verification_and_forget_its_bytes(&self, offset: DeviceOffsetInBytes, length: u64) {
++        self.inner.note_the_read_failing_self_verification_and_forget_its_bytes(offset, length)
++    }
++
++    fn discard_at(&mut self, offset: DeviceOffsetInBytes, length: u64) -> Result<singlefs_core::block_device::DiscardOutcome, BlockDeviceError> {
++        self.inner.discard_at(offset, length)
++    }
++
+     fn read_at(
+         &self,
+         offset: DeviceOffsetInBytes,
+--- original/src/lib.rs
++++ temporary-control/src/lib.rs
+@@ -427,6 +427,19 @@
+ }
+ 
+ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
++    fn reread_at_after_a_bad_read(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        self.inner.reread_at_after_a_bad_read(offset, buffer)
++    }
++    fn read_at_straight_from_the_disk(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        self.inner.read_at_straight_from_the_disk(offset, buffer)
++    }
++    fn keep_the_self_verified_reread(&self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
++        self.inner.keep_the_self_verified_reread(offset, bytes)
++    }
++    fn note_the_read_failing_self_verification_and_forget_its_bytes(&self, offset: DeviceOffsetInBytes, length: u64) {
++        self.inner.note_the_read_failing_self_verification_and_forget_its_bytes(offset, length)
++    }
++
+     fn read_at(
+         &self,
+         offset: DeviceOffsetInBytes,

@@ -1,0 +1,6 @@
+name=content_rows rows=[1, 4]
+name=multipath-registry before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=replay-comparison-units before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=mutation-tables before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=reading-discipline before_rows=[1, 2, 3, 4] after_rows=[1, 4] same=False
+name=doc-process-records before_rows=[1, 4] after_rows=[1, 4] same=True

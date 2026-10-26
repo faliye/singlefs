@@ -1,4 +1,0 @@
-cf32ad9a58e143768cc833d7f95a0f95b7e75c908e47f617d7cbbeea3defcf00  .claude/kb/invariants.md
-bcb62ad096caefa39084a9f05619e577ecb4280bba69255ad69012d2d0f2443d  .claude/kb/experiments/142-新池新建文件的干跑.md
-32536fc9e05ab3b3d62a87ffce44cd200b09df180710c96f5b7137a102e2ba3f  .claude/kb/checks-owed.md
-268e78ce3d2e820b420244191d64c70ab5706005959a8ceb3cdce154be590425  .claude/kb/experiments/07-离线索引harness.md

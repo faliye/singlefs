@@ -1,4 +1,0 @@
-run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 41.6 GiB，这一条要 2.0 GiB（峰值表里没有这条，按它的上限 2G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 6 条
-run-with-memory-cap: 排了 56 秒，起跑（singlefs-memory-cap-3330462-229309851）
-name=fresh io_min=512 recover=NoFile(i0t0) raw_red=[]
-name=fresh io_min=65536 recover=NoFile(i0t0) raw_red=[]

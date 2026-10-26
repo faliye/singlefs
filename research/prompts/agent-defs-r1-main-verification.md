@@ -34,7 +34,7 @@
 | C2 变更史条目标题不在输入里 | Opus | **采纳** | 读 `lib-history-brief.py` 第 59–65 行、`lib-item-ref-status.py` 第 62–63 行（核查员核过引用） | `kb-scribe` 输入：标题整行由主 agent 给 |
 | C3 49 号 `--write` 会给别的会话的条目补「（待补）」 | Opus | **采纳（条件打中）** | 核查员复跑一致 | `kb-scribe` 第 2 步：跑前跑后 diff，改到这一轮之外的条目就停 |
 | C4 子 agent 取不到派发前的哈希 | Opus | **采纳（轻）** | 读定义 | `kb-scribe`：哈希记开工时与收尾时两次 |
-| D1 定义没写 `mutate.sh` 的参数与 bin 名，写错时脚本报成「基线就是红的」 | Opus；`mutation-triage` 试跑同一问题 | **采纳** | 现查 `scripts/experiments/Cargo.toml`：显式 `[[bin]]` 名是连字符（例 `e67-device-subset`）；`mutation-triage` 试跑撞到退出码 6 | `experiment-runner` 第 3 步：写明参数、在仓根下跑、bin 名以 Cargo.toml 为准 |
+| D1 定义没写 `mutate.sh` 的参数与 bin 名，写错时脚本报成「基线就是红的」 | Opus；`mutation-triage` 试跑同一问题 | **采纳** | 现查 `scripts/experiment-apparatus/Cargo.toml`：显式 `[[bin]]` 名是连字符（例 `e67-device-subset`）；`mutation-triage` 试跑撞到退出码 6 | `experiment-runner` 第 3 步：写明参数、在仓根下跑、bin 名以 Cargo.toml 为准 |
 | D2 重跑已有实验要写的重跑登记与实验变更史不在写范围，闸会拒 | Opus | **采纳** | 现查 `research/prompts/` 下 6 份 `e*-r*-prereg.md`；写范围表里没有 `experiments-history.md` | `experiment-runner` 写范围与 `.claude/hooks/agent-write-scope.tsv` 各加两条；实测 `e150-r2-prereg.md` 放行、`_e150-r2-body.md` 仍拒 |
 | D3 执行员可以经「修订」少报一个量 | Opus（归格有保留） | **采纳** | E153 试跑里执行员确实把依赖读法甲的 A10 挪出了报告流 | `experiment-runner`：修订只许收严或补臂，少报交主 agent |
 | E1 要改的文件在「别的会话在改」清单里时实现员没有停法；`crates/mutations.tsv` 又要写又被排除 | Opus | **采纳** | 读定义第 3 步与写范围 | `implementation-writer` 新第 5 步：清单里的文件停下交回；`mutations.tsv` 只追加整行 |

@@ -275,7 +275,7 @@ error: test failed, to rerun pass `-p singlefs-harness --bin e156_allocation_bas
 == 53-format-const-placeholders.sh exit=0
   ✓ 格式常量文件里的占位都指得到分项或欠账（4 个占位：D23（journal 的角色与格式） 已定项 19；C506（每区槽数 S 写成编译期常量，条文说它住系统配置）；D22（单元原子性怎么合成） 已定项 1；C323（镜像大小全仓没有条款））
 == 80-absolute-assertions.sh exit=0
-  ✓ 152 个实验二进制各自至少有一条绝对值断言（scripts/experiments 下 148 份，别处 src/bin 下以 e<数字>_ 开头的 4 份）
+  ✓ 152 个实验二进制各自至少有一条绝对值断言（scripts/experiment-apparatus 下 148 份，别处 src/bin 下以 e<数字>_ 开头的 4 份）
 == 92-layout-checker-sync.sh exit=0
   ✓ 布局清单 1 套布局、6 条路径都在，位号都对得上 D15（格式冻结政策） 已定项 4 的登记表；这次改动比 73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321，105 个格式常量里变了 7 个（checker 在同一次改动里跟了 7 个，按滞后表放行 0 个），都不欠 checker 跟进
 == 93-feature-bits.sh exit=0
@@ -337,7 +337,7 @@ error: test failed, to rerun pass `-p singlefs-harness --bin e156_allocation_bas
 5. SysPre 与新生效值的影响（实二报告「写范围之外、这一批牵连到的」第 5、6 条）：
    - 单测里调 `raise_rollback_floor` 的（e158 `mount_writable_then_raise_floor_reaches_the_injected_fault`）是绿的，但它绿的理由已经变了（第七节 E158 第 5 条）。
    - e156 没有单测直接调 `raise_rollback_floor`、`effective_rollback_floor`。
-   - 产物没重跑（派发不让跑整轮）。`scripts/experiments/replay.sh` 第 185、188–201 行 E156 / E158 共 15 行都是 `exact` 对拍，推的是会对不上。
+   - 产物没重跑（派发不让跑整轮）。`scripts/experiment-apparatus/replay.sh` 第 185、188–201 行 E156 / E158 共 15 行都是 `exact` 对拍，推的是会对不上。
 6. 门禁 69 号：两个 bin 与变异表改了，`research/results/` 里没有不比它们旧的 E156 / E158 产物，推的是会红，没跑 69。
 7. naming-lint 在 e156 第 2915 行那一处，HEAD 上就有。要改只是一个局部变量改名（同名 3 处）。不在派发范围，我没顺手改。
 

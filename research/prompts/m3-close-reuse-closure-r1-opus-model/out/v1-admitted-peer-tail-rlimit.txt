@@ -1,0 +1,6 @@
+name=admitted-peer-tail-rlimit wrapper_status=0
+host_lookup_lines_in_diagnostics=1
+  host_lookup_line=run-with-memory-cap: 没查到别的机器：第二台没读到，判不了（退 1：Resource limit (rlimit) exceeded）
+problems=[]
+summary=落点 无；证明错 1 条，rlimit 用尽夹证明错
+proof_error_messages=["assertion failed"]

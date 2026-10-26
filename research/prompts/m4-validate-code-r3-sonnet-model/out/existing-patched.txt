@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running tests/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session.rs (/home/fy5090/.local/share/singlefs/work/m4-validate-code-r3-sonnet/target/debug/deps/whole_file_hole_of_upper_leaf_tag_zero_changed_by_the_session-109d910fcfbabcd5)
+
+running 9 tests
+test a_whole_file_hole_of_tag_zero_extended_by_the_session_reads_back_its_new_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two ... ok
+test a_whole_file_hole_of_tag_zero_kept_at_its_size_by_the_session_reads_back_its_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_entry_when_the_session_rewrites_its_upper_leaf_for_inode_two ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_then_extended_after_its_upper_leaf_is_rewritten_reads_back_zeros ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_then_unlinked_leaves_no_entry_in_the_upper_leaf ... ok
+test a_whole_file_hole_of_tag_zero_truncated_to_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf ... ok
+test a_whole_file_hole_of_tag_zero_shrunk_by_the_session_reads_back_its_new_size_as_zeros ... ok
+test a_whole_file_hole_of_tag_zero_keeps_its_upper_leaf_when_the_session_writes_an_inode_past_that_leaf ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+

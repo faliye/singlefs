@@ -1,0 +1,31 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/unlink_of_files_other_than_the_first.rs (target/release/deps/unlink_of_files_other_than_the_first-b5365841a56a57e5)
+
+running 10 tests
+test a_root_left_one_level_above_the_only_leaf_with_an_entry_reddens_the_upper_shape_invariant ... ok
+test a_file_created_before_the_first_file_was_deleted_is_still_written_after_it ... ok
+test deleting_the_first_file_beside_inode_five_hundred_leaves_its_leaf_under_a_level_one_root ... ok
+test deleting_inode_five_hundred_beside_the_first_file_lowers_the_upper_segment_to_the_first_leaf ... ok
+test each_deletion_batch_of_another_file_cuts_only_that_file_and_the_first_file_reads_back_unchanged ... ok
+test deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root ... FAILED
+test one_set_of_files_with_data_reaches_one_upper_segment_through_two_histories ... ok
+test a_writable_remount_after_the_intent_of_another_file_continues_its_deletion_to_the_end ... ok
+test unlinking_the_first_file_after_the_upper_segment_grew_to_level_one_keeps_the_leaf_of_the_other_file ... ok
+test unlinking_another_file_holding_three_data_units_releases_them_and_drops_its_upper_entry ... ok
+
+failures:
+
+---- deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root stdout ----
+
+thread 'deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root' (1892353) panicked at crates/singlefs-harness/tests/common_images_for_the_checker_tier/unlink_of_files_other_than_the_first.rs:522:9:
+删序 [1, 500]：有条目的号集合空
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    deleting_both_files_in_either_order_ends_in_one_zero_entry_upper_root
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+error: test failed, to rerun pass `-p singlefs-harness --test unlink_of_files_other_than_the_first`
+mutant_rc=101

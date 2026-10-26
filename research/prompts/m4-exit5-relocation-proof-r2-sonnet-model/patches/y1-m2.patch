@@ -1,0 +1,37 @@
+diff -ruN tree-b/crates/singlefs-core/Cargo.toml tree-m2/crates/singlefs-core/Cargo.toml
+--- tree-b/crates/singlefs-core/Cargo.toml
++++ tree-m2/crates/singlefs-core/Cargo.toml
+@@ -15,6 +15,13 @@
+ singlefs-format = { path = "../singlefs-format" }
+ # 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它；compaction_plan 直接调用整理选段核、计划核，allocator 调用释放代比较核。
+ singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
++vstd = "=0.0.0-2026-09-20-0158"
++
++[lints.rust]
++unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
++
++[package.metadata.verus]
++verify = true
+ 
+ [features]
+ # 七·6 各处按身份查的计数（`transaction::lookup_work`：查了几次、每次看过索引几项、建了几次索引、解了几次中央映射叶）：只给测试读，默认关；
+diff -ruN tree-b/crates/singlefs-core/src/compaction_plan.rs tree-m2/crates/singlefs-core/src/compaction_plan.rs
+--- tree-b/crates/singlefs-core/src/compaction_plan.rs
++++ tree-m2/crates/singlefs-core/src/compaction_plan.rs
+@@ -8,6 +8,7 @@
+ 
+ use std::collections::{BTreeMap, BTreeSet};
+ use std::num::{NonZeroU64, NonZeroUsize};
++use vstd::prelude::*;
+ use std::time::Duration;
+ 
+ use singlefs_format::CLUSTER_SEGMENT_SLOTS;
+@@ -939,6 +940,8 @@
+ 
+ /// 签发前判（D26（后台整理与放置回收） 已定项 1 第 2 条）：空洞数 ≥ R 里要搬的单元数才签。
+ #[must_use]
++#[verus_verify]
++#[verus_spec(admit => ensures admit == (holes >= units_to_move))]
+ pub const fn holes_admit_the_issue(holes: u64, units_to_move: u64) -> bool {
+     holes >= units_to_move
+ }

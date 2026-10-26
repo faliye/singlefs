@@ -1,7 +1,0 @@
-header_and_preflight_lines_match_frozen=yes
-=== probe <根> --force
-  after_preflight_args=[<草稿根>/repo-force] PREFLIGHT_FORCE_GIVEN=1
-  forwarded_to_inner=[]
-=== probe <根> --force --other
-  after_preflight_args=[<草稿根>/repo-force --other] PREFLIGHT_FORCE_GIVEN=1
-  forwarded_to_inner=[--other]

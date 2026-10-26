@@ -1,2 +1,0 @@
-probe-old: probe mount=ok
-probe-old: probe publish=ok

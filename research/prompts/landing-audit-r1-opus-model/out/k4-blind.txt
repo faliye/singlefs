@@ -1,0 +1,15 @@
+rework.md 行 44，blind-rework.md 行 44，共有键 44
+续派 42 次；主因一致 37；可避免（Y 或 P 对 N）一致 33
+对不上的：
+  E171 #7	rework：计划内分段 / N	盲判：计划内分段 / P
+  E171 #11	rework：别的 / P	盲判：别的 / 拿不准：N 或 P
+  E171 #20	rework：改方向 / Y	盲判：拿不准 / Y
+  E171 #21	rework：改方向 / Y	盲判：提示错 / Y
+  E171 #28	rework：改方向 / N	盲判：计划内分段 / N
+  E171 #29	rework：改方向 / N	盲判：改方向 / P
+  E171 #30	rework：改方向 / N	盲判：改方向 / P
+  E171 #31	rework：改方向 / N	盲判：改方向 / P
+  E171 #33	rework：改方向 / N	盲判：改方向 / P
+  E171 #34	rework：别的 / N	盲判：别的 / P
+  E171 #35	rework：计划内分段 / N	盲判：别的 / P
+  E188 #8	rework：计划内分段 / N	盲判：产物有错 / Y

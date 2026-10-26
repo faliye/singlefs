@@ -1,0 +1,48 @@
+EXPERIMENT_REPLAY_SCRIPT='replay.sh' KNOWN_SCRIPT_LOCATIONS[replay.sh]='scripts/experiment-apparatus/replay.sh'
+a01	light	expect=light	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items
+a02	light	expect=light	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --force --list-items
+a03	light	expect=light	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items --force
+a04	light	expect=light	same	cwd=.	bash scripts/hosts/capped.sh 31 bash scripts/experiment-apparatus/replay.sh --list-items
+a05	light	expect=light	same	cwd=.	bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/experiment-apparatus/replay.sh --list-items
+a06	light	expect=light	same	cwd=.	nice -n 19 bash scripts/experiment-apparatus/replay.sh --list-items
+a07	light	expect=light	same	cwd=.	bash -c 'bash scripts/experiment-apparatus/replay.sh --list-items'
+a08	light	expect=light	same	cwd=.	env REPLAY_MEMORY_CAP=1G bash scripts/experiment-apparatus/replay.sh --list-items
+a09	light	expect=light	same	cwd=scripts/experiment-apparatus	bash replay.sh --list-items
+a10	light	expect=light	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items | head -3
+a11	light	expect=light	same	cwd=.	/usr/bin/time -v bash scripts/experiment-apparatus/replay.sh --list-items
+a12	light	expect=light	same	cwd=.	SINGLEFS_HEAVY_TESTS=commit bash scripts/experiment-apparatus/replay.sh --list-items
+a13	light	expect=light	same	cwd=.	cd scripts/experiment-apparatus && bash ./replay.sh --list-items
+b01	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh
+b02	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh E142
+b03	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items E142
+b04	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --admission-only
+b05	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --full
+b06	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items --full
+b07	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items --list-items
+b08	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items; bash scripts/experiment-apparatus/replay.sh E142
+b09	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items && bash scripts/experiment-apparatus/replay.sh
+b10	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/hosts/capped.sh 31 bash scripts/experiment-apparatus/replay.sh E142
+b11	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/experiment-apparatus/replay.sh
+b12	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash -c 'bash scripts/experiment-apparatus/replay.sh E142'
+b13	heavy:replay-all-stage	expect=heavy	same	cwd=.	X=E142; bash scripts/experiment-apparatus/replay.sh $X
+b14	heavy:replay-all-stage	expect=heavy	same	cwd=.	args=(--list-items E142); bash scripts/experiment-apparatus/replay.sh "${args[@]}"
+b15	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items=E142
+b16	heavy:commit-check-selftest-unregistered	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items --selftest
+b17	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh -- --list-items
+b18	heavy:replay-all-stage	expect=heavy	same	cwd=.	source scripts/experiment-apparatus/replay.sh E142
+b19	heavy:replay-all-stage	expect=heavy	same	cwd=.	sh scripts/experiment-apparatus/replay.sh E142
+b20	heavy:replay-all-stage	expect=heavy	same	cwd=.	./scripts/experiment-apparatus/replay.sh E142
+b21	heavy:replay-all-stage	expect=heavy	same	cwd=.	exec bash scripts/experiment-apparatus/replay.sh E142
+b22	light	expect=heavy	DIFF	cwd=.	echo E142 | xargs bash scripts/experiment-apparatus/replay.sh
+b23	light	expect=heavy	DIFF	cwd=.	find . -maxdepth 0 -exec bash scripts/experiment-apparatus/replay.sh E142 \;
+b24	light	expect=heavy	DIFF	cwd=.	cp scripts/experiment-apparatus/replay.sh /tmp/claude-1000/r.sh; bash /tmp/claude-1000/r.sh E142
+b25	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --force
+b26	heavy:replay-all-stage	expect=heavy	same	cwd=.	bash scripts/experiment-apparatus/replay.sh --list-items --force E142
+c01	light	expect=note	-	cwd=.	bash /tmp/claude-1000/copy/scripts/experiment-apparatus/replay.sh --list-items
+c02	light	expect=note	-	cwd=.	bash /tmp/claude-1000/copy/replay.sh --list-items
+c03	light	expect=note	-	cwd=.	bash scripts/experiments/replay.sh --list-items
+c04	light	expect=note	-	cwd=.	bash scripts/experiment-apparatus/replay.sh --selftest
+c05	light	expect=note	-	cwd=.	REPLAY_BREAK=guard-off bash scripts/experiment-apparatus/replay.sh --list-items
+c06	light	expect=note	-	cwd=scripts	bash replay.sh --list-items
+c07	light	expect=note	-	cwd=.	bash scripts/crash/../experiment-apparatus/replay.sh --list-items
+cases=46 diff=3

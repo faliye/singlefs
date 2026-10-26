@@ -1,0 +1,6 @@
+name=crt_shift arm=controlled index=0 clock=process forms=gpu keys=76 median_r4_over_r3=0.367 min=0.254 max=0.685 below_one=76
+name=crt_shift arm=controlled index=0 clock=thread forms=gpu keys=108 median_r4_over_r3=0.392 min=0.232 max=0.676 below_one=108
+name=crt_shift arm=controlled index=1 clock=process forms=gpu keys=12 median_r4_over_r3=0.937 min=0.734 max=1.010 below_one=10
+name=crt_shift arm=controlled index=1 clock=thread forms=gpu keys=108 median_r4_over_r3=0.950 min=0.721 max=1.247 below_one=82
+name=crt_shift arm=reproduction index=0 clock=process forms=gpu keys=82 median_r4_over_r3=0.338 min=0.245 max=0.720 below_one=82
+name=crt_shift arm=reproduction index=0 clock=thread forms=gpu keys=108 median_r4_over_r3=0.377 min=0.225 max=0.676 below_one=108

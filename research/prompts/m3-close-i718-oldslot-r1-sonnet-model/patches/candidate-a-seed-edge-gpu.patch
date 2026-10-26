@@ -1,0 +1,37 @@
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+@@ -4597,7 +4597,33 @@
+     if (have_oldest && lt64(recomputed_threshold, oldest)) {
+         recomputed_threshold = oldest;
+     }
+-    judge(INVARIANT_I_7_18, eq64(reclaim_threshold, recomputed_threshold));
++    // 最新根之后那一次发布（txg N+1）的落点 (区域 (N+1) mod R, 槽 ((N+1) div R) mod S) 上有没有自证过的根（walk.rs 同名函数同一段）
++    let next_txg = add64(newest_root.txg, u64_of(1u));
++    let next_by_region = divmod64(next_txg, u64_of(g.regions));
++    let next_region = next_by_region.remainder.x;
++    let next_slot = divmod64(next_by_region.quotient, u64_of(g.slots_per_region)).remainder.x;
++    var next_slot_holds_a_root = false;
++    for (var i = 0u; i < root_count; i = i + 1u) {
++        if (checker_root_region(i) == next_region && checker_root_slot_in_its_region(i) == next_slot) {
++            next_slot_holds_a_root = true;
++        }
++    }
++    let next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed =
++        !next_slot_holds_a_root && !lt64(next_txg, u64_of(ring_length_in_txgs));
++    var accepted = eq64(reclaim_threshold, recomputed_threshold);
++    if (next_slot_lacks_a_root_from_the_first_overwrite_of_the_seed) {
++        // 甲含种子边：那一槽按旧内容算，N+1−3S 也当一条有效根并进去（钉值并进的 oldest 已在上面），t 等于两种现算之一即成立
++        var oldest_with_the_old_content = sub64(next_txg, u64_of(ring_length_in_txgs));
++        if (have_oldest && lt64(oldest, oldest_with_the_old_content)) {
++            oldest_with_the_old_content = oldest;
++        }
++        var recomputed_with_the_old_content = newest_root.floor;
++        if (lt64(recomputed_with_the_old_content, oldest_with_the_old_content)) {
++            recomputed_with_the_old_content = oldest_with_the_old_content;
++        }
++        accepted = accepted || eq64(reclaim_threshold, recomputed_with_the_old_content);
++    }
++    judge(INVARIANT_I_7_18, accepted);
+     if (pinned == ROOT_RECORD_NO_RING_SLOT_PINNED) {
+         judge(INVARIANT_I_7_19, true);
+         return;

@@ -1,0 +1,6 @@
+test lookup_work_counts_one_entry_per_step_of_a_walk_from_either_end_and_one_lookup_per_search ... ok
+test first_entry_of_each_identity_keeps_the_first_entry_of_identities_repeated_across_a_long_shuffled_table ... ok
+test a_whole_rewrite_under_a_snapshot_and_its_destruction_look_up_kept_mapping_entries_through_indexes_built_once ... ok
+test relocation_batches_of_two_and_of_eight_units_build_their_indexes_once_and_look_up_each_planned_unit_twice ... ok
+test a_whole_rewrite_of_one_file_looks_up_each_replaced_and_carried_unit_through_indexes_built_once_at_every_site ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.38s

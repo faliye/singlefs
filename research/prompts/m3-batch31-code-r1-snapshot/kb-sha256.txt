@@ -1,2 +1,0 @@
-9a4be32c655aa4f686b1bc4b1a57b369addcb4ee67e2455d36d56f821c5e7908  .claude/kb/invariants.md
-4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md

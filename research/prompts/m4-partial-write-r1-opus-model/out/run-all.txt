@@ -1,0 +1,192 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 38.6 GiB，这一条要 2.0 GiB（峰值表里没有这条，按它的上限 2G 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 40.1 GiB；账上在跑 4 条
+  → 第二台此刻放得下（可用 40.7 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 2G --label moved-from-queue-555349-1756625530 -- cargo test --offline -p singlefs-harness --test partial_write_attack -- --nocapture --test-threads 1
+run-with-memory-cap: 排了 57 秒，起跑（singlefs-memory-cap-555349-1756625530）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/partial_write_attack.rs (target/debug/deps/partial_write_attack-912cfc00bf604a15)
+
+running 6 tests
+test r2_forms_of_an_empty_file_and_read_at_over_the_cells ... 观测 R2 空文件形态一（新建 inode 2，size 0）：单元 0 个；read_at(0, 0) 成功，0 字节、全零 = true、块层读 0 次
+观测 R2 空文件形态二（第一个文件截到 0，之后走了 1 步）：存在的单元 1，单元 0 声明长度 Some(Ok(0))；单元 1 个；read_at(0, 0) 成功，0 字节、全零 = true、块层读 0 次
+观测 R2 空文件形态三（第一个文件整份覆盖写成 0 字节）：发成 = true；存在的单元 1；单元 1 个；read_at(0, 0) 成功，0 字节、全零 = true、块层读 0 次
+观测 R5 跨末尾：size 3000 的文件 单元 1 个；read_at(2000, 4096) 失败 RangeBeyondEndOfFile { file_size_in_bytes: 3000, offset: FileOffsetInBytes(2000), length_in_bytes: 4096 }
+观测 R5 跨末尾：size 3000 的文件只读 size 之内那一段 单元 1 个；read_at(2000, 1000) 成功，1000 字节、全零 = false、块层读 1 次
+观测 R2 洞：变长到三个净荷之后存在的单元 1，单元 1 个；read_at(32734, 4096) 成功，4096 字节、全零 = true、块层读 0 次
+ok
+test r3_injected_corruption_of_the_old_unit_under_the_two_readings ... 观测 R3 改坏旧单元 = false 读法 MemoryBytesOfThePreviousVersion：部分写结果 Ok(())，块层读 0 次，之后读者读整文件 读得出，违例的不变量 ["I-1.13"]
+观测 R3 改坏旧单元 = false 读法 DiskWithTheWholeUnitChecksum：部分写结果 Ok(())，块层读 1 次，之后读者读整文件 读得出，违例的不变量 ["I-1.13"]
+观测 R3 改坏旧单元 = true 读法 MemoryBytesOfThePreviousVersion：部分写结果 Ok(())，块层读 0 次，之后读者读整文件 读得出，违例的不变量 ["I-2.1", "I-4.8", "I-7.4", "I-1.13"]
+观测 R3 改坏旧单元 = true 读法 DiskWithTheWholeUnitChecksum：部分写结果 Err("读回旧单元：两份都读不回或整单元校验和对不上 ⇒ 部分写失败（D4 已定项 4）")，块层读 2 次，之后读者读整文件 DataUnitChecksumMismatchEverywhere { unit_index_in_file: DataUnitIndexInFile(1), hinted_slot: SlotNumber(50184) }，违例的不变量 ["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+ok
+test r3_the_truncation_tail_path_today ... 观测 R3 截断尾单元：旧尾单元两份都改坏，同一进程里截到 65368：Ok(())；违例的不变量 ["I-2.1", "I-4.8", "I-7.4"]
+观测 R3 截断尾单元：盘完好，同一进程里截到 65368：Ok(())
+观测 R3 截断尾单元：盘完好，重开可写挂载之后（现行版本里单元 2 的字节为空 = false）截到 65368：Ok("发成")
+ok
+test r4_candidates_on_the_mirror ... 观测 R4 候选：镜像上第一个文件 size 97895，存在的单元 3，size 要的单元 3，有洞 = false
+观测 R4 候选：部分写单元 0 再把单元 1、2 原样重写之后出生 txg [5, 6, 7]，I-1.13 Holds，这次部分写一共写了 3 个数据单元
+ok
+test r4_mirror_a_partial_write_on_one_unit_then_the_scan_rebuild ... 观测 R4 起点：三个单元的出生 txg [4, 4, 4]，I-1.13 Holds
+观测 R4 部分写单元 0：出生 txg [5, 4, 4]；挂载态读者读回整文件与期望相同 = true；写序一条照字面判死某个活单元 = true；I-1.13 Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 2 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50184、盘 1 槽 50184}；「每个 inode 的数据单元集合」差 2 处，第一处 key （inode 1、偏移 32634）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 3）")；违例的不变量 ["I-1.13"]
+观测 R4 部分写单元 1：出生 txg [4, 5, 4]；挂载态读者读回整文件与期望相同 = true；写序一条照字面判死某个活单元 = true；I-1.13 Violated("扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 1 处，第一处 key （码 1、出生树 65536、出生 txg 4、实例 1、事务号 4）：扫描重建没有这一条、遍历方向 落点 {盘 0 槽 50186、盘 1 槽 50186}；「每个 inode 的数据单元集合」差 1 处，第一处 key （inode 1、偏移 65268）：扫描重建 没有这一条、遍历方向 （码 1、出生树 65536、出生 txg 4、实例 1、事务号 4）")；违例的不变量 ["I-1.13"]
+观测 R4 部分写单元 2：出生 txg [4, 4, 5]；挂载态读者读回整文件与期望相同 = true；写序一条照字面判死某个活单元 = false；I-1.13 Holds；违例的不变量 []
+观测 R4 汇总：三个单元各部分写一次，I-1.13 违例 2 次
+ok
+test r4_user_steps_opened_over_short_histories ... 观测 R4 扫：历史 [PartialWrite(0)] 出生 txg [5, 4, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1)] 出生 txg [4, 5, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2)] 出生 txg [4, 4, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole] 出生 txg [5, 5, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload] 出生 txg [4, 4, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0)] 出生 txg [6, 4, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1)] 出生 txg [5, 6, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2)] 出生 txg [5, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole] 出生 txg [6, 6, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload] 出生 txg [5, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(0)] 出生 txg [6, 5, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(1)] 出生 txg [4, 6, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(2)] 出生 txg [4, 5, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), OverwriteWhole] 出生 txg [6, 6, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), ExtendByOnePayload] 出生 txg [4, 5, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(0)] 出生 txg [6, 4, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(1)] 出生 txg [4, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(2)] 出生 txg [4, 4, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), OverwriteWhole] 出生 txg [6, 6, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), ExtendByOnePayload] 出生 txg [4, 4, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(0)] 出生 txg [6, 5, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(1)] 出生 txg [5, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(2)] 出生 txg [5, 5, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, OverwriteWhole] 出生 txg [6, 6, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, ExtendByOnePayload] 出生 txg [5, 5, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(0)] 出生 txg [6, 4, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(1)] 出生 txg [4, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(2)] 出生 txg [4, 4, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, OverwriteWhole] 出生 txg [6, 6, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, ExtendByOnePayload] 出生 txg [4, 4, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0), PartialWrite(0)] 出生 txg [7, 4, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0), PartialWrite(1)] 出生 txg [6, 7, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0), PartialWrite(2)] 出生 txg [6, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(0), ExtendByOnePayload] 出生 txg [6, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1), PartialWrite(0)] 出生 txg [7, 6, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1), PartialWrite(1)] 出生 txg [5, 7, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1), PartialWrite(2)] 出生 txg [5, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(1), ExtendByOnePayload] 出生 txg [5, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2), PartialWrite(0)] 出生 txg [7, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2), PartialWrite(1)] 出生 txg [5, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2), PartialWrite(2)] 出生 txg [5, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), PartialWrite(2), ExtendByOnePayload] 出生 txg [5, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole, PartialWrite(0)] 出生 txg [7, 6, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole, PartialWrite(1)] 出生 txg [6, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole, PartialWrite(2)] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), OverwriteWhole, ExtendByOnePayload] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload, PartialWrite(0)] 出生 txg [7, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload, PartialWrite(1)] 出生 txg [5, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload, PartialWrite(2)] 出生 txg [5, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(0), ExtendByOnePayload, ExtendByOnePayload] 出生 txg [5, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(0), PartialWrite(0)] 出生 txg [7, 5, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(0), PartialWrite(1)] 出生 txg [6, 7, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(0), PartialWrite(2)] 出生 txg [6, 5, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(0), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(0), ExtendByOnePayload] 出生 txg [6, 5, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(1), PartialWrite(0)] 出生 txg [7, 6, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(1), PartialWrite(1)] 出生 txg [4, 7, 4] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(1), PartialWrite(2)] 出生 txg [4, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(1), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(1), ExtendByOnePayload] 出生 txg [4, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(2), PartialWrite(0)] 出生 txg [7, 5, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(2), PartialWrite(1)] 出生 txg [4, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(2), PartialWrite(2)] 出生 txg [4, 5, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(2), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), PartialWrite(2), ExtendByOnePayload] 出生 txg [4, 5, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), OverwriteWhole, PartialWrite(0)] 出生 txg [7, 6, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), OverwriteWhole, PartialWrite(1)] 出生 txg [6, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), OverwriteWhole, PartialWrite(2)] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), OverwriteWhole, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), OverwriteWhole, ExtendByOnePayload] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), ExtendByOnePayload, PartialWrite(0)] 出生 txg [7, 5, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), ExtendByOnePayload, PartialWrite(1)] 出生 txg [4, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), ExtendByOnePayload, PartialWrite(2)] 出生 txg [4, 5, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), ExtendByOnePayload, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(1), ExtendByOnePayload, ExtendByOnePayload] 出生 txg [4, 5, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(0), PartialWrite(0)] 出生 txg [7, 4, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(0), PartialWrite(1)] 出生 txg [6, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(0), PartialWrite(2)] 出生 txg [6, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(0), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(0), ExtendByOnePayload] 出生 txg [6, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(1), PartialWrite(0)] 出生 txg [7, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(1), PartialWrite(1)] 出生 txg [4, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(1), PartialWrite(2)] 出生 txg [4, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(1), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(1), ExtendByOnePayload] 出生 txg [4, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(2), PartialWrite(0)] 出生 txg [7, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(2), PartialWrite(1)] 出生 txg [4, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(2), PartialWrite(2)] 出生 txg [4, 4, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(2), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), PartialWrite(2), ExtendByOnePayload] 出生 txg [4, 4, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), OverwriteWhole, PartialWrite(0)] 出生 txg [7, 6, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), OverwriteWhole, PartialWrite(1)] 出生 txg [6, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), OverwriteWhole, PartialWrite(2)] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), OverwriteWhole, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), OverwriteWhole, ExtendByOnePayload] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), ExtendByOnePayload, PartialWrite(0)] 出生 txg [7, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), ExtendByOnePayload, PartialWrite(1)] 出生 txg [4, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), ExtendByOnePayload, PartialWrite(2)] 出生 txg [4, 4, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), ExtendByOnePayload, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [PartialWrite(2), ExtendByOnePayload, ExtendByOnePayload] 出生 txg [4, 4, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(0), PartialWrite(0)] 出生 txg [7, 5, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(0), PartialWrite(1)] 出生 txg [6, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(0), PartialWrite(2)] 出生 txg [6, 5, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(0), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(0), ExtendByOnePayload] 出生 txg [6, 5, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(1), PartialWrite(0)] 出生 txg [7, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(1), PartialWrite(1)] 出生 txg [5, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(1), PartialWrite(2)] 出生 txg [5, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(1), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(1), ExtendByOnePayload] 出生 txg [5, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(2), PartialWrite(0)] 出生 txg [7, 5, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(2), PartialWrite(1)] 出生 txg [5, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(2), PartialWrite(2)] 出生 txg [5, 5, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(2), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, PartialWrite(2), ExtendByOnePayload] 出生 txg [5, 5, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, OverwriteWhole, PartialWrite(0)] 出生 txg [7, 6, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, OverwriteWhole, PartialWrite(1)] 出生 txg [6, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, OverwriteWhole, PartialWrite(2)] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, OverwriteWhole, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, OverwriteWhole, ExtendByOnePayload] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, ExtendByOnePayload, PartialWrite(0)] 出生 txg [7, 5, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, ExtendByOnePayload, PartialWrite(1)] 出生 txg [5, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, ExtendByOnePayload, PartialWrite(2)] 出生 txg [5, 5, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, ExtendByOnePayload, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [OverwriteWhole, ExtendByOnePayload, ExtendByOnePayload] 出生 txg [5, 5, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(0), PartialWrite(0)] 出生 txg [7, 4, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(0), PartialWrite(1)] 出生 txg [6, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(0), PartialWrite(2)] 出生 txg [6, 4, 7] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(0), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(0), ExtendByOnePayload] 出生 txg [6, 4, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(1), PartialWrite(0)] 出生 txg [7, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(1), PartialWrite(1)] 出生 txg [4, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(1), PartialWrite(2)] 出生 txg [4, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(1), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(1), ExtendByOnePayload] 出生 txg [4, 6, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(2), PartialWrite(0)] 出生 txg [7, 4, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(2), PartialWrite(1)] 出生 txg [4, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(2), PartialWrite(2)] 出生 txg [4, 4, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(2), OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, PartialWrite(2), ExtendByOnePayload] 出生 txg [4, 4, 6] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, OverwriteWhole, PartialWrite(0)] 出生 txg [7, 6, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, OverwriteWhole, PartialWrite(1)] 出生 txg [6, 7, 6] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, OverwriteWhole, PartialWrite(2)] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, OverwriteWhole, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, OverwriteWhole, ExtendByOnePayload] 出生 txg [6, 6, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, ExtendByOnePayload, PartialWrite(0)] 出生 txg [7, 4, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, ExtendByOnePayload, PartialWrite(1)] 出生 txg [4, 7, 5] I-1.13 违例 = true 照字面预测 = true 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, ExtendByOnePayload, PartialWrite(2)] 出生 txg [4, 4, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, ExtendByOnePayload, OverwriteWhole] 出生 txg [7, 7, 7] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫：历史 [ExtendByOnePayload, ExtendByOnePayload, ExtendByOnePayload] 出生 txg [4, 4, 5] I-1.13 违例 = false 照字面预测 = false 读者读回相同 = true
+观测 R4 扫汇总：历史 155 段，I-1.13 违例 79 段，判定与照字面预测一致 155 段，挂钟 29.228383316s
+ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.10s
+

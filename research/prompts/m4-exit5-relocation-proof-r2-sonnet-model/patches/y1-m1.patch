@@ -1,0 +1,47 @@
+diff -ruN tree-b/crates/singlefs-core/Cargo.toml tree-m1/crates/singlefs-core/Cargo.toml
+--- tree-b/crates/singlefs-core/Cargo.toml
++++ tree-m1/crates/singlefs-core/Cargo.toml
+@@ -15,8 +15,15 @@
+ singlefs-format = { path = "../singlefs-format" }
+ # 取 journal 前缀的纯函数核（Verus 验的那一份），recovery::replay_journal 调它；compaction_plan 直接调用整理选段核、计划核，allocator 调用释放代比较核。
+ singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
++vstd = "=0.0.0-2026-09-20-0158"
+ 
+ [features]
+ # 七·6 各处按身份查的计数（`transaction::lookup_work`：查了几次、每次看过索引几项、建了几次索引、解了几次中央映射叶）：只给测试读，默认关；
+ # harness 档的 dev 依赖打开它。不开时计数的几处什么都不做，发布构建不多出开销。
+ lookup-work-counters = []
++
++[lints.rust]
++unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
++
++[package.metadata.verus]
++verify = true
+diff -ruN tree-b/crates/singlefs-core/src/compaction_plan.rs tree-m1/crates/singlefs-core/src/compaction_plan.rs
+--- tree-b/crates/singlefs-core/src/compaction_plan.rs
++++ tree-m1/crates/singlefs-core/src/compaction_plan.rs
+@@ -7,6 +7,7 @@
+ //! 打分是 [`greedy_score`]；cost-benefit 与轮转留给 E10（老化：结构抗老化 vs 事后整理） 的臂。
+ 
+ use std::collections::{BTreeMap, BTreeSet};
++use vstd::prelude::*;
+ use std::num::{NonZeroU64, NonZeroUsize};
+ use std::time::Duration;
+ 
+@@ -937,11 +938,15 @@
+         .collect()
+ }
+ 
++verus! {
+ /// 签发前判（D26（后台整理与放置回收） 已定项 1 第 2 条）：空洞数 ≥ R 里要搬的单元数才签。
+ #[must_use]
+-pub const fn holes_admit_the_issue(holes: u64, units_to_move: u64) -> bool {
++pub const fn holes_admit_the_issue(holes: u64, units_to_move: u64) -> (admit: bool)
++    ensures admit == (holes >= units_to_move)
++{
+     holes >= units_to_move
+ }
++}
+ 
+ /// 停机谓词（D26（后台整理与放置回收） 已定项 1 第 2 条，判决 G4）：删意图那一刻 R 按记录全空——R 那块盘上起点在 R 里的未释放记录一条都没有。
+ #[must_use]

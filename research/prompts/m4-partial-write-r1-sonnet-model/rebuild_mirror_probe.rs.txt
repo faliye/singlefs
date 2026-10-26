@@ -1,0 +1,41 @@
+    /// 正推腿草稿（不入库）：三个单元的第一个文件，size 罩三个单元，三个单元在偏移 0、K、2K，出生 txg 是 `birth_txgs`；返回认领了哪几个偏移。
+    fn offsets_claimed_with_three_data_units(birth_txgs: [u64; 3]) -> Vec<u64> {
+        let record = inode_record(FIRST_INODE, OBJECT_BIRTH_OF_THE_FIRST_INODE, 3 * SECOND_DATA_UNIT_OFFSET_IN_BYTES);
+        let inode_container = inode_container_holding(1, &[record]);
+        let inode_placement = placement_on_device_zero(50242);
+        let data_unit_at = |offset_in_bytes: u64, birth_txg: u64| DataUnitVersion {
+            tree: EXTENT_TREE,
+            offset_in_bytes,
+            birth_txg,
+            instance: 1,
+            transaction: 2 * birth_txg + offset_in_bytes / SECOND_DATA_UNIT_OFFSET_IN_BYTES,
+        };
+        let copies = [
+            copy_of_the_container(inode_placement, &inode_container),
+            data_unit_copy(placement_on_device_zero(50180), &data_unit_at(0, birth_txgs[0])),
+            data_unit_copy(
+                placement_on_device_zero(50182),
+                &data_unit_at(SECOND_DATA_UNIT_OFFSET_IN_BYTES, birth_txgs[1]),
+            ),
+            data_unit_copy(
+                placement_on_device_zero(50184),
+                &data_unit_at(2 * SECOND_DATA_UNIT_OFFSET_IN_BYTES, birth_txgs[2]),
+            ),
+        ];
+        let tables = rebuilt_from(&copies, &[(inode_placement, inode_container)]).expect("定得下来");
+        tables.data_units_of_each_inode.keys().map(|position| position.offset_in_bytes).collect()
+    }
+
+    /// 镜像：三个单元同在 txg 3 写下，txg 5 在中间的单元 1 上做一次部分写（只重写单元 1，单元 2 不动、出生 txg 仍是 3）。
+    #[test]
+    fn probe_a_partial_write_in_the_middle_unit_kills_the_unit_after_it() {
+        let k = SECOND_DATA_UNIT_OFFSET_IN_BYTES;
+        println!("name=partial_write_middle_only births=[3,5,3] claimed={:?}", offsets_claimed_with_three_data_units([3, 5, 3]));
+        println!("name=partial_write_first_only births=[5,3,3] claimed={:?}", offsets_claimed_with_three_data_units([5, 3, 3]));
+        println!("name=partial_write_last_only births=[3,3,5] claimed={:?}", offsets_claimed_with_three_data_units([3, 3, 5]));
+        println!("name=partial_write_middle_and_tail_rewritten births=[3,5,5] claimed={:?}", offsets_claimed_with_three_data_units([3, 5, 5]));
+        println!("name=partial_write_first_and_all_after_rewritten births=[5,5,5] claimed={:?}", offsets_claimed_with_three_data_units([5, 5, 5]));
+        println!("name=unit_offsets k={k}");
+        assert_eq!(offsets_claimed_with_three_data_units([3, 5, 3]), [0, k]);
+    }
+

@@ -1,4 +1,0 @@
-name=compare file=probe.out same=yes
-name=compare file=probe-deps.out same=yes
-name=compare file=quick-sim.out same=yes
-name=compare file=capped.out same=no

@@ -1,0 +1,5 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/mut/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.33s
+  Executable tests/publish_lookup_by_identity.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/publish_lookup_by_identity-c0eb24ee20a3e0b2)
+  Executable tests/snapshot_release_and_destroy_through_the_deadlist.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-opus/target-debug/debug/deps/snapshot_release_and_destroy_through_the_deadlist-ed36be39ea00ad83)

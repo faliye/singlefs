@@ -1,0 +1,13 @@
+b981732ba8fca9e35a389f2417f0aea46599126d5cc207765ed56a0f199cc0a8  .claude/kb/feature-bits.md
+a0676c3837b47d739cf9a414354b113cee3bebf9fe63dc92e99cf2efdf26e2df  .claude/kb/decisions/05-snapshot-space-accounting-mechanism.en.md
+8bfae4c19ae9292da96f5d5d94558f372cb5dfe5aa4e4dfec0fc81a83c13668c  .claude/kb/decisions/05-スナップショット-空間会計メカニズム.ja.md
+3efb60c982f0474518a4aff3075f81a100ed7420ab914aa9669f9e204bb5df3a  .claude/kb/decisions/05-快照-空间记账机制.md
+527eb79f43bb71215bf2ef2d971970a977b74df59e3bd80f715f3eaa3aa7600d  .claude/kb/decisions/08-core-index-structure.en.md
+bb38e7355f0a3309860332535f23ad9c4e1097d0787eb7620e7acbf7cf4b7bf7  .claude/kb/decisions/08-コアインデックス構造.ja.md
+b628a769498f091e416314eba407750028295e5bc5da37cb481de26c9ca50497  .claude/kb/decisions/08-核心索引结构.md
+1d3decf8439e90776d8d53a4974c3f4b09a4e40755a1cb36ef14fcf2f937fc4e  .claude/kb/decisions/15-format-freeze-policy.en.md
+261cfd6c14f6cd3edc9cbe4e6979ec6428192bc3f5039668e014dea517e5d021  .claude/kb/decisions/15-フォーマット凍結ポリシー.ja.md
+1ddc2b2435ff1cd1fc29b3bdb60b64bb2335e64882aaaf662b34ecd5017c6470  .claude/kb/decisions/15-格式冻结政策.md
+a4ea80f2a6c50a6d0aeff1901f1d417405c840494971cea6ea65e93c6e8cb716  .claude/kb/decisions/28-mount-time-commitments.en.md
+e5850241705e435ca29323f1d51e93fc2ed54030630aa16df3a056f49083495f  .claude/kb/decisions/28-マウント時コミットメント量.ja.md
+0f6fc9d1127d3ee89ef20f83bd2c7d7a6629195ac2aa537ebc55017059d081c3  .claude/kb/decisions/28-挂载期承诺量.md

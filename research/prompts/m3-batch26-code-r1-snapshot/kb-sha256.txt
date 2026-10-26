@@ -1,1 +1,0 @@
-02ec50c0aa688884c67afa7c8b3881b97c835248a8e1eb19b9701a18b949d1b2  .claude/kb/invariants.md

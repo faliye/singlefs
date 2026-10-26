@@ -1,0 +1,3 @@
+name=mutant_applied mutant=core_hi_published_at_the_batch file=crates/singlefs-core/src/transaction.rs
+name=mutant_applied mutant=core_hi_lo_plus_one file=crates/singlefs-core/src/transaction.rs
+name=mutant_applied mutant=checker_bound_lo_plus_one file=crates/singlefs-checker/src/walk.rs

@@ -1,0 +1,16 @@
+# 被判的代码文件（正文「一、题面」那张表里的 .sh / .py），diff 的取工作区对暂存区的加行，new 的整份算加行
+.claude/gate.d/doc-experiments.sh	diff
+.claude/hooks/runner-dispatch-guard.sh	diff
+.claude/hooks/lib_heavy_tests.py	diff
+.claude/hooks/heavy-test-guard.sh	diff
+.claude/hooks/write-guard.sh	diff
+.claude/hooks/handback-guard.sh	diff
+scripts/agents/agent-cost.py	diff
+scripts/agents/dispatch-prompt.py	diff
+scripts/agents/agent-watch.py	diff
+scripts/agents/cite-check.py	diff
+scripts/gate/apply-writer-patch.py	diff
+scripts/kb/claim-experiment.sh	diff
+scripts/kb/stale-candidates.py	diff
+.claude/gate.d/fixtures/doc-experiments.sh/replay-comparison-units-green/setup.sh	new
+.claude/gate.d/fixtures/doc-experiments.sh/replay-comparison-units-red/setup.sh	new

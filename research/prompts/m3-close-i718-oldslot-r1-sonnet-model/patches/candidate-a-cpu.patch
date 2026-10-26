@@ -1,0 +1,48 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -8520,9 +8520,44 @@
+         newest_root.rollback_floor,
+     );
+     let (newest_instance, newest_txg) = (newest_root.instance, newest_root.checkpoint_txg);
++    // 探针改法（草稿副本）：最新根之后那一次发布（txg N+1）的根槽上没有自证过的根时，那一槽按旧内容算（D16 已定项 1「环里最旧有效根」
++    // 「写失败的槽按旧内容算」）：它可能住过的最旧 txg N+1−3S 也当一条有效根，t 等于两种现算之一即成立。
++    let ring_length_in_txgs = geometry.regions * geometry.slots_per_region;
++    let next_txg = newest_txg + 1;
++    let next_slot = (
++        next_txg % geometry.regions,
++        (next_txg / geometry.regions) % geometry.slots_per_region,
++    );
++    let next_slot_holds_a_self_verified_root = roots
++        .iter()
++        .any(|(region, slot, _)| (*region, *slot) == next_slot);
++    let recomputed_with_the_next_slot_by_its_old_content = (!next_slot_holds_a_self_verified_root
++        && next_txg > ring_length_in_txgs)
++        .then(|| {
++            deferred_slots_reclaim_threshold(
++                roots
++                    .iter()
++                    .map(|(_, _, root)| {
++                        (
++                            standing_in_the_newest_roots_table(root),
++                            root.checkpoint_txg,
++                        )
++                    })
++                    .chain(
++                        pinned_txg_counted_as_a_valid_root
++                            .map(|pinned_txg| (RootStandingInTheNewestRootsTable::Valid, pinned_txg)),
++                    )
++                    .chain(std::iter::once((
++                        RootStandingInTheNewestRootsTable::Valid,
++                        next_txg - ring_length_in_txgs,
++                    ))),
++                newest_root.rollback_floor,
++            )
++        });
+     judgements.judge(
+         ROOT_RECORD_RECLAIM_THRESHOLD_EQUALS_THE_RECOMPUTED_THRESHOLD,
+-        newest_root.reclaim_threshold == recomputed_threshold,
++        newest_root.reclaim_threshold == recomputed_threshold
++            || Some(newest_root.reclaim_threshold) == recomputed_with_the_next_slot_by_its_old_content,
+         || {
+             format!(
+                 "最新根（实例 {newest_instance}、txg {newest_txg}）带的回收门槛 t {}，按这条根自己带的 F {}、环里按它的实例表仍有效的根与钉槽 p {} 现算是 {recomputed_threshold}",

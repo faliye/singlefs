@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/partial_write_cost_probe.rs (target/debug/deps/partial_write_cost_probe-44350def96b0fa40)
+
+running 1 test
+name=whole_write_first units=1 rewritten=12 records=1 released=12 roles=datax1,t*x11
+name=tail_unit_rewrite units=1 rewritten=12 records=1 released=12 roles=datax1,t*x11
+name=whole_rewrite units=1 rewritten=12 records=1 released=12 roles=datax1,t*x11
+name=whole_write_first units=3 rewritten=15 records=3 released=12 roles=datax3,extent_lowerx1,t*x11
+name=tail_unit_rewrite units=3 rewritten=13 records=1 released=13 roles=datax1,extent_lowerx1,t*x11
+name=whole_rewrite units=3 rewritten=15 records=3 released=15 roles=datax3,extent_lowerx1,t*x11
+name=whole_write_first units=144 rewritten=158 records=144 released=12 roles=datax144,extent_lowerx1,t*x13
+name=tail_unit_rewrite units=144 rewritten=15 records=1 released=15 roles=datax1,extent_lowerx1,t*x13
+name=whole_rewrite units=144 rewritten=158 records=144 released=158 roles=datax144,extent_lowerx1,t*x13
+name=whole_write_first units=145 rewritten=161 records=145 released=12 roles=datax145,extent_lowerx3,t*x13
+name=tail_unit_rewrite units=145 rewritten=16 records=1 released=16 roles=datax1,extent_lowerx2,t*x13
+name=whole_rewrite units=145 rewritten=161 records=145 released=161 roles=datax145,extent_lowerx3,t*x13
+name=whole_write_first units=288 rewritten=306 records=288 released=12 roles=datax288,extent_lowerx3,t*x15
+name=tail_unit_rewrite units=288 rewritten=17 records=1 released=17 roles=datax1,extent_lowerx2,t*x14
+name=whole_rewrite units=288 rewritten=308 records=288 released=306 roles=datax288,extent_lowerx3,t*x17
+test print_the_cost_of_rewriting_one_data_unit_and_of_rewriting_the_whole_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+

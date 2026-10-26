@@ -1,0 +1,8 @@
+file=.claude/rules/implementation-workflow.md fragments=4 present=4 absent=0
+file=.claude/rules/verification.md fragments=7 present=7 absent=0
+file=.claude/rules/three-way-inference.md fragments=2 present=2 absent=0
+file=.claude/skills/crash-test/commit-stages.md fragments=5 present=5 absent=0
+file=.claude/agent-common.md fragments=1 present=1 absent=0
+file=.claude/hooks/heavy-test-guard.sh fragments=2 present=0 absent=2
+  ABSENT: #                 实验复跑入口 scripts/experiment-apparatus/replay.sh 按名字判、不读正文（lib_heavy_tests.py 的 EXPERIMENT_REPL
+  ABSENT: #                 只有恰好一个 --list-items（逐行打可点名的实验号，不编、不跑）与登记表里的单独 --selftest 不算

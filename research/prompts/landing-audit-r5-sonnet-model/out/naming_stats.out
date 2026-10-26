@@ -1,0 +1,2 @@
+name=naming_command_exit_codes 两条命令的 Bash 调用=668 整条退出码分布={0: 660, 1: 4, 2: 4} 其中命令里带 timeout=51
+name=last_naming_lint_exit 调用过 naming-lint.sh 的子agent=148 最后一次整条退出码分布={0: 148}

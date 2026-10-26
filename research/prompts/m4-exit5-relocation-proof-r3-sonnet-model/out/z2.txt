@@ -1,0 +1,24 @@
+name=verus case=f1_feature_fork rc=0 verification results:: 1 verified, 0 errors|
+name=verus case=f1b_debug_assertions_fork rc=0 verification results:: 1 verified, 0 errors|
+name=verus case=f2_trait_impl_outside rc=0 verification results:: 1 verified, 0 errors|
+name=verus case=f3_unsafe rc=0 verification results:: 1 verified, 0 errors|
+name=verus case=f4_default_method rc=1 error: postcondition not satisfied|verification results:: 1 verified, 1 errors|
+name=verus case=f5_macro_outside rc=0 verification results:: 1 verified, 0 errors|
+name=verus case=g1_trait_spec rc=1 error: `core::num::error::ParseIntError` is not supported (note: you may be able to add a Verus specification to this type with the `externa|
+name=verus case=g2_external_attr rc=1 error: cannot use function `z2_g2_external_attr::hidden` which is ignored because it is either declared outside the verus! macro or it is ma|
+name=verus case=f1_feature_fork-with-cfg-feature-wide rc=1 error: possible arithmetic underflow/overflow|error: postcondition not satisfied|verification results:: 0 verified, 1 errors|
+name=z2_verus_compile rc=0 verification results:: 1 verified, 0 errors
+name=verus-compiled-run pick=12
+name=z2_product_build profile=debug features=none rc=0
+name=z2_product_run profile=debug features=none fn=f1_feature_fork::pick returned=12 ensures_holds=true
+name=z2_product_run profile=debug features=none fn=f1b_debug_assertions_fork::pick returned=12 ensures_holds=true
+name=z2_product_run profile=debug features=none fn=f5_macro_outside::pick returned=11 ensures_holds=false
+name=z2_product_run profile=debug features=none fn=f2_trait_impl_outside::read_checked returned=99 ensures_holds=false
+name=z2_product_build profile=release features=wide rc=0
+name=z2_product_run profile=release features=wide fn=f1_feature_fork::pick returned=11 ensures_holds=false
+name=z2_product_run profile=release features=wide fn=f1b_debug_assertions_fork::pick returned=11 ensures_holds=false
+name=z2_product_run profile=release features=wide fn=f5_macro_outside::pick returned=11 ensures_holds=false
+name=z2_product_run profile=release features=wide fn=f2_trait_impl_outside::read_checked returned=99 ensures_holds=false
+name=std_spec_differential domain=sorted slices over {0,1,2} len<=7 cases=360 wrong_spec_failures=168 weaker_true_spec_failures=0
+name=std_spec_differential first_counterexample slice=[0, 0] x=0 std_returned=Ok(1)
+name=z2_gate_scan verus_keep_ghost_hits_in_verus_proof_check_py=0

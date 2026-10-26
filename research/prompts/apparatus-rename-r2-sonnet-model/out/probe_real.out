@@ -1,0 +1,4 @@
+name=real_row base_files=395 落点在=395 字节原样相同=290 整串替换之后相同=362
+name=moved_only 改动范围=6039 库剔掉=1066 独立写法剔掉=1073 库有独立没有=0 独立有库没有=7 问题=None
+  库有独立没有前五条=[]
+  独立有库没有前五条=['.claude/gate.d/fixtures/code-source-discipline.sh/data-names-red/setup.sh', '.claude/gate.d/fixtures/doc-experiments.sh/evidence-in-repo-red/setup.sh', 'scripts/experiment-apparatus/e10-aging-compaction-run.sh', 'scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh', 'scripts/experiments/e10-aging-compaction-run.sh']

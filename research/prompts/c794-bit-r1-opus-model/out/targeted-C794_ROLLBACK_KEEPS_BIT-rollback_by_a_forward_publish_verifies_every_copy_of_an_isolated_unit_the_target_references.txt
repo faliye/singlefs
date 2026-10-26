@@ -1,3 +1,0 @@
-test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
-test rolling_back_to_the_version_referencing_an_isolated_unit_whose_failing_copy_was_written_back_intact_goes_through ... FAILED
-test rolling_back_to_the_version_referencing_an_isolated_unit_with_a_copy_that_does_not_verify_is_refused_before_any_write ... ok

@@ -1,3 +1,4 @@
+E7INPUT name=input_fingerprint key=E43 sha256=3a9b3a76cd09acc2832e3af3d796325c37d2c3c63fdef243b96d9664eba516d5 units=71
 E7RESULT name=config base_meta_tenths=1580 base_meta_raid_tenths=2020 zfs_tenths=1280 btrfs_4k_tenths=825 btrfs_128k_tenths=2073 node_hdr=64 ptr_bytes=40 leaves=16777216 in_unit_hdr=105 out_of_unit_ptr=53
 E7RESULT name=space unit=4096 n=0 counted_tenths=1580 counted_pct_milli=3857 uncounted_tenths=1580 uncounted_pct_milli=3857 raid_counted_tenths=2020 raid_counted_pct_milli=4932 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
 E7RESULT name=space unit=4096 n=16 counted_tenths=1740 counted_pct_milli=4248 uncounted_tenths=1580 uncounted_pct_milli=3857 raid_counted_tenths=2180 raid_counted_pct_milli=5322 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0

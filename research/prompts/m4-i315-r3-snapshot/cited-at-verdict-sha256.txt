@@ -1,0 +1,6 @@
+2d8174a5885bd388720c5c1832c39e40cae92f6ec9f2e185657260d26d2b278c  crates/singlefs-core/src/allocator.rs
+0c2510a5e19e56d16fbc8a1ccccad11a79e9357f8313c219251e00e930e674f2  crates/singlefs-core/src/recovery.rs
+b4b6a6e54b6a43d9c4f3d0abeaa49965eb8b3ffe7de852b8921bd9e185ac5ddb  crates/singlefs-format/src/lib.rs
+07bdef40d8cf3bb39cb629d48835dbf2c719ad56f98886d469f662872f5f0ad2  .claude/kb/decisions/23-journal的角色与格式.md
+8184291b9d71645dd7caaf6097a47862d4f4e4bb57b2761a525bcce6660ff5b3  crates/singlefs-core/src/mount.rs（HEAD 841b3beab 那一版）
+8184291b9d71645dd7caaf6097a47862d4f4e4bb57b2761a525bcce6660ff5b3  crates/singlefs-core/src/mount.rs

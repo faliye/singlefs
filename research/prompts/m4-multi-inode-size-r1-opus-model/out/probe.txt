@@ -1,0 +1,73 @@
+name=start inode3_bytes=100 inode2_tag=None inode3_tag=Some("InlineDataUnit(DataPointer { head: Point")
+name=start-multi inode3_units=[(3, 3)]
+name=start reader=mounted_read inode=3 收：size 100、读出 100 字节、非零 99 个
+name=start reader=rebuild_version inode=3 收：inode 3 的 size Some(100)、第一个文件之外有单元的文件 [(3, 1)]
+name=start reader=recover 读回第一个文件 3000 字节
+name=start reader=mount_writable 收
+name=start checker=pool judged=109 violated=0 
+name=h1 publish_size_change(inode 2, 5000) 发成
+name=h1 inode2_tag=None
+name=h1 reader=mounted_read inode=2 打开拒：ExtentRecordCountDoesNotMatchTheFileSize { inode: InodeNumber(2), extent_records: 0, data_units_implied_by_the_file_size: 1, file_size_in_bytes: 5000 }
+name=h1 reader=rebuild_version inode=2 收：inode 2 的 size Some(5000)、第一个文件之外有单元的文件 [(3, 1)]
+name=h1 reader=recover 读回第一个文件 3000 字节
+name=h1 reader=mount_writable 收
+name=h1 checker=pool judged=109 violated=0 
+name=h1 model_glue=Some(Undecodable { what: "0 个数据单元接起来 0 字节，记录的 size 是 5000" })
+name=h1-crafted reader=mounted_read inode=2 打开拒：ExtentRecordCountDoesNotMatchTheFileSize { inode: InodeNumber(2), extent_records: 0, data_units_implied_by_the_file_size: 1, file_size_in_bytes: 5000 }
+name=h1-crafted reader=rebuild_version inode=2 收：inode 2 的 size Some(5000)、第一个文件之外有单元的文件 [(3, 1)]
+name=h1-crafted reader=recover 读回第一个文件 3000 字节
+name=h1-crafted reader=mount_writable 收
+name=h1-crafted checker=pool judged=109 violated=0 
+name=h2 publish_size_change(inode 3, 5000) 发成
+name=h2 reader=mounted_read inode=3 读拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+name=h2 reader=rebuild_version inode=3 拒：Walk(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h2 reader=recover 读回第一个文件 3000 字节
+name=h2 reader=mount_writable 拒：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h2 checker=pool judged=109 violated=1 I-9.38〔根（实例 1、txg 6）：inode 3 偏移 0 的数据单元声明长度 100，记录 size 5000 要 min(size − 起点, 净荷容量 32634) = 5000〕
+name=h3 publish_size_change(inode 3, 65275) 发成
+name=h3 inode3_tag=Some("InlineDataUnit(DataPointer { head: Point")
+name=h3 reader=mounted_read inode=3 打开拒：ExtentRecordCountDoesNotMatchTheFileSize { inode: InodeNumber(3), extent_records: 1, data_units_implied_by_the_file_size: 3, file_size_in_bytes: 65275 }
+name=h3 reader=rebuild_version inode=3 拒：Walk(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })
+name=h3 reader=recover 读回第一个文件 3000 字节
+name=h3 reader=mount_writable 拒：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "这个文件的 extent 记录条数与 inode size 按净荷容量除出来的单元数不符" })
+name=h3 checker=pool judged=109 violated=2 I-4.6〔根（实例 1、txg 6）：inode 3 的记录 nlink = 1、size 65275，按净荷容量 32634 要 3 个数据单元，extent 树里有 1 个；标签 1 或 2（之后没有洞）、没有对得上的截断条目：恰好 3 个〕 ; I-9.38〔根（实例 1、txg 6）：inode 3 偏移 0 的数据单元声明长度 100，记录 size 65275 要 min(size − 起点, 净荷容量 32634) = 32634〕
+name=h4 publish_size_change(inode 3, 50) 发成
+name=h4-intent reader=mounted_read inode=3 读拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+name=h4-intent reader=rebuild_version inode=3 拒：Walk(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h4-intent reader=recover 读回第一个文件 3000 字节
+name=h4-intent reader=mount_writable 拒：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h4-intent checker=pool judged=109 violated=1 I-9.38〔根（实例 1、txg 6）：inode 3 偏移 0 的数据单元声明长度 100，记录 size 50 要 min(size − 起点, 净荷容量 32634) = 50〕
+name=h4-intent model_glue=Some("Undecodable { what: \"1 个数据单元接起来 100 字节，记录的 size 是 50\" }")
+name=h4-intent inode3_truncation_field=Some(InodeRecordTruncationField { truncation_txg: CheckpointTxg(0), truncated_size_in_bytes: 0 })
+name=h4 走空：发成 0 步，停在 Err("TruncationRefused(TruncationIntentDoesNotNameTheLiveRecord { intent: TruncationIntent { inode: InodeNumber(3), object_birth: CheckpointTxg(4), target_size_in_bytes: 50 } })")
+name=h4-walked reader=mounted_read inode=3 读拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+name=h4-walked reader=rebuild_version inode=3 拒：Walk(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h4-walked reader=recover 读回第一个文件 3000 字节
+name=h4-walked reader=mount_writable 拒：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h4-walked checker=pool judged=109 violated=1 I-9.38〔根（实例 1、txg 6）：inode 3 偏移 0 的数据单元声明长度 100，记录 size 50 要 min(size − 起点, 净荷容量 32634) = 50〕
+name=h5 publish_size_change(inode 3, 100) 发成
+name=h5-intent reader=mounted_read inode=3 读拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+name=h5-intent reader=rebuild_version inode=3 拒：Walk(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h5-intent reader=recover 读回第一个文件 3000 字节
+name=h5-intent reader=mount_writable 拒：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h5-intent checker=pool judged=109 violated=1 I-9.38〔根（实例 1、txg 6）：inode 3 偏移 0 的数据单元声明长度 32634，记录 size 100 要 min(size − 起点, 净荷容量 32634) = 100〕
+name=h5-intent model_glue=Some("Undecodable { what: \"3 个数据单元接起来 97902 字节，记录的 size 是 100\" }")
+name=h5-intent inode3_truncation_field=Some(InodeRecordTruncationField { truncation_txg: CheckpointTxg(0), truncated_size_in_bytes: 0 })
+name=h5 走空：发成 0 步，停在 Err("TruncationRefused(TruncationIntentDoesNotNameTheLiveRecord { intent: TruncationIntent { inode: InodeNumber(3), object_birth: CheckpointTxg(4), target_size_in_bytes: 100 } })")
+name=h5-walked reader=mounted_read inode=3 读拒：DataUnitDisagreesWithTheLookupPath { unit_index_in_file: DataUnitIndexInFile(0), invariant: "E142 走读同款", detail: "数据单元的声明长度与文件大小按净荷容量算出来的不符" }
+name=h5-walked reader=rebuild_version inode=3 拒：Walk(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h5-walked reader=recover 读回第一个文件 3000 字节
+name=h5-walked reader=mount_writable 拒：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "声明长度与 inode size 按净荷容量切出来的这一段不符" })
+name=h5-walked checker=pool judged=109 violated=1 I-9.38〔根（实例 1、txg 6）：inode 3 偏移 0 的数据单元声明长度 32634，记录 size 100 要 min(size − 起点, 净荷容量 32634) = 100〕
+name=h6 inode3_tag=Some("NoDataUnit")
+name=h6-tag-zero-size-5000 reader=mounted_read inode=3 收：size 5000、读出 5000 字节、非零 0 个
+name=h6-tag-zero-size-5000 reader=rebuild_version inode=3 拒：Walk(UnitMalformed { what: "extent 树里第一个文件之外的文件没有单元、单元有洞或尾部有洞（按 inode 号写数据写不出来，第一版不支持）" })
+name=h6-tag-zero-size-5000 reader=recover 拒：UnitMalformed { what: "extent 树里第一个文件之外的文件没有单元、单元有洞或尾部有洞（按 inode 号写数据写不出来，第一版不支持）" }
+name=h6-tag-zero-size-5000 reader=mount_writable 拒：Recovery(UnitMalformed { what: "extent 树里第一个文件之外的文件没有单元、单元有洞或尾部有洞（按 inode 号写数据写不出来，第一版不支持）" })
+name=h6-tag-zero-size-5000 checker=pool judged=109 violated=4 I-3.1〔盘 0：记账的已分配 Some(688128)，遍历全部有效根得到 655360（其中隔离豁免 0、F 之下仍在 defer 的 0、钉带出来的 0）；机理：根环槽数 24、最新根 txg 5、环里自证过的根槽 6 个、最老的自证过的根 txg 0、遍历的候选根槽 6 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个〕 ; I-3.11〔盘 0：记账的已分配 Some(688128) 减 defer 待释放 Some(393216)，不等于从最新根（txg 5）走读到的 262144（其中隔离豁免 0）〕 ; I-1.13〔扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 1 处，第一处 key （码 1、出生树 65536、出生 txg 5、实例 1、事务号 3）：扫描重建 落点 {盘 0 槽 50182、盘 1 槽 50182}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 1 处，第一处 key （inode 3、偏移 0）：扫描重建 （码 1、出生树 65536、出生 txg 5、实〕 ; I-3.15〔根（实例 1、txg 5）：盘 1 槽 50182 的分配记录（未释放、跨 2 槽）罩住的单元（码 1、诞生代号 5、写序实例 1、事务号 3）在这一版的中央映射里没有一把相符的 key 指着这一槽（指着这一槽的 key：没有；与它相符的 key 落在：没有）〕
+name=h6-tag-zero-size-0 reader=mounted_read inode=3 收：size 0、读出 0 字节、非零 0 个
+name=h6-tag-zero-size-0 reader=rebuild_version inode=3 拒：Walk(UnitMalformed { what: "extent 树里第一个文件之外的文件没有单元、单元有洞或尾部有洞（按 inode 号写数据写不出来，第一版不支持）" })
+name=h6-tag-zero-size-0 reader=recover 拒：UnitMalformed { what: "extent 树里第一个文件之外的文件没有单元、单元有洞或尾部有洞（按 inode 号写数据写不出来，第一版不支持）" }
+name=h6-tag-zero-size-0 reader=mount_writable 拒：Recovery(UnitMalformed { what: "extent 树里第一个文件之外的文件没有单元、单元有洞或尾部有洞（按 inode 号写数据写不出来，第一版不支持）" })
+name=h6-tag-zero-size-0 checker=pool judged=109 violated=4 I-3.1〔盘 0：记账的已分配 Some(688128)，遍历全部有效根得到 655360（其中隔离豁免 0、F 之下仍在 defer 的 0、钉带出来的 0）；机理：根环槽数 24、最新根 txg 5、环里自证过的根槽 6 个、最老的自证过的根 txg 0、遍历的候选根槽 6 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个〕 ; I-3.11〔盘 0：记账的已分配 Some(688128) 减 defer 待释放 Some(393216)，不等于从最新根（txg 5）走读到的 262144（其中隔离豁免 0）〕 ; I-1.13〔扫描重建的三张表与遍历方向从最新根读出的不同：「中央映射」差 1 处，第一处 key （码 1、出生树 65536、出生 txg 5、实例 1、事务号 3）：扫描重建 落点 {盘 0 槽 50182、盘 1 槽 50182}、遍历方向没有这一条；「每个 inode 的数据单元集合」差 1 处，第一处 key （inode 3、偏移 0）：扫描重建 （码 1、出生树 65536、出生 txg 5、实〕 ; I-3.15〔根（实例 1、txg 5）：盘 1 槽 50182 的分配记录（未释放、跨 2 槽）罩住的单元（码 1、诞生代号 5、写序实例 1、事务号 3）在这一版的中央映射里没有一把相符的 key 指着这一槽（指着这一槽的 key：没有；与它相符的 key 落在：没有）〕
+name=elapsed seconds=1

@@ -1,6 +1,0 @@
-R3CAPACITY key_width=7 entry_width=19 leaf=855 internal=174
-R3CAPACITY key_width=14 entry_width=26 leaf=624 internal=162
-R3CAPACITY key_width=19 entry_width=31 leaf=523 internal=154
-R3CAPACITY key_width=21 entry_width=33 leaf=491 internal=151
-R3CAPACITY key_width=22 entry_width=34 leaf=477 internal=150
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished

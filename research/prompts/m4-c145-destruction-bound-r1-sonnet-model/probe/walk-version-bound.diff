@@ -1,0 +1,90 @@
+--- crates/singlefs-checker/src/walk.rs
++++ crates/singlefs-checker/src/walk.rs
+@@ -16614,6 +16614,8 @@
+ /// 一版上 I-3.5 ③ ④ 与逆向、I-3.6 要的全部输入（只读读出来的）。第一版只有一个活头：树表里恰好一条 inode 树条目与一条头 ID 指它的 extent 树条目。
+ #[derive(Clone, Debug)]
+ struct DeadlistAndSnapshotReachOfAVersion {
++    /// 被判这一版自己的 checkpoint_txg：下一侧是活头的未完成销毁意图，待放集的纪元上界取它（盘上读得到；任何含这条条目的版本的 txg 都大于条目的纪元）。
++    version_txg: u64,
+     head_inode_tree: u64,
+     head_previous_snapshot_txg: u64,
+     /// 活头两棵树（inode 树、extent 树）下面每个单元的中央映射 key：Ref_头。
+@@ -16693,7 +16695,7 @@
+                 destroyed.snapshot_inode_root_tree,
+             );
+             entry.epoch >= destroyed.snapshot_txg
+-                && upper_bound.is_none_or(|bound| entry.epoch < bound)
++                && entry.epoch < upper_bound.unwrap_or(facts.version_txg)
+                 && entry.birth_txg() > destroyed.previous_snapshot_txg
+         })
+ }
+@@ -17068,6 +17070,7 @@
+     snapshots: &[SnapshotEntryOfTheScan],
+     central_mapping: &CentralMappingLocationsOfAVersion,
+     cache: &mut IndexNodeCache,
++    version_txg: u64,
+ ) -> Result<Option<DeadlistAndSnapshotReachOfAVersion>, SnapshotAndDeadlistScanGap> {
+     let kind_of = |entry: &&Vec<u8>| read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET);
+     let deadlist_tree_entries: Vec<&Vec<u8>> = tree_table_entries
+@@ -17156,6 +17159,7 @@
+         }
+     }
+     Ok(Some(DeadlistAndSnapshotReachOfAVersion {
++        version_txg,
+         head_inode_tree,
+         head_previous_snapshot_txg: read_u64(
+             head_inode_tree_entry,
+@@ -17260,6 +17264,7 @@
+             &snapshots,
+             &central_mapping,
+             cache,
++            version.checkpoint_txg,
+         ) {
+             // 一个快照都没有、deadlist 一条都没有：I-3.6 判一次、成立（空 deadlist，同 I-9.24 空队列报成立）；I-3.5 ③ ④ 没有对象。
+             Ok(None) => judgements.judge(
+@@ -21868,6 +21873,7 @@
+     const HEAD_INODE_TREE_OF_THE_SYNTHETIC_WORLD: u64 = 65537;
+     /// 合成世界里两个快照的码 14 树 ID 与 S.txg：S1 在 txg 4 建、S2 在 txg 6 建。
+     const FIRST_SNAPSHOT_TREE: u64 = 70000;
++    const VERSION_TXG_OF_THE_SYNTHETIC_WORLD: u64 = 100;
+     const FIRST_SNAPSHOT_TXG: u64 = 4;
+     const SECOND_SNAPSHOT_TREE: u64 = 70002;
+     const SECOND_SNAPSHOT_TXG: u64 = 6;
+@@ -21920,6 +21926,7 @@
+         units: &UnitsOfTheSyntheticWorld,
+     ) -> DeadlistAndSnapshotReachOfAVersion {
+         DeadlistAndSnapshotReachOfAVersion {
++            version_txg: VERSION_TXG_OF_THE_SYNTHETIC_WORLD,
+             head_inode_tree: HEAD_INODE_TREE_OF_THE_SYNTHETIC_WORLD,
+             head_previous_snapshot_txg: SECOND_SNAPSHOT_TXG,
+             units_of_the_head: BTreeSet::from([units
+@@ -21991,6 +21998,21 @@
+             .1
+     }
+ 
++    /// 销毁意图与最后一批之间、下一侧是活头：一条纪元不小于本版 txg 的条目不在待放集里（盘上不可能有：条目的纪元小于任何含它的版本的 txg），
++    /// 它的单元没有活快照引用，I-3.5 逆向判红。待放集上界取无穷的旧写法放过它。
++    #[test]
++    fn an_entry_whose_epoch_reaches_the_version_txg_is_not_in_the_pending_release_set_of_a_destroy_whose_next_side_is_the_head() {
++        let units = units_of_the_synthetic_world();
++        let mut world = world_between_the_destroy_intent_of_the_second_snapshot_and_its_last_batch(&units);
++        let legal = verdict_of_the_deadlist_judge(&world, REFERENCE_INTERVALS_ARE_EXACT);
++        assert!(matches!(legal, InvariantVerdict::Holds), "合法态先成立：{legal:?}");
++        world
++            .deadlist_entries
++            .push(deadlist_entry_of_the_head(VERSION_TXG_OF_THE_SYNTHETIC_WORLD, &units.born_between_the_snapshots));
++        let stray = verdict_of_the_deadlist_judge(&world, REFERENCE_INTERVALS_ARE_EXACT);
++        assert_violated_mentioning(&stray, "没有一个活快照引用它", "纪元不小于本版 txg 的条目不在待放集里");
++    }
++
+     fn assert_violated_mentioning(verdict: &InvariantVerdict, fragment: &str, what: &str) {
+         match verdict {
+             InvariantVerdict::Violated(detail) => assert!(
+@@ -22141,6 +22163,7 @@
+     fn an_empty_deadlist_without_snapshots_holds_the_tight_bound_and_leaves_the_reference_intervals_unjudged(
+     ) {
+         let world = DeadlistAndSnapshotReachOfAVersion {
++            version_txg: VERSION_TXG_OF_THE_SYNTHETIC_WORLD,
+             head_inode_tree: HEAD_INODE_TREE_OF_THE_SYNTHETIC_WORLD,
+             head_previous_snapshot_txg: 0,
+             units_of_the_head: BTreeSet::new(),

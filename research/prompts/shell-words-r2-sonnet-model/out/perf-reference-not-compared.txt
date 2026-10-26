@@ -1,0 +1,7 @@
+perf 3000 个收尾的双引号替换后接 bash heredoc: tree-orig rc=0 0.70s | tree rc=2 3.62s
+perf 300 层没收尾的 $(: tree-orig rc=0 0.37s | tree rc=0 0.28s
+perf 300 层没收尾的双引号替换: tree-orig rc=0 0.37s | tree rc=0 0.13s
+perf 500 个没配对的双引号: tree-orig rc=2 0.19s | tree rc=2 0.21s
+perf 20 个花括号序列相乘: tree-orig rc=0 0.07s | tree rc=0 0.07s
+perf 引号空串 800 个: tree-orig rc=2 0.14s | tree rc=2 0.09s
+perf 花括号空份 40 层: tree-orig rc=2 0.08s | tree rc=2 0.08s

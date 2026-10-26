@@ -1,3 +1,0 @@
-cargo_rc=0
-test rebuild::tests::the_scan_rebuild_names_no_crate_item_outside_the_whitelist_by_a_path ... ok
-test rebuild::tests::the_use_list_of_the_scan_rebuild_is_exactly_the_format_parsing_whitelist ... ok

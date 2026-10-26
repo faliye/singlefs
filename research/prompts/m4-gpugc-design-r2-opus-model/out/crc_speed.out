@@ -1,0 +1,2 @@
+name=crc_speed implementation=software_eight_tables bytes=16777216 runs=21 crc32c=0x3430be3b anchor_holds=true thread_cpu_median_nanoseconds=5903485 bytes_per_second=2841917274
+name=crc_speed implementation=sse42_instruction bytes=16777216 runs=21 crc32c=0x3430be3b anchor_holds=true thread_cpu_median_nanoseconds=1484834 bytes_per_second=11299051611

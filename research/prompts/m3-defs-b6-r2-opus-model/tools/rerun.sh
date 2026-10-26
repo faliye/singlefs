@@ -101,7 +101,7 @@ rerun_steps() {
       printf '%s\t%s\tdetached-run long-run-check rc=%s\t%s\n' "$v" "$f" "$rc" "$(head -1 "$WORK/x6-dr.txt" | cut -c1-200)"
     done
   done > "$out/x6-detached-check.txt"
-  for v in r2 r1; do echo "== $v"; nice -n 19 python3 "$T/x6_headers.py" "$WORK/$v" "$F/x6/header-scripts.txt" 2>&1 | sed 's#scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/#E171/#'; done > "$out/x6-headers.txt"
+  for v in r2 r1; do echo "== $v"; nice -n 19 python3 "$T/x6_headers.py" "$WORK/$v" "$F/x6/header-scripts.txt" 2>&1 | sed 's#scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/#E171/#'; done > "$out/x6-headers.txt"
   # X2：heavy-thread-defaults（只抽格里的 python 原样跑，基准 none）
   for v in r2 r1; do nice -n 19 python3 "$T/run_htd_cell.py" "$WORK/$v" "$F/x2/sample" > "$out/x2-sample-$v.txt" 2>&1 || true; done
   if [[ -n "${B3_FROZEN:-}" ]]; then nice -n 19 python3 "$T/run_htd_cell.py" "$B3_FROZEN" "$F/x2/sample" > "$out/x2-sample-b3.txt" 2>&1 || true; fi

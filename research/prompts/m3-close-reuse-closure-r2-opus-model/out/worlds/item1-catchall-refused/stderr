@@ -1,0 +1,6 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 6 秒）：slice 已占 250 MiB，这一条要 200 MiB（峰值表里没有这条，按它的上限 200M 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 256 MiB；账上在跑 1 条
+run-with-memory-cap: 没查到别的机器：查的那一支出了异常（TypeError）
+  ✗ 内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 250 MiB（回收不掉的用量 0 MiB + 账上还没涨到量的 250 MiB），这一条要 200 MiB（峰值表里没有这条，按它的上限 200M 算（host-resources.py 对它的预测 8.0 GiB 不比它小）），总上限 256 MiB；命令没跑。账上占着的：
+      singlefs-memory-cap-attack-blocker：要 250 MiB，此刻占 0 MiB，包装进程 1404348，2026-10-22T00:00:00Z 起跑，键「blocker」
+  → 怎么办：等上面那几条跑完再跑这一条（或把 RUN_WITH_MEMORY_CAP_WAIT_SECONDS 设长）；这一条的上限写得比它真要的大，就写小一点；别绕开这个包装去跑——排不上说明此刻整机放不下，硬起就是再来一次整机 OOM
+run-with-memory-cap: 没查到别的机器：查的那一支出了异常（TypeError）

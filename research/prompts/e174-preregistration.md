@@ -92,7 +92,7 @@
 - **别的等待**：单元校验和那条派活等自己那一次提交（`gpu_unit_checks.rs` 第 659 行 `submission_index: Some(submission)`）；判器派活等 `LONGEST_WAIT_FOR_THE_CARD_SECONDS`（`crash_judge_dispatch.rs` 第 32 行，第 875 行）。
 - **同一个设备几条线程共用**：单元校验和那笔借据把卡交给 `std::sync::Arc::new(lease.card().clone())`（`crash_amplification.rs` 第 5815–5830 行一带），按 `checking_threads()` 几条线程一起派活；借据丢掉时设备上可能还有别的借据的活。这一形归第二段。
 
-`research/` 一侧：`scripts/experiments/Cargo.toml` 第 478 行起已有 `wgpu =30.0.1`（`vulkan`、`wgsl`、`std`）与 `pollster =1.0.1`，挂在特性 `e163-gpu` 上，只给 E163 的 bin 用。
+`research/` 一侧：`scripts/experiment-apparatus/Cargo.toml` 第 478 行起已有 `wgpu =30.0.1`（`vulkan`、`wgsl`、`std`）与 `pollster =1.0.1`，挂在特性 `e163-gpu` 上，只给 E163 的 bin 用。
 
 ## 四、跑之前已经存在的数
 
@@ -115,13 +115,13 @@
 
 ### 装置写在哪（写死）
 
-装置走 `scripts/experiments/`：独立手写模型，不与实现共用代码（`.claude/rules/implementation-first.md` 第 4 条）。这条岔路问的是 wgpu 30.0.1 与本机驱动在「丢缓冲之后多久读数里不含它」上的行为，另写一份独立装置答得了，不写成入库装置。
+装置走 `scripts/experiment-apparatus/`：独立手写模型，不与实现共用代码（`.claude/rules/implementation-first.md` 第 4 条）。这条岔路问的是 wgpu 30.0.1 与本机驱动在「丢缓冲之后多久读数里不含它」上的行为，另写一份独立装置答得了，不写成入库装置。
 
-- 源文件 `scripts/experiments/e174_lease_drop_wait_memory_return.rs`，bin 名 `e174-lease-drop-wait-memory-return`，挂新特性 `e174-gpu = ["dep:wgpu", "dep:pollster"]`（依赖沿用同一份 `Cargo.toml` 里已钉的 `wgpu =30.0.1`、`pollster =1.0.1`），`required-features = ["e174-gpu"]`。
+- 源文件 `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs`，bin 名 `e174-lease-drop-wait-memory-return`，挂新特性 `e174-gpu = ["dep:wgpu", "dep:pollster"]`（依赖沿用同一份 `Cargo.toml` 里已钉的 `wgpu =30.0.1`、`pollster =1.0.1`），`required-features = ["e174-gpu"]`。
 - 装置照实现取的设置写成本地常量（不引 `crates/`）：后端只用 Vulkan；`request_device` 的 `required_limits` 取 `adapter.limits()`、`memory_hints` 取 `MemoryHints::Performance`；读数用 `nvidia-smi -q -d MEMORY,PIDS`，按进程号把 `Used GPU Memory` 加起来；「不等待」臂的 poll 是 `PollType::Poll`。执行员开跑之前逐条对 `crates/` 回比（第十一节停机条款的命令），不符就停。
 - 一个装置进程只用一张卡、只起一个设备；父进程按清单一个接一个起子进程（同一时刻卡上只有一个装置进程，不并行），每个子进程自己计时、自己把结果行写进自己的输出文件；父进程等子进程结束后整份读完再并（不在转发输出的循环里打时间戳，`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）。
 - 次序：清单按种子 174 打乱；同一格的 5 轮里两条臂交替（等待、不等待、等待…），两张卡交替。
-- 由主 agent 经 `bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/hosts/run-with-memory-cap.sh <上限> <父进程命令…>` 起（`.claude/rules/verification.md`「凡用 GPU 先清场，跑完不复原」）；上限取 `scripts/experiments/replay.sh` 的 `REPLAY_MEMORY_CAP` 默认 8G（缓冲都在卡上，主机侧不按 S 涨）。
+- 由主 agent 经 `bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/hosts/run-with-memory-cap.sh <上限> <父进程命令…>` 起（`.claude/rules/verification.md`「凡用 GPU 先清场，跑完不复原」）；上限取 `scripts/experiment-apparatus/replay.sh` 的 `REPLAY_MEMORY_CAP` 默认 8G（缓冲都在卡上，主机侧不按 S 涨）。
 
 ### 一笔借据在装置里怎么做
 
@@ -371,7 +371,7 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 用户定案（原话，2026-10-15，派发提示转述）：「剪枝就是单元的 做不到就重做」「做完 对账 不用问我 怎么改 不符合要求的统统改掉 从零开始跑也再所不惜」。
 
-**装置写在哪（写死，同原登记）**：`scripts/experiments/e174_lease_drop_wait_memory_return.rs`，走 `scripts/experiments/`（独立手写，不与 `crates/` 共用代码），不是入库装置。取键脚本与 E178 修订 4 共用 `scripts/experiments/device-code-key.py`；键的单元那一半由 `crates/singlefs-unit-graph` 的 `unit-graph` 算，装置不链它、不读 `crates/` 的常量。
+**装置写在哪（写死，同原登记）**：`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs`，走 `scripts/experiment-apparatus/`（独立手写，不与 `crates/` 共用代码），不是入库装置。取键脚本与 E178 修订 4 共用 `scripts/experiment-apparatus/device-code-key.py`；键的单元那一半由 `crates/singlefs-unit-graph` 的 `unit-graph` 算，装置不链它、不读 `crates/` 的常量。
 
 #### 修订 2 之一：问题与问题单
 
@@ -424,10 +424,10 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 #### 修订 2 之三：实现今天的样子（这一次现查的行号）
 
-- 装置续跑那几处：`scripts/experiments/e174_lease_drop_wait_memory_return.rs:312`（`struct ChildJob`：格 + 轮号）、`:365`（`key_text`）、`:1495`（`type ProductRounds = BTreeMap<ChildJob, RoundData>`）、`:1503`（`parse_product`，`judge` 也用它）、`:2602`（`run_child`）、`:2547`（`run_wgpu_child`）、`:2592`（`run_simulated_child`）、`:2792`（`pending_jobs`：产物里已有的（格，轮）不再起）、`:2911`（`run_one_child`，`:2913` 的 `current_exe` 只在父进程这一侧）、`:2940`（`load_product`）、`:2975`（`run_parent`）、`:2987`（有 `name=done` 行又没要补的就整趟不跑）、`:2995`（config 行）、`:3021`（子进程的输出追加进产物）；文件头 `:11`–`:14`；`grep -nE 'sha256|digest|DEVICE_SOURCE|include_str|rustc|toolchain'` 在这份文件里无输出（gaps 路量的，键里没有代码与工具链）。
+- 装置续跑那几处：`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs:312`（`struct ChildJob`：格 + 轮号）、`:365`（`key_text`）、`:1495`（`type ProductRounds = BTreeMap<ChildJob, RoundData>`）、`:1503`（`parse_product`，`judge` 也用它）、`:2602`（`run_child`）、`:2547`（`run_wgpu_child`）、`:2592`（`run_simulated_child`）、`:2792`（`pending_jobs`：产物里已有的（格，轮）不再起）、`:2911`（`run_one_child`，`:2913` 的 `current_exe` 只在父进程这一侧）、`:2940`（`load_product`）、`:2975`（`run_parent`）、`:2987`（有 `name=done` 行又没要补的就整趟不跑）、`:2995`（config 行）、`:3021`（子进程的输出追加进产物）；文件头 `:11`–`:14`；`grep -nE 'sha256|digest|DEVICE_SOURCE|include_str|rustc|toolchain'` 在这份文件里无输出（gaps 路量的，键里没有代码与工具链）。
 - 设计员在草稿副本上用 `unit-graph closure` 量的（修订 2 之八）：`run_wgpu_child` 闭包 148 个单元、`run_simulated_child` 139、`run_child` 191、`ChildJob::child_arguments` 19，拒算都是 0；`run_wgpu_child` 的闭包里没有 `SimulatedCardHost` 的单元、没有 `judge_product`、`run_parent`、`pending_jobs`；`run_child` 两种卡的单元都有。
 - `unit-graph` 的用法、根的取法、拒算与键的组成见 E178 修订 4 之三（同一个程序）；E174 这个 bin 挂特性 `e174-gpu`，取键时加 `--cfg 'feature="e174-gpu"'`。
-- 复跑表 `scripts/experiments/replay.sh:946`–`:949` 四行（`checks`、模型卡第二段产物的 `judge`、两段真卡产物的 `judge`），都是确定性读法，不起卡。
+- 复跑表 `scripts/experiment-apparatus/replay.sh:946`–`:949` 四行（`checks`、模型卡第二段产物的 `judge`、两段真卡产物的 `judge`），都是确定性读法，不起卡。
 
 #### 修订 2 之四：跑之前已经存在的数
 
@@ -443,7 +443,7 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 | 子进程的单元 | `unit-graph key <仓根>/scripts e7_index_bench::run_child_on_the_card --target bin:e174-lease-drop-wait-memory-return --cfg 'feature="e174-gpu"' --threads <N>`；`run --simulated` 的轮入口换成 `e7_index_bench::run_child_on_the_model` | 进 |
 | 父进程告诉子进程哪一格的那一段 | 同上，入口 `e7_index_bench::ChildJob::child_arguments` | 进 |
 | 工具链行 | 同 E178 修订 4 之五（`rustc -vV`、`cargo -V`、构建环境、`[profile.release]` 摊开），另加 `features e174-gpu` | 进 |
-| 依赖版本行 | `locked_dependency_lines(<仓根>/scripts/experiments, "e7-index-bench")`（含 wgpu、pollster） | 进 |
+| 依赖版本行 | `locked_dependency_lines(<仓根>/scripts/experiment-apparatus, "e7-index-bench")`（含 wgpu、pollster） | 进 |
 | 参数 | `format!("{cell:?}")` 加 `round=<轮号>` | 进 |
 | 驱动与卡 | 父进程开跑时 `nvidia-smi --query-gpu=pci.bus_id,name,memory.total,driver_version --format=csv,noheader` 里这一格那张卡的那一行；`--simulated` 写 `simulated` | 进 |
 | 产物路径与目录名、`--skip-light`、`--limit-jobs`、清单位置、乱序值、日期、机器 | — | 不进 |
@@ -463,16 +463,16 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 #### 修订 2 之六：执行员要做的改动（落点；行号是这一次现查的）
 
-装置 `scripts/experiments/e174_lease_drop_wait_memory_return.rs`：
+装置 `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs`：
 
 1. `:2602` `run_child` 拆成 `run_child_on_the_card` 与 `run_child_on_the_model`（各自解析参数），`run_child` 只按 `--simulated` 分派；行为不变。
 2. `:2975`–`:3035` `run_parent`：开跑时读 `--code-key-file`（`device-code-key.py` 打的组成清单，两个入口各一行代码键）与驱动、卡那几行；`:2987` 的「有 done 行就不跑」改成「库里这一段每格都齐了就只拼产物」；`:3021` 的「子进程输出追加进产物」改成「这一轮原子写进库」；循环完由库拼产物、照修订 2 之五处理 `--output` 已在的情形；成功句照修订 2 之五。`:2995` config 行字段不变。
 3. `:1495`、`:1503`：`parse_product` 不动（`judge` 照用）；另加由库按轮键读回、拼成 `ProductRounds` 的那一步，`:2792` `pending_jobs` 吃它，逻辑不动。
 4. `:2911` `run_one_child` 交回的文本照旧，`child_failed` 行照旧由它写；`:2940` `load_product` 只留给 `judge` 与「`--output` 已在」那一比。
 5. 参数：加 `--code-key-file <组成清单>`、`--written-list <文件>`；库取 `E174_ROUND_LIBRARY`，默认 `~/.local/share/singlefs/experiments/e174/rounds`。不给 `--code-key-file`：退 2，出路写「经 `device-code-key.py run` 起」（这个装置没有登记成只算不存的复跑行，`run` 一律经取键脚本起）。
-6. 文件头 `:11`–`:14` 改写续跑的说法；`scripts/experiments/replay.sh:946`–`:949` 四行不改，执行员改完装置后照跑一遍（修订 2 之七 Q-K-仅键换）。
+6. 文件头 `:11`–`:14` 改写续跑的说法；`scripts/experiment-apparatus/replay.sh:946`–`:949` 四行不改，执行员改完装置后照跑一遍（修订 2 之七 Q-K-仅键换）。
 
-取键脚本 `scripts/experiments/device-code-key.py` 照 E178 修订 4 之六；E174 用它时给两个 `--entry`（`run_child_on_the_card` 或 `run_child_on_the_model`，与 `ChildJob::child_arguments`）与 `--feature e174-gpu`。
+取键脚本 `scripts/experiment-apparatus/device-code-key.py` 照 E178 修订 4 之六；E174 用它时给两个 `--entry`（`run_child_on_the_card` 或 `run_child_on_the_model`，与 `ChildJob::child_arguments`）与 `--feature e174-gpu`。
 
 **单元测试**（装置内；`checks` 子命令里的自检可以同时调它们，不起卡）：
 
@@ -564,7 +564,7 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 ### 修订 3（执行员，2026-10-15，装置改完、单元测试与变异跑完，真树样本、复跑表四行与模型卡空库重跑一次没跑之前；只触及续跑键）
 
-- **依赖行收窄**：修订 2 之五「键的组成」一表「依赖版本行」那一格不再取 `locked_dependency_lines(<仓根>/scripts/experiments, "e7-index-bench")`（整个包的传递依赖），改取每个入口闭包里的 Rust 单元点到的外部包与它们的传递依赖，取法与 `research/prompts/e178-preregistration.md` 修订 5 第一条相同（`scripts/experiments/device-code-key.py` 文件头「键的组成」依赖行那一条）。这一条不是收严：它少作废了入口闭包没点到的依赖变动。依据是派发提示（`~/.local/share/singlefs/work/runner-e178-e174-resume-keys/prompt.md`）「主 agent 对设计员交的几点的定」第 ② 条，原句：「② 依赖行不取整个包的传递依赖，收窄到闭包真引到的外部包及其传递依赖（`unit-graph key --lock-line` 只喂闭包引到的那几行，怎么从闭包成员取「引到哪些外部包」照设计 3.1）」。
+- **依赖行收窄**：修订 2 之五「键的组成」一表「依赖版本行」那一格不再取 `locked_dependency_lines(<仓根>/scripts/experiment-apparatus, "e7-index-bench")`（整个包的传递依赖），改取每个入口闭包里的 Rust 单元点到的外部包与它们的传递依赖，取法与 `research/prompts/e178-preregistration.md` 修订 5 第一条相同（`scripts/experiment-apparatus/device-code-key.py` 文件头「键的组成」依赖行那一条）。这一条不是收严：它少作废了入口闭包没点到的依赖变动。依据是派发提示（`~/.local/share/singlefs/work/runner-e178-e174-resume-keys/prompt.md`）「主 agent 对设计员交的几点的定」第 ② 条，原句：「② 依赖行不取整个包的传递依赖，收窄到闭包真引到的外部包及其传递依赖（`unit-graph key --lock-line` 只喂闭包引到的那几行，怎么从闭包成员取「引到哪些外部包」照设计 3.1）」。
 - **驱动与卡进键**：修订 2 之一「读法写死」里「驱动与卡进键……这一样待主 agent 认」由主 agent 认了，依据是同一份派发提示同一段第 ① 条，原句：「① E174 的键带驱动版本与卡型，收（这个实验测的就是驱动行为；对账底稿第二节第 3 条「驱动不进键」只管崩溃判器）」。键的组成照修订 2 之五，一字不改。
 - **单元测试与变异读数**（时点在真树样本与复跑之前）：改完的装置在草稿副本上 `cargo test --release --features e174-gpu --bin e174-lease-drop-wait-memory-return` 30 条绿（原 19 条加新 11 条）；`mutate.sh` 整表 34 条（原 28 条加 M29–M34）抓到 34、无效 0、没红 0，收尾「已还原，基线仍全绿」。`device-code-key.py key` 打的组成清单：入口 `run_child_on_the_card` 闭包 160 个单元、dependency 行 61（wgpu、pollster 与它们的传递依赖）；`run_child_on_the_model` 151 个单元、dependency 行 0；`ChildJob::child_arguments` 19 个单元、dependency 行 0；三者拒算都是 0（草稿 `logs/e174-key-run_child_on_the_card.out`、`logs/e174-key-run_child_on_the_model.out`）。修订 2 之八的闭包关系量了：`run_child_on_the_card` 的闭包是 `run_wgpu_child` 的 148 个单元加 12 个（`ChildJob::from_child_arguments`、`CellKey::from_fields`、五个 `from_label`、`EVERY_CARD`、`EVERY_LIVENESS`、`parse_child_arguments`、入口自己、一条 use），没有 `SimulatedCardHost` 的单元，V-K4 没触发。
 - **牵到的那一行样本**：修订 2 之六真树样本表「作废」类「`Cargo.lock` 里 wgpu 抬一版」的作废面「全部」，收窄之后读成「真卡的轮全部」：真卡入口闭包点到 wgpu，代码键换；模型卡入口（`run_child_on_the_model`）与参数入口不点 wgpu，代码键不换。真树样本照跑这一行，产物里另报模型卡入口那一列（期望不换），判据不改。
@@ -585,8 +585,8 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 - `crates/singlefs-checker-tier/src/crash_judge_dispatch.rs` 15–35；grep 命中第 32、875、878、882 行。
 - `crates/singlefs-checker-tier/Cargo.toml` 第 22、29 行；`Cargo.lock` 第 275–277、1085–1087、1113–1115、1154–1156 行。
 - `crates/mutations.tsv`：只在 `grep -l` 里命中文件名，内容没读。
-- `scripts/experiments/Cargo.toml` 460–490；`scripts/experiments/e163_gpu_multicard_crc32c.rs` 第 408 行（grep 命中）。
-- `scripts/kb/claim-experiment.sh` 1–40；`scripts/crash/gpu-quiesce-run.sh` 1–40；`scripts/kb/quote-kb.py` 1–60；`scripts/kb/replace-once.py` 1–30；`scripts/experiments/replay.sh` 第 25、26、218、480、785、1479 行（grep 命中）。
+- `scripts/experiment-apparatus/Cargo.toml` 460–490；`scripts/experiment-apparatus/e163_gpu_multicard_crc32c.rs` 第 408 行（grep 命中）。
+- `scripts/kb/claim-experiment.sh` 1–40；`scripts/crash/gpu-quiesce-run.sh` 1–40；`scripts/kb/quote-kb.py` 1–60；`scripts/kb/replace-once.py` 1–30；`scripts/experiment-apparatus/replay.sh` 第 25、26、218、480、785、1479 行（grep 命中）。
 - 依赖源码（`~/.cargo/registry/src/*/`）：`wgpu-hal-30.0.1/src/lib.rs` 439–477；`wgpu-hal-30.0.1/src/vulkan/adapter.rs` 第 7、2951 行与 `vulkan/command.rs` 第 24、27 行（grep 命中）；`gpu-allocator-0.28.0/src/vulkan/mod.rs` 470–500、655–690 与 grep 命中第 26、29、165、232–234、276、287、350、377–386、436、484、487、488、542、577、653、667、670、673 行；`gpu-allocator-0.28.0/src/lib.rs` 第 281、304、440 行（grep 命中）；`wgpu-30.0.1/src/api/device.rs` 630–638；`wgpu-types-30.0.1/src/counters.rs` 177–185；`wgpu-types-30.0.1/src/lib.rs` 176–201。
 - 没读：`.claude/kb/experiments/`、`research/results/`、`.claude/kb/experiments.md`、`experiments-history.md`、`records/2026-09-30-里程碑三开工第一轮.md`（派发提示点名的批次记录，没读，免得读到结果行）。
 
@@ -636,7 +636,7 @@ crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 与 `research/prompts/e178-preregistration.md` 第 13.4 节是同一次（两份修订同一个设计员同一轮写），文件清单与命令照那一节；这里补 E174 专有的。
 
-- 装置 `scripts/experiments/e174_lease_drop_wait_memory_return.rs` 1–60、236–260、295–370、1284–1310、1485–1560、2547–2650、2780–2830、2900–3036；grep 命中第 31、33、318、339、973、1305、2027、2334、2405、2670、2872、2913、2987、2995、3004、3021 行；`scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv` 行数与末 3 行的变异名；`research/results/` 只 `ls` 了 E174 的文件名、`git log` 取了两段产物的提交（18b30adb）。
+- 装置 `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs` 1–60、236–260、295–370、1284–1310、1485–1560、2547–2650、2780–2830、2900–3036；grep 命中第 31、33、318、339、973、1305、2027、2334、2405、2670、2872、2913、2987、2995、3004、3021 行；`scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv` 行数与末 3 行的变异名；`research/results/` 只 `ls` 了 E174 的文件名、`git log` 取了两段产物的提交（18b30adb）。
 
 命令（`$D`、`$UG` 同 E178 第 13.4 节）：
 

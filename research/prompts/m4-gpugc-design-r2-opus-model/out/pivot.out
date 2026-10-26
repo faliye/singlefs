@@ -1,0 +1,64 @@
+name=pivot_rows total=2684
+name=pivot_values key=clock values=process,thread
+name=pivot_values key=form values=shared,split,today_single_kernel
+name=pivot_values key=gap_milliseconds values=0,50
+name=pivot_values key=wait values=blocking,sleep_100_microseconds,sleep_1_millisecond
+name=pivot_values key=threshold_kind values=attack_ledger,machine_scaled
+name=pivot_values key=candidate values=every_stage,release_check_only,scan_checksum_and_choice,scan_checksum_only
+name=pivot_values key=index values=0,1
+name=pivot label=thread_all_forms_all_gaps candidate=scan_checksum_only card=0 losing=108 unstable=108
+name=pivot label=thread_all_forms_all_gaps candidate=scan_checksum_only card=1 losing=216
+name=pivot label=thread_all_forms_all_gaps candidate=scan_checksum_and_choice card=0 losing=29 not_losing_lower_bound=37 unstable=150
+name=pivot label=thread_all_forms_all_gaps candidate=scan_checksum_and_choice card=1 losing=140 not_losing_lower_bound=14 unstable=62
+name=pivot label=thread_all_forms_all_gaps candidate=release_check_only card=0 losing=64 unstable=152
+name=pivot label=thread_all_forms_all_gaps candidate=release_check_only card=1 losing=216
+name=pivot label=thread_all_forms_all_gaps candidate=every_stage card=0 losing=6 not_losing=147 unstable=87
+name=pivot label=thread_all_forms_all_gaps candidate=every_stage card=1 losing=92 not_losing=93 unstable=55
+name=pivot label=process_all_forms_all_gaps candidate=scan_checksum_only card=0 losing=80 unstable=88
+name=pivot label=process_all_forms_all_gaps candidate=scan_checksum_only card=1 losing=72
+name=pivot label=process_all_forms_all_gaps candidate=scan_checksum_and_choice card=0 losing=18 not_losing_lower_bound=30 unstable=120
+name=pivot label=process_all_forms_all_gaps candidate=scan_checksum_and_choice card=1 losing=35 not_losing_lower_bound=14 unstable=23
+name=pivot label=process_all_forms_all_gaps candidate=release_check_only card=0 losing=24 unstable=124
+name=pivot label=process_all_forms_all_gaps candidate=release_check_only card=1 losing=16
+name=pivot label=process_all_forms_all_gaps candidate=every_stage card=0 losing=5 not_losing=120 unstable=67
+name=pivot label=process_all_forms_all_gaps candidate=every_stage card=1 losing=16 not_losing=38 unstable=18
+name=pivot label=thread_form_shared candidate=scan_checksum_only card=0 losing=98 unstable=46
+name=pivot label=thread_form_shared candidate=scan_checksum_only card=1 losing=144
+name=pivot label=thread_form_shared candidate=scan_checksum_and_choice card=0 losing=29 not_losing_lower_bound=33 unstable=82
+name=pivot label=thread_form_shared candidate=scan_checksum_and_choice card=1 losing=92 not_losing_lower_bound=14 unstable=38
+name=pivot label=thread_form_shared candidate=release_check_only card=0 losing=60 unstable=84
+name=pivot label=thread_form_shared candidate=release_check_only card=1 losing=144
+name=pivot label=thread_form_shared candidate=every_stage card=0 losing=6 not_losing=92 unstable=46
+name=pivot label=thread_form_shared candidate=every_stage card=1 losing=62 not_losing=55 unstable=27
+name=pivot label=thread_form_split candidate=scan_checksum_only card=0 losing=10 unstable=62
+name=pivot label=thread_form_split candidate=scan_checksum_only card=1 losing=72
+name=pivot label=thread_form_split candidate=scan_checksum_and_choice card=0 not_losing_lower_bound=4 unstable=68
+name=pivot label=thread_form_split candidate=scan_checksum_and_choice card=1 losing=48 unstable=24
+name=pivot label=thread_form_split candidate=release_check_only card=0 losing=4 unstable=68
+name=pivot label=thread_form_split candidate=release_check_only card=1 losing=72
+name=pivot label=thread_form_split candidate=every_stage card=0 not_losing=40 unstable=32
+name=pivot label=thread_form_split candidate=every_stage card=1 losing=23 not_losing=30 unstable=19
+name=pivot label=thread_form_today_single_kernel candidate=scan_checksum_only card=0 
+name=pivot label=thread_form_today_single_kernel candidate=scan_checksum_only card=1 
+name=pivot label=thread_form_today_single_kernel candidate=scan_checksum_and_choice card=0 
+name=pivot label=thread_form_today_single_kernel candidate=scan_checksum_and_choice card=1 
+name=pivot label=thread_form_today_single_kernel candidate=release_check_only card=0 
+name=pivot label=thread_form_today_single_kernel candidate=release_check_only card=1 
+name=pivot label=thread_form_today_single_kernel candidate=every_stage card=0 not_losing=15 unstable=9
+name=pivot label=thread_form_today_single_kernel candidate=every_stage card=1 losing=7 not_losing=8 unstable=9
+name=pivot label=thread_gap_0 candidate=scan_checksum_only card=0 losing=42 unstable=102
+name=pivot label=thread_gap_0 candidate=scan_checksum_only card=1 losing=144
+name=pivot label=thread_gap_0 candidate=scan_checksum_and_choice card=0 losing=3 not_losing_lower_bound=35 unstable=106
+name=pivot label=thread_gap_0 candidate=scan_checksum_and_choice card=1 losing=68 not_losing_lower_bound=14 unstable=62
+name=pivot label=thread_gap_0 candidate=release_check_only card=0 losing=12 unstable=132
+name=pivot label=thread_gap_0 candidate=release_check_only card=1 losing=144
+name=pivot label=thread_gap_0 candidate=every_stage card=0 not_losing=112 unstable=56
+name=pivot label=thread_gap_0 candidate=every_stage card=1 losing=33 not_losing=90 unstable=45
+name=pivot label=thread_gap_50 candidate=scan_checksum_only card=0 losing=66 unstable=6
+name=pivot label=thread_gap_50 candidate=scan_checksum_only card=1 losing=72
+name=pivot label=thread_gap_50 candidate=scan_checksum_and_choice card=0 losing=26 not_losing_lower_bound=2 unstable=44
+name=pivot label=thread_gap_50 candidate=scan_checksum_and_choice card=1 losing=72
+name=pivot label=thread_gap_50 candidate=release_check_only card=0 losing=52 unstable=20
+name=pivot label=thread_gap_50 candidate=release_check_only card=1 losing=72
+name=pivot label=thread_gap_50 candidate=every_stage card=0 losing=6 not_losing=35 unstable=31
+name=pivot label=thread_gap_50 candidate=every_stage card=1 losing=59 not_losing=3 unstable=10

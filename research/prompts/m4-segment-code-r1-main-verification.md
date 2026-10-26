@@ -4,6 +4,8 @@
 
 被判的产品代码（整段合入，冻结副本 `~/.local/share/singlefs/work/m4-segment-code-r1/repo/`，sha256 在 `m4-segment-code-r1-snapshot/crates-sha256.txt` 21 行）：`crates/singlefs-core/src/admission.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/block_device.rs`、`crates/singlefs-core/src/code_two_tree.rs`、`crates/singlefs-core/src/compaction_plan.rs`、`crates/singlefs-core/src/lib.rs`、`crates/singlefs-core/src/logged_operations.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/mounted_read.rs`、`crates/singlefs-core/src/mounted_session.rs`、`crates/singlefs-core/src/records.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/region_scan.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/unlink.rs`、`crates/singlefs-core/src/write_accounting.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-reference-filesystem/src/lib.rs`、`crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs`、`crates/singlefs-replay-prefix/src/lib.rs`。正文 `research/prompts/_m4-segment-code-r1-body.md`，背景材料 `_m4-segment-code-r1-background.md`。
 
+开工快照：`research/prompts/m4-segment-code-r1-snapshot/`
+
 ## 一、核查
 
 - 快照：两条腿各自在冻结副本根上 `sha256sum -c` 21 行全 OK（两份报告开头原样）；主 agent 写判决前在工作树与冻结副本上各核一遍 crates 21 行、kb 快照一遍，全 OK。腿跑着的时候主 agent 没改被判文件（变异轻型重跑只读源码）。

@@ -1,0 +1,6 @@
+a698c94b29f3b2f126a36c76e642575113e250332e3ef7b6cd823820f5dbf21b  scripts/gate/lib_function_units.py
+351e6907a8c7f7ad14dc50c67dbeffea60183901fea170bdf7a5b0deb2b2b35f  scripts/hosts/run-with-memory-cap.sh
+3fb70c8e29514aab0e93859675adc2febe166630c7c4b70a0ab2be2abe526a73  scripts/hosts/host-resources.py
+857d6a80ffedf0cfb12431a7795d529045e050309eb199c772138aa980db6aa7  scripts/hosts/host-dispatch.py
+3d47020ded1813a7dcf09710b907f5dd7eb4297a715c7c849b3d1e69ad510f61  scripts/hosts/peer-host-lib.sh
+c774dcceef840e6ed9ef742de9b90f8eb7cc93c96d937fea49fe6fe67f6b3d85  scripts/gate/verus-proof-check.py

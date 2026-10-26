@@ -1,0 +1,13 @@
+a483d5a2a0ac4afb1a2576be951384b6de7be1b10c872437a92b4a1e10690fce  .claude/kb/layout/01-first-txn.md
+1e925d51dafa35c1ed68975398876ac577a27b953e5c364baa0b8c1be65a5faa  .claude/kb/experiments/187-cost-of-persisting-quarantine-marks.en.md
+608ebfc7c5dc6da3794c019151ac0355d3df2290d40bca1e3d9a7b9daebed977  .claude/kb/experiments/187-隔离落盘代价.md
+9321927830d2c90967bc711f13cdd74686e48ec876f6344d82e028bc32072930  .claude/kb/experiments/187-隔離マークの永続化コスト.ja.md
+22fc3e1e584e5c664ed46499f13f028aba02d66ce5a7ff5824a48df4793fe488  .claude/kb/decisions/19-block-pointer-structure-width-budget.en.md
+6a77c8d795e7f01662265135df9e0e7a4119df8d404fc6e1779cddff24b82f5c  .claude/kb/decisions/19-ブロックポインタ構造と幅予算.ja.md
+5e2cb9e207b3489923a6ca60ddc92b6a9b7f861697ce3b19782491e5250143f0  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+a27012fa599a8a506aa19d868b73ad305f48d58360675ebe4750d9e8208540a7  .claude/kb/decisions/08-core-index-structure.en.md
+404d421744ada049bb1a121fc3599714875db0f1b4a639a5d11de05b838911e1  .claude/kb/decisions/08-コアインデックス構造.ja.md
+cf535e04aea2c6e9fd0afc2db87743d078774568bc0694bf560f9d1035296c1d  .claude/kb/decisions/08-核心索引结构.md
+d0faebbbc9c9848bbac2728e87111c242545241463fe071d8e08528e4c1f3578  .claude/kb/decisions/03-space-allocation.en.md
+109447492fce948daa0e2b4ba4d7ae253563381f04214b2a513cb93ba329e753  .claude/kb/decisions/03-空间分配.md
+654f54e81f3452451792e77c796d007a081da0e59faae7c0718ac62175f38de1  .claude/kb/decisions/03-領域割り当て.ja.md

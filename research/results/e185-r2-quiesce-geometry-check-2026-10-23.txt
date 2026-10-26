@@ -1,0 +1,4 @@
+GPU_QUIESCE step=quiesce result=stopped-and-read-back holders=0
+GPU_QUIESCE step=command result=exit-0
+GPU_QUIESCE step=restore result=not-restored holders=0
+GPU_QUIESCE step=exit code=0

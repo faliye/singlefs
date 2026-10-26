@@ -508,9 +508,9 @@ PC2c、PC4c 找不到判别位置、或命中数为 0 不作废：那条臂的�
 | `scripts/kb/claim-experiment.sh` | 1–60 |
 | `scripts/kb/quote-kb.py` | 1–40 |
 | `scripts/kb/replace-once.py` | 1–30 |
-| `scripts/experiments/replay.sh` | grep `REPLAY_MEMORY_CAP` 命中 25、26、404、449、450 |
+| `scripts/experiment-apparatus/replay.sh` | grep `REPLAY_MEMORY_CAP` 命中 25、26、404、449、450 |
 
-没读：`.claude/kb/experiments/` 下任何实验页、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`research/results/`、`records/`、`.claude/kb/decisions-history/`、`scripts/experiments/perf-by-milestone.md`。
+没读：`.claude/kb/experiments/` 下任何实验页、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`research/results/`、`records/`、`.claude/kb/decisions-history/`、`scripts/experiment-apparatus/perf-by-milestone.md`。
 
 ### 13.2 跑过的命令（原样）与算术的原样输出
 

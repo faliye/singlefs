@@ -1,6 +1,0 @@
-158a740762a98646c1fb5202acc3203e790abd23c117c26b5f7d686031c0459b  .claude/kb/invariants.md
-4e8c6208f9a37e71b6a5055c5a9f8b58c527095d2f7d3569a990f765107ee532  .claude/kb/milestone/01-first-txn.md
-9726aceba3a225028a45d4bb8ab143a2f9a48d709183f28a260919fae9150241  .claude/kb/checks-owed.md
-b05bdd2f269a51bf072908c0879bcaf457853bb2acbdee4146e6f4010d3abedb  .claude/kb/experiments/171-三oracle合谋测试.md
-dcccc0aa686d742d4f2976a54986a6f27157364d4db1c461ee905b5c1ce63ea1  .claude/kb/decisions/03-空间分配.md
-8906cccea92f669e24960adf4c27a07fe328a1b0bd56212bb87e8b45a2f018b4  .claude/kb/decisions/08-核心索引结构.md

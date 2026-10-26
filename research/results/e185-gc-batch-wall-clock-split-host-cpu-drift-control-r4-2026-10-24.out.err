@@ -1,0 +1,7 @@
+  · 回读看的卡：本机卡 0,1（多机配置的 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED）；跳过别的活着的登记下的 3 个进程
+GPU_QUIESCE step=quiesce result=joined-and-read-back holders=1
+  · 已有 1 趟清过场在用卡，回读过了，跟着用
+GPU_QUIESCE step=command result=exit-0
+GPU_QUIESCE step=restore result=not-restored holders=1
+  · 清了场、没复原：清场停下的服务一直停着；要复原手动跑私有复原脚本（多机配置的 QUIESCE_START_COMMAND），再跑 QUIESCE_STARTED_CHECK_COMMAND 回读到它退 0
+GPU_QUIESCE step=exit code=0

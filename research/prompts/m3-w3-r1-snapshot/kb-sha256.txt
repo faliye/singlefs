@@ -1,9 +1,0 @@
-32ddf0f21c857168af23492b4e10a6359fa21984ccbfa6722c416aaa14298bc3  .claude/kb/checks-owed.md
-2448958a486fb1e5254cde675a4a7800137b41a0646198857fe2c7b5854bd22b  .claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md
-268e78ce3d2e820b420244191d64c70ab5706005959a8ceb3cdce154be590425  .claude/kb/experiments/07-离线索引harness.md
-7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md
-4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md
-64dd93007bea9bcd39db3ad5b988f1476d680510b9ddc2b08fe36e5cc58245dc  .claude/kb/decisions/05-快照-空间记账机制.md
-b378f7c079d5d0b30c7fa6ba042b745d02ec11a2b16d1b247c0d84093a108e93  .claude/kb/decisions/23-journal的角色与格式.md
-6739e34a220703a5bbf4619ed72134b160731c6c47260899ad13c0f0996f704a  .claude/kb/decisions/18-块里携带什么信息.md
-a7230d029c40ecf422f2a9970f77c6aa942f765ed73167159ab14d19c668059d  .claude/kb/decisions/15-格式冻结政策.md

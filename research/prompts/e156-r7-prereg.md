@@ -6,7 +6,7 @@
 
 **这一份回答问题单 `research/prompts/m3-close-cost-measurement-questions.md` 的 H1 一行**（13 行，sha256 `c5dec701293cb41b2f3a7b291b8e85a4e3f5e837c60024415f21c3023e1ba2d5`）。H2–H5 归 E183（`research/prompts/e183-preregistration.md`），这一份不量。
 
-**装置写在哪（写死）：入库装置。** 执行员改写 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 与它的内联单测；不在 `scripts/experiments/` 另起装置。依据：H1 的翻面观测是「今天的代码上，洞上多扣的槽数随洞数增长是否有上界」，问的就是 `crates/` 这份分配器（回收门槛、全零槽钉住、挂载内回收）的性质，另写一份独立模型答不了；独立的那一半是第七节 7.2 的 Python 锚点脚本（不读 `crates/`）。只读、只驱动与观测，不改 `crates/singlefs-core`、`crates/singlefs-checker`、`crates/singlefs-format`；变异照第九节追加进 `crates/mutations.tsv`（只追加，用 `scripts/kb/insert-row.py`，`crates/mutations.tsv` 有别的会话在追加）。
+**装置写在哪（写死）：入库装置。** 执行员改写 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 与它的内联单测；不在 `scripts/experiment-apparatus/` 另起装置。依据：H1 的翻面观测是「今天的代码上，洞上多扣的槽数随洞数增长是否有上界」，问的就是 `crates/` 这份分配器（回收门槛、全零槽钉住、挂载内回收）的性质，另写一份独立模型答不了；独立的那一半是第七节 7.2 的 Python 锚点脚本（不读 `crates/`）。只读、只驱动与观测，不改 `crates/singlefs-core`、`crates/singlefs-checker`、`crates/singlefs-format`；变异照第九节追加进 `crates/mutations.tsv`（只追加，用 `scripts/kb/insert-row.py`，`crates/mutations.tsv` 有别的会话在追加）。
 
 **这条实验要读 `crates/` 的常量**：同第 6 次（即第 4 次表头那张表，连同第 2、3 次表头），这一次一个都不新加。新族的洞的 txg、`k_满(S)`、终点 txg 一律由装置里的 `anchor_model`（装置本地的 Rust 移植）与第七节 7.2 的 Python 脚本各算一份、两边比（停机 S20），不从 `crates/` 算。
 
@@ -170,7 +170,7 @@
 | J44 | 装置里洞数的取样写死成 `[1u64, 2, 4]`，三处 | 装置第 1439、4363、5030 行 |
 | J45 | `main()` 只把 `fits = True` 的格送进判定（锚点那一段 `.filter(|(_, _, cell)| cell.fits)`），排不下的格跳过 | 装置第 4746 行、第 5042 行 |
 | J46 | 族的形状：`HhCellShape { slots_per_region, density, hole_count, position }`；跑一条历史 `run_hh_history`；逐格汇总 `emit_cell_summary`；峰值对门槛判 `judge_peak_against_threshold` | 装置第 1533、2603、3061、3835 行；`main` 在第 4729 行 |
-| J47 | 复跑登记：`scripts/experiments/replay.sh` 第 1012 行是 E156 那一行（产物名不读、只核行在） | `grep -n 'E156' scripts/experiments/replay.sh`，第十三节命令四 |
+| J47 | 复跑登记：`scripts/experiment-apparatus/replay.sh` 第 1012 行是 E156 那一行（产物名不读、只核行在） | `grep -n 'E156' scripts/experiment-apparatus/replay.sh`，第十三节命令四 |
 
 由 J43–J45：新族 Hc、Hs 要给锚点模型与装置各加一个「按给定的洞 txg 表造历史」的入口；洞数取样改成按 S 现算的范围；`fits = False` 的格要放进判定（W30）。这是执行员改装置的三处，第五节 5.4 列全。
 
@@ -232,7 +232,7 @@
 
 **实现量（估计）**：E20 约 80 行（Rust 锚点）+ Python 脚本已写好；E21–E23 约 200 行；E24、E25 约 150 行；新变异 5 条。跑：一次编译，116 条历史（第 6 次是 38 条、最长 120 txg；这一次最长 210 txg），全部在内存稀疏盘上。
 
-- **第一段（补 H1；补完即够判）**：① 第七节命令一重跑、sha256 核；② E20–E25；③ 单测（PC-档序列、Hs 入口）与第九节新变异逐条证红；④ 116 条历史 × 两个时点；⑤ 第六节 R7a–R7f、第 6 次 R1a、R1b、R3 守门；⑥ 第七节、第八节；⑦ 新产物入库、`scripts/experiments/replay.sh` 第 1012 行改指新产物（照执行员定义）。**交回即判**：问题单 H1 的够判条件「洞数至少取三档（含环满一圈），每档报多扣槽数」由 R7a、R7c 两行罩住，两行都出了判定就够判。
+- **第一段（补 H1；补完即够判）**：① 第七节命令一重跑、sha256 核；② E20–E25；③ 单测（PC-档序列、Hs 入口）与第九节新变异逐条证红；④ 116 条历史 × 两个时点；⑤ 第六节 R7a–R7f、第 6 次 R1a、R1b、R3 守门；⑥ 第七节、第八节；⑦ 新产物入库、`scripts/experiment-apparatus/replay.sh` 第 1012 行改指新产物（照执行员定义）。**交回即判**：问题单 H1 的够判条件「洞数至少取三档（含环满一圈），每档报多扣槽数」由 R7a、R7c 两行罩住，两行都出了判定就够判。
 - 没有第二段。
 
 **预计挂钟**：2 小时内。依据（推的，没量）：第 6 次跑 38 条历史、最长 120 txg；这一次 116 条、最长 210 txg，单条历史的发布数约是第 6 次的 1–1.75 倍，总发布数约第 6 次的 4 倍；第 6 次的挂钟这一份没读（不读产物），按「每次发布在 4 GiB 内存稀疏盘上是毫秒级」推，116 条合计约 1.5 万次发布，加一次编译（checker 档包，约 10–20 分钟）在 2 小时内。超过 2 小时的迹象（第一条 S = 16 的 Hc(27) 单条挂钟 > 10 分钟）出现时，执行员停在能交接的点交回，由主 agent 按 (S, ρ) 分片重派（分片单元 = 一个 (S, ρ) 的全部族，6 片；续跑 = 每片一份产物，已有完整产物的片不重跑）。
@@ -643,7 +643,7 @@ $ sha256sum crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs
 21b239255798b2dde5679bb14f537c3886e25591655d872c13eb42f15a1ed08f  crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs
 $ grep -c 'e156_allocation_basis_counts' crates/mutations.tsv
 27
-$ grep -n 'E156' scripts/experiments/replay.sh | head -1    # 只核行在，产物名不读
+$ grep -n 'E156' scripts/experiment-apparatus/replay.sh | head -1    # 只核行在，产物名不读
 1012:E156|@driver_e156||…
 $ grep -rn '补洞\|fill_the_hole\|refill' crates/singlefs-core/src/ | wc -l
 2

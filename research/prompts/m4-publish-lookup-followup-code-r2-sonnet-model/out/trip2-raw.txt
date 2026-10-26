@@ -1,0 +1,131 @@
+  · ③ 两台的工具链相同（rustc 1.98.0 (88d9e12ae 2026-08-18)）
+  · ④ 树拷到第二台 runs/m4-r2-sonnet-trip2（git 列得出的 3434 个文件，没跟踪的临时文件排掉 0 个，规范副本另拷），在那里 git init 并提交一次
+  · ⑤ 第二台开跑（脱离 ssh 会话起，经副本里的 run-with-memory-cap.sh 16G），每 5 秒看一次
+  … 第二台那一份：running
+  · 第二台在用 6.8 核（登记 31）：只看了 303 秒，不满一个窗口（600 秒），还不判
+  ✗ 第二台在用 6.3 核（登记 31）：最近 606 秒平均、同时在算的线程约 1.0 条，都低于阈值 7.75（登记的四分之一）；这一窗口里没有声明串行段
+     → 怎么办：第二台那一趟在用的核太少：停下它（python3 .claude/singlefs-ai-sop/scripts/proc.py stop 1775958，驱动收到 TERM 先停第二台那条命令、取回点名的产物、再删第二台的树；驱动在 detached-run.sh 起的单元里就用 detached-run.sh stop <名>），照 .claude/rules/test-script-discipline.md「编译与算法都要快」把装置里互相独立的单位分到登记的线程数上再跑；真要串行的段由程序当场往 $SINGLEFS_SERIAL_DECLARATIONS 写「<秒>\t此刻串行：<理由>」，核过理由成立就 --ack 进程:1775958 接着跑
+  ✗ 第二台在用 3.7 核（登记 31）：最近 605 秒平均、同时在算的线程约 1.0 条，都低于阈值 7.75（登记的四分之一）；这一窗口里没有声明串行段
+     → 怎么办：第二台那一趟在用的核太少：停下它（python3 .claude/singlefs-ai-sop/scripts/proc.py stop 1775958，驱动收到 TERM 先停第二台那条命令、取回点名的产物、再删第二台的树；驱动在 detached-run.sh 起的单元里就用 detached-run.sh stop <名>），照 .claude/rules/test-script-discipline.md「编译与算法都要快」把装置里互相独立的单位分到登记的线程数上再跑；真要串行的段由程序当场往 $SINGLEFS_SERIAL_DECLARATIONS 写「<秒>\t此刻串行：<理由>」，核过理由成立就 --ack 进程:1775958 接着跑
+name=trip2 start nproc=32
+name=t4 cell=plain cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=plain core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features= ] 
+name=t4 cell=environment cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=environment core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features= ] 
+name=t4 cell=config_env cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=config_env core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features= ] 
+name=t4 cell=feature cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=feature core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS ] 
+name=t4 cell=harness_normal cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=harness_normal core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features= ] 
+name=t4 cell=harness_test cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=harness_test core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS ] 
+name=t4 cell=rustflags_cfg cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=rustflags_cfg core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features=LOOKUP_WORK_COUNTERS ] 
+name=t4 cell=rustflags_cfg_with_target cargo_rc=0 lib_cfg=[] script_cfg=[]
+name=t4 cell=rustflags_cfg_with_target core_build_script_outputs=0 metadata=[] 
+name=t4 cell=stale second_build_ran_core_build_script=0 second_build_recompiled_core=0
+name=t4 cell=stale core_build_script_outputs=1 metadata=[cargo::metadata=enabled_features= ] 
+   Compiling singlefs-harness v0.1.0 (第二台的目录/runs/m4-r2-sonnet-trip2/after/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 48.47s
+  Executable tests/diff_history_remount.rs (target/release/deps/diff_history_remount-6b287aaba72eee00)
+name=diff_run copy=after rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 73.02s
+   Compiling singlefs-harness v0.1.0 (第二台的目录/runs/m4-r2-sonnet-trip2/before/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 55.87s
+  Executable tests/diff_history_remount.rs (target/release/deps/diff_history_remount-6b287aaba72eee00)
+name=diff_run copy=before rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 87.58s
+name=differential seeds=256 steps=64 lines=16896 lines_before=16896 before_vs_after=identical
+name=differential_coverage op=new_inodes steps=1741 ok=1741 err=0
+name=differential_coverage op=write steps=5100 ok=5100 err=0
+name=differential_coverage op=overwrite steps=986 ok=986 err=0
+name=differential_coverage op=create_snapshot steps=1213 ok=1213 err=0
+name=differential_coverage op=destroy_snapshot steps=758 ok=758 err=0
+name=differential_coverage op=unlink steps=511 ok=511 err=0
+name=differential_coverage op=compaction steps=2326 ok=2326 err=0
+name=differential_coverage op=relocate steps=1594 ok=1594 err=0
+name=differential_coverage op=raise_floor steps=1524 ok=1524 err=0
+name=differential_coverage op=remount steps=631 ok=631 err=0
+name=differential_coverage panics_after=0 panics_before=0 remount_ok=631
+   Compiling singlefs-harness v0.1.0 (第二台的目录/runs/m4-r2-sonnet-trip2/probe/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 02s
+  Executable tests/probe_scans.rs (target/release/deps/probe_scans-46420f7ed52cde1e)
+name=probe scenario=write_size n=8 first_file_units=1 units_in_version=42 files_other_than_first=3 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=22 alloc_find=28 has_placement_any=8 carried_lower_find=2 lower_children_find=0 reloc_contains=0 unit_find=214 file_find=3 upper_leaf_filter=3] none_site=Some(LookupWork { index_builds: 5, index_lookups: 65, index_entries_examined: 298, largest_index_looked_up: 42, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=470
+name=probe scenario=write_size n=32 first_file_units=1 units_in_version=66 files_other_than_first=3 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=46 alloc_find=28 has_placement_any=8 carried_lower_find=2 lower_children_find=0 reloc_contains=0 unit_find=358 file_find=3 upper_leaf_filter=3] none_site=Some(LookupWork { index_builds: 5, index_lookups: 65, index_entries_examined: 331, largest_index_looked_up: 66, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=1070
+name=probe scenario=write_size n=128 first_file_units=1 units_in_version=162 files_other_than_first=3 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=142 alloc_find=28 has_placement_any=8 carried_lower_find=2 lower_children_find=0 reloc_contains=0 unit_find=934 file_find=3 upper_leaf_filter=3] none_site=Some(LookupWork { index_builds: 5, index_lookups: 65, index_entries_examined: 424, largest_index_looked_up: 162, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=3470
+name=probe scenario=first_file d=8 first_file_units=8 units_in_version=41 files_other_than_first=2 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=176 alloc_find=28 has_placement_any=8 carried_lower_find=1 lower_children_find=0 reloc_contains=0 unit_find=258 file_find=3 upper_leaf_filter=2] none_site=Some(LookupWork { index_builds: 5, index_lookups: 68, index_entries_examined: 315, largest_index_looked_up: 41, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=472
+name=probe scenario=first_file d=64 first_file_units=64 units_in_version=97 files_other_than_first=2 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=1280 alloc_find=25 has_placement_any=8 carried_lower_find=1 lower_children_find=0 reloc_contains=0 unit_find=706 file_find=3 upper_leaf_filter=2] none_site=Some(LookupWork { index_builds: 5, index_lookups: 296, index_entries_examined: 1700, largest_index_looked_up: 97, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=676
+name=probe scenario=first_file d=256 first_file_units=256 units_in_version=291 files_other_than_first=2 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=5120 alloc_find=25 has_placement_any=8 carried_lower_find=1 lower_children_find=0 reloc_contains=0 unit_find=2258 file_find=3 upper_leaf_filter=2] none_site=Some(LookupWork { index_builds: 5, index_lookups: 1068, index_entries_examined: 7749, largest_index_looked_up: 291, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=1450
+name=probe scenario=pool_files p=16 first_file_units=1 units_in_version=99 files_other_than_first=16 alloc_nodes=7 rewritten_roles=0 cmp[first_file_contains=22 alloc_find=28 has_placement_any=8 carried_lower_find=15 lower_children_find=0 reloc_contains=0 unit_find=532 file_find=3 upper_leaf_filter=16] none_site=Some(LookupWork { index_builds: 5, index_lookups: 236, index_entries_examined: 1305, largest_index_looked_up: 95, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=587
+name=probe scenario=pool_files p=64 first_file_units=1 units_in_version=343 files_other_than_first=64 alloc_nodes=9 rewritten_roles=0 cmp[first_file_contains=26 alloc_find=45 has_placement_any=11 carried_lower_find=63 lower_children_find=0 reloc_contains=0 unit_find=1984 file_find=4 upper_leaf_filter=64] none_site=Some(LookupWork { index_builds: 6, index_lookups: 1276, index_entries_examined: 9413, largest_index_looked_up: 339, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=42 all_sites_lookups=1854
+name=probe scenario=pool_files p=256 first_file_units=1 units_in_version=1324 files_other_than_first=256 alloc_nodes=21 rewritten_roles=0 cmp[first_file_contains=32 alloc_find=195 has_placement_any=8 carried_lower_find=255 lower_children_find=0 reloc_contains=0 unit_find=7820 file_find=3 upper_leaf_filter=256] none_site=Some(LookupWork { index_builds: 5, index_lookups: 3871, index_entries_examined: 35945, largest_index_looked_up: 1320, mapping_leaf_decodes: 0, times_entered: 0 }) all_sites_index_builds=33 all_sites_lookups=4838
+name=probe scenario=remount files=16 units=95 cmp[unit_find=5138 file_find=0 inode_record_find=153] all_sites=LookupWork { index_builds: 142, index_lookups: 2486, index_entries_examined: 11520, largest_index_looked_up: 95, mapping_leaf_decodes: 21, times_entered: 446 }
+name=probe scenario=remount files=64 units=339 cmp[unit_find=22274 file_find=0 inode_record_find=2145] all_sites=LookupWork { index_builds: 154, index_lookups: 8483, index_entries_examined: 57990, largest_index_looked_up: 339, mapping_leaf_decodes: 23, times_entered: 1070 }
+name=probe scenario=remount files=256 units=1320 cmp[unit_find=87628 file_find=0 inode_record_find=33153] all_sites=LookupWork { index_builds: 154, index_lookups: 31298, index_entries_examined: 283448, largest_index_looked_up: 1320, mapping_leaf_decodes: 23, times_entered: 3422 }
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 16.25s
+warning: `singlefs-harness` (test "bench_positions") generated 1 warning (run `cargo fix --test "bench_positions" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 25s
+  Executable tests/bench_positions.rs (target/release/deps/bench_positions-e1a99855a09d9bf6)
+name=bench copy=before
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=0 ns_per_call=13682
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=1 ns_per_call=17382
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=2 ns_per_call=18978
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=8 ns_per_call=32324
+name=bench_small_publish files=64 units=245 one_unit_rewrite_us_min=6535 median=7363 max=9471
+name=bench_remount files=64 units=339 elapsed_ms=46 all_sites=LookupWork { index_builds: 92, index_lookups: 7505, index_entries_examined: 54505, largest_index_looked_up: 339, mapping_leaf_decodes: 23 }
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=0 ns_per_call=53702
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=1 ns_per_call=68889
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=2 ns_per_call=74294
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=8 ns_per_call=126769
+name=bench_small_publish files=256 units=1224 one_unit_rewrite_us_min=24910 median=27975 max=70485
+name=bench_remount files=256 units=1320 elapsed_ms=173 all_sites=LookupWork { index_builds: 92, index_lookups: 29345, index_entries_examined: 269828, largest_index_looked_up: 1320, mapping_leaf_decodes: 23 }
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=0 ns_per_call=146950
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=1 ns_per_call=193020
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=2 ns_per_call=207040
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=8 ns_per_call=289791
+name=bench_small_publish files=1024 units=5145 one_unit_rewrite_us_min=101116 median=132011 max=182466
+name=bench_remount files=1024 units=5241 elapsed_ms=788 all_sites=LookupWork { index_builds: 108, index_lookups: 137441, index_entries_examined: 1541366, largest_index_looked_up: 5241, mapping_leaf_decodes: 27 }
+name=bench_sizes size_of_identity_slot_index_pair=40 size_of_published_unit_header=64
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 167.17s
+warning: `singlefs-harness` (test "bench_positions") generated 1 warning (run `cargo fix --test "bench_positions" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 32.53s
+  Executable tests/bench_positions.rs (target/release/deps/bench_positions-e1a99855a09d9bf6)
+name=bench copy=after
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=0 ns_per_call=9399
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=1 ns_per_call=15175
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=2 ns_per_call=15839
+name=bench_positions files=64 units=339 mapped_units=334 positions_given=8 ns_per_call=21179
+name=bench_small_publish files=64 units=245 one_unit_rewrite_us_min=4278 median=4562 max=4975
+name=bench_remount files=64 units=339 elapsed_ms=32 all_sites=LookupWork { index_builds: 154, index_lookups: 8483, index_entries_examined: 57990, largest_index_looked_up: 339, mapping_leaf_decodes: 23, times_entered: 1070 }
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=0 ns_per_call=35958
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=1 ns_per_call=56172
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=2 ns_per_call=59556
+name=bench_positions files=256 units=1320 mapped_units=1309 positions_given=8 ns_per_call=79483
+name=bench_small_publish files=256 units=1224 one_unit_rewrite_us_min=16875 median=17474 max=19607
+name=bench_remount files=256 units=1320 elapsed_ms=121 all_sites=LookupWork { index_builds: 154, index_lookups: 31298, index_entries_examined: 283448, largest_index_looked_up: 1320, mapping_leaf_decodes: 23, times_entered: 3422 }
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=0 ns_per_call=155201
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=1 ns_per_call=252678
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=2 ns_per_call=265225
+name=bench_positions files=1024 units=5241 mapped_units=5204 positions_given=8 ns_per_call=362151
+name=bench_small_publish files=1024 units=5145 one_unit_rewrite_us_min=84053 median=87670 max=111304
+name=bench_remount files=1024 units=5241 elapsed_ms=543 all_sites=LookupWork { index_builds: 178, index_lookups: 143477, index_entries_examined: 1602543, largest_index_looked_up: 5241, mapping_leaf_decodes: 27, times_entered: 12914 }
+name=bench_sizes size_of_identity_slot_index_pair=40 size_of_published_unit_header=64
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 132.70s
+name=carried test=whole_rewrite_no_snapshot carried_accounting_deadlist_mapping=[0, 0, 1] none_site=Some(LookupWork { index_builds: 5, index_lookups: 1286, index_entries_examined: 9986, largest_index_looked_up: 452, mapping_leaf_decodes: 0, times_entered: 0 })
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 2.94s
+publish_lookup_by_identity deadlist_pool deadlist_entries=795 deadlist_tree_nodes=5
+publish_lookup_by_identity deadlist_pool_rewrite data_units=8 carried_accounting_nodes=0 carried_deadlist_nodes=2 carried_mapping_nodes=10 lookup_work=LookupWorkOfEachSite { work_of_each_site: {None: LookupWork { index_builds: 5, index_lookups: 2613, index_entries_examined: 23053, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 0 }, Some(SnapshotJudgement): LookupWork { index_builds: 6, index_lookups: 46, index_entries_examined: 388, largest_index_looked_up: 906, mapping_leaf_decodes: 4, times_entered: 2 }, Some(MappingEntriesOfTheReleaseJudgement): LookupWork { index_bui
+publish_lookup_by_identity deadlist_pool_rewrite data_units=32 carried_accounting_nodes=0 carried_deadlist_nodes=3 carried_mapping_nodes=10 lookup_work=LookupWorkOfEachSite { work_of_each_site: {None: LookupWork { index_builds: 5, index_lookups: 2547, index_entries_examined: 22451, largest_index_looked_up: 906, mapping_leaf_decodes: 0, times_entered: 0 }, Some(SnapshotJudgement): LookupWork { index_builds: 6, index_lookups: 142, index_entries_examined: 1262, largest_index_looked_up: 906, mapping_leaf_decodes: 4, times_entered: 2 }, Some(MappingEntriesOfTheReleaseJudgement): LookupWork { index_
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 9.47s
+name=mutant row=1 rc=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out :: 并行线一：C491：共享的提交内生块挪到一次发布的第一条记录里点名（末条只点名自己那个数据单元）
+name=mutant_panic row=1 thread 'publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record' (229030) panicked at crates/singlefs-harness/tests/sequential_write_split_into_one_unit_transactions.rs:157:5: => assertion `left == right` failed: 前一条只点名一个单元 | left: 13 | right: 1 | note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+name=mutant row=2 rc=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out :: 并行线一：C394：释放之前读盘核校验和只走这次重写的角色（文件变短换下的尾巴不核，被改坏的那一份照常回到空闲池）
+name=mutant_panic row=2 thread 'shrinking_a_multi_unit_file_checks_the_released_tail_against_its_mapping_checksums_before_releasing_it' (230881) panicked at crates/singlefs-core/src/transaction.rs:11471:9: => assertion `left == right` failed: resolve 判生死的那一组用户可见单元，就是释放判定路径按这次换下的全部角色走出来的用户可见那一组 | left: {Data(DataUnitIndexInFile(0)), ExtentLowerNode(ExtentLowerNodePosition { level: 0, index: 0 }), ExtentRoot, Ino
+name=peer_mutants tsv=alt3-mutations.tsv rows=1,2,3 nproc=32
+name=mutant row=1 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out :: ALT3a 记账树单独退回线性（无快照整份重写用例判）
+name=mutant row=2 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out :: ALT3b 记账树单独退回线性（快照下整份重写与删快照用例判）
+name=mutant row=3 rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out :: ALT3c deadlist 树单独退回线性（无快照整份重写用例判）
+name=peer_mutants done
+name=trip2 done
+  · 第二台那条命令退 0
+  · ⑥ 取回 8 条（共点名 8 条）到 /home/fy5090/.local/share/singlefs/work/multi-host-run/m4-r2-sonnet-trip2
+  · ⑦ 删了第二台 runs/m4-r2-sonnet-trip2 这一趟的树与进程号、退出码、输出、串行声明四个文件（回读不在了）

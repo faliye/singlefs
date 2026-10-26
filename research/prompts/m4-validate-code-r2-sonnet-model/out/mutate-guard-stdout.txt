@@ -1,0 +1,6 @@
+name=mutant mutant=directory_arm_does_nothing rc=101 test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 343 filtered out; finished in 0.04s
+name=mutant_case mutant=directory_arm_does_nothing test block_device::tests::a_temporary_image_is_gone_after_a_panic_inside_the_scope ... ok
+name=mutant_case mutant=directory_arm_does_nothing test block_device::tests::a_temporary_image_and_directory_are_gone_once_the_scope_ends_normally ... FAILED
+name=mutant mutant=file_arm_does_nothing rc=101 test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 343 filtered out; finished in 0.00s
+name=mutant_case mutant=file_arm_does_nothing test block_device::tests::a_temporary_image_is_gone_after_a_panic_inside_the_scope ... FAILED
+name=mutant_case mutant=file_arm_does_nothing test block_device::tests::a_temporary_image_and_directory_are_gone_once_the_scope_ends_normally ... FAILED

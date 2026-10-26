@@ -1,0 +1,66 @@
+--- a/.claude/rules/implementation-workflow.md
++++ b/.claude/rules/implementation-workflow.md
+@@ -28,7 +28,7 @@
+ 
+ ## 复用重型门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判
+ 
+-改动之后一条判定要不要重判，判据是**它的单元键在判定库里有没有键相同、作数的判定**：键只由这条判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的依赖版本与它自己的内容输入组成（D13（验证路线） 已定项 17）。算键时有两种排除，理由不同、分开记。文件级：`scripts/crash/lib_verdict_library.py` 的 `NOT_JUDGING_FILES` 那两份（算键的库自己与 `scripts/gate/lib_function_units.py`）按角色排，管怎么存、怎么算键，不管判对错，它们的单元不进任何一份判定的键。边级：一条只打提示、不改判定结局的子进程边，按实测排，不沿它收；登记在 `scripts/gate/lib_function_units.py` 的 `EXCLUDED_PROGRAM_EDGES`。边级排除要配三格自证：这条路上的任何异常不改包装退出码；判法读包装输出前去掉这条路打的行；切边前后少掉的单元只经这条边可达。另有一格「键不变而退出码变」必红。python 模块有单元进闭包时，它在 import 时执行的模块级语句一起进闭包：import、赋值、类头本身（不连方法）、带装饰器或缺省值的 def 头。`checker-tier-crash-point-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-broad-mutation、checker-tier-research-build-and-replay 都按判定入库，整道、整格没有复用判定；没有判定库的阶段每次照跑。
++改动之后一条判定要不要重判，判据是**它的单元键在判定库里有没有键相同、作数的判定**：键只由这条判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的闭包真引到的依赖版本与它自己的内容输入组成（D13（验证路线） 已定项 17）。算键时有两种排除。文件级：`scripts/crash/lib_verdict_library.py` 的 `NOT_JUDGING_FILES` 那两份（算键的库自己与 `scripts/gate/lib_function_units.py`）按角色排，管怎么存、怎么算键，不管判对错，它们的单元不进任何一份判定的键。边级：一条只打提示、不改判定结局的子进程边，按实测排，不沿它收；登记在 `scripts/gate/lib_function_units.py` 的 `EXCLUDED_PROGRAM_EDGES`。边级排除要配三格自证：这条路上的任何异常不改包装退出码；判法读包装输出前去掉这条路打的行；切边前后少掉的单元只经这条边可达。另有一格「键不变而退出码变」必红。python 模块有单元进闭包时，它在 import 时执行的模块级语句一起进闭包：import、赋值、类头本身（不连方法）、带装饰器或缺省值的 def 头。`checker-tier-crash-point-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-broad-mutation、checker-tier-research-build-and-replay 都按判定入库，整道、整格没有复用判定；没有判定库的阶段每次照跑。
+ 
+ 复用由阶段自己做、自己报：每道的成功句报这一趟现判、复用各几条，有拒算的另报拒算几条（checker-tier-broad-mutation 只读结论，这几个数在它前面起的驱动的成功句里），作废的判定报得出是哪几个函数单元变了（键的组成清单随判定落盘）。收尾报告抄每道的这一句；没有这一句的那一道按没跑算（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
+ 
+@@ -46,7 +46,7 @@
+ | 仓副本里正文改过的脚本的自证 | 登记为 light 的 `--selftest` 也按提交时的检查办：子 agent 不在副本里跑，把命令写进交回报告；主 agent 在集成副本里跑，命令带 `SINGLEFS_HEAVY_TESTS=commit`，不弹窗（`.claude/hooks/heavy-test-guard.sh` 不带前缀照拒）；跑之前主 agent 看一眼那份自证（连同它 source / import 的库）相对主工作区的 diff（`diff -u <主工作区里那一份> <副本里那一份>`，逐份比），正文起编译、测试或别的重活的照重型办：提交时跑，或先弹窗问用户（钩子不读副本里的正文，这一步只靠主 agent 看） |
+ | 其余任何时候 | 重型不跑（合入后验证里 `scripts/gate/merge-and-verify.sh` 带 `SINGLEFS_HEAVY_TESTS=user-request` 起的 checker 档快档那一步与它给出的只重跑那几格的命令（那一步红了、本次未跑或没带前缀时打出的那一条）除外，跑法照 `.claude/main-agent.md`「写与验分两段」验证段第 1 步）；子 agent 只跑 harness 与形式化那一条轻型 |
+ 
+-**重型测试**就是 checker 档那一批加上整机资源级的活，判定在 `.claude/hooks/lib_heavy_tests.py` 的 `classify`（逐类的写法在它文件头）。轻型三条（`scripts/crash/crash-point-replay.sh`、门禁 checker-tier-formal-verification、checker-tier-crates-mutation-replay 带 `--quick`，可再带 `--item <项>`，`.claude/rules/verification.md`「两档：轻型与重型」）不算重型；子 agent 交回前只跑形式化那一条，崩溃与变异两条交主 agent 跑；同三条不带 `--quick` 的剪枝、逐条（`--item`）、全量（崩溃点重放入口带 `--full`，另两道门禁设 `SINGLEFS_GATE_FULL=1`）是重型。重型是：崩溃点重放入口的重型跑法、跑到 checker 档包 `singlefs-checker-tier` 的测试（`cargo test -p singlefs-checker-tier`、不挑包而包的范围含它、直接执行它的测试二进制）、门禁 `checker-tier-crash-point-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification（连同直接起它的判法脚本 `scripts/gate/verus-proof-check.py` 证明、空真、必红三种用法与 `scripts/experiment-apparatus/e165-pin-red-examples.py --replay`）与 checker-tier-research-build-and-replay 的 experiment-replay 格、`qemu-system-*` 与 `scripts/devices/vm-bench.sh`、`.claude/scripts/lkmm.sh` 与 `herd7`、参数里有 `crates/mutations.tsv` 的 `scripts/mutation/mutate.sh`、全量 `cargo test`（`--all` / `--workspace` / 工作区根裸跑）与 `.claude/scripts/check.sh`、`gate.sh` 整轮与 `scripts/gate/gate-staged.sh`、E152 装置、广谱变异（`scripts/mutation/broad-mutation.py` 起 cargo 或改库目录的每一种用法；`--list-items`、`--summary`、`--check-ignored`、`--help`（`-h`）与登记为 light 的单独 `--selftest` 不算）与门禁 checker-tier-broad-mutation（只点名 gate-verdict 一格的 `--check gate-verdict` 不算）、崩溃放量（`scripts/crash/crash-amplification.sh`、`crash-amplification-item.sh`、`crash-amplification-two-hosts.sh` 的真跑；`crash-amplification.sh --list-items` 与 `.claude/hooks/selftest-registry.tsv` 登记为 light 的 `--selftest` 不算）、真编 QEMU（`scripts/devices/build-patched-qemu.sh` 除 `--selftest` 之外的用法）。包装（`bash -c`、`capped.sh`、`run-with-memory-cap.sh`、`nice`、`timeout`、`env`、`/usr/bin/time`、`flock` 这类）里面的同样算；命令位置上执行的脚本闸读进去逐行判。由 `.claude/hooks/heavy-test-guard.sh`（Bash 的 PreToolUse）在执行前拒绝：子 agent 跑任何一样拒绝；主 agent 不带前缀也拒绝。派发提示要子 agent 跑重型测试的，由 `.claude/hooks/runner-dispatch-guard.sh` 拒绝；许可子 agent 跑轻型三条的放行。
++**重型测试**就是 checker 档那一批加上整机资源级的活，判定在 `.claude/hooks/lib_heavy_tests.py` 的 `classify`（逐类的写法在它文件头）。轻型三条（`scripts/crash/crash-point-replay.sh`、门禁 checker-tier-formal-verification、checker-tier-crates-mutation-replay 带 `--quick`，可再带 `--item <项>`，`.claude/rules/verification.md`「两档：轻型与重型」）不算重型；子 agent 交回前只跑形式化那一条，崩溃与变异两条交主 agent 跑；同三条不带 `--quick` 的剪枝、逐条（`--item`）、全量（崩溃点重放入口带 `--full`，另两道门禁设 `SINGLEFS_GATE_FULL=1`）是重型。重型是：崩溃点重放入口的重型跑法、跑到 checker 档包 `singlefs-checker-tier` 的测试（`cargo test -p singlefs-checker-tier`、不挑包而包的范围含它、直接执行它的测试二进制）、门禁 `checker-tier-crash-point-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification（连同直接起它的判法脚本 `scripts/gate/verus-proof-check.py` 证明、空真、必红三种用法与 `scripts/experiment-apparatus/e165-pin-red-examples.py --replay`）与 checker-tier-research-build-and-replay 的 experiment-replay 格、实验复跑入口 `scripts/experiment-apparatus/replay.sh`（不带参数、点名实验号、`--admission-only`；`--list-items` 与登记为 light 的单独 `--selftest` 不算）、`qemu-system-*` 与 `scripts/devices/vm-bench.sh`、`.claude/scripts/lkmm.sh` 与 `herd7`、参数里有 `crates/mutations.tsv` 的 `scripts/mutation/mutate.sh`、全量 `cargo test`（`--all` / `--workspace` / 工作区根裸跑）与 `.claude/scripts/check.sh`、`gate.sh` 整轮与 `scripts/gate/gate-staged.sh`、E152 装置、广谱变异（`scripts/mutation/broad-mutation.py` 起 cargo 或改库目录的每一种用法；`--list-items`、`--summary`、`--check-ignored`、`--help`（`-h`）与登记为 light 的单独 `--selftest` 不算）与门禁 checker-tier-broad-mutation（只点名 gate-verdict 一格的 `--check gate-verdict` 不算）、崩溃放量（`scripts/crash/crash-amplification.sh`、`crash-amplification-item.sh`、`crash-amplification-two-hosts.sh` 的真跑；`crash-amplification.sh --list-items` 与 `.claude/hooks/selftest-registry.tsv` 登记为 light 的 `--selftest` 不算）、真编 QEMU（`scripts/devices/build-patched-qemu.sh` 除 `--selftest` 之外的用法）。包装（`bash -c`、`capped.sh`、`run-with-memory-cap.sh`、`nice`、`timeout`、`env`、`/usr/bin/time`、`flock` 这类）里面的同样算；命令位置上执行的脚本闸读进去逐行判。由 `.claude/hooks/heavy-test-guard.sh`（Bash 的 PreToolUse）在执行前拒绝：子 agent 跑任何一样拒绝；主 agent 不带前缀也拒绝。派发提示要子 agent 跑重型测试的，由 `.claude/hooks/runner-dispatch-guard.sh` 拒绝；许可子 agent 跑轻型三条的放行。
+ 
+ herd7 / LKMM、QEMU 与 Verus 不归上游 singlefs-ai-sop 管：相关的脚本、样本、模板与规则段落都不在 SOP 里，怎么测、怎么验、接不接进门禁由本工程自己定。三样都是本工程自己的阶段：
+ 
+--- a/.claude/rules/verification.md
++++ b/.claude/rules/verification.md
+@@ -47,7 +47,7 @@
+ | 档 | 守什么 | 跑法 | 谁跑、什么时候 |
+ |---|---|---|---|
+ | 轻型 | 两个目标：守住系统核心代码不红（核心部分，每次都跑）；测这一次改到的代码（可变部分，跑的人按自己改到的文件点名） | 三条命令带 `--quick`：`bash scripts/crash/crash-point-replay.sh --quick`（只用本机、不动第二台时加 `--local-only`）、`bash .claude/gate.d/checker-tier-formal-verification.sh --quick <根>`、`bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick <根>`。只带 `--quick` 跑核心部分；再带 `--item <项>`（可给几次）跑核心部分加点名的项，可点名的项用各条的 `--list-items` 列；点名的项在轻型的域上跑（崩溃取「甲二」与展开 6 两个域的并集，形式化与变异就是那几项本身）。跑全部的项与域；放量那一段经崩溃判定库复用块键与判器单元键都相同、已判过的块（与重型同一份库），不只跑一部分 | 形式化那一条：实现员、调查员交回前跑；崩溃与变异两条：子 agent 不起，命令写进报告「要主 agent 跑的命令」一节，主 agent 在实现员的副本里跑；合入后验证三条的全部由主 agent 跑；三条带不带 `SINGLEFS_HEAVY_TESTS` 前缀都放行 |
+-| 重型 | 总门闸：验全体 | 同三条命令不带 `--quick`，三种跑法：不带参数是剪枝（只剪单元键相同、已判过的与等价的；单元键只由判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的依赖版本与判定自己的内容输入组成，路径、名字、行号、资源上限、限时、提交与树不进键；两种排除理由不同、分开记：文件级是 `scripts/crash/lib_verdict_library.py` 的 `NOT_JUDGING_FILES` 那两份，管怎么存、怎么算键，不管判对错，它们的单元不进任何一份判定的键，边级是只打提示、不改判定结局的子进程边，按实测排，不沿它收，登记在 `scripts/gate/lib_function_units.py` 的 `EXCLUDED_PROGRAM_EDGES`，边级排除的三格自证在 `.claude/rules/implementation-workflow.md`「复用重型门禁的判定：按每条判定的单元键判」一节；python 模块有单元进闭包时，它在 import 时执行的模块级语句一起进闭包：import、赋值、类头本身（不连方法）、带装饰器或缺省值的 def 头；D13（验证路线） 已定项 17）、`--item <项>` 是逐条、全量是不读判定库、现判出的判定照键写回（崩溃点重放入口带 `--full`；形式化与变异两道门禁不认 `--full`，设 `SINGLEFS_GATE_FULL=1`，变异那一道也认 `GATE_MUTATION_START_OVER=1`） | 只由主 agent 带前缀跑：提交时，或用户要求时 |
++| 重型 | 总门闸：验全体 | 同三条命令不带 `--quick`，三种跑法：不带参数是剪枝（只剪单元键相同、已判过的与等价的；单元键只由判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的闭包真引到的依赖版本与判定自己的内容输入组成，路径、名字、行号、资源上限、限时、提交与树不进键；两种排除：文件级是 `scripts/crash/lib_verdict_library.py` 的 `NOT_JUDGING_FILES` 那两份，管怎么存、怎么算键，不管判对错，它们的单元不进任何一份判定的键，边级是只打提示、不改判定结局的子进程边，按实测排，不沿它收，登记在 `scripts/gate/lib_function_units.py` 的 `EXCLUDED_PROGRAM_EDGES`，边级排除的三格自证在 `.claude/rules/implementation-workflow.md`「复用重型门禁的判定：按每条判定的单元键判」一节；python 模块有单元进闭包时，它在 import 时执行的模块级语句一起进闭包：import、赋值、类头本身（不连方法）、带装饰器或缺省值的 def 头；D13（验证路线） 已定项 17）、`--item <项>` 是逐条、全量是不读判定库、现判出的判定照键写回（崩溃点重放入口带 `--full`；形式化与变异两道门禁不认 `--full`，设 `SINGLEFS_GATE_FULL=1`，变异那一道也认 `GATE_MUTATION_START_OVER=1`） | 只由主 agent 带前缀跑：提交时，或用户要求时 |
+ 
+ - 核心部分取什么：形式化是工具链、证明、钉表三项（钉表那一项只判红例钉表 `.claude/gate.d/e165-pinned-red-examples.tsv` 自己，不读 `research/`）；crates 变异表是改坏对象在 `crates/singlefs-core/src/` 的那些行里每个测试目标固定一行（登记表 `.claude/gate.d/crates-mutation-light-rows.tsv`）；崩溃是每项在「甲二」与展开 6 两个域的并集上判，连同小输入上的 GPU 与 CPU 对拍、剪枝自证、钉回来的红例（两个域的写法以 `scripts/crash/crash-point-replay.sh` 文件头为准）。重型是全部：形式化的全部项、变异整表、崩溃整域。
+ - 轻型是重型的子集：轻型里有的每一项，重型里都有。写测试先写重型，再把其中关键的步骤拿出来放进轻型；轻型登记的每一行写明取自重型的哪一项，指得到重型里现存的那一项。
+--- a/scripts/mutation/crates-mutation-rows.py
++++ b/scripts/mutation/crates-mutation-rows.py
+@@ -203,7 +203,7 @@
+   judge-units-whole-file  判法单元指纹取闭包碰到的那几份文件的整份原文（改前的取法）（自证「只改判法脚本的注释：判法单元指纹不变」那一格必须判错）
+   judging-files-included  scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：判法单元指纹里留着
+                        NOT_JUDGING_FILES 那两份（lib_verdict_library.py、lib_function_units.py）的单元（改前的样子）
+-                       （本模块自证「改 NOT_JUDGING_FILES 那两份里任一份的一个函数：判法单元指纹不变，闭包里也没有那两份的单元」那一格必须判错）
++                       （本模块自证「改 lib_function_units.py 的 RustFile.row 一处函数体：判法单元指纹不变，闭包里也没有 NOT_JUDGING_FILES 那两份的单元（lib_verdict_library.py 对 crates 判法闭包贡献 0，没有函数可改）」那一格必须判错）
+   coveragenotrecorded  抓到之后不记覆盖（自证「头一趟每条点名测试记一份覆盖、同一条测试的几行共用一份」
+                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错；另有记覆盖次数的四格跟着判错：
+                        「头一趟起 1 批基线 + 4 条变异，另记 4 份覆盖」「下一趟只跑剩下的 2 条」「插桩编译那一步写出的剖析文件」「会话里平常跑……4 个工作进程」）
+@@ -6872,19 +6872,17 @@
+                     "        if expected == parsed.full_name or parsed.full_name.endswith(\"::\" + expected):\n")
+     parsing_key, _references = judging_units(environment, copy)
+     selftest.check("改 libtest 结果行解析函数的一处：判法单元指纹变", parsing_key != scheduling_key, f"{scheduling_key[:16]}… → {parsing_key[:16]}…")
+-    # NOT_JUDGING_FILES 那两份（D13 已定项 17 的文件级排除）：lib_function_units.py 的 RustFile.row（闭包里有它）与 lib_verdict_library.py 的 digest_text 各改一处函数体，指纹不变；
+-    # 弄坏开关 judging-files-included（lib_mutation_units.py 里的，同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）下前一处改动进指纹、这一格判错
++    # NOT_JUDGING_FILES 那两份（D13 已定项 17 的文件级排除）里，闭包里有单元的只有 lib_function_units.py：改它的 RustFile.row 一处函数体，指纹不变。
++    # lib_verdict_library.py 对 crates 判法闭包贡献 0（开关 judging-files-included 下 judging-units --units 现数也没有它的单元），没有函数可改，这一半不造改动；
++    # 弄坏开关 judging-files-included（lib_mutation_units.py 里的，同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）下 RustFile.row 的改动进指纹、这一格判错
+     units_file = os.path.join(copy, "scripts", "gate", "lib_function_units.py")
+     with open(units_file, encoding="utf-8") as handle:
+         units_text = handle.read()
+     row_line = '        return snippet_of(self.source_rows[line - 1]) if 0 < line <= len(self.source_rows) else ""\n'
+     assert units_text.count(row_line) >= 1, units_file
+     selftest_write(units_file, units_text.replace(row_line, row_line.replace("0 < line", "1 <= line"), 1))
+-    replace_in_file(os.path.join(copy, "scripts", "crash", "lib_verdict_library.py"),
+-                    '    return hashlib.sha256(text.encode("utf-8", "surrogateescape") if isinstance(text, str) else text).hexdigest()\n',
+-                    '    return hashlib.sha256(text.encode("utf-8", "replace") if isinstance(text, str) else text).hexdigest()\n')
+     excluded_key, excluded_references = judging_units(environment, copy)
+-    selftest.check("改 NOT_JUDGING_FILES 那两份里任一份的一个函数：判法单元指纹不变，闭包里也没有那两份的单元",
++    selftest.check("改 lib_function_units.py 的 RustFile.row 一处函数体：判法单元指纹不变，闭包里也没有 NOT_JUDGING_FILES 那两份的单元（lib_verdict_library.py 对 crates 判法闭包贡献 0，没有函数可改）",
+                    excluded_key == parsing_key and not any(reference.file in mutation_units.not_judging_files() for reference in excluded_references),
+                    f"{parsing_key[:16]}… → {excluded_key[:16]}…；那两份的单元 {sum(reference.file in mutation_units.not_judging_files() for reference in excluded_references)} 个")
+     shown = run_command_capturing(command_judging_units, [copy])

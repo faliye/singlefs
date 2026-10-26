@@ -1,0 +1,14 @@
+y1_a_external_type_in_verus_fn [--no-cheating] rc=1 error: cannot use type `y1_a_external_type_in_verus_fn::AllocationRecord` which is ignored
+y1_a_external_type_in_verus_fn [允许作弊标记] rc=1 error: cannot use type `y1_a_external_type_in_verus_fn::AllocationRecord` which is ignored
+y1_b_attribute_mode [--no-cheating] rc=0 verification results:: 2 verified, 0 errors
+y1_b_attribute_mode [允许作弊标记] rc=0 verification results:: 2 verified, 0 errors
+y1_c_external_type_specification [--no-cheating] rc=0 verification results:: 1 verified, 0 errors
+y1_c_external_type_specification [允许作弊标记] rc=0 verification results:: 1 verified, 0 errors
+y1_d_assume_specification [--no-cheating] rc=1 error: external_body/assume_specification not allowed with --no-cheating
+y1_d_assume_specification [允许作弊标记] rc=0 verification results:: 1 verified, 0 errors
+y1_e_external_body [--no-cheating] rc=1 error: external_body/assume_specification not allowed with --no-cheating
+y1_e_external_body [允许作弊标记] rc=0 verification results:: 1 verified, 0 errors
+y1_f_unverified_callers_are_not_checked [--no-cheating] rc=0 verification results:: 3 verified, 0 errors
+y1_f_unverified_callers_are_not_checked [允许作弊标记] rc=0 verification results:: 3 verified, 0 errors
+y1_g_assume_specification_signature_must_match_std [--no-cheating] rc=1 error: assume_specification requires function type signature to match `core::option::impl&
+y1_g_assume_specification_signature_must_match_std [允许作弊标记] rc=1 error: assume_specification requires function type signature to match `core::option::impl&

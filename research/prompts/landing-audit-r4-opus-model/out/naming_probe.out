@@ -1,0 +1,10 @@
+对照：改了 .rs 没跑：退 2；✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）：
+对照：两条都真跑：退 0
+false && 两条（一条都没执行，退 1）：退 0
+true || 两条（一条都没执行，退 0）：退 0
+if false; then 两条; fi：退 0
+bash -n 只查语法：退 2；✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）：
+timeout 0.1 包着、被杀退 124：退 0
+两条写进函数定义不调用：退 0
+根写成 "$CLAUDE_PROJECT_DIR"（真跑了两条）：退 2；✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）：
+worktree 里改、根写主工作区（应拒）：退 2；✗ implementation-writer 改了 crates/ 或 scripts/ 下的 .rs，会话记录里改完之后没跑过共用约束点名的两条命名检查（只认真跑过的命令，报告里写跑了不算）：

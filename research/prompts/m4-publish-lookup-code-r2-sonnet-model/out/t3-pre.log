@@ -1,0 +1,43 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/pre/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/pre/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/pre/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/pre/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/pre/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/pre/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 14s
+     Running tests/diff_t3.rs (/home/fy5090/.local/share/singlefs/work/m4-publish-lookup-code-r2-sonnet/rerun-check-t3/target-pre/debug/deps/diff_t3-2fbecca5d92d211b)
+
+running 1 test
+T3DIFF case=untouched result=Ok digest=990476732496cd8d deadlist_entries=4 kept=4 released=8
+T3DIFF case=duplicate-role-appended-with-another-key result=Ok digest=990476732496cd8d deadlist_entries=4 kept=4 released=8
+T3DIFF case=duplicate-role-prepended-with-another-key result=Err ReleaseNotInMapping { unit: Data(DataUnitIndexInFile(0)) }
+T3DIFF case=duplicate-role-same-key-twice result=Ok digest=990476732496cd8d deadlist_entries=4 kept=4 released=8
+test t3_differential_before_and_after has been running for over 60 seconds
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=role-data-0-missing result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=role-inode-root-missing result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=role-extent-root-missing result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+T3DIFF-PANIC-LOCATION crates/singlefs-core/src/transaction.rs:7074
+T3DIFF case=mapped-units-empty result=Panic message=照抄进来的角色在上一版里进映射、有一把 key
+test t3_differential_before_and_after ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 118.33s
+

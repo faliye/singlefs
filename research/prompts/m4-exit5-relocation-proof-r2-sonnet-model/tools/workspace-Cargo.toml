@@ -1,0 +1,14 @@
+# 草稿目录里的最小工作区：只留 core 与它的两个依赖，让 cargo metadata 不去下载别的平台的包（离线）。
+[workspace]
+resolver = "2"
+members = [
+    "crates/singlefs-format",
+    "crates/singlefs-core",
+    "crates/singlefs-replay-prefix",
+]
+
+[profile.release]
+opt-level = 3
+debug = true
+overflow-checks = true
+debug-assertions = true

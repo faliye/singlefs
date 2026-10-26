@@ -1,0 +1,178 @@
+name=make_trees built=cut-load-edge,cut-load-edge-syn,cut-lookup,cut-lookup-syn,edge-decl,load-edge
+RESULT closure tree=current rc=4 units=1579 refused=[      1 inline-script-not-literal;]
+RESULT closure tree=cut-lookup rc=0 units=1232 refused=[]
+RESULT closure tree=load-edge rc=4 units=1610 refused=[      1 inline-script-not-literal;]
+RESULT closure tree=cut-load-edge rc=0 units=1289 refused=[]
+RESULT closure tree=cut-lookup-syn rc=0 units=1232 refused=[]
+RESULT closure tree=cut-load-edge-syn rc=4 units=1257 refused=[      1 python-syntax;]
+RESULT closure tree=edge-decl rc=0 units=1234 refused=[]
+DIFF current -> cut-lookup
+  前 1578 后 1231 少 348 多 1
+    少  101 scripts/hosts/rocksdb-prebuilt.py
+    少   75 scripts/hosts/host-resources.py
+    少   41 scripts/hosts/host-dispatch.py
+    少   40 .claude/hooks/lib_long_run.py
+    少   26 scripts/crash/crash-amplification-lib.sh
+    少   20 scripts/crash/crash-point-replay-shard-configuration-check.sh
+    少   18 .claude/hooks/lib_heavy_tests.py
+    少    9 scripts/hosts/memory_peaks_lib.py
+    少    5 .claude/hooks/lib_shell_words.py
+    少    5 scripts/hosts/peer-host-lib.sh
+    少    3 .claude/singlefs-ai-sop/scripts/preflight.py
+    少    1 .claude/scripts/project_preflight.py
+    少    1 .claude/hooks/lib_work_root.py
+    少    1 scripts/hosts/run-with-memory-cap.sh
+    少    1 .claude/singlefs-ai-sop/scripts/proc.py
+    少    1 scripts/gate/lib_function_units.py
+    多    1 scripts/hosts/run-with-memory-cap.sh
+DIFF current -> load-edge
+  前 1578 后 1609 少 2 多 33
+    少    2 scripts/gate/lib_function_units.py
+    多   15 .claude/hooks/lib_heavy_tests.py
+    多   10 scripts/hosts/host-dispatch.py
+    多    2 scripts/gate/lib_function_units.py
+    多    2 .claude/hooks/lib_shell_words.py
+    多    2 .claude/singlefs-ai-sop/scripts/proc.py
+    多    2 .claude/hooks/lib_work_root.py
+DIFF current -> cut-load-edge
+  前 1578 后 1288 少 324 多 34
+    少  101 scripts/hosts/rocksdb-prebuilt.py
+    少   75 scripts/hosts/host-resources.py
+    少   37 scripts/hosts/host-dispatch.py
+    少   34 .claude/hooks/lib_long_run.py
+    少   26 scripts/crash/crash-amplification-lib.sh
+    少   20 scripts/crash/crash-point-replay-shard-configuration-check.sh
+    少   10 .claude/hooks/lib_heavy_tests.py
+    少    9 scripts/hosts/memory_peaks_lib.py
+    少    5 scripts/hosts/peer-host-lib.sh
+    少    3 .claude/hooks/lib_shell_words.py
+    少    2 scripts/gate/lib_function_units.py
+    少    1 .claude/hooks/lib_work_root.py
+    少    1 scripts/hosts/run-with-memory-cap.sh
+    多   15 .claude/hooks/lib_heavy_tests.py
+    多   10 scripts/hosts/host-dispatch.py
+    多    2 scripts/gate/lib_function_units.py
+    多    2 .claude/hooks/lib_shell_words.py
+    多    2 .claude/singlefs-ai-sop/scripts/proc.py
+    多    2 .claude/hooks/lib_work_root.py
+    多    1 scripts/hosts/run-with-memory-cap.sh
+DIFF current -> edge-decl
+  前 1578 后 1233 少 353 多 8
+    少  101 scripts/hosts/rocksdb-prebuilt.py
+    少   75 scripts/hosts/host-resources.py
+    少   41 scripts/hosts/host-dispatch.py
+    少   40 .claude/hooks/lib_long_run.py
+    少   26 scripts/crash/crash-amplification-lib.sh
+    少   20 scripts/crash/crash-point-replay-shard-configuration-check.sh
+    少   18 .claude/hooks/lib_heavy_tests.py
+    少    9 scripts/hosts/memory_peaks_lib.py
+    少    5 .claude/hooks/lib_shell_words.py
+    少    5 scripts/gate/lib_function_units.py
+    少    5 scripts/hosts/peer-host-lib.sh
+    少    3 .claude/singlefs-ai-sop/scripts/preflight.py
+    少    2 scripts/hosts/run-with-memory-cap.sh
+    少    1 .claude/scripts/project_preflight.py
+    少    1 .claude/hooks/lib_work_root.py
+    少    1 .claude/singlefs-ai-sop/scripts/proc.py
+    多    6 scripts/gate/lib_function_units.py
+    多    2 scripts/hosts/run-with-memory-cap.sh
+TRACE tree=current
+  TRACE 载入 host-dispatch.py 实际 import 的仓内文件 6 份：.claude/hooks/lib_heavy_tests.py .claude/hooks/lib_long_run.py .claude/hooks/lib_shell_words.py .claude/scripts/project_preflight.py scripts/hosts/memory_peaks_lib.py scripts/hosts/host-dispatch.py
+  TRACE 闭包里没有的 0 份：无
+TRACE tree=cut-lookup
+  TRACE 载入 host-dispatch.py 实际 import 的仓内文件 6 份：.claude/hooks/lib_heavy_tests.py .claude/hooks/lib_long_run.py .claude/hooks/lib_shell_words.py .claude/scripts/project_preflight.py scripts/hosts/memory_peaks_lib.py scripts/hosts/host-dispatch.py
+  TRACE 闭包里没有的 3 份：.claude/hooks/lib_heavy_tests.py .claude/hooks/lib_long_run.py .claude/hooks/lib_shell_words.py
+TRACE tree=cut-load-edge
+  TRACE 载入 host-dispatch.py 实际 import 的仓内文件 6 份：.claude/hooks/lib_heavy_tests.py .claude/hooks/lib_long_run.py .claude/hooks/lib_shell_words.py .claude/scripts/project_preflight.py scripts/hosts/memory_peaks_lib.py scripts/hosts/host-dispatch.py
+  TRACE 闭包里没有的 0 份：无
+SCAN cut-lookup: 入口 35 个，闭包变了 4 个，其中拒算变多的 0 个
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→0 单元 792→436 拒算 1→0
+  scripts/gate/verus-proof-check.py::check_proof rc 4→0 单元 1579→1232 拒算 1→0
+  scripts/gate/verus-proof-check.py::check_vacuity rc 4→0 单元 1567→1220 拒算 1→0
+  scripts/gate/verus-proof-check.py::check_must_red_worlds rc 4→0 单元 1575→1228 拒算 1→0
+SCAN load-edge: 入口 35 个，闭包变了 25 个，其中拒算变多的 0 个
+  scripts/mutation/broad-mutation.py::select_items rc 0→0 单元 44→73 拒算 0→0
+  scripts/mutation/broad-mutation.py::verdict_state rc 0→0 单元 33→62 拒算 0→0
+  scripts/mutation/broad-mutation.py::Judgement.state rc 0→0 单元 963→1004 拒算 0→0
+  scripts/mutation/broad-mutation.py::Judgement.row_holds rc 0→0 单元 948→989 拒算 0→0
+  scripts/mutation/broad-mutation.py::Judgement.selection rc 0→0 单元 943→984 拒算 0→0
+  scripts/mutation/broad-mutation.py::process_item rc 0→0 单元 93→119 拒算 0→0
+  scripts/mutation/broad-mutation.py::Runner.escalate_step rc 4→4 单元 792→837 拒算 1→1
+  scripts/mutation/broad-mutation.py::escalation_evidence_problems rc 0→0 单元 21→50 拒算 0→0
+  scripts/mutation/mutation-prune.py::UnitTree.closure_key rc 0→0 单元 863→884 拒算 0→0
+  scripts/mutation/broad-mutation.py::gpu_pass_command rc 0→0 单元 27→56 拒算 0→0
+  scripts/mutation/broad-mutation.py::gpu_classify_build rc 0→0 单元 33→62 拒算 0→0
+  scripts/mutation/broad-mutation.py::gpu_classify_test rc 0→0 单元 64→90 拒算 0→0
+  scripts/mutation/broad-mutation.py::gpu_combined_state rc 0→0 单元 31→60 拒算 0→0
+  scripts/mutation/broad-mutation.py::GpuJudging.need rc 0→0 单元 50→79 拒算 0→0
+  scripts/mutation/broad-mutation.py::GpuJudging.row_holds rc 0→0 单元 888→920 拒算 0→0
+  scripts/mutation/broad-mutation.py::GpuJudging.test_key_of rc 0→0 单元 46→75 拒算 0→0
+  scripts/mutation/crates-mutation-rows.py::verdict_of_run rc 0→0 单元 51→91 拒算 0→0
+  scripts/mutation/crates-mutation-rows.py::baseline_problem rc 0→0 单元 46→86 拒算 0→0
+  scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem rc 0→0 单元 30→72 拒算 0→0
+  scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units rc 0→0 单元 322→340 拒算 0→0
+  scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test rc 0→0 单元 316→334 拒算 0→0
+  scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units rc 0→0 单元 307→325 拒算 0→0
+  scripts/gate/verus-proof-check.py::check_proof rc 4→4 单元 1579→1610 拒算 1→1
+  scripts/gate/verus-proof-check.py::check_vacuity rc 4→4 单元 1567→1598 拒算 1→1
+  scripts/gate/verus-proof-check.py::check_must_red_worlds rc 4→4 单元 1575→1606 拒算 1→1
+CELL 基线键：ed782301de199481
+CELL 改被调方 host-resources.py 的一个常量：键不变
+CELL 改调用方包装里的一个常量：键变了
+CELL 改声明的理由文字：键变了
+CELL 声明指到不存在的边：7f8b79c854e2b218
+      1 closure-exclusion-stale       1 inline-script-not-literal 
+CELL 另一条边（入口自己直接起 host-resources.py，同时经包装）：闭包里 host-resources.py 的单元 75 个
+FIXTURE imp scripts/a.py::run: 闭包里的文件 scripts/a.py scripts/loaded.py 
+FIXTURE launch scripts/a.py::via_runpy: 闭包里的文件 scripts/a.py scripts/child_run.py 
+FIXTURE launch scripts/a.py::via_subprocess: 闭包里的文件 scripts/a.py scripts/child_sub.py 
+FIXTURE launch scripts/a.py::via_import_module: 闭包里的文件 scripts/a.py scripts/child_mod.py 
+HEREDOC variant=a admission 指纹 83323ff80c0d1e5f
+HEREDOC variant=b admission 指纹 569458f70f54845d
+FAULTS current
+  CELL begin：起不了线程: 异常冒出来 RuntimeError: can't start new thread
+  CELL finish：退 252 之前前台建不了临时文件: 异常冒出来 OSError: [Errno 28] No space left on device
+  CELL finish：第二台那一份的 memory_cap 不是字符串: 异常冒出来 TypeError: object of type 'int' has no len()
+  CELL finish：human 抛 ValueError: 异常冒出来 ValueError: human 读不了
+  CELL cancel：process.poll 抛 OSError: 异常冒出来 OSError: poll 读不了
+  CELL begin：后台线程里建不了临时文件: 没有异常冒出来；打了 11 行
+FAULTS patched
+  CELL begin：起不了线程: 没有异常冒出来；打了 1 行
+  CELL finish：退 252 之前前台建不了临时文件: 没有异常冒出来；打了 1 行
+  CELL finish：第二台那一份的 memory_cap 不是字符串: 没有异常冒出来；打了 1 行
+  CELL finish：human 抛 ValueError: 没有异常冒出来；打了 1 行
+  CELL cancel：process.poll 抛 OSError: 没有异常冒出来
+  CELL begin：后台线程里建不了临时文件: 没有异常冒出来；打了 1 行
+LINES current
+  LINE [放得下] prefixed=NO    → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 1G --label uni
+  LINE [放不下] prefixed=yes run-with-memory-cap: 现查别的机器：第二台此刻也放不下（可用 1.0 GiB，预测 8.0 GiB 放不下）
+  LINE [没查到（带第二台 stderr 末行）] prefixed=yes run-with-memory-cap: 没查到别的机器：host-resources.py 退 3：ssh: connect to host 第二台 port 22: Connection refused
+  LINE [放得下而告警记录写不进] prefixed=NO    → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 1G --label uni
+  LINE [放得下而告警记录写不进] prefixed=NO    ! 告警记录写不进（FileNotFoundError: [Errno 2] No such file or directory: '/proc/nonexistent'）：看门狗读不到这一条，靠上面那一行叫人看；设
+  LINE [后台线程里异常没兜住] prefixed=NO  Exception in thread Thread-1 (run):
+  LINE [后台线程里异常没兜住] prefixed=NO  Traceback (most recent call last):
+  LINE [后台线程里异常没兜住] prefixed=NO    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+  LINE [后台线程里异常没兜住] prefixed=NO      self.run()
+  LINE [后台线程里异常没兜住] prefixed=NO    File "/usr/lib/python3.12/threading.py", line 1010, in run
+  LINE [后台线程里异常没兜住] prefixed=NO      self._target(*self._args, **self._kwargs)
+  LINE [后台线程里异常没兜住] prefixed=NO    File "admission_head.py", line 282, in run
+  LINE [后台线程里异常没兜住] prefixed=NO    File "admission_head.py", line 245, in query
+  LINE [后台线程里异常没兜住] prefixed=NO    File "/home/fy5090/code/singlefs/research/prompts/m3-close-reuse-closure-r2-sonnet-model/tools/wrapper_probe
+  LINE [后台线程里异常没兜住] prefixed=NO      namespace["tempfile"].TemporaryFile = lambda *a, **k: (_ for _ in ()).throw(OSError(28, "No space left on 
+  LINE [后台线程里异常没兜住] prefixed=NO                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  LINE [后台线程里异常没兜住] prefixed=NO    File "/home/fy5090/code/singlefs/research/prompts/m3-close-reuse-closure-r2-sonnet-model/tools/wrapper_probe
+  LINE [后台线程里异常没兜住] prefixed=NO      namespace["tempfile"].TemporaryFile = lambda *a, **k: (_ for _ in ()).throw(OSError(28, "No space left on 
+  LINE [后台线程里异常没兜住] prefixed=NO  OSError: [Errno 28] No space left on device
+JOIN current
+  JOIN finish 12 秒还没回来（排队锁被别的进程持着 40 秒；线程卡在 take_turn 的 flock 上，join 没有时限）
+JOIN patched-try-only
+  JOIN finish 12 秒还没回来（排队锁被别的进程持着 40 秒；线程卡在 take_turn 的 flock 上，join 没有时限）
+JOIN bounded
+  JOIN finish 在 12 秒之内回来了（用了 5 到 12 秒）
+STRIP
+  EVIDENCE 原样读：证据缺 0 样 []
+  EVIDENCE 先去掉 run-with-memory-cap: 起头的行再读：证据缺 2 样 ['原来那趟的日志里没有包装打的「撞了内存上限 64M」', '升档那趟的日志里没有包装打的「撞了内存上限 256M」']
+  VERUS wrapper_own_lines 原样：3 行，头一行 = → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run
+  VERUS wrapper_own_lines 先去掉 run-with-memory-cap: 起头的行：3 行，头一行 = → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run
+SOURCE_STAMP_SYNC rc=0 本地多出的目录: fakehost: 
+exit=0

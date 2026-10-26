@@ -194,7 +194,7 @@ GPU 路径与 CPU 路径是两份实现，GPU 的结果抽样交 CPU 复核（D2
 
 ### 装置住哪（写死）
 
-**入库装置**：`crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs`，变异表 `scripts/experiments/e185_gc_batch_wall_clock_split.mutations.tsv`（表的位置照执行员定义的入库装置那一支，执行员与它不一致时照执行员定义，在第十二节记一行）。理由：问题单问的就是 `crates/` 这份 GC 代码的性质（一批的挂钟、它的阶段拆分、它交给 GPU 的字节），另写一份独立模型答不了；GPU 一侧量的是 checker 档里唯一一份 GPU 代码 `GpuCard::crc32c_of_ranges`。一个二进制、四个子命令：`wall-clock`（第一段）、`stage-split`（第二段）、`gpu-submission`（第三段，`#[cfg(feature = "gpu")]`；不带特性编出来的这个子命令退 78 并报「本次未跑：没编 gpu 特性」）、`foreground-fsync`（第四段，附带）。
+**入库装置**：`crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs`，变异表 `scripts/experiment-apparatus/e185_gc_batch_wall_clock_split.mutations.tsv`（表的位置照执行员定义的入库装置那一支，执行员与它不一致时照执行员定义，在第十二节记一行）。理由：问题单问的就是 `crates/` 这份 GC 代码的性质（一批的挂钟、它的阶段拆分、它交给 GPU 的字节），另写一份独立模型答不了；GPU 一侧量的是 checker 档里唯一一份 GPU 代码 `GpuCard::crc32c_of_ranges`。一个二进制、四个子命令：`wall-clock`（第一段）、`stage-split`（第二段）、`gpu-submission`（第三段，`#[cfg(feature = "gpu")]`；不带特性编出来的这个子命令退 78 并报「本次未跑：没编 gpu 特性」）、`foreground-fsync`（第四段，附带）。
 
 **装置读 `crates/` 的这些常量，执行员逐个改成本地常量、开跑先回比断言**（对不上走第十一节停机条款，不直接引）：
 
@@ -422,7 +422,7 @@ Q1、Q2、Q4、Q5、Q6、Q7、Q13、Q16 的判定在上面每个旋钮的两端�
 | V14 包含自检不判 | 去掉「挂钟 ≥ CPU + 等盘」 | 合成一批：挂钟 1 ms、CPU 0.8 ms、等盘 0.5 ms | 包含自检单测 |
 | V15 GPU 结果不与 CPU 对拍 | 去掉逐段比对 | 往 GPU 交回的结果里改一段（单测里换掉回读值） | CRC 对拍必须判红 |
 
-变异表 `scripts/experiments/e185_gc_batch_wall_clock_split.mutations.tsv` 的原文要在装置源码里恰好命中一次（`.claude/rules/mutation-sampling.md` 第七类）；常量断言写加法不写减法（同文件第八类）。
+变异表 `scripts/experiment-apparatus/e185_gc_batch_wall_clock_split.mutations.tsv` 的原文要在装置源码里恰好命中一次（`.claude/rules/mutation-sampling.md` 第七类）；常量断言写加法不写减法（同文件第八类）。
 
 ## 十、失败条款
 
@@ -473,7 +473,7 @@ Q1、Q2、Q4、Q5、Q6、Q7、Q13、Q16 的判定在上面每个旋钮的两端�
 
 （留空。装置写之后、产物之前由执行员写，只许收严或补臂。）
 
-12.1（记一行，不是修订判据；2026-10-19 装置写完，单测与产物都还没跑）：变异表的位置照执行员定义入库装置那一支，22 行变异（V1–V15 照第九节，V16–V22 是执行员补的）追加进 `crates/mutations.tsv` 末尾、名字以「E185 V」起头，不另建 `scripts/experiments/e185_gc_batch_wall_clock_split.mutations.tsv`。依据是第五节「装置住哪」那一句「执行员与它不一致时照执行员定义，在第十二节记一行」。第六、七、九、十、十一节一个字没动。
+12.1（记一行，不是修订判据；2026-10-19 装置写完，单测与产物都还没跑）：变异表的位置照执行员定义入库装置那一支，22 行变异（V1–V15 照第九节，V16–V22 是执行员补的）追加进 `crates/mutations.tsv` 末尾、名字以「E185 V」起头，不另建 `scripts/experiment-apparatus/e185_gc_batch_wall_clock_split.mutations.tsv`。依据是第五节「装置住哪」那一句「执行员与它不一致时照执行员定义，在第十二节记一行」。第六、七、九、十、十一节一个字没动。
 
 12.2（修订 CPU 时钟的读法；2026-10-19 装置改完，单测与产物都还没跑，时点在产物之前；依据是派发提示「关的是哪几条」第 1、2、3 条）：第一节「CPU 时间」那一行的读法从本线程 `/proc/thread-self/schedstat` 第一个字段之差换成本线程 `clock_gettime(CLOCK_THREAD_CPUTIME_ID)`（Linux 上 clock id 3）两次读数之差；第五节「计时与计数怎么做」、阳性对照表第 1 行 CPU 臂「按本线程 schedstat 自旋 2 ms」、第六节 Q3「schedstat 量的 CPU」、第十条 F5「schedstat 读法」里说的 schedstat 一律照这个钟读，原文不改。依据（实测，本机，2026-10-19 重跑）：`grep -E '^CONFIG_HZ=|CONFIG_NO_HZ_FULL=|CONFIG_SCHEDSTATS=|CONFIG_SCHED_INFO=' /boot/config-$(uname -r)` 输出 `CONFIG_HZ=1000`；同一线程连读 schedstat 20 万次（`os.pread` 第一个字段）输出 `distinct_changes 83 min_delta 3180 median_delta 999893`，即对正在跑的线程约 1 ms 才前进一次；同样连读 `time.thread_time_ns()`（即 `CLOCK_THREAD_CPUTIME_ID`）20 万次输出 `thread_cputime reads 200000 distinct_changes 200000 median_delta 170`。第六节到第十一节的判据、门槛、停机条款（含第 6 条「挂钟 ≥ CPU + 等盘」）一个字不改。第九节 V2「schedstat 读错字段」照派发提示第 3 条「V2「读错字段」换成一条对新时钟的会红变异」换成「clock id 3 改成 1（`CLOCK_MONOTONIC`）」：睡着的时间也算 CPU，在第一行盘臂阳性对照点（f = 0.75、K = 8、P = 1024，写里多睡 2 ms）上 CPU 增量变成写调用次数 × 2 ms、等盘增量变成 0，该红的是阳性对照表第 1 行盘臂两格，单测 `thread_cpu_time_stands_still_while_the_thread_sleeps` 红。新加一条开跑自检（收严，只多一种停机）：`wall-clock`、`stage-split`、`foreground-fsync` 开跑先在本线程上自旋 1 ms（按这个钟自己算）、连读这个钟，前进不到 100 次（或读不到、读满 1000 万次仍没走满 1 ms）就打 `name=stop_clause clause=clock_resolution`、停机退 3，一个取样点都不量；产物里 `name=clock_resolution_check` 一行报读了几次、前进几次。
 
@@ -627,7 +627,7 @@ E7RESULT name=verdict segment=wall_clock constant_or_anchor_mismatches=0 stop_cl
 | `.claude/kb/checks-owed.md` | 299 |
 | `.claude/kb/milestone/04-fourth-txn.md` | 标题行 grep；10、18、35、65、138、139（grep 命中）；130–145 |
 | `.claude/kb/experiments/21-GPU卸载的净收益.md` | 全部标题行（1、3、39、56、76、104、115、127、147、164、214、222）；164–213 |
-| `scripts/experiments/e21-transfer.py` | 1–81 |
+| `scripts/experiment-apparatus/e21-transfer.py` | 1–81 |
 | `crates/singlefs-core/src/mounted_session.rs` | grep 命中（34–3064 间与整理有关的行）；82–94；480–500；1925–2005；2520–3279 |
 | `crates/singlefs-core/src/region_scan.rs` | 1–420；grep 命中 511、850、965 |
 | `crates/singlefs-core/src/unit.rs` | grep 命中 11、59、60、121、233、296、368、374、403、414、476、482、542、548；355–420 |

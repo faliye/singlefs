@@ -1,0 +1,5 @@
+name=y4_first rc=0 note: verifying module compaction_plan (selected functions)|verification results:: 2 verified, 0 errors (partial verification with `--verify-*`)|
+name=y4_second_same_target rc=0 note: verifying module compaction_plan (selected functions)|
+name=y4_second_fresh_target rc=0 note: verifying module logged_operations (selected functions)|verification results:: 1 verified, 0 errors (partial verification with `--verify-*`)|
+name=y4_substring_ambiguity rc=101 error: more than one match found for --verify-function contains_slot, consider using wildcard *conta
+name=y4_json_per_function rc=0 func_details_total=76 core_entries=19 verified=13 errors=0

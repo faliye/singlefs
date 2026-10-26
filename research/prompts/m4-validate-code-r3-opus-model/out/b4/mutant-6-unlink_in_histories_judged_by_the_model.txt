@@ -1,0 +1,16 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/unlink_in_histories_judged_by_the_model.rs (target/release/deps/unlink_in_histories_judged_by_the_model-9f93dad776763493)
+
+running 8 tests
+test unlinking_the_first_file_then_reading_back_and_mounting_runs_to_the_end_with_the_model_agreeing ... ok
+test after_an_inode_is_created_on_the_emptied_version_a_rollback_to_before_the_unlink_lets_the_first_file_be_overwritten ... ok
+test an_unlink_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step ... ok
+test an_overwrite_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step ... ok
+test creating_an_inode_after_rolling_back_to_the_intent_walks_the_queue_first_and_is_judged_by_the_model ... ok
+test creating_inodes_after_the_first_file_was_deleted_runs_through_a_mount_with_the_model_agreeing ... ok
+test the_fast_tier_weights_draw_an_unlink_and_the_first_history_with_one_runs_to_the_end_with_the_model_agreeing ... ok
+test the_fast_tier_weights_draw_an_inode_creation_after_an_unlink_and_the_first_history_with_one_runs_to_the_end ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.47s
+
+mutant_rc=0

@@ -1,0 +1,18 @@
+--- crates/singlefs-core/src/transaction.rs
++++ crates/singlefs-core/src/transaction.rs
+@@ -10483,13 +10483,8 @@
+     let is_the_first_file = inode.0 == FIRST_INODE_NUMBER;
+     match (size_change, is_the_first_file) {
+         (SizeChangeOfARequest::SizeUnchanged, _) | (_, true) => {}
+-        (SizeChangeOfARequest::Extension | SizeChangeOfARequest::Truncation, false) => {
+-            return Err(PublishError::TruncationRefused(
+-                TruncationRefusal::SizeChangeOfAnInodeOtherThanTheFirstFileIsNotDecidedByTheClauses {
+-                    inode: inode.0,
+-                },
+-            ));
+-        }
++        // 攻方探针：只删拒绝那一支（「只放开边界、别处不改」那一种放开），别的文件的变长与截断照第一个文件那条路走下去。
++        (SizeChangeOfARequest::Extension | SizeChangeOfARequest::Truncation, false) => {}
+     }
+     let data_units_existing = if is_the_first_file {
+         u64::try_from(previous.data_pointers.len()).expect("单元数")

@@ -1,0 +1,9 @@
+name=hardware_crc_factor software_over_instruction=3.9759
+name=judgement_with_the_instruction_crc candidate=scan_checksum_only card=0 losing=216
+name=judgement_with_the_instruction_crc candidate=scan_checksum_only card=1 losing=216
+name=judgement_with_the_instruction_crc candidate=scan_checksum_and_choice card=0 losing=89 not_losing=4 unstable=123
+name=judgement_with_the_instruction_crc candidate=scan_checksum_and_choice card=1 losing=182 not_losing=4 unstable=30
+name=judgement_with_the_instruction_crc candidate=release_check_only card=0 losing=214 unstable=2
+name=judgement_with_the_instruction_crc candidate=release_check_only card=1 losing=216
+name=judgement_with_the_instruction_crc candidate=every_stage card=0 losing=29 not_losing=96 unstable=91
+name=judgement_with_the_instruction_crc candidate=every_stage card=1 losing=125 not_losing=55 unstable=36

@@ -1,0 +1,8 @@
+条目判定去掉钉住拒	if facts.role_is_pinned {\n        return RelocationItemVerdict::PinnedUnit;\n    }\n    let at_the_position	let at_the_position
+目的地判定漏掉受保护集那一半	if destinations[position] == protected[other] {	if false {
+目的地判定漏掉两两不同那一半	if destinations[earlier] == destinations[position] {	if false {
+形状要求去掉目的地两两不同	    &&& slots_are_pairwise_distinct(destinations)\n    &&& forall|position: int| 0 <= position < keys.len() ==>\n        s.current.contains_key	    &&& forall|position: int| 0 <= position < keys.len() ==>\n        s.current.contains_key
+形状要求去掉key两两不同	    &&& slots_are_pairwise_distinct(keys)\n    &&& slots_are_pairwise_distinct(destinations)	    &&& slots_are_pairwise_distinct(destinations)
+形状要求去掉目的地未被引用	            && gc_slot_is_unreferenced(s, destinations[position])\n}	            && true\n}
+单元写写的是空字节	bytes: relocation_copy_bytes(s, keys[count - 1]) },\n        )\n    }\n}\n\npub open spec fn state_after_the_mapping_swaps	bytes: Seq::empty() },\n        )\n    }\n}\n\npub open spec fn state_after_the_mapping_swaps
+结论里根没指向目的地	            &&& done.durable == done.current	            &&& done.durable != done.current

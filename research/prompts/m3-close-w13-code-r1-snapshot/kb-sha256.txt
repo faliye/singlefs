@@ -1,0 +1,8 @@
+772388ccf32201cb96eade3e4188b06f3e1f51a2d25b91a1b3894192b40c6e11  .claude/kb/checks-owed.md
+9e5747d852b802e5976068318ab46039d4e88c60656fa619a23416e03c893f20  .claude/kb/decisions/22-synthesizing-unit-atomicity.en.md
+13708d3f3b7e7e5cf78c6b4859479cfb662a58ea38e3495a24241272403e139b  .claude/kb/decisions/22-ユニット原子性の合成手法.ja.md
+d22a7ca22c7cc0958b97ee48ffe7724703de6f05e1a156d41fc085fe10a83d94  .claude/kb/decisions/22-单元原子性怎么合成.md
+1e3202a42847dc655086c05539171b186485f03919ca66da3c503b9060f3afc6  .claude/kb/decisions/18-information-carried-in-a-block.en.md
+0e50ebe1eaec8f6cc38c3a61285548814b5769bd19ff3f94042089883c14d173  .claude/kb/decisions/18-ブロックに含める情報.ja.md
+4d503c1ffde24422d118bfb76ba4c0e6740d3eb4efe7db4af9c3b1ffca40cf75  .claude/kb/decisions/27-小データパッキングコンテナ.ja.md
+19bc6524bd369ff3cebf567fd9a38ce6d169bbc5a81acc7e1130709096d724ea  crates/singlefs-checker/invariants/01-块自描述.md

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# 假 cargo：把参数（printf %q 逐个转义，空参数也留）记进沙盒根目录里的 .oracle-log（从当前目录往上找），不编译不跑；环境被 env -i 清空时照样记得到。
+# 一行拼好再一次写出（几个放后台的假 cargo 同时追加时，一行不会被另一行插进来）。
+dir="$PWD"
+while [ "$dir" != / ] && [ ! -e "$dir/.oracle-log" ]; do dir="$(dirname "$dir")"; done
+line="cargo"
+for a in "$@"; do line+=" $(printf '%q' "$a")"; done
+printf '%s\n' "$line" >> "$dir/.oracle-log"

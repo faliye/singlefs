@@ -6,7 +6,7 @@
 | （欠的检查清单 标题之下、第一个下级标题之前的正文：第 2-587 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
 | ### 已还清 | 抄 | 默认全抄（脚本生成） |
 
-### 小节清单：`.claude/kb/decisions/17-实现分层与第三方管道.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/17-implementation-layering-third-party-pipeline.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -24,7 +24,7 @@
 | ### Interactions with Other Decisions | 抄 | 默认全抄（脚本生成） |
 | ## Historical Versions | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/17-实现分层与第三方管道.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/17-実装階層とサードパーティパイプライン.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -74,7 +74,7 @@
 | ## I-3 空间记账 —— 类 | 抄 | 顶上标题，与开篇正文合成行区间 |
 | （I-3 标题之下、第一个下级标题之前的正文：第 2-39 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/22-单元原子性怎么合成.en.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/22-synthesizing-unit-atomicity.en.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -111,7 +111,7 @@
 | ### Interactions with Other Decisions | 抄 | 默认全抄（脚本生成） |
 | ## Version History | 抄 | 顶上标题，与开篇正文合成行区间 |
 
-### 小节清单：`.claude/kb/decisions/22-单元原子性怎么合成.ja.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/decisions/22-ユニット原子性の合成手法.ja.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

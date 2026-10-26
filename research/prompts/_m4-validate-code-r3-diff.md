@@ -1,0 +1,100 @@
+# m4-validate-code-r3：被判的产品代码改动全文（验证段修补一里落在产品代码的部分）
+
+来源：`~/.local/share/singlefs/work/m4-validate-fix-one/patch/crates.patch`（已打进主工作区）；只抽 `crates/singlefs-core/src/` 下的两份。
+
+```diff
+--- a/crates/singlefs-core/src/extent_tree.rs
++++ b/crates/singlefs-core/src/extent_tree.rs
+@@ -404,16 +404,21 @@
+         }
+     }
+ 
+-    /// 一个数据单元都没有的文件在上段叶里那一条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 与第六节 S1：
+-    /// 标签 0 配 size > 0 是整个文件都是洞；`research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」）：
+-    /// size > 0 写标签 0，size 0 不写条目——与 `transaction::publish_new_inodes` 建出来、一次都没写过内容的 inode 同一形，
+-    /// 读者按「没有条目」收（`write_request_split::DataUnitsOfTheInode::NoneWritten`）。写者装上段叶、算上段形状（有条目的号集合）都经这里。
++    /// 第一个文件一个数据单元都没有时它在上段叶里那一条（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K5 与第六节 S1：
++    /// 标签 0 是这个文件一个单元都没有，size > 0 时整个文件都是洞；`research/prompts/m4-validate-code-r1-main-verification.md` 用户定案「丑：写者接得住这一形」；
++    /// `research/prompts/m4-validate-code-r2-main-verification.md` 第二节 T1，用户 2026-10-24 定「甲」）：`size_of_its_inode_record_in_bytes` 是这一版
++    /// 第一个文件那条 inode 记录的 size，记录在就写标签 0、不看 size（size 0 与 size > 0 同一形），记录没了（unlink 最后一批之后）不写这一条。
++    /// size 0 也写：冷读那一路（`recovery` 读上段里第一个文件那一条）只给「第一个文件删完」留了没有条目的口子，有记录而没有条目的第一个文件
++    /// 冷走读、可写重挂、冷恢复都按标签 1、2 要至少一个单元、拒收。号 ≥ 2 的空 inode（`transaction::publish_new_inodes` 建出来、一次都没写过内容的）
++    /// 不经这里，照旧没有条目、读者按「没有条目」收（`write_request_split::DataUnitsOfTheInode::NoneWritten`）。
++    /// 写者装上段叶、算上段形状（有条目的号集合）都经这里。
+     #[must_use]
+-    pub const fn of_a_file_without_data_units(size_in_bytes: u64) -> Option<Self> {
+-        if size_in_bytes > 0 {
+-            Some(ExtentUpperLeafTarget::NoDataUnit)
+-        } else {
+-            None
++    pub const fn of_a_file_without_data_units(
++        size_of_its_inode_record_in_bytes: Option<u64>,
++    ) -> Option<Self> {
++        match size_of_its_inode_record_in_bytes {
++            Some(_) => Some(ExtentUpperLeafTarget::NoDataUnit),
++            None => None,
+         }
+     }
+ 
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3993,15 +3993,16 @@
+     }
+ 
+     /// 这一版 extent 树上段里有条目的 inode 号（上段规范形的 S，判决 `research/prompts/m3-multi-file-unlink-r1-main-verification.md`
+-    /// 第三节 M2）：第一个文件有数据单元、或一个单元都没有而 size > 0（上段叶标签 0，整个文件都是洞：
+-    /// [`ExtentUpperLeafTarget::of_a_file_without_data_units`]）时连 inode 1，加第一个文件之外每个有数据单元的文件。
+-    /// 与装上段叶写不写第一个文件那一条（`build_extent_tree`）同一条判法，形状与条目才对得上。
++    /// 第三节 M2）：第一个文件有数据单元、或一个单元都没有而记录还在（上段叶标签 0，size 0 也算：
++    /// [`ExtentUpperLeafTarget::of_a_file_without_data_units`]，判决 m4-validate-code-r2 T1 用户定「甲」）时连 inode 1，
++    /// 加第一个文件之外每个有数据单元的文件。与装上段叶写不写第一个文件那一条（`build_extent_tree`）同一条判法，形状与条目才对得上。
+     #[must_use]
+     pub fn inodes_with_an_extent_upper_leaf_entry(&self) -> BTreeSet<u64> {
+         let first_file_has_an_entry = !self.data_pointers.is_empty()
+-            || self.inode_record.is_some_and(|record| {
+-                ExtentUpperLeafTarget::of_a_file_without_data_units(record.size).is_some()
+-            });
++            || ExtentUpperLeafTarget::of_a_file_without_data_units(
++                self.inode_record.map(|record| record.size),
++            )
++            .is_some();
+         let first_file = first_file_has_an_entry.then_some(FIRST_INODE_NUMBER);
+         first_file
+             .into_iter()
+@@ -12064,7 +12065,7 @@
+ /// 下段先叶后根（叶装它罩的那几个单元的 extent 叶记录，内部节点装「孩子那一段的起点 key + 孩子这一版的指针」；第一个文件的下段在前，
+ /// 第一个文件之外各文件的下段按 inode 号接着），再上段先叶后根（重写的一片叶装它罩的那几个 inode 号上每个有数据单元的文件那一条叶条目：
+ /// 一个数据单元就内联它的数据指针（标签 2），多个就放下段根这一版的指针（标签 1）；第一个文件尾部有洞的写标签 3、4，一个单元都没有而
+-/// size > 0 的写标签 0。条目都取这一版内存里的指针）。
++/// 记录还在的写标签 0，size 0 也写。条目都取这一版内存里的指针）。
+ /// 照抄的节点字节、落点、指针全取上一版同一个位置上的。`data_pointers` 是第一个文件这一版每个数据单元的指针（第 i 项是单元 i），
+ /// `size_of_the_first_file_after_this_publish` 是这一版第一个文件那条记录的 size（这一版没有那条记录时为 `None`：不写它那一条），
+ /// `data_pointers_of_the_files_other_than_the_first` 是第一个文件之外各文件这一版的数据指针（与 `files_other_than_the_first.files` 同序）。
+@@ -12324,10 +12325,10 @@
+             .map(|previous_root_level| role_of_extent_upper_node(*position, previous_root_level));
+         let pointer = match origin {
+             ExtentTreeNodeOrigin::RewrittenThisPublish if position.level == 0 => {
+-                // 第一个文件这一版的那条叶条目：下段有根就指下段根，只有一个单元就内联它；一个单元都没有时按记录的 size 取
+-                // （`ExtentUpperLeafTarget::of_a_file_without_data_units`）：size > 0 是整个文件都是洞，照写标签 0（判决 m4-trunc-r1 K5、S1，
+-                // m4-validate-code-r1 用户定案「丑」：重写这片叶的发布不丢这一条）；记录没了（unlink 最后一批）或 size 0 就不写这一条，
+-                // 只剩它一条时这片叶成了零条目根（D8（核心索引结构） 已定项 16 第 5 条）。
++                // 第一个文件这一版的那条叶条目：下段有根就指下段根，只有一个单元就内联它；一个单元都没有时按记录在不在取
++                // （`ExtentUpperLeafTarget::of_a_file_without_data_units`）：记录在就照写标签 0，size 0 与 size > 0 一样（判决 m4-trunc-r1 K5、S1，
++                // m4-validate-code-r1 用户定案「丑」：重写这片叶的发布不丢这一条；m4-validate-code-r2 T1 用户定「甲」：截到 0 之后也不丢）；
++                // 记录没了（unlink 最后一批）就不写这一条，只剩它一条时这片叶成了零条目根（D8（核心索引结构） 已定项 16 第 5 条）。
+                 // 最后一个单元之后到 size 是洞的换成标签 3、4（判决 m4-trunc-r1 K5，`ExtentUpperLeafTarget::with_the_tail`）。
+                 let target = match (lower_nodes.last(), data_pointers.first()) {
+                     (Some((_, lower_root_pointer)), _) => {
+@@ -12336,8 +12337,9 @@
+                     (None, Some(only_data_pointer)) => {
+                         Some(ExtentUpperLeafTarget::InlineDataUnit(*only_data_pointer))
+                     }
+-                    (None, None) => size_of_the_first_file_after_this_publish
+-                        .and_then(ExtentUpperLeafTarget::of_a_file_without_data_units),
++                    (None, None) => ExtentUpperLeafTarget::of_a_file_without_data_units(
++                        size_of_the_first_file_after_this_publish,
++                    ),
+                 }
+                 .map(|target| target.with_the_tail(tail_of_the_first_file));
+                 // 这片叶罩的 inode 号上第一个文件之外的文件，条目照这一版内存里的指针装（照抄的文件的指针整理之后已换成映射位置，
+```

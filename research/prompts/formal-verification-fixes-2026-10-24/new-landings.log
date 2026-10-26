@@ -1,0 +1,34 @@
+  · must-red:证明负例·lemma_replay_core_result_replays_an_applied_record_twice_as_once 的函数体不能推出 false：落点 lemma_replay_core_result_replays_an_applied_record_twice_as_once；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:证明负例·lemma_replay_core_result_is_a_fixed_point 的函数体不能推出 false：落点 lemma_replay_core_result_is_a_fixed_point；证明错 1 条
+  · must-red:证明负例·lemma_replay_core_result_is_the_only_one_the_rules_allow 的函数体不能推出 false：落点 lemma_replay_core_result_is_the_only_one_the_rules_allow；证明错 1 条，rlimit 用尽夹证明错
+  · must-red:证明负例·witness_nonempty_replay_and_its_fixed_point 的函数体不能推出 false：落点 witness_nonempty_replay_and_its_fixed_point；证明错 1 条
+  · must-red:证明负例·lemma_movable_positions_are_the_movable_allocations_in_order 的函数体不能推出 false：落点 lemma_movable_positions_are_the_movable_allocations_in_order；证明错 1 条
+  · must-red:证明负例·lemma_every_position_is_movable_when_every_allocation_is 的函数体不能推出 false：落点 lemma_every_position_is_movable_when_every_allocation_is；证明错 1 条
+  · must-red:证明负例·lemma_relocating_in_order_keeps_every_read 的函数体不能推出 false：落点 lemma_relocating_in_order_keeps_every_read；证明错 1 条
+  · must-red:证明负例·lemma_a_planned_batch_keeps_every_read 的函数体不能推出 false：落点 lemma_a_planned_batch_keeps_every_read；证明错 1 条
+  · must-red:证明负例·lemma_under_the_premise_a_plan_takes_the_leading_allocations 的函数体不能推出 false：落点 lemma_under_the_premise_a_plan_takes_the_leading_allocations；证明错 1 条
+  · must-red:证明负例·one_movable_allocation_is_planned_and_not_reported_emptied 的函数体不能推出 false：落点 one_movable_allocation_is_planned_and_not_reported_emptied；证明错 1 条
+  · must-red:证明负例·a_segment_holding_a_pinned_slot_is_not_a_sound_choice 的函数体不能推出 false：落点 a_segment_holding_a_pinned_slot_is_not_a_sound_choice；证明错 1 条
+  · must-red:不变式负例·compaction_plan_proofs 第114行不变式不能恒假：落点 choose_compaction_segment；证明错 1 条
+  · must-red:不变式负例·compaction_plan_proofs 第412行不变式不能恒假：落点 plan_compaction_batch；证明错 1 条
+  · must-red:改判定·P1 贪心选最少改成最多：落点 choose_compaction_segment；证明错 1 条
+  · must-red:改判定·P1 同分改成取最后一段：落点 choose_compaction_segment；证明错 1 条
+  · must-red:见证·非空重放必须实际施加一条：落点 witness_nonempty_replay_and_its_fixed_point；证明错 2 条（条数与登记的 proof_errors=1 不同，条数只报）
+  ── 变异名	落点	条数
+  证明负例·lemma_replay_core_result_replays_an_applied_record_twice_as_once 的函数体不能推出 false	landing=lemma_replay_core_result_replays_an_applied_record_twice_as_once	1
+  证明负例·lemma_replay_core_result_is_a_fixed_point 的函数体不能推出 false	landing=lemma_replay_core_result_is_a_fixed_point	1
+  证明负例·lemma_replay_core_result_is_the_only_one_the_rules_allow 的函数体不能推出 false	landing=lemma_replay_core_result_is_the_only_one_the_rules_allow	1
+  证明负例·witness_nonempty_replay_and_its_fixed_point 的函数体不能推出 false	landing=witness_nonempty_replay_and_its_fixed_point	1
+  证明负例·lemma_movable_positions_are_the_movable_allocations_in_order 的函数体不能推出 false	landing=lemma_movable_positions_are_the_movable_allocations_in_order	1
+  证明负例·lemma_every_position_is_movable_when_every_allocation_is 的函数体不能推出 false	landing=lemma_every_position_is_movable_when_every_allocation_is	1
+  证明负例·lemma_relocating_in_order_keeps_every_read 的函数体不能推出 false	landing=lemma_relocating_in_order_keeps_every_read	1
+  证明负例·lemma_a_planned_batch_keeps_every_read 的函数体不能推出 false	landing=lemma_a_planned_batch_keeps_every_read	1
+  证明负例·lemma_under_the_premise_a_plan_takes_the_leading_allocations 的函数体不能推出 false	landing=lemma_under_the_premise_a_plan_takes_the_leading_allocations	1
+  证明负例·one_movable_allocation_is_planned_and_not_reported_emptied 的函数体不能推出 false	landing=one_movable_allocation_is_planned_and_not_reported_emptied	1
+  证明负例·a_segment_holding_a_pinned_slot_is_not_a_sound_choice 的函数体不能推出 false	landing=a_segment_holding_a_pinned_slot_is_not_a_sound_choice	1
+  不变式负例·compaction_plan_proofs 第114行不变式不能恒假	landing=choose_compaction_segment	1
+  不变式负例·compaction_plan_proofs 第412行不变式不能恒假	landing=plan_compaction_batch	1
+  改判定·P1 贪心选最少改成最多	landing=choose_compaction_segment	1
+  改判定·P1 同分改成取最后一段	landing=choose_compaction_segment	1
+  见证·非空重放必须实际施加一条	landing=witness_nonempty_replay_and_its_fixed_point	2
+  ✓ 补落点：crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 补了 16 行的第六段（共取到 16 行的落点，已有第六段的 0 行没改）；对着 git diff 过一眼再提交

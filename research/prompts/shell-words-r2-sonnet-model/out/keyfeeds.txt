@@ -1,0 +1,96 @@
+命令（guard/main）：{cargo,} test --all
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：{,} cargo test --all
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：cargo {,test} --all
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/implementation-writer）：{bash,} scripts/hosts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 用 -p 点名 singlefs-checker-tier（singlefs-checker-tier；当前目录或清单认不出、或点名的不是认得出的工作区成员，照点名的包判；checker 档，默认只在
+命令（guard/main）：FOO="$(pwd)" bash <<'EOF'\ncargo test --all\nEOF
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：cd "$(git rev-parse --show-toplevel)" && bash <<'EOF'\ncargo test --all\nEOF
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（det/main）：cd "$(git rev-parse --show-toplevel)" && bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF
+  改前：rc=0 
+  改后：rc=2 ✗ 前台的等待循环没有超时（认出的循环：until grep -q x f）：等的条件不成立就一直不返回，这一次调用卡在这里期间，发给你的消息也送不到
+命令（guard/main）：x=$(bash <<'EOF'\ncargo test --all\nEOF\n)
+  改前：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：cat s.sh > d1.sh 2>/dev/null && bash d1.sh
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d1.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=comm
+命令（guard/main）：cat s.sh > d2.sh && bash d2.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d2.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=comm
+  改后：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d2.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=comm
+命令（det/clerk）：cat scripts/hosts/detached-run.sh > /tmp/shw-dr-b.sh 2>/dev/null && bash /tmp/shw-dr-b.sh start --label m -- sleep 1
+  改前：rc=0 
+  改后：rc=2 ✗ clerk 用 scripts/hosts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/shw-dr-b.sh（这条命令里前面拷出来的 scripts/hosts/detached-run.sh） sta
+命令（det/clerk）：cat scripts/hosts/detached-run.sh > /tmp/shw-dr-a.sh && bash /tmp/shw-dr-a.sh start --label m -- sleep 1
+  改前：rc=2 ✗ clerk 用 scripts/hosts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/shw-dr-a.sh（这条命令里前面拷出来的 scripts/hosts/detached-run.sh） sta
+  改后：rc=2 ✗ clerk 用 scripts/hosts/detached-run.sh 起或停脱离会话的长跑（认出的调用：/tmp/shw-dr-a.sh（这条命令里前面拷出来的 scripts/hosts/detached-run.sh） sta
+命令（guard/main）：env =1 cargo test --all
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：bash -c -- 'cargo test --all'
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：ln -s ../s.sh sub/l.sh && bash sub/l.sh
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/sub/l.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=c
+命令（guard/main）：ln -s s.sh sub/l2.sh && bash sub/l2.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/sub/l2.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=
+  改后：rc=0 
+命令（guard/main）：bash -s -- s.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/s.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commi
+  改后：rc=0 
+命令（guard/main）：function foo { cargo test --all; }; "fo"o
+  改前：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  改后：rc=0 
+命令（guard/main）：function foo { cargo test --all; }; fo{o,}
+  改前：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  改后：rc=0 
+命令（guard/main）：function foo { cargo test --all; }; foo
+  改前：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：cat s.sh 01> d.sh && bash d.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commi
+  改后：rc=0 
+命令（guard/main）：cat s.sh "2"> d.sh ; bash d.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commi
+  改后：rc=0 
+命令（guard/main）：cat s.sh 3>d.sh >&3; bash d.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d.sh:4 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commi
+  改后：rc=0 
+命令（guard/main）：bash -c --posix 'cargo test --all'
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：bash -c -n 'cargo test --all'
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：env =1 -u X cargo test --all
+  改前：rc=0 
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：env A=1 -u X cargo test --all
+  改前：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  改后：rc=2 ✗ 重型测试被拒：cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+命令（guard/main）：cat <<'EOS' 2>d.sh\ncargo test --all\nEOS\nbash d.sh
+  改前：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d.sh:1 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commi
+  改后：rc=2 ✗ 重型测试被拒：脚本 <work>/scratch/d.sh:1 里的 cargo test 带 --workspace / --all（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commi
+命令（guard/main）：cp s.sh s{01..100..50}.sh && bash s001.sh
+  改前：rc=0 
+  改后：rc=0 
+命令（guard/main）：echo $'a\'b'; x=$(bash <<'EOF'\ncargo test --all\nEOF\n)
+  改前：rc=0 
+  改后：rc=0 
+命令（guard/main）：cat s.sh >> d.sh && bash d.sh
+  改前：rc=0 
+  改后：rc=0 
+命令（guard/main）：cat s.sh &> d.sh && bash d.sh
+  改前：rc=0 
+  改后：rc=0 

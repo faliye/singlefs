@@ -1,0 +1,4 @@
+name=symlink_dir_move_link_target_rewritten table_problems=0 dropped=[rig/path-link, rig2/a.sh, rig2/path-link, rig2/rel-link] kept=[] problem=None
+name=symlink_dir_move_link_target_untouched table_problems=0 dropped=[rig2/a.sh, rig2/path-link] kept=[] problem=None
+name=file_replaced_by_symlink_after_move table_problems=0 dropped=[] kept=[rig/a.sh, rig2/a.sh] problem=None
+name=exec_bit_added_after_move table_problems=0 dropped=[] kept=[rig2/a.sh] problem=None
