@@ -1,0 +1,15 @@
+# 实验号住在哪：一行一处出现过实验号的目录（或索引文件），这里列的每一处出现过的号都算「这个号用过、有这个号的东西」。
+# 读它的两处，读法只有一份（scripts/kb/lib_experiment_number_directories.py）：
+#   scripts/kb/claim-experiment.sh 的查号与 --next（每棵工作树都照占号那一棵里的这份登记查）；
+#   门禁 doc-experiments 的 experiment-orphans 格（这些处出现过的号，.claude/kb/experiments/ 里都要有正文）。
+# 写法：<相对仓根的路径><TAB><名字形态><TAB># 为什么（至少 4 个字）；空行与 # 开头的行不算。名字形态三种：
+#   e-number-names  目录底下逐层往下（名叫 target 的子目录不进），名字是 e 加号起头、号后面不接数字的文件与目录（e165-r5-prereg.md、e165_replay_bounded_enumeration.rs）
+#   number-names    目录底下逐层往下，名字是号加 - 起头的文件（实验页 07-<简称>.md，号去掉前导 0）
+#   index-rows      这份文件里以「| E<号>（」起头的行（实验索引表）
+# 登记了而树里不在的那一处不算错，两处各自列出；登记写坏（列数、形态、理由、路径、重复、一行都没有）两处都判红，占号拒绝给号。
+# 实验号住进一个新地方（新的装置目录、新的产物目录），在这里加一行，两处跟着认，不改脚本。
+research	e-number-names	# 跑前登记、重跑登记与三方材料（research/prompts/），实验产物（research/results/，含子目录）
+scripts	e-number-names	# 实验装置（scripts/experiment-apparatus/）、变异表（scripts/mutation/tables/）与别处带实验号的脚本（scripts/devices/ 下的探针）
+crates/singlefs-checker-tier/src/bin	e-number-names	# 登记里写死成入库装置的实验，装置住在 checker 档包里（e165_replay_bounded_enumeration.rs 这类）
+.claude/kb/experiments	number-names	# 实验页：<号>-<简称>.md 与两份译文
+.claude/kb/experiments.md	index-rows	# 实验索引表：只登了索引行、页还没建的号也算用过

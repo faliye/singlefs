@@ -1,6 +1,6 @@
 # 变异表
 
-**每个实验二进制一张表。** 在 `scripts/experiments/` 下跑 `bash ../mutation/mutate.sh <bin 名> <源文件> ../mutation/tables/<表>`（源文件相对 `scripts/experiments/` 写）
+**每个实验二进制一张表。** 在 `scripts/experiment-apparatus/` 下跑 `bash ../mutation/mutate.sh <bin 名> <源文件> ../mutation/tables/<表>`（源文件相对 `scripts/experiment-apparatus/` 写）
 逐条注入一个已知破坏、跑该 bin 的单测、记下红了哪几个、然后还原。
 
 表的格式：每行三段，**制表符**分隔——`变异名 <TAB> 原文 <TAB> 替换文`。

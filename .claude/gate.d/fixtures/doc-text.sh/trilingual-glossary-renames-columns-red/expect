@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-glossary
+want=翻译术语表与译文有 2 处不对（表自己 0 处；查了 1 组、4 条术语）
+want=.claude/kb/term-renames：中文「崩溃点」在 zh 里出现，en 里找不到「crash point」（术语表第 8 行）
+want=.claude/kb/term-renames：中文「重放」在 zh 里出现，ja 里找不到「リプレイ」（术语表第 9 行）
+want=doc-text.sh：1 格里 1 格红（trilingual-glossary）

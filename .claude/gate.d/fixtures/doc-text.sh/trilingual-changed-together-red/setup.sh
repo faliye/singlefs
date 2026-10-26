@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# 基准里登记的 README 与两组简报各有三份。这一轮：README 只改了英语和中文（工作区改动）；2026-09-14 只改了日语；
+# 基准里登记的 README 与两组简报各有三份。这一轮：README 只改了中文（工作区改动，两份译文都没碰）；2026-09-14 只改了日语（只改译文，放行）；
 # 2026-09-28 三份都改了；2026-10-12 新写了英语（未跟踪）和中文（暂存），日语没写；other.txt 与登记无关。
+# 改了中文的三组里 README 与 2026-10-12 判红；只改译文的 2026-09-14 放行，汇总里报放行 1 组。
 set -e
 put() { mkdir -p "$(dirname "$1")"; printf '%s\n' "${@:2}" > "$1"; }
 git init -q .
@@ -18,7 +19,6 @@ for name in 2026-09-14 2026-09-28; do
 done
 put other.txt 'base'
 git add -A && git commit -qm base
-printf '%s\n' 'more' >> README.en.md
 printf '%s\n' '更多' >> README.md
 printf '%s\n' '詳細' >> briefs/2026-09-14.ja.md
 printf '%s\n' 'more' >> briefs/2026-09-28.en.md

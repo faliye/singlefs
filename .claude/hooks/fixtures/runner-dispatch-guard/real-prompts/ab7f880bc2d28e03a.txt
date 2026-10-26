@@ -1,0 +1,39 @@
+# 派发：three-way-defense
+
+重型测试：不跑
+批次：records/2026-10-22-子agent结果落地审计.md#10
+线程上限：31
+禁读清单：research/prompts/landing-audit-r5-opus-output.md（同一轮的攻方腿报告）
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r5-sonnet
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r5-sonnet --purpose '三方 landing-audit-r5 的辩方腿草稿（landing-audit-r5-sonnet）'
+背景材料：research/prompts/_landing-audit-r5-background.md
+判决：research/prompts/landing-audit-r4-main-verification.md
+报告：research/prompts/landing-audit-r5-sonnet-output.md
+预计挂钟：2 小时内，读正文、第一轮判决、两份第一轮腿报告与第十批四份交回报告，逐条复核采与不采，不编译
+
+回复与报告用中文。
+
+轮名：landing-audit-r5（第九、十批改动的第二轮）。第一轮判决：`research/prompts/landing-audit-r4-main-verification.md`；第一轮腿报告：`research/prompts/landing-audit-r4-sonnet-output.md`、`research/prompts/landing-audit-r4-opus-output.md`；第一轮攻方模型 `research/prompts/landing-audit-r4-opus-model/`。模型目录（要写模型时）：research/prompts/landing-audit-r5-sonnet-model/。
+
+## 关的是哪几条
+
+正文 `research/prompts/_landing-audit-r5-body.md` 节「三、格」的 K1（第一轮判决够不够得着），逐条：
+
+1. 第一轮判决节「二、逐格判」里不采的两处（⑯ 前一半、⑯ 后一半）与记「没打中」的几处：理由站不站得住，给出能分辨的事实（文件:行、命令与输出）。
+2. K2-4 并 K3-2 收严成只认行首「草稿目录：」：判决写「收严不丢罩住的对象」；第十批交回 `research/prompts/subagent-landing-audit-2026-10-22/b10-hooks.md` 第八节写了 ⑯ 收严后行首带列表记号、引用记号或粗体的不再建写者锁、`a9717cf07fb6e7c21` 那一类 ⑰ 不再拦。这两样是不是判决当时就该算进代价的，那句话还成立吗；要量就拿主会话记录里全部派发提示数。
+3. 主 agent 判下的两处（交回闸 ⑤ 也认退 1 的命名检查、K2-6 只补互指不改 C879 结论）：是不是同样打中替代方案（只认退 0；删那五行）。
+
+每一条写：判决原文（文件:行）、复核结论（站得住 / 站不住 / 一半）、依据（命令与输出）、推翻条件。
+
+## 写法
+
+- 不重复第一轮已攻过的角度（正文节「一、题面」列了）；攻方腿另攻第十批的修补与方法，你不写那两格。
+- 方案按 `crates/` 与 `scripts/` 今天的实现来谈；被判的改动在 `research/prompts/landing-audit-r5-snapshot/judged-vs-head.diff`（对 HEAD），混有别的会话的改动（正文节「实现今天的样子」列了是哪几处）。
+- 现试放草稿目录，经 `scripts/hosts/run-with-memory-cap.sh 4G` 跑；不在主工作区改文件。
+- 报告分段写进报告路径：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建（`set -o noclobber`），之后 `>>` 追加；回复只写短句：报告路径、sha256、各条站得住几条。
+- 草稿与临时文件放草稿目录，不放会话共用的暂存目录。
+- 引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数。
+
+## 出口
+
+K1 逐条写完，报告写完交回。

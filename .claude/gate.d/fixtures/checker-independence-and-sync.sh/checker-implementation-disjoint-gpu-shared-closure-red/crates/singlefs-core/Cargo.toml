@@ -1,0 +1,10 @@
+[package]
+name = "singlefs-core"
+
+[dependencies]
+libc = "0.2"
+singlefs-format = { path = "../singlefs-format" }
+singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
+
+[dev-dependencies]
+sample-gpu-kernels = { path = "../sample-gpu-kernels" }

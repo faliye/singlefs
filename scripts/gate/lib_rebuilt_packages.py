@@ -10,10 +10,11 @@
 scripts/mutation/prove-red.sh（每条变异施加后那一趟编译核被改的那个包，按路径载入本库调 package_of / compiled_packages）。
 
 入口：
-  paths_in_patch(text) -> [相对仓根的路径]          `+++ b/<路径>` 与 `--- a/<路径>` 两种行，去重、按出现次序；/dev/null 不算
+  paths_in_patch(text) -> [相对仓根的路径]          新旧文件头及 rename/copy 路径，解 Git 引号，去重、按出现次序；/dev/null 不算
   package_of(tree, relative) -> 包名 | None           从文件所在目录往上找到第一份带 [package] 的 Cargo.toml（不出树根），交它的 name
   changed_packages(tree, relatives) -> (包名排好序, 不核的路径)   只认落在包里的 .rs（rustc 的 dep-info 只记它们，表、文档、Cargo.toml 改了 cargo 不一定重编）
-  files_known_to_cargo(target_directory, 绝对路径) -> (dep-info 里出现过的, 有没有 dep-info)
+  workspace_root_of(tree, relative) -> 绝对路径      cargo 起 rustc 时的当前目录：dep-info 里相对路径的起点（函数说明里写 cargo 的规矩）
+  files_known_to_cargo(target_directory, 绝对路径, 工作区根) -> (dep-info 里出现过的, 有没有 dep-info)   dep-info 里的相对路径以工作区根解成绝对路径再比
   packages_to_check(tree, relatives, target_directory) -> (要核的包名, 不核的说明)   包里改过的 .rs 一个都不在编译目录的 dep-info 里的不核
       （编完再看：编过的在新 dep-info 里，没重编的在上一次留下的 dep-info 里；都没有的是这几趟编译不读的，例如没开的 feature 下才编的模块）
   compiled_packages(text) -> {包名}                   编译输出里 `Compiling <包名> v<版本>` 的行（行首空白不算）
@@ -30,13 +31,18 @@ scripts/mutation/prove-red.sh（每条变异施加后那一趟编译核被改的
 
 弄坏开关 REBUILT_PACKAGES_BREAK=<项>（只给证红用）。项名、弄坏哪一处、打开后自证红在哪几格：
   any-compiling-line  编译输出里有任何一行 Compiling 就当改过的包全都重编了
-      本库「改过两个包、只重编了一个：点名没重编的那个」；连带 merge-and-verify.sh「编译目录里的产物比源码新」那一格
+      本库「改过两个包、只重编了一个：点名没重编的那个」「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」；连带 merge-and-verify.sh「编译目录里的产物比源码新」那一格
   patch-new-side-only 只认 `+++ b/` 行，不认 `--- a/`（删掉的文件不算改过）
       本库「补丁里取出改过的路径（新旧两侧、去重、不认 /dev/null）」「补丁删了一个文件：那个包也算改过」
   ignore-dep-info     不看编译目录的 dep-info，包里改过 .rs 的都核
-      本库「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」
+      本库「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」「dep-info 里是绝对路径：照原样认」
+  absolute-dep-info-only  dep-info 里的词只拿绝对路径比，相对路径不以工作区根解（改前的样子，真 cargo 写的 dep-info 一个都对不上）
+      本库「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」
+      「没重编的文件在上一次留下的 dep-info 里：照核、判红」；连带 merge-and-verify.sh（它用 --write-selftest-cargo 那份假 cargo，写的也是相对路径）
+      「头一次编、补丁改过的 demo 有 Compiling 行」「编过之后 --skip-apply 再验同一批补丁」「编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行」三格（都报「重编核对本次未判」）
 """
 import glob
+import importlib.util
 import os
 import re
 import sys
@@ -61,20 +67,54 @@ def broken(item):
     return os.environ.get(BREAK_VARIABLE, "") == item
 
 
-def paths_in_patch(text):
-    """补丁里改过的路径：`+++ b/<路径>`（新的一侧）与 `--- a/<路径>`（旧的一侧，删掉的文件只在这一侧）。"""
+def patch_paths(text, include_old=True):
+    """读 Git 补丁头中的路径；还原 C 风格引号，正文不作文件头解析。"""
+    specification = importlib.util.spec_from_file_location(
+        "snapshot_tree_for_patch_paths",
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "agents", "snapshot-tree.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
     found = []
+    in_header = True
+    remaining_old = remaining_new = 0
     for line in text.splitlines():
-        if line.startswith("+++ b/"):
-            path = line[len("+++ b/"):]
-        elif line.startswith("--- a/") and not broken("patch-new-side-only"):
-            path = line[len("--- a/"):]
-        else:
+        if line.startswith("diff --git "):
+            in_header = True
+        elif line.startswith("@@"):
+            match = re.match(r"@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@", line)
+            remaining_old, remaining_new = (int(value) if value is not None else 1 for value in match.groups()) if match else (0, 0)
+            in_header = False
             continue
-        path = path.split("\t", 1)[0].strip()
-        if path and path not in found:
-            found.append(path)
+        elif line.startswith("GIT binary patch"):
+            in_header = False
+        if not in_header:
+            if remaining_old or remaining_new:
+                if line.startswith((" ", "-")):
+                    remaining_old -= 1
+                if line.startswith((" ", "+")):
+                    remaining_new -= 1
+                if remaining_old == remaining_new == 0:
+                    in_header = True
+            continue
+        for prefix, old, strip_side in (
+                ("--- ", True, True), ("+++ ", False, True),
+                ("rename from ", True, False), ("rename to ", False, False),
+                ("copy from ", True, False), ("copy to ", False, False)):
+            if not line.startswith(prefix) or (old and not include_old):
+                continue
+            path = module.unquoted(line[len(prefix):].split("\t", 1)[0])
+            if strip_side:
+                if not path.startswith(("a/", "b/")):
+                    continue
+                path = path[2:]
+            if path and path not in found:
+                found.append(path)
     return found
+
+
+def paths_in_patch(text):
+    """补丁新旧两侧的文件路径，包括删除、重命名与 Git 引号路径。"""
+    return patch_paths(text, include_old=not broken("patch-new-side-only"))
 
 
 def package_of(tree, relative):
@@ -120,10 +160,39 @@ def dep_info_files(target_directory):
     return sorted(glob.glob(os.path.join(target_directory, "*", "deps", "*.d")) + glob.glob(os.path.join(target_directory, "*", "*", "deps", "*.d")))
 
 
-def files_known_to_cargo(target_directory, absolute_paths):
+def workspace_root_of(tree, relative):
+    """cargo 起 rustc 时的当前目录，也就是 dep-info 里相对路径的起点。cargo 的规矩（compiler 的 path_args）：路径包的源文件在工作区根底下的，
+    传给 rustc 的是相对工作区根的路径、rustc 的当前目录是工作区根，rustc 写进 deps/*.d 的源文件就是这样的相对路径；别的（registry 包、工作区根外的路径包）传绝对路径。
+    工作区根照 cargo 找：文件往上第一份带 [package] 的 Cargo.toml 所在目录起，再往上（不出树根）第一份带 [workspace] 的 Cargo.toml 所在目录；一份都没有，包自己的目录就是。
+    → 绝对路径（按树给的写法拼，不解符号链接）；文件不落在包里交树根。"""
+    tree_absolute = os.path.abspath(tree)
+    directory = os.path.dirname(os.path.join(tree_absolute, relative))
+    package_directory = None
+    while True:
+        manifest = os.path.join(directory, "Cargo.toml")
+        if os.path.isfile(manifest):
+            try:
+                with open(manifest, "rb") as handle:
+                    table = tomllib.load(handle)
+            except (OSError, tomllib.TOMLDecodeError):
+                table = {}
+            if package_directory is None and isinstance(table.get("package"), dict):
+                package_directory = directory
+            if package_directory is not None and isinstance(table.get("workspace"), dict):
+                return directory
+        if os.path.realpath(directory) == os.path.realpath(tree_absolute) or os.path.dirname(directory) == directory:
+            return package_directory or tree_absolute
+        directory = os.path.dirname(directory)
+
+
+def files_known_to_cargo(target_directory, absolute_paths, workspace_roots=()):
     """→ (dep-info 里出现过的那几个绝对路径, 编译目录里有没有 dep-info)。编完再调：这一趟编过的文件在新的 dep-info 里，
-    没重编的文件在上一次编它时留下的 dep-info 里；一份 dep-info 里都没有的，是这几趟编译根本不读的（没开的 feature 下才编的模块、没被引用的文件）。"""
+    没重编的文件在上一次编它时留下的 dep-info 里；一份 dep-info 里都没有的，是这几趟编译根本不读的（没开的 feature 下才编的模块、没被引用的文件）。
+    dep-info 里的相对路径（真 cargo 给工作区成员写的就是这种，见 workspace_root_of）以 workspace_roots 里的每一个解成绝对路径再比；绝对路径照原样比。"""
     wanted, found = set(absolute_paths), set()
+    roots = set()
+    for root in workspace_roots:
+        roots |= {os.path.abspath(root), os.path.realpath(root)}
     files = dep_info_files(target_directory)
     for path in files:
         try:
@@ -131,7 +200,10 @@ def files_known_to_cargo(target_directory, absolute_paths):
                 tokens = handle.read().split()
         except OSError:
             continue
-        found |= wanted & {token.rstrip(":") for token in tokens}
+        words = {token.rstrip(":") for token in tokens}
+        if not broken("absolute-dep-info-only"):
+            words |= {os.path.normpath(os.path.join(root, word)) for word in words if word and not os.path.isabs(word) for root in roots}
+        found |= wanted & words
         if found == wanted:
             break
     return found, bool(files)
@@ -177,7 +249,8 @@ def packages_to_check(tree, relatives, target_directory=None):
     if target_directory and grouped and not broken("ignore-dep-info"):
         real_tree = os.path.realpath(tree)
         absolute = {relative: {os.path.join(real_tree, relative), os.path.abspath(os.path.join(tree, relative))} for files in grouped.values() for relative in files}
-        found, has_dep_info = files_known_to_cargo(target_directory, set().union(*absolute.values()))
+        roots = {workspace_root_of(tree, relative) for files in grouped.values() for relative in files}
+        found, has_dep_info = files_known_to_cargo(target_directory, set().union(*absolute.values()), roots)
         if has_dep_info:
             unread = sorted(name for name, files in grouped.items() if not any(absolute[relative] & found for relative in files))
             if unread:
@@ -256,9 +329,9 @@ for name, directory in sorted(packages):
         print(f"   Compiling {name} v0.1.0 ({os.path.abspath(directory)})")
         with open(depinfo, "a"):
             pass
-        # 照 rustc 写 dep-info：<编译目录>/debug/deps/<包>.d，列出这个包的每个 .rs（绝对路径）
+        # 照 rustc 写 dep-info：<编译目录>/debug/deps/<包>.d，列出这个包的每个 .rs（与真 cargo 同形：相对工作区根的路径，这里的当前目录就是工作区根）
         os.makedirs(os.path.join(target, "debug", "deps"), exist_ok=True)
-        rust_files = sorted(os.path.abspath(os.path.join(root, file_name)) for root, _, file_names in os.walk(directory) for file_name in file_names if file_name.endswith(".rs"))
+        rust_files = sorted(os.path.normpath(os.path.join(root, file_name)) for root, _, file_names in os.walk(directory) for file_name in file_names if file_name.endswith(".rs"))
         with open(os.path.join(target, "debug", "deps", name.replace("-", "_") + ".d"), "w") as handle:
             handle.write(f"{os.path.abspath(depinfo)}: {' '.join(rust_files)}\n")
         os.utime(depinfo)
@@ -330,12 +403,28 @@ def selftest():
         cell("touch 只刷落在包里、还在的文件", count == 1 and os.stat(walk).st_mtime > 1577836800, f"刷了 {count} 个，walk.rs 的 mtime {os.stat(walk).st_mtime}")
         changed, skipped = changed_packages(tree, ["crates/alpha/Cargo.toml", "crates/beta/src/table.tsv"])
         cell("包里改的不是 .rs（Cargo.toml、表）：不核", changed == [] and len(skipped) == 2, f"包 {changed}，不核的 {skipped}")
-        # 编译目录里的 dep-info：alpha 的 lib.rs 编过（在 dep-info 里），beta-two 的 walk.rs 一份 dep-info 里都没有（没开的 feature 下才编的那种）
+        # 编译目录里的 dep-info：alpha 的 lib.rs 编过（在 dep-info 里），beta-two 的 walk.rs 一份 dep-info 里都没有（没开的 feature 下才编的那种）；
+        # dep-info 与真 cargo 同形：头上的产物是绝对路径，源文件是相对工作区根的路径
         target = os.path.join(work, "target")
         os.makedirs(os.path.join(target, "debug", "deps"))
         with open(os.path.join(target, "debug", "deps", "alpha-0123.d"), "w") as handle:
-            handle.write(f"{target}/debug/deps/alpha-0123.d: {os.path.realpath(tree)}/crates/alpha/src/lib.rs\n\n{os.path.realpath(tree)}/crates/alpha/src/lib.rs:\n")
+            handle.write(f"{target}/debug/deps/alpha-0123.d: crates/alpha/src/lib.rs\n\ncrates/alpha/src/lib.rs:\n")
         both = ["crates/alpha/src/lib.rs", "crates/beta/src/walk.rs"]
+        # 合入后验证那一趟的样子：编译目录在树外，dep-info 里是相对工作区根的路径（beta-two 的 walk.rs 在里面，alpha 的不在）
+        relative_target = os.path.join(work, "logs-run", "target")
+        os.makedirs(os.path.join(relative_target, "debug", "deps"))
+        with open(os.path.join(relative_target, "debug", "deps", "beta_two-89ab.d"), "w") as handle:
+            handle.write(f"{relative_target}/debug/deps/beta_two-89ab.d: crates/beta/src/walk.rs\n\ncrates/beta/src/walk.rs:\n")
+        code, lines = check(tree, [green_log], both, relative_target)
+        cell("dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核", code == EXIT_RED and "没重编：beta-two" in lines[0] and "核了 1 个包：beta-two" in lines[0]
+             and "alpha 改过的 .rs 不在" in lines[0], f"退 {code} {lines}")
+        # 绝对路径照原样认（registry 包、工作区根外的路径包，cargo 给 rustc 的是绝对路径）
+        absolute_target = os.path.join(work, "absolute-target")
+        os.makedirs(os.path.join(absolute_target, "debug", "deps"))
+        with open(os.path.join(absolute_target, "debug", "deps", "alpha-4567.d"), "w") as handle:
+            handle.write(f"{absolute_target}/debug/deps/alpha-4567.d: {os.path.realpath(tree)}/crates/alpha/src/lib.rs\n")
+        code, lines = check(tree, [green_log], both, absolute_target)
+        cell("dep-info 里是绝对路径：照原样认", code == 0 and "核了 1 个包：alpha" in lines[0], f"退 {code} {lines}")
         code, lines = check(tree, [green_log], both, target)
         cell("改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核", code == 0 and "beta-two" in lines[0] and "不核" in lines[0] and "核了 1 个包：alpha" in lines[0],
              f"退 {code} {lines}")
@@ -352,7 +441,7 @@ def selftest():
         print(f"  → 看 paths_in_patch / changed_packages / missing_rebuilds / check / touch；{BREAK_VARIABLE} 设着的话这里本来就该红")
         return EXIT_RED
     print(f"  ✓ lib_rebuilt_packages 自检通过（查了 {checked} 格）：补丁取路径认新旧两侧、删掉的文件也算、只重编一个包时点名另一个、红样本退 1 绿样本退 0、没有落在包里的文件退 77、touch 只刷包里还在的、"
-          f"不是 .rs 的不核、不在 dep-info 里的包不核、在上一次 dep-info 里而没重编的照红、没有 dep-info 时全核")
+          f"不是 .rs 的不核、不在 dep-info 里的包不核、在上一次 dep-info 里而没重编的照红、没有 dep-info 时全核、dep-info 里相对工作区根的路径与绝对路径都认")
     return 0
 
 

@@ -1,0 +1,7 @@
+exit=1
+want=· crash-case-replay：红的测试目标 1 个、FAILED 的测试函数 1 条
+want=FAILED plain_stream_quick
+want=样本断言：快档崩溃状态 7 个，期望 8 个（红的目标在 cargo 输出的尾巴之外）
+want=· crash-case-replay：这一趟 cargo 的整份输出留在 
+want=✗ checker 档快档判红
+want=逐格：crash-case-replay：红；feature-gated-tests：绿

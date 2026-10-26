@@ -1,0 +1,9 @@
+# 样本：与 checker-direction-overlap-green 同一份登记，源码里扫描式多调了一个遍历式的判定函数
+traversal-entry	crates/singlefs-checker/src/walk.rs::check_pool_image	-	# 池级 checker 对外的入口
+traversal-entry	crates/singlefs-checker/src/walk.rs::walked_index	-	# 比对点那一侧遍历式读出的索引
+scan-entry	crates/singlefs-checker/src/walk.rs::scanned_units	-	# 扫单元头、按魔数滤
+scan-entry	crates/singlefs-checker/src/rebuild.rs::rebuild_index	-	# 扫描重建三张表那一步
+comparison	crates/singlefs-checker/src/walk.rs::judge_rebuild_agrees_with_the_walked_index	-	# 拿两个方向的结果比
+traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image	scanned_units	# 编排函数调扫描式方向
+traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image	judge_rebuild_agrees_with_the_walked_index	# 编排函数调比对点
+shared-format	crates/singlefs-checker/src/lib.rs::read_u64	-	# 按小端读 8 字节

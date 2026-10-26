@@ -1,0 +1,6 @@
+exit=0
+want=✓ crates 改动 2 个文件都有去向（新写的判决文件 1 份，另有 1 个按 .claude/crates-review-exempt 豁免，基准 HEAD）
+want=      crates/demo/src/lib.rs：用户说判决之后这一处小改不再走三方
+want=判决之后改没改过（拿那一轮开工快照清单里的 sha256 比此刻的内容）：1 个对得上，0 个没比
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=doc-process-records.sh：1 格里 1 格绿（crates-adversarial-review），0 格本次未跑（无）

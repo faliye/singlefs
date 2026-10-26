@@ -3,11 +3,22 @@
 # run-condition: none 要的 Verus、cargo 与内存包装由各子命令自己判，缺了判红并给出路（缺工具直接红，不交给预判退 78）
 """门禁 checker-tier-formal-verification 的 Verus 那四格的判法（里程碑三七·5；阶段只负责把它接进门禁、给样本开关）。
 
-被验的：登记表 .claude/gate.d/verus-pins.tsv 点名的 crate（今天是只依赖 vstd 的 crates/singlefs-replay-prefix）与它里面的核（kernel 行，今天是它的 src/lib.rs 与子模块 src/compaction_plan_proofs.rs）。
-Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不变时不出判定行），对 crate 的入口文件 --crate-type=lib，带 --no-cheating、--output-json 与 --rlimit <登记的数>
-（登记表 rlimit 行；没有这一行时取 DEFAULT_RLIMIT，就是 Verus 0.2026.09.20 自己的默认 10。proof、vacuity、must-red-worlds 三格同一个数），
-判定取 stdout 的 JSON（verification-results 的 verified / errors / encountered-vir-error，verus 的 commit），报错位置取 stderr。
-直接起的 Verus 只带它自带的 vstd：crate 的 Cargo.toml 除 vstd 之外还有依赖，proof、vacuity、must-red-worlds 三格开跑之前判红。
+被验的：登记表 .claude/gate.d/verus-pins.tsv 点名的各 crate（crate 行可以多条、各有各的 verified 登记数；今天是只依赖 vstd 的 crates/singlefs-replay-prefix，
+singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel 行，落在哪个 crate 的目录里就归哪个 crate；必红世界表每个 crate 一张，放在它自己的目录里）。
+登记了几个 crate 时，proof、vacuity、must-red-worlds、coverage 四样逐个 crate 判（run_per_crate），--item 照各 crate 列出的项分过去；只登记一个 crate 时照一个判。
+被验区域：核里 verus! { … } 包的，与属性写法（#[verus_verify]、#[verus_spec(…)]）标的条目；crate 的 src 里有这两样的文件都要登记成核。
+两种起法（crate 行第四段）：
+  不写第四段：Verus 每次都直接起，对 crate 的入口文件 --crate-type=lib，带 --output-json 与 --rlimit <登记的数>；只带它自带的 vstd，crate 的 Cargo.toml
+    除 vstd 之外还有依赖，proof、vacuity、must-red-worlds 三格开跑之前判红。
+  第四段写 cargo：经 Verus 安装里的 cargo-verus 起 cargo verus focus -p <包> --offline -- <参数>（第二轮正推 Y4 第 2 条），副本是 crate 连同它经 path 连到的 crate、
+    仓根的 Cargo.lock 与一份只列这几个成员的工作区 Cargo.toml（整个工作区的 cargo metadata 在离线机器上过不了）；几处同时验各占一个编译目录，vstd 与依赖在里面只编一次。
+  两种都是一处判定一份新副本：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、stdout 没有判定行（第二轮正推 Y4 第 3 条，
+    2026-10-26 在草稿的小工作区里复现过）；没有判定行的那一处判红，不当绿。
+不带 --no-cheating（出口 5 第三轮判决第三节「门禁」）：assume_specification、external_body、uninterp 与 external_*_specification 照信任清单
+  .claude/gate.d/verus-trust-list.tsv 逐条登记（没登记、规格原文的 sha256 对不上、差分测试不在都判红），admit(…)、assume(…)、verifier::external、axiom 在核里一律判红，
+  都在起 Verus 之前判（region_problems、cheating_markers）。
+--rlimit 取登记表 rlimit 行；没有这一行时取 DEFAULT_RLIMIT，就是 Verus 0.2026.09.20 自己的默认 10。proof、vacuity、must-red-worlds 三格同一个数，各 crate 同一个数。
+判定取 stdout 的 JSON（verification-results 的 verified / errors / encountered-vir-error，verus 的 commit），报错位置取 stderr（直接起的相对 crate 目录，cargo 那一种相对副本根）。
 只验一个函数（证明逐项、空真每处）时按那个函数所在的核点模块（kernel_module）：--verify-function 只在 --verify-root 或 --verify-only-module 点的那一个模块里找。
   核是 crate 的入口文件（Cargo.toml 的 lib.path，默认 src/lib.rs）的点 --verify-root；入口所在目录下的 <名>.rs 与 <名>/mod.rs 点 --verify-only-module <名>，
   更深的用 :: 接起来（<甲>/<乙>.rs 与 <甲>/<乙>/mod.rs 是 <甲>::<乙>）。Verus 0.2026.09.20 的认法（2026-10-18 在草稿的三层小 crate 上量的）：
@@ -17,37 +28,59 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
   核不在入口所在目录下、或路径里有一段不是 Rust 标识符的，认不出模块，判红。必红世界整个 crate 验，不点函数，不点模块。
 
 用法（<根> 是被判的仓根；四个判的子命令都退 0 绿、1 红、2 用法错、77 本次未跑）：
-  verus-proof-check.py toolchain <根> [--verus-root 目录] [--cargo-home 目录]
+  verus-proof-check.py toolchain <根> [--verus-root 目录] [--cargo-home 目录] [--rustc-version-file 文件]
       版本一致：Verus 安装里 version.json 的 version 与 commit、安装目录旁 verus.zip 的 sha256（zip 在就核，不在报一句）、
       Cargo.lock 里登记的六个包各恰好一个版本且等于登记、本机 cargo 缓存里每个包的 .cargo_vcs_info.json（sha1、path_in_vcs）
-      与包源码的内容指纹（fingerprint 子命令的算法），都与登记相同。
+      与包源码的内容指纹（fingerprint 子命令的算法），都与登记相同；Verus 与产品的 rustc 版本差钉在登记表 rustc 行（rustc_pin_problems）：
+      version.json 的 toolchain 第一段、产品 rustc -vV（在被判的仓根起）的 release 与 commit-hash 都与 rustc 行相同（--rustc-version-file 给样本用：读那份文件当 rustc -vV 的输出）。
   verus-proof-check.py proof <根> [通用选项]
-      核里（去掉 // 注释之后）不许出现 external_body、assume…（含 assume_specification）、admit、verifier::external / verifier(external)、
+      核里（去掉 // 注释之后）不许出现 admit(…)、assume(…)、verifier::external / verifier(external)、
       verifier::rlimit / verifier(rlimit …)（函数上的 rlimit 属性盖过命令行的 --rlimit，那个函数就不在登记的额度上验）；
-      Verus 逐项验：核里 verus! { … } 里有证明义务的单元各一项（proof_items）：proof fn、exec fn、带 decreases 的 spec fn（终止义务）、
-      derive(Clone) 的类型（Verus 验它生成的 <类型>::clone）；不带 decreases 的 spec fn 没有证明义务、不成项，随用到它的项进键。
-      每项起一次 --verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function <名>（自由 fn 写它的名字，clone 写 <类型>::clone）：限时内出结局、没有 vir 错（作弊标记在这一层也被
-      --no-cheating 拒：只验一个函数时别处的 assume 照样拒，主 agent 2026-10-15 在副本上量的）、encountered-error 不是 true、errors 0、verified 至少 1、
+      被验区域（region_problems，起 Verus 之前判，先于切函数：按 cfg 分叉的两份同名 fn 红句先说 cfg）：axiom 一律判红；每一处可信声明（TRUST_KINDS）与 cfg 原子
+      （#[cfg(…)]、#[cfg_attr(…)]、cfg!(…)，与定义里有 cfg 的 macro_rules! 宏在被验区域里的调用）在信任清单里恰好一行、规格原文 sha256 相同、差分测试在
+      crates/ 下标了 #[test]，清单里这个 crate 的行在核里都找得到，vstd 恰好一行且与登记表 package vstd 行同版本同指纹；被验区域里声明的类型与 trait
+      在 crate 的 src 里 verus! 外面有 impl <Trait> for <类型> 的判红（cfg(test) 下的不判）。
+      Verus 逐项验：核的被验区域里有证明义务的单元各一项（proof_items）：proof fn、exec fn、带 decreases 的 spec fn（终止义务）、
+      derive(Clone) 的类型（Verus 验它生成的 <类型>::clone）；impl 与 trait 里的方法照样成项；不带 decreases 的 spec fn、trait 里没有函数体的声明、external_body 的 fn
+      没有证明义务、不成项，随用到它的项进键。项名是全路径 proof:<crate>::<模块>::<名>（第二轮正推 Y4 第 7 条；核是 crate 入口的没有模块那一段），
+      <名> 是交给 --verify-function 的那一个：自由 fn 写它的名字，impl 里的方法写 <类型>::<方法>（trait impl 也写类型），trait 里的写 <trait>::<方法>，clone 写 <类型>::clone。
+      每项起一次 --verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function <名>：限时内出结局、没有 vir 错、encountered-error 不是 true、errors 0、verified 至少 1、
       跑的 Verus 的 commit 等于登记。--verify-function 下真 Verus 不给 success 键、is-verifying-entire-crate 报 false，这两样不看（verification_clean）。
-      整格跑时各项 verified 之和（复用的取记下的数；按点的名字计，同名的只算一次）等于登记的数（整 crate 验的数），不等判红并点名
+      整格跑时各项 verified 之和（复用的取记下的数）等于这个 crate 登记的数（整 crate 验的数），不等判红并点名
       verified 与静态估的义务条数不同的项（proof fn 1、exec fn 1 加每个 while / loop / for 1、带 decreases 的 spec fn 1、clone 1）与没成项的 fn。超时判红（C5：超时不当通过）。
-      verus! 里两个 fn 同名、或 fn 在 impl / trait 里判红：--verify-function 按名点（有恰好同名的就取它，名字是别人子串的照常点得中），这两种点不准。
-      同名只在同一份核里判：Verus 只在点的那一个模块里找，两份核里同名的 Verus 点得准；但项名、各项之和与判定库都按名字计，两份核同名的今天不判红（见「管不到的」）。
+      同一个模块里两个 fn 交给 --verify-function 的名字相同（同一个类型的固有方法与 trait 方法同名）判红：Verus 按名点会把两个一起验；认不出类型的 impl 里的方法判红。
+      不同模块里同名的各是各的项。整格再做一次不带过滤的 crate 验证，防止义务遗漏；再把产品构建与 Verus 构建的 MIR 逐条目比（compare_mir，不按条入库）：
+      产品构建（cargo rustc --emit=mir，RUSTC_BOOTSTRAP=1 -Z trim-diagnostic-paths=false）的每个条目在 Verus 构建（verus --no-verify --compile -- --emit=mir；
+      cargo 那一种 cargo verus build -- --no-verify -- --emit=mir：不再验一遍、只编，证明在前面完整 crate 那一步验过；不带 --no-verify 时 cargo verus build 连 vstd 也验，
+      本机 2026-10-26 在小 crate 上量到 1.8 GB 对 1.0 GB）里都有、整段逐字相同，对不上判红（第三轮判决 Z2：宏写法产品构建返回 11、verus --compile 编出返回 12）。
   verus-proof-check.py vacuity <根> [通用选项]
-      空真：核里每一处 requires（整行以 requires 起头，fn 与闭包都算）找到它的函数体的 {（其后第一行以 { 起头、缩进不深于 requires 那一行的），
+      空真筛查：词法枚举 requires，非独立契约行拒绝（fn 与闭包都算），核里每一处 requires 找到它的函数体的 {（其后第一行以 { 起头、缩进不深于 requires 那一行的），
       在临时副本里 { 后面插 assert(false);，一处一份副本、一次 Verus（只验这一处所属的那个 fn：--verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function）；
-      每一处都要报 assertion failed 且位置就是插的那一行。
+      每一处都要报 assertion failed 且位置就是插的那一行；失败只表示未检出矛盾，不证明前置条件可满足。关键前提另用构造见证证明。
       验得过 ⇒ 这一处的前置条件不可满足，判红。一次只插一处：插在外层函数入口的 assert(false) 失败之后，Verus 把其后全部当 false 已知，
       里面闭包的那一处就验得过了（2026-10-01 在草稿里实测：七处一起插只报六处）。
+  verus-proof-check.py coverage <根>
+      静态检查每个带契约的函数与 invariant 块都有唯一锚点负例；不运行 Verus。
   verus-proof-check.py must-red-worlds <根> [通用选项]
-      必红世界：登记表 must-red-worlds 行点名的表（五段制表符分隔：变异名、文件、原文、替换文、proof_errors=M；\\n 表换行），
-      每行原文在文件里恰好命中一次，改坏的副本上 Verus 要出 JSON、errors ≥ 1，证明错的条数等于 M。一行都没有判红。
+      必红世界：登记表 must-red-worlds 行点名的表（六段制表符分隔：变异名、文件、原文、替换文、proof_errors=M、landing=<落点>；\\n 表换行），
+      每行原文在文件里恰好命中一次，改坏的副本上 Verus 要出 JSON、errors ≥ 1，证明错的落点等于第六段登记的落点。一行都没有判红。
+      判的是落点，不是条数（C654：条数会随求解环境、无关的 spec 改动漂，攻方在核上加一个没人用的 spec fn，同一行就从 2 条跳到 3 条）：
+        落点 = 每条证明错取它 --> 位置的那一行，在改坏之后的文件文本里往上找最近一行 fn 的开头（FUNCTION_HEADING），取那个 fn 的名字，去重排序成集合
+        （proof_error_landing；位置在 crate 之外或往上没有 fn 记（函数外），输出里有证明错没带位置记（无位置））。第六段 landing=<名>[,<名>…] 写这个集合，顺序随意，
+        与实测的集合不相等判红（红句写实测的落点、登记的落点与出路）；同一个 fn 里多报一条循环不变式、条数跳了，落点不变就不红。
+        第五段 proof_errors=M 的 M 退成「最近一次观测的条数」：与实测不同只报不判，成功句数一句「N 行证明错条数与第五段不同，只报不判」。
       证明错：输出里 error 起头的报错，除去含 Resource limit (rlimit) exceeded 的与以 aborting due to 起头的（proof_error_messages）；
-      M 只数它们，不数 rlimit 用尽（Verus 把 rlimit 用尽也计进 JSON 的 errors，同一行换个 rlimit 那个数就变）。
-      第五段一律写 proof_errors=<正整数>，不是这个形态的行（旧写法的输出片段、「verified, M errors」）不起 Verus、判红，出路写这条约定；
+      条数只数它们，不数 rlimit 用尽（Verus 把 rlimit 用尽也计进 JSON 的 errors，同一行换个 rlimit 那个数就变），rlimit 用尽那条的位置不进落点。
+      第五段一律写 proof_errors=<正整数>，第六段一律写 landing=<落点>：不是这个形态的行（旧写法的输出片段、「verified, M errors」，五段的旧行，
+      第六段缺或写成别的）不起 Verus、判红，出路写这条约定与补落点的办法；
       JSON 里没有整数的 verified 与 errors 的那一行判红。
       证明错一条都没有、只剩 rlimit 用尽的那一行不作数、判红：红在算力额度上，不是证明失败（改替换文，或调高登记的 rlimit）。
       替换文里（去掉 // 注释之后）有 verifier::rlimit / verifier(rlimit …) 的那一行判红：它盖过命令行的 --rlimit。
+  verus-proof-check.py must-red-landings <根> [--write] [通用选项]
+      给旧表补第六段用的一次性办法（重型：逐行起 Verus，同必红世界一格；不读写判定库，不是门禁的一格）：每一行照必红世界同样的办法改坏、起 Verus、取落点，
+      逐行打「变异名<TAB>landing=<落点><TAB>条数」，已有第六段的另写与实测是否相同；不带 --write 表不动。--write 把没有第六段的行补上 landing=<实测落点>
+      （已有第六段的不改；写同目录临时文件再 rename，补完回读一遍）。第一次补出来的落点要对着 git diff 过一眼（落点是不是这条变异本该盯的函数）；
+      之后落点变了，红句点名的是哪一行、实测落在哪，改落点一律手改，不再用这个办法重新取。--item 只补点名的行。
   通用选项：--verus-root 目录（默认 $SINGLEFS_VERUS_ROOT，再默认 ${XDG_DATA_HOME:-~/.local/share}/<登记表 release 行第五列>）
             --timeout 秒（默认 $GATE_VERUS_TIMEOUT_SECONDS，再默认 600）  --threads N（默认 $SINGLEFS_THREAD_CAP，再默认登记的重活默认并行度 .claude/heavy-thread-default）
             --jobs J（空真与必红世界几处同时验，默认 $GATE_VERUS_JOBS，再默认 min(处数, max(1, N // 4))；每一处的 Verus 取 N // J 条线程，至少 1；
@@ -63,14 +96,19 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
               「✗ 这一格 N 条真红、M 条没跑成：按红记」，交出的判定是红，不是没跑成
             排队时内存包装每 60 秒往 stderr 报一行（「排队（已等 …」，放行时「排了 … 秒，起跑」）：判法收包装的 stderr 判结局，
               那几行边跑边另转打到本进程的 stderr、行首带是哪一格（run_forwarding_queue_lines），判定用的输出不变
+            排队时内存包装现查别的机器（包装文件头「排队时去找别的机器」「整体兜底」）打的四种行首（「run-with-memory-cap: 没查到别的机器：」「run-with-memory-cap: 现查别的机器：」
+              「  → <机器>此刻放得下（」「  ! 告警记录写不进（」，HOST_LOOKUP_LINE）只出提示、不改结局：经包装起时判法读 stderr 之前去掉它们（strip_host_lookup_lines），
+              「没跑成」带的包装 ✗ 与 → 也就不带它们；「  ! 告警记录写不进」与包装 append_outcome_record 打的那一句同首，一起去掉。
+              升档证据两句（「撞了内存上限」「超过限时」）不在其中。包装 HostLookup 新加一处 say 而 HOST_LOOKUP_LINE 不认，自证 host-lookup-say-sites-covered 那一格红
             一道里只排一次（QueueRefusal）：一格里任何一处第一次拿到包装的 252（排不上，两种成因都算），这一格还没起的那几处不建副本、不起包装、不排队，
               已经起了的照常收；没起的那几处并成一条 ✗「没跑成：内存包装排不上，没再排队（同一道里 <格>「<哪一处>」那一处退了 252…）：这一格 N 处 Verus 没起——<逐个列名>」，
               → 用先排不上那一处的出路（照包装文件头「退出码」一段）。环境里有 VERUS_PROOF_CHECK_QUEUE_REFUSED_FILE（门禁 checker-tier-formal-verification 整道跑时给一份空文件）的，
               第一次拿到 252 时往那份文件写一行「哪一处<TAB>出路」，后面几格开跑前读到它就一处都不起包装、照上面那样报；所以整道最坏只等一次等待上限
   verus-proof-check.py list-items <根> [--verdict-library 目录] [--verus-root 目录]
       逐行打可点名的项「项<TAB>格[<TAB>说明]」：toolchain（verus-toolchain-pinned）一项，proof（verus-proof 整格；说明里报成项几个、各哪一类，
-      不成项的 spec fn 逐个点名）一项，证明每个成项的单元一项 proof:<--verify-function 点的名字>（说明是哪一类与它在核里的位置），
-      空真每处 requires 一项 vacuity:<所属 fn 名>#<函数内第几处>（说明是函数或闭包），必红世界每行一项 must-red:<变异名>（说明是表里第几行）。
+      不成项的 spec fn 逐个点名）一项，证明每个成项的单元一项 proof:<全路径>（说明是哪一类与它在核里的位置），
+      空真每处 requires 一项 vacuity:<所属 fn 的全路径>#<函数内第几处>（说明是函数或闭包），必红世界每行一项 must-red:<变异名>（说明是表里第几行；
+      几张表之间变异名也不许重名）。登记了几个 crate 的逐个 crate 列（全路径的头一段是 crate 名）。
       项名只当索引。只读登记表、核与必红世界表（核经 scripts/gate/lib_function_units.py 切单元），不起 Verus、不编；核没进仓时只列 toolchain 与 proof；登记表或表写坏了判红退 1。
       给了 --verdict-library：另往 stderr 每格一行「<格>：键对不上 N 条、无记录 M 条、键相同 K 条、拒算 R 条」，末了「键对不上共 N 条」（底稿第二节第 9 条 ⑦）；
         逐项照现在的键比库（与判那一格时算的键同一份），只读库、不写库、不起 Verus（Verus 要装着：键里的工具链读它的安装）；stdout 的项名逐行不变（自证 list-items-key-mismatch-count）。
@@ -89,7 +127,7 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
             只改注释、空行、别的 fn 不改它的键；不成项的 spec fn 改了，用到它的那几项现判、红句点名它（自证 reuse-spec-function-all-users）。
           空真每处另加「所属函数单元闭包」与「函数内第几处」：身份是所属函数单元与第几处 requires，不带路径与行号（空行让 requires 挪一行不现判）。
           必红世界每行另加「受影响的函数单元」（这一行原文所在的那几个单元，与 verus! 里闭包用到它们的每个 fn，这些入口并起来的单元闭包键：
-            改坏之后可能报错的就是它们，整个 crate 验、数证明错条数）与「这一行」（原文、替换文、第五段；变异名与文件路径不进，改名不现判）。
+            改坏之后可能报错的就是它们，整个 crate 验、取证明错的落点）与「这一行」（原文、替换文、第六段落点；第五段的条数只报、不进键，变异名与文件路径不进，改名不现判）。
         必红世界表 Verus 不读：改表里一行只现判那一行，证明与空真照复用；表头、注释与空行不进任何一项的键
           （自证 reuse-must-red-table-row-only、reuse-must-red-table-comment-only）。核 crate 里别的文件加一个空行、被验函数体里加一行注释都不现判
           （自证 reuse-crate-other-file-no-cells、reuse-comment-in-function-body）。
@@ -119,145 +157,254 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
 与 .cargo-ok（cargo 解包时写的本机标记），逐个「sha256  相对路径」按路径字节序排好、每行一个换行，整段再取 sha256。
 
 弄坏开关 VERUS_PROOF_CHECK_BREAK=<项>[,<项>…]（只给证红用；--selftest 与门禁样本在开着时都必须判错）。
-逐项写开关名、弄坏哪一处（括号里是开着时判错的门禁样本），下一行起写打开后自证哪几格判错（项名是 selftest() 的格名，括号里是那一行判错行的开头；
-每一项红时都另有汇总行「✗ verus-proof-check 自证 <格数> 格里 N 格判错：<格名…>」）：
+逐项写开关名、弄坏哪一处（括号里是开着时判错的门禁样本），下一行起写打开后自证哪几格判错（项名是 selftest() 的格名，「」里是那一格判错行的开头「✗ <格名> 这一格判错」，
+『』里是实测值或旧说法、不当点名的项；「连带红的格」「红的格」那一行把打开之后实际红的其余几格点全，点名的格与实际红的格逐格相同；
+每一格判错打一行以 ✗ 起头、带格名的细节行，转述的输出换行换成「 | 」不另起一行（one_line）；每一项红时都另有一句汇总行「✗ verus-proof-check 自证 <格数> 格里 N 格判错（逐格见上面…）」，
+不带格名、不当一格）：
   VERUS_PROOF_CHECK_BREAK=commit-unchecked  toolchain 不比 version.json 的 commit（样本 verus-toolchain-pinned-commit-red 判绿）
-      toolchain-commit（「toolchain-commit 这一格判错」）
+      toolchain-commit（「✗ toolchain-commit 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=fingerprint-unchecked  toolchain 不比包源码的内容指纹（样本 verus-toolchain-pinned-fingerprint-red 判绿）
-      toolchain-fingerprint（「toolchain-fingerprint 这一格判错」）
+      toolchain-fingerprint（「✗ toolchain-fingerprint 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=absent-kernel-not-run  核不在一律退 77（样本 verus-proof-kernel-deleted-red 退 77）
-      kernel-deleted（「kernel-deleted 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=cheating-unchecked  不 grep 作弊标记、不带 --no-cheating（样本 verus-proof-cheating-red 判绿）
-      proof-cheating（「proof-cheating 这一格判错」）、proof-rlimit-attribute（「proof-rlimit-attribute 这一格判错」）
+      kernel-deleted（「✗ kernel-deleted 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=cheating-unchecked  不 grep 核里一律不许的标记（admit(…)、assume(…)、verifier::external）（样本 verus-proof-cheating-red、verus-proof-verifier-external-red 判绿）
+      proof-cheating（「✗ proof-cheating 这一格判错」）、proof-rlimit-attribute（「✗ proof-rlimit-attribute 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=count-unchecked  不比各项 verified 之和与登记的数（样本 verus-proof-count-red 判绿）
-      proof-count、proof-sum-from-reused-records、proof-sum-short-red-named（「… 这一格判错」）
+      proof-count、proof-sum-from-reused-records、proof-sum-short-red-named（『… 这一格判错』）
+      红的格：「✗ proof-count 这一格判错」、「✗ proof-sum-from-reused-records 这一格判错」、「✗ proof-sum-short-red-named 这一格判错」
   VERUS_PROOF_CHECK_BREAK=timeout-as-pass  超时当绿（样本 verus-proof-timeout-red 判绿）
-      proof-timeout（「proof-timeout 这一格判错」）
+      proof-timeout（「✗ proof-timeout 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=vacuity-accepts-verified  插了 assert(false) 还验得过也当没事（样本 verus-vacuity-red 判绿）
-      vacuity-vacuous（「vacuity-vacuous 这一格判错」）、vacuity-closure-vacuous（「vacuity-closure-vacuous 这一格判错」）
+      vacuity-vacuous（「✗ vacuity-vacuous 这一格判错」）、vacuity-closure-vacuous（「✗ vacuity-closure-vacuous 这一格判错」）
+      连带红的格：「✗ item-alone-equals-whole-vacuity 这一格判错」
   VERUS_PROOF_CHECK_BREAK=vacuity-all-at-once  一份核的全部插入点插进同一份副本只跑一遍，闭包那一处没单报就当它随外层验过了（样本 verus-vacuity-closure-red 判绿）
-      vacuity-closure-vacuous（「vacuity-closure-vacuous 这一格判错」）、vacuity-vacuous（「vacuity-vacuous 这一格判错」）；
+      vacuity-closure-vacuous（「✗ vacuity-closure-vacuous 这一格判错」）、vacuity-vacuous（「✗ vacuity-vacuous 这一格判错」）；
       另有几格跟着判错：item-alone-equals-whole-vacuity 与空真那几格按条复用（整份一跑不按项记判定）
+      连带红的格：「✗ item-alone-equals-whole-vacuity 这一格判错」、「✗ reuse-vacuity 这一格判错」、「✗ reuse-comment-in-function-body 这一格判错」、
+        「✗ reuse-vacuity-line-moved 这一格判错」、「✗ reuse-timeout-changed 这一格判错」、「✗ reuse-proof-function-only 这一格判错」、「✗ module-per-kernel 这一格判错」、
+        「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、「✗ reuse-must-red-table-comment-only 这一格判错」、
+        「✗ reuse-crate-other-file-no-cells 这一格判错」、「✗ reuse-three-questions 这一格判错」
   VERUS_PROOF_CHECK_BREAK=mutation-accepts-green  改坏的副本上验得过也当红了（样本 verus-must-red-worlds-survives-red 判绿）
-      must-red-survives（「must-red-survives 这一格判错」）、must-red-proof-error-count（「must-red-proof-error-count 这一格判错」）、
-      must-red-mixed-not-run-and-red（「must-red-mixed-not-run-and-red 这一格判错」）
+      must-red-survives（「✗ must-red-survives 这一格判错」）、must-red-landing-moved（「✗ must-red-landing-moved 这一格判错」）、
+      must-red-mixed-not-run-and-red（「✗ must-red-mixed-not-run-and-red 这一格判错」）
+      连带红的格：「✗ must-red-landing-two-functions-one-registered 这一格判错」、「✗ item-select-one 这一格判错」、「✗ item-alone-equals-whole-must-red 这一格判错」、
+        「✗ reuse-row-own-key 这一格判错」、「✗ reuse-red-not-recorded 这一格判错」、「✗ prune-after-change 这一格判错」、「✗ queue-refused-started-rows-collected 这一格判错」
   VERUS_PROOF_CHECK_BREAK=rlimit-counts-as-red  必红世界里 rlimit 用尽的报错也当证明失败（样本 verus-must-red-worlds-rlimit-red 判绿）
-      must-red-rlimit（「must-red-rlimit 这一格判错」）
+      must-red-rlimit（「✗ must-red-rlimit 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=rlimit-any-line-voids  必红世界里输出夹着 rlimit 用尽的一律不作数（另有证明错也不算）（样本 verus-must-red-worlds-rlimit-with-proof-error-green 判红）
-      must-red-rlimit-with-proof-error（「must-red-rlimit-with-proof-error 这一格判错」）、
-      must-red-rlimit-10-counts-proof-errors-only（「must-red-rlimit-10-counts-proof-errors-only 这一格判错」）
+      must-red-rlimit-with-proof-error（「✗ must-red-rlimit-with-proof-error 这一格判错」）、
+      must-red-rlimit-10-counts-proof-errors-only（「✗ must-red-rlimit-10-counts-proof-errors-only 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=rlimit-attribute-unchecked  核里不认 verifier::rlimit 属性（样本 verus-proof-rlimit-attribute-red 判绿）
-      proof-rlimit-attribute（「proof-rlimit-attribute 这一格判错」）
+      proof-rlimit-attribute（「✗ proof-rlimit-attribute 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=mutation-rlimit-attribute-accepted  必红世界不拒替换文里的 verifier::rlimit 属性（样本 verus-must-red-worlds-rlimit-attribute-red 判绿）
-      must-red-rlimit-attribute（「must-red-rlimit-attribute 这一格判错」）
+      must-red-rlimit-attribute（「✗ must-red-rlimit-attribute 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=rlimit-unpinned  Verus 命令行不带 --rlimit（假 Verus 没见到 --rlimit 就报 vir 错）
-      proof-green（「proof-green 这一格判错」）；起 Verus 的格几乎都跟着判错（证明逐函数、空真、必红世界与按条复用那几格），例 must-red-green、proof-count、
-      vacuity-vacuous、vacuity-closure-vacuous、must-red-survives、must-red-proof-error-count、proof-rlimit-registered、proof-rlimit-too-low、proof-rlimit-default、
+      proof-green（「✗ proof-green 这一格判错」）；起 Verus 的格几乎都跟着判错（证明逐函数、空真、必红世界与按条复用那几格），例 must-red-green、proof-count、
+      vacuity-vacuous、vacuity-closure-vacuous、must-red-survives、must-red-proof-error-count-drift、proof-rlimit-registered、proof-rlimit-too-low、proof-rlimit-default、
       must-red-rlimit、must-red-rlimit-with-proof-error、must-red-rlimit-10-counts-proof-errors-only、must-red-rlimit-20-counts-proof-errors-only、must-red-mixed-not-run-and-red
+      连带红的格：「✗ must-red-green 这一格判错」、「✗ proof-count 这一格判错」、「✗ vacuity-vacuous 这一格判错」、「✗ vacuity-closure-vacuous 这一格判错」、「✗ must-red-survives 这一格判错」、
+        「✗ must-red-proof-error-count-drift 这一格判错」、「✗ must-red-landing-same-function-more-errors 这一格判错」、「✗ must-red-landing-moved 这一格判错」、
+        「✗ must-red-landing-line-shift 这一格判错」、「✗ must-red-landing-two-functions 这一格判错」、「✗ must-red-landing-two-functions-one-registered 这一格判错」、
+        「✗ must-red-landing-outside-function 这一格判错」、「✗ proof-rlimit-registered 这一格判错」、「✗ proof-rlimit-too-low 这一格判错」、「✗ proof-rlimit-default 这一格判错」、
+        「✗ must-red-rlimit 这一格判错」、「✗ must-red-rlimit-with-proof-error 这一格判错」、「✗ must-red-rlimit-10-counts-proof-errors-only 这一格判错」、
+        「✗ must-red-rlimit-20-counts-proof-errors-only 这一格判错」、「✗ landings-print 这一格判错」、「✗ landings-write 这一格判错」、「✗ landings-then-worlds 这一格判错」、
+        「✗ item-proof-one 这一格判错」、「✗ reuse-first-run-records 这一格判错」、「✗ reuse-second-run-reuses 这一格判错」、「✗ reuse-off 这一格判错」、「✗ reuse-proof 这一格判错」、
+        「✗ reuse-judging-units-changed 这一格判错」、「✗ reuse-comment-in-function-body 这一格判错」、「✗ reuse-timeout-changed 这一格判错」、
+        「✗ reuse-proof-function-only 这一格判错」、「✗ reuse-toolchain-changed 这一格判错」、「✗ reuse-must-red-renamed 这一格判错」、
+        「✗ reuse-spec-function-all-users 这一格判错」、「✗ proof-sum-from-reused-records 这一格判错」、「✗ module-per-kernel 这一格判错」、「✗ proof-spec-fn-not-item 这一格判错」、
+        「✗ proof-fn-verified-one-green 这一格判错」、「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-spec-decreases-item 这一格判错」、
+        「✗ proof-derived-clone-item 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、「✗ proof-sum-short-red-named 这一格判错」、
+        「✗ proof-zero-verified-red 这一格判错」、「✗ proof-errors-one-red 这一格判错」、「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-row-own-key 这一格判错」、
+        「✗ reuse-resume-after-kill 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、「✗ reuse-must-red-table-comment-only 这一格判错」、
+        「✗ reuse-crate-other-file-no-cells 这一格判错」、「✗ reuse-three-questions 这一格判错」、「✗ reuse-sentinel 这一格判错」、「✗ must-red-mixed-not-run-and-red 这一格判错」、
+        「✗ host-lookup-lines-not-read 这一格判错」、「✗ queue-refused-started-rows-collected 这一格判错」、
+        「✗ same-name-in-two-modules 这一格判错」、「✗ proof-method-items 这一格判错」、「✗ trust-registered-green 这一格判错」、「✗ no-cheating-dropped 这一格判错」、「✗ cfg-atom-registered 这一格判错」、「✗ mir-divergence 这一格判错」、「✗ mir-green 这一格判错」、
+        「✗ cargo-mode-proof 这一格判错」、「✗ cargo-mode-must-red 这一格判错」、「✗ cargo-mode-shared-build-directory 这一格判错」、「✗ cargo-mode-command 这一格判错」、「✗ multi-crate-proof 这一格判错」、「✗ multi-crate-item-routed 这一格判错」、「✗ reuse-trust-list-changed 这一格判错」
   VERUS_PROOF_CHECK_BREAK=anchor-unchecked  不核原文恰好命中一次（样本 verus-must-red-worlds-anchor-red 报不出「恰好命中一次」）
-      must-red-anchor（「must-red-anchor 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=expectation-form-unchecked  必红世界不核第五段是不是 proof_errors=<正整数>，认不出的照样起 Verus、不比条数
+      must-red-anchor（「✗ must-red-anchor 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=expectation-form-unchecked  必红世界不核第五段是不是 proof_errors=<正整数>，认不出的照样起 Verus
                                                       （样本 verus-must-red-worlds-legacy-expectation-red 判绿）
-      must-red-legacy-expectation（「must-red-legacy-expectation 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=proof-error-count-unchecked  必红世界不比证明错条数与第五段的 M（样本 verus-must-red-worlds-proof-error-count-red 判绿）
-      must-red-proof-error-count（「must-red-proof-error-count 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=rlimit-counted-in-proof-errors  必红世界数证明错时把 rlimit 用尽也算进去（样本 verus-must-red-worlds-rlimit-with-proof-error-green 判红）
-      must-red-rlimit-10-counts-proof-errors-only（「must-red-rlimit-10-counts-proof-errors-only 这一格判错」）、
-      must-red-rlimit-with-proof-error（「must-red-rlimit-with-proof-error 这一格判错」）
+      must-red-legacy-expectation（「✗ must-red-legacy-expectation 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=landing-unchecked  必红世界不比证明错的落点与第六段（落到别的函数照样判绿）（样本 verus-must-red-worlds-landing-moved-red 判绿）
+      must-red-landing-moved、must-red-landing-two-functions-one-registered（『… 这一格判错』）
+      红的格：「✗ must-red-landing-moved 这一格判错」、「✗ must-red-landing-two-functions-one-registered 这一格判错」
+  VERUS_PROOF_CHECK_BREAK=landing-by-count  必红世界改回按条数判：条数与第五段不同判红、落点不比（样本 verus-must-red-worlds-proof-error-count-drift-green 判红、
+                                            verus-must-red-worlds-landing-moved-red 判绿）
+      must-red-proof-error-count-drift、must-red-landing-same-function-more-errors、must-red-landing-two-functions、must-red-landing-moved、
+      must-red-landing-two-functions-one-registered（『… 这一格判错』）；landings-then-worlds 也跟着判错（那一行登记 3 条、实测 2 条）
+      红的格：「✗ must-red-proof-error-count-drift 这一格判错」、「✗ must-red-landing-same-function-more-errors 这一格判错」、「✗ must-red-landing-moved 这一格判错」、
+        「✗ must-red-landing-two-functions-one-registered 这一格判错」、「✗ landings-then-worlds 这一格判错」
+  VERUS_PROOF_CHECK_BREAK=landing-read-from-unmutated-text  落点在改坏之前的文件文本里找（替换文比原文多几行，位置对不上）
+      must-red-landing-line-shift（「✗ must-red-landing-line-shift 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=landing-missing-accepted  五段的旧行照收、不比落点
+      must-red-landing-missing（「✗ must-red-landing-missing 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=landing-form-unchecked  第六段不是 landing=<落点> 的行照样起 Verus、不比落点
+      must-red-landing-form（「✗ must-red-landing-form 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=list-items-needs-landing  list-items 也要必红世界表每行有第六段（五段的旧表列不出项，--list-items 与 --quick 跟着断）
+      list-items-legacy-table（「✗ list-items-legacy-table 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=landings-write-skipped  must-red-landings 带 --write 也什么都不写
+      landings-write（「✗ landings-write 这一格判错」）、landings-then-worlds（「✗ landings-then-worlds 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=rlimit-counted-in-proof-errors  必红世界数证明错时把 rlimit 用尽也算进去：条数多一条，只报不判，所以落点相同的行照旧判绿，
+      变的只有一句判定里多出『条数只报』、成功句里多一段『其中 N 行证明错条数与第五段 proof_errors= 不同，只报不判』；盯它的是成功句里没有这一段的两格，
+      各是 rlimit 用尽夹一条证明错、登记 proof_errors=1 的情形（门禁样本 verus-must-red-worlds-rlimit-with-proof-error-green 的 want 只认存在的片段，这个开关下它照旧判绿，不盯它）
+      must-red-rlimit-10-no-count-drift（「✗ must-red-rlimit-10-no-count-drift 这一格判错」）、
+      must-red-rlimit-with-proof-error-no-count-drift（「✗ must-red-rlimit-with-proof-error-no-count-drift 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=wrapper-exit-as-proof-red  包装自己退 245、250、251、252、254 照旧报成这一格的问题、给这一格自己的出路（自证里的假包装退 250 与 245）
-      proof-wrapper-exit（「proof-wrapper-exit 这一格判错」）、must-red-wrapper-exit（「must-red-wrapper-exit 这一格判错」）、
-      proof-wrapper-245（「proof-wrapper-245 这一格判错」）；
+      proof-wrapper-exit（「✗ proof-wrapper-exit 这一格判错」）、must-red-wrapper-exit（「✗ must-red-wrapper-exit 这一格判错」）、
+      proof-wrapper-245（「✗ proof-wrapper-245 这一格判错」）；
       另有 3 格跟着判错：must-red-mixed-not-run-and-red、must-red-wrapper-lines-carried、proof-wrapper-too-big
+      连带红的格：「✗ must-red-mixed-not-run-and-red 这一格判错」、「✗ must-red-wrapper-lines-carried 这一格判错」、「✗ proof-wrapper-too-big 这一格判错」、
+        「✗ host-lookup-lines-not-read 这一格判错」、「✗ queue-refused-started-rows-collected 这一格判错」、「✗ queue-refused-proof-not-run 这一格判错」
   VERUS_PROOF_CHECK_BREAK=tool-versions-launcher-only  tool-versions 只打 version.json 与 verus 的 sha256，不看 rust_verify、z3、vstd 与 VERUS_Z3_PATH
-      tool-versions-z3（「tool-versions-z3 这一格判错」）；另有 5 格跟着判错：tool-versions-install-top-level、tool-versions-z3-path-empty、
+      tool-versions-z3（「✗ tool-versions-z3 这一格判错」）；另有 5 格跟着判错：tool-versions-install-top-level、tool-versions-z3-path-empty、
       tool-versions-z3-bare-name、tool-versions-verus-environment、tool-versions-rustup-toolchain
+      连带红的格：「✗ reuse-toolchain-changed 这一格判错」、「✗ tool-versions-install-top-level 这一格判错」、「✗ tool-versions-z3-path-empty 这一格判错」、
+        「✗ tool-versions-z3-bare-name 这一格判错」、「✗ tool-versions-verus-environment 这一格判错」、「✗ tool-versions-rustup-toolchain 这一格判错」
   VERUS_PROOF_CHECK_BREAK=tool-versions-five-files-only  tool-versions 不打安装目录顶层的整体摘要（安装里多一份宏库）
-      tool-versions-install-top-level（「tool-versions-install-top-level 这一格判错」）
+      tool-versions-install-top-level（「✗ tool-versions-install-top-level 这一格判错」）
+      连带红的格：「✗ reuse-toolchain-changed 这一格判错」
   VERUS_PROOF_CHECK_BREAK=tool-versions-empty-z3-path-as-unset  VERUS_Z3_PATH 设成空串记成「未设」
-      tool-versions-z3-path-empty（「tool-versions-z3-path-empty 这一格判错」）
+      tool-versions-z3-path-empty（「✗ tool-versions-z3-path-empty 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=tool-versions-bare-z3-from-current-directory  VERUS_Z3_PATH 写裸名时按当前目录找、不照 PATH 找（PATH 里换一份 z3）
-      tool-versions-z3-bare-name（「tool-versions-z3-bare-name 这一格判错」）
+      tool-versions-z3-bare-name（「✗ tool-versions-z3-bare-name 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=tool-versions-verus-environment-ignored  tool-versions 不打 VERUS_ROOT 与 VERUS_USE_RUSTUP
                                                                    （两个变量没设、空串、换值、VERUS_ROOT 指的目录换内容）
-      tool-versions-verus-environment（「tool-versions-verus-environment 这一格判错」）
+      tool-versions-verus-environment（「✗ tool-versions-verus-environment 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=tool-versions-rustup-ignored  tool-versions 不打 RUSTUP_HOME、rustup 工具链的库摘要与 rustup 程序
                                                         （假 RUSTUP_HOME 里 librustc_driver 末尾 1 字节改了、libcore rmeta 改了、RUSTUP_HOME 换一份同内容的拷贝、PATH 里换一份 rustup）
-      tool-versions-rustup-toolchain（「tool-versions-rustup-toolchain 这一格判错」）
+      tool-versions-rustup-toolchain（「✗ tool-versions-rustup-toolchain 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=queue-refused-keeps-queueing  拿到包装的 252 之后其余照排（假包装一律睡 0.5 秒再退 252，94 行必红世界、8 处同时验要排 12 次）
-      queue-refused-must-red-once（「queue-refused-must-red-once 这一格判错」：包装被起 94 次、挂钟超过 3.0 秒）、queue-refused-later-cells-once（proof 格排不上之后空真与必红世界
+      queue-refused-must-red-once（「✗ queue-refused-must-red-once 这一格判错」：包装被起 94 次、挂钟超过 3.0 秒）、queue-refused-later-cells-once（proof 格排不上之后空真与必红世界
       照排）、queue-refused-started-rows-once；另有 4 格跟着判错：queue-refused-must-red-skipped-listed、queue-refused-started-rows-collected、
       queue-refused-vacuity-skipped、queue-refused-must-red-all-skipped
+      连带红的格：「✗ queue-refused-must-red-skipped-listed 这一格判错」、「✗ queue-refused-started-rows-collected 这一格判错」、「✗ queue-refused-started-rows-once 这一格判错」、
+        「✗ queue-refused-vacuity-skipped 这一格判错」、「✗ queue-refused-must-red-all-skipped 这一格判错」、「✗ queue-refused-later-cells-once 这一格判错」
   VERUS_PROOF_CHECK_BREAK=not-run-masks-red  一格里有一处「没跑成」就只报没跑成的那几条，同一格里的真红不报（一行没跑成、一行真没红）
-      must-red-mixed-not-run-and-red（「must-red-mixed-not-run-and-red 这一格判错」）
+      must-red-mixed-not-run-and-red（「✗ must-red-mixed-not-run-and-red 这一格判错」）
+      连带红的格：「✗ queue-refused-started-rows-collected 这一格判错」
   VERUS_PROOF_CHECK_BREAK=wrapper-output-dropped  「没跑成」那一条不带包装自己打的 ✗ 与 →
-      must-red-wrapper-lines-carried（「must-red-wrapper-lines-carried 这一格判错」）
+      must-red-wrapper-lines-carried（「✗ must-red-wrapper-lines-carried 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=wrapper-252-one-howto  252 不分成因，一律给「看 --status、空出来再重跑」（要的量比总上限还大）
-      proof-wrapper-too-big（「proof-wrapper-too-big 这一格判错」）
+      proof-wrapper-too-big（「✗ proof-wrapper-too-big 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=killed-as-proof-red  Verus 被信号停了照旧报「Verus 没出判定」、给这一格自己的出路（修证明）（样本 verus-proof-killed-red 判错）
-      proof-killed（假包装退 137；「proof-killed 这一格判错」）、proof-killed-direct（假 Verus kill -9 自己；「proof-killed-direct 这一格判错」）、
-      proof-killed-no-proof-howto（「proof-killed-no-proof-howto 这一格判错」）
+      proof-killed（假包装退 137；「✗ proof-killed 这一格判错」）、proof-killed-direct（假 Verus kill -9 自己；「✗ proof-killed-direct 这一格判错」）、
+      proof-killed-no-proof-howto（「✗ proof-killed-no-proof-howto 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=wrapper-queue-lines-swallowed  内存包装排队报的那几行只收进变量、不转打到本进程的 stderr（假包装报一行排队、等它被转打出来）
-      wrapper-queue-line-forwarded（「wrapper-queue-line-forwarded 这一格判错」）
+      wrapper-queue-line-forwarded（「✗ wrapper-queue-line-forwarded 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=host-lookup-lines-kept  判法照旧读内存包装现查别的机器打的那几行（不去 HOST_LOOKUP_LINE）
+      host-lookup-lines-not-read（排不上那一趟两种 HostLookup 行的「没跑成」不同、带着「→ 第二台此刻放得下」；「✗ host-lookup-lines-not-read 这一格判错」）
 逐项点名与按条复用的几项：
   VERUS_PROOF_CHECK_BREAK=list-items-pipe-unhandled  list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
-      list-items-closed-pipe（「list-items-closed-pipe 这一格判错」）
+      list-items-closed-pipe（「✗ list-items-closed-pipe 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=item-filter-ignored  --item 不起作用、照判全部（写错的项名也不退 2）
-      item-select-one、item-unknown、item-proof-one、item-proof-unknown（「… 这一格判错」）
+      item-select-one、item-unknown、item-proof-one、item-proof-unknown（『… 这一格判错』）
+      红的格：「✗ item-select-one 这一格判错」、「✗ item-unknown 这一格判错」、「✗ item-proof-one 这一格判错」、「✗ item-proof-unknown 这一格判错」、
+        「✗ multi-crate-item-routed 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-key-whole-crate  被验函数那一样换回核 crate 整个目录的原文摘要（旧判法：整 crate 一把）
-      reuse-comment-in-function-body（N38：被验函数体里只加一行注释，三格全现判；「reuse-comment-in-function-body 这一格判错」）；另有几格跟着判错：
+      reuse-comment-in-function-body（N38：被验函数体里只加一行注释，三格全现判；「✗ reuse-comment-in-function-body 这一格判错」）；另有几格跟着判错：
       reuse-crate-other-file-no-cells、reuse-vacuity-line-moved、reuse-timeout-changed、reuse-proof-function-only、reuse-spec-function-all-users、
       reuse-must-red-renamed、reuse-must-red-table-row-only、reuse-must-red-table-comment-only
+      连带红的格：「✗ reuse-vacuity-line-moved 这一格判错」、「✗ reuse-timeout-changed 这一格判错」、「✗ reuse-proof-function-only 这一格判错」、「✗ reuse-must-red-renamed 这一格判错」、
+        「✗ reuse-spec-function-all-users 这一格判错」、「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、
+        「✗ reuse-must-red-table-comment-only 这一格判错」、「✗ reuse-crate-other-file-no-cells 这一格判错」、「✗ reuse-three-questions 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-key-without-units  键里不带被验函数的单元闭包（改了一个函数照旧复用）
-      reuse-proof-function-only（「reuse-proof-function-only 这一格判错」）；另有 1 格跟着判错：reuse-spec-function-all-users
+      reuse-proof-function-only（「✗ reuse-proof-function-only 这一格判错」）；另有 1 格跟着判错：reuse-spec-function-all-users
+      连带红的格：「✗ reuse-spec-function-all-users 这一格判错」、「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-three-questions 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-key-function-only  被验函数那一样只取它自己的单元，不收它 requires / ensures 与函数体用到的 spec fn、proof fn
-      reuse-spec-function-all-users（改一个 spec fn，用到它的两项照旧复用；「reuse-spec-function-all-users 这一格判错」）
+      reuse-spec-function-all-users（改一个 spec fn，用到它的两项照旧复用；「✗ reuse-spec-function-all-users 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=vacuity-key-by-line-number  空真每处的键另带核的路径与 requires 的行号（旧判法）
-      reuse-vacuity-line-moved（N39：requires 上面加一个空行，空真两处现判；「reuse-vacuity-line-moved 这一格判错」）；
+      reuse-vacuity-line-moved（N39：requires 上面加一个空行，空真两处现判；「✗ reuse-vacuity-line-moved 这一格判错」）；
       另有 1 格跟着判错：reuse-comment-in-function-body（那一行注释让后面那个 fn 的 requires 挪了一行）
+      连带红的格：「✗ reuse-comment-in-function-body 这一格判错」、「✗ reuse-three-questions 这一格判错」
   VERUS_PROOF_CHECK_BREAK=must-red-key-with-name-and-path  必红世界「这一行」另带变异名与文件路径
-      reuse-must-red-renamed（只改变异名那一行现判；「reuse-must-red-renamed 这一格判错」）
+      reuse-must-red-renamed（只改变异名那一行现判；「✗ reuse-must-red-renamed 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=reuse-key-with-timeout  键里带限时（旧判法）
-      reuse-timeout-changed（E11：改限时三格全现判；「reuse-timeout-changed 这一格判错」）
+      reuse-timeout-changed（E11：改限时三格全现判；「✗ reuse-timeout-changed 这一格判错」）
+      连带红的格：「✗ list-items-key-mismatch-count 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-key-without-toolchain  键里不带工具链（Verus 安装里多一份库照旧复用）
-      reuse-toolchain-changed（「reuse-toolchain-changed 这一格判错」）
+      reuse-toolchain-changed（「✗ reuse-toolchain-changed 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=reuse-key-without-judging-units  判法单元指纹一律交空串（判结局的函数改了照旧复用）
-      reuse-judging-units-changed（「reuse-judging-units-changed 这一格判错」）
+      reuse-judging-units-changed（「✗ reuse-judging-units-changed 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=reuse-key-without-row  键里不带「这一行 / 这一处」（同一格几项共用一个键，只判过 A 就拿它的判定当 B 的）
-      reuse-row-own-key（「reuse-row-own-key 这一格判错」）；另有 4 格跟着判错：reuse-red-not-recorded、reuse-resume-after-kill、reuse-must-red-table-row-only、
+      reuse-row-own-key（「✗ reuse-row-own-key 这一格判错」）；另有 4 格跟着判错：reuse-red-not-recorded、reuse-resume-after-kill、reuse-must-red-table-row-only、
         prune-after-change
+      连带红的格：「✗ reuse-red-not-recorded 这一格判错」、「✗ reuse-resume-after-kill 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、「✗ prune-after-change 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-ignores-key  这一项判绿过就复用，不比键
       prune-after-change（剪枝自证：改了一行之后开着复用与关掉复用逐项判定不同）；另有几格跟着判错：reuse-proof-function-only、reuse-toolchain-changed、
         reuse-must-red-table-row-only、reuse-spec-function-all-users、reuse-judging-units-changed、reuse-must-red-renamed
+      红的格：「✗ reuse-judging-units-changed 这一格判错」、「✗ reuse-proof-function-only 这一格判错」、「✗ reuse-toolchain-changed 这一格判错」、
+        「✗ reuse-must-red-renamed 这一格判错」、「✗ reuse-spec-function-all-users 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、
+        「✗ reuse-three-questions 这一格判错」、「✗ reuse-sentinel 这一格判错」、「✗ prune-after-change 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-records-red  红的也记成绿
-      reuse-red-not-recorded（「reuse-red-not-recorded 这一格判错」）；另有 1 格跟着判错：reuse-resume-after-kill
+      reuse-red-not-recorded（「✗ reuse-red-not-recorded 这一格判错」）；另有 1 格跟着判错：reuse-resume-after-kill
+      连带红的格：「✗ reuse-resume-after-kill 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-records-whole-cell-only  一项判完不当场落盘，整格判完、一处问题都没有才一起记（被打断或有一项红，判过的全不留）
-      reuse-resume-after-kill（第一趟 C 那一处被 kill -9，第二趟同一条命令要只判 C：「reuse-resume-after-kill 这一格判错」）
+      reuse-resume-after-kill（第一趟 C 那一处被 kill -9，第二趟同一条命令要只判 C：「✗ reuse-resume-after-kill 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=threads-default-cpu-count  --threads 的缺省取核数（改前的样子），不取登记的重活默认并行度
-      threads-default-registered（「threads-default-registered 这一格判错」）
+      threads-default-registered（「✗ threads-default-registered 这一格判错」）
   证明成哪几项、每项怎么判（proof_items、verification_clean、check_proof；假 Verus 照真 Verus 的形态出 JSON，自证 fake-verus-real-shape 盯着它）：
   VERUS_PROOF_CHECK_BREAK=spec-fn-as-item  不带 decreases 的 spec fn 也成项（改前的样子：真仓 90 项里 49 个 spec fn 验出 0 条）（样本 verus-must-red-worlds-list-items 判错）
-      proof-spec-fn-not-item（「proof-spec-fn-not-item 这一格判错」）；另有几格跟着判错：reuse-spec-function-all-users、proof-entire-crate-false-not-red 等
+      proof-spec-fn-not-item（「✗ proof-spec-fn-not-item 这一格判错」）；另有几格跟着判错：reuse-spec-function-all-users、proof-entire-crate-false-not-red 等
+      连带红的格：「✗ reuse-spec-function-all-users 这一格判错」、「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-spec-decreases-item 这一格判错」、
+        「✗ proof-derived-clone-item 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、「✗ proof-sum-short-red-named 这一格判错」、
+        「✗ trust-registered-green 这一格判错」、「✗ no-cheating-dropped 这一格判错」
   VERUS_PROOF_CHECK_BREAK=spec-decreases-not-item  带 decreases 的 spec fn 不成项（它的终止义务没人验，之和少）
-      proof-spec-decreases-item（「proof-spec-decreases-item 这一格判错」）
+      proof-spec-decreases-item（「✗ proof-spec-decreases-item 这一格判错」）
+      连带红的格：「✗ proof-spec-fn-not-item 这一格判错」、「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、
+        「✗ proof-sum-short-red-named 这一格判错」
   VERUS_PROOF_CHECK_BREAK=derived-clone-not-item  verus! 里 derive(Clone) 的类型不成项（<类型>::clone 没人验，之和少；真仓少 8 条）
-      proof-derived-clone-item（「proof-derived-clone-item 这一格判错」）
+      proof-derived-clone-item（「✗ proof-derived-clone-item 这一格判错」）
+      连带红的格：「✗ proof-spec-fn-not-item 这一格判错」、「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、
+        「✗ proof-sum-short-red-named 这一格判错」
   VERUS_PROOF_CHECK_BREAK=require-success-key-per-function  --verify-function 下 JSON 没有 success 键当没验过（改前的样子：真仓 90 项全红）
-      proof-fn-verified-one-green（「proof-fn-verified-one-green 这一格判错」）；proof-green、vacuity-vacuous 等跟着判错
+      proof-fn-verified-one-green（「✗ proof-fn-verified-one-green 这一格判错」）；proof-green、vacuity-vacuous 等跟着判错
+      连带红的格：「✗ proof-green 这一格判错」、「✗ proof-count 这一格判错」、「✗ vacuity-vacuous 这一格判错」、「✗ vacuity-closure-vacuous 这一格判错」、「✗ proof-rlimit-registered 这一格判错」、
+        「✗ proof-rlimit-default 这一格判错」、「✗ item-proof-one 这一格判错」、「✗ reuse-proof 这一格判错」、「✗ reuse-comment-in-function-body 这一格判错」、
+        「✗ reuse-timeout-changed 这一格判错」、「✗ reuse-proof-function-only 这一格判错」、「✗ reuse-spec-function-all-users 这一格判错」、
+        「✗ proof-sum-from-reused-records 这一格判错」、「✗ module-per-kernel 这一格判错」、「✗ proof-spec-fn-not-item 这一格判错」、
+        「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-spec-decreases-item 这一格判错」、「✗ proof-derived-clone-item 这一格判错」、
+        「✗ proof-sum-equals-registered-green 这一格判错」、「✗ proof-sum-short-red-named 这一格判错」、「✗ proof-zero-verified-red 这一格判错」、
+        「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、「✗ reuse-must-red-table-comment-only 这一格判错」、
+        「✗ reuse-crate-other-file-no-cells 这一格判错」、「✗ reuse-three-questions 这一格判错」、「✗ host-lookup-lines-not-read 这一格判错」
   VERUS_PROOF_CHECK_BREAK=require-entire-crate-per-function  按函数验也要 is-verifying-entire-crate 是 true
-      proof-entire-crate-false-not-red（「proof-entire-crate-false-not-red 这一格判错」）
+      proof-entire-crate-false-not-red（「✗ proof-entire-crate-false-not-red 这一格判错」）
+      连带红的格：「✗ proof-green 这一格判错」、「✗ proof-count 这一格判错」、「✗ vacuity-vacuous 这一格判错」、「✗ vacuity-closure-vacuous 这一格判错」、「✗ proof-rlimit-registered 这一格判错」、
+        「✗ proof-rlimit-default 这一格判错」、「✗ item-proof-one 这一格判错」、「✗ reuse-proof 这一格判错」、「✗ reuse-comment-in-function-body 这一格判错」、
+        「✗ reuse-timeout-changed 这一格判错」、「✗ reuse-proof-function-only 这一格判错」、「✗ reuse-spec-function-all-users 这一格判错」、
+        「✗ proof-sum-from-reused-records 这一格判错」、「✗ module-per-kernel 这一格判错」、「✗ proof-spec-fn-not-item 这一格判错」、「✗ proof-fn-verified-one-green 这一格判错」、
+        「✗ proof-spec-decreases-item 这一格判错」、「✗ proof-derived-clone-item 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、
+        「✗ proof-sum-short-red-named 这一格判错」、「✗ proof-zero-verified-red 这一格判错」、「✗ list-items-key-mismatch-count 这一格判错」、
+        「✗ reuse-must-red-table-row-only 这一格判错」、「✗ reuse-must-red-table-comment-only 这一格判错」、「✗ reuse-crate-other-file-no-cells 这一格判错」、
+        「✗ reuse-three-questions 这一格判错」、「✗ host-lookup-lines-not-read 这一格判错」
   VERUS_PROOF_CHECK_BREAK=zero-verified-accepted  点的函数一条义务都没验（verified 0）也判绿
-      proof-zero-verified-red（「proof-zero-verified-red 这一格判错」）
+      proof-zero-verified-red（「✗ proof-zero-verified-red 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=nonzero-errors-accepted  errors 不是 0 也当验过（不是 vir 错的）
-      proof-errors-one-red（「proof-errors-one-red 这一格判错」）、proof-broken
+      proof-errors-one-red（「✗ proof-errors-one-red 这一格判错」）、proof-broken
+      连带红的格：「✗ proof-broken 这一格判错」、「✗ proof-rlimit-too-low 这一格判错」
   VERUS_PROOF_CHECK_BREAK=submodule-verify-root  只验一个函数时不按核所在的模块点，一律 --verify-root（改前的样子：真仓子模块 compaction_plan_proofs 的 20 项证明、9 处空真全红）
-      module-per-kernel（根、kernel、nested、nested::deep 四份核，逐项核命令行点的模块；「module-per-kernel 这一格判错」）；
+      module-per-kernel（根、kernel、nested、nested::deep 四份核，逐项核命令行点的模块；「✗ module-per-kernel 这一格判错」）；
       另有几格跟着判错（自证的核在子模块 src/kernel.rs 里，点根找不到函数）：proof-green、vacuity-green、proof-count 等起 Verus 逐函数验的格
+      连带红的格：「✗ proof-green 这一格判错」、「✗ vacuity-green 这一格判错」、「✗ proof-count 这一格判错」、「✗ vacuity-vacuous 这一格判错」、「✗ vacuity-closure-found 这一格判错」、
+        「✗ vacuity-closure-vacuous 这一格判错」、「✗ proof-rlimit-registered 这一格判错」、「✗ proof-rlimit-too-low 这一格判错」、「✗ proof-rlimit-default 这一格判错」、
+        「✗ item-proof-one 这一格判错」、「✗ item-alone-equals-whole-vacuity 这一格判错」、「✗ reuse-proof 这一格判错」、「✗ reuse-vacuity 这一格判错」、
+        「✗ reuse-comment-in-function-body 这一格判错」、「✗ reuse-vacuity-line-moved 这一格判错」、「✗ reuse-timeout-changed 这一格判错」、
+        「✗ reuse-proof-function-only 这一格判错」、「✗ reuse-spec-function-all-users 这一格判错」、「✗ proof-sum-from-reused-records 这一格判错」、
+        「✗ module-unrecognized-red 这一格判错」、「✗ proof-spec-fn-not-item 这一格判错」、「✗ proof-fn-verified-one-green 这一格判错」、
+        「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-spec-decreases-item 这一格判错」、「✗ proof-derived-clone-item 这一格判错」、
+        「✗ proof-sum-equals-registered-green 这一格判错」、「✗ proof-sum-short-red-named 这一格判错」、「✗ proof-zero-verified-red 这一格判错」、
+        「✗ proof-errors-one-red 这一格判错」、「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-must-red-table-row-only 这一格判错」、
+        「✗ reuse-must-red-table-comment-only 这一格判错」、「✗ reuse-crate-other-file-no-cells 这一格判错」、「✗ reuse-three-questions 这一格判错」、
+        「✗ host-lookup-lines-not-read 这一格判错」、「✗ item-proof-unknown 这一格判错」、「✗ list-items 这一格判错」、「✗ same-name-in-two-modules 这一格判错」、「✗ proof-method-items 这一格判错」、「✗ trust-unregistered 这一格判错」、「✗ trust-digest 这一格判错」、「✗ trust-registered-green 这一格判错」、
+        「✗ no-cheating-dropped 这一格判错」、「✗ cfg-atom-red 这一格判错」、「✗ cfg-atom-registered 这一格判错」、「✗ cfg-macro-red 这一格判错」、「✗ mir-divergence 这一格判错」、「✗ mir-green 这一格判错」、「✗ cargo-mode-proof 这一格判错」、「✗ cargo-mode-vacuity 这一格判错」、「✗ cargo-mode-shared-build-directory 这一格判错」、
+        「✗ cargo-mode-command 这一格判错」、「✗ multi-crate-proof 这一格判错」、「✗ reuse-trust-list-changed 这一格判错」
   VERUS_PROOF_CHECK_BREAK=key-mismatch-by-item-only  list-items 数键时这一项判绿过就算键相同，不比键
-      list-items-key-mismatch-count（「list-items-key-mismatch-count 这一格判错」）
+      list-items-key-mismatch-count（「✗ list-items-key-mismatch-count 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=reuse-lookup-skipped  一律不读库（键相同照样现判）
       reuse-three-questions（① 第二趟全现判）、reuse-sentinel（复用哨兵判红「复用失灵」，这一格要的就是红：照判；跟着判错的是 ① 那几格）
+      连带红的格：「✗ reuse-first-run-records 这一格判错」、「✗ reuse-judging-units-changed 这一格判错」、「✗ reuse-toolchain-changed 这一格判错」、
+        「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-row-own-key 这一格判错」、「✗ reuse-three-questions 这一格判错」
   REUSE_CHECKS_BREAK=rejudged-sentinel-passes（共用库 scripts/gate/lib_reuse_checks.py 的开关）  哨兵被现判不红
-      reuse-sentinel（「reuse-sentinel 这一格判错」）
+      reuse-sentinel（「✗ reuse-sentinel 这一格判错」）
 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：
   自证 reuse-three-questions 格三格的项一起算，打规范输出「REUSE_SELFTEST script=scripts/gate/verus-proof-check.py …」（门禁 code-tooling 的 reuse-selftests 格认它）；
   已有同义的格（reuse-first-run-records、reuse-second-run-reuses、reuse-comment-in-function-body、reuse-crate-other-file-no-cells、reuse-proof-function-only、
@@ -268,8 +415,56 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
 管不到的：spec 本身写得对不对；核与调它的 singlefs-core 之间（recovery.rs 调核那一段）没被证明的部分；插入点只认「requires 整行起头、函数体的 { 单独起行或是闭包那一行的头一个 {」
   这种写法（verusfmt 与本仓的写法），别的写法认不出就判红要求改写法。
   模块按核的文件路径认，不读 mod 声明：#[path = …] 挪了文件、或核写在 mod <名> { … } 内联块里的，点的模块与真的不同，Verus 报 could not find module / function、判红。
-  两份核里有同名的 fn：项名（proof:<名>、vacuity:<名>#<第几处>）、各项之和的计数与判定库的键都按名字，会并成一项；今天两份核里没有同名的，没判。
+  差分测试只核在 crates/ 下标了 #[test]，不在这里跑（它归 harness 档，随改动跑）；被验区域之外对被验类型的构造与对带 requires 的被验函数的调用（第二轮正推 Y4 第 8 条）
+  这一份不判；必红世界还是逐行手写，没有按 ensures 自动造（Y4 第 6 条）；逐函数结局还是逐项起 Verus，没改成读整 crate 一趟的 func-details（Y4 第 4 条）。
+被验区域与多 crate 的弄坏开关（门禁 checker-tier-formal-verification 那一道的变量 FORMAL_VERIFICATION_BREAK=<项>[,<项>…]，判法这一半在这份脚本里，那一道文件头另列一份
+它们让哪份门禁样本判错）；逐项写开关、弄坏哪一处，下一行起写打开后自证哪几格判错（「」里是那一格判错行的开头）：
+  FORMAL_VERIFICATION_BREAK=single-crate-registry  登记表只认第一个 crate（改前的样子）
+      multi-crate-proof（「✗ multi-crate-proof 这一格判错」）、multi-crate-list-items（「✗ multi-crate-list-items 这一格判错」）、
+      multi-crate-item-routed（「✗ multi-crate-item-routed 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=cargo-mode-ignored  crate 行第四段 cargo 不认、照直接起 verus 判（有别的依赖就红）
+      cargo-mode-proof（「✗ cargo-mode-proof 这一格判错」）、cargo-mode-vacuity（「✗ cargo-mode-vacuity 这一格判错」）、
+      cargo-mode-must-red（「✗ cargo-mode-must-red 这一格判错」）、cargo-mode-command（「✗ cargo-mode-command 这一格判错」）、
+      cargo-mode-shared-build-directory（「✗ cargo-mode-shared-build-directory 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=methods-refused  impl 与 trait 里的方法判红、要挪成自由 fn（改前的样子）
+      proof-method-items（「✗ proof-method-items 这一格判错」）、proof-same-point-name（「✗ proof-same-point-name 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=attribute-mode-unrecognized  属性写法（#[verus_verify]、#[verus_spec]）标的文件不当核
+      unregistered-attribute-kernel（「✗ unregistered-attribute-kernel 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=no-cheating-kept  照旧带 --no-cheating（登记了的 assume_specification、external_body 被 Verus 拒）
+      trust-registered-green（「✗ trust-registered-green 这一格判错」）、no-cheating-dropped（「✗ no-cheating-dropped 这一格判错」）、
+      cargo-mode-command（「✗ cargo-mode-command 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=trust-list-unchecked  信任清单不判（没登记的可信声明照收、表不在、vstd 行对不上、登记了却没有那一处都不红；被验区域里有 cfg 原子时 cfg 那几行照判）
+      trust-unregistered（「✗ trust-unregistered 这一格判错」）、trust-digests-reported（「✗ trust-digests-reported 这一格判错」）、
+      trust-stale-row（「✗ trust-stale-row 这一格判错」）、trust-list-missing（「✗ trust-list-missing 这一格判错」）、
+      trust-vstd（「✗ trust-vstd 这一格判错」）、trust-digest（「✗ trust-digest 这一格判错」）、
+      trust-test-missing（「✗ trust-test-missing 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=trust-digest-unchecked  不比登记的规格原文 sha256 与现算的
+      trust-digest（「✗ trust-digest 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=trust-test-unchecked  不核差分测试名在 crates/ 下标了 #[test]
+      trust-test-missing（「✗ trust-test-missing 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=trust-vstd-unchecked  不核信任清单的 vstd 行（恰好一行、与登记表 package vstd 行同版本同指纹）
+      trust-vstd（「✗ trust-vstd 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=axiom-accepted  核里的 axiom 不判
+      axiom-red（「✗ axiom-red 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=cfg-atom-accepted  被验区域里的 cfg 原子（连同宏里的 cfg）不认、不要登记
+      cfg-atom-red（「✗ cfg-atom-red 这一格判错」）、cfg-macro-red（「✗ cfg-macro-red 这一格判错」）、cfg-feature-fork（「✗ cfg-feature-fork 这一格判错」）、
+      cfg-atom-registered（「✗ cfg-atom-registered 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=cfg-macro-unchecked  定义里有 cfg 的宏在被验区域里的调用不认（只认写在被验区域里的 cfg）
+      cfg-macro-red（「✗ cfg-macro-red 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=trait-impl-outside-accepted  被验的类型与 trait 在 verus! 外面的 trait impl 不判
+      trait-impl-outside（「✗ trait-impl-outside 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=mir-compare-skipped  不比产品构建与 Verus 构建的 MIR
+      mir-divergence（「✗ mir-divergence 这一格判错」）、mir-green（「✗ mir-green 这一格判错」）、cargo-mode-proof（「✗ cargo-mode-proof 这一格判错」）、
+      cargo-mode-command（「✗ cargo-mode-command 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=rustc-pin-unchecked  不核登记表 rustc 行（Verus 与产品的 rustc 版本差）
+      rustc-pin-product（「✗ rustc-pin-product 这一格判错」）、rustc-pin-verus（「✗ rustc-pin-verus 这一格判错」）、
+      rustc-pin-missing（「✗ rustc-pin-missing 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=reuse-key-without-trust-list  每一项的键里不带信任清单（改了一行登记照旧复用）
+      reuse-trust-list-changed（「✗ reuse-trust-list-changed 这一格判错」）
+  FORMAL_VERIFICATION_BREAK=cargo-fingerprint-kept  cargo 那一种起之前不删被验的 crate 在共用编译目录里的指纹（第二处起拿不到判定行）
+      cargo-mode-shared-build-directory（「✗ cargo-mode-shared-build-directory 这一格判错」）
 """
+import ast
 import collections
 import concurrent.futures
 import contextlib
@@ -278,6 +473,7 @@ import io
 import hashlib
 import json
 import os
+import queue
 import re
 import shutil
 import signal
@@ -302,6 +498,7 @@ from heavy_threads import default_heavy_threads  # noqa: E402
 from lib_verdict_library import FunctionUnitIndex, Tally, UnitKey, VerdictLibrary, digest_text, digest_tree, judging_unit_key  # noqa: E402
 from lib_verdict_library import key_of, read_json, refused_component  # noqa: E402
 import lib_reuse_checks as reuse_checks  # noqa: E402
+from lib_function_units import rust_lex  # noqa: E402
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 REGISTRY = ".claude/gate.d/verus-pins.tsv"
 # 复用三问的规范输出与复用哨兵认的脚本名（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）
@@ -348,12 +545,38 @@ TOOL_VERSION_FILES = ("rust_verify", "z3", "vstd.vir", "libvstd.rlib")
 # 从 lib/rustlib/<三元组>/lib/ 读 std、core 这些 crate 的 rlib 与 rmeta（rustup_toolchain_fields）
 RUSTUP_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".rustup")
 EXCLUDED_PACKAGE_FILES = {"Cargo.toml", "Cargo.toml.orig", ".cargo_vcs_info.json", ".cargo-ok"}
-CHEATING_MARKER = re.compile(r"\b(external_body|external_fn_specification|assume\w*|admit)\b|verifier\s*::\s*external\b|verifier\s*\(\s*external\s*\)")
+# 核里一律不许的标记（不带 --no-cheating 之后这几样 Verus 不拒，由这里判）：admit(…)、assume(…)、verifier::external（让整个条目对 Verus 不可见）。
+# assume_specification、external_body、uninterp 这几样不在这里：照信任清单逐条登记（TRUST_KINDS）；axiom 另判（region_problems，按词法单元认）
+CHEATING_MARKER = re.compile(r"\badmit\s*\(|\bassume\s*\(|verifier\s*::\s*external\b|verifier\s*\(\s*external\s*\)")
+# 信任清单（出口 5 第三轮判决第三节「门禁」）：被验区域里每一处可信声明一行，vstd 按版本整体一行；格式写在表自己的文件头
+TRUST_LIST = ".claude/gate.d/verus-trust-list.tsv"
+TRUST_KINDS = ("assume_specification", "external_body", "uninterp", "external_fn_specification", "external_trait_specification",
+               "external_type_specification", "external_trait_extension")
+CFG_KIND = "cfg"
+TRUST_ROW_HOWTO = (f"照 {TRUST_LIST} 文件头写一行（制表符分隔）：种类、文件、点名的条目、规格原文的 sha256、一条差分测试的测试名、理由；"
+                   "红句里给了这一处现算的 sha256 与整行的样子，测试名写那条把这份规格与真实现逐值比的 #[test]（没有就先写它）")
 # 函数（或模块）上的 rlimit 属性：#[verifier::rlimit(N)] 与旧写法 #[verifier(rlimit(N))] 都盖过命令行的 --rlimit（Verus 0.2026.09.20 实测两种写法都认、--no-cheating 不拒）
 RLIMIT_ATTRIBUTE = re.compile(r"verifier\s*::\s*rlimit\b|verifier\s*\(\s*rlimit\b")
 FUNCTION_LINE = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(open\s+|closed\s+)?(proof\s+|spec\s+|exec\s+)?fn\s+(\w+)")
+# 必红世界表第六段（落点）的唯一形态：landing=<落点>[,<落点>…]；落点是证明错报在哪个函数里（一个 fn 名），或两个占位：
+# （函数外）证明错的位置不在任何 fn 的行里，（无位置）输出里这一条证明错没带 --> 位置。条数会随求解环境漂，落点不会（C654）
+LANDING_OUTSIDE, LANDING_NO_LOCATION = "（函数外）", "（无位置）"
+LANDING_TOKEN = rf"(?:[A-Za-z_][A-Za-z0-9_]*|{LANDING_OUTSIDE}|{LANDING_NO_LOCATION})"
+EXPECTED_LANDING = re.compile(rf"landing=({LANDING_TOKEN}(?:,{LANDING_TOKEN})*)")
+LANDING_HOWTO = ("必红世界表第六段一律写 landing=<函数名>[,<函数名>…]：证明错报在哪个 fn 里（Verus 报错 --> 位置所在的函数），多个用逗号、顺序随意；"
+                 "不是为了数条数：同一个 fn 里多报一条循环不变式、条数跳了，落点不变就不红。第一次补落点：在真仓上跑 "
+                 "python3 scripts/gate/verus-proof-check.py must-red-landings <根> --write（起 Verus 逐行验，重型，由主 agent 起）")
+# 一行 fn 的开头（verus! 里 spec、proof、exec、open、closed、broadcast 这些修饰都认）：证明错的位置往上找最近一行这样的，就是它落在哪个函数里
+FUNCTION_HEADING = re.compile(r"^\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?(?:(?:open|closed|broadcast|proof|spec(?:\([a-z]+\))?|exec|axiom|const|unsafe)\s+)*fn\s+(\w+)")
 DIAGNOSTIC_LOCATION = re.compile(r"^\s*-->\s+(\S+?):(\d+):(\d+)")
 BREAK = {item for item in os.environ.get("VERUS_PROOF_CHECK_BREAK", "").split(",") if item}
+# 门禁 checker-tier-formal-verification 那一道的弄坏开关（文件头「被验区域与多 crate 的弄坏开关」一段）：判法这一半在这份脚本里，两份文件头各列一份
+FORMAL_BREAK = {item for item in os.environ.get("FORMAL_VERIFICATION_BREAK", "").split(",") if item}
+# 这份脚本读的那几项（自证的开关轮逐项打开；门禁那一道自己读的另几项不在这里）
+FORMAL_BREAK_ITEMS = ("single-crate-registry", "cargo-mode-ignored", "methods-refused", "attribute-mode-unrecognized", "no-cheating-kept",
+                      "trust-list-unchecked", "trust-digest-unchecked", "trust-test-unchecked", "trust-vstd-unchecked", "axiom-accepted",
+                      "cfg-atom-accepted", "cfg-macro-unchecked", "trait-impl-outside-accepted", "mir-compare-skipped", "rustc-pin-unchecked",
+                      "reuse-key-without-trust-list", "cargo-fingerprint-kept")
 # 门禁给的一份文件：每格判完往里追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」（lib_verdict_library.Tally.append_to），门禁整道相加
 ITEM_TALLY_FILE_VARIABLE = "FORMAL_ITEM_TALLY_FILE"
 
@@ -373,6 +596,13 @@ class NotRun(Exception):
 def report_red(message, howto):
     print(f"  ✗ {message}")
     print(f"     → 怎么办：{howto}")
+
+
+def one_line(text):
+    """自证一格判错的细节行（以 ✗ 起头、带格名）里转述了被测那一格的输出：换行换成「 | 」，整条留在这一行里，
+    转述里以 ✗ 起头的那几行不另起一行、不被当成别的格（门禁 code-tooling 的 break-switch-replay 格按以 ✗ 起头的行认格）。"""
+    rows = text.split("\n")
+    return " | ".join([rows[0].rstrip(), *(row.strip() for row in rows[1:] if row.strip())])
 
 
 def report_cell(problems):
@@ -411,6 +641,36 @@ class Registry:
         self.kernels = []
         self.must_red_table = None
         self.rlimit = None
+        self.rustc = None            # rustc 行：(Verus 用的工具链, 产品 rustc 的版本, 产品 rustc 的 commit-hash)；只有 verus-toolchain-pinned 一格要它
+        self.cargo_mode = False      # crate 行第四段写 cargo：经 cargo verus focus 验（可以有别的依赖），不写是直接起 verus（只依赖 vstd）
+        self.crates = []             # 每个登记的 crate 一份（CRATE_FIELDS 换成那个 crate 的），只登记一个 crate 时就是 [自己]
+        self.all_crate_directories = []
+
+
+# 每个 crate 自己的几样（per_crate_view 换成那个 crate 的）；别的（release、package、rlimit、rustc）各 crate 共用
+CRATE_FIELDS = ("crate_directory", "verified_count", "kernels", "must_red_table", "cargo_mode")
+# 登记表各种行的段数；crate 行三段或四段（第四段只许写 cargo）
+REGISTRY_WIDTHS = {"release": (5,), "package": (6,), "crate": (3, 4), "kernel": (2,), "must-red-worlds": (2,), "rlimit": (2,), "rustc": (4,)}
+
+
+def per_crate_view(registry, crate):
+    """登记的一个 crate 的那一份登记：共用的几样照抄，CRATE_FIELDS 换成这个 crate 的。"""
+    view = Registry()
+    view.__dict__.update(registry.__dict__)
+    for name in CRATE_FIELDS:
+        setattr(view, name, crate[name])
+    view.crates = []
+    return view
+
+
+def crate_identifier(registry, manifest=None):
+    """crate 的 Rust 名（Cargo.toml 的 package.name，- 换成 _）：项名里全路径的头一段，与 Verus 的 func-details 同一种写法。"""
+    if manifest is None:
+        try:
+            manifest = tomllib.load(open(os.path.join(registry.root, registry.crate_directory, "Cargo.toml"), "rb"))
+        except (OSError, tomllib.TOMLDecodeError, TypeError, AttributeError):
+            manifest = {}
+    return (manifest.get("package", {}).get("name") or os.path.basename(registry.crate_directory or "crate")).replace("-", "_")
 
 
 def read_registry(root):
@@ -418,13 +678,15 @@ def read_registry(root):
     if not os.path.isfile(path):
         raise Red(f"登记表 {REGISTRY} 不在 {root} 里", "它随仓走；被删了从 git 找回，格式写在它自己的文件头")
     registry = Registry()
+    registry.root = root
     problems = []
+    crates, kernels, tables = [], [], []
     for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
         if not raw.strip() or raw.startswith("#"):
             continue
         fields = raw.split("\t")
-        kind, width = fields[0], {"release": 5, "package": 6, "crate": 3, "kernel": 2, "must-red-worlds": 2, "rlimit": 2}.get(fields[0])
-        if width is None or len(fields) != width:
+        kind, widths = fields[0], REGISTRY_WIDTHS.get(fields[0])
+        if widths is None or len(fields) not in widths:
             problems.append(f"第 {number} 行认不出（第一段 {kind!r}、{len(fields)} 段）")
             continue
         if kind == "release":
@@ -439,15 +701,19 @@ def read_registry(root):
                 problems.append(f"第 {number} 行：sha1 要 40 位、内容指纹要 64 位小写十六进制")
             registry.packages.append({"name": name, "version": version, "sha1": sha1, "path_in_vcs": path_in_vcs, "fingerprint": fingerprint})
         elif kind == "crate":
-            if registry.crate_directory is not None:
-                problems.append(f"第 {number} 行：crate 行不止一行")
-            registry.crate_directory = fields[1].rstrip("/")
+            directory = fields[1].rstrip("/")
+            if any(crate["crate_directory"] == directory for crate in crates):
+                problems.append(f"第 {number} 行：crate {directory} 登记了两次")
+            if len(fields) == 4 and fields[3] != "cargo":
+                problems.append(f"第 {number} 行：crate 行第四段只许写 cargo（经 cargo verus focus 验），读到 {fields[3]!r}")
             if not fields[2].isdigit() or int(fields[2]) == 0:
                 problems.append(f"第 {number} 行：verified 的登记数要是正整数，读到 {fields[2]!r}")
-            else:
-                registry.verified_count = int(fields[2])
+            crates.append({"crate_directory": directory, "verified_count": int(fields[2]) if fields[2].isdigit() else None,
+                           "kernels": [], "must_red_table": None,
+                           # 弄坏开关 cargo-mode-ignored：第四段 cargo 不认，照直接起 verus 判（改前的样子：有别的依赖就红）
+                           "cargo_mode": len(fields) == 4 and fields[3] == "cargo" and "cargo-mode-ignored" not in FORMAL_BREAK})
         elif kind == "kernel":
-            registry.kernels.append(fields[1])
+            kernels.append((number, fields[1]))
         elif kind == "rlimit":
             if registry.rlimit is not None:
                 problems.append(f"第 {number} 行：rlimit 行不止一行")
@@ -455,19 +721,45 @@ def read_registry(root):
                 problems.append(f"第 {number} 行：rlimit 要是正整数，读到 {fields[1]!r}")
             else:
                 registry.rlimit = int(fields[1])
+        elif kind == "rustc":
+            if registry.rustc is not None:
+                problems.append(f"第 {number} 行：rustc 行不止一行")
+            if not all(fields[1:]) or not re.fullmatch(r"[0-9a-f]{40}", fields[3]):
+                problems.append(f"第 {number} 行：rustc 行三段是 Verus 用的工具链、产品 rustc 的版本、产品 rustc 的 commit-hash（40 位小写十六进制）")
+            registry.rustc = tuple(fields[1:])
         else:
-            if registry.must_red_table is not None:
-                problems.append(f"第 {number} 行：must-red-worlds 行不止一行")
-            registry.must_red_table = fields[1]
-    if registry.tag is None or registry.crate_directory is None or not registry.kernels or registry.must_red_table is None or not registry.packages:
-        problems.append("release、crate、must-red-worlds 各要恰好一行，package 与 kernel 至少一行")
-    for kernel in registry.kernels:
-        if registry.crate_directory and not kernel.startswith(registry.crate_directory + "/"):
-            problems.append(f"核 {kernel} 不在登记的 crate {registry.crate_directory} 里")
+            tables.append((number, fields[1]))
+    if len(crates) > 1 and "single-crate-registry" in FORMAL_BREAK:
+        crates = crates[:1]   # 弄坏开关：只认登记表里第一个 crate（改前的样子）
+    for number, kernel in kernels:
+        owner = [crate for crate in crates if kernel.startswith(crate["crate_directory"] + "/")]
+        if not owner:
+            if "single-crate-registry" not in FORMAL_BREAK:
+                problems.append(f"核 {kernel} 不在登记的 crate {'、'.join(crate['crate_directory'] for crate in crates) or '（一个都没有）'} 里")
+            continue
+        owner[0]["kernels"].append(kernel)
+    for number, table in tables:
+        owner = [crate for crate in crates if table.startswith(crate["crate_directory"] + "/")] if len(crates) > 1 else crates
+        if not owner:
+            if "single-crate-registry" not in FORMAL_BREAK:
+                problems.append(f"第 {number} 行：必红世界表 {table} 不在登记的哪个 crate 的目录里（登记了几个 crate 时，每个 crate 的表放在它自己的目录里）")
+            continue
+        if owner[0]["must_red_table"] is not None:
+            problems.append(f"第 {number} 行：crate {owner[0]['crate_directory']} 的 must-red-worlds 行不止一行")
+        owner[0]["must_red_table"] = table
+    if registry.tag is None or not crates or not registry.packages or any(not crate["kernels"] or crate["must_red_table"] is None for crate in crates):
+        problems.append("release 恰好一行，crate 至少一行、每个 crate 至少一行 kernel、恰好一行 must-red-worlds，package 至少一行")
     if problems:
         raise Red(f"登记表 {REGISTRY} 写坏了：" + "；".join(problems), "照它文件头的格式改；一行一条、制表符分隔")
     if registry.rlimit is None:
         registry.rlimit = DEFAULT_RLIMIT
+    registry.all_crate_directories = [crate["crate_directory"] for crate in crates]
+    if len(crates) == 1:
+        for name in CRATE_FIELDS:
+            setattr(registry, name, crates[0][name])
+        registry.crates = [registry]
+    else:
+        registry.crates = [per_crate_view(registry, crate) for crate in crates]
     return registry
 
 
@@ -475,6 +767,19 @@ def kernel_files(root, registry):
     """登记的核都在就交回它们；核没进仓 NotRun；核不在而 crate 已经接了 Verus 判红。"""
     missing = [kernel for kernel in registry.kernels if not os.path.isfile(os.path.join(root, kernel))]
     if not missing:
+        # 不依赖登记数：新增模块的契约即使未验证，也能被已登记函数使用。
+        registered = {os.path.realpath(os.path.join(root, path)) for path in registry.kernels}
+        for directory, _subdirectories, filenames in os.walk(os.path.join(root, registry.crate_directory, "src")):
+            for filename in filenames:
+                if not filename.endswith(".rs"):
+                    continue
+                path = os.path.join(directory, filename)
+                _kinds, words, _lines, _docs = rust_lex(open(path, encoding="utf-8").read())
+                # verus! 宏包的，与属性写法（#[verus_verify]、#[verus_spec(…)]）标的，都是被验区域
+                attribute_mode = "attribute-mode-unrecognized" not in FORMAL_BREAK and any(word in ("verus_verify", "verus_spec") for word in words)
+                if (any(words[index:index + 2] == ["verus", "!"] for index in range(len(words) - 1)) or attribute_mode) and os.path.realpath(path) not in registered:
+                    raise Red(f"未登记的 Verus 核：{os.path.relpath(path, root)}" + ("（属性写法 #[verus_verify] / #[verus_spec]）" if attribute_mode else ""),
+                              f"把该文件加入 {REGISTRY} 的 kernel 行；所有被使用的证明契约都必须验证")
         return [os.path.join(root, kernel) for kernel in registry.kernels]
     crate = os.path.join(root, registry.crate_directory)
     evidence = []
@@ -524,18 +829,57 @@ def crate_manifest(root, registry):
 
 def check_dependencies(registry, manifest):
     """直接起的 Verus 只带它自带的 vstd：被验的 crate 除 vstd 之外还有依赖就编不过，开跑之前判红、说清下一步。"""
+    if registry.cargo_mode:
+        return   # 经 cargo verus focus 验：依赖照 Cargo.toml 由 cargo 编（copy_crate 连路径依赖一起拷）
     others = sorted(name for name in manifest.get("dependencies", {}) if name != "vstd")
     if others:
         raise Red(f"{registry.crate_directory}/Cargo.toml 除 vstd 之外还依赖 {' '.join(others)}：直接起的 Verus 只带它自带的 vstd，编不了别的 crate",
-                  "核的 crate 只依赖 vstd：要用的东西搬进核，或留在调用核的那一侧；确要加依赖，先给 scripts/gate/verus-proof-check.py "
-                  "补上用 Verus 钉的工具链编依赖、交给 --extern 的一步（旧写法 git log -S prepare_externs 找得到）")
+                  f"确要别的依赖（singlefs-core 这类），把 {REGISTRY} 里这个 crate 那一行写成四段、第四段 cargo：经 cargo verus focus 验，路径依赖连同 crate 一起拷进副本；"
+                  "只依赖 vstd 的核照旧三段、直接起 verus")
+
+
+def path_dependencies(root, crate_directory, seen=None):
+    """crate（相对仓根的目录）与它经 Cargo.toml 的 path 依赖（dependencies、build-dependencies，一层一层往下）连到的 crate 目录，相对仓根、排好序。
+    dev-dependencies 不收（cargo verus focus 不编测试）。路径出了仓根、或那份 Cargo.toml 不在的判红。"""
+    seen = set() if seen is None else seen
+    if crate_directory in seen:
+        return seen
+    seen.add(crate_directory)
+    manifest_path = os.path.join(root, crate_directory, "Cargo.toml")
+    try:
+        manifest = tomllib.load(open(manifest_path, "rb"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise Red(f"{crate_directory}/Cargo.toml 读不出：{error}", "先让 cargo build 认得这份清单")
+    for section in ("dependencies", "build-dependencies"):
+        for name, specification in sorted(manifest.get(section, {}).items()):
+            if not isinstance(specification, dict) or "path" not in specification:
+                continue
+            target = os.path.normpath(os.path.join(crate_directory, specification["path"]))
+            if target.startswith(os.pardir) or os.path.isabs(target) or not os.path.isfile(os.path.join(root, target, "Cargo.toml")):
+                raise Red(f"{crate_directory}/Cargo.toml 的路径依赖 {name} = {specification['path']!r} 不在仓里或没有 Cargo.toml",
+                          "被验的 crate 的路径依赖要都在仓里（cargo verus focus 在副本里连它们一起编）")
+            path_dependencies(root, target.replace(os.sep, "/"), seen)
+    return seen
 
 
 def copy_crate(root, registry, work):
-    source = os.path.join(root, registry.crate_directory)
-    destination = os.path.join(work, registry.crate_directory)
-    shutil.copytree(source, destination, ignore=shutil.ignore_patterns("target"), symlinks=True)
-    return destination
+    """一处判定一份副本：直接起 verus 的拷 crate 自己，交 crate 副本的目录（verus 在那里起）；cargo 那一种另拷它的路径依赖、仓根的 Cargo.lock，
+    在副本根写一份只列这几个成员的 Cargo.toml（整个工作区的 cargo metadata 在离线机器上过不了），交副本根（cargo verus focus 在那里起）。
+    每处判定都在一份新目录里：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、没有判定行（第二轮正推 Y4 第 3 条）。"""
+    if not registry.cargo_mode:
+        source = os.path.join(root, registry.crate_directory)
+        destination = os.path.join(work, registry.crate_directory)
+        shutil.copytree(source, destination, ignore=shutil.ignore_patterns("target"), symlinks=True)
+        return destination
+    members = sorted(path_dependencies(root, registry.crate_directory))
+    for member in members:
+        shutil.copytree(os.path.join(root, member), os.path.join(work, member), ignore=shutil.ignore_patterns("target"), symlinks=True)
+    with open(os.path.join(work, "Cargo.toml"), "w", encoding="utf-8") as handle:
+        handle.write("# verus-proof-check.py 拷的副本：只列被验的 crate 与它的路径依赖\n[workspace]\nresolver = \"2\"\nmembers = [\n"
+                     + "".join(f"    {json.dumps(member)},\n" for member in members) + "]\n")
+    if os.path.isfile(os.path.join(root, "Cargo.lock")):
+        shutil.copy2(os.path.join(root, "Cargo.lock"), os.path.join(work, "Cargo.lock"))
+    return work
 
 
 RUST_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -571,16 +915,62 @@ def verus_arguments(registry, manifest, threads, function=None, module=None):
     所以 verus! 里的 fn 同名判红（verus_functions），名字是别人子串的照常用。"""
     package = manifest.get("package", {})
     entry = manifest.get("lib", {}).get("path", "src/lib.rs")
-    arguments = ["--crate-type=lib", f"--edition={package.get('edition', '2021')}", "--crate-name", package.get("name", "crate").replace("-", "_"),
-                 "--num-threads", str(threads), "--output-json"]
+    # 不带 --no-cheating（出口 5 第三轮判决第三节「门禁」）：assume_specification、external_body、uninterp 这几样照信任清单逐条登记（trust_list_problems），
+    # admit、assume(、axiom、verifier::external 在被验区域里一律判红（region_problems），都在起 Verus 之前判
+    arguments = [] if registry.cargo_mode else ["--crate-type=lib", f"--edition={package.get('edition', '2021')}", "--crate-name", package.get("name", "crate").replace("-", "_")]
+    arguments += ["--num-threads", str(threads), "--output-json"]
     if "rlimit-unpinned" not in BREAK:
         arguments += ["--rlimit", str(registry.rlimit)]
-    if "cheating-unchecked" not in BREAK:
-        arguments.insert(0, "--no-cheating")
+    if "no-cheating-kept" in FORMAL_BREAK:
+        arguments.insert(0, "--no-cheating")   # 弄坏开关：照旧带 --no-cheating（登记了的 assume_specification 也被 Verus 拒）
     if function:
         arguments += ["--verify-root"] if module is None else ["--verify-only-module", module]
         arguments += ["--verify-function", function]
-    return arguments + [entry]
+    return arguments if registry.cargo_mode else arguments + [entry]
+
+
+def forget_crate_fingerprints(target, package):
+    """cargo 那一种几处同时验共用一个编译目录：起之前删掉被验的 crate 在这个编译目录里的指纹目录（<编译目录>/**/.fingerprint/<包>-*），让它每处都现编、出判定行；
+    cargo 的编译指纹不看 --verify-* 参数，换一份副本、改了文件时间也照样当它没变（2026-10-26 在样本上撞到，第二轮正推 Y4 第 3 条）。依赖的指纹不动、照旧复用。
+    弄坏开关 FORMAL_VERIFICATION_BREAK=cargo-fingerprint-kept 下不删（改前的样子：第二处起拿不到判定行）。"""
+    if "cargo-fingerprint-kept" in FORMAL_BREAK:
+        return
+    for path in glob.glob(os.path.join(target, "**", ".fingerprint", f"{package}-*"), recursive=True):
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def verus_program(registry, executable):
+    """起 Verus 的程序：直接起的是 verus（在 crate 副本里起）；cargo 那一种是 Verus 安装里 verus 旁边的 cargo-verus（在副本根起）。"""
+    if not registry.cargo_mode:
+        return executable
+    return os.path.join(os.path.dirname(executable), "cargo-verus")
+
+
+def verus_program_arguments(registry, arguments, build=False):
+    """交给 verus_program 的参数：直接起的照原样；cargo 那一种是 verus focus -p <包> --offline -- <参数…>（build 时是 verus build，MIR 比对用）。"""
+    if not registry.cargo_mode:
+        return list(arguments)
+    return ["verus", "build" if build else "focus", "-p", crate_package_name(registry), "--offline", "--", *arguments]
+
+
+def crate_package_name(registry):
+    try:
+        manifest = tomllib.load(open(os.path.join(registry.root, registry.crate_directory, "Cargo.toml"), "rb"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise Red(f"{registry.crate_directory}/Cargo.toml 读不出：{error}", "先让 cargo build 认得这份清单")
+    return manifest.get("package", {}).get("name") or os.path.basename(registry.crate_directory)
+
+
+def diagnostic_path(registry, relative):
+    """Verus 报错 --> 后面的路径怎么写这份文件（relative 相对仓根）：直接起的相对 crate 目录（在 crate 副本里起），cargo 那一种相对副本根（就是相对仓根）。"""
+    if registry.cargo_mode:
+        return relative
+    return os.path.relpath(relative, registry.crate_directory)
+
+
+def located_file(registry, path):
+    """Verus 报错 --> 后面的路径交回相对仓根的那一份（diagnostic_path 的反过来）。"""
+    return os.path.normpath(path if registry.cargo_mode else f"{registry.crate_directory}/{path}")
 
 
 def kernel_modules(root, registry, manifest, kernels):
@@ -594,6 +984,64 @@ def kernel_modules(root, registry, manifest, kernels):
 
 # 内存包装排队时报的那几行（run-with-memory-cap.sh：「排队（已等 …」每 60 秒一行，「排了 … 秒，起跑」放行时一行）
 WRAPPER_QUEUE_LINE = re.compile(r"^run-with-memory-cap: 排(队（|了 )")
+# 内存包装排队时现查别的机器（HostLookup，包装文件头「排队时去找别的机器」「整体兜底」）打的四种行首：只出提示、不改结局，判法读包装输出之前去掉
+# （strip_host_lookup_lines）。包装里 HostLookup 新加一处 say 而这里不认，自证 host-lookup-say-sites-covered 那一格红。
+# 「  ! 告警记录写不进」与包装 append_outcome_record 打的那一句同首，一起去掉（HOST_LOOKUP_ALSO_MATCHED）。
+# 这一段在 scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py、scripts/mutation/crates-mutation-rows.py 各一份、照同一份写，各自的自证核自己那一份。
+HOST_LOOKUP_LINE = re.compile(r"^(?:run-with-memory-cap: (?:没查到别的机器|现查别的机器)：|  → .+?此刻放得下（|  ! 告警记录写不进（)")
+HOST_LOOKUP_ALSO_MATCHED = {"append_outcome_record": "包装收尾写告警记录写不进时打的同一句，只出提示、不改结局"}
+
+
+def strip_host_lookup_lines(text):
+    """去掉内存包装 HostLookup 打的那几行（HOST_LOOKUP_LINE）；弄坏开关 host-lookup-lines-kept 下原样交回。"""
+    if "host-lookup-lines-kept" in BREAK:
+        return text
+    return "".join(line for line in text.splitlines(keepends=True) if not HOST_LOOKUP_LINE.match(line))
+
+
+def host_lookup_say_problems(wrapper_path, pattern=HOST_LOOKUP_LINE):
+    """包装内嵌 python（3<<'PY' 那一段）里 class HostLookup 的每一处 say(…)：拼出的那一行（f 串的插值换成 X；say 一个名字的，取本函数里给它赋的值）要被 pattern 认；
+    HostLookup 之外的 say(…) 与 print(…) 被它认的，只许是 HOST_LOOKUP_ALSO_MATCHED 点名的函数。交问题清单（空 = 都对）。"""
+    with open(wrapper_path, encoding="utf-8") as handle:
+        text = handle.read()
+    body = next((block for block in re.findall(r"3<<'PY'\n(.*?)\nPY\n", text, re.S) if "class HostLookup" in block), None)
+    if body is None:
+        return ["包装里找不到含 class HostLookup 的内嵌 python（3<<'PY' … PY）：包装改了写法，这一格的找法要跟着改"]
+    module = ast.parse(body)
+    problems, found = [], []
+
+    def sample(node, function):
+        if isinstance(node, ast.Name) and function is not None:
+            values = [statement.value for statement in ast.walk(function) if isinstance(statement, ast.Assign)
+                      and any(isinstance(target, ast.Name) and target.id == node.id for target in statement.targets)]
+            node = values[-1] if values else node
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.JoinedStr):
+            return "".join(part.value if isinstance(part, ast.Constant) else "X" for part in node.values)
+        return None
+
+    def visit(node, owner, function):
+        for child in ast.iter_child_nodes(node):
+            child_owner = child.name if isinstance(child, ast.ClassDef) and owner is None else owner
+            child_function = child if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else function
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id in ("say", "print") and child.args:
+                line = sample(child.args[0], function)
+                where = f"{owner + '.' if owner else ''}{function.name if function is not None else '<模块>'}（内嵌 python 第 {child.lineno} 行）"
+                if owner == "HostLookup" and child.func.id == "say":
+                    found.append(where)
+                    if line is None:
+                        problems.append(f"{where} 的 say 拼不出那一行（不是串、f 串或本函数里赋过值的名字）")
+                    elif not pattern.match(line):
+                        problems.append(f"{where} 的 say 打「{line[:80]}」，HOST_LOOKUP_LINE 不认")
+                elif owner != "HostLookup" and line is not None and pattern.match(line) and (function is None or function.name not in HOST_LOOKUP_ALSO_MATCHED):
+                    problems.append(f"{where} 打「{line[:80]}」不归 HostLookup，HOST_LOOKUP_LINE 却认它（去多了）")
+            visit(child, child_owner, child_function)
+
+    visit(module, None, None)
+    if not found:
+        problems.append("HostLookup 里一处 say 都没找到：包装改了写法，这一格的找法要跟着改")
+    return problems
 
 
 def run_forwarding_queue_lines(command, label, timeout=None, sink=None, **popen_keywords):
@@ -672,14 +1120,15 @@ def queue_refusal(options):
     return options.get("queue_refusal") if options.get("launcher") is None else None
 
 
-def run_verus(verus, crate_copy, arguments, options, key, label=None):
-    """起一次 Verus；交回 {exit, timed_out, wrapper, json, diagnostics}。同一道里已经排不上的不起，交 skipped_outcome；这一次拿到 252 就记进 QueueRefusal。"""
+def run_verus(program, arguments, crate_copy, options, key, label=None, extra_environment=None):
+    """起一次 Verus（program 是 verus_program 交的、arguments 是 verus_program_arguments 交的；MIR 比对的产品构建交 cargo 与它的参数）；交回 {exit, timed_out, wrapper, json, diagnostics}。
+    同一道里已经排不上的不起，交 skipped_outcome；这一次拿到 252 就记进 QueueRefusal。extra_environment 另设进环境（cargo 那一种的 CARGO_TARGET_DIR）。"""
     state = queue_refusal(options)
     earlier = state.refused() if state is not None else None
     if earlier:
         return skipped_outcome(earlier)
-    command = [verus, *arguments]
-    environment = dict(os.environ)
+    command = [program, *arguments]
+    environment = dict(os.environ, **(extra_environment or {}))
     timeout = options["timeout"]
     if options.get("launcher") is None:
         command = ["bash", MEMORY_CAP_RUNNER, options["memory_cap"],
@@ -692,6 +1141,8 @@ def run_verus(verus, crate_copy, arguments, options, key, label=None):
         command = [*options["launcher"], *command]
         subprocess_timeout = timeout
     exit_code, stdout, stderr = run_forwarding_queue_lines(command, key, timeout=subprocess_timeout, cwd=crate_copy, env=environment)
+    if options.get("launcher") is None:
+        stderr = strip_host_lookup_lines(stderr)   # 包装现查别的机器打的那几行只出提示、不改结局：判法不读（HOST_LOOKUP_LINE）
     outcome = {"exit": exit_code, "timed_out": exit_code == WRAPPER_TIMEOUT_EXIT, "wrapper": WRAPPER_OWN_EXITS.get(exit_code) if options.get("launcher") is None else None,
                "json": None, "diagnostics": stderr + "\n" + stdout, "stderr": stderr}
     try:
@@ -803,7 +1254,8 @@ def killed_signal(outcome):
 
 def check_toolchain(root, options):
     registry = read_registry(root)
-    kernel_files(root, registry)
+    for view in registry.crates:
+        kernel_files(root, view)
     problems = []
     directory = verus_directory(registry, options.get("verus_root"))
     version = read_version_json(directory)
@@ -849,12 +1301,55 @@ def check_toolchain(root, options):
             if fingerprint != package["fingerprint"] and "fingerprint-unchecked" not in BREAK:
                 problems.append((f"{package_directory} 的源码内容指纹是 {fingerprint}，登记的是 {package['fingerprint']}",
                                  "缓存里的源码被改过或换了来源：删掉这个目录再 cargo fetch --locked；确要换包就先改登记并复核同源"))
+    rustc_note = rustc_pin_problems(root, registry, version, options, problems)
     if problems:
         for message, howto in problems:
             report_red(message, howto)
         return EXIT_RED
-    print(f"  ✓ Verus {registry.tag}（commit {registry.commit[:12]}…）与登记相同，{zip_note}；Cargo.lock 与本机缓存里 {len(registry.packages)} 个包的版本、出处与源码指纹都与登记相同；按条：toolchain 一项，不复用（每趟现核）")
+    print(f"  ✓ Verus {registry.tag}（commit {registry.commit[:12]}…）与登记相同，{zip_note}；Cargo.lock 与本机缓存里 {len(registry.packages)} 个包的版本、出处与源码指纹都与登记相同；"
+          f"{rustc_note}；按条：toolchain 一项，不复用（每趟现核）")
     return EXIT_GREEN
+
+
+def product_rustc_version(root, options):
+    """产品构建的 rustc（在被判的仓根起 rustc -vV，rustup 照那里的设定选工具链）交 (release, commit-hash)；起不了交 (None, 原因)。
+    样本给 options["rustc_version_file"]（.formal-sample/rustc-version）时读那份文件当 rustc -vV 的输出。"""
+    if options.get("rustc_version_file"):
+        text = open(options["rustc_version_file"], encoding="utf-8").read()
+    else:
+        try:
+            completed = subprocess.run(["rustc", "-vV"], cwd=root, capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return None, f"起不了 rustc -vV：{error}"
+        if completed.returncode != 0:
+            return None, f"rustc -vV 退 {completed.returncode}：{completed.stderr.strip()[-200:]}"
+        text = completed.stdout
+    fields = dict(line.split(": ", 1) for line in text.split("\n") if ": " in line)
+    return (fields.get("release"), fields.get("commit-hash")), None
+
+
+def rustc_pin_problems(root, registry, version, options, problems):
+    """Verus 与产品的 rustc 版本差进工具链钉表（出口 5 第三轮判决第三节「门禁」）：登记表 rustc 行三段——Verus 用的工具链（version.json 的 toolchain 第一段）、
+    产品 rustc 的 release、commit-hash，都与此刻的相同。两边不同不判红（今天 Verus 1.98.1、产品 1.98.0），判的是「差」被钉住：哪一边换了都要改这一行，
+    改之前先在新的一对上把 MIR 比对跑一遍。问题追加进 problems，交一句给成功句。弄坏开关 FORMAL_VERIFICATION_BREAK=rustc-pin-unchecked 下不核。"""
+    if "rustc-pin-unchecked" in FORMAL_BREAK:
+        return "Verus 与产品的 rustc 没核（弄坏开关 rustc-pin-unchecked）"
+    if registry.rustc is None:
+        problems.append((f"登记表 {REGISTRY} 没有 rustc 行：Verus 与产品的 rustc 版本差没钉住",
+                         "加一行 rustc<TAB><Verus 的 version.json 里 toolchain 的第一段><TAB><产品 rustc -vV 的 release><TAB><它的 commit-hash>"))
+        return ""
+    verus_toolchain = ((version or {}).get("toolchain") or "").split(" ")[0]
+    if verus_toolchain != registry.rustc[0]:
+        problems.append((f"Verus 用的工具链是 {verus_toolchain or '（version.json 里没有）'}，登记表 rustc 行写的是 {registry.rustc[0]}",
+                         "换了 Verus 就照它 version.json 的 toolchain 改 rustc 行第二段，改之前在新工具链上把 MIR 比对（verus-proof 整格）跑一遍"))
+    parsed, failure = product_rustc_version(root, options)
+    release, commit = parsed if parsed else (None, None)
+    if failure:
+        problems.append((f"产品的 rustc 版本取不到：{failure}", "让 rustc -vV 在仓根跑得通（rustup 装着产品的工具链）"))
+    elif (release, commit) != (registry.rustc[1], registry.rustc[2]):
+        problems.append((f"产品的 rustc 是 {release}（commit-hash {commit}），登记表 rustc 行写的是 {registry.rustc[1]}（{registry.rustc[2]}）",
+                         "产品的工具链换了：照 rustc -vV 改 rustc 行第三、四段，改之前在新的一对上把 MIR 比对（verus-proof 整格）跑一遍"))
+    return f"Verus 的工具链 {registry.rustc[0]} 与产品的 rustc {registry.rustc[1]} 都与 rustc 行相同"
 
 
 def cheating_markers(root, kernels):
@@ -877,6 +1372,365 @@ def rlimit_attributes(root, kernels):
     return found
 
 
+# ── 被验区域：信任清单、axiom、cfg 原子、verus! 外面的 trait impl（出口 5 第三轮判决第三节「门禁」；起 Verus 之前判）──
+
+def read_trust_list(root):
+    """信任清单 → (vstd 那几行 [(版本, 内容指纹, 行号)], 条目行 [dict], 写坏的行 [说明])；表不在交 None。
+    条目行六段：种类（TRUST_KINDS 之一或 cfg）、文件（相对仓根）、点名的条目、规格原文的 sha256、差分测试的测试名、理由。vstd 行四段：vstd、版本、内容指纹、理由。"""
+    path = os.path.join(root, TRUST_LIST)
+    if not os.path.isfile(path):
+        return None
+    vstd_rows, rows, problems = [], [], []
+    for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
+        if not raw.strip() or raw.startswith("#"):
+            continue
+        fields = raw.split("\t")
+        if fields[0] == "vstd":
+            if len(fields) != 4 or not all(fields[1:]) or not re.fullmatch(r"[0-9a-f]{64}", fields[2]):
+                problems.append(f"{TRUST_LIST} 第 {number} 行：vstd 行四段（vstd、版本、内容指纹 64 位小写十六进制、理由）")
+                continue
+            vstd_rows.append((fields[1], fields[2], number))
+        elif fields[0] in TRUST_KINDS + (CFG_KIND,):
+            if len(fields) != 6 or not all(fields[1:]) or not re.fullmatch(r"[0-9a-f]{64}", fields[3]) or len(fields[5]) < 4:
+                problems.append(f"{TRUST_LIST} 第 {number} 行：条目行六段（种类、文件、点名的条目、规格原文的 sha256、差分测试名、理由至少 4 个字）")
+                continue
+            rows.append({"number": number, "kind": fields[0], "file": fields[1], "point": fields[2], "digest": fields[3], "test": fields[4]})
+        else:
+            problems.append(f"{TRUST_LIST} 第 {number} 行：第一段「{fields[0]}」不是 vstd、cfg 或 {'、'.join(TRUST_KINDS)} 之一")
+    return vstd_rows, rows, problems
+
+
+def trust_list_text(root, registry):
+    """进每一项键的「信任清单」那一样：vstd 行与这个 crate 里的条目行（去掉理由），排好序。表不在交空串。"""
+    listed = read_trust_list(root)
+    if listed is None:
+        return ""
+    vstd_rows, rows, _problems = listed
+    lines = [f"vstd\t{version}\t{fingerprint}" for version, fingerprint, _number in vstd_rows]
+    lines += [f"{row['kind']}\t{row['file']}\t{row['point']}\t{row['digest']}\t{row['test']}" for row in rows
+              if row["file"].startswith(registry.crate_directory + "/")]
+    return "\n".join(sorted(lines))
+
+
+TEST_FUNCTION = re.compile(r"#\s*\[\s*test\s*\]\s*(?:#\s*\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def test_functions(root):
+    """仓里 crates/ 下每份 .rs 里标了 #[test] 的函数名（差分测试的测试名照它核：写全路径的取最后一段）。"""
+    names = set()
+    for path in glob.glob(os.path.join(root, "crates", "**", "*.rs"), recursive=True):
+        try:
+            names.update(TEST_FUNCTION.findall(open(path, encoding="utf-8", errors="replace").read()))
+        except OSError:
+            continue
+    return names
+
+
+def innermost_unit(rust_file, index):
+    """词法单元 index 落在的最里层那个单元（数据单元不算）；不在任何单元里交 None。"""
+    best = None
+    for unit in rust_file.units:
+        if unit.data or unit.first_token is None or unit.last_token is None or not unit.first_token <= index <= unit.last_token:
+            continue
+        if best is None or unit.last_token - unit.first_token < best.last_token - best.first_token:
+            best = unit
+    return best
+
+
+def unit_path(crate, module, unit):
+    """条目的全路径 <crate>::<模块>::<名>：fn 照 verus_point_name（impl 里的写 <类型>::<方法>），别的条目是它的名字（套在别的条目里的写嵌套路径）。"""
+    if unit is None:
+        return "::".join(part for part in (crate, module, "（不在任何条目里）") if part)
+    name = (verus_point_name(unit) if unit.kind == "fn" else None) or (unit.short if unit.container is None else unit.name)
+    return "::".join(part for part in (crate, module, name) if part)
+
+
+def joined_tokens(rust_file, low, high):
+    """词法单元 [low, high) 用一个空格连起来（去了注释与空白：只改注释、换行的不变）。"""
+    return " ".join(rust_file.texts[low:high])
+
+
+def statement_end(rust_file, index, limit):
+    """从 index 往后找同一层的 ;（跳过配对的括号），交它的下标；找不到交 limit。"""
+    position = index
+    while position < limit:
+        if rust_file.texts[position] in ("(", "[", "{") and position in rust_file.pairs:
+            position = rust_file.pairs[position] + 1
+            continue
+        if rust_file.texts[position] == ";":
+            return position
+        position += 1
+    return limit
+
+
+def body_open(rust_file, unit):
+    """fn 单元函数体的 {（与单元最后一个 } 配对的那一个）；没有函数体交 None。"""
+    if unit is None or unit.last_token is None or rust_file.texts[unit.last_token] != "}":
+        return None
+    return next((opening for opening, closing in rust_file.pairs.items() if closing == unit.last_token), None)
+
+
+def region_spans(rust_file):
+    """被验区域在这份文件里的词法单元区间：每个 verus! { … }，与属性写法标的条目（attribute_verified）。"""
+    spans = list(verus_ranges(rust_file))
+    for unit in rust_file.units:
+        if not unit.data and unit.first_token is not None and unit.last_token is not None and attribute_verified(rust_file, unit):
+            spans.append((unit.first_token, unit.last_token))
+    return spans
+
+
+def trusted_declarations(rust_file, relative, crate, module, spans, cfg_macros):
+    """被验区域里每一处要登记的可信声明与 cfg 原子：[{kind, file, point, digest, line}]，次序照文件里的位置。
+    assume_specification：点名的是方括号里那一项（词法单元连写，例 <[T]>::binary_search），规格原文是从它到同一层的 ; 为止；
+    external_body：点名的是带它的 fn 的全路径，规格原文是函数体的 { 之前那一截（签名、requires、ensures）；
+    uninterp 与 external_*_specification：点名的是那个条目的全路径，规格原文是整个条目；
+    cfg 原子（#[cfg(…)]、#[cfg_attr(…)]、cfg!(…)，与定义里有 cfg 的 macro_rules! 宏在被验区域里的调用）：点名的是 <所在条目的全路径>#<原子>（例 crate::m::pick#cfg(feature="wide")、
+    crate::m::pick#plus_span!），规格原文是所在条目整个。"""
+    found = []
+    seen = set()
+    texts = rust_file.texts
+    for low, high in spans:
+        for index in range(low, min(high + 1, rust_file.count)):
+            word = texts[index]
+            if rust_file.kinds[index] != "ident" or (index, word) in seen or not (word in TRUST_KINDS or word in ("cfg", "cfg_attr") or word in cfg_macros):
+                continue
+            seen.add((index, word))
+            unit = innermost_unit(rust_file, index)
+            if word in TRUST_KINDS:
+                if word == "assume_specification":
+                    opening = next((position for position in range(index + 1, min(index + 40, rust_file.count)) if texts[position] == "["), None)
+                    closing = rust_file.pairs.get(opening) if opening is not None else None
+                    point = "".join(texts[opening + 1:closing]) if closing is not None else "（认不出方括号里的那一项）"
+                    end = statement_end(rust_file, index, high)
+                    spec = joined_tokens(rust_file, index, end + 1)
+                elif word == "external_body":
+                    point = unit_path(crate, module, unit)
+                    opening = body_open(rust_file, unit)
+                    spec = joined_tokens(rust_file, unit.first_token, opening if opening is not None else unit.last_token + 1) if unit is not None else word
+                else:
+                    point = unit_path(crate, module, unit)
+                    spec = joined_tokens(rust_file, unit.first_token, unit.last_token + 1) if unit is not None else word
+                found.append({"kind": word, "file": relative, "point": point, "digest": hashlib.sha256(spec.encode()).hexdigest(), "line": rust_file.lines[index]})
+                continue
+            atom = None
+            if word in ("cfg", "cfg_attr") and index + 1 < rust_file.count and texts[index + 1] in ("(", "!"):
+                opening = index + 1 if texts[index + 1] == "(" else index + 2
+                closing = rust_file.pairs.get(opening)
+                if closing is not None:
+                    atom = word + ("!" if texts[index + 1] == "!" else "") + "".join(texts[opening:closing + 1])
+            elif word in cfg_macros and index + 1 < rust_file.count and texts[index + 1] == "!" and "cfg-macro-unchecked" not in FORMAL_BREAK:
+                atom = f"{word}!"
+            if atom is not None:
+                spec = joined_tokens(rust_file, unit.first_token, unit.last_token + 1) if unit is not None else atom
+                found.append({"kind": CFG_KIND, "file": relative, "point": f"{unit_path(crate, module, unit)}#{atom}",
+                              "digest": hashlib.sha256(spec.encode()).hexdigest(), "line": rust_file.lines[index]})
+    return found
+
+
+def region_problems(root, registry, kernels, options):
+    """被验区域的几样，交 [(卡在哪, 下一步)]；options["region_note"] 记一句给成功句。
+    ① axiom（axiom fn、broadcast axiom）在核里一律判红；② 被验区域里每一处可信声明（TRUST_KINDS）与 cfg 原子都要在信任清单里恰好登记一行：
+       种类、文件、点名的条目相同，规格原文的 sha256 与现算的相同，差分测试名在 crates/ 下标了 #[test]；清单里这个 crate 的行在核里找不到那一处的判红（标记集合与清单相等）；
+       vstd 恰好一行，版本与内容指纹等于登记表 package vstd 那一行；③ 被验区域里声明的类型与 trait，在 crate 的 src 里 verus! 外面（属性写法也没标）有 impl <Trait> for <类型>
+       的判红（cfg(test) 下的不判：不进产品构建）。
+    弄坏开关（FORMAL_VERIFICATION_BREAK）：axiom-accepted 不判 ①；trust-list-unchecked 不判 ② 的条目行；trust-digest-unchecked 不比 sha256；trust-test-unchecked 不核测试名；
+    trust-vstd-unchecked 不核 vstd 行；cfg-atom-accepted 不认 cfg 原子；cfg-macro-unchecked 不认宏里的 cfg；trait-impl-outside-accepted 不判 ③。"""
+    problems = []
+    manifest = crate_manifest(root, registry)
+    crate = crate_identifier(registry, manifest)
+    workspace = unit_index(root, options).workspace()
+    crate_files = sorted(os.path.relpath(path, root).replace(os.sep, "/")
+                         for path in glob.glob(os.path.join(root, registry.crate_directory, "src", "**", "*.rs"), recursive=True))
+    try:
+        parsed = {relative: workspace.file(relative) for relative in crate_files}
+    except (OSError, ValueError) as error:
+        raise Red(f"切不出 {registry.crate_directory} 的源码（scripts/gate/lib_function_units.py）：{error}",
+                  "先让 python3 scripts/gate/lib_function_units.py dump <根> --language rust 在这棵树上跑通")
+    cfg_macros = set()
+    for rust_file in parsed.values():
+        for unit in rust_file.units:
+            if unit.kind == "macro_rules" and unit.first_token is not None and "cfg" in rust_file.texts[unit.first_token:unit.last_token + 1][2:]:
+                cfg_macros.add(unit.short)
+    kernel_relatives = [os.path.relpath(kernel, root).replace(os.sep, "/") for kernel in kernels]
+    declarations, axioms = [], []
+    verified_types, verified_traits = set(), set()
+    for relative in kernel_relatives:
+        rust_file = parsed.get(relative) or workspace.file(relative)
+        module = kernel_module(registry, manifest, relative)
+        spans = region_spans(rust_file)
+        for index, word in enumerate(rust_file.texts):
+            if word == "axiom" and rust_file.kinds[index] == "ident":
+                axioms.append(f"{relative}:{rust_file.lines[index]}（{unit_path(crate, module, innermost_unit(rust_file, index))}）")
+        declarations += trusted_declarations(rust_file, relative, crate, module, spans, cfg_macros)
+        ranges = verus_ranges(rust_file)
+        for unit in rust_file.units:
+            if unit.container is None and unit.kind in ("struct", "enum", "union", "type", "trait") and in_verified_region(rust_file, unit, ranges):
+                (verified_traits if unit.kind == "trait" else verified_types).add(unit.short)
+    if "axiom-accepted" not in FORMAL_BREAK:
+        for where in axioms:
+            problems.append((f"核里有 axiom：{where}（axiom fn 与 broadcast axiom 不验、直接当真）",
+                             "axiom 一律不许：把它写成 proof fn 证出来；确是可信的外部事实，写成 uninterp spec fn 或 external_body 的 exec fn，逐条登记进信任清单 " + TRUST_LIST))
+    cfg_declarations = [entry for entry in declarations if entry["kind"] == CFG_KIND]
+    if "cfg-atom-accepted" in FORMAL_BREAK:
+        declarations = [entry for entry in declarations if entry["kind"] != CFG_KIND]
+        cfg_declarations = []
+    listed = read_trust_list(root)
+    checked_rows = 0
+    if "trust-list-unchecked" not in FORMAL_BREAK or cfg_declarations:
+        if listed is None:
+            problems.append((f"信任清单 {TRUST_LIST} 不在（被验区域里要登记的 {len(declarations)} 处：{listed_names(entry['kind'] + ' ' + entry['point'] for entry in declarations)}）",
+                             f"建这张表：头一行 vstd、版本、内容指纹、理由（版本与指纹照 {REGISTRY} 的 package vstd 行），再逐处登记；{TRUST_ROW_HOWTO}"))
+        else:
+            vstd_rows, rows, written_problems = listed
+            problems += [(problem, f"照 {TRUST_LIST} 文件头的格式改") for problem in written_problems]
+            vstd_package = next((package for package in registry.packages if package["name"] == "vstd"), None)
+            if "trust-vstd-unchecked" not in FORMAL_BREAK:
+                if len(vstd_rows) != 1:
+                    problems.append((f"信任清单里 vstd 行有 {len(vstd_rows)} 行，要恰好一行（vstd 按版本整体登记）", f"照 {REGISTRY} 的 package vstd 行写一行 vstd、版本、内容指纹、理由"))
+                elif vstd_package is None or (vstd_rows[0][0], vstd_rows[0][1]) != (vstd_package["version"], vstd_package["fingerprint"]):
+                    problems.append((f"信任清单第 {vstd_rows[0][2]} 行的 vstd {vstd_rows[0][0]}（指纹 {vstd_rows[0][1][:12]}…）与登记表 package vstd 行"
+                                     f"（{vstd_package['version'] + '，指纹 ' + vstd_package['fingerprint'][:12] + '…' if vstd_package else '没有这一行'}）不同",
+                                     "换了 vstd 就照新的 package vstd 行一起改这一行（信任的是那一版 vstd 的全部规格），并复核同源"))
+            mine = [row for row in rows if row["file"].startswith(registry.crate_directory + "/")]
+            if registry.all_crate_directories and registry.crate_directory == registry.all_crate_directories[0]:
+                for row in rows:
+                    if not any(row["file"].startswith(directory + "/") for directory in registry.all_crate_directories):
+                        problems.append((f"信任清单第 {row['number']} 行的文件 {row['file']} 不在登记的哪个 crate 里", "删掉这一行，或照新路径改"))
+            tests = test_functions(root) if "trust-test-unchecked" not in FORMAL_BREAK else set()
+            used = set()
+            for entry in declarations:
+                if entry["kind"] != CFG_KIND and "trust-list-unchecked" in FORMAL_BREAK:
+                    continue
+                matched = [row for row in mine if (row["kind"], row["file"], row["point"]) == (entry["kind"], entry["file"], entry["point"])]
+                wanted_row = f"{entry['kind']}\\t{entry['file']}\\t{entry['point']}\\t{entry['digest']}\\t<差分测试名>\\t<理由>"
+                if not matched:
+                    problems.append((f"{entry['file']}:{entry['line']} 的 {entry['kind']} {entry['point']} 没登记进信任清单 {TRUST_LIST}（这一处的规格原文 sha256 {entry['digest']}）",
+                                     f"{TRUST_ROW_HOWTO}；这一处那一行：{wanted_row}；cfg 原子能不用就不用（被验区域里一律判红，确要的才登记）"))
+                    continue
+                if len(matched) > 1:
+                    problems.append((f"信任清单第 {'、'.join(str(row['number']) for row in matched)} 行登记的是同一处 {entry['kind']} {entry['point']}", "留一行"))
+                row = matched[0]
+                used.add(row["number"])
+                checked_rows += 1
+                if row["digest"] != entry["digest"] and "trust-digest-unchecked" not in FORMAL_BREAK:
+                    problems.append((f"信任清单第 {row['number']} 行 {entry['kind']} {entry['point']} 登记的规格原文 sha256 是 {row['digest'][:12]}…，现算的是 {entry['digest']}"
+                                     f"（{entry['file']}:{entry['line']} 的规格改过）",
+                                     "规格改了就先让那条差分测试对着新规格跑过，再照现算的 sha256 改这一行；不是有意改的就照 git 找回原来的规格"))
+                if "trust-test-unchecked" not in FORMAL_BREAK and row["test"].split("::")[-1] not in tests:
+                    problems.append((f"信任清单第 {row['number']} 行 {entry['kind']} {entry['point']} 点名的差分测试 {row['test']} 在 crates/ 下找不到标了 #[test] 的函数",
+                                     "先写那条差分测试（把这份规格与真实现在一批输入上逐值比，规格写错时它要红），再照它的函数名改这一行"))
+            if "trust-list-unchecked" not in FORMAL_BREAK:
+                for row in mine:
+                    if row["number"] not in used and (row["kind"] != CFG_KIND or "cfg-atom-accepted" not in FORMAL_BREAK):
+                        problems.append((f"信任清单第 {row['number']} 行登记了 {row['kind']} {row['point']}（{row['file']}），核的被验区域里没有这一处",
+                                         "那一处删了或改了名：删掉这一行，或照新的点名改（信任清单与被验区域里的标记一一对应）"))
+    trait_impls = []
+    if "trait-impl-outside-accepted" not in FORMAL_BREAK:
+        for relative, rust_file in parsed.items():
+            ranges = verus_ranges(rust_file)
+            for unit in rust_file.units:
+                if unit.kind != "impl" or unit.first_token is None or in_verified_region(rust_file, unit, ranges):
+                    continue
+                trait, target = impl_parts(unit.name[unit.name.rfind("<impl"):] if "<impl" in unit.name else unit.name)
+                if trait is None or any(re.search(r"\btest\b", str(condition[1] if isinstance(condition, tuple) else condition)) for condition in unit.conditions):
+                    continue
+                if trait in verified_traits or target in verified_types:
+                    trait_impls.append(f"{relative}:{unit.first_line} {unit.name}")
+        for where in trait_impls:
+            problems.append((f"被验的类型或 trait 在 verus! 外面有 trait impl：{where}（verus! 外面的 impl Verus 不看，trait 的 ensures 在这里没人核）",
+                             "把这个 impl 挪进 verus! 里（方法照 trait 的 requires / ensures 证出来）；确是不该被验的类型，改名或挪出被验区域"))
+    cfg_count = sum(1 for entry in declarations if entry["kind"] == CFG_KIND)
+    options["region_note"] = (f"被验区域：可信声明与 cfg 原子 {len(declarations)} 处都登记在信任清单里（其中 cfg 原子 {cfg_count} 处）、核对了 {checked_rows} 行，"
+                              f"axiom 0 处，被验类型与 trait {len(verified_types) + len(verified_traits)} 个、verus! 外面的 trait impl 0 处，vstd 按版本整体登记一行")
+    return problems
+
+
+# ── 产品构建与 verus --compile 构建的 MIR 逐函数比（出口 5 第三轮判决 Z2：cfg 分叉、宏里的 cfg 让两边编出的函数体不同，两次产品编译看不见）──
+
+MIR_ITEM_HEAD = re.compile(r"^(fn|const|static|promoted\[\d+\] in) ")
+
+
+def mir_items(text):
+    """--emit=mir 的文本按条目切：{条目名: [整段原文…]}（fn 的名字取到 ( 之前；同名的几段按出现的次序收）。"""
+    items, current, buffer = {}, None, []
+    for line in text.split("\n"):
+        if current is None:
+            if MIR_ITEM_HEAD.match(line) and line.endswith("{"):
+                current = re.sub(r"\(.*", "", line) if line.startswith("fn ") else line
+                buffer = [line]
+            continue
+        buffer.append(line)
+        if line == "}":
+            items.setdefault(current, []).append("\n".join(buffer))
+            current = None
+    return items
+
+
+def newest_mir(target, identifier):
+    """编译目录 debug/deps 下这个 crate 的 .mir（几份取最新的一份）；没有交 None。"""
+    found = sorted(glob.glob(os.path.join(target, "debug", "deps", f"{identifier}-*.mir")), key=os.path.getmtime)
+    return found[-1] if found else None
+
+
+def compare_mir(root, registry, manifest, executable, options):
+    """产品构建（cargo rustc --emit=mir，产品的 rustc；路径不裁短：RUSTC_BOOTSTRAP=1 -Z trim-diagnostic-paths=false，与 Verus 印的同一种写法）与
+    Verus 构建（直接起的 verus --no-verify --compile -- --emit=mir；cargo 那一种 cargo verus build -- --no-verify -- --emit=mir）的 MIR 逐条目比：产品构建的每个条目在 Verus 构建里都有、
+    整段逐字相同；Verus 构建多出来的（spec fn、proof fn 擦出来的空壳）不比。交 ([(卡在哪, 下一步)], 一句给成功句)。
+    两边各在这一份副本里编，编译目录各一份，比完删。弄坏开关 FORMAL_VERIFICATION_BREAK=mir-compare-skipped 下不比（改前的样子）。"""
+    if "mir-compare-skipped" in FORMAL_BREAK:
+        return [], "MIR 比对没跑（弄坏开关 mir-compare-skipped）"
+    identifier = crate_identifier(registry, manifest)
+    package = crate_package_name(registry)
+    howto = ("两边编出的函数体不同：多半是 cfg 原子或宏里的 cfg 让 Verus 看的与产品编的不是同一份（verus_keep_ghost、feature、debug_assertions），"
+             "把分叉去掉；确要的分叉连同它登记的那一行一起重想（信任清单只管规格，不替两边的执行代码作保）")
+    with tempfile.TemporaryDirectory(prefix="verus-proof-check-mir-") as work:
+        copy = copy_crate(root, registry, work)
+        if not registry.cargo_mode:
+            # 直接起的那一种：产品构建在 crate 副本里单独成一个工作区编（MIR 里 impl 的位置写 src/…，与 verus 在 crate 副本里起印的相同）
+            with open(os.path.join(copy, "Cargo.toml"), "a", encoding="utf-8") as handle:
+                handle.write("\n# verus-proof-check.py 的 MIR 比对：副本自成一个工作区\n[workspace]\n")
+            if os.path.isfile(os.path.join(root, "Cargo.lock")):
+                shutil.copy2(os.path.join(root, "Cargo.lock"), os.path.join(copy, "Cargo.lock"))
+        product_target, verus_target = os.path.join(work, "product-target"), os.path.join(work, "verus-target")
+        # 产品的 cargo 照 PATH 找（自证把假 cargo 放在 PATH 最前面）
+        product = run_verus("cargo", ["rustc", "-p", package, "--lib", "--offline", "--", "--emit=mir", "-Z", "trim-diagnostic-paths=false"], copy, options,
+                            "proof-mir", label="产品构建", extra_environment={"CARGO_TARGET_DIR": product_target, "RUSTC_BOOTSTRAP": "1"})
+        if registry.cargo_mode:
+            built = run_verus(verus_program(registry, executable),
+                              verus_program_arguments(registry, verus_arguments(registry, manifest, options["threads"]) + ["--no-verify", "--", "--emit=mir"], build=True),
+                              copy, options, "proof-mir", label="Verus 构建", extra_environment={"CARGO_TARGET_DIR": verus_target})
+            verus_mir = newest_mir(verus_target, identifier)
+        else:
+            verus_mir = os.path.join(work, "verus.mir")
+            built = run_verus(verus_program(registry, executable),
+                              verus_program_arguments(registry, verus_arguments(registry, manifest, options["threads"]) + ["--no-verify", "--compile", "--", "--emit=mir", "-o", verus_mir]),
+                              copy, options, "proof-mir", label="Verus 构建")
+        problems = []
+        verus_label = "Verus 构建（cargo verus build -- --no-verify -- --emit=mir）" if registry.cargo_mode else "Verus 构建（verus --no-verify --compile -- --emit=mir）"
+        for label, outcome in (("产品构建（cargo rustc --emit=mir）", product), (verus_label, built)):
+            if outcome.get("queue_skipped") or outcome["timed_out"] or outcome["wrapper"] or killed_signal(outcome) is not None or outcome["exit"] != 0:
+                tail = " | ".join(line for line in outcome.get("diagnostics", "").strip().split("\n")[-6:] if line.strip())
+                problems.append((f"MIR 比对：{label} 没编成（退 {outcome['exit']}）：{outcome_problem(outcome, options) or tail[-400:]}",
+                                 problem_howto(outcome, "照报错修；产品构建编不过先让 cargo build 过，Verus 构建编不过先看完整 crate 证明那一步")))
+        if problems:
+            return problems, ""
+        product_mir = newest_mir(product_target, identifier)
+        if product_mir is None or verus_mir is None or not os.path.isfile(verus_mir):
+            return [(f"MIR 比对：找不到 MIR 文件（产品构建 {product_mir or '没有'}，Verus 构建 {verus_mir or '没有'}）",
+                     "cargo 或 Verus 换了 --emit=mir 的落点：照新落点改 scripts/gate/verus-proof-check.py 的 newest_mir")], ""
+        product_items = mir_items(open(product_mir, encoding="utf-8", errors="replace").read())
+        verus_items = mir_items(open(verus_mir, encoding="utf-8", errors="replace").read())
+    missing = [name for name in product_items if name not in verus_items]
+    different = [name for name in product_items if name in verus_items and product_items[name] != verus_items[name]]
+    if not product_items:
+        return [("MIR 比对：产品构建的 MIR 里一个条目都切不出来", "看 mir_items 认的条目头（fn / const / static / promoted）还对不对得上 rustc 的印法")], ""
+    if missing or different:
+        return [(f"MIR 比对：产品构建 {len(product_items)} 个条目里，{len(different)} 个与 Verus 构建的函数体不同（{listed_names(different, 10)}），"
+                 f"{len(missing)} 个在 Verus 构建里没有（{listed_names(missing, 10)}）", howto)], ""
+    return [], (f"产品构建与 {'cargo verus build' if registry.cargo_mode else 'verus --compile'} 构建的 MIR 逐条目比：产品的 {len(product_items)} 个条目都在、整段逐字相同"
+                f"（Verus 构建另有 {len(verus_items) - len(product_items)} 个擦出来的条目，不比）")
+
+
 def verus_executable(registry, options):
     directory = verus_directory(registry, options.get("verus_root"))
     executable = os.path.join(directory, "verus")
@@ -887,8 +1741,18 @@ def verus_executable(registry, options):
     return executable, version
 
 
-def prepared(root, options):
+def crate_registry(root, options):
+    """这一趟判的那一个 crate 的登记：run_per_crate 交的 options["crate_view"]；没有时读登记表（只登记了一个 crate）。"""
+    if options.get("crate_view") is not None:
+        return options["crate_view"]
     registry = read_registry(root)
+    if len(registry.crates) != 1:
+        raise Red(f"登记表 {REGISTRY} 登记了 {len(registry.crates)} 个 crate，这一步只能判一个", "经 run_check 起（它逐个 crate 判）")
+    return registry
+
+
+def prepared(root, options):
+    registry = crate_registry(root, options)
     kernels = kernel_files(root, registry)
     manifest = crate_manifest(root, registry)
     check_dependencies(registry, manifest)
@@ -938,30 +1802,103 @@ def verus_ranges(rust_file):
             and position + 2 in rust_file.pairs]
 
 
+class VerusFunction(collections.namedtuple("VerusFunction", "name relative unit path")):
+    """被验区域里的一个 fn：name 是交给 --verify-function 的名字（自由 fn 是它的名字，impl 与 trait 里的是 <类型或 trait>::<方法>，与 Verus 列的可点名函数同一种写法），
+    relative 是核相对仓根的路径，unit 是 lib_function_units 切出的单元（算键的入口是 <核>::<unit.name>），path 是全路径
+    <crate>::<模块>::<name>（项名用它，与 Verus 的 func-details 同一种写法；核是 crate 入口的没有模块那一段）。"""
+
+
+def impl_parts(label):
+    """impl 单元的嵌套路径（lib_function_units 的写法：<impl …>，去掉了 impl 后面的泛型参数表与 where 子句）交 (trait 名或 None, 类型名)：都取路径的最后一段、去掉类型参数。
+    认不出（&T、dyn、元组这类）交 (trait, None)。"""
+    inner = label[len("<impl "):-1] if label.startswith("<impl ") and label.endswith(">") else label
+    trait, _for, target = inner.rpartition(" for ") if " for " in inner else ("", "", inner)
+
+    def last_segment(text):
+        text = text.strip().split("<", 1)[0].strip()
+        segment = text.split("::")[-1].strip()
+        return segment if RUST_IDENTIFIER.fullmatch(segment or "") else None
+    return (last_segment(trait) if trait else None), last_segment(target)
+
+
+def unit_attribute_words(rust_file, unit):
+    """单元开头那几个外属性 #[…] 里的词（文档注释不算）。"""
+    words, index = [], unit.first_token
+    while index is not None and index + 1 < rust_file.count and rust_file.texts[index] == "#" and rust_file.texts[index + 1] == "[" and index + 1 in rust_file.pairs:
+        close = rust_file.pairs[index + 1]
+        words += rust_file.texts[index + 2:close]
+        index = close + 1
+    return words
+
+
+def attribute_verified(rust_file, unit):
+    """属性写法标的被验单元：它自己或包它的 impl / trait 带 #[verus_verify] 或 #[verus_spec(…)]（弄坏开关 attribute-mode-unrecognized 下不认）。"""
+    if "attribute-mode-unrecognized" in FORMAL_BREAK:
+        return False
+    for owner in (unit, unit.container):
+        if owner is not None and owner.first_token is not None and any(word in ("verus_verify", "verus_spec") for word in unit_attribute_words(rust_file, owner)):
+            return True
+    return False
+
+
+def in_verified_region(rust_file, unit, ranges):
+    """单元在被验区域里：落在某个 verus! { … } 里，或是属性写法标的（attribute_verified）。"""
+    if unit.first_token is None:
+        return False
+    return any(low < unit.first_token < high for low, high in ranges) or attribute_verified(rust_file, unit)
+
+
+def verus_point_name(unit):
+    """交给 --verify-function 的名字：自由 fn 是它的名字；impl 里的方法是 <类型>::<方法>（trait impl 也写类型，Verus 0.2026.09.20 列可点名函数就是这么写的，
+    2026-10-26 在草稿的小 crate 上量的：impl Device for GoodDevice 的 read_slot 列成 GoodDevice::read_slot，同一个类型的固有方法与 trait 方法同名时按名点两个一起验）；
+    trait 里的方法是 <trait>::<方法>。认不出类型的交 None。
+    弄坏开关 methods-refused 下 impl 与 trait 里的一律交 None（改前的样子：判红要挪成自由 fn）。"""
+    container = unit.container
+    if container is None:
+        return unit.short
+    if "methods-refused" in FORMAL_BREAK:
+        return None
+    if container.kind == "trait":
+        return f"{container.short}::{unit.short}"
+    if container.kind == "impl":
+        _trait, target = impl_parts(container.name)
+        return f"{target}::{unit.short}" if target else None
+    return None
+
+
 def verus_functions(root, registry, kernels, options):
-    """核里 verus! { … } 里的每个 fn 单元（spec、proof、exec 都算），按核与行号的次序：[(名, 核的相对路径, 单元)]。空真认所属函数、必红世界认受影响的函数用它；
-    证明成哪几项另由 proof_items 从里面挑（spec fn 没有证明义务的不成项）。
-    同一份核里两个 fn 同名、或 fn 在 impl / trait 里（--verify-function 按名点，这两种点不准）判红，出路是改名或挪成自由 fn。"""
+    """核的被验区域（verus! { … } 里，与属性写法标的）里的每个 fn 单元（spec、proof、exec 都算；impl 与 trait 里的方法也算），按核与行号的次序：[VerusFunction]。
+    空真认所属函数、必红世界认受影响的函数用它；证明成哪几项另由 proof_items 从里面挑（spec fn 没有证明义务的不成项，trait 里没有函数体的声明不成项）。
+    同一个模块里两个 fn 交给 --verify-function 的名字相同（同一个类型的固有方法与 trait 方法同名，Verus 按名点会把两个一起验）判红，出路是改名。
+    认不出类型的 impl（&T、dyn 这类）里的方法判红。项名是全路径（VerusFunction.path），不同模块里同名的各是各的项。"""
     index = unit_index(root, options)
+    manifest = crate_manifest(root, registry)
+    crate = crate_identifier(registry, manifest)
     functions = []
     try:
         workspace = index.workspace()
         for kernel in kernels:
             relative = os.path.relpath(kernel, root).replace(os.sep, "/")
+            module = kernel_module(registry, manifest, relative)
             rust_file = workspace.file(relative)
             ranges = verus_ranges(rust_file)
             names = {}
             for unit in rust_file.units:
-                if unit.kind != "fn" or unit.first_token is None or not any(low < unit.first_token < high for low, high in ranges):
+                if unit.kind != "fn" or not in_verified_region(rust_file, unit, ranges):
                     continue
-                if unit.container is not None:
-                    raise Red(f"{relative}:{unit.first_line} 的 {unit.name} 在 verus! 里的 impl 或 trait 里：--verify-function 按名点不准它",
-                              "把它挪成 verus! 里的自由 fn（或给 verus-proof-check.py 的 verus_functions 补上带容器的点法再用）")
-                if unit.name in names:
-                    raise Red(f"{relative} 的 verus! 里有两个 fn 叫 {unit.name}（第 {names[unit.name].first_line} 行与第 {unit.first_line} 行）：--verify-function 按名点不准",
-                              "给其中一个改名，同步改 .claude/gate.d/verus-pins.tsv 与必红世界表里引它的行")
-                names[unit.name] = unit
-                functions.append((unit.name, relative, unit))
+                if unit.container is not None and unit.container.kind not in ("impl", "trait"):
+                    continue   # fn 里套的 fn 不另成函数（随外层验）
+                name = verus_point_name(unit)
+                if name is None:
+                    raise Red(f"{relative}:{unit.first_line} 的 {unit.name} 在 verus! 里的 impl 或 trait 里，认不出交给 --verify-function 的名字"
+                              + ("（弄坏开关 methods-refused）" if "methods-refused" in FORMAL_BREAK else "（impl 的类型不是一个具名的类型）"),
+                              "impl 写成 impl <Trait> for <类型名> 或 impl <类型名>；确要别的写法，给 verus-proof-check.py 的 verus_point_name 补上认法")
+                if name in names:
+                    raise Red(f"{relative} 的被验区域里有两个 fn 交给 --verify-function 的名字都是 {name}（第 {names[name].first_line} 行与第 {unit.first_line} 行）："
+                              "Verus 按名点会把两个一起验，逐项点不准",
+                              "给其中一个改名（同一个类型的固有方法与 trait 方法同名最常见），同步改必红世界表里引它的行")
+                names[name] = unit
+                functions.append(VerusFunction(name, relative, unit, "::".join(part for part in (crate, module, name) if part)))
     except (OSError, KeyError, ValueError) as error:
         raise Red(f"切不出核里的函数单元（scripts/gate/lib_function_units.py）：{error}", "先让 python3 scripts/gate/lib_function_units.py dump <根> --language rust 在这棵树上跑通")
     return functions
@@ -1013,22 +1950,33 @@ def proof_items(root, registry, kernels, functions, options):
     """证明这一格的项：有证明义务的单元各一项，按核与行号的次序交 [ProofItem]，与没成项的 [(名, 核的相对路径)]。
     成项的四类：proof fn、exec fn（各一条，exec fn 里每个 while / loop / for 另一条：Verus 把循环体单独验）、带 decreases 的 spec fn（终止义务一条）、
     verus! 里 derive(Clone) 的类型（Verus 验它生成的 <类型>::clone，一条）。spec fn 不带 decreases 的没有证明义务（真 Verus 逐函数验报 verified 0）：
-    不成项，随用到它的项进那一项的单元闭包键。项名 proof:<--verify-function 点的名字>；名字都是 Verus 可点名函数表里恰好那一个（自由 fn 的名字、<类型>::clone），
+    不成项，随用到它的项进那一项的单元闭包键；trait 里没有函数体的声明与 external_body 的 fn 也不成项。项名 proof:<全路径>（<crate>::<模块>::<名>），
+    交给 --verify-function 的 <名> 是 Verus 可点名函数表里恰好那一个（自由 fn 的名字、<类型>::<方法>、<trait>::<方法>、<类型>::clone），
     Verus 有恰好同名的就取它，不会点到别人。弄坏开关：spec-fn-as-item 下 spec fn 一律成项（改前的样子），spec-decreases-not-item 下带 decreases 的 spec fn
     不成项，derived-clone-not-item 下 derive(Clone) 不成项。"""
     workspace = unit_index(root, options).workspace()
+    manifest = crate_manifest(root, registry)
+    crate = crate_identifier(registry, manifest)
     by_kernel = {}
-    for name, relative, unit in functions:
-        by_kernel.setdefault(relative, []).append((name, unit))
+    for function in functions:
+        by_kernel.setdefault(function.relative, []).append(function)
     items, left_out = [], []
     for kernel in kernels:
         relative = os.path.relpath(kernel, root).replace(os.sep, "/")
         rust_file = workspace.file(relative)
+        module = kernel_module(registry, manifest, relative)
         ranges = verus_ranges(rust_file)
         entries = []
-        for name, unit in by_kernel.get(relative, []):
+        for function in by_kernel.get(relative, []):
+            name, unit = function.name, function.unit
             mode = function_mode(rust_file, unit)
             body = rust_file.texts[unit.first_token:unit.last_token]
+            if unit.container is not None and unit.container.kind == "trait" and "{" not in body:
+                left_out.append((function.path, relative))   # trait 里只有签名与契约、没有函数体的声明：Verus 不验它（义务落在各 impl 上）
+                continue
+            if "external_body" in unit_attribute_words(rust_file, unit):
+                left_out.append((function.path, relative))   # external_body：函数体不验，规格照信任清单登记（region_problems），不成项
+                continue
             if mode == "proof":
                 kind, estimate = PROOF_FN, 1
             elif mode == "exec":
@@ -1038,9 +1986,9 @@ def proof_items(root, registry, kernels, functions, options):
             elif "spec-fn-as-item" in BREAK:
                 kind, estimate = "spec fn", 0
             else:
-                left_out.append((name, relative))
+                left_out.append((function.path, relative))
                 continue
-            entries.append((unit.first_token, ProofItem(proof_item(name), name, relative, unit, kind, f"{relative}::{name}", estimate)))
+            entries.append((unit.first_token, ProofItem(proof_item(function.path), name, relative, unit, kind, f"{relative}::{unit.name}", estimate)))
         if "derived-clone-not-item" not in BREAK:
             for unit in rust_file.units:
                 if unit.kind not in ("struct", "enum", "union") or unit.first_token is None or unit.container is not None \
@@ -1049,17 +1997,18 @@ def proof_items(root, registry, kernels, functions, options):
                 for trait in DERIVED_VERIFIED_TRAITS:
                     if trait in derived_traits(rust_file, unit):
                         verus_name = f"{unit.short}::{trait.lower()}"
-                        entries.append((unit.first_token, ProofItem(proof_item(verus_name), verus_name, relative, unit, DERIVED_CLONE, f"{relative}::{unit.short}", 1)))
+                        full = "::".join(part for part in (crate, module, verus_name) if part)
+                        entries.append((unit.first_token, ProofItem(proof_item(full), verus_name, relative, unit, DERIVED_CLONE, f"{relative}::{unit.short}", 1)))
         items += [item for _position, item in sorted(entries, key=lambda pair: pair[0])]
     return items, left_out
 
 
 def owner_function(functions, relative, line):
-    """核 relative 第 line 行落在哪个 verus! 里的 fn 单元里，交 (名, 单元)；不在任何一个里交 (None, None)。"""
-    for name, kernel, unit in functions:
-        if kernel == relative and unit.first_line <= line <= unit.last_line:
-            return name, unit
-    return None, None
+    """核 relative 第 line 行落在哪个被验区域里的 fn 单元里，交那个 VerusFunction；不在任何一个里交 None。"""
+    for function in functions:
+        if function.relative == relative and function.unit.first_line <= line <= function.unit.last_line:
+            return function
+    return None
 
 
 def shared_components(root, registry, options):
@@ -1073,6 +2022,9 @@ def shared_components(root, registry, options):
         if "reuse-key-without-toolchain" not in BREAK:
             components.append(("工具链", digest_text(tool_versions_text(root, options.get("verus_root")))))
         components.append(("rlimit", digest_text(str(registry.rlimit))))
+        # 信任清单（vstd 行与这个 crate 的条目行）：登记的规格就是证明的前提，改一行这个 crate 的每一项都现判（第二轮正推 Y4 第 9 条）
+        if "reuse-key-without-trust-list" not in FORMAL_BREAK:
+            components.append(("信任清单", digest_text(trust_list_text(root, registry))))
         if "reuse-key-with-timeout" in BREAK:
             components.append(("限时", digest_text(str(options["timeout"]))))
         options["shared_components"] = components
@@ -1187,9 +2139,30 @@ def report_item(item, verdict, how, seconds=None):
     print(f"  · {item}：{verdict}，{how}" + (f"，{seconds:.1f} 秒" if seconds is not None else ""))  # gate-lint:detail
 
 
-def finish_tally(tally, cell):
+def cell_tally(options):
+    """这一格（登记了几个 crate 时是这个 crate 那一趟）的现判、复用数；几个 crate 一格时记进 options["crate_tallies"]，由 run_per_crate 合起来报一次。"""
+    tally = Tally()
+    if options.get("crate_tallies") is not None:
+        options["crate_tallies"].append(tally)
+    return tally
+
+
+def finish_tally(tally, cell, options=None):
+    """一格判完报「按条：现判 N、复用 M」，并往门禁给的 FORMAL_ITEM_TALLY_FILE 追加一行；几个 crate 一格时只报这个 crate 的、不追加（run_per_crate 合起来追加一行）。"""
+    if options is not None and options.get("crate_tallies") is not None:
+        print(f"  · 按条（{options['crate_view'].crate_directory}）：{tally.text()}")  # gate-lint:detail
+        return
     print(f"  · 按条：{tally.text()}")  # gate-lint:detail
     tally.append_to(os.environ.get(ITEM_TALLY_FILE_VARIABLE), cell)
+
+
+def merged_tally(tallies):
+    total = Tally()
+    for tally in tallies:
+        total.reused += tally.reused
+        for reason, count in tally.reasons.items():
+            total.reasons[reason] = total.reasons.get(reason, 0) + count
+    return total
 
 
 def proof_item(name):
@@ -1248,8 +2221,17 @@ def check_proof(root, options):
     不等判红并点名：verified 与静态估的义务条数不同的项、没成项的 verus! fn。--item proof 或不给 --item 是整格；--item proof:<名> 只验点名的，不比之和。"""
     registry, kernels, manifest, executable = prepared(root, options)
     modules = kernel_modules(root, registry, manifest, kernels)
-    functions = verus_functions(root, registry, kernels, options)
-    items, left_out = proof_items(root, registry, kernels, functions, options)
+    # 被验区域的另几样（出口 5 第三轮判决第三节「门禁」）：信任清单逐条登记、axiom、cfg 原子、被验类型的 trait impl 在 verus! 外面。
+    # 先于切函数判：按 cfg 分叉的两份同名 fn 在切函数那一步就红（逐项点不准），红句要先说 cfg 原子
+    region = region_problems(root, registry, kernels, options)
+    try:
+        functions = verus_functions(root, registry, kernels, options)
+        items, left_out = proof_items(root, registry, kernels, functions, options)
+    except Red as red:
+        if not region:
+            raise
+        report_cell(region + [(red.message, red.howto)])
+        return EXIT_RED
     if not items:
         raise Red(f"{len(kernels)} 份核的 verus! 里一个有证明义务的单元都没有（verus! 里 {len(functions)} 个 fn，{len(left_out)} 个是不带 decreases 的 spec fn）：证明这一格没有项",
                   "核里的证明写在 verus! { … } 里的 proof fn 与 exec fn 上；核挪了地方就改 .claude/gate.d/verus-pins.tsv 的 kernel 行")
@@ -1258,16 +2240,18 @@ def check_proof(root, options):
     whole = not wanted or "item-filter-ignored" in BREAK
     chosen = selected_items(dict(options, items=wanted), ["proof", *available], "verus-proof") if wanted else available
     selected = [entry for entry in items if entry.item in chosen]
-    store, tally = verdict_library(options, "proof-function", "proof"), Tally()
+    store, tally = verdict_library(options, "proof-function", "proof"), cell_tally(options)
     shared = shared_components(root, registry, options)
     problems = []
     if "cheating-unchecked" not in BREAK:
         for marker in cheating_markers(root, kernels):
-            problems.append((f"核里有不许的标记 {marker}", "证明里不许 assume / admit / external_body / verifier::external：把它换成真证明，证不出就照实报，不绕过"))
+            problems.append((f"核里有不许的标记 {marker}", "被验区域里不许 admit、assume(…)、axiom、verifier::external：把它换成真证明，证不出就照实报，不绕过；"
+                             f"std 规格与设备、校验和这类可信声明写成 assume_specification / external_body / uninterp spec fn，逐条登记进信任清单 {TRUST_LIST}"))
         if "rlimit-attribute-unchecked" not in BREAK:
             for marker in rlimit_attributes(root, kernels):
                 problems.append((f"核里有不许的标记 {marker}（函数上的 rlimit 属性盖过命令行的 --rlimit {registry.rlimit}，这个函数不在登记的额度上验）",
                                  f"删掉这个属性；证明确要更多额度，照 {REGISTRY} rlimit 行上面的注释在新数上把核与必红世界表整张重验一遍，再调高登记的数"))
+    problems += region
     counts, pending = {}, []
     keyed = [(entry, shared + function_components(root, registry, options, [entry.entry], "被验函数单元闭包") if shared else []) for entry in selected]
     sentinel = plan_sentinel(options, store, "proof-function", "verus-proof", [(entry.item, components) for entry, components in keyed])
@@ -1278,7 +2262,7 @@ def check_proof(root, options):
             reused, reason = False, "记录里没有 verified 数"
         tally.count(reused, reason)
         if reused:
-            counts[entry.verus_name] = int(verified)
+            counts[entry.item] = int(verified)
             report_item(entry.item, "绿", f"复用（{reason}）")
             sentinel.observe(entry.item, reuse_checks.REUSED, "绿")
         else:
@@ -1314,11 +2298,12 @@ def check_proof(root, options):
             return [(f"{item}：Verus 在 --verify-function {entry.verus_name} 上一条义务都没验（{results_text(results)}；它是 {entry.kind}，静态估 {entry.estimate} 条）",
                      "点到的不是要验的那个函数，或它本没有证明义务：看 scripts/gate/verus-proof-check.py 的 proof_items 怎么认它这一类"
                      "（不带 decreases 的 spec fn 不成项），名字与别的函数撞了就改名")], "", None
-        counts[entry.verus_name] = results["verified"]
+        counts[entry.item] = results["verified"]
         return [], f"{results['verified']} verified、0 errors", {"verified": str(results["verified"])}
 
     judging = ItemJudging(store, judge_one, "verus-proof",
-                          f"verus --verify-root|--verify-only-module <核所在的模块> --verify-function <名> --no-cheating --rlimit {registry.rlimit}（{registry.tag}）",
+                          f"{'cargo verus focus' if registry.cargo_mode else 'verus'} --verify-root|--verify-only-module <核所在的模块> --verify-function <名> "
+                          f"--rlimit {registry.rlimit}（{registry.tag}）",
                           sentinel=sentinel)
     started = time.monotonic()
     verify_in_parallel(root, registry, manifest, executable, options,
@@ -1330,8 +2315,8 @@ def check_proof(root, options):
     total = sum(counts.values())
     breakdown = item_kinds_text(selected)
     if whole and not problems and total != registry.verified_count and "count-unchecked" not in BREAK:
-        off = [f"{entry.verus_name} 验出 {counts[entry.verus_name]}、静态估 {entry.estimate}" for entry in selected
-               if entry.verus_name in counts and counts[entry.verus_name] != entry.estimate]
+        off = [f"{entry.item} 验出 {counts[entry.item]}、静态估 {entry.estimate}" for entry in selected
+               if entry.item in counts and counts[entry.item] != entry.estimate]
         problems.append((f"各项 verified 之和 {total} 与登记的 {registry.verified_count} 不同（{'少' if total < registry.verified_count else '多'} "
                          f"{abs(registry.verified_count - total)} 条；成项 {len(selected)} 个：{breakdown}，静态估之和 {sum(entry.estimate for entry in selected)}）："
                          f"verified 与静态估不同的项：{listed_names(off)}；没成项的 verus! fn（不带 decreases 的 spec fn，静态估 0 条）{len(left_out)} 个："
@@ -1339,21 +2324,44 @@ def check_proof(root, options):
                          "少了是整 crate 验出的义务有一部分不落在成项的单元上：在副本上整 crate 验一次（不带 --verify-function），再逐个 --verify-function 没成项的那几个，"
                          "验出非 0 的那一类补进 scripts/gate/verus-proof-check.py 的 proof_items；多了先看 verified 与静态估不同的那几项；"
                          f"确是加减了证明就照整 crate 验出的数改 {REGISTRY} 的 crate 行，并在改动说明里写加减了哪几个"))
-    finish_tally(tally, "verus-proof")
+    # 逐函数的计数相同并不表示义务集合完整；完整验证也检查未选中的引理。
+    if whole and not problems:
+        outcome = verify_in_parallel(root, registry, manifest, executable, options,
+                                     [("完整 crate 证明", {})], "proof-complete")[0]
+        problem = outcome_problem(outcome, options)
+        if problem or not verification_clean((outcome.get("json") or {}).get("verification-results", {}), False) or (outcome.get("json") or {}).get("verification-results", {}).get("is-verifying-entire-crate") is not True:
+            problems.append((f"完整 crate 验证失败：{problem or outcome['diagnostics'][-3000:]}",
+                             "逐项通过不能替代完整验证：检查漏登记、宏生成或未验证的引理"))
+    # 产品构建与 verus --compile 构建的 MIR 逐函数比（出口 5 第三轮判决 Z2）：整格跑、前面都没红时比一次，不按条入库（同完整 crate 证明）
+    mir_note = "MIR 比对没跑（--item 点名、或前面已经红了）"
+    if whole and not problems:
+        mir_problems, mir_note = compare_mir(root, registry, manifest, executable, options)
+        problems += mir_problems
+    finish_tally(tally, "verus-proof", options)
     if problems:
         report_cell(problems)
         return EXIT_RED
     scope = (f"--item 点名的 {len(selected)} 项（不比之和）" if not whole
              else f"成项 {len(selected)} 个（{breakdown}），各项 verified 之和 {total}、0 errors（登记 {registry.verified_count}）；"
                   f"不成项的 spec fn {len(left_out)} 个（没有证明义务，随用到它们的项进键）")
-    print(f"  ✓ Verus 逐项验 {registry.crate_directory}：{scope}，--no-cheating，--rlimit {registry.rlimit}，"
-          f"{len(kernels)} 份核里 0 处作弊标记，限时 {options['timeout']} 秒内出结局；按条{tally.text()}（{time.monotonic() - started:.1f} 秒）")
+    print(f"  ✓ Verus 逐项验 {registry.crate_directory}{'（cargo verus focus）' if registry.cargo_mode else ''}：{scope}，--rlimit {registry.rlimit}，"
+          f"{len(kernels)} 份核里 0 处不许的标记，{options.get('region_note', '被验区域没扫')}；{mir_note}；限时 {options['timeout']} 秒内出结局；"
+          f"按条{tally.text()}（{time.monotonic() - started:.1f} 秒）")
     return EXIT_GREEN
 
 
 def requires_insertion_points(text):
     """每一处 requires 的函数体头：[(requires 行号, { 所在行的下标, 说明)]；认不出函数体的抛 Red。"""
     lines = text.split("\n")
+    kinds, words, token_lines, _docs = rust_lex(text)
+    for position, word in enumerate(words):
+        if word != "requires" or (position > 0 and words[position - 1] in (".", "::")):
+            continue
+        line = token_lines[position]
+        prefix = strip_line_comment(lines[line - 1]).strip()
+        if not (prefix == "requires" or prefix.startswith("requires ")):
+            raise Red(f"第 {line} 行的 requires 不是独立契约行：拒绝漏检",
+                      "将 requires 单独起行，函数体的 { 单独起行后再做空真筛查")
     points = []
     for index, line in enumerate(lines):
         stripped = strip_line_comment(line).strip()
@@ -1389,6 +2397,12 @@ def verify_in_parallel(root, registry, manifest, executable, options, edits, key
     jobs = options["jobs"] or min(len(edits), max(1, options["threads"] // 4))
     threads = max(1, options["threads"] // jobs)
     state = queue_refusal(options)
+    # cargo 那一种：几处同时验各占一个编译目录（同一个编译目录 cargo 一次只让一处用），vstd 与依赖在一个编译目录里只编一次；
+    # 副本各在新目录里（copy_crate），被验的 crate 每处都现编，不会拿到上一处的结果
+    slots = queue.Queue()
+    slot_root = tempfile.mkdtemp(prefix="verus-proof-check-targets-") if registry.cargo_mode else None
+    for slot in range(jobs):
+        slots.put(os.path.join(slot_root, f"target-{slot}") if slot_root else None)
 
     def one(index, edit):
         started = time.monotonic()
@@ -1396,20 +2410,32 @@ def verify_in_parallel(root, registry, manifest, executable, options, edits, key
         if earlier:
             outcome = skipped_outcome(earlier)
         else:
-            with tempfile.TemporaryDirectory(prefix="verus-proof-check-") as work:
-                crate_copy = copy_crate(root, registry, work)
-                for relative, content in edit[1].items():
-                    with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
-                        handle.write(content)
-                outcome = run_verus(executable, crate_copy, verus_arguments(registry, manifest, threads, edit[2] if len(edit) > 2 else None,
-                                                                            edit[3] if len(edit) > 3 else None), options, key, label=edit[0])
+            slot = slots.get()
+            try:
+                with tempfile.TemporaryDirectory(prefix="verus-proof-check-") as work:
+                    crate_copy = copy_crate(root, registry, work)
+                    for relative, content in edit[1].items():
+                        with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
+                            handle.write(content)
+                    arguments = verus_program_arguments(registry, verus_arguments(registry, manifest, threads, edit[2] if len(edit) > 2 else None,
+                                                                                  edit[3] if len(edit) > 3 else None))
+                    if slot:
+                        forget_crate_fingerprints(slot, crate_package_name(registry))
+                    outcome = run_verus(verus_program(registry, executable), arguments, crate_copy, options, key, label=edit[0],
+                                        extra_environment={"CARGO_TARGET_DIR": slot} if slot else None)
+            finally:
+                slots.put(slot)
         if judged is not None:
             judged(index, outcome, time.monotonic() - started)
         return outcome
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-        futures = [pool.submit(one, index, edit) for index, edit in enumerate(edits)]
-        return [future.result() for future in futures]
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+            futures = [pool.submit(one, index, edit) for index, edit in enumerate(edits)]
+            return [future.result() for future in futures]
+    finally:
+        if slot_root:
+            shutil.rmtree(slot_root, ignore_errors=True)
 
 
 class ItemJudging:
@@ -1474,16 +2500,16 @@ def vacuity_points(root, registry, kernels, functions):
         every_point = list(lines)
         ordinals = {}
         for requires_line, brace, label in requires_insertion_points(text):
-            owner, _unit = owner_function(functions, relative, requires_line)
+            owner = owner_function(functions, relative, requires_line)
             if owner is None:
                 raise Red(f"{relative} 第 {requires_line} 行的 requires 不在 verus! 里的任何 fn 里：认不出它属于哪个函数",
                           "requires 只写在 verus! 里的 fn 与它里面的闭包上；确是新写法，把判法补进 scripts/gate/verus-proof-check.py 的 vacuity_points")
-            ordinals[owner] = ordinals.get(owner, 0) + 1
+            ordinals[owner.path] = ordinals.get(owner.path, 0) + 1
             changed = list(lines)
             changed[brace] = with_assert_false(changed[brace])
             every_point[brace] = with_assert_false(every_point[brace])
-            points.append((f"vacuity:{owner}#{ordinals[owner]}", f"{relative} {label}", {relative: "\n".join(changed)},
-                           (os.path.relpath(kernel, os.path.join(root, registry.crate_directory)), brace + 1, requires_line), owner, ordinals[owner]))
+            points.append((f"vacuity:{owner.path}#{ordinals[owner.path]}", f"{relative} {label}", {relative: "\n".join(changed)},
+                           (diagnostic_path(registry, relative), brace + 1, requires_line), owner, ordinals[owner.path]))
         all_at_once.append((relative, {relative: "\n".join(every_point)}))
     return points, all_at_once
 
@@ -1524,14 +2550,14 @@ def check_vacuity(root, options):
         raise NotRun(f"{len(kernels)} 份核里一处 requires 都没有：没有前置条件，空真这一格无对象可判")
     chosen = selected_items(options, [point[0] for point in points], "verus-vacuity")
     points = [point for point in points if point[0] in chosen]
-    store, tally = verdict_library(options, "vacuity-requires", "vacuity"), Tally()
+    store, tally = verdict_library(options, "vacuity-requires", "vacuity"), cell_tally(options)
     shared = shared_components(root, registry, options)
     pending, keyed = [], []
     for item, label, change, expected, owner, ordinal in points:
         components = []
         if shared:
             relative = label.split(" ", 1)[0]
-            components = shared + function_components(root, registry, options, [f"{relative}::{owner}"], "所属函数单元闭包")
+            components = shared + function_components(root, registry, options, [f"{relative}::{owner.unit.name}"], "所属函数单元闭包")
             if "reuse-key-without-row" not in BREAK:
                 components.append(("函数内第几处", digest_text(str(ordinal))))
             if "vacuity-key-by-line-number" in BREAK:
@@ -1559,41 +2585,49 @@ def check_vacuity(root, options):
             problems += item_problems
     else:
         judging = ItemJudging(store, lambda index, outcome: vacuity_item_problems(pending[index][1], pending[index][3], outcome, options), "verus-vacuity",
-                              f"verus --verify-root|--verify-only-module <核所在的模块> --verify-function <所属函数> --no-cheating --rlimit {registry.rlimit}"
+                              f"{'cargo verus focus' if registry.cargo_mode else 'verus'} --verify-root|--verify-only-module <核所在的模块> --verify-function <所属函数> --rlimit {registry.rlimit}"
                               f"（{registry.tag}），函数体头插 assert(false)",
                               sentinel=sentinel)
         verify_in_parallel(root, registry, manifest, executable, options,
-                           [(label, change, owner, modules[label.split(" ", 1)[0]]) for _item, label, change, _expected, _components, _reason, owner in pending],
+                           [(label, change, owner.name, modules[label.split(" ", 1)[0]]) for _item, label, change, _expected, _components, _reason, owner in pending],
                            "vacuity", judged=lambda index, outcome, seconds: judging(index, outcome, seconds, pending[index][0], pending[index][4],
                                                                                      judged_how(store, pending[index][0], pending[index][5], sentinel)))
         problems = judging.finish(len(pending))
         problems += sentinel.finish()
-    finish_tally(tally, "verus-vacuity")
+    finish_tally(tally, "verus-vacuity", options)
     if problems:
         report_cell(problems)
         return EXIT_RED
     named = f"（--item 点名的 {len(points)} 处）" if options.get("items") else ""
-    print(f"  ✓ 空真：{len(kernels)} 份核里 {len(points)} 处 requires{named}，每一处在函数体头插 assert(false)、只验它所属的函数，都在插的那一行报 assertion failed（前置条件可满足）；"
+    print(f"  ✓ 空真：{len(kernels)} 份核里 {len(points)} 处 requires{named}，每一处在函数体头插 assert(false)、只验它所属的函数，都在插的那一行报 assertion failed（未检出入口空真；这不是前置条件可满足性的证明）；"
           f"按条{tally.text()}")
     return EXIT_GREEN
 
 
-def must_red_rows(root, registry):
+def must_red_rows(root, registry, legacy_ok=False):
+    """必红世界表的行：六段制表符分隔——变异名、文件、原文、替换文、proof_errors=M（条数，只报）、landing=<落点>（判的是它）。
+    五段的旧行判红并指到补落点的办法；legacy_ok（只给 must-red-landings 补落点那一路）收五段的行，row["landing_text"] 交 None。"""
     path = os.path.join(root, registry.must_red_table)
     if not os.path.isfile(path):
-        raise Red(f"必红世界表 {registry.must_red_table} 不在", "核进了仓就要带它（五段制表符分隔：变异名、文件、原文、替换文、proof_errors=<证明错条数>）；路径改了就改登记表的 must-red-worlds 行")
-    rows, problems = [], []
+        raise Red(f"必红世界表 {registry.must_red_table} 不在", "核进了仓就要带它（六段制表符分隔：变异名、文件、原文、替换文、proof_errors=<证明错条数>、landing=<落点>）；路径改了就改登记表的 must-red-worlds 行")
+    rows, problems, unlanded = [], [], []
     for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
         if not raw.strip() or raw.startswith("#"):
             continue
         fields = raw.split("\t")
-        if len(fields) != 5 or not all(fields[index] for index in (0, 1, 2, 4)):
-            problems.append(f"第 {number} 行不是五段（或变异名、文件、原文、第五段 proof_errors= 有空的）")
+        if len(fields) == 5 and not legacy_ok and all(fields[index] for index in (0, 1, 2, 4)):
+            unlanded.append(f"第 {number} 行「{fields[0]}」")
+            continue
+        if len(fields) not in ((5, 6) if legacy_ok else (6,)) or not all(fields[index] for index in (0, 1, 2, 4)) or (len(fields) == 6 and not fields[5]):
+            problems.append(f"第 {number} 行不是六段（或变异名、文件、原文、第五段 proof_errors=、第六段 landing= 有空的）")
             continue
         rows.append({"number": number, "name": fields[0], "file": fields[1], "original": fields[2].replace("\\n", "\n"),
-                     "replacement": fields[3].replace("\\n", "\n"), "expected": fields[4]})
+                     "replacement": fields[3].replace("\\n", "\n"), "expected": fields[4], "landing_text": fields[5] if len(fields) == 6 else None})
+    if unlanded:
+        shown = "、".join(unlanded[:5]) + (f" 等 {len(unlanded)} 行" if len(unlanded) > 5 else "")
+        problems.append(f"{shown}只有五段、没写第六段落点 landing=（按条数判会随求解环境漂，这一格改按落点判）")
     if problems:
-        raise Red(f"{registry.must_red_table} 写坏了：" + "；".join(problems), "照表头的格式改")
+        raise Red(f"{registry.must_red_table} 写坏了：" + "；".join(problems), LANDING_HOWTO if unlanded else "照表头的格式改")
     if not rows:
         raise Red(f"{registry.must_red_table} 一行都没有：核没有一个必须报红的世界", "每一层证明至少一条改回去 Verus 就红的变异（show-me-test.md「设计论证同样照办」）")
     return rows
@@ -1604,13 +2638,13 @@ def must_red_item(row):
 
 
 def function_keys(root, options, functions):
-    """verus! 里每个 fn 的单元闭包键（{名: UnitKey}），一格里算一次存进 options。"""
+    """被验区域里每个 fn 的单元闭包键（{全路径: UnitKey}），一格里算一次存进 options。"""
     if options.get("function_keys") is None:
         index = unit_index(root, options)
         keys = {}
         try:
-            for name, relative, _unit in functions:
-                keys[name] = index.key([f"{relative}::{name}"])
+            for function in functions:
+                keys[function.path] = index.key([f"{function.relative}::{function.unit.name}"])
         except ValueError as error:
             raise Red(f"算不出核里函数的单元闭包：{error}", "先让 python3 scripts/gate/lib_function_units.py closure <根> <入口> 在这棵树上跑通")
         options["function_keys"] = keys
@@ -1624,7 +2658,7 @@ def must_red_components(root, registry, options, row, text, functions):
     if not options.get("verdict_library"):
         return []
     shared = shared_components(root, registry, options)
-    pieces = [row["original"], row["replacement"], row["expected"]]
+    pieces = [row["original"], row["replacement"], ",".join(sorted(parse_landing(row.get("landing_text")) or ()))]
     if "must-red-key-with-name-and-path" in BREAK:
         pieces = [row["name"], row["file"]] + pieces
     row_component = [] if "reuse-key-without-row" in BREAK else [("这一行", digest_text("\t".join(pieces)))]
@@ -1642,10 +2676,10 @@ def must_red_components(root, registry, options, row, text, functions):
     identities = {(unit.kind, unit.name, unit.file) for unit in mutated}
     keys = function_keys(root, options, functions)
     affected = []
-    for name, relative, _unit in functions:
-        members = {(line.split("\t")[0], line.split("\t")[1], line.split("\t")[2].rsplit(":", 1)[0]) for line in keys[name].units}
+    for function in functions:
+        members = {(line.split("\t")[0], line.split("\t")[1], line.split("\t")[2].rsplit(":", 1)[0]) for line in keys[function.path].units}
         if identities & members:
-            affected.append(f"{relative}::{name}")
+            affected.append(f"{function.relative}::{function.unit.name}")
     entries = affected + [f"{row['file']}::{unit.name}" for unit in mutated if f"{row['file']}::{unit.name}" not in affected]
     if not entries:
         return shared + [("受影响的函数单元", digest_text("原文不在任何单元里"))] + row_component
@@ -1656,8 +2690,53 @@ def must_red_components(root, registry, options, row, text, functions):
     return shared + [("受影响的函数单元", units)] + row_component
 
 
-def must_red_row_problems(row, outcome, options, registry):
-    """必红世界一行改坏之后的结局判出的问题，交回 (问题, 一句判定)；一句判定里带「rlimit 用尽夹证明错」时成功句把它数进去。"""
+def enclosing_function(rows, line):
+    """核文本的行列表 rows 里第 line 行落在哪个 fn 里：往上找最近一行 fn 的开头（FUNCTION_HEADING），交它的名字；往上一行都没有交 None。"""
+    for index in range(min(line, len(rows)) - 1, -1, -1):
+        found = FUNCTION_HEADING.match(rows[index])
+        if found:
+            return found.group(1)
+    return None
+
+
+def parse_landing(text):
+    """第六段 landing=<落点>[,<落点>…] 读成集合；不是这个形态交 None。"""
+    form = EXPECTED_LANDING.fullmatch(text or "")
+    return set(form.group(1).split(",")) if form else None
+
+
+def proof_error_landing(root, registry, files, diagnostics):
+    """改坏的副本上 Verus 的证明错（除去 rlimit 用尽）各落在哪个 fn 里，交排好序、去重的落点列表：每条证明错取它 --> 位置的那一行，
+    在改坏之后的文件文本里（files 是 {相对仓根的文件: 改坏之后的内容}，别的文件读 root 里的）往上找最近一行 fn 的开头；位置在 crate 之外、文件读不出、
+    往上没有 fn 的记（函数外），输出里有证明错没带位置的记（无位置）。落点不数条数：同一个 fn 里多报一条循环不变式，落点还是那一个（C654）。
+    弄坏开关 landing-read-from-unmutated-text：读改坏之前的文件（改坏的行数不一样，位置对不上）。"""
+    texts = {}
+
+    def rows_of(relative):
+        if relative not in texts:
+            if relative in files and "landing-read-from-unmutated-text" not in BREAK:
+                texts[relative] = files[relative].split("\n")
+            else:
+                path = os.path.join(root, relative)
+                texts[relative] = open(path, encoding="utf-8").read().split("\n") if os.path.isfile(path) else None
+        return texts[relative]
+
+    located = [(path, line) for message, path, line in diagnostic_blocks(diagnostics) if RLIMIT_EXHAUSTED not in message]
+    found = set()
+    for path, line in located:
+        rows = None if os.path.isabs(path) else rows_of(located_file(registry, path))
+        name = enclosing_function(rows, line) if rows is not None else None
+        found.add(name or LANDING_OUTSIDE)
+    if len(proof_error_messages(diagnostics)) > len(located):
+        found.add(LANDING_NO_LOCATION)
+    return sorted(found)
+
+
+def must_red_row_problems(row, outcome, options, registry, root=None, files=None, observe=None):
+    """必红世界一行改坏之后的结局判出的问题，交回 (问题, 一句判定)；一句判定里带「rlimit 用尽夹证明错」时成功句把它数进去。
+    判的是落点（proof_error_landing 与第六段 landing= 相等），条数只报：与第五段 proof_errors= 不同的在一句判定里写「条数只报」，成功句数进去。
+    observe 给了（must-red-landings 补落点那一路）：不比落点与条数，把 {行号: (落点, 条数)} 记进去。
+    弄坏开关：landing-unchecked 不比落点；landing-by-count 改回按条数判（条数不同判红、不比落点）。"""
     problem = outcome_problem(outcome, options)
     if problem:
         return [(f"第 {row['number']} 行「{row['name']}」：{problem}",
@@ -1678,51 +2757,122 @@ def must_red_row_problems(row, outcome, options, registry):
         return [(f"第 {row['number']} 行「{row['name']}」：Verus 输出里有 {RLIMIT_EXHAUSTED}，除它与 aborting due to 之外没有别的报错（--rlimit {registry.rlimit}；"
                  f"verified {results.get('verified')}、errors {results.get('errors')}：{listed}），这一行的红不作数",
                  f"这一行红在算力额度上，不是证明失败：改替换文或调高登记的 rlimit（{REGISTRY} 的 rlimit 行）")], ""
-    summary = f"证明错 {len(counted)} 条" + ("，rlimit 用尽夹证明错" if rlimit_exhausted else "")
+    landing = proof_error_landing(root, registry, files or {}, outcome["diagnostics"]) if root is not None else []
+    registered_count = row.get("proof_errors")
+    summary = f"落点 {'、'.join(landing) or '无'}；证明错 {len(counted)} 条" + ("，rlimit 用尽夹证明错" if rlimit_exhausted else "")
+    if registered_count is not None and len(counted) != registered_count:
+        summary += f"（条数与登记的 proof_errors={registered_count} 不同，条数只报）"
     if results.get("errors", 0) < 1 and "mutation-accepts-green" not in BREAK:
         return [(f"第 {row['number']} 行「{row['name']}」改坏之后 Verus 照样验过（verified {results.get('verified')}、errors 0）：证明没盯住这一处",
                  "补证明或收紧 spec，让这一处改坏就验不过；确是等价变异就从表里删掉并写明为什么")], summary
-    if (row["proof_errors"] is not None and len(counted) != row["proof_errors"]
-            and "proof-error-count-unchecked" not in BREAK and "mutation-accepts-green" not in BREAK):
-        listed = "；".join(f"{path}:{line} {message}" for message, path, line in diagnostic_blocks(outcome["diagnostics"])[:6])
-        return [(f"第 {row['number']} 行「{row['name']}」红了，但证明错 {len(counted)} 条，表里写的是 proof_errors={row['proof_errors']}"
-                 f"（--rlimit {registry.rlimit}；verified {results.get('verified')}、errors {results.get('errors')}；报的是：{listed}）",
-                 "先看红的是不是这条变异要盯的那一处（证明换了一条路红的就改证明或换改法）；确是它，照这一次的证明错条数改第五段。"
-                 "条数只数 error 起头的证明错，含 Resource limit (rlimit) exceeded 的与 aborting due to 那一句不计")], summary
+    if observe is not None:
+        observe[row["number"]] = (landing, len(counted))
+        return [], summary
+    registered = parse_landing(row.get("landing_text"))
+    listed = "；".join(f"{path}:{line} {message}" for message, path, line in diagnostic_blocks(outcome["diagnostics"])[:6])
+    if "landing-by-count" in BREAK:   # 弄坏开关：改回按条数判，不比落点
+        if registered_count is not None and len(counted) != registered_count and "mutation-accepts-green" not in BREAK:
+            return [(f"第 {row['number']} 行「{row['name']}」红了，但证明错 {len(counted)} 条，表里写的是 proof_errors={registered_count}", "按条数判（弄坏开关）")], summary
+        return [], summary
+    if registered is not None and set(landing) != registered and "landing-unchecked" not in BREAK and "mutation-accepts-green" not in BREAK:
+        return [(f"第 {row['number']} 行「{row['name']}」红了，但证明错落在 {'、'.join(landing) or '无'}，表里写的落点是 {'、'.join(sorted(registered))}"
+                 f"（--rlimit {registry.rlimit}；verified {results.get('verified')}、errors {results.get('errors')}；证明错 {len(counted)} 条，报的是：{listed}）",
+                 "先看红的是不是这条变异要盯的那一处：落到别的函数里，多半是证明或 spec 改过、红已经不是这条变异的本意（改证明或换改法）；"
+                 "确是本意（函数改了名、证明挪了位置），照这一次的落点改第六段 landing=。条数跳了不用管，只报不判")], summary
     return [], summary
+
+
+def prepare_must_red_row(root, registry, row, backfill=False):
+    """必红世界一行起 Verus 之前的几样：文件在登记的 crate 里、第五段是 proof_errors=<正整数>、第六段是 landing=<落点>、替换文里没有 rlimit 属性、
+    原文在文件里恰好命中一次。交 (问题或 None, 改坏之前的文本, {文件: 改坏之后的内容})；问题是 (卡在哪, 下一步)，有问题的这一行不起 Verus。
+    row["proof_errors"] 在这里读出（第五段不是规范形态时 None）。backfill（must-red-landings 补落点那一路）不核第五段与第六段的形态。
+    弄坏开关：expectation-form-unchecked、landing-form-unchecked 不核第五段、第六段的形态；mutation-rlimit-attribute-accepted、anchor-unchecked 见文件头。"""
+    target = os.path.join(root, row["file"])
+    if not row["file"].startswith(registry.crate_directory + "/") or not os.path.isfile(target):
+        return (f"第 {row['number']} 行「{row['name']}」的文件 {row['file']} 不在登记的 crate 里或不存在", "变异只许改被验的那个 crate 里的文件"), None, None
+    form = EXPECTED_PROOF_ERRORS.fullmatch(row["expected"])
+    row["proof_errors"] = int(form.group(1)) if form else None
+    if form is None and "expectation-form-unchecked" not in BREAK and not backfill:
+        return (f"第 {row['number']} 行「{row['name']}」的第五段「{row['expected']}」不是 proof_errors=<证明错条数>（没起 Verus）", EXPECTATION_HOWTO), None, None
+    if row.get("landing_text") is not None and parse_landing(row["landing_text"]) is None and "landing-form-unchecked" not in BREAK and not backfill:
+        return (f"第 {row['number']} 行「{row['name']}」的第六段「{row['landing_text']}」不是 landing=<落点>[,<落点>…]（没起 Verus）", LANDING_HOWTO), None, None
+    attributes = [match.group(0) for match in (RLIMIT_ATTRIBUTE.search(strip_line_comment(line)) for line in row["replacement"].split("\n")) if match]
+    if attributes and "mutation-rlimit-attribute-accepted" not in BREAK:
+        return (f"第 {row['number']} 行「{row['name']}」的替换文里有 {attributes[0]}：函数上的 rlimit 属性盖过命令行的 --rlimit {registry.rlimit}，改坏的副本不在登记的额度上验",
+                "删掉替换文里的 rlimit 属性；这一行要更多额度才红得出来，就换一处改法（必红世界要在登记的 rlimit 上红）"), None, None
+    text = open(target, encoding="utf-8").read()
+    hits = text.count(row["original"])
+    if hits != 1 and "anchor-unchecked" not in BREAK:
+        return (f"第 {row['number']} 行「{row['name']}」的原文在 {row['file']} 里命中 {hits} 次，要恰好命中一次（锚点腐化）",
+                "照今天的代码改这一行的原文，让它只命中要改坏的那一处"), None, None
+    return None, text, {row["file"]: text.replace(row["original"], row["replacement"], 1)}
+
+
+def negative_coverage_gaps(root, registry, kernels, functions, rows):
+    """静态覆盖：每个带契约的函数、每个循环不变式块都要有唯一锚点落入。
+    只判负例的登记完整性；变异是否真的失败仍由 must-red-worlds 验证。
+    """
+    gaps = []
+    for kernel in kernels:
+        relative = os.path.relpath(kernel, root).replace(os.sep, "/")
+        source = open(kernel, encoding="utf-8").read()
+        spans = []
+        for row in rows:
+            if row["file"] != relative or source.count(row["original"]) != 1:
+                continue
+            start = source.index(row["original"])
+            first = source[:start].count("\n") + 1
+            spans.append((first, first + row["original"].count("\n")))
+        def covered(first, last):
+            return any(low <= last and first <= high for low, high in spans)
+        lines = source.splitlines()
+        for name, path, unit, _full in functions:
+            if path != relative:
+                continue
+            text = "\n".join(lines[unit.first_line - 1:unit.last_line])
+            _kinds, words, _lines, _docs = rust_lex(text)
+            if any(word == "ensures" and (index == 0 or words[index - 1] != ".") for index, word in enumerate(words)) and not covered(unit.first_line, unit.last_line):
+                gaps.append(f"{relative}:{unit.first_line} 函数 {name}")
+        _kinds, words, token_lines, _docs = rust_lex(source)
+        for index, word in enumerate(words):
+            if word != "invariant":
+                continue
+            first = token_lines[index]
+            last = next((token_lines[later] for later in range(index + 1, len(words))
+                         if words[later] == "decreases"), first)
+            if not covered(first, last):
+                gaps.append(f"{relative}:{first} invariant 块")
+    return gaps
+
+
+def check_negative_coverage(root, options):
+    registry = crate_registry(root, options)
+    kernels = kernel_files(root, registry)
+    functions = verus_functions(root, registry, kernels, options)
+    rows = must_red_rows(root, registry)
+    gaps = negative_coverage_gaps(root, registry, kernels, functions, rows)
+    if gaps:
+        raise Red("必红覆盖缺口：" + "；".join(gaps),
+                  "给点名的函数或 invariant 块补唯一锚点的负例，再用真实 Verus 验证落点")
+    print("  ✓ 必红覆盖：每个带契约的函数与 invariant 块都有唯一锚点负例")
+    return EXIT_GREEN
 
 
 def check_must_red_worlds(root, options):
     registry, kernels, manifest, executable = prepared(root, options)
     functions = verus_functions(root, registry, kernels, options)
-    rows = must_red_rows(root, registry)
+    rows = must_red_rows(root, registry, legacy_ok="landing-missing-accepted" in BREAK)   # 弄坏开关 landing-missing-accepted：五段的旧行照收，不比落点
     chosen = selected_items(options, [must_red_item(row) for row in rows], "verus-must-red-worlds")
     rows = [row for row in rows if must_red_item(row) in chosen]
-    store, tally = verdict_library(options, "must-red-world-row", "must-red-worlds"), Tally()
+    store, tally = verdict_library(options, "must-red-world-row", "must-red-worlds"), cell_tally(options)
     problems, edits, judged, texts = [], [], [], {}
     rlimit_with_proof_error = 0
     for row in rows:
-        target = os.path.join(root, row["file"])
-        if not row["file"].startswith(registry.crate_directory + "/") or not os.path.isfile(target):
-            problems.append((f"第 {row['number']} 行「{row['name']}」的文件 {row['file']} 不在登记的 crate 里或不存在", "变异只许改被验的那个 crate 里的文件"))
+        problem, text, files = prepare_must_red_row(root, registry, row)
+        if problem:
+            problems.append(problem)
             continue
-        form = EXPECTED_PROOF_ERRORS.fullmatch(row["expected"])
-        row["proof_errors"] = int(form.group(1)) if form else None
-        if form is None and "expectation-form-unchecked" not in BREAK:
-            problems.append((f"第 {row['number']} 行「{row['name']}」的第五段「{row['expected']}」不是 proof_errors=<证明错条数>（没起 Verus）", EXPECTATION_HOWTO))
-            continue
-        attributes = [match.group(0) for match in (RLIMIT_ATTRIBUTE.search(strip_line_comment(line)) for line in row["replacement"].split("\n")) if match]
-        if attributes and "mutation-rlimit-attribute-accepted" not in BREAK:
-            problems.append((f"第 {row['number']} 行「{row['name']}」的替换文里有 {attributes[0]}：函数上的 rlimit 属性盖过命令行的 --rlimit {registry.rlimit}，改坏的副本不在登记的额度上验",
-                             "删掉替换文里的 rlimit 属性；这一行要更多额度才红得出来，就换一处改法（必红世界要在登记的 rlimit 上红）"))
-            continue
-        text = open(target, encoding="utf-8").read()
-        hits = text.count(row["original"])
-        if hits != 1 and "anchor-unchecked" not in BREAK:
-            problems.append((f"第 {row['number']} 行「{row['name']}」的原文在 {row['file']} 里命中 {hits} 次，要恰好命中一次（锚点腐化）",
-                             "照今天的代码改这一行的原文，让它只命中要改坏的那一处"))
-            continue
-        edits.append((row["name"], {row["file"]: text.replace(row["original"], row["replacement"], 1)}))
+        edits.append((row["name"], files))
         judged.append(row)
         texts[row["number"]] = text
     # 原文、第五段、rlimit 属性没过的行没起 Verus，按项各打一行红
@@ -1746,22 +2896,79 @@ def check_must_red_worlds(root, options):
             pending.append((row, edit, item, components, reason))
     if options.get("plan") is not None:
         return plan_done(options, "verus-must-red-worlds", store)
-    judging = ItemJudging(store, lambda index, outcome: must_red_row_problems(pending[index][0], outcome, options, registry), "verus-must-red-worlds",
-                          f"verus --no-cheating --rlimit {registry.rlimit}（{registry.tag}），整个 crate、原文换成替换文的副本", sentinel=sentinel)
+    judging = ItemJudging(store, lambda index, outcome: must_red_row_problems(pending[index][0], outcome, options, registry, root, pending[index][1][1]), "verus-must-red-worlds",
+                          f"{'cargo verus focus' if registry.cargo_mode else 'verus'} --rlimit {registry.rlimit}（{registry.tag}），整个 crate、原文换成替换文的副本", sentinel=sentinel)
     verify_in_parallel(root, registry, manifest, executable, options, [edit for _row, edit, _item, _components, _reason in pending], "must-red-worlds",
                        judged=lambda index, outcome, seconds: judging(index, outcome, seconds, pending[index][2], pending[index][3],
                                                                       judged_how(store, pending[index][2], pending[index][4], sentinel)))
     problems += judging.finish(len(pending))
     problems += sentinel.finish()
     rlimit_with_proof_error = sum(1 for summary in judging.summaries.values() if "rlimit 用尽夹证明错" in summary)
-    finish_tally(tally, "verus-must-red-worlds")
+    count_drifted = [pending[index][0]["name"] for index, summary in sorted(judging.summaries.items()) if "条数只报" in summary]
+    finish_tally(tally, "verus-must-red-worlds", options)
     if problems:
         report_cell(problems)
         return EXIT_RED
     named = f"（--item 点名的 {len(rows)} 行）" if options.get("items") else ""
-    print(f"  ✓ 必红世界：{registry.must_red_table} 的 {len(rows)} 行{named}每行改坏之后 Verus 都报错，证明错条数与第五段 proof_errors= 相同；原文都恰好命中一次；"
-          f"没有一行只红在 rlimit 用尽上（--rlimit {registry.rlimit}；{rlimit_with_proof_error} 行输出里夹着 rlimit 用尽、另有证明错，红计入，rlimit 用尽不计入证明错条数）；"
+    drift = (f"；其中 {len(count_drifted)} 行证明错条数与第五段 proof_errors= 不同，只报不判（{'、'.join(count_drifted[:5])}{'等' if len(count_drifted) > 5 else ''}）"
+             if count_drifted else "")
+    print(f"  ✓ 必红世界：{registry.must_red_table} 的 {len(rows)} 行{named}每行改坏之后 Verus 都报错，证明错落点与第六段 landing= 相同；原文都恰好命中一次；"
+          f"没有一行只红在 rlimit 用尽上（--rlimit {registry.rlimit}；{rlimit_with_proof_error} 行输出里夹着 rlimit 用尽、另有证明错，红计入，rlimit 用尽不计入证明错条数）{drift}；"
           f"按条{tally.text()}")
+    return EXIT_GREEN
+
+
+def check_must_red_landings(root, options):
+    """补落点（必红世界表第六段）：每一行照 check_must_red_worlds 同样的办法改坏、起 Verus、取证明错的落点，打「变异名<TAB>落点<TAB>条数」；
+    --write 时把没有第六段的行补上 landing=<实测落点>（已有第六段的不改，只报与实测是否相同），原子换上。重型（逐行起 Verus），不读写判定库。
+    这是第一次给旧表补落点用的：补出来的落点要对着 git diff 过一眼（落点是不是这条变异本该盯的函数），之后改落点一律手改，不再用它。"""
+    registry, kernels, manifest, executable = prepared(root, options)
+    rows = must_red_rows(root, registry, legacy_ok=True)
+    chosen = selected_items(options, [must_red_item(row) for row in rows], "verus-must-red-worlds")
+    rows = [row for row in rows if must_red_item(row) in chosen]
+    problems, edits, judged = [], [], []
+    for row in rows:
+        problem, _text, files = prepare_must_red_row(root, registry, row, backfill=True)
+        if problem:
+            problems.append(problem)
+            continue
+        edits.append((row["name"], files))
+        judged.append(row)
+    observed = {}
+    outcomes = verify_in_parallel(root, registry, manifest, executable, options, edits, "must-red-landings")
+    for row, edit, outcome in zip(judged, edits, outcomes):
+        row_problems, summary = must_red_row_problems(row, outcome, options, registry, root, edit[1], observe=observed)
+        problems += row_problems
+        print(f"  · {must_red_item(row)}：{summary}")  # gate-lint:detail
+    if problems:
+        report_cell(problems)
+        return EXIT_RED
+    print("  ── 变异名\t落点\t条数")  # gate-lint:detail
+    for row in judged:
+        landing, count = observed[row["number"]]
+        registered = parse_landing(row.get("landing_text")) if row.get("landing_text") else None
+        verdict = "" if registered is None else ("，与表里相同" if registered == set(landing) else f"，表里写的是 {','.join(sorted(registered))}（不改）")
+        print(f"  {row['name']}\tlanding={','.join(landing)}\t{count}{verdict}")  # gate-lint:detail
+    if not options.get("write") or "landings-write-skipped" in BREAK:   # 弄坏开关 landings-write-skipped：--write 什么都不写
+        print(f"  ✓ 补落点：{len(judged)} 行都取到了落点（没加 --write，表没动）")
+        return EXIT_GREEN
+    path = os.path.join(root, registry.must_red_table)
+    lines = open(path, encoding="utf-8").read().split("\n")
+    filled = 0
+    for row in judged:
+        if row.get("landing_text") is None:
+            lines[row["number"] - 1] += "\tlanding=" + ",".join(observed[row["number"]][0])
+            filled += 1
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=os.path.dirname(path), prefix=".landings-", delete=False) as handle:
+        handle.write("\n".join(lines))
+        temporary = handle.name
+    shutil.copymode(path, temporary)
+    os.replace(temporary, path)   # 换 inode：不在原文件上就地写
+    reread = {row["name"]: row for row in must_red_rows(root, registry, legacy_ok=True)}   # 回读：补的那几行要能照新格式读出来
+    unread = [row["name"] for row in judged if parse_landing((reread.get(row["name"]) or {}).get("landing_text")) is None]
+    if unread:
+        raise Red(f"补完回读，这些行的第六段读不出落点：{'、'.join(unread[:5])}（{registry.must_red_table} 已换上，git diff 看一眼）", "从 git 找回这张表再来；落点里有表格式不认的字就改 LANDING_TOKEN")
+    print(f"  ✓ 补落点：{registry.must_red_table} 补了 {filled} 行的第六段（共取到 {len(judged)} 行的落点，已有第六段的 {len(judged) - filled} 行没改）；对着 git diff 过一眼再提交")
     return EXIT_GREEN
 
 
@@ -1903,10 +3110,10 @@ def parse_options(arguments):
                "threads": default_threads(),
                "jobs": int(os.environ.get("GATE_VERUS_JOBS") or 0),
                "memory_cap": os.environ.get("GATE_VERUS_MEMORY_MAX") or "4G",
-               "items": [], "verdict_library": None, "reuse": True}
+               "items": [], "verdict_library": None, "reuse": True, "write": False, "cargo": None, "rustc_version_file": None}
     positional = []
     flags = {"--verus-root": "verus_root", "--cargo-home": "cargo_home", "--timeout": "timeout", "--threads": "threads",
-             "--jobs": "jobs", "--memory-cap": "memory_cap", "--verdict-library": "verdict_library"}
+             "--jobs": "jobs", "--memory-cap": "memory_cap", "--verdict-library": "verdict_library", "--rustc-version-file": "rustc_version_file"}
     position = 0
     while position < len(arguments):
         argument = arguments[position]
@@ -1917,6 +3124,9 @@ def parse_options(arguments):
             position += 2
         elif argument == "--no-reuse":
             options["reuse"] = False
+            position += 1
+        elif argument == "--write":
+            options["write"] = True
             position += 1
         elif argument in flags:
             if position + 1 >= len(arguments):
@@ -1934,7 +3144,12 @@ def parse_options(arguments):
     return positional, options
 
 
-CHECKS = {"toolchain": check_toolchain, "proof": check_proof, "vacuity": check_vacuity, "must-red-worlds": check_must_red_worlds}
+CHECKS = {"coverage": check_negative_coverage, "toolchain": check_toolchain, "proof": check_proof, "vacuity": check_vacuity, "must-red-worlds": check_must_red_worlds,
+          "must-red-landings": check_must_red_landings}   # must-red-landings 是给旧表补第六段用的一次性办法，不是门禁的一格
+
+
+# 逐个 crate 判的几格（登记了几个 crate 时 run_per_crate 一个一个判，--item 照各 crate 列出的项分过去）；toolchain 各 crate 共用一份
+PER_CRATE_CHECKS = {"coverage": None, "proof": "verus-proof", "vacuity": "verus-vacuity", "must-red-worlds": "verus-must-red-worlds", "must-red-landings": None}
 
 
 def run_check(name, root, options):
@@ -1942,6 +3157,10 @@ def run_check(name, root, options):
     try:
         if name == "toolchain" and options.get("items"):
             raise UsageError("verus-toolchain-pinned 格只有一项（toolchain），不收 --item", ["toolchain"])
+        if name in PER_CRATE_CHECKS and options.get("crate_view") is None:
+            registry = read_registry(os.path.abspath(root))
+            if len(registry.crates) > 1:
+                return run_per_crate(name, os.path.abspath(root), options, registry)
         return CHECKS[name](os.path.abspath(root), options)
     except UsageError as usage:
         report_red(usage.message, "照下面列的项名写（verus-proof-check.py list-items <根> 也列），给几次 --item 取并集")
@@ -1956,9 +3175,76 @@ def run_check(name, root, options):
         return EXIT_NOT_RUN
 
 
+def crate_item_lines(root, registry, options):
+    """一个 crate 的可点名的项（只读登记表、核与必红世界表，不起 Verus）：交 (项的那几行 [(项, 格, 说明)], 成项的证明 [ProofItem], 不成项的 [(全路径, 核)], 核在不在)。"""
+    try:
+        kernels = kernel_files(root, registry)
+    except NotRun:
+        kernels = []
+    functions = verus_functions(root, registry, kernels, options) if kernels else []
+    items, left_out = proof_items(root, registry, kernels, functions, options) if kernels else ([], [])
+    lines = [(entry.item, "verus-proof", f"{entry.kind} {entry.relative}:{entry.unit.first_line}") for entry in items]
+    points, _all_at_once = vacuity_points(root, registry, kernels, functions)
+    lines += [(point[0], "verus-vacuity", point[1]) for point in points]
+    if kernels:
+        lines += [(must_red_item(row), "verus-must-red-worlds", f"第 {row['number']} 行") for row in must_red_rows(root, registry, legacy_ok="list-items-needs-landing" not in BREAK)]
+    return lines, items, left_out, bool(kernels)
+
+
+def run_per_crate(name, root, options, registry):
+    """登记了几个 crate 时，一格逐个 crate 判（第二轮正推 Y4 第 1 条：crate 行可以多条、各有各的登记数）：--item 照各 crate 列出的项（crate_item_lines）分过去，
+    点名的项一个 crate 都没有的退 2；一个 crate 一项都没点到的这一趟不判它。各 crate 的按条数合成一行报、往门禁的 FORMAL_ITEM_TALLY_FILE 追加一行。
+    退出码：有用法错退 2，有红退 1，全是本次未跑退 77，否则 0。"""
+    wanted = list(options.get("items") or [])
+    owners = {}
+    if wanted:
+        for view in registry.crates:
+            lines, _items, _left_out, _wired = crate_item_lines(root, view, {"unit_index": unit_index(root, options)})
+            for item, cell, _note in lines:
+                if PER_CRATE_CHECKS.get(name) not in (None, cell) and not (name == "must-red-landings" and cell == "verus-must-red-worlds"):
+                    continue
+                if item in owners and owners[item] != view.crate_directory:
+                    raise Red(f"两个 crate（{owners[item]}、{view.crate_directory}）都有项 {item}", "必红世界表里的变异名在几张表之间也不许重名：给其中一行改名")
+                owners[item] = view.crate_directory
+        unknown = [item for item in wanted if item not in owners and not (name == "proof" and item == "proof")]
+        if unknown and "item-filter-ignored" not in BREAK:
+            raise UsageError(f"{PER_CRATE_CHECKS.get(name) or name} 格里没有点名的项：{'、'.join(unknown)}", (["proof"] if name == "proof" else []) + sorted(owners))
+    exits, tallies = [], []
+    for view in registry.crates:
+        mine = [item for item in wanted if owners.get(item) == view.crate_directory or item == "proof"]
+        if wanted and not mine and "item-filter-ignored" not in BREAK:
+            print(f"  · {view.crate_directory}：--item 没点到这个 crate 的项，这一格这一趟不判它")
+            continue
+        print(f"  ── {view.crate_directory}{'（cargo verus focus）' if view.cargo_mode else ''}")
+        crate_options = dict(options, crate_view=view, items=mine, crate_tallies=tallies, shared_components=None, function_keys=None)
+        try:
+            exits.append(CHECKS[name](root, crate_options))
+        except UsageError:
+            raise
+        except Red as red:
+            report_red(red.message, red.howto)
+            exits.append(EXIT_RED)
+        except NotRun as not_run:
+            print(f"  ! {not_run}")
+            exits.append(EXIT_NOT_RUN)
+    if tallies and PER_CRATE_CHECKS.get(name):
+        total = merged_tally(tallies)
+        print(f"  · 按条：{total.text()}")  # gate-lint:detail
+        total.append_to(os.environ.get(ITEM_TALLY_FILE_VARIABLE), PER_CRATE_CHECKS[name])
+    if EXIT_USAGE in exits:
+        return EXIT_USAGE
+    if EXIT_RED in exits:
+        return EXIT_RED
+    if exits and all(code == EXIT_NOT_RUN for code in exits):
+        return EXIT_NOT_RUN
+    print(f"  ✓ {PER_CRATE_CHECKS.get(name) or name}：登记的 {len(registry.crates)} 个 crate 判了 {len(exits)} 个（{'、'.join(view.crate_directory for view in registry.crates)}），都没红")
+    return EXIT_GREEN
+
+
 def list_items(root, verdict_library=None, verus_root=None):
     """逐行打「项<TAB>格[<TAB>说明]」：toolchain、proof（整格；说明里报成项几个、各哪一类，不成项的 spec fn 逐个点名）各一项，证明每个成项的单元一项
-    proof:<名>（说明是哪一类与它在核里的位置），空真每处 requires 一项 vacuity:<所属函数>#<第几处>，必红世界每行一项。
+    proof:<全路径>（说明是哪一类与它在核里的位置），空真每处 requires 一项 vacuity:<所属函数的全路径>#<第几处>，必红世界每行一项（只要行名：五段的旧行也列，
+    缺第六段落点由必红世界那一格判红）。登记了几个 crate 的，逐个 crate 列（全路径的头一段是 crate 名，各 crate 的项不会重名）。
     只读登记表、核与表（核经 lib_function_units.py 切单元），不起 Verus、不编。给了 verdict_library（命令行的 --verdict-library）另往 stderr 报每格键对不上的条数
     （report_key_mismatches）。"""
     root = os.path.abspath(root)
@@ -1969,27 +3255,28 @@ def list_items(root, verdict_library=None, verus_root=None):
         return EXIT_GREEN
     try:
         registry = read_registry(root)
-        try:
-            kernels = kernel_files(root, registry)
-        except NotRun:
-            kernels = []
         options = {"unit_index": None}
-        functions = verus_functions(root, registry, kernels, options) if kernels else []
-        items, left_out = proof_items(root, registry, kernels, functions, options) if kernels else ([], [])
-        if kernels:
-            lines[1] = (f"proof\tverus-proof\t整格（成项 {len(items)} 个：{item_kinds_text(items)}" +
-                        f"；不成项的 spec fn {len(left_out)} 个：{listed_names((name for name, _relative in left_out), limit=len(left_out))}）")
-        lines += [f"{entry.item}\tverus-proof\t{entry.kind} {entry.relative}:{entry.unit.first_line}" for entry in items]
-        points, _all_at_once = vacuity_points(root, registry, kernels, functions)
-        lines += [f"{point[0]}\tverus-vacuity\t{point[1]}" for point in points]
-        if kernels:
-            lines += [f"{must_red_item(row)}\tverus-must-red-worlds\t第 {row['number']} 行" for row in must_red_rows(root, registry)]
+        all_items, all_left_out, wired, seen = [], [], False, {}
+        for view in registry.crates:
+            crate_lines, items, left_out, crate_wired = crate_item_lines(root, view, options)
+            for item, _cell, _note in crate_lines:
+                if item in seen:
+                    raise Red(f"两个 crate（{seen[item]}、{view.crate_directory}）都有项 {item}", "必红世界表里的变异名在几张表之间也不许重名：给其中一行改名")
+                seen[item] = view.crate_directory
+            lines += ["\t".join(line) for line in crate_lines]
+            all_items += items
+            all_left_out += left_out
+            wired = wired or crate_wired
+        if wired:
+            lines[1] = (f"proof\tverus-proof\t整格（{len(registry.crates)} 个 crate 成项 {len(all_items)} 个：{item_kinds_text(all_items)}" if len(registry.crates) > 1
+                        else f"proof\tverus-proof\t整格（成项 {len(all_items)} 个：{item_kinds_text(all_items)}") + \
+                (f"；不成项的 spec fn {len(all_left_out)} 个：{listed_names((name for name, _relative in all_left_out), limit=len(all_left_out))}）")
     except Red as red:
         report_red(f"列不出可点名的项：{red.message}", red.howto)
         return EXIT_RED
     for line in lines:
         print(line)
-    if verdict_library and kernels:
+    if verdict_library and wired:
         report_key_mismatches(root, verdict_library, verus_root)
     return EXIT_GREEN
 
@@ -2000,21 +3287,27 @@ def report_key_mismatches(root, verdict_library, verus_root):
     项名逐行的 stdout 不变。必红世界里原文、第五段、rlimit 属性没过的行不起 Verus、不进库，不数。"""
     plan, unreadable = [], []
     _positional, defaults = parse_options([])
+    registry = read_registry(root)
+    views = registry.crates if len(registry.crates) > 1 else [None]
     for cell in ("proof", "vacuity", "must-red-worlds"):
-        buffer = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buffer):
-                CHECKS[cell](root, dict(defaults, verdict_library=verdict_library, verus_root=verus_root, plan=plan, queue_refusal=None, shared_components=None,
-                                         unit_index=None, function_keys=None))
-        except (Red, NotRun, UsageError) as error:
-            unreadable.append(f"{cell}：{getattr(error, 'message', str(error))}")
+        for view in views:
+            buffer = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    CHECKS[cell](root, dict(defaults, verdict_library=verdict_library, verus_root=verus_root, plan=plan, queue_refusal=None, shared_components=None,
+                                             unit_index=None, function_keys=None, crate_view=view))
+            except (Red, NotRun, UsageError) as error:
+                unreadable.append(f"{cell}{'（' + view.crate_directory + '）' if view is not None else ''}：{getattr(error, 'message', str(error))}")
     totals = collections.Counter()
+    merged = collections.OrderedDict()
     for cell, counts in plan:
+        merged.setdefault(cell, collections.Counter()).update(counts)
+    for cell, counts in merged.items():
         totals.update(counts)
         print(f"  · {cell}：" + "、".join(f"{state} {counts[state]} 条" for state in PLAN_STATES), file=sys.stderr)  # gate-lint:detail
     for line in unreadable:
         print(f"  ! 这一格的键数不出：{line}", file=sys.stderr)
-    print(f"  · 键对不上共 {totals['键对不上']} 条（{len(plan)} 格比了 {sum(totals.values())} 项，判定库 {verdict_library}）", file=sys.stderr)
+    print(f"  · 键对不上共 {totals['键对不上']} 条（{len(merged)} 格比了 {sum(totals.values())} 项，判定库 {verdict_library}）", file=sys.stderr)
 
 
 def main(arguments):
@@ -2035,13 +3328,16 @@ def main(arguments):
             signal.signal(signal.SIGPIPE, signal.SIG_DFL)
         return list_items(positional[0], options["verdict_library"], options["verus_root"])
     if not arguments or arguments[0] not in (*CHECKS, "fingerprint", "tool-versions"):
-        report_red("用法：verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根> [选项] | list-items <根> [--verdict-library 目录] | fingerprint <包目录> | tool-versions [<根>] | --selftest",
+        report_red("用法：verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根> [选项] | must-red-landings <根> [--write] | list-items <根> [--verdict-library 目录] | fingerprint <包目录> | tool-versions [<根>] | --selftest",
                    "看文件头的用法一节")
         return EXIT_USAGE
     try:
         positional, options = parse_options(arguments[1:])
     except ValueError as error:
         report_red(f"参数不对：{error}", "看文件头的用法一节")
+        return EXIT_USAGE
+    if options["write"] and arguments[0] != "must-red-landings":
+        report_red(f"{arguments[0]} 不收 --write", "只有 must-red-landings 收 --write（给必红世界表补第六段）")
         return EXIT_USAGE
     if arguments[0] == "fingerprint":
         if len(positional) != 1 or not os.path.isdir(positional[0]):
@@ -2066,14 +3362,81 @@ FAKE_VERUS = r'''#!/usr/bin/env python3
 # --verify-function 下没有 success 键、is-verifying-entire-crate false；vir 错只有 encountered-error 与 encountered-vir-error 两样。
 # 义务条数照真 Verus 量到的：proof fn 1 条，exec fn 1 条另加每个 while 1 条，spec fn 带 decreases 的 1 条、不带的 0 条，
 # derive(Clone) 的类型另有一个 <类型>::clone（1 条）；函数里有 SELFTEST_ZERO_VERIFIED 的那个函数验出 0 条。
+# impl 与 trait 里的方法照真 Verus 列可点名函数的写法记成 <类型>::<方法>（trait impl 也写类型）、<trait>::<方法>。
 # --verify-function 照真 Verus 点：有恰好同名的取它，否则唯一包含它的那一个，几个都包含它报 more than one match，一个都没有报 could not find。
 # 模块也照真 Verus 0.2026.09.20（2026-10-18 的三层小 crate 探针）：--verify-function 只在 --verify-root（src/lib.rs）或 --verify-only-module <模块>
 # （src/<甲>.rs、src/<甲>/mod.rs 是 <甲>，src/<甲>/<乙>.rs 是 <甲>::<乙>，不含子模块）点的那一个模块里找；两样都没给、两样都给、给的是 --verify-module，
-# 退 255、stdout 空；点的模块没有报 could not find module。环境里有 SELFTEST_VERUS_ARGUMENTS 的，每起一次往那份文件追加一行命令行参数（JSON）。
+# 退 255、stdout 空；点的模块没有报 could not find module。不同模块里同名的函数各是各的。环境里有 SELFTEST_VERUS_ARGUMENTS 的，每起一次往那份文件追加一行命令行参数（JSON；
+# --compile 那一趟是 MIR 比对，不记）。
+# MIR：带 --compile 与 -o <文件> 的那一趟验完整个 crate 之后往 -o 写一份假 MIR（verus 那一种）；--selftest-mir <product|verus> <crate 目录> <文件> 只写 MIR、不验
+# （假 cargo 与假 cargo-verus 用）。假 MIR 每个 fn 一段，正文是那个 fn 的源码行；产品那一种去掉带 SELFTEST_MIR_VERUS_ONLY 的行，verus 那一种去掉带
+# SELFTEST_MIR_PRODUCT_ONLY 的行、另多一段擦出来的空壳 selftest_ghost_shell。
 import json, os, re, sys, time
 here = os.path.dirname(os.path.realpath(__file__))
 commit = json.load(open(os.path.join(here, "version.json")))["verus"]["commit"]
-if os.environ.get("SELFTEST_VERUS_ARGUMENTS"):
+function_line = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:open\s+|closed\s+)?(?:broadcast\s+)?(?:uninterp\s+)?(?:axiom\s+)?(?P<mode>proof\s+|spec\s+|exec\s+)?fn\s+(?P<name>\w+)")
+type_line = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum)\s+(?P<name>\w+)")
+impl_line = re.compile(r"^(?P<indent>\s*)impl\b(?:\s*<[^>]*>)?\s+(?:(?P<trait>[\w:]+(?:\s*<[^>]*>)?)\s+for\s+)?(?P<target>[\w:]+)")
+trait_line = re.compile(r"^(?P<indent>\s*)(?:pub(?:\([^)]*\))?\s+)?trait\s+(?P<name>\w+)")
+
+
+def module_of(path, source="src"):
+    parts = os.path.relpath(path, source)[:-len(".rs")].split(os.sep)
+    parts = parts[:-1] if parts[-1] == "mod" else parts
+    return "" if parts == ["lib"] else "::".join(parts)
+
+
+def source_files(source="src"):
+    files = []
+    for directory, _s, names in os.walk(source):
+        for name in sorted(names):
+            if name.endswith(".rs"):
+                files.append(os.path.join(directory, name))
+    return sorted(files)
+
+
+def blocks_of(path):
+    """[(点名的名字, 模式, [源码行])]：一个 fn 从它那一行到下一个 fn 那一行之前；impl / trait 里的照 <类型或 trait>::<方法> 记。"""
+    blocks, container, external = [], None, False
+    for line in open(path).read().split("\n"):
+        if container is not None and line.strip() == "}" and len(line) - len(line.lstrip()) == container[1]:
+            container = None
+        opened = impl_line.match(line) or trait_line.match(line)
+        if opened and line.rstrip().endswith("{"):
+            name = (opened.groupdict().get("target") or opened.groupdict().get("name")).split("::")[-1]
+            container = (name, len(opened.group("indent")))
+        heading = function_line.match(line)
+        if heading:
+            name = heading.group("name") if container is None else f"{container[0]}::{heading.group('name')}"
+            # 带 external_body 的 fn 函数体不验（真 Verus 照它的规格当真、不出义务）：模式记成 trusted，义务 0 条
+            blocks.append([name, "trusted" if external else (heading.group("mode") or "exec ").strip(), [line]])
+            external = False
+        elif blocks:
+            blocks[-1][2].append(line)
+        if "external_body" in line.split("//")[0]:
+            external = True
+    return blocks
+
+
+def mir_text(flavor, source="src"):
+    skip = "SELFTEST_MIR_VERUS_ONLY" if flavor == "product" else "SELFTEST_MIR_PRODUCT_ONLY"
+    pieces = []
+    for path in source_files(source):
+        module = module_of(path, source)
+        for name, _mode, lines in blocks_of(path):
+            body = [line.strip() for line in lines if line.strip() and skip not in line]
+            pieces.append(f"fn {module + '::' if module else ''}{name}() -> () {{\n" + "".join(f"    {line}\n" for line in body) + "}\n")
+    if flavor == "verus":
+        pieces.append("fn selftest_ghost_shell() -> () {\n}\n")
+    return "\n".join(pieces)
+
+
+if sys.argv[1:2] == ["--selftest-mir"]:
+    flavor, crate_directory, out = sys.argv[2:5]
+    open(out, "w").write(mir_text(flavor, os.path.join(crate_directory, "src")))
+    sys.exit(0)
+compile_output = sys.argv[sys.argv.index("-o") + 1] if "--compile" in sys.argv and "-o" in sys.argv[:-1] else None
+if os.environ.get("SELFTEST_VERUS_ARGUMENTS") and compile_output is None:
     open(os.environ["SELFTEST_VERUS_ARGUMENTS"], "a").write(json.dumps(sys.argv[1:]) + "\n")
 no_cheating = "--no-cheating" in sys.argv
 rlimit = float(sys.argv[sys.argv.index("--rlimit") + 1]) if "--rlimit" in sys.argv[:-1] else None
@@ -2088,43 +3451,34 @@ if only is not None:
         sys.stderr.write(f"Error: {refusal}\n")
         sys.exit(255)
 target_module = None if only is None else only_module or ""
-
-
-def module_of(path):
-    parts = os.path.relpath(path, "src")[:-len(".rs")].split(os.sep)
-    parts = parts[:-1] if parts[-1] == "mod" else parts
-    return "" if parts == ["lib"] else "::".join(parts)
-function_line = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(open\s+|closed\s+)?(broadcast\s+)?(proof\s+|spec\s+|exec\s+)?fn\s+(\w+)")
-type_line = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(struct|enum)\s+(\w+)")
 if os.environ.get("SELFTEST_VERUS_TRACE"):
     open(os.environ["SELFTEST_VERUS_TRACE"], "a").write("起了一次\n")
-files = []
-for directory, _s, names in os.walk("src"):
-    for name in sorted(names):
-        if name.endswith(".rs"):
-            files.append(os.path.join(directory, name))
+files = source_files()
+# 键是「模块\0点名的名字」：不同模块里同名的各是各的
 obligations, order, home = {}, [], {}
-for path in sorted(files):
-    current, mode, derive_clone = None, None, False
-    for line in open(path).read().split("\n"):
-        heading, declared = function_line.match(line), type_line.match(line)
-        if heading:
-            current, mode = heading.group(6), (heading.group(5) or "exec ").strip()
-            obligations[current] = 0 if mode == "spec" else 1
-            order.append(current)
-            home[current] = module_of(path)
-        elif declared and derive_clone:
-            obligations[declared.group(4) + "::clone"] = 1
-            order.append(declared.group(4) + "::clone")
-            home[declared.group(4) + "::clone"] = module_of(path)
-        derive_clone = line.lstrip().startswith("#[derive(") and "Clone" in line
-        if current is not None and not heading:
-            if mode == "spec" and re.search(r"\bdecreases\b", line) and obligations[current] == 0:
-                obligations[current] = 1
+for path in files:
+    module, derive_clone = module_of(path), False
+    for name, mode, lines in blocks_of(path):
+        key = f"{module}\0{name}"
+        obligations[key] = 0 if mode in ("spec", "trusted") else 1
+        order.append(key)
+        home[key] = module
+        for line in lines[1:]:
+            if mode == "spec" and re.search(r"\bdecreases\b", line) and obligations[key] == 0:
+                obligations[key] = 1
             if mode == "exec" and re.match(r"^\s*while\b", line):
-                obligations[current] += 1
-        if current is not None and "SELFTEST_ZERO_VERIFIED" in line:
-            obligations[current] = -10 ** 6
+                obligations[key] += 1
+        for line in lines:
+            if "SELFTEST_ZERO_VERIFIED" in line:
+                obligations[key] = -10 ** 6
+    for line in open(path).read().split("\n"):
+        declared = type_line.match(line)
+        if declared and derive_clone:
+            key = f"{module}\0{declared.group('name')}::clone"
+            obligations[key] = 1
+            order.append(key)
+            home[key] = module
+        derive_clone = line.lstrip().startswith("#[derive(") and "Clone" in line
 selected = None
 if target_module and target_module not in {module_of(path) for path in files}:
     sys.stderr.write(f"error: could not find module {target_module} specified by --verify-module or --verify-only-module\n"
@@ -2132,27 +3486,31 @@ if target_module and target_module not in {module_of(path) for path in files}:
     print(json.dumps({"verification-results": {"encountered-error": True, "encountered-vir-error": True}, "verus": {"commit": commit}}))
     sys.exit(1)
 if only is not None:
-    order = [name for name in order if home[name] == target_module]
-    if only in order:
-        selected = only
+    order = [key for key in order if home[key] == target_module]
+    names = {key: key.split("\0", 1)[1] for key in order}
+    exact = [key for key in order if names[key] == only]
+    if exact:
+        selected = exact[0]
     else:
-        matched = [name for name in order if only in name]
+        matched = [key for key in order if only in names[key]]
         if len(matched) > 1:
             sys.stderr.write(f"error: more than one match found for --verify-function {only}, consider using wildcard *{only}* to verify all matched results,\n"
                              "       or specify a unique substring for the desired function, matched results are:\n"
-                             + "".join(f"         - {name}\n" for name in matched) + "\nerror: aborting due to 1 previous error\n\n")
+                             + "".join(f"         - {names[key]}\n" for key in matched) + "\nerror: aborting due to 1 previous error\n\n")
             print(json.dumps({"verification-results": {"encountered-error": True, "encountered-vir-error": True}, "verus": {"commit": commit}}))
             sys.exit(1)
         selected = matched[0] if matched else None
+selected_name = selected.split("\0", 1)[1] if selected else None
 functions, errors, vir, found = 0, [], [], selected is not None
-for name in order:
-    if only is None or name == selected:
-        functions += max(obligations[name], 0)
-for path in sorted(files):
+for key in order:
+    if only is None or key == selected:
+        functions += max(obligations[key], 0)
+for path in files:
     lines = open(path).read().split("\n")
     owner_vacuous = owner_failed = closure_vacuous = False
     current = None
     in_scope = only is None or module_of(path) == target_module
+    container = None
     for number, line in enumerate(lines, 1):
         if "SELFTEST_SLEEP" in line:
             time.sleep(30)
@@ -2160,10 +3518,17 @@ for path in sorted(files):
             os.kill(os.getpid(), 9)
         if no_cheating and re.search(r"\bassume\(", line.split("//")[0]):
             vir.append(("assume/admit not allowed with --no-cheating", path, number, 1))
+        if no_cheating and re.search(r"\b(assume_specification|external_body)\b", line.split("//")[0]):
+            vir.append(("external_body/assume_specification not allowed with --no-cheating", path, number, 1))
+        if container is not None and line.strip() == "}" and len(line) - len(line.lstrip()) == container[1]:
+            container = None
+        opened = impl_line.match(line) or trait_line.match(line)
+        if opened and line.rstrip().endswith("{"):
+            container = ((opened.groupdict().get("target") or opened.groupdict().get("name")).split("::")[-1], len(opened.group("indent")))
         heading = function_line.match(line)
         if heading:
-            current = heading.group(6)
-        if only is not None and (current != selected or not in_scope):
+            current = heading.group("name") if container is None else f"{container[0]}::{heading.group('name')}"
+        if only is not None and (current != selected_name or not in_scope):
             continue
         if heading:
             owner_vacuous = "SELFTEST_VACUOUS" in line
@@ -2201,8 +3566,159 @@ results.update({"verified": max(functions - failed, 0), "errors": failed, "is-ve
 if any("SELFTEST_NO_COUNTS" in open(path).read() for path in files):
     del results["verified"], results["errors"]
 print(json.dumps({"verification-results": results, "verus": {"commit": commit}}))
+if compile_output is not None and not errors:
+    open(compile_output, "w").write(mir_text("verus"))
 sys.exit(1 if errors else 0)
 '''
+
+# 假的 cargo（产品构建那一趟，MIR 比对用）与假的 cargo-verus（cargo 那一种 crate 起的 cargo verus focus / build）：只给 --selftest 用。
+# 两份都照 -p 点的包在副本里找成员（当前目录的 Cargo.toml 是那个包，或工作区 members 里名字对得上的那一个）；
+# 假 cargo 只认 rustc：往 $CARGO_TARGET_DIR/debug/deps/<包名>-0.mir 写产品那一种假 MIR。
+# 假 cargo-verus 认 verus focus 与 verus build：focus 在成员目录里起假 Verus（-- 之后的参数原样交给它），报错位置照真 cargo verus 改写成相对副本根的路径；
+# build 照样验整个 crate，再往 $CARGO_TARGET_DIR/debug/deps/<包名>-1.mir 写 verus 那一种假 MIR。环境里有 SELFTEST_CARGO_VERUS_ARGUMENTS 的，每起一次追加一行参数（JSON）。
+# focus 照真 cargo 的编译指纹：同一个编译目录里 <编译目录>/verus-partial/debug/.fingerprint/<包名>-fake 在就只打一行 Finished、不出判定行，不在就建它再验。
+FAKE_CARGO_COMMON = r'''#!/usr/bin/env python3
+import json, os, subprocess, sys, tomllib
+here = os.path.dirname(os.path.realpath(__file__))
+verus = os.path.join(os.environ.get("SELFTEST_FAKE_VERUS_DIRECTORY") or here, "verus")
+
+
+def member_of(package):
+    own = os.path.join(os.getcwd(), "Cargo.toml")
+    manifest = tomllib.load(open(own, "rb"))
+    if manifest.get("package", {}).get("name") == package:
+        return os.getcwd()
+    for member in manifest.get("workspace", {}).get("members", []):
+        path = os.path.join(os.getcwd(), member)
+        if tomllib.load(open(os.path.join(path, "Cargo.toml"), "rb")).get("package", {}).get("name") == package:
+            return path
+    sys.stderr.write(f"error: package `{package}` not found\n")
+    sys.exit(101)
+
+
+arguments = sys.argv[1:]
+package = arguments[arguments.index("-p") + 1]
+member = member_of(package)
+deps = os.path.join(os.environ.get("CARGO_TARGET_DIR") or os.path.join(os.getcwd(), "target"), "debug", "deps")
+'''
+
+FAKE_CARGO = FAKE_CARGO_COMMON + r'''
+if arguments[:1] != ["rustc"]:
+    sys.stderr.write(f"假 cargo 只认 rustc：{arguments}\n")
+    sys.exit(101)
+os.makedirs(deps, exist_ok=True)
+sys.exit(subprocess.run([verus, "--selftest-mir", "product", member, os.path.join(deps, package.replace("-", "_") + "-0.mir")]).returncode)
+'''
+
+FAKE_CARGO_VERUS = FAKE_CARGO_COMMON + r'''
+if os.environ.get("SELFTEST_CARGO_VERUS_ARGUMENTS"):
+    open(os.environ["SELFTEST_CARGO_VERUS_ARGUMENTS"], "a").write(json.dumps(arguments) + "\n")
+subcommand = arguments[1]
+rest = arguments[arguments.index("--") + 1:]
+# cargo 的编译指纹：同一个编译目录里被验的包验过一回就当没变，focus 只打一行 Finished、不起 Verus、stdout 没有判定行（真 cargo verus 的样子）
+fingerprint = os.path.join(os.environ.get("CARGO_TARGET_DIR") or os.path.join(os.getcwd(), "target"), "verus-partial", "debug", ".fingerprint", package + "-fake")
+if subcommand == "focus":
+    if os.path.isdir(fingerprint):
+        sys.stderr.write("    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s\n")
+        sys.exit(0)
+    os.makedirs(fingerprint)
+mir = "--emit=mir" in rest
+if mir:
+    rest = rest[:rest.index("--")] if "--" in rest else [word for word in rest if word != "--emit=mir"]
+relative = os.path.relpath(member, os.getcwd())
+ran = subprocess.run([verus, *rest, "src/lib.rs"], cwd=member, capture_output=True, text=True)
+sys.stdout.write(ran.stdout)
+sys.stderr.write(ran.stderr.replace("--> src/", f"--> {relative}/src/"))
+if subcommand == "build" and mir and ran.returncode == 0:
+    os.makedirs(deps, exist_ok=True)
+    subprocess.run([verus, "--selftest-mir", "verus", member, os.path.join(deps, package.replace("-", "_") + "-1.mir")], check=True)
+sys.exit(101 if ran.returncode else 0)
+'''
+
+# 被验区域那几格的自证用：插在 SELFTEST_KERNEL 的「} // verus!」之前（methods：impl 与 trait 里的方法成项；trust：要登记的三种可信声明；
+# trait：被验的 trait，另在 verus! 外面接一个 trait impl 与一个 cfg(test) 下的 impl）
+SELFTEST_METHODS_EXTRA = """
+pub trait Device {
+    fn read_slot(&self, slot: u64) -> (r: u64)
+        ensures
+            r <= 10;
+}
+
+pub struct Region {
+    pub start: u64,
+}
+
+impl Region {
+    pub fn contains(&self, slot: u64) -> (r: bool)
+        ensures
+            r == (self.start <= slot),
+    {
+        self.start <= slot
+    }
+}
+
+impl Device for Region {
+    fn read_slot(&self, slot: u64) -> (r: u64)
+    {
+        3
+    }
+}
+"""
+
+SELFTEST_TRUST_EXTRA = """
+pub assume_specification<T: Ord>[ <[T]>::binary_search ](s: &[T], x: &T) -> (r: Result<usize, usize>)
+    ensures
+        r matches Ok(i) ==> i < s.len();
+
+#[verifier::external_body]
+pub fn read_device(x: u64) -> (r: u64)
+    ensures
+        r == x,
+{
+    x
+}
+
+pub uninterp spec fn crc(x: u64) -> u64;
+"""
+
+SELFTEST_TRAIT_EXTRA = """
+pub trait Device {
+    fn read_slot(&self, slot: u64) -> (r: u64)
+        ensures
+            r <= 10;
+}
+"""
+
+SELFTEST_TRAIT_OUTSIDE = """
+pub struct BadDevice;
+
+impl Device for BadDevice {
+    fn read_slot(&self, _slot: u64) -> u64 { 99 }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    struct Mock;
+    impl Device for Mock {
+        fn read_slot(&self, _slot: u64) -> u64 { 1 }
+    }
+}
+"""
+
+
+def captured_stdout(function, *arguments):
+    """自证用：起 function，交 (它的返回值, 收下的 stdout)（StringIO，读 getvalue()）。"""
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        returned = function(*arguments)
+    return returned, buffer
+
+
+def selftest_kernel_with(extra, after=""):
+    """SELFTEST_KERNEL 的 verus! 里另加 extra，verus! 之后接 after。"""
+    return SELFTEST_KERNEL.replace("} // verus!\n", extra + "} // verus!\n") + after
+
 
 SELFTEST_KERNEL = """use vstd::prelude::*;
 verus! {
@@ -2225,6 +3741,36 @@ pub fn keep_small(value: u64) -> (result: u64)
             candidate <= 10,
         { candidate };
     if value > 10 { pick(10) } else { pick(value) }
+}
+} // verus!
+"""
+
+
+# 必红世界按落点判的自证用：tiny 的函数体带一个原来就有的标记（假 Verus 在这一行报一条证明错），在 clamp_to_limit 与 keep_small 之间；
+# 改坏 clamp_to_limit 的替换文比原文多几行时，tiny 里那一行在改坏之后的文件里挪到 keep_small 在改坏之前的文件里的行数上
+SELFTEST_LANDING_KERNEL = """use vstd::prelude::*;
+verus! {
+pub fn clamp_to_limit(value: u64, limit: u64) -> (result: u64)
+    requires
+        limit > 0,
+    ensures
+        result <= limit,
+{
+    if value > limit { limit } else { value }
+}
+
+pub fn tiny(value: u64) -> (result: u64)
+    ensures
+        result <= 3,
+{
+    if value > 3 { 3 } else { value } // SELFTEST_BROKEN
+}
+
+pub fn keep_small(value: u64) -> (result: u64)
+    ensures
+        result <= 10,
+{
+    if value > 10 { 10 } else { value }
 }
 } // verus!
 """
@@ -2310,6 +3856,11 @@ pub fn count_up(limit: u64) -> (result: u64)
 SELFTEST_BREAK_WORKERS = 6
 
 
+def selftest_break_caught(returncode, output):
+    """故障注入必须被具体自证格检出；崩溃、信号或用法错不算证明会红。"""
+    return returncode == EXIT_RED and re.search(r"(?m)^\s*✗ .+ 这一格判错[：:]", output) is not None
+
+
 def selftest():
     global MEMORY_CAP_RUNNER
     os.environ.pop(QUEUE_REFUSED_FILE_VARIABLE, None)   # 外面门禁给的那份不进自证：跨格那几格自己建一份
@@ -2320,9 +3871,12 @@ def selftest():
         commit, other_commit = "a" * 40, "b" * 40
         install = os.path.join(work, "tools", "verus-x86-linux")
         os.makedirs(install)
-        with open(os.path.join(install, "verus"), "w") as handle:
-            handle.write(FAKE_VERUS)
-        os.chmod(os.path.join(install, "verus"), 0o755)
+        for tool, text in (("verus", FAKE_VERUS), ("cargo", FAKE_CARGO), ("cargo-verus", FAKE_CARGO_VERUS)):
+            with open(os.path.join(install, tool), "w") as handle:
+                handle.write(text)
+            os.chmod(os.path.join(install, tool), 0o755)
+        rustc_version_file = os.path.join(work, "rustc-version.txt")
+        open(rustc_version_file, "w").write(f"rustc 1.0.0 (dddddddd 2026-01-01)\nbinary: rustc\ncommit-hash: {'d' * 40}\nrelease: 1.0.0\n")
         zip_path = os.path.join(work, "tools", "verus.zip")
         open(zip_path, "wb").write(b"zip")
         zip_digest = hashlib.sha256(b"zip").hexdigest()
@@ -2336,30 +3890,37 @@ def selftest():
         fingerprint, _count = package_source_fingerprint(package_directory)
 
         def make_root(name, kernel=SELFTEST_KERNEL, count=2, must_red=None, version_commit=commit, lock_version="0.0.1", with_kernel=True, wired=True, extra_dependency="",
-                      rlimit=7):
+                      rlimit=7, trust_rows=(), trust_list=True, rustc_row=f"rustc\tstable\t1.0.0\t{'d' * 40}\n", crate_mode=""):
             root = os.path.join(work, name)
             os.makedirs(os.path.join(root, ".claude", "gate.d"))
             os.makedirs(os.path.join(root, "crates", "core", "src"))
+            os.makedirs(os.path.join(root, "crates", "core", "tests"))
             json.dump({"verus": {"version": "0.9.9.tag", "commit": version_commit, "toolchain": "stable"}}, open(os.path.join(install, "version.json"), "w"))
             open(os.path.join(root, REGISTRY), "w").write(
                 "# 自证用\n"
                 f"release\t0.9.9.tag\t{commit}\t{zip_digest}\tunused\n"
                 f"package\tvstd\t0.0.1\t{'c' * 40}\tsource/vstd\t{fingerprint}\n"
-                "crate\tcrates/core\t%d\n" % count +
+                "crate\tcrates/core\t%d%s\n" % (count, crate_mode) +
                 "kernel\tcrates/core/src/kernel.rs\n"
-                "must-red-worlds\tcrates/core/verus-must-red-worlds.tsv\n" + (f"rlimit\t{rlimit}\n" if rlimit is not None else ""))
+                "must-red-worlds\tcrates/core/verus-must-red-worlds.tsv\n" + (f"rlimit\t{rlimit}\n" if rlimit is not None else "") + rustc_row)
+            if trust_list:
+                open(os.path.join(root, TRUST_LIST), "w").write(f"# 自证用\nvstd\t0.0.1\t{fingerprint}\t自证用：vstd 整体登记\n" + "".join(row + "\n" for row in trust_rows))
+            open(os.path.join(root, "crates", "core", "tests", "differential.rs"), "w").write(
+                "#[test]\nfn selftest_differential() {}\n\n#[test]\n#[ignore]\nfn selftest_differential_other() {}\n")
             open(os.path.join(root, "Cargo.lock"), "w").write(f'version = 4\n\n[[package]]\nname = "vstd"\nversion = "{lock_version}"\n')
             open(os.path.join(root, "crates", "core", "Cargo.toml"), "w").write(
                 '[package]\nname = "core-sample"\nedition = "2021"\n\n[dependencies]\n' + ('vstd = "=0.0.1"\n' if wired else "") + extra_dependency)
             open(os.path.join(root, "crates", "core", "src", "lib.rs"), "w").write("pub mod kernel;\n" if with_kernel else "")
             if with_kernel:
                 open(os.path.join(root, "crates", "core", "src", "kernel.rs"), "w").write(kernel)
-            rows = must_red if must_red is not None else ["收紧改松\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // SELFTEST_BROKEN\tproof_errors=1"]
+            rows = must_red if must_red is not None else ["收紧改松\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // SELFTEST_BROKEN\tproof_errors=1\tlanding=clamp_to_limit"]
             open(os.path.join(root, "crates", "core", "verus-must-red-worlds.tsv"), "w").write("# 自证用\n" + "".join(row + "\n" for row in rows))
             return root
 
         options = {"verus_root": install, "cargo_home": cargo_home, "launcher": [], "timeout": 5, "threads": 2, "jobs": 2,
-                   "memory_cap": "1G"}
+                   "memory_cap": "1G", "rustc_version_file": rustc_version_file}
+        # MIR 比对的产品构建照 PATH 找 cargo：假 cargo 放在最前面（只在这一趟自证的进程里）
+        os.environ["PATH"] = install + os.pathsep + os.environ.get("PATH", "")
 
         def expect(label, check, root, want_exit, want_text):
             nonlocal cases
@@ -2373,9 +3934,30 @@ def selftest():
             want_texts = want_text if isinstance(want_text, tuple) else (want_text,)
             if got != want_exit or any(text not in output for text in want_texts):
                 wrong.append(label)
-                print(f"    {label} 这一格判错：期望退 {want_exit}、输出含「{'」「'.join(want_texts)}」，实测退 {got}：{output.strip()[-300:]}")  # gate-lint:detail
+                print(one_line(f"  ✗ {label} 这一格判错：期望退 {want_exit}、输出含「{'」「'.join(want_texts)}」，实测退 {got}：{output.strip()[-300:]}"))  # gate-lint:detail
             return output
 
+        def expect_absent(label, output, unwanted):
+            """一格已经跑出来的输出里不许有 unwanted（输出是 expect 交回的那一份，不再起一遍 Verus）。"""
+            nonlocal cases
+            cases += 1
+            if unwanted in output:
+                wrong.append(label)
+                print(one_line(f"  ✗ {label} 这一格判错：期望输出里没有「{unwanted}」，实测有：{output.strip()[-300:]}"))  # gate-lint:detail
+
+        omitted_root = make_root("unregistered-proof-module")
+        open(os.path.join(omitted_root, "crates/core/src/omitted.rs"), "w").write(
+            "use vstd::prelude::*;\nverus! { pub proof fn bad() ensures false, {} }\n")
+        open(os.path.join(omitted_root, "crates/core/src/lib.rs"), "a").write("pub mod omitted;\n")
+        expect("unregistered-proof-module", "proof", omitted_root, 1, "未登记的 Verus 核")
+        inline_requires = SELFTEST_KERNEL.replace("    requires\n        limit > 0,", "    requires limit > 0,")
+        inline_requires = inline_requires.replace("-> (result: u64)\n    requires limit > 0,", "-> (result: u64) requires limit > 0,")
+        expect("inline-requires-refused", "vacuity", make_root("inline-requires", kernel=inline_requires), 1, "拒绝漏检")
+        coverage_root = make_root("negative-coverage")
+        expect("negative-coverage-missing", "coverage", coverage_root, 1, "函数 keep_small")
+        with open(os.path.join(coverage_root, "crates/core/verus-must-red-worlds.tsv"), "a") as handle:
+            handle.write("keep-small-contract\tcrates/core/src/kernel.rs\tresult <= 10,\tresult < 10,\tproof_errors=1\tlanding=keep_small\n")
+        expect("negative-coverage-complete", "coverage", coverage_root, 0, "每个带契约的函数")
         green = make_root("green")
         expect("toolchain-green", "toolchain", green, 0, "个包的版本、出处与源码指纹都与登记相同")
         expect("proof-green", "proof", green, 0, "成项 2 个（exec fn 2），各项 verified 之和 2、0 errors（登记 2）；不成项的 spec fn 0 个")
@@ -2406,11 +3988,173 @@ def selftest():
             "            candidate <= 10,", "            candidate <= 10, // SELFTEST_CLOSURE_VACUOUS")
         expect("vacuity-closure-vacuous", "vacuity", make_root("closurevacuous", kernel=closure_vacuous), 1, "keep_small 里第 20 行起的闭包：函数体头插 assert(false) 照样验得过")
         expect("crate-extra-dependency", "proof", make_root("extradependency", extra_dependency='singlefs-format = { path = "../format" }\n'), 1, "除 vstd 之外还依赖 singlefs-format")
-        expect("must-red-survives", "must-red-worlds", make_root("survives", must_red=["改注释\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // 只是注释\tproof_errors=1"]), 1, "照样验过")
-        expect("must-red-anchor", "must-red-worlds", make_root("anchor", must_red=["不在的原文\tcrates/core/src/kernel.rs\tnot present anywhere\tx\tproof_errors=1"]), 1, "恰好命中一次")
-        # 证明错条数与第五段 proof_errors= 不同：判红（开关 proof-error-count-unchecked 下判错）
-        expect("must-red-proof-error-count", "must-red-worlds", make_root("proofcount", must_red=["条数不对\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // SELFTEST_BROKEN\tproof_errors=2"]),
-               1, "证明错 1 条，表里写的是 proof_errors=2")
+
+        # ── 被验区域与多 crate（出口 5 第三轮判决第三节「门禁」；文件头「被验区域与多 crate 的弄坏开关」）──
+        def expect_true(label, passed, detail):
+            nonlocal cases
+            cases += 1
+            if not passed:
+                wrong.append(label)
+                print(one_line(f"  ✗ {label} 这一格判错：{detail}"))  # gate-lint:detail
+
+        # 按全路径逐项：不同模块里同名的各是各的项；impl 与 trait 里的方法成项（<类型>::<方法>），trait 里没有函数体的声明不成项（开关 methods-refused 下判错）
+        two_modules = make_root("same-name-in-two-modules", count=4)
+        with open(os.path.join(two_modules, REGISTRY), "a") as handle:
+            handle.write("kernel\tcrates/core/src/other.rs\n")
+        open(os.path.join(two_modules, "crates/core/src/other.rs"), "w").write(SELFTEST_KERNEL)
+        open(os.path.join(two_modules, "crates/core/src/lib.rs"), "a").write("pub mod other;\n")
+        expect("same-name-in-two-modules", "proof", two_modules, 0,
+               ("proof:core_sample::kernel::clamp_to_limit：绿", "proof:core_sample::other::clamp_to_limit：绿", "成项 4 个（exec fn 4）"))
+        expect("proof-method-items", "proof", make_root("methoditems", kernel=selftest_kernel_with(SELFTEST_METHODS_EXTRA), count=4), 0,
+               ("proof:core_sample::kernel::Region::contains：绿", "proof:core_sample::kernel::Region::read_slot：绿", "成项 4 个（exec fn 4）"))
+        same_point = selftest_kernel_with(SELFTEST_METHODS_EXTRA + "\nimpl Region {\n    pub fn read_slot(&self, slot: u64) -> (r: u64)\n    {\n        4\n    }\n}\n")
+        expect("proof-same-point-name", "proof", make_root("samepoint", kernel=same_point, count=5), 1, "交给 --verify-function 的名字都是 Region::read_slot")
+        # 属性写法（#[verus_verify]）标的文件也是核：没登记判红（开关 attribute-mode-unrecognized 下判错）
+        attribute_root = make_root("unregistered-attribute-kernel")
+        open(os.path.join(attribute_root, "crates/core/src/attributed.rs"), "w").write("#[verus_verify]\npub fn attributed(x: u64) -> u64 { x }\n")
+        open(os.path.join(attribute_root, "crates/core/src/lib.rs"), "a").write("pub mod attributed;\n")
+        expect("unregistered-attribute-kernel", "proof", attribute_root, 1, "未登记的 Verus 核：crates/core/src/attributed.rs（属性写法")
+        # 信任清单：没登记判红，红句给现算的 sha256；登记齐了判绿；sha256 不对、差分测试不在、登记了却没有那一处、vstd 行对不上、表不在，各判红
+        trust_kernel = selftest_kernel_with(SELFTEST_TRUST_EXTRA)
+        unregistered = expect("trust-unregistered", "proof", make_root("trustunregistered", kernel=trust_kernel), 1,
+                              ("assume_specification <[T]>::binary_search 没登记进信任清单", "external_body core_sample::kernel::read_device 没登记进信任清单",
+                               "uninterp core_sample::kernel::crc 没登记进信任清单"))
+        digests = dict(re.findall(r"的 (?:assume_specification|external_body|uninterp) (\S+) 没登记进信任清单 \S+（这一处的规格原文 sha256 ([0-9a-f]{64})）", unregistered))
+        expect_true("trust-digests-reported", len(digests) == 3, f"没登记的三处期望各报一个现算的 sha256，读到 {digests}")
+
+        def trust_rows(test="selftest_differential", wrong_digest=None, extra=()):
+            rows = []
+            for kind, point in (("assume_specification", "<[T]>::binary_search"), ("external_body", "core_sample::kernel::read_device"), ("uninterp", "core_sample::kernel::crc")):
+                digest = digests.get(point, "0" * 64)
+                rows.append(f"{kind}\tcrates/core/src/kernel.rs\t{point}\t{wrong_digest if wrong_digest and kind == 'external_body' else digest}\t{test}\t自证用：登记的可信声明")
+            return rows + list(extra)
+
+        trust_green = expect("trust-registered-green", "proof", make_root("trustregistered", kernel=trust_kernel, trust_rows=trust_rows()), 0,
+                             ("成项 2 个（exec fn 2）", "可信声明与 cfg 原子 3 处都登记在信任清单里"))
+        expect("trust-digest", "proof", make_root("trustdigest", kernel=trust_kernel, trust_rows=trust_rows(wrong_digest="e" * 64)), 1,
+               "external_body core_sample::kernel::read_device 登记的规格原文 sha256 是 eeeeeeeeeeee…")
+        expect("trust-test-missing", "proof", make_root("trusttest", kernel=trust_kernel, trust_rows=trust_rows(test="no_such_test")), 1,
+               "点名的差分测试 no_such_test 在 crates/ 下找不到标了 #[test] 的函数")
+        stale = "external_body\tcrates/core/src/kernel.rs\tcore_sample::kernel::gone\t" + "f" * 64 + "\tselftest_differential\t自证用：删了的那一处"
+        expect("trust-stale-row", "proof", make_root("truststale", kernel=trust_kernel, trust_rows=trust_rows(extra=[stale])), 1,
+               "登记了 external_body core_sample::kernel::gone（crates/core/src/kernel.rs），核的被验区域里没有这一处")
+        vstd_root = make_root("trustvstd")
+        edit_text = open(os.path.join(vstd_root, TRUST_LIST)).read().replace("vstd\t0.0.1\t", "vstd\t0.0.2\t")
+        open(os.path.join(vstd_root, TRUST_LIST), "w").write(edit_text)
+        expect("trust-vstd", "proof", vstd_root, 1, "的 vstd 0.0.2")
+        expect("trust-list-missing", "proof", make_root("trustmissing", trust_list=False), 1, "信任清单 .claude/gate.d/verus-trust-list.tsv 不在")
+        # 不带 --no-cheating：登记了的 assume_specification 与 external_body 照验（开关 no-cheating-kept 下假 Verus 照真 Verus 拒，trust-registered-green 判错）
+        expect_true("no-cheating-dropped", "--no-cheating" not in trust_green and "成项 2 个" in trust_green, f"登记齐了期望判绿：{one_line(trust_green.strip()[-300:])}")
+        # axiom 一律判红（开关 axiom-accepted 下判错）
+        axiom_kernel = selftest_kernel_with("\npub axiom fn lemma_false()\n    ensures\n        false;\n")
+        expect("axiom-red", "proof", make_root("axiom", kernel=axiom_kernel, count=3), 1, "核里有 axiom：crates/core/src/kernel.rs:")
+        # cfg 原子：cfg!(…)、#[cfg(…)]、宏定义里有 cfg 的宏在被验区域里的调用，没登记判红；登记了判绿（开关 cfg-atom-accepted、cfg-macro-unchecked 下判错）
+        body = "if value > limit { limit } else { value }"
+        cfg_kernel = SELFTEST_KERNEL.replace(body, "if cfg!(debug_assertions) { " + body + " } else { " + body + " }")
+        cfg_output = expect("cfg-atom-red", "proof", make_root("cfgatom", kernel=cfg_kernel), 1, "cfg core_sample::kernel::clamp_to_limit#cfg!(debug_assertions) 没登记进信任清单")
+        cfg_digest = re.search(r"#cfg!\(debug_assertions\) 没登记进信任清单 \S+（这一处的规格原文 sha256 ([0-9a-f]{64})）", cfg_output)
+        cfg_row = f"cfg\tcrates/core/src/kernel.rs\tcore_sample::kernel::clamp_to_limit#cfg!(debug_assertions)\t{cfg_digest.group(1) if cfg_digest else '0' * 64}\tselftest_differential\t自证用：登记的 cfg 原子"
+        expect("cfg-atom-registered", "proof", make_root("cfgregistered", kernel=cfg_kernel, trust_rows=[cfg_row]), 0, "其中 cfg 原子 1 处")
+        macro_kernel = SELFTEST_KERNEL.replace("verus! {\n", "macro_rules! plus_span {\n    ($e:expr) => { if cfg!(verus_keep_ghost) { $e } else { $e } };\n}\nverus! {\n", 1).replace(body, f"plus_span!({body})")
+        expect("cfg-macro-red", "proof", make_root("cfgmacro", kernel=macro_kernel), 1, "cfg core_sample::kernel::clamp_to_limit#plus_span! 没登记进信任清单")
+        fork_kernel = SELFTEST_KERNEL.replace("pub fn keep_small(", "#[cfg(feature = \"wide\")]\npub fn keep_small(", 1) + \
+            "verus! {\n#[cfg(not(feature = \"wide\"))]\npub fn keep_small(value: u64) -> (result: u64)\n    ensures\n        result <= 10,\n{\n    value % 10\n}\n} // verus!\n"
+        expect("cfg-feature-fork", "proof", make_root("cfgfork", kernel=fork_kernel), 1,
+               ("keep_small#cfg(feature=\"wide\") 没登记进信任清单", "交给 --verify-function 的名字都是 keep_small"))
+        # 被验的 trait 在 verus! 外面有 impl 判红，cfg(test) 下的不判（开关 trait-impl-outside-accepted 下判错）
+        trait_output = expect("trait-impl-outside", "proof", make_root("traitoutside", kernel=selftest_kernel_with(SELFTEST_TRAIT_EXTRA, SELFTEST_TRAIT_OUTSIDE)), 1,
+                              "verus! 外面有 trait impl：crates/core/src/kernel.rs:")
+        expect_absent("trait-impl-test-module-not-judged", trait_output, "Mock")
+        # MIR：产品构建与 Verus 构建的函数体不同判红（开关 mir-compare-skipped 下判错）；判绿时成功句报比了几个条目
+        expect("mir-divergence", "proof", make_root("mirdivergence", kernel=SELFTEST_KERNEL.replace(body, body + " // SELFTEST_MIR_VERUS_ONLY")), 1,
+               "MIR 比对：产品构建 2 个条目里，1 个与 Verus 构建的函数体不同（fn kernel::clamp_to_limit）")
+        expect("mir-green", "proof", green, 0, "产品构建与 verus --compile 构建的 MIR 逐条目比：产品的 2 个条目都在、整段逐字相同")
+        # Verus 与产品的 rustc 版本差进工具链钉表（开关 rustc-pin-unchecked 下判错）
+        expect("rustc-pin-product", "toolchain", make_root("rustcproduct", rustc_row=f"rustc\tstable\t1.0.1\t{'d' * 40}\n"), 1, "产品的 rustc 是 1.0.0")
+        expect("rustc-pin-verus", "toolchain", make_root("rustcverus", rustc_row=f"rustc\tnightly\t1.0.0\t{'d' * 40}\n"), 1, "Verus 用的工具链是 stable")
+        expect("rustc-pin-missing", "toolchain", make_root("rustcmissing", rustc_row=""), 1, "没有 rustc 行")
+        # cargo 那一种（crate 行第四段 cargo）：经 cargo verus focus 验、路径依赖连同 crate 一起拷，报错位置相对副本根（开关 cargo-mode-ignored 下判错）
+        cargo_root = make_root("cargomode", crate_mode="\tcargo", extra_dependency='singlefs-format = { path = "../format" }\n')
+        os.makedirs(os.path.join(cargo_root, "crates", "format", "src"))
+        open(os.path.join(cargo_root, "crates", "format", "Cargo.toml"), "w").write('[package]\nname = "singlefs-format"\nedition = "2021"\n')
+        open(os.path.join(cargo_root, "crates", "format", "src", "lib.rs"), "w").write("pub const LIMIT: u64 = 10;\n")
+        cargo_arguments = os.path.join(work, "cargo-verus-arguments.txt")
+        open(cargo_arguments, "w").close()
+        os.environ["SELFTEST_CARGO_VERUS_ARGUMENTS"] = cargo_arguments
+        try:
+            expect("cargo-mode-proof", "proof", cargo_root, 0, ("Verus 逐项验 crates/core（cargo verus focus）", "cargo verus build 构建的 MIR 逐条目比"))
+            expect("cargo-mode-vacuity", "vacuity", cargo_root, 0, "2 处 requires")
+            expect("cargo-mode-must-red", "must-red-worlds", cargo_root, 0, "证明错落点与第六段 landing= 相同")
+        finally:
+            os.environ.pop("SELFTEST_CARGO_VERUS_ARGUMENTS", None)
+        # 几处同时验共用一个编译目录（一处一个 job、两项轮流用它）：每处起之前删被验的 crate 的指纹，第二项照样出判定行（开关 cargo-fingerprint-kept 下第二项红）
+        shared_target_exit, shared_target_output = captured_stdout(run_check, "proof", cargo_root, dict(options, jobs=1))
+        expect_true("cargo-mode-shared-build-directory", shared_target_exit == 0 and "proof:core_sample::kernel::keep_small：绿" in shared_target_output.getvalue(),
+                    f"一个编译目录轮流验两项期望都判绿，实测退 {shared_target_exit}：{one_line(shared_target_output.getvalue().strip()[-300:])}")
+        cargo_runs = [json.loads(line) for line in open(cargo_arguments, encoding="utf-8").read().split("\n") if line]
+        expect_true("cargo-mode-command", bool(cargo_runs) and all(run[:6] in (["verus", "focus", "-p", "core-sample", "--offline", "--"],
+                                                                                  ["verus", "build", "-p", "core-sample", "--offline", "--"]) for run in cargo_runs)
+                    and any(run[1] == "build" for run in cargo_runs) and not any("--no-cheating" in run for run in cargo_runs),
+                    f"cargo-verus 期望照 verus focus|build -p core-sample --offline -- … 起、不带 --no-cheating，实测 {cargo_runs[:3]}")
+        # 几个 crate（crate 行可以多条）：逐个 crate 判、各比各的登记数，--item 分到它所属的 crate（开关 single-crate-registry 下判错）
+        multi_root = make_root("multicrate")
+        os.makedirs(os.path.join(multi_root, "crates", "second", "src"))
+        open(os.path.join(multi_root, "crates", "second", "Cargo.toml"), "w").write('[package]\nname = "second-sample"\nedition = "2021"\n\n[dependencies]\nvstd = "=0.0.1"\n')
+        open(os.path.join(multi_root, "crates", "second", "src", "lib.rs"), "w").write(
+            "use vstd::prelude::*;\nverus! {\npub fn double_it(value: u64) -> (result: u64)\n    requires\n        value < 100,\n    ensures\n        result == value + value,\n"
+            "{\n    value + value\n}\n} // verus!\n")
+        open(os.path.join(multi_root, "crates", "second", "verus-must-red-worlds.tsv"), "w").write(
+            "# 自证用\n第二个 crate\tcrates/second/src/lib.rs\t    value + value\t    value + value // SELFTEST_BROKEN\tproof_errors=1\tlanding=double_it\n")
+        with open(os.path.join(multi_root, REGISTRY), "a") as handle:
+            handle.write("crate\tcrates/second\t1\nkernel\tcrates/second/src/lib.rs\nmust-red-worlds\tcrates/second/verus-must-red-worlds.tsv\n")
+        expect("multi-crate-proof", "proof", multi_root, 0, ("proof:second_sample::double_it：绿", "proof:core_sample::kernel::clamp_to_limit：绿", "登记的 2 个 crate 判了 2 个"))
+        multi_listed, multi_listing = captured_stdout(list_items, multi_root)
+        expect_true("multi-crate-list-items", multi_listed == 0 and "proof:second_sample::double_it\tverus-proof" in multi_listing.getvalue()
+                    and "vacuity:second_sample::double_it#1\tverus-vacuity" in multi_listing.getvalue() and "2 个 crate 成项 3 个" in multi_listing.getvalue(),
+                    f"期望列出两个 crate 的项：{one_line(multi_listing.getvalue().strip()[-400:])}")
+        multi_options = dict(options, items=["proof:second_sample::double_it"])
+        multi_item_exit, multi_item_buffer = captured_stdout(run_check, "proof", multi_root, multi_options)
+        expect_true("multi-crate-item-routed", multi_item_exit == 0 and "crates/core：--item 没点到这个 crate 的项" in multi_item_buffer.getvalue()
+                    and "proof:second_sample::double_it：绿" in multi_item_buffer.getvalue(),
+                    f"--item 点第二个 crate 的项期望只判它，实测退 {multi_item_exit}：{one_line(multi_item_buffer.getvalue().strip()[-300:])}")
+        expect("must-red-survives", "must-red-worlds", make_root("survives", must_red=["改注释\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // 只是注释\tproof_errors=1\tlanding=clamp_to_limit"]), 1, "照样验过")
+        expect("must-red-anchor", "must-red-worlds", make_root("anchor", must_red=["不在的原文\tcrates/core/src/kernel.rs\tnot present anywhere\tx\tproof_errors=1\tlanding=clamp_to_limit"]), 1, "恰好命中一次")
+        # 必红世界按落点判、条数只报（C654）：证明错条数与第五段 proof_errors= 不同而落点没变，判绿并在成功句里数进「只报不判」（开关 landing-by-count 下判错）；
+        # 同一个 fn 里多报两条（条数 3，登记 1）也是；落点换了函数而条数没变判红（开关 landing-unchecked、landing-by-count 下判错）
+        broken_line = "if value > limit { limit } else { value } // SELFTEST_BROKEN"
+        clamp_row = "\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
+        expect("must-red-proof-error-count-drift", "must-red-worlds",
+               make_root("proofcount", must_red=["条数不对" + clamp_row + broken_line + "\tproof_errors=2\tlanding=clamp_to_limit"]),
+               0, ("证明错落点与第六段 landing= 相同", "1 行证明错条数与第五段 proof_errors= 不同，只报不判（条数不对）"))
+        expect("must-red-landing-same-function-more-errors", "must-red-worlds",
+               make_root("moreerrors", must_red=["多报两条" + clamp_row + broken_line + "\\n    // SELFTEST_BROKEN\\n    // SELFTEST_BROKEN\tproof_errors=1\tlanding=clamp_to_limit"]),
+               0, ("证明错落点与第六段 landing= 相同", "1 行证明错条数与第五段 proof_errors= 不同，只报不判（多报两条）"))
+        expect("must-red-landing-moved", "must-red-worlds",
+               make_root("landingmoved", must_red=["落到别的函数" + "\tcrates/core/src/kernel.rs\tif value > 10 { pick(10) } else { pick(value) }\t"
+                                                   "if value > 10 { pick(10) } else { pick(value) } // SELFTEST_BROKEN\tproof_errors=1\tlanding=clamp_to_limit"]),
+               1, "证明错落在 keep_small，表里写的落点是 clamp_to_limit")
+        # 落点按改坏之后的文本找（替换文比原文多几行，后面的行都挪了位置）：改坏的是 clamp_to_limit，原来就带标记的 tiny 在它后面，落点是 tiny；
+        # 读改坏之前的文本找就落到后面的 keep_small（开关 landing-read-from-unmutated-text 下判错）
+        shifted = "if value > limit { limit } else { value }" + "\\n" * 9
+        expect("must-red-landing-line-shift", "must-red-worlds",
+               make_root("landingshift", kernel=SELFTEST_LANDING_KERNEL, must_red=["往后挪九行" + clamp_row + shifted + "\tproof_errors=1\tlanding=tiny"]),
+               0, "证明错落点与第六段 landing= 相同")
+        # 两个函数各报一条：落点是两个名字的集合，登记的顺序随意
+        expect("must-red-landing-two-functions", "must-red-worlds",
+               make_root("twofunctions", kernel=SELFTEST_LANDING_KERNEL, must_red=["两处" + clamp_row + broken_line + "\tproof_errors=2\tlanding=tiny,clamp_to_limit"]),
+               0, "证明错落点与第六段 landing= 相同")
+        expect("must-red-landing-two-functions-one-registered", "must-red-worlds",
+               make_root("twoonereg", kernel=SELFTEST_LANDING_KERNEL, must_red=["两处只登记一处" + clamp_row + broken_line + "\tproof_errors=2\tlanding=clamp_to_limit"]),
+               1, "证明错落在 clamp_to_limit、tiny，表里写的落点是 clamp_to_limit")
+        # 证明错的位置不在任何 fn 里（核的第一行）：落点记（函数外）
+        expect("must-red-landing-outside-function", "must-red-worlds",
+               make_root("outsidefunction", must_red=["函数外\tcrates/core/src/kernel.rs\tuse vstd::prelude::*;\tuse vstd::prelude::*; // SELFTEST_BROKEN\tproof_errors=1\tlanding=（函数外）"]),
+               0, "证明错落点与第六段 landing= 相同")
+        # 五段的旧行：判红并指到补落点的办法（开关 landing-missing-accepted 下判错）；第六段不是 landing=<落点>：判红（开关 landing-form-unchecked 下判错）
+        expect("must-red-landing-missing", "must-red-worlds", make_root("landingmissing", must_red=["没写落点" + clamp_row + broken_line + "\tproof_errors=1"]),
+               1, ("只有五段、没写第六段落点 landing=", "must-red-landings"))
+        expect("must-red-landing-form", "must-red-worlds", make_root("landingform", must_red=["落点写法不对" + clamp_row + broken_line + "\tproof_errors=1\tclamp_to_limit"]),
+               1, ("的第六段「clamp_to_limit」不是 landing=<落点>", "必红世界表第六段一律写 landing="))
         expect("must-red-empty", "must-red-worlds", make_root("empty", must_red=[]), 1, "一行都没有")
         # rlimit：登记的数写上 Verus 命令行（假 Verus 见到的 --rlimit 小于标记要的数就报 rlimit 用尽）；没有 rlimit 行取 DEFAULT_RLIMIT；
         # 必红世界里只因 rlimit 用尽才报错的那一行不作数、判红（rlimit 用尽不计入证明错条数）
@@ -2421,35 +4165,42 @@ def selftest():
                                                           rlimit=None), 0, f"--rlimit {DEFAULT_RLIMIT}")
         expect("registry-rlimit-zero", "proof", make_root("rlimitzero", rlimit=0), 1, "rlimit 要是正整数")
         expect("must-red-rlimit", "must-red-worlds", make_root("mustredrlimit", must_red=["只撞 rlimit\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
-                                                                                        "if value > limit { limit } else { value } // SELFTEST_NEEDS_RLIMIT_99\tproof_errors=1"]),
+                                                                                        "if value > limit { limit } else { value } // SELFTEST_NEEDS_RLIMIT_99\tproof_errors=1\tlanding=clamp_to_limit"]),
                1, "这一行红在算力额度上，不是证明失败")
         # 输出里夹着 rlimit 用尽、另有一条真的证明错：红计入（只剩 rlimit 用尽的才不作数）
-        expect("must-red-rlimit-with-proof-error", "must-red-worlds", make_root("mustredrlimitproof", must_red=[
+        # rlimit 用尽不计入证明错条数：证明错 1 条对得上登记的 proof_errors=1，成功句里没有「条数不同、只报不判」那一段
+        # （开关 rlimit-counted-in-proof-errors 下条数成 2，成功句多出那一段：下面的 no-count-drift 一格判错）
+        count_drift_text = "证明错条数与第五段 proof_errors= 不同"
+        with_proof_error_output = expect("must-red-rlimit-with-proof-error", "must-red-worlds", make_root("mustredrlimitproof", must_red=[
             "撞 rlimit 又有证明错\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
-            "if value > limit { limit } else { value } // SELFTEST_NEEDS_RLIMIT_99 SELFTEST_BROKEN\tproof_errors=1"]),
+            "if value > limit { limit } else { value } // SELFTEST_NEEDS_RLIMIT_99 SELFTEST_BROKEN\tproof_errors=1\tlanding=clamp_to_limit"]),
                0, "1 行输出里夹着 rlimit 用尽、另有证明错，红计入")
+        expect_absent("must-red-rlimit-with-proof-error-no-count-drift", with_proof_error_output, count_drift_text)
         # 代码轮第三轮判决 J3 那四行的情形：同一行在 rlimit 10 上输出一条 rlimit 用尽加一条证明错（Verus 把 rlimit 用尽也计进 errors，errors 2），
-        # 在 rlimit 20 上只输出同一条证明错（errors 1）；第五段 proof_errors=1 只数证明错，两份都判绿（开关 rlimit-counted-in-proof-errors 下 rlimit 10 那份判错）
+        # 在 rlimit 20 上只输出同一条证明错（errors 1）；第五段 proof_errors=1 只数证明错，两份都判绿，成功句里都没有「条数不同」那一段
+        # （开关 rlimit-counted-in-proof-errors 下 rlimit 10 那份条数成 2、成功句多出那一段：no-count-drift 一格判错）
         j3_row = ("rlimit 用尽另记\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
                   "if value > limit { limit } else { value } // SELFTEST_NEEDS_RLIMIT_15\\n    // SELFTEST_BROKEN\t")
-        expect("must-red-rlimit-10-counts-proof-errors-only", "must-red-worlds", make_root("j3rlimit10", must_red=[j3_row + "proof_errors=1"], rlimit=10),
-               0, ("1 行输出里夹着 rlimit 用尽、另有证明错，红计入", "证明错条数与第五段 proof_errors= 相同"))
-        expect("must-red-rlimit-20-counts-proof-errors-only", "must-red-worlds", make_root("j3rlimit20", must_red=[j3_row + "proof_errors=1"], rlimit=20),
-               0, ("0 行输出里夹着 rlimit 用尽", "证明错条数与第五段 proof_errors= 相同"))
+        rlimit_10_output = expect("must-red-rlimit-10-counts-proof-errors-only", "must-red-worlds",
+                                  make_root("j3rlimit10", must_red=[j3_row + "proof_errors=1\tlanding=clamp_to_limit"], rlimit=10),
+                                  0, ("1 行输出里夹着 rlimit 用尽、另有证明错，红计入", "证明错落点与第六段 landing= 相同"))
+        expect_absent("must-red-rlimit-10-no-count-drift", rlimit_10_output, count_drift_text)
+        expect("must-red-rlimit-20-counts-proof-errors-only", "must-red-worlds", make_root("j3rlimit20", must_red=[j3_row + "proof_errors=1\tlanding=clamp_to_limit"], rlimit=20),
+               0, ("0 行输出里夹着 rlimit 用尽", "证明错落点与第六段 landing= 相同"))
         # 第五段写成旧形态（Verus 判定行的「verified, 2 errors」，rlimit 10 上它正好对得上）：不是 proof_errors=<正整数> 的行判红、出路写约定
         # （开关 expectation-form-unchecked 下判错）
-        expect("must-red-legacy-expectation", "must-red-worlds", make_root("legacyexpectation", must_red=[j3_row + "verified, 2 errors"], rlimit=10),
+        expect("must-red-legacy-expectation", "must-red-worlds", make_root("legacyexpectation", must_red=[j3_row + "verified, 2 errors\tlanding=clamp_to_limit"], rlimit=10),
                1, ("的第五段「verified, 2 errors」不是 proof_errors=<证明错条数>", "必红世界表第五段一律写 proof_errors=M"))
         # 函数上的 rlimit 属性盖过命令行的 --rlimit：核里有它，proof 判红；必红世界的替换文里有它，那一行判红
         expect("proof-rlimit-attribute", "proof", make_root("rlimitattribute", kernel=SELFTEST_KERNEL.replace(
             "pub fn clamp_to_limit(", "#[verifier::rlimit(20)]\npub fn clamp_to_limit(")), 1, "verifier::rlimit（函数上的 rlimit 属性盖过命令行的 --rlimit 7")
         expect("must-red-rlimit-attribute", "must-red-worlds", make_root("mustredrlimitattribute", must_red=[
-            "加 rlimit 属性\tcrates/core/src/kernel.rs\tpub fn clamp_to_limit(\t#[verifier::rlimit(20)] // SELFTEST_BROKEN\\npub fn clamp_to_limit(\tproof_errors=1"]),
+            "加 rlimit 属性\tcrates/core/src/kernel.rs\tpub fn clamp_to_limit(\t#[verifier::rlimit(20)] // SELFTEST_BROKEN\\npub fn clamp_to_limit(\tproof_errors=1\tlanding=clamp_to_limit"]),
                1, "的替换文里有 verifier::rlimit")
         # JSON 里缺整数的 verified 与 errors（vir 错没走到验证、或 Verus 换了 JSON 的写法）：那一行判红
         expect("must-red-counts-missing", "must-red-worlds", make_root("mustrednocounts", must_red=[
             "JSON 缺数\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
-            "if value > limit { limit } else { value } // SELFTEST_BROKEN SELFTEST_NO_COUNTS\tproof_errors=1"]),
+            "if value > limit { limit } else { value } // SELFTEST_BROKEN SELFTEST_NO_COUNTS\tproof_errors=1\tlanding=clamp_to_limit"]),
                1, "Verus 的 JSON 里没有整数的 verified 与 errors")
         # ── 逐项点名与按条复用（文件头「逐项点名与按条复用」）──
         import io
@@ -2478,14 +4229,33 @@ def selftest():
             cases += 1
             if not passed:
                 wrong.append(label)
-                print(f"    {label} 这一格判错：{detail}")  # gate-lint:detail
+                print(one_line(f"  ✗ {label} 这一格判错：{detail}"))  # gate-lint:detail
 
-        green_row = "改坏{0}\tcrates/core/src/kernel.rs\tif value > limit {{ limit }} else {{ value }}\tif value > limit {{ limit }} else {{ value }} // SELFTEST_BROKEN {0}\tproof_errors=1"
-        survives_row = "改注释{0}\tcrates/core/src/kernel.rs\tif value > limit {{ limit }} else {{ value }}\tif value > limit {{ limit }} else {{ value }} // 只是注释 {0}\tproof_errors=1"
+        # 补落点（must-red-landings）：不带 --write 只打实测的落点、表不动；带 --write 把五段的旧行补上第六段，已有第六段的不改；补完的表照新格式判绿
+        # （开关 landings-write-skipped 下 --write 什么都不写：landings-write 与 landings-then-worlds 判错）
+        pick_row = "\tcrates/core/src/kernel.rs\tif value > 10 { pick(10) } else { pick(value) }\tif value > 10 { pick(10) } else { pick(value) } // SELFTEST_BROKEN\t"
+        backfill_root = make_root("backfill", must_red=["补一" + clamp_row + broken_line + "\tproof_errors=1", "补二" + pick_row + "proof_errors=1",
+                                                        "已有" + clamp_row + broken_line + "\\n    // SELFTEST_BROKEN\tproof_errors=3\tlanding=clamp_to_limit"])
+        backfill_table = os.path.join(backfill_root, "crates", "core", "verus-must-red-worlds.tsv")
+        table_before = open(backfill_table, encoding="utf-8").read()
+        got, output, _verdicts = run_items("must-red-landings", backfill_root)
+        judge_cell("landings-print", got == 0 and "补一\tlanding=clamp_to_limit\t1" in output and "补二\tlanding=keep_small\t1" in output
+                   and "已有\tlanding=clamp_to_limit\t2，与表里相同" in output and "没加 --write，表没动" in output and open(backfill_table, encoding="utf-8").read() == table_before,
+                   f"期望打三行实测落点、表不动（退 0），实测退 {got}：{output.strip()[-400:]}")
+        got, output, _verdicts = run_items("must-red-landings", backfill_root, write=True)
+        table_after = open(backfill_table, encoding="utf-8").read().split("\n")
+        judge_cell("landings-write", got == 0 and "补了 2 行的第六段" in output
+                   and any(row.startswith("补一\t") and row.endswith("\tproof_errors=1\tlanding=clamp_to_limit") for row in table_after)
+                   and any(row.startswith("补二\t") and row.endswith("\tproof_errors=1\tlanding=keep_small") for row in table_after)
+                   and any(row.startswith("已有\t") and row.endswith("\tproof_errors=3\tlanding=clamp_to_limit") for row in table_after),
+                   f"期望补两行、已有的那行不动（退 0），实测退 {got}：{output.strip()[-300:]}；表：{table_after}")
+        expect("landings-then-worlds", "must-red-worlds", backfill_root, 0, ("证明错落点与第六段 landing= 相同", "1 行证明错条数与第五段 proof_errors= 不同，只报不判（已有）"))
+        green_row = "改坏{0}\tcrates/core/src/kernel.rs\tif value > limit {{ limit }} else {{ value }}\tif value > limit {{ limit }} else {{ value }} // SELFTEST_BROKEN {0}\tproof_errors=1\tlanding=clamp_to_limit"
+        survives_row = "改注释{0}\tcrates/core/src/kernel.rs\tif value > limit {{ limit }} else {{ value }}\tif value > limit {{ limit }} else {{ value }} // 只是注释 {0}\tproof_errors=1\tlanding=clamp_to_limit"
         # 三行必红世界改的是同一处原文：原文要恰好命中一次，三行各自改一份副本
         mixed_root = make_root("itemsmixed", must_red=[green_row.format("A"), survives_row.format("B"), green_row.format("C")])
         vacuity_lines = [requires_line for requires_line, _brace, _label in requires_insertion_points(SELFTEST_KERNEL)]
-        listed_items = ["toolchain", "proof", "proof:clamp_to_limit", "proof:keep_small", "vacuity:clamp_to_limit#1", "vacuity:keep_small#1",
+        listed_items = ["toolchain", "proof", "proof:core_sample::kernel::clamp_to_limit", "proof:core_sample::kernel::keep_small", "vacuity:core_sample::kernel::clamp_to_limit#1", "vacuity:core_sample::kernel::keep_small#1",
                         "must-red:改坏A", "must-red:改注释B", "must-red:改坏C"]
         judge_cell("vacuity-points-in-kernel", len(vacuity_lines) == 2, f"自证核里该有 2 处 requires，认出 {vacuity_lines}")
         trace_path = os.path.join(work, "verus-trace.txt")
@@ -2498,6 +4268,12 @@ def selftest():
         listed = [line.split("\t")[0] for line in buffer.getvalue().strip().split("\n")]
         judge_cell("list-items", listed_exit == 0 and listed == listed_items, f"期望退 0、逐行 {listed_items}，实测退 {listed_exit}、{listed}")
         judge_cell("list-items-no-verus", open(trace_path).read() == "", f"list-items 起了 Verus：{open(trace_path).read()!r}")
+        # 列项只要行名：五段的旧表（还没补第六段落点）照列，红在必红世界那一格上，不让 --list-items 与 --quick 跟着断（开关 list-items-needs-landing 下判错）
+        legacy_listing = io.StringIO()
+        with contextlib.redirect_stdout(legacy_listing):
+            legacy_listed_exit = list_items(make_root("legacylisting", must_red=["旧表一行" + clamp_row + broken_line + "\tproof_errors=1"]))
+        judge_cell("list-items-legacy-table", legacy_listed_exit == 0 and "must-red:旧表一行\tverus-must-red-worlds" in legacy_listing.getvalue(),
+                   f"五段的旧表期望照列（退 0、列出 must-red:旧表一行），实测退 {legacy_listed_exit}：{legacy_listing.getvalue().strip()[-300:]}")
         # 读的一头先关了（接 | head 的样子）：被 SIGPIPE 安静停掉，stderr 一个字都没有
         read_end, write_end = os.pipe()
         os.close(read_end)
@@ -2509,11 +4285,11 @@ def selftest():
         judge_cell("item-select-one", got == 1 and list(verdicts) == ["must-red:改注释B"], f"--item must-red:改注释B 期望只判这一行（退 1），实测退 {got}、判了 {list(verdicts)}")
         got, output, _verdicts = run_items("must-red-worlds", mixed_root, items=["must-red:没有这一行"])
         judge_cell("item-unknown", got == EXIT_USAGE and "must-red:改坏A" in output, f"点名没有的项期望退 2、列出可点名的项，实测退 {got}：{output.strip()[-300:]}")
-        got, output, verdicts = run_items("proof", mixed_root, items=["proof:clamp_to_limit"])
-        judge_cell("item-proof-one", got == 0 and list(verdicts) == ["proof:clamp_to_limit"] and "不比之和" in output,
-                   f"--item proof:clamp_to_limit 期望只验这一个函数、不比之和（退 0），实测退 {got}、判了 {list(verdicts)}：{output.strip()[-200:]}")
+        got, output, verdicts = run_items("proof", mixed_root, items=["proof:core_sample::kernel::clamp_to_limit"])
+        judge_cell("item-proof-one", got == 0 and list(verdicts) == ["proof:core_sample::kernel::clamp_to_limit"] and "不比之和" in output,
+                   f"--item proof:core_sample::kernel::clamp_to_limit 期望只验这一个函数、不比之和（退 0），实测退 {got}、判了 {list(verdicts)}：{output.strip()[-200:]}")
         got, output, _verdicts = run_items("proof", mixed_root, items=["proof:没有这个函数"])
-        judge_cell("item-proof-unknown", got == EXIT_USAGE and "proof:keep_small" in output, f"点名没有的函数期望退 2、列出可点名的项，实测退 {got}")
+        judge_cell("item-proof-unknown", got == EXIT_USAGE and "proof:core_sample::kernel::keep_small" in output, f"点名没有的函数期望退 2、列出可点名的项，实测退 {got}")
         # 点名单跑一项与它在整格里跑的判定相同（必红世界一绿一红一绿；空真里外层可满足、闭包不可满足）
         _got, _output, whole = run_items("must-red-worlds", mixed_root)
         alone = {item: run_items("must-red-worlds", mixed_root, items=[item])[2].get(item) for item in whole}
@@ -2572,8 +4348,8 @@ def selftest():
         edit_kernel(kernel_path, "        result <= limit,\n", "        result <= limit + 0,\n")
         after = {check: run_items(check, reuse_root, verdict_library=store_directory) for check in ("proof", "vacuity", "must-red-worlds")}
         judge_cell("reuse-proof-function-only", all(got == 0 for got, _output, _verdicts in after.values())
-                   and after["proof"][2].get("proof:clamp_to_limit", ("", ""))[1] == "现判" and after["proof"][2].get("proof:keep_small", ("", ""))[1] == "复用"
-                   and after["vacuity"][2].get("vacuity:clamp_to_limit#1", ("", ""))[1] == "现判" and after["vacuity"][2].get("vacuity:keep_small#1", ("", ""))[1] == "复用"
+                   and after["proof"][2].get("proof:core_sample::kernel::clamp_to_limit", ("", ""))[1] == "现判" and after["proof"][2].get("proof:core_sample::kernel::keep_small", ("", ""))[1] == "复用"
+                   and after["vacuity"][2].get("vacuity:core_sample::kernel::clamp_to_limit#1", ("", ""))[1] == "现判" and after["vacuity"][2].get("vacuity:core_sample::kernel::keep_small#1", ("", ""))[1] == "复用"
                    and "现判 3、复用 0" in after["must-red-worlds"][1] and "改了 fn clamp_to_limit" in after["proof"][1],
                    "期望只现判 clamp_to_limit 那几项、点名它变了，实测 " + "；".join(f"{check} 退 {got}：{output.strip()[-300:]}" for check, (got, output, _verdicts) in after.items()))
         with open(os.path.join(install, "libextra.so"), "w") as handle:
@@ -2583,6 +4359,17 @@ def selftest():
         finally:
             os.remove(os.path.join(install, "libextra.so"))
         judge_cell("reuse-toolchain-changed", got == 0 and "现判 3、复用 0（现判的原因：工具链 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        # 信任清单进键：这个 crate 的一行换一条差分测试，证明两项都现判、原因写「信任清单 变了」（开关 reuse-key-without-trust-list 下照复用，判错）
+        trust_store = os.path.join(work, "verdict-library-trust")
+        # 用登记了 cfg 原子的核：assume_specification 那几种条目 lib_function_units 拒算单元闭包（那一项照判、不复用），比不出复用
+        trust_reuse_root = make_root("reusetrust", kernel=cfg_kernel, trust_rows=[cfg_row])
+        first_got, first_output, _verdicts = run_items("proof", trust_reuse_root, verdict_library=trust_store)
+        trust_path = os.path.join(trust_reuse_root, TRUST_LIST)
+        trust_text = open(trust_path).read()
+        open(trust_path, "w").write(trust_text.replace("\tselftest_differential\t", "\tselftest_differential_other\t", 1))
+        got, output, _verdicts = run_items("proof", trust_reuse_root, verdict_library=trust_store)
+        judge_cell("reuse-trust-list-changed", first_got == 0 and got == 0 and "现判 2、复用 0（现判的原因：信任清单 变了 2）" in output,
+                   f"头一趟退 {first_got}，改了信任清单一行之后期望两项都现判，实测退 {got}：{output.strip()[-300:]}")
         # 必红世界一行只改变异名：键里不带名字与文件，照复用（开关 must-red-key-with-name-and-path 下判错）
         renamed_store = os.path.join(work, "verdict-library-renamed")
         renamed_root = make_root("reuserenamed", must_red=[green_row.format("A"), green_row.format("B"), green_row.format("C")])
@@ -2600,7 +4387,7 @@ def selftest():
         got, output, verdicts = run_items("proof", spec_root, verdict_library=spec_store)
         judge_cell("reuse-spec-function-all-users", first_spec[0] == 0 and got == 0
                    and {item: how for item, (_verdict, how) in verdicts.items()}
-                   == {"proof:clamp_to_limit": "复用", "proof:keep_small": "现判", "proof:keep_tiny": "现判"}
+                   == {"proof:core_sample::kernel::clamp_to_limit": "复用", "proof:core_sample::kernel::keep_small": "现判", "proof:core_sample::kernel::keep_tiny": "现判"}
                    and "改了 fn small_bound" in output,
                    f"第一趟退 {first_spec[0]}，期望用到 small_bound 的两项现判、点名它变了，clamp_to_limit 复用，实测退 {got}、{verdicts}：{output.strip()[-300:]}")
         # 计数之和用复用的记录：判绿记下之后把登记数改成 3，两项都复用、之和 2 照比、判红（开关 count-unchecked 下判错）
@@ -2673,7 +4460,7 @@ def selftest():
         # 每个函数两次：证明一项、空真一处（keep_small 那一处在闭包上，所属的还是 keep_small）
         judge_cell("module-per-kernel",
                    proof_exit == 0 and "各项 verified 之和 5、0 errors（登记 5）" in proof_output and vacuity_exit == 0 and "5 处 requires" in vacuity_output
-                   and dict(seen_scopes) == {name: [scope, scope] for name, scope in want_scopes.items()},
+                   and dict(seen_scopes) == {**{name: [scope, scope] for name, scope in want_scopes.items()}, "（整个 crate）": [[]]},
                    f"期望证明与空真都退 0、每个函数两次各点 {want_scopes}，实测证明退 {proof_exit}、空真退 {vacuity_exit}、点的是 {dict(seen_scopes)}："
                    f"{proof_output.strip()[-200:]} | {vacuity_output.strip()[-200:]}")
         # 核不在入口所在目录下：认不出模块，开跑之前判红、出路点 kernel_module
@@ -2687,22 +4474,22 @@ def selftest():
         judge_cell("module-unrecognized-red", got == 1 and "核 crates/core/proofs/kernel.rs 认不出是 crates/core 的哪个模块" in output and "kernel_module" in output,
                    f"期望认不出模块判红、出路点 kernel_module，实测退 {got}：{output.strip()[-300:]}")
         got, output, verdicts = run_items("proof", items_root)
-        want_items = ["proof:Pair::clone", "proof:sum_to", "proof:lemma_within_itself", "proof:count_up"]
+        want_items = ["proof:core_sample::kernel::Pair::clone", "proof:core_sample::kernel::sum_to", "proof:core_sample::kernel::lemma_within_itself", "proof:core_sample::kernel::count_up"]
         # spec fn 不带 decreases 的不成项（开关 spec-fn-as-item 下 within 成项、验出 0 条判红，这一格判错）
         judge_cell("proof-spec-fn-not-item", got == 0 and list(verdicts) == want_items and "不成项的 spec fn 1 个" in output,
                    f"期望退 0、逐项 {want_items}、报不成项的 spec fn 1 个，实测退 {got}、{list(verdicts)}：{output.strip()[-300:]}")
         # proof fn 按函数验出 verified 1（JSON 里没有 success 键）判绿（开关 require-success-key-per-function 下判错）
-        judge_cell("proof-fn-verified-one-green", verdicts.get("proof:lemma_within_itself") == ("绿", "现判") and "proof:lemma_within_itself：绿" in output,
-                   f"期望 proof:lemma_within_itself 现判判绿，实测 {verdicts}：{output.strip()[-300:]}")
+        judge_cell("proof-fn-verified-one-green", verdicts.get("proof:core_sample::kernel::lemma_within_itself") == ("绿", "现判") and "proof:core_sample::kernel::lemma_within_itself：绿" in output,
+                   f"期望 proof:core_sample::kernel::lemma_within_itself 现判判绿，实测 {verdicts}：{output.strip()[-300:]}")
         # 按函数验时 is-verifying-entire-crate 报 false 不判红（开关 require-entire-crate-per-function 下判错）
         judge_cell("proof-entire-crate-false-not-red", got == 0 and all(verdict == "绿" for verdict, _how in verdicts.values()) and "is-verifying-entire-crate" not in output,
                    f"期望逐项都绿，实测退 {got}、{verdicts}：{output.strip()[-300:]}")
         # 带 decreases 的 spec fn 有终止义务，成项（开关 spec-decreases-not-item 下判错）
-        judge_cell("proof-spec-decreases-item", verdicts.get("proof:sum_to", ("",))[0] == "绿" and "带 decreases 的 spec fn 1" in output,
-                   f"期望 proof:sum_to 成项判绿，实测 {verdicts}：{output.strip()[-300:]}")
+        judge_cell("proof-spec-decreases-item", verdicts.get("proof:core_sample::kernel::sum_to", ("",))[0] == "绿" and "带 decreases 的 spec fn 1" in output,
+                   f"期望 proof:core_sample::kernel::sum_to 成项判绿，实测 {verdicts}：{output.strip()[-300:]}")
         # verus! 里 derive(Clone) 的类型：Verus 验它生成的 <类型>::clone，成项（开关 derived-clone-not-item 下判错）
-        judge_cell("proof-derived-clone-item", verdicts.get("proof:Pair::clone", ("",))[0] == "绿" and "derive(Clone) 生成的 clone 1" in output,
-                   f"期望 proof:Pair::clone 成项判绿，实测 {verdicts}：{output.strip()[-300:]}")
+        judge_cell("proof-derived-clone-item", verdicts.get("proof:core_sample::kernel::Pair::clone", ("",))[0] == "绿" and "derive(Clone) 生成的 clone 1" in output,
+                   f"期望 proof:core_sample::kernel::Pair::clone 成项判绿，实测 {verdicts}：{output.strip()[-300:]}")
         # 各项之和等于登记的数判绿（真仓的 56 那一格的小样：1 + 1 + 1 + 2 = 5）
         judge_cell("proof-sum-equals-registered-green", got == 0 and "各项 verified 之和 5、0 errors（登记 5）" in output,
                    f"期望之和 5 等于登记的 5、判绿，实测退 {got}：{output.strip()[-300:]}")
@@ -2710,16 +4497,16 @@ def selftest():
         short_root = make_root("proofitemsshort", kernel=SELFTEST_ITEMS_KERNEL, count=6)
         got, output, _verdicts = run_items("proof", short_root)
         judge_cell("proof-sum-short-red-named", got == 1 and "各项 verified 之和 5 与登记的 6 不同（少 1 条" in output
-                   and "没成项的 verus! fn（不带 decreases 的 spec fn，静态估 0 条）1 个：within" in output and "verified 与静态估不同的项：没有" in output,
+                   and "没成项的 verus! fn（不带 decreases 的 spec fn，静态估 0 条）1 个：core_sample::kernel::within" in output and "verified 与静态估不同的项：没有" in output,
                    f"期望之和 5 与登记的 6 不同判红、点名 within，实测退 {got}：{output.strip()[-400:]}")
         # 选中的函数一条义务都没验（verified 0）判红（开关 zero-verified-accepted 下判错）；--item 只点它，不比之和
         zero_root = make_root("proofzero", kernel=SELFTEST_ITEMS_KERNEL.replace("        within(value, value),\n{\n", "        within(value, value),\n{\n    // SELFTEST_ZERO_VERIFIED\n"), count=5)
-        got, output, verdicts = run_items("proof", zero_root, items=["proof:lemma_within_itself"])
+        got, output, verdicts = run_items("proof", zero_root, items=["proof:core_sample::kernel::lemma_within_itself"])
         judge_cell("proof-zero-verified-red", got == 1 and "Verus 在 --verify-function lemma_within_itself 上一条义务都没验（verified 0" in output,
                    f"期望 verified 0 判红，实测退 {got}、{verdicts}：{output.strip()[-300:]}")
         # errors 1 判红，红句照原样报 JSON 的几样（开关 nonzero-errors-accepted 下判错）；--item 只点它，不比之和
         broken_root = make_root("prooferrorsone", kernel=SELFTEST_KERNEL.replace("result <= limit,", "result <= limit, // SELFTEST_BROKEN"))
-        got, output, verdicts = run_items("proof", broken_root, items=["proof:clamp_to_limit"])
+        got, output, verdicts = run_items("proof", broken_root, items=["proof:core_sample::kernel::clamp_to_limit"])
         judge_cell("proof-errors-one-red", got == 1 and "Verus 没验过（exec fn clamp_to_limit）：verified 0、errors 1、encountered-error true、vir 错 false" in output
                    and "postcondition not satisfied" in output,
                    f"期望 errors 1 判红、红句带 JSON 的几样与报错位置，实测退 {got}、{verdicts}：{output.strip()[-300:]}")
@@ -2829,7 +4616,7 @@ def selftest():
         rounds.append(three_round())
         edit_kernel(three_kernel, "        result <= limit,\n", "        result <= limit + 0,\n")
         rounds.append(three_round())
-        three_affected = ["proof:clamp_to_limit", "vacuity:clamp_to_limit#1", "must-red:改坏A", "must-red:改坏B", "must-red:改坏C"]
+        three_affected = ["proof:core_sample::kernel::clamp_to_limit", "vacuity:core_sample::kernel::clamp_to_limit#1", "must-red:改坏A", "must-red:改坏B", "must-red:改坏C"]
         three_passed, three_problems = reuse_checks.report_three_questions(SCRIPT_KEY, *[states for states, _exits in rounds], three_affected,
                                                                            sentinels=3)
         three_exits = [got for _states, exits in rounds for got in exits]
@@ -2899,7 +4686,7 @@ def selftest():
             cases += 1
             if "照 Verus 报错的位置修" in killed or "看上面 Verus 的报错" in killed:
                 wrong.append("proof-killed-no-proof-howto")
-                print(f"    proof-killed-no-proof-howto 这一格判错：被信号停了的那一条不该给修证明的出路：{killed.strip()[-300:]}")  # gate-lint:detail
+                print(one_line(f"  ✗ proof-killed-no-proof-howto 这一格判错：被信号停了的那一条不该给修证明的出路：{killed.strip()[-300:]}"))  # gate-lint:detail
         finally:
             MEMORY_CAP_RUNNER, options["launcher"] = saved_runner, saved_launcher
         # 假包装按副本源码里的标记出结局：SELFTEST_WRAPPER_QUEUED 照排队等满那样、SELFTEST_WRAPPER_TOO_BIG 照要的量比总上限还大那样往 stderr 打自己的 ✗ 与 →、退 252；
@@ -2915,24 +4702,68 @@ def selftest():
                          "  echo '  → 怎么办：上限写小一点再跑' >&2\n  exit 252\nfi\n"
                          "shift 4\nexec \"$@\"\n")
         MEMORY_CAP_RUNNER, options["launcher"] = marking_wrapper, None
+        saved_marking_jobs = options["jobs"]
         try:
             # 一格里一行没跑成（包装退 252）、一行改坏了照样验过（真红）：这一格判红，两条都报，末尾另打一行按红记（开关 not-run-masks-red 下判错）；
             # 没跑成那一条原样带着包装自己打的 ✗ 与 →（开关 wrapper-output-dropped 下 must-red-wrapper-lines-carried 判错）
             mixed = make_root("mixed", must_red=[
-                "改注释\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // 只是注释\tproof_errors=1",
-                "这一行排不上\tcrates/core/src/kernel.rs\t            candidate <= 10,\t            candidate <= 10, // SELFTEST_WRAPPER_QUEUED\tproof_errors=1"])
+                "改注释\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // 只是注释\tproof_errors=1\tlanding=clamp_to_limit",
+                "这一行排不上\tcrates/core/src/kernel.rs\t            candidate <= 10,\t            candidate <= 10, // SELFTEST_WRAPPER_QUEUED\tproof_errors=1\tlanding=clamp_to_limit"])
+            # 这两格一处一处起（jobs=1，照表的次序：改注释那一行先验完，再起排不上那一行）：两处同时起时，改注释那一行是在排不上那一行拿到 252 之前起（真红）
+            # 还是之后（不起），随此刻负载变
+            options["jobs"] = 1
             expect("must-red-mixed-not-run-and-red", "must-red-worlds", mixed, 1,
                    ("改坏之后 Verus 照样验过", "这一格 1 条真红、1 条没跑成：按红记", "252 是排队等满还放不下"))
             expect("must-red-wrapper-lines-carried", "must-red-worlds", mixed, 1, "包装自己打的：「✗ 内存不够排不上：等了 0 秒")
+            options["jobs"] = saved_marking_jobs
             # 252 的另一种成因（要的量比总上限还大）给「上限写小」，不给「空出来再重跑」（开关 wrapper-252-one-howto 下判错）；整格只有没跑成，不打按红记那一行
             too_big = expect("proof-wrapper-too-big", "proof", make_root("toobig", kernel=SELFTEST_KERNEL + "// SELFTEST_WRAPPER_TOO_BIG\n"), 1,
                              ("没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252", "等多久都放不下：把 GATE_VERUS_MEMORY_MAX"))
             cases += 1
             if "按红记" in too_big:
                 wrong.append("proof-wrapper-too-big-only-not-run")
-                print(f"    proof-wrapper-too-big-only-not-run 这一格判错：整格只有没跑成，不该打按红记那一行：{too_big.strip()[-300:]}")  # gate-lint:detail
+                print(one_line(f"  ✗ proof-wrapper-too-big-only-not-run 这一格判错：整格只有没跑成，不该打按红记那一行：{too_big.strip()[-300:]}"))  # gate-lint:detail
+        finally:
+            MEMORY_CAP_RUNNER, options["launcher"], options["jobs"] = saved_runner, saved_launcher, saved_marking_jobs
+        # 包装现查别的机器打的那几行（HOST_LOOKUP_LINE）判法不读：假包装照真包装那样先打几行（内容 A、B 两种），再照样起假 Verus；证明格两趟都判绿、
+        # 存进库的判定逐字相同；排不上（退 252）那一趟两种内容的「没跑成」逐字相同、不带那几行（开关 host-lookup-lines-kept 下判错）
+        lookup_wrapper = os.path.join(work, "host-lookup-memory-cap-wrapper.sh")
+        with open(lookup_wrapper, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 自证用的假内存包装：先把 HOST_LOOKUP_SELFTEST_LINES 原样打到 stderr（真包装现查别的机器打的那几行）；"
+                         "HOST_LOOKUP_SELFTEST_REFUSE 非空就再打包装自己的 ✗ 与 →、退 252，不然剥掉上限与 capped.sh 照样起那条命令\n"
+                         "printf '%s\\n' \"$HOST_LOOKUP_SELFTEST_LINES\" >&2\n"
+                         "if [[ -n \"${HOST_LOOKUP_SELFTEST_REFUSE:-}\" ]]; then\n"
+                         "  echo '  ✗ 内存不够排不上：等了 3 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=3），slice 已占 3.9 GiB；命令没跑。账上占着的：' >&2\n"
+                         "  echo '  → 怎么办：等上面那几条跑完再跑这一条' >&2\n  exit 252\nfi\n"
+                         "shift 4\nexec \"$@\"\n")
+        lookup_variants = {
+            "A": "run-with-memory-cap: 没查到别的机器：第二台没读到（ssh 退 255）\nrun-with-memory-cap: 现查别的机器：第二台此刻也放不下（可用 1.0 GiB）",
+            "B": ("  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 8G --label moved-from-queue-1 -- verus\n"
+                  "  ! 告警记录写不进（OSError: 自证造的）：看门狗读不到这一条，靠上面那一行叫人看；设 SINGLEFS_CORE_USAGE_ALERTS 指到可写的文件"),
+        }
+        stored, refused_text = {}, {}
+        MEMORY_CAP_RUNNER, options["launcher"] = lookup_wrapper, None
+        try:
+            for name, lines in lookup_variants.items():
+                store = os.path.join(work, f"verdict-library-host-lookup-{name}")
+                # 两趟都一处一处起（jobs=1）：开关把两项的键弄成同一个时（reuse-key-whole-crate、reuse-key-without-units），两处同时判绿、抢着写同一份键文件，
+                # 库里留下的是谁随此刻负载变，A、B 两趟存进库的会不同
+                got, _output, verdicts = run_items("proof", green, {"HOST_LOOKUP_SELFTEST_LINES": lines}, verdict_library=store, jobs=1)
+                records = {}
+                for directory, _subdirectories, files in os.walk(store):
+                    for file_name in files:
+                        with open(os.path.join(directory, file_name), encoding="utf-8") as handle:
+                            records[os.path.relpath(os.path.join(directory, file_name), store)] = handle.read()
+                stored[name] = (got, sorted(verdicts.values()), records)
+                # 排不上那一趟也一处一处起：两处同时起时，后一处是排在前一处拿到 252 之前起（也报 252）还是之后（不起），随此刻负载变，A、B 两趟的「没跑成」行数会不同
+                got, output, _verdicts = run_items("proof", green, {"HOST_LOOKUP_SELFTEST_LINES": lines, "HOST_LOOKUP_SELFTEST_REFUSE": "1"}, jobs=1)
+                refused_text[name] = (got, [line for line in output.split("\n") if NOT_RUN_MARK in line])
         finally:
             MEMORY_CAP_RUNNER, options["launcher"] = saved_runner, saved_launcher
+        judge_cell("host-lookup-lines-not-read",
+                   stored["A"] == stored["B"] and stored["A"][0] == 0 and bool(stored["A"][2]) and refused_text["A"] == refused_text["B"] and refused_text["A"][0] == 1
+                   and bool(refused_text["A"][1]) and not any(word in line for line in refused_text["A"][1] for word in ("别的机器", "此刻放得下", "告警记录写不进")),
+                   f"两种 HostLookup 行：存进库的（退出码、各项、库里的文件）{stored}；排不上那一趟（退出码、没跑成那几行）{refused_text}")
         # tool-versions 换了 z3、设了 VERUS_Z3_PATH 打的那一行都要变（开关 tool-versions-launcher-only 下这一格判错）
         import io
         import contextlib
@@ -2958,7 +4789,7 @@ def selftest():
                 os.environ["VERUS_Z3_PATH"] = saved_z3_path
         if len({without_z3, with_z3, with_override}) != 3:
             wrong.append("tool-versions-z3")
-            print(f"    tool-versions-z3 这一格判错：换 z3、设 VERUS_Z3_PATH 之后打的行应当各不相同，实测：{without_z3.strip()} | {with_z3.strip()} | {with_override.strip()}")  # gate-lint:detail
+            print(one_line(f"  ✗ tool-versions-z3 这一格判错：换 z3、设 VERUS_Z3_PATH 之后打的行应当各不相同，实测：{without_z3.strip()} | {with_z3.strip()} | {with_override.strip()}"))  # gate-lint:detail
         # 安装目录顶层多一份五样之外的文件（宏库）、VERUS_Z3_PATH 没设与设成空串、裸名 z3 而 PATH 里换一份：打的行都要变
         # （开关 tool-versions-five-files-only、tool-versions-empty-z3-path-as-unset、tool-versions-bare-z3-from-current-directory 下各自那一格判错）
         saved_path = os.environ.get("PATH", "")
@@ -2992,7 +4823,7 @@ def selftest():
             cases += 1
             if first == second:
                 wrong.append(f"tool-versions-{name}")
-                print(f"    tool-versions-{name} 这一格判错：前后两种环境打的行应当不同，实测都是：{first.strip()}")  # gate-lint:detail
+                print(one_line(f"  ✗ tool-versions-{name} 这一格判错：前后两种环境打的行应当不同，实测都是：{first.strip()}"))  # gate-lint:detail
         # VERUS_ROOT 与 VERUS_USE_RUSTUP：没设、空串、换值、VERUS_ROOT 指的目录换了一份文件，打的行两两不同（开关 tool-versions-verus-environment-ignored 下判错）
         cases += 1
         saved_environment = {variable: os.environ.pop(variable, None) for variable in ("VERUS_ROOT", "VERUS_USE_RUSTUP")}
@@ -3022,8 +4853,8 @@ def selftest():
                     os.environ[variable] = value
         if len(set(environment_lines.values())) != len(environment_lines):
             wrong.append("tool-versions-verus-environment")
-            print(f"    tool-versions-verus-environment 这一格判错：{len(environment_lines)} 种环境打的行应当两两不同，实测只有 {len(set(environment_lines.values()))} 种："  # gate-lint:detail
-                  + " | ".join(f"{label}：{line.strip()[-120:]}" for label, line in environment_lines.items()))
+            print(one_line(f"  ✗ tool-versions-verus-environment 这一格判错：{len(environment_lines)} 种环境打的行应当两两不同，实测只有 {len(set(environment_lines.values()))} 种："  # gate-lint:detail
+                  + " | ".join(f"{label}：{line.strip()[-120:]}" for label, line in environment_lines.items())))
         # rustup 工具链（C632）：假的 RUSTUP_HOME 里 toolchains/<version.json 的 toolchain> 的 lib/ 与 lib/rustlib/<三元组>/lib/ 各换一个文件、
         # RUSTUP_HOME 指到另一份同内容的拷贝、PATH 里换一份 rustup，打的行两两不同（开关 tool-versions-rustup-ignored 下判错）
         cases += 1
@@ -3065,8 +4896,8 @@ def selftest():
                 os.environ["RUSTUP_HOME"] = saved_rustup_home
         if len(set(rustup_lines.values())) != len(rustup_lines):
             wrong.append("tool-versions-rustup-toolchain")
-            print(f"    tool-versions-rustup-toolchain 这一格判错：{len(rustup_lines)} 种 rustup 工具链与 rustup 打的行应当两两不同，实测只有 {len(set(rustup_lines.values()))} 种："  # gate-lint:detail
-                  + " | ".join(f"{label}：{line.strip()[-160:]}" for label, line in rustup_lines.items()))
+            print(one_line(f"  ✗ tool-versions-rustup-toolchain 这一格判错：{len(rustup_lines)} 种 rustup 工具链与 rustup 打的行应当两两不同，实测只有 {len(set(rustup_lines.values()))} 种："  # gate-lint:detail
+                  + " | ".join(f"{label}：{line.strip()[-160:]}" for label, line in rustup_lines.items())))
         # 内存包装排不上（C631）：假包装一律睡 queue_wait 秒（照等满等待上限）再打 ✗ 与 →、退 252，每被起一次记一行；源码里有 SELFTEST_WRAPPER_ADMITTED 的
         # 睡 2 倍再照样起那条命令。一处拿到 252 之后，这一格与后面几格还没起的都不再排队，已经起了的照常收（开关 queue-refused-keeps-queueing 下这几格判错）
         queue_wait = 0.5
@@ -3080,10 +4911,10 @@ def selftest():
                          f"echo '  ✗ 内存不够排不上：等了 {queue_wait} 秒（自证的假包装），slice 已占满；命令没跑' >&2\n"
                          "echo '  → 怎么办：等上面那几条跑完再跑这一条' >&2\nexit 252\n")
         queue_kernel = SELFTEST_KERNEL + "".join(f"// queue anchor {index:03d}\n" for index in range(94))
-        queue_rows = [f"排队 {index:03d}\tcrates/core/src/kernel.rs\t// queue anchor {index:03d}\t// queue changed {index:03d}\tproof_errors=1" for index in range(94)]
+        queue_rows = [f"排队 {index:03d}\tcrates/core/src/kernel.rs\t// queue anchor {index:03d}\t// queue changed {index:03d}\tproof_errors=1\tlanding=clamp_to_limit" for index in range(94)]
         queue_root = make_root("queuerefused", kernel=queue_kernel, must_red=queue_rows)
         collected_root = make_root("queuecollected", kernel=queue_kernel, must_red=[
-            "起了的照收\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // 只是注释 SELFTEST_WRAPPER_ADMITTED\tproof_errors=1"]
+            "起了的照收\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // 只是注释 SELFTEST_WRAPPER_ADMITTED\tproof_errors=1\tlanding=clamp_to_limit"]
             + queue_rows[:9])
 
         def queue_counted():
@@ -3102,8 +4933,8 @@ def selftest():
             cases += 1
             if (time_limited and elapsed > queue_wait + 2.5) or not 1 <= runs <= most_wrapper_runs:
                 wrong.append(label)
-                print(f"    {label} 这一格判错：应当只排一次（包装 1 到 {most_wrapper_runs} 次"  # gate-lint:detail
-                      f"{f'、挂钟不超过 {queue_wait + 2.5:.1f} 秒' if time_limited else ''}），实测挂钟 {elapsed:.1f} 秒、包装被起 {runs} 次")
+                print(one_line(f"  ✗ {label} 这一格判错：应当只排一次（包装 1 到 {most_wrapper_runs} 次"  # gate-lint:detail
+                      f"{f'、挂钟不超过 {queue_wait + 2.5:.1f} 秒' if time_limited else ''}），实测挂钟 {elapsed:.1f} 秒、包装被起 {runs} 次"))
 
         saved_jobs = options["jobs"]
         refused_file = os.path.join(work, "queue-refused.txt")
@@ -3150,7 +4981,23 @@ def selftest():
     if queued != (0, "{}\n", "run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：自证造的一行\nVerus 自己的 stderr\n") \
             or forwarded != "  … verus-proof-check proof：run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：自证造的一行\n":
         wrong.append("wrapper-queue-line-forwarded")
-        print(f"    wrapper-queue-line-forwarded 这一格判错：交回 {queued!r}（退 9 是假包装等了 10 秒没见到转打），转打出来的 {forwarded!r}")  # gate-lint:detail
+        print(one_line(f"  ✗ wrapper-queue-line-forwarded 这一格判错：交回 {queued!r}（退 9 是假包装等了 10 秒没见到转打），转打出来的 {forwarded!r}"))  # gate-lint:detail
+
+    # 真包装 HostLookup 的每一处 say 都要被 HOST_LOOKUP_LINE 认、HostLookup 之外的不被它认（除了登记的同首那一句）；
+    # 再造一份在 HostLookup 里多一处 say 的包装，这一格的找法要报出它（包装新加一处 say 而没登记就红）
+    cases += 1
+    real_problems = host_lookup_say_problems(MEMORY_CAP_RUNNER)
+    with open(MEMORY_CAP_RUNNER, encoding="utf-8") as handle:
+        wrapper_text = handle.read()
+    planted_anchor = "    def wait_thread(self):\n"
+    with tempfile.TemporaryDirectory(prefix="verus-proof-check-say-sites-") as say_work:
+        planted = os.path.join(say_work, "run-with-memory-cap.sh")
+        with open(planted, "w", encoding="utf-8") as handle:
+            handle.write(wrapper_text.replace(planted_anchor, '    def planted(self):\n        say(f"run-with-memory-cap: 新加的一句：{self.unit}")\n\n' + planted_anchor, 1))
+        planted_problems = host_lookup_say_problems(planted) if planted_anchor in wrapper_text else ["包装里找不到 wait_thread，造不出多一处 say 的包装"]
+    if real_problems or not any("新加的一句" in problem for problem in planted_problems):
+        wrong.append("host-lookup-say-sites-covered")
+        print(one_line(f"  ✗ host-lookup-say-sites-covered 这一格判错：真包装 {real_problems}；多一处 say 的包装 {planted_problems}"))  # gate-lint:detail
 
     # --threads 的缺省：没设 SINGLEFS_THREAD_CAP 取登记文件第一条非注释行的数，设了取它
     with open(os.path.join(SCRIPT_DIRECTORY, "..", "..", ".claude", "heavy-thread-default"), encoding="utf-8") as handle:
@@ -3159,17 +5006,18 @@ def selftest():
     unset_threads, capped_threads = default_threads({}), default_threads({"SINGLEFS_THREAD_CAP": "7"})
     if registered_default is None or unset_threads != registered_default or capped_threads != 7:
         wrong.append("threads-default-registered")
-        print(f"    threads-default-registered 这一格判错：登记 {registered_default}，没设上限得 {unset_threads}，上限 7 得 {capped_threads}")  # gate-lint:detail
+        print(one_line(f"  ✗ threads-default-registered 这一格判错：登记 {registered_default}，没设上限得 {unset_threads}，上限 7 得 {capped_threads}"))  # gate-lint:detail
 
     breaks_missed, breaks_proven = [], 0
-    if not wrong and not BREAK and not reuse_checks.BREAK:
+    if not wrong and not BREAK and not reuse_checks.BREAK and not FORMAL_BREAK:
         items = ("commit-unchecked", "fingerprint-unchecked", "absent-kernel-not-run", "cheating-unchecked", "count-unchecked", "timeout-as-pass",
                      "vacuity-accepts-verified", "vacuity-all-at-once", "mutation-accepts-green", "anchor-unchecked", "rlimit-counts-as-red", "rlimit-unpinned",
                      "rlimit-any-line-voids", "rlimit-attribute-unchecked", "mutation-rlimit-attribute-accepted",
-                     "expectation-form-unchecked", "proof-error-count-unchecked", "rlimit-counted-in-proof-errors",
+                     "expectation-form-unchecked", "landing-unchecked", "landing-by-count", "landing-read-from-unmutated-text", "landing-missing-accepted",
+                     "landing-form-unchecked", "landings-write-skipped", "list-items-needs-landing", "rlimit-counted-in-proof-errors",
                      "wrapper-exit-as-proof-red", "tool-versions-launcher-only", "tool-versions-five-files-only", "tool-versions-empty-z3-path-as-unset",
                      "tool-versions-bare-z3-from-current-directory", "not-run-masks-red", "wrapper-output-dropped", "wrapper-252-one-howto",
-                     "wrapper-queue-lines-swallowed", "tool-versions-verus-environment-ignored", "killed-as-proof-red",
+                     "wrapper-queue-lines-swallowed", "host-lookup-lines-kept", "tool-versions-verus-environment-ignored", "killed-as-proof-red",
                      "tool-versions-rustup-ignored", "queue-refused-keeps-queueing",
                      "item-filter-ignored", "reuse-key-without-units", "reuse-key-whole-crate", "reuse-key-function-only",
                      "vacuity-key-by-line-number", "must-red-key-with-name-and-path", "reuse-key-with-timeout", "reuse-key-without-judging-units",
@@ -3178,30 +5026,33 @@ def selftest():
                      "reuse-records-red", "reuse-records-whole-cell-only", "threads-default-cpu-count", "list-items-pipe-unhandled",
                      "spec-fn-as-item", "spec-decreases-not-item", "derived-clone-not-item", "require-success-key-per-function",
                      "require-entire-crate-per-function", "zero-verified-accepted", "nonzero-errors-accepted", "submodule-verify-root", "key-mismatch-by-item-only",
-                     "reuse-lookup-skipped", "REUSE_CHECKS_BREAK=rejudged-sentinel-passes")
+                     "reuse-lookup-skipped", "REUSE_CHECKS_BREAK=rejudged-sentinel-passes",
+                     *(f"FORMAL_VERIFICATION_BREAK={item}" for item in FORMAL_BREAK_ITEMS))
         # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（至多 SELFTEST_BREAK_WORKERS 趟），按开关的次序收退出码、数份数；
         # 写成「变量=项」的是共用库 lib_reuse_checks.py 的开关（复用哨兵被现判不红：reuse-sentinel 那一格判错）
         def run_break(item):
             variable, _equals, value = item.rpartition("=") if "=" in item else ("VERUS_PROOF_CHECK_BREAK", "=", item)
-            return item, subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
-                                        env=dict(os.environ, **{variable: value})).returncode
+            completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
+                                       env=dict(os.environ, **{variable: value}))
+            return item, selftest_break_caught(completed.returncode, completed.stdout + completed.stderr)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(SELFTEST_BREAK_WORKERS, int(default_heavy_threads(os.environ))))) as pool:
             outcomes = list(pool.map(run_break, items))
         if len(outcomes) != len(items):
             breaks_missed.append(f"开关轮收回 {len(outcomes)} 趟、派出 {len(items)} 趟")
-        for item, returncode in outcomes:
-            if returncode == 0:
+        for item, caught in outcomes:
+            if not caught:
                 breaks_missed.append(item)
             else:
                 breaks_proven += 1
     if wrong:
-        report_red(f"verus-proof-check 自证 {cases} 格里 {len(wrong)} 格判错：{' '.join(wrong)}", "按判错那几格的标签找对应的 check_* 函数修；判据写在文件头")
+        report_red(f"verus-proof-check 自证 {cases} 格里 {len(wrong)} 格判错（逐格见上面以 ✗ 起头、带「这一格判错」的几行）",  # gate-lint:summary
+                   "按判错那几格的标签找对应的 check_* 函数修；判据写在文件头")
         return EXIT_RED
     if breaks_missed:
-        report_red(f"弄坏开关打开之后自证照样全对：{' '.join(breaks_missed)}", "那几个开关管的那一段没有自证盯着：补一格会被它弄错的自证，或修开关")
+        report_red(f"弄坏开关没有被具体自证格检出：{' '.join(breaks_missed)}", "检查子进程是否崩溃或被信号停止；正常执行却没有报判错的，补自证或修开关")
         return EXIT_RED
-    suffix = f"；弄坏开关 {breaks_proven} 个，每个都让至少一格判错" if not BREAK else "（开着弄坏开关，没重跑开关）"
+    suffix = f"；弄坏开关 {breaks_proven} 个，每个都让至少一格判错" if not (BREAK or FORMAL_BREAK or reuse_checks.BREAK) else "（开着弄坏开关，没重跑开关）"
     print(f"  ✓ verus-proof-check 自证 {cases} 格都判对{suffix}")
     return EXIT_GREEN
 

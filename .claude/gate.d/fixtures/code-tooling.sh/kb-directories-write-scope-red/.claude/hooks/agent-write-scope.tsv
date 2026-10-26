@@ -1,0 +1,5 @@
+# 样本写范围表：kb-scribe 盖全 .claude/kb，notes/invariants 只盖下一层，docs/extra 只有 clerk 的 docs/** 盖住
+kb-scribe	.claude/kb/**	样本
+kb-scribe	notes/invariants/*.md	样本：* 不跨目录
+kb-scribe	$SINGLEFS_WORK_ROOT/**	样本：工作根
+clerk	docs/**	样本：别的 agent 的行盖住了不算

@@ -1,0 +1,2 @@
+# 样本：scripts/old-rig 整个搬到 scripts/new-rig（.claude/gate.d/path-moves.tsv 登记了），脚本里只有路径跟着换了；表里改成新路径与新文件的 sha256
+scripts/new-rig/live.sh  4c7bc89faf2e2f3d5d047b19d20527c60db5a15686ad026470bfc483d55ad2a0  # 样本：文件头按现算写、不能改；搬了家

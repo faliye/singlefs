@@ -22,7 +22,7 @@ description: 跑 singlefs 的验证套件——LKMM 内存序、QEMU/KVM 真设�
 | 模型对拍 | 随机历史每一步与只住内存的理想模型比 | `.claude/gate.d/harness-model-differential-and-scenarios.sh`（harness 类，整轮门禁里跑） | `模型对拍` |
 | QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录制与程序录制流逐项比 | `.claude/gate.d/checker-tier-qemu-device-streams.sh`（重型） | 不声明覆盖 |
 | LKMM 内存序 | `litmus/` 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符 | `.claude/gate.d/checker-tier-lkmm.sh`，逻辑在 `.claude/scripts/lkmm.sh`（重型；缺 herd7 直接红） | 不声明覆盖 |
-| Verus 形式化验证 | 恢复重放取前缀、择根、扫环三截的核与择根取前缀的合判推论经 Verus 验过（版本钉住、证明、空真、必红世界），E165 全量的红例钉进快档逐行重放 | `.claude/gate.d/checker-tier-formal-verification.sh`，判法在 `scripts/gate/verus-proof-check.py` 与 `scripts/experiments/e165-pin-red-examples.py`（重型） | 不声明覆盖 |
+| Verus 形式化验证 | 恢复重放取前缀、择根、扫环三截的核与择根取前缀的合判推论经 Verus 验过（版本钉住、证明、空真、必红世界），E165 全量的红例钉进快档逐行重放 | `.claude/gate.d/checker-tier-formal-verification.sh`，判法在 `scripts/gate/verus-proof-check.py` 与 `scripts/experiment-apparatus/e165-pin-red-examples.py`（重型） | 不声明覆盖 |
 
 阶段头部写 `# gate-covers: <键>`，键只能是 `.claude/gate-not-implemented.tsv` 里登记的（本项目登记了 `崩溃点重放`、`模型对拍`）与共享 `gate.sh` 自带的 `最终判据`、`命名纪律（shell）`，写错一个字判红。
 这个阶段这一轮跑了且通过，`gate.sh` 末尾的未实现清单才把那一项换到「由项目本地阶段覆盖」下面；报了「本次未跑」的这一轮不算覆盖。

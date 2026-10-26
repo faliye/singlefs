@@ -50,7 +50,13 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
   ④ 挑一台：本机在前、第二台在后，挑第一台「预测量 + 余量放得下」的：内存 预测 + MEMORY_MARGIN_BYTES ≤ 那台此刻的空闲，且包装要记的量 ≤ slice 此刻放得下的
      （包装记的量：有真峰值记峰值，没有记上限，见 run-with-memory-cap.sh 文件头「排队」）；带 --gpu 再要 显存预测 ≤ 那台显存此刻放得下的。
      上限 = 预测 × CAP_FACTOR（按 MiB 向上取整）；第二台的上限不超过配置的 PEER_MEMORY_CAP（包装记的量比它还大，第二台算放不下）。
-     两台都放不下就等：每 POLL_SECONDS 秒重查一遍（②③ 都重做），第一次等与之后每 WAITING_REPORT_EVERY_SECONDS 秒往 stderr 报一行在等什么；
+     两台都放不下就等：等「新的资源释放广播或 POLL_SECONDS 到点」先到者，到了就重查一遍（②③ 都重做）；第一次等与之后每 WAITING_REPORT_EVERY_SECONDS 秒、
+     与每一次被广播叫醒时往 stderr 报一行在等什么；这几行与挑中之后那一行 step=decide / step=plan 里 woken_by= 写这一轮是被什么叫醒的
+     （start 还没等过、poll 到点、event:<种类> 被那一种事件叫醒）。
+     广播的收法只在 scripts/hosts/resource_release_broadcast.py（wait_for_events，读本机事件目录；用户 2026-10-23 定「叫醒并重判，不自动挪」，
+     records/2026-09-16-subagent拆分提案.md 第九十九节），哪一种事件都叫醒（本机放出的、别的机器推来的都可能让一台放得下）；那份库只在派（不是 --plan）时才导入，
+     开始判之前记下此刻最新的序号（判的那一会儿来的事件也算新的）。读广播出了任何异常只打一行 HOST_DISPATCH step=wait release=unreadable why=<异常>，
+     之后照旧每 POLL_SECONDS 秒重查，挑哪台、退出码不变。叫醒只是提前重查，挑哪台、派不派照旧按 ②③④ 判。
      HOST_DISPATCH_WAIT_SECONDS 给了就至多等那么久，到点退 242，不给就一直等到放得下。
      哪台都等多久也放不下（包装要记的量比每台的 slice 总上限都大、或预测加余量比每台的整机内存都大、或显存预测比每台卡的总量减余量都大）当场退 241。
      判与记账在同一把锁里（状态目录 HOST_DISPATCH_STATE_DIR，默认 ${XDG_RUNTIME_DIR:-/tmp}/singlefs-host-dispatch），几条同时来的一条一条判。
@@ -109,6 +115,8 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
   long-run-exempt-ignored  ⓪ 不查仓根 .claude/long-run-live-hosts-exempt，登记了的脚本也按登记值读  hosts-exempt-live-passes
   long-run-exempt-sha256-ignored  ⓪ 不比豁免表里登记的 sha256，登记了的脚本一律按现算读  hosts-exempt-sha-mismatch-single-host
   no-duration-record    跑完不记用时                                duration-recorded
+  release-ignored       两台都放不下时只等 POLL_SECONDS 到点，不看资源释放广播（改前的样子）  release-wakes
+  release-errors-escape 读资源释放广播出的异常不接住，往外抛                release-unreadable-polls
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -267,6 +275,14 @@ def settings_from_environment():
     state_home = environment.get("XDG_STATE_HOME") or os.path.join(environment.get("HOME") or "/", ".local", "state")
     runtime = environment.get("XDG_RUNTIME_DIR") or "/tmp"
     wait_text = environment.get("HOST_DISPATCH_WAIT_SECONDS", "")
+    wait_seconds = None
+    if wait_text:
+        try:
+            wait_seconds = float(wait_text)
+        except ValueError:
+            raise ValueError("HOST_DISPATCH_WAIT_SECONDS 要是不小于 0 的有限秒数") from None
+        if not math.isfinite(wait_seconds) or wait_seconds < 0:
+            raise ValueError("HOST_DISPATCH_WAIT_SECONDS 要是不小于 0 的有限秒数")
     return Settings(
         repository_root=repository_root,
         multi_host_run=os.path.join(SCRIPT_DIRECTORY, "multi-host-run.sh"),
@@ -278,7 +294,7 @@ def settings_from_environment():
         state_directory=environment.get("HOST_DISPATCH_STATE_DIR") or os.path.join(runtime, "singlefs-host-dispatch"),
         quiesce_state_directory=environment.get("GPU_QUIESCE_STATE_DIRECTORY") or os.path.join(runtime, "singlefs-gpu-quiesce"),
         environment=environment,
-        wait_seconds=float(wait_text) if wait_text else None,
+        wait_seconds=wait_seconds,
         duration_table=peaks.default_duration_table(environment))
 
 
@@ -637,12 +653,56 @@ def host_name(host):
     return "第二台" if host == "peer" else "本机"
 
 
+def resource_broadcast():
+    """资源释放广播那份库（scripts/hosts/resource_release_broadcast.py，SCRIPT_DIRECTORY 已在 sys.path 里）：只在要等的时候才导入（文件头 ④）。"""
+    import resource_release_broadcast
+    return resource_release_broadcast
+
+
+def release_unreadable(settings, error):
+    """读资源释放广播出了异常（文件头 ④）：只打一行，之后照旧只按 POLL_SECONDS 重查。弄坏开关 release-errors-escape 下往外抛。"""
+    if broken("release-errors-escape"):
+        raise error
+    settings.tell(f"HOST_DISPATCH step=wait release=unreadable why={type(error).__name__}:{str(error).replace(' ', '_')[:200]}")
+
+
+def release_watch_start(settings):
+    """开始判之前记下本机事件目录与此刻最新的序号：交（序号, 目录）；读不了打一行、交（0, None），之后照旧只按 POLL_SECONDS 重查。"""
+    try:
+        broadcast = resource_broadcast()
+        directory = broadcast.default_directory(settings.environment)
+        return broadcast.latest_sequence(directory), directory
+    except Exception as error:
+        release_unreadable(settings, error)
+        return 0, None
+
+
+def release_wait(settings, directory, after):
+    """两台都放不下时的一轮等（文件头 ④）：「新的资源释放广播或 settings.poll_seconds 到点」先到者；交（这一轮被什么叫醒, 新的序号, 目录）。
+    读不了广播打一行、照旧睡满这一轮，之后不再读（目录交 None）。弄坏开关 release-ignored 下只睡、不看广播。"""
+    started = time.monotonic()
+    if directory is not None and not broken("release-ignored"):
+        try:
+            events = resource_broadcast().wait_for_events(after, settings.poll_seconds, directory)
+        except Exception as error:
+            release_unreadable(settings, error)
+            events, directory = [], None
+        if events:
+            return f"event:{events[-1].get('kind', '?')}", max(event["seq"] for event in events), directory
+    remaining = settings.poll_seconds - (time.monotonic() - started)
+    if remaining > 0:
+        time.sleep(remaining)
+    return "poll", after, directory
+
+
 def decide(settings, request, prediction, peer, plan=False):
     """②–④：查、判、挑；放不下就等（plan 不等）。挑中了在派发器账上记一笔（plan 不记）。"""
     started = time.monotonic()
     last_report = None
     probes = 0
     first_reports = None
+    woken_by = "start"   # 上一轮是被什么叫醒的（文件头 ④）：start、poll、event:<种类>
+    release_after, release_directory = (0, None) if plan else release_watch_start(settings)
     while True:
         with dispatch_lock(settings):
             if first_reports is None or not broken("no-reprobe"):
@@ -682,7 +742,7 @@ def decide(settings, request, prediction, peer, plan=False):
                 settings.tell(f"HOST_DISPATCH step={'plan' if plan else 'decide'} host={chosen.host} memory_predicted={mebibytes_text(prediction.memory_predicted)} "
                               f"memory_history={prediction.memory_history} cap={mebibytes_text(chosen.cap)} booked={mebibytes_text(prediction.memory_booked)}"
                               + (f" gpu_predicted={prediction.gpu_predicted}M gpu_history={prediction.gpu_history}" if request.gpu else "")
-                              + f" waited={time.monotonic() - started:.0f}s")
+                              + f" waited={time.monotonic() - started:.0f}s woken_by={woken_by}")
                 entry_path = ""
                 if not plan:
                     os.makedirs(ledger_directory(settings), exist_ok=True)
@@ -708,12 +768,13 @@ def decide(settings, request, prediction, peer, plan=False):
                           + "；".join(f"{host_name(verdict.host)}：{verdict.why}" for verdict in verdicts))
             settings.tell("  → 怎么办：等占着的那几条跑完再派（run-with-memory-cap.sh --status、nvidia-smi 看是谁），或不设 HOST_DISPATCH_WAIT_SECONDS 让它一直等")
             return Decision(None, exit_code=EXIT_WAITED_OUT, probes=probes)
-        if last_report is None or now - last_report >= settings.report_every_seconds:
-            settings.tell(f"HOST_DISPATCH step=wait waited={now - started:.0f}s "
+        if last_report is None or now - last_report >= settings.report_every_seconds or woken_by.startswith("event:"):
+            settings.tell(f"HOST_DISPATCH step=wait waited={now - started:.0f}s woken_by={woken_by} "
                           + " ".join(f"{verdict.host}=「{verdict.why}」" for verdict in verdicts)
                           + ("" if peer is None or peer.available else f" peer=「不用：{peer.why}」"))
             last_report = now
-        time.sleep(settings.poll_seconds)
+        # 等「新的资源释放广播或 POLL_SECONDS 到点」先到者，到了就重查（文件头 ④）
+        woken_by, release_after, release_directory = release_wait(settings, release_directory, release_after)
 
 
 # ── 派与量显存 ──
@@ -906,12 +967,13 @@ def main(arguments):
         return EXIT_USAGE
     try:
         request, plan = parse_arguments(arguments)
+        settings = settings_from_environment()
     except ValueError as error:
         print(f"  ✗ host-dispatch.py 用法错：{error}", file=sys.stderr)
         print("  → 怎么办：host-dispatch.py [--gpu] [--label <标签>] [--fetch <树里的相对路径>]… [--shard <k>/<n>] [--estimated-hours <小时>] -- <命令…>，"
               "或 --plan [--gpu] [--shard <k>/<n>] [--estimated-hours <小时>] -- <命令…>、--selftest", file=sys.stderr)
         return EXIT_USAGE
-    return run_request(settings_from_environment(), request, plan=plan, install_signal_handlers=not plan)
+    return run_request(settings, request, plan=plan, install_signal_handlers=not plan)
 
 
 # ── 自证 ──
@@ -979,7 +1041,12 @@ class SelftestWorld:
         self.gpu_peak_table = os.path.join(self.directory, "gpu-peaks.tsv")
         self.duration_table = os.path.join(self.directory, "durations.tsv")
         self.quiesce_state = os.path.join(self.directory, "quiesce-state")
+        self.release_events = os.path.join(self.directory, "release-events")
         self.lines = []
+
+    def release_event(self, kind):
+        """照资源释放广播那份库的写法往这一格的本机事件目录放一条（store_event，文件头 ④）。"""
+        resource_broadcast().store_event(self.release_events, f"kind={kind} host=本机 source=local label=selftest-release time={time.time():.3f}", 500, 86400)
 
     @staticmethod
     def write_executable(path, text):
@@ -1033,8 +1100,9 @@ class SelftestWorld:
     def settings(self):
         environment = {name: value for name, value in os.environ.items()
                        if not name.startswith(("RUN_WITH_MEMORY_CAP_", "SINGLEFS_", "GPU_QUIESCE_", "HOST_DISPATCH_", "MULTI_HOST_", "PEER_HOST_LIB_",
-                                               "CLAUDE_CODE_SESSION_ID"))}
+                                               "RESOURCE_BROADCAST_", "CLAUDE_CODE_SESSION_ID"))}
         environment.update({
+            "RESOURCE_BROADCAST_DIRECTORY": self.release_events,   # 资源释放广播的本机事件目录：这一格自己的（文件头 ④）
             "PATH": os.pathsep.join([os.path.join(self.local, "bin"), os.path.join(self.directory, "ssh-bin"), os.environ.get("PATH", "")]),
             "SINGLEFS_DISPATCH_PROBE_MEMINFO": os.path.join(self.local, "meminfo"),
             "RUN_WITH_MEMORY_CAP_STATE_DIR": os.path.join(self.local, "state"),
@@ -1130,6 +1198,59 @@ def selftest_cells(root):
     waited = any("step=wait" in line for line in world.lines)
     check("waits-then-dispatches", code == 0 and waited and elapsed >= 0.5 and len(launches) == 1 and " --peer " not in f" {launches[0]} ",
           f"两台都放不下应当等、重查、空出来之后派到本机，实际退 {code}、用了 {elapsed:.1f} 秒、{'报了' if waited else '没报'}在等、派了「{launches}」")
+
+    # release-wakes：两台都只剩 2G、一轮等 6 秒；0.6 秒之后本机空出来并来一条资源释放广播 ⇒ 不等到点、4 秒内重查派到本机，等的那一行写 woken_by=event:memory-released
+    world = SelftestWorld(root, "release-wakes")
+    world.seed_peak(key, GIBIBYTE, "4G")
+    world.meminfo(world.local, 60, 2)
+    world.meminfo(world.peer, 60, 2)
+    settings = world.settings()
+    settings.poll_seconds, settings.report_every_seconds, settings.wait_seconds = 6.0, 60.0, 15.0
+
+    def free_then_broadcast():
+        world.meminfo(world.local, 60, 40)
+        world.release_event("memory-released")
+
+    timer = threading.Timer(0.6, free_then_broadcast)
+    timer.start()
+    started = time.monotonic()
+    code = dispatch(world, ["--", *command], settings)
+    elapsed = time.monotonic() - started
+    timer.join()
+    launches = world.launches()
+    wait_lines = [line for line in world.lines if "step=wait" in line or "step=decide" in line]
+    check("release-wakes", code == 0 and elapsed < 4 and len(launches) == 1 and " --peer " not in f" {launches[0]} "
+          and any("step=wait" in line and "woken_by=start" in line for line in wait_lines)
+          and any("step=decide" in line and "woken_by=event:memory-released" in line for line in wait_lines),
+          f"两台都放不下时来了资源释放广播应当不等到点（6 秒）就重查、派到本机，等的行写 woken_by=start、被叫醒之后挑中那一行写 woken_by=event:memory-released；"
+          f"实际退 {code}、用了 {elapsed:.1f} 秒、派了「{launches}」、等与挑中的行 {wait_lines}")
+
+    # release-unreadable-polls：读资源释放广播出异常（这一格把那份库换成一导入就抛的）⇒ 只打一行 release=unreadable，照旧每轮到点重查、空出来之后派到本机、退 0
+    world = SelftestWorld(root, "release-unreadable-polls")
+    world.seed_peak(key, GIBIBYTE, "4G")
+    world.meminfo(world.local, 60, 2)
+    world.meminfo(world.peer, 60, 2)
+    timer = threading.Timer(0.6, world.meminfo, (world.local, 60, 40))
+    real_resource_broadcast = globals()["resource_broadcast"]
+
+    def unreadable_broadcast():
+        raise RuntimeError("自证造的：资源释放广播那份库导入不了")
+
+    globals()["resource_broadcast"] = unreadable_broadcast
+    timer.start()
+    try:
+        code = dispatch(world, ["--", *command])
+        escaped = ""
+    except RuntimeError as error:
+        code, escaped = None, str(error)
+    finally:
+        globals()["resource_broadcast"] = real_resource_broadcast
+        timer.join()
+    launches = world.launches()
+    unreadable = [line for line in world.lines if "release=unreadable" in line]
+    check("release-unreadable-polls", code == 0 and not escaped and len(unreadable) == 1 and "RuntimeError" in unreadable[0] and len(launches) == 1,
+          f"读资源释放广播出异常应当只打一行 release=unreadable、照旧重查、空出来之后派到本机退 0；实际退 {code}、抛出「{escaped}」、"
+          f"release=unreadable 的行 {unreadable}、派了「{launches}」")
 
     # switch-off-local-only：双机开关没开，本机放不下 ⇒ 不碰第二台、等满 0.5 秒退 242、没派
     world = SelftestWorld(root, "switch-off-local-only")
@@ -1424,6 +1545,8 @@ SWITCH_EXPECTED_CELLS = {
     "long-run-exempt-ignored": ["hosts-exempt-live-passes"],
     "long-run-exempt-sha256-ignored": ["hosts-exempt-sha-mismatch-single-host"],
     "no-duration-record": ["duration-recorded"],
+    "release-ignored": ["release-wakes"],
+    "release-errors-escape": ["release-unreadable-polls"],
 }
 
 
@@ -1469,7 +1592,7 @@ def selftest():
           f"有历史按历史预测、撞过顶的往上放一档、没历史用默认值、包装账上还没涨到量的从余量里减、派发器自己刚派出去的按预测记账（两条之和放得下就都派、放不下不派）、"
           f"--gpu 按显存余量挑机器并套清场包装、还没清场按卡的总量算、跑完记显存峰值、显存不够记成撞过顶、哪台都放不下当场退 {EXIT_NEVER_FITS}、退出码原样带回、"
           f"第二台的上限收到 PEER_MEMORY_CAP、历史用时或预计挂钟超过 2 小时而只占一台退 {EXIT_LONG_SINGLE_HOST}、不超过 2 小时与两台分片与脚本头写齐了分片多机或分不了照派、脚本头声明不齐退 {EXIT_LONG_SINGLE_HOST}、"
-          f"跑完记用时、没有 -- 退 {EXIT_USAGE}；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
+          f"跑完记用时、没有 -- 退 {EXIT_USAGE}、两台都放不下时来了资源释放广播不等到点就重查、读广播出异常只打一行照旧到点重查；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
 

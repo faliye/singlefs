@@ -49,6 +49,12 @@ find_kernel() {
   return 1
 }
 
+# 限速模型目前只实现单盘；拒绝不支持的组合，不能静默减少磁盘或关闭录制。
+if [[ -n "${VM_IOPS:-}" ]]; then
+  [[ "$VM_DISKS" == 1 ]] || die "VM_IOPS 暂不支持 VM_DISKS=$VM_DISKS" "多盘实验去掉 VM_IOPS；限速实验用 VM_DISKS=1"
+  [[ -z "${VM_BLKLOGWRITES_DIR:-}" ]] || die "VM_IOPS 不能与 VM_BLKLOGWRITES_DIR 同时使用" "分别运行限速与设备录制实验"
+fi
+
 # 工作目录登记簿。**必须在 run_one 之前声明**：run_one 在命令替换（子 shell）里跑，
 # 它只能继承已经存在的变量，且它对变量的赋值传不回来——所以走文件，不走变量。
 VM_WORKLIST="${VM_WORKLIST:-}"
@@ -65,7 +71,13 @@ stage_initramfs_root() { # stage_initramfs_root <根目录> <静态二进制> [�
   # VM_EXTRA_ROOT：这个目录里的东西原样并进 initramfs 的根
   # （E152（按里程碑对比六家文件系统的文件性能） 要的 fio、各家用户态、依赖库、解压过的模块）。
   [[ -n "${VM_EXTRA_ROOT:-}" ]] && cp -a "$VM_EXTRA_ROOT"/. "$ird"/
-  printf '%s\n' "$*" > "$ird/args"
+  # POSIX sh 可读取的单引号字面量：保留空参数、换行与通配符，不执行参数内容。
+  local arg
+  {
+    printf 'set -- "$@"'
+    for arg in "$@"; do printf " '%s'" "${arg//\'/\'\\\'\'}"; done
+    printf '\n'
+  } > "$ird/args"
   # N 块盘：来宾侧设备名按 virtio 顺序 vda vdb vdc …（盘镜像由 run_one 建）
   local d devs=""
   for ((d=0; d<VM_DISKS; d++)); do
@@ -83,7 +95,9 @@ if [ ! -b /dev/vda ]; then
   echo "SINGLEFS_EXIT=200"
   /bin/busybox poweroff -f
 fi
-/bench $(cat /devs) $(cat /args); rc=$?
+set -- $(cat /devs)
+. /args
+/bench "$@"; rc=$?
 echo "SINGLEFS_EXIT=$rc"
 /bin/busybox poweroff -f
 INIT

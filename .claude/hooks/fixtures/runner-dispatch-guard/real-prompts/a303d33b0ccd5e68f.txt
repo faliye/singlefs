@@ -1,0 +1,30 @@
+# 派发：tooling-writer
+
+重型测试：不跑
+批次：records/2026-10-22-子agent结果落地审计.md#5
+线程上限：31
+内存上限：16G
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r1fix-hooks
+报告：/home/fy5090/.local/share/singlefs/work/landing-audit-r1fix-hooks/result.md
+预计挂钟：2 小时内，两个钩子、三份脚本与一份新库，各带自证与弄坏开关
+
+回复与报告用中文。
+
+开工先读：判决 `research/prompts/landing-audit-r1-main-verification.md` 节「二、逐格判」K2、K3、K4 表、节「三、判决」第一张表「钩子与脚本」那一行；攻方腿 `research/prompts/landing-audit-r1-opus-output.md` 的 K2-4、K2-6、K3-1、K4-1、K4-2 各节。
+
+## 关的是哪几条（逐条出口）
+
+1. **K2-4 报告行一份解析**：`.claude/hooks/runner-dispatch-guard.sh` 里派发闸 ④ 的 `SCOPE_MENTION` 与新判法 ⑰ 的 `REPORT_LABEL_LINE` 并成一个报告行解析，标签认「报告」「报告路径」「报告写进」「报告写到」，取出的路径同时交 ④（写范围）与 ⑰（文件名带 report 就拒）。⑰ 那一格把「报告路径：…/report.md」放行的样本改成拒。出口：`dispatch-prompt.py --check` 上「报告：…/report.md」「报告路径：…/report.md」都退非 0，「报告：（草稿目录）/result.md」退 0；有一个弄坏开关打开后「报告路径：」那一格红。
+2. **K3-1 三方腿的报告默认值**：`scripts/agents/dispatch-prompt.py` 骨架按类型给「报告：」一行的默认：`three-way-forward`、`three-way-attack`、`three-way-defense` 三种填一个形如 `research/prompts/（轮）-（模型）-output.md` 的占位，占位照骨架现有占位的尖括号写法（轮与模型两处都要主 agent 填，不填 `--check` 照拒）；别的类型照旧（草稿目录）/result.md。攻方、辩方定义的 `required-inputs` 补「报告」由第 17 号任务改，你这边骨架按改后的定义打出「报告：」一行。派发闸对三方三种类型另判：报告行解析出的路径要形如 `research/prompts/*-output.md`，不是就拒，拒绝说明给出形态。出口：三方三种类型照骨架只填别的占位、不改报告行，`--check` 退非 0；填成 `research/prompts/x-r1-opus-output.md` 退 0；填成草稿目录下的 `result.md` 退非 0；各有自证格与开关。
+3. **K2-6 「交回」一个定义**：`scripts/agents/` 下新建一份子 agent 会话记录库（名字你起），至少给出「交回送达了没有」（调过 SubagentHandback、且后面有它对应、不是错误的 tool_result，与 `.claude/hooks/continuation-guard.sh` 今天的认法相同）与「起点按首条记录时间」。`scripts/agents/agent-cost.py`（`scan_subagent` 与 `outcome` 的交回判定、起点筛选）、`.claude/hooks/continuation-guard.sh`、`scripts/agents/agent-watch.py` 都从它取；删各自重写的那一段。出口：三处在一份「先被拒、后来送达」与一份「被拒之后再没送达」的造出来的会话记录上判得一样；库有自证与开关（让「被拒的调用也算送达」），三处的自证仍绿。
+4. **K4-1 结局账可复**：`agent-cost.py outcome` 加 `--until YYYY-MM-DD`（不含那一天之后开工的子 agent）；成功句报 `--since`、`--until` 的取值。
+5. **K4-2 返工词表**：`REWORK_WORDS` 不认「修订」（单字「修」后面接「订」的不算）；自证「返工词表」那一项加「E177 跑前登记修订」不算返工；开关 `narrow-rework-words` 照旧。
+6. **写范围表**：`.claude/hooks/agent-write-scope.tsv` 执行员那一行（`.claude/gate.d/replay-comparison-units.tsv`）的说明列改成指到改后的执行员定义（第 17 号任务给执行员第 5 步与写范围补这份表）；别的不动。
+
+## 要改的文件
+
+`.claude/hooks/runner-dispatch-guard.sh`、`.claude/hooks/continuation-guard.sh`（钩子改法走 `scripts/gate/hook-swap.py`）、`.claude/hooks/agent-write-scope.tsv`、`scripts/agents/dispatch-prompt.py`、`scripts/agents/agent-cost.py`、`scripts/agents/agent-watch.py`、`scripts/agents/` 下新的库、`scripts/agents/README.md`、它们的自证与 `.claude/hooks/selftest-registry.tsv` 的登记。不碰：`.claude/agents/`、`.claude/agent-common.md`、`.claude/main-agent.md`（第 17 号任务）、`.claude/gate.d/`、`.claude/hooks/lib_long_run.py`、`scripts/kb/`（第 16 号任务）。`runner-dispatch-guard.sh` 里有别的会话先改的 TaskStop 一段，不动它；开工与写之前各 `git diff --stat` 看一眼，有新出现的不是你的未暂存改动就停下交回。
+
+## 出口
+
+六条各自的出口都达成；改过的钩子与脚本的 `--selftest` 照登记的 light / heavy 办（light 的自己跑，读数写进报告；别的写进「要主 agent 跑的命令」）。报告写改了什么、删了什么、开关、读数、没做什么。

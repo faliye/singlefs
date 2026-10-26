@@ -1,0 +1,5 @@
+# 样本登记表：一份没有 --list-items、一份那一句少 red=、一行指到不在的文件、一行少一段
+scripts/gate/no-list-items.sh	SAMPLE_ITEM	item=,exit=	# 样本：没有列项那个参数
+scripts/gate/short_fields.py	SAMPLE_PY_ITEM	judged=,red=,reused=	# 样本：那一句少红了多少
+scripts/gate/gone.sh	SAMPLE_ITEM	item=	# 样本：指到的文件不在
+scripts/gate/no-list-items.sh	SAMPLE_ITEM	# 样本：少一段

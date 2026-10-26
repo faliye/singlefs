@@ -21,8 +21,22 @@ holder_alive / is_self_or_ancestor / describe（判法不在这里另写一份�
   不读脚本正文：`bash x.sh` 里的 cargo 不在这一道的射程里（gate.sh、merge-and-verify.sh 这类自己持锁或不起 cargo 的另算）。
   不排队：钩子不等锁，被占着就拒，拒绝说明给出谁占着与下一步（等它放，或在副本里编）。
 
+编译目录（workspace_cargo_target_refusal；heavy-test-guard.sh 在 decide() 里同合入锁一起调，主 agent 与子 agent 一样判）：
+  用户定案「所有脚本自行编译，完成后自行删除 不再预留生成物」：主工作区里直接敲的 cargo 编进 <仓根>/target、删了又长，这一判在执行前拒。
+  ① 命令位置上的每一条 cargo 照 cargo_invocations 取（与合入锁共用：包装剥掉之后剥出来的那条再切一遍，bash -c、cd 跟着走；run-build-directory.sh 那一层记下来；
+     命令文本本身里只定义、调不到的 `function 名字 { …; }` 的函数体不判，与重型那一处同一个口径，拆开拼写调到的、认不准的照判：lib_shell_words.py 的 function_never_called）；
+     子命令是会编的（BUILDING_SUBCOMMANDS：build、check、test、bench、run、doc、clippy、rustc、rustdoc、fix 与它们的内建别名）才判，fmt、metadata、tree、clean 这类放行。
+  ② 起它的目录所在的 git 工作树根要正是主仓（调用方给的 main_root，钩子给 project_root）：仓副本、git worktree 加出来的树、目录认不出的不判。
+  ③ 编译目录：显式给的（--target-dir、CARGO_TARGET_DIR、CARGO_BUILD_TARGET_DIR、--config build.target-dir=…；变量先看命令文本里设的，再看钩子自己的环境）在仓外放行、在仓里拒；
+     没显式给而包在 scripts/hosts/run-build-directory.sh 里的放行（它给这一次一个自己的编译目录、跑完删）；再看配置文件（起它的目录往上每层的 .cargo/config.toml、
+     $CARGO_HOME/config.toml）的 build.target-dir；都没有就是默认的 <工作区根>/target，在仓里，拒。写了而此刻算不出（带没赋过的变量）的不拒，交一句 notice。
+  ④ 拒绝说明写出哪一条、为什么，与在第一个 cargo 前插上 `bash <主仓>/scripts/hosts/run-build-directory.sh ` 的那一条（照抄能过这一判）。
+  不读脚本正文：入口脚本自己起的 cargo 不在射程里。
+
 接口：
   workspace_cargo_lock_refusal(command, directory, shell_words, heavy_tests, lock_library_path, hook_environment=None) -> (拒绝说明 或 None, notices)
+  workspace_cargo_target_refusal(command, directory, shell_words, heavy_tests, main_root, hook_environment=None) -> (拒绝说明 或 None, notices)
+  cargo_invocations(command, directory, shell_words, heavy_tests) -> [CargoInvocation]   两判共用的取法
   build_held_workspace(work) -> (主工作区路径, 持锁的假进程, 锁文件路径)   自证与 heavy-test-guard.sh 的自检共用的现场（用完 holder.kill()）
   selftest() -> 0 / 1
 
@@ -42,15 +56,43 @@ holder_alive / is_self_or_ancestor / describe（判法不在这里另写一份�
       「持有者已死：放行」
   not-build-too    只查版本、清单的子命令也拒
       「cargo --version 与 cargo locate-project 不拒」
+编译目录那一判的四项：
+  bare-cargo-allowed  不判编译目录，一律放行
+      「编译目录：裸 cargo test：拒」「编译目录：cd 进 crates/ 之后的 cargo build：拒」「编译目录：经内存包装起：拒」「编译目录：capped.sh、nice、timeout、env 包着：拒」
+      「编译目录：bash -c 里起：拒」「编译目录：CARGO_TARGET_DIR 指到仓里：拒」「编译目录：拒绝说明给出包一层的写法与出路」等这一判里该拒的 12 格与三方 shell-words-r2 判决第 8 条加的「编译目录：function 定义之后拆开拼写调用：拒」，
+      与「编译目录：CARGO_TARGET_DIR 写在算不出的变量里：放行并记一条」（不记 notice）；heavy-test-guard.sh 自检「编译目录：」开头该拒的三格与「编译目录：function 定义之后拆开拼写调用：拒（退出码 2）」
+  outside-target-not-recognized  不认显式给的编译目录（--target-dir、CARGO_TARGET_DIR、CARGO_BUILD_TARGET_DIR、--config）
+      「编译目录：带仓外 CARGO_TARGET_DIR：放行」「编译目录：export 了仓外 CARGO_TARGET_DIR 再起：放行」「编译目录：会话环境里有仓外 CARGO_TARGET_DIR：放行」
+      「编译目录：--target-dir 指到仓外：放行」「编译目录：--config build.target-dir 指到仓外：放行」「编译目录：包装脚本外面又给了仓里的 CARGO_TARGET_DIR：拒」等 9 格
+  wrapper-not-recognized  不认 run-build-directory.sh 包着的
+      「编译目录：经包装脚本起：放行」「编译目录：内存包装里套包装脚本起：放行」「编译目录：包装脚本里 bash -c 再 cd 进 crates/ 起：放行」「编译目录：照拒绝说明照抄的那一条：放行」
+  non-building-refused  不编的子命令也判
+      「编译目录：cargo fmt：放行」「编译目录：cargo metadata、cargo tree、cargo clean：放行」
+  uncalled-functions-judged  命令文本本身里只定义、调不到的 function 的函数体也判（三方 shell-words-r2 判决第二节第 8 条之前的判法）
+      「编译目录：只定义、调不到的 function 函数体：放行」；heavy-test-guard.sh 自检「编译目录：只定义、调不到的 function 函数体：放行（退出码 0）」与「lib_workspace_cargo_lock.py 的自检」
+另有 lib_shell_words.py 的 LIB_SHELL_WORDS_BREAK=function-calls-literal-only（拆开拼写的调用认不出）与 function-keyword-as-command（function 关键字当命令词）：「编译目录：function 定义之后拆开拼写调用：拒」；
+uncalled-functions-run（只定义的函数体照判）：「编译目录：只定义、调不到的 function 函数体：放行」
+另有 lib_heavy_tests.py 的 LIB_HEAVY_TESTS_BREAK=run-build-directory-opaque（包装里那条看不见）：「编译目录：包装脚本外面又给了仓里的 CARGO_TARGET_DIR：拒」
 """
 import os
+import re
+import shlex
 import subprocess
 import sys
 import tempfile
 import time
+import tomllib
+from typing import NamedTuple
 
 BREAK_VARIABLE = "WORKSPACE_CARGO_LOCK_BREAK"
-BREAK_ITEMS = ("ignore-lock", "ignore-reentry", "main-tree-only", "refuse-free", "not-build-too")
+BREAK_ITEMS = ("ignore-lock", "ignore-reentry", "main-tree-only", "refuse-free", "not-build-too",
+               "bare-cargo-allowed", "outside-target-not-recognized", "wrapper-not-recognized", "non-building-refused", "uncalled-functions-judged")
+# 编译目录那一判（文件头「编译目录」一段）：会编、会往编译目录里写的子命令（别名照 cargo 内建的认）；别的（fmt、metadata、tree、clean、update……）不判
+BUILDING_SUBCOMMANDS = {"build", "b", "check", "c", "test", "t", "bench", "run", "r", "doc", "d", "clippy", "rustc", "rustdoc", "fix"}
+TARGET_DIRECTORY_VARIABLES = ("CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR")
+RUN_BUILD_DIRECTORY_SCRIPT = "scripts/hosts/run-build-directory.sh"
+# 拒绝说明里给的「包一层」写法插在命令文本里第一个像命令词的 cargo 之前（前面是行首、空白、;&|( 或引号）
+FIRST_CARGO_WORD = re.compile(r"""(?:^|(?<=[\s;&|('"]))cargo(?=\s|$)""", re.M)
 HOLDER_VARIABLE = "SINGLEFS_WORKSPACE_LOCK_HOLDER"
 LOCK_FILE_VARIABLE = "SINGLEFS_WORKSPACE_LOCK_FILE"
 # 不编、不动 target 的子命令：只查版本、清单与帮助
@@ -66,22 +108,39 @@ def switch_is_set(item):
     return item in chosen
 
 
-def cargo_runs_in(command, directory, shell_words, heavy_tests):
-    """命令文本里命令位置上起的每一条 cargo：→ [(cargo 的子命令, 起它的目录或 None, 命令前后写的 HOLDER 变量或 "")]。"""
-    runs = []
-    for found in shell_words.commands_at_command_position(command, directory).commands:
+class CargoInvocation(NamedTuple):
+    subcommand: str
+    directory: str | None          # 起它的目录（cd、env -C、-C、--manifest-path 之后的）；认不出是 None
+    environment: dict              # 这条命令看得到的、命令文本里设过的变量（lib_shell_words 的 CommandAtPosition.environment，值照写的样子）
+    rest: list                     # 子命令后面的参数
+    configuration_values: list     # 全局选项 --config 的值（lib_heavy_tests 的 CargoCommand.configuration_values）
+    variables: dict                # 跑这条命令时命令文本里记下的变量（展开参数用）
+    own_build_directory: bool      # 包在 scripts/hosts/run-build-directory.sh 里（这一趟一个自己的编译目录）
+
+
+def cargo_invocations(command, directory, shell_words, heavy_tests, environment=None, own_build_directory=False, depth=0):
+    """命令文本里命令位置上起的每一条 cargo（合入锁与编译目录两判共用这一份）：包装（command_under_launcher 认的那几样、gpu-quiesce-run.sh）剥掉之后，
+    剥出来的那条当一段命令文本再切一遍（里面的 bash -c、cd 照 lib_shell_words 跟着走），最多套 LAUNCHER_LAYERS 层；剥的那一层是 run-build-directory.sh 的，
+    里面起的每一条记 own_build_directory（弄坏开关 wrapper-not-recognized 下不记）。→ [CargoInvocation]。
+    最外一层（depth 0，Bash 调用的命令文本本身）里只定义、调不到的 `function 名字 { …; }` 的函数体不判，与 heavy-test-guard.sh 判重型那一处同一个口径
+    （lib_shell_words.py 的 uncalled_functions_skipped / function_never_called：拆开拼写调到的、认不准的照判；剥出来的里一层照判函数体）；
+    弄坏开关 uncalled-functions-judged 下最外一层也照判函数体（改前的判法）。"""
+    invocations = []
+    skip_uncalled = depth == 0 and not switch_is_set("uncalled-functions-judged")
+    for found in shell_words.commands_at_command_position(command, directory, environment, uncalled_functions_skipped=skip_uncalled).commands:
         words, where = list(found.words), found.directory
-        for _ in range(LAUNCHER_LAYERS):
-            launched = heavy_tests.command_under_launcher(words, where) or heavy_tests.command_under_gpu_quiesce(words, where)
-            if not launched or not launched[0]:
-                break
-            words = list(launched[0])
-            if launched[1] and where is not None:
-                where = shell_words.resolve_path(where, launched[1])
+        launched = heavy_tests.command_under_launcher(words, where) or heavy_tests.command_under_gpu_quiesce(words, where)
+        if launched and launched[0]:
+            if depth < LAUNCHER_LAYERS:
+                wrapped = own_build_directory or (heavy_tests.command_under_run_build_directory(words, where) is not None
+                                                  and not switch_is_set("wrapper-not-recognized"))
+                inner_directory = shell_words.resolve_path(where, launched[1]) if launched[1] and where is not None else where
+                invocations += cargo_invocations(shlex.join(launched[0]), inner_directory, shell_words, heavy_tests, found.environment, wrapped, depth + 1)
+            continue
         if not words or os.path.basename(words[0]) != "cargo":
             continue
         cargo = heavy_tests.cargo_subcommand(words[1:], where)
-        if cargo is None or (cargo.subcommand in NON_BUILDING_SUBCOMMANDS and not switch_is_set("not-build-too")):
+        if cargo is None:
             continue
         where = cargo.directory
         for index, argument in enumerate(cargo.rest):
@@ -91,8 +150,16 @@ def cargo_runs_in(command, directory, shell_words, heavy_tests):
                 resolved = shell_words.resolve_path(where, manifest)
                 where = os.path.dirname(resolved) if resolved else None
                 break
-        runs.append((cargo.subcommand, where, found.environment.get(HOLDER_VARIABLE, "")))
-    return runs
+        invocations.append(CargoInvocation(cargo.subcommand, where, dict(found.environment), list(cargo.rest), list(cargo.configuration_values),
+                                           dict(found.variables or {}), own_build_directory))
+    return invocations
+
+
+def cargo_runs_in(command, directory, shell_words, heavy_tests):
+    """命令文本里命令位置上起的、要认合入锁的每一条 cargo：→ [(cargo 的子命令, 起它的目录或 None, 命令前后写的 HOLDER 变量或 "")]。"""
+    return [(run.subcommand, run.directory, run.environment.get(HOLDER_VARIABLE, ""))
+            for run in cargo_invocations(command, directory, shell_words, heavy_tests)
+            if run.subcommand not in NON_BUILDING_SUBCOMMANDS or switch_is_set("not-build-too")]
 
 
 def work_tree_root(directory):
@@ -162,6 +229,117 @@ def workspace_cargo_lock_refusal(command, directory, shell_words, heavy_tests, l
             continue
         return refusal_text(f"cargo {subcommand}", tree, path, record, lock), []
     return None, []
+
+
+# ── 编译目录（文件头「编译目录」一段） ──
+def inside(path, root):
+    path, root = os.path.realpath(path), os.path.realpath(root)
+    return path == root or path.startswith(root + os.sep)
+
+
+def written_directory(text, invocation, shell_words, from_command):
+    """命令里写的一个目录（命令前的赋值、--target-dir 的值）→ 绝对路径；带算不出的变量、命令替换的交 None。相对路径照 cargo 按它起的目录解。
+    from_command：值照写的样子（要展开 ~ 与变量）；钩子环境里读到的是已展开的值。"""
+    value = shell_words.assigned_value(text, invocation.variables) if from_command else text
+    if value is None or invocation.directory is None:
+        return None
+    return shell_words.resolve_path(invocation.directory, value)
+
+
+def explicit_target_directory(invocation, shell_words, hook_environment):
+    """这条 cargo 显式给的编译目录：→ (从哪来, 绝对路径或 None)；路径 None 是写了而此刻算不出。哪儿都没给交 (None, None)。
+    次序照 cargo：--target-dir，CARGO_TARGET_DIR，CARGO_BUILD_TARGET_DIR，--config build.target-dir=…；变量先看命令文本里设的，再看钩子自己的环境。
+    弄坏开关 outside-target-not-recognized 下一律交 (None, None)。"""
+    if switch_is_set("outside-target-not-recognized"):
+        return None, None
+    rest = invocation.rest[: invocation.rest.index("--")] if "--" in invocation.rest else invocation.rest
+    for index, argument in enumerate(rest):
+        value = argument[len("--target-dir="):] if argument.startswith("--target-dir=") else (
+            rest[index + 1] if argument == "--target-dir" and index + 1 < len(rest) else None)
+        if value is not None:
+            return "--target-dir", written_directory(value, invocation, shell_words, True)
+    for name in TARGET_DIRECTORY_VARIABLES:
+        if invocation.environment.get(name):
+            return f"命令里的 {name}", written_directory(invocation.environment[name], invocation, shell_words, True)
+        if hook_environment.get(name):
+            return f"会话环境里的 {name}", written_directory(hook_environment[name], invocation, shell_words, False)
+    for value in invocation.configuration_values:
+        key, separator, assigned = value.partition("=")
+        if separator and key.strip() == "build.target-dir":
+            return "--config build.target-dir", written_directory(assigned.strip().strip("\"'"), invocation, shell_words, True)
+    return None, None
+
+
+def configured_target_directory(directory, hook_environment):
+    """cargo 配置文件里的 build.target-dir（从起它的目录往上每一层的 .cargo/config.toml、.cargo/config，再 $CARGO_HOME/config.toml）：
+    → (从哪来, 绝对路径) 或 (None, None)。相对路径照 cargo 按那个 .cargo 目录的上一层解。读不出的文件跳过。"""
+    candidates, current = [], os.path.realpath(directory)
+    while True:
+        candidates += [(current, os.path.join(current, ".cargo", name)) for name in ("config.toml", "config")]
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    cargo_home = hook_environment.get("CARGO_HOME") or os.path.join(os.path.expanduser("~"), ".cargo")
+    candidates += [(os.path.dirname(cargo_home), os.path.join(cargo_home, name)) for name in ("config.toml", "config")]
+    for base, path in candidates:
+        try:
+            with open(path, "rb") as handle:
+                configured = tomllib.load(handle).get("build", {}).get("target-dir")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if isinstance(configured, str) and configured:
+            return f"配置文件 {path} 的 build.target-dir", os.path.normpath(os.path.join(base, configured))
+    return None, None
+
+
+def wrapped_suggestion(command, main):
+    """拒绝说明里能照抄的那一条：第一个像命令词的 cargo 之前插 `bash <主仓>/scripts/hosts/run-build-directory.sh `；找不到交 None。"""
+    found = FIRST_CARGO_WORD.search(command)
+    if not found:
+        return None
+    return command[: found.start()] + f"bash {os.path.join(main, RUN_BUILD_DIRECTORY_SCRIPT)} " + command[found.start():]
+
+
+def workspace_cargo_target_refusal(command, directory, shell_words, heavy_tests, main_root, hook_environment=None):
+    """主仓（main_root 所在那棵主工作树）里起、编译目录会落进主仓的 cargo（会编的子命令）：→ (拒绝说明 或 None, notices)。
+    放行：不编的子命令；起它的目录不在主仓这棵工作树里（仓副本、git worktree 加出来的树、目录认不出）；显式给的编译目录在仓外；
+    包在 run-build-directory.sh 里而没有显式给编译目录；配置文件给的 build.target-dir 在仓外。编译目录写了而此刻算不出的不拒，交一句 notice。
+    弄坏开关 bare-cargo-allowed 下一律放行；non-building-refused 下不编的子命令也判。"""
+    hook_environment = os.environ if hook_environment is None else hook_environment
+    if switch_is_set("bare-cargo-allowed"):
+        return None, []
+    main = os.path.realpath(main_root)
+    refused, notices = [], []
+    for run in cargo_invocations(command, directory, shell_words, heavy_tests):
+        if run.subcommand not in BUILDING_SUBCOMMANDS and not switch_is_set("non-building-refused"):
+            continue
+        if run.directory is None or work_tree_root(run.directory) != main:
+            continue
+        source, target = explicit_target_directory(run, shell_words, hook_environment)
+        if source is None and run.own_build_directory:
+            continue
+        if source is None:
+            source, target = configured_target_directory(run.directory, hook_environment)
+        if source is not None and target is None:
+            notices.append(f"cargo {run.subcommand} 的编译目录写在{source}里、此刻算不出落在哪，没判它会不会编进 {main} 里")
+            continue
+        if target is not None and not inside(target, main):
+            continue
+        reason = f"{source}指到仓里的 {target}" if source else f"没给编译目录（--target-dir、CARGO_TARGET_DIR 都没有），默认编进 {main}/target"
+        refused.append(f"cargo {run.subcommand}（{reason}）")
+    if not refused:
+        return None, notices
+    suggestion = wrapped_suggestion(command, main)
+    lines = [f"✗ 主工作区里直接起的 cargo 会编进主仓 {main} 里：{refused[0]}"] + [f"  另有：{entry}" for entry in refused[1:]]
+    lines += ["  （用户定案「所有脚本自行编译，完成后自行删除 不再预留生成物」：编译目录用完就删，主工作区的 target/ 删了又长的那条路由这一道堵上）",
+              f"→ 怎么办：经 bash {RUN_BUILD_DIRECTORY_SCRIPT} 包一层起，它给这一次一个自己的编译目录、跑完删（正常退、出错、被 TERM 都删）："]
+    if suggestion:
+        lines.append(f"    {suggestion}")
+    lines += ["  范围声明（SINGLEFS_RUN_SCOPE）照旧写在最前面，run-with-memory-cap.sh、capped.sh、nice、timeout、env 照旧写在它外面；",
+              "  或给 CARGO_TARGET_DIR 一个仓外、自己用完删的目录（例 CARGO_TARGET_DIR=<草稿目录>/target），交回或收工之前删掉；",
+              "  不编的子命令（fmt、metadata、tree、clean）不拦，入口脚本自己起的 cargo 不经这一道；判法在 .claude/hooks/lib_workspace_cargo_lock.py 文件头「编译目录」一段。"]
+    return "\n".join(lines), notices
 
 
 # ── 自证 ──
@@ -280,6 +458,70 @@ def selftest():
         with open(linked_lock, "w", encoding="utf-8") as handle:
             handle.write(f"pid={holder.pid}\nstart={start}\nsession=别的会话\ncommand=假合入 merge-and-verify\nsince={time.time()}\n")
         cell("git worktree 加出来的树自己的锁被占着：拒", "cargo build", linked, True, extra=names_holder)
+
+        # 编译目录（文件头「编译目录」一段）：主仓是 main（临时 git 仓），钩子环境只给一个空的 CARGO_HOME（不看本会话与本机用户真有的配置）
+        crates = os.path.join(main, "crates")
+        os.makedirs(os.path.join(crates, "singlefs-harness"), exist_ok=True)
+        outside = os.path.join(work, "outside-target")
+        isolated = {"CARGO_HOME": os.path.join(work, "cargo-home")}
+        configured_outside = os.path.join(main, "configured-outside")
+        configured_inside = os.path.join(main, "configured-inside")
+        for configured, written in ((configured_outside, os.path.join(work, "configured-target")), (configured_inside, "own-target")):
+            os.makedirs(os.path.join(configured, ".cargo"))
+            with open(os.path.join(configured, ".cargo", "config.toml"), "w", encoding="utf-8") as handle:
+                handle.write(f'[build]\ntarget-dir = "{written}"\n')
+        wrapper = os.path.join(os.path.realpath(main), RUN_BUILD_DIRECTORY_SCRIPT)
+
+        def target_cell(name, command, directory, want_refused, hook_environment=None, extra=None, want_notice=False):
+            nonlocal checked
+            checked += 1
+            try:
+                message, notices = workspace_cargo_target_refusal(command, directory, shell_words, heavy_tests, main, dict(isolated, **(hook_environment or {})))
+            except Exception as error:
+                failures.append(f"{name}：判的那一刻抛 {error!r}")
+                return
+            if bool(message) != want_refused or bool(notices) != want_notice:
+                failures.append(f"{name}：命令 {command!r}（目录 {directory}）应当{'拒' if want_refused else '放行'}{'、记一条 notice' if want_notice else ''}，"
+                                f"实际 {'拒' if message else '放行'}，notices {notices}，说明 {(message or '')[:300]!r}")
+            elif message and extra and not extra(message):
+                failures.append(f"{name}：拒了，但说明不合要求：{message!r}")
+
+        target_cell("编译目录：裸 cargo test：拒", "cargo test -p singlefs-harness --lib", main, True)
+        target_cell("编译目录：cd 进 crates/ 之后的 cargo build：拒", f"cd {crates} && cargo build", work, True)
+        target_cell("编译目录：cd 进 crates/ 的子目录（相对路径）之后的 cargo check：拒", "cd crates/singlefs-harness && cargo check", main, True)
+        target_cell("编译目录：经内存包装起：拒", "bash scripts/hosts/run-with-memory-cap.sh 12G cargo test -p singlefs-harness --lib", main, True)
+        target_cell("编译目录：capped.sh、nice、timeout、env 包着：拒", "timeout 200 nice -n 19 env A=1 bash scripts/hosts/capped.sh 31 cargo clippy --all-targets", main, True)
+        target_cell("编译目录：bash -c 里起：拒", "bash -c 'cd crates && cargo build --release'", main, True)
+        target_cell("编译目录：/usr/bin/time 包着 bash -c 起：拒", "/usr/bin/time -v bash -c 'cargo doc --no-deps'", main, True)
+        target_cell("编译目录：CARGO_TARGET_DIR 指到仓里：拒", f"CARGO_TARGET_DIR={main}/target-mine cargo build", main, True)
+        target_cell("编译目录：--target-dir 指到仓里的相对路径：拒", "cargo build --target-dir target/mine", main, True)
+        target_cell("编译目录：仓里的配置文件给的 build.target-dir 在仓里：拒", "cargo build", configured_inside, True)
+        target_cell("编译目录：包装脚本外面又给了仓里的 CARGO_TARGET_DIR：拒", f"CARGO_TARGET_DIR={main}/target bash scripts/hosts/run-build-directory.sh cargo build", main, True)
+        target_cell("编译目录：拒绝说明给出包一层的写法与出路", "SINGLEFS_RUN_SCOPE='x' bash scripts/hosts/run-with-memory-cap.sh 12G cargo test -p singlefs-harness --lib", main, True,
+                    extra=lambda message: f"bash scripts/hosts/run-with-memory-cap.sh 12G bash {wrapper} cargo test -p singlefs-harness --lib" in message
+                    and "→ 怎么办" in message and "CARGO_TARGET_DIR" in message and "默认编进" in message)
+        target_cell("编译目录：带仓外 CARGO_TARGET_DIR：放行", f"CARGO_TARGET_DIR={outside} cargo build", main, False)
+        target_cell("编译目录：先赋变量再拼仓外 CARGO_TARGET_DIR：放行", f"D={work}; CARGO_TARGET_DIR=$D/outside-target cargo test -p singlefs-harness --lib", main, False)
+        target_cell("编译目录：export 了仓外 CARGO_TARGET_DIR 再起：放行", f"export CARGO_TARGET_DIR={outside}; cargo test", main, False)
+        target_cell("编译目录：经内存包装、env 给仓外 CARGO_TARGET_DIR：放行", f"bash scripts/hosts/run-with-memory-cap.sh 12G env CARGO_TARGET_DIR={outside} cargo test", main, False)
+        target_cell("编译目录：会话环境里有仓外 CARGO_TARGET_DIR：放行", "cargo build", main, False, hook_environment={"CARGO_TARGET_DIR": outside})
+        target_cell("编译目录：--target-dir 指到仓外：放行", f"cargo build --target-dir={outside}", main, False)
+        target_cell("编译目录：--config build.target-dir 指到仓外：放行", f"cargo build --config 'build.target-dir=\"{outside}\"'", main, False)
+        target_cell("编译目录：仓里的配置文件给的 build.target-dir 在仓外：放行", "cargo build", configured_outside, False)
+        target_cell("编译目录：cargo fmt：放行", "cargo fmt --all", main, False)
+        target_cell("编译目录：cargo metadata、cargo tree、cargo clean：放行", "cargo metadata --format-version 1; cargo tree; cargo clean", main, False)
+        target_cell("编译目录：经包装脚本起：放行", "bash scripts/hosts/run-build-directory.sh cargo test -p singlefs-harness --lib", main, False)
+        target_cell("编译目录：内存包装里套包装脚本起：放行", "bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/run-build-directory.sh cargo test", main, False)
+        target_cell("编译目录：包装脚本里 bash -c 再 cd 进 crates/ 起：放行", "bash scripts/hosts/run-build-directory.sh bash -c 'cd crates && cargo build'", main, False)
+        target_cell("编译目录：照拒绝说明照抄的那一条：放行", f"bash scripts/hosts/run-with-memory-cap.sh 12G bash {wrapper} cargo test -p singlefs-harness --lib", main, False)
+        target_cell("编译目录：仓副本（不在 git 仓里）里起：放行", "cargo build", plain_copy, False)
+        target_cell("编译目录：git worktree 加出来的树里起：放行", "cargo build", linked, False)
+        target_cell("编译目录：CARGO_TARGET_DIR 写在算不出的变量里：放行并记一条", "CARGO_TARGET_DIR=$SOMEWHERE/target cargo build", main, False, want_notice=True)
+        target_cell("编译目录：命令里只是提到 cargo 的字：放行", "echo cargo build; grep -n cargo Cargo.toml", main, False)
+        # 只定义、调不到的 function 与判重型那一处同一个口径（三方 shell-words-r2 判决第二节第 2、8 条；uncalled-functions-judged 下第一格红，
+        # lib_shell_words.py 的 function-calls-literal-only 下第二格红）
+        target_cell("编译目录：只定义、调不到的 function 函数体：放行", "function noop { cargo build; }", main, False)
+        target_cell("编译目录：function 定义之后拆开拼写调用：拒", 'function noop { cargo build; }; "no"op', main, True)
     finally:
         if holder is not None:
             holder.kill()
@@ -293,11 +535,14 @@ def selftest():
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
-        print(f"  → 看 workspace_cargo_lock_refusal / cargo_runs_in / work_tree_root；{BREAK_VARIABLE} 设着的话这里本来就该红（项与红的格见文件头）")
+        print(f"  → 看 workspace_cargo_lock_refusal / workspace_cargo_target_refusal / cargo_invocations / explicit_target_directory / configured_target_directory / work_tree_root"
+              f"（剥包装在 lib_heavy_tests.py 的 command_under_launcher）；{BREAK_VARIABLE} 设着的话这里本来就该红（项与红的格见文件头）")
         return 1
     print(f"  ✓ lib_workspace_cargo_lock 自检通过（查了 {checked} 格）：主工作区里起 cargo 锁被别的活进程占着拒绝并写出谁占着与下一步（cd、-C、--manifest-path、内存包装、bash -c 都认），"
           "持锁者自己（HOLDER 变量）放行，锁空着、持有者已死、不在 git 仓里的仓副本、只查版本的子命令放行，默认位置的锁文件认得，"
-          "git worktree 加出来的树只认它自己那一把（主工作树的被占着放行、它自己的被占着拒）")
+          "git worktree 加出来的树只认它自己那一把（主工作树的被占着放行、它自己的被占着拒）；"
+          "编译目录：主仓里直接起的会编的 cargo（裸起、cd 进 crates/、经内存包装、capped.sh、nice、timeout、env、bash -c、/usr/bin/time 包着，CARGO_TARGET_DIR、--target-dir、配置文件指到仓里）拒绝并给出包一层的写法，"
+          "仓外的 CARGO_TARGET_DIR（命令前、export、env、会话环境）、--target-dir、--config、配置文件，run-build-directory.sh 包着的（连同内存包装里套它、它里面 bash -c），不编的子命令，仓副本与 git worktree 加出来的树放行，算不出的放行并记一条")
     return 0
 
 

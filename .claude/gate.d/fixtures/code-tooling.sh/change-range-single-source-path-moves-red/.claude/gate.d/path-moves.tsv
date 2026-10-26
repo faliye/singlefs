@@ -1,0 +1,6 @@
+# 样本：不在 git 仓里，判不了哪几行此刻生效，只核写法与出处——日期不是 YYYY-MM-DD、只有三列、出处不在各一行；前两行写法对，旧前缀还在磁盘上、新前缀不在磁盘上都不核
+scripts/old-rig	scripts/new-rig	2026-10-01	records/样本搬迁.md
+scripts/gone-rig	scripts/missing-rig	2026-10-01	records/样本搬迁.md
+scripts/a-rig	scripts/new-rig	十月一日	records/样本搬迁.md
+scripts/b-rig	scripts/new-rig	2026-10-01
+scripts/c-rig	scripts/new-rig	2026-10-01	records/没有这一份.md

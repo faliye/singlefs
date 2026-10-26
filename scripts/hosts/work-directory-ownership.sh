@@ -34,6 +34,7 @@
 #   skip-log           删之前不写日志：自证「sweep:删前日志逐项带 du -sh 的大小」「sweep:日志里删前那一行排在删了那一行之前」两格红
 #   ignore-open-files  不看 /proc，有进程开着文件的也删：自证「sweep:有进程开着文件的目录不删、列出进程号」红
 #   dry-run-deletes    --dry-run 照真删：自证「sweep --dry-run:一项不删、不写日志、列出会删的」红
+# 开关仅在 --selftest 与它建的临时标记所标识的子进程里生效；普通运行设了开关直接拒绝。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -351,6 +352,8 @@ selftest() {
   fi
   root="$SELFTEST_SCRATCH/work"
   mkdir -p "$root"
+  export WORK_DIRECTORY_OWNERSHIP_SELFTEST_MARK="$SELFTEST_SCRATCH/selftest-mark"
+  printf '%s\n' work-directory-ownership-selftest > "$WORK_DIRECTORY_OWNERSHIP_SELFTEST_MARK"
   as_session() {
     local session="$1"
     shift
@@ -426,6 +429,13 @@ selftest() {
   echo "  ✓ 工作目录归属自证通过（查了 ${#cells[@]} 格）：claim 写三行、取不到会话号与别的会话的目录拒绝；sweep 只删本会话没人在用的，别的会话的、没有归属文件的、有进程开着文件的留着并列出，删前日志逐项带大小，--dry-run 不删"
 }
 
+if [[ -n "${WORK_DIRECTORY_OWNERSHIP_BREAK:-}" && "${1:-}" != --selftest ]]; then
+  if [[ -z "${WORK_DIRECTORY_OWNERSHIP_SELFTEST_MARK:-}" ]] \
+      || [[ "$(cat -- "$WORK_DIRECTORY_OWNERSHIP_SELFTEST_MARK" 2>/dev/null)" != work-directory-ownership-selftest ]]; then
+    refuse "WORK_DIRECTORY_OWNERSHIP_BREAK 只在 --selftest 里认，这一次什么都没做" \
+      "unset WORK_DIRECTORY_OWNERSHIP_BREAK 后再跑"
+  fi
+fi
 check_break_items
 case "${1:-}" in
   claim) shift; claim "$@" ;;

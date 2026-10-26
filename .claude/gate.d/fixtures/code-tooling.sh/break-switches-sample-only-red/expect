@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switches-sample-only
+want=.claude/gate.d/unguarded.sh 读了 SAMPLE_STAGE_BREAK 这类弄坏开关，不经 stage_cells_run 跑格、也没调 stage_cells_refuse_unsampled_break_switches
+want=.claude/gate.d/lib/stage-cells.sh 的 stage_cells_run 里没调 stage_cells_refuse_unsampled_break_switches
+want=弄坏开关只在样本根上认：2 处没经共用库那一判（读开关的阶段 1 道）
+want=break-switches-sample-only：红（退出 1）

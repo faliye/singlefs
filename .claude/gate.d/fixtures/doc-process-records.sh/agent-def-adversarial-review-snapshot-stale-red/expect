@@ -1,0 +1,7 @@
+exit=1
+want=改过的定义与共用约束里 1 个在判决之后又改过
+want=      .claude/agents/demo.md（demo-r1-main-verification.md 那一轮的 research/prompts/demo-r1-snapshot/sha256sums.txt 记的 b784b667231a…，此刻是 40093c143239…）
+want=判决之后又改过：再开一轮
+want=或照 .claude/agent-def-review-exempt 按内容哈希登记豁免
+want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（agent-def-adversarial-review）

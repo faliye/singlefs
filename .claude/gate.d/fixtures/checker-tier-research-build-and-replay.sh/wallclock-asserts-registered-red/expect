@@ -1,5 +1,5 @@
 exit=1
-want=scripts/experiments/timed_bench.rs:11（busy_work_finishes_within_a_millisecond）：有按挂钟判的断言，没有登记位
+want=scripts/experiment-apparatus/timed_bench.rs:11（busy_work_finishes_within_a_millisecond）：有按挂钟判的断言，没有登记位
 want=挂钟断言的登记位有 1 处不对
 want=// wallclock-assert: <量的是什么，至少 8 个字>
 want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）

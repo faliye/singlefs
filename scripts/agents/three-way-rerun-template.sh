@@ -19,6 +19,7 @@
 # 弄坏开关（只给 --selftest 证红用）：
 #   RERUN_TEMPLATE_BREAK=root-from-self-path  仓根改回从本脚本路径往上推四层（旧 rerun.sh 的写法），--repo 不认
 #       「✗ 自检：拷进与仓无关的临时目录、传参应当跑通」那一格红
+#       连带红的格：「✗ 自检：--work 指到已有输出的目录应当退 2、不在旧输出上接着写」
 set -euo pipefail
 
 refuse() {   # refuse <卡在哪>：打出卡在哪、出路与用法，退 2

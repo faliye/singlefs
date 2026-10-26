@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-omission
+want=三语译文与中文的内容量对不上：过短 1 处、过长 0 处、配不上 2 处（段数不同的节与编号行），在 1 份译文里
+want=按文件：README.en.md  3 处
+want=README.en.md:15  英语，内容量比 0.41（不到 0.42，过短）：中文那一份 README.md:17 量 54、这一份 22
+want=README.en.md:5  英语，这一节段数与中文不同：中文那一份 README.md:5 起这一节 3 段，这一份 2 段
+want=README.md:25  英语那一份 README.en.md 没有首列编号 C12 的表格行（第 1 个）
+want=照中文那一份点名的那一段整段译
+want=doc-text.sh：1 格里 1 格红（trilingual-omission）

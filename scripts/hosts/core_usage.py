@@ -24,6 +24,7 @@
 取样（tree_sample）：从给的进程号往下的整棵进程树，读 /proc/<pid>/stat。
   在用的 CPU 秒数 = 树里每个活着的进程的 utime + stime + cutime + cstime（cutime、cstime 是它收过尸的子进程，连同它们收过尸的子进程，所以中途退出的子进程照算）。
   每条线程（/proc/<pid>/task/<tid>/stat，键「进程号/线程号/起始时刻」）的 utime + stime 另记一份，用来算「同时在算的线程」。
+  同一遍另数树里每条线程此刻的状态（那一行第三列）：状态 D（不可打断的睡眠，在等盘）几条记 disk_waiting_threads，状态 R（在跑或排队等核）几条记 computing_threads。
   命令行里有 multi-host-run.sh、后面（-- 之前）带 --peer 的进程连同它的整棵子树不算进来，只数有几个（peer_drivers）：
   那一支在等第二台，第二台用几个核由 multi-host-run.sh 自己报。
 判（judge_series）：样本序列前面补一个「起跑时刻、0 CPU 秒」的样本（树根进程的起始时刻）。
@@ -40,6 +41,9 @@
     依据（推的，没量过）：登记要求每件重活用这么多条线程，并行对了的阶段在用核数贴着它；串行的装置是 1 左右。四分之一离两头都远：
     编译收尾、写盘这类在 10 分钟里短暂掉到几个核的，平均下来过得去；只起了一两条、三五条线程的都报。
   在用核数与同时在算的线程都低于阈值，判「核数过少」；树里有 multi-host-run.sh --peer 那一支的，判「在等第二台」、不报。
+  等盘（用户 2026-10-26 定「等盘标出来、不判过少」）：判成核数过少的那一窗口，把窗口里（基准之后、到这一次为止）带线程状态的各次样本的
+    disk_waiting_threads、computing_threads 各自加起来，在等盘的线程次数多于在算的，改判「等盘」：打一行标出取样次数与两个数、不打 ✗、不写告警记录、judge 退 0。
+    按采样判、逐窗口判：下一窗口在算的占多数就照报核数过少；窗口里一次带线程状态的样本都没有（旧样本、别的写法造的样本）照旧判。没有参数能关掉这一判、也没有参数能扩大它。
   窗口 600 秒（10 分钟：与 .claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」的 5 分钟进度间隔对上，两次进度之内就看得出来）。
     SINGLEFS_CORE_USAGE_WINDOW_SECONDS 只许往短里改（正整数，不超过 600），给的比 600 长照 600 判、打一句说明：不许一个参数把整趟静音。
     阈值没有参数可改。
@@ -58,6 +62,7 @@
   机器忙、而活又是一批批短命的线程或子进程（两次取样之间生了又死）时，「同时在算的线程」数不准，可能误报；判的那一行带着两个数，由主 agent 看。
   树里同时有 multi-host-run.sh --peer 那一支与本机自己的活时，整棵判成「在等第二台」，本机那一半不判。
   脱离进程树跑的（重新挂到 init 或别的 subreaper 底下的孙进程）数不到。
+  线程状态只在取样那一刻看：两次取样之间进出状态 D 的数不到；状态 D 不分等的是盘还是别的不可打断的事（NFS、内核锁这类也算进等盘）。
 弄坏开关 CORE_USAGE_BREAK=<项>（逗号分隔；只在 --selftest 里认：自证进程自己，与它起的、环境里 CORE_USAGE_SELFTEST_MARK 指着自证临时目录里那份标记的子进程；
   别处设了，直接执行的各个用法拒、退 2）。项名、弄坏哪一处、打开后自证哪几格红（「✗ core_usage.py 自证：<格名>」）：
   descendants-ignored          取样只算树根自己              子进程里忙等的也算进来；multi-host-run.sh --peer 那一支不算、判成在等第二台（往下找不到那一支）
@@ -72,6 +77,7 @@
   alert-record-skipped         判成核数过少也不写告警记录       一条线程忙等：judge 退 3、打 ✗ 与出路、写告警记录（带会话号）
   negative-cores-allowed       合计 CPU 秒数掉下去时照旧相减，不取还在树里的线程的增量当下限   进程离开树、合计掉了的：在用核数不为负、不低于还在树里的线程的用量
                                （造的样本序列「窗口里有进程离开了这棵树」与真进程「孙进程被孤立」两格红）
+  disk-wait-uncounted          判的时候不数状态 D 的线程（改前的样子）   等盘：窗口里在等盘的线程次数多于在算的，标等盘、不判核数过少
 """
 import hashlib
 import importlib.util
@@ -101,6 +107,8 @@ REASON_MINIMUM_CHARACTERS = 8
 SERIAL_MARK = "此刻串行："
 PARALLEL_MARK = "此刻并行"
 PEER_DRIVER_NAME = "multi-host-run.sh"
+DISK_WAIT_STATE = "D"   # /proc/<pid>/task/<tid>/stat 第三列：不可打断的睡眠，在等盘（文件头「取样」「判」的「等盘」）
+COMPUTING_STATE = "R"   # 在跑或排着队等核
 SESSION_VARIABLE = "CLAUDE_CODE_SESSION_ID"
 BREAK_VARIABLE = "CORE_USAGE_BREAK"
 SELFTEST_MARK_VARIABLE = "CORE_USAGE_SELFTEST_MARK"
@@ -199,8 +207,8 @@ def is_peer_driver(arguments):
     return False
 
 
-def thread_times(pid, hertz):
-    """{「进程号/线程号/起始时刻」: CPU 秒数}，只记用过 CPU 的线程。"""
+def thread_times(pid, hertz, states=None):
+    """{「进程号/线程号/起始时刻」: CPU 秒数}，只记用过 CPU 的线程；给了 states（dict）就把每条线程此刻的状态字母计数进去（没用过 CPU 的也数）。"""
     found = {}
     try:
         tasks = os.listdir(f"/proc/{pid}/task")
@@ -214,6 +222,8 @@ def thread_times(pid, hertz):
             ticks = int(fields[11]) + int(fields[12])
             if ticks > 0:
                 found[f"{pid}/{task}/{fields[19]}"] = round(ticks / hertz, 2)
+            if states is not None:
+                states[fields[0]] = states.get(fields[0], 0) + 1
         except (OSError, IndexError, ValueError):
             continue
     return found
@@ -241,13 +251,15 @@ def tree_sample(root_pid, table=None):
         frontier.extend(children.get(pid, []))
     ticks = 0
     per_thread = {}
+    thread_states = {}
     for pid in included:
         info = table[pid]
         ticks += info["own_ticks"] + (0 if broken("reaped-ignored") else info["reaped_ticks"])
-        per_thread.update(thread_times(pid, hertz))
+        per_thread.update(thread_times(pid, hertz, thread_states))
     return {"root": root_pid, "time": round(time.time(), 3), "started": round(boot_time() + root["start_ticks"] / hertz, 2),
             "cpu": round(ticks / hertz, 2), "processes": len(included), "threads": len(per_thread), "peer_drivers": len(peer_drivers),
-            "thread_cpu": per_thread}
+            "thread_cpu": per_thread, "disk_waiting_threads": thread_states.get(DISK_WAIT_STATE, 0),
+            "computing_threads": thread_states.get(COMPUTING_STATE, 0)}
 
 
 def gone_sample(root_pid):
@@ -335,11 +347,12 @@ def overlap(intervals, start, end):
 
 
 def judge_series(samples, entries, problems, registered, window):
-    """判一次（判法在文件头「判」）：返回一个 dict，status 是 ok、low、warming、waiting-peer、gone 之一。"""
+    """判一次（判法在文件头「判」）：返回一个 dict，status 是 ok、low、disk-wait、warming、waiting-peer、gone 之一。"""
     current = samples[-1]
     threshold = registered / SHARE_DIVISOR
     verdict = {"status": "gone", "registered": registered, "threshold": threshold, "window": window, "problems": problems,
-               "cores": 0.0, "dropped_cpu": 0.0, "parallel": 0.0, "span": 0.0, "declared_in_window": 0.0, "reasons": [], "declared_fraction": 0.0}
+               "cores": 0.0, "dropped_cpu": 0.0, "parallel": 0.0, "span": 0.0, "declared_in_window": 0.0, "reasons": [], "declared_fraction": 0.0,
+               "state_samples": 0, "disk_waiting": 0, "computing": 0}
     if current.get("gone"):
         return verdict
     same_root = [sample for sample in samples[:-1] if not sample.get("gone") and sample.get("root") == current["root"]
@@ -375,6 +388,15 @@ def judge_series(samples, entries, problems, registered, window):
         if low and declared > 0 and broken("declaration-silences"):
             low = False
         verdict["status"] = "low" if low else "ok"
+        # 等盘（文件头「判」）：这一窗口里各次取样数到的状态 D 的线程次数多于状态 R 的，在用核数低是在等盘，标等盘、不判核数过少。
+        #   按取样判：只数这一窗口里带线程状态的样本（基准之后、到这一次为止），一次都没有就照旧判。弄坏开关 disk-wait-uncounted 下不数
+        window_samples = [sample for sample in same_root + [current]
+                          if base["time"] < sample["time"] <= current["time"] and "disk_waiting_threads" in sample]
+        disk_waiting = sum(int(sample.get("disk_waiting_threads", 0)) for sample in window_samples)
+        computing = sum(int(sample.get("computing_threads", 0)) for sample in window_samples)
+        verdict.update(state_samples=len(window_samples), disk_waiting=disk_waiting, computing=computing)
+        if low and window_samples and disk_waiting > computing and not broken("disk-wait-uncounted"):
+            verdict["status"] = "disk-wait"
     return verdict
 
 
@@ -389,6 +411,10 @@ def verdict_lines(verdict, subject, next_step=DEFAULT_NEXT_STEP):
         return [f"  · {head}：这一棵在等第二台（multi-host-run.sh --peer 那一支不算进来，第二台用几个核由它自己报），不判"]
     if status == "warming":
         return [f"  · {head}：只看了 {verdict['span']:.0f} 秒，不满一个窗口（{verdict['window']} 秒），还不判"]
+    if status == "disk-wait":
+        return [f"  · {head}：最近 {verdict['span']:.0f} 秒平均、同时在算的线程约 {verdict['parallel']:.1f} 条，低于阈值 {threshold:g}；"
+                f"这一窗口 {verdict['state_samples']} 次取样里在等盘（状态 D）的线程合计 {verdict['disk_waiting']} 次、在算（状态 R）的 {verdict['computing']} 次，"
+                f"等盘的占多数：标等盘，不判核数过少{dropped_note(verdict)}"]
     if status == "ok":
         return [f"  · {head}：最近 {verdict['span']:.0f} 秒平均，同时在算的线程约 {verdict['parallel']:.1f} 条，阈值 {threshold:g}，不报{dropped_note(verdict)}"]
     return [f"  ✗ {head}：最近 {verdict['span']:.0f} 秒平均、同时在算的线程约 {verdict['parallel']:.1f} 条，都低于阈值 {threshold:g}（登记的四分之一）"
@@ -557,7 +583,8 @@ def command_judge(arguments):
             raise OSError(f"读不到 {WORK_ROOT_LIBRARY}，不知道工作根在哪")
         append_line(path, json.dumps(record, ensure_ascii=False, separators=(",", ":")))
     except OSError as error:
-        print(f"  ! 告警记录写不进（{error}）：看门狗读不到这一条，靠上面这一行 ✗ 叫人看；设 {ALERTS_VARIABLE} 指到可写的文件")
+        print(f"  ! 告警记录写不进（{error}）：看门狗读不到这一条，靠上面那一行红行叫人看")
+        print(f"     → 怎么办：设 {ALERTS_VARIABLE} 指到可写的文件")
     return 3
 
 
@@ -662,11 +689,16 @@ def selftest():
 
     def stop_tree(process):
         """只停这份自证自己起的那个进程与它底下的（逐个按进程号，从最底层起）。"""
-        for pid in reversed(descendants(process.pid)):
+        def stop_one_then_the_rest(pids):
+            # 进程号都是从这份自证自己起的树根列出的后代；每一层只发一个信号，不在循环里批量发
+            if not pids:
+                return
             try:
-                os.kill(pid, 9)
+                os.kill(pids[0], 9)
             except OSError:
                 pass
+            stop_one_then_the_rest(pids[1:])
+        stop_one_then_the_rest(list(reversed(descendants(process.pid))))
         if process.poll() is None:
             process.kill()
         process.wait()
@@ -736,6 +768,9 @@ def selftest():
         cell("子进程里忙等的也算进来",
              sample is not None and child_pids and child_cpu > 0 and sample["cpu"] >= child_cpu * 0.9,
              f"树根 bash {child_tree.pid} 的样本 {sample and sample['cpu']} 秒，子进程 {child_pids} 自己 {child_cpu:.2f} 秒")
+        cell("取样数线程状态：子进程一条线程忙等的那棵树，样本里在算（状态 R）的线程至少 1 条、带在等盘（状态 D）的线程数",
+             sample is not None and sample.get("computing_threads", 0) >= 1 and isinstance(sample.get("disk_waiting_threads"), int),
+             f"样本里 computing_threads={sample and sample.get('computing_threads')}、disk_waiting_threads={sample and sample.get('disk_waiting_threads')}")
         # 子进程忙 1 秒退出、bash 收过尸：等 bash 底下只剩 sleep 再取
         reaped_tree = start(["bash", "-c", f'"$0" {script} busy-load 1 1; exec sleep 30', sys.executable])
         for _ in range(600):
@@ -804,6 +839,25 @@ def selftest():
              f"{WINDOW_VARIABLE}=3600 取到 {window} 秒（{note}），判成 {verdict['status']}")
         verdict = judge_series(synthetic(300.0, 1, 300.0), [], [], registered, 600)
         cell("不满一个窗口不判", verdict["status"] == "warming" and "还不判" in verdict_lines(verdict, "本机")[0], f"判成 {verdict['status']}")
+
+        # 等盘（造的样本序列）：一条线程算满整个窗口（1 核，低于阈值），窗口里三次取样各记状态 D 与状态 R 的线程几条
+        def state_series(disk_counts, computing_counts):
+            samples = []
+            for index, (disk, computing) in enumerate(zip(disk_counts, computing_counts), 1):
+                moment = origin + 200.0 * index
+                samples.append({"root": 1, "time": moment, "started": origin, "cpu": moment - origin, "peer_drivers": 0,
+                                "thread_cpu": {"1/1/0": moment - origin}, "disk_waiting_threads": disk, "computing_threads": computing})
+            return samples
+
+        verdict = judge_series(state_series([1, 1, 0], [0, 0, 1]), [], [], registered, 600)
+        line = verdict_lines(verdict, "本机")[0]
+        cell("等盘：窗口里在等盘的线程次数（2）多于在算的（1），标等盘、不判核数过少",
+             verdict["status"] == "disk-wait" and "标等盘" in line and "✗" not in line and "在等盘（状态 D）的线程合计 2 次、在算（状态 R）的 1 次" in line,
+             f"判成 {verdict['status']}，那一行：{line}")
+        verdict = judge_series(state_series([0, 1, 0], [1, 0, 1]), [], [], registered, 600)
+        line = verdict_lines(verdict, "本机")[0]
+        cell("等盘：窗口里在算的线程次数（2）多于在等盘的（1），照报核数过少",
+             verdict["status"] == "low" and line.startswith("  ✗") and "标等盘" not in line, f"判成 {verdict['status']}，那一行：{line}")
         # 窗口里有进程离开了这棵树（造的样本序列）：基准 1000 秒里 900 秒是一个子树里的，到这一次它不在了，合计掉到 130 秒；还在树里的线程这一窗口涨了 60 秒
         base_sample = {"root": 1, "time": origin + 100, "started": origin, "cpu": 1000.0, "peer_drivers": 0, "thread_cpu": {"1/1/0": 50.0, "2/2/0": 900.0}}
         dropped_sample = {"root": 1, "time": origin + 700, "started": origin, "cpu": 130.0, "peer_drivers": 0, "thread_cpu": {"1/1/0": 110.0}}
@@ -881,7 +935,8 @@ def selftest():
         print(f"     → 怎么办：设了 {BREAK_VARIABLE} 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看 scripts/hosts/core_usage.py")
         return 1
     print(f"  ✓ core_usage.py 自证 {len(cells)} 格都对（登记数那么多条线程忙等不报、一条线程忙等报并写告警记录、子进程与收过尸的子进程照算、"
-          "multi-host-run.sh --peer 那一支判成在等第二台、机器忙不误报、声明照报并标出理由与超过一半、理由太短不算、窗口不许调长、不满一个窗口不判、声明的用法、开关设在自证之外拒）")
+          "multi-host-run.sh --peer 那一支判成在等第二台、机器忙不误报、声明照报并标出理由与超过一半、理由太短不算、窗口不许调长、不满一个窗口不判、"
+          "取样数线程状态、窗口里等盘占多数标等盘而在算占多数照报、声明的用法、开关设在自证之外拒）")
     return 0
 
 

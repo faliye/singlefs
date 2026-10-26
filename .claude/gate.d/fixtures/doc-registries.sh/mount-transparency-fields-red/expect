@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mount-transparency-fields
+want=harness 字段表引的 D13 行「卸载记号」在 .claude/kb/decisions/13-样本验证路线.md 的逐字段表里没有
+want=逐字段表的「多出来的一行」那一行，harness 字段表一段都没引它
+want=harness 根记录字段表「fsid」4..20 与 .claude/kb/decisions/22-样本合成.md 已定项 7 根记录字段表 名字对不上：「fsid」对 kb「池号」
+want=挂载透明字段表的 kb 一侧对账有 3 处不对
+want=mount-transparency-fields：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（mount-transparency-fields）

@@ -1,0 +1,7 @@
+exit=1
+want=搬迁登记表 .claude/gate.d/path-moves.tsv 有 4 处不对（共 5 行）
+want=第 2 行的新前缀 tools/real-b 下有基准 HEAD 里本来就在的文件（tools/real-b/run.sh，共 1 份）：这一行不是一次搬迁
+want=第 3 行：基准 HEAD 里旧前缀 tools/real-a 下的 1 份，照这一行换前缀的落点上有 1 份此刻不在（tools/gone/run.sh）
+want=第 4 行与第 5 行串了（old 与 old/x 相同或一个在另一个下面）
+want=第 6 行：照这一行换前缀的落点上有 1 份没被 git 跟踪（被 .gitignore 忽略，或在 git 看不到的地方：build/rig/run.sh）
+want=→ 怎么办：

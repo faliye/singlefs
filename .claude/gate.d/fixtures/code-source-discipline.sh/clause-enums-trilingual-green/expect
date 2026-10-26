@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：clause-enums
+want=逐个对得上
+want=2 对成员
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=clause-enums：绿
+want=code-source-discipline.sh：1 格里 1 格绿（clause-enums），0 格本次未跑（无）

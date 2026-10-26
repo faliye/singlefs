@@ -1,0 +1,7 @@
+exit=1
+want=research/prompts/e991-r2-prereg.md 比对对象表 #3（比对对象 e991-c.out，重跑产物名 e991-c-rerun.out）在 replay-comparison-units.tsv 里没有一行对得上，文件头也没点名不登记
+want=第 6 行（E991「丙」）：留存产物名 e991-z.out 在 research/prompts/e991-r2-prereg.md 的比对对象表里一行都对不上
+want=第 7 行（E991「丁」）：登记出处 research/prompts/e991-preregistration.md 里没有表头逐字是
+want=文件头「不登记的比对对象」点名的 research/prompts/e991-r2-prereg.md #9 在那份登记的比对对象表里没有
+want=样本只跑 .gate-cells 点名的格：replay-comparison-units
+want=doc-experiments.sh：1 格里 1 格红（replay-comparison-units）

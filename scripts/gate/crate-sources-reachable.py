@@ -5,7 +5,7 @@
 要么从某个目标经 #[path = "…"]、mod <名>; 或 include!("…") 引得到。两样都不是的，cargo 根本不编它，判红。
 
 用法：
-    crate-sources-reachable.py [目录…]     # 不给就判 scripts/experiments 与 crates（相对仓根）
+    crate-sources-reachable.py [目录…]     # 不给就判 scripts/experiment-apparatus 与 crates（相对仓根）
     crate-sources-reachable.py --selftest  # CRATE_SOURCES_REACHABLE_BREAK=<开关> 时必须红在点名的格
 
 判法：
@@ -43,7 +43,7 @@ REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 
-DEFAULT_DIRECTORIES = ("scripts/experiments", "crates")
+DEFAULT_DIRECTORIES = ("scripts/experiment-apparatus", "crates")
 SKIPPED_DIRECTORY = re.compile(r"^(target|target-.*|\.git)$")
 PATH_ATTRIBUTE = re.compile(r'^\s*#\[path\s*=\s*"([^"]+)"\]\s*$')
 OTHER_ATTRIBUTE = re.compile(r"^\s*#\[[^\]]*\]\s*$")
@@ -273,7 +273,7 @@ def main(arguments):
     missing = [directory for directory in directories if not os.path.isdir(directory)]
     if missing:
         print(f"  ✗ 目录不在：{'、'.join(missing)}")
-        print("     → 怎么办：给存在的目录，或不给参数判 scripts/experiments 与 crates")
+        print("     → 怎么办：给存在的目录，或不给参数判 scripts/experiment-apparatus 与 crates")
         return 2
     return judge(directories, base)
 

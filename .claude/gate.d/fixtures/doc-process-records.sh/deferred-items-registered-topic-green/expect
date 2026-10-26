@@ -1,0 +1,4 @@
+exit=0
+want=records/ 下这次新增的带延后类词的行：判了 1 行，都写着指得到的登记（C 号、拆分提案的节号与序号、文件:行或登记处；records/ 新增的 .md 行共 9 行）；不判的：词只在「」或反引号里的 0 行、围栏里的 0 行、拆分提案（登记处本身）里的 0 行、「延后」只在点话题的（名词「延后项」、统计数）4 行、标题 1 行
+want=样本只跑 .gate-cells 点名的格：deferred-items-registered
+want=doc-process-records.sh：1 格里 1 格绿（deferred-items-registered），0 格本次未跑（无）

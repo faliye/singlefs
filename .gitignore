@@ -9,8 +9,8 @@ target/
 
 # research/ 入库（2026-08-29 用户定案）：实验代码、单测、变异脚本、原始产物都要进仓，
 # 因为决策正文把它们当依据引用——只在一台机器上的证据对第二个人不是证据。
-# 只有构建产物除外，它由上面那条 `target/` 兜住（scripts/experiments/target 有 315 MB）。
-/scripts/experiments/target/
+# 只有构建产物除外，它由上面那条 `target/` 兜住（scripts/experiment-apparatus/target 有 315 MB）。
+/scripts/experiment-apparatus/target/
 
 # run-with-memory-cap.sh 的峰值表：数只在本机成立，门禁 59 号跑的时候每条都写它（跟踪着会让 gate.sh 的工作区指纹开跑与收尾对不上）
 

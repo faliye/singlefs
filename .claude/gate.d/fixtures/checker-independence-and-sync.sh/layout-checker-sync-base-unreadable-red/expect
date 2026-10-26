@@ -1,0 +1,4 @@
+exit=1
+want=1 条格式定义路径取不到基准 HEAD 那一版，第 ④ 条对它们没比
+want=format/布局.md：读不出基准 HEAD 里的 format/布局.md（git show 退 128
+want=layout-checker-sync：红（退出 1）

@@ -3,10 +3,10 @@
 # 一份 kb 表格里反引号包着的单元格带缩写；注释里和函数调用实参里的同形态串不判；排除表一行指向已经改好名的串、一行指向不存在的文件。
 # 样本自己带 .claude/abbreviations（只登记 e<数字> 这一类编号，没登记 mac）。
 set -e
-mkdir -p .claude/kb scripts/experiments
+mkdir -p .claude/kb scripts/experiment-apparatus
 printf 'e<数字>  # 样本：实验编号\n' > .claude/abbreviations
-printf 'scripts/experiments/e1_demo.rs:renamed_long  # 样本：已经改好名还登记着\nscripts/experiments/gone.rs:cnt_total  # 样本：指向不存在的文件\n' > .claude/data-name-lint-exclude
-cat > scripts/experiments/e1_demo.rs <<'RS'
+printf 'scripts/experiment-apparatus/e1_demo.rs:renamed_long  # 样本：已经改好名还登记着\nscripts/experiment-apparatus/gone.rs:cnt_total  # 样本：指向不存在的文件\n' > .claude/data-name-lint-exclude
+cat > scripts/experiment-apparatus/e1_demo.rs <<'RS'
 const FIELDS: &[(&str, u32)] = &[("system_configuration_mac", 16), ("slot_count", 4)];
 fn arm(selector: u8) -> &'static str {
     match selector {

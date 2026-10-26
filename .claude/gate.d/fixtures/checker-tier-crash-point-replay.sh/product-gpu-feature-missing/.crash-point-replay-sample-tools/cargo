@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 按条记库与补判样本的假 cargo（快档样本档）：-V 打版本；test 照 cases/tests.tsv 逐个测试二进制打 libtest 的输出。
+# tests.tsv 一行一条：<哪一趟：plain|feature|both><TAB><源文件><TAB><libtest 名，- 是这个二进制这一趟一条都没有><TAB><ok|FAILED|ignored><TAB><样子><TAB><测试自己打的一行，- 是不打>
+#   样子：line（自己打的那一行先单独一行，结果行在它后面：几条同时跑时的样子）、scattered（「test <名> ... 」后面接自己打的那一行，结局另起一行：
+#   --test-threads 1 的样子）、glued（结局粘在自己打的那一行后面，认不出结局）。
+# 不带 --features 是 plain 那一趟，带了是 feature 那一趟。带 --tests 打这一趟的全部源文件；不带的 --lib 打 src/lib.rs、--test <名> 打 tests/<名>.rs、
+# --bin <名> 打 src/bin/<名>.rs（点了而这一趟没有它的行，打 running 0 tests）。-- 之后的 --skip <名>（带 --exact 时整名相同才跳）跳过的不打、计进 filtered out。
+# 有 FAILED 的二进制汇总行写 FAILED、整趟退 101。每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>，expect 靠它核阶段交了哪几个目标与 --skip。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+pass=plain all_sources=0 skips=() exact=0 after=0 previous="" sources=()
+for word in "$@"; do
+  if ((after)); then
+    [[ "$word" == --exact ]] && exact=1
+    [[ "$previous" == --skip ]] && skips+=("$word")
+  else
+    case "$previous" in
+      --features) pass=feature ;;
+      --test) sources+=("tests/$word.rs") ;;
+      --bin) sources+=("src/bin/$word.rs") ;;
+    esac
+    [[ "$word" == --tests ]] && all_sources=1
+    [[ "$word" == --lib ]] && sources=(src/lib.rs "${sources[@]}")
+  fi
+  [[ "$word" == -- ]] && after=1
+  previous="$word"
+done
+if ((all_sources)); then
+  mapfile -t sources < <(awk -F'\t' -v pass="$pass" '($1 == pass || $1 == "both") && !seen[$2]++ { print $2 }' "$here/cases/tests.tsv")
+fi
+skipped() {
+  local skip
+  for skip in ${skips[@]+"${skips[@]}"}; do
+    if ((exact)); then [[ "$1" == "$skip" ]] && return 0; else [[ "$1" == *"$skip"* ]] && return 0; fi
+  done
+  return 1
+}
+echo "    Finished \`release\` profile [optimized] target(s) in 0.01s"
+status=0 number=0
+for source in ${sources[@]+"${sources[@]}"}; do
+  number=$((number + 1))
+  if [[ "$source" == src/lib.rs ]]; then echo "     Running unittests src/lib.rs (target/release/deps/singlefs_checker_tier-000000000000000$number)"
+  else echo "     Running $source (target/release/deps/$(basename "$source" .rs)-000000000000000$number)"; fi
+  passed=0 failed=0 ignored=0 filtered=0 count=0 lines=()
+  while IFS=$'\t' read -r row_pass row_source name outcome form printed; do
+    [[ "$row_source" == "$source" && ( "$row_pass" == "$pass" || "$row_pass" == both ) ]] || continue
+    [[ "$name" == - ]] && continue
+    if skipped "$name"; then filtered=$((filtered + 1)); continue; fi
+    count=$((count + 1))
+    case "$form" in
+      scattered) lines+=("test $name ... $printed" "$outcome") ;;
+      glued) lines+=("test $name ... $printed$outcome") ;;
+      *) [[ "$printed" != - ]] && lines+=("$printed"); lines+=("test $name ... $outcome") ;;
+    esac
+    case "$outcome" in ok) passed=$((passed + 1)) ;; FAILED) failed=$((failed + 1)) ;; ignored) ignored=$((ignored + 1)) ;; esac
+  done < "$here/cases/tests.tsv"
+  echo
+  echo "running $count tests"
+  printf '%s\n' ${lines[@]+"${lines[@]}"}
+  echo
+  if ((failed)); then
+    echo "failures:"; echo
+    echo "test result: FAILED. $passed passed; $failed failed; $ignored ignored; 0 measured; $filtered filtered out; finished in 0.00s"
+    echo "error: test failed, to rerun pass \`--test $(basename "$source" .rs)\`"
+    status=101
+  else
+    echo "test result: ok. $passed passed; 0 failed; $ignored ignored; 0 measured; $filtered filtered out; finished in 0.00s"
+  fi
+  echo
+done
+exit "$status"

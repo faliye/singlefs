@@ -113,13 +113,13 @@ def run_selftest():
     cells = []
     green_files = ["research/README.md", "research/prompts/r1-body.md", "research/results/e1.out",
                    "scripts/README.md", "scripts/kb/README.md", "scripts/kb/tool.py",
-                   "scripts/experiments/README.md", "scripts/experiments/e9_device/main.rs"]
+                   "scripts/experiment-apparatus/README.md", "scripts/experiment-apparatus/e9_device/main.rs"]
     judged, problems = layout_problems(green_files)
     cells.append(("green", judged == 8 and problems == [], f"绿样本 8 份应当一处都不报，实判 {judged} 份、报 {problems}"))
     cases = [
         ("research-top", green_files + ["research/scripts/tool.sh"], "多出 scripts"),
         ("readme", [path for path in green_files if path != "scripts/kb/README.md"], "scripts/kb/README.md 不在"),
-        ("depth", green_files + ["scripts/experiments/e9_device/deeper/x.rs"], "第 4 层"),
+        ("depth", green_files + ["scripts/experiment-apparatus/e9_device/deeper/x.rs"], "第 4 层"),
         ("no-results", green_files + ["scripts/hosts/README.md", "scripts/hosts/run.log"], "run.log"),
         ("scripts-top", green_files + ["scripts/stray.sh"], "stray.sh"),
     ]
@@ -128,7 +128,7 @@ def run_selftest():
         reported = [message for name, message in problems if name == cell]
         cells.append((cell, any(want in message for message in reported), f"该在 {cell} 格报出含「{want}」的一句，实报 {problems}"))
     with tempfile.TemporaryDirectory() as work:
-        for path in green_files + ["scripts/experiments/target/release/build.log"]:
+        for path in green_files + ["scripts/experiment-apparatus/target/release/build.log"]:
             full = os.path.join(work, path)
             os.makedirs(os.path.dirname(full), exist_ok=True)
             open(full, "w", encoding="utf-8").close()

@@ -12,7 +12,7 @@
     「原文」（`路径:行号`）  或  「原文」(`路径:行号`)        引号紧挨着括号里的位置
     `路径:行号`：「原文」    或  `路径:行号` 「原文」          位置之后紧跟引号
 行号可以是区间（`路径:12-15`）；位置也可以写成小节：`路径@标题`（标题不带井号、逐字，原文要在那一节里，到同级或更高一级的下一个标题为止；
-标题命中不是恰好一次判红）——引规则与 kb 的条款优先这样写，不用为一个行号再读一遍文件。路径带目录的按 --root（默认仓根）逐个找；只写文件名的在仓里 `git ls-files` 按文件名找，恰好一个才判。
+标题命中不是恰好一次判红）——引规则与 kb 的条款优先这样写，不用为一个行号再读一遍文件。路径带目录的按 --root（默认仓根）逐个找；只写文件名的按文件名找，恰好一个才判：--root 是 git 仓根的在 `git ls-files` 里找，不是 git 仓根的（snapshot-tree.py 铺的树、草稿目录）按目录逐层找实际文件（不进 .git、不跟目录链接）；几个 --root 的合起来找。
 原文里的「…」与「……」是省略：切开的每一段要按次序出现在那一行（或区间）里。比对前两边都去掉 ** 与反引号、把连续空白并成一个空格。
 判不了的不判、单列：路径认不出（不在、文件名不唯一）、行号超出文件、给了 --unchanged-since 而被引文件在那之后改过。
 裸行号（紧挨着没有引文的 `路径:行号` 或 `路径:起-止`，路径的认法与上面同一份）也核，只核行号在不在文件里：
@@ -26,7 +26,8 @@
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一例的标签，括号里是那条「✗ 自检：」的开头）：
   CITE_CHECK_BREAK=always-ok  judge() 与 judge_section() 不比原文，每处引文都判对上
       行号错一行（「✗ 自检：行号错一行：应当判红」）、指到标题行（「✗ 自检：指到标题行：应当判红」）、
-      行号是背景材料的（「✗ 自检：行号是背景材料的：应当判红」）、小节写法：原文不在那一节（「✗ 自检：小节写法：原文不在那一节：应当判红」）
+      行号是背景材料的（「✗ 自检：行号是背景材料的：应当判红」）、小节写法：原文不在那一节（「✗ 自检：小节写法：原文不在那一节：应当判红」）、
+      非 git 根上只写文件名、行号错（「✗ 自检：非 git 根上只写文件名、行号错：应当判红」）
   CITE_CHECK_BREAK=ignore-changed  judge() 不看 --unchanged-since，开工之后改过的被引文件照判
       被引文件在开工之后改过（「✗ 自检：被引文件在开工之后改过：应当只列进没判」）
   CITE_CHECK_BREAK=no-background-check  judge() 不比背景材料，行号是背景材料的不单报
@@ -42,6 +43,10 @@
       裸行号路径认不出（「✗ 自检：裸行号路径认不出：应当数 1 处裸行号、列进没判」）、命令行那两格裸行号报数（「✗ 自检：命令行 […/bare-red.md …」「✗ 自检：命令行 […/bare-green.md …」）
   CITE_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、读不了的文件与写错的 --unchanged-since（改前的样子）
       命令行那几格（「✗ 自检：命令行 ['--help'] 应当退 0」起的六条）
+      连带红的格：「✗ 自检：命令行 ['-h'] 应当退 0」、「✗ 自检：命令行 ['--bogus', '…'] 应当退 2」、「✗ 自检：命令行 ['…nothere.md'] 应当退 2」、「✗ 自检：命令行 ['…', '--background', '…'] 应当退 2」、「✗ 自检：命令行 ['…', '--unchanged-since', '昨天'] 应当退 2」
+  CITE_CHECK_BREAK=non-git-root-unindexed  tracked_files_by_basename() 在不是 git 仓根的 --root 上不按目录找文件名、交空表（改前的样子：只写文件名的引文一律认不出、只列进没判；
+      records/2026-10-23-subagent拆分提案.md 第一百二十二节 ①）
+      非 git 根上只写文件名的引文行号错（「✗ 自检：非 git 根上只写文件名、行号错：应当判红」）、非 git 根上只写文件名的引文对上（「✗ 自检：非 git 根上只写文件名、对上：应当判绿且判了」）
 """
 import os
 import re
@@ -103,13 +108,27 @@ def citations_in(report_text):
 
 
 def tracked_files_by_basename(root):
+    """Git 仓索引已跟踪文件；普通快照目录索引实际文件，不跟随目录链接。"""
+    relatives = None
     try:
-        output = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True, text=True, check=True).stdout
+        top = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"], capture_output=True, check=True).stdout
+        if os.path.realpath(os.fsdecode(top).rstrip("\n")) == os.path.realpath(root):
+            output = subprocess.run(["git", "-C", root, "ls-files", "-z"], capture_output=True, check=True).stdout
+            relatives = list(dict.fromkeys(os.fsdecode(path) for path in output.split(b"\0") if path))
     except (OSError, subprocess.CalledProcessError):
+        pass
+    if relatives is None and BROKEN == "non-git-root-unindexed":   # 弄坏开关：非 git 根上不按目录找（改前的样子）
         return {}
+    if relatives is None:
+        relatives = []
+        for directory, directories, files in os.walk(root):
+            directories[:] = [name for name in directories if name != ".git"]
+            relatives.extend(os.path.relpath(os.path.join(directory, name), root) for name in files)
     by_name = {}
-    for relative in output.splitlines():
-        by_name.setdefault(os.path.basename(relative), []).append(os.path.join(root, relative))
+    for relative in relatives:
+        absolute = os.path.join(root, relative)
+        if os.path.isfile(absolute):
+            by_name.setdefault(os.path.basename(relative), []).append(absolute)
     return by_name
 
 
@@ -197,7 +216,13 @@ def judge_section(lines, title, quote):
 
 
 def check_reports(report_paths, roots, background_paths, unchanged_since):
-    by_basename = tracked_files_by_basename(roots[0])
+    by_basename = {}
+    for root in roots:
+        for name, paths in tracked_files_by_basename(root).items():
+            matches = by_basename.setdefault(name, [])
+            for path in paths:
+                if os.path.realpath(path) not in {os.path.realpath(match) for match in matches}:
+                    matches.append(path)
     background_lines = [(path, open(path, encoding="utf-8", errors="replace").read().splitlines()) for path in background_paths] or None
     bad, skipped, total, bare_total, bare_unjudged = [], [], 0, 0, 0
     for report_path in report_paths:
@@ -277,6 +302,7 @@ def run(arguments):
 
 def selftest():
     work = tempfile.mkdtemp(prefix="cite-check-selftest-")
+    plain_roots = []   # 非 git 根那两格的临时目录（不在 work 里：work 是 git 仓）
     try:
         subprocess.run(["git", "-C", work, "init", "-q"], check=True)
         os.makedirs(os.path.join(work, "kb"))
@@ -309,7 +335,7 @@ def selftest():
         ]
         failures = []
         for label, text, want in cases:
-            report = os.path.join(work, "report.md")
+            report = os.path.join(work, "result.md")
             with open(report, "w", encoding="utf-8") as handle:
                 handle.write(f"报告\n{text}\n")
             total, _, bad, _, _ = check_reports([report], [work], [os.path.join(work, "background.md")], None)
@@ -320,7 +346,24 @@ def selftest():
                 got = 0
             if total != 1 or got != want:
                 failures.append(f"{label}：应当{'判红' if want else '判绿'}，实际数到 {total} 处、{'判红' if got else '判绿'}（{bad}）")
-        changed_report = os.path.join(work, "report.md")
+        # 非 git 根（snapshot-tree.py 铺的树、草稿目录这类）上只写文件名的引文：按目录找文件名，恰好一个才判（开关 non-git-root-unindexed 下认不出、只列进没判，两格都红）
+        plain_root = tempfile.mkdtemp(prefix="cite-check-plain-root-")
+        plain_roots.append(plain_root)
+        os.makedirs(os.path.join(plain_root, "deep", "er"))
+        with open(os.path.join(plain_root, "deep", "er", "laid.rs"), "w", encoding="utf-8") as handle:
+            handle.write("fn laid() {\n    let tree = 7;\n}\n")
+        plain_report = os.path.join(plain_root, "result.md")
+        for label, text, want in (("非 git 根上只写文件名、行号错", "「let tree = 7」（`laid.rs:3`）", 1),
+                                  ("非 git 根上只写文件名、对上", "「let tree = 7」（`laid.rs:2`）", 0)):
+            with open(plain_report, "w", encoding="utf-8") as handle:
+                handle.write(f"报告\n{text}\n")
+            total, _, bad, skipped, _ = check_reports([plain_report], [plain_root], [], None)
+            judged = total == 1 and not skipped
+            if want and not bad:
+                failures.append(f"{label}：应当判红，实际数到 {total} 处、对不上 {bad}、没判 {skipped}")
+            if not want and (bad or not judged):
+                failures.append(f"{label}：应当判绿且判了（不是只列进没判），实际数到 {total} 处、对不上 {bad}、没判 {skipped}")
+        changed_report = os.path.join(work, "result.md")
         with open(changed_report, "w", encoding="utf-8") as handle:
             handle.write("「第一条：先查 再写」（`kb/rule.md:6`）\n")
         _, _, bad, skipped, _ = check_reports([changed_report], [work], [], unchanged_since=0.0)
@@ -369,14 +412,15 @@ def selftest():
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
-            print("  → 看 citations_in() / judge() / judge_section() 的判法；CITE_CHECK_BREAK（always-ok、no-heading-check、no-background-check、ignore-changed、title-any-section、bare-line-refs-ignored）设着的话这里本来就该红")
+            print("  → 看 citations_in() / judge() / judge_section() / tracked_files_by_basename() 的判法；CITE_CHECK_BREAK（always-ok、no-heading-check、no-background-check、ignore-changed、title-any-section、bare-line-refs-ignored、non-git-root-unindexed）设着的话这里本来就该红")
             return 1
         print(f"  ✓ cite-check 自检通过：对上的、位置在前、省略号、只写文件名、区间放行，错行、标题行、背景材料行号、超出文件判红，认不出的与开工后改过的只列不判（{len(cases) + 1} 种）；"
+              "非 git 根上只写文件名的按目录找到、照判（行号错判红、对上判绿，2 种）；"
               f"裸行号 {len(bare_cases)} 种：超出文件与区间的止超出文件判红并报实际行数，在范围内的列进没判单独计数，带引文的、引号里的、网址端口不当裸行号；"
               f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的报告与背景材料、写错的 --unchanged-since 退 2 带出路")
         return 0
     finally:
-        subprocess.run(["rm", "-rf", "--", work], check=False)
+        subprocess.run(["rm", "-rf", "--", work, *plain_roots], check=False)
 
 
 if __name__ == "__main__":

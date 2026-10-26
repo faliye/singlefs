@@ -1,0 +1,2 @@
+# 复用三问（改一处闭包外的输入）：上一版只差一个没有测试引的函数 spare_function，三条对拍的闭包不含它，全部复用、现判 0、不起 cargo
+product-gpu-real-card-tests

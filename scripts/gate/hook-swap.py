@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
 # admission: always 每一次换钩子都要现判这一刻的规格、草稿与主工作区那几份，上一次换过不替这一次作保
 # run-condition: command bash python3
-"""先验后换：.claude/hooks/ 下的钩子与它读的共用模块、登记表，先在草稿里套上定点替换验过，再在主工作区定点换上；
+"""先验后换：.claude/hooks/ 下的钩子与它读的共用模块、登记表，或 scripts/ 下的脚本，先在草稿里套上定点替换验过，再在主工作区定点换上；
 换上之后再验一遍，不对就按反向定点替换回滚（只把这一次换上的几处改回去，不整份覆盖，别的会话这段时间里改的照留）。
+两种规格各走一遍，不混在一份里：钩子规格（文件在 .claude/hooks/ 这一层）要 --hook、拿钩子逐条喂；脚本规格（文件在 scripts/ 下，不限层数）不喂钩子，
+换上之后改跑 --verify 给的命令（一般是被换脚本的 --selftest）。
 
 用法：
   hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]
+  hook-swap.py <规格.json> --scratch <草稿目录> [--verify <命令>] [--root <仓根>] [--dry-run]   # 脚本规格：文件都在 scripts/ 下，不带 --hook 与 --feeds
   hook-swap.py --feed-only --hook <钩子> [--feeds <喂法.json>] [--root <仓根>]   # 只喂不换：拿此刻的钩子逐条喂，一条一行写退出码，不写任何文件
   hook-swap.py --selftest        # HOOK_SWAP_BREAK=<项> 时必须判红
 
 <规格.json> 同 scripts/kb/replace-batch.py：JSON 数组，每项 {"file": 路径, "old": 旧串, "new": 新串, "count": 可省，默认 1}，
-  同一个文件的多处按数组次序依次施加；file 写相对仓根的路径或绝对路径，只收 <仓根>/.claude/hooks/ 这一层里已有的普通文件；旧串、新串都不许空。
+  同一个文件的多处按数组次序依次施加；file 写相对仓根的路径或绝对路径，只收 <仓根>/.claude/hooks/ 这一层里已有的普通文件，
+  或 <仓根>/scripts/ 下（任意层）已有的普通文件，两处的文件不能写进同一份规格；旧串、新串都不许空。
 <钩子> 是要喂 JSON 的那一份（.claude/hooks/ 下的 .sh），不在规格里也照样做语法检查与喂法。
 <喂法.json>：JSON 数组，每项 {"label": 说明, "command": Bash 命令, "exit": 0 或 2, "agent_type": 可省（省了是主 agent）, "cwd": 可省（默认 {root}），
   "neutral": 可省（true 是新旧两版判得一样的，回滚之后拿它们再核一遍）}；也可以写 "input": 一整份钩子 JSON 代替 command、cwd 与 agent_type。
   command、cwd 与 input 里的 {root} 换成这一次判的仓根（草稿里是草稿树，换上之后是主工作区）。
   不给 --feeds 时用内置的那一份（BUILTIN_FEEDS，按钩子相对仓根的路径取；没有内置的就要给）。
+<命令>（--verify，只给脚本规格）：换上之后在 <仓根> 里用 bash -c 跑一遍，退 0 才算验过；写被换脚本的 --selftest（例：python3 scripts/kb/replace-once.py --selftest），
+  跑得过 VERIFY_TIMEOUT_SECONDS 秒的算不过。命令只在换上之后跑，草稿里（没有仓的样子）只做语法检查；不给 --verify 就只做换上之后的语法检查与回读。
+  heavy 登记的自证不要写进来（它们归主 agent 在提交时跑）。
 撤回一次换上：把规格倒过来（old 与 new 对调、次序倒排；每次换上都写一份在 <草稿目录>/hook-swap/reverse-<时刻>.json）再跑一遍，
   --feeds 给一份不含这一次新判法的喂法。
 
@@ -24,21 +31,26 @@
      要回得到原文——回不到（新串在改后的文件里不止 count 处）就停：反向定点替换回滚不了的规格不收。
   2. 草稿树 <草稿目录>/hook-swap/tree：.claude/hooks/ 整份拷一份（不带 __pycache__），套上改后的文本；仓根与 .claude/ 下别的项一律符号链接到主工作区
      （钩子按自己所在的位置找仓根、登记表与 preflight，链接过去判的就是主工作区的那几份）。
+     脚本规格的草稿树只放改后的那几份文件（按它们在仓里的相对路径），不链接仓里别的东西：脚本规格不在草稿里跑脚本，写进去的路径也就不会穿过链接落到主工作区。
   3. 草稿里验：规格里的文件与 <钩子> 是 .sh 的跑 `bash -n`，再把里面喂给 python 的 heredoc（`python3 … <<'PY'`）逐段编译；.py 整份编译；
      逐条喂 <喂法>（CLAUDE_PROJECT_DIR 设成草稿树、检出记录写草稿目录、不带 SINGLEFS_HEAVY_TESTS），退出码要等于写的那一个，
      stderr 里不许有「没判成」「读不到共用模块」（钩子坏了放行时说的话）。有一条不对就停，主工作区一个字节不写。--dry-run 停在这里。
+     脚本规格只做语法检查（.sh 的 bash -n 与内嵌 python、.py 整份编译，别的后缀不查），不喂钩子。
   4. 再读主工作区那几份，要与第 1 步记的逐字节相同（这段时间里别的会话改了就停，一个字节不写）；整批先预演一遍（同目录临时文件写完、fsync，
      改名之前停下），全过了逐份改名换上（scripts/kb/lib_atomic_replace.py），回读。
-  5. 主工作区里照第 3 步再验一遍（CLAUDE_PROJECT_DIR 设成仓根）。不对就回滚：逐份在此刻的内容上做反向定点替换（每处要恰好命中 count 次），
-     改名换上；再对回滚后的文件做语法检查、喂标了 neutral 的几条。
+  5. 主工作区里照第 3 步再验一遍（CLAUDE_PROJECT_DIR 设成仓根）；脚本规格再跑 --verify 的命令（输出写 <草稿目录>/hook-swap/verify-<时刻>.log）。
+     不对就回滚：逐份在此刻的内容上做反向定点替换（每处要恰好命中 count 次），改名换上；再对回滚后的文件做语法检查、喂标了 neutral 的几条
+     （脚本规格回滚后只做语法检查，不再跑 --verify 的命令）。
   草稿树跑完就删；喂法的输出与检出记录留在 <草稿目录>/hook-swap/ 下。
 
 钩子在 bash 这一层坏了时，每一条 Bash 调用都会被它拒（退 2），连改回去的那一条也起不来：这条脚本在同一个进程里回滚，不靠下一条 Bash；
 退出码 6 时只剩 Edit / Write 能改，提示行逐处写出要改回的地方，反向规格在草稿目录里。
+脚本规格收进来的原因：scripts/ 下被所有会话当工具用的脚本（scripts/kb/replace-once.py 这几份）换到一半或换坏了，别的会话每一次调用都受影响；
+原来靠手工协议（核基线、同目录临时文件加 mv、回读、跑自证、红了换回），现在同一套先验后换、基线核对、整批预演、换上之后验证、反向定点回滚都落在这一个进程里。
 
 退出码：0 换上了、换上之后验过（--dry-run：草稿里验过）；1 草稿里验不过（一个字节没写）；2 参数、路径或规格不对（一个字节没写）；
 3 草稿验过之后主工作区那几份被改了（一个字节没写）；4 换上时失败（已换上的几份回滚了）；
-5 换上之后验不过、已按反向定点替换回滚、回滚后验过；6 回滚不成或回滚后还验不过（看提示行）。
+5 换上之后验不过（脚本规格含 --verify 的命令退非 0 或超时）、已按反向定点替换回滚、回滚后验过；6 回滚不成或回滚后还验不过（看提示行）。
 
 弄坏开关（只给自证判红用，生效时往 stderr 打一行）：HOOK_SWAP_BREAK=
   swap-on-draft-red      草稿里验不过也换上：「草稿红不换」三格红
@@ -48,6 +60,10 @@
   rollback-whole-file    回滚时整份写回换上之前的内容（盖掉别的会话这段时间里的改动）：「换上之后红回滚」那一格红
   stale-builtin-feed     内置喂法里混进一条脚本搬家之前的旧路径：「内置喂法里的脚本路径都在」那一格红
   brace-feeds-dropped    内置喂法里不带花括号与参数通配那六条：「内置喂法带花括号与参数通配的六条」与「花括号写法上放行的钩子，先验停下」两格红
+  script-verify-skipped  脚本规格换上之后不跑 --verify 的命令：「脚本规格：过」（输出里没有「验证命令退 0」）与「脚本规格：验证红回滚」两格红
+  script-paths-unrestricted  规格里的文件不限在 .claude/hooks/ 与 scripts/ 下（仓里已有的普通文件都收）：「脚本规格：scripts/ 之外的文件不收」那一格红
+  （swap-on-draft-red、skip-base-check、rollback-whole-file、skip-post-swap-check 在脚本规格上同样生效：swap-on-draft-red 下两格「脚本规格：草稿红不换」红，
+  skip-base-check 下「脚本规格：验的时候主工作区那份被改了」红，rollback-whole-file 下「脚本规格：验证红回滚」红，skip-post-swap-check 下「脚本规格：过」「脚本规格：验证红回滚」红）
 不认识的值直接拒绝，免得拼错的开关被当成「没开」。
 """
 import hashlib
@@ -71,8 +87,10 @@ from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  
 
 BREAK_VARIABLE = "HOOK_SWAP_BREAK"
 KNOWN_BREAK_MODES = ("swap-on-draft-red", "skip-embedded-python", "skip-base-check", "skip-post-swap-check", "rollback-whole-file", "stale-builtin-feed",
-                     "brace-feeds-dropped")
+                     "brace-feeds-dropped", "script-verify-skipped", "script-paths-unrestricted")
 HOOKS_DIRECTORY = os.path.join(".claude", "hooks")
+SCRIPTS_DIRECTORY = "scripts"
+VERIFY_TIMEOUT_SECONDS = 900
 WORK_DIRECTORY_NAME = "hook-swap"
 FEED_TIMEOUT_SECONDS = 120
 FEED_EXIT_CODES = (0, 2)
@@ -199,11 +217,13 @@ def sha256_of(data):
     return hashlib.sha256(data if isinstance(data, bytes) else data.encode("utf-8")).hexdigest()
 
 
-def resolve_edits(spec, root):
-    """规格 → [Edit]；路径不在 .claude/hooks/ 这一层、不是已有的普通文件、旧串或新串为空、count 不是正整数，抛 BadInput。"""
+def resolve_edits(spec, root, mode=""):
+    """规格 → [Edit]；路径不在 .claude/hooks/ 这一层、也不在 scripts/ 下、不是已有的普通文件、两处的文件混在一份里、旧串或新串为空、count 不是正整数，抛 BadInput。
+    mode 是弄坏开关（script-paths-unrestricted：scripts/ 的限制放开成整个仓根，只给自证判红用）。"""
     if not isinstance(spec, list) or not spec:
         raise BadInput("规格不是非空的 JSON 数组\n→ 怎么办：写成 [{\"file\": …, \"old\": …, \"new\": …}, …]（同 replace-batch.py）")
     hooks = os.path.realpath(os.path.join(root, HOOKS_DIRECTORY))
+    scripts = os.path.realpath(os.path.join(root, SCRIPTS_DIRECTORY if mode != "script-paths-unrestricted" else ""))
     edits = []
     for number, item in enumerate(spec, 1):
         if not isinstance(item, dict) or not all(isinstance(item.get(key), str) for key in ("file", "old", "new")):
@@ -215,11 +235,20 @@ def resolve_edits(spec, root):
             raise BadInput(f"规格第 {number} 处的旧串或新串是空的：空串回滚时找不回原处\n→ 怎么办：两边都带上前后文（删一段就把它前后的一行一起写进旧串与新串）")
         written = item["file"] if os.path.isabs(item["file"]) else os.path.join(root, item["file"])
         path = os.path.realpath(written)
-        if os.path.dirname(path) != hooks or not os.path.isfile(path):
-            raise BadInput(f"规格第 {number} 处的文件 {item['file']} 不是 {hooks} 这一层里已有的普通文件\n"
-                           "→ 怎么办：这条脚本只换 .claude/hooks/ 下的钩子、共用模块与登记表；别的文件照原来的办法改，新文件先排他建好再换")
+        if (os.path.dirname(path) != hooks and not is_inside(path, scripts)) or not os.path.isfile(path):
+            raise BadInput(f"规格第 {number} 处的文件 {item['file']} 不是 {hooks} 这一层、也不是 {scripts} 下已有的普通文件\n"
+                           "→ 怎么办：这条脚本只换 .claude/hooks/ 下的钩子、共用模块与登记表，和 scripts/ 下的脚本；别的文件照原来的办法改，新文件先排他建好再换")
         edits.append(Edit(number, os.path.relpath(path, root), path, item["old"], item["new"], count))
+    kinds = {is_script_edit(edit, root) for edit in edits}
+    if len(kinds) > 1:
+        raise BadInput("规格里既有 .claude/hooks/ 下的钩子文件、又有 scripts/ 下的脚本：两种验法不同（钩子拿 JSON 喂，脚本换上之后跑 --verify 的命令），混在一份里换不了\n"
+                       "→ 怎么办：拆成两份规格各跑一次；脚本规格先换（它不影响钩子），钩子规格后换")
     return edits
+
+
+def is_script_edit(edit, root):
+    """这一处的文件不在 .claude/hooks/ 这一层：按脚本规格的验法办。"""
+    return os.path.dirname(edit.path) != os.path.realpath(os.path.join(root, HOOKS_DIRECTORY))
 
 
 def apply_edits(texts, edits, reverse=False):
@@ -391,15 +420,48 @@ def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutra
 
 
 def check_tree(root, relatives, hook_relative, feeds, log_path, detections_path, mode, only_neutral=False):
-    """root 下这几份文件的语法检查与喂法；交 (问题列表, 一句做了什么)。"""
+    """root 下这几份文件的语法检查与喂法；交 (问题列表, 一句做了什么)。hook_relative 是 None（脚本规格）时只做语法检查，不喂。"""
     problems, segments = [], 0
-    for relative in sorted(set(relatives) | {hook_relative}):
+    checked = set(relatives) | ({hook_relative} if hook_relative else set())
+    for relative in sorted(checked):
         found, compiled = static_problems(os.path.join(root, relative), relative, mode)
         problems += found
         segments += compiled
+    if hook_relative is None:
+        return problems, f"{len(checked)} 份文件语法检查、内嵌 python {segments} 段编译"
     fed_problems, fed = feed_problems(os.path.join(root, hook_relative), root, feeds, log_path, detections_path, only_neutral)
     problems += fed_problems
-    return problems, f"{len(set(relatives) | {hook_relative})} 份文件语法检查、内嵌 python {segments} 段编译、喂了 {fed} 条"
+    return problems, f"{len(checked)} 份文件语法检查、内嵌 python {segments} 段编译、喂了 {fed} 条"
+
+
+def build_scripts_draft_tree(tree, planned):
+    """脚本规格的草稿树：只放改后的那几份（按它们在仓里的相对路径），不链接仓里别的东西，写进去的路径不会穿过链接落到主工作区。"""
+    if os.path.lexists(tree):
+        shutil.rmtree(tree)
+    for relative, text in planned.items():
+        destination = os.path.join(tree, relative)
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        with open(destination, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+
+def verify_problem(command, root, log_path):
+    """换上之后在仓根跑 --verify 的命令：退 0 返回 None，否则返回一句问题；输出写 log_path。"""
+    environment = {key: value for key, value in os.environ.items() if key != "SINGLEFS_HEAVY_TESTS"}
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    try:
+        done = subprocess.run(["bash", "-c", command], cwd=root, stdin=subprocess.DEVNULL, capture_output=True, text=True, env=environment,
+                              timeout=VERIFY_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        with open(log_path, "a", encoding="utf-8") as log:
+            log.write(f"{command}\n超时 {VERIFY_TIMEOUT_SECONDS} 秒\n")
+        return f"验证命令 {VERIFY_TIMEOUT_SECONDS} 秒没跑完：{command[:160]}"
+    with open(log_path, "a", encoding="utf-8") as log:
+        log.write(f"{command}\n退 {done.returncode}\n{done.stdout}\n{done.stderr}\n")
+    if done.returncode == 0:
+        return None
+    tail = [line for line in (done.stdout + done.stderr).splitlines() if line.strip()][-3:]
+    return f"验证命令退 {done.returncode}：{command[:160]}；输出末几行 {tail}"
 
 
 def build_draft_tree(root, tree, planned):
@@ -468,23 +530,35 @@ def rollback(swapped, edits, base_texts, mode):
     return problem_lines, rolled
 
 
-def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None, after_swap=None):
-    """交回 (退出码, 提示行)。after_draft、after_swap 只给自证用：草稿验完之后、换上之后各调一次（模拟别的会话在这段时间里改文件）。"""
+def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None, after_swap=None, verify=None):
+    """交回 (退出码, 提示行)。after_draft、after_swap 只给自证用：草稿验完之后、换上之后各调一次（模拟别的会话在这段时间里改文件）。
+    脚本规格（文件都在 scripts/ 下）：hook 与 feeds 给 None，verify 是换上之后跑的命令（可省）；钩子规格：hook 必给，verify 给 None。"""
     mode = break_mode()
     root = os.path.realpath(root)
     scratch = os.path.abspath(scratch)
     if os.path.realpath(scratch) == root or is_inside(scratch, root):
         raise BadInput(f"草稿目录 {scratch} 在主工作区里\n→ 怎么办：放进派发提示给的草稿目录（工作根 ~/.local/share/singlefs/work/<轮>/ 这类仓外位置）")
-    edits = resolve_edits(spec, root)
-    hook_path = os.path.realpath(hook if os.path.isabs(hook) else os.path.join(root, hook))
-    if os.path.dirname(hook_path) != os.path.realpath(os.path.join(root, HOOKS_DIRECTORY)) or not hook_path.endswith(".sh") or not os.path.isfile(hook_path):
-        raise BadInput(f"--hook {hook} 不是 {os.path.join(root, HOOKS_DIRECTORY)} 这一层里已有的 .sh\n→ 怎么办：--hook 写要喂 JSON 的那一份钩子（例如 .claude/hooks/heavy-test-guard.sh）")
-    hook_relative = os.path.relpath(hook_path, root)
-    if feeds is None:
-        feeds = builtin_feeds_for(hook_relative, mode)
+    edits = resolve_edits(spec, root, mode)
+    script_spec = is_script_edit(edits[0], root)
+    if script_spec:
+        if hook is not None or feeds is not None:
+            raise BadInput("规格里的文件都在 scripts/ 下，不带 --hook 与 --feeds：脚本没有钩子要喂\n"
+                           "→ 怎么办：去掉 --hook / --feeds；换上之后要跑的检查（例：被换脚本的 --selftest）写成 --verify '<命令>'")
+        hook_relative = None
+    else:
+        if verify is not None:
+            raise BadInput("--verify 只给 scripts/ 下的脚本规格；钩子规格换上之后拿 JSON 喂钩子验\n→ 怎么办：去掉 --verify，要喂的补进 --feeds")
+        if hook is None:
+            raise BadInput("规格里是 .claude/hooks/ 下的文件，要 --hook 点名拿哪一份钩子喂\n→ 怎么办：加 --hook <钩子>（例如 .claude/hooks/heavy-test-guard.sh）")
+        hook_path = os.path.realpath(hook if os.path.isabs(hook) else os.path.join(root, hook))
+        if os.path.dirname(hook_path) != os.path.realpath(os.path.join(root, HOOKS_DIRECTORY)) or not hook_path.endswith(".sh") or not os.path.isfile(hook_path):
+            raise BadInput(f"--hook {hook} 不是 {os.path.join(root, HOOKS_DIRECTORY)} 这一层里已有的 .sh\n→ 怎么办：--hook 写要喂 JSON 的那一份钩子（例如 .claude/hooks/heavy-test-guard.sh）")
+        hook_relative = os.path.relpath(hook_path, root)
         if feeds is None:
-            raise BadInput(f"{hook_relative} 没有内置喂法\n→ 怎么办：--feeds 给一份喂法（放行几条、该拒几条，写法见文件头）")
-    validate_feeds(feeds)
+            feeds = builtin_feeds_for(hook_relative, mode)
+            if feeds is None:
+                raise BadInput(f"{hook_relative} 没有内置喂法\n→ 怎么办：--feeds 给一份喂法（放行几条、该拒几条，写法见文件头）")
+        validate_feeds(feeds)
     relatives = sorted({edit.relative for edit in edits})
     base_bytes = {relative: read_bytes(os.path.join(root, relative)) for relative in relatives}
     try:
@@ -503,20 +577,31 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
     stamp = f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{os.getpid()}"
     log_path, detections_path = os.path.join(work, f"feeds-{stamp}.log"), os.path.join(work, f"detections-{stamp}.jsonl")
     reverse_spec_path = os.path.join(work, f"reverse-{stamp}.json")
+    verify_log_path = os.path.join(work, f"verify-{stamp}.log")
     with open(reverse_spec_path, "w", encoding="utf-8") as handle:
         json.dump([{"file": edit.relative, "old": edit.new, "new": edit.old, "count": edit.count} for edit in reversed(edits)], handle, ensure_ascii=False, indent=1)
-    lines = [f"规格 {len(edits)} 处、{len(relatives)} 份文件（{'、'.join(relatives)}）；喂的钩子 {hook_relative}；喂法 {len(feeds)} 条",
+    if script_spec:
+        head = (f"规格 {len(edits)} 处、{len(relatives)} 份文件（{'、'.join(relatives)}）；脚本规格，不喂钩子；"
+                f"换上之后的验证命令 {verify if verify else '无（只做语法检查与回读）'}")
+        tail = f"验证输出 {verify_log_path}；反向规格 {reverse_spec_path}"
+    else:
+        head = f"规格 {len(edits)} 处、{len(relatives)} 份文件（{'、'.join(relatives)}）；喂的钩子 {hook_relative}；喂法 {len(feeds)} 条"
+        tail = f"喂法输出 {log_path}；反向规格 {reverse_spec_path}"
+    lines = [head,
              *(f"  {relative} 换上之前 sha256 {sha256_of(base_bytes[relative])}，换上之后应当是 {sha256_of(planned[relative])}" for relative in relatives),
-             f"喂法输出 {log_path}；反向规格 {reverse_spec_path}"]
+             tail]
     tree = os.path.join(work, "tree")
     try:
-        build_draft_tree(root, tree, planned)
+        if script_spec:
+            build_scripts_draft_tree(tree, planned)
+        else:
+            build_draft_tree(root, tree, planned)
         draft_problems, draft_summary = check_tree(tree, relatives, hook_relative, feeds, log_path, detections_path, mode)
     finally:
         shutil.rmtree(tree, ignore_errors=True)
     if draft_problems:
         lines += [f"✗ 草稿里验不过（{draft_summary}），主工作区一个字节没写：", *(f"  - {problem}" for problem in draft_problems),  # gate-lint:summary
-                  f"→ 怎么办：照上面几条改规格再跑；喂法的整段 stderr 在 {log_path}"]
+                  f"→ 怎么办：照上面几条改规格再跑" + ("" if script_spec else f"；喂法的整段 stderr 在 {log_path}")]
         if mode != "swap-on-draft-red":
             return EXIT_DRAFT_RED, lines
     else:
@@ -561,6 +646,12 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
         return EXIT_SWAPPED, lines
     live_problems, live_summary = check_tree(root, relatives, hook_relative, feeds, log_path, detections_path, mode)
     live_problems = [f"{relative} 换上之后回读与草稿里验过的不同" for relative in readback] + live_problems
+    if script_spec and verify and mode != "script-verify-skipped":
+        failed = verify_problem(verify, root, verify_log_path)
+        if failed:
+            live_problems.append(failed)
+        else:
+            live_summary += f"、验证命令退 0（{verify[:80]}）"
     if not live_problems:
         lines.append(f"✓ 换上了 {len(swapped)} 份（改名换上新 inode、回读一致），主工作区里再验过：{live_summary}")
         return EXIT_SWAPPED, lines
@@ -573,10 +664,10 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
     after_problems, after_summary = check_tree(root, relatives, hook_relative, feeds, log_path, detections_path, mode, only_neutral=True)
     if after_problems:
         lines += [f"✗ 已按反向定点替换回滚 {len(rolled)} 份，回滚之后还验不过（{after_summary}）：", *(f"  - {problem}" for problem in after_problems),  # gate-lint:summary
-                  f"→ 怎么办：钩子现在可能是坏的；看 {log_path} 的 stderr，用 Edit 修，交主 agent"]
+                  f"→ 怎么办：{'这几份脚本' if script_spec else '钩子'}现在可能是坏的；看 {verify_log_path if script_spec else log_path} 里的输出，用 Edit 修，交主 agent"]
         return EXIT_ROLLBACK_FAILED, lines
     lines.append(f"→ 已按反向定点替换回滚 {len(rolled)} 份（{'、'.join(rolled)}），回滚之后验过（{after_summary}）；"
-                 f"照上面几条改规格，必要时 --dry-run 先看草稿，再跑；喂法的整段 stderr 在 {log_path}")
+                 f"照上面几条改规格，必要时 --dry-run 先看草稿，再跑" + ("" if script_spec else f"；喂法的整段 stderr 在 {log_path}"))
     return EXIT_ROLLED_BACK, lines
 
 
@@ -604,6 +695,10 @@ SELFTEST_FEEDS = [{"label": "轻的放行", "command": "ls -la", "exit": 0, "neu
 SELFTEST_GOOD_EDIT = {"file": ".claude/hooks/fake_lib.py", "old": "    return MARKER in command\n",
                       "new": "    return MARKER in command or \"*\" in command  # 新判法\n"}
 SELFTEST_OTHER_SESSION_LINE = "# 别的会话这段时间里加的一行\n"
+# 脚本规格的样本：scripts/tool.py 退 0 就是验过，scripts/sub/tool.sh 是更深一层的 .sh
+SELFTEST_SCRIPT = '#!/usr/bin/env python3\nVERSION = 1\n\n\ndef main():\n    return 0\n\n\nif __name__ == "__main__":\n    raise SystemExit(main())\n'
+SELFTEST_SCRIPT_SHELL = "#!/usr/bin/env bash\necho tool\n"
+SELFTEST_SCRIPT_VERIFY = "python3 scripts/tool.py"
 
 
 def selftest():
@@ -614,6 +709,10 @@ def selftest():
         root = os.path.join(work, name, "repo")
         os.makedirs(os.path.join(root, HOOKS_DIRECTORY))
         os.makedirs(os.path.join(root, "research"))
+        os.makedirs(os.path.join(root, "scripts", "sub"))
+        for relative, content in (("research/notes.txt", "记录\n"), ("scripts/tool.py", SELFTEST_SCRIPT), ("scripts/sub/tool.sh", SELFTEST_SCRIPT_SHELL)):
+            with open(os.path.join(root, relative), "w", encoding="utf-8") as handle:
+                handle.write(content)
         for file_name, text, file_mode in (("fake-guard.sh", SELFTEST_GUARD, 0o755), ("fake_lib.py", SELFTEST_LIBRARY, 0o644)):
             path = os.path.join(root, HOOKS_DIRECTORY, file_name)
             with open(path, "w", encoding="utf-8") as handle:
@@ -624,14 +723,14 @@ def selftest():
     def hooks_file(root, file_name):
         return os.path.join(root, HOOKS_DIRECTORY, file_name)
 
-    def run(label, spec, want_code, want_files, want_text=None, after_draft=None, after_swap=None, want_new_inode=None):
+    def run(label, spec, want_code, want_files, want_text=None, after_draft=None, after_swap=None, want_new_inode=None, verify=None, hook=".claude/hooks/fake-guard.sh"):
         nonlocal checked
         checked += 1
         root = fresh_repository(f"case-{checked}")
         scratch = os.path.join(work, f"case-{checked}", "scratch")
         inode_before = os.stat(hooks_file(root, want_new_inode)).st_ino if want_new_inode else None
         try:
-            code, lines = swap(spec, ".claude/hooks/fake-guard.sh", scratch, root, feeds=SELFTEST_FEEDS,
+            code, lines = swap(spec, hook, scratch, root, feeds=SELFTEST_FEEDS, verify=verify,
                                after_draft=(lambda: after_draft(root)) if after_draft else None,
                                after_swap=(lambda: after_swap(root)) if after_swap else None)
         except BadInput as error:
@@ -759,6 +858,82 @@ def selftest():
             problems.append("全对的钩子没换成新版")
         if problems:
             failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
+
+    # 脚本规格：文件在 scripts/ 下，不喂钩子，换上之后跑 --verify 的命令
+    def run_scripts(label, spec, want_code, want_files, want_text=None, verify=None, hook=None, feeds=None, dry_run=False, after_draft=None, after_swap=None,
+                    want_new_inode=None):
+        nonlocal checked
+        checked += 1
+        root = fresh_repository(f"scripts-case-{checked}")
+        scratch = os.path.join(work, f"scripts-case-{checked}", "scratch")
+        inode_before = os.stat(os.path.join(root, want_new_inode)).st_ino if want_new_inode else None
+        try:
+            code, lines = swap(spec, hook, scratch, root, feeds=feeds, dry_run=dry_run, verify=verify,
+                               after_draft=(lambda: after_draft(root)) if after_draft else None,
+                               after_swap=(lambda: after_swap(root)) if after_swap else None)
+        except BadInput as error:
+            code, lines = EXIT_BAD_INPUT, str(error).splitlines()
+        problems = []
+        if code != want_code:
+            problems.append(f"退出码 {code}（应当 {want_code}）")
+        for relative, want in want_files.items():
+            got = read_text(os.path.join(root, relative))
+            if got != want:
+                problems.append(f"{relative} 的内容不对（sha256 {sha256_of(got)[:12]}，应当 {sha256_of(want)[:12]}）")
+        if want_text is not None and not any(want_text in line for line in lines):
+            problems.append(f"输出里没有「{want_text}」")
+        if code != EXIT_SWAPPED and not any(line.lstrip().startswith("→") for line in lines):
+            problems.append("拒绝没带「→」出路")
+        for directory in ("scripts", os.path.join("scripts", "sub")):
+            leftovers = [name for name in os.listdir(os.path.join(root, directory)) if name.startswith(".")]
+            if leftovers:
+                problems.append(f"{directory} 里留下临时文件 {leftovers}")
+        if os.path.exists(os.path.join(scratch, WORK_DIRECTORY_NAME, "tree")):
+            problems.append("草稿树没删")
+        if want_new_inode and os.stat(os.path.join(root, want_new_inode)).st_ino == inode_before:
+            problems.append(f"{want_new_inode} 换上之后 inode 没变：在原 inode 上写的")
+        if problems:
+            failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
+
+    script_untouched = {"scripts/tool.py": SELFTEST_SCRIPT, "scripts/sub/tool.sh": SELFTEST_SCRIPT_SHELL}
+    script_version_edit = {"file": "scripts/tool.py", "old": "VERSION = 1\n", "new": "VERSION = 2\n"}
+    script_version_two = SELFTEST_SCRIPT.replace("VERSION = 1\n", "VERSION = 2\n", 1)
+    run_scripts("脚本规格：过：草稿里验过、换上、验证命令退 0（新 inode）", [script_version_edit], EXIT_SWAPPED,
+                {**script_untouched, "scripts/tool.py": script_version_two}, want_text="验证命令退 0", verify=SELFTEST_SCRIPT_VERIFY, want_new_inode="scripts/tool.py")
+    run_scripts("脚本规格：过：深一层的 .sh、不给 --verify 只做语法检查", [{"file": "scripts/sub/tool.sh", "old": "echo tool\n", "new": "echo tool2\n"}], EXIT_SWAPPED,
+                {**script_untouched, "scripts/sub/tool.sh": "#!/usr/bin/env bash\necho tool2\n"}, want_text="✓ 换上了 1 份")
+    run_scripts("脚本规格：--dry-run 停在草稿，一个字节不写", [script_version_edit], EXIT_SWAPPED, script_untouched, want_text="--dry-run：停在草稿", dry_run=True)
+    # 草稿红不换（开关 swap-on-draft-red 下这两格红）
+    run_scripts("脚本规格：草稿红不换：.py 编译不过", [{"file": "scripts/tool.py", "old": "return 0\n", "new": "return (0\n"}], EXIT_DRAFT_RED, script_untouched,
+                want_text="编译不过", verify=SELFTEST_SCRIPT_VERIFY)
+    run_scripts("脚本规格：草稿红不换：深一层的 .sh 的 bash -n 不过", [{"file": "scripts/sub/tool.sh", "old": "echo tool\n", "new": "echo tool\nif true; then\n"}],
+                EXIT_DRAFT_RED, script_untouched, want_text="bash -n 不过")
+
+    # 验证红回滚：语法对、验证命令退 1；换上之后别的会话又在同一份脚本里加了一行，回滚只改回这一次的那一处，那一行留着
+    # （开关 script-verify-skipped、skip-post-swap-check、rollback-whole-file 下红）
+    def other_session_appends_script(root):
+        with open(os.path.join(root, "scripts", "tool.py"), "a", encoding="utf-8") as handle:
+            handle.write(SELFTEST_OTHER_SESSION_LINE)
+    run_scripts("脚本规格：验证红回滚：验证命令退 1、反向定点替换只改回这一次的那一处，别的会话加的一行留着",
+                [{"file": "scripts/tool.py", "old": "    return 0\n", "new": "    return 1\n"}], EXIT_ROLLED_BACK,
+                {**script_untouched, "scripts/tool.py": SELFTEST_SCRIPT + SELFTEST_OTHER_SESSION_LINE},
+                want_text="验证命令退 1", verify=SELFTEST_SCRIPT_VERIFY, after_swap=other_session_appends_script)
+
+    # 验的时候主工作区那份被改了：不换（开关 skip-base-check 下红）
+    def other_session_edits_script(root):
+        with open(os.path.join(root, "scripts", "tool.py"), "w", encoding="utf-8") as handle:
+            handle.write(SELFTEST_OTHER_SESSION_LINE + SELFTEST_SCRIPT)
+    run_scripts("脚本规格：验的时候主工作区那份被改了：一个字节不写", [script_version_edit], EXIT_CHANGED,
+                {**script_untouched, "scripts/tool.py": SELFTEST_OTHER_SESSION_LINE + SELFTEST_SCRIPT}, after_draft=other_session_edits_script,
+                verify=SELFTEST_SCRIPT_VERIFY)
+    # 规格不收的几种（开关 script-paths-unrestricted 下第一种红）
+    run_scripts("脚本规格：scripts/ 之外的文件不收", [{"file": "research/notes.txt", "old": "记录", "new": "笔记"}], EXIT_BAD_INPUT, script_untouched)
+    run_scripts("脚本规格：钩子文件与脚本混在一份规格里：不收", [{"file": ".claude/hooks/fake_lib.py", "old": 'MARKER = "HEAVY"', "new": 'MARKER = "HEAVYX"'}, script_version_edit],
+                EXIT_BAD_INPUT, script_untouched, hook=".claude/hooks/fake-guard.sh", feeds=SELFTEST_FEEDS)
+    run_scripts("脚本规格：带 --hook：不收（脚本没有钩子要喂）", [script_version_edit], EXIT_BAD_INPUT, script_untouched, hook=".claude/hooks/fake-guard.sh")
+    run_scripts("脚本规格：带 --feeds：不收", [script_version_edit], EXIT_BAD_INPUT, script_untouched, feeds=SELFTEST_FEEDS)
+    run("钩子规格：带 --verify：不收", [SELFTEST_GOOD_EDIT], EXIT_BAD_INPUT, untouched, verify="true")
+    run("钩子规格：不带 --hook：不收", [SELFTEST_GOOD_EDIT], EXIT_BAD_INPUT, untouched, hook=None)
     shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
         print(f"  ✗ hook-swap 自检：{failure}")  # gate-lint:detail
@@ -767,8 +942,10 @@ def selftest():
         return 1
     print(f"  ✓ hook-swap 自检通过（查了 {checked} 种）：草稿与换上之后都验过的换上新 inode；钩子 bash 层语法错、内嵌 python 编译不过、判法改错的草稿一个字节不写；"
           "换上之后验不过的按反向定点替换回滚、别的会话这段时间里加的一行留着；验的时候主工作区被改了不换；"
-          "不在 .claude/hooks/ 的文件、回滚找不回原处的规格不收；内嵌 python 切段认 <<- 与没收尾的；内置喂法里的脚本路径都在仓里；内置喂法带花括号与参数通配的六条，"
-          "在花括号写法上放行的钩子先验停下并点名那一条")
+          "不在 .claude/hooks/ 也不在 scripts/ 的文件、回滚找不回原处的规格不收；内嵌 python 切段认 <<- 与没收尾的；内置喂法里的脚本路径都在仓里；内置喂法带花括号与参数通配的六条，"
+          "在花括号写法上放行的钩子先验停下并点名那一条；脚本规格（scripts/ 下任意层）：草稿语法检查、--dry-run 停在草稿、换上之后验证命令退 0 才算验过，"
+          "验证命令退 1 按反向定点替换回滚（别的会话加的一行留着）、验的时候被改不换、scripts/ 之外的文件与钩子脚本混写的规格不收、"
+          "脚本规格带 --hook 或 --feeds、钩子规格带 --verify 或不带 --hook 都不收")
     return 0
 
 
@@ -776,8 +953,9 @@ def main(arguments):
     if arguments == ["--selftest"]:
         return selftest()
     usage = ("hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]，"
+             "或 hook-swap.py <规格.json> --scratch <草稿目录> [--verify <命令>] [--root <仓根>] [--dry-run]（规格里的文件都在 scripts/ 下），"
              "或 hook-swap.py --feed-only --hook <钩子>，或 hook-swap.py --selftest")
-    options = {"--hook": None, "--scratch": None, "--feeds": None, "--root": REPOSITORY_ROOT}
+    options = {"--hook": None, "--scratch": None, "--feeds": None, "--root": REPOSITORY_ROOT, "--verify": None}
     dry_run, feed_only_mode, positional, position = False, False, [], 0
     while position < len(arguments):
         argument = arguments[position]
@@ -814,8 +992,8 @@ def main(arguments):
             return EXIT_BAD_INPUT
         print("\n".join(lines))
         return code
-    if len(positional) != 1 or options["--hook"] is None or options["--scratch"] is None:
-        print("✗ 参数不对：要一份规格、--hook 与 --scratch")
+    if len(positional) != 1 or options["--scratch"] is None:
+        print("✗ 参数不对：要一份规格与 --scratch（钩子规格另要 --hook）")
         print(f"→ 怎么办：{usage}")
         return EXIT_BAD_INPUT
     try:
@@ -830,7 +1008,7 @@ def main(arguments):
         print("→ 怎么办：两份都是 UTF-8 的 JSON 数组，写法见文件头")
         return EXIT_BAD_INPUT
     try:
-        code, lines = swap(spec, options["--hook"], options["--scratch"], options["--root"], feeds=feeds, dry_run=dry_run)
+        code, lines = swap(spec, options["--hook"], options["--scratch"], options["--root"], feeds=feeds, dry_run=dry_run, verify=options["--verify"])
     except BadInput as error:
         problem, _, next_step = str(error).partition("\n")
         print(f"✗ {problem}")

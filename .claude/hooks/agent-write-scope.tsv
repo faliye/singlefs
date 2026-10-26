@@ -4,19 +4,22 @@
 #    旧根在跑的子 agent 与别的会话的子 agent 都交回之后，由主 agent 撤（改那份库，这张表不动）。
 # ⚠️ 模式里只有 ** 与 * 两个元字符：write-guard.sh 的 glob_to_regex 把别的字符一律 re.escape，
 #    写 e[0-9]*.rs 会被当成字面的「e[0-9]」、永远匹配不上，而闸只报「越出写范围」、不会说模式没写对（2026-09-22 踩过）。
-# 只登记 tools 里有 Write 或 Edit 的定义；表与定义逐项一致由 code-tooling.sh 的 agent-write-scope 格判。Bash 里的写不经过这道闸。
+# 只登记 tools 里有 Write 或 Edit 的定义；表与定义逐项一致由 code-tooling.sh 的 agent-write-scope 格判。Bash 里的写不经过 write-guard.sh，由 bash-command-detector.sh 的 ⑫ 照这张表判（读表与判法在 lib_write_scope.py，两边同一份；只判这张表里有行的 agent，往本仓写、落在它那几行之外的执行前拒绝）。
 implementation-writer	crates/**	implementation-writer.md「写范围」
 implementation-writer	litmus/**	implementation-writer.md「写范围」
 implementation-writer	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根；过渡期另放行旧根）（定义不许它写 kb 与 research/）
 kb-scribe	.claude/kb/**	kb-scribe.md「写范围」；relabel-item.py 改写的别处文件只许那个脚本改，不经 Edit
+kb-scribe	crates/singlefs-checker/invariants/*.md	crates/singlefs-checker/invariants/ 下的不变量清单，只限这些 .md（载体搬到这里之后，候选扫描认得它，写回员要能把去向写回；records/2026-10-22-子agent结果落地审计.md 第三批依赖表第 12 号任务，定义的「写范围」由第 11 号任务补）
+kb-scribe	crates/singlefs-checker/invariants/**/*.md	crates/singlefs-checker/invariants/ 各层子目录里的不变量清单，只限这些 .md（* 不跨目录、**/*.md 不盖下一层，与上一行合起来盖住下一层与各层子目录；门禁 code-tooling 的 kb-directories-write-scope 格要登记的 kb 目录下一层与子目录都写得到，records/2026-09-16-subagent拆分提案.md 第九十节 ⑧）
 kb-scribe	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根；过渡期另放行旧根）
-experiment-runner	scripts/experiments/**	experiment-runner.md「写范围」：bin 源文件
+experiment-runner	scripts/experiment-apparatus/**	experiment-runner.md「写范围」：bin 源文件
 experiment-runner	crates/singlefs-checker-tier/src/bin/e*.rs	实验装置要驱动真实 crates/ 代码时的只读 bin（2026-09-22 E156 撞上：岔路问的是「今天这份代码的性质」，另写一份独立模型答不了）。限定 e 开头加数字，碰不到 new_pool_file_creation_* 那几个生产装置；这个 bin 不许改 core/checker；checker 档包的改动改完直接跑、不开代码轮（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」），越界写由写闸管
 experiment-runner	crates/mutations.tsv	入库装置的变异行只追加进末尾（experiment-runner.md 第 2 步与「写范围」；2026-09-23 E158 撞上：闸拒了那次追加，三行落进 scripts/mutation/tables/ 下、门禁 checker-tier-crates-mutation-replay 复跑不到）
 experiment-runner	scripts/mutation/tables/**	变异表
 experiment-runner	research/results/**	这个实验的产物
-experiment-runner	scripts/experiments/replay.sh	复跑登记行
-experiment-runner	scripts/experiments/Cargo.toml	在末尾追加这个实验的 [[bin]]（agent-defs-r2 写范围探针：138 个实验 bin 有 100 个显式登记，副本里的试跑测不到这一处被拒）
+experiment-runner	scripts/experiment-apparatus/replay.sh	复跑登记行
+experiment-runner	.claude/gate.d/replay-comparison-units.tsv	experiment-runner.md 第 5 步与「写范围」：重跑登记有比对对象表的，实现单元时往这张表每个比对对象登一行（只写这个实验的行）
+experiment-runner	scripts/experiment-apparatus/Cargo.toml	在末尾追加这个实验的 [[bin]]（agent-defs-r2 写范围探针：138 个实验 bin 有 100 个显式登记，副本里的试跑测不到这一处被拒）
 experiment-runner	research/prompts/e*-preregistration.md	跑前登记的「修订」一段
 experiment-runner	.claude/kb/experiments/**	实验页
 experiment-runner	.claude/kb/experiments.md	实验索引行

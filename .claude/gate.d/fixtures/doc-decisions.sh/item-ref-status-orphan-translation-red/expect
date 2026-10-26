@@ -1,0 +1,7 @@
+exit=1
+want=decisions/ 下有 2 份孤立译文
+want=.claude/kb/decisions/941-甲.ja.md：没有 941-甲.md
+want=.claude/kb/decisions/943-丙.en.md：没有 943-丙.md
+want=.claude/kb/引用方.md:4 「已定项 2」写的是已定，而 D941（样本甲） 正文里第 2 条是未定
+want=  item-ref-status：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（item-ref-status）

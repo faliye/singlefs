@@ -1,0 +1,4 @@
+exit=0
+want=可信声明与 cfg 原子 1 处都登记在信任清单里
+want=产品构建与 verus --compile 构建的 MIR 逐条目比
+want=verus-proof：绿

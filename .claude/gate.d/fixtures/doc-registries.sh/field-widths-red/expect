@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：field-widths
+want=「设备 ID（8）」宽 1，指向的 D419 已定项 1 正文里没写出 1
+want=「密文校验和（9）」宽 4，指向的 D419 已定项 2 正文里没写出 4
+want=新池新建文件字段表里 2 行写的宽度，被指的已定分项正文里没写出（判了 3 行）
+want=field-widths：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-widths）

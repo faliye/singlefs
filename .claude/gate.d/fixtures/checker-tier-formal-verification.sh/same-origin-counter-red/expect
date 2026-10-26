@@ -1,0 +1,4 @@
+exit=1
+want=对「refinement-spec-o1-model」（refinement 的 spec × O1 的 model）：累计 5 次不一致而判「spec 错」0 次（model 错 5 次）：两条腿实际同源
+want=✗ 同源性计数器：1 处不对（已立 1 对、未立 1 对、事件 5 行）
+want=same-origin-counter：红（退出 1）

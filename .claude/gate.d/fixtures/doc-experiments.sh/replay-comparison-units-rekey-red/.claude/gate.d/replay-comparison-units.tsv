@@ -1,0 +1,6 @@
+# 样本登记表（借键红）：四行都复跑写 none:，登记出处与留存产物名四行都和基准那一版一样（setup.sh 写的基准见那份文件）。
+# 第 3 行把基准里 E991「丙」那一行的实验号与单元名换成 E992「丁」，第 4 行只换单元名（「戊」换「己」），第 5 行只换实验号（E991 换 E993），第 6 行原样。
+E992	research/prompts/e991-registration.md	丁	crates/sample/units.rs	e991-c.out	none:没有复跑行的理由甲
+E991	research/prompts/e991-registration.md	己	crates/sample/units.rs	e991-e.out	none:没有复跑行的理由乙
+E993	research/prompts/e991-registration.md	庚	crates/sample/units.rs	e991-g.out	none:没有复跑行的理由丙
+E991	research/prompts/e991-registration.md	甲	crates/sample/units.rs	e991-a.out	none:没有复跑行的理由丁

@@ -1,0 +1,7 @@
+# 样本用的 Verus 登记表：release 行照真仓（样本里没有 verus.zip，那一项只报一句不核），只登记一个假的 vstd 包
+release	0.2026.09.20.aef82ed	aef82eda71838deef4a8cd0260fda6c9504be9b9	7b870fa12bc589015c2fab60a8b3d9f07c7b1adb3444eb0fadffcbf7f0447b33	singlefs/formal-tools/verus-0.2026.09.20/verus-x86-linux
+package	vstd	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	source/vstd	135cc8280824fe808e9d25edf33978f5ee32dc51a1ccb47e74ee0c4b4f91b545
+crate	crates/singlefs-replay-prefix	2
+kernel	crates/singlefs-replay-prefix/src/lib.rs
+must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+rustc	1.98.1-x86_64-unknown-linux-gnu	1.97.0	88d9e12ae178fab0fb5cc050a94da85685d449ea

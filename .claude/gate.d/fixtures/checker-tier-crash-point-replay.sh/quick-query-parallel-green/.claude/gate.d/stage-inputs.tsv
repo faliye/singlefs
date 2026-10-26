@@ -1,0 +1,5 @@
+checker-tier-crash-point-replay.sh	tests-of:singlefs-checker-tier	command=cargo command=rustc	# 样本：本阶段那一行（入口是 checker 档包的测试函数）
+crash-case:settled-covered-stream	-	test=singlefs-checker-tier:settled_covered_stream:settled_covered_stream_full	# 样本：查库并行样本里的一条崩溃枚举用例
+crash-case:slow-uncovered-stream	-	test=singlefs-checker-tier:slow_uncovered_stream:slow_uncovered_stream_full	# 样本：查库并行样本里的一条崩溃枚举用例
+crash-case:fast-uncovered-stream	-	test=singlefs-checker-tier:fast_uncovered_stream:fast_uncovered_stream_full	# 样本：查库并行样本里的一条崩溃枚举用例
+crash-case:other-covered-stream	-	test=singlefs-checker-tier:other_covered_stream:other_covered_stream_full	# 样本：查库并行样本里的一条崩溃枚举用例

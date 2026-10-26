@@ -4,7 +4,7 @@
 
 Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。Rust 一侧 crates/singlefs-checker-tier 的判定存储（verdict_store 模块）是另一份存法，不在这里。
 用它的：
-  门禁 checker-tier-formal-verification 的两份判法（scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py）、
+  门禁 checker-tier-formal-verification 的两份判法（scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py）、
     门禁 checker-tier-lkmm（.claude/scripts/lkmm.sh 每份 litmus 两条判定）与门禁 checker-tier-qemu-device-streams（每档一条判定）用整套：
     函数单元闭包键（FunctionUnitIndex）、VerdictLibrary 存放与按键读、write_atomically 原子写、Tally 现判与复用分开报；两道 shell 写的门禁经下面的命令行用。
   门禁 checker-tier-crates-mutation-replay 的判法（scripts/mutation/crates-mutation-rows.py）用 write_atomically、read_text 与 Tally。

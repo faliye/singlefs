@@ -1,0 +1,6 @@
+exit=1
+want=搬迁登记表 .claude/gate.d/path-moves.tsv 有 3 处不对（共 5 行）
+want=第 4 行日期「十月一日」不是 YYYY-MM-DD
+want=第 5 行有 3 列，要 4 列
+want=第 6 行的出处 records/没有这一份.md 不在
+want=→ 怎么办：

@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switches-sample-only
+want=读开关的 2 道都经共用库那一判（经 stage_cells_run 1 道、自己调 stage_cells_refuse_unsampled_break_switches 1 道）
+want=break-switches-sample-only：绿

@@ -1,12 +1,12 @@
 exit=1
 want=样本只跑 .gate-cells 点名的格：data-names
-want=scripts/experiments/e1_demo.rs:1  元组首列「system_configuration_mac」里 「mac」是缩写
-want=scripts/experiments/e1_demo.rs:4  => 右侧「tail_cnt」里 「cnt」是缩写
-want=scripts/experiments/e1_demo.rs:9  键= 的键名「num_items」里 「num」是缩写
-want=scripts/experiments/e1_demo.rs:10  元组首列「x」里 「x」是单字母
+want=scripts/experiment-apparatus/e1_demo.rs:1  元组首列「system_configuration_mac」里 「mac」是缩写
+want=scripts/experiment-apparatus/e1_demo.rs:4  => 右侧「tail_cnt」里 「cnt」是缩写
+want=scripts/experiment-apparatus/e1_demo.rs:9  键= 的键名「num_items」里 「num」是缩写
+want=scripts/experiment-apparatus/e1_demo.rs:10  元组首列「x」里 「x」是单字母
 want=.claude/kb/demo.md:3  kb 表格单元格「cnt_total」里 「cnt」是缩写
-want=.claude/data-name-lint-exclude:1  scripts/experiments/e1_demo.rs:renamed_long 已经一个违规都没有了
-want=.claude/data-name-lint-exclude:2  scripts/experiments/gone.rs:cnt_total 指向不存在的路径 scripts/experiments/gone.rs
+want=.claude/data-name-lint-exclude:1  scripts/experiment-apparatus/e1_demo.rs:renamed_long 已经一个违规都没有了
+want=.claude/data-name-lint-exclude:2  scripts/experiment-apparatus/gone.rs:cnt_total 指向不存在的路径 scripts/experiment-apparatus/gone.rs
 want=5 处违规、排除表 2 处不合规（扫了 2 份文件、9 个串）
 want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
 want=data-names：红（退出 1）

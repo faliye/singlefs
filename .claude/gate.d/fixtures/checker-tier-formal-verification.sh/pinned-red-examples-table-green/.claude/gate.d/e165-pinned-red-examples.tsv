@@ -1,7 +1,7 @@
 # E165（恢复重放有界穷举与变异杀伤界）钉住的红例：全量那一档每出一个红，按输入原样钉成这里的一行，快档逐行复判（用户 2026-10-01 定，调度记录 records/2026-10-01-里程碑三形式化接入.md 第三节）。
 # 修好之后留作回归：今天的实现在这个输入上的逐态行要与 ⑦ 逐字节相同，⑥ 点名的「改回去就红」的变异要还在它的表里。
-# 行只由 scripts/experiments/e165-pin-red-examples.py <红例账…> 追加（写前复核这份文件没被别人改过，已钉的不重复），不手改；
-# E165 第二段驱动 scripts/experiments/e165-replay-mutation-kill-bounds.sh 写完红例账之后当场调它。
+# 行只由 scripts/experiment-apparatus/e165-pin-red-examples.py <红例账…> 追加（写前复核这份文件没被别人改过，已钉的不重复），不手改；
+# E165 第二段驱动 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh 写完红例账之后当场调它。
 # 门禁 checker-tier-formal-verification 的两格判这张表：pinned-red-examples-table（只判这张表自己：22 段、指纹、抄来的段、㉒ 的写法、⑥ 的变异还在；不读红例账与产物）、
 # pinned-red-examples-replay（⑥ 的变异还在；装置 e165_replay_bounded_enumeration --pinned-cases <本表> 逐行打的结果与 ⑦ 逐字节相同）。
 # 八段，制表符分隔：

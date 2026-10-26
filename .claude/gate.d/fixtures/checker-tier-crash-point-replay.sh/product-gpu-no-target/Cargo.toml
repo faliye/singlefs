@@ -1,0 +1,2 @@
+[workspace]
+members = ["crates/singlefs-checker-tier", "crates/singlefs-background-gpu"]

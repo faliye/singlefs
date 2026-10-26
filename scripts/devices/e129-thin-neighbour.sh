@@ -30,14 +30,33 @@ S() {
   printf '%s\n' "$PASS" | sudo -S -p '' "$@"
 }
 
+source "$REPO/scripts/devices/dm-owned.sh" || exit 2
+
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e129n.XXXXXX")"
-POOL=sfs_e129n_pool; TH=sfs_e129n_thin; SN=sfs_e129n_snap; DATA=sfs_e129n_data
+POOL="sfs_e129n_pool_${W##*.}_$$"; TH="sfs_e129n_thin_${W##*.}_$$"; SN="sfs_e129n_snap_${W##*.}_$$"; DATA="sfs_e129n_data_${W##*.}_$$"
 LOOP_M=""; LOOP_D=""
+teardown_pool() {
+  local d
+  for d in "$SN" "$TH" "$POOL" "$DATA"; do remove_dm "$d" || return 1; done
+  if [[ -n "$LOOP_M" ]]; then
+    S losetup -d "$LOOP_M" || return 1
+    LOOP_M=""
+  fi
+  if [[ -n "$LOOP_D" ]]; then
+    S losetup -d "$LOOP_D" || return 1
+    LOOP_D=""
+  fi
+  rm -f "$W/meta.img" "$W/data.img"
+}
 cleanup() {
-  for d in "$SN" "$TH" "$POOL" "$DATA"; do S dmsetup remove "$d" 2>/dev/null; done
-  [ -n "$LOOP_M" ] && S losetup -d "$LOOP_M" 2>/dev/null
-  [ -n "$LOOP_D" ] && S losetup -d "$LOOP_D" 2>/dev/null
-  rm -rf "${W:?}"
+  local status=$?
+  if teardown_pool; then
+    rm -rf "${W:?}" || status=1
+  else
+    printf '  ✗ 清理失败，保留后备文件：%s（meta=%s data=%s）\n' "$W" "$LOOP_M" "$LOOP_D" >&2
+    status=1
+  fi
+  exit "$status"
 }
 trap cleanup EXIT
 N=0; SPOOL=""; emit() { printf 'E7RESULT %s\n' "$*"; [ -n "$SPOOL" ] && printf '%s\n' "$*" >> "$SPOOL"; N=$((N+1)); }
@@ -62,27 +81,27 @@ sys.stdout.buffer.write(bytes(buf))" > "$1"; }
 one_cell() {
   local round="$1" inject="$2"
   truncate -s "${META_MB}M" "$W/meta.img"; truncate -s "${DATA_MB}M" "$W/data.img"
-  LOOP_M="$(S losetup --find --show "$W/meta.img")"
-  LOOP_D="$(S losetup --find --show "$W/data.img")"
-  S dd if=/dev/zero of="$LOOP_M" bs=4096 count=1 status=none 2>/dev/null
+  LOOP_M="$(S losetup --find --show "$W/meta.img")" || { emit "name=fatal reason=setup_failed"; exit 4; }
+  LOOP_D="$(S losetup --find --show "$W/data.img")" || { emit "name=fatal reason=setup_failed"; exit 4; }
+  S dd if=/dev/zero of="$LOOP_M" bs=4096 count=1 status=none 2>/dev/null || { emit "name=fatal reason=setup_failed"; exit 4; }
   local data_sect=$(( DATA_MB*1024*1024/512 ))
   if [ "$inject" = 1 ]; then
     printf '0 %d linear %s 0\n%d %d error\n' "$GOOD_SECT" "$LOOP_D" "$GOOD_SECT" "$((data_sect-GOOD_SECT))" > "$W/dt"
   else
     printf '0 %d linear %s 0\n' "$data_sect" "$LOOP_D" > "$W/dt"
   fi
-  S dmsetup create "$DATA" "$W/dt" || { emit "name=fatal reason=data_dm_failed"; return; }
-  S dmsetup create "$POOL" --table "0 $data_sect thin-pool $LOOP_M /dev/mapper/$DATA $BLK_SECT 0" \
-    || { emit "name=fatal reason=pool_failed"; return; }
-  S dmsetup message "/dev/mapper/$POOL" 0 "create_thin 0"
-  S dmsetup create "$TH" --table "0 $VOL_SECT thin /dev/mapper/$POOL 0"
+  create_dm "$DATA" "$W/dt" || { emit "name=fatal reason=data_dm_failed"; exit 4; }
+  create_dm "$POOL" --table "0 $data_sect thin-pool $LOOP_M /dev/mapper/$DATA $BLK_SECT 0" \
+    || { emit "name=fatal reason=pool_failed"; exit 4; }
+  S dmsetup message "/dev/mapper/$POOL" 0 "create_thin 0" || { emit "name=fatal reason=setup_failed"; exit 4; }
+  create_dm "$TH" --table "0 $VOL_SECT thin /dev/mapper/$POOL 0" || { emit "name=fatal reason=setup_failed"; exit 4; }
 
-  mkpattern "$W/pat.bin"
-  S dd if="$W/pat.bin" of="/dev/mapper/$TH" bs="$BLK_BYTES" count=1 oflag=direct status=none 2>/dev/null
+  mkpattern "$W/pat.bin" || { emit "name=fatal reason=setup_failed"; exit 4; }
+  S dd if="$W/pat.bin" of="/dev/mapper/$TH" bs="$BLK_BYTES" count=1 oflag=direct status=none 2>/dev/null || { emit "name=fatal reason=setup_failed"; exit 4; }
   S blockdev --flushbufs "/dev/mapper/$TH" 2>/dev/null
   # 建快照 ⇒ 块共享 ⇒ 下一次写触发整块 COW（分配到块 1，横跨 good/error 边界）
-  S dmsetup message "/dev/mapper/$POOL" 0 "create_snap 1 0"
-  S dmsetup create "$SN" --table "0 $VOL_SECT thin /dev/mapper/$POOL 1"
+  S dmsetup message "/dev/mapper/$POOL" 0 "create_snap 1 0" || { emit "name=fatal reason=setup_failed"; exit 4; }
+  create_dm "$SN" --table "0 $VOL_SECT thin /dev/mapper/$POOL 1" || { emit "name=fatal reason=setup_failed"; exit 4; }
 
   # ⚠️ **判别子**：光看「邻居完好」分不出「机制是安全的」和「注入根本没打到 COW」。
   # 所以这一步同时记两样：数据设备上真正写进去了多少扇区，以及 pool 用了几个块。
@@ -110,18 +129,22 @@ one_cell() {
     first_diff="$(python3 -c "
 got=open('$W/b.bin','rb').read()
 want=open('$W/pat.bin','rb').read()[$B_OFF:$B_OFF+512]
-print(next((i for i,(a,b) in enumerate(zip(got,want)) if a!=b), -1) if got!=want else -1)")"
+print(next((i for i,(a,b) in enumerate(zip(got,want)) if a!=b), min(len(got), len(want))) if got!=want else -1)")" || { emit "name=fatal reason=compare_failed"; exit 4; }
+    [[ "$first_diff" =~ ^(-1|[0-9]+)$ ]] || { emit "name=fatal reason=invalid_comparison"; exit 4; }
     if [ "$first_diff" = "-1" ]; then verdict=intact; else verdict=silent; fi
   fi
   emit "name=neighbour round=$round inject=$inject write_rc=$wrc read_rc=$rrc verdict=$verdict first_diff=$first_diff cow_sectors=$cow_sectors pool_data_before=$pool_before pool_data_after=$pool_after"
 
-  for d in "$SN" "$TH" "$POOL" "$DATA"; do S dmsetup remove "$d" 2>/dev/null; done
-  S losetup -d "$LOOP_M" 2>/dev/null; LOOP_M=""
-  S losetup -d "$LOOP_D" 2>/dev/null; LOOP_D=""
-  rm -f "$W/meta.img" "$W/data.img"
+  teardown_pool || { emit "name=fatal reason=cleanup_failed"; exit 4; }
 }
 
 for r in $(seq 1 "$ROUNDS"); do one_cell "$r" 1; one_cell "$r" 0; done
+
+# 每轮两格必须齐全；没有测量不等于没有失败。
+for inject in 0 1; do
+  cells=$(grep -c "^name=neighbour .* inject=$inject " "$SPOOL" || true)
+  [[ "$cells" -eq "$ROUNDS" ]] || { emit "name=fatal reason=missing_cells inject=$inject cells=$cells"; exit 5; }
+done
 
 # ── 判决。两条，缺一条这一格的「邻居完好」就什么也不证明：
 # ① 注入格必须真的把 COW 撕开：0 < cow_sectors < 128。为 0 说明注入没打到 COW，

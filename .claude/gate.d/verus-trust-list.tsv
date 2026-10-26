@@ -1,0 +1,18 @@
+# Verus 的信任清单：门禁 checker-tier-formal-verification 的 verus-proof 格（scripts/gate/verus-proof-check.py 的 region_problems）照它判被验区域里的可信声明。
+# 被验区域是登记表 .claude/gate.d/verus-pins.tsv 点名的各 crate 的核里 verus! { … } 包的与属性写法（#[verus_verify]、#[verus_spec(…)]）标的条目。
+# 一行一条，制表符分隔，第一段是种类：
+#   vstd	<版本>	<包源码的内容指纹>	<理由>
+#     vstd 按版本整体信任一行：版本与指纹要与 verus-pins.tsv 的 package vstd 那一行相同（换 vstd 两处一起改，并照那份表的注释复核同源）。恰好一行。
+#   <种类>	<文件（相对仓根）>	<点名的条目>	<规格原文的 sha256>	<差分测试的测试名>	<理由（至少 4 个字）>
+#     种类：assume_specification、external_body、uninterp、external_fn_specification、external_trait_specification、external_type_specification、
+#       external_trait_extension，或 cfg（被验区域里的 cfg 原子：#[cfg(…)]、#[cfg_attr(…)]、cfg!(…)，与定义里有 cfg 的 macro_rules! 宏在被验区域里的调用）。
+#     点名的条目：assume_specification 写方括号里那一项（词法单元连写，例 <[T]>::binary_search）；external_body、uninterp 与 external_*_specification
+#       写那个条目的全路径 <crate>::<模块>::<名>（impl 里的方法写 <类型>::<方法>）；cfg 写 <所在条目的全路径>#<原子>（例 singlefs_core::m::pick#cfg!(debug_assertions)、
+#       singlefs_core::m::pick#plus_span!）。
+#     规格原文的 sha256：assume_specification 是从它到同一层的 ; 为止，external_body 是函数体的 { 之前那一截（签名、requires、ensures），
+#       uninterp、external_*_specification 与 cfg 是所在条目整个；都是去了注释与空白的词法单元用一个空格连起来再取 sha256。
+#       没登记、或 sha256 对不上时红句里给现算的那一个与整行的样子。
+#     差分测试的测试名：crates/ 下标了 #[test] 的一个函数名（写全路径的取最后一段），它把这一份规格与真实现在一批输入上逐值比，规格写错时要红。
+# 判法：被验区域里的每一处都要恰好登记一行（种类、文件、点名的条目相同），清单里落在某个 crate 里的行在那个 crate 的核里都找得到，文件不在登记的哪个 crate 里的行判红。
+# axiom、admit(…)、assume(…)、verifier::external 不进这张表：在核里一律判红。cfg 原子能不用就不用。
+vstd	0.0.0-2026-09-20-0158	068cac977afcf0f5d5b736f8fa3ceb79114a1f3634c59ba6671331a99dd022ac	vstd 的全部 assume_specification 与外部规格按发布整体信任，版本钉在 verus-pins.tsv 的 package vstd 行

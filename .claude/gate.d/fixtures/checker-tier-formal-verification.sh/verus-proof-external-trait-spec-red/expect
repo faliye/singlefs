@@ -1,0 +1,3 @@
+exit=1
+want=external_trait_specification singlefs_replay_prefix::ExFromStr 没登记进信任清单
+want=verus-proof：红（退出 1）

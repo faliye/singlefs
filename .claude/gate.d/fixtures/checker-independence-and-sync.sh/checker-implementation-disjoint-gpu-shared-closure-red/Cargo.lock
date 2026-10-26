@@ -1,0 +1,36 @@
+# 样本：只留 wgpu 一族那一支与两个外部 crate
+version = 4
+
+[[package]]
+name = "bytemuck"
+version = "1.23.0"
+
+[[package]]
+name = "naga"
+version = "30.0.1"
+dependencies = [
+ "smallvec",
+]
+
+[[package]]
+name = "pollster"
+version = "1.0.1"
+
+[[package]]
+name = "smallvec"
+version = "1.15.0"
+
+[[package]]
+name = "wgpu"
+version = "30.0.1"
+dependencies = [
+ "bytemuck",
+ "wgpu-core",
+]
+
+[[package]]
+name = "wgpu-core"
+version = "30.0.1"
+dependencies = [
+ "naga",
+]

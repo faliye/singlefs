@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：selftest-registry-deviations
+want=.claude/hooks/selftest-registry.tsv:3 scripts/gate/sample-heavy.sh（heavy）的理由没以「偏离上游：」起头
+want=.claude/hooks/selftest-registry.tsv:4 scripts/crash/sample-heavy-if-set.sh（heavy-if-set:SINGLEFS_HEAVY_TESTS）的理由「偏离上游：」之后不到 8 个字
+want=登记成重的自证 2 行里 2 行没登记成偏离
+want=selftest-registry-deviations：红（退出 1）

@@ -1,0 +1,5 @@
+# 样本：一行好的、一行指向不存在的文件、一行锚串一处都不命中、最后一行是基准之后才加的（setup.sh 提交基准时去掉它）
+scripts/hosts/selftest_values.sh:--memory-cap 256M  # 样本：自证里造的假值
+scripts/hosts/gone.sh:16G  # 样本：指向不存在的文件
+scripts/experiment-apparatus/fixed_wrapper.sh:no-such-anchor  # 样本：锚串一处都不命中
+scripts/experiment-apparatus/fixed_option.sh:--memory-cap 6G  # 样本：基准之后才加的一行 grown-row

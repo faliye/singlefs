@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""治理文档、kb 与仓根 README（README.md、README.zh.md、README.ja.md）里对门禁的指向还指不指得到：门禁 doc-registries 的 governance-refs 那一格调它，不单独成阶段。
+"""治理文档、kb 与仓根 README（README.md、README.en.md、README.ja.md）里对门禁的指向还指不指得到：门禁 doc-registries 的 governance-refs 那一格调它，不单独成阶段。
 
 治理文档：CLAUDE.md、.claude/main-agent.md、.claude/agent-common.md、.claude/agents/*.md、.claude/rules/*.md、.claude/skills/*/SKILL.md。
-现状文字：治理文档加 .claude/kb/ 下全部 .md 与仓根的 README.md、README.zh.md、README.ja.md（三语文件，在的都算），去掉「## 历史版本」那一节（到下一个「## 」标题或文件末尾）与
+现状文字：治理文档加 .claude/kb/ 下全部 .md 与仓根的 README.md、README.en.md、README.ja.md（三语文件，在的都算），去掉「## 历史版本」那一节（到下一个「## 」标题或文件末尾）与
 decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；research/prompts/、records/、.claude/warnings/ 不在射程里（冻结的证据与记事）。
 仓根的三份 README 只判 ④ ⑤（它们不是治理文档，① ② ③ 不扫它们）。
 
@@ -41,7 +41,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
 
 输出：每处红一行「文件:行: 说明」；「没判的」逐条一行；末两行
 「扫 N 份治理文档：门禁号 A 处、路径 B 处、小节 C 处；没判 D 处；跳过 E 处（被 .gitignore 挡着 F、不像仓内路径 G、仓外或带占位 H）」与
-「扫 M 份现状文字（治理文档、kb 与仓根 README.md、README.zh.md、README.ja.md，历史版本节与变更史除外）：门禁全名 I 处、格名 J 处、旧编号 K 处」。
+「扫 M 份现状文字（治理文档、kb 与仓根 README.md、README.en.md、README.ja.md，历史版本节与变更史除外）：门禁全名 I 处、格名 J 处、旧编号 K 处」。
 退出码：0 全指得到；1 有指不到的；3 一份治理文档都没扫到（没有对象，不许当通过）；4 本脚本自己出错（读不了某份文件这类，打出 traceback）；
 python 起不来时退 2（打不开脚本）。调用方把 0、1、3 之外的都当「没跑成」。
 
@@ -50,8 +50,10 @@ python 起不来时退 2（打不开脚本）。调用方把 0、1、3 之外的
   names-ignored         ④ 整条不判：governance-refs-red 里「不是门禁目录里的门禁」「格名表里没有」那几行 want 找不到
   history-scanned       「## 历史版本」一节与变更史也扫：governance-refs-green 判红
   fences-scanned        代码围栏里的行也当现状文字扫：governance-refs-green 里围栏内那行旧路径判红
-  readme-skipped        仓根的三份 README 都不进现状文字：governance-refs-red 里「README.md:」「README.zh.md:」「README.ja.md:」那几行 want 找不到，
+  readme-skipped        仓根的三份 README 都不进现状文字：governance-refs-red 里「README.md:」「README.en.md:」「README.ja.md:」那几行 want 找不到，
                         governance-refs-green 的现状文字份数与全名、格名处数对不上
+  readme-old-name       README_PATTERNS 退回改名之前的 README.zh.md（仓根现在没有这一份，README.en.md 扫不到）：governance-refs-red 里「README.en.md:」那一行 want 找不到，
+                        governance-refs-green 的现状文字份数少一份
 """
 import glob
 import importlib.util
@@ -70,10 +72,17 @@ BROKEN = os.environ.get("GOVERNANCE_REFS_BREAK", "")
 CARRIER_PATTERNS = ["CLAUDE.md", ".claude/main-agent.md", ".claude/agent-common.md",
                     ".claude/agents/*.md", ".claude/rules/*.md", ".claude/skills/*/SKILL.md"]
 KB_PATTERN = ".claude/kb/**/*.md"
-# 仓根的三份 README（英语 README.md 是默认版本，README.zh.md 是中文，README.ja.md 是日语）：只进现状文字（④ ⑤），不当治理文档；在的才算
-README_PATTERNS = ["README.md", "README.zh.md", "README.ja.md"]
-HISTORY_FILES = ("decisions-history.md", "experiments-history.md", "CHANGELOG.md")
-HISTORY_HEADING = re.compile(r"^##\s*历史版本")
+# 仓根的三份 README（README.md 是中文，README.en.md 是英语，README.ja.md 是日语）：只进现状文字（④ ⑤），不当治理文档；在的才算
+README_PATTERNS = ["README.md", "README.en.md", "README.ja.md"]
+# 弄坏开关 readme-old-name：退回改名之前的文件名
+if BROKEN == "readme-old-name":
+    README_PATTERNS = ["README.md", "README.zh.md", "README.ja.md"]
+HISTORY_FILES = (
+    "decisions-history.md", "decisions-history.en.md", "decisions-history.ja.md",
+    "experiments-history.md", "experiments-history.en.md", "experiments-history.ja.md",
+    "CHANGELOG.md", "CHANGELOG.en.md", "CHANGELOG.ja.md",
+)
+HISTORY_HEADING = re.compile(r"^##\s*(?:历史版本|Historical Versions|履歴バージョン)")
 LEVEL_TWO_HEADING = re.compile(r"^##\s")
 FENCE_LINE = re.compile(r"^[ \t]*```")
 GATE_NUMBER = re.compile(r"(?<![0-9A-Za-z.\-–])((?:[0-9]{2}\s*[、/]\s*)*[0-9]{2})\s*号")
@@ -457,7 +466,7 @@ def main():
     for item in unjudged:
         print(f"  没判的：{item}")
     print(f"  扫 {len(carriers)} 份治理文档：门禁号 {counts['gate']} 处、路径 {counts['path']} 处、小节 {counts['section']} 处；没判 {len(unjudged)} 处；跳过 {sum(skipped.values())} 处（被 .gitignore 挡着 {skipped['ignored']}、不像仓内路径 {skipped['not_repo_path']}、仓外或带占位 {skipped['outside']}）")
-    print(f"  扫 {len(current_carriers)} 份现状文字（治理文档、kb 与仓根 README.md、README.zh.md、README.ja.md，历史版本节与变更史除外）：门禁全名 {counts['name']} 处、格名 {counts['cell']} 处、旧编号 {counts['old']} 处")
+    print(f"  扫 {len(current_carriers)} 份现状文字（治理文档、kb 与仓根 README.md、README.en.md、README.ja.md，历史版本节与变更史除外）：门禁全名 {counts['name']} 处、格名 {counts['cell']} 处、旧编号 {counts['old']} 处")
     return 1 if problems else 0
 
 

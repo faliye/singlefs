@@ -4,14 +4,15 @@
 """只暂存这一轮的改动：几个会话共写同一批文件时，把工作区里「我的」那几块挑进暂存区，别人的留在工作区。
 
 用法：
-  stage-mine.py --match 正则 [--match 正则 …] [--foreign 正则 …] [--split 正则] [--by-row] [--dry-run] 文件…
+  stage-mine.py --match 正则 [--match 正则 …] [--foreign 正则 …] [--split 正则] [--by-row] [--keep-foreign] [--dry-run] 文件…
   stage-mine.py --write-index 文件 内容来源文件 [--foreign 正则 …]
+  stage-mine.py --verify --rename 旧 新 [--rename 旧 新 …] 文件…   # 旧是正则，新是 re.sub 的替换串
   stage-mine.py --selftest      # STAGE_MINE_BREAK=<项> 时必须判红（项名见文末）
 
 怎么挑：拿暂存区里的版本（没暂存过就是 HEAD）当底，与工作区逐行比，得到一段段改动；
 插入的整段再按「块」切开——默认 markdown 标题行、表格行、replay.sh 的登记行（`E<数字>|`）各起一块，其余行跟着前一块走；
 一块里有任何一行命中 --match 就是我的，进暂存区；一行都不命中的留在工作区。
-改了已有行的那种改动切不开：两个会话改了同一行时它会整段进来，所以任何进暂存区的块命中 --foreign 一律拒绝。
+改了已有行的那种改动切不开：两个会话改了同一行时它会整段进来，所以任何进暂存区的块命中 --foreign 一律拒绝（带 --keep-foreign 时不拒，那一块照暂存区原样留下，见下）。
 新文件不归它管：整份是这一轮的就直接 `git add`。
 
 **挪了位置的行**：一行被挪到别处、内容又顺手改过时，逐行比对给出的是「这里删一行、那里插一行」两段，
@@ -34,6 +35,17 @@ dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
 文件相对仓根；内容来源文件按调用时的目录算。按块挑的写索引（`stage`）走同一个函数 `write_index`，不另抄；
 它拿暂存区那一版当比对底（块里本来就在暂存区、别的会话暂存的行不算这一次新增的）。
 
+**--keep-foreign（命中 --foreign 的块照暂存区原样留下）**：一行同时含我的改动与别人的改动（两个会话改了同一行）时，那一块既命中 --match 又命中 --foreign，
+换任何 --split 都切不开。带 --keep-foreign：这样的块不拒，要写进暂存区的内容里这一块取比对底（暂存区，没暂存过就是 HEAD）那一版原样，工作区一个字节不动；
+别的我的块照常进。输出里这一块打成「= …（命中 --foreign，按暂存区原样留下）」，算在「留在工作区」里：它里面我的那一半没进暂存区，
+要另行处理（等对方先提交再挑，或手里合一份内容走 --write-index）。命中 --match 的块全都命中 --foreign、一块都没进的，退 3。
+与 --by-row 同用时，纯行式的块照 --by-row 按整行挑，--by-row 拒的照旧拒。scripts/kb/batch-target.py 的按块挑组认同一个开关（choose() 的 keep_foreign）。
+
+**--verify（证明暂存进去的只有我的）**：拿暂存区那一版与 HEAD 那一版逐行比（不在 HEAD 里或不在暂存区里的当空文件），得到删除行与新增行；
+删除行逐行依次套上 --rename 给的改名（re.sub(旧, 新)），与新增行按多重集相减（同一行出现几次算几份），两个方向剩下的行数合起来要为 0：
+为 0 退 0，报每个文件删除、新增各几行；不为 0 逐行列出（新增里多出的、删除里多出的各至多 20 行），退 5。
+它管的是「这一批只是改名」的暂存：改名之外另有新增或删除的行（别的会话的改动整份进了暂存区就是这样）都会剩下。至少要一个 --rename；只读，不写索引、不碰工作区。
+
 为什么要有它：同一个文件里两个会话的块常常紧挨着插在同一处（两份变更史的最上面、索引表的末尾），
 按行或按段手抄「HEAD + 我的」已经手写了四遍，每遍都要为那几个文件现写一段 python。
 
@@ -43,16 +55,25 @@ dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
 没带 --by-row 必须拒绝，带了必须只暂存我那一行、暂存区 = HEAD + 我那一行，块里夹正文行时带了也拒绝；
 再造一份带别人新增行的内容喂给 --write-index，必须退 3、索引不动，只带我的新增行的必须写进去。
 另造一个块（两张表各有一条分隔行 `|---|`，我的一行加在第二张表的分隔行后面），必须落在第二处。
+另造一份同一行挤着我的改名与别人改动的文件：没带 --keep-foreign 必须拒绝（退 4），带了必须只暂存我那一块、那一行照暂存区原样留下、工作区不动，
+命中 --match 的块全命中 --foreign 的必须退 3；再往暂存区里放三份：只改名的 --verify 必须退 0，夹着别人改的一行、别人多加一份重复行的必须退 5，没给 --rename 退 2。
 
-弄坏开关 STAGE_MINE_BREAK=<项>（只给 --selftest 证红用，打开后 --selftest 退 1；项名、弄坏哪一处、红在哪个用例）：
+弄坏开关 STAGE_MINE_BREAK=<项>（只给 --selftest 证红用，打开后 --selftest 退 1；项名、弄坏哪一处、红在哪个用例，「」里是失败行的开头）：
   STAGE_MINE_BREAK=by-row-takes-block   --by-row 退回整块进：同时命中 --match 与 --foreign 的纯行式块整块进暂存区，别人的行跟着进来
-      红在「整表重排按整行挑」（selftest: 整表重排应当只暂存我那一行……）
+      红在整表重排按整行挑：「✗ selftest: 整表重排应当只暂存我那一行」，连带「✗ table.md：要写进索引的内容里…命中 --foreign，一个字没写」（整块进之后写索引那一道拒了）
   STAGE_MINE_BREAK=write-index-unchecked   write_index() 写之前不核 --foreign
-      红在「--write-index 带别人新增行」（selftest: --write-index 带别人新增行应当退 3……）
+      红在 --write-index 带别人新增行：「✗ selftest: --write-index 带别人新增行应当退 3」
   STAGE_MINE_BREAK=first-occurrence-anchor   choose_rows() 找锚点退回取底的块里第一处命中（改前的写法）
-      红在「块里有重复行」（selftest: 重复行：| MINE | 应当落在第二张表的 |---| 之后……）
+      红在块里有重复行：「✗ selftest: 重复行：| MINE | 应当落在第二张表的 |---| 之后」
+  STAGE_MINE_BREAK=keep-foreign-refuses   --keep-foreign 不生效：命中 --foreign 的块照旧整份拒（改前的样子）
+      红在 --keep-foreign：「✗ selftest: --keep-foreign 应当只暂存我那一块」
+  STAGE_MINE_BREAK=verify-without-rename   --verify 不套改名：删除行原样与新增行相减
+      红在 --verify 只改名：「✗ selftest: --verify 只改名的暂存应当剩 0 行、退 0」
+  STAGE_MINE_BREAK=verify-set-difference   --verify 按集合相减（同一行几份只算一份）
+      红在 --verify 多出一份重复行：「✗ selftest: --verify 别人多加的一份重复行应当剩下、退 5」
 STAGE_MINE_NO_SPLIT=1、STAGE_MINE_NO_MOVE_PAIRING=1 是更早的两个关闭开关，行为见上，selftest 写法不同（判红即退 0）。
 """
+import collections
 import difflib
 import os
 import re
@@ -200,8 +221,9 @@ def choose_rows(path, old_lines, new_lines, match_patterns, foreign_patterns):
     return result, mine_rows, [old_lines[index] for index in sorted(dropped)], left_rows
 
 
-def choose(path, match_patterns, foreign_patterns, split_pattern, cwd, by_row=False):
-    """返回（新的暂存内容, 进暂存区的块, 留在工作区的块）；每块是（行, 是不是按挪动配上的；按整行挑出的写 'row'）。拒绝时抛 SystemExit。"""
+def choose(path, match_patterns, foreign_patterns, split_pattern, cwd, by_row=False, keep_foreign=False):
+    """返回（新的暂存内容, 进暂存区的块, 留在工作区的块）；每块是（行, 是不是按挪动配上的；按整行挑出的写 'row'）；
+    keep_foreign（--keep-foreign）时命中 --foreign 的我的块照比对底原样留下、记进留在工作区的块（第二项写 'foreign'）。拒绝时抛 SystemExit。"""
     try:
         base_text = git(['show', f':{path}'], cwd=cwd).decode('utf-8')
     except subprocess.CalledProcessError:
@@ -259,12 +281,19 @@ def choose(path, match_patterns, foreign_patterns, split_pattern, cwd, by_row=Fa
                 staged.append(([row], 'row'))
             if left_rows:
                 left.append((left_rows, False))
+        elif mine and keep_foreign and BROKEN != 'keep-foreign-refuses' and any(hits_any(line, foreign_patterns) for line in shown):
+            result.extend(old_lines)   # --keep-foreign：同一块里挤着别人的改动，这一块照比对底原样留下，工作区不动
+            left.append((shown, 'foreign'))
         elif mine:
             result.extend(new_lines)
             staged.append((shown, paired))
         else:
             result.extend(old_lines)
             left.append((shown, False))
+    if not staged and any(kind == 'foreign' for _block, kind in left):
+        print(f'  ✗ {path}：命中 --match 的块都命中了 --foreign，按暂存区原样留下了，没有一块可暂存')
+        print('    → 我的改动都和别人的挤在同一块里：等对方先提交再挑，或者手里合一份内容走 --write-index')
+        raise SystemExit(3)
     if not staged:
         print(f'  ✗ {path}：没有一块命中 --match')
         print('    → 查一下正则写对没有；这个文件里真没有这一轮的改动，就别把它列进来')
@@ -342,11 +371,82 @@ def run_write_index(argv, cwd):
     return code
 
 
+def changed_lines(base_text, content):
+    """content 相对 base_text 的删除行与新增行（含改写的两边），去掉行尾换行：→（删除行, 新增行）。"""
+    base_lines, content_lines = base_text.splitlines(), content.splitlines()
+    deleted, added = [], []
+    for tag, base_start, base_end, work_start, work_end in difflib.SequenceMatcher(None, base_lines, content_lines, autojunk=False).get_opcodes():
+        if tag in ('replace', 'delete'):
+            deleted.extend(base_lines[base_start:base_end])
+        if tag in ('replace', 'insert'):
+            added.extend(content_lines[work_start:work_end])
+    return deleted, added
+
+
+def text_at(revision, path, cwd):
+    """git show <revision>:<path> 的内容；不在那里（新文件、已删）交空串。"""
+    try:
+        return git(['show', f'{revision}:{path}'], cwd=cwd).decode('utf-8')
+    except subprocess.CalledProcessError:
+        return ''
+
+
+def run_verify(argv, cwd):
+    """--verify（文件头）：暂存区相对 HEAD 的删除行套上 --rename 的改名，与新增行按多重集相减，两个方向剩下的行数要为 0；剩下的逐行列出、退 5。"""
+    renames, paths = [], []
+    arguments = iter(argv)
+    for argument in arguments:
+        if argument == '--rename':
+            pair = [next(arguments, None), next(arguments, None)]
+            if None in pair:
+                paths = []
+                break
+            renames.append((re.compile(pair[0]), pair[1]))
+        else:
+            paths.append(argument)
+    if not renames or not paths:
+        print('  ✗ --verify 要至少一个 --rename 旧 新 和一个文件')
+        print('    → stage-mine.py --verify --rename "旧名" "新名" 文件…（旧是正则，新是 re.sub 的替换串；几条改名就写几个 --rename）')
+        return 2
+    leftover_total = 0
+    for path in paths:
+        deleted, added = changed_lines(text_at('HEAD', path, cwd), text_at('', path, cwd))
+        renamed = deleted
+        if BROKEN != 'verify-without-rename':
+            renamed = []
+            for line in deleted:
+                for pattern, replacement in renames:
+                    line = pattern.sub(replacement, line)
+                renamed.append(line)
+        if BROKEN == 'verify-set-difference':
+            extra_added = sorted(set(added) - set(renamed))
+            extra_deleted = sorted(set(renamed) - set(added))
+        else:
+            extra_added = sorted((collections.Counter(added) - collections.Counter(renamed)).elements())
+            extra_deleted = sorted((collections.Counter(renamed) - collections.Counter(added)).elements())
+        leftover = len(extra_added) + len(extra_deleted)
+        leftover_total += leftover
+        print(f'{path}：暂存区相对 HEAD 删除 {len(deleted)} 行、新增 {len(added)} 行，删除行套上 {len(renames)} 条改名之后剩 {leftover} 行')
+        for line in extra_added[:20]:
+            print(f'  + {line[:110]}（新增里多出的：不是哪一行删除行改名之后的样子）')
+        for line in extra_deleted[:20]:
+            print(f'  - {line[:110]}（删除里多出的：改名之后在新增行里找不到）')
+    if leftover_total:
+        print(f'  ✗ --verify：{len(paths)} 个文件里暂存区有 {leftover_total} 行不是这一批的改名')
+        print('    → 上面 + / - 那几行是别的改动进了暂存区：只清自己的路径 git restore --staged -- <文件>，再用 stage-mine.py --match … 按块挑；'
+              '确实是这一批的改名漏写了，补一个 --rename 再核')
+        return 5
+    print(f'✓ --verify 查了 {len(paths)} 个文件：暂存区相对 HEAD 的删除行套上 {len(renames)} 条改名之后与新增行逐行抵消，剩 0 行')
+    return 0
+
+
 def run(argv, cwd):
     if argv[:1] == ['--write-index']:
         return run_write_index(argv[1:], cwd)
+    if argv[:1] == ['--verify']:
+        return run_verify(argv[1:], cwd)
     match_patterns, foreign_patterns, paths = [], [], []
-    split_pattern, dry_run, by_row = re.compile(DEFAULT_SPLIT), False, False
+    split_pattern, dry_run, by_row, keep_foreign = re.compile(DEFAULT_SPLIT), False, False, False
     arguments = iter(argv)
     for argument in arguments:
         if argument == '--match':
@@ -359,6 +459,8 @@ def run(argv, cwd):
             dry_run = True
         elif argument == '--by-row':
             by_row = True
+        elif argument == '--keep-foreign':
+            keep_foreign = True
         else:
             paths.append(argument)
     if not match_patterns or not paths:
@@ -368,7 +470,7 @@ def run(argv, cwd):
     total_staged = 0
     for path in paths:
         try:
-            content, staged, left = choose(path, match_patterns, foreign_patterns, split_pattern, cwd, by_row)
+            content, staged, left = choose(path, match_patterns, foreign_patterns, split_pattern, cwd, by_row, keep_foreign)
         except SystemExit as refusal:
             return int(refusal.code)
         if not dry_run:
@@ -379,10 +481,21 @@ def run(argv, cwd):
         print(f'{path}：暂存 {len(staged)} 块，留在工作区 {len(left)} 块' + ('（--dry-run，暂存区没动）' if dry_run else ''))
         for block, paired in staged:
             print(f'  + {block[0].rstrip()[:100]}' + ('（按挪动配上的旧版，一起删）' if paired is True else '（--by-row 按整行挑出）' if paired == 'row' else ''))
-        for block, _ in left:
-            print(f'  · {block[0].rstrip()[:100]}')
+        for block, kind in left:
+            if kind == 'foreign':
+                print(f'  = {block[0].rstrip()[:100]}（命中 --foreign，按暂存区原样留下）')
+            else:
+                print(f'  · {block[0].rstrip()[:100]}')
     print(f'✓ 查了 {len(paths)} 个文件，暂存 {total_staged} 块')
     return 0
+
+
+def selftest_red(problem):
+    """自证判错的那一格：打一行以 ✗ 起头的失败行与出路，交回退出码 1。"""
+    print(f'  ✗ selftest: {problem}')
+    print('    → 怎么办：看那一格测的是哪一支（按块切、挪动配对、--by-row、--write-index、锚点、--keep-foreign、--verify），对着那一支修；'
+          'STAGE_MINE_BREAK 或 STAGE_MINE_NO_SPLIT / STAGE_MINE_NO_MOVE_PAIRING 设着的话这里本来就该红')
+    return 1
 
 
 def selftest():
@@ -416,19 +529,20 @@ def selftest():
         forced_off = [flag for flag in ('STAGE_MINE_NO_SPLIT', 'STAGE_MINE_NO_MOVE_PAIRING') if os.environ.get(flag) == '1']
         if forced_off:
             if history_ok and index_ok:
-                print(f'selftest: 关掉 {"、".join(forced_off)} 之后仍然只暂存了我的 —— 检查坏了'); return 1
+                return selftest_red(f'关掉 {"、".join(forced_off)} 之后仍然只暂存了我的 —— 检查坏了')
             print(f'selftest: 关掉 {"、".join(forced_off)} 确认判红（别人的块被卷进来、或挪动那一行留下了旧版）'); return 0
         if not history_ok:
-            print('selftest: 紧挨着的两块没切开，暂存区不等于「HEAD + 我的」—— 正是本脚本要防的形态'); return 1
+            return selftest_red('紧挨着的两块没切开，暂存区不等于「HEAD + 我的」—— 正是本脚本要防的形态')
         if not index_ok:
-            print('selftest: 挪了位置的那一行留下了旧版，暂存区里有两份 —— 正是本脚本要防的形态'); return 1
+            return selftest_red('挪了位置的那一行留下了旧版，暂存区里有两份 —— 正是本脚本要防的形态')
         if run(['--match', '不存在的标记', 'history.md'], repo) != 3:
-            print('selftest: --match 一处都没命中时没有拒绝'); return 1
-        problem = selftest_by_row() or selftest_write_index() or selftest_duplicate_anchor()
+            return selftest_red('--match 一处都没命中时没有拒绝')
+        problem = selftest_by_row() or selftest_write_index() or selftest_duplicate_anchor() or selftest_keep_foreign() or selftest_verify()
         if problem:
-            print(f'selftest: {problem}'); return 1
+            return selftest_red(problem)
         print('selftest: 通过（紧挨着的两块、两行表格、两行登记各切开，只暂存了我的；挪了位置的那一行只留新版；没命中时拒绝；'
-              '整表重排时 --by-row 只暂存我那一行、没带 --by-row 或块里夹正文行时拒绝；块里有重复行时我的行按位置对应锚到第二处；--write-index 带别人新增行时退 3、不带时写进索引）')
+              '整表重排时 --by-row 只暂存我那一行、没带 --by-row 或块里夹正文行时拒绝；块里有重复行时我的行按位置对应锚到第二处；--write-index 带别人新增行时退 3、不带时写进索引；'
+              '同一行挤着别人改动时没带 --keep-foreign 拒、带了只暂存我那一块、全挤着时退 3；--verify 只改名的退 0、夹着别人改的一行或多一份重复行的退 5、没给 --rename 退 2）')
         return 0
 
 
@@ -481,6 +595,55 @@ def selftest_duplicate_anchor():
     if picked[0] != work_lines:
         return ('重复行：| MINE | 应当落在第二张表的 |---| 之后、| y | 之前（暂存内容 = 工作区这一块），实际 '
                 + ''.join(picked[0]).replace(chr(10), ' ⏎ '))
+    return None
+
+
+def selftest_keep_foreign():
+    """同一行挤着我的改名与别人的改动（换任何 --split 都切不开）：没带 --keep-foreign 拒；带了只暂存我那一块、那一行照暂存区原样留下、工作区不动；
+    命中 --match 的块全命中 --foreign 时退 3。返回问题描述，没问题返回 None。"""
+    base = '# 记录\n\n## 一节\n\n旧名 出现在这一行\n\n## 二节\n\n别的\n\n## 末节\n\n末尾\n'
+    shared_line = base.replace('旧名 出现在这一行\n', '新名 出现在这一行，系统配置\n', 1)
+    work = shared_line.replace('## 末节\n', '## 新名 三节\n\n新名 的正文\n\n## 末节\n', 1)
+    expected = base.replace('## 末节\n', '## 新名 三节\n\n新名 的正文\n\n## 末节\n', 1)
+    arguments = ['--match', '新名', '--foreign', '系统配置']
+    with tempfile.TemporaryDirectory() as repo:
+        selftest_repo(repo, {'record.md': base, 'shared.md': base})
+        for name, text in (('record.md', work), ('shared.md', shared_line)):
+            with open(os.path.join(repo, name), 'w', encoding='utf-8') as handle:
+                handle.write(text)
+        if run(arguments + ['record.md'], repo) != 4 or git(['show', ':record.md'], cwd=repo).decode('utf-8') != base:
+            return '同一行挤着别人改动的块，没带 --keep-foreign 应当拒绝（退 4）、暂存区不动'
+        code = run(arguments + ['--keep-foreign', 'record.md'], repo)
+        staged_text = git(['show', ':record.md'], cwd=repo).decode('utf-8')
+        with open(os.path.join(repo, 'record.md'), encoding='utf-8') as handle:
+            work_after = handle.read()
+        if code != 0 or staged_text != expected or work_after != work:
+            return ('--keep-foreign 应当只暂存我那一块、同一行挤着别人改动的那一块照暂存区原样留下（暂存区 = HEAD + 「新名 三节」那一块），工作区不动；'
+                    f'实际退 {code}，暂存区{"对" if staged_text == expected else "不对"}，工作区{"没动" if work_after == work else "被改了"}')
+        if run(arguments + ['--keep-foreign', 'shared.md'], repo) != 3 or git(['show', ':shared.md'], cwd=repo).decode('utf-8') != base:
+            return '--keep-foreign 下命中 --match 的块全都命中 --foreign 时应当退 3、暂存区不动'
+    return None
+
+
+def selftest_verify():
+    """--verify：暂存区里只有改名的退 0；夹着别人改的一行、别人多加一份与改名之后相同的重复行的退 5；没给 --rename 退 2。返回问题描述，没问题返回 None。"""
+    base = '| 编号 | 名字 |\n|---|---|\n| E1 | 旧名甲 |\n| E2 | 旧名乙 |\n| E3 | 别的 |\n'
+    renamed = base.replace('旧名', '新名')
+    staged = {'names.md': renamed, 'other.md': renamed.replace('| E3 | 别的 |', '| E3 | 别人改的 |'), 'twice.md': renamed + '| E1 | 新名甲 |\n'}
+    rename = ['--verify', '--rename', '旧名', '新名']
+    with tempfile.TemporaryDirectory() as repo:
+        selftest_repo(repo, {name: base for name in staged})
+        for name, text in staged.items():
+            if write_index(name, text, repo, (), 'index') != 0:
+                return f'--verify 那一格造暂存区时写不进 {name}'
+        if run(rename + ['names.md'], repo) != 0:
+            return '--verify 只改名的暂存应当剩 0 行、退 0'
+        if run(rename + ['other.md'], repo) != 5:
+            return '--verify 暂存区里夹着别人改的一行应当剩下、退 5'
+        if run(rename + ['twice.md'], repo) != 5:
+            return '--verify 别人多加的一份重复行应当剩下、退 5（按多重集相减）'
+        if run(['--verify', 'names.md'], repo) != 2:
+            return '--verify 没给 --rename 应当退 2'
     return None
 
 

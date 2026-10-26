@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-outside-selftest
+want=平常跑设弄坏开关：读开关的 2 份：探了 1 份（都被拒并点名变量只在自证里认）、待改 1 份
+want=break-switch-outside-selftest：绿

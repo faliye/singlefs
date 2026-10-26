@@ -1,0 +1,7 @@
+exit=1
+want=checker 档包 `singlefs-checker-tier` 与产品 GPU 包 `singlefs-background-gpu` 有一边依赖另一边（按本仓内部依赖图算的传递闭包，dev-dependencies 也算）
+want=singlefs-checker-tier → singlefs-background-gpu（singlefs-checker-tier 的 Cargo.toml 里写成别名 `product`）
+want=源码里有 2 处互相引用（checker 档引产品 GPU 包：真名 1 处、别名 1 处；产品 GPU 包引 checker 档：真名 0 处、别名 0 处
+want=crates/singlefs-checker-tier/src/lib.rs:1：use singlefs_background_gpu::reclaim_dispatch;
+want=crates/singlefs-checker-tier/tests/gpu_judge_against_the_product.rs:3：assert_eq!(product::reclaim_dispatch(), 16384);
+want=checker-implementation-disjoint：红（退出 1）

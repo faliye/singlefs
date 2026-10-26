@@ -1,0 +1,2 @@
+# 样本豁免表
+sample-stage.sh	SAMPLE_STAGE_BREAK=gone-switch	# 样本：头注里已经没有这一条

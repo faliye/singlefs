@@ -10,7 +10,7 @@
 函数外的项各切单元（const、static、struct、impl 头、宏都是单元），切不开当解析缺陷修，不退整文件。判法是判结局那几个函数单元的指纹，没有手写的版本号。
 
   mutation-prune.py --selftest            自证：controls 路的 S34、T16、N37、N45、T17，verify 路量过的 index_node_entry_capacity 那一格，
-                                          与本库自己加的几格（见 SAMPLES），逐个判沿用的决定；另有清单按单元存、跑全部的例外、覆盖文件名归一、
+                                          与本库自己加的几格（见 SAMPLES），逐个判沿用的决定；另有清单按单元存、覆盖者键跳过默认 cfg 下不编的测试、跑全部的例外、覆盖文件名归一、
                                           -E 按块切、CPU 限时倍数、runner；不起 cargo，runner 那几格起一个假测试程序
   mutation-prune.py --index <树> [文件…]   打每个文件的单元（种类、限定名、起止行、指纹前 12 位），排查用
 
@@ -26,6 +26,7 @@
   测试键 = 抓到它那条测试的单元闭包键（入口是那条测试函数）；认不出是哪条测试、或闭包拒算，交 None 与原因（那一条现判，不退整包、不退只比测试函数）。
   覆盖者键 = 静态闭包里有容器单元的每一条测试（第一段的、第二段慢档用例、checker 档的、被变异包的文档测试，排除表里的不算）各自测试键的多重集：
     闭包是那条测试执行得到的单元的上界，集合与各自的键不变、也没有新测试的闭包碰到它，没红就沿用。
+    默认 cfg 下不编的测试（整份挂了这一次没开的 #![cfg(feature = "…")]，闭包交 entry-cfg-inactive）不可能是这一趟的覆盖者：跳过，不拒、不进条数，跳过几条写在 coverers_key 返回的第三项；别的拒因照旧整条拒。
 沿用判据（carry_decision）：键相同的那一行；抓到的另要测试键与现算的相同、那条测试此刻不在排除表里（升档判的抓到带档位，另要覆盖者键相同：超时、撞顶是在碰得到它的那几条测试跑着时出的，它们变了、或有新测试碰到它就现判）；
   没红的要覆盖者键相同；无效的键相同就沿用（键里有容器与它点到的单元、依赖、工具链）；超时、内存撞顶、驱动错不是结论，照选中现判；
   拒算的（容器或它的闭包里有认不出的形态）不沿用，每趟现判。
@@ -60,8 +61,12 @@
   coverage-paths-unnormalized       覆盖文件名不拼不截                                            覆盖文件名归一（「✗ 自证：覆盖文件名没归一或行列没对上」）
   nextest-filter-single-argument    挑测试的 -E 拼成一个参数                                      -E 按块切（「✗ 自证：挑测试的 -E 没按块切」）
   limit-below-smt                   不核 CPU 限时倍数的下限                                       CPU 限时倍数（「✗ 自证：CPU 限时的倍数或上限算错」）
+  coverers-cfg-inactive-refused     覆盖者键碰到默认 cfg 下不编的测试（entry-cfg-inactive）也整条拒                覆盖者键那一格（「✗ 自证：覆盖者键没跳过默认 cfg 下不编的测试」）
   cpu-limit-ignored                 RUNNER_SCRIPT 在 limit 模式不设 CPU 上限、只看墙钟             runner（「✗ 自证：runner 的限时不对」）
   弄坏开关打开后本库 --selftest 退 1，汇总行「✗ mutation-prune.py --selftest：<格数> 格里 N 格判错」；驱动 broad-mutation.py 的 --selftest 打开同一个开关时红在哪写在它自己的文件头。
+弄坏开关只在自证里认（refuse_break_outside_selftest）：直接执行本库而命令行不是单独一个 --selftest（--index、不带参数、认不得的参数）时，环境里设了 BROAD_MUTATION_BREAK
+  就在参数解析之前退 2，点名这个变量只在自证里认；被驱动当库载入时不判（驱动自己在参数解析之前拒）。
+  outside-selftest-guard-skipped    父进程是带 --selftest 的本库时（自证起的探针）平常跑设了也照跑（改前的样子）   守卫那一格（「✗ 自证：平常跑设了 BROAD_MUTATION_BREAK 没被拒」）
 
 gate-similar: broad-mutation.py 它是逐条驱动（库目录、续跑、逐步命令），这里是它载入的纯函数库，判的是同一件事的剪枝那一半，分开是为了自证不碰库目录
 gate-similar: lib_function_units.py 它切单元、收闭包、算闭包键；这里只调它，加上广谱变异自己的那几样（容器、相对位置、测试键、覆盖者键、清单的单元键、依赖行）
@@ -105,6 +110,35 @@ CARGO_CONFIG_PROGRAMS = (("build", "rustc"), ("build", "rustc-wrapper"), ("build
 
 def broken(name):
     return name in BREAKS
+
+
+
+def parent_is_own_selftest():
+    """父进程是不是带 --selftest 的这份库（自证起的探针子进程）：读 /proc 的命令行与当前目录；读不到当不是。"""
+    try:
+        parent = os.getppid()
+        with open(f"/proc/{parent}/cmdline", "rb") as handle:
+            argv = [word.decode("utf-8", "replace") for word in handle.read().split(b"\0") if word]
+        directory = os.readlink(f"/proc/{parent}/cwd")
+    except OSError:
+        return False
+    own = os.path.realpath(__file__)
+    return "--selftest" in argv[1:] and any(os.path.realpath(os.path.join(directory, word)) == own for word in argv[1:])
+
+
+def refuse_break_outside_selftest(argv):
+    """弄坏开关只在自证里认（文件头「弄坏开关只在自证里认」）：命令行不是单独一个 --selftest 而环境里设了 BROAD_MUTATION_BREAK，参数解析之前退 2、点名变量。
+    弄坏开关 outside-selftest-guard-skipped：父进程是带 --selftest 的本库时不拒（改前的样子）。"""
+    # 变量名写成字面量、不另立模块级常量：模块级赋值进广谱变异判法单元的闭包（scripts/gate/lib_function_units.py 文件头「import 时执行的模块级语句」）
+    value = os.environ.get("BROAD_MUTATION_BREAK", "")
+    if not value or argv == ["--selftest"]:
+        return
+    if "outside-selftest-guard-skipped" in value.split(",") and parent_is_own_selftest():
+        return
+    print(f"  ✗ 环境里设了 BROAD_MUTATION_BREAK={value}，而这一趟不是 mutation-prune.py --selftest：弄坏开关只在自证里认，不许进平常跑", file=sys.stderr)
+    print(f"  → 怎么办：清掉再跑（env -u BROAD_MUTATION_BREAK python3 {os.path.join(SCRIPT_DIRECTORY, 'mutation-prune.py')} …）；"
+          "要看开关红在哪，单独跑 --selftest（开关写法在文件头「规则」）", file=sys.stderr)
+    sys.exit(2)
 
 
 def digest_of(parts):
@@ -854,17 +888,23 @@ def catching_test_key(tree, caught_by, global_lines, exclusions=()):
 
 
 def coverers_key(tree, unit, tests, global_lines):
-    """覆盖者键：静态闭包里有这个容器单元的每一条测试，各自测试键的多重集取 sha256。→ (键或 None, 条数, 为什么)。"""
-    keys = []
+    """覆盖者键：静态闭包里有这个容器单元的每一条测试，各自测试键的多重集取 sha256。→ (键或 None, 条数, 为什么)。
+    只因 entry-cfg-inactive 拒的测试（这一次编译的 cfg 下它不编进来，整份挂了没开的 #![cfg(feature = "…")]）不可能是这一趟的覆盖者：跳过，不算拒、不进条数；
+    键算出来时第三项写跳过了几条（cfg-inactive-skipped:N，没跳过是空串），不静默。别的拒因（闭包收不全、形态认不出……）照旧整条拒。
+    弄坏开关 coverers-cfg-inactive-refused：不跳过，碰到这样的测试照改前整条拒。"""
+    keys, skipped = [], 0
     for entry in tests:
-        closure, _forms = tree.closure(entry["unit"], entry["target"])
+        closure, forms = tree.closure(entry["unit"], entry["target"])
+        if closure is None and forms == ["entry-cfg-inactive"] and not broken("coverers-cfg-inactive-refused"):
+            skipped += 1
+            continue
         if closure is not None and id(unit) not in closure.members:
             continue
         key, refused = test_key(tree, entry["unit"], entry["target"], global_lines)
         if key is None:
             return None, len(keys), f"coverer-refused:{entry['binary']} {entry['test']}:" + ",".join(refused or ["closure"])
         keys.append(key)
-    return digest_of_lines(["coverers-v1"] + sorted(keys)), len(keys), ""
+    return digest_of_lines(["coverers-v1"] + sorted(keys)), len(keys), (f"cfg-inactive-skipped:{skipped}" if skipped else "")
 
 
 # ── 结论能不能沿用 ─────────────────────────────────────────────────────────────────────────────────────────
@@ -1581,6 +1621,39 @@ def selftest_list_cells(work, check):
           "看 list_entry 与 restore_item：相对位置按去掉注释的词法单元数记，反算回此刻源码里的行列，原文要逐字对上")
 
 
+COVERERS_FEATURE_MANIFEST = ('[package]\nname = "mharness"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\ngpu = []\n\n'
+                            '[dev-dependencies]\nmcore = { path = "../mcore" }\n')
+COVERERS_POOL = "pub fn publish(n: u64) -> u64 {\n    n + 1\n}\n"
+COVERERS_GATED_TEST = '#![cfg(feature = "gpu")]\n\n#[test]\nfn gpu_catches() {\n    assert_eq!(mcore::pool::publish(2), 3);\n}\n'
+COVERERS_EXTERN_TEST = '#[test]\nfn gpu_catches() {\n    assert_eq!(mcore::pool::publish(2), 3);\n    extern_call();\n}\nextern "C" {\n    fn extern_call();\n}\n'
+
+
+def coverers_of_sample(work, name, extra):
+    """覆盖者键样本：mcore 的 publish 是容器单元，tests/t.rs 的 catches 够得着它；extra 另加的文件见各格。→ (键, 条数, 为什么)。"""
+    files = dict({"crates/mcore/src/pool.rs": COVERERS_POOL, T: test_calling("mcore::pool::publish(1)", 2),
+                  "crates/mharness/Cargo.toml": COVERERS_FEATURE_MANIFEST}, **extra)
+    root = os.path.join(work, "coverers", name)
+    write_tree(root, files)
+    tree = UnitTree(root)
+    item = item_for(files, ("crates/mcore/src/pool.rs", "+", "-", 0))
+    unit = tree.container(item["file"], tuple(item["start"]), tuple(item["end"]))
+    return coverers_key(tree, unit, test_entries(tree, ("mcore", "mharness")), sample_globals(root, []))
+
+
+def selftest_coverers_cells(work, check):
+    """覆盖者键：整份挂了没开的 #![cfg(feature = "gpu")] 的测试（entry-cfg-inactive）够得着容器单元也跳过，键算得出、条数不含它、键与没有这份测试时的相同、跳过几条看得见；
+    同一条测试换成别的拒因（extern 块，闭包收不全）照旧整条拒、点名那条测试。"""
+    plain = coverers_of_sample(work, "plain", {})
+    gated = coverers_of_sample(work, "gated", {"crates/mharness/tests/g.rs": COVERERS_GATED_TEST})
+    check(gated[0] is not None and gated[1] == 1 and gated[2] == "cfg-inactive-skipped:1" and gated[0] == plain[0],
+          f"覆盖者键没跳过默认 cfg 下不编的测试（有那份测试：键 {gated[0] and gated[0][:12]}、条数 {gated[1]}、说明 {gated[2]!r}；没有它：键 {plain[0] and plain[0][:12]}、条数 {plain[1]}）",
+          "看 coverers_key：tree.closure 交 [\"entry-cfg-inactive\"] 的测试不可能是这一趟的覆盖者，跳过、不拒、不进条数，跳过几条写在返回的第三项（弄坏开关 coverers-cfg-inactive-refused）")
+    refused = coverers_of_sample(work, "refused", {"crates/mharness/tests/g.rs": COVERERS_EXTERN_TEST})
+    check(refused[0] is None and refused[1] == 0 and "mharness::g gpu_catches" in refused[2] and "extern-block" in refused[2],
+          f"同一条测试因别的原因拒算（extern 块）时覆盖者键没整条拒（键 {refused[0] and refused[0][:12]}、条数 {refused[1]}、说明 {refused[2]!r}）",
+          "看 coverers_key：只有 entry-cfg-inactive 这一种拒因跳过，别的拒因照旧返回 coverer-refused:<二进制> <用例名>:<形态>")
+
+
 def run_selftest():
     import shutil
     import tempfile
@@ -1603,6 +1676,7 @@ def run_selftest():
             check(decision == sample[1], f"样本 {sample[0]} 判成 {decision}（{reason}），该是 {sample[1]}（守它的开关 {sample[2]}）",
                   f"看文件头「规则」里开关 {sample[2]} 那一条与 carry_decision、mutation_key、catching_test_key、coverers_key")
         selftest_list_cells(work, check)
+        selftest_coverers_cells(work, check)
         root = os.path.join(work, "c2")
         write_tree(root, C2_SOURCES)
         tree = UnitTree(root)
@@ -1646,13 +1720,14 @@ def run_selftest():
               f"CPU 限时的倍数或上限算错（1.5 倍{'没' if check_cpu_multiplier(1.5) is None else ''}拒；表 {table}）",
               "看 check_cpu_multiplier 与 limits_table：上限 = 倍数 × 基线 CPU 秒 + 下限，倍数不小于 2.0")
         selftest_runner(work, check)
+        selftest_break_guard(work, check)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if failures[0]:
         print(f"  ✗ mutation-prune.py --selftest：{cells[0]} 格里 {failures[0]} 格判错", file=sys.stderr)
         print(f"     → 怎么办：照上面每一格的出路改，再跑 python3 {os.path.join(SCRIPT_DIRECTORY, 'mutation-prune.py')} --selftest", file=sys.stderr)
         return 1
-    print(f"  ✓ mutation-prune.py --selftest：{len(SAMPLES)} 个样本的沿用决定（S34、T16、N37、N45、T17、INDEX 在内）、清单按单元存、X1b / X3 / K1 跑全部、"
+    print(f"  ✓ mutation-prune.py --selftest：{len(SAMPLES)} 个样本的沿用决定（S34、T16、N37、N45、T17、INDEX 在内）、清单按单元存、覆盖者键跳过默认 cfg 下不编的测试、X1b / X3 / K1 跑全部、"
           f"覆盖文件名归一、-E 按块切、CPU 限时倍数、runner 量时与限时，{cells[0]} 格都对")
     return 0
 
@@ -1695,8 +1770,33 @@ def selftest_runner(work, check):
           "看 RUNNER_SCRIPT：limit 模式给子进程设 RLIMIT_CPU（SIGXCPU 停了报 kind=cpu），墙钟到点停整个进程组报 kind=wall、退 124；--list 不限时")
 
 
+def selftest_break_guard(work, check):
+    """弄坏开关只在自证里认：本库当探针子进程起（父进程就是这一趟 --selftest），环境里设 BROAD_MUTATION_BREAK 跑 --index、不带参数、
+    门禁探针那一套参数（--force --break-guard-probe-unknown-option），都要退 2、stderr 点名变量只在自证里认；不设时 --index 照常退 0。
+    弄坏开关 outside-selftest-guard-skipped 打开时（BREAKS 原样带进探针的环境）--index 那一趟照跑、退 0，这一格判错。"""
+    import subprocess
+    root = os.path.join(work, "break-guard")
+    write_tree(root, {})
+    base = {key: value for key, value in os.environ.items() if key != "BROAD_MUTATION_BREAK"}
+    probe_value = ",".join(["probe", *sorted(BREAKS)])
+    own = os.path.join(SCRIPT_DIRECTORY, "mutation-prune.py")
+
+    def run(arguments, value):
+        environment = dict(base, **({"BROAD_MUTATION_BREAK": value} if value else {}))
+        return subprocess.run([sys.executable, "-B", own, *arguments], capture_output=True, text=True, env=environment, timeout=120, stdin=subprocess.DEVNULL)
+    refused = {" ".join(arguments) or "（不带参数）": run(arguments, probe_value)
+               for arguments in (["--index", root], [], ["--force", "--break-guard-probe-unknown-option"])}
+    plain = run(["--index", root], "")
+    wrong = [f"{name} 退 {done.returncode}：{done.stderr.strip()[-200:]}" for name, done in refused.items()
+             if done.returncode != 2 or not any("BROAD_MUTATION_BREAK" in row and "自证" in row for row in done.stderr.split("\n"))]
+    check(not wrong and plain.returncode == 0 and "FILE\t" in plain.stdout,
+          f"平常跑设了 BROAD_MUTATION_BREAK 没被拒（{'；'.join(wrong) or '三趟都拒了'}；不设时 --index 退 {plain.returncode}：{plain.stderr.strip()[-200:]}）",
+          "看 refuse_break_outside_selftest：命令行不是单独一个 --selftest 而环境里设了 BROAD_MUTATION_BREAK，参数解析之前退 2、点名变量只在自证里认")
+
+
 if __name__ == "__main__":
     preflight(__file__)
+    refuse_break_outside_selftest(sys.argv[1:])
     if sys.argv[1:2] == ["--index"] and len(sys.argv) >= 3:
         tree = UnitTree(sys.argv[2])
         for path in sys.argv[3:] or sorted(tree.files):

@@ -1,0 +1,4 @@
+exit=0
+want=产品 GPU 包 crates/singlefs-background-gpu 不在，crates/*/Cargo.toml 里也没有包叫 `singlefs-background-gpu` 或依赖它：⑧ 本次未跑
+want=产品 GPU 包 crates/singlefs-background-gpu 不在，⑧ 本次未跑
+want=checker-implementation-disjoint：绿

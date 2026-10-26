@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 每个实现员补丁交回都要打一次，判的是这一刻的补丁目录与主工作区
 # run-condition: command git
-"""把实现员交回的补丁目录打进主工作区：补丁、变异表按名字合并、跑 code-source-discipline，记一笔「自上次崩溃验证全绿以来打了几个补丁」。
+"""把实现员交回的补丁目录打进主工作区：补丁、变异表按名字合并、跑 code-source-discipline 与轻型变异登记表的核法，记一笔「自上次崩溃验证全绿以来打了几个补丁」。
 
 用法：
     apply-writer-patch.py <补丁目录> [--root 仓根] [--dry-run] [--snapshot-ruled '快照冲突已判：<轮名> <理由>']…
@@ -12,9 +12,13 @@
     mutations-append.tsv         要追加的变异行，每行六段（与 crates/mutations.tsv 同），名字在表里不许已有、在这个文件里也不许出现两次
     mutations-replacements.tsv   要整行换掉的变异行，每行六段，按第一段的名字找表里恰好一行换掉
     mutations-delete.txt         要删的变异名，一行一个，表里要恰好一行
-    report.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的层 0 流与崩溃枚举用例」一节
+    result.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的层 0 流与崩溃枚举用例」一节
 次序：先全部核一遍（补丁 git apply --check、名字在不在、行是不是六段、checker 那一节在不在），有一处不对就一个字不改、退 2；
-都对了才 git apply、改名换上新的变异表，跑 .claude/gate.d/code-source-discipline.sh 的 mutation-tables 那一格（--check mutation-tables），把这一次记进 <git common-dir>/singlefs-applied-writer-patches.tsv。
+都对了才 git apply、改名换上新的变异表，跑 .claude/gate.d/code-source-discipline.sh 的 mutation-tables 那一格（--check mutation-tables），
+再跑轻型变异登记表的核法（这份脚本所在仓里的 scripts/mutation/crates-mutation-light-rows.py check <被打的仓根>），把这一次记进 <git common-dir>/singlefs-applied-writer-patches.tsv。
+轻型登记（.claude/kb/milestone/03-third-txn.md 记的同一个漏法第二次出现：新测试目标进了核心变异行而轻型登记表没跟上）：只报不拦，
+  补丁照样打上；核红时与 code-source-discipline 那一行同形报一行「crates-mutation-light-rows：退出码 N，<汇总>」，下面逐行抄它列的每一处
+  （缺行的那一处带照挑法该补的原文「<变异名><制表符><测试目标>」），退出码记 1。
 自上次崩溃验证全绿（门禁 checker-tier-crash-point-replay --full 判绿那一趟在它的日志目录里留的 all-green：git common-dir 里
 singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级没有全绿标记了）以来打过的补丁到 CRASH_VERIFY_HINT_PATCHES 个（5，推的）就打一行提示：
 只提示、不拦，跑不跑由用户定。
@@ -34,7 +38,10 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
   放行行认不认、拒绝说明怎么写只在 .claude/hooks/lib_snapshot_conflicts.py（派发闸 ⑥ 调同一份）；出路同派发闸 ⑥：等判决写完再打，
   或命令行 --snapshot-ruled '快照冲突已判：<轮名> <理由>'（可给几次，理由不许空）显式放过点名的那一轮，或用户已叫停的轮在 research/prompts/abandoned-rounds.tsv 登记一行收掉。
   副本上不查（副本不是那一轮取快照的工作区）。
-退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对、补丁改到开着的三方轮开工快照里的文件、副本上有证红在跑、
+  快照清单读不了（是目录、没有读权限、悬空的链接）的那一份不判，照「放行但必记检出」照打：输出里与别的提醒一样以 ! 起头，逐份点名那一轮与那份清单、写出路
+  （lib_snapshot_conflicts.py 的 unreadable_lines），检出记录（AGENT_HOOK_DETECTIONS，没设取 .claude/hooks/lib_work_root.py 的 default_detections_path）
+  追加一行、结局只记，会话号取 WORK_DIRECTORY_OWNER_SESSION、CLAUDE_CODE_SESSION_ID、CLAUDE_SESSION_ID 里先设了的那个，看门狗据此报给主 agent；退出码照打的结果，不因它变。
+退出码：0 打上了（code-source-discipline 与轻型登记核法都绿）；1 打上了但 code-source-discipline 或轻型登记核法红；2 核的时候就不对、补丁改到开着的三方轮开工快照里的文件、副本上有证红在跑、
   或主工作区合入锁没拿成，一个字没改。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一份补丁目录的名字，括号里是那条「✗ 自检：」的开头）：
@@ -57,6 +64,12 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
       pertree（「✗ 自检：主工作树的锁被占着时往 git worktree 加出来的树打补丁应当不排队、当场打上」）
   APPLY_WRITER_PATCH_BREAK=snapshot-ignored  apply() 打进主工作区之前不查开着的三方轮开工快照（改前的样子）
       snapshot（「✗ 自检：补丁改到开着的三方轮开工快照里的文件应当拒绝、退 2、一个字不改」）；snapshot-ruled 照绿（放行那一格分不出差别）
+      连带红的格：「✗ 自检：快照清单读不了时应当照打、点名那一轮与那几份清单」
+  APPLY_WRITER_PATCH_BREAK=snapshot-unreadable-unmarked  转给 lib_snapshot_conflicts.py 的同名开关：读不了的快照清单不分出来、照旧只记进提醒，不打放行但必记检出那几行、不记检出
+      snapshot-unreadable（「✗ 自检：快照清单读不了时应当照打、点名那一轮与那几份清单、写明放行但必记检出、检出记录多一行」）
+  APPLY_WRITER_PATCH_BREAK=light-rows-unchecked  apply() 打完不跑轻型变异登记表的核法（改前的样子）
+      lightrows（「✗ 自检：打完之后轻型登记表缺核心测试目标的行应当报红、列出该补的原文、退 1、补丁照打」）；lightrows-green 照绿
+      连带红的格：「✗ 自检：轻型登记表跟上了之后应当报绿、退 0」
 """
 import fcntl
 import glob
@@ -77,6 +90,7 @@ BROKEN = os.environ.get("APPLY_WRITER_PATCH_BREAK", "")
 CRASH_VERIFY_HINT_PATCHES = int(os.environ.get("CRASH_VERIFY_HINT_PATCHES", "5"))   # 推的，没量过
 CHECKER_SECTION = "受影响的层 0 流与崩溃枚举用例"
 LOG_NAME = "singlefs-applied-writer-patches.tsv"
+LIGHT_ROWS_CHECK = os.path.join(REPOSITORY_ROOT, "scripts", "mutation", "crates-mutation-light-rows.py")   # 轻型登记的核法（文件头「轻型登记」），取这份脚本所在仓里那一份
 FULL_GREEN_RUN_GLOB = os.path.join("singlefs-crash-point-replay-logs", "*", "all-green")   # --full 判绿那一趟日志目录里留的那一份（不是复用的标记，只记这一趟绿过）
 COPY_LOCK_NAME = ".prove-red.lock"   # 副本锁（文件头「副本锁」）：放在副本根
 
@@ -113,24 +127,35 @@ MUTATION_TABLE = "crates/mutations.tsv"
 MUTATION_FILES = ("mutations-append.tsv", "mutations-replacements.tsv", "mutations-delete.txt")
 
 
-def touched_paths(patch_directory):
-    """补丁改到的文件（仓根相对路径）：crates.patch 里 --- a/ 与 +++ b/ 两侧，三份变异表文件有一份写了行就另算 crates/mutations.tsv。"""
+def touched_paths(patch_directory, include_mutation_files=True):
+    """补丁改到的文件（仓根相对路径）：crates.patch 新旧两侧（含 Git 引号与重命名），三份变异表文件有一份写了行就另算 crates/mutations.tsv。"""
     touched = set()
     patch_path = os.path.join(patch_directory, "crates.patch")
     if os.path.isfile(patch_path):
-        for line in open(patch_path, encoding="utf-8", errors="replace"):
-            for prefix in ("--- a/", "+++ b/"):
-                if line.startswith(prefix):
-                    touched.add(os.path.normpath(line[len(prefix):].rstrip("\n").split("\t", 1)[0]))
-    for name in MUTATION_FILES:
+        specification = importlib.util.spec_from_file_location(
+            "rebuilt_packages_for_writer_paths", os.path.join(SCRIPT_DIRECTORY, "lib_rebuilt_packages.py"))
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        with open(patch_path, encoding="utf-8", errors="surrogateescape") as handle:
+            touched.update(os.path.normpath(path) for path in module.patch_paths(handle.read()))
+    for name in MUTATION_FILES if include_mutation_files else ():
         path = os.path.join(patch_directory, name)
         if os.path.isfile(path) and any(line.strip() and not line.startswith("#") for line in open(path, encoding="utf-8", errors="replace")):
             touched.add(MUTATION_TABLE)
     return touched
 
 
+SESSION_VARIABLES = ("WORK_DIRECTORY_OWNER_SESSION", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID")   # 检出记录的会话号依次取这几个（同 scripts/hosts/work-directory-ownership.sh）
+
+
+def snapshot_library_break(name):
+    """交给 lib_snapshot_conflicts.py 的弄坏开关：只转 APPLY_WRITER_PATCH_BREAK=snapshot-unreadable-unmarked 这一项（文件头「弄坏开关」）。"""
+    return name == "snapshot-unreadable-unmarked" and BROKEN == "snapshot-unreadable-unmarked"
+
+
 def snapshot_refusal(patch_directory, root, ruled_lines):
-    """开工快照（文件头「开工快照」）：补丁改到的文件落在开着的三方轮快照里，交拒绝说明的几行；没撞交 []（提醒照样交回，前缀 !）。"""
+    """开工快照（文件头「开工快照」）：补丁改到的文件落在开着的三方轮快照里，交拒绝说明的几行；没撞交 []（提醒照样交回，前缀 !）。
+    读不了的快照清单照「放行但必记检出」：提醒里逐份点名，没撞时往检出记录追加一行（文件头「开工快照」末段）。"""
     notes = []
     try:
         library = snapshot_conflicts_library()
@@ -138,9 +163,14 @@ def snapshot_refusal(patch_directory, root, ruled_lines):
         return [f"✗ 载入不了开工快照的判法 {SNAPSHOT_CONFLICTS_LIBRARY}：{error}",
                 "→ 怎么办：那份库随仓走（派发闸 ⑥ 调同一份），从 git 找回再打；查不了快照就不往主工作区打，一个字都没改"], []
     ruled = library.ruled_snapshot_conflicts("\n".join(ruled_lines))
-    conflicts = library.conflicts_of_paths(root, touched_paths(patch_directory), ruled, notes)
+    unreadable = []
+    conflicts = library.conflicts_of_paths(root, touched_paths(patch_directory), ruled, notes, broken=snapshot_library_break, unreadable=unreadable)
+    notes += library.unreadable_lines(root, unreadable, who="apply-writer-patch.py", this_time="打补丁")
     if not conflicts:
-        return [], notes
+        session = next((os.environ[name] for name in SESSION_VARIABLES if os.environ.get(name)), None)
+        recorded = library.record_unreadable(root, unreadable, f"apply-writer-patch.py {os.path.abspath(patch_directory)}", session_id=session,
+                                             agent_type="主 agent（apply-writer-patch.py）")
+        return [], notes + ([recorded] if recorded else [])
     text = library.refusal_text(root, "补丁要改的文件", conflicts, notes, "再打", "命令行加 --snapshot-ruled 写", this_time="打补丁")
     return text.splitlines() + ["→ 一个字都没改"], []
 
@@ -205,20 +235,21 @@ def plan(patch_directory, root):
     patch_path = os.path.join(patch_directory, "crates.patch")
     patch = patch_path if os.path.isfile(patch_path) and os.path.getsize(patch_path) > 0 else None
     if patch:
-        touched = [line[len("+++ b/"):].strip() for line in open(patch, encoding="utf-8", errors="replace") if line.startswith("+++ b/")]
+        touched = touched_paths(patch_directory, include_mutation_files=False)
         if "crates/mutations.tsv" in touched:
             problems.append("crates.patch 里动了 crates/mutations.tsv：变异表的改动写进那三个文件，按名字合并")
-        report_path = os.path.join(patch_directory, "report.md")
+        report_path = os.path.join(patch_directory, "result.md")
         report = open(report_path, encoding="utf-8", errors="replace").read() if os.path.isfile(report_path) else ""
         if any(path.startswith("crates/singlefs-checker/src/") for path in touched) and CHECKER_SECTION not in report and BROKEN != "checker-section-ignored":
-            problems.append(f"补丁动了 crates/singlefs-checker/src/，report.md 里却没有「{CHECKER_SECTION}」一节")
+            problems.append(f"补丁动了 crates/singlefs-checker/src/，result.md 里却没有「{CHECKER_SECTION}」一节")
         checked = git(root, "apply", "--check", patch)
         if checked.returncode != 0 and BROKEN != "apply-unchecked":
             problems.append(f"git apply --check 不过：{checked.stderr.strip()[:300]}")
     table_path = os.path.join(root, "crates", "mutations.tsv")
     if not os.path.isfile(table_path):
         return problems + ["主工作区没有 crates/mutations.tsv"], None, patch
-    lines = open(table_path, encoding="utf-8").read().splitlines(keepends=True)
+    with open(table_path, encoding="utf-8") as handle:
+        lines = handle.read().splitlines(keepends=True)
     names = [line.split("\t", 1)[0] for line in lines if line.strip() and not line.startswith("#")]
     appended = table_rows(os.path.join(patch_directory, "mutations-append.tsv"))
     replaced = table_rows(os.path.join(patch_directory, "mutations-replacements.tsv"))
@@ -264,10 +295,18 @@ def patches_since_last_crash_verification(root, log_path):
     return sum(1 for row in rows if row and float(row[0]) > since)
 
 
-def apply(patch_directory, root, dry_run, gate33, main_workspace=None, say=print_now, snapshot_ruled=()):
+def light_rows_command(root):
+    """轻型变异登记表的核法（文件头「轻型登记」）：这份脚本所在仓里那一份 crates-mutation-light-rows.py check <被打的仓根>。"""
+    return [sys.executable or "python3", LIGHT_ROWS_CHECK, "check", root]
+
+
+def apply(patch_directory, root, dry_run, gate33, main_workspace=None, say=print_now, snapshot_ruled=(), light_rows=None):
     """副本上先试拿副本锁（文件头「副本锁」），拿到了再核、再打，打完放锁；主工作区拿主工作区合入锁（文件头「主工作区合入锁」，排队等），
     核之前先查开着的三方轮开工快照（文件头「开工快照」；snapshot_ruled 是命令行 --snapshot-ruled 给的那几句）。
-    main_workspace 不给就按 root 是不是这份脚本所在的仓判（自证给 True，把临时仓当主工作区）。"""
+    main_workspace 不给就按 root 是不是这份脚本所在的仓判（自证给 True，把临时仓当主工作区）。
+    light_rows 是打完之后跑的轻型登记核法命令（文件头「轻型登记」），不给就是 light_rows_command(root)。"""
+    if light_rows is None:
+        light_rows = light_rows_command(root)
     if main_workspace is None:
         main_workspace = os.path.realpath(root) == os.path.realpath(REPOSITORY_ROOT)
     if main_workspace:
@@ -281,7 +320,7 @@ def apply(patch_directory, root, dry_run, gate33, main_workspace=None, say=print
             refusal, notes = ([], []) if BROKEN == "snapshot-ignored" else snapshot_refusal(patch_directory, root, snapshot_ruled)
             if refusal:
                 return 2, refusal
-            code, lines = apply_holding_the_lock(patch_directory, root, dry_run, gate33)
+            code, lines = apply_holding_the_lock(patch_directory, root, dry_run, gate33, light_rows)
             return code, lines + notes
         finally:
             problem = WORKSPACE_LOCK.release(held)
@@ -297,13 +336,13 @@ def apply(patch_directory, root, dry_run, gate33, main_workspace=None, say=print
             return 2, [f"✗ 副本 {root} 上有证红在跑（{COPY_LOCK_NAME} 被进程 {copy_lock_holder(root)} 占着），这一次不打",
                        "→ 怎么办：副本上有证红在跑，等它跑完或换一份副本；一个字都没改"]
     try:
-        return apply_holding_the_lock(patch_directory, root, dry_run, gate33)
+        return apply_holding_the_lock(patch_directory, root, dry_run, gate33, light_rows)
     finally:
         if lock is not None:
             release_copy_lock(root, lock)
 
 
-def apply_holding_the_lock(patch_directory, root, dry_run, gate33):
+def apply_holding_the_lock(patch_directory, root, dry_run, gate33, light_rows):
     problems, merged, patch = plan(patch_directory, root)
     if problems:
         return 2, [f"✗ {problem}" for problem in problems] + ["→ 怎么办：一个字都没改。照每处改补丁目录（或退给实现员），再跑一次"]
@@ -322,6 +361,10 @@ def apply_holding_the_lock(patch_directory, root, dry_run, gate33):
     gate = subprocess.run(gate33, cwd=root, capture_output=True, text=True)
     gate_line = ([line for line in gate.stdout.splitlines() if line.strip()] or ["（没有输出）"])[-1]
     lines.append(f"code-source-discipline：退出码 {gate.returncode}，{gate_line.strip()}")
+    light_rows_code = 0
+    if BROKEN != "light-rows-unchecked":
+        light_rows_code, light_rows_lines = light_rows_report(root, light_rows)
+        lines += light_rows_lines
     common = git(root, "rev-parse", "--git-common-dir").stdout.strip()
     log_path = os.path.join(common if os.path.isabs(common) else os.path.join(root, common), LOG_NAME)
     digest = hashlib.sha256(open(patch, "rb").read()).hexdigest() if patch else "-"
@@ -331,8 +374,29 @@ def apply_holding_the_lock(patch_directory, root, dry_run, gate33):
     if count >= CRASH_VERIFY_HINT_PATCHES and BROKEN != "no-hint":
         lines.append(f"! 自上次崩溃验证全绿以来已打 {count} 个实现员补丁（提示线 {CRASH_VERIFY_HINT_PATCHES}，推的）：弹窗问用户要不要用 "
                      "SINGLEFS_HEAVY_TESTS=user-request 由主 agent 跑一次（checker-tier-crash-point-replay 按用例复用，只跑输入变了的崩溃枚举用例）；只提示，不拦")
-    lines.append(f"调度表可贴的一行：| {os.path.basename(os.path.normpath(patch_directory))} | 已打（{time.strftime('%m-%d %H:%M', time.localtime())}） | code-source-discipline {gate.returncode} |")
-    return (0 if gate.returncode == 0 else 1), lines
+    lines.append(f"调度表可贴的一行：| {os.path.basename(os.path.normpath(patch_directory))} | 已打（{time.strftime('%m-%d %H:%M', time.localtime())}） | "
+                 f"code-source-discipline {gate.returncode}，轻型登记 {light_rows_code} |")
+    return (0 if gate.returncode == 0 and light_rows_code == 0 else 1), lines
+
+
+def light_rows_report(root, command):
+    """打完之后跑轻型登记的核法（文件头「轻型登记」）：→ (退出码, 报的几行)。只报不拦：红时汇总那一行之外逐行抄它列的每一处（缺行的带该补的原文）。
+    起不了的（脚本不在、解释器起不来）按红报，退出码记 1，出路写在那一行里。"""
+    try:
+        checked = subprocess.run(command, cwd=root, capture_output=True, text=True)
+    except OSError as error:
+        return 1, [f"crates-mutation-light-rows：起不了核法 {' '.join(command)}：{error}",
+                   f"  → 怎么办：补丁已打上；轻型登记没核，看 {LIGHT_ROWS_CHECK} 在不在，手跑 python3 {LIGHT_ROWS_CHECK} check {root} 补核"]
+    output = [line for line in checked.stdout.splitlines() if line.strip()]
+    summary = (output or [(checked.stderr.strip().splitlines() or ["（没有输出）"])[-1]])[-1].strip()
+    if checked.returncode == 0:
+        return 0, [f"crates-mutation-light-rows：退出码 0，{summary}"]
+    details = [line.strip() for line in output if line.strip().startswith("✗")]
+    summary_line = next((line for line in reversed(details) if "处不对" in line), summary)
+    howto = next((line.strip() for line in output if line.strip().startswith("→")), "")
+    return 1, ([f"crates-mutation-light-rows：退出码 {checked.returncode}，{summary_line}（补丁已打上，只报不拦）"]
+               + [f"  {line}" for line in details if line != summary_line]
+               + ([f"  {howto}"] if howto else [f"  → 怎么办：照上面几处改 .claude/gate.d/crates-mutation-light-rows.tsv，再跑 python3 {LIGHT_ROWS_CHECK} check {root} 核"]))
 
 
 def selftest():
@@ -351,6 +415,10 @@ def selftest():
         open(os.path.join(root, "crates", "demo", "src", "lib.rs"), "w").write("fn a() -> u32 { 1 }\n")
         open(os.path.join(root, "crates", "singlefs-checker", "src", "lib.rs"), "w").write("fn check() {}\n")
         open(os.path.join(root, "crates", "mutations.tsv"), "w").write("# 表头\nkeep\tf\to\tr\t-p demo --lib\tt\nold\tf\to\tr\t-p demo --lib\tt\ngone\tf\to\tr\t-p demo --lib\tt\n")
+        # 轻型变异登记表（文件头「轻型登记」）：变异表里没有改坏对象在核心代码下的行，只有表头的登记表核得过；lightrows 那两格再往里加核心行
+        light_table = os.path.join(root, ".claude", "gate.d", "crates-mutation-light-rows.tsv")
+        os.makedirs(os.path.dirname(light_table))
+        open(light_table, "w").write("# 样本轻型登记表\n")
         for command in (["init", "-q"], ["add", "-A"], ["-c", "user.name=s", "-c", "user.email=s@s", "commit", "-qm", "base"]):
             git(root, *command, check=True)
         def patch_directory(name, source_change=None, append="", replace="", delete="", report=""):
@@ -363,7 +431,7 @@ def selftest():
                 open(path, "w").write(new_text)
                 open(os.path.join(directory, "crates.patch"), "w").write(git(root, "diff", "--", relative).stdout)
                 open(path, "w").write(original)
-            for file_name, text in (("mutations-append.tsv", append), ("mutations-replacements.tsv", replace), ("mutations-delete.txt", delete), ("report.md", report)):
+            for file_name, text in (("mutations-append.tsv", append), ("mutations-replacements.tsv", replace), ("mutations-delete.txt", delete), ("result.md", report)):
                 if text:
                     open(os.path.join(directory, file_name), "w").write(text)
             return directory
@@ -525,6 +593,55 @@ def selftest():
                             snapshot_ruled=("快照冲突已判：r-open 只改样本函数的返回值，判过不碰那一轮的证据",))
         if code != 0 or "fn a() -> u32 { 7 }" not in open(os.path.join(root, "crates", "demo", "src", "lib.rs")).read():
             failures.append(f"补丁改到开着的三方轮快照里的文件、命令行给了「快照冲突已判：r-open <理由>」应当照打，实际退 {code} {lines}")
+        # snapshot-unreadable：再开两轮，r-folder 的清单是目录、r-locked 的清单没有读权限（列的是补丁不碰的文件）；补丁只追加变异行（crates/mutations.tsv 在 r-open
+        # 的清单里，命令行放过 r-open）。照打、退 0，输出逐份点名那一轮与那份清单、写明放行但必记检出，检出记录多一行（结局只记）
+        import json
+        for round_name in ("r-folder", "r-locked"):
+            open(os.path.join(prompts, f"_{round_name}-body.md"), "w").write(f"# {round_name} 正文\n")
+        os.makedirs(os.path.join(prompts, "r-folder-snapshot", "crates-sha256.txt"))
+        os.makedirs(os.path.join(prompts, "r-locked-snapshot"))
+        locked_list = os.path.join(prompts, "r-locked-snapshot", "crates-sha256.txt")
+        open(locked_list, "w").write(f"{'c' * 64}  crates/demo/src/untouched.rs\n")
+        os.chmod(locked_list, 0)
+        unreadable_rounds = ("r-folder",) if os.access(locked_list, os.R_OK) else ("r-folder", "r-locked")   # 以 root 跑时去掉读权限也读得了
+        detections = os.path.join(work, "detections.jsonl")
+        saved_detections = os.environ.get("AGENT_HOOK_DETECTIONS")
+        os.environ["AGENT_HOOK_DETECTIONS"] = detections
+        try:
+            unreadable_patch = patch_directory("snapshot-unreadable", append="unreadable-row\tf\to\tr\t-p demo --lib\tt\n")
+            code, lines = apply(unreadable_patch, root, False, gate33, main_workspace=True, say=lambda line: None,
+                                snapshot_ruled=("快照冲突已判：r-open 只追加样本变异行，判过不碰那一轮的证据",))
+        finally:
+            if saved_detections is None:
+                os.environ.pop("AGENT_HOOK_DETECTIONS", None)
+            else:
+                os.environ["AGENT_HOOK_DETECTIONS"] = saved_detections
+        recorded = []
+        if os.path.exists(detections):
+            for line in open(detections, encoding="utf-8"):
+                try:
+                    recorded.append(json.loads(line))
+                except ValueError:
+                    recorded.append({"坏行": line})
+        named = all(any(round_name in line and "放行但必记检出" in line for line in lines) for round_name in unreadable_rounds)
+        if code != 0 or "unreadable-row\t" not in open(table_path).read() or not named or len(recorded) != 1 or recorded[0].get("outcome") != "只记" \
+                or len(recorded[0].get("findings") or []) != len(unreadable_rounds):
+            failures.append(f"快照清单读不了时应当照打、点名那一轮与那几份清单、写明放行但必记检出、检出记录多一行，实际退 {code} {lines}，检出 {recorded}")
+        # lightrows：追加一条改坏对象在核心代码下、测试目标新的变异行，轻型登记表没跟上：补丁照打、报红、列出该补的原文、退 1；
+        # lightrows-green：登记表补上那一行之后再打一份，报绿、退 0。两格走副本那一支（main_workspace 不给，临时仓不是这份脚本所在的仓），不碰上面开着的那一轮快照
+        core_row = "corenew\tcrates/singlefs-core/src/fresh.rs\to\tr\t-p singlefs-core --test fresh_target\tt\n"
+        light_rows_red = patch_directory("lightrows", append=core_row)
+        code, lines = apply(light_rows_red, root, False, gate33)
+        wanted_row = "corenew\t-p singlefs-core --test fresh_target"
+        if code != 1 or "corenew\t" not in open(table_path).read() or not any(line.startswith("crates-mutation-light-rows：退出码 1") for line in lines) \
+                or not any(wanted_row in line for line in lines):
+            failures.append(f"打完之后轻型登记表缺核心测试目标的行应当报红、列出该补的原文、退 1、补丁照打，实际退 {code} {lines}")
+        with open(light_table, "a") as handle:
+            handle.write(wanted_row + "\n")
+        light_rows_green = patch_directory("lightrows-green", append="noncore\tf\to\tr\t-p demo --lib\tt\n")
+        code, lines = apply(light_rows_green, root, False, gate33)
+        if code != 0 or not any(line.startswith("crates-mutation-light-rows：退出码 0") for line in lines):
+            failures.append(f"轻型登记表跟上了之后应当报绿、退 0，实际退 {code} {lines}")
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
@@ -532,7 +649,9 @@ def selftest():
             return 1
         print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名（表里已有的、追加表自己里两行同名的）、打不上的都在核的时候拒绝，到提示线打提示，副本锁被占着时拒绝、没占时照打，"
               "主工作区合入锁被别的合入占着时排队报出持有者、对方放了才打，持有者已死的报出来接管，merge-and-verify 持锁时起的不排队，"
-              "主工作树的锁被占着时往 git worktree 加出来的树打补丁不排队，补丁改到开着的三方轮开工快照里的文件（代码与变异表）拒、命令行给了快照冲突已判的照打（查了 13 种）")
+              "主工作树的锁被占着时往 git worktree 加出来的树打补丁不排队，补丁改到开着的三方轮开工快照里的文件（代码与变异表）拒、命令行给了快照冲突已判的照打，"
+              "快照清单读不了的照打、点名那一轮与那份清单并记一条检出，"
+              "打完轻型登记表缺核心测试目标的行报红列出该补的原文、补上之后报绿（查了 16 种）")
         return 0
     finally:
         import shutil

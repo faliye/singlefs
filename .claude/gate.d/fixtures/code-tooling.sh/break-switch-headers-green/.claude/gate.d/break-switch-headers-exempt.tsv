@@ -1,0 +1,2 @@
+# 样本豁免表
+scripts/gate/pending.sh	# 样本：还没改成 mutate.sh 写法

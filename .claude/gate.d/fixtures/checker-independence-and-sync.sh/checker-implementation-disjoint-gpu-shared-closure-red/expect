@@ -1,0 +1,5 @@
+exit=1
+want=checker 档包与产品 GPU 包的依赖闭包（dev-dependencies 也算）除允许共用的之外还交在 2 个上
+want=pollster：singlefs-checker-tier → pollster；singlefs-background-gpu → pollster
+want=sample-gpu-kernels：singlefs-checker-tier → sample-gpu-kernels；singlefs-background-gpu → sample-gpu-kernels
+want=checker-implementation-disjoint：红（退出 1）

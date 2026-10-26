@@ -1,0 +1,7 @@
+exit=1
+want=! 样本档：
+want=✗ 样本档：上一版那一格的判定没记进库（  ✗ 样本档造的失灵：假 python3 拦下了拿上一版记库的 verdict-record
+want=/model-differential-seed.
+want=.record 里 admission.py verdict-record 报的错（看完自己删），修好样本或判定库路径再跑
+want=在这一格的草稿目录删掉之后还在、内容与留下那一刻逐字节相同（sha256
+want=harness-model-differential-and-scenarios.sh：1 格里 1 格红（model-fast-tier）

@@ -1,0 +1,10 @@
+exit=1
+want=有实验产物没被 experiments.md 点名
+want=research/results/e97-gz-uncited-2026-10-22.out.gz
+want=E97 点名 e97-gz-nowhere-2026-10-22.out —— 树里没有，git 历史里也没有
+want=1 份被点名的产物既不在 research/results 下、也不在版本库历史里
+want=样本只跑 .gate-cells 点名的格：results-cited
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（results-cited）
+want=→ results-cited：在 experiments.md 对应实验的口径段点名
+want=bash .claude/gate.d/doc-experiments.sh --check results-cited

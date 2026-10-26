@@ -7,6 +7,8 @@
 # 长得像钟点的冒号对（产物行的 名字=值、Python 切片、字典与逗号列表、时区偏移、引号与反引号里的代码字面、百分比、time -v 的格式说明、
 # 「门禁号:行号」表格、门禁文件名、同一行带「文件:行号」的编号对）一行一类，靠上下文规则放行：
 # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时这里判红；
+# mountinfo 一行里的主:次设备号（Rust 多行字符串里的续行，与 /proc/self/mountinfo 的普通一行）靠 mountinfo 那一条上下文规则放行：
+# LIB_FORBIDDEN_NOTATIONS_BREAK=mountinfo-device-numbers 时 records/colon-pairs.md 的那两行判红（形态相近的真钟点在 clock-times-mountinfo-red）；
 # .sh、.py、.rs 里带 clock-times:allow 放行标记（写了理由）的三行放行：LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=clock-times 时这里判红。
 # 每种形态落在它排除前缀下的一格：上游副本里带角标的 md（八进制转义）；门禁样本的 expect、hook 自检、c510 那一轮的提示里带钟点或时区词的行
 # （冒号由变量拼、时区词由 "" 断开拼进变量）。这几格只在排除前缀生效时放行：LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS 点名那一形态时这里判红。
@@ -47,6 +49,8 @@ printf '%s\n' "git 哈希 9fceb02d3e1a、e171-r6、m3-batch59 这类编号" \
   printf '%s\n' '撞键 `3:10`：冷重开是 `2:11`'
   printf '%s\n' 'candidates=[ 1:15=ok@1:24 3:26=ok@3:26] rows=1:12/3/4;2:13/5/6'
   printf '%s\n' 'taken_jst=2026-09-27T01:20:12+09:00 started_jst=2026-09-15T03:12'
+  printf '%s\n' '            "26 32 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n\'
+  printf '%s\n' '/proc/self/mountinfo 的一行：36 35 0:25 /docker /mnt rw,relatime shared:1 - overlay overlay rw'
 } > records/colon-pairs.md
 printf '%s\n' "TZ=${utc}-14 date +%F  # clock-times:allow 环境变量写法：POSIX 的时区串，符号与东京时间相反" > .claude/scripts/tz.sh
 printf '%s\n' "RESETS = re.compile(r\"resets (\\d+)(am|pm) \\(${utc}\\)\")  # clock-times:allow 解析外部通知文本，格式由对方定" > .claude/hooks/parse.py

@@ -1,0 +1,6 @@
+# 搬迁登记表：目录或文件搬了家、改了名（.claude/rules/path-moves.md），门禁里「与 gate 基准那一版比只缩不涨」的表照它换算，换了路径的行不算新增。
+# 一行一条，制表符分隔四列：<旧前缀><TAB><新前缀><TAB><YYYY-MM-DD><TAB>records/<文件>.md（前缀写相对仓根的路径，不带开头的 / 与 ./、不带结尾的 /）。
+# 读法在 .claude/gate.d/lib-lag-baseline.py 文件头「搬迁登记」：门禁只用此刻生效的行（这一行不在 gate 基准那一版的登记表里，gate 基准那一版里旧前缀下有文件、新前缀下没有文件；提交进基准之后不再生效），生效的行之间不许串，不在基准那一版登记表里的新行不生效的判红；基准那一版的全文按生效的行的次序把旧前缀换成新前缀，
+# 只按仓根起的路径前缀换（scripts/experiments 不换 scripts/experiments2，也不换别的目录下同名的一段 vendor/scripts/experiments）；按「路径 + sha256」钉的表（.claude/long-run-live-hosts-exempt）另把基准那一版的脚本照同样换算，与此刻逐字节相同才放行；装置与判决工具里按 sha256 钉的值（E171、E170 的 frozen_o3、reuse_library，scripts/agents/snapshot-tree.py）的核对照旧按全部登记行倒换，提交之后照旧。
+# 这张表写得对不对、此刻生效的行串没串、有没有搬迁实据（基准里旧前缀下的每份文件此刻在新前缀下都在且被 git 跟踪，新前缀在基准里没有文件，旧前缀此刻不在磁盘上；出处在）由门禁 code-tooling 的 change-range-single-source 格判。
+scripts/experiments	scripts/experiment-apparatus	2026-10-23	records/2026-10-23-实验装置目录改名.md

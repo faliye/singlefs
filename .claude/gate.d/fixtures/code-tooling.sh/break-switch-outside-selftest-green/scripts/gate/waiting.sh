@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# 样本脚本：读了弄坏开关，平常跑设了也不拒；登记在待改表里，所以这一格不探它
+# 弄坏开关：
+#   WAITING_BREAK=quiet  读到就多打一行
+#       waiting-red（「✗ 自检：多打的一行」）
+if [[ "${WAITING_BREAK:-}" == quiet ]]; then echo "样本：被弄坏了"; fi
+echo "样本：照常跑"

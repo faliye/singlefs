@@ -1,0 +1,26 @@
+# 假的积压登记表小程序（门禁 code-tooling 的 crash-full-run-backlog 格的样本用）：只认 check，照真的那一份（crates/singlefs-checker-tier/src/bin/crash_full_run_backlog.rs）的写法打行。
+# 核法是真的那一份的简化：照合表项序展开，每项先第二列的 crash-case:、再第三列的放量分项（照 ITEMS 列表的次序）；表里「项名 部分 键」三列逐行与展开比，
+# 少登、多登各报一处，两边都有的那几件次序不同报一处。样本根里放了 .crash-full-run-backlog-overcount 的：末行多报一处 problems=、照没有问题退 0（count-red 那一份用）。
+import os, sys
+arguments = sys.argv[1:]
+if not arguments or arguments[0] != "check":
+    print("样本里的假小程序只认 check", file=sys.stderr)
+    sys.exit(2)
+options = dict(zip(arguments[1::2], arguments[2::2]))
+items_order = [line.split("\t")[0] for line in open(options["--amplification-items"], encoding="utf-8") if line.strip()]
+expansion = []
+for line in open(options["--merged-items"], encoding="utf-8"):
+    if not line.strip() or line.startswith("#"):
+        continue
+    cells = line.rstrip("\n").split("\t")
+    expansion += [(cells[0], "crash-point-replay", key) for key in ([] if cells[1] == "-" else cells[1].split())]
+    expansion += [(cells[0], "crash-amplification", key) for key in sorted([] if cells[2] == "-" else cells[2].split(), key=items_order.index)]
+rows = [tuple(line.rstrip("\n").split("\t")[1:4]) for line in open(options["--table"], encoding="utf-8") if line.split("\t")[0].isdigit()]
+problems = [f"少登：{' '.join(part)}" for part in expansion if part not in rows] + [f"多登：{' '.join(row)}" for row in rows if row not in expansion]
+if [row for row in rows if row in expansion] != [part for part in expansion if part in rows]:
+    problems.append("照展开次序登记的那几行次序与合表加 ITEMS 的展开不同")
+for problem in problems:
+    print(f"CRASH_FULL_RUN_BACKLOG_PROBLEM\t{problem}")
+reported = len(problems) + (1 if os.path.exists(".crash-full-run-backlog-overcount") else 0)
+print(f"CRASH_FULL_RUN_BACKLOG_CHECK\trows={len(rows)}\texpansion_parts={len(expansion)}\tproblems={reported}")
+sys.exit(1 if problems else 0)

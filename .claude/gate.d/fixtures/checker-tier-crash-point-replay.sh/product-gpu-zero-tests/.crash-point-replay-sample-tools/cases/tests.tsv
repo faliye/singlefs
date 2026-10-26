@@ -1,0 +1,5 @@
+both	src/lib.rs	tests::shared_check	ok	line	-
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-
+feature	tests/checksum_kernels_agree.rs	the_bitwise_kernel_agrees_with_the_cpu	ok	line	-
+feature	tests/checksum_kernels_agree.rs	the_table_kernel_agrees_with_the_cpu	ok	line	-
+feature	tests/two_kernels_reconcile.rs	the_two_kernels_confirm_every_entry	ignored	line	-

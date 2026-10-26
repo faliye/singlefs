@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：feature-bits
+want=记账表 .claude/kb/feature-bits.md 与位号的唯一登记位（.claude/kb/decisions/15-格式冻结政策.md 已定项 4）对不上
+want=记账表登记了 incompat 位 1，.claude/kb/decisions/15-格式冻结政策.md 已定项 4 的登记表里没有这一位，登记表把它列在未分配区间 1..255 里
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=feature-bits：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（feature-bits）
+want=→ feature-bits：
+want=bash .claude/gate.d/code-source-discipline.sh --check feature-bits

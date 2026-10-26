@@ -1,0 +1,5 @@
+exit=0
+want=乙（还没推的提交）本次未跑：当前分支 master 没有上游
+want=甲 查了 2 个跟踪的文件，乙 本次未跑（当前分支 master 没有上游）
+want=样本只跑 .gate-cells 点名的格：committed-file-size
+want=  committed-file-size：绿

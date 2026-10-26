@@ -1,0 +1,6 @@
+exit=1
+want=产品行为视图：crates/fsample/src/lib.rs:58 只有 python 那一份切出：fn	fsample::lemma_doubled_is_even
+want=  ✗ 产品行为视图：dump 有 3 处单元两份不同（Rust 29 行、python 31 行）
+want=产品行为视图：crates/fsample/src/lib.rs::proven_entry 只在 python 闭包里：fn	fsample::lemma_doubled_is_even
+want=  ✗ 产品行为视图：crates/fsample/src/lib.rs::proven_entry：闭包两份不同（Rust 3 个、python 5 个；只在 Rust 里 1 个、只在 python 里 3 个）
+want=function-units-two-implementations-agree：红（退出 1）

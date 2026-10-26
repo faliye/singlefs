@@ -1,0 +1,7 @@
+exit=1
+want=读不出 kb 目录登记位
+want=invariant-count-elsewhere 没判：kb 目录登记位读不出
+want=inline-sums 没判：kb 目录登记位读不出
+want=  invariant-count-elsewhere：红（退出 1）
+want=  inline-sums：红（退出 1）
+want=doc-registries.sh：2 格里 2 格红

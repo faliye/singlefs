@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 「RocksDB 取值没判过不起 cargo」样本的假 rustc：只打版本
+echo "rustc 0.0.0-crash-point-replay-sample"

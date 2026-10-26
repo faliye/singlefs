@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-outside-selftest
+want=scripts/gate/split.py 读了 SPLIT_BREAK：关守卫项与别的项同写（env SPLIT_BREAK=guard-off,skip … --force --break-guard-probe-unknown-option）没被拒，退 2 但输出里没有点名 SPLIT_BREAK 只在自证里认的一行
+want=scripts/gate/described.sh 读了 DESCRIBED_BREAK：关守卫项与别的项同写（env DESCRIBED_BREAK=open-door,quiet … --force --break-guard-probe-unknown-option）没被拒，退 0，照常跑
+want=平常跑设弄坏开关：2 处不对（读开关的 2 份：探了 2 份、待改 0 份）
+want=break-switch-outside-selftest：红（退出 1）

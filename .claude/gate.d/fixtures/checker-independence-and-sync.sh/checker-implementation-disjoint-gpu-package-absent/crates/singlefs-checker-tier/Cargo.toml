@@ -1,0 +1,10 @@
+[package]
+name = "singlefs-checker-tier"
+
+[dependencies]
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
+wgpu = { version = "=30.0.1", default-features = false, optional = true }

@@ -1,0 +1,4 @@
+# 样本登记表（比对对象表绿）：research/prompts/e991-r2-prereg.md 比对对象表三行，甲对 #1 的比对对象，乙对 #2 的重跑产物名（旧登记那种只写前缀之后一段的写法），#3 在文件头点名不登记。
+# 不登记的比对对象：research/prompts/e991-r2-prereg.md #3：样本里这条正式跑在单元表里没有单元；欠在 C92（样本欠账）
+E991	research/prompts/e991-r2-prereg.md	甲	crates/sample/units.rs	e991-a.out	none:样本没有复跑行的理由
+E991	research/prompts/e991-r2-prereg.md	乙	crates/sample/units.rs	e991-replay-2026-10-04-r2-segment1-b.out	none:样本没有复跑行的理由

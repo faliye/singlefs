@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# harness-model-differential-and-scenarios 样本 model-fast-tier-seed-record-kept-red 的假 python3：阶段把这个目录放 PATH 最前面，
+# 起 admission.py 的 python3 先到这里。只拦样本档拿上一版记库那一次（参数里同时有 verdict-record 与「样本档：上一版」，那是 --how 的值）：
+# 打一行红句、退 2，造出「上一版那一格的判定没记进库」；别的调用把这个目录从 PATH 里摘掉，原样交给 PATH 上真的 python3。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+arguments=" $* "
+if [[ "$arguments" == *" verdict-record "* && "$arguments" == *" 样本档：上一版 "* ]]; then
+  echo "  ✗ 样本档造的失灵：假 python3 拦下了拿上一版记库的 verdict-record（样本根 $(pwd -P)），这一格的判定没记进库"
+  exit 2
+fi
+remaining_path=""
+IFS=: read -r -a path_entries <<<"$PATH"
+for path_entry in "${path_entries[@]}"; do
+  [[ -n "$path_entry" && "$(cd "$path_entry" 2>/dev/null && pwd -P)" == "$here" ]] && continue
+  remaining_path+="${remaining_path:+:}$path_entry"
+done
+PATH="$remaining_path" exec python3 "$@"

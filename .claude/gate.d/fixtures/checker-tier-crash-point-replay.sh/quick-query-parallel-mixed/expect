@@ -1,0 +1,10 @@
+exit=1
+want=查库 3 条一齐起（并行度 
+want=取每台默认重活线程数）；多机配置没开 GPU，不清场
+want=crash-case:covered-stream：全部块都有键相同的判定、没有红（块 3：复用 3、没有判定 0、红 0、拒算 0）
+want=crash-case:uncovered-stream：块没罩住（退 3：块 4：复用 1、没有判定 3、红 0、拒算 0）；这条查库的进程退 101，日志最后一行：test result: ok.
+want=crash-case:red-stream：库里有判红的块（块 2：复用 2、没有判定 0、红 1、拒算 0）
+want=crash-case:judged-stream：实跑绿（块 4：复用 1、现判 3、红 2、拒算 0）
+want=✗ 1 条崩溃枚举用例在崩溃判定库里有键相同而判红的块：crash-case:red-stream
+want=逐格：crash-case-replay：红
+want=✗ 快档有 1 格判红：crash-case-replay（各自的出路在上面）

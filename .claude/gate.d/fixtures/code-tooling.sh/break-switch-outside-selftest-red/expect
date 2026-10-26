@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-outside-selftest
+want=scripts/gate/silent.sh 读了 SILENT_BREAK：平常跑时设上它（env SILENT_BREAK=quiet … --force --break-guard-probe-unknown-option）没被拒，退 0，照常跑
+want=scripts/gate/loud.py 读了 LOUD_BREAK：平常跑时设上它（env LOUD_BREAK=skip … --force --break-guard-probe-unknown-option）没被拒，退 2 但输出里没有点名 LOUD_BREAK 只在自证里认的一行
+want=.claude/gate.d/break-switch-outside-selftest-pending.tsv:2 指到的 scripts/gate/gone.sh 不在，那一行删掉
+want=.claude/gate.d/break-switch-outside-selftest-pending.tsv:3 scripts/gate/plain.sh 代码里不读弄坏开关了，那一行删掉
+want=平常跑设弄坏开关：4 处不对（读开关的 3 份：探了 3 份、待改 0 份）
+want=break-switch-outside-selftest：红（退出 1）

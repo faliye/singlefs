@@ -1,0 +1,4 @@
+exit=77
+want=决策正文与基准 HEAD 只差登记的搬迁（.claude/gate.d/path-moves.tsv），这一格无对象可判
+want=  entry-added：本次未跑
+want=doc-decisions.sh：跑到的 1 格都本次无对象可判，这一道本次未跑（不记通过）

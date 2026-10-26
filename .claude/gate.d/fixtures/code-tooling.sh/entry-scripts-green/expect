@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：entry-scripts
+want=! scripts/gate/sample-pending.sh 登记成入口脚本、还没改成入口脚本格式，本次未判
+want=入口脚本格式：核了 2 份（scripts/gate/sample-entry.sh、scripts/gate/sample_entry.py），都有 --list-items、--selftest 与带齐字段的那一句；pending 1 份本次未判（scripts/gate/sample-pending.sh）
+want=entry-scripts：绿

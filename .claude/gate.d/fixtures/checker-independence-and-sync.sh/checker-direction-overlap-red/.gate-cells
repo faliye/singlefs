@@ -1,0 +1,2 @@
+# 扫描式方向扫单元头时调了遍历式判根记录的函数 root_record_is_well_formed：越界一个、点名它与两边各从哪收进；判的是 checker-direction-overlap 格
+checker-direction-overlap

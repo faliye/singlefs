@@ -39,6 +39,14 @@ git 忽略的（`multi-host.env` 这类本机私有的）不读、不改；不�
 （checks-owed C441）。`--check` 与 `--apply` 都不扫，成功句与失败句报出排除了几个目录；
 别的格的样本目录、别的门禁文件名下叫 `term-renames-*` 的目录照扫。
 
+路径形态的命中只报不换：旧名所在的那一段不间断文字（以空白、引号、反引号、括号、中英文逗号句号分号冒号顿号为界，见 PATH_TOKEN_DELIMITERS）以 `~/`、`/`、`./`、`../` 起头、
+是带 `://` 的网址、带 `/` 而至少一段像文件名，或整段像一个文件名（`名字.md` / `.rs` / `.toml` / `.sh` / `.py` 等，PATH_FILE_SUFFIX；
+行文里的斜杠词（读/写、增/删）不带这几样，照换；`.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv` 归下一段的已归档产物判法，不在这里；
+带 `:行号` 的先去掉行号），就是路径形态：`/srv/旧名/data`、`crates/旧名/src/lib.rs`、`旧名说明.md` 都是。路径指的是磁盘上（第二台上）真实存在的目录或文件，
+文字里换了名它就指空，2026-10-18 实测 --apply 把第二台上真实存在的目录路径也换了名。--apply 不换它、--check 照数（旧名还在，不装作没有），
+两边都逐条报「文件:行  那一段文字」；出路是真实存在的路径登记 `.claude/term-rename-exempt` 的按行豁免，写错的引用手改（连同改名那份文件或目录本身）。
+同一行里路径之外的旧名照换。--apply 的退出码不因它变，退 0；判红在随后的 --check。
+
 已归档产物的文件名不换也不报：一个文件名形态的串（`名字.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv`，名字从一段 `[A-Za-z0-9_.-]` 连续串的开头起认），
 版本库历史里 `research/results/` 下出现过、今天树里没有，它就是一份已归档产物的名字，产物改不了名，
 引它的那一处留旧名 doc-experiments.sh 的 results-cited 格才在历史里找得到（`.claude/rules/path-moves.md`「留存产物分两类」）。按串判，不整份豁免。
@@ -50,6 +58,10 @@ git 忽略的（`multi-host.env` 这类本机私有的）不读、不改；不�
 自证（--selftest）里有一格判长串掩码：一段 65536 字的连续 `[A-Za-z0-9_.-]` 串（不带扩展名）后面跟一个已归档产物的名字，
 掩码在子进程里跑、1 秒内要做完，换出来的与不加左边界时逐字相同（逐字比在短串上做：不加左边界的那一条在长串上跑不完）。
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一格的名字，括号里是那条「✗ 自检失败：」的开头）：
+  SWEEP_TERM_BREAK=path-shaped-replaced  不识别路径形态，带 `/` 的与像文件名的命中也照旧名换掉（改前的样子）
+      路径形态（「✗ 自检失败：路径形态那一格判错：」，--apply 之后路径形态的命中被换掉了、或 --check 报不出文件:行）
+  SWEEP_TERM_BREAK=slash-words-protected  路径形态退回「带 `/` 就算」（收窄之前的认法），行文里的斜杠词（读/写）也被当路径掩起来不换
+      斜杠词（「✗ 自检失败：斜杠词那一格判错：」，--apply 之后斜杠词里的旧名没被换掉）
   SWEEP_TERM_BREAK=archived-names-unprotected  不保护已归档产物的名字，照旧名换掉
       已归档产物（「✗ 自检失败：已归档产物的名字被换掉了，或换完仍判红」）
   SWEEP_TERM_BREAK=product-name-no-left-boundary  去掉产物名字的左边界（PRODUCT_FILE_NAME_PATTERN_WITHOUT_LEFT_BOUNDARY）
@@ -60,6 +72,7 @@ git 忽略的（`multi-host.env` 这类本机私有的）不读、不改；不�
       按行豁免（「✗ 自检失败：按行豁免那一格判错：同一份文件里没豁免的两行」）
   SWEEP_TERM_BREAK=ignored-files-walked  根在 git 工作树里也走整棵目录树，不按 git ls-files 列
       只扫 git 列出的（「✗ 自检失败：只扫 git 列出的那一格判错：git 忽略的 multi-host.env、memory-peaks.tsv 不该算进去」）
+      连带红的格：「✗ 全仓还有 1 份文件、…处旧名，其中路径形态 0 处」
   SWEEP_TERM_BREAK=header-as-row  load_renames() 不跳登记表的表头行（「旧」「新」「匹配」「是什么」那一行），当数据行读
       表头不当记录（「✗ 自检失败：表头不当记录那一格判错：只有标记、表头与分隔行的登记表」…）
   SWEEP_TERM_BREAK=own-fixtures-swept  不排除 term-renames 格自己的样本目录，照登记表扫、照旧名换
@@ -94,6 +107,13 @@ PRODUCT_FILE_NAME_PATTERN_WITHOUT_LEFT_BOUNDARY = re.compile(PRODUCT_FILE_NAME_B
 PRODUCT_NAME_PROBE_RUN_LENGTH = 65536
 PRODUCT_NAME_PROBE_SECONDS = 1.0
 ARCHIVED_PLACEHOLDER_PATTERN = re.compile("\x00archived(\\d+)\x00")
+# 路径形态：旧名所在的那一段不间断文字（token）以 ~/、/、./、../ 起头、是带 :// 的网址、带 `/` 而至少一段像文件名，或整段像一个文件名。界：空白、引号、反引号、括号、中英文逗号句号分号冒号顿号与 | ! ? 和占位符的 \x00
+PATH_TOKEN_DELIMITERS = frozenset(" \t\r\n\"'`<>()[]{}（）「」『』【】《》，。；：、|,;!?！？\x00")
+PATH_FILE_SUFFIX = re.compile(r"^[^/]+\.(?:md|rs|toml|sh|py|wgsl|yaml|yml|lock|cfg|conf|env|service|rules|html|css|js|ts)$")
+PATH_LINE_NUMBER_SUFFIX = re.compile(r"(?::\d+)+$")
+PATH_ROOT_PREFIXES = ("~/", "/", "./", "../")
+PATH_PLACEHOLDER_PATTERN = re.compile("\x00path(\\d+)\x00")
+PATH_REPORT_LIMIT = 50
 EXEMPT_FILE = ".claude/term-rename-exempt"
 # 门禁 doc-text 的 term-renames 格自己的判别力样本：这个目录下、目录名以这个前缀起头的，默认不扫（文件头有说明，checks-owed C441）
 OWN_CELL_FIXTURE_PARENT = ".claude/gate.d/fixtures/doc-text.sh"
@@ -334,6 +354,46 @@ def restore_archived_product_names(text, masked):
     return ARCHIVED_PLACEHOLDER_PATTERN.sub(lambda match: masked[int(match.group(1))], text)
 
 
+def path_shaped(token):
+    """token 是不是路径形态：以 ~/、/、./、../ 起头，或是带 :// 的网址，或（去掉行号和收尾的标点之后）按 `/` 切开至少一段像文件名；
+    不带 `/` 的整段像文件名也算。只带 `/` 不够：行文里的斜杠词（读/写）不是路径。弄坏开关 slash-words-protected 退回带 `/` 就算。"""
+    if "/" in token and broken("slash-words-protected"):
+        return True
+    if token.startswith(PATH_ROOT_PREFIXES) or "://" in token:
+        return True
+    stripped = PATH_LINE_NUMBER_SUFFIX.sub("", token).rstrip(".,:")
+    return any(PATH_FILE_SUFFIX.match(segment) for segment in stripped.split("/"))
+
+
+def mask_path_shaped(text, detect):
+    """路径形态的命中：旧名所在的那一段文字换成占位符，替换与计数都看不见它；返回 (换过的文本, 被换下来的原串, [(行号, 原串)])。
+    行号照传进来的文本数（前面的掩码都不改行数）。弄坏开关 path-shaped-replaced 打开时什么都不掩。"""
+    if broken("path-shaped-replaced"):
+        return text, [], []
+    spans = set()
+    for match in detect.finditer(text):
+        start, end = match.span()
+        while start > 0 and text[start - 1] not in PATH_TOKEN_DELIMITERS:
+            start -= 1
+        while end < len(text) and text[end] not in PATH_TOKEN_DELIMITERS:
+            end += 1
+        if path_shaped(text[start:end]):
+            spans.add((start, end))
+    kept, found = [], []
+    pieces, position = [], 0
+    for start, end in sorted(spans):
+        kept.append(text[start:end])
+        found.append((text.count("\n", 0, start) + 1, text[start:end]))
+        pieces.append(text[position:start] + "\x00path%d\x00" % (len(kept) - 1))
+        position = end
+    pieces.append(text[position:])
+    return "".join(pieces), kept, found
+
+
+def restore_path_shaped(text, kept):
+    return PATH_PLACEHOLDER_PATTERN.sub(lambda match: kept[int(match.group(1))], text)
+
+
 def exempt_line_placeholder(number):
     return EXEMPT_LINE_OPEN + "".join(chr(EXEMPT_LINE_DIGIT_ZERO + int(digit)) for digit in str(number)) + EXEMPT_LINE_CLOSE
 
@@ -416,6 +476,7 @@ def sweep(root, apply_changes, defer=(), tally=None):
     own_fixture_directories = set()
     worst = []
     refused = []
+    path_hits = []          # (相对路径, 行号, 路径形态的那一段文字)：只报不换
     for relative in candidates:
         if exempt(relative, entries):
             continue
@@ -430,12 +491,17 @@ def sweep(root, apply_changes, defer=(), tally=None):
         scanned += 1
         text, kept_lines = mask_exempt_lines(text, line_exemptions.get(relative, ()))
         text, masked = mask_archived_product_names(text, archived_names)
-        count = len(detect.findall(text))
+        text, kept_paths, found_paths = mask_path_shaped(text, detect)
+        replaceable = len(detect.findall(text))
+        path_hits += [(relative, number, token) for number, token in found_paths]
+        # --check 数旧名还在的全部处（含路径形态的）；--apply 只换并只数能换的，只剩路径形态命中的文件不重写
+        count = replaceable if apply_changes else replaceable + len(found_paths)
         if not count:
             continue
         if apply_changes:
             for pattern, new in replacements:
                 text = pattern.sub(lambda match, new=new: new, text)
+            text = restore_path_shaped(text, kept_paths)
             text = restore_archived_product_names(text, masked)
             text = restore_exempt_lines(text, kept_lines)
             try:
@@ -449,10 +515,11 @@ def sweep(root, apply_changes, defer=(), tally=None):
         occurrences += count
         worst.append((count, relative))
     if tally is not None:
-        tally.update(files=files, occurrences=occurrences, scanned=scanned, excluded_fixture_directories=len(own_fixture_directories))
+        tally.update(files=files, occurrences=occurrences, scanned=scanned, excluded_fixture_directories=len(own_fixture_directories), path_shaped=len(path_hits))
     excluded_note = "；默认不扫 term-renames 格自己的样本目录 %d 个" % len(own_fixture_directories)
     if apply_changes:
         print("  ✓ 换了 %d 份文件、%d 处（登记的改名 %d 条、豁免 %d 条、按行豁免 %d 行；范围：%s%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
+        report_path_shaped(path_hits, True)
         if refused:
             for relative, count, message in refused:                # gate-lint:detail
                 print("      %s（%d 处）：%s" % (relative, count, message))
@@ -460,14 +527,17 @@ def sweep(root, apply_changes, defer=(), tally=None):
             print("     → 怎么办：按每份后面那行「→ 怎么办」处理（多半是有多个硬链接或当前用户只读），再跑一次 --apply；")
             print("               已经换好的那些搜不出旧名，不会重复换。")
             return 3
-        print("     → 下一步：cargo build 与 cargo test --workspace，再 bash scripts/experiments/replay.sh 全量复跑，")
+        print("     → 下一步：cargo build 与 cargo test --workspace，再 bash scripts/experiment-apparatus/replay.sh 全量复跑，")
         print("               产物必须仍然逐字节一致 —— 源码与产物一起换，这一条才成立，要跑出来看，不能声称。")
         return 0
     if occurrences:
         for count, relative in sorted(worst, reverse=True)[:20]:   # gate-lint:detail
             print("      %-72s %d 处" % (relative, count))
-        print("  ✗ 全仓还有 %d 份文件、%d 处旧名（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
-        print("     → 怎么办：跑 python3 scripts/kb/sweep-term.py --apply 换掉；")
+        report_path_shaped(path_hits, False)
+        print("  ✗ 全仓还有 %d 份文件、%d 处旧名，其中路径形态 %d 处（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s%s）"
+              % (files, occurrences, len(path_hits), len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
+        print("     → 怎么办：跑 python3 scripts/kb/sweep-term.py --apply 换掉（路径形态的 --apply 不换，上面逐条列了文件:行：路径是真实存在的，"
+              "登记按行豁免；是写错的引用，手改连同那份文件或目录本身）；")
         print("               确实该留旧名的，登记进 .claude/term-rename-exempt 并写明为什么：整份都该留的写路径，")
         print("               只有一句该留的写 <路径>:「<那一行里的一段原文>」只豁免那一行。")
         return 1
@@ -476,6 +546,20 @@ def sweep(root, apply_changes, defer=(), tally=None):
     print("     按行豁免 %d 行（%d 份文件里，那几行留原文、别的行照扫）" % (exempt_line_count, len(line_exemptions)))
     print("     默认没扫 term-renames 格自己的样本目录 %d 个（%s/%s*，代码里写死，判别力样本里要留着旧名）" % (len(own_fixture_directories), OWN_CELL_FIXTURE_PARENT, OWN_CELL_FIXTURE_PREFIX))
     return 0
+
+
+def report_path_shaped(path_hits, applied):
+    """路径形态的命中逐条列「文件:行  那一段文字」（上限 PATH_REPORT_LIMIT 条，其余报个数）；没有就什么都不打。applied 是 --apply 那一趟：说明没换。"""
+    if not path_hits:
+        return
+    for relative, number, token in path_hits[:PATH_REPORT_LIMIT]:      # gate-lint:detail
+        print("      %s:%d  %s" % (relative, number, token))
+    if len(path_hits) > PATH_REPORT_LIMIT:
+        print("      …另有 %d 处没列" % (len(path_hits) - PATH_REPORT_LIMIT))
+    if applied:
+        print("  ! 路径形态的命中 %d 处只报不换（上面逐条列了文件:行）：路径指的是真实存在的目录或文件，文字里换了名它就指空" % len(path_hits))
+        print("     → 怎么办：真实存在的路径登记 .claude/term-rename-exempt 的按行豁免（<路径>:「<那一行里的一段原文>」  # 为什么）；"
+              "是写错的引用，手改，连同改名那份文件或目录本身；随后的 --check 照数它们。")
 
 
 def selftest():
@@ -572,6 +656,8 @@ def selftest():
         return 1
     for cell_name, check, remedy in (
             ("正则匹配", check_regex_rows, "看 compile_rules() 里「正则」那一支有没有原样用「旧」一列（前后断言要留着）、table_cells() 的 \\| 还原、regex_row_problem() 的三样拒绝"),
+            ("路径形态", check_path_shaped, "看 mask_path_shaped() 与 path_shaped()：旧名所在那一段文字带 / 或像文件名的，--apply 要掩起来不换，--check 要数并逐条报文件:行"),
+            ("斜杠词", check_slash_words, "看 path_shaped()：只带 / 不算路径，行文里的斜杠词（读/写）旧名要换；以 ~/、/、./、../ 起头的、带 :// 的、有一段像文件名的才是路径形态"),
             ("按行豁免", check_line_exemptions, "看 load_exempt() 读 <路径>:「<行内锚>」那一支与锚恰好命中一行的判法、mask_exempt_lines() 只换含锚的那一行"),
             ("自己那一格的样本", check_own_cell_fixtures, "看 own_cell_fixture_directory() 与 sweep() 里 --check / --apply 跳过它的那一句：OWN_CELL_FIXTURE_PARENT 下目录名以 OWN_CELL_FIXTURE_PREFIX 起头的样本目录默认不扫"),
             ("只扫 git 列出的", check_git_listing, "看 candidate_files()：根在 git 工作树里要走 git ls-files --cached --others --exclude-standard，不走整棵目录树"),
@@ -598,6 +684,7 @@ def selftest():
           "改之前打开文件的读者接着读到旧内容、fsync 在改名之前、经符号链接改的是它指向的文件、"
           "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件；"
           "「匹配」写正则的只打 D13 那一层的「层 1」「层 2」4 处、不打树层与外层那一行，\\| 还原成竖线，带捕获组、能匹配空串、编译不过的退 2；"
+          "路径形态（带 / 的与像文件名的）的命中 --apply 不换、--check 照数并逐条报文件:行，同一行里路径之外的旧名照换；"
           "按行豁免只留锚那一行、同一份文件里另外 2 行照判照换，锚命中 0 行或不止一行、指不到文件、读不出锚都退 2；"
           "在 git 工作树里只扫跟踪的与未跟踪而未忽略的 2 份，git 忽略的 multi-host.env、memory-peaks.tsv 不读不写；"
           "登记表只有标记、表头与分隔行时不把表头当规则、退 2 报一行数据都没有；"
@@ -735,6 +822,77 @@ def check_regex_rows():
 
 
 LINE_EXEMPTION_SAMPLE_LINES = ["第一行：用户原话「超级块要改名」，原样留着", "第二行：超级块的别处说法照新名", "第三行：再提一次超级块", ""]
+
+
+PATH_SHAPED_SAMPLE_LINES = ["目录 /srv/超级块/data 在第二台上真实存在", "文件 超级块说明.md:12 在别处", "行文里的超级块要换，路径旁的 超级块 也要换", "引用 [说明](docs/x.md) 与 crates/超级块/src/lib.rs", ""]
+
+
+def check_path_shaped():
+    """路径形态那一格：旧名所在的那一段文字带 / 或像文件名的，--apply 不换、--check 照数并逐条报文件:行，同一行里路径之外的旧名照换；
+    只剩路径形态命中的文件 --apply 不重写（内容与权限不动）。返回空串是判对。"""
+    import contextlib
+    import io
+    import tempfile
+    with tempfile.TemporaryDirectory() as root:
+        write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
+        sample = os.path.join(root, "notes.md")
+        only_paths = os.path.join(root, "only-paths.md")
+        with open(sample, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(PATH_SHAPED_SAMPLE_LINES))
+        with open(only_paths, "w", encoding="utf-8") as handle:
+            handle.write("只有路径：~/超级块/notes\n")
+        os.utime(only_paths, (1, 1))
+        tally = {}
+        code = quietly(sweep, root, False, tally=tally)
+        if code != 1 or tally.get("occurrences") != 6 or tally.get("path_shaped") != 4:
+            return "--check 应当退 1、报 6 处其中路径形态 4 处，实际退 %s、%s 处、路径形态 %s 处" % (code, tally.get("occurrences"), tally.get("path_shaped"))
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            sweep(root, True)
+        applied_output = buffer.getvalue()
+        actual = open(sample, encoding="utf-8").read().split("\n")
+        want = PATH_SHAPED_SAMPLE_LINES[:2] + ["行文里的系统配置要换，路径旁的 系统配置 也要换"] + PATH_SHAPED_SAMPLE_LINES[3:]
+        if actual != want:
+            return "--apply 之后应当只换行文里的两处、路径形态的原样在：应当是 %r，实际 %r" % (want, actual)
+        if open(only_paths, encoding="utf-8").read() != "只有路径：~/超级块/notes\n" or os.stat(only_paths).st_mtime != 1:
+            return "只剩路径形态命中的文件 --apply 不该重写它（内容或修改时间变了）"
+        for want_line in ("notes.md:1  /srv/超级块/data", "notes.md:2  超级块说明.md:12", "notes.md:4  crates/超级块/src/lib.rs", "only-paths.md:1  ~/超级块/notes"):
+            if want_line not in applied_output:
+                return "--apply 应当逐条报路径形态的命中「%s」（文件:行  那一段文字），输出：%s" % (want_line, applied_output.strip()[-400:])
+        if "notes.md:3" in applied_output:
+            return "行文里能换的那一行（第 3 行）不该被报成路径形态"
+        buffer = io.StringIO()
+        tally = {}
+        with contextlib.redirect_stdout(buffer):
+            code = sweep(root, False, tally=tally)
+        checked_output = buffer.getvalue()
+        if code != 1 or tally.get("occurrences") != 4 or tally.get("path_shaped") != 4 or "notes.md:1  /srv/超级块/data" not in checked_output:
+            return "--apply 之后 --check 应当仍退 1、报 4 处且全是路径形态并逐条报文件:行，实际退 %s、%s 处、路径形态 %s 处" % (code, tally.get("occurrences"), tally.get("path_shaped"))
+    return ""
+
+
+SLASH_WORD_SAMPLE_LINES = ["行文里的超级块/读写 与 增删/超级块 是斜杠词，要换", "目录 ~/超级块/notes 与 ./超级块/x 与 ../超级块/y 与 /超级块/z 是路径", "文件 docs/超级块/说明.md 与网址 https://example.com/超级块 也是路径", ""]
+
+
+def check_slash_words():
+    """斜杠词那一格：带 `/` 不够算路径。行文里的斜杠词（超级块/读写）里的旧名照换；以 ~/、/、./、../ 起头的、带 :// 的网址、
+    有一段像文件名的（docs/超级块/说明.md）仍是路径形态，--apply 不换、--check 照数。返回空串是判对。"""
+    import tempfile
+    with tempfile.TemporaryDirectory() as root:
+        write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
+        sample = os.path.join(root, "notes.md")
+        with open(sample, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(SLASH_WORD_SAMPLE_LINES))
+        tally = {}
+        code = quietly(sweep, root, False, tally=tally)
+        if code != 1 or tally.get("occurrences") != 8 or tally.get("path_shaped") != 6:
+            return "--check 应当退 1、报 8 处其中路径形态 6 处（斜杠词 2 处不算路径），实际退 %s、%s 处、路径形态 %s 处" % (code, tally.get("occurrences"), tally.get("path_shaped"))
+        quietly(sweep, root, True)
+        actual = open(sample, encoding="utf-8").read().split("\n")
+        want = ["行文里的系统配置/读写 与 增删/系统配置 是斜杠词，要换"] + SLASH_WORD_SAMPLE_LINES[1:]
+        if actual != want:
+            return "--apply 之后应当只换斜杠词里的两处、路径形态的原样在：应当是 %r，实际 %r" % (want, actual)
+    return ""
 
 
 def check_line_exemptions():

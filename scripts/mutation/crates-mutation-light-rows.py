@@ -25,17 +25,17 @@ mutation-light-rows 格调 check，门禁 checker-tier-crates-mutation-replay �
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（格名是 selftest() 里那一格，自证打「✗ 自证 <格名>：…」）：
   CRATES_MUTATION_LIGHT_ROWS_BREAK=missing-targets-accepted  ④ 不核核心行的每个测试目标都有一行
-      missing-target、missing-core-target
+      「✗ 自证 missing-target：」、「✗ 自证 missing-core-target：」
   CRATES_MUTATION_LIGHT_ROWS_BREAK=unknown-rows-accepted  ② 不核点名的变异名在变异表里
-      unknown-row
+      「✗ 自证 unknown-row：」
   CRATES_MUTATION_LIGHT_ROWS_BREAK=duplicate-targets-accepted  ④ 一个测试目标登记两行不红
-      two-rows-for-one-target
+      「✗ 自证 two-rows-for-one-target：」
   CRATES_MUTATION_LIGHT_ROWS_BREAK=target-column-unchecked  ③ 不核写的测试目标与那一行的第五列对得上
-      wrong-target-column
+      「✗ 自证 wrong-target-column：」
   CRATES_MUTATION_LIGHT_ROWS_BREAK=non-core-rows-accepted  ⑤ 不核登记的行改坏对象在核心代码下
-      non-core-row
+      「✗ 自证 non-core-row：」
   CRATES_MUTATION_LIGHT_ROWS_BREAK=non-core-targets-required  ④ 把核心行之外的测试目标也算进「要登记」（旧判法：整表每个测试目标一行）
-      clean、non-core-target-needs-no-row
+      「✗ 自证 clean：」、「✗ 自证 non-core-target-needs-no-row：」
 """
 import importlib.util
 import os

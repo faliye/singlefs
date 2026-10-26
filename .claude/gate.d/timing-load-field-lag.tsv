@@ -1,5 +1,5 @@
-# 计时行留存产物的负载字段滞后表：一行两列、制表符分隔——留存产物名（scripts/experiments/replay.sh 复跑表 timing 行的第 4 列）、理由（至少 8 个字）；# 开头的行与空行不算。
-# 读它的是 scripts/experiments/replay.sh 的计时行负载关（文件头「计时行的负载关」）：新产物收尾行没有 loadavg1 / cpus 的判红，登记在这里的留存产物照旧判。
+# 计时行留存产物的负载字段滞后表：一行两列、制表符分隔——留存产物名（scripts/experiment-apparatus/replay.sh 复跑表 timing 行的第 4 列）、理由（至少 8 个字）；# 开头的行与空行不算。
+# 读它的是 scripts/experiment-apparatus/replay.sh 的计时行负载关（文件头「计时行的负载关」）：新产物收尾行没有 loadavg1 / cpus 的判红，登记在这里的留存产物照旧判。
 # 只缩不涨：装置的收尾行补了字段、留存产物换成带字段的新产物之后，在同一次改动里删掉它那一行；不往这里加新行去绕开那一关，新实验的装置一开始就写字段。
 #   replay.sh 开跑前核：名字不是某条 timing 行的第 4 列、重复登记、没写理由、留存产物自己已经有字段，都判红退 2。门禁不判涨，靠 review。
 # 留存产物多数已按「每次提交删上一次的实验记录」归档进版本库，不在 research/results/ 树里：git log --all --diff-filter=D --name-only -- "*<产物文件名>" 找得到。
@@ -12,4 +12,3 @@ e20-poscontrol-2026-08-29.out	2026-10-13 立 C350 之前的产物，装置还没
 e21-cpu-2026-08-28.out	2026-10-13 立 C350 之前的产物，装置还没加收尾字段
 e128-pointer-birth-cost-2026-09-10.out	2026-10-13 立 C350 之前的产物，装置还没加收尾字段
 e144-header-checksum-cost-2026-09-13.out	2026-10-13 立 C350 之前的产物，装置还没加收尾字段
-e161-crash-state-dedup-and-time-split-feasibility-r2-2026-10-05.out	2026-10-13 立 C350 之前的产物，装置还没加收尾字段

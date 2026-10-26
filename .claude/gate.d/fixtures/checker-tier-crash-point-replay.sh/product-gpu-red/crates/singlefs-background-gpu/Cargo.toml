@@ -1,0 +1,11 @@
+[package]
+name = "singlefs-background-gpu"
+version = "0.0.0"
+edition = "2021"
+
+[features]
+tests-on-a-real-gpu = []
+
+[[test]]
+name = "checksum_kernels_agree"
+required-features = ["tests-on-a-real-gpu"]

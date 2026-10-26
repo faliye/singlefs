@@ -1,0 +1,4 @@
+exit=1
+want=没注册日志写法闸：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 two-logs-guard.sh 的一条
+want=→ 怎么办：在 hooks.PreToolUse 的 Bash 那一条里加 command "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/two-logs-guard.sh"
+want=agent-write-scope：红（退出 1）

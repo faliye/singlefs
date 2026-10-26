@@ -9,15 +9,19 @@
   python  按文件路径导入（importlib.util.spec_from_file_location，与 lib_shell_words.py 的导入法相同），或把 .claude/hooks 放进 sys.path 再 import
   shell   work_root="$(python3 <仓根>/.claude/hooks/lib_work_root.py)"：打一行展开后的工作根，不建目录
   写范围表 .claude/hooks/agent-write-scope.tsv 的路径模式以 $SINGLEFS_WORK_ROOT/ 起头的，由 expand_scope_pattern 展开成工作根与旧根各一条
+  钩子判不了而照常放行时 record_unjudged_pass 往检出记录追加一行（结局「只记」）：ask-user-claim-guard.sh、host-resources-reminder.sh、
+  timer-only-remind-guard.sh、session-start.sh 调它；读不到这一份的钩子 stderr 说一句没记成
 
 弄坏开关（只给用它的钩子与脚本的自证判红用）：SINGLEFS_WORK_ROOT_BREAK=
   new-root-unknown     work_root() 交回旧根，scratch_roots() 与 mention_prefix_pattern() 只认旧根：各份自证里「工作根下」那几格红
   legacy-root-unknown  scratch_roots() 与 mention_prefix_pattern() 不认旧根：各份自证里「过渡期旧根下」那几格红
 不认识的值抛 ValueError，免得拼错的开关被当成「没开」。
 """
+import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 
 WORK_ROOT_VARIABLE = "SINGLEFS_WORK_ROOT"
 DEFAULT_WORK_ROOT = "~/.local/share/singlefs/work"
@@ -117,6 +121,30 @@ def default_detections_path():
 def state_directory(name):
     """钩子与看门狗的状态目录：工作根下的 <name>。"""
     return os.path.join(work_root(), name)
+
+
+def record_unjudged_pass(hook_name, hook_input, command, findings, path=None):
+    """钩子判不了而照常放行时，照「放行但必记检出」往检出记录追加一行（结局「只记」，看门狗据此报给主 agent）。
+    hook_input 不是 dict（读不懂的输入）时会话号写「读不到」；findings 是给人看的几句（写清哪道钩子、卡在哪）；command 是给人看的这一次调用。
+    path 不给取 AGENT_HOOK_DETECTIONS，没设取 default_detections_path。交 (记进的路径或 None, 一句给人看的说明)：记成了说记进哪里，没记成说为什么。"""
+    known = hook_input if isinstance(hook_input, dict) else {}
+    session = known.get("session_id")
+    entry = {"time": datetime.now(timezone.utc).isoformat(), "hook": hook_name,
+             "session_id": session if isinstance(session, str) and session else "读不到",
+             "agent_id": known.get("agent_id"), "agent_type": known.get("agent_type") or "主 agent",
+             "transcript_path": known.get("transcript_path"), "command": str(command or "")[:2000],
+             "findings": [str(finding) for finding in findings], "outcome": "只记"}
+    try:
+        target = path or os.environ.get("AGENT_HOOK_DETECTIONS") or default_detections_path()
+    except ValueError as error:   # 工作根的弄坏开关写错
+        return None, f"检出没记成：取不到检出记录的位置（{error}）"
+    try:
+        os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
+        with open(target, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as error:
+        return None, f"检出没记成：写不了 {target}（{error}）"
+    return target, f"照「放行但必记检出」，检出记进 {target}"
 
 
 if __name__ == "__main__":

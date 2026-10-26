@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: checker 类：checker 与实现只共享常量模块、记账语义不许同源，harness 档不依赖 checker 档；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟；判器调用点要么在判定段里、要么带了豁免或 CPU 参照的标记
+# gate-stage: checker 类：checker 与实现只共享常量模块、记账语义不许同源，harness 档不依赖 checker 档，checker 档与产品 GPU 包不共用代码；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟；判器调用点要么在判定段里、要么带了豁免或 CPU 参照的标记
 # gate-fixture: yes
 # gate-category: checker 类
 # gate-similar: code-source-discipline.sh 它的 format-constants 格也按 lib-format-const.py 读格式常量，但判的是 kb 字段表与常量模块两边的值逐个对得上；这里判格式常量变了 checker 跟没跟，不比两边的值；它的 mutation-tables 格按 lib-owed.py 读欠账表，判实验源码与变异表的纪律
@@ -10,17 +10,20 @@
 # gate-similar: checker-tier-crash-point-replay.sh 开跑前调 crash-case-check.py 判 checker 档测试文件声明模块，对象是测试文件；这里判的是包之间的依赖方向
 # gate-similar: harness-model-differential-and-scenarios.sh 同样盯 harness 档，但判的是用例粒度与模型对拍，不读 Cargo.toml
 # gate-similar: code-source-discipline.sh 它的 gpu-exemptions 格（scripts/crash/gpu-exemptions-check.py）读同一种 // gpu-exempt: 标记，判的是标记与豁免表逐项对上；这里的 cpu-judging-sites 格判的是判器调用点有没有落在判定段里或带了标记，对象是调用点不是表行；并进那一道要改 code-source-discipline.sh，那一份这一轮有别的会话在加格（records/2026-10-13-复用键与全仓改名.md 课题 4 批次 4-2 派发），所以落在判 checker 与实现之间账的这一道
+# gate-similar: code-tooling.sh 它的 function-units-two-implementations-agree 格也调 scripts/gate/lib_function_units.py，判的是函数单元两份实现逐单元对拍；这里的 checker-direction-overlap 格拿它收的闭包判池级 checker 两个方向共享了什么，对象是 checker 源码、不是库本身
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就三格都跑，格名写错退 2）：
-# gate-cell: checker-implementation-disjoint checker 与实现只共享常量模块，harness 档不依赖 checker 档
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就四格都跑，格名写错退 2）：
+# gate-cell: checker-implementation-disjoint checker 与实现只共享常量模块，harness 档不依赖 checker 档，checker 档与产品 GPU 包不共用代码
 # gate-cell: layout-checker-sync 布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟
 # gate-cell: cpu-judging-sites checker 档与 harness 档里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记
+# gate-cell: checker-direction-overlap 池级 checker 遍历式与扫描式两个方向调用的函数单元，交集只许落在格式解析与常量里，取不到调用图也判红
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、汇总与退出码在共用库 lib/stage-cells.sh。
 #
 # ── checker-implementation-disjoint ──
 # 依据：.claude/kb/decisions/13-验证路线.md 已定项 5（两侧只共享 kb 字段表生成的常量模块）与已定项 15（依赖方向）；⑤⑥⑦ 另依已定项 3（RefFS）
 # 与用户 2026-10-02 定 F4「RefFS 单独一个包，按依赖图判」（research/prompts/m3-formal-r4-main-verification.md「用户定案」，
-# 判决 research/prompts/m3-formal-r5-main-verification.md 第二节 U4 一行）。七条，任一条不成立判红：
+# 判决 research/prompts/m3-formal-r5-main-verification.md 第二节 U4 一行）；⑧ 另依七·2 第三轮判决 research/prompts/m4-gpugc-design-r3-main-verification.md
+# 第二节 G7 一行与用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」（records/2026-10-19-里程碑四GPU垃圾回收开工.md 那一天弹窗定四问的一行）。八条，任一条不成立判红：
 #   ① 按 crates/*/Cargo.toml 建内部依赖图，singlefs-checker 与 singlefs-core 各取传递闭包求交，减去 singlefs-format 必须为空。
 #      取闭包：checker 经中间包依赖实现时，直接依赖表上看不出。外部 crate 是叶子、照样参与求交；
 #      罩不到外部 crate 之间的传递依赖（要真跑 cargo tree）。
@@ -36,12 +39,23 @@
 #      照下一段改写死的路径）；都没有，⑤ ⑥ 两条报本次未跑：输出里打一行 `!`，设了 $GATE_NOT_RUN_FILE 时往里追加一行，这一格照 ①–④ ⑦ 判绿或判红
 #      （.claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」：只跑了一部分，跳过的逐项报）。包目录在而没有 Cargo.toml，
 #      或一个 .rs 都没有，判红。
+#   ⑧ checker 档包 singlefs-checker-tier 与产品 GPU 包 singlefs-background-gpu：两边的传递闭包（dev-dependencies 也算）里都没有对方；
+#      两边闭包的交集减去允许共用的必须为空。允许共用的：singlefs-format、singlefs-core 与它们经 [dependencies] / [build-dependencies]
+#      带进来的（dev-dependencies 不算），wgpu、naga 一族（名字是 wgpu、naga 或以 `wgpu-`、`naga-` 起头）与仓根 Cargo.lock 里它们的传递依赖
+#      （没有 Cargo.lock 时只认一族的名字）。有一边依赖另一边时交集这一条不判（交集就是下面那一边的整个闭包），等依赖删掉再判。
+#      两边的源码（包目录下全部 .rs，target/ 除外）零处引对方：真名按标识符认，经 `package =` 改名引进来的别名照 ② 的认法（`别名::`）。
+#      包在而哪一边一个 .rs 都没有，判红。
+#   产品 GPU 包目录 crates/singlefs-background-gpu 不在时照 RefFS 那一段：crates/*/Cargo.toml 里另有一个包叫这个名字、或有包依赖这个名字，判红；
+#      都没有，⑧ 报本次未跑（输出里打一行 `!`，设了 $GATE_NOT_RUN_FILE 时往里追加一行），这一格照别的几条判绿或判红。
+#   ⑧ 罩不到的：外部 crate 之间的传递依赖只看 Cargo.lock 里 wgpu、naga 一族那一支（别的要真跑 cargo tree）；`#[path = …]`、`include!`、
+#      `include_str!` 跨包目录引源码或着色器文件不认（只认 crate 名与别名）。
 # 依赖表认 [dependencies] / [dev-dependencies] / [build-dependencies] / [target.'…'.dependencies]、[dependencies.X]、
 # `X.workspace = true`（根 Cargo.toml [workspace.dependencies] 里的 package = 改名也认）、`别名 = { package = "真名", … }`；闭包按真名求交。
 # 为什么：checker 重建记账、运行时增量维护记账，I-3.1（已分配统计对得上） 拿两者对账；两侧共用语义代码时写错会两边同样错，对账照样全绿。
+#   ⑧ 同一个理由落在 GPU 上：checker 档的 GPU 判器与产品 GPU 包共用一段代码时，那段写错会让判器与被判的产品路径一起错，GPU 对拍照样全绿。
 # 射程：判不了两边各写的语义对不对（归模型对拍与变异表）；「运行时记账分支取反，I-3.1 必须红」在 crates/mutations.tsv，
 # 归门禁 checker-tier-crates-mutation-replay；也判不了 RefFS 的语义对不对、它与实现是不是落在同一个崩溃语义的误解上（归 D13（验证路线） 已定项 6 的合谋测试）。
-# 六个 crate 路径写死，改名或搬家时判红、不跳过（RefFS 那一个在包还不存在时照上一段）。
+# 七个 crate 路径写死，改名或搬家时判红、不跳过（RefFS 与产品 GPU 包那两个在包还不存在时照上面各自那一段）。
 #
 # ── layout-checker-sync ──
 # 读 .claude/gate.d/layouts.tsv：一套布局一行，制表符分四列（布局名 / incompat 位号 / 格式定义路径 / checker 判定路径，后两列逗号分隔）。
@@ -58,6 +72,8 @@
 # 变更探测器暂用「常量名 → 值」集合，不是 D15（格式冻结政策） 已定项 3 的 spec_hash：format-spec/<组件>.toml 还没有
 # （C119（冻结组件没有 spec 文件）），有了就把抽取源换过去。
 # 改动范围取 scripts/gate/changed-paths.sh 的 gate_diff_base gate 与 gate_changed_paths（带未跟踪文件）；
+# 基准那一版的格式定义经 lib-lag-baseline.py 的 baseline_text 取：基准里没有这份（这次新加的）常量全算新增；git 取不到（基准名不在、对象库缺了那一份）判红、
+#   点名那一份，那一套布局的第 ④ 条不往下比（改前取不到交空串，与「基准里没有」分不出，撞上另一份没变同值的就按首次登记放过去）。
 # git 调用带 `-c core.quotepath=false`，否则中文路径被打成八进制引号串，与布局清单比不上。
 # 滞后表指的欠账号按 lib-owed.py 读 checks-owed.md：「### 已还清」整行标题之前算开着，认不出那个标题判红。
 #
@@ -70,6 +86,8 @@
 #   layout-checker-sync-first-registration-same-value          首次挂标记、值没变、checker 没碰：绿
 #   layout-checker-sync-first-registration-underscored-literal .rs 字面量带 `_`、标记写不带的同一个数：绿
 #   layout-checker-sync-first-registration-changed-value       源值这次也变了：红
+#   layout-checker-sync-base-unreadable-red                    两份格式定义都没改，基准那一版布局.md 的对象从对象库里删掉（ls-tree 认得出、show 读不出）：
+#                                                              红、点名「读不出基准 HEAD 里的 format/布局.md」（改前当成基准里没有、报首次登记判绿）
 #   checker-implementation-disjoint-red 里没有 RefFS 包：⑤ ⑥ 报本次未跑；-green 带 RefFS 包（dev-dependencies 里用别名引 singlefs-format，
 #                                          测试引 singlefs_reference_filesystem 自己；harness 与 checker 档依赖它，方向对）：⑤⑥⑦ 绿
 #   checker-implementation-disjoint-reference-closure-red          RefFS 依赖一个外部 crate，dev-dependencies 经中间包够到 singlefs-core：⑤ 红
@@ -79,21 +97,62 @@
 #                                                                  ⑦ 红（① 跟着红：两边闭包都有 RefFS）
 #   checker-implementation-disjoint-reference-moved-red            RefFS 包搬到 crates/reference-filesystem、harness 照名字依赖它：判红
 #   checker-implementation-disjoint-reference-without-sources-red  RefFS 包只有 Cargo.toml、一个 .rs 都没有：判红
-# 弄坏开关：
-#   STAGE_CELLS_BREAK=red-swallowed       共用库汇总吞红：两份 -red 与 changed-value 退 0
-#   CHECKER_INDEPENDENCE_BREAK=<项>       每一项拆掉一条新判红分支，点名的样本判错：
-#     reference-closure-unchecked          ⑤ 不判：reference-closure-red 退 0
-#     reference-direct-names-unchecked     ⑥ 的真名不判：reference-sources-red 的「源码里有 2 处引」出不来
-#     reference-aliases-unchecked          ⑥ 的别名不判：reference-sources-red 的「1 处用别名 `oracle::`」出不来
-#     reference-dependents-unchecked       ⑦ 不判：reference-dependents-red 的「依赖闭包（dev-dependencies 也算）里有 RefFS 包」出不来
-#     reference-moved-unchecked            包目录不在而包名还在时按本次未跑报：reference-moved-red 退 0
-#     reference-sources-empty-accepted     一个 .rs 都没有也照判：reference-without-sources-red 退 0
-#     reference-absent-unreported          包不在时不报本次未跑：checker-implementation-disjoint-red 的「⑤ ⑥ 两条本次未跑」出不来
-#     relative-root-unresolved             cd 进根之后不把根换成绝对路径：cpu-judging-sites-relative-root-green 里判法脚本在新的工作目录下读不到登记表，退 1，「判器调用点都合规…」出不来
-#   REJECTION_BLOCKS_BREAK=summaries-only lib/rejection-blocks.py 只打摘要：layout-checker-sync-red 的「format/布局.md:5  标记按文法读不出来」明细出不来
-#   CPU_JUDGING_SITES_CHECK_BREAK=<项>    判法那一份（scripts/crash/cpu-judging-sites-check.py，开关表在它文件头）的弄坏开关，样本上：
-#     unmarked-sites-accepted              没标记的调用点不判红：cpu-judging-sites-red 的「history.rs:1 violations_on 调 check_pool_image」出不来
-#     table-targets-unchecked              登记表的文件与 ::函数名不核：cpu-judging-sites-red 的「pool_checker_*.rs」那一句出不来
+#   上面几份都没有产品 GPU 包：⑧ 报本次未跑。
+#   checker-implementation-disjoint-gpu-package-absent         checker 档带 wgpu、产品 GPU 包不在、也没有包叫这个名字或依赖它：退 0，⑧ 报本次未跑
+#   checker-implementation-disjoint-gpu-green                  产品 GPU 包在，两边只共用 wgpu（另有允许的 singlefs-core、singlefs-format），注释里写 singlefs_checker_tier 不算：⑧ 绿
+#   checker-implementation-disjoint-gpu-checker-tier-depends-red  checker 档 [dependencies] 依赖产品 GPU 包、[dev-dependencies] 另用别名 `product` 引它，
+#                                                              src 引一处真名、tests 引一处别名：⑧ 红（依赖与源码两样）
+#   checker-implementation-disjoint-gpu-bridge-red             产品 GPU 包的 dev-dependencies 用别名 `judge` 引中间包 sample-gpu-judge-bridge，
+#                                                              中间包依赖 checker 档包、转出它的 GPU 判器模块：⑧ 红（依赖那一样）
+#   checker-implementation-disjoint-gpu-shared-closure-red     两边互不依赖，都依赖本仓的 sample-gpu-kernels 与外部的 pollster；
+#                                                              另都依赖 wgpu、bytemuck（Cargo.lock 里是 wgpu 的依赖）、singlefs-core（带进 singlefs-replay-prefix、libc）：
+#                                                              ⑧ 红、交集只点 2 个（sample-gpu-kernels、pollster）
+#   checker-implementation-disjoint-gpu-package-moved-red      产品 GPU 包搬到 crates/background-gpu、包名没变：判红
+#   checker-implementation-disjoint-gpu-package-without-sources-red  产品 GPU 包只有 Cargo.toml、一个 .rs 都没有：判红
+# 弄坏开关（打开后样本判错；每条下面逐行点名判错的样本，括号里是那一份出不来的那一句）：
+#   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
+#     checker-implementation-disjoint-red、checker-implementation-disjoint-reference-closure-red
+#     checker-implementation-disjoint-reference-dependents-red、checker-implementation-disjoint-reference-moved-red
+#     checker-implementation-disjoint-reference-sources-red、checker-implementation-disjoint-reference-without-sources-red
+#     checker-implementation-disjoint-gpu-checker-tier-depends-red、checker-implementation-disjoint-gpu-bridge-red
+#     checker-implementation-disjoint-gpu-shared-closure-red、checker-implementation-disjoint-gpu-package-moved-red
+#     checker-implementation-disjoint-gpu-package-without-sources-red
+#     cpu-judging-sites-red、layout-checker-sync-base-unreadable-red
+#     layout-checker-sync-first-registration-changed-value、layout-checker-sync-red
+#     checker-direction-overlap-red、checker-direction-overlap-unobtainable-red
+#   LAG_BASELINE_BREAK=unreadable-as-absent  归 lib-lag-baseline.py：baseline_text 把 git 取不到当成基准里没有
+#     layout-checker-sync-base-unreadable-red（退 0）
+#   CHECKER_INDEPENDENCE_BREAK=reference-closure-unchecked  ⑤ 不判
+#     checker-implementation-disjoint-reference-closure-red（退 0）
+#     checker-implementation-disjoint-reference-sources-red（⑤ 跟着红的那一句「singlefs-reference-filesystem → singlefs-core（…写成别名 `oracle`）」）
+#   CHECKER_INDEPENDENCE_BREAK=reference-direct-names-unchecked  ⑥ 的真名不判
+#     checker-implementation-disjoint-reference-sources-red（「源码里有 2 处引」）
+#   CHECKER_INDEPENDENCE_BREAK=reference-aliases-unchecked  ⑥ 的别名不判
+#     checker-implementation-disjoint-reference-sources-red（「1 处用别名 `oracle::`」）
+#   CHECKER_INDEPENDENCE_BREAK=reference-dependents-unchecked  ⑦ 不判
+#     checker-implementation-disjoint-reference-dependents-red（「依赖闭包（dev-dependencies 也算）里有 RefFS 包」）
+#   CHECKER_INDEPENDENCE_BREAK=reference-moved-unchecked  包目录不在而包名还在时按本次未跑报
+#     checker-implementation-disjoint-reference-moved-red（退 0）
+#   CHECKER_INDEPENDENCE_BREAK=reference-sources-empty-accepted  一个 .rs 都没有也照判
+#     checker-implementation-disjoint-reference-without-sources-red（退 0）
+#   CHECKER_INDEPENDENCE_BREAK=reference-absent-unreported  包不在时不报本次未跑
+#     checker-implementation-disjoint-red（「⑤ ⑥ 两条本次未跑」）
+#   CHECKER_INDEPENDENCE_BREAK=gpu-packages-unchecked  ⑧ 不判（包在时的依赖、交集、源码、没有 .rs，包不在而包名还在的搬家；包不在时照样报本次未跑）
+#     checker-implementation-disjoint-gpu-checker-tier-depends-red（退 0）
+#     checker-implementation-disjoint-gpu-bridge-red（退 0）
+#     checker-implementation-disjoint-gpu-shared-closure-red（退 0）
+#     checker-implementation-disjoint-gpu-package-moved-red（退 0）
+#     checker-implementation-disjoint-gpu-package-without-sources-red（退 0）
+#   CHECKER_INDEPENDENCE_BREAK=relative-root-unresolved  cd 进根之后不把根换成绝对路径
+#     cpu-judging-sites-relative-root-green（判法脚本在新的工作目录下读不到登记表，退 1，「判器调用点都合规…」）
+#   REJECTION_BLOCKS_BREAK=summaries-only  归 lib/rejection-blocks.py：只打摘要、不打明细
+#     layout-checker-sync-base-unreadable-red（「format/布局.md：读不出基准 HEAD 里的 format/布局.md」）
+#     layout-checker-sync-first-registration-changed-value（「改值 SAMPLE_UNIT_BYTES：16384 → 32768（format/src/lib.rs）」）
+#     layout-checker-sync-red（「format/布局.md:5  标记按文法读不出来」）
+#   CPU_JUDGING_SITES_CHECK_BREAK=unmarked-sites-accepted  归 scripts/crash/cpu-judging-sites-check.py（开关表在它文件头）：没标记的调用点不判红
+#     cpu-judging-sites-red（「history.rs:1 violations_on 调 check_pool_image」）
+#   CPU_JUDGING_SITES_CHECK_BREAK=table-targets-unchecked  归 cpu-judging-sites-check.py：登记表的文件与 ::函数名不核
+#     cpu-judging-sites-red（「pool_checker_*.rs」那一句）
 #
 # ── cpu-judging-sites ──
 # 依据：records/2026-10-13-复用键与全仓改名.md「课题 4」出口 ④（门禁能拦住「没打标记的 CPU 就地判」；豁免表那一格只核标记与表行对上，管不到没打标记的）。
@@ -105,10 +164,22 @@
 #   cpu-judging-sites-red    另有 harness 档 src 里一处没标记的池级 checker 调用，登记表多一行一份都对不上的 pool_checker_*.rs：红、逐处列
 #   cpu-judging-sites-relative-root-green  同 cpu-judging-sites-green，另在样本根放 .relative-root-sample：阶段先 cd 到样本的上一级、再以相对路径给根，判得与绝对路径相同：绿
 #
+# ── checker-direction-overlap ──
+# 依据：D13（验证路线） 已定项 12「两者对同一条不变量独立判断，共享的只有格式解析」与 checks-owed.md C410（checker 两个方向共享什么没有检查）；
+# 扫描式方向的边界照用户 2026-10-26 定的「连 walk.rs 扫单元头那几个函数一起算，另建调用图」。checker-implementation-disjoint 格是 crate 粒度，罩不到同一个 crate 里的两个方向。
+# 判法只在 scripts/gate/checker-direction-overlap.py check（两个方向的闭包怎么收、切点与比对点、交集里各类单元怎么分、登记表核法与射程都在它文件头）；
+# 闭包由 scripts/gate/lib_function_units.py 收，入口、切点、比对点、局部绑定与允许共享的格式解析单元登记在 .claude/gate.d/checker-direction-entries.tsv。
+# 交集里格式解析之外的函数单元越界判红，取不到调用图（表不在、入口找不到、闭包里有拒算）判红；crates/ 不在退 77。
+# 判法自己的自证在 scripts/gate/checker-direction-overlap.py --selftest（弄坏开关 CHECKER_DIRECTION_OVERLAP_BREAK 的表在它文件头，只在自证里认）。
+# 样本（fixtures/checker-independence-and-sync.sh/）：
+#   checker-direction-overlap-green              交集只有登记的 lib.rs 读字节函数、singlefs-format 包里的函数、读盘接口的方法声明与常量，比对点自己的闭包只列不判：绿
+#   checker-direction-overlap-red                扫描式扫单元头时调了遍历式判根记录的函数：红、点名那一个单元与两边各从哪个入口收进
+#   checker-direction-overlap-unobtainable-red   扫描式入口登的是改名之前的名字、源码里找不到：取不到调用图，红
+#
 # 项目根：可以给相对路径。阶段 cd 进根之后把根换成 pwd -P 的绝对路径，各格和它们起的子进程都用这一个绝对路径（cpu-judging-sites 格把它交给 python 判法，
 # 相对路径会在新的工作目录下再解析一次）。样本档只能给绝对路径，样本根里放着 .relative-root-sample 的（阶段所在的仓之外）由阶段自己走一遍"上一级 + 相对名"的调法。
 #
-#   bash .claude/gate.d/checker-independence-and-sync.sh [项目根]                          三格都跑
+#   bash .claude/gate.d/checker-independence-and-sync.sh [项目根]                          四格都跑
 #   bash .claude/gate.d/checker-independence-and-sync.sh --list                            逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/checker-independence-and-sync.sh --check <格名>[,<格名>…] [项目根]   只跑点名的格
 set -uo pipefail
@@ -119,12 +190,14 @@ REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_NAME="$(basename "$0")"
 source "$STAGE_DIR/lib/stage-cells.sh"
 
-stage_cell checker-implementation-disjoint cell_checker_implementation_disjoint "checker 与实现只共享常量模块，harness 档不依赖 checker 档" \
-  "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量；harness 档不依赖 checker 档（D13（验证路线） 已定项 5、15）；RefFS 只依赖 singlefs-format、不引那四个包，实现与池级 checker 不依赖它（用户 2026-10-02 定 F4）"
+stage_cell checker-implementation-disjoint cell_checker_implementation_disjoint "checker 与实现只共享常量模块，harness 档不依赖 checker 档，checker 档与产品 GPU 包不共用代码" \
+  "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量；harness 档不依赖 checker 档（D13（验证路线） 已定项 5、15）；RefFS 只依赖 singlefs-format、不引那四个包，实现与池级 checker 不依赖它（用户 2026-10-02 定 F4）；checker 档与产品 GPU 包 singlefs-background-gpu 互不依赖、互不引，只共用 singlefs-format、singlefs-core 与 wgpu、naga 一族（用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」）"
 stage_cell layout-checker-sync cell_layout_checker_sync "布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟" \
   "在同一次改动里改这套布局的 checker 判定路径；checker 今天确实判不了的，把常量名登记进 .claude/gate.d/layouts-checker-lag.tsv 并挂一条开着的欠账；布局清单与位号登记照上面那一条的出路改"
 stage_cell cpu-judging-sites cell_cpu_judging_sites "checker 档与 harness 档里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记" \
   "照上面逐处列的改：真跑实现、只能在 CPU 上判的那一截在函数上一行写 // gpu-exempt: <截名>、豁免表 .claude/gate.d/gpu-exemptions.tsv 登记同名一行（每加一行先问用户）；GPU 对拍的 CPU 参照那一侧写 // cpu-reference-for-gpu-comparison；能走两段的搬进判定段（从库里读回再判）；判定段与判器本体登记在 .claude/gate.d/cpu-judging-sites.tsv；改完单跑 python3 scripts/crash/cpu-judging-sites-check.py check 到它退 0，再只重跑这一格：bash .claude/gate.d/checker-independence-and-sync.sh --check cpu-judging-sites"
+stage_cell checker-direction-overlap cell_checker_direction_overlap "池级 checker 遍历式与扫描式两个方向调用的函数单元，交集只许落在格式解析与常量里，取不到调用图也判红" \
+  "照上面逐个列的改：越界的单元属格式解析的搬进 crates/singlefs-checker/src/lib.rs、在 .claude/gate.d/checker-direction-entries.tsv 加一行 shared-format（认不认它属格式解析由用户定，D13（验证路线） 已定项 12 只许共享格式解析），不属的在扫描式那一侧自己写一份（改 crates/ 归实现员）；库按名字误连的同名局部量登 local-binding；取不到调用图的照点名的那一行改登记表；改完单跑 python3 scripts/gate/checker-direction-overlap.py check 到它退 0，再只重跑这一格：bash .claude/gate.d/checker-independence-and-sync.sh --check checker-direction-overlap"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -161,6 +234,8 @@ HARNESS = "crates/singlefs-harness"
 CHECKER_TIER = "crates/singlefs-checker-tier"
 REFERENCE = "crates/singlefs-reference-filesystem"
 REFERENCE_CRATE_NAME = "singlefs-reference-filesystem"
+BACKGROUND_GPU = "crates/singlefs-background-gpu"
+BACKGROUND_GPU_CRATE_NAME = "singlefs-background-gpu"
 BREAK = os.environ.get("CHECKER_INDEPENDENCE_BREAK", "")
 
 def fail(message, steps):
@@ -192,12 +267,14 @@ def workspace_renames():
 
 WORKSPACE_RENAMES = workspace_renames()
 
-def manifest_of(crate_dir):
-    """(包名, 依赖的真名集合, {别名: 真名})。依赖表的几种写法见文件头。"""
+DEV_DEPENDENCY_TABLE = re.compile(r"(?:^\[|\.)dev-dependencies(?:\]|\.)")
+
+def manifest_of(crate_dir, with_dev=True):
+    """(包名, 依赖的真名集合, {别名: 真名})。依赖表的几种写法见文件头。with_dev 为假时 dev-dependencies 那几张表不读（⑧ 算允许共用的那一份闭包）。"""
     path = os.path.join(crate_dir, "Cargo.toml")
     if not os.path.isfile(path):
         fail(f"找不到 {path}", [
-            f"怎么办：crate 改名或搬家了，同步改这个阶段里写死的六个路径（{CHECKER} / {CORE} / {SHARED} / {HARNESS} / {CHECKER_TIER} / {REFERENCE}）。",
+            f"怎么办：crate 改名或搬家了，同步改这个阶段里写死的七个路径（{CHECKER} / {CORE} / {SHARED} / {HARNESS} / {CHECKER_TIER} / {REFERENCE} / {BACKGROUND_GPU}）。",
             "        这一道判的是 checker 与实现之间共享了什么，路径对不上就没有对象可判，所以它判红而不是跳过。",
         ])
     package_name, names, aliases = None, set(), {}
@@ -224,9 +301,10 @@ def manifest_of(crate_dir):
         stripped = line.strip()
         if stripped.startswith("["):
             in_package = stripped == "[package]"
-            in_dependencies = bool(DEPENDENCY_TABLE.match(stripped))
+            skipped_table = not with_dev and bool(DEV_DEPENDENCY_TABLE.search(stripped))
+            in_dependencies = bool(DEPENDENCY_TABLE.match(stripped)) and not skipped_table
             item = DEPENDENCY_ITEM_TABLE.match(stripped)
-            item_table = item.group(1) if item else None
+            item_table = item.group(1) if item and not skipped_table else None
             if item_table:
                 add(item_table, "")
             continue
@@ -246,10 +324,11 @@ def manifest_of(crate_dir):
             add(dotted.group(1) if dotted else key, value)
     return package_name or os.path.basename(crate_dir), names, aliases
 
-internal, internal_aliases, crate_directories = {}, {}, {}
+internal, internal_aliases, crate_directories, internal_without_dev = {}, {}, {}, {}
 for manifest_path in sorted(glob.glob("crates/*/Cargo.toml")):
     name, dependencies, _aliases = manifest_of(os.path.dirname(manifest_path))
     internal[name] = dependencies
+    internal_without_dev[name] = manifest_of(os.path.dirname(manifest_path), with_dev=False)[1]
     internal_aliases[name] = _aliases
     crate_directories.setdefault(name, []).append(os.path.dirname(manifest_path))
 
@@ -498,6 +577,150 @@ if reference_dependents and BREAK != "reference-dependents-unchecked":
         [f"怎么办：{REFERENCE_DECISION}；实现与池级 checker 都不依赖它，否则三个 oracle 不再互相独立（D13（验证路线） 已定项 3、6）。",
          "        把这条依赖删掉；要拿 RefFS 对拍的用例写进 harness 档或 checker 档。"],
     ))
+# ⑧ checker 档的 GPU 判器与产品 GPU 包不共用代码：互不依赖、互不引，闭包只交在允许共用的上
+BACKGROUND_GPU_DECISION = ("用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」（records/2026-10-19-里程碑四GPU垃圾回收开工.md；"
+                           "判决 research/prompts/m4-gpugc-design-r3-main-verification.md 第二节 G7）")
+GPU_SHARED_FAMILY = re.compile(r"^(?:wgpu|naga)(?:-[A-Za-z0-9_\-]+)?$")
+gpu_judged = BREAK != "gpu-packages-unchecked"
+
+def lock_dependency_graph():
+    """仓根 Cargo.lock 的 [[package]] 名 → 它 dependencies 里的名字（去掉 `名字 版本` 的版本）；没有 Cargo.lock 交 None。"""
+    if not os.path.isfile("Cargo.lock"):
+        return None
+    graph, current, in_list = {}, None, False
+    for line in open("Cargo.lock", encoding="utf-8"):
+        stripped = line.strip()
+        if in_list:
+            if stripped.startswith("]"):
+                in_list = False
+            elif stripped.startswith('"') and current is not None:
+                graph[current].add(stripped.strip('",').split(" ", 1)[0])
+            continue
+        if stripped.startswith("["):
+            current = None
+        elif stripped.startswith("name =") and current is None:
+            current = stripped.split("=", 1)[1].strip().strip('"')
+            graph.setdefault(current, set())
+        elif stripped.startswith("dependencies = [") and current is not None:
+            inline = stripped[len("dependencies = ["):]
+            for word in inline.rstrip("]").split(","):
+                if word.strip().strip('"'):
+                    graph[current].add(word.strip().strip('"').split(" ", 1)[0])
+            in_list = not inline.endswith("]")
+    return graph
+
+def closure_without_dev(roots):
+    """roots 与它们经 [dependencies] / [build-dependencies] 带进来的（本仓内部依赖图，dev-dependencies 不算）。"""
+    seen, queue = set(roots), list(roots)
+    while queue:
+        for dependency in internal_without_dev.get(queue.pop(), ()):
+            if dependency not in seen:
+                seen.add(dependency)
+                queue.append(dependency)
+    return seen
+
+def package_sources(directory):
+    return sorted(path for path in glob.glob(f"{directory}/**/*.rs", recursive=True) if "/target/" not in path[len(directory):])
+
+def references_to(sources, target_name, aliases):
+    """sources 里引 target_name 的行：真名按标识符认，aliases（{别名: 真名}）里指到它的别名按 `别名::` 认。交（真名那几处, 别名那几处, 别名表）。"""
+    identifier = target_name.replace("-", "_")
+    direct_pattern = re.compile(r"(?<![\w])" + re.escape(identifier) + r"(?![\w])")
+    via = sorted(alias.replace("-", "_") for alias, real in aliases.items() if real == target_name and alias.replace("-", "_") != identifier)
+    via_pattern = re.compile(r"(?<![\w])(" + "|".join(map(re.escape, via)) + r")\s*::") if via else None
+    direct, renamed = [], []
+    for path in sources:
+        for line_number, line in enumerate(open(path, encoding="utf-8"), 1):
+            code = line.split("//", 1)[0]
+            if direct_pattern.search(code):
+                direct.append(f"{path}:{line_number}：{line.strip()}")
+            elif via_pattern and via_pattern.search(code):
+                renamed.append(f"{path}:{line_number}：{line.strip()}")
+    return direct, renamed, via
+
+GPU_SEPARATION_STEPS = [f"怎么办：{BACKGROUND_GPU_DECISION}。checker 档的 GPU 判器与产品 GPU 包共用一段代码时，那段写错会让判器与被判的产品路径一起错，",
+                        "        GPU 对拍照样全绿（D13（验证路线） 已定项 5 同一个理由）。两边都要用的东西各写一份；",
+                        f"        只许共用 `{SHARED_CRATE_NAME}`、`{core_name}`（连同它们不经 dev-dependencies 带进来的）与 wgpu、naga 一族（连同 Cargo.lock 里它们的依赖）。"]
+background_gpu_present = os.path.isdir(BACKGROUND_GPU)
+if background_gpu_present:
+    background_gpu_name, _, background_gpu_aliases = manifest_of(BACKGROUND_GPU)
+    _, _, checker_tier_aliases = manifest_of(CHECKER_TIER)
+    background_gpu_closure = closure_of(BACKGROUND_GPU) - {background_gpu_name}
+    checker_tier_closure = closure_of(CHECKER_TIER) - {checker_tier_name}
+    gpu_problems = []
+    depends_on_each_other = [dependency_chain(upper, lower) for upper, lower, closure in
+                             ((checker_tier_name, background_gpu_name, checker_tier_closure),
+                              (background_gpu_name, checker_tier_name, background_gpu_closure)) if lower in closure]
+    if depends_on_each_other:
+        gpu_problems.append((
+            f"checker 档包 `{checker_tier_name}` 与产品 GPU 包 `{background_gpu_name}` 有一边依赖另一边（按本仓内部依赖图算的传递闭包，dev-dependencies 也算）：",
+            depends_on_each_other,
+            GPU_SEPARATION_STEPS + ["        把这条依赖删掉；删掉之后再跑这一格，两边闭包的交集那一条才判（有一边依赖另一边时交集就是下面那一边的整个闭包）。"],
+        ))
+    lock_graph = lock_dependency_graph()
+    gpu_family_allowed = {name for name in (background_gpu_closure | checker_tier_closure | set(lock_graph or ())) if GPU_SHARED_FAMILY.match(name)}
+    queue = list(gpu_family_allowed)
+    while lock_graph is not None and queue:
+        for dependency in lock_graph.get(queue.pop(), ()):
+            if dependency not in gpu_family_allowed:
+                gpu_family_allowed.add(dependency)
+                queue.append(dependency)
+    internal_allowed = closure_without_dev({SHARED_CRATE_NAME, core_name})
+    shared_beyond_allowed = [] if depends_on_each_other else sorted((background_gpu_closure & checker_tier_closure) - internal_allowed - gpu_family_allowed)
+    if shared_beyond_allowed:
+        gpu_problems.append((
+            f"checker 档包与产品 GPU 包的依赖闭包（dev-dependencies 也算）除允许共用的之外还交在 {len(shared_beyond_allowed)} 个上：",
+            [f"{name}：{dependency_chain(checker_tier_name, name)}；{dependency_chain(background_gpu_name, name)}" for name in shared_beyond_allowed],
+            GPU_SEPARATION_STEPS,
+        ))
+    checker_tier_sources = package_sources(CHECKER_TIER)
+    background_gpu_sources = package_sources(BACKGROUND_GPU)
+    for directory, sources in ((CHECKER_TIER, checker_tier_sources), (BACKGROUND_GPU, background_gpu_sources)):
+        if not sources:
+            gpu_problems.append((
+                f"{directory} 下一个 .rs 都没有：",
+                [f"{directory}/Cargo.toml 在，源码一份都扫不到"],
+                ["怎么办：包搬了源码目录就同步改这个阶段里的路径；扫到 0 个文件而报绿，与判过了一模一样。"],
+            ))
+    tier_direct, tier_renamed, tier_via = references_to(checker_tier_sources, background_gpu_name, checker_tier_aliases)
+    gpu_direct, gpu_renamed, gpu_via = references_to(background_gpu_sources, checker_tier_name, background_gpu_aliases)
+    cross_references = tier_direct + tier_renamed + gpu_direct + gpu_renamed
+    if cross_references:
+        gpu_problems.append((
+            f"checker 档包与产品 GPU 包的源码里有 {len(cross_references)} 处互相引用（checker 档引产品 GPU 包：真名 {len(tier_direct)} 处、"
+            f"别名 {len(tier_renamed)} 处；产品 GPU 包引 checker 档：真名 {len(gpu_direct)} 处、别名 {len(gpu_renamed)} 处；别名照 Cargo.toml 里的 package = 认）：",
+            cross_references,
+            GPU_SEPARATION_STEPS + ["        改名引进来照样是引（照 ② 的认法）；把引用与那条依赖一起删掉。"],
+        ))
+    if gpu_judged:
+        problems.extend(gpu_problems)
+    gpu_summary = (f"checker 档包与产品 GPU 包 `{background_gpu_name}` 互不依赖，两边闭包（{len(checker_tier_closure)} 个、{len(background_gpu_closure)} 个）"
+                   f"的交集 {len(background_gpu_closure & checker_tier_closure)} 个都在允许共用的里（经 `{SHARED_CRATE_NAME}`、`{core_name}` 带进来的 {len(internal_allowed)} 个，"
+                   f"wgpu、naga 一族{'连同 Cargo.lock 里它们的依赖' if lock_graph is not None else '（仓根没有 Cargo.lock，只认一族的名字）'} {len(gpu_family_allowed)} 个），"
+                   f"两边的 {len(checker_tier_sources)} 份、{len(background_gpu_sources)} 份源码零处互相引用（别名引进来的 {len(tier_via) + len(gpu_via)} 个）")
+else:
+    # 包目录不在：包名还在别处、或还有包依赖它，是搬家或改名了；都没有，⑧ 本次未跑
+    elsewhere = sorted(crate_directories.get(BACKGROUND_GPU_CRATE_NAME, []))
+    depended_on_by = sorted(name for name, dependencies in internal.items() if BACKGROUND_GPU_CRATE_NAME in dependencies)
+    if elsewhere or depended_on_by:
+        if gpu_judged:
+            problems.append((
+                f"{BACKGROUND_GPU} 不在，而包 `{BACKGROUND_GPU_CRATE_NAME}` 还在别处、或还有包依赖它：",
+                [f"包放在 {directory}" for directory in elsewhere] + [f"{name} 依赖它" for name in depended_on_by],
+                [f"怎么办：产品 GPU 包搬家或改名了，同步改这个阶段里写死的路径（{BACKGROUND_GPU}）与包名；",
+                 "        路径对不上 ⑧ 就没有对象可判，所以判红而不是报本次未跑。"],
+            ))
+        gpu_summary = f"产品 GPU 包 {BACKGROUND_GPU} 不在而包名还在，⑧ 没判"
+    else:
+        print(f"  ! 产品 GPU 包 {BACKGROUND_GPU} 不在，crates/*/Cargo.toml 里也没有包叫 `{BACKGROUND_GPU_CRATE_NAME}` 或依赖它：⑧ 本次未跑")
+        not_run_file = os.environ.get("GATE_NOT_RUN_FILE")
+        if not_run_file:
+            with open(not_run_file, "a", encoding="utf-8") as not_run_handle:
+                not_run_handle.write(f"checker-independence-and-sync.sh 的 checker-implementation-disjoint 格 ⑧ 本次未跑：产品 GPU 包 {BACKGROUND_GPU} 还不存在\n")
+        gpu_summary = f"产品 GPU 包 {BACKGROUND_GPU} 不在，⑧ 本次未跑"
+if not gpu_judged:
+    gpu_summary = f"弄坏开关 gpu-packages-unchecked：⑧ 没判（{gpu_summary}）"
+
 if reference_present:
     reference_summary = (f"RefFS 包 `{reference_name}` 的依赖闭包 {len(reference_closure)} 个都在 {{它自己, `{SHARED_CRATE_NAME}`}} 里，"
                          f"它的 {len(reference_sources)} 份源码零处引实现、池级 checker、harness 档、checker 档（别名引进来的 {len(reference_forbidden_aliases)} 个）")
@@ -517,9 +740,11 @@ print(f"  ✓ checker 与实现只共享常量模块 `{SHARED_CRATE_NAME}`（传
       f"checker 的 {len(checker_sources)} 份源码零处引 `singlefs_core`（别名引进来的 {len(core_aliases)} 个）；"
       f"共享模块 {len(shared_sources)} 份源码的正文 {scanned_lines} 行里没有分支与循环（`#[cfg(test)]` 标着的项 {skipped_test_lines} 行不扫）；"
       f"harness 档的依赖闭包 {len(harness_dependencies)} 个里没有 checker 档包，它的 {len(harness_sources)} 份源码零处引它；"
-      f"{reference_summary}；实现闭包 {len(core_dependencies)} 个、池级 checker 闭包 {len(checker_dependencies)} 个里都没有 RefFS 包")
+      f"{reference_summary}；实现闭包 {len(core_dependencies)} 个、池级 checker 闭包 {len(checker_dependencies)} 个里都没有 RefFS 包；"
+      f"{gpu_summary}")
 print(f"    这一道判不了的：两边各自手写的那份语义对不对（归模型对拍与变异表），以及 C12（增量语义共用） 另一半"
-      f"「运行时记账分支取反 ⇒ I-3.1（已分配统计对得上） 必须红」——那一条在 `crates/mutations.tsv` 里，门禁 checker-tier-crates-mutation-replay 复跑")
+      f"「运行时记账分支取反 ⇒ I-3.1（已分配统计对得上） 必须红」——那一条在 `crates/mutations.tsv` 里，门禁 checker-tier-crates-mutation-replay 复跑；"
+      f"⑧ 认不出 `#[path = …]`、`include!`、`include_str!` 跨包目录引源码或着色器文件")
 PY
 }
 
@@ -554,6 +779,8 @@ def load_library(module_name, file_name):
 format_const = load_library("format_const", "lib-format-const.py")
 owed_library = load_library("owed", "lib-owed.py")
 rejection_blocks = load_library("rejection_blocks", "lib/rejection-blocks.py")
+# 取基准那一版的格式定义：三种结局（有、基准里没有、git 取不到）只在 lib-lag-baseline.py 的 baseline_text 一份，取不到判红
+lag_baseline = load_library("lag_baseline", "lib-lag-baseline.py")
 # code-source-discipline 读 .rs 的值要整数字面量（integer_literal）；两道统一与否还没定，统一时改这一个名字。
 RUST_VALUE_READING = "normalized_text"
 GIT = ["git", "-c", "core.quotepath=false"]
@@ -665,9 +892,17 @@ def constants_in(text, path, record_problems):
                                    f"（第 {'、'.join(str(line_number) for line_number in duplicate.line_numbers)} 行）")
     return found
 
+baseline_problems = []   # 取不到基准那一版的格式定义路径：收尾判红，那一套布局的第 ④ 条不比
+
 def baseline_text(path):
-    result = subprocess.run([*GIT, "show", f"{base}:{path}"], capture_output=True, text=True)
-    return result.stdout if result.returncode == 0 else ""
+    """基准那一版的全文：基准里没有这份（这次新加的格式定义）交空串，常量全算新增；git 取不到（基准名不在、对象库缺了那一份）
+    交 None 并记进 baseline_problems——不许当成「基准里没有」，那样常量全成了新出现的，撞上同一套布局里没变、同值的另一份就按「首次登记」放过去。
+    取法是 lib-lag-baseline.py 的 baseline_text（路径按当前目录，就是被判的根），与各处「只缩不涨」同一份三种结局。"""
+    text, problem = lag_baseline.baseline_text(base, path)
+    if problem is not None:
+        baseline_problems.append(f"{path}：{problem.sentence()}")
+        return None
+    return text or ""
 
 NUMERIC_LITERAL_AFTER_UNDERSCORE_STRIP = re.compile(r"-?[0-9]+")
 
@@ -725,16 +960,22 @@ if lag:
 # 键是（格式定义路径, 常量名）：同一个常量在 kb 字段表与常量模块里各登记一次，只按名字合并会让后读到的盖掉前一份的改值。
 drifted, empty_sources, checked_constants, excused, followed, registered_without_change = [], [], 0, [], [], []
 for row in rows:
-    current, baseline = {}, {}
+    current, baseline, baseline_unreadable = {}, {}, False
     for path in row["format"]:
         found = constants_in(open(path, encoding="utf-8").read(), path, record_problems=True)
         if not found:
             empty_sources.append(f'{row["name"]}：{path}')
         for name, value in found.items():
             current[(path, name)] = value
-        for name, value in constants_in(baseline_text(path), path, record_problems=False).items():
+        base_version = baseline_text(path)
+        if base_version is None:
+            baseline_unreadable = True
+            continue
+        for name, value in constants_in(base_version, path, record_problems=False).items():
             baseline[(path, name)] = value
     checked_constants += len(current)
+    if baseline_unreadable:
+        continue   # 这一套布局有一份取不到基准：不按「新增」往下比，收尾报 baseline_problems 判红
 
     def first_registration_of_unchanged_value(new_path, name, value):
         """一个 (格式定义路径, 常量名) 键这次才出现，检查同一套布局里别的格式定义路径这次
@@ -775,6 +1016,12 @@ for row in rows:
     excused.extend(entry for name, entry in changes if name in lag)
     if unexcused:
         drifted.append((row, unexcused))
+
+if baseline_problems:
+    failures.append((f"{len(baseline_problems)} 条格式定义路径取不到基准 {base} 那一版，第 ④ 条对它们没比（不是没变）：", baseline_problems, [
+        "怎么办：照括号里 git 的报错修仓库状态（基准名不在、对象库缺了那一份），再只重跑这一格；",
+        "          取不到基准时这一套布局的常量全成了新出现的，与「这次新加了这份格式定义」分不出，所以判红、不往下比。",
+    ]))
 
 if marker_problems:
     failures.append((f"格式定义里 {len(marker_problems)} 处 format-const 标记读不出来或重复登记，变更探测对它们不作数：", marker_problems, [
@@ -831,6 +1078,15 @@ cell_cpu_judging_sites() {
     exit 77
   fi
   python3 "$REPO_ROOT/scripts/crash/cpu-judging-sites-check.py" check "$ROOT"
+}
+
+# ── checker-direction-overlap ──
+cell_checker_direction_overlap() {
+  if [[ ! -d crates ]]; then
+    echo "  ! $ROOT 下没有 crates/：两个方向的调用图这一格本次无对象可判"
+    exit 77
+  fi
+  python3 "$REPO_ROOT/scripts/gate/checker-direction-overlap.py" check "$ROOT"
 }
 
 stage_cells_run "$ROOT"

@@ -12,7 +12,7 @@ required-inputs: 判决|规格, 草稿目录, 报告
 
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
-两段活在一个 agent 里做：先照判决起草规格（第 0 步），规格过了 `scripts/kb/kb-spec-check.py` 再照规格写。主 agent 给了现成规格的跳过第 0 步。写的时候不补内容、不做判断：规格里没写的句子一个字不加；规格与原文对不上（旧串不唯一、找不到）就停下报告；规格点名的文件不在你的写范围里（例如 `CLAUDE.md`），也停下报告，不按规格硬写。
+两段活在一个 agent 里做：先照判决起草规格（第 0 步），规格过了 `scripts/kb/kb-spec-check.py` 再照规格写。主 agent 给了现成规格的跳过第 0 步。写的时候不补内容、不做判断：规格里没写的句子一个字不加；规格与原文对不上（旧串不唯一、找不到）就停下报告；规格点名的文件不在你的写范围里（例如 `CLAUDE.md`），也停下报告，不按规格硬写。规格里的目标文件不存在（被搬、被改名、被拆）时，整份不写，停下：报告「找不到的目标」一节逐条写规格里的文件与旧串，以及 `git log --diff-filter=DR --name-only -- <文件名>` 和 `grep -rnF <旧串的一段>` 查到的新位置（查不到写查不到），交回；不跳过那一条、不照新位置自己改。
 开工先读：`.claude/singlefs-ai-sop/skills/decide/SKILL.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；`.claude/rules/format-evolution.md`「硬约束」与「决策正文只写现状，依据写成指针；决策与实验双向登记」两节；`.claude/rules/changelog-format.md`；`.claude/singlefs-ai-sop/rules/writing-discipline.md`。
 
 ## 输入（主 agent 必须给）
@@ -23,7 +23,7 @@ required-inputs: 判决|规格, 草稿目录, 报告
 - 欠账表要加或还的行：也写成逐条规格（加：新行与插在哪一整行之后；还：被还的那一行，与移进已还清表的新行、插在哪一整行之后）。
 - 写决策正文（新立分项、或改一条分项的定案 / 射程 / 依据）的：规格要按 `.claude/rules/format-evolution.md` 那一节的形态逐块给全（四块、索引行、未定项的字节判决），形态本身照那一节，这份定义不抄第二份；缺哪一块就停下报告，不自己补。
 - **规格改了某条分项的「**依据**」段时，同一份规格还要带上那个实验页 `### 影响的决策` 表里对应那几行的改动**（旧串、新串，一条分项一行；门禁 doc-experiments 的 decision-links 格判两侧同时到位，判关系归主 agent）。规格里没带那几行就停下报告，列出缺哪几行。
-- 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下（写范围闸对你只放行 `.claude/kb/` 与那里）。
+- 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下（写范围闸对你放行 `.claude/kb/`、`crates/singlefs-checker/invariants/*.md` 与 `crates/singlefs-checker/invariants/**/*.md`（不变量清单下一层与各层子目录里的 `.md`）与那里）。
 
 ## 做什么
 
@@ -39,13 +39,14 @@ required-inputs: 判决|规格, 草稿目录, 报告
 ## 写范围
 
 - `.claude/kb/**`。
+- `crates/singlefs-checker/invariants/*.md` 与 `crates/singlefs-checker/invariants/**/*.md`（不变量清单，下一层与各层子目录里的都算，只限这些 `.md`；`crates/` 别处与 `.rs` 照旧不碰）。
 - `relabel-item.py` 自己会改写的引用所在文件：`records/**/*.md`、`research/**/*.md`（`research/prompts/` 除外）、`research/**/*.rs`、`.claude/rules/*.md`（`crates/**/*.rs` 不改：预演列出就停下交主 agent）。这几处只许由那个脚本改，你不手改；`.claude/rules/` 的放行只到这里。
 - `~/.local/share/singlefs/work/` 下的报告文件与草稿目录。
 - 用 Edit 写的部分与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致；`relabel-item.py` 走 Bash，闸管不到，照上面几条自己守。
 
 ## 产出
 
-- 报告：规格文件路径与 `sha256sum`、`kb-spec-check.py` 的原样末行、要主 agent 判的点、`replace-batch.py` 原样输出、`relabel-item.py` 改了哪些文件与「要人看」清单、第 2、3 步 `--write` 的原样末行与退出码、改过的全部文件与前后 sha256。
+- 报告：规格文件路径与 `sha256sum`、`kb-spec-check.py` 的原样末行、要主 agent 判的点、「找不到的目标」一节（没有就写 0 条）、`replace-batch.py` 原样输出、`relabel-item.py` 改了哪些文件与「要人看」清单、第 2、3 步 `--write` 的原样末行与退出码、改过的全部文件与前后 sha256。
 
 ## 没做什么（固定会有的）
 

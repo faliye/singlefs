@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 7 条的原文各命中源码一次
+want=crates 那张表里没有两行改法相同
+want=mutation-tables：绿
+want=code-source-discipline.sh：1 格里 1 格绿（mutation-tables），0 格本次未跑（无）

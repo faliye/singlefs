@@ -17,7 +17,7 @@
 - 顶上标题的直接子节：抄，按自己的标题取；再往下的子节：抄、理由以「随」起头，由父节带到；
 - `### 已定项` / `### 未定项` 的分项索引表：不抄，行区间（标题下一行到第一个 `####` 之前）作 --extra 按行取；它下面的 `####` 分项各按自己的标题取；
 - `## 历史版本` 及其子节：不抄（正文只引现状；--no-history 之外的默认）。
-读的文件：正文里写出的 `.claude/kb/…md` 路径、D / E 编号对应的决策与实验页、C 编号对应的欠账表、I-<n>.<m>（与类号 I-<n>）所在的不变量类文件
+读的文件：正文里写出的 `.claude/kb/…md` 路径、D / E 编号对应的决策与实验页（只认中文那一份：同号的 `.en.md`、`.ja.md` 译文不拉，认法同 `.claude/trilingual-documents`）、C 编号对应的欠账表、I-<n>.<m>（与类号 I-<n>）所在的不变量类文件
 （`.claude/kb-directories` 登记的目录里含 `| I-<n>.` 表行的那几份，类号找不到文件的退回那个目录的 README.md），加 --files 给的；
 认编号与 I 号指到哪份文件的读法都是 quote-kb.py 的 cited_kb_sources(…, loose=True)（I 号经它的 invariant_files_for），与 quote-kb.py --cited 判清单全不全是同一个函数（这里用宽读法，认出的是 --cited 的超集）；
 正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算）。
@@ -40,6 +40,8 @@
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
   THREE_WAY_MATERIALS_BREAK=no-resume  build() 不认 --resume，checklist-specs.py 判红时只给改前那条只补附录的命令
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」）
+  THREE_WAY_MATERIALS_BREAK=keep-translations  cited_files() 不排编号引出的 `.en.md`、`.ja.md` 译文，同号的三份都进清单（改前的样子）
+      译文（「✗ 自检：同号有译文时清单里只有中文那一份」）
   QUOTE_KB_BREAK=invariants-to-readme  quote-kb.py 的开关（I 号一律退回不变量目录的 README.md），读法是那一份，这里同样红
       不变量号（「✗ 自检：正文点名 I-7.4」）、续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
 """
@@ -69,6 +71,8 @@ NUMBER = re.compile(r"(?<![A-Za-z0-9])([DECI])(\d+)(?![0-9])")
 ROW = re.compile(r"^\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|$")   # kb-sections.py 的空单元格写成「| |」，格与格之间只有一个空格
 HEADING = re.compile(r"^(#{1,6}) ")
 INDEX_TABLE_TITLES = ("### 已定项", "### 未定项")
+# 三语登记（.claude/trilingual-documents 文件头）认译文的办法：模式匹配到的以这两种后缀结尾的是译文，不是中文那一份
+TRANSLATION_SUFFIXES = (".en.md", ".ja.md")
 HISTORY_TITLE = "历史版本"
 
 
@@ -108,7 +112,7 @@ def own_number_reading(body_text, root):
 def cited_files(body_text, root):
     """正文里引到的 kb 文件，显式路径在前、编号在后，按出现次序去重；不在的不列。
     读法是 quote-kb.py 的 cited_kb_sources(…, loose=True)：与 --cited 判清单全不全（严格读法）同一份函数，宽读法认出的是超集。
-    `doc-lint:not-numbers` 声明的记号不当编号。"""
+    `doc-lint:not-numbers` 声明的记号不当编号。编号引出的同号译文（`.en.md`、`.ja.md`）不列，只认中文那一份；正文写出路径的照列。"""
     if BROKEN == "own-number-reading":
         sources = own_number_reading(body_text, root)
     else:
@@ -119,9 +123,11 @@ def cited_files(body_text, root):
         if BROKEN == "skip-declared-kind":   # 弄坏开关：声明了哪个字母的记号，这个字母的编号全跳过
             kinds = {token[0] for token in not_numbers_declared(body_text)}
             sources = [(path, token) for path, token in sources if token == path or token[0] not in kinds]
-    ordered = []
+    ordered, written = [], set(KB_PATH.findall(body_text))
     for path, _token in sources:
         relative = os.path.relpath(path, root) if os.path.isabs(path) else path
+        if relative.endswith(TRANSLATION_SUFFIXES) and relative not in written and BROKEN != "keep-translations":
+            continue   # 编号按 glob 找到的同号译文：只认中文那一份（弄坏开关 keep-translations 照拉）
         if relative not in ordered and os.path.isfile(os.path.join(root, relative)):
             ordered.append(relative)
     return ordered
@@ -438,6 +444,25 @@ def selftest():
                 and "08-重名.md" in snapshot and root_ring_file in snapshot):
             failures.append(f"checklist-specs.py 判红之后照抄给出的 --resume 命令跑一次，应当补上缺的那张清单、附录、背景材料与快照一起齐；"
                             f"第一次退 {code_first}、给的命令 {given}、续做退 {resumed_code}：{resumed_output[-300:]}；{' '.join(lines_first)[-300:]}")
+        # 三语 kb：D9 的中文页旁边有同号的英日译文（文件名各是译过的名字），正文只写编号：清单、快照与附录里只有中文那一份
+        translated = {"09-译文样本.md": "## D9 译文样本 —— 已定\n\n开篇 ZHHEAD。\n\n### 细节\n\n中文细节 ZHBODY。\n",
+                      "09-translation-sample.en.md": "## D9 translation sample — decided\n\nOpening ENHEAD.\n\n### Details\n\nEnglish detail ENBODY.\n",
+                      "09-翻訳サンプル.ja.md": "## D9 翻訳サンプル —— 決定\n\n冒頭 JAHEAD。\n\n### 詳細\n\n日本語の詳細 JABODY。\n"}
+        for name, text in translated.items():
+            open(os.path.join(work, ".claude", "kb", "decisions", name), "w", encoding="utf-8").write(text)
+        open(os.path.join(work, "research", "prompts", "_t-r6-body.md"), "w", encoding="utf-8").write(
+            "# t-r6 正文\n\n判 D9（译文样本） 站不站得住。\n")
+        code_translated, lines_translated = build("t-r6", work, [], [], keep_history=False, quiet=True)
+        produced = {name: os.path.join(work, "research", "prompts", name) for name in
+                    ("_t-r6-checklist.md", "_t-r6-appendix.md", os.path.join("t-r6-snapshot", "kb-sha256.txt"))}
+        texts = {name: (open(path, encoding="utf-8").read() if os.path.isfile(path) else "") for name, path in produced.items()}
+        listed = CHECKLIST_SECTION.findall(texts["_t-r6-checklist.md"])
+        snapshot_files = [line.split("  ", 1)[1] for line in texts[os.path.join("t-r6-snapshot", "kb-sha256.txt")].split("\n") if "  " in line]
+        checked += 1
+        if not (code_translated == 0 and listed == [".claude/kb/decisions/09-译文样本.md"] and snapshot_files == [".claude/kb/decisions/09-译文样本.md"]
+                and "ZHBODY" in texts["_t-r6-appendix.md"] and "ENBODY" not in texts["_t-r6-appendix.md"] and "JABODY" not in texts["_t-r6-appendix.md"]):
+            failures.append(f"同号有译文时清单里只有中文那一份：应当做成（退出码 0）、清单与快照只列 09-译文样本.md、附录不含译文正文，"
+                            f"实际退 {code_translated}，清单列了 {listed}，快照列了 {snapshot_files}；{' '.join(lines_translated)[-300:]}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
@@ -447,7 +472,8 @@ def selftest():
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 项）：索引表不抄而按行区间补抄、分项与细节按自己的标题或随父节抄、历史节不抄、"
           "附录与背景材料含该抄的每一段、快照列了 kb 文件、产出已存在时拒绝覆盖、not-numbers 声明的记号不当编号而没声明的照拉、"
-          "只点名 I-7.4 与 I-8.3 时带上那两份不变量类文件、认编号与 quote-kb.py --cited 同一份读法、checklist-specs.py 判红后照抄 --resume 一次补齐")
+          "只点名 I-7.4 与 I-8.3 时带上那两份不变量类文件、认编号与 quote-kb.py --cited 同一份读法、checklist-specs.py 判红后照抄 --resume 一次补齐、"
+          "同号有译文时只认中文那一份")
     return 0
 
 

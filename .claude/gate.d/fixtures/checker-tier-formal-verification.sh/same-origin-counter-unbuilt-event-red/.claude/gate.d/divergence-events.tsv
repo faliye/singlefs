@@ -1,0 +1,4 @@
+# 样本用的不一致事件表：格式照 .claude/gate.d/divergence-events.tsv 文件头
+对	o3-reffs	O3	RefFS	未立	样本里 O3 一边还没有
+对	refinement-spec-o1-model	refinement 的 spec	O1 的 model	已立	两边都有代码
+事件	2026-10-01	o3-reffs	model错	records/2026-10-01-样本.md 第 3 行	样本：未立的对不该有事件

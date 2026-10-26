@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：out-of-project-names
+want=放行表 .claude/out-of-project-paths 有 3 行写得不对（只列行号，不打印路径）
+want=.claude/out-of-project-paths:4  理由不到 8 个字
+want=.claude/out-of-project-paths:5  不是「<路径>  # 理由」的写法
+want=.claude/out-of-project-paths:6  路径要以 ~/ 或 / 开头
+want=放行表 .claude/out-of-project-paths 里 1 条没有一份 git 跟踪的脚本（.sh、.py、.rs）字面引到
+want=.claude/out-of-project-paths:3  没有脚本引到这条路径
+want=doc-text.sh：1 格里 1 格红（out-of-project-names）

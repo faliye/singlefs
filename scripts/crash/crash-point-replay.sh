@@ -23,12 +23,22 @@
 #                                               （cargo run … --bin crash_library_reader -- keys：只读开库、不写），它的输出写法在
 #                                               crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段，自证 list-items-with-keys 格
 #                                               把那一段原样喂进来钉读法；读库程序退非 0 或输出认不出照实报、退 1
+#   crash-point-replay.sh --list-items --backlog --milestone <mN> [--backlog-states-at-least <态数>] [--states-at-least <态数>]
+#                                               只读·积压（下面「积压跑法」）：同上，末尾再打几行「积压<TAB>…」：积压登记表在今天的判法键下的游标、这一里程碑新增
+#                                               与判法键变了的先跑几件、到积压下限与到合计下限各要跑到哪一行。不改表，不起快档、门禁与放量入口；只编、只起表的小程序
+#   crash-point-replay.sh --backlog --milestone <mN> [--backlog-states-at-least <态数>] [--states-at-least <态数>] [--local-only]
+#                                               重型·积压（下面「积压跑法」）：照积压登记表取件起跑，先这一里程碑新增与判法键变了的，再从游标起照表的次序取到两条下限；
+#                                               取到的件崩溃点重放部分交门禁 checker-tier-crash-point-replay --full --item <crash-case: 键>、放量部分交 crash-amplification.sh --item <分项>，
+#                                               判过的块照块判定库复用（不带 --start-over、不设只写不读），每跑完一件经表的小程序 record 回写那一行
 #   crash-point-replay.sh --local-only [--quick | --full] [--item …]
 #                                               只用本机（与上面除 --list-items、--selftest 之外的任一种跑法合用；与那两个一起给退 2）：第二台一概不动、不连。开跑时把多机配置
-#                                               派生一份临时的（ENABLE_ACROSS_MACHINES 写成 0，去掉 PEER_ 开头与 HOST_JUDGE_WEIGHTS 两类键、显卡先后里第二台的项；本机的 GPU 与清场照旧），
+#                                               派生一份临时的（ENABLE_ACROSS_MACHINES 写成 0，去掉 PEER_ 开头与 HOST_JUDGE_WEIGHTS 两类键、显卡先后里另一台的项；这一台的 GPU 与清场照旧；
+#                                               哪几项是这一台的照 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 取：没设或 local 留 local: 去 peer:，peer（在第二台上跑）留 peer: 去 local:），
 #                                               导出 SINGLEFS_MULTI_HOST_CONFIG 指到它，快档、门禁的崩溃点重放部分与放量入口都读这一份；原来那份不改，跑完删派生的。
 #                                               文件头两条 run-condition 在参数解析之前判，读的仍是原来那份（只判配置对不对得上，不连第二台）；多机配置不在时两个开关本来就关，照原样跑
 #   crash-point-replay.sh --selftest            假 cargo、假的两套驱动、假的准入模块走一遍各格，末尾一轮从下面「弄坏开关」那张表现读开关、逐个打开
+#                                               （设了 CRASH_POINT_REPLAY_SELFTEST_ONLY=backlog 的：只走积压跑法那几格（backlog-* 与 list-items-backlog）就停，别的格与开关轮不走，
+#                                               单看那几格用；这个变量只认 backlog 这一个值，别的值退 2）
 #   引擎配了 GPU 只由 GPU 判、没配只由 CPU 判，同一批状态一趟只判一次；GPU 判与 CPU 判的对拍是另立的测试，不在这里跑（用户 2026-10-11 定）。
 #   不带 --quick 的跑法是重型，只由带 SINGLEFS_HEAVY_TESTS 前缀的主 agent 跑（.claude/hooks/heavy-test-guard.sh 判）；轻型经
 #   scripts/hosts/run-with-memory-cap.sh 起，谁都能跑。
@@ -84,7 +94,8 @@
 #       本机 SHARE=0/2、第二台 SHARE=1/2 经 multi-host-run.sh 跑完取回库、本机带 SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<取回的库> 再跑一趟；
 #       库用那一份长期库 <放量的家目录>/crash-state-verdicts（CRASH_LIBRARY_DIRECTORY_NAME；单机那一趟用例照默认落的也是它，
 #       crates/singlefs-checker-tier/src/crash_library.rs 的 CrashLibraryClass::GivenStates），跨趟留着、键相同的表照库复用，被打断之后重跑同一条命令就是续跑；
-#       跑完只删取回的那一份与送第二台的快照（<放量的家目录>/runs/<标签>/fetched、library-for-peer），双机驱动的日志留在 <放量的家目录>/runs/<标签>/。
+#       取回的那一份与送第二台的快照（<放量的家目录>/runs/<标签>/fetched、library-for-peer、library-for-peer-placement）双机驱动退出时自己删（它文件头「跑完删库的拷贝」），
+#       这里跑完只再删一次 fetched 与 library-for-peer 兜底（两边都删是幂等的）；长期库不删，双机驱动的日志留在 <放量的家目录>/runs/<标签>/。
 #       开了 GPU 整条经 gpu-quiesce-run.sh 清场再起、带 --quiesced。
 #       判法：双机驱动退 0 照导入那一趟（import.log）的 libtest 结果判（同上「一项怎么判」）；退 78（第二台连不上、库没取回、卡用不上、给定状态表借不到显存）
 #       与内存包装的结局 245、251、252、254 记 not-run、退 78；退 77 记 not-run；别的照导入那一趟的结果记红。
@@ -134,21 +145,57 @@
 #                             填 .claude/gate.d/crash-ignored-nodes.tsv、invariant-zero-evaluations.tsv 的初值用 crash-flow-coverage.py baseline <ignored|zero-evaluations> 这一份
 #     crash-flow-coverage.md  覆盖表（入口 × StepKind 成员，两个域各一张）、ignore 开着的节点、评估 0 次的（流，不变量）对
 #   这两份只落产物、不判红、不改这一趟的退出码（判在门禁 checker-tier-crash-point-replay 的出口 4 那几格）；写不成报一行。
+# 积压跑法（.claude/kb/milestone/04-fourth-txn.md 出口 10「崩溃全量：新增的跑完，另补积压」；用户 2026-10-26 定：在今天的单元键下有判定就算罩住，复用的块算跑了）：
+#   积压登记表 crates/singlefs-checker-tier/crash-full-run-backlog.tsv（写法在它的表头）只经表的小程序 crash_full_run_backlog 读写：子命令与输出行在
+#   crates/singlefs-checker-tier/src/bin/crash_full_run_backlog.rs 文件头，取件、游标与判法键的口径在 src/crash_full_run_backlog.rs，这里不另写一份读法。
+#   小程序经 cargo run --release --quiet --offline -p singlefs-checker-tier --features verdict-store --bin crash_full_run_backlog -- <子命令> 起（经 capped.sh default；
+#   判法键里有构建档与工具链：编法同门禁 checker-tier-crash-point-replay 起多数崩溃枚举用例的那一种，release、默认特性、不带 gpu），编译目录是这一趟的 CARGO_TARGET_DIR。
+#   --backlog（重型）依次：
+#   ① crash-amplification.sh --list-items 存成这一趟的 ITEMS 列表；append-missing 把合表加 ITEMS 展开里有、表里没有的件追加到表末尾（归属是 --milestone 那一个、态数未数）；
+#     再 check 核表与展开逐件一致，核不过（小程序退非 0）退 2、不取件、什么都不起。
+#   ② today-judging-key 取今天的判法键。
+#   ③ plan 取件：--backlog-states-at-least、--states-at-least 给了才交，不给是小程序的默认（出口 10 的积压 50 亿、合计 100 亿）。先核 plan 的输出（完整性闸：游标那一行与末行
+#     CRASH_FULL_RUN_BACKLOG_PLAN 各恰好一行、末行在最后、每件一行字段齐、序号不重、先跑的那一组（new-or-judging-key-changed）都排在积压（backlog）之前、两组各自照表的次序、
+#     两组的态数之和与未数的件数等于末行报的），对不上退 1、一件都不跑；一件都没取到退 77。
+#   ④ 计划：取到的件照取件的次序排（先跑的那一组在前）；它们所在的项的快档测试目标先跑一遍（快档红了两部分都不起，同重型别的跑法），再照取件的次序逐件跑：
+#     crash-point-replay 那一部分交门禁 checker-tier-crash-point-replay --full --item <crash-case: 键> <根>（日志 enumeration.<项>.<用例名>.log），
+#     crash-amplification 那一部分交 crash-amplification.sh --item <分项>（日志 pipeline.<分项>.log）。
+#   ⑤ 每跑完一件经 record 回写那一行：判法键写今天的；最后一次写「<日期>；crash-point-replay.sh --backlog --milestone <mN> 那一趟」；绿的进度写「全绿」，
+#     红的写「红：<哪一道退几>（<日期> 积压跑法；日志 <文件名>）」，本次未跑的不回写。态数：崩溃点重放部分取门禁打的那一行「全量日志：<用例日志>；发现日志：…」点名的用例日志里
+#     CRASH_CASE_BLOCKS 行的 states= 之和（一行都没有就取 CRASH_POINT_REPLAY_PARALLEL_FINISHED 行的 states= 之和），放量部分取 CRASH_AMPLIFICATION_ITEM 行的 states= 加 reused=
+#     （复用的块算罩住，整件算）；数不出的不交 --states：表里那一行原来数过的照写进度，原来未数而判绿的不回写（全绿而未数是 check 判的一处问题），记 recorded=no、写明为什么。
+#   每件一行 CRASH_POINT_REPLAY_BACKLOG_PART sequence=<序号> group=<new-or-judging-key-changed|backlog> item=<项> part=<部分> key=<键> verdict=<green|red|not-run>
+#     recorded=<yes|no> states=<回写的态数，没交写 -> reason=<没回写的原因，回写了写 ->；之后一行 CRASH_POINT_REPLAY_BACKLOG_TOTAL milestone=<mN> taken=<取到几件>
+#     new_or_judging_key_changed=<几件> backlog=<几件> recorded=<回写几件> not_recorded=<没回写几件> recorded_states=<回写的态数之和> record_failures=<record 没写成几件>；
+#     record 没写成的、回写与没回写之和不等于取到的件数的，整趟退 1。
+#   --list-items --backlog（只读）：today-judging-key，再三趟 plan：照交的两条下限一趟（积压跑法这一趟会取到哪些件）、只看积压下限一趟（加 --states-at-least 0）、
+#     只看合计下限一趟（加 --backlog-states-at-least 0）；打「积压<TAB>…」几行：今天的判法键、游标（序号与项、部分、键，或没有）、先跑的那一组几件几态、
+#     到积压下限要跑到哪一行、到合计下限要跑到哪一行、积压跑法一趟取几件。不起 append-missing、check、record，不起快档、门禁与放量入口；
+#     编译目录是这一趟在 ${TMPDIR:-/tmp} 下建的（调用方设了 CARGO_TARGET_DIR 照它、不删），跑完删。起小程序之前同样先判 rocksdb-prebuilt.py entry，判红退 1。
 # 退出码：
 #   0   跑到的项都不红、派出收回相等（有项本次未跑也是 0，成功句逐项点名）
-#   1   有红（含快档红：这时崩溃点重放部分与放量部分没起）、或派出收回对不上
+#   1   有红（含快档红：这时崩溃点重放部分与放量部分没起）、或派出收回对不上；积压跑法：plan 的输出对不上、取到的件不在合表里、record 没写成
 #   2   用法错：参数认不得、--item 后面缺项名或项名认不得（列出可点名的项）、--quick 与 --full 一起给、--list-items 或 --selftest 夹了别的参数、
-#       合表核不过、按段登记文件核不过、平常跑时带了只供自证的变量（见「只供自证」）
-#   77  派出的项全是本次未跑，也没有红
+#       合表核不过、按段登记文件核不过、平常跑时带了只供自证的变量（见「只供自证」）；--backlog 没带 --milestone m<号>、与 --quick / --full / --item 一起给、
+#       --milestone 或两条下限不跟 --backlog、下限不是十进制整数；积压登记表核不过（小程序 check 退非 0）
+#   77  派出的项全是本次未跑，也没有红；积压跑法在今天的判法键下一件都没取到
 #   78  运行条件不满足：preflight 判的（文件头两条 run-condition），或背后有一段退 78（显卡、第二台、清场用不上，给定状态表的判器借不到显存，
-#       多机配置开了双机而判法判不过；放量入口退 78 而这一项没打 ITEM 行）而这一趟没有红
+#       多机配置开了双机而判法判不过；放量入口退 78 而这一项没打 ITEM 行）而这一趟没有红；
+#       或起任何 cargo 之前 scripts/hosts/rocksdb-prebuilt.py entry 判红（这台没装预编库、此刻进程环境的取值缺了或对不上；一项都没起，出路是开新会话
+#       或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"）。--list-items --with-keys 起读库程序之前同样判，判红退 1
+# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：建好这一趟的日志目录之后，调用方没设 CARGO_TARGET_DIR 时在里面建 target、export 给快档、
+#   崩溃点重放那一道、放量入口与双机驱动（它们看到设了就不另建）；正常结束、红了、被 TERM / INT 停（等手里那一步退出）都在 EXIT 上删
+#   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程、整趟退非 0）。调用方设了的照它、不删。
+# 日志出两份（用户 2026-10-21：过万行的全量日志太长，一般只看错误警告）：快档、崩溃点重放部分、放量部分、双机驱动各自的日志都经 scripts/hosts/two-logs.sh 写，
+#   <日志目录>/<段>.log 是全量，旁边同名的 <段>.problems.log 只收错误与警告（门禁的 ✗ 与 → 出路、⚠、本次未跑、汇总，cargo / rustc 的 error 与 warning:，libtest 的 FAILED 与 panicked，
+#   Traceback，非 0 退出码），每行前带它在全量日志里的行号，末行写收了几行、全量几行；开跑时打日志目录，收尾逐份列出 .problems.log，红的原因里点名这一份。
 # 弄坏开关 CRASH_POINT_REPLAY_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。写法同 scripts/crash/crash-amplification.sh 文件头「弄坏开关」一段：
 #   一行「#   CRASH_POINT_REPLAY_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头写点名的格（、隔开；括号里是失败行的句首，开关轮不读）。
 #   --selftest 末尾那一轮（开关轮，crash-amplification-lib.sh 的 crash_amplification_switch_wheel）从这张表现读，表里的开关与代码里 replay_break_is 认的要相等：
 #   CRASH_POINT_REPLAY_BREAK=accept-unknown-item  认不得的项名悄悄丢掉、照跑
 #       unknown-item（「项名写错应当退 2、列出可点名的项、什么都不起」）
 #   CRASH_POINT_REPLAY_BREAK=list-items-builds  --list-items 先起一趟 cargo build 再列
-#       list-items（「--list-items 应当退 0、逐项列出、不起 cargo 与驱动」）、list-items-with-keys（「--list-items --with-keys 应当只读判定库、不起 cargo 与驱动」）
+#       list-items（「--list-items 应当退 0、逐项列出、不起 cargo 与驱动」）、list-items-with-keys（「--list-items --with-keys 应当照读库程序文件头「输出」那一段的写法报键对不上的块数、不起 cargo」）、list-items-backlog（「--list-items --backlog 应当退 0、照小程序 plan 报游标与到两条下限各要跑到哪一行、只起表的小程序、不改表」）
 #   CRASH_POINT_REPLAY_BREAK=quick-throwaway-library  轻型的放量部分带一份这一趟新建、跑完删掉的空判定库（改前的样子：不复用、打断之后没有续点）
 #       quick-runs-the-light-domains（「轻型应当照甲二与展开 6 跑全部项」）、quick-reuses-the-long-term-library（「轻型那一趟第二次跑应当复用第一次判过的块」）、
 #       reuse-three-questions（「复用三问没过」：每一趟一份空库，第二趟照样全现判）
@@ -159,40 +206,41 @@
 #   CRASH_POINT_REPLAY_BREAK=quick-without-both-tiers  轻型不跑两档都跑的那几类
 #       quick-runs-the-light-domains（「轻型应当照甲二与展开 6 跑全部项」）、quick-gpu（「开了 GPU 快档应当带 gpu 特性、经清场包装起」：少了那几个测试目标）、
 #       fast-tier-not-run（「快档跑到 0 条或没卡没跑的，应当记本次未跑」：钉表那一类没了，本次未跑少一项）、
-#       local-only-keeps-gpu-drops-peer-cards（--local-only 下的 GPU 那一格同样数快档的测试目标，少了两档都跑的那几类就数不对）
+#       local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：--local-only 下的 GPU 那一格同样数快档的测试目标，少了两档都跑的那几类就数不对）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
 #   CRASH_POINT_REPLAY_BREAK=heavy-without-fast-tier  重型的计划里没有快档那一段
 #       light-within-heavy（「轻型的每一件在重型里都应当有」）、pruned-heavy（「不带参数的重型应当照剪枝跑全部项」）、named-heavy（「--item 应当只跑点名的项」）、
-#       fast-tier-slice-states-sent（剪枝与 --full 两种跑法一趟快档都没跑）、
-#       fast-tier-red-stops-heavy（重型没有快档那一段，快档红不出来）、local-only（--item 那一趟找不到点名的快档测试目标）
+#       fast-tier-slice-states-sent（「✗ 自证 fast-tier-slice-states-sent：」：剪枝与 --full 两种跑法一趟快档都没跑）、
+#       fast-tier-red-stops-heavy（「✗ 自证 fast-tier-red-stops-heavy：」：重型没有快档那一段，快档红不出来）、local-only（「✗ 自证 local-only：」：--item 那一趟找不到点名的快档测试目标）
 #   CRASH_POINT_REPLAY_BREAK=gpu-without-quiesce  开了 GPU 时快档那几趟不经清场包装起
 #       quick-gpu（「开了 GPU 快档应当带 gpu 特性、经清场包装起」）、
-#       local-only-keeps-gpu-drops-peer-cards（--local-only 下的 GPU 那一格同样要快档经清场包装起）
+#       local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：--local-only 下的 GPU 那一格同样要快档经清场包装起）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
 #   CRASH_POINT_REPLAY_BREAK=gpu-cards-not-sent  开了 GPU 时快档那几趟不交显卡先后
 #       quick-gpu（「开了 GPU 快档应当带 gpu 特性、经清场包装起」）、
-#       local-only-keeps-gpu-drops-peer-cards（--local-only 下的 GPU 那一格同样要交显卡先后）
+#       local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：--local-only 下的 GPU 那一格同样要交显卡先后）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
 #   CRASH_POINT_REPLAY_BREAK=gpu-test-threads-unset  开了 GPU 时快档那几趟测试参数不带 --test-threads 1（改前的样子）
 #       quick-gpu（「开了 GPU 快档应当带 gpu 特性、经清场包装起、测试参数带 --test-threads 1」：调用记录里 gpu 那几趟（三项的测试目标加 BOTH_TIERS_GROUPS 里的测试目标，个数自证现数）的 -- --nocapture 后面不是 --test-threads 1；没开 GPU 的 quick-runs-the-light-domains 那一格要求 -- --nocapture 后面直接是 cards=，这个开关不动它）、
-#       local-only-keeps-gpu-drops-peer-cards（--local-only 下的 GPU 那一格同样要带 --test-threads 1）
+#       local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：--local-only 下的 GPU 那一格同样要带 --test-threads 1）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
 #   CRASH_POINT_REPLAY_BREAK=red-as-green  快档 cargo 退非 0、有 FAILED 也记绿
 #       fast-tier-red（「快档一个测试目标红了，那一项应当红、整趟退 1」）、
-#       fast-tier-red-stops-heavy（快档红记成绿，重型就不会停）
+#       fast-tier-red-stops-heavy（「✗ 自证 fast-tier-red-stops-heavy：」：快档红记成绿，重型就不会停）、
+#       run-target-red（「跑完运行目录里不剩它建的编译目录（快档红退 1）」：快档红记成绿、整趟退 0）
 #   CRASH_POINT_REPLAY_BREAK=not-run-as-green  快档跑到 0 条、有 NOT_RUN_NO_GPU_ADAPTER 也记绿
 #       fast-tier-not-run（「快档跑到 0 条或没卡没跑的，应当记本次未跑」）、all-not-run（「派出的项全是本次未跑，应当退 77」）
 #   CRASH_POINT_REPLAY_BREAK=skip-collection-count  放量部分收不回的分项不记红、派出收回不核
 #       collection-count（「放量那一项收不回，应当红、派出收回对不上」）、
-#       pipeline-entry-1-still-red、pipeline-entry-78-not-run、pipeline-entry-78-red-first（收不回的项一笔都不记）
+#       pipeline-entry-1-still-red（「✗ 自证 pipeline-entry-1-still-red：」）、pipeline-entry-78-not-run（「✗ 自证 pipeline-entry-78-not-run：」）、pipeline-entry-78-red-first（「✗ 自证 pipeline-entry-78-red-first：」：收不回的项一笔都不记）
 #   CRASH_POINT_REPLAY_BREAK=full-keeps-reuse  全量不带 --start-over、放量部分不设只写不读（SINGLEFS_CRASH_LIBRARY_WRITE_ONLY）
-#       full-heavy（「全量应当只写不读」）、full-writes-back-into-the-one-library（--full 那一支没设只写不读）
+#       full-heavy（「全量应当只写不读」）、full-writes-back-into-the-one-library（「✗ 自证 full-writes-back-into-the-one-library：」：--full 那一支没设只写不读）
 #   CRASH_POINT_REPLAY_BREAK=enumeration-exit-ignored  崩溃点重放那一道的退出码不看，一律记绿
-#       enumeration-red（「崩溃点重放那一道红了，那一项应当红」）
+#       enumeration-red（「崩溃点重放那一道红了，那一项应当红」）、backlog-red-part-recorded-red（「积压跑法里红的那一件应当回写成红、整趟退 1」：门禁退 1 当绿，那一件回写成全绿）
 #   CRASH_POINT_REPLAY_BREAK=pipeline-red-ignored  放量那一项的 red= 与 verdict=red 不看
 #       pipeline-red（「放量那一项红了，那一项应当红」）、last-run-list（「上次红的清单不对」：放量红的那一项没记成红）、
-#       pipeline-entry-78-red-first（放量红的 alpha 记成绿）
+#       pipeline-entry-78-red-first（「✗ 自证 pipeline-entry-78-red-first：」：放量红的 alpha 记成绿）
 #   CRASH_POINT_REPLAY_BREAK=honor-test-variables-outside-selftest  平常跑时也认只供自证的变量，不拒
 #       test-variables-outside-selftest（「平常跑时带了只供自证的变量应当退 2」）
 #   CRASH_POINT_REPLAY_BREAK=fast-tier-classes-sent  开了 GPU 时快档那几趟照改前送三类 GPU_COMPUTATION_CLASSES
 #       quick-gpu（「开了 GPU 快档应当带 gpu 特性、经清场包装起」：调用记录里 classes= 不是 [unset]）、
-#       local-only-keeps-gpu-drops-peer-cards（--local-only 下的 GPU 那一格同样要求 classes=[unset]）
+#       local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：--local-only 下的 GPU 那一格同样要求 classes=[unset]）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
 #   CRASH_POINT_REPLAY_BREAK=segments-registry-not-sent  不往引擎送按段登记文件的路径
 #       segments-registry-sent（「快档与放量每一趟都应当带按段登记文件的绝对路径」）
 #   CRASH_POINT_REPLAY_BREAK=segments-registry-unchecked  开跑前不核按段登记文件
@@ -201,19 +249,19 @@
 #       fast-tier-run-condition-not-met（「快档日志里有给定状态表借不到显存那一行……整趟退 78」）
 #   CRASH_POINT_REPLAY_BREAK=two-hosts-not-used  多机配置开了双机，经给定状态引擎的测试目标也照本机一趟跑（改前的样子）
 #       fast-tier-two-hosts（「开了双机，经给定状态引擎的测试目标应当照双机驱动的三步跑」）、
-#       fast-tier-two-hosts-peer-unreachable（「第二台连不上…应当记本次未跑、整趟退 78」）、fast-tier-two-hosts-configuration-refused（「开了双机而判法判不过…」）、
-#       fast-tier-slice-states-sent（双机开的那一趟没有双机驱动本机与第二台那几趟的调用记录）、
-#       local-only-baseline-sees-peer（对照：不给 --local-only 时双机驱动该起）
+#       fast-tier-two-hosts-peer-unreachable（「第二台连不上…应当记本次未跑、写原因、整趟退 78」）、fast-tier-two-hosts-configuration-refused（「开了双机而判法判不过…」）、
+#       fast-tier-slice-states-sent（「✗ 自证 fast-tier-slice-states-sent：」：双机开的那一趟没有双机驱动本机与第二台那几趟的调用记录）、
+#       local-only-baseline-sees-peer（「✗ 自证 local-only-baseline-sees-peer：」：对照：不给 --local-only 时双机驱动该起）
 #   CRASH_POINT_REPLAY_BREAK=two-hosts-when-off  双机关着也把经给定状态引擎的测试目标交双机驱动
 #       fast-tier-two-hosts-off（「双机关着，经给定状态引擎的测试目标应当照旧本机一趟」）、
-#       fast-tier-two-hosts-configuration-refused（不调判法就交了双机驱动，判法判不过也照跑）、
-#       local-only（派生的配置里双机关着也交了双机驱动）、local-only-keeps-gpu-drops-peer-cards（同上）
+#       fast-tier-two-hosts-configuration-refused（「✗ 自证 fast-tier-two-hosts-configuration-refused：」：不调判法就交了双机驱动，判法判不过也照跑）、
+#       local-only（「✗ 自证 local-only：」：派生的配置里双机关着也交了双机驱动）、local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：同上）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
 #   CRASH_POINT_REPLAY_BREAK=two-hosts-unreachable-as-red  双机驱动退 78（第二台连不上）照红记
-#       fast-tier-two-hosts-peer-unreachable（「第二台连不上…应当记本次未跑、整趟退 78」）
+#       fast-tier-two-hosts-peer-unreachable（「第二台连不上…应当记本次未跑、写原因、整趟退 78」）
 #   CRASH_POINT_REPLAY_BREAK=two-hosts-check-failure-as-single  多机配置开了双机而判法判不过，照双机关、本机一趟跑
 #       fast-tier-two-hosts-configuration-refused（「开了双机而判法判不过…」）
 #   CRASH_POINT_REPLAY_BREAK=memory-cap-not-forwarded  套在内存包装里也不把外层的上限给放量入口与双机驱动（改前的样子）
-#       outer-memory-cap-forwarded（「套在内存包装里，放量入口应当带外层的上限」）、fast-tier-two-hosts（双机驱动那一趟没带 --memory-cap 3G）
+#       outer-memory-cap-forwarded（「套在内存包装里，放量入口应当带外层的上限」）、fast-tier-two-hosts（「✗ 自证 fast-tier-two-hosts：」：双机驱动那一趟没带 --memory-cap 3G）
 #   CRASH_POINT_REPLAY_BREAK=threads-not-defaulted  快档的 cargo 不经 capped.sh default 起，吃 cargo 自己的缺省（改前的样子）
 #       fast-tier-threads-default（「快档每一趟 cargo 都应当带登记的重活默认并行度」）
 #   CRASH_POINT_REPLAY_BREAK=full-in-a-library-of-its-own  --full 那一支照改前给放量部分另建一份空判定库（<放量的家目录>/crash-point-replay-full/…，跑完没人读）
@@ -231,14 +279,41 @@
 #       fast-tier-slice-states-sent（「调用方设了……快档每一趟应当照原值收到」）
 #   CRASH_POINT_REPLAY_BREAK=fast-tier-red-continues  重型的快档红了也照旧往下起崩溃点重放部分与放量部分（改前的样子）
 #       fast-tier-red-stops-heavy（「快档红了，重型的剪枝、逐条、全量都应当退 1、不起崩溃点重放那一道与放量入口……」）
+#   CRASH_POINT_REPLAY_BREAK=logs-single  每一段的日志只写一份全量的（改前的样子：tee，不经 two-logs.sh，没有 .problems.log）
+#       two-logs-per-part（「快档红的那一段应当出两份日志……」）
 #   CRASH_POINT_REPLAY_BREAK=pipeline-78-as-red  放量入口退 78 而没打 ITEM 行，照旧记红（收不回，改前的样子）
-#       pipeline-entry-78-not-run（「放量入口退 78 而没打 ITEM 行，两项应当记本次未跑……」）、pipeline-entry-78-red-first（gamma 记了红，不是本次未跑）
+#       pipeline-entry-78-not-run（「放量入口退 78 而没打 ITEM 行，两项应当记本次未跑……」）、pipeline-entry-78-red-first（「✗ 自证 pipeline-entry-78-red-first：」：gamma 记了红，不是本次未跑）
 #   CRASH_POINT_REPLAY_BREAK=local-only-ignored  --local-only 认下却不派生多机配置，双机照开
-#       local-only（「给了 --local-only，开了双机的多机配置也应当不起双机驱动……」）、local-only-keeps-gpu-drops-peer-cards（显卡先后里第二台的项还在）
+#       local-only（「给了 --local-only，开了双机的多机配置也应当不起双机驱动……」）、local-only-keeps-gpu-drops-peer-cards（「✗ 自证 local-only-keeps-gpu-drops-peer-cards：」：显卡先后里第二台的项还在）、local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：角色 peer 那一格同上）
+#   CRASH_POINT_REPLAY_BREAK=local-only-role-ignored  --local-only 派生多机配置时不看角色，一律去 peer: 项（改前的样子：在第二台上去掉的是第二台自己的卡）
+#       local-only-on-peer-keeps-own-cards（「✗ 自证 local-only-on-peer-keeps-own-cards：」：显卡先后只剩起活那一台的 local: 项）
 #   CRASH_POINT_REPLAY_BREAK=local-only-accepted-with-list-items  --local-only 与 --list-items 一起给也不拒
 #       local-only-usage（「--local-only 与 --list-items 一起给应当退 2、什么都不起」）
 #   CRASH_POINT_REPLAY_BREAK=flow-coverage-table-skipped  跑完不往这一趟的日志目录落覆盖表与记录（改前的样子）
 #       flow-coverage-table（「跑完应当在这一趟的日志目录里落覆盖表 crash-flow-coverage.md 与记录 crash-flow-records.tsv…」）
+#   CRASH_POINT_REPLAY_BREAK=rocksdb-entry-unchecked  起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#       rocksdb-entry-refused（「checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，应当在起 cargo 之前退 78…」：往下走起了假 cargo）
+#   CRASH_POINT_REPLAY_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（改前的样子：快档在仓根照仓根的 target 编、跨趟留着）
+#       run-target-green（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、run-target-red（「跑完运行目录里不剩它建的编译目录（快档红退 1）」）、
+#       run-target-term（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
+#   CRASH_POINT_REPLAY_BREAK=backlog-usage-unchecked  积压跑法的用法不核（--backlog 缺 --milestone、与 --quick / --full / --item 一起给、--milestone 不跟 --backlog 都照跑）
+#       backlog-usage（「积压跑法的用法错应当退 2、什么都不起」）
+#   CRASH_POINT_REPLAY_BREAK=backlog-table-unchecked  积压跑法开跑前不经小程序 append-missing 与 check 核表
+#       backlog-table-refused（「积压登记表核不过（小程序 check 退 1）应当退 2、不取件、什么都不起」）
+#   CRASH_POINT_REPLAY_BREAK=backlog-plan-unchecked  小程序 plan 的输出不核（完整性闸不判，照它报的件跑）
+#       backlog-plan-integrity（「小程序 plan 的输出对不上（末行的积压态数比取件行加起来多 1）应当退 1、一件都不跑」）
+#   CRASH_POINT_REPLAY_BREAK=backlog-bounds-dropped  两条下限不交给小程序 plan（照小程序的默认取件）
+#       backlog-stops-at-the-bounds（「取件取到两条下限就停」：多跑了 gamma-amp）、list-items-backlog（「--list-items --backlog 应当……」：到积压下限那一行报到序号 4、不是 3）
+#   CRASH_POINT_REPLAY_BREAK=backlog-table-order  取到的件照表的序号重排再跑（不照取件的次序）
+#       backlog-new-and-key-changed-first（「这一里程碑新增与判法键变了的应当先跑」：alpha-amp 排到了最前）
+#   CRASH_POINT_REPLAY_BREAK=backlog-not-recorded  跑完一件不经小程序 record 回写（照说回写了）
+#       backlog-stops-at-the-bounds、backlog-below-the-bounds-takes-everything、backlog-red-part-recorded-red（三格都核 record 的调用）
+#   CRASH_POINT_REPLAY_BREAK=backlog-red-as-green  红的那一件照「全绿」回写
+#       backlog-red-part-recorded-red（「积压跑法里红的那一件应当回写成红、整趟退 1」）
+#   CRASH_POINT_REPLAY_BREAK=backlog-not-run-recorded  本次未跑的那一件也照「全绿」回写
+#       backlog-below-the-bounds-takes-everything（「本次未跑的那一件不回写」：gamma-amp 回写成了全绿）
+#   CRASH_POINT_REPLAY_BREAK=backlog-listing-appends  只读用法照积压跑法那样先 append-missing（改了表）
+#       list-items-backlog（「--list-items --backlog 应当……不改表」：调用记录里有 append-missing）
 # 只供自证（自证起的子进程里才认；平常跑时有一个非空就退 2 拒跑，--list-items 与 --selftest 本身不拒）：CRASH_POINT_REPLAY_BREAK=<项>（上面那张表）；
 #   CRASH_POINT_REPLAY_ROOT=<造出来的小仓>：合表、stage-inputs.tsv、门禁 checker-tier-crash-point-replay、crash-amplification.sh 与准入模块 admission.py 都从它取
 #   （那三份是自证写的假的：只记一行参数、照环境变量打结果）；
@@ -268,6 +343,7 @@ PINNED_RED_EXAMPLES_NOT_RUN_REASON="崩溃点重放还没有钉表：全量出�
 replay_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 replay_script_directory="$(dirname "$replay_script")"
 source "$replay_script_directory/crash-amplification-lib.sh"
+source "$replay_script_directory/../hosts/run-build-directory.sh"
 repository_root="$(cd "$replay_script_directory/../.." && pwd)"
 
 # 只供自证的三个变量（文件头「只供自证」）：读完就清掉
@@ -285,14 +361,21 @@ replay_test_variables=()
 [[ -n "$replay_keys_reader_output" ]] && replay_test_variables+=(CRASH_POINT_REPLAY_KEYS_READER_OUTPUT)
 unset CRASH_POINT_REPLAY_BREAK CRASH_POINT_REPLAY_ROOT CRASH_POINT_REPLAY_SELFTEST_MARK CRASH_POINT_REPLAY_KEYS_READER_OUTPUT
 replay_break_is() { [[ ",$replay_break," == *",$1,"* ]]; }
+# 起任何 cargo 之前判这台的 RocksDB 预编库取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」：这台装了、此刻进程环境的取值对得上）。判红交回 1，
+# entry 自己打 ✗ 与出路；树里没有依赖 rocksdb 的清单、PATH 上是带标记的假 cargo，entry 报不判、交回 0。弄坏开关 rocksdb-entry-unchecked 下不判
+replay_rocksdb_entry_holds() {
+  replay_break_is rocksdb-entry-unchecked && return 0
+  python3 "$replay_script_directory/../hosts/rocksdb-prebuilt.py" entry --root "$repository_root" >&2
+}
 
 usage() {
-  echo "  ✗ 用法不对：$1。用法：$0 [--quick | --full] [--local-only] [--item <项>]… | --list-items [--with-keys] | --selftest" >&2
-  echo "  → 怎么办：不带参数是重型·剪枝；--quick 是轻型；--local-only 只用本机、不动第二台；项名照 --list-items 列的写；--quick 与 --full 不一起给" >&2
+  echo "  ✗ 用法不对：$1。用法：$0 [--quick | --full] [--local-only] [--item <项>]… | --backlog --milestone <mN> [--backlog-states-at-least <态数>] [--states-at-least <态数>] [--local-only] | --list-items [--with-keys] [--backlog --milestone <mN> …] | --selftest" >&2
+  echo "  → 怎么办：不带参数是重型·剪枝；--quick 是轻型；--local-only 只用本机、不动第二台；项名照 --list-items 列的写；--quick 与 --full 不一起给；--backlog 照积压登记表取件（文件头「积压跑法」），要带 --milestone" >&2
   exit 2
 }
 
 tier=""; quick=0; full=0; list_items=0; with_keys=0; selftest=0; local_only=0; named_items=()
+backlog=0; backlog_milestone=""; backlog_backlog_bound=""; backlog_total_bound=""   # 积压跑法（文件头「积压跑法」）的开关、里程碑与两条下限
 while (($#)); do
   case "$1" in
     --quick) quick=1; shift ;;
@@ -301,6 +384,15 @@ while (($#)); do
     --with-keys) with_keys=1; shift ;;
     --selftest) selftest=1; shift ;;
     --local-only) local_only=1; shift ;;
+    --backlog) backlog=1; shift ;;
+    --milestone|--backlog-states-at-least|--states-at-least)
+      if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then usage "$1 后面缺值"; fi
+      case "$1" in
+        --milestone) backlog_milestone="$2" ;;
+        --backlog-states-at-least) [[ "$2" =~ ^[0-9]+$ ]] || usage "--backlog-states-at-least 要十进制整数（态数），给的是 $2"; backlog_backlog_bound="$2" ;;
+        *) [[ "$2" =~ ^[0-9]+$ ]] || usage "--states-at-least 要十进制整数（态数），给的是 $2"; backlog_total_bound="$2" ;;
+      esac
+      shift 2 ;;
     --item)
       if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then usage "--item 后面缺项名"; fi
       named_items+=("$2"); shift 2 ;;
@@ -422,9 +514,9 @@ PYTHON
   fast_state=green; fast_reason=""; fast_exit="$run_exit"; fast_red=0
   if (( condition_lines > 0 )) && ! replay_break_is given-states-run-condition-as-red; then
     fast_state=not-run; fast_exit=78
-    fast_reason="运行条件不满足：给定状态表的判器借不到显存（$condition_line；共 $condition_lines 处，日志 $log），这一趟不算数；等卡上占着显存的跑完再重跑"
+    fast_reason="运行条件不满足：给定状态表的判器借不到显存（$condition_line；共 $condition_lines 处，日志 $log、错误警告 ${log%.log}.problems.log），这一趟不算数；等卡上占着显存的跑完再重跑"
   elif [[ "$run_exit" != 0 || "$failed" -gt 0 ]] && ! replay_break_is red-as-green; then
-    fast_state=red; fast_reason="cargo test 退 $run_exit、红 $failed 条（日志 $log）"
+    fast_state=red; fast_reason="cargo test 退 $run_exit、红 $failed 条（日志 $log、错误警告 ${log%.log}.problems.log）"
     (( failed > 0 )) || failed=1
     fast_red=$failed
   elif (( passed + failed == 0 )) && ! replay_break_is not-run-as-green; then
@@ -467,7 +559,7 @@ run_fast_tier_target_on_two_hosts() { # <测试目标> <记给哪几项>
   echo "── 快档（两台分片）：bash scripts/crash/crash-amplification-two-hosts.sh ${two_hosts_arguments[*]}（本机 0/2、第二台 1/2 取回库、本机带 IMPORT 再跑${quiesce_prefix[*]:+；经 scripts/crash/gpu-quiesce-run.sh 清场再起}）"
   run_logged "$two_hosts_log" ${quiesce_prefix[@]+"${quiesce_prefix[@]}"} "${two_hosts_environment[@]}" bash "$replay_script_directory/crash-amplification-two-hosts.sh" "${two_hosts_arguments[@]}"
   two_hosts_exit="$(cat "$two_hosts_log.exit" 2>/dev/null || echo 255)"
-  # 长期库留着（下一趟照键复用、打断之后续跑）；取回的那一份与送第二台的快照是这一趟的拷贝，删掉，日志留着
+  # 长期库留着（下一趟照键复用、打断之后续跑）；取回的那一份与送第二台的快照是这一趟的拷贝，双机驱动退出时已经自己删了（它文件头「跑完删库的拷贝」），这里再兜一次；日志留着
   rm -rf -- "${two_hosts_runs:?}/fetched" "${two_hosts_runs:?}/library-for-peer"
   if [[ -n "$library_root" ]]; then
     rm -rf -- "${library_root:?}/${target:?}"
@@ -479,20 +571,20 @@ run_fast_tier_target_on_two_hosts() { # <测试目标> <记给哪几项>
     78)
       fast_tests=0; fast_red=0
       if replay_break_is two-hosts-unreachable-as-red; then
-        fast_state=red; fast_exit=1; fast_red=1; fast_reason="双机驱动退 78（日志 $two_hosts_log、$two_hosts_runs/）"
+        fast_state=red; fast_exit=1; fast_red=1; fast_reason="双机驱动退 78（日志 $two_hosts_log、错误警告 ${two_hosts_log%.log}.problems.log、$two_hosts_runs/）"
       else
         fast_state=not-run; fast_exit=78
-        fast_reason="运行条件不满足：双机驱动退 78（第二台连不上、第二台的库没取回、卡用不上或给定状态表的判器借不到显存，出路见它打的那一句；日志 $two_hosts_log、$two_hosts_runs/）"
+        fast_reason="运行条件不满足：双机驱动退 78（第二台连不上、第二台的库没取回、卡用不上或给定状态表的判器借不到显存，出路见它打的那一句；日志 $two_hosts_log、错误警告 ${two_hosts_log%.log}.problems.log、$two_hosts_runs/）"
       fi ;;
     245|251|252|254)
       fast_state=not-run; fast_exit=78; fast_tests=0; fast_red=0
-      fast_reason="运行条件不满足：双机驱动退 $two_hosts_exit（内存包装自己的结局或显存不够，这一次的输出不算结果：scripts/hosts/run-with-memory-cap.sh 文件头「退出码」；日志 $two_hosts_log、$two_hosts_runs/）" ;;
+      fast_reason="运行条件不满足：双机驱动退 $two_hosts_exit（内存包装自己的结局或显存不够，这一次的输出不算结果：scripts/hosts/run-with-memory-cap.sh 文件头「退出码」；日志 $two_hosts_log、错误警告 ${two_hosts_log%.log}.problems.log、$two_hosts_runs/）" ;;
     77)
       fast_state=not-run; fast_exit=77; fast_tests=0; fast_red=0
-      fast_reason="双机驱动退 77（本次未跑；日志 $two_hosts_log、$two_hosts_runs/）" ;;
+      fast_reason="双机驱动退 77（本次未跑；日志 $two_hosts_log、错误警告 ${two_hosts_log%.log}.problems.log、$two_hosts_runs/）" ;;
     *)
       judge_fast_tier_log "$two_hosts_exit" "$two_hosts_runs/import.log"
-      fast_reason="双机驱动退 $two_hosts_exit；${fast_reason:-导入那一趟的结果判不出红}（日志 $two_hosts_log、$two_hosts_runs/）" ;;
+      fast_reason="双机驱动退 $two_hosts_exit；${fast_reason:-导入那一趟的结果判不出红}（日志 $two_hosts_log、错误警告 ${two_hosts_log%.log}.problems.log、$two_hosts_runs/）" ;;
   esac
   for owner in $owners; do record_part "$owner" fast-tier "$target" "$fast_exit" "$fast_state" "$fast_tests" "$fast_red" "$fast_reused" "$((SECONDS - started))" "$fast_reason"; done
 }
@@ -548,11 +640,17 @@ replay_light_within_heavy() {
 #   项<TAB>段（fast-tier|pipeline|enumeration|not-run）<TAB>对象<TAB>退出码<TAB>结论（green|red|not-run）<TAB>判了多少<TAB>红了多少<TAB>复用（数、unknown 或 none）<TAB>秒<TAB>原因
 record_part() { printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" >>"$part_records"; }
 
-# 跑一条命令：输出边跑边转打、同时进日志；退出码写进 <日志>.exit
-run_logged() { # <日志> <命令…>
-  local log="$1"
+# 跑一条命令：输出边跑边转打，同时出两份日志（scripts/hosts/two-logs.sh：<日志> 是全量，同名的 .problems.log 只收错误与警告、行前带全量日志里的行号，一般只看它）；
+# 退出码写进 <日志>.exit。弄坏开关 logs-single：照改前只写一份全量日志（tee）
+run_logged() { # <日志，以 .log 结尾> <命令…>
+  local log="$1" exit_code
   shift
-  { "$@" 2>&1; echo "$?" >"$log.exit"; } | tee "$log"
+  if replay_break_is logs-single; then
+    { "$@" 2>&1; echo "$?" >"$log.exit"; } | tee "$log"
+    return 0
+  fi
+  if bash "$replay_script_directory/../hosts/two-logs.sh" "${log%.log}" -- "$@" 2>&1; then exit_code=0; else exit_code=$?; fi
+  echo "$exit_code" >"$log.exit"
 }
 
 run_fast_tier() { # <计划文件>：快档那一段（fast-tier 的件），一个测试目标一趟；同一个测试目标几项都点名时跑一次、记给每一项
@@ -596,7 +694,7 @@ run_fast_tier() { # <计划文件>：快档那一段（fast-tier 的件），一
   for target in "${targets[@]}"; do
     owners="$(awk -F'\t' -v wanted="$target" '$2 == "fast-tier" && $3 == wanted { print $1 }' "$plan_file")"
     if [[ "$build_exit" != 0 ]]; then
-      for owner in $owners; do record_part "$owner" fast-tier "$target" "$build_exit" red 0 1 unknown "$((SECONDS - started))" "快档编不过（cargo test --no-run 退 $build_exit，日志 $build_log）"; done
+      for owner in $owners; do record_part "$owner" fast-tier "$target" "$build_exit" red 0 1 unknown "$((SECONDS - started))" "快档编不过（cargo test --no-run 退 $build_exit，日志 $build_log、错误警告 ${build_log%.log}.problems.log）"; done
       continue
     fi
     # 经给定状态引擎的测试目标，双机开着（或开着而判法判不过）：交双机驱动（文件头「双机」）
@@ -622,6 +720,7 @@ run_enumeration_part() { # <项> <crash-case: 键…>：交门禁 checker-tier-c
   fi
   for key in "$@"; do arguments+=(--item "$key"); done
   log="$run_directory/enumeration.$item.log"
+  [[ "$tier" == backlog ]] && log="$run_directory/enumeration.$item.${1#crash-case:}.log"   # 积压跑法一趟只交一条用例，同一项的几条各一份日志
   echo "── 崩溃点重放部分（$item）：bash .claude/gate.d/checker-tier-crash-point-replay.sh ${arguments[*]} <根>"
   run_logged "$log" bash "$repository_root/.claude/gate.d/checker-tier-crash-point-replay.sh" "${arguments[@]}" "$repository_root"
   exit_code="$(cat "$log.exit" 2>/dev/null || echo 255)"
@@ -632,15 +731,27 @@ run_enumeration_part() { # <项> <crash-case: 键…>：交门禁 checker-tier-c
     77) state=not-run; reason="崩溃点重放那一道退 77（本次未跑）" ;;
     3) state=not-run; reason="崩溃点重放那一道退 3（样本档，没跑真的崩溃点重放）" ;;
     78) state=not-run; reason="崩溃点重放那一道退 78（运行条件不满足：修好设备，或改配置）" ;;
-    *) state=red; reason="崩溃点重放那一道退 $exit_code（日志 $log）"; red_cases=$# ;;
+    *) state=red; reason="崩溃点重放那一道退 $exit_code（日志 $log、错误警告 ${log%.log}.problems.log）"; red_cases=$# ;;
   esac
   record_part "$item" enumeration "$*" "$exit_code" "$state" "$#" "$red_cases" "$reused" "$((SECONDS - started))" "$reason"
 }
 
-# 只用本机（文件头参数表 --local-only）：多机配置派生一份临时的，ENABLE_ACROSS_MACHINES 写成 0，去掉第二台的键与显卡先后里第二台的项（本机的 GPU 与清场照旧），
+# 只用本机（文件头参数表 --local-only）：多机配置派生一份临时的，ENABLE_ACROSS_MACHINES 写成 0，去掉第二台的键与显卡先后里另一台的项（照角色取，见下；这一台的 GPU 与清场照旧），
 # 改 configuration_file 指到它并导出 SINGLEFS_MULTI_HOST_CONFIG（快档、门禁、放量入口都经这个变量找多机配置）；多机配置不在时两个开关本来就关，什么都不用做。
 # 临时的一份放在 local_only_directory 里，进程退出时删。
 local_only_directory=""
+# 收尾（EXIT trap）：删 --local-only 派生多机配置的临时目录与这一趟自己建的编译目录（文件头「编译目录」）；编译目录没删成而本来要退 0 的改退 1。
+#   弄坏开关 run-target-kept：编译目录不删
+replay_finish() {
+  local finish_exit=$?
+  trap - EXIT
+  if [[ -n "${local_only_directory:-}" ]]; then rm -rf -- "${local_only_directory:?}"; fi
+  if ! run_build_directory_end $(replay_break_is run-target-kept && echo keep); then
+    (( finish_exit != 0 )) || finish_exit=1
+  fi
+  exit "$finish_exit"
+}
+
 make_local_only_configuration() {
   local source_file="$configuration_file" derived_file
   if [[ ! -f "$source_file" ]]; then
@@ -652,14 +763,20 @@ make_local_only_configuration() {
     echo "  → 怎么办：看 ${TMPDIR:-/tmp} 可不可写、盘满没满；不想为这个建目录就改多机配置的 ENABLE_ACROSS_MACHINES 为 0 再不带 --local-only 跑" >&2
     exit 78
   fi
-  trap 'rm -rf -- "${local_only_directory:?}"' EXIT
+  trap replay_finish EXIT   # 收尾连同这一趟的编译目录一起删（replay_finish）
   derived_file="$local_only_directory/multi-host.env"
-  if ! python3 - "$source_file" "$derived_file" <<'PYTHON'
+  # 显卡先后里哪几项是这一台的照角色取（scripts/hosts/peer-host-lib.sh 文件头「两台用同一份多机配置」）：角色 local（没设也是）留 local: 项、去 peer: 项；
+  #   角色 peer（这一份在第二台上跑，配置是起活那一台带过来的同一份）留 peer: 项、去 local: 项。弄坏开关 local-only-role-ignored 下照改前一律去 peer: 项
+  local own_card_prefix="local:" other_card_prefix="peer:"
+  if [[ "${SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE:-local}" == peer ]] && ! replay_break_is local-only-role-ignored; then
+    own_card_prefix="peer:" other_card_prefix="local:"
+  fi
+  if ! python3 - "$source_file" "$derived_file" "$other_card_prefix" <<'PYTHON'
 import sys
-source, target = sys.argv[1], sys.argv[2]
+source, target, other_card_prefix = sys.argv[1], sys.argv[2], sys.argv[3]
 second_host_keys = ("PEER_SSH_HOST", "PEER_REPOSITORY_DIRECTORY", "PEER_CARGO_BIN_DIRECTORY", "PEER_MEMORY_CAP", "HOST_JUDGE_WEIGHTS")
 card_keys = ("GPU_CARDS_BY_PRIORITY", "GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED")
-kept = ["# crash-point-replay.sh --local-only 从多机配置派生的一份：只用本机（ENABLE_ACROSS_MACHINES 写成 0，去掉第二台的键与显卡先后里第二台的项）"]
+kept = ["# crash-point-replay.sh --local-only 从多机配置派生的一份：只用这一台（ENABLE_ACROSS_MACHINES 写成 0，去掉第二台的键与显卡先后里另一台的项，哪几项是这一台的照角色取）"]
 for raw in open(source, encoding="utf-8"):
     line = raw.rstrip("\n")
     key, separator, value = line.strip().partition("=")
@@ -672,7 +789,7 @@ for raw in open(source, encoding="utf-8"):
         text = value.strip()
         if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"":
             text = text[1:-1]
-        kept.append(f"{key}='{' '.join(entry for entry in text.split() if not entry.startswith('peer:'))}'")
+        kept.append(f"{key}='{' '.join(entry for entry in text.split() if not entry.startswith(other_card_prefix))}'")
         continue
     kept.append(line)
 kept.append("ENABLE_ACROSS_MACHINES=0")
@@ -686,7 +803,7 @@ PYTHON
   fi
   configuration_file="$derived_file"
   export SINGLEFS_MULTI_HOST_CONFIG="$derived_file"
-  echo "  · 只用本机：多机配置照 $source_file 派生了一份关了双机的（去掉第二台的键与显卡先后里第二台的项），快档、门禁与放量入口都读这一份，第二台不动"
+  echo "  · 只用本机：多机配置照 $source_file 派生了一份关了双机的（去掉第二台的键与显卡先后里 $other_card_prefix 起头的项、留 $own_card_prefix 起头的这一台的卡），快档、门禁与放量入口都读这一份，另一台不动"
 }
 
 # 快档红：重型不起崩溃点重放部分与放量部分（文件头「一项怎么判」）。计划里这两段的每一件各记一笔本次未跑（退出码列 77、原因写快档红与红的测试目标）
@@ -741,7 +858,7 @@ run_pipeline_part() { # <计划文件>：放量部分（pipeline-* 的件）一�
   else
     replay_break_is heavy-slice-states-set && pipeline_environment+=("SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=$LIGHT_REGISTERED_SEGMENT_SLICE_STATES")
     # 重型：全部项都点了就不带 --item（放量入口照全量判，scope=full）；全量只写不读：库不读、全部块现判、照键写回同一份库（不另建库）
-    if [[ "$tier" == named ]] || (( ! all_named )); then
+    if [[ "$tier" == named || "$tier" == backlog ]] || (( ! all_named )); then
       for word in "${requested[@]}"; do arguments+=(--item "$word"); done
     fi
     if [[ "$tier" == full ]] && replay_break_is full-in-a-library-of-its-own; then   # 弄坏开关：改前另建一份跑完没人读的空库
@@ -756,6 +873,7 @@ run_pipeline_part() { # <计划文件>：放量部分（pipeline-* 的件）一�
   # 套在内存包装里：外层的上限给放量入口（文件头「内存包装」）
   [[ -n "$outer_memory_cap" ]] && arguments+=(--memory-cap "$outer_memory_cap")
   log="$run_directory/pipeline.log"
+  [[ "$tier" == backlog ]] && log="$run_directory/pipeline.${requested[0]}.log"   # 积压跑法一趟只交一个分项
   echo "── 放量部分：${pipeline_environment[*]+${pipeline_environment[*]} }bash scripts/crash/crash-amplification.sh ${arguments[*]}"
   started=$SECONDS
   run_logged "$log" env ${pipeline_environment[@]+"${pipeline_environment[@]}"} bash "$repository_root/scripts/crash/crash-amplification.sh" ${arguments[@]+"${arguments[@]}"}
@@ -773,7 +891,7 @@ run_pipeline_part() { # <计划文件>：放量部分（pipeline-* 的件）一�
         record_part "${pipeline_owner[$name]}" pipeline "$name" 78 not-run 0 0 0 "$((SECONDS - started))" "运行条件不满足：放量入口退 78、没打 $name 的 CRASH_AMPLIFICATION_ITEM 行，这一项本次未跑（出路见入口打的那一句，日志 $log）"
         continue
       fi
-      record_part "${pipeline_owner[$name]}" pipeline "$name" "$exit_code" red 0 1 unknown "$((SECONDS - started))" "放量入口退 $exit_code、没打 $name 的 CRASH_AMPLIFICATION_ITEM 行（收不回，日志 $log）"
+      record_part "${pipeline_owner[$name]}" pipeline "$name" "$exit_code" red 0 1 unknown "$((SECONDS - started))" "放量入口退 $exit_code、没打 $name 的 CRASH_AMPLIFICATION_ITEM 行（收不回，日志 $log、错误警告 ${log%.log}.problems.log）"
       continue
     fi
     fields="$(python3 -c '
@@ -923,6 +1041,373 @@ open(exit_file, "w").write(f"{code}\n")
 PYTHON
 }
 
+# ── 积压跑法（文件头「积压跑法」）：积压登记表只经表的小程序读写，这里只起它、核它的输出、照它取到的件跑
+BACKLOG_TABLE_PATH_IN_REPOSITORY="crates/singlefs-checker-tier/crash-full-run-backlog.tsv"   # 同 crates/singlefs-checker-tier/src/crash_full_run_backlog.rs 的 CRASH_FULL_RUN_BACKLOG_TABLE_PATH_IN_REPOSITORY，逐字相同
+backlog_table=""; backlog_directory=""; backlog_today_key=""
+backlog_take_sequences=(); backlog_take_groups=(); backlog_take_items=(); backlog_take_parts=(); backlog_take_keys=(); backlog_take_states=()
+backlog_recorded=0; backlog_not_recorded=0; backlog_recorded_states=0; backlog_record_failures=0; backlog_parts_reported=0
+
+# 交给 plan 的两条下限：给了才交（不给是小程序的默认）。弄坏开关 backlog-bounds-dropped 下一条都不交
+backlog_backlog_bound_options() { [[ -n "$backlog_backlog_bound" ]] && ! replay_break_is backlog-bounds-dropped && printf '%s\n' --backlog-states-at-least "$backlog_backlog_bound"; return 0; }
+backlog_total_bound_options() { [[ -n "$backlog_total_bound" ]] && ! replay_break_is backlog-bounds-dropped && printf '%s\n' --states-at-least "$backlog_total_bound"; return 0; }
+
+backlog_program() { # <子命令> <选项…>：起表的小程序（编法见文件头「积压跑法」），标准输出原样交回、退出码照它
+  ( cd "$repository_root" && bash "$replay_script_directory/../hosts/capped.sh" default \
+      cargo run --release --quiet --offline -p singlefs-checker-tier --features verdict-store --bin crash_full_run_backlog -- "$@" )
+}
+
+backlog_read_today_key() { # 设 backlog_today_key；取不到交回 1（打 ✗ 与出路）
+  local output
+  if ! output="$(backlog_program today-judging-key)"; then
+    printf '%s\n' "$output" | tail -n 5 >&2
+    echo "  ✗ 积压登记表的小程序 today-judging-key 没取到今天的判法键（编不过或拒算，上面是它的输出尾部）" >&2
+    echo "  → 怎么办：单跑 cargo run --release -p singlefs-checker-tier --features verdict-store --bin crash_full_run_backlog -- today-judging-key 看报错，修好再跑" >&2
+    return 1
+  fi
+  backlog_today_key="$(sed -nE 's/^CRASH_FULL_RUN_BACKLOG_TODAYS_JUDGING_KEY\tkey=([0-9a-f]{64})$/\1/p' <<<"$output" | tail -n 1)"
+  if [[ -z "$backlog_today_key" ]]; then
+    echo "  ✗ 小程序 today-judging-key 的输出里没有「CRASH_FULL_RUN_BACKLOG_TODAYS_JUDGING_KEY<TAB>key=<64 位小写十六进制>」那一行" >&2
+    echo "  → 怎么办：照 crates/singlefs-checker-tier/src/bin/crash_full_run_backlog.rs 文件头的写法对上 backlog_read_today_key，再跑" >&2
+    return 1
+  fi
+}
+
+# 起一趟 plan 并核它的输出（文件头「积压跑法」③的完整性闸）：核过了才把取到的件写进 <取件文件>（一行「序号<TAB>组<TAB>项<TAB>部分<TAB>键<TAB>态数」，照取件的次序），
+# 另写 <取件文件>.summary 一行「游标<TAB>先跑那一组的态数<TAB>积压的态数<TAB>未数的件数<TAB>lower_bounds」；对不上交回 1、<取件文件> 空着。弄坏开关 backlog-plan-unchecked 下不核
+backlog_plan() { # <取件文件> [<plan 的下限选项>…]
+  local takes_file="$1" plan_exit
+  shift
+  : >"$takes_file"; rm -f -- "$takes_file.summary"
+  if backlog_program plan --table "$backlog_table" --today-judging-key "$backlog_today_key" --current-milestone "$backlog_milestone" "$@" >"$takes_file.raw"; then plan_exit=0; else plan_exit=$?; fi
+  python3 - "$takes_file.raw" "$takes_file" "$plan_exit" "$(replay_break_is backlog-plan-unchecked && echo 1 || echo 0)" <<'PYTHON'
+import sys
+raw_file, takes_file, plan_exit, unchecked = sys.argv[1:5]
+GROUPS = ("new-or-judging-key-changed", "backlog")
+PARTS = ("crash-point-replay", "crash-amplification")
+lines = [line for line in open(raw_file, encoding="utf-8", errors="replace").read().split("\n") if line]
+problems, takes, cursors, plans = [], [], [], []
+for number, line in enumerate(lines, 1):
+    fields = line.split("\t")
+    values = dict(field.split("=", 1) for field in fields[1:] if "=" in field)
+    if fields[0] == "CRASH_FULL_RUN_BACKLOG_CURSOR":
+        cursors.append(values.get("sequence", ""))
+    elif fields[0] == "CRASH_FULL_RUN_BACKLOG_TAKE":
+        take = [values.get(name, "") for name in ("sequence", "group", "item", "part", "key", "states")]
+        if (not take[0].isdigit() or take[1] not in GROUPS or not take[2] or take[3] not in PARTS or not take[4]
+                or not (take[5].isdigit() or take[5] == "not-counted") or any(" " in value for value in take)):
+            problems.append(f"第 {number} 行取件行字段不齐或认不出：{line[:200]}")
+        takes.append(take)
+    elif fields[0] == "CRASH_FULL_RUN_BACKLOG_PLAN":
+        plans.append((number, values))
+    else:
+        problems.append(f"第 {number} 行认不出：{line[:200]}")
+if plan_exit != "0":
+    problems.append(f"小程序 plan 退 {plan_exit}")
+if len(cursors) != 1 or not (cursors[0] == "none" or cursors[0].isdigit()):
+    problems.append(f"游标那一行要恰好一行、序号是数或 none（实有 {len(cursors)} 行：{'、'.join(cursors) or '无'}）")
+if len(plans) != 1 or plans[-1][0] != len(lines):
+    problems.append(f"末行要恰好是一行 CRASH_FULL_RUN_BACKLOG_PLAN（实有 {len(plans)} 行）")
+sequences = [take[0] for take in takes]
+if len(set(sequences)) != len(sequences):
+    problems.append(f"取件的序号有重复：{' '.join(sequences)}")
+groups = [take[1] for take in takes]
+first_backlog = next((index for index, group in enumerate(groups) if group == GROUPS[1]), len(groups))
+if GROUPS[0] in groups[first_backlog:]:
+    problems.append(f"先跑的那一组（{GROUPS[0]}）有件排在积压之后")
+for group in GROUPS:
+    numbers = [int(take[0]) for take in takes if take[1] == group and take[0].isdigit()]
+    if numbers != sorted(numbers):
+        problems.append(f"{group} 那一组没照表的次序：{' '.join(map(str, numbers))}")
+summary = plans[-1][1] if plans else {}
+if plans:
+    def total(group):
+        return sum(int(take[5]) for take in takes if take[1] == group and take[5].isdigit())
+    expected = {"new_or_judging_key_changed_states": total(GROUPS[0]), "backlog_states": total(GROUPS[1]),
+                "taken_without_a_count": sum(1 for take in takes if take[5] == "not-counted")}
+    for name, value in expected.items():
+        if summary.get(name) != str(value):
+            problems.append(f"末行 {name}={summary.get(name, '（没有）')}，取件行加起来是 {value}")
+    if summary.get("lower_bounds") not in ("both", "every-uncovered-row-below-the-bounds"):
+        problems.append(f"末行 lower_bounds={summary.get('lower_bounds', '（没有）')} 认不出")
+if problems and unchecked != "1":
+    for problem in problems:
+        print(f"  ✗ 积压登记表的小程序 plan 的输出：{problem}", file=sys.stderr)  # gate-lint:detail
+    print(f"  ✗ 积压登记表的小程序 plan 的输出对不上（{len(problems)} 处），一件都不跑", file=sys.stderr)
+    print(f"  → 怎么办：照上面逐处对 crates/singlefs-checker-tier/src/bin/crash_full_run_backlog.rs 的 plan 与它文件头的写法；那一趟的原样输出在 {raw_file}", file=sys.stderr)
+    sys.exit(1)
+with open(takes_file, "w", encoding="utf-8") as handle:
+    handle.write("".join("\t".join(take) + "\n" for take in takes))
+with open(takes_file + ".summary", "w", encoding="utf-8") as handle:
+    handle.write("\t".join([cursors[0] if cursors else "none", summary.get("new_or_judging_key_changed_states", "0"), summary.get("backlog_states", "0"),
+                            summary.get("taken_without_a_count", "0"), summary.get("lower_bounds", "?")]) + "\n")
+PYTHON
+}
+
+# 只读用法的收尾（EXIT trap）：删这一趟的编译目录与临时目录
+backlog_listing_finish() {
+  local finish_exit=$?
+  trap - EXIT
+  if ! run_build_directory_end; then (( finish_exit != 0 )) || finish_exit=1; fi
+  [[ -z "$backlog_directory" ]] || rm -rf -- "${backlog_directory:?}"
+  exit "$finish_exit"
+}
+
+# --list-items --backlog（文件头「积压跑法」末段）：today-judging-key、三趟 plan，打「积压<TAB>…」几行；没列成交回 1
+backlog_listing() {
+  local plan_bounds=() backlog_bound=() total_bound=() word
+  backlog_table="$repository_root/$BACKLOG_TABLE_PATH_IN_REPOSITORY"
+  if ! backlog_directory="$(mktemp -d "${TMPDIR:-/tmp}/crash-point-replay-backlog-list.XXXXXX")"; then
+    echo "  ✗ 建不了只读积压用法的临时目录（${TMPDIR:-/tmp}）" >&2
+    echo "  → 怎么办：看 ${TMPDIR:-/tmp} 可不可写、盘满没满，修好再跑" >&2
+    return 1
+  fi
+  trap backlog_listing_finish EXIT
+  run_build_directory_begin "$backlog_directory" || return 1
+  while IFS= read -r word; do backlog_bound+=("$word"); done < <(backlog_backlog_bound_options)
+  while IFS= read -r word; do total_bound+=("$word"); done < <(backlog_total_bound_options)
+  plan_bounds=(${backlog_bound[@]+"${backlog_bound[@]}"} ${total_bound[@]+"${total_bound[@]}"})
+  if replay_break_is backlog-listing-appends; then   # 弄坏开关：只读用法照积压跑法那样先追加少登的件（改了表）
+    bash "$repository_root/scripts/crash/crash-amplification.sh" --list-items >"$backlog_directory/amplification-items.txt" 2>/dev/null
+    backlog_program append-missing --table "$backlog_table" --merged-items "$repository_root/.claude/gate.d/crash-point-replay-items.tsv" \
+      --amplification-items "$backlog_directory/amplification-items.txt" --registered-in "$backlog_milestone" --provenance "只读用法追加" >/dev/null
+  fi
+  backlog_read_today_key || return 1
+  backlog_plan "$backlog_directory/takes-run.tsv" ${plan_bounds[@]+"${plan_bounds[@]}"} || return 1
+  backlog_plan "$backlog_directory/takes-backlog-bound.tsv" ${backlog_bound[@]+"${backlog_bound[@]}"} --states-at-least 0 || return 1
+  backlog_plan "$backlog_directory/takes-total-bound.tsv" --backlog-states-at-least 0 ${total_bound[@]+"${total_bound[@]}"} || return 1
+  python3 - "$backlog_today_key" "$backlog_milestone" "${backlog_bound[1]:-}" "${total_bound[1]:-}" \
+    "$backlog_directory/takes-run.tsv" "$backlog_directory/takes-backlog-bound.tsv" "$backlog_directory/takes-total-bound.tsv" <<'PYTHON'
+import sys
+key, milestone, backlog_bound, total_bound, run_file, backlog_file, total_file = sys.argv[1:8]
+
+
+def read(path):
+    takes = [line.rstrip("\n").split("\t") for line in open(path, encoding="utf-8") if line.strip()]
+    cursor, new_states, backlog_states, not_counted, bounds = open(path + ".summary", encoding="utf-8").read().rstrip("\n").split("\t")
+    return {"takes": takes, "cursor": cursor, "new_states": int(new_states), "backlog_states": int(backlog_states), "not_counted": int(not_counted), "bounds": bounds}
+
+
+def group(plan, name):
+    return [take for take in plan["takes"] if take[1] == name]
+
+
+def not_counted(takes):
+    return sum(1 for take in takes if take[5] == "not-counted")
+
+
+run, backlog_only, total_only = read(run_file), read(backlog_file), read(total_file)
+backlog_text = f"{backlog_bound} 态" if backlog_bound else "小程序的默认（出口 10 的 50 亿态）"
+total_text = f"{total_bound} 态" if total_bound else "小程序的默认（出口 10 的 100 亿态）"
+print(f"积压\t今天的判法键 {key}（镜像判定那一组判法单元在这份小程序里的指纹）")
+cursor_take = next((take for plan in (run, backlog_only, total_only) for take in plan["takes"] if take[0] == run["cursor"]), None)
+if run["cursor"] == "none":
+    print("积压\t游标：没有（今天的判法键下每一行都全绿）")
+elif cursor_take:
+    print(f"积压\t游标：序号 {run['cursor']}（{cursor_take[2]} {cursor_take[3]} {cursor_take[4]}）")
+else:
+    print(f"积压\t游标：序号 {run['cursor']}")
+new = group(run, "new-or-judging-key-changed")
+print(f"积压\t先跑这一里程碑（{milestone}）新增与判法键变了的：{len(new)} 件、{run['new_states']} 态（未数 {not_counted(new)} 件，照取、算 0）"
+      + (f"：序号 {'、'.join(take[0] for take in new)}" if new else ""))
+for label, bound_text, plan, total in (("到积压下限", backlog_text, backlog_only, False), ("到合计下限", total_text, total_only, True)):
+    backlog = group(plan, "backlog")
+    reached = "够了" if plan["bounds"] == "both" else "不够：没罩住的积压全取也到不了"
+    states = plan["new_states"] + plan["backlog_states"] if total else plan["backlog_states"]
+    if backlog:
+        where = ("从游标起" if not total else "") + f"跑到序号 {max(int(take[0]) for take in backlog)}"
+    else:
+        where = "积压一件都不用跑"
+    print(f"积压\t{label} {bound_text}：{where}（积压 {len(backlog)} 件；{'新增与积压合计' if total else '积压'} {states} 态，{reached}；未数 {not_counted(plan['takes'])} 件，照取、算 0）")
+backlog = group(run, "backlog")
+print(f"积压\t积压跑法一趟（两条下限都够才停：积压 {backlog_text}、合计 {total_text}）：取 {len(run['takes'])} 件（先跑 {len(new)} 件、积压 {len(backlog)} 件）"
+      + (f"，积压跑到序号 {max(int(take[0]) for take in backlog)}" if backlog else "") + f"；lower_bounds={run['bounds']}（只读：没核表与合表、ITEMS 对不对得上，那一核在积压跑法开跑时与门禁 code-tooling 的 crash-full-run-backlog 格）")
+PYTHON
+}
+
+# 重型·积压的计划（文件头「积压跑法」①到④）：核表、取件、写 $plan_file，填取到的件、selected_items 与 named_items；退不了的直接退（收尾由 EXIT trap 管）
+backlog_prepare_plan() {
+  local items_list="$run_directory/amplification-items.txt" output check_exit takes_file="$run_directory/backlog-takes.tsv"
+  local sequence group item part key states index word bound_options=()
+  backlog_table="$repository_root/$BACKLOG_TABLE_PATH_IN_REPOSITORY"
+  backlog_directory="$run_directory"
+  if ! bash "$repository_root/scripts/crash/crash-amplification.sh" --list-items >"$items_list" 2>"$items_list.err"; then
+    echo "  ✗ 崩溃放量入口 --list-items 没列成（$(tail -n 2 "$items_list.err" | tr '\n' ' ')），积压登记表核不了，什么都不跑" >&2
+    echo "  → 怎么办：单跑 bash scripts/crash/crash-amplification.sh --list-items 看报错，修好再跑" >&2
+    exit 2
+  fi
+  if ! replay_break_is backlog-table-unchecked; then
+    if ! output="$(backlog_program append-missing --table "$backlog_table" --merged-items "$repository_root/.claude/gate.d/crash-point-replay-items.tsv" \
+         --amplification-items "$items_list" --registered-in "$backlog_milestone" \
+         --provenance "积压跑法开跑时追加（$(TZ=Asia/Tokyo date +%F)）：合表加 ITEMS 展开里有、表里没有；等这一件跑完那一趟的计数行再填")"; then
+      printf '%s\n' "$output" | tail -n 5 >&2
+      echo "  ✗ 积压登记表的小程序 append-missing 没做成（上面是它的输出尾部），什么都不跑" >&2
+      echo "  → 怎么办：照它报的改合表、ITEMS 或表（表的写法在它的表头），再跑" >&2
+      exit 2
+    fi
+    echo "  · 积压登记表：$(sed -nE 's/^CRASH_FULL_RUN_BACKLOG_APPENDED\tparts=([0-9]+)$/合表加 ITEMS 展开里有、表里没有的追加了 \1 件（归属 '"$backlog_milestone"'，态数未数）/p' <<<"$output")"
+    if output="$(backlog_program check --table "$backlog_table" --merged-items "$repository_root/.claude/gate.d/crash-point-replay-items.tsv" --amplification-items "$items_list")"; then
+      check_exit=0
+    else
+      check_exit=$?
+    fi
+    if (( check_exit != 0 )); then
+      printf '%s\n' "$output" >&2
+      echo "  ✗ 积压登记表 $BACKLOG_TABLE_PATH_IN_REPOSITORY 核不过（小程序 check 退 $check_exit，上面逐处列了），不取件、什么都不跑" >&2
+      echo "  → 怎么办：照上面每一处改表（多登、次序不对、全绿而态数没数、跑过而判法键没记），或改合表与 ITEMS；表的写法在它的表头，再跑" >&2
+      exit 2
+    fi
+  fi
+  backlog_read_today_key || exit 1
+  while IFS= read -r word; do bound_options+=("$word"); done < <(backlog_backlog_bound_options; backlog_total_bound_options)
+  backlog_plan "$takes_file" ${bound_options[@]+"${bound_options[@]}"} || exit 1
+  # 取到的件照取件的次序（弄坏开关 backlog-table-order 下照表的序号重排）
+  while IFS=$'\t' read -r sequence group item part key states; do
+    [[ -n "$sequence" ]] || continue
+    backlog_take_sequences+=("$sequence"); backlog_take_groups+=("$group"); backlog_take_items+=("$item")
+    backlog_take_parts+=("$part"); backlog_take_keys+=("$key"); backlog_take_states+=("$states")
+  done < <(if replay_break_is backlog-table-order; then LC_ALL=C sort -t $'\t' -k1,1n -- "$takes_file"; else cat -- "$takes_file"; fi)
+  if (( ${#backlog_take_sequences[@]} == 0 )); then
+    echo "  ! 积压登记表在今天的判法键下没有要跑的件（游标 $(cut -f1 "$takes_file.summary")），这一趟一件都没跑：本次未跑，不是通过" >&2
+    exit 77
+  fi
+  for index in "${!backlog_take_sequences[@]}"; do
+    item="${backlog_take_items[index]}"; part="${backlog_take_parts[index]}"; key="${backlog_take_keys[index]}"
+    if [[ -z "${item_cases[$item]+set}" ]] \
+       || { [[ "$part" == crash-point-replay ]] && [[ " ${item_cases[$item]} " != *" $key "* ]]; } \
+       || { [[ "$part" == crash-amplification ]] && [[ " ${item_pipeline_items[$item]} " != *" $key "* ]]; }; then
+      echo "  ✗ 积压登记表取到的序号 ${backlog_take_sequences[index]}（$item $part $key）不在合表那一项里，什么都不跑" >&2
+      echo "  → 怎么办：表与合表对不上，先跑一趟 check 看哪几处（门禁 code-tooling 的 crash-full-run-backlog 格同一判法），照它改表或合表再跑" >&2
+      exit 1
+    fi
+  done
+  # 计划：取到的件所在的项的快档测试目标在前，再照取件的次序每件一行
+  : >"$plan_file"
+  for item in "${backlog_take_items[@]}"; do
+    [[ " ${selected_items[*]-} " == *" $item "* ]] && continue
+    selected_items+=("$item")
+    for word in ${item_light_targets[$item]}; do printf '%s\tfast-tier\t%s\n' "$item" "$word" >>"$plan_file"; done
+  done
+  for index in "${!backlog_take_sequences[@]}"; do
+    if [[ "${backlog_take_parts[index]}" == crash-point-replay ]]; then
+      printf '%s\tenumeration-full\t%s\n' "${backlog_take_items[index]}" "${backlog_take_keys[index]}" >>"$plan_file"
+    else
+      printf '%s\tpipeline-full\t%s\n' "${backlog_take_items[index]}" "${backlog_take_keys[index]}" >>"$plan_file"
+    fi
+  done
+  named_items=("${selected_items[@]}")   # 上次红的清单只换这一趟跑到的项（同 --item）
+  echo "  · 积压登记表取件：$(wc -l <"$takes_file") 件（游标 $(cut -f1 "$takes_file.summary")；今天的判法键 $backlog_today_key），照取件的次序跑：$(awk -F'\t' '{ printf "%s%s %s %s", (NR > 1 ? "、" : ""), $1, $2, $5 }' "$takes_file")"
+}
+
+# 用例日志里 <行首> 那几行的 states= 之和：打「<和> <行数>」（日志不在打「0 0」）
+backlog_states_in_the_case_log() { # <用例日志> <行首>
+  [[ -n "$1" && -f "$1" ]] || { echo "0 0"; return 0; }
+  awk -v prefix="$2" '{ line = $0; sub(/^[ \t]+/, "", line); count = split(line, words, /[ \t]+/); if (words[1] != prefix) next
+                         for (index_of_word = 2; index_of_word <= count; index_of_word++) if (words[index_of_word] ~ /^states=[0-9]+$/) { total += substr(words[index_of_word], 8); lines++ } }
+                       END { printf "%.0f %d\n", total, lines }' "$1"
+}
+
+# 跑完一件之后回写那一行（文件头「积压跑法」⑤），打 CRASH_POINT_REPLAY_BACKLOG_PART
+backlog_record_the_part() { # <下标> <这一件的记录行（parts.tsv 的最后一行）> <这一件的日志>
+  local index="$1" record_line="$2" log="$3" sequence group item part key planned_states wanted_kind today case_log
+  local record_item record_kind record_object record_exit state record_states record_reused
+  local verdict=not-run recorded=no states="-" reason="-" progress="" states_text="" counted_states="" counted_lines=0 counted_source="" record_output
+  local record_arguments=()
+  sequence="${backlog_take_sequences[index]}"; group="${backlog_take_groups[index]}"; item="${backlog_take_items[index]}"
+  part="${backlog_take_parts[index]}"; key="${backlog_take_keys[index]}"; planned_states="${backlog_take_states[index]}"
+  today="$(TZ=Asia/Tokyo date +%F)"
+  backlog_parts_reported=$((backlog_parts_reported + 1))
+  wanted_kind=pipeline; [[ "$part" == crash-point-replay ]] && wanted_kind=enumeration
+  IFS=$'\t' read -r record_item record_kind record_object record_exit state record_states _ record_reused _ <<<"$record_line"
+  if [[ "$record_item" != "$item" || "$record_kind" != "$wanted_kind" || "$record_object" != "$key" ]]; then
+    state=lost; reason="这一件没记下结果（收不回），不回写"
+  fi
+  if [[ "$state" == green || "$state" == red ]]; then
+    verdict="$state"
+    if [[ "$part" == crash-point-replay ]]; then
+      case_log="$(sed -nE 's/^    全量日志：(.*)；发现日志：.*$/\1/p' -- "$log" 2>/dev/null | tail -n 1)"
+      counted_source=CRASH_CASE_BLOCKS
+      read -r counted_states counted_lines <<<"$(backlog_states_in_the_case_log "$case_log" CRASH_CASE_BLOCKS)"
+      if [[ "$counted_lines" == 0 ]]; then
+        counted_source=CRASH_POINT_REPLAY_PARALLEL_FINISHED
+        read -r counted_states counted_lines <<<"$(backlog_states_in_the_case_log "$case_log" CRASH_POINT_REPLAY_PARALLEL_FINISHED)"
+      fi
+      [[ "$counted_lines" =~ ^[1-9][0-9]*$ && "$counted_states" =~ ^[0-9]+$ ]] \
+        && states_text="$counted_states；$today crash-point-replay.sh --backlog 那一趟用例日志里 $counted_source 行的 states= 之和（$counted_lines 行）"
+      progress="红：门禁 checker-tier-crash-point-replay --full --item $key 退 $record_exit（$today 积压跑法；日志 $(basename -- "$log")）"
+    else
+      if [[ "$record_states" =~ ^[0-9]+$ && "$record_reused" =~ ^[0-9]+$ ]]; then
+        counted_states=$((record_states + record_reused))
+        states_text="$counted_states；$today crash-point-replay.sh --backlog 那一趟 CRASH_AMPLIFICATION_ITEM 行的 states= 加 reused="
+      fi
+      progress="红：崩溃放量 $key 判红（CRASH_AMPLIFICATION_ITEM 退 $record_exit；$today 积压跑法；日志 $(basename -- "$log")）"
+    fi
+    if [[ "$verdict" == green ]] || replay_break_is backlog-red-as-green; then progress="全绿"; fi
+  elif [[ "$state" == not-run ]] && replay_break_is backlog-not-run-recorded; then
+    progress="全绿"   # 弄坏开关：本次未跑的也照全绿回写
+  fi
+  [[ "$state" == not-run && "$reason" == - ]] && reason="本次未跑，不回写"
+  if [[ -z "$progress" ]]; then
+    :
+  elif [[ -z "$states_text" && "$planned_states" == not-counted && "$progress" == 全绿 ]]; then
+    reason="判绿而态数数不出、表里这一行原来也未数（全绿而未数是小程序check判的一处问题），不回写"
+  else
+    record_arguments=(record --table "$backlog_table" --sequence "$sequence" --judging-key "$backlog_today_key" --progress "$progress"
+                      --last-run "$today；crash-point-replay.sh --backlog --milestone $backlog_milestone 那一趟")
+    [[ -n "$states_text" ]] && record_arguments+=(--states "$states_text")
+    if replay_break_is backlog-not-recorded; then
+      recorded=yes   # 弄坏开关：照说回写了，其实没起 record
+    elif record_output="$(backlog_program "${record_arguments[@]}")" && grep -qxF -- "CRASH_FULL_RUN_BACKLOG_RECORDED"$'\t'"sequence=$sequence" <<<"$record_output"; then
+      recorded=yes
+    else
+      reason="小程序record没写成"; backlog_record_failures=$((backlog_record_failures + 1))
+      echo "  ✗ 积压登记表：序号 $sequence（$item $part $key）的 record 没写成（输出：${record_output//$'\n'/｜}）" >&2
+      echo "  → 怎么办：单跑 cargo run --release -p singlefs-checker-tier --features verdict-store --bin crash_full_run_backlog -- ${record_arguments[*]} 看报错；表里这一行还是跑之前的样子" >&2
+    fi
+  fi
+  if [[ "$recorded" == yes ]]; then
+    backlog_recorded=$((backlog_recorded + 1)); reason="-"
+    if [[ -n "$states_text" ]]; then states="$counted_states"; backlog_recorded_states=$((backlog_recorded_states + counted_states)); fi
+  else
+    backlog_not_recorded=$((backlog_not_recorded + 1))
+  fi
+  echo "CRASH_POINT_REPLAY_BACKLOG_PART sequence=$sequence group=$group item=$item part=$part key=$key verdict=$verdict recorded=$recorded states=$states reason=$reason"
+}
+
+run_backlog_parts() { # 照取件的次序逐件跑、逐件回写（文件头「积压跑法」④⑤）
+  local index item part key log one_plan
+  for index in "${!backlog_take_sequences[@]}"; do
+    item="${backlog_take_items[index]}"; part="${backlog_take_parts[index]}"; key="${backlog_take_keys[index]}"
+    if [[ "$part" == crash-point-replay ]]; then
+      run_enumeration_part "$item" "$key"
+      log="$run_directory/enumeration.$item.${key#crash-case:}.log"
+    else
+      one_plan="$run_directory/backlog-part.${backlog_take_sequences[index]}.tsv"
+      printf '%s\tpipeline-full\t%s\n' "$item" "$key" >"$one_plan"
+      run_pipeline_part "$one_plan"
+      log="$run_directory/pipeline.$key.log"
+    fi
+    backlog_record_the_part "$index" "$(tail -n 1 -- "$part_records")" "$log"
+  done
+}
+
+# 末行 CRASH_POINT_REPLAY_BACKLOG_TOTAL（文件头「积压跑法」）：快档红没起的件逐件补一行；record 没写成、件数对不上的改退 1
+backlog_summarize() {
+  local index taken="${#backlog_take_sequences[@]}" new_count=0 group
+  for ((index = backlog_parts_reported; index < taken; index++)); do
+    echo "CRASH_POINT_REPLAY_BACKLOG_PART sequence=${backlog_take_sequences[index]} group=${backlog_take_groups[index]} item=${backlog_take_items[index]} part=${backlog_take_parts[index]} key=${backlog_take_keys[index]} verdict=not-run recorded=no states=- reason=快档红，这一件没起"
+    backlog_not_recorded=$((backlog_not_recorded + 1))
+  done
+  for group in ${backlog_take_groups[@]+"${backlog_take_groups[@]}"}; do [[ "$group" == new-or-judging-key-changed ]] && new_count=$((new_count + 1)); done
+  echo "CRASH_POINT_REPLAY_BACKLOG_TOTAL milestone=$backlog_milestone taken=$taken new_or_judging_key_changed=$new_count backlog=$((taken - new_count)) recorded=$backlog_recorded not_recorded=$backlog_not_recorded recorded_states=$backlog_recorded_states record_failures=$backlog_record_failures"
+  if (( backlog_record_failures > 0 || backlog_recorded + backlog_not_recorded != taken )); then
+    echo "  ✗ 积压登记表回写：取到 $taken 件，回写 $backlog_recorded 件、没回写 $backlog_not_recorded 件，其中 record 没写成 $backlog_record_failures 件" >&2
+    echo "  → 怎么办：看上面 record 没写成的那几行；表里那几行还是跑之前的样子，修好重跑同一条命令（判过的块照库复用）" >&2
+    echo 1 >"$run_directory/exit"
+  else
+    echo "  · 积压登记表回写：取到 $taken 件（先跑 $new_count 件、积压 $((taken - new_count)) 件），回写 $backlog_recorded 件、共 $backlog_recorded_states 态；没回写 $backlog_not_recorded 件（原因见上面 recorded=no 那几行）"
+  fi
+}
+
 run_selftest() {
   local work root calls cells=0 failures=0 exit_code
   work="$(mktemp -d "${TMPDIR:-/tmp}/crash-point-replay-selftest.XXXXXX")"
@@ -949,6 +1434,11 @@ ITEMS=(
   $'gamma-amp\tgamma_amp\tgamma_amplified\t全量'
 )
 config_summary() { local file="${SINGLEFS_MULTI_HOST_CONFIG:-}"; if [[ -f "$file" ]]; then printf 'across=%s peer=%s cards=%s' "$(grep -c '^ENABLE_ACROSS_MACHINES=1' "$file")" "$(grep -c 'peer-selftest' "$file")" "$(grep -c 'peer:' "$file")"; else printf 'none'; fi; }
+if [[ "${1:-}" == --list-items ]]; then   # 积压跑法那几格：照真的入口逐行打 ITEMS（分项名在第一列），记一行、什么都不判
+  echo 'pipeline-list-items' >>"${STUB_CALLS:?}"
+  printf '%s\n' "${ITEMS[@]}"
+  exit 0
+fi
 printf 'pipeline-entry %s\n' "$*" >>"${STUB_CALLS:?}"
 printf 'pipeline-env config=[%s]\n' "$(config_summary)" >>"$STUB_CALLS"
 printf 'pipeline-env segments=[%s]\n' "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" >>"$STUB_CALLS"
@@ -997,6 +1487,18 @@ STUB
 config_summary() { local file="${SINGLEFS_MULTI_HOST_CONFIG:-}"; if [[ -f "$file" ]]; then printf 'across=%s peer=%s cards=%s' "$(grep -c '^ENABLE_ACROSS_MACHINES=1' "$file")" "$(grep -c 'peer-selftest' "$file")" "$(grep -c 'peer:' "$file")"; else printf 'none'; fi; }
 printf 'enumeration-gate %s\n' "$*" >>"${STUB_CALLS:?}"
 printf 'enumeration-env config=[%s]\n' "$(config_summary)" >>"$STUB_CALLS"
+# 积压跑法那几格（STUB_CASE_LOG_DIRECTORY 设了）：给每条点名的用例照真的那一道写一份用例日志（CRASH_CASE_BLOCKS 行带 states=37），打「开跑」与「全量日志：」那两行
+if [[ -n "${STUB_CASE_LOG_DIRECTORY:-}" ]]; then
+  previous_word=""
+  for word in "$@"; do
+    if [[ "$previous_word" == --item ]]; then
+      echo "CRASH_CASE_BLOCKS blocks=4 reused=1 fresh=3 red=0 refused=0 states=37" >"$STUB_CASE_LOG_DIRECTORY/${word#crash-case:}.log"
+      echo "  · $word 开跑（自证）"
+      echo "    全量日志：$STUB_CASE_LOG_DIRECTORY/${word#crash-case:}.log；发现日志：$STUB_CASE_LOG_DIRECTORY/${word#crash-case:}.findings"
+    fi
+    previous_word="$word"
+  done
+fi
 previous=""
 for argument in "$@"; do
   [[ "$previous" == --item && -n "${STUB_CRASH_POINT_REPLAY_REUSED:-}" ]] && echo "  · $argument 复用：全部块都有键相同的判定（自证）"
@@ -1016,6 +1518,20 @@ printf 'cargo %s cards=[%s] classes=[%s] quiesced=[%s] slice-states=[%s] jobs=[%
   "${SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES-unset}" "${CARGO_BUILD_JOBS-unset}" "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" >>"${STUB_CALLS:?}"
 config_summary() { local file="${SINGLEFS_MULTI_HOST_CONFIG:-}"; if [[ -f "$file" ]]; then printf 'across=%s peer=%s cards=%s' "$(grep -c '^ENABLE_ACROSS_MACHINES=1' "$file")" "$(grep -c 'peer-selftest' "$file")" "$(grep -c 'peer:' "$file")"; else printf 'none'; fi; }
 printf 'cargo-env config=[%s]\n' "$(config_summary)" >>"$STUB_CALLS"
+# 编译目录那几格（run-target-*）：记下收到的 CARGO_TARGET_DIR、往里写一份产物；给了 STUB_SLEEP 每一趟睡这么多秒（被 TERM 停那一格）
+if [[ -n "${STUB_TARGET_LOG:-}" ]]; then
+  printf '%s\n' "${CARGO_TARGET_DIR-unset}" >>"$STUB_TARGET_LOG"
+  [[ -z "${CARGO_TARGET_DIR:-}" ]] || { mkdir -p "$CARGO_TARGET_DIR/release" && echo built >"$CARGO_TARGET_DIR/release/artifact"; }
+fi
+[[ -z "${STUB_SLEEP:-}" ]] || sleep "$STUB_SLEEP"
+# 积压跑法那几格：cargo run … --bin crash_full_run_backlog -- <子命令…> 交给假的小程序（STUB_BACKLOG_PROGRAM），退它的退出码
+if [[ " $* " == *" --bin crash_full_run_backlog "* ]]; then
+  backlog_arguments=(); after_separator=0
+  for argument in "$@"; do
+    if (( after_separator )); then backlog_arguments+=("$argument"); elif [[ "$argument" == -- ]]; then after_separator=1; fi
+  done
+  exec python3 "${STUB_BACKLOG_PROGRAM:?}" "${backlog_arguments[@]}"
+fi
 [[ " $* " == *" --no-run "* ]] && exit "${STUB_BUILD_EXIT:-0}"
 target=""; previous=""
 for argument in "$@"; do [[ "$previous" == --test ]] && target="$argument"; previous="$argument"; done
@@ -1053,7 +1569,8 @@ STUB
   # 只用本机那几格（--local-only）的多机配置：双机与 GPU 都开，显卡先后里第二台也点了名（派生的那一份要去掉第二台的键与它的卡、留着本机的卡与清场）
   { cat "$work/multi-host-gpu-off.env"; printf '%s\n' PEER_SSH_HOST=peer-selftest PEER_REPOSITORY_DIRECTORY=/nonexistent/peer-tree PEER_CARGO_BIN_DIRECTORY=/nonexistent/bin PEER_MEMORY_CAP=4G \
     ENABLE_ACROSS_MACHINES=1 ENABLE_GPU=1 'GPU_CARDS_BY_PRIORITY="local:0:8G peer:0:8G"' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="local:0:24G peer:0:16G"'; } >"$work/multi-host-two-hosts-gpu.env"
-  # 双机驱动是真的 scripts/crash/crash-amplification-two-hosts.sh，只换掉它本机那一趟与第二台那一趟（它文件头「只供测试」的两个变量，entry 每一格都设上）
+  # 双机驱动是真的 scripts/crash/crash-amplification-two-hosts.sh，只换掉它本机那一趟与第二台那一趟（它文件头「只供测试」的两个变量，entry 每一格都设上）；
+  #   它算被测源码摘要的树也换成这里的小仓（同一段的 CRASH_AMPLIFICATION_TWO_HOSTS_SOURCE_ROOT：真仓的 crates/ 别的会话正改着，双机那几格不因此退 77）
   cat >"$work/two-hosts-local.sh" <<'STUB'
 #!/usr/bin/env bash
 # 假的双机驱动本机那一趟（自证用，CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN）：调法 <share> <库目录> <日志> [<附加环境 键=值>…]，环境由双机驱动照真的那一趟组。
@@ -1116,13 +1633,17 @@ STUB
     : >"$calls"
     cells=$((cells + 1))
     env -u RUN_WITH_MEMORY_CAP_OUTER_UNIT -u RUN_WITH_MEMORY_CAP_OUTER_CAP -u SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES \
+      -u SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE -u GPU_QUIESCE_ORIGIN_READ_BACK \
       PATH="$work/bin:$PATH" STUB_CALLS="$calls" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" \
       SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-off.env" CRASH_POINT_REPLAY_SELFTEST_MARK="$work/mark" CRASH_POINT_REPLAY_ROOT="$root" \
       CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN="$work/two-hosts-local.sh" CRASH_AMPLIFICATION_TWO_HOSTS_PEER_RUN="$work/two-hosts-peer.sh" CRASH_AMPLIFICATION_PEER_THREADS=2 \
+      CRASH_AMPLIFICATION_TWO_HOSTS_SOURCE_ROOT="$root" \
       CRASH_POINT_REPLAY_BREAK="$replay_break" ${settings[@]+"${settings[@]}"} bash "$replay_script" "$@" >"$work/out" 2>&1
     exit_code=$?
   }
   calls_have() { grep -qE -- "$1" "$calls"; }
+  # 编译目录那几格（文件头「编译目录」）：调用方的 CARGO_TARGET_DIR 不带进子进程（只有 run-target-caller 那一格自己设）
+  unset CARGO_TARGET_DIR
   calls_count() { grep -cE -- "$1" "$calls"; }
   out_has() { grep -qF -- "$1" "$work/out"; }
   item_line() { grep -E "^CRASH_POINT_REPLAY_ITEM item=$1 " "$work/out"; }
@@ -1151,6 +1672,189 @@ STUB
      || ! out_has $'键\timage_judgement 这一份的判法单元指纹 0505050505050505'; then
     cell_failed list-items-with-keys "--list-items --with-keys 应当照读库程序文件头「输出」那一段的写法报键对不上的块数、不起 cargo" \
       "看 report_the_keys_of_the_library 与 crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段"
+  fi
+  # ── 积压跑法那几格（文件头「积压跑法」）：假 cargo 把 cargo run … --bin crash_full_run_backlog -- <子命令…> 交给假的小程序 $work/backlog-program.py，
+  #   假的门禁给点名的用例写一份用例日志（CRASH_CASE_BLOCKS 行带 states=37）、打「全量日志：」那一行，假的放量入口认 --list-items。
+  #   小仓的表四行（照小仓合表加 ITEMS 的展开）：1 alpha 的 crash-case:alpha、2 alpha 的 alpha-amp、3 beta 的 crash-case:beta、4 gamma 的 gamma-amp
+  cat >"$work/backlog-program.py" <<'STUB'
+# 假的积压登记表小程序（自证用）：照 crates/singlefs-checker-tier/src/bin/crash_full_run_backlog.rs 文件头的写法打行；每次调记一行「backlog-program <参数…>」。
+# plan 照小程序的口径取件：今天的判法键下全绿的算罩住；没罩住的里先全取这一里程碑登记的与判法键变了的（跑过、记下的键不是今天的），
+#   再从游标起照表的次序取积压，取到积压够积压下限、两组合计够合计下限为止，不到就全取；未数的照取、算 0。
+# STUB_BACKLOG_CHECK_PROBLEMS=<n>：check 报 n 处问题、退 1；STUB_BACKLOG_PLAN_TAMPER=1：plan 末行的积压态数比取件行加起来多 1；STUB_BACKLOG_RECORD_EXIT=<n>：record 退 n
+import os, sys
+TODAY = "a" * 64
+arguments = sys.argv[1:]
+with open(os.environ["STUB_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write("backlog-program " + " ".join(arguments) + "\n")
+command, options = arguments[0], dict(zip(arguments[1::2], arguments[2::2]))
+if command == "today-judging-key":
+    print(f"CRASH_FULL_RUN_BACKLOG_TODAYS_JUDGING_KEY\tkey={TODAY}")
+    sys.exit(0)
+if command == "append-missing":
+    print("CRASH_FULL_RUN_BACKLOG_APPENDED\tparts=0")
+    sys.exit(0)
+if command == "check":
+    problems = int(os.environ.get("STUB_BACKLOG_CHECK_PROBLEMS", "0"))
+    for number in range(problems):
+        print(f"CRASH_FULL_RUN_BACKLOG_PROBLEM\t自证造的第 {number + 1} 处问题")
+    print(f"CRASH_FULL_RUN_BACKLOG_CHECK\trows=4\texpansion_parts=4\tproblems={problems}")
+    sys.exit(1 if problems else 0)
+if command == "record":
+    print(f"CRASH_FULL_RUN_BACKLOG_RECORDED\tsequence={options['--sequence']}")
+    sys.exit(int(os.environ.get("STUB_BACKLOG_RECORD_EXIT", "0")))
+if command != "plan":
+    sys.exit(2)
+rows = [line.rstrip("\n").split("\t") for line in open(options["--table"], encoding="utf-8")]
+rows = [row for row in rows if len(row) == 9 and row[0].isdigit()]
+today, milestone = options["--today-judging-key"], options["--current-milestone"]
+backlog_bound = int(options.get("--backlog-states-at-least", "5000000000"))
+total_bound = int(options.get("--states-at-least", "10000000000"))
+
+
+def is_today(key):
+    return key != "未记" and today.startswith(key)
+
+
+def states(row):
+    head = row[5].split("；")[0]
+    return int(head) if head.isdigit() else None
+
+
+uncovered = [row for row in rows if not (row[7] == "全绿" and is_today(row[6]))]
+new = [row for row in uncovered if row[4] == milestone or (row[7] != "未跑" and not is_today(row[6]))]
+taken = [("new-or-judging-key-changed", row) for row in new]
+new_states = sum(states(row) or 0 for row in new)
+backlog_states = 0
+for row in uncovered:
+    if row in new:
+        continue
+    if backlog_states >= backlog_bound and new_states + backlog_states >= total_bound:
+        break
+    taken.append(("backlog", row))
+    backlog_states += states(row) or 0
+reached = backlog_states >= backlog_bound and new_states + backlog_states >= total_bound
+print(f"CRASH_FULL_RUN_BACKLOG_CURSOR\tsequence={uncovered[0][0] if uncovered else 'none'}")
+for group, row in taken:
+    count = states(row)
+    print(f"CRASH_FULL_RUN_BACKLOG_TAKE\tgroup={group}\tsequence={row[0]}\titem={row[1]}\tpart={row[2]}\tkey={row[3]}\tstates={'not-counted' if count is None else count}")
+reported_backlog = backlog_states + (1 if os.environ.get("STUB_BACKLOG_PLAN_TAMPER") else 0)
+print(f"CRASH_FULL_RUN_BACKLOG_PLAN\tnew_or_judging_key_changed_states={new_states}\tbacklog_states={reported_backlog}"
+      f"\ttaken_without_a_count={sum(1 for _, row in taken if states(row) is None)}\tlower_bounds={'both' if reached else 'every-uncovered-row-below-the-bounds'}")
+STUB
+  local backlog_table_file="$root/crates/singlefs-checker-tier/crash-full-run-backlog.tsv" backlog_key_today backlog_table_digest arguments backlog_usage_wrong
+  local backlog_settings=(STUB_BACKLOG_PROGRAM="$work/backlog-program.py" STUB_CASE_LOG_DIRECTORY="$work/case-logs")
+  local backlog_row_alpha_green backlog_row_alpha_amp backlog_row_beta backlog_row_gamma_amp backlog_record_head
+  mkdir -p "$work/case-logs"
+  backlog_key_today="$(printf 'a%.0s' {1..64})"
+  write_backlog_table() { # <行…>：表头三行照真表的样子，之后每个参数一行
+    { printf '%s\n' '# 自证的积压登记表' $'照展开次序登记的行数\t4' $'序号\t项名\t部分\t键\t归属\t态数\t判法键\t进度\t最后一次'; printf '%s\n' "$@"; } >"$backlog_table_file"
+  }
+  backlog_row() { # <序号> <项> <部分> <键> <归属> <态数> <判法键> <进度>：一行九列
+    local last_run='2026-10-25；自证'
+    [[ "$8" == 未跑 ]] && last_run=无
+    printf '%s\t%s\t%s\t%s\t%s\t%s；自证\t%s\t%s\t%s' "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$last_run"
+  }
+  call_line() { grep -nE -- "$1" "$calls" | head -n 1 | cut -d: -f1; }   # <模式>：调用记录里头一处命中的行号，没有打空
+  backlog_row_alpha_green="$(backlog_row 1 alpha crash-point-replay crash-case:alpha m3-and-earlier 100 "$backlog_key_today" 全绿)"
+  backlog_row_alpha_amp="$(backlog_row 2 alpha crash-amplification alpha-amp m3-and-earlier 100 未记 未跑)"
+  backlog_row_beta="$(backlog_row 3 beta crash-point-replay crash-case:beta m3-and-earlier 100 未记 未跑)"
+  backlog_row_gamma_amp="$(backlog_row 4 gamma crash-amplification gamma-amp m3-and-earlier 100 未记 未跑)"
+  backlog_record_head="^backlog-program record --table $backlog_table_file"
+  # backlog-usage：--backlog 缺 --milestone、与 --quick / --full / --item 一起给、--milestone 不跟 --backlog ⇒ 都退 2、什么都不起
+  write_backlog_table "$backlog_row_alpha_green" "$backlog_row_alpha_amp" "$backlog_row_beta" "$backlog_row_gamma_amp"
+  backlog_usage_wrong=""
+  for arguments in "--backlog" "--backlog --milestone m4 --quick" "--backlog --milestone m4 --full" "--backlog --milestone m4 --item alpha" "--milestone m4" "--states-at-least 5"; do
+    # shellcheck disable=SC2086  # 参数是空格隔开的几个词，逐个交
+    entry "${backlog_settings[@]}" -- $arguments
+    [[ "$exit_code" == 2 && ! -s "$calls" ]] || backlog_usage_wrong+="「$arguments」退 $exit_code；"
+  done
+  [[ -z "$backlog_usage_wrong" ]] || cell_failed backlog-usage "积压跑法的用法错应当退 2、什么都不起（$backlog_usage_wrong）" "看参数那一段之后积压跑法的用法核"
+  # backlog-stops-at-the-bounds：两条下限都是 150、序号 1 在今天的键下全绿 ⇒ 游标在序号 2，取 2（alpha-amp，100 态）、3（crash-case:beta，100 态）就够了、不取 4；
+  #   快档只跑 alpha 与 beta 两项的测试目标；两件各回写一次全绿、今天的键，态数 14（放量 states=10 加 reused=4）与 37（用例日志里 CRASH_CASE_BLOCKS 行的 states=）
+  entry "${backlog_settings[@]}" -- --backlog --milestone m4 --backlog-states-at-least 150 --states-at-least 150
+  if [[ "$exit_code" != 0 ]] || ! calls_have '^backlog-program plan .* --current-milestone m4 --backlog-states-at-least 150 --states-at-least 150$' \
+     || ! calls_have '^pipeline-entry --item alpha-amp$' || ! calls_have "^enumeration-gate --full --item crash-case:beta " \
+     || calls_have 'gamma-amp$' || calls_have '^enumeration-gate .*crash-case:alpha' \
+     || ! calls_have '^cargo test --release -p singlefs-checker-tier --features verdict-store --no-run --test alpha --test beta cards=' \
+     || ! calls_have "$backlog_record_head --sequence 2 --judging-key $backlog_key_today --progress 全绿 --last-run [0-9]{4}-[0-9]{2}-[0-9]{2}；crash-point-replay.sh --backlog --milestone m4 那一趟 --states 14；" \
+     || ! calls_have "$backlog_record_head --sequence 3 --judging-key $backlog_key_today --progress 全绿 .* --states 37；" \
+     || [[ "$(calls_count '^backlog-program record ')" != 2 ]] \
+     || ! grep -qE '^CRASH_POINT_REPLAY_BACKLOG_TOTAL milestone=m4 taken=2 new_or_judging_key_changed=0 backlog=2 recorded=2 not_recorded=0 recorded_states=51 record_failures=0$' "$work/out"; then
+    cell_failed backlog-stops-at-the-bounds "取件取到两条下限就停：两条下限 150 应当只跑序号 2（alpha-amp）与 3（crash-case:beta）、不跑 4（gamma-amp），两件各回写全绿与态数 14、37" \
+      "看 backlog_prepare_plan 交给 plan 的两条下限、run_backlog_parts 照取件跑与 backlog_record_the_part 的回写"
+  fi
+  # backlog-below-the-bounds-takes-everything：两条下限 100000、没罩住的只有三件（300 态）⇒ 三件全取全跑；gamma-amp 那一项放量报本次未跑 ⇒ 它不回写，另两件回写
+  entry "${backlog_settings[@]}" STUB_AMP_NOT_RUN=gamma-amp -- --backlog --milestone m4 --backlog-states-at-least 100000 --states-at-least 100000
+  if [[ "$exit_code" != 0 ]] || ! calls_have '^pipeline-entry --item alpha-amp$' || ! calls_have '^pipeline-entry --item gamma-amp$' \
+     || ! calls_have "^enumeration-gate --full --item crash-case:beta " || calls_have "$backlog_record_head --sequence 4 " \
+     || [[ "$(calls_count '^backlog-program record ')" != 2 ]] \
+     || ! grep -qE '^CRASH_POINT_REPLAY_BACKLOG_PART sequence=4 group=backlog item=gamma part=crash-amplification key=gamma-amp verdict=not-run recorded=no states=- reason=' "$work/out" \
+     || ! grep -qE '^CRASH_POINT_REPLAY_BACKLOG_TOTAL milestone=m4 taken=3 new_or_judging_key_changed=0 backlog=3 recorded=2 not_recorded=1 ' "$work/out"; then
+    cell_failed backlog-below-the-bounds-takes-everything "两条下限都到不了时没罩住的三件应当全取全跑；本次未跑的那一件（gamma-amp）不回写，另两件回写" \
+      "看 backlog_plan 取到的件与 backlog_record_the_part 里本次未跑那一支"
+  fi
+  # backlog-new-and-key-changed-first：序号 3 归属 m4（这一里程碑新增）、序号 4 在别的键下全绿（判法键变了），两条下限 50
+  #   ⇒ 先跑 3、4（照表的次序），再从游标起跑积压序号 2；调用记录里 crash-case:beta、gamma-amp、alpha-amp 依次
+  write_backlog_table "$backlog_row_alpha_green" "$backlog_row_alpha_amp" "$(backlog_row 3 beta crash-point-replay crash-case:beta m4 100 未记 未跑)" \
+    "$(backlog_row 4 gamma crash-amplification gamma-amp m3-and-earlier 100 bbbbbbbbbbbbbbbb 全绿)"
+  entry "${backlog_settings[@]}" -- --backlog --milestone m4 --backlog-states-at-least 50 --states-at-least 50
+  local backlog_beta_line backlog_gamma_line backlog_alpha_line
+  backlog_beta_line="$(call_line '^enumeration-gate --full --item crash-case:beta ')"; backlog_gamma_line="$(call_line '^pipeline-entry --item gamma-amp$')"
+  backlog_alpha_line="$(call_line '^pipeline-entry --item alpha-amp$')"
+  if [[ "$exit_code" != 0 || -z "$backlog_beta_line" || -z "$backlog_gamma_line" || -z "$backlog_alpha_line" ]] \
+     || (( backlog_beta_line > backlog_gamma_line || backlog_gamma_line > backlog_alpha_line )) \
+     || ! grep -qE '^CRASH_POINT_REPLAY_BACKLOG_TOTAL milestone=m4 taken=3 new_or_judging_key_changed=2 backlog=1 ' "$work/out"; then
+    cell_failed backlog-new-and-key-changed-first "这一里程碑新增与判法键变了的应当先跑：crash-case:beta（m4）、gamma-amp（键变了）在前，积压 alpha-amp 在后（调用记录行号 ${backlog_beta_line:-无}、${backlog_gamma_line:-无}、${backlog_alpha_line:-无}）" \
+      "看 backlog_prepare_plan 读取件文件的次序（照取件的次序，不照表的序号）"
+  fi
+  # list-items-backlog：只读用法，两条下限 150 与 250 ⇒ 游标序号 2；只看积压下限跑到序号 3，只看合计下限跑到序号 4；三项照列；
+  #   只起表的小程序（today-judging-key 一次、plan 三次），不起 record、append-missing、check、快档、门禁与放量入口，表一个字节不动
+  write_backlog_table "$backlog_row_alpha_green" "$backlog_row_alpha_amp" "$backlog_row_beta" "$backlog_row_gamma_amp"
+  backlog_table_digest="$(sha256sum <"$backlog_table_file")"
+  entry "${backlog_settings[@]}" -- --list-items --backlog --milestone m4 --backlog-states-at-least 150 --states-at-least 250
+  if [[ "$exit_code" != 0 || "$(grep -cE $'^(alpha|beta|gamma)\t轻型：' "$work/out")" != 3 ]] \
+     || ! out_has $'积压\t游标：序号 2（alpha crash-amplification alpha-amp）' || ! out_has $'积压\t到积压下限 150 态：从游标起跑到序号 3（' \
+     || ! out_has $'积压\t到合计下限 250 态：跑到序号 4（' \
+     || [[ "$(calls_count '^cargo ')" != 4 || "$(calls_count '^cargo run --release --quiet --offline -p singlefs-checker-tier --features verdict-store --bin crash_full_run_backlog -- (today-judging-key|plan) ')" != 4 ]] \
+     || [[ "$(calls_count '^backlog-program plan ')" != 3 ]] || calls_have '^backlog-program (record|append-missing|check) ' \
+     || calls_have '^(pipeline-entry|pipeline-list-items|enumeration-gate)' || [[ "$(sha256sum <"$backlog_table_file")" != "$backlog_table_digest" ]]; then
+    cell_failed list-items-backlog "--list-items --backlog 应当退 0、照小程序 plan 报游标与到两条下限各要跑到哪一行、只起表的小程序（today-judging-key 一次、plan 三次）、不改表、不起快档与两套驱动" \
+      "看 backlog_listing 与 --list-items 那一段"
+  fi
+  # backlog-plan-integrity：plan 末行的积压态数比取件行加起来多 1 ⇒ 退 1、一件都不跑、不回写
+  entry "${backlog_settings[@]}" STUB_BACKLOG_PLAN_TAMPER=1 -- --backlog --milestone m4 --backlog-states-at-least 150 --states-at-least 150
+  if [[ "$exit_code" != 1 ]] || ! out_has "积压登记表的小程序 plan 的输出对不上" || calls_have '^(pipeline-entry|enumeration-gate) ' \
+     || calls_have '^cargo test ' || calls_have '^backlog-program record '; then
+    cell_failed backlog-plan-integrity "小程序 plan 的输出对不上（末行的积压态数比取件行加起来多 1）应当退 1、一件都不跑" "看 backlog_plan 里核 plan 输出的那一段"
+  fi
+  # backlog-table-refused：先 append-missing、再 check；check 报一处问题、退 1 ⇒ 退 2、不取件（不起 plan）、什么都不起
+  entry "${backlog_settings[@]}" STUB_BACKLOG_CHECK_PROBLEMS=1 -- --backlog --milestone m4
+  if [[ "$exit_code" != 2 ]] || ! out_has "积压登记表 $BACKLOG_TABLE_PATH_IN_REPOSITORY 核不过" || calls_have '^backlog-program plan ' \
+     || ! calls_have '^backlog-program append-missing ' || ! calls_have '^backlog-program check ' \
+     || calls_have '^(pipeline-entry|enumeration-gate) ' || calls_have '^cargo test '; then
+    cell_failed backlog-table-refused "积压登记表核不过（小程序 check 退 1）应当退 2、不取件、什么都不起" "看 backlog_prepare_plan 里 append-missing 与 check 那一段"
+  fi
+  # backlog-red-part-recorded-red：门禁对 crash-case:beta 退 1 ⇒ 整趟退 1；序号 3 回写成红（进度「红：门禁 … 退 1…」），序号 2 照回写全绿
+  entry "${backlog_settings[@]}" STUB_CRASH_POINT_REPLAY_EXIT=1 -- --backlog --milestone m4 --backlog-states-at-least 150 --states-at-least 150
+  if [[ "$exit_code" != 1 ]] || ! calls_have "$backlog_record_head --sequence 3 --judging-key $backlog_key_today --progress 红：门禁 checker-tier-crash-point-replay --full --item crash-case:beta 退 1（" \
+     || ! calls_have "$backlog_record_head --sequence 2 --judging-key $backlog_key_today --progress 全绿 " \
+     || ! grep -qE '^CRASH_POINT_REPLAY_BACKLOG_PART sequence=3 group=backlog item=beta part=crash-point-replay key=crash-case:beta verdict=red recorded=yes ' "$work/out"; then
+    cell_failed backlog-red-part-recorded-red "积压跑法里红的那一件应当回写成红、整趟退 1（序号 3 的进度写「红：门禁 … 退 1」，序号 2 照写全绿）" \
+      "看 backlog_record_the_part 里定进度那一段与 run_enumeration_part 的退出码"
+  fi
+  if [[ -n "${CRASH_POINT_REPLAY_SELFTEST_ONLY:-}" ]]; then
+    if [[ "$CRASH_POINT_REPLAY_SELFTEST_ONLY" != backlog ]]; then
+      echo "  ✗ CRASH_POINT_REPLAY_SELFTEST_ONLY=$CRASH_POINT_REPLAY_SELFTEST_ONLY 认不得（只认 backlog）" >&2
+      echo "     → 怎么办：去掉这个变量跑全部格与开关轮，或写成 CRASH_POINT_REPLAY_SELFTEST_ONLY=backlog 只看积压跑法那几格" >&2
+      exit 2
+    fi
+    if (( failures > 0 )); then
+      echo "  ✗ --selftest（只走积压跑法那几格）：$cells 趟里 $failures 格判错" >&2
+      echo "     → 怎么办：照上面每一格给的出路改，再跑 CRASH_POINT_REPLAY_SELFTEST_ONLY=backlog $0 --selftest；改完去掉这个变量跑全部格与开关轮" >&2
+      exit 1
+    fi
+    echo "  ✓ --selftest（只走积压跑法那几格，别的格与开关轮没走）：$cells 趟都对"
+    exit 0
   fi
   # unknown-item / missing-item-value / quick-and-full：用法错退 2、什么都不起
   entry -- --item no-such-item
@@ -1261,6 +1965,50 @@ STUB
     exit_code="${#stop_wrong[@]} 处"
     cell_failed fast-tier-red-stops-heavy "快档红了，重型的剪枝、逐条、全量都应当退 1、不起崩溃点重放那一道与放量入口、两段记本次未跑：快档红、派出收回相等；轻型照旧往下跑放量部分：${stop_wrong[*]}" \
       "看收尾那一段主流程里 skip_parts_after_red_fast_tier 的判据与 summarize 里红的项连带打的本次未跑"
+  fi
+  # run-target-green / run-target-red / run-target-term：跑完运行目录里不剩它建的编译目录（文件头「编译目录」）：调用方没设 CARGO_TARGET_DIR，轻型；
+  #   假 cargo 记下每一趟收到的编译目录、往里写一份产物。正常退 0、快档红退 1、被 TERM 停（假 cargo 每一趟睡 3 秒，头一趟起了之后只给入口发 TERM，
+  #   入口等手里那一步退出后走 EXIT，退 143）：每一趟收到的都是 $work/home/runs/crash-point-replay-*/target 那同一份，跑完不在了
+  run_target_check() { # <格名> <要的退出码> <一句结局>
+    local seen
+    seen="$(sort -u "$work/targets.log" 2>/dev/null)"
+    if [[ "$exit_code" != "$2" || "$(grep -c . <<<"$seen")" != 1 || "$seen" != "$work"/home/runs/crash-point-replay-*/target || -e "$seen" ]]; then
+      cell_failed "$1" "跑完运行目录里不剩它建的编译目录（$3）：假 cargo 收到「$(tr '\n' ' ' <<<"$seen")」，要的退出码 $2，跑完$([[ -n "$seen" && -e "$seen" ]] && echo 还在 || echo 不在)" \
+        "看建日志目录之后的 run_build_directory_begin 与收尾的 replay_finish（run_build_directory_end），TERM / INT 的 trap 退 143 / 130、等手里那一步退出再走 EXIT"
+    fi
+  }
+  : >"$work/targets.log"; entry STUB_TARGET_LOG="$work/targets.log" -- --quick; run_target_check run-target-green 0 "正常退 0"
+  : >"$work/targets.log"; entry STUB_TARGET_LOG="$work/targets.log" STUB_RED_TARGETS=beta -- --quick; run_target_check run-target-red 1 "快档红退 1"
+  local term_entry term_attempt
+  : >"$work/targets.log"; : >"$calls"; cells=$((cells + 1))
+  env -u RUN_WITH_MEMORY_CAP_OUTER_UNIT -u RUN_WITH_MEMORY_CAP_OUTER_CAP -u SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES \
+    PATH="$work/bin:$PATH" STUB_CALLS="$calls" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" \
+    SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-off.env" CRASH_POINT_REPLAY_SELFTEST_MARK="$work/mark" CRASH_POINT_REPLAY_ROOT="$root" \
+    CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN="$work/two-hosts-local.sh" CRASH_AMPLIFICATION_TWO_HOSTS_PEER_RUN="$work/two-hosts-peer.sh" CRASH_AMPLIFICATION_PEER_THREADS=2 \
+    CRASH_POINT_REPLAY_BREAK="$replay_break" STUB_TARGET_LOG="$work/targets.log" STUB_SLEEP=3 bash "$replay_script" --quick >"$work/out" 2>&1 &
+  term_entry=$!
+  for (( term_attempt = 0; term_attempt < 600; term_attempt++ )); do [[ -s "$work/targets.log" ]] && break; sleep 0.1; done
+  kill -TERM "$term_entry" 2>/dev/null
+  if wait "$term_entry"; then exit_code=0; else exit_code=$?; fi
+  run_target_check run-target-term 143 "被 TERM 停"
+  # run-target-caller：调用方设了 CARGO_TARGET_DIR ⇒ 每一趟照收到它、跑完不删
+  mkdir -p "$work/caller-target"; : >"$work/targets.log"
+  entry STUB_TARGET_LOG="$work/targets.log" CARGO_TARGET_DIR="$work/caller-target" -- --quick
+  if [[ "$exit_code" != 0 || "$(sort -u "$work/targets.log")" != "$work/caller-target" || ! -f "$work/caller-target/release/artifact" ]]; then
+    cell_failed run-target-caller "调用方设了 CARGO_TARGET_DIR 时每一趟应当照收到它、跑完不删（收到「$(sort -u "$work/targets.log" | tr '\n' ' ')」）" \
+      "看 run_build_directory_begin：设了 CARGO_TARGET_DIR 就不建、不删"
+  fi
+  # two-logs-per-part：每一段的日志出两份（全量 <段>.log，旁边同名的 <段>.problems.log 只收错误与警告：行前带全量日志里的行号，末行写收了几行全量几行）；
+  #   快档红的那个测试目标的 FAILED 行在错误警告日志里，输出里点名这份日志的路径
+  local problems_run problems_file problems_last_line
+  entry STUB_RED_TARGETS=beta -- --quick
+  problems_run="$(ls -td "$work/home/runs"/crash-point-replay-* 2>/dev/null | head -n 1)"
+  problems_file="$problems_run/fast-tier.beta.problems.log"
+  problems_last_line="$(tail -n 1 "$problems_file" 2>/dev/null)"   # 管道收尾的 grep -q 在 pipefail 下会把命中读成没命中：先落到变量
+  if [[ ! -f "$problems_run/fast-tier.beta.log" || ! -f "$problems_file" ]] || ! grep -qE '^[0-9]+:test broken \.\.\. FAILED$' "$problems_file" \
+     || ! grep -qE '收了 [0-9]+ 行，全量日志共 [0-9]+ 行' <<<"$problems_last_line" || ! out_has "错误警告 $problems_file"; then
+    cell_failed two-logs-per-part "快档红的那一段应当出两份日志（fast-tier.beta.log 全量、旁边的 fast-tier.beta.problems.log 带行号收那条 FAILED、末行写收了几行全量几行），输出里点名错误警告日志的路径 $problems_file" \
+      "看 run_logged 经 scripts/hosts/two-logs.sh 起命令，与红的原因里的 \${log%.log}.problems.log"
   fi
   # pipeline-entry-78-not-run：放量入口退 78（运行条件不满足）而没打 CRASH_AMPLIFICATION_ITEM 行 ⇒ 两项都记本次未跑、整趟退 78，不说「都不红」；
   #   红先判：alpha-amp 红、gamma-amp 收不回而入口退 78 ⇒ 退 1；入口退 1 而收不回照旧红
@@ -1491,6 +2239,15 @@ STUB
     cell_failed local-only-keeps-gpu-drops-peer-cards "--local-only 下 GPU 照旧开（verdict-store,gpu、清场包装、测试参数带 --test-threads 1）、显卡先后只剩本机的卡 local:0:24G，第二台的卡不进快档" \
       "看 make_local_only_configuration 对 GPU_CARDS_BY_PRIORITY 与 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED 去掉 peer: 项的那一段"
   fi
+  # local-only-on-peer-keeps-own-cards：同一份配置在第二台上跑（角色 peer；起活那一台照配置清过场、回读过了，清场包装照 GPU_QUIESCE_ORIGIN_READ_BACK=1 起命令）
+  #   ⇒ --local-only 下快档交的显卡先后只剩这一台的卡 peer:0:16G（清场之后那一份里 peer: 那几项），起活那一台的 local: 项去掉；双机驱动不起
+  entry SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-two-hosts-gpu.env" SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 \
+    SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer GPU_QUIESCE_ORIGIN_READ_BACK=1 -- --quick --local-only
+  if [[ "$exit_code" != 0 ]] || calls_have '^two-hosts-' || calls_have 'cards=\[[^]]*local:' || ! calls_have '^cargo-env config=\[across=0 peer=0 cards=2\]' \
+     || [[ "$(calls_count "^cargo test --release -p singlefs-checker-tier --features verdict-store,gpu --test [a-z0-9_]+ -- --nocapture --test-threads 1 cards=\[peer:0:16G\] classes=\[unset\] quiesced=\[yes\]")" != $((3 + extras_count)) ]]; then
+    cell_failed local-only-on-peer-keeps-own-cards "角色 peer（在第二台上跑）时 --local-only 下快档交的显卡先后应当只剩这一台的卡 peer:0:16G、去掉起活那一台的 local: 项（GPU、清场包装、--test-threads 1 照旧）" \
+      "看 make_local_only_configuration 按 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 换读的那一段：角色 peer 时留 peer: 项、去 local: 项"
+  fi
   # local-only-usage：--local-only 与 --list-items 一起给 ⇒ 退 2、什么都不起
   entry -- --list-items --local-only
   [[ "$exit_code" == 2 && ! -s "$calls" ]] || cell_failed local-only-usage "--local-only 与 --list-items 一起给应当退 2、什么都不起" "看参数那一段 --list-items 的互斥核"
@@ -1504,6 +2261,16 @@ STUB
     cell_failed flow-coverage-table "跑完应当在这一趟的日志目录里落覆盖表 crash-flow-coverage.md 与记录 crash-flow-records.tsv，快档打的覆盖行在里面（日志目录 ${flow_run_directory:-没找到}）" \
       "看 summarize 之后落覆盖表那一段与 scripts/crash/crash-flow-coverage.py 的 run-directory、table"
   fi
+  # rocksdb-entry-refused：小仓的 checker 档包依赖 rocksdb、进程环境里四个取值是空的，PATH 最前面的假 cargo 不带 rocksdb-prebuilt.py 认的标记
+  #   ⇒ 起任何 cargo 之前 rocksdb-prebuilt.py entry 判红、退 78，假 cargo 与两套驱动一次都没起（别的格小仓里没有这份清单，entry 报不判）
+  printf '%s\n' '[package]' 'name = "singlefs-checker-tier"' 'version = "0.0.0"' '[dependencies]' 'rocksdb = { version = "=0.25.0", optional = true }' \
+    >"$root/crates/singlefs-checker-tier/Cargo.toml"
+  entry ROCKSDB_LIB_DIR= ROCKSDB_STATIC= SNAPPY_LIB_DIR= SNAPPY_STATIC= -- --quick
+  if [[ "$exit_code" != 78 ]] || [[ -s "$calls" ]] || ! out_has "rocksdb-prebuilt entry：" || ! out_has "这一趟不起 cargo"; then
+    cell_failed rocksdb-entry-refused "checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，应当在起 cargo 之前退 78、一个 cargo 与驱动都不起、输出里有 rocksdb-prebuilt entry 的红句" \
+      "看定档之后 replay_rocksdb_entry_holds 那一段（scripts/hosts/rocksdb-prebuilt.py entry）"
+  fi
+  rm -f -- "$root/crates/singlefs-checker-tier/Cargo.toml"
   # light-within-heavy：真合表与小仓两份上，轻型（全部项）的每一件在重型·剪枝（全部项）里都有
   cells=$((cells + 1))
   local within_real within_sample
@@ -1552,16 +2319,28 @@ STUB
     轻型起放量入口时调用方没设就把分片的段一趟判的态数设成 $LIGHT_REGISTERED_SEGMENT_SLICE_STATES（设了照用、不带 --quick 不设）、快档那一段不分档同样设（设了照用，连同交双机驱动的本机与第二台那几趟）、开了双机时经给定状态引擎的测试目标照双机驱动三步跑
     （本机 0/2、第二台 1/2 取回库、本机带 IMPORT 指到取回的库再跑，双机驱动是真的、两趟是假的）而双机关着照旧本机一趟、第二台连不上与判法判不过记本次未跑退 78、
     快档红了重型不起崩溃点重放部分与放量部分（两段记本次未跑：快档红）而轻型照旧往下跑、放量入口退 78 记本次未跑（红先判）而退 1 照旧红、
-    --local-only 下假驱动看不到第二台（多机配置派生一份关了双机的，显卡先后只剩本机的卡，GPU 照开），与 --list-items 一起给退 2，"
+    --local-only 下假驱动看不到第二台（多机配置派生一份关了双机的，显卡先后只剩本机的卡，GPU 照开；角色 peer 时只剩第二台自己的卡），与 --list-items 一起给退 2，
+    跑完运行目录里不剩它建的编译目录（正常、快档红、被 TERM 停）而调用方设的 CARGO_TARGET_DIR 不删，
+    积压跑法照积压登记表取件（两条下限交给小程序 plan、取到两条下限就停、不足全取、这一里程碑新增与判法键变了的先跑、每件回写全绿与态数、红的回写成红、本次未跑的不回写、
+    用法错与表核不过退 2 不起、plan 的输出对不上退 1 不跑）而 --list-items --backlog 只起表的小程序（游标、到两条下限各跑到哪一行）、不改表，"
   echo "    （cargo、两套驱动与准入模块都是假的，不编不跑）；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的格"
   exit 0
 }
 
 if (( selftest )); then
-  (( quick || full || list_items || with_keys || local_only || ${#named_items[@]} )) && usage "--selftest 不与别的参数一起给"
+  (( quick || full || list_items || with_keys || local_only || backlog || ${#named_items[@]} || ${#backlog_milestone} || ${#backlog_backlog_bound} || ${#backlog_total_bound} )) && usage "--selftest 不与别的参数一起给"
   run_selftest
 fi
 (( with_keys && ! list_items )) && usage "--with-keys 只跟 --list-items 一起给"
+# 积压跑法的用法（文件头「积压跑法」）：--milestone 写成 m<号>、跟 --backlog 一起给；不与 --quick、--full、--item 一起给；两条下限只跟 --backlog。弄坏开关 backlog-usage-unchecked 下不核
+if ! replay_break_is backlog-usage-unchecked; then
+  if (( backlog )); then
+    [[ "$backlog_milestone" =~ ^m[0-9]+$ ]] || usage "--backlog 要带 --milestone m<号>（这一里程碑，例 m4），给的是「$backlog_milestone」"
+    (( quick || full || ${#named_items[@]} )) && usage "--backlog 不与 --quick、--full、--item 一起给（取哪几件由积压登记表定）"
+  elif [[ -n "$backlog_milestone$backlog_backlog_bound$backlog_total_bound" ]]; then
+    usage "--milestone、--backlog-states-at-least、--states-at-least 只跟 --backlog 一起给"
+  fi
+fi
 
 # --list-items --with-keys：崩溃判定库里键对不上的块（只读读库程序 crash_library_reader keys；它的输出写法在
 # crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段）。读库程序退非 0、输出认不出照实报，交回 1。
@@ -1620,7 +2399,14 @@ if (( list_items )); then
     printf '%s\t轻型：%s；重型：快档 %s ∪ %s\n' "$name" "$light_text" "${item_light_targets[$name]}" "$heavy_text"
   done
   if (( with_keys )); then
+    # 读库程序是 cargo run 起的（checker 档包，编到 librocksdb-sys）：起之前判取值，判红退 1；自证喂读库输出的那一趟不起 cargo、不判
+    if ! (( replay_in_selftest_child )) || [[ -z "$replay_keys_reader_output" ]]; then replay_rocksdb_entry_holds || exit 1; fi
     report_the_keys_of_the_library || exit 1
+  fi
+  if (( backlog )); then
+    # 只读·积压（文件头「积压跑法」末段）：表的小程序编到 librocksdb-sys，起它之前判 RocksDB 预编库的取值，判红退 1
+    replay_rocksdb_entry_holds || exit 1
+    backlog_listing || exit 1
   fi
   exit 0
 fi
@@ -1644,7 +2430,9 @@ done
 # 定档
 (( quick && full )) && usage "--quick 与 --full 不一起给"
 with_groups=0
-if (( quick )); then
+if (( backlog )); then
+  tier=backlog; tier_title="重型·积压（里程碑 $backlog_milestone，照积压登记表取件）"; selected_items=()   # 项由 backlog_prepare_plan 照取到的件填
+elif (( quick )); then
   tier=quick; tier_title="轻型（核心部分：全部项在甲二 ∪ 展开 $LIGHT_EXPAND_UP_TO 上，连同两档都跑的那几类）"; with_groups=1
   (( ${#named_items[@]} )) && echo "  · 点名的项已在核心部分里（核心部分每次都跑全部项）：${named_items[*]}"
   selected_items=("${item_names[@]}")
@@ -1666,6 +2454,12 @@ if ! replay_break_is segments-registry-unchecked; then
     echo "  → 怎么办：照上面逐处列的改 .claude/gate.d/crash-point-replay-segments.tsv（写法在它的表头），再跑" >&2
     exit 2
   fi
+fi
+# 起任何 cargo 之前（快档、崩溃点重放那一道、放量入口、双机驱动都在这之后起）判 RocksDB 预编库的取值：判红退 78、什么都不起
+if ! replay_rocksdb_entry_holds; then
+  echo "  ✗ 起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），这一趟一项都没起，退 78" >&2
+  echo "  → 怎么办：照上面那几行的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再跑同一条命令" >&2
+  exit 78
 fi
 if replay_break_is segments-registry-not-sent; then
   unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY
@@ -1698,10 +2492,19 @@ if ! mkdir -p -- "$run_directory"; then
   echo "  → 怎么办：看 $pipeline_home 可不可写、盘满没满，修好再跑" >&2
   exit 78
 fi
+# 这一趟的编译目录（文件头「编译目录」）：收尾的 EXIT trap（replay_finish）删
+run_build_directory_begin "$run_directory" || exit 78
+trap replay_finish EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 part_records="$run_directory/parts.tsv"; : >"$part_records"
 plan_file="$run_directory/plan.tsv"
-replay_plan "$tier" "$with_groups" ${selected_items[@]+"${selected_items[@]}"} >"$plan_file"
-echo "── 崩溃点重放$tier_title：${#selected_items[@]} 项（多机配置 $configuration_file：GPU $( (( gpu_switch )) && echo 开 || echo 关)$( (( local_only )) && echo '，只用本机、第二台不动')），日志 $run_directory/"
+if [[ "$tier" == backlog ]]; then
+  backlog_prepare_plan   # 文件头「积压跑法」①到④：核表、取件、写计划；退不了的在里面直接退（收尾由 EXIT trap 管）
+else
+  replay_plan "$tier" "$with_groups" ${selected_items[@]+"${selected_items[@]}"} >"$plan_file"
+fi
+echo "── 崩溃点重放$tier_title：${#selected_items[@]} 项（多机配置 $configuration_file：GPU $( (( gpu_switch )) && echo 开 || echo 关)$( (( local_only )) && echo '，只用本机、第二台不动')），日志 $run_directory/（每份 .log 旁边有同名的 .problems.log：只收错误与警告，行前带全量日志里的行号，一般只看它）"
 
 # 计划里直接记本次未跑的（两档都跑的那几类里没有测试目标的）
 while IFS=$'\t' read -r plan_item plan_kind plan_object; do
@@ -1713,20 +2516,25 @@ if [[ "$tier" != quick ]] && ! replay_break_is fast-tier-red-continues \
    && awk -F'\t' '$2 == "fast-tier" && $5 == "red" { found = 1 } END { exit !found }' "$part_records"; then
   skip_parts_after_red_fast_tier "$plan_file"
 else
-  if [[ "$tier" != quick ]]; then
+  if [[ "$tier" == backlog ]]; then
+    run_backlog_parts   # 照取件的次序逐件跑、逐件回写（文件头「积压跑法」④⑤）
+  elif [[ "$tier" != quick ]]; then
     for name in ${selected_items[@]+"${selected_items[@]}"}; do
       [[ -n "${item_cases[$name]}" ]] || continue
       # shellcheck disable=SC2086  # 键是空格隔开的一串，逐个当参数
       run_enumeration_part "$name" ${item_cases[$name]}
     done
   fi
-  run_pipeline_part "$plan_file"
+  [[ "$tier" == backlog ]] || run_pipeline_part "$plan_file"
 fi
 summarize "$plan_file" "$tier_title"
+[[ "$tier" != backlog ]] || backlog_summarize
+echo "  · 错误警告日志（每份全量日志旁边同名的 .problems.log，一般只看它）：$(find "$run_directory" -maxdepth 1 -name '*.problems.log' | LC_ALL=C sort | tr '\n' ' ')"
 # 覆盖行与计数行落成产物（文件头「输出」末段）：只落产物、不判红、不改退出码；弄坏开关 flow-coverage-table-skipped 下照改前不落
 if ! replay_break_is flow-coverage-table-skipped; then
   flow_coverage_judge="$replay_script_directory/crash-flow-coverage.py"
-  if python3 "$flow_coverage_judge" run-directory "$run_directory" --tier "$tier" >"$run_directory/crash-flow-records.tsv" 2>"$run_directory/crash-flow-coverage.err" \
+  # 积压跑法照点名的重型记（逐件点名、整域；crash-flow-coverage.py 的 --tier 只认 quick、pruned、named、full 四档）
+  if python3 "$flow_coverage_judge" run-directory "$run_directory" --tier "${tier/#backlog/named}" >"$run_directory/crash-flow-records.tsv" 2>"$run_directory/crash-flow-coverage.err" \
      && python3 "$flow_coverage_judge" table "$repository_root" "$run_directory/crash-flow-records.tsv" >"$run_directory/crash-flow-coverage.md" 2>>"$run_directory/crash-flow-coverage.err"; then
     echo "  · 覆盖表（入口 × StepKind、ignore 开着的节点、评估 0 次的对）：$run_directory/crash-flow-coverage.md；记录 $(grep -c . "$run_directory/crash-flow-records.tsv") 条：$run_directory/crash-flow-records.tsv"
   else

@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：third-txn-hooks
+want=删除写出的字节三处互相挂钩（字节那一步 三·6；形态 3 行、行到作业点 6 处、引 layout/01 2 处、段序列出处的文件与函数 4 个）
+want=doc-registries.sh：1 格里 1 格绿（third-txn-hooks），0 格本次未跑（无）

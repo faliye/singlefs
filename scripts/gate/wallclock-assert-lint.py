@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# admission: always 判的是此刻 scripts/experiments/*.rs 里的 #[test]，几秒跑完；改了测试或登记位就要现判
+# admission: always 判的是此刻 scripts/experiment-apparatus/*.rs 里的 #[test]，几秒跑完；改了测试或登记位就要现判
 # run-condition: none 只读 .rs 源码，纯 python3 标准库，不起 cargo
 """按挂钟判的断言要有登记位（checks-owed C465）。登记位只是一行注释，装置源码里不加任何代码。
 
 用法：
-    wallclock-assert-lint.py [仓根]          # 不给就判本仓；扫 <仓根>/scripts/experiments/*.rs 里每个 #[test] 函数
+    wallclock-assert-lint.py [仓根]          # 不给就判本仓；扫 <仓根>/scripts/experiment-apparatus/*.rs 里每个 #[test] 函数
     wallclock-assert-lint.py --list [仓根]   # 打登记了的测试，一行「<文件>TAB<函数名>」；门禁的单测格靠它按名给 cargo test 传 --skip
     wallclock-assert-lint.py --selftest      # WALLCLOCK_ASSERT_LINT_BREAK=<开关> 时必须红在点名的格
 
@@ -22,7 +22,7 @@
   // wallclock-assert-load-safe: <为什么负载再高也不会红>   断言里有挂钟词，但判的方向不怕负载（量到的只会更大才过的下界，或比的是配置值、字面量算出来的数）。门禁里照跑，不跳过。
 
 --skip 是子串匹配：登记的函数名是别的 #[test] 函数名的子串（含同名）时，--skip 会把那一条一起跳过。判法把扫到的全部 #[test] 函数名当全集，
-  登记名撞上别的、没登记的测试名就判红，点名撞上的那一条；出路是改名，或者把撞上的那一条也登记（它也得是有挂钟断言的测试）。全集只含 scripts/experiments/ 顶层的 .rs，子目录里的不扫。
+  登记名撞上别的、没登记的测试名就判红，点名撞上的那一条；出路是改名，或者把撞上的那一条也登记（它也得是有挂钟断言的测试）。全集只含 scripts/experiment-apparatus/ 顶层的 .rs，子目录里的不扫。
 
 判红：
   ① 有挂钟断言而两种登记位都没有（点名文件:行号）；两种都有
@@ -31,10 +31,10 @@
   ④ 登记名是别的未登记 #[test] 函数名的子串
 
 滞后表 .claude/gate.d/wallclock-assert-lag.tsv（本判法立之前就在仓里、还没人复核的挂钟断言；只缩不涨，门禁不判涨，靠 review）：
-  一行一个测试，`scripts/experiments/<文件>.rs::<函数名>  # 理由`（理由至少 8 个字，写它量的是什么、为什么还没登记）。落在表里的没登记的挂钟断言不判红，
+  一行一个测试，`scripts/experiment-apparatus/<文件>.rs::<函数名>  # 理由`（理由至少 8 个字，写它量的是什么、为什么还没登记）。落在表里的没登记的挂钟断言不判红，
   成功行另报「另有 N 条在滞后表里」；表里的行对应的测试已经登记、不再有挂钟断言或函数不在了，判红（陈旧行，删掉）。新写的挂钟断言一律直接写登记位，不往表里加。
 
-退出码：0 全对；1 有红（逐条点名文件:行号）；2 用法错；77 scripts/experiments/ 下一份 .rs 都没有、或一个 #[test] 都没扫到。
+退出码：0 全对；1 有红（逐条点名文件:行号）；2 用法错；77 scripts/experiment-apparatus/ 下一份 .rs 都没有、或一个 #[test] 都没扫到。
 
 弄坏开关 WALLCLOCK_ASSERT_LINT_BREAK=<项>（逗号连几个；只在 --selftest 里认，别处设了只打一句提醒）：
   registration-unchecked 有挂钟断言没登记位的也判绿，unregistered 与 propagated-unregistered 两格该红
@@ -60,7 +60,7 @@ REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 
-EXPERIMENT_DIRECTORY = os.path.join("scripts", "experiments")
+EXPERIMENT_DIRECTORY = os.path.join("scripts", "experiment-apparatus")
 # 词表：标识符按下划线与驼峰拆成小写词，连续命中这些词序列就算挂钟量。要扩就往这里加。
 WALLCLOCK_VOCABULARY = ("elapsed", "Instant", "Duration", "per_second", "throughput", "nanoseconds")
 # 取时刻的写法：出现在语句里，那条语句就是挂钟量的来源。
@@ -422,7 +422,7 @@ def read_lag(root):
         for number, line in enumerate(handle.read().split("\n"), 1):
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
-            match = re.match(r"^(scripts/experiments/[\w.-]+\.rs::\w+)\s+#\s*(.*\S)\s*$", line)
+            match = re.match(r"^(scripts/experiment-apparatus/[\w.-]+\.rs::\w+)\s+#\s*(.*\S)\s*$", line)
             if not match or len(match.group(2)) < LAG_REASON_CHARACTERS:
                 problems.append(f"{LAG_TABLE}:{number}：这一行不是「<相对仓根的 .rs>::<函数名>  # <理由，至少 {LAG_REASON_CHARACTERS} 个字>」")
             elif match.group(1) in rows:
@@ -610,7 +610,7 @@ def sample_files():
     fn rate_is_high_on_an_empty_input() {
         assert_eq!(1 + 1, 2);
     }
-""", "会连 scripts/experiments/sample.rs:"),
+""", "会连 scripts/experiment-apparatus/sample.rs:"),
         "collision-both-registered-green": ("""
     #[test]
     // wallclock-assert: 每秒吞吐要超过 10 块
@@ -653,14 +653,14 @@ def run_selftest():
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             status = judge(root, True)
-        cells.append(("list", status == 0 and output.getvalue() == "scripts/experiments/sample.rs\tfaster_with_threads\n",
-                      f"--list 该只列一行「scripts/experiments/sample.rs<TAB>faster_with_threads」，实得 {output.getvalue()!r}"))
+        cells.append(("list", status == 0 and output.getvalue() == "scripts/experiment-apparatus/sample.rs\tfaster_with_threads\n",
+                      f"--list 该只列一行「scripts/experiment-apparatus/sample.rs<TAB>faster_with_threads」，实得 {output.getvalue()!r}"))
         # 滞后表：没登记的挂钟断言落在表里不判红（成功行另报）；表里的行对应的测试已经登记就是陈旧行，判红
         unmarked = sample_files()["unregistered"][0]
         for cell, content, lag_row, expected in (
-                ("lag-listed", unmarked, "scripts/experiments/sample.rs::faster_with_threads  # 立表之前就在仓里，还没复核", "另有 1 条在滞后表"),
-                ("lag-stale", sample_files()["green"][0], "scripts/experiments/sample.rs::faster_with_threads  # 已经登记了，这一行该删", "滞后表只缩不涨"),
-                ("lag-malformed", unmarked, "scripts/experiments/sample.rs::faster_with_threads  # 短", "这一行不是")):
+                ("lag-listed", unmarked, "scripts/experiment-apparatus/sample.rs::faster_with_threads  # 立表之前就在仓里，还没复核", "另有 1 条在滞后表"),
+                ("lag-stale", sample_files()["green"][0], "scripts/experiment-apparatus/sample.rs::faster_with_threads  # 已经登记了，这一行该删", "滞后表只缩不涨"),
+                ("lag-malformed", unmarked, "scripts/experiment-apparatus/sample.rs::faster_with_threads  # 短", "这一行不是")):
             root = os.path.join(scratch, cell)
             os.makedirs(os.path.join(root, EXPERIMENT_DIRECTORY))
             os.makedirs(os.path.join(root, os.path.dirname(LAG_TABLE)))

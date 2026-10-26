@@ -16,7 +16,7 @@ printf 'M_库里点名只在集成测试里的用例\tcrates/demo/src/lib.rs\tpu
 # 第 13、14 行是同一处改法（文件、原文、替换文三样全同），点名两条不同的测试：一处改法只许一行，这一组判红
 printf 'M_同一改法点名库里的用例\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_doubled(\t-p demo --lib\tlib_case\n' >> crates/mutations.tsv
 printf 'M_同一改法点名集成测试\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_doubled(\t-p demo --test reads_outside\treads_a_file_outside_the_copy\n' >> crates/mutations.tsv
-printf 'fn main() {}\n' > scripts/experiments/e3_latin1.rs
+printf 'fn main() {}\n' > scripts/experiment-apparatus/e3_latin1.rs
 printf 'M1_\xe9chantillon\tfn main() {}\tfn main() { }\n' > scripts/mutation/tables/e3_latin1.tsv
 git init -q .
 git config user.email selftest@example.invalid

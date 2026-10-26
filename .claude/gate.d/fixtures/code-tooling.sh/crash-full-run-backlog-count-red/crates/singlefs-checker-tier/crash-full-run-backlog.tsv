@@ -1,0 +1,7 @@
+# 样本的积压登记表（写法同 crates/singlefs-checker-tier/crash-full-run-backlog.tsv 的表头）
+照展开次序登记的行数	4
+序号	项名	部分	键	归属	态数	判法键	进度	最后一次
+1	alpha	crash-point-replay	crash-case:alpha	m3-and-earlier	未数；样本	未记	未跑	无
+2	alpha	crash-amplification	alpha-amp	m3-and-earlier	未数；样本	未记	未跑	无
+3	beta	crash-point-replay	crash-case:beta	m3-and-earlier	未数；样本	未记	未跑	无
+4	gamma	crash-amplification	gamma-amp	m3-and-earlier	未数；样本	未记	未跑	无

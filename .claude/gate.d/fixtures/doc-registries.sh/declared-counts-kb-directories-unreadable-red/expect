@@ -1,0 +1,6 @@
+exit=1
+want=读不出 kb 目录登记位
+want=declared-counts 没判：kb 目录登记位读不出
+want=  declared-counts：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（declared-counts）
+want=欠检查 1 条、已还清 1 条

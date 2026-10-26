@@ -276,7 +276,8 @@ class UnitKeys:
     @property
     def workspace(self):
         if self._workspace is None:
-            self._workspace = function_units().RustWorkspace(self.root)
+            # 变异行键与点名测试的闭包判产品行为：Rust 单元取产品行为视图，verus! 里的规格与证明不进键（lib_function_units.py 文件头「判定种类」）
+            self._workspace = function_units().RustWorkspace(self.root, function_units().PRODUCT_BEHAVIOR)
         return self._workspace
 
     def rust_file(self, path):

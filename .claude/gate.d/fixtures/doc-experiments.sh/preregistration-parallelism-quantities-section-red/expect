@@ -1,0 +1,5 @@
+exit=1
+want=research/prompts/e995-preregistration.md:14：「预计挂钟：」里的态数「24 条」与第六节写的「17 条」（第 7 行）对不上
+want=这次改动的跑前登记里 1 处「预计挂钟：」的态数与第六节写的对不上（比了 1 个态数）
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=doc-experiments.sh：1 格里 1 格红（preregistration-parallelism）

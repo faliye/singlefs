@@ -47,21 +47,21 @@ RefFS 判器名的接收者（receiver_kind）：allowed_set_for_a_crash_in、cr
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（格名是 selftest() 里那一格，自证打「✗ 自证 <格名>：…」）：
   CPU_JUDGING_SITES_CHECK_BREAK=unmarked-sites-accepted  ③ 之外的调用点不判红
-      unmarked-site、wrapper-call、marker-elsewhere、self-test-other-function、reference-call-beside-local-method、reference-path-call、reference-through-use-alias、reference-receiver-type-unknown
+      「✗ 自证 unmarked-site：」、「✗ 自证 wrapper-call：」、「✗ 自证 marker-elsewhere：」、「✗ 自证 self-test-other-function：」、「✗ 自证 reference-call-beside-local-method：」、「✗ 自证 reference-path-call：」、「✗ 自证 reference-through-use-alias：」、「✗ 自证 reference-receiver-type-unknown：」
   CPU_JUDGING_SITES_CHECK_BREAK=marker-anywhere-in-file  文件里哪里写了标记都算这份文件里每一处调用点合规（不看是不是写在包住它的函数前面）
-      marker-elsewhere
+      「✗ 自证 marker-elsewhere：」
   CPU_JUDGING_SITES_CHECK_BREAK=judging-bodies-not-followed  登记表里判器本体的名字不当判器认（调它的地方不判）
-      clean（数出的调用点少一处）、wrapper-call、local-function-of-the-same-name、self-test-nested、same-name-local-method、reference-call-beside-local-method
+      「✗ 自证 clean：」（数出的调用点少一处）、「✗ 自证 wrapper-call：」、「✗ 自证 local-function-of-the-same-name：」、「✗ 自证 self-test-nested：」、「✗ 自证 same-name-local-method：」、「✗ 自证 reference-call-beside-local-method：」
   CPU_JUDGING_SITES_CHECK_BREAK=table-targets-unchecked  登记表的文件（通配）与 ::函数名对不对得上不核
-      stale-exclusion、missing-function、missing-self-test-function
+      「✗ 自证 stale-exclusion：」、「✗ 自证 missing-function：」、「✗ 自证 missing-self-test-function：」
   CPU_JUDGING_SITES_CHECK_BREAK=judge-self-tests-not-followed  登记表里 judge-self-test 的函数不认（里面的调用点照判）
-      clean、nested-function-marker、local-function-of-the-same-name、self-test-nested、same-name-local-method（这几格的样本里都带着没登记就会判红的自测函数；最后一格数出的调用点少一处）
+      「✗ 自证 clean：」、「✗ 自证 nested-function-marker：」、「✗ 自证 local-function-of-the-same-name：」、「✗ 自证 self-test-nested：」、「✗ 自证 same-name-local-method：」（这几格的样本里都带着没登记就会判红的自测函数；最后一格数出的调用点少一处）
   CPU_JUDGING_SITES_CHECK_BREAK=local-function-of-the-same-name-followed  文件自己定义了与判器本体同名的函数时，调它仍算判器本体的调用点
-      local-function-of-the-same-name
+      「✗ 自证 local-function-of-the-same-name：」
   CPU_JUDGING_SITES_CHECK_BREAK=judge-self-test-covers-whole-file  judge-self-test 登了一个函数，那份文件里每个函数里的调用点都算合规（函数级退成整份）
-      self-test-other-function
+      「✗ 自证 self-test-other-function：」
   CPU_JUDGING_SITES_CHECK_BREAK=receiver-unchecked  RefFS 判器名（allowed_set_for_a_crash_in、crash_and_recover）也只按名字认，不看接收者（改前的判法）
-      same-name-local-method、reference-call-beside-local-method
+      「✗ 自证 same-name-local-method：」、「✗ 自证 reference-call-beside-local-method：」
 """
 import fnmatch
 import importlib.util

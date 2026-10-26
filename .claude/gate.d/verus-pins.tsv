@@ -2,9 +2,15 @@
 # 一行一条，制表符分隔，第一段是种类：
 #   release	<Verus 发布 tag>	<它出自的提交（40 位）>	<发布包 zip 的 sha256：本机那一份放在安装目录旁、名叫 verus.zip，在就核，不在只报一句>	<安装目录，相对 ${XDG_DATA_HOME:-~/.local/share}；SINGLEFS_VERUS_ROOT 盖过它>
 #   package	<crates.io 包名>	<版本>	<包里 .cargo_vcs_info.json 的 git.sha1>	<它的 path_in_vcs>	<包源码的内容指纹：去掉顶层 Cargo.toml、Cargo.toml.orig、.cargo_vcs_info.json、.cargo-ok，算法见 verus-proof-check.py 文件头>
-#   crate	<被验的 crate 目录>	<Verus 验整个 crate 时 verified 的登记数：加减了证明就照判定行改这个数，改动说明写加减了哪几个>
-#   kernel	<核的路径（在 crate 里）>
-#   must-red-worlds	<必红世界表的路径（五段制表符分隔：变异名、文件、原文、替换文、proof_errors=<证明错条数>）>
+#   crate	<被验的 crate 目录>	<Verus 验整个 crate 时 verified 的登记数：加减了证明就照判定行改这个数，改动说明写加减了哪几个>[	cargo]
+#     可以多行，一个 crate 一行、各有各的登记数，四格逐个 crate 判；第四段不写是直接起 verus（crate 只依赖 vstd），写 cargo 是经 cargo verus focus 验（可以有别的依赖，
+#     路径依赖连同 crate 一起拷进副本；singlefs-core 这一种）
+#   kernel	<核的路径（在 crate 里）>：落在哪个 crate 的目录里就归哪个 crate；crate 的 src 里有 verus! 或 #[verus_verify] / #[verus_spec] 的文件都要登记
+#   must-red-worlds	<必红世界表的路径（六段制表符分隔：变异名、文件、原文、替换文、proof_errors=<证明错条数，只报不判>、landing=<证明错落在的函数，格判的是它>）>
+#     每个 crate 恰好一行；登记了几个 crate 时表放在它那个 crate 的目录里
+#   rustc	<Verus 用的工具链：安装里 version.json 的 toolchain 第一段>	<产品 rustc -vV 的 release>	<它的 commit-hash>
+#     Verus 与产品的 rustc 版本差钉在这里（verus-toolchain-pinned 格核三段都与此刻相同）；哪一边换了都要改这一行，改之前在新的一对上把 verus-proof 整格（连同 MIR 比对）跑一遍
+# 被验区域里的可信声明（assume_specification、external_body、uninterp 这几样）与 cfg 原子照信任清单 .claude/gate.d/verus-trust-list.tsv 逐条登记，格式写在那张表的文件头。
 #   rlimit	<Verus 命令行上的 --rlimit，proof、vacuity、must-red-worlds 三格同一个数；至多一行，没有这一行取 verus-proof-check.py 的 DEFAULT_RLIMIT>
 #
 # 同源的依据（主 agent 2026-10-01 用 GitHub compare 现查；工具实现员 2026-10-01 在 /tmp/claude-1000/m3-verus-gate-3-3/provenance/ 复核一遍）：
@@ -24,13 +30,22 @@ package	verus_syn	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b
 package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/prettyplease	0052db78e25abd4a063ac154bfb8e616aa017725154a3dba5d6e9816551f8f97
 # 核是单独的 crate singlefs-replay-prefix（只依赖 vstd），核就是它的 src/lib.rs。56 是第 10 批加择根核、扫环核与合判推论合入那一版的判定行
 # （主 agent 合入后在 /tmp/claude-1000/m3-verus-rows-10-3/rows.out 现跑：Verus 0.2026.09.20 --no-cheating --rlimit 10，56 verified, 0 errors）；加减了证明照合入那一版的判定行改这个数。
-crate	crates/singlefs-replay-prefix	78
+# 2026-10-24：加入无 requires 的非空重放与不动点构造见证，78 + 1 = 79；选段增强贪心契约不增加义务数。
+# 2026-10-24 GC 扩展：九条新增义务（协议保持/历史归纳/崩溃幂等/读者保护/撕裂拒绝/回收核与见证），79 + 9 = 88。
+# 2026-10-26 里程碑四出口 5 第一批：gc_ring_interval_proofs（区间版根环、两层 F、G7）新核，gc_crash_proofs 换成门槛引理、P4 改区间；88 − 9（旧的同一逻辑版本模型九条）+ 3（gc_crash_proofs 新三条）+ 8（P4 区间版净增）+ 23（新核：20 个 proof fn、3 个带 decreases 的 spec fn）= 113（实现员在草稿副本里直接起 Verus 现量）。
+crate	crates/singlefs-replay-prefix	113
 kernel	crates/singlefs-replay-prefix/src/lib.rs
 kernel	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/gc_crash_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/gc_ring_interval_proofs.rs
 must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
 # rlimit 取 10，就是 Verus 0.2026.09.20 不给 --rlimit 时的默认值：今天的核与必红世界表都是在默认值上验的（实现员 4-1 的报告 /tmp/claude-1000/m3-verus-core-4-1/report.md
 # 第 62 行起的命令不带 --rlimit；同一份第 105 行：主循环 --rlimit 5 验得过、3 验不过），10 是验得过的最小值 5 的两倍，写死之后不随 Verus 改默认值漂。
 # 必红世界表第五段一律写 proof_errors=M：M 是一行改坏之后的证明错条数，就是 error 起头的报错除去含 Resource limit (rlimit) exceeded 的
-# 与以 aborting due to 起头的之后剩下的条数（不数 rlimit 用尽：Verus 把它也计进 errors，同一行换个 rlimit 那个数就变），格里比条数等于 M；
-# 第五段不是这个形态的行判红。证明错一条都没有、只剩 rlimit 用尽的那一行不作数、判红。要调高这个数，先在新数上把核与必红世界表整张重验一遍再改。
+# 与以 aborting due to 起头的之后剩下的条数（不数 rlimit 用尽：Verus 把它也计进 errors，同一行换个 rlimit 那个数就变）。条数会随求解环境、无关的 spec 改动漂（C654），
+# 所以格不拿它判红，只在条数与 M 不同时报一句；格判的是第六段 landing=<函数名>[,<函数名>…]：证明错报在哪个 fn 里，与实测的集合相等才绿。
+# 第五段、第六段不是这个形态的行判红。证明错一条都没有、只剩 rlimit 用尽的那一行不作数、判红。要调高这个数，先在新数上把核与必红世界表整张重验一遍再改。
 rlimit	10
+# 2026-10-26 钉下：Verus 0.2026.09.20 起 rust_verify 用 1.98.1，产品的 rustc（rustup 默认工具链）是 1.98.0；这一对上 replay-prefix 的产品构建与 verus --compile 构建
+# 的 MIR 逐条目比 83 个条目逐字相同（工具实现员在草稿副本里量的，RUSTC_BOOTSTRAP=1 -Z trim-diagnostic-paths=false）
+rustc	1.98.1-x86_64-unknown-linux-gnu	1.98.0	88d9e12ae178fab0fb5cc050a94da85685d449ea

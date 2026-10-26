@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：agent-definition-shape
+want=定义的形状：2 份定义都写明 model 与 tools、tools 里没有 Agent 与 Task、输入写范围产出没做什么四节齐
+want=；派发闸 ⑭ 判的 1 份定义「输入」一节都写了预计挂钟、分片、续跑、多机、复用五个标签
+want=agent-definition-shape：绿

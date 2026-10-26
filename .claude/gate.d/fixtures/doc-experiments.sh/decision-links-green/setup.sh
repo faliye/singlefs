@@ -68,7 +68,7 @@ cat > .claude/kb/experiments/01-样本一.md <<'EOF'
 
 正文提到 D1（甲） 与 D2（乙），RAID5（不是决策） 不算。
 
-产物 `research/results/e1-sample.out`，复跑经 `scripts/experiments/replay.sh`。
+产物 `research/results/e1-sample.out`，复跑经 `scripts/experiment-apparatus/replay.sh`。
 
 ### 影响的决策
 

@@ -1,0 +1,10 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：field-refs
+want=「空白甲」 的指向写「无分项」：格式级空白要么指到一条分项
+want=「空白乙」 的指向写「（空）」
+want=「根槽未定字段」 在根槽那一节（七、发布（根记录与根槽））指向未定项「D430（样本指向） 未定项 1」
+want=「根槽空白字段」 在根槽那一节（七、发布（根记录与根槽））的指向写「无分项」：根槽段的字段不许留格式级空白，豁免表也不认
+want=.claude/gate.d/field-pointer-blanks.tsv:4「已经补了指向的行」在指向空着的行里命中 0 行
+want=新池新建文件的字段表里有 5 处指向有误
+want=field-refs：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-refs）

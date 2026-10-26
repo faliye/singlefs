@@ -1,0 +1,3 @@
+exit=1
+want=第 4 行：对「o3-reffs」还是未立，不收事件（共 1 行点名了它）
+want=same-origin-counter：红（退出 1）

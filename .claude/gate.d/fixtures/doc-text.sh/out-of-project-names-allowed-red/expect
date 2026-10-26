@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：out-of-project-names
+want=这次改动新加的 3 行写了不归本项目的目录名或根下系统目录的占用，在 1 份文件里
+want=records/2026-10-21-样本空间.md:6  名字类·反引号（来源：本机家目录）、名字类·带容量（来源：本机家目录）（名字不打印）
+want=records/2026-10-21-样本空间.md:7  名字类·路径段（来源：本机家目录）（名字不打印）
+want=records/2026-10-21-样本空间.md:8  名字类·路径段（来源：本机家目录）（名字不打印）
+want=改成不指名的说法（例「根分区其余不归 singlefs」）
+want=doc-text.sh：1 格里 1 格红（out-of-project-names）

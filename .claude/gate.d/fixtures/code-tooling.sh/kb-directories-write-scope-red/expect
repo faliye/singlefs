@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：kb-directories-write-scope
+want=.claude/kb-directories 登记的 notes/invariants：写回员（kb-scribe）写不到子目录里的 .md（探 notes/invariants/kb-directories-write-scope-probe/kb-directories-write-scope-probe.md）
+want=.claude/kb-directories 登记的 docs/extra：写回员（kb-scribe）写不到下一层的 .md（探 docs/extra/kb-directories-write-scope-probe.md）
+want=登记的 3 个 kb 目录里 2 个写回员写不全
+want=kb-directories-write-scope：红（退出 1）

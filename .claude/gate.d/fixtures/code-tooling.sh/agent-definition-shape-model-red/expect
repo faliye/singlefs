@@ -1,0 +1,4 @@
+exit=1
+want=这些定义的 frontmatter 没写 model——派发时取默认模型，定义里说的模型与真跑的对不上：
+want=     beta
+want=agent-definition-shape：红（退出 1）

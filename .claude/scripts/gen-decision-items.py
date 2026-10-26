@@ -11,11 +11,16 @@
 状态由**它住在哪一节**决定，不由行内文字决定——正文里一句「与 D16（发布语义） 已定的
 checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把一条未定项判成已定。
 
+**用法**：`gen-decision-items.py [项目根] [--status-cells]`。读 `<项目根>/.claude/kb/decisions/` 下的正文；不给项目根就取工作目录。
+不从脚本位置定根：门禁 doc-decisions 起的是真仓里这一份、读的是样本根的 decisions/，它显式传自己的项目根。
+项目根下没有 `.claude/kb/decisions/`、或里面除译文外一份正文都没有，判错退 1；未知参数、给了两个项目根判用法错退 2；
+不是喂样本却设了弄坏开关（文件末尾「弄坏开关」一段），退 2。
+
 **两种输出**：
 
 | 怎么跑 | 打印什么 | 谁消费 |
 |---|---|---|
-| 不带参数 | 索引页那段 `<!-- gen:decision-items -->` 生成块 | `.claude/gate.d/doc-decisions.sh` 的格「决策分项清单与正文同步」与格「未定项判过改不改新池新建文件的字节」 |
+| 不带 `--status-cells` | 索引页那段 `<!-- gen:decision-items -->` 生成块 | `.claude/gate.d/doc-decisions.sh` 的格「决策分项清单与正文同步」与格「未定项判过改不改新池新建文件的字节」 |
 | `--status-cells` | 每行 `D<n>\t<状态列该写什么>\t<进度列该写什么>` | 同上，用来写回决策索引表的「状态」列与「进度」列 |
 
 **状态列写的是分项计数**（`已定 6 项 / 未定 0 项`），不是三态词——
@@ -32,9 +37,17 @@ checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把
 自证：门禁 doc-decisions 的样本 decision-items-sync-translation-green（decisions/ 下放着英语与日语译文，首行不是 `## D<n> 简称 —— 状态`）
 走本脚本，要求照常出清单、不报首行读不出。
 
-弄坏开关（只给样本自证证红用，设进环境）：
+弄坏开关（只给样本自证证红用，设进环境；几项用逗号隔开）。只在门禁喂样本时认（sample_root_feeding()）：读的项目根（第一个参数，没给取工作目录）
+是样本根——根里有 .gate-cells 或空文件 .gate-break-sample、这个根（真实路径）不是生成器所在的仓、也没设 GATE_STAGED_FROM，
+与门禁共用库 .claude/gate.d/lib/stage-cells.sh 的 stage_cells_refuse_unsampled_break_switches 同一条判据。平常跑设了它，读参数之前就拒绝、退 2，
+输出点名这个变量只在样本自证里认。
   GEN_DECISION_ITEMS_BREAK=read-translations  decision_body_files() 把译文也当正文读（改前的 glob）
       decision-items-sync-translation-green（期望退出 0，实测 1：生成器报「首行读不出」）
+  GEN_DECISION_ITEMS_BREAK=cwd-root-unchecked  不认项目根参数、不判用法错，按工作目录读，决策目录不在或没有正文照样退 0、输出空（改前的样子）
+      （开关只在样本根上认：下面的空目录里放空文件 .gate-break-sample，第一个参数给的项目根也是放了 .gate-break-sample 的样本根）
+      在空目录里起、不带参数（期望退出 1、stderr 有「第一个参数给项目根」，实测 0）；
+      在空目录里起、第一个参数给一份带决策正文的样本根（期望退出 0、输出里有「- **D」起头的行，实测 0、输出空）；
+      带一个未知参数 --bogus（期望退出 2，实测 0）
 """
 import os, re, glob, sys
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -43,7 +56,28 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from project_preflight import preflight  # noqa: E402
 preflight(__file__)
 TRANSLATION_SUFFIX = re.compile(r'\.[a-z]{2}\.md$')
-BROKEN = os.environ.get('GEN_DECISION_ITEMS_BREAK', '')
+BREAK_VARIABLE = 'GEN_DECISION_ITEMS_BREAK'
+
+
+def sample_root_feeding(arguments):
+    """这一趟是不是门禁喂样本：读的项目根（参数里第一个不以 - 起头的，没给取工作目录）是样本根——根里有 .gate-cells 或 .gate-break-sample，
+    这个根（真实路径）不是生成器所在的仓（本文件往上两级），也没设 GATE_STAGED_FROM。
+    判据照门禁共用库 .claude/gate.d/lib/stage-cells.sh 的 stage_cells_refuse_unsampled_break_switches（弄坏开关只在样本根上认）。"""
+    root = next((argument for argument in arguments if not argument.startswith('-')), None) or os.getcwd()
+    real_root = os.path.realpath(root)
+    own_repository = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
+    marked = any(os.path.isfile(os.path.join(real_root, marker)) for marker in ('.gate-cells', '.gate-break-sample'))
+    return marked and real_root != own_repository and not os.environ.get('GATE_STAGED_FROM')
+
+
+if os.environ.get(BREAK_VARIABLE) and not sample_root_feeding(sys.argv[1:]):
+    print(f"  ✗ 环境里设了 {BREAK_VARIABLE}={os.environ[BREAK_VARIABLE]}：这个弄坏开关只在样本自证里认（门禁 doc-decisions 喂样本，读的项目根是样本根），"
+          f"平常跑设了就拒绝，一份正文都没读\n"
+          f"     → 怎么办：平常跑先 unset {BREAK_VARIABLE} 再起；要证红就经 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 喂门禁 doc-decisions 的样本"
+          f"（样本根里有 .gate-cells 或空文件 .gate-break-sample）", file=sys.stderr)
+    sys.exit(2)
+BROKEN = set(os.environ.get(BREAK_VARIABLE, '').split(','))
+USAGE = '用法：gen-decision-items.py [项目根] [--status-cells]（不给项目根就取工作目录）'
 
 def clip(text, n):
     """截到 n 个字符，**但不许留下没闭合的括注**。
@@ -176,13 +210,39 @@ def decision_body_files():
     规矩在 .claude/skills/trilingual/SKILL.md），首行与分项都是译文的写法，当正文读会报首行读不出、或把同一条决策数两遍。
     判法与 .claude/gate.d/lib-trilingual.py 的 LANGUAGE_SUFFIXED 同口径：带两个小写字母语言后缀的 .md 不是中文那一份。"""
     found = sorted(glob.glob('.claude/kb/decisions/*.md'))
-    if BROKEN == 'read-translations':   # 弄坏开关：译文也当正文读（改前的样子）
+    if 'read-translations' in BROKEN:   # 弄坏开关：译文也当正文读（改前的样子）
         return found
     return [f for f in found if not TRANSLATION_SUFFIX.search(os.path.basename(f))]
 
 
-# `--status-cells`：只打印决策索引表「状态」列该写的那格，一行一条决策。
-cells_only = '--status-cells' in sys.argv[1:]
+def parsed_arguments(arguments):
+    """返回 (项目根或 None, 是否 --status-cells)；未知参数、两个项目根退 2。"""
+    root, status_cells = None, False
+    for argument in arguments:
+        if argument == '--status-cells':
+            status_cells = True
+        elif argument.startswith('-') or root is not None:
+            what = f"认不出参数「{argument}」" if argument.startswith('-') else f"给了两个项目根：{root} 与 {argument}"
+            print(f"  ✗ 用法错：{what}\n     → {USAGE}", file=sys.stderr)
+            sys.exit(2)
+        else:
+            root = argument
+    return root, status_cells
+
+
+if 'cwd-root-unchecked' in BROKEN:   # 弄坏开关：不认项目根、不判用法错，按工作目录读（改前的样子）
+    project_root, cells_only = None, '--status-cells' in sys.argv[1:]
+else:
+    project_root, cells_only = parsed_arguments(sys.argv[1:])
+decisions_directory = os.path.join(project_root or os.getcwd(), '.claude', 'kb', 'decisions')
+if 'cwd-root-unchecked' not in BROKEN:
+    if not os.path.isdir(decisions_directory):
+        sys.exit(f"  ✗ 项目根下没有决策目录 {decisions_directory}：一份正文都读不到，输出会是空的\n"
+                 f"     → 第一个参数给项目根，或在项目根里起（{USAGE}）")
+    os.chdir(project_root or os.getcwd())
+    if not decision_body_files():
+        sys.exit(f"  ✗ {decisions_directory} 下除译文外一份决策正文都没有，输出会是空的\n"
+                 f"     → 第一个参数给项目根，或在项目根里起（{USAGE}）；项目根对了而正文真没有，先从 git 里找回 decisions/ 下的正文")
 
 lines, cells = [], []
 for f in decision_body_files():

@@ -4,3 +4,4 @@ package	vstd	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	sour
 crate	crates/singlefs-replay-prefix	2
 kernel	crates/singlefs-replay-prefix/src/lib.rs
 must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+rustc	1.98.1-x86_64-unknown-linux-gnu	1.98.0	88d9e12ae178fab0fb5cc050a94da85685d449ea

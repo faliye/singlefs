@@ -1,0 +1,6 @@
+exit=1
+want=· binding:a/publish.litmus：绿，现判（没给判定库）
+want=· binding:b/publish.litmus：红，现判（没给判定库）
+want=litmus/b/publish.litmus  crates/ 下没有一个 .rs 写出 b/publish.litmus
+want=代码绑定检查未过：1 项
+want=checker-tier-lkmm.sh：1 格里 1 格红（litmus-verdicts）

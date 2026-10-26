@@ -1,0 +1,2 @@
+# 复用三问（改闭包里一个函数单元）：上一版只差 weighted_sum_of 的函数体，只有引它的 the_two_kernels_confirm_every_entry 现判，另两条复用并经 --skip 跳过
+product-gpu-real-card-tests

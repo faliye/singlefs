@@ -1,0 +1,5 @@
+exit=1
+want=定义与共用约束里这些行与规则文件逐字相同、不短于 20 个字符
+want=     .claude/agents/beta.md:29 与 .claude/rules/sample-rule.md:6 逐字相同
+want=     .claude/agent-common.md:4 与 .claude/rules/sample-rule.md:5 逐字相同
+want=agent-definition-shape：红（退出 1）

@@ -5,3 +5,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
+vstd = "=0.0.0-2026-09-20-0158"
+
+# MIR 比对的产品构建在样本副本里起 cargo rustc：要 vstd 编得过（直接起的 verus 用它自带的 vstd，不读这一行）
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }

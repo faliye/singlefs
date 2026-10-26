@@ -26,6 +26,19 @@
 # 自证：bash scripts/kb/verify-citations.sh --selftest（合成两棵假树，不碰本机的真树）
 # 源码固定点由环境变量覆盖：FS_REFS=/path bash scripts/kb/verify-citations.sh
 set -uo pipefail
+# 弄坏开关 VERIFY_CITATIONS_BREAK_TALLY、VERIFY_CITATIONS_BREAK_CACHE_KEPT 只在 --selftest 起的那几趟里认（自证设 VERIFY_CITATIONS_SELFTEST_MARK 指到它建的标记文件）：
+# 平常跑设了就在一切之前退 2、点名变量只在自证里认。弄坏开关 VERIFY_CITATIONS_BREAK_GUARD_OFF=1：这一道不拒（自证里「平常跑设了弄坏开关退 2」那一格转红）
+if [[ -z "${VERIFY_CITATIONS_BREAK_GUARD_OFF:-}" && "${1:-}" != --selftest ]]; then
+  for verify_citations_break_variable in VERIFY_CITATIONS_BREAK_TALLY VERIFY_CITATIONS_BREAK_CACHE_KEPT; do
+    [[ -n "${!verify_citations_break_variable:-}" ]] || continue
+    if [[ -z "${VERIFY_CITATIONS_SELFTEST_MARK:-}" || "$(cat -- "$VERIFY_CITATIONS_SELFTEST_MARK" 2>/dev/null)" != verify-citations-selftest ]]; then
+      echo "  ✗ $verify_citations_break_variable 是弄坏开关，只在自证（--selftest）里认；平常跑设了就拒，这一次什么都没跑" >&2
+      echo "  → 怎么办：去掉 $verify_citations_break_variable 再跑；要证红就跑 $verify_citations_break_variable=1 bash scripts/kb/verify-citations.sh --selftest" >&2
+      exit 2
+    fi
+  done
+fi
+unset verify_citations_break_variable
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
@@ -151,11 +164,11 @@ ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，�
 # 取回方式 scripts/kb/fetch-refs.sh（含 URL 与 sha256），抽取器 scripts/kb/pdf-text.py。
 # ⚠️ 抽取器只解 FlateDecode + 单字节字体。抽出乱码要当**抽取失败**处理，不许当成「原文没这句」——
 #    ZFS On-Disk Specification 就是这种（CID 字体），所以它不在那张表里，见 fetch-refs.sh 的说明。
-# 抽出的文本是跨轮复用的缓存，放 GATE_CROSS_RUN_TMPDIR：门禁每轮给阶段一个私有 TMPDIR，跑完里面剩下的判红并删掉
-# （.claude/singlefs-ai-sop/rules/command-safety.md「测试镜像一律放临时目录」）。门禁之外单跑时落回平常的临时目录。
-PDFTXT_CACHE="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-$(id -u)"
-mkdir -p "$PDFTXT_CACHE"
-pdftxt() { # pdftxt <树名> <文献名> —— 抽一次缓存一次，打印缓存路径；抽不出就打印空
+# 抽出的文本放这一趟自己的临时目录 PDFTXT_CACHE（下面「跑」那一段开头在 ${TMPDIR:-/tmp} 下 mktemp -d），同一趟里一份文献只抽一次，
+# 退出时（跑完、判红、被 TERM / INT 停）连同目录删掉，不留给以后的趟复用（用户 2026-10-23 定案「自己用完自己删」）。
+# 只供自证使用的开关 VERIFY_CITATIONS_BREAK_CACHE_KEPT=1：照改前放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
+#   （自证「文本缓存跑完连目录删」那一格由绿转红）。
+pdftxt() { # pdftxt <树名> <文献名> —— 这一趟里抽一次缓存一次，打印缓存路径；抽不出就打印空
   local tree="$1" name="$2" pdf="" out="" partial=""
   pdf="${TREE_ROOT[$tree]}/$name"; out="$PDFTXT_CACHE/${name%.pdf}.txt"
   [[ -f "$pdf" ]] || return 1
@@ -370,14 +383,17 @@ selftest_assertions() {
 }
 st_run() { # st_run <合成树目录> <断言表名> [额外的环境赋值…] —— 打印整份输出，退出码转手
   local work="$1" assertions="$2"; shift 2
-  env GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
+  env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
 }
 selftest() {
   local work="" out="" rc=0 leftovers=0
   work="$(mktemp -d "${TMPDIR:-/tmp}/verify-citations-selftest-XXXXXX")"
   # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
   trap "rm -rf -- '$work'" EXIT
-  mkdir -p "$work/refs/linux-6.17/fs/bcachefs" "$work/refs/zfs/include/sys" "$work/refs/docs" "$work/kern/fs/xfs"
+  # 自证起的子进程的标记：别处（平常跑）设了弄坏开关会被拒，自证自己起的那几趟靠它放行（文件头附近那一道）
+  printf '%s\n' verify-citations-selftest >"$work/mark"
+  export VERIFY_CITATIONS_SELFTEST_MARK="$work/mark"
+  mkdir -p "$work/refs/linux-6.17/fs/bcachefs" "$work/refs/zfs/include/sys" "$work/refs/docs" "$work/kern/fs/xfs" "$work/tmp"
   printf '#define BUCKET_GC_GEN_MAX\t96U\n' >"$work/refs/linux-6.17/fs/bcachefs/alloc_background.h"
   printf '#define SPA_BLKPTRSHIFT\t7\n'     >"$work/refs/zfs/include/sys/spa.h"
   printf '#define XLOG_MAX_ICLOGS\t8\n'     >"$work/kern/fs/xfs/xfs_log_format.h"
@@ -400,6 +416,10 @@ selftest() {
   # ⑦ 分组报数与被扫集合对不上 ⇒ 判红（开关只漏记一格，钉的是一个 1 的差）
   out="$(st_run "$work" green VERIFY_CITATIONS_BREAK_TALLY=1)"; rc=$?
   st_case "分组报数算错判红" 红 "$rc" "$out" '分组报数与被扫集合对不上'
+  # 平常跑设了弄坏开关：标记清掉、带一个认不得的选项，要退非 0 并点名变量只在自证里认；没有这道拒时它照常跑完合成表（所以这里也指到合成表，不碰真树）
+  out="$(env VERIFY_CITATIONS_SELFTEST_MARK= TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=green \
+         VERIFY_CITATIONS_BREAK_TALLY=1 bash "$SELF" --force --break-guard-probe-unknown-option 2>&1)"; rc=$?
+  st_case "平常跑设了弄坏开关退 2 并点名只在自证里认" 红 "$rc" "$out" 'VERIFY_CITATIONS_BREAK_TALLY 是弄坏开关，只在自证'
   # ⑧ ⑨ 原有的两条判据一条都没放松
   out="$(st_run "$work" missing-file)"; rc=$?
   st_case "文件不在仍判红" 红 "$rc" "$out" '源码不在'
@@ -412,8 +432,8 @@ selftest() {
   st_case "命令一棵树都没读判红" 红 "$rc" "$out" '命令没读标着的那棵树'
   # ⑫ ⑬ ⑭ 抽取到一半失败：这一次判红，下一次也不许拿留下的半截文本当原文匹配，缓存目录里不许留半截文件。
   # 抽取器换成一个假的：先吐出半截（要找的那句正好在里面），再退 1。抽取器按本脚本所在的目录找，
-  # 所以把本脚本拷一份、旁边放假抽取器，跑那一份；GATE_CROSS_RUN_TMPDIR 与 TMPDIR 都指进临时目录，碰不到本机真的文本缓存。
-  mkdir -p "$work/bin" "$work/tmp"
+  # 所以把本脚本拷一份、旁边放假抽取器，跑那一份；TMPDIR 指进临时目录（这一趟的文本缓存建在它底下）。
+  mkdir -p "$work/bin"
   cp "$SELF" "$work/bin/verify-citations.sh"
   cat >"$work/bin/pdf-text.py" <<'HALF_EXTRACTOR_EOF'
 import sys
@@ -422,14 +442,14 @@ sys.stdout.flush()
 sys.exit(1)
 HALF_EXTRACTOR_EOF
   printf '%%PDF-1.4 synthetic\n' >"$work/refs/docs/half.pdf"
-  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=half-extraction bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=half-extraction bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
   st_case "抽取到一半失败判红" 红 "$rc" "$out" '抽取失败'
-  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=half-extraction bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=half-extraction bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
   st_case "抽取失败之后再跑，不拿半截文本当原文" 红 "$rc" "$out" '抽取失败'
   leftovers="$(find "$work/tmp" -name 'half.txt*' -type f | wc -l)"
   st_case "抽取失败不在缓存目录里留半截文件" 绿 "$(( leftovers == 0 ? 0 : 1 ))" "缓存目录里留下的半截文件：$leftovers 个" '半截文件：0 个'
-  # ⑮ 抽出的文本缓存落在 GATE_CROSS_RUN_TMPDIR 底下，TMPDIR 里一项都不留：门禁每轮给阶段的私有 TMPDIR 跑完剩下的判红并删掉。
-  # 抽取器换成一个整篇吐完、退 0 的假的，同样拷一份本脚本放在它旁边跑。
+  # ⑮ 抽出的文本放这一趟自己的临时目录、跑完连目录删：TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里一项都不留（不留给以后的趟复用）。
+  # 抽取器换成一个整篇吐完、退 0 的假的，同样拷一份本脚本放在它旁边跑；退 0 说明这一趟抽出了文本、模式命中了。
   mkdir -p "$work/bin-whole" "$work/private-tmp" "$work/cross-run-tmp"
   cp "$SELF" "$work/bin-whole/verify-citations.sh"
   cat >"$work/bin-whole/pdf-text.py" <<'WHOLE_EXTRACTOR_EOF'
@@ -439,9 +459,9 @@ WHOLE_EXTRACTOR_EOF
   printf '%%PDF-1.4 synthetic\n' >"$work/refs/docs/whole.pdf"
   out="$(env TMPDIR="$work/private-tmp" GATE_CROSS_RUN_TMPDIR="$work/cross-run-tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=whole-extraction bash "$work/bin-whole/verify-citations.sh" 2>&1)"; rc=$?
   private_leftovers="$(find "$work/private-tmp" -mindepth 1 | wc -l)"
-  cross_run_cached="$(find "$work/cross-run-tmp" -name 'whole.txt' -type f | wc -l)"
-  st_case "文本缓存落在 GATE_CROSS_RUN_TMPDIR、TMPDIR 里不留" 绿 "$(( rc == 0 && private_leftovers == 0 && cross_run_cached == 1 ? 0 : 1 ))" \
-    "退出码 $rc；TMPDIR 里留下 $private_leftovers 项，GATE_CROSS_RUN_TMPDIR 里的缓存 $cross_run_cached 份；输出：$out" 'TMPDIR 里留下 0 项，GATE_CROSS_RUN_TMPDIR 里的缓存 1 份'
+  cross_run_leftovers="$(find "$work/cross-run-tmp" -mindepth 1 | wc -l)"
+  st_case "文本缓存跑完连目录删、TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里都不留" 绿 "$(( rc == 0 && private_leftovers == 0 && cross_run_leftovers == 0 ? 0 : 1 ))" \
+    "退出码 $rc；TMPDIR 里留下 $private_leftovers 项，GATE_CROSS_RUN_TMPDIR 里留下 $cross_run_leftovers 项；输出：$out" 'TMPDIR 里留下 0 项，GATE_CROSS_RUN_TMPDIR 里留下 0 项'
 
   rm -rf "${work:?}"
   if (( st_failed )); then
@@ -449,12 +469,26 @@ WHOLE_EXTRACTOR_EOF
     echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree；文本缓存那一格看 PDFTXT_CACHE 那一行。"
     exit 1
   fi
-  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存落在 GATE_CROSS_RUN_TMPDIR）"
+  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存跑完连目录删、平常跑设了弄坏开关退 2）"
   exit 0
 }
 if [[ "${1:-}" == "--selftest" ]]; then selftest; fi
 
 # ── 跑 ─────────────────────────────────────────────────────────────────
+# 这一趟的文本缓存（上面「外部文献」那一段）：退出时连同目录删；被 TERM / INT 停先转成 exit，EXIT 钩子照跑
+if [[ "${VERIFY_CITATIONS_BREAK_CACHE_KEPT:-}" == "1" ]]; then
+  PDFTXT_CACHE="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-$(id -u)"
+  mkdir -p "$PDFTXT_CACHE"
+else
+  if ! PDFTXT_CACHE="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-pdftext.XXXXXX")"; then
+    echo "  ✗ 建不了这一趟的文本缓存目录（${TMPDIR:-/tmp} 下 mktemp -d 失败）"
+    echo "  → 怎么办：看 TMPDIR 指的目录在不在、可不可写、盘满没满"
+    exit 2
+  fi
+  trap 'rm -rf -- "${PDFTXT_CACHE:?}"' EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+fi
 echo "══ 外部引用复核 ══"
 for tree_name in "${TREE_ORDER[@]}"; do
   printf '  %s（%s）根：%s\n' "$tree_name" "${TREE_PINNED[$tree_name]}" "${TREE_ROOT[$tree_name]}"

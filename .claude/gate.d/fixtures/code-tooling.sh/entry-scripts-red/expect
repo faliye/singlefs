@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：entry-scripts
+want=.claude/gate.d/entry-scripts.tsv:5 不是「<路径><TAB><前缀><TAB><字段，逗号连><TAB># 理由>」
+want=.claude/gate.d/entry-scripts.tsv:4 指到的 scripts/gate/gone.sh 不在
+want=scripts/gate/no-list-items.sh：代码里没有 --list-items
+want=scripts/gate/short_fields.py：「SAMPLE_PY_ITEM」那一句少了字段 red=
+want=入口脚本格式：4 处不对（登记 2 份）
+want=entry-scripts：红（退出 1）

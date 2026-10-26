@@ -1,5 +1,5 @@
 exit=1
 want=样本只跑 .gate-cells 点名的格：crate-sources-reachable
-want=scripts/experiments/forgotten.rs：不是任何 crate 的目标
+want=scripts/experiment-apparatus/forgotten.rs：不是任何 crate 的目标
 want=判了 2 份 .rs，1 份落空
 want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）

@@ -36,7 +36,7 @@ research/ 整个可删（.claude/rules/directory-layout.md「research/：可以�
   种类串要逐字出现。今天四条路径（instance_acquisition、warm_up、transaction、post_mkfs_stream）都登记在那里，
   钉它们的是 `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 的 `recorded_paths_match_the_registered_segment_sequences`，
   它由 `cargo test` 钉在活代码上——串对不上活代码，那条用例先红。
-  <名> 没登记钉住它的用例的，才与 E142 产物比：产物路径从 `scripts/experiments/replay.sh` 复跑登记表里 `E142|...` 那一行的
+  <名> 没登记钉住它的用例的，才与 E142 产物比：产物路径从 `scripts/experiment-apparatus/replay.sh` 复跑登记表里 `E142|...` 那一行的
   「入库产物」那一列取；那份产物不在，这几行记「本次未跑」（退 77，不判红）。
 - 「实例切换 / 管理员回退」「抬 F 的空发布」两行标了 **预想**（没写成字节）的跳过，计入跳过数；标「装置钉住」的表格行只计数，
   覆盖写固定脚本流那句另与钉它的用例核数组、写数与闭式（check_device_pinned_notes）。
@@ -45,23 +45,35 @@ research/ 整个可删（.claude/rules/directory-layout.md「research/：可以�
   减出来的路径集合大小若不是恰好一个，直接判成结构性错误（八节的写法变了，这段解析要跟着改），不猜、不悄悄跳过。
 
 自证会红：`--selftest` 的输入是当前这份 layout/01-first-txn.md、它点名的 crates 用例文件（活代码，不是生成物）
-与脚本旁边的样本 `scripts/crash/check-segment-registry-product-sample.txt`（E142 第二十五次跑主产物第 35–41、46、60 行的原样摘抄，
-只用来测产物行的解析）；不读 replay.sh 指的产物，也不读 research/ 下任何文件。要与产物比的那一支，产物行由自证照登记行现造。
+与脚本旁边的样本 `scripts/crash/check-segment-registry-product-sample.txt`（行形照 E142 第二十五次跑主产物第 35–41、46、60 行，
+name=segments 五行的数换成现行钉值，出处写在样本文件头；只用来测产物行的解析）；不读 replay.sh 指的产物，也不读 research/ 下任何文件。要与产物比的那一支，产物行由自证照登记行现造。
 各格（项名是 run_self_test() 里 problems 那一条的开头）：
   未改动的拷贝（不摆产物）判绿；mkfs 那一行段序列改一个数、种类改一个重数、覆盖写固定脚本流的段序列改一个数，各判红；
+  覆盖写固定脚本流的登记句改成认不出的形状（「N 次写」写成「N 笔写」，一句都认不出），判红；
+  钉它的用例文件拷贝里状态数只剩带下划线的 Rust 写法（例 `1_678_377_095`，不带下划线的写法一处不留），判绿；
   八节开头「`path=…`」声明里多写一条 `selftest_unclaimed_path`，退 2 并点出实际剩几条；
   第一条出处写 path= 的表格行段序列改一个数、次操作改一个数，与钉它的 crates 用例比，各判红；
+  同一行里同一串出现两次（段序列栏一处、出处栏一处）：自证造的小布局表上只换段序列栏那一处、出处栏那一处不动（真仓备料的几处也照段序列栏换）；
   把那条路径从 PATH_PINNING_TESTS 里拿掉（只能与产物比）：产物不在退 77 并点名那一行，摆上照登记现造的产物判绿，产物里段序列改一个数判红；
   样本的产物行解析出五条路径、都带种类；`--print-mkfs-segments-line` 那一支三份（照登记打一行、段序列跟着变、改名与抄成两行退 2）；
   `--print-segments-lines` 打出的行数等于声明的路径数、按产物行解析回来与登记相符，第一条路径的段序列改一个数打出的行跟着变。
 
-弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪一项红（括号里是那条「✗ --selftest 没通过：」下面那一条的开头）：
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证红的那几格（「」里是失败行的开头：自证逐条以 ✗ 起头列出判错的格，末尾一句「✗ --selftest 没通过：N 项」是汇总）：
   CHECK_SEGMENT_REGISTRY_BREAK=accept-extra-path  build_merged_stream_entry() 把「排除之后恰好剩一条」当成「至少剩一条」判（`!= 1` 当 `< 1`）
-      多声明一条 path（「八节开头「`path=…`」声明里多写了一条 `selftest_unclaimed_path`」那一条）
+      多声明一条 path（「✗ 八节开头「`path=…`」声明里多写了一条 `selftest_unclaimed_path`」）
   CHECK_SEGMENT_REGISTRY_BREAK=path-rows-to-product  perform_check() 不认 PATH_PINNING_TESTS，出处写 path= 的行一律与 E142 产物比
-      不摆 replay.sh 与产物的未改动拷贝定不下产物路径、退 2（「未改动的拷贝（不摆产物）本该判绿」那一条）
+      不摆 replay.sh 与产物的未改动拷贝定不下产物路径、退 2（「✗ 未改动的拷贝（不摆产物）本该判绿」与它转述的「✗ 找不到 …/scripts/experiment-apparatus/replay.sh，E142 产物的路径定不下来」）；
+      与钉它的用例比的两格同样退 2（「✗ 把「…」（path=instance_acquisition）的段序列…本该退 1」、「✗ 把「…」的「6 次操作」改成「7 次操作」之后…本该退 1」）；
+      覆盖写固定脚本流那两格的拷贝同样不摆产物、退 2（「✗ 覆盖写固定脚本流的登记句改成认不出的形状…本该退 1」、「✗ 钉它的用例文件拷贝里状态数只剩带下划线的写法…本该判绿」）；
+      摆上产物那一格比不上别的路径（「✗ 只能与产物比、摆上照登记现造的产物之后本该判绿」）
   CHECK_SEGMENT_REGISTRY_BREAK=product-required  要与产物比而产物不在时退回改之前的判法：退 2 记红，不报本次未跑
-      （「只能与产物比、产物不在的那一行本该退 77（本次未跑）」那一条）
+      （「✗ 只能与产物比、产物不在的那一行本该退 77（本次未跑）」）
+  CHECK_SEGMENT_REGISTRY_BREAK=unrecognized-note-accepted  check_device_pinned_notes() 一句覆盖写固定脚本流的登记都认不出时照改之前的判法当成没有要核的（不记对不上）
+      （「✗ 覆盖写固定脚本流的登记句改成认不出的形状…本该退 1」）
+  CHECK_SEGMENT_REGISTRY_BREAK=underscore-kept  check_device_pinned_notes() 比状态数之前照改之前不去掉数字间的下划线
+      （「✗ 钉它的用例文件拷贝里状态数只剩带下划线的写法…本该判绿」）
+  CHECK_SEGMENT_REGISTRY_BREAK=segment-cell-unscoped  「同一行两处同串」那一格里 mutate_one_segment_number() 照改之前在整行里换（同一行里那一串出现两次就备料失败）
+      （「✗ 同一行里同一串出现两次（段序列栏一处、出处栏一处）时自证本该只换段序列栏那一处」）
 """
 import argparse
 import dataclasses
@@ -78,7 +90,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 LAYOUT_RELATIVE_PATH = pathlib.Path('.claude/kb/layout/01-first-txn.md')
-REPLAY_SCRIPT_RELATIVE_PATH = pathlib.Path('scripts/experiments/replay.sh')
+REPLAY_SCRIPT_RELATIVE_PATH = pathlib.Path('scripts/experiment-apparatus/replay.sh')
 RESULTS_DIRECTORY_RELATIVE_PATH = pathlib.Path('research/results')
 # 自证测产物行解析用的样本（E142 第二十五次跑主产物 e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out 第 35–41、46、60 行原样摘抄），跟着脚本放
 PRODUCT_SAMPLE_PATH = pathlib.Path(__file__).resolve().parent / 'check-segment-registry-product-sample.txt'
@@ -117,6 +129,7 @@ PRODUCT_SEGMENT_LINE_REQUIRED_KEYS = ('path', 'operations', 'segments', 'closed_
 MKFS_ROW_LABEL = 'mkfs 种根'  # 八节登记表第一列的原文；--print-mkfs-segments-line 按它认那一行
 MKFS_PRODUCT_PATH_NAME = 'mkfs'  # 虚机二进制与 E142 产物里 mkfs 那一行的 path= 值
 EXTRA_DECLARED_PATH_NAME = 'selftest_unclaimed_path'  # --selftest 往八节开头的 path= 声明里多写的那一条（没有表格行占它）
+SELFTEST_DUPLICATE_ROW_LABEL = '自证造的一行（同一串写两处）'  # --selftest「同一行两处同串」那一格的小布局表里那一行的第一列
 SELFTEST_PRODUCT_FILE_NAME = 'selftest-e142.out'  # --selftest 要与产物比的那一支：临时仓里 replay.sh 的 E142 行指的产物名
 
 
@@ -548,11 +561,11 @@ def check_device_pinned_notes(section_text, repository_root):
         if array_count == 0:
             mismatches.append(f'{label}：用例文件 {test_file_relative_path} 里没有钉这个数组 `{array_text}`')
         # Rust 的长整数字面量带下划线分组（clippy unreadable_literal 要求，例 `6_649_413_746`），比状态数之前把数字之间的下划线去掉
-        digits_joined_test_text = re.sub(r'(?<=\d)_(?=\d)', '', normalized_test_text)
+        digits_joined_test_text = normalized_test_text if broken('underscore-kept') else re.sub(r'(?<=\d)_(?=\d)', '', normalized_test_text)
         if str(claimed_crash_state_count) not in digits_joined_test_text:
             mismatches.append(f'{label}：用例文件 {test_file_relative_path} 里没有钉状态数 {claimed_crash_state_count}')
         checked_descriptions.append(f'{label}（{claimed_operation_count} 次写、{claimed_crash_state_count} 个状态，数组在 {test_file_relative_path} 里出现 {array_count} 次）')
-    if not checked_descriptions:
+    if not checked_descriptions and not broken('unrecognized-note-accepted'):
         # 一句都认不出时不许当成「没有要核的」放过：那句登记被改了形状，这一格就再没人核（扫到 0 项不是通过）
         mismatches.append('八节里一句「覆盖写固定脚本流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」的登记都认不出：登记句的形状改了，覆盖写固定脚本流就没人核')
     return mismatches, checked_descriptions
@@ -591,10 +604,59 @@ def mutate_device_pinned_note(layout_text):
             original_segment_sequence_text, mutated_segment_sequence_text, match.group(4))
 
 
-def mutate_one_segment_number(layout_text, row_label=None):
+def mutate_device_pinned_note_shape(layout_text):
+    """--selftest 用：把八节里每一句「覆盖写固定脚本流的段序列」登记的「N 次写」改成「N 笔写」，句子留着、数不动，DEVICE_PINNED_NOTE_PATTERN 一句都认不出。
+    返回 (改过的全文, 改前那一段, 改后那一段)。改完还认得出一句就抛 CheckError（造不出「认不出」的输入）。"""
+    section_text = extract_section_eight(layout_text)
+    matches = list(DEVICE_PINNED_NOTE_PATTERN.finditer(section_text))
+    if not matches:
+        raise CheckError('八节里找不到「覆盖写固定脚本流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」这句登记，自证没法造出认不出的形状')
+    mutated_text = layout_text
+    for match in matches:
+        operations_match = re.search(r'\d+\s*次写', match.group(0))
+        original_span = operations_match.group(0)
+        mutated_span = original_span.replace('次写', '笔写', 1)
+        sentence_mutated = match.group(0).replace(original_span, mutated_span, 1)
+        mutated_text = replace_once_inside(mutated_text, extract_section_eight(mutated_text), match.group(0), sentence_mutated, '八节')
+    if DEVICE_PINNED_NOTE_PATTERN.search(extract_section_eight(mutated_text)):
+        raise CheckError('把「N 次写」改成「N 笔写」之后八节里还认得出覆盖写固定脚本流的登记句，自证造不出认不出的形状')
+    return mutated_text, original_span, mutated_span
+
+
+def underscore_grouped_pinned_test_text(test_text, crash_state_count):
+    """--selftest 用：钉它的用例文件里把状态数的每一处十进制写法（不带下划线的）换成三位一组带下划线的 Rust 写法（例 `1_678_377_095`）。
+    返回 (改过的正文, 换了几处, 带下划线的那一串)。换完还剩不带下划线的写法、或一处都没换，抛 CheckError。"""
+    plain_text = str(crash_state_count)
+    grouped_text = f'{crash_state_count:_}'
+    plain_pattern = re.compile(r'(?<![\d_])' + re.escape(plain_text) + r'(?![\d_])')
+    rewritten_text, replaced_count = plain_pattern.subn(grouped_text, test_text)
+    if '_' not in grouped_text:
+        raise CheckError(f'状态数 {plain_text} 不到四位，写不成带下划线的形式，自证造不出那一格的输入')
+    if plain_pattern.search(rewritten_text):
+        raise CheckError(f'用例文件里换完还剩不带下划线的状态数 {plain_text}，自证造不出「只有带下划线的钉值」的输入')
+    if replaced_count == 0 and grouped_text not in rewritten_text:
+        raise CheckError(f'用例文件里既没有 {plain_text} 也没有 {grouped_text}，自证造不出那一格的输入')
+    return rewritten_text, replaced_count, grouped_text
+
+
+def segment_cell_replaced(row_line, original_span, mutated_span, where):
+    """--selftest 用：只在登记表那一行的「段序列」栏（第二列）里换：row_to_entry 取的段序列是这一栏里最后一个数字串，这里换的也是这一栏里最后一处。
+    出处栏里引的同一串（取号那一行写着「两轮的 `2+2` 由……钉住」）一个字不动。切栏只认没转义的竖线（与 parse_registry_table_rows 同一个认法），切完原样接回。"""
+    pieces = UNESCAPED_PIPE_PATTERN.split(row_line)
+    if len(pieces) < 4 or original_span not in pieces[2]:
+        raise CheckError(f'{where}的段序列栏里找不到 {original_span}——自证定位不到那一栏')
+    cell = pieces[2]
+    at = cell.rfind(original_span)
+    pieces[2] = cell[:at] + mutated_span + cell[at + len(original_span):]
+    return '|'.join(pieces)
+
+
+def mutate_one_segment_number(layout_text, row_label=None, whole_line=False):
     """--selftest 用：把八节表格第一条可比对的行（给了 row_label 就只看第一列是它的那一行），段序列的最后一项加 1。
 
-    只在那一行里换（`replace_once_inside`），免得替换的时候顺手改坏了别的地方——那样测出来的「判红」证明的是别的东西，不是这条检查本身。
+    只在那一行的段序列栏里换（`segment_cell_replaced`），免得替换的时候顺手改坏了别的地方——那样测出来的「判红」证明的是别的东西，不是这条检查本身；
+    同一行的出处栏里引着同一串也不碍事。whole_line=True 是改前的换法（在整行里换，同一行里那一串出现两次就定位不到）：
+    只给「同一行两处同串」那一格在弄坏开关 segment-cell-unscoped 下用，真仓备料的几处一律照段序列栏换。
     """
     section_text = extract_section_eight(layout_text)
     for row_cells in parse_registry_table_rows(section_text):
@@ -609,8 +671,12 @@ def mutate_one_segment_number(layout_text, row_label=None):
         terms = original_segment_sequence_text.split('+')
         terms[-1] = str(int(terms[-1]) + 1)
         mutated_segment_sequence_text = '+'.join(terms)
-        mutated_layout_text = replace_once_inside(layout_text, row_line, original_span, f'`{mutated_segment_sequence_text}`',
-                                                  f'「{entry.row_label}」那一行')
+        where = f'「{entry.row_label}」那一行'
+        if whole_line:
+            mutated_layout_text = replace_once_inside(layout_text, row_line, original_span, f'`{mutated_segment_sequence_text}`', where)
+        else:
+            mutated_row_line = segment_cell_replaced(row_line, original_span, f'`{mutated_segment_sequence_text}`', where)
+            mutated_layout_text = replace_once_inside(layout_text, row_line, row_line, mutated_row_line, where)
         return mutated_layout_text, entry.row_label, original_segment_sequence_text, mutated_segment_sequence_text
     raise CheckError('八节的登记表里找不到一条「不是预想、且带段序列数字串」的行，自证没法造出一个可判红的改动')
 
@@ -767,7 +833,7 @@ def perform_check(repository_root, path_pinning_tests=None):
             lines.append(f'     {mismatch}')
         lines.append('     → 怎么办：表是抄错了，就照钉住那条路径的用例改 .claude/kb/layout/01-first-txn.md 那一行（用例由 cargo test 钉在活代码上，权威在用例）；')
         lines.append('       用例文件或函数改了名，照今天的名字改出处栏或这个脚本的 PATH_PINNING_TESTS；')
-        lines.append('       钉不到用例、只与产物比的那一行，产物过期了就重跑 E142，再让 scripts/experiments/replay.sh 里 E142 那一行的入库产物名字跟上。')
+        lines.append('       钉不到用例、只与产物比的那一行，产物过期了就重跑 E142，再让 scripts/experiment-apparatus/replay.sh 里 E142 那一行的入库产物名字跟上。')
         return 1, lines
 
     compared_total_count = compared_table_row_count + compared_note_count
@@ -899,6 +965,17 @@ def run_self_test():
             candidate = real_repository_root / relative_path
             if relative_path not in pinned_test_files and candidate.is_file():
                 pinned_test_files[relative_path] = candidate.read_text(encoding='utf-8')
+        # 覆盖写固定脚本流那句改成认不出的形状（「N 次写」写成「N 笔写」）：一句都认不出要判红，不当「没有要核的」放过
+        (shape_mutated_layout_text, original_shape_span, mutated_shape_span) = mutate_device_pinned_note_shape(layout_text)
+        # 钉它的用例文件的临时拷贝里，状态数只剩带下划线的 Rust 写法（clippy unreadable_literal 要的分组）：比之前去掉数字间的下划线，要判绿
+        underscore_test_files = dict(pinned_test_files)
+        underscore_descriptions = []
+        for match in DEVICE_PINNED_NOTE_PATTERN.finditer(section_text):
+            if match.group(4) not in underscore_test_files:
+                raise CheckError(f'覆盖写固定脚本流那句点名的用例文件 {match.group(4)} 不在，带下划线那一格造不出输入')
+            (underscore_test_files[match.group(4)], underscore_replaced_count,
+             underscore_grouped_text) = underscore_grouped_pinned_test_text(underscore_test_files[match.group(4)], int(match.group(3)))
+            underscore_descriptions.append(f'{match.group(4)} 里状态数换成 {underscore_grouped_text}（换了 {underscore_replaced_count} 处）')
     except (CheckError, OSError) as error:
         print(f'  ✗ --selftest 备料就失败了：{error}')
         print('     → 怎么办：先跑一次不带 --selftest 的检查，确认真实仓库能正常读出登记表与钉它的用例；'
@@ -916,6 +993,9 @@ def run_self_test():
         red_exit_code, _red_lines = perform_check(fixture('red', mutated_layout_text))
         kind_red_exit_code, _kind_red_lines = perform_check(fixture('kind-red', kind_mutated_layout_text))
         pinned_red_exit_code, _pinned_red_lines = perform_check(fixture('pinned-red', pinned_mutated_layout_text))
+        shape_red_exit_code, shape_red_lines = perform_check(fixture('pinned-shape-red', shape_mutated_layout_text))
+        underscore_green_exit_code, underscore_green_lines = perform_check(
+            build_fixture_root(workspace_path / 'pinned-underscore-green', layout_text, underscore_test_files))
         extra_path_exit_code, extra_path_lines = perform_check(fixture('extra-path', extra_path_layout_text))
         path_red_exit_code, path_red_lines = perform_check(fixture('path-red', path_mutated_layout_text))
         operations_red_exit_code, operations_red_lines = perform_check(fixture('operations-red', operations_mutated_layout_text))
@@ -953,6 +1033,16 @@ def run_self_test():
         problems.append(
             f'把覆盖写固定脚本流的段序列 `{original_pinned_text}` 改成 `{mutated_pinned_text}` 之后，检查仍然判绿——'
             f'装置钉住那一半（闭式、{pinned_test_relative_path} 里的数组）没有判别力'
+        )
+    if shape_red_exit_code != 1 or '都认不出' not in '\n'.join(shape_red_lines):
+        problems.append(
+            f'覆盖写固定脚本流的登记句改成认不出的形状（「{original_shape_span}」写成「{mutated_shape_span}」）之后本该退 1、点出「登记都认不出」，'
+            f'实际退 {shape_red_exit_code}：' + ' / '.join(shape_red_lines)
+        )
+    if underscore_green_exit_code != 0:
+        problems.append(
+            f'钉它的用例文件拷贝里状态数只剩带下划线的写法（{"；".join(underscore_descriptions)}）之后本该判绿，'
+            f'实际退 {underscore_green_exit_code}：' + ' / '.join(underscore_green_lines)
         )
     if extra_path_exit_code != 2 or f'实际剩 {expected_extra_path_remaining_count} 条' not in '\n'.join(extra_path_lines):
         problems.append(
@@ -1039,27 +1129,47 @@ def run_self_test():
             f'实际退 {lines_red_exit_code}：' + ' / '.join(lines_red_lines)
         )
 
+    # 同一行里同一串出现两次（段序列栏一处、出处栏一处，取号那一行就是这样）：自证造一份小布局表，段序列栏那一处换成新串、出处栏那一处不动
+    duplicate_layout_text = (
+        '## 八、根槽写路径的段序列登记表\n\n| 路径 | 段序列 | 出处 | 在不在 |\n|---|---|---|---|\n'
+        f'| {SELFTEST_DUPLICATE_ROW_LABEL} | [两段] ⇒ `2+2`，6 次操作、7 个崩溃状态 | 两轮的 `2+2` 由自证钉住 | 在 |\n\n## 九、下一节\n')
+    try:
+        duplicate_mutated_text, _, _, duplicate_mutated_sequence = mutate_one_segment_number(
+            duplicate_layout_text, SELFTEST_DUPLICATE_ROW_LABEL, whole_line=broken('segment-cell-unscoped'))
+        duplicate_row = next(line for line in duplicate_mutated_text.split('\n') if line.startswith(f'| {SELFTEST_DUPLICATE_ROW_LABEL} |'))
+        duplicate_cells = UNESCAPED_PIPE_PATTERN.split(duplicate_row)
+        duplicate_ok = (duplicate_mutated_sequence == '2+3' and '`2+3`' in duplicate_cells[2] and '`2+2`' not in duplicate_cells[2]
+                        and '`2+2`' in duplicate_cells[3])
+        duplicate_note = f'改完那一行是 {duplicate_row}'
+    except CheckError as error:
+        duplicate_ok, duplicate_note = False, f'备料失败：{error}'
+    if not duplicate_ok:
+        problems.append(f'同一行里同一串出现两次（段序列栏一处、出处栏一处）时自证本该只换段序列栏那一处、出处栏那一处不动：{duplicate_note}')
+
     if problems:
-        print('  ✗ --selftest 没通过：')
         for problem in problems:
-            print(f'     {problem}')
+            print(f'  ✗ {problem}')  # gate-lint:detail
+        print(f'  ✗ --selftest 没通过：{len(problems)} 项（上面逐条列着）')
         print('     → 怎么办：看清楚上面改坏的是哪一行、期望判红的地方是不是真的判了红，')
         print('       再回头检查 perform_check 里对应那一支（与钉住的用例比、与产物比、装置钉住）的比较逻辑；CHECK_SEGMENT_REGISTRY_BREAK 设着的话这里本来就该红。')
         return 1
 
     print(
-        '  ✓ --selftest 通过（17 格，输入是真仓的布局表八、它点名的 crates 用例与脚本旁边的产物样本，不读 research/）：'
+        '  ✓ --selftest 通过（20 格，输入是真仓的布局表八、它点名的 crates 用例与脚本旁边的产物样本，不读 research/）：'
         '未改动的拷贝不摆产物判绿（退出码 0）；'
         f'把「{mutated_row_label}」的段序列改成 `{mutated_segment_sequence_text}` 之后判红（退出码 {red_exit_code}）；'
         f'只把「{kind_mutated_row_label}」第一段的种类 `{original_kind_text}` 改成 `{mutated_kind_text}` 也判红（退出码 {kind_red_exit_code}）；'
         f'把覆盖写固定脚本流的段序列改成 `{mutated_pinned_text}` 也判红（退出码 {pinned_red_exit_code}）；'
+        f'覆盖写固定脚本流的登记句改成认不出的形状（「{mutated_shape_span}」）判红（退出码 {shape_red_exit_code}）；'
+        f'用例拷贝里状态数只剩带下划线的写法（{"；".join(underscore_descriptions)}）判绿（退出码 {underscore_green_exit_code}）；'
         f'八节开头的 path= 声明多写一条 `{EXTRA_DECLARED_PATH_NAME}` 退 {extra_path_exit_code}、消息点出实际剩 {expected_extra_path_remaining_count} 条；'
         f'「{path_entry.row_label}」的段序列改成 `{mutated_path_sequence_text}`、「{original_operations_span}」改成「{mutated_operations_span}」，与钉它的用例 {pinning_function_name} 比各退 1；'
         f'它只能与产物比时，产物不在退 {product_absent_exit_code}（本次未跑）、照登记现造的产物判绿、产物段序列改成 `{product_red_sequence_text}` 退 {product_red_exit_code}；'
         f'样本 {PRODUCT_SAMPLE_PATH.name} 解析出 {len(sample_segment_lines)} 条路径；'
         f'--print-mkfs-segments-line 打出「{MKFS_ROW_LABEL}」那一行（`{mkfs_green_lines[0]}`，按产物行解析回来四样与登记相符），'
         f'段序列改成 `{mutated_mkfs_sequence_text}` 跟着变，那一行改名、抄成两行都退 2；'
-        f'--print-segments-lines 打出 {len(lines_green_lines)} 行（{"、".join(declared_paths)}），段序列改了跟着变'
+        f'--print-segments-lines 打出 {len(lines_green_lines)} 行（{"、".join(declared_paths)}），段序列改了跟着变；'
+        '同一行里段序列栏与出处栏写着同一串时，自证只换段序列栏那一处'
     )
     return 0
 

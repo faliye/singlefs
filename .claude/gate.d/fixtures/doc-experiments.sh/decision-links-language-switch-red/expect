@@ -1,0 +1,4 @@
+exit=1
+want=[没回看] .claude/kb/experiments/01-样本一.md：这次改动里 E1 正文改了，影响的决策表一行都没回看
+want=只改语言切换行的改动 0 份不算正文改了
+want=doc-experiments.sh：1 格里 1 格红（decision-links）

@@ -84,6 +84,7 @@ import json  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
 import shlex  # noqa: E402
+import math  # noqa: E402
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
@@ -95,6 +96,10 @@ SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIRECTORY)
 import memory_peaks_lib as peaks  # noqa: E402
 
+# bash -c 起的两份脚本：多机配置的判法、第二台那几段的共用库。写成模块常量（函数单元键按字面折得出、连到那两份；
+# 放进 Options 的字段里就折不出，起它们的那两处拒算 shell-path-unfolded）
+CONFIGURATION_CHECK = os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-point-replay-shard-configuration-check.sh")
+PEER_HOST_LIB = os.path.join(SCRIPT_DIRECTORY, "peer-host-lib.sh")
 HOST_TIMEOUT_SECONDS = 12.0
 SAMPLE_SECONDS = 1.0
 PROBE_MARK = "HOST_RESOURCES_PROBE "
@@ -240,8 +245,6 @@ class Machine:
 @dataclass
 class Options:
     settings: object             # host-dispatch.py 的 Settings：峰值表、显存峰值表、派发器与清场包装的状态目录、环境
-    configuration_check: str
-    peer_host_lib: str
     sample_seconds: float = SAMPLE_SECONDS
     host_timeout_seconds: float = HOST_TIMEOUT_SECONDS
 
@@ -249,11 +252,17 @@ class Options:
 def options_from_environment():
     settings = dispatcher().settings_from_environment()
     environment = settings.environment
+    def positive_seconds(name, default):
+        try:
+            seconds = float(environment.get(name) or default)
+        except ValueError:
+            raise ValueError(f"{name} 要是大于 0 的有限秒数") from None
+        if not math.isfinite(seconds) or seconds <= 0:
+            raise ValueError(f"{name} 要是大于 0 的有限秒数")
+        return seconds
     return Options(settings=settings,
-                   configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-point-replay-shard-configuration-check.sh"),
-                   peer_host_lib=os.path.join(SCRIPT_DIRECTORY, "peer-host-lib.sh"),
-                   sample_seconds=float(environment.get("HOST_RESOURCES_SAMPLE_SECONDS") or SAMPLE_SECONDS),
-                   host_timeout_seconds=float(environment.get("HOST_RESOURCES_HOST_TIMEOUT_SECONDS") or HOST_TIMEOUT_SECONDS))
+                   sample_seconds=positive_seconds("HOST_RESOURCES_SAMPLE_SECONDS", SAMPLE_SECONDS),
+                   host_timeout_seconds=positive_seconds("HOST_RESOURCES_HOST_TIMEOUT_SECONDS", HOST_TIMEOUT_SECONDS))
 
 
 def load_machines(options):
@@ -263,13 +272,13 @@ def load_machines(options):
         environment["MULTI_HOST_CONFIGURATION_BREAK"] = ",".join(filter(None, [environment.get("MULTI_HOST_CONFIGURATION_BREAK"), "switch-off-is-on"]))
     loader = ('assignments="$(bash "$1" --emit-hosts "$2")"; status=$?; if ((status != 0)); then exit "$status"; fi; eval "$assignments"; '
               'for name in ${!MULTI_HOST_@} CRASH_POINT_REPLAY_SHARD_CONFIGURATION_FILE QUIESCE_STOP_COMMAND PEER_SSH_HOST; do printf "%s=%s\\0" "$name" "${!name}"; done')
-    completed = subprocess.run(["bash", "-c", loader, "host-resources", options.configuration_check, options.settings.repository_root],
+    completed = subprocess.run(["bash", "-c", loader, "host-resources", CONFIGURATION_CHECK, options.settings.repository_root],
                                capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL)
     machines = [Machine(1)]
     if completed.returncode == 3:
         return machines, {}, "多机配置里跨机开关 ENABLE_ACROSS_MACHINES 没开：只报本机"
     if completed.returncode != 0:
-        return machines, {}, (f"多机配置判不过（判法 {os.path.basename(options.configuration_check)} 退 {completed.returncode}；"
+        return machines, {}, (f"多机配置判不过（判法 {os.path.basename(CONFIGURATION_CHECK)} 退 {completed.returncode}；"
                               "单跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 看原因）：只报本机")
     values = dict(item.split("=", 1) for item in completed.stdout.split("\0") if "=" in item)
     count = int(values.get("MULTI_HOST_COUNT") or 0)
@@ -314,7 +323,7 @@ def run_on_machine(options, machine, text):
               'peer_host_run / "$5"')
     timeout = None if broken("no-host-timeout") else options.host_timeout_seconds
     try:
-        completed = subprocess.run(["bash", "-c", runner, "host-resources", options.peer_host_lib, machine.ssh_host,
+        completed = subprocess.run(["bash", "-c", runner, "host-resources", PEER_HOST_LIB, machine.ssh_host,
                                     machine.cargo_bin_directory, machine.repository_directory, text],
                                    capture_output=True, text=True, env=options.settings.environment, timeout=timeout, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
@@ -595,12 +604,13 @@ def main(arguments, options=None, output=None):
     output = output or (lambda text: print(text, flush=True))
     try:
         as_json, gpu, command, shard, estimated_hours = parse_arguments(arguments)
+        options = options or options_from_environment()
     except ValueError as error:
         print(f"  ✗ host-resources.py 用法错：{error}", file=sys.stderr)
         print("  → 怎么办：host-resources.py [--json]，或 host-resources.py [--json] [--gpu] [--shard <k>/<n>] [--estimated-hours <小时>] -- <命令…>、--selftest",
               file=sys.stderr)
         return EXIT_USAGE
-    result = collect(options or options_from_environment(), command, gpu, shard, estimated_hours)
+    result = collect(options, command, gpu, shard, estimated_hours)
     output(json.dumps(public_json(result), ensure_ascii=False) if as_json else render(result))
     return 1 if command and result["command"]["fits_on"] is None else 0
 
@@ -735,7 +745,7 @@ class SelftestWorld:
             peak_table=self.peak_table, gpu_peak_table=self.gpu_peak_table,
             state_directory=os.path.join(self.directory, "dispatch-state"), quiesce_state_directory=os.path.join(self.directory, "quiesce-state"),
             environment=environment, duration_table=self.duration_table)
-        return Options(settings=settings, configuration_check=settings.configuration_check, peer_host_lib=settings.peer_host_lib,
+        return Options(settings=settings,
                        sample_seconds=0.0, host_timeout_seconds=host_timeout_seconds)
 
     def ssh_calls(self):

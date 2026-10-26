@@ -1,0 +1,7 @@
+exit=0
+want=挂钟算式本次未判 1 份：「预计挂钟：」那一行写不出态数或单态耗时（或写了而没有挂钟可比）：research/prompts/e994-preregistration.md:8
+want=跑前登记的「并行与挂钟」：查了 4 份（research/prompts/e186-preregistration.md、research/prompts/e187-preregistration.md、research/prompts/e197-preregistration.md、research/prompts/e994-preregistration.md），五样都写全了；号小于 186 不判的 1 份：research/prompts/e100-preregistration.md
+want=挂钟算式判了 3 条（3 份）；挂钟算式本次未判 1 份（写不出态数或单态耗时）：research/prompts/e994-preregistration.md:8
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（preregistration-parallelism），0 格本次未跑（无）

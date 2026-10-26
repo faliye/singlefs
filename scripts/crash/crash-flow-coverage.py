@@ -65,27 +65,44 @@
 弄坏开关（只给 --selftest 证红用）CRASH_FLOW_COVERAGE_BREAK=<项>（几个用逗号连）。逐项写开关名、弄坏哪一处，下一行写打开后自证哪几格红
 （格名是 selftest_cases() 里那一格的名字；门禁 checker-tier-crash-point-replay 的样本哪一份判错写在那道门禁文件头）：
   CRASH_FLOW_COVERAGE_BREAK=unregistered-entry-accepted  coverage 不判登记表外的入口
-      coverage-unregistered-entry
+      「✗ 自检 coverage-unregistered-entry：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=entry-absence-unchecked  coverage 不判登记的入口在这个域里一条行都没有
-      coverage-entry-without-lines
+      「✗ 自检 coverage-entry-without-lines：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=step-kind-coverage-unchecked  coverage 不判 StepKind 成员没被罩住
-      coverage-new-step-kind-member、coverage-only-ignored-does-not-cover
+      「✗ 自检 coverage-new-step-kind-member：」、「✗ 自检 coverage-only-ignored-does-not-cover：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=any-expansion-covers  罩住照「出现」算，不看 expansion=expanded
-      coverage-only-ignored-does-not-cover、table
+      「✗ 自检 coverage-only-ignored-does-not-cover：」、「✗ 自检 table：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=incomplete-judged-as-complete  有 unknown 记录或 --subset 时照样判入口没有行与成员没被罩住
-      coverage-incomplete-is-not-run、coverage-subset-is-not-run
+      「✗ 自检 coverage-incomplete-is-not-run：」、「✗ 自检 coverage-subset-is-not-run：」
+      「✗ StepKind 成员 Barrier 在 quick 域里没被任何一条流罩住（没有一条 step=Barrier expansion=ex」
+      「✗ crash-flow-coverage（quick 域）：覆盖行 2 条，2 处不对（逐处列在上面）」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=ignored-growth-accepted  ignored 不判比基准多出来的节点
-      ignored-one-more-node
+      「✗ 自检 ignored-one-more-node：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=unseeded-marker-ignored  两张基准不认「# 初值：未填」，照空基准判
-      baselines-unseeded
+      「✗ 自检 baselines-unseeded：」
+      「✗ crash-ignored-nodes：这一趟 ignore 开着的节点 1 个（ignored_point 0、registered_se」
+      「✗ quick…sample_stream:CHECKER…I-2.1 评估过 0 次，基准里没有这一行」
+      「✗ quick…sample_stream:CRASH_POINT_REPLAY_SAMPLE_FAST…I-2.1 评估过 0 次，基准里没有」
+      「✗ invariant-zero-evaluations（quick 域）：2 条流，评估 0 次的对 2 个，其中 2 个不在基准里」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=zero-growth-accepted  zero-evaluations 不判基准外的 0 次对
-      zero-evaluations-new-zero
+      「✗ 自检 zero-evaluations-new-zero：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=empty-reason-accepted  zero-evaluations 不判基准里理由空着的行
-      zero-evaluations-empty-reason
+      「✗ 自检 zero-evaluations-empty-reason：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=reuse-without-recall  collect-quick 照改前：复用的测试二进制不取回存着的行、也不报 unknown
-      collect-quick-recalls-reused-binary、collect-quick-partial-reuse-is-unknown
+      「✗ 自检 collect-quick-recalls-reused-binary：」、「✗ 自检 collect-quick-partial-reuse-is-unknown：」
+      「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=block-count-unchecked  last-full 不核块行数与 not_full_under_the_current_key
-      last-full-block-count
+      「✗ 自检 last-full-block-count：」
+      「✗ 自检 …格里有…格判错」
 """
 import glob
 import hashlib

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓、此刻的 Verus 安装与 cargo 缓存，上一次的结论不替这一次作保
 # run-condition: none 要的 Verus、cargo 与装置由各格的判法自己判，缺了判红；核还没进仓时 Verus 那四格报本次未跑
-# gate-stage: 形式化验证（Verus 证明恢复重放取前缀的核，版本钉住、空真与必红世界；E165 全量的红例钉进快档）
+# gate-stage: 形式化验证（Verus 证明恢复重放取前缀的核，版本钉住、空真与必红世界按落点判；E165 全量的红例钉进快档；两条本该独立的腿的同源性计数器）
 # gate-fixture: yes
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-lkmm.sh 同是起外部验证器的一道，接法相同（判法放脚本、每条判定按单元键进判定库 scripts/crash/lib_verdict_library.py）；它起 herd7 判 litmus，这里起 Verus 判 crates/ 的证明，并进去会让两件不相干的事共用一份判定库的种类与出路
@@ -9,18 +9,21 @@
 # gate-similar: code-source-discipline.sh 它的 mutation-tables 格静态判实验二进制的变异表成形、锚点唯一；这里判 E165 钉住红例的表本身、并逐行在今天的实现上重放
 # gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格整份复跑入库实验比产物；这里只逐行重放钉住的红例（快档）
 # gate-similar: checker-tier-crash-point-replay.sh 它判崩溃点重放与登记的崩溃枚举用例；这里判证明与有界穷举的红例，不起崩溃枚举
+# gate-similar: checker-independence-and-sync.sh 它判 checker 与实现、RefFS 与实现的依赖闭包不相交（结构上的独立）；same-origin-counter 格数的是两条腿运行时的不一致事件（统计上的独立），读 divergence-events.tsv 一张表、不看依赖，并进它会让一道结构门禁去读事件账
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就六格按下面的次序全跑，格名写错退 2）：
-# gate-cell: verus-toolchain-pinned Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹都与登记相同
-# gate-cell: verus-proof Verus 带 --no-cheating 逐项验核里 verus! 有证明义务的单元（proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone），每项限时内出结局、errors 0、verified 至少 1，各项 verified 之和等于登记的数，核里没有作弊标记
-# gate-cell: verus-vacuity 核里每一处 requires 的函数体头插 assert(false) 都验不过（前置条件可满足，不空真）
-# gate-cell: verus-must-red-worlds 必红世界表每行改坏核之后 Verus 都报错、证明错条数等于第五段的 proof_errors=，原文恰好命中一次
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就七格按下面的次序全跑，格名写错退 2）：
+# gate-cell: verus-toolchain-pinned Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹、Verus 与产品的 rustc 版本都与登记相同
+# gate-cell: verus-proof Verus 逐项验登记的各 crate 被验区域里有证明义务的单元（按全路径：proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone，impl 与 trait 里的方法也算），每项限时内出结局、errors 0、verified 至少 1，各 crate 各项 verified 之和等于它登记的数，整格再完整验证 crate、产品构建与 verus --compile 构建的 MIR 逐条目相同；起 Verus 之前判被验区域：可信声明与 cfg 原子照信任清单逐条登记，axiom、作弊标记与 verus! 外面被验类型的 trait impl 判红
+# gate-cell: verus-vacuity 核里每一处 requires 的函数体头插 assert(false) 都验不过（未检出入口空真；可满足性另由构造见证证明）
+# gate-cell: verus-must-red-worlds 先查函数与不变式负例覆盖；必红世界表每行改坏核之后 Verus 都报错、证明错落在第六段 landing= 登记的函数里（条数只报不判），原文恰好命中一次
 # gate-cell: pinned-red-examples-table 钉表 e165-pinned-red-examples.tsv 自己：每行 22 段整行抄带档、第 1 段与第 2、3、7 段重算的指纹相同、抄来的账行与自己的段对得上、第 22 段是规范写法的档，点名的变异还在它的表里；不读红例账、kill-bounds 产物与 research/ 下任何文件
 # gate-cell: pinned-red-examples-replay 钉住的每一行是 22 段整行抄带档、抄来的账行与自己的段对得上，点名的变异还在它的表里，装置按档在今天的实现上逐行打的结果与原实现期望的逐态行逐字节相同
+# gate-cell: same-origin-counter 同源性计数器：不一致事件表 divergence-events.tsv 里每个已立的对累计 ≥ 5 次不一致而判「spec 错」0 次即判红；未立的对报未立、不计入，条款欠一句不计入累计
 # 参数解析、每格一个子 shell、汇总与退出码经共用库 lib/stage-cells.sh。
 #
 # 判法都在两份脚本里（判据、默认值、弄坏开关写在各自文件头），这一道只接进门禁、给样本开关：
-#   Verus 四格：scripts/gate/verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根>，登记表 .claude/gate.d/verus-pins.tsv。
+#   Verus 四格：scripts/gate/verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根>，登记表 .claude/gate.d/verus-pins.tsv（crate 行可以多条：
+#     replay-prefix 直接起 verus，singlefs-core 这一种第四段写 cargo、经 cargo verus focus 验），信任清单 .claude/gate.d/verus-trust-list.tsv（verus-proof 格判）。
 #     核没进仓（登记的核不在、crate 不依赖 vstd、src 里没有 verus!）时四格都退 77；核不在而 crate 已经接了 Verus 判红。
 #     读的环境变量：GATE_VERUS_TIMEOUT_SECONDS（限时，默认 600 秒，超时判红：C5（Z3 超时当通过））、GATE_VERUS_MEMORY_MAX（默认 4G）、
 #     GATE_VERUS_JOBS（几处同时验）、SINGLEFS_THREAD_CAP（线程，没设取登记的重活默认并行度 .claude/heavy-thread-default）、SINGLEFS_VERUS_ROOT（Verus 安装目录，盖过登记表）。
@@ -28,8 +31,8 @@
 #     判法往文件里写一行「哪一处<TAB>出路」，这一格与后面几格还没起的 Verus 都不再排队（已经起了的照常收），pinned-red-examples-replay 格读到它就不编装置、不起重放，
 #     各报「没跑成：内存包装排不上，没再排队」，各格的汇总之后另打一行「这一道没跑成：内存包装排不上」；出路照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段。
 #     所以整道最坏只等一次等待上限（RUN_WITH_MEMORY_CAP_WAIT_SECONDS，带 SINGLEFS_HEAVY_TESTS 时默认 3600 秒），不是每处、每格各等一次。
-#   红例两格：scripts/experiments/e165-pin-red-examples.py --check-table / --replay，表的格式写在 .claude/gate.d/e165-pinned-red-examples.tsv 表头；
-#     table 格只读钉表与变异表，不读红例账、kill-bounds 产物与 research/ 下任何文件（钉全由 E165 第二段驱动 scripts/experiments/e165-replay-mutation-kill-bounds.sh
+#   红例两格：scripts/experiment-apparatus/e165-pin-red-examples.py --check-table / --replay，表的格式写在 .claude/gate.d/e165-pinned-red-examples.tsv 表头；
+#     table 格只读钉表与变异表，不读红例账、kill-bounds 产物与 research/ 下任何文件（钉全由 E165 第二段驱动 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh
 #     写完一对账与产物时当场判，写法在它文件头「钉红例」一段）；每行的 ㉒ 是出那份账的那一趟的档，replay 按档分组起装置、每组带 ㉒ 的参数（例 --profile r2）。
 #     --replay 编装置的内存上限读 GATE_E165_PINNED_MEMORY_MAX（默认 2G，由那份脚本读）。
 #     装置 e165_replay_bounded_enumeration 还不认 --pinned-cases 时，replay 格判完「变异还在」那一半就退 77。
@@ -37,7 +40,7 @@
 # 复用：每条（证明按函数、空真每处 requires、必红世界每行、钉表每行）一条判定，键是这一条涉及的 Verus 函数单元（被验 fn、它 requires / ensures 用到的
 #   spec fn 与 proof fn）去注释后的指纹、Verus 与 vstd 版本；钉表行的键是那一行档与参数重放真走到的装置函数单元闭包、状态输入、期望逐态行、变异原文与替换文；
 #   限时不进键；空真项身份是所属函数单元指纹加函数内第几处，不带路径与行号。格不复用，不问 stage-must-run.sh，不写全绿标记：一格判绿就是它的每一条判定都判绿
-#   （现判的或复用的），verus-toolchain-pinned 与 pinned-red-examples-table 每趟现判（只读几份文件，几秒）。
+#   （现判的或复用的），verus-toolchain-pinned、pinned-red-examples-table 与 same-origin-counter 每趟现判（只读几份文件，几秒）。必红世界每行的键里是改坏的原文、替换文与第六段落点（landing=），第五段条数只报、不进键。
 #   每条判定的键、判法单元指纹（判结局的那几个函数的单元闭包键，判定库与 lib_function_units.py 不进）写在两份判法脚本文件头「逐项点名与按条复用」，
 #   存放、组成清单与作废时报出变了的单元写在判定库 scripts/crash/lib_verdict_library.py 文件头。
 #   判定库：真仓与 --staged 下在被判那棵树的 git common-dir 的 singlefs-formal-unit-verdicts/（GATE_FORMAL_VERDICT_LIBRARY 盖过它；2026-10-15 前的
@@ -62,9 +65,13 @@
 #   verus-proof-timeout-red：rlimit 设成无穷、样本限时 20 秒；verus-proof-killed-red：替身 Verus 起来就 kill -9 自己，判红，✗ 写「Verus 被信号停了」；
 #   pinned-red-examples-replay-killed-red：桩装置打一行就 kill -9 自己，判红，✗ 写「装置被信号停了」；这两份另核汇总出路里「被信号停了」那一句（不改证明或实现）
 #   verus-proof-kernel-absent（核没进仓）、pinned-red-examples-replay-device-absent（没有桩、装置源码不认 --pinned-cases）：退 77
+#   pinned-red-examples-replay-rocksdb-entry-refused：同 device-absent（没有桩），另放依赖 rocksdb 的 crates/singlefs-checker-tier/Cargo.toml：
+#     起装置的 cargo build 之前 rocksdb-prebuilt.py entry 判红（样本根没有 Cargo.lock，进程环境有没有取值都红），这一格退 1、装置没编
 #   verus-vacuity-closure-red：外层函数的前置条件可满足、里面闭包的不可满足
-#   verus-must-red-worlds-：-rlimit-red 改坏之后只剩 rlimit 用尽；-rlimit-with-proof-error-green 另有一条证明错（proof_errors=1）；
-#     -legacy-expectation-red 第五段旧写法「verified, 1 errors」；-proof-error-count-red 一条证明错、第五段写 proof_errors=2
+#   verus-must-red-worlds-：-rlimit-red 改坏之后只剩 rlimit 用尽；-rlimit-with-proof-error-green 另有一条证明错（proof_errors=1，落点是那条证明错所在的函数）；
+#     -legacy-expectation-red 第五段旧写法「verified, 1 errors」；-proof-error-count-drift-green 一条证明错、第五段写 proof_errors=2：条数对不上而落点没变，只报不判，判绿；
+#     -landing-moved-red 条数对得上而第六段落点登记成别的函数，判红；-landing-missing-red 五段的旧行，判红并指到补落点的办法（C654）
+#   same-origin-counter-*：只放 .claude/gate.d/divergence-events.tsv（不起 Verus）；文件头「弄坏开关」一段点名各让哪份判错
 #   pinned-red-examples-table-green：根里没有 research/，钉表三行好，判绿；-table-archived-ledger-green：research/results/ 下有一份账、同一趟的 kill-bounds 产物不在（归档了），
 #     钉表好，照判绿（这一格不读账与产物）；-table-red：一行的 ① 与 ②③⑦ 重算的不同；-table-variant-red：⑥ 点名的变异不在 crates/mutations.tsv 里了；
 #     -table-profile-red：一行的 ㉒ 写成「--profile r1 --table direct」（默认值也写了，不是规范写法）
@@ -73,9 +80,20 @@
 #     -replay-profile-missing-red：有一行没写档（21 段），判红、出路给 --backfill
 #   Verus 那几份样本起的是真的 Verus（SINGLEFS_VERUS_ROOT 或登记表 release 行的安装目录），没装就判红，与真仓一样；verus-proof-killed-red 起替身
 #   （设了 SINGLEFS_VERUS_ROOT 时它盖过登记表、起的是真 Verus，这一份判错）。
+#   被验区域与多 crate 的那几份（出口 5 第三轮判决第三节「门禁」；要拦的写法取自 research/prompts/m4-exit5-relocation-proof-r2-opus-model/verus/ 与
+#   research/prompts/m4-exit5-relocation-proof-r3-sonnet-model/verus/ 里的例子，样本核的文件头写着取自哪一份）：
+#     verus-proof-trust-unregistered-red（binary_search 的 assume_specification 没登记）、-trust-registered-green（登记齐了：规格原文 sha256、差分测试名，
+#     不带 --no-cheating 照验、MIR 比对相同）、-trust-digest-red（登记的 sha256 不对）、-trust-test-missing-red（差分测试不在）、-trust-vstd-red（vstd 行版本不对）、
+#     -axiom-red（axiom fn）、-axiom-broadcast-red（broadcast axiom）、-cfg-feature-red（#[cfg(feature)] 分叉的两份 pick）、-cfg-debug-assertions-red（cfg!(debug_assertions)）、
+#     -cfg-macro-red（宏在 verus! 外面定义、展开里带 cfg!）、-mir-divergence-red（同一个宏的 cfg 登记了，静态那一关过了，红在 MIR 比对上：产品构建 start + 1、
+#     verus --compile 编出 start + span）、-trait-impl-outside-red（被验 trait 在 verus! 外面的 impl；cfg(test) 下的不判）、-external-trait-spec-red
+#     （external_trait_specification 没登记）、-verifier-external-red（#[verifier::external]）、-attribute-kernel-red（#[verus_verify] 标的文件没登记成核）、
+#     -core-function-green（登记一个 core 小函数：crate 行第四段 cargo、带路径依赖 singlefs-format，impl 里的方法照全路径成项，cargo verus build 的 MIR 相同）；
+#     verus-must-red-worlds-list-items-two-crates（两个 crate 逐个列项、全路径不重名）；verus-toolchain-pinned-rustc-red（rustc 行的产品 rustc 版本与 .formal-sample/rustc-version 不同）
 # 只供样本的开关（被判的根不是这道阶段所在的仓、也没设 GATE_STAGED_FROM 时才认；真仓与 --staged 下放了也不认）：
 #   .formal-sample/verus-install/         版本一致格改读这里的 version.json（不起它）
 #   .formal-sample/cargo-home/            版本一致格改读这里的 registry/src/*/
+#   .formal-sample/rustc-version          版本一致格把这份文件当产品 rustc -vV 的输出（不起 rustc；样本的 rustc 行照它写）
 #   .formal-sample/verus-timeout-seconds  Verus 那几格的限时改成文件里的秒数
 #   .formal-sample/e165-stub.sh           replay 格改用这个桩当装置（经 bash 起，不经内存包装）
 #   .formal-sample/list-items             当成给了 --list-items（样本没法带参数）
@@ -84,7 +102,7 @@
 #   .formal-sample/quick                  当成给了 --quick（样本 quick-green、quick-red：核没进仓，toolchain 与 proof 两项本次未跑，table 照钉表判绿 / 判红）
 #   .formal-sample/run-twice              判定库放这一趟的临时目录、读，整道接连跑两趟：第二趟按条全复用（按条复用的样本）
 # 弄坏开关：格的判法那一份的开关 VERUS_PROOF_CHECK_BREAK=<项> 与 E165_PIN_RED_EXAMPLES_BREAK=<项>（逐项让哪份样本判错写在两份脚本的文件头）；
-#   汇总与 --check 的归共用库（STAGE_CELLS_BREAK=red-swallowed 让每份红样本整道退 0；marker-ignored 让每份样本六格都跑，汇总那条「跑了 1 格」找不到）。
+#   汇总与 --check 的归共用库（STAGE_CELLS_BREAK=red-swallowed 让每份红样本整道退 0；marker-ignored 让每份样本七格都跑，汇总那条「跑了 1 格」找不到）。
 #   逐项点名与按条复用：判法那一半的开关在两份脚本文件头「逐项点名与按条复用」；这一道自己接的那一半 FORMAL_VERIFICATION_BREAK=<项>[,<项>…]，
 #   自证是 scripts/gate/admission.py --selftest 的 run_formal_item_cells（临时仓里跑这份脚本、两份判法换成记参数的假驱动）：
 #     items-unchecked       --item 写错的项名悄悄丢掉、不退 2        自证「--item 写错退 2」那一条红；样本 pinned-red-examples-replay-item-unknown 判错
@@ -92,6 +110,49 @@
 #     library-in-tmpdir     判定库放 $TMPDIR（门禁每轮新给、跑完删）而不是 git common-dir   自证「判定库在 git common-dir」那一条红
 #     quick-core-unselected  --quick 不把核心部分那三项放进点名，照整道跑                    样本 quick-green 判错（输出里找不到「--quick：核心部分」）
 #     list-items-without-library  --list-items 不把判定库交给 verus-proof-check.py list-items（键对不上几条不报）   样本 verus-must-red-worlds-list-items-key-counts 判错
+#     rocksdb-entry-unchecked  pinned-red-examples-replay 不带 --binary 时起装置的 cargo build 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#                              样本 pinned-red-examples-replay-rocksdb-entry-refused 判错（输出里找不到「rocksdb-prebuilt entry：」，退 77：装置源码不认 --pinned-cases）
+#   被验区域与多 crate（判法在 scripts/gate/verus-proof-check.py，那份文件头「被验区域与多 crate 的弄坏开关」一段另列打开之后自证哪几格判错）的开关，
+#   开关一行、下一行起写打开之后判错的样本：
+#   FORMAL_VERIFICATION_BREAK=single-crate-registry  登记表只认第一个 crate
+#       verus-must-red-worlds-list-items-two-crates（core 那几项列不出来）
+#   FORMAL_VERIFICATION_BREAK=cargo-mode-ignored  crate 行第四段 cargo 不认、照直接起 verus 判
+#       verus-proof-core-function-green（判红：除 vstd 之外还依赖 singlefs-format）
+#   FORMAL_VERIFICATION_BREAK=methods-refused  impl 与 trait 里的方法判红、要挪成自由 fn
+#       verus-proof-core-function-green、verus-must-red-worlds-list-items-two-crates
+#   FORMAL_VERIFICATION_BREAK=attribute-mode-unrecognized  #[verus_verify] 标的文件不当核
+#       verus-proof-attribute-kernel-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=no-cheating-kept  照旧带 --no-cheating
+#       verus-proof-trust-registered-green（判红：Verus 拒 assume_specification）
+#   FORMAL_VERIFICATION_BREAK=trust-list-unchecked  信任清单不判
+#       verus-proof-trust-unregistered-red、verus-proof-external-trait-spec-red、verus-proof-trust-test-missing-red、verus-proof-trust-digest-red、verus-proof-trust-vstd-red
+#   FORMAL_VERIFICATION_BREAK=trust-digest-unchecked  不比登记的规格原文 sha256
+#       verus-proof-trust-digest-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=trust-test-unchecked  不核差分测试名
+#       verus-proof-trust-test-missing-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=trust-vstd-unchecked  不核信任清单的 vstd 行
+#       verus-proof-trust-vstd-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=axiom-accepted  核里的 axiom 不判
+#       verus-proof-axiom-red、verus-proof-axiom-broadcast-red（找不到「核里有 axiom」）
+#   FORMAL_VERIFICATION_BREAK=cfg-atom-accepted  被验区域里的 cfg 原子不认
+#       verus-proof-cfg-feature-red、verus-proof-cfg-debug-assertions-red、verus-proof-cfg-macro-red（找不到「没登记进信任清单」）
+#   FORMAL_VERIFICATION_BREAK=cfg-macro-unchecked  定义里有 cfg 的宏在被验区域里的调用不认
+#       verus-proof-cfg-macro-red（只剩 MIR 比对那一句红，找不到「#plus_span! 没登记进信任清单」）
+#   FORMAL_VERIFICATION_BREAK=trait-impl-outside-accepted  被验 trait 在 verus! 外面的 impl 不判
+#       verus-proof-trait-impl-outside-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=mir-compare-skipped  不比产品构建与 Verus 构建的 MIR
+#       verus-proof-mir-divergence-red（判绿）、verus-proof-trust-registered-green、verus-proof-core-function-green、verus-proof-green（找不到 MIR 那一句）
+#   FORMAL_VERIFICATION_BREAK=rustc-pin-unchecked  不核登记表 rustc 行
+#       verus-toolchain-pinned-rustc-red（判绿）
+#   同源性计数器格（same-origin-counter；判法在本文件 cell_same_origin_counter，表是 .claude/gate.d/divergence-events.tsv）的开关，开关一行、下一行起写打开之后判错的样本：
+#   FORMAL_VERIFICATION_BREAK=same-origin-zero-spec-wrong-unchecked  不判「累计 ≥ 5 次而 spec 错 0 次」
+#       same-origin-counter-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=same-origin-clause-gap-counted  条款欠一句也计入累计
+#       same-origin-counter-clause-gap-green（判红）
+#   FORMAL_VERIFICATION_BREAK=same-origin-unbuilt-reported-green  未立的对当已立的对数、报绿
+#       same-origin-counter-green（找不到「已立 2 对、未立 1 对」）、same-origin-counter-red（汇总里「未立 1 对」找不到）、same-origin-counter-unbuilt-event-red（判绿）
+#   FORMAL_VERIFICATION_BREAK=same-origin-unbuilt-events-accepted  未立的对收了事件也不判红
+#       same-origin-counter-unbuilt-event-red（判绿）
 #   红例两格的开关，开关一行、下一行起写打开之后判错的样本（自证格写在 e165-pin-red-examples.py 文件头）：
 #   E165_PIN_RED_EXAMPLES_BREAK=table-check-globs-research  table 格照改前的判法：取 research/results/e165-*-red-examples.tsv、按文件名配产物判钉全
 #       pinned-red-examples-table-archived-ledger-green（判红：产物不在）、pinned-red-examples-table-green（退 77：没有账）
@@ -124,20 +185,22 @@ source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 VERUS_CHECK="$STAGE_REPOSITORY/scripts/gate/verus-proof-check.py"
-PIN_CHECK="$STAGE_REPOSITORY/scripts/experiments/e165-pin-red-examples.py"
+PIN_CHECK="$STAGE_REPOSITORY/scripts/experiment-apparatus/e165-pin-red-examples.py"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
-stage_cell verus-toolchain-pinned cell_verus_toolchain_pinned "Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹都与登记相同" \
+stage_cell verus-toolchain-pinned cell_verus_toolchain_pinned "Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹、Verus 与产品的 rustc 版本都与登记相同" \
   "装登记的 Verus 发布或用 SINGLEFS_VERUS_ROOT 指到它；缓存不对就删掉那个包目录再 cargo fetch --locked；要换版本先照 .claude/gate.d/verus-pins.tsv 的注释复核同源再改登记"
-stage_cell verus-proof cell_verus_proof "Verus 带 --no-cheating 逐项验核里 verus! 有证明义务的单元（proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone），每项限时内出结局、errors 0、verified 至少 1，各项 verified 之和等于登记的数，核里没有作弊标记" \
+stage_cell verus-proof cell_verus_proof "Verus 逐项验登记的各 crate 被验区域里有证明义务的单元（按全路径：proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone，impl 与 trait 里的方法也算），每项限时内出结局、errors 0、verified 至少 1，各 crate 各项 verified 之和等于它登记的数，整格再完整验证 crate、产品构建与 verus --compile 构建的 MIR 逐条目相同；起 Verus 之前判被验区域：可信声明与 cfg 原子照信任清单逐条登记，axiom、作弊标记与 verus! 外面被验类型的 trait impl 判红" \
   "照 Verus 报错的位置修证明或实现；verified 数变了而确是加减了证明，就改 .claude/gate.d/verus-pins.tsv 的 crate 行并写明加减了哪几个；超时先查哪条查询慢，不许靠放宽限时了事；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改证明或实现；✗ 行写「被信号停了」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，这一次的输出不算判定，不改证明或实现"
-stage_cell verus-vacuity cell_verus_vacuity "核里每一处 requires 的函数体头插 assert(false) 都验不过（前置条件可满足，不空真）" \
+stage_cell verus-vacuity cell_verus_vacuity "核里每一处 requires 的函数体头插 assert(false) 都验不过（未检出入口空真；可满足性另由构造见证证明）" \
   "验得过的那一处前置条件不可满足：改前置条件让它可满足；插入点认错了就按 scripts/gate/verus-proof-check.py 的 requires_insertion_points 改写法；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件"
-stage_cell verus-must-red-worlds cell_verus_must_red_worlds "必红世界表每行改坏核之后 Verus 都报错、证明错条数等于第五段的 proof_errors=，原文恰好命中一次" \
-  "锚点腐化就照今天的核改那一行的原文；改坏了还验得过就补证明或收紧 spec；第五段照约定写 proof_errors=<证明错条数>（不数 rlimit 用尽），条数变了先确认红的还是这条变异要盯的那一处再改；表在 .claude/gate.d/verus-pins.tsv 的 must-red-worlds 行点名的路径；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改表或证明"
+stage_cell verus-must-red-worlds cell_verus_must_red_worlds "先查函数与不变式负例覆盖；必红世界表每行改坏核之后 Verus 都报错、证明错落在第六段 landing= 登记的函数里（条数只报不判），原文恰好命中一次" \
+  "锚点腐化就照今天的核改那一行的原文；改坏了还验得过就补证明或收紧 spec；落点换了先确认红的还是这条变异要盯的那一处（落到别的函数多半是证明或 spec 改过，改证明或换改法），确是本意再照红句里的实测改第六段 landing=<函数名>[,<函数名>…]；条数跳了不用管，第五段 proof_errors=<证明错条数> 只报不判；五段的旧行跑 python3 scripts/gate/verus-proof-check.py must-red-landings <根> --write 补第六段（重型，由主 agent 起）；表在 .claude/gate.d/verus-pins.tsv 的 must-red-worlds 行点名的路径；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改表或证明"
 stage_cell pinned-red-examples-table cell_pinned_red_examples_table "钉表 e165-pinned-red-examples.tsv 自己：每行 22 段整行抄带档、第 1 段与第 2、3、7 段重算的指纹相同、抄来的账行与自己的段对得上、第 22 段是规范写法的档，点名的变异还在它的表里；不读红例账、kill-bounds 产物与 research/ 下任何文件" \
-  "表只由 scripts/experiments/e165-pin-red-examples.py 写：8 段的旧行与 21 段没写档的行跑 python3 scripts/experiments/e165-pin-red-examples.py --backfill；指纹、抄来的段或档的写法对不上是手改坏了，从 git 找回那一行；变异行不在了就找回那一行，确是改名就照新名改这张表（要写明为什么）；新出的红例由 E165 第二段驱动写完账当场钉，这一格不补钉"
+  "表只由 scripts/experiment-apparatus/e165-pin-red-examples.py 写：8 段的旧行与 21 段没写档的行跑 python3 scripts/experiment-apparatus/e165-pin-red-examples.py --backfill；指纹、抄来的段或档的写法对不上是手改坏了，从 git 找回那一行；变异行不在了就找回那一行，确是改名就照新名改这张表（要写明为什么）；新出的红例由 E165 第二段驱动写完账当场钉，这一格不补钉"
 stage_cell pinned-red-examples-replay cell_pinned_red_examples_replay "钉住的每一行是 22 段整行抄带档、抄来的账行与自己的段对得上，点名的变异还在它的表里，装置按档在今天的实现上逐行打的结果与原实现期望的逐态行逐字节相同" \
-  "8 段的旧行与 21 段没写档的行跑 python3 scripts/experiments/e165-pin-red-examples.py --backfill 补成 22 段；抄来的账行与自己的段对不上是手改坏了，从 git 找回再钉；变异行不在了就找回那一行；装置逐行对不上是今天的实现在钉住的输入上与原实现不同，按回归修实现；装置报指纹漂了先查它的枚举次序与状态编码；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改变异行或实现；✗ 行写「被信号停了」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，这一次的输出不算判定，不改变异行或实现"
+  "8 段的旧行与 21 段没写档的行跑 python3 scripts/experiment-apparatus/e165-pin-red-examples.py --backfill 补成 22 段；抄来的账行与自己的段对不上是手改坏了，从 git 找回再钉；变异行不在了就找回那一行；装置逐行对不上是今天的实现在钉住的输入上与原实现不同，按回归修实现；装置报指纹漂了先查它的枚举次序与状态编码；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改变异行或实现；✗ 行写「被信号停了」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，这一次的输出不算判定，不改变异行或实现"
+stage_cell same-origin-counter cell_same_origin_counter "同源性计数器：不一致事件表 divergence-events.tsv 里每个已立的对累计 ≥ 5 次不一致而判「spec 错」0 次即判红；未立的对报未立、不计入，条款欠一句不计入累计" \
+  "红的那一对累计 ≥ 5 次不一致而 spec 错 0 次，说明两条腿实际同源：D13 已定项 13 定的处置是把它们合并、预算移给穷举，这是设计决定，交主 agent 问用户，不靠改表销账；表里确有一次判错了（该是 spec 错）就改那一行的判谁错、出处写重判的记录；表写坏了（日期、对名、判谁错、出处，或未立的对收了事件）照红行点名的那一行改，格式在 .claude/gate.d/divergence-events.tsv 文件头"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 root_argument=""
 tool_versions_requested=0
@@ -248,7 +311,7 @@ list_formal_items() {
   if python3 "$PIN_CHECK" --list-items --root "$ROOT" >> "$formal_items_file"; then listing_exit=0; else listing_exit=$?; fi
   if ((listing_exit != 0)); then
     cat "$formal_items_report_file" >&2
-    echo "  ✗ 列不出红例两格的项：scripts/experiments/e165-pin-red-examples.py --list-items 退 $listing_exit"
+    echo "  ✗ 列不出红例两格的项：scripts/experiment-apparatus/e165-pin-red-examples.py --list-items 退 $listing_exit"
     echo "     → 怎么办：照它上面打的红行修钉表 .claude/gate.d/e165-pinned-red-examples.tsv；列项只读文件，不编装置。"
     rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"; exit 1
   fi
@@ -325,6 +388,7 @@ replay_options=()
 if ((sample_mode)); then
   [[ -d .formal-sample/verus-install ]] && toolchain_options+=(--verus-root "$ROOT/.formal-sample/verus-install")
   [[ -d .formal-sample/cargo-home ]] && toolchain_options+=(--cargo-home "$ROOT/.formal-sample/cargo-home")
+  [[ -f .formal-sample/rustc-version ]] && toolchain_options+=(--rustc-version-file "$ROOT/.formal-sample/rustc-version")
   [[ -f .formal-sample/verus-timeout-seconds ]] && verus_options+=(--timeout "$(tr -dc '0-9' < .formal-sample/verus-timeout-seconds)")
   [[ -f .formal-sample/e165-stub.sh ]] && replay_options+=(--binary "$ROOT/.formal-sample/e165-stub.sh" --memory-cap none)
 fi
@@ -338,7 +402,7 @@ fi
 cell_verus_toolchain_pinned() { python3 "$VERUS_CHECK" toolchain "$ROOT" ${toolchain_options[@]+"${toolchain_options[@]}"}; }
 cell_verus_proof() { item_arguments_of verus-proof; python3 "$VERUS_CHECK" proof "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
 cell_verus_vacuity() { item_arguments_of verus-vacuity; python3 "$VERUS_CHECK" vacuity "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
-cell_verus_must_red_worlds() { item_arguments_of verus-must-red-worlds; python3 "$VERUS_CHECK" must-red-worlds "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
+cell_verus_must_red_worlds() { python3 "$VERUS_CHECK" coverage "$ROOT" || return $?; item_arguments_of verus-must-red-worlds; python3 "$VERUS_CHECK" must-red-worlds "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
 cell_pinned_red_examples_table() { python3 "$PIN_CHECK" --check-table --root "$ROOT"; }
 cell_pinned_red_examples_replay() {
   # 前面 Verus 那几格已经排不上（判法写了 $queue_refused_record）：这一格不编装置、不起重放，不再排一次队
@@ -350,7 +414,127 @@ cell_pinned_red_examples_replay() {
     return 1
   fi
   item_arguments_of pinned-red-examples-replay
+  # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：不带 --binary（样本的桩）时 e165-pin-red-examples.py --replay 起
+  #   cargo build -p singlefs-checker-tier（verdict-store 默认开、编到 librocksdb-sys）：起它之前判一次这台装了、此刻进程环境的取值对得上，判红这一格退 1、装置不编。
+  #   树里没有依赖 rocksdb 的清单（别的样本）、PATH 上是带标记的假 cargo，entry 报不判。弄坏开关 FORMAL_VERIFICATION_BREAK=rocksdb-entry-unchecked 下不判
+  #   （样本 pinned-red-examples-replay-rocksdb-entry-refused 判错）。这一份被拷到不带 scripts/hosts/ 的树里时报一行没判、往下走
+  if [[ " ${replay_options[*]-} " != *" --binary "* && ",${FORMAL_VERIFICATION_BREAK:-}," != *,rocksdb-entry-unchecked,* ]] \
+     && [[ ! -f "$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py" ]]; then
+    echo "  ! RocksDB 预编库的取值没判：$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py 不在（这一份阶段被拷到了不带 scripts/hosts/ 的树里）"
+  elif [[ " ${replay_options[*]-} " != *" --binary "* && ",${FORMAL_VERIFICATION_BREAK:-}," != *,rocksdb-entry-unchecked,* ]] \
+     && ! python3 "$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py" entry --root "$ROOT"; then
+    echo "  ✗ 起 cargo 编装置之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），这一格没编装置、没起重放"
+    echo "     → 怎么办：照上面的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再只跑这一格：bash .claude/gate.d/checker-tier-formal-verification.sh --check pinned-red-examples-replay"
+    return 1
+  fi
   python3 "$PIN_CHECK" --replay --root "$ROOT" ${replay_options[@]+"${replay_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}
+}
+
+# ── 格 same-origin-counter：还 checks-owed.md C191（同源性计数器只盖了一对）。D13 已定项 13「冲突 2」的判据逐字：同源性要被观测，统计 spec 与 model 不一致的事件数
+# 及每次判定哪一方错，累计 ≥ 5 次不一致而判「spec 错」的次数为 0，说明两者实际同源，处置是把两条腿合并、预算移给穷举。
+# 读被判的根里 .claude/gate.d/divergence-events.tsv（格式在那张表自己的文件头）：「对」行登记哪一对、哪边算 spec、已立还是未立，「事件」行是一次不一致（日期、对名、判谁错、出处、说明）。
+#   已立的对：累计 = spec 错 + model 错的行数；累计 ≥ 5 而 spec 错 0 次判红；条款欠一句的行先记账，不计入累计、不计入 spec 错（D13 第三格）；
+#             每一对都把累计次数报出来，0 次只说「还没有事件进表」，不当作验过独立。
+#   未立的对：报「未立」，不报绿、不计入任何一格；表里有点名它的事件行判红（未立的对不收事件）。
+#   表写坏了判红：不是「对」「事件」行、段数不对、对名重复或不合写法、状态不是已立 / 未立、日期不是 YYYY-MM-DD、事件点名没登记的对、判谁错不是 spec错 / model错 / 条款欠一句、出处不是仓内路径起头。
+#   一对已立的都没有：退 77（本次未跑），不当通过。
+# 样本：same-origin-counter-red（一对已立的对 5 次不一致全判 model 错，判红）、same-origin-counter-green（一对 5 次里有 1 次 spec 错、一对 2 次 model 错加 2 次条款欠一句，
+#   一对未立；判绿，报「已立 2 对、未立 1 对」）、same-origin-counter-clause-gap-green（4 次 model 错加 3 次条款欠一句：条款欠一句不计入累计，判绿）、
+#   same-origin-counter-unbuilt-event-red（未立的对收了事件，判红）、same-origin-counter-verdict-red（判谁错写成表外的词，判红）。
+# 弄坏开关 FORMAL_VERIFICATION_BREAK=same-origin-zero-spec-wrong-unchecked / same-origin-clause-gap-counted / same-origin-unbuilt-reported-green /
+#   same-origin-unbuilt-events-accepted，各让哪份样本判错写在本文件头「弄坏开关」一段。
+cell_same_origin_counter() {
+  python3 - "$ROOT" "${FORMAL_VERIFICATION_BREAK:-}" <<'PY'
+import datetime, os, re, sys
+root, broken = sys.argv[1], {item for item in sys.argv[2].split(",") if item}
+TABLE = ".claude/gate.d/divergence-events.tsv"
+THRESHOLD = 5
+VERDICTS = ("spec错", "model错", "条款欠一句")
+STATES = ("已立", "未立")
+path = os.path.join(root, TABLE)
+if not os.path.isfile(path):
+    print(f"  ✗ 同源性计数器的不一致事件表 {TABLE} 不在")
+    print("     → 怎么办：它随仓走（checks-owed.md C191）；被删了从 git 找回，格式写在表自己的文件头")
+    sys.exit(1)
+pairs, events, problems = {}, [], []
+for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
+    if not raw.strip() or raw.startswith("#"):
+        continue
+    fields = raw.split("\t")
+    where = f"{TABLE} 第 {number} 行"
+    if fields[0] == "对":
+        if len(fields) != 6 or not all(fields[1:]):
+            problems.append(f"{where}：「对」行要六段（对、对名、spec 一方、model 一方、已立|未立、说明），都不许空，读到 {len(fields)} 段")
+        elif not re.fullmatch(r"[a-z0-9][a-z0-9-]*", fields[1]):
+            problems.append(f"{where}：对名「{fields[1]}」只许小写字母、数字、连字符")
+        elif fields[1] in pairs:
+            problems.append(f"{where}：对名「{fields[1]}」登记了两次（第 {pairs[fields[1]]['number']} 行）")
+        elif fields[4] not in STATES:
+            problems.append(f"{where}：状态「{fields[4]}」要写已立或未立")
+        else:
+            pairs[fields[1]] = {"number": number, "spec": fields[2], "model": fields[3], "state": fields[4], "note": fields[5]}
+    elif fields[0] == "事件":
+        if len(fields) != 6 or not all(fields[1:]):
+            problems.append(f"{where}：「事件」行要六段（事件、日期、对名、判谁错、出处、说明），都不许空，读到 {len(fields)} 段")
+            continue
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fields[1]):
+                raise ValueError
+            datetime.date.fromisoformat(fields[1])
+        except ValueError:
+            problems.append(f"{where}：日期「{fields[1]}」不是 YYYY-MM-DD")
+            continue
+        if fields[3] not in VERDICTS:
+            problems.append(f"{where}：判谁错「{fields[3]}」要写 {' | '.join(VERDICTS)} 之一")
+            continue
+        if not re.match(r"[A-Za-z0-9_.-]+/\S+", fields[4]):
+            problems.append(f"{where}：出处「{fields[4]}」要以仓内相对路径起头（records/…、research/…、.claude/kb/… 这类，可后接行号）")
+            continue
+        events.append({"number": number, "date": fields[1], "pair": fields[2], "verdict": fields[3]})
+    else:
+        problems.append(f"{where}：第一段「{fields[0]}」不是「对」或「事件」")
+if not pairs and not problems:
+    problems.append(f"{TABLE} 里一个「对」都没有：没有要观测的对")
+for event in events:
+    if event["pair"] not in pairs:
+        problems.append(f"{TABLE} 第 {event['number']} 行：事件点名的对「{event['pair']}」没有「对」行登记")
+built, unbuilt, lines = [], [], []
+for name, pair in pairs.items():
+    mine = [event for event in events if event["pair"] == name]
+    if pair["state"] == "未立" and "same-origin-unbuilt-reported-green" not in broken:
+        unbuilt.append(name)
+        lines.append(f"  · {name}：未立（{pair['note']}）——不报绿、不计入任何一格")
+        if mine and "same-origin-unbuilt-events-accepted" not in broken:
+            problems.append(f"{TABLE} 第 {mine[0]['number']} 行：对「{name}」还是未立，不收事件（共 {len(mine)} 行点名了它）")
+        continue
+    built.append(name)
+    spec_wrong = sum(1 for event in mine if event["verdict"] == "spec错")
+    model_wrong = sum(1 for event in mine if event["verdict"] == "model错")
+    clause_gap = sum(1 for event in mine if event["verdict"] == "条款欠一句")
+    counted = spec_wrong + model_wrong
+    judged_count = counted + (clause_gap if "same-origin-clause-gap-counted" in broken else 0)
+    state = ("还没有事件进表，累计 0 次只说明没观测到，不说明两边独立" if not mine
+             else f"未满 {THRESHOLD} 次，不判同源" if judged_count < THRESHOLD
+             else f"已满 {THRESHOLD} 次而 spec 错 0 次，实际同源" if spec_wrong == 0
+             else f"已满 {THRESHOLD} 次，spec 错 {spec_wrong} 次，不是同源的样子")
+    lines.append(f"  · {name}（{pair['spec']} × {pair['model']}）：已立，累计不一致 {counted} 次（spec 错 {spec_wrong}、model 错 {model_wrong}），"
+                 f"条款欠一句 {clause_gap} 次先记账、不计入；{state}")
+    if judged_count >= THRESHOLD and spec_wrong == 0 and "same-origin-zero-spec-wrong-unchecked" not in broken:
+        problems.append(f"对「{name}」（{pair['spec']} × {pair['model']}）：累计 {judged_count} 次不一致而判「spec 错」0 次（model 错 {model_wrong} 次）：两条腿实际同源")
+for line in lines:
+    print(line)  # gate-lint:detail
+if problems:
+    for problem in problems:
+        print(f"  ✗ {problem}")  # gate-lint:detail
+    print(f"  ✗ 同源性计数器：{len(problems)} 处不对（已立 {len(built)} 对、未立 {len(unbuilt)} 对、事件 {len(events)} 行）")  # gate-lint:summary
+    print("     → 怎么办：累计 ≥ 5 次而 spec 错 0 次的，是两条腿实际同源：D13 已定项 13 定的处置是把它们合并、预算移给穷举，这是设计决定，交主 agent 问用户，不靠改表销账；"
+          "表里确有一次判错了（该是 spec 错）就改那一行的判谁错、出处写重判的记录；表写坏了照上面点名的行改，格式在 .claude/gate.d/divergence-events.tsv 文件头")
+    sys.exit(1)
+if not built:
+    print(f"  ! {TABLE} 里一对已立的都没有（未立 {len(unbuilt)} 对），这一格无对象可判")
+    sys.exit(77)
+print(f"  ✓ 同源性计数器：已立 {len(built)} 对、未立 {len(unbuilt)} 对（未立的不报绿、不计入）；事件 {len(events)} 行，已立的每一对都没有累计 ≥ {THRESHOLD} 次而 spec 错 0 次")
+PY
 }
 
 # 格不复用（文件头「复用」一段）：每一格照跑，格里每一条按自己的单元键查判定库。

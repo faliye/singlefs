@@ -1,6 +1,6 @@
 exit=0
 want=样本只跑 .gate-cells 点名的格：session-names
 want=查了 5 份文本文件，没有会话号
-want=没扫的：会话号的排除前缀下 1 份
+want=没扫的：会话号的排除前缀下 8 份
 want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
 want=doc-text.sh：1 格里 1 格绿（session-names），0 格本次未跑（无）

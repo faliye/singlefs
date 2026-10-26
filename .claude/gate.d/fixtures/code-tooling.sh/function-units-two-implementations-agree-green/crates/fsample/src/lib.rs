@@ -51,3 +51,28 @@ pub const SHARED_SOURCE: &str = include_str!("shared.wgsl");
 pub fn kernel_text() -> &'static str {
     KERNEL_SOURCE
 }
+verus! {
+pub open spec fn doubled(x: u32) -> u32 {
+    x * 2
+}
+proof fn lemma_doubled_is_even(x: u32)
+    ensures
+        doubled(x) % 2 == 0,
+{
+    assert(doubled(x) == x * 2);
+}
+pub fn scaled(x: u32) -> (r: u32)
+    requires
+        x < 1000,
+    ensures
+        r == doubled(x),
+{
+    proof {
+        lemma_doubled_is_even(x);
+    }
+    x * 2
+}
+} // verus!
+pub fn proven_entry() -> u32 {
+    scaled(3)
+}

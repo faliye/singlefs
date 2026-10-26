@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：test-function-names
+want=查了 2 条 #[test] 函数的名字（crates/*/tests/ 与 crates/*/src/），没有按里程碑、步号、增补号、并行线号或欠账号起的（豁免表 .claude/gate.d/test-function-names-exempt.tsv 登记的存量 1 条不判）
+want=test-function-names：绿

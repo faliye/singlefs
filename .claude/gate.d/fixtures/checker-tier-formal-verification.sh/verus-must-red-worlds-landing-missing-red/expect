@@ -1,0 +1,4 @@
+exit=1
+want=第 2 行「夹到上限时返回原值」只有五段、没写第六段落点 landing=
+want=python3 scripts/gate/verus-proof-check.py must-red-landings <根> --write
+want=verus-must-red-worlds：红（退出 1）

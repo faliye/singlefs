@@ -1,0 +1,5 @@
+both	src/lib.rs	tests::shared_check	ok	line	-
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-
+feature	tests/checksum_kernels_agree.rs	the_bitwise_kernel_agrees_with_the_cpu	ok	scattered	NOT_RUN_NO_GPU_ADAPTER test=the_bitwise_kernel_agrees_with_the_cpu reason=本机的 Vulkan 适配器里一张独立显卡都没有（样本：跟在 test 行后面）
+feature	tests/checksum_kernels_agree.rs	the_table_kernel_agrees_with_the_cpu	ok	scattered	NOT_RUN_NO_GPU_ADAPTER test=the_table_kernel_agrees_with_the_cpu reason=本机的 Vulkan 适配器里一张独立显卡都没有（样本：跟在 test 行后面）
+feature	tests/two_kernels_reconcile.rs	the_two_kernels_confirm_every_entry	ok	scattered	NOT_RUN_NO_GPU_ADAPTER test=the_two_kernels_confirm_every_entry reason=本机的 Vulkan 适配器里一张独立显卡都没有（样本：跟在 test 行后面）

@@ -1,0 +1,4 @@
+# 门禁阶段弄坏开关复跑（C639）的豁免：门禁 code-tooling 的 stage-break-switch-replay 格读它（判据在那一格函数上方的注释）。
+# 写法：<阶段文件名><TAB><开关=值，或 * 整道><TAB># 理由。登记了的不复跑、逐条报本次未跑；登记的一条在那一道头注里已经没有了，那一格判红、叫人删那一行。
+# 只缩不涨：头注改成 mutate.sh 写法、或改准了点名的样本，就删那一行；新开关不往这里加。
+harness-test-environment.sh	HARNESS_TEST_ENVIRONMENT_BREAK=cross-run-unscanned	# 只在喂样本的环境里有 GATE_CROSS_RUN_TMPDIR 时判错：复跑结果跟着起这一格的环境走（gate.sh 里有、单跑没有），点名定不成一个固定的集合

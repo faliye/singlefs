@@ -25,11 +25,13 @@ S() {
   printf '%s\n' "$PASS" | sudo -S -p '' "$@"
 }
 
+source "$REPO/scripts/devices/dm-owned.sh" || exit 2
+
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-stripe.XXXXXX")"
-DM="singlefs_stripe_probe"
+DM="singlefs_stripe_probe_${W##*.}_$$"
 LOOPS=()
 cleanup() {
-  S dmsetup remove "$DM" 2>/dev/null
+  remove_dm "$DM" 2>/dev/null
   for l in "${LOOPS[@]:-}"; do [ -n "$l" ] && S losetup -d "$l" 2>/dev/null; done
   rm -rf "$W"
 }
@@ -53,7 +55,7 @@ probe_one() {  # $1=devs $2=chunk_bytes
   sect=$(( DISK_MB * 1024 * 1024 / 512 ))
   tbl="0 $(( sect * devs )) striped $devs $cs"
   for ((i=0;i<devs;i++)); do tbl="$tbl ${LOOPS[$i]} 0"; done
-  S dmsetup create "$DM" --table "$tbl" 2>/dev/null || { emit "name=skip devs=$devs chunk=$chunk reason=dmsetup_failed"; return; }
+  create_dm "$DM" --table "$tbl" 2>/dev/null || { emit "name=skip devs=$devs chunk=$chunk reason=dmsetup_failed"; return; }
   for k in 0 1 2 3 4 5 7 9 13 17 23 31; do
     mark="M${devs}_${chunk}_${k}_$$"
     printf '%s' "$mark" > "$W/mark.bin"
@@ -95,7 +97,7 @@ probe_one() {  # $1=devs $2=chunk_bytes
     distinct=$(printf '%s\n' "${seen2[@]}" | sort -u | wc -l)
     emit "name=poscontrol_composite_stride chunk=$chunk stride=8 distinct_devices=$distinct expect=1 collides=$([ "$distinct" -eq 1 ] && echo 1 || echo 0)"
   fi
-  S dmsetup remove "$DM" 2>/dev/null
+  remove_dm "$DM" 2>/dev/null
 }
 
 for devs in 2 3 4; do

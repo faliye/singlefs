@@ -1,0 +1,7 @@
+exit=0
+want=fn crates/singlefs-checker/src/lib.rs:6-8 singlefs_checker::read_u64（登记表 .claude/gate.d/checker-direction-entries.tsv:9）
+want=fn crates/singlefs-format/src/lib.rs:3-5 singlefs_format::slot_offset（singlefs-format 包）
+want=fn crates/singlefs-checker/src/lib.rs:11-11 singlefs_checker::<trait ImageReader>::read
+want=只在比对点里 fn crates/singlefs-checker/src/walk.rs:35-41 singlefs_checker::walk::judge_rebuild_agrees_with_the_walked_index
+want=✓ 两个方向的函数单元交集都落在格式解析与常量里：交集 8 个单元，函数单元 2 个都是格式解析，没有函数体的 trait 方法声明 1 个，常量 1 个，类型与结构 4 个
+want=checker-direction-overlap：绿

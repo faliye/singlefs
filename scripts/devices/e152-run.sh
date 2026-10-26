@@ -11,7 +11,7 @@
 #     （跑前登记第八节第 1 条），两次都记；
 #   - 八个配置按轮交错跑（第 1 轮八个都跑完再跑第 2 轮），宿主上的漂移平摊到每一家（跑前登记第七节）。
 set -uo pipefail
-RESEARCH="$(cd "$(dirname "$0")/../experiments" && pwd)"
+RESEARCH="$(cd "$(dirname "$0")/../experiment-apparatus" && pwd)"
 REPOSITORY="$(cd "$RESEARCH/../.." && pwd)"
 # 三条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（SINGLEFS_THREAD_CAP 设了取它）
 CAPPED_DEFAULT=(bash "$REPOSITORY/scripts/hosts/capped.sh" default)
@@ -27,9 +27,9 @@ cd "$RESEARCH" || fail "进不了 $RESEARCH" "从仓里跑"
 KERNEL="$(bash ../devices/vm-kernel.sh --release "$RELEASE")" \
   || fail "拿不到 $RELEASE 的内核镜像" "单跑 bash scripts/devices/vm-kernel.sh --release $RELEASE 看报错"
 "${CAPPED_DEFAULT[@]}" cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
-  || fail "来宾二进制编不过" "cd scripts/experiments && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
+  || fail "来宾二进制编不过" "cd scripts/experiment-apparatus && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
 "${CAPPED_DEFAULT[@]}" cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
-  || fail "宿主上的汇总二进制编不过" "cd scripts/experiments && cargo build --release --bin e152-file-system-benchmark"
+  || fail "宿主上的汇总二进制编不过" "cd scripts/experiment-apparatus && cargo build --release --bin e152-file-system-benchmark"
 # singlefs 的真设备二进制与门禁 checker-tier-qemu-device-streams 同一种编法：glibc 目标加 +crt-static（checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
 ( cd "$REPOSITORY" && "${CAPPED_DEFAULT[@]}" cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1 ) \
   || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device"
@@ -42,13 +42,14 @@ trap 'rm -rf "${WORK:?}"' EXIT
 # 起跑时把要调的脚本复制一份，之后只调副本：bash 边读边执行脚本，仓里的原件中途被别的会话一改，
 # 正在跑的那一次就会读到错位的内容（2026-09-15 第二次正式跑实测：vm-bench.sh 开头注释被改，那一次报语法错退出）。
 mkdir -p "$WORK/scripts/devices"
-cp scripts/devices/vm-bench.sh scripts/devices/e152-stage-root.sh "$WORK/scripts/devices/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
+cp "$REPOSITORY/scripts/devices/vm-bench.sh" "$REPOSITORY/scripts/devices/e152-stage-root.sh" "$WORK/scripts/devices/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
 bash "$WORK/scripts/devices/e152-stage-root.sh" "$WORK/root" "$RELEASE" "$SINGLEFS_BINARY" \
   || fail "附加根没建成" "单跑 bash scripts/devices/e152-stage-root.sh <新的空目录> $RELEASE $SINGLEFS_BINARY"
 
 PARTIAL="$OUTPUT.partial"
-rm -f "$OUTPUT" "$PARTIAL"   # 本轮输出不许跨轮复用
-echo "E152RUN_HEADER kernel=$RELEASE rounds=$ROUNDS configurations=${CONFIGURATIONS// /,} started_jst=$(TZ=Asia/Tokyo date '+%Y-%m-%dT%H:%M')" > "$PARTIAL"
+[[ ! -d "$OUTPUT" ]] || fail "产物路径是目录：$OUTPUT" "指定一个文件路径"
+rm -f -- "$PARTIAL" || fail "无法清理 $PARTIAL" "检查产物目录权限"   # 成功发布前保留上一份产物
+echo "E152RUN_HEADER kernel=$RELEASE rounds=$ROUNDS configurations=${CONFIGURATIONS// /,} started_jst=$(TZ=Asia/Tokyo date '+%Y-%m-%dT%H:%M')" > "$PARTIAL" || fail "写不了 $PARTIAL" "检查父目录是否存在、空间及权限"
 for ((round = 1; round <= ROUNDS; round++)); do
   for configuration in $CONFIGURATIONS; do
     case "$configuration" in
@@ -64,10 +65,10 @@ for ((round = 1; round <= ROUNDS; round++)); do
         bash "$WORK/scripts/devices/vm-bench.sh" "$GUEST_BINARY" "$configuration" "$round" > "$run_output" 2>&1
       vm_exit=$?
       {
-        echo "E152RUN configuration=$configuration round=$round attempt=$attempt host_load1=$host_load vm_exit=$vm_exit"
+        echo "E152RUN configuration=$configuration round=$round attempt=$attempt host_load1=$host_load vm_exit=$vm_exit" || fail "写入运行记录失败：$PARTIAL" "检查空间及权限，本轮未发布"
         # 只收行首的：vm-bench.sh 已经从控制台里抠干净了才打印；失败时它还会把控制台末尾缩进着再打一遍，那一份不收
-        grep -a '^E7RESULT ' "$run_output" | tr -d '\r'
-      } >> "$PARTIAL"
+        sed -n '/^E7RESULT /p' "$run_output" | tr -d '\r'
+      } >> "$PARTIAL" || fail "追加结果失败：$PARTIAL" "检查空间及权限，本轮未发布"
       echo "  $(TZ=Asia/Tokyo date '+%H:%M:%S') 第 $round 轮 $configuration 第 $attempt 次 vm_exit=$vm_exit 宿主负载 $host_load" >&2
       [[ $vm_exit -eq 0 ]] && break
       tail -25 "$run_output" | sed 's/^/      /' >&2
@@ -77,6 +78,8 @@ done
 
 "$HOST_BINARY" summarize "$PARTIAL" > "$WORK/summary.txt" \
   || fail "汇总失败，产物留在 $PARTIAL" "$HOST_BINARY summarize $PARTIAL 看报错"
-cat "$WORK/summary.txt" >> "$PARTIAL"
-mv "$PARTIAL" "$OUTPUT"
-echo "  ✓ E152 产物：$OUTPUT（$(wc -l < "$OUTPUT") 行，其中汇总 $(wc -l < "$WORK/summary.txt") 行）" >&2
+cat "$WORK/summary.txt" >> "$PARTIAL" || fail "追加汇总失败：$PARTIAL" "检查空间及权限，本轮未发布"
+output_lines="$(wc -l < "$PARTIAL")" || fail "读不了 $PARTIAL" "检查产物权限，本轮未发布"
+summary_lines="$(wc -l < "$WORK/summary.txt")" || fail "读不了汇总" "检查工作目录权限，本轮未发布"
+mv -T -- "$PARTIAL" "$OUTPUT" || fail "发布失败，产物保留在 $PARTIAL" "检查目标路径、空间及权限"
+echo "  ✓ E152 产物：$OUTPUT（$output_lines 行，其中汇总 $summary_lines 行）" >&2

@@ -1,0 +1,4 @@
+exit=1
+want=rocksdb-prebuilt entry：
+want=起 cargo 之前 RocksDB 预编库的取值没判过
+want=device-streams：红（退出 1）

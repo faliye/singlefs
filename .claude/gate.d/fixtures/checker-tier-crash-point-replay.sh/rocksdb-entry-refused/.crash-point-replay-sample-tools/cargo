@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 「RocksDB 取值没判过不起 cargo」样本的假 cargo：不带 rocksdb-prebuilt.py 认的假 cargo 标记，entry 照判；被起了就打一行、退 101
+echo "样本的假 cargo 被起了：$*"
+exit 101

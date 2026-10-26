@@ -1,0 +1,8 @@
+exit=3
+want=样本档（快档）：
+want=GPU_QUIESCE step=quiesce result=stopped-and-read-back holders=0
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1
+want=本次未跑（这不是通过）：产品 GPU 包 crates/singlefs-background-gpu/tests/two_kernels_reconcile.rs 挂特性 tests-on-a-real-gpu，真显卡对拍快档跑到它的用例 0 条
+want=! product-gpu-real-card-tests 不算全绿：2 个对拍测试目标（特性 tests-on-a-real-gpu）跑到 2 条，本次未跑 1 处：编进来 0 条的目标 1 个（crates/singlefs-background-gpu/tests/two_kernels_reconcile.rs），没卡没跑的对拍 0 条
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；feature-gated-tests：无对象可判；product-gpu-real-card-tests：有 1 处本次未跑
+not-green-by-design=product-gpu-real-card-tests 样本档用假 cargo 走快档流程，判绿也退 3（这一趟没跑过真的显卡，不许记成通过）

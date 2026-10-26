@@ -1,4 +1,10 @@
 # 门禁 code-source-discipline 的 format-constants 格不扫的路径：一行一条 <从仓根起的路径>  # 为什么；目录写成以 / 结尾。
 # 排除只缩不涨：指向不存在的路径、一份被 git 列出的 .rs 都没排到的行判红，理由（# 后面至少 4 个字）不许省。
 # 只登记原样保存的冻结证据（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」），活的实验源码与 crates/ 照判，不进这张表。
-research/prompts/d23-e16r5-r1-opus-model/  # 三方腿原样保存的证据（模型自己写的 .rs，里面的 JOURNAL_NAMED_ENTRIES_PER_RECORD = 67 是当时的值），改常量等于改证据
+scripts/experiment-apparatus/e116_pack_settle.rs  # E116 原样保存的装置源码（header 487 时的产物，改常量等于改证据）
+scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs  # E142 原样保存的装置源码（header 487 / root 457 时的产物，改常量等于改证据）
+scripts/experiment-apparatus/e157_parallel_line_one_clauses.rs  # E157 原样保存的装置源码（header 487 时的产物，改常量等于改证据）
+scripts/experiment-apparatus/e16_fifth_run_peak_under_today_widths.rs  # E16 原样保存的装置源码（header 487 时的产物，改常量等于改证据）
+scripts/experiment-apparatus/e172_deletion_write_dry_run.rs  # E172 原样保存的装置源码（header 487 时的产物，改常量等于改证据）
+scripts/experiment-apparatus/e43_extension_point_budget.rs  # E43 原样保存的装置源码（header 487 时的产物，改常量等于改证据）
+scripts/experiment-apparatus/e49_chain_width.rs  # E49 原样保存的装置源码（header 487 时的产物，改常量等于改证据）

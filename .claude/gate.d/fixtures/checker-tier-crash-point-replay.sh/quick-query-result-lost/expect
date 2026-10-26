@@ -1,0 +1,6 @@
+exit=1
+want=查库 3 条一齐起（并行度 
+want=✗ crash-case-replay：查库派出 3 条，只收回 2 条退出码（没留下退出码的 1 条：vanishing-stream；起查库那一层退 0）
+want=→ 怎么办：并行的查库有的没跑完就没了（被杀、内存包装撞了上限，或清场没过、一条都没起），收不全就不判，不当本次未跑
+want=逐格：crash-case-replay：红
+want=✗ 快档有 1 格判红：crash-case-replay（各自的出路在上面）

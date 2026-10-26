@@ -1,0 +1,3 @@
+# 样本用的信任清单（格式照仓里 .claude/gate.d/verus-trust-list.tsv 的文件头）
+vstd	0.0.0-2026-09-20-0158	068cac977afcf0f5d5b736f8fa3ceb79114a1f3634c59ba6671331a99dd022ac	样本：vstd 整体登记
+cfg	crates/singlefs-replay-prefix/src/lib.rs	singlefs_replay_prefix::pick#plus_span!	ce227ee54798e27c744df95fd8171c96cb0c2f90fd07a39ad90c43e50056855c	mir_divergence_sample	样本：登记了的 cfg 原子，MIR 比对照样判

@@ -15,16 +15,22 @@
   broad-mutation.py --full [怎么跑]                全量：不读判定库、选中的条全部现判（只写不读），现判的照键写回同一份库；沿用得了而现判翻了面的逐条打 FLIPPED。
                                                    SINGLEFS_GATE_FULL=1 同义
   broad-mutation.py --refresh-list                 只换树、生成清单、把清单按单元记进库（不编不跑），之后 --list-items / --summary 在同一份源码上列得出全部条
-  broad-mutation.py --list-items                   逐行打「序号 <TAB> 包 <TAB> 变异名 <TAB> 状态 <TAB> stale=<同一处变异键对不上的判定行数> <TAB> key=<此刻的键>」，不编不跑、不起 cargo
-  broad-mutation.py --summary                      八栏条数与提交门禁那一行（见下「输出」）；不编不跑、不起 cargo，只读库目录
+  broad-mutation.py --list-items                   逐行打「序号 <TAB> 包 <TAB> 变异名 <TAB> 状态 <TAB> stale=<同一处变异键对不上的判定行数> <TAB> key=<此刻的键>」，不编不跑、不起 cargo；
+                                                   状态是两趟合起来的（CPU 那一趟没红又要 GPU 那一趟的条取合起来的状态，见下「GPU 那一趟」）
+  broad-mutation.py --summary                      八栏条数与提交门禁那一行（见下「输出」，八栏按两趟合起来的状态数，另报 GPU 那一趟要几条、复用几条、本次未跑几条）；不编不跑、不起 cargo，只读库目录
   broad-mutation.py --check-ignored                只判 --source 那棵树里 harness 档的 #[ignore] 用例登记得对不对（见下「忽略用例登记」），打第二段慢档用例那一步的命令；不编不跑、不要前缀
   broad-mutation.py --unit-environment             只打一行：此刻环境里构建环境与工具链认的变量（拿掉它构建环境的生效值就变、或在树里起的 rustc -Vv 就变的那几个，
                                                    例 RUSTUP_TOOLCHAIN；scripts/hosts/detached-run.sh 本来就带进单元的 UNIT_CARRIED_VARIABLES 除外），
                                                    写成 `env 名=值 …`（按 shell 引好）；一个都没有打空行。不编（只起 rustc -Vv）、不跑、不改库目录。
                                                    经 detached-run.sh 起单元之前跑它，把这一行原样接在 `--` 后面（.claude/skills/crash-test/commit-stages.md 第 2b 步）
   broad-mutation.py --import-results <目录>        把另一台机器库目录里的判定行并进本机这一份库（两台各跑一片之后合）：逐行核段数、结局、键的写法，
-                                                   键相同而两边定论不同的不并、逐条列出；另一台的校验列核不了，去掉用本机的密钥重签
-  broad-mutation.py --selftest                     自证（假清单、假测试命令，不起 cargo）
+                                                   键相同而两边定论不同的不并、逐条列出；每行的校验列先用另一台的密钥核（两台交换密钥，对端那一份的取法见下
+                                                   「判定行的校验列」），一行核不过整表拒、退 1，对端密钥取不到拒导入、退 2；核过去掉、用本机的密钥重签。
+                                                   同目录的 gpu-verdicts.tsv（GPU 那一趟的判定）也并进本机的 gpu-verdicts.tsv：逐行核键——行的键要是本机此刻源码（--source，
+                                                   与两台跑的同一份）清单里某一条的单元键、行的 gpu_key 要等于本机此刻 GPU 趟自己的键——对不上的行不并、逐条列出（IMPORT_GPU_REJECTED），
+                                                   之后本机补跑 GPU 趟时照现判；核键要本机已记清单（--refresh-list，两台各跑过一片的本机都记过了），清单不全拒
+  broad-mutation.py --selftest                     自证（假清单、假测试命令、假 GPU，不起 cargo）；环境变量 BROAD_MUTATION_SELFTEST_CELLS=<组名,…> 只跑点名的几组格（开发时分段跑，
+                                                   组名见 SELFTEST_CELL_NAMES，有的组接着前面组留下的库目录；不设就是全部，门禁与提交前跑的都不设）
 已删的（传了退 2，出路写新跑法）：--sync-tree、--commit、--changed-since、--milestone-full（「一版」不再是容器，不按提交选条；里程碑末全量用 --full）。
 
 选哪些条（不给 --item 就是此刻清单里沿用不了的全部条，按序号）：
@@ -39,6 +45,7 @@
   --skip-stage-two        只跑第一段；第一段没红的记「只过了第一段」（stage-one-only），不算「没红」定论
   --stage-two-only        只给过了第一段的条补第二段；点名的条没过过第一段（判定库里没有它键相同的 stage-one-only 行）拒，退 2
   --stage-two-eatmydata   第二段的文档测试与 checker 档快档也经 eatmydata 跑（默认不经；harness 慢档用例那一步与第一段同一种起法，一直经）
+  --skip-gpu              不跑 GPU 那一趟（见下「GPU 那一趟」）：要这一趟的条逐条打 BROAD_MUTATION_GPU_NOT_RUN（本次未跑，不落行、不算没红、也不算通过）；机器上没卡时用
   --threads <N>           线程数，默认取 SINGLEFS_THREAD_CAP，没设取每台默认重活线程数（.claude/heavy-thread-default 的登记值）；编译与测试都照它（经 scripts/hosts/capped.sh）
   --memory-cap <上限>     每条命令的内存上限（scripts/hosts/run-with-memory-cap.sh 的写法），默认 BROAD_MUTATION_MEMORY_CAP，没设 24G
   --timeout-floor <秒>    单步超时的地板，默认 900；--timeout-multiplier <倍> 默认 5。单步超时 = max(地板, 倍数 × 基线里这一步的秒数)：
@@ -53,12 +60,16 @@
   --tools-from <文件>（工具版本换成这份文件，一行一个）：提交门禁的样本用，真跑与写行的用法不认。
 
 库目录（一份，固定一处，不随趟、不随判法换目录、没有版本目录）：
-  tree/            专用树：每一趟开跑先把 --source 那棵树的导出范围逐文件换进来（内容不同的才写、写的文件 mtime 取此刻，源码里没有的删掉），
-                   变异就地改这里的一个文件、判完拷回原件：编译目录跨条复用，每条只付增量编译。导出范围取门禁 checker-tier-crates-mutation-replay 登记的
+  runs/run-<进程号>-<随机>/   这一趟的运行目录（用户 2026-10-23 定案「自己用完自己删」：编译生成物每趟新建、跑完删，判定库照留、照旧按单元键复用）。
+                   拿到库目录的锁之后建（Library.begin_run），正常结束、拒绝退出、被 TERM / INT 停都在 main 的收尾删掉（Library.end_run；
+                   删之前经 scripts/hosts/run_build_directory.py 核本机没有进程开着里面的文件，有就不删、逐个报进程，这一趟别的都成了也退 9）。
+                   被 KILL 的那一趟留下的，下一趟拿到锁之后先删（同样先核开着的文件；里面有在途记录的报一句被打断在哪一条）。里面四样：
+    tree/          专用树：开跑把 --source 那棵树的导出范围逐文件拷进来（写的文件 mtime 取此刻），变异就地改这里的一个文件、判完拷回原件：
+                   编译目录在这一趟里跨条复用，每条只付增量编译。导出范围取门禁 checker-tier-crates-mutation-replay 登记的
                    拷贝范围（scripts/mutation/crates-mutation-rows.py 的 copied_paths，去掉 research/ 下的）加 .cargo/
-  tree.synced      上一次换树改了几个文件、什么时候（只当记录，不进任何键）
-  target/、target-coverage/   CARGO_TARGET_DIR；scratch/ 是每一步的 TMPDIR（每一步开跑前清空）
-  inflight.json、inflight.original   在途记录：改文件之前先存原件、记下改的是哪一条；开跑时它在就先把原件拷回（临时件 inflight.restore 在库目录里，不在树里）
+    target/、target-coverage/   CARGO_TARGET_DIR；scratch/ 是每一步的 TMPDIR（每一步开跑前清空），scratch-coverage/ 是覆盖那一步的产物
+    inflight.json、inflight.original   在途记录：改文件之前先存原件、记下改的是哪一条，判完照它拷回（临时件 inflight.restore 在运行目录里，不在树里）
+  tree.synced      上一次换树拷了几个文件、什么时候（只当记录，不进任何键）
   verdicts.tsv     判定库（只追加，每行带校验列）：一行一条判定，键是那一条变异的单元键（见下「键」），另记结局、哪一段判的、抓到它的测试与它的测试键、
                    覆盖者键、编译与测试秒数、判定日期、跑法、序号与变异名与位置（只当索引）、拒算形态、备注
   compositions/<键前两位>/<键>.txt   每把键（变异键、测试键）的组成清单：单元行（种类、限定名、文件:起止、指纹）、依赖行、工具链那几行；
@@ -75,6 +86,8 @@
                    记录键是那条测试的测试键（checker 档逐个二进制的取那个二进制里各条测试的测试键），测试的闭包不变就照用，变了那几条重跑插桩
   escalated-verdicts.tsv、escalation/   升档判的抓到的登记表与两趟日志（见下「升档」）
   imports.tsv      导入记录；logs/ 没过的那一步的输出（每条每步一份，后一趟同名的盖掉前一趟）
+  gpu-verdicts.tsv GPU 那一趟的判定库（只追加，每行带同一把密钥算的校验列，十四段：键、序号、包、变异名、结局、抓到它的测试、测试键、覆盖者键、GPU 趟自己的键、测试秒、判定日期、跑法、备注、校验列）：
+                   键是那条变异的单元键（与 verdicts.tsv 里 CPU 那一趟的同一把），GPU 那一趟的结局只记在这里，不进 verdicts.tsv；沿用判据同 CPU 那一趟（见下「GPU 那一趟」）
 
 键（规则与弄坏开关在 scripts/mutation/mutation-prune.py 文件头；单元与闭包由 scripts/gate/lib_function_units.py 算）：
   变异键 = 容器单元（包住这条变异的最小单元）的单元闭包键（闭包里每个单元的种类与去注释指纹、数据单元摘要、入口目标的生效 cfg、
@@ -100,6 +113,12 @@
   密钥放库目录之外、仓之外：${XDG_CONFIG_HOME:-~/.config}/singlefs/broad-mutation-result.key（DEFAULT_RESULT_KEY），一行 64 位小写十六进制（32 字节随机数），
     属主是自己、权限 600，所在目录 700。没有时，往判定库里写行的用法（真跑、--import-results）开跑前排他新建一份并说一句；只读的（--summary、--list-items）不建。
     密钥落在库目录里、权限不是 600、内容写坏，写行的用法拒（退 2）；只读的照「校验不了」办。
+  另一台的密钥（用户 2026-10-26 定「两台交换密钥」）：--import-results 并进来的行带的是另一台那把密钥算的校验列，导入时用另一台的密钥核。
+    对端那一份放在本机密钥同一个目录、名字在 .key 前加 .peer：${XDG_CONFIG_HOME:-~/.config}/singlefs/broad-mutation-result.peer.key（peer_result_key：
+    由本机密钥的路径推出，自证里是 BROAD_MUTATION_RESULT_KEY 那一份旁边的 .peer.key），内容是另一台那份 broad-mutation-result.key 的原样，
+    同样要属主是自己、权限 600、落在库目录之外；两台各自把对方的那一份经私有通道拷到自己这里，不打印、不进仓、不进库目录。
+    取不到（不在、权限不对、内容写坏、落在库目录里）拒导入（退 2，一行都不写）；verdicts.tsv 或 gpu-verdicts.tsv 有一行用它核不过（取回来的表被改过，
+    或这份对端密钥不是那一台此刻的）整表拒（退 1，一行都不写）；全部核过才去掉对端的校验列、照本机的密钥重签落行。
   读判定库时段数不对的行、校验列对不上的行、没有密钥时的每一行都不算判定（那几条照沿用不了选、续跑时重跑），--summary 把它们报成对不上、退 1；
     提交门禁 gate-verdict 格另用同一把密钥逐行核 verdicts.tsv，一行不过就红。
   管不到的：升档登记表（escalated-verdicts.tsv）的行不带校验列，证据靠日志的 sha256 与驱动、包装那两句，门禁另核。
@@ -112,6 +131,36 @@
   第二段只补第一段没跑到的（用户 2026-09-30 定）：被变异的两个包的文档测试（cargo test --doc）、harness 档四个包里标了 #[ignore] 的慢档用例
   （与第一段同一种起法，eatmydata + cargo nextest 加 --run-ignored only，再用 -E 排掉排除表里的，步名 two-test-slow-harness）、checker 档快档（cargo test --release -p singlefs-checker-tier --lib --tests）；
   都没红才记 missed。checker 档标了 #[ignore] 的全量崩溃枚举不在这里（另列第三段，驱动还没做）。第二段被打断的条，续跑时只补第二段。
+GPU 那一趟（C489；用户 2026-10-22 定「第二段补一趟带 gpu 特性的快档」，出处 .claude/kb/checks-owed.md 的 C489、records/2026-09-30-里程碑三开工第一轮.md 的 GPU 普查）：
+  CPU 那一趟（上面的两段）全跑完之后，对「CPU 那一趟最后落的结论是没红、又有带 gpu 特性的测试够得着」的条另补一趟 checker 档快档（verification.md「checker 档自己分快档与全量」带特性那一趟）：
+    cargo test --release -p singlefs-checker-tier --features <tests/ 里 cfg 点到的特性> --lib / --test <挂特性的测试文件>… -- --nocapture --test-threads 1
+    特性与挂特性的文件每趟从 checker 档 tests/ 顶层每个 .rs 的 #[cfg(…)] / #![cfg(…)] 现读（gated_test_files，同门禁 checker-tier-crash-point-replay 的 feature-gated-tests 格），
+    一个文件都不挂特性、或特性里没有 gpu：没有这一趟。每条先编（cargo test --no-run，编不过记无效）再跑测试步；测试步整条经 scripts/crash/gpu-quiesce-run.sh 照多机配置清场并回读，
+    跑完不复原（要复原手动跑多机配置里的私有复原脚本），GPU 测试各占卡的显存所以 --test-threads 1；BINDGEN_EXTRA_CLANG_ARGS 取 scripts/crash/crash-amplification-lib.sh
+    的 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS（与崩溃放量同一个值，编译产物才共用）；每一步仍经内存包装（--memory-cap、--threads 同 CPU 那一趟），整步限时 =
+    max(--timeout-floor, --timeout-multiplier × 这一趟开跑时在没改过的树上量的秒数)。
+  要不要这一趟：一条两趟里任一趟红算抓到，所以只给 CPU 那一趟没红（missed）的条跑；还要有一条这一趟跑得到的测试（checker 档的库与挂特性的测试文件里不标 #[ignore] 的）带 gpu 特性的静态闭包
+    含这条变异的容器单元、又真引到 gpu 原子（feature = "gpu" 带真值 true，闭包键里 cfg 原子的那一项）——改坏对象落在带 gpu 特性才编进来的代码、或判器单元闭包含它，都是这一条的特例；
+    够不着它的、够得着却不引 gpu 的，这一趟帮不上，照旧只有 CPU 那一趟。要跑的目标取这些测试所在的目标（lib、挂特性的文件）。
+  结局：编不过 unviable，测试步退 101（有测试没过）caught（抓到它的测试取第一条没过的；--nocapture 加 --test-threads 1 下结果行常被测试自己的输出打散，认不出就读收尾的 failures: 名单），
+    全过且跑到了测试 missed；日志里有 NOT_RUN_NO_GPU_ADAPTER（GPU 对拍没找到卡，打一行就返回成功）、或清场包装退 78（清场回读没过，测试没起）是本次未跑：不落行、不算没红，
+    BROAD_MUTATION_GPU_NOT_RUN 逐条报；退 0 而一个测试都没跑到记 driver-error（不算没红）；超时（253）、内存撞顶（250）记 timeout / memory-cap（没结论，这一趟不做升档：
+    加大 --timeout-floor / --memory-cap 再 --item <序号> --rerun）；内存包装自己的结局（245、251、252、254）整趟停，退 3，不落行。
+  基线：这一趟要跑的目标先在没改过的树上跑一遍（编译步、测试步各一次），不绿拒（退 6，基线不绿后面每一条抓到都不作数）；基线里就见到 NOT_RUN_NO_GPU_ADAPTER 或清场没过，
+    整趟本次未跑；这一趟的基线不记库，每趟现跑。
+  两趟的结局分开记：CPU 那一趟的行照旧只在 verdicts.tsv（这一节的函数不在 JUDGING_ENTRIES 的闭包里，CPU 那一趟的判法单元指纹不因它们变，库里 CPU 那一趟的判定一条都不作废），
+    GPU 那一趟的行在 gpu-verdicts.tsv；一条的合起来的状态（gpu_combined_state）：CPU 没红、要 GPU 趟的条，GPU 抓到 / 没红 / 无效就是定论，超时 / 内存撞顶 / 驱动错是没结论，
+    库里还没有它的 GPU 结论是 none（理由 gpu-not-run，不算没红）；别的条就是 CPU 那一趟的状态。--summary 的八栏、MISSED / NO_CONCLUSION 明细、提交门禁那一行和 --list-items 的状态都按合起来的状态数。
+  沿用：GPU 判定行的键是变异的单元键，另带 gpu_key（这一趟的写法、编进来的特性、GPU 趟的判法单元指纹 gpu_judging_key，从 GPU_JUDGING_ENTRIES 收，与 CPU 那一趟的指纹分开）；
+    抓到的要抓到它的测试此刻带特性的测试键（它的单元闭包键）与行里的相同，没红的要覆盖者键（这一趟够得着它的那些测试各自测试键的多重集）相同，无效的键相同就沿用，
+    超时 / 内存撞顶 / 驱动错不是结论；CPU 那一趟沿用不了重判过的条，GPU 那一趟照自己的键判；--full、--rerun 下 GPU 那一趟也不读库、现判；复用哨兵 GPU 趟另有一份（项名 gpu:<序号>）。
+  导入：两台各跑一片时，GPU 趟在拿卡的那一台（或两台）上跑、判定在那一台库目录的 gpu-verdicts.tsv；--import-results 把那一份并进本机的 gpu-verdicts.tsv（跑法加 import: 前缀、校验列先用另一台的密钥核过再照本机密钥重签，
+    本机已有的相同行不重复导），并之前逐行核键（行的键在本机此刻清单的单元键里、gpu_key 等于本机此刻的 GpuJudging.pass_key，两把键见上「沿用」），核不过的不并、列出来；
+    并进来之后本机不带 --shard 的一趟里，键相同、gpu_key 相同的行照常沿用，GPU 趟只现判没有结论的条（沿用判据的其余几问——测试键、覆盖者键——仍在用到时现核，核不过的那一条照现判）。
+  没做：升档（超时、撞顶两趟取证）。
+  CPU 那一趟的前提（不归这一节）：mutation-prune.py 的 coverers_key 跳过默认 cfg 下不编的测试（tests/ 里整个文件 #![cfg(feature = "gpu")] 的，entry-cfg-inactive；
+    它们不可能是 CPU 那一趟的覆盖者，不算拒、不进条数），CPU 那一趟没红的行的覆盖者键因此算得出，GPU 那一趟才选得到它们；别的拒因仍整条拒（状态 none，理由 coverer-refused）。
+    弄坏开关 coverers-cfg-inactive-refused（BROAD_MUTATION_BREAK）：不跳过、照旧整条拒，红在 mutation-prune.py --selftest 的覆盖者键那一格；本驱动的 --selftest 不另设这一格。
 忽略用例登记：harness 档四个包（crates/<包>/src 与 tests 下）里每一条 #[ignore] 用例只有两种归宿，要跑第二段的这一趟开跑前（基线之前）按专用树里的源码逐条判：
   理由以「harness 慢档用例：」开头的，进第二段慢档用例那一步；按环境变量起的大档与工具（没给环境变量就红、或规模由环境变量定）写在排除表
   scripts/mutation/broad-mutation-ignored-exclusions.tsv，一行一条：<二进制 id><空格><用例名><TAB><理由>，二进制 id 与用例名照 cargo nextest list 的写法，
@@ -120,7 +169,7 @@
   认不出写法的 #[ignore]（多行的、带条件的）。只跑第一段的趟（--skip-stage-two）不判。--check-ignored 只做这一判、打第二段那一步的完整命令。
   第二段那一步的步名是 two-test-slow-harness（旧步名 two-test-ignored 是没排除大档的那一版命令，基线表里旧名的行不认）。
 中断续接：任何时刻被 TERM / KILL，重跑同一条命令：沿用得了的条一条都不重跑（带 --item 的一样）；被打断的那一条没有新行、只重跑它（或只补它的第二段）；
-  树里留着被改过的源文件时先照在途记录拷回原件，拷不回的由开跑的换树照源码重写；树里多出源码里没有的文件，换树时删掉。
+  被 KILL 的那一趟的运行目录（改过的树、在途记录、编译目录）下一趟拿到锁之后先删掉，这一趟在新建的运行目录里照源码换树（库目录「runs/」）。
   被 TERM / INT 停：在途那一步连同内存包装给它开的 scope 一起停（systemctl --user stop 自己那一个 scope），不留着它跑完。
   被 KILL：留下的那一步还活着时占着库目录的锁（锁的描述符在驱动与内存包装最外层那个 bash 手里）：等 --lock-wait 秒，还占着就退 4、不跑。
 基线：每一步、每个线程数（--threads）按基线键先在没改过的树上跑一遍，全绿才开始跑变异（基线红了一律退 6）；基线的秒数定这个线程数下的超时。
@@ -145,7 +194,7 @@
     stdout 写「按条记基线：N 份记录沿用 M、照跑 K；拒算的 R 条每趟照跑（头几条）」。文档测试那一步不经 runner、量不了逐条，照旧整步。
     今天的树上第一段测试步 3 条、checker 档快档 15 条拒算（读 env!("CARGO_MANIFEST_DIR") 拼出的目录或运行期给的文件名、起自己这个可执行文件），
     lib_function_units.py 与 crates/singlefs-unit-graph 逐条同义，那几种形态两边都拒算，不在这里另认。
-  换树只重写内容不同的文件、写的文件 mtime 取此刻：cargo 按 mtime 判本地包新不新鲜，内容变了的必重编，没变的照旧复用编译目录。
+  每一趟的编译目录是新建的（库目录「runs/」）：头一回编（验环境与编译步的基线）从头编，之后各条在这一趟里只付增量编译；不照用上一趟编的产物。
   每次重起（这一趟没现跑基线的那一段）先在没改过的树上把编译那几步各跑一遍，红了退 6：基线绿过之后环境坏了要在落行之前发现。
   编译那一步退 101 而日志里没有带源码位置的编译错误（磁盘满、锁文件不符这一类），不记无效，记 driver-error 并当场在没改过的树上验一次编译。
 内存：每一步命令各自经 scripts/hosts/run-with-memory-cap.sh 跑（与 mutate.sh、门禁 checker-tier-crates-mutation-replay 同一种套法），
@@ -200,26 +249,41 @@
 
 输出：开跑一行 BROAD_MUTATION_PLAN list=<清单条数> judge=<现判> carried=<沿用> refused=<拒算> selected=<选中> threads=… memory_cap=…，
       要现判的每条一行 BROAD_MUTATION_JUDGE sequence=… reason=…（沿用不了的理由；作废时另带 changed=<变了的单元>）；
-      每条判完一行 BROAD_MUTATION_ITEM sequence=… outcome=… stage=… build_seconds=… test_seconds=… name=…；
-      末尾一行 BROAD_MUTATION_TOTAL selected=… ran=… judged=<现判> carried=<沿用> refused=<拒算> 各结局条数，成功那句报「现判 N、沿用 M、拒算 R」；
+      每条判完一行 BROAD_MUTATION_ITEM sequence=… outcome=… stage=… build_seconds=… test_seconds=… wall_seconds=… judged=1 red=<没红记 1，别的记 0> reused=0 name=…
+      （入口脚本那一行的判了、红了、复用了多少：这一行只给现判的条打，一条一判，复用的条不打这一行、数在 BROAD_MUTATION_PLAN 的 carried=；C641）；
+      末尾一行 BROAD_MUTATION_TOTAL selected=… ran=… judged=<现判> carried=<沿用> refused=<拒算> 各结局条数，成功那句报「现判 N、沿用 M、拒算 R」，后面接「GPU 趟（要 K 条）：现判 a、复用 b、本次未跑 c」；
+      GPU 那一趟：BROAD_MUTATION_GPU_PLAN needed=<要这一趟的条数> judge=<现判> carried=<沿用> refused=<拒算> features=<特性>，现判的每条一行 BROAD_MUTATION_GPU_JUDGE sequence=… reason=… labels=<目标>，
+      判完一行 BROAD_MUTATION_GPU_ITEM sequence=… cpu=<CPU 那一趟的结局> gpu=<GPU 那一趟的结局> combined=<合起来的状态> build_seconds=… test_seconds=… wall_seconds=… judged=1 red=<GPU 没红记 1> reused=0 name=…，
+      本次未跑的每条一行 BROAD_MUTATION_GPU_NOT_RUN sequence=… reason=<no-adapter / quiesce-refused / skip-gpu> name=…，末尾一行 BROAD_MUTATION_GPU_TOTAL needed=… judged=… carried=… not_run=… 各结局条数；
       --full 另打 BROAD_MUTATION_FULL flipped=<条数> 与 FLIPPED 明细；
-      --summary 打 BROAD_MUTATION_SUMMARY 一行（八栏与 refused=、unlisted_units=）与 MISSED、DRIVER_ERROR、REFUSED、UNLISTED 明细，
-      BROAD_MUTATION_GATE 一行（total、concluded、missed、without_conclusion、refused、unlisted_units、escalated、verdict）与 NO_CONCLUSION、ESCALATED 明细；
-      升档那一步各打一行 BROAD_MUTATION_ESCALATION sequence=… step=… first=… escalated=… exit=…；--import-results 打 BROAD_MUTATION_IMPORT 一行与 IMPORT_CONFLICT 明细。
+      --summary 打 BROAD_MUTATION_SUMMARY 一行（八栏与 refused=、unlisted_units=、gpu_needed= gpu_reused= gpu_not_run= gpu_without_conclusion=）与 MISSED、DRIVER_ERROR、REFUSED、UNLISTED 明细，
+      BROAD_MUTATION_GATE 一行（total、concluded、missed、without_conclusion、refused、unlisted_units、escalated、gpu_needed、gpu_reused、gpu_not_run、gpu_without_conclusion、verdict）与 NO_CONCLUSION、ESCALATED 明细；
+      gpu_needed 是要 GPU 那一趟的条数（CPU 那一趟没红、又有带 gpu 特性的测试够得着），它 = gpu_reused（库里键相同、沿用判据认的 GPU 结论）+ gpu_not_run（还没有 GPU 结论：没卡、没来得及跑）+
+      gpu_without_conclusion（GPU 那一趟超时 / 内存撞顶 / 驱动错）；后两种的条在 without_conclusion 里、NO_CONCLUSION 明细的理由写 gpu-…，不在 missed 里；
+      NO_CONCLUSION 明细的理由后面接「上一趟限时 <N> 秒」（last_time_limit_text：定下状态的那一行备注里记的整步限时，超时之后升档重跑过的取升档那趟的；
+      备注里没有整步限时的不接：直接撞顶的、驱动错、GPU 趟的、经 runner 按单条限 CPU 的测试步），之后才是作废时变了的单元；
+      升档那一步各打一行 BROAD_MUTATION_ESCALATION sequence=… step=… first=… escalated=… exit=…；--import-results 打 BROAD_MUTATION_IMPORT 一行（CPU 那一趟的判定行：rows_read、imported、already_present、conflicting_keys…；
+      GPU 那一趟的：gpu_rows_read、gpu_imported、gpu_already_present、gpu_conflicting_keys、gpu_withheld_rows、gpu_rejected、gpu_partial_tail_ignored）与 IMPORT_CONFLICT、
+      IMPORT_GPU_CONFLICT（<TAB>键前十六位<TAB>本机结局<TAB>另一台结局<TAB>变异名）、IMPORT_GPU_REJECTED（<TAB>序号<TAB>键前十六位<TAB>理由 key-not-in-list / gpu-pass-changed<TAB>变异名<TAB>说明）明细。
       一步跑着时每过 PROGRESS_INTERVAL_SECONDS 秒（300）往 stderr 打一行
       BROAD_MUTATION_PROGRESS sequence=<序号，基线是 baseline，验环境是 environment> step=<步名> elapsed_seconds=… compiled_crates=… tests_passed=… tests_failed=…
-退出码：0 选中的条都判完；1 --summary 栏数对不上或判定库有对不上的行（段数、校验列、没有密钥）、--import-results 有冲突的条、忽略用例登记对不上（含排除表写坏）、
+退出码：0 选中的条都判完；1 --summary 栏数对不上或判定库有对不上的行（段数、校验列、没有密钥）、--import-results 有冲突的条或键对不上被拒的 GPU 判定行（别的行已导入）、忽略用例登记对不上（含排除表写坏）、
   清单按单元存复原不回去、清单里有落不进任何单元的变异、--selftest 有格判错；
-  2 用法错（项写错、库目录不合或是旧库、没带前缀、缺工具、只供自证的变量出现在自证之外、要写行而密钥用不了、传了已删的参数）；
+  2 用法错（项写错、库目录不合或是旧库、没带前缀、缺工具、真跑起 cargo 之前 RocksDB 预编库的取值判红（scripts/hosts/rocksdb-prebuilt.py entry：这台没装、
+    此刻进程环境的取值缺了或对不上；出路是开新会话，或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"）、只供自证的变量出现在自证之外、要写行而密钥用不了、传了已删的参数）；
   3 内存包装自己的结局（251 起不来、252 排不上、254 被总上限挤掉、245 显存不够）：那一条不落行，修好重跑同一条命令；
-  4 锁被占着；5 在途记录对不上又换不了树；6 基线不绿、或疑似环境坏了；
+  4 锁被占着；5 在途记录对不上又换不了树；6 基线不绿（含 GPU 那一趟的基线）、或疑似环境坏了；
+  9 这一趟别的都成了，运行目录没删掉（有进程开着里面的文件，或删了回读还在；逐个报进程，出路照那一句）；
   8 --summary 判提交门禁红（有没结论的条、有没红的条、或有单元没记清单；BROAD_MUTATION_GATE 行写 verdict=red）；
   143 被 TERM / INT 停（在途那一条不落行）。
+自证失败行的转述：失败行（「✗ 自证：」那一行）转述驱动输出的尾部，截在哪由临时路径长短定；转述里的 ✗ 一律换成「〔转述〕」，截进来的半行不另成失败行；
+  上一格判完以来这一格起的驱动在完整输出里报的 ✗ 行（如「✗ 复用失灵：…」）整行接在失败行那一行末尾「；这一格起的驱动报的失败行 N 行：…」
+  （去掉数字之后相同的几行并成一种、注明同样的另几行，至多 SELFTEST_DRIVER_FAILURE_LINES_SHOWN 种，多的只报种数）。下面点名驱动报的那一句的，对的是失败行那一行。
 弄坏开关 BROAD_MUTATION_BREAK=<项>（逗号分隔，只给 --selftest 证红用，只在 --selftest 自己起的子进程里生效）。
 逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 run_selftest_cells 里那几组格的函数名，括号里是那条「✗ 自证：」的开头；
 每一项红时都另有汇总行「✗ --selftest：<格数> 格里 N 格判错」，退 1）：
   BROAD_MUTATION_BREAK=list-items-pipe-unhandled  --list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError、退 120）
-      红：「✗ 自证：--list-items 接 」、「✗ 自证： head 时没照 SIGPIPE 惯例安静退」
+      红：「✗ 自证：--list-items 接 | head 时没照 SIGPIPE 惯例安静退」
   BROAD_MUTATION_BREAK=own-libtest-failure-line  libtest 结果行回到驱动自己那条正则取红的测试名（名字带上「 - should panic」），不经 lib_libtest_result_lines.py
       红：「✗ 自证：两段式的结局不对」
   BROAD_MUTATION_BREAK=rerun-done  沿用得了的条照样重跑（不读判定库）
@@ -228,48 +292,82 @@
       「✗ 自证：点名沿用得了的条没跳过」、「✗ 自证：点名加 --rerun 没有重跑并追加新行」、「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、「✗ 自证：抓到的条被后来的超时行盖掉了」、「✗ 自证：--stage-two-only 点到没过过第一段的条没拒」、「✗ 自证：认不出的退出码没处理对」、
       「✗ 自证：工具链没进每一把键」、「✗ 自证：--summary 没列升档判的抓到、或下一趟没按键沿用」、「✗ 自证：--unit-environment 打的不是构建环境认的那几个变量」、「✗ 自证：--unit-environment 没把换了工具链的 RUSTUP_TOOLC」、「✗ 自证：两台各一片的结果没合对」
       另红：「✗ 自证：reuse-three-questions：」（① 第二趟全现判）、「✗ 自证：reuse-sentinel：」（这一格要的就是那一趟复用哨兵判红；跟着判错的是照常那一趟）
+      另红：「✗ --stage-two-only 点到的第 2、7 条在判定库里没有键相同的 stage-one-only 行」、「✗ 复用失灵：…键相同却现判了」、「✗ 自证：同一条命令第二趟 GPU 那一趟没复用」、「✗ 自证：有卡之后重跑同一条命令没把 GPU 那一趟补上」、「✗ 自证：键对不上的 GPU 判定行没被拒、或拒了之后本机的 GPU 趟没把它照现判」、「✗ 自证：第二台的 GPU 判定行没随导入并进本机库、或并进来之后本机的 GPU 趟还是把同一批判了一遍」
   REUSE_CHECKS_BREAK=rejudged-sentinel-passes（共用库 scripts/gate/lib_reuse_checks.py 的开关，哨兵被现判不红）
       红：「✗ 自证：reuse-sentinel：」
   BROAD_MUTATION_BREAK=interrupted-as-done  被打断的那一条重起时照「已完成」落一行、不重跑
       红：「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：末行没写完的判定库没处理对」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」
   BROAD_MUTATION_BREAK=no-row-flush  判定行攒在内存里到收尾才写
       红：「✗ 自证：杀驱动之前，前两条的判定行没有都落盘」、「✗ 自证：重起之后沿用得了的条或基线被重跑了」
   BROAD_MUTATION_BREAK=stage-two-missed-as-caught  第二段没红记成抓到
-      红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：不带参数、库里有可沿用的判定时没有沿用」、「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿」、「✗ 自证：抓到它的那条测试改了之后那几条没现判」、
-      「✗ 自证：--full 没有只写不读、或没列出翻面的条」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：旧步名的基线行被认了」
+      红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU 不对」、「✗ 自证：不带参数、库里有可沿用的判定时没有沿用」、「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿用」、
+      「✗ 自证：抓到它的那条测试改了之后那几条没现判」、「✗ 自证：--full 没有只写不读、或没列出翻面的条」、「✗ 自证：reuse-three-questions」、「✗ 自证：reuse-sentinel」、
+      「✗ 自证：只有 CPU 红：CPU 那一趟抓到的条也起了 GPU 那一趟、或两趟的结局没分开记」、「✗ 自证：GPU 那一趟的结局没有单独存进 gpu-verdicts.tsv」、
+      「✗ 自证：只有 GPU 红：GPU 那一趟红了没算抓到、抓到它的测试没认出来、或 --list-items 的状态不是两趟合起来的」、「✗ 自证：两趟都没红：没记成没红、或 GPU 那一趟跑了闭包够不着的条」、「✗ 自证：GPU 那一趟的命令不对」、
+      「✗ 自证：没卡：没报本次未跑、记成了没红、或落了 GPU 行」、「✗ 自证：有卡之后重跑同一条命令没把 GPU 那一趟补上」、「✗ 自证：中途没卡：这一条之后的没停下、或落了行」、「✗ 自证：--skip-gpu 还是起了 GPU 的步、或没逐条报本次未跑」、「✗ 自证：清场没过」、
+      「✗ 自证：GPU 趟基线红没拒成「基线不绿」」、「✗ 自证：GPU 趟超时 / 一个测试都没跑到不是没结论」、「✗ 自证：GPU 趟编不过没记成无效」、「✗ 自证：同一条命令第二趟 GPU 那一趟没复用」、「✗ 自证：点名加 --rerun 没有重跑 GPU 那一趟并追加新行」、
+      「✗ 自证：手追加的没有校验列、校验列对不上的 GPU 判定行没判红」、「✗ 自证：BROAD_MUTATION_ITEM 每条一行没带判了、红了、复用了多少，或 red= 与结局对不上」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：旧步名的基线行被认了」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」、「✗ 自证：两台各跑一片的 GPU 导入格前提不成立」
   BROAD_MUTATION_BREAK=summary-mismatch-silent  汇总对不上（认不出的结局、校验列、清单表复原不回去）不报
       红：「✗ 自证：判定库里有认不出的结局时汇总没判红」、「✗ 自证：清单按单元存的表被改坏了没判红」、「✗ 自证：手追加的没有校验列、校验列对不上的 caught 行被当成了判定」、「✗ 自证：密钥不在时 --summary 没判红、或替它建了一份」
-  BROAD_MUTATION_BREAK=no-restore  开跑时不照在途记录恢复
-      红：「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」
+      另红：「✗ 自证：手追加的没有校验列、校验列对不上的 GPU 判定行没判红」
+  BROAD_MUTATION_BREAK=interrupted-run-directory-kept  开跑时不删上一趟被 KILL 留下的运行目录、不认它里面的在途记录
+      红：「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」、「✗ 自证：重起跑完之后库目录里还剩上一趟被 KILL 留下的、或这一趟的运行目录」、「✗ 自证：上一趟被 KILL 留下的运行目录」、
+      「✗ 自证：恢复原件半途被杀之后树里多出了文件、临时件不在运行目录里、或重跑没照常判完」
   BROAD_MUTATION_BREAK=accept-unknown-item  不认得的项悄悄略过
       红：「✗ 自证：不认得的项没拒」
+  BROAD_MUTATION_BREAK=exclude-re-ignored  换树时不把 .cargo/mutants.toml 拷进专用树（cargo-mutants 读不到 exclude_re，等于忽略它）
+      红：「✗ 自证：exclude_re 没排掉那一条、清单没整版重判、或别的条没沿用」
+  BROAD_MUTATION_BREAK=no-conclusion-limit-dropped  --summary 的 NO_CONCLUSION 理由不接上一趟的限时（改前的样子）
+      红：「✗ 自证：--summary 的 NO_CONCLUSION 超时那一行理由里没带上一趟的限时秒数」
+  BROAD_MUTATION_BREAK=item-counts-dropped  每条一行 BROAD_MUTATION_ITEM 不带 judged=、red=、reused=（改前的样子）
+      红：「✗ 自证：BROAD_MUTATION_ITEM 每条一行没带判了、红了、复用了多少」
   BROAD_MUTATION_BREAK=test-variables-anywhere  只供自证的变量隔一层进程、库目录在自证工作目录之外也认
       红：「✗ 自证：只供自证的变量指着自证工作目录之外的库时没拒」、「✗ 自证：父进程不是 --selftest 的进程带着假一步的变量时没拒」、「✗ 自证：父进程不是 --selftest 的进程只带着弄坏开关时没拒」
+      另红：「✗ 自证：平常跑设了弄坏开关、带认不得的选项时没在参数解析之前拒并点名」
+  BROAD_MUTATION_BREAK=break-guard-after-parsing  只供自证的变量（含这个弄坏开关）平常跑设了的拒排回参数解析之后（改前的样子：认不得的选项先被 argparse 当用法错拒，不点名变量）
+      红：「✗ 自证：平常跑设了弄坏开关、带认不得的选项时没在参数解析之前拒并点名」
   BROAD_MUTATION_BREAK=state-is-last-row  一条的状态照旧取最后一行
       红：「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、「✗ 自证：抓到的条被后来的超时行盖掉了」
   BROAD_MUTATION_BREAK=named-items-always-rerun  点名的条沿用得了也重跑
       红：「✗ 自证：点名沿用得了的条没跳过」、「✗ 自证：点名加 --rerun 没有重跑并追加新行」、「✗ 自证：抓到的条被后来的超时行盖掉了」、「✗ 自证：--summary 没列升档判的抓到、或下一趟没按键沿用」、「✗ 自证：--unit-environment 打的不是构建环境认的那几个变量」、
       「✗ 自证：--unit-environment 没把换了工具链的 RUSTUP_TOOLC」
+      另红：「✗ 自证：有卡之后重跑同一条命令没把 GPU 那一趟补上」
   BROAD_MUTATION_BREAK=partial-row-kept  末行不完整时照旧补一个换行留着它
       红：「✗ 自证：末行没写完的判定库没处理对」
+      另红：「✗ 汇总对不上：判定库里没有校验列或校验列对不上的…行不算」
   BROAD_MUTATION_BREAK=no-environment-check  重起不验编译、连着无效或秒红也不查
       红：「✗ 自证：认不出的退出码没处理对」、「✗ 自证：基线绿过之后编译坏了，重起没发现」、「✗ 自证：连续无效而原件上编译照过时没有接着跑」、「✗ 自证：连续 3 条秒红的抓到、原件上那一步也红，没有停下报疑似环境坏了」
   BROAD_MUTATION_BREAK=unviable-by-exit-code  编译步退 101 一律记无效
       红：「✗ 自证：认不出的退出码没处理对」
   BROAD_MUTATION_BREAK=unknown-exit-stops  一步退认不出的码照旧整趟停
       红：「✗ 自证：认不出的退出码没处理对」
+      另红：「✗ 第 3 条的 one-test 退 104（认不出的退出码）：不落行」
   BROAD_MUTATION_BREAK=gpu-memory-as-driver-error  一步退 245（内存包装认出的显存不够）照认不出的码落一行 driver-error、不停
       红：「✗ 自证：一步退 245」
   BROAD_MUTATION_BREAK=stage-two-without-stage-one  点名加 --stage-two-only 不看过没过第一段
       红：「✗ 自证：--stage-two-only 点到没过过第一段的条没拒」、「✗ 自证：父进程不是 --selftest 的进程带着假一步的变量时没拒」
   BROAD_MUTATION_BREAK=stage-two-full-cargo-test  第二段照旧是整遍 cargo test 加快档
       红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：--stage-two-only 不对」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：第二段的步不对」、
-      「✗ 自证： (binary_id(=singlefs-format::ignored_ca」、「✗ 自证： (binary_id(=singlefs-format::ignored_ca」、「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、
+      「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、
       「✗ 自证：登记对的树上 --check-ignored 没判绿、或第二段那一步的命令不对」、「✗ 自证：旧步名的基线行被认了」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」、「✗ 自证：重起之后沿用得了的条或基线被重跑了」
   BROAD_MUTATION_BREAK=term-leaves-step-running  被 TERM 时只给包装发一次 TERM
-      此刻不让任何格红：scripts/hosts/run-with-memory-cap.sh 自己接 TERM、停它开的那个 scope（它文件头「被停」一段），只给包装发 TERM 也停得下；保留这一项，包装哪天不再自己停 scope 时 selftest_stop_cells 照样红
-  BROAD_MUTATION_BREAK=import-unchecked  导入不核段数、结局与键的写法
-      红：「✗ 自证：该拒的导入没拒、或别的源码的行顶替了本机的」
+      红：「✗ 自证：包装自己不停 scope 时被 TERM 停，在途那一步没有一起停」（selftest_stop_cells 里经包装的弄坏开关 RUN_WITH_MEMORY_CAP_BREAK=term-leaves-scope 起的那一趟：
+      包装被 TERM 时照改前不停自己开的 scope，只给包装发 TERM 停不下在途那一步；照常经真包装的那一趟包装自己停 scope，不跟着红。
+      那一格转述的驱动输出里驱动那一句被 TERM 停的话，句首的叉号换成了〔转述〕，不另成一行失败行）
+  BROAD_MUTATION_BREAK=import-unchecked  导入不核段数、结局与键的写法（verdicts.tsv 与 gpu-verdicts.tsv 两张表都不核）
+      红：「✗ 自证：该拒的导入没拒、或别的源码的行顶替了本机的」、「✗ 自证：不成形的 GPU 判定行没整表拒、或拒了还写了别的行」
+  BROAD_MUTATION_BREAK=peer-mac-unchecked  导入不用另一台的密钥核它的校验列（verdicts.tsv 与 gpu-verdicts.tsv 都不核，对端密钥取不到也照导：改前的样子）
+      红：「✗ 自证：另一台的行被改了一个字（校验列没跟着改）时导入没整表拒」、「✗ 自证：取不到另一台的密钥时导入没拒」
+  BROAD_MUTATION_BREAK=import-verdicts-only  导入只并 verdicts.tsv、不看 gpu-verdicts.tsv（改前的样子：第二台的 GPU 判定不随导入回来，本机的 GPU 趟把同一批再判一遍）
+      红：「✗ 自证：第二台的 GPU 判定行没随导入并进本机库、或并进来之后本机的 GPU 趟还是把同一批判了一遍」、「✗ 自证：键对不上的 GPU 判定行没被拒、或拒了之后本机的 GPU 趟没把它照现判」、
+      「✗ 自证：不成形的 GPU 判定行没整表拒、或拒了还写了别的行」、「✗ 自证：两台定论不同的 GPU 判定行没挡下」
+  BROAD_MUTATION_BREAK=import-gpu-keys-unchecked  导入 GPU 判定行不核两把键（行的键在不在本机此刻清单里、gpu_key 等不等于本机此刻 GPU 趟自己的键）
+      红：「✗ 自证：键对不上的 GPU 判定行没被拒、或拒了之后本机的 GPU 趟没把它照现判」
+  BROAD_MUTATION_BREAK=import-gpu-conflict-ignored  导入 GPU 判定行不看两边定论不同（同一把键本机与另一台各有定论而结局不同的也并进来）
+      红：「✗ 自证：两台定论不同的 GPU 判定行没挡下」
   BROAD_MUTATION_BREAK=unregistered-ignored-passes  没登记的忽略用例判绿
       红：「✗ 自证：新加的没登记的忽略用例没判红」
   BROAD_MUTATION_BREAK=stale-exclusion-passes  排除表指着不存在的用例或两边都在判绿
@@ -279,13 +377,23 @@
   BROAD_MUTATION_BREAK=exclusion-filter-dropped  第二段慢档用例那一步的命令不带排除的 -E
       红：「✗ 自证：登记对的树上 --check-ignored 没判绿、或第二段那一步的命令不对」
   BROAD_MUTATION_BREAK=ignored-scan-skips-nested-modules  扫源码时模块里的 #[ignore] 略过
-      红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：不带参数、库里有可沿用的判定时没有沿用」、「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿」、「✗ 自证：抓到它的那条测试改了之后那几条没现判」、
-      「✗ 自证：--full 没有只写不读、或没列出翻面的条」、「✗ 自证：第二段基线红没报成带出路的拒绝」、「✗ 自证：--stage-two-only 不对」、「✗ 自证：杀驱动之前，前两条的判定行没有都落盘」、「✗ 自证：驱动被杀之后树里没有留着改过的文件与在途记录」、「✗ 自证：上一趟留下的进程还占着锁时没拒」、
-      「✗ 自证：重起之后沿用得了的条或基线被重跑了」、「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」
+      红：「✗ 自证：登记对的树上 --check-ignored 没判绿、或第二段那一步的命令不对」（直接判模块里的 #[ignore] 扫没扫到：mod 里的两条没扫到，排除表里那两行成了指着不存在的用例）；
+      跟着红的（排除表对不上，要跑第二段的趟都在基线之前被拒，后面的格前提不成立）：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU 不对」、「✗ 自证：不带参数、库里有可沿用的判定时没有沿用」、「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿用」、
+      「✗ 自证：抓到它的那条测试改了之后那几条没现判」、「✗ 自证：--full 没有只写不读、或没列出翻面的条」、「✗ 自证：第二段基线红没报成带出路的拒绝」、「✗ 自证：reuse-three-questions」、「✗ 自证：reuse-sentinel」、
+      「✗ 自证：只有 CPU 红：CPU 那一趟抓到的条也起了 GPU 那一趟、或两趟的结局没分开记」、「✗ 自证：GPU 那一趟的结局没有单独存进 gpu-verdicts.tsv」、
+      「✗ 自证：只有 GPU 红：GPU 那一趟红了没算抓到、抓到它的测试没认出来、或 --list-items 的状态不是两趟合起来的」、「✗ 自证：两趟都没红：没记成没红、或 GPU 那一趟跑了闭包够不着的条」、「✗ 自证：GPU 那一趟的命令不对」、
+      「✗ 自证：没卡：没报本次未跑、记成了没红、或落了 GPU 行」、「✗ 自证：有卡之后重跑同一条命令没把 GPU 那一趟补上」、「✗ 自证：中途没卡：这一条之后的没停下、或落了行」、「✗ 自证：--skip-gpu 还是起了 GPU 的步、或没逐条报本次未跑」、「✗ 自证：清场没过」、
+      「✗ 自证：GPU 趟基线红没拒成「基线不绿」」、「✗ 自证：GPU 趟超时 / 一个测试都没跑到不是没结论」、「✗ 自证：GPU 趟编不过没记成无效」、「✗ 自证：同一条命令第二趟 GPU 那一趟没复用」、「✗ 自证：点名加 --rerun 没有重跑 GPU 那一趟并追加新行」、
+      「✗ 自证：手追加的没有校验列、校验列对不上的 GPU 判定行没判红」、「✗ 自证：--stage-two-only 不对」、「✗ 自证：杀驱动之前，前两条的判定行没有都落盘」、「✗ 自证：驱动被杀之后它那一趟的运行目录里没有留着改过的树与在途记录」、「✗ 自证：上一趟留下的进程还占着锁时没拒」、
+      「✗ 自证：重起之后沿用得了的条或基线被重跑了」、「✗ 自证：BROAD_MUTATION_ITEM 每条一行没带判了、红了、复用了多少，或 red= 与结局对不上」、「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、
+      「✗ 自证：第二段的步不对」、「✗ 自证：判定库里有认不出的结局时汇总没判红」、「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、「✗ 自证：旧步名的基线行被认了」、「✗ 自证：排除表指着不存在的用例、或两边都在，没判红」、
+      「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」、「✗ 树里的忽略用例登记对不上：排除表里…行指着树里没有的用例」、「✗ 自证：两台各跑一片的 GPU 导入格前提不成立」
   BROAD_MUTATION_BREAK=slow-step-keeps-old-name  第二段慢档用例那一步还叫旧步名 two-test-ignored
       红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：--stage-two-only 不对」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：第二段的步不对」、
-      「✗ 自证： (binary_id(=singlefs-format::ignored_ca」、「✗ 自证： (binary_id(=singlefs-format::ignored_ca」、「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、
+      「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、
       「✗ 自证：登记对的树上 --check-ignored 没判绿、或第二段那一步的命令不对」、「✗ 自证：旧步名的基线行被认了」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」
   BROAD_MUTATION_BREAK=progress-never  一步跑着时进度间隔的判断永不触发、一行 BROAD_MUTATION_PROGRESS 都不打
       红：「✗ 自证：一步跑过进度间隔没有报进度」
   BROAD_MUTATION_BREAK=coverage-selection-ignored  剪枝：不按覆盖挑测试
@@ -293,19 +401,24 @@
   BROAD_MUTATION_BREAK=stage-two-not-by-binary  剪枝：第二段不按二进制挑
       红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」
   BROAD_MUTATION_BREAK=doc-tests-skipped  剪枝：文档测试不跑
-      红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：第二段的步不对」、「✗ 自证： (binary_id(=singlefs-format::ignored_ca」、
-      「✗ 自证： (binary_id(=singlefs-format::ignored_ca」
+      红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：第二段的步不对」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」
   BROAD_MUTATION_BREAK=whole-step-time-limit  剪枝：测试步照旧设整步总时限
       红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」、「✗ 自证：剪枝跑没有重跑超时、内存撞顶的条」、「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：抓到的条被后来的超时行盖掉了」、
       「✗ 自证：两趟都撞顶、证据齐的没判成 caught-by-memory」、「✗ 自证：两台各一片的结果没合对」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」
   BROAD_MUTATION_BREAK=cpu-limit-ignored  剪枝：测试步不经 runner 限 CPU
       红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑、测试步经 runner 限 CPU」
+      另红：「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
   BROAD_MUTATION_BREAK=carry-without-store-check  判定库里键相同就沿用（抓到它的测试键、覆盖者键都不比）
       红：「✗ 自证：抓到它的那条测试改了之后那几条没现判」
+      另红：「✗ 自证：reuse-three-questions：」
   BROAD_MUTATION_BREAK=summary-gate-silent  --summary 有没红或没结论也退 0
       红：「✗ 自证：--full 没有只写不读、或没列出翻面的条」、「✗ 自证：剪枝跑没有重跑超时、内存撞顶的条」、「✗ 自证：汇总不对」、「✗ 自证：末行没写完的判定库没处理对」、「✗ 自证：认不出的退出码没处理对」、「✗ 自证：两台各一片的结果没合对」
+      另红：「✗ 自证：两趟都没红：」、「✗ 自证：只有 CPU 红：」、「✗ 自证：没卡：」
   BROAD_MUTATION_BREAK=stage-two-baseline-red-generic  第二段基线红只报一句不给出路
       红：「✗ 自证：第二段基线红没报成带出路的拒绝」
+      另红：「✗ 基线 two-test-checker-tier 在没改过的树上退 101：基线不绿」
   BROAD_MUTATION_BREAK=environmental-not-reselected  不带参数的剪枝跑不重跑超时、内存撞顶的条
       红：「✗ 自证：剪枝跑没有重跑超时、内存撞顶的条」、「✗ 自证：两台各一片的结果没合对」
   BROAD_MUTATION_BREAK=escalation-skipped  超时、撞顶不升档，照旧记没结论
@@ -315,6 +428,7 @@
       红：「✗ 自证：两趟都超时、证据齐的没判成 caught-by-timeout」、「✗ 自证：两趟都撞顶、证据齐的没判成 caught-by-memory」、「✗ 自证：--summary 没列升档判的抓到、或下一趟没按键沿用」、「✗ 自证：换了 --threads 之后基线没在新线程数下另记、或登记行指的基线行对不上」
   BROAD_MUTATION_BREAK=escalation-evidence-unchecked  两趟都撞了什么就判抓到，不核证据（两趟结局不同、基线缺也判）
       红：「✗ 自证：剪枝跑没有重跑超时、内存撞顶的条」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：加大 --timeout-floor、--memory-cap 再 --item」、「✗ 自证：证据不齐的升档判成了抓到」、「✗ 自证：两台各一片的结果没合对」
+      另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」
   BROAD_MUTATION_BREAK=escalated-not-summarised  --summary 不列 ESCALATED、判定行不带 escalated=
       红：「✗ 自证：--summary 没列升档判的抓到、或下一趟没按键沿用」
   BROAD_MUTATION_BREAK=unit-environment-fixed-list  --unit-environment 只认 RUSTFLAGS、RUSTDOCFLAGS、CARGO_PROFILE_* 这几个
@@ -329,17 +443,24 @@
       红：「✗ 自证：升档那趟没按自己的上限排队、或改坏了源码的那几步没设撞总上限时先挨杀」
   BROAD_MUTATION_BREAK=mutation-steps-not-oom-first  改坏了源码的那几步不带 RUN_WITH_MEMORY_CAP_OOM_FIRST
       红：「✗ 自证：升档那趟没按自己的上限排队、或改坏了源码的那几步没设撞总上限时先挨杀」
+  BROAD_MUTATION_BREAK=rocksdb-entry-unchecked  真跑起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+      红：「✗ 自证：被判的树里 checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，没在起 cargo 之前拒」
+      （entry 的跳过办法：被判的树里没有依赖 rocksdb 的清单（自证的 SELFTEST_SOURCES 就是这样），或 PATH 上的 cargo 是带
+      『# rocksdb-prebuilt-entry: selftest-fake-cargo』那一行的假 cargo；见 scripts/hosts/rocksdb-prebuilt.py 文件头『entry』）
   BROAD_MUTATION_BREAK=no-carry-without-arguments  不带选条参数时不读判定库（全部现判）
       红：「✗ 自证：不带参数、库里有可沿用的判定时没有沿用」、「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿」、「✗ 自证：抓到它的那条测试改了之后那几条没现判」、「✗ 自证：改一条排除之后别的条没照样沿用」、「✗ 自证：只改 Cargo.toml 注释之后别的条没照样沿用」、
       「✗ 自证：加大限时参数与上限之后别的条没照样沿用」、「✗ 自证：拒算的条没有每趟现判、或别的条没沿用」、「✗ 自证：剪枝跑没有重跑超时、内存撞顶的条」、「✗ 自证：--stage-two-only 不对」、「✗ 自证：重起之后沿用得了的条或基线被重跑了」、「✗ 自证：--shard 0/2 跑的不是沿用不了的偶数序号」、
       「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、「✗ 自证：认不出的退出码没处理对」、「✗ 自证：工具链没进每一把键」、「✗ 自证：两台各一片的结果没合对」
+      另红：「✗ 复用失灵：…键相同却现判了」、「✗ 自证：reuse-sentinel：」、「✗ 自证：reuse-three-questions：」、「✗ 自证：同一条命令第二趟 GPU 那一趟没复用」、「✗ 自证：键对不上的 GPU 判定行没被拒、或拒了之后本机的 GPU 趟没把它照现判」、「✗ 自证：第二台的 GPU 判定行没随导入并进本机库、或并进来之后本机的 GPU 趟还是把同一批判了一遍」
   BROAD_MUTATION_BREAK=select-by-commit  恢复按提交选条：被判那棵树里相对 HEAD 改过的文件里的条一律现判
       红：「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿」、「✗ 自证：抓到它的那条测试改了之后那几条没现判」
   BROAD_MUTATION_BREAK=judge-units-raw-text  判法单元指纹取两份脚本整份原文的 sha256（只改注释也变）
       红：「✗ 自证：只改驱动注释判法单元指纹变了」
+      另红：「✗ 自证：改了 GPU 趟的函数，CPU 那一趟的判法单元指纹跟着变了」
   BROAD_MUTATION_BREAK=limits-in-key  --timeout-floor、--memory-cap、--cpu-multiplier 进每一把键
       红：「✗ 自证：加大限时参数与上限之后别的条没照样沿用」、「✗ 自证：加大 --timeout-floor、--memory-cap 再 --item」、「✗ 自证：两趟都超时、证据齐的没判成 caught-by-timeout」、「✗ 自证：两趟都撞顶、证据齐的没判成 caught-by-memory」、
       「✗ 自证：升档那趟跑完没照它往后的结局判」、「✗ 自证：证据不齐的升档判成了抓到」、「✗ 自证：--summary 没列升档判的抓到、或下一趟没按键沿用」
+      另红：「✗ 自证：reuse-sentinel：」
   BROAD_MUTATION_BREAK=refused-carried  拒算的条与抓到它的测试认不出的条照沿用
       红：「✗ 自证：拒算的条没有每趟现判、或别的条没沿用」
   BROAD_MUTATION_BREAK=removed-arguments-accepted  已删的参数不另拒（落进 argparse 的用法错）
@@ -350,16 +471,43 @@
       红：「✗ 自证：库目录落在 /dev/shm 里时只读的 --summary 也拒了」
   BROAD_MUTATION_BREAK=list-cache-unchecked  清单按单元记进 lists.tsv 之后不复原核对
       红：「✗ 自证：清单里有被变异包之外的一条时 --refresh-list 没拒」
-  BROAD_MUTATION_BREAK=sync-keeps-extra-files  换树不删源码里没有的文件
-      红：「✗ 自证：手改过的树没照源码换回去」、「✗ 自证：换树没删树里多出来的文件」、「✗ 自证：恢复原件半途被杀之后树里多出了文件、或重跑没恢复」
-  BROAD_MUTATION_BREAK=sync-preserves-source-mtime  换树照源文件的 mtime 拷（shutil.copy2），cargo 会把旧产物当新鲜
-      红：「✗ 自证：换树之后编译目录照旧产物跑了」
+  BROAD_MUTATION_BREAK=run-directory-kept  跑完（正常、拒绝、被 TERM / INT 停）不删这一趟的运行目录（改前的样子：编译目录与树跨趟留着）
+      红：「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（正常结束）」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（出错退出）」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（被 TERM 停）」、
+      「✗ 自证：这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 9」、「✗ 自证：重起跑完之后库目录里还剩上一趟被 KILL 留下的、或这一趟的运行目录」、「✗ 自证：上一趟被 KILL 留下的运行目录」、
+      「✗ 自证：恢复原件半途被杀之后树里多出了文件、临时件不在运行目录里、或重跑没照常判完」
+  BROAD_MUTATION_BREAK=run-directory-open-files-unchecked  删这一趟的运行目录之前不核有没有进程开着里面的文件
+      红：「✗ 自证：这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 9」
+  BROAD_MUTATION_BREAK=build-directory-in-home  照改前把专用树、编译目录、每一步的 TMPDIR 与在途记录放在库目录里、跨趟留着（不建 runs/ 下的运行目录）
+      红：「✗ 自证：第二趟的编译目录不是新建的」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（正常结束）」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（出错退出）」、
+      「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（被 TERM 停）」、「✗ 自证：这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 9」、「✗ 自证：驱动被杀之后它那一趟的运行目录里没有留着改过的树与在途记录」、
+      「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」、「✗ 自证：重起跑完之后库目录里还剩上一趟被 KILL 留下的、或这一趟的运行目录」、「✗ 自证：上一趟被 KILL 留下的运行目录」、
+      「✗ 自证：恢复原件半途被杀之后树里多出了文件、临时件不在运行目录里、或重跑没照常判完」
   BROAD_MUTATION_BREAK=baseline-by-packages  基线键照改前取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名
       红：「✗ 自证：基线键没按这一步跑到的判定的单元闭包取」、「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
+      另红：「✗ 自证：第二趟的编译目录不是新建的」
   BROAD_MUTATION_BREAK=baseline-refused-step-whole  不按条记基线：基线键拒算的测试步照改前整步照跑（一条拒算整步照跑）
       红：「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
   BROAD_MUTATION_BREAK=baseline-alerts-beside-peaks  基线那几步不设 SINGLEFS_CORE_USAGE_ALERTS（改前的写法：告警跟着基线峰值表写到它旁边，叫不醒主 agent）
       红：「✗ 自证：基线那几步交给一步的 SINGLEFS_CORE_USAGE_ALERTS 不是 core_usage.py 的 alerts_path() 给的真记录」
+  BROAD_MUTATION_BREAK=gpu-red-not-caught  GPU 那一趟红了不算抓到（合起来仍记没红）
+      红：「✗ 自证：只有 GPU 红：」
+  BROAD_MUTATION_BREAK=gpu-all-items  不看闭包：每一条 CPU 那一趟没红的都跑 GPU 那一趟、目标取全部（闭包不引 gpu 的、没有测试够得着的也跑）
+      红：「✗ 自证：只有 CPU 红：」、「✗ 自证：两趟都没红：」、「✗ 自证：GPU 那一趟的命令不对」、「✗ 自证：同一条命令第二趟 GPU 那一趟没复用」、「✗ 自证：点名加 --rerun 没有重跑 GPU 那一趟并追加新行」
+      另红：「✗ 自证：reuse-sentinel：」、「✗ 自证：reuse-three-questions：」、「✗ 自证：两台各跑一片的 GPU 导入格前提不成立」
+  BROAD_MUTATION_BREAK=gpu-not-run-as-missed  没找到卡（NOT_RUN_NO_GPU_ADAPTER）记成没红
+      红：「✗ 自证：没卡：」、「✗ 自证：有卡之后重跑同一条命令没把 GPU 那一趟补上」、「✗ 自证：中途没卡：」
+  BROAD_MUTATION_BREAK=gpu-carry-ignored  GPU 那一趟沿用得了的行照样重跑
+      红：「✗ 自证：同一条命令第二趟 GPU 那一趟没复用」、「✗ 自证：点名加 --rerun 没有重跑 GPU 那一趟并追加新行」、复用哨兵那一格（reuse-sentinel：GPU 趟沿用得了的被现判，复用失灵）
+      另红：「✗ 自证：reuse-sentinel：」、「✗ 自证：reuse-three-questions：」、「✗ 自证：键对不上的 GPU 判定行没被拒、或拒了之后本机的 GPU 趟没把它照现判」、「✗ 自证：第二台的 GPU 判定行没随导入并进本机库、或并进来之后本机的 GPU 趟还是把同一批判了一遍」
+  BROAD_MUTATION_BREAK=gpu-quiesce-dropped  GPU 那一趟的测试步不经 scripts/crash/gpu-quiesce-run.sh
+      红：「✗ 自证：GPU 那一趟的命令不对」
+  BROAD_MUTATION_BREAK=gpu-test-threads-dropped  GPU 那一趟的测试步不加 --test-threads 1
+      红：「✗ 自证：GPU 那一趟的命令不对」
+  BROAD_MUTATION_BREAK=gpu-mac-unchecked  读 GPU 判定库不核校验列
+      红：「✗ 自证：手追加的没有校验列、校验列对不上的 GPU 判定行没判红」
+  BROAD_MUTATION_BREAK=gpu-also-when-cpu-caught  CPU 那一趟抓到的条也跑 GPU 那一趟
+      红：「✗ 自证：只有 CPU 红：」
+      另红：「✗ 自证：reuse-three-questions：」
 mutation-prune.py 文件头列的那几项（驱动在自证里把它们转给规则库）打开时这份 --selftest 不一定红，由 mutation-prune.py --selftest 判。
 只供测试（--selftest 自己设；这个进程的父进程不是带 --selftest 的这份脚本、或库目录不在那一趟自证的工作目录里，设了任何一个都拒，退 2）：
   BROAD_MUTATION_STEP_DRIVER=1 每一步的真命令换成自证工作目录（BROAD_MUTATION_SELFTEST_WORK）里的 fake-step-driver
@@ -370,12 +518,15 @@ mutation-prune.py 文件头列的那几项（驱动在自证里把它们转给�
   BROAD_MUTATION_ALLOW_VOLATILE_HOME=1 许库目录落在 /tmp 下、BROAD_MUTATION_EXCLUSIONS=<文件> 换掉排除表、
   BROAD_MUTATION_PROGRESS_INTERVAL=<秒> 换掉进度间隔、BROAD_MUTATION_TOOL_VERSIONS=<文字> 换掉工具版本、
   BROAD_MUTATION_JUDGING_KEY=<文字> 换掉本仓这一份的判法单元指纹（自证每一趟不现算它，判法单元指纹那几格在拷贝上现算）、
+  BROAD_MUTATION_GPU_JUDGING_KEY=<文字> 换掉本仓这一份的 GPU 趟判法单元指纹（同上，GPU 趟指纹那一格在拷贝上现算）、
   BROAD_MUTATION_RESULT_KEY=<文件> 判定行的密钥换成这一份（自证起的每个子进程都带：自证不读写真的密钥）、
   BROAD_MUTATION_RUSTC=1 工具链换成起自证工作目录里 fake-rustc-vv 的 -Vv（--unit-environment 比工具链那一格用；文件名同样写死）。
 
 gate-similar: checker-tier-crates-mutation-replay.sh 它按 crates/mutations.tsv 逐条改坏、点名的测试必须红，行是人写的、判的是「这条测试抓不抓得到」；这里的清单由 cargo-mutants 生成、判每条变异有没有任何测试抓到，导出范围取它登记的那一份
 gate-similar: mutate.sh 它跑一张手写变异表对一个实验二进制，每条 cargo test 经内存包装；这里同样逐步经内存包装，但清单是生成的、判定按单元键落在库目录里沿用与续接
 gate-similar: crash-amplification.sh 它是崩溃放量的分项驱动，--list-items / --item 与「重跑同一条命令就是续跑」的形态照它；判的对象不同（崩溃点状态对变异）
+gate-similar: gpu-quiesce-run.sh 它只管清场、回读、跑（不复原）；这里 GPU 那一趟的测试步整条经它起，清场的写法、多机配置与回读都不在这里另抄
+gate-similar: checker-tier-crash-point-replay.sh 它的 feature-gated-tests 格对崩溃枚举用例的状态块跑同一条带特性的快档命令、判的是「状态块有没有红」；这里同一条命令判的是「CPU 那一趟没红的变异有没有被带特性的测试抓到」，特性与文件的现读写法照它的
 gate-similar: mutation-shard-run.sh 它把 crates/mutations.tsv 的行分给两台、第二台的判定库记录经 crates-mutation-rows.py import 再导入；这里两台各起一趟 --shard k/2、判定库是一张只追加的 TSV，导入（--import-results）逐行核段数、结局与键，两边的记录形态不同，导入不共用
 """
 import argparse
@@ -407,6 +558,7 @@ sys.path.insert(0, os.path.join(REPOSITORY, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
 sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
 from heavy_threads import HeavyThreadDefaultError, default_heavy_threads  # noqa: E402
+import run_build_directory  # noqa: E402  scripts/hosts/run_build_directory.py：这一趟的运行目录跑完删、删之前核开着的文件（文件头「库目录」runs/）
 
 SELF_PATH = os.path.join(SCRIPT_DIRECTORY, os.path.basename(__file__))
 # libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）全仓只在 lib_libtest_result_lines.py 解析一份：should panic 那一段不进名字
@@ -521,6 +673,7 @@ WRAPPER_INFRASTRUCTURE_EXITS = {MEMORY_CAP_UNAVAILABLE_EXIT: "带上限的 scope
 NEXTEST_TEST_FAILED_EXIT = 100       # cargo nextest run：有测试没过
 CARGO_FAILED_EXIT = 101              # cargo：编不过、或 cargo test 有测试没过
 EXIT_INCONSISTENT, EXIT_USAGE, EXIT_INFRASTRUCTURE, EXIT_LOCKED, EXIT_DIRTY_TREE, EXIT_BASELINE_RED, EXIT_STOPPED = 1, 2, 3, 4, 5, 6, 143
+EXIT_RUN_DIRECTORY_KEPT = 9          # 这一趟别的都成了，运行目录没删掉（有进程开着里面的文件，或回读还在）
 NEXTEST_FAILURE_LINE = re.compile(r"^\s*(?:FAIL|TIMEOUT|ABORT|LEAK-FAIL|SIG[A-Z0-9]+)\s+\[[^\]]*\]\s+(?:\([^)]*\)\s+)?(\S.*?)\s*$")
 # libtest 那几步（文档测试、checker 档快档）的日志里认出二进制的两种行：cargo test 起每个测试二进制前打的 Running、文档测试打的 Doc-tests
 LIBTEST_RUNNING_LINE = re.compile(r"^\s*Running (?:unittests )?(?P<source>\S+) \((?P<executable>[^)]+)\)\s*$")
@@ -541,12 +694,15 @@ ENVIRONMENT_SEQUENCE = "environment"      # 在没改过的树上验环境的那
 # 内存包装给一步开的 scope：名字里第一段数字是包装自己的进程号（scripts/hosts/run-with-memory-cap.sh 的 unit="singlefs-memory-cap-$$-…"）
 OWN_SCOPE_UNIT = re.compile(r"/(singlefs-memory-cap-(\d+)-\d+\.scope)\s*$")
 SELFTEST_WORK_VARIABLE = "BROAD_MUTATION_SELFTEST_WORK"
+SELFTEST_CELLS_VARIABLE = "BROAD_MUTATION_SELFTEST_CELLS"     # 开发时分段跑自证：逗号隔开的几组格名（SELFTEST_CELL_NAMES）；不设就是全部，门禁与提交前跑的都不设
 SELFTEST_STEP_DRIVER_NAME = "fake-step-driver"   # 自证写在自证工作目录里的假一步（文件头「只供测试」BROAD_MUTATION_STEP_DRIVER）
 SELFTEST_RUSTC_NAME = "fake-rustc-vv"            # 自证写在自证工作目录里的假 rustc（BROAD_MUTATION_RUSTC）
+SELFTEST_TRANSCRIBED_FAILURE_MARK = "〔转述〕"   # 失败行转述的驱动输出里，✗ 换成它（文件头开关表前那一段「转述」）
+SELFTEST_DRIVER_FAILURE_LINES_SHOWN = 8          # 失败行末尾整行接上的、这一格起的驱动报的 ✗ 行：去掉数字之后相同的并成一种，至多这么多种，多的只报种数
 TEST_ONLY_VARIABLES = ("BROAD_MUTATION_STEP_DRIVER", "BROAD_MUTATION_STEP_VIA_WRAPPER", "BROAD_MUTATION_LIST_DRIVER", "BROAD_MUTATION_EXPORT_EVERYTHING",
                        "BROAD_MUTATION_TOOLCHAIN", "BROAD_MUTATION_KILL_AT", "BROAD_MUTATION_ALLOW_VOLATILE_HOME", "BROAD_MUTATION_EXCLUSIONS", "BROAD_MUTATION_BREAK",
-                       "BROAD_MUTATION_PROGRESS_INTERVAL", "BROAD_MUTATION_TOOL_VERSIONS", "BROAD_MUTATION_JUDGING_KEY", "BROAD_MUTATION_RESULT_KEY",
-                       "BROAD_MUTATION_RUSTC")
+                       "BROAD_MUTATION_PROGRESS_INTERVAL", "BROAD_MUTATION_TOOL_VERSIONS", "BROAD_MUTATION_JUDGING_KEY", "BROAD_MUTATION_GPU_JUDGING_KEY",
+                       "BROAD_MUTATION_RESULT_KEY", "BROAD_MUTATION_RUSTC")
 SELFTEST_ANCESTOR_DEPTH = 6
 REMOVED_ARGUMENTS = {"--sync-tree": "「一版」不再是容器：每一趟开跑自己把 --source 那棵树换进专用树",
                      "--commit": "不按提交导出：被判的是 --source 那棵工作树此刻的内容",
@@ -648,6 +804,21 @@ def heavy_prefix_text():
     return f"{HEAVY_PREFIX_VARIABLE}=commit（用户要求时 ={HEAVY_PREFIX_VALUES[1]}）"
 
 
+def refuse_outside_selftest(present):
+    """只供自证的变量设着而这个进程不是 --selftest 自己起的子进程：退 2，点名是哪几个变量只在自证里认。"""
+    unset_command = "env " + " ".join(f"-u {name}" for name in present) + f" python3 {SELF_PATH} …"
+    refuse(f"环境里设了只供 --selftest 用的变量（{'、'.join(present)}），而这个进程不是 --selftest 自己起的子进程：假的一步、假清单与弄坏开关不许进真跑",
+           f"清掉再跑：{unset_command}；要看这些变量怎么用，读文件头「只供测试」一段")
+
+
+def check_test_only_variables_before_parsing(argv):
+    """只供自证的变量平常跑设了就拒，排在一切参数解析之前（认不得的选项也先看这个）；命令行带 --selftest 的是自证本身，放过。
+    弄坏开关 break-guard-after-parsing：不在这里拒，退回参数解析之后的 check_test_only_variables 去拒（改前的样子）。"""
+    present = [name for name in TEST_ONLY_VARIABLES if os.environ.get(name)]
+    if present and "--selftest" not in argv and not raw_break("break-guard-after-parsing") and not test_mode():
+        refuse_outside_selftest(present)
+
+
 def check_test_only_variables(home):
     """只供自证的变量出现在自证之外、或指着自证工作目录之外的库：拒，一步都不做。"""
     present = [name for name in TEST_ONLY_VARIABLES if os.environ.get(name)]
@@ -655,8 +826,7 @@ def check_test_only_variables(home):
         return
     unset_command = "env " + " ".join(f"-u {name}" for name in present) + f" python3 {SELF_PATH} …"
     if not test_mode():
-        refuse(f"环境里设了只供 --selftest 用的变量（{'、'.join(present)}），而这个进程不是 --selftest 自己起的子进程：假的一步、假清单与弄坏开关不许进真跑",
-               f"清掉再跑：{unset_command}；要看这些变量怎么用，读文件头「只供测试」一段")
+        refuse_outside_selftest(present)
     work = os.environ.get(SELFTEST_WORK_VARIABLE)
     if raw_break("test-variables-anywhere"):
         return
@@ -1045,13 +1215,14 @@ class Library:
 
     def __init__(self, home):
         self.home = home
-        self.tree = os.path.join(home, "tree")
+        self.runs = os.path.join(home, "runs")
+        self.run_directory = None
+        # 专用树、编译目录、每一步的 TMPDIR 与在途记录都在这一趟的运行目录里（文件头「库目录」runs/），begin_run 之前没有。
+        # 专用树先是空串：只读的用法不开跑，Judgement 里 os.path.isdir 判它不在，构建环境与 rustc -Vv 就在 --source 上算
+        self.tree = ""
+        self.target = self.target_coverage = self.scratch = None
+        self.inflight_record = self.inflight_original = self.inflight_restore = None
         self.tree_synced = os.path.join(home, "tree.synced")
-        self.target = os.path.join(home, "target")
-        self.scratch = os.path.join(home, "scratch")
-        self.inflight_record = os.path.join(home, "inflight.json")
-        self.inflight_original = os.path.join(home, "inflight.original")
-        self.inflight_restore = os.path.join(home, "inflight.restore")
         self.verdicts_path = os.path.join(home, "verdicts.tsv")
         self.lists_path = os.path.join(home, "lists.tsv")
         self.baselines_path = os.path.join(home, "baselines.tsv")
@@ -1142,6 +1313,59 @@ class Library:
     def baseline_directory(self, baseline_key):
         return os.path.join(self.home, "baselines", baseline_key[:16])
 
+    def place_run_directory(self, directory):
+        self.run_directory = directory
+        self.tree = os.path.join(directory, "tree")
+        self.target = os.path.join(directory, "target")
+        self.target_coverage = os.path.join(directory, "target-coverage")
+        self.scratch = os.path.join(directory, "scratch")
+        self.inflight_record = os.path.join(directory, "inflight.json")
+        self.inflight_original = os.path.join(directory, "inflight.original")
+        self.inflight_restore = os.path.join(directory, "inflight.restore")
+
+    def begin_run(self):
+        """这一趟的运行目录（文件头「库目录」runs/）：拿到锁之后先删上一趟被 KILL 留下的运行目录（树、编译目录、在途记录；删之前核没有进程开着里面的文件），
+        再新建这一趟的 <库目录>/runs/run-<进程号>-<随机>/。交上一趟被打断在哪一条的在途记录（没有交 None）。
+        弄坏开关 interrupted-run-directory-kept：不删上一趟留下的、不认它的在途记录；build-directory-in-home：照改前把树、编译目录与在途记录放在库目录里、跨趟留着。"""
+        if break_is("build-directory-in-home"):
+            os.makedirs(self.home, exist_ok=True)
+            self.place_run_directory(self.home)
+            self.run_directory = None
+            return None
+        interrupted = None
+        os.makedirs(self.runs, exist_ok=True)
+        if not break_is("interrupted-run-directory-kept"):
+            for name in sorted(os.listdir(self.runs)):
+                leftover = os.path.join(self.runs, name)
+                record_path = os.path.join(leftover, "inflight.json")
+                if os.path.isfile(record_path):
+                    try:
+                        with open(record_path, encoding="utf-8") as handle:
+                            interrupted = json.load(handle)
+                    except (OSError, ValueError):
+                        interrupted = None
+                    if interrupted is not None:
+                        say(f"  · 上一趟被打断在第 {interrupted['sequence']} 条（改的是 {interrupted['file']}）：它那一趟的运行目录删掉，这一趟在新换的树上重判它")
+                note(f"  · 上一趟留下的运行目录 {leftover}（那一趟被 KILL，或删的时候有进程开着里面的文件）：")
+                for line in run_build_directory.remove_run_build_directory(leftover)[1]:
+                    note(line)
+        self.place_run_directory(tempfile.mkdtemp(prefix=f"run-{os.getpid()}-", dir=self.runs))
+        return interrupted
+
+    def end_run(self):
+        """删这一趟的运行目录（正常结束、拒绝、被 TERM / INT 停都在 main 的 finally 里走到）：删之前核本机没有进程开着里面的文件，
+        有就不删、逐个报进程（scripts/hosts/run_build_directory.py）。交删成了没有；没建过（build-directory-in-home、--import-results）交 True。
+        弄坏开关 run-directory-kept：不删；run-directory-open-files-unchecked：不核开着的文件就删。"""
+        directory, self.run_directory = self.run_directory, None
+        if directory is None:
+            return True
+        if break_is("run-directory-kept"):
+            return True
+        removed, lines = run_build_directory.remove_run_build_directory(directory, check_open=not break_is("run-directory-open-files-unchecked"))
+        for line in lines:
+            note(line)
+        return removed
+
 
 def resolve_home(given, read_only=False):
     """库目录：先核只供自证的变量与旧库；要往库里写的用法另拒落在开机会清空的目录里的库。只读的用法（--list-items、--summary、--check-ignored、
@@ -1153,7 +1377,7 @@ def resolve_home(given, read_only=False):
     if old and not break_is("old-layout-accepted"):
         refuse(f"库目录 {home} 是「一版一个目录」那时的旧库（有 {'、'.join(old)}）：旧库目录与旧版本目录整个弃用，判定不迁移、不补签",
                f"另起一个新的库目录：默认 {DEFAULT_HOME}（或 --home / SINGLEFS_BROAD_MUTATION_HOME 指到一个空目录），照提交流程第 2b 步不带选条参数重判；"
-               "旧的那一个确认没用了就自己删掉（编译目录 target/ 可以先挪进新库目录接着用）")
+               "旧的那一个确认没用了就自己删掉（连同里面的编译目录：每一趟的编译目录建在这一趟的运行目录里，跑完删，不跨趟复用）")
     if test_variable("BROAD_MUTATION_ALLOW_VOLATILE_HOME") == "1":
         return home
     if read_only and not break_is("read-only-volatile-refused"):
@@ -1209,10 +1433,12 @@ def exported_files(source, paths):
 
 
 def sync_tree(library, source):
-    """换树（文件头「库目录」tree/）：导出范围里内容不同的文件照写（mtime 取此刻，cargo 按它判要重编），源码里没有的删掉。交 (改了几个, 删了几个)。
-    弄坏开关 sync-preserves-source-mtime：照源文件的 mtime 拷（cargo 会把旧产物当新鲜）；sync-keeps-extra-files：不删源码里没有的。"""
+    """换树（文件头「库目录」runs/ 的 tree/）：把导出范围拷进这一趟新建的专用树（内容不同的才写、mtime 取此刻，源码里没有的删掉）。交 (改了几个, 删了几个)。"""
     paths = ["."] if test_variable("BROAD_MUTATION_EXPORT_EVERYTHING") == "1" else export_paths()
     wanted = exported_files(source, paths)
+    if break_is("exclude-re-ignored"):
+        # 弄坏开关：.cargo/mutants.toml 不拷进专用树，cargo-mutants 读不到里面的 exclude_re（等于忽略它），清单按单元存的键也不随它变
+        wanted.pop(os.path.join(".cargo", "mutants.toml"), None)
     if not any(path.endswith(".rs") for path in wanted):
         refuse(f"被判的那棵树 {source} 在导出范围（{' '.join(paths)}）里一份 .rs 都没有", "--source 给被判的仓根（主工作区或一份副本）")
     os.makedirs(library.tree, exist_ok=True)
@@ -1226,13 +1452,12 @@ def sync_tree(library, source):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         if os.path.lexists(target):
             os.remove(target)
-        (shutil.copy2 if break_is("sync-preserves-source-mtime") else shutil.copyfile)(origin, target)
+        shutil.copyfile(origin, target)
         shutil.copymode(origin, target)
         changed += 1
-    if not break_is("sync-keeps-extra-files"):
-        for relative in sorted(files_in_tree(library.tree) - set(wanted)):
-            os.remove(os.path.join(library.tree, relative))
-            removed += 1
+    for relative in sorted(files_in_tree(library.tree) - set(wanted)):
+        os.remove(os.path.join(library.tree, relative))
+        removed += 1
     library.manifest = manifest
     write_atomically(library.tree_synced, (json.dumps({"synced_on": today_text(), "source": source, "files": len(manifest), "changed": changed,
                                                        "removed": removed}, ensure_ascii=False) + "\n").encode())
@@ -1357,7 +1582,7 @@ PRUNE_BREAKS = ("catching-test-own-function-only", "mutated-function-only", "con
                 "relative-position-counts-comments", "dependency-lines-dropped", "dependency-whole-lock", "profile-ignored", "manifest-text-in-global-key",
                 "exclusions-in-global-key", "catching-test-exclusion-ignored", "unviable-rejudged", "missed-coverers-ignored", "missed-always-rejudged",
                 "escalated-not-carried", "escalated-coverers-ignored", "list-cache-context-dropped", "outside-mutation-selected", "const-context-runs-selected", "spawning-binary-selected",
-                "coverage-paths-unnormalized", "nextest-filter-single-argument", "limit-below-smt")
+                "coverage-paths-unnormalized", "nextest-filter-single-argument", "limit-below-smt", "coverers-cfg-inactive-refused")
 PRUNE_MODULE = None
 
 
@@ -2289,7 +2514,7 @@ class Runner:
                 refuse(f"按覆盖挑测试要 llvm-profdata 与 llvm-cov，{llvm or 'rustc 的 sysroot'} 下没有",
                        "装 rustup 组件：rustup component add llvm-tools（与编译器同一份 LLVM，profraw 格式对得上）；装在别处就加 --llvm-bin <目录>")
             specification = os.path.join(os.path.dirname(out), f"{name}.spec.json")
-            write_atomically(specification, json.dumps({"kind": stage, "tree": self.library.tree, "target": os.path.join(self.library.home, "target-coverage"),
+            write_atomically(specification, json.dumps({"kind": stage, "tree": self.library.tree, "target": self.library.target_coverage,
                                                         "scratch": self.library.scratch, "llvm_bin": llvm, "workers": self.arguments.threads, "out": out,
                                                         "known": [list(job) for job in sorted(known)]}).encode())
             say(f"  · 覆盖 {name}：在没改过的树上插桩列一遍测试，记录键对得上的 {len(known)} 条照用、其余现跑")
@@ -3142,6 +3367,715 @@ def process_item(library, runner, item, with_stage_one, with_stage_two):
         restore_original(library)
 
 
+# ── GPU 那一趟（C489：第二段补一趟带 gpu 特性的 checker 档快档；文件头「GPU 那一趟」） ───────────────────────────────────────
+# 这一节的函数都不在 JUDGING_ENTRIES 的闭包里：CPU 那一趟的判法单元指纹不因它们变，库里 CPU 那一趟的判定照沿用；
+# GPU 那一趟自己的判法单元指纹从 GPU_JUDGING_ENTRIES 收（gpu_judging_key），进 GPU 判定行的 gpu_key。
+
+GPU_VERDICTS = "gpu-verdicts.tsv"
+GPU_VERDICT_COLUMNS = ("key", "sequence", "package", "name", "outcome", "caught_by", "test_key", "coverage_key", "gpu_key", "test_seconds",
+                       "judged_on", "method", "note", "mac")
+GPU_SIGNED_COLUMNS = len(GPU_VERDICT_COLUMNS) - 1       # mac 一段签的是它前面那十三段
+GPU_ROW_OUTCOMES = (*FINAL_OUTCOMES, DRIVER_ERROR)
+GPU_FEATURE = "gpu"
+GPU_TESTS_DIRECTORY = "crates/singlefs-checker-tier/tests"
+GPU_BUILD_STEP, GPU_TEST_STEP = "gpu-build-checker-tier", "gpu-test-checker-tier"
+GPU_BASELINE_SEQUENCE = "gpu-baseline"
+GPU_NO_ADAPTER_MARK = "NOT_RUN_NO_GPU_ADAPTER"      # GPU 对拍找不到 GPU 适配器时测试打的那一行（门禁 checker-tier-crash-point-replay 的 feature-gated-tests 格读同一个词）
+GPU_QUIESCE_REFUSED_EXIT = 78                        # scripts/crash/gpu-quiesce-run.sh 清场回读没过、命令没起时退的码
+GPU_NOT_RUN = "not-run"                              # 这一趟没跑成：不落行、不算没红
+GPU_INFRASTRUCTURE = "infrastructure"                # 内存包装自己的结局：不落行，整趟停（退 3）
+QUIESCE_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "crash", "gpu-quiesce-run.sh")
+BINDGEN_LIBRARY = os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-amplification-lib.sh")
+GPU_ATTRIBUTE_START = re.compile(r"#(!?)\[\s*cfg\s*\(")
+GPU_FEATURE_NAME = re.compile(r"\bfeature\s*=\s*\"([^\"]+)\"")
+GPU_PASSED_COUNT = re.compile(r"^test result: \w+\. (\d+) passed", re.M)
+# GPU 那一趟自己的判法单元指纹（文件头「GPU 那一趟」）：从这几个函数收 python 单元闭包（命令怎么拼、步结局怎么分、沿用怎么判、两趟怎么合）
+GPU_JUDGING_ENTRIES = (("scripts/mutation/broad-mutation.py", "gpu_pass_command"), ("scripts/mutation/broad-mutation.py", "gpu_classify_build"),
+                       ("scripts/mutation/broad-mutation.py", "gpu_classify_test"), ("scripts/mutation/broad-mutation.py", "gpu_combined_state"),
+                       ("scripts/mutation/broad-mutation.py", "GpuJudging.need"), ("scripts/mutation/broad-mutation.py", "GpuJudging.row_holds"),
+                       ("scripts/mutation/broad-mutation.py", "GpuJudging.test_key_of"))
+GPU_JUDGING_KEYS = {}
+
+
+class GpuOutcome(NamedTuple):
+    outcome: str       # missed / caught / timeout / memory-cap / driver-error / not-run / infrastructure
+    caught_by: str     # 抓到它的测试（「<二进制 id> <用例名>」），别的结局是空
+    note: str
+
+
+class GpuTotals(NamedTuple):
+    needed: int        # 要这一趟的条数（CPU 那一趟没红、又有带特性的测试够得着它）
+    judged: int        # 这一趟现判了几条
+    carried: int       # 键相同、沿用得了的几条
+    not_run: int       # 本次未跑几条（没卡、清场没过、--skip-gpu）
+    failed: bool       # 复用哨兵判红
+    outcomes: dict     # 现判的各结局条数
+
+
+# gate-overlap:copy-kept checker-tier-crash-point-replay.sh 的 list_feature_gated_test_files 是嵌在 bash 里的 python，读不进来；这里同一套判法照搬一份，两边都认 tests/ 里的 cfg 点到的特性
+def gated_test_files(tests_directory):
+    """checker 档 tests/ 顶层每个 .rs 里 #[cfg(…)] / #![cfg(…)] 点到的特性：[(文件名, whole-file 或 items, [特性])]，照文件名排序；挂特性的一个都没有交空表。
+    括号按层数配对（rustfmt 把长的 cfg 折成几行也认），// 起头的行不读。"""
+    found = []
+    try:
+        names = sorted(name for name in os.listdir(tests_directory) if name.endswith(".rs") and os.path.isfile(os.path.join(tests_directory, name)))
+    except OSError:
+        return found
+    for name in names:
+        with open(os.path.join(tests_directory, name), encoding="utf-8", errors="replace") as handle:
+            text = "\n".join(line for line in handle.read().splitlines() if not line.lstrip().startswith("//"))
+        features, whole_file = set(), False
+        for start in GPU_ATTRIBUTE_START.finditer(text):
+            depth, position = 1, start.end()
+            while position < len(text) and depth > 0:
+                depth += {"(": 1, ")": -1}.get(text[position], 0)
+                position += 1
+            named = GPU_FEATURE_NAME.findall(text[start.end():position])
+            features.update(named)
+            if named and start.group(1) == "!":
+                whole_file = True
+        if features:
+            found.append((name, "whole-file" if whole_file else "items", sorted(features)))
+    return found
+
+
+def gpu_bindgen_arguments():
+    """librocksdb-sys 的 bindgen 要的头文件目录：与崩溃放量取同一个值（scripts/crash/crash-amplification-lib.sh 的 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS），
+    编译产物才共用。在子 shell 里 source 那份库、只读这一个变量；读不到交空串（调用方说一句、照调用方的环境）。"""
+    if not os.path.isfile(BINDGEN_LIBRARY):
+        return ""
+    done = subprocess.run(["bash", "-c", 'source "$1" >/dev/null 2>&1; printf "%s" "${CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS:-}"', "bindgen", BINDGEN_LIBRARY],
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    return done.stdout if done.returncode == 0 else ""
+
+
+def gpu_pass_command(kind, features, labels):
+    """GPU 那一趟一步的命令（verification.md「checker 档自己分快档与全量」带特性那一趟）：编译步 cargo test --release -p singlefs-checker-tier --features <特性> <目标> --no-run；
+    测试步在它后面加 `-- --nocapture --test-threads 1`（GPU 对拍的测试各占卡的显存，不并行起），并整条经 scripts/crash/gpu-quiesce-run.sh 清场再起（跑完不复原）。
+    labels 是要跑的目标：lib 是 --lib，别的是 --test <文件名>。弄坏开关 gpu-quiesce-dropped 不经清场、gpu-test-threads-dropped 不加 --test-threads 1。"""
+    targets = []
+    for label in sorted(labels, key=lambda text: (text != "lib", text)):
+        targets += ["--lib"] if label == "lib" else ["--test", label]
+    head = ["cargo", "test", "--locked", "--release", "-p", CHECKER_TIER_PACKAGE, "--features", ",".join(features), *targets]
+    if kind == "build":
+        return head + ["--no-run"]
+    quiesce = [] if break_is("gpu-quiesce-dropped") else ["bash", QUIESCE_RUNNER, "--"]
+    threads = [] if break_is("gpu-test-threads-dropped") else ["--test-threads", "1"]
+    return quiesce + head + ["--", "--nocapture", *threads]
+
+
+def gpu_log_text(log_path):
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as handle:
+            return handle.read()
+    except OSError:
+        return ""
+
+
+def gpu_failing_test(log_path):
+    """GPU 那一趟第一条没过的测试：先照 libtest 结果行认（first_failing_test）；--nocapture 加 --test-threads 1 下结果行常被测试自己的输出打散，认不出就读收尾的
+    「failures:」名单（缩进四格的测试名），二进制照前面最近的 Running 行补。认不出交 UNRECOGNISED_TEST。"""
+    name = first_failing_test(log_path, CARGO_FAILED_EXIT, CHECKER_TIER_PACKAGE)
+    if name != UNRECOGNISED_TEST:
+        return name
+    binary, listing = "", False
+    for line in gpu_log_text(log_path).splitlines():
+        binary = libtest_binary(line, binary, CHECKER_TIER_PACKAGE)
+        if line.rstrip() == "failures:":
+            listing = True
+            continue
+        if listing:
+            named = re.match(r"^    (\S+)\s*$", line)
+            if named:
+                return f"{binary} {named.group(1)}" if binary else named.group(1)
+            if line.strip() and not line.startswith(" "):
+                listing = False
+    return UNRECOGNISED_TEST
+
+
+def gpu_classify_build(exit_code, log_path):
+    """GPU 那一趟编译步的结局：→ (None 编得过 | missed 不会有 | unviable / timeout / memory-cap / driver-error / infrastructure, 备注)。
+    编译那一步退 101 而日志里没有带源码位置的编译错误（磁盘满、锁文件不符这一类）不记无效，记驱动错。"""
+    if exit_code == 0:
+        return None, ""
+    if exit_code == TIME_LIMIT_HIT_EXIT:
+        return "timeout", f"{GPU_BUILD_STEP} 超时"
+    if exit_code == MEMORY_CAP_HIT_EXIT:
+        return "memory-cap", f"{GPU_BUILD_STEP} 撞了内存上限"
+    if exit_code in WRAPPER_INFRASTRUCTURE_EXITS:
+        return GPU_INFRASTRUCTURE, f"{GPU_BUILD_STEP} 退 {exit_code}（{WRAPPER_INFRASTRUCTURE_EXITS[exit_code]}）"
+    if exit_code == CARGO_FAILED_EXIT:
+        if log_shows_compile_error(log_path):
+            return "unviable", f"{GPU_BUILD_STEP} 编不过"
+        return DRIVER_ERROR, f"{GPU_BUILD_STEP} 退 {exit_code} 而日志里没有带源码位置的编译错误：不算无效"
+    return DRIVER_ERROR, f"{GPU_BUILD_STEP} 退 {exit_code}（认不出的退出码，不是这条变异的结局）"
+
+
+def gpu_classify_test(exit_code, log_path):
+    """GPU 那一趟测试步的结局（GpuOutcome）：退 0 且跑到了测试、日志里没有 NOT_RUN_NO_GPU_ADAPTER 才是没红（missed）；
+    日志里有 NOT_RUN_NO_GPU_ADAPTER（GPU 测试没找到卡，打一行就返回成功）或清场包装退 78 是本次未跑（not-run，不落行、不算没红）；
+    退 0 而一个测试都没跑到不算没红，记驱动错；退 101 是有测试没过 = 抓到，带第一条没过的测试。"""
+    text = gpu_log_text(log_path)
+    passed = sum(int(count) for count in GPU_PASSED_COUNT.findall(text))
+    if exit_code == 0:
+        if GPU_NO_ADAPTER_MARK in text and not break_is("gpu-not-run-as-missed"):
+            return GpuOutcome(GPU_NOT_RUN, "", f"no-adapter：日志里有 {GPU_NO_ADAPTER_MARK}，GPU 测试没找到卡、没跑")
+        if passed == 0:
+            return GpuOutcome(DRIVER_ERROR, "", "GPU 趟一个测试都没跑到（日志里没有 passed 的计数）：不算没红")
+        return GpuOutcome("missed", "", f"{passed} 条测试都过了")
+    if exit_code == GPU_QUIESCE_REFUSED_EXIT:
+        return GpuOutcome(GPU_NOT_RUN, "", "quiesce-refused：清场回读没过（卡上有不归清场白名单的进程，或多机配置里没写全清场命令），测试没起")
+    if exit_code == TIME_LIMIT_HIT_EXIT:
+        return GpuOutcome("timeout", "", f"{GPU_TEST_STEP} 超时")
+    if exit_code == MEMORY_CAP_HIT_EXIT:
+        return GpuOutcome("memory-cap", "", f"{GPU_TEST_STEP} 撞了内存上限")
+    if exit_code in WRAPPER_INFRASTRUCTURE_EXITS:
+        return GpuOutcome(GPU_INFRASTRUCTURE, "", f"{GPU_TEST_STEP} 退 {exit_code}（{WRAPPER_INFRASTRUCTURE_EXITS[exit_code]}）")
+    if exit_code == CARGO_FAILED_EXIT:
+        return GpuOutcome("caught", gpu_failing_test(log_path), GPU_TEST_STEP)
+    return GpuOutcome(DRIVER_ERROR, "", f"{GPU_TEST_STEP} 退 {exit_code}（认不出的退出码，不是这条变异的结局）")
+
+
+def gpu_combined_state(cpu, needed, gpu):
+    """两趟合起来的状态（ItemState）与没结论时的理由：CPU 那一趟没红、又要 GPU 那一趟的条，看 GPU 那一趟的状态——抓到 / 没红 / 无效就是定论，
+    超时、内存撞顶、驱动错照样是没结论，库里还没有它的结论是 none（理由 gpu-not-run，不算没红）；别的条就是 CPU 那一趟的状态。
+    一条两趟里任一趟红算抓到：CPU 那一趟抓到的，GPU 那一趟不用跑。弄坏开关 gpu-red-not-caught：GPU 那一趟红不算抓到；gpu-not-run-as-missed：本次未跑记成没红。"""
+    if cpu.state != "missed" or not needed:
+        return cpu, ""
+    if break_is("gpu-red-not-caught") and gpu.state == "caught":
+        return ItemState("missed", cpu.passed_stage_one), ""
+    if gpu.state in DECISIVE_OUTCOMES:
+        return ItemState(gpu.state, cpu.passed_stage_one), ""
+    if gpu.state in (*ENVIRONMENTAL_OUTCOMES, DRIVER_ERROR):
+        return ItemState(gpu.state, cpu.passed_stage_one), f"gpu-{gpu.state}"
+    if break_is("gpu-not-run-as-missed"):
+        return ItemState("missed", cpu.passed_stage_one), ""
+    return ItemState(NOT_RUN, cpu.passed_stage_one), "gpu-not-run"
+
+
+def lines_digest(lines):
+    return hashlib.sha256("".join(line + "\n" for line in lines).encode("utf-8", "surrogateescape")).hexdigest()
+
+
+def gpu_judging_key(root=REPOSITORY):
+    """GPU 那一趟的判法单元指纹（文件头「GPU 那一趟」）：GPU_JUDGING_ENTRIES 那几个函数在 root 上的 python 单元闭包键，连起来取 sha256；与 CPU 那一趟的
+    判法单元指纹（judging_units_key）分开：改 GPU 那一趟的判法不动 CPU 那一趟库里的判定，改 CPU 那一趟的判法单元也不让 GPU 判定行单独作废（它们的键本来就带 CPU 的）。"""
+    fake = test_variable("BROAD_MUTATION_GPU_JUDGING_KEY")
+    if fake and root == REPOSITORY:
+        return fake
+    if root in GPU_JUDGING_KEYS:
+        return GPU_JUDGING_KEYS[root]
+    library = prune_rules().units_library()
+    options = library.Options()
+    options.under = [place for place in JUDGING_SCAN_FILES if os.path.isfile(os.path.join(root, place))]
+    lines = []
+    for path, name in GPU_JUDGING_ENTRIES:
+        try:
+            closure = library.closure_of(root, f"{path}::{name}", options)
+        except (library.UsageError, library.FunctionUnitsError) as error:
+            refuse(f"GPU 趟的判法单元指纹算不出：{path}::{name}（{error}）", "GPU_JUDGING_ENTRIES 里的函数改了名就照着改那一张表；scripts/gate/lib_function_units.py 起不来就先修它")
+        key, refusals = library.closure_key(closure, allow_refused=True)
+        lines.append(f"{path}::{name}\t{key}\t{','.join(sorted({refusal.form for refusal in refusals}))}")
+    GPU_JUDGING_KEYS[root] = lines_digest(lines)
+    return GPU_JUDGING_KEYS[root]
+
+
+# ── GPU 判定库：gpu-verdicts.tsv（只追加，每行带同一把密钥算的校验列） ─────────────────────────────────────────
+
+def gpu_verdicts_path(library):
+    return os.path.join(library.home, GPU_VERDICTS)
+
+
+def gpu_result_mac(key, fields):
+    """GPU 判定行的校验列：HMAC-SHA256(密钥, 前十三段照写进表里的样子用制表符接起来、UTF-8)，小写十六进制（与 result_mac 同一把密钥、同一种算法，只是段数不同）。"""
+    text = "\t".join(clean_field(field) for field in fields[:GPU_SIGNED_COLUMNS])
+    return hmac.new(key, text.encode("utf-8", "surrogateescape"), hashlib.sha256).hexdigest()
+
+
+def read_gpu_verdicts(library):
+    """GPU 判定库：全列且校验列对得上的行才算数；少一段的、校验列对不上的、没有密钥时的每一行都不算、列进 forged（弄坏开关 gpu-mac-unchecked 下都算）。
+    → SignedTableRead（同 read_signed_table 的形状）。"""
+    path = gpu_verdicts_path(library)
+    key, key_problem = library.result_key()
+    rows, forged, malformed_lines, partial_tail = [], [], [], ""
+    if not os.path.exists(path):
+        return SignedTableRead(rows, forged, malformed_lines, partial_tail)
+    with open(path, "rb") as handle:
+        lines = handle.read().decode("utf-8", errors="surrogateescape").split("\n")
+    if lines[-1] != "":
+        partial_tail = lines[-1]
+    unchecked = break_is("gpu-mac-unchecked")
+    for number, line in enumerate(lines[:-1], start=1):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) == GPU_SIGNED_COLUMNS and not unchecked:
+            forged.append((number, fields[0][:16], "没有校验列（少一段）"))
+            continue
+        if len(fields) not in (GPU_SIGNED_COLUMNS, len(GPU_VERDICT_COLUMNS)):
+            malformed_lines.append(number)
+            continue
+        if not unchecked:
+            if key is None:
+                forged.append((number, fields[0][:16], key_problem or "没有密钥，校验不了"))
+                continue
+            if not hmac.compare_digest(gpu_result_mac(key, fields), fields[-1]):
+                forged.append((number, fields[0][:16], "校验列对不上"))
+                continue
+        rows.append(dict(zip(GPU_VERDICT_COLUMNS, fields[:GPU_SIGNED_COLUMNS])))
+    return SignedTableRead(rows, forged, malformed_lines, partial_tail)
+
+
+def record_gpu_verdict(library, fields):
+    """落一行 GPU 判定：十三段加上校验列，fsync。"""
+    key = library.result_key(create=True)[0]
+    cleaned = [clean_field(field) for field in fields[:GPU_SIGNED_COLUMNS]]
+    append_row(gpu_verdicts_path(library), GPU_VERDICT_COLUMNS, cleaned + [gpu_result_mac(key, cleaned)])
+
+
+def record_gpu_verdicts(library, rows):
+    """一次落几行 GPU 判定（导入的行），各带本机密钥算的校验列，fsync 一次。"""
+    key = library.result_key(create=True)[0]
+    cleaned = [[clean_field(field) for field in fields[:GPU_SIGNED_COLUMNS]] for fields in rows]
+    append_rows(gpu_verdicts_path(library), GPU_VERDICT_COLUMNS, [fields + [gpu_result_mac(key, fields)] for fields in cleaned])
+
+
+# ── GPU 那一趟的判定：要不要跑、键、沿用、两趟合起来 ───────────────────────────────────────────────────────────
+
+class GpuView(NamedTuple):
+    needed: bool           # CPU 那一趟没红、又有带特性的测试够得着它：要 GPU 那一趟
+    labels: list           # 要跑的目标（lib、挂特性的测试文件名）
+    need: dict             # GpuJudging.need 的原样（coverers 键等）
+    gpu: ItemState         # GPU 那一趟自己的状态（没要这一趟的条是 none）
+    combined: ItemState    # 两趟合起来的状态
+    reason: str            # 合起来没有结论时的理由
+    deciding: object       # 定下 GPU 状态的那一行（没有是 None）
+
+
+def refresh_verdict_rows(judgement):
+    """判定库重读一遍，换进 Judgement（构造时读的那几行之后又落了新行）；单元树、全局那几行与已算好的键不动。"""
+    judgement.table = judgement.library.read_verdicts()
+    judgement.by_key, judgement.by_locator = {}, {}
+    for row in judgement.table.rows:
+        judgement.by_key.setdefault(row["key"], []).append(row)
+        judgement.by_locator.setdefault(row["locator"], []).append(row)
+
+
+def cpu_state_for_gpu(judgement, item):
+    """CPU 那一趟的状态，不论拒算：真跑时 Judgement.state 对拒算的条一律给 none（每趟现判），GPU 那一趟要看的是 CPU 那一趟最后落的结论，所以临时按只读的判法问一次。"""
+    saved = judgement.for_run
+    judgement.for_run = False
+    try:
+        return judgement.state(item)
+    finally:
+        judgement.for_run = saved
+
+
+class GpuJudging:
+    """一棵树上 GPU 那一趟的判定（文件头「GPU 那一趟」）：带特性的测试够得着哪些单元、这一趟要跑哪几个目标、判定库里键相同的行沿用不沿用。
+    judgement 是同一棵树上 CPU 那一趟的 Judgement（共用它的单元树、全局那几行、排除表）。"""
+
+    def __init__(self, library, judgement, arguments):
+        self.library, self.judgement, self.arguments = library, judgement, arguments
+        self.rules = judgement.rules
+        self.gated = gated_test_files(os.path.join(judgement.root, GPU_TESTS_DIRECTORY))
+        self.features = sorted({feature for _name, _scope, features in self.gated for feature in features})
+        self.enabled = GPU_FEATURE in self.features
+        self.gated_labels = {name[:-3] for name, _scope, _features in self.gated}
+        self.feature_arguments = [f"{CHECKER_TIER_PACKAGE}/{feature}" for feature in self.features]
+        self.entry_list, self.closures, self.keys, self.cached_pass_key = None, {}, {}, None
+        self.table = read_gpu_verdicts(library)
+        self.by_key = {}
+        for row in self.table.rows:
+            self.by_key.setdefault(row["key"], []).append(row)
+
+    def pass_key(self):
+        """GPU 那一趟自己的键（每一行 GPU 判定都带）：这一趟的写法、编进来的特性、GPU 趟的判法单元指纹。"""
+        if self.cached_pass_key is None:
+            self.cached_pass_key = lines_digest(["broad-mutation-gpu-pass-v1", "features\t" + ",".join(self.features), "judging\t" + gpu_judging_key()])
+        return self.cached_pass_key
+
+    def entries(self):
+        """这一趟跑得到的测试（静态列出，不含 #[ignore] 的）：checker 档包的 lib 与挂特性的测试文件里的测试，带上要跑的目标（lib / 文件名）。"""
+        if self.entry_list is None:
+            found = []
+            for entry in self.rules.test_entries(self.judgement.tree, (CHECKER_TIER_PACKAGE,), self.judgement.exclusions):
+                if entry["ignored"]:
+                    continue
+                parts = entry["target"].split(":", 2)
+                if parts[1] == "lib":
+                    label = "lib"
+                elif parts[1] == "test" and parts[2] in self.gated_labels:
+                    label = parts[2]
+                else:
+                    continue
+                found.append(dict(entry, label=label))
+            self.entry_list = found
+        return self.entry_list
+
+    def closure_of(self, entry):
+        """一条测试在这一趟的 cfg 与特性下的闭包（带 --release 的 cfg 去掉 debug_assertions，特性是挂特性的文件点到的那几个）；入口在这一组 cfg 下不编交 None。"""
+        cache_key = (id(entry["unit"]), entry["target"])
+        if cache_key not in self.closures:
+            tree = self.judgement.tree
+            library = tree.library
+            release_cfg = [item for item in library.DEFAULT_RUST_CFG if item != "debug_assertions"]
+            found = None
+            for extra in ((), ("test",)):
+                try:
+                    found = library.rust_closure_of(tree.workspace, entry["unit"], entry["target"], release_cfg + list(extra), no_default_cfg=True,
+                                                    features=self.feature_arguments)
+                    break
+                except library.UsageError:
+                    found = None
+            self.closures[cache_key] = found
+        return self.closures[cache_key]
+
+    @staticmethod
+    def references_gpu(closure):
+        """闭包真引到 gpu 原子（带这一趟的真值 true）：闭包里有单元的 cfg 点到 feature = "gpu"。"""
+        return any(atom == f'feature="{GPU_FEATURE}"\ttrue' for atom in closure.cfg_atoms)
+
+    def test_key_of(self, entry):
+        """一条测试在这一趟的测试键 = 它的单元闭包键（闭包键里有单元的种类与去注释指纹、闭包真引到的 cfg 原子与真值、依赖版本行、工具链那几行与 edition）：→ (键或 None, 拒算形态)。"""
+        cache_key = (id(entry["unit"]), entry["target"])
+        if cache_key not in self.keys:
+            closure = self.closure_of(entry)
+            if closure is None:
+                self.keys[cache_key] = (None, ["entry-cfg-inactive"])
+            else:
+                tree = self.judgement.tree
+                dependencies, dependency_refusals = tree.dependency_lines(closure)
+                key, closure_refusals = tree.library.closure_key(closure, toolchain=list(self.judgement.globals) + tree.edition_lines(closure),
+                                                                 dependencies=dependencies, allow_refused=True)
+                forms = sorted({refusal.form for refusal in closure_refusals}) + dependency_refusals
+                self.keys[cache_key] = (None, forms) if forms else (key, [])
+        return self.keys[cache_key]
+
+    def need(self, current):
+        """这一条要不要 GPU 那一趟：→ {needed, labels, coverers, why}。要 = 有一条这一趟跑得到的测试，它带特性的闭包里有这条变异的容器单元、
+        又真引到 gpu 原子（闭包不碰容器单元的测试、碰到了却不引 gpu 的，这一趟帮不上）；labels 是这些测试所在的目标；coverers 是它们各自测试键的多重集取 sha256
+        （沿用没红的要它相同），有一条的键拒算就是空串、why 写原因。弄坏开关 gpu-all-items：不看闭包，每一条 CPU 那一趟没红的都要、目标取全部。"""
+        unit = current["unit"]
+        if unit is None or not self.enabled:
+            return {"needed": False, "labels": [], "coverers": "", "why": "no-unit"}
+        keys, labels, why = [], set(), ""
+        for entry in self.entries():
+            if break_is("gpu-all-items"):
+                labels.add(entry["label"])
+                continue
+            closure = self.closure_of(entry)
+            if closure is None or id(unit) not in closure.members or not self.references_gpu(closure):
+                continue
+            labels.add(entry["label"])
+            key, refused = self.test_key_of(entry)
+            if key is None and not why:
+                why = f"coverer-refused:{entry['binary']} {entry['test']}:" + ",".join(refused or ["closure"])
+            elif key is not None:
+                keys.append(key)
+        if not labels:
+            return {"needed": False, "labels": [], "coverers": "", "why": ""}
+        coverers = "" if why or break_is("gpu-all-items") else lines_digest(["gpu-coverers-v1"] + sorted(keys))
+        return {"needed": True, "labels": sorted(labels), "coverers": coverers, "why": why}
+
+    def catching_key(self, caught_by):
+        """抓到它的测试在这一趟此刻的测试键：→ (键或 "", 为什么)。"""
+        unit, target_id, why = self.rules.resolve_test(self.judgement.tree, caught_by)
+        if unit is None:
+            return "", why
+        key, refused = self.test_key_of({"unit": unit, "target": target_id})
+        return (key, "") if key else ("", "catching-test-refused:" + ",".join(refused))
+
+    def row_holds(self, row, current, need, for_run):
+        """库里键相同的这一行 GPU 判定此刻还认不认（沿用判据，同 mutation-prune.py 的 carry_decision）：→ (认不认, 为什么不认)。
+        这一趟自己的键（pass_key）对不上的不认；抓到的要那条测试此刻的测试键相同；没红的要覆盖者键相同；无效的键相同就认；
+        超时、内存撞顶、驱动错不是结论，认下来只为定状态；抓到它的测试认不出的，真跑每趟现判、只读时看覆盖者键。"""
+        if row["gpu_key"] != self.pass_key():
+            return False, "gpu-pass-changed"
+        outcome = row["outcome"]
+        if outcome not in DECISIVE_OUTCOMES:
+            return True, ""
+        if outcome == "caught" and row["note"].startswith("catching-test-unresolved"):
+            if for_run:
+                return False, row["note"]
+            return (True, "") if need["coverers"] and need["coverers"] == row["coverage_key"] else (False, "coverers-changed")
+        test_now, test_why = self.catching_key(row["caught_by"]) if outcome == "caught" else ("", "")
+        record = {"key": row["key"], "outcome": outcome, "caught_by": row["caught_by"], "test_key": row["test_key"], "coverage_key": row["coverage_key"]}
+        return self.rules.carry_decision(record, {"key": current["key"], "refused": []}, test_now, test_why, need["coverers"], need["why"])
+
+    def state(self, current, need, for_run):
+        """GPU 那一趟的状态：→ (ItemState, 为什么沿用不了, 定下状态的那一行)。真跑时拒算的条一律沿用不了（每趟现判）。"""
+        if current["key"] is None or (for_run and current["refused"]):
+            return ItemState(NOT_RUN, False), "refused:" + ",".join(current["refused"]), None
+        rows = self.by_key.get(current["key"], [])
+        kept, reasons = [], []
+        for row in rows:
+            holds, why = self.row_holds(row, current, need, for_run)
+            (kept if holds else reasons).append(row if holds else why)
+        state = state_of_outcomes([row["outcome"] for row in kept])
+        deciding = next((row for row in reversed(kept) if row["outcome"] == state.state), None)
+        return state, (reasons[-1] if reasons else ("no-record" if not rows else "")), deciding
+
+    def view(self, item, cpu, for_run):
+        """一条两趟合起来的样子（GpuView）。cpu 是 CPU 那一趟的 ItemState。"""
+        nothing = ItemState(NOT_RUN, False)
+        if cpu.state != "missed" or not self.enabled:
+            return GpuView(False, [], {"needed": False, "labels": [], "coverers": "", "why": ""}, nothing, cpu, "", None)
+        current = self.judgement.key_of(item)
+        if current["key"] is None:
+            return GpuView(False, [], {"needed": False, "labels": [], "coverers": "", "why": "no-key"}, nothing, cpu, "", None)
+        need = self.need(current)
+        if not need["needed"]:
+            return GpuView(False, [], need, nothing, cpu, "", None)
+        gpu, _why, deciding = self.state(current, need, for_run)
+        combined, reason = gpu_combined_state(cpu, True, gpu)
+        return GpuView(True, need["labels"], need, gpu, combined, reason, deciding)
+
+
+def gpu_views(library, arguments, judgement, items, states, for_run):
+    """每一条两趟合起来的样子：→ (GpuJudging 或 None, {序号: GpuView})。没有 CPU 那一趟没红的条就不碰 GPU 判定（不算带特性的闭包）。"""
+    views, judging = {}, None
+    for item in items:
+        cpu = states[item["sequence"]][0]
+        if cpu.state == "missed":
+            if judging is None:
+                judging = GpuJudging(library, judgement, arguments)
+            views[item["sequence"]] = judging.view(item, cpu, for_run)
+    return judging, views
+
+
+def combined_states(states, views):
+    """{序号: (合起来的 ItemState, 理由, 定下状态的 CPU 那一行)}：要 GPU 那一趟的条用合起来的状态（理由 gpu-…），别的照 CPU 那一趟。"""
+    found = {}
+    for sequence, (state, reason, deciding) in states.items():
+        view = views.get(sequence)
+        if view is not None and view.needed:
+            found[sequence] = (view.combined, view.reason or reason, deciding if view.combined.state == state.state else None)
+        else:
+            found[sequence] = (state, reason, deciding)
+    return found
+
+
+# ── GPU 那一趟的跑：基线、逐条、本次未跑 ─────────────────────────────────────────────────────────────────────
+
+class GpuPass:
+    """GPU 那一趟的步（文件头「GPU 那一趟」）：编译步与测试步各自经 Runner.run_step 起（内存包装在最外层，清场包装在测试步命令里面），不设 runner 模式。
+    基线 = 在没改过的树上把这一趟要跑的目标跑绿一遍（编译步、测试步各一次），秒数定每一步的限时（--timeout-floor、--timeout-multiplier）；这一趟的基线不记库，每趟现跑。"""
+
+    def __init__(self, runner, judging):
+        self.runner, self.judging = runner, judging
+        self.arguments, self.library = runner.arguments, runner.library
+        self.bindgen = gpu_bindgen_arguments()
+        self.baseline_seconds = {}
+        self.build_step = (GPU_BUILD_STEP, "gpu", "build", [], None)
+        self.test_step = (GPU_TEST_STEP, "gpu", "test", [], None)
+
+    def run(self, step, sequence, labels, limit):
+        command = gpu_pass_command("build" if step is self.build_step else "test", self.judging.features, labels)
+        extra = {"BINDGEN_EXTRA_CLANG_ARGS": self.bindgen} if self.bindgen else {}
+        if self.runner.fake_driver:
+            extra["BROAD_MUTATION_STEP_COMMAND"] = json.dumps(command)
+        return self.runner.run_step(step, sequence, limit, command=command, extra=extra)
+
+    def limit(self, step_name):
+        return int(max(self.arguments.timeout_floor, self.arguments.timeout_multiplier * self.baseline_seconds.get(step_name, 0)))
+
+    def ensure_baseline(self, labels):
+        """→ (跑得了, 为什么跑不了)。没改过的树上编译红 / 测试红 / 一个测试都没跑到：拒（退 6，基线不绿后面每一条抓到都不作数）；
+        内存包装自己的结局：拒（退 3）；清场没过或没找到卡：这一趟本次未跑，不拒。"""
+        sequence = GPU_BASELINE_SEQUENCE
+        exit_code, seconds = self.run(self.build_step, sequence, labels, None)
+        build_log = self.runner.log_path(sequence, GPU_BUILD_STEP)
+        outcome, note_text = gpu_classify_build(exit_code, build_log)
+        if outcome == GPU_INFRASTRUCTURE:
+            self.runner.stop_for_infrastructure(GPU_BUILD_STEP, sequence, exit_code)
+        if outcome is not None:
+            refuse(f"GPU 趟基线 {GPU_BUILD_STEP} 在没改过的树上退 {exit_code}（{note_text}）：基线不绿，后面每一条 GPU 趟的抓到都不作数，一条都不跑",
+                   f"看日志 {build_log}；代码本来就编不过就先修代码（带 --features {','.join(self.judging.features)} 的 checker 档），是环境（盘满、缺 libclang、BINDGEN_EXTRA_CLANG_ARGS）就修环境，重跑同一条命令；"
+                   "这一趟先不要 GPU 趟就加 --skip-gpu", EXIT_BASELINE_RED)
+        self.baseline_seconds[GPU_BUILD_STEP] = seconds
+        os.remove(build_log)
+        exit_code, seconds = self.run(self.test_step, sequence, labels, None)
+        test_log = self.runner.log_path(sequence, GPU_TEST_STEP)
+        result = gpu_classify_test(exit_code, test_log)
+        if result.outcome == GPU_NOT_RUN:
+            return False, result.note
+        if result.outcome == GPU_INFRASTRUCTURE:
+            self.runner.stop_for_infrastructure(GPU_TEST_STEP, sequence, exit_code)
+        if result.outcome != "missed":
+            refuse(f"GPU 趟基线 {GPU_TEST_STEP} 在没改过的树上不绿（{'有测试没过：' + result.caught_by if result.outcome == 'caught' else result.note}）：基线不绿，后面每一条 GPU 趟的抓到都不作数，一条都不跑",
+                   f"看日志 {test_log}；代码本来就红就先修代码，是卡的毛病（显存、别的会话占着）就等卡空了重跑同一条命令；这一趟先不要 GPU 趟就加 --skip-gpu",
+                   EXIT_BASELINE_RED)
+        self.baseline_seconds[GPU_TEST_STEP] = seconds
+        os.remove(test_log)
+        say(f"  · GPU 趟基线绿：{GPU_BUILD_STEP} {self.baseline_seconds[GPU_BUILD_STEP]:.1f} 秒、{GPU_TEST_STEP} {seconds:.1f} 秒（目标 {','.join(labels)}）；"
+            f"每一步的限时定为 {self.limit(GPU_BUILD_STEP)} / {self.limit(GPU_TEST_STEP)} 秒")
+        return True, ""
+
+
+def plan_gpu_sentinel(candidates, arguments):
+    """GPU 那一趟的复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：候选是这一趟罩得住、沿用判据此刻认定论的 GPU 判定，项名「gpu:<序号>」。
+    --full、--rerun 不读库不抽。弄坏开关 gpu-carry-ignored（沿用得了的照样重跑）下这一趟判红「复用失灵」。"""
+    sentinel = reuse_checks.ReuseSentinel(SCRIPT_KEY, "广谱变异 GPU 趟")
+    off = "--full（不读判定库）" if arguments.full else "--rerun（点名的照样重跑）" if arguments.rerun else ""
+    sentinel.plan({f"gpu:{sequence}": outcome for sequence, outcome in candidates.items()}, reuse=not off, off_reason=off, printer=say)
+    return sentinel
+
+
+def judge_gpu_item(library, gpu_pass, item, need):
+    """判一条的 GPU 那一趟：先编（编不过记无效）再跑测试步，落一行 GPU 判定（本次未跑的不落行）。→ (GpuOutcome, 编译秒, 测试秒)。
+    树里的原件无论怎么退都拷回；被 TERM 停（Stopped）不落行。"""
+    runner, judging = gpu_pass.runner, gpu_pass.judging
+    sequence, current = item["sequence"], judging.judgement.key_of(item)
+    labels, method = need["labels"], "full" if gpu_pass.arguments.full else "fresh"
+    seconds = {"build": 0.0, "test": 0.0}
+
+    def record(outcome, caught_by="", test_key="", coverage_key="", note_text=""):
+        record_gpu_verdict(library, [current["key"], sequence, item["package"], item["name"], outcome, caught_by, test_key, coverage_key, judging.pass_key(),
+                                     f"{seconds['test']:.1f}", today_text(), method, note_text])
+
+    try:
+        apply_mutation(library, item)
+        exit_code, took = gpu_pass.run(gpu_pass.build_step, sequence, labels, gpu_pass.limit(GPU_BUILD_STEP))
+        seconds["build"] += took
+        build_log = runner.log_path(sequence, GPU_BUILD_STEP)
+        outcome, note_text = gpu_classify_build(exit_code, build_log)
+        if outcome == GPU_INFRASTRUCTURE:
+            runner.stop_for_infrastructure(GPU_BUILD_STEP, sequence, exit_code)
+        if outcome is not None:
+            record(outcome, note_text=note_text)
+            return GpuOutcome(outcome, "", note_text), seconds["build"], seconds["test"]
+        os.remove(build_log)
+        exit_code, took = gpu_pass.run(gpu_pass.test_step, sequence, labels, gpu_pass.limit(GPU_TEST_STEP))
+        seconds["test"] += took
+        test_log = runner.log_path(sequence, GPU_TEST_STEP)
+        result = gpu_classify_test(exit_code, test_log)
+        if result.outcome == GPU_INFRASTRUCTURE:
+            runner.stop_for_infrastructure(GPU_TEST_STEP, sequence, exit_code)
+        if result.outcome == GPU_NOT_RUN:
+            return result, seconds["build"], seconds["test"]
+        if result.outcome == "missed":
+            os.remove(test_log)
+            record("missed", coverage_key=need["coverers"], note_text=result.note)
+        elif result.outcome == "caught":
+            test_key, why = judging.catching_key(result.caught_by)
+            if test_key:
+                record("caught", result.caught_by, test_key, note_text=result.note)
+            else:
+                # 抓到它的测试认不出（同 CPU 那一趟）：每趟现判，另记覆盖者键给只读的 --summary 核
+                record("caught", result.caught_by, "", need["coverers"], note_text=f"catching-test-unresolved:{why}")
+        else:
+            record(result.outcome, note_text=result.note)
+        return result, seconds["build"], seconds["test"]
+    finally:
+        restore_original(library)
+
+
+def run_gpu_phase(library, runner, items, arguments):
+    """CPU 那一趟全跑完之后的 GPU 那一趟（文件头「GPU 那一趟」）：→ GpuTotals。
+    要这一趟的条 = 这一趟罩得住、CPU 那一趟最后落的结论是没红、又有带特性的测试够得着的；键相同、沿用得了的复用；沿用不了的现判（--full、--rerun 不读库）。
+    开跑先在没改过的树上跑一遍基线；没找到卡、清场没过、带了 --skip-gpu：要现判的条逐条打 BROAD_MUTATION_GPU_NOT_RUN（本次未跑，不落行、不算没红）。"""
+    outcomes = dict.fromkeys(GPU_ROW_OUTCOMES, 0)
+
+    def totals(needed=0, judged=0, carried=0, not_run=0, failed=False, report=True):
+        if report:
+            say(f"BROAD_MUTATION_GPU_TOTAL needed={needed} judged={judged} carried={carried} not_run={not_run} "
+                + " ".join(f"{SUMMARY_KEYS[name]}={count}" for name, count in outcomes.items()))
+        return GpuTotals(needed, judged, carried, not_run, failed, outcomes)
+
+    if arguments.skip_stage_two:
+        say("  · GPU 趟接在第二段后面，这一趟带了 --skip-stage-two，不跑")
+        return totals(report=False)
+    judgement = runner.judgement
+    refresh_verdict_rows(judgement)      # CPU 那一趟刚落的行要读进来（单元树、每条的键、测试的闭包照旧用这一趟已经算好的：树里的源码这一趟没变）
+    judging = GpuJudging(library, judgement, arguments)
+    if not judging.enabled:
+        say(f"  · GPU 趟：{GPU_TESTS_DIRECTORY} 下没有文件的 cfg 点到 gpu 特性，没有带 gpu 特性的快档可跑")
+        return totals(report=False)
+    pending, carried, refused, candidates = [], [], 0, {}
+    for item in items:
+        if not in_run_scope(item, arguments):
+            continue
+        cpu = cpu_state_for_gpu(judgement, item)[0]
+        if cpu.state != "missed" and not (break_is("gpu-also-when-cpu-caught") and cpu.state == "caught"):
+            continue
+        current = judgement.key_of(item)
+        if current["key"] is None:
+            continue
+        need = judging.need(current)
+        if not need["needed"]:
+            continue
+        gpu, reason, _deciding = judging.state(current, need, for_run=True)
+        if current["refused"]:
+            refused += 1
+        if gpu.state in DECISIVE_OUTCOMES:
+            candidates[item["sequence"]] = gpu.state     # 沿用判据此刻认定论的：复用哨兵的候选（弄坏开关 gpu-carry-ignored 下它们被现判，哨兵就判红）
+        if gpu.state in DECISIVE_OUTCOMES and not arguments.full and not arguments.rerun and not break_is("gpu-carry-ignored"):
+            carried.append((item, gpu, need))
+        else:
+            pending.append((item, need, reason or "no-record"))
+    needed = len(pending) + len(carried)
+    say(f"BROAD_MUTATION_GPU_PLAN needed={needed} judge={len(pending)} carried={len(carried)} refused={refused} features={','.join(judging.features)}")
+    if not needed:
+        return totals()
+    sentinel = plan_gpu_sentinel(candidates, arguments)
+    forced = next((item for item, _gpu, need in carried if sentinel.forced(f"gpu:{item['sequence']}")), None)
+    if forced is not None:
+        moved = next(entry for entry in carried if entry[0] is forced)
+        carried.remove(moved)
+        pending.append((forced, moved[2], "sentinel-forced"))
+    for item, need, reason in pending:
+        say(f"BROAD_MUTATION_GPU_JUDGE sequence={item['sequence']} reason={reason} labels={','.join(need['labels'])}")
+    if not pending:
+        return totals(needed=needed, carried=len(carried))
+    not_run_reason = "skip-gpu：这一趟带了 --skip-gpu" if arguments.skip_gpu else ""
+    gpu_pass = GpuPass(runner, judging)
+    if not not_run_reason:
+        say("  · GPU 趟：每一步测试经 scripts/crash/gpu-quiesce-run.sh 照多机配置清场并回读，跑完不复原（要复原手动跑多机配置里的私有复原脚本）")
+        available, why = gpu_pass.ensure_baseline(sorted({label for _item, need, _reason in pending for label in need["labels"]}, key=lambda text: (text != "lib", text)))
+        if not available:
+            not_run_reason = why
+    if not_run_reason:
+        for item, _need, _reason in pending:
+            say(f"BROAD_MUTATION_GPU_NOT_RUN sequence={item['sequence']} reason={not_run_reason.split('：')[0]} name={item['name']}")
+        say(f"  · GPU 趟本次未跑 {len(pending)} 条（{not_run_reason}）：它们没有 GPU 那一趟的结论，不算没红，也不算通过；有卡之后重跑同一条命令")
+        return totals(needed=needed, carried=len(carried), not_run=len(pending))
+    judged_outcomes, not_run_names, stopped_for = {}, [], ""
+    for item, need, _reason in pending:
+        if stopped_for:
+            not_run_names.append(item)
+            say(f"BROAD_MUTATION_GPU_NOT_RUN sequence={item['sequence']} reason={stopped_for} name={item['name']}")
+            continue
+        started = time.monotonic()
+        result, build_seconds, test_seconds = judge_gpu_item(library, gpu_pass, item, need)
+        if result.outcome == GPU_NOT_RUN:
+            stopped_for = result.note.split("：")[0]
+            not_run_names.append(item)
+            say(f"BROAD_MUTATION_GPU_NOT_RUN sequence={item['sequence']} reason={stopped_for} name={item['name']}")
+            continue
+        outcomes[result.outcome] = outcomes.get(result.outcome, 0) + 1
+        judged_outcomes[f"gpu:{item['sequence']}"] = result.outcome
+        cpu = cpu_state_for_gpu(judgement, item)[0]
+        combined, _reason = gpu_combined_state(cpu, True, ItemState(result.outcome, False))
+        say(f"BROAD_MUTATION_GPU_ITEM sequence={item['sequence']} cpu={cpu.state} gpu={result.outcome} combined={combined.state} build_seconds={build_seconds:.1f} "
+            f"test_seconds={test_seconds:.1f} wall_seconds={time.monotonic() - started:.1f} judged=1 red={1 if result.outcome == 'missed' else 0} reused=0 name={item['name']}"
+            + (f" first_failing_test={result.caught_by}" if result.caught_by else ""))
+    failed = False
+    skipped = {f"gpu:{item['sequence']}" for item in not_run_names}      # 没跑成的（卡中途没了）：不当复用也不当现判，哨兵不比
+    for key, stored in sentinel.candidates.items():
+        if key in skipped:
+            continue
+        if key not in judged_outcomes:
+            sentinel.observe(key, reuse_checks.REUSED, stored)
+        elif judged_outcomes[key] in DECISIVE_OUTCOMES:
+            sentinel.observe(key, reuse_checks.FORCED if sentinel.forced(key) else reuse_checks.JUDGED, judged_outcomes[key])
+    for message, howto in sentinel.finish(printer=say):
+        print(f"  ✗ {message}", file=sys.stderr)
+        print(f"  → 怎么办：{howto}", file=sys.stderr)
+        failed = True
+    return totals(needed=needed, judged=sum(outcomes.values()), carried=len(carried), not_run=len(not_run_names), failed=failed)
+
+
 # ── 选条、列项、汇总 ───────────────────────────────────────────────────────────────────────────────────────
 
 def changed_since_head(source):
@@ -3262,6 +4196,7 @@ def read_only_judgement(library, arguments, source):
 def list_items(library, arguments, source):
     judgement, items, unlisted, _unrestorable = read_only_judgement(library, arguments, source)
     states, stale = item_states(judgement, items), stale_counts(judgement, items)
+    states = combined_states(states, gpu_views(library, arguments, judgement, items, states, for_run=False)[1])    # 状态列是两趟合起来的（文件头「GPU 那一趟」）
     for item in items:
         say(f"{item['sequence']}\t{item['package']}\t{item['name']}\t{states[item['sequence']][0].state}\tstale={stale[item['sequence']]}"
             f"\tkey={judgement.key_of(item)['key'] or 'refused'}")
@@ -3270,11 +4205,30 @@ def list_items(library, arguments, source):
              f"{heavy_prefix_text()} python3 {SELF_PATH} --refresh-list 记上")
 
 
+def last_time_limit_text(row):
+    """--summary 的 NO_CONCLUSION 理由里那一段（文件头「输出」）：定下状态的那一行备注里记的上一趟限时——「<步> 超过 <N> 秒」取 N，
+    超时之后升档重跑过的「<步> 超时之后升档重跑（<原> → <升档>）…」取升档那趟的那个数，写成「上一趟限时 <N> 秒」；
+    备注里没有整步限时（直接撞顶的、驱动错、GPU 趟的、经 runner 按单条限 CPU 的测试步记成「超过 None 秒」的、没有定下状态的那一行）交空串。弄坏开关 no-conclusion-limit-dropped：一律交空串（改前的样子）。"""
+    if row is None or break_is("no-conclusion-limit-dropped"):
+        return ""
+    note = row.get("note", "")
+    found = re.search(r"超时之后升档重跑（\d+ → (\d+)）", note) or re.search(r"超过 (\d+) 秒", note)
+    return f"上一趟限时 {found.group(1)} 秒" if found else ""
+
+
 def summarise(library, arguments, source):
     """八栏条数与提交门禁那一行（文件头「输出」）；判定库对不上（段数、校验列、结局认不出）判红退 1，提交门禁判红退 8。"""
     judgement, items, unlisted, unrestorable = read_only_judgement(library, arguments, source)
     table = judgement.table
     states = item_states(judgement, items)
+    judging, views = gpu_views(library, arguments, judgement, items, states, for_run=False)
+    states = combined_states(states, views)     # CPU 那一趟没红又要 GPU 那一趟的条，状态取两趟合起来的（文件头「GPU 那一趟」）
+    gpu_table = judging.table if judging is not None else read_gpu_verdicts(library)
+    gpu_needed = [view for view in views.values() if view.needed]
+    gpu_reused = sum(1 for view in gpu_needed if view.gpu.state in DECISIVE_OUTCOMES)
+    gpu_not_run = sum(1 for view in gpu_needed if view.gpu.state == NOT_RUN)
+    gpu_without = len(gpu_needed) - gpu_reused - gpu_not_run
+    gpu_fields = f" gpu_needed={len(gpu_needed)} gpu_reused={gpu_reused} gpu_not_run={gpu_not_run} gpu_without_conclusion={gpu_without}"
     counts = dict.fromkeys(SUMMARY_COLUMNS, 0)
     refused, escalated, without, missed_items = [], [], [], []
     for item in items:
@@ -3291,8 +4245,9 @@ def summarise(library, arguments, source):
             missed_items.append(item)
     total = len(items)
     say(f"BROAD_MUTATION_SUMMARY total={total} " + " ".join(f"{SUMMARY_KEYS[column]}={counts[column]}" for column in SUMMARY_COLUMNS)
-        + f" refused={len(refused)} unlisted_units={len(unlisted)}")
-    say("  " + "、".join(f"{OUTCOME_TEXT[column]} {counts[column]}" for column in SUMMARY_COLUMNS) + f"；清单 {total} 条，拒算 {len(refused)} 条，没记清单的单元 {len(unlisted)} 个")
+        + f" refused={len(refused)} unlisted_units={len(unlisted)}{gpu_fields}")
+    say("  " + "、".join(f"{OUTCOME_TEXT[column]} {counts[column]}" for column in SUMMARY_COLUMNS) + f"；清单 {total} 条，拒算 {len(refused)} 条，没记清单的单元 {len(unlisted)} 个"
+        f"；要 GPU 那一趟的 {len(gpu_needed)} 条（有结论、库里键相同复用 {gpu_reused}，本次未跑 {gpu_not_run}，没结论 {gpu_without}）")
     for item in missed_items:
         say(f"MISSED\t{item['sequence']}\t{item['package']}\t{item['name']}")
     for item in items:
@@ -3314,6 +4269,14 @@ def summarise(library, arguments, source):
         problems.append(f"判定库里有 {len(table.malformed_lines)} 行段数不是 {len(VERDICT_COLUMNS)}（文件第 {'、'.join(str(number) for number in table.malformed_lines[:5])} 行）")
     if table.forged:
         problems.append(f"判定库里没有校验列或校验列对不上的 {table.forged_text()}：不是驱动用这台机器的密钥写的")
+    unknown_gpu_outcomes = [row for row in gpu_table.rows if row["outcome"] not in GPU_ROW_OUTCOMES]
+    if unknown_gpu_outcomes:
+        problems.append(f"GPU 判定库里有 {len(unknown_gpu_outcomes)} 行是认不出的结局（例：键 {unknown_gpu_outcomes[0]['key'][:16]}「{unknown_gpu_outcomes[0]['outcome']}」）")
+    if gpu_table.malformed_lines:
+        problems.append(f"GPU 判定库 {GPU_VERDICTS} 里有 {len(gpu_table.malformed_lines)} 行段数不是 {len(GPU_VERDICT_COLUMNS)}"
+                        f"（文件第 {'、'.join(str(number) for number in gpu_table.malformed_lines[:5])} 行）")
+    if gpu_table.forged:
+        problems.append(f"GPU 判定库 {GPU_VERDICTS} 里没有校验列或校验列对不上的 {gpu_table.forged_text()}：不是驱动用这台机器的密钥写的")
     if unrestorable:
         unit, entry = unrestorable[0]
         problems.append(f"清单按单元存的表里有 {len(unrestorable)} 条在此刻的源码上复原不回去（例：{unit.file} {unit.name} 的「{entry.get('description', '')[:60]}」）：lists.tsv 写坏或手改过")
@@ -3322,23 +4285,26 @@ def summarise(library, arguments, source):
     gate_red = bool(without or counts["missed"] or unlisted or total == 0)
     escalated_field = "" if break_is("escalated-not-summarised") else f" escalated={len(escalated)}"
     say(f"BROAD_MUTATION_GATE total={total} concluded={total - len(without)} missed={counts['missed']} without_conclusion={len(without)} refused={len(refused)} "
-        f"unlisted_units={len(unlisted)}{escalated_field} verdict={'red' if gate_red else 'green'}")
+        f"unlisted_units={len(unlisted)}{escalated_field}{gpu_fields} verdict={'red' if gate_red else 'green'}")
     for item, state, reason in without:
         changed = judgement.changed_units(item)
-        say(f"NO_CONCLUSION\t{item['sequence']}\t{state}\t{item['name']}\t{reason}" + (f"；变了：{changed}" if changed else ""))
+        reason_text = "；".join(part for part in (reason, last_time_limit_text(states[item["sequence"]][2])) if part)
+        say(f"NO_CONCLUSION\t{item['sequence']}\t{state}\t{item['name']}\t{reason_text}" + (f"；变了：{changed}" if changed else ""))
     if not break_is("escalated-not-summarised"):
         for item, label in escalated:
             say(f"ESCALATED\t{item['sequence']}\t{label}\t{item['name']}\t{judgement.key_of(item)['key']}")
     if problems and not break_is("summary-mismatch-silent"):
         print(f"  ✗ 汇总对不上：{'；'.join(problems)}", file=sys.stderr)
-        print(f"  → 怎么办：看 {library.verdicts_path} 里点到的那几行。段数不对、结局认不出、没有校验列或校验列对不上的行是写坏或手写的：停掉驱动，把判定库拷一份留底，"
+        print(f"  → 怎么办：看 {library.verdicts_path}（GPU 趟的判定在同目录的 {GPU_VERDICTS}）里点到的那几行。段数不对、结局认不出、没有校验列或校验列对不上的行是写坏或手写的：停掉驱动，把判定库拷一份留底，"
               "删掉点到的那几行（别的行不动），那几条再用 --item <序号> --rerun 重判；每一行都校验不过（密钥丢了、换了）就另起一个空库目录重判；"
               f"清单复原不回去的：{heavy_prefix_text()} python3 {SELF_PATH} --refresh-list 重新记", file=sys.stderr)
         return EXIT_INCONSISTENT
     if gate_red and not break_is("summary-gate-silent"):
-        print(f"  ✗ 提交门禁判红：{len(without)} 条沿用不了、也没有现判的结论，{counts['missed']} 条没红，{len(unlisted)} 个单元没记清单", file=sys.stderr)
+        print(f"  ✗ 提交门禁判红：{len(without)} 条沿用不了、也没有现判的结论（其中要 GPU 那一趟而没有结论的 {gpu_not_run + gpu_without} 条），{counts['missed']} 条没红，"
+              f"{len(unlisted)} 个单元没记清单", file=sys.stderr)
         print(f"  → 怎么办：主 agent 照 .claude/skills/crash-test/commit-stages.md 第 2b 步不带选条参数起驱动剪枝跑（{heavy_prefix_text()} python3 {SELF_PATH} "
-              "--threads … --memory-cap …：每条按单元键沿用、沿用不了的现判，超时、内存撞顶的那一步自动升档重跑一次），再跑这一道；"
+              "--threads … --memory-cap …：每条按单元键沿用、沿用不了的现判，超时、内存撞顶的那一步自动升档重跑一次；CPU 那一趟没红又要 GPU 那一趟的条"
+              "（NO_CONCLUSION 里理由是 gpu-…）接在最后经 scripts/crash/gpu-quiesce-run.sh 清场再跑，要在有卡的机器上跑，没卡的机器上它们是本次未跑、不算没红也不算通过），再跑这一道；"
               "证据不齐、仍是超时或内存撞顶的（NO_CONCLUSION 那几行），加大 --timeout-floor 或 --memory-cap 再 --item <序号> --rerun；"
               "没红的加一条能杀它的测试再判；确是等价变异的可写进 .cargo/mutants.toml 的 exclude_re（只那几条不再判），理由写在那一行旁边", file=sys.stderr)
         return EXIT_GATE_RED
@@ -3347,14 +4313,146 @@ def summarise(library, arguments, source):
 
 # ── 导入另一台机器的判定行 ───────────────────────────────────────────────────────────────────────────────────
 
-def import_results(library, source):
+# 这一节不新加模块级的赋值、类、import，也不给新函数的参数写缺省值：判法单元指纹（judging_units_key、gpu_judging_key）的闭包里带着模块级的赋值、类、import 与带缺省值的 def 头，
+# 多一条或改一条，库里的判定就一条都不沿用。要常量的写进函数里，要成组的返回值用 argparse.Namespace。
+
+def peer_result_key_path():
+    """另一台的密钥放哪（文件头「判定行的校验列」的「另一台的密钥」）：本机密钥（result_key_path）同一个目录、名字在 .key 前加 .peer。"""
+    stem, suffix = os.path.splitext(result_key_path())
+    return f"{stem}.peer{suffix}"
+
+
+def peer_mac_howto():
+    """对端密钥取不到、或拿它核不过时的出路（两台交换密钥）。"""
+    return (f"两台交换密钥：让另一台把它的 ${{XDG_CONFIG_HOME:-~/.config}}/{DEFAULT_RESULT_KEY} 经私有通道原样拷到本机 {peer_result_key_path()}"
+            "（chmod 600，所在目录 700；不打印、不进仓、不进库目录），再重跑同一条导入；对端密钥对、表核不过的，从另一台重新取一遍库目录")
+
+
+def peer_result_key(library):
+    """导入时核另一台校验列用的密钥：→ 字节。取不到（不在、权限不对、内容写坏、落在库目录里）拒导入（退 2）；读法同本机那一把（read_result_key），内容不打印。"""
+    path = os.path.realpath(peer_result_key_path())
+    if path_is_under(path, os.path.realpath(library.home)):
+        refuse(f"另一台的密钥 {path} 落在库目录 {library.home} 里：手写得了判定行的人也读得到它，核另一台的校验列就防不住手写的行；一行都没导入", peer_mac_howto())
+    key, problem = read_result_key(path)
+    if key is None:
+        refuse(f"另一台的密钥取不到（{problem}）：它的判定行带的是那一台的密钥算的校验列，核不了就不导；一行都没导入", peer_mac_howto())
+    return key
+
+
+def peer_mac_mismatches(rows, peer_key, mac):
+    """另一台表里（read_table 读出的全列行）校验列用 peer_key 核不过的行：→ [「第 <序号> 条（键 <前十六位>）」]；peer_key 是 None（弄坏开关 peer-mac-unchecked）不核、交空表。"""
+    if peer_key is None:
+        return []
+    return [f"第 {fields[1]} 条（键 {fields[0][:16]}）" for fields in rows if not hmac.compare_digest(mac(peer_key, fields), fields[-1])]
+
+
+def gpu_import_reject_text(reason):
+    """被拒的 GPU 判定行的理由，写成 IMPORT_GPU_REJECTED 那一行末尾的人话。"""
+    return {"key-not-in-list": "键不是本机此刻清单里任何一条的单元键（两台的源码不同，或这一条已不在清单里）",
+            "gpu-pass-changed": "GPU 趟自己的键（这一趟的写法、编进来的特性、GPU 趟判法单元指纹）与本机此刻的不同"}[reason]
+
+
+def gpu_import_plan(path, rows_read, fresh, already_present, conflicts, withheld, rejected, names, partial_tail):
+    """一次 GPU 判定行导入核完之后的结果（plan_gpu_import 的返回）：path 另一台库目录里的 gpu-verdicts.tsv；rows_read 读到的成形的行数；
+    fresh 核过、要并进本机的行（前十三段，跑法已加 import: 前缀）；already_present 本机已有相同行的条数；conflicts {键: (本机结局, 另一台结局)}（同一把键两边都有定论而不同，
+    这几把键的行不导）；withheld 因此没导的行数；rejected [(行, 理由)]（键对不上、GPU 趟自己的键对不上的行，不导）；names {键: 变异名}（列明细用）；
+    partial_tail 另一台那张表的末行没写完（不算数）。"""
+    return argparse.Namespace(path=path, rows_read=rows_read, fresh=fresh, already_present=already_present, conflicts=conflicts, withheld=withheld,
+                              rejected=rejected, names=names, partial_tail=partial_tail)
+
+
+def gpu_row_bare(row):
+    """一行 GPU 判定拿来比「本机有没有相同行」的样子：前十三段去掉跑法（导入的行跑法带 import: 前缀）。"""
+    return tuple(str(row[column]) for column in GPU_VERDICT_COLUMNS[:GPU_SIGNED_COLUMNS] if column != "method")
+
+
+def plan_gpu_import(library, arguments, directory, peer_key):
+    """另一台库目录里 gpu-verdicts.tsv 的行并进本机之前先核完（一行都不写）。段数不是十四、结局认不出、键不是 64 位十六进制的整表拒（同 verdicts.tsv 那一侧）。
+    成形的行逐条核两把键：行的键要是本机此刻清单里某一条的单元键（按本机此刻的源码现算）、行的 gpu_key 要等于本机此刻 GPU 趟自己的键（GpuJudging.pass_key，
+    含 GPU 趟判法单元指纹），对不上的不导、列出来；对得上的，本机已有相同行的不重复导，同一把键两边都有定论而结局不同的不导。
+    每行的校验列先用另一台的密钥（peer_key，import_results 取的；弄坏开关 peer-mac-unchecked 下是 None、不核）核，一行核不过整表拒；核过去掉，落行时照本机的密钥重签。
+    弄坏开关 import-verdicts-only：不看 gpu-verdicts.tsv（改前的样子）；
+    import-gpu-keys-unchecked：不核两把键；import-gpu-conflict-ignored：两边定论不同的也导；import-unchecked：也不核段数、结局与键的写法。"""
+    peer_path = os.path.join(directory, GPU_VERDICTS)
+    nothing = gpu_import_plan(peer_path, 0, [], 0, {}, 0, [], {}, False)
+    if break_is("import-verdicts-only") or not os.path.isfile(peer_path):
+        return nothing
+    unchecked = break_is("import-unchecked")
+    fetch_howto = "把另一台库目录里的 gpu-verdicts.tsv 与 verdicts.tsv（连同 compositions/）取回到一个目录里再给它"
+    table = read_table(peer_path, len(GPU_VERDICT_COLUMNS))
+    if table.malformed_lines and not unchecked:
+        refuse(f"{peer_path} 里有 {len(table.malformed_lines)} 行段数不是 {len(GPU_VERDICT_COLUMNS)}（第 {'、'.join(str(number) for number in table.malformed_lines[:5])} 行）：取回来的表不完整或被改过",
+               "一行都没导入（verdicts.tsv 的行也没导）。重新取一遍；另一台上先跑 --summary 看那张表自己对不对得上", EXIT_INCONSISTENT)
+    forged = peer_mac_mismatches(table.rows, peer_key, gpu_result_mac)
+    if forged:
+        refuse(f"{peer_path} 里有 {len(forged)} 行的校验列用另一台的密钥核不过（{forged[0]}" + ("；……" if len(forged) > 1 else "") + "）：取回来的表被改过，或本机存的对端密钥不是那一台此刻的",
+               "一行都没导入（verdicts.tsv 的行也没导）。" + peer_mac_howto(), EXIT_INCONSISTENT)
+    rows = [dict(zip(GPU_VERDICT_COLUMNS, row[:GPU_SIGNED_COLUMNS])) for row in table.rows]
+    wrong = []
+    for row in rows:
+        if unchecked:
+            break
+        if not re.fullmatch(r"[0-9a-f]{64}", row["key"]):
+            wrong.append(f"第 {row['sequence']} 条的键「{row['key'][:20]}」不是 64 位十六进制")
+        elif row["outcome"] not in GPU_ROW_OUTCOMES:
+            wrong.append(f"第 {row['sequence']} 条的结局「{row['outcome']}」认不出")
+    if wrong:
+        refuse(f"{peer_path} 里有 {len(wrong)} 行不成形：{wrong[0]}" + ("；……" if len(wrong) > 1 else ""), "一行都没导入（verdicts.tsv 的行也没导）。" + fetch_howto, EXIT_INCONSISTENT)
+    if not rows:
+        return gpu_import_plan(peer_path, 0, [], 0, {}, 0, [], {}, bool(table.partial_tail))
+    judgement, items, unlisted, unrestorable = read_only_judgement(library, arguments, arguments.source_root)
+    if not items or unlisted or unrestorable:
+        refuse(f"本机此刻的清单不全（{len(items)} 条，没记清单的单元 {len(unlisted)} 个，复原不回去 {len(unrestorable)} 处）：另一台的 {len(rows)} 行 GPU 判定没有一张完整的单元键表可核",
+               f"一行都没导入（verdicts.tsv 的行也没导）。先记清单：{heavy_prefix_text()} python3 {SELF_PATH} --refresh-list（--source 与两台跑的是同一份源码），再重跑同一条导入")
+    judging = GpuJudging(library, judgement, arguments)
+    current_keys = {judgement.key_of(item)["key"] for item in items} - {None}
+    pass_key = judging.pass_key()
+    local = judging.table
+    if (local.forged or local.malformed_lines) and not unchecked:
+        refuse(f"本机的 GPU 判定库自己就对不上（{local.forged_text() if local.forged else f'{len(local.malformed_lines)} 行段数不对'}）",
+               f"先修本机的：python3 {SELF_PATH} --summary 看出路", EXIT_INCONSISTENT)
+    kept, rejected = [], []
+    for row in rows:
+        reason = ""
+        if not break_is("import-gpu-keys-unchecked"):
+            if row["key"] not in current_keys:
+                reason = "key-not-in-list"
+            elif row["gpu_key"] != pass_key:
+                reason = "gpu-pass-changed"
+        if reason:
+            rejected.append((row, reason))
+        else:
+            kept.append(row)
+    local_rows = {gpu_row_bare(row) for row in local.rows}
+    local_decisive = {row["key"]: row["outcome"] for row in local.rows if row["gpu_key"] == pass_key and row["outcome"] in DECISIVE_OUTCOMES}
+    peer_decisive = {row["key"]: row["outcome"] for row in kept if row["outcome"] in DECISIVE_OUTCOMES}
+    conflicts = {} if break_is("import-gpu-conflict-ignored") else {key: (local_decisive[key], outcome) for key, outcome in peer_decisive.items()
+                                                                    if key in local_decisive and local_decisive[key] != outcome}
+    fresh, already_present, withheld = [], 0, 0
+    method_index = GPU_VERDICT_COLUMNS.index("method")
+    for row in kept:
+        if gpu_row_bare(row) in local_rows:
+            already_present += 1
+        elif row["key"] in conflicts:
+            withheld += 1
+        else:
+            fields = [row[column] for column in GPU_VERDICT_COLUMNS[:GPU_SIGNED_COLUMNS]]
+            if not fields[method_index].startswith("import:"):
+                fields[method_index] = f"import:{fields[method_index]}"
+            fresh.append(fields)
+    return gpu_import_plan(peer_path, len(rows), fresh, already_present, conflicts, withheld, rejected, {row["key"]: row["name"] for row in rows}, bool(table.partial_tail))
+
+
+def import_results(library, source, arguments):
     """两台各跑一片（--shard k/2）之后，把另一台库目录里的判定行并进本机这一份库（文件头「--import-results」）。source 是取回来的那份库目录
     （或其中的 verdicts.tsv）；compositions/ 在就一起拷。全部核完才写：每行段数、结局认得、键是 64 位十六进制；本机已有的相同行不重复导；
-    同一把键两边都有定论而结局不同的不导、逐条列出、退 1。另一台的行带的是它那台的密钥算的校验列，这里核不了：去掉，照本机的密钥重签。"""
+    同一把键两边都有定论而结局不同的不导、逐条列出、退 1。另一台的行带的是它那台的密钥算的校验列：先用另一台的密钥（peer_result_key）逐行核，
+    对端密钥取不到拒（退 2）、一行核不过整表拒（退 1），全部核过才去掉、照本机的密钥重签。
+    同目录的 gpu-verdicts.tsv（GPU 那一趟的判定）也并进来，核法见 plan_gpu_import：键对不上本机此刻源码与 GPU 趟指纹的行不导、列出来、退 1，之后本机的 GPU 趟照现判。"""
     library.result_key(create=True)
     directory = source if os.path.isdir(source) else os.path.dirname(os.path.abspath(source))
     peer_path = os.path.join(directory, "verdicts.tsv")
-    fetch_howto = "把另一台库目录里的 verdicts.tsv（连同 compositions/）取回到一个目录里再给它"
+    fetch_howto = "把另一台库目录里的 verdicts.tsv（连同 gpu-verdicts.tsv、compositions/）取回到一个目录里再给它"
     if not os.path.isfile(peer_path):
         refuse(f"{directory} 里没有 verdicts.tsv：没有判定行可导", fetch_howto)
     table = read_table(peer_path, len(VERDICT_COLUMNS))
@@ -3362,6 +4460,11 @@ def import_results(library, source):
     if table.malformed_lines and not unchecked:
         refuse(f"{peer_path} 里有 {len(table.malformed_lines)} 行段数不是 {len(VERDICT_COLUMNS)}（第 {'、'.join(str(number) for number in table.malformed_lines[:5])} 行）：取回来的表不完整或被改过",
                "重新取一遍；另一台上先跑 --summary 看那张表自己对不对得上", EXIT_INCONSISTENT)
+    peer_key = None if break_is("peer-mac-unchecked") else peer_result_key(library)
+    forged = peer_mac_mismatches(table.rows, peer_key, result_mac)
+    if forged:
+        refuse(f"{peer_path} 里有 {len(forged)} 行的校验列用另一台的密钥核不过（{forged[0]}" + ("；……" if len(forged) > 1 else "") + "）：取回来的表被改过，或本机存的对端密钥不是那一台此刻的",
+               "一行都没导入。" + peer_mac_howto(), EXIT_INCONSISTENT)
     peer_rows = [dict(zip(VERDICT_COLUMNS, row[:RESULT_SIGNED_COLUMNS])) for row in table.rows]
     wrong = []
     for row in peer_rows:
@@ -3377,6 +4480,7 @@ def import_results(library, source):
     if (local.forged or local.malformed_lines) and not unchecked:
         refuse(f"本机的判定库自己就对不上（{local.forged_text() if local.forged else f'{len(local.malformed_lines)} 行段数不对'}）",
                f"先修本机的：python3 {SELF_PATH} --summary 看出路", EXIT_INCONSISTENT)
+    gpu_plan = plan_gpu_import(library, arguments, directory, peer_key)     # GPU 判定行的核也在写任何一行之前做完（拒了就一行都不导）
     signed = RESULT_SIGNED_COLUMNS
 
     def bare(row):
@@ -3404,6 +4508,8 @@ def import_results(library, source):
             to_import.append(fields)
     if to_import:
         library.record_verdicts(to_import)
+    if gpu_plan.fresh:
+        record_gpu_verdicts(library, gpu_plan.fresh)
     copied = 0
     for fields in to_import:
         for key in (fields[0], fields[VERDICT_COLUMNS.index("test_key")]):
@@ -3414,21 +4520,43 @@ def import_results(library, source):
                 copied += 1
     after = {bare(row) for row in library.read_verdicts().rows}
     lost = [fields for fields in to_import if bare(dict(zip(VERDICT_COLUMNS, fields))) not in after]
+    gpu_after = {gpu_row_bare(row) for row in read_gpu_verdicts(library).rows}
+    gpu_lost = [fields for fields in gpu_plan.fresh if gpu_row_bare(dict(zip(GPU_VERDICT_COLUMNS, fields))) not in gpu_after]
     append_row(library.imports_path, IMPORT_COLUMNS, [now_text(), os.path.abspath(peer_path), file_digest(peer_path), len(peer_rows), len(to_import), already_present, len(conflicts)])
+    if gpu_plan.rows_read:
+        append_row(library.imports_path, IMPORT_COLUMNS, [now_text(), os.path.abspath(gpu_plan.path), file_digest(gpu_plan.path), gpu_plan.rows_read, len(gpu_plan.fresh),
+                                                          gpu_plan.already_present, len(gpu_plan.conflicts)])
     say(f"BROAD_MUTATION_IMPORT rows_read={len(peer_rows)} imported={len(to_import)} already_present={already_present} conflicting_keys={len(conflicts)} "
-        f"withheld_rows={withheld} compositions_copied={copied} partial_tail_ignored={1 if table.partial_tail else 0}")
+        f"withheld_rows={withheld} compositions_copied={copied} partial_tail_ignored={1 if table.partial_tail else 0} "
+        f"gpu_rows_read={gpu_plan.rows_read} gpu_imported={len(gpu_plan.fresh)} gpu_already_present={gpu_plan.already_present} gpu_conflicting_keys={len(gpu_plan.conflicts)} "
+        f"gpu_withheld_rows={gpu_plan.withheld} gpu_rejected={len(gpu_plan.rejected)} gpu_partial_tail_ignored={1 if gpu_plan.partial_tail else 0}")
     for key in sorted(conflicts):
         name = next((row["name"] for row in peer_rows if row["key"] == key), "")
         say(f"IMPORT_CONFLICT\t{key[:16]}\t本机 {conflicts[key][0]}\t另一台 {conflicts[key][1]}\t{name}")
+    for key in sorted(gpu_plan.conflicts):
+        say(f"IMPORT_GPU_CONFLICT\t{key[:16]}\t本机 {gpu_plan.conflicts[key][0]}\t另一台 {gpu_plan.conflicts[key][1]}\t{gpu_plan.names.get(key, '')}")
+    for row, reason in gpu_plan.rejected:
+        say(f"IMPORT_GPU_REJECTED\t{row['sequence']}\t{row['key'][:16]}\t{reason}\t{row['name']}\t{gpu_import_reject_text(reason)}")
     if lost:
         refuse(f"导入之后回读，{len(lost)} 行不在判定库里（例：第 {lost[0][1]} 条）", f"看 {library.verdicts_path} 所在的盘是不是满了；修好重跑同一条导入（已在的行不重复导）",
                EXIT_INCONSISTENT)
+    if gpu_lost:
+        refuse(f"导入之后回读，{len(gpu_lost)} 行 GPU 判定不在 {GPU_VERDICTS} 里（例：第 {gpu_lost[0][1]} 条）",
+               f"看 {gpu_verdicts_path(library)} 所在的盘是不是满了；修好重跑同一条导入（已在的行不重复导）", EXIT_INCONSISTENT)
     if conflicts:
         print(f"  ✗ {len(conflicts)} 把键在两台上都有定论而结局不同，这几把键的行没导入（别的 {len(to_import)} 行已导入）", file=sys.stderr)
         print(f"  → 怎么办：同一把键两边都判过说明分片给错了或有人点名跑过；看上面 IMPORT_CONFLICT 各行，"
               f"在本机点名重跑定一次：{heavy_prefix_text()} python3 {SELF_PATH} --item <序号> --rerun", file=sys.stderr)
+    if gpu_plan.rejected or gpu_plan.conflicts:
+        print(f"  ✗ GPU 判定：{len(gpu_plan.rejected)} 行的键对不上本机此刻的源码或 GPU 趟指纹、{len(gpu_plan.conflicts)} 把键在两台上都有定论而结局不同，这些行没导入"
+              f"（别的 {len(gpu_plan.fresh)} 行已导入）", file=sys.stderr)
+        print(f"  → 怎么办：看上面 IMPORT_GPU_REJECTED / IMPORT_GPU_CONFLICT 各行。键对不上多半是两台的 --source 不是同一份源码、本机这条命令的构建环境与工具链认的变量与跑片时不同（--unit-environment 打的那一行要接在命令前），或另一台跑完之后本机的源码、驱动的 GPU 趟写法又改了：对齐之后"
+              f"被拒的旧行由本机 GPU 趟现判，不靠重导（在有卡的机器上起 {heavy_prefix_text()} python3 {SELF_PATH}，不带 --shard）；"
+              f"定论不同的在本机点名重跑定一次：{heavy_prefix_text()} python3 {SELF_PATH} --item <序号> --rerun", file=sys.stderr)
+    if conflicts or gpu_plan.rejected or gpu_plan.conflicts:
         return EXIT_INCONSISTENT
-    say(f"  ✓ 导入 {len(to_import)} 行（读到 {len(peer_rows)} 行，本机已有 {already_present} 行）；python3 {SELF_PATH} --summary 看合起来的八栏")
+    say(f"  ✓ 导入 {len(to_import)} 行（读到 {len(peer_rows)} 行，本机已有 {already_present} 行）；GPU 判定导入 {len(gpu_plan.fresh)} 行（读到 {gpu_plan.rows_read} 行，本机已有 {gpu_plan.already_present} 行）；"
+        f"python3 {SELF_PATH} --summary 看合起来的八栏")
     return 0
 
 
@@ -3467,6 +4595,22 @@ def check_real_run_is_allowed():
     missing = [tool for tool in ("cargo", "rustc", "cargo-nextest", "eatmydata", "systemd-run", "systemctl") if shutil.which(tool) is None]
     if missing:
         refuse(f"PATH 上缺：{'、'.join(missing)}", "cargo-nextest 用 cargo install cargo-nextest --locked 装，eatmydata 用系统包管理器装（apt install eatmydata）")
+
+
+ROCKSDB_PREBUILT_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "rocksdb-prebuilt.py")
+
+
+def check_rocksdb_entry(source):
+    """真跑起任何 cargo 之前（同步树、清单、基线与每一步都在这之后）判这台的 RocksDB 预编库取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：
+    判的是 --source 那棵树（同步进库目录里的就是它）。判红照 entry 原样打红句、拒（退 2），一步都不起；没判红什么都不打。
+    弄坏开关 rocksdb-entry-unchecked 下不判（自证 selftest_rocksdb_entry_cells 那一格判错）。"""
+    if break_is("rocksdb-entry-unchecked"):
+        return
+    entry = subprocess.run([sys.executable, ROCKSDB_PREBUILT_PATH, "entry", "--root", source], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if entry.returncode != 0:
+        sys.stderr.write(entry.stdout + entry.stderr)
+        refuse("起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），一步都没起",
+               '照上面的出路修（开新会话，或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"），再跑同一条命令')
 
 
 class SuspectStreaks:
@@ -3625,6 +4769,7 @@ def parse_arguments(argv):
     stage.add_argument("--skip-stage-two", action="store_true")
     stage.add_argument("--stage-two-only", action="store_true")
     parser.add_argument("--stage-two-eatmydata", action="store_true")
+    parser.add_argument("--skip-gpu", action="store_true")
     parser.add_argument("--threads", type=int, default=default_threads())
     parser.add_argument("--memory-cap", default=os.environ.get("BROAD_MUTATION_MEMORY_CAP") or DEFAULT_MEMORY_CAP)
     parser.add_argument("--timeout-floor", type=int, default=DEFAULT_TIMEOUT_FLOOR_SECONDS)
@@ -3716,7 +4861,10 @@ def run_items(library, arguments, source):
     if not selected:
         if finish_reuse_sentinel(sentinel, {}):
             return 1
-        say(f"  ✓ 选中 0 条要跑：清单 {len(items)} 条，现判 0、沿用 {carried}、拒算 0（--summary 看八栏与提交门禁那一行）")
+        gpu_totals = run_gpu_phase(library, runner, items, arguments)     # CPU 那一趟没有要现判的，GPU 那一趟（上一趟没卡、没来得及跑的）照样补
+        if gpu_totals.failed:
+            return 1
+        say(f"  ✓ 选中 0 条要跑：清单 {len(items)} 条，现判 0、沿用 {carried}、拒算 0（--summary 看八栏与提交门禁那一行）；{gpu_totals_text(gpu_totals)}")
         return 0
     # --full：开跑时沿用得了的结论记下来，现判之后逐条比，翻了面的打 FLIPPED（里程碑末全量靠它看「沿用的那些还对不对」）
     snapshot = {item["sequence"]: states[item["sequence"]][0].state for item, _one, _two in selected} if arguments.full else {}
@@ -3742,9 +4890,11 @@ def run_items(library, arguments, source):
             outcome = fields[VERDICT_COLUMNS.index("outcome")]
             ran[outcome] += 1
             outcomes[str(item["sequence"])] = outcome
+            # 入口脚本那一行（文件头「输出」）：一条一判、没红的那一条红，复用的条不在这里（它们没现判）
+            counts = "" if break_is("item-counts-dropped") else f"judged=1 red={1 if outcome == 'missed' else 0} reused=0 "
             say(f"BROAD_MUTATION_ITEM sequence={item['sequence']} outcome={outcome} stage={fields[VERDICT_COLUMNS.index('stage')]} "
                 f"build_seconds={fields[VERDICT_COLUMNS.index('build_seconds')]} test_seconds={fields[VERDICT_COLUMNS.index('test_seconds')]} "
-                f"wall_seconds={time.monotonic() - item_started:.1f} name={item['name']}"
+                f"wall_seconds={time.monotonic() - item_started:.1f} {counts}name={item['name']}"
                 + (f" first_failing_test={fields[VERDICT_COLUMNS.index('caught_by')]}" if fields[VERDICT_COLUMNS.index('caught_by')] else ""))
             before = snapshot.get(item["sequence"])
             if before in DECISIVE_OUTCOMES and outcome in FINAL_OUTCOMES and outcome != before:
@@ -3760,8 +4910,17 @@ def run_items(library, arguments, source):
         say(f"BROAD_MUTATION_FULL flipped={len(flips)}")
     if finish_reuse_sentinel(sentinel, outcomes):
         return 1
-    say(f"  ✓ 选中的 {len(selected)} 条都判完（{'、'.join(f'{OUTCOME_TEXT[name]} {count}' for name, count in ran.items())}）：现判 {judged}、沿用 {carried}、拒算 {refused}")
+    gpu_totals = run_gpu_phase(library, runner, items, arguments)     # CPU 那一趟全跑完之后：没红又有带 gpu 特性的测试够得着的条，补一趟（文件头「GPU 那一趟」）
+    if gpu_totals.failed:
+        return 1
+    say(f"  ✓ 选中的 {len(selected)} 条都判完（{'、'.join(f'{OUTCOME_TEXT[name]} {count}' for name, count in ran.items())}）：现判 {judged}、沿用 {carried}、拒算 {refused}；"
+        f"{gpu_totals_text(gpu_totals)}")
     return 0
+
+
+def gpu_totals_text(totals):
+    """成功句里 GPU 那一趟的一段：要这一趟的条数与现判、复用、本次未跑各几条（本次未跑的没有结论，不算没红，也不算通过）。"""
+    return f"GPU 趟（要 {totals.needed} 条）：现判 {totals.judged}、复用 {totals.carried}、本次未跑 {totals.not_run}"
 
 
 def in_run_scope(item, arguments):
@@ -3841,10 +5000,11 @@ def print_unit_environment(root):
 
 
 def main(argv):
+    check_test_only_variables_before_parsing(argv)
     check_removed_arguments(argv)
     arguments = parse_arguments(argv)
     if arguments.selftest:
-        return run_selftest()
+        return run_selftest([name for name in os.environ.get(SELFTEST_CELLS_VARIABLE, "").split(",") if name] or None)
     if arguments.coverage_step:
         check_prefix("--coverage-step 在没改过的树上插桩跑全部测试")
         return coverage_step(arguments.coverage_step)
@@ -3853,7 +5013,7 @@ def main(argv):
     source = arguments.source_root = resolve_source(arguments.source, library.home, read_only)
     library.result_key_override = arguments.result_key
     if arguments.unit_environment:
-        return print_unit_environment(library.tree if os.path.isdir(library.tree) else source)
+        return print_unit_environment(source)
     if arguments.list_items:
         if not break_is("list-items-pipe-unhandled"):
             # 接 | head 时读的一头先关了：照 SIGPIPE 的惯例安静退出（被 SIGPIPE 停，shell 里退 141），不打 BrokenPipeError 的回溯
@@ -3868,16 +5028,28 @@ def main(argv):
         check_prefix("--import-results 往本机的判定库里加行")
     else:
         check_real_run_is_allowed()
+        check_rocksdb_entry(source)
     signal.signal(signal.SIGTERM, stop_on_signal)
     signal.signal(signal.SIGINT, stop_on_signal)
     library.lock_descriptor = acquire_lock(library.home, arguments.lock_wait)
     if arguments.import_results:
-        return import_results(library, arguments.import_results)
-    arguments.interrupted = None
-    if not break_is("no-restore"):
-        interrupted = arguments.interrupted = restore_original(library)
-        if interrupted is not None:
-            say(f"  · 树里留着第 {interrupted['sequence']} 条改过的 {interrupted['file']}：已照在途记录拷回原件")
+        return import_results(library, arguments.import_results, arguments)
+    # 这一趟的运行目录（文件头「库目录」runs/）：专用树、编译目录与在途记录都在里面；正常结束、拒绝、被 TERM / INT 停都在 finally 里删
+    arguments.interrupted = library.begin_run()
+    exit_code = None
+    try:
+        exit_code = run_in_the_run_directory(library, arguments, source)
+    finally:
+        removed = library.end_run()
+    if not removed:
+        note(f"  ✗ 这一趟的运行目录没删掉（上面一句是为什么）；这一趟本身退 {exit_code}")
+        note("  → 怎么办：照上面那句停掉还开着文件的进程、删掉那个目录；下一趟开跑时也会先删上一趟留下的运行目录")
+        return exit_code or EXIT_RUN_DIRECTORY_KEPT
+    return exit_code
+
+
+def run_in_the_run_directory(library, arguments, source):
+    """main 里拿到锁、建好这一趟的运行目录之后的那一段：换树、（--refresh-list）记清单，或逐条跑。"""
     sync_tree(library, source)
     library.result_key(create=True)     # 要往判定库里写行：密钥没有就先建（文件头「判定行的校验列」），建不了当场拒
     if arguments.refresh_list:
@@ -3947,6 +5119,43 @@ for line in open(os.path.join(work, "plan.tsv")):
 if "|" in action:
     # 「原来那趟|升档那趟」：驱动升档重跑时 BROAD_MUTATION_STEP_ATTEMPT=escalated
     action = action.split("|", 1)[1 if os.environ.get("BROAD_MUTATION_STEP_ATTEMPT") == "escalated" else 0]
+if step.startswith("gpu-"):
+    # GPU 那一趟的假步（假 GPU）：记下收到的环境与命令（自证核命令的写法、BINDGEN 的取值、限时），测试步的输出照 libtest 的写法打 Running 与 test result
+    with open(os.path.join(work, "gpu-env.log"), "a") as log:
+        log.write(f"{sequence}\t{step}\t{os.environ.get('BINDGEN_EXTRA_CLANG_ARGS', '-')}\t{os.environ.get('BROAD_MUTATION_STEP_COMMAND', '-')}\t"
+                  f"{os.environ.get('BROAD_MUTATION_STEP_TIME_LIMIT', '')}\n")
+    running = "     Running tests/gpu_pair.rs (target/release/deps/gpu_pair-0123456789abcdef)"
+    if step == "gpu-test-checker-tier":
+        if action in ("ok", "gpu-pass"):
+            print(running)
+            print("test gpu_case ... ok")
+            print("test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out")
+            sys.exit(0)
+        if action == "gpu-no-adapter":
+            print(running)
+            print("NOT_RUN_NO_GPU_ADAPTER test=gpu_case reason=没有找到 GPU 适配器（自证的假卡）")
+            print("test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out")
+            sys.exit(0)
+        if action == "gpu-fail":
+            print(running)
+            print("test gpu_case ... FAILED")
+            print("failures:")
+            print("    gpu_case")
+            print("test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out")
+            sys.exit(101)
+        if action == "gpu-fail-scrambled":
+            # --nocapture 加 --test-threads 1：结果行被测试自己的输出打散，认名字靠收尾的 failures: 名单
+            print(running)
+            print("test gpu_case ... GPU 对拍：第 3 个状态两边不一致")
+            print("FAILED")
+            print("failures:")
+            print("    gpu_case")
+            print("test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out")
+            sys.exit(101)
+        if action == "gpu-zero":
+            print(running)
+            print("test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out")
+            sys.exit(0)
 if action.startswith("peak:"):
     # 基线那一步：照包装的峰值表写一行（峰值字节、量的时刻、上限、键、线程数；时刻一段假的一步写 selftest），驱动拿它当这一步的基线峰值
     peaks = os.environ.get("RUN_WITH_MEMORY_CAP_PEAKS")
@@ -3991,13 +5200,21 @@ if action == "hang":
     while time.time() < deadline and not os.path.exists(os.path.join(work, "release")):
         time.sleep(0.05)
     sys.exit(0)
+if action == "leave-holder":
+    # 漏下一个进程：起一个脱出这一步的 sleep，工作目录在这一趟的树里，进程号记进 <工作目录>/holder.pid，这一步照绿退出
+    # （驱动删这一趟的运行目录之前核开着的文件那一格用：应当不删、报出它）
+    import subprocess
+    holder = subprocess.Popen(["sleep", "60"], cwd=tree, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    with open(os.path.join(work, "holder.pid"), "w") as out:
+        out.write(f"{holder.pid}\n")
+    sys.exit(0)
 if action.startswith("sleep:"):
     # 慢的一步：先过一条用例（进度行要数到它），再睡那么多秒、绿着退出
     print("        PASS [   0.010s] (1/9) singlefs-harness::catching the_case_that_passes", flush=True)
     time.sleep(float(action.split(":")[1]))
     sys.exit(0)
 if action in ("cargo-build", "cargo-test"):
-    # 假 cargo（换树后照内容重编那一格）：照 cargo 的判法编两个包——fingerprint 不在、或有源文件比上次编出的新，才重编；
+    # 假 cargo（每一趟自己的编译目录那一格）：照 cargo 的判法编两个包——fingerprint 不在、或有源文件比上次编出的新，才重编；
     # 测试那一步核编出来的是不是此刻树里的源码，不是就红（过时的产物）
     import hashlib
     target, stale = os.environ["CARGO_TARGET_DIR"], []
@@ -4073,6 +5290,7 @@ SELFTEST_BUILD_STEPS = ("one-build", "two-build-harness", "two-build-checker-tie
 SELFTEST_NEXTEST_CASE = "singlefs-harness::catching the_case_that_catches_it"
 SELFTEST_SLOW_CASE = "singlefs-format::ignored_cases slow_one"
 SELFTEST_JUDGING_KEY = "selftest-judging-units"
+SELFTEST_GPU_JUDGING_KEY = "selftest-gpu-judging-units"
 # 按条记基线那一格（selftest_baseline_entry_cells）另加的源码：第一段测试步一个测试二进制三条、一条起自己这个可执行文件（current_exe，单元闭包拒算）；
 # checker 档包的库里两条（一条拒算）、另一个测试目标一条
 SELFTEST_ENTRY_BASELINE_FILE = "crates/singlefs-harness/tests/per_entry.rs"
@@ -4094,6 +5312,22 @@ SELFTEST_ENTRY_RUNNER_LINES = ("one-test\tsinglefs-harness::catching\tcatching\t
                                "two-test-checker-tier\tsinglefs-checker-tier\tsinglefs_checker_tier\t*\t2.0\t2.5\tskip\n"
                                "two-test-checker-tier\tsinglefs-checker-tier\tsinglefs_checker_tier\t*\t0.5\t0.75\texact\n"
                                "two-test-checker-tier\tsinglefs-checker-tier::quick\tquick\t*\t1.0\t1.25\twhole\n")
+
+
+# GPU 那一趟的格用的工作树（SELFTEST_SOURCES 加一个 checker 档包）：库里没有测试；tests/gpu_pair.rs 的测试体里有 #[cfg(feature = "gpu")] 的语句（挂 gpu 特性、不带特性也编），
+# 里面一条测试经 judge() 够得着 singlefs-core 的 one、two、four、five（序号 1、2、4、5 的变异）；tests/plain_case.rs 不挂特性，只够得着 three（序号 3，CPU 那一趟的测试碰得到、
+# 带 gpu 的这一趟帮不上）；six 与 singlefs-checker 的 seven、eight（序号 6、7、8）没有任何测试够得着。
+# 不让 gpu_pair.rs 整个文件挂 #![cfg(feature = "gpu")]：这一格测的是测试体里有挂 gpu 的语句的写法；整个文件挂的那种（不带特性时不编，entry-cfg-inactive）
+# CPU 那一趟的覆盖者键（mutation-prune.py 的 coverers_key）现在跳过，由 mutation-prune.py 自己的自证管，这一格不去测。
+SELFTEST_GPU_FILES = {
+    "Cargo.toml": SELFTEST_SOURCES["Cargo.toml"].replace('"crates/singlefs-harness"]', '"crates/singlefs-harness", "crates/singlefs-checker-tier"]'),
+    "crates/singlefs-checker-tier/Cargo.toml": selftest_package("singlefs-checker-tier") + '\n[features]\ngpu = []\n\n[dependencies]\nsinglefs-core = { path = "../singlefs-core" }\n',
+    "crates/singlefs-checker-tier/src/lib.rs": "pub fn judge() -> u32 {\n    singlefs_core::one() + singlefs_core::two() + singlefs_core::four() + singlefs_core::five()\n}\n",
+    "crates/singlefs-checker-tier/tests/gpu_pair.rs": '#[test]\nfn gpu_case() {\n    #[cfg(feature = "gpu")]\n    let extra = 1;\n    #[cfg(not(feature = "gpu"))]\n    let extra = 0;\n'
+                                                      '    assert!(singlefs_checker_tier::judge() + extra > 0);\n}\n',
+    "crates/singlefs-checker-tier/tests/plain_case.rs": "#[test]\nfn plain_case() {\n    assert!(singlefs_core::three() > 0);\n}\n",
+}
+SELFTEST_GPU_CASE = "singlefs-checker-tier::gpu_pair gpu_case"      # 抓到它的测试，nextest 的写法（二进制 id 加用例名）
 
 
 def selftest_mutants(sources=None):
@@ -4136,6 +5370,7 @@ class Selftest:
         self.work = work
         self.cells = 0
         self.failures = 0
+        self.driver_failure_lines = []   # 上一格判完以来 run() 起的驱动在完整输出里报的 ✗ 行，check() 判红时整行接在失败行末尾
         self.source = os.path.join(work, "source")
         write_sources(self.source, SELFTEST_SOURCES)
         self.mutants = selftest_mutants()
@@ -4151,7 +5386,8 @@ class Selftest:
         self.environment = dict(os.environ, BROAD_MUTATION_SELFTEST_WORK=work, BROAD_MUTATION_STEP_DRIVER="1",
                                 BROAD_MUTATION_LIST_DRIVER=os.path.join(work, "list-driver.py"), BROAD_MUTATION_EXPORT_EVERYTHING="1",
                                 BROAD_MUTATION_ALLOW_VOLATILE_HOME="1", BROAD_MUTATION_EXCLUSIONS=self.exclusions_path,
-                                BROAD_MUTATION_RESULT_KEY=self.result_key_path(), BROAD_MUTATION_JUDGING_KEY=SELFTEST_JUDGING_KEY)
+                                BROAD_MUTATION_RESULT_KEY=self.result_key_path(), BROAD_MUTATION_JUDGING_KEY=SELFTEST_JUDGING_KEY,
+                                BROAD_MUTATION_GPU_JUDGING_KEY=SELFTEST_GPU_JUDGING_KEY)
         # 复用哨兵：别的格比的是现判与沿用的条数，沿用得了的全当哨兵、不抽强制现判；reuse-three-questions 与 reuse-sentinel 两格自己设
         self.environment[reuse_checks.SENTINEL_COUNT_VARIABLE] = "1000"
         self.environment.pop(reuse_checks.SENTINEL_SEED_VARIABLE, None)
@@ -4176,6 +5412,36 @@ class Selftest:
         """自证里的判定行密钥（库目录之外：各个库都在工作目录下各自的子目录里，密钥在 result-key/ 下），驱动头一回写行时建它。"""
         return os.path.join(self.work, "result-key", "broad-mutation-result.key")
 
+    def peer_side_key_path(self):
+        """自证里「另一台」自己的密钥（另一台那几份库各自跑时用它签），与本机这一份不同；导入前经 exchange_peer_key 拷到本机的对端密钥位置。"""
+        return os.path.join(self.work, "peer-result-key", "broad-mutation-result.key")
+
+    def peer_key_path(self):
+        """本机存另一台密钥的位置：照驱动的取法（peer_result_key_path）由本机这一份推出。"""
+        stem, suffix = os.path.splitext(self.result_key_path())
+        return f"{stem}.peer{suffix}"
+
+    def exchange_peer_key(self):
+        """两台交换密钥：把「另一台」的密钥原样拷到本机的对端密钥位置（600）。交 (另一台的密钥字节, 为什么不成)。"""
+        key, problem = read_result_key(self.peer_side_key_path())
+        if key is None:
+            return None, problem
+        os.makedirs(os.path.dirname(self.peer_key_path()), mode=0o700, exist_ok=True)
+        shutil.copyfile(self.peer_side_key_path(), self.peer_key_path())
+        os.chmod(self.peer_key_path(), 0o600)
+        return key, ""
+
+    def peer_signed_line(self, fields):
+        """自证改过的一行判定照另一台的写法重签（用「另一台」的密钥）：交写进表里的那一行。"""
+        key, _problem = read_result_key(self.peer_side_key_path())
+        return "\t".join(signed_result_row(key, fields[:RESULT_SIGNED_COLUMNS]))
+
+    def peer_signed_gpu_fields(self, fields):
+        """自证改过的一行 GPU 判定照另一台的写法重签：交十四段。"""
+        key, _problem = read_result_key(self.peer_side_key_path())
+        cleaned = [clean_field(field) for field in fields[:GPU_SIGNED_COLUMNS]]
+        return cleaned + [gpu_result_mac(key, cleaned)]
+
     def signed(self, fields):
         """自证手写的行照驱动的写法签上校验列（用自证这一份密钥）；密钥还没建交原样。"""
         key, _problem = read_result_key(self.result_key_path())
@@ -4187,7 +5453,9 @@ class Selftest:
 
     def run(self, home, *arguments, environment=None, source=None, **extra_environment):
         environment = dict(environment or self.environment, **extra_environment)
-        return subprocess.run(self.command(home, *arguments, source=source), capture_output=True, text=True, stdin=subprocess.DEVNULL, env=environment)
+        done = subprocess.run(self.command(home, *arguments, source=source), capture_output=True, text=True, stdin=subprocess.DEVNULL, env=environment)
+        self.driver_failure_lines += [line.strip() for line in f"{done.stdout}\n{done.stderr}".replace("\r", "\n").split("\n") if "✗" in line]
+        return done
 
     def calls(self):
         """调用记录：[(序号, 步名, mutated / pristine)]。"""
@@ -4199,17 +5467,38 @@ class Selftest:
 
     def called_sequences(self):
         """被调过的序号（基线是 0）；在没改过的树上验环境的那几步不算在里面，编译步的基线（基线键拒算、每趟照跑，文件头「基线」）也不算。"""
-        return {call[0] for call in self.calls() if call[0] != ENVIRONMENT_SEQUENCE and not (call[0] == str(BASELINE_SEQUENCE) and call[1] in SELFTEST_BUILD_STEPS)}
+        return {call[0] for call in self.calls() if call[0] != ENVIRONMENT_SEQUENCE and not call[1].startswith("gpu-")
+                and not (call[0] == str(BASELINE_SEQUENCE) and call[1] in SELFTEST_BUILD_STEPS)}
 
     def judged_sequences(self):
-        """被调过的变异序号（不算基线 0 与验环境）。"""
+        """被调过的变异序号（不算基线 0 与验环境；GPU 那一趟的步另在 gpu_calls 里）。"""
         return self.called_sequences() - {str(BASELINE_SEQUENCE)}
 
     def environment_steps(self):
         return [call[1] for call in self.calls() if call[0] == ENVIRONMENT_SEQUENCE]
 
+    def gpu_calls(self):
+        """GPU 那一趟的假步记的 [(序号, 步名, mutated / pristine)]（序号 gpu-baseline 是在没改过的树上的基线）。"""
+        return [call for call in self.calls() if call[1].startswith("gpu-")]
+
+    def gpu_judged_sequences(self):
+        """GPU 那一趟现判过的变异序号（不算 gpu-baseline）。"""
+        return {call[0] for call in self.gpu_calls() if call[0] != GPU_BASELINE_SEQUENCE}
+
+    def gpu_environment(self):
+        """GPU 那一趟的假步收到的 [(序号, 步名, BINDGEN_EXTRA_CLANG_ARGS, 命令, 整步限时)]。"""
+        path = os.path.join(self.work, "gpu-env.log")
+        if not os.path.exists(path):
+            return []
+        with open(path) as handle:
+            return [tuple(line.rstrip("\n").split("\t")) for line in handle if line.strip()]
+
+    def gpu_rows(self, home):
+        """这份库的 GPU 判定库里成形的行（{列名: 值}）。"""
+        return [dict(zip(GPU_VERDICT_COLUMNS, row)) for row in read_table(gpu_verdicts_path(Library(os.path.join(self.work, home))), len(GPU_VERDICT_COLUMNS)).rows]
+
     def clear_calls(self):
-        for name in ("calls.log", "selections.log", "coverage-known.log"):
+        for name in ("calls.log", "selections.log", "coverage-known.log", "gpu-env.log"):
             path = os.path.join(self.work, name)
             if os.path.exists(path):
                 os.remove(path)
@@ -4236,8 +5525,22 @@ class Selftest:
     def states(self, home, source=None):
         return {sequence: entry["state"] for sequence, entry in self.listed(home, source).items()}
 
-    def tree_is_pristine(self, home, sources=None):
-        tree = os.path.join(self.work, home, "tree")
+    def build_leftovers(self, home):
+        """跑完之后库目录里还剩的编译目录与树副本（相对库目录）：runs/ 下的每一个运行目录，与改前放在库目录里的那几样（tree、target、target-coverage、scratch）。"""
+        home_path = os.path.join(self.work, home)
+        runs = os.path.join(home_path, "runs")
+        found = [os.path.join("runs", name) for name in sorted(os.listdir(runs))] if os.path.isdir(runs) else []
+        return found + [name for name in ("tree", "target", "target-coverage", "scratch", "scratch-coverage") if os.path.lexists(os.path.join(home_path, name))]
+
+    def leftover_run_directories(self, home):
+        """库目录 runs/ 下此刻的运行目录（绝对路径）。"""
+        runs = os.path.join(self.work, home, "runs")
+        return [os.path.join(runs, name) for name in sorted(os.listdir(runs))] if os.path.isdir(runs) else []
+
+    def tree_is_pristine(self, tree, sources=None):
+        """tree（一棵专用树的绝对路径）里的源码与自证的源码逐份相同、没有多出来的文件。"""
+        if not os.path.isdir(tree):
+            return False
         for path, text in (sources or SELFTEST_SOURCES).items():
             with open(os.path.join(tree, path)) as handle:
                 if handle.read() != text:
@@ -4245,10 +5548,28 @@ class Selftest:
         return files_in_tree(tree) == set(sources or SELFTEST_SOURCES)
 
     def check(self, condition, wrong, howto):
+        """判一格。判红时打失败行「✗ 自证：<wrong>」：wrong 里转述的驱动输出截在哪由临时路径长短定，转述里的 ✗ 换成 SELFTEST_TRANSCRIBED_FAILURE_MARK，
+        不让截进来的半行另成一行失败行；上一格判完以来 run() 起的驱动在完整输出里报的 ✗ 行整行接在失败行那一行末尾（文件头开关表前那一段「转述」）。"""
         self.cells += 1
+        driver_lines, self.driver_failure_lines = self.driver_failure_lines, []
         if not condition:
             self.failures += 1
-            print(f"  ✗ 自证：{wrong}", file=sys.stderr)
+            head, newline, rest = wrong.replace("✗", SELFTEST_TRANSCRIBED_FAILURE_MARK).partition("\n")
+            if driver_lines:
+                # 去掉数字之后相同的几行（各趟报的「复用失灵：<项> …种子 <数>」这类）并成一行、注明同样的另几行，再取前 SELFTEST_DRIVER_FAILURE_LINES_SHOWN 种：
+                #   不让前面几趟的同一句把这一格后面那一句挤出去
+                kinds, repeats = [], {}
+                for line in driver_lines:
+                    key = re.sub(r"[0-9]+", "#", line)
+                    if key in repeats:
+                        repeats[key] += 1
+                    else:
+                        repeats[key] = 0
+                        kinds.append((key, line))
+                shown = [line + (f"（同样的另 {repeats[key]} 行）" if repeats[key] else "") for key, line in kinds[:SELFTEST_DRIVER_FAILURE_LINES_SHOWN]]
+                more = len(kinds) - len(shown)
+                head += f"；这一格起的驱动报的失败行 {len(driver_lines)} 行：{'；'.join(shown)}{f'；另 {more} 种没列' if more else ''}"
+            print(f"  ✗ 自证：{head}{newline}{rest}", file=sys.stderr)
             print(f"     → 怎么办：{howto}", file=sys.stderr)
 
 
@@ -4272,7 +5593,7 @@ def plan_field(text, key, line="BROAD_MUTATION_PLAN"):
 
 
 def selftest_basic_cells(selftest):
-    """那几格基本的：临时库目录拒、生成清单与列项、项写错、点名与两段、杀掉再起、各种结局、汇总、--from 与 --shard、手改过的树照源码换回去。"""
+    """那几格基本的：临时库目录拒、生成清单与列项、项写错、点名与两段、杀掉再起、各种结局、汇总、--from 与 --shard、上一趟被 KILL 留下的运行目录开跑先删。"""
     work = selftest.work
     # 库目录落在开机会清空的目录里拒（不带只供测试的放行）
     volatile_home = f"/dev/shm/broad-mutation-selftest-{os.getpid()}"
@@ -4318,7 +5639,7 @@ def selftest_basic_cells(selftest):
     unknown = selftest.run("first", "--item", "no-such-mutant", "--skip-stage-two")
     selftest.check(unknown.returncode == EXIT_USAGE and not selftest.calls(), f"不认得的项没拒（退 {unknown.returncode}，调了 {len(selftest.calls())} 步）",
                    "看 select_items：清单里找不到的序号或变异名要退 2 并写怎么查")
-    # 点名（一条按序号、一条按变异名）只跑第一段：只有基线与这两条被调，第二段的步一次都没调；判完树回到原样
+    # 点名（一条按序号、一条按变异名）只跑第一段：只有基线与这两条被调，第二段的步一次都没调；基线在原样的树上、每条在改过的树上跑（判完拷回原件，下一条才对得上）
     name_of_seven = listed_lines[6][2] if len(listed_lines) >= 7 and len(listed_lines[6]) == 6 else "?"
     named = selftest.run("first", "--item", "1", "--item", name_of_seven, "--skip-stage-two")
     calls = selftest.calls()
@@ -4326,8 +5647,7 @@ def selftest_basic_cells(selftest):
     selftest.check(named.returncode == 0 and selftest.called_sequences() == {"0", "1", "7"} and not any(call[1].startswith("two-") for call in calls)
                    and all(call[2] == ("pristine" if call[0] == "0" else "mutated") for call in calls)
                    and set(rows) == {"1", "7"} and (rows["1"]["outcome"], rows["1"]["stage"], rows["1"]["caught_by"]) == ("caught", "one", SELFTEST_NEXTEST_CASE)
-                   and re.fullmatch(r"[0-9a-f]{64}", rows["1"]["test_key"]) and (rows["7"]["outcome"], rows["7"]["stage"]) == (STAGE_ONE_ONLY, "one")
-                   and selftest.tree_is_pristine("first"),
+                   and re.fullmatch(r"[0-9a-f]{64}", rows["1"]["test_key"]) and (rows["7"]["outcome"], rows["7"]["stage"]) == (STAGE_ONE_ONLY, "one"),
                    f"点名两条只跑第一段不对（退 {named.returncode}；调用 {calls}；行 {sorted((row['sequence'], row['outcome'], row['stage']) for row in rows.values())}）：{named.stderr}",
                    "看 select_items 的点名那一支、process_item 的第一段与 --skip-stage-two：基线在没改过的树上跑、每条在改过的树上跑、判完拷回原件；抓到的那一行带测试键")
     # --stage-two-only：只给「只过了第一段」的那一条补第二段，第一段的步不再调；第二段里 harness 慢档用例那一步抓到它，带测试名
@@ -4339,7 +5659,7 @@ def selftest_basic_cells(selftest):
                    and seven == [(STAGE_ONE_ONLY, "one", ""), ("caught", "two", SELFTEST_NEXTEST_CASE)],
                    f"--stage-two-only 不对（退 {second.returncode}；调用 {calls}；第 7 条的行 {seven}）：{second.stderr}",
                    "看 select_items：只选状态是 stage-one-only 的、不跑第一段；process_item 第二段哪一步红了就记抓到并带测试名")
-    # 跑到一半 KILL：第 3 条的测试挂住时杀驱动。杀之前前两条的行已经落盘；杀之后树里留着改过的文件与在途记录
+    # 跑到一半 KILL：第 3 条的测试挂住时杀驱动。杀之前前两条的行已经落盘；杀之后它那一趟的运行目录留着（树里有改过的文件，在途记录在运行目录里）
     selftest.clear_calls()
     selftest.write_plan([row for row in SELFTEST_PLAN if row[0] != "3"] + [("3", "one-test", "hang")])
     driver = subprocess.Popen(selftest.command("second"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, env=selftest.environment)
@@ -4349,14 +5669,17 @@ def selftest_basic_cells(selftest):
     driver.wait()
     selftest.check(hanging and os.path.exists(os.path.join(work, "hanging")) and rows_before_stop == {"1", "2"},
                    f"杀驱动之前，前两条的判定行没有都落盘（落了 {sorted(rows_before_stop)}）", "看 Library.record_verdict：每条判完立刻追加并 fsync，不攒到收尾")
-    selftest.check(not selftest.tree_is_pristine("second") and os.path.exists(os.path.join(work, "second", "inflight.json")),
-                   "驱动被杀之后树里没有留着改过的文件与在途记录（后面几格的前提不成立）", "看 apply_mutation：先存原件、记在途记录，再改文件")
+    killed_runs = selftest.leftover_run_directories("second")
+    selftest.check(len(killed_runs) == 1 and not selftest.tree_is_pristine(os.path.join(killed_runs[0], "tree"))
+                   and os.path.exists(os.path.join(killed_runs[0], "inflight.json")),
+                   f"驱动被杀之后它那一趟的运行目录里没有留着改过的树与在途记录（后面几格的前提不成立；runs/ 下 {killed_runs}）",
+                   "看 apply_mutation：先存原件、记在途记录，再改文件；Library.begin_run：树与在途记录都在这一趟的运行目录里")
     # 被杀的驱动留下的那一步还活着时锁还占着：不等就退 4、一步都不跑
     selftest.clear_calls()
     locked = selftest.run("second", "--lock-wait", "0")
     selftest.check(locked.returncode == EXIT_LOCKED and not selftest.calls(), f"上一趟留下的进程还占着锁时没拒（退 {locked.returncode}）",
                    "看 acquire_lock 与 run_step 的 pass_fds：锁的描述符要传给每一步")
-    # 放开挂住的那一步，重跑同一条命令：沿用得了的条调用 0 次、基线不重跑；被打断的那一条重跑；树先恢复干净、跑完还是原样
+    # 放开挂住的那一步，重跑同一条命令：沿用得了的条调用 0 次、基线不重跑；被打断的那一条重跑；开跑先删上一趟留下的运行目录，跑完这一趟的也删了
     open(os.path.join(work, "release"), "w").close()
     selftest.write_plan(SELFTEST_PLAN)
     resumed = selftest.run("second")
@@ -4365,13 +5688,22 @@ def selftest_basic_cells(selftest):
     selftest.check(resumed.returncode == 0 and not called & {"0", "1", "2"},
                    f"重起之后沿用得了的条或基线被重跑了（退 {resumed.returncode}；被调的序号 {sorted(called)}）：{resumed.stderr}",
                    "看 select_items 与 Judgement.state：判定库里键相同、沿用判据认的条一条都不选；基线有这把基线键的绿记录的不重跑")
-    selftest.check("3" in called and [row["outcome"] for row in rows if row["sequence"] == "3"] == ["timeout"] and "已照在途记录拷回原件" in resumed.stdout,
+    item_lines = [line for line in resumed.stdout.splitlines() if line.startswith("BROAD_MUTATION_ITEM ")]
+    selftest.check(item_lines and all(re.search(r" judged=1 red=[01] reused=0 ", line) for line in item_lines)
+                   and all((" red=1 " in line) == (" outcome=missed " in line) for line in item_lines) and any(" outcome=missed " in line for line in item_lines),
+                   f"BROAD_MUTATION_ITEM 每条一行没带判了、红了、复用了多少，或 red= 与结局对不上（现判 {sorted(called - {'0'})}）：{item_lines[:3]}",
+                   "看 run_items 打 BROAD_MUTATION_ITEM 那一句：每条补 judged=1 red=<没红记 1> reused=0（入口脚本那一行，文件头「输出」）")
+    selftest.check("3" in called and [row["outcome"] for row in rows if row["sequence"] == "3"] == ["timeout"] and "上一趟被打断在第 3 条" in resumed.stdout,
                    f"被打断的第 3 条没有重跑、或被当成已完成（它的行：{[(row['outcome'], row['stage']) for row in rows if row['sequence'] == '3']}）",
-                   "看 main 里开跑时的 restore_original：只拷回原件，不给被打断的那一条落行")
-    selftest.check(selftest.tree_is_pristine("second") and not os.path.exists(os.path.join(work, "second", "inflight.json")),
-                   "重起跑完之后树没有回到原样、或在途记录还在", "看 restore_original 与 process_item 的 finally")
+                   "看 Library.begin_run：上一趟留下的运行目录里有在途记录就报被打断在哪一条、删掉那个运行目录，不给被打断的那一条落行")
+    selftest.check(not selftest.build_leftovers("second"),
+                   f"重起跑完之后库目录里还剩上一趟被 KILL 留下的、或这一趟的运行目录（{selftest.build_leftovers('second')}）",
+                   "看 Library.begin_run（开跑先删上一趟留下的）与 main 的 finally 里的 Library.end_run（跑完删这一趟的）")
     os.remove(os.path.join(work, "release"))
-    os.remove(os.path.join(work, "hanging"))
+    try:
+        os.remove(os.path.join(work, "hanging"))
+    except FileNotFoundError:
+        pass   # 挂住的那一步没起到（前面的格已经判红）：不在这里抛出去，后面的格照判
     # 两段式的结局：抓到（第一段、文档测试、慢档用例各一）、没红、无效、超时（两段各一）、内存撞顶，逐条对
     final = {row["sequence"]: (row["outcome"], row["stage"]) for row in rows if row["outcome"] != STAGE_ONE_ONLY}
     five = [row for row in rows if row["sequence"] == "5" and row["outcome"] == "caught"]
@@ -4404,12 +5736,18 @@ def selftest_basic_cells(selftest):
                    f"第二段的步不对：第 4 条调的是 {stage_two_of_four}；各步的命令 {table}",
                    "看 step_table：第二段 = 文档测试（被变异的两个包）+ harness 慢档用例（第一段的起法加 --run-ignored only 与排除表的 -E）+ checker 档快档，不重跑第一段那一遍")
     # 汇总对不上必须报：给第 4 条的键追加一行认不出的结局
-    four = selftest.rows_of("second", 4)[-1]
-    append_row(selftest.verdicts_path("second"), VERDICT_COLUMNS, selftest.signed([four[column] if column != "outcome" else "no-such-outcome"
-                                                                                   for column in VERDICT_COLUMNS[:RESULT_SIGNED_COLUMNS]]))
-    mismatched = selftest.run("second", "--summary")
-    selftest.check(mismatched.returncode == EXIT_INCONSISTENT, f"判定库里有认不出的结局时汇总没判红（退 {mismatched.returncode}）",
-                   "看 summarise 末尾的 problems：对不上要退 1")
+    four_rows = selftest.rows_of("second", 4)
+    if not four_rows:
+        # 前面几格红了、第 4 条一行判定都没有：这一格判不了，记判错，不在这里抛出去（后面的格照判）
+        selftest.check(False, "判定库里有认不出的结局时汇总没判红（前提不成立：second 里第 4 条一行判定都没有，照上面几格先修）",
+                       "看 run_items：second 那几趟要给第 4 条落判定行，这一格拿它最后一行造认不出的结局")
+    else:
+        four = four_rows[-1]
+        append_row(selftest.verdicts_path("second"), VERDICT_COLUMNS, selftest.signed([four[column] if column != "outcome" else "no-such-outcome"
+                                                                                       for column in VERDICT_COLUMNS[:RESULT_SIGNED_COLUMNS]]))
+        mismatched = selftest.run("second", "--summary")
+        selftest.check(mismatched.returncode == EXIT_INCONSISTENT, f"判定库里有认不出的结局时汇总没判红（退 {mismatched.returncode}）",
+                       "看 summarise 末尾的 problems：对不上要退 1")
     # --from 与 --shard（只跑第一段）
     selftest.clear_calls()
     from_seven = selftest.run("third", "--from", "7", "--skip-stage-two")
@@ -4419,19 +5757,28 @@ def selftest_basic_cells(selftest):
     shard = selftest.run("third", "--shard", "0/2", "--skip-stage-two")
     selftest.check(shard.returncode == 0 and selftest.called_sequences() == {"2", "4", "6"},
                    f"--shard 0/2 跑的不是沿用不了的偶数序号（退 {shard.returncode}；{sorted(selftest.called_sequences())}）", "看 select_items 的 shard：序号 mod n == k")
-    # 树里手改过一份、多出一份没登记的测试文件，又没有在途记录：开跑的换树照源码把它们换回去（改的写回、多的删掉），照常判
+    # 上一趟被 KILL 留下的运行目录（树里手改过一份、多出一份没登记的测试文件，编译目录里有旧产物，没有在途记录）：开跑先删掉它，
+    # 这一趟在新建的运行目录里照源码换树、照常判，跑完这一趟的也删掉
     selftest.clear_calls()
-    with open(os.path.join(work, "third", "tree", "crates/singlefs-core/src/lib.rs"), "a") as handle:
+    stale_run = os.path.join(work, "third", "runs", "run-4242-left-by-a-killed-run")
+    stale_tree = os.path.join(stale_run, "tree")
+    shutil.copytree(selftest.source, stale_tree, ignore=shutil.ignore_patterns(".git"))
+    with open(os.path.join(stale_tree, "crates/singlefs-core/src/lib.rs"), "a") as handle:
         handle.write("// 手改\n")
-    extra = os.path.join(work, "third", "tree", "crates/singlefs-core/tests/new_case.rs")
+    extra = os.path.join(stale_tree, "crates/singlefs-core/tests/new_case.rs")
     os.makedirs(os.path.dirname(extra), exist_ok=True)
     with open(extra, "w") as handle:
         handle.write("#[test]\nfn always_red() { panic!() }\n")
+    os.makedirs(os.path.join(stale_run, "target", "debug"))
+    with open(os.path.join(stale_run, "target", "debug", "stale-product"), "w") as handle:
+        handle.write("上一趟编的产物\n")
     dirty = selftest.run("third", "--item", "1", "--skip-stage-two")
-    selftest.check(dirty.returncode == 0 and "1 个内容不同" in dirty.stdout and "删了 1 个" in dirty.stdout and "1" in selftest.called_sequences()
-                   and selftest.tree_is_pristine("third"),
-                   f"手改过的树没照源码换回去（退 {dirty.returncode}；调用 {sorted(selftest.called_sequences())}）：{dirty.stdout[-400:]}{dirty.stderr[-300:]}",
-                   "看 sync_tree：导出范围里内容不同的照源码写回、源码里没有的删掉（弄坏开关 sync-keeps-extra-files 下不删）")
+    third_calls = [call for call in selftest.calls() if call[0] == "1"]
+    selftest.check(dirty.returncode == 0 and "1" in selftest.called_sequences() and third_calls and all(call[2] == "mutated" for call in third_calls)
+                   and f"删了这一趟的编译目录 {stale_run}" in dirty.stderr and not selftest.build_leftovers("third"),
+                   f"上一趟被 KILL 留下的运行目录（手改过的树、多出的测试文件、旧产物）没在开跑时删掉、或这一趟没照常判（退 {dirty.returncode}；"
+                   f"调用 {sorted(selftest.called_sequences())}；库目录里还剩 {selftest.build_leftovers('third')}）：{dirty.stdout[-400:]}{dirty.stderr[-300:]}",
+                   "看 Library.begin_run：拿到锁之后删 runs/ 下上一趟留下的每一个运行目录（删之前核没有进程开着），再新建这一趟的（弄坏开关 interrupted-run-directory-kept 下不删）")
     return listed_lines
 
 
@@ -4579,22 +5926,17 @@ def selftest_environment_cells(selftest):
 
 
 def selftest_sync_cells(selftest):
-    """换树：树里多出来的文件删掉；恢复原件的临时件不进树、恢复半途被杀照常恢复；换了工具链每把键都变。"""
+    """恢复原件的临时件不进树、恢复半途被杀之后下一趟照常判；换了工具链每把键都变。"""
     work = selftest.work
-    selftest.run("extras", "--item", "1", "--skip-stage-two")
-    leftover = os.path.join(work, "extras", "tree", "crates/singlefs-core/src/lib.rs.restore.4242")
-    with open(leftover, "w") as handle:
-        handle.write("旧版驱动留下的临时件\n")
-    cleaned = selftest.run("extras", "--item", "2", "--skip-stage-two")
-    selftest.check(cleaned.returncode == 0 and not os.path.exists(leftover) and "删了 1 个" in cleaned.stdout,
-                   f"换树没删树里多出来的文件（退 {cleaned.returncode}、临时件{'还在' if os.path.exists(leftover) else '删了'}）：{cleaned.stdout[-300:]}",
-                   "看 sync_tree：源码里没有的文件换树时删掉（多出来的测试文件会被 cargo 一起编进去，判出来的就不是这一份源码）")
     killed = selftest.run("extras", "--item", "3", "--skip-stage-two", BROAD_MUTATION_KILL_AT="restore-after-copy")
-    stray = sorted(files_in_tree(os.path.join(work, "extras", "tree")) - set(SELFTEST_SOURCES))
+    killed_runs = selftest.leftover_run_directories("extras")
+    stray = sorted(files_in_tree(os.path.join(killed_runs[0], "tree")) - set(SELFTEST_SOURCES)) if len(killed_runs) == 1 else ["（runs/ 下不是恰好一个运行目录）"]
+    restore_beside_tree = len(killed_runs) == 1 and os.path.exists(os.path.join(killed_runs[0], "inflight.restore"))
     rerun = selftest.run("extras", "--item", "3", "--skip-stage-two")
-    selftest.check(killed.returncode == -signal.SIGKILL and not stray and rerun.returncode == 0 and selftest.tree_is_pristine("extras"),
-                   f"恢复原件半途被杀之后树里多出了文件、或重跑没恢复（被杀那趟退 {killed.returncode}；多出 {stray}；重跑退 {rerun.returncode}）：{rerun.stderr}",
-                   "看 restore_original：临时件建在库目录（inflight.restore），不建在树里")
+    selftest.check(killed.returncode == -signal.SIGKILL and not stray and restore_beside_tree and rerun.returncode == 0 and not selftest.build_leftovers("extras"),
+                   f"恢复原件半途被杀之后树里多出了文件、临时件不在运行目录里、或重跑没照常判完（被杀那趟退 {killed.returncode}；多出 {stray}；"
+                   f"重跑退 {rerun.returncode}；库目录里还剩 {selftest.build_leftovers('extras')}）：{rerun.stderr}",
+                   "看 restore_original：临时件建在这一趟的运行目录里（inflight.restore），不建在树里；Library.begin_run 开跑先删上一趟留下的运行目录")
     # 工具链进每一把键：换了工具链，判过的一条都不沿用（沿用 0）；换回来照沿用
     first_toolchain, second_toolchain = "rustc 1.0.0 (selftest a)", "rustc 2.0.0 (selftest b)"
     selftest.write_plan([(str(sequence), "one-test", "fail-nextest") for sequence in range(1, 9)])
@@ -4610,6 +5952,45 @@ def selftest_sync_cells(selftest):
                    f"工具链没进每一把键（换了工具链现判的 {sorted(rejudged)}、沿用 {plan_field(changed.stdout, 'carried')}；换回来现判的 {sorted(selftest.judged_sequences())}、"
                    f"沿用 {plan_field(back.stdout, 'carried')}）：{changed.stderr[-300:]}",
                    "看 Judgement 的 globals（mutation-prune.py 的 global_lines：rustc -vV 各行进每一把键）")
+    # exclude_re（等价变异的出路）走一遍：被判那棵树的 .cargo/mutants.toml 写一条 exclude_re 排掉第 3 条，再跑：清单少那一条（--list-items、--summary 都是 7 条）、
+    # 清单整版重判（mutants.toml 解析后的值进清单按单元存的键：lists.tsv 每个单元重写一行），别的条照沿用（判定的键里没有 mutants.toml，现判 0）。
+    # 假清单驱动照 cargo-mutants 的读法在专用树里读 .cargo/mutants.toml、按变异名 re.search 去掉匹配上的。弄坏开关 exclude-re-ignored（换树不拷 .cargo/mutants.toml）下清单照旧 8 条，这一格判错
+    excluding_driver = os.path.join(work, "list-driver-exclude-re.py")
+    with open(excluding_driver, "w") as handle:
+        handle.write("#!/usr/bin/env python3\n"
+                     "# 假的 cargo mutants --list --json --diff：照专用树里 .cargo/mutants.toml 的 exclude_re 去掉变异名匹配上的那几条（cargo-mutants 按变异名 re.search）\n"
+                     "import json, os, re, sys, tomllib\n"
+                     "with open(os.path.join(os.environ['BROAD_MUTATION_SELFTEST_WORK'], 'mutants.json')) as handle:\n"
+                     "    mutants = [mutant for mutant in json.load(handle) if mutant['package'] == sys.argv[1]]\n"
+                     "patterns = []\n"
+                     "if os.path.isfile(os.path.join('.cargo', 'mutants.toml')):\n"
+                     "    with open(os.path.join('.cargo', 'mutants.toml'), 'rb') as handle:\n"
+                     "        patterns = tomllib.load(handle).get('exclude_re', [])\n"
+                     "print(json.dumps([mutant for mutant in mutants if not any(re.search(pattern, mutant['name']) for pattern in patterns)]))\n")
+    os.chmod(excluding_driver, 0o755)
+    excluded_source = selftest_source_copy(selftest, "exclude-re-source")
+    excluded_name = next(mutant["name"] for mutant in selftest.mutants if mutant["replacement"] == "MUTATED_3()")
+    selftest.write_plan([(str(sequence), "one-test", "fail-nextest") for sequence in range(1, 9)])
+    before_exclusion = selftest.run("exclude-re", "--skip-stage-two", source=excluded_source, BROAD_MUTATION_LIST_DRIVER=excluding_driver)
+    before_names = sorted(entry["name"] for entry in selftest.listed("exclude-re", excluded_source).values())
+    write_sources(excluded_source, {".cargo/mutants.toml": "# 自证：第 3 条当等价变异排掉\nexclude_re = ['MUTATED_3\\(\\)']\n"})
+    selftest.clear_calls()
+    after_exclusion = selftest.run("exclude-re", "--skip-stage-two", source=excluded_source, BROAD_MUTATION_LIST_DRIVER=excluding_driver)
+    rejudged_after_exclusion = selftest.judged_sequences()
+    after_names = sorted(entry["name"] for entry in selftest.listed("exclude-re", excluded_source).values())
+    excluded_summary = selftest.run("exclude-re", "--summary", source=excluded_source)
+    selftest.write_plan(SELFTEST_PLAN)
+    selftest.clear_calls()
+    list_line = re.search(r"清单：(\d+) 条，按单元记进 lists\.tsv（(\d+) 个单元，这一趟新写 (\d+) 行）", after_exclusion.stdout)
+    selftest.check(before_exclusion.returncode == 0 and len(before_names) == 8 and excluded_name in before_names
+                   and after_exclusion.returncode == 0 and after_names == sorted(name for name in before_names if name != excluded_name)
+                   and list_line is not None and list_line.group(1) == "7" and list_line.group(2) == list_line.group(3) and not rejudged_after_exclusion
+                   and "BROAD_MUTATION_SUMMARY total=7 " in excluded_summary.stdout,
+                   f"exclude_re 没排掉那一条、清单没整版重判、或别的条没沿用（头一趟退 {before_exclusion.returncode}、{len(before_names)} 条；写了 exclude_re 之后退 "
+                   f"{after_exclusion.returncode}、{len(after_names)} 条、还在不在 {excluded_name in after_names}；清单那一行 {list_line.group(0) if list_line else '（没打）'}；"
+                   f"现判的 {sorted(rejudged_after_exclusion)}；--summary {next((line for line in excluded_summary.stdout.splitlines() if line.startswith('BROAD_MUTATION_SUMMARY')), '（没打）')}）："
+                   f"{after_exclusion.stdout[-300:]}{after_exclusion.stderr[-300:]}",
+                   "看 sync_tree（.cargo/mutants.toml 要随导出范围拷进专用树，cargo-mutants 才读得到 exclude_re）与 record_list_cache（清单按单元存的键带 mutants.toml 解析后的值）")
 
 
 def selftest_selections(selftest):
@@ -4742,12 +6123,13 @@ def selftest_prune_cells(selftest):
 
 
 def selftest_reuse_cells(selftest):
-    """复用三问（reuse-three-questions）与复用哨兵（reuse-sentinel），写法在文件头「复用三问与复用哨兵」。"""
+    """复用三问（reuse-three-questions）与复用哨兵（reuse-sentinel），写法在文件头「复用三问与复用哨兵」。项里除了 CPU 那一趟的 1–8 条，
+    还有 GPU 那一趟的（项名 gpu:<序号>：CPU 那一趟没红、又有带 gpu 特性的测试够得着的第 4、5 条），两趟的复用一起问；复用哨兵 CPU 一份、GPU 一份。"""
     core = "crates/singlefs-core/src/lib.rs"
     head = "pub fn five() -> u32 {\n"
-    plan = [(str(sequence), "one-test", f"fail-nextest:{SELFTEST_SLOW_CASE}") for sequence in (1, 3, 5, 6, 7, 8)] + [("2", "one-build", "fail-compile")]
+    plan = [(str(sequence), "one-test", f"fail-nextest:{SELFTEST_SLOW_CASE}") for sequence in (1, 3, 6, 7, 8)] + [("2", "one-build", "fail-compile")]
     selftest.write_plan(plan)
-    source = selftest_source_copy(selftest, "three-questions-source")
+    source = selftest_source_copy(selftest, "three-questions-source", SELFTEST_GPU_FILES)
     commented = SELFTEST_CORE.replace(head, head + "    // 只加一行注释\n")
     changed = commented.replace(head, head + "    let _unused = 0;\n")
 
@@ -4758,13 +6140,14 @@ def selftest_reuse_cells(selftest):
             selftest.write_mutants(selftest_mutants(dict(SELFTEST_SOURCES, **{core: text})))
         selftest.clear_calls()
         ran = selftest.run("three-questions", source=source)
-        return ran, selftest.judged_sequences()
+        return ran, selftest.judged_sequences() | {f"gpu:{sequence}" for sequence in selftest.gpu_judged_sequences()}
 
     try:
         runs = [judged_run(), judged_run(), judged_run(commented), judged_run(changed)]
         items = sorted(runs[0][1])
         states = [{sequence: reuse_checks.JUDGED if sequence in judged else reuse_checks.REUSED for sequence in items} for _ran, judged in runs]
-        passed, problems = reuse_checks.report_three_questions(SCRIPT_KEY, *states, ["5"])
+        # 改 five 的体：CPU 那一趟第 5 条的键变、第 4 条的覆盖者键变（够得着它的 gpu_case 的测试键含 five）；GPU 那一趟第 4、5 条的覆盖者键同样变
+        passed, problems = reuse_checks.report_three_questions(SCRIPT_KEY, *states, ["4", "5", "gpu:4", "gpu:5"])
         selftest.check(passed and all(ran.returncode == 0 for ran, _judged in runs),
                        f"{reuse_checks.CELL_NAME}：四趟退 {[ran.returncode for ran, _judged in runs]}，现判的 {[sorted(judged) for _ran, judged in runs]}：{'；'.join(problems)}",
                        "照规范输出那一行 red 的那一问查：① 看 select_items 与 Judgement.state（键相同、沿用判据认的条不选）；② 看 mutation-prune.py 的单元键（注释不进指纹）；"
@@ -4773,15 +6156,21 @@ def selftest_reuse_cells(selftest):
         sentinel_environment = {reuse_checks.SENTINEL_COUNT_VARIABLE: "1", reuse_checks.SENTINEL_SEED_VARIABLE: "5"}
         selftest.clear_calls()
         green = selftest.run("three-questions", source=source, **sentinel_environment)
-        forced_line = re.search(r"强制现判 1 条：(\S+)", green.stdout)
-        green_judged = selftest.judged_sequences()
+        forced_lines = re.findall(r"强制现判 1 条：(\S+)", green.stdout)
+        green_judged, green_gpu_judged = selftest.judged_sequences(), selftest.gpu_judged_sequences()
         selftest.clear_calls()
         skipped = selftest.run("three-questions", source=source, BROAD_MUTATION_BREAK="rerun-done", **sentinel_environment)
-        selftest.check(green.returncode == 0 and "复用哨兵（广谱变异）：种子 5" in green.stdout and forced_line is not None and green_judged == {forced_line.group(1)}
-                       and "reason=sentinel-forced" in green.stdout and skipped.returncode == 1 and "复用失灵：" in skipped.stderr,
-                       f"{reuse_checks.SENTINEL_CELL_NAME}：照常那一趟退 {green.returncode}、现判的 {sorted(green_judged)}：{green.stdout[-400:]}{green.stderr[-200:]}；"
-                       f"沿用得了也重跑的那一趟退 {skipped.returncode}：{skipped.stderr[-300:]}",
-                       "看 plan_reuse_sentinel 与 finish_reuse_sentinel：候选是沿用判据认定论的条，抽中强制现判的那一条加进选中的条；判法在 scripts/gate/lib_reuse_checks.py 文件头「二」")
+        selftest.clear_calls()
+        gpu_skipped = selftest.run("three-questions", source=source, BROAD_MUTATION_BREAK="gpu-carry-ignored", **sentinel_environment)
+        selftest.check(green.returncode == 0 and "复用哨兵（广谱变异）：种子 5" in green.stdout and "复用哨兵（广谱变异 GPU 趟）：种子 5" in green.stdout and len(forced_lines) == 2
+                       and green_judged == {forced_lines[0]} and forced_lines[1].startswith("gpu:") and green_gpu_judged == {forced_lines[1].removeprefix("gpu:")}
+                       and "reason=sentinel-forced" in green.stdout and skipped.returncode == 1 and "复用失灵：" in skipped.stderr
+                       and gpu_skipped.returncode == 1 and "复用失灵：gpu:" in gpu_skipped.stderr,
+                       f"{reuse_checks.SENTINEL_CELL_NAME}：照常那一趟退 {green.returncode}、抽中 {forced_lines}、现判的 {sorted(green_judged)}、GPU 趟现判的 {sorted(green_gpu_judged)}："
+                       f"{green.stdout[-500:]}{green.stderr[-200:]}；CPU 沿用得了也重跑的那一趟退 {skipped.returncode}：{skipped.stderr[-300:]}；"
+                       f"GPU 沿用得了也重跑的那一趟退 {gpu_skipped.returncode}：{gpu_skipped.stderr[-300:]}",
+                       "看 plan_reuse_sentinel、finish_reuse_sentinel（CPU 那一趟）与 plan_gpu_sentinel、run_gpu_phase 里候选与 observe（GPU 那一趟，项名 gpu:<序号>）：候选是沿用判据认定论的条，"
+                       "抽中强制现判的那一条加进选中的条；判法在 scripts/gate/lib_reuse_checks.py 文件头「二」")
     finally:
         selftest.write_mutants(selftest.mutants)
         selftest.write_plan(SELFTEST_PLAN)
@@ -5016,6 +6405,12 @@ def selftest_escalation_cells(selftest):
     selftest.check(states.get("4") in ENVIRONMENTAL_OUTCOMES and "4" not in registry and "证据不齐" in last.get("4", {}).get("note", ""),
                    f"证据不齐的升档判成了抓到（第 4 条状态 {states.get('4')}、末行 {last.get('4')}；登记了 {sorted(registry)}）",
                    "看 escalation_evidence_problems：两趟结局不同、基线缺、限时或上限不到基线的 K 倍、日志里没有包装那一句，都是证据不齐，照环境型结局记")
+    # --summary 的 NO_CONCLUSION 理由带上一趟的限时秒数（last_time_limit_text）：第 4 条编译步超时、升档那趟（限时 5 → 20）撞顶、证据不齐，没结论，
+    # 上一趟就是升档那趟、限时 20 秒；第 2 条撞顶那一支判了抓到，不在 NO_CONCLUSION 里。弄坏开关 no-conclusion-limit-dropped 下不带，这一格判错
+    no_conclusion_line = next((line for line in summary.stdout.splitlines() if line.startswith("NO_CONCLUSION\t4\t")), "")
+    selftest.check(no_conclusion_line.count("\t") >= 4 and "上一趟限时 20 秒" in no_conclusion_line.split("\t", 4)[4],
+                   f"--summary 的 NO_CONCLUSION 超时那一行理由里没带上一趟的限时秒数（第 4 条那一行 {no_conclusion_line!r}；末行备注 {last.get('4', {}).get('note', '')!r}）",
+                   "看 last_time_limit_text：定下状态的那一行备注里「<步> 超过 <N> 秒」或「超时之后升档重跑（<原> → <升档>）」的那个数，接在 NO_CONCLUSION 的理由后面")
     labelled = {sequence: row["caught_by"] for sequence, row in last.items() if row["outcome"] == "caught" and row["caught_by"] in ESCALATED_LABELS}
     escalated_lines = {fields[1]: fields[2] for fields in (line.split("\t") for line in summary.stdout.splitlines()) if fields[0] == "ESCALATED" and len(fields) == 5}
     selftest.check(escalated_lines == labelled and summary_field(summary.stdout, "escalated") == len(labelled) and carried_again and again.returncode == 0,
@@ -5330,12 +6725,13 @@ FRESH_BUILD_COMMIT_TIME_NS = 1_790_000_000 * 10 ** 9    # 自证里的「源码�
 
 
 def selftest_fresh_build_cells(selftest):
-    """换树后照内容重编：源码 A 编过（产物新于源码的 mtime），换到源码 B（core 里一份文件内容变了、mtime 却早于那些产物），
-    换树照写的那一份 mtime 取此刻，基线必须重编 core、测试跑的是 B 编出来的。"""
+    """每一趟自己的编译目录（文件头「库目录」runs/）：同一份源码（mtime 早于产物）连跑两趟，第二趟的编译目录是新建的，两个包都从头编，
+    不照用上一趟编的产物；两趟跑完库目录里都不剩运行目录、也没有改前放在库目录里的树与编译目录（正常结束那一种结局）。"""
     work = selftest.work
     core_extra = "crates/singlefs-core/src/extra.rs"
 
     def commit_source(name, version):
+        """一份源码副本，每个文件的 mtime 都早于自证里编出的产物。"""
         directory = selftest_source_copy(selftest, name, {core_extra: f"pub const VERSION: u32 = {version};\n"})
         for found_directory, _directory_names, file_names in os.walk(directory):
             for file_name in file_names:
@@ -5350,28 +6746,66 @@ def selftest_fresh_build_cells(selftest):
             return {(fields[0], fields[2]) for fields in (line.rstrip("\n").split("\t") for line in handle) if len(fields) == 3}
 
     selftest.write_plan([("0", "one-build", "cargo-build"), ("0", "one-test", "cargo-test")])
-    source_a, source_b = commit_source("fresh-source-a", 1), commit_source("fresh-source-b", 2)
-    # 点名的是 checker 里的第 7 条：判它改的、拷回的都是 checker 的文件，core 那几份在基线之后没人碰过（真跑里变异拷回原件会顺手刷新 mtime，掩住换树那一半）
-    first = selftest.run("fresh", "--item", "7", "--skip-stage-two", source=source_a)
+    source = commit_source("fresh-source", 1)
+    # 点名的是 checker 里的第 7 条；两趟同一份源码：编译目录要是跨趟留着，第二趟两个包的产物都比源码新，一个都不重编
+    first = selftest.run("fresh", "--item", "7", "--skip-stage-two", source=source)
     built_before = compiled()
+    left_after_first = selftest.build_leftovers("fresh")
     if os.path.exists(os.path.join(work, "cargo.log")):
         os.remove(os.path.join(work, "cargo.log"))
-    second = selftest.run("fresh", "--item", "7", "--skip-stage-two", "--rerun", source=source_b)    # 第 7 条的键没变（extra.rs 不在它的闭包里），点名重跑才起基线
+    second = selftest.run("fresh", "--item", "7", "--skip-stage-two", "--rerun", source=source)    # 第 7 条的键没变，点名重跑才起基线
     rebuilt = compiled()
+    left_after_second = selftest.build_leftovers("fresh")
     selftest.write_plan(SELFTEST_PLAN)
-    selftest.check(first.returncode == 0 and {("0", "singlefs-core"), ("0", "singlefs-checker")} <= built_before and second.returncode == 0
-                   and ("0", "singlefs-core") in rebuilt and "1 个内容不同" in second.stdout,
-                   f"换树之后编译目录照旧产物跑了（源码 A 那趟退 {first.returncode}、编过 {sorted(built_before)}；换到 B 那趟退 {second.returncode}、重编的 {sorted(rebuilt)}）："
+    both = {("0", "singlefs-core"), ("0", "singlefs-checker")}
+    selftest.check(first.returncode == 0 and both <= built_before and second.returncode == 0 and both <= rebuilt,
+                   f"第二趟的编译目录不是新建的：照用了上一趟编的产物（第一趟退 {first.returncode}、编过 {sorted(built_before)}；第二趟退 {second.returncode}、编过 {sorted(rebuilt)}）："
                    f"{second.stdout[-300:]}{second.stderr[-400:]}",
-                   "看 sync_tree：内容不同的文件照写、mtime 取此刻（shutil.copyfile，不用 copy2 保留源文件的旧 mtime），cargo 才会按它重编")
+                   "看 Library.begin_run：每一趟在 runs/ 下新建自己的运行目录，CARGO_TARGET_DIR 是它里面的 target（弄坏开关 build-directory-in-home 下照改前放在库目录里、跨趟留着）")
+    selftest.check(first.returncode == 0 and second.returncode == 0 and not left_after_first and not left_after_second,
+                   f"跑完运行目录里不剩它建的编译目录与树副本（正常结束）：第一趟之后还剩 {left_after_first}，第二趟之后还剩 {left_after_second}",
+                   "看 main 的 finally 里的 Library.end_run：正常结束也删这一趟的运行目录（删之前核没有进程开着里面的文件）")
+
+
+def selftest_run_directory_cells(selftest):
+    """这一趟的运行目录跑完删（文件头「库目录」runs/）：出错退出（基线红，退 6）那一种结局也删；这一趟漏下一个进程开着运行目录里的文件时不删、报出那个进程、退 9。
+    正常结束那一种在 selftest_fresh_build_cells，被 TERM 停那一种在 selftest_stop_cells，上一趟被 KILL 留下的在 selftest_basic_cells。"""
+    work = selftest.work
+    selftest.write_plan([("0", "one-test", "exit:100")])
+    failed = selftest.run("own-error", "--item", "1", "--skip-stage-two")
+    left = selftest.build_leftovers("own-error")
+    selftest.check(failed.returncode == EXIT_BASELINE_RED and not left,
+                   f"跑完运行目录里不剩它建的编译目录与树副本（出错退出）：基线红那一趟退 {failed.returncode}（应当退 6），库目录里还剩 {left}：{failed.stderr[-400:]}",
+                   "看 main 的 finally 里的 Library.end_run：拒绝（Refusal）退出也删这一趟的运行目录")
+    holder_file = os.path.join(work, "holder.pid")
+    if os.path.exists(holder_file):
+        os.remove(holder_file)
+    selftest.write_plan([("1", "one-test", "leave-holder")])
+    held = selftest.run("own-holder", "--item", "1", "--skip-stage-two")
+    selftest.write_plan(SELFTEST_PLAN)
+    holder = int(open(holder_file).read().split()[0]) if os.path.exists(holder_file) else None
+    kept = selftest.leftover_run_directories("own-holder")
+    reported = holder is not None and f"进程 {holder}（" in held.stderr
+    if holder is not None and process_is_running(holder):
+        os.kill(holder, signal.SIGTERM)   # 只点假的一步记下的那一个进程号
+        wait_until(lambda: not process_is_running(holder), 10)
+    for directory in kept:
+        shutil.rmtree(directory, ignore_errors=True)
+    selftest.check(held.returncode == EXIT_RUN_DIRECTORY_KEPT and len(kept) == 1 and reported,
+                   f"这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 {EXIT_RUN_DIRECTORY_KEPT}（退 {held.returncode}；留着的 {kept}；漏下的进程 {holder}"
+                   f"{'报了' if reported else '没报'}）：{held.stderr[-600:]}",
+                   "看 Library.end_run：删之前经 scripts/hosts/run_build_directory.py 核本机有没有进程开着里面的文件（弄坏开关 run-directory-open-files-unchecked 下不核）")
 
 
 def selftest_import_cells(selftest):
-    """两台各跑一片之后合并导入：核每行的段数、结局与键的写法；本机已有的不重复导；同一把键两边定论不同的不导；别的源码判的行并进来也不顶替本机这一份的。"""
+    """两台各跑一片之后合并导入：核每行的段数、结局与键的写法；本机已有的不重复导；同一把键两边定论不同的不导；别的源码判的行并进来也不顶替本机这一份的。
+    两台各用各的密钥（另一台那几份库用 peer_side_key_path 签），导入前交换密钥（exchange_peer_key）：校验列用另一台的密钥核过才导、照本机的密钥重签；
+    另一台的行被改了一个字、取不到另一台的密钥，都拒、一行不写。"""
     work = selftest.work
-    selftest.run("peer", "--shard", "1/2", "--skip-stage-two")
+    selftest.run("peer", "--shard", "1/2", "--skip-stage-two", BROAD_MUTATION_RESULT_KEY=selftest.peer_side_key_path())
     selftest.run("local", "--shard", "0/2", "--skip-stage-two")
     peer_home = os.path.join(work, "peer")
+    peer_key, peer_key_problem = selftest.exchange_peer_key()
     imported = selftest.run("local", "--import-results", peer_home)
     summary = selftest.run("local", "--summary")
     again = selftest.run("local", "--import-results", peer_home)
@@ -5384,6 +6818,14 @@ def selftest_import_cells(selftest):
                    f"两台各一片的结果没合对（导入退 {imported.returncode}：{imported.stdout.splitlines()[:1]}；汇总 {summary.stdout.splitlines()[:1]}；"
                    f"再导一遍 {again.stdout.splitlines()[:1]}；之后剪枝跑现判的序号 {sorted(selftest.judged_sequences())}（只该是超时、撞顶的 3、6））：{imported.stderr}",
                    "看 import_results：核完才写、相同的行不重复导；导入之后状态照合起来的行算")
+    local_key, _local_problem = read_result_key(selftest.result_key_path())
+    brought = [[row[column] for column in VERDICT_COLUMNS] for row in selftest.rows("local") if row["method"].startswith("import:")]
+    selftest.check(peer_key is not None and local_key is not None and peer_key != local_key and len(brought) == 4
+                   and all(hmac.compare_digest(result_mac(local_key, fields), fields[-1]) for fields in brought)
+                   and not any(hmac.compare_digest(result_mac(peer_key, fields), fields[-1]) for fields in brought),
+                   f"另一台的密钥核过的行导进来之后没照本机的密钥重签（另一台的密钥{'在' if peer_key is not None else f'取不到：{peer_key_problem}'}、"
+                   f"本机的密钥{'在' if local_key is not None else '不在'}、两把{'不同' if peer_key != local_key else '相同'}；导进来的 {len(brought)} 行）",
+                   "看 import_results：校验列先用 peer_result_key 取的另一台密钥逐行核，核过去掉、record_verdicts 照本机的密钥重签")
     rows_before = len(selftest.rows("local"))
 
     def peer_copy(name, edit):
@@ -5398,7 +6840,7 @@ def selftest_import_cells(selftest):
     def break_first_key(lines):
         fields = lines[1].split("\t")
         fields[0] = "不是键"
-        return [lines[0], "\t".join(fields)] + lines[2:]
+        return [lines[0], selftest.peer_signed_line(fields)] + lines[2:]     # 照另一台的密钥重签：这一格核的是键的写法，不是校验列
     wrong_key = selftest.run("local", "--import-results", peer_copy("peer-wrong-key", break_first_key))
     rows_after_wrong = len(selftest.rows("local"))
     local_two = selftest.rows_of("local", 2)[0]
@@ -5406,13 +6848,36 @@ def selftest_import_cells(selftest):
     def add_conflicting_row(lines):
         fields = [local_two[column] for column in VERDICT_COLUMNS[:RESULT_SIGNED_COLUMNS]]
         fields[VERDICT_COLUMNS.index("outcome")] = "caught"
-        return lines[:-1] + ["\t".join(fields + ["0" * 64])] + lines[-1:]
+        return lines[:-1] + [selftest.peer_signed_line(fields)] + lines[-1:]
     conflict = selftest.run("local", "--import-results", peer_copy("peer-conflict", add_conflicting_row))
+    # 另一台的一行被改了一个字（变异名末尾换一个字），校验列没跟着改：用另一台的密钥核不过，整表拒、一行不写
+    def tamper_one_character(lines):
+        fields = lines[1].split("\t")
+        name = VERDICT_COLUMNS.index("name")
+        fields[name] = fields[name][:-1] + ("甲" if fields[name][-1:] != "甲" else "乙")
+        return [lines[0], "\t".join(fields)] + lines[2:]
+    rows_before_tamper = len(selftest.rows("local"))
+    tampered = selftest.run("local", "--import-results", peer_copy("peer-tampered", tamper_one_character))
+    selftest.check(tampered.returncode == EXIT_INCONSISTENT and "用另一台的密钥核不过" in tampered.stderr and len(selftest.rows("local")) == rows_before_tamper,
+                   f"另一台的行被改了一个字（校验列没跟着改）时导入没整表拒（退 {tampered.returncode}，应当 {EXIT_INCONSISTENT}；判定行 {rows_before_tamper} → {len(selftest.rows('local'))}）："
+                   f"{tampered.stdout[-300:]}{tampered.stderr[-300:]}",
+                   "看 import_results 与 peer_mac_mismatches：每行的校验列用另一台的密钥核，一行核不过整表拒（退 1）、一行不写（弄坏开关 peer-mac-unchecked 下不核）")
+    # 取不到另一台的密钥：拒导入（退 2）、一行不写，说明里点名本机存对端密钥的位置与交换的做法
+    away = selftest.peer_key_path() + ".away"
+    os.rename(selftest.peer_key_path(), away)
+    try:
+        keyless = selftest.run("local", "--import-results", peer_copy("peer-keyless", lambda lines: lines))
+    finally:
+        os.rename(away, selftest.peer_key_path())
+    selftest.check(keyless.returncode == EXIT_USAGE and "另一台的密钥取不到" in keyless.stderr and selftest.peer_key_path() in keyless.stderr
+                   and "两台交换密钥" in keyless.stderr and len(selftest.rows("local")) == rows_before_tamper,
+                   f"取不到另一台的密钥时导入没拒（退 {keyless.returncode}，应当 {EXIT_USAGE}；判定行 {rows_before_tamper} → {len(selftest.rows('local'))}）：{keyless.stdout[-300:]}{keyless.stderr[-400:]}",
+                   "看 peer_result_key：对端密钥在本机密钥同目录的 .peer.key，取不到就拒导入（退 2）、说明里点名那个位置与交换的做法（弄坏开关 peer-mac-unchecked 下不取）")
     # 别的源码（第 1 条那个函数的体改了）判的行并进来：键不同，本机第 1 条的状态不变，只多一条 stale
     foreign = selftest_source_copy(selftest, "foreign-source", {"crates/singlefs-core/src/lib.rs": SELFTEST_CORE.replace("pub fn one() -> u32 {\n", "pub fn one() -> u32 {\n    let _other = 0;\n")})
     selftest.write_mutants(selftest_mutants(dict(SELFTEST_SOURCES, **{"crates/singlefs-core/src/lib.rs": SELFTEST_CORE.replace("pub fn one() -> u32 {\n", "pub fn one() -> u32 {\n    let _other = 0;\n")})))
     try:
-        selftest.run("foreign", "--item", "1", "--skip-stage-two", source=foreign)
+        selftest.run("foreign", "--item", "1", "--skip-stage-two", source=foreign, BROAD_MUTATION_RESULT_KEY=selftest.peer_side_key_path())
     finally:
         selftest.write_mutants(selftest.mutants)
     state_before = selftest.listed("local").get("1", {})
@@ -5424,6 +6889,7 @@ def selftest_import_cells(selftest):
                    f"该拒的导入没拒、或别的源码的行顶替了本机的（键写坏的退 {wrong_key.returncode}、之后 {rows_after_wrong} 行对 {rows_before} 行；"
                    f"定论不同的退 {conflict.returncode}；别的源码那份退 {other_source.returncode}、第 1 条 {state_before} → {state_after}）：{wrong_key.stderr}{conflict.stdout}",
                    "看 import_results：每行的段数、结局、键的写法全部核完才写；同一把键两边都有定论而不同的不导、列出来、退 1；别的源码的键与本机的不同，并进来只是多一行")
+    selftest_gpu_import_cells(selftest)     # 导入的 GPU 判定行那几格接在这一组后面（不另列进 SELFTEST_CELL_NAMES：模块级的赋值在判法单元指纹的闭包里，改它库里的判定就一条都不沿用）
 
 
 def selftest_ignored_cells(selftest):
@@ -5517,6 +6983,12 @@ def selftest_test_variable_cells(selftest):
                    and len(selftest.rows("first")) == rows_before,
                    f"父进程不是 --selftest 的进程只带着弄坏开关时没拒（退 {relayed_break.returncode}，调了 {len(selftest.calls())} 步，判定行 {rows_before} → {len(selftest.rows('first'))}）：{relayed_break.stderr}",
                    "看 check_test_only_variables：TEST_ONLY_VARIABLES 里要有 BROAD_MUTATION_BREAK，非自证的进程带着它就拒")
+    # 平常跑设了弄坏开关、再带一个认不得的选项（门禁 code-tooling 的 break-switch-outside-selftest 格就这样探）：要在参数解析之前拒并点名变量，不是被 argparse 当用法错拒
+    probed = subprocess.run([sys.executable, "-c", relay, sys.executable, SELF_PATH, "--force", "--break-guard-probe-unknown-option"], capture_output=True, text=True,
+                            stdin=subprocess.DEVNULL, env=break_only)
+    selftest.check(probed.returncode == EXIT_USAGE and "BROAD_MUTATION_BREAK" in probed.stderr and "不是 --selftest 自己起的子进程" in probed.stderr,
+                   f"平常跑设了弄坏开关、带认不得的选项时没在参数解析之前拒并点名（退 {probed.returncode}）：{probed.stderr}",
+                   "看 main 开头的 check_test_only_variables_before_parsing：它要排在 check_removed_arguments 与 parse_arguments 之前")
 
 
 def selftest_progress_cells(selftest):
@@ -5531,7 +7003,8 @@ def selftest_progress_cells(selftest):
 
 
 def selftest_stop_cells(selftest):
-    """被 TERM 停：在途那一步连同内存包装给它开的 scope 一起停（这一格的假一步经真的内存包装起，要用户级 systemd）。"""
+    """被 TERM 停：在途那一步连同内存包装给它开的 scope 一起停（这一格的假一步经真的内存包装起，要用户级 systemd）。
+    照常的包装被 TERM 时自己停 scope，另一趟给包装设它的弄坏开关 term-leaves-scope（改前的包装），证驱动自己停 scope、不靠包装。"""
     work = selftest.work
     selftest.slice_used = True
     wrapper_environment = dict(selftest.environment, BROAD_MUTATION_STEP_VIA_WRAPPER="1", RUN_WITH_MEMORY_CAP_SLICE=selftest.slice,
@@ -5555,6 +7028,10 @@ def selftest_stop_cells(selftest):
         output, errors = driver.communicate()
     step_processes = [int(word) for word in open(pid_file).read().split()] if os.path.exists(pid_file) else []
     all_stopped = wait_until(lambda: not any(process_is_running(process_id) for process_id in step_processes), 10)
+    left_after_term = selftest.build_leftovers("stop")
+    selftest.check(driver.returncode == EXIT_STOPPED and not left_after_term,
+                   f"跑完运行目录里不剩它建的编译目录与树副本（被 TERM 停）：驱动退 {driver.returncode}，库目录里还剩 {left_after_term}：{errors[-600:]}",
+                   "看 main 的 finally：被 TERM / INT 停（Stopped）也走 Library.end_run，在途那一步连同 scope 停下之后删这一趟的运行目录")
     selftest.write_plan(SELFTEST_PLAN)
     selftest.clear_calls()
     rerun = subprocess.run(selftest.command("stop", "--item", "1", "--skip-stage-two", "--lock-wait", "0"), capture_output=True, text=True,
@@ -5562,49 +7039,494 @@ def selftest_stop_cells(selftest):
     open(os.path.join(work, "release"), "w").close()
     rows_of_one = [row["outcome"] for row in selftest.rows_of("stop", 1)]
     selftest.check(hanging and os.path.exists(os.path.join(work, "hanging")) and driver.returncode == EXIT_STOPPED and len(step_processes) >= 2 and all_stopped
-                   and rerun.returncode == 0 and rows_of_one == ["caught"] and selftest.tree_is_pristine("stop"),
+                   and rerun.returncode == 0 and rows_of_one == ["caught"],
                    f"被 TERM 停时在途那一步没有一起停（那一步{'挂住了' if hanging else '没起来'}；驱动退 {driver.returncode}；那一步的进程 {step_processes}、"
                    f"{'都停了' if all_stopped else '还有活着的'}；紧接着重跑退 {rerun.returncode}、第 1 条各行 {rows_of_one}）：{errors}{rerun.stderr}",
                    "看 Runner.stop_step：给包装发 TERM 之外，还要停它开的那一个 scope（own_scope_unit 找、systemctl --user stop）。"
                    "驱动退 6、日志里是 251：这台机器起不了带上限的 scope（没有用户级 systemd），真跑同样起不来，先修那一头")
 
+    # 包装自己不停 scope 的那一种（改前的包装：起了 scope 之后被 TERM 只删标记与账就退，命令在 scope 里照跑）：同一个假一步经真的内存包装起，给包装设它自己的弄坏开关
+    # RUN_WITH_MEMORY_CAP_BREAK=term-leaves-scope。包装只在它自证的标记在时认这个开关（run-with-memory-cap.sh 文件头「弄坏开关只在自证里认」）：照那一段建一份标记文件、
+    # 经 RUN_WITH_MEMORY_CAP_SELFTEST_MARK 带过去。只给包装发 TERM 时在途那一步停不下，驱动另停包装开的那一个 scope 才停得下：弄坏开关 term-leaves-step-running 在这一格红。
+    memory_cap_mark = os.path.join(work, "memory-cap-selftest-mark")
+    with open(memory_cap_mark, "w") as handle:
+        handle.write("run-with-memory-cap.sh --selftest 起的包装\n")
+    scope_kept_environment = dict(wrapper_environment, RUN_WITH_MEMORY_CAP_BREAK="term-leaves-scope", RUN_WITH_MEMORY_CAP_SELFTEST_MARK=memory_cap_mark)
+    for name in ("release", "hanging", "hang.pids"):
+        if os.path.exists(os.path.join(work, name)):
+            os.remove(os.path.join(work, name))
+    selftest.write_plan([("1", "one-test", "hang")])
+    driver = subprocess.Popen(selftest.command("stop-scope-kept", "--item", "1", "--skip-stage-two", "--timeout-floor", "120"), stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, text=True, stdin=subprocess.DEVNULL, env=scope_kept_environment)
+    hanging = wait_until(lambda: os.path.exists(os.path.join(work, "hanging")) or driver.poll() is not None, 90)
+    wait_until(lambda: os.path.exists(pid_file) and len(open(pid_file).read().split()) >= 2, 5)
+    driver.terminate()   # 只点自己起的这一个进程
+    try:
+        output, errors = driver.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        driver.kill()    # 只点自己起的这一个进程
+        output, errors = driver.communicate()
+    step_processes = [int(word) for word in open(pid_file).read().split()] if os.path.exists(pid_file) else []
+    all_stopped = wait_until(lambda: not any(process_is_running(process_id) for process_id in step_processes), 10)
+    open(os.path.join(work, "release"), "w").close()   # 停不下的那一步（弄坏开关下）见到它就退，不留到自证收尾
+    wait_until(lambda: not any(process_is_running(process_id) for process_id in step_processes), 10)
+    selftest.write_plan(SELFTEST_PLAN)
+    selftest.check(hanging and driver.returncode == EXIT_STOPPED and len(step_processes) >= 2 and all_stopped,
+                   f"包装自己不停 scope 时被 TERM 停，在途那一步没有一起停（包装带 RUN_WITH_MEMORY_CAP_BREAK=term-leaves-scope，改前的包装；"
+                   f"那一步{'挂住了' if hanging else '没起来'}；驱动退 {driver.returncode}；那一步的进程 {step_processes}、{'都停了' if all_stopped else '还有活着的'}）：{errors[-600:]}",
+                   "看 Runner.stop_step：给包装发 TERM 之外，驱动自己停包装开的那一个 scope（own_scope_unit 找、systemctl --user stop），不靠包装自己停；"
+                   "驱动退 2、日志里点名 RUN_WITH_MEMORY_CAP_BREAK：标记文件的那一行与 run-with-memory-cap.sh 的 SELFTEST_MARK_CONTENT 对不上了，照它改这里")
 
-def run_selftest_cells(selftest):
-    selftest_fresh_build_cells(selftest)
-    selftest_prune_cells(selftest)
-    selftest_reuse_cells(selftest)
-    selftest_global_cells(selftest)
-    selftest_judging_cells(selftest)
-    selftest_refused_cells(selftest)
-    selftest_removed_cells(selftest)
-    selftest_environmental_cells(selftest)
-    selftest_gpu_memory_cells(selftest)
-    selftest_basic_cells(selftest)
-    selftest_state_cells(selftest)
-    selftest_table_cells(selftest)
-    selftest_environment_cells(selftest)
-    selftest_sync_cells(selftest)
-    selftest_rerun_larger_limit_cells(selftest)
-    selftest_escalation_cells(selftest)
-    selftest_escalation_evidence_cells(selftest)
-    selftest_baseline_threads_cells(selftest)
-    selftest_baseline_key_cells(selftest)
-    selftest_baseline_entry_cells(selftest)
-    selftest_baseline_alerts_cells(selftest)
-    selftest_result_mac_cells(selftest)
-    selftest_unit_environment_cells(selftest)
-    selftest_import_cells(selftest)
-    selftest_ignored_cells(selftest)
-    selftest_test_variable_cells(selftest)
-    selftest_progress_cells(selftest)
-    selftest_stop_cells(selftest)
+
+def gpu_item_lines(output, prefix="BROAD_MUTATION_GPU_ITEM"):
+    """输出里每条一行的 GPU 趟结论：{序号: 那一行}。"""
+    found = {}
+    for line in output.splitlines():
+        if line.startswith(prefix + " "):
+            found[int(re.search(r"sequence=(\d+)", line).group(1))] = line
+    return found
 
 
-def run_selftest():
+def gpu_lines_of(output, prefix):
+    """输出里以 prefix 起头的行，每行拆成 {键: 值}（制表符分段的明细行拆不了，交原样）。"""
+    return [dict(token.split("=", 1) for token in line.split()[1:] if "=" in token) for line in output.splitlines() if line.startswith(prefix + " ")]
+
+
+def selftest_gpu_cells(selftest):
+    """GPU 那一趟（C489）：只有 CPU 红、只有 GPU 红、两趟都没红、没卡，各一格；GPU 只给 CPU 没红又有带 gpu 特性的测试够得着的条跑；
+    命令的写法（特性、目标、清场、--test-threads 1、BINDGEN）；超时 / 无效 / 一个测试都没跑到；--skip-gpu、清场没过、中途没卡、基线红；复用与 --rerun；
+    手追加的 GPU 判定行不算；--skip-stage-two 不跑；--list-items 的状态是两趟合起来的。假的一步当假 GPU（SELFTEST_STEP_DRIVER 的 gpu- 那几步）。"""
+    source = selftest_source_copy(selftest, "gpu-source", SELFTEST_GPU_FILES)
+    covered = {"1", "2", "4", "5"}
+    two = ("--item", "1", "--item", "2")
+
+    def gpu_run(home, plan, *arguments, **environment):
+        selftest.write_plan(plan)
+        selftest.clear_calls()
+        return selftest.run(home, *arguments, source=source, **environment)
+
+    def summary_of(home):
+        return selftest.run(home, "--summary", source=source)
+
+    def gate_fields(text):
+        found = gpu_lines_of(text, "BROAD_MUTATION_GATE")
+        return found[0] if found else {}
+
+    try:
+        # ① 只有 CPU 红：第 1 条 CPU 那一趟（第一段）抓到，GPU 那一趟不起；第 2 条 CPU 没红、GPU 也没红 ⇒ 没红
+        ran = gpu_run("gpu-cpu-red", [("1", "one-test", "fail-nextest")], *two)
+        cpu_rows = {row["sequence"]: (row["outcome"], row["stage"]) for row in selftest.rows("gpu-cpu-red")}
+        gpu_rows = [(row["sequence"], row["outcome"]) for row in selftest.gpu_rows("gpu-cpu-red")]
+        items = gpu_item_lines(ran.stdout)
+        summary = summary_of("gpu-cpu-red")
+        selftest.check(ran.returncode == 0 and cpu_rows == {"1": ("caught", "one"), "2": ("missed", "two")} and gpu_rows == [("2", "missed")]
+                       and selftest.gpu_judged_sequences() == {"2"} and set(items) == {2} and " cpu=missed gpu=missed combined=missed " in items[2]
+                       and " judged=1 red=1 reused=0 " in items[2] and "BROAD_MUTATION_GPU_PLAN needed=1 judge=1 carried=0 " in ran.stdout
+                       and "GPU 趟（要 1 条）：现判 1、复用 0、本次未跑 0" in ran.stdout
+                       and summary_field(summary.stdout, "caught") == 1 and summary_field(summary.stdout, "missed") == 1 and summary.returncode == EXIT_GATE_RED
+                       and (gate_fields(summary.stdout).get("gpu_needed"), gate_fields(summary.stdout).get("gpu_reused")) == ("1", "1"),
+                       f"只有 CPU 红：CPU 那一趟抓到的条也起了 GPU 那一趟、或两趟的结局没分开记（退 {ran.returncode}；CPU 行 {cpu_rows}；GPU 行 {gpu_rows}；GPU 趟现判过 "
+                       f"{sorted(selftest.gpu_judged_sequences())}）：{ran.stdout[-500:]}{ran.stderr[-300:]}",
+                       "看 run_gpu_phase：只给 CPU 那一趟落的结论是没红的条起 GPU 那一趟（一条两趟里任一趟红算抓到，CPU 红了就不用跑）；GPU 的结局落 gpu-verdicts.tsv，"
+                       "不进 verdicts.tsv，BROAD_MUTATION_GPU_ITEM 一行分开写 cpu= 与 gpu=")
+        selftest.check(set(os.listdir(os.path.join(selftest.work, "gpu-cpu-red"))) >= {GPU_VERDICTS, "verdicts.tsv"}
+                       and {(row["sequence"], row["outcome"]) for row in selftest.rows("gpu-cpu-red")} == {("1", "caught"), ("2", STAGE_ONE_ONLY), ("2", "missed")},
+                       "GPU 那一趟的结局没有单独存进 gpu-verdicts.tsv（verdicts.tsv 里只该有 CPU 那一趟的三行）", "看 record_gpu_verdict：GPU 趟的判定行落 gpu-verdicts.tsv，库里 CPU 那一趟的 verdicts.tsv 一行不改")
+
+        # ② 只有 GPU 红：CPU 那一趟都没红；第 1 条 GPU 的结果行被 --nocapture 打散（认名字靠 failures: 名单），第 2 条是整齐的结果行 ⇒ 合起来都是抓到
+        ran = gpu_run("gpu-gpu-red", [("1", "gpu-test-checker-tier", "gpu-fail-scrambled"), ("2", "gpu-test-checker-tier", "gpu-fail")], *two)
+        gpu_rows = {row["sequence"]: row for row in selftest.gpu_rows("gpu-gpu-red")}
+        items = gpu_item_lines(ran.stdout)
+        summary = summary_of("gpu-gpu-red")
+        listed = selftest.states("gpu-gpu-red", source)
+        selftest.check(ran.returncode == 0 and set(gpu_rows) == {"1", "2"} and all(row["outcome"] == "caught" and row["caught_by"] == SELFTEST_GPU_CASE
+                                                                                  and re.fullmatch(r"[0-9a-f]{64}", row["test_key"]) for row in gpu_rows.values())
+                       and all(" cpu=missed gpu=caught combined=caught " in line and " red=0 " in line for line in items.values()) and len(items) == 2
+                       and summary_field(summary.stdout, "caught") == 2 and summary_field(summary.stdout, "missed") == 0
+                       and (listed.get("1"), listed.get("2")) == ("caught", "caught"),
+                       f"只有 GPU 红：GPU 那一趟红了没算抓到、抓到它的测试没认出来、或 --list-items 的状态不是两趟合起来的（退 {ran.returncode}；GPU 行 "
+                       f"{[(sequence, row['outcome'], row['caught_by']) for sequence, row in sorted(gpu_rows.items())]}；--list-items {listed}）：{ran.stdout[-400:]}{ran.stderr[-300:]}",
+                       "看 gpu_combined_state（GPU 抓到就是抓到）、gpu_failing_test（--nocapture 下结果行被打散，认 failures: 名单）、GpuJudging.catching_key 与 list_items 的 combined_states")
+
+        # ③ 两趟都没红：CPU 没红、GPU 也没红 ⇒ 没红（汇总的没红栏）；GPU 那一趟只给有带特性的测试够得着的 4 条里 CPU 没红的跑（全量跑：8 条 CPU 都没红）
+        ran = gpu_run("gpu-neither", [])
+        gpu_rows = {row["sequence"]: row for row in selftest.gpu_rows("gpu-neither")}
+        summary = summary_of("gpu-neither")
+        missed_lines = [line.split("\t")[1] for line in summary.stdout.splitlines() if line.startswith("MISSED\t")]
+        environment = selftest.gpu_environment()
+        selftest.check(ran.returncode == 0 and set(gpu_rows) == covered and all(row["outcome"] == "missed" and re.fullmatch(r"[0-9a-f]{64}", row["coverage_key"])
+                                                                                  for row in gpu_rows.values())
+                       and selftest.gpu_judged_sequences() == covered and summary_field(summary.stdout, "missed") == 8 and sorted(missed_lines) == sorted(str(n) for n in range(1, 9))
+                       and (gate_fields(summary.stdout).get("gpu_needed"), gate_fields(summary.stdout).get("gpu_reused")) == ("4", "4") and summary.returncode == EXIT_GATE_RED
+                       and gpu_lines_of(ran.stdout, "BROAD_MUTATION_GPU_TOTAL")[0].get("judged") == "4",
+                       f"两趟都没红：没记成没红、或 GPU 那一趟跑了闭包够不着的条（GPU 行 {sorted(gpu_rows)}；GPU 趟现判过 {sorted(selftest.gpu_judged_sequences())}；"
+                       f"汇总没红 {summary_field(summary.stdout, 'missed')}、MISSED {missed_lines}）：{ran.stdout[-400:]}{ran.stderr[-300:]}",
+                       "看 GpuJudging.need：只给「有一条跑得到的测试，它带特性的闭包含容器单元、又真引到 gpu 原子」的条跑 GPU 那一趟；没红的 CPU + GPU 两趟都没红才记没红，汇总与门禁行照合起来的状态数")
+        # 命令的写法：特性是 tests/ 里 cfg 点到的、目标是够得着的那几个、测试步经清场包装并加 --nocapture --test-threads 1、编译步不经、BINDGEN_EXTRA_CLANG_ARGS 取崩溃放量那一份、每步有整步限时
+        bindgen = gpu_bindgen_arguments()
+        build_commands = [json.loads(entry[3]) for entry in environment if entry[1] == GPU_BUILD_STEP]
+        test_commands = [json.loads(entry[3]) for entry in environment if entry[1] == GPU_TEST_STEP]
+        right_test = ["bash", QUIESCE_RUNNER, "--", "cargo", "test", "--locked", "--release", "-p", CHECKER_TIER_PACKAGE, "--features", "gpu", "--test", "gpu_pair",
+                      "--", "--nocapture", "--test-threads", "1"]
+        right_build = ["cargo", "test", "--locked", "--release", "-p", CHECKER_TIER_PACKAGE, "--features", "gpu", "--test", "gpu_pair", "--no-run"]
+        limits = {(entry[0], entry[1]): entry[4] for entry in environment}
+        selftest.check(bindgen and len(environment) == 2 * (1 + len(covered)) and build_commands == [right_build] * (1 + len(covered)) and test_commands == [right_test] * (1 + len(covered))
+                       and all(entry[2] == bindgen for entry in environment) and limits[(GPU_BASELINE_SEQUENCE, GPU_BUILD_STEP)] == "None"
+                       and all(limits[(sequence, step)].isdigit() and int(limits[(sequence, step)]) >= 5 for sequence in covered for step in (GPU_BUILD_STEP, GPU_TEST_STEP)),
+                       f"GPU 那一趟的命令不对（BINDGEN {bindgen[:40]!r}；收到 {len(environment)} 步；编译步 {build_commands[:1]}；测试步 {test_commands[:1]}；限时 {sorted(limits.items())[:4]}）",
+                       "看 gpu_pass_command：编译步 cargo test --locked --release -p singlefs-checker-tier --features <特性> <目标> --no-run；测试步整条经 scripts/crash/gpu-quiesce-run.sh -- 起，"
+                       "后面加 -- --nocapture --test-threads 1；BINDGEN_EXTRA_CLANG_ARGS 取 gpu_bindgen_arguments（crash-amplification-lib.sh 的那一份）；基线不设限时、逐条设整步限时")
+
+        # ④ 没卡：基线那一趟日志里有 NOT_RUN_NO_GPU_ADAPTER ⇒ 两条逐条报本次未跑、不落 GPU 行、不记没红；之后有卡了重跑同一条命令补上
+        ran = gpu_run("gpu-no-card", [("gpu-baseline", GPU_TEST_STEP, "gpu-no-adapter")], *two)
+        summary = summary_of("gpu-no-card")
+        not_run = gpu_lines_of(ran.stdout, "BROAD_MUTATION_GPU_NOT_RUN")
+        no_conclusion = [line.split("\t") for line in summary.stdout.splitlines() if line.startswith("NO_CONCLUSION\t")]
+        gate = gate_fields(summary.stdout)
+        selftest.check(ran.returncode == 0 and not selftest.gpu_rows("gpu-no-card") and sorted(entry["sequence"] for entry in not_run) == ["1", "2"]
+                       and all(entry["reason"] == "no-adapter" for entry in not_run) and selftest.gpu_judged_sequences() == set()
+                       and "GPU 趟（要 2 条）：现判 0、复用 0、本次未跑 2" in ran.stdout and summary_field(summary.stdout, "missed") == 0
+                       and (gate.get("gpu_needed"), gate.get("gpu_reused"), gate.get("gpu_not_run")) == ("2", "0", "2")
+                       and {entry[1] for entry in no_conclusion if entry[-1].startswith("gpu-not-run")} == {"1", "2"} and summary.returncode == EXIT_GATE_RED,
+                       f"没卡：没报本次未跑、记成了没红、或落了 GPU 行（退 {ran.returncode}；本次未跑 {not_run}；GPU 行 {selftest.gpu_rows('gpu-no-card')}；汇总没红 {summary_field(summary.stdout, 'missed')}）："
+                       f"{ran.stdout[-500:]}{ran.stderr[-300:]}",
+                       "看 gpu_classify_test（日志里有 NOT_RUN_NO_GPU_ADAPTER 是 not-run，不是没红）与 GpuPass.ensure_baseline、run_gpu_phase 的 BROAD_MUTATION_GPU_NOT_RUN：本次未跑的不落行、不进没红栏，"
+                       "汇总里它们是 none（理由 gpu-not-run），门禁行的 gpu_not_run= 数得出")
+        # 有卡了：同一条命令 CPU 那一趟沿用跳过，GPU 那一趟补上
+        selftest.write_plan([])
+        selftest.clear_calls()
+        again = selftest.run("gpu-no-card", *two, source=source)
+        selftest.check(again.returncode == 0 and {row["sequence"]: row["outcome"] for row in selftest.gpu_rows("gpu-no-card")} == {"1": "missed", "2": "missed"}
+                       and "GPU 趟（要 2 条）：现判 2、复用 0、本次未跑 0" in again.stdout,
+                       f"有卡之后重跑同一条命令没把 GPU 那一趟补上（退 {again.returncode}）：{again.stdout[-400:]}{again.stderr[-300:]}",
+                       "看 run_items 里「选中 0 条要跑」那一支：CPU 那一趟没有要现判的，也要接着跑 run_gpu_phase")
+
+        # 中途没卡（基线有、第 1 条测试步打了 NOT_RUN_NO_GPU_ADAPTER）：这一条和后面的都本次未跑，已落的行不动
+        ran = gpu_run("gpu-card-gone", [("1", GPU_TEST_STEP, "gpu-no-adapter")], *two)
+        not_run = gpu_lines_of(ran.stdout, "BROAD_MUTATION_GPU_NOT_RUN")
+        selftest.check(ran.returncode == 0 and not selftest.gpu_rows("gpu-card-gone") and sorted(entry["sequence"] for entry in not_run) == ["1", "2"]
+                       and selftest.gpu_judged_sequences() == {"1"},
+                       f"中途没卡：这一条之后的没停下、或落了行（GPU 行 {selftest.gpu_rows('gpu-card-gone')}；本次未跑 {not_run}；GPU 趟现判过 {sorted(selftest.gpu_judged_sequences())}）",
+                       "看 run_gpu_phase 的 stopped_for：测试步见到 NOT_RUN_NO_GPU_ADAPTER，这一条不落行、后面的条不再起，逐条报本次未跑；树里的原件照拷回")
+
+        # --skip-gpu：一步 GPU 都不起，要这一趟的条逐条本次未跑
+        ran = gpu_run("gpu-skipped", [], *two, "--skip-gpu")
+        selftest.check(ran.returncode == 0 and not selftest.gpu_calls() and not selftest.gpu_rows("gpu-skipped")
+                       and sorted(entry["sequence"] for entry in gpu_lines_of(ran.stdout, "BROAD_MUTATION_GPU_NOT_RUN")) == ["1", "2"],
+                       f"--skip-gpu 还是起了 GPU 的步、或没逐条报本次未跑（GPU 步 {selftest.gpu_calls()}）：{ran.stdout[-300:]}", "看 run_gpu_phase 里的 skip_gpu")
+
+        # 清场没过（清场包装退 78、测试没起）：同样本次未跑，不拒、不记没红
+        ran = gpu_run("gpu-quiesce-refused", [("gpu-baseline", GPU_TEST_STEP, "exit:78")], *two)
+        not_run = gpu_lines_of(ran.stdout, "BROAD_MUTATION_GPU_NOT_RUN")
+        selftest.check(ran.returncode == 0 and not selftest.gpu_rows("gpu-quiesce-refused") and sorted(entry["sequence"] for entry in not_run) == ["1", "2"]
+                       and all(entry["reason"] == "quiesce-refused" for entry in not_run),
+                       f"清场没过（退 78）没报成本次未跑（退 {ran.returncode}；{not_run}）：{ran.stdout[-300:]}{ran.stderr[-300:]}",
+                       "看 gpu_classify_test 的退 78：清场回读没过、命令没起，是 not-run，出路是等卡上那个不归清场白名单的进程跑完再起，不停它")
+
+        # 基线红：没改过的树上 GPU 那一趟就不绿 ⇒ 拒（退 6）、一条 GPU 行都不落、树回到原样；CPU 那一趟已落的行在
+        ran = gpu_run("gpu-baseline-red", [("gpu-baseline", GPU_TEST_STEP, "gpu-fail")], *two)
+        selftest.check(ran.returncode == EXIT_BASELINE_RED and "GPU 趟基线" in ran.stderr and not selftest.gpu_rows("gpu-baseline-red") and {(row["sequence"], row["outcome"]) for row in selftest.rows("gpu-baseline-red")} == {("1", STAGE_ONE_ONLY), ("1", "missed"), ("2", STAGE_ONE_ONLY), ("2", "missed")}
+                       and selftest.gpu_judged_sequences() == set() and "--skip-gpu" in ran.stderr,
+                       f"GPU 趟基线红没拒成「基线不绿」（退 {ran.returncode}）：{ran.stderr[-400:]}", "看 GpuPass.ensure_baseline：没改过的树上编译红、测试红、一个测试都没跑到，退 6 并写出路")
+
+        # 超时、一个测试都没跑到、编不过：没结论的（超时、驱动错）不当定论，编不过是无效
+        ran = gpu_run("gpu-timeout", [("1", GPU_TEST_STEP, "exit:253"), ("2", GPU_TEST_STEP, "gpu-zero")], *two)
+        gpu_rows = {row["sequence"]: row["outcome"] for row in selftest.gpu_rows("gpu-timeout")}
+        summary = summary_of("gpu-timeout")
+        reasons = {line.split("\t")[1]: line.split("\t")[-1] for line in summary.stdout.splitlines() if line.startswith("NO_CONCLUSION\t")}
+        selftest.check(ran.returncode == 0 and gpu_rows == {"1": "timeout", "2": DRIVER_ERROR} and reasons.get("1") == "gpu-timeout" and reasons.get("2") == f"gpu-{DRIVER_ERROR}"
+                       and gate_fields(summary.stdout).get("gpu_without_conclusion") == "2" and summary_field(summary.stdout, "missed") == 0,
+                       f"GPU 趟超时 / 一个测试都没跑到不是没结论（GPU 行 {gpu_rows}；理由 {reasons}）：{ran.stdout[-300:]}{ran.stderr[-300:]}",
+                       "看 gpu_classify_test：退 253 是 timeout、退 0 而一个测试都没跑到是驱动错，都不是没红；汇总里它们是没结论（gpu_without_conclusion=）")
+        ran = gpu_run("gpu-unviable", [("1", GPU_BUILD_STEP, "fail-compile")], *two)
+        gpu_rows = {row["sequence"]: row["outcome"] for row in selftest.gpu_rows("gpu-unviable")}
+        selftest.check(ran.returncode == 0 and gpu_rows == {"1": "unviable", "2": "missed"} and selftest.states("gpu-unviable", source).get("1") == "unviable",
+                       f"GPU 趟编不过没记成无效（GPU 行 {gpu_rows}）：{ran.stdout[-300:]}{ran.stderr[-300:]}", "看 gpu_classify_build 与 judge_gpu_item：编译步退 101 又有带源码位置的编译错误才是无效")
+
+        # 复用：同一条命令再跑，GPU 那一趟一步都不起（沿用得了）；带 --rerun 点名的那一条重跑并追加新行
+        selftest.write_plan([])
+        selftest.clear_calls()
+        reused = selftest.run("gpu-neither", source=source)
+        selftest.check(reused.returncode == 0 and not selftest.gpu_calls() and not selftest.judged_sequences() and "BROAD_MUTATION_GPU_PLAN needed=4 judge=0 carried=4 " in reused.stdout
+                       and "GPU 趟（要 4 条）：现判 0、复用 4、本次未跑 0" in reused.stdout and len(selftest.gpu_rows("gpu-neither")) == 4,
+                       f"同一条命令第二趟 GPU 那一趟没复用（GPU 步 {selftest.gpu_calls()[:3]}）：{reused.stdout[-400:]}{reused.stderr[-300:]}",
+                       "看 GpuJudging.state 与 row_holds：键相同、gpu_key 相同、没红的覆盖者键相同才沿用；run_gpu_phase 里沿用得了的不选")
+        rerun = selftest.run("gpu-neither", "--item", "2", "--rerun", source=source)
+        selftest.check(rerun.returncode == 0 and selftest.gpu_judged_sequences() == {"2"} and len([row for row in selftest.gpu_rows("gpu-neither") if row["sequence"] == "2"]) == 2,
+                       f"点名加 --rerun 没有重跑 GPU 那一趟并追加新行（GPU 步 {selftest.gpu_calls()}）：{rerun.stdout[-300:]}{rerun.stderr[-300:]}",
+                       "看 run_gpu_phase：--rerun 下沿用得了的也现判，GPU 判定库只追加")
+        # --skip-stage-two：GPU 趟接在第二段后面，不起
+        ran = gpu_run("gpu-stage-one", [], *two, "--skip-stage-two")
+        selftest.check(ran.returncode == 0 and not selftest.gpu_calls() and "--skip-stage-two，不跑" in ran.stdout and not selftest.gpu_rows("gpu-stage-one"),
+                       f"--skip-stage-two 还是起了 GPU 那一趟（{selftest.gpu_calls()[:2]}）", "看 run_gpu_phase 开头的 skip_stage_two")
+        # 手追加的 GPU 判定行不算：少一段（没有校验列）与校验列对不上的两行，--summary 判红退 1、点名 GPU 判定库
+        forged_path = gpu_verdicts_path(Library(os.path.join(selftest.work, "gpu-neither")))
+        genuine_rows = selftest.gpu_rows("gpu-neither")
+        if not genuine_rows:
+            # 前面几格红了、gpu-neither 里一行 GPU 判定都没有：这一格判不了，记判错，不在这里抛出去（后面几组的格照判）
+            selftest.check(False, "手追加的没有校验列、校验列对不上的 GPU 判定行没判红（前提不成立：gpu-neither 里一行 GPU 判定都没有，照上面几格先修）",
+                           "看 run_gpu_phase：gpu-neither 那几趟要落 GPU 判定行，这一格拿其中一行造手追加的行")
+        else:
+            genuine = genuine_rows[0]
+            fields = [genuine[column] if column != "outcome" else "caught" for column in GPU_VERDICT_COLUMNS[:GPU_SIGNED_COLUMNS]]
+            append_row(forged_path, GPU_VERDICT_COLUMNS, fields)
+            append_row(forged_path, GPU_VERDICT_COLUMNS, fields + ["0" * 64])
+            forged = summary_of("gpu-neither")
+            selftest.check(forged.returncode == EXIT_INCONSISTENT and "GPU 判定库" in forged.stderr and "校验列" in forged.stderr,
+                           f"手追加的没有校验列、校验列对不上的 GPU 判定行没判红（退 {forged.returncode}）：{forged.stderr[-300:]}",
+                           "看 read_gpu_verdicts 与 summarise 的 problems：GPU 判定行同判定行一样带密钥算的校验列，对不上的不算判定、--summary 退 1")
+    finally:
+        selftest.write_plan(SELFTEST_PLAN)
+        selftest.clear_calls()
+
+
+GPU_JUDGING_CHILD = r'''
+import importlib.util, sys
+specification = importlib.util.spec_from_file_location("broad_mutation_gpu_judging_child", sys.argv[1])
+driver = importlib.util.module_from_spec(specification)
+specification.loader.exec_module(driver)
+print(driver.gpu_judging_key(sys.argv[2]))
+if len(sys.argv) > 3:
+    print(driver.judging_units_key(sys.argv[2]))
+'''
+
+
+def selftest_gpu_judging_cells(selftest):
+    """GPU 那一趟的判法单元指纹（文件头「GPU 那一趟」）：在一份拷贝上算，只改注释与文档串不变；改了 GPU 趟判结局的函数（gpu_classify_test 的体）就变；
+    改它不动 CPU 那一趟的判法单元指纹（库里 CPU 那一趟的判定一条都不作废）。由自证起的子进程算（弄坏开关在那里认）。"""
+    copy = os.path.join(selftest.work, "gpu-judging-copy")
+    for path in sorted({path for path, _name in (*JUDGING_ENTRIES, *GPU_JUDGING_ENTRIES)}) + ["scripts/gate/lib_libtest_result_lines.py", "scripts/gate/lib_function_units.py",
+                                                                                              "scripts/gate/lib_reuse_checks.py", "scripts/hosts/heavy_threads.py",
+                                                                                              ".claude/scripts/project_preflight.py"]:
+        if os.path.isfile(os.path.join(REPOSITORY, path)):
+            os.makedirs(os.path.dirname(os.path.join(copy, path)), exist_ok=True)
+            shutil.copyfile(os.path.join(REPOSITORY, path), os.path.join(copy, path))
+    driver_copy = os.path.join(copy, "scripts/mutation/broad-mutation.py")
+
+    def keys_now(with_cpu):
+        done = subprocess.run([sys.executable, "-c", GPU_JUDGING_CHILD, SELF_PATH, copy, *(["cpu"] if with_cpu else [])], capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                              env={name: value for name, value in selftest.environment.items() if name not in ("BROAD_MUTATION_JUDGING_KEY", "BROAD_MUTATION_GPU_JUDGING_KEY")})
+        lines = done.stdout.split()
+        return lines if done.returncode == 0 and len(lines) == (2 if with_cpu else 1) else [f"退 {done.returncode}：{done.stderr.strip()[-300:]}"] * (2 if with_cpu else 1)
+    with open(driver_copy, encoding="utf-8") as handle:
+        original = handle.read()
+    marker = "    text = gpu_log_text(log_path)\n    passed = sum("
+    changed_body = 'return GpuOutcome("timeout", "", f"{GPU_TEST_STEP} ' + '超时")'
+    if original.count(marker) != 1 or original.count(changed_body) != 1:
+        selftest.check(False, "GPU 趟判法单元指纹那一格找不到要改的两处（gpu_classify_test 的开头与超时那一行）", "看 selftest_gpu_judging_cells 里的 marker 与 changed_body：gpu_classify_test 改了写法就跟着改")
+        return
+    before_gpu, before_cpu = keys_now(True)
+    with open(driver_copy, "w", encoding="utf-8") as handle:
+        handle.write(original.replace(marker, "    # 自证：只加一行注释\n" + marker, 1).replace("\nimport argparse\n", "\n# 自证：文件里再加一行注释\nimport argparse\n", 1))
+    commented_gpu = keys_now(False)[0]
+    with open(driver_copy, "w", encoding="utf-8") as handle:
+        handle.write(original.replace(changed_body, 'return GpuOutcome("timeout", "", f"{GPU_TEST_STEP} ' + '超时（自证改了判结局的函数）")', 1))
+    body_gpu, body_cpu = keys_now(True)
+    selftest.check(re.fullmatch(r"[0-9a-f]{64}", before_gpu) and commented_gpu == before_gpu,
+                   f"只改驱动注释 GPU 趟的判法单元指纹变了（改前 {before_gpu[:16]}、只改注释之后 {commented_gpu[:16]}）",
+                   "看 gpu_judging_key：取 GPU_JUDGING_ENTRIES 那几个函数的 python 单元闭包键（注释与文档串不进指纹），不取整份原文")
+    selftest.check(re.fullmatch(r"[0-9a-f]{64}", body_gpu) and body_gpu != before_gpu,
+                   f"改了 GPU 趟判结局的函数（gpu_classify_test 的体）GPU 趟的判法单元指纹没变（{before_gpu[:16]} → {body_gpu[:16]}）",
+                   "看 GPU_JUDGING_ENTRIES：命令怎么拼、步结局怎么分、沿用怎么判、两趟怎么合那几个函数都要在里面")
+    selftest.check(re.fullmatch(r"[0-9a-f]{64}", before_cpu) and body_cpu == before_cpu,
+                   f"改了 GPU 趟的函数，CPU 那一趟的判法单元指纹跟着变了（{before_cpu[:16]} → {body_cpu[:16]}）：库里 CPU 那一趟的判定会一条都不沿用",
+                   "GPU 那一节的函数不许被 JUDGING_ENTRIES 的闭包点到（process_item、Runner.escalate_step 等不改、不调 GPU 那一节）；CPU 那一趟的判法单元指纹只管 CPU 那一趟")
+
+
+def selftest_gpu_import_cells(selftest):
+    """两台各跑一片时，第二台的 GPU 判定行随 --import-results 并进本机库（文件头「--import-results」）：第二台跑奇数片（序号 1、5 要 GPU 那一趟）、本机跑偶数片（2、4），
+    ① 导入之后本机 GPU 趟现判 0、复用 4（等于本机自己判的 2 条加导进来的 2 条），再导一遍一行不加；② 一行键对不上本机此刻的源码、一行 GPU 趟自己的键对不上：被拒、列出来、
+    退 1，对得上的那一行照导，之后本机的 GPU 趟只把被拒的那一条照现判；③ 一行结局认不出：整表拒，verdicts.tsv 的行也不导；④ 两边定论不同的一把键不导、列出来、退 1。"""
+    work = selftest.work
+    source = selftest_source_copy(selftest, "gpu-source", SELFTEST_GPU_FILES)
+    column = {name: index for index, name in enumerate(GPU_VERDICT_COLUMNS)}
+    peer_home = os.path.join(work, "gpu-import-peer")
+    local_home = os.path.join(work, "gpu-import-local")
+
+    def gpu_run(home, *arguments):
+        selftest.write_plan([])
+        selftest.clear_calls()
+        return selftest.run(home, *arguments, source=source)
+
+    def import_fields(output):
+        found = gpu_lines_of(output, "BROAD_MUTATION_IMPORT")
+        return found[0] if found else {}
+
+    def row_of(rows, sequence):
+        return next(fields for fields in rows if fields[column["sequence"]] == str(sequence))
+
+    def peer_copy(name, edit):
+        """另一台库目录的一份拷贝：verdicts.tsv 照原样，gpu-verdicts.tsv 的行换成 edit 给的（每行是字段表；edit 拿到的是原来的各行）。"""
+        directory = os.path.join(work, name)
+        os.makedirs(directory)
+        shutil.copyfile(os.path.join(peer_home, "verdicts.tsv"), os.path.join(directory, "verdicts.tsv"))
+        with open(os.path.join(peer_home, GPU_VERDICTS), encoding="utf-8") as handle:
+            lines = handle.read().split("\n")
+        original = [line.split("\t") for line in lines[1:] if line]
+        with open(os.path.join(directory, GPU_VERDICTS), "w", encoding="utf-8") as handle:
+            # 改过的行照另一台的密钥重签：这几格核的是键、结局与定论，不是校验列（校验列那两格在 selftest_import_cells）
+            handle.write("\n".join([lines[0]] + ["\t".join(selftest.peer_signed_gpu_fields(fields)) for fields in edit(original)]) + "\n")
+        return directory
+
+    try:
+        selftest.write_plan([])
+        selftest.clear_calls()
+        peer_run = selftest.run("gpu-import-peer", "--shard", "1/2", source=source, BROAD_MUTATION_RESULT_KEY=selftest.peer_side_key_path())
+        selftest.exchange_peer_key()
+        local_run = gpu_run("gpu-import-local", "--shard", "0/2")
+        peer_sequences = sorted(row["sequence"] for row in selftest.gpu_rows("gpu-import-peer"))
+        local_sequences = sorted(row["sequence"] for row in selftest.gpu_rows("gpu-import-local"))
+        prepared = peer_run.returncode == 0 and local_run.returncode == 0 and peer_sequences == ["1", "5"] and local_sequences == ["2", "4"]
+        selftest.check(prepared,
+                       f"两台各跑一片的 GPU 导入格前提不成立（第二台那一片退 {peer_run.returncode}、GPU 行 {peer_sequences}，应当 [1, 5]；本机那一片退 {local_run.returncode}、GPU 行 {local_sequences}，应当 [2, 4]）："
+                       f"{peer_run.stderr[-300:]}{local_run.stderr[-300:]}",
+                       "看 run_gpu_phase 与 in_run_scope：--shard k/2 只给序号 mod 2 == k 的条跑两趟，CPU 没红又有带 gpu 特性的测试够得着的条（序号 1、2、4、5）各落一行 GPU 判定")
+        if not prepared:
+            return
+        for name in ("gpu-import-local-bad", "gpu-import-local-malformed"):
+            shutil.copytree(local_home, os.path.join(work, name))
+
+        # ① 第二台的 GPU 判定行随导入并进本机库：之后本机的 GPU 趟一条都不现判，复用数 = 本机自己判的 + 导进来的
+        imported = selftest.run("gpu-import-local", "--import-results", peer_home, source=source)
+        fields = import_fields(imported.stdout)
+        brought = sorted((row["sequence"], row["method"]) for row in selftest.gpu_rows("gpu-import-local") if row["method"].startswith("import:"))
+        merged = sorted(row["sequence"] for row in selftest.gpu_rows("gpu-import-local"))
+        again = selftest.run("gpu-import-local", "--import-results", peer_home, source=source)
+        again_fields = import_fields(again.stdout)
+        plain = gpu_run("gpu-import-local")
+        selftest.check(imported.returncode == 0 and (fields.get("gpu_rows_read"), fields.get("gpu_imported"), fields.get("gpu_rejected")) == ("2", "2", "0")
+                       and brought == [("1", "import:fresh"), ("5", "import:fresh")] and merged == ["1", "2", "4", "5"]
+                       and again.returncode == 0 and (again_fields.get("gpu_imported"), again_fields.get("gpu_already_present")) == ("0", "2")
+                       and plain.returncode == 0 and not selftest.gpu_calls() and not selftest.judged_sequences()
+                       and "BROAD_MUTATION_GPU_PLAN needed=4 judge=0 carried=4 " in plain.stdout and "GPU 趟（要 4 条）：现判 0、复用 4、本次未跑 0" in plain.stdout
+                       and len(selftest.gpu_rows("gpu-import-local")) == 4,
+                       f"第二台的 GPU 判定行没随导入并进本机库、或并进来之后本机的 GPU 趟还是把同一批判了一遍（导入退 {imported.returncode}：{imported.stdout[-400:]}；并进来的 {brought}、合起来 {merged}；"
+                       f"再导一遍 {again_fields}；之后不带 --shard 的一趟退 {plain.returncode}、GPU 步 {selftest.gpu_calls()[:2]}）：{imported.stderr[-300:]}{plain.stdout[-300:]}",
+                       "看 import_results 与 plan_gpu_import：另一台库目录里的 gpu-verdicts.tsv 的行核过键（行的键在本机此刻清单的键里、gpu_key 等于 GpuJudging.pass_key）就并进本机的 gpu-verdicts.tsv，"
+                       "跑法加 import: 前缀、照本机密钥重签，本机已有的相同行不重复导；本机的 GPU 趟读的就是 gpu-verdicts.tsv，键相同、gpu_key 相同的行沿用")
+
+        # ② 一行键对不上、一行 GPU 趟自己的键对不上：被拒、列出来、退 1；对得上的那一行照导；之后本机的 GPU 趟只把被拒的那一条照现判
+        def mixed(rows):
+            stale = list(row_of(rows, 1))
+            stale[column["key"]] = "a" * 64
+            other_pass = list(row_of(rows, 5))
+            other_pass[column["gpu_key"]] = "b" * 64
+            return [stale, row_of(rows, 5), other_pass]
+        mixed_peer = peer_copy("gpu-import-peer-mixed", mixed)
+        bad = selftest.run("gpu-import-local-bad", "--import-results", mixed_peer, source=source)
+        bad_fields = import_fields(bad.stdout)
+        reasons = sorted(line.split("\t")[3] for line in bad.stdout.splitlines() if line.startswith("IMPORT_GPU_REJECTED\t"))
+        kept = sorted(row["sequence"] for row in selftest.gpu_rows("gpu-import-local-bad"))
+        rejudged = gpu_run("gpu-import-local-bad")
+        selftest.check(bad.returncode == EXIT_INCONSISTENT and (bad_fields.get("gpu_rows_read"), bad_fields.get("gpu_imported"), bad_fields.get("gpu_rejected")) == ("3", "1", "2")
+                       and reasons == ["gpu-pass-changed", "key-not-in-list"] and kept == ["2", "4", "5"]
+                       and rejudged.returncode == 0 and selftest.gpu_judged_sequences() == {"1"}
+                       and "BROAD_MUTATION_GPU_PLAN needed=4 judge=1 carried=3 " in rejudged.stdout,
+                       f"键对不上的 GPU 判定行没被拒、或拒了之后本机的 GPU 趟没把它照现判（导入退 {bad.returncode}，应当 {EXIT_INCONSISTENT}；{bad_fields}；被拒的理由 {reasons}；导入之后本机的 GPU 行 {kept}，应当 [2, 4, 5]；"
+                       f"之后一趟现判过 {sorted(selftest.gpu_judged_sequences())}，应当 [1]）：{bad.stderr[-400:]}{rejudged.stdout[-300:]}",
+                       "看 plan_gpu_import：行的键不在本机此刻清单的单元键里记 key-not-in-list，gpu_key 不等于 GpuJudging.pass_key() 记 gpu-pass-changed，这两种不导、IMPORT_GPU_REJECTED 逐条列出、整条导入退 1；"
+                       "对得上的行照导，被拒的那一条在本机没有 GPU 判定，之后补跑 GPU 趟时照现判")
+
+        # ③ 一行结局认不出：整表拒、退 1，verdicts.tsv 的行也一行不导
+        def unknown_outcome(rows):
+            broken = list(row_of(rows, 1))
+            broken[column["outcome"]] = "不是结局"
+            return [broken, row_of(rows, 5)]
+        malformed_peer = peer_copy("gpu-import-peer-malformed", unknown_outcome)
+        verdict_rows_before = len(selftest.rows("gpu-import-local-malformed"))
+        gpu_rows_before = len(selftest.gpu_rows("gpu-import-local-malformed"))
+        malformed = selftest.run("gpu-import-local-malformed", "--import-results", malformed_peer, source=source)
+        selftest.check(malformed.returncode == EXIT_INCONSISTENT and "认不出" in malformed.stderr
+                       and len(selftest.rows("gpu-import-local-malformed")) == verdict_rows_before and len(selftest.gpu_rows("gpu-import-local-malformed")) == gpu_rows_before,
+                       f"不成形的 GPU 判定行没整表拒、或拒了还写了别的行（退 {malformed.returncode}；判定行 {verdict_rows_before} → {len(selftest.rows('gpu-import-local-malformed'))}；"
+                       f"GPU 行 {gpu_rows_before} → {len(selftest.gpu_rows('gpu-import-local-malformed'))}）：{malformed.stderr[-300:]}",
+                       "看 plan_gpu_import：段数不是十四、结局认不出、键不是 64 位十六进制的整表拒，且排在 import_results 写任何一行（含 verdicts.tsv 的行）之前")
+
+        # ④ 同一把键两边都有定论而不同：这一把键的行不导、列出来、退 1
+        def opposite(rows):
+            opposed = list(row_of(rows, 5))
+            opposed[column["outcome"]] = "caught"
+            opposed[column["caught_by"]] = SELFTEST_GPU_CASE
+            opposed[column["test_key"]] = "c" * 64
+            opposed[column["coverage_key"]] = ""
+            return [opposed]
+        conflict_peer = peer_copy("gpu-import-peer-conflict", opposite)
+        rows_before = len(selftest.gpu_rows("gpu-import-local"))
+        conflict = selftest.run("gpu-import-local", "--import-results", conflict_peer, source=source)
+        conflict_fields = import_fields(conflict.stdout)
+        selftest.check(conflict.returncode == EXIT_INCONSISTENT and "IMPORT_GPU_CONFLICT\t" in conflict.stdout
+                       and (conflict_fields.get("gpu_conflicting_keys"), conflict_fields.get("gpu_imported")) == ("1", "0") and len(selftest.gpu_rows("gpu-import-local")) == rows_before,
+                       f"两台定论不同的 GPU 判定行没挡下（退 {conflict.returncode}；{conflict_fields}；GPU 行 {rows_before} → {len(selftest.gpu_rows('gpu-import-local'))}）：{conflict.stdout[-300:]}{conflict.stderr[-300:]}",
+                       "看 plan_gpu_import：同一把键本机与另一台各有一条定论（caught / missed / unviable）、结局不同，这一把键的行不导，IMPORT_GPU_CONFLICT 列出来，整条导入退 1")
+    finally:
+        selftest.write_plan(SELFTEST_PLAN)
+        selftest.clear_calls()
+
+
+SELFTEST_CELL_NAMES = (
+    "selftest_fresh_build_cells",
+    "selftest_run_directory_cells",
+    "selftest_prune_cells",
+    "selftest_reuse_cells",
+    "selftest_global_cells",
+    "selftest_judging_cells",
+    "selftest_gpu_cells",
+    "selftest_gpu_judging_cells",
+    "selftest_refused_cells",
+    "selftest_removed_cells",
+    "selftest_environmental_cells",
+    "selftest_gpu_memory_cells",
+    "selftest_basic_cells",
+    "selftest_state_cells",
+    "selftest_table_cells",
+    "selftest_environment_cells",
+    "selftest_sync_cells",
+    "selftest_rerun_larger_limit_cells",
+    "selftest_escalation_cells",
+    "selftest_escalation_evidence_cells",
+    "selftest_baseline_threads_cells",
+    "selftest_baseline_key_cells",
+    "selftest_baseline_entry_cells",
+    "selftest_baseline_alerts_cells",
+    "selftest_result_mac_cells",
+    "selftest_unit_environment_cells",
+    "selftest_import_cells",
+    "selftest_ignored_cells",
+    "selftest_test_variable_cells",
+    "selftest_progress_cells",
+    "selftest_stop_cells",
+    "selftest_rocksdb_entry_cells",
+)
+
+
+def run_selftest_cells(selftest, only=None):
+    """自证的各组格，照 SELFTEST_CELL_NAMES 的次序；only 给了只跑点名的几组（环境变量 BROAD_MUTATION_SELFTEST_CELLS，开发时分段跑用：有的组接着前面组留下的库目录，单跑要连前面那一组一起点）。"""
+    for name in SELFTEST_CELL_NAMES:
+        if only is None or name in only:
+            globals()[name](selftest)
+
+
+def selftest_rocksdb_entry_cells(selftest):
+    """真跑起 cargo 之前判 RocksDB 预编库的取值：被判的树里 checker 档包依赖 rocksdb、进程环境里四个取值是空的 ⇒ 拒（退 2）、假的一步一次都没起、报出 entry 的红句。
+    别的格的树（SELFTEST_SOURCES）没有依赖 rocksdb 的清单，entry 报不判。"""
+    tree = selftest_source_copy(selftest, "rocksdb-source", {"crates/singlefs-checker-tier/Cargo.toml": selftest_package("singlefs-checker-tier")
+                                                            + '\n[dependencies]\nrocksdb = { version = "=0.25.0", optional = true }\n'})
+    calls_before = len(selftest.calls())
+    refused = selftest.run("rocksdb", source=tree, ROCKSDB_LIB_DIR="", ROCKSDB_STATIC="", SNAPPY_LIB_DIR="", SNAPPY_STATIC="")
+    selftest.check(refused.returncode == EXIT_USAGE and len(selftest.calls()) == calls_before and "rocksdb-prebuilt entry：" in refused.stdout + refused.stderr,
+                   f"被判的树里 checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，没在起 cargo 之前拒（退 {refused.returncode}，"
+                   f"假的一步起了 {len(selftest.calls()) - calls_before} 次）：{(refused.stdout + refused.stderr)[-600:]}",
+                   "看 main 里 check_real_run_is_allowed 之后的 check_rocksdb_entry（scripts/hosts/rocksdb-prebuilt.py entry）")
+
+
+def run_selftest(only=None):
+    unknown = [name for name in (only or []) if name not in SELFTEST_CELL_NAMES]
+    if unknown:
+        refuse(f"BROAD_MUTATION_SELFTEST_CELLS 点了不认得的组：{'、'.join(unknown)}", f"只认这几组：{'、'.join(SELFTEST_CELL_NAMES)}")
     work = tempfile.mkdtemp(prefix="broad-mutation-selftest.")
     selftest = Selftest(work)
     try:
-        run_selftest_cells(selftest)
+        run_selftest_cells(selftest, only)
     finally:
         open(os.path.join(work, "release"), "w").close()   # 挂住的那一步（有的话）见到它就退
         time.sleep(0.2)
@@ -5617,17 +7539,20 @@ def run_selftest():
         print(f"     → 怎么办：照上面每一格给的出路改，再跑 python3 {SELF_PATH} --selftest", file=sys.stderr)
         return 1
     say("  ✓ --selftest：临时库目录拒、生成清单与列项、项写错拒、点名与两段、杀掉再起只补没做完的、各种结局与汇总八栏、第二段只补第一段没跑到的、--from 与 --shard、"
-        "手改过的树照源码换回去、点名跳过沿用得了的条与 --rerun、定论不被降级、--stage-two-only 要过过第一段、清单按单元存的表改坏判红、末行没写完、认不出的退出码、"
-        "一步退 245（显存不够）停下不落行、重起验编译与连着无效或秒红、换树删多出来的文件与恢复半途被杀、工具链进每一把键、"
+        "上一趟被 KILL 留下的运行目录开跑先删、点名跳过沿用得了的条与 --rerun、定论不被降级、--stage-two-only 要过过第一段、清单按单元存的表改坏判红、末行没写完、认不出的退出码、"
+        "一步退 245（显存不够）停下不落行、重起验编译与连着无效或秒红、恢复原件半途被杀之后下一趟照常判、工具链进每一把键、"
         "不带参数就是剪枝（沿用数 > 0）、改了一个函数只现判它里面的条（同文件在某提交之后改过别处照样沿用）、--full 只写不读与翻面、"
         "加一条排除 / 只改 Cargo.toml 注释 / 加大限时照样沿用、改 RUSTFLAGS 全部现判、只改驱动注释判法单元指纹不变、拒算的条每趟现判、已删的参数与旧库拒、"
-        "剪枝跑重跑超时与内存撞顶的条、加大限时与上限再点名重跑判出结论、超时与撞顶自动升档（证据齐的判抓到并登记、升档那趟跑完照它往后判、证据不齐的没结论、"
+        "剪枝跑重跑超时与内存撞顶的条、--summary 的 NO_CONCLUSION 理由带上一趟限时（升档那趟的）、mutants.toml 写 exclude_re 之后清单少那一条且整版重记而别的条沿用、加大限时与上限再点名重跑判出结论、超时与撞顶自动升档（证据齐的判抓到并登记、升档那趟跑完照它往后判、证据不齐的没结论、"
         "--summary 逐条列、升档判的抓到按键沿用、升档那趟按自己的上限排队、变异步撞总上限时先挨杀）、升档证据五支各一格、基线按线程数分开记且登记行指的那一行对得上、"
         "基线键按测试的单元闭包取（改不在测试闭包里的函数测试步基线照沿用、改测试就重跑、编译步拒算照跑）、"
         "基线键拒算的测试步按条记基线（收得全的测试各自沿用、只照跑拒算与改过的那几条，checker 档拒算的那几条另起 --exact）、"
         "基线那几步的告警照旧写真记录（调用方设了的照调用方的、别的步不带）、"
-        "判定行带密钥校验列（手追加的不算）、--unit-environment 打构建环境与工具链认的会话变量、换树后照内容重编、合并导入、"
-        "忽略用例登记与排除表（没登记、指着不存在、两边都在、写坏、命令带 -E、旧基线行不认）、只供自证的变量不出自证、一步跑过进度间隔要报进度、被 TERM 连 scope 一起停，"
+        "判定行带密钥校验列（手追加的不算）、--unit-environment 打构建环境与工具链认的会话变量、每一趟自己的编译目录（不照用上一趟的产物）、跑完运行目录里不剩编译目录与树副本（正常、出错、被 TERM 停三种结局都删，有进程开着就不删、报出来、退 9）、合并导入、"
+        "第二台的 GPU 判定行随导入并进本机库（导入之后本机 GPU 趟现判 0、键对不上的行被拒并照现判、不成形的整表拒、两边定论不同的不导）、"
+        "忽略用例登记与排除表（没登记、指着不存在、两边都在、写坏、命令带 -E、旧基线行不认）、只供自证的变量不出自证、一步跑过进度间隔要报进度、被 TERM 连 scope 一起停、"
+        "GPU 那一趟（只有 CPU 红 / 只有 GPU 红 / 两趟都没红 / 没卡 / 清场没过 / 中途没卡 / --skip-gpu / 基线红 / 超时与无效与一个测试都没跑到、命令的写法、复用与 --rerun、"
+        "手追加的 GPU 判定行不算、--skip-stage-two 不跑、GPU 趟判法单元指纹与 CPU 的分开、复用三问与复用哨兵带上 GPU 趟），"
         f"{selftest.cells} 格都对")
     return 0
 
@@ -5641,5 +7566,5 @@ if __name__ == "__main__":
         sys.exit(refusal.code)
     except Stopped:
         print("  ✗ 被 TERM / INT 停了：在途那一条没落行，在途那一步已一起停掉", file=sys.stderr)
-        print("  → 怎么办：重跑同一条命令接着跑（树里留着改过的文件时开跑先照在途记录拷回原件）", file=sys.stderr)
+        print("  → 怎么办：重跑同一条命令接着跑（在途那一条在新换的树上重判；这一趟的运行目录没删掉的，下一趟开跑先删它）", file=sys.stderr)
         sys.exit(EXIT_STOPPED)

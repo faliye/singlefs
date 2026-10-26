@@ -9,7 +9,7 @@
 
 用法：
   archive-past-rounds.py --check          还留着上一轮的记录就判红（门禁用）
-  archive-past-rounds.py --apply          删掉；同时把指向被删文件的引用改成不带路径的说法
+  archive-past-rounds.py --apply          删掉；同时把指向被删文件的引用改成 `git show <删之前的提交>:<原路径>`（可重跑：磁盘上已删的跳过并报数）
   archive-past-rounds.py --apply --keep-registered   照删别的，被登记表点名的那几份留下、退 0（「把那份留下」这条出路）
   archive-past-rounds.py --selftest
 
@@ -19,19 +19,37 @@
 弄坏开关（只给 --selftest 证红用）：
   ARCHIVE_PAST_ROUNDS_BREAK=registry-check-skipped   named_by_registries() 不查登记表，一份都不报
       「✗ 自检失败：门禁登记表点名的上一轮产物」那一格红
+      连带红的格：「✗ 登记表点名的 3 处路径已经不在（文件早删了，或这一趟刚删），读那张表的检查拿到的是指空的路径」、「✗ 自检失败：--apply --keep-registered」、「✗ 自检失败：--check 不该把登记表点名、按规则留下的算成该删的」、「✗ 自检失败：变异表里…写法点名的、按子目录点名的」、「✗ 自检失败：登记了别的门禁目录（.claude/gate-directory 写 ops/gates）时」
   ARCHIVE_PAST_ROUNDS_BREAK=gate-directory-default-only   registry_trees() 不读 .claude/gate-directory，门禁目录一律取默认
       「✗ 自检失败：登记了别的门禁目录」那一格红
   ARCHIVE_PAST_ROUNDS_BREAK=gitlinks-kept   past_round_files() 不滤模式位 160000，gitlink 当文件进候选
       「✗ 自检失败：gitlink 进了候选」那一格红（--apply 对它 os.remove 抛 IsADirectoryError 的那条也跟着红）
+      连带红的格：「✗ 自检失败：有 gitlink 时 --apply（include 指空）抛了 IsADirectoryError」、「✗ 自检失败：有 gitlink 时 --apply（排除项指不到）抛了 IsADirectoryError」
   ARCHIVE_PAST_ROUNDS_BREAK=glob-range-protects   named_by_registries() 把带通配的射程当点名（按 fnmatch 配候选），射程配到的不删
       「✗ 自检失败：没点名的（只在注释行里提到的、通配射程里的）应当照删」那一格红（自证停在头一组出错的；单测 selftest_registry_namings 时
-      「✗ 自检失败：通配射程配到的那一份应当照删」那一格同样红）
+      『✗ 自检失败：通配射程配到的那一份应当照删』那一格同样红）
   ARCHIVE_PAST_ROUNDS_BREAK=dangling-registry-unreported   dangling_registry_namings() 一条都不报（登记表点名、文件已经不在的那几行）
       「✗ 自检失败：登记表点名、文件已经不在的那几行」那一格红
+      连带红的格：「✗ 自检失败：平铺登记表点名的那几份 --apply」、「✗ 这一趟删掉的 2 份上一轮产物被平铺登记表点名（排除表、豁免表不保护它点到的产物，删了那一行就指空）」
   ARCHIVE_PAST_ROUNDS_BREAK=flat-registries-unread   registry_namings() 不读平铺登记表（.claude/term-rename-exempt、.claude/*-exclude）
       「✗ 自检失败：这一趟要删、被平铺登记表点名的那几份」那一格红（它们指空之后的那几行也跟着报不出来）
+      连带红的格：「✗ 登记表点名的 2 处路径已经不在（文件早删了，或这一趟刚删），读那张表的检查拿到的是指空的路径」、「✗ 自检失败：平铺登记表点名的那几份 --apply」、「✗ 自检失败：登记表点名、文件已经不在的那几行（.claude/gate.d/stage.tsv:1、.claude/term-rename…」、「✗ 还留着上一轮及更早的实验记录 4 份（本轮的与判决不算）」
   ARCHIVE_PAST_ROUNDS_BREAK=mutation-replacement-counted   registry_namings() 对变异表也按整行认（原文、替换文里的代码文本也算点名）
       「✗ 自检失败：登记表点名、文件已经不在的那几行」那一格红（变异表替换文里写着的 e27-gone-prereg.md 也报成指空）
+  ARCHIVE_PAST_ROUNDS_BREAK=exclusion-colon-as-path   stale_exclusions() 把排除项整行当路径，<路径>:<串> 的写法也要整串存在（改前的样子）
+      「✗ 自检失败：<路径>:<串> 写法的排除项，路径在就不该报指不到东西」那一格红
+  ARCHIVE_PAST_ROUNDS_BREAK=rerun-crashes   run() --apply 不把磁盘上已删的挑出来，对着它们 os.remove（改前的样子）
+      「✗ 自检失败：第二次 --apply 抛了 FileNotFoundError」那一格红
+  ARCHIVE_PAST_ROUNDS_BREAK=check-counts-index   run() --check 把磁盘上已删、索引里还跟踪着的也算待归档（改前的样子）
+      「✗ 自检失败：磁盘上已删、索引里还跟踪着的不该算待归档」那一格红
+  ARCHIVE_PAST_ROUNDS_BREAK=rewrite-basename-only   rewrite_links() 把引用改成只留文件名（改前的样子），不写 git show <提交>:<原路径>
+      「✗ 自检失败：改引用后 history-consolidate.py loss-check 要退 0」那一格红（产物名里的日期随目录一起丢了；后面紧跟的『引用没改成 git show』那一格被它挡在前面）
+      连带红的格：「✗ 1 个日期块有找不到的数或编号」
+  ARCHIVE_PAST_ROUNDS_BREAK=history-carriers-ignored   rewrite_links() 不读 .claude/history-carriers，登记的变更史也照改（改前的样子）
+      「✗ 自检失败：登记在 .claude/history-carriers 的文件与它们的变更史，--apply 之后要逐字不变」那一格红
+      连带红的格：「✗ 自检失败：--apply」
+  ARCHIVE_PAST_ROUNDS_BREAK=still-input-by-basename   still_an_input() 按文件名认「还被代码当输入」（改前的样子），不按代码里写的完整路径
+      「✗ 自检失败：只有一个被完整路径引到，另一个同名的该删」那一格红
 
 判据（机械，不靠人记）：
   删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
@@ -53,8 +71,19 @@
         （目录加一个从别的文件名换后缀得来的名字）这里看不见，也不保护。代码把 research/ 下的文件当输入本身就是要消掉的依赖
         （research/ 整个可删，.claude/rules/directory-layout.md「research/：可以整个删掉的研究目录」）：读它的检查要改成读跟着测试放的登记，
         或者文件不在时报本次未跑；still_an_input 按字面文件名留下的那几份是还没改完的旧依赖，留着是免得这一趟当场塌，不是该保护的对象。
-  ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
-     不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
+        「还被代码当输入」按代码非注释行里写出的**完整路径**（如 research/prompts/leg-a/src/main.rs）认，不按文件名：四个腿目录里各有一份 src/main.rs，
+        只有一个被完整路径引到时，其余三个照删（2026-10-18 实测：按文件名把 4 个腿模型目录里的 src/main.rs 全留下了）。
+  ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用改成 `git show <删之前的提交>:<原路径>`（反引号包着，提交取删之前的 HEAD），
+     不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。
+     不剥成文件名：产物名里的目录与日期随路径一起丢了，门禁 doc-decisions 的 history-loss 格（`scripts/kb/history-consolidate.py loss-check`）判变更史丢了产物名；
+     `git show <提交>:<路径>` 里路径原样在，那一格认得出。已经写成 `git show <提交>:<路径>` 的不再改（重跑不套娃）；
+     markdown 链接目标 `](路径)` 里放不下空格，仍只留文件名。
+     不改的：登记在 `.claude/history-carriers` 的文件（读那张表：一行一个目录或文件，目录带结尾的 /），与登记项的变更史
+     （登记项 `<目录>/` 或 `<名>.md` 旁的 `<名>-history.md` 及它的 `.en.md`、`.ja.md` 译文：登记 `.claude/kb/decisions/` 的旁边是 `.claude/kb/decisions-history.md`）。
+     变更史记的是当时的原文，指向被删产物的路径在 git 历史里取得回；改写它既丢了原样，又让门禁 doc-decisions 的 history-loss 格当场红（2026-10-18 实测）。
+     --apply 报出跳过了几份文件、几处引用；登记表不在就一份都不跳。
+  可重跑：上一趟 --apply 删了文件、还没暂存或提交时，索引里仍跟踪着它们。这类「磁盘上已删、索引里还跟踪着」的不再算待归档（--check 不为它们判红）、
+  --apply 不再对它们 os.remove，只报数；它们的引用照改（上一趟被打断时没改完的补上）。
 """
 import os
 import re
@@ -70,7 +99,8 @@ DIRS = ("research/results", "research/prompts")
 KEEP = re.compile(r"-main-verification\.md$|abandoned-rounds\.tsv$")
 LINK = re.compile(r"(?:research/results|research/prompts)/[^\s`)（）\]\n，。、；]+")
 SCAN = (".claude/kb", "records", ".claude/rules", "briefs")
-# 会把留存产物当**输入**的地方：门禁阶段按名字读它去比对、装置源码 include_str! 在编译期读它。
+HISTORY_CARRIERS_FILE = ".claude/history-carriers"   # 哪些 kb 文件带「## 历史版本」节：一行一个目录或文件，# 之后是理由（.claude/rules/changelog-format.md）
+# 会把留存产物当**输入**的地方：门禁阶段按路径读它去比对、装置源码 include_str! 在编译期读它。
 # 这些不是「记录」，删了不是「去 git 历史里查」，是**这道检查没得比 / 这个 crate 编不过**。
 INPUT_TREES = (".claude/gate.d", ".claude/scripts", "scripts", "crates")
 INPUT_SUFFIX = (".sh", ".py", ".rs", ".toml")
@@ -146,8 +176,19 @@ def past_round_files(root="."):
     return sorted(p for p in tracked if p not in dirty and not KEEP.search(p))
 
 
+def written_as_path(text, relative):
+    """text 里有没有把 relative 整条路径写出来：后面不能紧接文件名字符（research/results/e1.out 不算 e1.output 的点名）。"""
+    start = text.find(relative)
+    while start >= 0:
+        following = text[start + len(relative):start + len(relative) + 1]
+        if not (following.isascii() and (following.isalnum() or following in ("_", "-"))):
+            return True
+        start = text.find(relative, start + 1)
+    return False
+
+
 def still_an_input(root, candidates):
-    """候选里还被代码当输入的那些：门禁阶段按名字读它去比对、装置源码 include_str! 在编译期读它。
+    """候选里还被代码当输入的那些：门禁阶段按路径读它去比对、装置源码 include_str! 在编译期读它。
     返回 {相对路径: [点名它的源文件]}。这些**不删**——它们不是上一轮的记录，是这一轮还在跑的东西的输入。
 
     2026-09-21 实测两次，都是删完才发现：① 段序列登记表那一道门禁（段序列登记表与 E142 产物逐字比对，已搬进 doc-registries 的 segment-registry 那一格）连同它的自证一起塌；
@@ -155,11 +196,9 @@ def still_an_input(root, candidates):
     而 HEAD 上就是这个状态。第一次只把射程补到门禁脚本与 scripts，漏掉装置源码，于是第二次照样发生——
     所以这里按「哪些后缀是代码」扫，不按「我记得哪些目录会引」扫。
 
-    只认字面文件名（文件头「不认」一段）：代码里拼出来的路径（例：按红例账的文件名换后缀配同一目录的杀伤界产物）这里看不见、不保护，
+    只认代码里字面写出的完整路径，不按文件名（文件头「不认」一段）：四个腿目录里各有一份 src/main.rs，按文件名认就全留下了。
+    代码里拼出来的路径（例：按红例账的文件名换后缀配同一目录的杀伤界产物）这里看不见、不保护，
     那份产物照删；读它的那一道要改成不读 research/（跟着测试放的登记，或文件不在报本次未跑），不是在这里补一条认法。"""
-    by_name = {}
-    for relative in candidates:
-        by_name.setdefault(os.path.basename(relative), []).append(relative)
     found = {}
     for tree in INPUT_TREES:
         for directory, _, names in os.walk(os.path.join(root, tree)):
@@ -180,10 +219,16 @@ def still_an_input(root, candidates):
                 # 不收这一刀，几乎每份产物都会被某处注释保下来，归档规则整个失效。
                 text = "\n".join(line for line in text.splitlines()
                                  if not line.lstrip().startswith(("#", "//", "//!", "/*", "*")))
-                for base, relatives in by_name.items():
-                    if base in text:
-                        for relative in relatives:
+                if BROKEN == "still-input-by-basename":
+                    for relative in candidates:
+                        if os.path.basename(relative) in text:
                             found.setdefault(relative, []).append(os.path.relpath(source, root))
+                    continue
+                if "research/" not in text:
+                    continue
+                for relative in candidates:
+                    if written_as_path(text, relative):
+                        found.setdefault(relative, []).append(os.path.relpath(source, root))
     return found
 
 
@@ -299,8 +344,23 @@ def report_dangling(dangling):
     for entry in dangling:                                         # gate-lint:detail
         print("      %s" % entry)
     print("     → 怎么办：同一次提交里删掉那几行登记，或把那一格的路径改成仓里在的文件（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」）；")
-    print("               那一格只是记录引用的，改成只留文件名、不带路径（与归档改写引用同一种写法）；读它的检查还要那份文件的，")
+    print("               那一格只是记录引用的，改成只留文件名、不带路径（登记表的格子放不下 git show 写法）；读它的检查还要那份文件的，")
     print("               改成读跟着测试放的登记或文件不在报本次未跑（.claude/rules/directory-layout.md），不去把产物找回来。")
+
+
+def report_gone(root, gone, apply_changes):
+    """磁盘上已删、索引里还跟踪着的那几份：只报数。--apply 时它们的引用另在 rewrite_links 里照改。"""
+    if not gone:
+        return
+    print("      另有 %d 份磁盘上已删、索引里还跟踪着（上一趟 --apply 删的，这批删除暂存或提交之后不再出现）：不算待归档，%s"
+          % (len(gone), "这一趟不再删它们、只补改它们的引用" if apply_changes else "不为它们判红"))
+
+
+def report_history_kept(kept_files, kept_hits):
+    """登记在 .claude/history-carriers 的文件与它们的变更史里没改的引用（文件头「⚠️」一段）：只报数，路径在 git 历史里取得回。"""
+    if kept_files:
+        print("      没改 %d 份登记在 %s 的文件与它们的变更史里指向被删产物的 %d 处引用（变更史记当时的原文；路径在 git 历史里取得回）"
+              % (kept_files, HISTORY_CARRIERS_FILE, kept_hits))
 
 
 def report_flat_named(flat_named, apply_changes):
@@ -323,13 +383,69 @@ def text_files(root="."):
                     yield os.path.relpath(os.path.join(directory, name), root)
 
 
-def rewrite_links(root, doomed):
-    """把指向被删文件的引用改成不带路径的说法，别留指空的路径。"""
+GIT_SHOW_BEFORE = re.compile(r"git show [0-9a-f]{7,40}:$")
+
+
+def commit_before_deletion(root):
+    """删之前的提交（HEAD）的短哈希；改写后的引用 `git show <它>:<原路径>` 读得到被删的文件。"""
+    return git("rev-parse", "--short=12", "HEAD", root=root).strip()
+
+
+def history_carriers(root):
+    """.claude/history-carriers 登记的目录或文件（一行一条，# 之后是理由；相对仓根，目录带结尾的 /）。表不在返回空。"""
+    if BROKEN == "history-carriers-ignored":
+        return []
+    try:
+        lines = open(os.path.join(root, HISTORY_CARRIERS_FILE), encoding="utf-8").read().splitlines()
+    except OSError:
+        return []
+    return [entry for entry in (line.split("#", 1)[0].strip() for line in lines) if entry]
+
+
+def history_text_guard(root):
+    """→ 函数 relative -> 是不是登记在 history-carriers 的文件，或登记项的变更史。
+    登记项 `<目录>/`（目录下的文件都算）与 `<文件>`（逐字）；变更史是登记项旁的 `<名>-history.md` 与它的 `.en.md`、`.ja.md` 译文
+    （`.claude/kb/decisions/` 旁是 `.claude/kb/decisions-history.md`）：变更史自己不带「## 历史版本」，登记表里没有它，改写它却一样丢当时的原文。"""
+    entries = history_carriers(root)
+    prefixes = tuple(entry for entry in entries if entry.endswith("/"))
+    exact = {entry for entry in entries if not entry.endswith("/")}
+    history_stems = set()
+    for entry in entries:
+        stem = entry.rstrip("/")
+        history_stems.add((stem[:-3] if stem.endswith(".md") else stem) + "-history")
+
+    def guarded(relative):
+        if relative in exact or relative.startswith(prefixes):
+            return True
+        return any(relative == stem + ".md" or (relative.startswith(stem + ".") and re.fullmatch(r"[a-z]{2}\.md", relative[len(stem) + 1:]))
+                   for stem in history_stems)
+    return guarded
+
+
+def rewrite_links(root, doomed, commit=None):
+    """把指向被删文件的引用改成 `git show <删之前的提交>:<原路径>`，别留指空的路径，也别把路径剥成文件名（产物名里的目录与日期会丢）。
+    已经写成 `git show <提交>:<路径>` 的不再改；markdown 链接目标 `](路径)` 里放不下空格，只留文件名。
+    登记在 `.claude/history-carriers` 的文件与它们的变更史（history_text_guard）整份不改，只数跳过了几份、几处。
+    → (改了几处, 动了几份文件, 跳过的变更史份数, 跳过的处数)"""
     doomed = set(doomed)
     changed = 0
     touched = 0
+    kept_files = 0
+    kept_hits = 0
+    guarded = history_text_guard(root)
+    if doomed and commit is None and BROKEN != "rewrite-basename-only":
+        commit = commit_before_deletion(root)
     for relative in text_files(root):
         path = os.path.join(root, relative)
+        if guarded(relative):
+            try:
+                kept = sum(1 for match in LINK.finditer(open(path, encoding="utf-8").read()) if match.group(0) in doomed)
+            except (UnicodeDecodeError, OSError):
+                kept = 0
+            if kept:
+                kept_files += 1
+                kept_hits += kept
+            continue
         try:
             text = open(path, encoding="utf-8").read()
         except (UnicodeDecodeError, OSError):
@@ -341,9 +457,16 @@ def rewrite_links(root, doomed):
             target = match.group(0)
             if target not in doomed:
                 return target
+            before = text[:match.start()]
+            if GIT_SHOW_BEFORE.search(before[-60:]):
+                return target                   # 已经是 git show <提交>:<路径>，再改就套娃了
             hits += 1
-            # 只留文件名，不留路径、也不逐处写「已归档」——那句话在 .claude/agent-common.md 里写一处就够
-            return os.path.basename(target)
+            if BROKEN == "rewrite-basename-only" or before.endswith("]("):
+                return os.path.basename(target)
+            # 反引号里的路径原地换成 git show 写法（外面那对反引号照用）；不在反引号里的，自己包一对
+            inside_backticks = before.endswith("`") and text[match.end():match.end() + 1] == "`"
+            shown = f"git show {commit}:{target}"
+            return shown if inside_backticks else f"`{shown}`"
 
         new = LINK.sub(fix, text)
         if hits:
@@ -351,7 +474,7 @@ def rewrite_links(root, doomed):
             open(path, "w", encoding="utf-8").write(new)
             changed += hits
             touched += 1
-    return changed, touched
+    return changed, touched, kept_files, kept_hits
 
 
 def missing_code_inputs(root):
@@ -402,8 +525,14 @@ def stale_exclusions(root):
             if not line or line.startswith("#"):
                 continue
             target = line.split("#")[0].strip()
-            if target and not os.path.exists(os.path.join(root, target)):
-                stale.append("%s:%d  %s" % (os.path.relpath(table, root), number, target))
+            if not target or os.path.exists(os.path.join(root, target)):
+                continue
+            # 排除项有两种写法：整份文件「<路径>」，和文件里的一条「<路径>:<串>」（门禁 code-source-discipline 的 data-names 格那张表）。
+            # 后一种要看冒号前的路径还在不在；整行当路径会把存量里两千多条都报成指不到东西。
+            path_part = target.split(":", 1)[0]
+            if BROKEN != "exclusion-colon-as-path" and path_part != target and os.path.exists(os.path.join(root, path_part)):
+                continue
+            stale.append("%s:%d  %s" % (os.path.relpath(table, root), number, path_part if BROKEN != "exclusion-colon-as-path" else target))
     return stale
 
 
@@ -423,6 +552,10 @@ def run(root, apply_changes, keep_registered=False):
         return 2
     try:
         doomed = past_round_files(root)
+        # 磁盘上已删、索引里还跟踪着的（上一趟 --apply 删的，还没暂存或提交）：不再算待归档，--apply 也不再删它们
+        splitting = BROKEN != ("rerun-crashes" if apply_changes else "check-counts-index")
+        gone = [p for p in doomed if splitting and not os.path.lexists(os.path.join(root, p))]
+        doomed = [p for p in doomed if p not in gone]
     except BaseUnavailable as error:
         print(f"  ✗ 取不到「这一轮」的起点（{error}），分不出哪些实验记录是上一轮的")
         print("     → 怎么办：在仓根跑、确认 scripts/gate/changed-paths.sh 在；基准取法与门禁 doc-process-records 的 knowledge-sync 格是同一份，那一份坏了两边一起坏。")
@@ -434,7 +567,7 @@ def run(root, apply_changes, keep_registered=False):
     flat_named = named_by_registries(root, doomed, kind="flat")    # 照删，只报（文件头「报」②）
     dangling = dangling_registry_namings(root)                      # 删之前就已经指空的（文件头「报」①）
     if inputs:
-        print("      留下 %d 份还被代码当输入的产物（门禁按名字读它比对、装置 include_str! 编译期读它）：" % len(inputs))
+        print("      留下 %d 份还被代码当输入的产物（门禁按路径读它比对、装置 include_str! 编译期读它）：" % len(inputs))
         for relative in sorted(inputs):                              # gate-lint:detail
             print("        %s  ← %s" % (relative, "、".join(sorted(set(inputs[relative])))))
     if registered:
@@ -444,6 +577,11 @@ def run(root, apply_changes, keep_registered=False):
             print("        %s  ← %s" % (relative, "、".join(registered[relative])))
     if not doomed:
         refused = apply_changes and refuse_registered(registered, keep_registered)
+        report_gone(root, gone, apply_changes)
+        if apply_changes and gone:
+            changed, touched, kept_files, kept_hits = rewrite_links(root, gone)
+            print("      补改了上一趟没改完的引用：%d 份文件 %d 处" % (touched, changed))
+            report_history_kept(kept_files, kept_hits)
         if dangling:
             report_dangling(dangling)
             return 1
@@ -458,6 +596,7 @@ def run(root, apply_changes, keep_registered=False):
               "还被代码当输入的产物（这一次 %d 份）、被检查读的登记表点名的产物（这一次 %d 份），后两类逐个列在上面" % (len(inputs), len(registered)))
         return 0
     if not apply_changes:
+        report_gone(root, gone, False)
         report_flat_named(flat_named, False)
         report_dangling(dangling)
         by_dir = {}
@@ -474,18 +613,21 @@ def run(root, apply_changes, keep_registered=False):
         print("     → 怎么办：跑 GATE_BASE=%s python3 scripts/kb/archive-past-rounds.py --apply 删掉，" % shown_base)
         print("               这个基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）；")
         print("               不给基准它会按 HEAD 算，把这一次提交要带的同步记录也当上一轮的删掉，删完门禁 doc-process-records 的 knowledge-sync 格当场红；")
-        print("               它同时把别处指向这些文件的引用改成只留文件名、不留路径；")
+        print("               它同时把别处指向这些文件的引用改成 `git show <删之前的提交>:<原路径>`（不剥成文件名）；")
         print("               要查删掉的内容去 git 历史里找，有疑问就重新验证、不翻旧证据。")
         return 1
     report_flat_named(flat_named, True)
-    changed, touched = rewrite_links(root, doomed)
+    report_gone(root, gone, True)
+    commit = commit_before_deletion(root)
+    changed, touched, kept_files, kept_hits = rewrite_links(root, doomed + gone, commit)   # 引用在删之前改，写的是删之前的提交
     for relative in doomed:
         os.remove(os.path.join(root, relative))
     dangling = dangling_registry_namings(root)                      # 删完再算一遍：这一趟删掉的平铺登记表点名的那几份落进来
     dangling_namings = {entry.split("  ", 1)[0] for entry in dangling}
     stale = [entry for entry in stale_exclusions(root) if entry.split("  ", 1)[0] not in dangling_namings]   # 同一行不报两遍
     losing = missing_code_inputs(root)
-    print("  ✓ 删了 %d 份上一轮及更早的实验记录；%d 份文件里 %d 处引用去掉了路径、只留文件名" % (len(doomed), touched, changed))
+    print("  ✓ 删了 %d 份上一轮及更早的实验记录；%d 份文件里 %d 处引用改成了 `git show <删之前的提交>:<原路径>`" % (len(doomed), touched, changed))
+    report_history_kept(kept_files, kept_hits)
     refused = refuse_registered(registered, keep_registered)
     if losing:
         print("  ✗ 代码非注释行点名了这些产物，而磁盘上没有——那道检查没得比、那个 crate 编不过：")
@@ -532,6 +674,12 @@ def selftest():
         if code != 0:
             return code
         code = selftest_in_temporary_directory()
+        if code != 0:
+            return code
+        code = selftest_rerun_and_exclusions()
+        if code != 0:
+            return code
+        code = selftest_history_carriers_and_full_paths()
         if code != 0:
             return code
         return selftest_gitlink()
@@ -672,7 +820,7 @@ def selftest_registry_namings():
         write(".claude/gate.d/stage.tsv", "E1\tquestion-row=research/prompts/e25-gone-questions.md#6:够判\n"
                                           "E2\t-\t-\t# 理由列里的记录引用不算点名：依据见 research/prompts/e26-cited-only.md\n")
         # 账的文件名在代码里写成字面（still_an_input 认得、留下），杀伤界产物的路径是换后缀拼出来的（看不见、照删）
-        write("scripts/experiments/pin.py", 'ledger = "research/results/e23-red-examples.tsv"\n'
+        write("scripts/experiment-apparatus/pin.py", 'ledger = "research/results/e23-red-examples.tsv"\n'
                                             'bounds = ledger.replace("-red-examples.tsv", "-kill-bounds.out")\n')
         git("add", "-A", root=work)
         subprocess.run(["git", "commit", "-qm", "上一轮"], cwd=work, check=True)
@@ -719,6 +867,7 @@ def selftest_registry_namings():
 
 
 def selftest_in_temporary_directory():
+    import shutil
     import tempfile
     with tempfile.TemporaryDirectory() as work:
         os.makedirs(os.path.join(work, "research/results"))
@@ -731,13 +880,20 @@ def selftest_in_temporary_directory():
         open(os.path.join(work, "research/prompts/r1-main-verification.md"), "w").write("判决\n")
         # 上一轮的产物，但装置源码在编译期读它：它不是记录，删了那个 crate 编不过
         open(os.path.join(work, "research/results/e3-input.out"), "w").write("input\n")
-        os.makedirs(os.path.join(work, "scripts/experiments"))
-        open(os.path.join(work, "scripts/experiments/probe.rs"), "w").write(
+        os.makedirs(os.path.join(work, "scripts/experiment-apparatus"))
+        open(os.path.join(work, "scripts/experiment-apparatus/probe.rs"), "w").write(
             '//! 依据见 research/results/e1-old.out\n'
             'const P: &str = include_str!("../../research/results/e3-input.out");\n')
         open(os.path.join(work, ".claude/kb/page.md"), "w").write(
             "产物 `research/results/e1-old.out`，判决 `research/prompts/r1-main-verification.md`，"
             "输入 `research/results/e3-input.out`\n")
+        # 变更史里引了带日期目录的产物：改引用时路径要原样留在 git show <提交>:<路径> 里，门禁 doc-decisions 的 history-loss 格才认得出产物名没丢
+        os.makedirs(os.path.join(work, "research/prompts/sample-2026-10-15"))
+        open(os.path.join(work, "research/prompts/sample-2026-10-15/r2-words-report.md"), "w").write("第二节：D44、D45 两行\n")
+        history_path = os.path.join(work, ".claude/kb/decisions-history.md")
+        open(history_path, "w").write("# 决策变更史\n\n## D1（样本）\n\n### 2026-10-15\n\n- 判决 `research/prompts/sample-2026-10-15/r2-words-report.md` 第二节 D44、D45 两行，数 44 与 45\n")
+        history_before = os.path.join(work, "history-before.md")
+        shutil.copyfile(history_path, history_before)
         git("add", "-A", root=work)
         subprocess.run(["git", "commit", "-qm", "round one"], cwd=work, check=True)
         open(os.path.join(work, "research/results/e2-new.out"), "w").write("new\n")
@@ -779,7 +935,7 @@ def selftest_in_temporary_directory():
         # 「代码点名了磁盘上没有的产物」这条自己也要证明会红：造一处非注释行的引用
         gate_dir = os.path.join(work, ".claude", "gate.d")
         os.makedirs(gate_dir, exist_ok=True)
-        sample = os.path.join(work, "scripts/experiments/gone.rs")
+        sample = os.path.join(work, "scripts/experiment-apparatus/gone.rs")
         open(sample, "w").write('const G: &str = include_str!("../../research/results/e9-gone.out");\n')
         if not missing_code_inputs(work):
             print("  ✗ 自检失败：装置源码 include_str! 点名了磁盘上没有的产物，missing_code_inputs 却一条都没报")
@@ -798,9 +954,31 @@ def selftest_in_temporary_directory():
             print("     → 怎么办：看它解出来的路径与磁盘上的实际位置差在哪。")
             return 1
         page = open(os.path.join(work, ".claude/kb/page.md"), encoding="utf-8").read()
-        if "research/results/e1-old.out" in page:
+        history_after = open(os.path.join(work, ".claude/kb/decisions-history.md"), encoding="utf-8").read()
+        loss = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "history-consolidate.py"), "loss-check",
+                               history_before, os.path.join(work, ".claude/kb/decisions-history.md"), "--repo", work], capture_output=True, text=True)
+        if loss.returncode != 0 or "git show" not in history_after:
+            print("  ✗ 自检失败：改引用后 history-consolidate.py loss-check 要退 0（产物名里的目录与日期一并留在 git show 写法里），实际退 %d：%s"
+                  % (loss.returncode, (loss.stdout + loss.stderr)[-400:]))
+            print("     → 怎么办：看 rewrite_links()：不要把引用剥成文件名，门禁 doc-decisions 的 history-loss 格判变更史丢了产物名。")
+            return 1
+        if re.search(r"(?<!git show [0-9a-f]{12}:)research/results/e1-old\.out", page):
             print("  ✗ 自检失败：指向被删文件的引用还留着指空的路径")
             print("     → 怎么办：看 rewrite_links() 的 LINK 正则与 doomed 集合。")
+            return 1
+        if not re.search(r"`git show [0-9a-f]{12}:research/results/e1-old\.out`", page):
+            print("  ✗ 自检失败：引用没改成 `git show <删之前的提交>:<原路径>`：" + page.strip())
+            print("     → 怎么办：看 rewrite_links() 的 fix()：反引号里的路径原地换成 git show 写法，提交取删之前的 HEAD。")
+            return 1
+        os.environ["GATE_BASE"] = "HEAD"
+        try:
+            again = run(work, True)                  # 第二遍：已改成 git show 写法的不套娃，磁盘上已删的跳过
+        finally:
+            os.environ.pop("GATE_BASE", None)
+        if again != 0 or open(os.path.join(work, ".claude/kb/decisions-history.md"), encoding="utf-8").read() != history_after or \
+                open(os.path.join(work, ".claude/kb/page.md"), encoding="utf-8").read() != page:
+            print("  ✗ 自检失败：第二遍改引用把已经写成 git show 的又改了一遍，或退出码不是 0（%s）" % again)
+            print("     → 怎么办：看 rewrite_links() 的 GIT_SHOW_BEFORE：路径前面已经是 git show <提交>: 的不再改。")
             return 1
         if "research/prompts/r1-main-verification.md" not in page:
             print("  ✗ 自检失败：指向判决的引用被误改了，判决没删就不该改它的链接")
@@ -843,8 +1021,164 @@ def selftest_in_temporary_directory():
             return 1
 
     print("  ✓ 自检：不给 GATE_BASE 的 --apply 当场拒绝且一个文件没删、有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
-          "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报、"
+          "指向被删文件的引用改成 `git show <删之前的提交>:<原路径>`（再跑 history-consolidate.py loss-check 退 0、重跑不套娃）、include 指空的产物报得出来、注释里的 include 与产物都在时不误报、"
           "没设 GATE_BASE 时基准取上游的 merge-base（与门禁 doc-process-records 的 knowledge-sync 格同一份取法）")
+    return 0
+
+
+def selftest_rerun_and_exclusions():
+    """三格：① 排除项的 <路径>:<串> 写法只看冒号前的路径还在不在；② 第二次 --apply（上一趟删了、还没暂存，索引里仍跟踪着）不抛 FileNotFoundError、已删的跳过并报数；
+    ③ --check 不把「磁盘上已删、索引里还跟踪着」的算成待归档。"""
+    import contextlib
+    import io
+    import tempfile
+    failures, checked = [], 0
+    with tempfile.TemporaryDirectory() as work:
+        def write(relative, text):
+            path = os.path.join(work, relative)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "w", encoding="utf-8").write(text)
+
+        def captured(apply_changes, base="HEAD"):
+            buffer = io.StringIO()
+            os.environ["GATE_BASE"] = base
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    code = run(work, apply_changes)
+            except Exception as error:
+                return error, buffer.getvalue()
+            finally:
+                os.environ.pop("GATE_BASE", None)
+            return code, buffer.getvalue()
+
+        git("init", "-q", root=work)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=work, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
+        # 起点提交：两份记录在它之后才进仓。第一趟 --apply 取 HEAD 当基准把它们删了；之后另一个基准（门禁单跑 --check 取的上游 merge-base 就是这一种）
+        # 取在它们进仓之前，磁盘上没有它们、diff 也不报，索引里却还跟踪着——候选从索引取，就把已删的也算进来
+        write("README.md", "起点\n")
+        git("add", "-A", root=work)
+        subprocess.run(["git", "commit", "-qm", "起点"], cwd=work, check=True)
+        starting_commit = git("rev-parse", "HEAD", root=work).strip()
+        write("research/results/e1-old.out", "上一轮\n")
+        write("research/results/e2-old.out", "上一轮\n")
+        write(".claude/kb/page.md", "产物 `research/results/e1-old.out` 与 research/results/e2-old.out\n")
+        write("docs/exists.md", "存量里的一条\n")
+        # 数据名排除表：<路径>:<串> 写法（路径在、串在文件里的）与整份文件写法，各一条指得到、一条指不到
+        write(".claude/data-name-lint-exclude", "# 样本\ndocs/exists.md:some_name  # 样本：路径在，不该报\ndocs/gone.md:other_name  # 样本：路径不在，该报\n"
+                                                 "docs/exists.md  # 样本：整份文件，在\ndocs/gone-whole.md  # 样本：整份文件，不在\n")
+        git("add", "-A", root=work)
+        subprocess.run(["git", "commit", "-qm", "上一轮"], cwd=work, check=True)
+        code, output = captured(True)
+        checked += 1
+        stale_lines = [line for line in output.splitlines() if line.strip().startswith(".claude/data-name-lint-exclude:")]
+        if code != 0 or len(stale_lines) != 2 or any("docs/exists.md" in line for line in stale_lines) \
+                or not any("docs/gone.md" in line and "other_name" not in line for line in stale_lines) or not any("docs/gone-whole.md" in line for line in stale_lines):
+            failures.append(("<路径>:<串> 写法的排除项，路径在就不该报指不到东西（路径不在的才报，且报的是路径）；整份文件写法照旧，"
+                             f"应当只报 docs/gone.md 与 docs/gone-whole.md 两条，实际退 {code}：{stale_lines}",
+                             "看 stale_exclusions()：冒号前的路径还在，这一条就不算指不到"))
+        checked += 1
+        if os.path.exists(os.path.join(work, "research/results/e1-old.out")):
+            failures.append(("第一趟 --apply 应当删掉 e1-old.out", "看 run() 的 os.remove 那一段"))
+        # 第二趟：删了没暂存，索引里还跟踪着两份
+        code_check, output_check = captured(False, starting_commit)
+        checked += 1
+        if code_check != 0 or "2 份磁盘上已删、索引里还跟踪着" not in output_check:
+            failures.append((f"磁盘上已删、索引里还跟踪着的不该算待归档：--check 应当退 0 并报「2 份磁盘上已删、索引里还跟踪着」，实际退 {code_check}：{output_check[-400:]}",
+                             "看 run() 里 gone 那一步：past_round_files() 的结果要把磁盘上已不在的分出去"))
+        code_again, output_again = captured(True, starting_commit)
+        checked += 1
+        if isinstance(code_again, Exception):
+            failures.append((f"第二次 --apply 抛了 {type(code_again).__name__}：{code_again}", "看 run() 里 os.remove 之前有没有把磁盘上已删的分出去"))
+        elif code_again != 0 or "2 份磁盘上已删、索引里还跟踪着" not in output_again:
+            failures.append((f"第二次 --apply 应当退 0 并报「2 份磁盘上已删、索引里还跟踪着」，实际退 {code_again}：{output_again[-400:]}",
+                             "看 report_gone() 与 run() 里 gone 那一步"))
+        page = open(os.path.join(work, ".claude/kb/page.md"), encoding="utf-8").read()
+        checked += 1
+        if page.count("git show") != 2:
+            failures.append((f"两趟 --apply 之后两处引用各改成一次 git show 写法（不套娃），实际：{page.strip()}", "看 rewrite_links() 的 GIT_SHOW_BEFORE"))
+    for failure, howto in failures:
+        print(f"  ✗ 自检失败：{failure}")                 # gate-lint:detail
+        print(f"     → 怎么办：{howto}；ARCHIVE_PAST_ROUNDS_BREAK 设着的话这里本来就该红")
+    if failures:
+        return 1
+    print(f"  ✓ 自检（可重跑与排除项，查了 {checked} 格）：<路径>:<串> 写法的排除项看冒号前的路径、--check 不把磁盘上已删而索引里还跟踪着的算待归档、"
+          "第二次 --apply 不抛异常并报数、引用不套娃")
+    return 0
+
+
+def selftest_history_carriers_and_full_paths():
+    """两格：① --apply 改写引用时跳过登记在 .claude/history-carriers 的文件与登记项的变更史（逐字不变），没登记的照改；
+    ② 「还被代码当输入」按完整路径认：三个腿目录各有一份 src/main.rs，只有一份被代码用完整路径写出来，只留那一份（另一份同名的只在代码里出现文件名，照删）。"""
+    import contextlib
+    import io
+    import tempfile
+    failures, checked = [], 0
+    with tempfile.TemporaryDirectory() as work:
+        def write(relative, text):
+            path = os.path.join(work, relative)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "w", encoding="utf-8").write(text)
+
+        def read(relative):
+            return open(os.path.join(work, relative), encoding="utf-8").read()
+
+        git("init", "-q", root=work)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=work, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
+        reference = "产物 `research/results/e50-old.out`，腿 `research/prompts/leg-b/src/main.rs`\n"
+        for leg in ("leg-a", "leg-b", "leg-c"):
+            write("research/prompts/%s/src/main.rs" % leg, "fn main() {}\n")
+        write("research/results/e50-old.out", "上一轮\n")
+        write("scripts/experiment-apparatus/runner.py", 'LEG = "research/prompts/leg-a/src/main.rs"\n# 依据 research/prompts/leg-c/src/main.rs\n')
+        write("scripts/experiment-apparatus/other.py", 'NAME = "main.rs"\n')
+        write(".claude/history-carriers", "# 样本：哪些 kb 文件带历史版本节\n.claude/kb/experiments/  # 实验页\n")
+        write(".claude/kb/experiments/01-x.md", reference + "\n## 历史版本\n")
+        write(".claude/kb/experiments-history.md", "## E1（样本）\n\n### 2026-10-15\n\n- " + reference)
+        write(".claude/kb/other.md", reference)
+        write("records/2026-10-15-样本.md", reference)
+        git("add", "-A", root=work)
+        subprocess.run(["git", "commit", "-qm", "上一轮"], cwd=work, check=True)
+        carrier_texts = {relative: read(relative) for relative in (".claude/kb/experiments/01-x.md", ".claude/kb/experiments-history.md")}
+        buffer = io.StringIO()
+        os.environ["GATE_BASE"] = "HEAD"
+        try:
+            with contextlib.redirect_stdout(buffer):
+                code = run(work, True)
+        finally:
+            os.environ.pop("GATE_BASE", None)
+        output = buffer.getvalue()
+        checked += 1
+        if code != 0:
+            failures.append((f"--apply 应当退 0，实际退 {code}：{output[-500:]}", "看 run() 的输出里哪一步判了红"))
+        checked += 1
+        changed_carriers = [relative for relative, text in carrier_texts.items() if read(relative) != text]
+        if changed_carriers:
+            failures.append((f"登记在 .claude/history-carriers 的文件与它们的变更史，--apply 之后要逐字不变，实际改了：{changed_carriers}",
+                             "看 rewrite_links() 开头的 history_text_guard()：登记项的目录前缀、逐字的文件、旁边的 <名>-history.md 都要跳过"))
+        checked += 1
+        if "没改 2 份登记在 .claude/history-carriers 的文件" not in output:
+            failures.append((f"--apply 应当报「没改 2 份登记在 .claude/history-carriers 的文件…」，输出：{output[-500:]}", "看 report_history_kept() 与 rewrite_links() 的返回值"))
+        checked += 1
+        for relative in (".claude/kb/other.md", "records/2026-10-15-样本.md"):
+            if not re.search(r"`git show [0-9a-f]{12}:research/results/e50-old\.out`", read(relative)):
+                failures.append((f"没登记的 {relative} 里指向被删产物的引用应当照改成 git show 写法：{read(relative).strip()}",
+                                 "看 history_text_guard() 有没有把没登记的也跳过了"))
+        checked += 1
+        if not os.path.exists(os.path.join(work, "research/prompts/leg-a/src/main.rs")):
+            failures.append(("被代码用完整路径 research/prompts/leg-a/src/main.rs 引到的那一份该留下", "看 still_an_input() 的 written_as_path()"))
+        checked += 1
+        gone_wrongly = [leg for leg in ("leg-b", "leg-c") if os.path.exists(os.path.join(work, "research/prompts/%s/src/main.rs" % leg))]
+        if gone_wrongly:
+            failures.append((f"只有一个被完整路径引到，另一个同名的该删（代码里只有文件名 main.rs 与注释里的路径不算引到），实际还留着：{gone_wrongly}",
+                             "看 still_an_input()：按候选的完整相对路径认，不按 os.path.basename"))
+    for failure, howto in failures:
+        print(f"  ✗ 自检失败：{failure}")                 # gate-lint:detail
+        print(f"     → 怎么办：{howto}；ARCHIVE_PAST_ROUNDS_BREAK=history-carriers-ignored 或 still-input-by-basename 设着的话这里本来就该红")
+    if failures:
+        return 1
+    print(f"  ✓ 自检（变更史与完整路径，查了 {checked} 格）：登记在 .claude/history-carriers 的文件与它们的变更史 --apply 之后逐字不变、没登记的照改；"
+          "「还被代码当输入」按完整路径认，同名的 src/main.rs 只留被完整路径引到的那一份")
     return 0
 
 
@@ -872,7 +1206,7 @@ def selftest_gitlink():
                 # 排除项指 research/ 之外：research/ 下指空的由 dangling_registry_namings 报（判红），这一格只证 stale_exclusions 跑到
                 write(".claude/sample-exclude", "docs/e7-gone-directory/  # 样本：删完指不到\n")
             else:
-                write("scripts/experiments/gone.rs", 'const G: &str = include_str!("../../research/results/e9-gone.out");\n')
+                write("scripts/experiment-apparatus/gone.rs", 'const G: &str = include_str!("../../research/results/e9-gone.out");\n')
             git("add", "-A", root=work)
             subprocess.run(["git", "commit", "-qm", "上一轮"], cwd=work, check=True)
             tip = git("rev-parse", "HEAD", root=work).strip()

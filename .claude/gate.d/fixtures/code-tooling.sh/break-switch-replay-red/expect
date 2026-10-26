@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=scripts/gate/wrong.py WRONG_BREAK=swap：不符，点名的项没在失败行里：「✗ 自检：本该红的那一格」
+want=scripts/gate/silent.py SILENT_BREAK=noop：没红，设上之后自证照样退 0（开关没弄坏什么）
+want=scripts/gate/nominal.py NOMINAL_BREAK=bare：没点名，点名的项里没有可比的「…」原文
+want=.claude/gate.d/break-switch-replay-files.tsv:6 指到的 scripts/gate/gone.py 不在，那一行删掉
+want=脚本与钩子的弄坏开关复跑：4 处不对（复跑了 4 条、4 份）
+want=break-switch-replay：红（退出 1）

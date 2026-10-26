@@ -1,0 +1,4 @@
+exit=0
+want=证明错落点与第六段 landing= 相同
+want=1 行证明错条数与第五段 proof_errors= 不同，只报不判（夹到上限时返回原值）
+want=verus-must-red-worlds：绿

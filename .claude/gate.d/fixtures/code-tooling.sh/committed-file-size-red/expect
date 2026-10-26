@@ -1,0 +1,9 @@
+exit=1
+want=甲：被提交的树里有 2 个文件超过 1024 字节，GitHub 的单文件推送上限，推不上去：
+want=old-big.out  2048 字节（暂存区）
+want=staged-big.bin  3000 字节（暂存区）
+want=提交里有超过单文件上限 1024 字节的内容（甲），逐个列在上面
+want=gzip -n -9 <文件> 压成 <文件>.gz 入库
+want=样本只跑 .gate-cells 点名的格：committed-file-size
+want=  committed-file-size：红（退出 1）
+want=bash .claude/gate.d/code-tooling.sh --check committed-file-size

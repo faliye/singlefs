@@ -31,7 +31,8 @@ check_snapshot() {   # $1 仓根 $2 轮名；stdout 逐行结论，返回 0 全�
   for list in "$dir"/*sha256*.txt; do
     [[ -f "$list" ]] || continue
     while IFS= read -r line || [[ -n "$line" ]]; do
-      [[ "$line" =~ ^([0-9a-fA-F]{64})[[:space:]]+\*?(.+)$ ]] || continue
+      [[ -z "$line" ]] && continue
+      [[ "$line" =~ ^([0-9a-fA-F]{64})[[:space:]]+\*?(.+)$ ]] || die "快照清单含非法记录：$list" "重新生成完整的 sha256 清单；不能跳过无法解析的记录" 2
       digest="${BASH_REMATCH[1]}"; path="${BASH_REMATCH[2]}"; path="${path#./}"
       checked=$((checked+1))
       if [[ ! -f "$root/$path" ]]; then

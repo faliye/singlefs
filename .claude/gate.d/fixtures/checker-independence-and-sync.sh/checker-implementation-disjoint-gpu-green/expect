@@ -1,0 +1,3 @@
+exit=0
+want=checker 档包与产品 GPU 包 `singlefs-background-gpu` 互不依赖，两边闭包（6 个、3 个）的交集 3 个都在允许共用的里（经 `singlefs-format`、`singlefs-core` 带进来的 2 个，wgpu、naga 一族（仓根没有 Cargo.lock，只认一族的名字） 1 个），两边的 2 份、1 份源码零处互相引用（别名引进来的 0 个）
+want=checker-implementation-disjoint：绿

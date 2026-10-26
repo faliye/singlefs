@@ -1,0 +1,9 @@
+# 样本用的不一致事件表：格式照 .claude/gate.d/divergence-events.tsv 文件头
+对	refinement-spec-o1-model	refinement 的 spec	O1 的 model	已立	两边都有代码
+事件	2026-10-01	refinement-spec-o1-model	model错	records/2026-10-01-样本.md 第 3 行	样本第 01 次：重判后 model 错
+事件	2026-10-02	refinement-spec-o1-model	model错	records/2026-10-02-样本.md 第 3 行	样本第 02 次：重判后 model 错
+事件	2026-10-03	refinement-spec-o1-model	model错	records/2026-10-03-样本.md 第 3 行	样本第 03 次：重判后 model 错
+事件	2026-10-04	refinement-spec-o1-model	model错	records/2026-10-04-样本.md 第 3 行	样本第 04 次：重判后 model 错
+事件	2026-10-05	refinement-spec-o1-model	条款欠一句	records/2026-10-05-样本.md 第 3 行	样本第 05 次：条款没写谁对
+事件	2026-10-06	refinement-spec-o1-model	条款欠一句	records/2026-10-06-样本.md 第 3 行	样本第 06 次：条款没写谁对
+事件	2026-10-07	refinement-spec-o1-model	条款欠一句	records/2026-10-07-样本.md 第 3 行	样本第 07 次：条款没写谁对

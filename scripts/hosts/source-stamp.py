@@ -16,7 +16,7 @@ CPU 一侧用的是旧 walk.rs 编出来的库（records/2026-09-30-里程碑三
       mtime 也比：touch 过、编到一半失败（产物还是旧的），之后又被 rsync -a 改回旧 mtime 的，照样再 touch。
   source-stamp.py sync <源树> <副本> [--target-dir <编译目录>] [--include …]…
       手工拷树的入口：rsync -a --no-times --checksum（不带 --delete；排除 .git、__pycache__，与任意一层名叫 target、target-* 的目录：
-      仓根 .gitignore 的 target/ 管的就是任意一层，scripts/experiments/target 这类编译目录动辄几十 G，与 refresh 不进的目录同一批）把源树拷进副本：
+      仓根 .gitignore 的 target/ 管的就是任意一层，scripts/experiment-apparatus/target 这类编译目录动辄几十 G，与 refresh 不进的目录同一批）把源树拷进副本：
       按内容比，内容变了的才拷、拷过去的 mtime 是此刻，没变的不动；再对副本做一次 refresh（拷之前被别人 rsync -a 过的也一并补上）。
       手敲 rsync -a 之后跑 refresh 同样拦得住，只是 rsync -a 把 touch 过的文件改回旧 mtime，下一次 refresh 会再 touch 它们、多重编一次。
   source-stamp.py --selftest
@@ -181,6 +181,9 @@ def refresh(tree, target, includes, say):
 
 def sync(source, copy, target, includes, say):
     """文件头 sync：rsync -a 拷进副本，再 refresh。"""
+    source, copy = os.path.realpath(source), os.path.realpath(copy)
+    if os.path.commonpath((source, copy)) in (source, copy):
+        raise OSError("源树与副本不能相同或互相包含；请选择源树之外的独立副本目录")
     if not os.path.isdir(source):
         raise OSError(f"源树 {source} 不在")
     os.makedirs(copy, exist_ok=True)
@@ -326,13 +329,13 @@ def selftest_cells(root):
     check("sync-rebuilds", code == 0 and "Compiling crates/demo/src/walk.rs" in output and "Fresh crates/demo/src/lib.rs" in output,
           f"sync 之后假 cargo 应当重编 walk.rs、不重编 lib.rs、测试过，实际退 {code}：{output.strip()[-300:]}")
 
-    # sync-skips-build-directories：源树里树根下面几层有编译目录（scripts/experiments/target 这类，主工作区那一份几十 G）⇒ sync 之后副本里没有它们，别的源文件照拷
+    # sync-skips-build-directories：源树里树根下面几层有编译目录（scripts/experiment-apparatus/target 这类，主工作区那一份几十 G）⇒ sync 之后副本里没有它们，别的源文件照拷
     base = os.path.join(root, "sync-skips-build-directories")
     source, copy = os.path.join(base, "source"), os.path.join(base, "copy")
     write(source, "Cargo.toml", "[workspace]\n", OLD_MTIME_SECONDS)
     write(source, "crates/demo/src/lib.rs", "pub fn f() {}\n", OLD_MTIME_SECONDS)
     write(source, "scripts/tool.py", "print(1)\n", OLD_MTIME_SECONDS)
-    build_directories = ["scripts/experiments/target", "scripts/experiments/target-gpu", "crates/demo/target"]
+    build_directories = ["scripts/experiment-apparatus/target", "scripts/experiment-apparatus/target-gpu", "crates/demo/target"]
     for directory in build_directories:
         write(source, f"{directory}/release/artifact.bin", "x" * (1 << 20), OLD_MTIME_SECONDS)
     sync(source, copy, os.path.join(copy, "target"), DEFAULT_INCLUDES, quiet)

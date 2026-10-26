@@ -1,0 +1,4 @@
+exit=0
+want=样本根放了 .gate-run-simulated：模拟在 gate.sh 里
+want=汇总：查了 1 类；✓ 1 类，判红 0 类，没查成 0 类，没跑 0 类
+want=machine-clean：绿

@@ -31,7 +31,7 @@
 
 判定请求（verdict-plan 的请求文件一行一条，制表符分隔；unit-key 的参数同一套）：<名字><制表符><入口>[<制表符><项>…]
   名字是这一条判定在库里的索引（门禁写测试函数的入口原样、格名、自证的命令），不进键。入口照 lib_function_units.py 的写法，相对 root: 那个目录。项：
-    root:<仓根起的目录>   闭包从哪棵树算（research 工作区写 root:scripts/experiments；不写是仓根）
+    root:<仓根起的目录>   闭包从哪棵树算（research 工作区写 root:scripts/experiment-apparatus；不写是仓根）
     target:<目标号>        lib_function_units 的目标号 <包目录名>:<lib|bin|test|…>:<名>（不写照它的默认挑）
     feature:<包>/<特性>    no-default-features    cfg:<名或 名="值">    profile:<名>（cargo 的编译档，例 release）
     judge:<入口>   judge-root:<目录>（判法在哪棵树里算闭包：门禁写它自己所在的仓，样本档被判的是样本；不写是被判的根；只当索引，不进键）
@@ -75,7 +75,7 @@
       @<别的键>（那个键登记的全部入口）；路径从仓根起。实验的入口在复跑表那一行之外另加进行键（准入键登记的装置入口）。崩溃枚举用例写 -，入口就是第三列的 test=。
   准入条件（第三列）：实验行认三种：
       question-row=<文件>#<行号>:<正则>          那份文件里第一列是 <行号> 的表格行，最后一格（状态）要匹配正则
-      product-field=<实验键>:<行名>:<字段>=<值>   scripts/experiments/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
+      product-field=<实验键>:<行名>:<字段>=<值>   scripts/experiment-apparatus/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
                                                   最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>
       same-run-field=<行名>:<字段>=<值>           同一趟里先跑的那一段这一趟的输出（路径由调用方经环境变量 SINGLEFS_ADMISSION_SAME_RUN_PRODUCT 交来）里，
                                                   最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>；不读 research/results/ 下的留存产物（用户 2026-10-18 定
@@ -123,20 +123,20 @@
     只写不读（SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1，门禁 --start-over）：库不读，全部块现判，照键写回同一份库。
     平常跑（门禁 --full）：键相同的块复用、对不上的现判；red 不是 0 判红。
 
-复跑表按行的准入键（scripts/experiments/replay.sh 里 ADMISSION_ROW_KEYS 那一段 heredoc；replay-row-keys、experiment 与 product-field= 都读它）：
+复跑表按行的准入键（scripts/experiment-apparatus/replay.sh 里 ADMISSION_ROW_KEYS 那一段 heredoc；replay-row-keys、experiment 与 product-field= 都读它）：
   一行一条，制表符分隔：<准入键> <制表符> <复跑表那一行的前三列，原样抄：实验号|二进制|参数> <制表符> <产物头谁写>
     产物头谁写：device  那一行跑的装置自己问准入、把 E7INPUT 行打在产物最前面（装置入口传的键要与这里的键逐字相同）；
                replay  那一行跑的东西不接准入（crates 的导出 bin 这一类），replay.sh 把准入放行时给的 E7INPUT 行接在新产物最前面。
   没写在这里的行，准入键是实验号、产物头由装置写。键的实验号要与那一行的实验号相同；每一条恰好指到复跑表一行，同一行只许指一次。
   登记了准入的键被复跑表两行以上共用判错：准入只按一个键比产物，分不清哪一行对哪一份。
 
-复跑表每一行的行键（replay-row-inputs；scripts/experiments/replay.sh 按行复用的键，算法 replay_row_request）：一行就是一条判定请求，入口是：
-  装置    二进制写名字的行：scripts/experiments/Cargo.toml 里 [[bin]] name 是它的那一份 path 的 main（root:scripts/experiments、target 那个 bin）；
+复跑表每一行的行键（replay-row-inputs；scripts/experiment-apparatus/replay.sh 按行复用的键，算法 replay_row_request）：一行就是一条判定请求，入口是：
+  装置    二进制写名字的行：scripts/experiment-apparatus/Cargo.toml 里 [[bin]] name 是它的那一份 path 的 main（root:scripts/experiment-apparatus、target 那个 bin）；
           二进制写 @<驱动函数> 的行：replay.sh 里那个函数（shell 单元闭包），连同驱动闭包里字面点名的 research 二进制的 main 与
-          `-p <包> … --bin <名>` 点名的仓根工作区 bin 的 main（包是 scripts/experiments/Cargo.toml 那个研究包的，--bin 的名字解到研究工作区 [[bin]] 的源码，
-          root:scripts/experiments）；`-p <包>` 点名了包却点不出 bin 的那一行拒算（replay-package-without-binary）
+          `-p <包> … --bin <名>` 点名的仓根工作区 bin 的 main（包是 scripts/experiment-apparatus/Cargo.toml 那个研究包的，--bin 的名字解到研究工作区 [[bin]] 的源码，
+          root:scripts/experiment-apparatus）；`-p <包>` 点名了包却点不出 bin 的那一行拒算（replay-package-without-binary）
   登记    这一行的准入键在登记表里登记的入口（入口另加进来，不是登记行原文）
-  判法    judge:scripts/experiments/replay.sh::replay_judge_fresh_product 与比对前删字段的几个函数（REPLAY_JUDGING_FUNCTIONS）
+  判法    judge:scripts/experiment-apparatus/replay.sh::replay_judge_fresh_product 与比对前删字段的几个函数（REPLAY_JUDGING_FUNCTIONS）
   内容    line:arguments=<这一行的参数>、line:compare=<exact|timing>、驱动闭包里点到 CHECKER_TIER_FEATURES 的行另加 line:gpu=<0|1>（replay.sh 开跑前读多机配置给）
           与 checker 档的 feature:singlefs-checker-tier/verdict-store、gpu；file:research/results/<留存产物>（期望产物的内容）
   实验号、产物文件名不进键。实验的准入（experiment）用的是同一把行键去掉期望产物那一项：产物头记着键，产物进了键就对不上自己。
@@ -151,6 +151,13 @@
                                  一条一行「<名字><制表符><reuse|judge|refused|not-compiled><制表符><键或 -><制表符><目标号><制表符><目标根文件><制表符><libtest 全名><制表符><原因>」，
                                  末行「PLAN judge=… reuse=… refused=… not-compiled=… ignored=…」；名字是入口，同一个函数编进几个目标的另接「@<目标号>」。
                                  门禁 checker-tier-crash-point-replay（快档两格）与 checker-tier-research-build-and-replay（research-unit-tests）照它按条跑 cargo test
+                                 并行（records/2026-10-23-subagent拆分提案.md 第一百零六节 ①：一个进程单核算几分钟，看门狗报核数过少）：工作区读一次，
+                                 之后每条测试函数「编不编（收 Rust 闭包）、编得进就算键」按测试函数交错分到每台默认重活线程数（registered_heavy_threads：
+                                 SINGLEFS_THREAD_CAP 设了照它，不然 .claude/heavy-thread-default）个 fork 出来的子进程里算，按原来的次序合回来，
+                                 查库、写计划文件与逐条打照旧在本进程里一条一条做：键、stdout、计划文件与一个进程算的逐字相同。
+                                 线程数是 1、要算的不到两条、线程数取不了（照 1 算）时在本进程里算，SINGLEFS_SERIAL_DECLARATIONS 设了且要算的有两条以上
+                                 时往它追加一行串行段声明（写法同 scripts/hosts/core_usage.py 的 declare-serial）。
+                                 ADMISSION_TEST_PLAN_WORKERS_FILE（只给自证）设了就往里写一行「processes=<子进程数，本进程里算是 0> items=<算了几条>」
   unit-key <根> <入口> [<项>…]   打「key <键>」与组成清单；拒算打拒算行、退 4
   verdict-plan <根> <种类> <请求文件> <计划文件> [--library-root <根>] [--full]
                                  逐条算键、查库：stdout 一条一行「<名字><制表符><reuse|judge|refused><制表符><键或 -><制表符><原因>」，末行
@@ -213,12 +220,22 @@
   condition-files-unchecked 登记表自查不核 question-row=、product-field= 点名的文件在不在：自证「登记表自查点得出前提点名的文件不在」那一格红
   skip-build-environment 构建环境的生效值不进工具链行：自证 E02（RUSTFLAGS 加一个 -C target-cpu=native，键要变）红
   ignore-row-keys        复跑表按行的准入键那一段不认：自证「复跑表按行的准入键」那几格红
+  replay-build-tools-unlinked  自证的临时仓不链 scripts/hosts/two-logs.sh 与 two_logs.py（replay.sh 开跑前的构建经它们起；改前的样子）：
+                         自证要真跑 replay.sh 的五格红（构建退 127）：「replay.sh：老产物没有产物头、新跑的有…」「弄坏 replay.sh 比对前删产物头那一步…」
+                         「replay.sh：留存产物头上的实验键与今天的相同时判「输入没变」…」「replay.sh：登记了准入、装置却没打实验键行时判跑不了」
+                         「复跑表按行的准入键：两行各给键、各自登记时两行都跑…」
   row-key-with-product-name  行键另加留存产物的文件名：门禁 checker-tier-research-build-and-replay 的样本 replay-row-key-samples 里 R03（只改产物文件名，行键不变）红
   row-key-without-gpu    行键不加 GPU 开关：自证 E22（切 ENABLE_GPU，点到 CHECKER_TIER_FEATURES 的那一行要现判）红
   research-package-unresolved  驱动点名 -p <研究包> --bin <名> 时照仓根工作区去找 bin（改前的样子）：自证「驱动点名 -p e7-index-bench --bin e900」那一格红（E900 拒算 replay-package-without-binary）
   test-key-with-whole-file  test-plan 给每条测试函数的键另加它所在的整份文件（门禁 checker-tier-crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=setting-file-whole-closure 转成它）：
                          那一道的样本 unit-key-samples-green 里 N19（只改设点文件里 test_u 的一个字，同文件的 test_v 不作废）红；这里的自证不点它
+  test-plan-serial-undeclared  test-plan 算键照改前在一个进程里一条一条算、也不写串行声明：
+                         自证「test-plan：同一份输入单线程与并行算出的 stdout 与计划文件逐字相同，并行那一趟真分到了子进程」那一格红
   dependencies-by-crate  外部依赖照包收（闭包碰到一个工作区包就收它 Cargo.toml 写的全部外部依赖，不看单元点没点它的名字）：自证 S14 形态那一格（itoa 抬版本只 test_v 变）红
+  rocksdb-entry-unchecked  crash-case-command 交命令之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）：
+                         自证「crash-case-command：checker 档包依赖 rocksdb 而进程环境里没有预编库的取值 ⇒ 不交命令、退 2」那一格红。
+                         entry 的跳过办法：被判的树里没有依赖 rocksdb 的清单（自证的小仓就是这样），或 PATH 上的 cargo 是带
+                         「# rocksdb-prebuilt-entry: selftest-fake-cargo」那一行的假 cargo（那份脚本文件头「entry」）
   blocks-count-unchecked crash-case-blocks 不核 blocks = reused + fresh + refused：自证「数对不上」那一格红
   blocks-count-without-refused crash-case-blocks 照改前核 blocks = reused + fresh（拒算的块不算进去）：自证「平常跑：拒算 1 块计在 refused」那一格红
   blocks-single-line-only crash-case-blocks 照改前要日志里恰好一行：自证「多流用例每条流一行」那一格红
@@ -229,6 +246,8 @@
   verdict-lookup-skipped VerdictLibrary.lookup 不读库、一律现判（复用失灵的样子）：自证 reuse-sentinel 那一格在自己那一趟里打开它、核「复用失灵」退 1；
                          外面设了它，reuse-three-questions 那一格 ①②③ 全红
   共用库的 REUSE_CHECKS_BREAK=rejudged-sentinel-passes（哨兵被现判不红）：自证 reuse-sentinel 那一格判错
+  函数单元库的 FUNCTION_UNITS_BREAK=rust-manifest-directory-reads-unrefused（清单目录拼出的目录也不拒算 runtime-path）：
+                         自证「实验准入入口 scripts/experiment-apparatus/lib.rs::admit_experiment_run_or_exit 的闭包不拒算；…」那一格红
   plan-failure-not-red   plan-failure 认出失灵也退 0、只打一行 !（改前四处调用方退回全部现判、不判红的样子）：自证 plan-failure 里判红的那几格转错；
                          四处调用方的样本里造失灵的那几份（*-plan-exit-red、*-plan-sentinel-red）照样跑完、不判红
   以及崩溃枚举用例日志与命令那几格的老开关（threads-by-worker-count、first-definition-only、ignore-attribute-without-space、single-worker-threads-field、
@@ -265,7 +284,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 REGISTRATION_TABLE = ".claude/gate.d/stage-inputs.tsv"
-REPLAY_SCRIPT = "scripts/experiments/replay.sh"
+REPLAY_SCRIPT = "scripts/experiment-apparatus/replay.sh"
 RESULTS_DIRECTORY = "research/results"
 GATE_GREEN_TREE_RECORD = "refs/sop/staged-green"   # 只有弄坏开关 tree-compare-reuse 读它（改前的复用路）；平常一处都不读
 FORCE_RERUN_VARIABLE = "SINGLEFS_EXPERIMENT_RERUN_REASON"
@@ -335,6 +354,7 @@ POSITIVE_INTEGER_FORM = re.compile(r"[1-9][0-9]*")
 CRASH_POINT_REPLAY_THREADS_VARIABLE = "SINGLEFS_CRASH_POINT_REPLAY_THREADS"
 HEAVY_THREAD_DEFAULT_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".claude", "heavy-thread-default")
 THREAD_CAP_VARIABLE = "SINGLEFS_THREAD_CAP"
+SERIAL_DECLARATIONS_VARIABLE = "SINGLEFS_SERIAL_DECLARATIONS"   # 串行段声明写进哪（scripts/hosts/core_usage.py 文件头「声明」；test-plan 在一个进程里算时写）
 HEAVY_THREAD_COMMENT_OR_BLANK_FORM = re.compile(r"[ \t]*(#|$)")
 HEAVY_THREAD_REGISTRATION_FORM = re.compile(r"[ \t]*([1-9][0-9]*)[ \t]+#[ \t]*[^ \t]")
 DEFAULT_WORKER_THREAD_SOURCES = ("available_parallelism",)
@@ -358,7 +378,7 @@ BUILD_ENVIRONMENT_COMPILER_VARIABLES = ("RUSTC", "CARGO_BUILD_RUSTC")
 CONFIGURATION_PROGRAM_BUILD_KEYS = ("rustc-wrapper", "rustc-workspace-wrapper")
 
 # 复跑表的行键（replay_row_request）
-REPLAY_RESEARCH_DIRECTORY = "scripts/experiments"
+REPLAY_RESEARCH_DIRECTORY = "scripts/experiment-apparatus"
 REPLAY_JUDGING_FUNCTIONS = ("replay_judge_fresh_product", "strip_admission_header", "strip_timing", "strip_load_fields", "timing_load_reading_raw", "timing_load_decide")
 REPLAY_GPU_FEATURE_VARIABLE = "CHECKER_TIER_FEATURES"
 REPLAY_SHELL_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
@@ -777,7 +797,8 @@ class KeyContext:
         if closure_root not in self.workspaces:
             library = function_units()
             try:
-                self.workspaces[closure_root] = library.RustWorkspace(closure_root)
+                # 这里算的单元键都判产品行为：Rust 单元取产品行为视图，verus! 里的规格与证明不进键（lib_function_units.py 文件头「判定种类」）
+                self.workspaces[closure_root] = library.RustWorkspace(closure_root, library.PRODUCT_BEHAVIOR)
             except library.FunctionUnitsError as error:
                 raise UnitKeyError(f"Rust 工作区读不出（{error}）") from error
         return self.workspaces[closure_root]
@@ -1336,13 +1357,14 @@ def sentinel_candidates(library, keyed):
     return candidates
 
 
-def plan_requests(root, kind, requests, library_root=None, full=False, context=None):
+def plan_requests(root, kind, requests, library_root=None, full=False, context=None, unit_keys=None):
     """逐条算键、查库：交 ([(请求, UnitKey, 决定, 原因)], 判定库)，照请求的次序；算过的键各把组成清单落盘一份。
+    unit_keys 给了就是调用方已算好的键（与 requests 一一对应，test-plan 在子进程里算的），不再算。
     复用哨兵（文件头「复用哨兵」）在查库之前抽：抽中强制现判的那一条不读库、照现判；抽到的哨兵查完库就记下它的结局。
     哨兵本身、要打的几行与红句挂在交出去的判定库上（sentinel、sentinel_lines、sentinel_problems）。"""
     context = context or KeyContext(root)
     library = VerdictLibrary(library_root or root, kind)
-    keyed = [(request, compute_unit_key(context, request)) for request in requests]
+    keyed = list(zip(requests, unit_keys)) if unit_keys is not None else [(request, compute_unit_key(context, request)) for request in requests]
     library.sentinel, library.sentinel_lines, library.sentinel_problems = None, [], []
     checks = reuse_checks_module()
     if checks is None:
@@ -1605,7 +1627,7 @@ def replay_row_key_entries(text):
 
 
 def replay_rows_with_keys(root):
-    """scripts/experiments/replay.sh 复跑表的每一行连同它的准入键：返回 ([ReplayRow], 按行的准入键那一段写错的说明)。
+    """scripts/experiment-apparatus/replay.sh 复跑表的每一行连同它的准入键：返回 ([ReplayRow], 按行的准入键那一段写错的说明)。
     没被那一段指明的行，键是实验号、产物头由装置写。弄坏开关 ignore-row-keys 下那一段整个不认（改前的样子）。"""
     replay_path = os.path.join(root, REPLAY_SCRIPT)
     if not os.path.isfile(replay_path):
@@ -1635,7 +1657,7 @@ def replay_rows_with_keys(root):
 
 
 def replay_products_of(root, experiment_key):
-    """scripts/experiments/replay.sh 登记表里准入键是这个键的那几行的留存产物（仓库根起的路径）；按行的准入键那一段写错抛 RegistrationError。"""
+    """scripts/experiment-apparatus/replay.sh 登记表里准入键是这个键的那几行的留存产物（仓库根起的路径）；按行的准入键那一段写错抛 RegistrationError。"""
     rows, problems = replay_rows_with_keys(root)
     if problems:
         raise RegistrationError("；".join(problems))
@@ -2577,7 +2599,7 @@ def configuration_layers(closure_root, environment):
 
 
 def build_environment_lines(root, environment=None):
-    """构建环境的生效值，旧的那种形状 [(名字, 内容字节)]（scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py 的 build_environment_lines 用它）：每一行生效值各一项。算不出抛 InputManifestError。"""
+    """构建环境的生效值，旧的那种形状 [(名字, 内容字节)]（scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py 的 build_environment_lines 用它）：每一行生效值各一项。算不出抛 InputManifestError。"""
     try:
         return [(f"<构建环境：{line}>", line.encode("utf-8", "surrogateescape")) for line in build_environment_setting_lines(root, environment)]
     except UnitKeyError as error:
@@ -2667,10 +2689,11 @@ def unit_text_before_body(root, unit):
     return text.split("{", 1)[0]
 
 
-def test_functions_of_package(context, package, closure_root=None, features=(), profile=None):
+def test_functions_of_package(context, package, closure_root=None, features=(), profile=None, resolve=True):
     """这个包 lib、各 bin 与各测试目标里带 #[test] 的函数（cargo test --tests 跑的就是这几种目标）：[TestFunction]，按（目标号、libtest 全名）排。
     state：compiled、not-compiled（这一组特性下 cfg 关着）、ignored。libtest 认的全名 = 那份文件在目标里的模块路径 + 单元的限定名（内联 mod 已在限定名里）。
-    同一个函数编进几个目标的，名字另接「@<目标号>」（入口不变）。"""
+    同一个函数编进几个目标的，名字另接「@<目标号>」（入口不变）。
+    resolve=False 时不收闭包：不标 ignore 的 state 先写 pending，另挂 closure_arguments（交给 KeyContext.rust_closure 的那几样），由 test-plan 分进子进程判（文件头 test-plan）。"""
     library = function_units()
     closure_root = closure_root or context.root
     workspace = context.workspace(closure_root)
@@ -2692,8 +2715,11 @@ def test_functions_of_package(context, package, closure_root=None, features=(), 
                     continue
                 libtest_name = "::".join(list(module_path) + [unit.name])
                 entry = f"{path}::{unit.name}"
+                closure_arguments = None
                 if TEST_IGNORE_FORM.search(head):
                     state = "ignored"
+                elif not resolve:
+                    state, closure_arguments = "pending", (closure_root, workspace, unit, target.id, cfg, list(features), False)
                 else:
                     try:
                         context.rust_closure(closure_root, workspace, unit, target.id, cfg, list(features), False)
@@ -2702,6 +2728,7 @@ def test_functions_of_package(context, package, closure_root=None, features=(), 
                         state = "not-compiled"
                 target_root = posixpath_relative(target.root_file, crate.directory)
                 found.append(TestFunction(entry, target.id, target_root, libtest_name, state))
+                found[-1].closure_arguments = closure_arguments
     entry_counts = collections.Counter(function.entry for function in found)
     for function in found:
         if entry_counts[function.entry] > 1:
@@ -2782,14 +2809,14 @@ def tree_compare_reuse(root, key):
 # ── 复跑表每一行的行键（replay_row_request；文件头「复跑表每一行的行键」）──────────
 
 def research_binary_sources(root):
-    """scripts/experiments/Cargo.toml 的 [[bin]]：{名字: scripts/experiments 起的源文件}；清单不在或读不出给空表。"""
+    """scripts/experiment-apparatus/Cargo.toml 的 [[bin]]：{名字: scripts/experiment-apparatus 起的源文件}；清单不在或读不出给空表。"""
     sections = manifest_sections(os.path.join(root, REPLAY_RESEARCH_DIRECTORY, "Cargo.toml")) or {}
     return {entry["name"]: os.path.normpath(entry["path"])
             for entry in sections.get("bin") or [] if isinstance(entry, dict) and isinstance(entry.get("name"), str) and isinstance(entry.get("path"), str)}
 
 
 def research_package_name(root):
-    """scripts/experiments/Cargo.toml 的 [package] name（研究工作区的包）；清单不在或读不出交 None。"""
+    """scripts/experiment-apparatus/Cargo.toml 的 [package] name（研究工作区的包）；清单不在或读不出交 None。"""
     package = (manifest_sections(os.path.join(root, REPLAY_RESEARCH_DIRECTORY, "Cargo.toml")) or {}).get("package")
     return package.get("name") if isinstance(package, dict) and isinstance(package.get("name"), str) else None
 
@@ -2857,7 +2884,7 @@ def replay_row_request(context, row_text, gpu_switch, registered_entries, withou
         research_package = research_package_name(root)
         for package in sorted(set(REPLAY_PACKAGE_MENTION.findall(text))):
             if package == research_package and not break_is_set("research-package-unresolved"):
-                # 研究工作区的包（驱动经 --manifest-path scripts/experiments/Cargo.toml 编它）：--bin 的名字解到那里 [[bin]] 的源码，与字面点名研究二进制同一种入口
+                # 研究工作区的包（驱动经 --manifest-path scripts/experiment-apparatus/Cargo.toml 编它）：--bin 的名字解到那里 [[bin]] 的源码，与字面点名研究二进制同一种入口
                 found = [f"{binaries[name]}::main" for name in named_bins if name in binaries]
                 if not found:
                     refusals.append(f"refused\treplay-package-without-binary\t{REPLAY_SCRIPT}\t{driver} 点名了 -p {package}，点不出 bin")
@@ -2876,7 +2903,7 @@ def replay_row_request(context, row_text, gpu_switch, registered_entries, withou
     elif bin_text in binaries:
         entries.append((f"{binaries[bin_text]}::main", [f"root:{REPLAY_RESEARCH_DIRECTORY}", "profile:release"]))
     else:
-        refusals.append(f"refused\treplay-binary-unknown\t{REPLAY_SCRIPT}\t{bin_text} 不是 scripts/experiments/Cargo.toml 的 [[bin]]、也不是 @<驱动函数>")
+        refusals.append(f"refused\treplay-binary-unknown\t{REPLAY_SCRIPT}\t{bin_text} 不是 scripts/experiment-apparatus/Cargo.toml 的 [[bin]]、也不是 @<驱动函数>")
     if uses_gpu and not break_is_set("row-key-without-gpu"):
         common.append(f"line:gpu={gpu_switch}")
     for entry in registered_entries:
@@ -3143,7 +3170,7 @@ def command_test_functions(arguments):
     values = option_pairs(arguments[2:], ("--root", "--feature", "--profile")) if len(arguments) >= 2 else None
     if values is None:
         say("  ✗ 用法：admission.py test-functions <项目根> <包> [--root <目录>] [--feature <包>/<特性>]… [--profile <名>]")
-        say("     → 怎么办：包写 Cargo.toml 的包名；research 工作区写 --root scripts/experiments")
+        say("     → 怎么办：包写 Cargo.toml 的包名；research 工作区写 --root scripts/experiment-apparatus")
         return EXIT_REGISTRATION_ERROR
     root = os.path.abspath(arguments[0])
     context = KeyContext(root)
@@ -3265,6 +3292,75 @@ def command_verdict_plan(arguments):
     return print_plan(root, planned, library, plan_file)
 
 
+# test-plan 分进子进程算的那一段（文件头 test-plan「并行」）：fork 之前把共用的东西放这里，子进程照抄父进程的内存读它们
+TEST_PLAN_SHARED = {}
+TEST_PLAN_WORKERS_FILE_VARIABLE = "ADMISSION_TEST_PLAN_WORKERS_FILE"   # 只给自证：写一行这一趟分了几个子进程、算了几条
+
+
+def declare_test_plan_segment(reason=None):
+    """往 SINGLEFS_SERIAL_DECLARATIONS 追加一行（文件头 test-plan「并行」）：给了 reason 是「此刻串行：<reason>」，没给是「此刻并行」；没设、写不进都不碍算键。
+    弄坏开关 test-plan-serial-undeclared 下不写。"""
+    path = os.environ.get(SERIAL_DECLARATIONS_VARIABLE, "")
+    if not path or break_is_set("test-plan-serial-undeclared"):
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(f"{time.time():.3f}\t{'此刻串行：' + reason if reason else '此刻并行'}\n")
+    except OSError:
+        pass
+
+
+def test_plan_resolve(indices):
+    """算 indices 那几条测试函数：→ [(序号, compiled 或 not-compiled, (键, 组成清单, 拒算行) 或 None)]。编得进的照 command_test_plan 拼的请求算键。"""
+    context, functions, request_of = TEST_PLAN_SHARED["context"], TEST_PLAN_SHARED["functions"], TEST_PLAN_SHARED["request_of"]
+    library = function_units()
+    resolved = []
+    for index in indices:
+        function = functions[index]
+        try:
+            context.rust_closure(*function.closure_arguments)
+        except library.UsageError:
+            resolved.append((index, "not-compiled", None))
+            continue
+        unit_key = compute_unit_key(context, request_of(function))
+        resolved.append((index, "compiled", (unit_key.key, unit_key.composition, unit_key.refusals)))
+    return resolved
+
+
+def test_plan_resolve_all(context, functions, request_of):
+    """pending 的那几条分到每台默认重活线程数个子进程里算（文件头 test-plan「并行」），交 {序号: UnitKey}，同时把 state 写回 compiled / not-compiled。"""
+    pending = [index for index, function in enumerate(functions) if function.state == "pending"]
+    try:
+        jobs = registered_heavy_threads(os.environ)
+    except InputManifestError:
+        jobs = 1
+    jobs = max(1, min(jobs, len(pending)))
+    TEST_PLAN_SHARED.update(context=context, functions=functions, request_of=request_of)
+    serial = jobs == 1 or break_is_set("test-plan-serial-undeclared")
+    if serial:
+        if len(pending) >= 2:
+            declare_test_plan_segment(f"test-plan 算键只分得到 1 条线程（每台默认重活线程数取到 1 或取不了），{len(pending)} 条测试函数在一个进程里一条一条算")
+        resolved = test_plan_resolve(pending)
+    else:
+        import concurrent.futures
+        import multiprocessing
+        declare_test_plan_segment()
+        shards = [pending[offset::jobs] for offset in range(jobs)]
+        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs, mp_context=multiprocessing.get_context("fork")) as pool:
+            resolved = [item for part in pool.map(test_plan_resolve, shards) for item in part]
+    if len(resolved) != len(pending):
+        raise UnitKeyError(f"test-plan 分出去 {len(pending)} 条、收回 {len(resolved)} 条")
+    if os.environ.get(TEST_PLAN_WORKERS_FILE_VARIABLE):
+        with open(os.environ[TEST_PLAN_WORKERS_FILE_VARIABLE], "w", encoding="utf-8") as handle:
+            handle.write(f"processes={0 if serial else jobs} items={len(pending)}\n")
+    keys = {}
+    for index, state, computed in resolved:
+        functions[index].state = state
+        if computed is not None:
+            keys[index] = UnitKey(*computed)
+    return keys
+
+
 def command_test_plan(arguments):
     """test-plan：test-functions 与 verdict-plan 在一个进程里做（闭包只收一次）。每条测试函数一行
     「<名字><制表符><reuse|judge|refused|not-compiled><制表符><键或 -><制表符><目标号><制表符><目标根文件><制表符><libtest 全名><制表符><原因>」。"""
@@ -3284,13 +3380,6 @@ def command_test_plan(arguments):
     if sample_failure != "sentinel-reuse-failed" and sample_failure is not None:
         return sample_plan_failure_exit("test-plan", root, sample_failure)
     context = KeyContext(root)
-    try:
-        functions = test_functions_of_package(context, package, closure_root, features, profile)
-    except (RegistrationError, UnitKeyError) as error:
-        print(f"  ✗ 列不出 {package} 的测试函数：{error}")
-        print("     → 怎么办：包名照 Cargo.toml 写；工作区读不出时先单跑 python3 scripts/gate/lib_function_units.py dump <根> 看它报什么")
-        return EXIT_REGISTRATION_ERROR
-    by_name = {function.name: function for function in functions}
     tokens_common = ([f"root:{closure_relative}"] if closure_relative != "." else []) + ([f"profile:{profile}"] if profile else [])
     tokens_common += [f"feature:{feature}" for feature in features] + values.get("--token", [])
     def whole_file(function):
@@ -3298,10 +3387,28 @@ def command_test_plan(arguments):
         if not break_is_set("test-key-with-whole-file"):
             return []
         return [f"file:{os.path.normpath(os.path.join(closure_relative, function.entry.split('::', 1)[0]))}"]
-    requests = [Request(function.name, function.entry, [f"target:{function.target_id}", *tokens_common, *whole_file(function)])
-                for function in functions if function.state == "compiled"]
+    def request_of(function):
+        return Request(function.name, function.entry, [f"target:{function.target_id}", *tokens_common, *whole_file(function)])
+    try:
+        # 工作区读一次；编不编与键分进子进程算（文件头 test-plan「并行」）。读工作区与后面查库、写计划文件是一个进程里按原序做的，各写一段串行声明
+        declare_test_plan_segment(f"test-plan 读工作区、列 {package} 的测试函数在一个进程里做（解析一次，子进程照抄它）")
+        functions = test_functions_of_package(context, package, closure_root, features, profile, resolve=False)
+        keys_by_index = test_plan_resolve_all(context, functions, request_of)
+    except (RegistrationError, UnitKeyError) as error:
+        declare_test_plan_segment()
+        print(f"  ✗ 列不出 {package} 的测试函数：{error}")
+        print("     → 怎么办：包名照 Cargo.toml 写；工作区读不出时先单跑 python3 scripts/gate/lib_function_units.py dump <根> 看它报什么")
+        return EXIT_REGISTRATION_ERROR
+    by_name = {function.name: function for function in functions}
+    compiled = [index for index, function in enumerate(functions) if function.state == "compiled"]
+    requests = [request_of(functions[index]) for index in compiled]
     library_root = os.path.abspath(values.get("--library-root", [root])[-1])
-    planned, library = plan_requests(root, kind, requests, library_root, full_requested(full), context)
+    declare_test_plan_segment("test-plan 查判定库、写组成清单与计划文件按原来的次序在一个进程里做（输出要与一个进程算的逐字相同）")
+    try:
+        planned, library = plan_requests(root, kind, requests, library_root, full_requested(full), context,
+                                         unit_keys=[keys_by_index[index] for index in compiled])
+    finally:
+        declare_test_plan_segment()
     if sample_failure == "sentinel-reuse-failed":
         add_sample_sentinel_failure(root, planned, library)
     not_compiled = [function for function in functions if function.state == "not-compiled"]
@@ -3746,6 +3853,21 @@ def command_crash_case_judge(arguments):
     return 0
 
 
+ROCKSDB_PREBUILT_SCRIPT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "hosts", "rocksdb-prebuilt.py")
+
+
+def rocksdb_entry_problem(root):
+    """crash-case-command 交命令之前的 RocksDB 预编库取值判（scripts/hosts/rocksdb-prebuilt.py entry --root <root>）：判得过（连同它报不判的两种：树里没有依赖 rocksdb 的清单、
+    PATH 上是带标记的假 cargo）交 None；判红交它打的红句（几行并成一行）；判法脚本不在（这一份被拷到不带 scripts/hosts/ 的树里）交 None 并在 stderr 说一句。"""
+    if not os.path.isfile(ROCKSDB_PREBUILT_SCRIPT):
+        say(f"  ! RocksDB 预编库的取值没判：{ROCKSDB_PREBUILT_SCRIPT} 不在（这一份准入模块被拷到了不带 scripts/hosts/ 的树里）")
+        return None
+    completed = subprocess.run([sys.executable, ROCKSDB_PREBUILT_SCRIPT, "entry", "--root", root], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if completed.returncode == 0:
+        return None
+    return " ".join(line.strip() for line in (completed.stdout + completed.stderr).splitlines() if line.strip())
+
+
 def command_crash_case_command(arguments):
     """跑一条崩溃枚举用例的命令与环境（crash_case_launch），stdout 以 NUL 分隔：本机核数、线程数、explicit 或 default，其后是整条命令的词。
     有错退 2，原因打在 stdout（不带 ✗，checker-tier-crash-point-replay 自己打 ✗ 与出路）。"""
@@ -3760,6 +3882,12 @@ def command_crash_case_command(arguments):
         machine_cores, threads, threads_origin, command = crash_case_launch(root, case, "--start-over" in flags, os.environ, "--blocks-query" in flags)
     except (RegistrationError, InputManifestError) as error:
         print(f"交不出 {key} 的命令：{error}")
+        return EXIT_REGISTRATION_ERROR
+    # 交的命令起 cargo test（checker 档包的崩溃枚举用例，verdict-store 默认开、编到 librocksdb-sys）：交之前判一次这台的 RocksDB 预编库取值
+    #   （scripts/hosts/rocksdb-prebuilt.py 文件头「entry」），判红不交命令、退 2，门禁一个 cargo 都不起。弄坏开关 rocksdb-entry-unchecked 下不判
+    problem = None if break_is_set("rocksdb-entry-unchecked") else rocksdb_entry_problem(root)
+    if problem:
+        print(f"交不出 {key} 的命令：起 cargo 之前 RocksDB 预编库的取值没判过（rocksdb-prebuilt.py entry 的红句：{problem}）")
         return EXIT_REGISTRATION_ERROR
     words = [str(machine_cores), str(threads), threads_origin, *command]
     sys.stdout.write("".join(word + "\0" for word in words))
@@ -3818,6 +3946,24 @@ def link_sop_copy(work):
     real_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
     with open(os.path.join(work, ".gitignore"), "a", encoding="utf-8") as handle:
         for relative_path in LINKED_INTO_SELFTEST_REPOSITORIES:
+            os.symlink(os.path.join(real_root, relative_path), os.path.join(work, relative_path))
+            handle.write(relative_path + "\n")
+
+
+# 临时仓里跑真仓 replay.sh 的副本时，开跑前的构建经 scripts/hosts/two-logs.sh 起（它再 exec 同目录的 two_logs.py），这一趟自己的编译目录经
+# scripts/hosts/run-build-directory.sh 建、删（删法在同目录的 run_build_directory.py）：四份都从真仓链进来
+REPLAY_BUILD_LOG_TOOLS = ("scripts/hosts/two-logs.sh", "scripts/hosts/two_logs.py", "scripts/hosts/run-build-directory.sh", "scripts/hosts/run_build_directory.py")
+
+
+def link_replay_build_log_tools(work):
+    """REPLAY_BUILD_LOG_TOOLS 在临时仓里建成指向真仓那一份的符号链接，写进临时仓的 .gitignore（同 link_sop_copy）。
+    弄坏开关 ADMISSION_BREAK=replay-build-tools-unlinked：不链（改前的样子），replay.sh 那几格的构建退 127、一条实验都没跑。"""
+    if break_is_set("replay-build-tools-unlinked"):
+        return
+    os.makedirs(os.path.join(work, "scripts", "hosts"), exist_ok=True)
+    real_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
+    with open(os.path.join(work, ".gitignore"), "a", encoding="utf-8") as handle:
+        for relative_path in REPLAY_BUILD_LOG_TOOLS:
             os.symlink(os.path.join(real_root, relative_path), os.path.join(work, relative_path))
             handle.write(relative_path + "\n")
 
@@ -4002,6 +4148,38 @@ def run_unit_key_cells(selftest, module):
                         f"退 {exit_code}，列出 {states}")
     except AssertionError as error:
         selftest.expect("单元键的样本改得动", False, str(error))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def run_test_plan_parallel_cells(selftest, module):
+    """test-plan 分进子进程算（文件头 test-plan「并行」）：同一份输入线程数 1（本进程里算）与 4（分进子进程）各跑一趟，stdout 与计划文件逐字相同；
+    线程数 4 那一趟真分到了子进程（ADMISSION_TEST_PLAN_WORKERS_FILE 写的 processes= 大于 1），或至少往 SINGLEFS_SERIAL_DECLARATIONS 写了串行声明。
+    弄坏开关 test-plan-serial-undeclared 下这一格红（改回一个进程串行、也不声明）。"""
+    work = tempfile.mkdtemp(prefix="admission-selftest-test-plan-parallel-")
+    try:
+        environment = build_unit_sample_repository(work)
+        runs = {}
+        for threads in ("1", "4"):
+            plan_file, workers_file, declarations = (os.path.join(work, f"{name}.{threads}") for name in ("plan", "workers", "declarations"))
+            # 复用哨兵的种子钉死：不钉每趟随机，打的那一行两趟不同
+            changes = {THREAD_CAP_VARIABLE: threads, TEST_PLAN_WORKERS_FILE_VARIABLE: workers_file, SERIAL_DECLARATIONS_VARIABLE: declarations,
+                       "SINGLEFS_REUSE_SENTINEL_SEED": "1"}
+            exit_code, output, messages = run_in_environment([sys.executable, module, "test-plan", work, "demo-gate.sh:test-plan-parallel", "demo", plan_file],
+                                                             dict(environment, **changes))
+            plan_text = open(plan_file, encoding="utf-8").read() if os.path.exists(plan_file) else None
+            workers = open(workers_file, encoding="utf-8").read().strip() if os.path.exists(workers_file) else ""
+            declared = os.path.exists(declarations) and os.path.getsize(declarations) > 0
+            runs[threads] = (exit_code, output, plan_text, workers, declared, messages)
+        single, parallel = runs["1"], runs["4"]
+        processes = re.search(r"processes=(\d+)", parallel[3])
+        selftest.expect("test-plan：同一份输入单线程与并行算出的 stdout 与计划文件逐字相同，并行那一趟真分到了子进程",
+                        single[0] == 0 and parallel[0] == 0 and single[1] == parallel[1] and single[2] is not None and single[2] == parallel[2]
+                        and "PLAN judge=3" in single[1] and (bool(processes and int(processes.group(1)) > 1) or parallel[4]),
+                        f"单线程退 {single[0]}、并行退 {parallel[0]}；stdout 相同 {single[1] == parallel[1]}、计划文件相同 {single[2] == parallel[2]}；"
+                        f"并行那一趟记的「{parallel[3] or '没写'}」、声明了串行 {parallel[4]}；单线程 stdout 尾部「{single[1].strip()[-200:]}」；stderr「{parallel[5].strip()[-200:]}」")
+    except AssertionError as error:
+        selftest.expect("test-plan 并行那一格的样本搭得起来", False, str(error))
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -4202,23 +4380,23 @@ def run_reuse_three_question_cells(selftest, module):
 
 
 RESEARCH_SAMPLE_FILES = {
-    "scripts/experiments/Cargo.toml": ('[package]\nname = "e7-index-bench"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\naes-gcm = "0.11.1"\n\n'
+    "scripts/experiment-apparatus/Cargo.toml": ('[package]\nname = "e7-index-bench"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\naes-gcm = "0.11.1"\n\n'
                                        '[lib]\npath = "lib.rs"\n\n[[bin]]\nname = "e23_journal_geom"\npath = "e23_journal_geom.rs"\n\n'
                                        '[[bin]]\nname = "e140-header-alignment"\npath = "e140_header_alignment.rs"\n\n[[bin]]\nname = "e900"\npath = "e900.rs"\n'),
-    "scripts/experiments/Cargo.lock": ('version = 4\n\n[[package]]\nname = "aes-gcm"\nversion = "0.11.1"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n'
+    "scripts/experiment-apparatus/Cargo.lock": ('version = 4\n\n[[package]]\nname = "aes-gcm"\nversion = "0.11.1"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n'
                                        'checksum = "cccc"\n\n[[package]]\nname = "e7-index-bench"\nversion = "0.1.0"\ndependencies = [\n "aes-gcm",\n]\n'),
-    "scripts/experiments/lib.rs": ("pub struct Emitter;\n\nimpl Emitter {\n    pub fn emit(&self) -> u32 {\n        1\n    }\n}\n\n"
+    "scripts/experiment-apparatus/lib.rs": ("pub struct Emitter;\n\nimpl Emitter {\n    pub fn emit(&self) -> u32 {\n        1\n    }\n}\n\n"
                                    "pub fn lru_new() -> u32 {\n    assert!(true, \"容量\");\n    5\n}\n"),
-    "scripts/experiments/e23_journal_geom.rs": ("use e7_index_bench::Emitter;\n\nfn simulate_journal_run() -> u64 {\n    let start = 0;\n    start\n}\n\n"
+    "scripts/experiment-apparatus/e23_journal_geom.rs": ("use e7_index_bench::Emitter;\n\nfn simulate_journal_run() -> u64 {\n    let start = 0;\n    start\n}\n\n"
                                                 "fn main() {\n    let _ = Emitter.emit();\n    let _ = simulate_journal_run();\n}\n"),
-    "scripts/experiments/e140_header_alignment.rs": "use aes_gcm::Aes256Gcm;\n\nfn main() {\n    let _ = std::mem::size_of::<Aes256Gcm>();\n}\n",
-    "scripts/experiments/e900.rs": "fn main() {\n    let _ = 1;\n}\n",
+    "scripts/experiment-apparatus/e140_header_alignment.rs": "use aes_gcm::Aes256Gcm;\n\nfn main() {\n    let _ = std::mem::size_of::<Aes256Gcm>();\n}\n",
+    "scripts/experiment-apparatus/e900.rs": "fn main() {\n    let _ = 1;\n}\n",
     RESULTS_DIRECTORY + "/e23-2026-09-01.out": "E7RESULT name=e23 rows=1\nE7RESULT name=done emitted=2\n",
     RESULTS_DIRECTORY + "/e140-2026-09-01.out": "E7RESULT name=e140 rows=1\nE7RESULT name=done emitted=2\n",
     RESULTS_DIRECTORY + "/e900-2026-09-01.out": "E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n",
     RESULTS_DIRECTORY + "/e901-2026-09-01.out": "E7RESULT name=e901 rows=1\nE7RESULT name=done emitted=2\n",
     ".claude/kb/decisions/08-sample.md": "# 样本决策\n\n一句。\n",
-    REGISTRATION_TABLE: ("# 样本登记表\nE900\tscripts/experiments/e900.rs::main\t# 样本实验\n"
+    REGISTRATION_TABLE: ("# 样本登记表\nE900\tscripts/experiment-apparatus/e900.rs::main\t# 样本实验\n"
                          "E900/second\t@E900\tquestion-row=research/questions.md#6:够判[：:][^（(|]*对照(本身)?是好的 product-field=E900:verdict:control_ok=true\t# 样本第二段\n"
                          "E900/third\t@E900\tsame-run-field=verdict:control_ok=true\t# 样本第二段的同一趟现判写法：前一段这一趟的输出经环境变量交来\n"),
 }
@@ -4247,7 +4425,7 @@ driver_e900() {
 }
 driver_gpu() {
   echo "${CHECKER_TIER_FEATURES[@]}"
-  ./scripts/experiments/target/release/e900
+  ./scripts/experiment-apparatus/target/release/e900
 }
 """
 
@@ -4296,7 +4474,7 @@ def run_experiment_cells(selftest, module):
                         exit_code == EXIT_INPUTS_UNCHANGED and output == "" and FORCE_RERUN_VARIABLE in messages, f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
         exit_code, _output, _messages = experiment("E900", {BREAK_VARIABLE: "skip-unchanged"})
         selftest.expect("弄坏开关 skip-unchanged 下「输入没变」那一格红（放行了）", exit_code == 0, f"弄坏之后仍退 {exit_code}")
-        device = os.path.join(work, "scripts/experiments/e900.rs")
+        device = os.path.join(work, "scripts/experiment-apparatus/e900.rs")
         edit_once(device, "let _ = 1;", "let _ = 2;")
         exit_code, _output, messages = experiment("E900")
         selftest.expect("实验准入：装置 main 改一个字 ⇒ 放行并报变了", exit_code == 0 and "变了" in messages, f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
@@ -4313,7 +4491,7 @@ def run_experiment_cells(selftest, module):
         table_path = os.path.join(work, REGISTRATION_TABLE)
         with open(table_path, encoding="utf-8") as handle:
             good_table = handle.read()
-        write_text(table_path, good_table + "# 加一行注释\nE901\tscripts/experiments/e23_journal_geom.rs::main scripts/experiments/e900.rs::main\t# 别的一行\n")
+        write_text(table_path, good_table + "# 加一行注释\nE901\tscripts/experiment-apparatus/e23_journal_geom.rs::main scripts/experiment-apparatus/e900.rs::main\t# 别的一行\n")
         exit_code, _output, _messages = experiment("E900")
         selftest.expect("实验准入：N22（登记表加注释、别的实验行多登记入口）⇒ 照判没变（退 77）", exit_code == EXIT_INPUTS_UNCHANGED, f"退 {exit_code}")
         write_text(table_path, good_table)
@@ -4348,7 +4526,7 @@ def run_experiment_cells(selftest, module):
                         exit_code == 0 and f"同一趟的输出 {same_run_product} 的 name=verdict control_ok=true" in messages, f"退 {exit_code}，stderr：{messages.strip()[-400:]}")
         exit_code, _output, _messages = experiment("E901")
         selftest.expect("实验准入：没登记的实验键退 2", exit_code == EXIT_REGISTRATION_ERROR, f"退 {exit_code}")
-        write_text(table_path, good_table + "E902\tscripts/experiments/e902_nowhere.rs::main\t# 入口文件不在\nE903\tscripts/experiments/e900.rs::main\tbogus=1\t# 认不出的条件\n")
+        write_text(table_path, good_table + "E902\tscripts/experiment-apparatus/e902_nowhere.rs::main\t# 入口文件不在\nE903\tscripts/experiment-apparatus/e900.rs::main\tbogus=1\t# 认不出的条件\n")
         exit_code, _output, _messages = experiment("E902")
         selftest.expect("实验准入：登记的入口文件不在时退 2", exit_code == EXIT_REGISTRATION_ERROR, f"退 {exit_code}")
         exit_code, _output, _messages = experiment("E903")
@@ -4416,8 +4594,8 @@ def run_row_key_cells(selftest, module):
             changed = sorted(row for row in baseline if after.get(row) != baseline[row])
             selftest.expect(f"行键：{label} ⇒ 变的是 {changed_rows or '无'}", changed == sorted(changed_rows), f"实际变的是 {changed or '无'}：{output.strip()[-400:]}")
 
-        cell("R01 E23 装置函数体改一个字", "scripts/experiments/e23_journal_geom.rs", "let start = 0;", "let start = 0u64;", ["E23"])
-        cell("R02 E23 装置函数里只加一行注释", "scripts/experiments/e23_journal_geom.rs", "    let start = 0;\n", "    // 只是注释\n    let start = 0;\n", [])
+        cell("R01 E23 装置函数体改一个字", "scripts/experiment-apparatus/e23_journal_geom.rs", "let start = 0;", "let start = 0u64;", ["E23"])
+        cell("R02 E23 装置函数里只加一行注释", "scripts/experiment-apparatus/e23_journal_geom.rs", "    let start = 0;\n", "    // 只是注释\n    let start = 0;\n", [])
         write_text(os.path.join(work, RESULTS_DIRECTORY, "e23-renamed-2026-09-01.out"), RESEARCH_SAMPLE_FILES[RESULTS_DIRECTORY + "/e23-2026-09-01.out"])
         cell("R03 E23 产物改名（内容相同）", REPLAY_SCRIPT, "|e23-2026-09-01.out|", "|e23-renamed-2026-09-01.out|", [])
         broken = {BREAK_VARIABLE: "row-key-with-product-name"}
@@ -4427,9 +4605,9 @@ def run_row_key_cells(selftest, module):
         edit_once(os.path.join(work, REPLAY_SCRIPT), "|e23-renamed-2026-09-01.out|", "|e23-2026-09-01.out|")
         selftest.expect("弄坏开关 row-key-with-product-name 下 R03 那一格转红（只改产物文件名，E23 的行键变了）",
                         broken_before.get("E23") and broken_before.get("E23") != broken_after.get("E23"), f"改名前 {broken_before.get('E23')}，改名后 {broken_after.get('E23')}")
-        cell("R04 共用库里两行都不用的 lru_new 改断言消息", "scripts/experiments/lib.rs", "\"容量\"", "\"容量上限\"", [])
-        cell("R05 Cargo.lock 里 aes-gcm 抬版本", "scripts/experiments/Cargo.lock", 'version = "0.11.1"', 'version = "0.11.2"', ["E140"])
-        cell("T18 共用库里 E23 用到的 Emitter::emit 改一个字", "scripts/experiments/lib.rs", "        1\n", "        2\n", ["E23"])
+        cell("R04 共用库里两行都不用的 lru_new 改断言消息", "scripts/experiment-apparatus/lib.rs", "\"容量\"", "\"容量上限\"", [])
+        cell("R05 Cargo.lock 里 aes-gcm 抬版本", "scripts/experiment-apparatus/Cargo.lock", 'version = "0.11.1"', 'version = "0.11.2"', ["E140"])
+        cell("T18 共用库里 E23 用到的 Emitter::emit 改一个字", "scripts/experiment-apparatus/lib.rs", "        1\n", "        2\n", ["E23"])
         cell("E22 切 GPU 开关（--gpu 1）", None, None, None, ["E901"], arguments=("--gpu", "1"))
         broken = {BREAK_VARIABLE: "row-key-without-gpu"}
         _exit_code, gpu_off, _output = row_keys(["--gpu", "0"], broken)
@@ -4439,8 +4617,8 @@ def run_row_key_cells(selftest, module):
         cell("期望产物的内容加一行", RESULTS_DIRECTORY + "/e140-2026-09-01.out", "E7RESULT name=done", "E7RESULT name=extra\nE7RESULT name=done", ["E140"])
         cell("驱动 driver_e900 改一个字", REPLAY_SCRIPT, "control_ok=true\\n", "control_ok=true \\n", ["E900"])
         cell("判法 replay_judge_fresh_product 改一个字", REPLAY_SCRIPT, 'diff -q "$1" "$2"', 'diff -q -- "$1" "$2"', ["E140", "E23", "E900", "E901"])
-        # 驱动在研究工作区里点名 -p <研究包> --bin <名>（E174 那四个驱动的写法）：行键从 --bin 的名字解到 scripts/experiments 里那份源码，不拒算
-        package_line = "  cargo build -q --release --manifest-path scripts/experiments/Cargo.toml -p e7-index-bench --bin e900 >&2 || return 1\n"
+        # 驱动在研究工作区里点名 -p <研究包> --bin <名>（E174 那四个驱动的写法）：行键从 --bin 的名字解到 scripts/experiment-apparatus 里那份源码，不拒算
+        package_line = "  cargo build -q --release --manifest-path scripts/experiment-apparatus/Cargo.toml -p e7-index-bench --bin e900 >&2 || return 1\n"
         edit_once(os.path.join(work, REPLAY_SCRIPT), "driver_e900() {\n", "driver_e900() {\n" + package_line)
         try:
             exit_code, package_keys, output = row_keys(["--gpu", "0"])
@@ -4847,6 +5025,17 @@ def run_crash_cases_listing_cells(selftest, module):
         selftest.expect("crash-case-command：不带 --start-over 与 --blocks-query ⇒ 两个变量都从调用方环境里清掉、不设",
                         exit_code == 0 and f"{CRASH_LIBRARY_WRITE_ONLY_VARIABLE}=1" not in words and f"{CRASH_CASE_BLOCKS_QUERY_VARIABLE}=1" not in words
                         and CRASH_LIBRARY_WRITE_ONLY_VARIABLE in words, f"退 {exit_code}，交的词 {words}")
+        # 交命令之前判 RocksDB 预编库的取值（rocksdb_entry_problem）：小仓另放一份依赖 rocksdb 的 checker 档包清单、进程环境里四个取值是空的
+        #   ⇒ 不交命令（stdout 里没有 cargo 那个词）、退 2、说出 entry 的红句；别的格小仓里没有这份清单，entry 报不判
+        rocksdb_manifest = os.path.join(work, "crates", "singlefs-checker-tier", "Cargo.toml")
+        os.makedirs(os.path.dirname(rocksdb_manifest), exist_ok=True)
+        write_text(rocksdb_manifest, '[package]\nname = "singlefs-checker-tier"\nversion = "0.0.0"\n[dependencies]\nrocksdb = { version = "=0.25.0", optional = true }\n')
+        exit_code, output, _messages = admission("crash-case-command", work, "crash-case:own",
+                                                 changes={"ROCKSDB_LIB_DIR": "", "ROCKSDB_STATIC": "", "SNAPPY_LIB_DIR": "", "SNAPPY_STATIC": ""})
+        selftest.expect("crash-case-command：checker 档包依赖 rocksdb 而进程环境里没有预编库的取值 ⇒ 不交命令、退 2",
+                        exit_code == EXIT_REGISTRATION_ERROR and "cargo" not in output.split("\0") and "rocksdb-prebuilt entry：" in output,
+                        f"退 {exit_code}，stdout「{output.strip()[:600]}」")
+        shutil.rmtree(os.path.dirname(rocksdb_manifest))
         run_crash_case_command_library_cells(selftest, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -5388,7 +5577,7 @@ def replay_copy_text(table_rows, break_header_strip, row_keys=()):
     """真仓 replay.sh 的副本：只换掉复跑表与按行的准入键那一段（row_keys，一行一条、制表符分隔；不给就是空的，真仓 E142 那几条不带进来）、
     在表后面拼上桩驱动；break_header_strip 时把比对前删产物头那一步换成 cat。
     replay.sh 的形状变了（表的起止、删头那一句、按行的准入键那一段不是恰好一处）抛 RegistrationError，那一格判错。"""
-    with open(os.path.join(SELFTEST_HERE, "..", "experiments", "replay.sh"), encoding="utf-8") as handle:
+    with open(os.path.join(SELFTEST_HERE, "..", "experiment-apparatus", "replay.sh"), encoding="utf-8") as handle:
         text = handle.read()
     if (text.count(REPLAY_TABLE_START) != 1 or text.count(REPLAY_STRIP_HEADER_COMMAND) != 1
             or text.count(REPLAY_ROW_KEYS_START) != 1):
@@ -5428,6 +5617,7 @@ def run_replay_cells(selftest, module):
         write_questions(work, "开着")
         write_text(os.path.join(work, REPLAY_TIMING_LAG_TABLE), REPLAY_TIMING_LAG_TABLE_HEAD)
         link_sop_copy(work)
+        link_replay_build_log_tools(work)
         run_quietly(["git", "-C", work, "add", "-A"], GIT_IDENTITY)
         run_quietly(["git", "-C", work, "commit", "-qm", "base"], GIT_IDENTITY)
         table_rows = [f"E{number}|@driver_e{number}||e{number}-2026-09-01.out|exact" for number in ("900", "901", "902")]
@@ -5449,12 +5639,16 @@ def run_replay_cells(selftest, module):
         exit_code, output, _run = replay("E900", table_rows, break_header_strip=True)
         selftest.expect("弄坏 replay.sh 比对前删产物头那一步（换成 cat）判对不上：上一格分得出差别",
                         exit_code == 1 and re.search(r"^E900 .*对不上", output, re.M) is not None, f"退 {exit_code}，输出：{output.strip()[-600:]}")
-        shutil.copy(os.path.join(first_run, "E900.1.out"), os.path.join(work, RESULTS_DIRECTORY, "e900-2026-09-02.out"))
-        rows_with_fingerprinted_product = [row.replace("e900-2026-09-01.out", "e900-2026-09-02.out") for row in table_rows]
-        exit_code, output, unchanged_run = replay("E900", rows_with_fingerprinted_product)
-        selftest.expect("replay.sh：留存产物头上的实验键与今天的相同时判「输入没变」、装置一次都没跑、汇总报没跑 1 行（只改复跑表里的产物文件名不动实验键）",
-                        exit_code == 0 and re.search(r"^E900 .*输入没变", output, re.M) is not None and "输入没变没跑 1" in output
-                        and not os.path.exists(os.path.join(unchanged_run, "driver-ran-E900")), f"退 {exit_code}，输出：{output.strip()[-600:]}")
+        unchanged_cell = "replay.sh：留存产物头上的实验键与今天的相同时判「输入没变」、装置一次都没跑、汇总报没跑 1 行（只改复跑表里的产物文件名不动实验键）"
+        if not os.path.isfile(os.path.join(first_run, "E900.1.out")):
+            selftest.expect(unchanged_cell, False, f"头一趟没出 E900.1.out（{first_run}），这一格接不上；先看头一格为什么没跑")
+        else:
+            shutil.copy(os.path.join(first_run, "E900.1.out"), os.path.join(work, RESULTS_DIRECTORY, "e900-2026-09-02.out"))
+            rows_with_fingerprinted_product = [row.replace("e900-2026-09-01.out", "e900-2026-09-02.out") for row in table_rows]
+            exit_code, output, unchanged_run = replay("E900", rows_with_fingerprinted_product)
+            selftest.expect(unchanged_cell,
+                            exit_code == 0 and re.search(r"^E900 .*输入没变", output, re.M) is not None and "输入没变没跑 1" in output
+                            and not os.path.exists(os.path.join(unchanged_run, "driver-ran-E900")), f"退 {exit_code}，输出：{output.strip()[-600:]}")
         exit_code, output, refused_run = replay("E901", table_rows)
         selftest.expect("replay.sh：前提没齐时判跑不了（准入退 3）、装置一次都没跑",
                         exit_code == 1 and re.search(r"^E901 .*跑不了 .*准入没放行（退 3）", output, re.M) is not None
@@ -5492,6 +5686,7 @@ def run_replay_row_key_cells(selftest, module):
             write_text(os.path.join(work, RESULTS_DIRECTORY, f"{name}-2026-09-01.out"), stored_body)
         write_text(os.path.join(work, REPLAY_TIMING_LAG_TABLE), REPLAY_TIMING_LAG_TABLE_HEAD)
         link_sop_copy(work)
+        link_replay_build_log_tools(work)
         run_quietly(["git", "-C", work, "add", "-A"], GIT_IDENTITY)
         run_quietly(["git", "-C", work, "commit", "-qm", "base"], GIT_IDENTITY)
         table_rows = ["E903|@driver_e903||e903-2026-09-01.out|exact", "E903|@driver_e903_second||e903-second-2026-09-01.out|exact"]
@@ -5608,10 +5803,47 @@ def run_plan_failure_cells(selftest, module):
         shutil.rmtree(work, ignore_errors=True)
 
 
+EXPERIMENT_ADMISSION_ENTRY = "lib.rs::admit_experiment_run_or_exit"   # 研究工作区（REPLAY_RESEARCH_DIRECTORY）里每个接了准入的装置 main 都调它
+PARENT_DIRECTORIES_ROOT_ENTRY = '''
+pub fn root_by_parent_directories() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
+}
+'''
+
+
+def run_experiment_admission_entry_cells(selftest):
+    """实验准入入口不拒算（它拒算时每个调它的实验键都是 refused，「输入没变不重跑」用不上）：真仓研究工作区里 EXPERIMENT_ADMISSION_ENTRY 的闭包没有拒算；
+    同一份 lib.rs 拷进临时目录、补一个照改前写法（清单目录往上两级拼出仓根）取路径的函数，它要拒算 runtime-path。
+    lib_function_units.py 的弄坏开关 FUNCTION_UNITS_BREAK=rust-manifest-directory-reads-unrefused（拼出目录也不拒算）下这一格转红。"""
+    work = tempfile.mkdtemp(prefix="admission-selftest-admission-entry-")
+    try:
+        library = function_units()
+        research = os.path.join(os.path.dirname(os.path.dirname(SELFTEST_HERE)), REPLAY_RESEARCH_DIRECTORY)
+        real_refusals = [refusal.text() for refusal in library.closure_of(research, EXPERIMENT_ADMISSION_ENTRY, library.Options()).refusal_list()]
+        with open(os.path.join(research, "lib.rs"), encoding="utf-8") as handle:
+            source = handle.read()
+        write_text(os.path.join(work, "Cargo.toml"), '[package]\nname = "e7-index-bench"\nversion = "0.1.0"\n\n[lib]\npath = "lib.rs"\n')
+        write_text(os.path.join(work, "lib.rs"), source + PARENT_DIRECTORIES_ROOT_ENTRY)
+        forms = {refusal.form for refusal in library.closure_of(work, "lib.rs::root_by_parent_directories", library.Options()).refusal_list()}
+        selftest.expect(f"实验准入入口 {REPLAY_RESEARCH_DIRECTORY}/{EXPERIMENT_ADMISSION_ENTRY} 的闭包不拒算；清单目录往上拼出仓根取路径的入口拒算 runtime-path",
+                        not real_refusals and "runtime-path" in forms,
+                        f"准入入口的拒算 {real_refusals or '无'}；往上拼目录的那个入口拒算 {sorted(forms) or '无'}（要有 runtime-path）")
+    except (library_errors() + (OSError, UnitKeyError)) as error:
+        selftest.expect("实验准入入口的闭包算得出", False, f"{type(error).__name__}：{error}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def library_errors():
+    module = FUNCTION_UNITS_MODULE.get("module")
+    return (module.FunctionUnitsError, module.UsageError) if module is not None else ()
+
+
 def run_selftest():
     selftest = Selftest()
     module = os.path.abspath(__file__)
     run_unit_key_cells(selftest, module)
+    run_test_plan_parallel_cells(selftest, module)
     run_verdict_library_cells(selftest, module)
     run_reuse_three_question_cells(selftest, module)
     run_plan_failure_cells(selftest, module)
@@ -5630,6 +5862,7 @@ def run_selftest():
     real_rows = read_registration_rows(repository_root)
     real_problems = lint_registration_rows(real_rows, repository_root)
     selftest.expect(f"真仓的登记表 {REGISTRATION_TABLE} 自查没有问题", not real_problems, "；".join(real_problems))
+    run_experiment_admission_entry_cells(selftest)
     run_real_crash_case_row_cells(selftest, real_rows)
     run_real_crash_case_features_cells(selftest, real_rows)
     _real_rows, _registered, real_row_key_problems, real_shared_keys = replay_row_key_problems(repository_root)
@@ -5641,7 +5874,7 @@ def run_selftest():
         print("     → 怎么办：照上面每一格的说明改被测的那一段；判据与为什么这么定见文件头。弄坏开关那几格红不了，说明那一格分不出差别")
         return 1
     print(f"  ✓ admission.py 自证通过：{selftest.checked} 格都对（单元键的阳性与阴性对照、判定库的现判 / 复用 / 只写不读、门禁复用答法的 H2 / H3 / E01、"
-          "verdict-plan 的复用三问与复用哨兵、实验键的 T19 / N22、复跑表行键的 R01–R05 / T18 / E22、崩溃枚举用例的登记 / 日志 / 线程 / 特性 / 块判定那一行 / red-blocks= 标记与 --ran；"
+          "verdict-plan 的复用三问与复用哨兵、实验键的 T19 / N22、实验准入入口不拒算、复跑表行键的 R01–R05 / T18 / E22、崩溃枚举用例的登记 / 日志 / 线程 / 特性 / 块判定那一行 / red-blocks= 标记与 --ran；"
           "含弄坏开关 verdict-key-with-entry-file、verdict-lookup-skipped、tree-compare-reuse、"
           "experiment-key-with-kb-documents、skip-build-environment、row-key-with-product-name、row-key-without-gpu、blocks-count-unchecked、ran-blocks-line-optional、skip-unchanged、"
           "skip-preconditions、skip-gate-preconditions 与崩溃枚举用例那几格的老开关下各自那一格转红）")

@@ -1,0 +1,36 @@
+# 派发：three-way-attack
+
+重型测试：不跑
+批次：records/2026-10-22-子agent结果落地审计.md#10
+线程上限：31
+禁读清单：research/prompts/landing-audit-r5-sonnet-output.md（同一轮的辩方腿报告）
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r5-opus
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r5-opus --purpose '三方 landing-audit-r5 的攻方腿草稿（landing-audit-r5-opus）'
+背景材料：research/prompts/_landing-audit-r5-background.md
+攻击面：正文 research/prompts/_landing-audit-r5-body.md 节「三、格」的 K2（第十批的修补本身）、K3（产生结论的方法与没看过的地方）
+报告：research/prompts/landing-audit-r5-opus-output.md
+预计挂钟：2 小时内，读正文、被判文件与第十批四份交回报告，在草稿目录里拷钩子与脚本喂造出来的输入，读真会话记录数形状，不编译
+
+回复与报告用中文。
+
+轮名：landing-audit-r5（第九、十批改动的第二轮）。第一轮判决：`research/prompts/landing-audit-r4-main-verification.md`；第一轮攻方模型 `research/prompts/landing-audit-r4-opus-model/`（探针在 `probes/`，可拿来比改前改后）。模型目录：research/prompts/landing-audit-r5-opus-model/。
+
+## 关的是哪几条
+
+1. **K2 第十批的修补本身**：正文节「三、格」K2 列的五处（新库 `lib_prompt_scratch_line.py` 与四处调用、交回闸 ⑤ 新判法、`lib_three_way_legs.py` 两个函数与派发闸自证读的 14 份真提示、`MERGE_VERIFY_QUICK_STEP` 与几处例外说法、break-switch-replay 格按字节收）；交回报告在 `research/prompts/subagent-landing-audit-2026-10-22/` 下 `b10-defs-sync.md`、`b10-hooks.md`、`b10-replay-decode.md`，主 agent 自己改的几处在正文「实现今天的样子」。改法做没做到判决那一条要的，带没带出新的误拦、误放、矛盾；交回报告自己列过的认不出的写法不重复报。
+2. **K3 产生结论的方法与没看过的地方**：第一轮 K3-1、K3-2 打中的形状与第十批收严之后新拒的形状，在真会话记录（`~/.claude/projects/-home-fy5090-code-singlefs/*/subagents/`）的派发提示与交回里出现过几次，写出数法与数；正文 K3 列的两处没看过的地方。
+
+每一条打中的写：哪一处（文件:行）、怎么复出来（命令与输出）、改法、推翻条件。没打中的格写「没打中」与你查了什么。你提的改法都算被攻过零轮，写明。
+
+## 写法
+
+- 不重复第一轮已攻过的角度（正文节「一、题面」列了）。
+- 方案按 `crates/` 与 `scripts/` 今天的实现来谈；被判的改动在 `research/prompts/landing-audit-r5-snapshot/judged-vs-head.diff`（对 HEAD），混有别的会话的改动（正文节「实现今天的样子」列了是哪几处）。
+- 现试放草稿目录，经 `scripts/hosts/run-with-memory-cap.sh 4G` 跑；不在主工作区改文件。模型目录里放 `tools/rerun.sh`（模板照第一轮攻方模型的那一份），判决时主 agent 在副本里复跑。
+- 报告分段写进报告路径：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建（`set -o noclobber`），之后 `>>` 追加；回复只写短句：报告路径、sha256、各格打中几条。
+- 草稿与临时文件放草稿目录，不放会话共用的暂存目录。
+- 引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数。
+
+## 出口
+
+K2、K3 逐格写完，报告写完交回。

@@ -143,9 +143,27 @@ declared="$(grep -ao 'GEOM done emitted=[0-9]*' "$LOGF" | tr -d '\r' | sed -n 's
 n=${#LINES[@]}
 [[ -n "$declared" ]] || { cp "$LOGF" "${TMPDIR:-/tmp}/vmgeom-fail.log"; die "读不到完成标记 —— 整轮作废。日志：${TMPDIR:-/tmp}/vmgeom-fail.log" "去这份日志里看来宾卡在哪一步（insmod 失败、找不到设备节点都是常见原因），修完重跑整个脚本，不要只重跑这一轮。"; }
 [[ "$n" -eq "$declared" ]] || die "完整性闸：抓到 $n 条，来宾声称发了 $declared 条 —— 整轮作废" "去 $KEEP 里看控制台日志，确认是不是抓取路径丢了行（rules/command-safety.md「结果抓取要有完整性闸」），排查完重跑整个脚本。"
-# 0/0 也要拦：读不到 ≠ 读到 0（rules/test-discipline.md）。来宾一个块设备都没看到，
-# 说明驱动没起来或命名不对，而不是「几何都一样」。
-[[ "$n" -ge 1 ]] || die "来宾一个 nvme 块设备都没看到（emitted=0）—— 整轮作废，不是阴性结果" "去 $KEEP 里看 insmod 是否成功、/sys 下有没有 nvme 设备节点；驱动没起来就查 vermagic 是否与内核匹配，修完重跑整个脚本。"
+# 必须看到配置的三块盘；自报条数相符不能证明设备枚举完整。
+[[ "$n" -eq 3 ]] || die "预期三块 NVMe，实际只有 $n 条 —— 整轮作废" "检查 $KEEP 中的驱动加载与命名空间枚举。"
+declare -A seen_devices=()
+for line in "${LINES[@]}"; do
+  # nr_zones 在非 zoned 设备上可以不存在，其他数值字段必须读到。
+  [[ "$line" =~ ^GEOM\ dev=(nvme0n[123])\ lbs=([0-9]+)\ pbs=([0-9]+)\ zoned=(none|host-managed)\ chunk_sectors=([0-9]+)\ nr_zones=([0-9]+|NA)\ bytes=([0-9]+)$ ]] \
+    || die "几何记录缺字段或格式不对：$line" "检查 $KEEP 中的 sysfs 读取结果。"
+  dev="${BASH_REMATCH[1]}"; lbs="${BASH_REMATCH[2]}"; pbs="${BASH_REMATCH[3]}"
+  zoned="${BASH_REMATCH[4]}"; chunk="${BASH_REMATCH[5]}"; zones="${BASH_REMATCH[6]}"; bytes="${BASH_REMATCH[7]}"
+  [[ -z "${seen_devices[$dev]:-}" ]] || die "设备记录重复：$dev" "每块预期设备必须恰好出现一次。"
+  seen_devices[$dev]=1
+  expected_chunk=131072; expected_zones=8
+  if [[ "$UNIFORM" == 0 && "$dev" == nvme0n2 ]]; then expected_chunk=262144; expected_zones=4; fi
+  if [[ "$UNIFORM" == 0 && "$dev" == nvme0n3 ]]; then
+    [[ "$lbs/$pbs/$zoned/$chunk/$bytes" == 512/512/none/0/536870912 && ( "$zones" == NA || "$zones" == 0 ) ]] \
+      || die "$dev 的几何与配置不符：$line" "检查普通 NVMe 命名空间的配置与读取。"
+  else
+    [[ "$lbs/$pbs/$zoned/$chunk/$zones/$bytes" == "4096/4096/host-managed/$expected_chunk/$expected_zones/536870912" ]] \
+      || die "$dev 的几何与配置不符：$line" "检查 zoned NVMe 命名空间的配置与读取。"
+  fi
+done
 ok "完整性闸通过：$n/$declared 条"
 say ""
 printf '%s\n' "${LINES[@]}" | sed 's/^/  /'
@@ -156,6 +174,6 @@ if [[ $UNIFORM -eq 1 ]]; then
   [[ "$distinct" -eq 1 ]] && ok "阴性对照通过：同构档塌成 1 种几何 ⇒ 读取路径有判别力" \
     || die "阴性对照失败：同构档看到 $distinct 种几何 —— 读取路径在回声参数，异构档的结论作废" "去 $KEEP 里看每个设备读到的原始几何值是不是来自命令行参数而不是 /sys；查一下读取路径（init 脚本里的 GEOM dev= 那段）是不是把某个字段读成了常量。"
 else
-  [[ "$distinct" -ge 2 ]] && ok "异构档：来宾确实看到 $distinct 种不同几何" \
+  [[ "$distinct" -eq 3 ]] && ok "异构档：来宾确实看到 $distinct 种不同几何" \
     || die "异构档只看到 $distinct 种几何 —— 来宾没能区分，模拟不成立" "确认三个命名空间的 -device 参数（NS_ARGS）几何真的不同（各自的 size/logical_block_size 之类），去 $KEEP 里核对来宾读到的值；参数本身相同就先把参数改开。"
 fi

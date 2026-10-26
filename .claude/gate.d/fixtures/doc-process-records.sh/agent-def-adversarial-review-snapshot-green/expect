@@ -1,0 +1,6 @@
+exit=0
+want=✓ 改过的定义与共用约束 2 份都有去向（新写的判决文件 1 份，另有 0 份按 .claude/agent-def-review-exempt 豁免，基准 HEAD）
+want=判决之后改没改过（拿那一轮开工快照清单里的 sha256 比此刻的内容）：1 个对得上，1 个没比
+want=      没比：.claude/main-agent.md
+want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review
+want=doc-process-records.sh：1 格里 1 格绿（agent-def-adversarial-review），0 格本次未跑（无）

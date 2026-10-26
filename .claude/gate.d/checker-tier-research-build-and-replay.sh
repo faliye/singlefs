@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要 cargo：缺了就在单测那一格判红、复跑那一格由它调的 scripts/experiments/replay.sh 编实验二进制时判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
+# run-condition: none 要 cargo：缺了就在单测那一格判红、复跑那一格由它调的 scripts/experiment-apparatus/replay.sh 编实验二进制时判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
 # gate-stage: research 工作区的构建与单测；入库的实验数今天还复现得出来吗
 # gate-fixture: yes
 # gate-category: checker-tier 类
@@ -17,7 +17,7 @@
 #                        单元闭包罩不住；增量编，没改动时 cargo 判新鲜），再 cargo test --release。
 #                        上游「构建与单测」只编 crates/，kb 里实测结论背后的实验二进制只有这一格编。
 #                        按条复用：每条测试函数（lib、各 bin、tests/ 里带 #[test] 的）一条判定，键是它的单元键（scripts/gate/admission.py test-plan，
-#                        闭包根 scripts/experiments、release 档、工具链、解析出的依赖版本，判法 scripts/gate/lib_libtest_result_lines.py 的 result_line），
+#                        闭包根 scripts/experiment-apparatus、release 档、工具链、解析出的依赖版本，判法 scripts/gate/lib_libtest_result_lines.py 的 result_line），
 #                        键相同的经 cargo test -- --exact --skip <全名> 跳过，一条都不用现判就不起 cargo test；判绿的照键记进
 #                        <git common-dir>/singlefs-unit-verdicts/checker-tier-research-build-and-replay.sh:research-unit-tests/。拒算的照跑、不记；
 #                        成功句报「单测按条：现判 N、复用 M、拒算 R、本次未跑 K」，红句另列红的那几条这一趟为什么现判（变了的单元）。
@@ -32,13 +32,13 @@
 #                        每个登记名逐条往 $GATE_NOT_RUN_FILE 报「挂钟断言 <函数名> 本次未跑」，成功句报「跳过挂钟断言 K 条（逐个列名）」，不记它们为绿、不判红。
 #                        登记位写坏时判法 --list 退 1，这一格不数、不传 --skip，那一错归 wallclock-asserts-registered 格。
 #                        要验这些断言：不带 --skip，在不并发的场合单独跑 cargo test。
-#   wallclock-asserts-registered  python3 scripts/gate/wallclock-assert-lint.py：scripts/experiments/*.rs 的 #[test] 里按挂钟判的断言要带 // wallclock-assert: 登记位
+#   wallclock-asserts-registered  python3 scripts/gate/wallclock-assert-lint.py：scripts/experiment-apparatus/*.rs 的 #[test] 里按挂钟判的断言要带 // wallclock-assert: 登记位
 #                        （或怕不着负载的 // wallclock-assert-load-safe:），缺了判红、点名文件:行号；带了而断言里没有挂钟量也判红；登记名是别的未登记测试名的子串
 #                        （--skip 是子串匹配，会连那一条一起跳过）也判红。判法、登记位写法在判法脚本文件头；
 #                        判法立之前就在仓里还没复核的在 .claude/gate.d/wallclock-assert-lag.tsv（只缩不涨），成功句另报条数，并往 $GATE_NOT_RUN_FILE 报一行。
-#   experiment-replay    不整格问复用、不比树、不比 HEAD：派给 scripts/experiments/replay.sh，它按行复用（下面「要跑时」那一段）。
+#   experiment-replay    不整格问复用、不比树、不比 HEAD：派给 scripts/experiment-apparatus/replay.sh，它按行复用（下面「要跑时」那一段）。
 #                        replay.sh 退 77（C350：整趟全是计时行的负载关，本次不判）不当红：这一格报「复跑整趟本次不判（负载高）」、往 $GATE_NOT_RUN_FILE 报一行、退 77；别的退出码照旧（非 0 判红）。
-#                        派给 scripts/experiments/replay.sh 的是表里的 exact 行减掉 SLOW；SLOW 里的与表里每一行 timing 都逐个列成「没派」。
+#                        派给 scripts/experiment-apparatus/replay.sh 的是表里的 exact 行减掉 SLOW；SLOW 里的与表里每一行 timing 都逐个列成「没派」。
 #                        对不上不一定是代码坏了，也可能是产物该更新，两种都要人判，所以判红。
 #                        replay.sh 按行复用（它文件头「按行复用」：每一行的行键是装置入口的单元闭包、参数、GPU 开关与特性集、期望产物内容、工具链、
 #                        解析出的依赖版本，算法在 scripts/gate/admission.py 文件头「复跑表每一行的行键」；键相同、判过的那一行不跑，全部行都复用的一趟不起编译、不清场）：
@@ -49,14 +49,15 @@
 #                        scripts/mutation/mutate.sh --compile-only <bin> <名>.rs <表>（判法、cargo 跑什么、退出码都在它文件头「只编不跑」；
 #                        每个 cargo 带的 RUSTFLAGS=…--cap-lints warn 在它文件头「deny 警告」，这里不另加）；
 #                        有一条 ⏭（编不过：平常跑里就是一条无效变异）整格红，逐条点名表与条目、打第一行 error。
-#                        枚举对象与 code-source-discipline 的 mutation-tables 格同一个来源：scripts/mutation/tables/ 下每张 .tsv 对 scripts/experiments/ 下同名的 .rs；
+#                        枚举对象与 code-source-discipline 的 mutation-tables 格同一个来源：scripts/mutation/tables/ 下每张 .tsv 对 scripts/experiment-apparatus/ 下同名的 .rs；
 #                        bin 名经 mutate.sh --binary-of <名>.rs 取（与它核对 bin 的读法同一份）。没有同名 .rs 的表（shell 探针、Python 驱动、crates 那一侧的）
 #                        取不出（bin、源文件、表）三元组，逐张点名、往 $GATE_NOT_RUN_FILE 报本次未跑、不算绿；一张都判不了退 77。
 #                        按条复用归 mutate.sh（它文件头「按条入库」：每条变异一条判定，键是原文、替换文、包住原文的单元闭包、cargo 参数与特性、工具链、依赖版本，
 #                        库在 git common-dir 底下的 singlefs-mutate-library/，不进 /tmp）：这一格不另建库、不整格问复用；一张表的条全部复用时 mutate.sh 一条都不编。
 #                        这一格读每张表末尾「计数：」那一行，逐张报「现判 N 条、复用 M 条、拒算 R 条」，成功句报合计与「本次未跑 K 张表」；
 #                        编不过的那一条另报 mutate.sh 写的「现判：[<名>] <原因>」（键对不上时是变了的单元）。SINGLEFS_GATE_FULL=1 时给 mutate.sh 带 --full（只写不读）。
-#                        编译目录一个、跨轮留着：${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-mutation-tables-compile-target/，各表串行增量编（编译产物，不是判定库）。
+#                        编译目录一个、这一趟自己的：这一格的临时目录（mktemp -d）里的 target/，各表串行增量编（编译产物，不是判定库），收尾连同临时目录删
+#                        （用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）。
 #                        挂了 required-features 的 bin 由 mutate.sh 带上 --features；E162 的 rocksdb 要的 BINDGEN_EXTRA_CLANG_ARGS 没设时取
 #                        scripts/crash/crash-amplification-lib.sh 的 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS（与 checker-tier-crash-point-replay 带特性那一趟同一处）。
 # 格结构经 lib/stage-cells.sh。
@@ -66,7 +67,6 @@
 #                                   包装退 245 或 250–254 不是单测的判定，单独判红、单独给出路。cargo build 不跑编出来的代码，不经包装。
 #   GATE_REPLAY_FULL=1              复跑那一格连 SLOW 与 timing 行一起跑
 #   SINGLEFS_GATE_FULL=1            只写不读：research-unit-tests 每条现判、照键记；replay.sh 照它只记不读；mutation-tables-compile 给 mutate.sh 带 --full
-#   GATE_CROSS_RUN_TMPDIR           mutation-tables-compile 格的编译目录放它下面（gate.sh 设它），没设取 TMPDIR
 #
 #   bash .claude/gate.d/checker-tier-research-build-and-replay.sh [项目根]                                三格都跑
 #   bash .claude/gate.d/checker-tier-research-build-and-replay.sh --list                                  逐行打格名与判什么，不跑格
@@ -78,7 +78,7 @@
 #     --item 给几次取并集，timing 与 SLOW 也照跑；成功行写明只跑了点名的几个，不是整格结论；实验号不在表里退 2
 #   bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check mutation-tables-compile [项目根]  只跑变异表只编译那一格
 #
-# 样本：fixtures/checker-tier-research-build-and-replay.sh/ 下十八份，各放 .gate-cells 只点名它判的那一格：
+# 样本：fixtures/checker-tier-research-build-and-replay.sh/ 下十九份，各放 .gate-cells 只点名它判的那一格：
 #   research-unit-tests-red    research 工作区里有一条单测红着的小仓，判红
 #   research-unit-tests-green  一条单测全绿、scripts/ 下一份脚本都没有，判绿，成功行报一个测试批次
 #   green                      带假 replay.sh 的小仓，表里一行快的 exact、一行 SLOW 里的 exact、一行 SLOW 里只有 timing 的；
@@ -91,7 +91,7 @@
 #                              第二趟第 1 条复用、第 2 条现判（对照样本 T14 的 :2），判绿
 #   mutation-tables-compile-deny-green  同形的工作区（warnings = "deny"），一条替换文只让一个函数再没人调、留下死代码：deny 下编不过，
 #                              mutate.sh 给每个 cargo 带的 --cap-lints warn 压成警告，判绿（两条都编得过）
-#   wallclock-asserts-registered-red    scripts/experiments/ 下一份 .rs 里有一个按挂钟判的断言（.elapsed() 比大小）的测试，没登记位，判红、点名文件:行号
+#   wallclock-asserts-registered-red    scripts/experiment-apparatus/ 下一份 .rs 里有一个按挂钟判的断言（.elapsed() 比大小）的测试，没登记位，判红、点名文件:行号
 #   wallclock-asserts-registered-green  同形的一份 .rs：一个带 // wallclock-assert: 的测试、一个带 // wallclock-assert-load-safe: 的测试，判绿并报登记 1 条、load-safe 1 条
 #   replay-load-skipped        带假 replay.sh（退 77）的小仓：复跑那一格认成本次未跑，整道退 77、输出里有「复跑整趟本次不判（负载高）」；改前这一格对 77 退 1
 #   experiment-replay-reused   带假 replay.sh 的小仓，末行打一行 REPLAY_TOTAL（现判 1 行、复用 2 行、拒算 0 行、已归档只跑不比 1 行）：这一格照它报复用数，判绿
@@ -105,6 +105,8 @@
 #   research-unit-tests-archived-not-run-unmatched-red  同形，那一行的 test= 写成计划里没有的名字：判红、点名对不上的那一条
 #   experiment-replay-inputs-not-run  带假 replay.sh 的小仓：打两行本次未跑与 REPLAY_TOTAL（not_run=2、load_skipped=0）后退 77，
 #                              这一格报「输入不在 2 行」「复跑整趟本次不判（要读的产物全不在）」、整道退 77
+#   experiment-replay-rocksdb-entry-refused  带假 replay.sh（同 experiment-replay-reused）的小仓，crates/singlefs-checker-tier/Cargo.toml 依赖 rocksdb：
+#                              起 replay.sh 之前 rocksdb-prebuilt.py entry 判红（样本根没有 Cargo.lock，进程环境有没有取值都红），这一格退 1、replay.sh 没起
 #   mutation-tables-compile 的样本里按条判定库与编译目录都是这一格自己的临时目录，跑完删；run-twice 那两份第二趟读第一趟记的。mutation-tables-compile 四份要真 cargo（经 mutate.sh cargo check 一个小 bin）；
 #   research-unit-tests-unit-key 的判定库在样本自己的 git common-dir 里（setup.sh git init），跑完随临时目录删；
 #   wallclock-asserts-registered 两份只读样本里的 .rs，不起 cargo。
@@ -135,6 +137,8 @@
 #       mutation-tables-compile-row-key（输出里找不到第二趟的「现判 1 条、复用 1 条」：第 1 条没改也被判成现判）
 #   unit-tests-without-library  research-unit-tests 的计划带 --full（一条都不复用，改前没有库的样子）
 #       research-unit-tests-unit-key（输出里找不到「现判 1、复用 2」：只加了一条单测，另两条也现判）
+#   rocksdb-entry-unchecked  experiment-replay 起 replay.sh 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#       experiment-replay-rocksdb-entry-refused（期望退 1、输出里有「rocksdb-prebuilt entry：」，实得退 0：假 replay.sh 照起了）
 # admission.py 的 ADMISSION_BREAK=plan-failure-not-red（按条复用失灵也不判红，改前退回全部现判的样子）：
 #       research-unit-tests-plan-exit-red、research-unit-tests-plan-sentinel-red（期望退 1，实得退 0）
 set -uo pipefail
@@ -152,7 +156,7 @@ stage_cell wallclock-asserts-registered cell_wallclock_asserts_registered "实�
 stage_cell experiment-replay cell_experiment_replay "入库的纯模型实验重跑一遍，与 research/results/ 里的产物逐字节相同" \
   "对不上先判是代码坏了还是产物该更新（两种都要人判）；只重跑红的那几个实验：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check experiment-replay --item <实验号>"
 stage_cell mutation-tables-compile cell_mutation_tables_compile "研究侧每张变异表逐条施加替换文只编译，一条编不过就红" \
-  "改那一行替换文（编得过、仍改被测行为），或装置改回能编；表归实验执行员改。单张核：在 scripts/experiments/ 里 bash ../mutation/mutate.sh --compile-only <bin> <源文件> <表>；改完只重跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check mutation-tables-compile"
+  "改那一行替换文（编得过、仍改被测行为），或装置改回能编；表归实验执行员改。单张核：在 scripts/experiment-apparatus/ 里 bash ../mutation/mutate.sh --compile-only <bin> <源文件> <表>；改完只重跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check mutation-tables-compile"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 list_items=0; root_argument=""; named_experiments=()
@@ -176,8 +180,8 @@ while (($#)); do
 done
 ROOT="${root_argument:-$STAGE_REPOSITORY}"
 cd "$ROOT" || exit 2
-R=scripts/experiments
-REPLAY_SCRIPT="scripts/experiments/replay.sh"
+R=scripts/experiment-apparatus
+REPLAY_SCRIPT="scripts/experiment-apparatus/replay.sh"
 ADMISSION="$STAGE_REPOSITORY/scripts/gate/admission.py"
 
 # replay.sh 表里的行：编号|二进制|参数|产物|exact 或 timing。门禁靠这个形状取行，改表格式要同时改这里。
@@ -235,7 +239,7 @@ if ((${#named_experiments[@]})); then
 fi
 
 # ── research-unit-tests ──
-# research_test_packages：research 工作区里带测试的包名（scripts/experiments/Cargo.toml 的 [package]，与 [workspace] members 各自 Cargo.toml 的 [package]），一行一个
+# research_test_packages：research 工作区里带测试的包名（scripts/experiment-apparatus/Cargo.toml 的 [package]，与 [workspace] members 各自 Cargo.toml 的 [package]），一行一个
 research_test_packages() {
   python3 - "$R" <<'PY'
 import glob, os, sys, tomllib
@@ -474,7 +478,7 @@ cell_research_unit_tests() {
     echo "               登记名是不是被别的写法拼错；--skip 是子串匹配，函数名要和登记的一字不差。"
     exit 1
   fi
-  # 研究单测读不到别的实验的产物、拿来当期望值的留存产物时打的本次未跑行（scripts/experiments/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER：
+  # 研究单测读不到别的实验的产物、拿来当期望值的留存产物时打的本次未跑行（scripts/experiment-apparatus/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER：
   # 「NOT_RUN_ARCHIVED_PRODUCT test=<目标根文件名去掉 .rs>::<libtest 全名> reason=<一句>」）：那几条 libtest 照判 ok，这里逐条报本次未跑、不记库；
   # 按条复用算得出时，test= 对不上计划里任何一条判红（名字写错的那一条会被当成判过的绿记进库）。弄坏开关 archived-not-run-ignored：不认这一种行（改前的样子）
   local archived_not_run=() archived_unmatched=() marker_test marker_reason plan_name
@@ -492,7 +496,7 @@ cell_research_unit_tests() {
   fi
   if ((${#archived_unmatched[@]})); then
     echo "  ✗ 本次未跑行点名的 ${#archived_unmatched[@]} 条用例（${archived_unmatched[*]}）在按条复用的计划里找不到：名字写错的那一条会被当成判过的绿记进库"
-    echo "     → 怎么办：调用处给的用例名写成 <目标根文件名去掉 .rs>::<libtest 全名>（例 e134_map_key_slot_baselines::tests::<函数名>，写法见 scripts/experiments/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER），"
+    echo "     → 怎么办：调用处给的用例名写成 <目标根文件名去掉 .rs>::<libtest 全名>（例 e134_map_key_slot_baselines::tests::<函数名>，写法见 scripts/experiment-apparatus/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER），"
     echo "               改完只跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests"
     exit 1
   fi
@@ -546,6 +550,17 @@ run_replay() {
   local -a break_setting=()
   # 弄坏开关 row-key-with-product-name（文件头）：交给 replay.sh 起的 admission.py（ADMISSION_BREAK），行键另加产物文件名
   research_build_broken row-key-with-product-name && break_setting=(ADMISSION_BREAK=row-key-with-product-name)
+  # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：replay.sh 编 checker 档的装置与 E162 那几个 bin（都编到 librocksdb-sys），
+  #   起它之前判一次这台装了、此刻进程环境的取值对得上，判红这一格退 1、replay.sh 不起（一个 cargo 都不起）。树里没有依赖 rocksdb 的清单（别的样本）、
+  #   PATH 上是带标记的假 cargo，entry 报不判。弄坏开关 rocksdb-entry-unchecked 下不判（样本 experiment-replay-rocksdb-entry-refused 判错）
+  #   这一份被拷到不带 scripts/hosts/ 的树里时报一行没判、往下走
+  if ! research_build_broken rocksdb-entry-unchecked && [[ ! -f "$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py" ]]; then
+    echo "  ! RocksDB 预编库的取值没判：$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py 不在（这一份阶段被拷到了不带 scripts/hosts/ 的树里）"
+  elif ! research_build_broken rocksdb-entry-unchecked && ! python3 "$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py" entry --root "$ROOT"; then
+    echo "  ✗ 复跑：起 replay.sh（它编到 librocksdb-sys）之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），一个实验都没跑"
+    echo "    → 怎么办：照上面的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再只跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check experiment-replay"
+    exit 1
+  fi
   replay_log="$(mktemp)"
   env ${break_setting[@]+"${break_setting[@]}"} bash "$REPLAY_SCRIPT" "$@" | tee "$replay_log"
   replay_rc="${PIPESTATUS[0]}"
@@ -593,7 +608,7 @@ cell_experiment_replay() {
   # （.claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」）。
   mapfile -t ALL_EXACT < <(replay_rows_of_kind exact)
   if ((${#ALL_EXACT[@]} == 0)); then
-    echo "  ✗ 从 scripts/experiments/replay.sh 里一行都没读到——表的格式变了？"
+    echo "  ✗ 从 scripts/experiment-apparatus/replay.sh 里一行都没读到——表的格式变了？"
     echo "    → 本阶段靠 '编号|二进制|参数|产物|exact' 这个形状取行，改表格式要同时改这里。"
     exit 1
   fi
@@ -672,13 +687,11 @@ cell_mutation_tables_compile() {
   fi
   scratch="$(mktemp -d)" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
   cleanup_paths="$(printf '%q' "$scratch")"
-  # 样本（被判的根不是这道阶段所在的仓、也不是 --staged）：按条判定库与编译目录都用这一格自己的临时目录，跑完删；
+  # 编译目录一律用这一格自己的临时目录，跑完删；样本（被判的根不是这道阶段所在的仓、也不是 --staged）另把按条判定库也放这里；
   # 只有 run-twice 那份接连判两趟（同一份库，第二趟照条复用），另放了 second-round/ 的在第二趟之前把它下面的文件盖到样本根上（改一条替换文）
   if [[ "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" && -z "${GATE_STAGED_FROM:-}" ]]; then sample_mode=1; fi
-  if ((sample_mode == 0)); then
-    target_directory="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-mutation-tables-compile-target"
-  else
-    target_directory="$scratch/target"
+  target_directory="$scratch/target"   # 这一格自己的编译目录（文件头 mutation-tables-compile），收尾随 $scratch 删
+  if ((sample_mode != 0)); then
     library="$scratch/library"
     library_setting=("MUTATE_LIBRARY_DIRECTORY=$library")
     [[ -f .mutation-tables-compile-sample/run-twice ]] && rounds=2
@@ -776,7 +789,7 @@ cell_mutation_tables_compile() {
       done
       echo "  ✗ 研究侧变异表有 $invalid_total 条替换文编不过、${#red_tables[@]} 张表没判完（按条：现判 $fresh_total 条、复用 $reused_total 条、拒算 $refused_total 条）"
       echo "     → 怎么办：编不过的改那一行替换文（编得过、仍改被测行为），或装置改回能编；没判完的照括号里 mutate.sh 的退出码办。"
-      echo "               单张核：(cd scripts/experiments && bash ../mutation/mutate.sh --compile-only <bin> <源文件> ../mutation/tables/<表>)"
+      echo "               单张核：(cd scripts/experiment-apparatus && bash ../mutation/mutate.sh --compile-only <bin> <源文件> ../mutation/tables/<表>)"
       exit 1
     fi
   done

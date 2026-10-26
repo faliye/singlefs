@@ -1,0 +1,10 @@
+[package]
+name = "singlefs-background-gpu"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+wgpu = { version = "=30.0.1", default-features = false }
+
+[dev-dependencies]
+judge = { package = "sample-gpu-judge-bridge", path = "../sample-gpu-judge-bridge" }

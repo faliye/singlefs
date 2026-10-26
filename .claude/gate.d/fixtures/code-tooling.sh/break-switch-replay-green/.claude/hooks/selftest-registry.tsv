@@ -1,0 +1,6 @@
+# 样本登记表
+scripts/gate/okay.py	light	# 样本：自证只在内存里判
+scripts/gate/guard.sh	light	# 样本：自证只在内存里判
+scripts/gate/noisy.py	light	# 样本：自证只在内存里判
+scripts/gate/chatty.py	light	# 样本：自证只在内存里判
+scripts/gate/other.py	light	# 样本：自证只在内存里判

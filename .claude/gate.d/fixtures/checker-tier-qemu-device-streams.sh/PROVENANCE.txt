@@ -11,14 +11,16 @@ raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1（那�
      也有本批 crates/singlefs-checker-tier/src/device_log.rs 的写零折叠改法（块内乱序可折、块间按序）。
    - check-exit：direct、file-overwrite、second-instance、raise-rollback-floor 为 0；
      skip-new-pool-file-creation-barrier、page-cache 为 1（两个对照，该红）。
-2. 对照的登记值（2026-10-18 起本阶段不读任何实验产物，样本里不放 research/ 与 scripts/experiments/replay.sh）：
+2. 对照的登记值（2026-10-18 起本阶段不读任何实验产物，样本里不放 research/ 与 scripts/experiment-apparatus/replay.sh）：
    - .claude/kb/layout/01-first-txn.md：「八、」标题、开头 path= 声明、登记表「mkfs 种根」与三条出处写 path= 的行（instance_acquisition、
      warm_up、transaction）、整条流那句提示（post_mkfs_stream）的合成副本；四样登记值逐字照 2026-10-02 那一趟 green/direct/out.txt 的
-     name=segments 五行写（mkfs 那一行 12+1+1+1+4、23 次操作、4114 个崩溃状态、zero_fill×8）。本阶段经 scripts/crash/check-segment-registry.py
+     name=segments 五行写（mkfs 那一行 12+1+1+1+4、23 次操作、4114 个崩溃状态、zero_fill×8）。真仓那一行此刻已是两趟写序之后的 2+12+1+1+1+4、
+     27 次操作、4117 个崩溃状态（钉值见下面 mkfs-segments-red 一段），虚机产物还没重录：green 等几份照旧跟 2026-10-02 那一趟对得上，
+     真仓上这一道红在 mkfs 那一行，重录归提交时（下面「重新生成」）。本阶段经 scripts/crash/check-segment-registry.py
      的 --print-mkfs-segments-line 与 --print-segments-lines 现取，前者与虚机的 path=mkfs 行比，后者与其余几行比。
    - crates/singlefs-harness/tests/new_pool_file_creation_publish.rs：只有一条常量 E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION = 3_937_788_698，
      值照那一趟虚机输出的 back_chain；本阶段从它取新池新建文件那条记录反向链的对照（真仓里同名常量由同一份用例对活代码断言）。
-   - green、red、direct-divergence-red、segments-step-red 四份的这两个文件逐字节相同；mkfs-segments-red 只差 mkfs 那一行的段序列。
+   - green、red、direct-divergence-red、segments-step-red 四份的这两个文件逐字节相同；mkfs-segments-red 只差登记表 mkfs 那一行（换成真仓现行那一行，见下）。
 3. .gate-cells（点名 device-streams）与 .qemu-prerecorded（空文件）照旧。
 
 green：上面六档原样，本阶段预录档判 6 档、123 项检查全过，退 77（预录档不算真跑过 QEMU，整道跟着退 77，不退 0）。
@@ -35,7 +37,11 @@ direct-divergence-red：与 green 只差一个数：direct-divergence-red/direct
      check-exit 仍是 0。direct 在判定次序的最前，这一份红在「direct 盘 1：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行」；
      弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 下 direct 不逐盘读，它判绿退 77，expect 里的 want 对不上。
 mkfs-segments-red：只摆 direct 一档（四件套与 green 逐字节相同），.gate-cells、.qemu-prerecorded、钉反向链的用例副本也与 green 相同；
-     登记表副本里 mkfs 那一行的段序列 12+1+1+1+4 改成 14+1+1+1+4（只改这一个数）：虚机输出是 12，登记表是 14。
+     登记表副本里 mkfs 那一行换成真仓现行那一行的四样（2026-10-22 起）：
+     段序列 2+12+1+1+1+4、27 次操作、4117 个崩溃状态、种类 [zero_fill×2,barrier×2]|[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]，
+     四样都由 harness 用例钉住：crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs 的 recorded_stream_matches_the_registered_mkfs_segment_sequence
+     （段序列、种类、闭式、次操作四个 assert_eq!），crates/singlefs-harness/tests/new_pool_file_creation_publish.rs 里 mkfs 那一截的 (次操作, 段序列, 闭式) 与种类串。
+     虚机输出是 2026-10-02 那一趟的 12+1+1+1+4、23 次操作、4114 个崩溃状态：这份样本摆的就是真仓此刻的样子（登记表跟上了新段序，虚机产物没重录）。
      本阶段红在「虚机跑 direct 的 mkfs 段序列与登记表不一致」：direct 这一档在这一句之前只判了 vm-exit；
      弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-compare-skipped 下 mkfs 那一行的比对跳过，它判绿退 77，expect 的 want 对不上。
 segments-step-red（2026-10-13，关 C487）：只摆 direct 一档（目录与 green 逐字节相同，只差 direct/out.txt 第 10 行），.gate-cells、.qemu-prerecorded、

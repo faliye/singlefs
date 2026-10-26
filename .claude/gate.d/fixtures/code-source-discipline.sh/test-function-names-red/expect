@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：test-function-names
+want=crates/demo-core/src/admission.rs:4 c123_two_devices_refuse_one_unit：#[test] 函数名按里程碑
+want=crates/singlefs-harness/tests/common/mod.rs:2 helper_checked_by_c789：#[test] 函数名按里程碑
+want=c999_renamed_long_ago：那份文件里没有这条带欠账号的 #[test]
+want=test-names（#[test] 函数名不按里程碑、步号、欠账号起）：查了 4 项，3 处不对
+want=#[test] 函数名：crash-case-check --only test-names 退 1
+want=test-function-names：红（退出 1）

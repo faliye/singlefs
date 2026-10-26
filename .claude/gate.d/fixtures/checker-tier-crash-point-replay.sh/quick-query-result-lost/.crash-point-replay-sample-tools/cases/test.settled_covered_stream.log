@@ -1,0 +1,9 @@
+   Compiling singlefs-checker-tier v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running tests/settled_covered_stream.rs (target/release/deps/settled_covered_stream-0000000000000009)
+
+running 1 test
+CRASH_CASE_BLOCKS blocks=3 reused=3 fresh=0 red=0 refused=0
+test settled_covered_stream_full ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s

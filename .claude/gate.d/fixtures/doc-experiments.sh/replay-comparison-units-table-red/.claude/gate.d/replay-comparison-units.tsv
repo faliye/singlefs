@@ -1,0 +1,7 @@
+# 样本登记表（比对对象表红）：research/prompts/e991-r2-prereg.md 的比对对象表 #3 这里没有一行、文件头也没点名；丙那一行的留存产物名在比对对象表里对不上；
+# 丁那一行的登记出处里没有固定形态的比对对象表；文件头点名不登记的 #9 在比对对象表里没有。四处都判红。
+# 不登记的比对对象：research/prompts/e991-r2-prereg.md #9：样本里点名一行比对对象表里没有的号；欠在 C92（样本欠账）
+E991	research/prompts/e991-r2-prereg.md	甲	crates/sample/units.rs	e991-a.out	none:样本没有复跑行的理由
+E991	research/prompts/e991-r2-prereg.md	乙	crates/sample/units.rs	e991-b.out	none:样本没有复跑行的理由
+E991	research/prompts/e991-r2-prereg.md	丙	crates/sample/units.rs	e991-z.out	none:样本没有复跑行的理由
+E991	research/prompts/e991-preregistration.md	丁	crates/sample/units.rs	e991-d.out	none:样本没有复跑行的理由

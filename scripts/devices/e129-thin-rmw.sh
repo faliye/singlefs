@@ -32,14 +32,33 @@ S() {
   printf '%s\n' "$PASS" | sudo -S -p '' "$@"
 }
 
+source "$REPO/scripts/devices/dm-owned.sh" || exit 2
+
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e129t.XXXXXX")"
-POOL=sfs_e129_pool; TH=sfs_e129_thin; SN=sfs_e129_snap
+POOL="sfs_e129_pool_${W##*.}_$$"; TH="sfs_e129_thin_${W##*.}_$$"; SN="sfs_e129_snap_${W##*.}_$$"
 LOOP_M=""; LOOP_D=""
+teardown_pool() {
+  local d
+  for d in "$SN" "$TH" "$POOL"; do remove_dm "$d" || return 1; done
+  if [[ -n "$LOOP_M" ]]; then
+    S losetup -d "$LOOP_M" || return 1
+    LOOP_M=""
+  fi
+  if [[ -n "$LOOP_D" ]]; then
+    S losetup -d "$LOOP_D" || return 1
+    LOOP_D=""
+  fi
+  rm -f "$W/meta.img" "$W/data.img"
+}
 cleanup() {
-  for d in "$SN" "$TH" "$POOL"; do S dmsetup remove "$d" 2>/dev/null; done
-  [ -n "$LOOP_M" ] && S losetup -d "$LOOP_M" 2>/dev/null
-  [ -n "$LOOP_D" ] && S losetup -d "$LOOP_D" 2>/dev/null
-  rm -rf "${W:?}"
+  local status=$?
+  if teardown_pool; then
+    rm -rf "${W:?}" || status=1
+  else
+    printf '  ✗ 清理失败，保留后备文件：%s（meta=%s data=%s）\n' "$W" "$LOOP_M" "$LOOP_D" >&2
+    status=1
+  fi
+  exit "$status"
 }
 trap cleanup EXIT
 N=0; SPOOL=""; emit() { printf 'E7RESULT %s\n' "$*"; [ -n "$SPOOL" ] && printf '%s\n' "$*" >> "$SPOOL"; N=$((N+1)); }
@@ -57,21 +76,14 @@ written_sectors() {
 
 setup_pool() {
   truncate -s "${META_MB}M" "$W/meta.img"; truncate -s "${DATA_MB}M" "$W/data.img"
-  LOOP_M="$(S losetup --find --show "$W/meta.img")"
-  LOOP_D="$(S losetup --find --show "$W/data.img")"
-  S dd if=/dev/zero of="$LOOP_M" bs=4096 count=1 status=none 2>/dev/null
+  LOOP_M="$(S losetup --find --show "$W/meta.img")" || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+  LOOP_D="$(S losetup --find --show "$W/data.img")" || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+  S dd if=/dev/zero of="$LOOP_M" bs=4096 count=1 status=none 2>/dev/null || { emit "name=fatal reason=device_operation_failed"; exit 4; }
   local data_sect; data_sect=$(( DATA_MB * 1024 * 1024 / 512 ))
-  S dmsetup create "$POOL" --table "0 $data_sect thin-pool $LOOP_M $LOOP_D $BLK_SECT 0" \
+  create_dm "$POOL" --table "0 $data_sect thin-pool $LOOP_M $LOOP_D $BLK_SECT 0" \
     || { emit "name=fatal reason=pool_create_failed"; exit 4; }
-  S dmsetup message "/dev/mapper/$POOL" 0 "create_thin 0"
-  S dmsetup create "$TH" --table "0 $VOL_SECT thin /dev/mapper/$POOL 0"
-}
-
-teardown_pool() {
-  for d in "$SN" "$TH" "$POOL"; do S dmsetup remove "$d" 2>/dev/null; done
-  [ -n "$LOOP_M" ] && S losetup -d "$LOOP_M" 2>/dev/null; LOOP_M=""
-  [ -n "$LOOP_D" ] && S losetup -d "$LOOP_D" 2>/dev/null; LOOP_D=""
-  rm -f "$W/meta.img" "$W/data.img"
+  S dmsetup message "/dev/mapper/$POOL" 0 "create_thin 0" || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+  create_dm "$TH" --table "0 $VOL_SECT thin /dev/mapper/$POOL 0" || { emit "name=fatal reason=device_operation_failed"; exit 4; }
 }
 
 # 一格：shared=1 建快照（块共享）、shared=0 不建（块独占）
@@ -79,24 +91,25 @@ one_cell() {
   local round="$1" shared="$2"
   setup_pool
   # 把第一个块整块写实，A 在偏移 0、B（邻居）在偏移 32768
-  S dd if=/dev/urandom of="/dev/mapper/$TH" bs="$BLK_BYTES" count=1 oflag=direct status=none 2>/dev/null
-  S blockdev --flushbufs "/dev/mapper/$TH" 2>/dev/null
+  S dd if=/dev/urandom of="/dev/mapper/$TH" bs="$BLK_BYTES" count=1 oflag=direct status=none 2>/dev/null || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+  S blockdev --flushbufs "/dev/mapper/$TH" 2>/dev/null || { emit "name=fatal reason=device_operation_failed"; exit 4; }
   if [ "$shared" = 1 ]; then
-    S dmsetup message "/dev/mapper/$POOL" 0 "create_snap 1 0"
-    S dmsetup create "$SN" --table "0 $VOL_SECT thin /dev/mapper/$POOL 1"
+    S dmsetup message "/dev/mapper/$POOL" 0 "create_snap 1 0" || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+    create_dm "$SN" --table "0 $VOL_SECT thin /dev/mapper/$POOL 1" || { emit "name=fatal reason=device_operation_failed"; exit 4; }
   fi
   local io_min pbs
   io_min="$(cat "/sys/block/$(basename "$(readlink -f "/dev/mapper/$TH")")/queue/minimum_io_size" 2>/dev/null)"
   pbs="$(cat "/sys/block/$(basename "$(readlink -f "/dev/mapper/$TH")")/queue/physical_block_size" 2>/dev/null)"
   local before after delta
-  before="$(written_sectors "$LOOP_D")"
+  before="$(written_sectors "$LOOP_D")" || { emit "name=fatal reason=counter_read_failed"; exit 4; }
   # 只写 512 字节
-  S dd if=/dev/urandom of="/dev/mapper/$TH" bs=512 count=1 oflag=direct status=none 2>/dev/null
-  S blockdev --flushbufs "/dev/mapper/$TH" 2>/dev/null
-  after="$(written_sectors "$LOOP_D")"
+  S dd if=/dev/urandom of="/dev/mapper/$TH" bs=512 count=1 oflag=direct status=none 2>/dev/null || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+  S blockdev --flushbufs "/dev/mapper/$TH" 2>/dev/null || { emit "name=fatal reason=device_operation_failed"; exit 4; }
+  after="$(written_sectors "$LOOP_D")" || { emit "name=fatal reason=counter_read_failed"; exit 4; }
+  [[ "$before" =~ ^[0-9]+$ && "$after" =~ ^[0-9]+$ && "$after" -ge "$before" ]] || { emit "name=fatal reason=invalid_counter"; exit 4; }
   delta=$(( after - before ))
   emit "name=cell round=$round shared=$shared host_sectors=1 data_dev_sectors=$delta thin_io_min=$io_min thin_pbs=$pbs"
-  teardown_pool
+  teardown_pool || { emit "name=fatal reason=cleanup_failed"; exit 4; }
 }
 
 for r in $(seq 1 "$ROUNDS"); do one_cell "$r" 1; one_cell "$r" 0; done

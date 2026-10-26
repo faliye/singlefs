@@ -1,0 +1,3 @@
+exit=1
+want=assume_specification <[T]>::binary_search 登记的规格原文 sha256 是 eeeeeeeeeeee…
+want=verus-proof：红（退出 1）

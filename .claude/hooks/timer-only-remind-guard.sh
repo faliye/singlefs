@@ -20,6 +20,9 @@
 #   不到 TIMER_MINIMUM_SECONDS 的有限 sleep、`proc.py wait`、看门狗 watch.sh、`detached-run.sh watch`、Monitor 盯日志（`tail -f … | grep`）、remind.sh 自己的命令、
 #   引号里和 heredoc 正文里当数据写的、脚本文件里的 sleep（`bash x.sh` 起的脚本不读进去）。
 # 判不到的：变量里拼出来的命令、eval、python 的 time.sleep 加 print、脚本文件里的 sleep、MCP 工具提供的定时器。
+# 判不了的照「放行但必记检出」：输入不是 JSON 对象（解不开、顶层不是对象）、读不到 lib_shell_words.py、Bash / Monitor 的 command 不是字符串、命令切不开、
+#   判的时候抛异常，照常退 0，stderr 写一行卡在哪，检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path，
+#   写法在它的 record_unjudged_pass）追加一行、结局「只记」，findings 以「定时闸没判、照常放行」起头；读不到 lib_work_root.py 时 stderr 另说一句没记成。
 # 退役判据：remind.sh 不再是本工程唯一的定时办法，或 Claude Code 不再提供这几个工具时删掉。
 #
 #   timer-only-remind-guard.sh --selftest   在内存里判造出来的 hook JSON，再起一次进程核退出码与 stderr；末尾逐个打开弄坏开关核它红在点名的格
@@ -37,13 +40,20 @@
 #   refuse-remind        连 remind.sh 自己的命令也拒                                       remind-start
 #   refuse-log-watch     Monitor 盯日志的命令也拒                                          log-watch
 #   no-next-step         拒绝信息里不写出路                                                next-step
+#   input-unrecorded     输入不是 JSON 对象时只打 stderr、不记检出（改前连 stderr 也不打）   input-recorded
+#   library-unrecorded   读不到 lib_shell_words.py 时只打 stderr、不记检出（同上）          library-recorded
+#   command-shape-unrecorded  command 不是字符串时只打 stderr、不记检出（同上）            command-shape-recorded
+#   split-unrecorded     命令切不开时只打 stderr、不记检出（同上）                         split-recorded
+#   exception-unrecorded 判的时候抛异常不接住、照原样抛出（改前的样子：进程退 1，照常放行）   exception-recorded
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import importlib.util, json, math, os, re, subprocess, sys
+import importlib.util, json, math, os, re, shutil, subprocess, sys, tempfile
 
 BREAK_VARIABLE = "TIMER_ONLY_REMIND_GUARD_BREAK"
+HOOK_NAME = "timer-only-remind-guard.sh"
+UNJUDGED_PREFIX = "定时闸没判、照常放行"
 TIMER_MINIMUM_SECONDS = 60
 REFUSED_TOOLS = ("CronCreate", "ScheduleWakeup", "RemoteTrigger")
 REFUSED_SKILLS = ("loop", "schedule")
@@ -141,14 +151,16 @@ def skill_name(tool_input):
     value = str(tool_input.get("skill") or tool_input.get("name") or "").strip().lstrip("/")
     return value.rsplit(":", 1)[-1]
 
-def refusal_reason(shell_words, hook_input):
-    """要拒就交一句话（卡在哪），放行交 None。"""
+def refusal_reason(shell_words, hook_input, unjudged=None):
+    """要拒就交一句话（卡在哪），放行交 None。command 不是字符串、命令切不开（判不了）的放行，给了 unjudged（列表）的往里记 (弄坏开关名, 一句)。"""
     tool = hook_input.get("tool_name")
     tool_input = hook_input.get("tool_input") or {}
     if tool in REFUSED_TOOLS and not broken("allow-cron-tools"):
         return f"工具 {tool} 是别的定时办法"
     if tool == "Skill" and skill_name(tool_input) in REFUSED_SKILLS and not broken("allow-skills"):
         return f"技能 {skill_name(tool_input)} 是别的定时办法"
+    if tool in COMMAND_TOOLS and not isinstance(tool_input.get("command"), str) and unjudged is not None:
+        unjudged.append(("command-shape-unrecorded", f"{tool} 的 tool_input.command 不是字符串（{type(tool_input.get('command')).__name__}），是不是定时的别的写法没判"))
     if tool in COMMAND_TOOLS and isinstance(tool_input.get("command"), str):
         if tool == "Monitor" and broken("ignore-monitor"):
             return None
@@ -158,7 +170,9 @@ def refusal_reason(shell_words, hook_input):
             return "Monitor 盯日志"
         try:
             kind = timer_in_command(shell_words, tool_input["command"])
-        except Exception:
+        except Exception as error:
+            if unjudged is not None:
+                unjudged.append(("split-unrecorded", f"{tool} 的命令切不开（{type(error).__name__}: {error}），是不是定时的别的写法没判"))
             return None
         if kind:
             return f"{tool} 的命令是定时的别的写法（{kind}）"
@@ -171,18 +185,53 @@ def refusal_text(reason):
         lines.append("→ 不是定时的写法不受影响：等一个进程结束用 `until ! kill -0 <pid>; do sleep 20; done` 或 `python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`；盯日志用 Monitor 跑 `tail -f <日志> | grep --line-buffered <模式>`；等后台任务结束本轮等完成通知")
     return "\n".join(lines)
 
-def hook_main(hook_dir):
+def record_unjudged(hook_dir, hook_input, problem, switch):
+    """判不了、照常放行的这一次：stderr 写一行，照「放行但必记检出」往检出记录追加一行（lib_work_root.py 的 record_unjudged_pass，结局只记）。
+    弄坏开关 switch 下只打 stderr、不记（改前是连 stderr 也不打）；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
+    print(f"! {HOOK_NAME}：{problem}，这一次没判、照常放行", file=sys.stderr)
+    if broken(switch):
+        return
+    tool_input = hook_input.get("tool_input") if isinstance(hook_input, dict) and isinstance(hook_input.get("tool_input"), dict) else {}
+    tool = hook_input.get("tool_name") if isinstance(hook_input, dict) else None
     try:
-        hook_input = json.loads(sys.stdin.read())
-    except ValueError:
-        return 0
-    if not isinstance(hook_input, dict):
+        sys.dont_write_bytecode = True
+        if hook_dir not in sys.path:
+            sys.path.insert(0, hook_dir)
+        import lib_work_root
+        _, said = lib_work_root.record_unjudged_pass(HOOK_NAME, hook_input, f"{tool or '?'}：{tool_input.get('command') or tool_input.get('skill') or ''}",
+                                                     [f"{UNJUDGED_PREFIX}：{problem}"])
+    except Exception as error:   # 文件不在、语法错都算读不到
+        said = f"检出没记成：读不到同目录的 lib_work_root.py（{error!r}）"
+    print(f"  {said}", file=sys.stderr)
+
+def hook_main(hook_dir):
+    return judge_raw(sys.stdin.buffer.read(), hook_dir)
+
+def judge_raw(raw, hook_dir):
+    """hook 的原始输入（字节）→ 退出码；拒的往 stderr 写原因与出路，判不了的照「放行但必记检出」（文件头「判不了的」一段）。"""
+    try:
+        hook_input = json.loads(raw.decode("utf-8"))
+        problem = None if isinstance(hook_input, dict) else f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象"
+    except ValueError as error:
+        hook_input, problem = None, f"输入不是合法的 JSON（{error}；前 200 字节：{raw[:200].decode('utf-8', 'replace')!r}）"
+    if problem:
+        record_unjudged(hook_dir, None, problem, "input-unrecorded")
         return 0
     try:
         shell_words = load_shell_words(hook_dir)
-    except Exception:
+    except Exception as error:
+        record_unjudged(hook_dir, hook_input, f"读不到同目录的 lib_shell_words.py（{error!r}）", "library-unrecorded")
         return 0
-    reason = refusal_reason(shell_words, hook_input)
+    unjudged = []
+    try:
+        reason = refusal_reason(shell_words, hook_input, unjudged)
+    except Exception as error:
+        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（改前的样子：进程退 1，照常放行、不记检出）
+            raise
+        record_unjudged(hook_dir, hook_input, f"判的时候抛异常（{type(error).__name__}: {error}）", "exception-unrecorded")
+        return 0
+    for switch, problem in unjudged:
+        record_unjudged(hook_dir, hook_input, problem, switch)
     if reason is None:
         return 0
     print(refusal_text(reason), file=sys.stderr)
@@ -234,7 +283,9 @@ CELLS = [
 BREAK_TABLE = [("allow-cron-tools", "tools"), ("allow-skills", "skills"), ("ignore-monitor", "monitor"), ("allow-sleep-echo", "sleep-echo"),
                ("allow-infinite-loop", "sleep-loop"), ("allow-date-test", "date-loop"), ("allow-system-timers", "system-timers"),
                ("refuse-wait-pid", "wait-pid"), ("refuse-real-work", "sleep-then-work"), ("refuse-short", "short-sleep"),
-               ("refuse-remind", "remind-start"), ("refuse-log-watch", "log-watch"), ("no-next-step", "next-step")]
+               ("refuse-remind", "remind-start"), ("refuse-log-watch", "log-watch"), ("no-next-step", "next-step"),
+               ("input-unrecorded", "input-recorded"), ("library-unrecorded", "library-recorded"), ("command-shape-unrecorded", "command-shape-recorded"),
+               ("split-unrecorded", "split-recorded"), ("exception-unrecorded", "exception-recorded")]
 
 def selftest_cells(hook_dir):
     shell_words = load_shell_words(hook_dir)
@@ -253,12 +304,14 @@ def selftest_cells(hook_dir):
             reason = refusal_reason(shell_words, hook_input)
             if reason is not None:
                 fail(cell, f"「{label}」应当放行，实际被拒：{reason}")
-    # 进程层：红样本退 2、stderr 带 remind.sh 与 SKILL.md 的出路，绿样本退 0 且 stderr 空；坏 JSON 放行
+    # 进程层：红样本退 2、stderr 带 remind.sh 与 SKILL.md 的出路，绿样本退 0 且 stderr 空
     hook = os.path.join(hook_dir, "timer-only-remind-guard.sh")
-    environment = dict(os.environ)
-    for label, payload, want_code in (("CronCreate", tool("CronCreate", prompt="x"), 2), ("等进程结束", bash("until ! kill -0 1; do sleep 20; done"), 0), ("坏 JSON", None, 0)):
+    scratch = tempfile.mkdtemp(prefix="timer-only-remind-guard-selftest-")
+    detections = os.path.join(scratch, "detections.jsonl")   # 检出记在自证自己的临时目录，不碰真的检出记录
+    environment = dict({key: value for key, value in os.environ.items() if key != "SINGLEFS_WORK_ROOT_BREAK"}, AGENT_HOOK_DETECTIONS=detections)
+    for label, payload, want_code in (("CronCreate", tool("CronCreate", prompt="x"), 2), ("等进程结束", bash("until ! kill -0 1; do sleep 20; done"), 0)):
         checked += 1
-        completed = subprocess.run(["bash", hook], input="不是 JSON" if payload is None else json.dumps(payload), capture_output=True, text=True, env=environment)
+        completed = subprocess.run(["bash", hook], input=json.dumps(payload), capture_output=True, text=True, env=environment)
         if completed.returncode != want_code:
             fail("process", f"「{label}」应当退 {want_code}，实际退 {completed.returncode}，stderr：{completed.stderr!r}")
         elif want_code == 2:
@@ -267,6 +320,72 @@ def selftest_cells(hook_dir):
                 fail("next-step", f"拒绝信息里应当写出 remind.sh start 的写法与 SKILL.md，实际 stderr：{completed.stderr!r}")
         elif completed.stderr:
             fail("process", f"「{label}」放行时 stderr 应当是空的，实际：{completed.stderr!r}")
+
+    def recorded():
+        try:
+            with open(detections, encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except OSError:
+            return []
+
+    def expect_recorded(cell, run, want, session):
+        """run() 起一次（钩子入口或进程里的 judge_raw）交 (退出码, stderr)；要退 0、stderr 写一行、检出记录多 want 行（结局只记、会话号 session）。"""
+        nonlocal checked
+        checked += 1
+        before = len(recorded())
+        try:
+            code, stderr = run()
+        except Exception as error:   # 弄坏开关 exception-unrecorded：进程里照原样抛出
+            code, stderr = f"抛出 {type(error).__name__}", ""
+        added = recorded()[before:]
+        if not (code == 0 and HOOK_NAME in stderr and len(added) == want and all(
+                entry.get("outcome") == "只记" and entry.get("session_id") == session and entry.get("hook") == HOOK_NAME
+                and all(str(finding).startswith(UNJUDGED_PREFIX) for finding in entry.get("findings") or []) for entry in added)):
+            fail(cell, f"应当退 0、stderr 写一行、检出记录多 {want} 行（结局只记、会话号 {session}）；实际退 {code}，stderr {stderr.strip()[:200]!r}，检出多了 {len(added)} 行：{added!r:.300}")
+
+    def through_entry(script, raw):
+        def run():
+            completed = subprocess.run(["bash", script], input=raw, capture_output=True, text=True, env=environment)
+            return completed.returncode, completed.stderr
+        return run
+
+    def in_process(raw, replaced=None):
+        """在进程里照钩子入口调 judge_raw；replaced 给了的把那几个函数临时换掉（造切不开、抛异常）。stderr 收进字符串。"""
+        def run():
+            import io
+            saved = {name: globals()[name] for name in (replaced or {})}
+            saved_stderr, saved_detections = sys.stderr, os.environ.get("AGENT_HOOK_DETECTIONS")
+            globals().update(replaced or {})
+            sys.stderr, os.environ["AGENT_HOOK_DETECTIONS"] = io.StringIO(), detections
+            try:
+                code = judge_raw(raw.encode("utf-8"), hook_dir)
+                return code, sys.stderr.getvalue()
+            finally:
+                captured, sys.stderr = sys.stderr, saved_stderr
+                globals().update(saved)
+                if saved_detections is None:
+                    os.environ.pop("AGENT_HOOK_DETECTIONS", None)
+                else:
+                    os.environ["AGENT_HOOK_DETECTIONS"] = saved_detections
+        return run
+
+    def raising(*arguments, **keywords):
+        raise RuntimeError("自证造的异常")
+
+    # 判不了的照「放行但必记检出」
+    expect_recorded("input-recorded", through_entry(hook, "不是 JSON"), 1, "读不到")
+    expect_recorded("input-recorded", through_entry(hook, "[]"), 1, "读不到")
+    bare = os.path.join(scratch, "bare")   # 只拷入口与 lib_work_root.py：读不到 lib_shell_words.py
+    os.makedirs(bare)
+    for name in ("timer-only-remind-guard.sh", "lib_work_root.py"):
+        shutil.copy(os.path.join(hook_dir, name), bare)
+    expect_recorded("library-recorded", through_entry(os.path.join(bare, "timer-only-remind-guard.sh"),
+                                                      json.dumps(dict(bash("sleep 1500; echo wake"), session_id="s-bare"))), 1, "s-bare")
+    expect_recorded("command-shape-recorded", through_entry(hook, json.dumps({"tool_name": "Bash", "session_id": "s-shape", "tool_input": {"command": ["sleep", "1500"]}})),
+                    1, "s-shape")
+    expect_recorded("split-recorded", in_process(json.dumps(dict(bash("sleep 1500; echo wake"), session_id="s-split")), {"timer_in_command": raising}), 1, "s-split")
+    expect_recorded("exception-recorded", in_process(json.dumps(dict(tool("CronList"), session_id="s-raise")), {"REFUSED_TOOLS": None}), 1, "s-raise")   # tool in None 抛 TypeError
+    shutil.rmtree(scratch, ignore_errors=True)
     return failures, checked
 
 def main():

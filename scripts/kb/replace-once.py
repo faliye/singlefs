@@ -16,21 +16,36 @@
 
 退出码：0 写成功；2 参数或文件问题；3 旧串命中 0 次；4 旧串命中多于一次；5 写完回读与预期不符；
 6 没换上（有多个硬链接、建不了临时文件、写或改名失败），原文件没动、临时文件已删；
-7 目标是仓里的 .md，新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个字节没写。
+7 目标是仓里的 .md，新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个字节没写；
+8 目标在仓里（任何后缀），新串带会话号（ListAgents 列的会话名），一个字节没写。
 命中 0 次时附上文件里最像旧串的那一段（行号、相似度）与第一处不同（旧串在那里是什么、文件里是什么），算法在 nearest_hint()。
 
 写 .md 之前判新串（退出码 7）：目标是仓里的 .md 时，旧串恰好命中一次之后、写之前，用 write-guard.sh 与门禁 doc-text 同一份判据
 （.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判新串；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
 判新串不判旧串；别的后缀、仓外、排除前缀下的文件不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 clock-times 格兜底。
 
-弄坏开关（只给 --selftest 证红用）：
+写仓里的文件之前判新串里的会话号（退出码 8）：旧串恰好命中一次之后、写之前，用 write-guard.sh 的第七道与门禁 doc-text 的 session-names 格同一份判据
+（.claude/gate.d/lib-forbidden-notations.py 的会话号形态，lib_notation_check.py 的 session_name_refusal 调它，三份定点写入脚本共用）判新串；
+带会话名的拒绝，逐处列出行号与出路（写成「别的会话」这类不带号的说法）。后缀不限，范围与写闸判 Write、Edit 一致：排除前缀、.sh .py .rs 里带
+「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证红的那几格（「」里是失败行的开头：自证逐条以 ✗ 起头列出判错的格，末尾一句「✗ --selftest 没通过：N 项」是汇总）：
   REPLACE_ONCE_BREAK=no-nearest  nearest_hint() 什么都不给（改前的说法）
-      命中 0 次附最像的一行（「✗ --selftest 没通过：」下面「命中 0 次时本该附上最像的一行」那一条）
+      「✗ 命中 0 次时本该附上最像的一行」
   REPLACE_ONCE_BREAK=no-clock-guard  replace_once() 不判新串里的钟点（改前的写法）
-      写 .md 之前判新串（「✗ --selftest 没通过：」下面写 .md 的几条：新串带紧凑时间戳、带日期钟点时区词、带光秃时区词、入口退出码 7 与不写文件）
+      「✗ 写 .md：新串带紧凑时间戳本该退出码 7」、「✗ 写 .md：新串带紧凑时间戳被拒绝之后文件或目录变了」
+      「✗ 写 .md：新串带日期、时区词、时分本该退出码 7」、「✗ 写 .md：新串带日期、时区词、时分被拒绝之后文件或目录变了」
+      「✗ 写 .md：新串带光秃的时区词本该退出码 7」、「✗ 写 .md：新串带光秃的时区词被拒绝之后文件或目录变了」
+      「✗ 写 .md：8 位数字后跟 T 但不是时间戳的新串本该放行」（前面那几格写进去之后旧串找不到了，连带红）
+      「✗ 写 .md：假仓里没有共用库，本该退出码 7」（不判钟点就走到会话号那一道，退 8）
+      「✗ 写 .md：入口本该退出码 7、打 ✗ 开头的说明且不写文件」
+  REPLACE_ONCE_BREAK=no-session-guard  replace_once() 不判新串里的会话号（改前的写法）
+      写之前判新串里的会话号，逐格以「✗ 写会话号：」起头（.md 与 .py 目标的新串带会话名、干跑、入口退出码 8、假仓里没有共用库与不写文件）
   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
       clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新串带紧凑时间戳的那几条红；
-      compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红
+      compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红；
+      session-names（整个会话号形态不判）时「写会话号：」的拒绝几条全红；LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一条红，
+      LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时排除前缀下放行的那一条红
 """
 import contextlib
 import difflib
@@ -40,7 +55,7 @@ import sys
 import tempfile
 
 from lib_atomic_replace import ReplaceRefused, problems_with_replacement_by_rename, replace_file_contents_by_rename
-from lib_notation_check import clock_refusal, copy_library_into
+from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -118,6 +133,10 @@ def replace_once(path, old_text, new_text, notation_root=None):
         refusal = clock_refusal(path, new_text, content[:content.index(old_text)].count('\n') + 1, notation_root)
         if refusal:
             return 7, '\n'.join(refusal)
+    if os.environ.get('REPLACE_ONCE_BREAK') != 'no-session-guard':   # 弄坏开关 no-session-guard：不判新串里的会话号
+        refusal = session_name_refusal(path, new_text, content[:content.index(old_text)].count('\n') + 1, notation_root)
+        if refusal:
+            return 8, '\n'.join(refusal)
     replaced = content.replace(old_text, new_text, 1)
     try:
         notes = replace_file_contents_by_rename(path, replaced)
@@ -210,6 +229,19 @@ def problems_with_clock_guard(workspace):
     return problems
 
 
+def problems_with_session_guard(workspace):
+    """写之前判新串里的会话号：样本与判法在 lib_notation_check.py 的 session_guard_problems（三份脚本共用），这里只接上 replace_once 与入口。"""
+    def attempt(path, new_text, root, dry_run):
+        return replace_once(path, '第二行 乙', new_text, notation_root=root)
+
+    def entry(path, new_text, root):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = main([path, '第二行 乙', new_text], notation_root=root)
+        return code, captured.getvalue()
+    return session_guard_problems(workspace, attempt, 8, entry)
+
+
 def selftest_in(workspace):
     sample = os.path.join(workspace, 'sample.md')
     with open(sample, 'w', encoding='utf-8') as handle:
@@ -238,6 +270,7 @@ def selftest_in(workspace):
     if code != 2:
         problems.append(f'空旧串本该退出码 2，实际 {code}')
     problems.extend(problems_with_clock_guard(workspace))
+    problems.extend(problems_with_session_guard(workspace))
     # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
     running_script = '#!/usr/bin/env bash\n' + 'echo 前面这几行正在被 bash 边跑边读\n' * 20 + 'run_step 甲\nexit $?\n'
     problems.extend(problems_with_replacement_by_rename(
@@ -247,14 +280,16 @@ def selftest_in(workspace):
         # 测试缝：强制走「多次命中也写」那条旧毛病，自检必须判红
         problems.append('REPLACE_ONCE_CORRUPT=1：强制走旧毛病（多次命中也写）')
     if problems:
-        print('  ✗ --selftest 没通过：')
         for problem in problems:
-            print(f'     {problem}')
+            print(f'  ✗ {problem}')  # gate-lint:detail
+        print(f'  ✗ --selftest 没通过：{len(problems)} 项（上面逐条列着）')
         print('     → 怎么办：看 replace_once 里对应分支的退出码与是否写文件；方括号开头的几条看 lib_atomic_replace.py 里同名那一格')
         return 1
     print('  ✓ --selftest 通过：命中 0 次拒绝（3）并附上最像的一行与第一处不同、2 次拒绝（4）、空串拒绝（2），都一个字节没写；命中 1 次写成功并回读确认；'
           '写仓里的 .md 之前判新串：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（7）并点名形态、行号与出路且不写文件，'
           '8 位数字后跟 T 但不是时间戳、只写日期、旧串带钟点而新串干净、.txt 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 7，理由不是钟点），入口退出码 7；'
+          '写仓里任何后缀的文件之前判新串里的会话号：.md 与 .py 目标带会话名的拒绝（8）并点名行号与出路「别的会话」且不写文件，干净的新串、.py 里带放行标记的一行、排除前缀下的文件、仓外的文件放行，'
+          '假仓里没有共用库时读不到会话号判据按拒绝办（退出码 8），入口退出码 8；'
           '换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、'
           '经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件')
     return 0

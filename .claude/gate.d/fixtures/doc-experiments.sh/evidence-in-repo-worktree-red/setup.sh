@@ -9,8 +9,8 @@ set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 here="$PWD"
 git init -q -b master .origin-repository
-mkdir -p .origin-repository/scripts/experiments .origin-repository/research/results .origin-repository/.claude/kb
-printf 'fn main() { println!("e920"); }\n' > .origin-repository/scripts/experiments/e920_worktree_stale.rs
+mkdir -p .origin-repository/scripts/experiment-apparatus .origin-repository/research/results .origin-repository/.claude/kb
+printf 'fn main() { println!("e920"); }\n' > .origin-repository/scripts/experiment-apparatus/e920_worktree_stale.rs
 printf 'E7RESULT name=e920 rows=1\n' > .origin-repository/research/results/e920-worktree-stale-2026-09-01.out
 printf '# 欠账\n\n| C920 | 样本欠账 | 还没还 |\n\n## 历史版本\n' > .origin-repository/.claude/kb/worktree-owed.md
 git -C .origin-repository add -A
@@ -22,7 +22,7 @@ administrative_directory="$(sed -n 's/^gitdir: //p' .git)"
 printf '%s\n' "$here/.git" > "$administrative_directory/gitdir"
 mkdir -p .origin-repository/.git/info
 printf '.origin-repository/\n' >> .origin-repository/.git/info/exclude
-printf 'fn main() { println!("e920 改过了"); }\n' > scripts/experiments/e920_worktree_stale.rs
+printf 'fn main() { println!("e920 改过了"); }\n' > scripts/experiment-apparatus/e920_worktree_stale.rs
 cat > .claude/kb/worktree-owed.md <<'EOF'
 # 欠账
 
@@ -39,4 +39,4 @@ cat > research/prompts/worktree-r1-opus.md <<'EOF'
 2. 实现员报告 `/tmp/claude-1000/worktree-impl/report.md`（它自己列的设计判断）。
 EOF
 TZ=Asia/Tokyo touch -d 2026-09-01 research/results/e920-worktree-stale-2026-09-01.out
-TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiments/e920_worktree_stale.rs
+TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiment-apparatus/e920_worktree_stale.rs

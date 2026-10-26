@@ -1,0 +1,11 @@
+[package]
+name = "singlefs-checker-tier"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+rocksdb = { version = "=0.25.0", optional = true }
+
+[features]
+default = ["verdict-store"]
+verdict-store = ["dep:rocksdb"]

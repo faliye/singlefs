@@ -1,0 +1,4 @@
+exit=1
+want=MIR 比对：产品构建
+want=个与 Verus 构建的函数体不同（fn pick）
+want=verus-proof：红（退出 1）

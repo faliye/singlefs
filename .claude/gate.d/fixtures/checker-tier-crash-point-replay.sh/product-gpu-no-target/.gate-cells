@@ -1,0 +1,2 @@
+# 产品 GPU 包有 tests-on-a-real-gpu 特性而没有测试目标挂它：无对象可判，对拍那一趟不起，往 GATE_NOT_RUN_FILE 记一行
+product-gpu-real-card-tests

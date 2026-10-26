@@ -1,0 +1,4 @@
+exit=0
+want=✓ kb 这次改动新增的 2 行里 2 句「不可达 / 走不到 / 触发不了」断言都带了仓里在的用例名或写了推的（带用例名 0 句、写推的 2 句；与存量清单逐字相同、按清单放过的 0 行；基准 HEAD）
+want=样本只跑 .gate-cells 点名的格：unreachable-claims
+want=doc-registries.sh：1 格里 1 格绿（unreachable-claims）

@@ -1,0 +1,22 @@
+R4J1_重判的等号错一侧	    if host_cpu_milliseconds < threshold_milliseconds:	    if host_cpu_milliseconds <= threshold_milliseconds:
+R4J2_重判读成了c_floor	    values = per_round_values(fields["host_cpu_per_submission_milliseconds_per_round"])	    values = per_round_values(fields["floor_host_cpu_per_submission_milliseconds_per_round"])
+R4J3_ρ倒过来	    return local_baseline_nanoseconds / peer_baseline_nanoseconds	    return peer_baseline_nanoseconds / local_baseline_nanoseconds
+R4J4_换到本机的门槛乘了两次ρ	                    threshold = scaled_threshold(base, fields["threshold_kind"], rho[(crt, source)])	                    threshold = scaled_threshold(scaled_threshold(base, fields["threshold_kind"], rho[(crt, source)]), fields["threshold_kind"], rho[(crt, source)])
+R4J5_B的不赔不标下界	        return "not_losing_lower_bound" if candidate == LOWER_BOUND_CANDIDATE else "not_losing"	        return "not_losing"
+R4J6_负的乙段增量照算	    if candidate == EVERY_STAGE and any(row["scan_increment"] < 0 for row in rows_needed):	    if False:
+R4J7_c_rt来源读成复现臂	fields.get("name") == "drift_control_point" and fields.get("arm") == "controlled"	fields.get("name") == "drift_control_point" and fields.get("arm") == "reproduction"
+R4J8_变没变比的是floor_judgement	                    r3_judgement = "absent" if r3_fields is None else r3_fields["judgement"]	                    r3_judgement = "absent" if r3_fields is None else r3_fields["floor_judgement"]
+R4J9_输入sha256不核	        holds = registered == "not_given" or digest == registered	        holds = True
+R4J10_线程钟行数不核	    if thread_lines != expected_thread_lines:	    if False:
+R4J11_B7的下沿写成开区间	"inside_the_band" if TODAY_OVER_R2_LOWER <= ratio <= TODAY_OVER_R2_UPPER else "outside_the_band"	"inside_the_band" if TODAY_OVER_R2_LOWER < ratio <= TODAY_OVER_R2_UPPER else "outside_the_band"
+R4J12_旋钮翻面一端没判定也算一对	        if one is None or other is None or not (is_a_judgement(one) and is_a_judgement(other)):	        if one is None or other is None:
+R4J13_阳性对照红的写法照判	                    if writing in voided:\n                        result = {	                    if False:\n                        result = {
+R4J14_单路三路的列对调	CRC_COLUMN = {"today": "today", "single": "hardware_single", "three_way": "hardware_three_way"}	CRC_COLUMN = {"today": "today", "single": "hardware_three_way", "three_way": "hardware_single"}
+R4J15_复现不逐字比	            if computed != fields.get(name):	            if False:
+R4J16_D5把not_run也算进unstable	        entry[1] += int(fields["judgement"] == "unstable")	        entry[1] += int(fields["judgement"] in ("unstable", "not_run"))
+R4J17_L1把从不稳定变赔也算进来	int(row["changed"] == "true" and row["judgement"] == "losing" and is_not_losing(row["r3_judgement"]))	int(row["changed"] == "true" and row["judgement"] == "losing")
+V166_系数乘到了选段	        rows.append(scaled)\n    return rows	        scaled["choose"] = None if row["choose"] is None else row["choose"] * factors.get(row["intent"][:3] + (writing, "crc"), (1.0, ""))[0]\n        rows.append(scaled)\n    return rows
+V167_写法甲的系数不是1	    if writing == TODAY:\n        return [dict(row) for row in r2_rows]	    if writing == "never":\n        return [dict(row) for row in r2_rows]
+V168_D的门槛含签发	    return total, batch_count, None	    return total + issue["release_check_crc"], batch_count, None
+R4J18_B5变成赔记成变成不稳定	            target = "changed_to_losing" if row["judgement"] == "losing" else (	            target = "changed_to_unstable" if row["judgement"] == "losing" else (
+R4J19_ρ与r3打出的不比	    if computed != printed:	    if False:

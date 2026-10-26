@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 模型对拍那几格要 cargo：缺了就在格里那一步 cargo test 判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
-# gate-stage: harness 类：harness 档一条用例一个场景；模型对拍（随机历史快档与五个取样点，每一步拿实现的结局与只住内存的理想模型比，每段一格、各点名一条用例）
+# gate-stage: harness 类：harness 档与 checker 档一条用例一个场景；模型对拍（随机历史快档与五个取样点，每一步拿实现的结局与只住内存的理想模型比，每段一格、各点名一条用例）
 # gate-fixture: yes
 # gate-category: harness 类
 # gate-covers: 模型对拍
@@ -13,7 +13,7 @@
 # gate-similar: checker-independence-and-sync.sh 它的 checker-implementation-disjoint 格判三个包之间的依赖方向与共享代码，对象是 Cargo.toml 与 use 语句；这里判的是 harness 档用例本身的粒度与对拍
 # gate-similar: harness-test-environment.sh 同属 harness 类，判的是跑完测试之后机器干不干净，读宿主状态，不读测试源码也不跑 cargo
 #
-# gate-cell: one-scenario harness 档一条用例一个场景
+# gate-cell: one-scenario harness 档与 checker 档一条用例一个场景
 # gate-cell: model-fast-tier 模型对拍：随机历史快档
 # gate-cell: model-reuse-sampling 模型对拍：偏向抬 F 之后复用的取样点
 # gate-cell: model-rollback-sampling 模型对拍：偏向抬 F 之后回退的取样点
@@ -23,10 +23,10 @@
 # 格结构经 lib/stage-cells.sh。
 #
 # ── one-scenario ──
-# 判法只在 scripts/crash/crash-case-check.py --only one-scenario：crates/singlefs-harness/tests/*.rs 里带 #[test] 的函数，
+# 判法只在 scripts/crash/crash-case-check.py --only one-scenario：crates/singlefs-harness/tests/*.rs 与 crates/singlefs-checker-tier/tests/*.rs 里带 #[test] 的函数
+# （checker 档那一半是 C637 加的；只读用例源码，不跑 checker 档），
 # 某个 for 循环体每一轮新建一个池，判红；用例上面写了「// harness-test-granularity:one-scenario <理由>」的不判。一条用例都没有：退 77。
 # 管不到的：一条用例里不建池的多场景（改的是同一个池）；慢档用例标得对不对。
-# 弄坏开关：CRASH_CASE_CHECK_BREAK=fresh-pool-loop-unseen 让循环里新建池认不出，one-scenario-red 退 0。
 #
 # ── model-*：模型对拍六段 ──
 # 被测的是 crates/singlefs-harness/tests/random_histories.rs 里调 run_history_campaign、经 print_uncaptured 把报告写进标准输出的六条用例，
@@ -56,13 +56,8 @@
 # 被判目录里没有 Cargo.toml 而有 model-differential-cargo-output.log 时不跑 cargo、不算键，只判录好的输出里这一段，并打出本该跑的 cargo 命令；
 # 两样都没有：这几格退 77。被判目录里有 .model-differential-sample-tools/ 时是样本档：把它放 PATH 最前面（里面的假 cargo 照 cases/<用例名>.log 打输出，
 # 假 rustc 打版本），不经内存包装与 capped.sh；另有 .unit-verdict-sample/prior/（上一版的树）时，每格先拿上一版算键、照判绿记进这一版样本的判定库，再照常查库。
-# 弄坏开关 GATE_MODEL_DIFFERENTIAL_BREAK=<项>：
-#   ignored-left-out   cargo 命令去掉 --include-ignored：model-differential-green 里核命令的那几条 want 找不到
-#   zero-steps-passed  步数为 0 的段按判过记：model-reuse-sampling-red、model-allocation-record-wall-red 退 0
-#   threads-not-defaulted  cargo 命令不经 scripts/hosts/capped.sh default（改前的样子，吃 cargo 自己的缺省）：model-differential-green 里核「经 capped.sh default 起」的那条 want 找不到
-#   one-key-for-every-cell  六格共用一份输入（每格的键另加整份 random_histories.rs）：model-unit-key-one-cell 里「复用」那五句找不到（只改了一格的函数，六格一起作废）
-# 共用库的 STAGE_CELLS_BREAK=red-swallowed 让各 red 样本退 0。
-# admission.py 的 ADMISSION_BREAK=plan-failure-not-red（按条复用失灵也不判红）让 model-fast-tier-plan-exit-red、model-fast-tier-plan-sentinel-red 退 0。
+# 判红时留下的日志（样本档拿上一版记库没记成时的 seed.record）拷到 ${TMPDIR:-/tmp} 下、出路指那一份，格收尾删草稿目录时不跟着删；
+# 样本档里格收尾（model_cell_exit_trap）另核每一份留下的在草稿目录删掉之后还在、内容与留下那一刻逐字节相同，核完删掉（样本不往 TMPDIR 里留东西）。
 #
 # 样本（fixtures/harness-model-differential-and-scenarios.sh/，每份的 .gate-cells 点名它判的格）：
 #   one-scenario-red                        一条每轮新建池的 harness 用例
@@ -80,6 +75,33 @@
 #                                           复用取样点那一格调的函数：只有 model-reuse-sampling 现判（假 cargo 打那一段），另五格复用、不起 cargo，六格都绿
 #   model-fast-tier-plan-exit-red           按条复用失灵：.unit-verdict-sample/plan-failure 写 exit-1（verdict-plan 退 1），快档那一格照旧现判、那一段判过，结论判红
 #   model-fast-tier-plan-sentinel-red       同形，写 sentinel-reuse-failed（verdict-plan 的复用哨兵报复用失灵），判红
+#   model-fast-tier-seed-record-kept-red    样本档拿上一版记库那一步没记成：假工具里的 python3 拦下带「--how 样本档：上一版」的 verdict-record、退 2（别的调用原样交给 PATH 上真的 python3）；
+#                                           快档那一格判红，出路点的是拷到 TMPDIR 下的 model-differential-seed.*.record；格收尾（EXIT trap）删掉草稿目录之后核它还在、
+#                                           内容与留下那一刻逐字节相同（sha256），核完删掉
+#
+# 弄坏开关（打开后样本判错；每条下面逐行点名判错的样本，括号里是那一份出不来的那一句）：
+#   CRASH_CASE_CHECK_BREAK=fresh-pool-loop-unseen  归 scripts/crash/crash-case-check.py（开关表在它文件头）：one-scenario 认不出循环里每轮新建的池
+#     one-scenario-red（退 0）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=ignored-left-out  cargo 命令去掉 --include-ignored
+#     model-differential-green（核命令的那几条 want）
+#     model-fast-tier-plan-exit-red（假 cargo 照收到的参数打的「MODEL_DIFFERENTIAL_SAMPLE cargo-arguments: … --include-ignored …」）
+#     model-unit-key-one-cell（同上）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=zero-steps-passed  步数为 0 的段按判过记
+#     model-allocation-record-wall-red（退 0）
+#     model-reuse-sampling-red（退 0）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=threads-not-defaulted  cargo 命令不经 scripts/hosts/capped.sh default（改前的样子，吃 cargo 自己的缺省；样本档的假 cargo 本来就不经它）
+#     model-differential-green（核「经 capped.sh default 起」的那条 want）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=one-key-for-every-cell  六格共用一份输入（每格的键另加整份 random_histories.rs）
+#     model-unit-key-one-cell（「复用」那五句：只改了一格的函数，六格一起作废）
+#   GATE_MODEL_DIFFERENTIAL_BREAK=seed-record-in-scratch  样本档拿上一版记库没记成时，照改前把出路指到这一格草稿目录里的 seed.record（不拷到 TMPDIR，格收尾时随 EXIT trap 删掉）
+#     model-fast-tier-seed-record-kept-red（「/model-differential-seed.」：出路指的是草稿目录里那一份，格收尾时报它已经不在了）
+#   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
+#     model-allocation-record-wall-red、model-fast-tier-plan-exit-red、model-fast-tier-plan-sentinel-red、model-fast-tier-red
+#     model-fast-tier-renamed-red、model-fast-tier-seed-record-kept-red、model-reuse-sampling-red、model-rollback-sampling-red
+#     model-unit-area-wall-admission-judged-red、model-unit-area-wall-red、one-scenario-red
+#   ADMISSION_BREAK=plan-failure-not-red  归 scripts/gate/admission.py：按条复用失灵也不判红
+#     model-fast-tier-plan-exit-red（退 0）
+#     model-fast-tier-plan-sentinel-red（退 0）
 #
 #   bash .claude/gate.d/harness-model-differential-and-scenarios.sh [项目根]                          七格都跑
 #   bash .claude/gate.d/harness-model-differential-and-scenarios.sh --list                            逐行打格名与判什么，不跑格
@@ -113,7 +135,7 @@ declare -A MODEL_TEST=(
 )
 MODEL_HOWTO_TAIL="模型对拍的判据与格表写在 .claude/gate.d/$STAGE_NAME 文件头；签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样，先看模型那一格引的条款，再判改实现还是改模型；用例改了名就把文件头格表与 MODEL_TEST 里那个名字一起改"
 
-stage_cell one-scenario cell_one_scenario "harness 档一条用例一个场景" \
+stage_cell one-scenario cell_one_scenario "harness 档与 checker 档一条用例一个场景" \
   "照上面 crash-case-check 那一句出路改：循环里每一轮新建一个池的，拆成带参数的函数加每个取值一条 #[test]；判据写在 scripts/crash/crash-case-check.py 文件头，规则在 .claude/rules/verification.md「harness 档里再分快档用例与慢档用例」"
 stage_cell model-fast-tier cell_model_fast_tier "模型对拍：随机历史快档" \
   "单跑这一条看细节：bash scripts/hosts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test $TEST_BINARY -- --include-ignored --exact ${MODEL_TEST[model-fast-tier]} --nocapture；$MODEL_HOWTO_TAIL"
@@ -211,9 +233,39 @@ model_seed_prior_verdict() {
   fi
   cut -f1 "$request_file" > "$scratch/seed.names"
   python3 "$ADMISSION" verdict-record "$prior" "$kind" "$scratch/seed.plan" "$scratch/seed.names" --how "样本档：上一版" --library-root "$ROOT" >"$scratch/seed.record" 2>&1 || {
+    # scratch 随调用方的 EXIT trap 删掉：判红时把 seed.record 拷到 TMPDIR 下留着，出路指那一份（样本档里格收尾核它还在，文件头「样本」）
+    local kept_record
+    if [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" == seed-record-in-scratch ]]; then
+      kept_record="$scratch/seed.record"   # 弄坏开关：改前的样子，出路指草稿目录里那一份、格收尾时被删
+    else
+      kept_record="$(mktemp "${TMPDIR:-/tmp}/model-differential-seed.XXXXXX.record")" && cp -- "$scratch/seed.record" "$kept_record" || kept_record="（没留下：拷不出来）"
+    fi
+    if [[ -f "$kept_record" ]]; then model_kept_logs+=("$kept_record"$'\t'"$(sha256sum < "$scratch/seed.record" | cut -d' ' -f1)"); fi
     echo "  ✗ 样本档：上一版那一格的判定没记进库（$(tail -n 2 "$scratch/seed.record" | tr '\n' ' ')）"
-    echo "     → 怎么办：看 $scratch/seed.record 里 admission.py verdict-record 报的错，修好样本或判定库路径再跑"; return 1; }
+    echo "     → 怎么办：看 $kept_record 里 admission.py verdict-record 报的错（看完自己删），修好样本或判定库路径再跑"; return 1; }
   echo "  · 样本档：上一版（.unit-verdict-sample/prior）这一格照判绿记进这一版的判定库"
+}
+
+# 判红时留下的日志：一份一行「<路径><TAB><留下那一刻的 sha256>」，格收尾的 model_cell_exit_trap 读
+model_kept_logs=()
+
+# model_cell_exit_trap：一格（子 shell）的 EXIT trap：删掉这一格的草稿目录；样本档（.model-differential-sample-tools/ 在）里再逐份核判红时留下的日志
+# 在草稿目录删掉之后还在、内容与留下那一刻逐字节相同，核完删掉（文件头「样本」）；真仓上留着给人看。不改这一格的退出码
+model_cell_exit_trap() {
+  rm -rf -- "${scratch:?}"
+  [[ -d "$ROOT/.model-differential-sample-tools" ]] || return 0
+  local kept_entry kept_path kept_digest
+  for kept_entry in ${model_kept_logs[@]+"${model_kept_logs[@]}"}; do
+    kept_path="${kept_entry%%$'\t'*}"
+    kept_digest="${kept_entry#*$'\t'}"
+    if [[ -f "$kept_path" && "$(sha256sum < "$kept_path" | cut -d' ' -f1)" == "$kept_digest" ]]; then
+      echo "  · 样本档：判红时留下的 $kept_path 在这一格的草稿目录删掉之后还在、内容与留下那一刻逐字节相同（sha256 ${kept_digest:0:12}）；核完删掉"
+      rm -f -- "$kept_path"
+    else
+      echo "  ✗ 样本档：判红时留下的 $kept_path 在这一格的草稿目录删掉之后不在了（或内容变了）：出路指的那一份跑完就没了"
+      echo "     → 怎么办：判红时把日志拷到 \${TMPDIR:-/tmp} 下（mktemp），出路指拷出来的那一份，不指这一格草稿目录里的"
+    fi
+  done
 }
 
 model_differential_cell() {
@@ -241,7 +293,7 @@ model_differential_cell() {
   fi
 
   scratch="$(mktemp -d)"
-  trap 'rm -rf -- "${scratch:?}"' EXIT
+  trap model_cell_exit_trap EXIT
   log="$scratch/cargo.log"
   if [[ -f Cargo.toml && -d crates/singlefs-harness ]]; then
     # 样本档（文件头「样本」）：假 cargo、假 rustc 放 PATH 最前面，不经内存包装与 capped.sh

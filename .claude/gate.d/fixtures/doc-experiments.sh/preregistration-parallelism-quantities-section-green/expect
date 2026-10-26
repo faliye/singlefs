@@ -1,0 +1,6 @@
+exit=0
+want=态数与第六节的比对本次未判 1 份：「预计挂钟：」里的态数在第六节里找不到同值或同量词的数（或态数没写量词）：research/prompts/e997-preregistration.md:14（12 个取样点）
+want=跑前登记的「并行与挂钟」：查了 2 份（research/prompts/e996-preregistration.md、research/prompts/e997-preregistration.md），五样都写全了
+want=挂钟算式判了 2 条（2 份）；态数与第六节比了 2 个，本次未判 1 份：research/prompts/e997-preregistration.md:14（12 个取样点）
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=doc-experiments.sh：1 格里 1 格绿（preregistration-parallelism），0 格本次未跑（无）

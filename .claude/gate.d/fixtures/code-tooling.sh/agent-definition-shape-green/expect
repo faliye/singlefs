@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：agent-definition-shape
+want=定义的形状：2 份定义都写明 model 与 tools、tools 里没有 Agent 与 Task、输入写范围产出没做什么四节齐
+want=没有与规则文件（1 份）逐字相同、不短于 20 个字符的行
+want=的调度表点名 2 个定义名，与 .claude/agents/ 两向相等（表里另有不是定义名的 2 个词：cfg、sample-stage）
+want=agent-definition-shape：绿

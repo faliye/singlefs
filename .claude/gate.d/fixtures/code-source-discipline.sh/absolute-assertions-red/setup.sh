@@ -10,7 +10,7 @@
 # 「只缩不涨」必须判红，不许当成「基准里还没有这张表、初次登记」放过去。
 set -euo pipefail
 printf 'M_测试名空着\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_emptied(\t-p demo --lib\t\n' >> crates/mutations.tsv
-printf 'fn main() {}\n' > scripts/experiments/e3_latin1.rs
+printf 'fn main() {}\n' > scripts/experiment-apparatus/e3_latin1.rs
 printf 'M1_\xe9chantillon\tfn main() {}\tfn main() { }\n' > scripts/mutation/tables/e3_latin1.tsv
 git init -q .
 git config user.email selftest@example.invalid

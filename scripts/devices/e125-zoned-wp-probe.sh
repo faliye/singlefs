@@ -43,6 +43,8 @@ S() { sudo -A "$@"; }
 CFG=/sys/kernel/config/nullb
 DEVS=()          # 建过的 configfs 目录名，按字面量清理，不按模式匹配杀
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e125.XXXXXX")"
+DEVICE_A="e125a_${WORK##*.}_$$"
+DEVICE_B="e125b_${WORK##*.}_$$"
 cleanup() {
   local d
   for d in "${DEVS[@]:-}"; do
@@ -62,7 +64,8 @@ fatal() { emit "name=fatal reason=$1"; emit "name=count n=$N"; exit 4; }
 # 建一台 null_blk zoned 设备。$1=名字 其余=attr=value
 mk() {
   local name="$1"; shift
-  S mkdir -p "$CFG/$name" || return 1
+  S mkdir "$CFG/$name" || return 1
+  # mkdir 排他成功才登记；既有设备绝不接管。
   DEVS+=("$name")
   local kv
   for kv in "$@"; do
@@ -82,14 +85,14 @@ zline() { S blkzone report -o "$(( $2 * ZSECT ))" -c 1 "$1" 2>/dev/null; }
 # 装置一：4 个区 × 64 MiB，前 1 个常规区，pbs 4096
 # ────────────────────────────────────────────────────────────────
 ZMB=64; NCONV=1; SIZEMB=256; BS=4096
-mk e125a "blocksize=$BS" "memory_backed=1" "zoned=1" "zone_size=$ZMB" \
+mk "$DEVICE_A" "blocksize=$BS" "memory_backed=1" "zoned=1" "zone_size=$ZMB" \
         "zone_nr_conv=$NCONV" "size=$SIZEMB" || fatal cannot_create_e125a
-DEV=/dev/e125a
+DEV="/dev/$DEVICE_A"
 ZBYTES=$((ZMB*1024*1024)); ZSECT=$((ZBYTES/512))
 
-PBS=$(cat /sys/block/e125a/queue/physical_block_size)
-LBS=$(cat /sys/block/e125a/queue/logical_block_size)
-NZ=$(cat /sys/block/e125a/queue/nr_zones)
+PBS=$(cat /sys/block/$DEVICE_A/queue/physical_block_size)
+LBS=$(cat /sys/block/$DEVICE_A/queue/logical_block_size)
+NZ=$(cat /sys/block/$DEVICE_A/queue/nr_zones)
 emit "name=config dev=$DEV zone_bytes=$ZBYTES nr_zones=$NZ nr_conv=$NCONV pbs=$PBS lbs=$LBS backend=null_blk_memory"
 # 槽宽 = 挂载时探测的 physical_block_size（D22 已定项 2）
 SLOT=$PBS
@@ -209,10 +212,10 @@ done
 # ────────────────────────────────────────────────────────────────
 # 判据 3：zone_full=1 造不造得出「WP 领先于我们认定的提交点」
 # ────────────────────────────────────────────────────────────────
-mk e125b "blocksize=$BS" "memory_backed=1" "zoned=1" "zone_size=$ZMB" \
+mk "$DEVICE_B" "blocksize=$BS" "memory_backed=1" "zoned=1" "zone_size=$ZMB" \
         "zone_nr_conv=0" "zone_full=1" "size=$SIZEMB" || fatal cannot_create_e125b
-DEVB=/dev/e125b
-NZB=$(cat /sys/block/e125b/queue/nr_zones)
+DEVB="/dev/$DEVICE_B"
+NZB=$(cat /sys/block/$DEVICE_B/queue/nr_zones)
 for ((z=0; z<NZB; z++)); do
   L="$(S blkzone report -o $((z*ZSECT)) -c 1 $DEVB 2>/dev/null)"
   st=$(sed -n 's/.*start: *\(0x[0-9a-f]*\).*/\1/p' <<<"$L")

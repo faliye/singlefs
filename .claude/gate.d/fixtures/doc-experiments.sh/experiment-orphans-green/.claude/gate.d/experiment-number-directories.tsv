@@ -1,0 +1,6 @@
+# 样本目录登记：与仓里那份 .claude/gate.d/experiment-number-directories.tsv 同样五处。
+research	e-number-names	# 跑前登记、重跑登记、三方材料与实验产物
+scripts	e-number-names	# 实验装置、变异表与别处带实验号的脚本
+crates/singlefs-checker-tier/src/bin	e-number-names	# 写死成入库装置的实验
+.claude/kb/experiments	number-names	# 实验页与两份译文
+.claude/kb/experiments.md	index-rows	# 实验索引表

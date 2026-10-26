@@ -1,15 +1,15 @@
 # naming-lint 不扫的目录或单个 .rs（.claude/singlefs-ai-sop/rules/code-discipline.md「门禁管哪一半」）。
 # 一行一条：<相对路径>  # 为什么。按文件列的那些是 0.0.41 命名纪律的回扫账：改完一个文件就删它那一行，只删不加；新文件照查。按目录列的 research/prompts 是原样保存的证据，不回收（evidence-discipline.md「原样保存的证据不许事后改」：门禁也得绕开这批目录）。
 research/prompts  # 三方腿与核查员原样保存的证据（模型自己写的 .rs），改名等于改证据（evidence-discipline.md「原样保存的证据不许事后改」，门禁要绕开这批目录；.claude/doc-lint-exclude 已有同一条）
-scripts/experiments/e114_pack_ledger.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处。M6/M7 的原文当日现查已各命中 1 次，改名时要连表一起改
-scripts/experiments/e116_pack_settle.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处。M16 的原文当日现查已命中 1 次，改名时要连表一起改
-scripts/experiments/e126_system_configuration_slot_width.rs  # 回扫已改完，剩 5 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 5
-scripts/experiments/e17_merge.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处（多为单字母循环变量与闭包参数）。溢出那条已修（阳性对照不再 panic、replay 跑得出产物），改名时要连变异表 M4 的锚点一起改
-scripts/experiments/e34_ring_iomin.rs  # 回扫已改完，剩 8 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 8
-scripts/experiments/e41_root_ring_geom.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7
-scripts/experiments/e46_region_spacing.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7
-scripts/experiments/e58_csum_grain.rs  # 回扫跳过：留存产物早于 ptr_bytes 108→53 的修正，replay 对不上 32 行，要先重跑产物
-scripts/experiments/e67_device_subset.rs  # 回扫跳过：还没回扫。M2 的原文 2026-09-16 多带一行上下文改成唯一命中、当日跑 mutate.sh 证明仍被抓；M1 的替换仍编不过，是一条无效变异，改名时要连它一起修
-scripts/experiments/e79_root_record.rs  # 回扫跳过：变异表 M1 的原文自 04b4f3e 起就不在源码里，要先修表
-scripts/experiments/e7_index.rs  # 回扫已改完，剩 1 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 1
-scripts/experiments/lib.rs  # 回扫已改完，剩 3 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 3
+scripts/experiment-apparatus/e114_pack_ledger.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处。M6/M7 的原文当日现查已各命中 1 次，改名时要连表一起改
+scripts/experiment-apparatus/e116_pack_settle.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处。M16 的原文当日现查已命中 1 次，改名时要连表一起改
+scripts/experiment-apparatus/e126_system_configuration_slot_width.rs  # 回扫已改完，剩 5 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 5
+scripts/experiment-apparatus/e17_merge.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处（多为单字母循环变量与闭包参数）。溢出那条已修（阳性对照不再 panic、replay 跑得出产物），改名时要连变异表 M4 的锚点一起改
+scripts/experiment-apparatus/e34_ring_iomin.rs  # 回扫已改完，剩 8 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 8
+scripts/experiment-apparatus/e41_root_ring_geom.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7
+scripts/experiment-apparatus/e46_region_spacing.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7
+scripts/experiment-apparatus/e58_csum_grain.rs  # 回扫跳过：留存产物早于 ptr_bytes 108→53 的修正，replay 对不上 32 行，要先重跑产物
+scripts/experiment-apparatus/e67_device_subset.rs  # 回扫跳过：还没回扫。M2 的原文 2026-09-16 多带一行上下文改成唯一命中、当日跑 mutate.sh 证明仍被抓；M1 的替换仍编不过，是一条无效变异，改名时要连它一起修
+scripts/experiment-apparatus/e79_root_record.rs  # 回扫跳过：变异表 M1 的原文自 04b4f3e 起就不在源码里，要先修表
+scripts/experiment-apparatus/e7_index.rs  # 回扫已改完，剩 1 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 1
+scripts/experiment-apparatus/lib.rs  # 回扫已改完，剩 3 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 3

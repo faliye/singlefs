@@ -1,0 +1,5 @@
+exit=1
+want=这些定义的 tools 里有 Agent 或 Task——子 agent 只由主 agent 派，不再往下派：
+want=     alpha：tools 里有 Agent
+want=     beta：tools 里有 Task
+want=agent-definition-shape：红（退出 1）

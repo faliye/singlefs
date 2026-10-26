@@ -57,13 +57,30 @@
          WGSL 入口（--rust-strings-entry 给 Rust 入口）的闭包带上给名字着落的 Rust 单元连同它的闭包。
   Python def（模块级 def / async def，类里的方法写 <类>.<方法>）、class（类头：装饰器、基类、类体里不是 def 的语句）、assign（模块级赋值，
          按目标名各一单元）、import（模块级 import，按绑定的名字各一单元）、module-body（其余模块级语句，限定名 <module-body>，每份文件一个，
-         没有语句也有）、main-guard（if __name__ == "__main__": 那一段，限定名 <main-guard>）；指纹 = ast.dump(节点, include_attributes=False)
+         没有语句也有）、main-guard（if __name__ == "__main__": 那一段，限定名 <main-guard>）、def-head（带装饰器或缺省值的模块级 def 与模块级类里的方法
+         另切的 def 头：只收装饰器与缺省值那几个表达式，限定名 <def 的限定名>.<head>，不进按名字的解析，下面「import 时执行的模块级语句」）；
+         指纹 = ast.dump(节点, include_attributes=False)
          的 sha256，节点里各层 def / class 的文档串先去掉。数据单元 docstring（被读 __doc__ 的文档串，限定名 <所属>.__doc__，模块的写 <module>.__doc__）、
          source-text（读自己原文的那份文件整份字节，限定名 <source-text>）。
   shell  function（规范文本里 function <名> () 起、同缩进的 } 止；嵌套的另算一个，限定名 <外层>::<名>，外层文本里留着它；here-doc 正文跳过不切）、
          script-body（规范文本去掉顶层函数，限定名 <script-body>）、shell-variable（顶层赋值语句，按变量名各一单元）、
          kept-comments（数据单元：程序读的注释「# <词>:」与 # shellcheck，限定名 <kept-comments>）。规范文本 = bash -n 过了且没有告警、
          整份包进一个函数定义 eval（不执行）、取 declare -f；指纹 = 单元规范文本的 sha256。起止行是回到原文按函数头找的，只当索引。
+
+Python 闭包：import 时执行的模块级语句（research/prompts/m3-close-reuse-closure-r3-main-verification.md 末节「用户定案」第 3 条；欠账 C890）：
+  一个模块有单元进闭包（ScriptClosure.module_entered），它就被载入过：它的模块级 import、assign、类头本身与 def-head 一起进闭包（规则名 import-time）；
+  类头走 import-time-class：不算被点名、不连方法，之后被别的规则点到再照被点名的类连方法。其余模块级语句在 module-body 里，本来就连。
+  内联 python（here-doc、-c）照样：这几样穿过去连边，自己不进闭包。不收的：只带注解、没装饰器也没缺省值的 def 头（注解在 import 时也求值）；main-guard 不在 import 时执行。
+不走的子进程边（EXCLUDED_PROGRAM_EDGES；同一份判决末节第 3、5 条）：登记了的（起它的文件, 起它的单元的限定名, 被起的程序）那一条子进程边不连
+  （python 单元与 shell 单元起的都认；shell 函数的限定名同单元表，嵌套的写 <外层>::<名>）。
+  按实测排：那一条边只打提示、不改结局；与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES（算键的库自己，按角色排、整份文件不进键）是两种排除。
+  今天三条，都在内存包装里：HostLookup.query 起 scripts/hosts/host-resources.py（包装文件头「排队时去找别的机器」「整体兜底」；判法读包装输出之前去掉它打的那几行）；
+  HostLookup.watch_events 与 broadcast_memory_released 起 scripts/hosts/resource_release_broadcast.py（包装文件头「资源释放广播」：排队时收、退出时发，
+  出事只打一行或一行都不打，排队、放行与退出码照旧；收到之后重查打的行与 HostLookup.query 打的同几种行首，判法照样去掉）。
+  自证 REAL_CUT_CELL 核切掉的单元只经这几条边可达：把被起的程序都当另几个根一起收，与不切的逐个相同。
+判法入口的登记（registered_judging_entries；命令行 entries <根>）：存判定的各路判法入口从各份脚本的登记现取，不手抄——广谱变异的 JUDGING_ENTRIES 与
+  GPU_JUDGING_ENTRIES、crates 变异的 JUDGING_ENTRIES、admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、
+  verus-proof-check.py 的 JUDGING_ENTRIES，加门禁阶段（.claude/gate.d/*.sh）里写死的 "judge:<文件>::<函数>" 令牌；自证真仓那几格的入口从它取。
 
 Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同义；这里只写 R-结构、R-路径、R-隐式与 R-开放的口径，别的几条照设计原文）：
   R-结构  成员连它的 impl / trait 头；单元（文档测试除外）连所在模块的模块头（mod_head），连这个目标里把它所在文件连进模块树的每一条 mod 声明
@@ -103,27 +120,51 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   shell 是 script-body；Rust 另认 fn 路径 <crate 名>::<模块…>::<名>（不带文件，按 lib 目标的模块树找）。
 
 用法：
-  lib_function_units.py dump <根> [--language rust|python|shell|wgsl] [--under <目录>]…
+  lib_function_units.py dump <根> [--language rust|python|shell|wgsl] [--under <目录>]… [--judgment-kind product-behavior|formal-verification]
   lib_function_units.py closure <根> <入口> [选项] [--explain]
   lib_function_units.py key <根> <入口> [选项]
   lib_function_units.py controls <根>     V5 / V11 两处变异（crates/mutations.tsv 里原文是那两行的）在临时拷贝上施加，
                                            三个入口的键变不变与 design 报告 2.2 节那张表比；只读根，不写根
-  lib_function_units.py --selftest
+  lib_function_units.py entries <根>      判法入口的登记现取（registered_judging_entries），一行一个；只读根
+  lib_function_units.py --selftest        临时目录里的夹具，另把本仓的 scripts/ 与 .claude/（不带 fixtures、kb）拷进临时目录量真仓那几格；不写本仓
   选项：--target <目标>  --cfg <名或 名="值">（加进全局 cfg）  --no-default-cfg  --feature <包名>/<特性>  --no-default-features
         --toolchain <行>  --dependency <行>  --external <程序名>=<sha256>=<--version 那一行>
         --wgsl-module <文件>（WGSL 入口拼进同一个模块的别的 .wgsl）  --rust-strings-entry <Rust 入口>（WGSL 里没定义的名字到这个入口闭包的串字面量里找）
         --under <目录>（python / shell 扫哪几处，默认 scripts、.claude/gate.d、.claude/hooks、.claude/scripts 与入口所在目录）
+        --judgment-kind product-behavior|formal-verification（Rust 单元在哪个视图上切、收、算，不给是 formal-verification；下面「判定种类」）
 退出码：0 判完；2 用法错；3 算不出（根不在、bash 起不来、清单读不出）；4 拒算（closure / key 的闭包里有拒算：打拒算行，key 不打键行）。
 
-库接口（门禁里 python 写的判法直接 import 它算键，不为算键先编 Rust）：
+库接口（门禁里 python 写的判法直接 import 它算键，不为算键先编 Rust；产品行为视图例外，下面「判定种类」）：
+  RustWorkspace(根, 判定种类=FORMAL_VERIFICATION, product_dump=None)：判定种类给 PRODUCT_BEHAVIOR 的是产品行为视图；
   rust_units(根) → [单元]；rust_closure(根, 入口, 目标=None, cfg=None) → 闭包；wgsl_units(根)、python_units(根, under)、shell_units(根, under)；
   closure_of(根, 入口, 选项) → 闭包（.members 成员与数据单元、.refusals、.cfg_lines、.programs）；
   closure_key(闭包, toolchain, dependencies, externals) → (键或 None, 拒算)；unit.text() 是进 UnitKey 组成清单的单元行（嵌套路径），
   unit.dump_text() 是 dump 与命令行输出的那一行（unit-graph 的写法）；unit_graph_key(Rust 闭包, 工具链行, 依赖行) → 照 unit-graph 的 reuse_key 算的键（对拍用）。
 
+判定种类（D13（验证路线） 已定项 17：剥规格与证明块只用于判产品行为的那几类判定的键，形式化判定的键保留规格）：
+  formal-verification（缺省）照源码原样切、收、算，verus! 里的规格与证明都进键（scripts/gate/verus-proof-check.py、
+    scripts/experiment-apparatus/e165-pin-red-examples.py 经 scripts/crash/lib_verdict_library.py 的 FunctionUnitIndex 用这一种）。
+  product-behavior 是判产品行为的判定用的视图（checker 档快档按条复用与 admission.py 算的别的单元键：KeyContext.workspace；
+    crates 变异的行键与点名测试：scripts/mutation/lib_mutation_units.py 的 UnitKeys.workspace）。剥法不在这里另写一份，取 crates/singlefs-unit-graph 的
+    unit-graph dump <根> --judgment-kind product-behavior（那一份用 verus_syn 剥），按它交的行改这一份：
+    · 只动有 verus! 块的文件；别的文件两个视图逐字相同。一个工作区都没有 verus! 块时不起 unit-graph。
+    · 这份文件里逐单元按「种类、限定名、文件:起-止」（dump 行去掉指纹那一段）配对：配上的，指纹换成 Rust 那一份的；
+      Rust 那一份没交、单元落在 verus! 块里的，记成只给 Verus 看的（Unit.ghost_only）：闭包收到它就停，不进键、不往下连（入口本身照收）；dump 不列。
+    · 配不上的（Rust 交的单元这里没有、verus! 块外的单元 Rust 没交、同一配对键两边个数不同或几个指纹分不清谁对谁）记文件级拒算
+      product-view-unmatched；Rust 那一份解不开的块（拒算行 verus-ghost-code-unparsed）照抄成这份文件的拒算；拿不到 Rust 那一份
+      （找不到或编不出 unit-graph、它退非 0）记文件级拒算 product-view-unavailable。文件级拒算照 Rust 的口径进链接到那份文件的每个闭包。
+    · 闭包照原样那一份的词法单元收边：规格与证明里点到的执行代码照收，只多不少；门禁 code-tooling 的 function-units-two-implementations-agree 格
+      另有产品行为视图那一趟，逐入口比这一份与 unit-graph closure --judgment-kind product-behavior 的闭包与键。
+  unit-graph 从哪来：设了 FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY 起那个目录里的 unit-graph（调用方保证它是被判那一版的 crates/singlefs-unit-graph 编的；对拍格与自证用）；
+    没设照这份库所在仓的 crates/singlefs-unit-graph、.claude/heavy-thread-default 与 Cargo.lock 的内容摘要找
+    ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-unit-graph-product-view/<摘要>/unit-graph，没有就在那里的临时工作区经 scripts/hosts/capped.sh default
+    起 cargo build --release --offline 编一份（几个进程同时要时排他锁，编完删工作区与编译目录，只留最近 3 份程序）。
+  RustWorkspace 构造时取一次 Rust 那一份（fork 出来的子进程共用父进程那一份），之后载入的有 verus! 块的文件照同一份改。
+
 拒算（3.4，认不出不静默跳过：这一条判定不复用、每趟现判）。形态名：
   Rust   unbalanced-brackets unknown-item cfg-unrecognized include-argument include-missing include-code runtime-path current-exe
          macro-generated-names proc-macro-crate extern-block module-file-missing bin-target-missing
+         产品行为视图另有 product-view-unavailable product-view-unmatched verus-ghost-code-unparsed（「判定种类」）
   WGSL   unbalanced-brackets unknown-item wgsl-undefined-name
   Python python-syntax getattr-variable globals-lookup import-unresolved import-module-variable spec-path-unfolded spec-path-missing
          sys-path-unfolded subprocess-path-unfolded subprocess-path-missing subprocess-command-unfolded（命令认不出、命令位置上的程序折不出）
@@ -240,9 +281,20 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   4-3h 那两条（自证里 unit_divergence_cells 里 4-3k 那两格之前的两格）：
   rust-underscore-items-named      const _ / static _ 照名字 _ 进 R-裸名的着落（let _ = …、_ => 里的 _ 把它们拉进闭包）
   rust-includes-outside-root-refused include_str! 一类读根外的文件一律拒算 include-missing（读得到也拒）
+  实验准入入口那一条（自证里「Rust：清单目录往上拼出仓根」那一格；admission.py --selftest 拿真仓 scripts/experiment-apparatus/lib.rs 的那一格同样转红）：
+  rust-manifest-directory-reads-unrefused Path::new(env!("CARGO_MANIFEST_DIR")).join(…) 拼出的是目录（仓根这一类）也不拒算 runtime-path（「读路径都不拒算」那种放宽）
   4-3k 那两条（自证里 unit_divergence_cells 末尾两格）：
   rust-blanket-self-parameter-only blanket 退回旧判法：自身类型里头一个名字是泛型参数才算（Box<T>、Option<Box<T>>、Sealed<T> 的 impl 不算）
   wgsl-other-file-definitions-unlinked WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义时，不把读它的 Rust 单元与那份 .wgsl 拉进闭包
+  import 时执行的模块级语句与不走的子进程边（自证里 import_time_cells 那几格）：
+  python-import-time-statements-ignored 模块有单元进闭包时不收它的模块级 import、赋值、类头与 def 头（C890 的样子）
+  python-def-heads-ignored         不切 def-head（装饰器与缺省值不进闭包）
+  python-import-time-classes-named 只因 import 时执行收进来的类头也算被点名、连方法
+  program-edge-exclusions-ignored  EXCLUDED_PROGRAM_EDGES 登记的子进程边照连
+  program-edge-exclusions-shell-ignored  EXCLUDED_PROGRAM_EDGES 只认 python 单元起的，shell 函数起的照连（内存包装的 broadcast_memory_released 那一条）
+  产品行为视图那两条（自证里 product_view_cells 那几格）：
+  product-view-kept-formal         不剥：产品行为视图照原样那一份（不取 Rust 那一份，规格与证明照进键）
+  product-view-strips-executable-code 剥到执行代码：verus! 块里的单元一律当只给 Verus 看的（被调到的执行代码也不进键）
 
 折叠认的写法（上面各开关管的那几条；推的，没有夹具钉住的不写在这里）：
   临时树、仓副本、worktree 里的「$目录/<相对路径>」「os.path.join(目录, <相对路径>)」按根里同一相对路径那一份认（至少两段、在根里存在）：
@@ -267,6 +319,7 @@ import ast
 import bisect
 import collections
 import copy
+import fcntl
 import glob
 import hashlib
 import os
@@ -286,6 +339,13 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 KEY_FORM = "singlefs-function-units-v1"
+# 判定种类（文件头「判定种类」）：与 crates/singlefs-unit-graph 的 --judgment-kind 同两个写法
+FORMAL_VERIFICATION = "formal-verification"
+PRODUCT_BEHAVIOR = "product-behavior"
+JUDGMENT_KINDS = (FORMAL_VERIFICATION, PRODUCT_BEHAVIOR)
+UNIT_GRAPH_DIRECTORY_VARIABLE = "FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY"
+UNIT_GRAPH_KEPT_PROGRAMS = 3
+VERUS_GHOST_CODE_UNPARSED = "verus-ghost-code-unparsed"
 BREAK_VARIABLE = "FUNCTION_UNITS_BREAK"
 REFUSED_EXIT = 4
 SHELL_TIMEOUT_SECONDS = 600
@@ -524,7 +584,7 @@ UNIT_SLOTS = ("language", "kind", "name", "file", "first_line", "last_line", "fi
               "plain", "methods", "qualified", "dyn_traits", "references", "data_references", "refusals",
               "self_types", "trait_name", "is_trait_impl", "blanket", "implicit_keys", "imports", "aliases", "import_glob", "defines",
               "declared", "node", "nodes", "facts", "body", "module", "cache", "full", "header", "module_head", "doc_module", "cfg_leaves",
-              "open_keys")
+              "open_keys", "ghost_only")
 
 # 弄坏开关 rust-kind-names-hyphenated 下输出行退回的旧拼法（与 crates/singlefs-unit-graph 对齐之前 python 这一份的写法）
 HYPHENATED_KIND_NAMES = {"macro_rules": "macro", "item_macro": "item-macro", "mod": "mod-decl", "extern_block": "extern-block",
@@ -1017,6 +1077,7 @@ class RustFile:
         self.kinds, self.texts, self.lines, self.documents = rust_lex(text)
         self.count = len(self.texts)
         self.units, self.refusals, self.mod_declarations, self.doctests = [], [], [], []
+        self.verus_spans = []           # [(verus! 块的 { 下标, 配对的 } 下标)]：产品行为视图认只给 Verus 看的单元用（文件头「判定种类」）
         # 文档测试挂在哪（照 crates/singlefs-unit-graph）：条目的外文档注释，与模块开头（文件开头、行内模块体开头到内属性收尾）的内文档注释
         self.module_documents = []      # [(内文档注释可落的下标区间 低, 高, 文件里的行内模块路径)]
         self.current_header, self.current_module_head = 0, None
@@ -1046,6 +1107,10 @@ class RustFile:
 
     def kind(self, index):
         return self.kinds[index] if 0 <= index < self.count else ""
+
+    def inside_verus(self, unit):
+        """单元落在某一块 verus! { … } 里。"""
+        return unit.first_token is not None and any(opening < unit.first_token < close for opening, close in self.verus_spans)
 
     def refuse(self, unit, form, index):
         line = self.lines[index] if 0 <= index < self.count else unit.first_line
@@ -1389,6 +1454,7 @@ class RustFile:
             if self.t(end) == ";":
                 end += 1
             if name == "verus" and self.t(opening) == "{":
+                self.verus_spans.append((opening, close))
                 self.scan(opening + 1, close, context, module_path, container, conditions, "rust-verus-segments-ignored" not in self.breaks)
                 return end
             if name in RUST_ITEM_MACROS_HOLDING_ITEMS and self.t(opening) == "{":
@@ -1639,6 +1705,9 @@ class RustFile:
                 c += 5
             if self.t(c) != "." and not path.startswith("../") and os.path.isfile(os.path.join(self.root, path)):
                 unit.data_references.append(("file", path, environment_index))
+                return
+            # 弄坏开关：拼出的是目录也照放行（目录底下读什么键里都看不见）；平常目录一律拒算，要仓根的点名清单目录里的一份文件再往上取
+            if "rust-manifest-directory-reads-unrefused" in active_breaks() and self.t(c) != "." and os.path.isdir(os.path.join(self.root, path)):
                 return
         self.refuse(unit, "runtime-path", environment_index)
 
@@ -1954,11 +2023,16 @@ def condition_mentions_test(tree):
 
 
 class RustWorkspace:
-    def __init__(self, root):
+    def __init__(self, root, judgment_kind=FORMAL_VERIFICATION, product_dump=None):
         if not os.path.isdir(root):
             raise FunctionUnitsError(f"根不在：{root}")
+        if judgment_kind not in JUDGMENT_KINDS:
+            raise UsageError(f"判定种类只认 {'、'.join(JUDGMENT_KINDS)}：{judgment_kind}")
         self.root = root
         self.breaks = active_breaks()
+        # 产品行为视图（文件头「判定种类」）：product_dump 是调用方交的 unit-graph dump --judgment-kind product-behavior 的行（对拍格与自证用），
+        # 不给就要用时起 unit-graph；product_view 是按文件分好的那一份（{文件: ([单元行], [拒算行])}），拿不到时是一句原因
+        self.judgment_kind, self.product_dump, self.product_view = judgment_kind, product_dump, None
         self.crates = discover_rust_crates(root)
         self.crate_by_directory = {crate.directory: crate for crate in self.crates}
         self.files = {}
@@ -1973,6 +2047,72 @@ class RustWorkspace:
             self.assign_full_names(self.files[path])
         self.names_assigned = True
         self.index()
+        for path in sorted(self.files):
+            self.apply_product_view(self.files[path])
+
+    def product_view_lines(self):
+        """Rust 那一份产品行为视图的 dump，按文件分好：{文件: ([单元行], [拒算行])}；拿不到交一句原因。一个工作区只取一次。"""
+        if self.product_view is None:
+            lines = self.product_dump
+            if lines is None:
+                try:
+                    lines = product_view_dump(self.root)
+                except ProductViewUnavailable as error:
+                    self.product_view = str(error)
+                    return self.product_view
+            grouped = {}
+            for line in lines:
+                fields = line.split("\t")
+                if len(fields) < 3 or fields[0] == "data":
+                    continue
+                place = grouped.setdefault(fields[2].rpartition(":")[0], ([], []))
+                if fields[0] == "refused":
+                    place[1].append(fields)
+                elif len(fields) == 4:
+                    place[0].append(line)
+            self.product_view = grouped
+        return self.product_view
+
+    def apply_product_view(self, rust_file):
+        """产品行为视图（文件头「判定种类」）：有 verus! 块的文件照 Rust 那一份换指纹、认只给 Verus 看的单元、记配不上的拒算。
+        弄坏开关 product-view-kept-formal 下照原样（不剥）；product-view-strips-executable-code 下 verus! 块里的单元一律当只给 Verus 看的（剥到执行代码）。"""
+        if self.judgment_kind != PRODUCT_BEHAVIOR or not rust_file.verus_spans or "product-view-kept-formal" in self.breaks:
+            return
+        if "product-view-strips-executable-code" in self.breaks:
+            for unit in rust_file.units:
+                if rust_file.inside_verus(unit):
+                    unit.ghost_only = True
+            return
+        view = self.product_view_lines()
+        block_line = rust_file.lines[rust_file.verus_spans[0][0]]
+        if isinstance(view, str):
+            rust_file.refusals.append(Refusal("product-view-unavailable", rust_file.path, block_line, snippet_of(view)))
+            return
+        theirs_lines, theirs_refusals = view.get(rust_file.path, ([], []))
+        for fields in theirs_refusals:
+            if fields[1] == VERUS_GHOST_CODE_UNPARSED:
+                at = fields[2].rpartition(":")[2]
+                rust_file.refusals.append(Refusal(VERUS_GHOST_CODE_UNPARSED, rust_file.path, int(at) if at.isdigit() else block_line,
+                                                  fields[3] if len(fields) > 3 else ""))
+        theirs, ours = {}, {}
+        for line in theirs_lines:
+            placed, _tab, fingerprint = line.rpartition("\t")
+            theirs.setdefault(placed, []).append(fingerprint)
+        for unit in rust_file.units:
+            ours.setdefault(unit.dump_text().rpartition("\t")[0], []).append(unit)
+        for placed in sorted(set(theirs) | set(ours)):
+            fingerprints, units = theirs.get(placed, []), ours.get(placed, [])
+            if len(fingerprints) == len(units) and len(set(fingerprints)) <= 1:
+                for unit, fingerprint in zip(units, fingerprints):
+                    unit.fingerprint = fingerprint
+                continue
+            if not fingerprints and all(rust_file.inside_verus(unit) for unit in units):
+                for unit in units:
+                    unit.ghost_only = True
+                continue
+            line = units[0].first_line if units else block_line
+            rust_file.refusals.append(Refusal("product-view-unmatched", rust_file.path, line,
+                                              snippet_of(f"{placed}：unit-graph 交 {len(fingerprints)} 个、这一份切出 {len(units)} 个")))
 
     def file_prefix(self, path):
         """一份文件里单元限定名的前缀（照 crates/singlefs-unit-graph 的 module_prefix_of_file）：crate 名、这份文件所属的头一个目标的标记
@@ -2019,6 +2159,7 @@ class RustWorkspace:
             self.files[path] = RustFile(self.root, path, text, crate.directory if crate else posixpath.dirname(path))
             if self.names_assigned:
                 self.assign_full_names(self.files[path])
+                self.apply_product_view(self.files[path])
         return self.files[path]
 
     def all_files(self):
@@ -2593,6 +2734,9 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
             seen.add((id(unit), identifier))
             if unit.kind in dropped or not active(unit, identifier):
                 continue
+            if unit.ghost_only and unit is not entry:
+                # 产品行为视图里只给 Verus 看的单元（文件头「判定种类」）：不进闭包、不往下连
+                continue
             closure.add(unit, via, rule)
             closure.unit_targets.setdefault(id(unit), identifier)
             closure.refusals.update(unit.refusals)
@@ -2747,6 +2891,97 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                 closure.add(member, None, "wgsl-module")
             closure.refusals.update(refusals)
     return closure
+
+
+class ProductViewUnavailable(Exception):
+    """拿不到 Rust 那一份产品行为视图（找不到或编不出 unit-graph、它退非 0）：有 verus! 块的文件记拒算 product-view-unavailable。"""
+
+
+def product_view_dump(root):
+    """unit-graph dump <根> --judgment-kind product-behavior 的输出行（文件头「判定种类」）；拿不到抛 ProductViewUnavailable。"""
+    program = os.path.join(unit_graph_directory(), "unit-graph")
+    try:
+        completed = subprocess.run([program, "dump", os.path.abspath(root), "--judgment-kind", PRODUCT_BEHAVIOR],
+                                   capture_output=True, text=True, errors="surrogateescape", stdin=subprocess.DEVNULL)
+    except OSError as error:
+        raise ProductViewUnavailable(f"起不了 unit-graph：{error}") from error
+    if completed.returncode != 0:
+        tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-2:] if line.strip())
+        raise ProductViewUnavailable(f"unit-graph dump --judgment-kind {PRODUCT_BEHAVIOR} 退 {completed.returncode}：{tail[:200]}")
+    return completed.stdout.splitlines()
+
+
+def unit_graph_directory():
+    """产品行为视图用的 unit-graph 所在的目录：设了 FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY 取它，没设取这份库所在仓那一份编出来的（built_unit_graph）。"""
+    return os.environ.get(UNIT_GRAPH_DIRECTORY_VARIABLE) or built_unit_graph(LIBRARY_ROOT)
+
+
+def built_unit_graph(repository):
+    """repository 里 crates/singlefs-unit-graph 编出来的 unit-graph 所在的目录（文件头「判定种类」里「unit-graph 从哪来」）；编不出抛 ProductViewUnavailable。"""
+    source = os.path.join(repository, "crates", "singlefs-unit-graph")
+    if not os.path.isfile(os.path.join(source, "Cargo.toml")):
+        raise ProductViewUnavailable(f"{repository} 里没有 crates/singlefs-unit-graph")
+    thread_registry = os.path.join(repository, ".claude", "heavy-thread-default")
+    lock_file = os.path.join(repository, "Cargo.lock")
+    inputs = [thread_registry, lock_file]
+    for directory, subdirectories, names in os.walk(source):
+        subdirectories[:] = sorted(name for name in subdirectories if name not in SKIPPED_DIRECTORIES)
+        inputs += [os.path.join(directory, name) for name in sorted(names)]
+    digest = hashlib.sha256()
+    for path in inputs:
+        digest.update(os.path.relpath(path, repository).encode("utf-8", "surrogateescape") + b"\0")
+        try:
+            with open(path, "rb") as handle:
+                digest.update(handle.read())
+        except OSError:
+            digest.update(b"<missing>")
+        digest.update(b"\0")
+    cache = os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or tempfile.gettempdir(), "singlefs-unit-graph-product-view")
+    directory = os.path.join(cache, digest.hexdigest())
+    program = os.path.join(directory, "unit-graph")
+    if os.access(program, os.X_OK):
+        return directory
+    try:
+        os.makedirs(cache, exist_ok=True)
+        with open(os.path.join(cache, ".lock"), "a", encoding="utf-8") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if not os.access(program, os.X_OK):
+                build_unit_graph(repository, source, thread_registry, lock_file, cache, directory, program)
+    except OSError as error:
+        raise ProductViewUnavailable(f"编不了 unit-graph（{cache}）：{error}") from error
+    return directory
+
+
+def build_unit_graph(repository, source, thread_registry, lock_file, cache, directory, program):
+    """在 cache 下的临时工作区里编 unit-graph、换上 program；编完删工作区与编译目录，cache 里只留最近 UNIT_GRAPH_KEPT_PROGRAMS 份程序。"""
+    build = tempfile.mkdtemp(prefix="build-", dir=cache)
+    try:
+        workspace = os.path.join(build, "workspace")
+        shutil.copytree(source, os.path.join(workspace, "crates", "singlefs-unit-graph"), ignore=shutil.ignore_patterns("target"))
+        os.makedirs(os.path.join(workspace, ".claude"))
+        shutil.copy2(thread_registry, os.path.join(workspace, ".claude", "heavy-thread-default"))
+        if os.path.isfile(lock_file):
+            shutil.copy2(lock_file, os.path.join(workspace, "Cargo.lock"))
+        with open(os.path.join(workspace, "Cargo.toml"), "w", encoding="utf-8") as handle:
+            handle.write('[workspace]\nmembers = ["crates/singlefs-unit-graph"]\nresolver = "2"\n\n[profile.release]\nopt-level = 3\n'
+                         'overflow-checks = true\ndebug-assertions = true\n')
+        completed = subprocess.run(["bash", os.path.join(repository, "scripts", "hosts", "capped.sh"), "default", "cargo", "build", "--release", "--offline",
+                                    "--manifest-path", os.path.join(workspace, "Cargo.toml"), "-p", "singlefs-unit-graph", "--bin", "unit-graph"],
+                                   capture_output=True, text=True, errors="surrogateescape", stdin=subprocess.DEVNULL,
+                                   env=dict(os.environ, CARGO_TARGET_DIR=os.path.join(build, "target")))
+        if completed.returncode != 0:
+            tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-3:] if line.strip())
+            raise ProductViewUnavailable(f"cargo build --release -p singlefs-unit-graph 退 {completed.returncode}：{tail[:300]}")
+        os.makedirs(directory, exist_ok=True)
+        partial = os.path.join(directory, "unit-graph.partial")
+        shutil.copy2(os.path.join(build, "target", "release", "unit-graph"), partial)
+        os.replace(partial, program)
+    finally:
+        shutil.rmtree(build, ignore_errors=True)
+    kept = sorted((name for name in os.listdir(cache) if not name.startswith((".", "build-"))),
+                  key=lambda name: os.path.getmtime(os.path.join(cache, name)), reverse=True)
+    for name in kept[UNIT_GRAPH_KEPT_PROGRAMS:]:
+        shutil.rmtree(os.path.join(cache, name), ignore_errors=True)
 
 
 RustClosureResult = collections.namedtuple("RustClosureResult", "members key refusals cfg_lines closure")
@@ -3324,6 +3559,22 @@ class PythonModule:
             self.by_name[name].append(unit)
         return unit
 
+    def add_def_head(self, statement, name):
+        """import 时就求值的 def 头（文件头「Python」一段的 def-head）：带装饰器或缺省值的 def（模块级的与模块级类里的方法）另切一个单元，
+        只收装饰器与缺省值那几个表达式（指纹与边都只看它们），不收函数体、不进 by_name（不被按名字点到）、不挂类头（不让类算被点名）。
+        限定名 <def 的限定名>.<head>。弄坏开关 python-def-heads-ignored 下不切。"""
+        arguments = statement.args
+        evaluated = list(statement.decorator_list) + list(arguments.defaults) + [value for value in arguments.kw_defaults if value is not None]
+        if not evaluated or "python-def-heads-ignored" in self.index.breaks:
+            return None
+        first = min(node.lineno for node in evaluated)
+        last = max(getattr(node, "end_lineno", None) or node.lineno for node in evaluated)
+        head = Unit("python", "def-head", f"{name}.<head>", self.path, first, last,
+                    dump_fingerprint(ast.Module(body=[ast.Expr(value=node) for node in evaluated], type_ignores=[])))
+        head.node, head.nodes, head.module, head.container = None, evaluated, self, None
+        self.units.append(head)
+        return head
+
     def function_fingerprint(self, node):
         if self.keep_comments:
             return sha256_text(ast.get_source_segment(self.text, node) or "")
@@ -3344,6 +3595,7 @@ class PythonModule:
         for statement in body:
             if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 self.add_unit("def", statement.name, statement, [statement], self.function_fingerprint(statement))
+                self.add_def_head(statement, statement.name)
                 self.note_docstring(statement.name, statement)
             elif isinstance(statement, ast.ClassDef):
                 head_body = [member for member in statement.body if not isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef))]
@@ -3357,6 +3609,7 @@ class PythonModule:
                     if isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         method = self.add_unit("def", f"{statement.name}.{member.name}", member, [member], self.function_fingerprint(member),
                                                container=head, short=member.name)
+                        self.add_def_head(member, f"{statement.name}.{member.name}")
                         self.note_docstring(method.name, member)
                         self.methods.append(method)
             elif isinstance(statement, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and assignment_names(statement):
@@ -4316,6 +4569,20 @@ class PythonModule:
             for name, binding in self.local_import_bindings(unit).items():
                 if name == unit.name or unit.name == "*":
                     facts.import_targets += self.binding_targets(binding, unit, facts)
+        # 只查询固定的 __file__ 与直接读 __file__ 一样，不会按字符串挑到任意函数。
+        # 仍遍历外层表达式；别的 globals()（动态键、传参、默认值）照旧拒算。
+        file_queries = set()
+        if self.binding("globals", unit) is None:
+            for query in walk_nodes(unit.nodes or []):
+                if (isinstance(query, ast.Call) and isinstance(query.func, ast.Attribute) and query.func.attr == "get"
+                        and len(query.args) == 1 and not query.keywords
+                        and isinstance(query.args[0], ast.Constant) and query.args[0].value == "__file__"):
+                    receiver = query.func.value
+                    if (isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Name) and receiver.func.id == "globals"
+                            and not receiver.args and not receiver.keywords):
+                        file_queries.add(id(receiver))
+            if file_queries:
+                facts.names.add("__file__")
         dropped = set()
         if "python-dispatch-tables-ignored" in breaks:
             # 弄坏开关：分派表（字典字面量）里当值写的函数名不连边
@@ -4338,7 +4605,8 @@ class PythonModule:
                 for binding in table.values():
                     facts.import_targets += self.binding_targets(binding, unit, facts)
             elif isinstance(node, ast.Call):
-                self.call_facts(node, unit, facts, breaks)
+                if id(node) not in file_queries:
+                    self.call_facts(node, unit, facts, breaks)
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                 facts.strings.add(node.value)
             elif isinstance(node, ast.Assign) and any(isinstance(target, ast.Subscript) and self.canonical(target.value, unit) == "sys.path"
@@ -7099,6 +7367,24 @@ def inline_refusals(root, python, shell, scripts, depth=0):
     return refusals
 
 
+# import 时就执行的模块级语句（文件头「Python 闭包：import 时执行的模块级语句」）：类头只当类头收进来时走的规则名（不算被点名、不连方法）
+IMPORT_TIME_RULE = "import-time"
+IMPORT_TIME_CLASS_RULE = "import-time-class"
+# 判法单元闭包不走的子进程边（文件头「不走的子进程边」）：(起它的文件, 起它的单元的限定名, 被起的程序) → 为什么。按实测排：这一条边只打提示、不改结局，
+# 自证 excluded-program-edge-only 那一格核切掉的单元只经这条边可达。与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES（按角色排、整份文件）是两种排除。
+EXCLUDED_PROGRAM_EDGES = {
+    ("scripts/hosts/run-with-memory-cap.sh", "HostLookup.query", "scripts/hosts/host-resources.py"):
+        "内存包装排队时现查别的机器：只往 stderr 打提示、写告警记录，排队、放行与退出码照旧（包装文件头「排队时去找别的机器」「整体兜底」）；"
+        "判法读包装输出之前去掉那几行（verus-proof-check.py、e165-pin-red-examples.py、crates-mutation-rows.py 的 HOST_LOOKUP_LINE）",
+    ("scripts/hosts/run-with-memory-cap.sh", "HostLookup.watch_events", "scripts/hosts/resource_release_broadcast.py"):
+        "内存包装排队时收资源释放广播（follow）：收到了只叫醒 HostLookup 再查一次别的机器，打的行与 HostLookup.query 的同几种行首（HOST_LOOKUP_LINE 照样去掉）；"
+        "follow 起不来、退了、读出异常只打一行，排队、放行与退出码照旧（包装文件头「资源释放广播」，自证 RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast 那几格）",
+    ("scripts/hosts/run-with-memory-cap.sh", "broadcast_memory_released", "scripts/hosts/resource_release_broadcast.py"):
+        "内存包装退出时发资源释放广播（emit）：输出一行都不进包装的 stdout / stderr、退出码不交回（EXIT trap 里不调 exit），包装的退出码与输出照旧"
+        "（包装文件头「资源释放广播」，自证 RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast 里「那份库出事」那一格）",
+}
+
+
 class ScriptClosure:
     def __init__(self, root, under):
         self.root = os.path.abspath(root)
@@ -7108,6 +7394,7 @@ class ScriptClosure:
         self.shell = None
         self.closure = Closure()
         self.named_classes, self.attributes_seen, self.loaded_modules, self.modules_seen = set(), set(), set(), set()
+        self.import_time_classes = set()   # 只当类头收进来（IMPORT_TIME_CLASS_RULE）、还没被点名的类头：之后被点名时再连方法
         self.methods_by_name = collections.defaultdict(list)
         self.closure_sourcers, self.processed_shell = collections.defaultdict(set), collections.defaultdict(list)
         self.todo = []
@@ -7122,8 +7409,18 @@ class ScriptClosure:
         return self.shell
 
     def push(self, unit, via, rule):
-        if unit is not None and id(unit) not in self.closure.members:
+        if unit is None:
+            return
+        if id(unit) not in self.closure.members:
             self.todo.append((unit, via, rule))
+        else:
+            self.named_after_import_time(unit, rule)
+
+    def named_after_import_time(self, unit, rule):
+        """先只当类头收进来（import 时执行）的类头，之后被点名（别的规则又推到它）：照被点名的类连方法。"""
+        if unit.kind == "class" and rule != IMPORT_TIME_CLASS_RULE and id(unit) in self.import_time_classes:
+            self.import_time_classes.discard(id(unit))
+            self.class_entered(unit)
 
     def push_program(self, file, via):
         language = language_of_file(self.root, file)
@@ -7147,14 +7444,16 @@ class ScriptClosure:
             unit, via, rule = self.todo.pop()
             if unit.scope == "inline":
                 if id(unit) in self.inline_seen:
+                    self.named_after_import_time(unit, rule)
                     continue
                 self.inline_seen.add(id(unit))
             elif not self.closure.add(unit, via, rule):
+                self.named_after_import_time(unit, rule)
                 continue
             if unit.data:
                 continue
             if unit.language == "python":
-                self.python_edges(unit)
+                self.python_edges(unit, rule)
             elif unit.language == "shell":
                 self.shell_edges(unit)
         return self.closure
@@ -7189,6 +7488,17 @@ class ScriptClosure:
             self.methods_by_name[method.short].append(method)
             if id(method.container) in self.named_classes and (method.short in self.attributes_seen or "python-attributes-unnarrowed" in self.breaks):
                 self.push(method, method.container, f"method {method.short}")
+        if "python-import-time-statements-ignored" in self.breaks:
+            return
+        # 模块有单元进闭包，它就被载入过：import 时执行的模块级语句一起进来（文件头「Python 闭包：import 时执行的模块级语句」）——
+        # 模块级 import、赋值、类头本身（IMPORT_TIME_CLASS_RULE：不算被点名、不连方法）与 def 头（装饰器、缺省值）；其余模块级语句在 module-body 里，本来就连
+        for unit in module.units:
+            if unit.data or unit.container is not None:
+                continue
+            if unit.kind in ("import", "assign", "def-head"):
+                self.push(unit, module.module_body, IMPORT_TIME_RULE)
+            elif unit.kind == "class":
+                self.push(unit, module.module_body, IMPORT_TIME_CLASS_RULE)
 
     def class_entered(self, head):
         self.named_classes.add(id(head))
@@ -7210,7 +7520,7 @@ class ScriptClosure:
                 for unit in module.by_name.get(name, ()):
                     self.push(unit, via, f"loaded {name}")
 
-    def python_edges(self, unit):
+    def python_edges(self, unit, rule=None):
         module = unit.module
         if module.path not in self.modules_seen:
             self.module_entered(module)
@@ -7221,7 +7531,10 @@ class ScriptClosure:
         if unit.kind != "module-body":
             self.push(module.module_body, unit, "module-body")
         if unit.kind == "class":
-            self.class_entered(unit)
+            if rule == IMPORT_TIME_CLASS_RULE and "python-import-time-classes-named" not in self.breaks:
+                self.import_time_classes.add(id(unit))   # 只当类头收进来：不连方法，之后被点名再连（named_after_import_time）
+            else:
+                self.class_entered(unit)
         for target in facts.import_targets:
             self.push(target, unit, "import")
         for name in sorted(facts.names):
@@ -7250,6 +7563,8 @@ class ScriptClosure:
                         self.push(target, unit, f"loaded {name}")
             self.push(loaded.module_body, unit, "load")
         for file in facts.program_links:
+            if (unit.file, unit.name, file) in EXCLUDED_PROGRAM_EDGES and "program-edge-exclusions-ignored" not in self.breaks:
+                continue   # 登记了的那一条子进程边不走（EXCLUDED_PROGRAM_EDGES）
             self.push_program(file, unit)
         for script in facts.inline_scripts:
             self.push_inline(script, unit)
@@ -7356,6 +7671,9 @@ class ScriptClosure:
                             for processed in list(self.processed_shell.get(path, ())):
                                 self.shell_names(processed, index.facts(processed), self.visible_files(path))
                 else:
+                    if (unit.file, unit.name, file) in EXCLUDED_PROGRAM_EDGES and "program-edge-exclusions-ignored" not in self.breaks \
+                            and "program-edge-exclusions-shell-ignored" not in self.breaks:
+                        continue   # 登记了的那一条子进程边不走（EXCLUDED_PROGRAM_EDGES；shell 函数起的同样认）
                     self.push_program(file, unit)
         if prefixes:
             # "前缀_$1" 派活：看得见的函数里名字以这个前缀起头的都连
@@ -7409,6 +7727,8 @@ class Options:
         self.cfg, self.no_default_cfg, self.features, self.no_default_features = [], False, [], False
         self.toolchain, self.dependencies, self.externals = [], [], {}
         self.wgsl_modules, self.rust_strings_entry, self.explain = [], None, False
+        # 判定种类（文件头「判定种类」）；product_dump 只给库接口的调用方交 Rust 那一份 dump 行用，命令行不认
+        self.judgment_kind, self.product_dump = FORMAL_VERIFICATION, None
 
 
 def closure_of(root, entry, options=None):
@@ -7417,7 +7737,7 @@ def closure_of(root, entry, options=None):
         raise FunctionUnitsError(f"根不在：{root}")
     language, path, qualified = parse_entry(root, entry)
     if language == "rust":
-        workspace = RustWorkspace(root)
+        workspace = RustWorkspace(root, options.judgment_kind, options.product_dump)
         unit, target_id = workspace.find_entry(path, qualified, options.target)
         return rust_closure_of(workspace, unit, target_id, options.cfg, options.no_default_cfg, options.features, options.no_default_features)
     if language == "wgsl":
@@ -7429,7 +7749,7 @@ def closure_of(root, entry, options=None):
         closure = Closure()
         if options.rust_strings_entry:
             rust_language, rust_path, rust_qualified = parse_entry(root, options.rust_strings_entry)
-            workspace = RustWorkspace(root)
+            workspace = RustWorkspace(root, options.judgment_kind, options.product_dump)
             if rust_language == "rust":
                 rust_unit, rust_target = workspace.find_entry(rust_path, rust_qualified, options.target)
                 rust = rust_closure_of(workspace, rust_unit, rust_target, options.cfg, options.no_default_cfg, options.features, options.no_default_features)
@@ -7535,11 +7855,11 @@ def unit_graph_key(closure, toolchain=(), lock_lines=()):
     return sha256_text("\n".join(lines)), []
 
 
-def dump_lines(root, language=None, under=None):
-    """→ (单元行, 拒算行, 各语言单元数)。"""
+def dump_lines(root, language=None, under=None, judgment_kind=FORMAL_VERIFICATION, product_dump=None):
+    """→ (单元行, 拒算行, 各语言单元数)。判定种类是产品行为时 Rust 单元照产品行为视图（文件头「判定种类」），只给 Verus 看的不列。"""
     units, refusals, counts = [], set(), collections.Counter()
     if language in (None, "rust"):
-        workspace = RustWorkspace(root)
+        workspace = RustWorkspace(root, judgment_kind, product_dump)
         names, pairs = cfg_entries(list(DEFAULT_RUST_CFG))
         known = set(KNOWN_CFG_NAMES)
         for crate in workspace.crates:
@@ -7552,6 +7872,8 @@ def dump_lines(root, language=None, under=None):
         for rust_file in workspace.all_files():
             refusals.update(rust_file.refusals)
             for unit in rust_file.units:
+                if unit.ghost_only:
+                    continue
                 units.append(unit)
                 counts["rust"] += 1
                 refusals.update(unit.refusals)
@@ -9485,6 +9807,34 @@ def shell_folding_cell(work):
     return {"s/lib.sh", "s/child.sh"} <= files and key is not None, f"闭包碰到的文件 {sorted(files)}，拒算 {[refusal.form for refusal in refusals]}"
 
 
+MANIFEST_ROOT_CELL = "Rust：清单目录往上拼出仓根（目录）拒算 runtime-path；点名清单目录里一份文件再往上取仓根的不拒算、那份文件的字节进键"
+# 实验准入入口（scripts/experiment-apparatus/lib.rs::admit_experiment_run_or_exit）取仓根的两种写法
+MANIFEST_ROOT_FIXTURE = {
+    "crates/fbench/Cargo.toml": '[package]\nname = "fbench"\n',
+    "crates/fbench/src/lib.rs": '''// 只是注释
+pub fn root_by_parent_directories() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
+}
+pub fn root_by_named_source() -> std::path::PathBuf {
+    let this_source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("lib.rs");
+    this_source.ancestors().nth(4).expect("lib.rs 在 <根>/crates/fbench/src/ 下").to_path_buf()
+}
+''',
+}
+
+
+def manifest_root_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, MANIFEST_ROOT_FIXTURE)
+    directory_key, directory_forms = fixture_key(base, "crates/fbench/src/lib.rs::root_by_parent_directories")
+    before, named_forms = fixture_key(base, "crates/fbench/src/lib.rs::root_by_named_source")
+    edit_file(base, "crates/fbench/src/lib.rs", "// 只是注释\n", "// 只是注释，改了措辞\n")
+    after, _ = fixture_key(base, "crates/fbench/src/lib.rs::root_by_named_source")
+    ok = directory_key is None and "runtime-path" in directory_forms and before is not None and after is not None and before != after
+    return ok, (f"往上拼目录的：键{'有' if directory_key else '无'}、拒算 {sorted(directory_forms)}（要拒算 runtime-path）；"
+                f"点名文件的：拒算 {sorted(named_forms)}，改那份文件里一句注释前后键{'相同' if before == after else '不同'}（要算得出且不同）")
+
+
 def no_refusal_cell(fixture, entry):
     def judge(work):
         base = os.path.join(work, "tree")
@@ -9585,6 +9935,414 @@ def key_external_cell(work):
         f"没给 cargo 时 {[refusal.form for refusal in refusals]}；给了之后键 {given}"
 
 
+# ── 判法入口的登记（文件头「判法入口的登记」）──
+
+JUDGING_ENTRY_STAGE_DIRECTORY = ".claude/gate.d"
+JUDGING_ENTRY_TOKEN = re.compile(r'"judge:([^"$\s]+?|\.claude/gate\.d/\$STAGE_NAME)::(\w+)"')
+
+
+def module_literal(root, path, name):
+    """root 里 path 那份 python 的模块级赋值 name 的字面值（ast.literal_eval）；找不到抛 FunctionUnitsError。"""
+    with open(os.path.join(root, path), encoding="utf-8") as handle:
+        tree = ast.parse(handle.read(), filename=path)
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign) and any(isinstance(target, ast.Name) and target.id == name for target in statement.targets):
+            return ast.literal_eval(statement.value)
+    raise FunctionUnitsError(f"{path} 里没有模块级的 {name}（判法入口的登记挪了：照文件头「判法入口的登记」改 registered_judging_entries）")
+
+
+def registered_judging_entries(root):
+    """存判定的各路判法入口，从各份脚本的登记现取（不手抄）：广谱变异 JUDGING_ENTRIES 与 GPU_JUDGING_ENTRIES、crates 变异 JUDGING_ENTRIES、
+    admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、verus-proof-check.py 的 JUDGING_ENTRIES，
+    再加门禁阶段（.claude/gate.d/*.sh）里写死的 "judge:<文件>::<函数>" 令牌（$STAGE_NAME 换成那一道阶段自己）。去重、保持登记的次序。"""
+    root = os.path.abspath(root)
+    entries = []
+    for name in ("JUDGING_ENTRIES", "GPU_JUDGING_ENTRIES"):
+        entries += [f"{path}::{function}" for path, function in module_literal(root, "scripts/mutation/broad-mutation.py", name)]
+    entries += list(module_literal(root, "scripts/mutation/crates-mutation-rows.py", "JUDGING_ENTRIES"))
+    replay_script = module_literal(root, "scripts/gate/admission.py", "REPLAY_SCRIPT")
+    entries += [f"{replay_script}::{function}" for function in module_literal(root, "scripts/gate/admission.py", "REPLAY_JUDGING_FUNCTIONS")]
+    entries.append(f"scripts/experiment-apparatus/e165-pin-red-examples.py::{module_literal(root, 'scripts/experiment-apparatus/e165-pin-red-examples.py', 'JUDGING_ENTRY')}")
+    entries += [f"scripts/gate/verus-proof-check.py::{function}" for function in module_literal(root, "scripts/gate/verus-proof-check.py", "JUDGING_ENTRIES").values()]
+    for stage in sorted(glob.glob(os.path.join(root, JUDGING_ENTRY_STAGE_DIRECTORY, "*.sh"))):
+        with open(stage, encoding="utf-8") as handle:
+            text = handle.read()
+        relative = os.path.relpath(stage, root).replace(os.sep, "/")
+        for path, function in JUDGING_ENTRY_TOKEN.findall(text):
+            entries.append(f"{relative if '$STAGE_NAME' in path else path}::{function}")
+    return list(dict.fromkeys(entries))
+
+
+# ── import 时执行的模块级语句与不走的子进程边（文件头「Python 闭包：import 时执行的模块级语句」「不走的子进程边」）的自证 ──
+
+IMPORT_TIME_FIXTURE = {
+    "tool/entry.py": ("import sys\n\nimport helper\n\n\ndef judge():\n    return helper.verdict()\n\n\n"
+                      "if __name__ == \"__main__\":\n    sys.exit(judge())\n"),
+    "tool/helper.py": ("import os\n\nUNUSED = 0\n\n\nclass Settings:\n    threshold = 0\n\n    def __init__(self):\n        self.value = 1\n\n\n"
+                       "def verdict():\n    return 0\n\n\ndef unused(value=0):\n    return value\n"),
+}
+IMPORT_TIME_ENTRY = "tool/entry.py::judge"
+# 每一种改动：(名, 文件, 原文, 改成) —— 前四种是 import 时就执行、让 python3 tool/entry.py 退非 0 的模块级语句，末一种是对照：
+# 改的是程序入口（main-guard）、不在 judge 的闭包里，退出码变了而键不变，这一格的判法必须认出它
+IMPORT_TIME_EDITS = (
+    ("模块级 import", "tool/helper.py", "import os\n", "from os import missing_name_for_selftest\n"),
+    ("模块级赋值", "tool/helper.py", "UNUSED = 0\n", "UNUSED = int(\"selftest\")\n"),
+    ("类头", "tool/helper.py", "    threshold = 0\n", "    threshold = int(\"selftest\")\n"),
+    ("没人调的 def 的缺省值", "tool/helper.py", "def unused(value=0):", "def unused(value=int(\"selftest\")):"),
+)
+IMPORT_TIME_CONTROL = ("程序入口（main-guard）", "tool/entry.py", "    sys.exit(judge())\n", "    sys.exit(judge() + 3)\n")
+IMPORT_TIME_EXIT_CELL = "python：import 时执行的模块级 import、赋值、类头与 def 缺省值改了让程序退出码变的，入口的键都变（键不变而退出码变的必红，对照那一种必须认出）"
+IMPORT_TIME_CLASS_CELL = "python：只因 import 时执行收进来的类头不算被点名，类里的 __init__ 改了不作废"
+REAL_CUT_CELL = "真仓：不走 EXCLUDED_PROGRAM_EDGES 登记的那几条子进程边（内存包装起 host-resources.py、resource_release_broadcast.py），少掉的单元只经那几条边可达（把被起的程序都当另几个根一起收，与不切的逐个相同）"
+REAL_ENTRIES_CELL = "真仓：判法入口从登记现取（registered_judging_entries），形式化入口与包装入口都在里面、都认得出"
+REAL_TREE_IGNORED = shutil.ignore_patterns("__pycache__", "fixtures", "kb", "target")
+REAL_FORMAL_SCRIPT = "scripts/gate/verus-proof-check.py"
+REAL_WRAPPER_ENTRY = "scripts/mutation/broad-mutation.py::Runner.escalate_step"   # 升档那一步经内存包装起命令：闭包里有包装与它排队时载入的模块
+# 真仓上的四格：(格名, 入口取哪一个, 文件, 原文, 改成)；原文在那份文件里要恰好一次，对不上这一格红、出路是照新原文改这里
+REAL_IMPORT_TIME_EDITS = (
+    ("真仓：改 .claude/hooks/lib_long_run.py 一个模块级 import，形式化入口的键变", "formal", ".claude/hooks/lib_long_run.py", "\nimport re\n", "\nimport re, json\n"),
+    ("真仓：改 scripts/hosts/memory_peaks_lib.py 的 import subprocess，包装入口的键变", "wrapper", "scripts/hosts/memory_peaks_lib.py",
+     "\nimport subprocess\n", "\nimport subprocess, shlex\n"),
+    ("真仓：改 scripts/hosts/host-dispatch.py 的一个类头（SelftestWorld），包装入口的键变", "wrapper", "scripts/hosts/host-dispatch.py",
+     "\nclass SelftestWorld:\n", "\nclass SelftestWorld:\n    IMPORT_TIME_SELFTEST = 1\n"),
+    ("真仓：改一个没人调的 def 的缺省值（scripts/hosts/host-dispatch.py 的 decide），包装入口的键变", "wrapper", "scripts/hosts/host-dispatch.py",
+     "def decide(settings, request, prediction, peer, plan=False):", "def decide(settings, request, prediction, peer, plan=None):"),
+)
+LIBRARY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+_REAL_IMPORT_TIME_RESULTS = {}
+
+
+def run_fixture_program(base, path):
+    """夹具里的小程序跑一遍交退出码（60 秒没退交 None）。"""
+    try:
+        return subprocess.run([sys.executable, "-B", os.path.join(base, path)], cwd=base, capture_output=True, text=True, timeout=60).returncode
+    except subprocess.TimeoutExpired:
+        return None
+
+
+def import_time_exit_cell(work):
+    """每一种改动各在一棵新树上量（键、python3 tool/entry.py 的退出码）与原树比：退出码变了而键不变的记下；前四种一个都不许有，对照那一种必须有。"""
+    base = os.path.join(work, "base")
+    write_tree(base, IMPORT_TIME_FIXTURE)
+    before_key = closure_key(closure_of(base, IMPORT_TIME_ENTRY), allow_refused=True)[0]
+    before_exit = run_fixture_program(base, "tool/entry.py")
+    blind, lines = [], []
+    for name, path, old, new in IMPORT_TIME_EDITS + (IMPORT_TIME_CONTROL,):
+        tree = os.path.join(work, f"edit-{len(lines)}")
+        write_tree(tree, IMPORT_TIME_FIXTURE)
+        edit_file(tree, path, old, new)
+        key = closure_key(closure_of(tree, IMPORT_TIME_ENTRY), allow_refused=True)[0]
+        exit_code = run_fixture_program(tree, "tool/entry.py")
+        lines.append(f"{name}：退出码 {before_exit}→{exit_code}，键{'变' if key != before_key else '不变'}")
+        if exit_code != before_exit and key == before_key:
+            blind.append(name)
+    want = [IMPORT_TIME_CONTROL[0]]
+    return blind == want, f"键不变而退出码变的（要恰好是对照那一种 {want}）：{blind}；{'；'.join(lines)}"
+
+
+def real_tree(work):
+    """本仓的 scripts/ 与 .claude/（不带 fixtures、kb、__pycache__）拷进临时目录：改真文件的几格在拷贝上改，不碰本仓。"""
+    tree = os.path.join(work, "real")
+    for top in ("scripts", ".claude"):
+        shutil.copytree(os.path.join(LIBRARY_ROOT, top), os.path.join(tree, top), ignore=REAL_TREE_IGNORED, symlinks=True)
+    return tree
+
+
+def real_entries(root):
+    """(形式化入口, 包装入口)：都从登记现取；形式化入口取 verus-proof-check.py 登记的头一个，包装入口要在登记里。"""
+    entries = registered_judging_entries(root)
+    formal = next((entry for entry in entries if entry.startswith(REAL_FORMAL_SCRIPT + "::")), None)
+    if formal is None or REAL_WRAPPER_ENTRY not in entries:
+        raise AssertionError(f"登记现取的 {len(entries)} 个判法入口里没有 {REAL_FORMAL_SCRIPT} 的入口或 {REAL_WRAPPER_ENTRY}：{entries}")
+    return formal, REAL_WRAPPER_ENTRY
+
+
+def real_import_time_results():
+    """真仓四格一起量（一棵拷贝、两个入口的原键各算一次）：{格名: (通过, 说明)}；同一个进程、同一组弄坏开关只量一次。"""
+    breaks = os.environ.get(BREAK_VARIABLE, "")
+    if breaks not in _REAL_IMPORT_TIME_RESULTS:
+        results = {}
+        with tempfile.TemporaryDirectory(prefix="function-units-real-tree-") as work:
+            tree = real_tree(work)
+            entries = dict(zip(("formal", "wrapper"), real_entries(tree)))
+            base_keys = {role: closure_key(closure_of(tree, entry), allow_refused=True)[0] for role, entry in entries.items()}
+            for name, role, path, old, new in REAL_IMPORT_TIME_EDITS:
+                absolute = os.path.join(tree, path)
+                with open(absolute, encoding="utf-8") as handle:
+                    original = handle.read()
+                if original.count(old) != 1:
+                    results[name] = (False, f"{path} 里「{old.strip()}」命中 {original.count(old)} 次（要恰好一次）：那份文件改了，照新原文改 REAL_IMPORT_TIME_EDITS")
+                    continue
+                with open(absolute, "w", encoding="utf-8") as handle:
+                    handle.write(original.replace(old, new))
+                try:
+                    key = closure_key(closure_of(tree, entries[role]), allow_refused=True)[0]
+                finally:
+                    with open(absolute, "w", encoding="utf-8") as handle:
+                        handle.write(original)
+                results[name] = (key != base_keys[role], f"{entries[role]} 的键改前 {base_keys[role]}、改后 {key}")
+        _REAL_IMPORT_TIME_RESULTS[breaks] = results
+    return _REAL_IMPORT_TIME_RESULTS[breaks]
+
+
+def real_import_time_cell(name):
+    def judge(_work):
+        return real_import_time_results()[name]
+    return judge
+
+
+def real_cut_cell(work):
+    """形式化入口：不切（弄坏开关 program-edge-exclusions-ignored）的闭包、切了的闭包、切了之后把登记的每个被起的程序都当另一个根一起收的闭包；
+    少掉的不空、切了的闭包里没有被起的程序的单元、一起收的与不切的逐个相同（少掉的单元只经登记的那几条边可达）。"""
+    tree = real_tree(work)
+    formal, _wrapper = real_entries(tree)
+    targets = sorted({target for _source, _unit_name, target in EXCLUDED_PROGRAM_EDGES})
+    edges = "；".join(f"{source} 的 {unit_name} 起 {target}" for source, unit_name, target in sorted(EXCLUDED_PROGRAM_EDGES))
+    language, path, qualified = parse_entry(tree, formal)
+
+    def members(extra=(), uncut=False):
+        previous = os.environ.get(BREAK_VARIABLE)
+        if uncut:
+            os.environ[BREAK_VARIABLE] = ",".join(item for item in [previous, "program-edge-exclusions-ignored"] if item)
+        try:
+            under = [place for place in DEFAULT_SCRIPT_DIRECTORIES if os.path.isdir(os.path.join(tree, place))]
+            script = ScriptClosure(tree, list(dict.fromkeys(under + [posixpath.dirname(path) or "."])))
+            module = script.python.module(path)
+            starts = [unit for unit in module.units if unit.name == qualified and not unit.data]
+            for target in extra:
+                script.push_program(target, None)
+            return {unit.text() for unit in script.run(starts).order}
+        finally:
+            if previous is None:
+                os.environ.pop(BREAK_VARIABLE, None)
+            else:
+                os.environ[BREAK_VARIABLE] = previous
+
+    cut, uncut, joint = members(), members(uncut=True), members(extra=targets)
+    lost = uncut - cut
+    targets_left = {target: sum(1 for line in cut if f"\t{target}:" in line) for target in targets}
+    targets_lost = {target: sum(1 for line in lost if f"\t{target}:" in line) for target in targets}
+    ok = bool(lost) and not any(targets_left.values()) and all(targets_lost.values()) and joint == uncut
+    return ok, (f"{formal}：不切 {len(uncut)} 个、切了 {len(cut)} 个、少掉 {len(lost)} 个；切了还剩的被起程序单元 {targets_left}、少掉的里各有 {targets_lost}；"
+                f"把 {'、'.join(targets)} 当另几个根一起收比不切多 {len(joint - uncut)} 个、少 {len(uncut - joint)} 个（边：{edges}）")
+
+
+def real_entries_cell(work):
+    tree = real_tree(work)
+    entries = registered_judging_entries(tree)
+    formal, wrapper = real_entries(tree)
+    unknown = []
+    for entry in entries:
+        language, path, qualified = parse_entry(tree, entry)
+        if not os.path.isfile(os.path.join(tree, path)):
+            unknown.append(entry)
+    return not unknown and len(entries) > 2, f"登记现取 {len(entries)} 个判法入口（形式化入口 {formal}、包装入口 {wrapper}），文件不在的 {unknown}"
+
+
+def import_time_cells():
+    return [
+        (IMPORT_TIME_EXIT_CELL, import_time_exit_cell),
+        (IMPORT_TIME_CLASS_CELL, compare_cell(IMPORT_TIME_FIXTURE, IMPORT_TIME_ENTRY, "tool/helper.py", "        self.value = 1\n", "        self.value = 2\n", "same")),
+        (REAL_ENTRIES_CELL, real_entries_cell),
+    ] + [(name, real_import_time_cell(name)) for name, _role, _path, _old, _new in REAL_IMPORT_TIME_EDITS] + [(REAL_CUT_CELL, real_cut_cell)]
+
+
+# 产品行为视图（文件头「判定种类」）那几格：Rust 那一份的替身是「照 crates/singlefs-unit-graph 的剥法手工剥过的拷贝（剥掉的换成空格、换行留着）
+# 照原样切出的 dump」，不起 cargo、不编；起 unit-graph 的那一条路由一个只认 dump --judgment-kind product-behavior 的假程序走一趟
+PRODUCT_VIEW_FILE = "crates/fverus/src/lib.rs"
+PRODUCT_VIEW_ENTRY = f"{PRODUCT_VIEW_FILE}::caller"
+PRODUCT_VIEW_SOURCE = """verus! {
+pub open spec fn doubled(x: u64) -> u64 {
+    x * 2
+}
+proof fn lemma_doubled_is_even(x: u64)
+    ensures
+        doubled(x) % 2 == 0,
+{
+    assert(doubled(x) == x * 2);
+}
+pub fn scaled(x: u64) -> (r: u64)
+    requires
+        x < 1000,
+    ensures
+        r == doubled(x),
+{
+    proof {
+        lemma_doubled_is_even(x);
+    }
+    helper(x) * 2
+}
+fn helper(x: u64) -> u64 {
+    x + 0
+}
+} // verus!
+pub fn caller() -> u64 {
+    scaled(3)
+}
+"""
+# 只给 Verus 看的那几段：spec 与 proof 函数整条、具名返回值的「(r:」与「)」、requires 与 ensures、函数体里的 proof 块
+PRODUCT_VIEW_GHOST_PIECES = (
+    "pub open spec fn doubled(x: u64) -> u64 {\n    x * 2\n}",
+    "proof fn lemma_doubled_is_even(x: u64)\n    ensures\n        doubled(x) % 2 == 0,\n{\n    assert(doubled(x) == x * 2);\n}",
+    "(r: ",
+    ")\n    requires\n        x < 1000,\n    ensures\n        r == doubled(x),",
+    "proof {\n        lemma_doubled_is_even(x);\n    }",
+)
+PRODUCT_VIEW_FIXTURE = {
+    "crates/fverus/Cargo.toml": '[package]\nname = "fverus"\n',
+    PRODUCT_VIEW_FILE: PRODUCT_VIEW_SOURCE,
+    "crates/fplain/Cargo.toml": '[package]\nname = "fplain"\n',
+    "crates/fplain/src/lib.rs": "pub fn plain() -> u32 {\n    7\n}\n",
+}
+PRODUCT_VIEW_LEMMA_CELL = "产品行为视图：引理里加一句 assert(true);，产品行为键不变、形式化键变"
+PRODUCT_VIEW_ENSURES_CELL = "产品行为视图：verus! 里执行函数的 ensures 改了，产品行为键不变"
+PRODUCT_VIEW_EXECUTABLE_CELL = "产品行为视图：verus! 里被调到的执行代码改了，产品行为键变"
+
+
+def product_view_files(edit=None):
+    """→ (原样那一份的文件表, 剥过的那一份)：edit 是 (旧串, 新串)，两份照改（落在被剥那几段里的，剥过的那一份照样剥掉）。"""
+    source, pieces = PRODUCT_VIEW_SOURCE, list(PRODUCT_VIEW_GHOST_PIECES)
+    if edit is not None:
+        old, new = edit
+        if source.count(old) != 1:
+            raise AssertionError(f"产品行为视图样本里「{old.strip()}」命中 {source.count(old)} 次（要恰好一次）")
+        source = source.replace(old, new)
+        pieces = [piece.replace(old, new) for piece in pieces]
+    blanked = source
+    for piece in pieces:
+        if blanked.count(piece) != 1:
+            raise AssertionError(f"产品行为视图样本里要剥的「{piece[:40]}」命中 {blanked.count(piece)} 次（要恰好一次）")
+        blanked = blanked.replace(piece, "".join(character if character == "\n" else " " for character in piece))
+    return dict(PRODUCT_VIEW_FIXTURE, **{PRODUCT_VIEW_FILE: source}), dict(PRODUCT_VIEW_FIXTURE, **{PRODUCT_VIEW_FILE: blanked})
+
+
+def product_view_dump_of(work, blanked_files):
+    """Rust 那一份的替身：剥过的那一份照原样切出的 dump 行（单元行与拒算行）。"""
+    base = os.path.join(work, "blanked")
+    shutil.rmtree(base, ignore_errors=True)
+    write_tree(base, blanked_files)
+    unit_lines, refusal_lines, _counts = dump_lines(base, "rust")
+    return unit_lines + refusal_lines
+
+
+def product_view_key(work, files, dump, kind=PRODUCT_BEHAVIOR, entry=PRODUCT_VIEW_ENTRY):
+    """→ (键或 None, 拒算形态的集合)：dump 是交给库的 Rust 那一份（None 是要用时起 unit-graph）。"""
+    base = os.path.join(work, "tree")
+    shutil.rmtree(base, ignore_errors=True)
+    write_tree(base, files)
+    options = Options()
+    options.judgment_kind, options.product_dump = kind, dump
+    return fixture_key(base, entry, options)
+
+
+def product_view_lemma_cell(work):
+    original, blanked = product_view_files()
+    edited, edited_blanked = product_view_files(("    assert(doubled(x) == x * 2);\n", "    assert(true);\n    assert(doubled(x) == x * 2);\n"))
+    before, before_forms = product_view_key(work, original, product_view_dump_of(work, blanked))
+    after, after_forms = product_view_key(work, edited, product_view_dump_of(work, edited_blanked))
+    formal_before, _ = product_view_key(work, original, None, FORMAL_VERIFICATION)
+    formal_after, _ = product_view_key(work, edited, None, FORMAL_VERIFICATION)
+    ok = before is not None and before == after and formal_before is not None and formal_after is not None and formal_before != formal_after
+    return ok, (f"产品行为键改前 {before}、改后 {after}（拒算 {sorted(before_forms | after_forms)}）；形式化键改前 {formal_before}、改后 {formal_after}")
+
+
+def product_view_compare_cell(edit, want):
+    def judge(work):
+        original, blanked = product_view_files()
+        edited, edited_blanked = product_view_files(edit)
+        before, before_forms = product_view_key(work, original, product_view_dump_of(work, blanked))
+        after, after_forms = product_view_key(work, edited, product_view_dump_of(work, edited_blanked))
+        if before is None or after is None:
+            return False, f"拒算了：改前 {sorted(before_forms)}，改后 {sorted(after_forms)}"
+        got = "changed" if before != after else "same"
+        return got == want, f"期望 {want}，实际 {got}"
+    return judge
+
+
+def product_view_refused_cell(mangle, form):
+    """Rust 那一份的 dump 经 mangle 改一处，入口的闭包要拒算 form。"""
+    def judge(work):
+        original, blanked = product_view_files()
+        key, forms = product_view_key(work, original, mangle(product_view_dump_of(work, blanked)))
+        return key is None and form in forms, f"要拒算 {form}，实际键 {'有' if key else '无'}、拒算 {sorted(forms)}"
+    return judge
+
+
+def product_view_extra_unit(lines):
+    return lines + [f"fn\tfverus::phantom\t{PRODUCT_VIEW_FILE}:30-31\t{'0' * 64}"]
+
+
+def product_view_outside_unit_missing(lines):
+    return [line for line in lines if not line.startswith("fn\tfverus::caller\t")]
+
+
+def product_view_block_unparsed(lines):
+    return lines + [f"refused\t{VERUS_GHOST_CODE_UNPARSED}\t{PRODUCT_VIEW_FILE}:1\tverus! {{"]
+
+
+def with_unit_graph_directory(directory, action):
+    """FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY 临时设成 directory 跑 action，跑完照原样恢复。"""
+    previous = os.environ.get(UNIT_GRAPH_DIRECTORY_VARIABLE)
+    os.environ[UNIT_GRAPH_DIRECTORY_VARIABLE] = directory
+    try:
+        return action()
+    finally:
+        if previous is None:
+            os.environ.pop(UNIT_GRAPH_DIRECTORY_VARIABLE, None)
+        else:
+            os.environ[UNIT_GRAPH_DIRECTORY_VARIABLE] = previous
+
+
+def product_view_unavailable_cell(work):
+    original, _blanked = product_view_files()
+
+    def keys():
+        return product_view_key(work, original, None), product_view_key(work, original, None, entry="crates/fplain/src/lib.rs::plain")
+    (key, forms), (plain_key, plain_forms) = with_unit_graph_directory(os.path.join(work, "nowhere"), keys)
+    return (key is None and "product-view-unavailable" in forms and plain_key is not None,
+            f"有 verus! 块那一份的入口：键 {'有' if key else '无'}、拒算 {sorted(forms)}（要拒算 product-view-unavailable）；没有的那一份：键 {plain_key}、拒算 {sorted(plain_forms)}")
+
+
+def product_view_program_cell(work):
+    original, blanked = product_view_files()
+    dump = product_view_dump_of(work, blanked)
+    expected, _forms = product_view_key(work, original, dump)
+    program_directory = os.path.join(work, "bin")
+    os.makedirs(program_directory)
+    dump_file, call_log = os.path.join(work, "product-view.txt"), os.path.join(work, "calls.txt")
+    with open(dump_file, "w", encoding="utf-8") as handle:
+        handle.write("".join(line + "\n" for line in dump))
+    program = os.path.join(program_directory, "unit-graph")
+    with open(program, "w", encoding="utf-8") as handle:
+        handle.write(f'#!/bin/bash\n[[ "$1 $3 $4" == "dump --judgment-kind {PRODUCT_BEHAVIOR}" && $# == 4 ]] || exit 2\n'
+                     f'printf "%s\\n" "$2" >> {shlex.quote(call_log)}\ncat {shlex.quote(dump_file)}\n')
+    os.chmod(program, 0o755)
+    got, forms = with_unit_graph_directory(program_directory, lambda: product_view_key(work, original, None))
+    formal, _formal_forms = with_unit_graph_directory(program_directory, lambda: product_view_key(work, original, None, FORMAL_VERIFICATION))
+    calls = open(call_log, encoding="utf-8").read().split("\n")[:-1] if os.path.isfile(call_log) else []
+    listed = dump_lines(os.path.join(work, "tree"), "rust", judgment_kind=PRODUCT_BEHAVIOR, product_dump=dump)[0]
+    ghost_listed = [line for line in listed if "doubled" in line.split("\t")[1]]
+    ok = got is not None and got == expected and formal is not None and calls == [os.path.join(work, "tree")] and not ghost_listed
+    return ok, (f"起假程序算的键 {got}（拒算 {sorted(forms)}），交 dump 算的键 {expected}；假程序被起 {len(calls)} 次 {calls}（只该产品行为那一趟起一次、根是 tree）；"
+                f"产品行为视图的 dump 里还列着只给 Verus 看的 {ghost_listed}")
+
+
+def product_view_cells():
+    return [
+        (PRODUCT_VIEW_LEMMA_CELL, product_view_lemma_cell),
+        (PRODUCT_VIEW_ENSURES_CELL, product_view_compare_cell(("        r == doubled(x),", "        r == doubled(x) + 0,"), "same")),
+        (PRODUCT_VIEW_EXECUTABLE_CELL, product_view_compare_cell(("    x + 0\n", "    x + 1\n"), "changed")),
+        ("产品行为视图：Rust 那一份交的单元这一份没切出，拒算 product-view-unmatched", product_view_refused_cell(product_view_extra_unit, "product-view-unmatched")),
+        ("产品行为视图：verus! 块外的单元 Rust 那一份没交，拒算 product-view-unmatched", product_view_refused_cell(product_view_outside_unit_missing,
+                                                                                                "product-view-unmatched")),
+        ("产品行为视图：Rust 那一份解不开 verus! 那一块，链接到它的闭包拒算 verus-ghost-code-unparsed",
+         product_view_refused_cell(product_view_block_unparsed, VERUS_GHOST_CODE_UNPARSED)),
+        ("产品行为视图：拿不到 Rust 那一份，有 verus! 块的文件拒算 product-view-unavailable，别的文件照算", product_view_unavailable_cell),
+        ("产品行为视图：没交 dump 时起 FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY 里的 unit-graph（只起产品行为那一趟），dump 不列只给 Verus 看的单元",
+         product_view_program_cell),
+    ]
+
+
 def selftest_cells():
     cells = []
     for name, entry, path, old, new, want in RUST_FIXTURE_CASES:
@@ -9594,6 +10352,7 @@ def selftest_cells():
         ("认不出的 cfg 谓词拒算", refused_cell(RUST_FIXTURE, f"{RUST_FIXTURE_ENTRY_FILE}::judge_speed", "cfg-unrecognized",
                                          ("crates/fextra/src/lib.rs", '#[cfg(feature = "fast")]', "#[cfg(accessible(fast))]"))),
         ("括号配不上的文件整份拒算", rust_unbalanced_cell),
+        (MANIFEST_ROOT_CELL, manifest_root_cell),
         ("WGSL 里没定义、Rust 串里也没有的名字拒算", wgsl_undefined_cell),
         ("dump 的单元行形态（带路径的宏、verus! 两个 fn、impl 头与方法）", rust_dump_cell),
         ("python：只改注释不作废", compare_cell(PYTHON_FIXTURE, "pkg/a.py::entry", "pkg/a.py", "    # 只是注释\n", "    # 只是注释，改了措辞\n", "same")),
@@ -9601,6 +10360,12 @@ def selftest_cells():
         ("python：有单元读 __doc__ 时改文档串作废", compare_cell(PYTHON_FIXTURE, "pkg/a.py::described", "pkg/a.py", '"""helper 的文档串"""',
                                                          '"""helper 的文档串，改了"""', "changed")),
         ("python：getattr 变量名拒算", refused_cell(PYTHON_FIXTURE, "pkg/a.py::dynamic", "getattr-variable")),
+        ("python：globals 只查询 __file__ 不拒算", no_refusal_cell(
+            {"sample.py": 'def entry():\n    return globals().get("__file__")\n'}, "sample.py::entry")),
+        ("python：globals 动态查询仍拒算", refused_cell(
+            {"sample.py": 'def entry(name):\n    return globals().get(name)\n'}, "sample.py::entry", "globals-lookup")),
+        ("python：globals 查询其他固定名字仍拒算", refused_cell(
+            {"sample.py": 'def entry():\n    return globals().get("handler")\n'}, "sample.py::entry", "globals-lookup")),
         ("python：getattr(<标准库模块>, 变量名) 不拒算（够不到仓里的代码）", no_refusal_cell(PYTHON_FIXTURE, "pkg/f.py::patched_os_function")),
         ("python：os.environ.get(…) or <缺省路径> 按缺省折，连到那份脚本", compare_cell(PYTHON_FIXTURE, "pkg/h.py::stop", "pkg/c.py", "    return 5", "    return 50", "changed")),
         ("python：自己写出字面文本再起的脚本不拒算", no_refusal_cell(PYTHON_FIXTURE, "pkg/h.py::run_stub")),
@@ -9656,6 +10421,8 @@ def selftest_cells():
     cells += alignment_cells()
     cells += closure_rule_cells()
     cells += unit_divergence_cells()
+    cells += import_time_cells()
+    cells += product_view_cells()
     return cells
 
 
@@ -9710,6 +10477,7 @@ BREAK_CELLS = (
     ("rust-trait-impl-edges-dropped", ("运算符重载", "Drop 隐式调用", "关联常量（经泛型）")),
     ("rust-verus-segments-ignored", ("verus! 里 ensures 带花括号：下一个函数照样切开，改它作废", "verus! 里够不到的函数改了不作废")),
     ("rust-cfg-ignored", ("cfg(feature) 关着的单元改了不作废", "认不出的 cfg 谓词拒算")),
+    ("rust-manifest-directory-reads-unrefused", (MANIFEST_ROOT_CELL,)),
     ("rust-doc-comments-kept", ("只改文档注释不作废", "改文档注释里的代码块：入口 fn 不作废")),
     ("wgsl-raw-text", ("WGSL 只改注释不作废", "WGSL 够不到的函数改了不作废")),
     ("python-comments-kept", ("python：只改注释不作废",)),
@@ -9807,6 +10575,13 @@ BREAK_CELLS = (
     ("rust-includes-outside-root-refused", ("include_str! 读根外的文件：读得到收成数据单元、改它键变，读不到拒算 include-missing",)),
     ("rust-blanket-self-parameter-only", ("R-方法：自身类型里出现泛型参数的 impl（(T, u32)、[T]、[T; N]、Box<T>、Option<Box<T>>、Sealed<T>）都按 blanket 放行，改 Sealed<T> 那一份作废",)),
     ("wgsl-other-file-definitions-unlinked", ("WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义：读它的 Rust 单元与那份 .wgsl 拉进闭包，改那个常量作废",)),
+    ("python-import-time-statements-ignored", (IMPORT_TIME_EXIT_CELL,)),
+    ("python-def-heads-ignored", (IMPORT_TIME_EXIT_CELL,)),
+    ("python-import-time-classes-named", (IMPORT_TIME_CLASS_CELL,)),
+    ("program-edge-exclusions-ignored", (REAL_CUT_CELL,)),
+    ("program-edge-exclusions-shell-ignored", (REAL_CUT_CELL,)),
+    ("product-view-kept-formal", (PRODUCT_VIEW_LEMMA_CELL, PRODUCT_VIEW_ENSURES_CELL)),
+    ("product-view-strips-executable-code", (PRODUCT_VIEW_EXECUTABLE_CELL,)),
 )
 
 
@@ -9865,7 +10640,7 @@ def selftest():
 # ── 命令行 ──────────────────────────────────────────────────────────────────
 
 VALUE_OPTIONS = ("--language", "--under", "--target", "--cfg", "--feature", "--toolchain", "--dependency", "--external", "--wgsl-module",
-                 "--rust-strings-entry")
+                 "--rust-strings-entry", "--judgment-kind")
 
 
 def parse_options(arguments):
@@ -9902,6 +10677,8 @@ def parse_options(arguments):
                 options.language = value
             elif argument == "--target":
                 options.target = value
+            elif argument == "--judgment-kind":
+                options.judgment_kind = value
             else:
                 options.rust_strings_entry = value
             i += 2
@@ -9912,6 +10689,8 @@ def parse_options(arguments):
         i += 1
     if options.language not in (None, "rust", "python", "shell", "wgsl"):
         raise UsageError(f"--language 只认 rust、python、shell、wgsl：{options.language}")
+    if options.judgment_kind not in JUDGMENT_KINDS:
+        raise UsageError(f"--judgment-kind 只认 {'、'.join(JUDGMENT_KINDS)}：{options.judgment_kind}")
     return options, positional
 
 
@@ -9928,7 +10707,7 @@ def main(arguments):
             if not os.path.isdir(root):
                 raise FunctionUnitsError(f"根不在：{root}")
             started = time.monotonic()
-            unit_lines, refusal_lines, counts = dump_lines(root, options.language, options.under or None)
+            unit_lines, refusal_lines, counts = dump_lines(root, options.language, options.under or None, options.judgment_kind)
             for line in unit_lines + refusal_lines:
                 print(line)
             summary = "、".join(f"{language} {count}" for language, count in sorted(counts.items()))
@@ -9958,10 +10737,16 @@ def main(arguments):
             return 0
         if command == "controls" and len(positional) == 1:
             return run_controls(positional[0])
+        if command == "entries" and len(positional) == 1:
+            entries = registered_judging_entries(positional[0])
+            for entry in entries:
+                print(entry)
+            print(f"  ✓ 从登记现取 {len(entries)} 个判法入口", file=sys.stderr)
+            return 0
         raise UsageError(f"认不出的用法：{' '.join(arguments)}")
     except UsageError as error:
         print(f"  ✗ 用法错：{error}", file=sys.stderr)
-        print("    → 怎么办：照文件头「用法」一段给参数（dump <根> | closure <根> <入口> | key <根> <入口> | controls <根> | --selftest）", file=sys.stderr)
+        print("    → 怎么办：照文件头「用法」一段给参数（dump <根> | closure <根> <入口> | key <根> <入口> | controls <根> | entries <根> | --selftest）", file=sys.stderr)
         return 2
     except (FunctionUnitsError, OSError) as error:
         print(f"  ✗ 算不出：{error}", file=sys.stderr)

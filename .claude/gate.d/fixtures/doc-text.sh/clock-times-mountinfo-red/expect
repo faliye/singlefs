@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：clock-times
+want=3 行在描述里写了钟点
+want=records/mountinfo-near.md:1  不挨日期时区的钟点
+want=records/mountinfo-near.md:2  不挨日期时区的钟点
+want=records/mountinfo-near.md:3  不挨日期时区的钟点
+want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=  clock-times：红（退出 1）
+want=doc-text.sh：1 格里 1 格红（clock-times）

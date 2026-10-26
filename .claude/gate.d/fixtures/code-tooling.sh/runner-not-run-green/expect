@@ -1,0 +1,4 @@
+exit=0
+want=本次未跑 1 条（自证退 77：自己造不出前提，不算通过、不记库，下一趟照跑）：「bash scripts/gate/sample-not-run-b.sh --selftest」
+want=research 脚本的自证判了的都通过、本次未跑 1 条：「bash scripts/gate/sample-not-run-b.sh --selftest」（这一格跑了 2 条，表取自 样本根的 .selftest-runners
+want=research-script-selftests：绿

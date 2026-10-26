@@ -1,0 +1,12 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：third-txn-hooks
+want=删除写出的字节的三处挂钩对不上 7 处
+want=「退役容器」的「里程碑那一步」写「第 50 批」，没点名登记这份表的那一步 三·6
+want=「谱系容器」指作业点 三·9，而 .claude/kb/milestone/03-third-txn.md 里没有「| 三·9 |」那一行
+want=「残行」这一行 4 格，表头 5 格
+want=引 layout/01「没有这一节」，而 .claude/kb/layout/01-first-txn.md 没有这一节，也没有一行首格是它
+want=引段序列登记表「不存在的路径」那一行
+want=出处点名的 renamed_function 在 crates/sample/tests/unlink_sample.rs 里找不到 fn
+want=出处点名的 crates/sample/tests/missing.rs 在仓里不存在
+want=third-txn-hooks：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（third-txn-hooks）

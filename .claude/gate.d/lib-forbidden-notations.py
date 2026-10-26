@@ -46,6 +46,8 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
   时区偏移、小数；前面是反引号而小时只有一位的，是反引号里的键（`3:10`）；
 - 紧跟在后面的是 %、「.数字」或「-字母」：百分比、「分:秒.百分之一秒」（time -v 的格式）、带编号的阶段文件名（「20:09-sample-stage.sh」这类）；
 - 紧跟在后面的是 = 或 /、或紧挨在前面的是 @ 或 ;：产物行里「槽:代=ok@槽:代」「rows=槽:代/…;槽:代/…」这类键值对与分隔列表；
+- mountinfo 一行里的主:次设备号（`/proc/<进程>/mountinfo` 的「挂载号 父挂载号 主:次设备号 根路径 挂载点 …」，Rust 多行字符串里的续行加不了放行标记）：
+  冒号对前面是「数字 空格 数字 空格」（挂载号与父挂载号），后面是「 /根路径 /挂载点」。只认这一个形态，缺一头的（只有一个挂载号、后面不是路径）照判；
 - 同一句里（句的边界是 。！？，没有这几个就是整行；「；」不算）有取值出了钟点范围的冒号对（时大于 23、分大于 59、一边三位或分只有一位）或「文件:行号」（「.md:42」这类）的，
   这一句里的冒号对按「门禁号:行号」「决策号:行号」这类编号读；别的句子里的冒号对不受它牵连。
 ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（产物行的字段值，「taken_jst=<日期>T<钟点>」这类）。
@@ -60,6 +62,8 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
   紧凑时间戳那一条判据行的键是 iso-compact-timestamp，写进上面的 <判据行键> 关掉它时 clock-times-red 里 records/iso-compact.md 那六行必须报不出来。
   同一个变量另认一项 first-hit-only：all_hits 只交最靠前的那一处（退回只报第一处的旧样子）；
   打开时 write-guard.sh --selftest 的「钟点:两处都报（行号与总数）」「会话号:两处都报（行号与总数）」两格必须判红。
+  同一个变量另认一项 mountinfo-device-numbers：mountinfo 一行里的主:次设备号不放过（退回改前，当钟点判）；
+  打开时 doc-text.sh 的 clock-times-green 里 records/colon-pairs.md 的 mountinfo 那两行必须判红（clock-times-mountinfo-red 不受影响，它本来就红）。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>：那几条判据行的上下文规则不生效，命中一律算违例。
   打开时 doc-text.sh 的 clock-times-green 样本里的冒号对、write-guard.sh --selftest 里靠上下文放行的格必须判红，证放行靠的是上下文规则。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=<形态键>：那几种形态的放行标记不认。
@@ -132,6 +136,19 @@ def sentence_around(line, match):
     return line[start:min(ends) if ends else len(line)]
 
 
+# mountinfo 一行的开头：「挂载号 父挂载号 主:次设备号 根路径 挂载点 …」；设备号前面是两个十进制数各带一个空格，后面是「 /根路径 /挂载点」
+MOUNTINFO_IDS_BEFORE = re.compile(r'(?<![\w:.])\d+ \d+ $')
+MOUNTINFO_PATHS_AFTER = re.compile(r' /\S* /')
+
+
+def is_mountinfo_device_number(line, match):
+    """冒号对是 mountinfo 一行里的主:次设备号。弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK=mountinfo-device-numbers 时一律不是。"""
+    if 'mountinfo-device-numbers' in environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK'):
+        return False
+    return (MOUNTINFO_IDS_BEFORE.search(line[:match.start()]) is not None
+            and MOUNTINFO_PATHS_AFTER.match(line[match.end():]) is not None)
+
+
 def bare_clock_is_not_clock(line, match):
     """不挨日期时区的钟点那一行的上下文规则：True 是这一处按上下文不是钟点。"""
     before, after = line[:match.start()], line[match.end():]
@@ -142,6 +159,8 @@ def bare_clock_is_not_clock(line, match):
     if after.startswith('%') or re.match(r'\.\d|-[A-Za-z]', after):
         return True
     if after.startswith(('=', '/')) or before.endswith(('@', ';')):
+        return True
+    if is_mountinfo_device_number(line, match):
         return True
     return numbered_pairs_in(sentence_around(line, match))
 
@@ -215,6 +234,48 @@ FORMS = (
             ('research/prompts/m3-close-noncode-sync.md', '冻结证据：阶段同步记录整行抄录记录里的旧文，旧文带钟点'),
             ('research/prompts/agentdef-r2-main-verification.md', '冻结证据：那一轮的判决，里面「决策号:行号」写法的冒号对（决策 06 的第 42 行）不是钟点，同一句里没有「文件:行号」可认'),
             ('research/results/e142-mutate-r25-s1-2026-10-13.log', '实验产物：变异驱动的原样输出带时间戳，复跑要逐字相同'),
+            ('research/results/e71-accounting-keys-single-generation-mutations-2026-10-20.log', '实验产物：变异驱动的原样输出，内存包装报的上一次峰值带量的时间戳'),
+            ('.claude/hooks/fixtures/runner-dispatch-guard/real-prompts/', '钩子样本：派发闸自证读的真派发提示原样，提示里抄的钟点与时间戳是被测输入'),
+            ('research/prompts/_rot-defs-r2-background.md', '冻结证据：那一轮的材料原样贴了 git log 输出，Date 行带提交的机器时间'),
+            ('research/prompts/_rot-defs-r2-body.md', '冻结证据：那一轮的材料原样贴了 git log 输出，Date 行带提交的机器时间'),
+            ('research/prompts/apparatus-rename-r1-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入'),
+            ('research/prompts/batch-2026-10-21-facts.tsv', '冻结证据：那一批的事实表，举了被误判成钟点的设备号写法，不是钟点'),
+            ('research/prompts/batch-2026-10-21-judge-6.md', '冻结证据：那一批的判决，「文件:行号」写法的冒号对不是钟点，同一句里没有带后缀的文件名可认'),
+            ('research/prompts/landing-audit-r1-opus-model/tools/outcome_check.py', '冻结证据：腿的工具，按会话记录的时区切天，时区词是代码字面'),
+            ('research/prompts/landing-audit-r1-snapshot/judged-vs-index.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里带时区词的代码'),
+            ('research/prompts/landing-audit-r2-opus-model/', '冻结证据：腿的模型目录，会话记录的原样导出与探针里的时间戳、时区词是被测输入'),
+            ('research/prompts/landing-audit-r2-opus-output.md', '冻结证据：腿的报告，论证的就是按哪个时区切天'),
+            ('research/prompts/landing-audit-r2-snapshot/judged-vs-index.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里带时区词的代码'),
+            ('research/prompts/landing-audit-r3-opus-model/', '冻结证据：腿的模型目录，会话记录的原样导出、真派发提示与探针里的时间戳、时区词是被测输入'),
+            ('research/prompts/landing-audit-r3-opus-output.md', '冻结证据：腿的报告，论证的就是按哪个时区切天，抄了窗口边界的时间戳'),
+            ('research/prompts/landing-audit-r3-snapshot/judged-vs-index.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里带时区词的代码'),
+            ('research/prompts/landing-audit-r4-opus-model/probes/naming_probe.py', '冻结证据：腿的探针，造会话记录的时间戳是被测输入'),
+            ('research/prompts/landing-audit-r4-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词与运行目录名'),
+            ('research/prompts/apparatus-rename-r2-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/apparatus-rename-r2-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入'),
+            ('research/prompts/apparatus-rename-r2-sonnet-model/tools/probe_h3.py', '冻结证据：腿的探针，样本行里的钟点是被测输入'),
+            ('research/prompts/landing-audit-r5-opus-model/', '冻结证据：腿的模型目录，被判钩子的原件、会话记录导出与探针里的时间戳、时区词是被测输入'),
+            ('research/prompts/landing-audit-r5-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词与运行目录名'),
+            ('research/prompts/landing-audit-r6-opus-model/', '冻结证据：腿的模型目录，被判钩子的原件、探针与它的输出里的时间戳、时区词是被测输入'),
+            ('research/prompts/landing-audit-r6-opus-output.md', '冻结证据：腿的报告，抄了探针输出里按时区切日期的汇总行'),
+            ('research/prompts/landing-audit-r6-snapshot/judged-vs-head.diff', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词、运行目录名与真派发提示'),
+            ('research/prompts/m3-close-c506-r2-opus-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m3-close-c656-r1-opus-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m3-close-c656-r2-sonnet-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m3-close-reuse-closure-r1-opus-model/', '冻结证据：腿的模型目录，造现场的时间戳与内存包装打出的起跑时间戳是被测输入与原样输出'),
+            ('research/prompts/m3-close-reuse-closure-r2-opus-model/', '冻结证据：腿的模型目录，造现场的时间戳与内存包装打出的起跑时间戳是被测输入与原样输出'),
+            ('research/prompts/m4-c860-r1-opus-s2-model/patches/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m4-c860-r1-sonnet-model/patch/', '冻结证据：腿的补丁目录，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m4-i315-r1-sonnet-model/probes/instrumentation.patch', '冻结证据：腿的探针补丁，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/m4-publish-lookup-code-r1-snapshot/reversal/b6-c860/', '冻结证据：那一轮回滚核对留的 diff 与说明，diff 头与说明里是拷贝时的机器时间'),
+            ('research/prompts/m4-publish-lookup-code-r2-opus-model/out/runs-logs/', '冻结证据：腿的运行日志，内存包装报的上一次峰值带量的时间戳，是原样输出'),
+            ('research/prompts/m4-publish-lookup-followup-code-r1-opus-model/tools/probe.patch', '冻结证据：腿的探针补丁，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/subagent-landing-audit-2026-10-22/', '冻结证据：那一次落地审计的逐组记录，抄了会话记录里的钟点、运行目录名与按时区切天的原文'),
+            ('research/prompts/apparatus-rename-r3-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入'),
+            ('research/prompts/landing-audit-r7-snapshot/', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词、运行目录名与真派发提示'),
+            ('research/prompts/landing-audit-r7-sonnet-output.md', '冻结证据：腿的报告，抄了报告里的时间戳与钟点'),
+            ('research/prompts/m3-close-gov-b17-r2-opus-output.md', '冻结证据：腿的报告，抄了 stat 机器时间'),
+            ('research/prompts/m3-close-gov-b17-r3-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间'),
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
             ('research/prompts/_c510-date-gate-r1-appendix.md', C510_REASON),
             ('research/prompts/_c510-date-gate-r1-attack-output.md', C510_REASON),
@@ -261,6 +322,40 @@ FORMS = (
             ('research/prompts/m3-close-noncode-judge-f14-f27.md', '冻结证据：那一轮逐行判决抄录记录里的旧文，旧文带会话号'),
             ('research/prompts/m3-defs-b3-r3-sonnet-output.md', '冻结证据：腿的报告，引了派发提示里的会话号'),
             ('research/prompts/m3-defs-b3-r3-sonnet-model/', '冻结证据：腿的模型目录，探针脚本里的会话号是被测输入'),
+            ('research/prompts/_m3-close-c409-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-c656-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-c656-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-c656-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-c693-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-c693-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-c693-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-rootring-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-rootring-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-rootring-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-sysconf-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-sysconf-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-close-sysconf-r3-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/landing-audit-r2-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号'),
+            ('research/prompts/landing-audit-r3-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号'),
+            ('research/prompts/landing-audit-r4-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号'),
+            ('research/prompts/landing-audit-r5-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号'),
+            ('research/prompts/landing-audit-r6-snapshot/', '冻结证据：那一轮开工快照对基准的 diff，抄了被判记录当时的原文，原文带会话号'),
+            ('research/prompts/landing-audit-r6-sonnet-model/inputs/dispatch-record.md', '冻结证据：腿的模型目录里拷的调度记录当时那一版，带会话号'),
+            ('research/prompts/subagent-landing-audit-2026-10-22/no-effect.md', '冻结证据：那一批交回报告的归档，引了别的会话的会话号'),
+            ('research/prompts/subagent-landing-audit-2026-10-22/b9-watch-cost.md', '冻结证据：那一批交回报告的归档，引了别的会话的会话号'),
+            ('research/prompts/_m3-multi-file-unlink-r1-appendix.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m3-multi-file-unlink-r1-background.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_rot-defs-r2-appendix.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_rot-defs-r2-background.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_rot-defs-r3-appendix.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_rot-defs-r3-background.md', '冻结证据：三方材料整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-batch2-code-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-c860-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-gc-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-segment-code-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-snapshot-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-trunc-r1-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
+            ('research/prompts/_m4-trunc-r2-', '冻结证据：三方材料（附录与背景）整段抄了 checks-owed.md 当时那一格，那一格带会话号'),
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
         ),
         'allow_suffixes': ('.sh', '.py', '.rs'),

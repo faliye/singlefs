@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-list-items
+want=键对不对得上没算出来
+want=crates-mutation-rows.py --list-items 在
+want=上没跑通（退 1；键对不上的条数没报出来
+want=mutation-list-items：红（退出 1）

@@ -1,0 +1,7 @@
+exit=1
+want=crates 改动里 2 个文件没有三方判决点名
+want=      crates/demo/src/held.rs（demo-r1-main-verification.md 在「## 这一轮被判过的文件」一节里只在写了否定词（没攻、没判、未攻、未判、没审、未审、不攻、不判 之一）的行上提到它，不算点名）
+want=      crates/demo/src/skipped.rs（demo-r1-main-verification.md 在「## 这一轮被判过的文件」一节里只在写了否定词（没攻、没判、未攻、未判、没审、未审、不攻、不判 之一）的行上提到它，不算点名）
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（crates-adversarial-review）
+want=bash .claude/gate.d/doc-process-records.sh --check crates-adversarial-review

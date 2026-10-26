@@ -1,0 +1,9 @@
+M1_键不带范围	    ("overlap", "scope", "verdict"),\n    ("share_group", "scope", "verdict"),	    ("overlap", None, "verdict"),\n    ("share_group", None, "verdict"),
+M2_比数值字段	("stop_check", "item", "result"),	("stop_check", "item", "detail"),
+M3_缺格当相同	KEY_PROBLEM_WORDS = ("absent", "duplicate")	KEY_PROBLEM_WORDS = ("duplicate",)
+M4_重复键后写盖前写	            if key in cells:\n	            if False:\n
+M5_F6第二条用开区间	fraction >= HALF	fraction > HALF
+M6_F1丢掉above半句	f1 = both_overlap and both_below	f1 = both_overlap
+M7_窄读带上负载格	NARROW_FAMILIES = ("stop_check", "anchor", "selfcheck_done")	NARROW_FAMILIES = ("stop_check", "anchor", "selfcheck_done", "overlap")
+M8_前缀不剥	body = body[len(PREFIX):].lstrip()	body = body
+M9_新数抄成旧数	    "full_states_smoke-snapshot_creation_stream": states_of(SNAPSHOT_SEGMENTS, segment_full),	    "full_states_smoke-snapshot_creation_stream": 16842807,

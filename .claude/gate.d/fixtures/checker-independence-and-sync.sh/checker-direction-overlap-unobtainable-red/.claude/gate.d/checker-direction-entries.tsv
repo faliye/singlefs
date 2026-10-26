@@ -1,0 +1,4 @@
+# 样本：扫描式入口登的是改名之前的名字 scanned_unit_headers，源码里只有 scanned_units
+traversal-entry	crates/singlefs-checker/src/walk.rs::check_pool_image	-	# 池级 checker 对外的入口
+scan-entry	crates/singlefs-checker/src/walk.rs::scanned_unit_headers	-	# 改了名而没跟着改的入口
+shared-format	crates/singlefs-checker/src/lib.rs::read_u64	-	# 按小端读 8 字节

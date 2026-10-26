@@ -37,19 +37,23 @@
 #   no-rebuild-check  施加变异之后那一趟编译不核被改的包有没有 Compiling 行（见「判法与次序」⑤）
 #       「编译目录里的产物比施加变异后的源码新（共用编译目录）：那一条判没重编、退 1，不判没红」（实际判成没红）；
 #       scripts/gate/lib_rebuilt_packages.py 的 REBUILT_PACKAGES_BREAK=any-compiling-line 不让这一格红（那一趟一行 Compiling 都没有）
+#   rocksdb-entry-unchecked  起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#       「副本里的 checker 档包依赖 rocksdb 而进程环境里没有预编库的取值：应当在起 cargo 之前整次拒绝、退 2、假 cargo 一次都不起」
+#       （entry 判的是 --copy 那棵树、--cargo 是要起的那一份 cargo；树里没有依赖 rocksdb 的清单、cargo 是带「# rocksdb-prebuilt-entry: selftest-fake-cargo」那一行的假 cargo 时不判）
 #   should panic 那一段的解析在 lib_libtest_result_lines.py：LIBTEST_RESULT_LINES_BREAK=should-panic-in-name 时
 #       「#[should_panic] 的用例红了……应当判抓到、退 0」判错
 # 编译目录那三格的开关（开关一行，下一行起是打开后判错的自证项）：
 #   PROVE_RED_BREAK=unbound-second-argument  开头照改前的写法拿 $2 拼 CARGO_TARGET_DIR 的默认值（set -u 下只给 --selftest 一个参数时当场退 1）；
 #     只在自证起的那一层子进程（PROVE_RED_SELFTEST_PROLOGUE 设着）里生效，外层照常跑完才报得出是哪一格
-#       「不设 CARGO_TARGET_DIR、只给 --selftest：开头那几行走得过去、不替调用方设编译目录」（子进程退 1，输出 $2: unbound variable）
+#       「✗ 自检：不设 CARGO_TARGET_DIR、只给 --selftest：开头那几行」（子进程退 1，输出 $2: unbound variable）
+#       连带红的格：「✗ 自检：不设 CARGO_BUILD_JOBS：开头那几行」、「✗ 自检：调用方设了 CARGO_BUILD_JOBS：开头那几行」
 #   PROVE_RED_BREAK=second-argument-target  CARGO_TARGET_DIR 的默认值照改前 $2 的取法拿第二个参数拼
-#       「--copy 不在第一个（--memory 1G --copy <副本>）：编译目录是 <副本>/target」（取成 1G/target）
+#       「✗ 自检：--copy 不在第一个（--memory 1G --copy <副本>）：编译目录」（取成 1G/target）
 #   PROVE_RED_BREAK=caller-target-overridden  调用方设了的 CARGO_TARGET_DIR 也换成 <副本>/target
-#       「调用方设了 CARGO_TARGET_DIR：照它的、不覆盖」；连带「编译目录里的产物比施加变异后的源码新（共用编译目录）……」
+#       「✗ 自检：调用方设了 CARGO_TARGET_DIR」；连带「编译目录里的产物比施加变异后的源码新（共用编译目录）……」
 #       （那一格的共用编译目录就是调用方设的 CARGO_TARGET_DIR，被换成副本自己的 target 之后照常重编、判抓到、退 0）
 #   PROVE_RED_BREAK=build-jobs-six  没设 CARGO_BUILD_JOBS 时写死 6（改前的样子），不取登记的重活默认并行度；同样只在自证起的那层子进程里生效
-#       「不设 CARGO_BUILD_JOBS：开头那几行应当取登记的重活默认并行度、调用方设了的照它」（子进程打 CARGO_BUILD_JOBS=6）
+#       「✗ 自检：不设 CARGO_BUILD_JOBS：开头那几行」（子进程打 CARGO_BUILD_JOBS=6）
 #
 # 判法与次序：
 #   ① --copy 必须是一份副本：目录在、里面有 crates/mutations.tsv、不是这份脚本所在的主工作区（在主工作区上改坏源码会波及别的会话）；
@@ -104,6 +108,7 @@ sys.dont_write_bytecode = True   # 下面按路径载入的两份模块不往 __
 SCRIPT_DIRECTORY = sys.argv[1]
 MAIN_ROOT = os.path.realpath(os.path.join(SCRIPT_DIRECTORY, "..", ".."))
 MEMORY_WRAPPER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
+ROCKSDB_PREBUILT = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "rocksdb-prebuilt.py")   # 起 cargo 之前判 RocksDB 预编库的取值（prove_holding_the_lock）
 BROKEN = os.environ.get("PROVE_RED_BREAK", "")
 TARGET_OPTIONS = {"--lib", "--test", "--bin"}
 GPU_MEMORY_HIT_EXIT = 245   # run-with-memory-cap.sh：显存不够（命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY），结果不算数
@@ -131,7 +136,7 @@ REBUILT = load_module(os.path.join(SCRIPT_DIRECTORY, "..", "gate", "lib_rebuilt_
 
 def default_memory_cap():
     try:
-        match = re.search(r'REPLAY_MEMORY_CAP="\$\{REPLAY_MEMORY_CAP:-([0-9]+[KMGT])\}"', open(os.path.join(SCRIPT_DIRECTORY, "..", "experiments", "replay.sh"), encoding="utf-8").read())
+        match = re.search(r'REPLAY_MEMORY_CAP="\$\{REPLAY_MEMORY_CAP:-([0-9]+[KMGT])\}"', open(os.path.join(SCRIPT_DIRECTORY, "..", "experiment-apparatus", "replay.sh"), encoding="utf-8").read())
         return match.group(1) if match else "8G"
     except OSError:
         return "8G"
@@ -307,6 +312,14 @@ def prove_holding_the_lock(copy, memory, crate, names, cargo, environment):
             chosen.append(row)
     if refusals:
         return 2, [f"✗ {line}" for line in refusals] + ["→ 怎么办：照 crates/mutations.tsv 表头把那一行写成六段（替换文之外不许空），cargo test 参数加上 -p <crate> 与 --lib / --test <目标> / --bin <名> 之一再证；一条都没跑"]
+    # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：有要跑的行就在起任何 cargo 之前判一次（判的是副本那棵树，起的是 cargo 那一份），
+    #   判红整次拒绝、退 2、一条都不跑。树里没有依赖 rocksdb 的清单（自证的副本）、cargo 是带标记的假 cargo，entry 报不判。弄坏开关 rocksdb-entry-unchecked 下不判
+    if chosen and BROKEN != "rocksdb-entry-unchecked":
+        entry = subprocess.run([sys.executable, ROCKSDB_PREBUILT, "entry", "--root", copy, "--cargo", cargo], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if entry.returncode != 0:
+            return 2, [line for line in (entry.stdout + entry.stderr).splitlines() if line.strip()] + [
+                "✗ 起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），一条都没跑",
+                '→ 怎么办：照上面的出路修（开新会话，或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"），再证这一批']
     logs = os.environ.get("PROVE_RED_LOG_DIRECTORY") or os.path.join(copy, "prove-red-logs")
     os.makedirs(logs, exist_ok=True)
     output = [f"- 本次未跑 {line}" for line in skipped]
@@ -495,6 +508,26 @@ def selftest():
         checked_cases += 1
         if code != 2 or not any("基线（没改源码）就红" in line for line in lines) or any(line.startswith("redbase\t抓到\t") for line in lines):
             failures.append(f"基线（没改源码）就红：停下、退 2、一条变异都不记抓到，实际 {code} {lines}")
+        # 起 cargo 之前判 RocksDB 预编库的取值：另一份副本里放一份依赖 rocksdb 的 checker 档包清单、进程环境里四个取值是空的，假 cargo 不带 entry 认的标记
+        #   ⇒ 整次拒绝、退 2、假 cargo 一次都没起（别的格副本里没有这份清单，entry 报不判）
+        rocksdb_copy = selftest_copy(work, "rocksdb")
+        write_text(os.path.join(rocksdb_copy, "crates", "singlefs-checker-tier", "Cargo.toml"),
+                   '[package]\nname = "singlefs-checker-tier"\nversion = "0.0.0"\n[dependencies]\nrocksdb = { version = "=0.25.0", optional = true }\n')
+        saved_values = {name: os.environ.get(name) for name in ("ROCKSDB_LIB_DIR", "ROCKSDB_STATIC", "SNAPPY_LIB_DIR", "SNAPPY_STATIC")}
+        os.environ.update({name: "" for name in saved_values})
+        try:
+            cargo_calls()
+            code, lines = prove(rocksdb_copy, "1G", "demo", ["caught"], cargo=fake_cargo)
+            calls = cargo_calls()
+        finally:
+            for name, value in saved_values.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        checked_cases += 1
+        if code != 2 or calls or not any("rocksdb-prebuilt entry：" in line for line in lines):
+            failures.append(f"副本里的 checker 档包依赖 rocksdb 而进程环境里没有预编库的取值：应当在起 cargo 之前整次拒绝、退 2、假 cargo 一次都不起，实际退 {code}、假 cargo 起了 {len(calls)} 次 {lines}")
         # 主工作区拿临时目录里一棵同样形态的树（有 crates/mutations.tsv）顶替、经 main_root 交给 prove：自证从哪棵树起（仓里、仓副本、符号链接拼的草稿树）都判得出这一格
         fake_main = selftest_copy(work, "main")
         code, lines = prove(fake_main, "1G", "demo", ["caught"], cargo=fake_cargo, main_root=fake_main)

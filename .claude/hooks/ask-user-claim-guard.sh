@@ -6,7 +6,7 @@
 # gate-similar: runner-dispatch-guard.sh 同样在 PreToolUse 上逐句判一段给人看的中文、引号里的片段换成占位不判；但它挂 Agent|Task、判派发提示里有没有点名岔路、「重型测试：不跑」一行、定义要的输入这类固定标签行，这里挂 AskUserQuestion、判断言词加出处，两边的句子判据没有一条相同。引号遮掉那一步两边各一份、写法不同（它逐字符用栈、不遮反引号，这里先遮反引号再按成对的引号反复替换）；抽成共用模块要改 runner-dispatch-guard.sh，这一次不碰别的钩子，交主 agent 定要不要抽
 # gate-similar: write-guard.sh 同样在执行前按字面拒一类写法（撇号类角标），但挂 Write|Edit、判的是落进文件的字与写哪个文件；弹窗问句不落盘，它看不见，并进去要让它多认一个工具、多一套与写文件无关的判据
 # gate-similar: continuation-guard.sh 挂 PreToolUse[SendMessage]，判收件的子 agent 在会话记录里交回过没有、被中断过没有；这里判弹窗里的句子，两边的对象与输入没有交集
-# gate-overlap:copy-kept continuation-guard.sh main() 那十行是钩子入口（认 --selftest、从 stdin 读 hook 的 JSON、读不出就放行、拒绝时把说明写进 stderr），不带判据；抽成共用模块要同时改 continuation-guard.sh 与 runner-dispatch-guard.sh，这一次的任务不许碰别的钩子，交主 agent 定要不要抽
+# gate-overlap:copy-kept continuation-guard.sh main() 那十行是钩子入口（认 --selftest、从 stdin 读 hook 的 JSON、拒绝时把说明写进 stderr），不带判据；抽成共用模块要同时改 continuation-guard.sh 与 runner-dispatch-guard.sh，这一次的任务不许碰别的钩子，交主 agent 定要不要抽
 # gate-overlap:copy-kept runner-dispatch-guard.sh 同 continuation-guard.sh 那一条：main() 入口十行三个钩子各一份，抽共用模块要改它，这一次不碰别的钩子
 #
 # 为什么：2026-09-23 主 agent 问用户 alloc-basis 岔路 7 时写「可达状态里 defer 一项不可能为 0……重新搭环境也造不出来」，后半句是推的；
@@ -25,7 +25,20 @@
 #      要么以登记过的扩展名收尾、名字里可以有汉字这类非 ASCII 的字；不带 / 的要以登记过的扩展名收尾）；research/results/ 下的文件名；
 #      name= 开头的产物行；「实测」「量过」「产物」「输出」前后 MEASUREMENT_WINDOW 个字以内带着一个数或路径，
 #      而且那个数或路径与这个词之间没有隔着断言词（「输出一定为 0」里 0 与「输出」之间隔着「一定」，不算）。
-#   ①有、②③都没有的句子逐句列出，退出 2；一句都没有就放行。stdin 读不出 JSON、questions 不是列表的放行。
+#   ①有、②③都没有的句子逐句列出，退出 2；一句都没有就放行。
+# 判不了的照「放行但必记检出」（用户 2026-10-23 定，records/2026-10-23-subagent拆分提案.md 第九十四节）：输入不是 JSON 对象（解不开、顶层不是对象）、
+#   tool_input.questions 不是列表、判的时候抛异常，照常退 0，stderr 写一行卡在哪，检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的
+#   default_detections_path；写法在它的 record_unjudged_pass）追加一行、结局「只记」，findings 以「弹窗闸没判、照常放行」起头；读不到 lib_work_root.py 时 stderr 另说一句没记成。
+# 弄坏开关只在自证里认：平常跑（不是 --selftest，也不是自证起的子进程）设了 ASK_USER_CLAIM_GUARD_BREAK 就退 2，stderr 点名它只在自证里认；
+#   自证起的子进程由环境里的 ASK_USER_CLAIM_GUARD_SELFTEST_MARK 认（指的那份文件在、内容是 SELFTEST_MARK_CONTENT）。
+# 逐项写开关名、弄坏哪一处、打开后自证哪几项红（「」里是失败行「✗ 自检：」之后那一段的开头）：
+#   ASK_USER_CLAIM_GUARD_BREAK=input-unrecorded  输入不是 JSON 对象时只放行、不记检出（改前的样子）
+#       「stdin：坏 JSON 放行并记一条检出（结局只记、会话号读不到）」
+#       「stdin：JSON 数组放行并记一条检出（结局只记、会话号读不到）」
+#   ASK_USER_CLAIM_GUARD_BREAK=questions-unrecorded  tool_input.questions 不是列表时只放行、不记检出（改前的样子）
+#       「stdin：questions 不是列表放行并记一条检出（结局只记、会话号照输入）」
+#   ASK_USER_CLAIM_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住，照原样抛出（改前的样子：进程退 1，Claude Code 照常放行、不记检出）
+#       「判的时候抛异常放行并记一条检出（结局只记、会话号照输入）」
 # 管不到的：出处是不是真的、数是不是那个产物里的、「推的」写得如不如实——这几样靠人（verify-before-claiming.md）；
 #   换个说法（「肯定」「绝对」「百分之百」）就过去了，词表只认上面九个；出处写在前一句、断言写在后一句的照拒。
 #
@@ -37,7 +50,17 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import json, os, re, subprocess, sys
+import json, os, re, subprocess, sys, tempfile
+
+HOOK_NAME = "ask-user-claim-guard.sh"
+BREAK_VARIABLE = "ASK_USER_CLAIM_GUARD_BREAK"
+SELFTEST_MARK_VARIABLE = "ASK_USER_CLAIM_GUARD_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "ask-user-claim-guard.sh --selftest 起的子进程"
+UNJUDGED_PREFIX = "弹窗闸没判、照常放行"
+INPUT_PREFIX_BYTES = 200
+
+def broken(item):
+    return item in os.environ.get(BREAK_VARIABLE, "").split(",")
 
 ASSERTION_WORDS = ("不可能", "造不出", "从来不", "从来没有", "一定", "必然", "永远不", "绝不会", "恒为")
 # 字面上带着断言词、说的却不是断言：先换掉再找
@@ -226,15 +249,72 @@ def selftest(hook_dir):
         got = [sentence for _, sentence, _ in flagged(tool_input)]
         results.append((label, want, got))
     script = os.path.join(hook_dir, "ask-user-claim-guard.sh")
+    scratch = tempfile.mkdtemp(prefix="ask-user-claim-guard-selftest-")
+    mark = os.path.join(scratch, "selftest-mark")   # 自证起的子进程带这份标记，照样认调用方设的弄坏开关
+    with open(mark, "w", encoding="utf-8") as handle:
+        handle.write(SELFTEST_MARK_CONTENT + "\n")
+    detections = os.path.join(scratch, "detections.jsonl")   # 检出记在自证自己的临时目录，不碰真的检出记录
+    environment = dict(os.environ, **{SELFTEST_MARK_VARIABLE: mark, "AGENT_HOOK_DETECTIONS": detections})
+
+    def recorded():
+        try:
+            with open(detections, encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except OSError:
+            return []
+
     for label, tool_input, want_code, want_in_stderr in (
             ("stdin：原话那句拒绝", cases[0][1], 2, "重新搭环境也造不出来"),
             ("stdin：两句里拒没出处的那句", cases[3][1], 2, "重新搭环境也造不出别的值"),
             ("stdin：带出处的放行", cases[7][1], 0, ""),
             ("stdin：中文文件名的文件:行号放行", {"questions": [{"question": chinese_file_name_sourced, "options": []}]}, 0, "")):
         completed = subprocess.run(["bash", script], input=json.dumps({"tool_name": "AskUserQuestion", "tool_input": tool_input}),
-                                   capture_output=True, text=True)
+                                   capture_output=True, text=True, env=environment)
         stderr_ok = want_in_stderr in completed.stderr if want_in_stderr else completed.stderr == ""
         results.append((label, (want_code, True), (completed.returncode, stderr_ok)))
+    # 判不了的照「放行但必记检出」：退 0、stderr 写一行、检出记录多一行（结局只记）
+    for label, raw, want_session in (
+            ("stdin：坏 JSON 放行并记一条检出（结局只记、会话号读不到）", "{不是 JSON", "读不到"),
+            ("stdin：JSON 数组放行并记一条检出（结局只记、会话号读不到）", "[]", "读不到"),
+            ("stdin：questions 不是列表放行并记一条检出（结局只记、会话号照输入）",
+             json.dumps({"tool_name": "AskUserQuestion", "session_id": "s-shape", "tool_input": {"questions": "一定会红"}}), "s-shape")):
+        before = len(recorded())
+        completed = subprocess.run(["bash", script], input=raw, capture_output=True, text=True, env=environment)
+        added = recorded()[before:]
+        results.append((label, (0, True, 1, "只记", want_session, True),
+                        (completed.returncode, HOOK_NAME in completed.stderr, len(added), added[0].get("outcome") if added else None,
+                         added[0].get("session_id") if added else None,
+                         bool(added) and all(finding.startswith(UNJUDGED_PREFIX) for finding in added[0].get("findings") or []))))
+    # 判的时候抛异常：在进程里把判法换成一个抛异常的，照钩子入口调 judge_input
+    original_flagged = globals()["flagged"]
+    def raising_flagged(tool_input):
+        raise RuntimeError("自证造的异常")
+    globals()["flagged"] = raising_flagged
+    saved_detections = os.environ.get("AGENT_HOOK_DETECTIONS")
+    os.environ["AGENT_HOOK_DETECTIONS"] = detections
+    before = len(recorded())
+    try:
+        got_code = judge_input(json.dumps({"tool_name": "AskUserQuestion", "session_id": "s-raise", "tool_input": cases[0][1]}).encode("utf-8"), hook_dir)
+    except Exception as error:   # 弄坏开关 exception-unrecorded：照原样抛出
+        got_code = f"抛出 {type(error).__name__}"
+    finally:
+        globals()["flagged"] = original_flagged
+        if saved_detections is None:
+            os.environ.pop("AGENT_HOOK_DETECTIONS", None)
+        else:
+            os.environ["AGENT_HOOK_DETECTIONS"] = saved_detections
+    added = recorded()[before:]
+    results.append(("判的时候抛异常放行并记一条检出（结局只记、会话号照输入）", (0, 1, "只记", "s-raise"),
+                    (got_code, len(added), added[0].get("outcome") if added else None, added[0].get("session_id") if added else None)))
+    # 平常跑（不带标记、不是 --selftest）设了弄坏开关：退 2、点名它只在自证里认
+    outside = subprocess.run(["bash", script], input=json.dumps({"tool_name": "AskUserQuestion", "tool_input": cases[7][1]}), capture_output=True, text=True,
+                             env=dict({key: value for key, value in os.environ.items() if key != SELFTEST_MARK_VARIABLE},
+                                      **{BREAK_VARIABLE: "input-unrecorded", "AGENT_HOOK_DETECTIONS": detections}))
+    results.append(("平常跑设了弄坏开关退 2、点名它只在自证里认", (2, True),
+                    (outside.returncode, any(BREAK_VARIABLE in line and "自证" in line for line in outside.stderr.splitlines()))))
+    for name in os.listdir(scratch):
+        os.remove(os.path.join(scratch, name))
+    os.rmdir(scratch)
     failures = [item for item in results if item[1] != item[2]]
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
@@ -243,23 +323,73 @@ def selftest(hook_dir):
         return 1
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：带断言词、同一句里没有出处也没写「推的」的句子拒绝，只拒没出处的那一句；"
           "出处（反引号里的路径或命令、文件:行号（带扩展名的中文文件名也认）、research/results/ 下的文件、name= 产物行、实测带数）、「推的，没量过」、"
-          "反引号与「」里的断言词、「不一定」放行；中文文件名没带行号、中文词后面跟冒号与数、/ 后面是不带扩展名的汉字跟冒号与数的照拒；四例走真实的 stdin 入口")
+          "反引号与「」里的断言词、「不一定」放行；中文文件名没带行号、中文词后面跟冒号与数、/ 后面是不带扩展名的汉字跟冒号与数的照拒；四例走真实的 stdin 入口；"
+          "输入不是 JSON 对象、questions 不是列表、判的时候抛异常照常放行并记一条检出；平常跑设了弄坏开关退 2")
     return 0
 
-def main():
-    hook_dir = sys.argv[1]
-    if len(sys.argv) > 2 and sys.argv[2] == "--selftest":
-        return selftest(hook_dir)
+def unjudged_pass(hook_input, problem, switch, hook_dir):
+    """判不了：照「放行但必记检出」stderr 写一行、检出记录追加一行（结局只记），交退出码 0。弄坏开关 switch 下只打 stderr、不记（改前的样子）。"""
+    print(f"! {HOOK_NAME}：{problem}，这一次没判、照常放行", file=sys.stderr)
+    if broken(switch):
+        return 0
+    tool_input = hook_input.get("tool_input") if isinstance(hook_input, dict) else None
+    header = tool_input.get("questions") if isinstance(tool_input, dict) else None
     try:
-        hook_input = json.load(sys.stdin)
-    except ValueError:
-        return 0
+        sys.dont_write_bytecode = True
+        if hook_dir not in sys.path:
+            sys.path.insert(0, hook_dir)
+        import lib_work_root
+        _, said = lib_work_root.record_unjudged_pass(HOOK_NAME, hook_input, f"AskUserQuestion：{str(header)[:300]}", [f"{UNJUDGED_PREFIX}：{problem}"])
+    except Exception as error:   # 文件不在、语法错都算读不到
+        said = f"检出没记成：读不到同目录的 lib_work_root.py（{error!r}）"
+    print(f"  {said}", file=sys.stderr)
+    return 0
+
+def judge_input(raw, hook_dir):
+    """hook 的原始输入（字节）→ 退出码。判不了的几种照「放行但必记检出」（文件头「判不了的」一段）。"""
+    try:
+        hook_input = json.loads(raw.decode("utf-8"))
+    except ValueError as error:
+        return unjudged_pass(None, f"输入不是合法的 JSON（{error}；读到 {len(raw)} 字节，前 {INPUT_PREFIX_BYTES} 字节：{raw[:INPUT_PREFIX_BYTES].decode('utf-8', 'replace')!r}）",
+                             "input-unrecorded", hook_dir)
     if not isinstance(hook_input, dict):
-        return 0
-    code, message = decide(hook_input)
+        return unjudged_pass(None, f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象", "input-unrecorded", hook_dir)
+    tool_input = hook_input.get("tool_input")
+    if not isinstance(tool_input, dict) or not isinstance(tool_input.get("questions"), list):
+        shape = type(tool_input.get("questions")).__name__ if isinstance(tool_input, dict) else f"tool_input 是 {type(tool_input).__name__}"
+        return unjudged_pass(hook_input, f"tool_input.questions 不是列表（{shape}），问句一句都没扫", "questions-unrecorded", hook_dir)
+    try:
+        code, message = decide(hook_input)
+    except Exception as error:
+        if broken("exception-unrecorded"):   # 弄坏开关：不接住，照原样抛出（改前的样子）
+            raise
+        return unjudged_pass(hook_input, f"判的时候抛异常（{type(error).__name__}: {error}）", "exception-unrecorded", hook_dir)
     if code:
         print(message, file=sys.stderr)
     return code
+
+def refuse_break_outside_selftest():
+    """弄坏开关只在自证里认：平常跑（不是 --selftest，也不是自证起的子进程）设了 ASK_USER_CLAIM_GUARD_BREAK 交 2，点名它只在自证里认；别的交 0。"""
+    if not os.environ.get(BREAK_VARIABLE) or sys.argv[2:] == ["--selftest"]:
+        return 0
+    mark = os.environ.get(SELFTEST_MARK_VARIABLE, "")
+    try:
+        if mark and open(mark, encoding="utf-8").read().strip() == SELFTEST_MARK_CONTENT:
+            return 0
+    except OSError:
+        pass
+    print(f"✗ {HOOK_NAME}：{BREAK_VARIABLE}={os.environ[BREAK_VARIABLE]} 是弄坏开关，只在自证（{HOOK_NAME} --selftest 与它起的子进程）里认；平常跑设了就拒，这一次没判", file=sys.stderr)
+    print(f"→ 怎么办：unset {BREAK_VARIABLE} 再来；要看开关红在哪一格，跑 {BREAK_VARIABLE}=<项> bash .claude/hooks/{HOOK_NAME} --selftest（开关写在文件头）", file=sys.stderr)
+    return 2
+
+def main():
+    hook_dir = sys.argv[1]
+    refused = refuse_break_outside_selftest()
+    if refused:
+        return refused
+    if len(sys.argv) > 2 and sys.argv[2] == "--selftest":
+        return selftest(hook_dir)
+    return judge_input(sys.stdin.buffer.read(), hook_dir)
 
 sys.exit(main())
 PY

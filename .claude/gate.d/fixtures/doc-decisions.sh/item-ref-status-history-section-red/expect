@@ -1,0 +1,5 @@
+exit=1
+want=分项引用与正文状态不一致 1 处
+want=.claude/kb/decisions-history.md:14 「已定项 1」写的是已定，而 D932（样本乙） 正文里第 1 条是未定
+want=  item-ref-status：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（item-ref-status）

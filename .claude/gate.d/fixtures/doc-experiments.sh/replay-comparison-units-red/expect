@@ -1,0 +1,16 @@
+exit=1
+want=登记出处不在：research/prompts/e991-missing.md
+want=单元名「丙不存在」在 crates/sample/units.rs 里一次都没找到
+want=单元名「丁重复」在 crates/sample/units.rs 里出现 2 次，不是恰好一次
+want=单元表出处不在：crates/sample/missing.rs
+want=复跑表里没有 E991 的驱动行 @driver_absent
+want=@driver_g 那一行的产物名是 e991-other.out，不是留存产物名 e991-g.out
+want=不是六列（实验号、登记出处、单元名、单元表出处、留存产物名、复跑）或有一列是空的
+want=none 行比基准多：replay-comparison-units.tsv 里这几行复跑写 none:，基准 HEAD 那一版里没有这样的行：
+want=     第 9 行 E991「辛」e991-h.out（research/prompts/e991-registration.md）
+want=     第 12 行 E991「癸」e991-j.out（research/prompts/e991-registration.md）
+want=样本只跑 .gate-cells 点名的格：replay-comparison-units
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（replay-comparison-units）
+want=→ replay-comparison-units：照 .claude/gate.d/replay-comparison-units.tsv 文件头
+want=bash .claude/gate.d/doc-experiments.sh --check replay-comparison-units

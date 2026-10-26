@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-untranslated
+want=三语译文里残留没译的中文超量：2 行（英语 0 行、日语 2 行，在 1 份译文里）；排除登记表 0 处不对
+want=按文件：README.ja.md  2 行
+want=README.ja.md:5  日语，剩 7 个日语不用的简体字（门槛 3）：这次改动里的文件，没改的旧文件里还留着的错不会被发现
+want=README.ja.md:7  日语，剩 3 个日语不用的简体字（门槛 3）：确認し、結果を记录する。
+want=照中文那一份同一行整行译，反引号、路径、链接目标逐字照中文
+want=doc-text.sh：1 格里 1 格红（trilingual-untranslated）

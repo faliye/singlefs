@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-untranslated
+want=排除登记表 5 处不对
+want=.claude/gate.d/trilingual-untranslated-exempt.tsv:3：.claude/kb/no-such-page.md 不是登记表 .claude/trilingual-documents 指到的、在的中文那一份 <名>.md
+want=.claude/gate.d/trilingual-untranslated-exempt.tsv:4：每行要两列、用制表符分隔、都不空：中文那一份的路径、理由
+want=.claude/gate.d/trilingual-untranslated-exempt.tsv:5：理由至少 4 个字
+want=.claude/gate.d/trilingual-untranslated-exempt.tsv:6：.claude/kb/translation-glossary.md 登记了两次
+want=.claude/gate.d/trilingual-untranslated-exempt.tsv:7：README.en.md 不是登记表 .claude/trilingual-documents 指到的、在的中文那一份 <名>.md
+want=doc-text.sh：1 格里 1 格红（trilingual-untranslated）

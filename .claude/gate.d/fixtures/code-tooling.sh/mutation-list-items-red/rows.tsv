@@ -1,0 +1,3 @@
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+plain	crates/tiny/src/lib.rs	{ left + right }	{ left * right }	-p tiny --lib -- adds	adds
+gated-without-feature	crates/tiny/src/lib.rs	{ left + right }	{ left - right }	-p tiny --lib -- gpu_only	gpu_only

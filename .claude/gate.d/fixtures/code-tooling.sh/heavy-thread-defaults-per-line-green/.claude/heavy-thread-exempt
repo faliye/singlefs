@@ -1,8 +1,8 @@
 # 样本：每一条被判行各有自己的锚串，逐行判过
 crates/demo/src/absorbed.rs:available_parallelism  # 样本：只把核数用在一个固定大小的池上，不是重活默认
 crates/demo/src/absorbed.rs:"SAMPLE_ABSORBED_SAMPLING_WORKERS", 8  # 样本：逐行判过，这一处取样的并发度是场景本身
-scripts/experiments/absorbed.py:print_cores = os.cpu_count()  # 样本：只把本机核数打进报告，不起线程
-scripts/experiments/absorbed.py:os.environ["SAMPLE_ABSORBED_WORKERS"]  # 样本：逐行判过，这一处读的是场景本身的并发度
+scripts/experiment-apparatus/absorbed.py:print_cores = os.cpu_count()  # 样本：只把本机核数打进报告，不起线程
+scripts/experiment-apparatus/absorbed.py:os.environ["SAMPLE_ABSORBED_WORKERS"]  # 样本：逐行判过，这一处读的是场景本身的并发度
 scripts/hosts/or_var_default.sh:SAMPLE_OR_VAR_JOBS=$fallback  # 样本：逐行判过，这一处 make 的并发度是场景本身
 scripts/hosts/or_arith_default.sh:SAMPLE_OR_ARITH_JOBS=$((4 * 2))  # 样本：逐行判过，这一处 make 的并发度是场景本身
 scripts/hosts/printenv_read.sh:printenv SAMPLE_PRINTENV_THREADS  # 样本：逐行判过，这一处读的是场景本身的并发度

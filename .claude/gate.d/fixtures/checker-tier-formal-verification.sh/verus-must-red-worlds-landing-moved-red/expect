@@ -1,0 +1,3 @@
+exit=1
+want=第 2 行「夹到上限时返回原值」红了，但证明错落在 clamp_to_limit，表里写的落点是 smaller_of_two
+want=verus-must-red-worlds：红（退出 1）

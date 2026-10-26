@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-glossary
+want=翻译术语表与译文有 4 处不对（表自己 0 处；查了 3 组、3 条术语）
+want=briefs/2026-09-14：中文「产物」在 zh 里出现，en 里找不到「artifact」（术语表第 9 行）
+want=briefs/2026-09-14：中文「产物」在 zh 里出现，ja 里找不到「成果物」（术语表第 9 行）
+want=briefs/2026-09-15：中文「合表」在 zh 里出现，en 里找不到「merged table」（术语表第 8 行）
+want=briefs/2026-09-15：中文「合表」在 zh 里出现，ja 里找不到「統合表」（术语表第 8 行）
+want=doc-text.sh：1 格里 1 格红（trilingual-glossary）

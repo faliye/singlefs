@@ -1,0 +1,12 @@
+[package]
+name = "singlefs-background-gpu"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+wgpu = { version = "=30.0.1", default-features = false }
+bytemuck = "1"
+pollster = "=1.0.1"
+sample-gpu-kernels = { path = "../sample-gpu-kernels" }
+
+[dev-dependencies]
+singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }

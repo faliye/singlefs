@@ -1,0 +1,4 @@
+exit=1
+want=.claude/process-safety-pending:2 scripts/gate/sample.sh 里一处要放行的都没有
+want=进程安全：0 处发信号的写法打得到不是自己点名的那一个进程，待改清单 1 处不对
+want=里有打得到别人进程的终止写法

@@ -6,7 +6,7 @@
 展开上限（轻型，展开 6 那个域）	6（LIGHT_EXPAND_UP_TO）	推的：没有扫值产物；轻型取「甲二」与展开 6 两个域的并集是用户 2026-10-10 定的两档（.claude/rules/verification.md「两档：轻型与重型」），6 这个数本身没人量过	scripts/crash/crash-point-replay.sh
 展开上限（全量）	30（FULL_EXPAND_UP_TO）	登记分项里最长一段的写数（第 32 批 Q 探针 PROBE_SEGMENT_SIZES，出处在 crash-amplification.sh 文件头「全量的展开深度」）	scripts/crash/crash-amplification.sh
 线程数（每台默认重活线程数）	31	用户 2026-10-12 定：所有重活默认每台 31 线程，双机两台各 31（records/2026-10-12-里程碑三工具与治理批.md）	.claude/heavy-thread-default
-内存上限（复跑与没另给上限的装置）	8G（REPLAY_MEMORY_CAP）	推的：没有按驱动分别量过（replay.sh 文件头那一段）；门禁各道另有 GATE_*_MEMORY_MAX，提交时照峰值表 ~/.local/share/singlefs/memory-peaks.tsv 定	scripts/experiments/replay.sh
+内存上限（复跑与没另给上限的装置）	8G（REPLAY_MEMORY_CAP）	推的：没有按驱动分别量过（replay.sh 文件头那一段）；门禁各道另有 GATE_*_MEMORY_MAX，提交时照峰值表 ~/.local/share/singlefs/memory-peaks.tsv 定	scripts/experiment-apparatus/replay.sh
 批大小（轻型里分片的段一趟判几个态）	65536（LIGHT_REGISTERED_SEGMENT_SLICE_STATES）	推的：取引擎的一块；重型不设、引擎没设取 2^32	scripts/crash/crash-point-replay.sh
 批大小（重型里分片的段一趟判几个态）	2^32（引擎读 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES，没设时的值）	推的：没有扫值产物	crates/singlefs-checker-tier/src/crash_amplification.rs
 双机分工	本机多机配置的 ENABLE_ACROSS_MACHINES、HOST_JUDGE_WEIGHTS、ENABLE_GPU、GPU_CARDS_BY_PRIORITY（值在不进仓的 multi-host.env）	推的：各台权重按量到的速度分，配置的写法在模板里；没有扫值产物	multi-host.env.example

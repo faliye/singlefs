@@ -30,12 +30,14 @@ done
 [ -n "$PASS" ] || { echo "E7RESULT name=fatal reason=no_sudo"; exit 3; }
 S() { printf '%s\n' "$PASS" | sudo -S -p '' "$@"; }
 
+source "$REPO/scripts/devices/dm-owned.sh" || exit 2
+
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e129.XXXXXX")"
-DM_NAME="sfs_e129_tear"
+DM_NAME="sfs_e129_tear_${W##*.}_$$"
 DM_DEV="/dev/mapper/$DM_NAME"
 LOOP=""
 cleanup() {
-  S dmsetup remove "$DM_NAME" 2>/dev/null
+  remove_dm "$DM_NAME" 2>/dev/null
   [ -n "$LOOP" ] && S losetup -d "$LOOP" 2>/dev/null
   rm -rf "${W:?}"
 }
@@ -61,7 +63,7 @@ emit "name=device loop=$LOOP backing=$W/backing.img"
 
 # 表：0..GOOD → loop；GOOD..GOOD+ERR → error
 printf '0 %d linear %s 0\n%d %d error\n' "$GOOD_SECTORS" "$LOOP" "$GOOD_SECTORS" "$ERR_SECTORS" > "$W/table"
-S dmsetup create "$DM_NAME" "$W/table" || { emit "name=fatal reason=dmsetup_failed"; exit 4; }
+create_dm "$DM_NAME" "$W/table" || { emit "name=fatal reason=dmsetup_failed"; exit 4; }
 S dmsetup table "$DM_NAME" | sed 's/^/E7RESULT name=dm_table row=/'
 N=$((N+2))
 
@@ -96,14 +98,15 @@ one_round() {
   S dd if="$W/pattern.bin" of="$DM_DEV" bs=8192 count=1 oflag=direct status=none 2>/dev/null
   rc_span=$?
   # 前缀（0..4095）应落在 loop 上；后缀无处可落
-  S dd if="$LOOP" of="$W/rb_span.bin" bs=4096 count=2 iflag=direct status=none 2>/dev/null
+  S dd if="$LOOP" of="$W/rb_span.bin" bs=4096 count=2 iflag=direct status=none 2>/dev/null || { emit "name=fatal reason=readback_failed"; exit 4; }
+  [[ "$(stat -c %s "$W/rb_span.bin")" == 8192 ]] || { emit "name=fatal reason=short_readback"; exit 4; }
   local pre_ok post_ok
   pre_ok=$(cmp -s -n "$BOUNDARY" "$W/rb_span.bin" "$W/pattern.bin" && echo 1 || echo 0)
   # 后缀那 4096 字节在 loop 上对应的位置**不该**被写（它属于 error 段，没有后备）
   post_ok=$(python3 -c "
 import sys
 d=open('$W/rb_span.bin','rb').read()[$BOUNDARY:$BOUNDARY+4096]
-print(1 if d==b'\x00'*4096 else 0)")
+print(1 if d==b'\x00'*4096 else 0)") || { emit "name=fatal reason=compare_failed"; exit 4; }
   emit "name=span round=$round write_rc=$rc_span prefix_persisted=$pre_ok suffix_absent=$post_ok"
 
   # ---- 格 2：阳性对照，整写落在好段 ----
@@ -111,7 +114,8 @@ print(1 if d==b'\x00'*4096 else 0)")
   local rc_good
   S dd if="$W/pattern.bin" of="$DM_DEV" bs=4096 count=1 oflag=direct status=none 2>/dev/null
   rc_good=$?
-  S dd if="$LOOP" of="$W/rb_good.bin" bs=4096 count=1 iflag=direct status=none 2>/dev/null
+  S dd if="$LOOP" of="$W/rb_good.bin" bs=4096 count=1 iflag=direct status=none 2>/dev/null || { emit "name=fatal reason=readback_failed"; exit 4; }
+  [[ "$(stat -c %s "$W/rb_good.bin")" == 4096 ]] || { emit "name=fatal reason=short_readback"; exit 4; }
   local good_ok
   good_ok=$(cmp -s -n "$BOUNDARY" "$W/rb_good.bin" "$W/pattern.bin" && echo 1 || echo 0)
   emit "name=poscontrol round=$round write_rc=$rc_good all_persisted=$good_ok"
@@ -121,11 +125,12 @@ print(1 if d==b'\x00'*4096 else 0)")
   local rc_err
   S dd if="$W/pattern.bin" of="$DM_DEV" bs=4096 count=1 seek=1 oflag=direct status=none 2>/dev/null
   rc_err=$?
-  S dd if="$LOOP" of="$W/rb_err.bin" bs=4096 count=2 iflag=direct status=none 2>/dev/null
+  S dd if="$LOOP" of="$W/rb_err.bin" bs=4096 count=2 iflag=direct status=none 2>/dev/null || { emit "name=fatal reason=readback_failed"; exit 4; }
+  [[ "$(stat -c %s "$W/rb_err.bin")" == 8192 ]] || { emit "name=fatal reason=short_readback"; exit 4; }
   local nothing_ok
   nothing_ok=$(python3 -c "
 d=open('$W/rb_err.bin','rb').read()
-print(1 if d==b'\x00'*len(d) else 0)")
+print(1 if d==b'\x00'*8192 else 0)") || { emit "name=fatal reason=compare_failed"; exit 4; }
   emit "name=negcontrol round=$round write_rc=$rc_err nothing_persisted=$nothing_ok"
 }
 

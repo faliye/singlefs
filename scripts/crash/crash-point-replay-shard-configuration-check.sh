@@ -6,8 +6,9 @@
 # 写法照 run-with-memory-cap.sh：正整数加 K / M / G / T，单位必写。
 #
 #   crash-point-replay-shard-configuration-check.sh [<仓根>]
-#       退 0 双机：开（stdout 一句：双机与 GPU 开没开、配置在哪、第二台是谁）；退 3 双机：关（配置判得过，但 ENABLE_ACROSS_MACHINES 不是 1：
-#       调用方照单机跑；stdout 一句「双机：关」与怎么打开，不连第二台）；退 1 判不过（stdout 一句原因，下一行是出路）。
+#       退 0 双机：开（stdout 一句：双机与 GPU 开没开、配置在哪、第二台是谁，句末接一段两台配置一不一致，见下面「两台配置一不一致」）；
+#       退 3 双机：关（配置判得过，但 ENABLE_ACROSS_MACHINES 不是 1，或这一台是第二台（下面「这一台是第二台」）：
+#       调用方照单机跑；stdout 一句「双机：关」与为什么，不连第二台）；退 1 判不过（stdout 一句原因，下一行是出路）。
 #   crash-point-replay-shard-configuration-check.sh --emit-assignments [<仓根>]
 #       判法同上；双机开着时 stdout 改打配置里每个键的 bash 赋值（printf %q，调用方 eval；两个开关键没写的打成 0），不打那一句；
 #       双机关着时照样打「双机：关」那一句、退 3，不打赋值。
@@ -44,6 +45,14 @@
 #                                别名就是 PEER_SSH_HOST 的那一台，没写的按 PEER_ 那三个取。
 #   崩溃点重放分片、变异分片与 multi-host-run.sh --peer 照旧只读 PEER_*（两台的老用法不变）；清单只给按台查资源的 scripts/hosts/host-resources.py 读（经 --emit-hosts）。
 #
+# 这一台是第二台（用户 2026-10-23 定两台用同一份配置；带过去的写法在 scripts/hosts/peer-host-lib.sh 文件头「两台用同一份多机配置」）：
+#   起活那一方给第二台那条命令设 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer（只许 local 或 peer，没设是 local；写了别的判不过、退 1）。配置照样整份判
+#   （同一份文件，写坏了两台一样坏），判得过之后四种用法都报「双机：关（这一台是第二台…）」、退 3：不连任何一台，PEER_SSH_HOST、PEER_*、HOSTS、HOST_<号>_*、
+#   HOST_JUDGE_WEIGHTS 这些按「本机 / 第二台」相对写的键一样都不打——经这一份读配置的脚本（变异分片、multi-host-run.sh --peer、崩溃点重放分片、按台查资源、资源释放广播推送）
+#   在第二台上都照单机走，不再往「第二台」起活或 ssh。
+# 两台配置一不一致（只在不带参数的那一种、双机开着、这一台不是第二台时报，只报、不改退出码）：本机这一份的 sha256 与第二台专用目录下常驻那一份
+#   （<PEER_REPOSITORY_DIRECTORY>/multi-host.env，入口每一趟带过去时一并换上）比，句末接「两台配置一致（sha256 前 12 位 …）」「两台配置不一致：…」或「第二台还没有常驻的那一份…」；
+#   不一致不拒：入口起活之前每一趟重新带过去、回读 sha256，对不上才拒跑（peer_host_carry_configuration）。
 # 配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
 # 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 multi-host.env.example。
 # 写法：一行一个 KEY=值（值不做 shell 展开；两头成对的单引号或双引号去掉一层），# 起头的行与空行不算；认不出的行、不认得的键、
@@ -71,6 +80,13 @@
 #         multi-host-run.sh 的自证不红（它的配置里没有这个键）
 #   MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown  显卡的两个键当不认得的键（并进多机配置之前的样子）
 #       scripts/crash/crash-amplification-item.sh --selftest 的第 22 格（「多机配置写了显卡的两个键却判不过…」）；crash-point-replay-shard-run.sh 与 multi-host-run.sh 的自证不红（它们的配置里没有这两个键）
+#   MULTI_HOST_CONFIGURATION_BREAK=peer-role-ignored  SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer 也照起活那台判（第二台照旧往「第二台」ssh、打相对的键）
+#       multi-host-run.sh 的「Ⓦ 第二台上（带过去的配置、角色 peer）判法报「双机：关」退 3、不打赋值，再起 multi-host-run.sh --peer 拒（退 255），一次都没往「第二台」ssh」（「判法退 …；ssh 记了 …」）
+#       crash-point-replay-shard-run.sh 的自证不红（它不设角色）
+#   MULTI_HOST_CONFIGURATION_BREAK=host-role-unchecked  SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 写了 local、peer 之外的值也不报错（照 local 判）
+#       multi-host-run.sh 的「Ⓦ 角色写了 local、peer 之外的值（Peer）⇒ 判法判不过（退 1），说是这个变量」（「判法退 …」）
+#   MULTI_HOST_CONFIGURATION_BREAK=differing-reported-same  两台配置不一致也报「两台配置一致」
+#       multi-host-run.sh 的「Ⓨ 判法报两台配置一不一致：跑过一趟之后报一致、本机这一份改了之后报不一致、第二台没有常驻那一份时报还没有」（「…改了之后：两台配置一致…」）
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（crash-point-replay-shard-run.sh --selftest 用，
 # 那时「第二台」是本机上的另一个目录）。
 #
@@ -103,6 +119,19 @@ refuse() { # refuse <原因>：打原因与出路，退 1
   echo "     → 怎么办：照仓根 multi-host.env.example 建本地配置 multi-host.env（git 忽略），或设 SINGLEFS_MULTI_HOST_CONFIG 指到它；第二台连不上先修 ssh 免密登录"
   exit 1
 }
+
+# 这一台是不是第二台（文件头「这一台是第二台」）：只许 local 或 peer，没设是 local
+host_role="${SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE:-local}"
+if [[ "$host_role" != local && "$host_role" != peer ]]; then
+  if [[ "$configuration_break" == host-role-unchecked ]]; then
+    host_role=local
+  else
+    echo "  ✗ 双机分片不能用：SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 只许写 local 或 peer（没设算 local），读到「$host_role」"
+    echo "     → 怎么办：这个变量由往第二台起活的一方设（scripts/hosts/peer-host-lib.sh 的 peer_host_role_environment）；本机上不设它，第二台上是 peer"
+    exit 1
+  fi
+fi
+[[ "$configuration_break" == peer-role-ignored ]] && host_role=local
 
 if [[ -n "${SINGLEFS_MULTI_HOST_CONFIG:-}" ]]; then
   configuration_file="$SINGLEFS_MULTI_HOST_CONFIG"
@@ -193,6 +222,11 @@ for switch_key in "${MULTI_HOST_SWITCH_KEYS[@]}"; do
 done
 gpu_text="GPU：关"
 [[ "${configuration[ENABLE_GPU]}" == 1 ]] && gpu_text="GPU：开"
+if [[ "$host_role" == peer ]]; then
+  # 第二台：配置是起活那台带过来的同一份，判得过；不连任何一台、不打相对的键，调用方照单机跑（文件头「这一台是第二台」）
+  echo "双机：关（这一台是第二台：SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer，配置 $configuration_file 是起活那台带过来的同一份；第二台上不再往第二台起活），${gpu_text}"
+  exit 3
+fi
 if [[ "${configuration[ENABLE_ACROSS_MACHINES]}" != 1 && "$configuration_break" != switch-off-is-on ]]; then
   # 双机关着：配置判得过，不连第二台；调用方照单机跑
   echo "双机：关（配置 $configuration_file 里 ENABLE_ACROSS_MACHINES 没写或不是 1；要开就在里面写一行 ENABLE_ACROSS_MACHINES=1），${gpu_text}"
@@ -242,5 +276,22 @@ elif (( emit_assignments || emit_hosts )); then
     done
   fi
 else
-  echo "双机：开，${gpu_text}；配置 $configuration_file，$peer_description"
+  # 两台配置一不一致（文件头「两台配置一不一致」）：本机这一份与第二台专用目录下常驻那一份的 sha256，只报
+  local_sum="$(sha256sum < "$configuration_file")"
+  local_sum="${local_sum%% *}"
+  standing_configuration="${configuration[PEER_REPOSITORY_DIRECTORY]}/multi-host.env"
+  if [[ "${SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE:-0}" == 1 ]]; then
+    standing_sum="$( { test -f "$standing_configuration" && sha256sum < "$standing_configuration"; } 2>/dev/null)"
+  else
+    standing_sum="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "${configuration[PEER_SSH_HOST]}" "test -f $(printf '%q' "$standing_configuration") && sha256sum < $(printf '%q' "$standing_configuration")" </dev/null 2>/dev/null)"
+  fi
+  standing_sum="${standing_sum%% *}"
+  if [[ -z "$standing_sum" ]]; then
+    consistency_text="第二台还没有常驻的那一份（下一趟起活时由入口带过去、核过 sha256 再跑）"
+  elif [[ "$standing_sum" == "$local_sum" || "$configuration_break" == differing-reported-same ]]; then
+    consistency_text="两台配置一致（sha256 前 12 位 ${local_sum:0:12}）"
+  else
+    consistency_text="两台配置不一致：第二台常驻的那一份 sha256 前 12 位 ${standing_sum:0:12}，本机这一份 ${local_sum:0:12}（本机这一份在上一趟起活之后改过；下一趟起活时入口重新带过去、核过再跑）"
+  fi
+  echo "双机：开，${gpu_text}；配置 $configuration_file，$peer_description；$consistency_text"
 fi

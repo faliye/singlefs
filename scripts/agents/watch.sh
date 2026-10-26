@@ -20,6 +20,7 @@
 #   bash scripts/agents/watch.sh --dry-run …                           只打印要跑的命令，不跑
 #   bash scripts/agents/watch.sh --selftest
 # 弄坏开关（只给证红用；自证不逐个打开，打开后跑 --selftest 核红在点名那一格）：
+#   WATCH_BREAK=floorkeydropped  process-rss-floor-mebibytes 这个键读了不转成选项（键表里新加的键自证不核的样子）   自检⑩红
 #   WATCH_BREAK=ackcommajoined  --ack 的逗号连写不拆，整串原样当一条交过去（改前的样子：连写的几个进程照报）   自检⑨红
 set -uo pipefail
 
@@ -32,9 +33,11 @@ watchdog="$here/agent-watch.py"
 
 die() { echo "  ✗ $1" >&2; echo "     → 怎么办：$2" >&2; exit 2; }
 
+# 配置里认的键（agent-watch.py 的长选项名去掉 --）：新加的键写在这一处，自证⑩逐个核它们转得成同名选项、且都是 agent-watch.py 认的选项
+KNOWN_CONFIG_KEYS=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes progress-stale-minutes kept-copy-hours scratch-idle-hours terminate-after-unacknowledged-reports memory-peak-alert-cap-percent root-free-gib-alert process-rss-floor-mebibytes "
 # 配置转成选项；不认识的 key、不是整数的值都拒绝，免得一个拼错的 key 被安静地丢掉
 config_options() {
-  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes progress-stale-minutes kept-copy-hours scratch-idle-hours terminate-after-unacknowledged-reports "
+  local line key value known="$KNOWN_CONFIG_KEYS"
   [[ -f "$conf" ]] || return 0
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
@@ -45,6 +48,7 @@ config_options() {
     value="${line#*=}"
     [[ "$known" == *" $key "* ]] || die "$conf 里的 key「$key」agent-watch.py 不认识" "key 用 agent-watch.py 的长选项名去掉 --，可写的那几个列在 $conf 文件头"
     [[ "$value" =~ ^[0-9]+$ ]] || die "$conf 里「$key」的值「$value」不是整数" "改成整数"
+    [[ "${WATCH_BREAK:-}" == floorkeydropped && "$key" == process-rss-floor-mebibytes ]] && continue   # 弄坏开关：这一个键读了不转（自检⑩红）
     printf -- '--%s\n%s\n' "$key" "$value"
   done < "$conf"
 }
@@ -64,11 +68,11 @@ selftest() {
   # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
   trap "rm -rf -- '$scratch'" EXIT
   # ① 配置里的 key 原样转成选项、agent 号逗号与空格都认
-  printf 'tool-minutes = 12\n# 注释\n\nmax-minutes=30\nleftover-background-grace-minutes=3\nprocess-rss-gibibytes=6\nkept-copy-hours=5\nscratch-idle-hours=4\nterminate-after-unacknowledged-reports=2\n' > "$scratch/ok.conf"
+  printf 'tool-minutes = 12\n# 注释\n\nmax-minutes=30\nleftover-background-grace-minutes=3\nprocess-rss-gibibytes=6\nkept-copy-hours=5\nscratch-idle-hours=4\nterminate-after-unacknowledged-reports=2\nmemory-peak-alert-cap-percent=40\nroot-free-gib-alert=100\n' > "$scratch/ok.conf"
   out="$(WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run a0000000000000001,a0000000000000002 a0000000000000003 2>&1)"
   [[ "$out" == *"--agents a0000000000000001,a0000000000000002,a0000000000000003"* && "$out" == *"--tool-minutes 12"* && "$out" == *"--max-minutes 30"* \
      && "$out" == *"--leftover-background-grace-minutes 3"* && "$out" == *"--process-rss-gibibytes 6"* && "$out" == *"--kept-copy-hours 5"* && "$out" == *"--scratch-idle-hours 4"* \
-     && "$out" == *"--terminate-after-unacknowledged-reports 2"* ]] \
+     && "$out" == *"--terminate-after-unacknowledged-reports 2"* && "$out" == *"--memory-peak-alert-cap-percent 40"* && "$out" == *"--root-free-gib-alert 100"* ]] \
     || { echo "  ✗ 自检①：配置或 agent 号没转对：$out"; fail=1; }   # gate-lint:detail
   checked=$((checked + 1))
   # ② 拼错的 key 必须拒绝，不许安静丢掉
@@ -120,6 +124,19 @@ selftest() {
   if WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run --processes --ack 上下文过大,进程:3162530 >/dev/null 2>&1; then
     echo "  ✗ 自检⑨：逗号连写头一条形态不对没被拒绝"; fail=1   # gate-lint:detail
   fi
+  checked=$((checked + 1))
+  # ⑩ 键表里的每一个键都转成同名的长选项、且都是 agent-watch.py 认的选项（新加的键不在上面①的样本里也核到）
+  : > "$scratch/all-keys.conf"
+  for key in $KNOWN_CONFIG_KEYS; do printf '%s=7\n' "$key" >> "$scratch/all-keys.conf"; done
+  out="$(WATCH_CONF="$scratch/all-keys.conf" bash "$0" --dry-run a0000000000000001 2>&1)"
+  help_text="$(python3 "$watchdog" --help 2>&1)" || { echo "  ✗ 自检⑩：agent-watch.py --help 没退 0：${help_text: -300}"; fail=1; }   # gate-lint:detail
+  missing_forward="" missing_option=""
+  for key in $KNOWN_CONFIG_KEYS; do
+    [[ "$out" == *"--$key 7"* ]] || missing_forward+=" $key"
+    [[ "$help_text" == *"--$key"* ]] || missing_option+=" $key"
+  done
+  [[ -z "$missing_forward" ]] || { echo "  ✗ 自检⑩：键表里这些键没转成同名的长选项：$missing_forward"; fail=1; }   # gate-lint:detail
+  [[ -z "$missing_option" ]] || { echo "  ✗ 自检⑩：键表里这些键不是 agent-watch.py 的选项（--help 里找不到）：$missing_option"; fail=1; }   # gate-lint:detail
   checked=$((checked + 1))
   rm -rf "${scratch:?}"
   if ((fail)); then

@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-headers
+want=scripts/gate/no-table.sh：代码里读了弄坏开关，文件头没有一条
+want=scripts/gate/undescribed.sh:3 UNDESCRIBED_BREAK=skip 缺弄坏哪一处
+want=.claude/hooks/no-items.py:3 NO_ITEMS_BREAK=skip 缺点名的项
+want=.claude/gate.d/break-switch-headers-exempt.tsv:2 scripts/gate/written.sh 的开关表已经三样写全了，豁免那一行删掉
+want=.claude/gate.d/break-switch-headers-exempt.tsv:3 指到的 scripts/gate/gone.sh 不在，那一行删掉
+want=弄坏开关文件头：5 处不对（读开关的 4 份：写全 0 份、豁免 1 份）
+want=break-switch-headers：红（退出 1）

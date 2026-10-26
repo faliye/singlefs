@@ -1,0 +1,4 @@
+# 样本的合表（写法同 .claude/gate.d/crash-point-replay-items.tsv）：三项，两段都有、只有崩溃点重放、只有放量
+alpha	crash-case:alpha	alpha-amp	alpha	# 两段都有
+beta	crash-case:beta	-	beta	# 只有崩溃点重放
+gamma	-	gamma-amp	gamma_amp	# 只有放量

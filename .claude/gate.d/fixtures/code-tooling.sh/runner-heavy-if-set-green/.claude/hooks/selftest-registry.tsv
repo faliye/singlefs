@@ -1,0 +1,2 @@
+# 样本自己的登记表（research-script-selftests 格经 light-selftest-guard.py --registry-root <样本根> 读它）：一行一份
+scripts/gate/sample-heavy-if-set.sh	heavy-if-set:SINGLEFS_HEAVY_TESTS	# 偏离上游：样本里的假自证，变量设着就写标记文件并退 1（真家伙会在这时起 cargo 与第二台），没设走假驱动退 0

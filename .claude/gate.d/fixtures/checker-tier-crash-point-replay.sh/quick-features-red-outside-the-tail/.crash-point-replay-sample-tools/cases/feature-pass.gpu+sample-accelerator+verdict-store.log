@@ -1,0 +1,91 @@
+   Compiling singlefs-checker-tier v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_tier-0000000000000010)
+
+running 2 tests
+test tests::one_is_one ... ok
+test verdict_store::tests::store_round_trips ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gpu_pair.rs (target/release/deps/gpu_pair-0000000000000012)
+
+running 1 test
+test gpu_pair_agrees_with_the_cpu ... GPU_JUDGE_SAMPLE states=4 red_states=3
+thread 'gpu_pair_agrees_with_the_cpu' panicked at crates/singlefs-checker-tier/tests/gpu_pair.rs:8:5:
+样本断言：GPU 判出 3 个红态，CPU 判出 0 个（红的目标在 cargo 输出的尾巴之外）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+    gpu_pair_agrees_with_the_cpu
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/accelerator_items.rs (target/release/deps/accelerator_items-0000000000000011)
+
+running 2 tests
+test accelerator_items_accelerated ... SAMPLE_ACCELERATOR_PROGRESS step=1/50
+SAMPLE_ACCELERATOR_PROGRESS step=2/50
+SAMPLE_ACCELERATOR_PROGRESS step=3/50
+SAMPLE_ACCELERATOR_PROGRESS step=4/50
+SAMPLE_ACCELERATOR_PROGRESS step=5/50
+SAMPLE_ACCELERATOR_PROGRESS step=6/50
+SAMPLE_ACCELERATOR_PROGRESS step=7/50
+SAMPLE_ACCELERATOR_PROGRESS step=8/50
+SAMPLE_ACCELERATOR_PROGRESS step=9/50
+SAMPLE_ACCELERATOR_PROGRESS step=10/50
+SAMPLE_ACCELERATOR_PROGRESS step=11/50
+SAMPLE_ACCELERATOR_PROGRESS step=12/50
+SAMPLE_ACCELERATOR_PROGRESS step=13/50
+SAMPLE_ACCELERATOR_PROGRESS step=14/50
+SAMPLE_ACCELERATOR_PROGRESS step=15/50
+SAMPLE_ACCELERATOR_PROGRESS step=16/50
+SAMPLE_ACCELERATOR_PROGRESS step=17/50
+SAMPLE_ACCELERATOR_PROGRESS step=18/50
+SAMPLE_ACCELERATOR_PROGRESS step=19/50
+SAMPLE_ACCELERATOR_PROGRESS step=20/50
+SAMPLE_ACCELERATOR_PROGRESS step=21/50
+SAMPLE_ACCELERATOR_PROGRESS step=22/50
+SAMPLE_ACCELERATOR_PROGRESS step=23/50
+SAMPLE_ACCELERATOR_PROGRESS step=24/50
+SAMPLE_ACCELERATOR_PROGRESS step=25/50
+SAMPLE_ACCELERATOR_PROGRESS step=26/50
+SAMPLE_ACCELERATOR_PROGRESS step=27/50
+SAMPLE_ACCELERATOR_PROGRESS step=28/50
+SAMPLE_ACCELERATOR_PROGRESS step=29/50
+SAMPLE_ACCELERATOR_PROGRESS step=30/50
+SAMPLE_ACCELERATOR_PROGRESS step=31/50
+SAMPLE_ACCELERATOR_PROGRESS step=32/50
+SAMPLE_ACCELERATOR_PROGRESS step=33/50
+SAMPLE_ACCELERATOR_PROGRESS step=34/50
+SAMPLE_ACCELERATOR_PROGRESS step=35/50
+SAMPLE_ACCELERATOR_PROGRESS step=36/50
+SAMPLE_ACCELERATOR_PROGRESS step=37/50
+SAMPLE_ACCELERATOR_PROGRESS step=38/50
+SAMPLE_ACCELERATOR_PROGRESS step=39/50
+SAMPLE_ACCELERATOR_PROGRESS step=40/50
+SAMPLE_ACCELERATOR_PROGRESS step=41/50
+SAMPLE_ACCELERATOR_PROGRESS step=42/50
+SAMPLE_ACCELERATOR_PROGRESS step=43/50
+SAMPLE_ACCELERATOR_PROGRESS step=44/50
+SAMPLE_ACCELERATOR_PROGRESS step=45/50
+SAMPLE_ACCELERATOR_PROGRESS step=46/50
+SAMPLE_ACCELERATOR_PROGRESS step=47/50
+SAMPLE_ACCELERATOR_PROGRESS step=48/50
+SAMPLE_ACCELERATOR_PROGRESS step=49/50
+SAMPLE_ACCELERATOR_PROGRESS step=50/50
+ok
+test accelerator_items_plain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/store_only.rs (target/release/deps/store_only-0000000000000014)
+
+running 1 test
+test store_only_quick ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p singlefs-checker-tier --test gpu_pair`

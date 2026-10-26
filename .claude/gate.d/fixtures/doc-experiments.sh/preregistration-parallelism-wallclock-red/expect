@@ -1,0 +1,9 @@
+exit=1
+want=research/prompts/e186-preregistration.md:8：预计挂钟与态数乘单态耗时差一个数量级以上：「1700 条」乘「每条重编加跑测试约 1 分钟」，与写的「5 分钟」比；算出约 28.3 小时，写的约 5 分钟
+want=research/prompts/e187-preregistration.md:8：预计挂钟与态数乘单态耗时差一个数量级以上：式子「960 × 10000 × 50 毫秒 ÷ 31 ≈ 155 秒」；算出约 4.3 小时，写的约 2.58 分钟
+want=research/prompts/e197-preregistration.md:8：预计挂钟与态数乘单态耗时差一个数量级以上：「6500 次与包装起」乘「每次约 1 秒」，与写的「8 分钟」比；算出约 1.81 小时，写的约 8 分钟
+want=这次改动的跑前登记里 3 处预计挂钟与态数乘单态耗时差一个数量级以上（判了 3 条、3 份）
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（preregistration-parallelism）
+want=→ preregistration-parallelism：照 .claude/agents/experiment-designer.md「登记的固定节名」

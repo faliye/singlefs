@@ -1,0 +1,7 @@
+exit=0
+want=research/results 下的实验产物全部被 experiments.md 点名（查了 1 份）
+want=点名的 2 份产物在树里或版本库历史里都找得到
+want=已跑的 1 个实验都点了名或写明了产物未留存
+want=样本只跑 .gate-cells 点名的格：results-cited
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（results-cited），0 格本次未跑（无）

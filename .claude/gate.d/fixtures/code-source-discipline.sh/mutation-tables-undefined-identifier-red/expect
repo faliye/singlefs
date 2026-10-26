@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 这 1 行的替换文引了 crates 里找不到定义的标识符
+want=crates/mutations.tsv:8 M_替换文引了已删的标识符（改 crates/demo/src/lib.rs）：halved_before
+want=替换文引了已删或改名的标识符：改那一行的替换文
+want=mutation-tables：红（退出 1）

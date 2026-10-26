@@ -1,0 +1,58 @@
+回复与报告用中文。
+
+重型测试：不跑
+批次：records/2026-10-18-里程碑三收尾与近期欠账.md#批 11
+线程上限：31
+草稿目录：/home/fy5090/.local/share/singlefs/work/m3-close-w11-acquisition-two-rounds-pins
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/m3-close-w11-acquisition-two-rounds-pins --purpose '验证段红：两份 checker 档测试的取号旧钉值'
+报告：/home/fy5090/.local/share/singlefs/work/m3-close-w11-acquisition-two-rounds-pins/report.md
+条款：D22（单元原子性怎么合成） 已定项 8 里「取号写两轮、每轮之后一道池屏障」（系统配置落地补丁甲'，已打进主工作区，实现在 crates/singlefs-core/src/transaction.rs 的取号那一圈循环）
+要动的 crates 文件：crates/singlefs-checker-tier/tests/crash_injection_campaign.rs、crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs，需要时连同它们引的 crates/singlefs-checker-tier/src/crash_injection.rs 里的钉值
+预计挂钟：2 小时内（照批 9 丙的算法推钉值，推的）
+自证在哪跑：不跑
+
+## 这一件是什么
+
+合入后验证段的红，都是系统配置落地「取号写两轮」带进来的旧钉值。主 agent 认的依据有两个：
+- 写数 34 → 38、68 → 76，每轮多一个 2 写的段；
+- 批 9 丙改了 22 份 checker 档测试的同类钉值，这两份测试不在里面。
+
+基线 = 主工作区现状（全部补丁已打）。在副本里改，交补丁：`patch/crates.patch`，有新变异行时另交 `patch/mutations-append.tsv`。主工作区一个字不写，补丁由主 agent 打。
+算法照批 9 丙：先用旧段形算出的数和旧钉值逐个对上，确认算法没错；再按新段形重算。报告 `~/.local/share/singlefs/work/m3-close-w9-stale-shape-pins/report.md`。
+
+不碰：`crates/mutations.tsv` 里已有的行；另一个调查员在查的那几行点名的测试文件。那几个文件是 `the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads` 所在的 harness 测试、J14 判表、C821 扫描重建与 I-9.40 GPU 那几份用例，撞了就停下报告。
+
+## 关的是哪几条
+
+日志都是 b6 在主工作区跑的：
+- 崩溃轻型 `/home/fy5090/.local/share/singlefs/work/m4-revalidate6b-crash-quick.log`；
+- 各项细日志在 `~/.local/share/singlefs/crash-amplification/runs/crash-point-replay-20261020T152004Z-2287939-*/share-0.log`；
+- 变异轻型 `/home/fy5090/.local/share/singlefs/work/m4-revalidate8-mutation-quick.log` 第 499–598 行。
+
+1. **`crash_injection_campaign`：27 过、5 败**。逐条：
+   - `a_batch_that_judged_no_crash_state_is_red_under_the_new_findings_only_assertions`（:514）
+   - `a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_finding_of_the_record_checker`（:1980）
+   - `a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_finding_of_the_record_checker_alone`（:2285，「从第 12 段的第一个写数到流尾共 793 个写」，实际 795）
+   - `a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_record_checker_alone`（:1893）
+   - `a_small_fast_tier_replay_without_second_crashes_is_judged_red_by_the_small_fast_tier_assertions`（:578）
+   - `a_version_rebuilt_from_records_missing_a_unit_…`（:2128，「第 22 段的头一个写是第二次覆盖写 (1, 5) 的根槽写」，left None）
+   - `the_record_checker_positive_controls_are_not_run_on_the_share_given_placeholder_conclusions_of_the_other_host`（:1893，期望 [JournalRecord, JournalRecord, RootRecordFua]，实际 [UnitWrite×3]）
+   - `two_shares_judged_apart_and_then_imported_…`（`src/crash_injection.rs` 第 2174、2565、5620 行附近的 panic 与「TABLE_JUDGED_BY_NO_HOST」）
+   有的 panic 是用例自己要的，计数以日志为准。
+   验收：每条红的原因写清是段号、段长还是写数挪了；钉值按新段形改，算式写进报告。
+2. **`crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library`：1 败，外加一行基线不绿**。
+   - 失败的是 `the_smallest_reuse_history_the_full_run_refused_builds_its_given_states_table_without_torn_images`（:1001），报「那一槽录制写 34 次；…68 次」，实际 (38, 76)。
+   - 同一文件里 `every_step_image_and_every_image_after_a_fault_of_the_harness_samplings_judged_through_the_library_has_no_finding` 在没改坏的树上就 panic（:1104）。它是 `crates/mutations.tsv` 第 602 行「实二五 D19 已定项 5（同一处）……」点名的测试。
+   验收：两处都查清是取号两轮带来的，钉值改到新值。:1104 那一处不是钉值的，停下报告原因，不硬改。
+
+两份测试都是 checker 档，你不跑：钉值按算式推，报告逐个写推的还是量过的。交回前跑 fmt、clippy（这两个测试目标）、形式化轻型。要主 agent 跑的命令写进报告：
+- 两份测试在打完补丁的主工作区里的单跑命令（重型，带 `SINGLEFS_HEAVY_TESTS`）；
+- 变异轻型点名第 602 行。
+
+## 出口
+
+补丁在 `patch/` 下，`git apply --check` 在主工作区过。报告写全四样：
+- 每条红的原因与改法；
+- 新旧钉值与算式；
+- 推的、量过的标记；
+- 要主 agent 跑的命令。

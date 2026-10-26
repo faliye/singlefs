@@ -1,0 +1,3 @@
+exit=77
+want=research 脚本的自证这一趟一条都没判过：起的 2 条都退 77（本次未跑：「bash scripts/gate/sample-not-run-b.sh --selftest」「bash scripts/gate/sample-not-run-c.sh --selftest」），也没有复用的
+want=research-script-selftests：本次未跑

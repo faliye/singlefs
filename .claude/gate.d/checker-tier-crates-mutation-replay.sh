@@ -68,16 +68,19 @@
 #   ⚠️ stdout 里的判定与进程数无关：按变异表的行号排序再打，GATE_MUTATION_WORKERS=1 与 =8 逐字相同（并发之后重新证红的那一半）；进度、前移只进 stderr；
 #   复用了多少进 stdout 的「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：<栏>）」「（复用）」或「（拒算）」与成功句末尾「；这一趟现判 …」，比判定时去掉这几处。
 #
-# 编译目录：GATE_MUTATION_TARGET_DIR 设了用它；不然 GATE_CROSS_RUN_TMPDIR 设了放 $GATE_CROSS_RUN_TMPDIR/singlefs-crates-mutation-target；
-#   都没设放 ${SINGLEFS_CROSS_RUN_CACHE_HOME:-~/.local/share/singlefs/cross-run-cache}/singlefs-crates-mutation-target，不落 /tmp
-#   （只在 crates-mutation-rows.py 的 default_shared_target_directory 一处算，这里不另算）。分片各加 -w<片号>、各自冷编一次（prepare_shard），记覆盖的再加 -coverage。
-#   片号跨调用经锁领（claim_worker_slot，C456）：共用编译目录那一层里每个片号一把锁文件（<共用目录>.slot 是第 1 片，其余 <共用目录>-w<片号>.slot），工作进程启动时从 1 往上
-#   试拿排他 flock（不阻塞），拿到第一个空闲的就是它的片号，锁拿到进程退出；同一台机器上并发的两次调用（普通 gate.sh 与 --staged 的临时 worktree）因此拿到不相交的片号集合，
-#   不再两边的第 2 片都指向同一个 -w2、被 cargo 的目录锁互相排队。缓存目录仍按片号跨轮复用（不按仓路径或会话号分目录：--staged 的临时 worktree 每趟都会冷编）。
-#   放 GATE_CROSS_RUN_TMPDIR 不放 TMPDIR：门禁每轮给阶段的私有 TMPDIR 跑完就删，放进去每轮都要从头编。
-#   编译目录数按这一趟的工作进程数复用：派活之前，片号大于这一趟工作进程数的 -w<片号>（连同 -coverage）回收，stderr 打一行删了几份、共多大；
-#   有进程的工作目录、命令行、CARGO_TARGET_DIR 指到它、或它那一片的在用标记与片号锁被别的进程拿着的不删，逐份写明谁在用（crates-mutation-rows.py 文件头「编译目录」）。
-#   回收与默认位置的自证在 crates-mutation-rows.py --selftest，弄坏开关 GATE_MUTATION_BREAK=extratargetskept、inusetargetremoved、targetdefaulttmp（本道样本不判这一条）。
+# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）：GATE_MUTATION_TARGET_DIR 设了用它（调用方给的，跑完不删）；没设时共用模块在这一趟自己的运行目录
+#   （$TMPDIR 下的 singlefs-mutation-replay-*）里建 build/singlefs-crates-mutation-target，分片各加 -w<片号>、记覆盖的再加 -coverage、先编一份依赖的 -seed 几份都在那个 build 里，
+#   正常结束、判红、被 TERM / HUP 停都删掉（删之前核没有进程开着里面的文件，有就不删、整道判红）；GATE_CROSS_RUN_TMPDIR 不再读。
+#   只在 crates-mutation-rows.py 的 default_shared_target_directory 与 run_pool 里算，这里不另算（它文件头「编译目录」）。
+#   片号锁、调用方给的编译目录上多出来的 -w<片号> 回收照旧（同一段）；自证在 crates-mutation-rows.py --selftest，
+#   弄坏开关 GATE_MUTATION_BREAK=extratargetskept、inusetargetremoved、targetdefaulttmp、runtargetkept、runtargetopenfilesunchecked（本道样本不判这一条）。
+#   先编一份依赖（crates-mutation-rows.py 文件头「先编一份依赖」）：开 2 个以上工作进程、要现跑的行选的包够得着外部依赖时，派活之前在 <共用目录>-seed（插桩的 -seed-coverage，
+#   源码副本 -seed-source 跨轮留着、按内容同步，锁 -seed.lock）里按组各编一次，工作进程起来时只把外部依赖的产物拷进自己的两份编译目录，工作区的包照旧各编各的
+#   （编出来的二进制里编死了 CARGO_MANIFEST_DIR，拷过去 cargo 照样判 Fresh、跑的时候读先编那一份的文件）；回收不碰这几份。先编那一份里摸过的包有产物是 fresh 整道判红。
+#   自证与弄坏开关 compile-per-worker、workspaceunitsshared、seedmtimekept、seedfreshunchecked 在 crates-mutation-rows.py --selftest；本道样本不判这一条。
+# 调试信息：这一道起的每条 cargo 都带 CARGO_PROFILE_{DEV,TEST,RELEASE,BENCH}_DEBUG=false（cargo test 用 test 档、承 dev；cargo test --release 用 release 档），
+#   顶掉仓根 Cargo.toml 的 [profile.release] debug = true 与调用方的同名变量；取值进行键（工具链行），改了整张表现判一次（crates-mutation-rows.py 文件头「调试信息」）。
+#   自证与弄坏开关 debuginfo-kept、debuginfo-unkeyed 在 crates-mutation-rows.py --selftest；本道样本不判这一条。
 #   片号锁的自证同在那里：弄坏开关 GATE_MUTATION_BREAK=local-shard-numbering（两次并发调用领到的片号重叠）那一格必须判错
 #   （直接起自证时同义名 CRATES_MUTATION_ROWS_BREAK）；本道样本不判这一条。
 # 崩溃判定库：变异版上走判定库的 checker 档用例不写真跑的长期库。起 cargo 时 SINGLEFS_CRASH_AMPLIFICATION_HOME 换成 GATE_MUTATION_CRASH_LIBRARY_HOME（设了、非空），
@@ -149,10 +152,11 @@
 #   MUTATION_SHARD_RUN_BREAK 的几项只在 scripts/mutation/mutation-shard-run.sh --selftest 起的进程里认（那份自证放的标记文件 MUTATION_SHARD_RUN_SELFTEST_MARK，
 #   内容与驱动的 MUTATION_SHARD_SELFTEST_MARK_CONTENT 同一行）；别处设了，这一格判红、什么都不判：
 #   MUTATION_SHARD_RUN_BREAK=break-honored-anywhere  别处设了也认
-#       本道样本不判错；红在 scripts/mutation/mutation-shard-run.sh --selftest 的一格（「✗ ⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外…」）
+#       本道样本不判错；红在 scripts/mutation/mutation-shard-run.sh --selftest 的两格（「✗ ⑨ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外」、「✗ ⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：」）：
+#       那份自证的场景小仓带 .gate-break-sample，门禁共用库「弄坏开关只在样本根上认」那一判认它，轮到这一格自己判「设在 --selftest 之外」
 #   MUTATION_SHARD_RUN_BREAK=no-final-pass  调完驱动就按驱动的退出码退，不再整张判
-#       本道样本不开双机、不判错；红在 scripts/mutation/mutation-shard-run.sh --selftest 的五格（「✗ ① checker-tier-crates-mutation-replay 接驱动那一趟判绿…」、
-#       「✗ ① 最后那一趟全部复用…」、「✗ ① 第二台判的行连同覆盖记录导入…」、「✗ ③ 第二台那一份判完 1 条就停…」、「✗ ④ 驱动拒了之后 checker-tier-crates-mutation-replay 在本机整张判…」）
+#       本道样本不开双机、不判错；红在 scripts/mutation/mutation-shard-run.sh --selftest 的六格（「✗ ① checker-tier-crates-mutation-replay 接驱动那一趟判绿…」、
+#       「✗ ① 最后那一趟全部复用…」、「✗ ① 第二台判的行连同覆盖记录导入…」、「✗ ③ 第二台那一份判完 1 条就停…」、「✗ ④ 驱动拒了之后 checker-tier-crates-mutation-replay 在本机整张判…」、「✗ ⑮ 第二台取值缺了：」）
 #   MUTATION_SHARD_RUN_BREAK=environment-opens  GATE_MUTATION_ACROSS_MACHINES=1 照旧把双机打开、不看配置的开关
 #       本道样本不判错；红在 scripts/mutation/mutation-shard-run.sh --selftest 的一格（「✗ 单机那一趟（配置没开双机、环境变量 GATE_MUTATION_ACROSS_MACHINES=1）判绿…」）
 #   复用、续跑、只改一行只跑那一行、单元键的每一样（第二轮复查 controls 路的 S34、S30、N33、N34、N45，被改坏的单元、点名测试的闭包、V5 那一类常量）、
@@ -166,6 +170,10 @@
 #   拷贝范围含 .cargo/（.cargo/config.toml 的 [env] BINDGEN_EXTRA_CLANG_ARGS，点名的测试要编 gpu 或 verdict-store 特性的行靠它编 librocksdb-sys）也在那里判：
 #   假 cargo 见 --features gpu 而副本里读不到那个变量就照构建脚本报 stdbool.h 找不到、退 101，记「基线不绿」；弄坏开关 GATE_MUTATION_BREAK=cargoconfignotcopied
 #   拷副本时跳过 .cargo/，那一格（「拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到」）必须判错。本道样本不判这一条（样本用真 cargo、不编 librocksdb-sys）。
+#   点名的测试要上卡的行经清场起（crates-mutation-rows.py 文件头「带 gpu 特性的格经清场起」）：上卡的特性是 GPU_TEST_FEATURES 里的两个，checker 档包的 gpu 与
+#   产品 GPU 包 singlefs-background-gpu 真显卡对拍的 tests-on-a-real-gpu；点名的测试没卡时打 NOT_RUN_NO_GPU_ADAPTER 后返回成功，记本次未跑（同上「本次未跑」）。
+#   弄坏开关 GATE_MUTATION_BREAK=product-gpu-feature-unquiesced 让 tests-on-a-real-gpu 不当上卡的特性认，crates-mutation-rows.py --selftest 里
+#   「产品 GPU 包（--features tests-on-a-real-gpu）的行：…」三格必须判错；本道样本不判这一条（样本用真 cargo、没有显卡，起不了清场）。
 # 样本（fixtures/checker-tier-crates-mutation-replay.sh/；各放 .gate-cells 点名 crates-mutation-rows，setup.sh 在样本目录里 git init）：
 #   red      变异表把上限压到 512M、限时压到 20 秒：1 MiB 的缓冲改成 1536 MiB 的那条报「内存撞顶」；步长 1 改成 0、循环走不到上界的那条报「超时」，
 #            它点名的测试先往 TMPDIR 写一个 4 KiB 的文件，判定里报「临时目录已整个删掉（删前留有 1 个文件」（0 个说明 TMPDIR 没传到测试进程）；
@@ -288,7 +296,7 @@ fi
 # 整道没有复用标记：复用落在每一行的行键上（共用模块 run_stage 逐行查判定库），这里不问 stage-must-run.sh、不写整道标记。
 # 前提读的是本阶段所在那一份仓的登记表：判别力样本的目录里没有登记表，前提照样按真表判。
 python3 "$STAGE_REPOSITORY/scripts/gate/admission.py" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
-# 编译目录不在这里算（文件头「编译目录」）：GATE_MUTATION_TARGET_DIR、GATE_CROSS_RUN_TMPDIR 设了照原样传，默认位置由共用模块定
+# 编译目录不在这里算（文件头「编译目录」）：GATE_MUTATION_TARGET_DIR 设了照原样传，没设由共用模块在这一趟的运行目录里建、跑完删
 # 带内存上限跑一条命令的包装在这份阶段所在的仓里（样本仓里没有 research/）
 GATE_MUTATION_MEMORY_CAP_RUNNER="$STAGE_REPOSITORY/scripts/hosts/run-with-memory-cap.sh"
 export GATE_MUTATION_MEMORY_CAP_RUNNER

@@ -1,0 +1,3 @@
+# 样本豁免表
+scripts/gate/written.sh	# 样本：已经写全了，这一行该删
+scripts/gate/gone.sh	# 样本：文件不在，这一行该删

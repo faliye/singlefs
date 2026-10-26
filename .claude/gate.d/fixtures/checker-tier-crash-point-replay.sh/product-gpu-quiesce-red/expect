@@ -1,0 +1,10 @@
+exit=1
+want=GPU_QUIESCE step=quiesce result=read-back-failed holders=0
+want=GPU_QUIESCE step=command result=not-started
+want=GPU_QUIESCE step=restore result=not-restored holders=0
+want=✗ product-gpu-real-card-tests：真显卡对拍那一趟没起：清场回读没过或多机配置没写全 QUIESCE_*
+want=等那个进程跑完再只重跑这一格，不停它
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；feature-gated-tests：无对象可判；product-gpu-real-card-tests：红
+want=/crash-point-replay-product-gpu.
+want=.log，看完自己删）
+want=在这一道的草稿目录删掉之后还在、内容与留下那一刻逐字节相同（sha256

@@ -1,0 +1,4 @@
+exit=1
+want=crates/singlefs-background-gpu 下一个 .rs 都没有
+want=crates/singlefs-background-gpu/Cargo.toml 在，源码一份都扫不到
+want=checker-implementation-disjoint：红（退出 1）

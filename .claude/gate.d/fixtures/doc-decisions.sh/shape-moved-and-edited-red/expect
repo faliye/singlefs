@@ -1,0 +1,5 @@
+exit=1
+want=1 个新写的日期块没住进自己的节
+want=.claude/kb/decisions-history.md:5  ### 2026-10-20  不在任何 `## D<n>（` 节里，上一级标题是「## 杂项」
+want=  shape：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（shape）

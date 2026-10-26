@@ -1,0 +1,9 @@
+exit=1
+want=1 份文件在 research/results 下找到、0 份登记了却找不到
+want=research/results/e9002-sample-2026-10-21.out.gz:2  qux_ok=false
+want=里既不在最新历史条目、也不在正文里被点名
+want=样本只跑 .gate-cells 点名的格：verdict-false-named
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（verdict-false-named）
+want=→ verdict-false-named：在实验页那一次跑的历史条目里点名
+want=bash .claude/gate.d/doc-experiments.sh --check verdict-false-named

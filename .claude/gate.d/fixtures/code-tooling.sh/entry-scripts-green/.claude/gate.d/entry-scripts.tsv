@@ -1,0 +1,4 @@
+# 样本登记表：两份带齐，一份 pending
+scripts/gate/sample-entry.sh	SAMPLE_ITEM	item=,exit=,judged=	# 样本：带齐
+scripts/gate/sample_entry.py	SAMPLE_PY_ITEM	judged=,red=,reused=	# 样本：带齐，那一句分两行写
+scripts/gate/sample-pending.sh	pending	-	# 样本：还没改成入口脚本格式

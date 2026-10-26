@@ -1,0 +1,4 @@
+exit=1
+want=核里有不许的标记 crates/singlefs-replay-prefix/src/lib.rs:
+want=verifier::external
+want=verus-proof：红（退出 1）

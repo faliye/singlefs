@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-untranslated
+want=三语译文里残留没译的中文超量：2 行（英语 2 行、日语 0 行，在 1 份译文里）；排除登记表 0 处不对
+want=按文件：README.en.md  2 行
+want=README.en.md:5  英语，剩 46 个汉字（门槛 15）：意图续做做成常规路径 | 可写挂载在建立实例时无条件走续做
+want=README.en.md:8  英语，剩 15 个汉字（门槛 15）：提交时间多一倍，写吞吐少四分之一.
+want=照中文那一份同一行整行译，反引号、路径、链接目标逐字照中文
+want=doc-text.sh：1 格里 1 格红（trilingual-untranslated）

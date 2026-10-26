@@ -8,18 +8,18 @@ crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs  # 实验装
 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs  # FirstStream、first_stream 按先后叫新池新建文件流，改名漏了；改成 NewPoolFileCreationStream、new_pool_file_creation_stream 归下一批实现员
 scripts/crash/crash-amplification.sh  # 自证里按位置叫登记表头一个分项的变量 first_item（第 919 行）；归下一批工具员改名
-scripts/experiments/e142_new_pool_file_creation_dry_run.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e153_ledger_shape_and_ring_holes.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e155_third_run_release_cascade.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e164_crash_amplification_design_function_test.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e170_o3_spec_executor/comparator_q2_implementation_verdicts.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e170_o3_spec_executor_with_witness_predicates/executor_main.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487/executor_main.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion/collusion_matrix.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion/collusion_report.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion/comparator.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion/run_directory.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion/test_collusion_matrix.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_directory.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/test_segment_two.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e155_third_run_release_cascade.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e170_o3_spec_executor/comparator_q2_implementation_verdicts.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/executor_main.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/executor_main.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion/collusion_matrix.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion/collusion_report.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion/run_directory.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion/test_collusion_matrix.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_directory.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_segment_two.py  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名

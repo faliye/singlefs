@@ -1,0 +1,8 @@
+exit=1
+want=records/2026-10-22-样本调度.md:5：带「延后」，写的登记指不到——拆分提案节号「第一百零九节」指不到：records/2026-10-23-subagent拆分提案.md 与 records/2026-09-16-subagent拆分提案.md 里都没有第 109 节
+want=records/2026-10-22-样本调度.md:6：带「下一批」，写的登记指不到——拆分提案节号与序号「第九十节 ⑦」指不到：records/2026-10-23-subagent拆分提案.md 与 records/2026-09-16-subagent拆分提案.md 的第 90 节里都没有行首是「⑦」的一行
+want=records/ 下这次新增的带延后类词的行里 2 行没登记去向（判了 3 行）
+want=records/2026-10-23-subagent拆分提案.md 的「第<节号>节 <行首序号>」（新欠账登这份；records/2026-09-16-subagent拆分提案.md 里已有的节照旧认）
+want=样本只跑 .gate-cells 点名的格：deferred-items-registered
+want=doc-process-records.sh：1 格里 1 格红（deferred-items-registered）
+want=bash .claude/gate.d/doc-process-records.sh --check deferred-items-registered

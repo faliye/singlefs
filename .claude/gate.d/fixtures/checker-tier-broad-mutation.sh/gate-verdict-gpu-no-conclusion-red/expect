@@ -1,0 +1,5 @@
+exit=1
+want=广谱变异提交门禁判红：此刻源码上 6 条里 2 条沿用不了也没现判、0 条没红、0 个单元没记清单
+want=沿用不了的里要 GPU 那一趟而没有结论的 2 条（本次未跑 2、没结论 0）
+want=NO_CONCLUSION 4 none crates/singlefs-core/src/lib.rs:11:5: replace the value with MUTATED_4() gpu-not-run
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

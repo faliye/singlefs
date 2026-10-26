@@ -1,0 +1,9 @@
+exit=1
+want=none 行比基准多：replay-comparison-units.tsv 里这几行复跑写 none:，基准 HEAD 那一版里没有这样的行：
+want=     第 3 行 E992「丁」e991-c.out（research/prompts/e991-registration.md）
+want=     第 4 行 E991「己」e991-e.out（research/prompts/e991-registration.md）
+want=     第 5 行 E993「庚」e991-g.out（research/prompts/e991-registration.md）
+want=样本只跑 .gate-cells 点名的格：replay-comparison-units
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（replay-comparison-units）
+want=→ replay-comparison-units：照 .claude/gate.d/replay-comparison-units.tsv 文件头

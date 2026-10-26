@@ -9,24 +9,26 @@
 # 交驱动之前先定两台怎么分活：多机配置写了 HOST_JUDGE_WEIGHTS（两台分活的权重）就带 --host-weights 交驱动，录入段与判段同一份权重、两台分着录（文件头「两台分活的权重」）；
 # 没写才按本机卡的算力分：开了 GPU 就先在本机排一趟派活计划取速度，带 --local-states-per-second 交驱动（驱动让第二台也量一趟、按两个速度分，
 # 文件头「本机速度」）；取不到速度就不带、两台等分，并打一行说明原因。
+# 定分活之前先核第二台（文件头「第二台先核两样」）：两台工具链与 rustfmt、clippy 组件、第二台的离线依赖，哪一样没过退 78、驱动没起、本机一步都没跑。
 #
 #   crash-point-replay-shard-run.sh --merged-log <崩溃枚举用例的键> <树根> <输入指纹> <日志文件> <测试目标> <用例函数>
 #       门禁 checker-tier-crash-point-replay --full 在双机配置开着时调（scripts/crash/crash-point-replay-shard-configuration-check.sh 判得过）；键与指纹只进标签与输出，
 #       测试目标与用例函数交驱动的 <测试目标> 与 --test-filter。
 #   crash-point-replay-shard-run.sh --selftest
 #       拿假的双机驱动（CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER）与假的排计划命令（CRASH_POINT_REPLAY_SHARD_RUN_PLACEMENT_COMMAND）走一遍：交的参数、库目录、--quiesce、两台分活权重、本机速度、日志抄回、退出码照驱动；
-#       另直接起判法脚本核 HOST_JUDGE_WEIGHTS 这个键（写对、写坏、没写）；末尾开关轮逐个打开弄坏开关核点名的格红。
+#       另直接起判法脚本核 HOST_JUDGE_WEIGHTS 这个键（写对、写坏、没写）；拿假的工具链（本机与第二台各一份 rustc、cargo、rustup，第二台是本机上的一个目录：
+#       SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1）核交驱动之前先核第二台：少 clippy、缺离线依赖就拒，清单拷过去核、核完删；末尾开关轮逐个打开弄坏开关核点名的格红。
 #       命令里设了 SINGLEFS_HEAVY_TESTS（非空）时，假的那几格与开关轮都对了再跑一格真跑 real-two-hosts-run（下面「真跑那一格」）；没设时这一格报本次未跑，不算绿。
 #       退出码：0 全对，真跑那一格本次未跑（没设变量；或设了变量而双机没开、驱动退 78）也是 0，输出里写明、报进 GATE_NOT_RUN_FILE；1 有格判错。
 #
 # 真跑那一格（real-two-hosts-run）：经真驱动（本仓的 crash-amplification-two-hosts.sh，不换）跑 checker 档一条标 ignore 的崩溃枚举用例，
 #   起法与门禁 checker-tier-crash-point-replay --full 双机那一路相同（本脚本 --merged-log）。用例是 crash-case:new-pool-file-creation-stream：登记了 shard=across-machines 的四条里态数最小的
-#   （闭式 16777260 态；另三条 multi-record-publish-stream 1358954634、unlink-after-the-multi-record-publish-stream 1463812278、overwrite-fixed-script-stream 1678377204，
+#   （闭式 16777268 态；另三条 multi-record-publish-stream 1358954642、unlink-after-the-multi-record-publish-stream 1463812286、overwrite-fixed-script-stream 1678377220，
 #   各取自测试文件里断言的 closed_form；没登记 shard 的那几条不走双机驱动的两段与导入）。测试目标与用例函数从 .claude/gate.d/stage-inputs.tsv 那一行的 test= 现读。
 #   库的家目录 SINGLEFS_CRASH_AMPLIFICATION_HOME 指到自证的临时目录、带 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY=1（判定库拒绝落在 /tmp 下，这一份是一次性的）；
 #   多机配置是这台机器那一份（crash-amplification-lib.sh 的 crash_amplification_multi_host_configuration_file）拷进临时目录、ENABLE_GPU 改成 0、去掉显卡先后那两个键
-#   （不上卡、不交 --quiesce 清场）；双机没开（ENABLE_ACROSS_MACHINES 不是 1）这一格本次未跑。本机编译目录
-#   CARGO_TARGET_DIR=${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/crash-point-replay-shard-run-selftest-target（跨轮复用，不删）；第二台的照驱动（树副本上一层的 crash-amplification-target）。
+#   （不上卡、不交 --quiesce 清场）；双机没开（ENABLE_ACROSS_MACHINES 不是 1）这一格本次未跑。编译目录不另给：--merged-log 那一趟在自己的运行目录里建、跑完删
+#   （下面「编译目录」），这一格另判跑完 runs/<标签>/target 不在；第二台的在它那一趟的树里编、跑完连同树删（multi-host-run.sh 文件头 ⑤ ⑦）。
 #   判：包装退 0；runs/<标签>/record.log 里有 CRASH_LIBRARY_RECORDED class=crash_state_enumeration … library=…/crash-state-verdicts（录入段真跑或录入键命中、那一行真打）；
 #   抄回的日志（导入那一趟）里 CRASH_POINT_REPLAY_PARALLEL_START 带 imported_blocks=<正数> shard=0/2、有一行不带 blocks_left_to_other_hosts= 的 CRASH_POINT_REPLAY_PARALLEL_FINISHED（导入之后对账为空）、
 #   CRASH_POINT_REPLAY 计数行 states 等于 closed_form、violations=0、exhaustive=true。驱动退 78（运行条件：第二台连不上这一类）记本次未跑。判错时 runs/<标签>/ 下的日志拷到
@@ -40,12 +42,12 @@
 #   副本和开跑前的对不上（拷的过程中源树被换了文件）不起驱动，跑完活的主工作区和开跑前的对不上（跑的中途源树被换了文件），这一格都报「本次作废」并列出变了的文件（至多 5 个）——
 #   照「本次未跑」那一类处理（退 0，输出里写明、报进 GATE_NOT_RUN_FILE），不当红也不当绿：副本上跑出来的结论证不了现在这棵树。
 #   必红的样本：CRASH_POINT_REPLAY_SHARD_RUN_BREAK=real-run-on-live-tree（不拷树）、crates-change-not-voided（不比指纹），在假的主工作区上演（自证 real-run-* 三格，不起 cargo、不连第二台）。
-#   第二台编译之前刷源码戳、持锁（这一份没有自己的第二台编译：第二台那一份经驱动 → multi-host-run.sh 的 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY → peer-host-lib.sh 的
-#   peer_host_shared_target_guard）：这一格另判 runs/<标签>/share-1.log（第二台分份那一趟）里「· 第二台：拿到共用编译目录 … 的锁」与 SOURCE_STAMP touched= 两行都在、
-#   前者在后者之前，且都在 cargo 打的头一行 Compiling / Finished / Running 之前。必红的样本：CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-shared-target-unguarded（驱动不交那个变量，两行都没有）。
 #   驱动本机那几趟经 run-with-memory-cap.sh 起、上限是驱动的默认 38G：整条套在 run-with-memory-cap.sh 里跑时外层上限要不小于它（里层比外层大，包装退 251），
 #   所以套在外层里时按下面「内存包装」一段把外层的上限交给驱动。
 #
+# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：--merged-log 那一趟建好 <库的家目录>/runs/<标签>/ 之后，调用方没设 CARGO_TARGET_DIR 时
+#   在里面建 target、export 给排计划那一趟与双机驱动（驱动本机那几趟用它）；正常结束、驱动退非 0、被 TERM / INT 停（等手里那一步退出）都在 EXIT 上删
+#   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程、退非 0）。调用方设了的照它、不删。
 # 库目录：SINGLEFS_CRASH_AMPLIFICATION_LIBRARY 设了交驱动的 --library；没设交 <库的家目录>/crash-state-verdicts（那一份长期库，几类测试同一份，
 #   crates/singlefs-checker-tier/src/crash_library.rs 的 CRASH_LIBRARY_DIRECTORY_NAME；家目录照 SINGLEFS_CRASH_AMPLIFICATION_HOME，没设是
 #   ~/.local/share/singlefs/crash-amplification）。门禁 --start-over 照旧交这一份、另设 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1（只写不读）。
@@ -60,6 +62,15 @@
 #   驱动文件头：给了 --host-weights 录入段与判段同一份权重，观察者录入段两台分着录（挂了观察者的用例录入段几个钟头，不再由本机整份录）。
 #   值经判法脚本的 --emit-host-weights 取（SINGLEFS_MULTI_HOST_CONFIG 指到这一趟读的那一份配置），这一份不自己解析配置：退 0 打的就是值，退 3 是没写（走下面的量速度），
 #   退 1 是配置判不过（打判法的两行原话、这一份退 1、驱动没起）。
+# 第二台先核两样（欠账 拆分提案第四十七节第 2 行之一、第五十三节「同一天另一处」）：读完两台分活的权重之后、排计划量速度与交驱动之前，
+#   经 scripts/hosts/peer-host-lib.sh 读同一份多机配置（peer_host_load_configuration，SINGLEFS_MULTI_HOST_CONFIG 指到这一趟读的那一份），只调它的函数、不另写一份：
+#   peer_host_compare_toolchains 比两台 rustc -Vv、cargo -V 与 rustup component list --installed 里 rustfmt、clippy 那两行；
+#   peer_host_check_offline_dependencies 在第二台空跑 cargo metadata --offline。它要第二台上有一份清单：把树根的 Cargo.toml、Cargo.lock、.cargo/、crates/
+#   （不带 target/、target-*/、__pycache__/）rsync 到第二台 <PEER_REPOSITORY_DIRECTORY>/runs/<标签>-offline-dependencies，核完就删（收尾的 EXIT 上再兜一次）；树根没有 Cargo.toml 的不核。
+#   配置判不过（判法要连第二台，连不上也在这一类）、读出来双机关着、工具链或组件不同、清单拷不过去、离线依赖不齐，都打原因与出路、退 78、驱动没起：
+#   与驱动把第二台那一趟 multi-host-run.sh 退 255（配置、工具链、拷树、连不上）映射成的 78 是同一类。
+#   不只靠驱动里 multi-host-run.sh 的 ③ ④ 那两步：驱动分份那一段本机 0/2 与第二台 1/2 同时起，第二台那一趟在那里被拒时本机那一份照样跑完才退 78（驱动先等第二台、再等本机）；
+#   在这里先核，本机的排计划、录入与判一步都不跑。那两步照旧在驱动里跑（这里核过之后第二台又变了的，那边再拒）。
 # 本机速度（用户 2026-10-17 定「gpu任务分配时候 按照gpu的核数、算力来配置」，只在配置没写 HOST_JUDGE_WEIGHTS 时走；驱动文件头「两台怎么分」：给了 --local-states-per-second 就让第二台也排一趟计划量速度、按两个速度分，
 #   都没给就等分，两台卡不一样多时慢的那台拖着整条）：多机配置写了 ENABLE_GPU=1 时，交驱动之前先在本机跑一趟只排派活计划（SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1，不判，
 #   起法同分项驱动 crash-amplification-item.sh 排计划那一趟：共用库 crash_amplification_run_on_this_host 0/1，库取交驱动的 --library 同一份，不带发现日志），经 scripts/crash/gpu-quiesce-run.sh
@@ -73,7 +84,8 @@
 # 发现日志：环境里设 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE=<日志文件>.findings.tsv 带给驱动的本机那两趟；只有导入那一趟判完整条流、写一节（0/2 那一趟只判自己领的块、不写）。
 # 日志：驱动那几份在 <库的家目录>/runs/<标签>/（local.log、第二台那几份、import.log），标签 crash-point-replay-<用例名>-<开跑时刻>-<进程号>；跑完不删。
 # 退出码：驱动的退出码（导入那一趟 cargo test 的退出码；77、78、248、249、250–254 的含义见驱动文件头）；2 用法错；
-#   1 驱动退 0 而导入那一趟的日志不在（驱动没跑到那一步却退 0：不当绿）；多机配置判不过（HOST_JUDGE_WEIGHTS 写坏这一类，驱动没起）也是 1。
+#   1 驱动退 0 而导入那一趟的日志不在（驱动没跑到那一步却退 0：不当绿）；多机配置判不过（HOST_JUDGE_WEIGHTS 写坏这一类，驱动没起）也是 1；
+#   78 另有一种：交驱动之前核第二台没过（文件头「第二台先核两样」，驱动没起）。
 # 重型：驱动跑 checker 档用例，只在提交时或用户要求时跑（SINGLEFS_HEAVY_TESTS 由调用方带着）；--selftest 没设 SINGLEFS_HEAVY_TESTS 时不起 cargo，不算重型，
 #   设了就起真跑那一格（.claude/hooks/selftest-registry.tsv 登记 heavy-if-set:SINGLEFS_HEAVY_TESTS）。
 #
@@ -86,7 +98,7 @@
 #   log-not-copied       导入那一趟的日志不抄进日志文件
 #       log-copied
 #   exit-swallowed       驱动退非 0 也退 0
-#       driver-exit-kept
+#       driver-exit-kept run-target-red
 #   quiesce-not-passed   ENABLE_GPU=1 也不交 --quiesce
 #       quiesce-when-gpu
 #   ignore-outer-cap     套在外层内存包装里也不把外层的上限交成 --memory-cap（改前的样子：驱动用自己的默认 38G，大过外层 16G，退 251）
@@ -101,8 +113,17 @@
 #       real-run-uses-a-frozen-copy
 #   crates-change-not-voided  真跑那一格跑完不比 crates 指纹，中途 crates 变了也照常判（红的当红）
 #       real-run-voided-when-crates-change
+#   run-target-kept      跑完不删 --merged-log 那一趟自己建的编译目录（改前的样子：驱动本机那几趟在树根照树根的 target 编、跨趟留着）
+#       run-target-green run-target-red run-target-term
+#   peer-toolchain-unchecked  交驱动之前不比两台工具链与组件（改前的样子：第二台缺组件要等驱动里 multi-host-run.sh 的 ③ 才拒，本机那一份照跑）
+#       peer-components-missing-refused
+#   peer-offline-dependencies-unchecked  交驱动之前不核第二台的离线依赖（改前的样子：要等驱动里 multi-host-run.sh 的 ④ 才拒）
+#       peer-dependency-missing-refused peer-dependencies-checked-on-a-manifest-copy
 # 判法脚本的弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=host-weights-unknown（定义在判法脚本文件头）也在这一份自证里证红，开关轮单独打开它：
 #   红的格逐字是 host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red（判法脚本把这个键当不认得的键，配置判不过）。
+# 共用库的弄坏开关 PEER_HOST_LIB_BREAK（定义在 scripts/hosts/peer-host-lib.sh 文件头）有两条也在这一份自证里证红，开关轮各单独打开一次（这一份调的是库的函数，库里那一步弄坏了这里跟着红）：
+#   components-uncompared 红的格逐字是 peer-components-missing-refused；
+#   offline-dependencies-unchecked 红的格逐字是 peer-dependency-missing-refused peer-dependencies-checked-on-a-manifest-copy。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -110,6 +131,22 @@ shard_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$shard_script_directory/crash-amplification-lib.sh"
 
 shard_break_is() { [[ ",${CRASH_POINT_REPLAY_SHARD_RUN_BREAK:-}," == *",$1,"* ]]; }
+source "$shard_script_directory/../hosts/run-build-directory.sh"
+# 第二台先核两样（文件头「第二台先核两样」）只调这一份的函数
+# shellcheck source=../hosts/peer-host-lib.sh
+source "$shard_script_directory/../hosts/peer-host-lib.sh"
+
+# 收尾（EXIT trap，--merged-log 那一趟装）：删第二台上核离线依赖用的那份清单（还在的话）、删这一趟自己建的编译目录（文件头「编译目录」），
+# 没删成而本来要退 0 的改退 1。弄坏开关 run-target-kept：不删编译目录
+shard_finish() {
+  local finish_exit=$?
+  trap - EXIT
+  shard_remove_peer_manifest_copy
+  if ! run_build_directory_end $(shard_break_is run-target-kept && echo keep); then
+    (( finish_exit != 0 )) || finish_exit=1
+  fi
+  exit "$finish_exit"
+}
 
 usage_error() {
   echo "  ✗ 用法不对：$1" >&2
@@ -210,6 +247,69 @@ shard_read_host_weights() {
   esac
 }
 
+# 第二台上核离线依赖用的那份清单（文件头「第二台先核两样」）：拷过去之后置成它在第二台上的目录，删了置回空串
+shard_peer_manifest_copy=""
+# shard_remove_peer_manifest_copy：那份清单还在就在第二台上删掉（只打目录名的最后一段，不打第二台的路径）；删不掉打一句、不改退出码
+shard_remove_peer_manifest_copy() {
+  [[ -n "$shard_peer_manifest_copy" ]] || return 0
+  if ! peer_host_run / "rm -rf -- $(printf '%q' "${shard_peer_manifest_copy:?}")" >/dev/null 2>&1; then
+    echo "  ! 第二台 runs/ 下核离线依赖用的那份清单 ${shard_peer_manifest_copy##*/} 没删掉：到第二台的专用目录 runs/ 下手动删"
+  fi
+  shard_peer_manifest_copy=""
+}
+
+# shard_check_peer <配置文件> <树根> <标签>：交驱动之前先核第二台（文件头「第二台先核两样」），只调 peer-host-lib.sh 的函数；
+# 过了退 0，没过打原因与出路、退 78。直接调，不在 $(…) 里。弄坏开关 peer-toolchain-unchecked：不比工具链与组件；peer-offline-dependencies-unchecked：不核离线依赖
+shard_check_peer() {
+  local configuration_file="$1" root="$2" label="$3" load_exit=0 entry dependencies_exit=0
+  local -a entries=()
+  SINGLEFS_MULTI_HOST_CONFIG="$configuration_file" peer_host_load_configuration "$shard_script_directory/crash-point-replay-shard-configuration-check.sh" "$root" || load_exit=$?
+  if (( load_exit == 3 )); then
+    echo "  ✗ 第二台用不上：多机配置 $configuration_file 读出来双机关着（判法报「双机：关」），驱动没起、本机一步都没跑"
+    echo "     → 怎么办：单跑 SINGLEFS_MULTI_HOST_CONFIG=$configuration_file bash scripts/crash/crash-point-replay-shard-configuration-check.sh 看它为什么报关（ENABLE_ACROSS_MACHINES 要写 1，这一台不是第二台），再跑 --full"
+    return 78
+  elif (( load_exit != 0 )); then
+    echo "  ✗ 第二台用不上：照上面那一行，多机配置判不过（判法要连第二台，连不上也在这一类），驱动没起、本机一步都没跑"
+    echo "     → 怎么办：照上面那一行的出路修好配置或第二台的连接，再跑 --full"
+    return 78
+  fi
+  if shard_break_is peer-toolchain-unchecked; then
+    echo "  ! 弄坏开关 CRASH_POINT_REPLAY_SHARD_RUN_BREAK=peer-toolchain-unchecked：交驱动之前不比两台工具链与组件"
+  elif ! peer_host_compare_toolchains; then
+    echo "  ✗ 第二台用不上：两台的工具链不同（上面那一行），驱动没起、本机一步都没跑"
+    echo "     → 怎么办：照上面那一行的出路把两台装成同一个工具链、装齐 rustfmt 与 clippy，再跑 --full"
+    return 78
+  else
+    echo "  · 第二台先核：两台的工具链与 rustfmt、clippy 组件相同（$peer_host_toolchain_text）"
+  fi
+  if shard_break_is peer-offline-dependencies-unchecked; then
+    echo "  ! 弄坏开关 CRASH_POINT_REPLAY_SHARD_RUN_BREAK=peer-offline-dependencies-unchecked：交驱动之前不核第二台的离线依赖"
+    return 0
+  fi
+  if [[ ! -f "$root/Cargo.toml" ]]; then
+    echo "  · 第二台先核：树根没有 Cargo.toml，不核离线依赖"
+    return 0
+  fi
+  for entry in Cargo.toml Cargo.lock .cargo crates; do
+    if [[ -e "$root/$entry" ]]; then entries+=("$entry"); fi
+  done
+  shard_peer_manifest_copy="$PEER_REPOSITORY_DIRECTORY/runs/$label-offline-dependencies"
+  if ! peer_host_run / "mkdir -p -- $(printf '%q' "$shard_peer_manifest_copy")" >/dev/null \
+     || ! ( cd "$root" && peer_host_copy --relative --exclude=target/ --exclude='target-*/' --exclude=__pycache__/ "${entries[@]}" "$(peer_host_path "$shard_peer_manifest_copy")/" ); then
+    shard_remove_peer_manifest_copy
+    echo "  ✗ 第二台用不上：清单（Cargo.toml、Cargo.lock、.cargo/、crates/）拷不到第二台专用目录的 runs/ 下，核不了离线依赖，驱动没起、本机一步都没跑"
+    echo "     → 怎么办：看第二台盘满没满、配置的 PEER_REPOSITORY_DIRECTORY 可不可写，再跑 --full"
+    return 78
+  fi
+  peer_host_check_offline_dependencies "$shard_peer_manifest_copy" || dependencies_exit=$?
+  shard_remove_peer_manifest_copy
+  if (( dependencies_exit != 0 )); then
+    echo "  ✗ 第二台用不上：离线依赖没核过（上面那一行），驱动没起、本机一步都没跑"
+    echo "     → 怎么办：照上面那一行的办法补齐第二台的 cargo 缓存，再跑 --full"
+    return 78
+  fi
+}
+
 # run_merged_log <键> <树根> <指纹> <日志> <测试目标> <用例函数>：交双机驱动，导入那一趟的日志抄进 <日志>；退出码照文件头「退出码」。
 run_merged_log() {
   local key="$1" root="$2" fingerprint="$3" log="$4" target="$5" function="$6"
@@ -222,6 +322,11 @@ run_merged_log() {
   library_home="${SINGLEFS_CRASH_AMPLIFICATION_HOME:-$HOME/.local/share/singlefs/crash-amplification}"
   library="${SINGLEFS_CRASH_AMPLIFICATION_LIBRARY:-$library_home/crash-state-verdicts}"
   label="crash-point-replay-${key#crash-case:}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  # 这一趟的编译目录（文件头「编译目录」）：收尾的 EXIT trap（shard_finish）删
+  run_build_directory_begin "$library_home/runs/$label" || return 78
+  trap shard_finish EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
   driver="${CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER:-$root/scripts/crash/crash-amplification-two-hosts.sh}"
   local -a driver_arguments=("$target" --test-filter "$function" --label "$label")
   shard_break_is library-not-passed || driver_arguments+=(--library "$library")
@@ -235,6 +340,8 @@ run_merged_log() {
   # 两台分活的权重（文件头「两台分活的权重」）：配置写了 HOST_JUDGE_WEIGHTS 就带 --host-weights 交驱动、不再量速度；弄坏开关 host-weights-not-passed：写了也不带，当没写走量速度那一支
   shard_read_host_weights "$configuration_file" "$root" || return 1
   if shard_break_is host-weights-not-passed; then shard_host_weights=""; fi
+  # 第二台先核两样（文件头「第二台先核两样」）：没过退 78，排计划与驱动都不起
+  shard_check_peer "$configuration_file" "$root" "$label" || return "$?"
   shard_local_speed="" shard_speed_reason=""
   if [[ -n "$shard_host_weights" ]]; then
     echo "  · 两台分活权重：$shard_host_weights（多机配置 HOST_JUDGE_WEIGHTS）：交驱动 --host-weights，录入段与判段同一份权重、两台分着录；不排计划量速度"
@@ -278,6 +385,10 @@ run_merged_log() {
 FAKE_TWO_HOSTS_DRIVER='#!/usr/bin/env bash
 printf "%s\n" "$*" > "${FAKE_DRIVER_CONTROL:?}/arguments"
 printf "%s\n" "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE-unset}" > "$FAKE_DRIVER_CONTROL/findings-file"
+# 编译目录那几格（run-target-*）：记下收到的 CARGO_TARGET_DIR、往里写一份产物；$FAKE_DRIVER_CONTROL/sleep 写了秒数就睡这么久（被 TERM 停那一格）
+printf "%s\n" "${CARGO_TARGET_DIR-unset}" > "$FAKE_DRIVER_CONTROL/target"
+if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then mkdir -p "$CARGO_TARGET_DIR/release" && echo built > "$CARGO_TARGET_DIR/release/artifact"; fi
+if [[ -f "$FAKE_DRIVER_CONTROL/sleep" ]]; then sleep "$(cat "$FAKE_DRIVER_CONTROL/sleep")"; fi
 label=""
 local_cap=""
 while (($#)); do
@@ -332,38 +443,108 @@ exit 99
 '
 selftest_cells=(library-default library-from-environment log-copied driver-exit-kept quiesce-when-gpu no-import-log-red findings-file threads-passed outer-memory-cap-to-driver local-speed-passed local-speed-unavailable-equal-split
   host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red
-  real-run-uses-a-frozen-copy real-run-voided-when-crates-change real-run-red-when-crates-unchanged)
+  real-run-uses-a-frozen-copy real-run-voided-when-crates-change real-run-red-when-crates-unchanged
+  run-target-green run-target-red run-target-term run-target-caller
+  peer-components-missing-refused peer-dependency-missing-refused peer-dependencies-checked-on-a-manifest-copy)
 selftest_host_weights_cells="host-weights-emitted host-weights-bad-refused host-weights-unwritten host-weights-passed host-weights-bad-red"  # MULTI_HOST_CONFIGURATION_BREAK=host-weights-unknown 该红的五格
 selftest_zero_fingerprint="0000000000000000000000000000000000000000000000000000000000000000"
 
-# selftest_write_configuration <ENABLE_GPU 的值> [<HOST_JUDGE_WEIGHTS 的值>]：写自证用的多机配置（判法脚本要的八个必写键齐、双机开；给了第二个参数（空串也算）就写 HOST_JUDGE_WEIGHTS 一行）
+# selftest_write_configuration <ENABLE_GPU 的值> [<HOST_JUDGE_WEIGHTS 的值>]：写自证用的多机配置（判法脚本要的八个必写键齐、双机开；给了第二个参数（空串也算）就写 HOST_JUDGE_WEIGHTS 一行）。
+# 第二台是本机上的目录（包装经 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 起）：专用目录 <自证目录>/peer/repository，cargo 目录是放假工具链的 <自证目录>/peer/cargo-bin
 selftest_write_configuration() {
   {
-    printf '%s\n' PEER_SSH_HOST=selftest-peer PEER_REPOSITORY_DIRECTORY=/selftest/peer/repository PEER_CARGO_BIN_DIRECTORY=/selftest/peer/cargo/bin PEER_MEMORY_CAP=24G \
+    printf '%s\n' PEER_SSH_HOST=selftest-peer "PEER_REPOSITORY_DIRECTORY=$selftest_work/peer/repository" "PEER_CARGO_BIN_DIRECTORY=$selftest_work/peer/cargo-bin" PEER_MEMORY_CAP=24G \
       QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND= ENABLE_ACROSS_MACHINES=1 "ENABLE_GPU=$1"
     if (( $# >= 2 )); then printf 'HOST_JUDGE_WEIGHTS=%s\n' "$2"; fi
   } > "$selftest_work/root/multi-host.env"
 }
 
+# 树根与第二台专用目录每格从空起：第二台先核那几格往树根放清单（selftest_write_manifest_tree），别的格树根只有多机配置、不核离线依赖
 selftest_reset() {
-  rm -rf -- "${selftest_work:?}/control" "${selftest_work:?}/home"
+  rm -rf -- "${selftest_work:?}/control" "${selftest_work:?}/home" "${selftest_work:?}/root" "${selftest_work:?}/peer/repository"
   rm -f -- "${selftest_work:?}/log" "${selftest_work:?}/log.findings.tsv" "${selftest_work:?}/output"
-  mkdir -p -- "$selftest_work/control" "$selftest_work/home" "$selftest_work/root"
+  mkdir -p -- "$selftest_work/control" "$selftest_work/home" "$selftest_work/root" "$selftest_work/peer/repository"
   selftest_write_configuration 0
+}
+
+# selftest_write_manifest_tree：树根放一份小清单（Cargo.toml、Cargo.lock、.cargo/config.toml、crates/demo 的清单与 lib.rs），crates/demo 下另有一个 target/（不该拷到第二台）
+selftest_write_manifest_tree() {
+  mkdir -p -- "$selftest_work/root/crates/demo/src" "$selftest_work/root/crates/demo/target/debug" "$selftest_work/root/.cargo"
+  printf '[workspace]\nmembers = ["crates/demo"]\n' > "$selftest_work/root/Cargo.toml"
+  printf '# lock\n' > "$selftest_work/root/Cargo.lock"
+  printf '[env]\n' > "$selftest_work/root/.cargo/config.toml"
+  printf '[package]\nname = "demo"\n' > "$selftest_work/root/crates/demo/Cargo.toml"
+  : > "$selftest_work/root/crates/demo/src/lib.rs"
+  : > "$selftest_work/root/crates/demo/target/debug/built"
+}
+
+# selftest_write_fake_toolchain <目录> <哪一台：local 或 peer>：放假的 rustc、cargo、rustup（第二台那一侧经 env -i 起、读不到环境变量，控制目录的路径写死在脚本里）。
+#   rustc -Vv / -vV 打同一份版本；cargo -V 打版本；cargo metadata 往控制目录的 <哪一台>-metadata-calls 记一行「目录|参数|manifest=yes 或 no|target=yes 或 no」
+#   （树里有没有 Cargo.toml、有没有 crates/demo/target），控制目录里有 <哪一台>-dependency-missing 就照 cargo 的原话报缺 vstd、退 101；
+#   rustup component list --installed 打 cargo、clippy、rustfmt 三行，控制目录里有 <哪一台>-clippy-missing 就不打 clippy 那一行；别的调法退 97
+selftest_write_fake_toolchain() {
+  local directory="$1" side="$2" header
+  header="$(printf '#!/usr/bin/env bash\ncontrol=%q side=%q' "$selftest_work/control" "$side")"
+  mkdir -p -- "$directory"
+  cat > "$directory/rustc" <<'FAKE_RUSTC'
+#!/usr/bin/env bash
+case "${1:-}" in
+  -Vv|-vV) printf 'rustc 1.98.0 (fakefake0 2026-08-18)\nbinary: rustc\ncommit-hash: fakefake0\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\n' ;;
+  *) echo "假的 rustc：认不得 $*" >&2; exit 97 ;;
+esac
+FAKE_RUSTC
+  { printf '%s\n' "$header"; cat <<'FAKE_CARGO'
+if [[ "${1:-}" == -V ]]; then echo "cargo 1.98.0 (fakefake1 2026-08-18)"; exit 0; fi
+if [[ "${1:-}" == metadata ]]; then
+  manifest=no target=no
+  if [[ -f Cargo.toml ]]; then manifest=yes; fi
+  if [[ -e crates/demo/target ]]; then target=yes; fi
+  printf '%s|%s|manifest=%s|target=%s\n' "$PWD" "$*" "$manifest" "$target" >> "$control/$side-metadata-calls"
+  if [[ -f "$control/$side-dependency-missing" ]]; then
+    echo 'error: no matching package named `vstd` found' >&2
+    echo 'location searched: registry `crates-io`' >&2
+    exit 101
+  fi
+  echo '{"packages":[]}'
+  exit 0
+fi
+echo "假的 cargo：认不得 $*" >&2
+exit 97
+FAKE_CARGO
+  } > "$directory/cargo"
+  { printf '%s\n' "$header"; cat <<'FAKE_RUSTUP'
+if [[ "$*" == "component list --installed" ]]; then
+  echo cargo-x86_64-unknown-linux-gnu
+  if [[ ! -f "$control/$side-clippy-missing" ]]; then echo clippy-x86_64-unknown-linux-gnu; fi
+  echo rustfmt-x86_64-unknown-linux-gnu
+  exit 0
+fi
+echo "假的 rustup：认不得 $*" >&2
+exit 97
+FAKE_RUSTUP
+  } > "$directory/rustup"
+  chmod +x "$directory/rustc" "$directory/cargo" "$directory/rustup"
 }
 
 # selftest_run_wrapper <日志> [环境 键=值…]：起这一份 --merged-log，输出写 <自证目录>/output，退出码放进 selftest_exit（直接调，不在 $(…) 里）
 selftest_exit=""
-selftest_run_wrapper() {
-  local log="$1"
-  shift
-  local -a wrapper_environment=(-u SINGLEFS_CRASH_AMPLIFICATION_LIBRARY -u SINGLEFS_CRASH_POINT_REPLAY_THREADS -u SINGLEFS_MULTI_HOST_CONFIG
+selftest_wrapper_environment=()
+# selftest_build_wrapper_environment [环境 键=值…]：env 要的参数（先清掉会串味的变量、再设自证用的假驱动与假排计划，PATH 最前面放本机那一份假工具链、第二台是本机上的目录）
+# 放进全局数组 selftest_wrapper_environment
+selftest_build_wrapper_environment() {
+  selftest_wrapper_environment=(-u SINGLEFS_CRASH_AMPLIFICATION_LIBRARY -u SINGLEFS_CRASH_POINT_REPLAY_THREADS -u SINGLEFS_MULTI_HOST_CONFIG -u CARGO_TARGET_DIR
     -u RUN_WITH_MEMORY_CAP_OUTER_UNIT -u RUN_WITH_MEMORY_CAP_OUTER_CAP
     "SINGLEFS_CRASH_AMPLIFICATION_HOME=$selftest_work/home" "FAKE_DRIVER_CONTROL=$selftest_work/control"
     "FAKE_DRIVER_REAL_DRIVER=$shard_script_directory/crash-amplification-two-hosts.sh"
     "CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER=$selftest_work/fake-driver.sh"
-    "CRASH_POINT_REPLAY_SHARD_RUN_PLACEMENT_COMMAND=$selftest_work/fake-placement.sh" "$@")
-  if env "${wrapper_environment[@]}" bash "$0" --merged-log crash-case:demo "$selftest_work/root" "$selftest_zero_fingerprint" "$log" demo_target demo_function >"$selftest_work/output" 2>&1; then
+    "CRASH_POINT_REPLAY_SHARD_RUN_PLACEMENT_COMMAND=$selftest_work/fake-placement.sh"
+    "PATH=$selftest_work/local-bin:$PATH" SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 "$@")
+}
+selftest_run_wrapper() {
+  local log="$1"
+  shift
+  selftest_build_wrapper_environment "$@"
+  if env "${selftest_wrapper_environment[@]}" bash "$0" --merged-log crash-case:demo "$selftest_work/root" "$selftest_zero_fingerprint" "$log" demo_target demo_function >"$selftest_work/output" 2>&1; then
     selftest_exit=0
   else
     selftest_exit=$?
@@ -373,6 +554,43 @@ selftest_run_wrapper() {
 selftest_arguments() { cat "$selftest_work/control/arguments" 2>/dev/null; }
 selftest_last_output() { cat "$selftest_work/output" 2>/dev/null; }
 
+# 编译目录那几格（文件头「编译目录」）：调用方没设 CARGO_TARGET_DIR，假驱动收到的是 <家目录>/runs/crash-point-replay-demo-*/target，跑完不在了
+selftest_run_target_gone() { # <要的退出码>
+  local seen
+  seen="$(cat "$selftest_work/control/target" 2>/dev/null)"
+  [[ "$selftest_exit" == "$1" && "$seen" == "$selftest_work"/home/runs/crash-point-replay-demo-*/target && ! -e "$seen" ]]
+}
+cell_run_target_green() {
+  selftest_reset
+  selftest_run_wrapper "$selftest_work/log"
+  selftest_run_target_gone 0
+}
+cell_run_target_red() {
+  selftest_reset
+  echo 1 > "$selftest_work/control/exit"
+  selftest_run_wrapper "$selftest_work/log"
+  selftest_run_target_gone 1
+}
+cell_run_target_term() {   # 假驱动睡 3 秒时只给这一份发 TERM：等驱动退出后走 EXIT、退 143
+  local wrapper_pid attempt
+  selftest_reset
+  echo 3 > "$selftest_work/control/sleep"
+  # 直接把 --merged-log 那一趟放后台（env 换成 bash，$! 就是它）：TERM 只发给自己起的这一个进程号，不从子进程里按命令行挑
+  selftest_build_wrapper_environment
+  env "${selftest_wrapper_environment[@]}" bash "$0" --merged-log crash-case:demo "$selftest_work/root" "$selftest_zero_fingerprint" "$selftest_work/log" demo_target demo_function \
+    >"$selftest_work/output" 2>&1 &
+  wrapper_pid=$!
+  for (( attempt = 0; attempt < 600; attempt++ )); do [[ -s "$selftest_work/control/target" ]] && break; sleep 0.1; done
+  kill -TERM "$wrapper_pid" 2>/dev/null
+  if wait "$wrapper_pid"; then selftest_exit=0; else selftest_exit=$?; fi
+  selftest_run_target_gone 143
+}
+cell_run_target_caller() {   # 调用方设了 CARGO_TARGET_DIR：假驱动照收到它，跑完不删
+  selftest_reset
+  mkdir -p "$selftest_work/caller-target"
+  selftest_run_wrapper "$selftest_work/log" CARGO_TARGET_DIR="$selftest_work/caller-target"
+  [[ "$selftest_exit" == 0 && "$(cat "$selftest_work/control/target" 2>/dev/null)" == "$selftest_work/caller-target" && -f "$selftest_work/caller-target/release/artifact" ]]
+}
 cell_library_default() {
   selftest_reset
   selftest_run_wrapper "$selftest_work/log"
@@ -559,6 +777,42 @@ cell_host_weights_bad_red() {
   [[ "$selftest_exit" == 1 && ! -e "$selftest_work/control/arguments" && "$(selftest_last_output)" == *"HOST_JUDGE_WEIGHTS 要写两台分活的权重"* ]]
 }
 
+# 交驱动之前先核第二台（文件头「第二台先核两样」），假的工具链两台各一份、第二台是本机上的目录：
+# 第二台的 rustup 少 clippy 那一行（开了 GPU、排计划写了速度）⇒ 退 78，驱动没起、排计划也没起，输出点名第二台缺组件 clippy、说驱动没起
+cell_peer_components_missing_refused() {
+  selftest_reset
+  selftest_write_configuration 1
+  echo speed:1234 > "$selftest_work/control/placement-mode"
+  : > "$selftest_work/control/peer-clippy-missing"
+  selftest_run_wrapper "$selftest_work/log"
+  [[ "$selftest_exit" == 78 && ! -e "$selftest_work/control/arguments" && ! -e "$selftest_work/control/placement-called" \
+     && "$(selftest_last_output)" == *"第二台缺组件 clippy"*"驱动没起"* ]]
+}
+# 树根有清单、第二台 cargo metadata --offline 报缺 vstd ⇒ 退 78，驱动没起，输出点名第二台缺依赖 vstd、带同步办法，第二台 runs/ 下拷过去的那份清单删了
+cell_peer_dependency_missing_refused() {
+  local -a left
+  selftest_reset
+  selftest_write_manifest_tree
+  : > "$selftest_work/control/peer-dependency-missing"
+  selftest_run_wrapper "$selftest_work/log"
+  left=("$selftest_work"/peer/repository/runs/*-offline-dependencies)
+  [[ "$selftest_exit" == 78 && ! -e "$selftest_work/control/arguments" && -s "$selftest_work/control/peer-metadata-calls" && ! -e "${left[0]}" \
+     && "$(selftest_last_output)" == *"第二台缺依赖 vstd"*"cargo fetch"*"驱动没起"* ]]
+}
+# 过了才交驱动：树根有清单（crates/demo 下另有 target/），第二台 cargo metadata --offline 恰在 runs/<标签>-offline-dependencies 里跑了一次、那里有 Cargo.toml、没拷 target/，
+# 跑完那份删了，本机没起 cargo metadata，驱动照常起、退 0
+cell_peer_dependencies_checked_on_a_manifest_copy() {
+  local calls
+  local -a left
+  selftest_reset
+  selftest_write_manifest_tree
+  selftest_run_wrapper "$selftest_work/log"
+  calls="$(cat "$selftest_work/control/peer-metadata-calls" 2>/dev/null)"
+  left=("$selftest_work"/peer/repository/runs/*-offline-dependencies)
+  [[ "$selftest_exit" == 0 && -e "$selftest_work/control/arguments" && ! -e "$selftest_work/control/local-metadata-calls" && ! -e "${left[0]}" && "$calls" != *$'\n'* \
+     && "$calls" == "$selftest_work/peer/repository/runs/crash-point-replay-demo-"*"-offline-dependencies|metadata --offline "*"|manifest=yes|target=no" ]]
+}
+
 # 真跑那一格的冻树与 crates 指纹（文件头「真跑那一格」冻树一段），在假的主工作区上演，不起 cargo、不连第二台：假的真跑包装记下收到的树根、前后读副本里 crates/lib.rs 两次，
 # 模式 change-crates-during 时在两次之间把活的主工作区里同一份改成 version two（等同别的会话中途往 crates 里换文件），退 3（等同真跑红）。
 # selftest_real_scene <场景名> [<包装模式>]：造假的主工作区与假包装，调 real_two_hosts_run；结果在 real_cell_outcome、real_cell_detail，场景目录放进 real_scene_directory
@@ -653,11 +907,10 @@ shard_freeze_tree() {
 
 real_two_hosts_run() {
   local repository_root real configuration_source across row test_field target function label_directories runs import_copy record_log wrapper_exit
-  local frozen_tree cargo_target voided="" crates_before crates_after
+  local frozen_tree voided="" crates_before crates_after
   local -a real_wrapper
   repository_root="${real_cell_source_root:-$(cd "$shard_script_directory/../.." && pwd)}"
   real="${real_cell_work:-$selftest_work/real}"
-  cargo_target="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/crash-point-replay-shard-run-selftest-target"
   mkdir -p -- "$real/home"
   configuration_source="$(crash_amplification_multi_host_configuration_file "$repository_root")"
   across="$(crash_amplification_configuration_value "$configuration_source" ENABLE_ACROSS_MACHINES)"
@@ -690,15 +943,15 @@ real_two_hosts_run() {
     real_cell_outcome=not-run real_cell_detail="本次作废：拷树的过程中 $repository_root 的 crates 被换了文件，副本和开跑前的对不上（变了：$(shard_manifest_changes "$crates_before" "$real/crates-copy.tsv")），没起驱动"
     return 0
   fi
-  echo "  · 真跑那一格：$REAL_CELL_CASE_KEY（$target::$function）在开跑时拷出来的树 $frozen_tree 上经真驱动双机跑（三趟共用这一份源码），库的家目录 $real/home，编译目录 $cargo_target"
+  echo "  · 真跑那一格：$REAL_CELL_CASE_KEY（$target::$function）在开跑时拷出来的树 $frozen_tree 上经真驱动双机跑（三趟共用这一份源码），库的家目录 $real/home，编译目录由 --merged-log 那一趟在 runs/<标签>/target 建、跑完删"
   if [[ -n "$real_cell_wrapper" ]]; then
     real_wrapper=(bash "$real_cell_wrapper" "$frozen_tree" "$real")
   else
     real_wrapper=(bash "$0" --merged-log "$REAL_CELL_CASE_KEY" "$frozen_tree" "$selftest_zero_fingerprint" "$real/merged.log" "$target" "$function")
   fi
-  if env -u SINGLEFS_CRASH_AMPLIFICATION_LIBRARY -u CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER -u CRASH_POINT_REPLAY_SHARD_RUN_BREAK \
+  if env -u SINGLEFS_CRASH_AMPLIFICATION_LIBRARY -u CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER -u CRASH_POINT_REPLAY_SHARD_RUN_BREAK -u CARGO_TARGET_DIR \
       SINGLEFS_CRASH_AMPLIFICATION_HOME="$real/home" SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY=1 SINGLEFS_MULTI_HOST_CONFIG="$real/multi-host.env" \
-      CARGO_TARGET_DIR="$cargo_target" "${real_wrapper[@]}" >"$real/output" 2>&1; then
+      "${real_wrapper[@]}" >"$real/output" 2>&1; then
     wrapper_exit=0
   else
     wrapper_exit=$?
@@ -714,8 +967,6 @@ real_two_hosts_run() {
   label_directories=("$real/home/runs/crash-point-replay-${REAL_CELL_CASE_KEY#crash-case:}-"*)
   runs="${label_directories[0]}"
   record_log="$runs/record.log" import_copy="$real/merged.log"
-  # 第二台分份那一趟编译之前刷源码戳、持锁（文件头「真跑那一格」）：ok，或「lock=<行号> stamp=<行号> cargo=<行号>」（0 是没有）
-  local peer_guard_order=""
   if [[ -n "$voided" ]]; then
     real_cell_outcome=not-run real_cell_detail="$voided"
   elif [[ "$wrapper_exit" == 78 ]]; then
@@ -726,11 +977,8 @@ real_two_hosts_run() {
     real_cell_outcome=red real_cell_detail="$real/home/runs/ 下这一趟的日志目录不是恰好一个（${label_directories[*]}）"
   elif ! grep -qE '^CRASH_LIBRARY_RECORDED class=crash_state_enumeration item=[^ ]+ manifest=[0-9a-f]+ library=.*/crash-state-verdicts$' "$record_log" 2>/dev/null; then
     real_cell_outcome=red real_cell_detail="录入段那一趟的日志 $record_log 里没有 CRASH_LIBRARY_RECORDED class=crash_state_enumeration … library=…/crash-state-verdicts 那一行（录入段没真跑，或录进了别的库）"
-  elif peer_guard_order="$(awk '/^  · 第二台：拿到共用编译目录 / && !lock { lock = NR } /^SOURCE_STAMP touched=/ && !stamp { stamp = NR }
-                                /^ +(Compiling|Finished|Running) / && !cargo { cargo = NR }
-                                END { if (lock && stamp && lock < stamp && (!cargo || stamp < cargo)) print "ok"; else print "lock=" lock + 0 " stamp=" stamp + 0 " cargo=" cargo + 0 }' "$runs/share-1.log" 2>/dev/null)"; \
-       [[ "$peer_guard_order" != ok ]]; then
-    real_cell_outcome=red real_cell_detail="第二台分份那一趟的日志 $runs/share-1.log 里编译之前没走共用编译目录的守卫：要「· 第二台：拿到共用编译目录 … 的锁」在 SOURCE_STAMP touched= 之前、两行都在 cargo 打的头一行 Compiling / Finished / Running 之前，实际行号 ${peer_guard_order:-（日志读不了）}（0 是没有）"
+  elif [[ -e "$runs/target" ]]; then
+    real_cell_outcome=red real_cell_detail="跑完 --merged-log 那一趟自己建的编译目录 $runs/target 还在（文件头「编译目录」：正常结束要删）"
   elif ! grep -qE '^CRASH_POINT_REPLAY_PARALLEL_START .* imported_blocks=[1-9][0-9]* shard=0/2 ' "$import_copy"; then
     real_cell_outcome=red real_cell_detail="抄回的导入那一趟日志里 CRASH_POINT_REPLAY_PARALLEL_START 不带 imported_blocks=<正数> shard=0/2（第二台判的块没导进来）"
   elif [[ -z "$(grep '^CRASH_POINT_REPLAY_PARALLEL_FINISHED ' "$import_copy" | grep -v 'blocks_left_to_other_hosts=')" ]]; then
@@ -767,6 +1015,8 @@ if [[ "${1:-}" == --selftest ]]; then
   chmod +x "$selftest_work/fake-driver.sh"
   printf '%s' "$FAKE_PLACEMENT_COMMAND" > "$selftest_work/fake-placement.sh"
   chmod +x "$selftest_work/fake-placement.sh"
+  selftest_write_fake_toolchain "$selftest_work/local-bin" local
+  selftest_write_fake_toolchain "$selftest_work/peer/cargo-bin" peer
   selftest_failed=0
   red_cells="$(CRASH_POINT_REPLAY_SHARD_RUN_BREAK= run_selftest_cells)"
   if [[ -n "$red_cells" ]]; then
@@ -774,12 +1024,13 @@ if [[ "${1:-}" == --selftest ]]; then
     echo "  → 怎么办：对着文件头「用法」与这几格的判法看交给驱动的参数、日志抄回、退出码哪一样变了。"
     selftest_failed=1
   fi
-  declare -A switch_cells=([library-not-passed]="library-default library-from-environment" [log-not-copied]="log-copied" [exit-swallowed]="driver-exit-kept" [quiesce-not-passed]="quiesce-when-gpu" [ignore-outer-cap]="outer-memory-cap-to-driver"
+  declare -A switch_cells=([library-not-passed]="library-default library-from-environment" [log-not-copied]="log-copied" [exit-swallowed]="driver-exit-kept run-target-red" [quiesce-not-passed]="quiesce-when-gpu" [ignore-outer-cap]="outer-memory-cap-to-driver"
     [speed-not-passed]="local-speed-passed" [placement-failure-ignored]="local-speed-unavailable-equal-split" [host-weights-not-passed]="host-weights-passed"
-    [real-run-on-live-tree]="real-run-uses-a-frozen-copy" [crates-change-not-voided]="real-run-voided-when-crates-change")
+    [real-run-on-live-tree]="real-run-uses-a-frozen-copy" [crates-change-not-voided]="real-run-voided-when-crates-change" [run-target-kept]="run-target-green run-target-red run-target-term"
+    [peer-toolchain-unchecked]="peer-components-missing-refused" [peer-offline-dependencies-unchecked]="peer-dependency-missing-refused peer-dependencies-checked-on-a-manifest-copy")
   switch_count=0
   for switch in library-not-passed log-not-copied exit-swallowed quiesce-not-passed ignore-outer-cap speed-not-passed placement-failure-ignored host-weights-not-passed \
-      real-run-on-live-tree crates-change-not-voided; do
+      real-run-on-live-tree crates-change-not-voided run-target-kept peer-toolchain-unchecked peer-offline-dependencies-unchecked; do
     switch_count=$((switch_count + 1))
     red_cells="$(CRASH_POINT_REPLAY_SHARD_RUN_BREAK="$switch" run_selftest_cells)"
     echo "  · 开关轮：CRASH_POINT_REPLAY_SHARD_RUN_BREAK=$switch 红的格：${red_cells:-（无）}"
@@ -798,8 +1049,21 @@ if [[ "${1:-}" == --selftest ]]; then
     echo "  → 怎么办：判法脚本文件头「弄坏开关」那一张表与它里面 host-weights-unknown 的分支对一遍。"
     selftest_failed=1
   fi
+  # 共用库的弄坏开关（文件头末尾那一段）：这一份调的是 peer-host-lib.sh 的函数，库里那一步弄坏了这里跟着红
+  declare -A library_switch_cells=([components-uncompared]="peer-components-missing-refused"
+    [offline-dependencies-unchecked]="peer-dependency-missing-refused peer-dependencies-checked-on-a-manifest-copy")
+  for switch in components-uncompared offline-dependencies-unchecked; do
+    switch_count=$((switch_count + 1))
+    red_cells="$(CRASH_POINT_REPLAY_SHARD_RUN_BREAK= PEER_HOST_LIB_BREAK="$switch" run_selftest_cells)"
+    echo "  · 开关轮：PEER_HOST_LIB_BREAK=$switch 红的格：${red_cells:-（无）}"
+    if [[ "$red_cells" != "${library_switch_cells[$switch]}" ]]; then
+      echo "  ✗ 开关轮：打开 PEER_HOST_LIB_BREAK=$switch 该红的是「${library_switch_cells[$switch]}」，实际红的是「$red_cells」"
+      echo "  → 怎么办：scripts/hosts/peer-host-lib.sh 文件头这一条开关与这一份 shard_check_peer 调它的那一步对一遍。"
+      selftest_failed=1
+    fi
+  done
   if (( selftest_failed )); then exit 1; fi
-  light_summary="${#selftest_cells[@]} 格绿（假的双机驱动：参数、库目录、--quiesce、日志抄回、退出码、发现日志、线程、外层内存上限；假的排计划命令：本机速度交驱动、取不到速度等分；多机配置的 HOST_JUDGE_WEIGHTS：写对、写坏、没写、交驱动 --host-weights；真跑那一格的冻树与 crates 指纹在假的主工作区上演：包装收到副本、中途 crates 变了报本次作废、没变照常判红），开关轮 ${switch_count} 个开关各红在点名的格"
+  light_summary="${#selftest_cells[@]} 格绿（假的双机驱动：参数、库目录、--quiesce、日志抄回、退出码、发现日志、线程、外层内存上限；假的排计划命令：本机速度交驱动、取不到速度等分；多机配置的 HOST_JUDGE_WEIGHTS：写对、写坏、没写、交驱动 --host-weights；真跑那一格的冻树与 crates 指纹在假的主工作区上演：包装收到副本、中途 crates 变了报本次作废、没变照常判红；交驱动之前先核第二台：少 clippy、缺离线依赖退 78 驱动没起，清单拷到第二台核、核完删），开关轮 ${switch_count} 个开关各红在点名的格"
   if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
     echo "  ✓ crash-point-replay-shard-run 自证（假的那几格）通过：$light_summary"
     echo "  ! 真跑那一格 real-two-hosts-run 本次未跑（这不是通过）：命令里没设 SINGLEFS_HEAVY_TESTS；要跑照文件头「真跑那一格」带 SINGLEFS_HEAVY_TESTS=user-request 起 --selftest"

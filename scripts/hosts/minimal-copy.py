@@ -168,8 +168,8 @@ def execute(arguments):
         missing = [item for item in REQUIRED_ITEMS if not os.path.lexists(os.path.join(source, item))]
         if missing and not broken("no-root-check"):
             raise ValueError(f"源树 {source} 不是仓根：缺 {'、'.join(missing)}")
-        if copy == source or copy.startswith(source + os.sep):
-            raise ValueError(f"副本 {copy} 在源树 {source} 里面（或就是它）")
+        if os.path.commonpath((source, copy)) in (source, copy):
+            raise ValueError(f"副本 {copy} 与源树 {source} 相同或互相包含")
     except ValueError as error:
         print(f"  ✗ minimal-copy.py 用法错：{error}", file=sys.stderr)
         print("  → 怎么办：minimal-copy.py <仓根> <副本目录> [--with-gate-tables] [--target-dir <编译目录>]；副本放在仓外（草稿目录）", file=sys.stderr)

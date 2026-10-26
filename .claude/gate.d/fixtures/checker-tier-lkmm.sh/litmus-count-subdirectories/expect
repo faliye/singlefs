@@ -1,0 +1,5 @@
+exit=77
+want=· 按条：现判 6、复用 0
+want=假 herd7（样本 .lkmm-fake-herd7）：4 份 litmus 全过，没起过真 herd7，这一格本次未跑
+want=litmus-verdicts：本次未跑
+not-green-by-design=litmus-verdicts 样本经假 herd7 跑（.lkmm-fake-herd7），没起过真 herd7，绿的一侧只能记本次未跑

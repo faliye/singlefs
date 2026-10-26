@@ -1,0 +1,2 @@
+# 样本豁免表
+sample-stage.sh	SAMPLE_STAGE_BREAK=noop	# 样本：这一条不复跑

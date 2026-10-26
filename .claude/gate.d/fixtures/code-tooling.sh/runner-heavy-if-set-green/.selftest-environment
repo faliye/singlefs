@@ -1,0 +1,3 @@
+# 模拟主 agent 单跑 code-tooling.sh --check research-script-selftests：命令带着 SINGLEFS_HEAVY_TESTS（给登记成 light 的自证用），也不在 gate.sh 整轮里
+SINGLEFS_HEAVY_TESTS=commit
+!GATE_NOT_RUN_FILE

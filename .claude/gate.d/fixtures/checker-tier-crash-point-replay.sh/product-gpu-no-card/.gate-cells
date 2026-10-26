@@ -1,0 +1,2 @@
+# 产品 GPU 包的真显卡对拍：没卡，三条对拍都打 NOT_RUN_NO_GPU_ADAPTER 后返回成功（都跟在 test 行后面，结局另起一行），逐条记本次未跑、不判红、不记库
+product-gpu-real-card-tests

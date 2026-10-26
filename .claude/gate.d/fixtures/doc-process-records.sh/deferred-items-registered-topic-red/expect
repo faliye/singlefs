@@ -1,0 +1,11 @@
+exit=1
+want=records/2026-10-22-样本调度.md:4：带「延后」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处
+want=records/2026-10-22-样本调度.md:5：带「下一批」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处
+want=records/2026-10-22-样本调度.md:6：带「延后」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处
+want=records/2026-10-22-样本调度.md:7：带「延后」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处
+want=records/2026-10-22-样本调度.md:8：带「下一批」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处
+want=records/ 下这次新增的带延后类词的行里 5 行没登记去向（判了 6 行）
+want=照 .claude/main-agent.md「一轮怎么开、怎么收」第 2 条在同一行写登记的编号或 文件:行
+want=样本只跑 .gate-cells 点名的格：deferred-items-registered
+want=doc-process-records.sh：1 格里 1 格红（deferred-items-registered）
+want=bash .claude/gate.d/doc-process-records.sh --check deferred-items-registered

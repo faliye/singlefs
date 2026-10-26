@@ -1,0 +1,12 @@
+exit=3
+want=样本档（快档）：
+want=查库 4 条一齐起（并行度 
+want=crash-case:settled-covered-stream：全部块都有键相同的判定、没有红（块 3：复用 3、没有判定 0、红 0、拒算 0）
+want=crash-case:slow-uncovered-stream：块没罩住（退 3：块 4：复用 1、没有判定 3、红 0、拒算 0）
+want=crash-case:fast-uncovered-stream：块没罩住（退 3：块 5：复用 2、没有判定 3、红 0、拒算 0）
+want=crash-case:other-covered-stream：全部块都有键相同的判定、没有红（块 2：复用 2、没有判定 0、红 0、拒算 0）
+want=不判红：crash-case:slow-uncovered-stream crash-case:fast-uncovered-stream
+want=✓ 登记 4 条崩溃枚举用例：实跑 0 条（登记了 red-blocks=judged-by-test，按退出码判，都绿）；查库 4 条：块全罩住 2 条、有红 0 条、本次未跑 2 条
+want=逐格：crash-case-replay：有 2 条崩溃枚举用例全量本次未跑；
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）

@@ -29,6 +29,15 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（scripts/agents/agent-watc
       当前目录与环境照外面那一条。认它照名字与位置：名字叫 gpu-quiesce-run.sh、又落在 scripts 这一层（路径尾部，同 located_in）；
       别处的同名拷贝不剥（heavy-test-guard.sh 照旧读它的正文）；--selftest 与没写 `--` 的不剥。不并进 command_under_launcher：
       host-resources-reminder.sh 按名字认 gpu-quiesce-run.sh 出 GPU 提醒，剥掉就认不出；heavy-test-guard.sh 与 classify_process 在 command_under_launcher 之后再试它。
+  command_under_two_logs(words, directory=None) -> (list[str], None) | None
+      words[0] 是 scripts/hosts/two-logs.sh（日志出两份的包装：转打、写 <名>.log 与 <名>.problems.log，退出码是被包命令的）而参数是 `[--quiet] <名> -- <命令…>` 时交回
+      `--` 之后那条命令，当前目录与环境照外面那一条；它不摘参数里的 --force，`--` 之后原样交回。认它照名字与位置：名字叫 two-logs.sh、又落在 scripts/hosts 这一层
+      （路径尾部，同 located_in）；别处的同名拷贝不剥；--selftest、--from-log 与没写 `--` 的不剥。command_under_launcher 在 detached-run.sh 之后试它，
+      所以 heavy-test-guard.sh、run-scope-guard.sh、host-resources-reminder.sh 和进程这一层的 classify_process 都看得穿它：包一层日志不让里面那条脱离这些闸。
+  command_under_run_build_directory(words, directory=None) -> (list[str], None) | None
+      words[0] 是 scripts/hosts/run-build-directory.sh（包一层起：这一趟一个自己的编译目录、跑完删）而参数是 `[--] <命令…>` 时交回那条命令，当前目录与环境照外面那一条。
+      认它照名字与位置（同 command_under_two_logs）；--selftest、没给命令的不剥。command_under_launcher 在 two-logs.sh 之后试它：包一层编译目录同样不让里面那条脱离这些闸；
+      lib_workspace_cargo_lock.py 的编译目录那一判另凭它认出「这条 cargo 有自己的编译目录」。
   classify_process(argv, cwd) -> list[HeavyTest]
       一个在跑的进程：argv 是 /proc/<pid>/cmdline 按 NUL 切开的那一串，cwd 是 /proc/<pid>/cwd 指向的目录。
       先照 lib_shell_words 剥掉 bash / sh 起脚本、bash -c、nice / timeout / env / taskset、capped.sh N 这类包装，
@@ -43,7 +52,9 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（scripts/agents/agent-watc
       heavy-test-guard.sh 拿它判子 agent 跑这一类经没经 scripts/hosts/run-with-memory-cap.sh（与重型不重型无关）。
   judged_by_name(word, directory) -> bool
       这个命令词是不是按名字判的仓内脚本（.claude/gate.d/ 下的阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在它们的仓内位置上）：
-      算不算重型、带什么参数才算，都在名字那一格判完了，要读脚本正文的一方不再读进去。
+      算不算重型、带什么参数才算，都在名字那一格判完了，要读脚本正文的一方不再读进去。放行靠参数的三份入口（OWN_COPY_ONLY_SCRIPTS：replay.sh、
+      crash-point-replay.sh、crash-amplification.sh）要命令词的整条路径逐级都不是符号链接、又正是本仓那一份才为真（own_repository_script），
+      路径尾部相同的别处拷贝与经符号链接起的（指到本仓那一份的也一样）为假、照读正文。
   selftest_judged_light(words, directory, environment=None) -> bool
       这一条是不是登记表里记成不起重活、又写成单独一个 --selftest 的自证（classify_selftest 判它放行）：要读脚本正文的一方同样不再读进去
       （正文里平常那条路上起的 cargo 不是自证跑的）。
@@ -64,7 +75,8 @@ path 依赖指到它、`workspace = true` 继承来的，或顺着 path 依赖�
 （`--manifest-path` 指到它的 Cargo.toml、-p / --package 点名它、当前目录在它里面裸跑）都按 checker-tier-cargo 判，经 bash -c、run-with-memory-cap.sh、capped.sh 包几层都一样；
 `cargo bench` 与 `cargo test` 同判（范围、--no-run、--list 都照 test 的）；-p / --package 的值先在当前目录（与 --manifest-path 指的那一份）自己的包名里找、再找工作区成员，
 独立的探针包（自己没有 [workspace]、也不是别人的成员）靠前一处才点得到；
-只编不跑（build、clippy、test --no-run、bench --no-run）与 `test -- --list` 不算。`cargo run` 只判这一支：虚拟工作区根上不带 -p 的看不出起的是哪个包，不判；
+只编不跑（build、clippy、test --no-run、bench --no-run）与 `test -- --list` 不算；`cargo mutants` 只带 --help、-h、--version、-V（一个或几个，别的参数一个都没有）的
+只打帮助或版本、不起 cargo test，也不算（MUTANTS_QUERY_ARGUMENTS；弄坏开关 mutants-help-counted 下照算）。`cargo run` 只判这一支：虚拟工作区根上不带 -p 的看不出起的是哪个包，不判；
 `cargo run` 起 checker 档包自己的装置二进制也照旧不判（只有 e152 那一个按名字算，与下面登记的红例钉表重放用法）；直接执行装置的本体与它同判、不算：`target/<profile>/<名字>`，
 与 `deps/<名字>-<哈希>` 里同它是一份的那一个（cargo build 编出、硬链接或拷贝上来的，同一个文件或逐字节相同；device_main_binary）。`deps/` 下与本体不是一份的
 （cargo test 编的装置内联单测、本体还没编出来的）照算 checker 档，拒绝说明写装置的 main 怎么起（弄坏开关 device-main-as-test）。
@@ -99,6 +111,16 @@ git、registry 来的依赖只认名字、不下载去看；Cargo.toml 读不了
 那一道的判法模块 scripts/mutation/crates-mutation-rows.py 带 --item 的（点名单跑几行，交给那一道的 --item）同一类；它别的用法（plan、row-plan、--list-items、
 static-check、judging-units、toolchain、library-directory、import、llvm-tools，与登记表里的单独 --selftest）只读或只用假 cargo，不算。
 不按「只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE」判：执行前的闸看不见进程环境，开着它也能拿登记成 checker 档的用例在本机真跑两片。
+产品 GPU 包的真显卡对拍（product_gpu_cargo_use；包 PRODUCT_GPU_PACKAGE_NAME 即 singlefs-background-gpu，特性 PRODUCT_GPU_FEATURE 即 tests-on-a-real-gpu）：cargo test 的范围里有这个包
+（工作区成员里认得出；-p 点名它而认不出工作区的照点名算，同 checker 档）、--features / -F 的值里有 tests-on-a-real-gpu（可带 <包>/ 前缀，前缀只许是这个包；或带 --all-features）、
+挑的目标会跑到集成测试（不挑，或带 --test / --tests / --all-targets；只 --lib、--doc 这类不跑 tests/ 里的目标）、--test 点了名的至少一个是对拍目标
+（product_gpu_test_targets：Cargo.toml 的 [[test]] 里 required-features 有这个特性的，或测试文件的 cfg 写了 feature = "tests-on-a-real-gpu" 的，注释行不读）：
+算重型，kind product-gpu-cargo，类名「产品 GPU 包真卡对拍」；直接执行这样的测试二进制（deps/<目标名>-<哈希>，目标名里的 - 换成 _；product_gpu_test_binaries）同类，kind product-gpu-binary。
+库单测、不开这个特性的运行（对拍目标因 required-features 不编）、只编不跑、test -- --list、cargo run、别的包开同名特性、链接这个包的别的包，都不算。
+这两个 kind 另要经 scripts/crash/gpu-quiesce-run.sh 起（GPU_QUIESCE_REQUIRED_KINDS，.claude/rules/verification.md「凡用 GPU 先清场，跑完不复原」）：classify 看不见外面包没包清场，
+剥掉包装的是 heavy-test-guard.sh 的 heavy_uses，由它的 decide 对这两个 kind 另拒不经清场起的（主 agent 带前缀也拒）。弄坏开关 product-gpu-feature-unjudged。
+罩不住的：命令词写成没展开的变量、指到这个包的测试二进制的（unexpanded_command_word_use 只认 checker 档）；对拍测试文件里 cfg 不是 feature = "…" 写法的；脚本里 python 拼出来的 cargo；
+门禁 checker-tier-crash-point-replay 的 product-gpu-real-card-tests 格与 crates 变异门禁自己起的 cargo 在阶段里面，这里不判（它们自己经清场包装起）。
 harness 档（singlefs-harness）、core、format、池级 checker（singlefs-checker）的测试随时跑，不算重型；工作区全量（--workspace / --all、
 工作区根裸跑、范围是全部成员）算「全量测试」。
 别名：--config 里 alias.<名> 或环境变量 CARGO_ALIAS_<名> 定的、子命令就是它的，看得到值就展开再判；值读不出（TOML 写坏了）按 checker 档算。
@@ -112,7 +134,7 @@ checker-tier-broad-mutation.sh（广谱变异的提交门禁：判广谱变异�
 checker-tier-formal-verification.sh（起 Verus 这个外部验证器、编装置逐行重放钉住的红例，照 .claude/rules/verification.md 的归类判据归 checker 档；类名「Verus」）；
 直接起的 verus 与 cargo verus 不算重型：写证明的实现员改一处验一次，验一个 crate 是秒级（接回可行性那一趟量到 8–21 秒），与 cargo build / clippy 同一类，
 认成重型就验不了自己写的证明；只有门禁那一道（逐格验、空真与必红世界逐处起 Verus、编装置）算。
-这一道的两份判法脚本 scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py 直接起（verus_judge_use）：先认出是这两份，再一律算这一类，
+这一道的两份判法脚本 scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py 直接起（verus_judge_use）：先认出是这两份，再一律算这一类，
 只放过字面写明的只读用法：verus-proof-check.py 的第一个参数是 toolchain（只读安装、Cargo.lock 与 cargo 缓存）、fingerprint、tool-versions、
 list-items（只读登记表、核与必红世界表，列可点名的项）之一；e165-pin-red-examples.py 照它文件头的用法判，起装置的只有 --replay：
 照它 main 的参数切法（e165_pin_mode：--check、--check-table、--replay、--backfill、--list-items 里写在后面的那个定模式，带值的选项跳过它的值）落到追加、--check、
@@ -136,14 +158,21 @@ python -c 起的算这一类。
 罩不住的：改名拷贝（两份没有签名行）、同一条命令里先 ln -s / cp 再起的、目录放变量（`env -C` 换的目录照 cd 跟，env_directory）、`script -qc`、xargs（lib_shell_words.py 那一侧的老口子）；
 python -c 的代码里把名字拼出来的（"verus-" + "proof-check.py"）、`python3 - < 脚本` 与 heredoc 喂给 python 的代码（与广谱变异那一段同一类老口子）。
 .claude/scripts/lkmm.sh 只带 --herd7-version 一个参数的（只找 herd7、打它版本输出的第一行；门禁准入登记 stage-inputs.tsv 的 environment= 起的就是它）不算，别的用法照旧算 herd7。
+直接起的 herd7 只带 -version 或 --version 一个参数的（只打版本号；HERD7_VERSION_ONLY_ARGUMENTS，写法照 LKMM_VERSION_ONLY_ARGUMENTS）同样不算，带别的参数照算 herd7
+（弄坏开关 herd7-version-flag-counted 下照算）。
 最后那一道（research 构建与单测、实验复跑两道合成）只有复跑那一格是重型：--check 只点名 research-unit-tests 的不算全部实验复跑。带 --list、--list-items 或 --tool-versions 的
 （只打格名表、逐项点名的清单、工具版本）哪一道都不算；带 --write 的（生成）不算。
+子 agent 交回前自查命名（.claude/agent-common.md 的交回前自查）：门禁 code-source-discipline.sh 的 --check 点名的格全在 vague-names、test-file-names、ordinal-names、data-names
+之内的不算提交时才跑的检查（NAMING_SELF_CHECK_CELLS，只读源码与文档文本、不编译；给几次 --check 取并集，--check=<格> 写法同样认）；不带 --check、点名里有别的格、点名为空的照旧算。
+范围声明由 run-scope-guard.sh 要，这里不判。上游 naming-lint.sh 不在 COMMIT_CHECK_SOP_SCRIPTS 里，本来就不算这一类。
 另一类「提交时才跑的检查」（COMMIT_CHECK_KINDS，类名 COMMIT_CHECK_CATEGORY；用户 2026-09-28 定：扫仓的门禁与各道 lint 只在提交前由主 agent 跑的
 scripts/gate/gate-staged.sh 跑）：不重型的门禁阶段；.claude/singlefs-ai-sop/scripts/ 下的 doc-lint.sh、gate-lint.sh、shell-lint.sh、preflight-lint.py、
 gate-overlap.py（--list 查清单不算）、rules-lint.sh、hooks-registered.sh、stage-selftest.sh；scripts/gate/gate-structure-check.py（它的 --selftest 照下一段判）；
 自证里起重活的、没登记的那几份（下一段）。
 谁能跑这一类由 heavy-test-guard.sh 定（与重型同一套放行）；看门狗 scripts/agents/agent-watch.py 在进程这一层不报这一类。
 自证（classify_selftest）：scripts/、.claude/hooks/ 下脚本的 --selftest 与 .claude/gate.d/lib/ 下共用库的直接执行（就是跑它的自证），
+门禁目录 .claude/gate.d/ 顶层以 lib- 起头的共用库（lib-lag-baseline.py 这类，GATE_TOP_LIBRARY_PREFIX；它们不是门禁阶段，gate_stage_name 同样不认）同脚本一样只认单独一个 --selftest，
+登记表里它们那一行写 light / heavy / heavy-if-set，不当门禁阶段的样本档行（gate_top_library_key；弄坏开关 gate-top-library-as-stage 下退回改前：当样本档行、命令认不出是自证），
 按同目录的登记表 selftest-registry.tsv 判（.claude/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」：自证用假的驱动、不起编译与重活，拦重型测试的闸不拦自证）。
 表里一行一份：light（自证不起 cargo、编译、虚机、herd7、Verus）而命令写成单独一个 --selftest（门禁共用库：不带参数或单独一个 --selftest）的，不算哪一类，
 谁都能跑，selftest_judged_light 为真；heavy 的照旧算提交时才跑的检查（kind commit-check-selftest）；heavy-if-set:<变量> 在命令里把那个变量设成非空时算 heavy，
@@ -165,7 +194,7 @@ selftest-work-copy-row-unchecked 下不比副本里的行，selftest-work-copy-c
 classify 先照 bash 展开、按展开出来的那几份判（下面「命令词带通配」），照字面判时它不是哪一份自证；case 的模式行（`.claude/gate.d/lib/*.py) …`）被切成命令时也是这样的词，
 照字面不当成起门禁共用库（展开出来是登记成轻的那几份，放行）。不带通配的 case 模式行（`scripts/x.sh) …`）照旧被切成一条命令（lib_shell_words.py 不认 case，老口子）。
 实验装置那一层（DEVICE_SELFTEST_PARENT 下正好一层的目录，今天登记的是 E171 装置目录里的编排与判法脚本，自证只用假驱动、假 multi-host-run 与临时目录）：
-登记表里键写 scripts/experiments/<装置>/<文件> 的行照收；命令词解到本仓那一份、写成单独一个 --selftest、又登记了的，照登记的轻重判（light 放行、不读正文，
+登记表里键写 scripts/experiment-apparatus/<装置>/<文件> 的行照收；命令词解到本仓那一份、写成单独一个 --selftest、又登记了的，照登记的轻重判（light 放行、不读正文，
 heavy 与设了变量的 heavy-if-set 算提交时才跑的检查）。这一层没登记的、带了 --selftest 之外参数的（`--selftest --cells <格>`）、别的树里路径尾部相同的不当自证，
 照没认这一层时那样按 classify 判：这一层不要求每份自证都登记，登记表外的不因此被拒（device_selftest_layer）。
 门禁样本（.claude/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」认的第三种自证形态：红绿样本目录）：同一份登记表里键是 .claude/gate.d/<阶段>.sh 的行登记
@@ -266,6 +295,8 @@ cargo mutants -d 指到别处的树。
   broad-mutation-by-name-only（驱动只按名字与位置认：指到它的符号链接、带签名行的改名拷贝、python -c 的代码里点它的都放过去）、
   broad-mutation-read-only-counted（驱动 --check-ignored 与提交门禁 --check gate-verdict 照旧算广谱变异：「广谱变异 --check-ignored 只判忽略用例登记」
     「广谱变异的提交门禁 --check=gate-verdict（等号写法）只跑判定那一格」「广谱变异的提交门禁经 nice 只跑判定那一格」三格红）、
+  naming-self-check-counted（code-source-discipline.sh 只点名那四格的 --check 照旧算提交时才跑的检查：「命名自查：点名四格」「命名自查：点名一格（等号写法）」「命名自查：--check 给两次取并集」三格红）、
+  naming-self-check-any-cell（code-source-discipline.sh 点名什么格都放行，不限那四格：「命名自查：点名里夹着别的格照算」「命名自查：只点名别的格照算」两格红）、
   detached-run-opaque（scripts/hosts/detached-run.sh start … -- <命令> 不剥，里面那条重型命令放过去）、
   detached-run-by-name-only（detached-run.sh 只按名字认：指到它的符号链接、带签名行的改名拷贝、同一条命令里先拷再起的都不剥，里面那条重型命令放过去）、
   selftest-registry-ignored（不读自证登记表，自证一律照旧算提交时才跑的检查）：判自证的格里凡期望放行（None）或期望 commit-check-selftest-unregistered 的都红（判成了 commit-check-selftest）、
@@ -319,13 +350,15 @@ cargo mutants -d 指到别处的树。
   LIB_HEAVY_TESTS_BREAK=posix-brackets-by-python-glob  带 `[:`、`[=`、`[.` 的词照旧交给 python glob（POSIX 字符类、等价类、整理符号认不出，零命中照字面判）
       cargo 那张表里「POSIX 字符类起 mutate.sh 跑 crates 整表」到「cd 到变量路径之后 POSIX 字符类起脚本照拒」七格、「POSIX 字符类起崩溃放量全量」、
       「bash 起不来时 POSIX 字符类起脚本照拒」与「造出来的登记表：POSIX 字符类起登记成 heavy 的自证」共十格红；
-      heavy-test-guard.sh --selftest 里「实现员 POSIX 字符类起 mutate.sh 跑 crates 整表：照拒」到「实现员 cd 到变量路径之后 POSIX 字符类起脚本：判不出，照拒」四格红
+      heavy-test-guard.sh --selftest 里『实现员 POSIX 字符类起 mutate.sh 跑 crates 整表：照拒』到『实现员 cd 到变量路径之后 POSIX 字符类起脚本：判不出，照拒』四格红
+      连带红的格：「✗ lib_heavy_tests 自检：等价类起 checker-tier-crash-point-replay」、「✗ lib_heavy_tests 自检：整理符号起 QEMU 那一道」、「✗ lib_heavy_tests 自检：POSIX 字符类夹在别的字符后面起 herd7 那一道（s[a[:lower:]]）」、「✗ lib_heavy_tests 自检：绝对路径里带 POSIX 字符类起 vm-bench.sh」、「✗ lib_heavy_tests 自检：参数里的 POSIX 字符类点到 crates 整表（crates/mutation[[:alph…」
   LIB_HEAVY_TESTS_BREAK=posix-brackets-unresolved-literal  bash 展不开或判不出时照字面判（与零命中一样），不拒
       cargo 那张表里「cd 到变量路径之后 POSIX 字符类起脚本照拒」与「bash 起不来时 POSIX 字符类起脚本照拒」两格红；
-      heavy-test-guard.sh --selftest 里「实现员 cd 到变量路径之后 POSIX 字符类起脚本：判不出，照拒」一格红
+      heavy-test-guard.sh --selftest 里『实现员 cd 到变量路径之后 POSIX 字符类起脚本：判不出，照拒』一格红
   LIB_HEAVY_TESTS_BREAK=crash-amplification-unnamed  崩溃放量的三份入口不按名字算重型（真跑放过去）
       cargo 那张表里「崩溃放量全量（crash-amplification.sh 不带参数）」到「POSIX 字符类起崩溃放量全量」六格红；
-      heavy-test-guard.sh --selftest 里「实现员起崩溃放量全量：照拒」到「主 agent 不带前缀起崩溃放量全量：照拒」三格与「实现员经 gpu-quiesce-run.sh 起崩溃放量全量：照拒」「主 agent不带前缀起崩溃放量全量：照拒」「主 agent不带前缀经 detached-run.sh start 起崩溃放量全量：照拒」「实现员带 =user-request 起崩溃放量全量：照拒」四格，共七格红
+      heavy-test-guard.sh --selftest 里『实现员起崩溃放量全量：照拒』到『主 agent 不带前缀起崩溃放量全量：照拒』三格与『实现员经 gpu-quiesce-run.sh 起崩溃放量全量：照拒』『主 agent不带前缀起崩溃放量全量：照拒』『主 agent不带前缀经 detached-run.sh start 起崩溃放量全量：照拒』『实现员带 =user-request 起崩溃放量全量：照拒』四格，共七格红
+      连带红的格：「✗ lib_heavy_tests 自检：崩溃放量点名分项」、「✗ lib_heavy_tests 自检：崩溃放量的分项驱动」、「✗ lib_heavy_tests 自检：崩溃放量的双机驱动真跑」、「✗ lib_heavy_tests 自检：通配起崩溃放量全量（crash-amplificatio?.sh）」、「✗ lib_heavy_tests 自检：重型：gpu-quiesce-run.sh -- 包着崩溃放量全量」
   上面这三个开关之外，已有的开关下新加的这几格跟着红（cargo 那张表 / heavy-test-guard.sh --selftest）：pattern-command-words-literal 十格（POSIX 字符类、
   等价类、整理符号起脚本的七格、「造出来的登记表：POSIX 字符类起登记成 heavy 的自证」与「通配起崩溃放量全量」「POSIX 字符类起崩溃放量全量」，参数那一格与「零命中」「合法」两格除外）/ 四格；argument-patterns-literal
   「参数里的 POSIX 字符类点到 crates 整表」一格；stage-by-number「整理符号起 QEMU 那一道」「POSIX 字符类夹在别的字符后面起 herd7 那一道」两格 / 一格；
@@ -335,56 +368,93 @@ cargo mutants -d 指到别处的树。
   三格 / 「工具实现员单独跑 crash-amplification.sh --selftest」、它的 stdin 那一格与「实现员单独跑分项驱动的自证」三格（崩溃放量入口的 --selftest 不按登记表判、
   落到按名字算重型；原先红的「工具实现员单独跑 crash-amplification.sh --selftest：读进去几份脚本」不再红，按名字判不读正文了）。
   heavy-test-guard.sh --selftest 里对应的几格（文件头写在各格旁边）在上面这几个开关下同样红。
+  LIB_HEAVY_TESTS_BREAK=experiment-replay-unnamed  实验复跑入口 scripts/experiment-apparatus/replay.sh 不按名字判（退回读正文：只列项也被读进去，正文里命令词没展开的行判成重型）
+      cargo 那张表里「实验复跑入口不带参数：全部实验复跑」「实验复跑入口点名实验」「实验复跑入口 --list-items 后面还带实验号：照拒」三格红（应当是 replay-all-stage，实际 None）；
+      按名字判那一组里「本仓那一份 replay.sh 按名字判（相对当前目录写）」「本仓那一份 replay.sh 按名字判（从 research 里写 ../）」「本仓那一份 replay.sh 按名字判（写绝对路径）」
+      「本仓那一份 replay.sh 按名字判（绝对路径里夹 ..）」四格红（应当是 True，实际 False），cargo 那张表里「路径尾部相同的别处 replay.sh 拷贝点名实验：照旧算全部实验复跑」一格红；
+      heavy-test-guard.sh --selftest 里『实现员列实验复跑入口的项（--list-items）：放行、不读正文』两项（应当是 0，实际 2：读进去撞上正文里命令词没展开的行；
+      『读进去几份脚本』应当是 0，实际 1）与『实现员起实验复跑入口点名实验：照拒』『主 agent 不带前缀起实验复跑入口：照拒』两格的『读进去几份脚本』红（应当是 0，实际 1：按名字判的不读正文）
+  LIB_HEAVY_TESTS_BREAK=judged-by-name-path-tail  放行靠参数的三份入口（replay.sh、crash-point-replay.sh、crash-amplification.sh）的 judged_by_name 退回只按路径尾部认（路径尾部相同的别处拷贝也不读正文）
+      本文件 --selftest 里按名字判（judged_by_name）那一组的「路径尾部相同的别处 replay.sh 拷贝不按名字判（读正文）」「当前目录是别处树、相对着写的 replay.sh 拷贝不按名字判（读正文）」
+      「路径尾部相同的别处 crash-point-replay.sh 拷贝不按名字判（读正文）」「路径尾部相同的别处 crash-amplification.sh 拷贝不按名字判（读正文）」
+      「经符号链接起的 replay.sh（路径尾部同仓内位置）不按名字判（读正文）」「仓根被符号链接指到，从那条链接下写本仓那一份 replay.sh 不按名字判（读正文）」
+      「当前目录是指到仓根的符号链接，相对着写的 replay.sh 不按名字判（读正文）」七格红（应当是 False，实际 True）；
+      heavy-test-guard.sh --selftest 里『实现员起路径尾部相同的实验复跑入口拷贝 --list-items（正文起 cargo）：读正文照拒』『实现员 cd 进别处树、相对着起实验复跑入口拷贝 --list-items（正文起 cargo）：读正文照拒』
+      『实现员经内存包装起路径尾部相同的崩溃点重放入口拷贝 --quick（正文起 cargo）：读正文照拒』『实现员起路径尾部相同的崩溃放量入口拷贝 --list-items（正文起 cargo）：读正文照拒』
+      『实现员起经符号链接指到本仓入口的 replay.sh --list-items（链接旁边放了改过的 preflight.sh）：不信符号链接，读正文照拒』五格红
+      （应当是 2，实际 0；读进去几份脚本应当是 1，实际 0）；cargo 那张表里新加的两格（别处 replay.sh 拷贝的 classify）不红：classify 对拷贝的判法没动
+  LIB_HEAVY_TESTS_BREAK=own-script-by-realpath  own_repository_script 退回比真实路径（符号链接按指到的算；治理轮 m3-close-gov-b17-r3 K2 之前的认法）
+      本文件 --selftest 里按名字判（judged_by_name）那一组的「指到本仓那一份的符号链接不按名字判（读正文，replay.sh）」「经符号链接起的 replay.sh（路径尾部同仓内位置）不按名字判（读正文）」
+      「中间一级是指到本仓脚本目录的符号链接，不按名字判（读正文）」「仓根被符号链接指到，从那条链接下写本仓那一份 replay.sh 不按名字判（读正文）」
+      「当前目录是指到仓根的符号链接，相对着写的 replay.sh 不按名字判（读正文）」五格红（应当是 False，实际 True）；
+      heavy-test-guard.sh --selftest 里『实现员起经符号链接指到本仓入口的 replay.sh --list-items（链接旁边放了改过的 preflight.sh）：不信符号链接，读正文照拒』两项红
+      （应当是 2，实际 0；读进去几份脚本应当是 1，实际 0；记几条检出不红）
   LIB_HEAVY_TESTS_BREAK=qemu-build-unnamed  scripts/devices/build-patched-qemu.sh 不按名字算真编 QEMU（不带参数、--rebuild 的真编放过去）
       cargo 那张表里「真编 QEMU（build-patched-qemu.sh 不带参数）」到「capped.sh 与 bash -c 包着真编 QEMU」五格红；
-      heavy-test-guard.sh --selftest 里「实现员真编 QEMU（--rebuild）：照拒」到「主 agent 不带前缀经内存包装真编 QEMU：照拒」三格红；
-      已有的开关 commit-checks-ignored、selftest-registry-ignored 下「真编 QEMU 的 --selftest 照登记表放行」与 heavy-test-guard.sh --selftest 里
-      「实现员单独跑 build-patched-qemu.sh 的自证」两格跟着红
+      heavy-test-guard.sh --selftest 里『实现员真编 QEMU（--rebuild）：照拒』到『主 agent 不带前缀经内存包装真编 QEMU：照拒』三格红；
+      已有的开关 commit-checks-ignored、selftest-registry-ignored 下『真编 QEMU 的 --selftest 照登记表放行』与 heavy-test-guard.sh --selftest 里
+      『实现员单独跑 build-patched-qemu.sh 的自证』两格跟着红
+      连带红的格：「✗ lib_heavy_tests 自检：真编 QEMU --rebuild」、「✗ lib_heavy_tests 自检：真编 QEMU 带别的参数（--force 由 preflight 摘掉，照编）」、「✗ lib_heavy_tests 自检：run-with-memory-cap.sh 包着真编 QEMU --rebuild」
   LIB_HEAVY_TESTS_BREAK=e165-pin-unexpanded-as-replay  红例钉表参数里有没展开的词就判不出、算 Verus（改前的判法：变量放进 --table、--root 的值也算重放）
       cargo 那张表里「红例钉表 --check --table 的值是变量拼的路径」到「经内存包装起红例钉表 --check --table 的值是变量」六格红（应当是 None，实际 verus-stage）；
-      heavy-test-guard.sh --selftest 里「工具实现员红例钉表 --check --table 的值是变量：放行」「工具实现员 for 循环里红例钉表 --check --root：放行」两格红
+      heavy-test-guard.sh --selftest 里『工具实现员红例钉表 --check --table 的值是变量：放行』『工具实现员 for 循环里红例钉表 --check --root：放行』两格红
+      连带红的格：「✗ lib_heavy_tests 自检：红例钉表 for 循环里 --check --root 的值是循环变量拼的路径」、「✗ lib_heavy_tests 自检：红例钉表 for 循环里 --backfill --root 的值是循环变量拼的路径」、「✗ lib_heavy_tests 自检：红例钉表追加带 --table、表与账都是变量拼的路径」、「✗ lib_heavy_tests 自检：红例钉表 --check 的账是 $(…) 拼的路径」
   LIB_HEAVY_TESTS_BREAK=e165-pin-backfill-as-append  红例钉表的 --backfill 不定模式（照它出现之前的判法，`--replay --backfill` 判成重放）
       cargo 那张表里「红例钉表 --replay 写在 --backfill 前面、以 --backfill 为准」一格红（应当是 None，实际 verus-stage）
   LIB_HEAVY_TESTS_BREAK=e165-pin-check-table-not-a-mode  红例钉表的 --check-table 不定模式（照它出现之前的判法，`--replay --check-table` 判成重放）
       cargo 那张表里「红例钉表 --replay 写在 --check-table 前面、以 --check-table 为准」一格红（应当是 None，实际 verus-stage）
   LIB_HEAVY_TESTS_BREAK=prove-red-unjudged  prove-red.sh 不按名字判（带前缀起时照跑的重型行放过去）
       cargo 那张表里「prove-red 带 SINGLEFS_HEAVY_TESTS=commit、点名 checker 档包的行」到「prove-red 带前缀、副本写在变量里：判不出照算」三格红（应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员带前缀起 prove-red、点名 checker 档包的行：照拒」一格（应当是 2，实际 0），与它、
-      「主 agent带前缀起 prove-red、点名 checker 档包的行：放行」两格的「：读进去几份脚本」（应当是 0，实际 1：不按名字判就读进替身的正文）共三格红
+      heavy-test-guard.sh --selftest 里『实现员带前缀起 prove-red、点名 checker 档包的行：照拒』一格（应当是 2，实际 0），与它、
+      『主 agent带前缀起 prove-red、点名 checker 档包的行：放行』两格的『：读进去几份脚本』（应当是 0，实际 1：不按名字判就读进替身的正文）共三格红
+      连带红的格：「✗ lib_heavy_tests 自检：prove-red 经内存包装、export 了 =user-request、--memory 写…」
   LIB_HEAVY_TESTS_BREAK=unexpanded-binary-unjudged  命令词没展开的一律不判（改前的判法）
       「命令词是循环里 ls 出来的变量、经内存包装与 capped.sh 起（第 936 行那一次的形）」到「命令词变量再点到另一个变量」四格红（应当是 checker-tier-binary，实际 None）；
-      heavy-test-guard.sh --selftest 里「三方腿经内存包装与 capped.sh 起循环里 ls 出来的 checker 档测试二进制：照拒」
-      「主 agent 不带前缀起循环里 ls 出来的 checker 档测试二进制：照拒」两格红
+      heavy-test-guard.sh --selftest 里『三方腿经内存包装与 capped.sh 起循环里 ls 出来的 checker 档测试二进制：照拒』
+      『主 agent 不带前缀起循环里 ls 出来的 checker 档测试二进制：照拒』两格红
+      连带红的格：「✗ lib_heavy_tests 自检：命令词是 $(ls …deps/<checker 档目标>-*)」、「✗ lib_heavy_tests 自检：命令词是写着字面路径的变量、带引号」
   LIB_HEAVY_TESTS_BREAK=light-tier-unrecognized  轻型三条（下面「两档里的轻型」）认不出，照重型算
       cargo 那张表里「轻型：崩溃点重放入口 --quick」到「轻型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick」九格红（应当是 None，实际 crash-point-replay、
       verus-stage 或 crates-mutation-stage）；「跑编译出来的代码：轻型：…」三格红（应当是 True，实际 False）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装起崩溃点重放入口 --quick：放行、不读正文」到「主 agent 不带前缀起崩溃点重放 --quick：放行」五格红
+      heavy-test-guard.sh --selftest 里『实现员经内存包装起崩溃点重放入口 --quick：放行、不读正文』到『主 agent 不带前缀起崩溃点重放 --quick：放行』五格红
+      连带红的格：「✗ lib_heavy_tests 自检：轻型：形式化那一道 --quick <根>」、「✗ lib_heavy_tests 自检：轻型：crates 变异那一道 --quick <根> --item <行>」、「✗ lib_heavy_tests 自检：轻型：--quick 与根之间夹的 --force 照 preflight 摘掉」、「✗ lib_heavy_tests 自检：轻型：根参数写成 $PWD」、「✗ lib_heavy_tests 自检：轻型：形式化那一道 --quick 而设的是崩溃点重放入口登记的改规模变量（不在它自己文件头的表里…」、「✗ lib_heavy_tests 自检：轻型：crates 变异那一道 --quick 而设的是形式化那一道的开关」、「✗ lib_heavy_tests 自检：轻型：crates 变异那一道 --quick 而开关变量的值为空」、「✗ lib_heavy_tests 自检：轻型：根参数写成前面赋过值的变量」、「✗ lib_heavy_tests 自检：轻型：根参数写成 $HOME/…」、「✗ lib_heavy_tests 自检：轻型：崩溃点重放入口 --local-only --quick 加点名一项」、「✗ lib_heavy_tests 自检：轻型：crates 变异那一道 --quick 的项经字面数组传」、「✗ lib_heavy_tests 自检：变量里的阶段路径带 --quick 是轻型」、「✗ lib_heavy_tests 自检：拒绝说明：--quick 而设了弄坏开关，写「结果不作轻型证据」」
   LIB_HEAVY_TESTS_BREAK=light-tier-any-arguments  带了 --quick 就当轻型，后面的 --full、--check、写成变量的项与多出的根参数都不看
       cargo 那张表里「重型：崩溃点重放入口 --quick 又带 --full」「重型：crates 变异那一道 --quick 又带 --check 点格」「重型：--quick 而点名的项写成变量」
-      「重型：--quick 带两个根参数」四格红（应当是重型的 kind，实际 None）；heavy-test-guard.sh --selftest 里「实现员起 crates 变异那一道 --quick 又带 --full：照拒」一格红
+      「重型：--quick 带两个根参数」四格红（应当是重型的 kind，实际 None）；heavy-test-guard.sh --selftest 里『实现员起 crates 变异那一道 --quick 又带 --full：照拒』一格红
+      连带红的格：「✗ lib_heavy_tests 自检：重型：--quick 而根参数写成没赋过值的变量」、「✗ lib_heavy_tests 自检：重型：crates 变异那一道 --quick 夹了 --local-only（只有崩溃点重放入口…」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 的项数组后来追加了 --full」、「✗ lib_heavy_tests 自检：重型：crates 变异那一道 --quick 的项数组元素改过」、「✗ lib_heavy_tests 自检：重型：crates 变异那一道 --quick 的项数组从文件逐行读进来」、「✗ lib_heavy_tests 自检：重型：形式化那一道 --quick 的项数组没赋过值」
   LIB_HEAVY_TESTS_BREAK=light-tier-memory-cap-unrequired  runs_compiled_code 不认轻型三条（子 agent 不经内存包装起也放过去）
-      「跑编译出来的代码：轻型：…」三格红（应当是 True，实际 False）；heavy-test-guard.sh --selftest 里「实现员不经内存包装起崩溃点重放 --quick：拒的是包装」一格红
+      「跑编译出来的代码：轻型：…」三格红（应当是 True，实际 False）；heavy-test-guard.sh --selftest 里『实现员不经内存包装起崩溃点重放 --quick：拒的是包装』一格红
   LIB_HEAVY_TESTS_BREAK=crash-point-replay-unnamed  崩溃点重放入口不按名字算重型（剪枝、逐条、全量都放过去）
       cargo 那张表里「重型：崩溃点重放入口 --quick 又带 --full」与「重型：崩溃点重放入口不带参数（剪枝）」到「重型：gpu-quiesce-run.sh -- 包着崩溃点重放入口不带参数」
       共六格红（应当是 crash-point-replay，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员起崩溃点重放入口不带参数（剪枝）：照拒」到「主 agent 不带前缀起崩溃点重放入口：照拒」五格红
+      heavy-test-guard.sh --selftest 里『实现员起崩溃点重放入口不带参数（剪枝）：照拒』到『主 agent 不带前缀起崩溃点重放入口：照拒』五格红
+      连带红的格：「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 而设了 CRASH_POINT_REPLAY_BREAK」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 而命令前设了登记的改规模变量」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 而前面 export 了登记的改规模变量」、「✗ lib_heavy_tests 自检：重型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick 而 env…」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --item 点名（逐条）」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --full（全量）」、「✗ lib_heavy_tests 自检：重型：别处同名的 crash-point-replay.sh 拷贝带 --quick」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --local-only 不带 --quick」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --local-only 又带 --full」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 的项数组后来追加了 --full」、「✗ lib_heavy_tests 自检：拒绝说明：崩溃点重放 --quick 而设了登记的改规模变量，点名变量并写「结果不作轻型证据」」、「✗ lib_heavy_tests 自检：拒绝说明：崩溃点重放 --quick 而设了登记的改规模变量，不断言 --quick 跑了什么」
   LIB_HEAVY_TESTS_BREAK=gpu-quiesce-opaque  command_under_gpu_quiesce 一律交 None，gpu-quiesce-run.sh -- <命令> 不剥（里面那条看不见）
       cargo 那张表里「重型：gpu-quiesce-run.sh -- 包着崩溃点重放入口不带参数」「重型：gpu-quiesce-run.sh -- 包着崩溃放量全量」
       「gpu-quiesce-run.sh -- 之后写的 --force 照 preflight 摘掉」三格红（应当是重型的 kind，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick 加点名一项：放行」的「：读进去几份脚本」一格
-      （应当是 0，实际 1：不剥就读进它的正文）、「实现员经 gpu-quiesce-run.sh 起崩溃点重放不带参数：照拒」「实现员经 gpu-quiesce-run.sh 起崩溃放量全量：照拒」两格
-      （应当是 2，实际 0）与这两格各自的「：读进去几份脚本」两格（应当是 0，实际 1），共五格红
+      heavy-test-guard.sh --selftest 里『实现员经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick 加点名一项：放行』的『：读进去几份脚本』一格
+      （应当是 0，实际 1：不剥就读进它的正文）、『实现员经 gpu-quiesce-run.sh 起崩溃点重放不带参数：照拒』『实现员经 gpu-quiesce-run.sh 起崩溃放量全量：照拒』两格
+      （应当是 2，实际 0）与这两格各自的『：读进去几份脚本』两格（应当是 0，实际 1），共五格红
+      连带红的格：「✗ lib_heavy_tests 自检：重型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick 而 env…」
+  LIB_HEAVY_TESTS_BREAK=two-logs-opaque  command_under_two_logs 一律交 None，two-logs.sh <名> -- <命令> 不剥（里面那条看不见）
+      cargo 那张表里「重型：two-logs.sh 包着全量 cargo test」「重型：two-logs.sh --quiet 包着全量 cargo test」两格红（应当是 full-cargo，实际 None）；
+      heavy-test-guard.sh --selftest 里『实现员经 two-logs.sh 起全量 cargo test：照拒』（应当是 2，实际 0）与它的『：读进去几份脚本』一格（应当是 0，实际 1：不剥就读进它的正文）、
+      『实现员经 two-logs.sh 套内存包装起崩溃点重放 --quick：放行』的『：读进去几份脚本』一格（应当是 0，实际 1），共三格红，另转出上面两格
+  LIB_HEAVY_TESTS_BREAK=run-build-directory-opaque  command_under_run_build_directory 一律交 None，run-build-directory.sh <命令> 不剥（里面那条看不见）
+      cargo 那张表里「重型：run-build-directory.sh 包着全量 cargo test」「重型：run-build-directory.sh -- 包着 checker 档的 cargo test」两格红（应当是重型的 kind，实际 None）；
+      lib_workspace_cargo_lock.py 的自检里『编译目录：包装脚本外面又给了仓里的 CARGO_TARGET_DIR：拒』一格红（应当拒，实际放行：包装里那条 cargo 看不见）
   LIB_HEAVY_TESTS_BREAK=verus-read-only-needs-literal-arguments  verus-proof-check.py 的只读子命令照旧要每个参数都字面写（`list-items $PWD` 算重型）
       cargo 那张表里「判法脚本只列可点名的项、根写成 $PWD（看门狗记下的那一次）」「只读子命令后面的参数写成变量不算（tool-versions $ROOT）」两格红（应当是 None，实际 verus-stage）；
-      heavy-test-guard.sh --selftest 里「工具实现员判法脚本 list-items $PWD（看门狗记下的那一次）：放行」一格红
+      heavy-test-guard.sh --selftest 里『工具实现员判法脚本 list-items $PWD（看门狗记下的那一次）：放行』一格红
   LIB_HEAVY_TESTS_BREAK=e165-pin-old-library-option  红例钉表带值的选项里判定库那一个照改名之前写 --verdict-store（--verdict-library 的值不跳过）
       cargo 那张表里「红例钉表 --check 后面 --verdict-library 的值碰巧叫 --replay、以 --check 为准」（应当是 None，实际 verus-stage）
       「红例重放 --verdict-library 的值碰巧叫 --check、照算重放」（应当是 verus-stage，实际 None）两格红
   LIB_HEAVY_TESTS_BREAK=checker-dependents-unjudged  链接 checker 档包的包不判（改前的判法：探针包 path 依赖 checker 档包，在它的 Cargo.toml 上起 cargo test / run 不重型）
-      cargo 那张表里「探针包：cargo run --manifest-path 指到 path 依赖 checker 档包的探针」到「探针包：workspace = true 继承 [workspace.dependencies] 里改名的 checker 档包」
+      cargo 那张表里「探针包：cargo run --manifest-path 指到 path 依赖 checker 档包的探针」到『探针包：workspace = true 继承 [workspace.dependencies] 里改名的 checker 档包』
       十格红（应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装与 bash -c 起 cargo run --manifest-path 指到链接 checker 档包的探针：照拒」
-      「实现员经内存包装 cargo test --manifest-path 指到链接 checker 档包的探针：照拒」「主 agent 不带前缀 cargo run 链接 checker 档包的探针：照拒」三格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装与 bash -c 起 cargo run --manifest-path 指到链接 checker 档包的探针：照拒』
+      『实现员经内存包装 cargo test --manifest-path 指到链接 checker 档包的探针：照拒』『主 agent 不带前缀 cargo run 链接 checker 档包的探针：照拒』三格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：探针包：cargo test --manifest-path 指到同一个探针」、「✗ lib_heavy_tests 自检：探针包：cargo run 的 -- 之后是程序的参数」、「✗ lib_heavy_tests 自检：探针包：经 bash -c 起 cargo run」、「✗ lib_heavy_tests 自检：探针包：经内存包装与 bash -c 包两层」、「✗ lib_heavy_tests 自检：探针包：经 capped.sh 起 cargo test」、「✗ lib_heavy_tests 自检：探针包：当前目录在探针里裸跑 cargo run」、「✗ lib_heavy_tests 自检：探针包：经工具包间接依赖（path 依赖链上有 package 改名的 dev-dependenc…」、「✗ lib_heavy_tests 自检：探针包：-p 点名工作区成员、workspace = true 继承 [workspace.dep…」、「✗ lib_heavy_tests 自检：探针包：cargo test -p 同一个成员」、「✗ lib_heavy_tests 自检：包名点名：当前目录在探针里 cargo test -p 探针自己的包名」、「✗ lib_heavy_tests 自检：包名点名：当前目录在探针里 cargo run -p 探针自己的包名」、「✗ lib_heavy_tests 自检：包名点名：--package 写法」、「✗ lib_heavy_tests 自检：包名点名：--package= 写法」、「✗ lib_heavy_tests 自检：包名点名：-p 贴着值写」、「✗ lib_heavy_tests 自检：包名点名：-p 加 --manifest-path 指到探针（当前目录在别处）」、「✗ lib_heavy_tests 自检：包名点名：经内存包装与 bash -c 起」、「✗ lib_heavy_tests 自检：包名点名：间接依赖 checker 档的探针也认」、「✗ lib_heavy_tests 自检：env 换目录：-C 换进探针再 cargo test -p 探针自己的包名」、「✗ lib_heavy_tests 自检：bench：cargo bench --manifest-path 指到链接 checker 档包…」、「✗ lib_heavy_tests 自检：bench：当前目录在探针里 cargo bench -p 探针自己的包名」、「✗ lib_heavy_tests 自检：清单路径：--manifest-path ~/… 指到链接 checker 档包的探针」、「✗ lib_heavy_tests 自检：清单路径：--manifest-path $HOME/… 指到链接 checker 档包的探针」
   上面这七个开关之外，已有的开关下这一批新加的几格跟着红（cargo 那张表）：crash-amplification-unnamed「重型：gpu-quiesce-run.sh -- 包着崩溃放量全量」一格；
   stage-by-number「重型：crates 变异那一道 --quick 又带 --check 点格」「重型：--quick 而点名的项写成变量」「重型：--quick 带两个根参数」「重型：形式化那一道不带参数」
   「重型：形式化那一道 --item（逐条）」「重型：crates 变异那一道 --full」六格；verus-judges-by-stage-only「判法脚本第一个参数写成变量照算」
@@ -393,72 +463,103 @@ cargo mutants -d 指到别处的树。
   LIB_HEAVY_TESTS_BREAK=package-flag-members-only  -p / --package 只在工作区成员表里找包名（改前的判法：独立的探针包点名放行）
       cargo 那张表里「包名点名：当前目录在探针里 cargo test -p 探针自己的包名」到「包名点名：间接依赖 checker 档的探针也认」八格与
       「bench：当前目录在探针里 cargo bench -p 探针自己的包名」一格红（应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装起 cargo test -p 当前目录探针自己的包名：照拒」「实现员经内存包装与 bash -c 起 cargo run --package= 点名探针：照拒」
-      「主 agent 不带前缀 cargo run -p 当前目录的链接 checker 档包的探针：照拒」三格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装起 cargo test -p 当前目录探针自己的包名：照拒』『实现员经内存包装与 bash -c 起 cargo run --package= 点名探针：照拒』
+      『主 agent 不带前缀 cargo run -p 当前目录的链接 checker 档包的探针：照拒』三格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：包名点名：当前目录在探针里 cargo run -p 探针自己的包名」、「✗ lib_heavy_tests 自检：包名点名：--package 写法」、「✗ lib_heavy_tests 自检：包名点名：--package= 写法」、「✗ lib_heavy_tests 自检：包名点名：-p 贴着值写」、「✗ lib_heavy_tests 自检：包名点名：-p 加 --manifest-path 指到探针（当前目录在别处）」、「✗ lib_heavy_tests 自检：包名点名：经内存包装与 bash -c 起」、「✗ lib_heavy_tests 自检：env 换目录：-C 换进探针再 cargo test -p 探针自己的包名」
   LIB_HEAVY_TESTS_BREAK=bench-unjudged  cargo bench 不判（改前的判法：bench 在链接 checker 档包的包上、checker 档包上、工作区全量上都放过去）
       cargo 那张表里「bench：cargo bench --manifest-path 指到链接 checker 档包的探针」到「bench：--workspace 是全量」六格红（应当是 checker-tier-cargo 或 full-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装起 cargo bench 指到链接 checker 档包的探针：照拒」一格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装起 cargo bench 指到链接 checker 档包的探针：照拒』一格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：bench：当前目录在探针里 cargo bench -p 探针自己的包名」、「✗ lib_heavy_tests 自检：bench：当前目录在 checker 档包里裸跑」、「✗ lib_heavy_tests 自检：bench：-p 点名 checker 档包」、「✗ lib_heavy_tests 自检：bench：工作区根不带 -p 是全量」
   再加两个开关（目录写在变量里；与上面几个开关无关）：
   LIB_HEAVY_TESTS_BREAK=package-flag-needs-directory  -p / --package 点名 checker 档包只在认得出的当前目录的工作区里找（改前的判法：cd 到变量路径之后、点名的不是成员的放了过去）
       cargo 那张表里「变量目录：」开头照算的九格与「工作区里没有这个成员：-p 点名 checker 档包照算」一格红（应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员 cd 到变量目录、经内存包装起 cargo test -p checker 档 --lib：照拒」「实现员 cd 到变量目录、经 timeout、nice、capped.sh、内存包装四层起：照拒」
-      「实现员 cd 到变量目录、经内存包装与 bash -c 起：照拒」「实现员 cd 到变量目录、经 /usr/bin/time、flock 与内存包装起：照拒」「实现员经内存包装 env -C 变量目录起 cargo test -p checker 档：照拒」
-      「主 agent 不带前缀 cd 到变量目录起 cargo test -p checker 档：照拒」六格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员 cd 到变量目录、经内存包装起 cargo test -p checker 档 --lib：照拒』『实现员 cd 到变量目录、经 timeout、nice、capped.sh、内存包装四层起：照拒』
+      『实现员 cd 到变量目录、经内存包装与 bash -c 起：照拒』『实现员 cd 到变量目录、经 /usr/bin/time、flock 与内存包装起：照拒』『实现员经内存包装 env -C 变量目录起 cargo test -p checker 档：照拒』
+      『主 agent 不带前缀 cd 到变量目录起 cargo test -p checker 档：照拒』六格红（应当是 2，实际 0）
   LIB_HEAVY_TESTS_BREAK=manifest-path-home-unexpanded  --manifest-path 的 `~`、`$HOME` 不展开（改前的判法：读不到清单就放过去）
       cargo 那张表里「清单路径：--manifest-path ~/… 指到链接 checker 档包的探针」「清单路径：--manifest-path $HOME/… 指到链接 checker 档包的探针」「清单路径：--manifest-path ~/… 指到 checker 档包、经内存包装」三格红（应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装 cargo test --manifest-path ~/… 指到链接 checker 档包的探针：照拒」一格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装 cargo test --manifest-path ~/… 指到链接 checker 档包的探针：照拒』一格红（应当是 2，实际 0）
   LIB_HEAVY_TESTS_BREAK=manifest-path-variable-unjudged  --manifest-path 写在变量里的不判（改前的判法）
       cargo 那张表里「变量清单：--manifest-path $D/crates/singlefs-checker-tier/Cargo.toml 经内存包装」一格红（应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装 cargo test --manifest-path 写在变量里指到 checker 档包：照拒」一格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装 cargo test --manifest-path 写在变量里指到 checker 档包：照拒』一格红（应当是 2，实际 0）
   package-specification-literal 下这一批另有「变量目录：-p 通配命中 checker 档」「变量目录：-p name@version」「变量目录：-p pkgid URL」三格跟着红。
   LIB_HEAVY_TESTS_BREAK=selftest-work-copy-unrecognized  工作根底下仓副本里的自证不认（改前的判法：副本里的 --selftest 一律「解到的不是登记表登记的那一份」）
       cargo 那张表之外，selftest_registry_cells 里「仓副本：副本登记表里这一行与主仓逐字相同、主仓登记成 light，放行」「仓副本：当前目录进副本、相对路径起，放行」
       「仓副本：弄坏开关打开的自证（命令前设变量）同样放行」「仓副本：装置那一层登记成 light 的编排脚本判成轻的自证」「仓副本：拒绝说明写明放行的条件与这一份哪一条不满足」
       「仓副本：脚本正文被改过的拒绝说明写明内容不同、改过的脚本的自证交主 agent 在集成副本里跑」六格红；
-      heavy-test-guard.sh --selftest 里「工具实现员在工作根下的仓副本里跑钩子自证（副本登记行与主仓逐字相同、副本里那份脚本与主仓那一份 sha256 相同）：放行、不读正文」
-      「工具实现员在工作根下的仓副本里跑钩子自证、命令前设弄坏开关变量：放行」两格红（应当是 0，实际 2；两格各连着的「：记几条检出」「：读进去几份脚本」不红），
-      「stdin:工具实现员在仓副本里跑钩子自证（登记行与主仓逐字相同）放行（退出码 0）」「stdin:脚本正文被改过的自证被拒时 stderr 写内容不同与改过的脚本交主 agent 在集成副本里跑」
-      「stdin:仓副本里自证被拒时 stderr 写哪一条不满足与放行的条件」三格红（应当是 0 或 1，实际 2 或 0），外加「lib_heavy_tests.py 的自检」一格红（应当是 0，实际 1；
+      heavy-test-guard.sh --selftest 里『工具实现员在工作根下的仓副本里跑钩子自证（副本登记行与主仓逐字相同、副本里那份脚本与主仓那一份 sha256 相同）：放行、不读正文』
+      『工具实现员在工作根下的仓副本里跑钩子自证、命令前设弄坏开关变量：放行』两格红（应当是 0，实际 2；两格各连着的『：记几条检出』『：读进去几份脚本』不红），
+      『stdin:工具实现员在仓副本里跑钩子自证（登记行与主仓逐字相同）放行（退出码 0）』『stdin:脚本正文被改过的自证被拒时 stderr 写内容不同与改过的脚本交主 agent 在集成副本里跑』
+      『stdin:仓副本里自证被拒时 stderr 写哪一条不满足与放行的条件』三格红（应当是 0 或 1，实际 2 或 0），外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1；
       row-unchecked、content-unchecked 两个开关下同样另有这一格）
+      连带红的格：「✗ lib_heavy_tests 自检：仓副本：脚本正文被改过的拒绝说明指到 implementation-workflow.md…」、「✗ lib_heavy_tests 自检：仓副本：脚本正文被改过的拒绝说明写明主 agent 跑之前看一眼这份脚本连同它 source /…」
   LIB_HEAVY_TESTS_BREAK=selftest-work-copy-row-unchecked  仓副本只看路径、不比副本里的登记行（副本里登记被改过、多出重复的也放）
       「仓副本：副本里这一行被改过，照拒」「仓副本：副本里这一行重复，照拒」「仓副本：拒绝说明写明放行的条件与这一份哪一条不满足」三格红（应当是 commit-check-selftest-unregistered，实际 None）；
-      heavy-test-guard.sh --selftest 里「工具实现员在仓副本里改了登记行再跑钩子自证：照拒」一格与「stdin:仓副本里登记行被改过的钩子自证拒绝（退出码 2）」
-      「stdin:仓副本里自证被拒时 stderr 写哪一条不满足与放行的条件」两格红（应当是 2 或 1，实际 0）
+      heavy-test-guard.sh --selftest 里『工具实现员在仓副本里改了登记行再跑钩子自证：照拒』一格与『stdin:仓副本里登记行被改过的钩子自证拒绝（退出码 2）』
+      『stdin:仓副本里自证被拒时 stderr 写哪一条不满足与放行的条件』两格红（应当是 2 或 1，实际 0）
   LIB_HEAVY_TESTS_BREAK=selftest-work-copy-content-unchecked  仓副本只看路径与登记行、不比副本里那份脚本与主仓那一份的 sha256（改前的判法：副本里脚本正文改过的也放）
       selftest_registry_cells 里「仓副本：副本里脚本正文被改过（登记行与主仓逐字相同），绝对路径起，照拒」「仓副本：副本里脚本正文被改过，当前目录进副本、相对路径起，照拒」
       （应当是 commit-check-selftest-unregistered，实际 None）与「仓副本：脚本正文被改过的拒绝说明写明内容不同、改过的脚本的自证交主 agent 在集成副本里跑」三格红；
-      heavy-test-guard.sh --selftest 里「工具实现员在仓副本里改了脚本正文（登记行相同）再跑钩子自证：照拒」「工具实现员在仓副本里改了脚本正文，命令前设弄坏开关变量：照拒」
-      「实现员在仓副本里改了脚本正文，当前目录进副本相对路径起：照拒」三格与「stdin:仓副本里脚本正文被改过的钩子自证拒绝（退出码 2）」
-      「stdin:脚本正文被改过的自证被拒时 stderr 写内容不同与改过的脚本交主 agent 在集成副本里跑」两格红（应当是 2 或 1，实际 0）
+      heavy-test-guard.sh --selftest 里『工具实现员在仓副本里改了脚本正文（登记行相同）再跑钩子自证：照拒』『工具实现员在仓副本里改了脚本正文，命令前设弄坏开关变量：照拒』
+      『实现员在仓副本里改了脚本正文，当前目录进副本相对路径起：照拒』三格与『stdin:仓副本里脚本正文被改过的钩子自证拒绝（退出码 2）』
+      『stdin:脚本正文被改过的自证被拒时 stderr 写内容不同与改过的脚本交主 agent 在集成副本里跑』两格红（应当是 2 或 1，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：仓副本：脚本正文被改过的拒绝说明指到 implementation-workflow.md…」、「✗ lib_heavy_tests 自检：仓副本：脚本正文被改过的拒绝说明写明主 agent 跑之前看一眼这份脚本连同它 source /…」
   LIB_HEAVY_TESTS_BREAK=selftest-work-copy-howto-short  仓副本里脚本正文被改过的拒绝说明退回改前的一句「由主 agent 在集成副本里跑」，不指到 implementation-workflow.md 那一节的做法、不写要核的命令、
       不写跑之前看 diff
       selftest_registry_cells 里「仓副本：脚本正文被改过的拒绝说明指到 implementation-workflow.md「checker 档只在提交时跑，harness 随时跑」那一节、写明主 agent 在集成副本里带 =commit 跑、不直接写 user-request 前缀」
       「仓副本：脚本正文被改过的拒绝说明写明主 agent 跑之前看一眼这份脚本连同它 source / import 的库相对主工作区的 diff、正文起重活的照重型办」两格红（应当是 True，实际 False）；
-      heavy-test-guard.sh --selftest 里「stdin:脚本正文被改过的自证被拒时 stderr 指到 implementation-workflow.md「checker 档只在提交时跑，harness 随时跑」那一节的做法」一格红（应当是 1，实际 0），
-      外加「lib_heavy_tests.py 的自检」一格红（应当是 0，实际 1）
+      heavy-test-guard.sh --selftest 里『stdin:脚本正文被改过的自证被拒时 stderr 指到 implementation-workflow.md「checker 档只在提交时跑，harness 随时跑」那一节的做法』一格红（应当是 1，实际 0），
+      外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
+  LIB_HEAVY_TESTS_BREAK=mutants-help-counted  test_invocation 里 cargo mutants 只带 --help、-h、--version、-V 的照旧算跑测试
+      cargo 那张表里「cargo mutants --help 只打帮助」「cargo mutants -V -h（只打版本与帮助）」两格红（应当是 None，实际判成重型）；heavy-test-guard.sh --selftest 原样转出这两格，
+      外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
+  LIB_HEAVY_TESTS_BREAK=broad-mutation-code-read-counted  code_only_reads_source 一律交假：python -c 的代码只 open 读驱动、ast.parse 它的照旧算广谱变异
+      cargo 那张表里「python3 -c 只 open 读驱动再 ast.parse：不算」「python3 -c 用 with open 读驱动、ast.walk 数函数：不算」两格红（应当是 None，实际 broad-mutation）；
+      heavy-test-guard.sh --selftest 里『实现员 python3 -c 只 open 读广谱变异驱动再 ast.parse：放行』一格红（应当是 0，实际 2），外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
+  LIB_HEAVY_TESTS_BREAK=broad-mutation-unit-environment-counted  广谱变异驱动的 --unit-environment 不算只读参数（照旧算广谱变异）
+      cargo 那张表里「广谱变异 --unit-environment 只打构建环境认的变量那一行」一格红（应当是 None，实际 broad-mutation）；
+      heavy-test-guard.sh --selftest 里『实现员跑广谱变异驱动 --unit-environment 只打一行：放行』一格红（应当是 0，实际 2），外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
+  LIB_HEAVY_TESTS_BREAK=herd7-version-flag-counted  直接起的 herd7 只带 -version 或 --version 的照旧算 herd7
+      cargo 那张表里「herd7 -version 只打版本号」「herd7 --version 只打版本号」两格红（应当是 None，实际 herd7）；
+      heavy-test-guard.sh --selftest 里『实现员直接跑 herd7 -version 只取版本号：放行』一格红（应当是 0，实际 2），外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
+  LIB_HEAVY_TESTS_BREAK=product-gpu-feature-unjudged  产品 GPU 包带 tests-on-a-real-gpu 的 cargo test 与直接执行它的对拍测试二进制不判（一律交 None，改前的样子：这个包的测试随时跑）
+      cargo 那张表里「产品 GPU 包：」开头的十六格红（应当是 product-gpu-cargo 或 product-gpu-binary，实际 None；「产品 GPU 包（不照算）：」开头的十一格不红）；
+      heavy-test-guard.sh --selftest 原样转出那十六格，另有『实现员经内存包装与清场起产品 GPU 包带 tests-on-a-real-gpu 的对拍测试：照拒』『主 agent 不带前缀经清场起产品 GPU 包的对拍测试：照拒』
+      『主 agent 带前缀不经清场起产品 GPU 包的对拍测试：照拒』『主 agent 带前缀不经清场直接起产品 GPU 包的对拍测试二进制：照拒』『主 agent 带前缀起脚本、脚本里不经清场跑产品 GPU 包的对拍测试：照拒』
+      五格红（应当是 2，实际 0），外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
+  LIB_HEAVY_TESTS_BREAK=broad-mutation-query-before-writing  广谱变异驱动先看只读参数，带了 --list-items、--summary 这类就放过，不看同写的 --coverage-step、--refresh-list、--import-results、--full（改前的样子）
+      cargo 那张表里「广谱变异 --coverage-step 与 --list-items 同写：插桩跑照算」「广谱变异 --summary 与贴着写的 --coverage-step=… 同写照算」
+      「广谱变异 --summary 与 --import-results 同写：导入照算」「广谱变异 --summary 与 --refresh-list 同写照算」「广谱变异 --list-items 与 --full 同写照算」五格红（应当是 broad-mutation，实际 None）；
+      heavy-test-guard.sh --selftest 原样转出这五格，外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
   再加几个开关（env 的选项；开关在 lib_shell_words.py，名字用它的变量 LIB_SHELL_WORDS_BREAK，写法见那份文件头「弄坏开关」一段）：
   LIB_SHELL_WORDS_BREAK=env-chdir-ignored  env 的 -C / --chdir 换的目录不跟（改前的判法：按外面的当前目录判）
-      cargo 那张表里「env 换目录」开头的十一格里十格红（「换的目录只管这一条」那格不红），另有「env 选项」前三格与放行的「env 选项：-iC 换进 harness 档目录裸跑放行」、「env 拆串：拆出来的串里带 -C 目录和赋值与引号」共五格红；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装 env -C 换进探针再 cargo test -p 探针自己的包名：照拒」「实现员经内存包装 env -C 换进 checker 档包目录裸跑 cargo test：照拒」
-      「实现员经内存包装 env --chdir=目录换进 checker 档包目录 cargo test --release：照拒」「实现员经内存包装 env --chdir 目录（分两个词）换进 checker 档包目录：照拒」
-      「主 agent 不带前缀 env -C 换进链接 checker 档包的探针 cargo run：照拒」五格红（应当是 2，实际 0），「实现员经内存包装 env -C 换进不依赖 checker 档包的探针裸跑 cargo test：放行」一格红（应当是 0，实际 2），
-      另有「实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒」「实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒」两格红（应当是 2，实际 0）
+      cargo 那张表里「env 换目录」开头的十一格里十格红（『换的目录只管这一条』那格不红），另有「env 选项」前三格与放行的「env 选项：-iC 换进 harness 档目录裸跑放行」、「env 拆串：拆出来的串里带 -C 目录和赋值与引号」共五格红；
+      heavy-test-guard.sh --selftest 里『实现员经内存包装 env -C 换进探针再 cargo test -p 探针自己的包名：照拒』『实现员经内存包装 env -C 换进 checker 档包目录裸跑 cargo test：照拒』
+      『实现员经内存包装 env --chdir=目录换进 checker 档包目录 cargo test --release：照拒』『实现员经内存包装 env --chdir 目录（分两个词）换进 checker 档包目录：照拒』
+      『主 agent 不带前缀 env -C 换进链接 checker 档包的探针 cargo run：照拒』五格红（应当是 2，实际 0），『实现员经内存包装 env -C 换进不依赖 checker 档包的探针裸跑 cargo test：放行』一格红（应当是 0，实际 2），
+      另有『实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒』『实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒』两格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：变量目录裸跑：export D 之后经内存包装 env -C $D/checker 档包目录」
   LIB_SHELL_WORDS_BREAK=env-option-clusters-unparsed  env 的选项退回只认整词 -u / --unset / -C / --chdir（改前的判法：合写的 -iC、-0iu、缩写的 --chd、单独的 - 与 -S / --split-string 都不认，
       选项簇被当成不带值的开关、它的值词被当成命令词）
-      cargo 那张表里「env 选项」开头六格里五格红（放行的「-iC 换进 harness 档目录裸跑放行」不红；应当是 checker-tier-cargo 或 full-cargo，实际 None 或 full-cargo）、
-      「env 拆串」开头七格里六格红（放行的「串里点名 harness 档包放行」不红；应当是 checker-tier-cargo，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒」「实现员经内存包装 env -S 拆串里是 checker 档包的 cargo test：照拒」
-      「实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒」三格红（应当是 2，实际 0），外加「lib_heavy_tests.py 的自检」一格红（应当是 0，实际 1）
+      cargo 那张表里「env 选项」开头六格里五格红（放行的『-iC 换进 harness 档目录裸跑放行』不红；应当是 checker-tier-cargo 或 full-cargo，实际 None 或 full-cargo）、
+      「env 拆串」开头八格里六格红（放行的『串里点名 harness 档包放行』『拆出来的串里赋值之后的 -C 是命令词，env 报错不跑』不红；应当是 checker-tier-cargo，实际 None）；
+      heavy-test-guard.sh --selftest 里『实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒』『实现员经内存包装 env -S 拆串里是 checker 档包的 cargo test：照拒』
+      『实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒』三格红（应当是 2，实际 0），外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
   LIB_SHELL_WORDS_BREAK=env-split-string-unexpanded  env 的 -S / --split-string 不拆（改前的判法：-S 当不带值的开关，字符串整个当命令词）
-      cargo 那张表里「env 拆串」开头七格里六格红（放行的一格不红）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装 env -S 拆串里是 checker 档包的 cargo test：照拒」「实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒」
-      两格红（应当是 2，实际 0），外加「lib_heavy_tests.py 的自检」一格红
+      cargo 那张表里「env 拆串」开头八格里六格红（放行的两格不红）；
+      heavy-test-guard.sh --selftest 里『实现员经内存包装 env -S 拆串里是 checker 档包的 cargo test：照拒』『实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒』
+      两格红（应当是 2，实际 0），外加『lib_heavy_tests.py 的自检』一格红
+  LIB_SHELL_WORDS_BREAK=env-options-after-assignment  env 认到赋值之后照旧认选项（三方 shell-words-r2 判决第二节第 5 条之前的判法）
+      cargo 那张表里「env 拆串：拆出来的串里赋值之后的 -C 是命令词，env 报错不跑」一格红（应当是 None，实际 checker-tier-cargo）；
+      heavy-test-guard.sh --selftest 原样转出这一格，外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
   再加三个开关（目录与轻型的参数写在变量里；后两个在 lib_shell_words.py，逐份逐格写在那份文件头）：
   LIB_HEAVY_TESTS_BREAK=light-tier-variables-unexpanded  light_tier_words_expanded 原样交回（改前的判法：`D=…; cd $D && … --quick $D` 照重型拒）
       cargo 那张表里「轻型：根参数写成前面赋过值的变量」「轻型：根参数写成 $HOME/…」两格红（应当是 None，实际 verus-stage 或 crates-mutation-stage）；
-      heavy-test-guard.sh --selftest 里「调查员 cd 到变量目录、经内存包装起形式化那一道 --quick 根写成同一个变量：放行」一格红（应当是 0，实际 2）
+      heavy-test-guard.sh --selftest 里『调查员 cd 到变量目录、经内存包装起形式化那一道 --quick 根写成同一个变量：放行』一格红（应当是 0，实际 2）
+      连带红的格：「✗ lib_heavy_tests 自检：轻型：crates 变异那一道 --quick 的项经字面数组传」、「✗ lib_heavy_tests 自检：轻型：崩溃点重放入口 --quick 的项经数组逐次追加传」
   LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded  cd / pushd / env -C 的目录与轻型的参数写在变量里的一律展开不了
       cargo 那张表里「变量目录裸跑：」开头照算的七格（应当是 checker-tier-cargo 或 full-cargo，实际 None）与上面那两格轻型红
+      连带红的格：「✗ lib_heavy_tests 自检：清单路径：--manifest-path $HOME/… 指到链接 checker 档包的探针」、「✗ lib_heavy_tests 自检：轻型：根参数写成前面赋过值的变量」、「✗ lib_heavy_tests 自检：轻型：根参数写成 $HOME/…」、「✗ lib_heavy_tests 自检：变量里的阶段路径：S=…; bash "$S" 起 crates 变异那一道整道」、「✗ lib_heavy_tests 自检：变量里的阶段路径：export 之后直接执行形式化那一道」、「✗ lib_heavy_tests 自检：变量里的阶段路径：目录放变量里拼出 crates 变异那一道」
   LIB_SHELL_WORDS_BREAK=variable-rebinding-unseen  for / select / read / unset 改写过的变量照旧用之前的值
       cargo 那张表里「变量目录裸跑：」开头的 for、read、unset 三格红（应当是 None，实际 checker-tier-cargo）
   这一批新加的格在已有的开关下也红：light-tier-unrecognized 下上面那两格轻型（已算进它那一条的九格）与 heavy-test-guard.sh 的「调查员 … 根写成同一个变量：放行」一格；
@@ -467,45 +568,49 @@ cargo mutants -d 指到别处的树。
   「变量目录裸跑：export D 之后经内存包装 env -C $D/checker 档包目录」一格与 heavy-test-guard.sh 的「实现员 export D 之后经内存包装 env -C $D/checker 档包目录裸跑：照拒」一格。
   LIB_HEAVY_TESTS_BREAK=light-tier-local-only-unrecognized  崩溃点重放入口的轻型不认 --local-only（改前的判法：`--quick --local-only` 照重型拒）
       cargo 那张表里「轻型：崩溃点重放入口 --quick --local-only」「轻型：崩溃点重放入口 --local-only --quick 加点名一项」两格红（应当是 None，实际 crash-point-replay）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装起崩溃点重放 --quick --local-only 加点名一项：放行」一格红（应当是 0，实际 2）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装起崩溃点重放 --quick --local-only 加点名一项：放行』一格红（应当是 0，实际 2）
   LIB_HEAVY_TESTS_BREAK=light-tier-arrays-unexpanded  light_tier_words_expanded 不展开 `"${数组[@]}"`（改前的判法：项经数组传的照重型拒）
       cargo 那张表里「轻型：crates 变异那一道 --quick 的项经字面数组传」「轻型：崩溃点重放入口 --quick 的项经数组逐次追加传」两格红（应当是 None，
-      实际 crates-mutation-stage 或 crash-point-replay）；heavy-test-guard.sh --selftest 里「实现员经内存包装起 crates 变异那一道 --quick、项经字面数组传：放行」一格红（应当是 0，实际 2）
+      实际 crates-mutation-stage 或 crash-point-replay）；heavy-test-guard.sh --selftest 里『实现员经内存包装起 crates 变异那一道 --quick、项经字面数组传：放行』一格红（应当是 0，实际 2）
   LIB_HEAVY_TESTS_BREAK=device-main-replay-allowed  装置本体的直接执行一律放行（改前的判法：`target/release/e165_replay_bounded_enumeration --pinned-cases <表>` 不判）
-      直接执行那张表里「红例钉表重放：装置本体 target/<profile>/<名字> 带 --pinned-cases」「…带 --profile 在前」「…deps/ 下同一份」「…选项写成没展开的变量」四格与之后的「装置重放的登记读不出：直接执行装置本体按重放算」一格红（应当是 verus-stage，实际 None），cargo 那张表里 cargo run 起装置的四格与「装置重放的登记读不出：cargo run 起装置也按重放算」一格同红；
-      heavy-test-guard.sh --selftest 里「实验执行员经内存包装直接执行 e165 装置的本体带 --pinned-cases：照拒」「…deps/ 下同一份带 --pinned-cases：照拒」「实验执行员经内存包装 cargo run 起 e165 装置带 --pinned-cases：照拒」三格红（应当是 2，实际 0）
+      直接执行那张表里「红例钉表重放：装置本体 target/<profile>/<名字> 带 --pinned-cases」「…带 --profile 在前」『…deps/ 下同一份』「…选项写成没展开的变量」四格与之后的「装置重放的登记读不出：直接执行装置本体按重放算」一格红（应当是 verus-stage，实际 None），cargo 那张表里 cargo run 起装置的四格与「装置重放的登记读不出：cargo run 起装置也按重放算」一格同红；
+      heavy-test-guard.sh --selftest 里『实验执行员经内存包装直接执行 e165 装置的本体带 --pinned-cases：照拒』『…deps/ 下同一份带 --pinned-cases：照拒』『实验执行员经内存包装 cargo run 起 e165 装置带 --pinned-cases：照拒』三格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：红例钉表重放：cargo run --bin 登记装置 -- --pinned-cases」、「✗ lib_heavy_tests 自检：红例钉表重放：cargo run --release -p 点名 checker 档包 --bin…」、「✗ lib_heavy_tests 自检：红例钉表重放：cargo run 的 --bin 值写成没展开的变量」、「✗ lib_heavy_tests 自检：红例钉表重放：装置本体在 deps/ 下、与 target/<profile>/<名字> 同一份」、「✗ lib_heavy_tests 自检：拒绝说明：红例钉表重放字面带 --pinned-cases，照旧说带了」
   LIB_HEAVY_TESTS_BREAK=device-replay-registry-unreadable-allowed  登记读不出时装置本体照旧放行（改前的判法：判不出就放）
       直接执行那张表之后的「装置重放的登记读不出：直接执行装置本体按重放算」「装置重放的登记读不出：cargo run 起装置也按重放算」两格红（应当是 verus-stage，实际 None）
   LIB_HEAVY_TESTS_BREAK=cargo-run-device-replay-allowed  cargo run --bin 起装置一律放行（改前的判法：`cargo run --bin e165_replay_bounded_enumeration -- --pinned-cases <表>` 不判）
-      cargo 那张表里「红例钉表重放：cargo run --bin 登记装置 -- --pinned-cases」「…-p 点名 checker 档包、--profile 在前」「…经内存包装与 bash -c、选项写成没展开的变量」
-      「…--bin 的值写成没展开的变量」四格与之后的「装置重放的登记读不出：cargo run 起装置也按重放算」一格红（应当是 verus-stage，实际 None）；
-      heavy-test-guard.sh --selftest 里「实验执行员经内存包装 cargo run 起 e165 装置带 --pinned-cases：照拒」一格红（应当是 2，实际 0）
+      cargo 那张表里「红例钉表重放：cargo run --bin 登记装置 -- --pinned-cases」『…-p 点名 checker 档包、--profile 在前』『…经内存包装与 bash -c、选项写成没展开的变量』
+      『…--bin 的值写成没展开的变量』四格与之后的「装置重放的登记读不出：cargo run 起装置也按重放算」一格红（应当是 verus-stage，实际 None）；
+      heavy-test-guard.sh --selftest 里『实验执行员经内存包装 cargo run 起 e165 装置带 --pinned-cases：照拒』一格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：红例钉表重放：cargo run --release -p 点名 checker 档包 --bin…」、「✗ lib_heavy_tests 自检：红例钉表重放：cargo run 经内存包装与 bash -c，选项写成没展开的变量」、「✗ lib_heavy_tests 自检：红例钉表重放：cargo run 的 --bin 值写成没展开的变量」
   LIB_HEAVY_TESTS_BREAK=light-tier-break-variable-ignored  light_tier_break_variable 一律交 None（改前的判法：带 --quick 时设了弄坏开关变量也照轻型放行）
       cargo 那张表里「重型：crates 变异那一道 --quick 而命令前设了 GATE_MUTATION_BREAK」「重型：形式化那一道 --quick 而 env 设了 FORMAL_VERIFICATION_BREAK」
       「重型：形式化那一道 --quick 而设了它文件头里别份脚本的开关 E165_PIN_RED_EXAMPLES_BREAK」「重型：崩溃点重放入口 --quick 而设了 CRASH_POINT_REPLAY_BREAK」
       「重型：crates 变异那一道 --quick 而前面 export 了 GATE_MUTATION_BREAK」五格红（应当是重型的 kind，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装起 crates 变异那一道 --quick、命令前设了 GATE_MUTATION_BREAK：照拒」「调查员…形式化那一道 --quick、命令前设了 FORMAL_VERIFICATION_BREAK：照拒」
-      「实现员…崩溃点重放 --quick、命令前设了 CRASH_POINT_REPLAY_BREAK：照拒」三格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装起 crates 变异那一道 --quick、命令前设了 GATE_MUTATION_BREAK：照拒』『调查员…形式化那一道 --quick、命令前设了 FORMAL_VERIFICATION_BREAK：照拒』
+      『实现员…崩溃点重放 --quick、命令前设了 CRASH_POINT_REPLAY_BREAK：照拒』三格红（应当是 2，实际 0）
+      连带红的格：「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 而命令前设了登记的改规模变量」、「✗ lib_heavy_tests 自检：重型：崩溃点重放入口 --quick 而前面 export 了登记的改规模变量」、「✗ lib_heavy_tests 自检：重型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick 而 env…」、「✗ lib_heavy_tests 自检：拒绝说明：--quick 而设了弄坏开关，写「结果不作轻型证据」」、「✗ lib_heavy_tests 自检：拒绝说明：--quick 而设了弄坏开关，不断言 --quick 跑了什么」、「✗ lib_heavy_tests 自检：拒绝说明：崩溃点重放 --quick 而设了登记的改规模变量，点名变量并写「结果不作轻型证据」」、「✗ lib_heavy_tests 自检：拒绝说明：崩溃点重放 --quick 而设了登记的改规模变量，不断言 --quick 跑了什么」
   LIB_HEAVY_TESTS_BREAK=light-scale-variable-ignored  light_tier_break_variable 不看文件头 LIGHT_SCALE_VARIABLE 那张表（改前的判法：带 --quick 时设了登记的改轻型规模的变量照轻型放行）
       cargo 那张表里「重型：崩溃点重放入口 --quick 而命令前设了登记的改规模变量」「重型：崩溃点重放入口 --quick 而前面 export 了登记的改规模变量」
       「重型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick 而 env 设了登记的改规模变量」三格红（应当是 crash-point-replay，实际 None）与
       「拒绝说明：崩溃点重放 --quick 而设了登记的改规模变量，点名变量并写「结果不作轻型证据」」「…，不断言 --quick 跑了什么」两格红（应当是 True，实际 False）；
-      heavy-test-guard.sh --selftest 里「实现员经内存包装起崩溃点重放 --quick、命令前设了登记的改规模变量 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES：照拒」
-      「实现员带范围声明与改规模变量起崩溃点重放 --quick（攻方探针原样）：照拒」「主 agent 不带前缀起崩溃点重放 --quick、命令前设了登记的改规模变量：照拒」三格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员经内存包装起崩溃点重放 --quick、命令前设了登记的改规模变量 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES：照拒』
+      『实现员带范围声明与改规模变量起崩溃点重放 --quick（攻方探针原样）：照拒』『主 agent 不带前缀起崩溃点重放 --quick、命令前设了登记的改规模变量：照拒』三格红（应当是 2，实际 0）
   LIB_HEAVY_TESTS_BREAK=break-variable-fact-dropped  --quick 而设了弄坏开关变量的拒绝说明不写「--quick 的结果不作轻型证据」这一句事实
       直接执行那张表之后的「拒绝说明：--quick 而设了弄坏开关，写「结果不作轻型证据」」「拒绝说明：崩溃点重放 --quick 而设了登记的改规模变量，点名变量并写「结果不作轻型证据」」两格红（应当是 True，实际 False）
   LIB_HEAVY_TESTS_BREAK=unexpanded-pin-same-message  红例钉表重放的选项写成没展开的词时，拒绝说明照字面带 --pinned-cases 的写法说（不点名那个词、不写出路）
       直接执行那张表之后的「拒绝说明：红例钉表重放的选项写成没展开的变量，点名变量并写出路」「…不说命令里带了 --pinned-cases」两格红（应当是 True，实际 False）；
-      heavy-test-guard.sh --selftest 里「lib_heavy_tests.py 的自检」一格跟着红
+      heavy-test-guard.sh --selftest 里『lib_heavy_tests.py 的自检』一格跟着红
   LIB_HEAVY_TESTS_BREAK=command-word-variables-unexpanded  command_word_expanded 原样交回（改前的判法：命令词写在变量里的看不见）
       cargo 那张表里「变量里的阶段路径：」开头照算的三格红（应当是 crates-mutation-stage 或 verus-stage，实际 None）；
-      heavy-test-guard.sh --selftest 里「实现员 S=… 之后 bash "$S" 起 crates 变异那一道整道：照拒」「主 agent 不带前缀 G=… 之后 bash "$G/…" 起形式化那一道：照拒」两格红（应当是 2，实际 0）
+      heavy-test-guard.sh --selftest 里『实现员 S=… 之后 bash "$S" 起 crates 变异那一道整道：照拒』『主 agent 不带前缀 G=… 之后 bash "$G/…" 起形式化那一道：照拒』两格红（应当是 2，实际 0）
   LIB_HEAVY_TESTS_BREAK=device-main-as-test  device_main_binary 一律交假（改前的判法：deps/ 下装置的本体照测试二进制算）
       直接执行那张表里「checker 档装置的本体在 deps/ 下、与 target/<profile>/<名字> 是同一份（cargo build 编出）：与 cargo run --bin 同判、不算」一格红（应当是 None，
-      实际 checker-tier-binary）；heavy-test-guard.sh --selftest 里「实验执行员经内存包装直接执行 checker 档装置的本体（deps/ 下与 target/release/<名字> 同一份）：放行」一格红（应当是 0，实际 2）
+      实际 checker-tier-binary）；heavy-test-guard.sh --selftest 里『实验执行员经内存包装直接执行 checker 档装置的本体（deps/ 下与 target/release/<名字> 同一份）：放行』一格红（应当是 0，实际 2）
+      连带红的格：「✗ lib_heavy_tests 自检：红例钉表重放：装置本体在 deps/ 下、与 target/<profile>/<名字> 同一份」
   LIB_SHELL_WORDS_BREAK=array-appends-unseen  `名字+=值`、`名字[下标]=值` 不记（改前的判法：数组后来改过的照旧用头一次赋的值）
       cargo 那张表里「重型：崩溃点重放入口 --quick 的项数组后来追加了 --full」「重型：crates 变异那一道 --quick 的项数组元素改过」「重型：crates 变异那一道 --quick 的项数组从文件逐行读进来」
-      三格红（应当是重型的 kind，实际 None）；heavy-test-guard.sh --selftest 里「实现员经内存包装起 crates 变异那一道 --quick、数组后来追加了 --full：照拒」一格红（应当是 2，实际 0）
+      三格红（应当是重型的 kind，实际 None）；heavy-test-guard.sh --selftest 里『实现员经内存包装起 crates 变异那一道 --quick、数组后来追加了 --full：照拒』一格红（应当是 2，实际 0）
   上面这五个开关那一批（--local-only、数组、命令词写在变量里、装置的本体）新加的格在已有的开关下也红：
   light-tier-unrecognized 下 cargo 那张表的「轻型：崩溃点重放入口 --quick --local-only」「轻型：崩溃点重放入口 --local-only --quick 加点名一项」「轻型：crates 变异那一道 --quick 的项经字面数组传」
   「轻型：崩溃点重放入口 --quick 的项经数组逐次追加传」「变量里的阶段路径带 --quick 是轻型」五格，与 heavy-test-guard.sh 的「实现员经内存包装起 crates 变异那一道 --quick、项经字面数组传：放行」
@@ -517,6 +622,11 @@ cargo mutants -d 指到别处的树。
   「主 agent 不带前缀 G=… 之后 bash "$G/…" 起形式化那一道：照拒」「…数组后来追加了 --full：照拒」三格；crash-point-replay-unnamed 下「重型：崩溃点重放入口 --local-only 不带 --quick」
   「重型：崩溃点重放入口 --local-only 又带 --full」「重型：崩溃点重放入口 --quick 的项数组后来追加了 --full」三格与 heavy-test-guard.sh 的「实现员经内存包装起崩溃点重放 --local-only 不带 --quick：照拒」一格；
   LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded 下「变量里的阶段路径：」开头照算的三格与 heavy-test-guard.sh 的「实现员 S=…」「主 agent 不带前缀 G=…」两格。
+  LIB_HEAVY_TESTS_BREAK=gate-top-library-as-stage  门禁目录顶层以 lib- 起头的共用库照改前判：登记表里那一行当门禁阶段的样本档行（light 认不出、算写坏的行），命令认不出是它的自证
+      selftest_registry_cells 里「样本登记表里写坏的几行逐条报出来（判定、理由、目录、重复、文件不在、门禁阶段那几行的判定与标记）」（多报 .claude/gate.d/lib-sample-library.py 那一行）、
+      「样本表：门禁目录顶层 lib- 起头的共用库没登记的 --selftest 照拒」（应当是 commit-check-selftest-unregistered，实际 None）、
+      「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」（多报 .claude/gate.d/lib-lag-baseline.py 那一行）三格红；
+      heavy-test-guard.sh --selftest 原样转出这三格，外加『lib_heavy_tests.py 的自检』一格红（应当是 0，实际 1）
 两档里的轻型（.claude/rules/verification.md「两档：轻型与重型」；类名不另起，轻型不算哪一类）：
   三条命令带 --quick 是轻型，谁都能跑（子 agent 带不带 SINGLEFS_HEAVY_TESTS 前缀都放行，主 agent 不带前缀也放行）：
   scripts/crash/crash-point-replay.sh --quick（崩溃点重放入口）、.claude/gate.d/checker-tier-formal-verification.sh --quick [<根>]、
@@ -538,8 +648,9 @@ cargo mutants -d 指到别处的树。
   LIB_HEAVY_TESTS_BREAK=light-tier-variables-unexpanded 下 cargo 那张表里「轻型：根参数写成前面赋过值的变量」「轻型：根参数写成 $HOME/…」两格红（应当是 None，
   实际 verus-stage 或 crates-mutation-stage），heavy-test-guard.sh --selftest 里「调查员 cd 到变量目录、经内存包装起形式化那一道 --quick 根写成同一个变量：放行」一格红
   （应当是 0，实际 2））；展开不了的（没在这段命令里赋值的）照重型算。
-  入口按名字与位置认：名字叫 crash-point-replay.sh、又落在 scripts 这一层（路径尾部；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，不读正文）；
-  别处的同名拷贝带 --quick 也照重型算（接受的误拒）。两道门禁按文件名认，与重型那一格同一种认法。
+  入口按名字与位置认：名字叫 crash-point-replay.sh、又落在 scripts 这一层（路径尾部；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置）；
+  别处的同名拷贝带 --quick 也照重型算（接受的误拒）。不读正文的只有整条路径逐级都不是符号链接、又正是本仓那一份的（judged_by_name，own_repository_script）：路径尾部相同的别处拷贝与经符号链接起的
+  classify 照旧交轻型或只列项，heavy-test-guard.sh 却读它的正文逐条判（弄坏开关 judged-by-name-path-tail 下退回只按路径尾部认、不读）。两道门禁按文件名认，与重型那一格同一种认法。
   重型照旧（kind crash-point-replay，类名「崩溃点重放」，只有主 agent 带前缀能跑）：入口不带参数（剪枝）、带 --item 不带 --quick（逐条）、带 --full（全量），
   与不是上面那种写法的每一种；只有摘掉 --force 之后恰好一个 --list-items 的（只列可点名的项）与登记表里的单独 --selftest 不算。两道门禁的重型照 STAGE_KIND。
   轻型三条在 runs_compiled_code 里算跑编译出来的代码（里面起 checker 档的 cargo 与 Verus）：子 agent 要经 scripts/hosts/run-with-memory-cap.sh 起，
@@ -548,9 +659,14 @@ cargo mutants -d 指到别处的树。
 崩溃放量的三份入口（test-script-align-r3 攻方 A2；类名「崩溃放量」，kind crash-amplification）：scripts/crash/crash-amplification.sh（不带参数是崩溃放量全量，
   --item 点名分项、--expand-up-to 缩过规模的同算）、crash-amplification-item.sh（分项驱动）、crash-amplification-two-hosts.sh（双机驱动），每一种跑法都经
   crash-amplification-lib.sh 起 checker 档 cargo test；正文里的 cargo 拼在 bash 数组里、分项驱动经变量起，读正文看不见，所以按名字判（CRASH_AMPLIFICATION_SCRIPTS：
-  名字是这三个就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那几份不读正文）。不算的：crash-amplification.sh 带 --list-items 的（只列分项，不清场、不跑）；
+  名字是这三个就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，解到本仓那几份的不读正文，crash-amplification.sh 路径尾部相同的别处拷贝读正文）。不算的：crash-amplification.sh 带 --list-items 的（只列分项，不清场、不跑）；
   仓内那几份单独一个 --selftest 的照自证登记表判（三份都登记成 light，放行）。别处同名拷贝的 --selftest 不在登记表里，
   按这一类算（接受的误拒）。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
+实验复跑入口 scripts/experiment-apparatus/replay.sh（类名「全部实验复跑」，kind replay-all-stage）：按名字判、不读正文（EXPERIMENT_REPLAY_SCRIPT：名字是它、又落在
+  scripts/experiment-apparatus/ 上才算，judged_by_name 认 KNOWN_SCRIPT_LOCATIONS 登记的位置）。不算的只有摘掉 --force 之后恰好一个 --list-items 的（逐行打可点名的实验号，
+  不编、不跑，replay.sh 文件头「--list-items」）与仓内那一份单独一个 --selftest（照自证登记表判，先于这一类）；不带参数、点名实验号、--admission-only、
+  --list-items 后面还带别的词，都照重型算。不读正文的只有整条路径逐级都不是符号链接、又正是本仓那一份的（judged_by_name，own_repository_script）：别处同名的拷贝与经符号链接起的读正文，路径尾部相同的也一样
+  （classify 对它照旧：带 --list-items 交 None、别的参数仍算全部实验复跑，读不读正文是 judged_by_name 的事）。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
 真编 QEMU（类名「真编 QEMU」，kind qemu-build）：scripts/devices/build-patched-qemu.sh 取源码、在 ${TMPDIR:-/tmp} 下约 1 GiB 的编译目录里按给的线程数编 QEMU、
   装进私有目录。按名字判（QEMU_BUILD_SCRIPT：名字是它就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那一份不读正文）：不带参数、--rebuild、别的参数都算，
   包装（bash -c、capped.sh、run-with-memory-cap.sh、nice 这类）里面的同样算。不算的只有仓内那一份单独一个 --selftest（照自证登记表判，登记成 light，放行）；
@@ -559,13 +675,20 @@ cargo mutants -d 指到别处的树。
 广谱变异的逐条驱动 scripts/mutation/broad-mutation.py（类名「广谱变异」，kind broad-mutation）：它逐条改坏 core / checker 的源码，每条起 cargo，整趟要几天。
   算的：凡要起 cargo 或改库目录的——不带选条参数的剪枝跑、--shard、--from、--package、--item 点名（点几条、带不带 --skip-stage-two 都算）、--stage-two-only、
   --full（只写不读、全部现判）、--refresh-list（换树、生成清单按单元记进库）、--import-results（往本机结果表里导入）；参数只认整词，argparse 认的缩写（--sum、--list）与贴着写的（--item=1）照算，接受的误拒。
-  不算的：带 --list-items、--summary、--check-ignored、--help、-h 之一的（只读：驱动走查询那一支就返回，--check-ignored 只扫这一版树里的源码与排除表、不起 cargo）；
+  不算的：带 --list-items、--summary、--check-ignored、--unit-environment、--help、-h 之一的（只读：驱动走查询那一支就返回，--check-ignored 只扫这一版树里的源码与排除表、不起 cargo，
+  --unit-environment 只打一行构建环境认的变量、只起 rustc -Vv）；
+  只读参数与起 cargo 或改库目录的参数（BROAD_MUTATION_WRITING_ARGUMENTS：--coverage-step、--refresh-list、--import-results、--full；贴着写的 =值、argparse 认的前缀缩写都认）
+  同写的照算：先看组合里有没有这几个，有一个就照重型判，没有才看只读参数（--shard、--from、--item 这类选条参数不改库目录，与只读参数同写照旧不算；
+  -h 与它们同写时驱动其实只打帮助，照算，接受的误拒；弄坏开关 broad-mutation-query-before-writing 下退回先看只读参数）；
   仓内位置上的 --selftest 照自证登记表判，
   改名拷贝、符号链接、python -c 起的 --selftest 不在表里，照旧算提交时才跑的检查。
   认驱动的三种办法（broad_mutation_driver）：名字是 broad-mutation.py 又落在 scripts（当前目录与命令文本里设的 PYTHONPATH 各试一遍，
   `python3 -m broad-mutation` 由切词交成这个名字）；命令词解到的文件的真实路径落在 scripts/mutation/broad-mutation.py（符号链接）；
   文件开头 BROAD_MUTATION_HEAD_BYTES 里有驱动的签名行（行首 `# broad-mutation-driver-signature:`，改名或拷走的一份）。
-  `python3 -c '…'` 的代码里出现 broad-mutation.py、或 run_module(…broad-mutation…) 的照驱动算（参数取代码之后的词）；代码里只是读它的也照算，接受的误拒。
+  `python3 -c '…'` 的代码里出现 broad-mutation.py、或 run_module(…broad-mutation…) 的照驱动算（参数取代码之后的词）；代码只 open 读、ast.parse 它的不算
+  （code_only_reads_source 用 ast 判：import 只许 BROAD_MUTATION_READ_ONLY_CODE_MODULES 里那几个模块，每一处调用都要是 BROAD_MUTATION_READ_ONLY_CODE_CALLS 里的名字或
+  BROAD_MUTATION_READ_ONLY_CODE_METHODS 里的方法，open 的模式只许字面写的读模式；exec、eval、__import__、runpy、importlib、改 sys.path 这类一样都不许，别的写法哪怕只读也照算，接受的误拒；
+  弄坏开关 broad-mutation-code-read-counted 下读它的也照算）。
   它是 python 脚本，闸不读它的正文，只按这里的名字、位置、签名行与参数判。
   提交门禁那一道 .claude/gate.d/checker-tier-broad-mutation.sh 按文件名算同一类（kind broad-mutation-stage，STAGE_KIND）；带 --list、--tool-versions 的不算，
   --check 只点名 gate-verdict 一格的不算（BROAD_MUTATION_READ_ONLY_CELL：那一格只读库目录、起驱动的 --summary；点了别的格或不带 --check 的照算）。
@@ -579,16 +702,20 @@ cargo mutants -d 指到别处的树。
   LIB_SHELL_WORDS_BREAK=python-options-by-dash  python 带值选项的值被当成脚本名，`python3 -W ignore <驱动>`、`-X`、`-m`、`-c` 起的放过去
       「python3 -W ignore 起广谱变异」「python3 -X dev 起广谱变异」「python3 -BW default（合写、值另起一个词）起广谱变异」
       「python3 --check-hash-based-pycs never 起广谱变异」「cd 进 scripts/mutation 再 python3 -m broad-mutation」「python3 -m scripts.mutation.broad-mutation（命名空间包）」
-      「python3 -m runpy broad-mutation」「PYTHONPATH 指到 scripts 再 python3 -m broad-mutation」「python3 -c runpy.run_path 起广谱变异」
+      「python3 -m runpy broad-mutation」『PYTHONPATH 指到 scripts 再 python3 -m broad-mutation』「python3 -c runpy.run_path 起广谱变异」
       「python3 -c exec(open(驱动).read())」「python3 -c runpy.run_module 按模块名起」十一格（应当是 broad-mutation，实际 None）；
       「PYTHONPATH 指到 scripts 再 python3 -m 起判法脚本跑必红世界」「export PYTHONPATH 再 python3 -m 起红例重放」「python3 -c runpy.run_path 起判法脚本跑必红世界」
       「python3 -c 里改 sys.argv 成 proof、代码之后写 tool-versions」「python3 -c 里改 sys.argv 成 --replay、代码之后不写词」「python3 -c 里 __import__ 按模块名起判法脚本验证明」
       「python3 -c 里 importlib.import_module 起红例重放」「python3 -c 里 spec_from_file_location 载入判法脚本再调 run_check、代码之后写 toolchain」
       「python3 -c 的 print 包着 __import__ 起判法脚本」「python3 -c 的 print 包着 __import__、代码只有这一句」「python3 -c runpy.run_path 起红例钉表、代码之后写 --check」
       十一格（应当是 verus-stage，实际 None）；「经 PYTHONPATH 起判法脚本的 --selftest：不在登记表的位置上，照旧算提交时才跑的检查」一格（应当是 commit-check-selftest，
-      实际 None）；共二十三格红
+      实际 None）；「python3 -c 先 ast.parse 驱动、再 runpy.run_path 起它照算」「python3 -c 读驱动、改 sys.path 再 __import__ 照算」「python3 -c 读驱动再 compile 交给 exec 照算」
+      「python3 -c 读驱动、模式写成 r+ 照算」四格（应当是 broad-mutation，实际 None）；共二十七格红
+      连带红的格：「✗ lib_heavy_tests 自检：PYTHONPATH 指到 scripts/mutation 再 python3 -m broad…」
   LIB_SHELL_WORDS_BREAK=detached-run-force-kept  detached-run.sh 的参数不照它的 preflight 摘 --force，`-- --force <重型命令>` 放过去
       「detached-run.sh start 的 -- 之后先写 --force 照摘」一格红（应当是 full-cargo，实际 None）
+  LIB_SHELL_WORDS_BREAK=shell-standard-input-unread  here-string 与管道喂给 shell 的字面文本不当命令再切（改前的判法）
+      「标准输入：here-string 喂给 bash 跑全量」「标准输入：printf 经管道喂给 bash 跑全量」「标准输入：echo 经管道喂给 sh 跑全量」三格红（应当是 full-cargo，实际 None）
   heavy-test-guard.sh --selftest 原样转出上面这几格的失败行，另加它自己的格（写在它的文件头）。
 """
 import ast, contextlib, filecmp, fnmatch, functools, glob, hashlib, importlib.util, itertools, os, re, shlex, shutil, stat, subprocess, sys, tempfile, tomllib
@@ -626,6 +753,7 @@ KIND_CATEGORY = {
     "crash-amplification": "崩溃放量", "pattern-unresolved": "判不出的通配",
     "crash-point-replay": "崩溃点重放",
     "qemu-build": "真编 QEMU",
+    "product-gpu-cargo": "产品 GPU 包真卡对拍", "product-gpu-binary": "产品 GPU 包真卡对拍",
 }
 # 提交时才跑的检查（用户 2026-09-28 定「现在改到提交时候才验证的部分 都删掉」「门禁是靠 脚本和 hook来解决的」）：
 # 扫仓的门禁阶段、上游的几道 lint、样本自检与阶段结构判法、自证里起重活的与没登记的那几份，都归提交前主 agent 跑的 scripts/gate/gate-staged.sh
@@ -642,10 +770,10 @@ COMMIT_CHECK_SOP_SCRIPTS = frozenset({"doc-lint.sh", "gate-lint.sh", "shell-lint
                                       "hooks-registered.sh", "stage-selftest.sh"})
 # 这几个目录下的脚本带 --selftest 跑是跑它的自证；.claude/gate.d/lib/ 下的共用库直接执行就是跑自证，带不带 --selftest 都算。轻重按登记表判（classify_selftest）
 # scripts/ 下按用途分的子目录（scripts/README.md）：脚本都住在这一层
-SCRIPT_CATEGORY_DIRECTORIES = tuple(f"scripts/{category}" for category in ("agents", "crash", "devices", "experiments", "gate", "hosts", "kb", "mutation"))
+SCRIPT_CATEGORY_DIRECTORIES = tuple(f"scripts/{category}" for category in ("agents", "crash", "devices", "experiment-apparatus", "gate", "hosts", "kb", "mutation"))
 COMMIT_CHECK_SELFTEST_DIRECTORIES = SCRIPT_CATEGORY_DIRECTORIES + (".claude/hooks", ".claude/gate.d/lib")
 # 实验装置那一层（文件头「实验装置那一层」）：这个目录下正好一层的目录，登记了的单独 --selftest 才当自证
-DEVICE_SELFTEST_PARENT = "scripts/experiments"
+DEVICE_SELFTEST_PARENT = "scripts/experiment-apparatus"
 GATE_LIBRARY_DIRECTORY = ".claude/gate.d/lib"
 # 自证登记表：一行 `<相对仓根的路径><制表符><判定><制表符># <理由>`，写法在表头。放在这份文件旁边；自证换成样本表时改这个变量
 SELFTEST_REGISTRY_NAME = "selftest-registry.tsv"
@@ -655,6 +783,8 @@ SELFTEST_CONDITION_VARIABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SELFTEST_REASON_MINIMUM = 4   # 理由（# 之后）至少几个字
 # 门禁阶段的样本档（文件头「门禁样本」）：登记表里键是 .claude/gate.d/<阶段>.sh 的行，判定写这三种之一
 GATE_STAGE_DIRECTORY = ".claude/gate.d"
+# 门禁目录顶层以它起头的文件是共用库、不是阶段（lib-lag-baseline.py 这类）：gate_stage_name 不当阶段认，登记表里它那一行照脚本的自证判（gate_top_library_key）
+GATE_TOP_LIBRARY_PREFIX = "lib-"
 STAGE_SAMPLES_LIGHT, STAGE_SAMPLES_MARKER, STAGE_SAMPLES_HEAVY = "samples-light", "samples-light-marker:", "samples-heavy"
 STAGE_SELFTEST_SCRIPT = "stage-selftest.sh"
 # stage-selftest.sh 自己认的两个参数（它文件头「用法」）：--item <阶段文件名> 只喂点名那几道（给几次取并集），--list-items 只列可点名的阶段、不喂样本；别的词是阶段目录
@@ -679,6 +809,9 @@ RESEARCH_BUILD_AND_REPLAY_STAGE = "checker-tier-research-build-and-replay.sh"
 RESEARCH_UNIT_TESTS_CELL = "research-unit-tests"
 BROAD_MUTATION_STAGE = "checker-tier-broad-mutation.sh"
 BROAD_MUTATION_READ_ONLY_CELL = "gate-verdict"   # 广谱变异提交门禁里只读库目录、起驱动 --summary 的那一格
+# 交回前自查命名：code-source-discipline.sh 的这四格只读源码与文档文本，--check 只点名它们的不算提交时才跑的检查
+NAMING_SELF_CHECK_STAGE = "code-source-discipline.sh"
+NAMING_SELF_CHECK_CELLS = frozenset({"vague-names", "test-file-names", "ordinal-names", "data-names"})
 # 弄坏开关 stage-by-number 用的旧认法（按两位数编号认，认不出去了编号的新名字）
 STAGE_KIND_BY_NUMBER = {"54": "crash-point-replay-stage", "55": "qemu-stage", "57": "herd7-stage", "59": "crates-mutation-stage", "87": "replay-all-stage"}
 # 按名字判的仓内脚本：名字 → 它在仓里的位置。命令词是这个名字、又落在这个位置上，judged_by_name 为真
@@ -692,18 +825,31 @@ KNOWN_SCRIPT_LOCATIONS = {
     "crash-amplification.sh": "scripts/crash/crash-amplification.sh", "crash-amplification-item.sh": "scripts/crash/crash-amplification-item.sh",
     "crash-amplification-two-hosts.sh": "scripts/crash/crash-amplification-two-hosts.sh",
     "build-patched-qemu.sh": "scripts/devices/build-patched-qemu.sh",
-    "crash-point-replay.sh": "scripts/crash/crash-point-replay.sh",
+    "crash-point-replay.sh": "scripts/crash/crash-point-replay.sh", "replay.sh": "scripts/experiment-apparatus/replay.sh",
     STAGE_SELFTEST_SCRIPT: ".claude/singlefs-ai-sop/scripts/stage-selftest.sh",
 }
+# 放行靠参数的入口（replay.sh 与 crash-point-replay.sh 的 --list-items、crash-point-replay.sh 的 --quick、crash-amplification.sh 的 --list-items：classify 交 None，
+# 要读正文的一方又因为 judged_by_name 为真而不读）：命令词的整条路径要逐级都不是符号链接、又正是本仓那一份才算按名字判（own_repository_script），路径尾部相同的别处拷贝与经符号链接起的不算，照读正文
+# （文件头「实验复跑入口」「两档里的轻型」「崩溃放量的三份入口」；弄坏开关 judged-by-name-path-tail 下退回只按路径尾部认）
+OWN_COPY_ONLY_SCRIPTS = frozenset({"replay.sh", "crash-point-replay.sh", "crash-amplification.sh"})
 # 广谱变异的逐条驱动（scripts/mutation/broad-mutation.py）：带这几个参数之一的只读（列项、汇总、帮助），不起 cargo、不改库目录
 BROAD_MUTATION_SCRIPT_NAME = "broad-mutation.py"
 BROAD_MUTATION_SCRIPT_DIRECTORY = "scripts/mutation"
-BROAD_MUTATION_QUERY_ARGUMENTS = frozenset({"--list-items", "--summary", "--check-ignored", "--help", "-h"})
+BROAD_MUTATION_QUERY_ARGUMENTS = frozenset({"--list-items", "--summary", "--check-ignored", "--unit-environment", "--help", "-h"})
+# 起 cargo 或改库目录的参数：与只读参数同写也照重型判（先判这几个，再看只读参数；文件头「广谱变异」一段）
+BROAD_MUTATION_WRITING_ARGUMENTS = frozenset({"--coverage-step", "--refresh-list", "--import-results", "--full"})
 # 驱动文件头的签名行（行首）：改名、拷走的一份按它认。读文件开头这么多字节找它；这份文件自己的开头里没有以它起头的行
 BROAD_MUTATION_SIGNATURE_LINE = re.compile(rb"^# broad-mutation-driver-signature:", re.MULTILINE)
 BROAD_MUTATION_HEAD_BYTES = 4096
 # python -c 的代码里点到驱动：文件名，或 runpy.run_module 按模块名起它
 BROAD_MUTATION_CODE_REFERENCE = re.compile(r"broad-mutation\.py|run_module\s*\([^)]*broad-mutation")
+# python -c 的代码里点到驱动、却只 open 读它、拿 ast 看它的（code_only_reads_source）：import 只许这几个模块，调用只许这几个名字与方法，open 只许字面写的读模式
+BROAD_MUTATION_READ_ONLY_CODE_MODULES = frozenset({"ast", "json", "re", "tokenize"})
+BROAD_MUTATION_READ_ONLY_CODE_CALLS = frozenset({"open", "print", "len", "sorted", "list", "set", "dict", "tuple", "str", "int", "repr", "enumerate", "zip", "range",
+                                                 "any", "all", "sum", "min", "max", "isinstance"})
+BROAD_MUTATION_READ_ONLY_CODE_METHODS = frozenset({"parse", "walk", "dump", "unparse", "iter_child_nodes", "get_docstring", "literal_eval", "read", "readlines",
+                                                   "splitlines", "split", "strip", "startswith", "endswith", "join", "format", "items", "keys", "values", "get",
+                                                   "count", "find", "search", "match", "fullmatch", "findall", "finditer", "group", "loads", "dumps"})
 # Verus 那一道（checker-tier-formal-verification.sh）的两份判法脚本：直接起时干活的用法算 verus-stage（verus_judge_use）
 VERUS_PROOF_CHECK_SCRIPT = "verus-proof-check.py"
 # 它文件头「用法」里起 Verus 的三个子命令（main 只认第一个参数）；只在弄坏开关 verus-judges-by-working-subcommand 下当判据用
@@ -722,9 +868,11 @@ VERUS_JUDGE_CODE_REFERENCE = {
 }
 # .claude/scripts/lkmm.sh 只打 herd7 版本的那一种用法（stage-inputs.tsv 里 checker-tier-lkmm 的 environment= 起的）
 LKMM_VERSION_ONLY_ARGUMENTS = ["--herd7-version"]
+# 直接起的 herd7 只打版本号的两种写法（只带这一个参数）
+HERD7_VERSION_ONLY_ARGUMENTS = (["-version"], ["--version"])
 E165_PIN_SCRIPT = "e165-pin-red-examples.py"
 # 两份判法脚本各住哪一层（相对仓根）
-VERUS_JUDGE_DIRECTORY_OF = {VERUS_PROOF_CHECK_SCRIPT: "scripts/gate", E165_PIN_SCRIPT: "scripts/experiments"}
+VERUS_JUDGE_DIRECTORY_OF = {VERUS_PROOF_CHECK_SCRIPT: "scripts/gate", E165_PIN_SCRIPT: "scripts/experiment-apparatus"}
 # 它 main 里带一个值的选项（切参数时跳过那个值）；E165_PIN_MODE_ARGUMENTS 里写在后面的那个定模式
 E165_PIN_OPTIONS_WITH_VALUE = frozenset({"--root", "--table", "--binary", "--memory-cap", "--threads", "--target", "--kill-bounds",
                                          "--item", "--verdict-library", "--block-rows"})
@@ -774,6 +922,14 @@ def libtest_lists_only(libtest_arguments):
 
 
 CHECKER_PACKAGE_NAME = "singlefs-checker-tier"   # checker 档住的包（D13 已定项 15）：它的集成测试、库单测与装置二进制都算重型
+# 产品的后台 GPU 包（D26 已定项 13）：它的真显卡对拍测试只在开了特性 tests-on-a-real-gpu 时才编（Cargo.toml 的 [[test]] required-features，或测试文件的 cfg），要卡；
+# 算重型（kind product-gpu-cargo、product-gpu-binary），而且要经 scripts/crash/gpu-quiesce-run.sh 起（文件头「产品 GPU 包的真显卡对拍」）。库单测与不开这个特性的运行照旧不算
+PRODUCT_GPU_PACKAGE_NAME = "singlefs-background-gpu"
+PRODUCT_GPU_FEATURE = "tests-on-a-real-gpu"
+# 起的时候要经清场包装的重型 kind：heavy-test-guard.sh 的 decide 对这几个另拒不经 scripts/crash/gpu-quiesce-run.sh 起的（主 agent 带前缀也一样）
+GPU_QUIESCE_REQUIRED_KINDS = frozenset({"product-gpu-cargo", "product-gpu-binary"})
+# 测试文件里 cfg 写了这个特性（注释行不算）
+PRODUCT_GPU_FEATURE_CFG = re.compile(r'\bfeature\s*=\s*"' + re.escape(PRODUCT_GPU_FEATURE) + '"')
 HOOK_REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 装置本体的重放用法（文件头「checker 档按包判」）：门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格经 e165-pin-red-examples.py --replay 起装置，
 # 装置名与选项登记在那份脚本的 DEVICE_BINARY、DEVICE_FLAG 两个常量里，按它读，不另抄名单。路径相对钩子所在的仓根；自检换成读不出的路径验「判不出就按重放算」
@@ -902,18 +1058,61 @@ def depends_on_checker_package(package_directory, root_directory=None, root_sect
     return False
 
 
-def checker_package_directories(directory):
-    """directory 往上找到的第一个含 crates/<checker 档包> 的根里那个包目录；一个都找不到（仓外执行）才取本 hook 所在仓的那一个。"""
+def package_directories_in(directory, package_name):
+    """directory 往上找，最近的那个含 crates/<包名> 的根里的包目录；往上都找不到（仓外执行）才取本 hook 所在仓的那一个。"""
     while directory:
-        candidate = os.path.join(directory, "crates", CHECKER_PACKAGE_NAME)
+        candidate = os.path.join(directory, "crates", package_name)
         if os.path.isdir(candidate):
             return [candidate]
         parent = os.path.dirname(directory)
         if parent == directory:
             break
         directory = parent
-    own = os.path.join(HOOK_REPOSITORY, "crates", CHECKER_PACKAGE_NAME)
+    own = os.path.join(HOOK_REPOSITORY, "crates", package_name)
     return [own] if os.path.isdir(own) else []
+
+
+def checker_package_directories(directory):
+    """directory 往上找到的第一个含 crates/<checker 档包> 的根里那个包目录；一个都找不到（仓外执行）才取本 hook 所在仓的那一个。"""
+    return package_directories_in(directory, CHECKER_PACKAGE_NAME)
+
+
+def product_gpu_test_targets(package_directory):
+    """产品 GPU 包里开了 PRODUCT_GPU_FEATURE 才编的测试目标名：Cargo.toml 的 [[test]] 里 required-features 有这个特性的，加 tests/ 顶层每个 .rs
+    （注释行不读）的 cfg 写了 feature = "tests-on-a-real-gpu" 的（文件名去掉 .rs）。读不了的文件不算。"""
+    names = set()
+    for target in (manifest_sections(os.path.join(package_directory, "Cargo.toml")) or {}).get("test") or []:
+        if isinstance(target, dict) and target.get("name") and PRODUCT_GPU_FEATURE in (target.get("required-features") or []):
+            names.add(target["name"])
+    for path in glob.glob(os.path.join(package_directory, "tests", "*.rs")):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                lines = handle.read().splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if PRODUCT_GPU_FEATURE_CFG.search("\n".join(line for line in lines if not line.lstrip().startswith("//"))):
+            names.add(os.path.basename(path)[:-3])
+    return names
+
+
+def product_gpu_test_binaries(directory):
+    """直接执行时认的产品 GPU 包真卡对拍测试二进制名（目标名里的 - 换成 _，cargo 编出来的测试二进制是这个写法）。"""
+    names = set()
+    for package_directory in package_directories_in(directory, PRODUCT_GPU_PACKAGE_NAME):
+        names.update(name.replace("-", "_") for name in product_gpu_test_targets(package_directory))
+    return names
+
+
+def product_gpu_feature_enabled(feature_values, all_features):
+    """cargo 的 --features / -F 的值（逗号或空白隔开，每个可带 <包>/ 或 <包>?/ 前缀，前缀只许是产品 GPU 包）里有 PRODUCT_GPU_FEATURE，或带 --all-features。"""
+    if all_features:
+        return True
+    for value in feature_values:
+        for item in re.split(r"[,\s]+", (value or "").strip().strip("'\"")):
+            package, _, feature = item.rpartition("/")
+            if feature == PRODUCT_GPU_FEATURE and package.rstrip("?") in ("", PRODUCT_GPU_PACKAGE_NAME):
+                return True
+    return False
 
 
 def checker_test_targets(directory):
@@ -953,6 +1152,9 @@ QEMU_BUILD_SCRIPT = "build-patched-qemu.sh"
 CRASH_POINT_REPLAY_SCRIPT = "crash-point-replay.sh"
 CRASH_POINT_REPLAY_DIRECTORY = "scripts/crash"
 CRASH_POINT_REPLAY_QUERY_ARGUMENTS = ["--list-items"]   # 只列可点名的项（摘掉 --force 之后恰好这一个词）
+# 实验复跑入口（文件头「实验复跑入口」）：名字是它、又落在 scripts/experiment-apparatus/ 上才按名字判；摘掉 --force 之后恰好一个 --list-items 的只列可点名的实验号，不算
+EXPERIMENT_REPLAY_SCRIPT = "replay.sh"
+EXPERIMENT_REPLAY_QUERY_ARGUMENTS = ["--list-items"]
 LIGHT_TIER_OPTION = "--quick"
 LIGHT_TIER_ITEM_OPTION = "--item"
 LIGHT_TIER_STAGES = frozenset({"checker-tier-formal-verification.sh", "checker-tier-crates-mutation-replay.sh"})
@@ -964,6 +1166,12 @@ ARRAY_REFERENCE = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\[[@*]\]\}$")
 # scripts/crash/gpu-quiesce-run.sh -- <命令…>：清场之后原样起那条命令（command_under_gpu_quiesce 剥掉它）
 GPU_QUIESCE_SCRIPT = "gpu-quiesce-run.sh"
 GPU_QUIESCE_DIRECTORY = "scripts/crash"
+# scripts/hosts/two-logs.sh [--quiet] <名> -- <命令…>：日志出两份的包装（转打、写 <名>.log 与 <名>.problems.log，退出码是那条命令的）：command_under_two_logs 剥掉它
+TWO_LOGS_SCRIPT = "two-logs.sh"
+# scripts/hosts/run-build-directory.sh [--] <命令…>：包一层起、这一趟一个自己的编译目录（跑完删）：command_under_run_build_directory 剥掉它
+RUN_BUILD_DIRECTORY_SCRIPT = "run-build-directory.sh"
+RUN_BUILD_DIRECTORY_LOCATION = "scripts/hosts"
+TWO_LOGS_DIRECTORY = "scripts/hosts"
 # 花括号展开与参数里的通配（classify 先照 bash 展开，文件头「花括号与参数里的通配」）：一个词最多展开成这么多份，超出的不判
 WORD_EXPANSION_LIMIT = 1024
 # 展开出来的命令再切一遍、再判时又带花括号或通配的（文件名里本身带这几个字符），最多再套这么多层
@@ -976,6 +1184,8 @@ BRACE_SEQUENCE = re.compile(r"([+-]?[0-9]+|[A-Za-z])\.\.([+-]?[0-9]+|[A-Za-z])(?
 # cargo llvm-cov 不起测试的子命令；cargo hack 后面接的、起测试或跑程序的子命令
 LLVM_COV_NON_RUNNING_SUBCOMMANDS = {"report", "clean", "show-env"}
 HACK_INNER_SUBCOMMANDS = {"test", "t", "run", "r", "nextest", "miri", "llvm-cov", "mutants"}
+# cargo mutants 只打帮助或版本的参数：只带这几个（一个或几个）时不起 cargo test
+MUTANTS_QUERY_ARGUMENTS = frozenset({"--help", "-h", "--version", "-V"})
 # cargo mutants 的选项里 cargo test 也认、照搬过去的（选包的那几个）
 MUTANTS_PACKAGE_OPTIONS_WITH_VALUE = {"-p", "--package", "--manifest-path"}
 ALIAS_CONFIGURATION = re.compile(r"^\s*alias\.([A-Za-z0-9_-]+)\s*=")
@@ -1144,6 +1354,8 @@ def test_invocation(subcommand, rest, directory=None):
                 return test_invocation(word, rest[:index] + rest[index + 1:])
         return None, []
     if subcommand == "mutants":
+        if rest and set(rest) <= MUTANTS_QUERY_ARGUMENTS and not break_is_set("mutants-help-counted"):
+            return None, []   # 只打帮助或版本，不起 cargo test
         return "test", mutants_test_arguments(rest, directory)
     return None, []
 
@@ -1183,6 +1395,38 @@ def package_flag_names_checker(packages, sections):
         if matched and (sections is None or not package_specification_is_pattern(specification)):
             named.append(specification)
     return named
+
+
+def package_flag_names_product_gpu(packages, sections):
+    """-p / --package 的值里点名产品 GPU 包的那几个（光名字、name@version、pkgid URL；通配只在 sections 是 None、认不出工作区时算）：
+    同 package_flag_names_checker，不看当前目录认不认得出。"""
+    return [specification for specification in packages
+            if package_specification_members(specification, {PRODUCT_GPU_PACKAGE_NAME})
+            and (sections is None or not package_specification_is_pattern(specification))]
+
+
+def product_gpu_cargo_use(described, packages, scope, members, sections, test_names, selectors, narrowed, feature_values, all_features):
+    """cargo test 这一条会不会跑产品 GPU 包带 PRODUCT_GPU_FEATURE 的真卡对拍测试（文件头「产品 GPU 包的真显卡对拍」）：会就交 product-gpu-cargo，不会交 None。
+    要同时成立：开了这个特性（product_gpu_feature_enabled）；范围里有产品 GPU 包（工作区成员里认得出，或 -p 点名而认不出工作区）；
+    挑的目标会跑到集成测试（不挑，或带 --test / --tests / --all-targets：只 --lib、--doc、--bin 这类不跑 tests/ 里的目标）；
+    --test 点了名的，其中至少一个是对拍目标（product_gpu_test_targets；认不出包目录时不看名字）。
+    弄坏开关 product-gpu-feature-unjudged 下一律交 None（改前的样子：这个包的测试随时跑）。"""
+    if break_is_set("product-gpu-feature-unjudged") or not product_gpu_feature_enabled(feature_values, all_features):
+        return None
+    product_directory = members.get(PRODUCT_GPU_PACKAGE_NAME)
+    in_scope = bool(product_directory) and os.path.normpath(product_directory) in {os.path.normpath(path) for path in scope}
+    named = package_flag_names_product_gpu(packages, sections)
+    if not in_scope and not named:
+        return None
+    if narrowed and not selectors & {"--test", "--tests", "--all-targets"}:
+        return None
+    if test_names and not selectors & {"--tests", "--all-targets"} and product_directory:
+        targets = {name.replace("-", "_") for name in product_gpu_test_targets(product_directory)}
+        if not any(name.replace("-", "_") in targets for name in test_names):
+            return None
+    return heavy_test("product-gpu-cargo", f"{described} 跑到 {PRODUCT_GPU_PACKAGE_NAME} 包带 {PRODUCT_GPU_FEATURE} 特性的真显卡对拍测试"
+                                           f"（要卡：默认只在提交时跑，而且要经 `bash scripts/crash/gpu-quiesce-run.sh -- <命令>` 清场起、带 --test-threads 1；"
+                                           f"{'--test ' + '、'.join(test_names) if test_names else '按包'}；库单测与不开这个特性的运行不算）")
 
 
 def manifest_path_expanded(manifest_argument):
@@ -1256,6 +1500,7 @@ def cargo_use(arguments, directory, environment=None):
         return None
     directory = found.directory
     packages, test_names, selectors, binaries = [], [], set(), []
+    feature_values, all_features = [], False
     whole_workspace, manifest_argument = False, None
     position = 0
     while position < len(rest):
@@ -1268,6 +1513,9 @@ def cargo_use(arguments, directory, environment=None):
         elif argument.startswith("-p") and len(argument) > 2 and not argument.startswith("--"):
             option, value = "-p", argument[2:].lstrip("=")
             position += 1
+        elif argument.startswith("-F") and len(argument) > 2 and not argument.startswith("--"):
+            option, value = "-F", argument[2:].lstrip("=")
+            position += 1
         elif argument in CARGO_TEST_OPTIONS_WITH_VALUE:
             option = argument
             value = rest[position + 1] if position + 1 < len(rest) else ""
@@ -1277,6 +1525,10 @@ def cargo_use(arguments, directory, environment=None):
             position += 1
         if option in ("-p", "--package"):
             packages.append(value)
+        elif option in ("--features", "-F"):
+            feature_values.append(value)
+        elif option == "--all-features":
+            all_features = True
         elif option == "--test":
             test_names.append(value)
             selectors.add(option)
@@ -1349,6 +1601,11 @@ def cargo_use(arguments, directory, environment=None):
     if named_checker:
         return heavy_test("checker-tier-cargo", f"{described} 用 -p 点名 {CHECKER_PACKAGE_NAME}（{'、'.join(named_checker)}；当前目录或清单认不出、"
                                                 "或点名的不是认得出的工作区成员，照点名的包判；checker 档，默认只在提交时跑）")
+    # 产品 GPU 包带 tests-on-a-real-gpu 的真卡对拍测试（文件头「产品 GPU 包的真显卡对拍」）：要卡，算重型，要经清场起
+    if not running:
+        product_gpu = product_gpu_cargo_use(described, packages, scope, members, sections, test_names, selectors, narrowed, feature_values, all_features)
+        if product_gpu is not None:
+            return product_gpu
     # 链接 checker 档包的包（探针包、原型包：[dependencies] 里 path 依赖 singlefs-checker-tier，或经 path 依赖间接依赖）：它的测试与 cargo run 起的程序
     # 里调 checker 档的崩溃枚举（856690 态那一次），按 checker 档算。run 在虚拟工作区根上不带 -p 的看不出起的是哪个包，不判这一道
     if scope and not (running and not packages and is_virtual_workspace_root):
@@ -1370,7 +1627,7 @@ def gate_stage_name(word, directory):
     """命令词是 .claude/gate.d/ 顶层的一道阶段时交回它的文件名，不是交 None。"""
     for candidate in (word, shell_words.resolve_path(directory, word) or ""):
         match = GATE_STAGE_PATH.search(candidate)
-        if match and not match.group(1).startswith("lib-"):
+        if match and not match.group(1).startswith(GATE_TOP_LIBRARY_PREFIX):
             return match.group(1)
     return None
 
@@ -1571,6 +1828,10 @@ def classify_gate_stage(stage, arguments, environment=None):
     if (stage == BROAD_MUTATION_STAGE and not break_is_set("broad-mutation-read-only-counted")
             and checked_cells(arguments) == {BROAD_MUTATION_READ_ONLY_CELL}):
         return None   # 只跑判定那一格：只读库目录、起驱动的 --summary（驱动 --summary 本身也不算）
+    if stage == NAMING_SELF_CHECK_STAGE and not break_is_set("naming-self-check-counted"):
+        naming_cells = checked_cells(arguments)
+        if naming_cells and (break_is_set("naming-self-check-any-cell") or naming_cells <= NAMING_SELF_CHECK_CELLS):
+            return None   # 交回前自查命名：--check 只点名那四格（文件头「交回前自查命名」），只读文本
     if kind:
         if break_variable is not None:
             return heavy_test(kind, f"门禁 {stage}（带 --quick，但环境里设了它文件头写的弄坏开关或登记的改轻型规模的变量 {break_variable}：{light_tier_break_fact()}"
@@ -1634,7 +1895,7 @@ def selftest_registry_at(path, modified, size):
         key, weight = fields[0], fields[1] if len(fields) > 1 else ""
         reason = fields[2][1:].strip() if len(fields) > 2 and fields[2].startswith("#") else ""
         condition = weight[len(SELFTEST_HEAVY_IF_SET):] if weight.startswith(SELFTEST_HEAVY_IF_SET) else None
-        stage_row = os.path.dirname(key) == GATE_STAGE_DIRECTORY
+        stage_row = os.path.dirname(key) == GATE_STAGE_DIRECTORY and not gate_top_library_key(key)
         wrong = []
         if stage_row:
             if not stage_samples_weight_is_valid(weight):
@@ -1643,9 +1904,10 @@ def selftest_registry_at(path, modified, size):
             wrong.append(f"判定「{weight}」认不出（只认 light、heavy、heavy-if-set:<变量>；门禁阶段的样本档写在 .claude/gate.d/<阶段>.sh 那一行）")
         if len(reason) < SELFTEST_REASON_MINIMUM:
             wrong.append(f"# 之后的理由不到 {SELFTEST_REASON_MINIMUM} 个字")
-        if not stage_row and os.path.dirname(key) not in COMMIT_CHECK_SELFTEST_DIRECTORIES and not device_selftest_layer(os.path.dirname(key)):
+        if (not stage_row and os.path.dirname(key) not in COMMIT_CHECK_SELFTEST_DIRECTORIES and not device_selftest_layer(os.path.dirname(key))
+                and not gate_top_library_key(key)):
             wrong.append(f"不在 {'、'.join(COMMIT_CHECK_SELFTEST_DIRECTORIES)} 之一的这一层，也不在实验装置那一层 {DEVICE_SELFTEST_PARENT}/<装置>"
-                         f"（门禁阶段的样本档写在 {GATE_STAGE_DIRECTORY} 这一层）")
+                         f"（门禁阶段的样本档写在 {GATE_STAGE_DIRECTORY} 这一层，那一层以 {GATE_TOP_LIBRARY_PREFIX} 起头的共用库照脚本登记）")
         if key in rows:
             wrong.append(f"与第 {rows[key].line} 行重复")
         if wrong and not lenient:
@@ -1654,6 +1916,14 @@ def selftest_registry_at(path, modified, size):
         if key not in rows:
             rows[key] = SelftestRow(weight if not wrong or weight.startswith(SELFTEST_HEAVY) else SELFTEST_LIGHT, reason, number)
     return rows, problems
+
+
+def gate_top_library_key(key):
+    """登记表的键（相对仓根）是不是门禁目录顶层以 lib- 起头的共用库：是就照脚本的自证判，不当门禁阶段的样本档行。
+    弄坏开关 gate-top-library-as-stage 下一律为假（改前：.claude/gate.d/ 这一层的键都当样本档行）。"""
+    if break_is_set("gate-top-library-as-stage"):
+        return False
+    return os.path.dirname(key) == GATE_STAGE_DIRECTORY and os.path.basename(key).startswith(GATE_TOP_LIBRARY_PREFIX)
 
 
 def read_selftest_registry(path):
@@ -1681,6 +1951,10 @@ def selftest_registry_key(word, directory):
     for place in COMMIT_CHECK_SELFTEST_DIRECTORIES:
         if located_in(word, directory, place):
             return f"{place}/{os.path.basename(os.path.normpath(word))}"
+    if located_in(word, directory, GATE_STAGE_DIRECTORY):
+        key = f"{GATE_STAGE_DIRECTORY}/{os.path.basename(os.path.normpath(word))}"
+        if gate_top_library_key(key):
+            return key   # 门禁目录顶层以 lib- 起头的共用库（文件头「自证」）
     for candidate in (os.path.normpath(word), shell_words.resolve_path(directory, word) or ""):
         parent = os.path.dirname(candidate)
         layer = f"{DEVICE_SELFTEST_PARENT}/{os.path.basename(parent)}"
@@ -2419,6 +2693,38 @@ def command_under_gpu_quiesce(words, directory=None):
     return rest[1:], None
 
 
+def command_under_two_logs(words, directory=None):
+    """words[0] 是 scripts/hosts 这一层的 two-logs.sh（名字与位置，located_in；别处的同名拷贝不剥）而参数是 `[--quiet] <名> -- <命令…>` 时交回 (<命令…> 的词, None)：
+    当前目录与环境照外面那一条；它不摘参数里的 --force（只对 python3 做准入），所以 `--` 之后原样交回。--selftest、--from-log 与没写 `--` 的交 None。
+    弄坏开关 two-logs-opaque 下一律交 None。"""
+    if break_is_set("two-logs-opaque") or not words or os.path.basename(words[0]) != TWO_LOGS_SCRIPT:
+        return None
+    if ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]) or not located_in(words[0], directory, TWO_LOGS_DIRECTORY):
+        return None
+    rest = words[1:]
+    if rest[:1] == ["--quiet"]:
+        rest = rest[1:]
+    if len(rest) < 3 or rest[0].startswith("-") or rest[1] != "--":
+        return None
+    return rest[2:], None
+
+
+def command_under_run_build_directory(words, directory=None):
+    """words[0] 是 scripts/hosts 这一层的 run-build-directory.sh（名字与位置，located_in；别处的同名拷贝不剥）而参数是 `[--] <命令…>`（包一层起：
+    这一趟一个自己的编译目录、跑完删，那份脚本文件末尾「包一层起」一段）时交回 (<命令…> 的词, None)：当前目录与环境照外面那一条。
+    --selftest、没给命令、命令前写了别的选项的交 None。弄坏开关 run-build-directory-opaque 下一律交 None。"""
+    if break_is_set("run-build-directory-opaque") or not words or os.path.basename(words[0]) != RUN_BUILD_DIRECTORY_SCRIPT:
+        return None
+    if ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]) or not located_in(words[0], directory, RUN_BUILD_DIRECTORY_LOCATION):
+        return None
+    rest = words[1:]
+    if rest[:1] == ["--"]:
+        rest = rest[1:]
+    elif rest[:1] and rest[0].startswith("-"):
+        return None
+    return (rest, None) if rest else None
+
+
 def command_under_launcher(words, directory=None):
     """words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序时，剥掉它（连同它的选项与位置参数），交回 (它起的那条命令的词, 那条命令的当前目录：
     None 是不变，systemd-run --working-directory 给的是相对当前目录的写法)；不是这几样、或后面没有要起的命令（strace -p、flock 只给 fd）交 None。
@@ -2426,10 +2732,18 @@ def command_under_launcher(words, directory=None):
     与 systemd-run -p / --property 的 Environment= / EnvironmentFile= 设的（assignments_of_environment_property）写在交回那条命令的最前面。
     flock 的 -c <字符串> 交回成 sh -c <字符串>。rustup 只认 rustup run，perf 只认 stat / record / trace 与 <组> record。
     scripts/hosts/detached-run.sh 的 start 照 command_under_detached_run 剥（directory 是 words 的当前目录，认改名拷贝与符号链接时解相对路径用）。
+    scripts/hosts/two-logs.sh 的 `[--quiet] <名> -- <命令…>` 照 command_under_two_logs 剥。
+    scripts/hosts/run-build-directory.sh 的 `[--] <命令…>` 照 command_under_run_build_directory 剥。
     scripts/crash/gpu-quiesce-run.sh 不在这里剥（command_under_gpu_quiesce，调用方另试）。"""
     detached = command_under_detached_run(words, directory)
     if detached is not None:
         return detached
+    two_logs = command_under_two_logs(words, directory)
+    if two_logs is not None:
+        return two_logs
+    own_build_directory = command_under_run_build_directory(words, directory)
+    if own_build_directory is not None:
+        return own_build_directory
     name = os.path.basename(words[0])
     if name not in LAUNCHER_OPTIONS_WITH_VALUE or ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]):
         return None
@@ -2541,10 +2855,29 @@ def broad_mutation_use(arguments, driver):
         return None
     query_arguments = (BROAD_MUTATION_QUERY_ARGUMENTS - {"--check-ignored"} if break_is_set("broad-mutation-read-only-counted")
                        else BROAD_MUTATION_QUERY_ARGUMENTS)
-    if query_arguments & given:
+    if break_is_set("broad-mutation-unit-environment-counted"):
+        query_arguments = query_arguments - {"--unit-environment"}
+    writing = [] if break_is_set("broad-mutation-query-before-writing") else broad_mutation_writing_arguments(arguments)
+    if query_arguments & given and not writing:
         return None
-    return heavy_test("broad-mutation", f"{driver}（逐条改坏 core / checker 的源码、每条起 cargo；不带选条参数的剪枝跑、--full、--refresh-list 与 --import-results 写库目录里的判定、清单与结果表；"
-                                        "只有 --list-items、--summary、--check-ignored、--help（-h）不算）")
+    together = (f"；这一条的 {'、'.join(writing)} 起 cargo 或改库目录，与 {'、'.join(sorted(query_arguments & given))} 同写照算" if writing and query_arguments & given else "")
+    return heavy_test("broad-mutation", f"{driver}（逐条改坏 core / checker 的源码、每条起 cargo；不带选条参数的剪枝跑、--full、--refresh-list 与 --import-results 写库目录里的判定、清单与结果表，"
+                                        "--coverage-step 插桩跑全部测试；只有 --list-items、--summary、--check-ignored、--unit-environment、--help（-h）不算，"
+                                        f"与 --coverage-step、--refresh-list、--import-results、--full 同写的照算{together}）")
+
+
+def broad_mutation_writing_arguments(arguments):
+    """广谱变异驱动参数里起 cargo 或改库目录的那几个（BROAD_MUTATION_WRITING_ARGUMENTS）：按出现次序交回认出的选项名；贴着写的 `--选项=值` 取等号前那一段，
+    argparse 认的前缀缩写（`--cov`、`--ref`，至少写到 `--` 之后一个字）也认。"""
+    found = []
+    for argument in arguments:
+        name = argument.split("=", 1)[0]
+        if not name.startswith("--") or len(name) < 3:
+            continue
+        matched = name if name in BROAD_MUTATION_WRITING_ARGUMENTS else next((option for option in sorted(BROAD_MUTATION_WRITING_ARGUMENTS) if option.startswith(name)), None)
+        if matched and matched not in found:
+            found.append(matched)
+    return found
 
 
 def unexpanded_word_pattern(word):
@@ -2815,6 +3148,51 @@ def code_only_prints_string_literals(code):
     return bool(tree.body) and all(prints_literals(statement) for statement in tree.body)
 
 
+# code_only_reads_source 里一出现就不放的名字：间接起代码、拿到内建表或模块的那几个（赋给别的名字再调就认不出，所以名字本身就不许出现）
+BROAD_MUTATION_CODE_INDIRECT_NAMES = frozenset({"exec", "eval", "compile", "__import__", "getattr", "setattr", "delattr", "globals", "locals", "vars",
+                                                "breakpoint", "input", "__builtins__", "__loader__", "__spec__"})
+
+
+def code_only_reads_source(code):
+    """python -c 的代码只 open 读文件、拿 ast / re / json 看它（广谱变异那一判用：代码里点到驱动，却不 import、不 run_module、不 exec 它）：
+    import 只许 BROAD_MUTATION_READ_ONLY_CODE_MODULES 里的模块（相对 import 不许）；每一处调用都要是 BROAD_MUTATION_READ_ONLY_CODE_CALLS 里的名字或
+    BROAD_MUTATION_READ_ONLY_CODE_METHODS 里的方法（调用的是别的写法，lambda、下标、调用的结果，一律不许）；内建 open 的模式只许字面写、不带 w / a / x / +，
+    不许 opener、* / ** 展开；BROAD_MUTATION_CODE_INDIRECT_NAMES 里的名字与双下划线起头的属性一出现就不放；类定义不放（元类在定义时被调用，看不见调用）。
+    语法错、空代码交 False。弄坏开关 broad-mutation-code-read-counted 下一律交 False（读它的也照算）。"""
+    if break_is_set("broad-mutation-code-read-counted"):
+        return False
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return False
+
+    def opens_for_reading(call):
+        if any(isinstance(argument, ast.Starred) for argument in call.args) or any(keyword.arg in (None, "opener") for keyword in call.keywords):
+            return False
+        mode = call.args[1] if len(call.args) > 1 else next((keyword.value for keyword in call.keywords if keyword.arg == "mode"), None)
+        return mode is None or (isinstance(mode, ast.Constant) and isinstance(mode.value, str) and not set(mode.value) & set("wax+"))
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import) and any(alias.name not in BROAD_MUTATION_READ_ONLY_CODE_MODULES for alias in node.names):
+            return False
+        if isinstance(node, ast.ImportFrom) and (node.level or node.module not in BROAD_MUTATION_READ_ONLY_CODE_MODULES):
+            return False
+        if isinstance(node, ast.ClassDef):
+            return False
+        if isinstance(node, ast.Name) and node.id in BROAD_MUTATION_CODE_INDIRECT_NAMES:
+            return False
+        if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            return False
+        if isinstance(node, ast.Call):
+            function = node.func
+            if isinstance(function, ast.Name):
+                if function.id not in BROAD_MUTATION_READ_ONLY_CODE_CALLS or (function.id == "open" and not opens_for_reading(node)):
+                    return False
+            elif not (isinstance(function, ast.Attribute) and function.attr in BROAD_MUTATION_READ_ONLY_CODE_METHODS):
+                return False
+    return bool(tree.body)
+
+
 def verus_judge_code_use(name, arguments):
     """`python3 -c '…'` 的代码里出现两份判法脚本的名字（VERUS_JUDGE_CODE_NAME）：一律算 verus-stage，不看代码之后的词
     （代码能自己改 sys.argv、直接调函数）；只放过每一句都是 print(<字符串字面量>…) 的代码（code_only_prints_string_literals）。没出现交 None。
@@ -2933,7 +3311,8 @@ def brace_gobble(word, position, wanted, budget):
 
 def brace_sequence(amble):
     """{<起>..<止>[..<步长>]} 里面那一段照 bash 展开成的几份（最多 WORD_EXPANSION_LIMIT 份）；不是合法的序列交 None。
-    整数照 bash 补零：起或止写成 0 起头的两位以上（或 -0 起头的三位以上）时，宽度取这样写的那几边的长度里大的那个。弄坏开关 brace-sequence-literal 下一律交 None。"""
+    整数照 bash 补零：起或止写成 0 起头的两位以上（或 -0 起头的三位以上）时，宽度取这样写的那几边的长度里大的那个（与 lib_shell_words.py 共用 brace_sequence_width）。
+    弄坏开关 brace-sequence-literal 下一律交 None。"""
     found = BRACE_SEQUENCE.fullmatch(amble)
     if found is None or break_is_set("brace-sequence-literal"):
         return None
@@ -2943,7 +3322,7 @@ def brace_sequence(amble):
     if first.isalpha():
         begin, end, render = ord(first), ord(last), chr
     else:
-        width = max([len(text) for text in (first, last) if (len(text) > 1 and text[0] == "0") or (len(text) > 2 and text[:2] == "-0")], default=0)
+        width = shell_words.brace_sequence_width(first, last)
         begin, end = int(first), int(last)
         render = (lambda value: f"{value:0{width}d}") if width else str
     step = step if begin <= end else -step
@@ -3088,6 +3467,9 @@ def classify(words, directory, environment=None, expand_patterns=True):
             hint = (f"；它是装置 {binary} 的话，装置的 main 用 target/<profile>/{binary} 或 cargo run --bin {binary} 起（与 deps/ 下同它是一份的那一个同判，不算重型）"
                     if binary in checker_device_targets(directory or HOOK_REPOSITORY) else "")
             return heavy_test("checker-tier-binary", f"直接执行 {CHECKER_PACKAGE_NAME} 包的测试二进制（{binary}）：checker 档，默认只在提交时跑{hint}")
+        if binary in product_gpu_test_binaries(directory or HOOK_REPOSITORY) and not break_is_set("product-gpu-feature-unjudged"):
+            return heavy_test("product-gpu-binary", f"直接执行 {PRODUCT_GPU_PACKAGE_NAME} 包带 {PRODUCT_GPU_FEATURE} 特性才编的真显卡对拍测试二进制（{binary}）："
+                                                    "要卡，默认只在提交时跑，而且要经 `bash scripts/crash/gpu-quiesce-run.sh -- <命令>` 清场起、带 --test-threads 1")
         return None
     if name.startswith("qemu-system"):
         return heavy_test("qemu-system", name)
@@ -3108,6 +3490,8 @@ def classify(words, directory, environment=None, expand_patterns=True):
             return None   # 只找 herd7、打它版本输出的第一行（stage-inputs.tsv 里 checker-tier-lkmm 的 environment= 起的那一条）
         return heavy_test("lkmm", ".claude/scripts/lkmm.sh")
     if name == "herd7":
+        if arguments in HERD7_VERSION_ONLY_ARGUMENTS and not break_is_set("herd7-version-flag-counted"):
+            return None   # 只打 herd7 的版本号
         return heavy_test("herd7", "herd7")
     if name == "mutate.sh":
         for argument in arguments:
@@ -3134,6 +3518,11 @@ def classify(words, directory, environment=None, expand_patterns=True):
             return None   # 只列分项，不清场、不跑
         return heavy_test("crash-amplification", f"scripts/crash/{name}（崩溃放量：每一项经 crash-amplification-lib.sh 起 checker 档 cargo test；"
                                                  "只有 crash-amplification.sh --list-items 与登记表里的单独 --selftest 不算）")
+    if name == EXPERIMENT_REPLAY_SCRIPT and not break_is_set("experiment-replay-unnamed") and known_script_at_location(words[0], directory):
+        if [argument for argument in arguments if argument != "--force"] == EXPERIMENT_REPLAY_QUERY_ARGUMENTS:
+            return None   # 只列可点名的实验号，不编、不跑（replay.sh 文件头 --list-items）；路径尾部相同的别处拷贝在这里也交 None，读不读它的正文看 judged_by_name
+        return heavy_test("replay-all-stage", f"scripts/experiment-apparatus/{name} {' '.join(arguments[:4])}（实验复跑：每个实验起装置或驱动；"
+                                                 "只有仓内那一份摘掉 --force 之后恰好一个 --list-items 的与登记表里的单独 --selftest 不算）")
     if name == PROVE_RED_SCRIPT:
         proving = prove_red_use(arguments, directory, environment)
         if proving is not None:
@@ -3163,7 +3552,8 @@ def classify(words, directory, environment=None, expand_patterns=True):
             return broad_mutation_use(arguments, driver)
         if shell_words.PYTHON_NAME.match(name) and not break_is_set("broad-mutation-by-name-only"):
             invocation = shell_words.python_invocation(arguments)
-            if invocation.code_string is not None and BROAD_MUTATION_CODE_REFERENCE.search(invocation.code_string):
+            if (invocation.code_string is not None and BROAD_MUTATION_CODE_REFERENCE.search(invocation.code_string)
+                    and not code_only_reads_source(invocation.code_string)):
                 return broad_mutation_use(arguments[invocation.script_index:], f"python -c 的代码里点了 {BROAD_MUTATION_SCRIPT_NAME}")
     if name in ("e152-file-system-benchmark", "e152-run.sh"):
         return heavy_test("e152", name)
@@ -3202,15 +3592,64 @@ def classify_process(argv, cwd):
     return heavy_tests_in_command_text(shlex.join(argv), cwd)
 
 
-def judged_by_name(word, directory):
-    """按名字判的仓内脚本（门禁阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在仓内位置上）：判定在名字那一格做完，不再读脚本正文。"""
-    if gate_stage_name(word, directory) is not None:
-        return True
+def known_script_at_location(word, directory):
+    """命令词（照写的样子，或按当前目录解开之后）是 KNOWN_SCRIPT_LOCATIONS 登记的名字、路径又以它的仓内位置收尾。只看路径尾部，不核是不是本仓那一份。"""
     location = KNOWN_SCRIPT_LOCATIONS.get(os.path.basename(word))
     if location is None:
         return False
     return any(candidate == location or candidate.endswith("/" + location)
                for candidate in (os.path.normpath(word), shell_words.resolve_path(directory, word) or ""))
+
+
+def path_without_symbolic_links(path, directory):
+    """路径（相对路径接在 directory 后面）从根一级一级走下去，每一级都不是符号链接时交走到的绝对路径，否则交 None；
+    相对路径而 directory 认不出（None、不是绝对路径）的也交 None。.. 取父目录，走到它时前面各级已确认不是符号链接，所以字面上的父目录就是真实的父目录。"""
+    if os.path.isabs(path):
+        text = path
+    elif directory is not None and os.path.isabs(directory):
+        text = os.path.join(directory, path)
+    else:
+        return None
+    walked = "/"
+    for part in text.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            walked = os.path.dirname(walked)
+            continue
+        walked = os.path.join(walked, part)
+        if os.path.islink(walked):
+            return None
+    return walked
+
+
+def own_repository_script(word, directory):
+    """命令词的整条路径（相对路径接在当前目录后面）逐级都不是符号链接，走到的正是本仓（HOOK_REPOSITORY）里 KNOWN_SCRIPT_LOCATIONS 登记的那一份；
+    经符号链接起的（链接指到本仓那一份的也一样）不算：入口按自己所在的路径（不解符号链接）定仓根，链接旁边放一份改过的 .claude/scripts/preflight.sh 与别的库，
+    入口照样 source 进来，比真实路径认不出。写在变量、通配里的，和当前目录认不出的相对路径，也不算。
+    弄坏开关 own-script-by-realpath 下退回比真实路径（符号链接按指到的算）。stage_selftest_is_own_copy 与自证登记表的认法没动，仍比真实路径。"""
+    location = KNOWN_SCRIPT_LOCATIONS.get(os.path.basename(word))
+    if location is None:
+        return False
+    expanded = os.path.expanduser(word)
+    if break_is_set("own-script-by-realpath"):
+        resolved = shell_words.resolve_path(directory, expanded)
+        return resolved is not None and os.path.realpath(resolved) == os.path.realpath(os.path.join(HOOK_REPOSITORY, location))
+    return path_without_symbolic_links(expanded, directory) == os.path.normpath(os.path.join(HOOK_REPOSITORY, location))
+
+
+def judged_by_name(word, directory):
+    """按名字判的仓内脚本（门禁阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在仓内位置上）：判定在名字那一格做完，不再读脚本正文。
+    OWN_COPY_ONLY_SCRIPTS 里的几个（放行靠参数的入口）要命令词的整条路径逐级都不是符号链接、又正是本仓那一份才算，路径尾部相同的别处拷贝与经符号链接起的不算、照读正文。
+    弄坏开关 judged-by-name-path-tail 下它们也只看路径尾部。"""
+    if gate_stage_name(word, directory) is not None:
+        return True
+    name = os.path.basename(word)
+    if KNOWN_SCRIPT_LOCATIONS.get(name) is None or (name == EXPERIMENT_REPLAY_SCRIPT and break_is_set("experiment-replay-unnamed")):
+        return False
+    if name in OWN_COPY_ONLY_SCRIPTS and not break_is_set("judged-by-name-path-tail"):
+        return own_repository_script(word, directory)
+    return known_script_at_location(word, directory)
 
 
 def build_sample_workspace(work):
@@ -3222,7 +3661,7 @@ def build_sample_workspace(work):
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(text)
     write("Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["crates/singlefs-core", "crates/singlefs-harness", "crates/singlefs-checker", "crates/singlefs-checker-tier"]\n'
-                        'exclude = ["scripts/experiments"]\n')
+                        'exclude = ["scripts/experiment-apparatus"]\n')
     write("crates/singlefs-core/Cargo.toml", '[package]\nname = "singlefs-core"\nversion = "0.0.0"\n')
     write("crates/singlefs-core/tests/core_contract.rs", "")
     write("crates/singlefs-harness/Cargo.toml", '[package]\nname = "singlefs-harness"\nversion = "0.0.0"\n')
@@ -3266,12 +3705,25 @@ def build_sample_workspace(work):
     write("inherit/member/Cargo.toml", '[package]\nname = "inherit-member"\nversion = "0.1.0"\n[dependencies]\nrenamed-tier = { workspace = true }\n')
     write("alias.env", '# 样本：systemd-run -p EnvironmentFile= 读的\nCARGO_ALIAS_XT="test -p singlefs-checker-tier"\n')
     write("plain.env", "# 样本\nRUST_BACKTRACE=1\n")
-    write("scripts/experiments/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
-    write("scripts/experiments/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
+    write("scripts/experiment-apparatus/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
+    write("scripts/experiment-apparatus/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
     write("mutants-sample/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["mutated", "other"]\n')
     write("mutants-sample/mutated/Cargo.toml", '[package]\nname = "mutated"\nversion = "0.0.0"\n')
     write("mutants-sample/other/Cargo.toml", '[package]\nname = "other"\nversion = "0.0.0"\n')
     write("mutants-sample/.cargo/mutants.toml", "# 样本：cargo mutants 每次测整个工作区\ntest_workspace = true\n")
+    # 产品 GPU 包（product_gpu_cargo_use）：自己一个虚工作区，不扰别的格。真卡对拍目标两个（一个写在 [[test]] 的 required-features 里，一个只在文件里写 cfg），
+    # 再一个 CPU 的集成测试目标（文件里只有注释里提到这个特性）；deps/ 下三个测试二进制，名字同目标名
+    product_gpu_root = "product-gpu-sample/crates/singlefs-background-gpu"
+    write("product-gpu-sample/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["crates/singlefs-background-gpu", "crates/singlefs-core"]\n')
+    write("product-gpu-sample/crates/singlefs-core/Cargo.toml", '[package]\nname = "singlefs-core"\nversion = "0.0.0"\n')
+    write(f"{product_gpu_root}/Cargo.toml", '[package]\nname = "singlefs-background-gpu"\nversion = "0.1.0"\n[features]\ntests-on-a-real-gpu = []\n'
+                                              '[[test]]\nname = "kernels_agree_with_the_cpu"\nrequired-features = ["tests-on-a-real-gpu"]\n')
+    write(f"{product_gpu_root}/src/lib.rs", "pub fn open_background_gpu() {}\n")
+    write(f"{product_gpu_root}/tests/kernels_agree_with_the_cpu.rs", "#[test]\nfn a_card_case() {}\n")
+    write(f"{product_gpu_root}/tests/cfg_gated_card_cases.rs", '#![cfg(feature = "tests-on-a-real-gpu")]\n#[test]\nfn another_card_case() {}\n')
+    write(f"{product_gpu_root}/tests/cpu_only_cases.rs", '// feature = "tests-on-a-real-gpu" 只在注释里提到\n#[test]\nfn a_cpu_case() {}\n')
+    for deps_name in ("kernels_agree_with_the_cpu", "cfg_gated_card_cases", "cpu_only_cases"):
+        write(f"product-gpu-sample/target/release/deps/{deps_name}-0123456789abcdef", "测试二进制\n")
     # 广谱变异的驱动（样本只有文件头）：仓内位置上的一份、指到它的两个符号链接（仓内改名、仓外）、带签名行的改名拷贝（仓内、仓外各一份）、
     # 删掉签名行的拷贝（罩不住的那一种）、不相干的 python 脚本
     driver_sample = ("#!/usr/bin/env python3\n# admission: always 样本\n# run-condition: command python3\n"
@@ -3292,7 +3744,7 @@ def build_sample_workspace(work):
     os.symlink(os.path.join(work, "scripts", "mutation", "broad-mutation.py"), os.path.join(work, "elsewhere", "linked-driver.py"))
     # Verus 那一道的两份判法脚本（样本只有文件头）：仓内位置上的各一份、仓外指到判法脚本的符号链接、仓内改名指到红例钉表的符号链接
     write("scripts/gate/verus-proof-check.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
-    write("scripts/experiments/e165-pin-red-examples.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
+    write("scripts/experiment-apparatus/e165-pin-red-examples.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
     # prove-red.sh 读的变异表：checker 档包一行、harness 档包一行、同名两行（取最后一行，是 harness 档的）
     write("crates/mutations.tsv", "# 样本（lib_heavy_tests 自检造的）\n"
           "tier-row\tcrates/singlefs-checker-tier/src/lib.rs\tjudge()\tjudge2()\t-p singlefs-checker-tier --lib -- judge\tjudge\n"
@@ -3300,7 +3752,7 @@ def build_sample_workspace(work):
           "renamed-row\tcrates/singlefs-checker-tier/src/lib.rs\tjudge()\tjudge3()\t-p singlefs-checker-tier --lib -- judge\tjudge\n"
           "renamed-row\tcrates/singlefs-harness/tests/overwrite_in_one_instance.rs\ta_daily_case\tc\t-p singlefs-harness --test overwrite_in_one_instance\ta_daily_case\n")
     os.symlink(os.path.join(work, "scripts", "gate", "verus-proof-check.py"), os.path.join(work, "elsewhere", "linked-proof-check.py"))
-    os.symlink("e165-pin-red-examples.py", os.path.join(work, "scripts", "experiments", "linked-pin.py"))
+    os.symlink("e165-pin-red-examples.py", os.path.join(work, "scripts", "experiment-apparatus", "linked-pin.py"))
     # 双机分片的驱动脚本读的登记表：驱动自检在临时仓里登记的那种（harness 档包的替身用例）、真跑的那种（checker 档包）、没登记分片的（驱动开跑就拒）
     # 门禁样本（文件头「门禁样本」）：这份文件所在仓里那几道阶段的原样拷贝（判「与登记的那一份相同」）、改过正文的 checker-tier-crash-point-replay 拷贝、
     # 放了 .crash-point-replay-sample-tools 的样本根、没放标记的目录、crates 变异表那一道的样本根，与喂给 stage-selftest.sh 的四份阶段目录
@@ -3408,17 +3860,18 @@ SAMPLE_SELFTEST_REGISTRY = (
     ".claude/gate.d/sample-stage-wrong.sh\tlight\t# 样本：门禁阶段写成自证的判定\n"
     ".claude/gate.d/sample-stage-escape.sh\tsamples-light-marker:../outside\t# 样本：标记跳出样本根\n"
     "scripts/gate/sample-samples-misplaced.sh\tsamples-light\t# 样本：样本档的判定写在研究脚本上\n"
-    "scripts/experiments/sample_device/sample_orchestrator.py\tlight\t# 样本：实验装置那一层的编排脚本，自证用假驱动\n"
-    "scripts/experiments/sample_device/sample_heavy_orchestrator.py\theavy\t# 偏离上游：样本，实验装置那一层登记成 heavy\n"
-    "scripts/experiments/sample_device/deeper/sample_too_deep.py\tlight\t# 样本：装置目录下面再深一层\n"
-    "scripts/sample_top.py\tlight\t# 样本：直接放在 scripts/ 下、不在哪个分类目录里\n")
+    "scripts/experiment-apparatus/sample_device/sample_orchestrator.py\tlight\t# 样本：实验装置那一层的编排脚本，自证用假驱动\n"
+    "scripts/experiment-apparatus/sample_device/sample_heavy_orchestrator.py\theavy\t# 偏离上游：样本，实验装置那一层登记成 heavy\n"
+    "scripts/experiment-apparatus/sample_device/deeper/sample_too_deep.py\tlight\t# 样本：装置目录下面再深一层\n"
+    "scripts/sample_top.py\tlight\t# 样本：直接放在 scripts/ 下、不在哪个分类目录里\n"
+    ".claude/gate.d/lib-sample-library.py\tlight\t# 样本：门禁目录顶层以 lib- 起头的共用库，自证用假驱动\n")
 # 样本表里该报出来的行（键）：判定认不出、理由太短、不在三处目录里、重复、文件不在
 SAMPLE_SELFTEST_REGISTRY_PROBLEM_KEYS = ["scripts/gate/sample-bad-weight.sh", "scripts/gate/sample-short-reason.sh", "elsewhere/sample-outside.sh",
                                          "scripts/gate/sample-light.sh", "scripts/gate/sample-missing.sh", ".claude/gate.d/sample-stage-wrong.sh",
                                          ".claude/gate.d/sample-stage-escape.sh", "scripts/gate/sample-samples-misplaced.sh",
-                                         "scripts/experiments/sample_device/deeper/sample_too_deep.py", "scripts/sample_top.py"]
+                                         "scripts/experiment-apparatus/sample_device/deeper/sample_too_deep.py", "scripts/sample_top.py"]
 # 样本登记表里实验装置那一层的那个装置目录（文件头「实验装置那一层」）
-SAMPLE_DEVICE_LAYER = "scripts/experiments/sample_device/"
+SAMPLE_DEVICE_LAYER = "scripts/experiment-apparatus/sample_device/"
 # 只含一行假 heavy 脚本的登记表：两份钩子自证里「登记为 heavy」的那几格拿它判（仓里登记的脚本自证都换成了假驱动，不拿真脚本当 heavy 样例）
 HEAVY_ONLY_REGISTRY_NAME = "heavy-only-selftest-registry.tsv"
 HEAVY_ONLY_SCRIPT = "scripts/gate/sample-only-heavy.py"
@@ -3571,7 +4024,7 @@ def selftest_registry_cells(work, results):
                      ".claude/gate.d/sample-stage.sh", "elsewhere-tree/scripts/gate/sample-light.sh",
                      *(SAMPLE_DEVICE_LAYER + name for name in ("sample_orchestrator.py", "sample_heavy_orchestrator.py", "deeper/sample_too_deep.py",
                                                                "sample_unregistered.py")),
-                     "scripts/sample_top.py",
+                     "scripts/sample_top.py", ".claude/gate.d/lib-sample-library.py", ".claude/gate.d/lib-sample-unregistered.py",
                      "elsewhere-tree/" + SAMPLE_DEVICE_LAYER + "sample_orchestrator.py"):
         os.makedirs(os.path.dirname(os.path.join(work, relative)), exist_ok=True)
         with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
@@ -3586,6 +4039,9 @@ def selftest_registry_cells(work, results):
         ("样本表：理由太短的一行不算登记", ["bash", "scripts/gate/sample-short-reason.sh", "--selftest"], UNREGISTERED_SELFTEST_KIND),
         ("样本表：别的树里路径尾部相同的 light 脚本不算登记", ["bash", os.path.join(work, "elsewhere-tree", "scripts", "gate", "sample-light.sh"), "--selftest"],
          UNREGISTERED_SELFTEST_KIND),
+        ("样本表：门禁目录顶层 lib- 起头的共用库登记成 light，单独 --selftest 放行", ["python3", ".claude/gate.d/lib-sample-library.py", "--selftest"], None),
+        ("样本表：门禁目录顶层 lib- 起头的共用库没登记的 --selftest 照拒", ["python3", ".claude/gate.d/lib-sample-unregistered.py", "--selftest"],
+         UNREGISTERED_SELFTEST_KIND),
     ]
     try:
         SELFTEST_REGISTRY_PATH, SELFTEST_REGISTRY_ROOT = sample_registry, work
@@ -3595,6 +4051,8 @@ def selftest_registry_cells(work, results):
         found_keys = sorted(match.group(1) for problem in selftest_registry_problems(sample_registry, work)
                             for match in [re.match(r"^第 \d+ 行 (\S+)：", problem)] if match)
         results.append(("样本登记表里写坏的几行逐条报出来（判定、理由、目录、重复、文件不在、门禁阶段那几行的判定与标记）", sorted(SAMPLE_SELFTEST_REGISTRY_PROBLEM_KEYS), found_keys))
+        results.append(("样本表：门禁目录顶层 lib- 起头的共用库带 --selftest 之外的参数不当自证", (False, None),
+                        classify_selftest(".claude/gate.d/lib-sample-library.py", ["show", "HEAD", "x.tsv"], work)))
         sample_stage_row = read_selftest_registry(sample_registry)[0].get(".claude/gate.d/sample-stage.sh")
         results.append(("样本表：门禁阶段的样本档那一行照收", "samples-light-marker:.sample-tools", sample_stage_row.weight if sample_stage_row else None))
         # 实验装置那一层（文件头「实验装置那一层」）：登记了的单独 --selftest 照登记的轻重判；没登记的、带别的参数的、别的树里的不当自证（照没认这一层时那样判）
@@ -3698,7 +4156,10 @@ def selftest():
             ("env 拆串：-S 'cargo test -p singlefs-checker-tier'", ["env", "-S", "cargo test -p singlefs-checker-tier"], work, "checker-tier-cargo"),
             ("env 拆串：-iS 合写、串贴着写", ["env", "-iScargo test -p singlefs-checker-tier"], work, "checker-tier-cargo"),
             ("env 拆串：--split-string=串", ["env", "--split-string=cargo test -p singlefs-checker-tier"], work, "checker-tier-cargo"),
-            ("env 拆串：拆出来的串里带 -C 目录和赋值与引号", ["env", "-S", "FOO=1 -C crates/singlefs-checker-tier cargo 'test'"], work, "checker-tier-cargo"),
+            ("env 拆串：拆出来的串里带 -C 目录和赋值与引号", ["env", "-S", "-C crates/singlefs-checker-tier FOO=1 cargo 'test'"], work, "checker-tier-cargo"),
+            # GNU env 认到赋值就不再认选项：赋值之后的 -C 是命令词，env 报 No such file、不跑（三方 shell-words-r2 判决第二节第 5 条；
+            # LIB_SHELL_WORDS_BREAK=env-options-after-assignment 下这一格红）
+            ("env 拆串：拆出来的串里赋值之后的 -C 是命令词，env 报错不跑", ["env", "-S", "FOO=1 -C crates/singlefs-checker-tier cargo 'test'"], work, None),
             ("env 拆串：串后面还有参数，接在串里最后一个词后面", ["env", "-S", "cargo test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
             ("env 拆串：串里点名 harness 档包放行", ["env", "-S", "cargo test -p singlefs-harness"], work, None),
             ("env 拆串：经内存包装与 capped.sh default 起、串里是 checker 档的测试", ["bash", "scripts/hosts/run-with-memory-cap.sh", "8G", "bash", "scripts/hosts/capped.sh", "default",
@@ -3740,6 +4201,10 @@ def selftest():
             ("cargo mutants -d 指到带 test_workspace = true 配置的树", ["cargo", "mutants", "-d", "mutants-sample", "-p", "mutated"], work, "full-cargo"),
             ("cargo mutants 配置里 test_workspace = true、命令行 --test-workspace false 盖掉", ["cargo", "mutants", "-p", "mutated", "--test-workspace", "false"], os.path.join(work, "mutants-sample"), None),
             ("cargo mutants --no-config 不读 test_workspace", ["cargo", "mutants", "--no-config", "-p", "mutated"], os.path.join(work, "mutants-sample"), None),
+            # cargo mutants 只带 --help、-h、--version、-V 的只打帮助或版本（开关 mutants-help-counted 下前两格红）；带了别的参数照判
+            ("cargo mutants --help 只打帮助", ["cargo", "mutants", "--help"], work, None),
+            ("cargo mutants -V -h（只打版本与帮助）", ["cargo", "mutants", "-V", "-h"], work, None),
+            ("cargo mutants --help 之外还带 -p checker 档照算", ["cargo", "mutants", "--help", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
             ("core 的一个测试目标", ["cargo", "test", "-p", "singlefs-core", "--test", "core_contract"], work, None),
             ("池级 checker 不是 checker 档", ["cargo", "test", "-p", "singlefs-checker"], work, None),
             ("池级 checker 的库单测", ["cargo", "test", "-p", "singlefs-checker", "--lib"], work, None),
@@ -3881,7 +4346,7 @@ def selftest():
             ("crates-mutation-rows.py --item 点名单跑一行：与那一道同一类", ["python3", "scripts/mutation/crates-mutation-rows.py", "--item", "5", work], work, "crates-mutation-stage"),
             ("crates-mutation-rows.py plan：只读，放行", ["python3", "scripts/mutation/crates-mutation-rows.py", "plan", work], work, None),
             ("crates-mutation-rows.py --list-items：只列，放行", ["python3", "scripts/mutation/crates-mutation-rows.py", "--list-items", work], work, None),
-            ("cargo run E152", ["cargo", "run", "--release", "--bin", "e152-file-system-benchmark"], os.path.join(work, "scripts", "experiments"), "e152"),
+            ("cargo run E152", ["cargo", "run", "--release", "--bin", "e152-file-system-benchmark"], os.path.join(work, "scripts", "experiment-apparatus"), "e152"),
             # cargo run 起登记了红例钉表重放用法的装置（cargo_run_device_replay；开关 cargo-run-device-replay-allowed 下前四格红）：带登记的选项照重型，别的用法与别的装置照旧不算
             ("红例钉表重放：cargo run --bin 登记装置 -- --pinned-cases", ["cargo", "run", "--release", "--bin", "e165_replay_bounded_enumeration", "--", "--pinned-cases", "table.tsv"],
              work, "verus-stage"),
@@ -3924,6 +4389,16 @@ def selftest():
             ("广谱变异 -h 带 --shard", ["python3", driver, "-h", "--shard", "0/2"], work, None),
             # 开关 broad-mutation-read-only-counted 下这一格红
             ("广谱变异 --check-ignored 只判忽略用例登记", ["python3", driver, "--check-ignored"], work, None),
+            # 开关 broad-mutation-unit-environment-counted 下这一格红
+            ("广谱变异 --unit-environment 只打构建环境认的变量那一行", ["python3", driver, "--unit-environment"], work, None),
+            # 只读参数与起 cargo 或改库目录的参数同写照算（开关 broad-mutation-query-before-writing 下前五格红）；单独的只读参数、只读参数带选条参数照旧不算
+            ("广谱变异 --coverage-step 与 --list-items 同写：插桩跑照算", ["python3", driver, "--coverage-step", "spec.json", "--list-items"], work, "broad-mutation"),
+            ("广谱变异 --summary 与贴着写的 --coverage-step=… 同写照算", ["python3", driver, "--summary", "--coverage-step=spec.json"], work, "broad-mutation"),
+            ("广谱变异 --summary 与 --import-results 同写：导入照算", ["python3", driver, "--summary", "--import-results", "/tmp/claude-1000/peer"], work, "broad-mutation"),
+            ("广谱变异 --summary 与 --refresh-list 同写照算", ["python3", driver, "--summary", "--refresh-list"], work, "broad-mutation"),
+            ("广谱变异 --list-items 与 --full 同写照算", ["python3", driver, "--list-items", "--full"], work, "broad-mutation"),
+            ("广谱变异 --coverage-step 单独：插桩跑照算", ["python3", driver, "--coverage-step", "spec.json"], work, "broad-mutation"),
+            ("广谱变异 --summary 带 --item 与 --shard（选条参数不改库目录）照旧不算", ["python3", driver, "--summary", "--item", "3", "--shard", "0/2"], work, None),
             ("广谱变异单独 --selftest：登记成假一步驱动，放行（不落到按驱动判的 --selftest 那一支）", ["python3", driver, "--selftest"], repository, None),
             ("登记成轻的脚本带别的参数再带 --selftest 照拒：广谱变异 --selftest 混运行参数", ["python3", driver, "--selftest", "--shard", "0/2"], repository,
              UNREGISTERED_SELFTEST_KIND),
@@ -3965,6 +4440,18 @@ def selftest():
             ("python3 -c 的代码带 --summary", ["python3", "-c", f"import runpy; runpy.run_path('{driver}', run_name='__main__')", "--summary"], work, None),
             ("符号链接带 --list-items", ["python3", "scripts/mutation/linked-driver.py", "--list-items"], work, None),
             ("python3 -c 不相干的代码", ["python3", "-c", "print(1)"], work, None),
+            # 代码只 open 读驱动、拿 ast 看它的不算（开关 broad-mutation-code-read-counted 下头两格红）；真 import、exec、改 sys.path 的照算
+            ("python3 -c 只 open 读驱动再 ast.parse：不算", ["python3", "-c", f"import ast; print(len(ast.parse(open('{driver}').read()).body))"], work, None),
+            ("python3 -c 用 with open 读驱动、ast.walk 数函数：不算",
+             ["python3", "-c", f"import ast\nwith open('{driver}', encoding='utf-8') as handle:\n    tree = ast.parse(handle.read())\n"
+                               "print(sorted(node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))[:3])"], work, None),
+            ("python3 -c 先 ast.parse 驱动、再 runpy.run_path 起它照算",
+             ["python3", "-c", f"import ast, runpy; ast.parse(open('{driver}').read()); runpy.run_path('{driver}', run_name='__main__')"], work, "broad-mutation"),
+            ("python3 -c 读驱动、改 sys.path 再 __import__ 照算",
+             ["python3", "-c", f"import ast, sys; ast.parse(open('{driver}').read()); sys.path.insert(0, 'scripts/mutation'); __import__('broad-mutation')"], work,
+             "broad-mutation"),
+            ("python3 -c 读驱动再 compile 交给 exec 照算", ["python3", "-c", f"exec(compile(open('{driver}').read(), 'driver', 'exec'))"], work, "broad-mutation"),
+            ("python3 -c 读驱动、模式写成 r+ 照算", ["python3", "-c", f"import ast; ast.parse(open('{driver}', 'r+').read())"], work, "broad-mutation"),
             ("签名行不在行首的不相干脚本", ["python3", os.path.join(work, "elsewhere", "unrelated.py")], work, None),
             ("删掉签名行的仓外拷贝认不出（罩不住的那一种，钉住现状）", ["python3", os.path.join(work, "elsewhere", "copy-without-signature.py")], work, None),
             ("grep 读驱动", ["grep", "-n", "main", driver], work, None),
@@ -3989,6 +4476,15 @@ def selftest():
              None),
             ("广谱变异的提交门禁 --list 只打格名表", ["bash", ".claude/gate.d/checker-tier-broad-mutation.sh", "--list"], work, None),
             ("广谱变异的提交门禁 --tool-versions 只打工具版本", ["bash", ".claude/gate.d/checker-tier-broad-mutation.sh", "--tool-versions"], work, None),
+            # 交回前自查命名：code-source-discipline.sh 的 --check 只点名那四格里的格不算（开关 naming-self-check-counted 下前三格红；naming-self-check-any-cell 下「夹着别的格」「只点名别的格」两格红）
+            ("命名自查：点名四格", ["bash", ".claude/gate.d/code-source-discipline.sh", "--check", "vague-names,test-file-names,ordinal-names,data-names", "/tmp/copy"], work, None),
+            ("命名自查：点名一格（等号写法）", ["bash", ".claude/gate.d/code-source-discipline.sh", "--check=data-names", "/tmp/copy"], work, None),
+            ("命名自查：--check 给两次取并集", ["bash", ".claude/gate.d/code-source-discipline.sh", "--check", "vague-names", "--check", "ordinal-names", "/tmp/copy"], work, None),
+            ("命名自查：点名里夹着别的格照算", ["bash", ".claude/gate.d/code-source-discipline.sh", "--check", "vague-names,format-constants", "/tmp/copy"], work, "commit-check-stage"),
+            ("命名自查：只点名别的格照算", ["bash", ".claude/gate.d/code-source-discipline.sh", "--check", "feature-bits", "/tmp/copy"], work, "commit-check-stage"),
+            ("命名自查：不带 --check 整道照算", ["bash", ".claude/gate.d/code-source-discipline.sh", "/tmp/copy"], work, "commit-check-stage"),
+            ("命名自查：--check 点名为空照算", ["bash", ".claude/gate.d/code-source-discipline.sh", "--check", "", "/tmp/copy"], work, "commit-check-stage"),
+            ("命名自查：上游 naming-lint.sh 不算", ["bash", ".claude/singlefs-ai-sop/scripts/naming-lint.sh", "/tmp/copy"], work, None),
             ("直接起 verus 验一个 crate 不算重型", ["verus", "--crate-type=lib", "--no-cheating", "src/lib.rs"], work, None),
             ("cargo verus verify 不算重型", ["cargo", "verus", "verify", "-p", "singlefs-core"], work, None),
             # Verus 那一道只打工具版本不算（开关 tool-versions-counted 下这一格红）
@@ -3998,8 +4494,8 @@ def selftest():
             ("直接起判法脚本跑空真、经 nice 与绝对路径", ["nice", "-n", "19", "python3", os.path.join(work, "scripts", "gate", "verus-proof-check.py"), "vacuity", work], "/",
              "verus-stage"),
             ("直接起判法脚本验证明", ["python3", "scripts/gate/verus-proof-check.py", "proof", "."], work, "verus-stage"),
-            ("直接起红例重放", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--root", "."], work, "verus-stage"),
-            ("经内存包装起红例重放、--check 写在 --replay 前面", ["bash", "scripts/hosts/run-with-memory-cap.sh", "4G", "python3", "scripts/experiments/e165-pin-red-examples.py",
+            ("直接起红例重放", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--root", "."], work, "verus-stage"),
+            ("经内存包装起红例重放、--check 写在 --replay 前面", ["bash", "scripts/hosts/run-with-memory-cap.sh", "4G", "python3", "scripts/experiment-apparatus/e165-pin-red-examples.py",
                                                             "--check", "--replay"], work, "verus-stage"),
             ("判法脚本只打工具版本", ["python3", "scripts/gate/verus-proof-check.py", "tool-versions", "."], work, None),
             ("判法脚本核版本一致（只读安装与缓存）", ["python3", "scripts/gate/verus-proof-check.py", "toolchain", "."], work, None),
@@ -4011,43 +4507,43 @@ def selftest():
             ("判法脚本第一个参数写成变量照算", ["python3", "scripts/gate/verus-proof-check.py", "$S", "."], work, "verus-stage"),
             # 判定库的选项改名成 --verdict-library（带一个值，切参数时跳过它的值；开关 e165-pin-old-library-option 下这两格红）
             ("红例钉表 --check 后面 --verdict-library 的值碰巧叫 --replay、以 --check 为准",
-             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check", "--verdict-library", "--replay"], work, None),
+             ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--check", "--verdict-library", "--replay"], work, None),
             ("红例重放 --verdict-library 的值碰巧叫 --check、照算重放",
-             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--verdict-library", "--check"], work, "verus-stage"),
+             ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--verdict-library", "--check"], work, "verus-stage"),
             ("crates 变异判法模块打判法单元清单（judging-units）不算", ["python3", "scripts/mutation/crates-mutation-rows.py", "judging-units", "."], work, None),
-            ("红例钉表只列可点名的项", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--list-items"], work, None),
+            ("红例钉表只列可点名的项", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--list-items"], work, None),
             ("判法脚本点名一处空真照算", ["python3", "scripts/gate/verus-proof-check.py", "vacuity", ".", "--item", "vacuity:src/lib.rs:5"], work, "verus-stage"),
-            ("红例重放点名一行照算", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--item", "pinned:3"], work, "verus-stage"),
-            ("红例重放 --item 的值碰巧叫 --check、照算重放", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--item", "--check"], work, "verus-stage"),
-            ("红例钉表只核钉全", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check"], work, None),
-            ("红例钉表 --replay 写在 --check 前面、以 --check 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--check"], work, None),
-            ("红例钉表 --root 的值碰巧叫 --replay", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check", "--root", "--replay"], work, None),
-            ("红例钉表追加", ["python3", "scripts/experiments/e165-pin-red-examples.py", "research/results/e165-sample-red-examples.tsv"], work, None),
+            ("红例重放点名一行照算", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--item", "pinned:3"], work, "verus-stage"),
+            ("红例重放 --item 的值碰巧叫 --check、照算重放", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--item", "--check"], work, "verus-stage"),
+            ("红例钉表只核钉全", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--check"], work, None),
+            ("红例钉表 --replay 写在 --check 前面、以 --check 为准", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--check"], work, None),
+            ("红例钉表 --root 的值碰巧叫 --replay", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--check", "--root", "--replay"], work, None),
+            ("红例钉表追加", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "research/results/e165-sample-red-examples.tsv"], work, None),
             # 红例钉表照它文件头的用法判：只有 --replay 起装置；参数里的变量只在可能展开成它认的选项名、或判不出落到哪种用法时才算
             # （开关 e165-pin-unexpanded-as-replay 下前六格红；e165-pin-backfill-as-append 下「--replay 写在 --backfill 前面」那一格红）
-            ("红例钉表 --check --table 的值是变量拼的路径", ["bash", "-c", "D=/tmp/x; python3 scripts/experiments/e165-pin-red-examples.py --check --table $D/dry-2c.tsv"],
+            ("红例钉表 --check --table 的值是变量拼的路径", ["bash", "-c", "D=/tmp/x; python3 scripts/experiment-apparatus/e165-pin-red-examples.py --check --table $D/dry-2c.tsv"],
              work, None),
             ("红例钉表 for 循环里 --check --root 的值是循环变量拼的路径",
-             ["bash", "-c", "for s in green red; do python3 scripts/experiments/e165-pin-red-examples.py --check --root $W/fixture-copies/$s; done"], work, None),
+             ["bash", "-c", "for s in green red; do python3 scripts/experiment-apparatus/e165-pin-red-examples.py --check --root $W/fixture-copies/$s; done"], work, None),
             ("红例钉表 for 循环里 --backfill --root 的值是循环变量拼的路径",
-             ["bash", "-c", "for d in green red; do python3 scripts/experiments/e165-pin-red-examples.py --backfill --root /x/fixtures/$d; done"], work, None),
+             ["bash", "-c", "for d in green red; do python3 scripts/experiment-apparatus/e165-pin-red-examples.py --backfill --root /x/fixtures/$d; done"], work, None),
             ("红例钉表追加带 --table、表与账都是变量拼的路径",
-             ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --table $D/dry-2c.tsv $R-$L-red-examples.tsv"], work, None),
-            ("红例钉表 --check 的账是 $(…) 拼的路径", ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --check research/results/$(date +%F)-red-examples.tsv"],
+             ["bash", "-c", "python3 scripts/experiment-apparatus/e165-pin-red-examples.py --table $D/dry-2c.tsv $R-$L-red-examples.tsv"], work, None),
+            ("红例钉表 --check 的账是 $(…) 拼的路径", ["bash", "-c", "python3 scripts/experiment-apparatus/e165-pin-red-examples.py --check research/results/$(date +%F)-red-examples.tsv"],
              work, None),
-            ("经内存包装起红例钉表 --check --table 的值是变量", ["bash", "-c", "bash scripts/hosts/run-with-memory-cap.sh 4G python3 scripts/experiments/e165-pin-red-examples.py "
+            ("经内存包装起红例钉表 --check --table 的值是变量", ["bash", "-c", "bash scripts/hosts/run-with-memory-cap.sh 4G python3 scripts/experiment-apparatus/e165-pin-red-examples.py "
                                                        "--check --table \"$T\""], work, None),
-            ("红例钉表 --replay 写在 --backfill 前面、以 --backfill 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--backfill"], work, None),
-            ("红例钉表只判钉表自己（--check-table）", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check-table"], work, None),
-            ("红例钉表 --replay 写在 --check-table 前面、以 --check-table 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--check-table"], work, None),
-            ("红例钉表 --check-table 写在 --replay 前面、以 --replay 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check-table", "--replay"], work, "verus-stage"),
-            ("红例钉表 --backfill 写在 --replay 前面、以 --replay 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--backfill", "--replay"], work, "verus-stage"),
-            ("红例钉表 --replay 的值位都是变量拼的路径照算", ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --replay --root $W/x"], work, "verus-stage"),
-            ("红例钉表 --check 后面接一个整词变量：可能展开成 --replay，照算", ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --check --table $D/x $O"], work,
+            ("红例钉表 --replay 写在 --backfill 前面、以 --backfill 为准", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--backfill"], work, None),
+            ("红例钉表只判钉表自己（--check-table）", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--check-table"], work, None),
+            ("红例钉表 --replay 写在 --check-table 前面、以 --check-table 为准", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--check-table"], work, None),
+            ("红例钉表 --check-table 写在 --replay 前面、以 --replay 为准", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--check-table", "--replay"], work, "verus-stage"),
+            ("红例钉表 --backfill 写在 --replay 前面、以 --replay 为准", ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--backfill", "--replay"], work, "verus-stage"),
+            ("红例钉表 --replay 的值位都是变量拼的路径照算", ["bash", "-c", "python3 scripts/experiment-apparatus/e165-pin-red-examples.py --replay --root $W/x"], work, "verus-stage"),
+            ("红例钉表 --check 后面接一个整词变量：可能展开成 --replay，照算", ["bash", "-c", "python3 scripts/experiment-apparatus/e165-pin-red-examples.py --check --table $D/x $O"], work,
              "verus-stage"),
             ("红例钉表 --replay --table 的值是整词变量：变量空着时 --check 成了 --table 的值，照算",
-             ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --replay --table $X --check"], work, "verus-stage"),
-            ("红例钉表经函数转 \"${@:2}\" 照算", ["bash", "-c", 'p() { python3 scripts/experiments/e165-pin-red-examples.py --table "$1" "${@:2}"; }; p t.tsv --replay'], work,
+             ["bash", "-c", "python3 scripts/experiment-apparatus/e165-pin-red-examples.py --replay --table $X --check"], work, "verus-stage"),
+            ("红例钉表经函数转 \"${@:2}\" 照算", ["bash", "-c", 'p() { python3 scripts/experiment-apparatus/e165-pin-red-examples.py --table "$1" "${@:2}"; }; p t.tsv --replay'], work,
              "verus-stage"),
             # prove-red.sh 带前缀起时照跑点名行里重型的那几行：照它读的变异表与 classify 判（开关 prove-red-unjudged 下前三格红）
             ("prove-red 带 SINGLEFS_HEAVY_TESTS=commit、点名 checker 档包的行",
@@ -4070,16 +4566,16 @@ def selftest():
             # 下前十二格红，末两格照绿）
             ("PYTHONPATH 指到 scripts 再 python3 -m 起判法脚本跑必红世界",
              ["env", "PYTHONPATH=scripts/gate", "python3", "-m", "verus-proof-check", "must-red-worlds", "."], work, "verus-stage"),
-            ("export PYTHONPATH 再 python3 -m 起红例重放", ["bash", "-c", "export PYTHONPATH=scripts/experiments; python3 -m e165-pin-red-examples --replay"], work, "verus-stage"),
+            ("export PYTHONPATH 再 python3 -m 起红例重放", ["bash", "-c", "export PYTHONPATH=scripts/experiment-apparatus; python3 -m e165-pin-red-examples --replay"], work, "verus-stage"),
             ("python3 -c runpy.run_path 起判法脚本跑必红世界",
              ["python3", "-c", "import runpy; runpy.run_path('scripts/gate/verus-proof-check.py', run_name='__main__')", "must-red-worlds", "."], work, "verus-stage"),
             ("仓外的符号链接指到判法脚本、跑必红世界", ["python3", os.path.join(work, "elsewhere", "linked-proof-check.py"), "must-red-worlds", work], "/", "verus-stage"),
-            ("仓内改名的符号链接指到红例钉表、--replay", ["python3", "scripts/experiments/linked-pin.py", "--replay"], work, "verus-stage"),
+            ("仓内改名的符号链接指到红例钉表、--replay", ["python3", "scripts/experiment-apparatus/linked-pin.py", "--replay"], work, "verus-stage"),
             ("判法脚本的子命令用命令替换写", ["bash", "-c", 'python3 scripts/gate/verus-proof-check.py "$(echo must-red-worlds)" .'], work, "verus-stage"),
             ("for 循环逐格跑判法脚本三格", ["bash", "-c", "for c in proof vacuity must-red-worlds; do python3 scripts/gate/verus-proof-check.py $c .; done"], work,
              "verus-stage"),
             ("shell 函数转参数起判法脚本", ["bash", "-c", 'v() { python3 scripts/gate/verus-proof-check.py "$@"; }; v must-red-worlds .'], work, "verus-stage"),
-            ("for 循环先核钉全再重放红例", ["bash", "-c", "for m in --check --replay; do python3 scripts/experiments/e165-pin-red-examples.py $m; done"], work, "verus-stage"),
+            ("for 循环先核钉全再重放红例", ["bash", "-c", "for m in --check --replay; do python3 scripts/experiment-apparatus/e165-pin-red-examples.py $m; done"], work, "verus-stage"),
             ("只读子命令后面的参数写成变量不算（tool-versions $ROOT）", ["bash", "-c", "python3 scripts/gate/verus-proof-check.py tool-versions $ROOT"], work, None),
             ("判法脚本不带参数照算（接受的误拒）", ["python3", "scripts/gate/verus-proof-check.py"], work, "verus-stage"),
             ("经 PYTHONPATH 起判法脚本的 --selftest：不在登记表的位置上，照旧算提交时才跑的检查",
@@ -4088,9 +4584,9 @@ def selftest():
             ("PYTHONPATH 再 python3 -m 起判法脚本核版本一致", ["env", "PYTHONPATH=scripts/gate", "python3", "-m", "verus-proof-check", "toolchain", "."], work, None),
             # 判参数之前照两份脚本开头的 preflight 摘掉每一个整词 --force（开关 verus-judges-force-kept 下这三格红）
             ("红例钉表 --target 的值位写 --force、后面写 --check：preflight 摘掉 --force，真跑的是 --replay",
-             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
+             ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
             ("红例钉表带 --root、--target 的值位写 --force、后面写 --check",
-             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--root", ".", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
+             ["python3", "scripts/experiment-apparatus/e165-pin-red-examples.py", "--root", ".", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
             ("判法脚本首参前写 --force、只打工具版本：preflight 摘掉之后是 tool-versions",
              ["python3", "scripts/gate/verus-proof-check.py", "--force", "tool-versions", "."], work, None),
             # python -c 的代码里出现两份判法脚本的名字就算那一道、不看代码之后的词（开关 verus-judges-code-by-later-words、verus-judges-by-working-subcommand、
@@ -4099,12 +4595,12 @@ def selftest():
              ["python3", "-c", "import runpy, sys; sys.argv = ['v', 'proof', '.']; runpy.run_path('scripts/gate/verus-proof-check.py', run_name='__main__')",
               "tool-versions"], work, "verus-stage"),
             ("python3 -c 里改 sys.argv 成 --replay、代码之后不写词",
-             ["python3", "-c", "import runpy, sys; sys.argv = ['p', '--replay']; runpy.run_path('scripts/experiments/e165-pin-red-examples.py', run_name='__main__')"],
+             ["python3", "-c", "import runpy, sys; sys.argv = ['p', '--replay']; runpy.run_path('scripts/experiment-apparatus/e165-pin-red-examples.py', run_name='__main__')"],
              work, "verus-stage"),
             ("python3 -c 里 __import__ 按模块名起判法脚本验证明",
              ["python3", "-c", "import sys; sys.path.insert(0, 'scripts/gate'); sys.exit(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
             ("python3 -c 里 importlib.import_module 起红例重放",
-             ["python3", "-c", "import importlib, sys; sys.path.insert(0, 'scripts/experiments'); sys.exit(importlib.import_module('e165-pin-red-examples').main(['--replay']))"],
+             ["python3", "-c", "import importlib, sys; sys.path.insert(0, 'scripts/experiment-apparatus'); sys.exit(importlib.import_module('e165-pin-red-examples').main(['--replay']))"],
              work, "verus-stage"),
             ("python3 -c 里 spec_from_file_location 载入判法脚本再调 run_check、代码之后写 toolchain",
              ["python3", "-c", "import importlib.util as u; s = u.spec_from_file_location('v', 'scripts/gate/verus-proof-check.py'); m = u.module_from_spec(s); "
@@ -4114,13 +4610,18 @@ def selftest():
             ("python3 -c 的 print 包着 __import__、代码只有这一句",
              ["python3", "-c", "print(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
             ("python3 -c runpy.run_path 起红例钉表、代码之后写 --check",
-             ["python3", "-c", "import runpy; runpy.run_path('scripts/experiments/e165-pin-red-examples.py', run_name='__main__')", "--check"], work, "verus-stage"),
+             ["python3", "-c", "import runpy; runpy.run_path('scripts/experiment-apparatus/e165-pin-red-examples.py', run_name='__main__')", "--check"], work, "verus-stage"),
             ("python3 -c 只 print 判法脚本的路径（字面字符串）：不算",
-             ["python3", "-c", "print('scripts/experiments/e165-pin-red-examples.py', 'scripts/gate/verus-proof-check.py')"], work, None),
+             ["python3", "-c", "print('scripts/experiment-apparatus/e165-pin-red-examples.py', 'scripts/gate/verus-proof-check.py')"], work, None),
             # lkmm.sh 只打 herd7 版本不算（开关 herd7-version-counted 下第一格红）；别的用法照旧算 herd7
             ("lkmm.sh 只打 herd7 版本", ["bash", ".claude/scripts/lkmm.sh", "--herd7-version"], work, None),
             ("lkmm.sh 整套判定", ["bash", ".claude/scripts/lkmm.sh"], work, "lkmm"),
             ("lkmm.sh --herd7-version 后面还带别的参数照算", ["bash", ".claude/scripts/lkmm.sh", "--herd7-version", "--force"], work, "lkmm"),
+            # 直接起的 herd7 只带 -version 或 --version 不算（开关 herd7-version-flag-counted 下头两格红）；带别的参数、跑 litmus 照算
+            ("herd7 -version 只打版本号", ["herd7", "-version"], work, None),
+            ("herd7 --version 只打版本号", ["herd7", "--version"], work, None),
+            ("herd7 -version 后面还带 litmus 文件照算", ["herd7", "-version", "litmus/a.litmus"], work, "herd7"),
+            ("herd7 跑 litmus 照算", ["herd7", "-conf", "linux-kernel.cfg", "litmus/a.litmus"], work, "herd7"),
             ("research 构建与复跑那一道只跑复跑那一格、按实验点名", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh", "--check", "experiment-replay",
                                                             "--item", "E142"], work, "replay-all-stage"),
             ("research 构建与复跑那一道两格一起点名", ["bash", ".claude/gate.d/checker-tier-research-build-and-replay.sh", "--check",
@@ -4153,8 +4654,8 @@ def selftest():
             ("登记成不起重活的研究脚本单独 --selftest 放行：admission.py", ["python3", "scripts/gate/admission.py", "--selftest"], repository, None),
             ("登记成不起重活的研究脚本单独 --selftest 放行：crash-amplification.sh（2026-10-01 被拒的那一条，假分项驱动）",
              ["bash", "scripts/crash/crash-amplification.sh", "--selftest"], repository, None),
-            ("登记成不起重活的研究脚本单独 --selftest 放行：从 scripts/experiments 里相对着写的 changed-paths.sh", ["bash", "../gate/changed-paths.sh", "--selftest"],
-             os.path.join(repository, "scripts", "experiments"), None),
+            ("登记成不起重活的研究脚本单独 --selftest 放行：从 scripts/experiment-apparatus 里相对着写的 changed-paths.sh", ["bash", "../gate/changed-paths.sh", "--selftest"],
+             os.path.join(repository, "scripts", "experiment-apparatus"), None),
             ("登记成不起重活的钩子单独 --selftest 放行", ["bash", ".claude/hooks/heavy-test-guard.sh", "--selftest"], repository, None),
             ("登记成不起重活的门禁共用库直接执行（就是跑它的自证）放行", ["bash", ".claude/gate.d/lib/stage-cells.sh"], repository, None),
             ("登记成不起重活的门禁共用库单独带 --selftest 放行", ["bash", ".claude/gate.d/lib/stage-cells.sh", "--selftest"], repository, None),
@@ -4248,6 +4749,17 @@ def selftest():
             ("POSIX 字符类起崩溃放量全量", ["bash", "scripts/crash/crash-amplification.s[[:alpha:]]"], repository, "crash-amplification"),
             ("崩溃放量只列分项（--list-items）放行", ["bash", "scripts/crash/crash-amplification.sh", "--list-items"], repository, None),
             ("崩溃放量分项驱动单独 --selftest 照登记表放行", ["bash", "scripts/crash/crash-amplification-item.sh", "--selftest"], repository, None),
+            # 实验复跑入口按名字判、不读正文（开关 experiment-replay-unnamed 下后三格红：应当是 replay-all-stage，实际 None）
+            ("实验复跑入口只列项（--list-items）放行", ["bash", "scripts/experiment-apparatus/replay.sh", "--list-items"], repository, None),
+            ("实验复跑入口摘掉 --force 之后只列项：放行", ["bash", "scripts/experiment-apparatus/replay.sh", "--force", "--list-items"], repository, None),
+            ("实验复跑入口不带参数：全部实验复跑", ["bash", "scripts/experiment-apparatus/replay.sh"], repository, "replay-all-stage"),
+            ("实验复跑入口点名实验", ["bash", "scripts/experiment-apparatus/replay.sh", "E142"], repository, "replay-all-stage"),
+            ("实验复跑入口 --list-items 后面还带实验号：照拒", ["bash", "scripts/experiment-apparatus/replay.sh", "--list-items", "E142"], repository, "replay-all-stage"),
+            # 路径尾部相同的别处拷贝：classify 照旧（只列项交 None，别的参数仍算全部实验复跑）；读不读它的正文是 judged_by_name 的事（按名字判那一组里的「别处拷贝」几格）
+            ("路径尾部相同的别处 replay.sh 拷贝带 --list-items：classify 交 None（读不读正文看 judged_by_name）",
+             ["bash", os.path.join(work, "copy-tree", "scripts", "experiment-apparatus", "replay.sh"), "--list-items"], work, None),
+            ("路径尾部相同的别处 replay.sh 拷贝点名实验：照旧算全部实验复跑",
+             ["bash", os.path.join(work, "copy-tree", "scripts", "experiment-apparatus", "replay.sh"), "E142"], work, "replay-all-stage"),
             # 两档里的轻型（文件头「两档里的轻型」）：三条带 --quick（可加 --item）的不算；重型的剪枝、逐条、全量与夹了别的词的照算
             # （开关 light-tier-unrecognized 下前九格红，light-tier-any-arguments 下「--quick 又带 --full」起四格红，crash-point-replay-unnamed 下「剪枝」起六格红，
             # gpu-quiesce-opaque 下 gpu-quiesce-run.sh 那三格红）
@@ -4316,6 +4828,17 @@ def selftest():
             ("重型：形式化那一道 --item（逐条）", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", "--item", "proof", work], work, "verus-stage"),
             ("重型：crates 变异那一道 --full", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--full", "."], work, "crates-mutation-stage"),
             ("别处的同名 gpu-quiesce-run.sh 不剥", ["bash", "/tmp/claude-1000/somewhere/gpu-quiesce-run.sh", "--", "cargo", "test", "--all"], work, None),
+            # two-logs.sh 包一层不让里面那条脱离闸（two-logs-opaque 下前两格红）
+            ("重型：two-logs.sh 包着全量 cargo test", ["bash", "scripts/hosts/two-logs.sh", "/tmp/claude-1000/somewhere/log", "--", "cargo", "test", "--all"], work, "full-cargo"),
+            ("重型：two-logs.sh --quiet 包着全量 cargo test", ["bash", "scripts/hosts/two-logs.sh", "--quiet", "/tmp/claude-1000/somewhere/log", "--", "cargo", "test", "--all"], work, "full-cargo"),
+            ("别处的同名 two-logs.sh 不剥", ["bash", "/tmp/claude-1000/somewhere/two-logs.sh", "/tmp/claude-1000/somewhere/log", "--", "cargo", "test", "--all"], work, None),
+            ("two-logs.sh --from-log 没有被包的命令", ["bash", "scripts/hosts/two-logs.sh", "--from-log", "/tmp/claude-1000/somewhere/log"], work, None),
+            # run-build-directory.sh 包一层编译目录不让里面那条脱离闸（run-build-directory-opaque 下前两格红）
+            ("重型：run-build-directory.sh 包着全量 cargo test", ["bash", "scripts/hosts/run-build-directory.sh", "cargo", "test", "--all"], work, "full-cargo"),
+            ("重型：run-build-directory.sh -- 包着 checker 档的 cargo test", ["bash", "scripts/hosts/run-build-directory.sh", "--", "cargo", "test", "-p", "singlefs-checker-tier"],
+             work, "checker-tier-cargo"),
+            ("别处的同名 run-build-directory.sh 不剥", ["bash", "/tmp/claude-1000/somewhere/run-build-directory.sh", "cargo", "test", "--all"], work, None),
+            ("run-build-directory.sh 后面跟的是选项（不是包着的命令）不剥", ["bash", "scripts/hosts/run-build-directory.sh", "--all", "cargo", "test", "--all"], work, None),
             # 崩溃点重放入口的轻型另认 --local-only（开关 light-tier-local-only-unrecognized 下前两格红）；两道门禁不认它
             ("轻型：崩溃点重放入口 --quick --local-only", ["bash", "scripts/crash/crash-point-replay.sh", "--quick", "--local-only"], work, None),
             ("轻型：崩溃点重放入口 --local-only --quick 加点名一项", ["bash", "scripts/crash/crash-point-replay.sh", "--local-only", "--quick", "--item", "fixed-script"], work, None),
@@ -4612,6 +5135,49 @@ def selftest():
         refused_bare = classify_process(["bash", stage_crash_point_replay, os.path.join(work, "sample-crash-point-replay-bare")], os.path.join(work, "sample-crash-point-replay-bare"))
         results.append(("门禁样本：checker-tier-crash-point-replay 照算崩溃点重放时说明里写样本档怎么跑", True,
                         bool(refused_bare) and "cd 进放了 .crash-point-replay-sample-tools 的样本根" in refused_bare[0].detail))
+        # 产品 GPU 包的真卡对拍（product_gpu_cargo_use、product_gpu_test_binaries）：开关 product-gpu-feature-unjudged 下「产品 GPU 包：」开头照算的各格红
+        # （应当是 product-gpu-cargo 或 product-gpu-binary，实际 None），不照算的各格不红
+        product_gpu_sample = os.path.join(work, "product-gpu-sample")
+        product_gpu_package = os.path.join(product_gpu_sample, "crates", "singlefs-background-gpu")
+        product_gpu_deps = os.path.join(product_gpu_sample, "target", "release", "deps")
+        feature = PRODUCT_GPU_FEATURE
+        card = ["cargo", "test", "-p", PRODUCT_GPU_PACKAGE_NAME]
+        quiesce = ["bash", "scripts/crash/gpu-quiesce-run.sh", "--"]
+        cargo_cases += [
+            ("产品 GPU 包：-p 点名它又开 --features tests-on-a-real-gpu", [*card, "--features", feature], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：--features=<包>/<特性>", [*card, f"--features={PRODUCT_GPU_PACKAGE_NAME}/{feature}"], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：-F 另起一个词", [*card, "-F", feature], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：-F 贴着值写", [*card, f"-F{feature}"], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：几个特性写在一个值里", [*card, "--features", f"other,{feature}"], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：--all-features", [*card, "--all-features"], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：--test 点名 [[test]] 里挂特性的目标，带 --test-threads 1", [*card, "--features", feature, "--test", "kernels_agree_with_the_cpu", "--", "--test-threads", "1"],
+             product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：--test 点名只在文件里写 cfg 的目标", [*card, "--features", feature, "--test", "cfg_gated_card_cases"], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：--tests", [*card, "--features", feature, "--tests"], product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：当前目录在包里裸跑", ["cargo", "test", "--features", feature], product_gpu_package, "product-gpu-cargo"),
+            ("产品 GPU 包：--manifest-path 指到它的清单", ["cargo", "test", "--manifest-path", "crates/singlefs-background-gpu/Cargo.toml", "--features", feature],
+             product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：-p 点名它而当前目录认不出工作区", [*card, "--features", feature], os.path.join(work, "no-such-directory"), "product-gpu-cargo"),
+            ("产品 GPU 包：经内存包装与 gpu-quiesce-run.sh 起", ["bash", "scripts/hosts/run-with-memory-cap.sh", "4G", *quiesce, *card, "--features", feature, "--", "--test-threads", "1"],
+             product_gpu_sample, "product-gpu-cargo"),
+            ("产品 GPU 包：直接执行 [[test]] 里挂特性的对拍测试二进制", [os.path.join(product_gpu_deps, "kernels_agree_with_the_cpu-0123456789abcdef"), "--test-threads", "1"],
+             product_gpu_sample, "product-gpu-binary"),
+            ("产品 GPU 包：直接执行只在文件里写 cfg 的对拍测试二进制", [os.path.join(product_gpu_deps, "cfg_gated_card_cases-0123456789abcdef")], product_gpu_sample, "product-gpu-binary"),
+            ("产品 GPU 包：经 gpu-quiesce-run.sh 起对拍测试二进制", [*quiesce, os.path.join(product_gpu_deps, "kernels_agree_with_the_cpu-0123456789abcdef")],
+             product_gpu_sample, "product-gpu-binary"),
+            ("产品 GPU 包（不照算）：不开这个特性，对拍目标不编", card, product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：只跑库单测", [*card, "--lib"], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：--lib 又开特性，只跑库、不跑 tests/ 里的目标", [*card, "--lib", "--features", feature], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：--test 点名 CPU 的集成测试目标又开特性", [*card, "--features", feature, "--test", "cpu_only_cases"], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：开的是别的包的同名特性", [*card, "--features", f"singlefs-core/{feature}"], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：点名的是别的包又开同名特性", ["cargo", "test", "-p", "singlefs-core", "--features", feature], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：只编不跑", [*card, "--features", feature, "--no-run"], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：只列用例", [*card, "--features", feature, "--", "--list"], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：cargo run 不判这一支", ["cargo", "run", "-p", PRODUCT_GPU_PACKAGE_NAME, "--features", feature], product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：直接执行对拍测试二进制只列用例", [os.path.join(product_gpu_deps, "kernels_agree_with_the_cpu-0123456789abcdef"), "--list"],
+             product_gpu_sample, None),
+            ("产品 GPU 包（不照算）：直接执行 CPU 的集成测试二进制", [os.path.join(product_gpu_deps, "cpu_only_cases-0123456789abcdef")], product_gpu_sample, None),
+        ]
         for label, argv, cwd, want in cargo_cases + launcher_cases + binary_cases:
             found = classify_process(argv, cwd)
             results.append((label, want, found[0].kind if found else None))
@@ -4666,6 +5232,17 @@ def selftest():
                      for command in shell_words.commands_at_command_position(text, work).commands]
             found = [use for use in found if use is not None]
             results.append((label, want, found[0].kind if found else None))
+        # here-string 与管道喂给从标准输入读命令的 shell 的字面文本当命令判（lib_shell_words.py 的 shell_standard_input；
+        # LIB_SHELL_WORDS_BREAK=shell-standard-input-unread 下前三格红：应当是 full-cargo，实际 None）
+        standard_input_cases = [
+            ("标准输入：here-string 喂给 bash 跑全量", "bash <<< 'cargo test --workspace'", "full-cargo"),
+            ("标准输入：printf 经管道喂给 bash 跑全量", "printf 'cargo test --workspace\\n' | bash", "full-cargo"),
+            ("标准输入：echo 经管道喂给 sh 跑全量", "echo 'cargo test --workspace' | sh", "full-cargo"),
+            ("标准输入：printf 经管道喂给 bash -c（代码不从标准输入读）不算", "printf 'cargo test --workspace' | bash -c 'cat'", None),
+        ]
+        for label, text, want in standard_input_cases:
+            found = heavy_tests_in_command_text(text, work)
+            results.append((label, want, found[0].kind if found else None))
         # bash 起不来时带 POSIX 字符类的命令词照拒（开关 posix-brackets-unresolved-literal 与 posix-brackets-by-python-glob 下这一格红）
         real_bash, BASH_FOR_PATTERNS = BASH_FOR_PATTERNS, os.path.join(work, "no-such-bash")
         try:
@@ -4679,7 +5256,7 @@ def selftest():
         # 花括号展开与 bash 一致：同一批词交给 bash（set -f 关掉通配，只剩花括号展开）逐个比（开关 brace-expansion-literal 下大半红，brace-sequence-literal 下序列那几格红）
         brace_words = ["{a,b}", "a{b,c}d", "{a{b,c}}", "{a,b{c,d}}e", "{a,b", "{{a,b}", "{a,b}}", "{a}", "{}", "{,}", "x{,}", "{,a}", "mutate.{sh,x}",
                        "{a,{b}}", "a{{b}}", "a{b{c,d}", "{a,b}{", "}{a,b}", "{}a,b}", "..{},aa,}a.", "ab{}1..,}{.{", "{1..3}", "{3..1}", "{01..10}", "{1..10..3}",
-                       "{a..e}", "{a..e..2}", "{1..a}", "{-2..2}", "{-01..3}", "{1..-03}", "{0..00}", "{1..05..2}", "{+1..3}", "{1..3..0}", "{1..3..-1}",
+                       "{a..e}", "{a..e..2}", "{1..a}", "{-2..2}", "{-01..3}", "{1..-03}", "{0..00}", "{1..05..2}", "{01..100..33}", "{100..00..50}", "{+1..3}", "{1..3..0}", "{1..3..-1}",
                        "{1...3}", "{a..}", "x{1..3}y{a,b}", "{1..2}{3..4}", "{a,b}{c,d}{e,f}"]
         script = "set -f\n" + "".join(f"set -- {word}\nprintf '%s\\0' \"$#\" \"$@\"\n" for word in brace_words)
         answer = subprocess.run(["bash"], input=script, capture_output=True, text=True).stdout.split("\0")
@@ -4693,6 +5270,17 @@ def selftest():
             results.append(("花括号展开与 bash 一致：bash 的输出读得出", True, False))
         # 自证登记表的读法：换成样本表（写坏的几种行都有）判；仓里那份表另核没有写坏的行、指到的文件都在
         registry_cases = selftest_registry_cells(work, results)
+        linked_replay = os.path.join(work, "linked-replay", "replay.sh")   # 指到本仓那一份 replay.sh 的符号链接
+        os.makedirs(os.path.dirname(linked_replay))
+        os.symlink(os.path.join(HOOK_REPOSITORY, KNOWN_SCRIPT_LOCATIONS["replay.sh"]), linked_replay)
+        # 经符号链接起本仓入口的另外三种（own_repository_script 不认符号链接）：路径尾部同仓内位置的链接、中间一级是指到本仓脚本目录的链接、仓根本身被链接指到（绝对路径写，或当前目录是那条链接）
+        tail_linked_replay = os.path.join(work, "link-tree", KNOWN_SCRIPT_LOCATIONS["replay.sh"])
+        os.makedirs(os.path.dirname(tail_linked_replay))
+        os.symlink(os.path.join(HOOK_REPOSITORY, KNOWN_SCRIPT_LOCATIONS["replay.sh"]), tail_linked_replay)
+        linked_directory = os.path.join(work, "linked-directory")
+        os.symlink(os.path.join(HOOK_REPOSITORY, "scripts"), linked_directory)
+        linked_repository = os.path.join(work, "linked-repository")
+        os.symlink(HOOK_REPOSITORY, linked_repository)
         name_cases = [
             ("门禁阶段按名字判", ".claude/gate.d/doc-text.sh", work, True),
             ("去了编号的门禁阶段按名字判", ".claude/gate.d/checker-tier-lkmm.sh", work, True),
@@ -4706,12 +5294,27 @@ def selftest():
             ("仓外的同名 broad-mutation.py 不按名字判", "/tmp/claude-1000/somewhere/broad-mutation.py", work, False),
             ("从 research 里相对着写的 mutate.sh", "scripts/mutation/mutate.sh", os.path.join(work, "research"), True),
             ("仓外的同名 mutate.sh 不按名字判", "/tmp/claude-1000/somewhere/mutate.sh", work, False),
-            ("仓内位置上的 crash-amplification.sh 按名字判（不读正文）", "scripts/crash/crash-amplification.sh", work, True),
+            ("仓内位置上的 crash-amplification.sh 按名字判（不读正文）", "scripts/crash/crash-amplification.sh", repository, True),
             ("仓内位置上的 crash-amplification-item.sh 按名字判", "scripts/crash/crash-amplification-item.sh", work, True),
             ("仓内位置上的 crash-amplification-two-hosts.sh 按名字判", "scripts/crash/crash-amplification-two-hosts.sh", work, True),
             ("仓内位置上的 build-patched-qemu.sh 按名字判（不读正文）", "scripts/devices/build-patched-qemu.sh", work, True),
-            ("仓内位置上的 crash-point-replay.sh 按名字判（不读正文）", "scripts/crash/crash-point-replay.sh", work, True),
+            ("仓内位置上的 crash-point-replay.sh 按名字判（不读正文）", "scripts/crash/crash-point-replay.sh", repository, True),
             ("没登记的脚本", "run-chain.sh", work, False),
+            # 放行靠参数的三份入口只认整条路径逐级不经符号链接的本仓那一份（OWN_COPY_ONLY_SCRIPTS）：开关 judged-by-name-path-tail 下四格「别处拷贝」与
+            # 经符号链接的三格（路径尾部同仓内位置的链接、仓根链接下写的、当前目录是仓根链接）红，应当是 False，实际 True；开关 own-script-by-realpath 下经符号链接的五格红，同样应当是 False，实际 True
+            ("本仓那一份 replay.sh 按名字判（相对当前目录写）", "scripts/experiment-apparatus/replay.sh", repository, True),
+            ("本仓那一份 replay.sh 按名字判（从 research 里写 ../）", "../scripts/experiment-apparatus/replay.sh", os.path.join(repository, "research"), True),
+            ("本仓那一份 replay.sh 按名字判（写绝对路径）", os.path.join(repository, KNOWN_SCRIPT_LOCATIONS["replay.sh"]), work, True),
+            ("本仓那一份 replay.sh 按名字判（绝对路径里夹 ..）", os.path.join(repository, "scripts", "crash", "..", "experiment-apparatus", "replay.sh"), work, True),
+            ("指到本仓那一份的符号链接不按名字判（读正文，replay.sh）", linked_replay, work, False),
+            ("经符号链接起的 replay.sh（路径尾部同仓内位置）不按名字判（读正文）", tail_linked_replay, work, False),
+            ("中间一级是指到本仓脚本目录的符号链接，不按名字判（读正文）", os.path.join(linked_directory, "experiment-apparatus", "replay.sh"), work, False),
+            ("仓根被符号链接指到，从那条链接下写本仓那一份 replay.sh 不按名字判（读正文）", os.path.join(linked_repository, KNOWN_SCRIPT_LOCATIONS["replay.sh"]), work, False),
+            ("当前目录是指到仓根的符号链接，相对着写的 replay.sh 不按名字判（读正文）", KNOWN_SCRIPT_LOCATIONS["replay.sh"], linked_repository, False),
+            ("路径尾部相同的别处 replay.sh 拷贝不按名字判（读正文）", os.path.join(work, "copy-tree", KNOWN_SCRIPT_LOCATIONS["replay.sh"]), work, False),
+            ("当前目录是别处树、相对着写的 replay.sh 拷贝不按名字判（读正文）", KNOWN_SCRIPT_LOCATIONS["replay.sh"], os.path.join(work, "copy-tree"), False),
+            ("路径尾部相同的别处 crash-point-replay.sh 拷贝不按名字判（读正文）", os.path.join(work, "copy-tree", KNOWN_SCRIPT_LOCATIONS["crash-point-replay.sh"]), work, False),
+            ("路径尾部相同的别处 crash-amplification.sh 拷贝不按名字判（读正文）", os.path.join(work, "copy-tree", KNOWN_SCRIPT_LOCATIONS["crash-amplification.sh"]), work, False),
         ]
         for label, word, directory, want in name_cases:
             results.append((label, want, judged_by_name(word, directory)))
@@ -4737,7 +5340,7 @@ def selftest():
             ("cargo clippy", ["cargo", "clippy", "--all-targets"], False),
             ("cargo 只带全局选项", ["cargo", "--version"], False),
             ("直接执行测试二进制", [os.path.join("target", "debug", "deps", "overwrite_in_one_instance-0123456789abcdef")], True),
-            ("直接执行 research 里的实验二进制", ["scripts/experiments/target/release/e142_region_diff_independent"], True),
+            ("直接执行 research 里的实验二进制", ["scripts/experiment-apparatus/target/release/e142_region_diff_independent"], True),
             ("直接执行名字里带 target 的自定编译目录里的二进制", ["/tmp/singlefs-crates-mutation-target/release/tiny"], True),
             ("带目标三元组的", ["./target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"], True),
             ("deps 下的 .d 依赖文件", [os.path.join("target", "release", "deps", "tiny.d")], False),
@@ -4760,7 +5363,7 @@ def selftest():
     if failures:
         print("    → 看 classify()、cargo_subcommand()、cargo_use()、package_specification_members()、alias_expansion()、test_invocation()、"
               "command_under_launcher()、launcher_option()、libtest_lists_only()、checker_test_targets()、test_binary_name()、"
-              "runs_compiled_code()、classify_process()、judged_by_name()、classify_selftest()、selftest_registry_at()、selftest_registry_problems()、"
+              "runs_compiled_code()、classify_process()、judged_by_name()、own_repository_script()、path_without_symbolic_links()、classify_selftest()、selftest_registry_at()、selftest_registry_problems()、"
               "stage_sample_run_allowed()、stage_sample_root()、stage_selftest_problems()、stage_selftest_arguments()、stage_selftest_item_problems()、stage_feed_problem()、"
               "same_as_registered_stage()、brace_expansion()、brace_gobble()、brace_sequence()、expanded_words()、word_expansion_use() 与登记表 "
               f"{SELFTEST_REGISTRY_NAME}、broad_mutation_driver()、broad_mutation_use()、verus_judge_script()、verus_judge_arguments()、verus_judge_use()、verus_judge_code_use()、e165_pin_mode()、"
@@ -4769,7 +5372,7 @@ def selftest():
         return 1
     print(f"  ✓ lib_heavy_tests 自检通过（查了 {len(results)} 种：cargo 与包装过的命令行 {len(cargo_cases)} 种、"
           f"/usr/bin/time、flock、systemd-run 这一类包在外面的 {len(launcher_cases)} 种、"
-          f"bash 起不来时的 POSIX 字符类 {len(bash_missing_cases)} 种、直接执行的测试二进制 {len(binary_cases)} 种、命令词没展开 {len(unexpanded_cases)} 种、花括号展开与 bash 对照 {len(brace_words)} 种、门禁样本 {len(stage_sample_cases) + 4} 种、样本登记表与仓里那份登记表 {registry_cases} 种、按名字判的脚本 {len(name_cases)} 种、"
+          f"bash 起不来时的 POSIX 字符类 {len(bash_missing_cases)} 种、直接执行的测试二进制 {len(binary_cases)} 种、命令词没展开 {len(unexpanded_cases)} 种、喂给 shell 的标准输入 {len(standard_input_cases)} 种、花括号展开与 bash 对照 {len(brace_words)} 种、门禁样本 {len(stage_sample_cases) + 4} 种、样本登记表与仓里那份登记表 {registry_cases} 种、按名字判的脚本 {len(name_cases)} 种、"
           f"跑不跑编译出来的代码 {len(compiled_cases)} 种）")
     return 0
 

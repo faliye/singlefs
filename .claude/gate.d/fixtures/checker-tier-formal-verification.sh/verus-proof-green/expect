@@ -1,3 +1,4 @@
 exit=0
 want=成项 2 个（exec fn 2），各项 verified 之和 2、0 errors（登记 2）；不成项的 spec fn 1 个
 want=verus-proof：绿
+want=产品构建与 verus --compile 构建的 MIR 逐条目比：产品的 3 个条目都在、整段逐字相同

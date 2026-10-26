@@ -1,0 +1,5 @@
+[package]
+name = "sample-gpu-judge-bridge"
+
+[dependencies]
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }

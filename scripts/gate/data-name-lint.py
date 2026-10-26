@@ -13,7 +13,7 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
     data-name-lint.py --selftest  # DATA_NAME_LINT_BREAK=<开关> 时必须红在点名的格
 
 扫哪些（只认整串匹配 [a-z][a-z0-9_]*）：
-  ① scripts/experiments/*.rs 与 crates/*/src/**/*.rs 里的字符串字面量，三种形态：
+  ① scripts/experiment-apparatus/*.rs 与 crates/*/src/**/*.rs 里的字符串字面量，三种形态：
      元组首列 ("名字", …)（左括号前面是标识符或 ! 的是函数或宏调用，不算元组）；
      => "名字" 右侧；
      任一字符串字面量里的 键= （键前面是串首、空白或 , ; ( [ { |，后面不是 = 或 >）。
@@ -60,7 +60,7 @@ from preflight import preflight  # noqa: E402
 NAMING_LINT = os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts", "naming-lint.sh")
 ABBREVIATIONS_FILE = ".claude/abbreviations"
 EXCLUDE_FILE = ".claude/data-name-lint-exclude"
-RUST_SCANNED = ("scripts/experiments", "crates")
+RUST_SCANNED = ("scripts/experiment-apparatus", "crates")
 KB_DIRECTORY = ".claude/kb"
 TERM_RENAMES_REGISTRY = ".claude/kb/term-renames.md"   # 术语改名登记表：登记的就是不许再用的旧名，扫它只会把旧名登记进排除表，不扫
 SKIPPED_DIRECTORY = re.compile(r"^(target|target-.*|\.git)$")
@@ -299,7 +299,7 @@ def walk_files(root, relative_directory, suffix, depth_rule):
 
 
 def is_scanned_rust(relative):
-    if re.fullmatch(r"scripts/experiments/[^/]+\.rs", relative):
+    if re.fullmatch(r"scripts/experiment-apparatus/[^/]+\.rs", relative):
         return True
     return re.fullmatch(r"crates/[^/]+/src/.+\.rs", relative) is not None
 
@@ -348,7 +348,7 @@ def load_exclusions(root, scanned):
             if not os.path.isfile(os.path.join(root, path)):
                 faults.append((number, f"{body} 指向不存在的路径 {path}")); continue
             if path not in scanned:
-                faults.append((number, f"{body} 的 {path} 不在扫描范围里（scripts/experiments/*.rs、crates/*/src/**/*.rs、.claude/kb/**/*.md）")); continue
+                faults.append((number, f"{body} 的 {path} 不在扫描范围里（scripts/experiment-apparatus/*.rs、crates/*/src/**/*.rs、.claude/kb/**/*.md）")); continue
             if key in table:
                 faults.append((number, f"{body} 与第 {table[key]} 行是同一条")); continue
         table[key] = number
@@ -367,7 +367,7 @@ def judge(root, quiet=False):
     registered, letters = read_registered(root)
     files, candidates = collect(root)
     if not files:
-        say(f"  ! 本次无对象可判：{root} 下没有 scripts/experiments/*.rs、crates/*/src/**/*.rs 与 .claude/kb/**/*.md")
+        say(f"  ! 本次无对象可判：{root} 下没有 scripts/experiment-apparatus/*.rs、crates/*/src/**/*.rs 与 .claude/kb/**/*.md")
         return 77, out
     exclusions, faults = load_exclusions(root, set(files))
     used = {key: 0 for key in exclusions}
@@ -428,28 +428,28 @@ def run_selftest():
 
     registered_mac = {".claude/abbreviations": "mac  # message authentication code：校验标签\n"}
     fields = 'const FIELDS: &[(&str, u32)] = &[("system_configuration_mac", 16)];\n'
-    case("tuple-column-red", {"scripts/experiments/e1_demo.rs": fields}, 1, "scripts/experiments/e1_demo.rs:1  元组首列「system_configuration_mac」里 「mac」")
-    case("registered-green", {"scripts/experiments/e1_demo.rs": fields, **registered_mac}, 0, "扫了 1 份文件、1 个串")
-    case("single-letter-red", {"scripts/experiments/e1_demo.rs": 'const FIELDS: &[(&str, u32)] = &[("x", 1)];\n'}, 1, "「x」是单字母")
+    case("tuple-column-red", {"scripts/experiment-apparatus/e1_demo.rs": fields}, 1, "scripts/experiment-apparatus/e1_demo.rs:1  元组首列「system_configuration_mac」里 「mac」")
+    case("registered-green", {"scripts/experiment-apparatus/e1_demo.rs": fields, **registered_mac}, 0, "扫了 1 份文件、1 个串")
+    case("single-letter-red", {"scripts/experiment-apparatus/e1_demo.rs": 'const FIELDS: &[(&str, u32)] = &[("x", 1)];\n'}, 1, "「x」是单字母")
     case("arrow-right-red", {"crates/demo/src/lib.rs": 'fn arm(a: u8) -> &\'static str {\n    match a {\n        0 => "tail_cnt",\n        _ => "tail_other",\n    }\n}\n'}, 1, "crates/demo/src/lib.rs:3  => 右侧「tail_cnt」里 「cnt」是缩写，写全：count", "tail_other")
     case("key-name-red", {"crates/demo/src/lib.rs": 'fn report() { println!("system={} num_items={}", 1, 2); }\n'}, 1, "键= 的键名「num_items」里 「num」", "「system」")
     case("key-line-red", {"crates/demo/src/lib.rs": 'fn f() {\n    println!("system={}\\\n        num_items={}", 1, 2);\n}\n'}, 1, "crates/demo/src/lib.rs:3  键= 的键名「num_items」")
     case("kb-table-red", {".claude/kb/demo.md": "| 字段 | 宽 |\n|---|---|\n| `cnt_total` | 8 |\n"}, 1, ".claude/kb/demo.md:3  kb 表格单元格「cnt_total」里 「cnt」")
     case("kb-term-renames-skipped", {".claude/kb/term-renames.md": "| 旧名 | 新名 | 匹配 |\n|---|---|---|\n| `cnt_total` | `count_total` | 整串 |\n", ".claude/kb/demo.md": "| 字段 |\n|---|\n| `count_total` |\n"}, 0, "扫了 1 份文件、1 个串")
     case("kb-table-green", {".claude/kb/demo.md": "| 字段 | 宽 |\n|---|---|\n| `count_total` | 8 |\n\n```\n| `cnt_fenced` | 8 |\n```\n正文里的 `cnt_prose` 不是表格\n"}, 0, "扫了 1 份文件、1 个串")
-    numbered = {"scripts/experiments/e100_demo.rs": 'const FIELDS: &[(&str, u32)] = &[("e100_slot_count", 1), ("c374_slot", 2)];\n'}
+    numbered = {"scripts/experiment-apparatus/e100_demo.rs": 'const FIELDS: &[(&str, u32)] = &[("e100_slot_count", 1), ("c374_slot", 2)];\n'}
     case("numbered-green", {**numbered, ".claude/abbreviations": "e<数字>  # 实验编号\nc<数字>  # 欠账编号\n"}, 0, "扫了 1 份文件、2 个串")
     case("numbered-red", numbered, 1, "「e100」是单字母加数字")
     case("comments-green", {"crates/demo/src/lib.rs": '// ("cnt_note", 1) 和 => "cnt_note" 写在注释里\n/* ("cnt_block", 1) */\nfn f() { let s = "not a name"; let t = "Cnt_Upper"; check("cnt", 3); }\n'}, 0, "合命名纪律")
     case("call-arguments-green", {"crates/demo/src/lib.rs": 'fn f() { check("cnt", 3); let v = vec!("cnt", 1); }\n'}, 0, "合命名纪律")
-    excluded = {"scripts/experiments/e1_demo.rs": fields}
-    case("exclusion-green", {**excluded, EXCLUDE_FILE: "scripts/experiments/e1_demo.rs:system_configuration_mac  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑\n"}, 0, "排除表 1 条放行 1 个串")
-    case("exclusion-whole-file-green", {**excluded, EXCLUDE_FILE: "scripts/experiments/e1_demo.rs  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑\n"}, 0, "排除表 1 条放行 1 个串")
-    stale = ("scripts/experiments/e1_demo.rs:system_configuration_mac  # 样本：理由\nscripts/experiments/e1_demo.rs:renamed_long  # 样本：已经改好名\n"
-             "scripts/experiments/gone.rs:cnt  # 样本：文件不存在\nscripts/experiments/e1_demo.rs:another_mac\n")
-    case("exclusion-stale-red", {**excluded, EXCLUDE_FILE: stale}, 1, "scripts/experiments/e1_demo.rs:renamed_long 已经一个违规都没有了")
-    case("exclusion-missing-path-red", {**excluded, EXCLUDE_FILE: "scripts/experiments/gone.rs:cnt  # 样本：文件不存在\n"}, 1, "指向不存在的路径 scripts/experiments/gone.rs")
-    case("exclusion-no-reason-red", {**excluded, EXCLUDE_FILE: "scripts/experiments/e1_demo.rs:system_configuration_mac\n"}, 1, "没写理由")
+    excluded = {"scripts/experiment-apparatus/e1_demo.rs": fields}
+    case("exclusion-green", {**excluded, EXCLUDE_FILE: "scripts/experiment-apparatus/e1_demo.rs:system_configuration_mac  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑\n"}, 0, "排除表 1 条放行 1 个串")
+    case("exclusion-whole-file-green", {**excluded, EXCLUDE_FILE: "scripts/experiment-apparatus/e1_demo.rs  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑\n"}, 0, "排除表 1 条放行 1 个串")
+    stale = ("scripts/experiment-apparatus/e1_demo.rs:system_configuration_mac  # 样本：理由\nscripts/experiment-apparatus/e1_demo.rs:renamed_long  # 样本：已经改好名\n"
+             "scripts/experiment-apparatus/gone.rs:cnt  # 样本：文件不存在\nscripts/experiment-apparatus/e1_demo.rs:another_mac\n")
+    case("exclusion-stale-red", {**excluded, EXCLUDE_FILE: stale}, 1, "scripts/experiment-apparatus/e1_demo.rs:renamed_long 已经一个违规都没有了")
+    case("exclusion-missing-path-red", {**excluded, EXCLUDE_FILE: "scripts/experiment-apparatus/gone.rs:cnt  # 样本：文件不存在\n"}, 1, "指向不存在的路径 scripts/experiment-apparatus/gone.rs")
+    case("exclusion-no-reason-red", {**excluded, EXCLUDE_FILE: "scripts/experiment-apparatus/e1_demo.rs:system_configuration_mac\n"}, 1, "没写理由")
     case("external-marker-green", {"crates/demo/src/lib.rs": 'fn kind() -> &\x27static str {\n    match 0 {\n        _ => "lib", // naming-lint:external cargo 定的目标种类名\n    }\n}\n'}, 0, "合命名纪律")
     case("external-marker-no-reason-red", {"crates/demo/src/lib.rs": 'fn kind() -> &\x27static str {\n    match 0 {\n        _ => "lib", // naming-lint:external\n    }\n}\n'}, 1, "「lib」是缩写")
     case("nothing-to-judge", {"README.md": "no sources\n"}, 77, "本次无对象可判")

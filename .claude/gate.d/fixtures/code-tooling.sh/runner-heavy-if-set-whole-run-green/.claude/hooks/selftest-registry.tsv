@@ -1,0 +1,2 @@
+# 样本自己的登记表（research-script-selftests 格经 light-selftest-guard.py --registry-root <样本根> 读它）：一行一份
+scripts/gate/sample-heavy-if-set-wanted.sh	heavy-if-set:SINGLEFS_HEAVY_TESTS	# 偏离上游：样本里的假自证，整轮里变量原样交下来才退 0（走真驱动那一支），没拿到就退 1

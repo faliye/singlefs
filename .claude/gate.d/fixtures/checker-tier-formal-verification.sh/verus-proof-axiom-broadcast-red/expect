@@ -1,0 +1,3 @@
+exit=1
+want=核里有 axiom：crates/singlefs-replay-prefix/src/lib.rs:
+want=verus-proof：红（退出 1）

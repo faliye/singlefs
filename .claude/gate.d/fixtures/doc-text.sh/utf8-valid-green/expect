@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：utf8-valid
+want=查了这次改动里 2 份工作区文本文件、0 份暂存区里与工作区不同的版本：整份按 UTF-8 严格解码，没有一处非法字节
+want=没查的 2 份：
+want=blob.dat（二进制（前 8 KiB 里有 NUL））
+want=packed.gz（二进制后缀）
+want=doc-text.sh：1 格里 1 格绿（utf8-valid），0 格本次未跑（无）

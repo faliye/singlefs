@@ -1,0 +1,6 @@
+exit=1
+want=存量清单 .claude/gate.d/unreachable-claims-stock.tsv 有 1 处不对
+want=      .claude/gate.d/unreachable-claims-stock.tsv:3 是基准 HEAD 之后新加的（.claude/kb/checks-owed.md：- C2 两盘都旧时走不到重同步那一支。）：这张表只缩不涨
+want=样本只跑 .gate-cells 点名的格：unreachable-claims
+want=  unreachable-claims：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（unreachable-claims）

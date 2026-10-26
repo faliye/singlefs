@@ -1,0 +1,4 @@
+exit=1
+want=排除表涨了：这几行基准
+want=第 2 行 scripts/new-rig/report_cores.sh:jobs=$(nproc)
+want=→ 怎么办：排除只缩不涨。

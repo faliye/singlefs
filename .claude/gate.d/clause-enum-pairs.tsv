@@ -12,6 +12,7 @@
 #   4 条文里对应它的那个名字（逐字，门禁在那一节的正文里找这个串）
 #   5 为什么这一对承重（一句话）
 D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	ZeroFill	整段清零	等价类按每段的步骤种类集合判，种类表多一个少一个就换了判据
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	Discard	discard	等价类按每段的步骤种类集合判，种类表多一个少一个就换了判据
 D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	UnitWrite	写单元	同上
 D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	JournalRecord	写 journal 记录	同上
 D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	RootRecordFua	根槽 FUA 写	同上

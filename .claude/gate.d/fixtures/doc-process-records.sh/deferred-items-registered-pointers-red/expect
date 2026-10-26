@@ -1,0 +1,7 @@
+exit=1
+want=records/2026-10-22-样本调度.md:4：带「延后」，写的登记指不到——C 号「C11」指不到：C11 在 .claude/kb/checks-owed.md 的「已还清」表里，已还清的不算登记（延后的事另登一行开着的）
+want=records/2026-10-22-样本调度.md:5：带「下一批」，写的登记指不到——文件:行「records/2026-10-22-样本调度.md:3」指不到：records/ 下只认两份拆分提案（records/2026-10-23-subagent拆分提案.md 与 records/2026-09-16-subagent拆分提案.md），别的记录不是登记处
+want=records/2026-10-22-样本调度.md:6：带「下一个题目」，写的登记指不到——文件:行「records/2026-10-22-样本调度.md:6」指不到：指的是这一行自己
+want=records/ 下这次新增的带延后类词的行里 3 行没登记去向（判了 5 行）
+want=样本只跑 .gate-cells 点名的格：deferred-items-registered
+want=doc-process-records.sh：1 格里 1 格红（deferred-items-registered）

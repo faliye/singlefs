@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：feature-bits
+want=D15（格式冻结政策） 的中文原文决策文件不止一份：.claude/kb/decisions/15-另一份.md、.claude/kb/decisions/15-格式冻结政策.md
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=feature-bits：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（feature-bits）
+want=→ feature-bits：
+want=bash .claude/gate.d/code-source-discipline.sh --check feature-bits

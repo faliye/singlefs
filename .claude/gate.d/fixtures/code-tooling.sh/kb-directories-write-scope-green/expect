@@ -1,0 +1,3 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：kb-directories-write-scope
+want=写回员（kb-scribe）的写范围盖住登记的 3 个 kb 目录（每个探下一层与子目录里的 .md 各一条）：.claude/kb、docs/extra、notes/invariants

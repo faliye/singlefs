@@ -1,0 +1,3 @@
+# 没点名 kb 文件的一行只在中文原文里找：引的原句中文原文里没有、只在日语译文里有（两份译文首行与中文写法不同），判红；
+# 弄坏开关 DOC_REGISTRIES_BREAK=read-translations 照改前连译文一起找，判绿
+audit-contradictions

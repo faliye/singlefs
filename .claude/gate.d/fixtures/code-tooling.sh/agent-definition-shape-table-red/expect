@@ -1,0 +1,6 @@
+exit=1
+want=这些定义在 .claude/main-agent.md「什么时候派哪个 agent」表里没被反引号点名
+want=     beta
+want=.claude/main-agent.md「什么时候派哪个 agent」表里反引号点名的这些词在 .claude/agents/ 里没有定义：
+want=     gamma
+want=agent-definition-shape：红（退出 1）

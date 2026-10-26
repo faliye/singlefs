@@ -1,0 +1,3 @@
+# D1 与 E5 各带英语、日语译文，首行写成各自的语言（英语单破折号、日语冒号没有 `## D1 ` / `## E5 ` 那个空格），分项小节、依据段与「影响的决策」表头也是各自的语言：
+# decision-links 只读中文原文，判绿；弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=read-translations 下译文进来，报「认不出标题」「没有表」
+decision-links

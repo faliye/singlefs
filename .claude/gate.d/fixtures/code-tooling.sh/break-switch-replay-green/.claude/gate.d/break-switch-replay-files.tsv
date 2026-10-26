@@ -1,0 +1,5 @@
+# 样本复跑登记表
+scripts/gate/okay.py	30	# 样本：开关逐条红在点名的失败行上
+scripts/gate/guard.sh	30	# 样本：自证自带开关轮，外面设开关被守卫拒
+scripts/gate/noisy.py	30	# 样本：不设开关也打一行 ✗ 拒绝行，三条开关各红一格加一句汇总行
+scripts/gate/chatty.py	30	# 样本：一条开关，不设开关也打一行 ✗ 拒绝行

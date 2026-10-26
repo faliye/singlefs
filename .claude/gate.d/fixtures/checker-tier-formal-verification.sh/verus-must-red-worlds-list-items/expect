@@ -1,10 +1,10 @@
 exit=0
 want=toolchain	verus-toolchain-pinned
-want=proof	verus-proof	整格（成项 2 个：exec fn 2；不成项的 spec fn 1 个：within）
-want=proof:clamp_to_limit	verus-proof	exec fn
-want=proof:smaller_of_two	verus-proof	exec fn
-want=vacuity:clamp_to_limit#1	verus-vacuity
-want=vacuity:smaller_of_two#1	verus-vacuity
+want=proof	verus-proof	整格（成项 2 个：exec fn 2；不成项的 spec fn 1 个：singlefs_replay_prefix::within）
+want=proof:singlefs_replay_prefix::clamp_to_limit	verus-proof	exec fn
+want=proof:singlefs_replay_prefix::smaller_of_two	verus-proof	exec fn
+want=vacuity:singlefs_replay_prefix::clamp_to_limit#1	verus-vacuity
+want=vacuity:singlefs_replay_prefix::smaller_of_two#1	verus-vacuity
 want=must-red:夹到上限时返回原值	verus-must-red-worlds
 want=table	pinned-red-examples-table
 want=pinned:22	pinned-red-examples-replay

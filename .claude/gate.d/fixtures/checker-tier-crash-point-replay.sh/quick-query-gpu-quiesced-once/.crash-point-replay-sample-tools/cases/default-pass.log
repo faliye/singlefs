@@ -1,0 +1,24 @@
+   Compiling singlefs-checker-tier v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_tier-0000000000000000)
+
+running 1 test
+test tests::one_is_one ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/settled_covered_stream.rs (target/release/deps/settled_covered_stream-0000000000000001)
+
+running 2 tests
+test settled_covered_stream_full ... ignored
+test settled_covered_stream_quick ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/uncovered_stream.rs (target/release/deps/uncovered_stream-0000000000000002)
+
+running 2 tests
+test uncovered_stream_full ... ignored
+test uncovered_stream_quick ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s

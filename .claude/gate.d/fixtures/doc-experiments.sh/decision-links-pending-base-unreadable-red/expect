@@ -1,0 +1,7 @@
+exit=1
+want=[待回填] 读不出基准 HEAD 里的 .claude/decision-links-pending（git show 退 128
+want=「只减不增」这一条没判
+want=决策与实验的登记有 1 处问题（待回填 1）
+want=样本只跑 .gate-cells 点名的格：decision-links
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（decision-links）

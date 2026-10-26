@@ -33,21 +33,27 @@ scripts/gate/merge-and-verify.sh（不带 --copy 时，命令行 acquire / relea
   lib_workspace_lock.py status --root <树>                             打出谁拿着；退 0 没人拿、3 有人拿着
   lib_workspace_lock.py --selftest
 
-弄坏开关 WORKSPACE_LOCK_BREAK=<项>（只给证红用）。项名、弄坏哪一处、打开后自证红在哪几格
+弄坏开关 WORKSPACE_LOCK_BREAK=<项>（只给证红用）。一条一行「WORKSPACE_LOCK_BREAK=<项>  弄坏哪一处」，下一行起写打开后本库自证红的格（「」里是失败行原文的开头）；
+别的脚本的自证里连带红的格写在『』里（本库的 --selftest 里看不到它们，由各自的自证核）
 （自证里每一格各用一份新锁文件、每一次等锁都有放弃时限（SELFTEST_GIVE_UP_SECONDS），哪个开关打开都在 60 秒内退 1、不挂住）：
-  trust-dead-holder  不看持有者死没死，记录里有人就排队
-      本库「持有者已死的锁文件：报出来、接管」（等到 give-up 点退 3）与「放锁之后记录清空」（死的那份记录留着）；
-      连带 merge-and-verify.sh「锁文件里的持有者已死……」与 apply-writer-patch.py「主工作区合入锁的持有者已死……」那一格
-  no-reentry         不认 SINGLEFS_WORKSPACE_LOCK_HOLDER，持有者之下的子进程也排队
-      本库「持有者之下的子进程：重入、不另拿」；连带 apply-writer-patch.py「merge-and-verify 持锁时起的 apply 应当不排队……」那一格
-  no-wait            记录里的持有者活着也照拿（不排队）
-      本库「两个进程同时要锁：后到的排队、报出前者、前者放了才拿到」「HOLDER 变量指着的持有者不是祖先：照排队……」
-      「持有者已死的锁文件：报出来、接管」（不看死活就不报接管）；
-      连带 merge-and-verify.sh「两个合入同时起……」「锁文件里的持有者已死……」与 apply-writer-patch.py「主工作区合入锁被别的合入占着时……」「主工作区合入锁的持有者已死时……」
-  lock-in-common-dir 锁文件照改前放 git common-dir（所有工作树共用一把）
-      本库「主工作树的锁被占着：git worktree 加出来的树照拿它自己那一把」；连带 apply-writer-patch.py「主工作树的锁被占着时往 git worktree 加出来的树打补丁……」、
-      merge-and-verify.sh「主工作树的锁被占着时在 git worktree 加出来的树里验……」与 .claude/hooks/lib_workspace_cargo_lock.py
-      「锁文件在默认位置，主工作树的锁被占着，git worktree 加出来的树里起：放行」「git worktree 加出来的树自己的锁被占着：拒」
+  WORKSPACE_LOCK_BREAK=trust-dead-holder  不看持有者死没死，记录里有人就排队
+      「✗ 自检：持有者已死的锁文件：报出来、接管」（等到 give-up 点退 3）「✗ 自检：放锁之后记录清空」（死的那份记录留着）
+      连带 merge-and-verify.sh 七格：『锁文件里的持有者已死……』（排队等死掉的持有者，到 SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS 退 1），
+      死的那份记录留在锁文件里，后面不带 --copy 的几格也排到放弃时限退 1：『--peer 时编译与测试交给第二台……』『--peer 时取回的日志全绿……』
+      『--peer 时第二台那一趟没跑成……』『--peer 时第二台的工具链没装 rustfmt 与 clippy……』『本机内存排不上（包装退 252）时……』
+      『checker 档快档那一步：带 --copy 与带 --peer 时应当报本次未跑』（与 merge-and-verify.sh 文件头这一条点名的逐格相同）；
+      连带 apply-writer-patch.py『主工作区合入锁的持有者已死……』那一格
+  WORKSPACE_LOCK_BREAK=no-reentry  不认 SINGLEFS_WORKSPACE_LOCK_HOLDER，持有者之下的子进程也排队
+      「✗ 自检：持有者之下的子进程：重入、不另拿」
+      连带 apply-writer-patch.py『merge-and-verify 持锁时起的 apply 应当不排队……』那一格（merge-and-verify.sh 的自证里 apply 是假的，不红）
+  WORKSPACE_LOCK_BREAK=no-wait  记录里的持有者活着也照拿（不排队）
+      「✗ 自检：两个进程同时要锁：后到的排队、报出前者、前者放了才拿到」「✗ 自检：HOLDER 变量指着的持有者不是祖先：照排队……」
+      「✗ 自检：持有者已死的锁文件：报出来、接管」（不看死活就不报接管）
+      连带 merge-and-verify.sh『两个合入同时起……』『锁文件里的持有者已死……』与 apply-writer-patch.py『主工作区合入锁被别的合入占着时……』『主工作区合入锁的持有者已死时……』
+  WORKSPACE_LOCK_BREAK=lock-in-common-dir  锁文件照改前放 git common-dir（所有工作树共用一把）
+      「✗ 自检：主工作树的锁被占着：git worktree 加出来的树照拿它自己那一把」
+      连带 apply-writer-patch.py『主工作树的锁被占着时往 git worktree 加出来的树打补丁……』、merge-and-verify.sh『主工作树的锁被占着时在 git worktree 加出来的树里验……』
+      与 .claude/hooks/lib_workspace_cargo_lock.py『锁文件在默认位置，主工作树的锁被占着，git worktree 加出来的树里起：放行』『git worktree 加出来的树自己的锁被占着：拒』
 """
 import fcntl
 import os

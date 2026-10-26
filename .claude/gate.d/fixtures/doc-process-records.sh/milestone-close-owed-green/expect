@@ -1,0 +1,4 @@
+exit=0
+want=里程碑三（.claude/kb/milestone/03-third-txn.md）（段表第 6 行状态写「已完结（样本）」）：欠账表开着的 5 行里没有一行的前置格「去向：」之后点名它
+want=段表写了收口的里程碑 1 个都没有点名它的开着的账（里程碑文件共 3 份，其余 2 份段表没写收口、不判）
+want=样本只跑 .gate-cells 点名的格：milestone-close-owed

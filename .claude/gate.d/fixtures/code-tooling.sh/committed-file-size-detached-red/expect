@@ -1,0 +1,6 @@
+exit=1
+want=乙：还没推的提交（相对 上游）里新增或改过的 blob 有 1 个超过 1024 字节，推的时候这几笔提交要整个上传：
+want=（加了大文件）  big.bin  2048 字节
+want=提交里有超过单文件上限 1024 字节的内容（乙），逐个列在上面
+want=样本只跑 .gate-cells 点名的格：committed-file-size
+want=  committed-file-size：红（退出 1）

@@ -1,0 +1,4 @@
+# 样本登记表（绿）：驱动行两行（单元名「甲」与「乙甲」并存）、复跑写 none 一行。
+E991	research/prompts/e991-registration.md	甲	crates/sample/units.rs	e991-a.out	driver_a
+E991	research/prompts/e991-registration.md	乙甲	crates/sample/units.rs	e991-b.out	driver_b
+E991	research/prompts/e991-registration.md	丙	crates/sample/units.rs	e991-c.out	none:没有复跑行的样本理由

@@ -1,0 +1,42 @@
+# 池级 checker 遍历式与扫描式两个方向的入口、切点、局部绑定与允许共享的格式解析单元（C410（checker 两个方向共享什么没有检查））。
+# 读它的判法是 scripts/gate/checker-direction-overlap.py（判法、分类与核法在它文件头），门禁 checker-independence-and-sync 的 checker-direction-overlap 格调它。
+# 一行四列，制表符分隔：角色、单元（<文件>::<限定名>，限定名是 python3 scripts/gate/lib_function_units.py dump 打的文件里的嵌套路径）、点名的名字（不用的写 -）、# 理由（至少 8 个字）。
+# 角色：
+#   traversal-entry  遍历式方向的根：从它收闭包
+#   scan-entry       扫描式方向的根：从它收闭包
+#   comparison       比对点：拿两个方向的结果比，不属哪一个方向；它调两个方向入口的那几处自动摘掉，它自己的闭包不判、逐个列出；要有一行 traversal-cut 把它从遍历式里切出来
+#   traversal-cut    收遍历式方向的闭包时，这个单元里点到这个名字的那几处不往下连；名字只许是某个 scan-entry 或 comparison 单元的名字（编排函数调扫描式方向与比对点的那几处）
+#   local-binding    这个单元里这个名字是 let 绑定的局部量，不是调同名函数：两个方向收闭包时都不按它连
+#   shared-format    允许两边共享的格式解析单元，只许登 crates/singlefs-checker/src/lib.rs 里的（singlefs-format 整个包本来就许共享，不用登）
+#   reporting-channel  允许两边共享的报告通道：往同一个判定累加器报判定的方法，只许登 crates/singlefs-checker/src/image.rs 里 impl Judgements 的方法（传的是判定结果，不是判定逻辑，不算判定共享）
+# 扫描式方向的边界照用户 2026-10-26 定的「连 walk.rs 扫单元头那几个函数一起算，另建调用图」。
+traversal-entry	crates/singlefs-checker/src/walk.rs::check_pool_image	-	# 池级 checker 对外的入口：产品镜像，三棵容器树按产品容量判
+traversal-entry	crates/singlefs-checker/src/walk.rs::check_pool_image_given_the_tombstone_container_capacity_knob	-	# 池级 checker 对外的入口：带墓碑容器容量旋钮
+traversal-entry	crates/singlefs-checker/src/walk.rs::check_pool_image_given_the_container_capacity_knobs	-	# 池级 checker 对外的入口：带三棵容器树的容量旋钮
+traversal-entry	crates/singlefs-checker/src/walk.rs::check_pool_image_naming_the_violation_sites	-	# 池级 checker 对外的入口：另交回判红时点名的盘与槽
+traversal-entry	crates/singlefs-checker/src/walk.rs::index_tables_walked_from_the_newest_root	-	# 比对点那一侧要的遍历式读法：从最新根读出三张表
+scan-entry	crates/singlefs-checker/src/walk.rs::scanned_content_units	-	# 扫描式方向扫单元头、按扫描式方向自己写的已发布谓词滤（content_unit_of_header 与 PublishedPredicateOfTheScanDirection 在它的闭包里），喂 I-1.8（归并后版本全序） 与扫描重建
+scan-entry	crates/singlefs-checker/src/walk.rs::judge_merged_version_total_order	-	# I-1.8（归并后版本全序） 只在扫描结果上判：扫描式方向自己的判定
+scan-entry	crates/singlefs-checker/src/rebuild.rs::choose_current_versions	-	# 扫描重建：从单元头择出每个对象身份的当前版本
+scan-entry	crates/singlefs-checker/src/rebuild.rs::rebuild_index_tables	-	# 扫描重建：从当前版本与码 3 记录现算三张表
+scan-entry	crates/singlefs-checker/src/rebuild.rs::<impl VersionsOfEachObject>::packed_containers_whose_records_are_read	-	# 扫描重建：比对点照它把要读的码 3 整单元读来
+comparison	crates/singlefs-checker/src/walk.rs::judge_scan_rebuild_agrees_with_the_walked_index	-	# I-1.13（扫描重建与遍历方向的索引相同） 拿扫描重建的三张表与遍历式读出的逐项比，不属哪一个方向
+traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image_given_the_container_capacity_knobs	scanned_content_units	# 编排函数在走读之后起扫描式方向那一遍
+traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image_given_the_container_capacity_knobs	judge_merged_version_total_order	# 编排函数在扫描结果上起 I-1.8（归并后版本全序）
+traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image_given_the_container_capacity_knobs	judge_scan_rebuild_agrees_with_the_walked_index	# 编排函数调比对点 I-1.13（扫描重建与遍历方向的索引相同）
+local-binding	crates/singlefs-checker/src/walk.rs::judge_the_appearance_rule_of_adjacent_candidate_versions	birth_txg_of	# 函数里 let birth_txg_of = |unit| … 是局部闭包，库按名字连到了 rebuild.rs 的同名函数
+shared-format	crates/singlefs-checker/src/lib.rs::read_u16	-	# 按小端读 2 字节
+shared-format	crates/singlefs-checker/src/lib.rs::read_six_byte_unsigned	-	# 按小端读 6 字节（写序里的事务号）
+shared-format	crates/singlefs-checker/src/lib.rs::read_u32	-	# 按小端读 4 字节
+shared-format	crates/singlefs-checker/src/lib.rs::read_u64	-	# 按小端读 8 字节
+shared-format	crates/singlefs-checker/src/lib.rs::crc32_castagnoli_table	-	# 格式定的校验和算法 CRC-32C（查表那一份）
+shared-format	crates/singlefs-checker/src/lib.rs::checksum_field_holds	-	# 按格式算头校验和、与头里那个字段比，不读别处
+shared-format	crates/singlefs-checker/src/lib.rs::index_node_header_bytes	-	# 码 2 节点头宽的格式式子（86 + 2 × key 宽 + 29）
+shared-format	crates/singlefs-checker/src/lib.rs::unit_checksum_layout	-	# 三类单元两道校验和各罩哪段字节，照字段表
+shared-format	crates/singlefs-checker/src/lib.rs::packed_unit_view	-	# 解码 3 打包记录单元的头与记录区（rebuild.rs 白名单里的那一项）
+shared-format	crates/singlefs-checker/src/lib.rs::<impl ContentUnitClass>::of	-	# 类标签 1 / 3 认成码 1 / 码 3
+shared-format	crates/singlefs-checker/src/lib.rs::<impl ContentUnitClass>::header_offsets	-	# 码 1 / 码 3 头里各段的偏移，照字段表
+shared-format	crates/singlefs-checker/src/lib.rs::<impl ContentUnitClass>::name	-	# 码 1 / 码 3 写进判红说明里的名字
+shared-format	crates/singlefs-checker/src/lib.rs::data_unit_bytes	-	# 格式常量 DATA_UNIT_BYTES 换成 usize 的一行函数（C410 用户 2026-10-26 定搬进 lib.rs、登允许共享）
+shared-format	crates/singlefs-checker/src/lib.rs::check_unit	-	# 单元头的 magic、标志、类标签、两道校验和与格式版本、预留位恒 0，照字段表解析（C410 用户 2026-10-26 定认格式解析）
+reporting-channel	crates/singlefs-checker/src/image.rs::<impl Judgements>::judge	-	# 判定累加器：两个方向往同一个累加器报判定，报告通道不算判定共享（C410 用户 2026-10-26 定）

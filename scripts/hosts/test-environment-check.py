@@ -22,7 +22,8 @@ check 逐类判，每类一行 ✓ / ✗ / !（没查成）/ -（没要求跑）
                    --gate-run-temporary-directory 点名的目录（gate.sh 发给这一轮各阶段的 TMPDIR）这一类不扫：
                    上游 gate.sh 的「跑完没留下临时文件」在全部阶段跑完之后判它下面的每一项、名字不限 singlefs-*，
                    这里再扫判的是它的一个子集；残留测试设备与宿主盘两类照旧把它算进临时目录（上游不看设备）；
-                   --cross-run-temporary-directory 点名的目录（gate.sh 开跑前的 TMPDIR，GATE_CROSS_RUN_TMPDIR：有意跨轮复用的缓存放那里）
+                   --cross-run-temporary-directory 点名的目录（gate.sh 开跑前的 TMPDIR，GATE_CROSS_RUN_TMPDIR：上游给有意跨轮留着的东西用；
+                   本仓只有门禁开跑时刻文件 gate-run-times 落在那里，编译生成物与文本缓存都每趟自己建、跑完删）
                    这一类另扫它（不是 /tmp 也不是这一轮的 TMPDIR 时，不点名就从来不扫），判法与别的临时目录相同；设备与宿主盘不算它
     宿主盘         /、/home、/tmp 与临时目录所在的文件系统变成只读；剩余空间低于阈值；
                    ext4 的 errors_count 不为 0；本次开机以来内核日志里宿主盘栈上的块设备错误；
@@ -47,11 +48,14 @@ record-run-start：把一趟门禁的开跑时刻写进 --run-times-file（本�
 4 只给 clean --refuse-too-recent：还有太新、这一趟清不掉的项。
 破坏开关（只给 --selftest 用，证明自检会红）：环境变量 TEST_ENVIRONMENT_CHECK_BREAK 取
 aliveowner / allowlist / openfile / pidreuse / recent / readonly / freespace / kernellog / loopbacking / deleteguard /
-gaterunscanned / crossrununscanned / previousrunignored / runtimesnotrotated 之一
-（previousrunignored：clean 不认上一趟的开跑时刻，上一趟留下的太新条目仍当可能正在跑，自检「上一趟留下的删得掉」那几条不中；
+gaterunscanned / crossrununscanned / previousrunignored / runtimesnotrotated / retiredcachesallowlisted / guardoff 之一
+（guardoff：平常跑（命令行里没有 --selftest）设了 TEST_ENVIRONMENT_CHECK_BREAK 也不拒，自检「平常跑设了破坏开关退 2 并点名只在自证里认」那一条不中；
+这个变量只在 --selftest 里认，平常跑设了就在参数解析之前退 2、点名它只在自证里认；
+previousrunignored：clean 不认上一趟的开跑时刻，上一趟留下的太新条目仍当可能正在跑，自检「上一趟留下的删得掉」那几条不中；
 runtimesnotrotated：record-run-start 不把本趟转成上一趟，自检「记两个时刻」那几条不中；gaterunscanned：临时目录残留这一类照扫 --gate-run-temporary-directory 点名的目录，
 自检「这一轮门禁的临时目录不进临时目录残留」那一条不中；crossrununscanned：临时目录残留这一类不扫 --cross-run-temporary-directory 点名的目录，
-自检「gate.sh 开跑前的 TMPDIR 也扫」那一条不中）。
+自检「gate.sh 开跑前的 TMPDIR 也扫」那一条不中；retiredcachesallowlisted：改前跨轮共用的编译目录与文本缓存的名字（RETIRED_CROSS_RUN_CACHES）照改前当白名单认，
+自检「临时条目 singlefs-crates-mutation-target 应判 residual」这一类四条、clean 预演汇总的「不碰几项」一条、「clean --yes 之后 … 还在」四条不中）。
 """
 import argparse
 import contextlib
@@ -77,7 +81,7 @@ SCRIPT_RELATIVE_PATH = 'scripts/hosts/test-environment-check.py'
 BREAK_SWITCH_VARIABLE = 'TEST_ENVIRONMENT_CHECK_BREAK'
 BREAK_SWITCH_NAMES = ('aliveowner', 'allowlist', 'openfile', 'pidreuse', 'recent',
                       'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned',
-                      'previousrunignored', 'runtimesnotrotated')
+                      'previousrunignored', 'runtimesnotrotated', 'retiredcachesallowlisted', 'guardoff')
 # 退出码 4：clean --refuse-too-recent 预演见到太新、这一趟清不掉的项
 EXIT_TOO_RECENT = 4
 TOKYO_TIMEZONE = datetime.timezone(datetime.timedelta(hours=9))
@@ -88,26 +92,28 @@ LOOP_BLOCK_MAJOR = 7
 # 进程起始时间晚于条目树里最新的修改时间这么多秒以上，就判那个 pid 已经被别的进程复用
 PROCESS_IDENTIFIER_REUSE_SLACK_SECONDS = 2.0
 
-# 有意跨轮复用的缓存：不判残留、clean 不碰。每条写明谁在用它。
+# 有意跨轮留着的东西：不判残留、clean 不碰。每条写明谁在用它。编译生成物不在这里（用户 2026-10-23 定案「自己用完自己删」：
+# 每一趟自己的编译目录跑完删），改前跨轮共用的那几个名字（RETIRED_CROSS_RUN_CACHES）现在没人建，见到就是残留。
 ALLOWLIST = (
-    (re.compile(r'^singlefs-crates-mutation-target(-w[0-9]+)?(-coverage)?$'),
-     '门禁 checker-tier-crates-mutation-replay 的 cargo 编译产物目录，跨轮复用；带 -w<片号> 的是它分片并发跑时每片各自的那一个，带 -coverage 的是那一片记覆盖的插桩编译'
-     '（scripts/mutation/crates-mutation-rows.py 的 prepare_shard 与 default_shared_target_directory）。'
-     '只在设了 GATE_CROSS_RUN_TMPDIR（gate.sh 设成它开跑前的 TMPDIR）时落在临时目录下，都没设落在 ~/.local/share/singlefs/cross-run-cache/ 下；'
-     '片号大于那一趟工作进程数的由它自己开跑时回收（有进程在用的不删），这里不判残留、clean 不碰'),
-    (re.compile(r'^singlefs-mutate-target$'),
-     'mutate.sh 的 cargo 编译产物目录，跨轮复用（scripts/mutation/mutate.sh 的 MUTATE_TARGET）'),
     (re.compile(r'^singlefs-e152-packages$'),
      'E152 六家文件系统的下载包缓存（scripts/devices/e152-stage-root.sh 的 PACKAGES）'),
-    (re.compile(r'^singlefs-pdftext-[0-9]+$'),
-     '引文核对的 PDF 抽文本缓存，名字里是 uid 不是 pid（scripts/kb/verify-citations.sh 的 PDFTXT_CACHE）'),
     (re.compile(r'^singlefs-vmlinuz(-.+)?$'),
      '给 QEMU 用的可读内核副本（scripts/devices/vm-kernel.sh 的 DEST）'),
+)
+# 改前跨轮共用、现在每趟自己建自己删的那几个名字：不在白名单里（见到就是没删干净的残留）；
+# 只有破坏开关 retiredcachesallowlisted 下照改前当白名单认（自检「改前跨轮共用的缓存名照残留判」那一条不中）
+RETIRED_CROSS_RUN_CACHES = (
+    (re.compile(r'^singlefs-crates-mutation-target(-w[0-9]+)?(-coverage)?$'),
+     '改前门禁 checker-tier-crates-mutation-replay 跨轮共用的编译目录（现在在这一趟的 <shard_root>/build/ 里，跑完删）'),
+    (re.compile(r'^singlefs-mutate-target$'),
+     '改前 mutate.sh 跨轮共用的编译目录（现在在这一趟的分片根里，跑完删）'),
+    (re.compile(r'^singlefs-pdftext-[0-9]+$'),
+     '改前引文核对跨轮共用的 PDF 抽文本缓存（scripts/kb/verify-citations.sh 现在每趟 mktemp -d、跑完删）'),
 )
 
 # 名字里带创建者 pid 的形态：按 pid 判创建者在不在。第一个捕获组是 pid。
 PROCESS_IDENTIFIER_NAME_PATTERNS = (
-    (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiments/replay.sh 的 OUT_DIR'),
+    (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiment-apparatus/replay.sh 的 OUT_DIR'),
     (re.compile(r'^singlefs-step[0-9]+-.+-([0-9]+)-[0-9]+-dev[0-9]+\.img$'),
      'crates/singlefs-harness/tests/ 的 image_path'),
     (re.compile(r'^singlefs-core-fake-sysfs-([0-9]+)$'), 'crates/singlefs-core/src/block_device.rs 的测试 queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none'),
@@ -314,7 +320,7 @@ def measure_entry(path):
 def match_allowlist(name):
     if break_switch_is('allowlist'):
         return None
-    for pattern, reason in ALLOWLIST:
+    for pattern, reason in ALLOWLIST + (RETIRED_CROSS_RUN_CACHES if break_switch_is('retiredcachesallowlisted') else ()):
         if pattern.match(name):
             return reason
     return None
@@ -890,7 +896,7 @@ def judge_temporary_entries(entries, open_path_scan, unreadable_directories, tem
                               f'{scope} 下 {len(residual)} 项残留，实际占用 {format_bytes(actual_total)}'
                               f'（表观 {format_bytes(apparent_total)}）；共查 {len(entries)} 项 singlefs-*，其中这一次跑自己产生的 {len(produced_by_this_run)} 项不判红',
                               [describe_entry(entry) for entry in residual] + kept_lines,
-                              f'跑 {CLEAN_COMMAND} 看计划，确认后加 --yes；某项其实是该留的缓存，'
+                              f'跑 {CLEAN_COMMAND} 看计划，确认后加 --yes；某项其实是该留的缓存（编译生成物不算：每一趟自己建、跑完删），'
                               '就把它连同用它的脚本与行号加进本脚本的 ALLOWLIST')
     if unreadable_directories:
         return CategoryResult('临时目录残留', 'unchecked', f'读不了 {"、".join(unreadable_directories)}',
@@ -1264,7 +1270,6 @@ def execute_clean(environment, actions):
     if any(action.device_command for action in actions) and runner is None:
         password = find_sudo_password()
         runner = make_sudo_runner(password) if password is not None else None
-    fresh_open_path_scan = scan_open_paths(environment.temporary_directories)
     for action in actions:
         if action.device_command:
             if runner is None:
@@ -1281,6 +1286,7 @@ def execute_clean(environment, actions):
             print(f'  ✓ 做了：{action.description}，回读确认没了')
             continue
         entry = action.temporary_entry
+        fresh_open_path_scan = scan_open_paths(environment.temporary_directories)
         try:
             recheck = classify_temporary_entry(entry.path, fresh_open_path_scan, time.time(), environment.recent_seconds,
                                                environment.produced_after, environment.previous_run_started)
@@ -1453,12 +1459,19 @@ def build_temporary_samples(fake_temporary, outside_directory, holders):
     set_tree_modification_time(os.path.join(fake_temporary, replay_reused), old_epoch)
     expectations[replay_reused] = 'residual'
 
-    for cache_name in ('singlefs-crates-mutation-target', 'singlefs-crates-mutation-target-w3-coverage', 'singlefs-pdftext-1000'):
+    for cache_name in ('singlefs-e152-packages', 'singlefs-vmlinuz-6.17'):
         os.mkdir(os.path.join(fake_temporary, cache_name))
         with open(os.path.join(fake_temporary, cache_name, 'cached'), 'w') as handle:
             handle.write('cache\n')
         set_tree_modification_time(os.path.join(fake_temporary, cache_name), old_epoch)
         expectations[cache_name] = 'allowlisted'
+    # 改前跨轮共用、现在每趟自己建自己删的编译目录与文本缓存：没人再建这几个名字，见到就是残留（RETIRED_CROSS_RUN_CACHES）
+    for retired_name in ('singlefs-crates-mutation-target', 'singlefs-crates-mutation-target-w3-coverage', 'singlefs-mutate-target', 'singlefs-pdftext-1000'):
+        os.mkdir(os.path.join(fake_temporary, retired_name))
+        with open(os.path.join(fake_temporary, retired_name, 'cached'), 'w') as handle:
+            handle.write('cache\n')
+        set_tree_modification_time(os.path.join(fake_temporary, retired_name), old_epoch)
+        expectations[retired_name] = 'residual'
 
     mktemp_dead = 'singlefs-e129t.AbC123'
     os.mkdir(os.path.join(fake_temporary, mktemp_dead))
@@ -1752,7 +1765,7 @@ def check_cross_run_directory(recorder, workspace):
     os.makedirs(gate_run)
     old_epoch = time.time() - 3600
     for directory, name in ((plain_temporary, 'singlefs-in-tmp.Old333'), (cross_run, 'singlefs-in-cross-run.Old444'),
-                            (cross_run, 'singlefs-crates-mutation-target')):
+                            (cross_run, 'singlefs-e152-packages')):
         write_text(os.path.join(directory, name, 'left'), 'stale\n')
         set_tree_modification_time(os.path.join(directory, name), old_epoch)
     environment = Environment(temporary_directories=[plain_temporary, gate_run], gate_run_temporary_directories=[gate_run],
@@ -1785,7 +1798,7 @@ def check_previous_run_window(recorder, workspace, holders):
         'singlefs-prev-left.Aaa111': 200,     # 窗口内、不到 10 分钟、没有进程开着：上一趟留下的
         'singlefs-before-prev.Bbb222': 400,   # 上一趟开跑之前、不到 10 分钟：太新，这一趟清不掉
         'singlefs-this-run.Ccc333': 30,       # 本趟开跑之后：这一趟自己的
-        'singlefs-crates-mutation-target': 200,   # 白名单
+        'singlefs-e152-packages': 200,   # 白名单
         'singlefs-held-open.Eee555': 200,     # 窗口内但有进程开着
         'singlefs-old-left.Rrr666': 3600,     # 本来就够老
     }
@@ -1801,7 +1814,7 @@ def check_previous_run_window(recorder, workspace, holders):
     with_window = classify(produced_after=this_started, previous_run_started=previous_started)
     verdicts = {name: entry.verdict for name, entry in with_window.items()}
     recorder.expect(verdicts == {'singlefs-prev-left.Aaa111': 'residual', 'singlefs-before-prev.Bbb222': 'in_use',
-                                 'singlefs-this-run.Ccc333': 'in_use', 'singlefs-crates-mutation-target': 'allowlisted',
+                                 'singlefs-this-run.Ccc333': 'in_use', 'singlefs-e152-packages': 'allowlisted',
                                  'singlefs-held-open.Eee555': 'in_use', 'singlefs-old-left.Rrr666': 'residual'},
                     f'上一趟门禁留下的（窗口内、不到 10 分钟、没人开着）该判残留，窗口外与本趟的不该：{verdicts}')
     recorder.expect(with_window['singlefs-prev-left.Aaa111'].from_previous_run
@@ -1878,6 +1891,14 @@ def check_previous_run_window(recorder, workspace, holders):
     # main 在设了破坏开关时一律拒跑；这几条只证命令行，开关交给上面各条去证，所以这里先摘掉它再还回去
     saved_switch = os.environ.pop(BREAK_SWITCH_VARIABLE, None)
     try:
+        # 平常跑设了破坏开关：认不得的选项也先被拒，退 2 并点名变量只在自证里认（guardoff 下这一道不拒，输出里就没有点名）
+        os.environ[BREAK_SWITCH_VARIABLE] = 'guardoff' if saved_switch == 'guardoff' else 'recent'
+        refusal_output = io.StringIO()
+        with contextlib.redirect_stdout(refusal_output):
+            refusal_code = main(['check', '--force', '--break-guard-probe-unknown-option'])
+        os.environ.pop(BREAK_SWITCH_VARIABLE, None)
+        recorder.expect(refusal_code == 2 and BREAK_SWITCH_VARIABLE in refusal_output.getvalue() and '自证' in refusal_output.getvalue(),
+                        f'平常跑设了破坏开关退 2 并点名只在自证里认：{refusal_code}，{refusal_output.getvalue()!r}')
         with contextlib.redirect_stdout(quiet):
             usage_codes = (main(['clean', '--yes', '--refuse-too-recent']), main(['check', '--previous-run-started', '5']),
                            main(['clean', '--run-times-file', times_path, '--previous-run-started', '5']),
@@ -1981,7 +2002,19 @@ def build_argument_parser():
     return parser
 
 
+def refuse_break_switch_outside_selftest(argument_list):
+    """破坏开关只在 --selftest 里认：命令行里没有 --selftest 而变量非空，打一行点名变量的话、交回 2（参数解析之前判，认不得的选项也先看这个）；否则交回 None。"""
+    if not os.environ.get(BREAK_SWITCH_VARIABLE) or '--selftest' in argument_list or break_switch_is('guardoff'):
+        return None
+    print(f'  ✗ 设了 {BREAK_SWITCH_VARIABLE}：破坏开关只在自证（--selftest）里认，平常跑（check / clean / record-run-start）不许在它下面跑，这一次什么都没做')
+    print(f'     → 怎么办：unset {BREAK_SWITCH_VARIABLE} 再跑；要看开关红在哪一条，跑 {BREAK_SWITCH_VARIABLE}=<项> python3 {SCRIPT_RELATIVE_PATH} --selftest')
+    return 2
+
+
 def main(argument_list):
+    refused = refuse_break_switch_outside_selftest(argument_list)
+    if refused is not None:
+        return refused
     parser = build_argument_parser()
     try:
         arguments = parser.parse_args(argument_list)
@@ -1989,10 +2022,6 @@ def main(argument_list):
         return 0 if exit_signal.code == 0 else 2
     if arguments.selftest:
         return run_selftest()
-    if os.environ.get(BREAK_SWITCH_VARIABLE):
-        print(f'  ✗ 设了 {BREAK_SWITCH_VARIABLE}：破坏开关只给 --selftest 用，check / clean 不许在它下面跑')
-        print(f'     → 怎么办：unset {BREAK_SWITCH_VARIABLE} 再跑')
-        return 2
     if arguments.yes and arguments.action != 'clean':
         print('  ✗ --yes 只对 clean 有意义')
         print(f'     → 怎么办：要清就跑 python3 {SCRIPT_RELATIVE_PATH} clean --yes')

@@ -1,0 +1,4 @@
+exit=1
+want=✗ 越界 fn crates/singlefs-checker/src/walk.rs:17-19 singlefs_checker::walk::root_record_is_well_formed（扫描式从 scanned_units 收进、经 walk.rs:43 unit_of_header；遍历式从 check_pool_image 收进、经 walk.rs:21 judge_root_record）
+want=✗ 两个方向的函数单元交集越出格式解析与常量 1 个，取不到调用图与登记表的问题 0 处
+want=checker-direction-overlap：红

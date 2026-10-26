@@ -1,0 +1,5 @@
+exit=1
+want=广谱变异提交门禁判红：此刻源码上 6 条里 1 条沿用不了也没现判、0 条没红、0 个单元没记清单
+want=沿用不了的里要 GPU 那一趟而没有结论的 1 条（本次未跑 0、没结论 1）
+want=NO_CONCLUSION 4 timeout crates/singlefs-core/src/lib.rs:11:5: replace the value with MUTATED_4() gpu-timeout
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

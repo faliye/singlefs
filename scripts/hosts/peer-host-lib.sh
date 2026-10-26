@@ -7,11 +7,33 @@
 # 配置与崩溃点重放分片同一份：scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-assignments（只调）。配置里的主机、目录与清场命令是私有的：
 # 这里的函数打出来的话一律写「第二台」，第二台上的命令与拷文件的错误输出经 peer_host_redact 换掉再打。
 #
+# 两台用同一份多机配置（用户 2026-10-23 定「两台的配置应该是一样的 不应该不同 这边改了那边就应该改」）：本机这一份（peer_host_load_configuration 读到的那一份）是唯一的源，
+#   往第二台起活的每个入口（scripts/hosts/multi-host-run.sh --peer，经它的 scripts/crash/crash-amplification-two-hosts.sh 与崩溃点重放分片，scripts/mutation/mutation-shard-run.sh）
+#   拷完树之后调 peer_host_carry_configuration，把它原样带到第二台这一趟的树根、回读 sha256 与本机的比，对不上就拒跑；第二台那条命令前面加 peer_host_role_environment 打的几个赋值：
+#   SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer（这个进程在哪台机器；Rust 那一侧读同一个变量，crates/singlefs-checker-tier/src/gpu_card_configuration.rs 的 HOST_ROLE_ENVIRONMENT_VARIABLE）、
+#   SINGLEFS_MULTI_HOST_CONFIG=<带过去的那一份>，起活这一侧照配置清过场、回读过了的另加 GPU_QUIESCE_ORIGIN_READ_BACK=1。
+#   第二台上照角色换读的几处：scripts/crash/crash-point-replay-shard-configuration-check.sh（角色是 peer 就报「双机：关」、退 3，PEER_SSH_HOST、PEER_*、HOSTS、
+#   HOST_JUDGE_WEIGHTS 一样都不打，经它读配置的脚本在第二台上都不再往第二台起活）与 scripts/crash/gpu-quiesce-run.sh（清场四个键在起活那台跑、两台都管，第二台上不跑，
+#   认 GPU_QUIESCE_ORIGIN_READ_BACK=1；显卡先后里 peer: 那几项是第二台自己的卡）。写法与依据在 multi-host.env.example 与这两份的文件头。
+#
+# 工具链比对（peer_host_compare_toolchains，欠账 拆分提案第四十七节第 2 行）：两台 rustc -Vv 前三行与 host 行、cargo -V 逐字相同；
+#   另比两台 rustup component list --installed 里 rustfmt、clippy 那两行（PEER_HOST_REQUIRED_COMPONENTS；合入后验证的 fmt、clippy 两步要它们）：
+#   哪一台缺一样，按「两台的工具链不同」拒、点名哪一台缺哪个组件，出路是在那一台 rustup component add rustfmt clippy；两台都有而那两行不同（目标三元组不同）同样拒。
+#   rustup component list 跑不了（PATH 上没有 rustup）也拒，不当作相同放过。
+# 离线依赖（peer_host_check_offline_dependencies，欠账 拆分提案第五十三节「同一天另一处」）：调用方把树拷到第二台之后、起命令之前调：
+#   树根有 Cargo.toml 的，在第二台那棵树里空跑 cargo metadata --offline --filter-platform <第二台 rustc -vV 的 host>（只解析依赖、不编，至多 PEER_HOST_METADATA_SECONDS 秒；
+#   不带 --filter-platform 时别的平台才用的依赖也要下载，本机 2026-10-26 在本仓工作区上量到它报缺 android_system_properties，带上就过）：
+#   退非 0 时从 cargo 的报错里认缺的依赖（no matching package named `X`、failed to get `X` as a dependency、failed to download `X`、
+#   failed to select a version for the requirement `X …`），打「第二台缺依赖 X」与同步办法（本机 cargo fetch 之后把本机 cargo 缓存的 registry/ 与 git/ rsync 到第二台同一位置），退 1；
+#   认不出缺哪个的打 cargo 报错的末几行（换掉私有的字），到点没跑完的说多半在等第二台 cargo 的包缓存锁，都退 1。树根没有 Cargo.toml 的不判（打一句）。
+#   第二台上这时还没有清单，所以不与工具链比对放在同一步：工具链在拷树之前比，离线依赖在拷树之后核，两样都在这一份里、都在起命令之前。
+#
 # 全局变量（peer_host_load_configuration 设）：PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY PEER_MEMORY_CAP
-#   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND、peer_host_is_this_machine；
-#   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_quiesce_left 报过之后置 0）；peer_host_toolchain_text（peer_host_compare_toolchains 设）；
-#   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）；
-#   peer_host_shared_target_prefix（peer_host_shared_target_prefix_for 设：第二台共用编译目录的守卫，接在第二台那条命令最前面）。
+#   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND、CRASH_POINT_REPLAY_SHARD_CONFIGURATION_FILE（本机这一份的路径）、peer_host_is_this_machine；
+#   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_quiesce_left 报过之后置 0）；peer_host_quiesce_read_back（peer_host_quiesce 回读过了置 1）；
+#   peer_host_carried_configuration、peer_host_configuration_sha256（peer_host_carry_configuration 设：第二台上这一趟用的那一份的路径、本机这一份的 sha256）；
+#   peer_host_toolchain_text（peer_host_compare_toolchains 设）；
+#   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）。
 # 调用方设的全局变量：PEER_HOST_WAIT_HOOK（函数名；peer_host_wait_detached 每轮询到一次 running 调它一次，不带参数，它的退出码不看；
 #   multi-host-run.sh 用它每隔一段取第二台那条命令在用几个核，scripts/hosts/core_usage.py；没设什么都不调）。
 # 只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）：「第二台」是本机上的另一个目录，命令在本机跑，
@@ -28,18 +50,53 @@
 #   PEER_HOST_LIB_BREAK=restore-after-run  peer_host_quiesce_left 照改前跑配置的 QUIESCE_START_COMMAND 复原
 #       mutation-shard-run.sh 的「① 照配置清了场、跑完没复原」（「stderr：…」）与「⑥ 两份都在跑时收到 TERM」（「退 143；…」）
 #       multi-host-run.sh 的自证不红（它不清场）
-#   下面三个弄坏的是第二台共用编译目录的守卫（peer_host_shared_target_guard，见那个函数的注释）；mutation-shard-run.sh 不用这个守卫，它的自证不红：
-#   PEER_HOST_LIB_BREAK=shared-target-not-refreshed  守卫照改前不刷源码戳（不跑 source-stamp.py refresh），只持锁
-#       multi-host-run.sh 的「Ⓜ 设了 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY ⇒ 第二台编之前刷源码戳：旧 mtime 新内容的那个文件重编（Compiling）、测试过（退 0）」（「第一趟退 0，第二趟退 101，第二趟输出：… Fresh crates/demo/src/walk.rs|…」）
-#   PEER_HOST_LIB_BREAK=shared-target-not-locked  守卫不持锁，只刷源码戳
-#       multi-host-run.sh 的「Ⓜ 同一共用编译目录两趟同时起：后一趟等前一趟放锁才刷源码戳、跑命令」（「前一趟放锁之前后一趟的命令已经跑了」）
-#   PEER_HOST_LIB_BREAK=shared-target-lock-held-to-exit  守卫持锁到命令退出，cargo 打出 Running 也不放
-#       multi-host-run.sh 的「Ⓜ 前一趟的命令打出 cargo 的 Running 行就放锁：后一趟不等它跑完」（「前一趟还在跑，后一趟 30 秒里没跑上」）
+#   PEER_HOST_LIB_BREAK=configuration-not-carried  peer_host_carry_configuration 不拷、不回读，第二台那条命令也不带 SINGLEFS_MULTI_HOST_CONFIG（改前的样子：第二台没有配置）
+#       multi-host-run.sh 的「Ⓤ --peer 把本机这一份多机配置原样带到第二台这一趟的树根（sha256 相同），第二台那条命令认得自己是第二台，第二台的专用目录里常驻那一份也相同」
+#         （「退 0；第二台那条命令看到的：role=peer configuration=没设 sum=不在 origin=没设；…」）、
+#         「Ⓥ 带到第二台的配置与本机这一份 sha256 不同（假 rsync 拷完往那一份末尾加一行）⇒ 拒（退 255，说两台的配置不同），命令没跑、第二台这一趟的树删了」（「退 0，命令跑了…」：没拷就没得比）、
+#         「Ⓦ 第二台上（带过去的配置、角色 peer）判法报「双机：关」退 3、不打赋值，再起 multi-host-run.sh --peer 拒（退 255），一次都没往「第二台」ssh」
+#         （「判法退 1（  ✗ 双机分片不能用：没有配置文件 …」）、
+#         「Ⓨ 判法报两台配置一不一致：跑过一趟之后报一致、本机这一份改了之后报不一致、第二台没有常驻那一份时报还没有」（「跑过一趟之后：第二台还没有常驻的那一份…」）
+#       mutation-shard-run.sh 的「⑯ 第二台那一份读到的多机配置就是本机这一份（这一趟带过去的，sha256 相同）、认得自己是第二台，起活这一侧清过场；本机那一份照旧；第二台专用目录下常驻那一份也相同」
+#         （「驱动退 …；第二台：role=peer configuration=没设 sum=不在 origin=1|…」），连带经 checker-tier-crates-mutation-replay 跑的 16 格（那份文件头这一条下面写了为什么）
+#   PEER_HOST_LIB_BREAK=role-reversed  peer_host_role_environment 给第二台那条命令设 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=local（角色读反）
+#       multi-host-run.sh 的「Ⓤ --peer 把本机这一份多机配置原样带到第二台这一趟的树根…」（「退 0；第二台那条命令看到的：role=local configuration=…」）
+#         与「Ⓦ 第二台上（带过去的配置、角色 peer）判法报「双机：关」退 3、不打赋值，再起 multi-host-run.sh --peer 拒（退 255），一次都没往「第二台」ssh」
+#         （「判法退 1（  ✗ 双机分片不能用：ssh -o BatchMode=yes … true 连不上 …），emit 退 1，里层 --peer 退 255；ssh 记了 4 次」）
+#       mutation-shard-run.sh 的「⑯ 第二台那一份读到的多机配置就是本机这一份…」（「驱动退 …；第二台：role=local …」），连带经 checker-tier-crates-mutation-replay 跑的 16 格
+#   PEER_HOST_LIB_BREAK=differing-configuration-accepted  peer_host_carry_configuration 回读到第二台那一份与本机的 sha256 不同也放行
+#       multi-host-run.sh 的「Ⓥ 带到第二台的配置与本机这一份 sha256 不同（假 rsync 拷完往那一份末尾加一行）⇒ 拒（退 255，说两台的配置不同），命令没跑、第二台这一趟的树删了」（「退 0，命令跑了…」）
+#       mutation-shard-run.sh 的自证只红经 checker-tier-crates-mutation-replay 跑的那 16 格（它没有造两台配置不同的那一格）
+#   PEER_HOST_LIB_BREAK=origin-read-back-always  peer_host_role_environment 不看起活这一侧清没清场，一律给第二台设 GPU_QUIESCE_ORIGIN_READ_BACK=1
+#       multi-host-run.sh 的「Ⓤ --peer 把本机这一份多机配置原样带到第二台这一趟的树根…」（「…origin=1」：这一格的驱动不经清场包装起）
+#         与「Ⓧ 驱动正经 gpu-quiesce-run.sh 起（登记文件在、名字以驱动的父进程号起头）⇒ 第二台那条命令拿到 GPU_QUIESCE_ORIGIN_READ_BACK=1；不是 ⇒ 没设」（「…不是那一趟退 0、看到 origin=1」）
+#       mutation-shard-run.sh 的自证只红经 checker-tier-crates-mutation-replay 跑的那 16 格（它的场景都照配置清了场）
+#   PEER_HOST_LIB_BREAK=components-uncompared  peer_host_compare_toolchains 不比两台的 rustfmt、clippy 组件（改前的样子）
+#       multi-host-run.sh 的「Ⓒ 第二台缺 clippy 组件（rustup component list --installed 里没有那一行）⇒ 拒（退 255，说两台的工具链不同、第二台缺组件 clippy），命令没跑、第二台没建这一趟的目录」
+#         （「退 0，命令跑了」）
+#       mutation-shard-run.sh 的自证不红（它没有造少组件的那一格）
+#   PEER_HOST_LIB_BREAK=offline-dependencies-unchecked  peer_host_check_offline_dependencies 不在第二台空跑 cargo metadata --offline（改前的样子）
+#       multi-host-run.sh 的「Ⓒ 第二台那棵树 cargo metadata --offline 报缺依赖 vstd ⇒ 拒（退 255，说第二台缺依赖 vstd、带同步办法），命令没跑、第二台这一趟的树删了」
+#         （「退 0，命令跑了」）
+#         与「Ⓒ 第二台那棵树 cargo metadata --offline 过了 ⇒ 照跑、退 0，假 cargo 记下在那棵树的树根跑过 metadata --offline」（「退 0，metadata 那一步记下的：」后面是空的）
+#       mutation-shard-run.sh 的自证不红（它不调这个函数）
+# 不设第二台共用编译目录（用户 2026-10-23 定案「自己用完自己删」）：第二台每一趟在自己那棵树里编，multi-host-run.sh 的 ⑦ 连同树里的编译目录一起删。
 
 peer_host_is_this_machine=0
 peer_host_quiesced=0
+peer_host_quiesce_read_back=0
+peer_host_carried_configuration=""
+peer_host_configuration_sha256=""
 peer_host_toolchain_text=""
 peer_host_detached_outcome=""
+PEER_HOST_ROLE_VARIABLE=SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE   # 这个进程在哪台机器：local 或 peer，没设是 local（文件头「两台用同一份多机配置」）
+PEER_HOST_CARRIED_CONFIGURATION_NAME=multi-host.env              # 带到第二台的那一份放在这一趟的树根、与第二台专用目录下常驻那一份的文件名
+PEER_HOST_REQUIRED_COMPONENTS=(rustfmt clippy)                   # 两台都要装的 rustup 组件（文件头「工具链比对」）
+PEER_HOST_METADATA_SECONDS=300                                   # 第二台空跑 cargo metadata --offline 至多等几秒（文件头「离线依赖」）
+
+peer_host_this_machine_is_peer() { # 这个进程是不是第二台（SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer）
+  [[ "${SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE:-local}" == peer ]]
+}
 
 peer_host_load_configuration() { # <配置判法脚本> <树根>：判得过就设配置的键，退 0；判法退 3（双机：关，配置没写 ENABLE_ACROSS_MACHINES=1）
   # 什么都不设、不打，退 3，由调用方报「双机：关」；判不过打一行原因（不含配置内容）与出路，退 1
@@ -97,7 +154,62 @@ peer_host_path() { # <第二台上的路径>：rsync 的参数写法
   if [[ "$peer_host_is_this_machine" == 1 ]]; then printf '%s' "$1"; else printf '%s:%s' "$PEER_SSH_HOST" "$1"; fi
 }
 
-peer_host_compare_toolchains() { # 两台 rustc -Vv 前三行与 host 行、cargo -V 相同退 0（peer_host_toolchain_text 设成本机 rustc 那一行）；不同或报不出打原因与出路，退 1
+peer_host_component_lines() { # <rustup component list --installed 的输出>：打其中 PEER_HOST_REQUIRED_COMPONENTS 那几行（就是组件名、或组件名后接「-<目标>」），按组件的次序
+  local component line
+  for component in "${PEER_HOST_REQUIRED_COMPONENTS[@]}"; do
+    while IFS= read -r line; do
+      if [[ "$line" == "$component" || "$line" == "$component"-* ]]; then printf '%s\n' "$line"; fi
+    done <<<"$1"
+  done
+}
+
+peer_host_missing_components() { # <peer_host_component_lines 打的那几行>：打缺的组件名，用「、」隔开；都在打空
+  local component line found joined=""
+  for component in "${PEER_HOST_REQUIRED_COMPONENTS[@]}"; do
+    found=0
+    while IFS= read -r line; do
+      if [[ "$line" == "$component" || "$line" == "$component"-* ]]; then found=1; fi
+    done <<<"$1"
+    (( found )) || joined+="${joined:+、}$component"
+  done
+  printf '%s' "$joined"
+}
+
+peer_host_compare_components() { # 两台 rustup component list --installed 里 rustfmt、clippy 那几行都在、逐字相同退 0；缺、不同或跑不了打原因与出路，退 1（文件头「工具链比对」）
+  local component_command='rustup component list --installed' local_components peer_components local_missing peer_missing
+  if ! local_components="$(bash -c "$component_command" 2>/dev/null)"; then
+    echo "  ✗ 本机 rustup component list --installed 跑不了，比不了 rustfmt、clippy 组件"
+    echo "     → 怎么办：看 PATH 里有没有 rustup（工具链要经 rustup 装）"
+    return 1
+  fi
+  if ! peer_components="$(peer_host_run / "$component_command" 2>/dev/null)"; then
+    echo "  ✗ 第二台 rustup component list --installed 跑不了，比不了 rustfmt、clippy 组件"
+    echo "     → 怎么办：看配置的 PEER_CARGO_BIN_DIRECTORY 下有没有 rustup、ssh 连不连得上"
+    return 1
+  fi
+  local_components="$(peer_host_component_lines "$local_components")"
+  peer_components="$(peer_host_component_lines "$peer_components")"
+  local_missing="$(peer_host_missing_components "$local_components")"
+  peer_missing="$(peer_host_missing_components "$peer_components")"
+  if [[ -n "$local_missing" ]]; then
+    echo "  ✗ 两台的工具链不同：本机缺组件 $local_missing（rustup component list --installed 里没有那一行）"
+    echo "     → 怎么办：在本机 rustup component add rustfmt clippy（合入后验证的 fmt、clippy 两步要它们），再跑"
+    return 1
+  fi
+  if [[ -n "$peer_missing" ]]; then
+    echo "  ✗ 两台的工具链不同：第二台缺组件 $peer_missing（rustup component list --installed 里没有那一行）"
+    echo "     → 怎么办：在第二台上给与本机同一个工具链 rustup component add rustfmt clippy（合入后验证的 fmt、clippy 两步要它们），再跑"
+    return 1
+  fi
+  if [[ "$local_components" != "$peer_components" ]]; then
+    echo "  ✗ 两台的工具链不同：rustfmt、clippy 组件那几行本机「${local_components//$'\n'/；}」，第二台「${peer_components//$'\n'/；}」"
+    echo "     → 怎么办：两台装同一个 rustup 工具链与组件（目标三元组相同）再跑"
+    return 1
+  fi
+}
+
+peer_host_compare_toolchains() { # 两台 rustc -Vv 前三行与 host 行、cargo -V 相同，rustfmt、clippy 组件两台都在、那几行相同，退 0（peer_host_toolchain_text 设成本机 rustc 那一行）；
+  # 不同、缺组件或报不出打原因与出路，退 1（文件头「工具链比对」）。弄坏开关 components-uncompared 下不比组件
   local description_command='rustc -Vv | head -3 && rustc -Vv | grep "^host: " && cargo -V' local_toolchain peer_toolchain
   if ! local_toolchain="$(bash -c "$description_command" 2>/dev/null)"; then
     echo "  ✗ 本机 rustc / cargo 报不出版本"
@@ -114,7 +226,49 @@ peer_host_compare_toolchains() { # 两台 rustc -Vv 前三行与 host 行、carg
     echo "     → 怎么办：两台装同一个 rustup 工具链（rustc -Vv 的 commit 相同）再跑"
     return 1
   fi
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,components-uncompared,* ]]; then
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=components-uncompared：不比两台的 rustfmt、clippy 组件"
+  else
+    peer_host_compare_components || return 1
+  fi
   peer_host_toolchain_text="${local_toolchain%%$'\n'*}"
+}
+
+peer_host_check_offline_dependencies() { # <第二台上这一趟的树根>：树根有 Cargo.toml 的，在那棵树里空跑 cargo metadata --offline，过了退 0；
+  # 缺离线依赖打「第二台缺依赖 <名>」与同步办法，认不出缺哪个、到点没跑完打原因与出路，退 1；树根没有 Cargo.toml 的打一句、退 0（文件头「离线依赖」）。
+  # 第二台的报错经 peer_host_run 换掉私有的字。弄坏开关 offline-dependencies-unchecked 下不跑、退 0（改前的样子）
+  local tree_root="$1" errors status missing
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,offline-dependencies-unchecked,* ]]; then
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=offline-dependencies-unchecked：不在第二台空跑 cargo metadata --offline"
+    return 0
+  fi
+  if ! peer_host_run "$tree_root" "test -f Cargo.toml" >/dev/null 2>&1; then
+    echo "  · 第二台那棵树的树根没有 Cargo.toml：不核离线依赖"
+    return 0
+  fi
+  # --filter-platform 第二台的 host：不带它 cargo metadata 连别的平台才用的依赖（android_system_properties 这类）也要下载，缓存里本来就没有，次次误报
+  if errors="$(peer_host_run "$tree_root" "timeout $PEER_HOST_METADATA_SECONDS cargo metadata --offline --format-version 1 --filter-platform \"\$(rustc -vV | sed -n 's/^host: //p')\" >/dev/null" 2>&1)"; then
+    echo "  · 第二台那棵树 cargo metadata --offline 过了：离线依赖齐"
+    return 0
+  else
+    status=$?
+  fi
+  missing="$(grep -oE 'no matching package named `[^`]+`|failed to get `[^`]+` as a dependency|failed to download `[^`]+`|failed to select a version for the requirement `[^`]+' <<<"$errors" \
+    | grep -oE '`[^` =]+' | tr -d '`' | awk '!seen[$0]++ { printf "%s%s", (joined++ ? "、" : ""), $0 }')"
+  if [[ -n "$missing" ]]; then
+    echo "  ✗ 第二台缺依赖 $missing：在第二台那棵树里 cargo metadata --offline 解析不出（第二台的 cargo 缓存里没有，命令跑到 cargo 那一步会退 101），这一趟不跑"
+    echo "     → 怎么办：同步第二台的 cargo 缓存：本机仓根先跑 cargo fetch（把依赖拉进本机的 cargo 缓存，默认 ~/.cargo），再把本机 cargo 缓存里的 registry/ 与 git/ 两个目录 rsync -a 到第二台 cargo 缓存的同一位置（不带 --delete）；第二台连得上网的，也可以在第二台那份仓里跑一次 cargo fetch。同步完再跑同一条命令"
+    return 1
+  fi
+  if (( status == 124 )); then
+    echo "  ✗ 第二台那棵树 cargo metadata --offline $PEER_HOST_METADATA_SECONDS 秒没跑完（多半在等第二台 cargo 的包缓存锁），这一趟不跑"
+    echo "     → 怎么办：看第二台有没有别的 cargo 正在拉依赖或编译，等它放锁再跑同一条命令"
+    return 1
+  fi
+  echo "  ✗ 第二台那棵树 cargo metadata --offline 退 $status，从报错里认不出缺哪个依赖，这一趟不跑；cargo 报的末几行（换掉了私有的字）："
+  printf '%s\n' "$errors" | tail -n 8 | sed 's/^/      /'   # gate-lint:detail
+  echo "     → 怎么办：照上面 cargo 报的修；缺依赖的同步办法是本机 cargo fetch 之后把本机 cargo 缓存的 registry/ 与 git/ rsync -a 到第二台同一位置；修好再跑同一条命令"
+  return 1
 }
 
 peer_host_sop_source() { # <树根> <驱动所在的仓根>：打要拷到第二台的规范副本目录——树里有就用树里的，没有用驱动所在仓的，再没有用那份仓的 git common-dir 所在的主仓的；都没有退 1
@@ -129,11 +283,82 @@ peer_host_sop_source() { # <树根> <驱动所在的仓根>：打要拷到第二
   return 1
 }
 
+peer_host_carry_configuration() { # <第二台上这一趟的树根>：本机这一份多机配置原样带过去（文件头「两台用同一份多机配置」）。
+  # 拷到 <树根>/multi-host.env，再在第二台上原样放一份到 PEER_REPOSITORY_DIRECTORY/multi-host.env（常驻那一份：判法报两台配置一不一致时比它），两份都回读 sha256 与本机这一份比；
+  # 都相同退 0，设 peer_host_carried_configuration、peer_host_configuration_sha256；拷不过去或对不上打原因与出路（不打配置的内容与路径），退 1。
+  # 弄坏开关 configuration-not-carried 下不拷、不回读、不设（改前的样子）；differing-configuration-accepted 下对不上也放行
+  local tree_root="$1" source_file="${CRASH_POINT_REPLAY_SHARD_CONFIGURATION_FILE:-}" local_sum carried standing staged read_back peer_sum peer_short
+  local peer_sums=()
+  peer_host_carried_configuration=""
+  peer_host_configuration_sha256=""
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,configuration-not-carried,* ]]; then
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=configuration-not-carried：本机的多机配置不带到第二台"
+    return 0
+  fi
+  if [[ -z "$source_file" || ! -f "$source_file" ]]; then
+    echo "  ✗ 本机这一份多机配置找不到（peer_host_load_configuration 没设 CRASH_POINT_REPLAY_SHARD_CONFIGURATION_FILE，或那份文件不在了），带不到第二台"
+    echo "     → 怎么办：先调 peer_host_load_configuration；配置照仓根 multi-host.env.example 写"
+    return 1
+  fi
+  local_sum="$(sha256sum < "$source_file")"
+  local_sum="${local_sum%% *}"
+  carried="$tree_root/$PEER_HOST_CARRIED_CONFIGURATION_NAME"
+  standing="$PEER_REPOSITORY_DIRECTORY/$PEER_HOST_CARRIED_CONFIGURATION_NAME"
+  staged="$standing.tmp.$$"
+  if ! peer_host_copy --chmod=F600 "$source_file" "$(peer_host_path "$carried")"; then
+    echo "  ✗ 本机的多机配置拷不到第二台这一趟的树根"
+    echo "     → 怎么办：看第二台盘满没满、那棵树可不可写，再跑同一条命令"
+    return 1
+  fi
+  # 常驻那一份先写同目录的临时文件再 mv 换上：别的一趟正在读它时读到的是整份旧的或整份新的
+  if ! peer_host_run / "cp -- $(printf '%q' "$carried") $(printf '%q' "$staged") && chmod 600 -- $(printf '%q' "$staged") && mv -f -- $(printf '%q' "$staged") $(printf '%q' "$standing")"; then
+    echo "  ✗ 第二台专用目录下常驻的那一份多机配置没换上"
+    echo "     → 怎么办：看配置的 PEER_REPOSITORY_DIRECTORY 可不可写、盘满没满，再跑同一条命令"
+    return 1
+  fi
+  read_back="$(peer_host_run / "sha256sum < $(printf '%q' "$carried") && sha256sum < $(printf '%q' "$standing")" 2>/dev/null)"
+  mapfile -t peer_sums <<< "$read_back"
+  for peer_sum in "${peer_sums[0]:-}" "${peer_sums[1]:-}"; do
+    peer_short="${peer_sum%% *}"
+    [[ "$peer_short" == "$local_sum" ]] && continue
+    if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,differing-configuration-accepted,* ]]; then
+      echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=differing-configuration-accepted：第二台那一份与本机这一份 sha256 不同也放行"
+      break
+    fi
+    echo "  ✗ 两台的多机配置不同：带到第二台的那一份回读出来的 sha256（${peer_short:0:12}…）与本机这一份（${local_sum:0:12}…）对不上，这一趟不跑"
+    echo "     → 怎么办：本机这一份是唯一的源，每一趟都重新带过去、重新核；看第二台盘满没满、那棵树与专用目录可不可写，再跑同一条命令"
+    return 1
+  done
+  peer_host_carried_configuration="$carried"
+  peer_host_configuration_sha256="$local_sum"
+  echo "  · 本机的多机配置原样带到第二台这一趟的树根与专用目录，回读 sha256 相同（${local_sum:0:12}…）"
+}
+
+peer_host_origin_quiesce_holder() { # 这个驱动正经 scripts/crash/gpu-quiesce-run.sh 起（那一层照配置清了场、回读过了）：GPU_QUIESCE_HOLDER 指的登记文件在、
+  # 文件名以这个驱动的父进程号加「-」起头（gpu-quiesce-run.sh 文件头「给调用方与派发器的接口」）
+  [[ -n "${GPU_QUIESCE_HOLDER:-}" && -e "$GPU_QUIESCE_HOLDER" && "${GPU_QUIESCE_HOLDER##*/}" == "$PPID-"* ]]
+}
+
+peer_host_role_environment() { # 打第二台那条命令前面要加的环境赋值（printf %q 过，空格隔开，末尾带一个空格；文件头「两台用同一份多机配置」）：
+  # SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer；带过去了配置的（peer_host_carry_configuration 设过）SINGLEFS_MULTI_HOST_CONFIG=<第二台上这一趟的那一份>；
+  # 起活这一侧照配置清过场、回读过了的（这一趟 peer_host_quiesce 回读过了，或 peer_host_origin_quiesce_holder）GPU_QUIESCE_ORIGIN_READ_BACK=1。
+  # 弄坏开关 role-reversed 下角色写成 local；origin-read-back-always 下一律带 GPU_QUIESCE_ORIGIN_READ_BACK=1
+  local role=peer text
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,role-reversed,* ]]; then role=local; fi
+  text="$PEER_HOST_ROLE_VARIABLE=$role "
+  if [[ -n "$peer_host_carried_configuration" ]]; then text+="SINGLEFS_MULTI_HOST_CONFIG=$(printf '%q' "$peer_host_carried_configuration") "; fi
+  if (( peer_host_quiesce_read_back )) || peer_host_origin_quiesce_holder || [[ ",${PEER_HOST_LIB_BREAK:-}," == *,origin-read-back-always,* ]]; then
+    text+="GPU_QUIESCE_ORIGIN_READ_BACK=1 "
+  fi
+  printf '%s' "$text"
+}
+
 peer_host_quiesce() { # 照配置清场（配置里写了才做），跑完回读；清场与回读的命令与输出都不打（里面有服务名）。回读没过退 1
   [[ -n "${QUIESCE_STOP_COMMAND:-}" ]] || return 0
   peer_host_quiesced=1
   bash -c "$QUIESCE_STOP_COMMAND" >/dev/null 2>&1
   if bash -c "$QUIESCE_STOPPED_CHECK_COMMAND" >/dev/null 2>&1; then
+    peer_host_quiesce_read_back=1
     echo "  · 照配置清了场，回读过了"
     return 0
   fi
@@ -195,80 +420,6 @@ peer_host_stop_process_tree() { # <进程号>：这个进程连同全部后代�
   for pid in "${pids[@]}"; do peer_host_process_is_alive "$pid" && survivors+=("$pid"); done
   if (( ${#survivors[@]} > 0 )); then echo "进程 $1 那一棵里 ${survivors[*]} 发了 TERM、KILL 还在"; return 1; fi
   echo "进程 $1 连同 $(( ${#pids[@]} - 1 )) 个后代都停了"
-}
-
-# 第二台共用编译目录的守卫：调用方（multi-host-run.sh，MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 设了时）把它接在第二台那条命令最前面，几棵树、几趟共用树外同一个编译目录时用。
-#   为什么：每一趟的树经 rsync -a 新拷，源文件带着本机的旧 mtime；cargo 按 mtime 判本地包新不新鲜，内容换了而 mtime 不比编译目录里上一次编的新，就照用别的树编的旧产物
-#   （.claude/rules/test-script-discipline.md「编译与算法都要快」：拷副本带了旧修改时刻的，把内容变了的文件改到此刻）。
-peer_host_shared_target_guard() { # <编译目录，相对树根> <refresh|no-refresh> <until-running|until-exit|unlocked> <命令…>：在第二台那棵树的树根跑（经 declare -f 带过去，
-  # 只用 bash、flock、python3 与树里的 scripts/hosts/source-stamp.py，不引别的函数）。在 <编译目录>.lock 上持排他锁（flock）→ source-stamp.py refresh（内容或 mtime 与戳里
-  # 不一样的源文件 touch 到此刻）→ 设 CARGO_TARGET_DIR、跑命令；命令的标准输出与标准错误并成一条管道转出，看到 cargo 打的「     Running <测试目标>」（编完、判完新鲜、开跑测试）
-  # 就放锁，没打这一行就到命令退出才放；锁的 fd 不交给命令。守卫自己没做成（没有 flock、建不了目录或锁文件、拿不到锁、刷不成戳）打原因与出路，命令不跑，退 255。
-  # 第二、三个参数只给弄坏开关用（peer_host_shared_target_prefix_for 照 PEER_HOST_LIB_BREAK 折出来），平常是 refresh until-running。退出码是命令的。
-  local target="${1%/}" refresh="$2" lock_mode="$3" lock_fd="" stamp_output="" stamp_line="" guard_line=""
-  local running_pattern='^[[:space:]]+Running [^`]'
-  shift 3
-  if ! command -v flock >/dev/null 2>&1; then
-    echo "  ✗ 第二台上没有 flock：共用编译目录 $target 持不了锁，命令没跑" >&2
-    echo "     → 怎么办：在第二台装 util-linux（带 flock）；或调用方不设 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY，让这一趟用树里自己的编译目录" >&2
-    return 255
-  fi
-  if ! mkdir -p -- "$target" 2>/dev/null || ! : >>"$target.lock" 2>/dev/null; then
-    echo "  ✗ 第二台建不了共用编译目录 $target 或它的锁文件 $target.lock，命令没跑" >&2
-    echo "     → 怎么办：看第二台那棵树的上一层可不可写、盘满没满" >&2
-    return 255
-  fi
-  exec {lock_fd}>>"$target.lock"
-  echo "  · 第二台：等共用编译目录 $target 的锁（刷源码戳、编、到 cargo 打出 Running 开跑这一段，同一个编译目录同一时刻只许一趟）"
-  if [[ "$lock_mode" != unlocked ]] && ! flock -x "$lock_fd"; then
-    echo "  ✗ 第二台拿不到共用编译目录的锁 $target.lock，命令没跑" >&2
-    echo "     → 怎么办：看第二台上那个文件可不可读写，再重跑同一条命令" >&2
-    return 255
-  fi
-  echo "  · 第二台：拿到共用编译目录 $target 的锁"
-  if [[ "$refresh" == refresh ]]; then
-    if ! stamp_output="$(python3 scripts/hosts/source-stamp.py refresh . --target-dir "$target" 2>&1)"; then
-      printf '%s\n' "$stamp_output" >&2
-      echo "  ✗ 第二台刷源码戳没做成（scripts/hosts/source-stamp.py refresh . --target-dir $target），命令没跑：不刷就可能拿编译目录里别的树编的旧产物跑" >&2
-      echo "     → 怎么办：照上面 source-stamp.py 打的原因修（树与编译目录在不在、可不可写），再重跑同一条命令" >&2
-      return 255
-    fi
-    # touch 过的文件逐个列的那几行不转出（头一次用、或每一趟新拷的树上一趟 touch 过的，都是成百上千行），只转汇总行 SOURCE_STAMP touched=…
-    while IFS= read -r stamp_line; do [[ "$stamp_line" == "  · touch "* ]] || printf '%s\n' "$stamp_line"; done <<<"$stamp_output"
-  fi
-  export CARGO_TARGET_DIR="$target"
-  "$@" {lock_fd}>&- 2>&1 | {
-    while IFS= read -r guard_line; do
-      printf '%s\n' "$guard_line"
-      if [[ "$guard_line" =~ $running_pattern ]]; then
-        if [[ "$lock_mode" == until-running ]]; then
-          flock -u "$lock_fd"
-          echo "  · 第二台：cargo 开跑，放开共用编译目录 $target 的锁"
-        fi
-        exec cat
-      fi
-    done
-    [[ -z "$guard_line" ]] || printf '%s' "$guard_line"
-  }
-  return "${PIPESTATUS[0]}"
-}
-
-peer_host_shared_target_prefix_for() { # <编译目录，相对树根>：第二台那条命令最前面要接的守卫写进数组 peer_host_shared_target_prefix
-  # （bash -c <peer_host_shared_target_guard 的定义> peer-shared-target-guard <编译目录> refresh until-running）；文件头那三个弄坏开关在这里折成守卫的第二、三个参数
-  local refresh=refresh lock_mode=until-running
-  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,shared-target-not-refreshed,* ]]; then
-    refresh=no-refresh
-    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=shared-target-not-refreshed：第二台共用编译目录不刷源码戳" >&2
-  fi
-  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,shared-target-not-locked,* ]]; then
-    lock_mode=unlocked
-    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=shared-target-not-locked：第二台共用编译目录不持锁" >&2
-  fi
-  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,shared-target-lock-held-to-exit,* ]]; then
-    lock_mode=until-exit
-    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=shared-target-lock-held-to-exit：第二台共用编译目录的锁持到命令退出" >&2
-  fi
-  peer_host_shared_target_prefix=(bash -c "$(declare -f peer_host_shared_target_guard)"$'\n''peer_host_shared_target_guard "$@"' peer-shared-target-guard "$1" "$refresh" "$lock_mode")
 }
 
 peer_host_start_detached() { # <目录> <进程号文件> <退出码文件> <输出文件> <命令文本>：在第二台的这个目录里脱离 ssh 会话起（setsid nohup），

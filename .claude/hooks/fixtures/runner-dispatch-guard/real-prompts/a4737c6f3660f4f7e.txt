@@ -1,0 +1,39 @@
+# 派发：experiment-runner
+
+回复与报告用中文。
+重型测试：不跑
+批次：records/2026-10-19-里程碑四GPU垃圾回收开工.md#3
+线程上限：31
+草稿目录：/home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-8
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-8 --purpose 'E185 装置造池并行化'
+报告：/home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-8/report.md
+这一段回答的岔路：不回答岔路，只让装置的长跑用满线程（问题单 research/prompts/m4-gpugc-measure-forks.md 第 1、2 行要用改好的装置跑第一段、第二段）
+上一段岔路表里还差：第 1 行交错那一趟、第 2 行第二段都没跑（见 /home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-6/report.md「岔路表」）
+预计挂钟：2 小时内（改装置、编译、clippy，推的）
+自证在哪跑：不跑
+
+## 背景（主 agent 现查过的）
+
+用户：「线程不能每次都用1」。E185 装置对取样点、轮次逐个串行，连不计时的造池也在同一条线程上：`run_the_wall_clock_segment` 里 `for point in points { measure_one_sampling_point(…) }`，`run_the_stage_split_segment` 同形；整份只有饱和吞吐起线程。第二段停下时的半截产物（仓外 ~/.local/share/singlefs/work/multi-host-run/e185-stage-split-2026-10-19/research/results/e185-gc-batch-wall-clock-split-stage-split.out，只当线索，不引）里 16 次造池 `construction_seconds` 合计 11204.9 秒；第一段第一趟造池合计约 16000 秒。第二台 32 核，跑的时候负载 1.0 上下。原因与去向记在 records/2026-09-16-subagent拆分提案.md 第七十二节。规矩：.claude/rules/test-script-discipline.md「编译与算法都要快」（互相独立的单位按区间切片并行，合并要确定，不能并行的写明为什么）。
+
+## 输入
+
+- 底稿：/home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-7/e185_gc_batch_wall_clock_split.rs（sha256 1373779a1848088feb0626bf2e4b103b1d5aef9cdea084331de5121c27958e8d，64 条单测，编过、clippy 0；报告 /home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-7/report.md）。
+- 跑前登记 research/prompts/e185-preregistration.md（修订到 12.9）。
+- 变异行 crates/mutations.tsv 里 E185 V1–V33（第 4905–4937 行；V21 的原文要随底稿换成 `LiveSlotFraction::OneQuarter => !position_in_segment.is_multiple_of(4),`，主 agent 换草稿时跑）。
+
+## 关的是哪几条
+
+1. 不计时的准备并行：造池、核几何、内存池重造、真盘镜像建立、重放输入的准备，凡是不在计时窗口里的、取样点与轮次之间互相独立的，按 `worker_threads_from_the_environment()` 条线程并行（`std::thread::scope`，每片各自建状态），同时在跑的份数再按内存封顶：先量（或按池的字节数算）一份池的峰值内存，取 min(线程数, 内存上限 ÷ 一份峰值)，内存上限取环境变量（没有就照运行时 `run-with-memory-cap.sh` 给的 28G 算，写明从哪取）。合并要确定：产物行的次序、内容与串行时逐字相同（除了计时数与新加的线程数字段），不随线程调度变。验收：新单测在小池上「并行造的池摘要（`digests_of_the_pool`）与串行造的逐个相同」「产物里取样点的行序与串行相同」；一条单测核准备阶段起了不止一条不同的线程。
+2. 计时窗口照旧串行、机器上没有本进程别的活：每次 `run_compaction` 调用、设备顺序写带宽、第二段的阶段重放与 2 ms 对照、饱和吞吐，开始之前本进程的准备线程全部已停（不许边量边造下一批池）。实现成「先并行造一组 → 再串行量这一组」交替，组的大小照第 1 条的封顶。验收：一条单测或断言证明计时窗口里本进程的线程数是 1（饱和吞吐那一步除外，它本来就是多线程的量）。
+3. 真盘臂的缓存状态不能因为改了造的时刻而变：查装置的真盘镜像读写开不开 O_DIRECT、量之前有没有清页缓存。若串行时「造完立刻量」与并行时「造完隔一阵再量」页缓存状态会不同，就把它统一成一种（例如量之前 fsync 加 `posix_fadvise(DONTNEED)`，或已是 O_DIRECT 则写明无影响），写进登记修订，不许静默改变量的口径。
+4. 产物报出用了几条线程：配置行加准备阶段的线程数与组大小；每组准备一行 `name=preparation` 报这一组几份、几条线程、挂钟秒数。产物键名照 data-name-lint 规矩起（不用缩写、不用序号）。
+5. 跑前登记加修订 12.10（时点在产物之前；写改了什么、为什么不动判据：准备阶段不在任何计时窗口里，判据、阈值、停机条款、臂、取样点一个不改；第 3 条的缓存口径怎么处理），并加一节或一段「并行与挂钟」：哪些单位互相独立、分几条线程、哪几步因计时必须串行与为什么、预计各段挂钟（推的，写依据）。第五节分段表的挂钟估计按新做法改写（推的）。
+6. 变异：每处新的并行判法留一条会红的变异行（例：准备阶段强制 1 条线程 → 第 1 条那条线程数单测红；合并按完成次序而不是取样点次序 → 行序单测红），写成 mutations-append.tsv 交主 agent 追加（不改 crates/mutations.tsv）。
+7. 在你自己的仓副本里（拷源文件不保留修改时刻，自己的 CARGO_TARGET_DIR）编译与 clippy：`cargo build --release -p singlefs-checker-tier --bin e185_gc_batch_wall_clock_split`、`cargo test --release -p singlefs-checker-tier --bin e185_gc_batch_wall_clock_split --no-run`、check.sh 口径的 clippy（`--all-targets --all-features -p singlefs-checker-tier -- -D warnings` 加 check.sh 的编码纪律 lint），fmt，naming-lint 与 data-name-lint 对这份文件 0 处。本机负载高，librocksdb-sys 编不完的照 runner-7 的做法设 `ROCKSDB_LIB_DIR`、`ROCKSDB_STATIC=1`。不跑单测（checker 档重型，主 agent 在第二台跑）。V1–V33 加新行的锚点在改好的草稿里各命中 1 次，给一张表；失效的给 replace-once 命令。
+
+## 出口
+
+- 改好的草稿 /home/fy5090/.local/share/singlefs/work/m4-gpugc-runner-8/e185_gc_batch_wall_clock_split.rs 与 send/ 下同一份，sha256；相对 1373779a 的 diff；mutations-append.tsv；登记 12.10 直接改在主工作区 research/prompts/e185-preregistration.md（只追加修订与「并行与挂钟」一节，用 scripts/kb/replace-once.py 或 insert-row.py 定点改，不整份重写）。
+- 报告写「要主 agent 跑的命令」：第二台先跑单测再跑第二段（stage-split），跑完再跑第一段（wall-clock），两条 multi-host-run.sh --peer 命令（--send 指 runner-8/send、--memory-cap 照第 1 条封顶用的数、看日志第一行的 sha256），以及预计各多久（推的）。
+- 交回前删掉自己建的仓副本与编译目录，du -sh 记大小。

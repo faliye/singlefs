@@ -1,0 +1,5 @@
+exit=0
+want=比对对象 2 行（E991）：登记出处都在
+want=比对对象表 1 份 3 行：登记表对上 2 行、文件头点名不登记 1 行（点名行都欠在开着的欠账上）
+want=样本只跑 .gate-cells 点名的格：replay-comparison-units
+want=doc-experiments.sh：1 格里 1 格绿（replay-comparison-units），0 格本次未跑（无）

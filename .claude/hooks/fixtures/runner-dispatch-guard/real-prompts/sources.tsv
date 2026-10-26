@@ -1,0 +1,31 @@
+# 派发闸 .claude/hooks/runner-dispatch-guard.sh 自证 ⑳ 读的 21 份真派发提示（拆分提案第九十节 ⑳、㉘、㉜、㉗、㉙；判决 research/prompts/landing-audit-r5-main-verification.md K2-3a）。
+# 后加的 7 份（第九十节 ㉗、㉙）：landing-audit-r4、r5、r6 六份真腿提示，取自各自子 agent 会话记录（主会话记录目录下 subagents/agent-<名>.jsonl）的首条提示原样；
+#   a75e9e30847f57bcd-forbidden-own.txt 是 a75e9e30847f57bcd.txt 改一处：禁读清单那一行写成本腿自己的报告（landing-audit-r4 攻方提示头一版的写法），别的一个字节没改。
+# 来历：逐字节拷自 research/prompts/landing-audit-r3-opus-model/prompts/<名>.md（第三轮攻方模型目录，research/prompts/landing-audit-r3-opus-output.md「复跑」一节写明：
+#   从会话记录取的真派发首条提示原样，带 -own-result、-delivery-colon、-section-colon 尾巴的是攻方在原样上改一处的变体）；后缀改成 .txt，内容一个字节没改。
+# 钉法：第二列是整份的 sha256，与那份攻方输出「复跑」一节列的逐份相同；派发闸的 REAL_PROMPT_EXPECTATIONS 钉的是同一组，
+#   自证核这一份与期望表逐份同名同 sha256、核每份读到的 sha256，目录不在、少一份、改了一个字节都判红。
+# 要换样本：这一份、REAL_PROMPT_EXPECTATIONS 与样本文件一起改，再跑 bash .claude/hooks/runner-dispatch-guard.sh --selftest。
+# a9717cf07fb6e7c21.txt 的 sha256 在 scripts/experiments → scripts/experiment-apparatus 目录改名时随样本与来源一起重钉，内容只差路径（records/2026-10-23-实验装置目录改名.md）。
+# 文件	sha256	拷自
+a0a2dfee322e26786.txt	f38acb831b6696f967c02caa39ed99ab70a2250bf49d4c6817136a02c6635b0d	research/prompts/landing-audit-r3-opus-model/prompts/a0a2dfee322e26786.md
+a28fe10b58d88beec.txt	537865dd7d924786d4633c60888070975639e4ff2c9a1c5c1e508ee5dcb12ebb	research/prompts/landing-audit-r3-opus-model/prompts/a28fe10b58d88beec.md
+a303d33b0ccd5e68f.txt	e021deda1917b2dbd91c814040ff7dfb93ff82eb1af7124d2edbb4410d2c2bd4	research/prompts/landing-audit-r3-opus-model/prompts/a303d33b0ccd5e68f.md
+a3652270eb80e4fd0-delivery-colon.txt	9832e848f67c4eef8878e60190dba887f304e3478835d9c45703aaca712f7c87	research/prompts/landing-audit-r3-opus-model/prompts/a3652270eb80e4fd0-delivery-colon.md
+a3652270eb80e4fd0-section-colon.txt	4dda75158e387a8c7b1c40719210ace881515d302d3e22d20caedad0b9624105	research/prompts/landing-audit-r3-opus-model/prompts/a3652270eb80e4fd0-section-colon.md
+a3652270eb80e4fd0.txt	7155650c7fea1113699845bd7df795a9aaf99dd674d74fc78b985016bcc38156	research/prompts/landing-audit-r3-opus-model/prompts/a3652270eb80e4fd0.md
+a4737c6f3660f4f7e-own-result.txt	c469195bef2c16482a1aded21a490a7a36f2009ce7a66b902247e3483c498c2c	research/prompts/landing-audit-r3-opus-model/prompts/a4737c6f3660f4f7e-own-result.md
+a4737c6f3660f4f7e.txt	089035c008e9c601d71f245626dfef6aff114491c7f9a5c0f63e41f5b0e3ddb2	research/prompts/landing-audit-r3-opus-model/prompts/a4737c6f3660f4f7e.md
+a789e7091d91430aa.txt	d93588072534e3b3f246b8c587c32697f8adb9a8699ea71f83ef6711cf3c9378	research/prompts/landing-audit-r3-opus-model/prompts/a789e7091d91430aa.md
+a86c5c8fb8ec28789.txt	e6604276c0d2617952e59d0a6dfa59a446b283ebf292ae20e7e02a99d2162408	research/prompts/landing-audit-r3-opus-model/prompts/a86c5c8fb8ec28789.md
+a8afb2185cfa840cc.txt	dfe14fd65f857490f9534b49d9256ef2a752b5c344e90303c792c9e8d87ff1d9	research/prompts/landing-audit-r3-opus-model/prompts/a8afb2185cfa840cc.md
+a9717cf07fb6e7c21.txt	a192f6e07576e2ba18bd4bcd70fd6c81c624793bc40524309537f0a0d9d3c466	research/prompts/landing-audit-r3-opus-model/prompts/a9717cf07fb6e7c21.md
+aa9ec3423c1f54bba-own-result.txt	7bca8a78304266e42377a376b7c21386d6ed4cb793a13ecadb510043937ebb9e	research/prompts/landing-audit-r3-opus-model/prompts/aa9ec3423c1f54bba-own-result.md
+aa9ec3423c1f54bba.txt	d365fba837d920d040f7c38cf6ce04a11f0e391505448669493fc07d8369fd81	research/prompts/landing-audit-r3-opus-model/prompts/aa9ec3423c1f54bba.md
+a61301bfaed0a3433.txt	7b83634a68c54b15fbf6b7b40f1b8f041576f58766f68abd0a7e3f48b42e21ec	子 agent a61301bfaed0a3433 会话记录的首条提示（landing-audit-r4 正推腿）
+a75e9e30847f57bcd.txt	14e124d638d1b2c04972bbded1ed8c7b58be64be6a4a9e758ffa944418a81304	子 agent a75e9e30847f57bcd 会话记录的首条提示（landing-audit-r4 攻方腿）
+a75e9e30847f57bcd-forbidden-own.txt	89a944c57dddb9e109e73d2368048f71957cdd48099f45db60042391ded6dd96	a75e9e30847f57bcd.txt 改一处：禁读清单写成本腿自己的报告
+a77dffd2065a0ba7e.txt	97d2076d75dc6eb2c2f006b29c869cce988e997dfc89fb71c6263c3400c38bf8	子 agent a77dffd2065a0ba7e 会话记录的首条提示（landing-audit-r5 攻方腿）
+ab7f880bc2d28e03a.txt	fddaabd60132380380ea6e47933d8854d843fc02be6bef9536ec9996906d1875	子 agent ab7f880bc2d28e03a 会话记录的首条提示（landing-audit-r5 辩方腿）
+a8a3bd6f093e19673.txt	6e5a05847e8c97bf50c8a9081961ca8d51fa1c99f6c1cbf47f66b06543ef7740	子 agent a8a3bd6f093e19673 会话记录的首条提示（landing-audit-r6 攻方腿）
+a42154ccf8829dc32.txt	ca1f0e92b75c450f5bd90e28d996991211943e6f50d4b6f856979903962e9657	子 agent a42154ccf8829dc32 会话记录的首条提示（landing-audit-r6 辩方腿）

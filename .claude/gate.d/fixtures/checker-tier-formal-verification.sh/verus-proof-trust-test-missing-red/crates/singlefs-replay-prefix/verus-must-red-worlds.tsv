@@ -1,0 +1,2 @@
+# 样本用的必红世界表（verus-proof 格不读它；--quick 列项要它至少一行）
+改坏开头一行	crates/singlefs-replay-prefix/src/lib.rs	use vstd::prelude::*;	use vstd::prelude::*; // 样本	proof_errors=1	landing=（函数外）

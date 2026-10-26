@@ -41,21 +41,29 @@
 #   machine-clean-red    判红 1 类（临时目录残留）、没查成 1 类
 #   machine-clean-green  10 类都查过、判红 0 类
 #   machine-clean-gate-run-green  放一份只核参数的替身 scripts/hosts/test-environment-check.py：在 gate.sh 里该带
-#                        --gate-run-temporary-directory <TMPDIR>、单跑时不带，对上了报判红 0 类，判绿
+#                        --gate-run-temporary-directory <TMPDIR>、单跑时不带，对上了报判红 0 类，判绿（经 stage-selftest.sh 喂时上游 lib.sh 摘掉了 GATE_NOT_RUN_FILE，核的是单跑那一支）
+#   machine-clean-gate-run-simulated-green  同一个替身，样本根另放空文件 .gate-run-simulated：这一格在样本根上见到它（环境里又没有 GATE_NOT_RUN_FILE）就模拟在 gate.sh 里——
+#                        新建一个临时目录，把这一格的 TMPDIR 与 GATE_NOT_RUN_FILE（<那个目录>/not-run）指过去、跑完删；替身要收到 --gate-run-temporary-directory <那个目录>，
+#                        对上了判绿（核的是在 gate.sh 里那一支）。.gate-run-simulated 只在样本根上认（有 .gate-cells、不是这道阶段所在的仓、没设 GATE_STAGED_FROM）
 #   machine-clean-cross-run-green  放一份只核参数的替身：GATE_CROSS_RUN_TMPDIR 设了该带 --cross-run-temporary-directory <它>、没设不带，
 #                        对上了报判红 0 类，判绿
 #   machine-clean-too-recent-red  替身的 clean 预演退 4、报一项太新还要等 N 秒：这一格拒绝开跑、退 1、点名那一项和还要等多久，不往下跑 check
 #   machine-clean-too-recent-green  替身核预演参数（--refuse-too-recent、--run-times-file 指到上面那份文件、--temporary-directory 给了）与 record-run-start
 #                        的参数（在 gate.sh 里该调、单跑不调），对上了预演退 0、check 判红 0 类，判绿
 # 脚本与录好的输出都没有：判红，不当跳过。
-# 弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让 machine-clean-red 退 0。
-# 这一道自己的弄坏开关 HARNESS_TEST_ENVIRONMENT_BREAK=gate-run-scanned：在 gate.sh 里也不交 --gate-run-temporary-directory。
-#   照 gate.sh 设好 TMPDIR 与 GATE_NOT_RUN_FILE（GATE_NOT_RUN_FILE 指到 TMPDIR 下）喂样本时 machine-clean-gate-run-green 判红、退 1；
-#   单跑时这一道本来就不交，那份样本照样判绿，证不了红。
-# 另一个 HARNESS_TEST_ENVIRONMENT_BREAK=cross-run-unscanned：GATE_CROSS_RUN_TMPDIR 设了也不交 --cross-run-temporary-directory。
-#   设好 GATE_CROSS_RUN_TMPDIR 喂样本时 machine-clean-cross-run-green 判红、退 1；没设时这一道本来就不交，那份样本照样判绿。
-# 再一个 HARNESS_TEST_ENVIRONMENT_BREAK=too-recent-allowed：预演退 4 也不拒绝开跑，照往下跑 check。
-#   喂 machine-clean-too-recent-red 时它判绿、退 0，与样本的 exit=1 对不上，那一份判红。
+# 弄坏开关（样本自检时设进环境；每条一行「开关=值  弄坏哪一处」，下面逐行点名打开后判错的样本，fixtures/harness-test-environment.sh/ 下的目录名；
+# 门禁 code-tooling 的 stage-break-switch-replay 格逐条复跑，比点名的与实测判错的）：
+#   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0（共用库别的项见那份文件头）
+#     machine-clean-red
+#     machine-clean-too-recent-red
+#   HARNESS_TEST_ENVIRONMENT_BREAK=too-recent-allowed  预演退 4 也不拒绝开跑，照往下跑 check
+#     machine-clean-too-recent-red
+#   HARNESS_TEST_ENVIRONMENT_BREAK=cross-run-unscanned  GATE_CROSS_RUN_TMPDIR 设了也不交 --cross-run-temporary-directory
+#     machine-clean-cross-run-green（只在喂样本的环境里设了 GATE_CROSS_RUN_TMPDIR 时判错；没设时这一道本来就不交，那份样本照样判绿）
+#   HARNESS_TEST_ENVIRONMENT_BREAK=gate-run-scanned  在 gate.sh 里也不交 --gate-run-temporary-directory
+#     machine-clean-gate-run-simulated-green
+# cross-run-unscanned 红不红取决于喂样本时的环境（stage-break-switch-replay 格起它的环境里有没有 GATE_CROSS_RUN_TMPDIR），
+# 单条登记在 .claude/gate.d/stage-break-switch-replay-exempt.tsv；gate-run-scanned 靠 machine-clean-gate-run-simulated-green 的 .gate-run-simulated 模拟在 gate.sh 里，不登记。
 #
 # 另一个弄坏开关在 scripts/hosts/test-environment-check.py 里（TEST_ENVIRONMENT_CHECK_BREAK=previousrunignored / runtimesnotrotated），
 # 由 code-tooling 的 research-script-selftests 格登记的 `--selftest` 证，不在这一道里。
@@ -134,8 +142,17 @@ collect_clean_directories() {
 cell_machine_clean() {
   local script_rc started summary red_classes unchecked_summary unchecked_classes failed expected_rc
   local run_times_file="${GATE_CROSS_RUN_TMPDIR:-$HOME/.local/share/singlefs/cross-run-cache}/gate-run-times"
+  # 样本根放了 .gate-run-simulated：模拟在 gate.sh 里（文件头「样本」一段）。只在样本根上认（判据与共用库认样本根的 .gate-cells 相同），
+  # 环境里已有 GATE_NOT_RUN_FILE（真在 gate.sh 里）时不动它。simulated_directory 不加 local：EXIT 的 trap 在这一格的子 shell 退出时才跑，那时函数已经返回
+  simulated_directory=""
+  if [[ -f .gate-run-simulated && -f .gate-cells && -z "${GATE_NOT_RUN_FILE:-}" && -z "${GATE_STAGED_FROM:-}" \
+    && "$(pwd -P)" != "$STAGE_CELLS_STAGE_REPOSITORY" ]]; then
+    simulated_directory="$(mktemp -d)"
+    export TMPDIR="$simulated_directory" GATE_NOT_RUN_FILE="$simulated_directory/not-run"
+    echo "  · 样本根放了 .gate-run-simulated：模拟在 gate.sh 里（这一格的 TMPDIR 与 GATE_NOT_RUN_FILE 指到 $simulated_directory，跑完删）"
+  fi
   log="$(mktemp)"
-  trap 'rm -f "$log"' EXIT
+  trap 'rm -f "$log"; [[ -z "$simulated_directory" ]] || rm -rf "${simulated_directory:?}"' EXIT
 
   # 在 gate.sh 里：这一轮的 TMPDIR 交给 --gate-run-temporary-directory（文件头「射程」一段）
   local gate_run_arguments=() in_gate_run=0
@@ -144,7 +161,8 @@ cell_machine_clean() {
     gate_run_arguments=(--gate-run-temporary-directory "$TMPDIR")
     in_gate_run=1
   fi
-  # gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR，跨轮复用的缓存放那里）：不是 /tmp 时不点名就从来不扫，点名交给 --cross-run-temporary-directory
+  # gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR：上游给跨轮留着的东西用；本仓只有上面那份 gate-run-times 落在那里，编译生成物与文本缓存都每趟自己建、跑完删）：
+  # 不是 /tmp 时不点名就从来不扫，点名交给 --cross-run-temporary-directory
   # （临时目录残留这一类另扫它，判法照旧；与 /tmp、这一轮的 TMPDIR 是同一处时脚本只扫一次）
   if [[ -n "${GATE_CROSS_RUN_TMPDIR:-}" && "${HARNESS_TEST_ENVIRONMENT_BREAK:-}" != cross-run-unscanned ]]; then
     gate_run_arguments+=(--cross-run-temporary-directory "$GATE_CROSS_RUN_TMPDIR")

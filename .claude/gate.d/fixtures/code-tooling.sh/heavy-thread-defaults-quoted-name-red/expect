@@ -1,11 +1,11 @@
 exit=1
 want=15 处自己定并行度默认值的写法没经登记位取
-want=scripts/experiments/baseline_read.py:3  读自己的线程变量 SAMPLE_BASELINE_THREADS：capped.sh 不设它
-want=scripts/experiments/wrap_helper.py:8  读自己的线程变量 SAMPLE_WRAP_THREADS：capped.sh 不设它
-want=scripts/experiments/alias_env.py:4  读自己的线程变量 SAMPLE_ALIAS_THREADS：capped.sh 不设它
-want=scripts/experiments/copied_env.py:4  读自己的线程变量 SAMPLE_COPIED_THREADS：capped.sh 不设它
-want=scripts/experiments/in_comparison.py:3  读自己的线程变量 SAMPLE_COMPARED_THREADS：capped.sh 不设它
-want=scripts/experiments/in_comparison.py:5  读自己的线程变量 SAMPLE_UNUSED_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/baseline_read.py:3  读自己的线程变量 SAMPLE_BASELINE_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/wrap_helper.py:8  读自己的线程变量 SAMPLE_WRAP_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/alias_env.py:4  读自己的线程变量 SAMPLE_ALIAS_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/copied_env.py:4  读自己的线程变量 SAMPLE_COPIED_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/in_comparison.py:3  读自己的线程变量 SAMPLE_COMPARED_THREADS：capped.sh 不设它
+want=scripts/experiment-apparatus/in_comparison.py:5  读自己的线程变量 SAMPLE_UNUSED_THREADS：capped.sh 不设它
 want=crates/demo/src/project_wrapper.rs:7  读自己的线程变量 SAMPLE_COUNT_WORKERS：capped.sh 不设它
 want=crates/demo/src/harness_wrapper.rs:4  读自己的线程变量 SAMPLE_HARNESS_WRAPPER_THREADS：capped.sh 不设它
 want=crates/demo/src/use_alias.rs:4  读自己的线程变量 SAMPLE_USE_ALIAS_THREADS：capped.sh 不设它

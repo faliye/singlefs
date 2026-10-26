@@ -1,0 +1,4 @@
+exit=1
+want=这些定义是派发闸 ⑭ 判的类型（.claude/hooks/runner-dispatch-guard.sh 的 LONG_RUN_AGENTS），「输入」一节没写全 ⑭ 要的标签
+want=     beta：缺 复用
+want=agent-definition-shape：红（退出 1）

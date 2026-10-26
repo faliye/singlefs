@@ -1,0 +1,5 @@
+exit=0
+want=Verus 逐项验 crates/singlefs-core（cargo verus focus）：成项 2 个（exec fn 2）
+want=proof:singlefs_core::compaction_plan::CompactionRegion::contains_slot：绿
+want=cargo verus build 构建的 MIR 逐条目比
+want=verus-proof：绿

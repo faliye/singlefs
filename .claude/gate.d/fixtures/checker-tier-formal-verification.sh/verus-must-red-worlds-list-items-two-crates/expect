@@ -1,0 +1,6 @@
+exit=0
+want=proof	verus-proof	整格（2 个 crate 成项 4 个：exec fn 4
+want=proof:singlefs_replay_prefix::clamp_to_limit	verus-proof	exec fn
+want=proof:singlefs_core::compaction_plan::CompactionRegion::contains_slot	verus-proof	exec fn
+want=vacuity:singlefs_core::compaction_plan::CompactionRegion::contains_slot#1	verus-vacuity
+want=vacuity:singlefs_replay_prefix::smaller_of_two#1	verus-vacuity

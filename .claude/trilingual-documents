@@ -1,4 +1,4 @@
-# 三语文件登记表：门禁 doc-text 的 trilingual-files、trilingual-structure、trilingual-changed-together、trilingual-glossary 四格从这里取对象。
+# 三语文件登记表：门禁 doc-text 的 trilingual-files、trilingual-structure、trilingual-changed-together、trilingual-glossary、trilingual-untranslated、trilingual-omission 六格从这里取对象。
 # 一行一条「<模式>  # 理由」，理由不许省（至少 4 个字）；模式写中文那一份（默认语言），相对仓根，* 与 ? 不跨目录，** 跨目录。
 # 一份中文文件 <名>.md 的三份是 <名>.md（zh）、<名>.en.md（en）、<名>.ja.md（ja）：三份都在、结构对得上、改动同进同出、译文照术语表 .claude/kb/translation-glossary.md 用词。
 # 模式匹配到的以 .en.md、.ja.md 结尾的文件是译文，不算中文那一份。登记表指不到任何文件的行判红。怎么改三语文件照 .claude/skills/trilingual/SKILL.md。

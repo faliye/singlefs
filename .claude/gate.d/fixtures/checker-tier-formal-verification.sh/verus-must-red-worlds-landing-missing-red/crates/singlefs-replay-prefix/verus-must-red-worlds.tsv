@@ -1,0 +1,2 @@
+# 样本用的必红世界表：变异名、文件、原文、替换文、proof_errors=<证明错条数>、landing=<落点>。这一行只有五段（旧写法，没写落点）：判红并指到补落点的办法
+夹到上限时返回原值	crates/singlefs-replay-prefix/src/lib.rs	        limit\n    } else {	        value\n    } else {	proof_errors=1

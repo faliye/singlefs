@@ -1,0 +1,5 @@
+exit=1
+want=广谱变异判定库里有 2 行不是驱动用这台机器的密钥写的
+want=GPU 判定库 gpu-verdicts.tsv 第 4 行（第 4 条，结局 caught）没有校验列（13 段）
+want=GPU 判定库 gpu-verdicts.tsv 第 5 行（第 4 条，结局 caught）的校验列对不上
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

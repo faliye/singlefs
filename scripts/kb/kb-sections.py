@@ -118,6 +118,14 @@ def render(paths):
     return '\n'.join(buf)
 
 
+def selftest_red(problem):
+    """自证判错的那一格：打一行以 ✗ 起头的失败行与出路，交回退出码 1。"""
+    print(f'  ✗ selftest: {problem}')
+    print('     → 怎么办：看那一格测的是哪一支（开头正文、一级标题、栅栏、heading_bounds），对着 sections() / heading_bounds() 修；'
+          'KB_SECTIONS_NO_PREAMBLE、KB_SECTIONS_NO_H1 设着的话这里本来就该红')
+    return 1
+
+
 def selftest():
     with tempfile.TemporaryDirectory() as d:
         f = os.path.join(d, 'sample.md')
@@ -127,10 +135,10 @@ def selftest():
         has_pre = any('之前的正文' in r for r in rows)
         if os.environ.get('KB_SECTIONS_NO_PREAMBLE'):
             if has_pre:
-                print('selftest: 强制关掉那一行之后它仍然在 —— 检查坏了'); return 1
+                return selftest_red('强制关掉那一行之后它仍然在 —— 检查坏了')
             print('selftest: 关掉那条分支确认判红（清单里没有开头正文那一行）'); return 0
         if not has_pre:
-            print('selftest: 清单里没有开头正文那一行 —— 正是本脚本要防的形态'); return 1
+            return selftest_red('清单里没有开头正文那一行 —— 正是本脚本要防的形态')
         h = os.path.join(d, 'h1.md')
         io.open(h, 'w', encoding='utf-8').write(
             '# 样本清单\n\n| C1 | 一整张表住在一级标题之下 |\n\n### 已还清\n\n正文。\n')
@@ -138,22 +146,22 @@ def selftest():
         has_h1 = any(r.startswith('（样本清单 标题之下') for r in hrows)
         if os.environ.get('KB_SECTIONS_NO_H1'):
             if has_h1:
-                print('selftest: 强制不认一级标题之后那一行仍然在 —— 检查坏了'); return 1
+                return selftest_red('强制不认一级标题之后那一行仍然在 —— 检查坏了')
             print('selftest: 关掉一级标题那条分支确认判红（一级标题下的正文没有自己的行）'); return 0
         if not has_h1:
-            print('selftest: 一级标题之下的正文没有自己的行 —— 整张表会从清单上消失'); return 1
+            return selftest_red('一级标题之下的正文没有自己的行 —— 整张表会从清单上消失')
         g = os.path.join(d, 'fenced.md')
         io.open(g, 'w', encoding='utf-8').write(
             '## D98 样本 —— 已定\n\n### 甲节\n\n```bash\n## 这一行在栅栏里，不是标题\n```\n\n### 乙节\n')
         frows = [t for t, _ in sections(g)]
         if any('栅栏里' in r for r in frows):
-            print('selftest: 代码栅栏里的 `## ` 行被当成标题发了一行'); return 1
+            return selftest_red('代码栅栏里的 `## ` 行被当成标题发了一行')
         b = os.path.join(d, 'bounds.md')
         io.open(b, 'w', encoding='utf-8').write(
             '## 甲\n\n```bash\n# 像标题的注释\n```\n\n### 甲一\n\n正文\n\n## 乙\n\n末行\n')
         brows, btotal = heading_bounds(b)
         if brows != [(1, 2, '## 甲'), (7, 3, '### 甲一'), (11, 2, '## 乙')] or btotal != 14:
-            print(f'selftest: heading_bounds 给出的标题表不对（栅栏里的 # 行不算、级别是 # 的个数、总行数按换行切开数）——{brows} 共 {btotal} 行'); return 1
+            return selftest_red(f'heading_bounds 给出的标题表不对（栅栏里的 # 行不算、级别是 # 的个数、总行数按换行切开数）——{brows} 共 {btotal} 行')
         # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；读不了的文件（目录）报文件名与出路、不抛 traceback
         cli_cases = [(['--help'], 0, '用法：'), (['-h'], 0, '用法：'), (['--bogus'], 2, '不认的选项：--bogus'),
                      ([d], 2, f'读不了 {d}'), ([os.path.join(d, 'nothere.md')], 2, '这些文件不存在')]
@@ -161,9 +169,9 @@ def selftest():
             child = subprocess.run([sys.executable, os.path.abspath(__file__), *arguments], capture_output=True, text=True)
             said = child.stdout + child.stderr
             if child.returncode != want_code or want_text not in said or 'Traceback' in said or (want_code and '→ 怎么办' not in said):
-                print(f'selftest: 命令行 {arguments} 应当退 {want_code}、说「{want_text}」（拒绝时带「→ 怎么办」、不抛 traceback），'
+                print(f'  ✗ selftest: 命令行 {arguments} 应当退 {want_code}、说「{want_text}」（拒绝时带「→ 怎么办」、不抛 traceback），'
                       f'实际退 {child.returncode}：{said[-300:]}')
-                print('           → 看 main() 开头那几道判；KB_SECTIONS_BREAK=raw-arguments 设着的话这里本来就该红')
+                print('     → 怎么办：看 main() 开头那几道判；KB_SECTIONS_BREAK=raw-arguments 设着的话这里本来就该红')
                 return 1
         print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；栅栏里的 `## ` 不算标题；'
               f'命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的、不存在的退 2 带出路）')

@@ -1,0 +1,4 @@
+exit=77
+want=一行比对对象都没有
+want=replay-comparison-units：本次未跑
+want=样本只跑 .gate-cells 点名的格：replay-comparison-units

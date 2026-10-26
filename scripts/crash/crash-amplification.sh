@@ -5,14 +5,14 @@
 # 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按登记表 ITEMS 的分项逐项跑；多机配置开着双机时，每一项由 crash-amplification-two-hosts.sh 把它的状态块按两台量到的速度分成两份（SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、1/2），第二台那一份取回、导入本机库并成一份
 # long-run-resume: 一份库装全部分项（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts，在 /tmp 之外）；重起同一条命令就是续跑：同一把判法单元指纹下判过的块全部复用、只判没判过的，第二台判到一半被停也先导入再退
-# long-run-unshardable: 多机：台数只认多机配置的双机开关（至多本机与 PEER_SSH_HOST 两台，不读 crash-point-replay-shard-configuration-check.sh --emit-hosts 的清单）；跑的那一步线程取 --threads 或本机核数减一、内存上限取 --memory-cap 与 --peer-memory-cap（本机默认 38G），只有本机只编那一步与第二台那两趟的线程按 host-resources.py --json 现算
+# long-run-unshardable: 多机：台数只认多机配置的双机开关（至多本机与 PEER_SSH_HOST 两台，不读 crash-point-replay-shard-configuration-check.sh --emit-hosts 的清单）；跑的那一步线程取 --threads、本机只编那一步取 CRASH_AMPLIFICATION_BUILD_THREADS、第二台那两趟取 CRASH_AMPLIFICATION_PEER_THREADS，没给的都取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它；crash-amplification-lib.sh 文件头「线程数的缺省」）、内存上限取 --memory-cap 与 --peer-memory-cap（本机默认 38G）
 # 崩溃放量全量（用户 2026-09-29 定：其他的崩溃放量放在一个脚本里做、作为分项；以后全量就是一起跑，分项用参数跑；不指定参数就作为全量跑）：
 #
 #   crash-amplification.sh                                  全量：登记表里每个分项按次序跑一遍，展开深度用 FULL_EXPAND_UP_TO（见「全量的展开深度」）
 #   crash-amplification.sh --item <分项> [--item <分项>]…    只跑点名的分项，给几次取并集（分项名照 --list-items 列的）；展开深度同全量，成功句不说全量
 #   crash-amplification.sh --expand-up-to <N> [--item …]    缩过规模的一趟：每项按展开 N 跑（N 与 FULL_EXPAND_UP_TO 相同就是没缩）；成功句写「缩过规模：展开 N」、不说全量，并点名哪几项不穷举
 #   crash-amplification.sh --list-items                     逐行列出可点名的分项：分项名、测试目标、用例函数、档位（TAB 隔开）；不清场、不跑
-#   crash-amplification.sh --selftest                       用假的分项驱动与假的清场命令走一遍第 1–48 格（复用三问与上次红的清单是第 47、48 格；列项、点名、拒绝、清场、各种判红、本次未跑、复用数、派出收回、
+#   crash-amplification.sh --selftest                       用假的分项驱动与假的清场命令走一遍第 1–50 格（复用三问与上次红的清单是第 47、48 格，RocksDB 取值没判过不起是第 50 格；列项、点名、拒绝、清场、各种判红、本次未跑、复用数、派出收回、
 #                                                           只供自证的变量、有红又有项退 78、按登记整批不判的数、驱动行的 red= 与全量的零态、复用数每项只取一次、两台分份的 flow= 行留的块、
 #                                                           分项驱动退 77 与它报的本次未跑、几条流里有的没借到、不带参数的全量里一项不穷举红在那一项、
 #                                                           只因登记的段不穷举不红而报段号与写数、没登段的流照旧红、往驱动送按段登记文件、登记文件写坏拒跑、
@@ -40,6 +40,9 @@
 # （回读没过退 78、一项都不跑；卡上有不归清场白名单的计算进程时就是这样，等它跑完再起，这里不停它），每一项都带 --quiesced 跑（显卡用清场之后那一份先后与额度），
 # 整趟跑完、跑红或被打断都不复原（那份包装打 GPU_QUIESCE step=restore result=not-restored；要复原由用户手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）。
 # 重起的那一趟认包装交下来的 GPU_QUIESCE_HOLDER（文件在、文件名以父进程号加「-」起头），不再清。
+# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：重起的那一趟建好 <放量家目录>/runs/entry-<时刻>-<进程号>/ 之后，调用方没设 CARGO_TARGET_DIR 时
+#   在里面建 target、export 给每一项的分项驱动（分项驱动看到设了就不另建）；正常结束、有项红、被 TERM / INT 停（等手里那一项的驱动退出）都在 EXIT 上删
+#   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程，整趟退非 0）。调用方设了的照它、不删。
 #
 # 全量的展开深度：只登记在一处，FULL_EXPAND_UP_TO（第一行代码之后那个赋值）。不带 --expand-up-to 就把它交给每一项的驱动；
 #   驱动行（CRASH_AMPLIFICATION）报的 expand_up_to 与交下去的不同判红；展开深度是它时每一行都要 exhaustive=true，或 exhaustive=false 只因登记的段
@@ -174,19 +177,31 @@
 #   77  派出的项一项都没判完（全是 not-run），也没有红
 #   78  运行条件不满足（出路：修好设备，或改配置）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
 #       开跑前清场回读没过或多机配置没写全清场那两个键（scripts/crash/gpu-quiesce-run.sh 判的，它打 GPU_QUIESCE step=command result=not-started）、
-#       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）
+#       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）、
+#       清场与起任何一项之前 scripts/hosts/rocksdb-prebuilt.py entry 判红（这台没装预编库、此刻进程环境的取值缺了或对不上；出路是开新会话，
+#       或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"）
 #   preflight 自己判不了条件（声明写坏）时退 1，见 .claude/singlefs-ai-sop/rules/preflight-discipline.md「不满足时」。没有别的退出码。
+# 项与项之间串行（判过并行这一条路走不通，当场声明串行）：点名的项一项一项交分项驱动，不同时起几项。理由：
+#   各项共用一份判定库（默认 <放量家目录>/crash-state-verdicts），引擎开库独占库的锁、别的进程开库要等它放手（crates/singlefs-checker-tier/src/crash_library.rs 的
+#   open_waiting_for_the_lock，上限 SINGLEFS_CRASH_LIBRARY_LOCK_WAIT_SECONDS），几项同时起也是排队等锁、等过上限就红；开了 GPU 时各项又照同一组清场之后的显卡额度、
+#   --test-threads 1 用卡（GPU 对拍的测试各占卡的显存，不并行起）。每一项里引擎照登记的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS）并行判。
+#   两项以上时，主循环开跑之前经 scripts/hosts/core_usage.py declare-serial 往 SINGLEFS_SERIAL_DECLARATIONS 写一段「此刻串行：<理由>」、跑完这一圈写「此刻并行」
+#   （核数取样报核数过少时标出这一段与理由，告警照报，core_usage.py 文件头「声明」）；没设那个变量只在标准输出打一行「N 项之间串行：<理由>」；只有一项不声明。
+#   声明写不进只打一句 ! 说明，这一趟照跑。
 # 弄坏开关 CRASH_AMPLIFICATION_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。逐项写开关名、弄坏哪一处、打开后 --selftest 哪几格该红
-#   （格号是 run_selftest 里的第 1–48 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
+#   （格号是 run_selftest 里的第 1–55 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
 # 写法（B 写法，样板是 scripts/mutation/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
 #   写点名的格「第 N 格」（、隔开；括号里是那一格失败行的句首，开关轮不读，括号外的每一段都算一格）。--selftest 末尾那一轮（开关轮）从这张表现读
 #   （crash-amplification-lib.sh 的 crash_amplification_read_switch_table，与双机驱动同一份读法）：表里 CRASH_AMPLIFICATION_BREAK 的开关与代码里认的开关要相等
 #   （表里另列清场包装 scripts/crash/gpu-quiesce-run.sh 的 GPU_QUIESCE_BREAK 开关，它们在那份包装里认，经重起的那一趟带进去），
 #   每个逐个打开、要退 1、红的格与点名的逐格相等：
 #   CRASH_AMPLIFICATION_BREAK=swallow-exit  分项驱动退非 0 也记 0
-#       第 8 格（「驱动退非 0 没记成红」）、第 20 格（「驱动退 78 却没停下退 78」）、第 22 格（「有红又有一项退 78 时没退 1」）、
+#       第 8 格（「驱动退非 0 没记成红」）、第 20 格（「驱动退 78 却没停下退 78」）、第 22 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、
 #       第 23 格（「驱动退 78 而行里报了红，这一项没记红」）、第 30 格（「跑完调了复原命令、或有项红时没退 1」）、
-#       第 31 格（「分项驱动退 77 没记进本次未跑」）、第 48 格（「上次红的清单不对」：红的那一项没记成红）
+#       第 31 格（「分项驱动退 77 没记进本次未跑」）、第 48 格（「上次红的清单不对」：红的那一项没记成红）、
+#       第 52 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」：这一项没记红、整趟退 0）
+#   CRASH_AMPLIFICATION_BREAK=logs-single  每一项驱动的输出只写一份全量日志（改前的样子：tee，不经 two-logs.sh，没有 .problems.log）
+#       第 49 格（「每一项的输出应当出两份日志…」）
 #   CRASH_AMPLIFICATION_BREAK=skip-filter  调驱动时不带 --test-filter
 #       第 4 格（「全量没把每个分项各调一次驱动」）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-item  不认得的分项名照跑
@@ -200,7 +215,7 @@
 #       第 6 格（「没有照「开跑前清一次、每项带 --quiesced、跑完不复原」走」）、第 30 格（「跑完调了复原命令、或有项红时没退 1」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-as-zero  取得出的复用数也记 0
 #       第 10 格（「复用数取错」）、第 28 格（「复用数没有每项只取一次」）、第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、
-#       第 45 格（「全部复用的一趟判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）、第 47 格（「复用三问没过」：键相同的一趟 ITEM 行写复用 0，折成现判）
+#       第 45 格（「全部复用的一趟…判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）、第 47 格（「复用三问没过」：键相同的一趟 ITEM 行写复用 0，折成现判）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-reuse  取不出复用数的项记成 reused=0、不计进 reuse_unknown、成功句不点名
 #       第 11 格（「取不出复用数的项没照实报出」）、第 12 格（「两台跑的行被拿来推复用数」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-across-shares  两台分份行、导入行、叫停的行也拿 states 减 states_checked_here 当复用数
@@ -208,7 +223,7 @@
 #   CRASH_AMPLIFICATION_BREAK=skip-collection-count  不核派出收回
 #       第 13 格（「少收回一项却没判红」）
 #   CRASH_AMPLIFICATION_BREAK=ignore-red-count  不看 red 之和（驱动退 0 与退 78 都不看）
-#       第 9 格（「驱动退 0 而 red=2 没记成红」）、第 22 格（「有红又有一项退 78 时没退 1」）、第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
+#       第 9 格（「驱动退 0 而 red=2 没记成红」）、第 22 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=accept-zero-lines  驱动退 0、0 行 CRASH_AMPLIFICATION 不判红
 #       第 14 格（「驱动退 0、0 行却没判红」）
 #   CRASH_AMPLIFICATION_BREAK=accept-not-exhaustive  展开深度是全量的那一个、有行不是穷举也不判红
@@ -225,11 +240,11 @@
 #   CRASH_AMPLIFICATION_BREAK=count-stopped-as-run  叫停与留了没判的块的项也记 green
 #       第 18 格（「被叫停的项没按本次未跑逐项报」）、第 19 格（「派出的项全没判完却没退 77」）、第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）
 #   CRASH_AMPLIFICATION_BREAK=item-78-as-failure  驱动退 78 照普通失败记、接着派后面的项
-#       第 20 格（「驱动退 78 却没停下退 78」）、第 22 格（「有红又有一项退 78 时没退 1」）、第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
+#       第 20 格（「驱动退 78 却没停下退 78」）、第 22 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=honor-test-variables-outside-selftest  平常跑时也认只供自证的四个变量，不拒
 #       第 21 格（「平常跑时带了只供自证的变量却没拒」）
 #   CRASH_AMPLIFICATION_BREAK=condition-before-red  有红又有一项驱动退 78 时整趟退 78（不让红优先）
-#       第 22 格（「有红又有一项退 78 时没退 1」）、第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
+#       第 22 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=ignore-red-on-78  驱动退 78 时不看行里的红，照本次未跑记
 #       第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=skip-ignore-report  成功句不报按登记整批不判的点数与态数
@@ -251,29 +266,29 @@
 #       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）
 #   CRASH_AMPLIFICATION_BREAK=driver-not-run-as-zero-lines  不认分项驱动的 CRASH_AMPLIFICATION_NOT_RUN 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
 #       第 31 格（「分项驱动退 77 没记进本次未跑」：原因里没有那一行的 reason=）、第 32 格（「几条流里有的没借到显存，这一项却记了通过」）、
-#       第 46 格（「分项驱动报判段没跑的那一项没记本次未跑」）
+#       第 46 格（「分项驱动报判段没跑…的那一项没记本次未跑」）
 #   CRASH_AMPLIFICATION_BREAK=driver-77-as-failure  分项驱动退 77 照别的非 0 退出码判红（改前的判法）
 #       第 31 格（「分项驱动退 77 没记进本次未跑」）
 #   CRASH_AMPLIFICATION_BREAK=judge-not-run-ignored  不认分项驱动转打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
-#       第 46 格（「分项驱动报判段没跑的那一项没记本次未跑」）
+#       第 46 格（「分项驱动报判段没跑…的那一项没记本次未跑」）
 #   CRASH_AMPLIFICATION_BREAK=registered-segments-ignored  不认驱动行的 registered_segments=（改前的判法：exhaustive=false 一律算不穷举）
-#       第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
 #       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）、
+#       第 40 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）、
 #       第 41 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）、
 #       第 42 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
 #       第 43 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）、
-#       第 45 格（「全部复用的一趟判了红」：登记段不认、stub 那条照不穷举红）
+#       第 45 格（「全部复用的一趟…判了红」：登记段不认、stub 那条照不穷举红）
 #   CRASH_AMPLIFICATION_BREAK=registered-excuses-the-whole-item  一项里有一行登了段，这一项 exhaustive=false 的行就都不算不穷举（不按行判）
 #       第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
 #   CRASH_AMPLIFICATION_BREAK=dash-counts-as-registered  registered_segments=- 也算登了段
 #       第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
 #   CRASH_AMPLIFICATION_BREAK=registered-segments-unreported  ITEM 行的 registered_segments= 写 -、成功句不报按段登记那一段
-#       第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
 #       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）
+#       第 40 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
 #   CRASH_AMPLIFICATION_BREAK=segments-registry-not-sent  不往分项驱动送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY（改前的样子）
 #       第 36 格（「分项驱动没收到按段登记文件的绝对路径」）
 #   CRASH_AMPLIFICATION_BREAK=segments-registry-unchecked  开跑前不核按段登记文件
@@ -283,39 +298,49 @@
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-missing-as-dash  驱动行没报 unregistered_segments_beyond_expansion= 当成报了 -（ITEM 行写 - 不写 unknown，判法上当成没有展不开的段）
 #       第 24 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 28 格（「复用数没有每项只取一次」）、
-#       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、
+#       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、第 34 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、
 #       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-unreported  ITEM 行的 unregistered_segments_beyond_expansion= 写 -、成功句不报展开上限盖不住又没登记的段
 #       第 24 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 28 格（「复用数没有每项只取一次」）、
-#       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、第 34 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
 #       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）
+#       第 40 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
 #   CRASH_AMPLIFICATION_BREAK=slice-progress-zero-accepted  分片段已判 0 态也不判红
 #       第 41 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）
 #   CRASH_AMPLIFICATION_BREAK=slice-zero-despite-reuse  分片段已判 0 态不看那一行的现判与复用（改前的判法：全部复用的一趟也红）
-#       第 45 格（「全部复用的一趟判了红」）
+#       第 45 格（「全部复用的一趟…判了红」）
 #   CRASH_AMPLIFICATION_BREAK=domains-missing-accepted  登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，当成没有登记段的域（不判红，ITEM 行写 -）
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
 #       第 42 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）
 #   CRASH_AMPLIFICATION_BREAK=domain-unlisted-segment-accepted  registered_segments= 列的段不在 registered_segment_domains= 里、分片段不在 registered_segment_progress= 里都不判红
 #       第 43 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
 #   CRASH_AMPLIFICATION_BREAK=slice-domains-unreported  ITEM 行的 registered_segment_domains= / registered_segment_progress= 写 -、成功句不报登记段的域那一段
-#       第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
 #       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）、
+#       第 40 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）、
 #       第 41 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」：ITEM 行的进度没照实写）、
 #       第 42 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
 #       第 43 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
 #   CRASH_AMPLIFICATION_BREAK=ignore-summed-per-row  按登记不判的 ignored_points= / states_skipped_by_ignore= 对每一行相加（同一条流的本机份、第二台份、导入、叫停再续各行重复计），不按流分组只取一次、同组各行不同也不记 unknown
 #       第 44 格（「按登记不判的点数与态数没按流分组、每组只取一次」）
+#   CRASH_AMPLIFICATION_BREAK=rocksdb-entry-unchecked  清场与起分项之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#       第 50 格（「checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，应当在清场与起任何一项之前退 78…」）
+#   CRASH_AMPLIFICATION_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（改前的样子：分项在仓根照仓根的 target 编、跨趟留着）
+#       第 51 格（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、第 52 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」）、
+#       第 53 格（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
+#   CRASH_AMPLIFICATION_BREAK=serial-undeclared  点名两项以上也不声明项与项之间串行（改前的样子：核数取样报核数过少时没有理由可标）
+#       第 55 格（「点名两项应当当场声明项与项之间串行…」）
+#   CRASH_AMPLIFICATION_BREAK=unshardable-threads-by-cores  自证读文件头 long-run-unshardable 那一行时换成改前的写法（跑的那一步线程取 --threads 或本机核数减一）
+#       第 56 格（「文件头 long-run-unshardable 那一行的线程取法应当与共用库「线程数的缺省」一致…」）
 # 只供自证（自证起的子进程里才认；平常跑时有一个非空就退 2 拒跑、拒绝句逐个点名，--list-items 与 --selftest 本身不拒）：
 #   CRASH_AMPLIFICATION_BREAK=<项>（上面那张表）；CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=1 每项的测试目标名后面加 -red（假驱动见了退 1）；
 #   CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT=<分项> 跑完那一项不打它的 CRASH_AMPLIFICATION_ITEM 行、不计进汇总（造一项收不回）；
 #   CRASH_AMPLIFICATION_ITEM_DRIVER=<脚本> 换掉分项驱动（自证用假的）；
-#   CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT=<目录> 按段登记的被判仓根换成它（核与送的都是 <目录>/.claude/gate.d/crash-point-replay-segments.tsv，见「按段登记」）。
+#   CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT=<目录> 按段登记的被判仓根换成它（核与送的都是 <目录>/.claude/gate.d/crash-point-replay-segments.tsv，见「按段登记」）；
+#     起 cargo 之前 rocksdb-prebuilt.py entry 判的树同样换成它（小仓里没有依赖 rocksdb 的清单，entry 报不判；第 50 格往里写一份依赖 rocksdb 的清单证红）。
 #   「自证起的子进程」的标记：CRASH_AMPLIFICATION_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它。
 #   这六个变量读完就从环境里清掉，不传给分项驱动；经清场包装重起的那一趟由这里原样交回去（只在自证起的子进程里）。
 #   清场走真的 scripts/crash/gpu-quiesce-run.sh：自证把多机配置指到临时目录里只写了假清场命令的一份、状态目录指到临时目录，不碰真的清场命令。
@@ -351,6 +376,7 @@ ITEMS=(
   $'tree-split-streams\tcrash_enumeration_tree_split_streams\tcrash_amplification_of_every_tree_split_stream_is_clean\t全量'
   $'position-addressed-trees\tcrash_enumeration_position_addressed_trees\tcrash_amplification_of_every_position_addressed_tree_stream_is_clean\t全量'
   $'floor-raise-pushed-by-the-session\tcrash_enumeration_floor_raise_pushed_by_admission\tcrash_amplification_of_the_floor_raise_pushed_by_the_session_is_clean\t全量'
+  $'truncate-to-zero-on-a-nearly-full-pool\tcrash_enumeration_truncate_to_zero_on_a_nearly_full_pool_stream\tcrash_amplification_of_the_truncate_to_zero_on_a_nearly_full_pool_stream_is_clean\t全量'
   $'sigma-of-the-misaligned-reuse\trecord_checker_judges_absence_by_the_persisted_set\tcrash_amplification_of_sigma_on_the_misaligned_reuse_history_is_clean\t全量'
   $'compaction-relocation\tcrash_enumeration_compaction_relocation_stream\tcrash_amplification_of_the_compaction_relocation_stream_is_clean\t全量'
   $'compaction-relocating-a-block-shared-with-a-snapshot\tcrash_enumeration_compaction_relocating_a_block_shared_with_a_snapshot_stream\tcrash_amplification_of_the_compaction_relocating_a_block_shared_with_a_snapshot_stream_is_clean\t全量'
@@ -783,6 +809,8 @@ run_selftest() {
   export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs"
   unset SINGLEFS_GPU_CARDS_CONFIG CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_SWITCHES CRASH_AMPLIFICATION_ITEM_CARDS GATE_NOT_RUN_FILE
   unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
+  # 串行声明（文件头「项与项之间串行」）：调用方的声明文件（经 detached-run.sh 这类起的）不带进各格，只有第 55 格自己给一份
+  unset SINGLEFS_SERIAL_DECLARATIONS
   # 按段登记的仓根（文件头「按段登记」）：合表照抄仓里那一份，按段登记文件只写一行核得过的（第 37 格临时换成写坏的一份、跑完换回）
   local segments_root="$work/segments-root" segments_registry
   segments_registry="$segments_root/.claude/gate.d/crash-point-replay-segments.tsv"
@@ -795,6 +823,12 @@ run_selftest() {
 # 假的分项驱动：记下参数与收到的按段登记文件路径；形态按 STUB_SHAPE_<测试目标>（没给按 STUB_SHAPE，再没给 single-host）打几行 CRASH_AMPLIFICATION（照真驱动的几种行），
 # 每行的 expand_up_to 照交进来的 --expand-up-to（给了 STUB_EXPAND_OVERRIDE 就报它：造一个不照参数跑的驱动）；测试目标名以 -red 结尾的退 1
 printf 'driver %s segments=[%s]\n' "$*" "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" >> "${STUB_LOG:?}"
+# 编译目录那几格（第 51–54 格）：记下收到的 CARGO_TARGET_DIR、往里写一份产物；给了 STUB_SLEEP 睡这么多秒（被 TERM 停那一格）
+if [[ -n "${STUB_TARGET_LOG:-}" ]]; then
+  printf '%s\n' "${CARGO_TARGET_DIR-unset}" >> "$STUB_TARGET_LOG"
+  [[ -z "${CARGO_TARGET_DIR:-}" ]] || { mkdir -p "$CARGO_TARGET_DIR/release" && echo built > "$CARGO_TARGET_DIR/release/artifact"; }
+fi
+[[ -z "${STUB_SLEEP:-}" ]] || sleep "$STUB_SLEEP"
 target="$1"; expand=""; previous=""
 for argument in "$@"; do
   if [[ "$previous" == --expand-up-to ]]; then expand="$argument"; fi
@@ -1553,6 +1587,97 @@ STUB
     selftest_cell_failed "上次红的清单不对：红一趟之后「$last_red」、点名别的项绿一趟之后「$last_kept」、那一项绿了之后「$last_cleared」" \
       "看主循环收尾写 last-run 那一段：红的分项一行一个，点名了分项的只换跑到的那几项（scripts/gate/lib_reuse_checks.py last-run --ran）"
   fi
+  # 第 49 格：每一项的输出出两份日志（scripts/hosts/two-logs.sh）：全量 <分项>.log，旁边同名的 <分项>.problems.log 带行号收「本次未跑」那一行、末行写收了几行全量几行；
+  #   输出点名这份日志的路径。假驱动退 77 并在 stderr 打「! 本次未跑」那一行（placement-not-run 形态）
+  cells=$((cells + 1))
+  local two_logs_output two_logs_directory two_logs_problems two_logs_last_line
+  two_logs_output="$(STUB_SHAPE=placement-not-run entry --item tree-split-streams 2>&1)"
+  two_logs_directory="$(ls -td "$work/home/runs"/entry-* 2>/dev/null | head -n 1)"
+  two_logs_problems="$two_logs_directory/tree-split-streams.problems.log"
+  two_logs_last_line="$(tail -n 1 "$two_logs_problems" 2>/dev/null)"   # 管道收尾的 grep -q 在 pipefail 下会把命中读成没命中：先落到变量
+  if [[ ! -f "$two_logs_directory/tree-split-streams.log" || ! -f "$two_logs_problems" ]] || ! grep -qE '^[0-9]+:  ! 本次未跑（这不是通过）' "$two_logs_problems" \
+     || ! grep -qE '收了 [0-9]+ 行，全量日志共 [0-9]+ 行，被包的命令退出码 77' <<<"$two_logs_last_line" || ! grep -qF "错误警告 $two_logs_problems" <<<"$two_logs_output"; then
+    selftest_cell_failed "每一项的输出应当出两份日志（tree-split-streams.log 全量；旁边的 tree-split-streams.problems.log 带行号收「本次未跑」那一行、末行写收了几行全量几行、退出码 77），输出里点名错误警告日志的路径 $two_logs_problems；实际目录里有「$(ls "$two_logs_directory" 2>/dev/null | tr '\n' ' ')」" \
+      "看主循环里起分项驱动那一段：经 scripts/hosts/two-logs.sh 起，名取 \${item_output_file%.log}"
+  fi
+  # 第 50 格：小仓（按段登记的仓根）的 checker 档包依赖 rocksdb、进程环境里四个取值是空的 ⇒ 清场与起任何一项之前 rocksdb-prebuilt.py entry 判红，退 78，
+  #   不清场、分项驱动一次都没起（别的格小仓里没有这份清单，entry 报不判）
+  cells=$((cells + 1)); : > "$log"; : > "$QUIESCE_LOG"
+  mkdir -p "$segments_root/crates/singlefs-checker-tier"
+  printf '%s\n' '[package]' 'name = "singlefs-checker-tier"' 'version = "0.0.0"' '[dependencies]' 'rocksdb = { version = "=0.25.0", optional = true }' \
+    >"$segments_root/crates/singlefs-checker-tier/Cargo.toml"
+  ROCKSDB_LIB_DIR= ROCKSDB_STATIC= SNAPPY_LIB_DIR= SNAPPY_STATIC= entry >/dev/null 2>"$errors"; exit_code=$?
+  if [[ "$exit_code" != 78 ]] || [[ -s "$log" || -s "$QUIESCE_LOG" ]] || ! grep -qF "rocksdb-prebuilt entry：" "$errors" || ! grep -qF "这一趟不起 cargo" "$errors"; then
+    selftest_cell_failed "checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，应当在清场与起任何一项之前退 78、分项驱动一次都没起（退 $exit_code；驱动记录 $(wc -l <"$log") 行）" \
+      "看按段登记之后 rocksdb-prebuilt.py entry 那一段"
+  fi
+  rm -rf -- "${segments_root:?}/crates"
+  # 第 51–53 格：跑完运行目录里不剩它建的编译目录（文件头「编译目录」）：调用方没设 CARGO_TARGET_DIR，点名一项；假驱动记下收到的编译目录、往里写一份产物。
+  #   第 51 格正常退 0、第 52 格驱动退 1（这一项红、整趟退 1）、第 53 格被 TERM 停（驱动睡 3 秒时只给入口发 TERM，入口等驱动退出后走 EXIT，退 143）：
+  #   收到的编译目录在 $SINGLEFS_CRASH_AMPLIFICATION_HOME/runs/entry-*/target，跑完不在了
+  # 逐格点名：被 TERM 停的那一格只给自己起的入口那一趟发一次，三格逐条调用、不在循环里发信号
+  selftest_target_case() { # <格号:要的退出码>
+    local target_case="$1" target_seen target_entry target_attempt
+    cells=$((cells + 1)); : > "$log"; : > "$work/targets.log"
+    if [[ "${target_case%%:*}" == 53 ]]; then
+      env -u CARGO_TARGET_DIR STUB_TARGET_LOG="$work/targets.log" STUB_SLEEP=3 CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT="$segments_root" \
+        bash "$0" --item tree-split-streams >/dev/null 2>"$errors" &
+      target_entry=$!
+      for (( target_attempt = 0; target_attempt < 600; target_attempt++ )); do [[ -s "$work/targets.log" ]] && break; sleep 0.1; done
+      # 入口经清场包装重起过自己：TERM 发给重起的那一趟（这一趟的目录名 entry-<时刻>-<进程号> 里的进程号），清场包装等它退出、交回它的退出码
+      target_seen="$(head -n 1 "$work/targets.log" 2>/dev/null)"; target_seen="${target_seen%/target}"
+      [[ "${target_seen##*-}" =~ ^[0-9]+$ ]] && kill -TERM "${target_seen##*-}" 2>/dev/null
+      if wait "$target_entry"; then exit_code=0; else exit_code=$?; fi
+    elif [[ "${target_case%%:*}" == 52 ]]; then
+      env -u CARGO_TARGET_DIR STUB_TARGET_LOG="$work/targets.log" CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=1 CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" \
+        CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT="$segments_root" bash "$0" --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
+    else
+      env -u CARGO_TARGET_DIR STUB_TARGET_LOG="$work/targets.log" CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT="$segments_root" \
+        bash "$0" --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
+    fi
+    target_seen="$(head -n 1 "$work/targets.log" 2>/dev/null)"
+    if [[ "$exit_code" != "${target_case#*:}" || "$target_seen" != "$SINGLEFS_CRASH_AMPLIFICATION_HOME"/runs/entry-*/target || -e "$target_seen" ]]; then
+      selftest_cell_failed "跑完运行目录里不剩它建的编译目录（$([[ "${target_case%%:*}" == 51 ]] && echo 正常退 0 || { [[ "${target_case%%:*}" == 52 ]] && echo 驱动退 1 || echo 被 TERM 停; })）：驱动收到「${target_seen:-没收到}」，退 $exit_code（要 ${target_case#*:}），跑完$([[ -n "$target_seen" && -e "$target_seen" ]] && echo 还在 || echo 不在)；stderr 尾部：$(tail -n 2 "$errors" | tr '\n' ' ')" \
+        "看主循环之前 run_build_directory_begin 与 crash_amplification_entry_finish（EXIT 上 run_build_directory_end），TERM / INT 的 trap 退 143 / 130、等手里那一步退出再走 EXIT"
+    fi
+  }
+  selftest_target_case 51:0
+  selftest_target_case 52:1
+  selftest_target_case 53:143
+  # 第 54 格：调用方设了 CARGO_TARGET_DIR：驱动照收到它、跑完不删
+  cells=$((cells + 1)); : > "$log"; : > "$work/targets.log"; mkdir -p "$work/caller-target"
+  CARGO_TARGET_DIR="$work/caller-target" STUB_TARGET_LOG="$work/targets.log" entry --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
+  if [[ "$exit_code" != 0 || "$(head -n 1 "$work/targets.log" 2>/dev/null)" != "$work/caller-target" || ! -f "$work/caller-target/release/artifact" ]]; then
+    selftest_cell_failed "调用方设了 CARGO_TARGET_DIR 时驱动应当照收到它、跑完不删（退 $exit_code，驱动收到「$(head -n 1 "$work/targets.log" 2>/dev/null)」）" \
+      "看 run_build_directory_begin：设了 CARGO_TARGET_DIR 就不建、不删"
+  fi
+  # 第 55 格：项与项之间串行（文件头「项与项之间串行」）：点名两项、设了 SINGLEFS_SERIAL_DECLARATIONS ⇒ 打一行「2 项之间串行：…」，声明文件里恰好两行：
+  #   先一行「<秒>\t此刻串行：<理由>」（理由点名共用一份判定库），跑完一行「<秒>\t此刻并行」；只点名一项 ⇒ 不声明、声明文件不建
+  cells=$((cells + 1)); : > "$log"; rm -f -- "$work/serial-two" "$work/serial-one"
+  local serial_two_exit serial_one_exit serial_two_lines=""
+  SINGLEFS_SERIAL_DECLARATIONS="$work/serial-two" entry --item tree-split-streams --item multi-record-publish >"$work/serial-two.out" 2>"$errors"; serial_two_exit=$?
+  SINGLEFS_SERIAL_DECLARATIONS="$work/serial-one" entry --item tree-split-streams >/dev/null 2>>"$errors"; serial_one_exit=$?
+  [[ -f "$work/serial-two" ]] && serial_two_lines="$(cut -f 2 "$work/serial-two" | tr '\n' '|')"
+  if [[ "$serial_two_exit" != 0 || "$serial_one_exit" != 0 ]] || ! grep -q '2 项之间串行：' "$work/serial-two.out" \
+     || [[ "$(grep -c . "$work/serial-two" 2>/dev/null)" != 2 ]] || ! grep -qE $'^[0-9.]+\t此刻串行：.*共用一份判定库' "$work/serial-two" \
+     || ! grep -qE $'^[0-9.]+\t此刻并行$' "$work/serial-two" || [[ "$(tail -n 1 "$work/serial-two" 2>/dev/null | cut -f 2)" != 此刻并行 ]] || [[ -e "$work/serial-one" ]]; then
+    selftest_cell_failed "点名两项应当当场声明项与项之间串行（声明文件里先「此刻串行：…共用一份判定库…」、跑完「此刻并行」，实记「${serial_two_lines:-没有声明文件}」，两项那一趟退 $serial_two_exit），只点名一项不声明（退 $serial_one_exit，声明文件$([[ -e "$work/serial-one" ]] && echo 建了 || echo 没建)）" \
+      "看主循环之前 items_serial_reason 那一段（两项以上时 core_usage.py declare-serial）与主循环之后的 declare-parallel"
+  fi
+  # 第 56 格：文件头 long-run-unshardable 那一行写的线程取法与共用库「线程数的缺省」一致：点名 .claude/heavy-thread-default、不写核数；
+  #   共用库 crash_amplification_default_threads（没设 SINGLEFS_THREAD_CAP）打的就是 .claude/heavy-thread-default 登记的那个数
+  cells=$((cells + 1))
+  local unshardable_line registered_threads library_threads
+  unshardable_line="$(grep -m 1 '^# long-run-unshardable:' "$0")"
+  if crash_amplification_break_is unshardable-threads-by-cores; then   # 弄坏开关：照改前的写法判
+    unshardable_line="# long-run-unshardable: 多机：台数只认多机配置的双机开关；跑的那一步线程取 --threads 或本机核数减一"
+  fi
+  registered_threads="$(awk '!/^[ \t]*(#|$)/ { print $1; exit }' "$repository_root/.claude/heavy-thread-default" 2>/dev/null)"
+  library_threads="$(unset SINGLEFS_THREAD_CAP CRASH_AMPLIFICATION_ITEM_BREAK; crash_amplification_default_threads 2>/dev/null)"
+  if [[ "$unshardable_line" != *".claude/heavy-thread-default"* || "$unshardable_line" == *核数* || -z "$registered_threads" || "$library_threads" != "$registered_threads" ]]; then
+    selftest_cell_failed "文件头 long-run-unshardable 那一行的线程取法应当与共用库「线程数的缺省」一致：点名 .claude/heavy-thread-default、不写核数，共用库没给线程数时取的（${library_threads:-没取到}）等于登记的（${registered_threads:-没读到}）；那一行：${unshardable_line:0:160}" \
+      "照 crash-amplification-lib.sh 文件头「线程数的缺省」改文件头 long-run-unshardable 那一行的线程取法"
+  fi
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
@@ -1591,7 +1716,7 @@ STUB
     echo "     → 怎么办：红的格与表里写的不同，要么改那一处判法让开关红在点名的格，要么照实改文件头那一行；单看一个开关：CRASH_AMPLIFICATION_BREAK=<开关> $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：列项带档位、拒不认得的名与缺项名、全量带展开深度、点名取并集、清场次序、清场失败退 78、跑完与有项红都不复原、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、两台的行、派出收回、0 行判红、全量不穷举判红（不带参数的全量里红在不穷举的那一项）、缩过规模照实写并点名不穷举的项、展开深度对不上判红、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、全量零态判红、复用数每项只取一次（先判着、导入、计划行不重复计）、两台分份的 flow= 行留的块同一组有导入行才不算、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑，$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
+  echo "  ✓ --selftest：列项带档位、拒不认得的名与缺项名、全量带展开深度、点名取并集、清场次序、清场失败退 78、跑完与有项红都不复原、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、两台的行、派出收回、0 行判红、全量不穷举判红（不带参数的全量里红在不穷举的那一项）、缩过规模照实写并点名不穷举的项、展开深度对不上判红、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、全量零态判红、复用数每项只取一次（先判着、导入、计划行不重复计）、两台分份的 flow= 行留的块同一组有导入行才不算、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、点名两项以上当场声明项与项之间串行（一项不声明）、文件头 long-run-unshardable 那一行的线程取法与共用库一致（取登记线程数、不写核数），$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
   exit 0
 }
 if (( selftest )); then run_selftest; fi
@@ -1661,6 +1786,15 @@ else
   export SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY="$segments_registry"
 fi
 
+# RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：清场与起任何一项（分项驱动里起 cargo）之前判一次这台装了、此刻进程环境的取值对得上，
+#   判红退 78、不清场、一项都不跑。判的树是被判的仓根（自证起的子进程里同样换成 CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT 那一棵小仓：没有依赖 rocksdb 的清单，entry 报不判）。
+#   弄坏开关 rocksdb-entry-unchecked 下不判（第 50 格判错）
+if ! crash_amplification_break_is rocksdb-entry-unchecked && ! python3 "$crash_amplification_script_directory/../hosts/rocksdb-prebuilt.py" entry --root "$segments_root" >&2; then
+  echo "  ✗ 起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），没清场、一项都没跑（退 78）" >&2
+  echo "  → 怎么办：照上面那几行的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再跑同一条命令" >&2
+  exit 78
+fi
+
 # 清场（文件头「清场」）：在清场包装底下（GPU_QUIESCE_HOLDER 指到包装登记的文件，文件名以父进程号加「-」起头）每项带 --quiesced；
 #   不在就经它带同一组参数重起自己，交回它的退出码（清场回读没过 78，别的是重起那一趟的）；跑完不复原
 quiesced_arguments=()
@@ -1691,6 +1825,21 @@ if ! mkdir -p -- "$entry_run_directory"; then
   echo "  → 怎么办：修好设备，或改配置：看 $crash_amplification_home 可不可写，或把 SINGLEFS_CRASH_AMPLIFICATION_HOME 指到可写、开机不清空的目录（退 78）" >&2
   exit 78
 fi
+# 这一趟的编译目录（文件头「编译目录」）：调用方没设 CARGO_TARGET_DIR 时建 <这一趟的目录>/target、export 给每一项的驱动；正常结束、红了、被 TERM / INT 停都在 EXIT 上删
+#   （删之前核没有进程开着里面的文件，有就整趟退非 0）。弄坏开关 run-target-kept：不删
+source "$crash_amplification_script_directory/../hosts/run-build-directory.sh"
+run_build_directory_begin "$entry_run_directory" || exit 78
+crash_amplification_entry_finish() {
+  local finish_exit=$?
+  trap - EXIT
+  if ! run_build_directory_end $(crash_amplification_break_is run-target-kept && echo keep); then
+    (( finish_exit != 0 )) || finish_exit=1
+  fi
+  exit "$finish_exit"
+}
+trap crash_amplification_entry_finish EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY:-}" ]]; then
   echo "  · 往引擎送按段登记文件 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=$SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY（$(grep -cvE '^(#|[[:space:]]*$)' "$SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY") 行登记）" >&2
 fi
@@ -1705,6 +1854,20 @@ registered_items=0; registered_segment_count=0; registered_entries=""
 beyond_items=0; beyond_segment_count=0; beyond_entries=""; beyond_unknown_items=0; beyond_unknown_names=""
 domain_field_missing_failed_names=(); slice_zero_failed_names=()
 domain_segment_count=0; domain_full_count=0; domain_slice_count=0; domain_items=0; domain_entries=""
+# 项与项之间串行（文件头「项与项之间串行」）：两项以上时当场声明（scripts/hosts/core_usage.py declare-serial，写进 SINGLEFS_SERIAL_DECLARATIONS；没设只打一行说明），
+#   跑完这一圈声明并行。弄坏开关 serial-undeclared 下照改前不声明
+items_serial_reason="崩溃放量的分项共用一份判定库（引擎开库独占库的锁，几项同时起也是排队等锁）与同一组清场之后的显卡额度，项与项之间串行；每项里引擎按登记线程数并行判"
+items_serial_declared=0
+if (( ${#rows_to_run[@]} > 1 )) && ! crash_amplification_break_is serial-undeclared; then
+  echo "  · ${#rows_to_run[@]} 项之间串行：$items_serial_reason"
+  if [[ -n "${SINGLEFS_SERIAL_DECLARATIONS:-}" ]]; then
+    if python3 "$crash_amplification_script_directory/../hosts/core_usage.py" declare-serial "$items_serial_reason"; then
+      items_serial_declared=1
+    else
+      echo "  ! 串行声明没写进 $SINGLEFS_SERIAL_DECLARATIONS（上面是 core_usage.py 的原因）：核数取样报核数过少时标不出这一段的理由；这一趟照跑" >&2
+    fi
+  fi
+fi
 for row in "${rows_to_run[@]}"; do
   name="$(item_fields "$row" 1)"; target="$(item_fields "$row" 2)"; function_name="$(item_fields "$row" 3)"
   # 自证用：把测试目标改成带 -red 的名字，让假驱动退 1
@@ -1712,12 +1875,21 @@ for row in "${rows_to_run[@]}"; do
   filter_arguments=(--test-filter "$function_name")
   crash_amplification_break_is skip-filter && filter_arguments=()
   item_output_file="$entry_run_directory/$name.log"
-  echo "== 分项 $name（$target::$function_name，展开 $requested_expand_up_to）$(date -u +%FT%TZ)；输出另存 $item_output_file"
+  echo "== 分项 $name（$target::$function_name，展开 $requested_expand_up_to）$(date -u +%FT%TZ)；输出另存 $item_output_file，错误警告 ${item_output_file%.log}.problems.log"
   item_started_at=$(date +%s)
   items_dispatched=$((items_dispatched + 1))
-  bash "$driver" "$target" "${filter_arguments[@]+"${filter_arguments[@]}"}" "${driver_arguments[@]+"${driver_arguments[@]}"}" "${quiesced_arguments[@]+"${quiesced_arguments[@]}"}" 2>&1 \
-    | tee -- "$item_output_file"
-  pipe_status=("${PIPESTATUS[@]}"); item_exit="${pipe_status[0]}"
+  # 驱动的输出边跑边转打，同时出两份日志（scripts/hosts/two-logs.sh：$item_output_file 是全量，同名的 .problems.log 只收错误与警告，行前带全量日志里的行号，一般只看它）；
+  #   退出码是驱动的。弄坏开关 logs-single：照改前只写一份全量日志（tee）
+  if crash_amplification_break_is logs-single; then
+    bash "$driver" "$target" "${filter_arguments[@]+"${filter_arguments[@]}"}" "${driver_arguments[@]+"${driver_arguments[@]}"}" "${quiesced_arguments[@]+"${quiesced_arguments[@]}"}" 2>&1 \
+      | tee -- "$item_output_file"
+    pipe_status=("${PIPESTATUS[@]}"); item_exit="${pipe_status[0]}"
+  elif bash "$crash_amplification_script_directory/../hosts/two-logs.sh" "${item_output_file%.log}" -- \
+       bash "$driver" "$target" "${filter_arguments[@]+"${filter_arguments[@]}"}" "${driver_arguments[@]+"${driver_arguments[@]}"}" "${quiesced_arguments[@]+"${quiesced_arguments[@]}"}" 2>&1; then
+    item_exit=0
+  else
+    item_exit=$?
+  fi
   crash_amplification_break_is swallow-exit && item_exit=0
   read -r item_lines item_states item_red item_reused item_exhaustive item_expand item_stopped item_unjudged item_bad_red item_ignored item_skipped \
     item_not_exhaustive_lines item_not_exhaustive_flows item_registered_segments item_beyond_lines item_beyond_segments item_beyond_missing_lines item_beyond_missing_flows \
@@ -1905,6 +2077,9 @@ for row in "${rows_to_run[@]}"; do
   esac
   [[ -n "$stopped_by_condition" ]] && break
 done
+if (( items_serial_declared )) && ! python3 "$crash_amplification_script_directory/../hosts/core_usage.py" declare-parallel; then
+  echo "  ! 串行段的收尾（此刻并行）没写进 $SINGLEFS_SERIAL_DECLARATIONS（上面是 core_usage.py 的原因）：之后的取样会把这一段串行算到下一条声明为止；这一趟的判定不受影响" >&2
+fi
 # 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）：红的分项一行一个；点名了分项的只换跑到的那几项
 last_run_red_file="$(mktemp)" && last_run_ran_file="$(mktemp)" && {
   printf '%s\n' ${failed_names[@]+"${failed_names[@]}"} >"$last_run_red_file"
@@ -1942,14 +2117,14 @@ if (( items_failed > 0 )); then
   fi
   if (( ${#slice_zero_failed_names[@]} > 0 )); then
     slice_zero_text="$(printf '%s、' "${slice_zero_failed_names[@]}")"
-    echo "  → 分片段这一趟已判 0 态的项（${slice_zero_text%、}）：这一趟一个态都没判，看录入段与判段的日志（那一项的输出 $entry_run_directory/<分项>.log 里录入段与判段那几趟）；修好之后只重跑这几项：$0$(printf ' --item %s' "${slice_zero_failed_names[@]}")${expand_up_to_given:+ --expand-up-to $expand_up_to_given}" >&2
+    echo "  → 分片段这一趟已判 0 态的项（${slice_zero_text%、}）：这一趟一个态都没判，看录入段与判段的日志（那一项的输出 $entry_run_directory/<分项>.log（错误警告在同名的 .problems.log）里录入段与判段那几趟）；修好之后只重跑这几项：$0$(printf ' --item %s' "${slice_zero_failed_names[@]}")${expand_up_to_given:+ --expand-up-to $expand_up_to_given}" >&2
   fi
-  echo "  → 怎么办：看那一项的输出（另存在 $entry_run_directory/<分项>.log）与它驱动日志目录里的 placement.log / run.log（动用了第二台的是 share-0.log / share-1.log / import.log）；修好之后只重跑判红的那几项：$0$(printf ' --item %s' "${failed_names[@]}")${expand_up_to_given:+ --expand-up-to $expand_up_to_given}" >&2
+  echo "  → 怎么办：看那一项的错误警告日志（$entry_run_directory/<分项>.problems.log，行前带全量日志里的行号）、全量输出（另存在 $entry_run_directory/<分项>.log）与它驱动日志目录里的 placement.log / run.log（动用了第二台的是 share-0.log / share-1.log / import.log）；修好之后只重跑判红的那几项：$0$(printf ' --item %s' "${failed_names[@]}")${expand_up_to_given:+ --expand-up-to $expand_up_to_given}" >&2
   run_verdict=1
 fi
 if [[ -n "$stopped_by_condition" ]]; then
   echo "  ✗ 分项 $stopped_by_condition 的驱动退 78（显卡或第二台用不上，或清场、多机配置不满足）：这一趟停在这一项，后面 $(( ${#rows_to_run[@]} - items_dispatched )) 项没派" >&2
-  echo "  → 怎么办：修好设备，或改配置：看那一项的输出（$entry_run_directory/$stopped_by_condition.log）里拒绝与出路那几行；修好之后重跑同一条命令（判过的块在库里，接着判）" >&2
+  echo "  → 怎么办：修好设备，或改配置：看那一项的错误警告日志（$entry_run_directory/$stopped_by_condition.problems.log）与全量输出（$entry_run_directory/$stopped_by_condition.log）里拒绝与出路那几行；修好之后重跑同一条命令（判过的块在库里，接着判）" >&2
   # 有红先判（文件头「一项怎么判」）：这一趟有红就退 1，退 78 的那一项照上面点名
   if (( ! run_verdict )) || crash_amplification_break_is condition-before-red; then exit 78; fi
   echo "  · 这一趟有红，退 1（有红先判）；退 78 的那一项照上面的出路修好设备，与判红的几项一起重跑" >&2

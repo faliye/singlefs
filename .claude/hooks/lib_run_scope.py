@@ -48,7 +48,7 @@ STAGE_QUERY_ARGUMENTS = frozenset({"--list", "--list-items", "--selftest", "--he
 CRASH_REPLAY_QUERY_ARGUMENTS = frozenset({"--list-items", "--selftest", "--help", "-h"})
 CRASH_AMPLIFICATION_QUERY_ARGUMENTS = frozenset({"--list-items", "--selftest", "--help", "-h"})
 SELFTEST_ONLY_QUERY_ARGUMENTS = frozenset({"--selftest", "--help", "-h"})
-REPLAY_QUERY_ARGUMENTS = frozenset({"--selftest", "--admission-only", "--help", "-h"})
+REPLAY_QUERY_ARGUMENTS = frozenset({"--selftest", "--admission-only", "--list-items", "--help", "-h"})
 # 崩溃放量的分项驱动与双机驱动带一个值的选项（照两份的用法行）
 CRASH_DRIVER_OPTIONS_WITH_VALUE = frozenset({"--test-filter", "--library", "--expand-up-to", "--threads", "--memory-cap", "--peer-memory-cap", "--label",
                                              "--host-weights", "--local-states-per-second"})
@@ -61,21 +61,33 @@ GATE_WHOLE_LOCATIONS = (".claude/singlefs-ai-sop/scripts", ".claude/scripts")
 BREAK_VARIABLE_NAME = "RUN_SCOPE_GUARD_BREAK"
 # 弄坏开关 → 打开后红的自证格，写全（文件头「弄坏开关」一段逐项照这张表写；开关轮核红的格与这里逐格相等，并核每个开关名都写在 run-scope-guard.sh 文件头里）
 BREAK_SWITCH_CELLS = {
-    "declaration-optional": ["门禁整道：没带声明拒", "崩溃点重放剪枝跑：没带声明拒", "崩溃放量全部分项：没带声明拒", "崩溃放量双机驱动：没带声明拒", "replay.sh 全部实验：没带声明拒", "gate-staged.sh 没带声明拒", "cargo test 整工作区：没带声明拒", "bash -c 里的门禁没带声明拒", "capped.sh 包着的 cargo test 没带声明拒", "env 带别的变量、没带声明拒", "nice 与 timeout 包着、没带声明拒", "flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "detached-run.sh start 包着的门禁没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒", "入口：没带声明拒（退出码 2）", "入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法", "入口：拒绝说明附上次红的清单", "入口：没有上次红的记录时照写", "入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）"],
+    "declaration-optional": ["门禁整道：没带声明拒", "崩溃点重放剪枝跑：没带声明拒", "崩溃放量全部分项：没带声明拒", "崩溃放量双机驱动：没带声明拒", "replay.sh 全部实验：没带声明拒", "gate-staged.sh 没带声明拒", "cargo test 整工作区：没带声明拒", "bash -c 里的门禁没带声明拒", "here-string 喂给 bash 的 cargo test 整工作区：没带声明拒", "printf 经管道喂给 bash 的门禁：没带声明拒", "echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒", "capped.sh 包着的 cargo test 没带声明拒", "env 带别的变量、没带声明拒", "nice 与 timeout 包着、没带声明拒", "flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "detached-run.sh start 包着的门禁没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒", "入口：没带声明拒（退出码 2）", "入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法", "入口：拒绝说明附上次红的清单", "入口：没有上次红的记录时照写", "入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）"],
     "segments-unchecked": ["声明缺段：没写为什么拒", "声明值空：范围一段是空的拒", "声明写两次：种类写两次拒", "声明种类认不出拒"],
     "kind-unchecked": ["门禁 --item 声明成 whole：种类对不上拒", "门禁 --quick 声明成 items：种类对不上拒", "merge-and-verify 声明成 items：种类对不上拒", "cargo test 整包声明成 target：种类对不上拒"],
     "count-unchecked": ["门禁 --check 两格写成 1 格：范围数对不上拒", "whole 范围没写整轮或整包拒", "cargo test 两个目标写成 3 个：范围数对不上拒", "cargo test --exact 两个测试写成 1 个：范围数对不上拒"],
     "reason-unchecked": ["gate.sh 为什么只写验证拒", "为什么太短拒", "为什么只写要跑验证拒"],
     "subagent-whole-allowed": ["子 agent 起崩溃点重放剪枝跑、带对的声明：whole 拒", "子 agent 起整道门禁、带对的声明：whole 拒", "入口：子 agent whole 拒、说明写交回主 agent", "入口：命令开头已有声明时模板只留一份"],
-    "scripts-unread": ["驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒"],
+    "scripts-unread": ["驱动脚本里一行缺声明拒", "外面带声明、驱动脚本里一行缺声明拒", "驱动脚本再起驱动脚本、里面缺声明拒", "直接执行的驱动脚本缺声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒", "同一条命令里 heredoc 写出的驱动脚本缺声明拒",
+                       "入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）"],
     "wrappers-opaque": ["flock 包着的门禁没带声明拒", "gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒", "detached-run.sh start 包着的门禁没带声明拒", "/usr/bin/time 包着的 cargo test 没带声明拒", "detached-run.sh start 起驱动脚本、里面缺声明拒"],
     "allowed-unrecorded": ["入口：放行的记进检出记录（四段与命令）"],
     "last-runs-unread": ["入口：拒绝说明附上次红的清单"],
-    "query-forms-declared": ["门禁 --list 不要声明", "门禁 --selftest 不要声明", "崩溃点重放 --list-items 不要声明", "replay.sh --admission-only 不要声明", "cargo test --no-run 不要声明", "cargo test -- --list 不要声明"],
+    "query-forms-declared": ["门禁 --list 不要声明", "门禁 --selftest 不要声明", "崩溃点重放 --list-items 不要声明", "replay.sh --admission-only 不要声明", "replay.sh --list-items 不要声明", "cargo test --no-run 不要声明", "cargo test -- --list 不要声明"],
+    "replay-list-items-declared": ["replay.sh --list-items 不要声明"],
     "tooling-scripts-read": ["仓里的工具脚本不读：放行"],
     "cargo-targets-as-whole": ["cargo test 两个目标、带对的声明：放", "cargo test --lib --exact 两个测试、带对的声明：放", "子 agent cargo test 点名目标、带对的声明：放", "capped.sh 外面带声明放", "驱动脚本里每一行都带声明：放"],
     "template-keeps-declaration": ["入口：命令开头已有声明时模板只留一份"],
+    "failure-unrecorded": ["入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出", "入口：判的时候抛异常放行、stderr 报一句、记一条检出", "入口：here-string 喂给 bash 的是变量放行、记一条检出",
+                           "入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）",
+                           "入口：判法文件读不到时记一条检出（结局只记、会话号照输入）", "入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置"],
+    "judge-crash-unrecorded": ["入口：判法文件在而导入就出错时放行、stderr 报一句、记一条检出（结局只记、会话号照输入）"],
+    "driver-unread-unrecorded": ["入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）"],
+    "honor-outside-selftest": ["入口：平常跑设了弄坏开关退 2、点名它只在自证里认", "入口：标记文件内容对不上照拒"],
+    "honor-outside-selftest-with-others": ["入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它"],
 }
+# 弄坏开关只在自证里认：自证起的入口靠这个变量指到自证建的标记文件、内容逐字是 SELFTEST_MARK_CONTENT 才认开关（同一句写在 run-scope-guard.sh 那一段守卫里）
+SELFTEST_MARK_VARIABLE = "RUN_SCOPE_GUARD_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "run-scope-guard.sh --selftest 起的子进程"
 
 heavy_tests = None
 shell_words = None
@@ -119,9 +131,10 @@ class FoundRun(NamedTuple):
 
 
 class ScanState:
-    """一次判定里各层共用：同一条命令里前面用 heredoc 写出的文件（实际路径 → 正文）。"""
+    """一次判定里各层共用：同一条命令里前面用 heredoc 写出的文件（实际路径 → 正文），各层判不了的、喂给 shell 的输入（每处一句）。"""
     def __init__(self):
         self.written = {}
+        self.unjudged = []
 
 
 def without_force(arguments):
@@ -183,6 +196,8 @@ def crash_run_shape(name, arguments):
         if items:
             how = "全量（--full）" if "--full" in rest else "逐条"
             return RunShape("items", f"崩溃点重放入口{how}点名的项 {'、'.join(items)}", len(items), "项", counted_text(len(items), "项"), key, "crash")
+        if "--backlog" in rest:
+            return RunShape("whole", "崩溃点重放入口的积压跑法（--backlog，照积压登记表取件）", None, "", "整轮", key, "crash")
         how = "全量（--full，只写不读）" if "--full" in rest else "剪枝跑全部项"
         return RunShape("whole", f"崩溃点重放入口的重型{how}", None, "", "整轮", key, "crash")
     if name == "crash-amplification.sh":
@@ -212,10 +227,11 @@ def crash_run_shape(name, arguments):
 
 def replay_run_shape(arguments):
     rest = without_force(arguments)
-    if query_form(rest, REPLAY_QUERY_ARGUMENTS):
+    query_arguments = REPLAY_QUERY_ARGUMENTS - {"--list-items"} if guard_switch_on("replay-list-items-declared") else REPLAY_QUERY_ARGUMENTS
+    if query_form(rest, query_arguments):
         return None
     numbers = list(dict.fromkeys(argument for argument in rest if not argument.startswith("-")))
-    key = "scripts/experiments/replay.sh"
+    key = "scripts/experiment-apparatus/replay.sh"
     if numbers:
         return RunShape("items", f"实验复跑点名的实验 {'、'.join(numbers)}", len(numbers), "个实验", counted_text(len(numbers), "个实验"), key, "replay")
     return RunShape("whole", "实验复跑的全部实验（不带实验号）", None, "", "整轮", key, "replay")
@@ -299,7 +315,7 @@ def run_shape_of(words, directory):
     if name in ("crash-point-replay.sh", "crash-amplification.sh", "crash-amplification-item.sh", "crash-amplification-two-hosts.sh") \
             and heavy_tests.located_in(word, directory, "scripts/crash"):
         return crash_run_shape(name, arguments)
-    if name == "replay.sh" and heavy_tests.located_in(word, directory, "scripts/experiments"):
+    if name == "replay.sh" and heavy_tests.located_in(word, directory, "scripts/experiment-apparatus"):
         return replay_run_shape(arguments)
     if name == "merge-and-verify.sh" and heavy_tests.located_in(word, directory, "scripts/gate"):
         if query_form(without_force(arguments), SELFTEST_ONLY_QUERY_ARGUMENTS):
@@ -471,9 +487,18 @@ def driver_script_text(command, state):
         try:
             with open(real, "rb") as handle:
                 data = handle.read(MAXIMUM_SCRIPT_BYTES + 1)
-        except OSError:
+        except OSError as error:   # 在而读不了：里面要声明的命令判不了，记一处（弄坏开关 driver-unread-unrecorded 下静默跳过，改前的样子）
+            if not guard_switch_on("driver-unread-unrecorded"):
+                state.unjudged.append(f"命令位置上执行的脚本 {real} 读不了（{type(error).__name__}: {error.strerror or error}），里面要声明的命令没判")
             return None
-    if len(data) > MAXIMUM_SCRIPT_BYTES or b"\0" in data[:SCRIPT_HEAD_BYTES]:
+    if b"\0" in data[:SCRIPT_HEAD_BYTES]:
+        return None
+    if len(data) > MAXIMUM_SCRIPT_BYTES:   # 太大：是 shell 脚本的照判不了记一处（同上）
+        interpreter = interpreter_of_head(data[:SCRIPT_HEAD_BYTES])
+        shell_script = (command.launcher is not None or interpreter in shell_words.SHELL_NAMES
+                        or (interpreter is None and (real.endswith(".sh") or resolved.endswith(".sh"))))
+        if shell_script and not guard_switch_on("driver-unread-unrecorded"):
+            state.unjudged.append(f"命令位置上执行的脚本 {real} 比 {MAXIMUM_SCRIPT_BYTES} 字节大，没读进去，里面要声明的命令没判")
         return None
     if command.launcher is None:
         interpreter = interpreter_of_head(data[:SCRIPT_HEAD_BYTES])
@@ -514,7 +539,10 @@ def scope_runs_in_text(text, directory, environment=None, frames=(), script=None
     if state is None:
         state = ScanState()
     found, seen, numbered = [], {}, None
-    for command in shell_words.commands_at_command_position(text, directory, environment).commands:
+    scan = shell_words.commands_at_command_position(text, directory, environment)
+    # 喂给从标准输入读命令的 shell、判不了的输入（lib_shell_words.py 的 shell_standard_input）：照常判字面的那一部分，这一处记进检出
+    state.unjudged += [f"脚本 {script} 里{entry}" if script else entry for entry in scan.unjudged_shell_inputs]
+    for command in scan.commands:
         key = tuple(command.words)
         occurrence = seen.get(key, 0)
         seen[key] = occurrence + 1
@@ -627,6 +655,7 @@ class ScopeDecision(NamedTuple):
     message: str | None  # 拒绝时写给 stderr 的说明
     allowed: list        # 放行的每一条（FoundRun）
     refused: list        # 被拒的每一条：(FoundRun, [说明])
+    unjudged: list = []  # 判不了的、喂给 shell 的输入（每处一句）：照常判别的，记进检出
 
 
 def decide_scope(hook_input, project_root):
@@ -634,14 +663,15 @@ def decide_scope(hook_input, project_root):
     command_text = tool_input.get("command") or ""
     agent_type = hook_input.get("agent_type") or None
     directory = hook_input.get("cwd") or project_root
-    runs = scope_runs_in_text(command_text, directory)
+    state = ScanState()
+    runs = scope_runs_in_text(command_text, directory, state=state)
     refused, allowed = [], []
     for found in runs:
         problems = scope_problems(found.shape, found.declaration, agent_type)
         (refused if problems else allowed).append((found, problems) if problems else found)
     if refused:
-        return ScopeDecision(2, refusal_text(refused, command_text), allowed, refused)
-    return ScopeDecision(0, None, allowed, [])
+        return ScopeDecision(2, refusal_text(refused, command_text), allowed, refused, state.unjudged)
+    return ScopeDecision(0, None, allowed, [], state.unjudged)
 
 
 def detections_path_now(hook_directory):
@@ -680,17 +710,47 @@ def record_scope_decision(hook_input, decision, path):
                 "where": frames_description(found.frames) if found.frames else "命令文本", "words": shlex.join(found.words)[:500],
                 "kind_of_command": found.shape.kind, "what": found.shape.what, "declaration": found.declaration, "segments": declaration.segments})
             append_detection(path, entry)
-    if decision.refused:
-        findings = [f"范围声明被拒：{found.shape.what}：{'；'.join(problems)}" for found, problems in decision.refused]
-        append_detection(path, dict(common, session_id=hook_input.get("session_id"), findings=findings, outcome="被拒"))
+    findings = [f"范围声明被拒：{found.shape.what}：{'；'.join(problems)}" for found, problems in decision.refused]
+    if decision.unjudged and not failure_recording_dropped():   # 判不了的、喂给 shell 的输入：跟着这一条命令记（放行的写「只记」）
+        findings += [f"范围声明闸判不了：{entry}" for entry in decision.unjudged]
+    if findings:
+        append_detection(path, dict(common, session_id=hook_input.get("session_id"), findings=findings, outcome="被拒" if decision.refused else "只记"))
+
+
+HOOK_INPUT_HEAD_BYTES = 200   # hook 输入不是 JSON 对象时，诊断里贴它开头这么多字节
+
+
+def failure_recording_dropped():
+    """弄坏开关 failure-unrecorded（判不了的只打 stderr、不记检出）设没设。不核别的项认不认得：判的时候抛异常那一支也读它，
+    而认不出的项正是让 guard_switch_on 抛异常的那一种（自证拿它当注入）。"""
+    return "failure-unrecorded" in os.environ.get(BREAK_VARIABLE_NAME, "").split(",")
+
+
+def note_unjudged(warning, hook_input, hook_directory):
+    """判不了、照常执行的一条：stderr 打一行，检出记录记一行（结局「只记」；hook 输入读不出来时会话号与 agent 写「读不到」）。"""
+    print(f"  ! {warning}", file=sys.stderr)
+    if failure_recording_dropped():
+        return
+    tool_input = hook_input.get("tool_input") if isinstance(hook_input, dict) and isinstance(hook_input.get("tool_input"), dict) else {}
+    command = tool_input.get("command") or ""
+    known = hook_input if isinstance(hook_input, dict) else {}
+    append_detection(detections_path_now(hook_directory), {
+        "time": datetime.now(timezone.utc).isoformat(), "hook": GUARD_SCRIPT_NAME,
+        "session_id": known.get("session_id", "读不到"), "agent_id": known.get("agent_id", "读不到"),
+        "agent_type": (known.get("agent_type") or "主 agent") if known else "读不到", "transcript_path": known.get("transcript_path", "读不到"),
+        "command": (command if isinstance(command, str) else repr(command))[:2000], "findings": [warning], "outcome": "只记"})
 
 
 def hook_main(hook_directory):
+    raw = sys.stdin.buffer.read()
     try:
-        hook_input = json.load(sys.stdin)
-    except Exception:
-        return 0
-    if not isinstance(hook_input, dict):
+        hook_input = json.loads(raw)
+        unreadable = None if isinstance(hook_input, dict) else f"解出来是 {type(hook_input).__name__}，不是对象"
+    except Exception as error:   # 不是合法 JSON、不是 UTF-8
+        hook_input, unreadable = None, f"解析出错：{error!r}"
+    if unreadable:   # 照常执行，打一行可定位的诊断（钩子名、开头的字节）、记一条检出
+        note_unjudged(f"{GUARD_SCRIPT_NAME} 收到的 hook 输入不是 JSON 对象（{unreadable}），这条命令没判、照常执行；"
+                      f"开头 {len(raw[:HOOK_INPUT_HEAD_BYTES])} 字节（共 {len(raw)} 字节）：{raw[:HOOK_INPUT_HEAD_BYTES]!r}", None, hook_directory)
         return 0
     tool_input = hook_input.get("tool_input") if isinstance(hook_input.get("tool_input"), dict) else {}
     command_text = tool_input.get("command") or ""
@@ -702,8 +762,8 @@ def hook_main(hook_directory):
         project_root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.dirname(hook_directory))
         decision = decide_scope(hook_input, project_root)
         record_scope_decision(hook_input, decision, detections_path_now(hook_directory))
-    except Exception as error:
-        print(f"  ! {GUARD_SCRIPT_NAME} 没判成（{error!r}），这条命令照常执行", file=sys.stderr)
+    except Exception as error:   # 判的时候抛了：照常执行，stderr 报一句、记一条检出
+        note_unjudged(f"{GUARD_SCRIPT_NAME} 没判成（{error!r}），这条命令照常执行", hook_input, hook_directory)
         return 0
     if decision.code:
         print(decision.message, file=sys.stderr)
@@ -769,9 +829,10 @@ def selftest_cells(work):
          f"{scope_text('target', '分项驱动一个目标', '1 个测试目标')} bash scripts/crash/crash-amplification-item.sh crash_amplification_fixed_script --threads 8", 0),
         ("崩溃放量双机驱动：没带声明拒", None, "bash scripts/crash/crash-amplification-two-hosts.sh crash_amplification_fixed_script", 2),
         # 实验复跑、合入后验证、整轮门禁
-        ("replay.sh 两个实验：带对的声明放", None, f"{scope_text('items', '复跑 E142 与 E165', '2 个实验')} bash scripts/experiments/replay.sh E142 E165", 0),
-        ("replay.sh 全部实验：没带声明拒", None, "bash scripts/experiments/replay.sh", 2),
-        ("replay.sh --admission-only 不要声明", None, "bash scripts/experiments/replay.sh --admission-only E142", 0),
+        ("replay.sh 两个实验：带对的声明放", None, f"{scope_text('items', '复跑 E142 与 E165', '2 个实验')} bash scripts/experiment-apparatus/replay.sh E142 E165", 0),
+        ("replay.sh 全部实验：没带声明拒", None, "bash scripts/experiment-apparatus/replay.sh", 2),
+        ("replay.sh --admission-only 不要声明", None, "bash scripts/experiment-apparatus/replay.sh --admission-only E142", 0),
+        ("replay.sh --list-items 不要声明", None, "bash scripts/experiment-apparatus/replay.sh --list-items", 0),
         ("merge-and-verify 声明成 whole：放", None,
          f"{scope_text('whole', '合入后验证', '整轮', '这一批三份补丁碰了 harness 与 core 两个包，脚本只挑这两个包与依赖它们的包')} bash scripts/gate/merge-and-verify.sh p1 p2", 0),
         ("merge-and-verify 声明成 items：种类对不上拒", None, f"{scope_text('items', '合入后验证', '2 项')} bash scripts/gate/merge-and-verify.sh p1 p2", 2),
@@ -801,6 +862,11 @@ def selftest_cells(work):
         # 包装
         ("bash -c 里的门禁没带声明拒", None, "bash -c 'bash .claude/gate.d/doc-text.sh .'", 2),
         ("bash -c 外面带声明放", None, f"{whole_stage} bash -c 'bash .claude/gate.d/doc-text.sh .'", 0),
+        # here-string 与管道喂给从标准输入读命令的 shell 的字面文本当命令判（lib_shell_words.py 的 shell_standard_input；LIB_SHELL_WORDS_BREAK=shell-standard-input-unread 下这三格红）
+        ("here-string 喂给 bash 的 cargo test 整工作区：没带声明拒", None, "bash <<< 'cargo test --workspace'", 2),
+        ("printf 经管道喂给 bash 的门禁：没带声明拒", None, "printf 'bash .claude/gate.d/doc-text.sh .\\n' | bash", 2),
+        ("echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒", None, "echo 'cargo test --workspace' | sh", 2),
+        ("here-string 外面带声明放", None, f"{whole_stage} bash <<< 'bash .claude/gate.d/doc-text.sh .'", 0),
         ("capped.sh 包着的 cargo test 没带声明拒", sub, "bash scripts/hosts/capped.sh 31 cargo test -p singlefs-harness --test model_contract", 2),
         ("capped.sh 外面带声明放", sub,
          f"{scope_text('target', 'harness 一个目标', '1 个测试目标')} bash scripts/hosts/capped.sh 31 cargo test -p singlefs-harness --test model_contract", 0),
@@ -918,19 +984,142 @@ def selftest_entry_cells(work, guard_script):
                     and refused_entries[0]["findings"][0].startswith("范围声明被拒")))
     plain = feed("ls -la")
     results.append(("入口：别的命令放行、不写 stderr", (0, ""), (plain.returncode, plain.stderr)))
-    # 判法文件读不到：照常放行并报一句（钩子挂在每一条 Bash 上，坏了不许把所有命令都拒掉）
-    # 只拷入口一份；它 source 的 .claude/scripts/preflight.sh 与那一份找的规范副本 .claude/singlefs-ai-sop/ 链接到钩子所在的仓
+    # 判不了的照常放行、记一条检出（结局「只记」）：hook 输入不是 JSON 对象（stderr 打带钩子名与开头字节的诊断，会话号写读不到）、
+    # 判的时候抛异常（RUN_SCOPE_GUARD_BREAK 里加一个认不出的项，guard_switch_on 抛 ValueError）、here-string 喂给 bash 的是变量。
+    # RUN_SCOPE_GUARD_BREAK=failure-unrecorded 下这三格红，LIB_SHELL_WORDS_BREAK=shell-standard-input-unread 下第三格红
+    def recorded_entries():
+        if not os.path.exists(detections):
+            return []
+        with open(detections, encoding="utf-8") as handle:
+            return [json.loads(line) for line in handle if line.strip()]
+    before = len(recorded_entries())
+    unreadable = [subprocess.run(["bash", guard_script], input=raw, capture_output=True, env=environment, timeout=120)
+                  for raw in (b'{"tool_name": "Bash", "tool_input": ', b'["Bash"]')]
+    added = recorded_entries()[before:]
+    results.append(("入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出", ([0, 0], True, 2, ["读不到", "读不到"]),
+                    ([run.returncode for run in unreadable],
+                     all(f"{GUARD_SCRIPT_NAME} 收到的 hook 输入不是 JSON 对象" in run.stderr.decode("utf-8", "replace") for run in unreadable)
+                     and "b'[\"Bash\"]'" in unreadable[1].stderr.decode("utf-8", "replace"),
+                     len(added), [entry.get("session_id") for entry in added])))
+    before = len(recorded_entries())
+    # 关守卫项 honor-outside-selftest 与别的项同写会被入口的守卫先拒（第一百二十二节 ②），注入认不出的项时摘掉它
+    injected = ",".join([item for item in os.environ.get(BREAK_VARIABLE_NAME, "").split(",") if item and item != "honor-outside-selftest"] + ["not-a-switch"])
+    raising = subprocess.run(["bash", guard_script], input=json.dumps({"tool_name": "Bash", "cwd": work, "session_id": "s-raise",
+                             "tool_input": {"command": "bash .claude/gate.d/doc-text.sh ."}}), capture_output=True, text=True,
+                             env=dict(environment, **{BREAK_VARIABLE_NAME: injected}), timeout=120)
+    added = recorded_entries()[before:]
+    results.append(("入口：判的时候抛异常放行、stderr 报一句、记一条检出", (0, True, 1, "s-raise", "只记"),
+                    (raising.returncode, "没判成" in raising.stderr, len(added), added[0].get("session_id") if added else None,
+                     added[0].get("outcome") if added else None)))
+    before = len(recorded_entries())
+    fed_variable = feed('bash <<< "$CMD"', session="s-fed")
+    added = [entry for entry in recorded_entries()[before:] if entry.get("session_id") == "s-fed"]
+    results.append(("入口：here-string 喂给 bash 的是变量放行、记一条检出", (0, 1, True, "只记"),
+                    (fed_variable.returncode, len(added), bool(added) and any("here-string `$CMD`" in finding for finding in added[0].get("findings", [])),
+                     added[0].get("outcome") if added else None)))
+    # 判法文件读不到：照常放行、报一句、记一条检出（钩子挂在每一条 Bash 上，坏了不许把所有命令都拒掉）
+    # 只拷入口与 lib_work_root.py（入口记检出时取默认位置用）；它 source 的 .claude/scripts/preflight.sh 与那一份找的规范副本 .claude/singlefs-ai-sop/ 链接到钩子所在的仓。
+    #   入口自己记：AGENT_HOOK_DETECTIONS 设了记那里，没设记进 lib_work_root.py 的默认位置（这里把 SINGLEFS_WORK_ROOT 指进临时目录）。failure-unrecorded 下记检出的两格红
     lonely = os.path.join(work, "lonely", ".claude", "hooks")
     os.makedirs(lonely, exist_ok=True)
     shutil.copy(guard_script, os.path.join(lonely, GUARD_SCRIPT_NAME))
+    shutil.copy(os.path.join(os.path.dirname(guard_script), "lib_work_root.py"), os.path.join(lonely, "lib_work_root.py"))   # 入口记检出时取默认位置
     claude_directory = os.path.dirname(os.path.dirname(os.path.abspath(guard_script)))
     for linked in ("scripts", "singlefs-ai-sop"):
         link = os.path.join(work, "lonely", ".claude", linked)
         if os.path.exists(os.path.join(claude_directory, linked)) and not os.path.lexists(link):
             os.symlink(os.path.join(claude_directory, linked), link)
-    orphan = subprocess.run(["bash", os.path.join(lonely, GUARD_SCRIPT_NAME)], input=json.dumps({"tool_name": "Bash", "cwd": work,
-                            "tool_input": {"command": "bash .claude/gate.d/doc-text.sh ."}}), capture_output=True, text=True, env=environment, timeout=60)
+    orphan_input = json.dumps({"tool_name": "Bash", "cwd": work, "session_id": "s-orphan", "tool_input": {"command": "bash .claude/gate.d/doc-text.sh ."}})
+    before = len(recorded_entries())
+    orphan = subprocess.run(["bash", os.path.join(lonely, GUARD_SCRIPT_NAME)], input=orphan_input, capture_output=True, text=True, env=environment, timeout=60)
+    added = recorded_entries()[before:]
     results.append(("入口：判法文件读不到时放行并报一句", (0, True), (orphan.returncode, "照常执行" in orphan.stderr)))
+    results.append(("入口：判法文件读不到时记一条检出（结局只记、会话号照输入）", (1, "s-orphan", "只记", GUARD_SCRIPT_NAME, True),
+                    (len(added), added[0].get("session_id") if added else None, added[0].get("outcome") if added else None,
+                     added[0].get("hook") if added else None, bool(added) and "读不到判法" in " ".join(added[0].get("findings") or []))))
+    default_detections = os.path.join(work, "orphan-work-root", "agent-hook-detections.jsonl")
+
+    def default_entries():
+        try:
+            with open(default_detections, encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except OSError:
+            return []
+    before = len(default_entries())
+    without_variable = {key: value for key, value in environment.items() if key not in (DETECTIONS_VARIABLE, "SINGLEFS_WORK_ROOT_BREAK")}
+    orphan_default = subprocess.run(["bash", os.path.join(lonely, GUARD_SCRIPT_NAME)], input=orphan_input, capture_output=True, text=True, timeout=60,
+                                    env=dict(without_variable, SINGLEFS_WORK_ROOT=os.path.dirname(default_detections)))
+    added = default_entries()[before:]
+    results.append(("入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置", (0, 1, "s-orphan", "只记"),
+                    (orphan_default.returncode, len(added), added[0].get("session_id") if added else None, added[0].get("outcome") if added else None)))
+    # 判法文件在而没跑完（这里放一份导入就抛异常的 lib_run_scope.py）：入口照常放行、stderr 报一句、自己记一条检出（会话号照输入）；
+    #   judge-crash-unrecorded 下这一格红（只打 stderr、不记）
+    crashing = os.path.join(work, "crashing", ".claude", "hooks")
+    os.makedirs(crashing, exist_ok=True)
+    shutil.copy(guard_script, os.path.join(crashing, GUARD_SCRIPT_NAME))
+    shutil.copy(os.path.join(os.path.dirname(guard_script), "lib_work_root.py"), os.path.join(crashing, "lib_work_root.py"))
+    with open(os.path.join(crashing, "lib_run_scope.py"), "w", encoding="utf-8") as handle:
+        handle.write("raise RuntimeError('自证造的导入错')\n")
+    for linked in ("scripts", "singlefs-ai-sop"):
+        link = os.path.join(work, "crashing", ".claude", linked)
+        if os.path.exists(os.path.join(claude_directory, linked)) and not os.path.lexists(link):
+            os.symlink(os.path.join(claude_directory, linked), link)
+    before = len(recorded_entries())
+    crashed = subprocess.run(["bash", os.path.join(crashing, GUARD_SCRIPT_NAME)],
+                             input=json.dumps({"tool_name": "Bash", "cwd": work, "session_id": "s-crash", "tool_input": {"command": "bash .claude/gate.d/doc-text.sh ."}}),
+                             capture_output=True, text=True, env=environment, timeout=60)
+    added = recorded_entries()[before:]
+    results.append(("入口：判法文件在而导入就出错时放行、stderr 报一句、记一条检出（结局只记、会话号照输入）", (0, True, 1, "s-crash", "只记", True),
+                    (crashed.returncode, "没跑完" in crashed.stderr, len(added), added[0].get("session_id") if added else None,
+                     added[0].get("outcome") if added else None, bool(added) and "没跑完" in " ".join(added[0].get("findings") or []))))
+    # 驱动脚本在而读不了（chmod 成 000）：照常放行、这一条命令记一行检出（「范围声明闸判不了」起头）；driver-unread-unrecorded 下这一格红
+    locked_driver = os.path.join(work, "locked-driver.sh")
+    with open(locked_driver, "w", encoding="utf-8") as handle:
+        handle.write("#!/usr/bin/env bash\nbash .claude/gate.d/doc-text.sh .\n")
+    os.chmod(locked_driver, 0)
+    before = len(recorded_entries())
+    try:
+        locked_run = feed("bash ./locked-driver.sh", session="s-locked")
+    finally:
+        os.chmod(locked_driver, 0o600)
+    added = [entry for entry in recorded_entries()[before:] if entry.get("session_id") == "s-locked"]
+    results.append(("入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）", (0, 1, "只记", True),
+                    (locked_run.returncode, len(added), added[0].get("outcome") if added else None,
+                     bool(added) and any(str(finding).startswith("范围声明闸判不了") and "读不了" in str(finding) for finding in added[0].get("findings") or []))))
+    # 弄坏开关只在自证里认：不带标记、或标记文件内容对不上的平常跑设了开关，入口在读 hook 的 JSON 之前退 2、stderr 点名它只在自证里认（探法同门禁
+    #   code-tooling 的 break-switch-outside-selftest 格）；带标记的自证子进程照认开关。honor-outside-selftest 设着时探的开关里也带上它，前两格红。检出写另一份，不搅前面几格的数
+    honored = "honor-outside-selftest" in os.environ.get(BREAK_VARIABLE_NAME, "").split(",")
+    probe_item = "honor-outside-selftest" if honored else "declaration-optional"
+    unmarked = {key: value for key, value in environment.items() if key != SELFTEST_MARK_VARIABLE}
+    unjudged = os.path.join(work, "outside-selftest-detections.jsonl")
+    plain = subprocess.run(["bash", guard_script, "--force", "--break-guard-probe-unknown-option"], input="", capture_output=True, text=True, timeout=120,
+                           env=dict(unmarked, **{BREAK_VARIABLE_NAME: probe_item, DETECTIONS_VARIABLE: unjudged}))
+    results.append(("入口：平常跑设了弄坏开关退 2、点名它只在自证里认", (2, True),
+                    (plain.returncode, any(BREAK_VARIABLE_NAME in line and "自证" in line for line in plain.stderr.splitlines()))))
+    forged_mark = os.path.join(work, "forged-selftest-mark")
+    with open(forged_mark, "w", encoding="utf-8") as handle:
+        handle.write("别处写的标记\n")
+    plain_input = json.dumps({"tool_name": "Bash", "cwd": work, "session_id": "s-outside", "tool_input": {"command": "ls -la"}})
+    forged = subprocess.run(["bash", guard_script], input=plain_input, capture_output=True, text=True, timeout=120,
+                            env=dict(unmarked, **{BREAK_VARIABLE_NAME: probe_item, DETECTIONS_VARIABLE: unjudged, SELFTEST_MARK_VARIABLE: forged_mark}))
+    results.append(("入口：标记文件内容对不上照拒", 2, forged.returncode))
+    marked_input = json.dumps({"tool_name": "Bash", "cwd": work, "session_id": "s-outside", "tool_input": {"command": "bash .claude/gate.d/doc-text.sh ."}})
+    marked = subprocess.run(["bash", guard_script], input=marked_input, capture_output=True, text=True, timeout=120,
+                            env=dict(environment, **{BREAK_VARIABLE_NAME: "declaration-optional", DETECTIONS_VARIABLE: unjudged}))
+    results.append(("入口：自证起的子进程（带标记）照认弄坏开关", 0, marked.returncode))
+    # 关守卫项 honor-outside-selftest 只在单独一项时认（records/2026-10-23-subagent拆分提案.md 第一百二十二节 ②）：与别的项同写，平常跑与带标记的子进程都退 2、点名它；
+    #   honor-outside-selftest-with-others 设着时带标记那一格的开关里也带上它（改前的样子：同写照认），那一格红
+    combined_item = "honor-outside-selftest,declaration-optional"
+    combined_plain = subprocess.run(["bash", guard_script, "--force", "--break-guard-probe-unknown-option"], input="", capture_output=True, text=True, timeout=120,
+                                    env=dict(unmarked, **{BREAK_VARIABLE_NAME: combined_item, DETECTIONS_VARIABLE: unjudged}))
+    results.append(("入口：关守卫项与别的项同写：平常跑退 2、点名它只在单独一项时认", (2, True),
+                    (combined_plain.returncode, "honor-outside-selftest" in combined_plain.stderr and "唯一一项" in combined_plain.stderr)))
+    lenient = "honor-outside-selftest-with-others" in os.environ.get(BREAK_VARIABLE_NAME, "").split(",")
+    combined_marked = subprocess.run(["bash", guard_script, "--force", "--break-guard-probe-unknown-option"], input="", capture_output=True, text=True, timeout=120,
+                                     env=dict(environment, **{BREAK_VARIABLE_NAME: combined_item + (",honor-outside-selftest-with-others" if lenient else ""),
+                                                              DETECTIONS_VARIABLE: unjudged}))
+    results.append(("入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它", (2, True),
+                    (combined_marked.returncode, "honor-outside-selftest" in combined_marked.stderr and "唯一一项" in combined_marked.stderr)))
     return results
 
 
@@ -946,6 +1135,11 @@ def selftest(hook_directory):
     outside_break = os.environ.get(BREAK_VARIABLE_NAME) or None
     try:
         build_selftest_tree(work)
+        # 自证起的入口带这个标记才认弄坏开关（入口的守卫；不带标记的平常跑设了开关退 2）
+        selftest_mark = os.path.join(work, "selftest-mark")
+        with open(selftest_mark, "w", encoding="utf-8") as handle:
+            handle.write(SELFTEST_MARK_CONTENT + "\n")
+        os.environ[SELFTEST_MARK_VARIABLE] = selftest_mark
         results = selftest_judge_cells(work) + selftest_entry_cells(work, guard_script)
         failures = failed_labels(results)
         for label, want, got in results:
@@ -967,8 +1161,8 @@ def selftest(hook_directory):
             if missing:
                 switch_problems.append(f"开关 {switch} 点名的格不在自证里：{'、'.join(missing)}")
                 continue
-            if f"{BREAK_VARIABLE_NAME}={switch}" not in header and f"  {switch} " not in header:
-                switch_problems.append(f"开关 {switch} 没写进 {GUARD_SCRIPT_NAME} 的文件头")
+            if not re.search(r"^#\s+" + re.escape(f"{BREAK_VARIABLE_NAME}={switch}") + r"\s", header, re.M):
+                switch_problems.append(f"开关 {switch} 没写进 {GUARD_SCRIPT_NAME} 的文件头（一行「{BREAK_VARIABLE_NAME}={switch}  <弄坏哪一处>」，下一行起写红的格）")
             os.environ[BREAK_VARIABLE_NAME] = switch
             try:
                 broken = selftest_judge_cells(work)
@@ -996,6 +1190,7 @@ def selftest(hook_directory):
     finally:
         if outside_break:
             os.environ[BREAK_VARIABLE_NAME] = outside_break
+        os.environ.pop(SELFTEST_MARK_VARIABLE, None)
         shutil.rmtree(work, ignore_errors=True)
 
 

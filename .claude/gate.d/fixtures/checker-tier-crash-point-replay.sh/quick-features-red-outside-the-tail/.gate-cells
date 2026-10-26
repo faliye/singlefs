@@ -1,0 +1,2 @@
+# 带特性那一趟退 101、红的测试目标落在 cargo 输出的尾巴之外：判红，抄出 FAILED 的测试函数名与 panic 段；判的是带特性那一格。阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+feature-gated-tests

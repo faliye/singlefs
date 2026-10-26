@@ -1,0 +1,4 @@
+exit=1
+want=驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）
+want=汇总行的 GPU 趟计数 {'gpu_needed': 3, 'gpu_reused': 2, 'gpu_not_run': 1, 'gpu_without_conclusion': 0} 与判定行的 {'gpu_needed': 3, 'gpu_reused': 3, 'gpu_not_run': 0, 'gpu_without_conclusion': 0} 不同
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

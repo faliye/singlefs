@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：crash-full-run-backlog
+want=积压登记表：核了 4 行、合表加 ITEMS 展开 4 件，逐件一致（0 处问题
+want=crash-full-run-backlog：绿

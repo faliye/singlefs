@@ -9,7 +9,7 @@
 # gate-similar: checker-tier-formal-verification.sh 它起 Verus 判证明，每条判定按单元键在它自己的库里复用；这里只读广谱变异驱动的判定，并进去会让两件不相干的事共用一份判法
 # gate-similar: checker-tier-crash-point-replay.sh 它的快档逐条核崩溃枚举用例的崩溃状态块、缺块报本次未跑；这里有没结论的判红不报本次未跑（用户定提交前跑完才能提交）
 #
-# gate-cell: gate-verdict 驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上，升档登记行与判定行的校验列逐行复核
+# gate-cell: gate-verdict 驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上，升档登记行与判定行（含 GPU 判定行）的校验列逐行复核
 # 参数解析、每格一个子 shell、汇总与退出码经共用库 lib/stage-cells.sh。
 #
 # 判什么：此刻源码上每一条变异都有单元键相同的结论、没有一条没红（gate-verdict 格）；结论键是被变异的函数单元与它调到的单元各自的指纹、原文、替换文、
@@ -25,6 +25,12 @@
 #   NO_CONCLUSION、MISSED、REFUSED、UNLISTED 明细行数与计数不同、清单 0 条）、汇总行与判定行各数对不上（两行的 total、refused、unlisted_units，
 #   汇总行抓到加没红加无效对判定行的 concluded、汇总行超时加内存撞顶加只过了第一段加驱动错加没跑对 without_conclusion、汇总行八栏之和对它的 total），都判红。
 #   拒算的条（refused=：单元键里有认不出的形态、或抓到它的测试认不出）照报条数、逐条 REFUSED，有键相同的现判结论就算有结论（驱动每趟都现判它们）。
+#   GPU 那一趟（C489，用户 2026-10-22 定「第二段补一趟带 gpu 特性的快档」，驱动文件头「GPU 那一趟」）：CPU 那一趟没红、又有带 gpu 特性的测试够得着的条，
+#   要 GPU 那一趟的结论才算有结论：驱动 --summary 的汇总行与判定行都带 gpu_needed（要这一趟的条数）、gpu_reused（库里键相同的 GPU 结论）、gpu_not_run（还没有 GPU 结论：没卡、
+#   清场没过、没来得及跑，本次未跑不算没红也不算通过）、gpu_without_conclusion（GPU 趟超时、内存撞顶、驱动错）；后两种条在 without_conclusion 里、NO_CONCLUSION 明细的理由写 gpu-…。
+#   这一格判：判定行要有这四个数（没有的是旧驱动，判红）；gpu_needed = gpu_reused + gpu_not_run + gpu_without_conclusion；后两个之和不超过 without_conclusion（判绿的驱动
+#   不许把没有 GPU 结论的条当有结论数；GPU 趟没结论判红，红的那一支照抄 NO_CONCLUSION 明细）；汇总行的四个数与判定行的相同；库目录的 gpu-verdicts.tsv 另用同一把密钥逐行核
+#   （每行十四段、末段是前十三段的 HMAC-SHA256，算法在这里另写一份）。
 #   超时、内存撞顶照驱动算没结论（用户 2026-10-02 定）；驱动对超时、撞顶的那一步自动升档重跑一次，两趟都超时 / 撞顶而证据齐的判抓到（用户 2026-10-03 定，驱动文件头「升档」）：
 #   --summary 逐条打 ESCALATED <TAB> 序号 <TAB> 标签 <TAB> 变异名 <TAB> 键、判定行带 escalated=<条数>（条数与 ESCALATED 行数不同判红；有 ESCALATED 而判定行没有 escalated= 判红）。
 #   这一格逐行复核库目录登记表 escalated-verdicts.tsv（列名、标签、升档常量取此刻驱动里的 ESCALATION_COLUMNS 与四个常量）：只认键是某一行 ESCALATED 的键的登记行
@@ -50,44 +56,97 @@
 #   -empty-list-red 清单 0 条、判定行 green；-unknown-verdict-red verdict=pending、退 8；-totals-mismatch-red 汇总行 total=5091、not_run=5085，判定行 total=6 写 green；
 #   -refused-count-red 两行都写 refused=1、一行 REFUSED 都没列；-unlisted-lie-red 判定行写 green 而 unlisted_units=2。
 #   gate-verdict-escalated-* 与 gate-verdict-result-mac-* 那几份（escalated 族，各情形写在 lib/broad-mutation-samples.py 的 build_escalated）。
-# 弄坏开关 CHECKER_TIER_BROAD_MUTATION_BREAK=<项>（逗号分隔；只给样本证红用），打开后判错的样本：
-#   summary-red-passes            驱动退 8、判定行写 red 也算绿，判定行与退出码对不上不判
-#                                                                             gate-verdict-missed-red、-no-conclusion-red、-red-exit-zero-red、-units-callee-changed-red、-units-unlisted-red（判绿）
-#   verdict-exit-unchecked        判定行写 red 而退 0 不判                    gate-verdict-red-exit-zero-red（判绿）
-#   verdict-value-unchecked       verdict 不是 green / red 不判               gate-verdict-unknown-verdict-red（判绿）
-#   counts-unchecked              不核判定行的计数与明细                      gate-verdict-silent-driver-red、-detail-count-red、-empty-list-red、-refused-count-red、-unlisted-lie-red（判绿）
-#   detail-count-unchecked        不核明细行数与计数                          gate-verdict-detail-count-red、-refused-count-red（判绿）
-#   empty-list-passes             清单 0 条不判                               gate-verdict-empty-list-red（判绿）
-#   unlisted-passes               判绿时不看 unlisted_units                   gate-verdict-unlisted-lie-red（判绿）
-#   summary-gate-totals-unchecked 不核汇总行与判定行的各数                    gate-verdict-totals-mismatch-red（判绿）
-#   gate-line-optional            没有判定行而退 0 算绿                       gate-verdict-line-missing-red（判绿）
-#   escalated-multiple-unchecked  登记行不核倍数门槛（连同「比原来的大」）    gate-verdict-escalated-multiple-red、-memory-multiple-red、-not-larger-red（判绿）
-#   escalated-log-digest-unchecked 登记行不核日志的 sha256                    gate-verdict-escalated-log-digest-red（判绿）
-#   escalated-key-unchecked       登记行不按键挑，每一行都核、ESCALATED 对登记行只比序号与标签
-#                                                                             gate-verdict-escalated-old-key-red（判绿）、-green（那一行别的键的坏行被核，判红）
-#   escalated-evidence-optional   登记行指的日志不在（或不在 escalation/ 下）也认
-#                                                                             gate-verdict-escalated-handwritten-red、-logs-elsewhere-red（判绿）
-#   escalated-count-unchecked     不核判定行 escalated= 与 ESCALATED 行数（连同有 ESCALATED 而没有 escalated=）
-#                                                                             gate-verdict-escalated-count-red、-no-escalated-field-red（判绿）
-#   escalated-baseline-last-row   基线照改前取：这一步最后一行绿记录，不看登记的行号、基线键与线程数
-#                                                                             gate-verdict-escalated-threads-rerun-green（判红：旧登记行对上了 16 线程那一行）、
-#                                                                             -baseline-row-changed-red（判绿：不看那一行的线程数）
-#   escalated-baseline-row-identity-unchecked 不核登记行指的那一行的基线键、步名、结局与线程数
-#                                                                             gate-verdict-escalated-baseline-row-changed-red、-baseline-key-differs-red（判绿）
-#   escalated-baseline-unchecked  不比登记的基线与它指的那一行的值            gate-verdict-escalated-baseline-lie-red（判绿）
-#   escalated-not-larger-unchecked 不核升档那趟比原来的大                     gate-verdict-escalated-not-larger-red（判绿）
-#   escalated-memory-multiple-ignored 撞顶那一边的倍数门槛按 0 算             gate-verdict-escalated-memory-multiple-red（判绿）
-#   escalated-trailer-unchecked   不核日志末尾驱动写的那一行                  gate-verdict-escalated-no-trailer-red、-trailer-wrong-red（判绿）
-#   escalated-trailer-key-only    驱动那一行只核键（不核序号、步名、哪一趟、限时、退出码）
-#                                                                             gate-verdict-escalated-trailer-wrong-red（判绿）、-no-trailer-red（照红，缺打全那一行的 want）
-#   escalated-wrapper-unchecked   不核日志里包装打的那一句                    gate-verdict-escalated-no-wrapper-red（判绿）
-#   escalated-columns-loose       登记行只要不少于 10 段就认                  gate-verdict-escalated-columns-red（判绿）
-#   escalated-field-optional      有 ESCALATED 而判定行没有 escalated= 不判   gate-verdict-escalated-no-escalated-field-red（判绿）
-#   escalated-label-unchecked     ESCALATED 对登记行只比键（不比标签）        gate-verdict-escalated-label-differs-red（判绿）
-#   escalated-logs-anywhere       日志不在 escalation/ 下也认                 gate-verdict-escalated-logs-elsewhere-red（判绿）
-#   result-mac-unchecked          不核判定库的校验列                          gate-verdict-result-mac-forged-red、-result-mac-key-missing-red（判绿）、
-#                                                                             gate-verdict-escalated-green、-escalated-threads-rerun-green（照绿，缺「判定库 N 行逐行核过」的 want）
-#   汇总与 --check 的归共用库（STAGE_CELLS_BREAK=red-swallowed 让每份红样本的格按绿记、整道退 0）。
+#   gate-verdict-gpu-* 那几份（GPU 那一趟）：summary 族录好的输出——-green 要 GPU 趟的 3 条都有库里键相同的结论；-no-conclusion-red 要 GPU 趟的 3 条里 2 条本次未跑（没卡）、退 8；
+#   -timeout-red 1 条 GPU 趟超时（没结论）、退 8；-silent-driver-red 判定行写 green、退 0，without_conclusion=0 而 gpu_not_run=2（把没有 GPU 结论的条当有结论数了）；
+#   -counts-red 判定行 green、gpu_needed=3 却只有 1 条复用；-fields-missing-red 判定行没有 gpu_ 四个数（旧驱动）；-summary-mismatch-red 汇总行与判定行的 GPU 趟计数不同；
+#   gpu 族（lib/broad-mutation-samples.py 的 build_gpu）：-mac-green 判定库与 GPU 判定库的行都带用样本密钥算的校验列；-mac-forged-red GPU 判定库末尾手追加一行没有校验列、一行校验列对不上；
+#   gate-verdict-units-gpu-* 两份（units 族，真驱动 --summary 在带 checker 档包的小工作区上）：-units-gpu-green CPU 那一趟没红的一条被带 gpu 特性的测试抓到（GPU 判定行是抓到，
+#   测试键是此刻算的）；-units-gpu-no-conclusion-red 同一条 CPU 没红、GPU 趟还没有结论（NO_CONCLUSION 理由 gpu-not-run，gpu_not_run=1）。
+# 弄坏开关（只给样本证红用，样本自检时设进环境；CHECKER_TIER_BROAD_MUTATION_BREAK 可以逗号分隔几项一起开，下面逐项写）。逐项写开关名、弄坏哪一处，
+# 下一行起写打开后判错的样本（fixtures/checker-tier-broad-mutation.sh/ 下的目录名，括号里是判错的样子）：
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=summary-red-passes  驱动退 8、判定行写 red 也算绿，判定行与退出码对不上不判
+#       gate-verdict-missed-red、gate-verdict-no-conclusion-red、gate-verdict-red-exit-zero-red、gate-verdict-units-callee-changed-red、gate-verdict-units-unlisted-red、
+#       gate-verdict-gpu-no-conclusion-red、gate-verdict-gpu-timeout-red、gate-verdict-units-gpu-no-conclusion-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=verdict-exit-unchecked  判定行写 red 而退 0 不判
+#       gate-verdict-red-exit-zero-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=verdict-value-unchecked  verdict 不是 green / red 不判
+#       gate-verdict-unknown-verdict-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=counts-unchecked  不核判定行的计数与明细
+#       gate-verdict-silent-driver-red、gate-verdict-detail-count-red、gate-verdict-empty-list-red、gate-verdict-refused-count-red、gate-verdict-unlisted-lie-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=detail-count-unchecked  不核明细行数与计数
+#       gate-verdict-detail-count-red、gate-verdict-refused-count-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=empty-list-passes  清单 0 条不判
+#       gate-verdict-empty-list-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=unlisted-passes  判绿时不看 unlisted_units
+#       gate-verdict-unlisted-lie-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=summary-gate-totals-unchecked  不核汇总行与判定行的各数
+#       gate-verdict-totals-mismatch-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=gate-line-optional  没有判定行而退 0 算绿
+#       gate-verdict-line-missing-red（照红，缺「0 行 BROAD_MUTATION_GATE，各该恰好一行」那条 want）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-multiple-unchecked  登记行不核倍数门槛（连同「比原来的大」）
+#       gate-verdict-escalated-multiple-red、gate-verdict-escalated-memory-multiple-red、gate-verdict-escalated-not-larger-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-log-digest-unchecked  登记行不核日志的 sha256
+#       gate-verdict-escalated-log-digest-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-key-unchecked  登记行不按键挑，每一行都核、ESCALATED 对登记行只比序号与标签
+#       gate-verdict-escalated-old-key-red（判绿）
+#       gate-verdict-escalated-green（那一行别的键的坏行被核，判红）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-evidence-optional  登记行指的日志不在（或不在 escalation/ 下）也认
+#       gate-verdict-escalated-handwritten-red、gate-verdict-escalated-logs-elsewhere-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-count-unchecked  不核判定行 escalated= 与 ESCALATED 行数（连同有 ESCALATED 而没有 escalated=）
+#       gate-verdict-escalated-count-red、gate-verdict-escalated-no-escalated-field-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-baseline-last-row  基线照改前取：这一步最后一行绿记录，不看登记的行号、基线键与线程数
+#       gate-verdict-escalated-threads-rerun-green（判红：旧登记行对上了 16 线程那一行）
+#       gate-verdict-escalated-baseline-row-changed-red、gate-verdict-escalated-baseline-key-differs-red（判绿：不看那一行的线程数与基线键）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-baseline-row-identity-unchecked  不核登记行指的那一行的基线键、步名、结局与线程数
+#       gate-verdict-escalated-baseline-row-changed-red、gate-verdict-escalated-baseline-key-differs-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-baseline-unchecked  不比登记的基线与它指的那一行的值
+#       gate-verdict-escalated-baseline-lie-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-not-larger-unchecked  不核升档那趟比原来的大
+#       gate-verdict-escalated-not-larger-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-memory-multiple-ignored  撞顶那一边的倍数门槛按 0 算
+#       gate-verdict-escalated-memory-multiple-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-trailer-unchecked  不核日志末尾驱动写的那一行
+#       gate-verdict-escalated-no-trailer-red、gate-verdict-escalated-trailer-wrong-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-trailer-key-only  驱动那一行只核键（不核序号、步名、哪一趟、限时、退出码）
+#       gate-verdict-escalated-trailer-wrong-red（判绿）
+#       gate-verdict-escalated-no-trailer-red（照红，缺打全那一行的 want）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-wrapper-unchecked  不核日志里包装打的那一句
+#       gate-verdict-escalated-no-wrapper-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-columns-loose  登记行只要不少于 10 段就认
+#       gate-verdict-escalated-columns-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-field-optional  有 ESCALATED 而判定行没有 escalated= 不判
+#       gate-verdict-escalated-no-escalated-field-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-label-unchecked  ESCALATED 对登记行只比键（不比标签）
+#       gate-verdict-escalated-label-differs-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=escalated-logs-anywhere  日志不在 escalation/ 下也认
+#       gate-verdict-escalated-logs-elsewhere-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=result-mac-unchecked  不核判定库的校验列
+#       gate-verdict-result-mac-forged-red、gate-verdict-result-mac-key-missing-red（判绿）
+#       gate-verdict-escalated-green、gate-verdict-escalated-threads-rerun-green、gate-verdict-gpu-mac-green、gate-verdict-units-gpu-green、gate-verdict-units-green
+#       （照绿，缺「判定库 N 行逐行核过带密钥的校验列」那条 want）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-fields-optional  判定行没有 gpu_ 四个数也认（旧驱动），连同不核汇总行与判定行的 GPU 趟计数
+#       gate-verdict-gpu-fields-missing-red、gate-verdict-gpu-summary-mismatch-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-counts-unchecked  不核 gpu_needed 等于三项之和
+#       gate-verdict-gpu-counts-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-pending-unchecked  不核 gpu_not_run 加 gpu_without_conclusion 不超过 without_conclusion
+#       gate-verdict-gpu-silent-driver-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-totals-unchecked  不核汇总行的 GPU 趟计数与判定行的相同
+#       gate-verdict-gpu-summary-mismatch-red（判绿）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-result-mac-unchecked  不核 GPU 判定库的校验列
+#       gate-verdict-gpu-mac-forged-red（判绿）
+#       gate-verdict-gpu-mac-green、gate-verdict-units-gpu-green（照绿，缺「GPU 判定库 N 行逐行核过带密钥的校验列」那条 want）
+#   STAGE_CELLS_BREAK=red-swallowed  归共用库：每份红样本的格按绿记、整道退 0（汇总与 --check 归共用库）
+#       gate-verdict-detail-count-red、gate-verdict-empty-list-red、gate-verdict-line-missing-red、gate-verdict-missed-red、gate-verdict-no-conclusion-red、
+#       gate-verdict-red-exit-zero-red、gate-verdict-refused-count-red、gate-verdict-silent-driver-red、gate-verdict-totals-mismatch-red、gate-verdict-unknown-verdict-red、
+#       gate-verdict-unlisted-lie-red、gate-verdict-result-mac-forged-red、gate-verdict-result-mac-key-missing-red、
+#       gate-verdict-escalated-baseline-key-differs-red、gate-verdict-escalated-baseline-lie-red、gate-verdict-escalated-baseline-row-changed-red、gate-verdict-escalated-columns-red、
+#       gate-verdict-escalated-count-red、gate-verdict-escalated-handwritten-red、gate-verdict-escalated-label-differs-red、gate-verdict-escalated-log-digest-red、
+#       gate-verdict-escalated-logs-elsewhere-red、gate-verdict-escalated-memory-multiple-red、gate-verdict-escalated-multiple-red、gate-verdict-escalated-no-escalated-field-red、
+#       gate-verdict-escalated-no-trailer-red、gate-verdict-escalated-no-wrapper-red、gate-verdict-escalated-not-larger-red、gate-verdict-escalated-old-key-red、
+#       gate-verdict-escalated-trailer-wrong-red、
+#       gate-verdict-gpu-counts-red、gate-verdict-gpu-fields-missing-red、gate-verdict-gpu-mac-forged-red、gate-verdict-gpu-no-conclusion-red、gate-verdict-gpu-silent-driver-red、
+#       gate-verdict-gpu-summary-mismatch-red、gate-verdict-gpu-timeout-red、
+#       gate-verdict-units-callee-changed-red、gate-verdict-units-gpu-no-conclusion-red、gate-verdict-units-unlisted-red（判绿）
 #
 #   bash .claude/gate.d/checker-tier-broad-mutation.sh [项目根]
 #   bash .claude/gate.d/checker-tier-broad-mutation.sh --list              逐行打格名与判什么，不起驱动、不起 rustc
@@ -103,7 +162,7 @@ SAMPLE_MARKER=".broad-mutation-sample"
 SAMPLE_DIRECTORY=".broad-sample"
 RUN_DRIVER_HOWTO="主 agent 照 .claude/skills/crash-test/commit-stages.md 第 2b 步不带选条参数起驱动剪枝跑，再跑这一道"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
-stage_cell gate-verdict cell_gate_verdict "驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上，升档登记行与判定行的校验列逐行复核" \
+stage_cell gate-verdict cell_gate_verdict "驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上，升档登记行与判定行（含 GPU 判定行）的校验列逐行复核" \
   "没有结论的、有单元没记清单的：$RUN_DRIVER_HOWTO（剪枝跑也重跑超时、内存撞顶的条，那一步自动升档重跑一次，两趟都超时 / 撞顶而证据齐的判抓到；证据不齐、仍是这两种的加大 --timeout-floor 或 --memory-cap 再 --item <序号> --rerun）；没红的：加一条能杀它的测试（改 crates/ 归实现员）再让驱动判那一条，确是等价变异的可写进 .cargo/mutants.toml 的 exclude_re（只那几条不再判）；升档登记行复核不过的照它点的那一样修，或 --item <序号> --rerun 重判那一条；--summary 退 1（判定库或清单表对不上）照驱动打的 → 修"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 root_argument=""
@@ -213,15 +272,26 @@ if None in (total, concluded, missed, without, refused, unlisted):
     print(f"  ✗ 判定行的计数读不出：{gate}")
     print("     → 怎么办：驱动打的判定行坏了（要 total、concluded、missed、without_conclusion、refused、unlisted_units 各一个整数），scripts/mutation/broad-mutation.py 从 git 取今天的那一份再跑。")
     sys.exit(1)
+# GPU 那一趟（驱动文件头「GPU 那一趟」）：要这一趟的条数 = 库里键相同的结论 + 本次未跑（还没有结论）+ 没结论（超时、内存撞顶、驱动错）；后两种在 without_conclusion 里
+gpu_keys = ("gpu_needed", "gpu_reused", "gpu_not_run", "gpu_without_conclusion")
+gpu = {key: number(key) for key in gpu_keys}
+if None in gpu.values():
+    if "gpu-fields-optional" not in broken:
+        print(f"  ✗ 判定行没有 GPU 那一趟的计数（要 {'、'.join(gpu_keys)} 各一个整数）：{gate}")
+        print("     → 怎么办：这是驱动的毛病（旧的那一份不报 GPU 趟，判不了「要 GPU 那一趟的条都有结论」）：scripts/mutation/broad-mutation.py 从 git 取今天的那一份再跑；GPU 趟的写法在驱动文件头「GPU 那一趟」。")
+        sys.exit(1)
+    gpu = dict.fromkeys(gpu_keys, 0)
 verdict = gate.get("verdict")
 if verdict == "red" and summary_exit == 8 and "summary-red-passes" not in broken:
-    print(f"  ✗ 广谱变异提交门禁判红：此刻源码上 {total} 条里 {without} 条沿用不了也没现判、{missed} 条没红、{unlisted} 个单元没记清单")  # gate-lint:summary
+    print(f"  ✗ 广谱变异提交门禁判红：此刻源码上 {total} 条里 {without} 条沿用不了也没现判、{missed} 条没红、{unlisted} 个单元没记清单"
+          f"；沿用不了的里要 GPU 那一趟而没有结论的 {gpu['gpu_not_run'] + gpu['gpu_without_conclusion']} 条（本次未跑 {gpu['gpu_not_run']}、没结论 {gpu['gpu_without_conclusion']}）")  # gate-lint:summary
     for line in (missed_lines + no_conclusion + unlisted_lines)[:30]:
         print("     " + line.replace("\t", " "))  # gate-lint:detail
     if len(missed_lines) + len(no_conclusion) + len(unlisted_lines) > 30:
         print(f"     ……另有 {len(missed_lines) + len(no_conclusion) + len(unlisted_lines) - 30} 行，全文在驱动 --summary 的输出里")  # gate-lint:detail
     print(f"     → 怎么办：没有结论的、有单元没记清单的：{howto_run}（剪枝跑也重跑超时、内存撞顶的条，那一步自动升档重跑一次，两趟都超时 / 撞顶而证据齐的判抓到；"
-          "证据不齐、仍是这两种的加大 --timeout-floor 或 --memory-cap 再 --item <序号> --rerun）；"
+          "证据不齐、仍是这两种的加大 --timeout-floor 或 --memory-cap 再 --item <序号> --rerun；理由写 gpu-… 的是 CPU 那一趟没红又要 GPU 那一趟的条：在有卡的机器上重跑同一条命令，"
+          "GPU 趟接在最后自己清场再跑，没卡的机器上它们是本次未跑，不算没红也不算通过）；"
           "没红的：加一条能杀它的测试（改 crates/ 归实现员）再让驱动判那一条，确是等价变异的可写进 .cargo/mutants.toml 的 exclude_re（只那几条不再判）。")
     sys.exit(1)
 expected_exit = 0 if verdict == "green" else 8
@@ -243,6 +313,15 @@ if "counts-unchecked" not in broken:
                             f"判定行 without_conclusion={without}、missed={missed}、refused={refused}、unlisted_units={unlisted}，汇总行 missed={summary.get('missed')}")
     if total <= 0 and "empty-list-passes" not in broken:
         inconsistent.append("此刻清单 0 条：没有可判的变异，不是通过")
+# GPU 那一趟的计数（各自的开关，不跟着上面的 counts-unchecked / summary-gate-totals-unchecked 走）
+if "gpu-counts-unchecked" not in broken and gpu["gpu_needed"] != gpu["gpu_reused"] + gpu["gpu_not_run"] + gpu["gpu_without_conclusion"]:
+    inconsistent.append(f"gpu_needed={gpu['gpu_needed']} 不等于 gpu_reused={gpu['gpu_reused']} 加 gpu_not_run={gpu['gpu_not_run']} 加 gpu_without_conclusion={gpu['gpu_without_conclusion']}")
+if "gpu-pending-unchecked" not in broken and gpu["gpu_not_run"] + gpu["gpu_without_conclusion"] > without:
+    inconsistent.append(f"gpu_not_run 加 gpu_without_conclusion 是 {gpu['gpu_not_run'] + gpu['gpu_without_conclusion']}，比 without_conclusion={without} 还多"
+                        "（要 GPU 那一趟而没有结论的条在没结论里：判绿的驱动把它们当有结论数了，本次未跑不是通过）")
+gpu_in_summary = {key: number(key, summary) for key in gpu_keys}
+if "gpu-totals-unchecked" not in broken and "gpu-fields-optional" not in broken and gpu_in_summary != gpu:
+    inconsistent.append(f"汇总行的 GPU 趟计数 {gpu_in_summary} 与判定行的 {gpu} 不同")
 if "summary-gate-totals-unchecked" not in broken:
     columns = ("total", "caught", "missed", "unviable", "timeout", "memory_cap", "stage_one_only", "driver_error", "not_run", "refused", "unlisted_units")
     counts = {key: number(key, summary) for key in columns}
@@ -285,6 +364,7 @@ try:
                  memory_label: 0 if "escalated-memory-multiple-ignored" in broken else driver.ESCALATION_MEMORY_BASELINE_MULTIPLE}
     registry_path, evidence_directory = os.path.join(home, driver.ESCALATION_REGISTRY), driver.ESCALATION_DIRECTORY
     verdict_columns, signed_columns = len(driver.VERDICT_COLUMNS), driver.RESULT_SIGNED_COLUMNS
+    gpu_columns, gpu_signed, gpu_file = len(driver.GPU_VERDICT_COLUMNS), driver.GPU_SIGNED_COLUMNS, driver.GPU_VERDICTS
     result_key_path = sample_result_key or driver.result_key_path()
 except Exception as error:  # 驱动被删、改坏、少了升档那几个常量
     print(f"  ✗ 读不进广谱变异的驱动 {driver_path} 里升档与判定库的常量：{error}")
@@ -327,8 +407,39 @@ if "result-mac-unchecked" not in broken and os.path.exists(verdicts_path):
             mac_problems.append(f"{where}的校验列对不上")
         else:
             mac_rows += 1
+# GPU 那一趟的判定库（驱动文件头「GPU 那一趟」）：同一把密钥，每一行十四段、末段是前十三段的 HMAC-SHA256；这一段的算法同样在这里另写一份，不调驱动的函数
+gpu_mac_rows = 0
+gpu_verdicts_path = os.path.join(home, gpu_file)
+if "gpu-result-mac-unchecked" not in broken and os.path.exists(gpu_verdicts_path):
+    gpu_key = None
+    try:
+        gpu_key_status = os.stat(result_key_path)
+        if gpu_key_status.st_uid == os.getuid() and not gpu_key_status.st_mode & 0o077:
+            with open(result_key_path, encoding="ascii", errors="replace") as handle:
+                gpu_key_text = handle.read().strip()
+            if re.fullmatch(r"[0-9a-f]{64}", gpu_key_text):
+                gpu_key = bytes.fromhex(gpu_key_text)
+    except OSError:
+        gpu_key = None
+    with open(gpu_verdicts_path, "rb") as handle:
+        gpu_verdict_text = handle.read().decode("utf-8", errors="surrogateescape").split("\n")
+    for line_number, line in enumerate(gpu_verdict_text[:-1], start=1):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        where = f"GPU 判定库 {gpu_file} 第 {line_number} 行（第 {fields[1] if len(fields) > 1 else '?'} 条，结局 {fields[4] if len(fields) > 4 else '?'}）"
+        if len(fields) == gpu_signed:
+            mac_problems.append(f"{where}没有校验列（{gpu_signed} 段）")
+        elif len(fields) != gpu_columns:
+            mac_problems.append(f"{where}段数是 {len(fields)}，不是 {gpu_columns}")
+        elif gpu_key is None:
+            mac_problems.append(f"{where}校验不了：密钥 {result_key_path} 不在、权限不是 600 或内容不对")
+        elif not hmac.compare_digest(hmac.new(gpu_key, "\t".join(fields[:gpu_signed]).encode("utf-8", "surrogateescape"), hashlib.sha256).hexdigest(), fields[-1]):
+            mac_problems.append(f"{where}的校验列对不上")
+        else:
+            gpu_mac_rows += 1
 if mac_problems:
-    print(f"  ✗ 广谱变异判定库里有 {len(mac_problems)} 行不是驱动用这台机器的密钥写的（{verdicts_path}）：")  # gate-lint:summary
+    print(f"  ✗ 广谱变异判定库里有 {len(mac_problems)} 行不是驱动用这台机器的密钥写的（{verdicts_path}，GPU 趟的 {gpu_verdicts_path}）：")  # gate-lint:summary
     for entry in mac_problems[:20]:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：没有校验列或校验列对不上的行是手写或拷来的：照驱动 --summary 打的出路把判定库拷一份留底、删掉点到的那几行，再让驱动点名重判那几条"
@@ -460,7 +571,8 @@ if registry_problems:
           "再让驱动点名重判那几条（--item <序号> --rerun，前缀与起法照 .claude/skills/crash-test/commit-stages.md 第 2b 步），跑完再跑这一道；"
           "倍数不够的加大 --timeout-floor / --memory-cap 再 --rerun")
     sys.exit(1)
-print(f"  ✓ 广谱变异提交门禁判绿：此刻源码上 {total} 条每一条都有单元键相同的结论，没红 0 条，没记清单的单元 0 个，拒算 {refused} 条（有键相同的现判结论）；升档判的抓到 {len(escalated_lines)} 条、登记行逐行复核过；判定库 {mac_rows} 行逐行核过带密钥的校验列")
+print(f"  ✓ 广谱变异提交门禁判绿：此刻源码上 {total} 条每一条都有单元键相同的结论，没红 0 条，没记清单的单元 0 个，拒算 {refused} 条（有键相同的现判结论）；升档判的抓到 {len(escalated_lines)} 条、登记行逐行复核过；判定库 {mac_rows} 行逐行核过带密钥的校验列；"
+      f"要 GPU 那一趟的 {gpu['gpu_needed']} 条都有库里键相同的结论（复用 {gpu['gpu_reused']} 条），GPU 判定库 {gpu_mac_rows} 行逐行核过带密钥的校验列")
 PY
 python_exit=$?
 rm -f "${output:?}"

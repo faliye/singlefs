@@ -20,9 +20,13 @@
 #   跳过 git 的全局选项（-C <目录> 另记下，让仓目录跟着它走；-c、--git-dir、--work-tree、--namespace、--super-prefix、--config-env 各带一个值），
 #   第一个不以 - 开头的词是 commit 才算。查的是那条命令所在的目录（cd 跟着走），hook 输入的 cwd 当起点，认不出目录时取 cwd。
 #   merge、cherry-pick、revert、pull、rebase 这些也动 HEAD，但私有索引的做法只出现在 commit 上，这里不认。
-# 时限：检查脚本至多跑 CHECK_TIME_LIMIT_SECONDS 秒（SHARED_INDEX_STALE_REMINDER_TIME_LIMIT 可换），到点只停自己起的那一个进程，什么都不提醒。
-# 提醒超过 MAXIMUM_CONTEXT_LINES 行时只留前面这些行，末尾写怎么看全的。读不到共用模块、JSON 读不出、检查脚本退 0、77 以外也不是 1 的，什么都不提醒、退 0
-#   （检查脚本退别的码时往 stderr 写一句没判成）。命令失败时有没有这个事件，取决于 Claude Code；这个钩子不看命令的结局，只看仓此刻的状态。
+# 时限：检查脚本至多跑 CHECK_TIME_LIMIT_SECONDS 秒（SHARED_INDEX_STALE_REMINDER_TIME_LIMIT 可换），到点只停自己起的那一个进程。
+# 判不了时放行但必记检出：检查脚本到点没查完、起不来（OSError）、退 0、1、77 以外的码，照常放行（退 0），往 stderr 写一行卡在哪
+#   （到点的是「提交后的索引检查到点没查完（时限 N 秒）」）与手动检查的命令（python3 scripts/gate/shared-index-stale-check.py --repo <目录>），
+#   并往检出记录（AGENT_HOOK_DETECTIONS，没设取 lib_work_root.py 的 default_detections_path）追加一行，结局 outcome 写「只记」。
+#   检查脚本退 77（本次未查：不在 git 仓里、没有 HEAD、HEAD 没改任何文件）是它判过的结论，不报。
+# 提醒超过 MAXIMUM_CONTEXT_LINES 行时只留前面这些行，末尾写怎么看全的。输入不是 JSON 对象（解不开、顶层不是对象）、判的时候出错（读不到共用模块、切词抛的），
+#   什么都不提醒、退 0，同样照「放行但必记检出」：stderr 写一句（判的时候出错写「没判成」），检出记录追加一行、结局「只记」。命令失败时有没有这个事件，取决于 Claude Code；这个钩子不看命令的结局，只看仓此刻的状态。
 # 退役判据：不再有人用 GIT_INDEX_FILE 指私有索引提交，或提交的做法改成每个会话各用一个工作树时删掉。
 #
 #   shared-index-stale-reminder.sh --selftest   在临时目录里造小仓、喂造出来的 hook JSON；末尾逐个打开弄坏开关核它红在点名的格
@@ -32,17 +36,23 @@
 #   ignore-dash-c        -C 的值当成子命令                             commit-with-dash-c
 #   ignore-directory     不跟 -C 与 cd，一律取 hook 输入的 cwd           commit-with-dash-c、commit-after-cd
 #   refuse-command       检出了就拒（退 2）                           commit-stale、commit-with-dash-c、commit-after-cd、commit-in-bash-c
+#   silent-on-unfinished 检查脚本到点没查完、起不来、退别的码时退回静默（stderr 不写、检出不记）   check-timeout、check-exit-code
+#   input-unrecorded     输入不是 JSON 对象时退回静默（stderr 不写、检出不记，改前的样子）      bad-json-recorded
+#   exception-unrecorded 判的时候出错时只打 stderr、不记检出（改前的样子）                   exception-recorded
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（同 host-resources-reminder.sh）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import concurrent.futures, importlib.util, json, os, shutil, subprocess, sys, tempfile
+import concurrent.futures, importlib.util, json, os, shlex, shutil, subprocess, sys, tempfile
+from datetime import datetime, timezone
 
 CHECK_TIME_LIMIT_SECONDS = 30.0
 MAXIMUM_CONTEXT_LINES = 80
 BREAK_VARIABLE = "SHARED_INDEX_STALE_REMINDER_BREAK"
+DETECTIONS_VARIABLE = "AGENT_HOOK_DETECTIONS"
+HOOK_NAME = "shared-index-stale-reminder.sh"
 GIT_OPTIONS_WITH_VALUE = {"-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"}
 
 def broken(item):
@@ -55,8 +65,8 @@ def load_library(hook_dir, name):
     return library
 
 def name_path(hook_dir, name):
-    if name == "lib_shell_words":
-        return os.path.join(hook_dir, "lib_shell_words.py")
+    if name.startswith("lib_"):
+        return os.path.join(hook_dir, name + ".py")
     return os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "gate", name + ".py")
 
 def commit_directories(shell_words, text, start):
@@ -86,36 +96,73 @@ def commit_directories(shell_words, text, start):
                 found.append(directory)
     return found
 
+def unfinished(what, directory):
+    """判不了时交给 stderr 与检出记录的那一句：卡在哪、照常放行、手动检查的命令。silent-on-unfinished 下退回静默（交 None）。"""
+    if broken("silent-on-unfinished"):
+        return None
+    return f"{what}，这条命令照常算数；手动检查：python3 scripts/gate/shared-index-stale-check.py --repo {shlex.quote(directory)}"
+
 def check_repository(hook_dir, directory):
-    """→ 检查脚本的输出行（检出了）；没检出或没判成交 None。"""
+    """→ (检出的输出行, 判不了的说明)。检出了交 (行, None)；查过没检出交 (None, None)；到点没查完、起不来、退别的码交 (None, 说明)。"""
     script = name_path(hook_dir, "shared-index-stale-check")
     limit = float(os.environ.get("SHARED_INDEX_STALE_REMINDER_TIME_LIMIT") or CHECK_TIME_LIMIT_SECONDS)
     environment = {name: value for name, value in os.environ.items() if name not in ("SHARED_INDEX_STALE_CHECK_BREAK",)}
     try:
         completed = subprocess.run([sys.executable, "-B", script, "--repo", directory], capture_output=True, text=True, stdin=subprocess.DEVNULL,
                                    env=environment, timeout=limit, check=False)
-    except subprocess.TimeoutExpired:
-        return None   # run 到点只停自己起的这一个进程
+    except subprocess.TimeoutExpired:   # run 到点只停自己起的这一个进程
+        return None, unfinished(f"提交后的索引检查到点没查完（时限 {limit:g} 秒）", directory)
+    except OSError as error:
+        return None, unfinished(f"提交后的索引检查起不来（{error}）", directory)
     if completed.returncode == 1:
-        return completed.stdout.strip().splitlines()
+        return completed.stdout.strip().splitlines(), None
     if completed.returncode not in (0, 77):
         tail = completed.stderr.strip().splitlines()[-1][:300] if completed.stderr.strip() else ""
-        print(f"  ! shared-index-stale-reminder.sh 没判成（检查脚本退 {completed.returncode}{'：' + tail if tail else ''}），这条命令照常算数", file=sys.stderr)
-    return None
+        return None, unfinished(f"提交后的索引检查没给出结论（检查脚本退 {completed.returncode}{'：' + tail if tail else ''}）", directory)
+    return None, None
+
+def detections_path(hook_dir):
+    configured = os.environ.get(DETECTIONS_VARIABLE)
+    if configured:
+        return configured
+    try:
+        return load_library(hook_dir, "lib_work_root").default_detections_path()
+    except Exception:
+        return None
+
+def record_unfinished(hook_input, hook_dir, problem):
+    """判不了、照常放行的这一次往检出记录追加一行（结局「只记」，看门狗照这一栏说下一步）；写不进去时往 stderr 说一句。
+    hook_input 读不出（不是 JSON 对象）时给 {}，会话号写「读不到」。"""
+    tool_input = hook_input.get("tool_input") if isinstance(hook_input.get("tool_input"), dict) else {}
+    entry = {"time": datetime.now(timezone.utc).isoformat(), "hook": HOOK_NAME, "session_id": hook_input.get("session_id") or "读不到",
+             "agent_id": hook_input.get("agent_id"), "agent_type": hook_input.get("agent_type") or "主 agent",
+             "transcript_path": hook_input.get("transcript_path"), "command": (tool_input.get("command") or "")[:500],
+             "findings": [f"提交后的索引检查判不了、照常放行：{problem}"], "outcome": "只记"}
+    path = detections_path(hook_dir)
+    try:
+        if not path:
+            raise OSError(f"没设 {DETECTIONS_VARIABLE}，也读不到 lib_work_root.py")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as error:
+        print(f"  ! {HOOK_NAME}：这一条检出没记上（{error}）", file=sys.stderr)
 
 def remind(hook_input, hook_dir):
-    """交提醒正文；不用提醒交 None。"""
+    """→ (提醒正文或 None, 判不了的说明列表)。"""
     tool_input = hook_input.get("tool_input") if isinstance(hook_input.get("tool_input"), dict) else {}
     text = tool_input.get("command") or ""
     start = hook_input.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     shell_words = load_library(hook_dir, "lib_shell_words")
-    reports = []
+    reports, problems = [], []
     for directory in commit_directories(shell_words, text, start):
-        lines = check_repository(hook_dir, directory)
+        lines, problem = check_repository(hook_dir, directory)
         if lines:
             reports.append((directory, lines))
+        if problem:
+            problems.append(problem)
     if not reports:
-        return None
+        return None, problems
     pieces = ["提交后检查：这条命令做了 git commit，共用索引没有跟上新 HEAD（scripts/gate/shared-index-stale-check.py 只报告，不拦命令、没动任何索引）："]
     for directory, lines in reports:
         pieces.append(f"仓 {directory}")
@@ -123,20 +170,32 @@ def remind(hook_input, hook_dir):
     if len(pieces) > MAXIMUM_CONTEXT_LINES:
         omitted = len(pieces) - MAXIMUM_CONTEXT_LINES
         pieces = pieces[:MAXIMUM_CONTEXT_LINES] + [f"（还有 {omitted} 行没列；看全：python3 scripts/gate/shared-index-stale-check.py --repo <仓>）"]
-    return "\n".join(pieces)
+    return "\n".join(pieces), problems
 
 def main_hook(hook_dir):
+    raw = sys.stdin.buffer.read()
     try:
-        hook_input = json.load(sys.stdin)
-    except Exception:
-        return 0
-    if not isinstance(hook_input, dict):
+        hook_input = json.loads(raw.decode("utf-8"))
+        unreadable = None if isinstance(hook_input, dict) else f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象"
+    except Exception as error:
+        hook_input, unreadable = {}, f"输入不是合法的 JSON（{type(error).__name__}: {error}；前 200 字节：{raw[:200].decode('utf-8', 'replace')!r}）"
+    if unreadable:   # 判不了：照常放行，stderr 写一行、记一条检出（弄坏开关 input-unrecorded 下什么都不说，改前的样子）
+        if not broken("input-unrecorded"):
+            problem = f"{unreadable}，这条命令是不是 git commit 没判；手动检查：python3 scripts/gate/shared-index-stale-check.py --repo <仓>"
+            print(f"  ! {HOOK_NAME}：{problem}", file=sys.stderr)
+            record_unfinished({}, hook_dir, problem)
         return 0
     try:
-        message = remind(hook_input, hook_dir)
+        message, problems = remind(hook_input, hook_dir)
     except Exception as error:   # 共用模块读不到、切词抛的：什么都不提醒
         print(f"  ! shared-index-stale-reminder.sh 没判成（{error!r}）", file=sys.stderr)
+        if not broken("exception-unrecorded"):   # 弄坏开关：只打 stderr、不记检出（改前的样子）
+            record_unfinished(hook_input, hook_dir, f"判的时候出错（{type(error).__name__}: {error}），这条命令是不是 git commit、共用索引过没过期都没判；"
+                                                    "手动检查：python3 scripts/gate/shared-index-stale-check.py --repo <仓>")
         return 0
+    for problem in problems:
+        print(f"  ! {HOOK_NAME}：{problem}", file=sys.stderr)
+        record_unfinished(hook_input, hook_dir, problem)
     if message is None:
         return 0
     print(json.dumps({"systemMessage": message, "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": message}}, ensure_ascii=False))
@@ -149,6 +208,9 @@ def selftest_cells(hook_dir, root):
     hook = os.path.join(hook_dir, "shared-index-stale-reminder.sh")
     scenarios = load_library(hook_dir, "shared-index-stale-check")
     clean = {name: value for name, value in os.environ.items() if name not in (BREAK_VARIABLE, "GIT_INDEX_FILE")}
+    detections = os.path.join(root, "detections.jsonl")
+    clean[DETECTIONS_VARIABLE] = detections   # 自证里的检出只记进临时目录，不进真的检出记录
+    last_run = {"stderr": ""}
 
     def check(cell, condition, detail):
         nonlocal checked
@@ -157,13 +219,14 @@ def selftest_cells(hook_dir, root):
             failures.append(cell)
             print(f"  ✗ 自证 {cell}：{detail}")   # gate-lint:detail
 
-    def feed(kind, command, directory=None, raw=None):
+    def feed(kind, command, directory=None, raw=None, extra_environment=None):
         fixture = scenarios.make_scenario(root, kind)
         text = raw if raw is not None else command.format(repository=fixture.repository, private_index=fixture.private_index)
         start = fixture.root if directory == "outside" else fixture.repository
+        environment = dict(clean, **({BREAK_VARIABLE: os.environ[BREAK_VARIABLE]} if BREAK_VARIABLE in os.environ else {}), **(extra_environment or {}))
         completed = subprocess.run(["bash", hook], input=text if raw is not None else json.dumps({"tool_name": "Bash", "tool_input": {"command": text}, "cwd": start}),
-                                   capture_output=True, text=True, env=dict(clean, **({BREAK_VARIABLE: os.environ[BREAK_VARIABLE]} if BREAK_VARIABLE in os.environ else {})),
-                                   timeout=120, check=False)
+                                   capture_output=True, text=True, env=environment, timeout=120, check=False)
+        last_run["stderr"] = completed.stderr
         try:
             context = json.loads(completed.stdout)["hookSpecificOutput"]["additionalContext"] if completed.stdout.strip() else ""
             event = json.loads(completed.stdout)["hookSpecificOutput"]["hookEventName"] if completed.stdout.strip() else ""
@@ -192,6 +255,56 @@ def selftest_cells(hook_dir, root):
     check("not-commit", code == 0 and context == "", f"不是提交的命令（仓此刻确实是过期的）：应当不查、不出提醒；实际退 {code}，提醒「{context[:200]}」")
     code, context, _ = feed("stale", "", raw="这不是 JSON")
     check("bad-json", code == 0 and context == "", f"读不出的输入：应当退 0、什么都不说；实际退 {code}，提醒「{context[:200]}」")
+
+    def detection_lines():
+        try:
+            with open(detections, encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except OSError:
+            return []
+
+    # 检查脚本到点没查完：照常放行，stderr 写那一句与手动检查的命令，检出记录多一行、结局只记
+    before = len(detection_lines())
+    code, context, _ = feed("stale", "git commit -q -m x", extra_environment={"SHARED_INDEX_STALE_REMINDER_TIME_LIMIT": "0.001"})
+    recorded = detection_lines()
+    added = recorded[before:]
+    check("check-timeout", code == 0 and context == "" and "提交后的索引检查到点没查完（时限 0.001 秒）" in last_run["stderr"]
+          and "scripts/gate/shared-index-stale-check.py --repo " in last_run["stderr"]
+          and len(added) == 1 and added[0].get("outcome") == "只记" and added[0].get("hook") == HOOK_NAME,
+          f"时限 0.001 秒、喂一条 git commit：应当退 0、stderr 有「到点没查完」与手动检查命令、检出记录多一行（结局只记）；"
+          f"实际退 {code}，stderr「{last_run['stderr'][:300]}」，检出记录多了 {len(added)} 行：{added!r:.300}")
+    # 检查脚本退 0、1、77 以外的码（这里让它找不到脚本，python 退 2）：交出判不了的说明与手动检查命令
+    missing_hook_dir = os.path.join(root, "no-check-script", ".claude", "hooks")
+    lines, problem = check_repository(missing_hook_dir, root)
+    check("check-exit-code", lines is None and problem is not None and "检查脚本退 2" in problem and "shared-index-stale-check.py --repo " in problem,
+          f"检查脚本退 2：应当交出「没给出结论（检查脚本退 2…）」与手动检查命令；实际 lines={lines!r}，说明「{problem}」")
+    # 输入不是 JSON 对象（坏 JSON、数组）：照常放行、不出提醒，stderr 写一行、检出记录各多一行（结局只记、会话号读不到）
+    before = len(detection_lines())
+    outcomes = [feed("stale", "", raw=raw) for raw in ("这不是 JSON", "[]")]
+    added = detection_lines()[before:]
+    check("bad-json-recorded", all(code == 0 and context == "" for code, context, _ in outcomes) and HOOK_NAME in last_run["stderr"] and len(added) == 2
+          and all(entry.get("outcome") == "只记" and entry.get("session_id") == "读不到" and entry.get("hook") == HOOK_NAME for entry in added),
+          f"坏 JSON 与 JSON 数组：应当各退 0、不出提醒、stderr 写一行、检出记录各多一行（结局只记、会话号读不到）；实际 {outcomes!r}，"
+          f"stderr「{last_run['stderr'][:200]}」，检出记录多了 {len(added)} 行：{added!r:.300}")
+    # 判的时候出错（这里让它读不到 lib_shell_words.py：只拷入口与 lib_work_root.py，它 source 的 .claude/scripts 与规范副本链接到钩子所在的仓）：照常放行、记一条检出
+    bare = os.path.join(root, "bare", ".claude", "hooks")
+    os.makedirs(bare)
+    for name in ("shared-index-stale-reminder.sh", "lib_work_root.py"):
+        shutil.copy(os.path.join(hook_dir, name), bare)
+    for linked in ("scripts", "singlefs-ai-sop"):
+        target = os.path.join(os.path.dirname(hook_dir), linked)
+        if os.path.exists(target):
+            os.symlink(target, os.path.join(root, "bare", ".claude", linked))
+    before = len(detection_lines())
+    completed = subprocess.run(["bash", os.path.join(bare, "shared-index-stale-reminder.sh")],
+                               input=json.dumps({"tool_name": "Bash", "session_id": "s-bare", "tool_input": {"command": "git commit -q -m x"}, "cwd": root}),
+                               capture_output=True, text=True, env=dict(clean, **({BREAK_VARIABLE: os.environ[BREAK_VARIABLE]} if BREAK_VARIABLE in os.environ else {})),
+                               timeout=120, check=False)
+    added = detection_lines()[before:]
+    check("exception-recorded", completed.returncode == 0 and completed.stdout == "" and "没判成" in completed.stderr and len(added) == 1
+          and added[0].get("outcome") == "只记" and added[0].get("session_id") == "s-bare" and "lib_shell_words" in " ".join(added[0].get("findings") or []),
+          f"读不到 lib_shell_words.py：应当退 0、不出提醒、stderr 写没判成、检出记录多一行（结局只记、会话号 s-bare、点名那份库）；"
+          f"实际退 {completed.returncode}，stdout「{completed.stdout[:120]}」，stderr「{completed.stderr.strip()[:200]}」，检出记录多了 {len(added)} 行：{added!r:.300}")
     return failures, checked
 
 SWITCH_EXPECTED_CELLS = {
@@ -200,6 +313,9 @@ SWITCH_EXPECTED_CELLS = {
     "ignore-dash-c": ["commit-with-dash-c"],
     "ignore-directory": ["commit-with-dash-c", "commit-after-cd"],
     "refuse-command": ["commit-stale", "commit-with-dash-c", "commit-after-cd", "commit-in-bash-c"],
+    "silent-on-unfinished": ["check-timeout", "check-exit-code"],
+    "input-unrecorded": ["bad-json-recorded"],
+    "exception-unrecorded": ["exception-recorded"],
 }
 
 def cells_in_scratch(hook_dir):
@@ -237,6 +353,7 @@ def selftest(hook_dir):
         print("  → 怎么办：照上面那几个开关看它在代码里弄坏的那一处还在不在判法上；改了判法就改 SWITCH_EXPECTED_CELLS 与文件头的表")
         return 1
     print(f"  ✓ shared-index-stale-reminder.sh 自证通过（查了 {checked} 格：私有索引提交之后（含 git -C、cd 之后、bash -c 里）出提醒且照常放行，正常提交、不是提交的命令、读不出的输入不出提醒；"
+          f"检查脚本到点没查完、退别的码时照常放行、stderr 说卡在哪与手动检查命令、检出记录记一行只记，输入不是 JSON 对象、判的时候出错同样照常放行并记检出；"
           f"弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 

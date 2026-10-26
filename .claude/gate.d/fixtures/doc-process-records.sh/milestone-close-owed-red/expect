@@ -1,0 +1,9 @@
+exit=1
+want=里程碑三（.claude/kb/milestone/03-third-txn.md）（段表第 6 行状态写「**结束（样本：用户定收口）**」）：欠账表开着的 6 行里有 3 行的前置
+want=✗ C9801（样本中文号带项号）
+want=✗ C9802（样本文件名）
+want=✗ C9803（样本阿拉伯号）
+want=把去向改到还开着的里程碑
+want=样本只跑 .gate-cells 点名的格：milestone-close-owed
+want=doc-process-records.sh：1 格里 1 格红（milestone-close-owed）
+want=bash .claude/gate.d/doc-process-records.sh --check milestone-close-owed

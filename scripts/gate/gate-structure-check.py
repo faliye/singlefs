@@ -274,7 +274,7 @@ def selftest():
         shutil.rmtree(work, ignore_errors=True)
     if wrong:
         for entry in wrong:
-            print(f"     {entry}")  # gate-lint:detail
+            print(f"  ✗ {entry}")  # gate-lint:detail
         print(f"  ✗ gate-structure-check 自证 {checked} 份仓里有判错的（上面逐条列着）")
         print("  → 怎么办：按判错那一条找 judge_stage 里对应的一样修；弄坏开关打开时判红是对的。")
         return 1

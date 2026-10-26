@@ -1,0 +1,5 @@
+# 样本登记表：heavy 一行理由没写起头、heavy-if-set 一行起头之后只有 3 个字，light 与 samples-heavy 各一行不判
+scripts/gate/sample-light.sh	light	# 只起假的 cargo 打一行就退
+scripts/gate/sample-heavy.sh	heavy	# 自证起真 cargo 编一份样本 crate 再跑测试
+scripts/crash/sample-heavy-if-set.sh	heavy-if-set:SINGLEFS_HEAVY_TESTS	# 偏离上游：起编译
+.claude/gate.d/sample-stage.sh	samples-heavy	# 样本档起真 cargo 编样本 crate

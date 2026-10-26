@@ -1,0 +1,7 @@
+# 入口脚本登记表（.claude/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」；门禁 code-tooling 的 entry-scripts 格读它，写法在那一格函数上方的注释）。
+# 一行一份：<相对仓根的路径><TAB><每项一行或末行总计的前缀><TAB><那一行要带的字段，逗号连><TAB># 理由
+# 前缀那一列写 pending 的是认了是入口脚本、还没改成这个格式的（字段那一列写 -），那一格逐份报本次未判；改成了就换成前缀与字段。
+scripts/crash/crash-amplification.sh	CRASH_AMPLIFICATION_ITEM	item=,exit=,states=,reused=,red=,seconds=	# 崩溃放量入口：逐分项一行（项名、退出码、现判态数、复用、红、秒），末行 CRASH_AMPLIFICATION_TOTAL
+scripts/mutation/broad-mutation.py	BROAD_MUTATION_ITEM	sequence=,outcome=,judged=,red=,reused=,wall_seconds=,name=	# 广谱变异驱动：现判的每条一行（C641 补了判了、红了、复用了多少），复用的条数在 BROAD_MUTATION_PLAN 的 carried=
+scripts/experiment-apparatus/replay.sh	REPLAY_TOTAL	dispatched=,collected=,judged=,reused=,drift=,broken=	# 实验复跑入口：每行一条结果行（实验号、二进制、判定、说明），末行 REPLAY_TOTAL 总计；C641 补了 --list-items、写错退 2 与三条完整性闸的自证，每行那一句还不带计数
+scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh	pending	-	# E165 第二段驱动：C641 正推按上游定义数出的入口脚本，没有每项一行与末行总计，还没改

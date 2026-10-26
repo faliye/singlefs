@@ -19,6 +19,7 @@
     文件:A-B     第 A 到第 B 行（1 起，含两端）
     文件@标题    从该标题行抄到下一个同级或更高级标题之前
     文件~正则    抄命中的那一整行（命中必须唯一）
+文件与参数从哪一处切开：前缀是已有文件的那几处 `:` / `@` / `~` 里最靠前的一处，所以标题或正则里的半角冒号不会被当成行区间（split_spec）。
 
 节边界另算一遍（C264）。回读比对拿产物去对 pick() 取出的那一段，两者出自同一个抽取器，pick() 取错了范围它照样一致。
 所以对每条 `文件@标题` 取法，另用 kb-sections.py 的 heading_bounds()（另一段代码，认标题的读法与小节清单是同一份）算一次该节的起止行，
@@ -46,21 +47,32 @@ research/prompts/ 三份历史材料里 9 处节尾因此截短，已改）。
   QUOTE_KB_BREAK=not-numbers-in-fence  not_numbers_declared() 把代码围栏里的声明也算上
       围栏那一格（「✗ 自检：代码围栏里的 not-numbers 声明不算」）
   QUOTE_KB_BREAK=bare-lacking-hint  lacking_checklist_message() 走回改前的说法：不点是哪个编号引出的、不给照抄的命令
-      退 5 的说明那一格（「✗ 自检：退 5 的说明应当点出 I-7.4 引出了 02-根环.md」）
+      退 5 的说明那一格（『✗ 自检：退 5 的说明应当点出 I-7.4 引出了 02-根环.md』）
+      连带红的格：「✗ 自检：正文只按路径引了 .claude/kb/decisions/27-小数据打包容器.md（没有编号）而清单里没有它，--cited」
   QUOTE_KB_BREAK=invariants-to-readme  invariant_files_for() 不按类号找类文件，I 号一律退回不变量目录的 README.md
       不变量号按类那一格（「✗ 自检：正文点名 I-7.4 与 I-8.3」）；three-way-materials.py 调的是同一份，它的自证同样红在「正文点名 I-7.4」
   QUOTE_KB_BREAK=no-readme-fallback  invariant_files_for() 类号找不到类文件时什么都不给，不退回 README.md
       退回 README 那一格（「✗ 自检：正文点名 I-10.1」）
   QUOTE_KB_BREAK=fence-not-skipped  pick() 找节尾时不跳过代码围栏（改前的样子：围栏里一行 `# 注释` 当一级标题，整节在那里截断）
       节边界那一格（「✗ 自检：干净的 pick() 下」开头那条；自证自己在进程内再打开它，断言旧的回读比对仍绿、新的节边界比对红、main 退 7）；
-      外面设着它跑 --selftest，红在同一格，后面「代码栅栏里的 `#` 行不被当成标题」那一格不会走到
+      外面设着它跑 --selftest，红在同一格，后面『代码栅栏里的 `#` 行不被当成标题』那一格不会走到
   QUOTE_KB_BREAK=checklist-reasons-unchecked  check_checklist_reasons() 不核「不抄」理由点名的节，红样本判绿
       理由那一格（「✗ 自检：清单一行「不抄」、理由说正文在「某个没抄的节」里抄了」开头那条）
+  QUOTE_KB_BREAK=colon-first  split_spec() 走回改前的先后（先 `:` 再 `@` 再 `~`），标题带半角冒号的 `文件@标题` 被切成 `文件:行区间`
+      标题带半角冒号那一格（「✗ 自检：标题带半角冒号」开头那条）
+  QUOTE_KB_BREAK=kb-directories-raw  kb_directory_entries() 走回改前的读法：登记位的原串只去首尾空白与结尾的 `/`，不规整 `./`，绝对路径与走出仓的也认
+      登记位规整那一格（「✗ 自检：登记位写成 ./ 开头、/ 结尾、中间重复 / 的三行」开头那条）；
+      stale-candidates.py 调的是同一份，它的自证红在『登记位写成 ./crates/singlefs-checker/invariants（./ 开头）时不变量清单里的现状句没进候选表』
+  QUOTE_KB_BREAK=strict-counts-translations  cited_kb_sources() 的严格读法照旧把同号的 .en.md、.ja.md 译文算进 glob（改前的样子：三语之后同号 3 份、一个都不认）
+      同号三语那一格（「✗ 自检：同号有中英日三份时」开头那条）
 
 --cited 认编号时，正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算，与 doc-lint 同读法）；
 认编号的读法只有 cited_kb_sources() 一份：three-way-materials.py 收材料时调它的宽读法（不要求「（」），--cited 用严格读法，宽读法认出的是超集。
+D / E 编号按 `<号>-*.md` 找决策与实验页时，严格读法只数中文那一份：同号的 `.en.md`、`.ja.md` 译文（TRANSLATION_SUFFIXES，认法同 `.claude/trilingual-documents`）不算，
+三语之后同号 3 份也认得出；宽读法照旧把同号的几份都给（three-way-materials.py 自己排译文）。
 I-<类>[.<号>] 指到哪份文件不认死文件名（invariant_files_for）：在 `.claude/kb-directories` 登记的 kb 目录里
-（登记是替换不是追加，没登记就是 `.claude/kb`；与 `.claude/gate.d/doc-registries.sh` 的 kb_candidate_roots 同一个读法）找含 `| I-<类>.` 表行的 .md，
+（登记是替换不是追加，没登记就是 `.claude/kb`；读法与规整只在这里的 kb_directory_entries 一份，`.claude/gate.d/doc-registries.sh` 的 kb_candidate_roots
+与 stale-candidates.py 都调它：开头的 `./`、结尾的 `/` 去掉，绝对路径与 `..` 走出仓的行拒、打到 stderr）找含 `| I-<类>.` 表行的 .md，
 这一类住在哪几份就指哪几份；类号找不到文件的，退回那些文件所在目录的 README.md（没有编号、跨类的引用都指它），退 5 的说明里点名是退回的。
 退 5 时逐个写缺的文件是正文里哪个记号引出的，给一条能照抄的 `python3 scripts/kb/kb-sections.py <文件> >> <清单>`，
 并写明接上的那几张要逐行标抄不抄、标完重跑。
@@ -104,13 +116,23 @@ def read(path):
         return f.read().split('\n')
 
 
+SPEC_SEPARATORS = ((':', 'range'), ('@', 'head'), ('~', 're'))
+
+
 def split_spec(spec):
-    """→ (文件, 参数, 取法)，取法是 'range' / 'head' / 're'。分隔符的先后（先 `:` 再 `@` 再 `~`）pick() 与节边界另算（check_section_bounds）共用这一份。"""
-    for sep, kind in ((':', 'range'), ('@', 'head'), ('~', 're')):
-        if sep in spec:
-            path, arg = spec.split(sep, 1)
-            return path, arg, kind
-    sys.exit(f"quote-kb: 取法认不出：{spec}\n  → 写成 文件:A-B / 文件@标题 / 文件~正则")
+    """→ (文件, 参数, 取法)，取法是 'range' / 'head' / 're'。pick() 与节边界另算（check_section_bounds）共用这一份。
+    分隔符取前缀是已有文件的那几处里最靠前的一处，一处都不是已有文件就取最靠前的一处（pick() 再报文件不在）：
+    `文件@标题` 的标题、`文件~正则` 的正则里有半角冒号时，冒号在分隔符之后，不会被当成 `文件:A-B` 切开。"""
+    if os.environ.get('QUOTE_KB_BREAK') == 'colon-first':   # 弄坏开关：走回改前的先后，先 `:` 再 `@` 再 `~`
+        for sep, kind in SPEC_SEPARATORS:
+            if sep in spec:
+                path, arg = spec.split(sep, 1)
+                return path, arg, kind
+    candidates = sorted((index, kind) for sep, kind in SPEC_SEPARATORS for index, char in enumerate(spec) if char == sep)
+    if not candidates:
+        sys.exit(f"quote-kb: 取法认不出：{spec}\n  → 写成 文件:A-B / 文件@标题 / 文件~正则")
+    index, kind = next(((index, kind) for index, kind in candidates if os.path.isfile(spec[:index])), candidates[0])
+    return spec[:index], spec[index + 1:], kind
 
 
 def pick(spec):
@@ -417,6 +439,8 @@ NUMBER_SHAPES = (
     ('C', r'(?<![A-Za-z0-9-])(C\d+)（', r'(?<![A-Za-z0-9-])(C\d+)(?![0-9])'),
     ('I', r'(?<![A-Za-z0-9-])(I-\d+\.\d+)（', r'(?<![A-Za-z0-9-])(I-\d+(?:\.\d+)?)(?![0-9])'),
 )
+# 三语登记（.claude/trilingual-documents 文件头）认译文的办法：以这两种后缀结尾的是译文，不是中文那一份；严格读法按编号找页时不数它们
+TRANSLATION_SUFFIXES = ('.en.md', '.ja.md')
 
 
 KB_DIRECTORIES_REGISTRY = '.claude/kb-directories'
@@ -424,16 +448,55 @@ INVARIANT_TABLE_ROW = re.compile(r'^\| I-(\d+)\.\d+ ', re.M)   # 不变量表行
 INVARIANT_DIRECTORY_INDEX = 'README.md'
 
 
-def kb_candidate_roots(root):
-    """登记在 `.claude/kb-directories` 的 kb 目录，相对仓根、排序去重。登记是替换不是追加：登记了就只认登记的那几个，
-    没登记（或登记的目录都不在）就是 `.claude/kb`。读法与 doc-registries.sh 的 kb_candidate_roots 相同：空行与 `#` 起头的行跳过，`#` 之后是注释，目录要在。"""
-    registered = []
+def kb_directory_entries(root):
+    """登记位 `.claude/kb-directories` 逐行读、规整：→ (登记的目录 [相对仓根，规整过，按登记次序去重], 拒掉的行 [(行号, 原文, 为什么)])。
+    空行与 `#` 起头的行跳过，`#` 之后是注释。规整用 os.path.normpath：去掉开头的 `./`、结尾的 `/`、中间的 `./` 与重复的 `/`，
+    这样拼出的路径与 git 列出的相对路径同形（stale-candidates.py 拿它拼模式去配 git 路径）。拒：绝对路径、规整之后以 `..` 起头（走出仓）
+    或就是仓根本身（`.`）的行。规整过、没被拒、目录不在的照旧不算登记、不报。
+    弄坏开关 QUOTE_KB_BREAK=kb-directories-raw 退回改前的读法：原串只去首尾空白与结尾的 `/`，不规整也不拒。"""
+    registered, refused = [], []
     registry = os.path.join(root, KB_DIRECTORIES_REGISTRY)
-    if os.path.isfile(registry):
-        for raw in open(registry, encoding='utf-8'):
-            entry = raw.split('#', 1)[0].strip().rstrip('/')
-            if entry and entry not in registered and os.path.isdir(os.path.join(root, entry)):
-                registered.append(entry)
+    if not os.path.isfile(registry):
+        return registered, refused
+    raw_reading = os.environ.get('QUOTE_KB_BREAK') == 'kb-directories-raw'
+    for number, raw in enumerate(open(registry, encoding='utf-8'), 1):
+        written = raw.split('#', 1)[0].strip()
+        if not written:
+            continue
+        if raw_reading:
+            entry = written.rstrip('/')
+        elif os.path.isabs(written):
+            refused.append((number, written, '是绝对路径'))
+            continue
+        else:
+            entry = os.path.normpath(written)
+            if entry == '..' or entry.startswith('../'):
+                refused.append((number, written, f'规整成 {entry}，走出了仓'))
+                continue
+            if entry == '.':
+                refused.append((number, written, '规整之后是仓根本身，不是一个 kb 目录'))
+                continue
+        if entry and entry not in registered and os.path.isdir(os.path.join(root, entry)):
+            registered.append(entry)
+    return registered, refused
+
+
+KB_DIRECTORIES_REFUSALS_REPORTED = set()   # 同一个进程里同一行只报一次（一次调用链里 kb_candidate_roots 会被调好几次）
+
+
+def kb_candidate_roots(root):
+    """登记在 `.claude/kb-directories` 的 kb 目录，相对仓根、排序去重（读法与规整只在 kb_directory_entries 一份）。登记是替换不是追加：登记了就只认登记的那几个，
+    没登记（或登记的目录都不在、都被拒了）就是 `.claude/kb`。被拒的行（绝对路径、走出仓）逐行打到 stderr，写那一行与出路，不静默跳过。
+    门禁 doc-registries.sh 的 kb_candidate_roots 调的就是这一份。"""
+    registered, refused = kb_directory_entries(root)
+    for number, written, why in refused:
+        key = (os.path.realpath(root), number, written)
+        if key in KB_DIRECTORIES_REFUSALS_REPORTED:
+            continue
+        KB_DIRECTORIES_REFUSALS_REPORTED.add(key)
+        print(f"  ✗ {KB_DIRECTORIES_REGISTRY} 第 {number} 行「{written}」{why}，这一行不认，那个目录不算 kb 目录", file=sys.stderr)
+        print("     → 怎么办：写成相对仓根的目录（例如 crates/singlefs-checker/invariants），开头不带 /、不用 .. 走出仓；"
+              "开头的 ./ 与结尾的 / 可以写，读的时候会去掉", file=sys.stderr)
     return sorted(registered) or ['.claude/kb']
 
 
@@ -477,7 +540,7 @@ def cited_kb_sources(text, root, loose=False):
     记号是正文里写出的路径本身，或 D<n> / E<n> / C<n> / I-<n>.<m> 编号；`doc-lint:not-numbers` 里声明的记号不算编号（not_numbers_declared）。
     I 号指到含这一类表行的那几份文件，类号找不到文件的退回 README.md（invariant_files_for）。
     认编号的读法只有这一份：quote-kb.py --cited（cited_kb_files，严格读法）与 three-way-materials.py 收材料（loose=True，宽读法）都调它。
-    严格读法：编号后面紧跟「（」，D / E 编号要恰好对上一份决策或实验页；宽读法：不要求括号、对上几份拉几份。
+    严格读法：编号后面紧跟「（」，D / E 编号要恰好对上一份决策或实验页（只数中文那一份，同号的 .en.md、.ja.md 译文不算）；宽读法：不要求括号、对上几份拉几份（译文也给）。
     宽读法认出的是严格读法的超集，材料按宽读法拉齐的文件，--cited 按严格读法判时一份不缺。路径不在的照样列，由调用方判。
 
     C234（三方材料的小节清单只覆盖被判那一项所在的文件）：清单只给被判那一项所在的文件做，
@@ -498,6 +561,8 @@ def cited_kb_sources(text, root, loose=False):
             hits = set()
             for stem in (f'{number:02d}-', f'{number}-'):
                 hits.update(glob.glob(os.path.join(root, '.claude/kb', folder, stem + '*.md')))
+            if not loose and os.environ.get('QUOTE_KB_BREAK') != 'strict-counts-translations':
+                hits = {hit for hit in hits if not hit.endswith(TRANSLATION_SUFFIXES)}   # 严格读法只数中文那一份（弄坏开关：译文照数）
             if len(hits) == 1 or (loose and hits):
                 sources += [(os.path.relpath(hit, root), token) for hit in sorted(hits)]
         elif letter == 'C':
@@ -680,6 +745,30 @@ def selftest_in(work):
         return 1
     print("  ✓ 自检：三种取法（含带代码块的条款）都逐字节一致，且抄漏一行时判红")
     print("  ✓ 自检：裸标题与同前缀的带括注标题并存时，精确匹配取到裸标题那一节")
+    # 标题带半角冒号：`文件@标题` 与 `文件~正则` 的冒号在分隔符之后，照取标题与正则；`文件:A-B` 照旧认
+    colon_source = os.path.join(sample_directory, 'colon.md')
+    with open(colon_source, 'w', encoding='utf-8') as f:
+        f.write('## 中文那一节\n\n正文一\n\n## Criterion 3: Doubling Experiment\n\nbody: with colon\n\n## 后一节\n')
+    colon_specs = [f'{colon_source}@## Criterion 3: Doubling Experiment', f'{colon_source}@## 中文那一节',
+                   f'{colon_source}~^body: with colon$', f'{colon_source}:1-3']
+    colon_wanted = [(colon_source, 5, ['## Criterion 3: Doubling Experiment', '', 'body: with colon', '']),
+                    (colon_source, 1, ['## 中文那一节', '', '正文一', '']), (colon_source, 7, ['body: with colon']),
+                    (colon_source, 1, ['## 中文那一节', '', '正文一'])]
+    colon_output = os.path.join(sample_directory, 'colon-output.md')
+    try:
+        colon_picked = [pick(spec) for spec in colon_specs]
+        colon_problem = verify(colon_specs, build(colon_specs)) or '；'.join(check_section_bounds(colon_specs)) or None
+        captured_out, captured_err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(captured_out), contextlib.redirect_stderr(captured_err):
+            colon_code = main([colon_output, *colon_specs])
+    except SystemExit as stop:
+        colon_picked, colon_problem, colon_code = None, f'取法切错、pick() 退出：{stop.code}', None
+    if colon_picked != colon_wanted or colon_problem or colon_code != 0 or not os.path.exists(colon_output):
+        print(f"  ✗ 自检：标题带半角冒号的 `文件@标题`、正则带半角冒号的 `文件~正则` 应当照取、回读逐字节一致、节边界对得上、main 退 0，"
+              f"`文件:A-B` 照旧认；实际取到 {colon_picked}，{colon_problem}，main 退 {colon_code}")
+        print("     → 怎么办：看 split_spec() 取分隔符那一步：要取前缀是已有文件的最靠前一处；QUOTE_KB_BREAK=colon-first 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：标题带半角冒号的 `文件@标题` 与正则带冒号的 `文件~正则` 照取、回读逐字节一致、节边界对得上，`文件:A-B` 照旧认")
     # C264：节边界另算一遍。干净的 pick() 与 kb-sections.py 的节边界对得上；
     # pick() 不跳围栏（QUOTE_KB_BREAK=fence-not-skipped）时，旧的回读比对仍绿、新的节边界比对红、main 退 7、不写出口
     fence_specs = [f'{src}@#### 代码块里有井号']
@@ -796,6 +885,28 @@ def selftest_in(work):
         print("     → 怎么办：not_numbers_declared() 要跳过围栏里的行（与 doc-lint 同读法）；QUOTE_KB_BREAK=not-numbers-in-fence 设着的话这里本来就该红。")
         return 1
     print("  ✓ 自检：--cited 不把 doc-lint:not-numbers 声明的记号当编号（E1 不拉、E165 照拉），围栏里的声明不算")
+    # 三语：同号的决策页有中文、英语、日语三份。严格读法只认中文那一份，清单里没有它的小节清单时 --cited 要求补它；宽读法照旧三份都给
+    trilingual_chinese = '.claude/kb/decisions/13-验证路线.md'
+    for name in ('13-验证路线.md', '13-verification-route.en.md', '13-検証ルート.ja.md'):
+        with open(os.path.join(cited_root, '.claude/kb/decisions', name), 'w', encoding='utf-8') as f:
+            f.write('## 样本\n')
+    trilingual_body = '这一轮判 D13（验证路线） 站不站得住。\n'
+    trilingual_checklist = os.path.join(cited_root, 'trilingual-checklist.md')
+    with open(trilingual_checklist, 'w', encoding='utf-8') as f:
+        f.write("### 小节清单：`.claude/kb/decisions/99-样本.md`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n| ## D99 样本 —— 已定 | 抄 | 样本 |\n")
+    trilingual_strict = sorted(cited_kb_files(trilingual_body, cited_root))
+    trilingual_lacking = check_cited(trilingual_checklist, trilingual_body, cited_root)
+    trilingual_loose = sorted(path for path, _token in cited_kb_sources(trilingual_body, cited_root, loose=True))
+    with open(trilingual_checklist, 'a', encoding='utf-8') as f:
+        f.write(f"\n### 小节清单：`{trilingual_chinese}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n| ## 样本 | 不抄 | 样本 |\n")
+    trilingual_covered = check_cited(trilingual_checklist, trilingual_body, cited_root)
+    if trilingual_strict != [trilingual_chinese] or trilingual_lacking != [trilingual_chinese] or trilingual_covered or len(trilingual_loose) != 3:
+        print(f"  ✗ 自检：同号有中英日三份时，--cited 的严格读法应当只认中文那一份 {trilingual_chinese}、清单里没有它的小节清单就要求补它、补上之后不再报，宽读法照旧三份都给；"
+              f"实际严格读法认 {trilingual_strict}，没补时要求补 {trilingual_lacking}，补上之后还报 {trilingual_covered}，宽读法给 {trilingual_loose}")
+        print("     → 怎么办：看 cited_kb_sources() 里 D / E 编号那一段：严格读法要先排掉以 TRANSLATION_SUFFIXES 结尾的译文再数；"
+              "QUOTE_KB_BREAK=strict-counts-translations 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：同号有中英日三份时，--cited 的严格读法只认中文那一份、清单里没有它就要求补，宽读法照旧三份都给")
     # 不变量清单按类拆在登记的 kb 目录里（README.md 加类文件，形态照 crates/singlefs-checker/invariants/）：I 号按类号指到类文件
     invariants_directory = 'crates/sample/invariants'
     os.makedirs(os.path.join(cited_root, invariants_directory))
@@ -843,6 +954,41 @@ def selftest_in(work):
         print("     → 怎么办：看 invariant_files_for() 的退回那一支与 lacking_checklist_message()；QUOTE_KB_BREAK=no-readme-fallback 设着的话这里本来就该红。")
         return 1
     print("  ✓ 自检：类号找不到类文件时退回 README.md，退 5 的说明点名是退回的")
+    # 登记位 .claude/kb-directories 的规整与拒绝（kb_directory_entries、kb_candidate_roots）
+    registry_root = os.path.join(work, 'kb-directories-sample')
+    for directory in ('.claude/kb', 'crates/x/invariants'):
+        os.makedirs(os.path.join(registry_root, directory))
+    os.makedirs(os.path.join(work, 'outside-the-repository'))
+
+    def roots_with(registry_text):
+        with open(os.path.join(registry_root, KB_DIRECTORIES_REGISTRY), 'w', encoding='utf-8') as f:
+            f.write(registry_text)
+        KB_DIRECTORIES_REFUSALS_REPORTED.clear()
+        captured = io.StringIO()
+        with contextlib.redirect_stderr(captured):
+            roots = kb_candidate_roots(registry_root)
+            kb_candidate_roots(registry_root)   # 同一个进程里第二次调，被拒的行不再报
+        return roots, kb_directory_entries(registry_root)[1], captured.getvalue()
+
+    roots, refused, report = roots_with('./crates/x/invariants/  # ./ 开头、/ 结尾\n.claude//kb  # 重复的 /\ncrates/./x/invariants  # 规整之后与第一行相同\n')
+    if roots != ['.claude/kb', 'crates/x/invariants'] or refused or report:
+        print(f"  ✗ 自检：登记位写成 ./ 开头、/ 结尾、中间重复 / 的三行，应当规整成 ['.claude/kb', 'crates/x/invariants']、一行不拒，"
+              f"实际 {roots}，拒了 {refused}，stderr {report!r}")
+        print("     → 怎么办：看 kb_directory_entries() 的规整（os.path.normpath）；QUOTE_KB_BREAK=kb-directories-raw 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：登记位写成 ./ 开头、/ 结尾、中间重复 / 的，规整成相对仓根的写法、去重")
+    absolute = os.path.join(registry_root, 'crates/x/invariants')
+    roots, refused, report = roots_with(f'{absolute}  # 绝对路径\n../outside-the-repository  # 走出仓\ncrates/../..  # 规整成 ..\n.  # 仓根\n'
+                                        'crates/x/invariants  # 好的一行\n')
+    wanted = [f'第 1 行「{absolute}」是绝对路径', '第 2 行「../outside-the-repository」规整成 ../outside-the-repository，走出了仓',
+              '第 3 行「crates/../..」规整成 ..，走出了仓', '第 4 行「.」规整之后是仓根本身', '→ 怎么办：写成相对仓根的目录']
+    if roots != ['crates/x/invariants'] or [number for number, _, _ in refused] != [1, 2, 3, 4] \
+            or any(piece not in report for piece in wanted) or report.count('是绝对路径') != 1:
+        print(f"  ✗ 自检：登记位写成绝对路径、../ 走出仓、规整成 ..、写成 . 的四行应当拒、在 stderr 逐行点名（同一行只报一次），只认好的那一行，"
+              f"实际 {roots}，拒了 {refused}，stderr {report!r}")
+        print("     → 怎么办：看 kb_directory_entries() 的拒绝那几支与 kb_candidate_roots() 的报法；QUOTE_KB_BREAK=kb-directories-raw 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：登记位写成绝对路径、走出仓、仓根本身的行被拒，stderr 逐行点名并给出路，同一行只报一次")
     print("  ✓ 自检：清单标「抄」而附录里没有时判红（C262）")
     return 0
 

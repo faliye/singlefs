@@ -1,0 +1,19 @@
+# singlefs 自己的脚本读的仓外路径：进仓的文字写到这些路径（与它们底下的路径）时放过，同一个目录名单独出现照判。
+# 一行一条「<路径>  # 理由」：路径以 ~/ 或 / 开头，理由至少 8 个字，写哪份脚本读它、读来做什么；每一条要有 git 跟踪的 .sh、.py、.rs 字面引到。
+# 判法在门禁 doc-text 的 out-of-project-names 格（.claude/gate.d/doc-text.sh 文件头「out-of-project-names」一段）。
+~/kbuild/linux-om  # scripts/kb/verify-citations.sh 默认在这棵内核树里核 kb 引的内核源码行
+~/linux-bug-fix/linux  # .claude/scripts/fetch-deps.sh 与 .claude/scripts/lkmm.sh 从这棵内核树取 LKMM 的模型文件
+~/code/fs-refs  # scripts/kb/fetch-refs.sh 把参考论文取到这里，scripts/kb/verify-citations.sh 与 scripts/kb/pdf-text.py 从这里读
+~/.cargo  # Rust 工具链的 cargo 与依赖缓存：scripts/gate/light-selftest-guard.py、scripts/crash/crash-point-replay-shard-configuration-check.sh 按这条路径认 cargo
+~/.rustup  # Rust 工具链本体：scripts/gate/light-selftest-guard.py 与 .claude/hooks/lib_heavy_tests.py 按这条路径认工具链里的二进制
+~/.opam  # herd7 装在这里：.claude/scripts/fetch-deps.sh 装它，.claude/scripts/lkmm.sh 从这里起它
+~/.local/share/singlefs  # singlefs 的工作根、判定库、峰值表与上次运行记录，脚本、钩子与门禁都读写这里
+~/.local/state/singlefs  # scripts/agents/remind.sh、scripts/hosts/detached-run.sh 与 .claude/hooks/remind-rearm-stop-guard.sh 的提醒与长活记录
+~/.config/singlefs  # 不进仓的本机私有配置：门禁 doc-text 读第二台私有名单，scripts/gate/light-selftest-guard.py 认这里的清场脚本
+~/.cache/singlefs  # singlefs 的缓存：crates/singlefs-checker-tier 存 GPU 判器编好的管线，.claude/scripts/fetch-deps.sh 放 LKMM 的模型文件
+~/.claude  # Claude Code 的会话记录：scripts/agents/agent-watch.py、agent-cost.py、agent-handover.py 与 .claude/hooks/session-start.sh 读这里
+~/.nv/GLCache  # NVIDIA 驱动的盘上着色器缓存：crates/singlefs-checker-tier/src/crash_judge_dispatch.rs 的 GPU 判器靠它跨进程复用编好的管线
+~/.vscode-server  # VSCode 远程服务端：.claude/hooks/bash-command-detector.sh 按这条路径认 VSCode 服务端进程，不停它
+~/.bashrc  # scripts/hosts/rocksdb-prebuilt.py install 写的取值来源与环境配置
+~/.config/environment.d  # scripts/hosts/rocksdb-prebuilt.py install 写的用户级 systemd 环境配置
+~/.local/bin/claude  # claude 可执行文件的默认安装路径：.claude/hooks/bash-command-detector.sh 按它认子 agent 起 claude 会话的命令词

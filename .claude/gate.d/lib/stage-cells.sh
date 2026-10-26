@@ -32,6 +32,15 @@
 #   被判的根（pwd -P）不是这道阶段所在的仓（阶段文件往上两级，pwd -P）、也没设 GATE_STAGED_FROM 时，
 #   只跑文件里点名的格；与 --check 走同一段选格（stage_cells_pick）。文件里点了没登记的格、或一格都没点：退 2。
 #
+# 弄坏开关只在样本根上认（C622（门禁的弄坏开关平常跑也认），用户 2026-10-01 定「样本根里放标记」）：stage_cells_run 开头先调
+#   stage_cells_refuse_unsampled_break_switches：环境里有名字以 _BREAK 结尾、值非空的变量（哪一道、哪一份库的开关都算，连同 STAGE_CELLS_BREAK），
+#   而被判的根（当前目录）不是样本根，就一格都不跑、退 2。样本根：根里有 .gate-cells 或 .gate-break-sample（空文件也行，随样本进库），
+#   而且这个根（pwd -P）不是这道阶段所在的仓、也没设 GATE_STAGED_FROM（与 .gate-cells 同一条判据）。是样本根时打一行「认环境里的弄坏开关」。
+#   自证在临时目录里搭的小仓（阶段的副本就在这棵树里，被判的根就是阶段所在的仓：scripts/mutation/mutation-shard-run.sh --selftest 的场景）另认一种：
+#   根里的 .gate-break-sample 第一行逐字是 STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE 接这个根的 pwd -P，也没设 GATE_STAGED_FROM。
+#   空文件、第一行写的是别的路径（小仓整棵拷到别处、拷进真仓）的照拒；打一行「是自证搭的小仓，认环境里的弄坏开关」。
+#   不 source 这份库跑格的阶段（checker-tier-crash-point-replay）在 cd 到根之后自己调这一个函数。
+#
 # stage_cells_run：每格的退出码写进临时目录，全部跑完按登记次序回读（份数对不上判红）。
 #   汇总逐格一行「<格名>：绿 / 红（退出 N）/ 本次未跑」。
 #   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
@@ -58,6 +67,10 @@
 #   not-run-unreported  退 77 的格不往 $GATE_NOT_RUN_FILE 报        all-not-run、mixed 判错
 #   generic-howto       红格不接它自己的出路，只给一句通用的        red 判错
 #   last-run-unwritten  不写上次红的清单                            last-run-whole、last-run-partial 判错
+#   break-honored-everywhere  弄坏开关在哪个根上都认（改前的样子）   break-without-marker、break-with-marker、break-staged、break-own-repository、
+#                             break-own-repository-marked、break-own-repository-marked-staged、break-own-repository-elsewhere 判错
+#   own-repository-any-marker  阶段所在的仓里有 .gate-break-sample 就认，不看第一行   break-own-repository、break-own-repository-elsewhere 判错
+#   own-repository-refused     阶段所在的仓一律不认（改前的样子：自证搭的小仓也拒）   break-own-repository-marked 判错
 
 declare -ga STAGE_CELLS_NAMES=()
 declare -gA STAGE_CELLS_FUNCTION=() STAGE_CELLS_TITLE=() STAGE_CELLS_HOWTO=()
@@ -67,6 +80,8 @@ STAGE_CELLS_SELECTION_SOURCE="全部登记的格"
 STAGE_CELLS_STAGE_FILE="${BASH_SOURCE[1]:-$0}"
 STAGE_CELLS_STAGE_NAME="${STAGE_CELLS_STAGE_FILE##*/}"
 STAGE_CELLS_STAGE_REPOSITORY=""
+# 自证搭的小仓在 .gate-break-sample 第一行写这一句、紧接这个根的 pwd -P（文件头「弄坏开关只在样本根上认」）；scripts/mutation/mutation-shard-run.sh 的自证从这一行现读
+STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE="自证在临时目录里搭的小仓，阶段的副本就在这棵树里："
 STAGE_CELLS_REUSE_CHECKS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P)/scripts/gate/lib_reuse_checks.py"
 if [[ "$STAGE_CELLS_STAGE_FILE" == */* ]]; then
   STAGE_CELLS_STAGE_REPOSITORY="$(cd "${STAGE_CELLS_STAGE_FILE%/*}/../.." 2>/dev/null && pwd -P)"
@@ -206,6 +221,40 @@ stage_cells_apply_sample_marker() {
   printf '  · 样本只跑 .gate-cells 点名的格：%s（%s 是样本，不是这道阶段所在的仓）\n' "${STAGE_CELLS_SELECTED[*]}" "$root"
 }
 
+# stage_cells_refuse_unsampled_break_switches <根的说明>：环境里设了弄坏开关、而当前目录不是样本根，就退 2（文件头「弄坏开关只在样本根上认」）。
+# 只看导出到环境里的变量（compgen -e）：开关从环境来，漏在环境里的才是这一条要拦的。
+stage_cells_refuse_unsampled_break_switches() {
+  local root="$1" name root_physical
+  local set_switches=()
+  while IFS= read -r name; do
+    if [[ "$name" =~ ^[A-Za-z0-9_]*_BREAK$ && -n "${!name:-}" ]]; then set_switches+=("$name=${!name}"); fi
+  done < <(compgen -e)
+  ((${#set_switches[@]})) || return 0
+  [[ "${STAGE_CELLS_BREAK:-}" == break-honored-everywhere ]] && return 0
+  root_physical="$(pwd -P)"
+  if [[ ( -f .gate-cells || -f .gate-break-sample ) && -n "$root_physical" && "$root_physical" != "$STAGE_CELLS_STAGE_REPOSITORY" && -z "${GATE_STAGED_FROM:-}" ]]; then
+    printf '  · %s 是样本根（有 .gate-cells 或 .gate-break-sample），认环境里的弄坏开关：%s\n' "$root" "${set_switches[*]}"
+    return 0
+  fi
+  # 阶段所在的仓：只认自证搭的小仓，.gate-break-sample 第一行逐字写着那一句接这个根自己的 pwd -P
+  local first_line="" own_repository_sample=0
+  if [[ -n "$root_physical" && "$root_physical" == "$STAGE_CELLS_STAGE_REPOSITORY" && -f .gate-break-sample && -z "${GATE_STAGED_FROM:-}" ]]; then
+    IFS= read -r first_line < .gate-break-sample || true
+    [[ "$first_line" == "$STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE$root_physical" ]] && own_repository_sample=1
+    [[ "${STAGE_CELLS_BREAK:-}" == own-repository-any-marker ]] && own_repository_sample=1
+  fi
+  [[ "${STAGE_CELLS_BREAK:-}" == own-repository-refused ]] && own_repository_sample=0
+  if ((own_repository_sample)); then
+    printf '  · %s 是自证搭的小仓（阶段所在的仓，.gate-break-sample 第一行写着它自己的路径），认环境里的弄坏开关：%s\n' "$root" "${set_switches[*]}"
+    return 0
+  fi
+  printf '  ✗ %s：环境里设了弄坏开关 %s，而被判的根 %s 不是样本根（没有 .gate-cells / .gate-break-sample，或是阶段所在的仓、--staged 的临时树），一格都没跑\n' \
+    "$STAGE_CELLS_STAGE_NAME" "${set_switches[*]}" "$root"
+  printf '     → 怎么办：平常跑把这几个变量 unset 掉再起（它们只给样本证红用）；要证红就经 stage-selftest.sh 喂样本，样本根里放 .gate-cells 或空文件 .gate-break-sample（随样本进库）；'
+  printf '自证在临时目录里搭的、阶段副本就在里面的小仓，.gate-break-sample 第一行写「%s<这个根的 pwd -P>」。\n' "$STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE"
+  exit 2
+}
+
 # stage_cells_write_last_run <红的格…>：写上次红的清单（文件头「上次红的清单」）。当前目录是被判的根。
 stage_cells_write_last_run() {
   local root_physical ran_file="" name
@@ -229,6 +278,7 @@ stage_cells_run() {
   local root="${1:-.}" scratch name function_name cell_exit index=0 collected=0
   local green=() red=() not_run=()
   local -A verdict_of=()
+  stage_cells_refuse_unsampled_break_switches "$root"
   stage_cells_apply_sample_marker "$root"
   scratch="$(mktemp -d)" || { printf '  ✗ %s：建不了放逐格退出码的临时目录\n' "$STAGE_CELLS_STAGE_NAME"; printf '     → 怎么办：看 $TMPDIR 满没满、有没有写权限，修好再跑；这一道一格都没跑。\n'; exit 1; }
   for name in "${STAGE_CELLS_SELECTED[@]}"; do
@@ -323,7 +373,9 @@ stage_cells_selftest() {
   mkdir -p "$own_root/.claude/gate.d" "$sample_root"
   # 合成阶段整份由这一条 printf 写出（函数单元库认「单元自己 printf 出来再起的脚本」，代码就是这几行）
   # shellcheck disable=SC2016
-  printf '%s\n' '#!/usr/bin/env bash' 'set -uo pipefail' "source $(printf '%q' "$library_under_test")" \
+  # 这一趟的 STAGE_CELLS_BREAK 经 SAMPLE_CELLS_BROKEN 交进合成阶段、在里面当不导出的变量用：只证这份库的格结构，不让「弄坏开关只在样本根上认」
+  # 那一判把每一条都拦成退 2；那一判自己由 break-* 那几条用环境里的 SAMPLE_SWITCH_BREAK 证。
+  printf '%s\n' '#!/usr/bin/env bash' 'set -uo pipefail' 'STAGE_CELLS_BREAK="${SAMPLE_CELLS_BROKEN:-}"; unset SAMPLE_CELLS_BROKEN' "source $(printf '%q' "$library_under_test")" \
       'cell_alpha() { printf "alpha\n" >> "$SAMPLE_TRACE"; echo "  alpha 格判完"; exit "${OUTCOME_ALPHA:-0}"; }' \
       'cell_beta()  { printf "beta\n"  >> "$SAMPLE_TRACE"; echo "  beta 格判完";  exit "${OUTCOME_BETA:-0}"; }' \
       'cell_gamma() { printf "gamma\n" >> "$SAMPLE_TRACE"; echo "  gamma 格判完"; exit "${OUTCOME_GAMMA:-0}"; }' \
@@ -347,7 +399,13 @@ stage_cells_selftest() {
     shift
     : > "$scratch/trace"; : > "$scratch/rest"; : > "$scratch/not-run"
     got_exit=0
-    env -u GATE_NOT_RUN_FILE -u GATE_STAGED_FROM SAMPLE_TRACE="$scratch/trace" SAMPLE_REST="$scratch/rest" \
+    # 外面环境里的弄坏开关一律不带进合成阶段（这份库自己的那个经 SAMPLE_CELLS_BROKEN 另交）
+    local inherited_switches=() inherited_name
+    while IFS= read -r inherited_name; do
+      [[ "$inherited_name" == *_BREAK ]] && inherited_switches+=(-u "$inherited_name")
+    done < <(compgen -e)
+    env -u GATE_NOT_RUN_FILE -u GATE_STAGED_FROM ${inherited_switches[@]+"${inherited_switches[@]}"} SAMPLE_CELLS_BROKEN="${STAGE_CELLS_BREAK:-}" \
+      SAMPLE_TRACE="$scratch/trace" SAMPLE_REST="$scratch/rest" \
       ${environment[@]+"${environment[@]}"} bash "$stage_file" "$@" > "$scratch/out" 2>&1 || got_exit=$?
     got_trace="$(tr '\n' ' ' < "$scratch/trace")"; got_trace="${got_trace% }"; [[ -n "$got_trace" ]] || got_trace="-"
     cases=$((cases + 1))
@@ -415,10 +473,39 @@ stage_cells_selftest() {
   if sample_case last-run-green 0 "alpha beta gamma" SINGLEFS_LAST_RUNS_DIRECTORY="$scratch/last-runs" -- "$sample_root"; then
     if [[ ! -f "$last_run_file" || -s "$last_run_file" ]]; then case_wrong "全绿之后上次红的清单该是空文件"; fi
   fi
+  # 弄坏开关只在样本根上认：没标记的根、阶段所在的仓、--staged 都退 2、一格不跑；值空着的不算设了
+  local bare_root="$scratch/bare-root"
+  mkdir -p "$bare_root"
+  if sample_case break-without-marker 2 - SAMPLE_SWITCH_BREAK=red -- "$bare_root"; then
+    output_has "环境里设了弄坏开关 SAMPLE_SWITCH_BREAK=red"
+  fi
+  : > "$sample_root/.gate-break-sample"
+  if sample_case break-with-marker 0 "alpha beta gamma" SAMPLE_SWITCH_BREAK=red -- "$sample_root"; then
+    output_has "认环境里的弄坏开关：SAMPLE_SWITCH_BREAK=red"
+  fi
+  sample_case break-staged 2 - SAMPLE_SWITCH_BREAK=red GATE_STAGED_FROM=/nonexistent-source-repository -- "$sample_root"
+  rm -f "$sample_root/.gate-break-sample"
+  : > "$own_root/.gate-break-sample"
+  sample_case break-own-repository 2 - SAMPLE_SWITCH_BREAK=red -- "$own_root"
+  # 阶段所在的仓只认自证搭的小仓：第一行逐字是那一句接它自己的 pwd -P 才认；写的是别的路径（整棵拷来的）、--staged 照拒
+  local own_root_physical sample_root_physical
+  own_root_physical="$(cd "$own_root" && pwd -P)"; sample_root_physical="$(cd "$sample_root" && pwd -P)"
+  printf '%s%s\n' "$STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE" "$own_root_physical" > "$own_root/.gate-break-sample"
+  if sample_case break-own-repository-marked 0 "alpha beta gamma" SAMPLE_SWITCH_BREAK=red -- "$own_root"; then
+    output_has "是自证搭的小仓（阶段所在的仓，.gate-break-sample 第一行写着它自己的路径），认环境里的弄坏开关：SAMPLE_SWITCH_BREAK=red"
+  fi
+  sample_case break-own-repository-marked-staged 2 - SAMPLE_SWITCH_BREAK=red GATE_STAGED_FROM=/nonexistent-source-repository -- "$own_root"
+  printf '%s%s\n' "$STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE" "$sample_root_physical" > "$own_root/.gate-break-sample"
+  if sample_case break-own-repository-elsewhere 2 - SAMPLE_SWITCH_BREAK=red -- "$own_root"; then
+    output_has "环境里设了弄坏开关 SAMPLE_SWITCH_BREAK=red"
+  fi
+  rm -f "$own_root/.gate-break-sample"
+  sample_case break-empty-value 0 "alpha beta gamma" SAMPLE_SWITCH_BREAK= -- "$bare_root"
 
   local breaks_proven=0 breaks_missed=() break_name
   if ((wrong == 0)) && [[ -z "$nested" && -z "${STAGE_CELLS_BREAK:-}" ]]; then
-    for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten; do
+    for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten break-honored-everywhere \
+        own-repository-any-marker own-repository-refused; do
       if STAGE_CELLS_BREAK="$break_name" bash "$library_under_test" --selftest-nested >/dev/null 2>&1; then
         breaks_missed+=("$break_name")
       else

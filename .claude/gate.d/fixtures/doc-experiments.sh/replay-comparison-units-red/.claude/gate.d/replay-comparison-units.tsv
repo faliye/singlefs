@@ -1,0 +1,12 @@
+# 样本登记表（红）：每种红各一行，列义同 .claude/gate.d/replay-comparison-units.tsv 文件头。
+E991	research/prompts/e991-registration.md	甲	crates/sample/units.rs	e991-a.out	driver_a
+E991	research/prompts/e991-missing.md	乙	crates/sample/units.rs	e991-b.out	driver_b
+E991	research/prompts/e991-registration.md	丙不存在	crates/sample/units.rs	e991-c.out	driver_c
+E991	research/prompts/e991-registration.md	丁重复	crates/sample/units.rs	e991-d.out	driver_d
+E991	research/prompts/e991-registration.md	戊	crates/sample/missing.rs	e991-e.out	driver_e
+E991	research/prompts/e991-registration.md	己	crates/sample/units.rs	e991-f.out	driver_absent
+E991	research/prompts/e991-registration.md	庚	crates/sample/units.rs	e991-g.out	driver_g
+E991	research/prompts/e991-registration.md	辛	crates/sample/units.rs	e991-h.out	none:没有复跑行的理由甲
+E991	research/prompts/e991-registration.md	壬	crates/sample/units.rs	e991-i.out	none:没有复跑行的理由乙
+E991	research/prompts/e991-registration.md	五列的行	crates/sample/units.rs	e991-k.out
+E991	research/prompts/e991-registration.md	癸	crates/sample/units.rs	e991-j.out	none:没有复跑行的理由丙

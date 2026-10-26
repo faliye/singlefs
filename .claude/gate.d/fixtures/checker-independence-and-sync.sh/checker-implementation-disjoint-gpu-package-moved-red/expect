@@ -1,0 +1,4 @@
+exit=1
+want=crates/singlefs-background-gpu 不在，而包 `singlefs-background-gpu` 还在别处、或还有包依赖它
+want=包放在 crates/background-gpu
+want=checker-implementation-disjoint：红（退出 1）

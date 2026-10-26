@@ -1,0 +1,4 @@
+exit=0
+want=✓ records/2026-10-23-subagent拆分提案.md：3 个节号（标题 4 处、索引表 4 行）不重号、各在索引表里一行；照例外表认的历史重号：五十六 2 处
+want=样本只跑 .gate-cells 点名的格：ledger-section-numbers
+want=doc-process-records.sh：1 格里 1 格绿（ledger-section-numbers），0 格本次未跑（无）

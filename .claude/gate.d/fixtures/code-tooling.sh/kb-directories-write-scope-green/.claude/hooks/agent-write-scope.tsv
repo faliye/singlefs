@@ -1,0 +1,5 @@
+# 样本写范围表：kb-scribe 用 ** 盖全登记的三个 kb 目录
+kb-scribe	.claude/kb/**	样本
+kb-scribe	notes/invariants/**	样本：** 跨目录
+kb-scribe	docs/extra/**	样本
+kb-scribe	$SINGLEFS_WORK_ROOT/**	样本：工作根

@@ -1,0 +1,10 @@
+exit=0
+want=门禁自检通过：5 个脚本
+want=进程安全：查了 5 个脚本（.sh 5 个、.py 0 个）
+want=own-scope 标注放行 1 处（scripts/gate/stop-own.sh:9）
+want=研究脚本、hook 与 .claude/scripts 的门禁纪律：扫了 3 个目录
+want=执行位：本次未判（script-modes.sh 退 77
+want=语法：查了
+want=裸 cd：查了
+want=本次未判（这不是通过）：.claude/process-safety-pending:2 scripts/gate/deeper/killer.sh 所在的目录 scripts/gate/deeper 这一趟没扫
+want=本次未判：.claude/process-safety-pending 里 1 个文件所在的目录这一趟没扫（scripts/gate/deeper/killer.sh）

@@ -1,0 +1,5 @@
+exit=1
+want=checker 档包 `singlefs-checker-tier` 与产品 GPU 包 `singlefs-background-gpu` 有一边依赖另一边（按本仓内部依赖图算的传递闭包，dev-dependencies 也算）
+want=singlefs-background-gpu → sample-gpu-judge-bridge → singlefs-checker-tier（singlefs-background-gpu 的 Cargo.toml 里写成别名 `judge`）
+want=删掉之后再跑这一格，两边闭包的交集那一条才判
+want=checker-implementation-disjoint：红（退出 1）

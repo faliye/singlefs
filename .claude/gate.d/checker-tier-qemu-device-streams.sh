@@ -77,27 +77,43 @@
 #   新池新建文件那条记录的反向链与同一份用例文件里的常量 E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION 比（那条用例对活代码断言反向链等于它）。
 #   程序录制流在这一趟里现算不出独立的期望值：宿主检查照模式重跑的是同一份程序，拿它当对照等于自己比自己。
 #
-# 弄坏开关（只给样本证红用）：GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 让 direct 那一档只看退出码与宿主读回、不逐盘读 divergence=none 那一行，
-#   direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0）判绿退 77、expect 里那几条 want 找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-product-read 让取对照退回改之前的取法：从 scripts/experiments/replay.sh 的 @driver_e142 那一行取产物名、
-#   读 research/results/<名> 的 name=root_record 取反向链：样本里都没有 research/（也没有 replay.sh），green 红在「解析不出产物文件」、不是预期的退 77，expect 里的 want 对不上。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-compare-skipped 让 path=mkfs 那一行与布局表八登记值的比对跳过：
-#   mkfs-segments-red（样本登记行的段序列 12+1+1+1+4 改成 14+1+1+1+4，虚机输出是 12+1+1+1+4）判绿退 77，
-#   红不在「mkfs 段序列与登记表不一致」，expect 里的 want 对不上。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped 让虚机输出与布局表八 path= 那几处登记（path=mkfs 之外那几行）逐字比对那一步跳过：
-#   segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2，登记行都不动）判绿退 77，
-#   红不在「段序列（path=mkfs 之外那几行）与布局表八登记的不一致」，expect 里的 want 对不上。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=tier-key-is-the-whole-stage 让每档的键退回整道一把（这一档的判据、档位参数、initramfs 清单换成六档合起来的一份）：
-#   tier-key-samples-one-tier-parameters（只改 raise-rollback-floor 一档的盘参数）里 file-overwrite 那一档也报现判，expect 里「· file-overwrite：复用」找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-from-main 让来宾程序单元退回六档共用 main 起的一把：tier-key-samples-guest-function（只改 raise-rollback-floor 的入口
-#   走到的函数）里 direct 那一档也报现判，expect 里「· direct：复用」「· 按档：现判 1、复用 5」找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-without-main 让来宾程序单元只从这一档的入口起算、不收 main：tier-key-samples-guest-dispatch（只改 main 的参数解析）
-#   六档都报复用，expect 里「· direct：现判」「· 按档：现判 6、复用 0」找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-with-listing-lines 让开跑前的清单退回改前的取法（vm-bench.sh 标准输出里抬头那几行留在清单里）：
-#   tier-key-samples-manifest-recorded 头一趟六档都报「清单不同……没记」，第二趟「现判 6、复用 0」，expect 里「· 头一趟记下 6 档」找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-check-skipped 让跑完不核清单、照记：tier-key-samples-manifest-differs 六档都记下、second-instance 也复用，
-#   expect 里「· second-instance：现判（无记录）」「· 按档：现判 1、复用 5」找不到。
-#   GATE_QEMU_DEVICE_STREAMS_BREAK=reuse-lookup-skipped 让每一档一律不读库：tier-key-samples-three-questions 判红（复用三问 ① 与复用哨兵都红），expect 里的 exit=77 对不上。
+# 弄坏开关（只给样本证红用，样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/checker-tier-qemu-device-streams.sh/ 下的目录名，
+# 括号里是判错的样子）：
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread  让 direct 那一档只看退出码与宿主读回、不逐盘读 divergence=none 那一行
+#       direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0：判绿退 77，expect 里那几条 want 找不到）
+#       green（少了逐盘读的那几项检查，「123 项检查全过」那条 want 找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-product-read  让反向链的对照退回改之前的取法（从 scripts/experiment-apparatus/replay.sh 的 @driver_e142 那一行取产物名、读 research/results/<名> 的 name=root_record）
+#       red、green、back-chain-pin-missing-red、direct-divergence-red、mkfs-segments-red、segments-step-red（样本里都没有 research/、也没有 replay.sh，
+#       取对照那一步当场红在「解析不出产物文件」：green 期望退出 77、实测 1，别的几份 expect 里的 want 对不上）
+#       tier-key-samples-guest-dispatch、tier-key-samples-guest-function、tier-key-samples-init-heredoc、tier-key-samples-kernel-byte、tier-key-samples-manifest-differs、
+#       tier-key-samples-manifest-recorded、tier-key-samples-one-tier-parameters、tier-key-samples-registry-unread-line、tier-key-samples-three-questions
+#       （键样本每趟算键之前也取一次对照，同样当场红：期望退出 77，实测 1）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-compare-skipped  让 path=mkfs 那一行与布局表八「mkfs 种根」登记值的比对跳过
+#       mkfs-segments-red（样本登记行换成真仓现行那一行：段序列 2+12+1+1+1+4、27 次操作、4117 个崩溃状态、种类多最前一段 [zero_fill×2,barrier×2]；
+#       虚机输出是 2026-10-02 录的 12+1+1+1+4、23 次操作、4114 个崩溃状态：判绿退 77，「mkfs 段序列与登记表不一致」那条 want 对不上）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped  让虚机输出与布局表八 path= 那几处登记（path=mkfs 之外那几行）逐字比对那一步跳过
+#       segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2、登记行都不动：判绿退 77，
+#       「段序列（path=mkfs 之外那几行）与布局表八登记的不一致」那条 want 对不上）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=tier-key-is-the-whole-stage  让每档的键退回整道一把（这一档的判据、档位参数、initramfs 清单换成六档合起来的一份）
+#       tier-key-samples-one-tier-parameters（只改 raise-rollback-floor 一档的盘参数，file-overwrite 那一档也报现判：「· file-overwrite：复用」找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-from-main  让来宾程序单元退回六档共用 main 起的一把
+#       tier-key-samples-guest-function（只改 raise-rollback-floor 的入口走到的函数，direct 那一档也报现判：「· direct：复用」「· 按档：现判 1、复用 5」找不到）
+#       tier-key-samples-three-questions（期望退出 77，实测 1；REUSE_SELFTEST 那一行找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-without-main  让来宾程序单元只从这一档的入口起算、不收 main
+#       tier-key-samples-guest-dispatch（只改 main 的参数解析，六档都报复用：「· direct：现判」「· 按档：现判 6、复用 0」找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-with-listing-lines  让开跑前的清单退回改前的取法（vm-bench.sh 标准输出里抬头那几行留在清单里）
+#       tier-key-samples-manifest-recorded（头一趟六档都报「清单不同……没记」，第二趟「现判 6、复用 0」：「· 头一趟记下 6 档」找不到）
+#       tier-key-samples-manifest-differs（「· 头一趟记下 5 档」「· direct：复用」「· 按档：现判 1、复用 5」找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-check-skipped  让跑完不核清单、照记
+#       tier-key-samples-manifest-differs（六档都记下、second-instance 也复用：「· second-instance：现判（无记录）」「· 按档：现判 1、复用 5」找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=reuse-lookup-skipped  让每一档一律不读库
+#       tier-key-samples-three-questions（复用三问 ① 与复用哨兵都红：期望退出 77，实测 1）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=rocksdb-entry-unchecked  让起 cargo 之前判 RocksDB 预编库取值那一步（下面「RocksDB 预编库的取值」）跳过
+#       rocksdb-entry-refused（往下走判前置，红在别处：「rocksdb-prebuilt entry：」找不到）
+# RocksDB 预编库的取值：真跑（不放 .qemu-prerecorded）在判前置、查判定库与两条 cargo build 之前先跑 scripts/hosts/rocksdb-prebuilt.py entry（这台装了、
+#   此刻进程环境的取值对得上），判红这一格退 1、一个 cargo 都不起。样本 rocksdb-entry-refused（不放 .qemu-prerecorded，只有 Cargo.toml、
+#   crates/singlefs-harness/Cargo.toml 与依赖 rocksdb 的 crates/singlefs-checker-tier/Cargo.toml；样本根没有 Cargo.lock，进程环境有没有取值都红）：退 1、红句点名 entry；
+#   弄坏开关 rocksdb-entry-unchecked（上面的开关表）让这一步跳过。
 # 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：真跑每一趟六档的组成表写好之后、查库之前抽哨兵（候选按键文件查，与 lookup 分开），
 #   抽中强制现判的那一档不读库、照现跑；哨兵被现判、强制现判那一档判红，这一格红。SINGLEFS_GATE_FULL=1 不抽。
 #   键样本 tier-key-samples-three-questions（.qemu-key-samples/ 另放 unrelated.sh 与 affected）：头一趟六档照绿记下，同一份输入、unrelated.sh（钉反向链的用例文件末尾加一行这一道不读的）
@@ -424,7 +440,7 @@ BACK_CHAIN_PINNING_CONSTANT="E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION"
 load_registered_expectations() {
   local registered_output product_name product
   if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-product-read ]]; then
-    product_name="$(awk -F'|' '$1=="E142" && $2=="@driver_e142" { print $4 }' scripts/experiments/replay.sh 2>/dev/null | head -1)"
+    product_name="$(awk -F'|' '$1=="E142" && $2=="@driver_e142" { print $4 }' scripts/experiment-apparatus/replay.sh 2>/dev/null | head -1)"
     product="research/results/$product_name"
     [[ -f "$product" ]] || fail "（弄坏开关 e142-product-read）从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $product）" "这是改之前的取法：research/ 整个可删，产物不在这一道就红；关掉弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK。"
     EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$product" | head -1)"
@@ -493,7 +509,7 @@ PY
       while IFS= read -r excluded; do exclusions+=(--exclude-unit "$excluded"); done < "$keys_directory/guest-excluded-$mode.txt"
     fi
     unit_key_into "$keys_directory/guest-$mode.txt" "$ROOT" "${entries[@]}" ${exclusions[@]+"${exclusions[@]}"} \
-      "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: --release --target x86_64-unknown-linux-gnu rustflags=-C target-feature=+crt-static" --dependency-of singlefs-checker-tier
+      "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: --release --target x86_64-unknown-linux-gnu rustflags=-C target-feature=+crt-static -L /usr/lib/gcc/x86_64-linux-gnu/13 -L /usr/lib/gcc/x86_64-linux-gnu/14 -l static=stdc++ -C link-arg=-fuse-ld=bfd" --dependency-of singlefs-checker-tier
   done
 }
 # 共用的几样单元键与外部输入（宿主脚本、来宾与宿主检查两个程序、判法、内核、QEMU、E142），写进 $keys_directory；每一档的组成表另由 write_tier_table 写
@@ -730,6 +746,16 @@ QEMU_DEVICE_LOG_MEGABYTES="${VM_LOG_MB:-4096}"
 if ((prerecorded == 0)); then
   ((${#named_modes[@]})) && echo "  · 只跑点名的 ${#MODES[@]} 档（${MODES[*]}）：每档照键查判定库，判出的照键写库"
   [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+  # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：这一格编的两个二进制都在 checker 档包里（verdict-store 默认开、编到 librocksdb-sys），
+  #   起任何 cargo 之前（连同判前置与查判定库）判一次这台装了、此刻进程环境的取值对得上，判红这一格退 1、一个 cargo 都不起。树里没有依赖 rocksdb 的清单、
+  #   PATH 上是带标记的假 cargo，entry 报不判。弄坏开关 rocksdb-entry-unchecked 下不判（样本 rocksdb-entry-refused 判错）。预录档不编译，不判
+  #   这一份被拷到不带 scripts/hosts/ 的树里时报一行没判、往下走
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != rocksdb-entry-unchecked && ! -f "$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py" ]]; then
+    echo "  ! RocksDB 预编库的取值没判：$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py 不在（这一份阶段被拷到了不带 scripts/hosts/ 的树里）"
+  elif [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != rocksdb-entry-unchecked ]] && ! python3 "$STAGE_REPOSITORY/scripts/hosts/rocksdb-prebuilt.py" entry --root "$ROOT"; then
+    fail "起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），一档都没跑" \
+      "照上面的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再跑同一条命令"
+  fi
   # 三个前置（QEMU、/dev/kvm、内核镜像）登记在 stage-inputs.tsv 本阶段那一行第三列，没齐判红
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
 fi
@@ -804,8 +830,8 @@ else
   MODES=("${modes_to_run[@]}")
   # 虚机二进制要静态链接（initramfs 里没有动态库）：glibc 目标加 +crt-static 编成 static-pie。不编 musl 目标：checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器
   # 两条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它）
-  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1; then
-    fail "虚机二进制（glibc 静态 PIE）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device 看报错。"
+  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static","-L","/usr/lib/gcc/x86_64-linux-gnu/13","-L","/usr/lib/gcc/x86_64-linux-gnu/14","-l","static=stdc++","-C","link-arg=-fuse-ld=bfd"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1; then
+    fail "虚机二进制（glibc 静态 PIE）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\",\"-L\",\"/usr/lib/gcc/x86_64-linux-gnu/13\",\"-L\",\"/usr/lib/gcc/x86_64-linux-gnu/14\",\"-l\",\"static=stdc++\",\"-C\",\"link-arg=-fuse-ld=bfd\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device 看报错。"
   fi
   if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check >/dev/null 2>&1; then
     fail "宿主一侧的设备日志检查编不过" "单跑 cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check 看报错。"

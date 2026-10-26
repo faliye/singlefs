@@ -14,14 +14,21 @@
 #   configuration_file（多机配置的路径，文件头「配置」一段怎么找）、gpu_switch（0 / 1）、across_machines_switch（0 / 1）、features、
 #   gpu_cards_by_priority（这一趟用的那一份，没写是空串）、gpu_cards_by_priority_when_quiesced（清场之后那一份，没写是空串）、
 #   common_environment、cargo_build_arguments、cargo_test_arguments（数组）
-#   crash_amplification_prepare 交回非 0（都是 2）只有一种，是配置的事，调用方退 78：说是清过场、开了 GPU 或写了不清场那一份显卡先后，多机配置里却没写清场之后那一份。
+#   crash_amplification_prepare 交回非 0（都是 2）有两种，调用方都退 78：说是清过场、开了 GPU 或写了不清场那一份显卡先后，多机配置里却没写清场之后那一份（配置的事）；
+#     开了 GPU 而没清场（quiesced 不是 1）：不清场那一份显卡额度不再给（用卡先清场；两个驱动开了 GPU、没带 --quiesced 时调它之前已经经清场包装带 --quiesced 重起了自己）。
+#     弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=unquiesced-gpu-share 下照改前给不清场那一份，由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
+#     （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 # 交给本机那一趟的环境由 crash_amplification_environment_for_this_host 组（数组 this_host_environment，env 的参数）；
 #   驱动自证里换掉本机那一趟时也经它组，只把起 cargo 换成假的。
 #
 # 运行条件与失败分类（崩溃放量入口与分项驱动共用）：
 #   crash_amplification_run_condition_holds [<仓根>]   两个驱动文件头 run-condition: check 调它（preflight 用 bash -c 在仓根起）；只判配置：
 #       开了 GPU 就要在多机配置里写了显卡、点名的卡与双机开关对得上。不连第二台、不碰卡：那两样跑起来才知道，用不上时驱动在运行中退 78。
-#   crash_amplification_cards_match_the_hosts <双机 0/1> <显卡配置的值>   双机开着两台都要有点名的卡，双机没开不许点名第二台的卡
+#   crash_amplification_cards_match_the_hosts <双机 0/1> <显卡配置的值>   双机开着两台都要有点名的卡，双机没开不许点名第二台的卡（这一台是第二台时除外，见下一条）
+#   第二台（两台用同一份多机配置：起活那一方把配置带过来、设 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer，scripts/hosts/peer-host-lib.sh 文件头「两台用同一份多机配置」）：
+#       crash_amplification_this_host_is_peer 认它；crash_amplification_prepare 与 crash_amplification_run_condition_holds 在第二台上把双机照关算（across_machines_switch=0：
+#       第二台上不再往第二台分），显卡先后里 local: 那几项是起活那一台的卡、带过来的配置里本来就有，不算「没开双机却点名了另一台的卡」；peer: 那几项是这一台的（用例那一侧照同一个变量取）。
+#       弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=peer-role-ignored 下不认角色（照起活那台判），由 scripts/crash/crash-amplification-item.sh --selftest 证红。
 #   crash_amplification_failure_kind <日志…>           一趟没跑成，日志里说的是哪一类：device（显卡或显存用不上，含给定状态表的判器借不到显存那一行，运行条件，调用方退 78）、
 #       build（这份二进制跑不了这一趟：结论的版本与树对不上、配置开了 GPU 而没编进 gpu 特性，运行条件，调用方退 78）、
 #       algorithm（算法上判不了：有状态 GPU 判不了、内核展开超预算、建不出表，调用方退 248），都不是打空串；几类都有时先 device、再 build
@@ -29,7 +36,7 @@
 #     （内存包装退的 245 显存不够照原样，出路由 crash_amplification_explain_exit_code 的 245 那一支打）
 #   弄坏开关读 CRASH_AMPLIFICATION_ITEM_BREAK（开关表与该红的格在 scripts/crash/crash-amplification-item.sh 文件头）：
 #   accept-missing-peer-cards、accept-peer-cards-without-across、accept-missing-card-list、device-unusable-as-run-failure、algorithm-refusal-as-run-failure、
-#   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、library-in-the-old-directory。
+#   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、library-in-the-old-directory、peer-role-ignored。
 #   given-states-run-condition-as-run-failure（给定状态表借不到显存那一行不认、不退 78）只由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #   （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 #   其中 device-unusable-as-run-failure、algorithm-refusal-as-run-failure 打开时 scripts/crash/crash-amplification-two-hosts.sh --selftest 也红
@@ -49,7 +56,7 @@
 #   crash_amplification_switch_wheel <放输出的目录> <取格的正则> <只比退出码 0/1> -- <自证命令…>
 #       调用方先从自己文件头的开关表现读出开关（crash_amplification_read_switch_table，不在代码里另抄名单），填两个同序数组：switch_wheel_assignments 每个开关一项「<变量>=<开关名>」；
 #       switch_wheel_expected 那个开关点名的格，空白隔开，写成「-」表示表里没列它、打开后应当退 0、一格不红。
-#       每个开关一个子进程：先 env -u 清掉数组里出现过的每个变量、只设这一个，再设 CRASH_AMPLIFICATION_SWITCH_WHEEL_INNER（指到这一轮写的标记文件；
+#       每个开关一个子进程（子 shell 里 exec）：先 unset 数组里出现过的每个变量、只 export 这一个，再设 CRASH_AMPLIFICATION_SWITCH_WHEEL_INNER（指到这一轮写的标记文件；
 #       调用方用 crash_amplification_switch_wheel_inner 认它，认出来就不再起开关轮），跑自证命令，标准输出与标准错误并进 <目录>/switch-wheel-<序号>.out，
 #       一批一批起、逐个 wait 收退出码。并行度：CRASH_AMPLIFICATION_SELFTEST_JOBS（正整数），没给取 SINGLEFS_THREAD_CAP（scripts/hosts/capped.sh 设的），再没给取登记的重活默认并行度（.claude/heavy-thread-default）。
 #       对上的逐个打 ·（标准输出），对不上的逐个打 ✗（标准错误，出路由调用方的汇总句给）；交回之后 switch_wheel_failures 是对不上的处数
@@ -78,15 +85,18 @@
 # 自证（单独执行 bash scripts/crash/crash-amplification-lib.sh --selftest；被 source 时不跑）：调真的 crash_amplification_run_on_this_host，
 #   仓根换成临时目录下的假树，内存包装像真的那样收到 TERM 停自己起的子命令（假 scope）再退 143，cargo 是 PATH 前面的假脚本（占着一个文件当「库的锁」、收到 TERM 慢一点放掉），不起重活；
 #   失败行是「✗ 自证 <格名>：…」。格：term-reaches-cargo（放后台的子 shell 里被停）、term-reaches-cargo-in-foreground（调用方的 shell 里没设 TERM 处理）、
-#   term-returns-143-under-caller-trap（调用方设了 TERM 处理）、term-during-build-skips-test、exit-code-passes-through、build-failure-skips-test、caller-term-trap-kept。
+#   term-returns-143-under-caller-trap（调用方设了 TERM 处理）、term-during-build-skips-test、exit-code-passes-through、build-failure-skips-test、caller-term-trap-kept、
+#   rocksdb-entry-refused（假树的 checker 档包依赖 rocksdb、进程环境里没有预编库的取值：交回 78、两步 cargo 都不起；别的格假树里没有这份清单，entry 报不判）。
 #   末尾一轮（开关轮）从下面的表现读开关与点名的格，逐个打开再跑一遍 --selftest，核红的格与点名的逐格相等（判法是同一份库的 crash_amplification_switch_wheel）。
 # 弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=<项>（几个用逗号连；只给 --selftest 证红用）。写法同上面「弄坏开关轮」一段：一行「#   <变量>=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头写点名的格。
 #   CRASH_AMPLIFICATION_LIB_BREAK=term-not-forwarded  收到 TERM 只记一笔、不转给记下的那一趟（cargo 收不到，库的锁一直占到它自己跑完）
-#       term-reaches-cargo、term-reaches-cargo-in-foreground、term-returns-143-under-caller-trap、term-during-build-skips-test
+#       term-reaches-cargo（「✗ 自证 term-reaches-cargo：」）、term-reaches-cargo-in-foreground（「✗ 自证 term-reaches-cargo-in-foreground：」）、term-returns-143-under-caller-trap（「✗ 自证 term-returns-143-under-caller-trap：」）、term-during-build-skips-test（「✗ 自证 term-during-build-skips-test：」）
 #   CRASH_AMPLIFICATION_LIB_BREAK=term-not-waited  转完 TERM 不等它退出、不等库的锁放掉，当场按被停退
-#       term-reaches-cargo、term-reaches-cargo-in-foreground、term-returns-143-under-caller-trap
+#       term-reaches-cargo（「✗ 自证 term-reaches-cargo：」）、term-reaches-cargo-in-foreground（「✗ 自证 term-reaches-cargo-in-foreground：」）、term-returns-143-under-caller-trap（「✗ 自证 term-returns-143-under-caller-trap：」）
 #   CRASH_AMPLIFICATION_LIB_BREAK=term-trap-not-restored  那一趟返回之后不放回调用方原来的 TERM 处理
-#       term-returns-143-under-caller-trap、caller-term-trap-kept
+#       term-returns-143-under-caller-trap（「✗ 自证 term-returns-143-under-caller-trap：」）、caller-term-trap-kept（「✗ 自证 caller-term-trap-kept：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=rocksdb-entry-unchecked  起这一趟的 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#       rocksdb-entry-refused（「✗ 自证 rocksdb-entry-refused：」）
 #
 # 配置（用户 2026-10-10 定：多机配置合成一份，不零散配置；判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J5、J11）：
 #   只读一份多机配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（git 忽略、这台机器一份；模板是仓根的 multi-host.env.example）。
@@ -95,7 +105,7 @@
 #   开关 ENABLE_GPU、ENABLE_ACROSS_MACHINES 的判法不改（没写或写 0 算关，键的定义只在 crash-point-replay-shard-configuration-check.sh）。
 #   显卡的两个键也写在这一份里：GPU_CARDS_BY_PRIORITY（不清场时显卡的先后与每张卡的显存额度，读法在
 #   crates/singlefs-checker-tier/src/gpu_card_configuration.rs 的 parse_cards_by_priority）、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED（清场之后的先后与额度，同一种写法；
-#   全量开跑就清场，用的是这一份）。挑中的那一份显卡先后经环境变量 GPU_CARDS_BY_PRIORITY 交给用例（本机与第二台同一份，各取点名给自己的卡）。
+#   全量开跑就清场，用的是这一份；开了 GPU 一律先清场、用这一份，不清场那一份 crash_amplification_prepare 不再给）。挑中的那一份显卡先后经环境变量 GPU_CARDS_BY_PRIORITY 交给用例（本机与第二台同一份，各取点名给自己的卡）。
 #   私有显卡配置（SINGLEFS_GPU_CARDS_CONFIG 指的那一份、~/.config/singlefs/gpu-cards.env）退役：这里不读它，本机那一趟起 cargo 前 env -u 清掉这个变量，
 #   用例也就读不到它；第二台那几趟本来就只看命令里送过去的环境。
 # 走 GPU 的计算类：不再有正表，也不再经环境变量交。开了 GPU（ENABLE_GPU=1）引擎就三类全走 GPU，它不读 GPU_COMPUTATION_CLASSES
@@ -166,6 +176,7 @@ crash_amplification_prepare() {
   gpu_switch=0; across_machines_switch=0; features="verdict-store"
   [[ "$(crash_amplification_configuration_value "$configuration_file" ENABLE_GPU)" == 1 ]] && gpu_switch=1
   [[ "$(crash_amplification_configuration_value "$configuration_file" ENABLE_ACROSS_MACHINES)" == 1 ]] && across_machines_switch=1
+  crash_amplification_this_host_is_peer && across_machines_switch=0   # 第二台上双机照关算（文件头「第二台」）
   if [[ "${library_is_temporary:-0}" == 1 ]]; then gpu_switch=0; fi  # 自证不上卡
   (( gpu_switch )) && features="verdict-store,gpu"
   local cards_file
@@ -180,6 +191,14 @@ crash_amplification_prepare() {
       return 2
     fi
     gpu_cards_by_priority="$gpu_cards_by_priority_when_quiesced"
+  fi
+  # 开了 GPU 而没清场（quiesced 不是 1）：不再给不清场那一份显卡先后与额度（用卡先清场，.claude/rules/verification.md「凡用 GPU 先清场」），交回 2。
+  #   两个驱动开了 GPU、没带 --quiesced 时在调这里之前已经经 scripts/crash/gpu-quiesce-run.sh 带 --quiesced 重起了自己，走到这里的是绕过了那一步的调用方。
+  #   弄坏开关 unquiesced-gpu-share 下照改前给不清场那一份（GPU_CARDS_BY_PRIORITY）
+  if (( gpu_switch )) && [[ "${quiesced:-0}" != 1 ]] && ! crash_amplification_item_break_is unquiesced-gpu-share; then
+    echo "  ✗ 开了 GPU 却没清场（多机配置：$configuration_file）：不清场那一份显卡额度（GPU_CARDS_BY_PRIORITY）不再用，用卡先清场" >&2
+    echo "  → 怎么办：经 bash scripts/crash/gpu-quiesce-run.sh -- <驱动命令…> --quiesced 起（分项驱动与双机驱动不带 --quiesced 时自己经它重起），多机配置里写清场之后那一份 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED" >&2
+    return 2
   fi
   common_environment=(SINGLEFS_HEAVY_TESTS=user-request "BINDGEN_EXTRA_CLANG_ARGS=$CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS")
   [[ -n "${expand_up_to:-}" ]] && common_environment+=("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=$expand_up_to")
@@ -247,7 +266,7 @@ crash_amplification_threads_now() { # <local|peer> [<显式给的线程数>]
 # 只把 TERM 转给记下的那一个进程号（内存包装：它收到 TERM 自己停它开的 scope，cargo 随之停）、不再起下一步、等记下的那个进程号退出（库的锁随 cargo 退出放掉）、
 # 放回原来的 TERM 处理，
 # 再对自己发 TERM：调用方没设 TERM 处理的（崩溃放量分项驱动的主线、双机驱动放后台的本机那一趟）就此按被停退 143，设了的（双机驱动主线）它的处理跑过之后交回 143。
-# 弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK（文件头「弄坏开关」）：term-not-forwarded、term-not-waited、term-trap-not-restored。
+# 弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK（文件头「弄坏开关」）：term-not-forwarded、term-not-waited、term-trap-not-restored、rocksdb-entry-unchecked。
 crash_amplification_lib_break_is() { [[ ",${CRASH_AMPLIFICATION_LIB_BREAK:-}," == *",$1,"* ]]; }
 
 crash_amplification_process_is_running() { # <进程号>：在跑（没有、或已是僵尸都算没在跑）交回 0
@@ -332,6 +351,14 @@ crash_amplification_run_on_this_host() { # <share> <库目录> <日志> [<附加
   if crash_amplification_item_break_is build-threads-fixed; then
     build_threads=6
   elif ! build_threads="$(crash_amplification_threads_now local "${CRASH_AMPLIFICATION_BUILD_THREADS:-}" 2>"$log")"; then
+    cat -- "$log" >&2
+    return 78
+  fi
+  # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：起这一趟的两步 cargo 之前判 repository_root 那棵树这台装了、此刻进程环境的取值对得上，
+  #   判红交回 78（entry 的红句写进 <日志>、也转打到标准错误），两步都不起。崩溃放量分项驱动与双机驱动本机那几趟都经这里起 cargo。
+  #   树里没有依赖 rocksdb 的清单（自证的假树）、PATH 上是带标记的假 cargo，entry 报不判。弄坏开关 rocksdb-entry-unchecked 下不判（自证 rocksdb-entry-refused 判错）
+  if ! crash_amplification_lib_break_is rocksdb-entry-unchecked \
+     && ! python3 "$(dirname "${BASH_SOURCE[0]}")/../hosts/rocksdb-prebuilt.py" entry --root "$repository_root" >"$log" 2>&1; then
     cat -- "$log" >&2
     return 78
   fi
@@ -429,13 +456,20 @@ PYTHON
 
 crash_amplification_item_break_is() { [[ ",${CRASH_AMPLIFICATION_ITEM_BREAK:-}," == *",$1,"* ]]; }
 
-# 显卡配置与双机开关对不对得上：双机开着两台都要有点名的卡，双机没开不许点名第二台的卡。对得上交回 0，对不上打原因与出路、交回 1
+# 这一台是不是第二台（文件头「第二台」）：SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer；弄坏开关 peer-role-ignored 下一律不是
+crash_amplification_this_host_is_peer() {
+  [[ "${SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE:-local}" == peer ]] && ! crash_amplification_item_break_is peer-role-ignored
+}
+
+# 显卡配置与双机开关对不对得上：双机开着两台都要有点名的卡，双机没开不许点名第二台的卡（这一台是第二台时 local: 那几项是起活那一台的、带过来的配置里本来就有，不算）。
+# 对得上交回 0，对不上打原因与出路、交回 1
 crash_amplification_cards_match_the_hosts() { # <双机开关 0/1> <显卡配置的值>
   local across="$1" cards="$2" names_local=0 names_peer=0 entry
   for entry in $cards; do
     [[ "$entry" == local:* ]] && names_local=1
     [[ "$entry" == peer:* ]] && names_peer=1
   done
+  crash_amplification_this_host_is_peer && return 0
   if [[ "$across" == 1 ]] && (( ! names_local || ! names_peer )) && ! crash_amplification_item_break_is accept-missing-peer-cards; then
     echo "  ✗ 配置开了双机与 GPU，显卡先后「$cards」却没有两台各点名至少一张卡" >&2
     echo "  → 怎么办：修好设备，或改配置：照仓根 multi-host.env.example 在多机配置里给两台各点名卡（local:<序号>:<额度> 与 peer:<序号>:<额度>）；不想用第二台就把多机配置的 ENABLE_ACROSS_MACHINES 改成 0" >&2
@@ -457,6 +491,7 @@ crash_amplification_run_condition_holds() { # [<仓根>]：对得上交回 0；�
   [[ "$(crash_amplification_configuration_value "$configuration" ENABLE_GPU)" == 1 ]] && gpu=1
   [[ "$(crash_amplification_configuration_value "$configuration" ENABLE_ACROSS_MACHINES)" == 1 ]] && across=1
   if [[ -n "${CRASH_AMPLIFICATION_ITEM_SWITCHES:-}" ]]; then IFS=, read -r gpu across <<<"$CRASH_AMPLIFICATION_ITEM_SWITCHES"; fi
+  crash_amplification_this_host_is_peer && across=0   # 第二台上双机照关算（文件头「第二台」）
   [[ "$gpu" == 1 ]] || return 0
   cards_file="$(crash_amplification_cards_source_file "$configuration")"
   if [[ -n "${CRASH_AMPLIFICATION_ITEM_CARDS:-}" ]]; then
@@ -582,7 +617,7 @@ crash_amplification_switch_wheel_verdict() { # <点名的格> <退出码> <输�
 
 crash_amplification_switch_wheel() { # <放输出的目录> <取格的正则> <只比退出码 0/1> -- <自证命令…>（两个数组与交回的变量见文件头）
   local directory="$1" pattern="$2" exit_only="$3" jobs batch index count assignment variable observed shown
-  local variables=" " unset_arguments=() pids=() exits=()
+  local variables=" " unset_names=() pids=() exits=()
   shift 3
   [[ "${1:-}" == -- ]] && shift
   switch_wheel_failures=0; switch_wheel_collected=0
@@ -592,13 +627,17 @@ crash_amplification_switch_wheel() { # <放输出的目录> <取格的正则> <�
   for assignment in ${switch_wheel_assignments[@]+"${switch_wheel_assignments[@]}"}; do
     variable="${assignment%%=*}"
     [[ "$variables" == *" $variable "* ]] && continue
-    variables+="$variable "; unset_arguments+=(-u "$variable")
+    variables+="$variable "; unset_names+=("$variable")
   done
   printf '%s\n' "$CRASH_AMPLIFICATION_SWITCH_WHEEL_MARK_CONTENT" >"$directory/switch-wheel-mark"
   for ((batch = 0; batch < count; batch += jobs)); do
     for ((index = batch; index < batch + jobs && index < count; index++)); do
-      env "${unset_arguments[@]}" "${switch_wheel_assignments[index]}" CRASH_AMPLIFICATION_SWITCH_WHEEL_INNER="$directory/switch-wheel-mark" "$@" \
-        >"$directory/switch-wheel-$index.out" 2>&1 &
+      # 子 shell 里清变量、设这一个开关再 exec 自证命令（不写成 env "${数组[@]}" …：函数单元键折不开数组里的 -u 与赋值，整个闭包拒算）
+      (
+        unset ${unset_names[@]+"${unset_names[@]}"}
+        export "${switch_wheel_assignments[index]}" CRASH_AMPLIFICATION_SWITCH_WHEEL_INNER="$directory/switch-wheel-mark"
+        exec "$@"
+      ) >"$directory/switch-wheel-$index.out" 2>&1 &
       pids[index]=$!
     done
     for ((index = batch; index < batch + jobs && index < count; index++)); do
@@ -628,7 +667,7 @@ crash_amplification_switch_wheel() { # <放输出的目录> <取格的正则> <�
 # 仓根换成格目录下的假树：内存包装像真的那样把命令放后台等、收到 TERM 先停自己起的子命令（假 scope）再退 143，capped.sh 去掉线程数照起，cargo 是 PATH 前面的一个假脚本
 # （像真 cargo 那样占着「库的锁」一个文件、收到 TERM 慢一点放掉、再退）。失败行都是「✗ 自证 <格名>：<细节>」，开关轮靠它认红的格。
 crash_amplification_lib_selftest() {
-  local lib_script work failures=0 cells=0 cell_exit=0 cell_directory=""
+  local lib_script work driver_text failures=0 cells=0 cell_exit=0 cell_directory=""
   lib_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
   work="$(mktemp -d "${TMPDIR:-/tmp}/crash-amplification-lib-selftest.XXXXXX")" || {
     echo "  ✗ --selftest：建不了临时目录（TMPDIR=${TMPDIR:-/tmp}）" >&2
@@ -636,7 +675,9 @@ crash_amplification_lib_selftest() {
     return 2
   }
   trap "rm -rf -- '$work'" EXIT   # 现在展开：函数返回之后局部变量 work 已经没了
-  cat >"$work/driver.sh" <<'DRIVER'
+  # 外壳的正文放进变量、run_cell 用 bash -c 起（不写进文件再 bash 那份文件：写出来的脚本里 source "$2" 折不开，函数单元键拒算；
+  # bash -c 的串之后的词照 $0 $1 … 折进去）
+  driver_text="$(cat <<'DRIVER'
 #!/usr/bin/env bash
 # 自证里调真的 crash_amplification_run_on_this_host 的外壳：$1 仓根（假树）$2 共用库 $3 格目录 $4 形态（foreground 在本 shell 里调、background 像双机驱动那样放后台的子 shell 里调）
 repository_root="$1"; source "$2" || exit 3
@@ -659,6 +700,7 @@ echo "run-returned rc=$run_exit lock=$(lock_state)" >>"$STUB_CALLS"
 trap -p TERM >"$cell/trap-after"
 exit "$run_exit"
 DRIVER
+)"
   cat >"$work/cargo" <<'CARGO'
 #!/usr/bin/env bash
 step=test; [[ " $* " == *" --no-run "* ]] && step=build
@@ -699,7 +741,7 @@ MEMORYCAP
     printf '%s\n' '#!/usr/bin/env bash' 'shift; exec "$@"' >"$cell_directory/root/scripts/hosts/capped.sh"
     cp -- "$work/cargo" "$cell_directory/bin/cargo"; chmod +x "$cell_directory/bin/cargo"
     env -u CRASH_AMPLIFICATION_TERM_WAIT_SECONDS STUB_CALLS="$cell_directory/calls" STUB_LOCK="$cell_directory/library.lock" STUB_DIR="$cell_directory" STUB_HOLD_STEP="$hold_step" \
-      STUB_CALLER_TRAP=0 STUB_BUILD_EXIT=0 STUB_TEST_EXIT=0 "$@" bash "$work/driver.sh" "$cell_directory/root" "$lib_script" "$cell_directory" "$shape" >"$cell_directory/output" 2>&1 &
+      STUB_CALLER_TRAP=0 STUB_BUILD_EXIT=0 STUB_TEST_EXIT=0 "$@" bash -c "$driver_text" driver "$cell_directory/root" "$lib_script" "$cell_directory" "$shape" >"$cell_directory/output" 2>&1 &
     driver_pid=$!
     if [[ "$term_at" != none ]]; then
       while (( waited < 100 )) && { [[ ! -e "$cell_directory/started.$term_at" ]] || { [[ "$shape" == background && ! -e "$cell_directory/run-pid" ]]; }; }; do
@@ -774,6 +816,16 @@ MEMORYCAP
   if [[ "$cell_exit" != 0 ]] || ! grep -qF 'caller-term-trap' "$work/caller-term-trap-kept/trap-after" || grep -qF 'crash_amplification_on_term' "$work/caller-term-trap-kept/trap-after"; then
     cell_failed caller-term-trap-kept "没被停：那一趟返回之后调用方原来的 TERM 处理还在、本库的处理已拆掉（实有「$(cat -- "$work/caller-term-trap-kept/trap-after" 2>/dev/null)」）" \
       "看 crash_amplification_restore_term_trap 与 crash_amplification_run_on_this_host 起头记下的 trap -p TERM"
+  fi
+  # 起 cargo 之前判 RocksDB 预编库的取值：这一格的假树里 checker 档包依赖 rocksdb、进程环境里四个取值是空的、PATH 前面的假 cargo 不带 entry 认的标记
+  #   ⇒ 那一趟交回 78，两步 cargo 都没起，输出里有 rocksdb-prebuilt entry 的红句
+  mkdir -p "$work/rocksdb-entry-refused/root/crates/singlefs-checker-tier"
+  printf '%s\n' '[package]' 'name = "singlefs-checker-tier"' 'version = "0.0.0"' '[dependencies]' 'rocksdb = { version = "=0.25.0", optional = true }' \
+    >"$work/rocksdb-entry-refused/root/crates/singlefs-checker-tier/Cargo.toml"
+  run_cell rocksdb-entry-refused foreground none ROCKSDB_LIB_DIR= ROCKSDB_STATIC= SNAPPY_LIB_DIR= SNAPPY_STATIC=
+  if [[ "$cell_exit" != 78 ]] || calls_have rocksdb-entry-refused '^cargo-' || ! grep -qF 'rocksdb-prebuilt entry：' "$work/rocksdb-entry-refused/output"; then
+    cell_failed rocksdb-entry-refused "树里的 checker 档包依赖 rocksdb 而进程环境里没有预编库的取值，那一趟应当交回 78、两步 cargo 都不起、输出里有 rocksdb-prebuilt entry 的红句" \
+      "看 crash_amplification_run_on_this_host 里两步 cargo 之前 rocksdb-prebuilt.py entry 那一段"
   fi
 
   if (( failures > 0 )); then

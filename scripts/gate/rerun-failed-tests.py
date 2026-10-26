@@ -14,6 +14,7 @@
 认的段头：`Running tests/<目标>.rs (…)` → `--test <目标>`；`Running unittests src/lib.rs (…)` → `--lib`；
 `Running unittests src/bin/<名>.rs (…)` → `--bin <名>`；`Doc-tests` 段不认（文档测试按名字重跑不了），有失败就判红要人看。
 完整性闸：每一段收到的 `test <名> ... FAILED` 条数要等于那一段 `test result:` 行报的 failed 数，对不上判红、stdout 不出命令。
+没有段头的测试结果、认不出目标的新 Running 段都不并入前一个目标；无法定位的失败判红，不生成可能跑错目标的命令。
 结果行与汇总行的解析在 scripts/gate/lib_libtest_result_lines.py（全仓一份）：#[should_panic] 的用例那一段「 - should panic」不进名字。
 一个失败都没有：打印「没有失败的用例」到 stderr、退出 0、stdout 为空。
 弄坏开关 RERUN_FAILED_TESTS_BREAK（只给自证证红用），一项一行，下一行起写打开后判错的自证格：
@@ -76,15 +77,18 @@ def failed_tests_by_target(log_text):
     for line in log_text.split("\n"):
         header = SECTION_HEADER.match(line)
         doctest = DOCTEST_HEADER.match(line)
-        if header or doctest:
+        running = re.match(r"^\s*Running\s+(.+)", line)
+        if header or doctest or running:
             if os.environ.get(BREAK_VARIABLE) == "merge-sections" and current is not None:
                 continue
-            current = {"source": header.group(1) if header else f"doc-tests {doctest.group(1)}",
+            current = {"source": header.group(1) if header else f"doc-tests {doctest.group(1)}" if doctest else running.group(1),
                        "selector": target_selector_of(header.group(1)) if header else None,
                        "failed": [], "reported": None}
             sections.append(current)
             continue
         if current is None:
+            if failed_name_of(line) is not None or libtest_result_lines.summary_line(line) is not None:
+                problems.append("测试结果之前没有 Running / Doc-tests 段头，无法确认所属目标")
             continue
         failed = failed_name_of(line)
         if failed is not None:

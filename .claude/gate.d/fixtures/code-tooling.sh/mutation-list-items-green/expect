@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-list-items
+want=crates-mutation-rows.py --list-items 在被判的根上跑通：列了 1 行，键对不上 1 条（这一趟要现判）
+want=mutation-list-items：绿

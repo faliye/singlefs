@@ -1,0 +1,2 @@
+[workspace]
+members = ["crates/singlefs-harness"]

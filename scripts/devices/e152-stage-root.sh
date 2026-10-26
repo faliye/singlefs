@@ -36,6 +36,7 @@ $ZFS_POOL/libnvpair3linux_2.3.4-1ubuntu2_amd64.deb libnvpair3linux_2.3.4-1ubuntu
 $ZFS_POOL/libuutil3linux_2.3.4-1ubuntu2_amd64.deb libuutil3linux_2.3.4-1ubuntu2_amd64.deb 9b01291a01c2c6832e9a25b1dcd428cfe2fb0886c3bd52725d8baf22ef4e0955
 $BCACHEFS_POOL/bcachefs-tools_24%2breally1.3.4-2build2_amd64.deb bcachefs-tools_24+really1.3.4-2build2_amd64.deb 351dcfb3c14daf6967fe36bfe5b98742b53515dd2a2339cb0f1fd07d25832334"
 mkdir -p "$PACKAGES/debs" || fail "建不了 $PACKAGES" "设 E152_PACKAGE_CACHE 指一个可写的目录"
+VERIFIED_PACKAGES=()
 while read -r url file_name expected_sha256; do
   [[ -n "$url" ]] || continue
   package_file="$PACKAGES/debs/$file_name"
@@ -46,11 +47,12 @@ while read -r url file_name expected_sha256; do
   actual_sha256="$(sha256sum "$package_file" | cut -d' ' -f1)"
   [[ "$actual_sha256" == "$expected_sha256" ]] \
     || fail "$file_name 的 sha256 是 $actual_sha256，表里是 $expected_sha256" "删掉 $package_file 重下；仍对不上就是仓库里的包换了，不许改表了事"
+  VERIFIED_PACKAGES+=("$package_file")
 done <<< "$PACKAGE_TABLE"
 PACKAGE_ROOT="$PACKAGES/root"
 rm -rf "${PACKAGE_ROOT:?}"
 mkdir -p "$PACKAGE_ROOT"
-for package_file in "$PACKAGES"/debs/*.deb; do
+for package_file in "${VERIFIED_PACKAGES[@]}"; do
   dpkg-deb -x "$package_file" "$PACKAGE_ROOT" || fail "解包 $package_file 失败" "删掉它重下"
 done
 

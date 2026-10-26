@@ -1,0 +1,4 @@
+exit=1
+want=决策正文改了 12 行，却没往变更史新增任何条目
+want=  entry-added：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（entry-added）

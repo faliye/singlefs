@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mount-transparency-fields
+want=挂载透明字段表与 kb 对得上：D13 逐字段表 5 行（harness 引 4 行、不按字节比登记 1 行），根记录 4 段、系统配置 3 段的名字与区间与 kb 相同
+want=doc-registries.sh：1 格里 1 格绿（mount-transparency-fields），0 格本次未跑（无）

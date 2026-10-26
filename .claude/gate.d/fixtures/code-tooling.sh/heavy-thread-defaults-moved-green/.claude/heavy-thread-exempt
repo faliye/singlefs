@@ -1,0 +1,2 @@
+# 样本：scripts/old-rig 整个搬到 scripts/new-rig（.claude/gate.d/path-moves.tsv 登记了），表里那一行改成新路径
+scripts/new-rig/report_cores.sh:jobs=$(nproc)  # 样本：只把核数打出来，不起线程

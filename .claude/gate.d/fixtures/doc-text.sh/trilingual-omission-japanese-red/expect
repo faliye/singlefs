@@ -1,0 +1,10 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-omission
+want=三语译文与中文的内容量对不上：过短 5 处、过长 0 处、配不上 0 处（段数不同的节与编号行），在 1 份译文里
+want=按文件：README.ja.md  5 处
+want=README.ja.md:7  日语，内容量比 0.19（不到 0.9，过短）
+want=README.ja.md:9  日语，内容量比 0.28（不到 0.9，过短）
+want=README.ja.md:11  日语，内容量比 0.25（不到 0.9，过短）
+want=README.ja.md:12  日语，内容量比 0.31（不到 0.9，过短）
+want=README.ja.md:16  日语，内容量比 0.89（不到 0.9，过短）
+want=doc-text.sh：1 格里 1 格红（trilingual-omission）

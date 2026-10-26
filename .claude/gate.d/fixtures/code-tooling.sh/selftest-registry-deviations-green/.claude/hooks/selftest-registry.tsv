@@ -1,0 +1,4 @@
+# 样本登记表：heavy 与 heavy-if-set 各一行都以「偏离上游：」起头、写了起的是什么与为什么换不成假的
+scripts/gate/sample-light.sh	light	# 只起假的 cargo 打一行就退
+scripts/gate/sample-heavy.sh	heavy	# 偏离上游：自证起 QEMU 虚机跑桩程序，测的就是虚机这一层，换不成假的
+scripts/crash/sample-heavy-if-set.sh	heavy-if-set:SINGLEFS_HEAVY_TESTS	# 偏离上游：设了变量再经真双机驱动编译、真跑用例，要核的正是真用例的录入段

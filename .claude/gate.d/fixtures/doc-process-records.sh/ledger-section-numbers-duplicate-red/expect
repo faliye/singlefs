@@ -1,0 +1,6 @@
+exit=1
+want=✗ records/2026-10-23-subagent拆分提案.md：「## 一百零三、」标题重号 2 处（第 19、23 行）
+want=✗ records/2026-10-23-subagent拆分提案.md 的节号与索引有 1 处对不上（2 个节号）
+want=样本只跑 .gate-cells 点名的格：ledger-section-numbers
+want=doc-process-records.sh：1 格里 1 格红（ledger-section-numbers）
+want=bash .claude/gate.d/doc-process-records.sh --check ledger-section-numbers

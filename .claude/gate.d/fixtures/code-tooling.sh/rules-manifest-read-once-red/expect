@@ -1,0 +1,4 @@
+exit=1
+want=的 read-once 登记了这些规则，但 .claude/rules/ 与上游副本 .claude/singlefs-ai-sop/rules/ 里都没有——登记悬空：
+want=     .claude/rules/ghost.md
+want=rules-manifest：红（退出 1）

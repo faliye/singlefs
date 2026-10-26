@@ -1,0 +1,8 @@
+exit=1
+want=kb 这次改动新增的 2 句「不可达 / 走不到 / 触发不了」断言既没带仓里在的用例名，也没写「推的」「没量过」（基准 HEAD）
+want=      .claude/kb/checks-owed.md：- C2 掉盘之后挂成可写这一格不可达
+want=      .claude/kb/checks-owed.md：- C3 两盘都旧时走不到重同步那一支（用例 `ghost_case_rejects`）（ghost_case_rejects 在 crates/、scripts/ 下找不到 #[test] fn 定义）
+want=没有这样的用例就写「推的，没量过」
+want=样本只跑 .gate-cells 点名的格：unreachable-claims
+want=  unreachable-claims：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（unreachable-claims）

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 查库并行样本的假 cargo（快档样本档）：-V 打版本；test 带 --test <目标> 且有 cases/test.<目标>.log 的，打那一份日志、退出码照同名 .exit（没有就 0）；
+# 别的 test：不带 --features 打 cases/default-pass.log，带 --features <特性> 打 cases/feature-pass.<特性，逐号换成 +>.log，没有那一份日志退 101。别的一律退 101。
+# 查库那一趟（环境里 SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1）另认三样，都放在 cases/ 里：
+#   barrier                    一行「<条数> <最多等几秒>」：每条先在 cases/barrier-state/ 下留一个以目标命名的空文件，等那里凑齐这么多个才往下走，等不齐退 98；
+#                              只有同时在跑的查库有这么多条才凑得齐，所以串行起的查库在这里退 98
+#   test.<目标>.delay          一个数：凑齐（或没有 barrier）之后再睡这么多秒才打日志，造「先派的后收到」
+#   test.<目标>.kill-parent    在时：打完日志给自己的父进程发 KILL（并行起查库的那个后台子 shell 就是它的父进程，死了就不写退出码文件），造「某一条没留下退出码」
+# 每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>。同名 .signal 在时打完日志给自己发它写的信号。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+features=""
+target=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --features ]]; then features="$word"; fi
+  if [[ "$previous" == --test ]]; then target="$word"; fi
+  previous="$word"
+done
+log="$here/cases/default-pass.log"
+if [[ -n "$features" ]]; then log="$here/cases/feature-pass.${features//,/+}.log"; fi
+if [[ -n "$target" && -f "$here/cases/test.$target.log" ]]; then log="$here/cases/test.$target.log"; fi
+[[ -f "$log" ]] || { echo "样本里没有这组特性的日志：${log##*/}（参数：$*）"; exit 101; }
+# 收到的参数打成一行 CRASH_POINT_REPLAY_PROGRESS（阶段只转出这一类行），expect 靠它核阶段真的把哪些参数交给了 cargo
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+if [[ "${SINGLEFS_CRASH_CASE_BLOCKS_QUERY:-}" == 1 && -n "$target" ]]; then
+  if [[ -f "$here/cases/barrier" ]]; then
+    read -r needed patience < "$here/cases/barrier"
+    mkdir -p "$here/cases/barrier-state"
+    : > "$here/cases/barrier-state/$target"
+    ticks=0
+    while (( $(find "$here/cases/barrier-state" -type f | wc -l) < needed )); do
+      sleep 0.1
+      ticks=$((ticks + 1))
+      if (( ticks > patience * 10 )); then rm -f "$here/cases/barrier-state/$target"; echo "同时在跑的查库没凑齐 $needed 条（等了 $patience 秒）：查库不是并行起的"; exit 98; fi
+    done
+  fi
+  [[ -f "$here/cases/test.$target.delay" ]] && sleep "$(cat "$here/cases/test.$target.delay")"
+fi
+cat "$log"
+if [[ -f "${log%.log}.signal" ]]; then kill -s "$(cat "${log%.log}.signal")" "$$"; fi
+if [[ "${SINGLEFS_CRASH_CASE_BLOCKS_QUERY:-}" == 1 && -n "$target" && -f "$here/cases/test.$target.kill-parent" ]]; then kill -s KILL "$PPID"; fi
+exit "$(cat "${log%.log}.exit" 2>/dev/null || echo 0)"

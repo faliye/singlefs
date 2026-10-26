@@ -1,0 +1,3 @@
+exit=1
+want=未登记的 Verus 核：crates/singlefs-replay-prefix/src/attributed.rs（属性写法
+want=verus-proof：红（退出 1）

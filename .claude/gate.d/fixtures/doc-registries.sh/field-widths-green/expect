@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：field-widths
+want=新池新建文件字段表写了宽度的行，宽度都写在被指的已定分项里（判了 3 行；宽度写成算式、几段或指向里没有已定项的 2 行不判）
+want=doc-registries.sh：1 格里 1 格绿（field-widths），0 格本次未跑（无）

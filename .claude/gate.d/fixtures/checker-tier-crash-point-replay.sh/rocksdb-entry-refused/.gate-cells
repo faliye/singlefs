@@ -1,0 +1,2 @@
+# checker 档包依赖 rocksdb、假 cargo 不带 rocksdb-prebuilt.py 认的标记：起 cargo 之前 entry 判红、退 1，算给崩溃枚举用例那一格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

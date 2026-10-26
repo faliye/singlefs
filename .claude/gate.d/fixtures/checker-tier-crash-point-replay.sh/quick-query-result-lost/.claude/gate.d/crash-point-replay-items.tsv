@@ -1,0 +1,4 @@
+# 样本的崩溃点重放合表（开跑前的静态判据 crash-case-check.py --only placement 读它：每条 crash-case: 恰好被一项点名，写法同仓里那一份的表头）
+settled-covered-stream	crash-case:settled-covered-stream	-	settled_covered_stream	# 样本
+vanishing-stream	crash-case:vanishing-stream	-	vanishing_stream	# 样本
+uncovered-stream	crash-case:uncovered-stream	-	uncovered_stream	# 样本

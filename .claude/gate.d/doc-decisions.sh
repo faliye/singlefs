@@ -55,9 +55,23 @@
 #   decision-history-green                  决策正文改了 7 行，D1 节新增一个带一条顶格 `- ` 项的日期块：entry-added、shape 都绿
 #   shape-red                               shape 的 a 到 e 五样都有新增的，基准里另有存量只计数：shape 红
 #   shape-green                             新增的日期块都住对节、同节日期不重复、围栏里的旧形态不算，存量只计数：shape 绿、entry-added 本次未跑
+#   entry-added-moved-only-not-run          决策正文 6 行点名的 tools/old-rig 搬到 tools/new-rig、登记在 .claude/gate.d/path-moves.tsv，这一次只换了这 6 行的路径、变更史没新增条目：
+#                                           只差登记的搬迁不算决策正文改了，entry-added 无对象可判、整道退 77
+#   entry-added-moved-unregistered-red      现场同上、搬迁没登记：决策正文改了 12 行、没新增变更史条目，entry-added 红
+#   entry-added-moved-and-edited-red        现场同 entry-added-moved-only-not-run（搬迁登记了），另把一行正文改了：决策正文改了 14 行，entry-added 红
 #   settled-same-file-item-heading-red / -green  settled-same-file 的分项定案标题样本：本次提交在未定项一节之前新增 `#### 已定项 2：丙问题`；
 #                                           红的那份未定项一字未动、索引页待议节补了复核注，红在那条未定项上；绿的那份未定项与待议节都补了复核注，绿
 #   history-loss-red / history-loss-green   基准里一块带一个数：整理时弄丢了判红；整理成一条结论、数都在判绿
+#   history-loss-moved-commit-ref-green     tools/old-rig 搬到 tools/new-rig 并登记，变更史一块里「改前」行留着 `git show 31e47115:tools/old-rig/run.sh`、「依据」行换成新路径：
+#                                           换算基准那一版时提交引用后面的路径不换，与改后逐字相同，判绿
+#   history-loss-moved-unregistered-red     现场同上、搬迁没登记：「依据」那一行在改后找不到，判红
+#   history-loss-moved-and-edited-red       现场同 history-loss-moved-commit-ref-green（登记了），另删了「依据」行里的 1.7：判红在 1.7
+#   shape-moved-only-green                  存量节外日期块（上一级标题「## 杂项」）里一行点名的 tools/old-rig 搬到 tools/new-rig 并登记，那一行只换了路径：
+#                                           只因搬迁才变了的行不算新增，那一块仍是存量，shape 绿、存量「条目住在节外 1 处」
+#   shape-moved-unregistered-red            现场同上、搬迁没登记：那一行算新增，红在「1 个新写的日期块没住进自己的节」
+#   shape-moved-and-edited-red              现场同 shape-moved-only-green（登记了），那一行除了换路径还补了半句：红在同一处
+#   history-loss-base-unreadable-red        现场同 history-loss-green，基准那一版变更史的对象从对象库里删掉（ls-tree 认得出、show 读不出）：
+#                                           判红在「读不出基准 HEAD 里的 .claude/kb/decisions-history.md」（取法 lib-lag-baseline.py show；改前跳过、报「与基准无差异」退 77）
 #   cross-decision-status-noun-phrase-red   D2502 写「D2501 的条带宽度可变粒度仍然未定」而 D2501 已定（隔着名词短语）；半定的 D2509 同样判红：cross-decision-status 红
 #   cross-decision-status-quoted-red        「」引文里的陈旧写法（隔名词短语的与紧贴的各一处），引文旁边没有现状：红
 #   cross-decision-status-relaxed-green     引文带现状（同一句、下一句、引用块之后的下一段）、「未定 0 项」「余下三项未定」、说成未定、当时未定、夹了 E12 的、待定的决策说未定：绿
@@ -68,6 +82,9 @@
 #                                           绿：指到存在的材料、腿况缺失、否定的「没有走三方论证」、「」里引的阴性原话、「第三方」、被挂账表罩住
 #   evidence-ledger-red                     挂账表写坏（列数、格名、片段太短）与罩不住（对象不红、文件不在），三格都红
 #   evidence-ledger-grew-red                setup.sh 造 git 仓：挂账表相对基准提交多了一行：three-way-leg-record 红
+#   evidence-ledger-base-unreadable-red     setup.sh 造 git 仓：挂账表与基准逐字相同，基准那一版挂账表的对象从对象库里删掉（ls-tree 认得出、show 读不出）：
+#                                           三格都红在「读不出基准 HEAD 里的 .claude/gate.d/decision-evidence-lag.tsv（git show 退 128…），这张表只缩不涨没比」
+#                                           （取法 lib-lag-baseline.py 的 baseline_text；改前 base_ledger_text 把取不到当成基准里没有这张表，三格都绿）
 #   evidence-pointer-history-green          setup.sh 造 git 仓：判决与材料先提交、后整批删掉（归档出了树，git 历史里取得回来）：inference-needs-verdict、three-way-leg-record 绿
 #   按编号取文件的三份（决策有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的登记表取中文原文，判法 lib-item-ref-status.py 的 numbered_files 与 heads_for_referrer）：
 #   freeze-layer-membership-translation-green  D15、D18 各有两份译文，首行写成 `## D15 (…) — Settled` 读不出、里面也没有「#### 已定项 7 / 11」：
@@ -75,54 +92,96 @@
 #   freeze-layer-membership-translation-red    同一套文件，登记表一行依据点名 D18 已定项 5、中文原文没有：freeze-layer-membership 红、点名「D18 第 5 条分项」
 #   write-frequency-translation-green       D1 有两份读不出首行的译文，登记表的权威分项在中文原文里：write-frequency 绿（改前 load_map() 当场退 1、报「2 份首行读不出」）
 #   数一遍、按语言分组的两份（判法 lib-item-ref-status.py 的 same_language_files 与 files_by_language）：
-#   kb-shape-translation-green              D1、D2 各有中文原文与英语、日语译文，译文的分项小节是各自的语言（### Settled Items 这类），首行状态词照第 5 段的判据写：
+#   kb-shape-translation-green              D1、D2 各有中文原文与英语、日语译文，译文的分项小节是各自的语言（### Settled Items 这类），首行状态词写中文的（首行写成各自语言的另见 kb-shape-translation-first-line-green）：
 #                                           kb-shape 绿，第 5 段报「中文原文 2 条、译文 .en.md 2 条、译文 .ja.md 2 条」，第 7 段报没对的译文份数
 #                                           （改前第 5 段把三语的号并成 [1, 1, 1, 2, 2, 2] 判不连号，第 7 段拿中文索引去对译文、每条决策多报两遍「已定 0 项 / 未定 0 项」）
 #   kb-shape-translation-red                同一套文件，中文索引表 D2 写「已定 2 项 / 未定 0 项」而中文原文是 1 / 1，日语译文 02 那一份首行写成 D3：
 #                                           kb-shape 红，点名中文原文的 D2 计数与「决策编号不连续或不从 D1 起（译文 .ja.md）：[1, 3]」
+#   item-ref-status 认变更史节标题与孤立译文的四份（判法 lib-item-ref-status.py 的 references、is_orphan_translation、orphan_translations）：
+#   item-ref-status-history-section-green   变更史 `## D931（样本甲）` / `## D932（样本乙）` 两节，节里 `### <日期>` 的条目裸写「已定项 k / 未定项 k」（D932 节里一条先提到 D931），
+#                                           都归节标题那条决策、状态相符：item-ref-status 绿（改前往前找最近提到的 D 号，归到 D931 上报不一致）
+#   item-ref-status-history-section-red     同样的变更史，D932 节里裸写的「已定项 1」归到节标题 D932 之后状态不符（D932 的第 1 条是未定；
+#                                           改前往前找最近提到的 D931，D931 的第 1 条是已定、判绿）：item-ref-status 红、点名 D932
+#   item-ref-status-orphan-translation-red  decisions/ 下有两份没有同名中文原文的译文（一份首行读得出、编号同 D941 的中文原文，一份首行读不出），中文引用方写的
+#                                           「D941（样本甲） 已定项 2」按中文原文判（改前 D941 被孤立译文的分项表整张换掉，报「没有第 2 条」）：红在孤立译文这一类上，另有一处真不一致
+#   item-ref-status-orphan-translation-green  每份译文都有同名的中文原文：不报孤立译文，绿
+#   译文首行与中文写法不同的两份（决策表、第 5 段的标题与分项只读中文原文，判法 lib-item-ref-status.py 的 decision_heads 与 originals_only）：
+#   item-ref-status-translation-first-line-green  D941 的英语译文首行用单破折号、日语译文用冒号没有破折号：item-ref-status 绿（改前报「2 份首行读不出」）
+#   kb-shape-translation-first-line-green   kb-shape-translation-green 的四份译文首行写成各自的语言（`— Settled`、`—— 確定` 这类）：kb-shape 绿，第 5 段报「译文 4 份只按语言判编号连号」
+#                                           （改前第 5 段拿中文的状态词判译文的标题，四份都报「标题缺状态」）
 # 弄坏开关（样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-decisions.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：红格按绿记、整道退 0
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-history-red、decision-items-sync-red、decision-summary-width-red、
 #       freeze-layer-membership-red、history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、
 #       settled-same-file-item-heading-red、settled-same-file-red、shape-cells-marker-red、shape-red、stale-open-items-red、status-redundancy-red、user-verdict-owed-red、
-#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、
-#       write-frequency-red、freeze-layer-membership-translation-red、kb-shape-translation-red（期望退出 1，实测 0）
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-red、evidence-ledger-grew-red、evidence-ledger-base-unreadable-red、
+#       inference-needs-verdict-red、three-way-leg-record-red、write-frequency-red、freeze-layer-membership-translation-red、kb-shape-translation-red、
+#       item-ref-status-history-section-red、item-ref-status-orphan-translation-red、history-loss-base-unreadable-red（期望退出 1，实测 0）
+#       entry-added-moved-unregistered-red、entry-added-moved-and-edited-red、history-loss-moved-unregistered-red、history-loss-moved-and-edited-red、shape-moved-unregistered-red、shape-moved-and-edited-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
 #       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red、
-#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
-#       evidence-ledger-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、history-loss-base-unreadable-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       evidence-ledger-red、evidence-ledger-base-unreadable-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
 #       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
 #       freeze-layer-membership-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
 #       freeze-layer-membership-translation-green、write-frequency-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
-#       kb-shape-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；kb-shape-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#       kb-shape-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；kb-shape-translation-green、kb-shape-translation-first-line-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
+#       item-ref-status-history-section-red、item-ref-status-orphan-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       item-ref-status-history-section-green、item-ref-status-orphan-translation-green、item-ref-status-translation-first-line-green（期望退出 0，实测 1）
+#       entry-added-moved-unregistered-red、entry-added-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；entry-added-moved-only-not-run（期望退出 77，实测 1）
+#       history-loss-moved-unregistered-red、history-loss-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；history-loss-moved-commit-ref-green（期望退出 0，实测 1）
+#       shape-moved-unregistered-red、shape-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；shape-moved-only-green（期望退出 0，实测 1）
+#       cross-decision-status-ledger-green、cross-decision-status-relaxed-green、decision-items-sync-translation-green、evidence-pointer-history-green、
+#       inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）
 #   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
 #       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red、
-#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
-#       evidence-ledger-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、history-loss-base-unreadable-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       evidence-ledger-red、evidence-ledger-base-unreadable-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
 #       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
 #       freeze-layer-membership-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
 #       freeze-layer-membership-translation-green、write-frequency-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
-#       kb-shape-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；kb-shape-translation-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#       kb-shape-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；kb-shape-translation-green、kb-shape-translation-first-line-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）；
+#       item-ref-status-history-section-red、item-ref-status-orphan-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       item-ref-status-history-section-green、item-ref-status-orphan-translation-green、item-ref-status-translation-first-line-green（期望退出 0，实测 1）
+#       entry-added-moved-unregistered-red、entry-added-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；entry-added-moved-only-not-run（期望退出 77，实测 1）
+#       history-loss-moved-unregistered-red、history-loss-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；history-loss-moved-commit-ref-green（期望退出 0，实测 1）
+#       shape-moved-unregistered-red、shape-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；shape-moved-only-green（期望退出 0，实测 1）
+#       cross-decision-status-ledger-green、cross-decision-status-relaxed-green、decision-items-sync-translation-green、evidence-pointer-history-green、
+#       inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）
 #   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：按编号取文件不分语言、取排序后的第一个命中（改前的取法，取到 <号>-<名>.en.md），
 #                                       heads_for_referrer 不筛语言（读不出首行的译文也算这一格的对象）；same_language_files 不筛语言、files_by_language 并成一组
 #                                       （kb-shape 第 7 段拿中文索引去对译文，第 5 段把三语的号并成一个列表判连号）
-#       freeze-layer-membership-translation-green、write-frequency-translation-green、kb-shape-translation-green（期望退出 0，实测 1）；
-#       kb-shape-translation-red（输出里找不到「决策编号不连续或不从 D1 起（译文 .ja.md）：[1, 3]」）
+#       freeze-layer-membership-translation-green、write-frequency-translation-green、kb-shape-translation-green、kb-shape-translation-first-line-green、
+#       item-ref-status-translation-first-line-green（期望退出 0，实测 1；后一份是 decision_heads 在这个开关下也连译文一起读）；
+#       kb-shape-translation-red（输出里找不到「决策编号不连续或不从 D1 起（译文 .ja.md）：[1, 3]」）；
+#       item-ref-status-orphan-translation-red（输出里找不到「decisions/ 下有 2 份孤立译文」：这个开关下不区分孤立与否，孤立译文又进决策表）
+#   KB_ORPHAN_TRANSLATION_BREAK=substitute  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：孤立译文（带语言后缀、同目录没有同名中文原文）又进决策表、
+#                                       顶替同号的中文原文，也不单独报一类（改前的口径）
+#       item-ref-status-orphan-translation-red（输出里找不到「decisions/ 下有 2 份孤立译文」）
+#   KB_HISTORY_SECTION_OWNER_BREAK=nearest-d  归 lib-item-ref-status.py：不认变更史的 `## D<n>（简称）` 节标题，每个 `### ` 标题都把标题上的归属清掉（改前的口径），
+#                                       节里裸写的分项退回「往前找最近提到的 D 号」
+#       item-ref-status-history-section-green（期望退出 0，实测 1）；item-ref-status-history-section-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=kb-shape  kb-shape 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味…」）；kb-shape-red（期望退出 1，实测 0）；
-#       kb-shape-translation-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味（6 条决策…」）；kb-shape-translation-red（期望退出 1，实测 0）
+#       kb-shape-translation-green、kb-shape-translation-first-line-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味（2 条决策…」）；kb-shape-translation-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=item-ref-status  item-ref-status 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「分项引用与正文状态一致…」）；decision-documents-some-cells-not-run（输出里找不到「  item-ref-status：本次未跑」）；
-#       item-ref-status-red（期望退出 1，实测 0）
+#       item-ref-status-red、item-ref-status-history-section-red、item-ref-status-orphan-translation-red（期望退出 1，实测 0）；
+#       item-ref-status-history-section-green、item-ref-status-orphan-translation-green、item-ref-status-translation-first-line-green（输出里找不到「分项引用与正文状态一致…」）
+#   DOC_DECISIONS_BREAK=read-translations  kb-shape 第 5 段的标题状态、分项两节、未定条数连译文一起判（改前；编号连号照旧按语言各判各的）
+#       kb-shape-translation-first-line-green（期望退出 0，实测 1）；
+#       kb-shape-translation-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味（2 条决策、核 3 行分项索引；译文 4 份只按语言判编号连号）…」：译文也进了判，成功句不再报只按语言判的译文份数）
+#   KB_DECISION_HEADS_BREAK=read-translations  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：决策表连译文一起读（改前），译文首行读不出就报红
+#       item-ref-status-translation-first-line-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=status-redundancy  status-redundancy 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「状态只说一遍，且分项都在对的节里…」）；status-redundancy-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=cross-decision-status  cross-decision-status 格不跑、按判过了记
@@ -130,7 +189,8 @@
 #       decision-documents-green（输出里找不到「没有把已定的决策说成未定…」）；
 #       cross-decision-status-relaxed-green（输出里找不到「没有把已定的决策说成未定（扫 3 份 kb 文件，比对 3 条决策的状态行）」）；
 #       cross-decision-status-ledger-green（输出里找不到「没有把已定的决策说成未定（扫 2 份 kb 文件，比对 2 条决策的状态行）」）；
-#       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 4 处不对」）
+#       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 4 处不对」）；
+#       evidence-ledger-base-unreadable-red（输出里找不到「  cross-decision-status：红（退出 1）」）
 #   DOC_DECISIONS_BREAK=settled-item-self-open  settled-item-self-open 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「已定项的正文没有把已经定了的东西说成未定…」）；settled-item-self-open-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=settled-ref-says-open  settled-ref-says-open 格不跑、按判过了记
@@ -149,7 +209,8 @@
 #       decision-documents-green（输出里找不到「冻结层归属登记表判过了…」）；decision-documents-some-cells-not-run（输出里找不到「  freeze-layer-membership：本次未跑」）；
 #       freeze-layer-membership-red、freeze-layer-membership-translation-red（期望退出 1，实测 0）；freeze-layer-membership-translation-green（输出里找不到「冻结层归属登记表判过了…」）
 #   DOC_DECISIONS_BREAK=decision-items-sync  decision-items-sync 格不跑、按判过了记
-#       decision-documents-green（输出里找不到「决策索引表状态列与进度列与正文同步（21 条决策）」）；decision-items-sync-red（期望退出 1，实测 0）
+#       decision-documents-green（输出里找不到「决策索引表状态列与进度列与正文同步（21 条决策）」）；decision-items-sync-red（期望退出 1，实测 0）；
+#       decision-items-sync-translation-green（输出里找不到「决策索引表状态列与进度列与正文同步（1 条决策）」）
 #   GEN_DECISION_ITEMS_BREAK=read-translations  归生成器 .claude/scripts/gen-decision-items.py（设进环境，被 decision-items-sync 格起的生成器继承）：译文也当正文读（改前的 glob）
 #       decision-items-sync-translation-green（期望退出 0，实测 1：「✗ 生成器跑不起来」下接「首行读不出」）
 #   DOC_DECISIONS_BREAK=blocking-verdict  blocking-verdict 格不跑、按判过了记
@@ -164,12 +225,15 @@
 #       write-frequency-red（期望退出 1，实测 0）；write-frequency-translation-green（输出里找不到「同一结构的写频率只有一个量级…」）
 #   DOC_DECISIONS_BREAK=entry-added  entry-added 格不跑、按判过了记
 #       decision-history-green（输出里找不到「决策正文改了 7 行，变更史新增 1 条条目」）；decision-history-red（输出里找不到「决策正文改了 2 行（碰了 2 行状态行，不按小改动放行），…」）；
-#       shape-green（输出里找不到「doc-decisions.sh：2 格里 1 格绿…」）
+#       shape-green（输出里找不到「doc-decisions.sh：2 格里 1 格绿…」）；entry-added-moved-unregistered-red、entry-added-moved-and-edited-red（期望退出 1，实测 0）；
+#       entry-added-moved-only-not-run（期望退出 77，实测 0）
 #   DOC_DECISIONS_BREAK=shape  shape 格不跑、按判过了记
 #       decision-history-green（输出里找不到「查了 3 份 kb 文件、1 个 `### 日期` 标题…」）；decision-history-red（输出里找不到「.claude/kb/invariants.md:5  ##…」）；
-#       shape-cells-marker-red、shape-red（期望退出 1，实测 0）；shape-green（输出里找不到「变更史的形状对：查了 7 份 kb 文件、11 个 `###…」）
+#       shape-cells-marker-red、shape-red（期望退出 1，实测 0）；shape-green（输出里找不到「变更史的形状对：查了 7 份 kb 文件、11 个 `###…」）；
+#       shape-moved-unregistered-red、shape-moved-and-edited-red（期望退出 1，实测 0）；shape-moved-only-green（输出里找不到「变更史的形状对：查了 1 份 kb 文件、2 个 `###…」）
 #   DOC_DECISIONS_BREAK=history-loss  history-loss 格不跑、按判过了记
-#       history-loss-green（输出里找不到「变更史整理没丢：查了 1 份，基准里每个日期块的数、编号、产…」）；history-loss-red（期望退出 1，实测 0）
+#       history-loss-green（输出里找不到「变更史整理没丢：查了 1 份，基准里每个日期块的数、编号、产…」）；history-loss-red、history-loss-base-unreadable-red（期望退出 1，实测 0）；
+#       history-loss-moved-commit-ref-green（输出里找不到「变更史整理没丢：查了 1 份，基准里每个日期块的数、编号、产…」）；history-loss-moved-unregistered-red、history-loss-moved-and-edited-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=write-frequency-levels-merged  write-frequency 不同级一律判同级
 #       write-frequency-green（期望退出 0，实测 1）；write-frequency-red（输出里找不到「01-写频率样本甲.md:11「系统配置槽」写成「每次挂载」…」）
 #   DOC_DECISIONS_BREAK=write-frequency-negation-asserts  write-frequency 否定形态也算断言
@@ -181,12 +245,13 @@
 #   DOC_DECISIONS_BREAK=write-frequency-restriction-as-plain  write-frequency「只在 / 仅」当普通断言
 #       write-frequency-green（输出里找不到「同一结构的写频率只有一个量级…」）；write-frequency-red（输出里找不到「01-写频率样本甲.md:15「系统配置槽」用「只在 / 仅…」）
 #   DOC_DECISIONS_BREAK=stock-judged  shape 把存量也当新增判
-#       shape-green（期望退出 0，实测 1）；shape-red（输出里找不到「2 处新写的标题把日期与「（其N）」粘在同一个 `### `…」）
+#       shape-green、shape-moved-only-green（期望退出 0，实测 1）；shape-red（输出里找不到「2 处新写的标题把日期与「（其N）」粘在同一个 `### `…」）
 #   DOC_DECISIONS_BREAK=fused-ignored  shape 不判 a（日期与序号粘在一起）
 #       decision-history-red（输出里找不到「.claude/kb/invariants.md:5  ##…」）；shape-cells-marker-red（期望退出 1，实测 0）；
 #       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「2 处新写的标题把日期与「（其N）」粘在同一个 `### `…」）
 #   DOC_DECISIONS_BREAK=no-home-ignored  shape 不判 b（日期块没住进自己的节）
-#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「4 个新写的日期块没住进自己的节」）
+#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「4 个新写的日期块没住进自己的节」）；
+#       shape-moved-only-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-moved-unregistered-red、shape-moved-and-edited-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=duplicate-date-ignored  shape 不判 c（同节同一个日期开几块）
 #       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「2 组同一节里同一个日期开了几个 `### ` 块」）
 #   DOC_DECISIONS_BREAK=wrapper-ignored  shape 不判 d（旧形态包装）
@@ -198,11 +263,13 @@
 #   DOC_DECISIONS_BREAK=inference-needs-verdict  inference-needs-verdict 格不跑、按判过了记
 #       inference-needs-verdict-red（期望退出 1，实测 0）；inference-needs-verdict-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、5 条依据条目，带推论记号的 2 条…」）；
 #       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 5 处不对」）；
-#       evidence-pointer-history-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、2 条依据条目，带推论记号的 1 条…」）
+#       evidence-pointer-history-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、2 条依据条目，带推论记号的 1 条…」）；
+#       evidence-ledger-base-unreadable-red（输出里找不到「  inference-needs-verdict：红（退出 1）」）
 #   DOC_DECISIONS_BREAK=three-way-leg-record  three-way-leg-record 格不跑、按判过了记
 #       three-way-leg-record-red、evidence-ledger-grew-red（期望退出 1，实测 0）；three-way-leg-record-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、6 条依据条目，写了「三方」的 4 条…」）；
 #       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 3 处不对」）；
-#       evidence-pointer-history-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、2 条依据条目，写了「三方」的 1 条…」）
+#       evidence-pointer-history-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、2 条依据条目，写了「三方」的 1 条…」）；
+#       evidence-ledger-base-unreadable-red（输出里找不到「  three-way-leg-record：红（退出 1）」）
 #   DOC_DECISIONS_BREAK=cross-decision-status-tight-only  cross-decision-status 只认紧贴的写法（改前的判法）
 #       cross-decision-status-noun-phrase-red（期望退出 1，实测 0）；cross-decision-status-ledger-green（期望退出 0，实测 1：挂账行罩的那一句不红了）；
 #       cross-decision-status-quoted-red（输出里找不到「.claude/kb/decisions/2504-引文样本引用方.md:3 说 D2503 未定（隔着名词短语，在「」引文里…」）；
@@ -216,15 +283,21 @@
 #   DOC_DECISIONS_BREAK=cross-decision-status-history-phrases-judged  「说成未定」「（当时未定）」也判
 #       cross-decision-status-relaxed-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=cross-decision-status-other-number-ignored  决策号与「未定」之间夹了别的编号也判
-#       cross-decision-status-relaxed-green（期望退出 0，实测 1）
+#       cross-decision-status-relaxed-green、decision-documents-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=evidence-pointer-unchecked  点名了判决 / 材料就算指到，不查存在（inference-needs-verdict、three-way-leg-record 共用）
 #       inference-needs-verdict-red（输出里找不到「自陈是推论的依据条目没有指到存在的判决：2 条」）；three-way-leg-record-red（输出里找不到「依据里写了「三方」而没有腿况记录：3 条」）
 #   DOC_DECISIONS_BREAK=evidence-history-ignored  判决 / 材料只认树里的，不读 git 历史（两格共用）
 #       evidence-pointer-history-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=evidence-ledger-unjudged  挂账表的行不核罩没罩住、写得对不对（三格共用）
 #       evidence-ledger-red（期望退出 1，实测 0）
-#   DOC_DECISIONS_BREAK=evidence-ledger-growth-unjudged  挂账表相对基准涨了不判（三格共用）
-#       evidence-ledger-grew-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=evidence-ledger-growth-unjudged  挂账表相对基准涨了不判、基准那一版也不取（三格共用）
+#       evidence-ledger-grew-red、evidence-ledger-base-unreadable-red（期望退出 1，实测 0）
+#   LAG_BASELINE_BREAK=unreadable-as-absent  归 lib-lag-baseline.py（设进环境，被三格起的 python 与 history-loss 起的 show 继承）：git 取不到基准那一版当成「基准里没有」，不比
+#       evidence-ledger-base-unreadable-red（期望退出 1，实测 0）；history-loss-base-unreadable-red（期望退出 1，实测 77）
+#   LAG_BASELINE_BREAK=commit-ref-rewritten  归 lib-lag-baseline.py（设进环境，被 history-loss 起的 show 继承）：基准那一版换算时连「<提交哈希>:」后面的路径也换
+#       history-loss-moved-commit-ref-green（期望退出 0，实测 1）
+#   LAG_BASELINE_BREAK=moved-only-kept  归 lib-lag-baseline.py（设进环境，被 entry-added 经 changed-paths.sh 起的 moved-only-filter 继承）：与基准只差登记搬迁的决策文件照旧算改了
+#       entry-added-moved-only-not-run（期望退出 77，实测 1）；shape 的新增行同样不剔（经 lib-lag-baseline.py 的 drop_moved_lines）：shape-moved-only-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=evidence-ledger-ignored  挂账表当空表读（三格共用）
 #       cross-decision-status-ledger-green、inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）；evidence-ledger-red（期望退出 1，实测 0）；
 #       evidence-ledger-grew-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 1 处不对」）
@@ -247,6 +320,8 @@ GATE_DIRECTORY="$STAGE_DIR"
 REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_RELATIVE_PATH=".claude/gate.d/$(basename "${BASH_SOURCE[0]}")"
 LIB_ITEM_REF_STATUS="$GATE_DIRECTORY/lib-item-ref-status.py"
+# 挂账表与基准那一版比：取基准那一版的三种结局（有表、没有表、git 取不到）经它（DECISION_EVIDENCE_SOURCE 的 base_ledger_text，路径由环境变量 LIB_LAG_BASELINE 给）
+LIB_LAG_BASELINE="$GATE_DIRECTORY/lib-lag-baseline.py"
 LIB_CHANGED_PATHS="$REPO_ROOT/scripts/gate/changed-paths.sh"
 # 生成器按本脚本所在的仓取、不按项目根：样本根里没有 .claude/scripts/（坑见格 blocking-verdict）
 GENERATOR="$REPO_ROOT/.claude/scripts/gen-decision-items.py"
@@ -800,13 +875,19 @@ PY
 
   echo
   echo "── 5. 决策标题：编号连续、带状态；分项两节严格分开、未定条数与列表相符 ──"
-  INDEX_VS_BODY_SOURCE="$INDEX_VS_BODY_SOURCE" LIB_ITEM_REF_STATUS="$LIB_ITEM_REF_STATUS" python3 - $KB/decisions/*.md <<'PY'
+  BREAK_SWITCH="$BREAK_SWITCH" INDEX_VS_BODY_SOURCE="$INDEX_VS_BODY_SOURCE" LIB_ITEM_REF_STATUS="$LIB_ITEM_REF_STATUS" python3 - $KB/decisions/*.md <<'PY'
 import os, re, sys, types
 # 标题里未定条数的读法与第 7 段同一份（INDEX_VS_BODY_SOURCE 的 declared_open_count）
 lib_index_vs_body = types.ModuleType("lib_index_vs_body")
 exec(compile(os.environ["INDEX_VS_BODY_SOURCE"], "INDEX_VS_BODY_SOURCE", "exec"), lib_index_vs_body.__dict__)
+# 标题带状态、分项两节、未定条数这几条只判中文原文（lib-item-ref-status.py 的 originals_only）：状态词、小节标题与「状态：」标记都是中文写法，
+# 译文的首行写成 `— Settled`、`—— 確定` 这类各自的语言，照中文的判据判就整份报红。译文只按语言判编号连号（下面 files_by_language 那一段）。
+# 弄坏开关 DOC_DECISIONS_BREAK=read-translations 照改前连译文一起判。
+judged_paths = lib_index_vs_body.load_item_ref_status().originals_only(
+    sys.argv[1:], os.environ.get("BREAK_SWITCH") == "read-translations")
+translations_numbering_only = len(sys.argv[1:]) - len(judged_paths)
 body = ""
-for p in sys.argv[1:]:
+for p in judged_paths:
     body += open(p, encoding="utf-8").read().split("\n## 历史版本", 1)[0] + "\n"
 fail = 0
 index_rows_checked = 0
@@ -944,7 +1025,8 @@ for a, b in zip(starts, starts[1:]):
         bad(f"{title.split()[1]} 标题写「{declared_phrase}」，「### 未定项」小节里实际 {got} 项",
                 "改正文标题里的条数，并同步 decisions.md 索引行；改完跑 SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 doc-decisions.sh 的 decision-items-sync 格（--write）; 范围=1 格; 为什么=…' bash .claude/gate.d/doc-decisions.sh --write --check decision-items-sync")
 if not fail:
-    print(f"  ✓ 决策标题与未定项列表相符，且两节没有互相串味（{decision_count} 条决策、核 {index_rows_checked} 行分项索引）"
+    translations_note = f"；译文 {translations_numbering_only} 份只按语言判编号连号" if translations_numbering_only else ""
+    print(f"  ✓ 决策标题与未定项列表相符，且两节没有互相串味（{decision_count} 条决策、核 {index_rows_checked} 行分项索引{translations_note}）"
           f"；编号连号按语言各判各的：{'、'.join(numbering_groups)}")
 sys.exit(1 if fail else 0)
 PY
@@ -963,7 +1045,8 @@ PY
 # ════ 格「分项引用状态」════
 # 每一处「D<n>（简称） 已定项 k / 未定项 k」都在断言那条分项的状态，权威是正文两节的索引表；扫 kb / records / research / crates 全域，含 .rs 注释。
 # 判据、出路与成功行在 lib-item-ref-status.py 的 main（格「冻结层归属登记表」与 scripts/kb/relabel-item.py 也用这份库）。
-# 样本：item-ref-status-red 判红。
+# 变更史 `## D<n>（简称）` 节里裸写的分项归这一节的决策；decisions/ 下没有同名中文原文的译文单独报一类红、不解任何引用（判法同在 lib-item-ref-status.py）。
+# 样本：item-ref-status-red 判红；item-ref-status-history-section-red / -green、item-ref-status-orphan-translation-red / -green 判节标题与孤立译文。
 grid_item_ref_status() (
   python3 "$LIB_ITEM_REF_STATUS"
 )
@@ -1069,7 +1152,7 @@ grid_cross_decision_status() (
 
   load_diff_base
 
-  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" python3 - "$KB" "$BREAK_SWITCH" "$diff_base" <<'PY'
+  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" LIB_LAG_BASELINE="$LIB_LAG_BASELINE" python3 - "$KB" "$BREAK_SWITCH" "$diff_base" <<'PY'
 import os, re, sys, pathlib, types
 
 lib = types.ModuleType("decision_evidence")
@@ -1081,6 +1164,8 @@ diff_base = sys.argv[3]
 status, name, unparsed = {}, {}, []
 title_re = re.compile(r'^##\s+(D\d+)\s*(.+?)\s*——\s*(.+?)\s*$')
 for f in sorted((kb / "decisions").glob("*.md")):
+    if re.search(r'\.[a-z]{2}\.md$', f.name):
+        continue
     lines = f.read_text(encoding="utf-8").splitlines()
     hit = next((m for m in (title_re.match(l) for l in lines) if m), None)
     if hit:
@@ -1161,6 +1246,8 @@ scanned_files, history_files, history_section_lines = 0, [], 0
 tallies = {"计数写法": 0, "中间夹了别的编号": 0, "表格竖线、破折号、斜杠、「其中」之后": 0, "说成未定或当时未定": 0}
 tight_hits = relaxed_hits = quoted_with_current = as_of_then_skipped = 0
 for f in sorted(kb.rglob("*.md")):
+    if re.search(r'\.[a-z]{2}\.md$', f.name):
+        continue
     rel = f.relative_to(kb.parent.parent)
     # 决策变更史整份是历史，写的是当时的状态
     if f.name == "decisions-history.md" or f.parent.name == "decisions-history":
@@ -1227,9 +1314,10 @@ if break_switch == 'evidence-ledger-ignored':
 red_entries = [(rel, "-", ln, text, (rel, ln, d, st, kind, text)) for rel, ln, d, st, kind, text in bad]
 still_red, ledgered, stale = lib.apply_ledger("cross-decision-status", red_entries, rows)
 bad = [entry[4] for entry in still_red]
-grown = [] if break_switch == "evidence-ledger-growth-unjudged" else lib.ledger_growth("cross-decision-status", rows, lib.base_ledger_text(diff_base))
+grown, base_problem = ([], None) if break_switch == "evidence-ledger-growth-unjudged" else lib.ledger_growth("cross-decision-status", rows, diff_base)
 table_problems = [] if break_switch == "evidence-ledger-unjudged" else ledger_problems + stale
 table_problems += [f"{lib.LEDGER}:{row[0]} 相对基准那一版新增了一行（{row[2]} {row[3]}）：这张表只缩不涨" for row in grown]
+table_problems += [base_problem] if base_problem else []
 filtered_note = ("隔着名词短语的写法滤掉的：" + "；".join(f"{key} {count} 处" for key, count in tallies.items())
                  + f"；「」引文里旁边带现状放过的 {quoted_with_current} 处；实验变更史里新判法不判的 {as_of_then_skipped} 处；被挂账表罩住的 {ledgered} 处")
 
@@ -1246,6 +1334,7 @@ if bad or table_problems:
         for problem in table_problems:
             print(f"     {problem}")  # gate-lint:detail
         print("     → 怎么办：这张表只收此刻判红、当场补不上的存量：罩不住的行删掉（对象改好了就是它该退场），格式写坏的照表头改；新判红的句子改写成现状，别往表里加行。")
+        print("               读不出、取不到基准那一版的，按括号里 git 的报错修好仓库状态（基准要存在、对象库没坏）再跑：取不到基准不是「基准里没有这张表」。")
     print(f"     {filtered_note}")
     sys.exit(1)
 print(f"  ✓ 没有把已定的决策说成未定（扫 {scanned_files} 份 kb 文件，比对 {len(status)} 条决策的状态行）")
@@ -1990,13 +2079,13 @@ grid_decision_items_sync() (
   # 各分支手写的 rm 管不到半路被打断的那一次：退出时一律删
   trap 'rm -f "${gen_err:?}" "${cells_f:?}"' EXIT
   # 生成器的 stderr 里有它自己的出路，不吞
-  want="$(python3 "$GEN" 2>"$gen_err")" || {
+  want="$(python3 "$GEN" "$ROOT" 2>"$gen_err")" || {
     echo "  ✗ 生成器跑不起来"
     sed 's/^/   /' "$gen_err"
     echo "     → 怎么办：按上面这段报错改 $GEN 或它读的那几份 kb；"
     echo "               生成器跑不起来时这一格什么都没查，不是通过。"
     rm -f "$gen_err" "$cells_f"; exit 1; }
-  python3 "$GEN" --status-cells >"$cells_f" 2>"$gen_err" || {
+  python3 "$GEN" "$ROOT" --status-cells >"$cells_f" 2>"$gen_err" || {
     echo "  ✗ 生成器的 --status-cells 跑不起来"
     sed 's/^/   /' "$gen_err"
     echo "     → 怎么办：同上——状态列没算出来时，这一半什么都没查，不是通过。"
@@ -2007,11 +2096,11 @@ grid_decision_items_sync() (
   fail=0
 
   if [[ "$WRITE" == "1" ]]; then
-    python3 - "$IDX" "$S" "$E" "$GEN" <<'PY'
+    python3 - "$IDX" "$S" "$E" "$GEN" "$ROOT" <<'PY'
 import sys, subprocess
-idx, s, e, gen = sys.argv[1:5]
+idx, s, e, gen, root = sys.argv[1:6]
 body = open(idx, encoding='utf-8').read()
-new = subprocess.run(['python3', gen], capture_output=True, text=True).stdout.rstrip()
+new = subprocess.run(['python3', gen, root], capture_output=True, text=True).stdout.rstrip()
 a = body.index(s) + len(s)
 b = body.index(e)
 open(idx, 'w', encoding='utf-8').write(body[:a] + "\n" + new + "\n" + body[b:])
@@ -2118,19 +2207,19 @@ PY
 grid_blocking_verdict() (
   DEC=.claude/kb/decisions
   # 生成器按本脚本所在的仓取（GENERATOR），不按 cwd：样本把 cwd 换成只放着样本 kb 的临时目录，按 cwd 取会找不到生成器而跳过，红样本悄悄变绿。
-  # 生成器自己 glob 的是 cwd 下的 kb，正合样本所需。
+  # 生成器读显式传给它的项目根（$ROOT，喂样本时是样本根）下的 kb，不从它自己的位置定根。
   GEN="$GENERATOR"
   [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，这一格无对象可判"; exit 77; }
   # 生成器随仓走，不在是被删了或挪了：退 1 不退 77，与格「决策分项清单与正文同步」一致
   [[ -f "$GEN" ]] || { echo "  ✗ 找不到生成器 $GEN"; echo "     → 生成器随门禁住在同一个仓的 .claude/scripts/ 下：它丢了这一格什么都判不了，从 git 里找回它"; exit 1; }
 
-  python3 - "$DEC" "$GEN" <<'PY'
+  python3 - "$DEC" "$GEN" "$ROOT" <<'PY'
 import re, sys, glob, subprocess, os
 
-dec, gen = sys.argv[1], sys.argv[2]
+dec, gen, root = sys.argv[1], sys.argv[2], sys.argv[3]
 
 # ── 权威清单：哪些 (决策号, 分项号) 是未定的 ────────────────────
-r = subprocess.run(['python3', gen], capture_output=True, text=True)
+r = subprocess.run(['python3', gen, root], capture_output=True, text=True)
 if r.returncode != 0:
     print("  ✗ 生成器跑不起来，拿不到未定项清单")
     print('\n'.join('   ' + l for l in r.stderr.splitlines()))
@@ -2643,8 +2732,12 @@ load_diff_base() {
 # 基准取 changed-paths.sh 的 gate_diff_base gate：已提交没推出去的决策改动也算。
 # 小改动（增删合计不超过 4 行、一行状态都没碰：首行「## D<n> 简称 —— 状态」、「状态：」、已定项 / 未定项标题）不要求变更史，退 77。
 # 两条路径放数组：拼成一个字符串再加引号会变成单个 pathspec，什么都匹配不到。
+# 与基准只差登记搬迁（.claude/gate.d/path-moves.tsv）的决策文件不算改了：列出与基准不同的决策文件，过一遍 changed-paths.sh 的 gate_drop_moved_only
+#   （判法 lib-lag-baseline.py 的 moved_only_paths，与改动范围剔得一样），剩下的才数行、看状态行；一份都不剩退 77。剩下的文件里因搬迁换了路径的行照样计进行数（只按文件剔）。
+#   样本 entry-added-moved-only-not-run（只差搬迁，退 77）、entry-added-moved-unregistered-red（没登记，红）、entry-added-moved-and-edited-red（登记了又改了一行，红）；
+#   弄坏开关 LAG_BASELINE_BREAK=moved-only-kept 下 entry-added-moved-only-not-run 判红。
 cell_entry_added() {
-  local KB HIST diff_base diff_rc numstat changed decision_diff status_lines_touched added hist_diff
+  local KB HIST diff_base diff_rc numstat changed decision_diff status_lines_touched added hist_diff listed kept
   KB=(.claude/kb/decisions.md .claude/kb/decisions)
   HIST=.claude/kb/decisions-history.md
 
@@ -2667,6 +2760,14 @@ cell_entry_added() {
     1) ;;
     *) git_failed "diff --quiet $diff_base" "$diff_rc" ;;
   esac
+  # 与基准只差登记搬迁的决策文件不算改了（scripts/gate/changed-paths.sh 的 gate_drop_moved_only，与改动范围剔得一样）：剩下的才数行、看状态行
+  listed="$(git -c core.quotepath=false diff --name-only "$diff_base" -- "${KB[@]}")" || git_failed "diff --name-only" "$?"
+  kept="$(gate_drop_moved_only "$diff_base" <<<"$listed")" || git_failed "diff（只差搬迁那一层，lib-lag-baseline.py moved-only-filter）" "$?"
+  if [[ -z "$kept" ]]; then
+    echo "  ! 决策正文与基准 $diff_base 只差登记的搬迁（.claude/gate.d/path-moves.tsv），这一格无对象可判"
+    exit 77
+  fi
+  mapfile -t KB <<<"$kept"
 
   numstat="$(git diff "$diff_base" --numstat -- "${KB[@]}")" || git_failed "diff --numstat" "$?"
   changed=$(awk '{n+=$1+$2} END{print n+0}' <<<"$numstat")
@@ -2702,8 +2803,14 @@ cell_entry_added() {
 # ── history-loss：变更史整理不许丢 ──
 # 整理变更项（.claude/rules/changelog-format.md）不许丢数、编号、产物名、别的日期、引名。两份变更史各拿基准里那一版与现在的比：
 # scripts/kb/history-consolidate.py loss-check（判法与出路在它的文件头），任一份退非 0 判红；都与基准无差异或基准里没有退 77。
+# 基准那一版经 lib-lag-baseline.py show 取（三种结局只在那一份：退 0 有、退 3 基准里没有这份、别的是 git 取不到）：取不到判红、点名那一份，
+#   不当成基准里没有（改前 cat-file -e 失败就跳过，两份都跳过之后报「与基准无差异」退 77，整理丢没丢其实没比）。
+# 样本 history-loss-base-unreadable-red：基准那一版变更史的对象从对象库里删掉，判红在「读不出基准 HEAD 里的 .claude/kb/decisions-history.md」。
+# 登记了搬迁（.claude/gate.d/path-moves.tsv）时，基准那一版照登记换算，「<提交哈希>:」后面的路径不换（git show <提交>:<路径> 有意留旧路径）：
+#   样本 history-loss-moved-commit-ref-green 判绿；history-loss-moved-unregistered-red（没登记）、history-loss-moved-and-edited-red（登记了又删了一个数）判红；
+#   弄坏开关 LAG_BASELINE_BREAK=commit-ref-rewritten 下 history-loss-moved-commit-ref-green 判红。
 cell_history_loss() {
-  local diff_base checked=0 failed=0 hist base_copy rc
+  local diff_base checked=0 failed=0 unreadable=0 hist base_copy rc base_exit base_problem
   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "  ! 不在 git 仓库里，这一格无对象可判"
     exit 77
@@ -2712,9 +2819,16 @@ cell_history_loss() {
   for hist in .claude/kb/decisions-history.md .claude/kb/experiments-history.md; do
     [[ -f "$hist" ]] || continue
     if git diff --quiet "$diff_base" -- "$hist" 2>/dev/null; then continue; fi
-    if ! git cat-file -e "$diff_base:$hist" 2>/dev/null; then continue; fi
     base_copy="$(mktemp "${TMPDIR:-/tmp}/history-loss-base.XXXXXX")"
-    git show "$diff_base:$hist" > "$base_copy"
+    base_exit=0
+    base_problem="$(python3 "$LIB_LAG_BASELINE" show "$diff_base" "$hist" 2>&1 >"$base_copy")" || base_exit=$?
+    if ((base_exit == 3)); then rm -f "$base_copy"; continue; fi   # 基准里没有这份变更史：没有可比的
+    if ((base_exit != 0)); then
+      failed=$((failed + 1)); unreadable=$((unreadable + 1))
+      echo "  ✗ $hist：${base_problem:-lib-lag-baseline.py show 退 $base_exit}，整理丢没丢没比"   # gate-lint:summary
+      rm -f "$base_copy"
+      continue
+    fi
     rc=0
     python3 "$REPO_ROOT/scripts/kb/history-consolidate.py" loss-check "$base_copy" "$hist" --repo "$PWD" --force > "$base_copy.out" 2>&1 || rc=$?
     checked=$((checked + 1))
@@ -2726,7 +2840,12 @@ cell_history_loss() {
     rm -f "$base_copy" "$base_copy.out"
   done
   if ((failed)); then
-    howto "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；判法与出路在 scripts/kb/history-consolidate.py 文件头。"
+    if ((unreadable)); then
+      howto "取不到基准那一版的：照括号里 git 的报错修仓库状态（基准名不在、对象库缺了那一份），再只重跑这一格；取不到时整理丢没丢没比，不是没丢。"
+    fi
+    if ((failed > unreadable)); then
+      howto "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；判法与出路在 scripts/kb/history-consolidate.py 文件头。"
+    fi
     exit 1
   fi
   if ((checked == 0)); then
@@ -2745,11 +2864,13 @@ cell_history_loss() {
 #   e) 节里的 `### 日期` 块一条 `- ` 项都没有
 # 只判这一轮新增的（基准同 entry-added）：a、d 看那一行，b 看块里任一行，c 看重复的几行里任一行，e 看 `### ` 行；基准里就有的只计数不判红。
 # 新增行按 `git diff -U0` 的 hunk 头取行号（changed-paths.sh 的 gate_added_lines 只给行文），未跟踪的整份算新增；不在 git 仓里整棵树按新增判。围栏里的行不算。
+# 登记了搬迁（.claude/gate.d/path-moves.tsv）时，只因搬迁才变了的行不算新增（without_moved_lines 经 lib-lag-baseline.py 的 drop_moved_lines 剔，与 gate_added_lines 剔的同一种）：
+#   样本 shape-moved-only-green 判绿，shape-moved-unregistered-red、shape-moved-and-edited-red 判红；弄坏开关 LAG_BASELINE_BREAK=moved-only-kept 下 shape-moved-only-green 判红。
 # 判不了：变更项写得对不对、该点名的决策或实验点没点全、日期块是不是倒序。
 cell_shape() {
   local diff_base
   load_diff_base
-  python3 - "$diff_base" <<'PY'
+  LIB_LAG_BASELINE="$LIB_LAG_BASELINE" python3 - "$diff_base" <<'PY'
 import os, re, subprocess, sys
 
 KB = '.claude/kb'
@@ -2802,7 +2923,41 @@ def added_line_numbers():
                 start, count = int(match.group(1)), int(match.group(2) or 1)
                 added.setdefault(path, set()).update(range(start, start + count))
     whole = {item for item in git('ls-files', '-z', '--others', '--exclude-standard', '--', KB).split('\0') if item}
-    return added, whole
+    return without_moved_lines(added, whole)
+
+
+def without_moved_lines(added, whole):
+    """只因登记的搬迁才变了的行不算新增（lib-lag-baseline.py 的 drop_moved_lines，与 changed-paths.sh 的 gate_added_lines 剔得一样）。
+    搬迁登记表没有内容行时原样交回；整份算新增的（未跟踪）也逐行过一遍，过完按行号记。登记表写坏了照没有登记时交回、打一行提示；git 取不到判红。"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('lag_baseline', os.environ['LIB_LAG_BASELINE'])
+    lag_baseline = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lag_baseline)
+    moves, problems = lag_baseline.path_moves()
+    if not moves and not problems:
+        return added, whole
+    entries, unread = [], set()
+    for path in sorted(set(added) | whole):
+        try:
+            with open(path, encoding='utf-8', errors='surrogateescape') as handle:
+                lines = handle.read().split('\n')
+        except OSError:
+            unread.add(path)
+            continue
+        numbers = range(1, len(lines) + 1) if path in whole else sorted(added[path])
+        entries += [(path, lines[number - 1], number) for number in numbers if 0 < number <= len(lines)]
+    kept, problem = lag_baseline.drop_moved_lines(base, entries)
+    if isinstance(problem, lag_baseline.PathMovesProblem):
+        print(f'  ! {problem.sentence()}；新增行没剔只差搬迁的')
+    elif problem is not None:
+        raise DiffUnreadable(problem.sentence())
+    remaining = {}
+    for path, _text, number in kept:
+        remaining.setdefault(path, set()).add(number)
+    for path in unread:
+        if path in added:
+            remaining[path] = added[path]
+    return remaining, {path for path in whole if path in unread}
 
 
 def is_new(changes, path, numbers):
@@ -3314,26 +3469,31 @@ def apply_ledger(cell, red, rows, ledger_path=LEDGER):
 
 
 def base_ledger_text(diff_base, ledger_path=LEDGER):
-    """基准那一版的挂账表正文；基准取不到、那一版没有这张表返回 None（不比）。路径写成 ./ 开头：按当前目录算，样本根在别的仓里时不会读到那个仓的表。"""
+    """基准那一版的挂账表正文：(正文, None)；不在 git 仓里（diff_base 空）、基准那一版没有这张表：(None, None)，不比；
+    git 取不到基准那一版（基准名不在、对象库缺了那一份）：(None, 问题句)，调用方判红，不当成「基准里没有这张表」。
+    三种结局的取法只在 lib-lag-baseline.py 的 baseline_text 一份（路径由环境变量 LIB_LAG_BASELINE 给），路径按当前目录算：样本根在别的仓里时不会读到那个仓的表。"""
     if not diff_base:
-        return None
-    try:
-        done = subprocess.run(['git', 'show', f'{diff_base}:./{ledger_path}'], capture_output=True, text=True)
-    except OSError:
-        return None
-    return done.stdout if done.returncode == 0 else None
+        return None, None
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('lag_baseline', os.environ['LIB_LAG_BASELINE'])
+    lag_baseline = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lag_baseline)
+    text, problem = lag_baseline.baseline_text(diff_base, ledger_path)
+    return text, (None if problem is None else f'{problem.sentence()}，这张表只缩不涨没比')
 
 
-def ledger_growth(cell, rows, base_text):
-    """基准那一版的表里没有的 (格名, 路径, 位置, 片段) = 涨了的行（只缩不涨）。"""
+def ledger_growth(cell, rows, diff_base):
+    """(涨了的行, 问题句)：基准那一版的表里没有的 (格名, 路径, 位置, 片段) = 涨了的行（只缩不涨）；
+    基准取不到时涨了的行是空表、问题句非空（调用方判红），基准里没有这张表、不在 git 仓里时两样都空。"""
+    base_text, problem = base_ledger_text(diff_base)
     if base_text is None:
-        return []
+        return [], problem
     base = set()
     for raw in base_text.splitlines():
         cells = raw.split('\t')
         if raw.strip() and not raw.startswith('#') and len(cells) == 5:
             base.add(tuple(cells[:4]))
-    return [row for row in rows if row[1] == cell and tuple(row[1:5]) not in base]
+    return [row for row in rows if row[1] == cell and tuple(row[1:5]) not in base], None
 PY
 
 # ════ 格「推论要有判决」════
@@ -3347,17 +3507,19 @@ PY
 #     同一条目里有「用户」就不算：定案人是用户，不是一条没走三方的推论；推论记号那三组不给这个豁免。
 #   看不见：词表外的写法（「推出」「推导」「无实验」本身不算：那是在说没量，不是在说没走三方）、记号写在依据块之外的。
 # 真仓上量过：依据块里 1080 条条目，带记号的 13 条（指到判决 10 条；另有 21 条是用户定案的「没走三方」，不算）；红 3 条（D22 已定项 8 与 25、D23 已定项 14），登在挂账表。
-# 存量挂账：.claude/gate.d/decision-evidence-lag.tsv 里本格的行，文件头写了写法；一行必须恰好罩住此刻判红的一条，罩不住判红，表里新增的行（相对基准那一版）判红。
+# 存量挂账：.claude/gate.d/decision-evidence-lag.tsv 里本格的行，文件头写了写法；一行必须恰好罩住此刻判红的一条，罩不住判红，表里新增的行（相对基准那一版）判红；
+#   git 取不到基准那一版判红，不当成基准里没有这张表（取法 lib-lag-baseline.py 的 baseline_text，三格共用 base_ledger_text；样本 evidence-ledger-base-unreadable-red）。
 # 弄坏开关 DOC_DECISIONS_BREAK=evidence-pointer-unchecked（点名了判决就算指到，不查存在）/ evidence-history-ignored（只认树里的，不读 git 历史）/
 #   evidence-ledger-unjudged（挂账表的行不核罩没罩住、写得对不对）/ evidence-ledger-growth-unjudged（表涨了不判）/
 #   inference-user-verdict-judged（用户定案的「没走三方」也算推论）/ inference-negation-ignored（「不是推的」也算记号）。
 # 样本：inference-needs-verdict-red（无判决、判决文件不存在各一条，另有一条带存在的判决不判）、inference-needs-verdict-green（带判决、「不是推的」、用户定案、被挂账罩住）、
-#   evidence-ledger-red（挂账表写坏与罩不住）、evidence-ledger-grew-red（表相对基准涨了）、evidence-pointer-history-green（判决文件只在 git 历史里）。
+#   evidence-ledger-red（挂账表写坏与罩不住）、evidence-ledger-grew-red（表相对基准涨了）、evidence-ledger-base-unreadable-red（基准那一版挂账表的对象缺了，三格都红）、
+#   evidence-pointer-history-green（判决文件只在 git 历史里）。
 grid_inference_needs_verdict() (
   [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions，这一格无对象可判"; exit 77; }
   load_diff_base
 
-  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" python3 - "$BREAK_SWITCH" "$diff_base" <<'PY'
+  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" LIB_LAG_BASELINE="$LIB_LAG_BASELINE" python3 - "$BREAK_SWITCH" "$diff_base" <<'PY'
 import os, re, sys, types
 
 lib = types.ModuleType('decision_evidence')
@@ -3408,9 +3570,10 @@ rows, ledger_problems, ledger_present = lib.read_ledger()
 if BREAK == 'evidence-ledger-ignored':
     rows, ledger_problems = [], []
 red, ledgered, stale = lib.apply_ledger(CELL, red, rows)
-grown = [] if BREAK == 'evidence-ledger-growth-unjudged' else lib.ledger_growth(CELL, rows, lib.base_ledger_text(DIFF_BASE))
+grown, base_problem = ([], None) if BREAK == 'evidence-ledger-growth-unjudged' else lib.ledger_growth(CELL, rows, DIFF_BASE)
 table_problems = [] if BREAK == 'evidence-ledger-unjudged' else ledger_problems + stale
 table_problems += [f'{lib.LEDGER}:{row[0]} 相对基准那一版新增了一行（{row[2]} {row[3]}）：这张表只缩不涨' for row in grown]
+table_problems += [base_problem] if base_problem else []
 
 if red or table_problems:
     if red:
@@ -3425,7 +3588,7 @@ if red or table_problems:
         for problem in table_problems:
             print(f'     {problem}')  # gate-lint:detail
         print('     → 怎么办：这张表只收此刻判红、当场补不上判决的存量，一行一条：罩不住的行删掉（对象改好了就是它该退场），格式写坏的照表头改；')
-        print('               新判红的条目补判决，别往表里加行。')
+        print('               新判红的条目补判决，别往表里加行；读不出、取不到基准那一版的，按括号里 git 的报错修好仓库状态（基准要存在、对象库没坏）再跑。')
     sys.exit(1)
 print(f'  ✓ 自陈是推论的依据条目都指到了存在的判决：扫 {files} 份决策、{len(entries)} 条依据条目，'
       f'带推论记号的 {marked} 条（指到判决 {pointed} 条，挂账 {ledgered} 条；用户定案的「没走三方」{user_exempt} 条不算）')
@@ -3453,7 +3616,7 @@ grid_three_way_leg_record() (
   [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions，这一格无对象可判"; exit 77; }
   load_diff_base
 
-  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" python3 - "$BREAK_SWITCH" "$diff_base" <<'PY'
+  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" LIB_LAG_BASELINE="$LIB_LAG_BASELINE" python3 - "$BREAK_SWITCH" "$diff_base" <<'PY'
 import os, re, sys, types
 
 lib = types.ModuleType('decision_evidence')
@@ -3501,9 +3664,10 @@ rows, ledger_problems, ledger_present = lib.read_ledger()
 if BREAK == 'evidence-ledger-ignored':
     rows, ledger_problems = [], []
 red, ledgered, stale = lib.apply_ledger(CELL, red, rows)
-grown = [] if BREAK == 'evidence-ledger-growth-unjudged' else lib.ledger_growth(CELL, rows, lib.base_ledger_text(DIFF_BASE))
+grown, base_problem = ([], None) if BREAK == 'evidence-ledger-growth-unjudged' else lib.ledger_growth(CELL, rows, DIFF_BASE)
 table_problems = [] if BREAK == 'evidence-ledger-unjudged' else ledger_problems + stale
 table_problems += [f'{lib.LEDGER}:{row[0]} 相对基准那一版新增了一行（{row[2]} {row[3]}）：这张表只缩不涨' for row in grown]
+table_problems += [base_problem] if base_problem else []
 
 if red or table_problems:
     if red:
@@ -3518,7 +3682,7 @@ if red or table_problems:
         for problem in table_problems:
             print(f'     {problem}')  # gate-lint:detail
         print('     → 怎么办：这张表只收此刻判红、当场补不上指针的存量，一行一条：罩不住的行删掉（对象改好了就是它该退场），格式写坏的照表头改；')
-        print('               新判红的条目补指针或腿况，别往表里加行。')
+        print('               新判红的条目补指针或腿况，别往表里加行；读不出、取不到基准那一版的，按括号里 git 的报错修好仓库状态（基准要存在、对象库没坏）再跑。')
     sys.exit(1)
 print(f'  ✓ 依据里写了「三方」的条目都有腿况记录：扫 {files} 份决策、{len(entries)} 条依据条目，写了「三方」的 {claims} 条'
       f'（指到存在的材料 {pointed} 条，写明腿况缺失 {missing_stated} 条，挂账 {ledgered} 条）')

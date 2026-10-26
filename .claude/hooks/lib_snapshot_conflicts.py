@@ -8,18 +8,25 @@
   research/prompts/abandoned-rounds.tsv 登记了这一轮、而且登记行过得了 lib_abandoned_rounds.py 的判法的（用户叫停、不写判决）不算；登记了而过不了的照旧算开着，原因记进 notes。
   <轮>-halted.md 这一支已撤：文件还在的，开着的轮在 notes 里提醒改道登记表。读不到 lib_abandoned_rounds.py 时不收任何叫停的轮，notes 写一句。
 快照清单（snapshot_listed_paths）：快照目录里文件名含 sha256 的每一份，一行「<64 位十六进制哈希><空白>[*]<路径>」；路径从第一段 .claude/ 或 crates/ 起归一成仓根相对路径
-  （./.claude/…、tree/crates/…、defs/.claude/… 都认），归一不了的行跳过；读不了的清单记进 notes、跳过，不当成撞快照。
+  （./.claude/…、tree/crates/…、defs/.claude/… 都认），归一不了的行跳过。
+  读不了的清单（是目录、没有读权限、悬空的链接；快照目录本身列不出也算一份）不当成撞快照，也不混进「读得了、没列要改的路径」：调用方给了 unreadable（列表）的，
+  逐份追加 (轮名, 路径, 原因) 分开交回，调用方照「放行但必记检出」放行——unreadable_lines 打给人看的几行（点名那一轮与那份清单、出路），
+  record_unreadable 往检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path）追加一行、结局「只记」，看门狗据此报给主 agent。
+  没给 unreadable 的照旧只记进 notes、快照目录列不出照旧抛出。
 放行行（ruled_snapshot_conflicts）：一行以「快照冲突已判：<轮名> <理由>」开头（行首可以有列表记号与粗体星号），理由非空、不是 <理由> 这种占位；只认这一行，不跨到下一行。
   派发闸在派发提示里找，apply-writer-patch.py 认命令行 --snapshot-ruled 给的那几句。
 拒绝说明（refusal_text）：逐轮列撞了的文件（至多 SNAPSHOT_CONFLICTS_SHOWN_LIMIT 个），出路三条：等判决写完、单起一行写放行行、用户已叫停的在登记表收掉。
 
 弄坏开关：调用方传进来 broken(<名>) → 真假（派发闸传 RUNNER_DISPATCH_GUARD_BREAK 那一份，名字与它文件头那几项相同：snapshot-body-optional、snapshot-closed-round-open、
   snapshot-abandoned-ignored、snapshot-abandoned-unchecked、snapshot-loose-lines、snapshot-no-normalize、snapshot-unreadable-aborts、snapshot-unreadable-denies、
-  snapshot-valve-ignored、snapshot-valve-loose）；打开后红在哪一格写在调用方的文件头。不传就一项都不开。
+  snapshot-unreadable-unmarked、snapshot-valve-ignored、snapshot-valve-loose；apply-writer-patch.py 只转 APPLY_WRITER_PATCH_BREAK=snapshot-unreadable-unmarked 这一项）；
+  打开后红在哪一格写在调用方的文件头。不传就一项都不开。
 """
+import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
@@ -42,6 +49,8 @@ SNAPSHOT_CONFLICTS_SHOWN_LIMIT = 20
 NONE_WORDS = {"", "无", "没有", "无。", "-", "—", "空", "none"}
 ABANDONED_ROUNDS_TABLE = abandoned_library.TABLE_PATH if abandoned_library is not None else os.path.join("research", "prompts", "abandoned-rounds.tsv")
 SNAPSHOT_HALTED_SUFFIX = "-halted.md"   # 已撤的一支：文件还在时只在拒绝说明里提醒改道，不认
+DETECTIONS_VARIABLE = "AGENT_HOOK_DETECTIONS"   # 检出记录的位置；没设取同目录 lib_work_root.py 的 default_detections_path
+UNREADABLE_FINDING_PREFIX = "快照清单读不了、照常放行"   # 检出记录里每条发现的起头（看门狗不把它算进只记不叫醒的那一类，照报给主 agent）
 
 
 def never(_name):
@@ -113,10 +122,20 @@ def repository_path_of_snapshot_line(line, broken=never):
     return None if normalized.startswith("..") else normalized
 
 
-def snapshot_listed_paths(snapshot_directory, notes, broken=never, who="派发闸"):
-    """快照目录里文件名含 sha256 的每份清单读出来的路径：{仓库根相对路径: 清单文件}。认不出的行跳过；读不了的清单记进 notes、跳过。"""
+def snapshot_listed_paths(snapshot_directory, notes, broken=never, who="派发闸", round_name=None, unreadable=None):
+    """快照目录里文件名含 sha256 的每份清单读出来的路径：{仓库根相对路径: 清单文件}。认不出的行跳过。
+    读不了的清单不算撞快照：给了 unreadable（列表）的逐份追加 (round_name, 清单路径, 原因)，与「读得了而没列要改的路径」分开交给调用方；快照目录本身列不出的整个目录算一份。
+    没给 unreadable 的（或弄坏开关 snapshot-unreadable-unmarked 下）照旧只记进 notes，快照目录列不出照旧抛出。"""
     listed = {}
-    for list_name in sorted(os.listdir(snapshot_directory)):
+    marked = unreadable is not None and not broken("snapshot-unreadable-unmarked")
+    try:
+        list_names = sorted(os.listdir(snapshot_directory))
+    except OSError as error:
+        if not marked or broken("snapshot-unreadable-aborts"):
+            raise
+        unreadable.append((round_name, snapshot_directory, error.strerror or str(error)))
+        return listed
+    for list_name in list_names:
         if SNAPSHOT_LIST_NAME_MARK not in list_name:
             continue
         list_path = os.path.join(snapshot_directory, list_name)
@@ -128,7 +147,10 @@ def snapshot_listed_paths(snapshot_directory, notes, broken=never, who="派发�
                 raise
             if broken("snapshot-unreadable-denies"):
                 listed[f"<读不了的清单 {list_name}>"] = list_path
-            notes.append(f"! {who}（快照那一条）读不了快照清单 {list_path}：{error}；这一份跳过，没当成撞快照")
+            if marked:
+                unreadable.append((round_name, list_path, error.strerror or str(error)))
+            else:
+                notes.append(f"! {who}（快照那一条）读不了快照清单 {list_path}：{error}；这一份跳过，没当成撞快照")
             continue
         for line in lines:
             repository_path = repository_path_of_snapshot_line(line, broken)
@@ -151,15 +173,74 @@ def ruled_snapshot_conflicts(text, broken=never, none_words=NONE_WORDS):
     return ruled
 
 
-def conflicts_of_paths(project_root, paths, ruled, notes, broken=never, source_name="补丁", who="apply-writer-patch.py"):
-    """要改的文件（仓根相对路径的集合）撞了哪几轮的快照：[(轮名, 快照目录, [(路径, 出现在哪, 清单文件)])]；放行行点名了的轮不算。"""
+def conflicts_of_paths(project_root, paths, ruled, notes, broken=never, source_name="补丁", who="apply-writer-patch.py", unreadable=None):
+    """要改的文件（仓根相对路径的集合）撞了哪几轮的快照：[(轮名, 快照目录, [(路径, 出现在哪, 清单文件)])]；放行行点名了的轮不算。
+    unreadable 原样交给 snapshot_listed_paths（读不了的清单逐份追加进去）。"""
     conflicts = []
     for round_name, snapshot_directory in open_three_way_rounds(project_root, notes, broken, who=who):
-        listed = snapshot_listed_paths(snapshot_directory, notes, broken, who=who)
+        listed = snapshot_listed_paths(snapshot_directory, notes, broken, who=who, round_name=round_name, unreadable=unreadable)
         hits = sorted(path for path in paths if path in listed)
         if hits and round_name not in ruled and "*" not in ruled:
             conflicts.append((round_name, snapshot_directory, [(path, source_name, listed[path]) for path in hits]))
     return conflicts
+
+
+def shown_path(project_root, path):
+    """给人看的路径：在仓根下的写仓根相对路径，别的原样。"""
+    relative = os.path.relpath(path, project_root)
+    return path if relative.startswith("..") else relative
+
+
+def unreadable_lines(project_root, unreadable, who="派发闸", this_time="派发"):
+    """读不了的快照清单（snapshot_listed_paths 交的 unreadable）打给人看的几行：逐份点名那一轮与那份清单、写明这一份没判、照「放行但必记检出」放行；末行是出路。
+    没有读不了的交 []。"""
+    if not unreadable:
+        return []
+    lines = [f"! {who}（快照那一条）读不了快照清单 {shown_path(project_root, list_path)}（三方轮 {round_name}，{reason}）：这一份没判，"
+             f"照「放行但必记检出」这一次{this_time}照常放行，检出记录记一条" for round_name, list_path, reason in unreadable]
+    lines.append("→ 怎么办：看那几份为什么读不了（是目录、没有读权限、悬空的链接），修好（改回普通文件、补上读权限、补回链接指的文件）；"
+                 "修好之前自己核这一次要改的文件在不在那一轮的快照里，在的等那一轮的判决写完再动（.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」）")
+    return lines
+
+
+def detections_path():
+    """检出记录在哪：环境变量 AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path；都取不到交 None。"""
+    configured = os.environ.get(DETECTIONS_VARIABLE)
+    if configured:
+        return configured
+    try:
+        import lib_work_root
+        return lib_work_root.default_detections_path()
+    except Exception:  # 文件不在、语法错、工作根的弄坏开关写错都算取不到
+        return None
+
+
+def record_unreadable(project_root, unreadable, command, session_id=None, agent_id=None, agent_type=None, transcript_path=None):
+    """读不了的快照清单往检出记录追加一行（结局「只记」：这一次照常放行了），看门狗据此报给主 agent。
+    交一行给人看的说明：记进了哪里，或为什么没记成；没有读不了的交 None。"""
+    if not unreadable:
+        return None
+    path = detections_path()
+    if not path:
+        return f"! 检出没记成：取不到检出记录的位置（{DETECTIONS_VARIABLE} 没设，同目录 lib_work_root.py 也读不到）"
+    entry = {
+        "time": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id,
+        "agent_id": agent_id,
+        "agent_type": agent_type or "主 agent",
+        "transcript_path": transcript_path,
+        "command": command[:500],
+        "findings": [f"{UNREADABLE_FINDING_PREFIX}：三方轮 {round_name} 的快照清单 {shown_path(project_root, list_path)}（{reason}）没判"
+                     for round_name, list_path, reason in unreadable],
+        "outcome": "只记",
+    }
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as error:
+        return f"! 检出没记成：写不了 {path}（{error}）"
+    return f"  检出记进 {path}"
 
 
 def refusal_text(project_root, subject, conflicts, notes, wait_action, valve_place, this_time="派发"):

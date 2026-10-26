@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-untranslated
+want=三语译文里残留没译的中文超量：3 行（英语 1 行、日语 2 行，在 2 份译文里）；排除登记表 0 处不对
+want=红行里 3 行是与中文逐字相同、不到门槛而还剩中文的
+want=README.en.md:3  英语，与中文逐字相同（README.md:3），剩 5 个汉字：中文** · [English] · [日本語]
+want=README.ja.md:5  日语，与中文逐字相同（README.md:5），剩 1 个日语不用的简体字：编号 | 名称 |
+want=README.ja.md:9  日语，与中文逐字相同（README.md:9），剩 2 个日语不用的简体字：结论
+want=与中文逐字相同的行是照抄没译
+want=doc-text.sh：1 格里 1 格红（trilingual-untranslated）

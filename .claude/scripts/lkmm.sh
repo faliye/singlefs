@@ -40,32 +40,47 @@
 #      「屏障挡住了」还是「本来就撞不上」，只有同一条测试去掉屏障才回答得了。
 #   4. 每条 Never 都要绑到代码。herd7 只判 litmus 写下的那个形态：代码改了发布顺序而 litmus 没跟，
 #      判定照样是 Never，门禁照样绿。所以锚点要在那份文件里恰好命中一个单元，而且 crates/ 下要有一个 .rs
-#      写出这个 litmus 的文件名——那是读它、拿它跟代码今天的形态比的测试。测得对不对门禁判不了，要人看。
+#      写出这个 litmus 的项名（认法在 binding_mention_paths：前后不接别的文件名字符，前面可以带 litmus/）——
+#      那是读它、拿它跟代码今天的形态比的测试。测得对不对门禁判不了，要人看。
 #   5. 没有 herd7 直接失败，不静默跳过。
 #
 # 1–4 都排在 herd7 探测之前：它们不需要 herd7，
 # 该红的先红出来（selftest 的样本也靠这一点才喂得进去）。
 #
+# 项名：litmus/ 下递归找 .litmus，每份的项名是它相对 litmus/ 的路径（顶层的就是文件名，子目录里的带目录，例 sub/publish.litmus）；
+#   判定项、按条的临时文件（$WORK/<种类>/<项名>）与写出文件名那一查都用项名，两个子目录里同名的 litmus 不串。
+#   弄坏开关 GATE_LKMM_BREAK=litmus-items-by-file-name（自证 scripts/gate/lkmm-selftest.sh 用）：项名只取文件名（改前），两个子目录里的同名 litmus 共用一个项名与一份临时文件，
+#     两份都报成 binding:<文件名>、herd7:<文件名>（自证 litmus-same-name-subdirectories 那一格判错：找不到 binding:a/publish.litmus 那一行）。
 # 判定库（--verdict-library <目录>，判定库 scripts/crash/lib_verdict_library.py；门禁给 git common-dir 下的 singlefs-lkmm-verdicts/）：每份 litmus 两条判定。
-#   herd7:<文件名>    herd7 的判定与声明相符。键是 litmus 去掉行首起的 (* … *) 注释之后的内容、singlefs-expect 声明的那个值（它在注释里却决定判据）、
+#   herd7:<项名>      herd7 的判定与声明相符。键是 litmus 去掉行首起的 (* … *) 注释之后的内容、singlefs-expect 声明的那个值（它在注释里却决定判据）、
 #                     herd7（-version 第一行与可执行文件的 sha256）、内核树 tools/memory-model 里 herd7 读的模型文件（顶层的 .cfg、.cat、.bell、.def）
 #                     逐份内容、内核树的版本（git 树的提交号，不是 git 树就读 Makefile 的 VERSION / PATCHLEVEL / SUBLEVEL / EXTRAVERSION），
 #                     判法单元指纹是这份脚本里 judge_herd7_output 的单元闭包键。锚点指到的代码不进：herd7 不读代码。
-#   binding:<文件名>  每条 Never 的锚点都恰好命中一个单元、crates/ 下有 .rs 写出这份 litmus 的文件名。键是 litmus 去注释的内容、锚点声明、
-#                     锚点指到的那几个单元的（种类，去注释指纹）、文件名，判法单元指纹是 check_binding_test_mentions 的单元闭包键；
-#                     锚点每趟都现解（键要它），复用的只跳过写出文件名那一查。
+#   binding:<项名>    每条 Never 的锚点都恰好命中一个单元、crates/ 下有 .rs 写出这份 litmus 的项名。键是 litmus 去注释的内容、锚点声明、
+#                     锚点指到的那几个单元的（种类，去注释指纹）、项名（组成表那一行仍叫「litmus 文件名」）、写出文件名的测试（crates/ 下写出项名的 .rs 按路径排序，
+#                     逐份相对路径与内容 sha256；一份都没有写固定的「无」），判法单元指纹是 check_binding_test_mentions 的单元闭包键。
+#                     锚点与写出文件名的那批 .rs 每趟都现找（键要它们）：那批 .rs 删掉、改名或改掉那一处提及都让键变、这一条现判。
 #   键相同、上次判绿就复用（herd7 那一条不起 herd7）；--no-reuse 只写不读。每条一行「· <项>：绿|红，现判（<原因>：<变了的单元>）|复用（…）」，
 #   末了一行「· 按条：现判 N、复用 M」。不给 --verdict-library 不读不写，每条都现判。
 #   弄坏开关 GATE_LKMM_BREAK=litmus-key-drops-every-comment（门禁 checker-tier-lkmm 的样本用）：herd7 那一条的键把注释整个去掉、连 singlefs-expect 的值也不留，
 #     改了期望照样复用（样本 litmus-key-samples-expectation-changed-red 判绿退 77）。
+#   弄坏开关 GATE_LKMM_BREAK=binding-key-drops-test-mentions（自证 scripts/gate/lkmm-selftest.sh 用）：绑定那一条的组成表不放「写出文件名的测试」那一行，
+#     删掉唯一写出文件名的 .rs 照样复用判绿（自证 binding-test-mentions-in-key 那一格判错）。
+#   弄坏开关 GATE_LKMM_BREAK=binding-mention-substring（自证 scripts/gate/lkmm-selftest.sh 用）：写出项名那一查退回按子串找（改前），
+#     只写了 mp-publish.litmus 的 .rs 也算写出 publish.litmus（自证 binding-mention-boundary 那一格判错）。
 #   复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：绑定、herd7 两种判定各一份，组成表都算好之后、判之前抽（候选按键文件查，verdict-library-candidate，
 #     与 lookup 分开）；抽中强制现判的那一条那一行写「强制现判」、不读库；哨兵被现判、强制现判判定与库里不同，算一项红。种子与条数取 SINGLEFS_REUSE_SENTINEL_SEED、
 #     SINGLEFS_REUSE_SENTINEL_COUNT；没给判定库、--no-reuse 不抽。弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped：一律不读库，自证（scripts/gate/lkmm-selftest.sh）
 #     reuse-three-questions 那一格判错、reuse-sentinel 那一格要的红照判。
 #   复用三问与哨兵的自证在 scripts/gate/lkmm-selftest.sh（拿门禁 checker-tier-lkmm 的样本 litmus-key-samples-anchor-body-changed 的 setup.sh 造现场、假 herd7 跑这一份）：
 #     这一份的 --selftest 会被重型测试闸按 herd7 拦，自证另放一份可以单独起的。
-source "$(dirname "${BASH_SOURCE[0]}")/../singlefs-ai-sop/scripts/lib.sh"
+# 准入经 .claude/scripts/preflight.sh 判（规范副本先找这棵树的、再找主仓的，两处都没有就拒绝；坑写在它的文件头），不直接 source 副本里的 lib.sh：
+#   worktree 与 gate.sh --staged 的临时树里没有副本，直接 source 会落空，preflight 成了找不到的命令、参数被清空、不带参数照跑。
+#   lib.sh（ok、bad、howto、warn、say、die、head1、project_root）取 preflight.sh 找到的那一份副本里的：它与 preflight.py 同在副本的 scripts/ 下（PREFLIGHT_PROGRAM）。
+source "$(dirname "${BASH_SOURCE[0]}")/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+source "${PREFLIGHT_PROGRAM%/*}/lib.sh" || { echo "  ✗ 规范副本里没有 lib.sh：${PREFLIGHT_PROGRAM%/*}/lib.sh（preflight.py 在而 lib.sh 不在，副本装得不全）"
+  echo "     → 怎么办：重装规范副本（bash .claude/singlefs-ai-sop/install.sh）再跑。"; exit 1; }
 
 LKMM_SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERDICT_LIBRARY_MODULE="$LKMM_SCRIPT_DIRECTORY/../../scripts/crash/lib_verdict_library.py"
@@ -123,7 +138,16 @@ head1 "LKMM（herd7）"
         "放进 <项目根>/litmus/。没有并发改动就不该跑到这条检查。"; exit 1; }
 # 路径必须绝对化：下面要 cd 进内核树跑 herd7（模型文件是相对路径引的），
 # 相对路径 cd 之后就找不着了
-mapfile -t FILES < <(find "$LITMUS_DIR" -name '*.litmus' -exec readlink -f {} \; | sort)
+# 每份的项名（LITMUS_KEY）是它相对 litmus/ 的路径：顶层的就是文件名（判定库里已有的判定照旧复用），子目录里的带目录，
+# 两个子目录里同名的 litmus 各是各的项，判定项、临时文件与写出文件名那一查都不串（文件头「判定库」一段）。
+# 弄坏开关 GATE_LKMM_BREAK=litmus-items-by-file-name 退回改前：项名只取文件名。
+declare -A LITMUS_KEY=()
+FILES=()
+while IFS= read -r -d '' litmus_relative; do
+  f="$(readlink -f "$LITMUS_DIR/$litmus_relative")"
+  FILES+=("$f")
+  if [[ ",${GATE_LKMM_BREAK:-}," == *,litmus-items-by-file-name,* ]]; then LITMUS_KEY["$f"]="${litmus_relative##*/}"; else LITMUS_KEY["$f"]="$litmus_relative"; fi
+done < <(find "$LITMUS_DIR" -name '*.litmus' -printf '%P\0' | sort -z)
 [[ ${#FILES[@]} -gt 0 ]] || { bad "$LITMUS_DIR 下没有 .litmus 文件"
   howto "照 litmus/ 那对现成的抄一对进来（Never + 去屏障的 Sometimes 对照），" \
         "或者删掉空的 litmus/ 目录。"; exit 1; }
@@ -131,6 +155,11 @@ mapfile -t FILES < <(find "$LITMUS_DIR" -name '*.litmus' -exec readlink -f {} \;
 # 按条判定的临时文件（组成表、单元清单）：跑完删
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-lkmm.XXXXXX")"
 trap 'rm -rf "${WORK:?}"' EXIT
+# work_file <种类> <项名>：这份 litmus 的临时文件路径 $WORK/<种类>/<项名>（项名里的子目录照建），调用方自己接后缀
+work_file() {
+  local path="$WORK/$1/$2"
+  mkdir -p "${path%/*}" && printf '%s' "$path"
+}
 
 # ── 静态检查：期望声明 / 寄存器声明 / atomic_t 初值类型 ──
 # 寄存器用法只在剥掉注释的正文里找：头部 (* … *) 注释里写 r1、r2 不是用了它，不能逼人往 litmus 里塞一个没人用的声明。
@@ -436,16 +465,48 @@ tally_text() {
 }
 
 # ── 每条 Never 都要绑到代码 ──
-# check_binding_test_mentions <litmus 文件名>：crates/ 下有一个 .rs 写出这个文件名（那是读它、拿它跟代码今天的形态比的测试，门禁按文件名认）
+# binding_mention_paths <项名> <输出>：crates/ 下写出这份 litmus 的 .rs（相对项目根的路径，NUL 隔开）写进 <输出>，交 grep 的退出码（0 有、1 一份没有、2 及以上读不全）。
+#   写出绑定查（check_binding_test_mentions）与组成表「写出文件名的测试」那一行（binding_mentions_value）共用这一份匹配。认的写法：
+#   项名（顶层的是文件名，子目录里的是相对 litmus/ 的路径）前面不接文件名字符（字母、数字、_、-、.、/），或者前面紧挨着 litmus/ 这一级目录
+#   （litmus 前面同样不接字母、数字、_、-、.，可以接 /，例 ../../litmus/<项名>）；后面不接文件名字符。
+#   所以只写了 mp-bar.litmus 的不算写出 bar.litmus，写了 "litmus/bar.litmus" 的算；别的目录下的同名文件（other/bar.litmus、litmus/sub/bar.litmus）也不算写出顶层的 bar.litmus。
+#   按字节比（LC_ALL=C）：汉字、引号这类非 ASCII 字符都算边界。
+#   弄坏开关 GATE_LKMM_BREAK=binding-mention-substring 退回改前：按子串找（grep -F），不看边界。
+binding_mention_paths() {
+  local status=0 pattern
+  : > "$2"
+  [[ -d "$ROOT/crates" ]] || return 1
+  if [[ ",${GATE_LKMM_BREAK:-}," == *,binding-mention-substring,* ]]; then
+    (cd "$ROOT" && grep -rlZF --include='*.rs' -- "$1" crates) > "$2" 2>/dev/null || status=$?
+    return "$status"
+  fi
+  pattern="$(printf '%s' "$1" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
+  (cd "$ROOT" && LC_ALL=C grep -rlZE --include='*.rs' -e "(^|[^A-Za-z0-9_./-]|(^|[^A-Za-z0-9_.-])litmus/)$pattern(\$|[^A-Za-z0-9_./-])" crates) > "$2" 2>/dev/null || status=$?
+  return "$status"
+}
+# check_binding_test_mentions <项名>：crates/ 下有一个 .rs 写出这份 litmus（那是读它、拿它跟代码今天的形态比的测试，门禁按项名认，认法在 binding_mention_paths）
 check_binding_test_mentions() {
-  grep -rqF --include='*.rs' -- "$1" "$ROOT/crates" 2>/dev/null
+  binding_mention_paths "$1" "$WORK/mention-check.paths" || true
+  [[ -s "$WORK/mention-check.paths" ]]
+}
+# binding_mentions_value <项名>：组成表「写出文件名的测试」那一行的值（文件头「判定库」一段）。crates/ 下写出这份 litmus 的 .rs（binding_mention_paths）按路径排序，
+#   逐份「相对路径<TAB>内容 sha256」取摘要；一份都没有交「无」；grep 读不全（退 2 及以上）交一个每趟都不同的值，这一条不复用
+binding_mentions_value() {
+  local listing grep_status=0
+  listing="$(work_file mentions "$1").txt"
+  binding_mention_paths "$1" "$listing.paths" || grep_status=$?
+  if ((grep_status > 1)); then printf '读不全（grep 退 %s，%s）' "$grep_status" "$EPOCHREALTIME"; return 0; fi
+  LC_ALL=C sort -z "$listing.paths" | while IFS= read -r -d '' mention_path; do
+    printf '%s\t%s\n' "$mention_path" "$(sha256sum < "$ROOT/$mention_path" | cut -d' ' -f1)"
+  done > "$listing"
+  if [[ -s "$listing" ]]; then sha256sum < "$listing" | cut -d' ' -f1; else printf '无'; fi
 }
 n_bound=0; n_unbound=0
 binding_items=(); binding_tables=(); binding_names=(); binding_rels=(); binding_anchor_counts=()
 for f in "${FILES[@]}"; do
   [[ "${EXPECT[$f]}" == Never ]] || continue
-  rel="${f#"$ROOT"/}"; litmus_name="$(basename "$f")"
-  facts="$WORK/facts-$litmus_name.txt"
+  rel="${f#"$ROOT"/}"; litmus_key="${LITMUS_KEY[$f]}"
+  facts="$(work_file facts "$litmus_key").txt"
   if ! litmus_facts "$ROOT" "$f" > "$facts"; then
     bad "$rel  解析不了锚点（scripts/gate/lib_function_units.py 切不出那份 .rs，输出在上面）"
     howto "先让 python3 scripts/gate/lib_function_units.py dump <根> --language rust 在这棵树上跑通。"
@@ -479,20 +540,22 @@ for f in "${FILES[@]}"; do
     fi
     n_unbound=$((n_unbound+1)); continue
   fi
-  # 锚点都恰好命中一个单元；这一条判定（binding:<文件名>）按键复用写出文件名那一查
-  grep '^anchor' "$facts" | cut -f4- > "$WORK/anchor-units-$litmus_name.txt"
-  unit_key_file "$WORK/anchor-units-$litmus_name.txt" "$WORK/anchor-key-$litmus_name.txt"
-  table="$WORK/binding-$litmus_name.tsv"
+  # 锚点都恰好命中一个单元；这一条判定（binding:<项名>）按键复用写出文件名那一查，那一查读的 .rs 进键（「写出文件名的测试」那一行）
+  anchor_units="$(work_file anchor-units "$litmus_key").txt"; anchor_key="$(work_file anchor-key "$litmus_key").txt"
+  grep '^anchor' "$facts" | cut -f4- > "$anchor_units"
+  unit_key_file "$anchor_units" "$anchor_key"
+  table="$(work_file binding "$litmus_key").tsv"
   { printf 'litmus 去注释内容\t%s\n' "$(grep '^content' "$facts" | cut -f2)"
     printf '锚点声明\t%s\n' "$(digest_of "$(grep '^declaration' "$facts" | cut -f2-)")"
-    printf '锚点单元\t@%s\n' "$WORK/anchor-key-$litmus_name.txt"
-    printf 'litmus 文件名\t%s\n' "$(digest_of "$litmus_name")"
+    printf '锚点单元\t@%s\n' "$anchor_key"
+    printf 'litmus 文件名\t%s\n' "$(digest_of "$litmus_key")"
+    [[ ",${GATE_LKMM_BREAK:-}," == *,binding-key-drops-test-mentions,* ]] || printf '写出文件名的测试\t%s\n' "$(binding_mentions_value "$litmus_key")"
     printf '判法单元指纹\t@%s\n' "$(judging_units_file check_binding_test_mentions)"; } > "$table"
-  binding_items+=("binding:$litmus_name"); binding_tables+=("$table"); binding_names+=("$litmus_name"); binding_rels+=("$rel"); binding_anchor_counts+=("$anchor_count")
+  binding_items+=("binding:$litmus_key"); binding_tables+=("$table"); binding_names+=("$litmus_key"); binding_rels+=("$rel"); binding_anchor_counts+=("$anchor_count")
 done
 sentinel_plan binding-litmus 绑定 "$WORK/sentinel-binding.json" binding_items binding_tables
 for index in "${!binding_items[@]}"; do
-  item="${binding_items[$index]}"; table="${binding_tables[$index]}"; litmus_name="${binding_names[$index]}"; rel="${binding_rels[$index]}"
+  item="${binding_items[$index]}"; table="${binding_tables[$index]}"; litmus_key="${binding_names[$index]}"; rel="${binding_rels[$index]}"
   anchor_count="${binding_anchor_counts[$index]}"
   if judge_lookup binding-litmus "$item" "$table" "$WORK/sentinel-binding.json"; then
     count_item 1 "$item_reason"
@@ -501,18 +564,19 @@ for index in "${!binding_items[@]}"; do
     n_bound=$((n_bound+1)); continue
   fi
   count_item 0 "$item_reason"
-  if ! check_binding_test_mentions "$litmus_name"; then
+  if ! check_binding_test_mentions "$litmus_key"; then
     say "  · $item：红，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-binding.json" "$item" "$judged_word" 红
-    bad "$rel  crates/ 下没有一个 .rs 写出 $litmus_name —— 没有测试把它和代码对上"
+    bad "$rel  crates/ 下没有一个 .rs 写出 $litmus_key —— 没有测试把它和代码对上"
     howto "写一个测试读这个 litmus，拿它的写者 / 读者次序跟代码今天实际发出的次序比" \
-          "（例：录制写请求流，按步骤分类后逐项比）。测试里要写出文件名 $litmus_name，门禁按文件名认。" \
+          "（例：录制写请求流，按步骤分类后逐项比）。测试里要写出 $litmus_key（顶层的写文件名，子目录里的写相对 litmus/ 的路径，前面可以带 litmus/），" \
+          "门禁按这个名字认，前后不接别的文件名字符（只写了 mp-${litmus_key##*/} 那种不算）。" \
           "herd7 只判 litmus 写下的形态：代码改了顺序而 litmus 没跟，判定照样是 Never。"
     fails=$((fails+1)); continue
   fi
   say "  · $item：绿，$judged_word（$item_reason）"   # gate-lint:detail
   sentinel_observe "$WORK/sentinel-binding.json" "$item" "$judged_word" 绿
-  record_item binding-litmus "$item" "$table" "$anchor_count 个锚点各恰好命中一个单元，crates/ 下有 .rs 写出 $litmus_name" "lkmm.sh 绑定检查（锚点经 lib_function_units.py 解析）"
+  record_item binding-litmus "$item" "$table" "$anchor_count 个锚点各恰好命中一个单元，crates/ 下有 .rs 写出 $litmus_key" "lkmm.sh 绑定检查（锚点经 lib_function_units.py 解析）"
   n_bound=$((n_bound+1))
 done
 sentinel_finish "$WORK/sentinel-binding.json" || fails=$((fails+1))
@@ -582,22 +646,22 @@ cd "$KTREE/tools/memory-model" || die "进不去内核树的 tools/memory-model�
 herd7_items=(); herd7_tables=()
 for f in "${FILES[@]}"; do
   want="${EXPECT[$f]}"
-  litmus_name="$(basename "$f")"
-  table="$WORK/herd7-$litmus_name.tsv"
+  litmus_key="${LITMUS_KEY[$f]}"
+  table="$(work_file herd7 "$litmus_key").tsv"
   { printf 'litmus 去注释内容\t%s\n' "$(digest_of "$(litmus_code_without_comments "$f")")"
     [[ ",${GATE_LKMM_BREAK:-}," == *,litmus-key-drops-every-comment,* ]] || printf '期望\t%s\n' "$(digest_of "$want")"
     printf 'herd7\t%s\n' "$HERD7_IDENTITY"
     printf '内存模型\t%s\n' "$MODEL_DIGEST"
     printf '内核树版本\t%s\n' "$(digest_of "$KTREE_VERSION")"
     printf '判法单元指纹\t@%s\n' "$(judging_units_file judge_herd7_output)"; } > "$table"
-  herd7_items+=("herd7:$litmus_name"); herd7_tables+=("$table")
+  herd7_items+=("herd7:$litmus_key"); herd7_tables+=("$table")
 done
 sentinel_plan herd7-litmus herd7 "$WORK/sentinel-herd7.json" herd7_items herd7_tables
 for index in "${!FILES[@]}"; do
   f="${FILES[$index]}"
-  rel="litmus/$(basename "$f")"   # 此时已 cd 进内核树，不能再算相对路径
+  rel="litmus/${LITMUS_KEY[$f]}"   # 此时已 cd 进内核树，不能再算相对路径
   want="${EXPECT[$f]}"
-  litmus_name="$(basename "$f")"
+  litmus_key="${LITMUS_KEY[$f]}"
   item="${herd7_items[$index]}"; table="${herd7_tables[$index]}"
   if judge_lookup herd7-litmus "$item" "$table" "$WORK/sentinel-herd7.json"; then
     count_item 1 "$item_reason"
@@ -627,7 +691,7 @@ for index in "${!FILES[@]}"; do
     say "  · $item：绿，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-herd7.json" "$item" "$judged_word" 绿
     ok "$rel  $herd7_observation（符合声明）"
-    record_item herd7-litmus "$item" "$table" "herd7 判 $herd7_observation，与声明相符" "herd7 -conf linux-kernel.cfg $litmus_name（$HERD7_VERSION_LINE）"
+    record_item herd7-litmus "$item" "$table" "herd7 判 $herd7_observation，与声明相符" "herd7 -conf linux-kernel.cfg litmus/$litmus_key（$HERD7_VERSION_LINE）"
   else
     say "  · $item：红，$judged_word（$item_reason）"   # gate-lint:detail
     sentinel_observe "$WORK/sentinel-herd7.json" "$item" "$judged_word" 红

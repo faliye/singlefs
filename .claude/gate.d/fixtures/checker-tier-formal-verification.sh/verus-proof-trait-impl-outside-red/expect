@@ -1,0 +1,4 @@
+exit=1
+want=verus! 外面有 trait impl：crates/singlefs-replay-prefix/src/lib.rs:
+want=<impl Device for BadDevice>
+want=verus-proof：红（退出 1）

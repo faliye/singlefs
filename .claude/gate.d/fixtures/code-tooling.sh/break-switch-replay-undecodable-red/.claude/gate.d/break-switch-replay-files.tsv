@@ -1,0 +1,5 @@
+# 样本复跑登记表
+scripts/gate/okay.py	30	# 样本：开关逐条红在点名的失败行上
+scripts/gate/garbled.py	30	# 样本：一条开关下自证吐坏字节，另一条照常红
+scripts/gate/silent.py	30	# 样本：开关设上之后自证照样退 0
+scripts/gate/garbled-mismatch.py	30	# 样本：开关下吐坏字节、红的又不是点名的那一格

@@ -1,0 +1,26 @@
+# 派发：experiment-designer
+
+重型测试：不跑
+批次：records/2026-10-22-里程碑五第二轮.md#批2
+草稿目录：/home/fy5090/.local/share/singlefs/work/m5-r2-batch-cadence-prereg
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/m5-r2-batch-cadence-prereg --purpose '里程碑五一·4 整理批节奏实验跑前登记'
+被测条款：.claude/kb/decisions/27-小数据打包容器.md 的「已定项 1」「已定项 26」「未定项 28」「未定项 29」「未定项 34」「未定项 36」各节
+岔路单：问题单 research/prompts/m5-knobs-questions.md
+预计挂钟：2 小时内
+
+回复与报告用中文。
+
+仓根是 worktree `/home/fy5090/.local/share/singlefs/work/m5-dev`（分支 m5-dev），不是 `/home/fy5090/code/singlefs`。
+
+## 关的是哪几条
+
+问题单 `research/prompts/m5-knobs-questions.md` 的 K3、K4、K5、K6、K7 五行（整理批间隔 b、单批映射叶差对一步准入 W、临时小数据容器上界与假 ENOSPC、b 内被改写的对象免于搬迁、整理批空跑），共用一套整理批节奏装置，写成一个新实验的跑前登记。验收：
+
+- 登记里每个量对应问题单的一行（K3–K7），对不上任何一行的不登记；每行的翻面观测与够判条件在登记的判据里写死。
+- 负载取 E189（smallfile 负载三列） 的 SF1–SF4 定义（读 `.claude/kb/experiments/` 下 E189 的页与它的跑前登记里负载的定义，不读产物里的数）；档表取 D27 已定项 13 的 48 档；W 取 D27 与 D28（挂载期承诺量） 现行条款给的一步准入，写明出处。
+- 阳性对照与必红形态照问题单：K3 的 cap 等于 1、K6 的改写比例为 0。
+- 实验简称你按问题起一个交主 agent 认；取号用 `scripts/kb/claim-experiment.sh`，但它只看本工作树：取号之前另查主工作区 `/home/fy5090/code/singlefs` 的 `.claude/kb/experiments.md` 与 `research/prompts/e*-preregistration.md`、`.claude/kb/experiments/` 下的文件名，取两棵树合起来的下一个空号，报告里写明两边各自的最大号。
+
+## 出口
+
+跑前登记写成 `research/prompts/e<号>-preregistration.md`（在 worktree 里），报告写到 `/home/fy5090/.local/share/singlefs/work/m5-r2-batch-cadence-prereg/report.md`：取的号与两棵树的最大号、简称、登记里每个量对问题单哪一行、问法有两种读法的地方。回复只写登记路径、报告路径与 sha256。

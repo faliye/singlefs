@@ -1,0 +1,9 @@
+M1_对数底错	/ math.log(POOL_SIZE_RATIO)	/ math.log(2)
+M2_第一批取成签发那一次	if row["kind"] in BATCH_KINDS	if True
+M3_作废轮不剔	row.get("valid") == "true"	True
+M4_线性那条边不含等号	if alpha <= near_linear_limit:	if alpha < near_linear_limit:
+M5_不滤内存臂	row.get("arm") == "memory"	True
+M6_同一份活漏比释放前读盘核那一栏	    "release_check_read_bytes",\n	    "kind",\n
+M7_按轮配对错位	zip(small_values, large_values)	zip(small_values, large_values[1:] + large_values[:1])
+M8_中位写成平均	return statistics.median(values)	return statistics.mean(values)
+M9_门槛挪动不翻面	if alpha <= near_linear_limit:	if alpha <= 1.25:

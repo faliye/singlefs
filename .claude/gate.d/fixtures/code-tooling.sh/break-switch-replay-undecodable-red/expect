@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=scripts/gate/garbled.py GARBLED_BREAK=bytes：坏字节，stdout 里有不合法的 UTF-8
+want=scripts/gate/silent.py SILENT_BREAK=noop：没红，设上之后自证照样退 0（开关没弄坏什么）
+want=scripts/gate/garbled-mismatch.py GARBLED_MISMATCH_BREAK=bytes：不符，点名的项没在失败行里：「✗ 自检：点名的那一格」
+want=scripts/gate/garbled-mismatch.py GARBLED_MISMATCH_BREAK=bytes：坏字节，stdout 里有不合法的 UTF-8
+want=脚本与钩子的弄坏开关复跑：4 处不对（复跑了 5 条、4 份）
+want=输出带不合法 UTF-8 的
+want=break-switch-replay：红（退出 1）

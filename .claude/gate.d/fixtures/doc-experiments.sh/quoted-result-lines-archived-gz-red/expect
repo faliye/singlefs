@@ -1,0 +1,9 @@
+exit=1
+want=有 1 行整行抄的产物行，在 scripts/experiment-apparatus/replay.sh 登记着的 1 份产物里一份都找不到
+want=.claude/kb/experiments/98-归档压缩产物.md:
+want=E7RESULT name=verdict arm=a count=4
+want=样本只跑 .gate-cells 点名的格：quoted-result-lines
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（quoted-result-lines）
+want=→ quoted-result-lines：打开这个实验复跑命令登记的那份产物
+want=bash .claude/gate.d/doc-experiments.sh --check quoted-result-lines

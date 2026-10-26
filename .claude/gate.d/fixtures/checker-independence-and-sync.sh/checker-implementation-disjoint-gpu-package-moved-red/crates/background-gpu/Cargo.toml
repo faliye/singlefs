@@ -1,0 +1,6 @@
+[package]
+name = "singlefs-background-gpu"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+wgpu = { version = "=30.0.1", default-features = false }

@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=scripts/gate/partial.py PARTIAL_BREAK=two：不符，失败行没被点名：「✗ 自检：没点名的那一格
+want=scripts/gate/carriage.py CARRIAGE_BREAK=progress：不符，失败行没被点名：「✗ 自检：回车后面那一格
+want=脚本与钩子的弄坏开关复跑：2 处不对（复跑了 2 条、2 份）
+want=break-switch-replay：红（退出 1）

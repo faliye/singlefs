@@ -1,0 +1,226 @@
+{
+"closures": {
+"closure\tfsample::entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"key\tc5c4aabeb2cee0f6cd2907e2309546c5a5ffb8f0f59fe0c5aec0159d5159eaef"
+]
+},
+"closure\tfsample::entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"key\tc5c4aabeb2cee0f6cd2907e2309546c5a5ffb8f0f59fe0c5aec0159d5159eaef"
+]
+},
+"closure\tfsample::heaviest\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"trait\tfsample::Weigh\tcrates/fsample/src/lib.rs:15-15\tb454b45ceae6e45365c5273ff8eebe2501277e96d5ea62b69cddc47284fc406a",
+"fn\tfsample::<trait Weigh>::weigh\tcrates/fsample/src/lib.rs:16-16\t542729a4831337076c3e60bba5f4de4f96d20dcb54f529af9844b26019b5d376",
+"impl\tfsample::<impl Weigh for ( T , u32 )>\tcrates/fsample/src/lib.rs:18-18\t243e3c9b473e351c6aee4ae1483fab3be690628b35b3ef2cef6b1eb9c6b967b4",
+"fn\tfsample::<impl Weigh for ( T , u32 )>::weigh\tcrates/fsample/src/lib.rs:19-21\tc9a342cb9f720500821f36586a91b2457aad07697312dd69ede3fbe83f686782",
+"impl\tfsample::<impl Weigh for [ T ]>\tcrates/fsample/src/lib.rs:23-23\t0171018b7d741aa2a6378367ead4ed74d8f0b3200ce7e2e10c4e9728e6999aaa",
+"fn\tfsample::<impl Weigh for [ T ]>::weigh\tcrates/fsample/src/lib.rs:24-26\tb6aa381d14c614f164768ed5e25184fecebb26a9fd45307e176b13e0514de498",
+"impl\tfsample::<impl Weigh for [ T ; N ]>\tcrates/fsample/src/lib.rs:28-28\tf03a2bc3929357a350b991ece136f61c74ac644598f1cbf963fee68e965ad97e",
+"fn\tfsample::<impl Weigh for [ T ; N ]>::weigh\tcrates/fsample/src/lib.rs:29-31\t1578f09310acf687704e748d022ab45118aa30a805a61268437287ed1ede742a",
+"impl\tfsample::<impl Weigh for Box < T >>\tcrates/fsample/src/lib.rs:33-33\te8aa1dbdd725b7b02054e0a94128897b535657bc660319f12988bc89fd4677df",
+"fn\tfsample::<impl Weigh for Box < T >>::weigh\tcrates/fsample/src/lib.rs:34-36\tc5ec70590f6ffee6d9e42afc04859fd60820cf663ba6ae0ae1af485facc1089e",
+"impl\tfsample::<impl Weigh for Option < Box < T > >>\tcrates/fsample/src/lib.rs:38-38\t2bb897cf50cdc25818f5eeecd9a2cc33976910b7507bbcd6da9294f6cfb7f860",
+"fn\tfsample::<impl Weigh for Option < Box < T > >>::weigh\tcrates/fsample/src/lib.rs:39-44\t8341cf4ce44c156206261b132092c285e314e9a5807a2e4c2ed9dc8bbcbfaf3f",
+"fn\tfsample::heaviest\tcrates/fsample/src/lib.rs:46-48\tc1ac83e2fbecdf87ffbc01e95f3f0884a16a89ffd339d0abb47a93d329938626",
+"key\t904f76530dab3a6d6cb9b040e5a35a9a69d5de0b991d2207b2e0d767b0fdefea"
+]
+},
+"closure\tfsample::heaviest\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"trait\tfsample::Weigh\tcrates/fsample/src/lib.rs:15-15\tb454b45ceae6e45365c5273ff8eebe2501277e96d5ea62b69cddc47284fc406a",
+"fn\tfsample::<trait Weigh>::weigh\tcrates/fsample/src/lib.rs:16-16\t542729a4831337076c3e60bba5f4de4f96d20dcb54f529af9844b26019b5d376",
+"impl\tfsample::<impl Weigh for ( T , u32 )>\tcrates/fsample/src/lib.rs:18-18\t243e3c9b473e351c6aee4ae1483fab3be690628b35b3ef2cef6b1eb9c6b967b4",
+"fn\tfsample::<impl Weigh for ( T , u32 )>::weigh\tcrates/fsample/src/lib.rs:19-21\tc9a342cb9f720500821f36586a91b2457aad07697312dd69ede3fbe83f686782",
+"impl\tfsample::<impl Weigh for [ T ]>\tcrates/fsample/src/lib.rs:23-23\t0171018b7d741aa2a6378367ead4ed74d8f0b3200ce7e2e10c4e9728e6999aaa",
+"fn\tfsample::<impl Weigh for [ T ]>::weigh\tcrates/fsample/src/lib.rs:24-26\tb6aa381d14c614f164768ed5e25184fecebb26a9fd45307e176b13e0514de498",
+"impl\tfsample::<impl Weigh for [ T ; N ]>\tcrates/fsample/src/lib.rs:28-28\tf03a2bc3929357a350b991ece136f61c74ac644598f1cbf963fee68e965ad97e",
+"fn\tfsample::<impl Weigh for [ T ; N ]>::weigh\tcrates/fsample/src/lib.rs:29-31\t1578f09310acf687704e748d022ab45118aa30a805a61268437287ed1ede742a",
+"impl\tfsample::<impl Weigh for Box < T >>\tcrates/fsample/src/lib.rs:33-33\te8aa1dbdd725b7b02054e0a94128897b535657bc660319f12988bc89fd4677df",
+"fn\tfsample::<impl Weigh for Box < T >>::weigh\tcrates/fsample/src/lib.rs:34-36\tc5ec70590f6ffee6d9e42afc04859fd60820cf663ba6ae0ae1af485facc1089e",
+"impl\tfsample::<impl Weigh for Option < Box < T > >>\tcrates/fsample/src/lib.rs:38-38\t2bb897cf50cdc25818f5eeecd9a2cc33976910b7507bbcd6da9294f6cfb7f860",
+"fn\tfsample::<impl Weigh for Option < Box < T > >>::weigh\tcrates/fsample/src/lib.rs:39-44\t8341cf4ce44c156206261b132092c285e314e9a5807a2e4c2ed9dc8bbcbfaf3f",
+"fn\tfsample::heaviest\tcrates/fsample/src/lib.rs:46-48\tc1ac83e2fbecdf87ffbc01e95f3f0884a16a89ffd339d0abb47a93d329938626",
+"key\t904f76530dab3a6d6cb9b040e5a35a9a69d5de0b991d2207b2e0d767b0fdefea"
+]
+},
+"closure\tfsample::kernel_text\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"wgsl_compute\tfsample::kernel.wgsl::main\tcrates/fsample/src/kernel.wgsl:1-4\t8ffc22004d230c95f464b17c1c1567f32014dd4f0c4edeb928259bf9ca6d90f0",
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"const\tfsample::KERNEL_SOURCE\tcrates/fsample/src/lib.rs:49-49\t6dbf1358969089e11d8e1aacd0ed02c42f4210fa96e26d1f706bf67fe2d3ec63",
+"const\tfsample::SHARED_SOURCE\tcrates/fsample/src/lib.rs:50-50\t91053f68448d52ed5f87ac3c6150350a83af8e083e2e754e699fcb59e9351c14",
+"fn\tfsample::kernel_text\tcrates/fsample/src/lib.rs:51-53\t0f2352b4e1bc0623f9587de97931fa1252b358207fa1aa53ddeb7f01272684fe",
+"wgsl_const\tfsample::shared.wgsl::SHARED_LIMIT\tcrates/fsample/src/shared.wgsl:1-1\t4eddcfd008102a39ae81b0bd64530071c5fd4b4017e353e0d4cdf54cf5e72e75",
+"key\t532b8cb86bea4f39f5e1345cf08ece8691c61306b1d928812f016cfaa3ff14a1"
+]
+},
+"closure\tfsample::kernel_text\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"wgsl_compute\tfsample::kernel.wgsl::main\tcrates/fsample/src/kernel.wgsl:1-4\t8ffc22004d230c95f464b17c1c1567f32014dd4f0c4edeb928259bf9ca6d90f0",
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"const\tfsample::KERNEL_SOURCE\tcrates/fsample/src/lib.rs:49-49\t6dbf1358969089e11d8e1aacd0ed02c42f4210fa96e26d1f706bf67fe2d3ec63",
+"const\tfsample::SHARED_SOURCE\tcrates/fsample/src/lib.rs:50-50\t91053f68448d52ed5f87ac3c6150350a83af8e083e2e754e699fcb59e9351c14",
+"fn\tfsample::kernel_text\tcrates/fsample/src/lib.rs:51-53\t0f2352b4e1bc0623f9587de97931fa1252b358207fa1aa53ddeb7f01272684fe",
+"wgsl_const\tfsample::shared.wgsl::SHARED_LIMIT\tcrates/fsample/src/shared.wgsl:1-1\t4eddcfd008102a39ae81b0bd64530071c5fd4b4017e353e0d4cdf54cf5e72e75",
+"key\t532b8cb86bea4f39f5e1345cf08ece8691c61306b1d928812f016cfaa3ff14a1"
+]
+},
+"closure\tfsample::main\t--target\tbin:fsample\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
+"key\tb59afd6a1052225478d864a785711af59af0c4bd74e0b3d2d2dd9566637e7abe"
+]
+},
+"closure\tfsample::main\t--target\tbin:fsample\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
+"key\tb59afd6a1052225478d864a785711af59af0c4bd74e0b3d2d2dd9566637e7abe"
+]
+},
+"closure\tfsample::proven_entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::doubled\tcrates/fsample/src/lib.rs:55-57\taf6ed29e9d96bb8f2131891ac19d73c7fc312e89b56e65a57c85b79b5d6f764f",
+"fn\tfsample::lemma_doubled_is_even\tcrates/fsample/src/lib.rs:58-63\t000761acf3b7d88b23510ad55c268c4462495b4151c407b73e21e85cfefa0e27",
+"fn\tfsample::scaled\tcrates/fsample/src/lib.rs:64-74\t5c82d371ba7711ba96c13691c8e792ed1d5bae660164fd4722ce5239a6cd7122",
+"fn\tfsample::proven_entry\tcrates/fsample/src/lib.rs:76-78\tc65c06c2bf9f2f1c1099aadfb9d652b53d915f392285a39c80612af15efbfd3a",
+"key\tbffe064d6be37d5d1ad3d84ba3170aff4b5fd39c983fbd9bc5d44b7be48c0c18"
+]
+},
+"closure\tfsample::proven_entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::scaled\tcrates/fsample/src/lib.rs:64-74\t07c2c39d56e8f85ea1c89533d174bb035a694d306f655a9fea106888ecb07fab",
+"fn\tfsample::proven_entry\tcrates/fsample/src/lib.rs:76-78\tc65c06c2bf9f2f1c1099aadfb9d652b53d915f392285a39c80612af15efbfd3a",
+"key\t57ce8f873f3196769a46f065e7f2d7e1c40a0f70d8687e3a9ae3a3783afe645f"
+]
+},
+"closure\tfsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
+"key\t4b38617aff14aaaca75d2b157a63e8e98a70414d1a3a6d56f77843a2cb780f5b"
+]
+},
+"closure\tfsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
+"key\t4b38617aff14aaaca75d2b157a63e8e98a70414d1a3a6d56f77843a2cb780f5b"
+]
+},
+"dump\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"wgsl_compute\tfsample::kernel.wgsl::main\tcrates/fsample/src/kernel.wgsl:1-4\t8ffc22004d230c95f464b17c1c1567f32014dd4f0c4edeb928259bf9ca6d90f0",
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
+"trait\tfsample::Weigh\tcrates/fsample/src/lib.rs:15-15\tb454b45ceae6e45365c5273ff8eebe2501277e96d5ea62b69cddc47284fc406a",
+"fn\tfsample::<trait Weigh>::weigh\tcrates/fsample/src/lib.rs:16-16\t542729a4831337076c3e60bba5f4de4f96d20dcb54f529af9844b26019b5d376",
+"impl\tfsample::<impl Weigh for ( T , u32 )>\tcrates/fsample/src/lib.rs:18-18\t243e3c9b473e351c6aee4ae1483fab3be690628b35b3ef2cef6b1eb9c6b967b4",
+"fn\tfsample::<impl Weigh for ( T , u32 )>::weigh\tcrates/fsample/src/lib.rs:19-21\tc9a342cb9f720500821f36586a91b2457aad07697312dd69ede3fbe83f686782",
+"impl\tfsample::<impl Weigh for [ T ]>\tcrates/fsample/src/lib.rs:23-23\t0171018b7d741aa2a6378367ead4ed74d8f0b3200ce7e2e10c4e9728e6999aaa",
+"fn\tfsample::<impl Weigh for [ T ]>::weigh\tcrates/fsample/src/lib.rs:24-26\tb6aa381d14c614f164768ed5e25184fecebb26a9fd45307e176b13e0514de498",
+"impl\tfsample::<impl Weigh for [ T ; N ]>\tcrates/fsample/src/lib.rs:28-28\tf03a2bc3929357a350b991ece136f61c74ac644598f1cbf963fee68e965ad97e",
+"fn\tfsample::<impl Weigh for [ T ; N ]>::weigh\tcrates/fsample/src/lib.rs:29-31\t1578f09310acf687704e748d022ab45118aa30a805a61268437287ed1ede742a",
+"impl\tfsample::<impl Weigh for Box < T >>\tcrates/fsample/src/lib.rs:33-33\te8aa1dbdd725b7b02054e0a94128897b535657bc660319f12988bc89fd4677df",
+"fn\tfsample::<impl Weigh for Box < T >>::weigh\tcrates/fsample/src/lib.rs:34-36\tc5ec70590f6ffee6d9e42afc04859fd60820cf663ba6ae0ae1af485facc1089e",
+"impl\tfsample::<impl Weigh for Option < Box < T > >>\tcrates/fsample/src/lib.rs:38-38\t2bb897cf50cdc25818f5eeecd9a2cc33976910b7507bbcd6da9294f6cfb7f860",
+"fn\tfsample::<impl Weigh for Option < Box < T > >>::weigh\tcrates/fsample/src/lib.rs:39-44\t8341cf4ce44c156206261b132092c285e314e9a5807a2e4c2ed9dc8bbcbfaf3f",
+"fn\tfsample::heaviest\tcrates/fsample/src/lib.rs:46-48\tc1ac83e2fbecdf87ffbc01e95f3f0884a16a89ffd339d0abb47a93d329938626",
+"const\tfsample::KERNEL_SOURCE\tcrates/fsample/src/lib.rs:49-49\t6dbf1358969089e11d8e1aacd0ed02c42f4210fa96e26d1f706bf67fe2d3ec63",
+"const\tfsample::SHARED_SOURCE\tcrates/fsample/src/lib.rs:50-50\t91053f68448d52ed5f87ac3c6150350a83af8e083e2e754e699fcb59e9351c14",
+"fn\tfsample::kernel_text\tcrates/fsample/src/lib.rs:51-53\t0f2352b4e1bc0623f9587de97931fa1252b358207fa1aa53ddeb7f01272684fe",
+"fn\tfsample::scaled\tcrates/fsample/src/lib.rs:64-74\t07c2c39d56e8f85ea1c89533d174bb035a694d306f655a9fea106888ecb07fab",
+"fn\tfsample::proven_entry\tcrates/fsample/src/lib.rs:76-78\tc65c06c2bf9f2f1c1099aadfb9d652b53d915f392285a39c80612af15efbfd3a",
+"fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
+"wgsl_const\tfsample::shared.wgsl::SHARED_LIMIT\tcrates/fsample/src/shared.wgsl:1-1\t4eddcfd008102a39ae81b0bd64530071c5fd4b4017e353e0d4cdf54cf5e72e75"
+]
+}
+},
+"dump": {
+"exit": 0,
+"lines": [
+"wgsl_compute\tfsample::kernel.wgsl::main\tcrates/fsample/src/kernel.wgsl:1-4\t8ffc22004d230c95f464b17c1c1567f32014dd4f0c4edeb928259bf9ca6d90f0",
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
+"trait\tfsample::Weigh\tcrates/fsample/src/lib.rs:15-15\tb454b45ceae6e45365c5273ff8eebe2501277e96d5ea62b69cddc47284fc406a",
+"fn\tfsample::<trait Weigh>::weigh\tcrates/fsample/src/lib.rs:16-16\t542729a4831337076c3e60bba5f4de4f96d20dcb54f529af9844b26019b5d376",
+"impl\tfsample::<impl Weigh for ( T , u32 )>\tcrates/fsample/src/lib.rs:18-18\t243e3c9b473e351c6aee4ae1483fab3be690628b35b3ef2cef6b1eb9c6b967b4",
+"fn\tfsample::<impl Weigh for ( T , u32 )>::weigh\tcrates/fsample/src/lib.rs:19-21\tc9a342cb9f720500821f36586a91b2457aad07697312dd69ede3fbe83f686782",
+"impl\tfsample::<impl Weigh for [ T ]>\tcrates/fsample/src/lib.rs:23-23\t0171018b7d741aa2a6378367ead4ed74d8f0b3200ce7e2e10c4e9728e6999aaa",
+"fn\tfsample::<impl Weigh for [ T ]>::weigh\tcrates/fsample/src/lib.rs:24-26\tb6aa381d14c614f164768ed5e25184fecebb26a9fd45307e176b13e0514de498",
+"impl\tfsample::<impl Weigh for [ T ; N ]>\tcrates/fsample/src/lib.rs:28-28\tf03a2bc3929357a350b991ece136f61c74ac644598f1cbf963fee68e965ad97e",
+"fn\tfsample::<impl Weigh for [ T ; N ]>::weigh\tcrates/fsample/src/lib.rs:29-31\t1578f09310acf687704e748d022ab45118aa30a805a61268437287ed1ede742a",
+"impl\tfsample::<impl Weigh for Box < T >>\tcrates/fsample/src/lib.rs:33-33\te8aa1dbdd725b7b02054e0a94128897b535657bc660319f12988bc89fd4677df",
+"fn\tfsample::<impl Weigh for Box < T >>::weigh\tcrates/fsample/src/lib.rs:34-36\tc5ec70590f6ffee6d9e42afc04859fd60820cf663ba6ae0ae1af485facc1089e",
+"impl\tfsample::<impl Weigh for Option < Box < T > >>\tcrates/fsample/src/lib.rs:38-38\t2bb897cf50cdc25818f5eeecd9a2cc33976910b7507bbcd6da9294f6cfb7f860",
+"fn\tfsample::<impl Weigh for Option < Box < T > >>::weigh\tcrates/fsample/src/lib.rs:39-44\t8341cf4ce44c156206261b132092c285e314e9a5807a2e4c2ed9dc8bbcbfaf3f",
+"fn\tfsample::heaviest\tcrates/fsample/src/lib.rs:46-48\tc1ac83e2fbecdf87ffbc01e95f3f0884a16a89ffd339d0abb47a93d329938626",
+"const\tfsample::KERNEL_SOURCE\tcrates/fsample/src/lib.rs:49-49\t6dbf1358969089e11d8e1aacd0ed02c42f4210fa96e26d1f706bf67fe2d3ec63",
+"const\tfsample::SHARED_SOURCE\tcrates/fsample/src/lib.rs:50-50\t91053f68448d52ed5f87ac3c6150350a83af8e083e2e754e699fcb59e9351c14",
+"fn\tfsample::kernel_text\tcrates/fsample/src/lib.rs:51-53\t0f2352b4e1bc0623f9587de97931fa1252b358207fa1aa53ddeb7f01272684fe",
+"fn\tfsample::doubled\tcrates/fsample/src/lib.rs:55-57\taf6ed29e9d96bb8f2131891ac19d73c7fc312e89b56e65a57c85b79b5d6f764f",
+"fn\tfsample::lemma_doubled_is_even\tcrates/fsample/src/lib.rs:58-63\t000761acf3b7d88b23510ad55c268c4462495b4151c407b73e21e85cfefa0e27",
+"fn\tfsample::scaled\tcrates/fsample/src/lib.rs:64-74\t5c82d371ba7711ba96c13691c8e792ed1d5bae660164fd4722ce5239a6cd7122",
+"fn\tfsample::proven_entry\tcrates/fsample/src/lib.rs:76-78\tc65c06c2bf9f2f1c1099aadfb9d652b53d915f392285a39c80612af15efbfd3a",
+"fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
+"wgsl_const\tfsample::shared.wgsl::SHARED_LIMIT\tcrates/fsample/src/shared.wgsl:1-1\t4eddcfd008102a39ae81b0bd64530071c5fd4b4017e353e0d4cdf54cf5e72e75"
+]
+}
+}

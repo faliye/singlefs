@@ -1,0 +1,3 @@
+exit=1
+want=第 3 行：判谁错「都不对」要写 spec错 | model错 | 条款欠一句 之一
+want=same-origin-counter：红（退出 1）

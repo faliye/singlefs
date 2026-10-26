@@ -1,0 +1,14 @@
+exit=3
+want=样本档（快档）：
+want=查库 2 条一齐起（并行度 
+want=用例要上卡，整段只经一次 scripts/crash/gpu-quiesce-run.sh 照多机配置清场再起，跑完不复原
+want=GPU_QUIESCE step=quiesce result=stopped-and-read-back holders=0
+want=GPU_QUIESCE step=command result=exit-0
+want=GPU_QUIESCE step=restore result=not-restored holders=0
+want=查库的命令（以 crash-case:settled-covered-stream 为例，每条各自的清场包装已去掉）：env -u GPU_COMPUTATION_CLASSES -u SINGLEFS_GPU_CARDS_CONFIG
+want=--features gpu --test settled_covered_stream -- --include-ignored --exact settled_covered_stream_full --nocapture --test-threads 1
+want=crash-case:settled-covered-stream：全部块都有键相同的判定、没有红（块 3：复用 3、没有判定 0、红 0、拒算 0）
+want=crash-case:uncovered-stream：块没罩住（退 3：块 4：复用 1、没有判定 3、红 0、拒算 0）
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）

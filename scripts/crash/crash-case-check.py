@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # admission: always 判的是此刻 crates/*/tests/ 的源码与登记表，几秒跑完；每次改测试都现判
 # run-condition: none 只读仓里的 Rust 源码与 .claude/gate.d/stage-inputs.tsv
-"""测试源码与崩溃点测试登记表的六样静态判据，判法只在这一份里；三道门禁各调各的那几样：
+"""测试源码与崩溃点测试登记表的七样静态判据，判法只在这一份里；三道门禁各调各的那几样：
 
   placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记进崩溃点重放合表（checker-tier-crash-point-replay 开跑前判）
   modules       checker 档每个测试文件第一行声明它测哪几个模块（checker-tier-crash-point-replay 开跑前判）
   file-names    测试文件名不按里程碑、步号起（code-source-discipline 的一格）
-  one-scenario  harness 档一条用例一个场景（harness-model-differential-and-scenarios 的一格）
+  test-names    #[test] 函数名不按里程碑、步号、欠账号起（code-source-discipline 的 test-function-names 格）
+  one-scenario  harness 档与 checker 档一条用例一个场景（harness-model-differential-and-scenarios 的一格）
   must-red      每条崩溃枚举用例在 crates/mutations.tsv 里至少有一行变异点名它的测试目标（checker-tier-crash-point-replay 的 crash-case-must-red 格）
   knobs         崩溃点测试的旋钮登记表每行取值与依据不空、出处路径在（checker-tier-crash-point-replay 的 crash-knobs 格）
 
 用法：
-    crash-case-check.py [--only <项>[,<项>…]] [仓根]     # 不给 --only 就六样都判
+    crash-case-check.py [--only <项>[,<项>…]] [仓根]     # 不给 --only 就七样都判
     crash-case-check.py --selftest                      # CRASH_CASE_CHECK_BREAK=<项> 时必须判红
 
 判法：
@@ -35,8 +36,13 @@
      singlefs_checker_tier:: 导入的模块逐个相同；一个都不导入的写「无（为什么）」。
   file-names：crates/singlefs-harness/tests/*.rs 与 crates/singlefs-checker-tier/tests/*.rs 的文件名不带里程碑序数、步号、增补号、
      并行线号、欠账号（MILESTONE_FILE_NAME）。
-  one-scenario：crates/singlefs-harness/tests/*.rs 里带 #[test] 的函数，函数体里某个 for 循环体每一轮新建一个池
-     （FRESH_POOL_CALL），判红；用例上面写了「harness-test-granularity:one-scenario <理由>」的不判。
+  test-names（C638）：crates/*/tests/ 下（含子目录）与 crates/*/src/ 下 .rs 里带 #[test] 的函数名，拿同一条 MILESTONE_FILE_NAME 判：
+     带里程碑序数、步号、增补号、并行线号、欠账号（c<三位数>）的判红，来历进 commit message 或 .claude/kb/。
+     立账时已在的存量登记在 .claude/gate.d/test-function-names-exempt.tsv（一行「<相对仓根的文件><TAB><函数名><TAB># 理由>」，理由至少 4 个字），
+     登记了的不判；一行在那份文件里一条带欠账号的 #[test] 都对不上（函数改了名、删了、文件不在）判红：那一行删掉。表只缩不涨（不判涨，靠 review）。
+     带实验号（e<数>）与 m<数>_ 的不在 MILESTONE_FILE_NAME 里，不判（算不算来历没定）。
+  one-scenario：crates/singlefs-harness/tests/*.rs 与 crates/singlefs-checker-tier/tests/*.rs 里带 #[test] 的函数（C637 把 checker 档一并扫进来），
+     函数体里某个 for 循环体每一轮新建一个池（FRESH_POOL_CALL），判红；用例上面写了「harness-test-granularity:one-scenario <理由>」的不判。
   must-red（K5，出口 4「每条流至少一个必红世界」，按崩溃枚举用例数）：.claude/gate.d/stage-inputs.tsv 每一行 crash-case:<名>（test=<包>:<测试目标>:<函数>）
      在 crates/mutations.tsv 里至少有一行变异，cargo test 的参数那一列带 -p <包>（或 --package <包>）与 --test <测试目标>；变异行归到用例只靠测试目标反推，
      同一个测试目标里的几条用例共用点名它的行。缺的逐条列、判红。这一样只判「在册」，变异真把那条用例改红由门禁 checker-tier-crates-mutation-replay 跑整表证。
@@ -50,9 +56,16 @@
 退出码：0 选中的都齐（至少一样判过）；1 有缺的（逐个列出）；2 用法错或读不了登记表；77 选中的每一样都无对象可判。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头；
-每一项红时都另有汇总行「✗ 自检 14 种里有 N 处判错」）：
+每一项红时都另有汇总行「✗ 自检 20 种里有 N 处判错」）：
   CRASH_CASE_CHECK_BREAK=fresh-pool-loop-unseen  one_scenario_problems() 不报循环里每轮新建池的用例
-      循环里每轮新建池（「✗ 自检：循环里每轮新建池的 harness 用例应当报出来」）
+      循环里每轮新建池（「✗ 自检：循环里每轮新建池的 harness 用例应当报出来」）、
+      checker 档按参数循环（「✗ 自检：checker 档里循环每轮新建池的用例应当报出来」）
+  CRASH_CASE_CHECK_BREAK=one-scenario-tier-unscanned  one_scenario_problems() 只扫 harness 档（C637 之前的射程）
+      checker 档按参数循环（「✗ 自检：checker 档里循环每轮新建池的用例应当报出来」）
+  CRASH_CASE_CHECK_BREAK=test-names-unseen  test_function_name_problems() 不报带欠账号的 #[test] 函数名
+      用例名带欠账号（「✗ 自检：带欠账号的 #[test] 函数名应当报出来」）
+  CRASH_CASE_CHECK_BREAK=test-names-exempt-stale-unseen  test_function_name_problems() 不报对不上的豁免行
+      用例名豁免过期（「✗ 自检：一条用例都对不上的豁免行应当报出来」）
   CRASH_CASE_CHECK_BREAK=helpers-unseen  enumerating_helpers() 不认同一文件里调全量枚举的 helper
       经同文件 helper（「✗ 自检：harness 包里经同文件 helper 调全量枚举的用例应当报住错了包」）、
       through_a_named_sweep（「✗ 自检：harness 包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）
@@ -125,7 +138,8 @@ ITEMS = {
     "placement": "崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记进崩溃点重放合表",
     "modules": "checker 档每个测试文件第一行声明它测哪几个模块",
     "file-names": "测试文件名不按里程碑、步号起",
-    "one-scenario": "harness 档一条用例一个场景",
+    "test-names": "#[test] 函数名不按里程碑、步号、欠账号起",
+    "one-scenario": "harness 档与 checker 档一条用例一个场景",
     "must-red": "每条崩溃枚举用例在 crates/mutations.tsv 里至少有一行变异点名它的测试目标",
     "knobs": "崩溃点测试的旋钮登记表每行取值与依据不空、出处路径在",
 }
@@ -137,6 +151,7 @@ CRASH_CASE_ROW = re.compile(r"^crash-case:[^\t]+\t[^\t]*\t(?:.*\s)?test=([\w-]+)
 CRASH_CASE_KEYED_ROW = re.compile(r"^(crash-case:[^\t]+)\t[^\t]*\t(?:.*\s)?test=([\w-]+):(\w+):(\w+)")
 MUTATIONS_TABLE = os.path.join("crates", "mutations.tsv")
 KNOBS_TABLE = os.path.join(".claude", "gate.d", "crash-knobs.tsv")
+TEST_NAMES_EXEMPT = os.path.join(".claude", "gate.d", "test-function-names-exempt.tsv")
 
 
 def function_body(text, start):
@@ -261,7 +276,7 @@ def problems_in(root):
 
 
 FRESH_POOL_CALL = re.compile(r"\b(?:build_pool\w*|build_through_\w+|format_pool)\s*\(|\bMemoryPool::with_devices\s*\(")
-TIER_MODULES = ["crash", "crash_state_enumeration", "crash_point_replay_progress", "crash_injection", "writable_mount_phases", "crash_given_states", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_library", "crash_amplification", "verdict_store", "gpu_unit_checks",
+TIER_MODULES = ["crash", "crash_state_enumeration", "crash_point_replay_progress", "crash_full_run_backlog", "crash_injection", "writable_mount_phases", "crash_given_states", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_library", "crash_amplification", "verdict_store", "gpu_unit_checks",
     "crash_facts",
     "crash_verify_gpu",
     "crash_judge_tables",
@@ -293,15 +308,18 @@ def tier_test_paths(root):
 
 
 def one_scenario_problems(root):
-    """one-scenario：→ (查了几条 harness 用例, 问题)。"""
-    problems, harness_tests = [], 0
-    for path in harness_test_paths(root):
+    """one-scenario：→ (查了几条 harness 档用例, 查了几条 checker 档用例, 问题)。"""
+    problems, counted = [], {HARNESS_PACKAGE: 0, CHECKER_PACKAGE: 0}
+    scanned = [(HARNESS_PACKAGE, path) for path in harness_test_paths(root)]
+    if BROKEN != "one-scenario-tier-unscanned":
+        scanned += [(CHECKER_PACKAGE, path) for path in tier_test_paths(root)]
+    for package, path in scanned:
         text = open(path, encoding="utf-8", errors="replace").read()
         for match in TEST_FUNCTION.finditer(text):
             attributes = match.group(1)
             if "#[test]" not in attributes:
                 continue
-            harness_tests += 1
+            counted[package] += 1
             if "harness-test-granularity:one-scenario" in attributes:
                 continue
             body = function_body(text, match.end())
@@ -310,7 +328,60 @@ def one_scenario_problems(root):
                     line = text.count("\n", 0, match.start(2)) + 1
                     problems.append(f"{os.path.relpath(path, root)}:{line} {match.group(2)}：循环里每一轮新建一个池，是一条用例装了几个独立场景")
                     break
-    return harness_tests, problems
+    return counted[HARNESS_PACKAGE], counted[CHECKER_PACKAGE], problems
+
+
+def test_function_paths(root):
+    """test-names 扫的源码：crates/*/tests/ 下（含子目录）与 crates/*/src/ 下的 .rs，去重、按路径排。"""
+    paths = glob.glob(os.path.join(root, "crates", "*", "tests", "**", "*.rs"), recursive=True)
+    paths += glob.glob(os.path.join(root, "crates", "*", "src", "**", "*.rs"), recursive=True)
+    return sorted(set(paths))
+
+
+def test_function_name_exemptions(root):
+    """豁免表 → ({(文件, 函数名): 行号}, 写坏的行)；表不在交 ({}, [])。"""
+    path = os.path.join(root, TEST_NAMES_EXEMPT)
+    if not os.path.isfile(path):
+        return {}, []
+    rows, malformed = {}, []
+    for number, line in enumerate(open(path, encoding="utf-8"), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        columns = line.rstrip("\n").split("\t")
+        reason = columns[2].lstrip("#").strip() if len(columns) >= 3 else ""
+        if len(columns) != 3 or not columns[2].startswith("#") or len(reason) < 4 or not columns[0] or not columns[1]:
+            malformed.append(f"{TEST_NAMES_EXEMPT}:{number} 不是「<相对仓根的文件><TAB><函数名><TAB># 理由>」（理由至少 4 个字）")
+            continue
+        rows[(columns[0], columns[1])] = number
+    return rows, malformed
+
+
+def test_function_name_problems(root):
+    """test-names：→ (查了几条 #[test] 函数, 豁免了几条, 问题)。"""
+    exempt, problems = test_function_name_exemptions(root)
+    used, tests, exempted = set(), 0, 0
+    for path in test_function_paths(root):
+        relative = os.path.relpath(path, root)
+        text = open(path, encoding="utf-8", errors="replace").read()
+        for match in TEST_FUNCTION.finditer(text):
+            if "#[test]" not in match.group(1):
+                continue
+            tests += 1
+            name = match.group(2)
+            if not MILESTONE_FILE_NAME.search(name):
+                continue
+            if (relative, name) in exempt:
+                used.add((relative, name))
+                exempted += 1
+                continue
+            if BROKEN != "test-names-unseen":
+                line = text.count("\n", 0, match.start(2)) + 1
+                problems.append(f"{relative}:{line} {name}：#[test] 函数名按里程碑、步号或欠账号起，改成它测什么，来历进 commit message 或 .claude/kb/")
+    if BROKEN != "test-names-exempt-stale-unseen":
+        for (relative, name), number in sorted(exempt.items(), key=lambda item: item[1]):
+            if (relative, name) not in used:
+                problems.append(f"{TEST_NAMES_EXEMPT}:{number} {relative} {name}：那份文件里没有这条带欠账号的 #[test]（改了名、删了或文件不在），这一行删掉")
+    return tests, exempted, problems
 
 
 def test_file_name_problems(root):
@@ -453,9 +524,15 @@ def judge(root, items):
             test_files, problems = test_file_name_problems(root)
             results[item] = (test_files, problems,
                              f"查了 {test_files} 份测试文件的名字（harness 档与 checker 档的 tests/*.rs），没有按里程碑、步号、增补号、并行线号或欠账号起的")
+        elif item == "test-names":
+            tests, exempted, problems = test_function_name_problems(root)
+            results[item] = (tests, problems,
+                             f"查了 {tests} 条 #[test] 函数的名字（crates/*/tests/ 与 crates/*/src/），没有按里程碑、步号、增补号、并行线号或欠账号起的"
+                             f"（豁免表 {TEST_NAMES_EXEMPT} 登记的存量 {exempted} 条不判）")
         elif item == "one-scenario":
-            harness_tests, problems = one_scenario_problems(root)
-            results[item] = (harness_tests, problems, f"harness 档 {harness_tests} 条用例都是一条一个场景")
+            harness_tests, tier_tests, problems = one_scenario_problems(root)
+            results[item] = (harness_tests + tier_tests, problems,
+                             f"harness 档 {harness_tests} 条用例都是一条一个场景（checker 档 {tier_tests} 条一并判过）")
         elif item == "must-red":
             cases, problems = must_red_problems(root)
             results[item] = (cases, problems, f"{cases} 条崩溃枚举用例在 {MUTATIONS_TABLE} 里都有点名它的测试目标的变异行（只判在册，证红归 checker-tier-crates-mutation-replay）")
@@ -474,7 +551,10 @@ REMEDIES = {
                 "一个都不导入的写「无（为什么）」（.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）。"],
     "file-names": ["测试文件按它测什么起名：领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号，来历进 commit message 或 .claude/kb/",
                    "（.claude/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；改名照 .claude/rules/path-moves.md「怎么做」改全仓引用。"],
-    "one-scenario": ["harness 档一条用例只装一个场景：循环体挪进带参数的函数，每个取值一条 #[test]，红了只重跑那一条；",
+    "test-names": ["#[test] 函数按它测什么起名，不带里程碑、步号、增补号、并行线号、欠账号，来历进 commit message 或 .claude/kb/",
+                   "（.claude/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；带欠账号的是被测对象的名字（例：一条判据叫 c670）的，改成说那个对象是什么；",
+                   f"立账时已在、还没逐条读的存量登记在 {TEST_NAMES_EXEMPT}，表只缩不涨，改了名就删那一行。"],
+    "one-scenario": ["harness 档与 checker 档一条用例只装一个场景：循环体挪进带参数的函数，每个取值一条 #[test]，红了只重跑那一条；",
                      "确是一个场景的（同一个池上按次序做几轮）在用例上面写一行 // harness-test-granularity:one-scenario <理由>",
                      "（.claude/rules/verification.md「harness 档里再分快档用例与慢档用例」）。"],
     "must-red": [f"给那条用例补一行变异进 {MUTATIONS_TABLE}（只追加）：改坏那条流走到的实现或判器，cargo test 的参数写 -p <包> --test <测试目标> -- <必红的测试> --exact，",
@@ -528,7 +608,7 @@ def run(root, items):
 
 
 SELFTEST_CASES = ["登记了的与快档放行、注明不是用例的不算", "标了 ignore 没登记", "住错了包（直接调、经 helper、自己逐个造崩溃状态）",
-                  "固定崩溃态不算枚举", "每轮新建池与豁免", "模块声明缺与对不上", "writable_mount_phases 的次序（排在 crash_injection 之后）", "crash_given_states 的次序（排在 writable_mount_phases 之后、bad_disk_input 之前）", "字符串字面量里的模块路径不算真导入", "按里程碑起名", "--only 只判点名的",
+                  "固定崩溃态不算枚举", "每轮新建池与豁免", "模块声明缺与对不上", "writable_mount_phases 的次序（排在 crash_injection 之后）", "crash_given_states 的次序（排在 writable_mount_phases 之后、bad_disk_input 之前）", "字符串字面量里的模块路径不算真导入", "按里程碑起名", "用例名带欠账号", "用例名豁免过期", "checker 档按参数循环", "--only 只判点名的",
                   "合表点名的放量分项算登记", "合表没点名的 crash-case 报出来", "合表核法（lib_crash_point_replay_items.py 的 selftest_cells）",
                   "必红世界有与缺", "必红世界包对不上", "旋钮登记表齐与缺"]
 
@@ -628,11 +708,18 @@ def selftest():
         open(os.path.join(tests_directory, "given_states_out_of_order.rs"), "w").write(
             "//! checker 档模块：crash_given_states、writable_mount_phases\nuse singlefs_checker_tier::writable_mount_phases::C;\n"
             "use singlefs_checker_tier::crash_given_states::D;\n")
-        _count, scenario = one_scenario_problems(work)
+        # checker 档的按参数循环（C637）：一条每轮新建池的报出来，一条写了 one-scenario 豁免的不报
+        open(os.path.join(tests_directory, "rollback_parameters.rs"), "w").write(
+            "//! checker 档模块：无（样本：只造池）\n#[test]\nfn every_rollback_parameter() {\n    for floor in [1, 2] {\n        let pool = build_pool(\"z\");\n    }\n}\n"
+            "\n// harness-test-granularity:one-scenario 同一个池按次序回退两次，合起来是一个场景\n#[test]\nfn tier_scenario_waived() {\n"
+            "    for floor in [1, 2] {\n        let pool = build_pool(\"w\");\n    }\n}\n")
+        harness_count, tier_count, scenario = one_scenario_problems(work)
         if not any("several_scenarios" in problem for problem in scenario):
             failures.append(f"循环里每轮新建池的 harness 用例应当报出来，实际 {scenario}")
-        if any("one_scenario_waived" in problem for problem in scenario):
+        if any("one_scenario_waived" in problem or "tier_scenario_waived" in problem for problem in scenario):
             failures.append(f"写了 one-scenario 豁免的不该报，实际 {scenario}")
+        if not any("rollback_parameters.rs" in problem and "every_rollback_parameter" in problem for problem in scenario):
+            failures.append(f"checker 档里循环每轮新建池的用例应当报出来（查了 harness 档 {harness_count} 条、checker 档 {tier_count} 条），实际 {scenario}")
         _count, modules = module_declaration_problems(work)
         if not any("module_mismatch.rs" in problem and "crash_point_replay_progress" in problem for problem in modules):
             failures.append(f"声明与导入对不上的 checker 档测试文件应当报出来，实际 {modules}")
@@ -651,6 +738,23 @@ def selftest():
         _count, file_names = test_file_name_problems(work)
         if not any("second_transaction_step_one_sample" in problem for problem in file_names):
             failures.append(f"按里程碑起名的测试文件应当报出来，实际 {file_names}")
+        # #[test] 函数名带欠账号（C638）：src/ 里的单测与 tests/ 子目录里的都扫；登记了豁免的不报，豁免行对不上的报
+        os.makedirs(os.path.join(work, "crates", "demo-core", "src"))
+        os.makedirs(os.path.join(harness_tests_directory, "common"))
+        open(os.path.join(work, "crates", "demo-core", "src", "admission.rs"), "w").write(
+            "#[cfg(test)]\nmod tests {\n    #[test]\n    fn c123_two_devices_refuse_one_unit() {}\n\n    #[test]\n    fn c456_listed_while_it_is_read() {}\n\n"
+            "    #[test]\n    fn refuses_one_unit_when_one_slot_short() {}\n}\n")
+        open(os.path.join(harness_tests_directory, "common", "mod.rs"), "w").write("#[test]\nfn helper_checked_by_c789() {}\n")
+        open(os.path.join(work, TEST_NAMES_EXEMPT), "w").write(
+            "# 样本豁免表\ncrates/demo-core/src/admission.rs\tc456_listed_while_it_is_read\t# 样本：存量，待逐条读\n"
+            "crates/demo-core/src/admission.rs\tc999_renamed_long_ago\t# 样本：早改了名，这一行该删\n")
+        named_tests, named_exempted, names = test_function_name_problems(work)
+        if not any("c123_two_devices_refuse_one_unit" in problem for problem in names) or not any("helper_checked_by_c789" in problem for problem in names):
+            failures.append(f"带欠账号的 #[test] 函数名应当报出来（src/ 里的单测与 tests/ 子目录里的都扫；查了 {named_tests} 条），实际 {names}")
+        if any("c456_listed_while_it_is_read：" in problem for problem in names) or named_exempted != 1:
+            failures.append(f"登记了豁免的用例名不该报、豁免数应当是 1，实际豁免 {named_exempted}、{names}")
+        if not any("c999_renamed_long_ago" in problem and "这一行删掉" in problem for problem in names):
+            failures.append(f"一条用例都对不上的豁免行应当报出来，实际 {names}")
         only_file_names = judge(work, ["file-names"])
         if list(only_file_names) != ["file-names"]:
             failures.append(f"--only file-names 应当只判 file-names 一样（这棵树上 placement、modules、one-scenario 都有问题，不该报出来），实际判了 {list(only_file_names)}")

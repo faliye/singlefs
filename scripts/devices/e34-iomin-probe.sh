@@ -46,11 +46,17 @@ done
 S() { printf '%s\n' "$PASS" | sudo -S -p '' "$@"; }
 
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e34.XXXXXX")"
-MD_NAME="sfs_e34_probe"
+MD_NAME="sfs_e34_${W##*.}_$$"
+MD_OWNED=0
+stop_array() {
+  [[ "$MD_OWNED" == 1 ]] || return 0
+  S mdadm --stop "$MD_DEV" || return 1
+  MD_OWNED=0
+}
 MD_DEV="/dev/md/$MD_NAME"
 LOOPS=()
 cleanup() {
-  S mdadm --stop "$MD_DEV" 2>/dev/null
+  stop_array 2>/dev/null
   for l in "${LOOPS[@]:-}"; do [ -n "$l" ] && S losetup -d "$l" 2>/dev/null; done
   rm -rf "$W"
 }
@@ -77,7 +83,7 @@ OFF_C_R1=$(( 10 * CHUNK ))    # 陪 R1（行 3、扇区位 0）
 OFF_C_R2=$(( 21 * CHUNK ))    # 陪 R2（行 7、扇区位 0）
 
 fresh_array() {
-  S mdadm --stop "$MD_DEV" 2>/dev/null
+  stop_array 2>/dev/null || return 1
   for l in "${LOOPS[@]:-}"; do [ -n "$l" ] && S losetup -d "$l" 2>/dev/null; done
   LOOPS=()
   local i
@@ -88,6 +94,7 @@ fresh_array() {
   done
   S mdadm --create "$MD_DEV" --level=5 --raid-devices=$DEVS --chunk=$CHUNK_K \
       --assume-clean --run --quiet "${LOOPS[@]}" 2>/dev/null || return 1
+  MD_OWNED=1
   S udevadm settle 2>/dev/null
   return 0
 }
@@ -99,7 +106,8 @@ put_mark() { # $1=偏移字节 $2=标记串
 }
 # 降级读数组偏移处 512 字节，回显开头 32 字节
 get_mark() { # $1=偏移字节
-  S dd if="$MD_DEV" of="$W/read.bin" bs=512 skip=$(( $1 / 512 )) count=1 iflag=direct status=none
+  S dd if="$MD_DEV" of="$W/read.bin" bs=512 skip=$(( $1 / 512 )) count=1 iflag=direct status=none || return 1
+  [[ "$(stat -c %s "$W/read.bin")" == 512 ]] || return 1
   head -c 32 "$W/read.bin"
 }
 # 标记在哪条腿：逐个 backing 文件找（观测，不算 layout）。
@@ -158,7 +166,7 @@ run_scenario() { # $1=轮号 $2=场景名 $3=受害偏移 $4=注入撕裂(0/1) $
   put_mark $OFF_C_R2 "~C2_${round}_$$~"
   S sync
   # 掉电序列：先停干净（系统配置落盘），再在停机状态注入，再少一条腿拉起
-  S mdadm --stop "$MD_DEV" 2>/dev/null
+  stop_array 2>/dev/null || { emit "name=fatal reason=stop_failed"; exit 4; }
   local legA legV
   legA="$(leg_of "$MA")" || { emit "name=skip scen=$scen round=$round reason=legA_ambiguous"; return; }
   local vmark
@@ -177,10 +185,11 @@ run_scenario() { # $1=轮号 $2=场景名 $3=受害偏移 $4=注入撕裂(0/1) $
   for i in 0 1 2 3; do [ "$i" != "$legV" ] && members+=("${LOOPS[$i]}"); done
   S mdadm --assemble "$MD_DEV" --run --quiet "${members[@]}" 2>/dev/null || {
     emit "name=skip scen=$scen round=$round reason=degraded_assemble_failed"; return; }
+  MD_OWNED=1
   S udevadm settle 2>/dev/null
   S sh -c 'echo 3 > /proc/sys/vm/drop_caches'
   local got intact
-  got="$(get_mark "$v_off")"
+  got="$(get_mark "$v_off")" || { emit "name=fatal reason=victim_read_failed scen=$scen round=$round"; exit 4; }
   case "$got" in "$vmark"*) intact=1;; *) intact=0;; esac
   emit "name=scenario scen=$scen round=$round legA=$legA legV=$legV torn=$do_tear victim_intact=$intact vacuous=$([ "$legA" = "$legV" ] && [ "$fail_mark" != "B" ] && echo 1 || echo 0)"
 }

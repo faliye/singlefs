@@ -1,7 +1,14 @@
 exit=0
-want=scripts/ 里声称有 --selftest 的 5 份中 1 份有门禁阶段在跑
-want=没跑的 4 份（登记在这一格的 NOT_RUN_HERE）
+want=scripts/ 里声称有 --selftest 的 12 份中 1 份有门禁阶段在跑
+want=没跑的 11 份（登记在这一格的 NOT_RUN_HERE）
 want=scripts/devices/vm-bench.sh：自证要连起三次虚机
 want=scripts/crash/lib_crash_point_replay_items.py：它自己没有自证
 want=scripts/kb/lib_notation_check.py：它自己没有自证
 want=scripts/mutation/lib_mutation_units.py：它自己没有自证
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.py：它自己没有自证
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py：它自己没有自证
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_selftest_harness.py：它自己没有自证
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_8.py：冻结层、一个字节不改
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py：冻结层、一个字节不改
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py：冻结层、一个字节不改
+want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py：冻结层、一个字节不改

@@ -24,11 +24,23 @@ DEST="$DEST_DIR/singlefs-vmlinuz"
 
 die() { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
+# 目录、空文件与复制中断留下的文件都不是可用内核。
+kernel_readable() {
+  [[ -f "$1" && -s "$1" && -r "$1" ]]
+}
+cached_kernel_matches() {
+  kernel_readable "$1" || return 1
+  local source_size cached_size
+  source_size="$(stat -c %s "$2" 2>/dev/null)" || return 1
+  cached_size="$(stat -c %s "$1")" || return 1
+  [[ "$source_size" == "$cached_size" ]]
+}
+
 # 已经有可读的就直接用——SINGLEFS_KERNEL 优先，其次已复制过的，再次 /boot 里碰巧可读的。
 find_readable() {
-  [[ -n "${SINGLEFS_KERNEL:-}" && -r "${SINGLEFS_KERNEL:-}" ]] && { printf '%s' "$SINGLEFS_KERNEL"; return 0; }
-  [[ -r "$DEST" ]] && { printf '%s' "$DEST"; return 0; }
-  local k; for k in /boot/vmlinuz-*; do [[ -r "$k" ]] && { printf '%s' "$k"; return 0; }; done
+  [[ -n "${SINGLEFS_KERNEL:-}" ]] && kernel_readable "$SINGLEFS_KERNEL" && { printf '%s' "$SINGLEFS_KERNEL"; return 0; }
+  kernel_readable "$DEST" && { printf '%s' "$DEST"; return 0; }
+  local k; for k in /boot/vmlinuz-*; do kernel_readable "$k" && { printf '%s' "$k"; return 0; }; done
   return 1
 }
 
@@ -38,8 +50,9 @@ if [[ "${1:-}" == "--release" ]]; then
   RELEASE="${2:-}"
   [[ -n "$RELEASE" ]] || die "--release 后面没有内核版本" "→ 例：vm-kernel.sh --release $(uname -r)"
   DEST="$DEST_DIR/singlefs-vmlinuz-$RELEASE"
-  [[ -r "$DEST" ]] && { printf '%s\n' "$DEST"; exit 0; }
   SRC="/boot/vmlinuz-$RELEASE"
+  cached_kernel_matches "$DEST" "$SRC" && { printf '%s\n' "$DEST"; exit 0; }
+  kernel_readable "$SRC" && { printf '%s\n' "$SRC"; exit 0; }
   [[ -e "$SRC" ]] || die "/boot 下没有 vmlinuz-$RELEASE" "→ ls /boot 看有哪些版本，把其中一个传给 --release"
 else
   if K="$(find_readable)"; then
@@ -66,13 +79,14 @@ for v in "${SUDO_PASS_A:-}" "${SUDO_PASS_B:-}"; do
 done
 [[ -n "$PASS" ]] || die ".env 里的口令都不通过 sudo 校验" "检查 $REPO/.env 里 SUDO_PASS_A / SUDO_PASS_B 是不是最新口令；改完重跑，或者手动 sudo cp $SRC $DEST 再 sudo chown \$USER $DEST。"
 
-printf '%s\n' "$PASS" | sudo -S -p '' cp "$SRC" "$DEST" 2>/dev/null
-printf '%s\n' "$PASS" | sudo -S -p '' chown "$(id -u):$(id -g)" "$DEST" 2>/dev/null
-
-# **回读确认，不靠退出码**（command-safety：改状态的命令要回读实际状态）
-[[ -r "$DEST" ]] || die "复制之后 $DEST 仍不可读" "检查 $DEST_DIR 的挂载权限（noexec/nosuid 之类不影响可读性，但确认目录本身可写可读），或者手动跑 sudo cp $SRC $DEST && sudo chown \$USER $DEST 看具体报什么错。"
-SRC_SZ="$(printf '%s\n' "$PASS" | sudo -S -p '' stat -c%s "$SRC" 2>/dev/null)"
-DST_SZ="$(stat -c%s "$DEST" 2>/dev/null)"
-[[ -n "$SRC_SZ" && "$SRC_SZ" == "$DST_SZ" ]] || die "大小对不上：源 ${SRC_SZ:-?} 目标 ${DST_SZ:-?}" "复制过程可能被打断或者 $SRC 中途变了；删掉 $DEST 重跑这个脚本。"
-
+# 私有临时文件验证完成后才发布；复制失败不会污染下一次读取的缓存。
+COPY="$(mktemp "$DEST_DIR/.singlefs-vmlinuz.XXXXXX")" || die "建不了内核临时文件：$DEST_DIR"
+trap 'rm -f -- "${COPY:?}"' EXIT
+printf '%s\n' "$PASS" | sudo -S -p '' cp "$SRC" "$COPY" 2>/dev/null || die "复制内核失败：$SRC"
+printf '%s\n' "$PASS" | sudo -S -p '' chown "$(id -u):$(id -g)" "$COPY" 2>/dev/null || die "内核副本改属主失败"
+kernel_readable "$COPY" || die "内核副本为空、不可读或不是普通文件"
+SRC_SZ="$(printf '%s\n' "$PASS" | sudo -S -p '' stat -c%s "$SRC" 2>/dev/null)" || die "读取源内核大小失败"
+DST_SZ="$(stat -c%s "$COPY")" || die "读取副本大小失败"
+[[ "$SRC_SZ" == "$DST_SZ" ]] || die "大小对不上：源 $SRC_SZ 目标 $DST_SZ"
+mv -T -- "$COPY" "$DEST" || die "发布内核缓存失败：$DEST"
 printf '%s\n' "$DEST"

@@ -1,0 +1,7 @@
+exit=1
+want=· feature-gated-tests：红的测试目标 1 个、FAILED 的测试函数 1 条
+want=FAILED gpu_pair_agrees_with_the_cpu
+want=样本断言：GPU 判出 3 个红态，CPU 判出 0 个（红的目标在 cargo 输出的尾巴之外）
+want=· feature-gated-tests：这一趟 cargo 的整份输出留在 
+want=✗ feature-gated-tests：带特性那一趟 cargo test 退 101（上面是它的尾部与全部红的用例、测试目标）
+want=逐格：crash-case-replay：有 1 条崩溃枚举用例全量本次未跑；feature-gated-tests：红

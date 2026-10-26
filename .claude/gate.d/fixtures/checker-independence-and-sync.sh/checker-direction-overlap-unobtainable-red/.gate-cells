@@ -1,0 +1,2 @@
+# 取不到调用图：登记表的扫描式入口改了名、源码里找不到，闭包无从收起；判的是 checker-direction-overlap 格
+checker-direction-overlap

@@ -1,0 +1,3 @@
+# 样本复跑登记表
+scripts/gate/partial.py	30	# 样本：开关红了两格、点名一格
+scripts/gate/carriage.py	30	# 样本：没点名的那一格接在 \r 收尾的进度行后面

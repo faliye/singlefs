@@ -1,0 +1,4 @@
+exit=1
+want=✗ 取不到调用图：.claude/gate.d/checker-direction-entries.tsv:3 scan-entry crates/singlefs-checker/src/walk.rs::scanned_unit_headers：crates/singlefs-checker/src/walk.rs 里限定名 scanned_unit_headers 命中 0 个单元
+want=✗ 两个方向的函数单元交集越出格式解析与常量 0 个，取不到调用图与登记表的问题 1 处
+want=checker-direction-overlap：红

@@ -1,0 +1,2 @@
+# 样本：scripts/old-rig 整个搬到 scripts/new-rig，表里那一行改成新路径；没有搬迁登记表
+scripts/new-rig/report_cores.sh:jobs=$(nproc)  # 样本：只把核数打出来，不起线程

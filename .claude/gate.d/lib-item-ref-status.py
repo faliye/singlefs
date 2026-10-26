@@ -7,7 +7,7 @@
 
 判据：引用处写「已定项 k」而正文那条标着未定（或反过来）⇒ 判红。
 归属靠同一行里最近的 D 记号；行内没有 D 记号时，用文件自身的决策号，
-再退到该行之前最近出现过的 D 记号——三级都判不出的也判红，因为
+再退到变更史日期标题上的 D 号、变更史 `## D<n>（简称）` 节标题的 D 号，最后是该行之前最近出现过的 D 记号——各级都判不出的也判红，因为
 一个归属判不出的编号引用，读的人同样判不出。
 
 **归属规则只有这一份**：门禁 doc-decisions（`doc-decisions.sh`）的格「分项引用状态」跑这里的 main，
@@ -28,11 +28,45 @@ doc-decisions（kb-shape 第 7 段）中文索引表的分项计数只对中文�
 弄坏开关 KB_NUMBERED_FILE_BREAK=first-match：不分语言，按路径排序交回全部候选（调用方取第一个的取到排在最前的译文 `.en.md`，
 求并集的连译文一起并进来；heads_for_referrer 不筛语言；same_language_files 原样交回全部、files_by_language 并成一组）。
 打开后判错的样本逐道写在三道门禁文件头的弄坏开关一节。
+
+**决策表只读中文原文**（decision_heads、self_decisions）：决策号、简称与分项表都只从中文原文 `<号>-<名>.md` 读，译文（带 `.<两个小写字母>.md` 后缀）
+不进决策表，首行写成什么（`—` 单破折号、Settled / 確定 这类状态词）这里都不判、不报读不出；译文的分项引用归属落在同号的中文原文那条决策上。
+改前译文与原文一起读：译文首行与中文写法不同就整格报「首行读不出」红，读得出时同号的分项表靠文件名排序让中文那份最后覆盖。
+弄坏开关 KB_DECISION_HEADS_BREAK=read-translations：译文又进决策表（改前的口径；KB_NUMBERED_FILE_BREAK=first-match 下同样连译文一起读）。
+样本：门禁 doc-decisions 的 item-ref-status-translation-first-line-green。
+
+**孤立译文不顶替原文**（is_orphan_translation、orphan_translations）：decisions/ 下带语言后缀的译文，同目录没有同名的中文原文（`<号>-<名>.md`），
+就是孤立译文。它不进决策表（decision_heads 不收、load_map 不读）、不参与按编号取文件、不当引用方的归属，也不被扫引用；
+main 把它单独报一类红，出路是补中文原文或删掉这份译文。改前它的首行读得出时，同一个决策号的分项表被它整张换掉，
+中文引用方写的「D1（数据可移动性 / 反向索引） 已定项 4」被解成「D1（甲（訳））」而报「没有第 4 条」。
+弄坏开关 KB_ORPHAN_TRANSLATION_BREAK=substitute：孤立译文又进决策表、顶替同号的中文原文，也不单独报（改前的口径）。
+
+**变更史的节标题**（references）：`decisions-history.md` 一条决策一节，节标题写成 `## D<n>（简称）`，节里 `### <日期>` 的条目带不带决策号的「已定项 k / 未定项 k」都归这一节的决策。
+归属顺序：行内紧挨着的指名、行内最近的 D 记号、文件自身的决策号、日期标题上的 D 号、节标题的 D 号、之前出现过的最近的 D 记号。
+弄坏开关 KB_HISTORY_SECTION_OWNER_BREAK=nearest-d：不认 `## D<n>（` 节标题、每个 `### ` 标题都清掉标题上的归属（改前的口径），
+节里裸写的分项退回「往前找最近出现过的 D 号」，归错决策或报归属判不出。
 """
-import re, glob, sys, os
+import re, glob, sys, os, json
+from functools import lru_cache
 
 LANGUAGE_SUFFIXED = re.compile(r'\.([a-z]{2})\.md$')
 NUMBERED_FILE_BREAK = os.environ.get('KB_NUMBERED_FILE_BREAK', '')
+ORPHAN_TRANSLATION_BREAK = os.environ.get('KB_ORPHAN_TRANSLATION_BREAK', '')
+HISTORY_SECTION_OWNER_BREAK = os.environ.get('KB_HISTORY_SECTION_OWNER_BREAK', '')
+DECISION_HEADS_BREAK = os.environ.get('KB_DECISION_HEADS_BREAK', '')
+DECISIONS_DIRECTORY = '.claude/kb/decisions'
+
+
+@lru_cache(maxsize=1)
+def translation_paths():
+    path = '.claude/kb/translation-paths.json'
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as handle:
+            return json.load(handle)
+    except Exception:
+        return {}
 
 
 def language_of(path):
@@ -41,17 +75,52 @@ def language_of(path):
     return hit.group(1) if hit else ''
 
 
+def is_orphan_translation(path):
+    """带编号的译文（`<号>-<名>.<语言>.md`），同目录没有同名的中文原文 `<号>-<名>.md`。
+    若在 .claude/kb/translation-paths.json 登记过映射，以映射的中文原名判断。
+    弄坏开关 KB_ORPHAN_TRANSLATION_BREAK=substitute 与 KB_NUMBERED_FILE_BREAK=first-match（改前的口径，不区分孤立与否）下一份都不算。"""
+    if ORPHAN_TRANSLATION_BREAK == 'substitute' or NUMBERED_FILE_BREAK == 'first-match':
+        return False
+    name = os.path.basename(path or '')
+    if not language_of(name) or not re.match(r'^\d+-', name):
+        return False
+    direct = os.path.join(os.path.dirname(path), LANGUAGE_SUFFIXED.sub('.md', name))
+    if os.path.isfile(direct):
+        return False
+    tp = translation_paths()
+    norm = os.path.normpath(path)
+    for orig, renamed in tp.items():
+        if os.path.normpath(renamed) == norm or os.path.basename(renamed) == name:
+            zh = LANGUAGE_SUFFIXED.sub('.md', orig)
+            if os.path.isfile(zh):
+                return False
+    return True
+
+
+def orphan_translations(directory=None):
+    """directory（不给取 decisions/）下的孤立译文，排序后的路径列表；main 单独报一类红。弄坏开关下恒空。"""
+    directory = directory or DECISIONS_DIRECTORY
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return []
+    return sorted(path for path in (os.path.join(directory, name) for name in names)
+                  if os.path.isfile(path) and is_orphan_translation(path))
+
+
 def numbered_files(directory, number, referrer=None):
     """directory 下编号是 number 的那一份（文件名 `<号>-*.md`，号前可补 0）→ 排序后的路径列表（通常一份，空表示没有）。
 
-    引用方 referrer 是中文取中文原文；是译文取同一种语言的那一份，没有就取中文原文。弄坏开关下交回全部候选。"""
+    引用方 referrer 是中文取中文原文；是译文取同一种语言的那一份，没有就取中文原文。孤立译文（没有同名中文原文的）一份都不交回。
+    弄坏开关 KB_NUMBERED_FILE_BREAK=first-match 下交回全部候选（含孤立译文）。"""
     pattern = re.compile(r'^0*%d-.*\.md$' % int(number))
     try:
         names = os.listdir(directory)
     except OSError:
         return []
     candidates = sorted(os.path.join(directory, name) for name in names
-                        if pattern.match(name) and os.path.isfile(os.path.join(directory, name)))
+                        if pattern.match(name) and os.path.isfile(os.path.join(directory, name))
+                        and not is_orphan_translation(os.path.join(directory, name)))
     if NUMBERED_FILE_BREAK == 'first-match':
         return candidates
     language = language_of(referrer)
@@ -64,17 +133,19 @@ def numbered_files(directory, number, referrer=None):
 def heads_for_referrer(heads, unreadable, referrer=None):
     """decision_heads 的结果里，只留引用方 referrer 按编号取得到的那几份（中文引用方只留中文原文，译文引用方留同语言的、缺的那几个号补中文原文）。
 
-    首行读不出的那几份同样筛：中文引用方只关心中文原文读不读得出，译文的首行由扫全部文件的格（分项引用状态）判。弄坏开关下原样交回。"""
+    首行读不出的那几份同样筛：中文引用方只关心中文原文读不读得出（decision_heads 平时只读中文原文，译文只在弄坏开关下进来）。
+    孤立译文（没有同名中文原文的）两张表里都不留。弄坏开关 KB_NUMBERED_FILE_BREAK=first-match 下原样交回。"""
     if NUMBERED_FILE_BREAK == 'first-match':
         return heads, unreadable
     language = language_of(referrer)
     if not language:
         return ({path: head for path, head in heads.items() if language_of(path) == ''},
                 [(path, first) for path, first in unreadable if language_of(path) == ''])
-    kept = {path: head for path, head in heads.items() if language_of(path) == language}
+    kept = {path: head for path, head in heads.items() if language_of(path) == language and not is_orphan_translation(path)}
     numbers = {decision for decision, _ in kept.values()}
     kept.update({path: head for path, head in heads.items() if language_of(path) == '' and head[0] not in numbers})
-    return kept, [(path, first) for path, first in unreadable if language_of(path) in ('', language)]
+    return kept, [(path, first) for path, first in unreadable
+                  if language_of(path) in ('', language) and not is_orphan_translation(path)]
 
 
 def same_language_files(paths, referrer=None):
@@ -85,6 +156,16 @@ def same_language_files(paths, referrer=None):
         return list(paths)
     language = language_of(referrer)
     return [path for path in paths if language_of(path) == language]
+
+
+def originals_only(paths, read_translations=False):
+    """paths 里的中文原文（不带 `.<两个小写字母>.md` 后缀的），次序不变；read_translations 为真时原样交回全部。
+
+    整张表、整段正文只该有一处权威的判据用它（锚与标记全仓只许一处、登记值、字段表加和、决策与实验页的形状）：译文照抄了锚与标记、
+    首行与小节标题是各自的语言，读进来就多出几处权威、或把译文的标题判成「认不出」。各门禁把自己的弄坏开关 read-translations 交给 read_translations。"""
+    if read_translations:
+        return list(paths)
+    return [path for path in paths if not language_of(path)]
 
 
 def files_by_language(paths):
@@ -98,8 +179,10 @@ def files_by_language(paths):
 
 
 def decision_heads(strict=True):
-    """decisions/*.md 每一份首行的 ({路径: (决策号, 简称)}, [(首行读不出的路径, 首行)])。
+    """decisions/ 下每一份中文原文首行的 ({路径: (决策号, 简称)}, [(首行读不出的路径, 首行)])。
 
+    译文不读（文件头「决策表只读中文原文」；弄坏开关 KB_DECISION_HEADS_BREAK=read-translations 与 KB_NUMBERED_FILE_BREAK=first-match 下连译文一起读）。
+    孤立译文（没有同名中文原文的 `<号>-<名>.<语言>.md`）一份都不收，两张表里都没有它。
     首行读不出 `## D<n> 简称 —— 状态` 的（多一份 README、首行前有空行或 BOM、漏了破折号）一份都不跳过，
     也不让调用方撞上裸的 AttributeError：strict 时当场打印 ✗ 与出路、退出码 1；
     不 strict 时交回清单，由调用方在报完自己的问题之后调 report_unreadable 并判红。
@@ -107,7 +190,12 @@ def decision_heads(strict=True):
     load_map 与 self_decisions 都从这里取，两处的口径不许分叉（写法照门禁 doc-decisions INDEX_VS_BODY_SOURCE 读首行那一段）。
     """
     heads, unreadable = {}, []
+    read_translations = DECISION_HEADS_BREAK == 'read-translations' or NUMBERED_FILE_BREAK == 'first-match'
     for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
+        if is_orphan_translation(f):
+            continue   # 孤立译文不进决策表、首行读不读得出也不在这里报：main 单独报一类（orphan_translations）
+        if language_of(f) and not read_translations:
+            continue   # 译文不进决策表：决策号、简称、分项表只认中文原文（文件头「决策表只读中文原文」）
         first = open(f, encoding='utf-8').read().split('\n', 1)[0]
         mm = re.match(r'## (D\d+) (.+?)\s*——', first)
         if mm:
@@ -126,6 +214,13 @@ def report_unreadable(unreadable):
         print(f"     {f}：首行是 {first[:40]!r}")  # gate-lint:detail
     print("     → 怎么办：把首行写成 `## D3 空间分配 —— 半定（…）`，首行之前不许有空行或 BOM；")
     print("       decisions/ 下只放决策正文，说明性的文字写进 decisions.md。读不出来就是这一份没核过，不许当成通过。")
+
+
+def report_orphan_translations(orphans):
+    print(f"  ✗ decisions/ 下有 {len(orphans)} 份孤立译文（带语言后缀、同目录没有同名的中文原文），它们不解任何引用、里面的引用也没扫")  # gate-lint:summary
+    for f in orphans:
+        print(f"     {f}：没有 {LANGUAGE_SUFFIXED.sub('.md', os.path.basename(f))}")  # gate-lint:detail
+    print("     → 怎么办：补上同名的中文原文，或删掉这份译文；中文引用方只认中文原文，译文只在有同名原文时才算那条决策的另一种语言。")
 
 
 def load_map(heads=None):
@@ -165,11 +260,19 @@ def is_excluded_prompt_file(path):
 
 
 def scanned_files(candidates=None):
-    return [f for f in (candidates if candidates is not None else candidate_files()) if not is_excluded_prompt_file(f)]
+    # 孤立译文也不扫：它没有归属可言（不在决策表里），里面的裸引用会再报一遍「归属判不出」，盖住真正的出路（补原文或删译文，main 单独报那一类）
+    return [f for f in (candidates if candidates is not None else candidate_files())
+            if not is_excluded_prompt_file(f) and not is_orphan_translation(f)]
 
 
 def self_decisions(heads=None):
-    return {f: d for f, (d, _) in (heads if heads is not None else decision_heads()[0]).items()}
+    """{决策文件: 它自身的决策号}；译文（不在决策表里）取同目录同名中文原文的决策号，里面裸写的分项照样归到这条决策。"""
+    own = {f: d for f, (d, _) in (heads if heads is not None else decision_heads()[0]).items()}
+    for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
+        original = os.path.join(os.path.dirname(f), LANGUAGE_SUFFIXED.sub('.md', os.path.basename(f)))
+        if f not in own and language_of(f) and original in own:
+            own[f] = own[original]
+    return own
 
 
 # 紧挨着分项引用的「D<n>（简称）」：简称里许套一层括号（「D14（双轨（大小文件 / 持久临时））」），
@@ -182,7 +285,7 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
 
     skipped_fenced_lines 给一个 list 时，代码围栏里跳过没判的行号逐个追加进去（成功行报「没查的」用）。
     """
-    self_d = self_map.get(path); last = None; hist = None; in_fence = False
+    self_d = self_map.get(path); last = None; hist = None; section = None; in_fence = False
     lines = open(path, encoding='utf-8').read().split('\n')
     fence_line_numbers = [ln for ln, line in enumerate(lines, 1) if line.lstrip().startswith('```')]
     # 围栏行是奇数个：最后一个没闭合，不当围栏——按开关切的话，它之后的半份文件整段不判。
@@ -200,11 +303,17 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
             if skipped_fenced_lines is not None:
                 skipped_fenced_lines.append(ln)
             continue
-        if (path.endswith('decisions-history.md') or '/decisions-history/' in path) and line.startswith('### '):
-            mm = re.search(r'D(\d+)', line); hist = 'D' + mm.group(1) if mm else None
+        if path.endswith('decisions-history.md') or '/decisions-history/' in path:
+            # 变更史一条决策一节：`## D<n>（简称）` 是节标题，节里 `### <日期>` 的条目裸写的分项归这一节的决策；
+            # 日期标题自己带 D 号的（`### … D14 …`）归那一条，不带的不清掉节标题的归属。
+            # 弄坏开关 nearest-d：不认节标题，每个 `### ` 标题都把归属清成标题上的 D 号或空（改前的口径）。
+            if line.startswith('## ') and HISTORY_SECTION_OWNER_BREAK != 'nearest-d':
+                mm = re.match(r'## D(\d+)', line); section = 'D' + mm.group(1) if mm else None; hist = None
+            elif line.startswith('### '):
+                mm = re.search(r'D(\d+)', line); hist = 'D' + mm.group(1) if mm else None
         for m in re.finditer(r'(已定项|未定项)\s*(\d+)', line):
             k = int(m.group(2)); want = '已' if m.group(1) == '已定项' else '未'
-            pre = line[:m.start()]; ds = re.findall(r'D(\d+)', pre)
+            pre = line[:m.start()]; ds = re.findall(r'(?<![0-9A-Za-z_])[Dd](\d+)', pre)
             # ⚠️ 只有**紧挨着**分项引用的那个编号才算「指名」（仓里规范的引用形态是
             # `D6（快照实现模型） 已定项 2`）。行内更早提到的编号不算：同一行里裸写的
             # 「已定项 k」按文件自身的决策号解析，那是下面三级回退存在的理由。
@@ -217,10 +326,10 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
             if named in item_map and k not in item_map[named]:
                 yield ln, line, m, want, None, named, named
                 continue
-            owner = next((c for c in (named, 'D' + ds[-1] if ds else None, self_d, hist, last)
+            owner = next((c for c in (named, 'D' + ds[-1] if ds else None, self_d, hist, section, last)
                           if c in item_map and k in item_map[c]), None)
             yield ln, line, m, want, owner, None, named
-        for d in re.findall(r'D(\d+)', line):
+        for d in re.findall(r'(?<![0-9A-Za-z_])[Dd](\d+)', line):
             if 'D' + d in item_map: last = 'D' + d
 
 
@@ -261,15 +370,18 @@ def main():
                            f"（{names[owner]}） 正文里第 {k} 条是{item_map[owner][k]}定：{line.strip()[:60]}")
         if skipped_fenced_lines:
             skipped_fenced_lines_by_file[path] = len(skipped_fenced_lines)
+    orphans = orphan_translations()
     if unreadable:
         report_unreadable(unreadable)
+    if orphans:
+        report_orphan_translations(orphans)
     if bad:
         print(f"  ✗ 分项引用与正文状态不一致 {len(bad)} 处")
         for b in bad[:40]: print("    ", b)
         print("     → 权威是各决策正文的「### 已定项 / ### 未定项」两张表；改引用处，或先改正文再改引用。")
         print("     → 报「指名 Dn 而它没有第 k 条」的：那个编号引不到任何东西，去查它本来想指哪一条。")
         print("     → 一条分项刚翻了状态、引用一大片对不上的：用 scripts/kb/relabel-item.py D<n> <k> 按同一份归属规则改写。")
-    if bad or unreadable:
+    if bad or unreadable or orphans:
         sys.exit(1)
     n = sum(len(v) for v in item_map.values())
     # 一处引用都没扫到，这一轮什么都没比过：退 77，门禁记「本次未跑」而不是通过

@@ -1,0 +1,66 @@
+# 门禁 code-tooling 的 hardcoded-quota 格的排除表：跑法里写死内存上限或台数的写法里，自证造的假值、写给人照抄的例子、这一轮不碰的文件，与改不成现算的那几处。
+# 写法：一行「<路径>:<锚串>  # 理由」（锚串与 # 之间至少两个空格，理由至少 4 个字）；那份文件里含锚串的被判行都放行。
+# 指向不存在的文件、锚串一处被判行都不命中，判红；只缩不涨：改动范围的基准那一版（照 .claude/gate.d/path-moves.tsv 登记、此刻生效的搬迁把路径换成新前缀之后）里没有的「路径:锚串」判红。
+# 改成照多机配置与 host-resources.py 现算了（run-with-memory-cap.sh auto、不写 --memory-cap、--emit-hosts 的 MULTI_HOST_COUNT）就删掉那一行。
+
+# 自证与单测里造的假值：喂给被测脚本或假驱动的上限与台数，不起真跑法
+scripts/crash/crash-amplification-item.sh:PEER_MEMORY_CAP=1G  # 自证造的多机配置
+scripts/crash/crash-amplification-lib.sh:threads=7; memory_cap=1G  # 自证里调真函数的外壳给的参数
+scripts/crash/crash-amplification-two-hosts.sh:run_cell peer-cap-follows-this-host -- some-target --memory-cap 6G  # 自证格：第二台跟本机同一个上限
+scripts/crash/crash-point-replay-shard-run.sh:PEER_MEMORY_CAP=24G  # 自证造的多机配置
+scripts/crash/crash-point-replay-shard-run.sh:*"--memory-cap 16G"*  # 自证断言：外层上限交成 --memory-cap
+scripts/crash/crash-point-replay.sh:PEER_MEMORY_CAP=4G  # 自证造的多机配置
+scripts/experiment-apparatus/e165-pin-red-examples.py:"--memory-cap", "1G"  # 自证给桩装置的参数
+scripts/experiment-apparatus/e171_three_oracle_collusion/test_collusion_pipeline.py:run-with-memory-cap.sh", "4G"  # 单测断言：拼出来的命令带调用方给的上限
+scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py:run-with-memory-cap.sh", "4G"  # 单测断言：拼出来的命令带调用方给的上限
+scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py:"memory_cap": "1G"  # 单测输入
+scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py:memory_cap="1G"  # 单测输入
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py:parser.add_argument("--memory-cap", default="4G")  # 自证用的假驱动，默认值是假件的参数
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:"PEER_MEMORY_CAP") == "50G"  # 自证断言：解出来的多机配置
+scripts/experiment-apparatus/e184-segment-one-long-run.sh:E184_SELFTEST_HOSTS  # 自证里假机器清单的台数
+scripts/experiment-apparatus/e184-segment-one-long-run.sh:E184_KEYS_MEMORY_CAP=12G E184_DUMP_MEMORY_CAP=9G  # 自证格：环境变量覆盖档表里的上限
+scripts/gate/verus-proof-check.py:"memory_cap": "1G", "rustc_version_file"  # 自证给假 Verus 的参数
+scripts/hosts/detached-run.sh:long-run-check -- bash "$scripts_directory/run-with-memory-cap.sh" 1G  # 自证里造的样本命令
+scripts/hosts/detached-run.sh:run-with-memory-cap.sh" 16G bash "$long_run/full.sh"  # 自证格：长活⑬写死内存要被拒的输入
+scripts/hosts/detached-run.sh:x --memory-cap 6G  # 自证格：长活⑬写死内存要被拒的输入
+scripts/hosts/detached-run.sh:写死了 capped.sh 31、run-with-memory-cap.sh 16G  # 自证断言：拒绝说明点名写死的那一个
+scripts/hosts/host-resources.py:["memory_cap"] == "8G"  # 自证断言：第三台的上限取配置的 HOST_<号>_MEMORY_CAP
+scripts/mutation/broad-mutation.py:"--memory-cap", "32G"  # 自证给假一步的参数
+scripts/mutation/broad-mutation.py:"--memory-cap", "1G"  # 自证给假一步的参数
+scripts/mutation/crates-mutation-rows.py:GATE_MUTATION_MEMORY_MAX="4G"  # 自证给假内存包装的参数
+scripts/mutation/mutate.sh:MUTATE_MEMORY_MAX=64M  # 自证给真包装的小上限（撞顶那几格）
+
+# 这一轮不碰的文件（别的会话留着没提交的改动、钩子与别的门禁）：改了要连同那份文件一起改，交它们的那一批
+.claude/gate.d/checker-tier-research-build-and-replay.sh:${GATE_RESEARCH_BUILD_MEMORY_MAX:-8G}  # 不碰：别的门禁；改成 auto 要连同它文件头与共用约束里写的默认一起改
+.claude/gate.d/harness-model-differential-and-scenarios.sh:${GATE_MODEL_DIFFERENTIAL_MEMORY_MAX:-8G}  # 不碰：别的门禁；改成 auto 要连同它文件头与共用约束里写的默认一起改
+.claude/gate.d/lib/broad-mutation-samples.py:memory_cap="24G"  # 不碰：别的门禁的样本库，给假驱动的参数
+.claude/hooks/lib_heavy_tests.py:run-with-memory-cap.sh", "8G"  # 不碰：钩子；自证样本，喂给重型测试闸判的命令，不起
+.claude/hooks/lib_heavy_tests.py:run-with-memory-cap.sh", "4G"  # 不碰：钩子；自证样本，喂给重型测试闸判的命令，不起
+.claude/hooks/lib_heavy_tests.py:run-with-memory-cap.sh", "12G"  # 不碰：钩子；自证样本，喂给重型测试闸判的命令，不起
+.claude/hooks/lib_heavy_tests.py:"--memory-cap", "200G"  # 不碰：钩子；自证样本，喂给重型测试闸判的命令，不起
+scripts/hosts/multi-host-run.sh:--memory-cap 256M  # 不碰（别的会话的改动）；自证里造的场景上限
+scripts/hosts/multi-host-run.sh:run-with-memory-cap.sh" 16M  # 不碰（别的会话的改动）；自证里占着锁的假活
+scripts/hosts/multi-host-run.sh:--memory-cap 2G --label peer-too-big  # 不碰（别的会话的改动）；自证格：比配置大要被拒的输入
+scripts/hosts/multi-host-run.sh:MULTI_HOST_LOCAL_DEFAULT_MEMORY_CAP=8G  # 不碰（别的会话的改动）；本机模式的默认上限，改成 auto 要连同 --memory-cap 认 auto 一起改
+scripts/hosts/run-with-memory-cap.sh:PEER_MEMORY_CAP=40G  # 不碰（别的会话的改动）；自证造的多机配置
+scripts/experiment-apparatus/replay.sh:REPLAY_MEMORY_CAP="${REPLAY_MEMORY_CAP:-8G}"  # 不碰（别的会话的改动）；共用约束拿它当子 agent 跑编出代码的默认上限，要一起改
+scripts/experiment-apparatus/replay.sh:E165_KILL_BOUNDS_MEMORY_CAP=  # 不碰（别的会话的改动）；变体复跑的上限按撞过顶的记录定，理由写在同一行
+scripts/experiment-apparatus/replay.sh:${E168_S1_HISTORY_MEMORY_CAP:-4G}  # 不碰（别的会话的改动）
+scripts/experiment-apparatus/replay.sh:${E168_POSITIVE_CONTROLS_MEMORY_CAP:-20G}  # 不碰（别的会话的改动）
+
+# 改不成现算的：上限是实验参数、进了驱动的算术，或要交给不认 auto 的 multi-host-run.sh --memory-cap
+scripts/crash/crash-amplification-item.sh:memory_cap="38G"  # 默认照 slice 总上限定（文件头那一段）；第二台跟本机同一个上限经 multi-host-run.sh --memory-cap 交过去，它不认 auto
+scripts/crash/crash-amplification-two-hosts.sh:memory_cap="38G"  # 默认照 slice 总上限定（文件头那一段）；第二台跟本机同一个上限经 multi-host-run.sh --memory-cap 交过去，它不认 auto
+scripts/experiment-apparatus/e165-pin-red-examples.py:or "2G"  # 门禁 checker-tier-formal-verification 文件头写着默认 2G，那份门禁这一轮不碰，要一起改
+scripts/gate/verus-proof-check.py:or "4G"  # 门禁 checker-tier-formal-verification 文件头写着 GATE_VERUS_MEMORY_MAX 默认 4G，那份门禁这一轮不碰，要一起改
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:DEVICE_MEMORY_CAP = "6G"  # 编排按字节算每台放几条线道，auto 换不成字节
+scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:PEER_OUTER_MEMORY_CAP = "4G"  # 交给 multi-host-run.sh --memory-cap（不认 auto），编排也按它的字节算
+scripts/experiment-apparatus/e183-capacity-cells.sh:${E183_CELL_MEMORY_CAP:-24G}  # 上限是实验参数：撞上限（退 250）记成「内存上限之外」的定局（跑前登记 X3）
+scripts/experiment-apparatus/e184-segment-one-long-run.sh:FIXED_MEMORY_CAP="16G"  # 每档上限与线程成对、按量过的峰值写在档表里（文件头档表那一段），这一档同口径
+scripts/experiment-apparatus/e185-r2-segment-run.sh:E185_MEMORY_CAP=40G  # 装置自己读来算预算的上限，跑前登记写定（外层 46G、E185_MEMORY_CAP=40G），不是内存包装的上限
+scripts/experiment-apparatus/e185-r3-segment-run.sh:E185_MEMORY_CAP=40G  # 装置自己读来算预算的上限，跑前登记写定（外层 46G、E185_MEMORY_CAP=40G），不是内存包装的上限
+scripts/experiment-apparatus/e185-r4-segment-run.sh:E185_MEMORY_CAP=${E185_MEMORY_CAP:-40G}  # 装置自己读来算预算的上限，跑前登记写定（外层 46G、E185_MEMORY_CAP=40G），不是内存包装的上限
+scripts/gate/merge-and-verify.sh:MEMORY="${REPLAY_MEMORY_CAP:-8G}"  # --memory 同时交给 multi-host-run.sh --memory-cap（不认 auto）与快档上限取法的下限算术
+scripts/mutation/mutate.sh:MEMORY_MAX="${MUTATE_MEMORY_MAX:-16G}"  # 上限是判「内存撞顶」这一类变异结局的口径，开跑先 --check 它；随峰值表浮动会让同一条变异前后判得不同
+scripts/mutation/mutation-shard-run.sh:${MUTATION_SHARD_PEER_MEMORY_CAP:-4G}  # 第二台整份的外层上限，要盖得住里层每条变异的上限；auto 按整份历史峰值算，不保证盖得住
+scripts/mutation/broad-mutation.py:DEFAULT_MEMORY_CAP = "24G"  # 升档重跑按字节翻倍（memory_cap_bytes），撞顶记成 memory-cap 结局，auto 换不成字节

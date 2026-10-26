@@ -1,0 +1,15 @@
+[package]
+name = "singlefs-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }
+vstd = "=0.0.0-2026-09-20-0158"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
+
+[package.metadata.verus]
+verify = true

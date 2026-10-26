@@ -1,0 +1,5 @@
+exit=1
+want=.claude/kb/decisions-history.md：读不出基准 HEAD 里的 .claude/kb/decisions-history.md（git show 退 128
+want=整理丢没丢没比
+want=  history-loss：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（history-loss）

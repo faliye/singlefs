@@ -1,0 +1,37 @@
+# 派发：three-way-forward
+
+重型测试：不跑
+批次：records/2026-10-22-子agent结果落地审计.md#9
+线程上限：31
+禁读清单：research/prompts/landing-audit-r4-opus-output.md（同一轮的攻方腿报告）
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r4-sonnet
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r4-sonnet --purpose '三方 landing-audit-r4 的正推腿草稿（landing-audit-r4-sonnet）'
+背景材料：research/prompts/_landing-audit-r4-background.md
+报告：research/prompts/landing-audit-r4-sonnet-output.md
+预计挂钟：2 小时内，读正文、九十节 ⑥ 到 ㉔、八份第九批交回报告与被判文件，逐行对改法，不编译
+
+回复与报告用中文。
+
+轮名：landing-audit-r4（第九批改动的第一轮）。前三轮判决：`research/prompts/landing-audit-r1-main-verification.md`、`research/prompts/landing-audit-r2-main-verification.md`、`research/prompts/landing-audit-r3-main-verification.md`。模型目录（要写模型时）：research/prompts/landing-audit-r4-sonnet-model/。
+
+## 关的是哪几条
+
+正文 `research/prompts/_landing-audit-r4-body.md` 节「三、格」的 K1（每处改法做没做到它那一行），逐条：
+
+1. 拆分提案 `records/2026-09-16-subagent拆分提案.md` 第九十节 ⑥ 到 ㉔ 每一行：「要拦什么」列的验收标准，第九批改法落在哪一份文件哪一句、哪一个判法（交回报告在 `research/prompts/subagent-landing-audit-2026-10-22/` 下 `b9-prefix-probe.md`、`b9-dispatch-guard.md`、`b9-handback-guard.md`、`b9-gates-a.md`、`b9-gates-b.md`、`b9-watch-cost.md`、`b9-leg-types.md`、`b9-defs-verify.md`；逐件结果在调度记录 `records/2026-10-22-子agent结果落地审计.md` 节「第九批」），做到的写依据（文件:行），没做到、只做了一半、越出那一行的写哪一格。
+2. 每条改法：该红的输入现在会不会红。给得出复跑的，在草稿目录里拷那份钩子或脚本喂一条造出来的输入，引输出整行。
+3. 交回报告里写「推的、没量过」的（⑬ 的 512 MiB 下限、⑯ 加 frontmatter 键之后定义照常派出、任务 30 的桶变化），这一批有没有当成量的写进定义、记录或文件头。
+
+每一条写：九十节哪一行、改法的文件:行、做到 / 没做到 / 一半 / 越位、依据（命令与输出）、推翻条件。
+
+## 写法
+
+- 方案按 `crates/` 与 `scripts/` 今天的实现来谈；被判的改动在 `research/prompts/landing-audit-r4-snapshot/judged-vs-head.diff`（对 HEAD），混有别的会话的改动（正文节「实现今天的样子」列了是哪几处），按九十节与交回报告点名的改法认这一批的。
+- 现试放草稿目录，经 `scripts/hosts/run-with-memory-cap.sh 4G` 跑；不在主工作区改文件。
+- 报告分段写进报告路径：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建（`set -o noclobber`），之后 `>>` 追加；回复只写短句：报告路径、sha256、K1 各行做到几条。
+- 草稿与临时文件放草稿目录，不放会话共用的暂存目录。
+- 引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数。
+
+## 出口
+
+K1 逐行写完，报告写完交回。

@@ -1,0 +1,6 @@
+exit=1
+want=✗ records/2026-10-23-subagent拆分提案.md：节号 一百零四（标题在第 24 行）在索引表里没有一行
+want=✗ records/2026-10-23-subagent拆分提案.md：索引表第 10 行的节号 一百零九 没有对应的「## 一百零九、」一节
+want=✗ records/2026-10-23-subagent拆分提案.md 的节号与索引有 2 处对不上（3 个节号）
+want=样本只跑 .gate-cells 点名的格：ledger-section-numbers
+want=doc-process-records.sh：1 格里 1 格红（ledger-section-numbers）

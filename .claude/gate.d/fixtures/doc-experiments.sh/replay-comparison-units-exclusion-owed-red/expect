@@ -1,0 +1,8 @@
+exit=1
+want=replay-comparison-units.tsv 里 3 处对不上
+want=replay-comparison-units.tsv 第 3 行：「不登记的比对对象」没写欠在哪一条账（理由里要写「欠在 C<号>（简称）」）
+want=replay-comparison-units.tsv 第 4 行：写的 C998 在 .claude/kb/checks-owed.md 里没有登记
+want=replay-comparison-units.tsv 第 5 行：写的 C991（样本已还）在 .claude/kb/checks-owed.md 里已还清
+want=先在 `.claude/kb/checks-owed.md` 登记欠账号，同一行写上
+want=样本只跑 .gate-cells 点名的格：replay-comparison-units
+want=doc-experiments.sh：1 格里 1 格红（replay-comparison-units）

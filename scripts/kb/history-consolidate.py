@@ -32,6 +32,19 @@
   HISTORY_CONSOLIDATE_BREAK=drop-number  transform_entry() 把条目正文里第一处两位以上的数（日期与「- **改前**」行除外）删掉一个，样本里每个家节条目各丢一个
       干净迁移不该有丢失（「✗ 自检：干净迁移不该有丢失：」）、
       快查·改后没留成结论句（「✗ 自检：快查·改后没留成结论句」）
+  HISTORY_CONSOLIDATE_BREAK=git-show-ignores-path  normalized_line() 比产物行时把反引号里的 `.out` `.tsv` `.log` `.json` `.csv` 产物名一律抹成同一个记号，路径与产物名不同也算同一行
+      产物行换成 git show 写法又改了产物名或目录，要判丢而没判（「✗ 自检：git show 引用写法：」，逐格点名是哪个后缀、改了什么）
+      不设开关时 --selftest 也把这个开关打开一次，核上面那几格都红（没红的是『弄坏开关 git-show-ignores-path』）
+  HISTORY_CONSOLIDATE_BREAK=english-quotes-unprotected  引名的引号退回只认「」『』（改前的样子）：strip_same_date() 把英语 "…" 与 “…” 里的同日日期当重复日期删，引名核对也不认这两种引号
+      英语引号里的同日日期被删了（「✗ 自检：英语引号里的引名：」，逐格点名是哪种引号、删成了什么）
+      不设开关时 --selftest 也把这个开关打开一次，核那一格红（没红的那一项是 弄坏开关 english-quotes-unprotected）
+
+引名：「」『』与英语的 "…"、“…” 四种引号里的一段（判法只在 QUOTE_PAIRS 一处，doc-consolidate.py 经 strip_same_date 与 missing_quoted_names 用同一份）。
+引号里的日期是被引的小节名的一部分，同日也不删；丢失核对把引号里带日期的那一段当引名，要在改后找得到。
+
+产物行（行里有 RESULT，或反引号里写着 `.out` `.tsv` `.log` `.json` `.csv` 的产物名）要在改后逐字找得到；
+唯一放宽：反引号里的 `<路径>` 与 `git show <提交>:<同一路径>` 算同一处，两个方向都行（归档脚本删产物时做的改写）；
+路径、产物名、同一行别的字改了照旧判丢。
 """
 import argparse
 import collections
@@ -188,13 +201,37 @@ def truncate_summary(text, limit=48):
 
 FENCE_ROW_PREFIX_RE = re.compile(r'(?m)^\s*\d+: ?')
 EMBEDDED_DATE_RE = re.compile(r'[A-Za-z0-9_./\-]*20\d\d-\d\d-\d\d[A-Za-z0-9_./\-]*')
-CODE_SPAN_RE = re.compile(r'`[^`\n]*`|「[^「」\n]*」|『[^『』\n]*』')
-QUOTED_NAME_RE = re.compile(r'「[^「」\n]*20\d\d-\d\d-\d\d[^「」\n]*」|『[^『』\n]*20\d\d-\d\d-\d\d[^『』\n]*』')
+QUOTE_PAIRS = (('「', '」'), ('『', '』'), ('“', '”'), ('"', '"'))   # 引名的四种引号：中日的两种与英语的两种（判法只在这一处）
+CHINESE_QUOTE_PAIRS = QUOTE_PAIRS[:2]   # 弄坏开关 english-quotes-unprotected 退回的样子：只认「」『』
+QUOTE_BREAK = ''  # 只给 --selftest 证红用：见 QUOTE_BREAK_MODES
+
+
+def quote_span_pattern(pairs):
+    """一对引号括住的一段，不跨行、不跨同种引号；从左往右成对认（"a" 与 "b" 之间那一段不算被引的）。"""
+    return '|'.join(f'{re.escape(opening)}[^{re.escape(opening)}{re.escape(closing)}\\n]*{re.escape(closing)}' for opening, closing in pairs)
+
+
+QUOTE_SPAN_RE = re.compile(quote_span_pattern(QUOTE_PAIRS))
+CHINESE_QUOTE_SPAN_RE = re.compile(quote_span_pattern(CHINESE_QUOTE_PAIRS))
+CODE_SPAN_RE = re.compile(r'`[^`\n]*`|' + quote_span_pattern(QUOTE_PAIRS))
+CHINESE_CODE_SPAN_RE = re.compile(r'`[^`\n]*`|' + quote_span_pattern(CHINESE_QUOTE_PAIRS))
 STANDALONE_DATE_RE = r'(?<![\w./\-])%s(?![\w./\-])'
 
 
+def quote_span_re():
+    return CHINESE_QUOTE_SPAN_RE if QUOTE_BREAK == 'english-quotes-unprotected' else QUOTE_SPAN_RE
+
+
+def code_span_re():
+    return CHINESE_CODE_SPAN_RE if QUOTE_BREAK == 'english-quotes-unprotected' else CODE_SPAN_RE
+
+
+GIT_SHOW_COMMIT_RE = re.compile(r'(`git show )[0-9a-f]{7,40}(:)')
+
+
 def ids_and_numbers(text):
-    stripped = DATE_RE.sub(' ', FENCE_ROW_PREFIX_RE.sub('', text))
+    # 引用里的提交哈希是定位用的，哈希里的数字串不是正文的数
+    stripped = DATE_RE.sub(' ', FENCE_ROW_PREFIX_RE.sub('', GIT_SHOW_COMMIT_RE.sub(r'\1\2', text)))
     ids = set(ID_RE.findall(stripped))
     without_ids = ID_RE.sub(' ', stripped)
     numbers = set(n for n in NUMBER_RE.findall(without_ids) if len(n.replace(',', '').replace('.', '')) >= 2)
@@ -222,8 +259,8 @@ def flatten_for_quote(text):
 
 
 def quoted_names_with_dates(text):
-    """「2026-09-27：第 4 次跑」这类引的小节名，日期是名字的一部分；取引号里的正文，比的是它在不在可达范围里。"""
-    return set(flatten_for_quote(span[1:-1]) for span in QUOTED_NAME_RE.findall(text))
+    """「2026-09-27：第 4 次跑」、"2026-10-13 (the 25th run)" 这类引的小节名，日期是名字的一部分；取引号里的正文，比的是它在不在可达范围里。"""
+    return set(flatten_for_quote(span[1:-1]) for span in quote_span_re().findall(text) if DATE_RE.search(span))
 
 
 def without_old_state_summaries(text):
@@ -237,7 +274,7 @@ def missing_quoted_names(before_text, reach_text):
 
 
 def strip_same_date(line, date):
-    """只删独立出现的同日日期；反引号、「」『』里的，连在路径或名字里的，以及紧跟「：」当小节名用的不动。"""
+    """只删独立出现的同日日期；反引号与引名的四种引号（QUOTE_PAIRS）里的，连在路径或名字里的，以及紧跟「：」当小节名用的不动。"""
     if date not in line:
         return line
     spans = []
@@ -246,7 +283,7 @@ def strip_same_date(line, date):
         spans.append(match.group(0))
         return f'\x00{len(spans) - 1}\x00'
 
-    line = CODE_SPAN_RE.sub(keep, line)
+    line = code_span_re().sub(keep, line)
     line = re.sub(STANDALONE_DATE_RE % date + r'(?=：)', keep, line)
     standalone = STANDALONE_DATE_RE % date
     line = re.sub(r'（' + standalone + r'）', '', line)
@@ -476,11 +513,18 @@ def block_map(text):
 POINTER_RE = re.compile(r'见 ((?:D|E)\d+（.*?）) 节同日条目')
 GIT_REF_RE = re.compile(r'`git show ([0-9a-f]+):([^`]+)`')
 PRODUCT_LINE_RE = re.compile(r'RESULT|`[^`]*\.(?:out|tsv|log|json|csv)`')
+GIT_SHOW_SPAN_RE = re.compile(r'`git show [0-9a-f]{7,40}:([^`\s]+)`')
+ANY_PRODUCT_SPAN_RE = re.compile(r'`[^`]*\.(?:out|tsv|log|json|csv)`')
+LOSS_CHECK_BREAK = ''  # 只给 --selftest 证红用：见 LOSS_CHECK_BREAK_MODES
 
 
 def normalized_line(line, block_date=''):
-    """比对产物行时不看缩进、列表符号、快查前缀、行号前缀、空白，也不看所属日期（它按规矩被删）。"""
+    """比对产物行时不看缩进、列表符号、快查前缀、行号前缀、空白，也不看所属日期（它按规矩被删）；
+    也不看引用写法：`<路径>` 与 `git show <提交>:<同一路径>` 算同一处（归档脚本删产物时把前者改成后者）。路径与产物名改了别的字照旧不同。"""
     text = FENCE_ROW_PREFIX_RE.sub('', line)
+    text = GIT_SHOW_SPAN_RE.sub(lambda match: '`' + match.group(1) + '`', text)
+    if LOSS_CHECK_BREAK == 'git-show-ignores-path':
+        text = ANY_PRODUCT_SPAN_RE.sub('`产物`', text)
     text = re.sub(r'^\s*(?:>\s*|-\s+|\*\s+)+', '', text)  # 列表符号与引用符号；`**结论**` 的星号不是列表符号
     text = re.sub(r'^(?:快查·(?:改后|改了什么)：|\*\*结论\*\*：)\s*', '', text)
     if block_date:
@@ -621,15 +665,87 @@ SAMPLE = '''# 决策变更史
 
 
 BREAK_MODES = ('drop-number',)  # 弄坏开关 HISTORY_CONSOLIDATE_BREAK 认的取值，只给 --selftest 用（文件头逐个写了打开后哪几项红）
+LOSS_CHECK_BREAK_MODES = ('git-show-ignores-path',)  # 弄坏的是 loss-check 本身（不是迁移结果）：产物行比对不看路径
+
+
+GIT_SHOW_HISTORY = '''# 决策变更史
+
+## E1（甲）
+
+### 2026-09-10
+
+#### E1（甲） 已定项 1
+
+- 产物 `research/results/e1-run.%s`，通过 34 项。
+'''
+
+
+def git_show_cases(mode):
+    """产物行改引用写法的几种情形：返回不合预期的句子（空表示 loss-check 全对）。mode 非空时打开 loss-check 的弄坏开关。"""
+    global LOSS_CHECK_BREAK
+    previous, LOSS_CHECK_BREAK = LOSS_CHECK_BREAK, mode
+    problems = []
+    try:
+        for extension in ('out', 'tsv', 'log', 'json', 'csv'):
+            plain = GIT_SHOW_HISTORY % extension
+            shown = plain.replace(f'`research/results/e1-run.{extension}`',
+                                  f'`git show 0123456789ab:research/results/e1-run.{extension}`')
+            if shown == plain:
+                problems.append(f'样本没换成 git show 写法（{extension}）')
+            for name, before, after in (('写成 git show', plain, shown), ('git show 写回路径', shown, plain)):
+                if loss_check(before, after, repo=None)[1]:
+                    problems.append(f'.{extension} 产物行{name}不该判丢')
+            renamed = shown.replace('e1-run', 'e1-other')
+            moved = shown.replace('research/results/', 'research/old/')
+            reworded = shown.replace('通过', '失败')
+            for name, after in (('产物名改了', renamed), ('目录改了', moved), ('同一行别的字改了', reworded)):
+                if not loss_check(plain, after, repo=None)[1]:
+                    problems.append(f'.{extension} 产物行换成 git show 写法又{name}，要判丢，没判')
+    finally:
+        LOSS_CHECK_BREAK = previous
+    return problems
+
+
+QUOTE_BREAK_MODES = ('english-quotes-unprotected',)  # 弄坏的是引名的认法：英语两种引号退回不认
+QUOTE_CASE_DATE = '2026-09-26'
+# （格名, 一行正文, 被引的小节名）：同一行里引号外有一处同日日期要删，引号里那一处要留
+ENGLISH_QUOTE_CASES = (
+    ('英语直引号', '- On 2026-09-26 the section "2026-09-26 (the 4th run)" was rerun.', '"2026-09-26 (the 4th run)"'),
+    ('英语弯引号', '- On 2026-09-26 the section “2026-09-26 (the 4th run)” was rerun.', '“2026-09-26 (the 4th run)”'),
+)
+# 两对直引号之间的日期不在引号里：成对认，不把前一对的右引号与后一对的左引号认成一对
+BETWEEN_QUOTES_LINE = '- The "A" run on 2026-09-26 and the "B" run.'
+
+
+def english_quote_cases(mode):
+    """英语引号里的引名：返回不合预期的句子（空表示全对）。mode 非空时打开引名认法的弄坏开关。"""
+    global QUOTE_BREAK
+    previous, QUOTE_BREAK = QUOTE_BREAK, mode
+    problems = []
+    try:
+        for name, line, quoted in ENGLISH_QUOTE_CASES:
+            stripped = strip_same_date(line, QUOTE_CASE_DATE)
+            if quoted not in stripped:
+                problems.append(f'{name}里的同日日期被删了：{line} → {stripped}')
+            if stripped.count(QUOTE_CASE_DATE) != 1:
+                problems.append(f'{name}那一行引号外的同日日期该删、引号里的该留，剩 {stripped.count(QUOTE_CASE_DATE)} 处：{stripped}')
+            if not missing_quoted_names(line, line.replace(quoted, 'the 4th run')):
+                problems.append(f'{name}里带日期的引名改后不见了，丢失核对没判丢')
+        between = strip_same_date(BETWEEN_QUOTES_LINE, QUOTE_CASE_DATE)
+        if QUOTE_CASE_DATE in between:
+            problems.append(f'两对直引号之间的同日日期不在引号里，该删没删：{between}')
+    finally:
+        QUOTE_BREAK = previous
+    return problems
 
 
 def selftest():
     break_mode = os.environ.get('HISTORY_CONSOLIDATE_BREAK', '')
-    if break_mode and break_mode not in BREAK_MODES:
+    if break_mode and break_mode not in BREAK_MODES + LOSS_CHECK_BREAK_MODES + QUOTE_BREAK_MODES:
         print(f'✗ 自检：HISTORY_CONSOLIDATE_BREAK={break_mode} 认不得')
-        print(f'  → 取值只有 {" ".join(BREAK_MODES)}（文件头「弄坏开关」一段）；平常跑 --selftest 不设它')
+        print(f'  → 取值只有 {" ".join(BREAK_MODES + LOSS_CHECK_BREAK_MODES + QUOTE_BREAK_MODES)}（文件头「弄坏开关」一段）；平常跑 --selftest 不设它')
         return 2
-    after, report, _before_blocks, _git = migrate(SAMPLE, repo=None, break_mode=break_mode or None)
+    after, report, _before_blocks, _git = migrate(SAMPLE, repo=None, break_mode=break_mode if break_mode in BREAK_MODES else None)
     checked, losses = loss_check(SAMPLE, after, repo=None)
     problems = []
     if losses:
@@ -661,7 +777,21 @@ def selftest():
         problems.append('文件自己文末的「## 历史版本」节没有原样留在文末')
     if len(report['multi_day_blocks']) != 1:
         problems.append(f'同日多条应报 1 个块，报了 {report["multi_day_blocks"]}')
+    for case in git_show_cases(break_mode if break_mode in LOSS_CHECK_BREAK_MODES else ''):
+        problems.append('git show 引用写法：' + case)
     caught = []
+    for mode in LOSS_CHECK_BREAK_MODES:
+        if not git_show_cases(mode):
+            problems.append(f'弄坏开关 {mode}：loss-check 不看路径，git show 引用写法的几种情形没红')
+        else:
+            caught.append(f'{mode} 红')
+    for case in english_quote_cases(break_mode if break_mode in QUOTE_BREAK_MODES else ''):
+        problems.append('英语引号里的引名：' + case)
+    for mode in QUOTE_BREAK_MODES:
+        if not english_quote_cases(mode):
+            problems.append(f'弄坏开关 {mode}：引号退回只认「」『』，英语引号那一格没红')
+        else:
+            caught.append(f'{mode} 红')
     for mode in BREAK_MODES:
         broken, _r, _b, _g = migrate(SAMPLE, repo=None, break_mode=mode)
         _checked, broken_losses = loss_check(SAMPLE, broken, repo=None)
@@ -674,8 +804,8 @@ def selftest():
             print('✗ 自检：' + problem)
         print('  → 改 history-consolidate.py 的对应分支，再跑 --selftest')
         return 1
-    print(f'✓ 自检通过：干净迁移零丢失，指针 1 条，快查 / 现状 / 同日日期 / （其N）都删了，'
-          f'弄坏开关 {len(caught)} 个各开一次、故意丢数都被抓（{"；".join(caught)}）')
+    print(f'✓ 自检通过：干净迁移零丢失，指针 1 条，快查 / 现状 / 同日日期 / （其N）都删了，英语引号 {len(ENGLISH_QUOTE_CASES)} 种里的引名日期留着，'
+          f'弄坏开关 {len(caught)} 个各开一次、都被抓（{"；".join(caught)}）')
     return 0
 
 

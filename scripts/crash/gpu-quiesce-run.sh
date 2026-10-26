@@ -16,10 +16,18 @@
 #   输出逐条追加进这一趟的本机日志 <日志目录>/<日期>-<登记名>.log（目录 700、文件 600，每条前后各一行「== <键> 起 <时刻>」「== <键> 退 <码>」）：
 #   清场回读没过、或这一趟跑的清场命令退非 0 时留下，路径写进 GPU_QUIESCE 那一行的 log=；都过了就删掉。
 # 上一趟清了场没复原、服务已经停着：这一趟照样跑清场命令（私有清场脚本见已经停干净就只回读、退 0），回读过了就照跑。
+# 第二台（两台用同一份多机配置，带过去的写法在 scripts/hosts/peer-host-lib.sh 文件头「两台用同一份多机配置」）：清场四个键写的是「在起活的那一台跑、两台都管」的命令
+#   （multi-host.env.example：清场命令在本机跑、例子是停掉占着两台的服务；清场回读另查第二台，下面「两样都只管本机的卡与进程；第二台的回读不变」），
+#   第二台的清场就是起活那一台照这份配置跑的那一趟。所以起活那一方设了 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer（只许 local 或 peer，没设是 local；
+#   写了别的，命令不起、退 78）时这一份不跑清场与回读那两条命令：
+#   起活那一方照配置清过场、回读过了（它给第二台设 GPU_QUIESCE_ORIGIN_READ_BACK=1：变异分片在开跑之前 peer_host_quiesce 回读过了，或 multi-host-run.sh --peer 正经这一份起）
+#   就照跑，清场那一行写 result=quiesced-on-origin；没设就不起命令、退 78，清场那一行写 result=not-quiesced-on-origin，出路是在起活那一台清场。
+#   锁、登记、本机日志与出去时那一行照旧（同一台上几趟同时用卡照样分得清）；配置里清场那两个键照样要写全（同一份配置，没写全两台一样退 78）。
+#   回读看的卡照角色取：第二台上显卡先后里 peer:<序号>:<额度> 那几项是这一台的卡（local: 那几项是起活那一台的），标准错误那一句照报。
 #   日志目录 ${GPU_QUIESCE_LOG_DIRECTORY:-<工作根>/gpu-quiesce-logs}：开机不清，工作根只在 .claude/hooks/lib_work_root.py 里定义（SINGLEFS_WORK_ROOT），
 #   这里经 python3 那份库取，取不到照「状态目录建不了」退 78；--selftest 把它指到自己的临时目录，不落进真工作根。
-#   这一份与它调的东西不停、不杀任何进程，也不按模式找进程：清场只停清场命令白名单里的服务单元；这一趟要用的卡上有不归白名单、也不在别的活着的登记之下的
-#   计算进程（别的会话的 GPU 活）时清场回读本来就不过，照拒（退 78），出路是等那个进程跑完再起。
+#   清场不停、不杀任何进程，也不按模式找进程：清场只停清场命令白名单里的服务单元；这一趟要用的卡上有不归白名单、也不在别的活着的登记之下的
+#   计算进程（别的会话的 GPU 活）时清场回读本来就不过，照拒（退 78），出路是等那个进程跑完再起。命令起了之后，只有它自己的进程组会收到信号（下面「被打断」）。
 # 回读看哪几张卡、跳过哪些进程：这一份在进来时算好两样，经环境只交给清场那两条命令（QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND），
 #   私有回读脚本认它们；调用方带进来的同名变量进来时先清掉，不认、也不传给 <命令…>：
 #   GPU_QUIESCE_CHECK_LOCAL_CARDS=<本机卡的 nvidia-smi 序号，逗号隔开>  这一趟要用的本机卡，回读只看这几张上的计算进程。
@@ -34,19 +42,45 @@
 # 几趟同时用卡：每一趟进来时在状态目录（${GPU_QUIESCE_STATE_DIRECTORY:-${XDG_RUNTIME_DIR:-/tmp}/singlefs-gpu-quiesce}）的 holders/ 下登记一份
 #   <进程号>-<进程的开机后起始时刻>，进出都在同一把 flock 锁里（至多等 GPU_QUIESCE_LOCK_SECONDS 秒，默认 900）。进来时没有别的活着的登记才跑清场命令，
 #   有就只回读；出去时删掉自己的登记。登记的进程号不在了、或起始时刻对不上（进程号被重用）的登记是死的，进出时删掉；被 SIGKILL 的那一趟留下的登记由下一趟删。
-# 被打断：收到 INT、TERM、HUP 时不停命令、不发任何信号，等前台那条命令自己结束再退；清场途中收到的，命令不起。都不复原。
-#   要停这一条链，从最底层的命令起停（停这一份自己而命令还在跑时，它要等命令结束才退）。
+# 被打断（欠账 拆分提案第一百二十三节）：命令起在自己的进程组里（set -m，进程组号就是命令的进程号），标准输入输出与环境照旧交给它。
+#   ① 收到 INT、TERM、HUP：把同一个信号转给命令的整个进程组，限时等它退出，到点进程组里还有成员就发 KILL，再做出去时的收尾（删登记、发广播、不复原）。
+#      限时 GPU_QUIESCE_FORWARD_WAIT_DEFAULT_SECONDS（8 秒；调用方可用 GPU_QUIESCE_FORWARD_WAIT_SECONDS 改，取值限在 1 到 GPU_QUIESCE_FORWARD_WAIT_CEILING_SECONDS（10 秒，
+#      即 .claude/singlefs-ai-sop/scripts/proc.py stop 的默认宽限）之间，写得不对取默认）。清场途中收到的，命令不起。都不复原。
+#      命令退 0 而这一份收到过信号时仍退 128+信号号（见「退出码」）。
+#   ② 这一份被 KILL（没有 trap 可跑）：起命令时同时起一个守卫（也在自己的进程组里，输出丢掉），每 GPU_QUIESCE_GUARD_POLL_SECONDS 秒（默认 0.5）按
+#      「进程号加开机后起始时刻」看这一份还在不在（僵尸算不在）；不在了就对命令的进程组发 TERM、等同一个限时、再发 KILL。命令退出之后这一份先停掉守卫再出去
+#      （不停的话守卫之后会对一个已经空了的进程组发信号，进程号重用时就打到别人头上）。
+#      为什么是守卫而不是 PR_SET_PDEATHSIG：后者只通知命令这一个进程、不管它的子孙，bash 里也设不了（要先起 python 再 exec，多一层）；
+#      systemd scope 要用户级 systemd，而内存包装自己已经开 scope，再套一层是嵌套。进程组加守卫在 bash 里就落得了，覆盖命令的整个进程组。
+#   够不到的：命令的子孙自己 setsid 出去的、或内存包装开的 systemd scope 里的（那一支由内存包装收到 TERM 时自己 systemctl --user stop，见它的文件头）；
+#      起命令到守卫起来之间（几毫秒）这一份被 KILL，命令成孤儿。命令在后台进程组里，读终端会被停（SIGTTIN）：这一份起的命令都不读终端，标准输入是管道、文件或 /dev/null。
+#   要停这一条链，对这一份发 TERM 就够（命令的进程组随之收到）；不用再从最底层的命令起逐个停。
+# 资源释放广播（用户 2026-10-23 定「叫醒并重判，不自动挪」，records/2026-09-16-subagent拆分提案.md 第九十九节；发与收都在 scripts/hosts/resource_release_broadcast.py）：
+#   命令起过的那一趟，出去时删掉自己的 holders/ 登记之后（gpu_quiesce_leave 里，锁外）发一条 gpu-released：标签是这一趟的登记名，带命令的退出码与出去时别的活着的登记数
+#   （holders_left；读不出锁时不带）。清场回读没过、锁等不到、用法错这几种命令没起的不发：它没占过卡。
+#   状态目录不是默认那一份（设了 GPU_QUIESCE_STATE_DIRECTORY：别的脚本的自证与假世界）不发，除非显式给了 RESOURCE_BROADCAST_DIRECTORY。
+#   推不出去的那几行写进本机事件目录的 push-problems.log（emit --problems-to-log），广播那一步的输出一行都不进这一份的标准错误（GPU_QUIESCE 行给调用方读）；
+#   出了什么事都不改这一份的退出码，至多晚退那份库的 PUSH_SECONDS（4 秒）加起 python 与读配置的零点几秒。
+# 在用核数（欠账 拆分提案第一百零六节「同类」第一条）：看门狗（scripts/agents/agent-watch.py 与 scripts/hosts/core_usage.py）只看 CPU，经这一份起的命令活在卡上、
+#   CPU 只喂数据，照样判成核数过少。所以清场过了、起命令之前，这一份经 scripts/hosts/core_usage.py declare-serial 写一条串行声明（理由 GPU_QUIESCE_SERIAL_REASON，
+#   以「在卡上算」起头），命令退出之后（正常退、被转发的信号停下都算）经 declare-parallel 撤掉；命令没起（清场回读没过、锁等不到、用法错）一条都不写。
+#   声明写进哪一份：调用方给了 SINGLEFS_SERIAL_DECLARATIONS（detached-run.sh start、multi-host-run.sh --peer 起的命令里已经设好）就写那一份；没给就在状态目录的
+#   serial-declarations/<登记名> 给这一趟建一份、export 给命令（看门狗到重活进程那棵树的环境里找这个变量），撤掉之后删掉。
+#   写不成（core_usage.py 跑不起来、文件写不进）打一句「!」、照起命令：声明只是给看门狗的注，不挡这一趟。声明不让告警不报（core_usage.py 文件头「声明」）。
+#   管不到：同一份调用方给的声明文件被几趟同时用时，先退的那一趟的「此刻并行」把别的趟还没结束的串行段也收了；这一份被 KILL 时撤不掉，自己建的那一份留在状态目录里。
 # 卡与额度：不读显卡配置、不定额度、不按余量拒或排队：用哪几张卡、各给多少由调用方定（例：分项驱动按清场之后那一份显卡配置交给用例），
 #   这一份只管清场、回读、跑。调用方给的环境（GPU_CARDS_BY_PRIORITY 这类）原样传给命令。
 # 给调用方与派发器的接口（选哪台、查余量、定卡与额度都在调用方；这一份不读也不改它们）：
 #   参数只有 -- <命令…>；命令的环境原样带下去（调用方定的卡与额度经环境交给命令，例 GPU_CARDS_BY_PRIORITY），另加一个 GPU_QUIESCE_HOLDER=<这一趟的登记文件>：
 #   命令要核自己在清场之下，看这份文件在、文件名以它父进程的进程号加「-」起头（被包着的命令的父进程就是这一份）。
+#   调用方没给 SINGLEFS_SERIAL_DECLARATIONS 时命令另拿到这一趟自己建的那一份（见「在用核数」）。
 #   交给清场那两条命令的另有 GPU_QUIESCE_CHECK_LOCAL_CARDS、GPU_QUIESCE_CHECK_EXEMPT_PIDS（见「回读看哪几张卡、跳过哪些进程」），<命令…> 拿不到它们。
 #   状态目录 GPU_QUIESCE_STATE_DIRECTORY、本机日志目录 GPU_QUIESCE_LOG_DIRECTORY 与锁的等待 GPU_QUIESCE_LOCK_SECONDS 可由调用方给；同一台机器上同时用卡的各趟要用同一个状态目录；
 #   调用方的自证用假清场命令跑这一份时，把日志目录也指到自己的临时目录，不然失败那几趟的日志落进真工作根。
 #   结局读退出码与下面的 GPU_QUIESCE 行：命令自己退 78 与这一份退 78 由 step=command 那一行分（not-started 是这一份拒的）。
 # 输出：标准错误上逐步一行，给调用方与派发器读（字段 key=value，空格隔开）：
-#   GPU_QUIESCE step=quiesce result=stopped-and-read-back|joined-and-read-back|read-back-failed holders=<进来时别的活着的登记数>[ stop-exit=<码>][ log=<本机日志>]
+#   GPU_QUIESCE step=quiesce result=stopped-and-read-back|joined-and-read-back|read-back-failed|quiesced-on-origin|not-quiesced-on-origin holders=<进来时别的活着的登记数>[ stop-exit=<码>][ log=<本机日志>]
+#     后两种只在第二台上（文件头「第二台」）
 #     stop-exit 是这一趟跑的清场命令的退出码，回读没过或它退非 0 时打（回读过了而它退非 0，那一行是 stopped-and-read-back 带非 0 的 stop-exit，照跑）；
 #     log 在留下本机日志时打
 #   GPU_QUIESCE step=command result=exit-<码>|not-started
@@ -57,12 +91,14 @@
 # 退出码：
 #   <命令的>  命令起了：交回命令的退出码；命令退 0 而这一份收到过 INT/TERM/HUP 时退 128+信号号
 #   2         用法错：没给 -- 或 -- 后面没有命令
-#   78        命令没起：多机配置里 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND 没写全、状态目录或本机日志建不了（含取不到工作根）、锁等不到、清场回读没过；
+#   78        命令没起：多机配置里 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND 没写全、状态目录或本机日志建不了（含取不到工作根）、锁等不到、清场回读没过、
+#             第二台上起活那一方没清场（没设 GPU_QUIESCE_ORIGIN_READ_BACK=1）、SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 写了 local、peer 之外的值；
 #             收到 INT/TERM/HUP 而命令还没起时退 128+信号号
 # 弄坏开关 GPU_QUIESCE_BREAK=<项>（只给证红用，逗号连几个；--selftest 末尾那一轮从这张表现读，写法同 scripts/crash/crash-amplification.sh 文件头「弄坏开关」一段，
 #   格名是 run_selftest 里「✗ 自证 <格名>：」的那一段）：
 #   GPU_QUIESCE_BREAK=run-despite-failed-quiesce  清场回读没过也起命令
-#       quiesce-read-back-fails（「清场回读没过却起了命令」）
+#       quiesce-read-back-fails（「清场回读没过却起了命令」）、broadcast-not-started（「✗ 自证 broadcast-not-started：清场回读没过、命令没起的那一趟」：命令照起了，出去时也发了 gpu-released）、
+#       serial-declaration（「✗ 自证 serial-declaration：清场回读没过那一趟退 0，声明文件「…」，命令起了」：命令照起了，起之前也写了串行声明）
 #   GPU_QUIESCE_BREAK=restore-after-run  出去时（命令起没起、退几都算）又照多机配置跑 QUIESCE_START_COMMAND 与 QUIESCE_STARTED_CHECK_COMMAND 复原，restore 那一行写 restored
 #       no-restore（「跑完调了复原命令」）
 #   GPU_QUIESCE_BREAK=trust-stale-holders  死了的登记也当活着的
@@ -70,25 +106,52 @@
 #   GPU_QUIESCE_BREAK=accept-missing-quiesce-commands  多机配置里 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND 没写全也不清场照起命令
 #       missing-commands（「多机配置没写全清场命令却没退 78」）
 #   GPU_QUIESCE_BREAK=no-failure-log  回读没过也不留本机日志、GPU_QUIESCE 行不带 log=
-#       failure-log（「回读没过没留本机日志」）
+#       failure-log（「✗ 自证 failure-log：…没留本机日志」：回读没过没留本机日志）
 #   GPU_QUIESCE_BREAK=failure-log-on-stderr  清场命令的输出打到标准错误上，不进本机日志
-#       failure-log（「清场命令的输出打到了标准错误上」）
+#       failure-log（「✗ 自证 failure-log：…私有输出打到了标准错误上」：清场命令的输出打到了标准错误上）
 #   GPU_QUIESCE_BREAK=failure-log-in-runtime-dir  没设 GPU_QUIESCE_LOG_DIRECTORY 时日志落进 ${XDG_RUNTIME_DIR:-/tmp}（重启就清），不落工作根
-#       failure-log（「本机日志没落在工作根下」）
+#       failure-log（「✗ 自证 failure-log：…默认位置不在工作根下」：本机日志没落在工作根下）
 #   GPU_QUIESCE_BREAK=drop-stop-exit  GPU_QUIESCE 清场那一行不带 stop-exit=（清场命令退非 0 而回读过了时看不出它退了几）
-#       stop-exit（「清场命令退非 0 而回读过了，那一行没带 stop-exit」）
+#       stop-exit（「✗ 自证 stop-exit：清场命令退…而回读过了，清场那一行没带 stop-exit」）
 #   GPU_QUIESCE_BREAK=no-holder-descendants  不给回读 GPU_QUIESCE_CHECK_EXEMPT_PIDS：别的活着的登记底下的进程也当外人（改前的样子）
 #       holder-descendants（「前一趟登记下的进程在卡上，后一趟进来回读没过」）
 #   GPU_QUIESCE_BREAK=exempt-holder-session  跳过的进程按会话号认：与别的活着的登记同一个会话的进程都跳过（不在任何登记之下的外人也跳过了）
 #       outsider-not-exempt（「不在任何登记之下的进程在卡上，回读却过了」）
 #   GPU_QUIESCE_BREAK=check-every-card  不给回读 GPU_QUIESCE_CHECK_LOCAL_CARDS：这一趟不用的卡也查（改前的样子）
-#       unused-card-outsider（「这一趟只用卡 1，卡 0 上的外人挡住了回读」）、used-card-outsider（「回读拿到的卡不是只有卡 0」）
+#       unused-card-outsider（「这一趟只用卡 1，卡 0 上的外人挡住了回读」）、used-card-outsider（「✗ 自证 used-card-outsider：这一趟用卡 0，卡 0 上的外人却没挡住回读」：回读拿到的卡不是只有卡 0）、
+#       peer-role-cards（「第二台上显卡先后「local:0:8G peer:1:8G」…」：不挑卡，第二台那一句说的是本机所有卡）
 #   GPU_QUIESCE_BREAK=cards-from-unquiesced-key  没设 GPU_CARDS_BY_PRIORITY 时读多机配置的 GPU_CARDS_BY_PRIORITY（不清场那一份），不读 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED
 #       used-card-outsider（「这一趟用卡 0，卡 0 上的外人却没挡住回读」）
 #   GPU_QUIESCE_BREAK=keep-inherited-check-variables  调用方带进来的 GPU_QUIESCE_CHECK_LOCAL_CARDS、GPU_QUIESCE_CHECK_EXEMPT_PIDS 不清掉，这一份没设的那一样照它们传给回读
 #       used-card-outsider（「这一趟用卡 0，卡 0 上的外人却没挡住回读」）
+#   GPU_QUIESCE_BREAK=broadcast-none  出去时不发资源释放广播（改前的样子）
+#       broadcast-gpu-released（「✗ 自证 broadcast-gpu-released：命令起过、退 7 之后应当…发一条 gpu-released」）
+#   GPU_QUIESCE_BREAK=broadcast-unstarted  清场回读没过、命令没起的那一趟也发
+#       broadcast-not-started（「✗ 自证 broadcast-not-started：清场回读没过、命令没起的那一趟应当…不发」）
+#   GPU_QUIESCE_BREAK=broadcast-exit-swallowed  广播那一步出事时照它的退出码退、输出照打到标准错误
+#       broadcast-fault-exit（「资源释放广播那份库出事时应当照退命令的 7、标准错误里没有广播那一步的行」）
+#   GPU_QUIESCE_BREAK=peer-runs-configured-commands  第二台上照起活那台跑配置的清场与回读（改前的读法：把「在起活那台跑、两台都管」的命令拿到第二台上跑）
+#       peer-role-origin-quiesce（「第二台上跑了配置的清场命令」）、peer-role-without-origin-quiesce（「第二台上起活那一方没清场，却…」）、
+#       peer-role-cards（「第二台上显卡先后「local:0:8G peer:1:8G」…」：那一句照起活那台写「回读看的卡：本机卡 1」，不说这一台是第二台）
+#   GPU_QUIESCE_BREAK=peer-ignores-origin-read-back  第二台上不看 GPU_QUIESCE_ORIGIN_READ_BACK：起活那一方没清场也照起命令
+#       peer-role-without-origin-quiesce（「第二台上起活那一方没清场，却…」）
+#   GPU_QUIESCE_BREAK=peer-role-read-as-local  第二台上回读看的卡照起活那台取 local: 那几项（角色读反）
+#       peer-role-cards（「第二台上显卡先后「local:0:8G peer:1:8G」…」）
+#   GPU_QUIESCE_BREAK=host-role-unchecked  SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 写了 local、peer 之外的值也不拒（照 local 跑）
+#       host-role-invalid（「角色写了 Peer…」）
 #   这几个开关别的脚本的自证也认（它们起的命令经这一份）：崩溃放量入口 scripts/crash/crash-amplification.sh、分项驱动 scripts/crash/crash-amplification-item.sh
 #   与门禁 checker-tier-crash-point-replay 的样本，各红在哪一格写在那三份文件头。
+#   下面五个开关只有这一份的 --selftest 认（被打断时转发与守卫那几格、在用核数的串行声明那一格）：
+#   GPU_QUIESCE_BREAK=no-forward-signal  收到 INT/TERM/HUP 只记一笔、不转给命令的进程组，也不起到点的 KILL（改前的样子：等命令自己结束）
+#       interrupted（「✗ 自证 interrupted：被信号打断之后…」）、forward-term（「✗ 自证 forward-term：…」）、forward-limit（「✗ 自证 forward-limit：…」）
+#   GPU_QUIESCE_BREAK=no-kill-after-limit  转发之后限时到了也不对命令的进程组发 KILL（忽略 TERM 的命令一直跑）
+#       forward-limit（「✗ 自证 forward-limit：…」）
+#   GPU_QUIESCE_BREAK=no-orphan-guard  起命令时不起守卫（这一份被 KILL 之后命令成孤儿接着跑）
+#       kill-wrapper（「✗ 自证 kill-wrapper：…」）
+#   GPU_QUIESCE_BREAK=leave-guardian-running  命令退出之后不停守卫
+#       guardian-stopped（「✗ 自证 guardian-stopped：…」）
+#   GPU_QUIESCE_BREAK=no-serial-declaration  起命令之前不写串行声明，没给 SINGLEFS_SERIAL_DECLARATIONS 时也不给命令建一份（改前的样子：看门狗按核数过少报卡上的段）
+#       serial-declaration（「✗ 自证 serial-declaration：…」）
 # 自证末尾那一轮走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给取登记的重活默认并行度）。
 #
 # gate-similar: peer-host-lib.sh 它的 peer_host_quiesce / peer_host_quiesce_left 只在双机配置开着时读得到清场命令，也不管几趟同时用卡；改它会废掉崩溃点重放双机分片三条用例的全绿标记（admission.py 的 SHARD_DRIVER_FILES），所以这里另写清场与登记
@@ -106,6 +169,11 @@ source "$gpu_quiesce_script_directory/crash-amplification-lib.sh"
 GPU_QUIESCE_KEYS=(QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND)
 # 复原那一对只在弄坏开关 restore-after-run 下读（文件头「清场」：复原由用户手动做）
 GPU_QUIESCE_RESTORE_KEYS=(QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND)
+# 转发信号之后等命令退出的限时（文件头「被打断」）：默认值与上限；上限不长于 proc.py stop 的默认宽限（10 秒）
+GPU_QUIESCE_FORWARD_WAIT_DEFAULT_SECONDS=8
+GPU_QUIESCE_FORWARD_WAIT_CEILING_SECONDS=10
+# 起命令之前写的串行声明的理由（文件头「在用核数」）：以「在卡上算」起头，不到 core_usage.py 的 8 个字下限就不算声明
+GPU_QUIESCE_SERIAL_REASON="在卡上算：经 gpu-quiesce-run.sh 起的命令活在 GPU 上，CPU 只喂数据"
 
 gpu_quiesce_break_is() { [[ ",${GPU_QUIESCE_BREAK:-}," == *",$1,"* ]]; }
 gpu_quiesce_line() { echo "GPU_QUIESCE $*" >&2; }
@@ -150,13 +218,15 @@ gpu_quiesce_other_live_holders() { # 打 holders/ 下别的活着的登记数；
   printf '%s' "$live"
 }
 
-gpu_quiesce_local_cards_of() { # <显卡先后的值>：打其中 local 那几项的序号（逗号隔开，按出现次序、去重）；有一项写法不对或一项本机卡都没有交回 1
-  local entries=() entry cards=","
+gpu_quiesce_local_cards_of() { # <显卡先后的值>：打其中这一台那几项的序号（逗号隔开，按出现次序、去重；这一台在起活那台是 local，在第二台是 peer，
+  # 文件头「第二台」）；有一项写法不对或一项这一台的卡都没有交回 1
+  local entries=() entry cards="," this_host=local
+  if [[ "$gpu_quiesce_role" == peer ]] && ! gpu_quiesce_break_is peer-role-read-as-local; then this_host=peer; fi
   read -r -a entries <<<"$1"
   for entry in ${entries[@]+"${entries[@]}"}; do
     [[ "$entry" =~ ^(local|peer):([0-9]{1,9}):([0-9]{1,15})[GM]$ ]] || return 1
     (( 10#${BASH_REMATCH[3]} > 0 )) || return 1
-    [[ "${BASH_REMATCH[1]}" == local ]] || continue
+    [[ "${BASH_REMATCH[1]}" == "$this_host" ]] || continue
     [[ "$cards" == *",$((10#${BASH_REMATCH[2]})),"* ]] || cards+="$((10#${BASH_REMATCH[2]})),"
   done
   cards="${cards#,}"; cards="${cards%,}"
@@ -266,6 +336,7 @@ gpu_quiesce_leave() {
   else
     echo "  · ${GPU_QUIESCE_LOCK_SECONDS:-900} 秒没拿到清场锁 $gpu_quiesce_state_directory/lock，自己的登记没删：下一趟进来时认出它是死的、删掉" >&2
   fi
+  gpu_quiesce_broadcast "$others"
   if gpu_quiesce_break_is restore-after-run; then
     for restore_key in "${GPU_QUIESCE_RESTORE_KEYS[@]}"; do
       gpu_quiesce_commands[$restore_key]="$(crash_amplification_configuration_value "$gpu_quiesce_configuration" "$restore_key")"
@@ -278,6 +349,154 @@ gpu_quiesce_leave() {
   echo "  · 清了场、没复原：清场停下的服务一直停着；要复原手动跑私有复原脚本（多机配置的 QUIESCE_START_COMMAND），再跑 QUIESCE_STARTED_CHECK_COMMAND 回读到它退 0" >&2
 }
 
+# 资源释放广播（文件头「资源释放广播」）：命令起过才发 gpu-released；输出不进这一份的标准错误，退出码不交回（弄坏开关 broadcast-exit-swallowed 下照它退、照打）
+gpu_quiesce_broadcast() { # <出去时别的活着的登记数，读不出是 unknown>
+  local -a holders_option=()
+  gpu_quiesce_break_is broadcast-none && return 0
+  (( gpu_quiesce_command_started )) || gpu_quiesce_break_is broadcast-unstarted || return 0
+  [[ -z "${GPU_QUIESCE_STATE_DIRECTORY:-}" || -n "${RESOURCE_BROADCAST_DIRECTORY:-}" ]] || return 0
+  [[ "$1" =~ ^[0-9]+$ ]] && holders_option=(--holders-left "$1")
+  if gpu_quiesce_break_is broadcast-exit-swallowed; then
+    python3 "$gpu_quiesce_script_directory/../hosts/resource_release_broadcast.py" emit --kind gpu-released --label "gpu-quiesce-$gpu_quiesce_holder_name" \
+      --exit-code "$gpu_quiesce_command_exit" ${holders_option[@]+"${holders_option[@]}"} --problems-to-log </dev/null || exit $?
+    return 0
+  fi
+  python3 "$gpu_quiesce_script_directory/../hosts/resource_release_broadcast.py" emit --kind gpu-released --label "gpu-quiesce-$gpu_quiesce_holder_name" \
+    --exit-code "$gpu_quiesce_command_exit" ${holders_option[@]+"${holders_option[@]}"} --problems-to-log </dev/null >/dev/null 2>&1
+  return 0
+}
+
+# 在用核数的串行声明（文件头「在用核数」）：起命令之前写、命令退出之后撤；写不成打一句「!」照跑
+gpu_quiesce_serial_declare() { # 调用方给了 SINGLEFS_SERIAL_DECLARATIONS 就写那一份，没给就在状态目录里给这一趟建一份、export 给命令。弄坏开关 no-serial-declaration 下都不做
+  local declare_output
+  if gpu_quiesce_break_is no-serial-declaration; then
+    echo "  ! 弄坏开关 GPU_QUIESCE_BREAK=no-serial-declaration：起命令之前不写串行声明" >&2
+    return 0
+  fi
+  if [[ -z "${SINGLEFS_SERIAL_DECLARATIONS:-}" ]]; then
+    gpu_quiesce_serial_own_file="$gpu_quiesce_state_directory/serial-declarations/$gpu_quiesce_holder_name"
+    if ! { mkdir -p -- "${gpu_quiesce_serial_own_file%/*}" && : >"$gpu_quiesce_serial_own_file"; } 2>/dev/null; then
+      echo "  ! 建不了这一趟的串行声明文件 $gpu_quiesce_serial_own_file：不写声明，照起命令（看门狗按核数过少报这一段时，理由是在卡上算）" >&2
+      gpu_quiesce_serial_own_file=""
+      return 0
+    fi
+    export SINGLEFS_SERIAL_DECLARATIONS="$gpu_quiesce_serial_own_file"
+  fi
+  if declare_output="$(python3 "$gpu_quiesce_script_directory/../hosts/core_usage.py" declare-serial "$GPU_QUIESCE_SERIAL_REASON" 2>&1)"; then
+    gpu_quiesce_serial_declared=1
+  else
+    echo "  ! 串行声明没写成（scripts/hosts/core_usage.py declare-serial：${declare_output//$'\n'/；}）：照起命令（看门狗按核数过少报这一段时，理由是在卡上算）" >&2
+  fi
+}
+gpu_quiesce_serial_withdraw() { # 命令退出之后：写过声明的追加一条「此刻并行」撤掉；这一趟自己建的那一份随后删掉。调过一次之后再调什么都不做
+  local declare_output
+  if (( gpu_quiesce_serial_declared )); then
+    gpu_quiesce_serial_declared=0
+    if ! declare_output="$(python3 "$gpu_quiesce_script_directory/../hosts/core_usage.py" declare-parallel 2>&1)"; then
+      echo "  ! 撤串行声明没写成（scripts/hosts/core_usage.py declare-parallel：${declare_output//$'\n'/；}）：$SINGLEFS_SERIAL_DECLARATIONS 里那一段串行算到下一条声明为止" >&2
+    fi
+  fi
+  if [[ -n "$gpu_quiesce_serial_own_file" ]]; then
+    rm -f -- "$gpu_quiesce_serial_own_file"
+    gpu_quiesce_serial_own_file=""
+  fi
+}
+
+# 被打断时的转发、限时与守卫（文件头「被打断」）。命令起在自己的进程组里（set -m）：gpu_quiesce_command_pid 同时是它的进程组号
+gpu_quiesce_forward_limit() { # 打限时秒数：GPU_QUIESCE_FORWARD_WAIT_SECONDS 是 1 到上限之间的整数就取它，否则取默认
+  local seconds="${GPU_QUIESCE_FORWARD_WAIT_SECONDS:-}"
+  if [[ "$seconds" =~ ^[0-9]{1,3}$ ]] && (( 10#$seconds >= 1 && 10#$seconds <= GPU_QUIESCE_FORWARD_WAIT_CEILING_SECONDS )); then
+    printf '%s' "$((10#$seconds))"
+  else
+    printf '%s' "$GPU_QUIESCE_FORWARD_WAIT_DEFAULT_SECONDS"
+  fi
+}
+
+gpu_quiesce_process_alive() { # <进程号> <开机后起始时刻>：进程在、起始时刻对得上、不是僵尸；只用内建（守卫每个间隔调一次）
+  local line rest fields=()
+  { read -r line <"/proc/$1/stat"; } 2>/dev/null || return 1
+  rest="${line##*) }"
+  read -r -a fields <<<"$rest"
+  [[ "${fields[0]:-Z}" != Z && "${fields[19]:-}" == "$2" ]]
+}
+
+gpu_quiesce_on_signal() { # <信号名> <退出码>：INT/TERM/HUP 的 trap；记下，命令起过了就转给它的进程组
+  gpu_quiesce_interrupted="$2"
+  gpu_quiesce_last_signal="$1"
+  gpu_quiesce_forward_signal
+}
+
+gpu_quiesce_forward_signal() { # 把 gpu_quiesce_last_signal 转给命令的进程组（进程组不在就发给命令自己），起到点的 KILL；命令还没起就什么也不做
+  [[ -n "$gpu_quiesce_command_pid" && -n "$gpu_quiesce_last_signal" ]] || return 0
+  gpu_quiesce_break_is no-forward-signal && return 0
+  gpu_quiesce_forwarded=1
+  kill -s "$gpu_quiesce_last_signal" -- "-$gpu_quiesce_command_pid" 2>/dev/null || kill -s "$gpu_quiesce_last_signal" "$gpu_quiesce_command_pid" 2>/dev/null
+  gpu_quiesce_arm_limit
+}
+
+gpu_quiesce_arm_limit() { # 起一个限时的 KILL：它自己一个进程组（命令先退了就整组停掉它，不留 sleep）；已经起过的不再起
+  [[ -z "$gpu_quiesce_limit_pid" ]] || return 0
+  gpu_quiesce_break_is no-kill-after-limit && return 0
+  local job_control_was_on=0
+  [[ $- == *m* ]] && job_control_was_on=1
+  set -m
+  { sleep "$gpu_quiesce_limit_seconds"; kill -s KILL -- "-$gpu_quiesce_command_pid" 2>/dev/null; } </dev/null >/dev/null 2>&1 &
+  gpu_quiesce_limit_pid=$!
+  (( job_control_was_on )) || set +m
+}
+
+gpu_quiesce_disarm_limit() { # 命令退了：停掉没到点的 KILL。用 KILL（TERM 在刚 fork 出来、还没重置 trap 的几毫秒里会被吞掉），再 wait 收尸、丢掉它的标准错误（不然 bash 打「Killed …」和整段命令正文）
+  [[ -n "$gpu_quiesce_limit_pid" ]] || return 0
+  kill -s KILL -- "-$gpu_quiesce_limit_pid" 2>/dev/null || kill -s KILL "$gpu_quiesce_limit_pid" 2>/dev/null
+  wait "$gpu_quiesce_limit_pid" 2>/dev/null
+  gpu_quiesce_limit_pid=""
+}
+
+gpu_quiesce_guard_start() { # 起守卫：这一份没了（被 KILL）就停命令的进程组；守卫自己一个进程组，输出丢掉
+  gpu_quiesce_guard_pid=""
+  gpu_quiesce_break_is no-orphan-guard && return 0
+  local wrapper_start="${gpu_quiesce_holder_name#*-}" job_control_was_on=0
+  [[ $- == *m* ]] && job_control_was_on=1
+  set -m
+  (
+    trap - EXIT INT TERM HUP
+    exec </dev/null >/dev/null 2>&1
+    while gpu_quiesce_process_alive "$$" "$wrapper_start"; do sleep "$gpu_quiesce_guard_poll"; done
+    kill -s TERM -- "-$gpu_quiesce_command_pid" 2>/dev/null
+    for ((guard_tick = 0; guard_tick < gpu_quiesce_limit_seconds * 10; guard_tick++)); do
+      kill -0 -- "-$gpu_quiesce_command_pid" 2>/dev/null || exit 0
+      sleep 0.1
+    done
+    kill -s KILL -- "-$gpu_quiesce_command_pid" 2>/dev/null
+  ) &
+  gpu_quiesce_guard_pid=$!
+  (( job_control_was_on )) || set +m
+}
+
+gpu_quiesce_guard_stop() { # 命令退了、这一份还在：停守卫（它之后会对一个空了的进程组发信号，进程号重用时打到别人头上）
+  [[ -n "$gpu_quiesce_guard_pid" ]] || return 0
+  gpu_quiesce_break_is leave-guardian-running && return 0
+  kill -s KILL -- "-$gpu_quiesce_guard_pid" 2>/dev/null || kill -s KILL "$gpu_quiesce_guard_pid" 2>/dev/null   # KILL 不是 TERM：守卫刚 fork 出来、还没重置 trap 的几毫秒里 TERM 会被吞掉（自证里命令一闪而过时量到过）
+  wait "$gpu_quiesce_guard_pid" 2>/dev/null
+  gpu_quiesce_guard_pid=""
+}
+
+gpu_quiesce_wait_command() { # 等命令退出，交回它的退出码；wait 被 trap 打断（命令还在）就接着等
+  local code again
+  while :; do
+    # 信号在命令起好、进程号记下之前到了的，trap 那一刻没处转，这里补转
+    if [[ -n "$gpu_quiesce_interrupted" ]] && (( ! gpu_quiesce_forwarded )); then gpu_quiesce_forward_signal; fi
+    wait "$gpu_quiesce_command_pid" 2>/dev/null; code=$?   # 2>/dev/null：命令被 KILL 时 bash 在这里打「Killed …」和整段命令正文，退出码不丢
+    if (( code > 128 )) && kill -0 "$gpu_quiesce_command_pid" 2>/dev/null; then continue; fi
+    if (( code > 128 )); then
+      # 命令已经退了：被 trap 打断的那一次 wait 没取到它的退出码时，再取一次（取过了是 127）
+      wait "$gpu_quiesce_command_pid" 2>/dev/null; again=$?
+      (( again != 127 )) && code="$again"
+    fi
+    return "$code"
+  done
+}
+
 run_selftest() {
   local work failures=0 cells=0 nested=0
   crash_amplification_switch_wheel_inner && nested=1
@@ -285,6 +504,12 @@ run_selftest() {
   trap 'rm -rf -- "${work:?}"' EXIT
   # 本机日志一律落进这里的临时目录（run_wrapper 再按状态目录各给一份），不落进真工作根；格 failure-log 里查默认位置的那一趟另把工作根指到临时目录
   export GPU_QUIESCE_LOG_DIRECTORY="$work/logs"
+  # 转发之后的限时与守卫的间隔取短（文件头「被打断」），各格里被停的假命令几秒内就见分晓；调用方带进来的这两个值不认
+  export GPU_QUIESCE_FORWARD_WAIT_SECONDS=2 GPU_QUIESCE_GUARD_POLL_SECONDS=0.2
+  # 串行声明不往调用方的声明文件里写（自证经 detached-run.sh 起时环境里有 SINGLEFS_SERIAL_DECLARATIONS）：格 serial-declaration 自己给；别的格各趟在自己的状态目录里建、撤、删
+  unset SINGLEFS_SERIAL_DECLARATIONS
+  # 角色与起活那一方清没清场不从调用方带进来（自证在第二台上跑时环境里有 SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer）：第二台那几格自己给
+  unset SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE GPU_QUIESCE_ORIGIN_READ_BACK
   # 假的清场命令：每一步记一笔进 FAKE_CALLS；FAKE_STOPPED_CHECK / FAKE_STARTED_CHECK 写成 fail 时那一步回读不过；FAKE_STOP_EXIT 是清场命令的退出码（默认 0）；
   #   设了 FAKE_GPU_PROCESSES 的，回读再过一道假的「卡上的计算进程」（gpu-check.sh）
   printf '%s\n' \
@@ -312,6 +537,7 @@ STUB
   # 复原那一对没写的多机配置（格 no-restore）：这一份不读它们，照跑
   grep -vE '^QUIESCE_START(ED_CHECK)?_COMMAND=' "$work/multi-host.env" >"$work/multi-host-without-restore.env"
   # 假的命令：<模式> 记开始与结束；fail 退 7，self-term 自己收 TERM 退出，wait-for:<文件> 等那份文件出现（至多 10 秒），sleep:<秒> 睡一会儿，
+  #   term-aware:<秒> / ignore-term:<秒> 起一个孙辈 sleep、进程号记进 $FAKE_PIDS.command 与 .child、起好了记 command-ready，再等：前者收到 TERM 记 command-got-term 就退，后者不理 TERM，
   #   hold <进程号文件> <放行文件> 起一个子进程（这一份的孙辈）、把它的进程号写进 <进程号文件>，等它见到 <放行文件>（至多 30 秒）退出
   cat >"$work/command.sh" <<'STUB'
 #!/usr/bin/env bash
@@ -325,6 +551,11 @@ case "$1" in
   sleep:*) sleep "${1#sleep:}" ;;
   hold) bash -c 'for ((round = 0; round < 600; round++)); do [[ -e "$1" ]] && break; sleep 0.05; done' hold-child "$3" &
         echo "$!" >"$2"; wait "$!" ;;
+  term-aware:*|ignore-term:*)
+        # 收到 TERM 记一笔就退（term-aware），或不理 TERM（ignore-term，孙辈 sleep 也继承了忽略）；孙辈与自己的进程号记进 $FAKE_PIDS.child、.command，起好了记 command-ready
+        if [[ "$1" == term-aware:* ]]; then trap 'echo command-got-term >> "$FAKE_CALLS"; exit 0' TERM; else trap '' TERM; fi
+        sleep "${1#*:}" & grandchild=$!; echo "$grandchild" >"${FAKE_PIDS:?}.child"; echo "$$" >"$FAKE_PIDS.command"
+        echo command-ready >> "$FAKE_CALLS"; wait "$grandchild" ;;
 esac
 echo "command-$1-end" >> "$FAKE_CALLS"
 STUB
@@ -339,15 +570,17 @@ STUB
     while (($#)) && [[ "$1" != -- ]]; do environment+=("$1"); shift; done
     # 调用方环境里的显卡先后与回读握手变量不带进来，要的格自己给
     env -u GPU_CARDS_BY_PRIORITY -u GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED -u GPU_QUIESCE_CHECK_LOCAL_CARDS -u GPU_QUIESCE_CHECK_EXEMPT_PIDS \
+      -u RESOURCE_BROADCAST_DIRECTORY -u RESOURCE_BROADCAST_SELFTEST_FAULT -u RESOURCE_BROADCAST_SELFTEST_MARK \
+      -u SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE -u GPU_QUIESCE_ORIGIN_READ_BACK \
       SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" GPU_QUIESCE_STATE_DIRECTORY="$state" GPU_QUIESCE_LOG_DIRECTORY="$state/logs" FAKE_CALLS="$calls" ${environment[@]+"${environment[@]}"} \
       bash "$0" "$@" >"$calls.out" 2>&1
   }
   # 调用次序（复原那两笔 start / started-check 不列：跑完调没调复原命令只由格 no-restore 判）
   calls_of() { { grep -vxE 'start|started-check' "$1" || true; } | tr '\n' ' '; }
-  wait_for_line() { # <文件> <行>：至多等 10 秒那一行出现
-    local round
-    for ((round = 0; round < 200; round++)); do grep -qx -- "$2" "$1" 2>/dev/null && return 0; sleep 0.05; done
-    return 1
+  wait_for_line() { # <文件> <行> [<至多等几秒，默认 10>]：那一行出现（按挂钟算，不按轮数）
+    local deadline=$((SECONDS + ${3:-10}))
+    while (( SECONDS < deadline )); do grep -qx -- "$2" "$1" 2>/dev/null && return 0; sleep 0.05; done
+    grep -qx -- "$2" "$1" 2>/dev/null
   }
   local cell_exit calls no_restore_output
 
@@ -412,7 +645,7 @@ STUB
   if [[ "$cell_exit" != 7 || "$(calls_of "$calls")" != "stop stopped-check command-fail-start command-fail-end " ]]; then
     selftest_cell_failed command-fails "命令失败之后没交回命令的退出码 7（退 $cell_exit，次序「$(calls_of "$calls")」）" "看末尾的退出码：命令起了就交回它的"
   fi
-  # 格 interrupted：① 命令跑着时这一份收到 TERM（kill 自己起的那一份的进程号）⇒ 等命令结束、退 143；② 命令自己被 TERM 打断 ⇒ 退 143
+  # 格 interrupted：① 命令跑着时这一份收到 TERM（kill 自己起的那一份的进程号）⇒ 转给命令（默认处理，它当场停）、退 143，命令没跑到结束；② 命令自己被 TERM 打断 ⇒ 退 143
   cells=$((cells + 1)); calls="$work/term.calls"; : >"$calls"
   # 直接起这一份（不经 run_wrapper 那层函数），$! 才是这一份自己的进程号
   env SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" GPU_QUIESCE_STATE_DIRECTORY="$work/state-term" FAKE_CALLS="$calls" \
@@ -422,10 +655,111 @@ STUB
   wait "$wrapper_pid"; interrupted_exit=$?
   calls="$work/self-term.calls"; : >"$calls"
   run_wrapper "$calls" "$work/state-self-term" -- bash "$work/command.sh" self-term; cell_exit=$?
-  if [[ "$interrupted_exit" != 143 || "$(calls_of "$work/term.calls")" != "stop stopped-check command-sleep:1-start command-sleep:1-end " ]] \
+  if [[ "$interrupted_exit" != 143 || "$(calls_of "$work/term.calls")" != "stop stopped-check command-sleep:1-start " ]] \
      || [[ "$cell_exit" != 143 || "$(calls_of "$calls")" != "stop stopped-check command-self-term-start " ]]; then
-    selftest_cell_failed interrupted "被信号打断之后没等命令结束，或没退 143（这一份收到 TERM：退 $interrupted_exit，次序「$(calls_of "$work/term.calls")」；命令被 TERM：退 $cell_exit，次序「$(calls_of "$calls")」）" \
-      "看 INT/TERM/HUP 的 trap（只记下信号、等前台命令结束）与末尾的退出码"
+    selftest_cell_failed interrupted "被信号打断之后没把信号转给命令（命令跑到了结束），或没退 143（这一份收到 TERM：退 $interrupted_exit，次序「$(calls_of "$work/term.calls")」；命令被 TERM：退 $cell_exit，次序「$(calls_of "$calls")」）" \
+      "看 INT/TERM/HUP 的 trap（gpu_quiesce_on_signal：记下信号、转给命令的进程组）、gpu_quiesce_wait_command 与末尾的退出码"
+  fi
+  # 被打断时的转发、限时与守卫（文件头「被打断」）四格。假命令 term-aware / ignore-term 起一个孙辈 sleep（同一个进程组），把两个进程号记进 FAKE_PIDS.command / .child，
+  #   带一个只此一趟的记号参数：扫 /proc/*/cmdline 看这一份、守卫、命令有没有留下（孙辈 sleep 的命令行里没有记号，用记下的进程号认）
+  pid_running() { # <进程号>：在跑（僵尸不算）
+    local stat_line
+    [[ -n "${1:-}" ]] && { read -r stat_line <"/proc/$1/stat"; } 2>/dev/null || return 1
+    stat_line="${stat_line##*) }"
+    [[ "${stat_line%% *}" != Z ]]
+  }
+  leftover_count() { # <记号>：命令行里带记号的进程数（模式写成 [l]eak，grep 自己的命令行不匹配）
+    grep -la -- "[l]eak-token-$1" /proc/[0-9]*/cmdline 2>/dev/null | wc -l
+  }
+  wait_no_leftover() { # <记号> <至多等几秒>
+    local deadline=$((SECONDS + $2))   # 按挂钟算，不按轮数：机器忙时扫一遍 /proc 要好几秒
+    while (( SECONDS < deadline )); do [[ "$(leftover_count "$1")" == 0 ]] && return 0; sleep 0.05; done
+    [[ "$(leftover_count "$1")" == 0 ]]
+  }
+  start_forward_wrapper() { # <格名> <假命令的模式> <记号> [<环境 键=值>…]：直接起这一份（$! 才是它自己的进程号），置 forward_wrapper_pid、forward_calls、forward_pids
+    local cell="$1" mode="$2" token="$3"; shift 3
+    forward_calls="$work/$cell.calls"; forward_pids="$work/$cell.pids"; : >"$forward_calls"
+    env SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" GPU_QUIESCE_STATE_DIRECTORY="$work/state-$cell" FAKE_CALLS="$forward_calls" FAKE_PIDS="$forward_pids" "$@" \
+      bash "$0" -- bash "$work/command.sh" "$mode" "leak-token-$token" >"$forward_calls.out" 2>&1 &
+    forward_wrapper_pid=$!
+  }
+  await_forward_wrapper() { # <至多等几秒>：等 forward_wrapper_pid 退出，置 forward_exit；到点还没退就 KILL 它、forward_exit 置 stuck，并按记下的进程号收掉假命令（不留进程）
+    local deadline=$((SECONDS + $1))
+    while (( SECONDS < deadline )); do kill -0 "$forward_wrapper_pid" 2>/dev/null || break; sleep 0.05; done
+    if kill -0 "$forward_wrapper_pid" 2>/dev/null; then
+      kill -KILL "$forward_wrapper_pid" 2>/dev/null; wait "$forward_wrapper_pid" 2>/dev/null; forward_exit=stuck
+    else
+      wait "$forward_wrapper_pid"; forward_exit=$?
+    fi
+  }
+  reap_forward_command() { # 按记下的进程号收掉假命令和它的孙辈（只这两个自己起的进程号）
+    local recorded
+    for recorded in "$forward_pids.command" "$forward_pids.child"; do
+      [[ -s "$recorded" ]] && pid_running "$(cat -- "$recorded")" && kill -KILL "$(cat -- "$recorded")" 2>/dev/null
+    done
+    return 0
+  }
+  # 机器忙的时候（开关轮一批起很多份）进程收尾要几秒：各格等「停了没有」的上限放宽到这个数；停对了的格不会等满，只有该红的格等满
+  local forward_settle_seconds=15
+  local round forward_ready forward_deadline forward_wrapper_pid forward_calls forward_pids forward_exit started_microseconds elapsed_milliseconds forward_token command_running child_running leftovers_state
+  # 格 forward-term：命令跑着时这一份收到 TERM ⇒ TERM 转给命令的进程组（命令记 command-got-term、孙辈 sleep 也停），这一份退 143，不留进程
+  cells=$((cells + 1)); forward_token="$$-term"
+  start_forward_wrapper forward-term "term-aware:60" "$forward_token"
+  forward_ready=no
+  if wait_for_line "$forward_calls" command-ready "$forward_settle_seconds"; then forward_ready=yes; kill -TERM "$forward_wrapper_pid"; fi
+  await_forward_wrapper $((GPU_QUIESCE_FORWARD_WAIT_SECONDS + forward_settle_seconds))
+  command_running=no; child_running=no
+  pid_running "$(cat -- "$forward_pids.command" 2>/dev/null)" && command_running=yes
+  pid_running "$(cat -- "$forward_pids.child" 2>/dev/null)" && child_running=yes
+  wait_no_leftover "$forward_token" "$forward_settle_seconds" && leftovers_state=none || leftovers_state="$(leftover_count "$forward_token") 个"
+  if [[ "$forward_ready" != yes || "$forward_exit" != 143 ]] || ! grep -qx command-got-term "$forward_calls" || [[ "$command_running" != no || "$child_running" != no || "$leftovers_state" != none ]]; then
+    selftest_cell_failed forward-term "这一份收到 TERM 没把它转给命令的进程组、没退 143，或命令、孙辈、这一份、守卫有没停的（假命令在 ${forward_settle_seconds} 秒内起好了：$forward_ready，退 ${forward_exit}，命令收到 TERM「$(grep -cx command-got-term "$forward_calls")」次，命令还在跑：$command_running，孙辈还在跑：$child_running，命令行带记号的进程留下 $leftovers_state）" \
+      "看 gpu_quiesce_on_signal / gpu_quiesce_forward_signal（kill -s <信号> -- -<命令的进程号>）、起命令那一段的 set -m 与 gpu_quiesce_guard_stop"
+  fi
+  reap_forward_command
+  # 格 forward-limit：命令不理 TERM ⇒ 转发之后等满限时（GPU_QUIESCE_FORWARD_WAIT_SECONDS=2）才对它的进程组发 KILL，这一份退命令被 KILL 的 137，不留进程；没等够限时就杀也红
+  cells=$((cells + 1)); forward_token="$$-limit"
+  start_forward_wrapper forward-limit "ignore-term:60" "$forward_token"
+  started_microseconds=0; forward_ready=no
+  if wait_for_line "$forward_calls" command-ready "$forward_settle_seconds"; then forward_ready=yes; started_microseconds="${EPOCHREALTIME/./}"; kill -TERM "$forward_wrapper_pid"; fi
+  await_forward_wrapper $((GPU_QUIESCE_FORWARD_WAIT_SECONDS + forward_settle_seconds))
+  elapsed_milliseconds=$(( (${EPOCHREALTIME/./} - started_microseconds) / 1000 ))
+  command_running=no; child_running=no
+  pid_running "$(cat -- "$forward_pids.command" 2>/dev/null)" && command_running=yes
+  pid_running "$(cat -- "$forward_pids.child" 2>/dev/null)" && child_running=yes
+  wait_no_leftover "$forward_token" "$forward_settle_seconds" && leftovers_state=none || leftovers_state="$(leftover_count "$forward_token") 个"
+  if [[ "$forward_ready" != yes || "$forward_exit" != 137 ]] || grep -qx command-got-term "$forward_calls" || (( elapsed_milliseconds < GPU_QUIESCE_FORWARD_WAIT_SECONDS * 1000 - 300 )) \
+     || [[ "$command_running" != no || "$child_running" != no || "$leftovers_state" != none ]]; then
+    selftest_cell_failed forward-limit "命令不理 TERM，这一份没在限时（${GPU_QUIESCE_FORWARD_WAIT_SECONDS} 秒）到点之后对它的进程组发 KILL、没退 137、等不够限时就动了手，或命令、孙辈、这一份、守卫有没停的（假命令在 ${forward_settle_seconds} 秒内起好了：$forward_ready，退 ${forward_exit}，从发 TERM 到这一份退出 ${elapsed_milliseconds} 毫秒，命令还在跑：$command_running，孙辈还在跑：$child_running，命令行带记号的进程留下 $leftovers_state）" \
+      "看 gpu_quiesce_arm_limit（转发之后起一个 sleep <限时> 再 kill -s KILL -- -<命令的进程号> 的后台组）与 gpu_quiesce_disarm_limit"
+  fi
+  reap_forward_command
+  # 格 kill-wrapper：这一份被 KILL（没有 trap 可跑）⇒ 守卫发现它没了，对命令的进程组发 TERM、限时之后发 KILL，命令、孙辈、守卫都不留（命令不理 TERM，两步都走到）
+  cells=$((cells + 1)); forward_token="$$-kill"
+  start_forward_wrapper kill-wrapper "ignore-term:60" "$forward_token"
+  forward_ready=no
+  if wait_for_line "$forward_calls" command-ready "$forward_settle_seconds"; then forward_ready=yes; kill -KILL "$forward_wrapper_pid"; fi
+  wait "$forward_wrapper_pid" 2>/dev/null
+  forward_deadline=$((SECONDS + GPU_QUIESCE_FORWARD_WAIT_SECONDS + forward_settle_seconds))
+  while (( SECONDS < forward_deadline )); do
+    pid_running "$(cat -- "$forward_pids.command" 2>/dev/null)" || pid_running "$(cat -- "$forward_pids.child" 2>/dev/null)" || break
+    sleep 0.05
+  done
+  command_running=no; child_running=no
+  pid_running "$(cat -- "$forward_pids.command" 2>/dev/null)" && command_running=yes
+  pid_running "$(cat -- "$forward_pids.child" 2>/dev/null)" && child_running=yes
+  wait_no_leftover "$forward_token" "$forward_settle_seconds" && leftovers_state=none || leftovers_state="$(leftover_count "$forward_token") 个"
+  if [[ "$forward_ready" != yes || "$command_running" != no || "$child_running" != no || "$leftovers_state" != none ]]; then
+    selftest_cell_failed kill-wrapper "这一份被 KILL 之后命令的进程组没停（假命令在 ${forward_settle_seconds} 秒内起好了：$forward_ready，命令还在跑：$command_running，孙辈还在跑：$child_running，命令行带记号的进程留下 $leftovers_state）" \
+      "看 gpu_quiesce_guard_start（守卫按进程号加起始时刻看这一份还在不在，没了就 kill -s TERM、限时后 kill -s KILL -- -<命令的进程号>）与起命令那一段有没有调它"
+  fi
+  reap_forward_command
+  # 格 guardian-stopped：命令正常退出之后守卫不留（守卫的间隔取比等的上限还长的 30 秒，留着的话等满上限也还在；开关 leave-guardian-running 下它留到 30 秒后自己发现这一份没了、退出）
+  cells=$((cells + 1)); forward_token="$$-guard"; calls="$work/guardian.calls"; : >"$calls"
+  run_wrapper "$calls" "$work/state-guardian" GPU_QUIESCE_GUARD_POLL_SECONDS=30 -- bash "$work/command.sh" ok "leak-token-$forward_token"; cell_exit=$?
+  wait_no_leftover "$forward_token" "$forward_settle_seconds" && leftovers_state=none || leftovers_state="$(leftover_count "$forward_token") 个"
+  if [[ "$cell_exit" != 0 || "$leftovers_state" != none ]]; then
+    selftest_cell_failed guardian-stopped "命令正常退出之后守卫还在（退 $cell_exit，命令行带记号的进程留下 $leftovers_state）" "看 gpu_quiesce_guard_stop：命令退出之后、出去之前整组 KILL 守卫"
   fi
   # 格 overlapping-runs：A 先进来清场，B 跟着进来只回读（joined-and-read-back holders=1）；清场命令只跑一次，两趟都退 0
   cells=$((cells + 1)); calls="$work/overlap.calls"; : >"$calls"
@@ -471,6 +805,39 @@ STUB
      || ! grep -q '清了场、没复原' "$work/no-restore.calls.out"; then
     selftest_cell_failed no-restore "跑完调了复原命令（各格的调用记录里 start / started-check 共 $restore_calls 笔），或出去时那一行不是 result=not-restored（缺的：${restore_lines_missing:-无}），或没写复原那一对的配置、接着上一趟再起一趟没照跑（两趟退 $no_restore_first_exit、$cell_exit，次序「$(tr '\n' ' ' <"$calls")」）" \
       "看 gpu_quiesce_leave：只删自己的登记、打 step=restore result=not-restored，不跑 QUIESCE_START_COMMAND；读配置那一段只要清场那两个键"
+  fi
+  # 格 serial-declaration：在用核数的串行声明（文件头「在用核数」）。命令是一段小脚本：把它拿到的 SINGLEFS_SERIAL_DECLARATIONS 与那一份此刻的内容记进一份文件。
+  #   ① 调用方给了 SINGLEFS_SERIAL_DECLARATIONS ⇒ 命令起来时那一份里已有一条「此刻串行：在卡上算…」，命令退出之后追加一条「此刻并行」，共两行、次序对；
+  #   ② 没给 ⇒ 命令拿到这一趟状态目录 serial-declarations/ 下的一份、里面有那条串行声明，出去之后那一份删了；
+  #   ③ 清场回读没过、命令没起的那一趟，调用方给的那一份一行都没写
+  cells=$((cells + 1)); calls="$work/serial.calls"; : >"$calls"
+  local serial_given="$work/serial-given.declarations" serial_refused="$work/serial-refused.declarations"
+  local serial_given_exit serial_own_exit serial_refused_exit serial_own_path serial_problems=""
+  local serial_probe='{ printf "%s\n" "${SINGLEFS_SERIAL_DECLARATIONS:-没设}"; cat -- "${SINGLEFS_SERIAL_DECLARATIONS:-/dev/null}" 2>/dev/null; } > "$1"'
+  local serial_line_pattern=$'^[0-9][0-9.]*\t此刻串行：在卡上算' parallel_line_pattern=$'^[0-9][0-9.]*\t此刻并行$'
+  : >"$serial_given"; : >"$serial_refused"
+  run_wrapper "$calls" "$work/state-serial" SINGLEFS_SERIAL_DECLARATIONS="$serial_given" -- bash -c "$serial_probe" serial-probe "$work/serial-given.seen"; serial_given_exit=$?
+  run_wrapper "$calls" "$work/state-serial-own" -- bash -c "$serial_probe" serial-probe "$work/serial-own.seen"; serial_own_exit=$?
+  run_wrapper "$calls" "$work/state-serial-refused" SINGLEFS_SERIAL_DECLARATIONS="$serial_refused" FAKE_STOPPED_CHECK=fail -- \
+    bash -c "$serial_probe" serial-probe "$work/serial-refused.seen"; serial_refused_exit=$?
+  serial_own_path="$(head -n 1 "$work/serial-own.seen" 2>/dev/null)"
+  [[ "$serial_given_exit" == 0 ]] || serial_problems+="给了声明文件那一趟退 $serial_given_exit；"
+  if [[ "$(head -n 1 "$work/serial-given.seen" 2>/dev/null)" != "$serial_given" ]] || ! grep -q "$serial_line_pattern" <<<"$(sed -n 2p "$work/serial-given.seen" 2>/dev/null)"; then
+    serial_problems+="给了声明文件那一趟命令起来时看到的是「$(cat "$work/serial-given.seen" 2>/dev/null | tr '\n' '|')」，不是那一份带一条在卡上算的串行声明；"
+  fi
+  if [[ "$(wc -l <"$serial_given")" != 2 ]] || ! grep -q "$serial_line_pattern" <<<"$(sed -n 1p "$serial_given")" || ! grep -q "$parallel_line_pattern" <<<"$(sed -n 2p "$serial_given")"; then
+    serial_problems+="给了声明文件那一趟跑完那一份是「$(tr '\n' '|' <"$serial_given")」，不是一条串行声明接一条此刻并行；"
+  fi
+  if [[ "$serial_own_exit" != 0 || "$serial_own_path" != "$work/state-serial-own/serial-declarations/"* || -e "$serial_own_path" ]] \
+     || ! grep -q "$serial_line_pattern" <<<"$(sed -n 2p "$work/serial-own.seen" 2>/dev/null)"; then
+    serial_problems+="没给声明文件那一趟退 $serial_own_exit，命令看到的是「$(cat "$work/serial-own.seen" 2>/dev/null | tr '\n' '|')」，那一份出去之后$([[ -n "$serial_own_path" && -e "$serial_own_path" ]] && echo 还在 || echo 不在)；"
+  fi
+  if [[ "$serial_refused_exit" != 78 || -s "$serial_refused" || -e "$work/serial-refused.seen" ]]; then
+    serial_problems+="清场回读没过那一趟退 $serial_refused_exit，声明文件「$(tr '\n' '|' <"$serial_refused")」，命令$([[ -e "$work/serial-refused.seen" ]] && echo 起了 || echo 没起)；"
+  fi
+  if [[ -n "$serial_problems" ]]; then
+    selftest_cell_failed serial-declaration "${serial_problems%；}" \
+      "看 gpu_quiesce_serial_declare / gpu_quiesce_serial_withdraw 与起命令那一段：清场过了、起命令之前写声明（没给 SINGLEFS_SERIAL_DECLARATIONS 就在状态目录里建一份 export 给命令），命令退出之后撤、删掉自己建的那一份；命令没起不写"
   fi
   # 格 usage：没给 -- 或 -- 后面没有命令 ⇒ 退 2，什么都不跑
   cells=$((cells + 1)); calls="$work/usage.calls"; : >"$calls"
@@ -539,6 +906,66 @@ STUB
   touch "$work/outsider-release"
   wait "$outsider_pid"
 
+  # 资源释放广播（文件头「资源释放广播」）三格：事件目录是这一格自己的（RESOURCE_BROADCAST_DIRECTORY）、不推（RESOURCE_BROADCAST_PUSH=off）；读事件只用 cat 与 grep
+  local events broadcast_lines
+  # 格 broadcast-gpu-released：命令起过、退 7 ⇒ 照退 7，出去时发一条 gpu-released（标签是登记名、exit=7、holders_left=0）
+  cells=$((cells + 1)); calls="$work/broadcast.calls"; : >"$calls"; events="$work/broadcast-events"
+  run_wrapper "$calls" "$work/state-broadcast" RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off -- bash "$work/command.sh" fail; cell_exit=$?
+  broadcast_lines="$(cat "$events"/*.event 2>/dev/null)"
+  if [[ "$cell_exit" != 7 ]] || [[ "$(grep -cE '^seq=1 kind=gpu-released host=本机 source=local label=gpu-quiesce-[0-9]+-[0-9]+ exit=7 holders_left=0 ' <<<"$broadcast_lines")" != 1 ]]; then
+    selftest_cell_failed broadcast-gpu-released "命令起过、退 7 之后应当照退 7、发一条 gpu-released（标签是登记名、exit=7、holders_left=0）（退 $cell_exit，事件「$broadcast_lines」）" \
+      "看 gpu_quiesce_leave 末尾调的 gpu_quiesce_broadcast：命令起过（gpu_quiesce_command_started）就经 resource_release_broadcast.py emit 发一条"
+  fi
+  # 格 broadcast-not-started：清场回读没过、命令没起 ⇒ 退 78，不发
+  cells=$((cells + 1)); calls="$work/broadcast-refused.calls"; : >"$calls"; events="$work/broadcast-refused-events"
+  run_wrapper "$calls" "$work/state-broadcast-refused" RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off FAKE_STOPPED_CHECK=fail -- bash "$work/command.sh" ok; cell_exit=$?
+  broadcast_lines="$(cat "$events"/*.event 2>/dev/null)"
+  if [[ "$cell_exit" != 78 || -n "$broadcast_lines" ]]; then
+    selftest_cell_failed broadcast-not-started "清场回读没过、命令没起的那一趟应当退 78、不发资源释放广播（退 $cell_exit，事件「$broadcast_lines」）" \
+      "看 gpu_quiesce_broadcast 开头：命令没起（gpu_quiesce_command_started 是 0）就不发，它没占过卡"
+  fi
+  # 格 broadcast-fault-exit：那份库出事（只给自证的 RESOURCE_BROADCAST_SELFTEST_FAULT=crash，带那份库认的标记）⇒ 照退命令的 7，标准错误里没有广播那一步打的行
+  cells=$((cells + 1)); calls="$work/broadcast-fault.calls"; : >"$calls"; events="$work/broadcast-fault-events"
+  printf '%s\n' "resource_release_broadcast.py 自证的标记" >"$work/broadcast-mark"
+  run_wrapper "$calls" "$work/state-broadcast-fault" RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off RESOURCE_BROADCAST_SELFTEST_FAULT=crash \
+    RESOURCE_BROADCAST_SELFTEST_MARK="$work/broadcast-mark" -- bash "$work/command.sh" fail; cell_exit=$?
+  if [[ "$cell_exit" != 7 ]] || grep -qE '自证造的崩溃|没广播到|resource_release_broadcast' "$calls.out"; then
+    selftest_cell_failed broadcast-fault-exit "资源释放广播那份库出事时应当照退命令的 7、标准错误里没有广播那一步的行（退 $cell_exit，输出「$(tail -n 3 "$calls.out")」）" \
+      "看 gpu_quiesce_broadcast：emit 的输出丢掉、退出码不交回（return 0）"
+  fi
+
+  # 第二台（文件头「第二台」）四格：角色 peer 时配置的清场与回读不在这里跑，认起活那一方给的 GPU_QUIESCE_ORIGIN_READ_BACK=1；回读看的卡照角色取 peer: 那几项
+  # 格 peer-role-origin-quiesce：角色 peer、起活那一方清过场 ⇒ 清场命令一条都没跑、照起命令、退 0，清场那一行是 quiesced-on-origin
+  cells=$((cells + 1)); calls="$work/peer-origin.calls"; : >"$calls"
+  run_wrapper "$calls" "$work/state-peer-origin" SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer GPU_QUIESCE_ORIGIN_READ_BACK=1 -- bash "$work/command.sh" ok; cell_exit=$?
+  if [[ "$cell_exit" != 0 || "$(calls_of "$calls")" != "command-ok-start holder-of-parent command-ok-end " ]] \
+     || ! grep -q '^GPU_QUIESCE step=quiesce result=quiesced-on-origin holders=0$' "$calls.out"; then
+    selftest_cell_failed peer-role-origin-quiesce "第二台上跑了配置的清场命令、没照起命令或清场那一行不是 quiesced-on-origin（退 $cell_exit，次序「$(calls_of "$calls")」，清场那一行「$(grep '^GPU_QUIESCE step=quiesce ' "$calls.out")」）" \
+      "看进来那一段的 gpu_quiesce_on_peer：角色 peer 时不调 gpu_quiesce_run_configured，GPU_QUIESCE_ORIGIN_READ_BACK=1 就算回读过了"
+  fi
+  # 格 peer-role-without-origin-quiesce：角色 peer、起活那一方没清场 ⇒ 清场命令一条都没跑、命令没起、退 78，清场那一行是 not-quiesced-on-origin
+  cells=$((cells + 1)); calls="$work/peer-no-origin.calls"; : >"$calls"
+  run_wrapper "$calls" "$work/state-peer-no-origin" SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer -- bash "$work/command.sh" ok; cell_exit=$?
+  if [[ "$cell_exit" != 78 || -n "$(calls_of "$calls")" ]] || ! grep -q '^GPU_QUIESCE step=quiesce result=not-quiesced-on-origin holders=0$' "$calls.out" \
+     || ! grep -q '^GPU_QUIESCE step=command result=not-started$' "$calls.out"; then
+    selftest_cell_failed peer-role-without-origin-quiesce "第二台上起活那一方没清场，却跑了配置的清场命令或起了命令、没退 78（退 $cell_exit，次序「$(calls_of "$calls")」，清场那一行「$(grep '^GPU_QUIESCE step=quiesce ' "$calls.out")」）" \
+      "看进来那一段的 gpu_quiesce_on_peer：没设 GPU_QUIESCE_ORIGIN_READ_BACK=1 就照回读没过办、不起命令"
+  fi
+  # 格 peer-role-cards：角色 peer、显卡先后「local:0:8G peer:1:8G」⇒ 标准错误那一句说这一趟用的是本机卡 1（peer: 那一项），不是卡 0
+  cells=$((cells + 1)); calls="$work/peer-cards.calls"; : >"$calls"
+  run_wrapper "$calls" "$work/state-peer-cards" SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer GPU_QUIESCE_ORIGIN_READ_BACK=1 GPU_CARDS_BY_PRIORITY='local:0:8G peer:1:8G' -- bash "$work/command.sh" ok; cell_exit=$?
+  if [[ "$cell_exit" != 0 ]] || ! grep -q '回读看的卡：这一台是第二台.*这一趟用的是本机卡 1（环境变量 GPU_CARDS_BY_PRIORITY）' "$calls.out"; then
+    selftest_cell_failed peer-role-cards "第二台上显卡先后「local:0:8G peer:1:8G」应当取 peer: 那一项、说这一趟用本机卡 1（退 $cell_exit，那一句「$(grep '回读看的卡' "$calls.out")」）" \
+      "看 gpu_quiesce_local_cards_of：角色 peer 时这一台是 peer: 那几项"
+  fi
+  # 格 host-role-invalid：角色写了 Peer（不是 local 也不是 peer）⇒ 清场命令一条都没跑、命令没起、退 78，点名这个变量
+  cells=$((cells + 1)); calls="$work/role-invalid.calls"; : >"$calls"
+  run_wrapper "$calls" "$work/state-role-invalid" SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=Peer -- bash "$work/command.sh" ok; cell_exit=$?
+  if [[ "$cell_exit" != 78 || -s "$calls" ]] || ! grep -q 'SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 只许写 local 或 peer' "$calls.out"; then
+    selftest_cell_failed host-role-invalid "角色写了 Peer 却没退 78、没点名这个变量，或跑了东西（退 $cell_exit，次序「$(calls_of "$calls")」）" \
+      "看参数之后认角色那一段：只许 local 或 peer，别的不起命令、退 78"
+  fi
+
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
@@ -567,7 +994,7 @@ STUB
     echo "     → 怎么办：红的格与表里写的不同，要么改那一处让开关红在点名的格，要么照实改文件头那一行；单看一个开关：GPU_QUIESCE_BREAK=<开关> $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：清场回读命令的次序、没写全清场命令退 78、清场回读不过不起命令、清场命令退非 0 而回读过了那一行带 stop-exit、回读没过或清场命令退非 0 时在工作根下留 600 的本机日志且输出不上标准错误、命令失败交回退出码、被信号打断等命令结束退 143、两趟重叠只清一次、死了的登记不挡、跑完不调复原命令且报 not-restored（没写复原那一对、接着上一趟再起都照跑）、用法错退 2、前一趟登记下的进程不挡后一趟回读而外人照挡、回读只看这一趟要用的本机卡（GPU_CARDS_BY_PRIORITY，没设取多机配置清场之后那一份；调用方带进来的回读变量不认），$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，收回 $switch_wheel_collected 个，各红在点名的那一格"
+  echo "  ✓ --selftest：清场回读命令的次序、没写全清场命令退 78、清场回读不过不起命令、清场命令退非 0 而回读过了那一行带 stop-exit、回读没过或清场命令退非 0 时在工作根下留 600 的本机日志且输出不上标准错误、命令失败交回退出码、被信号打断时把信号转给命令的进程组、限时之后补 KILL、退 143，这一份被 KILL 时守卫停命令的进程组，命令退出后守卫不留、两趟重叠只清一次、死了的登记不挡、跑完不调复原命令且报 not-restored（没写复原那一对、接着上一趟再起都照跑）、清场过了起命令之前写一条在卡上算的串行声明、命令退出之后撤（没给声明文件就自己建一份交给命令、撤后删，命令没起不写）、用法错退 2、前一趟登记下的进程不挡后一趟回读而外人照挡、回读只看这一趟要用的本机卡（GPU_CARDS_BY_PRIORITY，没设取多机配置清场之后那一份；调用方带进来的回读变量不认）、命令起过出去时发一条 gpu-released 而命令没起的不发、那份库出事时退出码与标准错误照旧、第二台上不跑配置的清场与回读而认起活那一方清过场（没清过不起命令）、第二台回读看的卡取 peer: 那几项、角色写错退 78，$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，收回 $switch_wheel_collected 个，各红在点名的那一格"
   exit 0
 }
 
@@ -580,6 +1007,20 @@ esac
 # 回读的两个握手变量只由这一份置、只给清场那两条命令：调用方带进来的清掉，不认、也不传给 <命令…>
 gpu_quiesce_break_is keep-inherited-check-variables || unset GPU_QUIESCE_CHECK_LOCAL_CARDS GPU_QUIESCE_CHECK_EXEMPT_PIDS
 gpu_quiesce_check_environment=()
+
+# 这一台是起活的那一台还是第二台（文件头「第二台」）：只许 local 或 peer，没设是 local；写了别的不起命令、退 78
+gpu_quiesce_role="${SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE:-local}"
+if [[ "$gpu_quiesce_role" != local && "$gpu_quiesce_role" != peer ]]; then
+  if gpu_quiesce_break_is host-role-unchecked; then
+    gpu_quiesce_role=local
+  else
+    gpu_quiesce_line "step=command result=not-started"
+    gpu_quiesce_line "step=exit code=78"
+    echo "  ✗ SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE 只许写 local 或 peer（没设算 local），读到「$gpu_quiesce_role」：认不出这一台是哪一台，命令没起" >&2
+    echo "  → 怎么办：这个变量由往第二台起活的一方设（scripts/hosts/peer-host-lib.sh 的 peer_host_role_environment）；起活的那一台不设它，第二台上是 peer（退 78）" >&2
+    exit 78
+  fi
+fi
 
 # 读配置里清场那两个键：缺一个就不清场、不起命令，退 78
 gpu_quiesce_configuration="$(gpu_quiesce_configuration_file)"
@@ -631,10 +1072,15 @@ if ! { mkdir -p -m 700 -- "$gpu_quiesce_log_directory" && chmod 700 -- "$gpu_qui
   exit 78
 fi
 gpu_quiesce_registered=0; gpu_quiesce_command_started=0; gpu_quiesce_command_exit=0; gpu_quiesce_interrupted=""
-trap 'gpu_quiesce_interrupted=130' INT
-trap 'gpu_quiesce_interrupted=143' TERM
-trap 'gpu_quiesce_interrupted=129' HUP
-trap 'gpu_quiesce_leave; gpu_quiesce_finish_log' EXIT
+gpu_quiesce_command_pid=""; gpu_quiesce_last_signal=""; gpu_quiesce_forwarded=0; gpu_quiesce_limit_pid=""; gpu_quiesce_guard_pid=""
+gpu_quiesce_serial_declared=0; gpu_quiesce_serial_own_file=""
+gpu_quiesce_limit_seconds="$(gpu_quiesce_forward_limit)"
+gpu_quiesce_guard_poll="${GPU_QUIESCE_GUARD_POLL_SECONDS:-0.5}"
+[[ "$gpu_quiesce_guard_poll" =~ ^[0-9]+(\.[0-9]+)?$ ]] || gpu_quiesce_guard_poll=0.5
+trap 'gpu_quiesce_on_signal INT 130' INT
+trap 'gpu_quiesce_on_signal TERM 143' TERM
+trap 'gpu_quiesce_on_signal HUP 129' HUP
+trap 'gpu_quiesce_serial_withdraw; gpu_quiesce_leave; gpu_quiesce_finish_log' EXIT
 
 # 进来：锁里登记、没有别的活着的登记才清场，回读
 if ! gpu_quiesce_enter_lock; then
@@ -655,12 +1101,23 @@ gpu_quiesce_break_is no-holder-descendants || gpu_quiesce_exempt_pids="$(gpu_qui
 [[ -n "$gpu_quiesce_exempt_pids" ]] && gpu_quiesce_check_environment+=("GPU_QUIESCE_CHECK_EXEMPT_PIDS=$gpu_quiesce_exempt_pids")
 gpu_quiesce_exempt_count=0
 [[ -n "$gpu_quiesce_exempt_pids" ]] && gpu_quiesce_exempt_count="$(wc -w <<<"$gpu_quiesce_exempt_pids")"
-echo "  · 回读看的卡：$gpu_quiesce_cards_said；跳过别的活着的登记下的 $gpu_quiesce_exempt_count 个进程" >&2
+# 第二台（文件头「第二台」）：不跑配置的清场与回读，认起活那一方给的 GPU_QUIESCE_ORIGIN_READ_BACK=1。弄坏开关 peer-runs-configured-commands 下照起活那台跑
+gpu_quiesce_on_peer=0
+if [[ "$gpu_quiesce_role" == peer ]] && ! gpu_quiesce_break_is peer-runs-configured-commands; then gpu_quiesce_on_peer=1; fi
+if (( gpu_quiesce_on_peer )); then
+  echo "  · 回读看的卡：这一台是第二台，回读在起活那一台跑（两台都管），这里不跑；这一趟用的是$gpu_quiesce_cards_said" >&2
+else
+  echo "  · 回读看的卡：$gpu_quiesce_cards_said；跳过别的活着的登记下的 $gpu_quiesce_exempt_count 个进程" >&2
+fi
 gpu_quiesce_stopped_here=0
 gpu_quiesce_stop_exit=0
-if (( gpu_quiesce_others == 0 )); then gpu_quiesce_run_configured QUIESCE_STOP_COMMAND; gpu_quiesce_stop_exit=$?; gpu_quiesce_stopped_here=1; fi
 gpu_quiesce_read_back=0
-gpu_quiesce_run_configured QUIESCE_STOPPED_CHECK_COMMAND && gpu_quiesce_read_back=1
+if (( gpu_quiesce_on_peer )); then
+  if [[ "${GPU_QUIESCE_ORIGIN_READ_BACK:-}" == 1 ]] || gpu_quiesce_break_is peer-ignores-origin-read-back; then gpu_quiesce_read_back=1; fi
+else
+  if (( gpu_quiesce_others == 0 )); then gpu_quiesce_run_configured QUIESCE_STOP_COMMAND; gpu_quiesce_stop_exit=$?; gpu_quiesce_stopped_here=1; fi
+  gpu_quiesce_run_configured QUIESCE_STOPPED_CHECK_COMMAND && gpu_quiesce_read_back=1
+fi
 gpu_quiesce_leave_lock
 gpu_quiesce_quiesce_failed=0
 gpu_quiesce_stop_field=""
@@ -669,7 +1126,17 @@ if (( gpu_quiesce_stopped_here )) && { (( ! gpu_quiesce_read_back )) || (( gpu_q
   gpu_quiesce_break_is drop-stop-exit || gpu_quiesce_stop_field=" stop-exit=$gpu_quiesce_stop_exit"
   gpu_quiesce_stop_field+="$gpu_quiesce_log_field"
 fi
-if (( gpu_quiesce_read_back )); then
+if (( gpu_quiesce_on_peer )); then
+  if (( gpu_quiesce_read_back )); then
+    gpu_quiesce_line "step=quiesce result=quiesced-on-origin holders=$gpu_quiesce_others"
+    echo "  · 照多机配置清了场：这一台是第二台，清场与回读在起活那一台跑过（两台都管，GPU_QUIESCE_ORIGIN_READ_BACK=1），这里不再跑" >&2
+  else
+    gpu_quiesce_line "step=quiesce result=not-quiesced-on-origin holders=$gpu_quiesce_others"
+    echo "  ✗ 这一台是第二台（SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer），起活那一方没照配置清场（没给 GPU_QUIESCE_ORIGIN_READ_BACK=1）：清场命令在起活那一台跑、两台都管，第二台上不跑它，命令没起" >&2
+    echo "  → 怎么办：在起活那一台清场再把活挪过来：变异分片开跑之前照配置清场（scripts/mutation/mutation-shard-run.sh ⑤）；multi-host-run.sh --peer 外面套一层 bash scripts/crash/gpu-quiesce-run.sh -- （退 78）" >&2
+    gpu_quiesce_quiesce_failed=1
+  fi
+elif (( gpu_quiesce_read_back )); then
   if (( gpu_quiesce_stopped_here )); then
     gpu_quiesce_line "step=quiesce result=stopped-and-read-back holders=0$gpu_quiesce_stop_field"
     if (( gpu_quiesce_stop_exit != 0 )); then
@@ -689,10 +1156,20 @@ else
   gpu_quiesce_break_is run-despite-failed-quiesce || gpu_quiesce_quiesce_failed=1
 fi
 
-# 跑：前台起，收到 INT/TERM/HUP 只记下、等它自己结束
+# 跑：命令起在自己的进程组里（set -m，标准输入输出与环境原样），这一份等它；收到 INT/TERM/HUP 转给它的进程组、限时之后补 KILL，被 KILL 时守卫停它的进程组（文件头「被打断」）
+# 清场过了、起命令之前写串行声明（文件头「在用核数」）：命令退出之后撤；写声明的途中收到信号的，命令不起，声明在出去时撤
+if (( ! gpu_quiesce_quiesce_failed )) && [[ -z "$gpu_quiesce_interrupted" ]]; then gpu_quiesce_serial_declare; fi
 if (( ! gpu_quiesce_quiesce_failed )) && [[ -z "$gpu_quiesce_interrupted" ]]; then
   gpu_quiesce_command_started=1
-  GPU_QUIESCE_HOLDER="$gpu_quiesce_state_directory/holders/$gpu_quiesce_holder_name" "$@"; gpu_quiesce_command_exit=$?
+  set -m
+  GPU_QUIESCE_HOLDER="$gpu_quiesce_state_directory/holders/$gpu_quiesce_holder_name" "$@" &
+  gpu_quiesce_command_pid=$!
+  set +m
+  gpu_quiesce_guard_start
+  gpu_quiesce_wait_command; gpu_quiesce_command_exit=$?
+  gpu_quiesce_guard_stop
+  gpu_quiesce_disarm_limit
+  gpu_quiesce_serial_withdraw
   gpu_quiesce_line "step=command result=exit-$gpu_quiesce_command_exit"
 else
   gpu_quiesce_line "step=command result=not-started"

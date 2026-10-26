@@ -1,0 +1,12 @@
+exit=1
+want=records/2026-10-22-样本调度.md:5：带「延后」，同一行没写 C 号、拆分提案的节号与行首序号、文件:行或登记处
+want=records/2026-10-22-样本调度.md:6：带「下一批」，写的登记指不到——C 号「C99」指不到：.claude/kb/checks-owed.md 里没有「| C99 |」这一行
+want=records/2026-10-22-样本调度.md:7：带「下轮开」，写的登记指不到——拆分提案节号与序号「第九十节 ⑤」指不到：records/2026-10-23-subagent拆分提案.md 与 records/2026-09-16-subagent拆分提案.md 的第 90 节里都没有行首是「⑤」的一行
+want=records/2026-10-22-样本调度.md:8：带「留给」，写的登记指不到——拆分提案节号「第九十节」指不到：那一节有行首序号（2 行），要写是哪一行
+want=records/2026-10-22-样本调度.md:9：带「下一个题目」，写的登记指不到——文件:行「research/notes.md:99」指不到：research/notes.md 只有 30 行
+want=records/2026-10-22-样本调度.md:10：带「延后」，写的登记指不到——文件:行「gone.md:3」指不到：gone.md 不在树里（只写文件名的要写从仓根起的路径）
+want=records/ 下这次新增的带延后类词的行里 6 行没登记去向（判了 7 行）
+want=照 .claude/main-agent.md「一轮怎么开、怎么收」第 2 条在同一行写登记的编号或 文件:行
+want=样本只跑 .gate-cells 点名的格：deferred-items-registered
+want=doc-process-records.sh：1 格里 1 格红（deferred-items-registered）
+want=bash .claude/gate.d/doc-process-records.sh --check deferred-items-registered

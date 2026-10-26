@@ -1,0 +1,6 @@
+exit=0
+want=扫了 10 份决策、4 份字节布局表；表后合计 3 张，表前说明句 2 张，format-const 标记 2 个；字节布局表里的结构总宽 5 处都有登记
+want=准入不等式 3 项逐项有归属
+want=3 条认购
+want=余 44
+want=doc-registries.sh：3 格里 3 格绿（field-table-sums admission-terms tree-table-reserve），0 格本次未跑（无）

@@ -1,0 +1,5 @@
+# 样本登记表
+scripts/gate/okay.py	light	# 样本：自证只在内存里判
+scripts/gate/garbled.py	light	# 样本：自证只在内存里判
+scripts/gate/silent.py	light	# 样本：自证只在内存里判
+scripts/gate/garbled-mismatch.py	light	# 样本：自证只在内存里判

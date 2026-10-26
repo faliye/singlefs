@@ -1,0 +1,5 @@
+exit=1
+want=这些定义缺以「输入」「写范围」「产出」「没做什么」起头的二级标题（代码围栏里的不算）：
+want=     alpha：缺 产出、没做什么
+want=     beta：缺 写范围
+want=agent-definition-shape：红（退出 1）

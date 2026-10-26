@@ -1,0 +1,6 @@
+# field-registry-green 加上 D5、D8、D28、D368 的英语与日语译文：译文首行写成各自的语言（单破折号、冒号、Settled / 確定），
+# 照抄了准入两个锚与式子、树表认购标记与表、format-const 标记（英语那份没跟上：SAMPLE_LAYOUT_RECORD 留着旧值 15、树表多一行认购 60）。
+# 三格只读中文原文，判绿；弄坏开关 DOC_REGISTRIES_BREAK=read-translations 下三格都红
+field-table-sums
+admission-terms
+tree-table-reserve

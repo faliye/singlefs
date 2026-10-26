@@ -2,11 +2,13 @@
 在样本根里造好 gate-verdict 格要读的东西，阶段本身不知道各情形怎么造。
 
 调用（阶段经参数把驱动与样本根传进来）：python3 <这份文件> <驱动 broad-mutation.py 的路径> <样本根> <情形>
-情形分三族：
+情形分四族：
   summary:<名>     录好的驱动 --summary 输出：写 .broad-sample/summary.sh（打录好的那几行、退录好的码），格照它判，库目录里没有东西
   escalated:<名>   升档判的抓到与判定行的校验列：在 .broad-sample/home/ 造判定库（verdicts.tsv，每行带用 .broad-sample/result.key 算的 HMAC-SHA256 校验列）、
                    基线表（baselines.tsv）、两趟日志（escalation/ 下，末尾带驱动那一行、带包装那一句）、登记表（escalated-verdicts.tsv），
                    再写 .broad-sample/summary.sh 打录好的 --summary；sha256 与校验列在这里现算，不调驱动的函数
+  gpu:<名>         GPU 那一趟的判定库（gpu-verdicts.tsv）的校验列：在 .broad-sample/home/ 造 verdicts.tsv 与 gpu-verdicts.tsv（每行带用 .broad-sample/result.key 算的 HMAC-SHA256 校验列），
+                   再写 .broad-sample/summary.sh 打录好的 --summary（GPU 趟要 2 条、都有结论）；sha256 与校验列在这里现算，不调驱动的函数
   units:<名>       新键在真源码上的样子：样本根里写一棵小工作区（singlefs-core、singlefs-checker、singlefs-harness），载入驱动、用它的函数照这棵树
                    把清单按单元记进 .broad-sample/home/lists.tsv、每条记一行抓到（键是此刻算的单元键）；再照情形改源码。不写 summary.sh：
                    格起真的驱动 --summary（--toolchain-from / --tools-from 取样本里的两份文件），判法、单元键都是此刻驱动那一份
@@ -31,7 +33,10 @@ VERDICT_HEADER = ("key", "sequence", "package", "name", "outcome", "stage", "cau
                   "judged_on", "method", "locator", "refused", "note", "mac")
 REGISTRY_HEADER = ("key", "sequence", "name", "label", "step", "baseline_key", "baseline", "baseline_row", "threads", "first_limit", "escalated_limit",
                    "required_multiple", "first_log", "first_log_sha256", "escalated_log", "escalated_log_sha256", "judged_on")
-SUMMARY_COUNTS = ("total", "caught", "missed", "unviable", "timeout", "memory_cap", "stage_one_only", "driver_error", "not_run", "refused", "unlisted_units")
+SUMMARY_COUNTS = ("total", "caught", "missed", "unviable", "timeout", "memory_cap", "stage_one_only", "driver_error", "not_run", "refused", "unlisted_units",
+                  "gpu_needed", "gpu_reused", "gpu_not_run", "gpu_without_conclusion")
+GPU_VERDICT_HEADER = ("key", "sequence", "package", "name", "outcome", "caught_by", "test_key", "coverage_key", "gpu_key", "test_seconds", "judged_on", "method", "note", "mac")
+GPU_CASE = "singlefs-checker-tier::gpu_pair gpu_case"
 
 
 def summary_line(**counts):
@@ -40,12 +45,17 @@ def summary_line(**counts):
     return "BROAD_MUTATION_SUMMARY " + " ".join(f"{name}={values[name]}" for name in SUMMARY_COUNTS)
 
 
-def gate_line(total, concluded, missed=0, without=0, refused=0, unlisted=0, escalated=0, verdict="green", escalated_field=True):
+def gate_line(total, concluded, missed=0, without=0, refused=0, unlisted=0, escalated=0, verdict="green", escalated_field=True,
+              gpu_needed=0, gpu_reused=0, gpu_not_run=0, gpu_without=0, gpu_fields=True):
     return (f"BROAD_MUTATION_GATE total={total} concluded={concluded} missed={missed} without_conclusion={without} refused={refused} unlisted_units={unlisted}"
-            + (f" escalated={escalated}" if escalated_field else "") + f" verdict={verdict}")
+            + (f" escalated={escalated}" if escalated_field else "")
+            + (f" gpu_needed={gpu_needed} gpu_reused={gpu_reused} gpu_not_run={gpu_not_run} gpu_without_conclusion={gpu_without}" if gpu_fields else "")
+            + f" verdict={verdict}")
 
 
 MISSED_NAME = "crates/singlefs-core/src/sample.rs:12:9: replace + with - in add"
+GPU_NAME_FOUR = "crates/singlefs-core/src/lib.rs:11:5: replace the value with MUTATED_4()"
+GPU_NAME_FIVE = "crates/singlefs-core/src/lib.rs:14:5: replace the value with MUTATED_5()"
 # summary 族：录好的 --summary 输出与退出码（行用 \t 分段，照驱动的写法）
 RECORDED = {
     # 全有结论（键相同），没有没红：绿
@@ -78,11 +88,29 @@ RECORDED = {
     # 判定行写 green、退 0，而 unlisted_units=2（有单元没记清单，清单不全）
     "unlisted-lie": ([summary_line(total=6, caught=5, unviable=1, unlisted_units=2), "UNLISTED\tcrates/singlefs-core/src/lib.rs:30\tfn\tnew_function",
                       "UNLISTED\tcrates/singlefs-core/src/lib.rs:40\tfn\tother_function", gate_line(6, 6, unlisted=2)], 0),
+    # GPU 那一趟（驱动文件头「GPU 那一趟」）：要 GPU 趟的 3 条都有库里键相同的结论（其中 2 条是 GPU 趟抓到的，所以八栏里是抓到）：绿
+    "gpu-green": ([summary_line(total=6, caught=5, unviable=1, gpu_needed=3, gpu_reused=3), gate_line(6, 6, gpu_needed=3, gpu_reused=3)], 0),
+    # 要 GPU 趟的 3 条里 2 条本次未跑（没卡）：它们不算没红也不算通过，是没结论，驱动判红退 8，格照抄 NO_CONCLUSION（理由 gpu-not-run）
+    "gpu-no-conclusion": ([summary_line(total=6, caught=3, unviable=1, not_run=2, gpu_needed=3, gpu_reused=1, gpu_not_run=2),
+                           gate_line(6, 4, without=2, verdict="red", gpu_needed=3, gpu_reused=1, gpu_not_run=2),
+                           f"NO_CONCLUSION\t4\tnone\t{GPU_NAME_FOUR}\tgpu-not-run", f"NO_CONCLUSION\t5\tnone\t{GPU_NAME_FIVE}\tgpu-not-run"], 8),
+    # 要 GPU 趟的 3 条里 1 条 GPU 趟超时（没结论）：驱动判红退 8
+    "gpu-timeout": ([summary_line(total=6, caught=4, unviable=1, timeout=1, gpu_needed=3, gpu_reused=2, gpu_without_conclusion=1),
+                     gate_line(6, 5, without=1, verdict="red", gpu_needed=3, gpu_reused=2, gpu_without=1), f"NO_CONCLUSION\t4\ttimeout\t{GPU_NAME_FOUR}\tgpu-timeout"], 8),
+    # 判定行写 green、退 0、without_conclusion=0，而 gpu_not_run=2：驱动把没有 GPU 结论的条当有结论数了
+    "gpu-silent-driver": ([summary_line(total=6, caught=5, unviable=1, gpu_needed=3, gpu_reused=1, gpu_not_run=2), gate_line(6, 6, gpu_needed=3, gpu_reused=1, gpu_not_run=2)], 0),
+    # 判定行 green，gpu_needed=3 却只有 1 条复用、另两项是 0：三项加不起来
+    "gpu-counts": ([summary_line(total=6, caught=5, unviable=1, gpu_needed=3, gpu_reused=1), gate_line(6, 6, gpu_needed=3, gpu_reused=1)], 0),
+    # 判定行没有 gpu_ 四个数（旧驱动）
+    "gpu-fields-missing": ([summary_line(total=6, caught=5, unviable=1), gate_line(6, 6, gpu_fields=False)], 0),
+    # 汇总行与判定行的 GPU 趟计数不同
+    "gpu-summary-mismatch": ([summary_line(total=6, caught=5, unviable=1, gpu_needed=3, gpu_reused=2, gpu_not_run=1), gate_line(6, 6, gpu_needed=3, gpu_reused=3)], 0),
 }
 ESCALATED_VARIANTS = ("green", "multiple", "log-digest", "old-key", "handwritten", "count", "threads-rerun", "baseline-row-changed", "baseline-lie", "not-larger",
                       "memory-multiple", "no-trailer", "trailer-wrong", "no-wrapper", "columns", "no-escalated-field", "label-differs", "logs-elsewhere",
                       "baseline-key-differs", "result-mac-forged", "result-mac-key-missing")
-UNITS_VARIANTS = ("green", "callee-changed", "comment-only", "unlisted")
+UNITS_VARIANTS = ("green", "callee-changed", "comment-only", "unlisted", "gpu-green", "gpu-no-conclusion")
+GPU_VARIANTS = ("mac-green", "mac-forged")
 
 
 def write(path, text, mode=None):
@@ -202,6 +230,27 @@ def build_escalated(root, variant):
                          f"ESCALATED\t1\t{label_one}\t{NAME_ONE}\t{KEY_ONE}", f"ESCALATED\t2\tcaught-by-memory\t{NAME_TWO}\t{KEY_TWO}"], 0)
 
 
+def build_gpu(root, variant):
+    """gpu 族（情形名见 GPU_VARIANTS）：verdicts.tsv 里 6 条抓到、gpu-verdicts.tsv 里 2 行（一条 GPU 趟抓到、一条没红，都带校验列）；
+    mac-green 全部校验得过；mac-forged GPU 判定库末尾手追加一行没有校验列（十三段）、一行校验列对不上。录好的 --summary：GPU 趟要 2 条、都有结论（判绿）。"""
+    home = os.path.join(root, ".broad-sample", "home")
+    os.makedirs(home, exist_ok=True)
+    rows = []
+    for sequence, line in ((1, 2), (2, 5), (3, 8), (4, 11), (5, 14), (6, 17)):
+        rows.append([f"{sequence:064x}", str(sequence), "singlefs-core", f"crates/singlefs-core/src/lib.rs:{line}:5: replace the value with MUTATED_{sequence}()",
+                     "caught", "one", "singlefs-harness::catching some_case", "c" * 64, "", "0.0", "1.0", "2026-10-22", "fresh", "", "", ""])
+    write(os.path.join(home, "verdicts.tsv"), "# " + "\t".join(VERDICT_HEADER) + "\n" + "".join("\t".join(row + [mac(row)]) + "\n" for row in rows))
+    gpu_rows = [[f"{4:064x}", "4", "singlefs-core", GPU_NAME_FOUR, "caught", GPU_CASE, "d" * 64, "", "9" * 64, "1.0", "2026-10-22", "fresh", "GPU 趟抓到"],
+                [f"{5:064x}", "5", "singlefs-core", GPU_NAME_FIVE, "missed", "", "", "e" * 64, "9" * 64, "1.0", "2026-10-22", "fresh", "3 条测试都过了"]]
+    text = "# " + "\t".join(GPU_VERDICT_HEADER) + "\n" + "".join("\t".join(row + [mac(row)]) + "\n" for row in gpu_rows)
+    if variant == "mac-forged":
+        forged = [f"{4:064x}", "4", "singlefs-core", GPU_NAME_FOUR, "caught", GPU_CASE, "d" * 64, "", "9" * 64, "1.0", "2026-10-22", "fresh", "手写的"]
+        text += "\t".join(forged) + "\n" + "\t".join(forged + ["0" * 64]) + "\n"
+    write(os.path.join(home, "gpu-verdicts.tsv"), text)
+    write(os.path.join(root, ".broad-sample", "result.key"), RESULT_KEY_TEXT + "\n", 0o600)
+    write_summary(root, [summary_line(total=6, caught=6, gpu_needed=2, gpu_reused=2), gate_line(6, 6, gpu_needed=2, gpu_reused=2)], 0)
+
+
 UNITS_CORE = "pub fn one() -> u32 {\n    1\n}\nfn helper() -> u32 {\n    7\n}\npub fn three() -> u32 {\n    helper()\n}\n"
 UNITS_CHECKER = "pub fn seven() -> u32 {\n    7\n}\n"
 UNITS_TREE = {
@@ -229,9 +278,23 @@ UNITS_CHANGES = {
 }
 
 
+# units 族的 GPU 情形：UNITS_TREE 加一个 checker 档包（特性 gpu、依赖 singlefs-core），tests/gpu_pair.rs 的测试体里有挂 gpu 特性的语句、经 judge() 够得着 one；
+# 第 1 条（one）CPU 那一趟没红，别的条抓到。gpu-green：第 1 条的 GPU 判定行是抓到；gpu-no-conclusion：GPU 趟还没有结论
+UNITS_GPU_FILES = {
+    "Cargo.toml": UNITS_TREE["Cargo.toml"].replace('"crates/singlefs-harness"]', '"crates/singlefs-harness", "crates/singlefs-checker-tier"]'),
+    "crates/singlefs-checker-tier/Cargo.toml": '[package]\nname = "singlefs-checker-tier"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\ngpu = []\n\n'
+                                              '[dependencies]\nsinglefs-core = { path = "../singlefs-core" }\n',
+    "crates/singlefs-checker-tier/src/lib.rs": "pub fn judge() -> u32 {\n    singlefs_core::one()\n}\n",
+    "crates/singlefs-checker-tier/tests/gpu_pair.rs": '#[test]\nfn gpu_case() {\n    #[cfg(feature = "gpu")]\n    let extra = 1;\n    #[cfg(not(feature = "gpu"))]\n    let extra = 0;\n'
+                                                      '    assert!(singlefs_checker_tier::judge() + extra > 0);\n}\n',
+}
+
+
 def build_units(driver_path, root, variant):
-    """units 族（情形名见 UNITS_VARIANTS）：照驱动此刻的函数在样本根这棵小工作区上记清单与判定，再照 UNITS_CHANGES 改源码。"""
-    for path, text in UNITS_TREE.items():
+    """units 族（情形名见 UNITS_VARIANTS）：照驱动此刻的函数在样本根这棵小工作区上记清单与判定，再照 UNITS_CHANGES 改源码。
+    gpu-green、gpu-no-conclusion 另加 UNITS_GPU_FILES 那个 checker 档包：第 1 条（one）CPU 那一趟记没红，GPU 判定行照驱动的函数记（gpu-green 抓到、gpu-no-conclusion 不记）。"""
+    gpu_case = variant.startswith("gpu-")
+    for path, text in {**UNITS_TREE, **(UNITS_GPU_FILES if gpu_case else {})}.items():
         write(os.path.join(root, path), text)
     sample = os.path.join(root, ".broad-sample")
     write(os.path.join(sample, "rustc-vv.txt"), "rustc 1.0.0-sample (样本)\nhost: x86_64-unknown-linux-gnu\n")
@@ -260,9 +323,22 @@ def build_units(driver_path, root, variant):
     for item in items:
         current = judgement.key_of(item)
         library.write_composition(current["key"], current["composition"])
+        if gpu_case and item["sequence"] == 1:
+            # CPU 那一趟没红：覆盖者键取此刻够得着它的测试各自测试键的多重集（驱动的 coverers_for）；GPU 那一趟照驱动的函数记
+            library.record_verdict([current["key"], item["sequence"], item["package"], item["name"], "missed", "two", "", "", judgement.coverers_for(current["unit"])[0] or "",
+                                    "0.0", "1.0", driver.today_text(), "fresh", current["locator"], ",".join(current["refused"]), "样本"])
+            if variant == "gpu-green":
+                judging = driver.GpuJudging(library, judgement, arguments)
+                case = "singlefs-checker-tier::gpu_pair gpu_case"
+                gpu_test_key, gpu_why = judging.catching_key(case)
+                if not gpu_test_key:
+                    raise SystemExit(f"样本里 GPU 趟抓到它的那条测试算不出测试键：{gpu_why}")
+                driver.record_gpu_verdict(library, [current["key"], item["sequence"], item["package"], item["name"], "caught", case, gpu_test_key, "", judging.pass_key(),
+                                                   "1.0", driver.today_text(), "fresh", "样本"])
+            continue
         library.record_verdict([current["key"], item["sequence"], item["package"], item["name"], "caught", "one", caught_by, test_key, "", "0.0", "1.0",
                                 driver.today_text(), "fresh", current["locator"], ",".join(current["refused"]), "样本"])
-    for path, text in UNITS_CHANGES[variant].items():
+    for path, text in UNITS_CHANGES.get(variant, {}).items():
         write(os.path.join(root, path), text)
 
 
@@ -278,12 +354,14 @@ def main(arguments):
         write_summary(root, lines, exit_code)
     elif family == "escalated" and variant in ESCALATED_VARIANTS:
         build_escalated(root, variant)
+    elif family == "gpu" and variant in GPU_VARIANTS:
+        build_gpu(root, variant)
     elif family == "units" and variant in UNITS_VARIANTS:
         shutil.rmtree(os.path.join(root, ".broad-sample", "home"), ignore_errors=True)
         build_units(driver_path, root, variant)
     else:
         print(f"  ✗ 认不出的样本情形「{scenario}」", file=sys.stderr)
-        print(f"  → 怎么办：写 summary:<{'/'.join(RECORDED)}>、escalated:<{'/'.join(ESCALATED_VARIANTS)}> 或 units:<{'/'.join(UNITS_VARIANTS)}>", file=sys.stderr)
+        print(f"  → 怎么办：写 summary:<{'/'.join(RECORDED)}>、escalated:<{'/'.join(ESCALATED_VARIANTS)}>、gpu:<{'/'.join(GPU_VARIANTS)}> 或 units:<{'/'.join(UNITS_VARIANTS)}>", file=sys.stderr)
         return 2
     return 0
 

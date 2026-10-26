@@ -1,7 +1,7 @@
 exit=1
 want=5 处自己定并行度默认值的写法没经登记位取
 want=crates/demo/src/absorbed.rs:3  读自己的线程变量 SAMPLE_ABSORBED_SAMPLING_WORKERS：capped.sh 不设它
-want=scripts/experiments/absorbed.py:3  读自己的线程变量 SAMPLE_ABSORBED_WORKERS：capped.sh 不设它
+want=scripts/experiment-apparatus/absorbed.py:3  读自己的线程变量 SAMPLE_ABSORBED_WORKERS：capped.sh 不设它
 want=scripts/hosts/or_var_default.sh:3  写死的线程数默认（|| / && 赋值）
 want=scripts/hosts/or_arith_default.sh:2  写死的线程数默认（|| / && 赋值）
 want=scripts/hosts/printenv_read.sh:3  读自己的线程变量 SAMPLE_PRINTENV_THREADS：capped.sh 不设它

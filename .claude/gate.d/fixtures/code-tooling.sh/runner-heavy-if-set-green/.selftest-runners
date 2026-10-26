@@ -1,0 +1,2 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：一条，在样本自己的登记表里登记成 heavy-if-set:SINGLEFS_HEAVY_TESTS
+bash scripts/gate/sample-heavy-if-set.sh --selftest

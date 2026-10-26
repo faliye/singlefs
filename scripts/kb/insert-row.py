@@ -26,23 +26,34 @@
 
 退出码：0 插好了（或干跑）；1 用法不对或自检没过；2 --absent 已有命中；3 锚点不是恰好命中一次；
 4 读到写之间文件被改过；5 没换上（有多个硬链接、建不了临时文件、写或改名失败）；
-6 目标是仓里的 .md，新行带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法）。2–6 都是原文件没动、没留临时文件。
+6 目标是仓里的 .md，新行带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法）；
+7 目标在仓里（任何后缀），新行带会话号（ListAgents 列的会话名）。2–7 都是原文件没动、没留临时文件。
 
 写 .md 之前判新行（退出码 6）：目标是仓里的 .md 时，锚点定位成功之后、写之前（干跑也判），用 write-guard.sh 与门禁 doc-text 同一份判据
 （.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判 --line 给的新行；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
 别的后缀、仓外、排除前缀下的文件不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 clock-times 格兜底。
 
+写文件之前判新行里的会话号（退出码 7）：锚点定位成功之后、写之前（干跑也判），用 write-guard.sh 的第七道与门禁 doc-text 的 session-names 格同一份判据
+（.claude/gate.d/lib-forbidden-notations.py 的会话号形态，lib_notation_check.py 的 session_name_refusal 调它，三份定点写入脚本共用）判 --line 给的新行；
+带会话名的拒绝，逐处列出行号与出路（写成「别的会话」这类不带号的说法）。后缀不限，范围与写闸判 Write、Edit 一致：排除前缀、.sh .py .rs 里带
+「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
+
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（括号里是那条「✗ 自检失败：」的开头）：
   INSERT_ROW_BREAK=vague-anchor-hint  anchor_hints() 走回改前的说法（「把正则写得更具体些」，不点元字符、不列行号）
       锚点命中多次（「✗ 自检失败：锚点命中两次时没列出每一处的行号」；自证停在第一处失败，排在它后面的
-      「✗ 自检失败：锚点带括号命中 0 次」那一格同样判这一支，只在前一格过了时才走到）
+      『✗ 自检失败：锚点带括号命中 0 次』那一格同样判这一支，只在前一格过了时才走到）
+      连带红的格：「✗ 锚点在 … 里命中 2 次，只认恰好一次（--after 按正则认）」
   INSERT_ROW_BREAK=literal-as-regex  insert() 把 --<…>-literal 照旧按正则认
       按字面插（「✗ 自检失败：--after-literal 带括号的锚点没插成」）
   INSERT_ROW_BREAK=no-clock-guard  insert() 不判新行里的钟点（改前的写法）
-      写 .md 之前判新行（「✗ 自检失败：写 .md：…」那几条：新行带紧凑时间戳、带日期钟点时区词、带光秃时区词、干跑也拒、入口退出码 6 与不写文件）
+      写 .md 之前判新行（「✗ 自检失败：写 .md 之前判新行没判对」那几条：新行带紧凑时间戳、带日期钟点时区词、带光秃时区词、干跑也拒、入口退出码 6 与不写文件）
+  INSERT_ROW_BREAK=no-session-guard  insert() 不判新行里的会话号（改前的写法）
+      写文件之前判新行里的会话号（「✗ 自检失败：写会话号之前判新行没判对」，下面逐条以「写会话号：」开头：.md 与 .py 目标的新行带会话名、干跑也拒、入口退出码 7 与不写文件）
   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
       clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新行带紧凑时间戳的那几条红；
-      compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红
+      compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红；
+      session-names（整个会话号形态不判）时「写会话号：」的拒绝几条全红；LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一条红，
+      LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时排除前缀下放行的那一条红
 """
 import argparse
 import contextlib
@@ -55,7 +66,7 @@ import sys
 
 from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
     replace_file_contents_by_rename
-from lib_notation_check import clock_refusal, copy_library_into
+from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -145,6 +156,12 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
             print("  ✗ " + "\n".join(refusal))
             print("  → 怎么办：新行里的钟点、时区词与时间戳删掉，只写日期，再插")
             return 6
+    if BROKEN != "no-session-guard":   # 弄坏开关 no-session-guard：不判新行里的会话号
+        refusal = session_name_refusal(path, line, at + 1, notation_root)
+        if refusal:
+            print("  ✗ " + "\n".join(refusal))
+            print("  → 怎么办：新行里的会话号换成「别的会话」这类不带号的说法，事情与日期照留，再插")
+            return 7
     lines.insert(at, line)
     if dry_run:
         print("  （干跑）会插在 %s:%d，锚点是第 %d 行" % (path, at + 1, matched[0] + 1))
@@ -249,6 +266,22 @@ def problems_with_clock_guard(work):
     return problems
 
 
+def problems_with_session_guard(work):
+    """写之前判新行里的会话号：样本与判法在 lib_notation_check.py 的 session_guard_problems（三份脚本共用），这里只接上 insert 与入口。"""
+    def attempt(path, new_text, root, dry_run):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = insert(path, r"^第一行", "after", new_text, None, dry_run, notation_root=root)
+        return code, captured.getvalue()
+
+    def entry(path, new_text, root):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = main([path, "--after", r"^第一行", "--line", new_text], notation_root=root)
+        return code, captured.getvalue()
+    return session_guard_problems(work, attempt, 7, entry)
+
+
 def selftest():
     import tempfile
     with tempfile.TemporaryDirectory() as work:
@@ -308,6 +341,14 @@ def selftest():
             print("     → 查 insert() 里调 clock_refusal 的那一段与 lib_notation_check.py；"
                   "INSERT_ROW_BREAK=no-clock-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 设着的话这里本来就该红。")
             return 1
+        session_problems = problems_with_session_guard(work)
+        if session_problems:
+            print("  ✗ 自检失败：写会话号之前判新行没判对")
+            for problem in session_problems:
+                print("     " + problem)  # gate-lint:detail
+            print("     → 查 insert() 里调 session_name_refusal 的那一段与 lib_notation_check.py；"
+                  "INSERT_ROW_BREAK=no-session-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 设着的话这里本来就该红。")
+            return 1
         # 写前复核：让 digest 在读之后返回不同的值，模拟别的会话在这中间写过
         global digest
         original = digest
@@ -351,6 +392,8 @@ def selftest():
           "锚点带括号命中 0 次时点出元字符并给 --before-literal 与转义好的写法、--before-literal 按字面插成、读到写之间被改过拒绝且不写也不留临时文件；"
           "写仓里的 .md 之前判新行：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（6，干跑也拒）并点名形态、行号与出路且不写文件，"
           "8 位数字后跟 T 但不是时间戳、只写日期、.txt 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 6，理由不是钟点），入口退出码 6；"
+          "写任何后缀的仓内文件之前判新行里的会话号：.md 与 .py 目标带会话名的拒绝（7，干跑也拒）并点名行号与出路「别的会话」且不写文件，干净的新行、.py 里带放行标记的一行、"
+          "排除前缀下的文件、仓外的文件放行，假仓里没有共用库时读不到会话号判据按拒绝办（退出码 7），入口退出码 7；"
           "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
           "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
     return 0

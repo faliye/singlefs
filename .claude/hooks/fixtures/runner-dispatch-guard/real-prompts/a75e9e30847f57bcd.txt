@@ -1,0 +1,35 @@
+# 派发：three-way-attack
+
+重型测试：不跑
+批次：records/2026-10-22-子agent结果落地审计.md#9
+线程上限：31
+禁读清单：research/prompts/landing-audit-r4-sonnet-output.md（同一轮的正推腿报告）
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r4-opus
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r4-opus --purpose '三方 landing-audit-r4 的攻方腿草稿（landing-audit-r4-opus）'
+背景材料：research/prompts/_landing-audit-r4-background.md
+报告：research/prompts/landing-audit-r4-opus-output.md
+攻击面：正文 research/prompts/_landing-audit-r4-body.md 节「三、格」的 K2（新句子与已有的有没有矛盾）、K3（哪一条最脆）
+预计挂钟：2 小时内，读正文与被判文件、八份第九批交回报告，在草稿目录里拷钩子与脚本喂造出来的输入，不编译
+
+回复与报告用中文。
+
+轮名：landing-audit-r4（第九批改动的第一轮）。前三轮判决：`research/prompts/landing-audit-r1-main-verification.md`、`research/prompts/landing-audit-r2-main-verification.md`、`research/prompts/landing-audit-r3-main-verification.md`。模型目录（要写模型时）：research/prompts/landing-audit-r4-opus-model/。
+
+## 关的是哪几条
+
+1. **K2 新句子与已有的有没有矛盾**：正文节「三、格」K2 列的三组（定义之间、钩子之间、门禁之间），加 C879 那一句；每一对逐句并排，引两边原文（文件:行）。也找正文没列、你读到的别的矛盾对，与两处判同一件事而判法不同的。
+2. **K3 哪一条最脆**：正文 K3 点的五处（⑭ 认自证临时目录、⑬ 下限之后真大的命令、⑳ 草稿目录一行的认法、⑥ 命名检查的认法、`merge-and-verify.sh` 判补丁碰没碰 checker 档闭包）与你读到的别的新判法；拆分提案第九十节 ㉕、㉖、㉗ 已记的口子不重复报。每一处给能复跑的输入：在草稿目录里拷那份钩子或脚本，喂一条造出来的输入，引输出整行。
+
+每一条打中的写：哪一处（文件:行）、怎么复出来（命令与输出）、改法、推翻条件。没打中的格写「没打中」与你查了什么。你提的改法都算被攻过零轮，写明。
+
+## 写法
+
+- 方案按 `crates/` 与 `scripts/` 今天的实现来谈；被判的改动在 `research/prompts/landing-audit-r4-snapshot/judged-vs-head.diff`（对 HEAD），混有别的会话的改动（正文节「实现今天的样子」列了是哪几处），按九十节与交回报告点名的改法认这一批的。
+- 现试放草稿目录，经 `scripts/hosts/run-with-memory-cap.sh 4G` 跑；不在主工作区改文件。
+- 报告分段写进报告路径：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建（`set -o noclobber`），之后 `>>` 追加；回复只写短句：报告路径、sha256、各格打中几条。
+- 草稿与临时文件放草稿目录，不放会话共用的暂存目录。
+- 引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数。
+
+## 出口
+
+K2、K3 逐格写完，报告写完交回。

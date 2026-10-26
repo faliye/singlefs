@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：crash-full-run-backlog
+want=积压登记表：照展开次序登记的那几行次序与合表加 ITEMS 的展开不同
+want=与合表加 ITEMS 展开对不上：1 处问题、0 处输出不对（核了 4 行、展开 4 件）
+want=crash-full-run-backlog：红（退出 1）

@@ -1,0 +1,8 @@
+exit=1
+want=这些三方轮次发过腿，却没有判决、也不在撂下登记表里
+want=     neg-r1（_neg-r1-body.md、neg-r1-opus.md）
+want=     wait-r2（_wait-r2-body.md）
+want=「**判决**：」后面写没判、未判、待判的也不算
+want=样本只跑 .gate-cells 点名的格：abandoned-rounds
+want=doc-process-records.sh：1 格里 1 格红（abandoned-rounds）
+want=bash .claude/gate.d/doc-process-records.sh --check abandoned-rounds

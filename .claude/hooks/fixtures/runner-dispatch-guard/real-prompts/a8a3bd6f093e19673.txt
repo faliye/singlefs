@@ -1,0 +1,37 @@
+# 派发：three-way-attack
+
+重型测试：不跑
+批次：records/2026-10-22-子agent结果落地审计.md#11
+线程上限：31
+禁读清单：research/prompts/landing-audit-r6-sonnet-output.md（同一轮的辩方腿报告）
+草稿目录：/home/fy5090/.local/share/singlefs/work/landing-audit-r6-opus
+认领：bash scripts/hosts/work-directory-ownership.sh claim /home/fy5090/.local/share/singlefs/work/landing-audit-r6-opus --purpose '三方 landing-audit-r6 的攻方腿草稿（landing-audit-r6-opus）'
+背景材料：research/prompts/_landing-audit-r6-background.md
+攻击面：正文 research/prompts/_landing-audit-r6-body.md 节「三、格」的 K2（「已定」项撑不撑得住）、K3（报出的数能不能核）
+报告：research/prompts/landing-audit-r6-opus-output.md
+预计挂钟：2 小时内，读正文与被判文件、第十一批三份交回报告，在草稿目录里拷钩子与脚本喂造出来的输入、读真会话记录复算，不编译
+
+回复与报告用中文。
+
+轮名：landing-audit-r6（第九到十一批改动的第三轮、最后一轮）。前两轮判决：`research/prompts/landing-audit-r4-main-verification.md`、`research/prompts/landing-audit-r5-main-verification.md`；前两轮攻方模型 `research/prompts/landing-audit-r4-opus-model/`、`research/prompts/landing-audit-r5-opus-model/`（探针在 `probes/`，可拿来比改前改后）。模型目录：research/prompts/landing-audit-r6-opus-model/。
+
+## 关的是哪几条
+
+不重复前两轮已攻过的角度（正文节「一、题面」列了）：
+
+1. **K2 「已定」项撑不撑得住**：第十一批四处（交回闸 ⑤ 的退出码认法、交回闸 ② 与派发闸 ⑰ 共用的仓内路径认法与任务 37 加的 worktree 认法、看门狗按行首「草稿目录：」取 progress.md；交回报告在 `research/prompts/subagent-landing-audit-2026-10-22/` 下 `b11-guards.md`、`b11-watch-wording.md`、`b11-worktree-reports.md`）做没做到第二轮判决那一条，在真会话记录上换一批没被量过的输入还对不对；`| tail` 那一类不收是不是该收。前两轮站住的形态（写回员目标、三方腿类型表、三个报告名前缀、草稿目录一行收严、坏字节记红）有没有被第十一批改坏。几处定义里的例外说法与 `scripts/gate/merge-and-verify.sh` 今天打出的重跑命令逐字对不对得上。
+2. **K3 报出的数能不能核**：两份判决与调度记录节「第九批收尾」「第十批」「第十一批」引的数，照写明的命令在副本上复出来，或指出哪一个复不出来、为什么。重点：第二轮判决的 402 份与 4 份，第十一批工具员的 3、46、693、22、41 与任务 37 的 37、9（交回报告给的，主 agent 没复算）。
+
+每一条打中的写：哪一处（文件:行）、怎么复出来（命令与输出）、改法、推翻条件。没打中的格写「没打中」与你查了什么。这是最后一轮：你提的改法都算被攻过零轮，写明。
+
+## 写法
+
+- 方案按 `crates/` 与 `scripts/` 今天的实现来谈；被判的改动在 `research/prompts/landing-audit-r6-snapshot/judged-vs-head.diff`（对 HEAD），混有别的会话的改动（正文节「实现今天的样子」列了是哪几处）。
+- 现试与复算放草稿目录，经 `scripts/hosts/run-with-memory-cap.sh 4G` 跑；不在主工作区改文件。模型目录里放 `tools/rerun.sh`（模板照前两轮攻方模型的那一份），判决时主 agent 在副本里复跑。
+- 报告分段写进报告路径：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建（`set -o noclobber`），之后 `>>` 追加；回复只写短句：报告路径、sha256、各格打中几条。
+- 草稿与临时文件放草稿目录，不放会话共用的暂存目录。
+- 引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数。
+
+## 出口
+
+K2、K3 逐格写完，报告写完交回。

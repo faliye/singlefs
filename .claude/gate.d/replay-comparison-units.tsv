@@ -1,0 +1,59 @@
+# 重跑登记的比对对象机读登记：一行一个比对对象，六列、制表符分隔（2026-10-22 用户定「先立固定形态再立格」；读它的是门禁 doc-experiments 的 replay-comparison-units 格）。
+#   1 实验号          E<数字>，如 E165。
+#   2 登记出处        登记这个比对对象的跑前登记或重跑登记，仓内路径（如 research/prompts/e165-r5-prereg.md）。
+#   3 单元名          单元表里这条正式跑的名字，照单元表源码里的字符串字面量逐字抄（不带双引号）；在单元表出处里要恰好出现一次。
+#   4 单元表出处      含这个单元名字符串字面量的源文件，仓内路径。
+#   5 留存产物名      这条正式跑留在 research/results/ 的产物，裸文件名。复跑列写驱动名的，它等于 scripts/experiment-apparatus/replay.sh 复跑表里那个驱动那一行的第 4 列（期望产物），格判；
+#                    复跑写 none: 的，写登记里这条正式跑的重跑产物名。产物归档成 .gz 或移出工作区的，仍写原来的裸文件名。
+#   6 复跑            replay.sh 复跑表里那一行第 2 列去掉 @ 的驱动名（如 driver_e165）；确实没有复跑行的写 none:理由（理由至少 4 个字）。复跑写 none: 的行只缩不涨：
+#                    格拿它与 gate 基准那一版里复跑写 none: 的行比（按（实验号，登记出处，单元名，留存产物名）四样一起当键：换实验号、换单元名借同一份登记也算新行），基准里没有的判红；新登记的比对对象要在 replay.sh 补驱动行、复跑列写驱动名。
+# 登记行归执行员：实现单元、登记复跑的同一次改动里往这里加（阶段归属表 .claude/gate.d/stage-owners.tsv 这一格那一行）。
+# 一个单元对应几个复跑行的（如 driver_e165 与 driver_e165_light 都核「r1 合法」），每个复跑行各登记一行。
+# 登记的范围：一份重跑登记的比对对象表里，有单元表里单元的那些正式跑。单元表（crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs 里测试
+# every_criterion_has_a_positive_control_and_every_control_is_red 的 formal_run_units 数组）没有单元的正式跑这里不登记，逐行点名在下面「不登记的比对对象」那几行。
+# 比对对象表的固定形态（表头逐字、一行一个正式跑）写在 .claude/agents/experiment-designer.md 第 1 步；格把表里每一行与这里逐行对：
+#   表里一行要有一行登记的留存产物名等于它的比对对象或重跑产物名（重跑产物名只写前缀之后一段的旧登记，留存产物名以「-<那一段>」收尾也算），
+#   或在这里点名不登记：一行一条，行首写「# 不登记的比对对象：<登记出处> #<表的 # 列>：<理由>」（理由至少 4 个字），
+#   理由里写「欠在 C<号>（简称）」，号要在 .claude/kb/checks-owed.md 开着的那张表里（没写、号不在、号已还清，格都判红）；没有欠账号的先在那里登记，同一行写上。
+# E165 r5 #15 到 #19 与 r7 #1 到 #3 这八条「不登记的比对对象」就是 .claude/kb/checks-owed.md 的 C879（E165 根选择与杀伤界正式跑没有单元）：那几条正式跑在 formal_run_units 里补了单元，就删掉这八行、改登记成正式行。
+# 不登记的比对对象：research/prompts/e165-r5-prereg.md #15：r3 档择根，单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r5-prereg.md #16：r4 档带故障的择根，单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r5-prereg.md #17：r2 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r5-prereg.md #18：r3 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r5-prereg.md #19：r4 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r7-prereg.md #1：r3 档择根（KA 换成 KL 的第 7 次重跑），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r7-prereg.md #2：r4 档带故障的择根（KA 换成 KL 的第 7 次重跑），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e165-r7-prereg.md #3：r5 修订 1 的 R2 闸那一族带故障的择根（KA 换成 KL 的第 7 次重跑），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
+# 不登记的比对对象：research/prompts/e185-r3-prereg.md #1：r1 的 gpu-submission 产物，今天的写法那几格的挂钟只并列报、不判；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r3-prereg.md #2：r2 第二段产物，第一段拿它现算候选门槛（P7、停机 J-S3）与 ρ_机器 的分母；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r3-prereg.md #3：r2 第二段产物，第三段（附带）的 scan_region 重放与它并列只报；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r4-prereg.md #1：r3 第一段带 -2 的产物，控漂移段两条臂的轮次比与 unstable 数与它并列（D1–D5）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r4-prereg.md #2：r3 第一段带 -2 的产物，重判段 c_rt 来源 r3 那一端逐行重判、写法甲下逐行复现（PR1、K-S3）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r4-prereg.md #3：r2 第二段产物，写法与拆分段写法甲的阶段 CPU 与它并列（B7，重判段算）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r4-prereg.md #4：r2 第二段产物，门槛来源「r2 产物按比例换」那一端的底（B3）；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e185-r4-prereg.md #5：r3 第三段产物，第 3 行拆法甲的并列（F5）；第 3 行主 agent 在装置写之前撤了（登记第一节「主 agent 定」第 6 条），这一趟不比；E185 没有单元表，没有单元可登记；欠在 C895（E185 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e184-r2-prereg.md #1：第一段整份改前产物 e184-regular-layer-cost-counts-segment-one-2026-10-19.out，E184 装置没有正式跑单元表，判定词逐格比由重跑登记 5.3 的比较脚本做；欠在 C901（E161 与 E184 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e184-r2-prereg.md #2：自检产物 e184-regular-layer-cost-counts-selfcheck-2026-10-23.out，E184 装置没有正式跑单元表，复跑由 replay.sh 的 driver_e184 逐字节比；欠在 C901（E161 与 E184 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e161-r3-prereg.md #1：可行性档改前产物 e161-crash-state-dedup-and-time-split-feasibility-r2-2026-10-05.out，E161 装置没有正式跑单元表，行 3 的比对由登记里的比对脚本做；欠在 C901（E161 与 E184 重跑的比对对象没有单元表）
+# r1 至 r4 四份登记的比对对象表已被 r5 那份取代（r5 的比对对象表把它们的正式跑都重列了一遍），不再登记；那四份的表头不是固定形态，格看不见它们。
+# 单元表里有、这里不登记的 6 个单元（对着 research/prompts/e165-r5-prereg.md 第十一节末尾那张比对对象表 19 行逐个判过，都不是比对对象，一个一行）：
+#   「r3 合法」：比对对象表里 r3 档只有第 14 行对抗一族与第 15 行择根，没有合法一族；这个单元对的是 replay.sh 的 driver_e165_r6_r3_legal，产物 e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out 是之后 r6 那一次新跑的。
+#   「r5 合法」：r5 档是这份登记第三段新跑的（5.6 第三段那一行列的 segment3-r5-legal-family.out），是被比的一侧，不是比对对象表里的「上一次」。
+#   「r5 对抗」：r5 档第三段新跑的 segment3-r5-adversarial-family.out，是被比的一侧，不是比对对象表里的「上一次」。
+#   「r5 多盘」：r5 档第三段新跑的 segment3-r5-multi-disk.out，是被比的一侧，不是比对对象表里的「上一次」。
+#   「奇数版本的 r5 合法」：r5 档第三段新跑的 segment3-r5-odd-marker-legal-family.out，是被比的一侧，不是比对对象表里的「上一次」。
+#   「奇数版本的 r5 对抗」：r5 档第三段新跑的 segment3-r5-odd-marker-adversarial-family.out，是被比的一侧，不是比对对象表里的「上一次」。
+E165	research/prompts/e165-r5-prereg.md	r1 合法	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out	driver_e165
+E165	research/prompts/e165-r5-prereg.md	r1 合法	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-01-light-legal-family.out	driver_e165_light
+E165	research/prompts/e165-r5-prereg.md	r1 对抗	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out	driver_e165_adversarial
+E165	research/prompts/e165-r5-prereg.md	r2 合法	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-legal-family.out	none:replay.sh 里没有复跑行，r2 直接建表的合法一族
+E165	research/prompts/e165-r5-prereg.md	r2 对抗	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-adversarial-family.out	none:replay.sh 里没有复跑行，r2 直接建表的对抗一族
+E165	research/prompts/e165-r5-prereg.md	奇数版本的 r2 合法	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-legal-family.out	none:replay.sh 里没有复跑行，反奇偶的合法一族
+E165	research/prompts/e165-r5-prereg.md	奇数版本的 r2 对抗	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-adversarial-family.out	none:replay.sh 里没有复跑行，反奇偶的对抗一族
+E165	research/prompts/e165-r5-prereg.md	r2 多盘	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out	driver_e165_r2_segment3_multi_disk
+E165	research/prompts/e165-r5-prereg.md	两份表都取的 r2 合法	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out	driver_e165_r2_segment4_table_both_legal
+E165	research/prompts/e165-r5-prereg.md	两份表都取的 r2 对抗	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out	driver_e165_r2_segment4_table_both_adversarial
+E165	research/prompts/e165-r5-prereg.md	两份表都取的 r2 多盘	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out	driver_e165_r2_segment4_table_both_multi_disk
+E165	research/prompts/e165-r5-prereg.md	两份表都取、盘次序反报的 r2 合法	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out	driver_e165_r2_segment4_reversed_disk_order_legal
+E165	research/prompts/e165-r5-prereg.md	两份表都取、盘次序反报的 r2 多盘	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out	driver_e165_r2_segment4_reversed_disk_order_multi_disk
+E165	research/prompts/e165-r5-prereg.md	r3 对抗	crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out	driver_e165_r3_segment1_adversarial

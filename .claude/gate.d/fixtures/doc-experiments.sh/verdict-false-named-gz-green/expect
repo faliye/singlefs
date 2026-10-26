@@ -1,0 +1,7 @@
+exit=0
+want=1 份文件在 research/results 下找到、0 份登记了却找不到
+want=1 个字段是 false，其中 1 个已点名、0 个没点名
+want=登记产物里判决字段是 false 的都在对应实验页里点了名（点名 1 个）
+want=样本只跑 .gate-cells 点名的格：verdict-false-named
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（verdict-false-named），0 格本次未跑（无）

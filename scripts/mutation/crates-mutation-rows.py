@@ -19,13 +19,17 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                                           STRAY    <行号> <变异名> <段名> <转义>         原文或替换文里有 \\n 以外的反斜杠转义
                                           LITERAL  <文件> <行号> <字面量> <解析到的路径> ② crates/ 下 .rs 里以 "../ 起头、按所在 crate 的根解析之后
                                                                                          逃出 crates/、又不在拷贝范围里的字符串字面量（只 code-source-discipline 判，checker-tier-crates-mutation-replay 靠基线）
+                                          UNDEFINED <行号> <变异名> <文件> <标识符，逗号分隔>  替换文施加之后新出现、被改文件与它所在的包的 .rs 里都一处没有的标识符
+                                                                                         （replacement_undefined_identifiers；替换文自己绑定的、方法与路径里的段、宏、属性里的、_ 起头的、
+                                                                                         标准库预导入与基本类型不算；只 static-check 判，checker-tier-crates-mutation-replay 派活之前不判、套用后编不过记无效）
+                                          IDENTIFIERS_CHECKED <判了标识符的行数> <没判的行数（文件不是 .rs 或锚点失效）>
                                           COPIED   <拷贝范围，空格分隔>
                                           CHECKED  <成形的行数> <.rs 份数> <逃出 crates/ 的字面量处数（在范围里的与不在的合计）>
                                         门禁 code-source-discipline 调它；--table 不给就读 <根>/crates/mutations.tsv（不在当空表）；
                                         参数不对（缺 <根>、--table 缺值、<根> 不是目录）与 --table 指的文件不在都打 ERROR 行（原因）、
                                         下一行「→ 怎么办」，退 2
   judging-units <根> [--units]          判法单元指纹（见「判法单元」）：打「<sha256> <单元数>」，带 --units 再逐个打单元（种类、文件:起-止、限定名、指纹）；算不出（拒算）退 2
-  toolchain <根>                        行键里的工具链行（rustc -vV、cargo -V、构建环境解析后的值）；双机分片的驱动拿两台的比。算不出退 2
+  toolchain <根>                        行键里的工具链行（rustc -vV、cargo -V、构建环境解析后的值，照起 cargo 时的环境算、含关调试信息那四个变量）；双机分片的驱动拿两台的比。算不出退 2
   library-directory <根>                这棵树此刻那一份判定库的路径（双机分片的驱动从第二台拷回来比对用）；算不出退 2
   row-plan <根>                         双机分片的驱动（scripts/mutation/mutation-shard-run.sh）分行用：每一条成形的变异打一行
                                           <行号> <行键，拒算写 -> <这一趟会不会复用，1 或 0> <上一次现跑的秒数，没记过写 -> <anchor-broken 或 ->
@@ -44,7 +48,8 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   --item <行号或变异名> [--item …] <根>  只判点名的几行：交给门禁 checker-tier-crates-mutation-replay.sh --item（同一份选行模式，点名单跑与整张跑时那一行判定相同，
                                         判定库照写、照复用）；点名的不在表里退 2。是重型（.claude/hooks/lib_heavy_tests.py 按名字认）
   llvm-tools <根>                       打找到的 llvm-profdata、llvm-cov 与它们的 LLVM 版本；找不到或与 rustc 的 LLVM 版本对不上退 1、给出路
-  --selftest                            自证（假 cargo、假 llvm 工具、假内存包装，在临时仓里跑 run_stage；格数由成功行现算）
+  --selftest                            自证（假 cargo、假 llvm 工具、假内存包装，在临时仓里跑 run_stage；格数由成功行现算）；
+                                        有格的前提没造出来（并发领片号那一格两次调用没重叠）记本次未跑、逐格列出，别的格都对时退 77，不判绿
 
 拷贝范围 = .claude/gate.d/stage-inputs.tsv 里 checker-tier-crates-mutation-replay 那一行登记的路径（读本模块所在那一份仓的登记表：判别力样本的目录里没有登记表），
   底下每一段都不叫 target（各 crate 自己的编译目录）。checker-tier-crates-mutation-replay 照它拷每片的源码副本，code-source-discipline 照它静态判；判法只有 is_copied_into_each_shard 一处。
@@ -71,8 +76,10 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
 判法单元（judging_units，JUDGING_ENTRIES）：判「抓没抓到」的那几个函数——结局分类 verdict_of_run（连同它调到的 libtest 结果行解析，
   scripts/gate/lib_libtest_result_lines.py 一份）、基线分类 baseline_problem、覆盖复用判据 baseline_reuse_problem、切 fn 规则
   （lib_mutation_units.py 的 UnitKeys.mutated_units、resolve_test、executed_units，连同它们调到的 lib_function_units.py）——从它们收 python 闭包合起来，
-  指纹 = 闭包里单元（种类，去注释指纹）的多重集。只改注释、文档串、别的函数（阶段脚本的调度、内存包装、判定库的存放、派活与报数）指纹不变；
-  改了闭包里任何一个函数，整张表的行键都变。闭包里有拒算（getattr 变量名、折不出的 import 路径这一类）就算不出，这一道判红、一条都不跑。
+  指纹 = 闭包里单元（种类，去注释指纹）的多重集；scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES 那两份（D13 已定项 17 的文件级排除）不在这里排：
+  lib_function_units.py 经 executed_units 管覆盖落进哪几个单元，覆盖决定基线复用，是判对错的一环，它的单元照进指纹、里面的拒算照算。
+  只改注释、文档串、别的函数（阶段脚本的调度、内存包装、判定库的存放、派活与报数）指纹不变；
+  改了闭包里任何一个函数（含 lib_function_units.py 的切单元），整张表的行键、基线键与覆盖号都变。闭包里有拒算（getattr 变量名、折不出的 import 路径这一类）就算不出，这一道判红、一条都不跑。
 
 行键（KeyContext.components，文件头「复用」那一句的逐样）：
   被改坏的单元   原文所在那份 .rs 里与原文重叠的最里层单元（fn 项；函数外的项按项单元：const、static、struct、impl 头、宏……）的（种类，指纹）；
@@ -82,7 +89,7 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   点名测试       cargo 参数选中的目标里那条 #[test] fn 单元的闭包键（入口 = 那条测试函数，lib_function_units.py 的 rust_closure_of，
                  带上 cargo 参数里的特性）；认不出是哪一个单元、或闭包拒算，这一行拒算
   开关与特性     cargo 参数里不是名字的开关（--release、--include-ignored 这一类）与特性
-  工具链         lib_mutation_units.py 的 toolchain_lines（rustc -vV、cargo -V、构建环境解析后的值）
+  工具链         lib_mutation_units.py 的 toolchain_lines（rustc -vV、cargo -V、构建环境解析后的值），照起 cargo 时的环境算：含关调试信息那四个变量（见「调试信息」）
   依赖版本       点名测试的闭包与被改坏的单元真点名的外部 crate 在 Cargo.lock 里落到的包与传递依赖（lib_mutation_units.py 的 dependency_lines）
   拒算的行每趟照跑、不复用、不写记录，成功句另报「拒算 R 条」，stderr 逐行写为什么。
 
@@ -91,7 +98,8 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
     records/<行键>        一条变异的判定（判定、要打的那一行、判定日期、跑法、点名测试的闭包号、被改坏的单元号、工具链与依赖的号）；
                           只有超时、内存撞顶那两档另记这一趟的上限与限时（这两档本来不复用）
     baselines/<基线键>    一条点名测试在没改坏的副本上的基线（基线键 = 判法单元、测试 fn 单元指纹、开关与特性、工具链、依赖）
-    coverage/<覆盖号>     覆盖记录（覆盖号 = 测试 fn 单元指纹、开关与特性、工具链）：那条测试执行过的单元及各自的指纹，不带用例全名与快照号
+    coverage/<覆盖号>     覆盖记录（覆盖号 = 判法单元指纹、测试 fn 单元指纹、开关与特性、工具链）：那条测试执行过的单元及各自的指纹，不带用例全名与快照号；
+                          判法单元变了（含 lib_function_units.py 切单元的改动）覆盖号跟着变，旧记录不再被引用，下一趟重记
     compositions/、units/  组成清单（判法单元、每份点名测试的闭包、工具链行、依赖版本行）与单元表：作废时照它报变了哪几个单元
     index/<变异名与文件>  这一行上一次的键与几样组成的号：只用来说清现判的原因，不当复用的依据
     timings/<六段>        上一次现跑的用时与超没超时（派活次序用；import 不导：另一台的快慢不代表本机）
@@ -129,6 +137,9 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
     这一趟源码副本总目录底下的一个文件（不在那一条的 TMPDIR 里，不进「删前留有几个文件」）；包装的峰值表仍按原命令记键（RUN_WITH_MEMORY_CAP_KEY）。
   包装排队时每 60 秒往 stderr 报一行（scripts/hosts/run-with-memory-cap.sh 的 WAITING_REPORT_EVERY_SECONDS）；这里收包装的 stderr 判结局，
     那几行（WRAPPER_QUEUE_LINE）边跑边另转打到本进程的 stderr，行首带是哪一行变异或哪一批基线（run_forwarding_queue_lines）；收进来判结局的输出与 stdout 都不变。
+  包装排队时现查别的机器（包装文件头「排队时去找别的机器」「整体兜底」）打的四种行首（HOST_LOOKUP_LINE：「run-with-memory-cap: 没查到别的机器：」
+    「run-with-memory-cap: 现查别的机器：」「  → <机器>此刻放得下（」「  ! 告警记录写不进（」）只出提示、不改结局：判结局（verdict_of_run）读输出之前去掉它们，
+    那一句带的末几行也就不带它们；升档证据两句（「撞了内存上限」「超过限时」）不在其中。包装 HostLookup 新加一处 say 而 HOST_LOOKUP_LINE 不认，自证那一格红。
 
 并行理由（包装文件头「日常一条」：包装 2026-10-06 撤了「同一个会话同时只许一条」，并行理由它已经不看；下面照旧设着，无害）：
   这里起的每次包装（基线的批与每条变异）都带 RUN_WITH_MEMORY_CAP_PARALLEL_REASON=「同一次 checker-tier-crates-mutation-replay（本模块进程 <pid>）的第 <i> 个工作进程，
@@ -151,6 +162,39 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   整道不因它判红，成功句写明抓到几条、本次未跑几条；一条抓到的都没有、只有本次未跑的退 77（选行模式照旧退 3 / 1）。
   GATE_MUTATION_NOT_RUN_RECORD=<文件> 设了，每条本次未跑往里追加一行（阶段把它转给 gate.sh 的 GATE_NOT_RUN_FILE）；写不进去整道判红。
   只有「抓到」复用，本次未跑的下一趟照跑。
+  带 gpu 特性的格另有两种记本次未跑（多机配置不在、给定状态全交 CPU 判），见下面「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」。
+
+带 gpu 特性的格经清场起（gpu_quiesce_prefix、separate_gpu_quiesce_lines；.claude/rules/verification.md「凡用 GPU 先清场，跑完不复原」）：
+  这一道起的 cargo test 里 `--` 之前开了上卡的特性（GPU_TEST_FEATURES：checker 档包的 gpu，与产品 GPU 包 singlefs-background-gpu 真显卡对拍的 tests-on-a-real-gpu；
+  --features / -F 里写这些名字或 <包>/<名字>，或 --all-features）、真跑测试的那几次（基线的批、变异、记覆盖的插桩跑），
+  命令前面另套一层 bash scripts/crash/gpu-quiesce-run.sh --（套在内存包装外面：清场等锁、清场命令不算进测试的限时，也不跑在带内存上限的 scope 里）；
+  清场、回读、几趟同时用卡、跑完不复原都照那一份，用哪张卡由用例照清场之后的显卡配置取。只编不跑的几次（--no-run：先编、插桩编译、先编一份依赖）与不带 gpu 特性的不经它。
+  按格套、不整趟套：只有这几格上卡；整趟套要改阶段脚本与双机分片的驱动，整张表跑几个钟头里一直挂着清场登记。
+  清场包装自己打的几种行（GPU_QUIESCE step=…、回读看的卡、清了场、没复原）挪出那一次的输出，判结局与尾巴只看命令自己的。
+  包装退 78、打了 GPU_QUIESCE step=command result=not-started（清场回读没过、多机配置没写全清场键、锁等不到：命令没起）：
+    变异那一条记「清场没过没跑」（不交判法：不算抓到、不算没红，不写用时表），另起一行「清场没过没跑：N 条」（「计数：」那一行的格式不动），整道判红、出路是等卡上那个进程跑完再点名重跑；
+    基线那一批记基线不绿，那一句写明清场回读没过、命令没起；记覆盖的插桩跑记「覆盖没记成」（不判红）。
+  清场包装取 GATE_MUTATION_GPU_QUIESCE_RUNNER（设了用它，自证用），没设取本模块所在仓的 scripts/crash/gpu-quiesce-run.sh（它照那一份仓的多机配置清场）。
+  双机分片的驱动在第二台起的那一份照第二台那棵树的清场包装与多机配置清场。
+
+带 gpu 特性的格把多机配置交给测试、跑完核真用了卡（gpu_test_run、gpu_rows_multi_host_configuration、gpu_card_unused_reason）：
+  工作进程在源码副本里起 cargo，副本不是 git 工作树，测试照 git common-dir 找不到多机配置，GPU 开关就是关的、全交 CPU 判。
+  所以上面那几次（--features 开了 gpu、真跑测试：基线的批、变异、插桩跑；与清场同一份判法 gpu_test_run）的环境里设 SINGLEFS_MULTI_HOST_CONFIG=<多机配置的绝对路径>；
+  只编不跑的几次与不带 gpu 特性的不设（调用方自己设了的照原样往下传，不动）。
+  多机配置在哪：调用方设了 SINGLEFS_MULTI_HOST_CONFIG 照它（相对路径按本进程的当前目录取成绝对路径）；没设取本模块所在仓的
+  ${GATE_MUTATION_MULTI_HOST_CONFIG:-<git common-dir 的上一层>/multi-host.env}（取不到 common-dir 退回本模块所在仓的根，同 scripts/gate/admission.py 的
+  multi_host_configuration_file；GATE_MUTATION_MULTI_HOST_CONFIG 是自证换它用的）。那份文件不在的，不设，那一行照下面的「GPU 用不上」记。
+  变异那一条判出「没红」（verdict_of_run 交 failure）、点名的测试恰好对上一个用例而且都是 ok 的，再看这一条用没用上卡，用不上记「本次未跑」（同文件头「本次未跑」：
+  不算抓到、不算没红，逐条打出来，整道不因它判红）：
+    ① 多机配置不在（上一段）：GPU 用不上；
+    ② 点名的测试那一段输出（libtest 的「---- <全名> stdout ----」；输出里一段都没有时看整份）里有 CRASH_POINT_REPLAY_GIVEN_STATES 行，
+       而每一行的 states_judged_by_the_gpu_here 都是 0：给定状态全交 CPU 判，GPU 一个状态都没判。
+  点名的测试打了 FAILED 的照记抓到（.claude/rules/mutation-sampling.md「改了一个格式常量之后」一节的次序：FAILED 先于本次未跑），不再看用没用卡。
+  不打 CRASH_POINT_REPLAY_GIVEN_STATES 行的点名测试（GPU 对拍、取卡、卡池这些不经给定状态判的），不另判用没用卡、照常判：
+    要卡的用例都经 crate singlefs-checker-tier 的 gpu_unit_checks::gpu_test_start 取卡（用例 every_gpu_test_takes_its_cards_through_gpu_test_start 判这一条），
+    它不读多机配置的 GPU 开关：卡起来了就在卡上跑，本机没有 NVIDIA 卡打 NOT_RUN_NO_GPU_ADAPTER（上面「本次未跑」那一路已经认），
+    有卡而一张都起不来当场 panic（测试红），没有悄悄改交 CPU 判的一支；不要卡的（源码扫描、假设备的账本单测）判的东西跟卡无关。
+  弄坏开关 gpu-rows-configuration-unpassed、gpu-unused-as-missed、given-states-count-ignored（见下）。
 
 
 弄坏开关（GATE_MUTATION_BREAK，只给证红用，逗号分隔可给几个；CRATES_MUTATION_ROWS_BREAK 是同义名，直接起本模块自证时用，两个变量都认）：
@@ -165,6 +209,10 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   baseline-by-tree-snapshot  基线 ok 只按整树快照复用（改前的判法）（自证「加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用」
                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错）
   judge-units-whole-file  判法单元指纹取闭包碰到的那几份文件的整份原文（改前的取法）（自证「只改判法脚本的注释：判法单元指纹不变」那一格必须判错）
+  judging-function-units-excluded  判法单元指纹不收 lib_function_units.py 的单元（D13 已定项 17 文件级排除用在 crates 变异判法上的样子）
+                       （本模块自证「改 lib_function_units.py 的 RustFile.row 一处函数体：判法单元指纹变，闭包里有 lib_function_units.py 的单元」那一格必须判错）
+  coverage-id-without-judging  覆盖号不带判法单元指纹（改前的样子）
+                       （本模块自证「覆盖号随判法单元指纹变：改 lib_function_units.py 的 RustFile.row 一处函数体，同一条点名测试的覆盖号跟着变」那一格必须判错）
   coveragenotrecorded  抓到之后不记覆盖（自证「头一趟每条点名测试记一份覆盖、同一条测试的几行共用一份」
                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错；另有记覆盖次数的四格跟着判错：
                        「头一趟起 1 批基线 + 4 条变异，另记 4 份覆盖」「下一趟只跑剩下的 2 条」「插桩编译那一步写出的剖析文件」「会话里平常跑……4 个工作进程」）
@@ -178,6 +226,26 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   gpumemoryasoutput    内存包装退 245（显存不够）不单列、照输出判（本模块自证「包装退 245（显存不够）记显存不够、不算抓到」那一格必须判错）
   cargoconfignotcopied 拷每片源码副本时跳过拷贝范围里的 .cargo/（登记漏了它时的样子）：副本里的 cargo 读不到 .cargo/config.toml 的 [env]
                        （本模块自证「拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到」那一格必须判错）
+  gpu-rows-unquiesced  带 gpu 特性的格也不经清场包装、只经内存包装起（改前的样子）
+                       （本模块自证「带 gpu 特性的行：真跑测试的那几次…各经 gpu-quiesce-run.sh 起…」「带 gpu 特性的行：变异那一趟清场回读没过…」
+                       「带 gpu 特性的行：基线那一批清场回读没过…」三格必须判错；产品 GPU 包那三格「产品 GPU 包（--features tests-on-a-real-gpu）的行：真跑测试的那几次各经…」
+                       「产品 GPU 包的行：变异那一趟清场回读没过…」「产品 GPU 包的行：清场过了、点名的测试没卡打 NOT_RUN_NO_GPU_ADAPTER…」同样判错，共六格）
+  product-gpu-feature-unquiesced  产品 GPU 包的 tests-on-a-real-gpu 不当上卡的特性认，只认 gpu（改前的样子：这一包的真显卡对拍行不经清场、也不交多机配置）
+                       （本模块自证「产品 GPU 包（--features tests-on-a-real-gpu）的行：真跑测试的那几次各经…」「产品 GPU 包的行：变异那一趟清场回读没过…」
+                       「产品 GPU 包的行：清场过了、点名的测试没卡打 NOT_RUN_NO_GPU_ADAPTER…」三格必须判错）
+  quiesce-refusal-unread  清场包装退 78、命令没起也不认，照命令的输出判（变异记成点名的测试没跑到、基线记成一行都没出现）
+                       （本模块自证「带 gpu 特性的行：变异那一趟清场回读没过…」「带 gpu 特性的行：基线那一批清场回读没过…」「产品 GPU 包的行：变异那一趟清场回读没过…」三格必须判错）
+  gpu-rows-configuration-unpassed  带 gpu 特性的格不往环境里设 SINGLEFS_MULTI_HOST_CONFIG、也不认多机配置不在（改前的样子）
+                       （本模块自证「带 gpu 特性的行：真跑测试的那几次在副本里起的 cargo 环境里有 SINGLEFS_MULTI_HOST_CONFIG…」
+                       「带 gpu 特性的行：多机配置不在…」两格必须判错）
+  gpu-unused-as-missed  带 gpu 特性的格判出没红时不核用没用上卡（改前的样子：多机配置不在、给定状态全交 CPU 判的也记没红）
+                       （本模块自证「带 gpu 特性的行：多机配置不在…」「带 gpu 特性的行：给定状态全交 CPU 判…」两格必须判错）
+  given-states-count-ignored  有 CRASH_POINT_REPLAY_GIVEN_STATES 行就当没用上卡，不读 states_judged_by_the_gpu_here 的数
+                       （本模块自证「带 gpu 特性的行：给定状态有 GPU 判过的…照常判」那一格必须判错）
+  undefinedidentifiersunchecked  static-check 不判替换文里新引的标识符（改前的样子）
+                       （本模块自证「static-check 的 UNDEFINED：替换文引了已删的标识符 halved_before 的那一行报一行…」那一格必须判错）
+  overlapunchecked     并发领片号那一格不核两次调用重叠没有、照判对错（改前的样子）
+                       （本模块自证「先起的那次在后起的那次开始之前就退了（样本）：并发领片号那一格认出两次调用没重叠、记本次未跑…」那一格必须判错）
   staticusagebare      static-check 参数不对时只打改前那一行用法，不写缺了什么、不给「→ 怎么办」（本模块自证「static-check 缺 <根>」那一格必须判错）
   tablemissingok       static-check --table 指的文件不在时照旧当空表判、报「CHECKED 0 …」退 0（本模块自证「static-check --table 指的文件不在」那一格必须判错）
   shardrootkeptonsignal  run_pool 不接 TERM / HUP（改前的样子：收到就停，$TMPDIR 下的 singlefs-mutation-replay-* 留着）
@@ -192,8 +260,13 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                        （本模块自证「片号大于这一趟工作进程数的 -w<片号> 连同 -coverage 开跑时回收、不大于的留着、打一行删了几份多大」那一格必须判错）
   inusetargetremoved   回收之前不核有没有进程在用（工作目录、命令行、CARGO_TARGET_DIR、在用标记），多出来的照删
                        （本模块自证「多出来的 -w<片号> 有进程在用的不删」那一格必须判错）
-  targetdefaulttmp     GATE_MUTATION_TARGET_DIR 与 GATE_CROSS_RUN_TMPDIR 都没设时编译目录照改前退回 ${TMPDIR:-/tmp}
-                       （本模块自证「两个变量都没设时编译目录不落 /tmp、落在跨轮缓存家目录下」那一格必须判错）
+  targetdefaulttmp     没设 GATE_MUTATION_TARGET_DIR 时编译目录照更早的样子放 ${TMPDIR:-/tmp}/singlefs-crates-mutation-target（跨轮共用、跑完不删）
+                       （本模块自证「跑完运行目录里不剩它建的编译目录（没设 GATE_MUTATION_TARGET_DIR：…）」与「跑完运行目录里不剩它建的编译目录（被 TERM 停）」两格必须判错）
+  runtargetkept        跑完不删这一趟自己建的编译目录（连同它所在的 $TMPDIR 下的 singlefs-mutation-replay-*；改前的样子：编译目录跨轮留着）
+                       （本模块自证「跑完运行目录里不剩它建的编译目录（没设 GATE_MUTATION_TARGET_DIR：…）」与「跑完运行目录里不剩它建的编译目录（被 TERM 停）」两格必须判错；
+                       连带「被 TERM 停（双机分片的驱动停这一份的样子）：…」那一格，$TMPDIR 下的 singlefs-mutation-replay-* 留着）
+  runtargetopenfilesunchecked  删这一趟的编译目录之前不核有没有进程开着里面的文件
+                       （本模块自证「这一趟的编译目录里还有进程开着文件：不删、报出那个进程」那一格必须判错）
   local-shard-numbering  工作进程的片号不领锁、照改前从本调用的共享计数器现领本地序号（改前的样子：两次并发调用的第 2 片都指向同一个 -w2）
                        （本模块自证「同一个共用编译目录上并发的两次调用各起 2 个工作进程：领到的片号集合不相交、四把片号锁都被占」那一格必须判错）
   sharedcrashlibrary   起 cargo 时不换崩溃判定库的家目录、不清调用方点名的单份库（改前的样子：变异版的结论写进真跑的长期库）
@@ -215,6 +288,8 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                        （本模块自证「编译并行度按内存上限收…」那一格必须判错；一个工作进程的两趟 4G / 9G 那一格在核数大于 2 的机器上也跟着判错）
   memorycompilemerged  包装退 250 不分编译那一趟与测试那一趟，都记内存撞顶、出路都写「无界分配」（改前的样子）
                        （本模块自证「先编那一趟撞了内存上限：记编译撞顶…」那一格必须判错）
+  hostlookuplineskept  判结局（verdict_of_run）照旧读内存包装现查别的机器打的那几行（不去 HOST_LOOKUP_LINE，包装文件头「整体兜底」）
+                       （本模块自证「包装现查别的机器打的那几行内容不同，判出的档与那一句逐字相同…」那一格必须判错）
   crashlibraryacrossshards  变异复跑的崩溃判定库几片共用一份、不按片号分子目录（改前的样子）
                        （本模块自证「崩溃判定库每片各一份…」「两个工作进程同时在跑…」「变异复跑起的 cargo 写自己的崩溃判定库」「设了 GATE_MUTATION_CRASH_LIBRARY_HOME」四格必须判错）
   exactduplicated      记覆盖那一趟把行里已有的 --exact 与自己补的叠成两个（改前的样子，libtest 报 Option 'exact' given more than once、覆盖记不成）
@@ -224,6 +299,10 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                        （本模块自证「闭包算不成（并行算…）」与「--list-items 遇到闭包算不成」两格必须判错）
   wgsl-whole-file      scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：.wgsl 照改前当数据单元、
                        取整份字节的 sha256（本模块自证「WGSL 按 fn 取键」那一格必须判错）
+  rocksdb-entry-unchecked  起任何 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+                       （本模块自证「RocksDB 预编库的取值缺了：起 cargo 之前判红、退 1、假 cargo 一次都不起」那一格必须判错）。
+                       entry 的跳过办法：被判的树里没有依赖 rocksdb 的清单（自证的小仓就是这样），或 PATH 上的 cargo 是带
+                       「# rocksdb-prebuilt-entry: selftest-fake-cargo」那一行的假 cargo（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）
 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：
   自证 reuse-three-questions 一格：一份小仓（SELFTEST_UNIT_ROWS 五行）头一趟、同一份输入第二趟、同一个文件里加一个没人调的函数（闭包外）、
     改被改坏的函数 check_root 的别一行（闭包内：原文在它里面的 root-457、root-double 两行现判）各跑一趟，打规范输出
@@ -233,18 +312,18 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   每一趟 run_stage 开跑前从库里抽哨兵：候选是此刻行键在 records/ 里有「抓到」记录的行（直接读记录，与 row_decision 分开）；抽中强制现判的那一行
     栏写「复用哨兵强制现判」、照现判跑。哨兵被现判、强制现判那一行不是抓到，整道判红。种子与条数取环境里的 SINGLEFS_REUSE_SENTINEL_SEED、
     SINGLEFS_REUSE_SENTINEL_COUNT；SINGLEFS_GATE_FULL=1、GATE_MUTATION_START_OVER=1 不抽。自证别的格设 SINGLEFS_REUSE_SENTINEL_COUNT=1000（键相同的全当哨兵、不抽强制现判）。
-编译目录（default_shared_target_directory，阶段脚本不另算）：GATE_MUTATION_TARGET_DIR 设了用它；不然 GATE_CROSS_RUN_TMPDIR 设了（gate.sh 设成它开跑前的 TMPDIR）
-  放它底下的 singlefs-crates-mutation-target；都没设放 ${SINGLEFS_CROSS_RUN_CACHE_HOME:-~/.local/share/singlefs/cross-run-cache}/singlefs-crates-mutation-target，
-  不退回 $TMPDIR 或 /tmp（command-safety.md「有意跨轮复用的缓存」：放 GATE_CROSS_RUN_TMPDIR 下或项目定的位置）。第 1 片用它，其余片加 -w<片号>，记覆盖的再加 -coverage。
-  回收（reclaim_extra_target_directories）：派活之前，同一层里片号大于这一趟工作进程数的 -w<片号> 与 -w<片号>-coverage 删掉，stderr 打一行删了几份、共多大；
-  删之前核没人在用——有进程的工作目录在它底下、命令行里有它底下的路径、环境里 CARGO_TARGET_DIR 指到它底下，或那一片的在用标记
+编译目录（default_shared_target_directory，阶段脚本不另算；用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）：GATE_MUTATION_TARGET_DIR 设了用它（调用方给的，跑完不删）；
+  没设时 run_pool 在这一趟自己的运行目录（$TMPDIR 下的 singlefs-mutation-replay-*，下称 shard_root）里建 <shard_root>/build/singlefs-crates-mutation-target，
+  这一趟的全部编译目录（第 1 片用它，其余片加 -w<片号>，记覆盖的再加 -coverage，先编一份依赖的 -seed、-seed-coverage、-seed-source，片号锁 .slot）都在 <shard_root>/build 里；
+  正常结束、判红、被 TERM / HUP 停都在 run_pool 的收尾删掉（scripts/hosts/run_build_directory.py：删之前核本机没有进程开着里面的文件，有就是这一趟的子进程没收干净，
+  不删、连同 shard_root 留着、逐个报进程，整道判红）。GATE_CROSS_RUN_TMPDIR 与跨轮缓存家目录不再读。
+  回收（reclaim_extra_target_directories）只对调用方给的 GATE_MUTATION_TARGET_DIR 起作用：派活之前，同一层里片号大于这一趟工作进程数的 -w<片号> 与 -w<片号>-coverage 删掉，
+  stderr 打一行删了几份、共多大；删之前核没人在用——有进程的工作目录在它底下、命令行里有它底下的路径、环境里 CARGO_TARGET_DIR 指到它底下，或那一片的在用标记
   （工作进程活着时在自己的编译目录里拿着 .singlefs-mutation-worker.lock 的共享锁，回收一侧试拿排他锁拿不到）被别的进程拿着，就留着、逐份写明谁在用。
-  代价：这一趟工作进程少（--item 只点一两行）之后，下一趟整张跑时多出来的那几片要从头冷编一次。
-  片号（claim_worker_slot）跨调用经锁领：共用编译目录那一层里每个片号一把锁文件（第 1 片 <共用目录>.slot，其余片 <共用目录>-w<片号>.slot），
+  片号（claim_worker_slot）经锁领：编译目录那一层里每个片号一把锁文件（第 1 片 <编译目录>.slot，其余片 <编译目录>-w<片号>.slot），
   工作进程启动时从 1 往上试拿排他 flock（不阻塞），拿到第一个空闲的就是它的片号，锁拿到进程退出（stderr 每个工作进程报一行「领到片号 <n>」）。
-  同一台机器上并发的两次调用因此拿到不相交的片号集合，不再两边的第 2 片都指向同一个 -w2 而被 cargo 的「Blocking waiting for file lock on build directory」互相排队；
-  编译目录仍按片号跨轮复用（不按仓路径或会话号分目录：--staged 的临时 worktree 每趟都会冷编）。片号锁文件建不了、或前 4096 片都被占：报一行，退回本调用内的本地序号。
-  回收（reclaim_extra_target_directories）同样核片号锁：别的调用的工作进程刚领到的那一片，被占着的不删。
+  调用方给的同一个 GATE_MUTATION_TARGET_DIR 上并发的两次调用因此拿到不相交的片号集合，不再两边的第 2 片都指向同一个 -w2 而被 cargo 的目录锁互相排队。
+  片号锁文件建不了、或前 4096 片都被占：报一行，退回本调用内的本地序号。回收同样核片号锁：别的调用的工作进程刚领到的那一片，被占着的不删。
 逐行上限（read_row_limits、limits_for_lines）：核心部分的行各自要的内存与限时写在 .claude/gate.d/crates-mutation-light-rows.tsv 里，单起一行
   「# 逐行上限：<变异名><TAB><内存上限，systemd 写法，或 -><TAB><限时秒，或 ->[<TAB># 依据]」（# 开头：那张表的核法 crates-mutation-light-rows.py 与门禁取名字的 awk 都不读它）。
   点名的变异名照 crates/mutations.tsv 第一列认，同名的几行都拿它；没写的行、写 - 的那一样照整张表的那一个数（表头「# 每条变异的内存上限：」、GATE_MUTATION_MEMORY_MAX、默认 4G；
@@ -265,10 +344,15 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   与改前的单个工作进程一样报出来；不在这里改它的上限，那是登记它的人该改的）。头一行写「逐行上限最大 X、按额度排队」，最大那一格比外层大时另写这一句。
   每条变异的上限本身不动（量到峰值之后再定）；上限与限时都不进行键，改了不作废记录（只记在超时、内存撞顶那两档的记录里）。
   第四项是磁盘余量，下一段。
-磁盘余量（disk_bound_for，第四项）：每个工作进程最多占两份编译目录（普通一份、插桩一份，prepare_shard 与 judge_coverage 起的），一份涨满按「编译目录上限」（下下段）算。
-  派活之前按目标盘（编译目录所在那块）的余量核：片号 1…n 各两份「还能涨的量」（上限减去此刻已占，目录还没建的是整个上限）加起来，再加备用 GATE_MUTATION_DISK_RESERVE（默认 30G，推的），
+磁盘余量（disk_bound_for，第四项）：每个工作进程最多占两份编译目录（普通一份、插桩一份，prepare_shard 与 judge_coverage 起的），一份涨到多少按实测峰值算：
+  每个工作进程每判完一格（trim_worker_target，清之前）量一次自己那份编译目录的占盘，追加进判定库目录下的 target-occupancy.tsv（一行「<时刻秒><TAB>普通|插桩<TAB><字节>」，
+  record_target_occupancy），派活之前两种各取最近 20 次里最大的当这一种的涨幅（measured_target_peaks；记录多过 1000 行时只留每种最近 20 行）；
+  哪一种还没有读数（头一趟、换了库）的那一种按「编译目录上限」（下下段）算，上限只当清理线。头一行写明每种的涨幅与来源。下面「还能涨的量」「上限」照这个涨幅读；
+  开 2 个以上工作进程时先编一份依赖的 -seed、-seed-coverage 两份也每一趟新编，各按一份上限另算（n ≥ 2 才加）。
+  派活之前按目标盘（编译目录所在那块）的余量核：片号 1…n 各两份「还能涨的量」（上限减去此刻已占，目录还没建的是整个上限；每一趟自己建的都还没建）加起来，
+  n ≥ 2 再加先编那两份，再加备用 GATE_MUTATION_DISK_RESERVE（默认 30G，推的），
   不超过余量的最大 n 就是这一项；n 从 1 数到前三项最小的那个数再多 1（放得下再多 1 个才不与前三项并列成「卡在」）。一个都放不下按 1 个开（头一行写「那一项不足 1」）。
-  头一行写：磁盘余量多少、来源、备用多少、每份涨到多少，n 个共还要多少，再多 1 个要多少、放不下，所以给 n 个；「卡在「磁盘余量」这一项」。
+  头一行写：磁盘余量多少、来源、备用多少、每份涨到多少（含先编那两份），n 个共还要多少，再多 1 个要多少、放不下，所以给 n 个；「卡在「磁盘余量」这一项」。
   余量的来源：外层给了 GATE_MUTATION_DISK_FREE（systemd 写法，例 400G）就用它（双机分片的驱动、自证用）；没给读编译目录往上第一层存在的目录所在的盘此刻可用的字节（statvfs）；
   两样都读不到（写法不认的整道拒；statvfs 失败的）没有这一项，头一行写「磁盘余量没读到」及原因，工作进程数不按磁盘收。已有的编译目录按此刻占盘量，
   回收（reclaim_extra_target_directories）发生在这一步之后，所以只回收得掉的多出来的目录不算作余量（偏保守）。
@@ -276,8 +360,44 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
 编译目录上限（trim_target_directory、trim_worker_target，GATE_MUTATION_TARGET_DIR_CAP，默认 64G 是推的）：每个工作进程每判完一格（基线的批、一条变异、一组覆盖），
   量一次它自己那份编译目录（判基线与变异的普通那份，判覆盖的插桩那份）此刻的占盘；超过上限就清掉 <目录>/<档>/incremental 与 <目录>/<目标三元组>/<档>/incremental
   （rustc 每编一次改坏的副本往里加一个会话目录，只增不减；两格之间没有 cargo 在这份目录上跑），清完回读再量，stderr 报清了几处、共多大、清后多大。
-  依赖与测试二进制不动（那是下一趟复用的缓存）：清完仍超上限的只报「清后仍超上限」，由人在这一趟收尾后手删或调大上限。清不成（权限、文件被占）只报、不丢这一格的判定。
-  本机量到的一份普通编译目录 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（2026-10-21），所以清增量产物不保证清到线下；磁盘余量那一项已经按「涨到上限」算，不依赖清得掉。
+  清完增量仍超上限的，再清 <目录>/<档>/deps 与 <目录>/<目标三元组>/<档>/deps 里同名产物的旧版本（stale_dependency_artifacts）：文件名「<名字>-<16 位单元哈希>[.<后缀>]」
+  按（目录、名字、后缀）归堆，每堆按修改时刻只留最新那一版；同一个包换了特性或档编出的另一版也算同名，之后的格要用它时 cargo 照「产物不在」重编（慢，判定不变）。
+  清完回读仍超上限就停派：工作进程往这一趟 shard_root 里的停派目录（target_over_cap_directory）写一句，run_pool 每收一格看一眼，有就不再派活、等在跑的收完，
+  整道判红，拒绝说明逐份点名清后仍超线的编译目录、出路是调大上限或换盘（判完的格已入库，再跑一趟只跑剩下的）。清不成（权限、文件被占）只报、不丢这一格的判定、不停派。
+  本机量到的一份普通编译目录 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（2026-10-21），所以清增量产物不保证清到线下；磁盘余量那一项按实测峰值算，不依赖清得掉。
+调试信息（cargo_debug_overrides、key_toolchain_lines）：这一道起的每条 cargo（基线、变异的先编与跑、插桩编译与插桩跑、先编一份依赖）都带
+  CARGO_PROFILE_DEV_DEBUG、CARGO_PROFILE_TEST_DEBUG、CARGO_PROFILE_RELEASE_DEBUG、CARGO_PROFILE_BENCH_DEBUG = CARGO_DEBUG_SETTING（false）：cargo test 用 test 档（承 dev），
+  cargo test --release 用 release 档（bench 承 release），四档都设，顶掉调用方设的同名变量与仓根 Cargo.toml 的 [profile.release] debug = true。只设在起 cargo 的那一份环境里。
+  取值进行键：算工具链行时照起 cargo 的环境算（lib_mutation_units.py 的 toolchain_lines 收 CARGO_PROFILE_*），run_stage、plan、row-plan、import、--list-items 与 toolchain 子命令同一份；
+  取值改了（连同这一段头一次进来）整张表现判一次，栏是「工具链或依赖变了」，不迁移旧键。
+  不改判定：调试信息只进 DWARF 段，opt-level、overflow-checks、debug-assertions 不动；插桩的覆盖映射不靠 DWARF（2026-10-22 量过：一个探针包关掉调试信息、带 -Cinstrument-coverage
+  编出来的测试二进制没有 .debug_info 段，llvm-cov export 照样报执行过的函数计数 1、没执行的 0）。
+  量到的（本机，2026-10-22，singlefs-core 的测试目标冷编）：开着时写盘 916 MB、编译目录 826 MB、测试二进制 79 MB；关掉后 510 MB、421 MB、17 MB。
+先编一份依赖（prepare_seed、sync_dependency_artifacts）：每个工作进程各有一份源码副本与一份编译目录（-w<片号>，插桩的再加 -coverage），冷的那几份各自把外部依赖
+  （Cargo.lock 里带 source 的包：libc、vstd、wgpu、rocksdb 这一类）编一遍。这一趟开 2 个以上工作进程、要现跑的行（基线与变异）选的包顺 Cargo.lock 够得着外部依赖时，
+  派活之前先在 <编译目录>-seed（插桩的 <编译目录>-seed-coverage）里按组各编一次（组 = 一行 `--` 之前的参数只留选包、特性、档与目标三元组，seed_group_of；
+  先编那一组用它头一行自己选的目标，cargo 才连开发依赖一起编），每个工作进程起来时把这两份里外部依赖的产物拷进自己的两份编译目录（大小与修改时刻都对得上的不拷，拷的保留修改时刻）。
+  插桩那一份只编这一趟可能要记覆盖的行（现判的行里覆盖记录不是此刻的那几行，CoveragePlanner.predicted_rows）所在的组。
+  工作区里的包（Cargo.lock 里的 path 包）照旧各编各的、不拷：编出来的二进制把 CARGO_MANIFEST_DIR 编死在里面（env!），换了路径的副本拿着拷来的产物 cargo 照样判 Fresh
+  （cargo 1.98 量过），跑的时候读的就是先编那一份副本的文件；unit-graph 这类在跑的时候读别的包的源码，改坏的包不是它的依赖时它不重编，判定就变了。
+  先编那一份的源码副本 <编译目录>-seed-source 每一趟新建（调用方给了 GATE_MUTATION_TARGET_DIR 时跟着它留着）、按内容同步（.claude/rules/test-script-discipline.md「编译与算法都要快」那一节的修改时刻规矩）：内容没变的文件不重写、修改时刻不动；
+  变了、新加、删掉的文件所在的包（crates/<目录>，有 Cargo.toml 的）整包把修改时刻摸成此刻，不在哪个包底下的改动摸全部包。先编每一组都带 --message-format=json-render-diagnostics，
+  摸过的包编出来的每一个产物，在普通（或插桩）那一份里头一次出现时都要不是 fresh（那个包有 Compiling 行）；有一个头一次出现就是 fresh，整道判红、一条都不跑（stale_seed_artifacts）。
+  同一份里前面的组已经以非 fresh 编出过的同一个产物，后面的组复用它、cargo 报 fresh 是对的，不算坏：产物认 cargo JSON 里的单元身份（seed_unit_identity：package_id、manifest_path、
+  目标的 kind、crate_types、name，档、特性、filenames、executable；filenames 里 deps/ 下的文件名带 cargo 按包、特性、档、目标三元组、rustc 参数与依赖算的单元哈希，同一份编译目录里两个单元不会同名），
+  只按包名不放行：同包另一套特性或档编出来的单元是另一个身份，头一次出现就是 fresh 照判坏。普通与插桩两份各记各的。
+  建的时候（同步源码、编）拿 <编译目录>-seed.lock 的排他锁，工作进程拷的时候拿共享锁（调用方给的同一个 GATE_MUTATION_TARGET_DIR 上几次调用共用这一份时也不互相顶掉；产物按单元哈希起名）。
+  内存上限：外层读得到用整个外层（这时还没有工作进程在跑），读不到用每条的默认上限 × 工作进程数；并行度 = min(核数, 上限 ÷ COMPILE_GIB_PER_JOB)，GATE_MUTATION_CARGO_JOBS 设了用它（seed_limits）。
+  串行段声明（scripts/hosts/core_usage.py 文件头「声明」）：先编那一段几组共用一份编译目录、cargo 锁着它逐组编，每组的并行度又已按内存上限收过，
+    所以开编之前往 SINGLEFS_SERIAL_DECLARATIONS 写一行「此刻串行：<理由>」（理由写组数、并行度与内存上限），编完（连同编坏、读写出错）写「此刻并行」。
+    调用方没设这个变量时设成这一趟 shard_root 里的 serial-declarations，并放进起 cargo 的环境：agent-watch.py 到重活那棵树的进程环境里找它，
+    本进程改自己的环境 /proc 里看不到，起的 cargo 与包装看得到。写不进只报一行，不碍编。
+  拷（copy_seed_dependencies、sync_dependency_artifacts）：每个工作进程起来时各拷各的（几个工作进程同时拷），一个工作进程里普通、插桩两份要拷的文件
+    再分到 CARGO_BUILD_JOBS（核数 ÷ 工作进程数）条线程上拷；拷是读写盘，不声明串行。
+  先编没编成（退出码不是 0）的那一份只报、不判红，工作进程照旧自己编依赖（判定不受影响，只是慢）；拷的时候出错同样只报。编完照「编译目录上限」清一次那两份的增量产物；
+  「磁盘余量」给这两份各留一份上限（每一趟新编）。只开 1 个工作进程、要现跑的行都够不着外部依赖（树里没有 Cargo.lock 的自证小仓就是这样）时不起，stderr 写明没起的原因。
+  量到的（本机，2026-10-22，singlefs-core 的测试目标、关掉调试信息）：冷编一份写盘 510 MB、CPU 31.6 秒；拷依赖产物 175 个文件 98 MB；拷完之后在另一份新副本里编，
+  只有 singlefs-core、singlefs-format、singlefs-replay-prefix 三个工作区包重编，依赖 16 个全 Fresh，写盘 343 MB、CPU 21.3 秒（与拿着整份旧编译目录的工作进程 343 MB、20.6 秒相同）。
 测试线程数：不压。起 cargo test 时 RUST_TEST_THREADS 与仓里各测试读的线程数变量（SINGLEFS_THREAD_CAP 等）调用方设了什么就原样透传；只有 CARGO_BUILD_JOBS（编译并行度）按核数 ÷ 工作进程数收。
 编译并行度（compile_jobs_for）：上一句算出来的是一个工作进程的上限。先编那一趟（cargo test … --no-run：基线、变异的先编与插桩编译）另按这一行的内存上限收，
   取 上限 ÷ COMPILE_GIB_PER_JOB（1.75 GiB，向下取整、至少 1）与它的小者：每条 4G 时至多 2、8G 至多 4。1.75 是推的，只有一个读数（单编 librocksdb-sys，上限 4G，
@@ -319,16 +439,44 @@ libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总
     本模块自证「会话里平常跑（假包装照日常一条演）、4 个工作进程：各条照样判对，每次包装带自己那个工作进程的并行理由」
   overridecallerreason 调用方设了的并行理由也换成自己的
     本模块自证「调用方设了的并行理由原样传给每次包装、不覆盖」
-下面三个开关（磁盘余量、编译目录上限、先编借额度）一行一个，下一行起写打开后必须判错的自证项：
+下面六个开关（磁盘余量、编译目录上限、先编借额度）一行一个，下一行起写打开后必须判错的自证项：
   disknotchecked       工作进程数不看磁盘余量（改前的样子：2026-10-20 第二台 9 个工作进程把盘写满）
     本模块自证「磁盘余量放不下 9 份…」「已有的编译目录只算还能涨的…」「磁盘余量交给 run_stage…」「外层没给磁盘余量时读编译目录所在的盘…」四格必须判错
   targetcapignored     编译目录超过上限也不清增量产物（改前的样子：产物只增不减）
-    本模块自证「编译目录超过上限：清掉两处增量产物…」「清完仍超线：只清增量产物…」「编译目录上限交给 run_stage…」三格必须判错
+    本模块自证「编译目录超过上限：清掉两处增量产物…」「清完仍超线：只清增量产物…」「编译目录上限交给 run_stage…」「编译目录清完增量仍超上限：deps 里同名产物只留最新一版…」
+    「编译目录清完仍超上限（1K）：头一格判完就停派…」五格必须判错
+  depsnotpruned        清完增量仍超上限也不清 deps 里同名产物的旧版本（改前的样子）
+    本模块自证「编译目录清完增量仍超上限：deps 里同名产物只留最新一版…」那一格必须判错
+  overcapdispatched    清完仍超上限只报、照派（改前的样子）
+    本模块自证「编译目录清完仍超上限（1K）：头一格判完就停派…」那一格必须判错
+  diskbudgetbycap      磁盘预算不看实测峰值、每份编译目录一律按上限算（改前的样子）
+    本模块自证「磁盘预算按实测峰值算：…」那一格必须判错
   compilejobsownlimit  先编那一趟只按这一格自己的上限收，不向外层额度借（改前的样子：每条 4G 时至多 2）
     本模块自证「先编向外层额度借…」「借走的加在跑的各格上限不超过外层…」「外层 36G、2 个工作进程、每条 4G、核数 32：先编…收到的并行度全是 10…」
     「外层 36G、2 个工作进程、每条 4G：任一时刻在跑的各次包装的上限之和不超过 36G，先编借过额度…」四格必须判错
+下面九个开关（调试信息、先编一份依赖）一行一个，下一行起写打开后必须判错的自证项：
+  debuginfo-kept       起 cargo 时不设 CARGO_PROFILE_<档>_DEBUG（改前的样子：调试信息开着）
+    本模块自证「门禁起的每条 cargo 都关了调试信息」「改了构建档的取值之后行键变了」两格必须判错
+  debuginfo-unkeyed    起 cargo 时照设，算工具链行时不算进去（构建档的取值不进行键）
+    本模块自证「改了构建档的取值之后行键变了」那一格必须判错
+  compile-per-worker   不起先编那一份，每个工作进程自己编外部依赖（改前的样子）
+    本模块自证「4 个工作进程：外部依赖只在先编那一份里各编一次」那一格必须判错；「先编那一份的源码按内容同步」「先编那一份的修改时刻被留住」两格跟着判错（先编那一趟没起）；
+    「先编那一段声明串行段：调用方给的声明文件里…」「先编那一段声明串行段、调用方没设 SINGLEFS_SERIAL_DECLARATIONS…」两格也跟着判错（先编那一趟没起，没有声明）
+  workspaceunitsshared 从先编那一份拷产物时连工作区的包一起拷
+    本模块自证「先编那一份只拷外部依赖的产物」那一格必须判错
+  seedmtimekept        同步先编那一份的源码时，内容变了的文件写进去之后修改时刻改回原来的、一个包都不摸（修改时刻规矩坏了的样子）
+    本模块自证「先编那一份的源码按内容同步：改过的包重编、整道照常」那一格必须判错（先编那一趟判红）
+  seedfreshunchecked   先编那一趟不核摸过的包有没有重编
+    本模块自证「先编那一份的修改时刻被留住：先编那一趟判红、一条都不跑」那一格必须判错
+  seedfreshacrossgroups 先编那一趟每一组各判各的（改前的样子）：前面的组已经编过的产物，后面的组里 fresh 也记成坏的
+    本模块自证「先编那一份有两组：后一组复用前一组编出来的产物、cargo 报 fresh 不算坏，整道照常」那一格必须判错（先编那一趟判红）
+  seed-serial-undeclared 先编那一段不往 SINGLEFS_SERIAL_DECLARATIONS 写串行段声明（改前的样子：看门狗按核数过少报、看不到理由）
+    本模块自证「先编那一段声明串行段：调用方给的声明文件里…」「先编那一段声明串行段、调用方没设 SINGLEFS_SERIAL_DECLARATIONS…」两格必须判错
+  seed-copy-serial     工作进程从先编那一份拷依赖产物时照改前在一条线程上逐个拷
+    本模块自证「工作进程拷依赖产物分到几条线程上同时拷」那一格必须判错
 只供测试的开关：GATE_MUTATION_STOP_AFTER_ROWS=<k> 现跑的变异判完 k 条就不再派活、等在跑的收完，整道判红退出（造「跑到一半被杀」）。
 """
+import ast
 import collections
 import concurrent.futures
 import contextlib
@@ -345,11 +493,13 @@ import random
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import tomllib
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -378,6 +528,7 @@ SCRIPT_KEY = "scripts/mutation/crates-mutation-rows.py"   # 规范输出与复�
 STAGE = "checker-tier-crates-mutation-replay.sh"   # 登记表的键（拷贝范围）、阶段脚本的文件名
 STAGE_SCRIPT = os.path.join(STAGE_REPOSITORY, ".claude", "gate.d", STAGE)
 MODULE_PATH = os.path.realpath(__file__)
+ROCKSDB_PREBUILT_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "rocksdb-prebuilt.py")   # 起 cargo 之前判 RocksDB 预编库的取值（run_stage）
 DEFAULT_MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 TABLE = "crates/mutations.tsv"
 # 判定库（文件头「判定库」）：被判那棵树的 git common-dir（或 GATE_MUTATION_RECORDS_HOME）底下这一个目录，固定一处、不按版本号分目录
@@ -397,10 +548,10 @@ JUDGING_ENTRIES = (
 LLVM_TOOLS = ("llvm-profdata", "llvm-cov")
 LLVM_TOOLS_VARIABLE = "GATE_MUTATION_LLVM_TOOLS"
 COVERAGE_TARGET_SUFFIX = "-coverage"
-# 编译目录（文件头「编译目录」）：GATE_MUTATION_TARGET_DIR 设了用它；不然 GATE_CROSS_RUN_TMPDIR 设了放它底下；都没设放跨轮缓存家目录底下（不落 /tmp）
+# 编译目录（文件头「编译目录」）：GATE_MUTATION_TARGET_DIR 设了用它（跑完不删）；没设建在这一趟的 <shard_root>/build 里、跑完删
 TARGET_DIRECTORY_NAME = "singlefs-crates-mutation-target"
-CROSS_RUN_CACHE_HOME_VARIABLE = "SINGLEFS_CROSS_RUN_CACHE_HOME"
-DEFAULT_CROSS_RUN_CACHE_HOME = "~/.local/share/singlefs/cross-run-cache"
+RUN_BUILD_DIRECTORY_NAME = "build"
+RUN_BUILD_REMOVAL_FAILURES = []   # run_pool 收尾没删成的这一趟编译目录（有进程开着里面的文件、或删不成）：run_stage 照它整道判红
 # 变异复跑的崩溃判定库（文件头「变异复跑的判定库」）：起 cargo 时家目录换成它，不写进真跑的长期库
 MUTATION_CRASH_LIBRARY_HOME_VARIABLE = "GATE_MUTATION_CRASH_LIBRARY_HOME"
 CRASH_LIBRARY_HOME_VARIABLE = "SINGLEFS_CRASH_AMPLIFICATION_HOME"
@@ -415,6 +566,24 @@ WORKER_SLOT_LOCK_SUFFIX = ".slot"
 WORKER_SLOT_SEARCH_LIMIT = 4096
 COVERAGE_FLAG = "-Cinstrument-coverage"
 BUILD_PROFILES_DIRECTORY_NAME = "build-profiles"   # 插桩编译那一步（构建脚本、过程宏）写出的剖析文件的去处，在那一格的 TMPDIR 下，随 TMPDIR 一起删
+# 这一道起的 cargo 关调试信息（文件头「调试信息」）：cargo test 用 test 档（承 dev），cargo test --release 用 release 档（bench 承 release），四档都设。
+# 取值放在一格的列表里：自证「改了构建档的取值之后行键变了」那一格就地换它
+CARGO_DEBUG_PROFILES = ("DEV", "TEST", "RELEASE", "BENCH")
+CARGO_DEBUG_SETTING = ["false"]
+# 先编一份依赖（文件头「先编一份依赖」）：<共用目录>-seed（插桩的再加 -coverage）、源码副本 <共用目录>-seed-source、锁 <共用目录>-seed.lock
+SEED_TARGET_SUFFIX = "-seed"
+SEED_SOURCE_SUFFIX = "-seed-source"
+SEED_LOCK_SUFFIX = "-seed.lock"
+# 组的键（seed_group_of）：选目标的开关与只管输出的开关不进键，选包、特性、档、目标三元组与别的开关进键
+SEED_SELECTOR_SWITCHES = frozenset(("--lib", "--bins", "--tests", "--benches", "--examples", "--doc", "--all-targets"))
+SEED_VALUE_SELECTOR_SWITCHES = frozenset(("--test", "--bin", "--example", "--bench"))
+SEED_DROPPED_SWITCHES = frozenset(("-q", "--quiet", "--offline", "-v", "--verbose", "--no-run"))
+SEED_VALUE_DROPPED_SWITCHES = frozenset(("-j", "--jobs", "--color", "--message-format"))
+SEED_VALUE_KEPT_SWITCHES = frozenset(("-p", "--package", "--features", "-F", "--profile", "--target", "--manifest-path", "--config", "-Z"))
+# 编译目录里一个单元的产物与目录：deps/ 下「[lib]<名字>-<16 位哈希>[.<后缀>]」，.fingerprint/ 与 build/ 下「<包名>-<16 位哈希>」
+UNIT_ARTIFACT_NAME = re.compile(r"^.+-(?P<hash>[0-9a-f]{16})(?:\..+)?$")
+UNIT_DIRECTORY_NAME = re.compile(r"^(?P<name>.+)-[0-9a-f]{16}$")
+SEED_COPY_TEMPORARY_SUFFIX = ".singlefs-seed-copy"
 # 现判的栏（row_decision 交的栏名，次序就是报数的次序；拒算另报，不在栏里）
 REUSE_COLUMNS = (("start-over", "一律现判"), ("row-new", "行新加"), ("judging", "判法单元变了"), ("mutated", "被改坏的单元变了"),
                  ("test", "点名测试的闭包变了"), ("text", "原文或替换文变了"), ("environment", "工具链或依赖变了"),
@@ -473,6 +642,8 @@ TEST_NAME_FORM = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)*"
 # 点名的测试在本机没跑到被改坏的那一处时打的一行（见文件头「本次未跑」）；变异那一趟补 --show-output，libtest 才把成功用例的这一行交出来
 NOT_RUN_LINE = re.compile(r"^\s*NOT_RUN_NO_GPU_ADAPTER test=(\S+)(?: reason=(.*))?$", re.M)
 LIBTEST_SHOW_OUTPUT = "--show-output"
+# 开了就要上卡的 cargo 特性：checker 档包的 gpu，与产品 GPU 包（singlefs-background-gpu）真显卡对拍的 tests-on-a-real-gpu（Cargo.toml 的 [features] 与 [[test]] required-features 里的那个名字）
+GPU_TEST_FEATURES = frozenset({"gpu", "tests-on-a-real-gpu"})
 BYTES_PER_STAT_BLOCK = 512   # os.stat 的 st_blocks 按 512 字节一块数（POSIX）
 EXIT_SELECTION_ONLY = 3      # 只判了选中的行、都抓到：不是整道结论，门禁汇总记失败，不会被当成通过
 # run_pool 里接住这两个信号：先停自己起的工作进程、删 shard_root，再退 128 + 信号号（双机分片的驱动停这一份、门禁被打断时都走这一条）
@@ -546,6 +717,22 @@ def mutation_crash_library_environment(environment):
         return expanded_home_path(configured, environment), (CRASH_LIBRARY_DIRECTORY_VARIABLE,)
     real_home = environment.get(CRASH_LIBRARY_HOME_VARIABLE, "").strip() or DEFAULT_CRASH_LIBRARY_HOME
     return os.path.join(expanded_home_path(real_home, environment), MUTATION_CRASH_LIBRARY_SUBDIRECTORY), (CRASH_LIBRARY_DIRECTORY_VARIABLE,)
+
+
+def cargo_debug_overrides(environment):
+    """这一道起的 cargo 的构建档覆盖（文件头「调试信息」）：{CARGO_PROFILE_<档>_DEBUG: 取值}，起 cargo 的环境照它顶掉调用方的同名变量。
+    弄坏开关 debuginfo-kept：交空（改前的样子，调试信息照 Cargo.toml 与调用方的环境开着）。"""
+    if break_is(environment, "debuginfo-kept"):
+        return {}
+    return {f"CARGO_PROFILE_{profile}_DEBUG": CARGO_DEBUG_SETTING[0] for profile in CARGO_DEBUG_PROFILES}
+
+
+def key_toolchain_lines(root, environment):
+    """行键里的工具链行（文件头「行键」「调试信息」）：照起 cargo 时的环境算（调用方的环境加 cargo_debug_overrides），构建档的取值就进了键。
+    KeyContext 与 toolchain 子命令都调它。rustc / cargo 起不来抛 MutationUnitsError。弄坏开关 debuginfo-unkeyed：照调用方的环境算（构建档的取值不进键）。"""
+    if break_is(environment, "debuginfo-unkeyed"):
+        return mutation_units.toolchain_lines(root, environment)
+    return mutation_units.toolchain_lines(root, dict(environment, **cargo_debug_overrides(environment)))
 
 
 def compile_jobs_for(memory_max, requested_jobs, environment):
@@ -852,6 +1039,168 @@ def row_problems(root, rows, malformed, copied):
     return problems
 
 
+def package_directory_of(root, relative_path):
+    """被改文件所在的包：从它所在的目录往上找第一份 Cargo.toml，不越过 <根>、也不取 <根> 本身（仓根那一份是工作区）；找不到回 None。"""
+    root_directory = os.path.abspath(root)
+    directory = os.path.dirname(os.path.abspath(os.path.join(root, relative_path)))
+    while directory != root_directory and directory.startswith(root_directory + os.sep):
+        if os.path.isfile(os.path.join(directory, "Cargo.toml")):
+            return directory
+        directory = os.path.dirname(directory)
+    return None
+
+
+def rust_identifier_set(text):
+    """一段 Rust 源码里作为标识符出现过的词（lib_function_units.py 的 rust_lex：注释、字符串里的不算；r#name 记成 name）。"""
+    units = mutation_units.function_units()
+    kinds, texts, _lines, _documents = units.rust_lex(text)
+    return {word[2:] if word.startswith("r#") else word for kind, word in zip(kinds, texts) if kind == units.IDENT}
+
+
+def package_identifier_set(package_directory, cache):
+    """包目录底下每份 .rs（跳过 target）里出现过的标识符的并集；cache 是 {包目录: 集合}，同一趟 static-check 里每个包只读一遍。"""
+    if package_directory not in cache:
+        words = set()
+        for current_directory, directory_names, file_names in os.walk(package_directory):
+            directory_names[:] = sorted(name for name in directory_names if name != "target")
+            for file_name in sorted(file_names):
+                if file_name.endswith(".rs"):
+                    with open(os.path.join(current_directory, file_name), encoding="utf-8", errors="replace") as handle:
+                        words |= rust_identifier_set(handle.read())
+        cache[package_directory] = words
+    return cache[package_directory]
+
+
+def rust_unbound_references(kinds, words, watched):
+    """一串 rust_lex 词里，watched 中的名字哪几个有「引用」而没有一处「绑定」：按头一次引用的次序回出来（replacement_undefined_identifiers 判 UNDEFINED 用）。
+    words 是去掉 r# 的词。认作绑定的：let 之后到 = ; 单个 : 之前、for 之后到 in 之前的模式，闭包两条 | 之间的参数，fn struct enum const static type mod trait union mut ref
+    后面紧跟的名字，fn / impl / struct / enum / trait / type 之后尖括号里的泛型参数，后面接单个 : 的（参数名、字段名、类型标注前的绑定），后面接 @ 的，
+    match 臂 => 之前模式里小写起头的名字（往后只隔着模式里会有的词就到 =>；越过深度 0 的逗号时到 => 要在外层，越过的右花括号之后只许接 => , ) ] } | if）。
+    不算引用的：_ 起头的、#[…] / #![…] 属性里的、跟在 . 后面或 :: 前后的、后面接 ! 的。"""
+    units = mutation_units.function_units()
+    identifier, punctuation = units.IDENT, units.PUNCT
+    count = len(words)
+    padded = ["", ""] + words + ["", ""]   # rust_lex 的标点一个字符一个词：「::」是两个「:」，「=>」是「=」「>」；padded[index + 2] 是 words[index]
+    single_binders = ("fn", "struct", "enum", "const", "static", "type", "mod", "trait", "union", "mut", "ref")
+    pattern_words = ("ref", "mut", "if")
+    pattern_punctuation = (",", "(", ")", "[", "]", "{", "}", "|", "@", "&", ".", "-")
+
+    def is_identifier(index):
+        return 0 <= index < count and kinds[index] == identifier
+
+    def colon_alone(index):   # words[index] 是单个「:」，不是「::」里的
+        return words[index] == ":" and padded[index + 1] != ":" and padded[index + 3] != ":"
+
+    def arrow_at(index):
+        return words[index] == "=" and padded[index + 3] == ">"
+
+    def match_arm_binding(index):
+        depth, crossed_comma, step = 0, False, index + 1
+        while step < count and step < index + 400:
+            word = words[step]
+            if arrow_at(step):
+                return depth < 0 or not crossed_comma
+            if word == "if" and kinds[step] == identifier:
+                return True
+            if kinds[step] == identifier and word not in pattern_words and word in units.RUST_KEYWORDS:
+                return False
+            if kinds[step] == punctuation and word not in pattern_punctuation:
+                return False
+            if word in ("(", "[", "{"):
+                depth += 1
+            elif word in (")", "]", "}"):
+                depth -= 1
+                if word == "}" and depth < 0 and not (padded[step + 3] == "=" and padded[step + 4] == ">") \
+                        and padded[step + 3] not in (",", ")", "]", "}", "|", "if"):
+                    return False   # 出了外层的块（match 臂的块收尾），后面接的是下一臂
+            elif word == ",":
+                if depth < 0:
+                    return False
+                if depth == 0:
+                    crossed_comma = True
+            step += 1
+        return False
+
+    bound, references, pattern_until, attribute_depth, generic_depth = set(), [], None, 0, 0
+    for index in range(count):
+        word, kind = words[index], kinds[index]
+        if attribute_depth:   # #[…] / #![…] 里：数方括号到收尾
+            attribute_depth += {"[": 1, "]": -1}.get(word, 0) if kind == punctuation else 0
+            continue
+        if kind == punctuation and word == "[" and (padded[index + 1] == "#" or padded[index + 1] == "!" and padded[index] == "#"):
+            attribute_depth = 1
+            continue
+        if generic_depth:   # fn / impl / struct … 之后尖括号里：< 或 , 后面紧跟的名字是泛型参数
+            generic_depth += {"<": 1, ">": -1}.get(word, 0) if kind == punctuation else 0
+            if kind == identifier and padded[index + 1] in ("<", ",") and word in watched:
+                bound.add(word)
+            continue
+        if kind == punctuation and word == "<" and (is_identifier(index - 1) and padded[index] in ("fn", "struct", "enum", "trait", "type", "union")
+                                                    or padded[index + 1] == "impl"):
+            generic_depth = 1
+            continue
+        if pattern_until is not None:
+            if word in pattern_until and (word != ":" or colon_alone(index)):
+                pattern_until = None
+            elif kind == identifier:
+                bound.add(word)
+            continue
+        if kind == identifier and word == "let":
+            pattern_until = ("=", ";", ":")
+            continue
+        if kind == identifier and word == "for" and padded[index + 3] != "<":
+            pattern_until = ("in",)
+            continue
+        if kind == punctuation and word == "|" and padded[index + 1] in ("", "(", ",", "=", "move", "{", ";", ">", "return"):
+            pattern_until = ("|",)
+            continue
+        if kind != identifier or word not in watched:
+            continue
+        before, after = padded[index + 1], padded[index + 3]
+        if padded[index + 1] in single_binders or after == "@" or after == ":" and colon_alone(index + 1) \
+                or word[:1].islower() and after not in ("(", "{", "!", ":", ".") and match_arm_binding(index):
+            bound.add(word)
+            continue
+        if word.startswith("_") or before == "." or before == ":" and padded[index] == ":" or after in ("!", ":"):
+            continue
+        if word not in references:
+            references.append(word)
+    return [word for word in references if word not in bound]
+
+
+def replacement_undefined_identifiers(root, row, cache):
+    """static-check 的 UNDEFINED（文件头 static-check 那一段）：替换文施加之后新出现的标识符（施加之前整份被改文件里一处都没有的），
+    在被改文件所在的包的 .rs 里也一处不出现、又不是替换文自己绑定的，按头一次引用的次序回出来；对得上回 []。
+    先粗筛：替换文单独切词，去掉关键字、标准库预导入与基本类型的名字、_ 起头的、被改文件与它所在的包里出现过的；一个都不剩就回 []。
+    剩下的再细判：把替换文施加进被改文件、整份切词（这样替换文起止落在字符串或注释中间也切得对），只看施加前没有的那几个名字，
+    绑定与不算引用的写法照 rust_unbound_references。cache 是 {包目录: 标识符集合, ("file", 路径): 被改文件的标识符集合}。
+    不判的：文件不是 .rs、锚点失效（ANCHOR 已报）。弄坏开关 undefinedidentifiersunchecked：一个都不报。"""
+    if break_is(os.environ, "undefinedidentifiersunchecked") or not row.path.endswith(".rs") or anchor_problem(root, row) is not None:
+        return []
+    units = mutation_units.function_units()
+    predeclared = frozenset((
+        "_", "self", "Self", "super", "crate", "std", "core", "alloc",
+        "bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128", "isize", "f32", "f64",
+        "Some", "None", "Ok", "Err", "Option", "Result", "Vec", "String", "Box", "ToString", "ToOwned", "Clone", "Copy", "Default", "Drop",
+        "Eq", "PartialEq", "Ord", "PartialOrd", "Iterator", "IntoIterator", "Extend", "FromIterator", "DoubleEndedIterator", "ExactSizeIterator",
+        "Fn", "FnMut", "FnOnce", "From", "Into", "TryFrom", "TryInto", "AsRef", "AsMut", "Send", "Sync", "Sized", "Unpin", "drop"))
+    file_key = ("file", row.path)
+    with open(os.path.join(root, row.path), encoding="utf-8", errors="replace") as handle:
+        original_text = handle.read()
+    if file_key not in cache:
+        cache[file_key] = rust_identifier_set(original_text)
+    candidates = {word for word in rust_identifier_set(row.new)
+                  if word not in units.RUST_KEYWORDS and word not in predeclared and not word.startswith("_") and word not in cache[file_key]}
+    package_directory = package_directory_of(root, row.path) if candidates else None
+    if package_directory is not None:
+        candidates -= package_identifier_set(package_directory, cache)
+    if not candidates:
+        return []
+    kinds, texts, _lines, _documents = units.rust_lex(original_text.replace(row.old, row.new, 1))
+    words = [word[2:] if word.startswith("r#") else word for word in texts]
+    return rust_unbound_references(kinds, words, candidates)
+
+
 def string_literals(text):
     """源码里每一处字符串字面量（"…"、r#"…"#、b"…"）的 (起, 止)，注释里的不算；字面量的止点照 admission.py 的 end_of_literal。"""
     end_of_literal = admission_module().end_of_literal
@@ -959,15 +1308,20 @@ def judging_units(environment, repository=None):
     同一个进程里闭包碰到的那几份文件都没动过（修改时刻与大小）就沿用上一次算的（自证一趟起几十次 run_stage）。"""
     repository = repository or JUDGING_ROOT[0]
     whole_file = break_is(environment, "judge-units-whole-file")
-    cached = _JUDGING_CACHE.get((repository, whole_file))
+    function_units_excluded = break_is(environment, "judging-function-units-excluded")
+    cached = _JUDGING_CACHE.get((repository, whole_file, function_units_excluded))
     if cached is not None:
         key, references, stats = cached
         if all(_file_stat(os.path.join(repository, path)) == stat for path, stat in stats.items()):
             return key, references
     key, references, refusals = mutation_units.judging_units(repository, JUDGING_ENTRIES, whole_file=whole_file)
+    if key is not None and function_units_excluded:
+        # 弄坏开关（只给证红用）：lib_function_units.py 的单元不进指纹（D13 已定项 17 文件级排除用在这里的样子）
+        references = [reference for reference in references if reference.file != "scripts/gate/lib_function_units.py"]
+        key = mutation_units.key_of_lines([("form", ["judging-function-units-excluded"]), ("unit", [f"{reference.kind}\t{reference.fingerprint}" for reference in references])])
     if key is None:
         raise JudgingUnitsRefused("；".join(refusals[:3]) + (f" 等 {len(refusals)} 处" if len(refusals) > 3 else ""))
-    _JUDGING_CACHE[(repository, whole_file)] = (key, references, {path: _file_stat(os.path.join(repository, path)) for path in {reference.file for reference in references}})
+    _JUDGING_CACHE[(repository, whole_file, function_units_excluded)] = (key, references, {path: _file_stat(os.path.join(repository, path)) for path in {reference.file for reference in references}})
     return key, references
 
 
@@ -1074,7 +1428,7 @@ class KeyContext:
         self.root, self.environment = root, environment
         self.memory_max, self.timeout_seconds = memory_max, timeout_seconds
         self.judging, self.judging_references = judging_units(environment, judging_repository)
-        self.toolchain_lines = [] if break_is(environment, "rowkeywithouttoolchain") else mutation_units.toolchain_lines(root, environment)
+        self.toolchain_lines = [] if break_is(environment, "rowkeywithouttoolchain") else key_toolchain_lines(root, environment)
         self.toolchain = lines_key("toolchain", self.toolchain_lines)
         self.keys = mutation_units.UnitKeys(root)
         self._dependencies = {}
@@ -1129,7 +1483,9 @@ class KeyContext:
         baseline_key = mutation_units.key_of_lines([("form", [BASELINE_KEY_FORM]), ("judging", [self.judging]), ("test-unit", [test.unit.fingerprint]),
                                                     ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
                                                     ("toolchain", [self.toolchain]), ("dependency", [dependency])])
-        coverage_id = mutation_units.key_of_lines([("form", [COVERAGE_KEY_FORM]), ("test-unit", [test.unit.fingerprint]),
+        # 覆盖记录里的 executed 由 executed_units 落单元（lib_function_units.py 给行号区间）：判法单元指纹变了（含切单元的改动）旧记录不能再认，覆盖号带判法单元指纹
+        coverage_judging = [] if break_is(self.environment, "coverage-id-without-judging") else [("judging", [self.judging])]
+        coverage_id = mutation_units.key_of_lines([("form", [COVERAGE_KEY_FORM])] + coverage_judging + [("test-unit", [test.unit.fingerprint]),
                                                    ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
                                                    ("toolchain", [self.toolchain])])
         return Components(row_key, None, mutated, test.unit, test.full_name, closure.key, arguments.switches, self.toolchain, dependency,
@@ -1386,6 +1742,7 @@ def verdict_of_run(row, returncode, output, memory_max, timeout_seconds, environ
     """一条变异跑完之后判哪一档：(档, 那一条要打印的话)。environment 只看弄坏开关（notrunasmissed、memorycompilemerged）。
     compile_pass：这一趟交回的是先编那一趟（run_under_wrapper 的 compile_pass 标记）；包装退 250 时分两档：编译那一趟撞的记 compilememory（改坏之后的代码没编成，
     点名的测试没起，说不上被测代码无界分配），测试那一趟撞的记 memory。弄坏开关 memorycompilemerged：不分，照改前都记 memory。"""
+    output = strip_host_lookup_lines(output, environment)   # 包装现查别的机器打的那几行只出提示、不改结局：判法不读（HOST_LOOKUP_LINE）
     tail = output_tail(output)
     outcome = wrapper_outcome(returncode, memory_max, timeout_seconds)
     # 包装报的几种结局先判：被停、被杀的测试二进制可能已经打出了半截输出，不许拿它判抓到或没红
@@ -1443,16 +1800,41 @@ def raise_stop_requested(signal_number, _frame):
 
 
 @contextlib.contextmanager
-def own_workers_stopped_on_stop(pool, shard_root):
-    """收到停的信号时，在进程池等工作进程收工之前先停自己起的那几个工作进程（只对它们的进程号发 TERM），再删 shard_root，再往外抛。"""
+def own_workers_stopped_on_stop(pool, shard_root, environment):
+    """收到停的信号时，在进程池等工作进程收工之前先停自己起的那几个工作进程（只对它们的进程号发 TERM）、等它们退出（每个至多 60 秒），
+    再删这一趟自己建的编译目录（remove_owned_build_root：核过没有进程开着里面的文件）与 shard_root，再往外抛。编译目录没删成就连同 shard_root 留着。"""
     try:
         yield
     except StopRequested:
-        for process in list((getattr(pool, "_processes", None) or {}).values()):
+        processes = list((getattr(pool, "_processes", None) or {}).values())
+        for process in processes:
             with contextlib.suppress(OSError, ValueError):
                 process.terminate()
-        shutil.rmtree(shard_root, ignore_errors=True)
+        for process in processes:
+            with contextlib.suppress(OSError, ValueError, AssertionError):
+                process.join(60)
+        if remove_owned_build_root(shard_root, environment):
+            shutil.rmtree(shard_root, ignore_errors=True)
+        else:
+            note(f"  · 这一趟的临时目录 {shard_root} 留着（里面的编译目录没删）")
         raise
+
+
+def remove_owned_build_root(shard_root, environment):
+    """删这一趟自己建的 <shard_root>/build（文件头「编译目录」；调用方给了 GATE_MUTATION_TARGET_DIR 时没有它）：交回删了或本来就没有。
+    没删成（有进程开着里面的文件、删不成）记进 RUN_BUILD_REMOVAL_FAILURES（run_stage 判红）。弄坏开关 runtargetkept：不删、交回 False。"""
+    build_root = os.path.join(shard_root, RUN_BUILD_DIRECTORY_NAME)
+    if not os.path.lexists(build_root):
+        return True
+    if break_is(environment, "runtargetkept"):
+        note(f"  ! 弄坏开关 GATE_MUTATION_BREAK=runtargetkept：这一趟的编译目录 {build_root} 不删")
+        return False
+    removed, removal_lines = remove_run_build_root(build_root, environment)
+    for line in removal_lines:
+        note(line)
+    if not removed:
+        RUN_BUILD_REMOVAL_FAILURES.append(build_root)
+    return removed
 
 
 
@@ -1476,6 +1858,8 @@ def init_worker(sequence_counter, shard_root, context, budget=None):
         note(f"  … 工作进程 {os.getpid()} 起 cargo 用的崩溃判定库家目录：{shard_crash_library_home}（每片各一份，不与别的工作进程共用）")
     # 在用的标记（WORKER_TARGET_LOCK_NAME）：进程退出内核就放，别的一趟回收时拿不到排他锁就不删这份
     WORKER_STATE["target_lock"] = hold_worker_target_lock(target_directory)
+    # 先编一份依赖（文件头「先编一份依赖」）：先编成的那一份里外部依赖的产物拷进自己的两份编译目录（普通、插桩），工作区的包照旧自己编
+    copy_seed_dependencies(context, target_directory)
     # 这份副本的整树快照：只当基线记录的一样属性记下（弄坏开关 baseline-by-tree-snapshot 按它比），不当复用的依据
     snapshot = snapshot_identity(snapshot_of(work, context["copied"]))
     WORKER_STATE.update(work=work, environment=environment, context=context, shard_root=shard_root, worker_sequence=worker_sequence,
@@ -1549,19 +1933,32 @@ def expanded_home_path(path, environment):
 
 
 def default_shared_target_directory(environment):
-    """第 1 片的编译目录（其余片加 -w<片号>，记覆盖的再加 -coverage）：GATE_MUTATION_TARGET_DIR 设了用它；GATE_CROSS_RUN_TMPDIR 设了放它底下；
-    都没设放 ${SINGLEFS_CROSS_RUN_CACHE_HOME:-~/.local/share/singlefs/cross-run-cache} 底下，不退回 $TMPDIR 或 /tmp。
-    弄坏开关 targetdefaulttmp：都没设时照改前退回 ${TMPDIR:-/tmp}。"""
+    """调用方给的第 1 片编译目录（其余片加 -w<片号>，记覆盖的再加 -coverage）：GATE_MUTATION_TARGET_DIR 设了交它（跑完不删）；没设交 None，
+    run_pool 在这一趟的 <shard_root>/build 里建（run_build_target_directory）、收尾删。弄坏开关 targetdefaulttmp：没设时照更早的样子交
+    ${TMPDIR:-/tmp}/singlefs-crates-mutation-target（跨轮共用、不删）。"""
     explicit = environment.get("GATE_MUTATION_TARGET_DIR", "").strip()
     if explicit:
         return explicit
-    cross_run = environment.get("GATE_CROSS_RUN_TMPDIR", "").strip()
-    if cross_run:
-        return os.path.join(cross_run, TARGET_DIRECTORY_NAME)
     if break_is(environment, "targetdefaulttmp"):
         return os.path.join(environment.get("TMPDIR") or "/tmp", TARGET_DIRECTORY_NAME)
-    home = environment.get(CROSS_RUN_CACHE_HOME_VARIABLE, "").strip() or DEFAULT_CROSS_RUN_CACHE_HOME
-    return os.path.join(expanded_home_path(home, environment), TARGET_DIRECTORY_NAME)
+    return None
+
+
+def run_build_target_directory(shard_root):
+    """这一趟自己建的第 1 片编译目录：<shard_root>/build/singlefs-crates-mutation-target（别的片与先编那一份都是它在 build 里的兄弟）。"""
+    return os.path.join(shard_root, RUN_BUILD_DIRECTORY_NAME, TARGET_DIRECTORY_NAME)
+
+
+def planned_run_build_target_directory():
+    """run_pool 还没建 shard_root 时，磁盘余量按它将来所在的盘算（$TMPDIR 底下；路径此刻不在，disk_free_bytes 往上找到 $TMPDIR）。"""
+    return os.path.join(tempfile.gettempdir(), SHARD_ROOT_PREFIX + "planned", RUN_BUILD_DIRECTORY_NAME, TARGET_DIRECTORY_NAME)
+
+
+def remove_run_build_root(build_root, environment):
+    """删这一趟自己建的 <shard_root>/build（文件头「编译目录」）：删之前核本机没有进程开着里面的文件。回 (删成了没有, [要打的行])。
+    弄坏开关 runtargetopenfilesunchecked：不核开着的文件就删。"""
+    import run_build_directory   # scripts/hosts/run_build_directory.py（模块开头已把 scripts/hosts 放进 sys.path）
+    return run_build_directory.remove_run_build_directory(build_root, check_open=not break_is(environment, "runtargetopenfilesunchecked"))
 
 
 def hold_worker_target_lock(target_directory):
@@ -1713,9 +2110,10 @@ def reclaim_extra_target_directories(shared, worker_count, environment):
     return removed, kept, failed
 
 
-def target_reclaim_lines(shared, worker_count, outcome):
+def target_reclaim_lines(shared, worker_count, outcome, owned):
     removed, kept, failed = outcome
-    lines = [f"  … 编译目录：{shared}（第 1 片；其余片加 -w<片号>，记覆盖的再加 {COVERAGE_TARGET_SUFFIX}）；"
+    lines = [f"  … 编译目录：{shared}（第 1 片；其余片加 -w<片号>，记覆盖的再加 {COVERAGE_TARGET_SUFFIX}；"
+             + ("这一趟自己建的，跑完连同 build 整个删" if owned else "调用方给的 GATE_MUTATION_TARGET_DIR，跑完不删") + "）；"
              + (f"回收了片号大于这一趟 {worker_count} 个工作进程的 {len(removed)} 份，共 {format_size(sum(size for _path, size in removed))}"
                 f"（{'、'.join(os.path.basename(path) for path, _size in removed)}）" if removed
                 else f"片号大于这一趟 {worker_count} 个工作进程、要回收的 0 份")
@@ -1765,11 +2163,14 @@ def disk_free_bytes(shared, environment):
     return status.f_bavail * status.f_frsize, "编译目录所在的盘此刻可用"
 
 
-def disk_bound_for(shared, environment, ceiling):
+def disk_bound_for(shared, environment, ceiling, peaks):
     """磁盘余量放得下几个工作进程（文件头「磁盘余量」）：(个数或 None, 头一行要写的话)。
-    每个工作进程最多占两份编译目录（普通、插桩），每份涨到 TARGET_DIRECTORY_CAP 为止：片号 1…n 各份还能涨的量（上限减去此刻已占的，目录还没建的是整个上限）
-    加起来，再加备用 DISK_RESERVE，不超过目标盘余量的最大 n；n 从 1 数到 ceiling（前几项取最小的那个数，再多开也用不上）。一个都放不下交 0（调用方按 1 个开）。
-    余量没读到、写法不认交 None 与原因，头一行写明。弄坏开关 disknotchecked：不看磁盘（改前的样子）。"""
+    每个工作进程最多占两份编译目录（普通、插桩），每份涨到「每份的涨幅」为止：片号 1…n 各份还能涨的量（涨幅减去此刻已占的，目录还没建的是整个涨幅）
+    加起来；n ≥ 2 时先编一份依赖的 -seed、-seed-coverage 两份也按同样的算法加上（每一趟新编）；再加备用 DISK_RESERVE，不超过目标盘余量的最大 n；
+    n 从 1 数到 ceiling（前几项取最小的那个数，再多开也用不上）。一个都放不下交 0（调用方按 1 个开）。
+    每份的涨幅：peaks（measured_target_peaks 交的 {"普通": 字节或 None, "插桩": 字节或 None}，判定库里近几次每格判完量到的占盘峰值）里有那一种的读数就用它，
+    没有读数、peaks 是 None 的按 TARGET_DIRECTORY_CAP 算（上限只当清理线，没实测时才拿它顶）。
+    余量没读到、写法不认交 None 与原因，头一行写明。弄坏开关 disknotchecked：不看磁盘（改前的样子）；diskbudgetbycap：不看实测峰值、一律按上限算（改前的样子）。"""
     if break_is(environment, "disknotchecked"):
         return None, "弄坏开关 disknotchecked：不看磁盘余量"
     free, source = disk_free_bytes(shared, environment)
@@ -1779,17 +2180,27 @@ def disk_bound_for(shared, environment, ceiling):
     reserve = bytes_of_size(environment.get(DISK_RESERVE_VARIABLE, "").strip() or DEFAULT_DISK_RESERVE)
     if cap is None or reserve is None:
         return None, f"{TARGET_DIRECTORY_CAP_VARIABLE} 或 {DISK_RESERVE_VARIABLE} 的写法不认"
+    cap_text = environment.get(TARGET_DIRECTORY_CAP_VARIABLE, "").strip() or DEFAULT_TARGET_DIRECTORY_CAP
+    by_cap = peaks is None or break_is(environment, "diskbudgetbycap")
+    growth = {kind: cap if by_cap or peaks.get(kind) is None else peaks[kind] for kind in ("普通", "插桩")}
+    growth_text = "、".join(f"{kind}那份涨到 {cap_text}（没有实测读数，按上限）" if by_cap or peaks.get(kind) is None
+                            else f"{kind}那份涨到 {format_size(growth[kind])}（近几次每格判完量到的占盘峰值）" for kind in ("普通", "插桩"))
+
+    def room_of(directories):
+        return sum(max(0, growth[kind] - allocated_bytes_of_tree(directory)) if os.path.isdir(directory) else growth[kind]
+                   for kind, directory in zip(("普通", "插桩"), directories))
+    seed_base = os.path.normpath(shared) + SEED_TARGET_SUFFIX
+    seed_room = room_of([seed_base, seed_base + COVERAGE_TARGET_SUFFIX])
     count, total, next_total = 0, 0, None
     for sequence in range(1, max(1, ceiling) + 2):   # 多数一个：放得下天花板之外的一个，才不与前几项里最小的那一项并列成「卡在」
-        room = sum(max(0, cap - allocated_bytes_of_tree(directory)) if os.path.isdir(directory) else cap
-                   for directory in worker_target_directories(shared, sequence))
+        room = room_of(worker_target_directories(shared, sequence)) + (seed_room if sequence == 2 else 0)
         if reserve + total + room > free:
             next_total = total + room
             break
         total += room
         count = sequence
-    cap_text = environment.get(TARGET_DIRECTORY_CAP_VARIABLE, "").strip() or DEFAULT_TARGET_DIRECTORY_CAP
-    text = (f"磁盘余量 {format_size(free)}（{source}），留备用 {format_size(reserve)}，每个工作进程最多占两份编译目录（普通、插桩）、各涨到 {cap_text}（已有的目录只算还能涨的）："
+    text = (f"磁盘余量 {format_size(free)}（{source}），留备用 {format_size(reserve)}，每个工作进程最多占两份编译目录（{growth_text}），"
+            f"开 2 个以上时先编一份依赖的两份也照这两种涨幅算（已有的目录只算还能涨的）："
             f"{count} 个共还要 {format_size(total)}"
             + (f"，再多 1 个要 {format_size(next_total)}、放不下，所以给 {count} 个" if next_total is not None else f"，前几项的天花板 {ceiling} 个（连同再多 1 个）都放得下，这一项不卡"))
     return count, text
@@ -1815,9 +2226,10 @@ def incremental_directories_of(target_directory):
 
 
 def trim_target_directory(directory, cap_bytes, environment):
-    """一份编译目录占盘超过 cap_bytes 时清掉它底下的增量产物（incremental，rustc 每编一次改坏的副本都往里加、只增不减），回 (清前占盘, 清后占盘, [(清掉的目录, 字节)])。
+    """一份编译目录占盘超过 cap_bytes 时清掉它底下的增量产物（incremental，rustc 每编一次改坏的副本都往里加、只增不减），回 (清前占盘, 清后占盘, [(清掉的目录或文件, 字节)])。
+    清完增量仍超线的，再清 deps 里同名产物的旧版本（stale_dependency_artifacts：每个产物只留最新那一版）。
     没超线、目录不在、cap_bytes 是 None 都不动，清前清后交同一个数。清完回读再量一遍，不拿清前减清掉的估。只在两格之间调（run_pool 里每格判完），那时没有 cargo 在这份目录上跑。
-    依赖与测试二进制不动（那是下一趟复用的缓存），清完仍超线的由调用方报。弄坏开关 targetcapignored：不清（改前的样子）。"""
+    每个产物的最新一版不动，清完仍超线的由调用方报并停派（trim_worker_target）。弄坏开关 targetcapignored：不清（改前的样子）；depsnotpruned：只清增量、不清 deps 里的旧版本。"""
     if break_is(environment, "targetcapignored") or cap_bytes is None or not os.path.isdir(directory):
         return 0, 0, []
     before = allocated_bytes_of_tree(directory)
@@ -1828,7 +2240,41 @@ def trim_target_directory(directory, cap_bytes, environment):
         size = allocated_bytes_of_tree(path)
         shutil.rmtree(path)
         removed.append((path, size))
-    return before, allocated_bytes_of_tree(directory), removed
+    after = allocated_bytes_of_tree(directory)
+    if after > cap_bytes and not break_is(environment, "depsnotpruned"):
+        # 清完增量仍超线：deps 里同名产物只留最新那一版（stale_dependency_artifacts），清完再量（文件头「编译目录上限」）
+        for path in stale_dependency_artifacts(directory):
+            size = allocated_bytes_of_tree(path)
+            os.unlink(path)
+            removed.append((path, size))
+        after = allocated_bytes_of_tree(directory)
+    return before, after, removed
+
+
+def stale_dependency_artifacts(target_directory):
+    """<目录>/<档>/deps 与 <目录>/<目标三元组>/<档>/deps 里同名产物的旧版本：文件名照 cargo 写成「<名字>-<16 位单元哈希>[.<后缀>]」，
+    按（目录、名字、后缀）归堆，每堆按修改时刻只留最新的那一份，其余的交出来（路径的列表，按路径排）。名字里不带单元哈希的（cargo 拷到档那一层的工作区产物这一类）不动。
+    同一个包换了特性、档或参数编出来的另一版也算同名：留新的、删旧的，之后的格要用旧那一版时 cargo 照「产物不在」重编（慢，判定不变）。"""
+    stale, deps_directories = [], []
+    try:
+        levels = [entry.path for entry in os.scandir(target_directory) if entry.is_dir(follow_symlinks=False)]
+    except OSError:
+        levels = []
+    for level in sorted(levels):
+        deps_directories.append(os.path.join(level, "deps"))
+        with contextlib.suppress(OSError):
+            deps_directories += [os.path.join(entry.path, "deps") for entry in os.scandir(level) if entry.is_dir(follow_symlinks=False)]
+    for deps in sorted(set(path for path in deps_directories if os.path.isdir(path))):
+        piles = {}
+        with contextlib.suppress(OSError):
+            for entry in os.scandir(deps):
+                found = re.fullmatch(r"(.+)-[0-9a-f]{16}((?:\.[^.]+)*)", entry.name)
+                if found is None or not entry.is_file(follow_symlinks=False):
+                    continue
+                piles.setdefault((found.group(1), found.group(2)), []).append((entry.stat(follow_symlinks=False).st_mtime_ns, entry.path))
+        for pile in piles.values():
+            stale += [path for _mtime, path in sorted(pile)[:-1]]
+    return sorted(stale)
 
 
 def trim_worker_target(coverage):
@@ -1842,10 +2288,531 @@ def trim_worker_target(coverage):
     except OSError as error:
         note(f"  ! 编译目录 {directory} 超过上限时清增量产物没清成（{type(error).__name__}：{error}）；下一格判完再试")
         return
+    # 每格判完记一次占盘（清之前量的那个数，文件头「磁盘余量」：下一趟的磁盘预算按近几次的峰值算）；trim 没量的（目录不在、弄坏开关 targetcapignored）这里量
+    occupied = before or (allocated_bytes_of_tree(directory) if os.path.isdir(directory) else 0)
+    if occupied and context.get("library_directory"):
+        problem = record_target_occupancy(context["library_directory"], coverage, occupied)
+        if problem is not None:
+            note(f"  ! 编译目录占盘没记进 {target_occupancy_file(context['library_directory'])}（{problem}）；磁盘预算少一个读数，不碍这一格的判定")
     if before > (cap or before):
-        note(f"  … 编译目录 {directory} 占盘 {format_size(before)} 超过上限 {format_size(cap)}：清掉增量产物 {len(removed)} 处共 {format_size(sum(size for _path, size in removed))}，清后 {format_size(after)}"
-             + (f"；清后仍超上限（剩下的是依赖与测试二进制，不在清的范围里）：等这一趟收尾后手删这份目录，或把 {TARGET_DIRECTORY_CAP_VARIABLE} 调大"
-                if after > cap else ""))
+        incremental_removed = [size for path, size in removed if os.path.basename(path) == INCREMENTAL_DIRECTORY_NAME]
+        deps_removed = [size for path, size in removed if os.path.basename(path) != INCREMENTAL_DIRECTORY_NAME]
+        still_over = after > cap
+        note(f"  … 编译目录 {directory} 占盘 {format_size(before)} 超过上限 {format_size(cap)}：清掉增量产物 {len(incremental_removed)} 处共 {format_size(sum(incremental_removed))}"
+             + (f"、deps 里同名产物的旧版本 {len(deps_removed)} 份共 {format_size(sum(deps_removed))}" if deps_removed else "")
+             + f"，清后 {format_size(after)}"
+             + ("；清后仍超上限（剩下的是每个依赖与测试二进制的最新一版）：停派（文件头「编译目录上限」）" if still_over else ""))
+        if still_over and not break_is(context["environment"], "overcapdispatched"):
+            # 停派（文件头「编译目录上限」）：往这一趟 shard_root 里的停派目录写一份，父进程每收一格看一眼，有就不再派活。弄坏开关 overcapdispatched：只报不停（改前的样子）
+            report = (f"第 {WORKER_STATE.get('worker_sequence', '?')} 片的{'插桩' if coverage else '普通'}编译目录 {directory}："
+                      f"清前 {format_size(before)}、清后 {format_size(after)}，上限 {format_size(cap)}")
+            try:
+                write_atomically(os.path.join(target_over_cap_directory(WORKER_STATE["shard_root"]), f"{os.getpid()}-{'coverage' if coverage else 'plain'}"), report + "\n")
+            except OSError as error:
+                note(f"  ! 停派的标记没写成（{type(error).__name__}：{error}）：父进程照旧派活")
+
+
+def target_over_cap_directory(shard_root):
+    """这一趟的停派目录（文件头「编译目录上限」）：工作进程清完仍超上限往里写一份，run_pool 每收一格看一眼。"""
+    return os.path.join(shard_root, "target-over-cap")
+
+
+def target_over_cap_reports(shard_root):
+    """停派目录里每一份写的那一句（按文件名排）；目录不在或读不了的交 []。"""
+    reports = []
+    with contextlib.suppress(OSError):
+        for name in sorted(os.listdir(target_over_cap_directory(shard_root))):
+            with contextlib.suppress(OSError):
+                with open(os.path.join(target_over_cap_directory(shard_root), name), encoding="utf-8", errors="replace") as handle:
+                    reports.append(handle.read().strip())
+    return reports
+
+
+def target_occupancy_file(library_directory):
+    """每格判完量到的编译目录占盘记在判定库目录下这一份（文件头「磁盘余量」）：一行「<时刻秒><TAB>普通|插桩<TAB><字节>」，只追加。"""
+    return os.path.join(library_directory, "target-occupancy.tsv")
+
+
+def record_target_occupancy(library_directory, coverage, size_bytes):
+    """追加一行（O_APPEND，一行远小于 PIPE_BUF，几个工作进程同时追加不交错）；写进回 None，写不进回原因。"""
+    line = f"{int(time.time())}\t{'插桩' if coverage else '普通'}\t{size_bytes}\n".encode()
+    try:
+        descriptor = os.open(target_occupancy_file(library_directory), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(descriptor, line)
+        finally:
+            os.close(descriptor)
+    except OSError as error:
+        return f"{type(error).__name__}：{error}"
+    return None
+
+
+def measured_target_peaks(library_directory, recent):
+    """{"普通": 字节或 None, "插桩": 字节或 None}：两种编译目录各取最近 recent 次记录里最大的（文件头「磁盘余量」）；文件不在、读不了的都是 None，写坏的行不算。
+    记录多过 recent 的 50 倍时只留每种最近 recent 次，同目录临时文件改名换上（几趟同时用一份库时可能丢几个读数，只是预算少几个样本）。"""
+    kept = {"普通": [], "插桩": []}
+    path = target_occupancy_file(library_directory)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        fields = line.split("\t")
+        if len(fields) == 3 and fields[1] in kept and fields[2].isdigit():
+            kept[fields[1]].append((line, int(fields[2])))
+    if len(lines) > 50 * recent:
+        survivors = sorted((entry for values in kept.values() for entry in values[-recent:]), key=lambda entry: entry[0].split("\t")[0])
+        with contextlib.suppress(OSError):
+            write_atomically(path, "".join(entry[0] + "\n" for entry in survivors))
+    return {kind: max(size for _line, size in values[-recent:]) if values else None for kind, values in kept.items()}
+
+
+# ── 先编一份依赖（文件头「先编一份依赖」） ───────────────────────────────────────
+
+def seed_group_of(before):
+    """一行 cargo test 参数里 `--` 之前那一段 → (组的键, 先编这一组用的参数)。键只留选包、特性、档、目标三元组与别的开关（外部依赖编成什么只随它们变），
+    选目标的开关（--test <名>、--lib……）、TESTNAME 过滤词与只管输出的开关（-q、-j……）不进键；先编用的参数是键里那几样加这一行自己选的目标。"""
+    key, selectors, index = [], [], 0
+    while index < len(before):
+        word = before[index]
+        name, equals, _value = word.partition("=")
+        width = 1 if equals else 2
+        if name in SEED_VALUE_SELECTOR_SWITCHES:
+            selectors += before[index:index + width]
+            index += width
+        elif name in SEED_SELECTOR_SWITCHES:
+            selectors.append(word)
+            index += 1
+        elif name in SEED_VALUE_DROPPED_SWITCHES:
+            index += width
+        elif name in SEED_DROPPED_SWITCHES or not word.startswith("-"):
+            index += 1
+        elif name in SEED_VALUE_KEPT_SWITCHES:
+            key += before[index:index + width]
+            index += width
+        else:
+            key.append(word)
+            index += 1
+    return tuple(key), key + selectors
+
+
+def read_lock_file_packages(root):
+    """根下 Cargo.lock 的 [[package]]（读不了、读不懂、没有交空表）。"""
+    try:
+        with open(os.path.join(root, "Cargo.lock"), "rb") as handle:
+            packages = tomllib.load(handle).get("package", [])
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    return [package for package in packages if isinstance(package, dict) and isinstance(package.get("name"), str)]
+
+
+def path_packages_reaching_external(root):
+    """根下 Cargo.lock 里每个 path 包（没有 source 的）顺 dependencies 够不够得着带 source 的包：{包名: 真或假}。可选依赖照算（Cargo.lock 不分特性）。"""
+    packages = read_lock_file_packages(root)
+    by_name = collections.defaultdict(list)
+    for package in packages:
+        by_name[package["name"]].append(package)
+
+    def resolved(reference):
+        name, _space, rest = str(reference).partition(" ")
+        version = rest.split(" ")[0] if rest else None
+        return [package for package in by_name.get(name, []) if version is None or package.get("version") == version]
+    reaching = {}
+    for package in packages:
+        if "source" in package:
+            continue
+        seen, stack, found = set(), [package], False
+        while stack and not found:
+            for dependency in (item for reference in stack.pop().get("dependencies", []) for item in resolved(reference)):
+                identity = (dependency["name"], dependency.get("version"), dependency.get("source"))
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                if "source" in dependency:
+                    found = True
+                    break
+                stack.append(dependency)
+        reaching[package["name"]] = reaching.get(package["name"], False) or found
+    return reaching
+
+
+def seed_groups(rows, reaching):
+    """这一趟要先编的组：{组的键: 先编这一组用的参数}，按行的次序；选的包（-p，没写是整个工作区）都够不着外部依赖的组不编。"""
+    groups = collections.OrderedDict()
+    for row in rows:
+        key, arguments = seed_group_of(split_at_double_dash(row.arguments)[0])
+        if key in groups:
+            continue
+        packages = [key[index + 1] for index, word in enumerate(key[:-1]) if word in ("-p", "--package")]
+        packages += [word.partition("=")[2] for word in key if word.startswith(("-p=", "--package="))]
+        if any(reaching.get(package, False) for package in (packages or list(reaching))):
+            groups[key] = arguments
+    return groups
+
+
+@contextlib.contextmanager
+def seed_lock(shared, exclusive):
+    """先编那一份的锁：建（同步源码、编）的时候排他，工作进程拷的时候共享；拿不到就等。"""
+    import fcntl
+    path = os.path.normpath(shared) + SEED_LOCK_SUFFIX
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def files_under(base, item):
+    """base 底下 item（一个文件或一个目录）里的文件，相对 base；跳过 IGNORED_WHEN_COPYING_INTO_EACH_SHARD 的目录，不在交空表。"""
+    top = os.path.join(base, item)
+    if not os.path.isdir(top):
+        return [item] if os.path.lexists(top) else []
+    found = []
+    for directory, subdirectories, file_names in os.walk(top):
+        subdirectories[:] = sorted(name for name in subdirectories
+                                   if not any(fnmatch.fnmatch(name, pattern) for pattern in IGNORED_WHEN_COPYING_INTO_EACH_SHARD))
+        found += [os.path.relpath(os.path.join(directory, name), base) for name in sorted(file_names)]
+    return found
+
+
+def package_directories(source):
+    """源码副本里的包目录（相对副本根）：crates/ 底下一层、有 Cargo.toml 的。"""
+    crates = os.path.join(source, "crates")
+    try:
+        names = sorted(os.listdir(crates))
+    except OSError:
+        return set()
+    return {f"crates/{name}" for name in names if os.path.isfile(os.path.join(crates, name, "Cargo.toml"))}
+
+
+def sync_seed_source(root, copied, seed_source, environment):
+    """先编那一份的源码副本按内容同步：内容没变的文件不动；变了、新加的写进去（修改时刻是此刻），副本里有、拷贝范围里没有的删掉；
+    改动所在的包整包把修改时刻摸成此刻，不在哪个包底下的改动摸全部包。回 (摸过的包目录的集合, 改动的文件数)。
+    弄坏开关 seedmtimekept：内容变了的文件写进去之后修改时刻改回原来的、一个包都不摸（摸过的包照样交回，给 stale_seed_artifacts 核）。"""
+    items = [item for item in copied if not (item == CARGO_CONFIGURATION_DIRECTORY and break_is(environment, "cargoconfignotcopied"))]
+    wanted = sorted({relative for item in items for relative in files_under(root, item)})
+    os.makedirs(seed_source, exist_ok=True)
+    changed = []
+    for relative in wanted:
+        source, target = os.path.join(root, relative), os.path.join(seed_source, relative)
+        with open(source, "rb") as handle:
+            data = handle.read()
+        previous = None
+        if os.path.isdir(target) and not os.path.islink(target):
+            shutil.rmtree(target)
+        elif os.path.lexists(target):
+            with open(target, "rb") as handle:
+                if handle.read() == data:
+                    continue
+            previous = os.stat(target)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        temporary = target + SEED_COPY_TEMPORARY_SUFFIX
+        with open(temporary, "wb") as handle:
+            handle.write(data)
+        shutil.copymode(source, temporary)
+        os.replace(temporary, target)
+        if previous is not None and break_is(environment, "seedmtimekept"):
+            os.utime(target, ns=(previous.st_atime_ns, previous.st_mtime_ns))
+        changed.append(relative)
+    tops = {item.split("/")[0] for item in items}
+    for name in sorted(os.listdir(seed_source)):
+        if name not in tops:
+            path = os.path.join(seed_source, name)
+            changed += files_under(seed_source, name) or [name]
+            shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
+    for relative in sorted(set(relative for item in items for relative in files_under(seed_source, item)) - set(wanted)):
+        os.unlink(os.path.join(seed_source, relative))
+        changed.append(relative)
+    packages = package_directories(seed_source)
+    touched = set()
+    for relative in changed:
+        parts = relative.split("/")
+        package = "/".join(parts[:2]) if len(parts) > 2 and parts[0] == "crates" else None
+        touched |= {package} if package in packages else packages
+    if not break_is(environment, "seedmtimekept"):
+        now = time.time_ns()
+        for package in sorted(touched):
+            for relative in files_under(seed_source, package):
+                os.utime(os.path.join(seed_source, relative), ns=(now, now), follow_symlinks=False)
+    return touched, len(changed)
+
+
+def seed_unit_identity(message):
+    """一条 compiler-artifact 消息 → 编译单元的身份（JSON 文本）：package_id、manifest_path、目标的 kind、crate_types、name，档、特性、filenames、executable。
+    filenames 里 deps/ 下的文件名带 cargo 按包、特性、档、目标三元组、rustc 参数与依赖算的单元哈希（-C metadata），同一份编译目录里两个单元不会同名；
+    同包另一套特性或档编出来的单元哈希不同、身份也不同。其余几样在 filenames 为空（只检查）、或消息缺字段时垫底。"""
+    target = message.get("target") or {}
+    return json.dumps([message.get("package_id"), message.get("manifest_path"), target.get("kind"), target.get("crate_types"), target.get("name"),
+                       message.get("profile"), sorted(message.get("features") or []), message.get("filenames"), message.get("executable")], sort_keys=True)
+
+
+def stale_seed_artifacts(output, seed_source, touched, compiled=None):
+    """先编一组的 cargo JSON 输出里，摸过的包（touched）编出来而 fresh 为真的产物：[「<包目录> 的 <目标名>」…]。
+    compiled 是同一份编译目录（普通或插桩）里前面的组已经以非 fresh 编出过的单元身份（seed_unit_identity）的集合，这一组里非 fresh 的往里加；
+    fresh 的产物身份在里面的是复用前面的组编出来的，不算坏；头一次出现就是 fresh 的才算。不给（None）是只看这一组自己（弄坏开关 seedfreshacrossgroups 的样子）。"""
+    root = os.path.realpath(seed_source)
+    compiled = set() if compiled is None else compiled
+    stale = []
+    for line in output.splitlines():
+        if not line.startswith("{"):
+            continue
+        try:
+            message = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(message, dict) or message.get("reason") != "compiler-artifact":
+            continue
+        identity = seed_unit_identity(message)
+        if not message.get("fresh"):
+            compiled.add(identity)
+            continue
+        if identity in compiled:
+            continue
+        package = os.path.relpath(os.path.dirname(os.path.realpath(message.get("manifest_path") or "/")), root)
+        if package in touched:
+            stale.append(f"{package} 的 {(message.get('target') or {}).get('name', '?')}")
+    return stale
+
+
+def seed_limits(context):
+    """先编那一份的 (内存上限的 systemd 写法, CARGO_BUILD_JOBS)：外层读得到用整个外层，读不到用每条的默认上限 × 工作进程数；
+    并行度 min(核数, 上限 ÷ COMPILE_GIB_PER_JOB)，GATE_MUTATION_CARGO_JOBS 设了用它。"""
+    outer = context.get("outer_memory_bytes")
+    cap = outer if outer else (bytes_of_size(context["memory_max"]) or 0) * context["worker_count"]
+    given = context["environment"].get("GATE_MUTATION_CARGO_JOBS", "").strip()
+    return size_text_of_bytes(cap), given or str(max(1, min(os.cpu_count() or 4, int(cap // (COMPILE_GIB_PER_JOB * 1024 ** 3)))))
+
+
+def build_seed_group(context, command, seed_source, extra_environment, cap, label, temporary_root, instrumented):
+    """先编一组（经内存包装、不限时）：subprocess 的结果。TMPDIR 是这一组自己的，插桩那一份的构建脚本与过程宏的剖析文件也落在里面，编完整个删。"""
+    temporary = tempfile.mkdtemp(prefix="seed-", dir=temporary_root)
+    try:
+        environment = dict(context["environment"], TMPDIR=temporary, RUN_WITH_MEMORY_CAP_KEY=" ".join(command), **extra_environment)
+        environment.pop("RUN_WITH_MEMORY_CAP_TIME_LIMIT", None)
+        if instrumented:
+            environment["LLVM_PROFILE_FILE"] = os.path.join(temporary, "build-%p-%m.profraw")
+        return run_forwarding_queue_lines(["bash", context["memory_cap_runner"], cap] + command, label, cwd=seed_source, env=environment)
+    finally:
+        shutil.rmtree(temporary, ignore_errors=True)
+
+
+def prepare_seed(context, batches, ordered_rows, coverage_planner, temporary_root):
+    """派活之前先编一份依赖：交 (要报的话, 判红的那几句)。编成的记进 context["seed_targets"]（{"plain" 或 "coverage": 编译目录}），
+    工作进程起来时照它拷（copy_seed_dependencies）；没起、没编成的不在里面。弄坏开关 compile-per-worker：不起（改前的样子）。"""
+    context["seed_targets"] = {}
+    environment = context["environment"]
+    if break_is(environment, "compile-per-worker"):
+        return ["  … 先编一份依赖：没起（弄坏开关 compile-per-worker：每个工作进程自己编外部依赖）"], []
+    if context["worker_count"] < 2:
+        return [f"  … 先编一份依赖：没起（这一趟只开 {context['worker_count']} 个工作进程，没有别的工作进程共用）"], []
+    reaching = path_packages_reaching_external(context["root"])
+    plain = seed_groups([row for _key, batch_rows in batches for row in batch_rows] + list(ordered_rows), reaching)
+    coverage = seed_groups(coverage_planner.predicted_rows(ordered_rows), reaching)
+    if not plain and not coverage:
+        return ["  … 先编一份依赖：没起（要现跑的行选的包顺 Cargo.lock 都够不着外部依赖" + ("" if reaching else "；树里没有读得懂的 Cargo.lock") + "）"], []
+    shared = os.path.normpath(context["shared_target_directory"])
+    seed_source = shared + SEED_SOURCE_SUFFIX
+    cap, jobs = seed_limits(context)
+    lines, problems = [], []
+    declared = declare_seed_serial(environment, temporary_root, len(plain) + len(coverage), jobs, cap, lines)
+    try:
+        with seed_lock(shared, exclusive=True):
+            touched, changed_count = sync_seed_source(context["root"], context["copied"], seed_source, environment)
+            lines.append(f"  … 先编一份依赖：源码副本 {seed_source} 同步了 {changed_count} 个文件（摸了整包的 {len(touched)} 个"
+                         + (f"：{'、'.join(sorted(touched))}" if touched else "") + f"）；内存上限 {cap}、并行度 {jobs}")
+            overrides, configuration = coverage_build_settings(environment)
+            for kind, groups, target, extra, words in (("plain", plain, shared + SEED_TARGET_SUFFIX, {}, []),
+                                                       ("coverage", coverage, shared + SEED_TARGET_SUFFIX + COVERAGE_TARGET_SUFFIX, overrides, configuration)):
+                if not groups:
+                    continue
+                failed = []
+                compiled_units = set()
+                for arguments in groups.values():
+                    command = ["cargo", *words, "test", "--offline", *arguments, "--no-run", "--message-format=json-render-diagnostics"]
+                    run = build_seed_group(context, command, seed_source, dict(extra, CARGO_TARGET_DIR=target, CARGO_BUILD_JOBS=jobs), cap,
+                                           f"先编一份依赖（{'插桩' if kind == 'coverage' else '普通'}：{' '.join(arguments)}）", temporary_root, kind == "coverage")
+                    stale = [] if break_is(environment, "seedfreshunchecked") else stale_seed_artifacts(
+                        run.stdout, seed_source, touched, None if break_is(environment, "seedfreshacrossgroups") else compiled_units)
+                    problems += [f"{' '.join(command)}：{item} 是 fresh" for item in stale]
+                    if run.returncode != 0:
+                        failed.append(f"{' '.join(arguments)} 退 {run.returncode}：{output_tail(run.stderr, 3)}")
+                with contextlib.suppress(OSError):
+                    trim_target_directory(target, context.get("target_directory_cap_bytes"), environment)
+                if failed:
+                    lines.append(f"  ! 先编一份依赖（{'插桩' if kind == 'coverage' else '普通'}，{target}）{len(groups)} 组里 {len(failed)} 组没编成，"
+                                 f"这一趟各工作进程自己编依赖：{'；'.join(failed[:3])}")
+                else:
+                    context["seed_targets"][kind] = target
+                    lines.append(f"  … 先编一份依赖（{'插桩' if kind == 'coverage' else '普通'}）：{target} 编了 {len(groups)} 组，工作进程起来时拷其中外部依赖的产物")
+    except OSError as error:
+        # 同步源码、编、清增量产物时读写出错：这一趟不用先编那一份（工作进程照旧自己编依赖），判定不受影响
+        context["seed_targets"] = {}
+        lines.append(f"  ! 先编一份依赖没做成（{type(error).__name__}：{error}）：这一趟各工作进程自己编依赖")
+    finally:
+        if declared is not None:
+            append_serial_declaration(declared, "此刻并行", lines)
+    return lines, problems
+
+
+def append_serial_declaration(path, body, lines):
+    """往串行段声明文件追加一行「<秒>\\t<body>」（写法同 scripts/hosts/core_usage.py 文件头「声明」）；写不进往 lines 里报一行、交 False。"""
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(f"{time.time():.3f}\t{body}\n")
+        return True
+    except OSError as error:
+        lines.append(f"  ! 串行段声明写不进 {path}（{type(error).__name__}：{error}）：看门狗看不到先编那一段的理由，照报核数过少")
+        return False
+
+
+def declare_seed_serial(environment, temporary_root, group_count, jobs, cap, lines):
+    """先编那一段开编之前声明串行段（文件头「先编一份依赖」的「串行段声明」）：交声明文件的路径（编完照它写「此刻并行」），没写成交 None。
+    调用方没设 SINGLEFS_SERIAL_DECLARATIONS 时设成 temporary_root（这一趟的 shard_root）里的 serial-declarations，并放进 environment（起 cargo 的那一份）。
+    弄坏开关 seed-serial-undeclared：不声明。"""
+    if break_is(environment, "seed-serial-undeclared"):
+        lines.append("  … 先编一份依赖：没声明串行段（弄坏开关 seed-serial-undeclared）")
+        return None
+    # 变量名、文件名与两种标记都写成字面量、不另立模块级常量：模块级赋值进判法单元的闭包（scripts/gate/lib_function_units.py 文件头「import 时执行的模块级语句」）
+    path = environment.get("SINGLEFS_SERIAL_DECLARATIONS", "").strip()
+    if not path:
+        path = os.path.join(temporary_root, "serial-declarations")
+        environment["SINGLEFS_SERIAL_DECLARATIONS"] = path
+    reason = (f"先编一份依赖：{group_count} 组共用一份编译目录、cargo 锁着它逐组编，组与组不能同时编；"
+              f"每组的并行度 {jobs} 已按内存上限 {cap} ÷ {COMPILE_GIB_PER_JOB} GiB 与核数取小")
+    if not append_serial_declaration(path, "此刻串行：" + reason, lines):
+        return None
+    lines.append(f"  … 先编一份依赖：串行段声明写进 {path}（{reason}）；编完写「此刻并行」")
+    return path
+
+
+def dependency_artifact_entries(seed_target, seed_source, environment):
+    """先编那一份编译目录里外部依赖的产物：相对 seed_target 的路径（文件或目录）。每一档（底下有 .fingerprint 的那一层：<目录>/<档>、<目录>/<三元组>/<档>）里
+    .fingerprint/、build/ 下包名不是 Cargo.lock 里 path 包的目录；deps/ 下按单元哈希归堆，那一堆恰好一份 .d、里面列的源文件都是绝对路径、都不在源码副本底下的那一堆。
+    incremental/ 与档那一层的文件（cargo 拷上来的工作区产物）不拷。弄坏开关 workspaceunitsshared：.fingerprint/、build/、deps/ 底下的全拷。"""
+    path_names = {package["name"] for package in read_lock_file_packages(seed_source) if "source" not in package}
+    root = os.path.realpath(seed_source)
+    everything = break_is(environment, "workspaceunitsshared")
+    levels = []
+    for name in sorted(os.listdir(seed_target)) if os.path.isdir(seed_target) else []:
+        level = os.path.join(seed_target, name)
+        if os.path.isdir(os.path.join(level, ".fingerprint")):
+            levels.append(name)
+        elif os.path.isdir(level):
+            levels += [os.path.join(name, deeper) for deeper in sorted(os.listdir(level)) if os.path.isdir(os.path.join(level, deeper, ".fingerprint"))]
+    entries = []
+    for level in levels:
+        for kind in (".fingerprint", "build"):
+            base = os.path.join(seed_target, level, kind)
+            for name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+                matched = UNIT_DIRECTORY_NAME.match(name)
+                if matched and (everything or matched.group("name") not in path_names):
+                    entries.append(os.path.join(level, kind, name))
+        deps = os.path.join(seed_target, level, "deps")
+        units = collections.defaultdict(list)
+        for name in sorted(os.listdir(deps)) if os.path.isdir(deps) else []:
+            matched = UNIT_ARTIFACT_NAME.match(name)
+            if matched:
+                units[matched.group("hash")].append(name)
+        for names in units.values():
+            dep_infos = [name for name in names if name.endswith(".d")]
+            sources = dependency_info_sources(os.path.join(deps, dep_infos[0])) if len(dep_infos) == 1 else []
+            if everything or (sources and all(os.path.isabs(source) and not os.path.realpath(source).startswith(root + os.sep) for source in sources)):
+                entries += [os.path.join(level, "deps", name) for name in names]
+    return entries
+
+
+def dependency_info_sources(path):
+    """rustc 写的 .d 头一条规则冒号后面的源文件（反斜杠转义的空格还原）；读不了交空表。"""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            text = handle.read().replace("\\\n", " ")
+    except OSError:
+        return []
+    _target, _colon, rest = text.split("\n", 1)[0].partition(": ")
+    return [word.replace("\\ ", " ") for word in re.split(r"(?<!\\) ", rest) if word]
+
+
+def sync_dependency_artifacts(seed_target, destination, seed_source, environment, threads):
+    """把先编那一份里外部依赖的产物（dependency_artifact_entries）拷进 destination：大小与修改时刻都对得上的不拷，拷的保留修改时刻、同目录临时文件写完改名。
+    要拷的文件分到 threads 条线程上同时拷（弄坏开关 seed-copy-serial：照改前在一条线程上逐个拷）；哪一个拷不成，OSError 照抛给调用方。回 (拷了几个文件, 几字节)。"""
+    pending = dependency_copy_jobs(seed_target, destination, seed_source, environment)
+    copy_dependency_files(pending, threads, environment)
+    return len(pending), sum(size for _path, _target, size in pending)
+
+
+def copy_one_dependency_file(job):
+    path, target, _size = job
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    temporary = target + SEED_COPY_TEMPORARY_SUFFIX
+    shutil.copy2(path, temporary)
+    os.replace(temporary, target)
+
+
+def copy_dependency_files(pending, threads, environment):
+    """pending 里的 (源, 目标, 字节) 逐个拷：threads 大于 1 时分到那么多条线程上同时拷，出错的头一个原样抛（并行不许把失败吃掉）。"""
+    count = 1 if break_is(environment, "seed-copy-serial") else max(1, min(int(threads or 1), len(pending)))
+    if count == 1:
+        for job in pending:
+            copy_one_dependency_file(job)
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=count) as pool:
+        for future in [pool.submit(copy_one_dependency_file, job) for job in pending]:
+            future.result()
+
+
+def seed_copy_threads(context):
+    """一个工作进程拷依赖产物用几条线程：CARGO_BUILD_JOBS（run_stage 按核数 ÷ 工作进程数设的），读不出按核数 ÷ 工作进程数。"""
+    given = str(context["environment"].get("CARGO_BUILD_JOBS", "")).strip()
+    if given.isdigit() and int(given) > 0:
+        return int(given)
+    return max(1, (os.cpu_count() or 4) // max(1, int(context.get("worker_count") or 1)))
+
+
+def dependency_copy_jobs(seed_target, destination, seed_source, environment):
+    """先编那一份里外部依赖的产物里要拷进 destination 的文件：[(源, 目标, 字节)]；大小与修改时刻都对得上的不在里面。"""
+    pending = []
+    for relative in dependency_artifact_entries(seed_target, seed_source, environment):
+        source = os.path.join(seed_target, relative)
+        paths = ([os.path.join(directory, name) for directory, _subdirectories, names in os.walk(source) for name in names]
+                 if os.path.isdir(source) else [source])
+        for path in paths:
+            status = os.lstat(path)
+            if not stat.S_ISREG(status.st_mode):
+                continue
+            target = os.path.join(destination, os.path.relpath(path, seed_target))
+            with contextlib.suppress(FileNotFoundError):
+                existing = os.lstat(target)
+                if existing.st_size == status.st_size and existing.st_mtime_ns == status.st_mtime_ns:
+                    continue
+            pending.append((path, target, status.st_size))
+    return pending
+
+
+def copy_seed_dependencies(context, target_directory):
+    """工作进程起来时（init_worker）：先编成的那一份（普通、插桩）里外部依赖的产物拷进自己的两份编译目录，拿着先编那一份的共享锁拷。拷不成只报，自己编依赖。"""
+    seeds = context.get("seed_targets") or {}
+    if not seeds:
+        return
+    shared = os.path.normpath(context["shared_target_directory"])
+    environment = context["environment"]
+    threads = 1 if break_is(environment, "seed-copy-serial") else seed_copy_threads(context)
+    reports, pending = [], []
+    try:
+        with seed_lock(shared, exclusive=False):
+            # 普通、插桩两份要拷的文件先列全，再一起分到 threads 条线程上拷（文件头「先编一份依赖」的「拷」）
+            for kind, destination in (("plain", target_directory), ("coverage", target_directory + COVERAGE_TARGET_SUFFIX)):
+                if kind in seeds:
+                    jobs = dependency_copy_jobs(seeds[kind], destination, shared + SEED_SOURCE_SUFFIX, environment)
+                    pending += jobs
+                    reports.append(f"{'插桩' if kind == 'coverage' else '普通'} {len(jobs)} 个文件 {format_size(sum(size for _p, _t, size in jobs))}")
+            copy_dependency_files(pending, threads, environment)
+    except OSError as error:
+        note(f"  ! 工作进程 {os.getpid()} 从先编那一份拷依赖产物没拷成（{type(error).__name__}：{error}）：这一片自己编依赖")
+        return
+    note(f"  … 工作进程 {os.getpid()} 从先编那一份拷来外部依赖的产物：{'；'.join(reports)}（{threads} 条线程同时拷；大小与修改时刻对得上的不拷）")
 
 
 def baseline_job(batch):
@@ -1888,6 +2855,64 @@ def measure_and_remove_temporary_directory(directory, context):
 
 # 内存包装排队时报的那几行（run-with-memory-cap.sh：「排队（已等 …」每 60 秒一行，「排了 … 秒，起跑」放行时一行）
 WRAPPER_QUEUE_LINE = re.compile(r"^run-with-memory-cap: 排(队（|了 )")
+# 内存包装排队时现查别的机器（HostLookup，包装文件头「排队时去找别的机器」「整体兜底」）打的四种行首：只出提示、不改结局，判法读包装输出之前去掉
+# （strip_host_lookup_lines）。包装里 HostLookup 新加一处 say 而这里不认，自证 host-lookup-say-sites-covered 那一格红。
+# 「  ! 告警记录写不进」与包装 append_outcome_record 打的那一句同首，一起去掉（HOST_LOOKUP_ALSO_MATCHED）。
+# 这一段在 scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py、scripts/mutation/crates-mutation-rows.py 各一份、照同一份写，各自的自证核自己那一份。
+HOST_LOOKUP_LINE = re.compile(r"^(?:run-with-memory-cap: (?:没查到别的机器|现查别的机器)：|  → .+?此刻放得下（|  ! 告警记录写不进（)")
+HOST_LOOKUP_ALSO_MATCHED = {"append_outcome_record": "包装收尾写告警记录写不进时打的同一句，只出提示、不改结局"}
+
+
+def strip_host_lookup_lines(text, environment=None):
+    """去掉内存包装 HostLookup 打的那几行（HOST_LOOKUP_LINE）；environment 只看弄坏开关：hostlookuplineskept 下原样交回。"""
+    if break_is(environment or {}, "hostlookuplineskept"):
+        return text
+    return "".join(line for line in text.splitlines(keepends=True) if not HOST_LOOKUP_LINE.match(line))
+
+
+def host_lookup_say_problems(wrapper_path, pattern=HOST_LOOKUP_LINE):
+    """包装内嵌 python（3<<'PY' 那一段）里 class HostLookup 的每一处 say(…)：拼出的那一行（f 串的插值换成 X；say 一个名字的，取本函数里给它赋的值）要被 pattern 认；
+    HostLookup 之外的 say(…) 与 print(…) 被它认的，只许是 HOST_LOOKUP_ALSO_MATCHED 点名的函数。交问题清单（空 = 都对）。"""
+    with open(wrapper_path, encoding="utf-8") as handle:
+        text = handle.read()
+    body = next((block for block in re.findall(r"3<<'PY'\n(.*?)\nPY\n", text, re.S) if "class HostLookup" in block), None)
+    if body is None:
+        return ["包装里找不到含 class HostLookup 的内嵌 python（3<<'PY' … PY）：包装改了写法，这一格的找法要跟着改"]
+    module = ast.parse(body)
+    problems, found = [], []
+
+    def sample(node, function):
+        if isinstance(node, ast.Name) and function is not None:
+            values = [statement.value for statement in ast.walk(function) if isinstance(statement, ast.Assign)
+                      and any(isinstance(target, ast.Name) and target.id == node.id for target in statement.targets)]
+            node = values[-1] if values else node
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.JoinedStr):
+            return "".join(part.value if isinstance(part, ast.Constant) else "X" for part in node.values)
+        return None
+
+    def visit(node, owner, function):
+        for child in ast.iter_child_nodes(node):
+            child_owner = child.name if isinstance(child, ast.ClassDef) and owner is None else owner
+            child_function = child if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else function
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id in ("say", "print") and child.args:
+                line = sample(child.args[0], function)
+                where = f"{owner + '.' if owner else ''}{function.name if function is not None else '<模块>'}（内嵌 python 第 {child.lineno} 行）"
+                if owner == "HostLookup" and child.func.id == "say":
+                    found.append(where)
+                    if line is None:
+                        problems.append(f"{where} 的 say 拼不出那一行（不是串、f 串或本函数里赋过值的名字）")
+                    elif not pattern.match(line):
+                        problems.append(f"{where} 的 say 打「{line[:80]}」，HOST_LOOKUP_LINE 不认")
+                elif owner != "HostLookup" and line is not None and pattern.match(line) and (function is None or function.name not in HOST_LOOKUP_ALSO_MATCHED):
+                    problems.append(f"{where} 打「{line[:80]}」不归 HostLookup，HOST_LOOKUP_LINE 却认它（去多了）")
+            visit(child, child_owner, child_function)
+
+    visit(module, None, None)
+    if not found:
+        problems.append("HostLookup 里一处 say 都没找到：包装改了写法，这一格的找法要跟着改")
+    return problems
 
 
 def run_forwarding_queue_lines(command, label, sink=None, **popen_keywords):
@@ -1906,10 +2931,136 @@ def run_forwarding_queue_lines(command, label, sink=None, **popen_keywords):
 
     reader = threading.Thread(target=pump, name="wrapper-stderr", daemon=True)
     reader.start()
-    stdout = process.stdout.read()
-    process.wait()
+    try:
+        stdout = process.stdout.read()
+        process.wait()
+    except BaseException:
+        # 父进程里被停（run_pool 接住的 TERM、HUP，先编一份依赖那几趟在父进程里跑）：只停自己起的这一个包装，等它退了再往外抛
+        process.terminate()
+        try:
+            process.wait(timeout=TIMEOUT_KILL_GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        raise
     reader.join()
     return subprocess.CompletedProcess(command, process.returncode, stdout, "".join(stderr_lines))
+
+
+def gpu_quiesce_prefix(command, environment):
+    """这一次起的 cargo 要不要经清场包装（文件头「带 gpu 特性的格经清场起」）：cargo test 的 `--` 之前开了 gpu 特性（--features / -F 里有 gpu 或 <包>/gpu，
+    或 --all-features），而且真跑测试（不带 --no-run：只编不跑的不上卡），交 ["bash", <清场包装>, "--"]；别的交 []。
+    清场包装取 GATE_MUTATION_GPU_QUIESCE_RUNNER（自证换成它自己的），没设取本模块所在仓的 scripts/crash/gpu-quiesce-run.sh。
+    弄坏开关 gpu-rows-unquiesced：一律交 []（改前的样子：带 gpu 特性的也只经内存包装起）。"""
+    if break_is(environment, "gpu-rows-unquiesced") or not gpu_test_run(command, environment):
+        return []
+    return ["bash", environment.get("GATE_MUTATION_GPU_QUIESCE_RUNNER", "").strip() or os.path.join(SCRIPT_DIRECTORY, "..", "crash", "gpu-quiesce-run.sh"), "--"]
+
+
+def gpu_test_run(command, environment=None):
+    """这一次起的是不是带 gpu 特性、真跑测试的 cargo test：`--` 之前开了上卡的特性（--features / -F 里有 GPU_TEST_FEATURES 里的名字或 <包>/<名字>，或 --all-features），
+    而且不带 --no-run。清场（gpu_quiesce_prefix）与交多机配置（文件头「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」）都照它认。
+    弄坏开关 product-gpu-feature-unquiesced（environment 给了才认）：只认 gpu，产品 GPU 包的 tests-on-a-real-gpu 不算（改前的样子）。"""
+    if "cargo" not in command:
+        return False
+    words = command[command.index("cargo") + 1:]
+    if "test" not in words:
+        return False
+    words = words[words.index("test") + 1:]
+    before = words[:words.index("--")] if "--" in words else words
+    if "--no-run" in before:
+        return False
+    features = set()
+    for index, word in enumerate(before):
+        if word in ("--features", "-F") and index + 1 < len(before):
+            word = "--features=" + before[index + 1]
+        elif word.startswith("-F") and len(word) > 2:
+            word = "--features=" + word[2:]
+        if word.startswith("--features="):
+            features |= {feature.split("/")[-1] for feature in word[len("--features="):].replace(",", " ").split()}
+    wanted = {"gpu"} if environment is not None and break_is(environment, "product-gpu-feature-unquiesced") else GPU_TEST_FEATURES
+    return bool(features & wanted) or "--all-features" in before
+
+
+def gpu_rows_multi_host_configuration(environment):
+    """带 gpu 特性的格交给测试的多机配置（文件头「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」）：(绝对路径, 文件在不在)。
+    调用方设了 SINGLEFS_MULTI_HOST_CONFIG 照它；没设取 GATE_MUTATION_MULTI_HOST_CONFIG（自证用），再没设照 admission.py 的 multi_host_configuration_file
+    取本模块所在仓的那一份（git common-dir 的上一层下的 multi-host.env）。相对路径按本进程的当前目录取成绝对路径：测试在源码副本里起，相对路径到那里就指错了。"""
+    path = (environment.get("SINGLEFS_MULTI_HOST_CONFIG", "").strip() or environment.get("GATE_MUTATION_MULTI_HOST_CONFIG", "").strip()
+            or admission_module().multi_host_configuration_file(STAGE_REPOSITORY, {}))
+    path = os.path.abspath(path)
+    return path, os.path.isfile(path)
+
+
+def named_test_stdout(full_name, output):
+    """libtest 给点名的测试交出来的那一段输出（「---- <全名> stdout ----」之后、到下一段的头、「successes:」「failures:」或「test result:」为止）；
+    有几段（成功与失败各交一次）就接起来。输出里一段都没有（--nocapture 那种起法）交整份；有别的用例的段而没有它的，交空串（它没打字）。"""
+    header = f"---- {full_name} stdout ----"
+    collected, inside, found, any_section = [], False, False, False
+    for line in output.splitlines():
+        if line.startswith("---- ") and line.endswith(" stdout ----"):
+            any_section = True
+            inside = line == header
+            found = found or inside
+            continue
+        if inside and (line in ("successes:", "failures:") or line.startswith("test result:")):
+            inside = False
+            continue
+        if inside:
+            collected.append(line)
+    if found:
+        return "\n".join(collected)
+    return "" if any_section else output
+
+
+def given_states_gpu_counts(text):
+    """text 里每一行 CRASH_POINT_REPLAY_GIVEN_STATES（给定状态引擎每一趟收尾打的那一行，crate singlefs-checker-tier 的
+    crash_amplification::GIVEN_STATES_LINE_PREFIX；_KEY_REFUSED 这类同前缀的别的行不算）的 states_judged_by_the_gpu_here，按出现的次序。"""
+    line = re.compile(r"^\s*CRASH_POINT_REPLAY_GIVEN_STATES\s(?:.*\s)?states_judged_by_the_gpu_here=(\d+)(?=\s|$)", re.M)
+    return [int(found.group(1)) for found in line.finditer(text)]
+
+
+def gpu_card_unused_reason(row, output, configuration, environment):
+    """带 gpu 特性、判出没红的那一条用没用上卡（文件头「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」）：用不上交接在「点名的测试 <名字>」后面的那一句，
+    用上了或判不到这一层（点名的测试不是恰好对上一个用例、结果不都是 ok）交 None。configuration 是那一次交给测试的多机配置 (路径, 在不在)，没核过的是 None。
+    不打 CRASH_POINT_REPLAY_GIVEN_STATES 行的照常判（gpu_test_start 取卡：没卡打 NOT_RUN_NO_GPU_ADAPTER、有卡起不来就 panic，不悄悄改交 CPU）。
+    弄坏开关 gpu-unused-as-missed：一律交 None；given-states-count-ignored：有那一行就当没用上卡，不读数。"""
+    if break_is(environment, "gpu-unused-as-missed"):
+        return None
+    results = results_by_test(row.expected, output)
+    if len(results) != 1 or not all(outcome == "ok" for outcomes in results.values() for outcome in outcomes):
+        return None
+    if configuration is not None and not configuration[1]:
+        return (f"带 gpu 特性，本模块所在仓的多机配置 {configuration[0]} 不在，没交给测试：GPU 用不上（测试在副本里找不到多机配置，GPU 开关是关的），"
+                "改坏的 GPU 那一处没跑到")
+    counts = given_states_gpu_counts(named_test_stdout(next(iter(results)), output))
+    if counts and (break_is(environment, "given-states-count-ignored") or not any(counts)):
+        return (f"带 gpu 特性，它打的 {len(counts)} 行 CRASH_POINT_REPLAY_GIVEN_STATES 里 states_judged_by_the_gpu_here 全是 0："
+                "给定状态全交 CPU 判、GPU 一个状态都没判，改坏的 GPU 那一处没跑到")
+    return None
+
+
+def separate_gpu_quiesce_lines(run, environment):
+    """经清场包装起的那一次（文件头「带 gpu 特性的格经清场起」）：包装自己打的几种行（GPU_QUIESCE step=…、回读看的卡、清了场、没复原……）挪出 run.stderr、
+    放进 run.quiesce_lines，判结局与尾巴只看命令自己的输出；包装退 78 且打了 step=command result=not-started 的（清场回读没过、多机配置缺清场键、锁等不到：命令没起）
+    把 run.quiesce_refused 置成真。弄坏开关 quiesce-refusal-unread：不认没起（改前的样子：照命令的输出判，记成点名的测试没跑到）。"""
+    own_line = re.compile(r"^(?:GPU_QUIESCE step=|  · 回读看的卡：|  · 照多机配置清了场|  · 已有 \d+ 趟清过场在用卡|  · 清了场、没复原)")
+    kept, own = [], []
+    for line in run.stderr.splitlines(keepends=True):
+        (own if own_line.match(line) else kept).append(line)
+    run.stderr = "".join(kept)
+    run.quiesce_lines = [line.rstrip("\n") for line in own]
+    run.quiesce_refused = (run.returncode == 78 and any(line.startswith("GPU_QUIESCE step=command result=not-started") for line in run.quiesce_lines)
+                           and not break_is(environment, "quiesce-refusal-unread"))
+
+
+def quiesce_refusal_text(run):
+    """经清场包装起、命令没起的那一次（run.quiesce_refused）交接在「点名的测试」「那一批」后面的那一句；别的交 None。"""
+    if not getattr(run, "quiesce_refused", False):
+        return None
+    said = next((line for line in run.quiesce_lines if line.startswith("GPU_QUIESCE step=quiesce ")), "GPU_QUIESCE 没打清场那一行")
+    return (f"带 gpu 特性、经 scripts/crash/gpu-quiesce-run.sh 起，清场回读没过、命令没起（{said}；卡上有不归清场白名单的计算进程时就是这样，"
+            "等那个进程跑完再只重跑这几行，不停它）")
 
 
 def run_under_wrapper(command, temporary_directory, stamp_name, extra_environment=None, limits=None, compile_first=False):
@@ -1942,6 +3093,13 @@ def run_one_under_wrapper(command, temporary_directory, stamp_name, extra_enviro
     else:
         environment.pop("RUN_WITH_MEMORY_CAP_TIME_LIMIT", None)
     environment.update(extra_environment or {})
+    # 带 gpu 特性、真跑测试的那一次把多机配置交给测试（文件头「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」）：副本里它自己找不到；
+    # 文件不在就不设，judge_row 照「GPU 用不上」记。弄坏开关 gpu-rows-configuration-unpassed：不设、不记（改前的样子）
+    configuration = None
+    if gpu_test_run(command, context["environment"]) and not break_is(context["environment"], "gpu-rows-configuration-unpassed"):
+        configuration = gpu_rows_multi_host_configuration(context["environment"])
+        if configuration[1]:
+            environment["SINGLEFS_MULTI_HOST_CONFIG"] = configuration[0]
     cap, leased_bytes = memory_max, 0
     if stamp_name.endswith("-build") and environment.get("CARGO_BUILD_JOBS"):
         # 编译那一趟（基线与变异的先编、插桩编译）：并行度不按核数 ÷ 工作进程数；按这一行的内存上限收，套在外层包装里时再向外层额度里此刻空着的那一部分借
@@ -1958,12 +3116,19 @@ def run_one_under_wrapper(command, temporary_directory, stamp_name, extra_enviro
     kind, _dash, line_number = stamp_name[:-len("-build")].partition("-") if building else stamp_name.partition("-")
     label = {"baseline": f"基线（批首行是变异表第 {line_number} 行）", "coverage": f"覆盖（组首行是变异表第 {line_number.split('-')[0]} 行）"}.get(
         kind, f"变异表第 {line_number} 行") + ("（先编，不限时）" if building else "")
+    # 带 gpu 特性、真跑测试的那一次经清场包装起，清场包装在内存包装外面（文件头「带 gpu 特性的格经清场起」）
+    quiesce_prefix = gpu_quiesce_prefix(command, context["environment"])
     try:
-        run = run_forwarding_queue_lines(["bash", context["memory_cap_runner"], cap, "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
-                                         + command, label, cwd=state["work"], env=environment)
+        run = run_forwarding_queue_lines(quiesce_prefix + ["bash", context["memory_cap_runner"], cap, "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
+                                         + command, label + ("（带 gpu 特性，经清场包装起）" if quiesce_prefix else ""), cwd=state["work"], env=environment)
     finally:
         if leased_bytes:
             state["budget"].give_back(leased_bytes)
+    run.gpu_configuration = configuration
+    if quiesce_prefix:
+        separate_gpu_quiesce_lines(run, context["environment"])
+        if run.quiesce_refused:
+            note(f"  ! {label}：带 gpu 特性，清场回读没过、命令没起（清场包装退 78）：{'；'.join(run.quiesce_lines)}")
     if leased_bytes and run.returncode == MEMORY_CAP_HIT_EXIT:
         note(f"  ! {label}：先编那一趟撞了内存上限 {cap}（这一格自己的 {memory_max} 加向外层额度借的 {format_size(leased_bytes)}，并行度 {environment['CARGO_BUILD_JOBS']}）；"
              f"判定里写的上限是这一格自己的 {memory_max}")
@@ -2011,8 +3176,9 @@ def judge_batch(batch):
         measure_and_remove_temporary_directory(temporary_directory, context)
     output = run.stdout + run.stderr
     judged, record_problems = [], []
+    refused = quiesce_refusal_text(run)   # 带 gpu 特性那一批清场回读没过、命令没起（文件头「带 gpu 特性的格经清场起」）：不交判法，照基线不绿记、写明为什么
     for row in batch_rows:
-        problem = baseline_problem(row, run.returncode, output, *limits, compile_pass=getattr(run, "compile_pass", False))
+        problem = f"没判成：那一批{refused}" if refused else baseline_problem(row, run.returncode, output, *limits, compile_pass=getattr(run, "compile_pass", False))
         excerpt = None
         if problem is not None:
             results = results_by_test(row.expected, output)
@@ -2051,7 +3217,17 @@ def judge_row(row):
         # 不论退出码是几都删（含限时、撞顶被杀）：被杀的测试 Drop 守卫不跑，它建的镜像只有这里删得掉
         removal = measure_and_remove_temporary_directory(temporary_directory, context)
     output = run.stdout + run.stderr
-    verdict, text = verdict_of_run(row, run.returncode, output, *limits, context["environment"], compile_pass=getattr(run, "compile_pass", False))
+    refused = quiesce_refusal_text(run)
+    if refused:
+        # 带 gpu 特性那一条清场回读没过、命令没起（文件头「带 gpu 特性的格经清场起」）：记清场没过没跑，不交判法、不算抓到也不算没红
+        verdict, text = "quiescerefused", f"{TABLE}:{row.line_number} {row.name}：点名的测试 {row.expected} {refused}；不算抓到、也不算没红"
+    else:
+        verdict, text = verdict_of_run(row, run.returncode, output, *limits, context["environment"], compile_pass=getattr(run, "compile_pass", False))
+        # 带 gpu 特性、判出没红的那一条核用没用上卡（文件头「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」）：用不上记本次未跑，不进没红
+        unused = gpu_card_unused_reason(row, output, getattr(run, "gpu_configuration", None), context["environment"]) if verdict == "failure" and gpu_test_run(
+            ["cargo", "test"] + row.arguments.split(), context["environment"]) else None
+        if unused is not None:
+            verdict, text = "notrun", f"{TABLE}:{row.line_number} {row.name}：本次未跑——点名的测试 {row.expected} {unused}；不算抓到、也不算没红"
     if verdict in VERDICTS_KILLED_BY_WRAPPER:
         file_count, allocated_bytes, _apparent_bytes, is_still_there = removal
         first_line, line_break, rest = text.partition("\n")
@@ -2074,7 +3250,7 @@ def judge_row(row):
         failed_to_write = write_record_quietly("records", components["row_key"], fields)
         if failed_to_write:
             record_problems.append(failed_to_write)
-    if verdict not in VERDICTS_THAT_DID_NOT_RUN and verdict not in ("squeezed", "gpumemory"):
+    if verdict not in VERDICTS_THAT_DID_NOT_RUN and verdict not in ("squeezed", "gpumemory", "quiescerefused"):
         timing_path = os.path.join(context["timings_directory"], row_content_hash(row))
         try:
             write_atomically(timing_path, mutation_units.record_text(RECORD_HEADER, dict(
@@ -2175,6 +3351,9 @@ def record_coverage(job, overrides, configuration, temporary_directory, profiles
     switches = list(job["switches"]) if break_is(context["environment"], "exactduplicated") else [word for word in job["switches"] if word != "--exact"]
     run, _seconds = run_under_wrapper(["cargo", *configuration, "test", "--offline", *job["before"], "--", *switches, "--exact", job["test"]],
                                       temporary_directory, stamp + "-run", dict(overrides, LLVM_PROFILE_FILE=os.path.join(profiles, "cov-%p-%m.profraw")), limits=limits)
+    refused = quiesce_refusal_text(run)
+    if refused:
+        return f"插桩跑 {job['test']} 没起：{refused}"
     output = run.stdout + run.stderr
     outcome = wrapper_outcome(run.returncode, *limits)
     results = results_by_test(job["test"], output)
@@ -2370,6 +3549,21 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
         per_mutation_temporary_root = os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME)
         os.mkdir(per_mutation_temporary_root)
         os.mkdir(os.path.join(shard_root, START_STAMP_DIRECTORY_NAME))
+        os.mkdir(target_over_cap_directory(shard_root))   # 停派目录（文件头「编译目录上限」）：工作进程清完仍超上限往里写
+        # 这一趟自己的编译目录（文件头「编译目录」）：调用方没给 GATE_MUTATION_TARGET_DIR 就建在 <shard_root>/build 里，收尾（finally）删
+        if context["shared_target_directory"] is None:
+            build_root = os.path.join(shard_root, RUN_BUILD_DIRECTORY_NAME)
+            os.mkdir(build_root)
+            context["shared_target_directory"] = run_build_target_directory(shard_root)
+            for line in target_reclaim_lines(context["shared_target_directory"], worker_count, ([], [], []), owned=True):
+                note(line)
+        # 先编一份依赖（文件头「先编一份依赖」）：工作进程起来之前编好，编成的由 init_worker 拷进各自的编译目录；摸过的包没重编整道判红、一个工作进程都不起
+        seed_lines, seed_problems = prepare_seed(context, batches, ordered_rows, coverage_planner, shard_root)
+        for line in seed_lines:
+            note(line)
+        if seed_problems:
+            return dict(mutation=[], mutation_info={}, baseline={}, coverage=[], submitted=0, received=0, stopped=False, left_behind=[], record_problems=[],
+                        left_behind_contents={}, per_mutation_temporary_root=per_mutation_temporary_root, seed_problems=seed_problems)
         order_index = {row.line_number: index for index, row in enumerate(ordered_rows)}
         rows_by_line = {row.line_number: row for row in ordered_rows}
         ready, serial = [], 0
@@ -2398,7 +3592,7 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
                 needs[entry[2]] = job_memory_bytes(context, entry[3], entry[4])
             return needs[entry[2]]
         with concurrent.futures.ProcessPoolExecutor(max_workers=worker_count, initializer=init_worker,
-                                                    initargs=(sequence_counter, shard_root, context, budget)) as pool, own_workers_stopped_on_stop(pool, shard_root):
+                                                    initargs=(sequence_counter, shard_root, context, budget)) as pool, own_workers_stopped_on_stop(pool, shard_root, context["environment"]):
             while True:
                 while ready and len(in_flight) < worker_count and not outcome["stopped"]:
                     # 挑与记账在同一把锁里做完：先编那一趟借额度也在这把锁里，在跑各格的上限加借走的不会在两步之间超过外层
@@ -2443,6 +3637,11 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
                     else:
                         outcome["coverage"].append(result)
                     note(f"  … 已判 {outcome['received']} 格、派出 {outcome['submitted']} 格、还排着 {len(ready)} 格（基线的批、变异与覆盖合计；基线不绿的行不派变异）")
+                # 停派（文件头「编译目录上限」）：有工作进程清完仍超上限，在跑的收完就不再派活
+                over_cap = target_over_cap_reports(shard_root)
+                if over_cap and not outcome.get("over_cap"):
+                    outcome["stopped"], outcome["over_cap"] = True, over_cap
+                    note(f"  ! 编译目录清完仍超上限，停派：在跑的 {len(in_flight)} 格收完就不再派活（还排着 {len(ready)} 格；收尾判红，出路在那里）")
         outcome["budget_peak"] = budget.peak.value if budget is not None else None
         outcome["left_behind"] = sorted(os.listdir(per_mutation_temporary_root))
         outcome["left_behind_contents"] = {name: (sorted(os.listdir(os.path.join(per_mutation_temporary_root, name)))
@@ -2451,8 +3650,13 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
         outcome["per_mutation_temporary_root"] = per_mutation_temporary_root
         return outcome
     finally:
-        if shard_root is not None:
-            shutil.rmtree(shard_root, ignore_errors=True)
+        # 先删这一趟的编译目录（remove_owned_build_root：核过没有进程开着里面的文件），没删成就连同 shard_root 留着（run_stage 判红）；
+        # 被停时 own_workers_stopped_on_stop 已经删过，这里看到不在就照删 shard_root。弄坏开关 runtargetkept：两样都不删
+        if shard_root is not None and os.path.isdir(shard_root):
+            if remove_owned_build_root(shard_root, context["environment"]):
+                shutil.rmtree(shard_root, ignore_errors=True)
+            else:
+                note(f"  · 这一趟的临时目录 {shard_root} 留着（里面的编译目录没删）")
         for signal_number, handler in previous_handlers.items():
             signal.signal(signal_number, handler)
 
@@ -2657,6 +3861,17 @@ def run_stage(root, environment=None, judging_repository=None):
     copied, refused, anchor_broken = prechecks(root, rows, malformed, environment)
     if refused:
         return 1
+    # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：起任何 cargo 之前（算键、基线、变异、插桩编译都在这之后）判这台装了、
+    #   此刻进程环境的取值对得上；判红一条都不跑、退 1，红句照 entry 原样转打。树里没有依赖 rocksdb 的清单、PATH 上是带标记的假 cargo，entry 报不判，
+    #   这时什么都不打（stderr 头一行仍是「判定库记录」那一行）。弄坏开关 rocksdb-entry-unchecked 下不判（自证「RocksDB 预编库的取值缺了」那一格判错）
+    if not break_is(environment, "rocksdb-entry-unchecked"):
+        entry = subprocess.run([sys.executable, ROCKSDB_PREBUILT_PATH, "entry", "--root", root], env=environment, capture_output=True, text=True,
+                               stdin=subprocess.DEVNULL)
+        if entry.returncode != 0:
+            say(entry.stdout.rstrip("\n") + ("\n" + entry.stderr.rstrip("\n") if entry.stderr.strip() else ""))
+            print_rejection("起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），一条都没跑", [],
+                            ['照上面的出路修（开新会话，或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"），再跑同一条命令。'])
+            return 1
     # 锚点失效的行（文件头「锚点失效」）单记一档：不算键、不派活、不写库，别的行照跑
     anchor_judgements = [(row.line_number, "anchor", anchor_broken_text(row, anchor_broken[row.line_number]), None)
                          for row in rows if row.line_number in anchor_broken]
@@ -2749,14 +3964,23 @@ def run_stage(root, environment=None, judging_repository=None):
         # 个别行的大上限由 run_pool 按额度排队（每一格按自己的上限从外层额度里扣，文件头「工作进程数」）。largest_memory 只用来在头一行报
         largest_memory = limits_for_lines(dict(memory_max=memory_max, timeout_seconds=timeout_seconds, row_limits=row_limits),
                                           [row.line_number for row in candidates])[0]
-        # 编译目录所在的盘放得下几个工作进程的两份编译目录（文件头「磁盘余量」）：算在核数、条数、外层内存三项之后，取最小
+        # 编译目录所在的盘放得下几个工作进程的两份编译目录（文件头「磁盘余量」）：算在核数、条数、外层内存三项之后，取最小。
+        # 调用方没给 GATE_MUTATION_TARGET_DIR 时编译目录由 run_pool 在这一趟的 shard_root 里建，这里按它将来所在的盘（$TMPDIR）算
         shared_target = default_shared_target_directory(environment)
+        disk_probe = shared_target if shared_target is not None else planned_run_build_target_directory()
+        # 每份编译目录的涨幅按判定库里近 20 次每格判完量到的占盘峰值算（文件头「磁盘余量」），没有读数的那一种按上限
+        target_peaks = measured_target_peaks(library.directory, 20)
         worker_count, worker_count_head_line = worker_count_for(len(candidates), environment, memory_max, largest_memory,
-                                                                disk=lambda ceiling: disk_bound_for(shared_target, environment, ceiling))
+                                                                disk=lambda ceiling: disk_bound_for(disk_probe, environment, ceiling, target_peaks))
         note(worker_count_head_line)
         # 每个 cargo 的编译并行度：进程数 × 它 ≈ 核数，免得 N 个 cargo 各自按核数开 rustc、互相抢
         cargo_jobs = environment.get("GATE_MUTATION_CARGO_JOBS", "").strip() or str(max(1, (os.cpu_count() or 4) // worker_count))
         environment["CARGO_BUILD_JOBS"] = cargo_jobs
+        # 起 cargo 时关调试信息（文件头「调试信息」）：只设在起 cargo 的这一份环境里；取值另照 key_toolchain_lines 进了行键
+        debug_overrides = cargo_debug_overrides(environment)
+        environment.update(debug_overrides)
+        note("  … 起 cargo 时的构建档：" + ("、".join(f"{name}={value}" for name, value in sorted(debug_overrides.items())) + "（关调试信息，取值进行键）"
+                                       if debug_overrides else "照调用方的环境与 Cargo.toml（弄坏开关 debuginfo-kept：调试信息开着）"))
         # 变异复跑起的 cargo 写自己的崩溃判定库（文件头「变异复跑的判定库」）：不写进真跑的长期库
         crash_library_home, crash_library_cleared = mutation_crash_library_environment(environment)
         if crash_library_home is not None:
@@ -2769,15 +3993,18 @@ def run_stage(root, environment=None, judging_repository=None):
         note(f"  … 起 cargo 时的崩溃判定库家目录：{crash_library_home_text}"
              + (f"，清掉调用方点名的 {'、'.join(crash_library_cleared)}" if crash_library_home is not None else "（弄坏开关 sharedcrashlibrary：照调用方的环境）")
              + (f"；每个工作进程再用底下自己片号的 {CRASH_LIBRARY_SHARD_DIRECTORY_PREFIX}<片号> 子目录，不共用一份库" if crash_library_home is not None else ""))
-        # 编译目录数按这一趟的工作进程数复用：片号更大的旧 -w<片号>（连同 -coverage）开跑时回收，有人在用的留着（reclaim_extra_target_directories）
-        for line in target_reclaim_lines(shared_target, worker_count, reclaim_extra_target_directories(shared_target, worker_count, environment)):
-            note(line)
+        # 调用方给的编译目录：片号更大的旧 -w<片号>（连同 -coverage）开跑时回收，有人在用的留着（reclaim_extra_target_directories）；
+        # 这一趟自己建的由 run_pool 建好之后打那一行
+        if shared_target is not None:
+            for line in target_reclaim_lines(shared_target, worker_count, reclaim_extra_target_directories(shared_target, worker_count, environment), owned=False):
+                note(line)
         context = dict(root=root, copied=copied, environment=environment, memory_max=memory_max, timeout_seconds=timeout_seconds, row_limits=row_limits,
                        memory_cap_runner=memory_cap_runner, judging=key_context.judging, llvm_tools=tools,
                        library_directory=library.directory, timings_directory=timings_directory,
                        row_records={row.line_number: light_components(components[row.line_number]) for row in rows},
                        shared_target_directory=shared_target, worker_count=worker_count, stage_process=os.getpid(),
                        outer_memory_bytes=outer_memory_bytes(environment), target_directory_cap_bytes=target_directory_cap_bytes(environment))
+        RUN_BUILD_REMOVAL_FAILURES.clear()   # 这一趟 run_pool 收尾没删成的编译目录（同一进程里跑几趟时不带上一趟的）
         try:
             outcome = run_pool(context, worker_count, batches, ordered_candidates, baseline_ok_lines, numeric_settings["GATE_MUTATION_STOP_AFTER_ROWS"], planner)
         except concurrent.futures.process.BrokenProcessPool:
@@ -2785,6 +4012,17 @@ def run_stage(root, environment=None, judging_repository=None):
             print_rejection("有工作进程中途死了，这一轮的变异没跑全", [],
                             ["多半是内存不够被 OOM 杀的——GATE_MUTATION_WORKERS 调小再跑一遍（判完的那几条有判定库记录，下一趟只跑剩下的）；",
                              "单跑 GATE_MUTATION_WORKERS=1 能跑完就是并发度的问题，还死就去看那一条变异本身。"])
+            return 1
+        if RUN_BUILD_REMOVAL_FAILURES:
+            print_rejection(f"这一趟自己建的编译目录收尾没删成（{'、'.join(RUN_BUILD_REMOVAL_FAILURES)}），整道判红", [],
+                            ["照上面那几行报的进程逐个停掉（python3 .claude/singlefs-ai-sop/scripts/proc.py stop <进程号>），再删那个目录；",
+                             "是这一趟的工作进程或 cargo 没收干净：去看 scripts/mutation/crates-mutation-rows.py 的 run_pool 收尾。"])
+            return 1
+        if outcome.get("seed_problems"):
+            print_rejection(f"先编一份依赖：源码副本里摸过的包有 {len(outcome['seed_problems'])} 个产物 cargo 当成没变（fresh），修改时刻规矩坏了，一条都没跑",
+                            outcome["seed_problems"],
+                            ["去看 scripts/mutation/crates-mutation-rows.py 的 sync_seed_source（内容变了的文件要写成此刻的修改时刻、所在的包整包摸过）；",
+                             f"修好之前删掉 {os.path.normpath(context['shared_target_directory'] or planned_run_build_target_directory()) + SEED_SOURCE_SUFFIX} 再跑（整份重拷，修改时刻都是此刻）。"])
             return 1
     if outcome.get("budget_peak") is not None:
         note(f"  … 额度账：在跑各格的上限加先编借走的额度，这一趟的峰值 {format_size(outcome['budget_peak'])}（外层上限 {format_size(context['outer_memory_bytes'])}）")
@@ -2795,6 +4033,12 @@ def run_stage(root, environment=None, judging_repository=None):
         print_rejection(f"派出去 {outcome['submitted']} 格（基线的批、变异与覆盖），只收回 {outcome['received']} 格", [],
                         ["这是分片并发自己的完整性闸红了，不是变异的问题；把 GATE_MUTATION_WORKERS=1 再跑一遍看串行下是不是全的，",
                          "是就去查领活与收束那一段（scripts/mutation/crates-mutation-rows.py 的 run_pool）。"])
+        return 1
+    if outcome.get("over_cap"):
+        print_rejection(f"编译目录清掉增量产物与 deps 里同名产物的旧版本之后仍超上限 {TARGET_DIRECTORY_CAP_VARIABLE}，停派：在跑的那几格判完就没再派活，"
+                        f"这一轮没跑全（现判的变异判完 {len(outcome['mutation'])} 条）", outcome["over_cap"],
+                        [f"剩下的是每个依赖与测试二进制的最新一版：把 {TARGET_DIRECTORY_CAP_VARIABLE} 调大到放得下这一趟的一份编译目录（文件头「编译目录上限」），",
+                         "或给编译目录换一块余量大的盘（GATE_MUTATION_TARGET_DIR）；判完的那几格已经写了判定库记录，再跑一趟只跑剩下的。"])
         return 1
     if outcome["stopped"]:
         print_rejection(f"只供测试的开关 GATE_MUTATION_STOP_AFTER_ROWS={numeric_settings['GATE_MUTATION_STOP_AFTER_ROWS']}："
@@ -2888,6 +4132,19 @@ class CoveragePlanner:
     def initial_jobs(self):
         return []
 
+    def predicted_rows(self, rows):
+        """这一趟现跑之后可能要记覆盖的行（先编一份依赖的插桩那一份按它们的组编，文件头「先编一份依赖」）：与 job_after 同一条判据，只是不看判定、不记 scheduled，
+        同一份覆盖号只交头一行。"""
+        picked, seen = [], set()
+        for row in rows:
+            components = self.components.get(row.line_number)
+            if components is None or not components.coverage_id or not components.test_full_name or components.coverage_id in seen:
+                continue
+            seen.add(components.coverage_id)
+            if not executed_set_is_current(self.keys, self.library.read_json("coverage", components.coverage_id)):
+                picked.append(row)
+        return picked
+
     def job_after(self, row, judgement, info):
         if judgement[1] != "caught":
             return None
@@ -2950,6 +4207,7 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     refused, unavailable, baseline_bad = by_verdict["refused"], by_verdict["unavailable"], by_verdict["baseline"]
     not_run = by_verdict["notrun"]
     gpu_memory = by_verdict["gpumemory"]
+    quiesce_refused = by_verdict["quiescerefused"]   # 带 gpu 特性、清场回读没过、命令没起（文件头「带 gpu 特性的格经清场起」）
     anchor_broken = by_verdict["anchor"]   # 锚点失效（文件头「锚点失效」）：rows 里没有这几行，「共」那个数把它们加回来
     for text in caught:
         say(text)
@@ -2959,6 +4217,8 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
         f"（共 {len(rows) + len(anchor_broken)} 条）")
     if gpu_memory:   # 「计数：」那一行的格式不动（别的定义照栏读），显存不够另起一行报
         say(f"  显存不够：{len(gpu_memory)} 条（内存包装退 {GPU_MEMORY_HIT_EXIT}：不算抓到、不算没红，结果不算数）")
+    if quiesce_refused:   # 同上，另起一行报
+        say(f"  清场没过没跑：{len(quiesce_refused)} 条（点名的测试要编 gpu 特性、经 scripts/crash/gpu-quiesce-run.sh 起，清场回读没过、命令没起：不算抓到、不算没红）")
     if skip_baseline:
         say("  基线：没跑（GATE_MUTATION_BREAK=nobaseline，只给证红用）")
     else:
@@ -2973,7 +4233,8 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     # 本次未跑的逐条列出来（文件头「本次未跑」）：不算抓到、不算没红；「计数：」那一行的格式不动，另起一行报
     not_run_record_problem = None
     if not_run:
-        say(f"  本次未跑：{len(not_run)} 条（点名的测试在本机打了 NOT_RUN_NO_GPU_ADAPTER 后返回成功，没跑到被改坏的那一处：不算抓到、不算没红，这一趟不是整张表的结论）")
+        say(f"  本次未跑：{len(not_run)} 条（点名的测试在本机打了 NOT_RUN_NO_GPU_ADAPTER 后返回成功，或带 gpu 特性而多机配置不在、给定状态全交 CPU 判，"
+            "没跑到被改坏的那一处：不算抓到、不算没红，这一趟不是整张表的结论）")
         for text in not_run:
             say(f"    · {text}")
         not_run_record_problem = write_not_run_record(counts.get("not_run_record", ""), not_run)
@@ -3017,6 +4278,10 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
         (gpu_memory, f"有变异显存不够（显存不够 {len(gpu_memory)} 条；内存包装认出它们起止之间内核报了 NV_ERR_NO_MEMORY）：",
          ["这几条的结果不算数，重跑（抓到的有判定库记录，只重跑没作数的）；先看同一段时间谁在用卡（nvidia-smi），少给这几条或同时在跑的几条一些显存，",
           "上卡的跑法经 scripts/hosts/host-dispatch.py --gpu 按各台显存余量派；别把它记成抓到。"]),
+        (quiesce_refused, f"有变异带 gpu 特性、清场回读没过没跑（清场没过没跑 {len(quiesce_refused)} 条；经 scripts/crash/gpu-quiesce-run.sh 起，命令没起）：",
+         ["卡上有不归清场白名单的计算进程（别的会话的 GPU 活）时清场回读本来就不过：等那个进程跑完再只重跑这几行，不停它：",
+          "bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item <行号或变异名>；回读没过的原话在清场包装留的本机日志里（GPU_QUIESCE 那一行的 log=），",
+          "多机配置没写全 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND 的照仓根 multi-host.env.example 写全；别拿掉清场包装去跑。"]),
         (refused, f"有变异排不上没跑（排不上没跑 {len(refused)} 条；包装等满了等待上限，slice 还是放不下）：",
          ["bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，等那几件重活跑完再重跑；", "别拿掉包装去跑——排不上说明此刻整机放不下。"]),
         (unavailable, f"跑到一半带内存上限的 scope 起不来了（{len(unavailable)} 条没跑）：",
@@ -3034,8 +4299,8 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     if not_run_record_problem:
         print_rejection(f"本次未跑的 {len(not_run)} 条没写进 GATE_MUTATION_NOT_RUN_RECORD 那份记录（{not_run_record_problem}），门禁汇总就看不见它们", [],
                         ["看那份文件所在的目录满没满、有没有写权限；记不下本次未跑的这一趟按红记，免得被当成全判过。"])
-    red = bool(invalid or failures or memory_hits or compile_memory_hits or timeouts or squeezed or gpu_memory or refused or unavailable or baseline_bad or left_behind
-               or not_run_record_problem or anchor_broken)
+    red = bool(invalid or failures or memory_hits or compile_memory_hits or timeouts or squeezed or gpu_memory or quiesce_refused or refused or unavailable or baseline_bad
+               or left_behind or not_run_record_problem or anchor_broken)
     note(f"  … 这一轮 {counts['worker_count']} 个工作进程，每个 cargo 编译并行度 {counts['cargo_jobs']}{counts['compile_jobs_text']}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒；"
          f"复用抓到 {counts['reused']} 条、复用基线 ok {counts['reused_baseline']} 行，现跑变异 {counts['fresh_mutations']} 条、现跑基线 {counts['fresh_batches']} 批")
     if selection_path:
@@ -3144,8 +4409,19 @@ def command_static_check(arguments):
             print("\t".join([kind] + [str(item) for item in detail]))
     for relative, line_number, literal, resolved, _inside in outside_literals:
         print(f"LITERAL\t{relative}\t{line_number}\t{literal}\t{resolved}")
+    # 替换文里新引的标识符找不到定义（replacement_undefined_identifiers）：只 static-check 判，checker-tier-crates-mutation-replay 派活之前不判（那边套用后编不过记无效）
+    identifier_cache, undefined_rows, identifiers_unjudged = {}, 0, 0
+    for row in rows:
+        if not row.path.endswith(".rs") or anchor_problem(root, row) is not None:
+            identifiers_unjudged += 1
+            continue
+        missing = replacement_undefined_identifiers(root, row, identifier_cache)
+        if missing:
+            undefined_rows += 1
+            print(f"UNDEFINED\t{row.line_number}\t{row.name}\t{row.path}\t{','.join(missing)}")
+    print(f"IDENTIFIERS_CHECKED\t{len(rows) - identifiers_unjudged}\t{identifiers_unjudged}")
     print(f"CHECKED\t{len(rows)}\t{scanned}\t{len(literals)}")
-    return 1 if any(problems.values()) or outside_literals else 0
+    return 1 if any(problems.values()) or outside_literals or undefined_rows else 0
 
 
 
@@ -3190,7 +4466,7 @@ def command_toolchain(arguments):
         print("     → 怎么办：<根> 是被判那棵树的仓根（rustc、cargo 在那里起，从它往上找 .cargo/config.toml）")
         return 2
     try:
-        lines = mutation_units.toolchain_lines(arguments[0], dict(os.environ))
+        lines = key_toolchain_lines(arguments[0], dict(os.environ))
     except mutation_units.MutationUnitsError as error:
         print(f"  ✗ 算不出工具链行：{error}")
         print("     → 怎么办：装好 Rust 工具链（rustc -vV、cargo -V 要跑得通），根 Cargo.toml 要读得懂")
@@ -3486,9 +4762,36 @@ if os.environ.get("FAKE_CARGO_ENVIRONMENT_LOG"):
     # 设了才记：每起一次 test 往里追加一行 JSON，收到的线程数变量、编译并行度与编译目录
     names = ("RUST_TEST_THREADS", "CARGO_BUILD_JOBS", "CARGO_TARGET_DIR", "SINGLEFS_CRASH_AMPLIFICATION_HOME", "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY")
     with open(os.environ["FAKE_CARGO_ENVIRONMENT_LOG"], "a", encoding="utf-8") as environment_log:
-        recorded = {name: value for name, value in os.environ.items() if name in names or name.endswith("_THREADS") or name == "SINGLEFS_THREAD_CAP"}
+        recorded = {name: value for name, value in os.environ.items()
+                    if name in names or name.endswith("_THREADS") or name == "SINGLEFS_THREAD_CAP" or name.startswith("CARGO_PROFILE_")}
         recorded["ARGUMENTS"] = " ".join(arguments[1:])
         environment_log.write(json.dumps(recorded, sort_keys=True) + "\n")
+if os.path.isfile("Cargo.lock"):
+    # 外部依赖（Cargo.lock 里带 source 的包）：这份编译目录里缺它们的产物就照真 cargo 的样子「编」一遍（<档>/deps 下的 rlib 与 .d、.fingerprint、build），
+    # 往 $FAKE_CARGO_DEPENDENCY_LOG 记一行编译目录（设了才记）；先编一份依赖那几格数它
+    profile_directory = os.path.join(os.environ.get("CARGO_TARGET_DIR", "target"), "debug")
+    missing = []
+    for package in tomllib.load(open("Cargo.lock", "rb")).get("package", []):
+        if "source" in package:
+            unit = hashlib.sha256((package["name"] + package["version"]).encode()).hexdigest()[:16]
+            rlib = os.path.join(profile_directory, "deps", f"lib{package['name'].replace('-', '_')}-{unit}.rlib")
+            if not os.path.isfile(rlib):
+                missing.append((package, unit, rlib))
+    for package, unit, rlib in missing:
+        crate = package["name"].replace("-", "_")
+        registry_source = f"/crates-mutation-rows-selftest-registry/{package['name']}-{package['version']}/src/lib.rs"
+        os.makedirs(os.path.dirname(rlib), exist_ok=True)
+        with open(rlib, "w", encoding="utf-8") as handle:
+            handle.write(package["name"])
+        with open(os.path.join(profile_directory, "deps", f"{crate}-{unit}.d"), "w", encoding="utf-8") as handle:
+            handle.write(f"{rlib}: {registry_source}\n\n{registry_source}:\n")
+        for kind, name, file_name in ((".fingerprint", f"{package['name']}-{unit}", f"lib-{crate}"), ("build", f"{package['name']}-{unit[::-1]}", os.path.join("out", "generated.rs"))):
+            os.makedirs(os.path.dirname(os.path.join(profile_directory, kind, name, file_name)), exist_ok=True)
+            with open(os.path.join(profile_directory, kind, name, file_name), "w", encoding="utf-8") as handle:
+                handle.write(unit + "\n")
+    if missing and os.environ.get("FAKE_CARGO_DEPENDENCY_LOG"):
+        with open(os.environ["FAKE_CARGO_DEPENDENCY_LOG"], "a", encoding="utf-8") as log:
+            log.write(os.environ.get("CARGO_TARGET_DIR", "target") + "\n")
 if os.environ.get("FAKE_CARGO_BARRIER_DIR") and "--no-run" in arguments and hashlib.sha256(source.encode()).hexdigest()[:12] != os.environ.get("FAKE_CARGO_BARRIER_PRISTINE"):
     import time
     barrier = os.environ["FAKE_CARGO_BARRIER_DIR"]
@@ -3554,12 +4857,15 @@ if "--no-run" in before:
         sources = sorted(os.path.relpath(os.path.join(directory, name), os.getcwd()) for directory, _names, names in os.walk(os.path.join(crate, "src"))
                          for name in names if name.endswith(".rs"))
         executable = os.path.join(deps, f"{package}-0000000000000000")
+        # fresh 照 cargo 按修改时刻判的样子：产物在、而且不比这个包底下最新的文件旧（先编一份依赖那一格核摸过的包有没有重编读它）
+        newest_source = max((os.stat(os.path.join(directory, name)).st_mtime_ns for directory, _names, names in os.walk(crate) for name in names), default=0)
+        fresh = os.path.isfile(executable) and os.stat(executable).st_mtime_ns >= newest_source
         with open(executable, "w", encoding="utf-8") as handle:
             json.dump({"root": os.getcwd(), "sources": sources}, handle)
         with open(executable + ".d", "w", encoding="utf-8") as handle:
             handle.write(f"{executable}: {' '.join(sources)}\n\n")
         print(json.dumps({"reason": "compiler-artifact", "manifest_path": os.path.join(crate, "Cargo.toml"), "target": {"kind": ["lib"], "name": package},
-                          "profile": {"test": True}, "filenames": [executable], "executable": executable, "fresh": False}))
+                          "profile": {"test": True}, "filenames": [executable], "executable": executable, "fresh": fresh}))
     # 剖析文件只在插桩编译时写（参数或 RUSTFLAGS / CARGO_ENCODED_RUSTFLAGS 里带 -Cinstrument-coverage）：基线与变异先编的那一趟不插桩，不写
     instrumented = any("instrument-coverage" in word for word in sys.argv[1:]) or any(
         "instrument-coverage" in os.environ.get(name, "") for name in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS"))
@@ -3754,6 +5060,12 @@ SELFTEST_NOT_RUN_TEST = "// TEST gpu_parity NOTRUN 样本：本机没有 GPU 适
 SELFTEST_NOT_RUN_ROW = "card-path-changed\tcrates/tiny/src/lib.rs\t{ value / 2 }\t{ value / 4 }\t-p tiny --lib -- gpu_parity\tgpu_parity"
 # 点名的测试要编 gpu 特性的一行（真表里 GPU 判器那几批）：假 cargo 要读得到 .cargo/config.toml 的 [env] BINDGEN_EXTRA_CLANG_ARGS（FAKE_CARGO 头上那一段）
 SELFTEST_GPU_FEATURE_ROW = "gpu-double-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t-p tiny --features gpu --lib -- doubles\tdoubles"
+# 产品 GPU 包的真显卡对拍开的是 tests-on-a-real-gpu（不是 gpu）：同样要经清场起（文件头「带 gpu 特性的格经清场起」）
+SELFTEST_PRODUCT_GPU_FEATURE_ROW = ("product-gpu-double-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t"
+                                    "-p tiny --features tests-on-a-real-gpu --lib -- doubles\tdoubles")
+# 同一个特性、点名的测试在没卡的机器上打 NOT_RUN_NO_GPU_ADAPTER 后返回成功（SELFTEST_NOT_RUN_TEST 那一条用例）
+SELFTEST_PRODUCT_GPU_NOT_RUN_ROW = ("product-card-path-changed\tcrates/tiny/src/lib.rs\t{ value / 2 }\t{ value / 4 }\t"
+                                    "-p tiny --features tests-on-a-real-gpu --lib -- gpu_parity\tgpu_parity")
 SELFTEST_CARGO_CONFIGURATION = '[env]\nBINDGEN_EXTRA_CLANG_ARGS = "-I/crates-mutation-rows-selftest/include"\n'
 # 替换文空着的删行变异（真表里删掉一句调用、删掉 litmus 里一道屏障的那一类）
 SELFTEST_DELETION_ROW = "halve-deleted\tcrates/tiny/src/lib.rs\t{ value / 2 }\t\t-p tiny --lib -- halves\thalves"
@@ -3856,6 +5168,7 @@ class Selftest:
         self.work = work
         self.cells = 0
         self.failures = []
+        self.not_run = []   # 本次未跑的格（skip）
         self.bin_directory = os.path.join(work, "bin")
         selftest_write(os.path.join(self.bin_directory, "cargo"), FAKE_CARGO, executable=True)
         self.llvm_directory = os.path.join(work, "llvm")
@@ -3877,6 +5190,20 @@ class Selftest:
         # 复用哨兵：别的格比的是现判与复用的条数，键相同的全当哨兵、不抽强制现判；reuse-three-questions 与 reuse-sentinel 两格自己设
         self.base_environment[reuse_checks.SENTINEL_COUNT_VARIABLE] = "1000"
         self.base_environment.pop(reuse_checks.SENTINEL_SEED_VARIABLE, None)
+        # 串行段声明：调用方设了的不带进来（自证各趟不往调用方的声明文件里写），声明那一格自己设
+        self.base_environment.pop("SINGLEFS_SERIAL_DECLARATIONS", None)
+        # 清场包装（文件头「带 gpu 特性的格经清场起」）：别的格里带 gpu 特性的那几次经一份只原样起命令的假包装（不读多机配置、不清场、不上卡）；
+        # 清场那几格换成真的 gpu-quiesce-run.sh 与只写假清场命令的多机配置
+        self.quiesce_passthrough = os.path.join(work, "fake-gpu-quiesce-run.sh")
+        selftest_write(self.quiesce_passthrough, '#!/usr/bin/env bash\n# 自证用的假清场包装：去掉 -- 原样起命令\n[[ "${1:-}" == -- ]] && shift\nexec "$@"\n',
+                       executable=True)
+        self.base_environment["GATE_MUTATION_GPU_QUIESCE_RUNNER"] = self.quiesce_passthrough
+        # 交给带 gpu 特性那几格的多机配置（文件头「带 gpu 特性的格把多机配置交给测试、跑完核真用了卡」）：调用方设的不带进来，
+        # 本模块所在仓那一份也不读（有没有、写了什么随机器变），换成临时目录里的一份；交多机配置那几格自己设
+        self.base_environment.pop("SINGLEFS_MULTI_HOST_CONFIG", None)
+        self.multi_host_configuration = os.path.join(work, "selftest-multi-host", "multi-host.env")
+        selftest_write(self.multi_host_configuration, "# 自证用的多机配置：假 cargo 不读它，交多机配置那几格只核它的路径到没到测试的环境里\nENABLE_GPU=1\n")
+        self.base_environment["GATE_MUTATION_MULTI_HOST_CONFIG"] = self.multi_host_configuration
 
     def run(self, root, judging_repository=None, **changes):
         """在 root 上跑一趟 run_stage：(退出码, stdout, stderr, 这一趟假 cargo 起的每一行)。"""
@@ -3896,6 +5223,10 @@ class Selftest:
         self.cells += 1
         if not condition:
             self.failures.append(f"{label}{('：' + detail) if detail else ''}")
+
+    def skip(self, label, reason):
+        """这一格的前提没造出来：记本次未跑（不算对、也不算错，不进格数），run_selftest 收尾逐格列出，别的格都对时整趟退 77。"""
+        self.not_run.append(f"{label}：{reason}")
 
 
 def compile_invocation(line):
@@ -4196,6 +5527,30 @@ def selftest_libtest_result_cell(selftest, work):
                    verdict == "caught" and results == {"tests::answer_panics": ["FAILED"]}, f"判成 {verdict}：{text[:200]}；对上的 {results}")
 
 
+def selftest_host_lookup_cells(selftest, work):
+    """内存包装现查别的机器打的那几行（HOST_LOOKUP_LINE）判法不读：同一份 cargo 输出、前面那几行内容不同，verdict_of_run 交的档与那一句逐字相同、
+    不带那几行（弄坏开关 hostlookuplineskept 下判错）。包装 HostLookup 的每一处 say 都要被 HOST_LOOKUP_LINE 认、HostLookup 之外的不被它认
+    （除了登记的同首那一句）；再造一份在 HostLookup 里多一处 say 的包装，要报出它（包装新加一处 say 而没登记就红）。"""
+    row = Row(9, "selftest-host-lookup", "crates/selftest/src/lib.rs", "a", "b", "-p selftest", "tests::named", [])
+    cargo_output = "running 1 test\ntest tests::named ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored\n"
+    variants = ["run-with-memory-cap: 没查到别的机器：第二台没读到（ssh 退 255）\nrun-with-memory-cap: 现查别的机器：第二台此刻也放不下（可用 1.0 GiB）\n",
+                "  → 第二台此刻放得下（可用 43.0 GiB、要 8.0 GiB）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap 4G --label moved-from-queue-1 -- cargo test\n"
+                "  ! 告警记录写不进（OSError: 自证造的）：看门狗读不到这一条，靠上面那一行叫人看；设 SINGLEFS_CORE_USAGE_ALERTS 指到可写的文件\n"]
+    verdicts = [verdict_of_run(row, 0, lines + cargo_output, "4G", "1800", environment=os.environ) for lines in variants]
+    selftest.check("包装现查别的机器打的那几行内容不同，判出的档与那一句逐字相同、不带那几行",
+                   verdicts[0] == verdicts[1] and verdicts[0][0] == "failure" and not any(word in verdicts[0][1] for word in ("别的机器", "此刻放得下", "告警记录写不进")),
+                   f"{verdicts}")
+    real_problems = host_lookup_say_problems(DEFAULT_MEMORY_CAP_RUNNER)
+    with open(DEFAULT_MEMORY_CAP_RUNNER, encoding="utf-8") as handle:
+        wrapper_text = handle.read()
+    planted_anchor = "    def wait_thread(self):\n"
+    planted = os.path.join(work, "host-lookup-planted-wrapper.sh")
+    selftest_write(planted, wrapper_text.replace(planted_anchor, '    def planted(self):\n        say(f"run-with-memory-cap: 新加的一句：{self.unit}")\n\n' + planted_anchor, 1))
+    planted_problems = host_lookup_say_problems(planted) if planted_anchor in wrapper_text else ["包装里找不到 wait_thread，造不出多一处 say 的包装"]
+    selftest.check("包装 HostLookup 的每一处 say 都被 HOST_LOOKUP_LINE 认、HostLookup 里多一处没登记的 say 报得出",
+                   not real_problems and any("新加的一句" in problem for problem in planted_problems), f"真包装 {real_problems}；多一处 say 的包装 {planted_problems}")
+
+
 # 自证「被 TERM 停」那一格在子进程里跑 run_stage（按路径载入本模块）
 SELFTEST_STAGE_CHILD = ("import importlib.util, os, sys\n"
                         "specification = importlib.util.spec_from_file_location('crates_mutation_rows_selftest_child', sys.argv[1])\n"
@@ -4214,7 +5569,7 @@ def selftest_signal_and_pipe_cells(selftest, work):
     os.makedirs(temporary)
     hang, released, done = (os.path.join(work, name) for name in ("cargo-hanging", "cargo-released", "cargo-done"))
     environment = dict(os.environ, TMPDIR=temporary, GATE_MUTATION_START_OVER="1", FAKE_CARGO_HANG_FILE=hang, FAKE_CARGO_RELEASE_FILE=released,
-                       FAKE_CARGO_DONE_FILE=done)
+                       FAKE_CARGO_DONE_FILE=done, GATE_MUTATION_TARGET_DIR="")   # 编译目录建在这一趟的 shard_root 里（文件头「编译目录」），停完连同它删
     stderr_path = os.path.join(work, "signalled-stderr.txt")
     # stderr 落文件、不接管道：没接住信号时工作进程成了孤儿、还开着它，接管道就等不到头
     with open(stderr_path, "w", encoding="utf-8") as stderr_handle:
@@ -4273,6 +5628,11 @@ def selftest_signal_and_pipe_cells(selftest, work):
                    not not_ready and len(while_running) == 1 and left == [] and child.returncode == 128 + signal.SIGTERM and not worker_alive and os.path.exists(done),
                    f"{not_ready}跑的时候 {while_running}，停完 {left}，退 {child.returncode}，工作进程 {worker} 还活着 {worker_alive}，假 cargo 退了 {os.path.exists(done)}；"
                    f"stderr 尾：{stderr.strip()[-300:]}")
+    term_targets = selftest_run_target_directories(stderr)
+    selftest.check("跑完运行目录里不剩它建的编译目录（被 TERM 停）：编译目录建在 $TMPDIR 下这一趟的 singlefs-mutation-replay-* 的 build 里，停完连同它删掉",
+                   not not_ready and len(term_targets) == 1 and term_targets[0].startswith(os.path.join(temporary, SHARD_ROOT_PREFIX)) and not os.path.exists(term_targets[0])
+                   and left == [] and f"删了这一趟的编译目录 {os.path.dirname(term_targets[0])}" in stderr,
+                   f"{not_ready}编译目录 {term_targets}，停完 $TMPDIR 下剩 {left}；{[line for line in stderr.splitlines() if '编译目录' in line][:3]}")
     read_end, write_end = os.pipe()
     os.close(read_end)
     closed_pipe = subprocess.run([sys.executable, MODULE_PATH, "--list-items", repository], stdout=write_end, stderr=subprocess.PIPE, text=True,
@@ -4324,6 +5684,178 @@ def selftest_cargo_configuration_cell(selftest, work):
     selftest.check("拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到",
                    exit_code == 0 and "基线不绿 0 行" in stdout and "计数：抓到 2 条、没红 0 条" in stdout and len(feature_runs) == 2,
                    f"退 {exit_code}；假 cargo 带 --features gpu 起了 {len(feature_runs)} 次（要基线 1 次、变异 1 次）；拷贝范围 {copied_paths()}；{stdout}{stderr[-400:]}")
+
+
+def selftest_gpu_quiesce_cells(selftest, work):
+    """带 gpu 特性的格经清场起（文件头「带 gpu 特性的格经清场起」）：清场包装用真的 scripts/crash/gpu-quiesce-run.sh，多机配置是临时目录里只写假清场命令的一份
+    （清场与回读各往记录里追加一行；状态目录、本机日志都在临时目录里，不清真场、不上卡）。三格：
+    ① 带 gpu 的那一行真跑测试的几次（基线、变异、插桩跑）各经清场包装进一次、回读一次，只编不跑的几次与不带 gpu 的那一行不经；
+    ② 变异那一趟回读没过：那一行记清场没过没跑、不算抓到也不算没红，整道判红；不带 gpu 的照抓到；
+    ③ 基线那一批回读没过：记基线不绿，写明清场回读没过、命令没起。
+    产品 GPU 包（singlefs-background-gpu）的 tests-on-a-real-gpu 特性另有三格，同一份判法：
+    ④ 带 tests-on-a-real-gpu 的那一行真跑测试的几次各经清场包装进一次，只编不跑的与不带的不经；
+    ⑤ 变异那一趟回读没过：记清场没过没跑，整道判红；
+    ⑥ 清场过了、点名的测试在没卡的机器上打 NOT_RUN_NO_GPU_ADAPTER 后返回成功：记本次未跑，不算抓到也不算没红，整道不判红。
+    弄坏开关 product-gpu-feature-unquiesced 下这一特性不当上卡的特性认（④⑤⑥ 三格判错）。"""
+    real_runner = os.path.join(SCRIPT_DIRECTORY, "..", "crash", "gpu-quiesce-run.sh")
+
+    def quiesce_world(name, readback_passes_up_to, gpu_row=SELFTEST_GPU_FEATURE_ROW, extra_source=""):
+        """一棵带一行不带 gpu、一行带 gpu（gpu_row）的小仓，一份假清场配置：回读前 readback_passes_up_to 次过、之后不过（-1 是一直过）。交 (仓, 环境的改动, 清场记录)。"""
+        root = os.path.join(work, name)
+        build_selftest_repository(root, [SELFTEST_TABLE_ROWS[0], gpu_row], extra_source=extra_source)
+        selftest_write(os.path.join(root, CARGO_CONFIGURATION_DIRECTORY, "config.toml"), SELFTEST_CARGO_CONFIGURATION)
+        calls = os.path.join(work, name + "-quiesce-calls.log")
+        passes = "true" if readback_passes_up_to < 0 else f'[ "$(grep -c check "{calls}")" -le {readback_passes_up_to} ]'
+        configuration = os.path.join(work, name + "-multi-host.env")
+        selftest_write(configuration, "# 自证用的多机配置：只写假清场命令，清场与回读各往记录里追加一行\n"
+                       f"QUIESCE_STOP_COMMAND='echo stop >> \"{calls}\"'\n"
+                       f"QUIESCE_STOPPED_CHECK_COMMAND='echo check >> \"{calls}\"; {passes}'\n")
+        # 状态目录不是默认那一份、RESOURCE_BROADCAST_DIRECTORY 空着：清场包装不发资源释放广播（它文件头「资源释放广播」）
+        changes = dict(GATE_MUTATION_GPU_QUIESCE_RUNNER=real_runner, SINGLEFS_MULTI_HOST_CONFIG=configuration, GPU_CARDS_BY_PRIORITY="",
+                       GPU_QUIESCE_STATE_DIRECTORY=os.path.join(work, name + "-quiesce-state"), GPU_QUIESCE_LOG_DIRECTORY=os.path.join(work, name + "-quiesce-logs"),
+                       RESOURCE_BROADCAST_DIRECTORY="", RESOURCE_BROADCAST_PUSH="off", GATE_MUTATION_START_OVER="1")
+        return root, changes, calls
+
+    def quiesce_calls(calls):
+        if not os.path.exists(calls):
+            return []
+        with open(calls, encoding="utf-8") as handle:
+            return handle.read().split()
+
+    root, changes, calls = quiesce_world("gpu-quiesce-passes", -1)
+    exit_code, stdout, stderr, invocations = selftest.run(root, **changes)
+    gpu_runs = [line for line in invocations if "--features gpu" in line and "--no-run" not in line]
+    seen = quiesce_calls(calls)
+    selftest.check("带 gpu 特性的行：真跑测试的那几次（基线、变异、插桩跑）各经 gpu-quiesce-run.sh 起、清场回读一次，只编不跑的与不带 gpu 的不经",
+                   exit_code == 0 and "计数：抓到 2 条、没红 0 条" in stdout and len(gpu_runs) == 3 and seen.count("check") == 3 and seen.count("stop") == 3,
+                   f"退 {exit_code}；假 cargo 带 --features gpu 真跑了 {len(gpu_runs)} 次（要基线、变异、插桩跑各 1 次）；清场记录 {seen}（要 stop、check 各 3 次）；"
+                   f"{stdout[-600:]}{stderr[-400:]}")
+    root, changes, calls = quiesce_world("gpu-quiesce-mutation-refused", 1)
+    exit_code, stdout, stderr, invocations = selftest.run(root, **changes)
+    selftest.check("带 gpu 特性的行：变异那一趟清场回读没过，记清场没过没跑（不算抓到、不算没红），整道判红、点名那一行；不带 gpu 的照抓到",
+                   exit_code == 1 and "计数：抓到 1 条、没红 0 条" in stdout and "清场没过没跑：1 条" in stdout
+                   and "gpu-double-becomes-triple：点名的测试 doubles 带 gpu 特性、经 scripts/crash/gpu-quiesce-run.sh 起，清场回读没过、命令没起" in stdout,
+                   f"退 {exit_code}；清场记录 {quiesce_calls(calls)}；{stdout[-900:]}{stderr[-400:]}")
+    root, changes, calls = quiesce_world("gpu-quiesce-baseline-refused", 0)
+    exit_code, stdout, stderr, invocations = selftest.run(root, **changes)
+    selftest.check("带 gpu 特性的行：基线那一批清场回读没过，记基线不绿并写明清场回读没过、命令没起",
+                   exit_code == 1 and "基线不绿 1 行" in stdout and "没判成：那一批带 gpu 特性、经 scripts/crash/gpu-quiesce-run.sh 起，清场回读没过、命令没起" in stdout,
+                   f"退 {exit_code}；清场记录 {quiesce_calls(calls)}；{stdout[-900:]}{stderr[-400:]}")
+    root, changes, calls = quiesce_world("product-gpu-quiesce-passes", -1, SELFTEST_PRODUCT_GPU_FEATURE_ROW)
+    exit_code, stdout, stderr, invocations = selftest.run(root, **changes)
+    product_runs = [line for line in invocations if "--features tests-on-a-real-gpu" in line and "--no-run" not in line]
+    seen = quiesce_calls(calls)
+    selftest.check("产品 GPU 包（--features tests-on-a-real-gpu）的行：真跑测试的那几次各经 gpu-quiesce-run.sh 起、清场回读一次，只编不跑的与不带的不经",
+                   exit_code == 0 and "计数：抓到 2 条、没红 0 条" in stdout and len(product_runs) == 3 and seen.count("check") == 3 and seen.count("stop") == 3,
+                   f"退 {exit_code}；假 cargo 带 --features tests-on-a-real-gpu 真跑了 {len(product_runs)} 次（要基线、变异、插桩跑各 1 次）；清场记录 {seen}（要 stop、check 各 3 次）；"
+                   f"{stdout[-600:]}{stderr[-400:]}")
+    root, changes, calls = quiesce_world("product-gpu-quiesce-mutation-refused", 1, SELFTEST_PRODUCT_GPU_FEATURE_ROW)
+    exit_code, stdout, stderr, invocations = selftest.run(root, **changes)
+    selftest.check("产品 GPU 包的行：变异那一趟清场回读没过，记清场没过没跑（不算抓到、不算没红），整道判红、点名那一行；不带 gpu 的照抓到",
+                   exit_code == 1 and "计数：抓到 1 条、没红 0 条" in stdout and "清场没过没跑：1 条" in stdout
+                   and "product-gpu-double-becomes-triple：点名的测试 doubles 带 gpu 特性、经 scripts/crash/gpu-quiesce-run.sh 起，清场回读没过、命令没起" in stdout,
+                   f"退 {exit_code}；清场记录 {quiesce_calls(calls)}；{stdout[-900:]}{stderr[-400:]}")
+    root, changes, calls = quiesce_world("product-gpu-quiesce-card-absent", -1, SELFTEST_PRODUCT_GPU_NOT_RUN_ROW, SELFTEST_NOT_RUN_TEST)
+    not_run_record = os.path.join(work, "product-gpu-not-run-record.txt")
+    exit_code, stdout, stderr, invocations = selftest.run(root, GATE_MUTATION_NOT_RUN_RECORD=not_run_record, **changes)
+    recorded_lines = open(not_run_record, encoding="utf-8").read().splitlines() if os.path.exists(not_run_record) else []
+    seen = quiesce_calls(calls)
+    selftest.check("产品 GPU 包的行：清场过了、点名的测试没卡打 NOT_RUN_NO_GPU_ADAPTER 后返回成功，记本次未跑（不算抓到、不算没红），整道不判红，记录里一行",
+                   exit_code == 0 and "本次未跑：1 条" in stdout and "计数：抓到 1 条、没红 0 条" in stdout
+                   and f"{TABLE}:3 product-card-path-changed：本次未跑——点名的测试 gpu_parity 打了 NOT_RUN_NO_GPU_ADAPTER（样本：本机没有 GPU 适配器）" in stdout
+                   and len(recorded_lines) == 1 and "product-card-path-changed" in recorded_lines[0] and seen.count("stop") >= 2,
+                   f"退 {exit_code}；清场记录 {seen}（带 tests-on-a-real-gpu 真跑的几次各清一次，至少 2 次）；记录 {recorded_lines}；{stdout[-900:]}{stderr[-400:]}")
+
+
+def selftest_gpu_configuration_cells(selftest, work):
+    """带 gpu 特性的格把多机配置交给测试、跑完核真用了卡（文件头同名一段）。PATH 上换一份包着假 cargo 的假 cargo（这一格自己写，FAKE_CARGO 不动）：
+    每起一次往记录里写一行 JSON（参数、起在哪个目录、收到的 SINGLEFS_MULTI_HOST_CONFIG），点名 gpu_parity、带 --show-output、它是 ok 的那一次
+    照 libtest 的样子在末尾交出 $GIVEN_STATES_TALLIES（<GPU 判的>/<CPU 判的>，逗号分开几组）那几行 CRASH_POINT_REPLAY_GIVEN_STATES。五格：
+    ① 交多机配置：一行不带 gpu、一行带 gpu（都抓到），带 gpu 那一行真跑测试的几次（基线、变异、插桩跑）在副本里起的 cargo 收到
+       SINGLEFS_MULTI_HOST_CONFIG=那份配置的绝对路径，不带 gpu 的与只编不跑的收不到；
+    ② 多机配置不在：带 gpu、给定状态有 GPU 判过、变异没红的那一行收不到那个变量，记本次未跑（写明配置不在），不进没红；
+    ③ 给定状态有 GPU 判过的（两行里一行 states_judged_by_the_gpu_here 大于 0）：照常判，没红就记没红、整道判红；
+    ④ 给定状态全交 CPU 判（两行都是 0）：记本次未跑、不进没红，整道不判红；
+    ⑤ named_test_stdout 只读点名的测试那一段（别的用例那一段里 GPU 判过的、同前缀的拒算行都不算）。"""
+    gpu_row = "gpu-halve-quartered\tcrates/tiny/src/lib.rs\t{ value / 2 }\t{ value / 4 }\t-p tiny --features gpu --lib -- gpu_parity\tgpu_parity"
+    wrapper_directory = os.path.join(work, "gpu-configuration-bin")
+    selftest_write(os.path.join(wrapper_directory, "cargo"), r'''#!/usr/bin/env python3
+# 包着自证的假 cargo（$INNER_FAKE_CARGO）：记一行 JSON 进 $GPU_CONFIGURATION_LOG，原样起它；点名 gpu_parity、带 --show-output、它是 ok 的那一次
+# 照 libtest 的样子在末尾交出 $GIVEN_STATES_TALLIES 那几行 CRASH_POINT_REPLAY_GIVEN_STATES
+import json, os, subprocess, sys
+arguments = sys.argv[1:]
+while arguments[:1] == ["--config"]:   # 插桩编译与插桩跑在 test 前面带 --config build.rustflags=…（同假 cargo 的认法）
+    arguments = arguments[2:]
+if os.environ.get("GPU_CONFIGURATION_LOG") and arguments[:1] == ["test"]:
+    with open(os.environ["GPU_CONFIGURATION_LOG"], "a", encoding="utf-8") as log:
+        log.write(json.dumps({"ARGUMENTS": " ".join(arguments[1:]), "WORKING_DIRECTORY": os.getcwd(),
+                              "SINGLEFS_MULTI_HOST_CONFIG": os.environ.get("SINGLEFS_MULTI_HOST_CONFIG")}) + "\n")
+inner = subprocess.run([sys.executable, os.environ["INNER_FAKE_CARGO"]] + sys.argv[1:], capture_output=True, text=True)
+sys.stdout.write(inner.stdout)
+sys.stderr.write(inner.stderr)
+after = arguments[arguments.index("--") + 1:] if "--" in arguments else []
+if "--show-output" in after and "gpu_parity" in after and "test tests::gpu_parity ... ok" in inner.stdout:
+    lines = "".join(f"CRASH_POINT_REPLAY_GIVEN_STATES item=selftest-{index} stage=judge mode=judge judged_by=selftest tables_judged_here=1 "
+                    f"states_judged_by_the_gpu_here={gpu} states_judged_by_the_cpu_here={cpu} states_reused=0 states_the_gpu_could_not_judge=0\n"
+                    for index, (gpu, cpu) in enumerate(tally.split("/") for tally in os.environ["GIVEN_STATES_TALLIES"].split(",")))
+    print("\nsuccesses:\n\n---- tests::gpu_parity stdout ----\n" + lines)
+sys.exit(inner.returncode)
+''', executable=True)
+
+    def configuration_world(name, tallies, configuration, needed):
+        """一棵带一行不带 gpu（adds，抓到）、一行带 gpu（gpu_parity 只看 needed：给 { value * 2 } 时改 halve 的那一条没红，给 value / 2 } 时抓到；带收尾的花括号才只命中代码那一行、不命中别的用例的说明行，也不让变异的原文 { value / 2 } 在说明行里再命中一次）的小仓，跑一趟。
+        交 (仓, 退出码, stdout 与 stderr 末尾, 包着的假 cargo 记的每一次)。configuration 是交给本模块的那一份多机配置的路径（GATE_MUTATION_MULTI_HOST_CONFIG）。"""
+        root = os.path.join(work, name)
+        build_selftest_repository(root, [SELFTEST_TABLE_ROWS[0], gpu_row], extra_source=f"// TEST gpu_parity NEEDS {needed}\n")
+        selftest_write(os.path.join(root, CARGO_CONFIGURATION_DIRECTORY, "config.toml"), SELFTEST_CARGO_CONFIGURATION)
+        log = os.path.join(work, name + "-cargo-environment.jsonl")
+        exit_code, stdout, stderr, _ = selftest.run(
+            root, GATE_MUTATION_START_OVER="1", GATE_MUTATION_MULTI_HOST_CONFIG=configuration, GPU_CONFIGURATION_LOG=log, GIVEN_STATES_TALLIES=tallies,
+            INNER_FAKE_CARGO=os.path.join(selftest.bin_directory, "cargo"), PATH=wrapper_directory + os.pathsep + selftest.base_environment["PATH"])
+        return root, exit_code, stdout + stderr[-600:], environment_records(log)
+
+    def test_runs(records, with_gpu):
+        return [record for record in records if ("--features gpu" in record["ARGUMENTS"]) == with_gpu and "--no-run" not in record["ARGUMENTS"].split()]
+
+    configuration = os.path.join(work, "gpu-configuration-present", "multi-host.env")
+    selftest_write(configuration, "# 自证用的多机配置：假 cargo 不读它，这一格只核它的路径到没到测试的环境里\nENABLE_GPU=1\n")
+    root, exit_code, output, records = configuration_world("gpu-configuration-passed", "3/0", configuration, "value / 2 }")
+    with_gpu, without_gpu = test_runs(records, True), test_runs(records, False)
+    compiles = [record for record in records if "--no-run" in record["ARGUMENTS"].split()]
+    received = [record.get("SINGLEFS_MULTI_HOST_CONFIG") for record in with_gpu]
+    selftest.check("带 gpu 特性的行：真跑测试的那几次在副本里起的 cargo 环境里有 SINGLEFS_MULTI_HOST_CONFIG 指向本模块所在仓的多机配置（绝对路径），不带 gpu 的与只编不跑的没有",
+                   exit_code == 0 and "计数：抓到 2 条、没红 0 条" in output and len(with_gpu) == 3 and received == [configuration] * 3
+                   and all(record["WORKING_DIRECTORY"] != root for record in with_gpu) and without_gpu and compiles
+                   and all(record.get("SINGLEFS_MULTI_HOST_CONFIG") is None for record in without_gpu + compiles),
+                   f"退 {exit_code}；带 gpu 真跑 {len(with_gpu)} 次（要基线、变异、插桩跑各 1 次）收到 {received}（要都是 {configuration}），"
+                   f"起在 {[record['WORKING_DIRECTORY'] for record in with_gpu]}（不许是 {root}）；不带 gpu 与只编不跑的收到 "
+                   f"{[record.get('SINGLEFS_MULTI_HOST_CONFIG') for record in without_gpu + compiles]}（要都没有）；{output[-700:]}")
+    absent = os.path.join(work, "gpu-configuration-absent", "multi-host.env")
+    _root, exit_code, output, records = configuration_world("gpu-configuration-missing", "3/0", absent, "{ value * 2 }")
+    with_gpu = test_runs(records, True)
+    selftest.check("带 gpu 特性的行：多机配置不在，测试收不到 SINGLEFS_MULTI_HOST_CONFIG，没红的那一条记本次未跑（写明配置不在），不进没红",
+                   exit_code == 0 and "计数：抓到 1 条、没红 0 条" in output and "本次未跑：1 条" in output
+                   and f"gpu-halve-quartered：本次未跑——点名的测试 gpu_parity 带 gpu 特性，本模块所在仓的多机配置 {absent} 不在" in output
+                   and with_gpu and all(record.get("SINGLEFS_MULTI_HOST_CONFIG") is None for record in with_gpu),
+                   f"退 {exit_code}；带 gpu 真跑 {len(with_gpu)} 次收到 {[record.get('SINGLEFS_MULTI_HOST_CONFIG') for record in with_gpu]}（要都没有）；{output[-900:]}")
+    _root, exit_code, output, _records = configuration_world("gpu-given-states-on-the-card", "0/12,7/0", configuration, "{ value * 2 }")
+    selftest.check("带 gpu 特性的行：给定状态有 GPU 判过的（两行里一行 states_judged_by_the_gpu_here 大于 0）照常判：没红记没红、整道判红",
+                   exit_code == 1 and "计数：抓到 1 条、没红 1 条" in output and "gpu-halve-quartered：gpu_parity 没红" in output and "本次未跑：" not in output,
+                   f"退 {exit_code}；{output[-900:]}")
+    _root, exit_code, output, _records = configuration_world("gpu-given-states-on-the-cpu", "0/12,0/3", configuration, "{ value * 2 }")
+    selftest.check("带 gpu 特性的行：给定状态全交 CPU 判（每一行 states_judged_by_the_gpu_here 都是 0）记本次未跑、不进没红，整道不判红",
+                   exit_code == 0 and "计数：抓到 1 条、没红 0 条" in output and "本次未跑：1 条" in output
+                   and "gpu-halve-quartered：本次未跑——点名的测试 gpu_parity 带 gpu 特性，它打的 2 行 CRASH_POINT_REPLAY_GIVEN_STATES 里 states_judged_by_the_gpu_here 全是 0" in output,
+                   f"退 {exit_code}；{output[-900:]}")
+    sample = ("running 2 tests\ntest tests::gpu_parity ... ok\ntest tests::other ... ok\n\nsuccesses:\n\n"
+              "---- tests::other stdout ----\nCRASH_POINT_REPLAY_GIVEN_STATES item=a states_judged_by_the_gpu_here=9 states_judged_by_the_cpu_here=0\n\n"
+              "---- tests::gpu_parity stdout ----\nCRASH_POINT_REPLAY_GIVEN_STATES item=b states_judged_by_the_gpu_here=0 states_judged_by_the_cpu_here=4\n"
+              "CRASH_POINT_REPLAY_GIVEN_STATES_KEY_REFUSED item=b states_judged_by_the_gpu_here=5\n\n"
+              "successes:\n    tests::gpu_parity\n    tests::other\n\ntest result: ok. 2 passed; 0 failed\n")
+    named = given_states_gpu_counts(named_test_stdout("tests::gpu_parity", sample))
+    selftest.check("named_test_stdout 只读点名的测试那一段：别的用例那一段里 GPU 判过的、同前缀的拒算行都不算",
+                   named == [0] and named_test_stdout("tests::absent", sample) == "" and named_test_stdout("tests::gpu_parity", "no sections\n") == "no sections\n",
+                   f"读到 {named}（要 [0]）")
 
 
 PARALLEL_REASON_FORM = re.compile(r"^同一次 checker-tier-crates-mutation-replay（本模块进程 \d+）的第 (\d+) 个工作进程，各用各的源码副本与编译目录（这一轮共 4 个）$")
@@ -4424,50 +5956,101 @@ def selftest_target_directory_cells(selftest, work):
                    exit_code == 0 and set(used.values()) <= present and TARGET_DIRECTORY_NAME + "-w9" not in present
                    and any("有进程在用、没删 4 份" in line for line in reclaim_lines),
                    f"退 {exit_code}；剩下 {sorted(present)}；在用的四份 {sorted(used.values())}；{reclaim_lines}")
-    # 三：GATE_MUTATION_TARGET_DIR 与 GATE_CROSS_RUN_TMPDIR 都没设：落在跨轮缓存家目录下，不落 /tmp；设了 GATE_CROSS_RUN_TMPDIR 放它底下
-    # HOME 与 TMPDIR 都换成临时目录里的一份（弄坏开关退回 $TMPDIR 时也不往真的 /tmp 里建）；自证的临时目录本身可能在 /tmp 下，
-    # 所以判的是「不在 $TMPDIR 底下、也不是 /tmp 底下那一份」；rustc -V 要的 rustup 家目录照原样指回去
+    # 三：没设 GATE_MUTATION_TARGET_DIR（文件头「编译目录」）：编译目录建在这一趟自己的运行目录（$TMPDIR 下的 singlefs-mutation-replay-*）的 build 里，
+    #   正常退 0、没跑全退 1（GATE_MUTATION_STOP_AFTER_ROWS=1）两种结局跑完都删、$TMPDIR 下一样不剩、跨轮缓存家目录一样没建；被 TERM 停那一种在 selftest_signal_and_pipe_cells 里核。
+    #   HOME 与 TMPDIR 都换成临时目录里的一份（弄坏开关退回 $TMPDIR 下那一份时也不往真的 /tmp 里建）；rustc -V 要的 rustup 家目录照原样指回去
     home, temporary = os.path.join(work, "home"), os.path.join(work, "plain-tmp")
     os.makedirs(temporary, exist_ok=True)
-    unset = dict(GATE_MUTATION_TARGET_DIR="", GATE_CROSS_RUN_TMPDIR="", HOME=home, TMPDIR=temporary, GATE_MUTATION_WORKERS="1", GATE_MUTATION_START_OVER="1",
+    unset = dict(GATE_MUTATION_TARGET_DIR="", HOME=home, TMPDIR=temporary, GATE_MUTATION_WORKERS="1", GATE_MUTATION_START_OVER="1",
                  RUSTUP_HOME=os.environ.get("RUSTUP_HOME") or os.path.expanduser("~/.rustup"),
                  CARGO_HOME=os.environ.get("CARGO_HOME") or os.path.expanduser("~/.cargo"))
-    unset[CROSS_RUN_CACHE_HOME_VARIABLE] = ""
-    wanted = os.path.join(home, ".local", "share", "singlefs", "cross-run-cache", TARGET_DIRECTORY_NAME)
-    chosen = default_shared_target_directory(dict(selftest.base_environment, **unset))
-    under_cross_run = default_shared_target_directory(dict(selftest.base_environment, **dict(unset, GATE_CROSS_RUN_TMPDIR=os.path.join(work, "cross-run"))))
-    exit_code, _stdout, stderr, _ = selftest.run(repository, **unset)
-    selftest.check("两个变量都没设时编译目录不落 /tmp、落在跨轮缓存家目录下（设了 GATE_CROSS_RUN_TMPDIR 放它底下）",
-                   chosen == wanted and not chosen.startswith(temporary + os.sep) and chosen != os.path.join("/tmp", TARGET_DIRECTORY_NAME)
-                   and under_cross_run == os.path.join(work, "cross-run", TARGET_DIRECTORY_NAME)
-                   and exit_code == 0 and f"编译目录：{wanted}（" in stderr and os.path.isdir(wanted),
-                   f"选的是 {chosen}（要 {wanted}）；设了 GATE_CROSS_RUN_TMPDIR 时 {under_cross_run}；退 {exit_code}；"
-                   f"{[line for line in stderr.splitlines() if '编译目录：' in line]}")
+    problems = []
+    saved_tempdir = tempfile.tempdir   # run_stage 在本进程里跑：shard_root 照 tempfile.gettempdir() 建，这里指进 temporary，跑完还原
+    for name, extra, wanted_exit in (("正常", {}, 0), ("没跑全", {"GATE_MUTATION_STOP_AFTER_ROWS": "1"}, 1)):
+        tempfile.tempdir = temporary
+        try:
+            exit_code, _stdout, stderr, _ = selftest.run(repository, **dict(unset, **extra))
+        finally:
+            tempfile.tempdir = saved_tempdir
+        chosen = selftest_run_target_directories(stderr)
+        left = sorted(os.listdir(temporary))
+        if not (exit_code == wanted_exit and len(chosen) == 1 and chosen[0].startswith(os.path.join(temporary, SHARD_ROOT_PREFIX))
+                and chosen[0].endswith(os.sep + os.path.join(RUN_BUILD_DIRECTORY_NAME, TARGET_DIRECTORY_NAME)) and not os.path.exists(chosen[0]) and left == []
+                and f"删了这一趟的编译目录 {os.path.dirname(chosen[0])}" in stderr and not os.path.exists(os.path.join(home, ".local", "share", "singlefs", "cross-run-cache"))):
+            problems.append(f"{name}那一趟退 {exit_code}（要 {wanted_exit}），编译目录 {chosen}，$TMPDIR 下剩 {left}；"
+                            f"{[line for line in stderr.splitlines() if '编译目录' in line][:3]}")
+    selftest.check("跑完运行目录里不剩它建的编译目录（没设 GATE_MUTATION_TARGET_DIR：建在 $TMPDIR 下这一趟的 singlefs-mutation-replay-* 的 build 里，正常退 0、没跑全退 1 都删，$TMPDIR 下一样不剩）",
+                   not problems, "；".join(problems))
+    # 四：这一趟的编译目录里还有进程开着文件（自证起一个 sleep 开着 build 里的一份文件）：remove_run_build_root 不删、报出那个进程；只停自证自己起的那一个进程
+    build_root = os.path.join(work, "held-run", RUN_BUILD_DIRECTORY_NAME)
+    held = os.path.join(build_root, TARGET_DIRECTORY_NAME, "debug", "held")
+    os.makedirs(os.path.dirname(held))
+    with open(held, "w", encoding="utf-8") as held_handle:
+        holder = subprocess.Popen(["sleep", "60"], stdout=held_handle, stdin=subprocess.DEVNULL)
+    try:
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            with contextlib.suppress(OSError):
+                if os.readlink(f"/proc/{holder.pid}/fd/1") == held:
+                    break
+            time.sleep(0.05)
+        removed, lines = remove_run_build_root(build_root, selftest.base_environment)
+    finally:
+        holder.kill()
+        holder.wait()
+    selftest.check("这一趟的编译目录里还有进程开着文件：不删、报出那个进程",
+                   not removed and os.path.isdir(build_root) and any(f"进程 {holder.pid}（sleep 60）" in line for line in lines),
+                   f"删成了 {removed}，build 还在 {os.path.isdir(build_root)}；{lines}")
+
+
+def selftest_run_target_directories(stderr):
+    """stderr 里「… 编译目录：<路径>（第 1 片…」那几行的路径（这一趟用的第 1 片编译目录）。"""
+    return [line.split("编译目录：", 1)[1].split("（", 1)[0] for line in stderr.splitlines() if line.startswith("  … 编译目录：")]
 
 
 SELFTEST_OTHER_BATCH_ROW = "double-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t-p tiny --lib --quiet -- doubles\tdoubles"
 
 
-def selftest_worker_slot_cells(selftest, work):
-    """片号跨调用经锁领（文件头「编译目录」）：同一个共用编译目录上并发的两次调用各起 2 个工作进程（假 cargo 挂着不放，两次的工作进程都活着），
-    两次领到的片号集合不相交，四把片号锁都被占，放掉之后锁都空了；片号锁被占着的多出来的 -w<片号> 回收时留着。
-    两次调用各是一个子进程（stderr 落文件，片号从工作进程报的「领到片号 <n>」那一行读），基线的批分成两批、两个工作进程才都起得来。"""
-    shared = os.path.join(work, "slot-targets", TARGET_DIRECTORY_NAME)
-    released = os.path.join(work, "slot-cargo-released")
+def selftest_slot_overlap_problem(selftest, earlier_process, earlier_slots, shared):
+    """后起的那次领到片号的那一刻，两次调用重叠了没有：先起的那次的子进程还活着、它领到的两片的片号锁都被占，重叠回 None，没重叠回原因。
+    弄坏开关 overlapunchecked：不核，一律回 None（改前的样子：两次没重叠也照判对错）。"""
+    if break_is(selftest.base_environment, "overlapunchecked"):
+        return None
+    if earlier_process.poll() is not None:
+        return f"后起的那次领到片号时先起的那次已经退了（退 {earlier_process.poll()}）"
+    if len(earlier_slots) != 2:
+        return f"先起的那次只报了片号 {earlier_slots}"
+    free = []
+    for slot in earlier_slots:
+        held, handle = file_lock_is_held(slot_lock_path(shared, slot))
+        if handle is not None:
+            handle.close()
+        if not held:
+            free.append(slot)
+    return f"后起的那次领到片号时先起的那次的片号锁 {free} 没被占" if free else None
+
+
+def selftest_concurrent_slot_pair(selftest, work, tag, earlier_exits_first):
+    """在一个共用编译目录上起两次调用（各 2 个工作进程），回 dict：not_ready、earlier_slots、later_slots、held_while_running、free_afterwards、overlap_problem。
+    earlier_exits_first 为真是样本：先起的那次不挂假 cargo、等它退了才起后起的那次。"""
+    shared = os.path.join(work, f"slot-targets-{tag}", TARGET_DIRECTORY_NAME)
+    released = os.path.join(work, f"slot-cargo-released-{tag}")
     invocations = {}
     # 等的是条件（两个工作进程都报了片号；放掉假 cargo 之后两次调用都退出），不是定长：机器忙时头一步可以慢到分钟，照「被 TERM 停」那一格带超时地轮询；
     # 超时不再往下赌，记进 not_ready，这一格判错并写明没等到什么
     ready_seconds, finish_seconds = 300, 180
     not_ready = []
     for name in ("earlier", "later"):
-        repository = os.path.join(work, f"slots-{name}")
+        repository = os.path.join(work, f"slots-{tag}-{name}")
         build_selftest_repository(repository, [SELFTEST_TABLE_ROWS[0], SELFTEST_OTHER_BATCH_ROW])
-        temporary = os.path.join(work, f"slots-{name}-tmp")
+        temporary = os.path.join(work, f"slots-{tag}-{name}-tmp")
         os.makedirs(temporary)
         environment = dict(selftest.base_environment, GATE_MUTATION_TARGET_DIR=shared, GATE_MUTATION_WORKERS="2", GATE_MUTATION_START_OVER="1", TMPDIR=temporary,
-                           FAKE_CARGO_LOG=os.path.join(work, f"slots-{name}-cargo.log"), FAKE_CARGO_HANG_FILE=os.path.join(work, f"slots-{name}-hanging"),
-                           FAKE_CARGO_RELEASE_FILE=released, FAKE_CARGO_DONE_FILE=os.path.join(work, f"slots-{name}-done"))
-        invocations[name] = dict(repository=repository, environment=environment, stderr_path=os.path.join(work, f"slots-{name}-stderr.txt"))
+                           FAKE_CARGO_LOG=os.path.join(work, f"slots-{tag}-{name}-cargo.log"), FAKE_CARGO_HANG_FILE=os.path.join(work, f"slots-{tag}-{name}-hanging"),
+                           FAKE_CARGO_RELEASE_FILE=released, FAKE_CARGO_DONE_FILE=os.path.join(work, f"slots-{tag}-{name}-done"))
+        if earlier_exits_first and name == "earlier":
+            del environment["FAKE_CARGO_HANG_FILE"]   # 样本：先起的那次不挂，跑完就退
+        invocations[name] = dict(repository=repository, environment=environment, stderr_path=os.path.join(work, f"slots-{tag}-{name}-stderr.txt"))
 
     def slots_reported(name):
         with open(invocations[name]["stderr_path"], encoding="utf-8", errors="replace") as handle:
@@ -4485,15 +6068,6 @@ def selftest_worker_slot_cells(selftest, work):
             not_ready.append(f"{name} 那次 {ready_seconds} 秒内只报了片号 {reported}（子进程已退 {invocations[name]['process'].poll()}）")
         return reported
 
-    earlier_slots = start("earlier")
-    later_slots = start("later")
-    locks_while_running = {slot: file_lock_is_held(slot_lock_path(shared, slot)) for slot in sorted({*earlier_slots, *later_slots})}
-    held_while_running = sorted(slot for slot, (held, handle) in locks_while_running.items() if held)
-    for _held, handle in locks_while_running.values():
-        if handle is not None:
-            handle.close()
-    open(released, "w").close()
-
     def wait_for_own_selftest_child(process):
         """等自证自己起的那一个子进程退出；放掉假 cargo 之后 finish_seconds 秒还没退就停掉它（只停这一个，按进程对象，不按模式找），并记进 not_ready。"""
         try:
@@ -4503,6 +6077,17 @@ def selftest_worker_slot_cells(selftest, work):
             process.kill()
             process.wait()
 
+    earlier_slots = start("earlier")
+    if earlier_exits_first:
+        wait_for_own_selftest_child(invocations["earlier"]["process"])
+    later_slots = start("later")
+    overlap_problem = selftest_slot_overlap_problem(selftest, invocations["earlier"]["process"], earlier_slots, shared)
+    locks_while_running = {slot: file_lock_is_held(slot_lock_path(shared, slot)) for slot in sorted({*earlier_slots, *later_slots})}
+    held_while_running = sorted(slot for slot, (held, handle) in locks_while_running.items() if held)
+    for _held, handle in locks_while_running.values():
+        if handle is not None:
+            handle.close()
+    open(released, "w").close()
     for name in invocations:
         wait_for_own_selftest_child(invocations[name]["process"])
     free_afterwards = []
@@ -4511,10 +6096,31 @@ def selftest_worker_slot_cells(selftest, work):
         free_afterwards.append(not held)
         if handle is not None:
             handle.close()
-    selftest.check("同一个共用编译目录上并发的两次调用各起 2 个工作进程：领到的片号集合不相交、四把片号锁都被占、两次退出之后锁都空了",
-                   not not_ready and len(earlier_slots) == 2 and len(later_slots) == 2 and not set(earlier_slots) & set(later_slots)
-                   and held_while_running == sorted({*earlier_slots, *later_slots}) and len(held_while_running) == 4 and all(free_afterwards),
-                   f"{'；'.join(not_ready)}{'；' if not_ready else ''}先起的那次领到 {earlier_slots}、后起的那次领到 {later_slots}；跑的时候被占的锁 {held_while_running}；退出之后锁空了 {free_afterwards}")
+    return dict(not_ready=not_ready, earlier_slots=earlier_slots, later_slots=later_slots, held_while_running=held_while_running,
+                free_afterwards=free_afterwards, overlap_problem=overlap_problem)
+
+
+def selftest_worker_slot_cells(selftest, work):
+    """片号跨调用经锁领（文件头「编译目录」）：同一个共用编译目录上并发的两次调用各起 2 个工作进程（假 cargo 挂着不放，两次的工作进程都活着），
+    两次领到的片号集合不相交，四把片号锁都被占，放掉之后锁都空了；片号锁被占着的多出来的 -w<片号> 回收时留着。
+    两次调用各是一个子进程（stderr 落文件，片号从工作进程报的「领到片号 <n>」那一行读），基线的批分成两批、两个工作进程才都起得来。
+    并发那一格先核两次调用确实重叠（selftest_slot_overlap_problem：后起的那次领到片号时先起的那次还活着、它的两把片号锁都被占），没重叠就记这一格本次未跑、不判对错；
+    样本：先起的那次不挂假 cargo、等它退了才起后起的那次，那一格要认出没重叠（弄坏开关 overlapunchecked：不核重叠，样本那一格判错）。"""
+    pair = selftest_concurrent_slot_pair(selftest, work, "concurrent", False)
+    label = "同一个共用编译目录上并发的两次调用各起 2 个工作进程：领到的片号集合不相交、四把片号锁都被占、两次退出之后锁都空了"
+    if pair["overlap_problem"] is not None:
+        selftest.skip(label, f"两次调用没重叠，这一格的前提没造出来（{pair['overlap_problem']}）；先起的那次领到 {pair['earlier_slots']}、后起的那次领到 {pair['later_slots']}")
+    else:
+        earlier_slots, later_slots, held_while_running = pair["earlier_slots"], pair["later_slots"], pair["held_while_running"]
+        selftest.check(label,
+                       not pair["not_ready"] and len(earlier_slots) == 2 and len(later_slots) == 2 and not set(earlier_slots) & set(later_slots)
+                       and held_while_running == sorted({*earlier_slots, *later_slots}) and len(held_while_running) == 4 and all(pair["free_afterwards"]),
+                       f"{'；'.join(pair['not_ready'])}{'；' if pair['not_ready'] else ''}先起的那次领到 {earlier_slots}、后起的那次领到 {later_slots}；"
+                       f"跑的时候被占的锁 {held_while_running}；退出之后锁空了 {pair['free_afterwards']}")
+    sample = selftest_concurrent_slot_pair(selftest, work, "earlier-exits", True)
+    selftest.check("先起的那次在后起的那次开始之前就退了（样本）：并发领片号那一格认出两次调用没重叠、记本次未跑，不判对错",
+                   sample["overlap_problem"] is not None and "先起的那次已经退了" in sample["overlap_problem"],
+                   f"认出的没重叠：{sample['overlap_problem']}；先起的那次领到 {sample['earlier_slots']}、后起的那次领到 {sample['later_slots']}；{'；'.join(sample['not_ready'])}")
     # 回收：多出来的 -w<片号> 的片号锁被别的调用的工作进程拿着（它刚领到这一片、还没来得及拿在用标记）时留着，没人拿的照删
     targets = os.path.join(work, "slot-reclaim")
     reclaim_shared = os.path.join(targets, TARGET_DIRECTORY_NAME)
@@ -4640,33 +6246,33 @@ def selftest_write_random(path, size):
 
 def selftest_disk_cells(selftest, work):
     """磁盘余量（文件头「磁盘余量」）：每个工作进程最多占两份编译目录（普通、插桩）、各涨到上限，派活前按目标盘余量定工作进程数。
-    先直接调 worker_count_for 与 disk_bound_for：外层内存 38G ÷ 每条 4G 本来给 9 个，假的余量 100G、上限 10G、备用 5G，每个工作进程要 20G，放得下 4 个，头一行写明卡在磁盘余量；
-    已有的编译目录只算还能涨的（片号 1 的普通编译目录已占 8M，上限 10M、余量 100M、备用 1M：放得下 5 个，没有已有目录是 4 个）。
-    再起一趟 run_stage：假的余量 50G、备用 10G，开的工作进程数按余量收成 2 个（条数 4、外层内存 9 都放得下更多），头一行写明；余量写法不认的整道拒；
+    先直接调 worker_count_for 与 disk_bound_for：外层内存 38G ÷ 每条 4G 本来给 9 个，假的余量 100G、上限 10G、备用 5G，每个工作进程要 20G、开 2 个以上另加先编一份依赖的 20G，
+    放得下 3 个（共 80G），头一行写明卡在磁盘余量；已有的编译目录只算还能涨的（片号 1 的普通编译目录已占 8M，上限 10M、余量 100M、备用 1M：放得下 4 个，没有已有目录是 3 个）。
+    再起一趟 run_stage：假的余量 70G、备用 10G，开的工作进程数按余量收成 2 个（条数 4、外层内存 9 都放得下更多），头一行写明；余量写法不认的整道拒；
     余量设成空（外层没给）时读编译目录所在的盘，头一行写明来源。弄坏开关 disknotchecked（不看磁盘）下 run_stage 那一格与直接调的两格判错。"""
     environment = dict(selftest.base_environment)
     sixteen = dict(environment, GATE_MUTATION_WORKERS="16", **{OUTER_MEMORY_CAP_VARIABLE: "38G"})
     sized = dict(sixteen, **{DISK_FREE_VARIABLE: "100G", TARGET_DIRECTORY_CAP_VARIABLE: "10G", DISK_RESERVE_VARIABLE: "5G"})
     shared = os.path.join(work, "disk-target")
-    count, head = worker_count_for(20, sized, "4G", None, disk=lambda ceiling: disk_bound_for(shared, sized, ceiling))
-    selftest.check("磁盘余量放不下 9 份：外层内存 38G ÷ 4G 本来给 9 个，余量 100G（上限 10G、备用 5G、每个工作进程两份共 20G）按余量收成 4 个，头一行写明卡在磁盘余量与放得下几个",
-                   count == 4 and "卡在「磁盘余量」这一项" in head and "磁盘余量 100.0 GiB" in head and "4 个共还要 80.0 GiB，再多 1 个要 100.0 GiB、放不下" in head,
+    count, head = worker_count_for(20, sized, "4G", None, disk=lambda ceiling: disk_bound_for(shared, sized, ceiling, None))
+    selftest.check("磁盘余量放不下 9 份：外层内存 38G ÷ 4G 本来给 9 个，余量 100G（上限 10G、备用 5G、每个工作进程两份共 20G、开 2 个以上另加先编一份依赖的两份 20G）按余量收成 3 个，头一行写明卡在磁盘余量与放得下几个",
+                   count == 3 and "卡在「磁盘余量」这一项" in head and "磁盘余量 100.0 GiB" in head and "3 个共还要 80.0 GiB，再多 1 个要 100.0 GiB、放不下" in head,
                    f"{count}：{head}")
     tiny = dict(sixteen, **{DISK_FREE_VARIABLE: "100M", TARGET_DIRECTORY_CAP_VARIABLE: "10M", DISK_RESERVE_VARIABLE: "1M"})
     absent = os.path.join(work, "disk-target-absent")
     present = os.path.join(work, "disk-target-present")
     selftest_write_random(os.path.join(present, "debug", "deps", "blob.rlib"), 8 << 20)
-    absent_count, _head = disk_bound_for(absent, tiny, 9)
-    present_count, present_head = disk_bound_for(present, tiny, 9)
-    selftest.check("已有的编译目录只算还能涨的：片号 1 的普通编译目录已占 8M（上限 10M），余量 100M、备用 1M 放得下 5 个；没有已有目录是 4 个",
-                   absent_count == 4 and present_count == 5, f"没有已有目录 {absent_count}；片号 1 已占 8M {present_count}：{present_head}")
+    absent_count, _head = disk_bound_for(absent, tiny, 9, None)
+    present_count, present_head = disk_bound_for(present, tiny, 9, None)
+    selftest.check("已有的编译目录只算还能涨的：片号 1 的普通编译目录已占 8M（上限 10M），余量 100M、备用 1M 放得下 4 个；没有已有目录是 3 个（开 2 个以上另加先编一份依赖的两份）",
+                   absent_count == 3 and present_count == 4, f"没有已有目录 {absent_count}；片号 1 已占 8M {present_count}：{present_head}")
     repository = os.path.join(work, "disk-workers")
     build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
     target = os.path.join(work, "disk-workers-target")
     exit_code, _stdout, stderr, _ = selftest.run(
         repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="16", GATE_MUTATION_MEMORY_MAX="4G", GATE_MUTATION_TARGET_DIR=target,
-        **{OUTER_MEMORY_CAP_VARIABLE: "38G", DISK_FREE_VARIABLE: "50G", TARGET_DIRECTORY_CAP_VARIABLE: "10G", DISK_RESERVE_VARIABLE: "10G"})
-    selftest.check("磁盘余量交给 run_stage：开的工作进程数按余量收（余量 50G、备用 10G、每个工作进程 20G 开 2 个，不是条数 4 也不是外层内存的 9），头一行写明卡在磁盘余量",
+        **{OUTER_MEMORY_CAP_VARIABLE: "38G", DISK_FREE_VARIABLE: "70G", TARGET_DIRECTORY_CAP_VARIABLE: "10G", DISK_RESERVE_VARIABLE: "10G"})
+    selftest.check("磁盘余量交给 run_stage：开的工作进程数按余量收（余量 70G、备用 10G、每个工作进程 20G、先编一份依赖的两份 20G 开 2 个，不是条数 4 也不是外层内存的 9），头一行写明卡在磁盘余量",
                    exit_code == 0 and "这一轮开 2 个工作进程" in stderr and "卡在「磁盘余量」这一项" in stderr, f"退 {exit_code}；{stderr[:900]}")
     exit_code, stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, **{DISK_FREE_VARIABLE: "lots"})
     selftest.check("磁盘余量的写法不认：整道拒、带出路，一条变异都没跑", exit_code == 1 and f"{DISK_FREE_VARIABLE} 写成了「lots」" in stdout + stderr,
@@ -4711,12 +6317,69 @@ def selftest_target_cap_cells(selftest, work):
     # 清的那一趟另起一棵仓（判定库在仓的 git 目录里，沿用上一趟的覆盖记录就不会再编插桩那一份）
     trimmed_repository = os.path.join(work, "cap-run-trimmed")
     build_selftest_repository(trimmed_repository, SELFTEST_TABLE_ROWS)
+    # 上限 40K：假 cargo 每次先编写进增量产物的 64K 一来就超线、清掉增量之后剩下的（目录与 deps 里两份小文件，十几 K）在线下，所以照常跑完、不停派
     exit_code, _stdout, stderr, _ = selftest.run(trimmed_repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, FAKE_CARGO_INCREMENTAL_BYTES="65536",
-                                                 **{TARGET_DIRECTORY_CAP_VARIABLE: "1K"})
+                                                 **{TARGET_DIRECTORY_CAP_VARIABLE: "40K"})
     leftovers = [path for path in incremental_paths if os.path.exists(path)]
-    selftest.check("编译目录上限交给 run_stage：上限宽裕（1T）时增量产物两份都留着；上限 1K 时每格判完清掉超线的那份编译目录的增量产物（普通、插桩两份），跑完两份底下都没有增量产物",
+    selftest.check("编译目录上限交给 run_stage：上限宽裕（1T）时增量产物两份都留着；上限 40K 时每格判完清掉超线的那份编译目录的增量产物（普通、插桩两份），跑完两份底下都没有增量产物",
                    roomy_exit == 0 and len(roomy_left) == 2 and exit_code == 0 and not leftovers and os.path.isdir(os.path.join(target + COVERAGE_TARGET_SUFFIX, "debug", "deps")),
-                   f"宽裕时退 {roomy_exit}、留着 {len(roomy_left)} 份；1K 时退 {exit_code}、还剩 {leftovers}；{stderr[-500:]}")
+                   f"宽裕时退 {roomy_exit}、留着 {len(roomy_left)} 份；40K 时退 {exit_code}、还剩 {leftovers}；{stderr[-500:]}")
+
+
+def selftest_target_prune_cells(selftest, work):
+    """编译目录上限的后两步（文件头「编译目录上限」）：清完增量仍超线时 deps 里同名产物只留最新一版、清到线下；还超线就停派。
+    先直接调 trim_target_directory：上限 5 MiB，增量 1 MiB、libfoo 新旧两版各 2 MiB、foo_check 新旧两版各 1 MiB、不带单元哈希的 libplain 256 KiB，
+    清掉增量与两份旧版、新版与 libplain 还在、清后回读在线下（弄坏开关 depsnotpruned 下清后仍超线，这一格判错）。
+    再起一趟 run_stage：上限 1K（清什么都清不到线下），头一格（基线的批）判完就停派、整道判红、现判的变异 0 条、点名停派的那份编译目录（弄坏开关 overcapdispatched 下照派、退 0，这一格判错）。"""
+    environment = dict(selftest.base_environment)
+    directory = os.path.join(work, "prune-target")
+    deps = os.path.join(directory, "debug", "deps")
+    old_hash, new_hash = "a" * 16, "b" * 16
+    selftest_write_random(os.path.join(directory, "debug", "incremental", "session-d", "dep-graph.bin"), 1 << 20)
+    for name, size in ((f"libfoo-{old_hash}.rlib", 2 << 20), (f"libfoo-{new_hash}.rlib", 2 << 20), (f"foo_check-{old_hash}", 1 << 20), (f"foo_check-{new_hash}", 1 << 20),
+                       ("libplain.rlib", 256 << 10)):
+        selftest_write_random(os.path.join(deps, name), size)
+        stamp = 1000 if old_hash in name else 2000
+        os.utime(os.path.join(deps, name), (stamp, stamp))
+    before, after, removed = trim_target_directory(directory, 5 << 20, environment)
+    left = sorted(os.listdir(deps))
+    selftest.check("编译目录清完增量仍超上限：deps 里同名产物只留最新一版（libfoo、foo_check 的旧版删掉），不带单元哈希的不动，清后回读在线下",
+                   before > 5 << 20 and after <= 5 << 20 and left == sorted([f"libfoo-{new_hash}.rlib", f"foo_check-{new_hash}", "libplain.rlib"])
+                   and sorted(os.path.basename(path) for path, _size in removed) == sorted([INCREMENTAL_DIRECTORY_NAME, f"libfoo-{old_hash}.rlib", f"foo_check-{old_hash}"]),
+                   f"清前 {before}、清后 {after}、deps 里剩 {left}、清掉 {[path for path, _size in removed]}")
+    repository = os.path.join(work, "prune-run")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    target = os.path.join(work, "prune-run-target")
+    exit_code, stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=target, **{TARGET_DIRECTORY_CAP_VARIABLE: "1K"})
+    selftest.check("编译目录清完仍超上限（1K）：头一格判完就停派、整道判红，现判的变异 0 条，拒绝说明点名停派的那份编译目录",
+                   exit_code == 1 and "仍超上限 GATE_MUTATION_TARGET_DIR_CAP，停派" in stdout and "现判的变异判完 0 条" in stdout and f"编译目录 {target}：" in stdout,
+                   f"退 {exit_code}；{(stdout + stderr)[-900:]}")
+
+
+def selftest_disk_peak_cells(selftest, work):
+    """磁盘预算按实测峰值算（文件头「磁盘余量」）：每格判完记一次占盘，下一趟每份编译目录的涨幅取近几次的峰值，上限只当清理线。
+    先直接调：记下普通 9G、1G、2G、3G 与插桩 4G，取近 3 次是普通 3G（9G 那次出了窗口）、插桩 4G；余量 40G、上限 10G、备用 5G，
+    峰值普通 2G、插桩 3G 时每个工作进程 5G、放得下 6 个，插桩没有读数的那一种按上限 10G、只放得下 1 个（弄坏开关 diskbudgetbycap 下一律按上限、头一格也是 1 个，那一格判错）。
+    再起一趟 run_stage：跑完判定库目录下记了普通编译目录的占盘。"""
+    library = os.path.join(work, "peak-library")
+    os.makedirs(library)
+    for coverage, size in ((False, 9 << 30), (False, 1 << 30), (True, 4 << 30), (False, 2 << 30), (False, 3 << 30)):
+        record_target_occupancy(library, coverage, size)
+    peaks = measured_target_peaks(library, 3)
+    selftest.check("编译目录占盘的记录：普通、插桩两种各取最近 3 次里最大的（窗口之外的 9G 不算）", peaks == {"普通": 3 << 30, "插桩": 4 << 30}, f"{peaks}")
+    environment = dict(selftest.base_environment, **{DISK_FREE_VARIABLE: "40G", TARGET_DIRECTORY_CAP_VARIABLE: "10G", DISK_RESERVE_VARIABLE: "5G"})
+    measured_count, measured_head = disk_bound_for(os.path.join(work, "peak-target"), environment, 9, {"普通": 2 << 30, "插桩": 3 << 30})
+    mixed_count, mixed_head = disk_bound_for(os.path.join(work, "peak-target"), environment, 9, {"普通": 2 << 30, "插桩": None})
+    selftest.check("磁盘预算按实测峰值算：峰值普通 2G、插桩 3G 时余量 40G（备用 5G）放得下 6 个，插桩没有读数时那一种按上限 10G、放得下 1 个，头一行写明涨幅从哪来",
+                   measured_count == 6 and "普通那份涨到 2.0 GiB（近几次每格判完量到的占盘峰值）" in measured_head
+                   and mixed_count == 1 and "插桩那份涨到 10G（没有实测读数，按上限）" in mixed_head,
+                   f"按峰值 {measured_count}：{measured_head}；插桩没读数 {mixed_count}：{mixed_head}")
+    repository = os.path.join(work, "peak-run")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    exit_code, _stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_TARGET_DIR=os.path.join(work, "peak-run-target"))
+    recorded = measured_target_peaks(library_directory(repository, dict(selftest.base_environment)), 20)
+    selftest.check("run_stage 每格判完记一次编译目录占盘：跑完判定库目录下有普通编译目录的读数", exit_code == 0 and recorded["普通"] is not None,
+                   f"退 {exit_code}；读数 {recorded}；{stderr[-400:]}")
 
 
 def selftest_compile_budget_cells(selftest, work):
@@ -4783,6 +6446,26 @@ def selftest_compile_budget_cells(selftest, work):
     selftest.check("外层 36G、2 个工作进程、每条 4G：任一时刻在跑的各次包装的上限之和不超过 36G，先编借过额度（有一次包装的上限大于每条的 4G）",
                    bool(events) and peak_sum <= 36 << 30 and largest > 4 << 30 and "额度账：" in stderr,
                    f"包装起止 {len(events)} 行；上限之和的峰值 {peak_sum / 1024 ** 3:g}G；最大一次 {largest / 1024 ** 3:g}G；{stderr[-400:]}")
+
+
+def selftest_undefined_identifier_cell(selftest, work):
+    """static-check 的 UNDEFINED（replacement_undefined_identifiers）：替换文引了被改文件与包里都没有的标识符（照第六十一节那样被删掉的）的那一行报一行；
+    包里别的文件定义的、替换文自己绑定的（let、闭包参数、match 臂）、方法与路径里的段、宏、字符串与注释里的都不报。弄坏开关 undefinedidentifiersunchecked 下一行都不报，这一格判错。"""
+    root = os.path.join(work, "undefined-identifier")
+    rows = [
+        "deleted-identifier\tcrates/tiny/src/lib.rs\t{ value / 2 }\t{ halved_before / 2 }\t-p tiny --lib -- halves\thalves",
+        "defined-in-package\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ helper_elsewhere(value) * 2 }\t-p tiny --lib -- doubles\tdoubles",
+        "bound-in-replacement\tcrates/tiny/src/lib.rs\t{ 0 - value }\t{ let flipped = 0 - value; let pick = |input: i32| input; "
+        "match Some(flipped) { Some(inner) => pick(inner).max(i32::MIN), None => unreachable!() } }\t-p tiny --lib -- negates\tnegates",
+        "only-in-text\tcrates/tiny/src/lib.rs\t{ left + right }\t{ let _ = \"ghost_in_string\"; /* ghost_in_comment */ left - right }\t-p tiny --lib -- adds\tadds",
+    ]
+    build_selftest_repository(root, rows)
+    selftest_write(os.path.join(root, "crates", "tiny", "src", "other.rs"), "pub fn helper_elsewhere(value: u32) -> u32 { value }\n")
+    exit_code, output = run_command_capturing(command_static_check, [root])
+    undefined = [line for line in output.splitlines() if line.startswith("UNDEFINED\t")]
+    selftest.check("static-check 的 UNDEFINED：替换文引了已删的标识符 halved_before 的那一行报一行、退 1；包里别的文件定义的、替换文自己绑定的、方法、路径、宏、字符串与注释里的都不报",
+                   exit_code == 1 and undefined == ["UNDEFINED\t2\tdeleted-identifier\tcrates/tiny/src/lib.rs\thalved_before"]
+                   and "IDENTIFIERS_CHECKED\t4\t0" in output, output)
 
 
 def selftest_closure_refused_cell(selftest, work):
@@ -4872,6 +6555,249 @@ def selftest_coverage_exact_cell(selftest, work):
                    f"退 {exit_code}；带 --exact 的命令 {exact_lines}；{stdout[-300:]}；{stderr[-300:]}")
 
 
+def selftest_debuginfo_cells(selftest, work):
+    """起 cargo 时关调试信息（文件头「调试信息」）：一趟跑下来假 cargo 收到的每一次 test（基线、变异的先编与跑、插桩编译与插桩跑）环境里四档的
+    CARGO_PROFILE_<档>_DEBUG 都是 false，调用方设的 CARGO_PROFILE_RELEASE_DEBUG=true 也被顶掉；取值换成 line-tables-only 的那一趟每一行都现判、栏是工具链或依赖变了，
+    换回 false 又都复用。弄坏开关 debuginfo-kept（不设）下两格判错，debuginfo-unkeyed（不进键）下后一格判错。"""
+    repository = os.path.join(work, "debuginfo")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    environment_log = os.path.join(work, "debuginfo-environment.jsonl")
+    exit_code, _stdout, stderr, _ = selftest.run(repository, GATE_MUTATION_START_OVER="1", FAKE_CARGO_ENVIRONMENT_LOG=environment_log, CARGO_PROFILE_RELEASE_DEBUG="true")
+    records = environment_records(environment_log)
+    wanted = {f"CARGO_PROFILE_{profile}_DEBUG": "false" for profile in CARGO_DEBUG_PROFILES}
+    off = [record for record in records if all(record.get(name) == value for name, value in wanted.items())]
+    forms = {("--no-run" in record["ARGUMENTS"].split(), any(word.startswith("--message-format") for word in record["ARGUMENTS"].split())) for record in records}
+    selftest.check(f"门禁起的每条 cargo 都关了调试信息：{len(records)} 次（基线、变异的先编与跑、插桩编译与插桩跑）每一次四档的 CARGO_PROFILE_<档>_DEBUG 都是 false，调用方设的 true 也顶掉",
+                   exit_code == 0 and records and len(off) == len(records) and {(True, False), (False, False), (True, True)} <= forms,
+                   f"退 {exit_code}；{len(off)}/{len(records)} 次关了；收到的 {[{name: record.get(name) for name in wanted} for record in records[:3]]}；{stderr[-300:]}")
+    reused = selftest.run(repository)
+    saved = CARGO_DEBUG_SETTING[0]
+    try:
+        CARGO_DEBUG_SETTING[0] = "line-tables-only"
+        changed = selftest.run(repository)
+    finally:
+        CARGO_DEBUG_SETTING[0] = saved
+    back = selftest.run(repository)
+    selftest.check("改了构建档的取值之后行键变了：头一趟（调用方设了 true）之后同一取值 4 行都复用，换成 line-tables-only 那一趟 4 行都现判（工具链或依赖变了），换回 false 又 4 行都复用",
+                   reused[0] == 0 and "现判 0 条、复用 4 条" in reused[1] and changed[0] == 0 and len(per_row_how(changed[1])) == 4
+                   and set(per_row_how(changed[1]).values()) == {"现判：工具链或依赖变了"} and back[0] == 0 and "现判 0 条、复用 4 条" in back[1],
+                   f"同一取值 {per_row_how(reused[1])}；换了取值 {per_row_how(changed[1])}；换回来 {per_row_how(back[1])}")
+
+
+SELFTEST_EXTERNAL_LOCK = ('version = 4\n\n[[package]]\nname = "fakedep"\nversion = "1.2.3"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n'
+                          'checksum = "0000000000000000000000000000000000000000000000000000000000000000"\n\n'
+                          '[[package]]\nname = "tiny"\nversion = "0.1.0"\ndependencies = [\n "fakedep",\n]\n')
+
+
+def build_seed_repository(directory):
+    """先编一份依赖那几格的小仓：照 build_selftest_repository，另放一份 Cargo.lock，tiny 依赖一个带 source 的外部包 fakedep（假 cargo 照它「编」依赖）。"""
+    build_selftest_repository(directory, SELFTEST_TABLE_ROWS)
+    selftest_write(os.path.join(directory, "Cargo.lock"), SELFTEST_EXTERNAL_LOCK)
+
+
+def with_break(selftest, switch_name):
+    """在调用方给的弄坏开关之外再打开 switch_name（这一格自己造坏输入用）：交 GATE_MUTATION_BREAK 的新值。"""
+    given = [item for variable in BREAK_VARIABLES for item in selftest.base_environment.get(variable, "").split(",") if item]
+    return ",".join(given + [switch_name])
+
+
+def selftest_seed_cells(selftest, work):
+    """先编一份依赖（文件头「先编一份依赖」）：小仓的 tiny 依赖外部包 fakedep，假 cargo 在缺 fakedep 产物的编译目录里「编」一遍并记一行。
+    4 个工作进程（假 cargo 的屏障逼两个工作进程同时在编）：外部依赖只在 <共用目录>-seed 与 -seed-coverage 里各编一次，工作进程的编译目录一次都没编、产物是拷来的；
+    判定与 1 个工作进程（不先编）那一趟逐字相同。直接调 dependency_artifact_entries：只交外部依赖的产物，工作区的包、incremental、档那一层的文件不交；拷两遍，第二遍一个都不拷。
+    源码副本按内容同步：改了 tiny 的 lib.rs 之后只同步那 1 个文件、摸 crates/tiny，先编那一趟 tiny 重编、整道照常；修改时刻被留住（seedmtimekept）时先编那一趟判红、一条都不跑。
+    先编有两组（一行带 --release）：后一组复用前一组编出来的 tiny、假 cargo 报 fresh，整道照常（seedfreshacrossgroups 打开时判红）；修改时刻被留住时两组都是头一次出现就 fresh，照判红。
+    直接调 stale_seed_artifacts：前一组非 fresh、后一组同一个单元 fresh 不算坏；同包另一套特性的单元（身份不同）fresh、头一次出现就 fresh 的，照算坏。
+    弄坏开关 compile-per-worker、workspaceunitsshared、seedmtimekept、seedfreshunchecked、seedfreshacrossgroups 各让一格判错。"""
+    repository = os.path.join(work, "seed")
+    build_seed_repository(repository)
+    target = os.path.join(work, "seed-target")
+    dependency_log = os.path.join(work, "seed-dependencies.log")
+    environment_log = os.path.join(work, "seed-environment.jsonl")
+    declarations = os.path.join(work, "seed-serial-declarations")
+    seeded = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="4", GATE_MUTATION_TARGET_DIR=target, FAKE_CARGO_DEPENDENCY_LOG=dependency_log,
+                          FAKE_CARGO_ENVIRONMENT_LOG=environment_log, FAKE_CARGO_BARRIER_DIR=os.path.join(work, "seed-barrier"), FAKE_CARGO_BARRIER_PRISTINE=source_hash(repository),
+                          SINGLEFS_SERIAL_DECLARATIONS=declarations)
+    selftest_seed_declaration_cell(selftest, seeded, declarations)
+    compiled = open(dependency_log, encoding="utf-8").read().splitlines() if os.path.exists(dependency_log) else []
+    seeds = sorted([target + SEED_TARGET_SUFFIX, target + SEED_TARGET_SUFFIX + COVERAGE_TARGET_SUFFIX])
+    worker_targets = {record.get("CARGO_TARGET_DIR") for record in environment_records(environment_log)} - set(seeds)
+    plain_worker_targets = {path for path in worker_targets if not path.endswith(COVERAGE_TARGET_SUFFIX)}
+    copied_into = [path for path in sorted(worker_targets) if os.path.isfile(os.path.join(path, "debug", "deps", "libfakedep-"
+                   + hashlib.sha256(b"fakedep1.2.3").hexdigest()[:16] + ".rlib"))]
+    selftest.check("4 个工作进程：外部依赖只在先编那一份里各编一次（普通、插桩各 1 次），起过 cargo 的工作进程编译目录里一次都没编、依赖产物都是拷来的",
+                   seeded[0] == 0 and sorted(compiled) == seeds and len(plain_worker_targets) >= 2 and copied_into == sorted(worker_targets),
+                   f"退 {seeded[0]}；编过依赖的编译目录 {compiled}（要 {seeds}）；起过 cargo 的工作进程编译目录 {sorted(worker_targets)}，有拷来的 {copied_into}；{seeded[2][-600:]}")
+    reference = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="1", GATE_MUTATION_TARGET_DIR=os.path.join(work, "seed-reference-target"))
+    selftest.check("先编一份依赖不改判定：4 个工作进程先编那一趟与 1 个工作进程（不先编）那一趟判定逐字相同",
+                   seeded[0] == 0 and reference[0] == 0 and selftest_verdict_view(seeded[1]) == selftest_verdict_view(reference[1])
+                   and "先编一份依赖：没起（这一趟只开 1 个工作进程" in reference[2], f"{seeded[1]}\n——\n{reference[1]}\n{reference[2][-300:]}")
+    # 直接调：一份造出来的先编编译目录，外部依赖、工作区的包（.d 里是副本底下的绝对路径与相对路径两种）、incremental、档那一层的文件、三元组那一层各一样
+    source = os.path.join(work, "classify-source")
+    selftest_write(os.path.join(source, "Cargo.lock"), SELFTEST_EXTERNAL_LOCK)
+    seed_target = os.path.join(work, "classify-target")
+    external, workspace, relative, build, triple = "0123456789abcdef", "fedcba9876543210", "1111111111111111", "00112233445566ff", "abcdefabcdefabcd"
+    layout = {f"debug/deps/libfakedep-{external}.rlib": "rlib", f"debug/deps/fakedep-{external}.d": f"x: /registry/fakedep-1.2.3/src/lib.rs\n",
+              f"debug/deps/libtiny-{workspace}.rlib": "rlib", f"debug/deps/tiny-{workspace}.d": f"x: {source}/crates/tiny/src/lib.rs\n",
+              f"debug/deps/smoke-{relative}": "exe", f"debug/deps/smoke-{relative}.d": "x: crates/tiny/tests/smoke.rs\n",
+              f"debug/.fingerprint/fakedep-{external}/lib-fakedep": "f", f"debug/.fingerprint/tiny-{workspace}/lib-tiny": "f",
+              f"debug/build/fakedep-{build}/out/generated.rs": "g", f"debug/build/tiny-{build}/out/generated.rs": "g",
+              "debug/incremental/tiny-xyz/s/dep-graph.bin": "i", "debug/libtiny.rlib": "uplifted", "debug/.cargo-lock": "",
+              f"x86_64-unknown-linux-gnu/release/.fingerprint/fakedep-{triple}/lib-fakedep": "f"}
+    for path, text in layout.items():
+        selftest_write(os.path.join(seed_target, path), text)
+    entries = sorted(dependency_artifact_entries(seed_target, source, dict(selftest.base_environment)))
+    wanted_entries = sorted([f"debug/.fingerprint/fakedep-{external}", f"debug/build/fakedep-{build}", f"debug/deps/fakedep-{external}.d",
+                             f"debug/deps/libfakedep-{external}.rlib", f"x86_64-unknown-linux-gnu/release/.fingerprint/fakedep-{triple}"])
+    destination = os.path.join(work, "classify-destination")
+    first_copy = sync_dependency_artifacts(seed_target, destination, source, dict(selftest.base_environment), 1)
+    second_copy = sync_dependency_artifacts(seed_target, destination, source, dict(selftest.base_environment), 1)
+    kept_time = os.stat(os.path.join(destination, f"debug/deps/libfakedep-{external}.rlib")).st_mtime_ns == os.stat(os.path.join(seed_target, f"debug/deps/libfakedep-{external}.rlib")).st_mtime_ns
+    selftest.check("先编那一份只拷外部依赖的产物：.fingerprint、build、deps 里 fakedep 的 5 项（含三元组那一层），工作区的包、incremental、档那一层的文件不拷；头一遍拷 5 个文件、保留修改时刻，第二遍一个都不拷",
+                   entries == wanted_entries and first_copy[0] == 5 and second_copy == (0, 0) and kept_time
+                   and not os.path.exists(os.path.join(destination, f"debug/deps/libtiny-{workspace}.rlib")),
+                   f"交的 {entries}（要 {wanted_entries}）；头一遍 {first_copy}、第二遍 {second_copy}、修改时刻保留 {kept_time}")
+    selftest_seed_copy_threads_cell(selftest, work, seed_target, source)
+    # 源码副本按内容同步：头一趟整份进来；改了 tiny 的 lib.rs 之后只同步 1 个文件、摸 crates/tiny，先编那一趟 tiny 重编
+    fresh_repository = os.path.join(work, "seed-fresh")
+    build_seed_repository(fresh_repository)
+    fresh_target = os.path.join(work, "seed-fresh-target")
+    first = selftest.run(fresh_repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="2", GATE_MUTATION_TARGET_DIR=fresh_target)
+    landed = re.search(r"串行段声明写进 (\S+)（", first[2])
+    selftest.check("先编那一段声明串行段、调用方没设 SINGLEFS_SERIAL_DECLARATIONS：设成这一趟 shard_root（$TMPDIR 下的 singlefs-mutation-replay-*）里的 serial-declarations",
+                   first[0] == 0 and landed is not None and os.path.basename(landed.group(1)) == "serial-declarations"
+                   and os.path.basename(os.path.dirname(landed.group(1))).startswith(SHARD_ROOT_PREFIX),
+                   f"退 {first[0]}；{landed.group(1) if landed else '没报声明写进哪里'}：{first[2][-600:]}")
+    replace_in_file(os.path.join(fresh_repository, "crates", "tiny", "src", "lib.rs"), "// 本模块自证的样本 crate", "// 本模块自证的样本 crate（改过一次）")
+    second = selftest.run(fresh_repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="2", GATE_MUTATION_TARGET_DIR=fresh_target)
+    selftest.check("先编那一份的源码按内容同步：改了 tiny 的 lib.rs 之后只同步那 1 个文件、摸 crates/tiny，先编那一趟 tiny 重编、整道照常",
+                   first[0] == 0 and second[0] == 0 and "同步了 1 个文件（摸了整包的 1 个：crates/tiny）" in second[2]
+                   and "先编一份依赖（普通）：" in second[2], f"头一趟退 {first[0]}；改过之后退 {second[0]}：{(second[1] + second[2])[-900:]}")
+    replace_in_file(os.path.join(fresh_repository, "crates", "tiny", "src", "lib.rs"), "（改过一次）", "（改过两次）")
+    kept = selftest.run(fresh_repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="2", GATE_MUTATION_TARGET_DIR=fresh_target,
+                        GATE_MUTATION_BREAK=with_break(selftest, "seedmtimekept"))
+    selftest.check("先编那一份的修改时刻被留住（seedmtimekept）：先编那一趟判红、点名 crates/tiny 是 fresh，一条都不跑",
+                   kept[0] == 1 and "crates/tiny 的 tiny 是 fresh" in kept[1] + kept[2] and plain_invocations(kept[3]) == [],
+                   f"退 {kept[0]}；{(kept[1] + kept[2])[-900:]}；假 cargo {kept[3]}")
+    selftest_seed_group_cells(selftest, work)
+
+
+def load_core_usage():
+    """scripts/hosts/core_usage.py（串行段声明的读法在那里，自证照它读回）。"""
+    specification = importlib.util.spec_from_file_location("core_usage_for_crates_mutation_rows_selftest", os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "core_usage.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def selftest_seed_declaration_cell(selftest, seeded, declarations):
+    """先编那一段声明串行段（文件头「先编一份依赖」的「串行段声明」）：4 个工作进程那一趟，调用方给的 SINGLEFS_SERIAL_DECLARATIONS 里恰好一段
+    「此刻串行：先编一份依赖…」接一行「此刻并行」，照 core_usage.py 的读法读得回、没有写坏的行；直接调 declare_seed_serial（环境里没设变量）：
+    变量设进交给它的那份环境（起 cargo 的环境照它拷）、指到给的临时目录里的 serial-declarations。弄坏开关 seed-serial-undeclared 让它判错。"""
+    text = open(declarations, encoding="utf-8").read() if os.path.exists(declarations) else ""
+    entries, problems = load_core_usage().parse_declarations(text)
+    kinds = [kind for _moment, kind, _reason in entries]
+    direct_root = os.path.join(selftest.work, "seed-declaration-direct")
+    os.makedirs(direct_root, exist_ok=True)
+    direct_environment = {key: value for key, value in selftest.base_environment.items() if key != "SINGLEFS_SERIAL_DECLARATIONS"}
+    direct_lines = []
+    direct = declare_seed_serial(direct_environment, direct_root, 2, "4", "8G", direct_lines)
+    wanted = os.path.join(direct_root, "serial-declarations")
+    selftest.check("先编那一段声明串行段：调用方给的声明文件里一段「此刻串行：先编一份依赖…组共用一份编译目录…」接「此刻并行」，core_usage.py 读得回；"
+                   "没设变量时设进起 cargo 的那份环境",
+                   seeded[0] == 0 and kinds == ["serial", "parallel"] and not problems and entries[0][0] <= entries[1][0]
+                   and "先编一份依赖" in entries[0][2] and "组共用一份编译目录" in entries[0][2]
+                   and f"串行段声明写进 {declarations}" in seeded[2]
+                   and direct == wanted and direct_environment.get("SINGLEFS_SERIAL_DECLARATIONS") == wanted and os.path.isfile(wanted),
+                   f"退 {seeded[0]}；声明文件 {text!r}；读回 {entries}，写坏的 {problems}；直接调交 {direct}、环境里 {direct_environment.get('SINGLEFS_SERIAL_DECLARATIONS')}：{direct_lines}")
+
+
+def selftest_seed_copy_threads_cell(selftest, work, seed_target, source):
+    """工作进程拷依赖产物分到几条线程上同时拷（文件头「先编一份依赖」的「拷」）：直接调 sync_dependency_artifacts（threads=4），
+    shutil.copy2 换成先到一道两方屏障（5 秒）再拷的：头两个文件要在两条线程上同时拷到屏障才过得去，fakedep 的 rlib 拷到了（拷几个由「只拷外部依赖的产物」那一格管）。弄坏开关 seed-copy-serial 让它判错（屏障等满 5 秒被打破）。"""
+    barrier = threading.Barrier(2, timeout=5)
+    seen_threads, broken, arrivals = set(), [], []
+    arrival_lock = threading.Lock()
+    original_copy = shutil.copy2
+
+    def copy_after_barrier(path, target, **keywords):
+        with arrival_lock:
+            seen_threads.add(threading.get_ident())
+            arrivals.append(path)
+            gated = len(arrivals) <= 2   # 只有头两个文件过屏障
+        if gated:
+            try:
+                barrier.wait()
+            except threading.BrokenBarrierError:
+                broken.append(path)
+        return original_copy(path, target, **keywords)
+    destination = os.path.join(work, "classify-destination-threads")
+    shutil.copy2 = copy_after_barrier
+    try:
+        copied = sync_dependency_artifacts(seed_target, destination, source, dict(selftest.base_environment), threads=4)
+    finally:
+        shutil.copy2 = original_copy
+    selftest.check("工作进程拷依赖产物分到几条线程上同时拷：4 条线程，头两个文件同时到两方屏障（没有一次等满 5 秒），fakedep 的产物拷到了",
+                   copied[0] >= 2 and len(seen_threads) >= 2 and not broken and os.path.isfile(os.path.join(destination, "debug/deps/libfakedep-0123456789abcdef.rlib")),
+                   f"拷了 {copied}；拷的线程 {len(seen_threads)} 条；等满 5 秒屏障被打破的 {len(broken)} 次")
+
+
+def seed_artifact_message(package, root, unit_hash, fresh, features=()):
+    """cargo --message-format=json 的一条 compiler-artifact（字段照真 cargo：package_id、manifest_path、target、profile、features、filenames、executable、fresh）。"""
+    return json.dumps({"reason": "compiler-artifact", "package_id": f"path+file://{root}/crates/{package}#{package}@0.1.0",
+                       "manifest_path": os.path.join(root, "crates", package, "Cargo.toml"),
+                       "target": {"kind": ["lib"], "crate_types": ["lib"], "name": package, "src_path": os.path.join(root, "crates", package, "src", "lib.rs")},
+                       "profile": {"opt_level": "0", "debuginfo": 0, "test": True}, "features": list(features),
+                       "filenames": [f"/target/debug/deps/{package}-{unit_hash}"], "executable": f"/target/debug/deps/{package}-{unit_hash}", "fresh": fresh})
+
+
+def selftest_seed_group_cells(selftest, work):
+    """先编有两组时，后一组复用前一组编出来的产物（cargo 报 fresh）不算坏，头一次出现就是 fresh 的才算坏。"""
+    rows = SELFTEST_TABLE_ROWS + ["double-release-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t-p tiny --release --lib -- doubles\tdoubles"]
+    repository = os.path.join(work, "seed-groups")
+    build_selftest_repository(repository, rows)
+    selftest_write(os.path.join(repository, "Cargo.lock"), SELFTEST_EXTERNAL_LOCK)
+    target = os.path.join(work, "seed-groups-target")
+    common = dict(GATE_MUTATION_START_OVER="1", GATE_MUTATION_WORKERS="2", GATE_MUTATION_TARGET_DIR=target)
+    twice = selftest.run(repository, **common)
+    selftest.check("先编那一份有两组（-p tiny 与 -p tiny --release）：后一组复用前一组编出来的 tiny、假 cargo 报 fresh，不算坏、整道照常",
+                   twice[0] == 0 and "先编一份依赖（普通）：" in twice[2] and "编了 2 组" in twice[2] and "是 fresh" not in twice[1] + twice[2],
+                   f"退 {twice[0]}：{(twice[1] + twice[2])[-900:]}")
+    replace_in_file(os.path.join(repository, "crates", "tiny", "src", "lib.rs"), "// 本模块自证的样本 crate", "// 本模块自证的样本 crate（改过一次）")
+    edited = selftest.run(repository, **common)
+    selftest.check("先编那一份有两组、改了 tiny 的 lib.rs 之后：摸 crates/tiny、前一组重编、后一组复用，整道照常",
+                   edited[0] == 0 and "摸了整包的 1 个：crates/tiny" in edited[2] and "编了 2 组" in edited[2] and "是 fresh" not in edited[1] + edited[2],
+                   f"退 {edited[0]}：{(edited[1] + edited[2])[-900:]}")
+    replace_in_file(os.path.join(repository, "crates", "tiny", "src", "lib.rs"), "（改过一次）", "（改过两次）")
+    per_group = selftest.run(repository, **common, GATE_MUTATION_BREAK=with_break(selftest, "seedfreshacrossgroups"))
+    selftest.check("先编那一份有两组、每组各判各的（seedfreshacrossgroups）：后一组里 tiny 是 fresh 记成坏的，先编那一趟判红、一条都不跑",
+                   per_group[0] == 1 and "crates/tiny 的 tiny 是 fresh" in per_group[1] + per_group[2] and "--release" in per_group[1] + per_group[2]
+                   and plain_invocations(per_group[3]) == [], f"退 {per_group[0]}：{(per_group[1] + per_group[2])[-900:]}；假 cargo {per_group[3]}")
+    replace_in_file(os.path.join(repository, "crates", "tiny", "src", "lib.rs"), "（改过两次）", "（改过三次）")
+    kept = selftest.run(repository, **common, GATE_MUTATION_BREAK=with_break(selftest, "seedmtimekept"))
+    selftest.check("先编那一份有两组、修改时刻被留住（seedmtimekept）：两组里 tiny 头一次出现就是 fresh，照判红、一条都不跑",
+                   kept[0] == 1 and "crates/tiny 的 tiny 是 fresh" in kept[1] + kept[2] and plain_invocations(kept[3]) == [],
+                   f"退 {kept[0]}：{(kept[1] + kept[2])[-900:]}；假 cargo {kept[3]}")
+    # 直接调：两组的 cargo JSON 输出，同一份记录（compiled）串起来
+    root = os.path.join(work, "identity-source")
+    touched = {"crates/tiny"}
+    first_group = seed_artifact_message("tiny", root, "aaaaaaaaaaaaaaaa", False)
+    reused = seed_artifact_message("tiny", root, "aaaaaaaaaaaaaaaa", True)
+    other_features = seed_artifact_message("tiny", root, "bbbbbbbbbbbbbbbb", True, features=("gpu",))
+    compiled = set()
+    carried = [stale_seed_artifacts(first_group, root, touched, compiled), stale_seed_artifacts(reused, root, touched, compiled)]
+    selftest.check("先编两组的 cargo 输出：前一组 tiny 非 fresh、后一组同一个单元 fresh，不算坏",
+                   carried == [[], []] and len(compiled) == 1, f"{carried}；记下的单元 {len(compiled)} 个")
+    separate = [stale_seed_artifacts(first_group, root, touched), stale_seed_artifacts(reused, root, touched)]
+    selftest.check("先编两组的 cargo 输出各判各的（不给记录，seedfreshacrossgroups 的样子）：后一组 tiny fresh 算坏", separate == [[], ["crates/tiny 的 tiny"]], f"{separate}")
+    compiled = set()
+    stale_seed_artifacts(first_group, root, touched, compiled)
+    selftest.check("同包另一套特性编出来的单元（身份不同）在后一组头一次出现就是 fresh：照算坏，只按包名放行不行",
+                   stale_seed_artifacts(other_features, root, touched, compiled) == ["crates/tiny 的 tiny"], f"{compiled}")
+    selftest.check("头一组里头一次出现就是 fresh 的：照算坏", stale_seed_artifacts(reused, root, touched, set()) == ["crates/tiny 的 tiny"])
+    selftest.check("没摸过的包 fresh 不算坏（照旧）", stale_seed_artifacts(seed_artifact_message("fakedep", root, "cccccccccccccccc", True), root, touched, set()) == [])
+
+
 def run_selftest():
     work = tempfile.mkdtemp(prefix="crates-mutation-rows-selftest-")
     saved_environment = dict(os.environ)
@@ -4900,9 +6826,14 @@ def run_selftest():
         selftest_row_memory_budget_cells(selftest, work)
         selftest_disk_cells(selftest, work)
         selftest_target_cap_cells(selftest, work)
+        selftest_target_prune_cells(selftest, work)
+        selftest_disk_peak_cells(selftest, work)
         selftest_compile_budget_cells(selftest, work)
         selftest_libtest_result_cell(selftest, work)
+        selftest_host_lookup_cells(selftest, work)
         selftest_cargo_configuration_cell(selftest, work)
+        selftest_gpu_quiesce_cells(selftest, work)
+        selftest_gpu_configuration_cells(selftest, work)
         selftest_target_directory_cells(selftest, work)
         selftest_worker_slot_cells(selftest, work)
         selftest_signal_and_pipe_cells(selftest, work)
@@ -4914,6 +6845,9 @@ def run_selftest():
         selftest_closure_refused_cell(selftest, work)
         selftest_coverage_exact_cell(selftest, work)
         selftest_anchor_and_impact_cells(selftest, work)
+        selftest_undefined_identifier_cell(selftest, work)
+        selftest_debuginfo_cells(selftest, work)
+        selftest_seed_cells(selftest, work)
     finally:
         JUDGING_ROOT[0] = STAGE_REPOSITORY
         os.environ.clear()
@@ -4926,7 +6860,16 @@ def run_selftest():
         print("     → 怎么办：设了 GATE_MUTATION_BREAK 的，这就是要的结果（那个开关把对应的判法弄坏了）；没设的，照上面那几格去看 run_stage、row_decision、")
         print("       KeyContext.components、baseline_reuse_problem、judge_coverage、dispatch_order、command_import、command_plan、escaping_literals、read_table 与 row_problems；")
         print("       单元切分与闭包看 scripts/mutation/lib_mutation_units.py 与 scripts/gate/lib_function_units.py；并行理由那两格看 run_under_wrapper。")
+        for item in selftest.not_run:
+            print(f"      本次未跑：{item}")
         return 1
+    if selftest.not_run:
+        # 有格的前提没造出来（skip）：不判绿，退 77（本次未跑）
+        print(f"  · crates-mutation-rows.py 自证：判了的 {selftest.cells} 格都对，本次未跑 {len(selftest.not_run)} 格（前提没造出来，不算通过）：")
+        for item in selftest.not_run:
+            print(f"      {item}")
+        print("     → 怎么办：机器闲一点（/proc/pressure/io 的 some 低下来）再跑一遍 --selftest；还是本次未跑就照那一格写的原因看造前提的那几步")
+        return 77
     print(f"  ✓ crates-mutation-rows.py 自证 {selftest.cells} 格都对（复用、改一行只重跑那一行、跑到一半续跑、基线不绿、"
           "久的先派、选行只判一部分退 3、导入核键与判法单元指纹、多久没被引用才删、记录里没有主机名、拷贝范围两样、"
           "替换文空着的删行变异照常判、派活之前那几样 checker-tier-crates-mutation-replay 与 static-check 同一份判法、"
@@ -4937,7 +6880,10 @@ def run_selftest():
           "会话里平常跑时每次包装带自己那个工作进程的并行理由且调用方设了的不覆盖、"
           "工作进程数不超过外层内存上限 ÷ 每条变异的上限而外层上限读不到时头一行写明、"
           "有一行逐行上限很大（24G）也不压低工作进程数、派活按每一格自己的上限从外层额度里扣（在跑的各格上限之和不超过外层、大格不被饿死）、"
-          "拷贝范围含 .cargo/（点名的测试要编 gpu 特性的那一行在副本里读得到 [env]）、被 TERM 停时删掉 $TMPDIR 下的 singlefs-mutation-replay-*（TERM 落在建目录那一瞬也不漏）、"
+          "拷贝范围含 .cargo/（点名的测试要编 gpu 特性的那一行在副本里读得到 [env]）、"
+          "带 gpu 特性真跑测试的那几次经 gpu-quiesce-run.sh 清场再起（只编不跑的与不带 gpu 的不经；清场回读没过记清场没过没跑或基线不绿、整道判红）、"
+          "带 gpu 特性真跑测试的那几次在副本里收到本模块所在仓的多机配置（不带 gpu 的与只编不跑的收不到），多机配置不在或给定状态全交 CPU 判的没红记本次未跑而 GPU 判过的照常判、"
+          "被 TERM 停时删掉 $TMPDIR 下的 singlefs-mutation-replay-*（TERM 落在建目录那一瞬也不漏）、"
           "片号大于这一趟工作进程数的 -w<片号> 开跑时回收而有进程在用的不删、两个变量都没设时编译目录不落 /tmp、"
           "同一个共用编译目录上并发的两次调用领到的片号集合不相交（片号锁）而片号锁被占着的 -w<片号> 回收时留着、"
           "--list-items 接 | head 时安静退、变异复跑起的 cargo 写自己的崩溃判定库（真跑家目录底下的 mutation-replay/，或 GATE_MUTATION_CRASH_LIBRARY_HOME；每片再分一个 shard-<片号> 子目录，两个工作进程同时在跑时互不相同）而点名的单份库清掉、"
@@ -4947,7 +6893,9 @@ def run_selftest():
           "锚点失效按行判（那一行记锚点失效、不入库、整道判红，别的行照跑照入库）而 row-plan、plan、--list-items 把锚点失效的行单列（数据文件那一行也不算键）、"
           "牵连面在样本 crate 上报对牵连最大的单元与行数、"
           "磁盘余量放不下时工作进程数按余量收（已有的编译目录只算还能涨的、余量写法不认整道拒、没给余量读编译目录所在的盘）、"
-          "编译目录超过上限时判完一格清掉增量产物、套在外层包装里时先编向外层额度借（并行度升高、在跑各格的上限加借走的不超过外层））")
+          "编译目录超过上限时判完一格清掉增量产物、套在外层包装里时先编向外层额度借（并行度升高、在跑各格的上限加借走的不超过外层）、"
+          "起的每条 cargo 都关了调试信息而构建档的取值进行键、几个工作进程时外部依赖只在先编那一份里编一次且只拷外部依赖的产物、先编那一份的源码按内容同步而摸过的包没重编就判红、"
+          "先编那一段往 SINGLEFS_SERIAL_DECLARATIONS 声明串行段而拷依赖产物分到几条线程上同时拷）")
     return 0
 
 
@@ -4965,6 +6913,17 @@ def run_selftest_cells(selftest, work):
     selftest.check("第二趟判定与头一趟逐字相同（只差复用的报数）", selftest_verdict_view(second[1]) == selftest_verdict_view(first[1])
                    and "现判 0 条、复用 4 条、拒算 0 条、本次未跑 0 条" in second[1], second[1])
     selftest.check("第二趟 stderr 头一行报复用 4 条", "复用抓到 4 条" in (second[2].splitlines() or [""])[0], second[2])
+    # 起 cargo 之前判 RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：同一份小仓另放一份依赖 rocksdb 的 checker 档包清单、
+    #   进程环境里四个取值是空的，PATH 上的假 cargo 不带 entry 认的标记 ⇒ 退 1、假 cargo 一次都不起、报出 entry 的红句
+    rocksdb_repository = os.path.join(work, "rocksdb-repository")
+    shutil.copytree(repository, rocksdb_repository, symlinks=True)
+    selftest_write(os.path.join(rocksdb_repository, "crates", "singlefs-checker-tier", "Cargo.toml"),
+                   '[package]\nname = "singlefs-checker-tier"\nversion = "0.0.0"\n[dependencies]\nrocksdb = { version = "=0.25.0", optional = true }\n')
+    refused_by_rocksdb = selftest.run(rocksdb_repository, ROCKSDB_LIB_DIR="", ROCKSDB_STATIC="", SNAPPY_LIB_DIR="", SNAPPY_STATIC="")
+    selftest.check("RocksDB 预编库的取值缺了：起 cargo 之前判红、退 1、假 cargo 一次都不起",
+                   refused_by_rocksdb[0] == 1 and refused_by_rocksdb[3] == [] and "rocksdb-prebuilt entry：" in refused_by_rocksdb[1] + refused_by_rocksdb[2],
+                   refused_by_rocksdb[1] + refused_by_rocksdb[2])
+    shutil.rmtree(rocksdb_repository)
     # 二：进程数不同、一律不复用，判定仍逐字相同
     parallel = selftest.run(repository, GATE_MUTATION_WORKERS="4", GATE_MUTATION_START_OVER="1")
     selftest.check("GATE_MUTATION_WORKERS=4 与 =1 的判定逐字相同", selftest_verdict_view(parallel[1]) == selftest_verdict_view(first[1]), parallel[1])
@@ -5394,7 +7353,8 @@ def judging_copy(work, name):
         _key, references = judging_units({}, source)
     except (JudgingUnitsRefused, OSError):
         return copy, False
-    for path in sorted({reference.file for reference in references} | {".claude/scripts/project_preflight.py"}):
+    # lib_function_units.py 的单元在 references 里（照进指纹）；lib_verdict_library.py（NOT_JUDGING_FILES 的另一份）闭包里没有它的单元，拷贝照旧带上
+    for path in sorted({reference.file for reference in references} | {".claude/scripts/project_preflight.py", "scripts/crash/lib_verdict_library.py"}):
         if os.path.isfile(os.path.join(source, path)):
             os.makedirs(os.path.dirname(os.path.join(copy, path)), exist_ok=True)
             shutil.copyfile(os.path.join(source, path), os.path.join(copy, path))
@@ -5418,8 +7378,9 @@ def selftest_judging_unit_cells(selftest, work):
     replace_in_file(module, "    tail = output_tail(output)\n", "    # 判法单元自证加的一行注释\n    tail = output_tail(output)\n")
     commented_key, _references = judging_units(environment, copy)
     selftest.check("只改判法脚本的注释：判法单元指纹不变", commented_key == real_key, f"{real_key[:16]}… → {commented_key[:16]}…")
-    replace_in_file(module, "def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, stop_after, coverage_planner):\n",
-                    "def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, stop_after, coverage_planner, _unused=None):\n")
+    # 改的是 run_pool 的函数体：判法入口点不到 run_pool，函数体只在调它时才跑，import 时不执行。
+    # 不改它的签名：加一个带缺省值的参数，缺省值在 import 时求值，def 头按 scripts/gate/lib_function_units.py 文件头「Python 闭包：import 时执行的模块级语句」进闭包，指纹该变
+    replace_in_file(module, "    sequence_counter = multiprocessing.Value(\"i\", 0)\n", "    sequence_counter = multiprocessing.Value(\"i\", 1)\n")
     scheduling_key, _references = judging_units(environment, copy)
     selftest.check("改判法单元闭包外的函数（派活的 run_pool）：判法单元指纹不变", scheduling_key == commented_key or break_is(environment, "judge-units-whole-file"),
                    f"{commented_key[:16]}… → {scheduling_key[:16]}…")
@@ -5428,6 +7389,39 @@ def selftest_judging_unit_cells(selftest, work):
                     "        if expected == parsed.full_name or parsed.full_name.endswith(\"::\" + expected):\n")
     parsing_key, _references = judging_units(environment, copy)
     selftest.check("改 libtest 结果行解析函数的一处：判法单元指纹变", parsing_key != scheduling_key, f"{scheduling_key[:16]}… → {parsing_key[:16]}…")
+    # lib_function_units.py 管覆盖落进哪几个单元（executed_units 用它给的行号区间），是判对错的一环：改它的 RustFile.row 一处函数体，判法单元指纹变、闭包里有它的单元。
+    # D13 已定项 17 的文件级排除不用在这里；弄坏开关 judging-function-units-excluded 下这份的单元不进指纹、这一格判错
+    row_line = '        return snippet_of(self.source_rows[line - 1]) if 0 < line <= len(self.source_rows) else ""\n'
+
+    def edit_function_units(judging_root):
+        units_file = os.path.join(judging_root, "scripts", "gate", "lib_function_units.py")
+        with open(units_file, encoding="utf-8") as handle:
+            units_text = handle.read()
+        assert units_text.count(row_line) >= 1, units_file
+        selftest_write(units_file, units_text.replace(row_line, row_line.replace("0 < line", "1 <= line"), 1))
+
+    edit_function_units(copy)
+    function_units_key, function_units_references = judging_units(environment, copy)
+    function_units_count = sum(reference.file == "scripts/gate/lib_function_units.py" for reference in function_units_references)
+    selftest.check("改 lib_function_units.py 的 RustFile.row 一处函数体：判法单元指纹变，闭包里有 lib_function_units.py 的单元",
+                   function_units_key != parsing_key and function_units_count > 0,
+                   f"{parsing_key[:16]}… → {function_units_key[:16]}…；lib_function_units.py 的单元 {function_units_count} 个")
+    # 覆盖号带判法单元指纹：同一条点名测试，判法的拷贝只差 lib_function_units.py 的切单元，覆盖号要跟着变（弄坏开关 coverage-id-without-judging 下不变、这一格判错）
+    coverage_repository = os.path.join(work, "judging-coverage-id")
+    build_selftest_repository(coverage_repository, SELFTEST_UNIT_ROWS, source=SELFTEST_UNIT_SOURCE)
+    coverage_rows = read_table(os.path.join(coverage_repository, TABLE), environment)[0]
+
+    def coverage_id_on(judging_root):
+        _context, found, _library = plan_rows(coverage_repository, coverage_rows[:1], environment, "1G", 60, judging_root)
+        return found[coverage_rows[0].line_number].coverage_id, found[coverage_rows[0].line_number].judging
+
+    coverage_copy, coverage_copied = judging_copy(work, "judging-coverage-id-cells")
+    original_coverage_id, original_judging = coverage_id_on(coverage_copy)
+    edit_function_units(coverage_copy)
+    edited_coverage_id, edited_judging = coverage_id_on(coverage_copy)
+    selftest.check("覆盖号随判法单元指纹变：改 lib_function_units.py 的 RustFile.row 一处函数体，同一条点名测试的覆盖号跟着变",
+                   coverage_copied and bool(original_coverage_id) and bool(edited_coverage_id) and original_judging != edited_judging and original_coverage_id != edited_coverage_id,
+                   f"判法 {original_judging[:16]}… → {edited_judging[:16]}…；覆盖号 {original_coverage_id[:16]}… → {edited_coverage_id[:16]}…")
     shown = run_command_capturing(command_judging_units, [copy])
     selftest.check("judging-units 子命令打「<指纹> <单元数>」", shown[0] == 0 and re.fullmatch(r"[0-9a-f]{64} \d+\n", shown[1]) is not None, shown[1])
 

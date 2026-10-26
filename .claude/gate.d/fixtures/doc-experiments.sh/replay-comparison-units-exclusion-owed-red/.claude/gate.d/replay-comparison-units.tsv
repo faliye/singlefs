@@ -1,0 +1,7 @@
+# 样本登记表（点名不登记要指到开着的欠账）：research/prompts/e991-r2-prereg.md 比对对象表五行，甲对 #1；#2 到 #5 在文件头点名不登记。
+# #2 没写欠在哪一条账、#3 写的 C998 欠账表里没有、#4 写的 C991 已还清：三行判红；#5 欠在开着的 C92，不报。
+# 不登记的比对对象：research/prompts/e991-r2-prereg.md #2：样本里这条正式跑在单元表里没有单元
+# 不登记的比对对象：research/prompts/e991-r2-prereg.md #3：样本里这条正式跑在单元表里没有单元；欠在 C998（欠账表里没有的号）
+# 不登记的比对对象：research/prompts/e991-r2-prereg.md #4：样本里这条正式跑在单元表里没有单元；欠在 C991（样本已还）
+# 不登记的比对对象：research/prompts/e991-r2-prereg.md #5：样本里这条正式跑在单元表里没有单元；欠在 C92（样本欠账）
+E991	research/prompts/e991-r2-prereg.md	甲	crates/sample/units.rs	e991-a.out	none:样本没有复跑行的理由

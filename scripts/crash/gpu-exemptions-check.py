@@ -24,13 +24,13 @@
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（格名是 selftest() 里那一格，自证打「✗ 自证 <格名>：…」）：
   GPU_EXEMPTIONS_CHECK_BREAK=unregistered-markers-accepted  ② 不核代码里的标记在豁免表里
-      marker-without-row
+      「✗ 自证 marker-without-row：」
   GPU_EXEMPTIONS_CHECK_BREAK=unmarked-rows-accepted  ③ 不核豁免表每一行在代码里有标记
-      row-without-marker
+      「✗ 自证 row-without-marker：」
   GPU_EXEMPTIONS_CHECK_BREAK=marker-column-unchecked  ① 不核代码标记名一栏是不是「// gpu-exempt: <截名>」
-      wrong-marker-column
+      「✗ 自证 wrong-marker-column：」
   GPU_EXEMPTIONS_CHECK_BREAK=row-fields-unchecked  ① 不核为什么的字数与用户点头日期的写法
-      reason-too-short、date-malformed
+      「✗ 自证 reason-too-short：」、「✗ 自证 date-malformed：」
 """
 import os
 import re

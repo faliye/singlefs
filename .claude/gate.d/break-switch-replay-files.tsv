@@ -1,0 +1,63 @@
+# 脚本与钩子的弄坏开关复跑登记表（门禁 code-tooling 的 break-switch-replay 格，checks-owed.md C625 复跑方）：一行「<相对仓根的路径><TAB><每条开关最多跑几秒>[<TAB><基准趟最多跑几秒>]<TAB># 理由」。
+# 两个限时分开读：第二列只管开关趟（设上一条开关起的那一趟 --selftest）；第三列只管基准趟（不设开关起的那一趟），不写就照第二列。
+#   自证自带开关轮的（外面设开关被守卫当场拒，开关趟一起来就退 2；基准趟却要把自证与它自己的整轮开关跑完）写第三列：
+#   单跑一条开关的秒数 ×（1 + 开关条数 ÷ 它开关轮的并行度，向上取整），并行度没写死的按登记的每台默认重活线程数算。
+# 同一张文件头开关表两种读法：这一格读每条开关下一行起「」里的失败行原文；自证自带开关轮的，它自己的开关轮读括号外的格名、不读「」里的原文，格名对不对归它自己的开关轮。
+# 登记的脚本要：代码里读弄坏开关、文件头开关表每条三样写全（break-switch-headers 格）、在 .claude/hooks/selftest-registry.tsv 里登记成 light。
+# 加一行之前先把那份脚本的每一条开关设上跑一遍它的 --selftest，点名的格与实际红的格逐格相同再加：点名的项（文件头下一行起「」里的失败行原文）都在开关弄红的失败行里，
+# 开关弄红的、以 ✗ 起头的失败行（减去不设开关那一趟本来就有的，汇总行除外）每一行都被某一项照出来；
+# 自证自带开关轮的（外面设开关被它的守卫拒）也能登记，那几条算「自证自带开关轮」。判据与结局写在格函数上方的注释。
+.claude/hooks/completion-cleanup-guard.sh	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（单跑一条开关约 3 秒）
+.claude/hooks/lib_prompt_scratch_line.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（单跑一条不到 1 秒）
+.claude/hooks/continuation-guard.sh	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+.claude/hooks/ask-user-claim-guard.sh	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里（3 条、0 条不对，debt-tw-hooks-record/evidence/replay-ask.txt），自证只起自己的入口
+.claude/hooks/handback-guard.sh	120	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+.claude/hooks/runner-dispatch-guard.sh	120	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行 8、负载 50 到 90 时最慢一条 53.5 秒，不到上限的一半）
+scripts/agents/agent-cost.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/agent-handover.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/checklist-specs.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/cite-check.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/copy-originals.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/snapshot-tree.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（单跑一次不到 1 秒）
+scripts/agents/three-way-materials.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/subagent_transcript.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/agents/three-way-rerun-template.sh	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/crash/crash-case-check.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/gate/apply-writer-patch.py	120	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/gate/closeout-status.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/hosts/run-build-directory.sh	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（kept、owner-unrecorded、owner-left-alone 约 1 秒，foreground 约 8 秒：被 TERM 那一格等命令睡完）
+scripts/hosts/resource_release_broadcast.py	180	360	# 十三条开关逐个跑过：点名的格与实际红的格逐格相同（汇总句不带格名，认成汇总行）；基准趟（它自己的开关轮并行起 13 份）44 到 55 秒、负载 108 到 175 时 89 秒，单跑一条开关 6 到 31 秒；基准趟限时照文件头的算法 180 ×（1 + 13 ÷ 13）= 360（推的，没按新列量过）
+scripts/kb/batch-target.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/kb/claim-experiment.sh	60	# 三条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（单跑一条 0.1 到 0.5 秒，不开关整份 0.5 秒）
+scripts/kb/doc-consolidate.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/kb/kb-spec-check.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/kb/replace-batch.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/kb/stale-candidates.py	60	# 每条开关逐个跑过：点名的失败行原文都在失败行里，且自证跑得快（并行下最慢一条不到上限的一半）
+scripts/crash/check-segment-registry.py	60	# 三条开关逐个跑过两趟：点名的格与实际红的格逐格相同（失败细节逐条以 ✗ 起头，末尾一句汇总）；单跑一条最慢 2 秒
+scripts/gate/gate-structure-check.py	60	# 四条开关逐个跑过两趟：点名的格与实际红的格逐格相同（失败细节逐条以 ✗ 起头）；单跑一条最慢 4 秒
+scripts/gate/stage-mine.py	60	# 三条开关逐个跑过两趟：点名的格与实际红的格逐格相同（判错的那一格以 ✗ 起头）；单跑一条最慢 3 秒
+scripts/gate/changed-paths.sh	60	# 十一条开关逐个跑过两趟：点名的格与实际红的格逐格相同（失败细节逐条以 ✗ 起头）；单跑一条最慢 20 秒
+scripts/kb/kb-sections.py	60	# 一条开关跑过两趟：点名的格与实际红的格逐格相同（判错的那一格以 ✗ 起头）；单跑一次不到 1 秒
+scripts/kb/replace-once.py	60	# 三条开关逐个跑过两趟：点名的格与实际红的格逐格相同（失败细节逐条以 ✗ 起头，末尾一句汇总）；单跑一条最慢 6 秒
+scripts/kb/migrate-changelog-format.py	60	# 十条开关逐个跑过两趟、并行起也不被准入拒（运行条件只挡另一个带 --write 的实例）：点名的格与实际红的格逐格相同；单跑一条最慢 11 秒
+scripts/crash/cpu-judging-sites-check.py	60	# 八条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条最慢 3 秒
+scripts/crash/crash-flow-coverage.py	60	# 十一条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条最慢 3 秒
+scripts/crash/gpu-exemptions-check.py	60	# 四条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条不到 1 秒
+scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/drive.py	60	# 五条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条不到 1 秒
+scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/report.py	60	# 六条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条不到 1 秒
+scripts/kb/milestone-close-owed-check.py	60	# 七条开关逐个跑过两趟：点名的格与实际红的格逐格相同（自证转述的被测输出里以 ✗ 起头的行也点了名）；单跑一条不到 1 秒
+scripts/mutation/crates-mutation-light-rows.py	60	# 六条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条不到 1 秒
+scripts/crash/crash-amplification-lib.sh	120	240	# 四条开关逐个跑过两趟：点名的格与实际红的格逐格相同（它自己的开关轮读同一张表，括号里的失败行原文不读）；负载高时单跑一条最慢 49 秒；基准趟限时照文件头的算法 120 ×（1 + 4 ÷ 31 向上取整）= 240（推的，没按新列量过）
+.claude/hooks/write-guard.sh	120	# 一条开关跑过两趟：点名的格与实际红的格逐格相同；负载高时单跑一次最慢 33 秒
+scripts/experiment-apparatus/replay.sh	300	# 三十二条开关逐个跑过两趟：点名的格与实际红的格逐格相同；单跑一条最慢 46 秒，负载过百时有一条过了 120 秒
+scripts/hosts/detached-run.sh	600	# 五十三条开关逐个跑过：点名的格与实际红的格逐格相同（负载过百时 Ⓡ、Ⓠ 报警、Ⓕ、Ⓔ 被 TERM 停几格偶发多红，单独重跑一次不红）；负载 50 到 180 时单跑一条最慢 290 秒
+scripts/mutation/mutate.sh	420	# 三十三条开关逐个跑过两趟：点名的格与实际红的格逐格相同（sharedcopy 下各工作进程逐条加锁轮流用第 1 份副本，只红数副本那一格）；单跑一条最慢 161 秒，负载过七十时基准趟 202 秒
+scripts/mutation/broad-mutation.py	3600	# 七十七条开关逐个跑过两趟：点名的格与实际红的格逐格相同（失败行转述里的 ✗ 换掉，这一格起的驱动报的失败行整行接在失败行末尾）；第二台单跑一条最慢 332 秒，本机负载过百时最慢 1738 秒，限时按本机取
+scripts/mutation/mutation-shard-run.sh	1100	# 十六条开关逐个跑过两趟：点名的格与实际红的格逐格相同（场景小仓带 .gate-break-sample，经门禁跑的那几格认开关；比判定前把场景小仓的路径换成占位）；单跑一条最慢 527 秒
+scripts/crash/crash-point-replay.sh	1000	3000	# 五十一条开关逐个跑过两趟：点名的格与实际红的格逐格相同（自证自带开关轮，读同一张表，括号里的失败行原文不读）；单跑一条最慢 490 秒；基准趟限时照文件头的算法 1000 ×（1 + 51 ÷ 31 向上取整）= 3000（推的，没按新列量过）
+scripts/crash/crash-amplification.sh	800	2400	# 五十条开关逐个跑过两趟：点名的格与实际红的格逐格相同（自证自带开关轮，读同一张表，括号里的失败行原文不读）；单跑一条最慢 374 秒；基准趟限时照文件头的算法 800 ×（1 + 50 ÷ 31 向上取整）= 2400（推的，没按新列量过）
+scripts/agents/dispatch-prompt.py	120	# 二十三条开关逐个跑过（2026-10-26 照这一格的判法在草稿里复跑）：点名的格与实际红的格逐格相同；并行 8、负载四五十时连基准趟共约 34 秒
+.claude/hooks/lib_heavy_tests.py	60	# 五十九条开关逐个跑过（2026-10-26 照这一格的判法在草稿里复跑）：点名的格与实际红的格逐格相同；单跑一条约 2 秒，负载八十时并行 8 连基准趟不到一分钟
+scripts/gate/lib_workspace_lock.py	120	# 四条开关逐个跑过（2026-10-26 照这一格的判法在草稿里复跑）：点名的格与实际红的格逐格相同；并行 8、负载十几时单跑一条最慢 4.3 秒、基准趟 2.3 秒；自证每格有放弃时限，120 照合入后验证那一批报告给的数留余量
+scripts/hosts/memory_peaks_lib.py	60	# 五条开关逐个跑过：点名的格与实际红的格逐格相同；单跑一条不到 2 秒，自证不起子进程
+scripts/gate/merge-and-verify.sh	300	# 四十六条开关逐个跑过（2026-10-26 照这一格的判法在草稿里复跑）：点名的格与实际红的格逐格相同；并行 12、负载十几到二十几时单跑一条最慢 111 秒、基准趟 30 秒；300 按负载过百翻倍再留余量（推的）；WORKSPACE_LOCK_BREAK 那几条在它文件头是散文写法、不解析，随 lib_workspace_lock.py 那一行复跑

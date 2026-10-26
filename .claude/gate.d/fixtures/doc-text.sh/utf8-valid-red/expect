@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：utf8-valid
+want=这次改动里 2 份文本文件不是合法 UTF-8
+want=.claude/kb/坏页.md（工作区）  字节偏移 0（第 1 行），坏字节 0xFF 0xE6 0x9C 0xAA
+want=records/2026-09-24-样本调度.md（工作区）  字节偏移 42（第 4 行），坏字节 0xE4 0xB8 0x0A
+want=  utf8-valid：红（退出 1）
+want=doc-text.sh：1 格里 1 格红（utf8-valid）
+want=→ utf8-valid：照红行的文件
+want=bash .claude/gate.d/doc-text.sh --check utf8-valid

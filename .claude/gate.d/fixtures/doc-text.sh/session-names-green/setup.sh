@@ -13,3 +13,10 @@ printf '%s\n' "改 ${repo}-core、${repo}-checker-tier、${repo}-format，上游
   "交给会话「删除事务和并发事务实现」" > records/近似写法.md
 printf '%s\n' "NAME_PATTERN='${repo}-[0-9a-f]+'; echo ${repo}-""6a  # session-names:allow 解析 ListAgents 输出的自检输入" > .claude/scripts/parse.sh
 printf '%s\n' "want=交给 ${repo}-""21" > .claude/gate.d/fixtures/x/red/expect
+# 登记了会话号排除前缀的那几轮三方材料（附录与背景整段抄了 checks-owed.md 当时那一格，冻结证据），每轮一份：
+# 这几份放行；LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时同样判红。同族而没登记的在 session-names-red。
+mkdir -p research/prompts
+for material in _m4-batch2-code-r1-appendix _m4-c860-r1-background _m4-gc-r1-appendix _m4-segment-code-r1-background \
+  _m4-snapshot-r1-appendix _m4-trunc-r1-background _m4-trunc-r2-appendix; do
+  printf '%s\n' "| C1 | 立账（会话 ${repo}-""4f，2026-10-20） |" > "research/prompts/${material}.md"
+done

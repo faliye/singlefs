@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=! 本次未跑：sample-stage.sh SAMPLE_STAGE_BREAK=noop：登记在豁免表（样本：这一条不复跑）
+want=门禁阶段的弄坏开关复跑：复跑了 2 条开关（1 道阶段：sample-stage.sh），判错的样本与文件头点名的逐条相等；本次未跑 2 项
+want=stage-break-switch-replay：绿

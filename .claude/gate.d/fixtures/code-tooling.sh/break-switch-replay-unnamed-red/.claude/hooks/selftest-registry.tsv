@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/partial.py	light	# 样本：自证只在内存里判
+scripts/gate/carriage.py	light	# 样本：自证只在内存里判

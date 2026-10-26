@@ -1,0 +1,2 @@
+# 两个方向的函数单元交集只在格式解析与常量里：登记的 lib.rs 读字节函数、singlefs-format 包里的函数、读盘接口的方法声明与常量；比对点自己的闭包只列不判；判的是 checker-direction-overlap 格
+checker-direction-overlap

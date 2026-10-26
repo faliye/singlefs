@@ -1,5 +1,0 @@
-# 冻结范围里只改了路径的文件（.claude/rules/path-moves.md「怎么做」第 6 步：路径不在冻结范围内）：frozen_o3.freeze_differences 不把它们记成不同。
-# 一行五列，制表符隔开：名字（冻结范围里的文件名，或 freeze_seed）、冻结行里的值、现在的值、改它的提交、改了什么。
-# 冻结行在 research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out；登记之前从 git 历史取出冻结那一版逐行比过，只差这里写的那几处。
-executor_main.py	acdae4aa3f1a6a3fde3dcaa19bddd0ed667d2ccf0855d5040bc416cf7c310a67	a8f86158a61b036c9eb3e98aa6f5b9478cddae6a90e75520166eba7da05650b8	503b80e2a	文件头跑法那一行的导出目录 research/target/e170-dumps 改成 scripts/experiments/target/e170-dumps（1 处，冻结那一版是 503b80e2a^ 里的 research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/executor_main.py）
-freeze_seed	85441ae491419411	f13d959657cbfb0d	503b80e2a	跟着 executor_main.py 那一处路径变，种子按文件名排序把冻结范围里的文件内容逐个喂进 sha256 取前 16 位

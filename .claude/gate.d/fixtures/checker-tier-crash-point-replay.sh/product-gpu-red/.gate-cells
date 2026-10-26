@@ -1,0 +1,2 @@
+# 产品 GPU 包的真显卡对拍：有卡的机器上一条对拍判红（cargo 退 101），整格红、抄出 FAILED 的测试函数与它的测试目标
+product-gpu-real-card-tests

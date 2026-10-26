@@ -9,7 +9,19 @@
 "fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
 "const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
 "fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
-"key\t824caace0ff917c4b6da19e53e1abf7b6569174141268f3f0684d7d8f84cfbe0"
+"key\tc5c4aabeb2cee0f6cd2907e2309546c5a5ffb8f0f59fe0c5aec0159d5159eaef"
+]
+},
+"closure\tfsample::entry\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"key\tc5c4aabeb2cee0f6cd2907e2309546c5a5ffb8f0f59fe0c5aec0159d5159eaef"
 ]
 },
 "closure\tfsample::main\t--target\tbin:fsample\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -22,7 +34,20 @@
 "const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
 "fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
 "fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
-"key\t08ca8876bb9d83dcd54cef3c1cce65ed72da1dc3f9f39b39edebe562711a7a18"
+"key\tb59afd6a1052225478d864a785711af59af0c4bd74e0b3d2d2dd9566637e7abe"
+]
+},
+"closure\tfsample::main\t--target\tbin:fsample\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4",
+"key\tb59afd6a1052225478d864a785711af59af0c4bd74e0b3d2d2dd9566637e7abe"
 ]
 },
 "closure\tfsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu": {
@@ -31,7 +56,30 @@
 "mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
 "fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
 "data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
-"key\tbb6815ad1dbc47437b9f2f0d1c4c877b6aa77b858f0db36d5e876436c5a904f2"
+"key\t4b38617aff14aaaca75d2b157a63e8e98a70414d1a3a6d56f77843a2cb780f5b"
+]
+},
+"closure\tfsample::table\t--toolchain-line\thost: x86_64-unknown-linux-gnu\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
+"key\t4b38617aff14aaaca75d2b157a63e8e98a70414d1a3a6d56f77843a2cb780f5b"
+]
+},
+"dump\t--judgment-kind\tproduct-behavior": {
+"exit": 0,
+"lines": [
+"mod_head\tfsample::<module attributes>\tcrates/fsample/src/lib.rs:1-1\t1fbdc709e7a3099f26c0e5d71fe006758068c15a3ee819cd1b8520756fe90546",
+"mod_head\tfsample::nested\tcrates/fsample/src/lib.rs:2-2\t0a8070c35170b8999f300bc7661dce391c68e5bbe00c0399e5267aa193a3a183",
+"const\tfsample::nested::LIMIT\tcrates/fsample/src/lib.rs:3-3\tc12e1eb5cfab2d495990b849d7907eed53dfd7a5168ff00c1a0f3dd88b925373",
+"fn\tfsample::nested::inside\tcrates/fsample/src/lib.rs:4-6\t426ebaa9d9227b6979e2c2c756d67e72a9ff65d710b56f0c12bbb2c96957ae8f",
+"const\tfsample::WIDTH\tcrates/fsample/src/lib.rs:8-8\tddf070ca15c2d3bac81f6cb568a909743de9e120835eb9528f081168ae6cf2da",
+"fn\tfsample::entry\tcrates/fsample/src/lib.rs:9-11\t1c0d67b3bea91664a469b9bbe3ed65449304ff0178e93326eae70718dfba36d4",
+"fn\tfsample::table\tcrates/fsample/src/lib.rs:12-14\t1f46d2973fb5189c4b4ca29dbbb61f46cee9b8762298ff85fb0b074a43bfd925",
+"data\tcrates/fsample/src/table.txt\tcrates/fsample/src/lib.rs:13-13\t83ad05a6ffdb5c97fb81a8501561e30cc3458bed5a83525e931acb0f8486a393",
+"fn\tfsample::<bin fsample>::main\tcrates/fsample/src/main.rs:1-3\te975af0ffb3a371d8d6a264717ac5f8c69808e03a5d5c832ef6c50ed0022b7f4"
 ]
 }
 },

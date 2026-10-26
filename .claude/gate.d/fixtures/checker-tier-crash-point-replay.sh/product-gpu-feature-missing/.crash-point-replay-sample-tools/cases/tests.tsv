@@ -1,0 +1,2 @@
+both	src/lib.rs	tests::shared_check	ok	line	-
+plain	tests/plain_stream.rs	plain_stream_full	ignored	line	-

@@ -11,6 +11,10 @@
 #                     records/2026-09-16-subagent拆分提案.md 第五十五、五十六节）：按卡数次数、写头一次与末一次的时间，外加一行「怎么办」。
 #                     读不到内核日志（没有 journalctl、权限不够看不到内核日志、journalctl 出错或超时）报「没查成」，不当成没有 OOM、也不当成没撞显存。
 #                     近几小时按 journalctl _TRANSPORT=kernel 取（不用 -k：它只看这一次开机，卡死重启之后看不到死机之前那几行）。
+# 判不了的照「放行但必记检出」：输入不是 JSON 对象（解不开、顶层不是对象）、补提示的时候抛异常，照常退 0、不补提示，stderr 写一行，
+#   检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path，写法在它的 record_unjudged_pass）追加一行、结局「只记」，
+#   findings 以「开会话提示没判、照常放行」起头；读不到 lib_work_root.py 时 stderr 另说一句没记成。
+#   SESSION_START_BREAK=input-unrecorded（输入不是 JSON 对象时只打 stderr、不记）、=exception-unrecorded（抛异常不接住、照原样抛出）各让自检里对应的那一格红。
 #
 # 为什么：2026-09-25 两次整机 OOM 把 Claude Code 会话拖垮，第一次崩了之后主 agent 没查 `journalctl -k` 就照原样重派同一步，
 # 第二次 OOM 就是这样来的（records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。会话崩了再起，是 startup 或 resume。
@@ -30,6 +34,8 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 BROKEN_JUDGEMENT = os.environ.get("SESSION_START_BREAK", "")
+HOOK_NAME = "session-start.sh"
+UNJUDGED_PREFIX = "开会话提示没判、照常放行"
 DEFAULT_OOM_HOURS = 12        # 半天：会话夜里崩、第二天早上再开也罩得住，又不至于把前一天早已查清的 OOM 每次都翻出来
 JOURNAL_TIMEOUT_SECONDS = 20  # journalctl 读大日志可能慢；超时就报没查成，不拖住会话启动
 KILLS_LISTED_ONE_BY_ONE = 12  # 杀得多时逐条列 anon-rss 最大的这么多条，其余按进程名合计
@@ -231,6 +237,47 @@ def reminder(hook_input, project_root):
     return ""
 
 
+def record_unjudged(hook_dir, hook_input, problem, switch):
+    """判不了、这一次没补提示：stderr 写一行，照「放行但必记检出」往检出记录追加一行（lib_work_root.py 的 record_unjudged_pass，结局只记）。
+    弄坏开关 switch 下只打 stderr、不记（改前连 stderr 也不打）；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
+    print(f"! {HOOK_NAME}：{problem}，这一次没补提示", file=sys.stderr)
+    if BROKEN_JUDGEMENT == switch:
+        return
+    source = hook_input.get("source") if isinstance(hook_input, dict) else None
+    try:
+        sys.dont_write_bytecode = True
+        if hook_dir not in sys.path:
+            sys.path.insert(0, hook_dir)
+        import lib_work_root
+        _, said = lib_work_root.record_unjudged_pass(HOOK_NAME, hook_input, f"SessionStart：{source or '?'}", [f"{UNJUDGED_PREFIX}：{problem}"])
+    except Exception as error:   # 文件不在、语法错都算读不到
+        said = f"检出没记成：读不到同目录的 lib_work_root.py（{error!r}）"
+    print(f"  {said}", file=sys.stderr)
+
+
+def hook_main(raw, hook_dir):
+    """hook 的原始输入（字节）→ 退出码（恒 0）；要补的提示打到标准输出。判不了的照「放行但必记检出」（文件头「判不了的」一段）。"""
+    try:
+        hook_input = json.loads(raw.decode("utf-8"))
+        problem = None if isinstance(hook_input, dict) else f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象"
+    except ValueError as error:
+        hook_input, problem = None, f"输入不是合法的 JSON（{error}；前 200 字节：{raw[:200].decode('utf-8', 'replace')!r}）"
+    if problem:
+        record_unjudged(hook_dir, None, problem, "input-unrecorded")
+        return 0
+    project_root = os.environ.get("CLAUDE_PROJECT_DIR") or hook_input.get("cwd") or os.getcwd()
+    try:
+        text = reminder(hook_input, project_root)
+    except Exception as error:
+        if BROKEN_JUDGEMENT == "exception-unrecorded":   # 弄坏开关：不接住，照原样抛出（改前的样子：进程退 1，什么提示都不补、不记检出）
+            raise
+        record_unjudged(hook_dir, hook_input, f"补提示的时候抛异常（{type(error).__name__}: {error}）", "exception-unrecorded")
+        return 0
+    if text:
+        print(text)
+    return 0
+
+
 FAKE_KILL_LINES = (
     "2026-09-25T07:58:02.631401+00:00 host kernel: Out of memory: Killed process 2405 (ray::IDLE) total-vm:22011912kB, anon-rss:33792kB, file-rss:3272kB, shmem-rss:0kB, UID:1000 pgtables:648kB oom_score_adj:1000\n"
     "2026-09-25T07:58:02.681372+00:00 host kernel: Out of memory: Killed process 1691212 (e142_region_dif) total-vm:67315408kB, anon-rss:56156416kB, file-rss:1460kB, shmem-rss:0kB, UID:1000 pgtables:120792kB oom_score_adj:0\n"
@@ -375,29 +422,72 @@ def selftest_in(hook_dir, work):
     expect("journalctl 出错", run_hook("startup", failing), ["没查成", "journalctl 退出码 1"], ["内核没有因为内存不够杀过进程"])
     expect("没有 journalctl", run_hook("startup", path_without_journalctl=True), ["没查成", "没有 journalctl"], ["内核没有因为内存不够杀过进程"])
     expect("clear 不报", run_hook("clear", journal), [], ["Killed process", "内存不够", "上下文刚压缩过"])
+    # 判不了的照「放行但必记检出」：输入不是 JSON 对象照常退 0、不补提示、记一条检出（结局只记、会话号读不到）；补提示的时候抛异常同样记一条
+    detections = os.path.join(work, "detections.jsonl")   # 检出记在自证自己的临时目录，不碰真的检出记录
+
+    def recorded():
+        try:
+            with open(detections, encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except OSError:
+            return []
+
+    def expect_recorded(label, run, session):
+        nonlocal checked
+        checked += 1
+        before = len(recorded())
+        try:
+            code, stdout, stderr = run()
+        except Exception as error:   # 弄坏开关 exception-unrecorded：进程里照原样抛出
+            code, stdout, stderr = f"抛出 {type(error).__name__}", "", ""
+        added = recorded()[before:]
+        if not (code == 0 and stdout == "" and HOOK_NAME in stderr and len(added) == 1 and added[0].get("outcome") == "只记"
+                and added[0].get("session_id") == session and all(str(finding).startswith(UNJUDGED_PREFIX) for finding in added[0].get("findings") or [])):
+            failures.append(f"{label}：应当退 0、不补提示、stderr 写一行、检出记录多一行（结局只记、会话号 {session}）；"
+                            f"实际退 {code}，stdout {stdout[:120]!r}，stderr {stderr.strip()[:200]!r}，检出多了 {len(added)} 行：{added!r:.300}")
+
+    def through_entry(raw):
+        def run():
+            completed = subprocess.run(["bash", script], input=raw, capture_output=True, text=True, timeout=60,
+                                       env=dict(os.environ, CLAUDE_PROJECT_DIR=project_root, AGENT_HOOK_DETECTIONS=detections))
+            return completed.returncode, completed.stdout, completed.stderr
+        return run
+
+    def raising_reminder(hook_input, project_root):
+        raise RuntimeError("自证造的异常")
+
+    def in_process_raising():
+        import io
+        saved = (globals()["reminder"], sys.stdout, sys.stderr, os.environ.get("AGENT_HOOK_DETECTIONS"))
+        globals()["reminder"], sys.stdout, sys.stderr, os.environ["AGENT_HOOK_DETECTIONS"] = raising_reminder, io.StringIO(), io.StringIO(), detections
+        try:
+            code = hook_main(json.dumps({"hook_event_name": "SessionStart", "source": "startup", "session_id": "s-raise"}).encode("utf-8"), hook_dir)
+            return code, sys.stdout.getvalue(), sys.stderr.getvalue()
+        finally:
+            globals()["reminder"], sys.stdout, sys.stderr = saved[0], saved[1], saved[2]
+            if saved[3] is None:
+                os.environ.pop("AGENT_HOOK_DETECTIONS", None)
+            else:
+                os.environ["AGENT_HOOK_DETECTIONS"] = saved[3]
+
+    expect_recorded("坏 JSON 照常退 0、记一条检出", through_entry("{不是 JSON"), "读不到")
+    expect_recorded("JSON 数组照常退 0、记一条检出", through_entry("[]"), "读不到")
+    expect_recorded("补提示的时候抛异常照常退 0、记一条检出", in_process_raising, "s-raise")
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
         print("    → 看 reminder() / oom_report() / read_kernel_journal() / killed_processes() / gpu_memory_events() 与入口；"
-              "AFTER_COMPACT_DISABLE=1 或 SESSION_START_BREAK（skip-oom、unreadable-as-clean、count-selftest-kills、skip-gpu-oom、current-boot-only）设着的话这里本来就该红")
+              "AFTER_COMPACT_DISABLE=1 或 SESSION_START_BREAK（skip-oom、unreadable-as-clean、count-selftest-kills、skip-gpu-oom、current-boot-only、input-unrecorded、exception-unrecorded）设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 种）：压缩之后补分支、未提交数、最近的记录与看门狗命令；startup 与 resume 列近几小时内核杀的进程"
           f"（时间写 UTC 与 JST、进程号、进程名、anon-rss，整机 OOM 与 cgroup 上限分开，杀得多时逐条列最大的 {KILLS_LISTED_ONE_BY_ONE} 个、其余按进程名合计，"
           f"外加「怎么办」），同一段时间显卡驱动报的显存不够按卡数次数、写头一次与末一次（别的 NVRM 行不算），看得到内核日志而两样都没有时说查过；"
-          f"权限不够、一条内核消息都读不出、journalctl 出错、没有 journalctl 都报「没查成」；clear 不报；退出码恒 0")
+          f"权限不够、一条内核消息都读不出、journalctl 出错、没有 journalctl 都报「没查成」；clear 不报；输入不是 JSON 对象、补提示的时候抛异常照常退 0 并记一条检出；退出码恒 0")
     return 0
 
 
 hook_dir = sys.argv[1]
 if len(sys.argv) > 2 and sys.argv[2] == "--selftest":
     sys.exit(selftest(hook_dir))
-try:
-    hook_input = json.load(sys.stdin)
-except ValueError:
-    hook_input = {}
-project_root = os.environ.get("CLAUDE_PROJECT_DIR") or hook_input.get("cwd") or os.getcwd()
-text = reminder(hook_input, project_root)
-if text:
-    print(text)
-sys.exit(0)
+sys.exit(hook_main(sys.stdin.buffer.read(), hook_dir))
 PY

@@ -27,7 +27,10 @@
 # 时限：报告脚本至多跑 REPORT_TIME_LIMIT_SECONDS 秒（HOST_RESOURCES_REMINDER_TIME_LIMIT 可换），到点只停自己起的那一个进程（按它的进程号），
 #   提醒里照实写「各台此刻的资源没读到（报告脚本 N 秒没跑完）」与它到那时已经打出来的几行，命令照常放行。报告脚本退 0、1 以外的码同样写「没读到」。
 #   .claude/settings.json 里这一条的 timeout 要大于这个时限。
-# HOST_RESOURCES_REMINDER_SCRIPT 换掉报告脚本（只给自证）。读不到共用模块、JSON 读不出、认不出命令时什么都不打、退 0。
+# HOST_RESOURCES_REMINDER_SCRIPT 换掉报告脚本（只给自证）。认不出命令时什么都不打、退 0。
+# 判不了的照「放行但必记检出」：输入不是 JSON 对象（解不开、顶层不是对象）、判的时候出错（读不到共用模块、切词抛的），照常退 0，stderr 写一行，
+#   检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path，写法在它的 record_unjudged_pass）追加一行、结局「只记」，
+#   findings 以「资源提醒没判、照常放行」起头；读不到 lib_work_root.py 时 stderr 另说一句没记成。
 # 退役判据：派发器与各条跑法都改成开跑前自己查资源、提醒不再有人看时删掉。
 #
 #   host-resources-reminder.sh --selftest   在临时目录里喂造出来的 hook JSON，报告脚本换成假的；末尾逐个打开弄坏开关核它红在点名的格
@@ -38,6 +41,8 @@
 #   remind-everything   哪条命令都出提醒                 plain-command、merge-and-verify
 #   no-time-limit       等报告脚本不设时限               report-timeout
 #   refuse-command      出了提醒就拒（退 2）             heavy-test、compiled-code、gpu-script、gpu-feature、report-timeout、merge-and-verify
+#   input-unrecorded    输入不是 JSON 对象时只放行、不记检出（改前的样子）     input-unreadable-recorded
+#   exception-unrecorded  判的时候出错时只打 stderr、不记检出（改前的样子）    exception-recorded
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -52,6 +57,8 @@ GPU_SCRIPT_NAMES = {"gpu-quiesce-run.sh", "host-dispatch.py"}
 GPU_SCRIPT_PATTERNS = ("crash-amplification*.sh",)
 MERGE_AND_VERIFY = ("merge-and-verify.sh", "scripts/gate")   # 合入后验证：文件名与所在目录（文件头「认法」）
 BREAK_VARIABLE = "HOST_RESOURCES_REMINDER_BREAK"
+HOOK_NAME = "host-resources-reminder.sh"
+UNJUDGED_PREFIX = "资源提醒没判、照常放行"
 
 def broken(item):
     return item in os.environ.get(BREAK_VARIABLE, "").split(",")
@@ -160,18 +167,39 @@ def remind(hook_input, hook_dir, heavy_tests):
             "命令照常放行（这道钩子不拒、不排队），放不放得下看下面的结论，跑不起来就回报")
     return "\n".join(piece for piece in [head, problem, stdout] if piece)
 
-def main_hook(hook_dir):
+def record_unjudged(hook_dir, hook_input, problem, switch):
+    """判不了、照常放行的这一次：照「放行但必记检出」往检出记录追加一行（lib_work_root.py 的 record_unjudged_pass，结局只记）。
+    弄坏开关 switch 下不记（改前的样子）；读不到 lib_work_root.py、写不进去时 stderr 说一句没记成。"""
+    if broken(switch):
+        return
+    tool_input = hook_input.get("tool_input") if isinstance(hook_input, dict) and isinstance(hook_input.get("tool_input"), dict) else {}
     try:
-        hook_input = json.load(sys.stdin)
-    except Exception:
-        return 0
-    if not isinstance(hook_input, dict):
+        sys.dont_write_bytecode = True
+        if hook_dir not in sys.path:
+            sys.path.insert(0, hook_dir)
+        import lib_work_root
+        _, said = lib_work_root.record_unjudged_pass(HOOK_NAME, hook_input, tool_input.get("command") or "", [f"{UNJUDGED_PREFIX}：{problem}"])
+    except Exception as error:   # 文件不在、语法错都算读不到
+        said = f"检出没记成：读不到同目录的 lib_work_root.py（{error!r}）"
+    print(f"  {said}", file=sys.stderr)
+
+def main_hook(hook_dir):
+    raw = sys.stdin.buffer.read()
+    try:
+        hook_input = json.loads(raw.decode("utf-8"))
+        problem = None if isinstance(hook_input, dict) else f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象"
+    except Exception as error:
+        hook_input, problem = None, f"输入不是合法的 JSON（{type(error).__name__}: {error}；前 200 字节：{raw[:200].decode('utf-8', 'replace')!r}）"
+    if problem:
+        print(f"  ! {HOOK_NAME}：{problem}，这条命令照常执行、资源没查", file=sys.stderr)
+        record_unjudged(hook_dir, None, problem, "input-unrecorded")
         return 0
     try:
         heavy_tests = load_heavy_tests(hook_dir)
         message = remind(hook_input, hook_dir, heavy_tests)
     except Exception as error:   # 共用模块读不到、切词抛的：不拦命令，什么都不提醒
         print(f"  ! host-resources-reminder.sh 没判成（{error!r}），这条命令照常执行", file=sys.stderr)
+        record_unjudged(hook_dir, hook_input, f"判的时候出错（{type(error).__name__}: {error}），要不要提醒资源没判", "exception-unrecorded")
         return 0
     if message is None:
         return 0
@@ -195,6 +223,7 @@ def selftest_cells(hook_dir, root):
     fake = os.path.join(root, "fake-report.py")
     with open(fake, "w", encoding="utf-8") as handle:
         handle.write(FAKE_REPORT)
+    detections = os.path.join(root, "detections.jsonl")   # 检出记在自证自己的临时目录，不碰真的检出记录
 
     def check(cell, condition, detail):
         nonlocal checked
@@ -206,7 +235,7 @@ def selftest_cells(hook_dir, root):
     def feed(cell, command, **environment):
         log = os.path.join(root, f"{cell}.log")
         hook_environment = {name: value for name, value in os.environ.items() if not name.startswith(("HOST_RESOURCES_REMINDER_SCRIPT", "HOST_RESOURCES_REMINDER_TIME", "FAKE_REPORT_"))}
-        hook_environment.update({"HOST_RESOURCES_REMINDER_SCRIPT": fake, "FAKE_REPORT_LOG": log, **environment})
+        hook_environment.update({"HOST_RESOURCES_REMINDER_SCRIPT": fake, "FAKE_REPORT_LOG": log, "AGENT_HOOK_DETECTIONS": detections, **environment})
         started = time.monotonic()
         try:
             completed = subprocess.run(["bash", hook], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": repository}),
@@ -229,7 +258,7 @@ def selftest_cells(hook_dir, root):
     code, context, calls, _ = feed("compiled-code", "bash scripts/hosts/run-with-memory-cap.sh 8G cargo test -p singlefs-harness --test selftest_target")
     check("compiled-code", code == 0 and "资源提醒" in context and calls and calls[0].endswith("-- cargo test -p singlefs-harness --test selftest_target"),
           f"经内存包装的 harness 档 cargo test 应当出提醒、报告脚本拿剥掉包装的那一条；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
-    code, context, calls, _ = feed("gpu-script", "cd scripts/experiments && bash ../crash/gpu-quiesce-run.sh -- true")
+    code, context, calls, _ = feed("gpu-script", "cd scripts/experiment-apparatus && bash ../crash/gpu-quiesce-run.sh -- true")
     check("gpu-script", code == 0 and "GPU" in context and calls and calls[0].startswith("--gpu --"),
           f"清场包装应当认成 GPU、报告脚本带 --gpu、退 0；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
     code, context, calls, _ = feed("gpu-feature", "cargo build --release -p singlefs-checker-tier --features verdict-store,gpu")
@@ -249,6 +278,45 @@ def selftest_cells(hook_dir, root):
                                          HOST_RESOURCES_REMINDER_TIME_LIMIT="1")
     check("report-timeout", code == 0 and elapsed < 6 and "没读到" in context and "1 秒没跑完" in context,
           f"报告脚本 8 秒才完、时限 1 秒：应当 6 秒内放行（退 0）、提醒写「没读到」；实际退 {code}、用了 {elapsed:.1f} 秒，提醒「{context[:160]}」")
+
+    def recorded():
+        try:
+            with open(detections, encoding="utf-8") as handle:
+                return [json.loads(line) for line in handle if line.strip()]
+        except OSError:
+            return []
+
+    def run_raw(script, raw, environment):
+        completed = subprocess.run(["bash", script], input=raw, capture_output=True, text=True, timeout=60, env=environment)
+        return completed.returncode, completed.stdout, completed.stderr
+
+    base_environment = dict({name: value for name, value in os.environ.items() if name != "SINGLEFS_WORK_ROOT_BREAK"}, AGENT_HOOK_DETECTIONS=detections)
+    # 判不了的照「放行但必记检出」：输入不是 JSON 对象（坏 JSON、数组）照常退 0、不出提醒、各记一条检出（结局只记、会话号读不到）
+    before = len(recorded())
+    outcomes = [run_raw(hook, raw, base_environment) for raw in ("{不是 JSON", "[]")]
+    added = recorded()[before:]
+    check("input-unreadable-recorded", all(code == 0 and stdout == "" and HOOK_NAME in stderr for code, stdout, stderr in outcomes) and len(added) == 2
+          and all(entry.get("outcome") == "只记" and entry.get("session_id") == "读不到" and entry.get("hook") == HOOK_NAME
+                  and all(str(finding).startswith(UNJUDGED_PREFIX) for finding in entry.get("findings") or []) for entry in added),
+          f"坏 JSON 与 JSON 数组应当各退 0、不出提醒、stderr 写一行、检出记录各多一行（结局只记、会话号读不到）；实际 {outcomes!r:.300}，检出多了 {len(added)} 行：{added!r:.300}")
+    # 判的时候出错（这里让它读不到 lib_heavy_tests.py：只拷入口与 lib_work_root.py，它 source 的 .claude/scripts 与规范副本链接到钩子所在的仓）：照常退 0、记一条检出
+    bare = os.path.join(root, "bare", ".claude", "hooks")
+    os.makedirs(bare)
+    for name in ("host-resources-reminder.sh", "lib_work_root.py"):
+        shutil.copy(os.path.join(hook_dir, name), bare)
+    for linked in ("scripts", "singlefs-ai-sop"):
+        target = os.path.join(os.path.dirname(hook_dir), linked)
+        if os.path.exists(target):
+            os.symlink(target, os.path.join(root, "bare", ".claude", linked))
+    before = len(recorded())
+    code, stdout, stderr = run_raw(os.path.join(bare, "host-resources-reminder.sh"),
+                                   json.dumps({"tool_name": "Bash", "session_id": "s-bare", "tool_input": {"command": "cargo test -p singlefs-harness --test selftest_target"},
+                                               "cwd": repository}), base_environment)
+    added = recorded()[before:]
+    check("exception-recorded", code == 0 and stdout == "" and "没判成" in stderr and len(added) == 1 and added[0].get("outcome") == "只记"
+          and added[0].get("session_id") == "s-bare" and "lib_heavy_tests" in " ".join(added[0].get("findings") or []),
+          f"读不到 lib_heavy_tests.py 应当退 0、不出提醒、stderr 写没判成、检出记录多一行（结局只记、会话号 s-bare、点名那份库）；"
+          f"实际退 {code}，stdout「{stdout[:120]}」，stderr「{stderr.strip()[:200]}」，检出多了 {len(added)} 行：{added!r:.300}")
     return failures, checked
 
 SWITCH_EXPECTED_CELLS = {
@@ -258,6 +326,8 @@ SWITCH_EXPECTED_CELLS = {
     "remind-everything": ["plain-command", "merge-and-verify"],
     "no-time-limit": ["report-timeout"],
     "refuse-command": ["heavy-test", "compiled-code", "gpu-script", "gpu-feature", "report-timeout", "merge-and-verify"],
+    "input-unrecorded": ["input-unreadable-recorded"],
+    "exception-unrecorded": ["exception-recorded"],
 }
 
 def cells_in_scratch(hook_dir):
@@ -295,7 +365,7 @@ def selftest(hook_dir):
         print("  → 怎么办：照上面那几个开关看它在代码里弄坏的那一处还在不在判法上；改了判法就改 SWITCH_EXPECTED_CELLS 与文件头的表")
         return 1
     print(f"  ✓ host-resources-reminder.sh 自证通过（查了 {checked} 格：checker 档的 cargo test、经内存包装的 harness 档 cargo test、清场包装、"
-          f"带 gpu 特性的 cargo、合入后验证 merge-and-verify.sh 都出提醒且照常放行，它的 --selftest 与普通命令不出，报告脚本超时照样放行并写没读到；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
+          f"带 gpu 特性的 cargo、合入后验证 merge-and-verify.sh 都出提醒且照常放行，它的 --selftest 与普通命令不出，报告脚本超时照样放行并写没读到，输入不是 JSON 对象、判的时候出错照常放行并记检出；弄坏开关 {len(results)} 个逐个打开都红在点名的格）")
     return 0
 
 def main():

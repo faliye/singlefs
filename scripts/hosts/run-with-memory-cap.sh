@@ -3,8 +3,8 @@
 # run-condition: none 起不了 user systemd scope 时它自己退 251，调用方（checker-tier-crates-mutation-replay、check.sh 的前缀）按这个码分流；这里拒绝退 78 会让它们认错结局
 # 给一条命令定内存上限，起跑之前先判整机放不放得下、放不下就排队（records/2026-09-16-subagent拆分提案.md 第四十节第 28、30 行）。三层：
 #   ① 这一条的上限：放进 systemd 的临时 scope（MemoryMax=<上限>、MemorySwapMax=0、OOMPolicy=stop），撞上限只杀这个 scope 里的进程；
-#   ② 总量兜底：每个 scope 都挂进同一个 slice（默认 singlefs-heavy.slice），slice 的 MemoryMax = 整机内存 − 余量。几条合起来撞顶也只在 slice 里杀，
-#      杀不到 slice 外面的本地模型服务与 Claude Code 会话。slice 设不上就报错退出，不退回无总上限；
+#   ② 总量兜底：每个 scope 都挂进同一个 slice（默认 singlefs-heavy.slice），slice 的 MemoryMax = 整机内存 − 余量，MemoryHigh = MemoryMax 的 95%。几条合起来撞顶也只在 slice 里杀，
+#      杀不到 slice 外面的本地模型服务与 Claude Code 会话；快撞顶时由超出记账最多的那一条的包装先停它自己（「盯账」一段）。slice 设不上就报错退出，不退回无总上限；
 #   ③ 起跑前判内存量：拿一把锁，算「slice 里已占的 + 这一条按预测要的」，不超过总上限才起；放不下就放锁、隔一会儿再判，等满上限报「排不上」退出；
 #      账上没有在跑的而放不下（没有哪一条跑完会放出来），不排队、当场报「排不上」退出。
 #   只判「这台会不会 OOM」（用户 2026-10-06 定，records/2026-09-16-subagent拆分提案.md 第五十五节）：开跑前只在按预测这台放不下时排队、不为手续拒；
@@ -24,6 +24,7 @@
 # 上限照 systemd 的 MemoryMax 写法：正整数加 K / M / G / T（1024 进制），例 16G、512M；单位必写，不带单位的「16」在 systemd 那里是 16 字节，这里按用法错拒绝。默认值由调用方定，写在调用方的脚本头。
 # 退出码：
 #   0–244、246–249  那条命令自己的退出码（cargo 只退 0、101、126、127 与 128 + 信号号，碰不到 245 与 250–254）；包装自己的结局一个都不落在这一段，用法错也不落（退 251）；
+#                   只有一处例外：平常跑设了只给自证用的 RUN_WITH_MEMORY_CAP_BREAK，包装退 2、命令一行都没跑（文件头「弄坏开关只在自证里认」一段）；
 #   245    显存不够：命令退了非 0，而它起止之间的内核日志里有显卡驱动报的显存不够（NVRM … NV_ERR_NO_MEMORY，文件头「显存不够」一段）；那一次的输出不算结果。
 #          命令退 0 的不查、照退 0；内核日志查不成的照退命令自己的码，另报一行「显存 OOM 没查成」；
 #   250    撞了这一条自己的上限：scope 的 Result 是 oom-kill，scope 自己的 memory.events 里 oom 不为 0（或读不到）。
@@ -35,9 +36,11 @@
 #          那条命令一行都没跑（或结局判不了），不退回无上限、无总上限去跑——那正是要防的事；
 #   252    内存不够排不上：等满 RUN_WITH_MEMORY_CAP_WAIT_SECONDS 秒还放不下，或这一条要的量比总上限还大、或账上没有在跑的而这一条要的量加 slice 里回收不掉的用量已超总上限（这两种等多久都放不下，不等）。命令一行都没跑；退之前现查别的机器放不放得下这一条（「排队时去找别的机器」一段）；
 #   253    超过限时（RUN_WITH_MEMORY_CAP_TIME_LIMIT）：scope 的 Result 是 timeout，systemd 停掉了 scope 里的进程；
-#   254    被总上限挤掉：scope 的 Result 是 oom-kill，而 scope 自己的 oom 计数是 0、oom_kill 不为 0——整个 slice 满了，内核在 slice 里挑了这一条杀，
-#          不是它自己撞了它的上限；它的结果不算数，重跑它。按峰值表放进来的比按上限放进来的先挨杀（「排队」一段的 oom_score_adj），
-#          按峰值表放进来而挨杀的，这个键随之记成撞过顶，重跑时按它的上限排队。
+#   254    被总上限挤掉：slice 满了或快满了，这一条被停，不是它自己撞了它的上限；它的结果不算数，重跑它。两种来路，退出码相同、stderr 与告警记录分得开：
+#          包装盯账停的（「盯账」一段）：slice 回收不掉的用量到了 MemoryHigh，这一条超出记账最多、超出量过了容差，包装在撞总上限之前往它的 scope 写 cgroup.kill；
+#            stderr 报「超出记账最多…包装在撞总上限之前停了它」，告警记录写 kind=memory-squeezed、stopped_by=over-booking-watch，这个键记成撞过顶，重跑时按它的上限排队；
+#          内核挤掉的：scope 的 Result 是 oom-kill，而 scope 自己的 oom 计数是 0、oom_kill 不为 0——slice 撞了顶，内核在 slice 里挑了这一条杀（告警记录 stopped_by=kernel）；
+#            内核按超出记账的量挑（「排队」一段的 oom_score_adj），只有峰值超出记账过了容差的才把这个键记成撞过顶，没超账而被挑中的不记。
 #
 # 余量（RUN_WITH_MEMORY_CAP_RESERVE，默认 20G）留给 slice 外面：本地模型服务、各个 Claude Code 会话与它们起的工具、门禁在包装外面的进程、内核。
 #   2026-09-25 量的（只在本机成立；换机器、本地模型服务换模型或换并行度都要重量）：MemTotal 60.1 GiB；slice 外面回收不掉的合计 13.4 GiB
@@ -68,14 +71,20 @@
 #     在约 40 GiB 的总上限里排着不起）。预测取的是 host-resources.py 逐台判用的那一份：scripts/hosts/host-dispatch.py 的 predict（按文件路径导入，不另写一份），
 #     读这个包装的峰值表、键是这个包装的键；表里没有时它给 memory_peaks_lib.py 的 DEFAULT_MEMORY_PREDICTION_TEXT（8G）。预测算不出来（导入或调用出错）按它的上限算，
 #     原因写进排队时报的那一句。scope 的 MemoryMax 照旧是写的上限，不跟着改：预测少算了，涨过去的那一截撞的是 slice 的总上限；
-#     按预测放进来的（要的量小于上限）与按峰值表放进来的同样处置：写 oom_score_adj 500、被总上限挤掉之后这个键记成撞过顶，下一次按上限排队。
+#     按预测放进来的（要的量小于上限）与按峰值表放进来的同样处置：oom_score_adj 按记账算、超出记账被停或被挤掉之后这个键记成撞过顶，下一次按上限排队。
 #     几条按峰值表或预测放进来的，预测之和放得下就一起起、不排队。
 #     这两种也按它这一次的上限算（不按峰值表）：设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP=<为什么>（广谱变异驱动升档重跑的那一趟这样起）；
 #     这个键撞过顶（峰值表里这一行的近几次里有一次撞了顶：撞了自己的上限记成上限，被总上限挤掉的也记成上限，见「峰值表」一段）。
 #     按上限算比总上限还大的当场退 252（等多久都放不下），放不下就照下面排队、等满退 252，不放进去再撞 slice 的总上限。
-#   撞 slice 总上限时内核杀谁：外壳把自己的 oom_score_adj 写好、命令随之继承，内核在 slice 里挑「常驻页数 + oom_score_adj × 总上限页数 / 1000」最大的那一条杀。
-#     设了 RUN_WITH_MEMORY_CAP_OOM_FIRST=<为什么>（广谱变异驱动起变异那几步时这样起：一条无界分配的变异）的写 1000；按峰值表放进来的（要的量小于它的上限）写 500；
-#     按上限放进来的不写（0）。所以先杀设了 OOM_FIRST 的，再杀按峰值表放进来的，按上限放进来的最后；同一档里几条一起，内核挑大的，挑中的仍可能是别人那一条。
+#   撞 slice 总上限时内核杀谁（盯账没赶上时的兜底，records/2026-10-23-subagent拆分提案.md 第四十八节 ⑩c，用户 2026-10-26 定「改」）：外壳把自己的 oom_score_adj 写好、命令随之继承，
+#     内核按进程打分，在 slice 里挑「常驻页 + 页表页 + oom_score_adj × 分母页数 / 1000」最大的那个进程杀；分母 = slice 的 memory.max + min(slice 的 memory.swap.max, SwapTotal)。
+#     分母里的 swap 那一项是 2026-10-26 在 400M 的小 slice 上量的：两个进程常驻差约 23,200 页，slice 的 memory.swap.max 是 max 时 adj 差 10 与 11 之间翻面，
+#     设成 0 之后在 200 与 260 之间翻面，分别落在分母含 swap（每点约 2,200 页）与不含 swap（每点约 102 页）的预测上；memory.low、memory.min 与 cgroup 的记账量都不进这个分数。
+#     账上有记账的（按峰值表、按预测、按上限放进来的都算）写 oom_score_adj = 1000 − 记账 × 1000 / 分母（字节算，起 scope 之前现读，小于 0 取 0），
+#     代进去分数 = 常驻 − 记账 + 分母，内核挑的就是常驻超出自己记账最多的那个进程；设了 RUN_WITH_MEMORY_CAP_OOM_FIRST=<为什么>（广谱变异驱动起变异那几步时这样起：
+#     一条无界分配的变异）的写 1000，比任何一条超出记账的都先挨杀；套在外层里的里层一条不写，照旧继承外层那一条的。
+#     已知的局限：内核按进程打分，一条 scope 里几个进程分摊了超账（并行的 rustc 这类），每个进程都要减掉整条 scope 的记账，内核仍可能挑没超账的那一条；
+#     adj 是整数，本机正式 slice 上 1 点约 49 MiB（按上面的式子算的，没在正式 slice 上量），超账量差不到这么多的两条分不清。这两样由盯账接住（「盯账」一段），这里只是盯账没赶上时的次序。
 #   已占 = slice 里回收不掉的用量（memory.current 减 active_file 与 inactive_file：页缓存回收得掉，而结束了的 scope 的页缓存挂回 slice、一直算在 slice 的
 #          memory.current 里；2026-09-25 实测 scope 里 dd 写 120 MiB 退出之后，slice 的 memory.current 还是 131 MiB，其中 inactive_file 126 MiB）
 #        + 账上每条放行了还在跑的 max(0, 它要的量 − 它的 scope 此刻回收不掉的用量)：刚起跑的 cargo 还没涨到量，只看 slice 的用量，前后脚来的两条都判得下、合起来超。
@@ -100,12 +109,33 @@
 #   起 scope 的 systemd-run 放后台、用 wait 等，所以 trap 当场就跑，不等命令退出；命令读的标准输入照旧是调用方的（<&0），INT 照旧不被忽略（env --default-signal=INT；调用方进来时就忽略 INT 的照旧忽略）。
 #   scope 还没建出来（systemd-run 还在起，stop 找不到单元）：改给 systemd-run 那一个进程发 TERM。
 #
+# 盯账（records/2026-10-23-subagent拆分提案.md 第四十八节 ⑩c，用户 2026-10-26 定「改」）：几条按峰值表放进来的合起来撞总上限时，只停超出记账的那一条，不让内核按常驻挑中没超账、常驻更大的那一条
+#   （改之前 2026-10-26 在 400M 的小 slice 上 6 次里 6 次如此：没超账的那一条退 254、还被记成撞过顶，超账的那一条退 0）。三样合起来：
+#   ① 账上有记账的每一条，起 scope 之后包装另起一个盯账的子进程（watch_over_booking，python，读法复用 memory_peaks_lib.py 的 unreclaimable_bytes 与 live_ledger_entries），
+#     每 OVER_BOOKING_POLL_SECONDS（0.05）秒看一次：slice 回收不掉的用量（与排队的「已占」同一个定义）到了 slice 的 memory.max 的 SLICE_HIGH_PERMILLE（950）‰（触发线），
+#     就算账上每一条此刻超出记账多少（它的 scope 回收不掉的用量 − 它要的量）；自己超出的量大于 OVER_BOOKING_TOLERANCE_BYTES（16 MiB）、又是账上最多的（一样多的按单元名小的算最多），
+#     先把此刻的数写进标记文件（${状态目录}/peaks/<unit>.over-booking），再往自己的 scope 的 cgroup.kill 写 1。只动自己那一条，别的包装各管各的；写标记与写 cgroup.kill 那一段里 TERM 挡着，
+#     包装收尾时停它不会只写了一半。命令退出、包装被停或换了父进程，它在下一轮自己退。
+#     容差 16 MiB：2026-10-26 在 400M 的小 slice 上两条都不超账、合计压过触发线时，没超账那一条此刻用量离记账只差约 1 MiB（记账取的峰值与此刻用量差一点噪声就翻正）；正式 slice 上的噪声没量过。
+#   ② slice 的 memory.high 设成触发线（ensure_slice_high，与 MemoryMax 同一处设，照已有总上限走的那一支也设）：越过它的分配被内核节流，盯账赶得上一口气拿满的那种分配
+#     （2026-10-26 实测：不设它，一口气拿满的分配 5 次里 5 次抢在盯账前面撞了 memory.max、内核杀的是没超账的那一条；设了 5 次都由盯账停对，内核一次都没 OOM）。
+#     代价：越过触发线之后 slice 里正在分配的命令一律被节流，没超账的也一样。2026-10-26 在 400M 的小 slice 上量的：两条都不超账、合计越过 memory.high 约 10 MiB 时，
+#     后一条拿 140 MiB 用了 1.08–1.49 秒（独自拿 0.031 秒），slice 的 memory.events 里 high 计了 530–632 次（三趟）；正式 slice 与真实负载上没量过。
+#   ③ oom_score_adj 按记账算（「排队」一段「撞 slice 总上限时内核杀谁」）：盯账没赶上时内核按超出记账的量挑。
+#   包装认标记：命令退出之后标记在，就是盯账停的这一条，退 254（文件头「退出码」），这个键记成撞过顶（峰值记成上限），告警记录 kind=memory-squeezed、stopped_by=over-booking-watch，
+#   量到的峰值取标记里记的 scope 的 memory.peak（外壳随 cgroup.kill 一起没了，写不出峰值文件）；不落到「被外面停了（信号 9）」那一支。
+#   2026-10-26 在 400M 的小 slice 上量过的四种场景（单进程超账、同一条 scope 里 8 个进程分摊超账、一口气拿满、两条都不超账而合计压过触发线）各 5 次都只停了超账那一条或谁都没停；
+#   正式 slice（约 40 GiB）与真实负载上没量过。已知的局限：套在外层里的里层一条不记账，它的 scope 不在账上，盯账算不到它头上，它涨过头只由内核兜底。
+#
 # 排队时去找别的机器（用户 2026-10-20「提醒一下 去找一下可用的电脑」，records/2026-09-16-subagent拆分提案.md 第七十五节）：第一次报「排队」那一刻与退 252 之前
 #   （等满、要的量比总上限还大、账上没有在跑的而放不下、常驻加要的量超总上限，四处都算），现查别的机器此刻放不放得下这一条。
 #   判法是 scripts/hosts/host-resources.py --json -- <这条命令>（键照传 RUN_WITH_MEMORY_CAP_KEY；逐台判是 host-dispatch.py 的 predict 与 judge_host，这里不另写一份「哪台放得下」），
 #   只看多机配置里的第二台（PEER_SSH_HOST 那一台：multi-host-run.sh --peer 只去得了它）。
 #   放得下：往 stderr 打一行「  → 第二台此刻放得下（可用 X、要 Y）：改用 bash scripts/hosts/multi-host-run.sh --peer --memory-cap <上限> --label <名> -- <这条命令>」
 #     （X 是第二台此刻可用的内存，Y 是 host-resources.py 对这条命令的预测；上限是这一条的，比第二台的 PEER_MEMORY_CAP 大就照后者写），
+#     命令里以本机仓根（这份包装所在的树，符号链接解开前后两种写法都认）起头的参数改写成树内相对路径、仓根本身写 .（第二台那棵树不在本机仓根那个路径上，
+#     命令在那棵树的树根起；multi-host-run.sh --peer 见到这类参数会拒，退 2）：整词是仓根或以「仓根/」起头的才改，仓根之外的绝对路径与名字只是以仓根起头的路径（<仓根>-旁边）原样留着；
+#     告警记录的 command 一栏照旧是本机跑的原命令，出路（next_step）与那一行里是改写后的，
 #     再往告警记录（scripts/hosts/core_usage.py 文件头「告警记录」：同一种写法，经它的 append_line 写；写到哪照「峰值表」一段「告警跟着峰值表走」）追加一条：
 #     kind=memory-queue-peer-fits、phase=queued 或 refused、会话号、告警进程号（这个包装）、命令、这一条的上限、本机的数（要的量、slice 已占或回收不掉的、总上限）、
 #     第二台的数（可用、要的、上限）、那一行原文与出路。scripts/agents/agent-watch.py 读它叫醒主 agent（「本机内存排队、别的机器放得下」）：
@@ -122,12 +152,44 @@
 #     轮不到的打「没查到别的机器：N 秒前包装 <进程号> 刚查过」。谁上一次查的记在状态目录的 host-lookup.json（排队那把锁里读写）。
 #   RUN_WITH_MEMORY_CAP_HOST_LOOKUP 设成任何非空值（例 off）这一条不查，只打一行「没查到别的机器：RUN_WITH_MEMORY_CAP_HOST_LOOKUP=…」；自证里除了这几例都这样设。
 #   RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS 换掉 HOST_LOOKUP_SECONDS（只给自证）。
+#   整体兜底（research/prompts/m3-close-reuse-closure-r3-main-verification.md 末节「用户定案」第 1 条）：HostLookup 的 begin、finish、run、query、cancel 整段包在 try 里，
+#     出了任何异常（起线程、建临时文件、读输出、拼那一行……）只打一行「没查到别的机器：<哪一趟>出了 <异常>…」，排队、放行与退出码照旧；被 TERM 停的 SystemExit 照旧往外走。
+#     会卡住的两处不靠 try：排队锁在这里不阻塞地取（LOCK_NB，至多试 HOST_LOOKUP_LOCK_SECONDS 0.5 秒，避开排队那一步每轮占锁的那一瞬），取不到这一趟不查，
+#     打「没查到别的机器：排队锁 … 被别的进程占着…」；finish、cancel 等排队开始那一趟收尾至多等它的时限加 HOST_LOOKUP_JOIN_MARGIN_SECONDS（2）秒，
+#     过了打「没查到别的机器：排队开始那一趟 N 秒还没查完，不再等它」、不再等（daemon 线程，包装退出时随之没了）。
+#     这几行只出提示、不改结局：判法读包装输出前去掉它们（scripts/gate/verus-proof-check.py、scripts/experiment-apparatus/e165-pin-red-examples.py、
+#     scripts/mutation/crates-mutation-rows.py 各一份的 HOST_LOOKUP_LINE，只认 HostLookup 打的四种行首），判法单元的闭包也不走 HostLookup.query
+#     起 host-resources.py 那一条边（scripts/gate/lib_function_units.py 的 EXCLUDED_PROGRAM_EDGES）。HostLookup 里新加一处 say 而那三份正则不认它，三份的自证各红一格。
+#     自证（只跑这几项照旧是 RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=host-lookup）六格各造一处出事：四处异常由只给自证的 RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT 在真世界会抛的那一处抛；
+#     「锁被别的进程占着」起一个真占着排队锁的进程（RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_LOCK_HANDOFF 只管叫它来占、等它占上），「线程里的 query 睡着」让后台那一趟真睡
+#     （RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_SLEEP），两格都是真卡住、不抛异常；每格包装的退出码与关掉 HostLookup 的那一臂逐个相同、30 秒内退。
+#
+# 资源释放广播（用户 2026-10-23 定「叫醒并重判，不自动挪」，records/2026-09-16-subagent拆分提案.md 第九十九节；发与收都在 scripts/hosts/resource_release_broadcast.py）：
+#   发：命令真跑过之后（scope 里的外壳起来过：命令正常退出、退非 0、撞了这一条的上限 250、超时 253、被总上限挤掉 254、查不到结局 251、起了 scope 之后包装被 TERM / INT 停，都算），
+#     包装退出那一刻（EXIT trap 的 on_wrapper_exit 调 broadcast_memory_released）发一条 memory-released：标签是这一条的 scope 单元名，带包装的退出码与这一条的峰值
+#     （没量到取账上记的要的量）。排队没放行就退的（252、排队时被停、用法错、scope 起不来）不发：它没占过资源。--check、--status、--selftest 不发。
+#     套在外层包装里的不发：外层账上那一笔照旧占着，里层跑完放不出排队的余量。账与锁的目录不是默认那一份（设了 RUN_WITH_MEMORY_CAP_STATE_DIR：自证与别的脚本的假世界）
+#     不发，除非显式给了 RESOURCE_BROADCAST_DIRECTORY（事件说的是这台机器共用的那一份账）。
+#     推不出去的那几行写进本机事件目录的 push-problems.log（emit --problems-to-log），广播那一步的输出一行都不进包装的 stderr：判法读包装的 stderr。
+#     广播那一步出了什么事都不改包装的退出码（EXIT trap 里不调 exit），至多晚退那份库的 PUSH_SECONDS（4 秒）加起 python 与读配置的零点几秒。
+#   收：排队开始那一刻（第一次报「排队」）HostLookup.watch_events 起一个那份库的 follow --since <这一刻>（只停自己起的这一个；follow 起得慢也不漏掉起动那一会儿来的），排队每一轮的等（ADMISSION_POLL_SECONDS）
+#     换成「新事件或到点」先到者（HostLookup.pause）；收到别的机器推来的（source=pushed）或第二台那一趟跑完的（kind=peer-run-finished），当场在后台
+#     再跑一次上面「排队时去找别的机器」那一套查法（HostLookup.wake）；本机自己发的内存放出、卡放出、脱离单元结束不另查：第二台的余量不因它们变，
+#     本机放出的照旧由本机准入每 ADMISSION_POLL_SECONDS 秒重判接住。放得下照旧打改去第二台的那一行、写 kind=memory-queue-peer-fits、phase=queued，
+#     几种行尾都注「（被资源释放广播叫醒：第 N 号，<种类>）」。不改排队本身：不自动改去第二台，退出码照旧。
+#     去重：几条一起排队时一个事件只查一次：查了第几号事件记在 host-lookup.json 的 event（排队那把锁里读写，与 60 秒那一条共用这一份）；
+#     轮不到的打「没查到别的机器：第 N 号资源释放广播包装 <进程号> 已经查过…」。叫醒时排队开始那一趟或上一次叫醒那一趟还在查的，记下最新的号，查完再查。
+#     叫醒那一趟与 follow 出的任何异常照「整体兜底」只打一行「没查到别的机器：…」，排队、放行与退出码照旧；follow 起不来或退了，排队照旧每 ADMISSION_POLL_SECONDS 秒重判。
+#     RUN_WITH_MEMORY_CAP_HOST_LOOKUP 设了（这一条不查别的机器）不起 follow。只给自证：RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT=wake-thread 在叫醒那一趟起线程时抛。
+#   这两条子进程边（broadcast_memory_released 与 HostLookup.watch_events 起 resource_release_broadcast.py）只出提示、不改结局，判法单元的闭包不走它们
+#     （scripts/gate/lib_function_units.py 的 EXCLUDED_PROGRAM_EDGES）；自证 RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast 那几格核：那份库出事时包装的退出码照旧、
+#     包装的 stderr 里没有广播那一步打的行。自证里读写事件只用 grep 与 printf，不起那份库（起了就是另一条要排的边）。
 #
 # 峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认本机的 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv；从 git worktree、第二台的副本里跑的也读写本机那一份）：一行一条命令，文件头的 # 行写口径，
 #   由这个脚本建、读、写（写在同一把锁里，先写临时文件再改名；按 MiB 向上取整，与表里记的相同就不写）。口径：scope 里那个外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak（字节）。
 #   外壳不 exec 命令、留下来读，是因为 scope 一收尾它的 cgroup 就删了、systemd 也不留（2026-09-25 实测命令退出之后 MemoryPeak=[not set]）。
-#   含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。撞了这一条自己的上限记成上限；按峰值表放进来（要的量小于上限）又被总上限挤掉的也记成上限
-#   （它要的比排队时按的多，下一次按上限排）；超时、被停、照上限放进来而被挤掉的不记（量到的是半截）；
+#   含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。撞了这一条自己的上限记成上限；盯账停的、与按峰值表放进来（要的量小于上限）又被内核挤掉而峰值超出记账过了容差的也记成上限
+#   （它要的比排队时按的多，下一次按上限排）；超时、被停、没超出记账而被挤掉的（照上限放进来的超不了账）不记（量到的是半截）；
 #   命令被外面的信号停（退 128 加 HUP、INT、KILL、TERM 的信号号 1、2、9、15）而 scope 没撞自己的上限、也没被总上限挤掉的同样不记（量到的也是半截），
 #   另报一句「被外面停了（信号 N），这一次的峰值不记」与出路，退出码照命令自己的。
 #   放在仓外：数只在本机成立，是运行状态不是仓的内容；门禁 checker-tier-crates-mutation-replay 跑的时候每条都写它，放进工作区 gate.sh 开跑与收尾的工作区指纹就对不上。
@@ -139,10 +201,10 @@
 #   （.claude/skills/crash-test/commit-stages.md「跑之前定下来」一节）；排队照旧只按键取峰值。加这一列之前记的行照原样留四列写回：只认四列的旧包装还在跑时读得到它们，
 #   它收尾时写回的表里没有五列的行，那几条下一次按上限排队、重新记。
 #   近几次（第六列）：这个键最近 RECENT_MEASUREMENTS（memory_peaks_lib.py，5）次记进表的实测，新的在前，逗号隔开，每次写成「<峰值字节>:hit」或「<峰值字节>:clean」
-#   （hit 是撞了顶：撞了自己的上限、或按峰值表放进来又被总上限挤掉，峰值记成上限；clean 是整段跑完量到的）；前三列是最近那一次。
+#   （hit 是撞了顶：撞了自己的上限、被盯账停了、或按峰值表放进来超出记账又被内核挤掉，峰值记成上限；clean 是整段跑完量到的）；前三列是最近那一次。
 #   排队记账、auto、派发器 host-dispatch.py 的 predict 与 host-resources.py 都经 memory_peaks_lib.recorded_peak 读近几次：峰值取近几次里最大的，
 #   近几次里有一次撞顶就算撞过顶、按上限排队。所以撞顶之后连跑 4 次干净的仍按上限排，第 5 次干净的跑完之后才按峰值排；峰值一路变小时记账取近几次里最大的，不跟着变小。
-#   超时、被停、按上限放进来而被挤掉的照旧不记，近几次不动。没有第六列的旧行（四列、五列）照读，当成只有一次：那一行的峰值，到了那一次的上限就算撞了顶。
+#   超时、被停、没超出记账而被挤掉的照旧不记，近几次不动。没有第六列的旧行（四列、五列）照读，当成只有一次：那一行的峰值，到了那一次的上限就算撞了顶。
 #   加这一列之前就在跑的旧包装（收尾时读写的是四段：峰值、时刻、上限、线程数）写回时丢掉第六列：它写回的表里六列的行都只剩五列，
 #   那几条的近几次又从只有一次记起（memory_peaks_lib.read_peak_table 照旧交四段，它读得到这几行）。没动到的四列、五列行照原样写回。
 #   峰值涨了（工作量可能变了；键照旧是命令文本，代码改动让工作量变大时键不变，在结局上认）：
@@ -152,6 +214,7 @@
 #   经它的 append_line 写；写到哪见下面「告警跟着峰值表走」）追加一条 kind=memory-peak-grew：会话号、告警进程号（这个包装）、键、上限、记账与它从哪来、实测、倍数、那一行与出路。
 #   撞顶与被挤掉：退 250（撞了自己的上限）与退 254（被总上限挤掉）各往同一份告警记录追加一条 kind=memory-own-cap 与 kind=memory-squeezed，
 #   带会话号、告警进程号、键、上限、记账（套在外层里的不记账，写 null）与它从哪来、实测、是不是按峰值表放进来的（by_peak_table）；退出码不变。
+#   memory-squeezed 另带 stopped_by：over-booking-watch 是盯账停的（「盯账」一段，实测取标记里记的 scope 峰值），kernel 是内核挤掉的；两种都是「结果不算数，重跑」，看门狗照同一种报。
 #   设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条（有意撞顶的跑法：广谱变异驱动起无界分配的变异步）退 250、254 不写 memory-own-cap、memory-squeezed，
 #   退出码、峰值表、撞顶标记与 stderr 照旧；它的 memory-peak-grew 照写。
 #   scripts/agents/agent-watch.py 读这三种叫醒主 agent，包装退了也报（core_usage.py 的新鲜窗口内）。告警记录写不进只往 stderr 说一句，退出码照旧。
@@ -177,7 +240,16 @@
 #   RUN_WITH_MEMORY_CAP_KILL_GRACE（默认 30）秒还不退再发 KILL，退 253。要限时就用这个变量，别在包装外面套 timeout：套在外面的把排队的时间也算进去。
 # 等待上限（RUN_WITH_MEMORY_CAP_WAIT_SECONDS，秒，默认 3600）。这几个只管这一条：RUN_WITH_MEMORY_CAP_KEY、_TIME_LIMIT、_WAIT_SECONDS、_QUEUE_BY_CAP、_OOM_FIRST 传进命令之前清掉，
 #   命令里再经包装跑的不会接着用。
+# 这一条命令自己的临时目录（用户 2026-10-23 定案「自己用完自己删」；records/2026-09-16-subagent拆分提案.md 第九十二节末尾）：
+#   调用方没设 TMPDIR（或设成空串）时，起命令之前在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT（默认 /tmp）下 mktemp -d 一个 singlefs-run-with-memory-cap-<包装进程号>-XXXXXX，
+#   export 成 TMPDIR 交给命令；包装退出时（命令正常退、退非 0、被信号杀、撞了这一条的上限、超时、被总上限挤掉、排不上退 252、包装被 TERM / INT 停，都走 EXIT trap）
+#   整个删掉，删完回读还在就往 stderr 报一行、退出码照旧。测试进程被 SIGKILL 时 Drop 守卫不走，留在它 TMPDIR 里的东西由这一步删。
+#   SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1（名字与含义同 crates/singlefs-harness 的 KEEP_TEMPORARY_FILES_ENVIRONMENT_VARIABLE：只认 1）时不删，往 stderr 打一行
+#   「run-with-memory-cap: SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1：这一条命令的临时目录留着看现场：<路径>」，看完自己删。
+#   调用方设了 TMPDIR 的照它的：不另建、不删（那一份归调用方；套在外层包装里的里层一条读到的就是外层给的那一份）。
+#   --check、--status、--selftest 不起命令，不建。包装自己被 KILL / HUP 时 EXIT trap 不走，那一份留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下（名字带包装进程号）。
 # 其余环境变量有默认，只在自证与特殊场合设：
+#   RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 这一条命令自己的临时目录建在哪个目录下，默认 /tmp（上一段）；自证指到自己的临时目录里，核跑完那里一个不剩
 #   RUN_WITH_MEMORY_CAP_SLICE          slice 名，默认 singlefs-heavy.slice（名字里的 - 是 systemd 的层级：它挂在 singlefs.slice 底下）；只许 singlefs 开头的 .slice，别的按用法错退 251
 #   RUN_WITH_MEMORY_CAP_SLICE_TOTAL    直接给总上限（systemd 写法），顶掉「整机内存 − 余量」；自证用它压到几百 M
 #   RUN_WITH_MEMORY_CAP_STATE_DIR      锁与账的目录，默认 ${XDG_RUNTIME_DIR:-/run/user/<uid>}/singlefs-heavy-admission（tmpfs，重启清空，与 slice 同寿）
@@ -188,6 +260,12 @@
 #   RUN_WITH_MEMORY_CAP_HOST_LOOKUP           设了（任何非空值，例 off）排队与退 252 时不查别的机器；RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS 换掉查的时限（文件头「排队时去找别的机器」）
 #   RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=host-lookup  --selftest 只跑排队时去找别的机器那几项（看它红在哪用；只跑这几项的那一趟不算整份自证通过）
 #   RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=peak-history  --selftest 只跑峰值表近几次、峰值涨了、撞顶与被挤掉的告警、有意撞顶不写告警、告警跟着峰值表走那几项（同上，不算整份自证通过）
+#   RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=temporary-directory  --selftest 只跑这一条命令自己的临时目录那几项（同上，不算整份自证通过）
+#   RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast  --selftest 只跑资源释放广播那几项（同上，不算整份自证通过）
+#   RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=slice-total  --selftest 只跑被总上限挤掉、内核挑谁与盯账那几项（同上，不算整份自证通过）
+#   RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY  设了（非空）这一条不起盯账、不设 slice 的 memory.high，撞总上限全由内核按 oom_score_adj 挑：只给自证判内核兜底那几例；
+#                                             带着自证的标记（文件头「弄坏开关只在自证里认」）才认，平常跑设了不起作用
+#   RUN_WITH_MEMORY_CAP_SELFTEST_WATCH_TRACE  盯账每判一次（slice 到了触发线）往这个文件追加一行此刻的数：只给自证证明「两条都不超账」那一例真判到了；同样带着自证的标记才认
 # 套在包装里（包装里再经包装跑的：主 agent 照规则 run-with-memory-cap.sh 16G bash scripts/crash/crash-point-replay.sh --quick 起，里面放量那几项再经它；
 #   run-with-memory-cap.sh <上限> bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick 里每条变异再经它）：外层起 scope 时给命令设两个标记
 #   RUN_WITH_MEMORY_CAP_OUTER_UNIT=<这一条的 scope 单元名>、RUN_WITH_MEMORY_CAP_OUTER_CAP=<这一条的上限>。里层这一条两个标记都在、上限写法认得、
@@ -203,7 +281,10 @@
 # 弄坏开关 RUN_WITH_MEMORY_CAP_BREAK=<项>（只给 --selftest 证明它会红用，一次给一个；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 # （自证的例没有标签，项名直接写那条「✗ 自检：」失败行的句首、到「，实际」之前，长的截到能认出是哪一例；括号里写那一行接着报的。
 #   红的项多的，同一批几项写在一行，「」逐项隔开）：
-#   RUN_WITH_MEMORY_CAP_BREAK=nocap  不进 scope 直接跑（第一版之前的跑法），命令跑在调用方的 cgroup 里；53 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=nocap  不进 scope 直接跑（第一版之前的跑法），命令跑在调用方的 cgroup 里；60 项红
+#       「单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它」「盯账停的那一条应当往告警记录写一条 memory-squeezed」「多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它」
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」「两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到」
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（盯账那几项：命令不进 scope，超账那一条退 0、谁都没被停，slice 不在、读不到它的 oom_kill，峰值表里两行照旧是记好的那一次）
 #       「峰值表里记着 1.8G（1843 MiB）、这一次写 24G 上限的一条应当按 1843 MiB 记账」（实际 memory.max 是 max）
 #       「峰值表里没有、写 32G 的那一条应当按 host-resources.py 的预测 8G 记账」（实际账上没有它那一笔、memory.max 不是 32G）
 #       「上限 64M 里分配 512 MiB 的探针应当退 250 并报「撞了内存上限 64M」」（实际退 0：allocated 512 MiB）
@@ -241,7 +322,8 @@
 #       「slice 上有余量 10G 的一条活着时，默认余量的 --check 64M 应当照已有的总上限试、不改 slice 的 MemoryMax、stderr 里不打「照 slice」那一行、退 0」（实际退 0、slice 没改，但 stderr 多了那一行）
 #   RUN_WITH_MEMORY_CAP_BREAK=fallback  systemd-run 起不来时退回无上限跑
 #       「slice 设得上而 systemd-run 不认上限 99999999999999T 时 --check 应当退 251、报 systemd-run」（实际退 0：Failed to parse MemoryMax=…）
-#   RUN_WITH_MEMORY_CAP_BREAK=exitcode  按退出码 137 / 143 判撞顶，不看 scope 的 Result（也不读内核日志）；11 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=exitcode  按退出码 137 / 143 判撞顶，不看 scope 的 Result（也不读内核日志）；13 项红
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（实际被内核挤掉的那一条退 250；盯账停的那一支先认标记，不受这个开关影响）
 #       「吃内存的是孙进程时应当照样退 250」（实际退 101）
 #       「上限之内被 kill -9 的命令应当原样退 137、不算撞顶」（实际退 250）
 #       「命令退 3、起止之间内核报了 NVRM … NV_ERR_NO_MEMORY 时应当退 245」「内核日志读不出来时应当照退命令自己的 3、报「显存 OOM 没查成」」（实际退 3、没报）
@@ -251,7 +333,8 @@
 #       「按峰值表放进来的那一条涨过 slice 的总上限时」「两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时」（实际它退 250）
 #       「按峰值表放进来又被总上限挤掉之后，峰值表里这个键应当记成它的上限 200M」（实际记的是量到的峰值）
 #       「限时 1 秒跑 sleep 4 应当 4 秒之内退 253」（实际退 250）
-#   RUN_WITH_MEMORY_CAP_BREAK=noresult  不认 scope 的 Result；10 项红（另一项「套在外层里的一条撞了自己的上限应当退 250」：实际它退 137）
+#   RUN_WITH_MEMORY_CAP_BREAK=noresult  不认 scope 的 Result；12 项红（另一项「套在外层里的一条撞了自己的上限应当退 250」：实际它退 137）
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（实际被内核挤掉的那一条退 137、报「被外面停了」）
 #       「上限 64M 里分配 512 MiB 的探针应当退 250」（实际退 137）
 #       「吃内存的是孙进程时应当照样退 250」（实际退 101）
 #       「撞了自己的上限、起止之间内核又报了显存不够时应当照旧退 250」（实际退 245：落进命令退非 0 那一支）
@@ -259,7 +342,10 @@
 #       「设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP 的那一条应当按自己的上限 200M 排队」「按峰值表放进来的那一条涨过 slice 的总上限时」
 #       「撞过顶的键重跑时应当按自己的上限排队」「两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时」（实际它退 137）
 #       「按峰值表放进来又被总上限挤掉之后，峰值表里这个键应当记成它的上限 200M」（实际记的是量到的峰值）
-#   RUN_WITH_MEMORY_CAP_BREAK=noslice  不挂 slice 也不排队（加总上限之前的跑法）；28 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=noslice  不挂 slice 也不排队（加总上限之前的跑法）；35 项红
+#       「单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它」「盯账停的那一条应当往告警记录写一条 memory-squeezed」「多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它」
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」「两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到」
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（盯账那几项：不挂 slice 就不盯账，两条各在自己的 scope 里跑完）
 #       「峰值表里记着 1.8G（1843 MiB）、这一次写 24G 上限的一条应当按 1843 MiB 记账」（实际账上没有它那一笔）
 #       「峰值表里没有、写 32G 的那一条应当按 host-resources.py 的预测 8G 记账」（实际账上没有它那一笔）
 #       （其中「套在外层里起的一条应当不另记账、不排队」「标记变量漏到外层 scope 之外时应当照没套跑」两项：不排队也就不记账，账上 0 笔）
@@ -295,7 +381,10 @@
 #       「按峰值表放进来的那一条涨过 slice 的总上限时，内核应当杀它（退 254）、不杀照上限放进来的常驻那一条」（实际常驻那一条退 254）
 #       「排队中给包装发 TERM 这一例没判成」「排队中给包装发 INT 这一例没判成」「排队中给包装发 KILL 这一例没判成」「排队中给包装发 HUP 这一例没判成」
 #       「峰值表里没有、写 32G 的那一条应当按 host-resources.py 的预测 8G 记账」（实际账上记的是 0）
-#   RUN_WITH_MEMORY_CAP_BREAK=ignoretable  不看峰值表、一律按上限算；9 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=ignoretable  不看峰值表、一律按上限算；16 项红
+#       「单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它」「盯账停的那一条应当往告警记录写一条 memory-squeezed」「多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它」
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」「两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到」
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（盯账那几项：两条都按上限 300M 记账、放不进 400M，后一条等前一条跑完才起，谁都没被停）
 #       「峰值表里记着 1.8G（1843 MiB）、这一次写 24G 上限的一条应当按 1843 MiB 记账，在总上限 40G 里与按上限 24G 记账的那一条同时在跑」（实际它退 252：按 24G 记账）
 #       「峰值表里没有、写 32G 的那一条应当按 host-resources.py 的预测 8G 记账」（实际它退 252：按 32G 记账）
 #       「峰值表里没有的那一条应当按上限 200M 算」（实际退 252，报的是「按它的上限 200M 算（弄坏开关 ignoretable）」）
@@ -304,8 +393,10 @@
 #       「撞过顶的键（上一次撞了 200M）这一次上限 300M、总上限 256M 时应当不放进去、当场退 252、报「这个键撞过顶」」（实际退 252，报的不是这一句）
 #       「设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP 的那一条应当按自己的上限 200M 排队」「按峰值表放进来的那一条涨过 slice 的总上限时」
 #       「两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时」（实际它退 250：按上限排队，等常驻那一条跑完才起、撞了自己的上限）
-#   RUN_WITH_MEMORY_CAP_BREAK=noslicehit  被总上限挤掉的也报成撞了自己的上限
+#   RUN_WITH_MEMORY_CAP_BREAK=noslicehit  被内核挤掉的也报成撞了自己的上限（盯账停的那一支先认标记，不受这个开关影响）；6 项红
 #       「两条合起来超总上限 256M（各自没超上限 200M）时，被杀的那条应当退 254、报「被总上限挤掉」」（实际退 250 与 0）
+#       「按峰值表放进来的那一条涨过 slice 的总上限时，内核应当杀它」「两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时」
+#       「按峰值表放进来又被总上限挤掉的那一条应当退 254、往告警记录写一条 memory-squeezed」「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（实际挨挤的那一条退 250）
 #   RUN_WITH_MEMORY_CAP_BREAK=notimelimit  不设限时
 #       「限时 1 秒跑 sleep 4 应当 4 秒之内退 253」（实际退 0、用了 4 秒）
 #   RUN_WITH_MEMORY_CAP_BREAK=keepstale  账上包装已经死了的那一笔不删
@@ -315,7 +406,10 @@
 #   RUN_WITH_MEMORY_CAP_BREAK=noprivate  --status 不读私有配置，本地模型服务那一项一律当没配
 #       「--status 私有配置 set 那一例应当退 0、「slice 外面」那一行含「本地模型服务的 anon + shmem 5 MiB、」」（实际退 0、不含那一句）
 #   下面四个开关把 2026-10-06 撤了的手续拒绝装回去（证明自证认得出它们又出现了）：
-#   RUN_WITH_MEMORY_CAP_BREAK=overpeakreject  上限超过峰值表里实测峰值 2 倍就按用法错退 251（撤之前的判法）；11 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=overpeakreject  上限超过峰值表里实测峰值 2 倍就按用法错退 251（撤之前的判法）；18 项红
+#       「单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它」「盯账停的那一条应当往告警记录写一条 memory-squeezed」「多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它」
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」「两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到」
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（盯账那几项：记账 40 MiB、上限 300M 的那一条退 251、命令没跑）
 #       「峰值表里记着 1.8G（1843 MiB）、这一次写 24G 上限的一条应当按 1843 MiB 记账」（实际退 251：24G 超过 1.8G 的 2 倍）
 #       「上限 64M 超过峰值表里实测峰值 10M 的 2 倍时应当照常跑、不拒」（实际退 251、命令没跑）
 #       另外九项是峰值表里记着、上限比峰值大 2 倍以上的那几例（显存那两例的键在头一例跑完之后记了 3M）：
@@ -346,7 +440,10 @@
 #       「账上没有在跑的、要 40G 而回收不掉 420M、总上限 40.1G 时应当不等、当场退 252」（实际退 252、用了 4 秒，stderr 是「排队（已等 0 秒，至多 4 秒）」）
 #   RUN_WITH_MEMORY_CAP_BREAK=queuebaseline  账上有在跑的、这一条要的量加 slice 里不属于任何 scope 的常驻用量已超总上限时照旧排队（待优化第 19 行改前的跑法）
 #       「账上有一条在跑、而 slice 里 420M 常驻不属于任何 scope、要 40G 加常驻超总上限 40.1G 时应当不等、当场退 252」（实际退 252、用了 4 秒，stderr 是「排队（已等 0 秒，至多 4 秒）」）
-#   RUN_WITH_MEMORY_CAP_BREAK=nopeakmin  峰值表里有这条也按它的上限记账，不取较小的（待优化第 19 行改前的跑法）；5 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=nopeakmin  峰值表里有这条也按它的上限记账，不取较小的（待优化第 19 行改前的跑法）；12 项红
+#       「单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它」「盯账停的那一条应当往告警记录写一条 memory-squeezed」「多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它」
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」「两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到」
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」「被内核挤掉而没超出记账的那一条应当退 254」（盯账那几项：同 ignoretable，后一条等前一条跑完才起）
 #       「峰值表里记着 1.8G（1843 MiB）、这一次写 24G 上限的一条应当按 1843 MiB 记账，在总上限 40G 里与按上限 24G 记账的那一条同时在跑」（实际它退 252：按 24G 记账）
 #       「峰值表里记着约 30 MiB 的两条（上限各 200M、总上限 256M）应当按记下的量一起放行、同时在跑」（实际一条一条跑的）
 #       「两条合起来超总上限 256M（各自没超上限 200M）时，被杀的那条应当退 254」「按峰值表放进来的那一条涨过 slice 的总上限时」
@@ -358,13 +455,29 @@
 #       「账上没有在跑的、要 40G 而回收不掉 420M、总上限 40.1G 时应当不等、当场退 252」「账上有一条在跑时（要 40G、回收不掉 420M、总上限 40.1G）应当照旧排队」
 #       「账上有一条在跑、而 slice 里 420M 常驻不属于任何 scope、要 40G 加常驻超总上限 40.1G 时应当不等、当场退 252」
 #       （实际都退 0、命令跑了：峰值表里没有，按预测 8G 放进去）
-#   RUN_WITH_MEMORY_CAP_BREAK=nooomadjust  按峰值表放进来的不写 oom_score_adj
+#   RUN_WITH_MEMORY_CAP_BREAK=nooomadjust  账上有记账的一律不写 oom_score_adj（命令照旧继承调用方的，自证里是 0）；3 项红
 #       「按峰值表放进来的那一条涨过 slice 的总上限时，内核应当杀它（退 254）、不杀照上限放进来的常驻那一条」（实际常驻那一条退 254）
-#   RUN_WITH_MEMORY_CAP_BREAK=nooomfirst  不认 RUN_WITH_MEMORY_CAP_OOM_FIRST，设了它的照按峰值表放进来的写 500
-#       「两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时，内核应当杀它、不杀更大的常驻那一条」（实际常驻那一条退 254）
+#       「按峰值表放进来又被总上限挤掉的那一条应当退 254、往告警记录写一条 memory-squeezed」（实际常驻那一条退 254）「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」（实际没超账的常驻那一条退 254）
+#   RUN_WITH_MEMORY_CAP_BREAK=nooomfirst  不认 RUN_WITH_MEMORY_CAP_OOM_FIRST，设了它的照记账算 oom_score_adj；1 项红
+#       「被内核挤掉而没超出记账的那一条应当退 254」（实际它退 0：内核按记账挑了超账的那一条。OOM_FIRST 那一例设不设都是 OOM_FIRST 那一条超出记账最多，照记账算也先杀它，不再红）
 #   RUN_WITH_MEMORY_CAP_BREAK=noslicemark  按峰值表放进来又被总上限挤掉的不把这个键记成撞过顶
 #       「按峰值表放进来又被总上限挤掉之后，峰值表里这个键应当记成它的上限 200M」（实际还是 20 MiB）、
 #       「撞过顶的键重跑时应当按自己的上限排队、等常驻那一条跑完再起」（实际又按 20 MiB 放进去、退 254）
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」（实际超账那一条的键没记成撞过顶）
+#   盯账那几项（文件头「盯账」一段；RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=slice-total 连同被总上限挤掉、内核挑谁那几项只跑这几项）：
+#   RUN_WITH_MEMORY_CAP_BREAK=nowatch  不起盯账（只留按记账算的 oom_score_adj 与 slice 的 memory.high）；5 项红
+#       「单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它」「盯账停的那一条应当往告警记录写一条 memory-squeezed」
+#       「多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它」
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」
+#       「两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到」
+#       （实际没有盯账那一句、判法记录 0 行；多进程那一例内核杀的是没超账的常驻那一条）
+#   RUN_WITH_MEMORY_CAP_BREAK=noslicehigh  slice 不设 memory.high（盯账与按记账算的 oom_score_adj 照旧）；1 项红
+#       「一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%」（实际 memory.high 是 max，内核 OOM 了一次、由它杀了超账那一条）
+#       多进程那一例这个开关下时红时不红（2026-10-26 两趟里一趟红：内核杀了没超账的常驻那一条、盯账又停了超账那一条），不点名
+#   RUN_WITH_MEMORY_CAP_BREAK=oomadjustflat  oom_score_adj 照改前的两档写（按峰值表或预测放进来的 500、按上限放进来的不写）；1 项红
+#       「不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条」（实际没超账、常驻更大的那一条退 254，超账那一条退 0）
+#   RUN_WITH_MEMORY_CAP_BREAK=slicemarkall  按峰值表放进来而被内核挤掉的一律记成撞过顶，不看峰值超没超出记账（改前的判法）；1 项红
+#       「被内核挤掉而没超出记账的那一条应当退 254」（实际没超账的那一条的键记成了撞过顶）
 #   套在包装里那几项（文件头「套在包装里」一段）：
 #   RUN_WITH_MEMORY_CAP_BREAK=nestedqueues  套在外层里也照没套那样另记账、排队（改前的跑法）
 #       「套在外层里起的一条应当不另记账、不排队」（实际它退 252、用了 4 秒，2026-10-10 崩溃点重放轻型里放量那几项就这样等满 3600 秒退 252）、
@@ -382,17 +495,28 @@
 #   RUN_WITH_MEMORY_CAP_BREAK=recordkilledpeak  命令被外面的信号停（退 128 加 1、2、9、15）而 scope 没撞自己的上限、也没被总上限挤掉时，照旧把半截的峰值记进表、不报「被外面停了」（改前的跑法）；2 项红
 #       「命令被外面的 TERM 停应当原样退 143、报「被外面停了（信号 15），这一次的峰值不记」、峰值表里不留这个键」「命令被外面的 KILL 停应当原样退 137、报「被外面停了（信号 9），这一次的峰值不记」、峰值表里不留这个键」
 #   排队时去找别的机器那几项（文件头「排队时去找别的机器」；RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=host-lookup 只跑这几项）：
-#   RUN_WITH_MEMORY_CAP_BREAK=nohostlookup  排队与退 252 时不查别的机器（改前的跑法）；5 项红
-#       「第二台放得下时排队开始与退 252 时各打一行改去第二台的命令」「几条一起排队时 60 秒内只查一次」「第二台放不下时各打一行第二台此刻也放不下」
+#   RUN_WITH_MEMORY_CAP_BREAK=nohostlookup  排队与退 252 时不查别的机器（改前的跑法）；12 项红：下面列的前六项，加整体兜底那六格（四处抛异常、排队锁被占着、线程里的 query 睡着：关掉查之后走不到、没有那一行）
+#       「第二台放得下时排队开始与退 252 时各打一行改去第二台的命令」「改去第二台的命令里以本机仓根起头的参数改成树内相对路径」「几条一起排队时 60 秒内只查一次」「第二台放不下时各打一行第二台此刻也放不下」
 #       「第二台连不上时各打一行没查到别的机器」「查别的机器超过时限时各打一行没查到别的机器」（实际一行都没打）
-#   RUN_WITH_MEMORY_CAP_BREAK=hostlookupnorecord  放得下也不写告警记录
-#       「第二台放得下时排队开始与退 252 时各打一行改去第二台的命令、各写一条告警记录」（实际告警记录读不了：文件不在）
+#   RUN_WITH_MEMORY_CAP_BREAK=hostlookupnorecord  放得下也不写告警记录；2 项红
+#       「第二台放得下时排队开始与退 252 时各打一行改去第二台的命令、各写一条告警记录」「改去第二台的命令里以本机仓根起头的参数改成树内相对路径」（实际告警记录读不了：文件不在）
+#   RUN_WITH_MEMORY_CAP_BREAK=hostlookupabsolutepath  改去第二台的命令里不把以本机仓根起头的参数改成树内相对路径（改前的跑法）；1 项红
+#       「改去第二台的命令里以本机仓根起头的参数改成树内相对路径（仓根本身写 .），仓根之外的绝对路径与名字只是以仓根起头的路径原样留着」
+#       （实际 stderr 里还是 bash <仓根>/.claude/gate.d/x.sh --check a <仓根>，告警记录的出路里也是）
 #   RUN_WITH_MEMORY_CAP_BREAK=hostlookupblocking  排队开始那一趟在前台查（查完才重判）
 #       「排队开始时在查别的机器（第二台 6 秒才回话）不拖慢准入」（实际挡路那一笔删掉之后 7 秒多才起跑：要等排队开始那一趟查完）
 #   RUN_WITH_MEMORY_CAP_BREAK=hostlookupnotimeout  查别的机器不设时限
 #       「查别的机器超过时限时各打一行没查到别的机器：2 秒没查完」（实际等到 host-resources.py 自己的 8 秒，报的是第二台没读到）
 #   RUN_WITH_MEMORY_CAP_BREAK=hostlookupunthrottled  几条一起排队时各查各的
 #       「几条一起排队时 60 秒内只查一次」（实际后一条也查了、打了改去第二台的命令）
+#   整体兜底那六格（文件头「整体兜底」；下面三个开关打开之后的红是推的，交回时还没在真包装上跑过）：
+#   RUN_WITH_MEMORY_CAP_BREAK=hostlookupnocatch  HostLookup 接住异常也照旧抛出去（拿掉整体兜底的 try）；4 项红
+#       「HostLookup 在「thread-start」那一处抛异常时只打一行没查到别的机器、退出码与关掉它的那一臂相同」与 temp-file、read-output、format 三处的同一项
+#       （应当报退 251：排队那一步带着回溯退 1，包装照「排队那一步退 1」退 251）
+#   RUN_WITH_MEMORY_CAP_BREAK=hostlookuplockblocking  查别的机器那一趟照旧阻塞地取排队锁
+#       「排队锁被别的进程占着时这一趟不查、打一行「没查到别的机器：排队锁 … 被别的进程占着」」（应当报退 124：等那把锁等到 30 秒被停）
+#   RUN_WITH_MEMORY_CAP_BREAK=hostlookupjoinunbounded  等排队开始那一趟收尾不设上限
+#       「线程里的 query 睡着时退 252 之前不一直等它」（应当报退 124：等后台那一趟睡完等到 30 秒被停）
 #   峰值表近几次、峰值涨了、撞顶与被挤掉的告警、有意撞顶不写告警、告警跟着峰值表走那几项（文件头「峰值表」一段；RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=peak-history 只跑这几项）：
 #   RUN_WITH_MEMORY_CAP_BREAK=lastpeakonly  排队记账只看峰值表里最近一次实测（改前的判法）；2 项红
 #       「撞顶之后连跑 4 次干净的应当仍按上限 64M 排，第 5 次干净的也按上限、跑完之后第 6 次才按近 5 次实测里最大的峰值」（实际第 2 次起按最近一次的峰值记账）
@@ -401,20 +525,61 @@
 #       「记账 N MiB（峰值表）、实测约 M MiB 的那一趟应当打「这一次峰值 X，是记账 Y 的 Z 倍：工作量可能变了」与出路、写一条 memory-peak-grew」（实际记录 0 条、没打那一行）
 #   RUN_WITH_MEMORY_CAP_BREAK=growthanysource  判峰值涨了不看记账从哪来：按预测或默认值记账的也报
 #       「记账来自预测的默认值（峰值表里没有这条；跑起来把账上的 need 改成 1 MiB）的那一趟应当不打那一行、不写记录」（实际写了 1 条、打了那一行）
-#   RUN_WITH_MEMORY_CAP_BREAK=nooutcomealert  退 250、254 不写告警记录；2 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=nooutcomealert  退 250、254 不写告警记录；3 项红
 #       「撞了自己的上限应当退 250、往告警记录写一条 memory-own-cap」「按峰值表放进来又被总上限挤掉的那一条应当退 254、往告警记录写一条 memory-squeezed」
+#       「盯账停的那一条应当往告警记录写一条 memory-squeezed」（这一项不在 peak-history 那几项里）
 #       （实际退出码照旧、记录 0 条）
 #   RUN_WITH_MEMORY_CAP_BREAK=oomfirstalerts  设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的退 250、254 照旧写 memory-own-cap、memory-squeezed（改前的写法）；2 项红
 #       「设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的一条撞了自己的上限应当退 250、不写 memory-own-cap」（实际退 250、写了 1 条）
 #       「两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条挨挤之后应当不写 memory-squeezed」（实际写了 1 条；这一项不在 peak-history 那几项里）
-#   RUN_WITH_MEMORY_CAP_BREAK=alertsignorepeaks  不看峰值表在哪，告警一律写真记录（改前的写法）；5 项红
+#   RUN_WITH_MEMORY_CAP_BREAK=alertsignorepeaks  不看峰值表在哪，告警一律写真记录（改前的写法）；6 项红
+#       「盯账停的那一条应当往告警记录写一条 memory-squeezed」（实际峰值表旁边 0 条；这一项不在 peak-history 那几项里）
 #       「峰值表指到默认之外（这一例的临时峰值表）的一条撞顶应当往峰值表旁边的 peaks.tsv.alerts.jsonl 写一条 memory-own-cap、真记录不多一行」（实际旁边 0 条、真记录 1 条）
 #       读峰值表旁边那一份的这几项同样红（实际旁边 0 条，记录写进了这一例的真记录）：「撞了自己的上限应当退 250、往告警记录写一条 memory-own-cap」
 #       「记账 N MiB（峰值表）、实测约 M MiB 的那一趟应当打「这一次峰值 X，是记账 Y 的 Z 倍：工作量可能变了」与出路、写一条 memory-peak-grew」
 #       「按峰值表放进来又被总上限挤掉的那一条应当退 254、往告警记录写一条 memory-squeezed」
 #       「设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的一条撞了自己的上限应当退 250、不写 memory-own-cap」（没设的那一条旁边 0 条）
+#   这一条命令自己的临时目录那几项（文件头「这一条命令自己的临时目录」一段；RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=temporary-directory 只跑这几项）：
+#   RUN_WITH_MEMORY_CAP_BREAK=temporaryleft  包装退出时不删它给命令建的临时目录（改前没有这一步，命令被 SIGKILL 时留下的就一直留着）；5 项红
+#       「命令正常退出之后，包装给它的临时目录应当删掉」「命令退非 0 之后，包装给它的临时目录应当删掉」「命令被 kill -9 之后，包装给它的临时目录应当删掉」
+#       「命令撞了 64M 上限被杀之后，包装给它的临时目录应当删掉」「命令超过限时被停之后，包装给它的临时目录应当删掉」（实际那一份与命令写的文件都还在）
+#   RUN_WITH_MEMORY_CAP_BREAK=temporaryshared  不给命令建它自己的临时目录，调用方没设 TMPDIR 就照没设交给命令（改前的跑法）；6 项红：同上 5 项与
+#       「设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时临时目录应当留着、stderr 打出它的路径」（实际命令拿到的 TMPDIR 是空的）
+#   RUN_WITH_MEMORY_CAP_BREAK=temporarykeepignored  不认 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1，照删
+#       「设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时临时目录应当留着、stderr 打出它的路径」（实际那一份删了、没打那一行）
+#   RUN_WITH_MEMORY_CAP_BREAK=temporarycallerreplaced  调用方设了 TMPDIR 也另建一份顶掉它
+#       「调用方设了 TMPDIR 时命令应当拿到调用方那一份、跑完那一份与里面的文件都还在」（实际命令拿到的是包装另建的那一份）
+#   RUN_WITH_MEMORY_CAP_BREAK=temporarycallerdeleted  调用方设了 TMPDIR 时照它的，退出时却连它一起删
+#       「调用方设了 TMPDIR 时命令应当拿到调用方那一份、跑完那一份与里面的文件都还在」（实际调用方那一份删了）
 #   RUN_WITH_MEMORY_CAP_BREAK=alertspathtext  按字面比峰值表路径、不按真路径：经符号链接指到默认那一份的也当默认之外
 #       「经符号链接 … 指到默认峰值表的一条撞顶应当把 memory-own-cap 写进真记录、默认峰值表旁边不留」（实际真记录 0 条、旁边 1 条）
+#   资源释放广播那几项（文件头「资源释放广播」；RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast 只跑这几项）：
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-none  包装退出时不发（改前的样子）；3 项红
+#       「命令真跑过、退 3 之后应当发一条 memory-released」「起了 scope 之后包装被 TERM 停应当退 143、发一条 memory-released exit=143」
+#       「套在外层包装里跑完的一条应当不发、外层照发一条」（实际事件目录里 0 条）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-unadmitted  排队没放行就退的也发
+#       「排不上当场退 252 的一条应当不发资源释放广播」（实际事件目录里 1 条 exit=252）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-exit-swallowed  EXIT trap 里照广播那一步的退出码 exit（广播失败吞掉包装的退出码）
+#       「资源释放广播那份库出事（自证造的崩溃）时包装应当照退命令的 3」（实际退 1）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-lines-leak  广播那一步打的行照转到包装的 stderr
+#       「资源释放广播那份库出事（自证造的崩溃）时包装应当照退命令的 3、stderr 里没有广播那一步的行」（实际 stderr 里有「自证造的崩溃」那一行）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-nested  套在外层包装里的也发
+#       「套在外层包装里跑完的一条应当不发、外层照发一条」（实际 2 条）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-wake-ignored  排队时收到广播不叫醒、不重查（改前的样子：只每 ADMISSION_POLL_SECONDS 秒重判本机）
+#       「排队中收到第二台那一趟跑完的广播应当当场再查别的机器」（实际没有被资源释放广播叫醒的那一行）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-wake-any  本机自己发的内存放出也叫醒、另查别的机器
+#       「排队中收到本机自己发的内存放出应当不另查别的机器」（实际多了一行被资源释放广播叫醒的查法）
+#   RUN_WITH_MEMORY_CAP_BREAK=broadcast-wake-unthrottled  几条一起排队时一个事件各查各的
+#       「几条一起排队时一个资源释放广播只查一次」（实际两条都打了改去第二台的命令）
+#   RUN_WITH_MEMORY_CAP_BREAK=hostlookupnocatch 另红两项：「被资源释放广播叫醒那一趟起线程时抛异常应当只打一行没查到别的机器、退出码照旧」
+#       「排队中资源释放广播的 follow 出事（自证造的崩溃）应当只打一行没查到别的机器、退出码照旧」（排队那一步带着回溯退 1、包装退 251）
+#   RUN_WITH_MEMORY_CAP_BREAK=guard-off  平常跑设了弄坏开关也不拒（改前的样子：探针往下走到「没给要在上限里跑的命令」退 251，不点名变量）；2 项红
+#       「平常跑（没有自证的标记）设了 RUN_WITH_MEMORY_CAP_BREAK 应当退 2、点名它只在自证里认」标记「空」与标记指到头一行不对的文件各一项（实际退 251，报的是没给命令）
+#
+# 弄坏开关只在自证里认：RUN_WITH_MEMORY_CAP_BREAK 非空（guard-off 除外）、头一个参数不是 --selftest、又没有自证的标记的，在 preflight 之后、读参数之前退 2，
+#   stderr 点名这个变量只在自证（--selftest）里认，命令一行都没跑。自证的标记：RUN_WITH_MEMORY_CAP_SELFTEST_MARK=<文件>，那份文件在、头一行是 SELFTEST_MARK_CONTENT 那一行。
+#   --selftest 把它建在自己的临时目录里、export 给起的每一份包装；把这个开关原样传给包装的调用方自证（scripts/mutation/mutate.sh、scripts/hosts/multi-host-run.sh）
+#   同样建一份写这一行的标记文件、export 这个变量。标记随环境传给命令（套在外层里那几例的里层包装要认它）；自证收尾删掉标记文件，漏出去的变量指不到文件，不再认。
 #
 # 发信号的地方，每一处只打得到这一条自己起的进程（用户 2026-09-25 定「后面的脚本不能终止前面的脚本」「不能动 ssh」；
 # records/2026-09-16-subagent拆分提案.md 第四十节第 32 行）：
@@ -441,6 +606,9 @@ MEBIBYTE=$((1024 * 1024))
 DEFAULT_RESERVE="20G"                 # 依据见文件头「余量」一段
 DEFAULT_WAIT_SECONDS=3600             # 依据见文件头「排队」一段
 DEFAULT_KILL_GRACE_SECONDS=30
+SLICE_HIGH_PERMILLE=950                         # slice 的 memory.high 与盯账的触发线 = memory.max 的这么多千分之一（文件头「盯账」一段）
+OVER_BOOKING_TOLERANCE_BYTES=$((16 * 1024 * 1024))   # 超出记账过了这么多才算超账：盯账停谁、内核挤掉的记不记撞过顶都按它（文件头「盯账」一段）
+OVER_BOOKING_POLL_SECONDS=0.05                  # 盯账隔多久看一次
 BROKEN_JUDGEMENT="${RUN_WITH_MEMORY_CAP_BREAK:-}"
 # 起 scope 的 systemd-run 放后台（文件头「被停」一段），脚本里 & 起的命令一律忽略 INT、进了 bash 也 trap 不上：包装自己进来时 INT 没被忽略的，给它设回默认；
 # 进来时就被忽略的（调用方有意如此）照旧忽略
@@ -451,6 +619,20 @@ CAP_MODE=run                          # run_capped 的 mode（run：真要跑命
 NESTED_IN_OUTER_SCOPE=0               # 1：这一条套在外层包装的 scope 里（文件头「套在包装里」一段），不另记账、不排队
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+# 弄坏开关只在自证里认（文件头「弄坏开关只在自证里认」一段）：平常跑设了就在读参数之前退 2；弄坏开关 guard-off 下不拒（改前的样子）
+SELFTEST_MARK_CONTENT="run-with-memory-cap.sh --selftest 起的包装"
+if [[ -n "$BROKEN_JUDGEMENT" && "$BROKEN_JUDGEMENT" != guard-off && "${1:-}" != --selftest ]] \
+    && [[ -z "${RUN_WITH_MEMORY_CAP_SELFTEST_MARK:-}" || "$(head -n 1 -- "$RUN_WITH_MEMORY_CAP_SELFTEST_MARK" 2>/dev/null)" != "$SELFTEST_MARK_CONTENT" ]]; then
+  echo "  ✗ RUN_WITH_MEMORY_CAP_BREAK=$BROKEN_JUDGEMENT 是弄坏开关，只在自证（--selftest）里认；平常跑设了就拒，这一次命令一行都没跑（退 2）" >&2
+  echo "     → 怎么办：去掉 RUN_WITH_MEMORY_CAP_BREAK 再跑；要证红就跑 RUN_WITH_MEMORY_CAP_BREAK=<项> bash scripts/hosts/run-with-memory-cap.sh --selftest；调用方的自证要把它传给包装的，照文件头那一段建标记文件、export RUN_WITH_MEMORY_CAP_SELFTEST_MARK" >&2
+  exit 2
+fi
+# 只给自证的两个开关（文件头「其余环境变量」）：带着自证的标记才认，平常跑设了不起作用
+SELFTEST_KERNEL_ONLY=0 SELFTEST_WATCH_TRACE=""
+if [[ -n "${RUN_WITH_MEMORY_CAP_SELFTEST_MARK:-}" && "$(head -n 1 -- "$RUN_WITH_MEMORY_CAP_SELFTEST_MARK" 2>/dev/null)" == "$SELFTEST_MARK_CONTENT" ]]; then
+  [[ -z "${RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY:-}" ]] || SELFTEST_KERNEL_ONLY=1
+  SELFTEST_WATCH_TRACE="${RUN_WITH_MEMORY_CAP_SELFTEST_WATCH_TRACE:-}"
+fi
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIRECTORY/heavy-threads.sh"     # heavy_thread_default：峰值表的线程数一列认 capped.sh default
 SELF_PATH="$SCRIPT_DIRECTORY/$(basename "${BASH_SOURCE[0]}")"
@@ -462,6 +644,7 @@ STATE_DIRECTORY="${RUN_WITH_MEMORY_CAP_STATE_DIR:-${XDG_RUNTIME_DIR:-/run/user/$
 TIME_LIMIT_SECONDS="${RUN_WITH_MEMORY_CAP_TIME_LIMIT:-}"
 KILL_GRACE_SECONDS="${RUN_WITH_MEMORY_CAP_KILL_GRACE:-$DEFAULT_KILL_GRACE_SECONDS}"
 JOURNALCTL="${RUN_WITH_MEMORY_CAP_JOURNALCTL:-journalctl}"   # 只给自证换成假的（文件头「显存不够」一段）
+TEMPORARY_ROOT="${RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT:-/tmp}"   # 这一条命令自己的临时目录建在它下面（文件头「这一条命令自己的临时目录」一段）
 # 弄坏开关 dailynoqueue：照撤之前那样，从会话里起、不带 SINGLEFS_HEAVY_TESTS 的默认不排队（文件头「日常一条」一段）
 if [[ "$BROKEN_JUDGEMENT" == "dailynoqueue" && -z "${SINGLEFS_HEAVY_TESTS:-}" && -n "${CLAUDE_CODE_SESSION_ID:-}" ]]; then DEFAULT_WAIT_SECONDS=0; fi
 WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-$DEFAULT_WAIT_SECONDS}"
@@ -509,6 +692,67 @@ report_unavailable() {
   echo "  ✗ 带内存上限的 scope 起不来：$1" >&2
   echo "  → 怎么办：$2" >&2
   exit "$MEMORY_CAP_UNAVAILABLE_EXIT"
+}
+
+# 这一条命令自己的临时目录（文件头「这一条命令自己的临时目录」一段）：own_temporary_directory 记着包装建的那一份，EXIT trap 里删
+own_temporary_directory=""
+begin_own_temporary_directory() {
+  if [[ -n "${TMPDIR:-}" && "$BROKEN_JUDGEMENT" != "temporarycallerreplaced" ]]; then
+    [[ "$BROKEN_JUDGEMENT" == "temporarycallerdeleted" ]] && own_temporary_directory="$TMPDIR"
+    return 0
+  fi
+  [[ "$BROKEN_JUDGEMENT" == "temporaryshared" ]] && return 0
+  if ! own_temporary_directory="$(mktemp -d "$TEMPORARY_ROOT/singlefs-run-with-memory-cap-$$-XXXXXX")"; then
+    own_temporary_directory=""
+    report_unavailable "建不了这一条命令自己的临时目录（mktemp -d 在 $TEMPORARY_ROOT 下失败），命令一行都没跑" \
+      "看 $TEMPORARY_ROOT 在不在、可不可写、盘满没满（df -h $TEMPORARY_ROOT）；或由调用方自己设 TMPDIR（那一份归调用方删）"
+  fi
+  TMPDIR="$own_temporary_directory"
+  export TMPDIR
+}
+
+end_own_temporary_directory() {
+  local directory="$own_temporary_directory"
+  [[ -n "$directory" ]] || return 0
+  own_temporary_directory=""
+  if [[ "${SINGLEFS_KEEP_TEST_TEMPORARY_FILES:-}" == 1 && "$BROKEN_JUDGEMENT" != "temporarykeepignored" ]]; then
+    echo "run-with-memory-cap: SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1：这一条命令的临时目录留着看现场：$directory" >&2
+    return 0
+  fi
+  [[ "$BROKEN_JUDGEMENT" == "temporaryleft" ]] && return 0
+  rm -rf -- "${directory:?}"
+  if [[ -e "$directory" ]]; then
+    echo "run-with-memory-cap: 这一条命令的临时目录 $directory 删不干净（rm -rf 之后回读还在），退出码照命令的结局" >&2
+    echo "run-with-memory-cap: → 怎么办：ls -la $directory 看剩下什么、权限对不对；有进程还开着里面的文件就先 python3 scripts/hosts/run_build_directory.py holders $directory 找出来按进程号停，再手删" >&2
+  fi
+}
+
+# 资源释放广播（文件头「资源释放广播」）：run_capped 在命令真跑过之后置这三样，包装退出时 broadcast_memory_released 读
+memory_command_ran=0          # 1：scope 里的外壳起来过（命令跑过）
+released_unit=""              # 这一条的 scope 单元名（事件的标签）
+released_memory_bytes=""      # 这一条量到的峰值，没量到取账上记的要的量
+broadcast_memory_released() { # broadcast_memory_released <包装的退出码>：发一条 memory-released；广播那一步的输出不往包装的 stdout / stderr 带，退出码交回给弄坏开关用
+  local -a memory_option=()
+  [[ "$BROKEN_JUDGEMENT" != "broadcast-none" ]] || return 0
+  ((memory_command_ran)) || return 0
+  if ((NESTED_IN_OUTER_SCOPE)) && [[ "$BROKEN_JUDGEMENT" != "broadcast-nested" ]]; then return 0; fi
+  [[ -z "${RUN_WITH_MEMORY_CAP_STATE_DIR:-}" || -n "${RESOURCE_BROADCAST_DIRECTORY:-}" ]] || return 0
+  [[ "$released_memory_bytes" =~ ^[0-9]+$ ]] && memory_option=(--memory-bytes "$released_memory_bytes")
+  if [[ "$BROKEN_JUDGEMENT" == "broadcast-lines-leak" ]]; then
+    python3 "$SCRIPT_DIRECTORY/resource_release_broadcast.py" emit --kind memory-released --label "${released_unit:-singlefs-memory-cap}" --exit-code "$1" \
+      ${memory_option[@]+"${memory_option[@]}"} --problems-to-log < /dev/null
+    return
+  fi
+  python3 "$SCRIPT_DIRECTORY/resource_release_broadcast.py" emit --kind memory-released --label "${released_unit:-singlefs-memory-cap}" --exit-code "$1" \
+    ${memory_option[@]+"${memory_option[@]}"} --problems-to-log < /dev/null > /dev/null 2>&1
+}
+
+# EXIT trap：先删这一条命令自己的临时目录，再发资源释放广播；不调 exit，包装的退出码照旧（弄坏开关 broadcast-exit-swallowed 下照广播那一步的退出码退）
+on_wrapper_exit() {
+  local wrapper_exit=$? broadcast_exit=0
+  end_own_temporary_directory
+  broadcast_memory_released "$wrapper_exit" || broadcast_exit=$?
+  if [[ "$BROKEN_JUDGEMENT" == "broadcast-exit-swallowed" ]]; then exit "$broadcast_exit"; fi
 }
 
 check_size_syntax() { # check_size_syntax <写法> <是什么>
@@ -593,7 +837,35 @@ adopt_existing_slice_total() { # adopt_existing_slice_total <slice 的 cgroup �
 # 余量不同的调用者并发（文件头「余量」一段「并发调用者」）：slice 此刻的 MemoryMax 与自己算的不同、而 slice 上有活着的 scope 或账，照已有的值走、不去改它；
 # 自己设完读回的是别人刚设的另一个正整数，同样照读回的走。读回不是正整数（max、读不到）才是控制器没下放，照旧报错。
 # 弄坏开关 reject-foreign-reserve：两处都不采纳，读回不是自己设的就报错（改前的跑法）。
+# 总上限定下来之后再设 slice 的 memory.high（ensure_slice_high）。
 ensure_slice() {
+  ensure_slice_total && ensure_slice_high
+}
+
+# slice 的 memory.high = 总上限的 SLICE_HIGH_PERMILLE ‰（按 MiB 向下取整，文件头「盯账」②）：越过它的分配被内核节流，盯账赶得上一口气拿满的那种分配。
+# 照已有总上限走的那一支（总上限是别的调用者设的）也按那个总上限设。已经是这个数就不再设；设不上（set-property 失败、读回不是正整数）设 SLICE_PROBLEM、交非 0；
+# 读回是别的正整数（另一个调用者在设与读回之间按它的总上限设了）照读回的走。
+# 自证的 RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY 与弄坏开关 noslicehigh 下不设。
+ensure_slice_high() {
+  local wanted read_back="" control_output
+  [[ "$BROKEN_JUDGEMENT" != "noslicehigh" ]] || return 0
+  ((SELFTEST_KERNEL_ONLY)) && return 0
+  wanted=$((SLICE_TOTAL_BYTES * SLICE_HIGH_PERMILLE / 1000 / MEBIBYTE * MEBIBYTE))
+  IFS= read -r read_back < "$SLICE_DIRECTORY/memory.high" 2>/dev/null
+  [[ "$read_back" == "$wanted" ]] && return 0
+  if ! control_output="$(systemctl --user set-property --runtime "$SLICE" MemoryHigh="$wanted" 2>&1)"; then
+    SLICE_PROBLEM="systemctl --user set-property --runtime $SLICE MemoryHigh=$wanted 失败：$control_output"
+    return 1
+  fi
+  read_back=""
+  IFS= read -r read_back < "$SLICE_DIRECTORY/memory.high" 2>/dev/null
+  if [[ ! "$read_back" =~ ^[1-9][0-9]*$ ]]; then
+    SLICE_PROBLEM="设了 MemoryHigh=$wanted，读回 $SLICE_DIRECTORY/memory.high 是「${read_back:-读不到}」"
+    return 1
+  fi
+}
+
+ensure_slice_total() {
   local cgroup_path control_output read_back existing_total live_users
   SLICE_PROBLEM=""
   if ! SLICE_TOTAL_BYTES="$(slice_total_bytes)"; then
@@ -722,11 +994,26 @@ stop_queued_admission() { # stop_queued_admission <退出码>
 # 进程号是 `&` 当场记下的（`&` 与记下之间就到的，拿 $!），发之前核 /proc 里它的父进程是这个包装。
 scope_runner_pid=""        # systemd-run 的进程号：放后台那一刻记下，wait 等到它退出就清空
 scope_runner_forking=0     # 正在起 systemd-run
+over_booking_watcher_pid=""   # 盯账的子进程号（文件头「盯账」①）：放后台那一刻记下，stop_over_booking_watcher 停完清空
+
+# 停盯账的子进程：只给 `&` 当场记下的那一个进程号发 TERM（它写标记与 cgroup.kill 那一段挡着 TERM，写完才退），再等它退出
+stop_over_booking_watcher() {
+  [[ -n "$over_booking_watcher_pid" ]] || return 0
+  kill -TERM "$over_booking_watcher_pid" 2>/dev/null
+  wait "$over_booking_watcher_pid" 2>/dev/null
+  over_booking_watcher_pid=""
+}
+
 stop_own_scope_then_exit() { # stop_own_scope_then_exit <退出码>
   local runner_pid="$scope_runner_pid" stat_line
   local -a stat_fields=()
   if [[ -z "$runner_pid" ]] && ((scope_runner_forking)); then
     runner_pid="${!:-}"
+  fi
+  stop_over_booking_watcher
+  # 资源释放广播（文件头「资源释放广播」）：scope 里的外壳起来过（标记在）才算命令跑过，包装退出时照发
+  if [[ "$CAP_MODE" == "run" && -e "$started_marker" ]]; then
+    memory_command_ran=1 released_unit="$unit" released_memory_bytes="${admitted_need:-}"
   fi
   if [[ "$BROKEN_JUDGEMENT" != "term-leaves-scope" ]] && ! systemctl --user stop "$unit.scope" >/dev/null 2>&1; then
     if [[ -n "$runner_pid" ]] && IFS= read -r stat_line 2>/dev/null < "/proc/$runner_pid/stat"; then
@@ -734,7 +1021,7 @@ stop_own_scope_then_exit() { # stop_own_scope_then_exit <退出码>
       [[ "${stat_fields[1]:-}" == "$$" ]] && kill -TERM "$runner_pid" 2>/dev/null
     fi
   fi
-  rm -f -- "$started_marker" "$STATE_DIRECTORY/ledger/$unit.json" "$peak_file" "$peak_file.partial"
+  rm -f -- "$started_marker" "$STATE_DIRECTORY/ledger/$unit.json" "$peak_file" "$peak_file.partial" "$peak_file.over-booking" "$peak_file.over-booking.partial"
   exit "$1"
 }
 
@@ -760,7 +1047,7 @@ admission() {
       admission_exit=$?
     fi
   } 3<<'PY'
-import contextlib, dataclasses, fcntl, importlib.util, json, os, shlex, signal, subprocess, sys, tempfile, threading, time
+import contextlib, dataclasses, fcntl, importlib.util, json, os, select, shlex, signal, subprocess, sys, tempfile, threading, time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -776,6 +1063,18 @@ HOST_LOOKUP_SECONDS = 15.0              # 查别的机器一趟至多等这么�
 HOST_LOOKUP_PEER_TIMEOUT_SECONDS = 8    # 交给 host-resources.py 的每台时限（HOST_RESOURCES_HOST_TIMEOUT_SECONDS）
 HOST_LOOKUP_SAMPLE_SECONDS = 0.2        # 交给 host-resources.py 的核占用采样间隔（HOST_RESOURCES_SAMPLE_SECONDS）
 HOST_LOOKUP_EVERY_SECONDS = 60.0        # 几条一起排队时每这么多秒只查一次
+HOST_LOOKUP_LOCK_SECONDS = 0.5          # 查的那一趟不阻塞地取排队锁，至多试这么久（排队那一步每轮只占锁一瞬，避开它）；取不到这一趟不查（文件头「整体兜底」）
+HOST_LOOKUP_JOIN_MARGIN_SECONDS = 2.0   # 等在查的那一趟收尾至多等它的时限再加这么久，过了不再等它（文件头「整体兜底」）
+HOST_LOOKUP_SELFTEST_HANDOFF_SECONDS = 10.0   # 只给自证：叫自证的占锁进程来占排队锁之后至多等它这么久
+# 只给自证（「整体兜底」那几格）：RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT 点名的那一处抛它在真世界里会抛的那一种
+HOST_LOOKUP_SELFTEST_FAULTS = {
+    "thread-start": lambda: RuntimeError("can't start new thread（自证造的）"),
+    "temp-file": lambda: OSError(28, "No space left on device（自证造的）"),
+    "read-output": lambda: UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte（自证造的）"),
+    "format": lambda: TypeError("unsupported format string passed to NoneType.__format__（自证造的）"),
+    "wake-thread": lambda: RuntimeError("can't start new thread（自证造的，被资源释放广播叫醒那一趟）"),
+}
+BROADCAST_WAKE_KINDS = ("peer-run-finished",)   # 本机自己发的事件里叫醒另查的种类；别的机器推来的（source=pushed）一律叫醒（文件头「资源释放广播」）
 MEMORY_QUEUE_RECORD_KIND = "memory-queue-peer-fits"   # 告警记录的种类：scripts/agents/agent-watch.py 认它
 MEBIBYTE = 1024 * 1024
 state_directory = os.environ["RUN_WITH_MEMORY_CAP_STATE_DIR_RESOLVED"]
@@ -786,7 +1085,7 @@ broken = os.environ.get("RUN_WITH_MEMORY_CAP_BREAK", "")
 PEAK_TABLE_HEADER = [
     "# 每条命令近几次实测的内存峰值：scripts/hosts/run-with-memory-cap.sh 建、读、写（排队时按它算「这条要的量」：近几次里最大的，近几次里撞过顶就按上限），别手改。",
     "# 口径：scope 里的外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak，按 MiB 向上取整的字节数；含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。",
-    "#   撞了这一条自己的上限的记成上限；超时、被停、被总上限挤掉的不记（量到的是半截）。只在本机成立，换机器要重量，所以放在仓外的本机数据目录里。",
+    "#   撞了这一条自己的上限的、被盯账停了的、超出记账又被总上限挤掉的记成上限；超时、被停、没超出记账而被挤掉的不记（量到的是半截）。只在本机成立，换机器要重量，所以放在仓外的本机数据目录里。",
     "# 列（制表符分隔）：峰值字节、量的时刻（ISO 8601，Z 结尾）、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）、"
     "线程数（命令里 capped.sh 的 N，否则包装环境里 capped.sh 那几个线程变量的值，都没设写「未设（整机 N 核）」；加这一列之前记的行没有这一列）、"
     f"近几次（最近 {peaks.RECENT_MEASUREMENTS} 次实测，新的在前，逗号隔开，每次「<峰值字节>:hit」撞了顶或「<峰值字节>:clean」整段跑完；加这一列之前记的行没有这一列）。"
@@ -805,14 +1104,28 @@ size_bytes = peaks.size_bytes
 
 
 @contextlib.contextmanager
-def admission_lock():
+def admission_lock(within_seconds=None):
+    """排队那把锁，交拿没拿到。within_seconds 是 None 时等到拿到为止（排队与记账）；给了秒数就不阻塞地试（LOCK_NB），至多试这么久，
+    拿不到交 False、不等（查别的机器那一趟：HostLookup.take_turn，文件头「排队时去找别的机器」「整体兜底」）。弄坏开关 hostlookuplockblocking 下照旧等到拿到。"""
     if broken == "nolock":
-        yield
+        yield True
         return
     with open(lock_path, "a", encoding="utf-8") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
+        if within_seconds is None or broken == "hostlookuplockblocking":
+            fcntl.flock(handle, fcntl.LOCK_EX)
+        else:
+            deadline = time.monotonic() + within_seconds
+            while True:
+                try:
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        yield False
+                        return
+                    time.sleep(0.05)
         try:
-            yield
+            yield True
         finally:
             fcntl.flock(handle, fcntl.LOCK_UN)
 
@@ -917,6 +1230,30 @@ def say(text):
         print(text, file=sys.stderr, flush=True)
 
 
+def selftest_fault(point):
+    """只给自证（「整体兜底」那几格）：RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT 点名这一处时，在这里抛它在真世界里会抛的那一种（HOST_LOOKUP_SELFTEST_FAULTS）。"""
+    if os.environ.get("RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT", "") == point:
+        raise HOST_LOOKUP_SELFTEST_FAULTS[point]()
+
+
+def tree_relative_arguments(arguments):
+    """被包的命令里整词是本机仓根、或以「仓根/」起头的参数改写成树内相对路径（仓根本身写 .），别的参数原样：改去第二台的命令在第二台那棵树的树根起，
+    本机仓根的绝对路径在那边不存在（文件头「排队时去找别的机器」）。仓根是这份包装所在的树，逻辑路径与符号链接解开后的路径都认。
+    弄坏开关 hostlookupabsolutepath 下原样不改。"""
+    if broken == "hostlookupabsolutepath":
+        return list(arguments)
+    top = os.path.normpath(os.path.join(os.environ["RUN_WITH_MEMORY_CAP_SCRIPT_DIRECTORY_RESOLVED"], "..", ".."))
+    roots = list(dict.fromkeys([top, os.path.realpath(top)]))
+    rewritten = []
+    for argument in arguments:
+        for root in roots:
+            if argument == root or argument.startswith(root + "/"):
+                argument = argument[len(root):].lstrip("/") or "."
+                break
+        rewritten.append(argument)
+    return rewritten
+
+
 class HostLookup:
     """排队时去找别的机器（文件头「排队时去找别的机器」）：现查第二台此刻放不放得下这一条，判法是 scripts/hosts/host-resources.py 的逐台判
     （host-dispatch.py 的 predict 与 judge_host），这里不另写；放得下就打改去那台的命令、写告警记录，查不到照实打一行原因。"""
@@ -928,136 +1265,333 @@ class HostLookup:
         self.thread = None
         self.stopped = False
         self.alerted = False     # 写过 phase=queued 的告警记录：放行时补一条 admitted
+        self.events = None       # 收资源释放广播的 follow（文件头「资源释放广播」）：自己起的子进程，收尾时按它的进程号停
+        self.event_buffer = b""
+        self.wake_thread = None  # 被资源释放广播叫醒那一趟
+        self.pending_wake = None # 叫醒时还有一趟在查：记下最新的（号, 种类），查完再查
+        self.queued_at = time.time()   # 排队开始那一刻（begin 里改成那一刻）：交给 follow 的 --since
+
+    # 整体兜底（文件头「整体兜底」）：begin、finish、run、query、cancel 整段包在 try 里，出了任何异常只打一行（warn），排队与退出码照旧；
+    # 被 TERM 停的 SystemExit 不是 Exception，照旧往外走。弄坏开关 hostlookupnocatch 下接住了也照旧抛出去（拿掉 try 的样子）。
+
+    def warn(self, where, error):
+        """出了异常只打一行，打不出来也不往外抛。"""
+        try:
+            say(f"run-with-memory-cap: 没查到别的机器：{where}出了 {type(error).__name__}（{str(error)[:200]}），这一趟不查；排队与退出码照旧")
+        except Exception:
+            pass
+
+    def limit(self):
+        """查一趟的时限（秒）：RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS 换掉 HOST_LOOKUP_SECONDS（只给自证）；写的不是正的秒数交 None。"""
+        limit_text = os.environ.get("RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS", "")
+        try:
+            limit = float(limit_text) if limit_text else HOST_LOOKUP_SECONDS
+        except ValueError:
+            return None
+        return limit if limit > 0 else None
+
+    def wait_thread(self):
+        """等排队开始那一趟收尾：至多它的时限加 HOST_LOOKUP_JOIN_MARGIN_SECONDS 秒，过了不再等它（daemon 线程，包装退出时随之没了）。
+        弄坏开关 hostlookupjoinunbounded 下等到它收尾为止。"""
+        thread, self.thread = self.thread, None
+        self.join_lookup(thread, "排队开始那一趟")
+
+    def wait_wake_thread(self):
+        """等被资源释放广播叫醒那一趟收尾（文件头「资源释放广播」），时限与 wait_thread 相同。"""
+        thread, self.wake_thread = self.wake_thread, None
+        self.join_lookup(thread, "被资源释放广播叫醒那一趟")
+
+    def join_lookup(self, thread, what):
+        """wait_thread 与 wait_wake_thread 共用的等法（不按属性名取线程：闭包认不出 getattr 变量名，判法单元会拒算）。"""
+        if thread is None:
+            return
+        if broken == "hostlookupjoinunbounded":
+            thread.join()
+            return
+        bound = (self.limit() or HOST_LOOKUP_SECONDS) + HOST_LOOKUP_JOIN_MARGIN_SECONDS
+        thread.join(bound)
+        if thread.is_alive():
+            say(f"run-with-memory-cap: 没查到别的机器：{what} {bound:g} 秒还没查完，不再等它")
 
     def begin(self, local):
         """排队开始那一刻：放到后台线程查，排队照旧重判（不拖慢准入）。"""
-        if broken == "nohostlookup":
+        try:
+            if broken == "nohostlookup":
+                return
+            self.queued_at = time.time()
+            self.watch_events()
+            if broken == "hostlookupblocking":
+                self.run("queued", local)
+                return
+            selftest_fault("thread-start")
+            thread = threading.Thread(target=self.run, args=("queued", local), daemon=True)
+            thread.start()
+            self.thread = thread
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            self.warn("排队开始那一趟起线程时", error)
+
+    def watch_events(self):
+        """排队开始那一刻起一个资源释放广播的 follow（文件头「资源释放广播」）：只起这一个，收尾时只停这一个。
+        RUN_WITH_MEMORY_CAP_HOST_LOOKUP 设了不起（这一条不查别的机器，叫醒了也不查）。起不来只打一行，排队照旧。"""
+        try:
+            if os.environ.get("RUN_WITH_MEMORY_CAP_HOST_LOOKUP", "") or self.events is not None:
+                return
+            script = os.path.join(os.environ["RUN_WITH_MEMORY_CAP_SCRIPT_DIRECTORY_RESOLVED"], "resource_release_broadcast.py")
+            with self.guard:
+                if self.stopped:
+                    return
+                # --since 排队开始这一刻：follow 起得慢也不漏掉起动那一会儿来的事件
+                self.events = subprocess.Popen([sys.executable, "-B", script, "follow", "--since", f"{self.queued_at:.3f}"], stdout=subprocess.PIPE,
+                                               stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            self.events = None
+            self.warn("起资源释放广播的 follow 时", error)
+
+    def stop_events(self):
+        """停自己起的 follow（按它的进程号），等它退出。"""
+        events, self.events = self.events, None
+        if events is None:
             return
-        if broken == "hostlookupblocking":
-            self.run("queued", local)
-            return
-        self.thread = threading.Thread(target=self.run, args=("queued", local), daemon=True)
-        self.thread.start()
+        if events.poll() is None:
+            events.kill()   # 只停自己起的这一个（按它的进程号）
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            events.wait(timeout=5)
+        with contextlib.suppress(OSError):
+            events.stdout.close()
+
+    def pause(self, seconds, local):
+        """排队这一轮的等（文件头「资源释放广播」）：「新事件或 seconds 到点」先到者；收到该叫醒的就在后台再查一次别的机器。
+        follow 没起、退了、读出了异常：只打一行（退了与异常），照旧睡满这一轮。弄坏开关 broadcast-wake-ignored 下只睡、不看广播。"""
+        started = time.monotonic()
+        try:
+            events = self.events
+            if events is None or broken == "broadcast-wake-ignored":
+                time.sleep(seconds)
+                return
+            ready, _, _ = select.select([events.stdout.fileno()], [], [], seconds)
+            chunk = os.read(events.stdout.fileno(), 65536) if ready else None
+            if chunk == b"":
+                code = events.poll()
+                self.stop_events()
+                raise RuntimeError(f"资源释放广播的 follow 退了（退出码 {code}），之后只每 {ADMISSION_POLL_SECONDS:g} 秒重判本机")
+            if chunk:
+                self.event_buffer += chunk
+                *lines, self.event_buffer = self.event_buffer.split(b"\n")
+                wake = None
+                for line in lines:
+                    fields = dict(word.split("=", 1) for word in line.decode("utf-8", "replace").split() if "=" in word)
+                    if not fields.get("seq", "").isdigit():
+                        continue
+                    if fields.get("source") == "pushed" or fields.get("kind") in BROADCAST_WAKE_KINDS or broken == "broadcast-wake-any":
+                        wake = (int(fields["seq"]), fields.get("kind", "?"))
+                if wake is not None:
+                    self.wake(wake, local)
+            if self.pending_wake is not None:
+                self.wake(self.pending_wake, local)
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            self.stop_events()
+            self.warn("等资源释放广播时", error)
+            remaining = seconds - (time.monotonic() - started)
+            if remaining > 0:
+                time.sleep(remaining)
+
+    def wake(self, woken, local):
+        """收到该叫醒的资源释放广播（woken 是（号, 种类））：后台再跑一次查法；排队开始那一趟或上一次叫醒那一趟还在查的，记下最新的号，查完再查。"""
+        try:
+            with self.guard:
+                if self.stopped:
+                    return
+                busy = any(thread is not None and thread.is_alive() for thread in (self.thread, self.wake_thread))
+                if busy:
+                    self.pending_wake = max(self.pending_wake or woken, woken)
+                    return
+                self.pending_wake = None
+            selftest_fault("wake-thread")
+            thread = threading.Thread(target=self.run, args=("queued", local, woken), daemon=True)
+            thread.start()
+            self.wake_thread = thread
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            self.warn("被资源释放广播叫醒那一趟起线程时", error)
 
     def finish(self, local):
-        """退 252 之前：先等排队开始那一趟查完（至多它的时限），再现查一趟。"""
-        if broken == "nohostlookup":
-            return
-        if self.thread is not None:
-            self.thread.join()
-            self.thread = None
-        self.run("refused", local)
+        """退 252 之前：先等排队开始那一趟与叫醒那一趟查完（各至多它的时限加 HOST_LOOKUP_JOIN_MARGIN_SECONDS），再现查一趟。"""
+        try:
+            if broken == "nohostlookup":
+                return
+            self.stop_events()
+            self.wait_thread()
+            self.wait_wake_thread()
+            self.run("refused", local)
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            self.warn("退 252 之前那一趟", error)
 
     def cancel(self, admitted):
         """排队这一步要退了：停掉在查的那一趟；写过 queued 告警的、又在本机放行了，补一条 admitted。"""
-        with self.guard:
-            self.stopped = True
-            process = self.process
-        if process is not None and process.poll() is None:
-            process.kill()   # 只停自己起的这一个（按它的进程号）；它起的 ssh 由 ssh 自己收尾
-        if self.thread is not None:
-            self.thread.join()
-        if admitted and self.alerted:
-            self.record("admitted", {}, {}, f"run-with-memory-cap: 排了队之后在本机起跑了（{self.unit}）", "")
+        try:
+            with self.guard:
+                self.stopped = True
+                process = self.process
+            if process is not None and process.poll() is None:
+                process.kill()   # 只停自己起的这一个（按它的进程号）；它起的 ssh 由 ssh 自己收尾
+            self.stop_events()
+            self.wait_thread()
+            self.wait_wake_thread()
+            if admitted and self.alerted:
+                self.record("admitted", {}, {}, f"run-with-memory-cap: 排了队之后在本机起跑了（{self.unit}）", "")
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            self.warn("收尾时", error)
 
-    def take_turn(self):
-        """几条一起排队时每 HOST_LOOKUP_EVERY_SECONDS 秒只查一次：轮到交空串，轮不到交原因。同一个包装的两趟不互相挡。"""
-        if broken == "hostlookupunthrottled":
+    def take_turn(self, woken=None):
+        """几条一起排队时每 HOST_LOOKUP_EVERY_SECONDS 秒只查一次：轮到交空串，轮不到交原因。同一个包装的两趟不互相挡。
+        被资源释放广播叫醒的那一趟（woken 是（号, 种类））不看 60 秒，按事件去重：同一个号别的包装已经查过就不查（文件头「资源释放广播」）。
+        排队锁不阻塞地取（至多试 HOST_LOOKUP_LOCK_SECONDS 秒），被别的进程占着就交「锁被占着」的原因，这一趟不查（文件头「整体兜底」）。"""
+        if broken == "hostlookupunthrottled" and woken is None:
             return ""
         path = os.path.join(state_directory, "host-lookup.json")
+        handoff = os.environ.get("RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_LOCK_HANDOFF", "")
+        if handoff:   # 只给自证「锁被别的进程占着」那一格：叫自证的占锁进程来占住排队锁，等它占上了再取（真卡住的世界，不抛异常冒充）
+            with open(os.path.join(handoff, "request"), "w", encoding="utf-8"):
+                pass
+            deadline = time.monotonic() + HOST_LOOKUP_SELFTEST_HANDOFF_SECONDS
+            while not os.path.exists(os.path.join(handoff, "taken")) and time.monotonic() < deadline:
+                time.sleep(0.05)
         try:
-            with admission_lock():
+            with admission_lock(within_seconds=HOST_LOOKUP_LOCK_SECONDS) as locked:
+                if not locked:
+                    return (f"排队锁 {lock_path} 被别的进程占着（{HOST_LOOKUP_LOCK_SECONDS:g} 秒内没拿到），这一趟不查；"
+                            "要现查：python3 scripts/hosts/host-resources.py -- <这条命令>")
                 try:
                     with open(path, encoding="utf-8") as handle:
                         last = json.load(handle)
                 except (OSError, ValueError):
                     last = {}
+                if not isinstance(last, dict):
+                    last = {}
                 now = time.time()
-                if isinstance(last, dict) and isinstance(last.get("pid"), int) and last["pid"] != self.wrapper_pid \
-                        and isinstance(last.get("at"), (int, float)) and 0 <= now - last["at"] < HOST_LOOKUP_EVERY_SECONDS:
+                last_event = last.get("event") if isinstance(last.get("event"), int) else 0
+                someone_else = isinstance(last.get("pid"), int) and last["pid"] != self.wrapper_pid
+                if woken is not None:
+                    if someone_else and last_event >= woken[0] and broken != "broadcast-wake-unthrottled":
+                        return (f"第 {woken[0]} 号资源释放广播包装 {last['pid']} 已经查过（几条一起排队时一个事件只查一次，看那一条打的；"
+                                f"要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）")
+                    last_event = max(last_event, woken[0])
+                elif someone_else and isinstance(last.get("at"), (int, float)) and 0 <= now - last["at"] < HOST_LOOKUP_EVERY_SECONDS:
                     return (f"{now - last['at']:.0f} 秒前包装 {last['pid']} 刚查过（几条一起排队时每 {HOST_LOOKUP_EVERY_SECONDS:g} 秒只查一次，看那一条打的；"
                             f"要现查：python3 scripts/hosts/host-resources.py -- <这条命令>）")
                 temporary = f"{path}.{os.getpid()}.partial"
                 with open(temporary, "w", encoding="utf-8") as handle:
-                    json.dump({"pid": self.wrapper_pid, "at": now}, handle)
+                    json.dump({"pid": self.wrapper_pid, "at": now, "event": last_event}, handle)
                 os.replace(temporary, path)
         except OSError:
             pass   # 记不下谁查过：照查，宁可多查一次
         return ""
 
-    def query(self):
-        """(查不到的原因, 第二台那一份)：原因是空串时第二台那一份是 dict（name、available、need、fits、memory_cap、why）。"""
-        switch = os.environ.get("RUN_WITH_MEMORY_CAP_HOST_LOOKUP", "")
-        if switch:
-            return f"RUN_WITH_MEMORY_CAP_HOST_LOOKUP={switch}，这一条不查", None
-        limit_text = os.environ.get("RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS", "")
+    def query(self, woken=None):
+        """(查不到的原因, 第二台那一份)：原因是空串时第二台那一份是 dict（name、available、need、fits、memory_cap、why）。
+        woken 是被资源释放广播叫醒时的（号, 种类），交给 take_turn 按事件去重。
+        整段包在 try 里（文件头「整体兜底」）：出了异常交「查的时候出了 …」当原因，由 run 打成一行。"""
         try:
-            limit = float(limit_text) if limit_text else HOST_LOOKUP_SECONDS
-        except ValueError:
-            limit = 0
-        if not limit > 0:
-            return f"RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS 要写正的秒数，收到的是「{limit_text}」", None
-        problem = self.take_turn()
-        if problem:
-            return problem, None
-        script = os.path.join(os.environ["RUN_WITH_MEMORY_CAP_SCRIPT_DIRECTORY_RESOLVED"], "host-resources.py")
-        environment = dict(os.environ, RUN_WITH_MEMORY_CAP_KEY=self.key, HOST_RESOURCES_HOST_TIMEOUT_SECONDS=str(HOST_LOOKUP_PEER_TIMEOUT_SECONDS),
-                           HOST_RESOURCES_SAMPLE_SECONDS=str(HOST_LOOKUP_SAMPLE_SECONDS))
-        # 输出落进临时文件：到点停它时不被它留下的子进程（ssh）握着的管道卡住
-        with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output, tempfile.TemporaryFile(mode="w+", encoding="utf-8") as errors:
+            switch = os.environ.get("RUN_WITH_MEMORY_CAP_HOST_LOOKUP", "")
+            if switch:
+                return f"RUN_WITH_MEMORY_CAP_HOST_LOOKUP={switch}，这一条不查", None
+            sleep_text = os.environ.get("RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_SLEEP", "")
+            if sleep_text and threading.current_thread() is not threading.main_thread():
+                time.sleep(float(sleep_text))   # 只给自证「线程里的 query 睡着」那一格：后台那一趟真睡着（不抛异常冒充）
+            limit = self.limit()
+            if limit is None:
+                return f"RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS 要写正的秒数，收到的是「{os.environ.get('RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS', '')}」", None
+            problem = self.take_turn(woken)
+            if problem:
+                return problem, None
+            script = os.path.join(os.environ["RUN_WITH_MEMORY_CAP_SCRIPT_DIRECTORY_RESOLVED"], "host-resources.py")
+            environment = dict(os.environ, RUN_WITH_MEMORY_CAP_KEY=self.key, HOST_RESOURCES_HOST_TIMEOUT_SECONDS=str(HOST_LOOKUP_PEER_TIMEOUT_SECONDS),
+                               HOST_RESOURCES_SAMPLE_SECONDS=str(HOST_LOOKUP_SAMPLE_SECONDS))
+            # 输出落进临时文件：到点停它时不被它留下的子进程（ssh）握着的管道卡住
+            selftest_fault("temp-file")
+            with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output, tempfile.TemporaryFile(mode="w+", encoding="utf-8") as errors:
+                with self.guard:
+                    if self.stopped:
+                        return "排队这一步已经要退了，不查", None
+                    try:
+                        process = self.process = subprocess.Popen([sys.executable, "-B", script, "--json", "--", *self.command], stdout=output, stderr=errors,
+                                                                  stdin=subprocess.DEVNULL, env=environment)
+                    except OSError as error:
+                        return f"起不了 {script}（{error}）", None
+                try:
+                    code = process.wait(timeout=None if broken == "hostlookupnotimeout" else limit)
+                except subprocess.TimeoutExpired:
+                    process.kill()   # 只停自己起的这一个（按它的进程号）
+                    process.wait()
+                    return f"{limit:g} 秒没查完（停了 host-resources.py；它起的 ssh 由 ssh 自己收尾）", None
+                output.seek(0)
+                errors.seek(0)
+                selftest_fault("read-output")
+                stdout, stderr = output.read(), errors.read().strip()
+            if code not in (0, 1):
+                tail = stderr.splitlines()[-1][:200] if stderr else ""
+                return f"host-resources.py 退 {code}" + (f"：{tail}" if tail else ""), None
+            try:
+                result = json.loads(stdout)
+                if result.get("local_only_because"):
+                    return result["local_only_because"], None
+                peer = next((host for host in result["hosts"] if host.get("is_peer")), None)
+                if peer is None:
+                    return "多机配置里没有第二台（PEER_SSH_HOST）", None
+                verdict = next(verdict for verdict in result["command"]["verdicts"] if verdict["name"] == peer["name"])
+                if not verdict.get("read"):
+                    return f"{peer['name']}{verdict['why']}", None
+                return "", {"name": peer["name"], "available": peer["memory"]["available"], "need": result["command"]["prediction"]["memory"],
+                            "fits": bool(verdict["fits"]), "memory_cap": peer.get("memory_cap"), "why": verdict.get("why", "")}
+            except (ValueError, KeyError, TypeError, AttributeError, StopIteration) as error:
+                return f"host-resources.py 的输出读不出（{type(error).__name__}）", None
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
+            return f"查的时候出了 {type(error).__name__}（{str(error)[:200]}）", None
+
+    def run(self, phase, local, woken=None):
+        try:
+            self.run_unguarded(phase, local, woken)
+        except Exception as error:
+            if broken == "hostlookupnocatch":
+                raise
             with self.guard:
                 if self.stopped:
-                    return "排队这一步已经要退了，不查", None
-                try:
-                    process = self.process = subprocess.Popen([sys.executable, "-B", script, "--json", "--", *self.command], stdout=output, stderr=errors,
-                                                              stdin=subprocess.DEVNULL, env=environment)
-                except OSError as error:
-                    return f"起不了 {script}（{error}）", None
-            try:
-                code = process.wait(timeout=None if broken == "hostlookupnotimeout" else limit)
-            except subprocess.TimeoutExpired:
-                process.kill()   # 只停自己起的这一个（按它的进程号）
-                process.wait()
-                return f"{limit:g} 秒没查完（停了 host-resources.py；它起的 ssh 由 ssh 自己收尾）", None
-            output.seek(0)
-            errors.seek(0)
-            stdout, stderr = output.read(), errors.read().strip()
-        if code not in (0, 1):
-            tail = stderr.splitlines()[-1][:200] if stderr else ""
-            return f"host-resources.py 退 {code}" + (f"：{tail}" if tail else ""), None
-        try:
-            result = json.loads(stdout)
-            if result.get("local_only_because"):
-                return result["local_only_because"], None
-            peer = next((host for host in result["hosts"] if host.get("is_peer")), None)
-            if peer is None:
-                return "多机配置里没有第二台（PEER_SSH_HOST）", None
-            verdict = next(verdict for verdict in result["command"]["verdicts"] if verdict["name"] == peer["name"])
-            if not verdict.get("read"):
-                return f"{peer['name']}{verdict['why']}", None
-            return "", {"name": peer["name"], "available": peer["memory"]["available"], "need": result["command"]["prediction"]["memory"],
-                        "fits": bool(verdict["fits"]), "memory_cap": peer.get("memory_cap"), "why": verdict.get("why", "")}
-        except (ValueError, KeyError, TypeError, AttributeError, StopIteration) as error:
-            return f"host-resources.py 的输出读不出（{type(error).__name__}）", None
+                    return
+            self.warn("被资源释放广播叫醒那一趟" if woken else f"{'排队开始' if phase == 'queued' else '退 252 之前'}那一趟", error)
 
-    def run(self, phase, local):
-        problem, peer = self.query()
+    def run_unguarded(self, phase, local, woken=None):
+        problem, peer = self.query(woken)
         with self.guard:
             if self.stopped:
                 return
+        cause = f"（被资源释放广播叫醒：第 {woken[0]} 号，{woken[1]}）" if woken else ""
         if problem:
-            say(f"run-with-memory-cap: 没查到别的机器：{problem}")
+            say(f"run-with-memory-cap: 没查到别的机器：{problem}{cause}")
             return
         if not peer["fits"]:
-            say(f"run-with-memory-cap: 现查别的机器：{peer['name']}此刻也放不下（{peer['why']}）")
+            say(f"run-with-memory-cap: 现查别的机器：{peer['name']}此刻也放不下（{peer['why']}）{cause}")
             return
         cap_text, cap_note = self.cap_text, ""
         peer_cap = size_bytes(peer["memory_cap"] or "")
         if peer_cap is not None and peer_cap < self.cap_bytes:
             cap_text, cap_note = peer["memory_cap"], f"（第二台的上限至多 {peer['memory_cap']}，照它写）"
         label = self.unit.replace("singlefs-memory-cap-", "moved-from-queue-", 1)
-        command = f"bash scripts/hosts/multi-host-run.sh --peer --memory-cap {cap_text} --label {label} -- {shlex.join(self.command)}"
-        line = f"  → {peer['name']}此刻放得下（可用 {human(peer['available'])}、要 {human(peer['need'])}）：改用 {command}{cap_note}"
+        command = f"bash scripts/hosts/multi-host-run.sh --peer --memory-cap {cap_text} --label {label} -- {shlex.join(tree_relative_arguments(self.command))}"
+        selftest_fault("format")
+        line = f"  → {peer['name']}此刻放得下（可用 {human(peer['available'])}、要 {human(peer['need'])}）：改用 {command}{cap_note}{cause}"
         say(line)
         if broken != "hostlookupnorecord":
             self.record(phase, local, peer, line, f"本机内存排队、{peer['name']}放得下：改用 {command}{cap_note}；还要在本机跑就等它排上（退了 252 的那条要重起）")
@@ -1166,9 +1700,10 @@ def admit(unit, cap_bytes, cap_text, total_bytes, slice_directory, key, wrapper_
             print(f"run-with-memory-cap: 排队（已等 {now - started:.0f} 秒，至多 {wait_seconds:g} 秒）：slice 已占 {human(occupied)}，这一条要 {human(need)}"
                   f"（{need_text}），总上限 {human(total_bytes)}；账上在跑 {len(entries)} 条", file=sys.stderr)
             last_report = now
-            if first_report:   # 排队开始那一刻：后台现查别的机器（文件头「排队时去找别的机器」）
+            if first_report:   # 排队开始那一刻：后台现查别的机器（文件头「排队时去找别的机器」），起收资源释放广播的 follow（文件头「资源释放广播」）
                 lookup.begin({"need": need, "slice_occupied": occupied, "slice_total": total_bytes})
-        time.sleep(ADMISSION_POLL_SECONDS)
+        # 等「新事件或 ADMISSION_POLL_SECONDS 到点」先到者；收到该叫醒的就在后台再查一次别的机器（文件头「资源释放广播」）
+        lookup.pause(ADMISSION_POLL_SECONDS, {"need": need, "slice_occupied": occupied, "slice_total": total_bytes})
 
 
 def alerts_record_path():
@@ -1202,7 +1737,8 @@ def append_outcome_record(kind, subject, unit, wrapper_pid, fields, line, next_s
 
 def outcome_alerts(unit, key, cap_text, outcome, measured, entry, wrapper_pid):
     """文件头「峰值表」一段：一次跑完而峰值是记账的 CAP_FACTOR 倍以上（记账取自峰值表）打一行、写 memory-peak-grew；
-    退 250（own-cap）写 memory-own-cap，退 254（squeezed、squeezed-marked）写 memory-squeezed。entry 是账上这一笔（套在外层里的没有，交 None）。"""
+    退 250（own-cap）写 memory-own-cap，退 254（squeezed、squeezed-marked、over-booking-stopped）写 memory-squeezed，stopped_by 分内核挤掉的（kernel）与盯账停的（over-booking-watch）。
+    entry 是账上这一笔（套在外层里的没有，交 None）。"""
     booked = entry.get("need") if isinstance(entry, dict) and isinstance(entry.get("need"), int) else None
     source = entry.get("need_source") if isinstance(entry, dict) else None
     by_peak_table = source == "peak-table"
@@ -1238,13 +1774,18 @@ def outcome_alerts(unit, key, cap_text, outcome, measured, entry, wrapper_pid):
     elif outcome in ("squeezed", "squeezed-marked"):
         line = f"被总上限挤掉（键「{key[:120]}」，上限 {cap_text}、记账 {booked_text}、实测 {measured_text}，{admitted_text}）"
         next_step = "结果不算数，重跑它；常这样就 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 里同时在跑的是谁"
-        append_outcome_record(MEMORY_SQUEEZED_RECORD_KIND, "被总上限挤掉", unit, wrapper_pid, fields, line, next_step)
+        append_outcome_record(MEMORY_SQUEEZED_RECORD_KIND, "被总上限挤掉", unit, wrapper_pid, dict(fields, stopped_by="kernel"), line, next_step)
+    elif outcome == "over-booking-stopped":
+        line = (f"超出记账最多，包装在撞总上限之前停了它（键「{key[:120]}」，上限 {cap_text}、记账 {booked_text}、实测 {measured_text}，{admitted_text}）")
+        next_step = ("结果不算数，重跑它：峰值表里这个键已记成撞过顶，重跑时按上限排队；常这样说明它要的内存比峰值表里记的多了，"
+                     "bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 里同时在跑的是谁")
+        append_outcome_record(MEMORY_SQUEEZED_RECORD_KIND, "超出记账最多被包装停了", unit, wrapper_pid, dict(fields, stopped_by="over-booking-watch"), line, next_step)
 
 
 def finish(unit, key, cap_text, peak_text, outcome="", measured_text="", wrapper_pid_text=""):
     """scope 收尾之后：账上这一笔删掉，量到了峰值就记进峰值表（连同 run_capped 经环境交来的线程数），近几次往前推一次（文件头「峰值表」一段）。
-    outcome（run_capped 交来的结局）：clean 命令自己退出、own-cap 撞了自己的上限、squeezed 被总上限挤掉、squeezed-marked 按峰值表放进来又被挤掉
-    （peak_text 是上限）、空串（弄坏开关 exitcode 那一支）不写告警；measured_text 是外壳量到的峰值，wrapper_pid_text 是包装进程号。
+    outcome（run_capped 交来的结局）：clean 命令自己退出、own-cap 撞了自己的上限、squeezed 被总上限挤掉、squeezed-marked 按峰值表放进来超出记账又被挤掉、
+    over-booking-stopped 盯账停的（后两种 peak_text 是上限）、空串（弄坏开关 exitcode 那一支）不写告警；measured_text 是外壳量到的峰值，wrapper_pid_text 是包装进程号。
     峰值按 MiB 向上取整记，这一行写出来与表里记的相同就不写：整份重写要先写临时文件再改名，盘忙的时候一次要一两秒
     （2026-09-25 实测 IO 压力 full avg10 约 14% 时，写临时文件加改名 0.03–1.8 秒），而撞了上限的那几条每次记的都是上限。"""
     ledger_path = os.path.join(ledger_directory, unit + ".json")
@@ -1262,7 +1803,7 @@ def finish(unit, key, cap_text, peak_text, outcome="", measured_text="", wrapper
         return 0
     peak = -(-int(peak_text) // MEBIBYTE) * MEBIBYTE
     cap_bytes = size_bytes(cap_text)
-    hit = outcome in ("own-cap", "squeezed-marked") if outcome else cap_bytes is not None and peak >= cap_bytes
+    hit = outcome in ("own-cap", "squeezed-marked", "over-booking-stopped") if outcome else cap_bytes is not None and peak >= cap_bytes
     threads = os.environ.get("RUN_WITH_MEMORY_CAP_THREADS_RESOLVED") or None
     try:
         with admission_lock():
@@ -1433,6 +1974,13 @@ cap_judged_against_the_recorded_peak() { # cap_judged_against_the_recorded_peak 
   printf '%s' "$cap"
 }
 
+head_characters() { # head_characters <字数> [<文件>]：按字（UTF-8）取开头这么多个字，不截出半个汉字（按字节截的 head -c、cut -c 会，输出就解不成 UTF-8）；
+  # 不给文件读标准输入；文件读不了交空。解不开的字节换成 U+FFFD
+  python3 -c 'import sys
+data = open(sys.argv[2], "rb").read() if len(sys.argv) > 2 else sys.stdin.buffer.read()
+sys.stdout.write(data.decode("utf-8", "replace")[:int(sys.argv[1])])' "$@" 2>/dev/null
+}
+
 # 显存不够（文件头「显存不够」一段）：读 journalctl -k 里 <起> 到 <止>（epoch 秒）的行，打一行结论：
 #   hit <行数> <头一行>     有 NVRM … NV_ERR_NO_MEMORY 行
 #   clean                  看得到内核日志、窗口里没有
@@ -1449,14 +1997,14 @@ gpu_memory_verdict() { # gpu_memory_verdict <起> <止>
   else
     if probe_output="$(timeout 20 "$JOURNALCTL" -k -n 1 -q --no-pager 2>"$error_file")"; then journal_status=0; else journal_status=$?; fi
     if ((journal_status != 0)); then
-      problem="journalctl -k -n 1 退 $journal_status：$(head -c 200 "$error_file" | tr '\n' ' ')"
+      problem="journalctl -k -n 1 退 $journal_status：$(head_characters 200 "$error_file" | tr '\n' ' ')"
     elif grep -qF "$JOURNAL_PERMISSION_HINT" "$error_file"; then
       problem="权限不够，journalctl 看不到内核日志（要在 adm 或 systemd-journal 组里）"
     elif [[ -z "$probe_output" ]]; then
       problem="journalctl -k 连最近一条内核消息都读不出来"
     else
       if journal_output="$(timeout 20 "$JOURNALCTL" -k -q --no-pager -o short-iso "${window[@]}" 2>"$error_file")"; then journal_status=0; else journal_status=$?; fi
-      ((journal_status == 0)) || problem="journalctl -k --since/--until 退 $journal_status：$(head -c 200 "$error_file" | tr '\n' ' ')"
+      ((journal_status == 0)) || problem="journalctl -k --since/--until 退 $journal_status：$(head_characters 200 "$error_file" | tr '\n' ' ')"
     fi
     rm -f -- "$error_file"
   fi
@@ -1466,7 +2014,7 @@ gpu_memory_verdict() { # gpu_memory_verdict <起> <止>
   fi
   hits="$(grep -cE "$pattern" <<<"$journal_output")"
   if ((hits > 0)); then
-    echo "hit $hits $(grep -m 1 -E "$pattern" <<<"$journal_output" | cut -c 1-300)"
+    echo "hit $hits $(grep -m 1 -E "$pattern" <<<"$journal_output" | head_characters 300)"
   else
     echo "clean"
   fi
@@ -1491,9 +2039,111 @@ stopped_from_outside_signal() { # stopped_from_outside_signal <退出码>
   echo "$((code - 128))"
 }
 
+# 按记账算的 oom_score_adj（文件头「排队」一段「撞 slice 总上限时内核杀谁」）：1000 − 记账 × 1000 / 分母，分母 = slice 的 memory.max + min(slice 的 memory.swap.max, SwapTotal)，
+# 起 scope 之前现读（swap 开关变了跟着变），小于 0 取 0。分母读不出来交空：外壳不写，命令照旧继承调用方的
+booked_oom_score_adjust() { # booked_oom_score_adjust <记账，字节>
+  local slice_max="" swap_max="" swap_kibibytes denominator adjust
+  IFS= read -r slice_max < "$SLICE_DIRECTORY/memory.max" 2>/dev/null
+  IFS= read -r swap_max < "$SLICE_DIRECTORY/memory.swap.max" 2>/dev/null
+  swap_kibibytes="$(awk '$1 == "SwapTotal:" {print $2}' /proc/meminfo 2>/dev/null)"
+  [[ "$slice_max" =~ ^[1-9][0-9]*$ && "$swap_kibibytes" =~ ^[0-9]+$ ]] || return 0
+  denominator=$((swap_kibibytes * 1024))
+  [[ "$swap_max" =~ ^[0-9]+$ ]] && ((swap_max < denominator)) && denominator=$swap_max   # max（不限）就是 SwapTotal
+  denominator=$((denominator + slice_max))
+  adjust=$((1000 - $1 * 1000 / denominator))
+  ((adjust < 0)) && adjust=0
+  echo "$adjust"
+}
+
+# 盯账（文件头「盯账」①）：放后台起，命令退出、包装被停或换了父进程时自己退；包装收尾时只给它这一个进程号发 TERM。
+# 停自己那一刻先写标记文件（run_capped 认它判结局），写标记与写 cgroup.kill 那一段挡着 TERM。读法复用 memory_peaks_lib.py，不另写一份「回收不掉的用量」
+watch_over_booking() { # watch_over_booking <unit> <记账，字节> <systemd-run 的进程号> <标记文件>
+  exec python3 -B /dev/fd/3 "$SCRIPT_DIRECTORY" "$SLICE_DIRECTORY" "$STATE_DIRECTORY/ledger" "$1" "$2" "$3" "$$" "$4" \
+    "$OVER_BOOKING_TOLERANCE_BYTES" "$SLICE_HIGH_PERMILLE" "$OVER_BOOKING_POLL_SECONDS" "$SELFTEST_WATCH_TRACE" 3<<'PY'
+import os, signal, sys, time
+sys.dont_write_bytecode = True
+(script_directory, slice_directory, ledger_directory, unit, need_text, runner_text, wrapper_text, marker_path,
+ tolerance_text, permille_text, poll_text, trace_path) = sys.argv[1:13]
+sys.path.insert(0, script_directory)
+import memory_peaks_lib as peaks
+need, runner, wrapper = int(need_text), int(runner_text), int(wrapper_text)
+tolerance, permille, poll = int(tolerance_text), int(permille_text), float(poll_text)
+own = os.path.join(slice_directory, unit + ".scope")
+
+
+def alive(process_id):
+    try:
+        os.kill(process_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def read_number(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return int(handle.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def stop_own_scope(own_used, own_excess, slice_used, trigger):
+    """先写标记（run_capped 认它），再往自己的 scope 的 cgroup.kill 写 1；这一段挡着 TERM，包装收尾时停这个进程不会只做一半。"""
+    signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
+    peak = read_number(os.path.join(own, "memory.peak"))
+    with open(marker_path + ".partial", "w", encoding="utf-8") as handle:
+        handle.write(f"excess {own_excess}\nneed {need}\nused {own_used}\nslice {slice_used}\ntrigger {trigger}\npeak {peak if peak is not None else own_used}\n")
+    os.replace(marker_path + ".partial", marker_path)
+    try:
+        with open(os.path.join(own, "cgroup.kill"), "w", encoding="utf-8") as handle:
+            handle.write("1")
+    except OSError as error:
+        os.remove(marker_path)
+        print(f"run-with-memory-cap: 盯账停不了自己的 scope {unit}（写 cgroup.kill：{error}），撞总上限时照旧由内核按 oom_score_adj 挑", file=sys.stderr)
+
+
+def watch():
+    while os.getppid() == wrapper and alive(runner):
+        slice_max = read_number(os.path.join(slice_directory, "memory.max"))
+        slice_used = peaks.unreclaimable_bytes(slice_directory)
+        if os.path.isdir(own) and slice_max and slice_used is not None and slice_used >= slice_max * permille // 1000:
+            trigger = slice_max * permille // 1000
+            own_used = peaks.unreclaimable_bytes(own) or 0
+            own_excess = own_used - need
+            rival = None   # 超出记账比自己多的（一样多的按单元名小的算多）
+            for entry in peaks.live_ledger_entries(ledger_directory, remove_dead=False):
+                other, other_need = entry.get("unit"), entry.get("need")
+                if other == unit or not isinstance(other, str) or not isinstance(other_need, int):
+                    continue
+                other_directory = os.path.join(slice_directory, other + ".scope")
+                if not os.path.isdir(other_directory):
+                    continue
+                other_excess = (peaks.unreclaimable_bytes(other_directory) or 0) - other_need
+                if other_excess > own_excess or (other_excess == own_excess and other < unit):
+                    rival = f"{other} 超出 {other_excess}"
+                    break
+            if trace_path:
+                with open(trace_path, "a", encoding="utf-8") as handle:
+                    handle.write(f"{unit} slice {slice_used} trigger {trigger} own {own_used} need {need} excess {own_excess} rival {rival or '无'}\n")
+            if own_excess > tolerance and rival is None:
+                stop_own_scope(own_used, own_excess, slice_used, trigger)
+                return
+        time.sleep(poll)
+
+
+try:
+    watch()
+except Exception as error:   # 读 cgroup、读账、写标记出了没想到的事：盯账停下，撞总上限时照旧由内核按 oom_score_adj 挑
+    print(f"run-with-memory-cap: 盯账出了 {type(error).__name__}: {error}，这一条不再盯账，撞总上限时照旧由内核按 oom_score_adj 挑", file=sys.stderr)
+PY
+}
+
 run_capped() {
   local cap="$1" mode="$2" cap_bytes unit started_marker peak_file key command_threads_text exit_code result use_slice=1 admission_status
   local peak_bytes own_oom_count oom_kill_count scope_properties admitted_need over_admitted=0 oom_score_adjust="" command_started command_ended gpu_verdict stopped_signal
+  local over_booking_marker watch_excess watch_used watch_slice watch_trigger watch_peak squeezed_marked
   shift 2
   if [[ "$BROKEN_JUDGEMENT" == "nocap" ]]; then
     "$@"
@@ -1529,16 +2179,23 @@ run_capped() {
     admission_status=$?
     if [[ $admission_status -eq $MEMORY_ADMISSION_REFUSED_EXIT ]]; then
       trap - TERM INT
+      # 弄坏开关 broadcast-unadmitted：排队没放行就退的也当命令跑过、照发资源释放广播
+      [[ "$BROKEN_JUDGEMENT" != "broadcast-unadmitted" ]] || { memory_command_ran=1; released_unit="$unit"; }
       return "$MEMORY_ADMISSION_REFUSED_EXIT"
     fi
     if [[ $admission_status -ne 0 ]]; then
       report_unavailable "排队那一步退 $admission_status（上面是它的报错），命令一行都没跑" "照上面那几行修；不许绕开排队去跑"
     fi
-    # 撞 slice 总上限时谁先挨杀（文件头「排队」一段）：设了 OOM_FIRST 的 1000，按峰值表放进来的（账上记的要的量小于上限）500，按上限放进来的不写
+    # 撞 slice 总上限时内核挑谁（文件头「排队」一段）：账上有记账的按记账算（booked_oom_score_adjust），设了 OOM_FIRST 的 1000。
+    # over_admitted：按峰值表或预测放进来的（账上记的要的量小于上限）。弄坏开关 oomadjustflat 照改前的两档（按峰值表放进来的 500、按上限放进来的不写），nooomadjust 一律不写
     admitted_need="$(sed -n 's/.*"need": \([0-9][0-9]*\).*/\1/p' "$STATE_DIRECTORY/ledger/$unit.json" 2>/dev/null)"
-    if [[ "$admitted_need" =~ ^[0-9]+$ ]] && ((admitted_need < cap_bytes)); then
-      over_admitted=1
-      [[ "$BROKEN_JUDGEMENT" == "nooomadjust" ]] || oom_score_adjust=500
+    if [[ "$admitted_need" =~ ^[0-9]+$ ]]; then
+      ((admitted_need < cap_bytes)) && over_admitted=1
+      if [[ "$BROKEN_JUDGEMENT" == "oomadjustflat" ]]; then
+        ((over_admitted)) && oom_score_adjust=500
+      elif [[ "$BROKEN_JUDGEMENT" != "nooomadjust" ]]; then
+        oom_score_adjust="$(booked_oom_score_adjust "$admitted_need")"
+      fi
     fi
     if [[ -n "${RUN_WITH_MEMORY_CAP_OOM_FIRST:-}" && "$BROKEN_JUDGEMENT" != "nooomfirst" ]]; then
       oom_score_adjust=1000
@@ -1546,6 +2203,7 @@ run_capped() {
   fi
   started_marker="${TMPDIR:-/tmp}/run-with-memory-cap-$$-$RANDOM$RANDOM.started"
   peak_file="$STATE_DIRECTORY/peaks/$unit"
+  over_booking_marker="$peak_file.over-booking"   # 盯账停这一条时写（文件头「盯账」一段）
   # 起了 scope 之后被停（包括被外层 timeout 连同进程组一起停）：先停自己开的 scope，再把标记、账上这一笔与峰值文件删掉（stop_own_scope_then_exit）
   trap 'stop_own_scope_then_exit 143' TERM
   trap 'stop_own_scope_then_exit 130' INT
@@ -1563,16 +2221,24 @@ run_capped() {
   scope_runner_pid=""; scope_runner_forking=1
   { env "${SCOPE_RUNNER_INT_OPTION[@]}" -u RUN_WITH_MEMORY_CAP_KEY -u RUN_WITH_MEMORY_CAP_TIME_LIMIT -u RUN_WITH_MEMORY_CAP_WAIT_SECONDS -u RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON -u RUN_WITH_MEMORY_CAP_PARALLEL_REASON \
       -u RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP -u RUN_WITH_MEMORY_CAP_OOM_FIRST -u RUN_WITH_MEMORY_CAP_JOURNALCTL \
+      -u RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY -u RUN_WITH_MEMORY_CAP_SELFTEST_WATCH_TRACE \
       RUN_WITH_MEMORY_CAP_OUTER_UNIT="$unit" RUN_WITH_MEMORY_CAP_OUTER_CAP="$cap" \
       systemd-run --user --scope --unit="$unit" "${scope_properties[@]}" --quiet \
       bash -c "$SCOPE_HOLDER" run-with-memory-cap "$started_marker" "$peak_file" "$CGROUP_ROOT" "$oom_score_adjust" "$@" 2>&3 3>&-; } 3>&2 2>/dev/null <&0 &
   scope_runner_pid=$!; scope_runner_forking=0
+  # 盯账（文件头「盯账」①）：账上有记账的才盯（套在外层里的、--check 不盯）；自证的 KERNEL_ONLY 与弄坏开关 nowatch 下不起
+  over_booking_watcher_pid=""
+  if [[ "$mode" == "run" && $use_slice -eq 1 && "${admitted_need:-}" =~ ^[0-9]+$ && "$BROKEN_JUDGEMENT" != "nowatch" ]] && ((SELFTEST_KERNEL_ONLY == 0)); then
+    watch_over_booking "$unit" "$admitted_need" "$scope_runner_pid" "$over_booking_marker" &
+    over_booking_watcher_pid=$!
+  fi
   wait "$scope_runner_pid" 2>/dev/null
   exit_code=$?
   scope_runner_pid=""
+  stop_over_booking_watcher
   printf -v command_ended '%(%s)T' -1
   if [[ ! -e "$started_marker" ]]; then
-    rm -f -- "$STATE_DIRECTORY/ledger/$unit.json" "$peak_file" "$peak_file.partial"
+    rm -f -- "$STATE_DIRECTORY/ledger/$unit.json" "$peak_file" "$peak_file.partial" "$over_booking_marker" "$over_booking_marker.partial"
     trap - TERM INT
     if [[ "$BROKEN_JUDGEMENT" == "fallback" ]]; then
       "$@"
@@ -1583,14 +2249,30 @@ run_capped() {
   fi
   rm -f -- "$started_marker"
   trap - TERM INT
+  [[ "$mode" == "run" ]] && { memory_command_ran=1; released_unit="$unit"; }   # 资源释放广播：命令跑过（文件头「资源释放广播」）
   result="$(scope_result "$unit")"
   peak_bytes="$(peak_file_value "$peak_file" peak)"
+  released_memory_bytes="${peak_bytes:-${admitted_need:-}}"
   own_oom_count="$(peak_file_value "$peak_file" oom)"
   oom_kill_count="$(peak_file_value "$peak_file" oom_kill)"
   rm -f -- "$peak_file" "$peak_file.partial"
   if [[ "$mode" != "run" ]]; then
     rm -f -- "$STATE_DIRECTORY/ledger/$unit.json"
   fi
+  # 盯账停的（文件头「盯账」一段）：标记在就是包装自己在撞总上限之前停了这一条，退 254、这个键记成撞过顶，不落到「被外面停了」那一支
+  if [[ "$mode" == "run" && -f "$over_booking_marker" ]]; then
+    watch_excess="$(peak_file_value "$over_booking_marker" excess)" watch_used="$(peak_file_value "$over_booking_marker" used)"
+    watch_slice="$(peak_file_value "$over_booking_marker" slice)" watch_trigger="$(peak_file_value "$over_booking_marker" trigger)"
+    watch_peak="$(peak_file_value "$over_booking_marker" peak)"
+    rm -f -- "$over_booking_marker" "$over_booking_marker.partial"
+    released_memory_bytes="${watch_peak:-${admitted_need:-}}"
+    admission finish "$unit" "$key" "$cap" "$cap_bytes" over-booking-stopped "$watch_peak" "$$"
+    echo "run-with-memory-cap: 超出记账最多，包装在撞总上限之前停了它（slice $SLICE 回收不掉的 $watch_slice 字节到了触发线 $watch_trigger，scope $unit 此刻 $watch_used 字节、记账 ${admitted_need:-?}、超出 $watch_excess，是账上超出最多的；命令退出码 $exit_code）" >&2
+    echo "run-with-memory-cap: → 这一条的结果不算数，重跑它：峰值表里这个键已记成撞过顶，重跑时按它的上限 $cap 排队，放不下就等或退 $MEMORY_ADMISSION_REFUSED_EXIT；常这样说明它要的内存比峰值表里记的多了，bash $SELF_PATH --status 看 slice 里是谁" >&2
+    gpu_memory_note "$command_started" "$command_ended"
+    return "$SLICE_TOTAL_HIT_EXIT"
+  fi
+  rm -f -- "$over_booking_marker.partial"
   if [[ "$BROKEN_JUDGEMENT" == "exitcode" ]]; then
     [[ "$mode" == "run" ]] && admission finish "$unit" "$key" "$cap" "$peak_bytes"
     if [[ $exit_code -eq 137 || $exit_code -eq 143 ]]; then
@@ -1606,8 +2288,16 @@ run_capped() {
   fi
   if [[ "$result" == "oom-kill" && "$BROKEN_JUDGEMENT" != "noresult" ]]; then
     if ((use_slice)) && [[ "$own_oom_count" == "0" && "${oom_kill_count:-0}" != "0" && "$BROKEN_JUDGEMENT" != "noslicehit" ]]; then
-      if ((over_admitted)) && [[ "$mode" == "run" && "$BROKEN_JUDGEMENT" != "noslicemark" ]]; then
-        # 按峰值表放进来、又涨过了排队时按的量：这个键记成撞过顶（峰值记成上限），重跑时按它的上限排队（文件头「峰值表」一段）
+      # 按峰值表放进来、峰值又超出了排队时按的量（过了容差；峰值没量到的照超了算）：这个键记成撞过顶。没超账而被内核挑中的不记（文件头「退出码」254）。
+      # 弄坏开关 slicemarkall：按峰值表放进来而被挤掉的一律记（改前的判法）
+      squeezed_marked=0
+      if ((over_admitted)); then
+        if [[ "$BROKEN_JUDGEMENT" == "slicemarkall" || ! "$peak_bytes" =~ ^[0-9]+$ ]] || ((peak_bytes > admitted_need + OVER_BOOKING_TOLERANCE_BYTES)); then
+          squeezed_marked=1
+        fi
+      fi
+      if ((squeezed_marked)) && [[ "$mode" == "run" && "$BROKEN_JUDGEMENT" != "noslicemark" ]]; then
+        # 这个键记成撞过顶（峰值记成上限），重跑时按它的上限排队（文件头「峰值表」一段）
         admission finish "$unit" "$key" "$cap" "$cap_bytes" squeezed-marked "$peak_bytes" "$$"
         echo "run-with-memory-cap: 被 slice $SLICE 的总上限挤掉了（scope $unit 的 Result=oom-kill，而它自己没撞它的上限 $cap：它按峰值表放进来、涨过了排队时按的量，slice 满了，内核先挑了它；命令退出码 $exit_code）" >&2
         echo "run-with-memory-cap: → 这一条的结果不算数，重跑它：峰值表里这个键已记成撞过顶，重跑时按它的上限 $cap 排队，放不下就等或退 $MEMORY_ADMISSION_REFUSED_EXIT；bash $SELF_PATH --status 看 slice 里是谁" >&2
@@ -1615,7 +2305,11 @@ run_capped() {
         return "$SLICE_TOTAL_HIT_EXIT"
       fi
       [[ "$mode" == "run" ]] && admission finish "$unit" "$key" "$cap" "" squeezed "$peak_bytes" "$$"
-      echo "run-with-memory-cap: 被 slice $SLICE 的总上限挤掉了（scope $unit 的 Result=oom-kill，而它自己没撞它的上限 $cap：整个 slice 满了，内核在 slice 里挑了这一条杀；命令退出码 $exit_code）" >&2
+      if ((over_admitted && squeezed_marked == 0)); then
+        echo "run-with-memory-cap: 被 slice $SLICE 的总上限挤掉了（scope $unit 的 Result=oom-kill，而它自己没撞它的上限 $cap：它按峰值表放进来，峰值 $peak_bytes 字节没超出记账 ${admitted_need:-?}（容差 $OVER_BOOKING_TOLERANCE_BYTES），是 slice 满了、内核挑中了它；峰值表里这个键不记撞过顶；命令退出码 $exit_code）" >&2
+      else
+        echo "run-with-memory-cap: 被 slice $SLICE 的总上限挤掉了（scope $unit 的 Result=oom-kill，而它自己没撞它的上限 $cap：整个 slice 满了，内核在 slice 里挑了这一条杀；命令退出码 $exit_code）" >&2
+      fi
       echo "run-with-memory-cap: → 这一条的结果不算数，重跑它；常这样说明排队按峰值表放进来的几条实际占的比表里记的多，bash $SELF_PATH --status 看 slice 里是谁" >&2
       gpu_memory_note "$command_started" "$command_ended"
       return "$SLICE_TOTAL_HIT_EXIT"
@@ -1686,7 +2380,7 @@ selftest_job_code() {
 run_selftest() {
   local failures=0 checked=0 scratch output status marker hog_code job_code target slice_counter=0 slice context_directory
   local first_pid second_pid first_status second_status started_seconds elapsed_seconds cgroup_path first_total second_total_after
-  local -a selftest_slices=() context=()
+  local -a selftest_slices=() context=() host_lookup_payload=()   # host_lookup_payload：host_lookup_command 要换掉被包的命令时设（改去第二台的命令里改写路径那一格），平常空
   local selftest_admitted_at='2026-09-25T00:00:00Z'   # clock-times:allow 自检造的账本与峰值表时刻，格式照真账本
   target="${RUN_WITH_MEMORY_CAP_SELFTEST_TARGET:-$SELF_PATH}"
   # 自证本身也可能套在外层包装里跑（照规则经 run-with-memory-cap.sh <上限> 起）：各例只在「套在包装里」那几例里自己造外层，别的一律当没套
@@ -1695,6 +2389,9 @@ run_selftest() {
   # 「按上限放进来的不写」那几例就不是 0、内核挑错人：先把自证自己的写回 0（不提权也写得回：只往下写到 0）
   { printf '0\n' > /proc/self/oom_score_adj; } 2>/dev/null
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/run-with-memory-cap-selftest-XXXXXX")"
+  # 自证起的每一份包装的标记（文件头「弄坏开关只在自证里认」）：建在临时目录里、export，收尾随 scratch 删
+  printf '%s\n' "$SELFTEST_MARK_CONTENT" > "$scratch/selftest-mark"
+  export RUN_WITH_MEMORY_CAP_SELFTEST_MARK="$scratch/selftest-mark"
   hog_code="$(bounded_memory_hog_code)"
   job_code="$(selftest_job_code)"
   fail() { echo "  ✗ 自检：$1"; failures=$((failures + 1)); }   # gate-lint:detail
@@ -1704,9 +2401,10 @@ run_selftest() {
     slice="singlefs_memory_selftest_$$_${slice_counter}.slice"
     selftest_slices+=("$slice")
     context_directory="$scratch/context-$slice_counter"
-    mkdir -p "$context_directory"
+    mkdir -p "$context_directory/temporary-root"
+    # 各例起的包装给命令建的临时目录也落在这一例底下（文件头「这一条命令自己的临时目录」一段）：给包装发 KILL / HUP 的那几例 EXIT trap 不走、留下的那一份随 scratch 删
     context=(-u SINGLEFS_HEAVY_TESTS -u CLAUDE_CODE_SESSION_ID -u RUN_WITH_MEMORY_CAP_OUTER_UNIT -u RUN_WITH_MEMORY_CAP_OUTER_CAP RUN_WITH_MEMORY_CAP_SLICE="$slice" RUN_WITH_MEMORY_CAP_SLICE_TOTAL="$1" RUN_WITH_MEMORY_CAP_STATE_DIR="$context_directory/state"
-             RUN_WITH_MEMORY_CAP_PEAKS="$context_directory/peaks.tsv" RUN_WITH_MEMORY_CAP_HOST_LOOKUP=off)
+             RUN_WITH_MEMORY_CAP_PEAKS="$context_directory/peaks.tsv" RUN_WITH_MEMORY_CAP_HOST_LOOKUP=off RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT="$context_directory/temporary-root")
     # 告警记录跟着峰值表走（文件头「峰值表」一段「告警跟着峰值表走」）：写进这一例峰值表旁边的 peaks.tsv.alerts.jsonl（context_alerts），不写工作根那一份
     # （看门狗读那一份叫醒主 agent）；工作根换成这一例的 work-root，弄坏开关让告警写回真记录时也落在这里，它底下的 core-usage-alerts.jsonl 当「真记录」认
     context_alerts="$context_directory/peaks.tsv.alerts.jsonl"
@@ -1759,11 +2457,13 @@ FAKE_SSH
   }
   host_lookup_command() { # host_lookup_command <世界> <名> <等待上限秒> [变量=值…]：host_lookup_run 设成在这一例的环境里起包装（要 200M）的整条命令
     local world="$1" name="$2" wait_seconds="$3"
+    local -a payload=(bash -c ': > "$1"' touch-marker "$scratch/host-lookup-$name.ran")   # 被包的命令；host_lookup_payload 非空就换成它（改去第二台的命令里改写路径那一格）
     shift 3
+    if ((${#host_lookup_payload[@]})); then payload=("${host_lookup_payload[@]}"); fi
     host_lookup_run=(env "${context[@]}" env -u RUN_WITH_MEMORY_CAP_HOST_LOOKUP HOST_LOOKUP_SELFTEST_WORLD="$world" PATH="$world/bin:$PATH"
       SINGLEFS_MULTI_HOST_CONFIG="$world/multi-host.env" SINGLEFS_CORE_USAGE_ALERTS="$world/alerts.jsonl" CLAUDE_CODE_SESSION_ID=selftest-host-lookup-session
       RUN_WITH_MEMORY_CAP_KEY="selftest-host-lookup-$name" RUN_WITH_MEMORY_CAP_WAIT_SECONDS="$wait_seconds" "$@"
-      bash "$target" 200M bash -c ': > "$1"' touch-marker "$scratch/host-lookup-$name.ran")
+      bash "$target" 200M "${payload[@]}")
   }
   host_lookup_case() { # host_lookup_case <世界> <名> <等待上限秒> [变量=值…]：挡着路前台跑一条，退出码进 status、用了几秒进 elapsed_seconds，stderr 进 host-lookup-<名>.err
     local started=$SECONDS
@@ -1774,7 +2474,7 @@ FAKE_SSH
     rm -f -- "$context_directory/state/ledger/singlefs-memory-cap-selftest-blocker.json"
   }
   host_lookup_cells() {
-    local world records lines_count wrapper_pid poll err
+    local world records lines_count wrapper_pid poll err tree_top relative_tail
     local -a host_lookup_run=()
     # 第二台放得下（可用 43 GiB，这条命令没有峰值、预测 8G）：排队开始与退 252 时各打一行改去第二台的命令，告警记录 queued、refused 各一条
     fresh_context 256M
@@ -1807,6 +2507,31 @@ print("ok" if good else json.dumps(rows, ensure_ascii=False)[:800])' "$world/ale
     err="$scratch/host-lookup-throttled.err"
     if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT ]] || grep -qF '此刻放得下' "$err" || ! grep -q '没查到别的机器：.*刚查过' "$err"; then
       fail "几条一起排队时 60 秒内只查一次：紧接着来的一条应当打「没查到别的机器：… 刚查过」、不打改去第二台的命令、照旧退 $MEMORY_ADMISSION_REFUSED_EXIT，实际退 $status：$(cat "$err")"
+    fi
+    # 改去第二台的命令里，以本机仓根起头的参数改成树内相对路径（仓根本身写 .），仓根之外的绝对路径与名字只是以仓根起头的路径原样留着（命令没跑：挡着路、等满退 252）
+    fresh_context 256M
+    world="$scratch/host-lookup-relative"
+    host_lookup_world "$world" 43
+    checked=$((checked + 1))
+    tree_top="$(cd "$(dirname "$target")/../.." && pwd)"
+    host_lookup_payload=(bash "$tree_top/.claude/gate.d/x.sh" --check a "$tree_top" /tmp/outside-the-tree "$tree_top-beside/file")
+    host_lookup_case "$world" relative 4
+    host_lookup_payload=()
+    err="$scratch/host-lookup-relative.err"
+    relative_tail="-- bash .claude/gate.d/x.sh --check a . /tmp/outside-the-tree $tree_top-beside/file"
+    lines_count="$(grep -cF -- "$relative_tail" "$err")"
+    records="$(python3 -c 'import json, sys
+try:
+    rows = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+except OSError as error:
+    print(f"读不了：{error}")
+    sys.exit(0)
+tail = sys.argv[2]
+good = len(rows) == 2 and all(tail in row.get("next_step", "") and tail in row.get("line", "") and sys.argv[3] + "/.claude" not in row.get("next_step", "") for row in rows)
+print("ok" if good else json.dumps(rows, ensure_ascii=False)[:800])' "$world/alerts.jsonl" "$relative_tail" "$tree_top" 2>&1)"
+    if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT || "$lines_count" != 2 || "$records" != ok ]] || grep -F "→ 第二台此刻放得下" "$err" | grep -qF -- "bash $tree_top/.claude"; then
+      fail "改去第二台的命令里以本机仓根起头的参数改成树内相对路径（仓根本身写 .），仓根之外的绝对路径与名字只是以仓根起头的路径原样留着：排队开始与退 $MEMORY_ADMISSION_REFUSED_EXIT 时各一行、告警记录的出路与那一行里也是，\
+应当有「$relative_tail」，实际退 $status、那一行 ${lines_count:-0} 行、告警记录：$records；stderr：$(cat "$err")"
     fi
     # 第二台放不下（可用 1 GiB）：各打一行「第二台此刻也放不下」，不写告警记录
     fresh_context 256M
@@ -1869,6 +2594,71 @@ print("ok" if good else json.dumps(rows, ensure_ascii=False)[:800])' "$world/ale
     if [[ $status -ne 0 || ! -e "$scratch/host-lookup-prompt.ran" ]] || ((poll >= 40)); then
       fail "排队开始时在查别的机器（第二台 6 秒才回话）不拖慢准入：挡路那一笔删掉之后 4 秒内起跑、退 0，\
 实际退 $status、删掉之后 $((poll / 10)) 秒多$([[ -e "$scratch/host-lookup-prompt.ran" ]] && echo '才起跑' || echo '还没起跑')：$(cat "$err")"
+    fi
+    host_lookup_fallback_cells
+  }
+  # 整体兜底（文件头「排队时去找别的机器」「整体兜底」）：六处出事，包装的退出码与关掉 HostLookup 的那一臂逐个相同、30 秒内退。
+  # 四处异常由 RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT 在那一处抛；锁与线程两格造真卡住的世界：一个真进程占住排队锁、后台那一趟真睡着，不抛异常冒充
+  host_lookup_fallback_run() { # host_lookup_fallback_run <名> <上限> <等待上限秒> [变量=值…]：在 world 里挡着路跑一条（限 30 秒），退出码进 status，stderr 进 host-lookup-<名>.err
+    local name="$1" cap="$2" wait_seconds="$3"
+    shift 3
+    host_lookup_blocker
+    rm -f -- "$context_directory/state/host-lookup.json"   # 几条一起排队时每 60 秒只查一次：每一格都要现查，先清掉上一格记的谁查过
+    if timeout 30 env "${context[@]}" env -u RUN_WITH_MEMORY_CAP_HOST_LOOKUP HOST_LOOKUP_SELFTEST_WORLD="$world" PATH="$world/bin:$PATH" \
+        SINGLEFS_MULTI_HOST_CONFIG="$world/multi-host.env" SINGLEFS_CORE_USAGE_ALERTS="$world/alerts.jsonl" CLAUDE_CODE_SESSION_ID=selftest-host-lookup-session \
+        RUN_WITH_MEMORY_CAP_KEY="selftest-host-lookup-$name" RUN_WITH_MEMORY_CAP_WAIT_SECONDS="$wait_seconds" "$@" \
+        bash "$target" "$cap" bash -c ': > "$1"' touch-marker "$scratch/host-lookup-$name.ran" 2>"$scratch/host-lookup-$name.err"; then status=0; else status=$?; fi
+    rm -f -- "$context_directory/state/ledger/singlefs-memory-cap-selftest-blocker.json"
+  }
+  host_lookup_fallback_cells() {
+    local world off_status lock_off_status point handoff holder_pid err
+    fresh_context 256M
+    world="$scratch/host-lookup-fallback"
+    host_lookup_world "$world" 43
+    # 关掉 HostLookup 的两臂：排队等满 3 秒退 252；这一条要 300M、比总上限 256M 还大，当场退 252
+    host_lookup_fallback_run fallback-off 200M 3 RUN_WITH_MEMORY_CAP_HOST_LOOKUP=off
+    off_status=$status
+    host_lookup_fallback_run fallback-lock-off 300M 3 RUN_WITH_MEMORY_CAP_HOST_LOOKUP=off
+    lock_off_status=$status
+    # 起线程、建临时文件、读输出、拼改去第二台那一行（第二台放得下才走到）四处抛异常：只打一行「没查到别的机器：…出了 …」，退出码照旧
+    for point in thread-start temp-file read-output format; do
+      checked=$((checked + 1))
+      err="$scratch/host-lookup-fallback-$point.err"
+      host_lookup_fallback_run "fallback-$point" 200M 3 RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT="$point"
+      if [[ $status -ne $off_status || $off_status -ne $MEMORY_ADMISSION_REFUSED_EXIT ]] || grep -q '^Traceback' "$err" || ! grep -q '没查到别的机器：.*出了 ' "$err"; then
+        fail "HostLookup 在「$point」那一处抛异常时只打一行没查到别的机器、退出码与关掉它的那一臂相同（$off_status），实际退 $status：$(cat "$err")"
+      fi
+    done
+    # 锁被别的进程占着：当场退 252 之前现查的那一趟要取排队锁时，叫一个真进程来占住它（占上了写 taken，一直占着，到这一格收尾才停它）
+    handoff="$scratch/host-lookup-lock-handoff"
+    mkdir -p "$handoff" "$context_directory/state"
+    python3 -c 'import fcntl, os, sys, time
+handoff, lock_path = sys.argv[1], sys.argv[2]
+deadline = time.monotonic() + 30
+while not os.path.exists(os.path.join(handoff, "request")) and time.monotonic() < deadline:
+    time.sleep(0.05)
+handle = open(lock_path, "a")
+fcntl.flock(handle, fcntl.LOCK_EX)
+open(os.path.join(handoff, "taken"), "w").close()
+time.sleep(120)' "$handoff" "$context_directory/state/lock" &
+    holder_pid=$!
+    checked=$((checked + 1))
+    err="$scratch/host-lookup-fallback-lock.err"
+    host_lookup_fallback_run fallback-lock 300M 3 RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_LOCK_HANDOFF="$handoff"
+    kill "$holder_pid" 2>/dev/null
+    wait "$holder_pid" 2>/dev/null || :
+    if [[ $status -ne $lock_off_status || $lock_off_status -ne $MEMORY_ADMISSION_REFUSED_EXIT || ! -e "$handoff/taken" ]] \
+        || ! grep -q '没查到别的机器：排队锁 .* 被别的进程占着' "$err"; then
+      fail "排队锁被别的进程占着时这一趟不查、打一行「没查到别的机器：排队锁 … 被别的进程占着」、退出码与关掉它的那一臂相同（$lock_off_status），\
+实际退 $status（124 是 30 秒到了被停）、占锁进程$([[ -e "$handoff/taken" ]] && echo '占上了' || echo '没占上')：$(cat "$err")"
+    fi
+    # 线程里的 query 睡着：排队开始那一趟在后台真睡 120 秒，等满 3 秒退 252 之前至多等它 2 + 2 秒，不再等
+    checked=$((checked + 1))
+    err="$scratch/host-lookup-fallback-sleep.err"
+    host_lookup_fallback_run fallback-sleep 200M 3 RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_SLEEP=120 RUN_WITH_MEMORY_CAP_HOST_LOOKUP_SECONDS=2
+    if [[ $status -ne $off_status ]] || ! grep -q '没查到别的机器：排队开始那一趟 .* 秒还没查完，不再等它' "$err"; then
+      fail "线程里的 query 睡着时退 252 之前不一直等它、打一行「排队开始那一趟 … 秒还没查完，不再等它」、退出码与关掉它的那一臂相同（$off_status），\
+实际退 $status（124 是 30 秒到了被停）：$(cat "$err")"
     fi
   }
   # 只跑这几项（RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=host-lookup，看它红在哪用）：跑完收尾、退出，不算整份自证通过
@@ -2058,19 +2848,20 @@ print(prediction.memory_history, prediction.memory_predicted)'
     fi
 
     # 被总上限挤掉：常驻那一条按上限 160M 放进来、占 150 MiB；这一条峰值表里记 20 MiB、上限 200M，按峰值表放进来、涨到 400 MiB 挨杀（退 254），
-    # 写一条 memory-squeezed（按峰值表放进来的、记账 20 MiB）；常驻那一条退 0、不写
+    # 写一条 memory-squeezed（按峰值表放进来的、记账 20 MiB、stopped_by=kernel）；常驻那一条退 0、不写。
+    # 两条都设 RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY：不盯账、slice 不设 memory.high，判的是内核挤掉那一支的告警（盯账停的那一支见 over_booking_cells）
     fresh_context 256M
     checked=$((checked + 1))
     seed_peak selftest-squeezed $((20 * MEBIBYTE))
-    in_context env CLAUDE_CODE_SESSION_ID="$peak_session" RUN_WITH_MEMORY_CAP_KEY=selftest-squeeze-resident bash "$target" 160M python3 -c "$job_code" \
+    in_context env CLAUDE_CODE_SESSION_ID="$peak_session" RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-squeeze-resident bash "$target" 160M python3 -c "$job_code" \
       "$scratch/squeezed-1.start" "$scratch/squeezed-1.end" 0 150 4 >/dev/null 2>"$scratch/squeezed-1.err" &
     resident_pid=$!
     sleep 1
-    if in_context env CLAUDE_CODE_SESSION_ID="$peak_session" RUN_WITH_MEMORY_CAP_KEY=selftest-squeezed bash "$target" 200M python3 -c "$hog_code" 400 \
+    if in_context env CLAUDE_CODE_SESSION_ID="$peak_session" RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-squeezed bash "$target" 200M python3 -c "$hog_code" 400 \
         >/dev/null 2>"$scratch/squeezed-2.err"; then status=0; else status=$?; fi
     wait "$resident_pid"; resident_status=$?
     records="$(alert_check "$context_alerts" memory-squeezed selftest-squeezed \
-      "{\"session_id\": \"$peak_session\", \"cap\": \"200M\", \"booked\": $((20 * MEBIBYTE)), \"booked_source\": \"peak-table\", \"by_peak_table\": true, \"measured_at_least\": $((20 * MEBIBYTE))}")"
+      "{\"session_id\": \"$peak_session\", \"cap\": \"200M\", \"booked\": $((20 * MEBIBYTE)), \"booked_source\": \"peak-table\", \"by_peak_table\": true, \"stopped_by\": \"kernel\", \"measured_at_least\": $((20 * MEBIBYTE))}")"
     if [[ $status -ne $SLICE_TOTAL_HIT_EXIT || $resident_status -ne 0 || "$records" != ok ]] \
         || [[ "$(alert_check "$context_alerts" memory-squeezed selftest-squeeze-resident '{"count": 0}')" != ok ]]; then
       fail "按峰值表放进来又被总上限挤掉的那一条应当退 $SLICE_TOTAL_HIT_EXIT、往告警记录写一条 memory-squeezed（会话号、键、上限 200M、记账 20 MiB 取自峰值表、实测、按峰值表放进来的），\
@@ -2154,6 +2945,568 @@ print(prediction.memory_history, prediction.memory_predicted)'
     fi
     echo "  ✓ run-with-memory-cap.sh 自检（只跑峰值表近几次、峰值涨了、撞顶与被挤掉的告警那几项，不算整份自证通过）查了 $checked 项都对"
     exit 0
+  fi
+
+  # 这一条命令自己的临时目录（文件头「这一条命令自己的临时目录」一段）：假命令把拿到的 TMPDIR 写进 scratch 里的一份文件、往 TMPDIR 里写一份文件，再照各自的结局退；
+  # 核包装的退出码、那一份 TMPDIR 在包装退出之后不在了、RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 底下一个不剩。
+  # 自证可能套在外层包装里跑（外层给了 TMPDIR），各例一律 env -u TMPDIR、-u SINGLEFS_KEEP_TEST_TEMPORARY_FILES 起，只在点名的那一例设
+  temporary_directory_cells() {
+    local case_name case_status case_cell root recorded leftover caller code ending
+    local -a case_environment=()
+    code='printf "%s\n" "${TMPDIR-}" > "$1"; if [[ -n "${TMPDIR-}" ]]; then : > "$TMPDIR/left-by-command"; fi; '
+    for case_name in normal nonzero killed cap-hit time-limit; do
+      fresh_context 256M
+      root="$scratch/temporary-root-$case_name"
+      recorded="$scratch/temporary-$case_name.path"
+      mkdir -p "$root"
+      case_environment=()
+      case "$case_name" in
+        normal) ending='exit 0'; case_status=0; case_cell="命令正常退出之后，包装给它的临时目录应当删掉" ;;
+        nonzero) ending='exit 7'; case_status=7; case_cell="命令退非 0 之后，包装给它的临时目录应当删掉" ;;
+        killed) ending='kill -9 $$'; case_status=137; case_cell="命令被 kill -9 之后，包装给它的临时目录应当删掉" ;;
+        cap-hit) ending='python3 -c "$2" 512'; case_status=$MEMORY_CAP_HIT_EXIT; case_cell="命令撞了 64M 上限被杀之后，包装给它的临时目录应当删掉" ;;
+        time-limit) ending='sleep 30'; case_status=$TIME_LIMIT_HIT_EXIT; case_environment=(RUN_WITH_MEMORY_CAP_TIME_LIMIT=1)
+          case_cell="命令超过限时被停之后，包装给它的临时目录应当删掉" ;;
+      esac
+      checked=$((checked + 1))
+      if in_context env -u TMPDIR -u SINGLEFS_KEEP_TEST_TEMPORARY_FILES RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT="$root" ${case_environment[@]+"${case_environment[@]}"} \
+          bash "$target" 64M bash -c "$code$ending" temporary-case "$recorded" "$hog_code" >/dev/null 2>"$scratch/temporary-$case_name.err"; then status=0; else status=$?; fi
+      output="$(cat "$recorded" 2>/dev/null)"
+      leftover="$(ls -A "$root" 2>/dev/null)"
+      if [[ $status -ne $case_status || "$output" != "$root"/singlefs-run-with-memory-cap-* || -e "$output" || -n "$leftover" ]]; then
+        fail "$case_cell（退 $case_status、命令拿到的 TMPDIR 在 $root 底下、跑完那一份不在了、$root 底下一个不剩），实际退 $status、命令拿到的 TMPDIR 是「$output」、\
+那一份$([[ -n "$output" && -e "$output" ]] && echo "还在（里面：$(ls -A "$output" 2>/dev/null | tr '\n' ' ')）" || echo '不在')、$root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-$case_name.err")"
+      fi
+    done
+    # 设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1：那一份留着（命令写的文件也在），stderr 打出它的路径；看完由这里删
+    fresh_context 256M
+    root="$scratch/temporary-root-kept"
+    recorded="$scratch/temporary-kept.path"
+    mkdir -p "$root"
+    checked=$((checked + 1))
+    if in_context env -u TMPDIR SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT="$root" \
+        bash "$target" 64M bash -c "${code}exit 0" temporary-case "$recorded" >/dev/null 2>"$scratch/temporary-kept.err"; then status=0; else status=$?; fi
+    output="$(cat "$recorded" 2>/dev/null)"
+    if [[ $status -ne 0 || "$output" != "$root"/singlefs-run-with-memory-cap-* || ! -e "$output/left-by-command" ]] \
+        || ! grep -qF "SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1：这一条命令的临时目录留着看现场：$output" "$scratch/temporary-kept.err"; then
+      fail "设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时临时目录应当留着、stderr 打出它的路径（退 0、$root 底下那一份与命令写的 left-by-command 都在），\
+实际退 $status、命令拿到的 TMPDIR 是「$output」、那一份$([[ -n "$output" && -e "$output" ]] && echo '在' || echo '不在')：$(head_characters 600 "$scratch/temporary-kept.err")"
+    fi
+    rm -rf -- "${root:?}"
+    # 调用方自己给了 TMPDIR：命令拿到的就是它，包装不另建、不删；那一份与调用方放进去的、命令写的文件都还在
+    fresh_context 256M
+    root="$scratch/temporary-root-caller"
+    caller="$scratch/temporary-given-by-caller"
+    recorded="$scratch/temporary-caller.path"
+    mkdir -p "$root" "$caller"
+    : > "$caller/placed-by-caller"
+    checked=$((checked + 1))
+    if in_context env -u SINGLEFS_KEEP_TEST_TEMPORARY_FILES TMPDIR="$caller" RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT="$root" \
+        bash "$target" 64M bash -c "${code}exit 0" temporary-case "$recorded" >/dev/null 2>"$scratch/temporary-caller.err"; then status=0; else status=$?; fi
+    output="$(cat "$recorded" 2>/dev/null)"
+    leftover="$(ls -A "$root" 2>/dev/null)"
+    if [[ $status -ne 0 || "$output" != "$caller" || ! -e "$caller/placed-by-caller" || ! -e "$caller/left-by-command" || -n "$leftover" ]]; then
+      fail "调用方设了 TMPDIR 时命令应当拿到调用方那一份、跑完那一份与里面的文件都还在（退 0、拿到 $caller、$root 底下不另建），\
+实际退 $status、命令拿到的 TMPDIR 是「$output」、调用方那一份$([[ -e "$caller" ]] && echo "在（里面：$(ls -A "$caller" 2>/dev/null | tr '\n' ' ')）" || echo '不在了')、\
+$root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-caller.err")"
+    fi
+  }
+  # 只跑这几项（RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=temporary-directory，看它红在哪用）：跑完收尾、退出，不算整份自证通过
+  if [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_ONLY:-}" == temporary-directory ]]; then
+    temporary_directory_cells
+    for slice in "${selftest_slices[@]}"; do
+      systemctl --user stop "$slice" >/dev/null 2>&1
+      systemctl --user revert "$slice" >/dev/null 2>&1
+    done
+    rm -rf -- "${scratch:?}"
+    if ((failures)); then
+      echo "  ✗ run-with-memory-cap.sh 自检（只跑这一条命令自己的临时目录那几项）$failures 处不对（查了 $checked 项；测的是 $target）"
+      echo "  → 怎么办：照上面逐条改 begin_own_temporary_directory / end_own_temporary_directory 与主流程里挂 EXIT trap 的那两行；RUN_WITH_MEMORY_CAP_BREAK 设着的话本来就该红"
+      exit 1
+    fi
+    echo "  ✓ run-with-memory-cap.sh 自检（只跑这一条命令自己的临时目录那几项，不算整份自证通过）查了 $checked 项都对"
+    exit 0
+  fi
+
+  # 资源释放广播（文件头「资源释放广播」）：事件目录是这一例自己的（RESOURCE_BROADCAST_DIRECTORY），不推（RESOURCE_BROADCAST_PUSH=off）；
+  # 读写事件只用 grep 与 printf，不起那份库（文件头那一段末尾）。排队那几格借「排队时去找别的机器」的假世界（host_lookup_world）
+  broadcast_count() { # broadcast_count <事件目录> <grep -E 的式子>：事件文件里合这个式子的行数
+    cat "$1"/*.event 2>/dev/null | grep -cE -- "$2"
+  }
+  broadcast_write_event() { # broadcast_write_event <事件目录> <序号> <种类> <来源>：照那份库的写法放一条事件（先写临时文件再改名，last-sequence 跟着改）
+    mkdir -p "$1"
+    printf 'seq=%s kind=%s host=第二台 source=%s label=selftest-broadcast exit=0 time=%s date=%s\n' "$2" "$3" "$4" "${EPOCHREALTIME/,/.}" "$(TZ=Asia/Tokyo date +%F)" \
+      > "$1/.selftest-$2.partial"
+    mv -f -- "$1/.selftest-$2.partial" "$1/$(printf '%012d' "$2").event"
+    printf '%s\n' "$2" > "$1/.selftest-last-sequence.partial"
+    mv -f -- "$1/.selftest-last-sequence.partial" "$1/last-sequence"
+  }
+  broadcast_wait_for() { # broadcast_wait_for <文件> <grep -E 的式子> <至多几个 0.1 秒>：等到那一行出现退 0
+    local poll
+    for ((poll = 0; poll < $3; poll++)); do
+      grep -qE -- "$2" "$1" 2>/dev/null && return 0
+      sleep 0.1
+    done
+    return 1
+  }
+  broadcast_cells() {
+    local events err status wrapper_pid world lines_count records woke other_pid other_err other_status
+    local -a broadcast_context=()
+    # 命令真跑过、退 3：发一条 memory-released，标签是 scope 单元名、带退出码与峰值
+    fresh_context 256M
+    events="$context_directory/events"
+    broadcast_context=(RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off)
+    checked=$((checked + 1))
+    if in_context "${broadcast_context[@]}" bash "$target" 64M bash -c 'exit 3' 2>"$scratch/broadcast-ran.err"; then status=0; else status=$?; fi
+    lines_count="$(broadcast_count "$events" '^seq=[0-9]+ kind=memory-released host=本机 source=local label=singlefs-memory-cap-[0-9]+-[0-9]+ exit=3 memory_bytes=[0-9]+ ')"
+    if [[ $status -ne 3 || "$lines_count" != 1 ]]; then
+      fail "命令真跑过、退 3 之后应当发一条 memory-released（标签是 scope 单元名、exit=3、带峰值）、包装照退 3，实际退 $status、合的事件 ${lines_count:-0} 条：$(cat "$events"/*.event 2>/dev/null)"
+    fi
+    # 排不上当场退 252（要 512M、总上限 256M）：它没占过资源，不发
+    checked=$((checked + 1))
+    rm -rf -- "${events:?}"
+    if in_context "${broadcast_context[@]}" bash "$target" 512M true 2>"$scratch/broadcast-refused.err"; then status=0; else status=$?; fi
+    if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT ]] || compgen -G "$events/*.event" > /dev/null; then
+      fail "排不上当场退 $MEMORY_ADMISSION_REFUSED_EXIT 的一条应当不发资源释放广播，实际退 $status、事件：$(cat "$events"/*.event 2>/dev/null)"
+    fi
+    # 起了 scope 之后包装被 TERM 停（只停这里 & 起、\$! 记下的那个包装）：退 143、发一条 exit=143
+    checked=$((checked + 1))
+    rm -rf -- "${events:?}"
+    env "${context[@]}" "${broadcast_context[@]}" bash "$target" 64M bash -c ': > "$1"; sleep 30' term-probe "$scratch/broadcast-term.started" 2>"$scratch/broadcast-term.err" &
+    wrapper_pid=$!
+    for ((woke = 0; woke < 100; woke++)); do [[ -e "$scratch/broadcast-term.started" ]] && break; sleep 0.1; done
+    kill -TERM "$wrapper_pid" 2>/dev/null
+    if wait "$wrapper_pid"; then status=0; else status=$?; fi
+    lines_count="$(broadcast_count "$events" ' kind=memory-released .* exit=143 ')"
+    if [[ $status -ne 143 || "$lines_count" != 1 ]]; then
+      fail "起了 scope 之后包装被 TERM 停应当退 143、发一条 memory-released exit=143，实际退 $status、合的事件 ${lines_count:-0} 条：$(cat "$events"/*.event 2>/dev/null)；stderr：$(cat "$scratch/broadcast-term.err")"
+    fi
+    # 那份库出事（只给自证的 RESOURCE_BROADCAST_SELFTEST_FAULT=crash，带那份库认的标记）：包装照退命令的 3，广播那一步打的一行都不进包装的 stderr
+    checked=$((checked + 1))
+    rm -rf -- "${events:?}"
+    printf '%s\n' "resource_release_broadcast.py 自证的标记" > "$scratch/broadcast-mark"
+    if in_context "${broadcast_context[@]}" RESOURCE_BROADCAST_SELFTEST_FAULT=crash RESOURCE_BROADCAST_SELFTEST_MARK="$scratch/broadcast-mark" \
+        bash "$target" 64M bash -c 'exit 3' 2>"$scratch/broadcast-fault.err"; then status=0; else status=$?; fi
+    if [[ $status -ne 3 ]] || grep -qE '自证造的崩溃|没广播到|资源释放广播' "$scratch/broadcast-fault.err"; then
+      fail "资源释放广播那份库出事（自证造的崩溃）时包装应当照退命令的 3、stderr 里没有广播那一步的行，实际退 $status：$(cat "$scratch/broadcast-fault.err")"
+    fi
+    # 套在外层包装里：里层跑完不发，外层照发一条
+    checked=$((checked + 1))
+    rm -rf -- "${events:?}"
+    if in_context "${broadcast_context[@]}" bash "$target" 128M bash "$target" 32M true 2>"$scratch/broadcast-nested.err"; then status=0; else status=$?; fi
+    lines_count="$(broadcast_count "$events" ' kind=memory-released ')"
+    if [[ $status -ne 0 || "$lines_count" != 1 ]]; then
+      fail "套在外层包装里跑完的一条应当不发、外层照发一条，实际退 $status、事件 ${lines_count:-0} 条：$(cat "$events"/*.event 2>/dev/null)"
+    fi
+    # 排队中收到广播（第二台先放不下）：本机自己发的内存放出不另查；第二台那一趟跑完、第二台此刻放得下：当场再查、打改去第二台的命令、写 phase=queued
+    fresh_context 256M
+    events="$context_directory/events"
+    world="$scratch/broadcast-wake"
+    host_lookup_world "$world" 1
+    err="$scratch/host-lookup-broadcast-wake.err"
+    host_lookup_blocker
+    host_lookup_command "$world" broadcast-wake 40 RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off
+    "${host_lookup_run[@]}" 2>"$err" &
+    wrapper_pid=$!
+    broadcast_wait_for "$err" '现查别的机器：第二台此刻也放不下' 200
+    broadcast_write_event "$events" 1 memory-released local
+    sleep 3
+    checked=$((checked + 1))
+    if grep -q '被资源释放广播叫醒' "$err"; then
+      fail "排队中收到本机自己发的内存放出应当不另查别的机器，实际 stderr：$(cat "$err")"
+    fi
+    printf 'MemTotal: %d kB\nMemAvailable: %d kB\n' $((60 * 1024 * 1024)) $((43 * 1024 * 1024)) > "$world/peer/proc/meminfo"
+    broadcast_write_event "$events" 2 peer-run-finished local
+    checked=$((checked + 1))
+    if broadcast_wait_for "$err" '此刻放得下.*被资源释放广播叫醒：第 2 号，peer-run-finished' 150; then woke=0; else woke=1; fi
+    rm -f -- "$context_directory/state/ledger/singlefs-memory-cap-selftest-blocker.json"
+    if wait "$wrapper_pid"; then status=0; else status=$?; fi
+    records="$(python3 -c 'import json, sys
+try:
+    rows = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+except OSError as error:
+    print(f"读不了：{error}")
+    sys.exit(0)
+print("ok" if any(row.get("phase") == "queued" and row.get("kind") == "memory-queue-peer-fits" and "被资源释放广播叫醒" in row.get("line", "") for row in rows)
+      else json.dumps(rows, ensure_ascii=False)[:600])' "$world/alerts.jsonl" 2>&1)"
+    if [[ $woke -ne 0 || $status -ne 0 || "$records" != ok ]]; then
+      fail "排队中收到第二台那一趟跑完的广播应当当场再查别的机器：第二台放得下时打改去第二台的命令（行尾注被资源释放广播叫醒）、写 phase=queued、照旧排队到放行退 0，\
+实际$([[ $woke -eq 0 ]] && echo '打了' || echo '没打')那一行、退 $status、告警记录：$records；stderr：$(cat "$err")"
+    fi
+    # 几条一起排队（第二台一直放得下）：一个事件只查一次，另一条打「第 1 号资源释放广播包装 … 已经查过」
+    fresh_context 256M
+    events="$context_directory/events"
+    world="$scratch/broadcast-throttled"
+    host_lookup_world "$world" 43
+    err="$scratch/host-lookup-broadcast-throttled-a.err"
+    other_err="$scratch/host-lookup-broadcast-throttled-b.err"
+    host_lookup_blocker
+    host_lookup_command "$world" broadcast-throttled-a 40 RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off
+    "${host_lookup_run[@]}" 2>"$err" &
+    wrapper_pid=$!
+    broadcast_wait_for "$err" '此刻放得下' 200
+    host_lookup_command "$world" broadcast-throttled-b 40 RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off
+    "${host_lookup_run[@]}" 2>"$other_err" &
+    other_pid=$!
+    broadcast_wait_for "$other_err" '刚查过' 200
+    broadcast_write_event "$events" 1 peer-run-finished local
+    broadcast_wait_for "$err" '被资源释放广播叫醒' 150
+    broadcast_wait_for "$other_err" '被资源释放广播叫醒' 150
+    sleep 1
+    checked=$((checked + 1))
+    lines_count="$(cat "$err" "$other_err" | grep -c '此刻放得下.*被资源释放广播叫醒：第 1 号')"
+    records="$(cat "$err" "$other_err" | grep -c '没查到别的机器：第 1 号资源释放广播包装 [0-9]* 已经查过')"
+    rm -f -- "$context_directory/state/ledger/singlefs-memory-cap-selftest-blocker.json"
+    if wait "$wrapper_pid"; then status=0; else status=$?; fi
+    if wait "$other_pid"; then other_status=0; else other_status=$?; fi
+    if [[ "$lines_count" != 1 || "$records" != 1 || $status -ne 0 || $other_status -ne 0 ]]; then
+      fail "几条一起排队时一个资源释放广播只查一次：一条打改去第二台的命令、另一条打「第 1 号资源释放广播包装 … 已经查过」，两条照旧放行退 0，\
+实际查了 ${lines_count:-0} 次、已经查过 ${records:-0} 行、两条退 $status 与 $other_status；stderr：$(cat "$err")｜$(cat "$other_err")"
+    fi
+    # 叫醒那一趟起线程时抛异常（只给自证的 RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT=wake-thread）：只打一行没查到别的机器，排队照旧等满 6 秒退 252
+    fresh_context 256M
+    events="$context_directory/events"
+    world="$scratch/broadcast-wake-fault"
+    host_lookup_world "$world" 1
+    err="$scratch/host-lookup-broadcast-wake-fault.err"
+    host_lookup_blocker
+    host_lookup_command "$world" broadcast-wake-fault 6 RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off RUN_WITH_MEMORY_CAP_SELFTEST_LOOKUP_FAULT=wake-thread
+    timeout 30 "${host_lookup_run[@]}" 2>"$err" &
+    wrapper_pid=$!
+    broadcast_wait_for "$err" '现查别的机器：第二台此刻也放不下' 200
+    broadcast_write_event "$events" 1 peer-run-finished local
+    checked=$((checked + 1))
+    if wait "$wrapper_pid"; then status=0; else status=$?; fi
+    rm -f -- "$context_directory/state/ledger/singlefs-memory-cap-selftest-blocker.json"
+    if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT ]] || grep -q '^Traceback' "$err" || ! grep -q '没查到别的机器：被资源释放广播叫醒那一趟起线程时出了 RuntimeError' "$err"; then
+      fail "被资源释放广播叫醒那一趟起线程时抛异常应当只打一行没查到别的机器、退出码照旧（等满 6 秒退 $MEMORY_ADMISSION_REFUSED_EXIT），实际退 $status（124 是 30 秒到了被停）：$(cat "$err")"
+    fi
+    # 排队中 follow 出事（那份库认的自证标记加 RESOURCE_BROADCAST_SELFTEST_FAULT=crash：follow 一起来就退 1）：HostLookup.watch_events 起的那条子进程边上的异常
+    #   只打一行没查到别的机器，排队照旧每 ADMISSION_POLL_SECONDS 秒重判、等满 6 秒退 252（判法单元的闭包不走这条边：scripts/gate/lib_function_units.py 的 EXCLUDED_PROGRAM_EDGES）
+    fresh_context 256M
+    events="$context_directory/events"
+    world="$scratch/broadcast-follow-fault"
+    host_lookup_world "$world" 1
+    checked=$((checked + 1))
+    host_lookup_case "$world" broadcast-follow-fault 6 RESOURCE_BROADCAST_DIRECTORY="$events" RESOURCE_BROADCAST_PUSH=off RESOURCE_BROADCAST_SELFTEST_FAULT=crash \
+      RESOURCE_BROADCAST_SELFTEST_MARK="$scratch/broadcast-mark"
+    err="$scratch/host-lookup-broadcast-follow-fault.err"
+    lines_count="$(grep -c '没查到别的机器：等资源释放广播时出了 RuntimeError（资源释放广播的 follow 退了' "$err")"
+    if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT || "$lines_count" != 1 ]] || grep -qE '^Traceback|自证造的崩溃' "$err"; then
+      fail "排队中资源释放广播的 follow 出事（自证造的崩溃）应当只打一行没查到别的机器、退出码照旧（等满 6 秒退 $MEMORY_ADMISSION_REFUSED_EXIT），实际退 $status、那一行 ${lines_count:-0} 条：$(cat "$err")"
+    fi
+  }
+  # 只跑这几项（RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=broadcast，看它红在哪用）：跑完收尾、退出，不算整份自证通过
+  if [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_ONLY:-}" == broadcast ]]; then
+    broadcast_cells
+    for slice in "${selftest_slices[@]}"; do
+      systemctl --user stop "$slice" >/dev/null 2>&1
+      systemctl --user revert "$slice" >/dev/null 2>&1
+    done
+    rm -rf -- "${scratch:?}"
+    if ((failures)); then
+      echo "  ✗ run-with-memory-cap.sh 自检（只跑资源释放广播那几项）$failures 处不对（查了 $checked 项；测的是 $target）"
+      echo "  → 怎么办：照上面逐条改 broadcast_memory_released / on_wrapper_exit 与 HostLookup 的 watch_events、pause、wake、take_turn；RUN_WITH_MEMORY_CAP_BREAK 设着的话本来就该红"
+      exit 1
+    fi
+    echo "  ✓ run-with-memory-cap.sh 自检（只跑资源释放广播那几项，不算整份自证通过）查了 $checked 项都对"
+    exit 0
+  fi
+
+  # 被总上限挤掉、内核挑谁那几项（RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=slice-total 连同 over_booking_cells 只跑这几项）。
+  # 判内核那一支的几例（挤掉、按峰值表放进来涨过总上限、OOM_FIRST）各条都设 RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY：不盯账、slice 不设 memory.high，
+  # 撞总上限全由内核按 oom_score_adj（按记账算）挑；盯账停的那一支见 over_booking_cells
+  slice_total_cells() {
+  # 被总上限挤掉（第 ② 层兜住、退 254，不报成撞了自己的上限）：表里把这两条记成 10 MiB，排队一起放行，实际各拿 150 MiB，合起来超总上限 256M
+  fresh_context 256M
+  checked=$((checked + 1))
+  seed_peak selftest-underrecorded $((10 * MEBIBYTE))
+  in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-1.start" "$scratch/squeeze-1.end" 0.3 150 1.5 \
+    >/dev/null 2>"$scratch/squeeze-1.err" &
+  first_pid=$!
+  in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-2.start" "$scratch/squeeze-2.end" 0.3 150 1.5 \
+    >/dev/null 2>"$scratch/squeeze-2.err" &
+  second_pid=$!
+  wait "$first_pid"; first_status=$?
+  wait "$second_pid"; second_status=$?
+  if [[ $first_status -ne $SLICE_TOTAL_HIT_EXIT && $second_status -ne $SLICE_TOTAL_HIT_EXIT ]] || [[ $first_status -eq $MEMORY_CAP_HIT_EXIT || $second_status -eq $MEMORY_CAP_HIT_EXIT ]] \
+      || ! grep -q '总上限挤掉' "$scratch/squeeze-1.err" "$scratch/squeeze-2.err"; then
+    fail "两条合起来超总上限 256M（各自没超上限 200M）时，被杀的那条应当退 $SLICE_TOTAL_HIT_EXIT、报「被总上限挤掉」，实际退 $first_status 与 $second_status：$(cat "$scratch/squeeze-1.err" "$scratch/squeeze-2.err")"
+  fi
+
+  # 撞过顶的键按自己的上限排队（文件头「排队」一段）：上一次撞了 200M 的键，这一次上限 300M、总上限 256M，按 300M 算放不下，当场退 252，
+  # 不按峰值表里的 200M 放进去再涨过 slice 的总上限（改前退 254）
+  fresh_context 256M
+  checked=$((checked + 1))
+  seed_peak selftest-hit-before $((200 * MEBIBYTE))
+  started_seconds="$(date +%s%N)"
+  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-hit-before bash "$target" 300M python3 -c "$hog_code" 400 >/dev/null 2>"$scratch/hit-over-slice.err"; then status=0; else status=$?; fi
+  elapsed_seconds=$((($(date +%s%N) - started_seconds) / 1000000000))
+  if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT || $elapsed_seconds -ge 5 ]] || ! grep -q '这个键撞过顶' "$scratch/hit-over-slice.err"; then
+    fail "撞过顶的键（上一次撞了 200M）这一次上限 300M、总上限 256M 时应当不放进去、当场退 $MEMORY_ADMISSION_REFUSED_EXIT、报「这个键撞过顶」，实际退 $status、用了 $elapsed_seconds 秒：$(cat "$scratch/hit-over-slice.err")"
+  fi
+
+  # 升档那趟（设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP）按自己的上限排队：常驻那一条按上限 160M 放进来、占着 150 MiB，升档那趟峰值表里记 20 MiB、上限 200M，
+  # 按 200M 算放不下，等常驻那一条跑完再起，撞的是它自己的上限（退 250），常驻那一条照常退 0
+  fresh_context 256M
+  checked=$((checked + 1))
+  seed_peak selftest-escalated $((20 * MEBIBYTE))
+  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-resident bash "$target" 160M python3 -c "$job_code" "$scratch/queue-cap-1.start" "$scratch/queue-cap-1.end" 0 150 3 \
+    >/dev/null 2>"$scratch/queue-cap-1.err" &
+  first_pid=$!
+  sleep 1
+  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-escalated RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP='升档那趟（自检）' RUN_WITH_MEMORY_CAP_WAIT_SECONDS=30 \
+      RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/queue-cap-2.start" "$scratch/queue-cap-2.end" 0 300 0 \
+      >/dev/null 2>"$scratch/queue-cap-2.err"; then status=0; else status=$?; fi
+  wait "$first_pid"; first_status=$?
+  if [[ $first_status -ne 0 || $status -ne $MEMORY_CAP_HIT_EXIT ]] || ! all_exist "$scratch/queue-cap-1.end" "$scratch/queue-cap-2.start" \
+      || ! python3 -c 'import sys; sys.exit(0 if float(open(sys.argv[2]).read()) >= float(open(sys.argv[1]).read()) else 1)' "$scratch/queue-cap-1.end" "$scratch/queue-cap-2.start" 2>/dev/null \
+      || ! grep -q 'RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP' "$scratch/queue-cap-2.err"; then
+    fail "设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP 的那一条应当按自己的上限 200M 排队、等常驻那一条跑完再起、撞自己的上限退 $MEMORY_CAP_HIT_EXIT，常驻那一条退 0，实际常驻退 $first_status、它退 $status：$(cat "$scratch/queue-cap-1.err" "$scratch/queue-cap-2.err")"
+  fi
+
+  # 按峰值表放进来的那一条涨过 slice 的总上限：内核杀它（它记账 20 MiB、超出记账最多，按记账算的 oom_score_adj 让它分数最高），不杀照上限放进来的常驻那一条；
+  # 这个键随之记成撞过顶（峰值记成上限 200M），重跑时按 200M 排队，等常驻那一条跑完再起、撞自己的上限退 250
+  fresh_context 256M
+  checked=$((checked + 1))
+  seed_peak selftest-grower $((20 * MEBIBYTE))
+  in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-resident bash "$target" 160M python3 -c "$job_code" "$scratch/collateral-1.start" "$scratch/collateral-1.end" 0 150 4 \
+    >/dev/null 2>"$scratch/collateral-1.err" &
+  first_pid=$!
+  sleep 1
+  if in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-grower RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$hog_code" 400 \
+      >/dev/null 2>"$scratch/collateral-2.err"; then status=0; else status=$?; fi
+  wait "$first_pid"; first_status=$?
+  if [[ $first_status -ne 0 || $status -ne $SLICE_TOTAL_HIT_EXIT ]]; then
+    fail "按峰值表放进来的那一条涨过 slice 的总上限时，内核应当杀它（退 $SLICE_TOTAL_HIT_EXIT）、不杀照上限放进来的常驻那一条（退 0），实际常驻退 $first_status、它退 $status：$(cat "$scratch/collateral-1.err" "$scratch/collateral-2.err")"
+  fi
+  checked=$((checked + 1))
+  output="$(awk -F '\t' '$4 == "selftest-grower" {print $1 "\t" $3}' "$context_directory/peaks.tsv" 2>/dev/null)"
+  [[ "$output" == "$((200 * MEBIBYTE))"$'\t'"200M" ]] \
+    || fail "按峰值表放进来又被总上限挤掉之后，峰值表里这个键应当记成它的上限 200M（$((200 * MEBIBYTE))），实际「$output」"
+  checked=$((checked + 1))
+  in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-resident bash "$target" 160M python3 -c "$job_code" "$scratch/collateral-3.start" "$scratch/collateral-3.end" 0 150 3 \
+    >/dev/null 2>"$scratch/collateral-3.err" &
+  first_pid=$!
+  sleep 1
+  if in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-grower RUN_WITH_MEMORY_CAP_WAIT_SECONDS=30 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' \
+      bash "$target" 200M python3 -c "$job_code" "$scratch/collateral-4.start" "$scratch/collateral-4.end" 0 300 0 >/dev/null 2>"$scratch/collateral-4.err"; then status=0; else status=$?; fi
+  wait "$first_pid"; first_status=$?
+  if [[ $first_status -ne 0 || $status -ne $MEMORY_CAP_HIT_EXIT ]] || ! all_exist "$scratch/collateral-3.end" "$scratch/collateral-4.start" \
+      || ! python3 -c 'import sys; sys.exit(0 if float(open(sys.argv[2]).read()) >= float(open(sys.argv[1]).read()) else 1)' "$scratch/collateral-3.end" "$scratch/collateral-4.start" 2>/dev/null; then
+    fail "撞过顶的键重跑时应当按自己的上限排队、等常驻那一条跑完再起、撞自己的上限退 $MEMORY_CAP_HIT_EXIT，常驻那一条退 0，实际常驻退 $first_status、它退 $status：$(cat "$scratch/collateral-3.err" "$scratch/collateral-4.err")"
+  fi
+
+  # 两条都按峰值表放进来（常驻那一条记 140 MiB、上限 160M、占 150 MiB；另一条记 20 MiB、上限 200M）：设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条
+  # （广谱变异的变异步）涨过总上限时内核杀它（1000 对按记账算的那个数），不杀更大的常驻那一条
+  fresh_context 256M
+  checked=$((checked + 1))
+  seed_peak selftest-resident-recorded $((140 * MEBIBYTE))
+  seed_peak selftest-oom-first $((20 * MEBIBYTE))
+  in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-resident-recorded bash "$target" 160M python3 -c "$job_code" "$scratch/oom-first-1.start" "$scratch/oom-first-1.end" 0 150 4 \
+    >/dev/null 2>"$scratch/oom-first-1.err" &
+  first_pid=$!
+  sleep 1
+  if in_context env RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_KEY=selftest-oom-first RUN_WITH_MEMORY_CAP_OOM_FIRST='广谱变异的变异步（自检）' RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' \
+      bash "$target" 200M python3 -c "$hog_code" 400 >/dev/null 2>"$scratch/oom-first-2.err"; then status=0; else status=$?; fi
+  wait "$first_pid"; first_status=$?
+  if [[ $first_status -ne 0 || $status -ne $SLICE_TOTAL_HIT_EXIT ]]; then
+    fail "两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时，内核应当杀它（退 $SLICE_TOTAL_HIT_EXIT）、不杀更大的常驻那一条（退 0），实际常驻退 $first_status、它退 $status：$(cat "$scratch/oom-first-1.err" "$scratch/oom-first-2.err")"
+  fi
+  # 有意撞顶的跑法挨挤也不写 memory-squeezed（文件头「峰值表」一段）：只判记录，退出码由上面那一格判
+  checked=$((checked + 1))
+  records="$(alert_check "$context_alerts" memory-squeezed selftest-oom-first '{"count": 0}')"
+  [[ "$records" == ok ]] \
+    || fail "两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条挨挤之后应当不写 memory-squeezed，实际它退 $status、记录：$records"
+  }
+
+  # 盯账（文件头「盯账」一段）：每一例一个总上限 400M 的新 slice（触发线与 memory.high 都是 380 MiB）。常驻那一条（键 selftest-booked-steady）记账 240 MiB、
+  # 上限 300M、拿 240 MiB（这台上 python 外加外壳约 5 MiB，此刻约 245 MiB，超出记账约 5 MiB，在容差 16 MiB 以内）占 8 秒；它拿够之后起另一条，上限 300M，
+  # 记账 40 MiB 的涨到 200 MiB（超账）、记账 140 MiB 的拿 140 MiB（不超账）。两条的记账合计都放得进 400M，排队一起放行。
+  # 判：谁退什么、谁的 stderr 有盯账那一句、slice 的 memory.events 里 oom_kill 还是不是 0（内核一次都没 OOM）、峰值表里谁记成了撞过顶。
+  over_booking_cells() {
+    local grower_code steady_status other_status steady_err other_err kills high_now steady_recent other_row trace
+    local -a steady_env=() other_env=()
+    # 涨内存的作业（argv：收尾时刻写到哪、几个进程、每个进程涨到几 MiB、每步几 MiB、每步隔几秒、涨够之后占几秒）：几个进程是 fork 出来的，同在这一条的 scope 里
+    grower_code='import os, sys, time
+end_path, processes, per_process, step, step_seconds, hold_seconds = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+def grow():
+    held = []
+    while len(held) * step < per_process:
+        held.append(bytes([1]) * (step * 1024 * 1024))
+        time.sleep(step_seconds)
+    time.sleep(hold_seconds)
+children = []
+for _ in range(processes - 1):
+    child = os.fork()
+    if child == 0:
+        grow()
+        os._exit(0)
+    children.append(child)
+grow()
+codes = [os.waitpid(child, 0)[1] for child in children]
+if not any(codes):
+    open(end_path, "w").write(repr(time.time()))
+sys.exit(1 if any(codes) else 0)'
+    slice_event() { # slice_event <名字> → 这一例 slice 的 memory.events 里那一项（含它底下的 scope）；读不到交空
+      local group
+      group="$(systemctl --user show -p ControlGroup --value "$slice" 2>/dev/null)"
+      [[ -n "$group" ]] && awk -v wanted="$1" '$1 == wanted {print $2}' "/sys/fs/cgroup$group/memory.events" 2>/dev/null
+    }
+    # over_booking_pair <名> <另一条的键> <另一条的命令…>：起常驻那一条，等它拿够再起另一条（前台），之后等常驻那一条；
+    # 退出码进 steady_status、other_status，stderr 进 steady_err、other_err。两条各带 steady_env、other_env（各例自己设）
+    over_booking_pair() {
+      local name="$1" other_key="$2" poll
+      shift 2
+      steady_err="$scratch/over-booking-$name-steady.err" other_err="$scratch/over-booking-$name-other.err"
+      in_context env CLAUDE_CODE_SESSION_ID=selftest-over-booking-session RUN_WITH_MEMORY_CAP_KEY=selftest-booked-steady ${steady_env[@]+"${steady_env[@]}"} \
+        bash "$target" 300M python3 -c "$job_code" "$scratch/over-booking-$name-steady.start" "$scratch/over-booking-$name-steady.end" 0 240 8 >/dev/null 2>"$steady_err" &
+      first_pid=$!
+      for ((poll = 0; poll < 100; poll++)); do
+        [[ -e "$scratch/over-booking-$name-steady.start" ]] && break
+        sleep 0.1
+      done
+      sleep 1
+      if in_context env CLAUDE_CODE_SESSION_ID=selftest-over-booking-session RUN_WITH_MEMORY_CAP_KEY="$other_key" ${other_env[@]+"${other_env[@]}"} \
+          bash "$target" 300M "$@" >/dev/null 2>"$other_err"; then other_status=0; else other_status=$?; fi
+      wait "$first_pid"; steady_status=$?
+    }
+    over_booking_context() { # over_booking_context：总上限 400M 的新 slice，峰值表里记好三条的记账（上限都是 300M）
+      fresh_context 400M
+      seed_peak selftest-booked-steady $((240 * MEBIBYTE)) 300M
+      seed_peak selftest-booked-grower $((40 * MEBIBYTE)) 300M
+      seed_peak selftest-booked-within $((140 * MEBIBYTE)) 300M
+    }
+    # 判常驻那一条照常跑完、另一条被盯账停了（退 254、stderr 有盯账那一句）、内核没 OOM、另一条的键记成撞过顶而常驻那一条的不记；不对就交回非 0，问题写进 over_booking_problem
+    over_booking_stopped_right() { # over_booking_stopped_right <名>
+      over_booking_problem=""
+      kills="$(slice_event oom_kill)"
+      steady_recent="$(recent_column selftest-booked-steady)"
+      other_row="$(awk -F '\t' '$4 == "selftest-booked-grower" {print $1 "|" $6}' "$context_directory/peaks.tsv" 2>/dev/null)"
+      [[ $steady_status -eq 0 && -e "$scratch/over-booking-$1-steady.end" ]] || over_booking_problem+="常驻那一条退 $steady_status$([[ -e "$scratch/over-booking-$1-steady.end" ]] || echo '、没跑完')；"
+      [[ $other_status -eq $SLICE_TOTAL_HIT_EXIT ]] && grep -q '超出记账最多，包装在撞总上限之前停了它' "$other_err" || over_booking_problem+="超账那一条退 $other_status、stderr 里$(grep -q '超出记账最多' "$other_err" && echo '有' || echo '没有')盯账那一句；"
+      ! grep -q '超出记账最多' "$steady_err" || over_booking_problem+="常驻那一条被盯账停了；"
+      [[ "$kills" == 0 ]] || over_booking_problem+="slice 的 oom_kill 是「$kills」（不是 0：内核 OOM 过，或读不到）；"
+      [[ "$steady_recent" != *:hit* ]] || over_booking_problem+="常驻那一条的键记成了撞过顶（近几次「$steady_recent」）；"
+      [[ "${other_row%%|*}" == "$((300 * MEBIBYTE))" && "${other_row#*|}" == *:hit* ]] || over_booking_problem+="超账那一条的键没记成撞过顶（峰值|近几次「$other_row」）；"
+      [[ -z "$over_booking_problem" ]]
+    }
+    local over_booking_problem=""
+
+    # 单进程超账：另一条记账 40 MiB、每 0.15 秒涨 10 MiB 涨到 200 MiB；到触发线时它超出记账约 95 MiB，盯账停它
+    over_booking_context
+    checked=$((checked + 1))
+    steady_env=() other_env=()
+    over_booking_pair single selftest-booked-grower python3 -c "$grower_code" "$scratch/over-booking-single-other.end" 1 200 10 0.15 1
+    over_booking_stopped_right single \
+      || fail "单进程超账（记账 40 MiB 的那一条涨到 200 MiB）时盯账应当只停它（退 $SLICE_TOTAL_HIT_EXIT、报「超出记账最多，包装在撞总上限之前停了它」、键记成撞过顶），\
+没超账的常驻那一条退 0、键不记撞过顶，内核一次都不 OOM，实际：$over_booking_problem$(cat "$other_err" "$steady_err")"
+    # 盯账停的那一条写一条 memory-squeezed，stopped_by=over-booking-watch；常驻那一条不写
+    checked=$((checked + 1))
+    records="$(alert_check "$context_alerts" memory-squeezed selftest-booked-grower \
+      "{\"session_id\": \"selftest-over-booking-session\", \"cap\": \"300M\", \"booked\": $((40 * MEBIBYTE)), \"booked_source\": \"peak-table\", \"by_peak_table\": true, \"stopped_by\": \"over-booking-watch\", \"measured_at_least\": $((40 * MEBIBYTE))}")"
+    if [[ "$records" != ok || "$(alert_check "$context_alerts" memory-squeezed selftest-booked-steady '{"count": 0}')" != ok ]]; then
+      fail "盯账停的那一条应当往告警记录写一条 memory-squeezed（stopped_by=over-booking-watch、记账 40 MiB 取自峰值表、实测不小于记账），常驻那一条不写，实际：$records"
+    fi
+
+    # 多进程超账：另一条是同一条 scope 里 8 个进程、各每 0.15 秒涨 6 MiB 涨到 24 MiB（单个进程都不大，合起来超账）；内核按进程打分挑不对，盯账按 scope 算挑得对
+    over_booking_context
+    checked=$((checked + 1))
+    over_booking_pair multiple selftest-booked-grower python3 -c "$grower_code" "$scratch/over-booking-multiple-other.end" 8 24 6 0.15 1
+    over_booking_stopped_right multiple \
+      || fail "多进程超账（记账 40 MiB 的那一条在同一条 scope 里起 8 个进程各涨到 24 MiB）时盯账应当只停它（退 $SLICE_TOTAL_HIT_EXIT、报「超出记账最多，包装在撞总上限之前停了它」、键记成撞过顶），\
+没超账的常驻那一条退 0、键不记撞过顶，内核一次都不 OOM，实际：$over_booking_problem$(cat "$other_err" "$steady_err")"
+
+    # 一口气拿满：另一条起来一口气拿 200 MiB；越过 slice 的 memory.high（380 MiB）之后分配被节流，盯账赶在撞 memory.max 之前停它
+    over_booking_context
+    checked=$((checked + 1))
+    over_booking_pair at-once selftest-booked-grower python3 -c "$grower_code" "$scratch/over-booking-at-once-other.end" 1 200 200 0 1
+    high_now="$(systemctl --user show -p ControlGroup --value "$slice" 2>/dev/null)"
+    high_now="$(cat "/sys/fs/cgroup$high_now/memory.high" 2>/dev/null)"
+    if ! over_booking_stopped_right at-once || [[ "$high_now" != "$((380 * MEBIBYTE))" ]]; then
+      fail "一口气拿满（记账 40 MiB 的那一条起来就拿 200 MiB）时 slice 的 memory.high 应当是总上限的 95%（$((380 * MEBIBYTE))）、盯账应当只停它（退 $SLICE_TOTAL_HIT_EXIT、报「超出记账最多，包装在撞总上限之前停了它」、键记成撞过顶），\
+没超账的常驻那一条退 0、键不记撞过顶，内核一次都不 OOM，实际：$over_booking_problem slice 的 memory.high「$high_now」：$(cat "$other_err" "$steady_err")"
+    fi
+
+    # 两条都不超账、合计压过触发线：另一条记账 140 MiB、拿 140 MiB（约 145 MiB），两条合计约 390 MiB，过了 380 MiB 的触发线、在 400M 以内；
+    # 盯账判到了（两条的判法记录里有行）、谁都不停，两条都退 0，内核不 OOM
+    over_booking_context
+    checked=$((checked + 1))
+    trace="$scratch/over-booking-within.trace"
+    steady_env=(RUN_WITH_MEMORY_CAP_SELFTEST_WATCH_TRACE="$trace") other_env=(RUN_WITH_MEMORY_CAP_SELFTEST_WATCH_TRACE="$trace")
+    over_booking_pair within selftest-booked-within python3 -c "$job_code" "$scratch/over-booking-within-other.start" "$scratch/over-booking-within-other.end" 0 140 3
+    steady_env=() other_env=()
+    kills="$(slice_event oom_kill)"
+    if [[ $steady_status -ne 0 || $other_status -ne 0 || "$kills" != 0 || ! -s "$trace" ]] || grep -q '超出记账最多' "$steady_err" "$other_err"; then
+      fail "两条都不超账（记账 240 MiB 与 140 MiB、各超出约 5 MiB，合计约 390 MiB 过了触发线 380 MiB）时盯账应当判到（判法记录有行）、谁都不停、两条都退 0、内核不 OOM，\
+实际常驻退 $steady_status、另一条退 $other_status、slice 的 oom_kill「$kills」、判法记录 $(wc -l < "$trace" 2>/dev/null || echo 0) 行：$(tail -n 2 "$trace" 2>/dev/null)；$(cat "$other_err" "$steady_err")"
+    fi
+
+    # 内核兜底：两条都设 RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY（不盯账、slice 不设 memory.high），单进程超账撞了 memory.max，
+    # 内核按记账算的 oom_score_adj 杀超账那一条（退 254、记成撞过顶），不杀没超账、常驻更大的那一条（改前两条同为 500 时杀的是它，2026-10-26 实测 6 次里 6 次）
+    over_booking_context
+    checked=$((checked + 1))
+    steady_env=(RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1) other_env=(RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1)
+    over_booking_pair kernel selftest-booked-grower python3 -c "$grower_code" "$scratch/over-booking-kernel-other.end" 1 200 10 0.15 1
+    steady_env=() other_env=()
+    kills="$(slice_event oom_kill)"
+    steady_recent="$(recent_column selftest-booked-steady)"
+    other_row="$(awk -F '\t' '$4 == "selftest-booked-grower" {print $1 "|" $6}' "$context_directory/peaks.tsv" 2>/dev/null)"
+    if [[ $steady_status -ne 0 || $other_status -ne $SLICE_TOTAL_HIT_EXIT || "$kills" == 0 || -z "$kills" || "$steady_recent" == *:hit* ]] \
+        || [[ "${other_row%%|*}" != "$((300 * MEBIBYTE))" || "${other_row#*|}" != *:hit* ]] || ! grep -q '被 slice .* 的总上限挤掉了' "$other_err"; then
+      fail "不盯账、单进程超账撞了总上限时内核应当按记账算的 oom_score_adj 杀超账那一条（退 $SLICE_TOTAL_HIT_EXIT、报「被 slice … 的总上限挤掉了」、键记成撞过顶），没超账、常驻更大的那一条退 0、键不记撞过顶，\
+实际常驻退 $steady_status、超账那一条退 $other_status、slice 的 oom_kill「$kills」、常驻那一条近几次「$steady_recent」、超账那一条峰值|近几次「$other_row」：$(cat "$other_err" "$steady_err")"
+    fi
+
+    # 被内核挤掉而没超账的那一条不记撞过顶：两条都设 KERNEL_ONLY，常驻那一条另设 RUN_WITH_MEMORY_CAP_OOM_FIRST（oom_score_adj 1000，内核先挑它），
+    # 它没超出记账（约 5 MiB，在容差以内）：退 254、stderr 写明没超出记账、峰值表里它那一行照旧（不记撞过顶）；超账那一条随之跑完退 0
+    over_booking_context
+    checked=$((checked + 1))
+    steady_env=(RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1 RUN_WITH_MEMORY_CAP_OOM_FIRST='自证：让内核先挑没超账的那一条') other_env=(RUN_WITH_MEMORY_CAP_SELFTEST_KERNEL_ONLY=1)
+    over_booking_pair innocent selftest-booked-grower python3 -c "$grower_code" "$scratch/over-booking-innocent-other.end" 1 200 10 0.15 1
+    steady_env=() other_env=()
+    steady_recent="$(recent_column selftest-booked-steady)"
+    if [[ $steady_status -ne $SLICE_TOTAL_HIT_EXIT || $other_status -ne 0 || "$steady_recent" == *:hit* ]] || ! grep -q '没超出记账' "$steady_err"; then
+      fail "被内核挤掉而没超出记账的那一条应当退 $SLICE_TOTAL_HIT_EXIT、stderr 写明「没超出记账」、峰值表里这个键不记撞过顶，超账那一条跑完退 0，\
+实际它退 $steady_status、近几次「$steady_recent」（列数|第六列）、超账那一条退 $other_status：$(cat "$steady_err" "$other_err")"
+    fi
+  }
+  # 只跑这几项（RUN_WITH_MEMORY_CAP_SELFTEST_ONLY=slice-total，看它红在哪用）：跑完收尾、退出，不算整份自证通过
+  if [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_ONLY:-}" == slice-total ]]; then
+    slice_total_cells
+    over_booking_cells
+    for slice in "${selftest_slices[@]}"; do
+      systemctl --user stop "$slice" >/dev/null 2>&1
+      systemctl --user revert "$slice" >/dev/null 2>&1
+    done
+    rm -rf -- "${scratch:?}"
+    if ((failures)); then
+      echo "  ✗ run-with-memory-cap.sh 自检（只跑被总上限挤掉、内核挑谁与盯账那几项）$failures 处不对（查了 $checked 项；测的是 $target）"
+      echo "  → 怎么办：照上面逐条改 run_capped 里按记账算 oom_score_adj、认盯账标记与记不记撞过顶的几处，watch_over_booking、ensure_slice_high；RUN_WITH_MEMORY_CAP_BREAK 设着的话本来就该红"
+      exit 1
+    fi
+    echo "  ✓ run-with-memory-cap.sh 自检（只跑被总上限挤掉、内核挑谁与盯账那几项，不算整份自证通过）查了 $checked 项都对"
+    exit 0
+  fi
+
+  # 弄坏开关只在自证里认（文件头那一段；门禁 code-tooling 的 break-switch-outside-selftest 格就这样探）：
+  # 没有标记（变量清掉、或指到头一行不对的文件）而设了开关 ⇒ 退 2、点名它只在自证里认；弄坏开关 guard-off 下这一道不拒，探针往下走到「没给命令」退 251、不点名。
+  # 带着标记 ⇒ 不拒，往下走到同一处退 251
+  local guard_probe_break=nocap guard_probe_mark guard_probe_output guard_probe_status
+  [[ "$BROKEN_JUDGEMENT" != guard-off ]] || guard_probe_break=guard-off
+  printf '%s\n' "不是 $SELFTEST_MARK_CONTENT" > "$scratch/selftest-mark-wrong"
+  for guard_probe_mark in "" "$scratch/selftest-mark-wrong"; do
+    checked=$((checked + 1))
+    if guard_probe_output="$(env RUN_WITH_MEMORY_CAP_SELFTEST_MARK="$guard_probe_mark" RUN_WITH_MEMORY_CAP_BREAK="$guard_probe_break" \
+        bash "$target" --force --break-guard-probe-unknown-option 2>&1 </dev/null)"; then guard_probe_status=0; else guard_probe_status=$?; fi
+    if [[ "$guard_probe_status" != 2 ]] || ! grep -qE 'RUN_WITH_MEMORY_CAP_BREAK.*只在自证（--selftest）里认' <<<"$guard_probe_output"; then
+      fail "平常跑（没有自证的标记）设了 RUN_WITH_MEMORY_CAP_BREAK 应当退 2、点名它只在自证里认（标记「${guard_probe_mark:-空}」），实际退 $guard_probe_status：$(head -n 3 <<<"$guard_probe_output" | tr '\n' ' ')"
+    fi
+  done
+  checked=$((checked + 1))
+  if guard_probe_output="$(env RUN_WITH_MEMORY_CAP_BREAK=nocap bash "$target" --force --break-guard-probe-unknown-option 2>&1 </dev/null)"; then guard_probe_status=0; else guard_probe_status=$?; fi
+  if [[ "$guard_probe_status" != "$MEMORY_CAP_UNAVAILABLE_EXIT" ]] || grep -qF '只在自证（--selftest）里认' <<<"$guard_probe_output"; then
+    fail "带着自证的标记设了 RUN_WITH_MEMORY_CAP_BREAK 应当不拒、照常往下判（这一条没给命令，退 $MEMORY_CAP_UNAVAILABLE_EXIT），实际退 $guard_probe_status：$(head -n 3 <<<"$guard_probe_output" | tr '\n' ' ')"
   fi
 
   fresh_context 512M
@@ -2614,107 +3967,7 @@ FAKE_JOURNAL
   checked=$((checked + 1))
   scope_stop_case INT 130
 
-  # 被总上限挤掉（第 ② 层兜住、退 254，不报成撞了自己的上限）：表里把这两条记成 10 MiB，排队一起放行，实际各拿 150 MiB，合起来超总上限 256M
-  fresh_context 256M
-  checked=$((checked + 1))
-  seed_peak selftest-underrecorded $((10 * MEBIBYTE))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-1.start" "$scratch/squeeze-1.end" 0.3 150 1.5 \
-    >/dev/null 2>"$scratch/squeeze-1.err" &
-  first_pid=$!
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-underrecorded RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/squeeze-2.start" "$scratch/squeeze-2.end" 0.3 150 1.5 \
-    >/dev/null 2>"$scratch/squeeze-2.err" &
-  second_pid=$!
-  wait "$first_pid"; first_status=$?
-  wait "$second_pid"; second_status=$?
-  if [[ $first_status -ne $SLICE_TOTAL_HIT_EXIT && $second_status -ne $SLICE_TOTAL_HIT_EXIT ]] || [[ $first_status -eq $MEMORY_CAP_HIT_EXIT || $second_status -eq $MEMORY_CAP_HIT_EXIT ]] \
-      || ! grep -q '总上限挤掉' "$scratch/squeeze-1.err" "$scratch/squeeze-2.err"; then
-    fail "两条合起来超总上限 256M（各自没超上限 200M）时，被杀的那条应当退 $SLICE_TOTAL_HIT_EXIT、报「被总上限挤掉」，实际退 $first_status 与 $second_status：$(cat "$scratch/squeeze-1.err" "$scratch/squeeze-2.err")"
-  fi
-
-  # 撞过顶的键按自己的上限排队（文件头「排队」一段）：上一次撞了 200M 的键，这一次上限 300M、总上限 256M，按 300M 算放不下，当场退 252，
-  # 不按峰值表里的 200M 放进去再涨过 slice 的总上限（改前退 254）
-  fresh_context 256M
-  checked=$((checked + 1))
-  seed_peak selftest-hit-before $((200 * MEBIBYTE))
-  started_seconds="$(date +%s%N)"
-  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-hit-before bash "$target" 300M python3 -c "$hog_code" 400 >/dev/null 2>"$scratch/hit-over-slice.err"; then status=0; else status=$?; fi
-  elapsed_seconds=$((($(date +%s%N) - started_seconds) / 1000000000))
-  if [[ $status -ne $MEMORY_ADMISSION_REFUSED_EXIT || $elapsed_seconds -ge 5 ]] || ! grep -q '这个键撞过顶' "$scratch/hit-over-slice.err"; then
-    fail "撞过顶的键（上一次撞了 200M）这一次上限 300M、总上限 256M 时应当不放进去、当场退 $MEMORY_ADMISSION_REFUSED_EXIT、报「这个键撞过顶」，实际退 $status、用了 $elapsed_seconds 秒：$(cat "$scratch/hit-over-slice.err")"
-  fi
-
-  # 升档那趟（设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP）按自己的上限排队：常驻那一条按上限 160M 放进来、占着 150 MiB，升档那趟峰值表里记 20 MiB、上限 200M，
-  # 按 200M 算放不下，等常驻那一条跑完再起，撞的是它自己的上限（退 250），常驻那一条照常退 0
-  fresh_context 256M
-  checked=$((checked + 1))
-  seed_peak selftest-escalated $((20 * MEBIBYTE))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-resident bash "$target" 160M python3 -c "$job_code" "$scratch/queue-cap-1.start" "$scratch/queue-cap-1.end" 0 150 3 \
-    >/dev/null 2>"$scratch/queue-cap-1.err" &
-  first_pid=$!
-  sleep 1
-  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-escalated RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP='升档那趟（自检）' RUN_WITH_MEMORY_CAP_WAIT_SECONDS=30 \
-      RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$job_code" "$scratch/queue-cap-2.start" "$scratch/queue-cap-2.end" 0 300 0 \
-      >/dev/null 2>"$scratch/queue-cap-2.err"; then status=0; else status=$?; fi
-  wait "$first_pid"; first_status=$?
-  if [[ $first_status -ne 0 || $status -ne $MEMORY_CAP_HIT_EXIT ]] || ! all_exist "$scratch/queue-cap-1.end" "$scratch/queue-cap-2.start" \
-      || ! python3 -c 'import sys; sys.exit(0 if float(open(sys.argv[2]).read()) >= float(open(sys.argv[1]).read()) else 1)' "$scratch/queue-cap-1.end" "$scratch/queue-cap-2.start" 2>/dev/null \
-      || ! grep -q 'RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP' "$scratch/queue-cap-2.err"; then
-    fail "设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP 的那一条应当按自己的上限 200M 排队、等常驻那一条跑完再起、撞自己的上限退 $MEMORY_CAP_HIT_EXIT，常驻那一条退 0，实际常驻退 $first_status、它退 $status：$(cat "$scratch/queue-cap-1.err" "$scratch/queue-cap-2.err")"
-  fi
-
-  # 按峰值表放进来的那一条涨过 slice 的总上限：内核杀它（它的 oom_score_adj 是 500），不杀照上限放进来的常驻那一条；这个键随之记成撞过顶（峰值记成上限 200M），
-  # 重跑时按 200M 排队，等常驻那一条跑完再起、撞自己的上限退 250
-  fresh_context 256M
-  checked=$((checked + 1))
-  seed_peak selftest-grower $((20 * MEBIBYTE))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-resident bash "$target" 160M python3 -c "$job_code" "$scratch/collateral-1.start" "$scratch/collateral-1.end" 0 150 4 \
-    >/dev/null 2>"$scratch/collateral-1.err" &
-  first_pid=$!
-  sleep 1
-  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-grower RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' bash "$target" 200M python3 -c "$hog_code" 400 \
-      >/dev/null 2>"$scratch/collateral-2.err"; then status=0; else status=$?; fi
-  wait "$first_pid"; first_status=$?
-  if [[ $first_status -ne 0 || $status -ne $SLICE_TOTAL_HIT_EXIT ]]; then
-    fail "按峰值表放进来的那一条涨过 slice 的总上限时，内核应当杀它（退 $SLICE_TOTAL_HIT_EXIT）、不杀照上限放进来的常驻那一条（退 0），实际常驻退 $first_status、它退 $status：$(cat "$scratch/collateral-1.err" "$scratch/collateral-2.err")"
-  fi
-  checked=$((checked + 1))
-  output="$(awk -F '\t' '$4 == "selftest-grower" {print $1 "\t" $3}' "$context_directory/peaks.tsv" 2>/dev/null)"
-  [[ "$output" == "$((200 * MEBIBYTE))"$'\t'"200M" ]] \
-    || fail "按峰值表放进来又被总上限挤掉之后，峰值表里这个键应当记成它的上限 200M（$((200 * MEBIBYTE))），实际「$output」"
-  checked=$((checked + 1))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-resident bash "$target" 160M python3 -c "$job_code" "$scratch/collateral-3.start" "$scratch/collateral-3.end" 0 150 3 \
-    >/dev/null 2>"$scratch/collateral-3.err" &
-  first_pid=$!
-  sleep 1
-  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-grower RUN_WITH_MEMORY_CAP_WAIT_SECONDS=30 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' \
-      bash "$target" 200M python3 -c "$job_code" "$scratch/collateral-4.start" "$scratch/collateral-4.end" 0 300 0 >/dev/null 2>"$scratch/collateral-4.err"; then status=0; else status=$?; fi
-  wait "$first_pid"; first_status=$?
-  if [[ $first_status -ne 0 || $status -ne $MEMORY_CAP_HIT_EXIT ]] || ! all_exist "$scratch/collateral-3.end" "$scratch/collateral-4.start" \
-      || ! python3 -c 'import sys; sys.exit(0 if float(open(sys.argv[2]).read()) >= float(open(sys.argv[1]).read()) else 1)' "$scratch/collateral-3.end" "$scratch/collateral-4.start" 2>/dev/null; then
-    fail "撞过顶的键重跑时应当按自己的上限排队、等常驻那一条跑完再起、撞自己的上限退 $MEMORY_CAP_HIT_EXIT，常驻那一条退 0，实际常驻退 $first_status、它退 $status：$(cat "$scratch/collateral-3.err" "$scratch/collateral-4.err")"
-  fi
-
-  # 两条都按峰值表放进来（常驻那一条记 140 MiB、上限 160M、占 150 MiB；另一条记 20 MiB、上限 200M）：设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条
-  # （广谱变异的变异步）涨过总上限时内核杀它（1000 对 500），不杀更大的常驻那一条
-  fresh_context 256M
-  checked=$((checked + 1))
-  seed_peak selftest-resident-recorded $((140 * MEBIBYTE))
-  seed_peak selftest-oom-first $((20 * MEBIBYTE))
-  in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-resident-recorded bash "$target" 160M python3 -c "$job_code" "$scratch/oom-first-1.start" "$scratch/oom-first-1.end" 0 150 4 \
-    >/dev/null 2>"$scratch/oom-first-1.err" &
-  first_pid=$!
-  sleep 1
-  if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-oom-first RUN_WITH_MEMORY_CAP_OOM_FIRST='广谱变异的变异步（自检）' RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='自检排队这一例故意上限远大于峰值' \
-      bash "$target" 200M python3 -c "$hog_code" 400 >/dev/null 2>"$scratch/oom-first-2.err"; then status=0; else status=$?; fi
-  wait "$first_pid"; first_status=$?
-  if [[ $first_status -ne 0 || $status -ne $SLICE_TOTAL_HIT_EXIT ]]; then
-    fail "两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条涨过总上限时，内核应当杀它（退 $SLICE_TOTAL_HIT_EXIT）、不杀更大的常驻那一条（退 0），实际常驻退 $first_status、它退 $status：$(cat "$scratch/oom-first-1.err" "$scratch/oom-first-2.err")"
-  fi
-  # 有意撞顶的跑法挨挤也不写 memory-squeezed（文件头「峰值表」一段）：只判记录，退出码由上面那一格判
-  checked=$((checked + 1))
-  records="$(alert_check "$context_alerts" memory-squeezed selftest-oom-first '{"count": 0}')"
-  [[ "$records" == ok ]] \
-    || fail "两条都按峰值表放进来、设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的那一条挨挤之后应当不写 memory-squeezed，实际它退 $status、记录：$records"
+  slice_total_cells
 
   # 限时：超过 RUN_WITH_MEMORY_CAP_TIME_LIMIT 退 253，不跑满命令自己的时长
   checked=$((checked + 1))
@@ -2734,6 +3987,9 @@ FAKE_JOURNAL
   if [[ $status -ne 0 || -e "$context_directory/state/ledger/singlefs-memory-cap-dead.json" ]]; then
     fail "账上那一笔的包装已经死了，应当删掉它、放行这一条退 0，实际退 $status、那一笔$([[ -e "$context_directory/state/ledger/singlefs-memory-cap-dead.json" ]] && echo '还在' || echo '删了')：$(cat "$scratch/stale.err")"
   fi
+
+  # 盯账那几项（over_booking_cells，定义在上面）：各例自己开新 slice
+  over_booking_cells
 
   # 排队中停包装（信号只发给包装进程本身、不发给它的进程组，2026-09-26 撞见孤儿的就是这样停的）：排队那一步的子进程 5 秒内跟着退、
   # 调用方的管道 5 秒内读到 EOF、包装退 143 / 130（TERM / INT，trap 接住）或 137 / 129（KILL / HUP，被信号杀掉）、命令没跑、账上与 --status 里都没有这一条。
@@ -2896,6 +4152,7 @@ null 那一笔$([[ -e "$context_directory/state/ledger/singlefs-memory-cap-null-
   else
     mkdir -p "$hopeless_root$hopeless_group" "$context_directory/state/ledger"
     echo $((41062 * MEBIBYTE)) > "$hopeless_root$hopeless_group/memory.max"
+    echo $((41062 * MEBIBYTE * SLICE_HIGH_PERMILLE / 1000 / MEBIBYTE * MEBIBYTE)) > "$hopeless_root$hopeless_group/memory.high"   # 假根里 slice 的 memory.high 已是该设的数，不去设真的 slice
     echo $((420 * MEBIBYTE)) > "$hopeless_root$hopeless_group/memory.current"
     printf 'anon %s\nactive_file 0\ninactive_file 0\n' $((420 * MEBIBYTE)) > "$hopeless_root$hopeless_group/memory.stat"
     marker="$scratch/ran-hopeless"
@@ -3088,6 +4345,8 @@ BOOKED_PROBE
 
   host_lookup_cells
   peak_history_cells
+  temporary_directory_cells
+  broadcast_cells
 
   # 收尾之后不留账、不留 scope：每一例的账是空的，每个 slice 底下没有 scope
   checked=$((checked + 1))
@@ -3155,10 +4414,10 @@ BOOKED_PROBE
   rm -rf -- "${scratch:?}"
   if ((failures)); then
     echo "  ✗ run-with-memory-cap.sh 自检 $failures 处不对（查了 $checked 项；测的是 $target）"
-    echo "  → 怎么办：照上面逐条改 run_capped / ensure_slice / scope_result / admission / check_size_syntax / reject_usage / command_threads / private_setting / cap_judged_against_the_recorded_peak / gpu_memory_verdict（取键与读账在 memory_peaks_lib.py）；RUN_WITH_MEMORY_CAP_BREAK 设着、或 RUN_WITH_MEMORY_CAP_SELFTEST_TARGET 指着改前那一份的话这里本来就该红"
+    echo "  → 怎么办：照上面逐条改 run_capped / ensure_slice / ensure_slice_high / watch_over_booking / booked_oom_score_adjust / scope_result / admission / check_size_syntax / reject_usage / command_threads / private_setting / cap_judged_against_the_recorded_peak / gpu_memory_verdict（取键与读账在 memory_peaks_lib.py）；RUN_WITH_MEMORY_CAP_BREAK 设着、或 RUN_WITH_MEMORY_CAP_SELFTEST_TARGET 指着改前那一份的话这里本来就该红"
     exit 1
   fi
-  echo "  ✓ run-with-memory-cap.sh 自检通过（查了 $checked 项：--check 起得来、64M 上限里分配 512 MiB 的探针与它当孙进程时都判撞顶退 $MEMORY_CAP_HIT_EXIT、\
+  echo "  ✓ run-with-memory-cap.sh 自检通过（查了 $checked 项：平常跑设了弄坏开关退 2 并点名只在自证里认而带着自证的标记照常判、--check 起得来、64M 上限里分配 512 MiB 的探针与它当孙进程时都判撞顶退 $MEMORY_CAP_HIT_EXIT、\
 上限之内 kill -9 原样退 137 且 stderr 不多一行、退出码 0 / 7 / 101 原样传回、上限超过实测峰值 2 倍照常跑、auto 取实测峰值 1.5 倍、auto 而表里没有取保守默认值 8G、\
 同一个会话已有一条在跑时第二条照常放行、从会话里起的一条放不下时排队等前一条跑完、\
 余量不同的并发调用者不拒（先到的读回是后到的值照读回的走、slice 上有活着的使用者时后到的照已有的总上限走且不改 slice 的 MemoryMax、排队也按已有的算，这几例都打「照 slice … 已有的总上限」一行；slice 上有别的余量的调用者活着时 --check 照已有的试、不改 slice、不打这一行、退 0）、\
@@ -3170,6 +4429,8 @@ slice 设不上与余量比整机还大时退 $MEMORY_CAP_UNAVAILABLE_EXIT 且�
 常驻是在跑那一条的 scope 占着的则照旧排队、峰值表里记着 1.8G 的写 24G 上限按 1.8G 记账、与按 24G 记账的一条在 40G 里同时跑、\
 峰值记进表之后两条按记下的量一起跑、scope 里一直收 TERM 时峰值照记（TERM 只在这一例自己的 slice 底下自己开的 scope 里发）、被总上限挤掉退 $SLICE_TOTAL_HIT_EXIT、\
 撞过顶的键按上限算放不下当场退 $MEMORY_ADMISSION_REFUSED_EXIT、设了 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP 的按上限排队等常驻的跑完、按峰值表放进来涨过总上限的先挨杀且键记成撞过顶、重跑按上限排队、两条都按峰值表放进来时设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的先挨杀、\
+盯账（单进程超账、同一条 scope 里 8 个进程分摊超账、一口气拿满三种都只停超账那一条、退 $SLICE_TOTAL_HIT_EXIT、键记成撞过顶、写 memory-squeezed 且 stopped_by=over-booking-watch、内核不 OOM，\
+slice 的 memory.high 是总上限的 95%，两条都不超账而合计压过触发线时判到了也谁都不停）、不盯账时内核按记账算的 oom_score_adj 杀超账那一条、被内核挤掉而没超出记账的不记撞过顶、\
 超过限时退 $TIME_LIMIT_HIT_EXIT、死账不挡路、\
 套在外层里起的一条不另记账不排队、套在外层里上限比外层大退 $MEMORY_CAP_UNAVAILABLE_EXIT 且命令没跑、套在外层里撞了自己的上限退 $MEMORY_CAP_HIT_EXIT 而外层照跑完、标记变量漏到外层之外照没套跑、\
 排队中给包装本身发 TERM / INT / KILL / HUP 时排队那一步 5 秒内跟着退、调用方管道读到 EOF、包装退 143 / 130 / 137 / 129、命令没跑、账上与 --status 里没有这一条、\
@@ -3181,7 +4442,9 @@ slice 设不上与余量比整机还大时退 $MEMORY_CAP_UNAVAILABLE_EXIT 且�
 峰值表近几次（撞顶之后连跑 5 次干净的都按上限记账、第 6 次才按近 5 次里最大的，峰值一路变小时记账取最大的，四列五列旧行照读，派发器的 predict 在同一张表上取同一个数）、\
 峰值涨了（记账取自峰值表、实测是它 1.5 倍以上的打一行并写 memory-peak-grew，不到 1.5 倍的与按预测记账的不打）、退 $MEMORY_CAP_HIT_EXIT 与 $SLICE_TOTAL_HIT_EXIT 各写 memory-own-cap 与 memory-squeezed、\
 设了 RUN_WITH_MEMORY_CAP_OOM_FIRST 的撞顶与挨挤不写这两种而退出码与撞顶标记照旧、告警跟着峰值表走（峰值表指到默认之外的写它旁边那一份而真记录不多一行、不设与经符号链接指到默认的写真记录、显式给了告警记录的照显式的写）、\
-排队时去找别的机器（第二台放得下时排队开始与退 $MEMORY_ADMISSION_REFUSED_EXIT 时各打一行改去第二台的命令并写告警记录、放不下与连不上与超过时限各打一行、几条一起排队 60 秒只查一次、在查的那一趟不拖慢准入））"
+排队时去找别的机器（第二台放得下时排队开始与退 $MEMORY_ADMISSION_REFUSED_EXIT 时各打一行改去第二台的命令并写告警记录、放不下与连不上与超过时限各打一行、几条一起排队 60 秒只查一次、在查的那一趟不拖慢准入）、\
+这一条命令自己的临时目录（命令正常退、退非 0、被 kill -9、撞了上限、超过限时五种结局之后都删掉、设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 留着并打出路径、调用方给了 TMPDIR 照它的且不删）、\
+资源释放广播（命令跑过退 3 与起了 scope 之后被 TERM 停各发一条 memory-released、排不上不发、套在外层里不发、那份库出事时退出码照旧且 stderr 里没有它的行、排队中本机自己的内存放出不另查、第二台那一趟跑完当场再查且放得下写 phase=queued、几条一起排队一个事件只查一次、叫醒那一趟抛异常与 follow 出事各只打一行））"
 }
 
 # slice 名只许 singlefs 开头的 .slice（文件头「发信号的地方」一段）
@@ -3229,5 +4492,9 @@ if outer_cap="$(outer_scope_cap)"; then
       "把这一条的上限写到 $outer_cap 以内（调用方脚本的上限选项或变量，例 --memory-cap $outer_cap；外层给了多少读 RUN_WITH_MEMORY_CAP_OUTER_CAP）；真要这么多就把外层那一条的上限调大，或不套在外层里跑"
   fi
 fi
+# 这一条命令自己的临时目录：先挂 EXIT trap 再建，report_unavailable、stop_queued_admission、stop_own_scope_then_exit 里的 exit 都走得到它；
+# 同一个 trap 里接着发资源释放广播（on_wrapper_exit，文件头「资源释放广播」）
+trap on_wrapper_exit EXIT
+begin_own_temporary_directory
 run_capped "$cap" run "$@"
 exit $?

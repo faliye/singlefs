@@ -1,0 +1,2 @@
+# 样本：一行，锚串落在自证假值那一行上
+scripts/hosts/selftest_values.sh:--memory-cap 256M  # 样本：自证里造的假值
